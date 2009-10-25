@@ -591,6 +591,17 @@ config TOUCHSCREEN_PCAP
 	  To compile this driver as a module, choose M here: the
 	  module will be called pcap_ts.
 
+config TOUCHSCREEN_SYNTM12XX
+	tristate "Synaptic TM12xx touchscreen"
+	help
+	  Say Y here to enable support for Synaptic TM12xx
+	  series touchscreen controller.
+
+	  If unsure, say N.
+
+	  To compile this driver as module, choose M here: the
+	  module will be called syntm12xx
+
 config TOUCHSCREEN_TPS6507X
 	tristate "TPS6507x based touchscreens"
 	depends on I2C
