@@ -127,3 +127,69 @@ implementation needs:
 10. (*pdata->cpu_set_freq)(unsigned long f)
 
 11. (*pdata->cpu_get_freq)(void)
+
+OMAP OPP Layer
+==============
+OMAP SOCs have a standard set of tuples consisting of frequency and
+voltage pairs that the device will support per voltage domain. This
+is called Operating Points or OPP. The actual definitions of OMAP
+Operating Points varies over silicon within the same family of
+devices. For a specific domain, you can have a set of
+{frequency, voltage} pairs. As the kernel boots and more information
+is available, a set of these are activated based on the precise
+nature of device the kernel boots up on. It is interesting to
+remember that each IP which belongs to a voltage domain may define
+their own set of OPPs on top of this.
+
+OPP layer of its own depends on silicon specific implementation and
+board specific data to finalize on the final set of OPPs available
+in a system
+
+Initial list initialization:
+---------------------------
+Silicon specific initialization: First the OPP layer needs to be told
+that to initialize the tables for OMAP3, this is done board
+perspective by the call to:
+1. omap3_pm_init_opp_table - this in turn calls opp_init_list for all
+OPP types. This is the generic silicon operating points, however, the
+system may have additional features or customizations required. This
+flexibility is provided by the following apis:
+
+Query functions:
+----------------
+Search for OPPs for various cases:
+2. opp_find_freq_exact - exact search function
+3. opp_find_freq_floor - round_up search function
+4. opp_find_freq_ceil - round_down search function
+
+OPP modifier functions:
+----------------------
+The allows opp layer users to add customized OPPs or change the table
+for any need they may have
+5. opp_add - add a new OPP
+6. opp_enable - enable a disabled OPP
+7. opp_disable - disable an enabled OPP
+
+OPP Data retrieval functions:
+----------------------------
+The following sets of functions are useful for drivers to retrieved
+data stored in opp layer for various functions.
+8. opp_get_voltage - retrieve voltage for an opp
+9. opp_get_freq - get the frequency for an opp
+10. opp_get_opp_count - get number of opps enabled for a domain
+
+Cpufreq table generation:
+------------------------
+11. opp_init_cpufreq_table - this translates the OPP layer's internal
+OPP arrangement into a table understood and operated upon by the
+cpufreq layer.
+
+Deprecated functions:
+--------------------
+To maintain compatibility with out of tree drivers, opp_id is needed.
+OPP IDs are not constant acrross silicon, nor are they constant for a
+given silicon family. The rest of the layers should stop using these
+functions at the earliest. For the out of tree drivers currently,
+This is exposed by the following deprecated functions:
+12. opp_find_by_opp_id - get an OPP for an OPP ID
+13. opp_get_opp_id - get the OPP ID for an OPP

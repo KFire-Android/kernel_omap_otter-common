@@ -12,6 +12,11 @@ obj-  :=
 # OCPI interconnect support for 1710, 1610 and 5912
 obj-$(CONFIG_ARCH_OMAP16XX) += ocpi.o
 
+# OPP support in (OMAP3+ only at the moment)
+ifdef CONFIG_PM
+obj-$(CONFIG_ARCH_OMAP3) += opp.o
+endif
+
 # omap_device support (OMAP2+ only at the moment)
 obj-$(CONFIG_ARCH_OMAP2) += omap_device.o powerdomain.o
 obj-$(CONFIG_ARCH_OMAP3) += omap_device.o powerdomain.o
