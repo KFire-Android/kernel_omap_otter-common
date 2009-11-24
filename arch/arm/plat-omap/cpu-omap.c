@@ -32,6 +32,7 @@
 
 #if defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
 #include <plat/omap-pm.h>
+#include <plat/opp.h>
 #endif
 
 #define VERY_HI_RATE	900000000
@@ -86,6 +87,10 @@ static int omap_target(struct cpufreq_policy *policy,
 #ifdef CONFIG_ARCH_OMAP1
 	struct cpufreq_freqs freqs;
 #endif
+#if defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
+	unsigned long freq;
+	struct device *mpu_dev = omap2_get_mpuss_device();
+#endif
 	int ret = 0;
 
 	/* Ensure desired rate is within allowed range.  Some govenors
@@ -110,16 +115,9 @@ static int omap_target(struct cpufreq_policy *policy,
 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 #elif defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
-	if (mpu_opps) {
-		int ind;
-		for (ind = 1; ind <= MAX_VDD1_OPP; ind++) {
-			if (mpu_opps[ind].rate/1000 >= target_freq) {
-				omap_pm_cpu_set_freq
-					(mpu_opps[ind].rate);
-				break;
-			}
-		}
-	}
+	freq = target_freq * 1000;
+	if (opp_find_freq_ceil(mpu_dev, &freq))
+		omap_pm_cpu_set_freq(freq);
 #endif
 	return ret;
 }
@@ -137,7 +135,14 @@ static int __init omap_cpu_init(struct cpufreq_policy *policy)
 
 	policy->cur = policy->min = policy->max = omap_getspeed(0);
 
-	clk_init_cpufreq_table(&freq_table);
+	if (!cpu_is_omap34xx()) {
+		clk_init_cpufreq_table(&freq_table);
+	} else {
+		struct device *mpu_dev = omap2_get_mpuss_device();
+
+		opp_init_cpufreq_table(mpu_dev, &freq_table);
+	}
+
 	if (freq_table) {
 		result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
 		if (!result)
