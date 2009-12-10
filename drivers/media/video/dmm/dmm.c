@@ -28,8 +28,7 @@
 
 static s32 dmm_open(struct inode *i, struct file *f);
 static s32 dmm_release(struct inode *i, struct file *f);
-static s32 dmm_ioctl(struct inode *i, struct file *f,
-		     u32 c, unsigned long a);
+static s32 dmm_ioctl(struct inode *i, struct file *f, u32 c, unsigned long a);
 static s32 dmm_mmap(struct file *f, struct vm_area_struct *v);
 
 static s32 dmm_major;
@@ -58,8 +57,7 @@ static struct platform_driver dmm_driver_ldm = {
 	.remove = NULL,
 };
 
-static s32
-__init dmm_init(void)
+static s32 __init dmm_init(void)
 {
 	dev_t dev  = 0;
 	s32 r = -1;
@@ -108,21 +106,18 @@ EXIT:
 	return r;
 }
 
-static s32
-dmm_ioctl(struct inode *ip, struct file *filp, u32 cmd,
-		unsigned long arg)
+static s32 dmm_ioctl(struct inode *ip, struct file *filp, u32 cmd,
+							unsigned long arg)
 {
 	return 0;
 }
 
-static s32
-dmm_mmap(struct file *filp, struct vm_area_struct *vma)
+static s32 dmm_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	return 0;
 }
 
-static void
-__exit dmm_exit(void)
+static void __exit dmm_exit(void)
 {
 	platform_driver_unregister(&dmm_driver_ldm);
 	cdev_del(&dmm_device->cdev);
@@ -131,16 +126,14 @@ __exit dmm_exit(void)
 	class_destroy(dmmdev_class);
 }
 
-static s32
-dmm_open(struct inode *ip, struct file *filp)
+static s32 dmm_open(struct inode *ip, struct file *filp)
 {
 	s32 r = -1;
 	r = 0;
 	return r;
 }
 
-static s32
-dmm_release(struct inode *ip, struct file *filp)
+static s32 dmm_release(struct inode *ip, struct file *filp)
 {
 	s32 r = -1;
 	r = 0;
