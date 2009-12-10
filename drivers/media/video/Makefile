@@ -178,6 +178,7 @@ obj-$(CONFIG_VIDEO_SAA7164)     += saa7164/
 obj-$(CONFIG_VIDEO_IR_I2C)  += ir-kbd-i2c.o
 
 obj-$(CONFIG_DMM_OMAP)  += dmm/
+obj-$(CONFIG_TILER_OMAP)  += tiler/
 
 obj-$(CONFIG_ARCH_OMAP)	+= omap/
 

@@ -114,4 +114,6 @@ source "drivers/platform/Kconfig"
 
 source "drivers/media/video/dmm/Kconfig"
 
+source "drivers/media/video/tiler/Kconfig"
+
 endmenu

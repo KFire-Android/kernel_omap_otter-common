@@ -1,0 +1,6 @@
+config TILER_OMAP
+	tristate "OMAP TILER support"
+	default y
+	help
+           TILER driver for OMAP based boards.
+
