@@ -1,0 +1,153 @@
+/*
+ * dmm.c
+ *
+ * DMM driver support functions for TI OMAP processors.
+ *
+ * Copyright (C) 2009-2010 Texas Instruments, Inc.
+ *
+ * This package is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * THIS PACKAGE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ */
+
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/cdev.h>    /* struct cdev */
+#include <linux/kdev_t.h>  /* MKDEV() */
+#include <linux/fs.h>      /* register_chrdev_region() */
+#include <linux/device.h>  /* struct class */
+#include <linux/platform_device.h> /* platform_device() */
+#include <linux/err.h>     /* IS_ERR() */
+
+#define DEBUG(x) printk(KERN_NOTICE "%s()::%d:%s=(0x%08x)\n", \
+				__func__, __LINE__, #x, (int)x);
+
+static int dmm_open(struct inode *i, struct file *f);
+static int dmm_release(struct inode *i, struct file *f);
+static int dmm_ioctl(struct inode *i, struct file *f,
+		     unsigned int c, unsigned long a);
+static int dmm_mmap(struct file *f, struct vm_area_struct *v);
+
+static int dmm_major;
+static int dmm_minor;
+
+struct dmm_dev {
+	struct cdev cdev;
+};
+
+static struct dmm_dev *dmm_device;
+static struct class *dmmdev_class;
+static const struct file_operations dmm_fops = {
+	.open    = dmm_open,
+	.ioctl   = dmm_ioctl,
+	.release = dmm_release,
+	.mmap    = dmm_mmap,
+};
+
+static struct platform_driver dmm_driver_ldm = {
+	.driver = {
+		.owner = THIS_MODULE,
+		.name = "dmm",
+	},
+	.probe = NULL,
+	.shutdown = NULL,
+	.remove = NULL,
+};
+
+static int
+__init dmm_init(void)
+{
+	dev_t dev  = 0;
+	int r = -1;
+	struct device *device = NULL;
+
+	DEBUG(0);
+
+	if (dmm_major) {
+		dev = MKDEV(dmm_major, dmm_minor);
+		r = register_chrdev_region(dev, 1, "dmm");
+	} else {
+		r = alloc_chrdev_region(&dev, dmm_minor, 1, "dmm");
+		dmm_major = MAJOR(dev);
+	}
+
+	dmm_device = kmalloc(sizeof(struct dmm_dev), GFP_KERNEL);
+	if (!dmm_device) {
+		r = -ENOMEM;
+		unregister_chrdev_region(dev, 1);
+		printk(KERN_ERR "kmalloc():failed\n");
+		goto EXIT;
+	}
+	memset(dmm_device, 0x0, sizeof(struct dmm_dev));
+	cdev_init(&dmm_device->cdev, &dmm_fops);
+	dmm_device->cdev.owner = THIS_MODULE;
+	dmm_device->cdev.ops   = &dmm_fops;
+
+	r = cdev_add(&dmm_device->cdev, dev, 1);
+	if (r)
+		printk(KERN_ERR "cdev_add():failed\n");
+
+	dmmdev_class = class_create(THIS_MODULE, "dmm");
+
+	if (IS_ERR(dmmdev_class)) {
+		printk(KERN_ERR "class_create():failed\n");
+		goto EXIT;
+	}
+
+	device = device_create(dmmdev_class, NULL, dev, NULL, "dmm");
+	if (device == NULL)
+		printk(KERN_ERR "device_create() fail\n");
+
+	r = platform_driver_register(&dmm_driver_ldm);
+
+EXIT:
+	return r;
+}
+
+static int
+dmm_ioctl(struct inode *ip, struct file *filp, unsigned int cmd,
+		unsigned long arg)
+{
+	return 0;
+}
+
+static int
+dmm_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	return 0;
+}
+
+static void
+__exit dmm_exit(void)
+{
+	platform_driver_unregister(&dmm_driver_ldm);
+	cdev_del(&dmm_device->cdev);
+	kfree(dmm_device);
+	device_destroy(dmmdev_class, MKDEV(dmm_major, dmm_minor));
+	class_destroy(dmmdev_class);
+}
+
+static int
+dmm_open(struct inode *ip, struct file *filp)
+{
+	int r = -1;
+	r = 0;
+	return r;
+}
+
+static int
+dmm_release(struct inode *ip, struct file *filp)
+{
+	int r = -1;
+	r = 0;
+	return r;
+}
+
+MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("davidsin@ti.com");
+module_init(dmm_init);
+module_exit(dmm_exit);

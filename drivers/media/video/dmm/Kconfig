@@ -1,0 +1,6 @@
+config DMM_OMAP
+	tristate "OMAP DMM support"
+	default y
+	help
+           DMM driver for OMAP based boards.
+
