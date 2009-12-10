@@ -24,16 +24,16 @@
 #include <linux/err.h>     /* IS_ERR() */
 
 #define DEBUG(x) printk(KERN_NOTICE "%s()::%d:%s=(0x%08x)\n", \
-				__func__, __LINE__, #x, (int)x);
+				__func__, __LINE__, #x, (s32)x);
 
-static int dmm_open(struct inode *i, struct file *f);
-static int dmm_release(struct inode *i, struct file *f);
-static int dmm_ioctl(struct inode *i, struct file *f,
-		     unsigned int c, unsigned long a);
-static int dmm_mmap(struct file *f, struct vm_area_struct *v);
+static s32 dmm_open(struct inode *i, struct file *f);
+static s32 dmm_release(struct inode *i, struct file *f);
+static s32 dmm_ioctl(struct inode *i, struct file *f,
+		     u32 c, unsigned long a);
+static s32 dmm_mmap(struct file *f, struct vm_area_struct *v);
 
-static int dmm_major;
-static int dmm_minor;
+static s32 dmm_major;
+static s32 dmm_minor;
 
 struct dmm_dev {
 	struct cdev cdev;
@@ -58,11 +58,11 @@ static struct platform_driver dmm_driver_ldm = {
 	.remove = NULL,
 };
 
-static int
+static s32
 __init dmm_init(void)
 {
 	dev_t dev  = 0;
-	int r = -1;
+	s32 r = -1;
 	struct device *device = NULL;
 
 	DEBUG(0);
@@ -108,14 +108,14 @@ EXIT:
 	return r;
 }
 
-static int
-dmm_ioctl(struct inode *ip, struct file *filp, unsigned int cmd,
+static s32
+dmm_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		unsigned long arg)
 {
 	return 0;
 }
 
-static int
+static s32
 dmm_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	return 0;
@@ -131,18 +131,18 @@ __exit dmm_exit(void)
 	class_destroy(dmmdev_class);
 }
 
-static int
+static s32
 dmm_open(struct inode *ip, struct file *filp)
 {
-	int r = -1;
+	s32 r = -1;
 	r = 0;
 	return r;
 }
 
-static int
+static s32
 dmm_release(struct inode *ip, struct file *filp)
 {
-	int r = -1;
+	s32 r = -1;
 	r = 0;
 	return r;
 }
