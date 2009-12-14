@@ -22,6 +22,10 @@
 #include <linux/device.h>  /* struct class */
 #include <linux/platform_device.h> /* platform_device() */
 #include <linux/err.h>     /* IS_ERR() */
+#include <linux/io.h> /* ioremap() */
+#include <linux/errno.h>
+
+#include "dmm.h"
 
 #define DEBUG(x) printk(KERN_NOTICE "%s()::%d:%s=(0x%08x)\n", \
 				__func__, __LINE__, #x, (s32)x);
@@ -33,6 +37,8 @@ static s32 dmm_mmap(struct file *f, struct vm_area_struct *v);
 
 static s32 dmm_major;
 static s32 dmm_minor;
+
+void __iomem *dmm_base;
 
 struct dmm_dev {
 	struct cdev cdev;
@@ -101,6 +107,17 @@ static s32 __init dmm_init(void)
 		printk(KERN_ERR "device_create() fail\n");
 
 	r = platform_driver_register(&dmm_driver_ldm);
+
+	dmm_base = ioremap(DMM_BASE, DMM_SIZE);
+	if (!dmm_base)
+		return -ENOMEM;
+
+	__raw_writel(0x88888888, DMM_BASE + DMM_PAT_VIEW__0);
+	__raw_writel(0x88888888, DMM_BASE + DMM_PAT_VIEW__1);
+	__raw_writel(0x80808080, DMM_BASE + DMM_PAT_VIEW_MAP__0);
+	__raw_writel(0x80000000, DMM_BASE + DMM_PAT_VIEW_MAP_BASE);
+	__raw_writel(0x88888888, DMM_BASE + DMM_TILER_OR__0);
+	__raw_writel(0x88888888, DMM_BASE + DMM_TILER_OR__1);
 
 EXIT:
 	return r;
