@@ -249,6 +249,7 @@ void __init omap_map_sram(void)
 		base = OMAP4_SRAM_PA;
 		base = ROUND_DOWN(base, PAGE_SIZE);
 		omap_sram_io_desc[0].pfn = __phys_to_pfn(base);
+		omap_sram_io_desc[0].type = MT_MEMORY_NONCACHED;
 	}
 	omap_sram_io_desc[0].length = 1024 * 1024;	/* Use section desc */
 	iotable_init(omap_sram_io_desc, ARRAY_SIZE(omap_sram_io_desc));
