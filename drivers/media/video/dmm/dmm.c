@@ -26,14 +26,10 @@
 #include <linux/errno.h>
 
 #include "dmm.h"
+#include "../tiler/tiler.h"
 
 #define DEBUG(x) printk(KERN_NOTICE "%s()::%d:%s=(0x%08x)\n", \
 				__func__, __LINE__, #x, (s32)x);
-
-static s32 dmm_open(struct inode *i, struct file *f);
-static s32 dmm_release(struct inode *i, struct file *f);
-static s32 dmm_ioctl(struct inode *i, struct file *f, u32 c, unsigned long a);
-static s32 dmm_mmap(struct file *f, struct vm_area_struct *v);
 
 static s32 dmm_major;
 static s32 dmm_minor;
@@ -46,12 +42,6 @@ struct dmm_dev {
 
 static struct dmm_dev *dmm_device;
 static struct class *dmmdev_class;
-static const struct file_operations dmm_fops = {
-	.open    = dmm_open,
-	.ioctl   = dmm_ioctl,
-	.release = dmm_release,
-	.mmap    = dmm_mmap,
-};
 
 static struct platform_driver dmm_driver_ldm = {
 	.driver = {
@@ -63,13 +53,30 @@ static struct platform_driver dmm_driver_ldm = {
 	.remove = NULL,
 };
 
+static s32 dmm_open(struct inode *ip, struct file *filp)
+{
+	s32 r = -1;
+	r = 0;
+	return r;
+}
+
+static s32 dmm_release(struct inode *ip, struct file *filp)
+{
+	s32 r = -1;
+	r = 0;
+	return r;
+}
+
+static const struct file_operations dmm_fops = {
+	.open    = dmm_open,
+	.release = dmm_release,
+};
+
 static s32 __init dmm_init(void)
 {
 	dev_t dev  = 0;
 	s32 r = -1;
 	struct device *device = NULL;
-
-	DEBUG(0);
 
 	if (dmm_major) {
 		dev = MKDEV(dmm_major, dmm_minor);
@@ -112,26 +119,15 @@ static s32 __init dmm_init(void)
 	if (!dmm_base)
 		return -ENOMEM;
 
-	__raw_writel(0x88888888, DMM_BASE + DMM_PAT_VIEW__0);
-	__raw_writel(0x88888888, DMM_BASE + DMM_PAT_VIEW__1);
-	__raw_writel(0x80808080, DMM_BASE + DMM_PAT_VIEW_MAP__0);
-	__raw_writel(0x80000000, DMM_BASE + DMM_PAT_VIEW_MAP_BASE);
-	__raw_writel(0x88888888, DMM_BASE + DMM_TILER_OR__0);
-	__raw_writel(0x88888888, DMM_BASE + DMM_TILER_OR__1);
+	__raw_writel(0x88888888, dmm_base + DMM_PAT_VIEW__0);
+	__raw_writel(0x88888888, dmm_base + DMM_PAT_VIEW__1);
+	__raw_writel(0x80808080, dmm_base + DMM_PAT_VIEW_MAP__0);
+	__raw_writel(0x80000000, dmm_base + DMM_PAT_VIEW_MAP_BASE);
+	__raw_writel(0x88888888, dmm_base + DMM_TILER_OR__0);
+	__raw_writel(0x88888888, dmm_base + DMM_TILER_OR__1);
 
 EXIT:
 	return r;
-}
-
-static s32 dmm_ioctl(struct inode *ip, struct file *filp, u32 cmd,
-							unsigned long arg)
-{
-	return 0;
-}
-
-static s32 dmm_mmap(struct file *filp, struct vm_area_struct *vma)
-{
-	return 0;
 }
 
 static void __exit dmm_exit(void)
@@ -141,20 +137,6 @@ static void __exit dmm_exit(void)
 	kfree(dmm_device);
 	device_destroy(dmmdev_class, MKDEV(dmm_major, dmm_minor));
 	class_destroy(dmmdev_class);
-}
-
-static s32 dmm_open(struct inode *ip, struct file *filp)
-{
-	s32 r = -1;
-	r = 0;
-	return r;
-}
-
-static s32 dmm_release(struct inode *ip, struct file *filp)
-{
-	s32 r = -1;
-	r = 0;
-	return r;
 }
 
 MODULE_LICENSE("GPL v2");

@@ -14,19 +14,38 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef _TILER_H_
-#define _TILER_H_
+#ifndef TILER_H
+#define TILER_H
+
+#define TILER_PAGE 0x1000
+#define TILER_WIDTH    256
+#define TILER_HEIGHT   128
+#define TILER_BLOCK_WIDTH  64
+#define TILER_BLOCK_HEIGHT 64
+#define TILER_LENGTH (TILER_WIDTH * TILER_HEIGHT * TILER_PAGE)
 
 #define TILER_MAX_NUM_BLOCKS 16
 
-#define TILIOC_GBUF _IOWR('z', 101, u32)
-#define TILIOC_FBUF _IOWR('z', 102, u32)
-#define TILIOC_GPA _IOWR('z', 103, u32)
-#define TILIOC_MBUF _IOWR('z', 104, u32)
-#define TILIOC_QBUF _IOWR('z', 105, u32)
-#define TILIOC_RBUF _IOWR('z', 106, u32)
+#define TILIOC_GBUF  _IOWR('z', 101, u32)
+#define TILIOC_FBUF  _IOWR('z', 102, u32)
+#define TILIOC_GSSP  _IOWR('z', 103, u32)
+#define TILIOC_MBUF  _IOWR('z', 104, u32)
+#define TILIOC_QBUF  _IOWR('z', 105, u32)
+#define TILIOC_RBUF  _IOWR('z', 106, u32)
 #define TILIOC_URBUF _IOWR('z', 107, u32)
 #define TILIOC_QUERY_BLK _IOWR('z', 108, u32)
+
+#define TILER_ALIAS_BASE    (0x60000000)
+#define TILER_ACC_MODE_SHIFT  (27)
+
+#define COMPOSE_ALIAS_PTR(x, access_mode)\
+((void *)(TILER_ALIAS_BASE | (u32)x | (access_mode << TILER_ACC_MODE_SHIFT)))
+#define TILER_ALIAS_VIEW_CLEAR    (~0xE0000000)
+
+#define DMM_X_INVERT_SHIFT        (29)
+#define DMM_GET_X_INVERTED(x) ((((u32)x & (1<<DMM_X_INVERT_SHIFT)) > 0) ? 1 : 0)
+#define DMM_Y_INVERT_SHIFT        (30)
+#define DMM_GET_Y_INVERTED(x) ((((u32)x & (1<<DMM_Y_INVERT_SHIFT)) > 0) ? 1 : 0)
 
 enum tiler_fmt {
 	TILFMT_MIN     = -1,
@@ -38,6 +57,11 @@ enum tiler_fmt {
 	TILFMT_PAGE    = 4,
 	TILFMT_MAX     = 4
 };
+
+#define TILER_ACC_MODE_SHIFT  (27)
+#define TILER_ACC_MODE_MASK   (3)
+#define TILER_GET_ACC_MODE(x) ((enum tiler_fmt)\
+(((u32)x & (TILER_ACC_MODE_MASK<<TILER_ACC_MODE_SHIFT))>>TILER_ACC_MODE_SHIFT))
 
 struct area {
 	u16 width;
@@ -51,16 +75,34 @@ struct tiler_block_info {
 		u32 len;
 	} dim;
 	u32 stride;
-	void *va;
-	u32 pa;
+	void *ptr;
+	u32 ssptr;
 };
 
-struct tiler_alloc_info {
-	u32 num_blocks;
+struct tiler_buf_info {
+	s32 num_blocks;
 	struct tiler_block_info blocks[TILER_MAX_NUM_BLOCKS];
-	u32 offset;
+	s32 offset;
 };
 
-u32 tiler_alloc(struct tiler_alloc_info);
+s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32*sys_addr);
+
+s32 tiler_free(u32 sys_addr);
+
+u32 tiler_get_natural_addr(void *sysPtr);
+
+void tiler_rotate_view(struct dmmViewOrientT *orient, u32 rotation);
+
+u32 tiler_stride(u32 tsptr);
+
+void tiler_alloc_packed_nv12(s32 *count, u32 width, u32 height,
+				void **y_sysptr, void **uv_sysptr,
+				void **y_allocptr, void **uv_allocptr,
+				s32 aligned);
+
+void tiler_alloc_packed(s32 *count, enum tiler_fmt fmt, u32 width,
+				u32 height, void **sysptr, void **allocptr,
+				s32 aligned);
 
 #endif
+

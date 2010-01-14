@@ -1,3 +1,3 @@
 obj-$(CONFIG_DMM_OMAP) += dmm_omap.o
-dmm_omap-objs = dmm.o
+dmm_omap-objs = dmm.o dmm_page_rep.o dmm_ll_drv.o
 

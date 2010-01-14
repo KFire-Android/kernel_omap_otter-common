@@ -54,4 +54,72 @@
 #define DMM_PEG_PRIO          0x620
 #define DMM_PEG_PRIO_PAT      0x640
 
+/** @enum dmmPATRefillMethodT
+* Defining enumarated identifiers for possible PAT area refill methods. */
+enum dmmPATRefillMethodT {
+	MANUAL,
+	AUTO
+};
+
+/** @struc PATAreaT
+* Structure defining PAT page-area register. */
+struct PATAreaT {
+	int x0:8;
+	int y0:8;
+	int x1:8;
+	int y1:8;
+};
+
+/** @struc PATCtrlT
+* Structure defining PAT control register. */
+struct PATCtrlT {
+	int start:4;
+	int direction:4;
+	int lutID:8;
+	int sync:12;
+	int initiator:4;
+};
+
+/** @struc PATDescrT
+* Structure defining PAT area descriptor, needed for area refill procedures. */
+struct PATDescrT {
+	struct PATDescrT	*nextPatEntry;
+	struct PATAreaT	area;
+	struct PATCtrlT	ctrl;
+	unsigned long	data;
+};
+
+/** @enum dmmPATStatusErrT
+* Defining enumarated identifiers for PAT area status error field. */
+enum dmmPATStatusErrT {
+	NO_ERROR				= 0x0,
+	INVALID_DESCR			= 0x1,
+	INVALID_DATA_PTR		= 0x2,
+	UNEXP_AREA_UPDATE		= 0x4,
+	UNEXP_CONTROL_UPDATE	= 0x8,
+	UNEXP_DATA_UPDATE		= 0x10,
+	UNEXP_ACCESS			= 0x20
+};
+
+/** @struc dmmPATStatusT
+* Structure defining PAT area status. */
+struct dmmPATStatusT {
+	enum dmmPATStatusErrT error;
+	unsigned char ready;
+	unsigned char validDescriptor;
+	unsigned char engineRunning;
+	unsigned char done;
+	unsigned char linkedReconfig;
+	unsigned char remainingLinesCounter;
+};
+
+
+u32 dmm_get_phys_page(void);
+void dmm_free_phys_page(u32 page_addr);
+
+enum errorCodeT dmm_pat_refill(struct PATDescrT *patDesc,
+				signed long dmmPatAreaSel,
+				enum dmmPATRefillMethodT refillType,
+				int forcedRefill);
+
 #endif
