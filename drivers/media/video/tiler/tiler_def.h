@@ -1,8 +1,35 @@
-#ifndef TILER_DEP_H
-#define TILER_DEP_H
+/*
+ * tiler_def.h
+ *
+ * tiler driver support functions for TI OMAP processors.
+ *
+ * Copyright (C) 2009-2010 Texas Instruments, Inc.
+ *
+ * This package is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * THIS PACKAGE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ */
 
-/** @enum errorCodeT
-* Defining enumarated identifiers for general dmm driver errors. */
+#ifndef TILER_DEF_H
+#define TILER_DEF_H
+
+#define TILER_ALIAS_BASE    (0x60000000)
+#define TILER_ACC_MODE_SHIFT  (27)
+
+#define TIL_ALIAS_ADDR(x, access_mode)\
+((void *)(TILER_ALIAS_BASE | (u32)x | (access_mode << TILER_ACC_MODE_SHIFT)))
+#define TILER_ALIAS_VIEW_CLEAR    (~0xE0000000)
+
+#define DMM_X_INVERT_SHIFT        (29)
+#define DMM_GET_X_INVERTED(x) ((((u32)x & (1<<DMM_X_INVERT_SHIFT)) > 0) ? 1 : 0)
+#define DMM_Y_INVERT_SHIFT        (30)
+#define DMM_GET_Y_INVERTED(x) ((((u32)x & (1<<DMM_Y_INVERT_SHIFT)) > 0) ? 1 : 0)
+
+/* -- redefine */
 enum errorCodeT {
 	DMM_NO_ERROR,
 	DMM_WRONG_PARAM,
@@ -73,8 +100,6 @@ enum errorCodeT {
 #define DMM_HOR_Y_PAGE_COOR_GET_32(x)    (DMM_HOR_Y_COOR_GET_32(x) /           \
 				DMM_PAGE_DIMM_Y_MODE_32)
 
-/* :TODO: to be determined */
-
 #define DMM_VER_X_ADDRSHIFT_8            (14)
 #define DMM_VER_X_ADDRMASK_8            (0x1FFF)
 #define DMM_VER_X_COOR_GET_8(x)\
@@ -117,19 +142,4 @@ enum errorCodeT {
 #define DMM_VER_Y_PAGE_COOR_GET_32(x)    (DMM_VER_Y_COOR_GET_32(x) /           \
 				DMM_PAGE_DIMM_Y_MODE_32)
 
-#include "tiler.h"
-
-struct node {
-	struct tiler_buf_info *ptr;
-	unsigned long reserved;
-	struct node *nextnode;
-};
-
-int createlist(struct node **listhead);
-int addnode(struct node *listhead, struct tiler_buf_info *ptr);
-int removenode(struct node *listhead, int offset);
-int tiler_destroy_buf_info_list(struct node *listhead);
-int tiler_get_buf_info(struct node *listhead, struct tiler_buf_info **pp, int offst);
-
 #endif
-

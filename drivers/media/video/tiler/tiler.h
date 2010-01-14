@@ -35,18 +35,6 @@
 #define TILIOC_URBUF _IOWR('z', 107, u32)
 #define TILIOC_QUERY_BLK _IOWR('z', 108, u32)
 
-#define TILER_ALIAS_BASE    (0x60000000)
-#define TILER_ACC_MODE_SHIFT  (27)
-
-#define COMPOSE_ALIAS_PTR(x, access_mode)\
-((void *)(TILER_ALIAS_BASE | (u32)x | (access_mode << TILER_ACC_MODE_SHIFT)))
-#define TILER_ALIAS_VIEW_CLEAR    (~0xE0000000)
-
-#define DMM_X_INVERT_SHIFT        (29)
-#define DMM_GET_X_INVERTED(x) ((((u32)x & (1<<DMM_X_INVERT_SHIFT)) > 0) ? 1 : 0)
-#define DMM_Y_INVERT_SHIFT        (30)
-#define DMM_GET_Y_INVERTED(x) ((((u32)x & (1<<DMM_Y_INVERT_SHIFT)) > 0) ? 1 : 0)
-
 enum tiler_fmt {
 	TILFMT_MIN     = -1,
 	TILFMT_INVALID = -1,
@@ -83,6 +71,7 @@ struct tiler_buf_info {
 	s32 num_blocks;
 	struct tiler_block_info blocks[TILER_MAX_NUM_BLOCKS];
 	s32 offset;
+	struct list_head list; /* always last */
 };
 
 s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32*sys_addr);

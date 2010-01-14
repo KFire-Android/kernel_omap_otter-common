@@ -22,7 +22,7 @@
 //#include "dmm_prv.h"
 #include "dmm.h"
 #include "dmm_reg.h"
-#include "../tiler/tiler_deprecate.h"
+#include "../tiler/tiler_def.h"
 
 #if 0
 #define regdump(x, y) printk(KERN_NOTICE "%s()::%d:%s=(0x%08x)\n", \

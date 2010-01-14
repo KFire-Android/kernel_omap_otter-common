@@ -23,7 +23,7 @@
 #include <linux/mutex.h>
 
 #include "dmm_2d_alloc.h"
-#include "tiler_deprecate.h"
+#include "tiler_def.h"
 #include "../dmm/dmm_page_rep.h"
 
 #define DMM_ASSERT_BREAK printk(KERN_ERR "DMM Assert(Fail)\n"); while (1);

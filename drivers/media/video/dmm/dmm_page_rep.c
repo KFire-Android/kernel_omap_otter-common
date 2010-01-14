@@ -20,7 +20,7 @@
 #include <linux/mutex.h>
 
 #include "dmm_page_rep.h"
-#include "../tiler/tiler_deprecate.h"
+#include "../tiler/tiler_def.h"
 
 static struct mutex mtx;
 

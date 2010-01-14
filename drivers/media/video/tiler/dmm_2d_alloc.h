@@ -33,23 +33,23 @@ enum SideAffinity {
 };
 
 struct dmmTILERContPageAreaT {
-	unsigned short x0;
-	unsigned short y0;
-	unsigned short x1;
-	unsigned short y1;
-	unsigned short xPageOfst;
-	unsigned short yPageOfst;
-	unsigned short xPageCount;
-	unsigned short yPageCount;
+	u16 x0;
+	u16 y0;
+	u16 x1;
+	u16 y1;
+	u16 xPageOfst;
+	u16 yPageOfst;
+	u16 xPageCount;
+	u16 yPageCount;
 	enum SideAffinity fitToSide;
 	int patCustomPages;
-	unsigned long *patPageEntriesSpace;
+	u32 *patPageEntriesSpace;
 	struct page *page_list;
-	unsigned long *page_list_virt;
+	u32 *page_list_virt;
 	void *dma_va;
-	unsigned long dma_size;
+	u32 dma_size;
 	dma_addr_t dma_pa;
-	unsigned long *patPageEntries;
+	u32 *patPageEntries;
 };
 
 struct dmmTILERContPageAreaSpecT {
