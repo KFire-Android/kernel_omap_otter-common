@@ -33,20 +33,12 @@
 #include "tiler_def.h"
 #include "dmm_2d_alloc.h"
 #include "../dmm/dmm.h"
-#include "../dmm/dmm_page_rep.h"
-
-#if 1
-#define DEBUG(x) printk(KERN_ERR "%s()::%d:%s=(0x%08x)\n", \
-				__func__, __LINE__, #x, (s32)x);
-#else
-#define DEBUG(x)
-#endif
 
 struct tiler_dev {
 	struct cdev cdev;
 };
 
-static struct platform_driver tiler_driver_ldm = {
+struct platform_driver tiler_driver_ldm = {
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = "tiler",
@@ -56,7 +48,7 @@ static struct platform_driver tiler_driver_ldm = {
 	.remove = NULL,
 };
 
-static struct map {
+struct map {
 	struct list_head list;
 	void *ssptr;   /* system space (L3) tiler addr */
 	u32 num_pgs;   /* number of user space pages to be mapped */
@@ -68,46 +60,70 @@ static struct map {
 	u32 *pages;    /* list of pages */
 };
 
+struct __buf_info {
+	struct list_head list;
+	struct tiler_buf_info buf_info;
+};
+
+struct mem_info {
+	struct list_head list;
+	u32 sys_addr;      /* system space (L3) tiler addr */
+	void *dma_va;      /* dma_alloc_coherent virt addr */
+	dma_addr_t dma_pa; /* dma_alloc_coherent phys addr */
+	u32 size;          /* dma_alloc_coherent size */
+	u32 *page;         /* list of pages */
+	u32 num_pgs;       /* number of pages */
+};
+
 static s32 tiler_major;
 static s32 tiler_minor;
 static struct tiler_dev *tiler_device;
 static struct class *tilerdev_class;
 static u32 id;
 static struct map map_list;
-static struct map buf_list;
+static struct __buf_info buf_list;
+static struct mem_info mem_list;
+static struct mutex mtx;
 
 /* TODO: remove */
 static struct dmmTILERContCtxT *tilctx;
 
 static s32 tiler_mmap(struct file *filp, struct vm_area_struct *vma)
 {
+	struct __buf_info *_b = NULL;
 	struct tiler_buf_info *b = NULL;
 	s32 i = 0, j = 0, k = 0, m = 0, p = 0;
 	s32 bpp = 1;
 	struct list_head *pos = NULL;
 
-	DEBUG(__LINE__);
-
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
 	list_for_each(pos, &buf_list.list) {
-		b = list_entry(pos, struct tiler_buf_info, list);
-		if ((vma->vm_pgoff << PAGE_SHIFT) == b->offset) {
+		_b = list_entry(pos, struct __buf_info, list);
+		if ((vma->vm_pgoff << PAGE_SHIFT) == _b->buf_info.offset)
 			break;
-		}
 	}
-	if (!b) 
+	if (!_b)
 		return -EFAULT;
 
+	b = &_b->buf_info;
+
 	for (i = 0; i < b->num_blocks; i++) {
-		if (b->blocks[i].fmt >= TILFMT_8BIT && b->blocks[i].fmt <= TILFMT_32BIT) {
+		if (b->blocks[i].fmt >= TILFMT_8BIT &&
+					b->blocks[i].fmt <= TILFMT_32BIT) {
 			/* get line width */
-			bpp = (b->blocks[i].fmt == TILFMT_8BIT ? 1 : b->blocks[i].fmt == TILFMT_16BIT ? 2 : 4);
-			p = (b->blocks[i].dim.area.width * bpp + TILER_PAGE - 1) & ~(TILER_PAGE - 1);
+			bpp = (b->blocks[i].fmt == TILFMT_8BIT ? 1 :
+			       b->blocks[i].fmt == TILFMT_16BIT ? 2 : 4);
+			p = (b->blocks[i].dim.area.width * bpp +
+				TILER_PAGE - 1) & ~(TILER_PAGE - 1);
 
 			for (j = 0; j < b->blocks[i].dim.area.height; j++) {
-				vma->vm_pgoff = (b->blocks[i].ssptr + m) >> PAGE_SHIFT;
-				if (remap_pfn_range(vma, vma->vm_start + k, (b->blocks[i].ssptr + m) >> PAGE_SHIFT, p, vma->vm_page_prot))
+				/* map each page of the line */
+				vma->vm_pgoff =
+					(b->blocks[i].ssptr + m) >> PAGE_SHIFT;
+				if (remap_pfn_range(vma, vma->vm_start + k,
+					(b->blocks[i].ssptr + m) >> PAGE_SHIFT,
+					p, vma->vm_page_prot))
 					return -EAGAIN;
 				k += p;
 				if (b->blocks[i].fmt == TILFMT_8BIT)
@@ -118,8 +134,11 @@ static s32 tiler_mmap(struct file *filp, struct vm_area_struct *vma)
 			m = 0;
 		} else if (b->blocks[i].fmt == TILFMT_PAGE) {
 			vma->vm_pgoff = (b->blocks[i].ssptr) >> PAGE_SHIFT;
-			p = (b->blocks[i].dim.len + TILER_PAGE - 1) & ~(TILER_PAGE - 1);
-			if (remap_pfn_range(vma, vma->vm_start + k, (b->blocks[i].ssptr) >> PAGE_SHIFT, p, vma->vm_page_prot))
+			p = (b->blocks[i].dim.len + TILER_PAGE - 1) &
+							~(TILER_PAGE - 1);
+			if (remap_pfn_range(vma, vma->vm_start + k,
+				(b->blocks[i].ssptr) >> PAGE_SHIFT, p,
+				vma->vm_page_prot))
 				return -EAGAIN;;
 			k += p;
 		}
@@ -136,13 +155,13 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 	s32 r = -1;
 	u32 til_addr = 0x0;
 
-	struct tiler_buf_info buf_info = {0}, *info = NULL;
+	struct __buf_info *_b = NULL;
+	struct tiler_buf_info buf_info = {0}; //*info = NULL;
 	struct tiler_block_info block_info = {0};
 	struct list_head *pos = NULL, *q = NULL;
 
 	switch (cmd) {
 	case TILIOC_GBUF:
-		DEBUG(__LINE__);
 		if (copy_from_user(&block_info, (void __user *)arg,
 					sizeof(struct tiler_block_info)))
 			return -EFAULT;
@@ -167,14 +186,12 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 			return -EINVAL;
 		}
 
-		DEBUG(til_addr);
 		block_info.ssptr = til_addr;
 		if (copy_to_user((void __user *)arg, &block_info,
 					sizeof(struct tiler_block_info)))
 			return -EFAULT;
 		break;
 	case TILIOC_FBUF:
-		DEBUG(__LINE__);
 		if (copy_from_user(&block_info, (void __user *)arg,
 					sizeof(struct tiler_block_info)))
 			return -EFAULT;
@@ -183,7 +200,6 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 			return -EFAULT;
 		break;
 	case TILIOC_GSSP:
-		DEBUG(__LINE__);
 		pgd = pgd_offset(current->mm, arg);
 		if (!(pgd_none(*pgd) || pgd_bad(*pgd))) {
 			pmd = pmd_offset(pgd, arg);
@@ -201,18 +217,17 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		return 0x0;
 		break;
 	case TILIOC_MBUF:
-		DEBUG(__LINE__);
 		break;
 	case TILIOC_QBUF:
-		DEBUG(__LINE__);
 		if (copy_from_user(&buf_info, (void __user *)arg,
 					sizeof(struct tiler_buf_info)))
 			return -EFAULT;
 
 		list_for_each(pos, &buf_list.list) {
-			info = list_entry(pos, struct tiler_buf_info, list);
-			if (buf_info.offset == info->offset) {
-				if (copy_to_user((void __user *)arg, info,
+			_b = list_entry(pos, struct __buf_info, list);
+			if (buf_info.offset == _b->buf_info.offset) {
+				if (copy_to_user((void __user *)arg,
+					&_b->buf_info,
 					sizeof(struct tiler_buf_info)))
 					return -EFAULT;
 				else
@@ -222,43 +237,42 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		return -EFAULT;
 		break;
 	case TILIOC_RBUF:
-		DEBUG(__LINE__);
-		info = kmalloc(sizeof(struct tiler_buf_info), GFP_KERNEL);
-		if (!info)
+		_b = kmalloc(sizeof(struct __buf_info), GFP_KERNEL);
+		if (!_b)
 			return -ENOMEM;
-		memset(info, 0x0, sizeof(struct tiler_buf_info));
-		if (copy_from_user(info, (void __user *)arg,
+		memset(_b, 0x0, sizeof(struct __buf_info));
+
+		if (copy_from_user(&_b->buf_info, (void __user *)arg,
 					sizeof(struct tiler_buf_info)))
 			return -EFAULT;
 
-		info->offset = id;
+		_b->buf_info.offset = id;
 		id += 0x1000;
 
-		list_add(&(info->list), &buf_list.list);
+		list_add(&(_b->list), &buf_list.list);
 
-		DEBUG(info->offset);
-		if (copy_to_user((void __user *)arg, info, 
+		if (copy_to_user((void __user *)arg, &_b->buf_info,
 					sizeof(struct tiler_buf_info)))
 			return -EFAULT;
 		break;
 	case TILIOC_URBUF:
-		DEBUG(__LINE__);
 		if (copy_from_user(&buf_info, (void __user *)arg,
 					sizeof(struct tiler_buf_info)))
 			return -EFAULT;
 
 		list_for_each_safe(pos, q, &buf_list.list) {
-			info = list_entry(pos, struct tiler_buf_info, list);
-			if (buf_info.offset == info->offset) {
-				kfree(info);
+			_b = list_entry(pos, struct __buf_info, list);
+			if (buf_info.offset == _b->buf_info.offset) {
+				mutex_lock(&mtx);
 				list_del(pos);
+				mutex_unlock(&mtx);
+				kfree(_b);
 				return 0;
 			}
 		}
 		return -EFAULT;
 		break;
 	case TILIOC_QUERY_BLK:
-		DEBUG(__LINE__);
 		if (copy_from_user(&block_info, (void __user *)arg,
 					sizeof(struct tiler_block_info)))
 			return -EFAULT;
@@ -283,7 +297,6 @@ static s32 set_area(enum tiler_fmt fmt, u32 width, u32 height,
 	s32 x_pagedim = 0, y_pagedim = 0;
 	u16 tiled_pages_per_ss_page = 0;
 
-	DEBUG(0);
 	switch (fmt) {
 	case TILFMT_8BIT:
 		x_pagedim = DMM_PAGE_DIMM_X_MODE_8;
@@ -330,9 +343,8 @@ static s32 set_area(enum tiler_fmt fmt, u32 width, u32 height,
 	*x_area = ((*x_area + tiled_pages_per_ss_page) &
 					~(tiled_pages_per_ss_page - 1)) - 1;
 
-	if (*x_area > TILER_WIDTH || *y_area > TILER_HEIGHT) {
+	if (*x_area > TILER_WIDTH || *y_area > TILER_HEIGHT)
 		return -1;
-	}
 	return 0x0;
 }
 
@@ -340,14 +352,10 @@ static s32 get_area(u32 sys_addr, u32 *x_area, u32 *y_area)
 {
 	enum tiler_fmt fmt;
 
-	/* check sys_addr here! */
-
-	DEBUG(0);
 	sys_addr &= TILER_ALIAS_VIEW_CLEAR;
 	fmt = TILER_GET_ACC_MODE(sys_addr);
 
-	DEBUG(fmt);
-	switch(fmt+1) {
+	switch (fmt + 1) {
 	case TILFMT_8BIT:
 		*x_area = DMM_HOR_X_PAGE_COOR_GET_8(sys_addr);
 		*y_area = DMM_HOR_Y_PAGE_COOR_GET_8(sys_addr);
@@ -376,7 +384,6 @@ static u32 get_alias_addr(enum tiler_fmt fmt, u16 x, u16 y)
 	u32 acc_mode = -1;
 	u32 x_shft = -1, y_shft = -1;
 
-	DEBUG(0);
 	switch (fmt) {
 	case TILFMT_8BIT:
 		acc_mode = 0; x_shft = 6; y_shft = 20;
@@ -404,11 +411,9 @@ static u32 get_alias_addr(enum tiler_fmt fmt, u16 x, u16 y)
 s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 {
 	u32 num_pages = -1, i = -1, x_area = -1, y_area = -1;
-
 	struct dmmTILERContPageAreaT *area_desc = NULL, __area_desc = {0};
-	struct PATDescrT pat_desc = {0};
-
-	DEBUG(__LINE__);
+	struct pat pat_desc = {0};
+	struct mem_info *mi = NULL;
 
 	/* reserve area in tiler container */
 	if (set_area(fmt, width, height, &x_area, &y_area))
@@ -423,30 +428,35 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 
 	/* formulate system space address */
 	*sys_addr = get_alias_addr(fmt, area_desc->x0, area_desc->y0);
-	DEBUG(*sys_addr);
 
 	/* allocate pages */
 	area_desc->xPageCount = area_desc->x1 - area_desc->x0 + 1;
 	area_desc->yPageCount = area_desc->y1 - area_desc->y0 + 1;
 	num_pages = area_desc->xPageCount * area_desc->yPageCount;
-	DEBUG(num_pages);
 
-	area_desc->dma_size =  num_pages * 4 + 16;
-
-	area_desc->dma_va = dma_alloc_coherent(NULL, area_desc->dma_size,
-					&(area_desc->dma_pa), GFP_ATOMIC);
-	if (!area_desc->dma_va)
+	mi = kmalloc(sizeof(struct mem_info), GFP_KERNEL);
+	if (!mi)
 		return -ENOMEM;
-	memset(area_desc->dma_va, 0x0, area_desc->dma_size);
+	memset(mi, 0x0, sizeof(struct mem_info));
 
-	area_desc->patPageEntries =
-				(u32 *)(((u32)area_desc->dma_va + 15) & ~15);
+	mi->size =  num_pages * 4 + 16;
+	mi->dma_va = dma_alloc_coherent(NULL, mi->size, &mi->dma_pa,
+								GFP_ATOMIC);
+	if (!mi->dma_va) {
+		kfree(mi); return -ENOMEM;
+	}
+	memset(mi->dma_va, 0x0, mi->size);
+
+	mi->page = (u32 *)(((u32)mi->dma_va + 15) & ~15);
 
 	for (i = 0; i < num_pages; i++) {
-		area_desc->patPageEntries[i] = (u32)dmm_get_phys_page();
-		if (area_desc->patPageEntries[i] == 0x0)
+		mi->page[i] = dmm_get_page();
+		if (mi->page[i] == 0x0)
 			goto cleanup;
 	}
+	mi->num_pgs = num_pages;
+	mi->sys_addr = *sys_addr;
+	list_add(&(mi->list), &mem_list.list);
 
 	/* send pat desc to dmm driver */
 	pat_desc.area.x0 = area_desc->x0 + area_desc->xPageOfst;
@@ -458,67 +468,108 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 
 	pat_desc.ctrl.direction = 0;
 	pat_desc.ctrl.initiator = 0;
-	pat_desc.ctrl.lutID = 0;
+	pat_desc.ctrl.lut_id = 0;
 	pat_desc.ctrl.start = 1;
 	pat_desc.ctrl.sync = 0;
 
-	pat_desc.nextPatEntry = NULL;
-	pat_desc.data = (u32)area_desc->dma_pa;
+	pat_desc.next = NULL;
+	pat_desc.data = mi->dma_pa;
 
 	if (dmm_pat_refill(&pat_desc, 0, MANUAL, 0))
 		goto cleanup;
 
 	return 0x0;
 cleanup:
-	printk(KERN_ERR "TILER error.\n");
-	dma_free_coherent(NULL, area_desc->dma_size, area_desc->dma_va,
-				area_desc->dma_pa);
+	dma_free_coherent(NULL, mi->size, mi->dma_va, mi->dma_pa);
+	kfree(mi);
 	return -ENOMEM;
 }
 EXPORT_SYMBOL(tiler_alloc);
 
 s32 tiler_free(u32 sys_addr)
 {
+	u32 x_area = -1, y_area = -1, i = -1;
 	struct dmmTILERContPageAreaT *area_desc =  NULL;
-	u32 x_area = -1, y_area = -1;
+	struct list_head *pos = NULL, *q = NULL;
+	struct mem_info *mi = NULL;
 
 	if (get_area(sys_addr, &x_area, &y_area))
-		{DEBUG(__LINE__); return -EFAULT;}
+		return -EFAULT;
 
 	area_desc = search_2d_area(tilctx, x_area, y_area, 0, 0);
 	if (!area_desc)
-		{DEBUG(__LINE__); return -EFAULT;}
+		return -EFAULT;
 
 	/* freeing of physical pages should *not* happen in this next API */
 	if (!(dealloc_2d_area(tilctx, area_desc)))
-		{DEBUG(__LINE__); return -EFAULT;}
+		return -EFAULT;
+
+	printk(KERN_NOTICE "(1),");
+	list_for_each_safe(pos, q, &mem_list.list) {
+		mi = list_entry(pos, struct mem_info, list);
+		if (mi->sys_addr == sys_addr) {
+			mutex_lock(&mtx);
+			for (i = 0; i < mi->num_pgs; i++)
+				dmm_free_page(mi->page[i]);
+			mutex_unlock(&mtx);
+
+			dma_free_coherent(NULL, mi->size, mi->dma_va,
+								mi->dma_pa);
+
+			mutex_lock(&mtx);
+			list_del(pos);
+			mutex_unlock(&mtx);
+
+			kfree(mi);
+		}
+	}
+	printk(KERN_NOTICE "(2),");
+	if (!mi)
+		return -EFAULT;
 
 	/* should there be a call to remove the PAT entries? */
 
+	printk(KERN_NOTICE "(3)\n");
 	return 0x0;
 }
 EXPORT_SYMBOL(tiler_free);
 
 static void __exit tiler_exit(void)
 {
-	struct tiler_buf_info *info = NULL;
+	struct __buf_info *_b = NULL;
+	struct mem_info *mi = NULL;
 	struct list_head *pos = NULL, *q = NULL;
+	u32 i = -1;
 
-	DEBUG(0);
 	/* TODO: remove */
-	if (dmm_phys_page_rep_deinit())
-		printk(KERN_ERR "dmm_phys_page_rep_deinit() -- error\n");
 	mutex_destroy(&tilctx->mtx);
 	kfree(tilctx);
 	/* ------------ */
 
 	/* remove any leftover info structs that haven't been unregistered */
 	list_for_each_safe(pos, q, &buf_list.list) {
-		info = list_entry(pos, struct tiler_buf_info, list);
-		kfree(info);
+		_b = list_entry(pos, struct __buf_info, list);
+		mutex_lock(&mtx);
 		list_del(pos);
+		mutex_unlock(&mtx);
+		kfree(_b);
 	}
 
+	/* free any remaining page array lists */
+	list_for_each_safe(pos, q, &mem_list.list) {
+		mi = list_entry(pos, struct mem_info, list);
+		mutex_lock(&mtx);
+		for (i = 0; i < mi->num_pgs; i++)
+			dmm_free_page(mi->page[i]);
+		mutex_unlock(&mtx);
+		dma_free_coherent(NULL, mi->size, mi->dma_va, mi->dma_pa);
+		mutex_lock(&mtx);
+		list_del(pos);
+		mutex_unlock(&mtx);
+		kfree(mi);
+	}
+
+	mutex_destroy(&mtx);
 	platform_driver_unregister(&tiler_driver_ldm);
 	cdev_del(&tiler_device->cdev);
 	kfree(tiler_device);
@@ -528,13 +579,11 @@ static void __exit tiler_exit(void)
 
 static s32 tiler_open(struct inode *ip, struct file *filp)
 {
-	DEBUG(0);
 	return 0x0;
 }
 
 static s32 tiler_release(struct inode *ip, struct file *filp)
 {
-	DEBUG(0);
 	return 0x0;
 }
 
@@ -550,8 +599,6 @@ static s32 __init tiler_init(void)
 	dev_t dev  = 0;
 	s32 r = -1;
 	struct device *device = NULL;
-
-	DEBUG(__LINE__);
 
 	if (tiler_major) {
 		dev = MKDEV(tiler_major, tiler_minor);
@@ -598,11 +645,11 @@ static s32 __init tiler_init(void)
 	tilctx->contSizeX = TILER_WIDTH;
 	tilctx->contSizeY = TILER_HEIGHT;
 	mutex_init(&tilctx->mtx);
-	if(dmm_phys_page_rep_init())
-		return -ENOMEM;
 	/* ------------ */
 
+	mutex_init(&mtx);
 	INIT_LIST_HEAD(&buf_list.list);
+	INIT_LIST_HEAD(&mem_list.list);
 	id = 0xda7a000;
 
 EXIT:

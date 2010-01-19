@@ -26,10 +26,7 @@
 #include <linux/errno.h>
 
 #include "dmm.h"
-#include "../tiler/tiler.h"
-
-#define DEBUG(x) printk(KERN_NOTICE "%s()::%d:%s=(0x%08x)\n", \
-				__func__, __LINE__, #x, (s32)x);
+#include "dmm_mem.h"
 
 static s32 dmm_major;
 static s32 dmm_minor;
@@ -126,12 +123,17 @@ static s32 __init dmm_init(void)
 	__raw_writel(0x88888888, dmm_base + DMM_TILER_OR__0);
 	__raw_writel(0x88888888, dmm_base + DMM_TILER_OR__1);
 
+	if (dmm_init_mem())
+		return -ENOMEM;
+
 EXIT:
 	return r;
 }
 
 static void __exit dmm_exit(void)
 {
+	dmm_release_mem();
+	iounmap(dmm_base);
 	platform_driver_unregister(&dmm_driver_ldm);
 	cdev_del(&dmm_device->cdev);
 	kfree(dmm_device);

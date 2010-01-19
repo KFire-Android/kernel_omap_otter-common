@@ -17,9 +17,9 @@
 #include <linux/module.h>
 #include <linux/io.h>
 
-//#include "dmm_def.h"
-//#include "dmm_2d_alloc.h"
-//#include "dmm_prv.h"
+/* #include "dmm_def.h" */
+/* #include "dmm_2d_alloc.h" */
+/* #include "dmm_prv.h" */
 #include "dmm.h"
 #include "dmm_reg.h"
 #include "../tiler/tiler_def.h"
@@ -30,28 +30,6 @@
 #else
 #define regdump(x, y)
 #endif
-
-struct pat_area {
-	s32 x0:8;
-	s32 y0:8;
-	s32 x1:8;
-	s32 y1:8;
-};
-
-struct pat_ctrl {
-	s32 start:4;
-	s32 direction:4;
-	s32 lut_id:8;
-	s32 sync:12;
-	s32 initiator:4;
-};
-
-struct pat_desc {
-	struct pat_desc *next;
-	struct pat_area area;
-	struct pat_ctrl ctrl;
-	u32 data;
-};
 
 static void pat_ctrl_set(struct pat_ctrl *ctrl, s8 id)
 {
@@ -188,10 +166,8 @@ enum errorCodeT dmm_pat_refill_area_status_get(signed long dmmPatAreaStatSel,
  * @see errorCodeT,  PATDescrT, dmmPATRefillMethodT, s32 for further detail
  */
 /* ========================================================================== */
-enum errorCodeT dmm_pat_refill(struct PATDescrT *patDesc,
-				    signed long dmmPatAreaSel,
-				    enum dmmPATRefillMethodT refillType,
-				    s32 forcedRefill)
+s32 dmm_pat_refill(struct pat *patDesc, s32 dmmPatAreaSel,
+			enum pat_mode refillType, s32 forced_refill)
 {
 	enum errorCodeT eCode = DMM_NO_ERROR;
 	void __iomem *reg = NULL;
@@ -199,11 +175,10 @@ enum errorCodeT dmm_pat_refill(struct PATDescrT *patDesc,
 	u32 writeval = 0xffffffff;
 	u32 f = 0xffffffff; /* field */
 	u32 fp = 0xffffffff; /* field position */
-	struct pat_desc pat_desc = {0};
+	struct pat pat_desc = {0};
 
 	struct dmmPATStatusT areaStat;
-
-	if (forcedRefill == 0) {
+	if (forced_refill == 0) {
 		eCode = dmm_pat_refill_area_status_get(
 				dmmPatAreaSel, &areaStat);
 
@@ -229,8 +204,8 @@ enum errorCodeT dmm_pat_refill(struct PATDescrT *patDesc,
 				   ((((u32)patDesc) << fp) & f);
 			__raw_writel(writeval, reg);
 		} else if (refillType == MANUAL) {
-			/* check that the DMM_PAT_STATUS register has not reported
-			 * an error.
+			/* check that the DMM_PAT_STATUS register has not
+			 * reported an error.
 			 */
 			reg = (void __iomem *)(
 					(u32)dmm_base |
@@ -305,6 +280,7 @@ enum errorCodeT dmm_pat_refill(struct PATDescrT *patDesc,
 					(u32)dmm_base |
 					(u32)DMM_PAT_IRQSTATUS_RAW);
 			regval = 0xFFFFFFFF;
+
 			while (regval != 0x0) {
 				regval = __raw_readl(reg);
 				regdump("DMM_PAT_IRQSTATUS_RAW", regval);
@@ -374,6 +350,7 @@ enum errorCodeT dmm_pat_refill(struct PATDescrT *patDesc,
 			}
 		}
 	}
+
 	return eCode;
 }
 EXPORT_SYMBOL(dmm_pat_refill);

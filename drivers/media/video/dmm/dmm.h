@@ -54,72 +54,63 @@
 #define DMM_PEG_PRIO          0x620
 #define DMM_PEG_PRIO_PAT      0x640
 
-/** @enum dmmPATRefillMethodT
-* Defining enumarated identifiers for possible PAT area refill methods. */
-enum dmmPATRefillMethodT {
+enum pat_mode {
 	MANUAL,
 	AUTO
 };
 
-/** @struc PATAreaT
-* Structure defining PAT page-area register. */
-struct PATAreaT {
-	int x0:8;
-	int y0:8;
-	int x1:8;
-	int y1:8;
+struct pat_area {
+	s32 x0:8;
+	s32 y0:8;
+	s32 x1:8;
+	s32 y1:8;
 };
 
-/** @struc PATCtrlT
-* Structure defining PAT control register. */
-struct PATCtrlT {
-	int start:4;
-	int direction:4;
-	int lutID:8;
-	int sync:12;
-	int initiator:4;
+struct pat_ctrl {
+	s32 start:4;
+	s32 direction:4;
+	s32 lut_id:8;
+	s32 sync:12;
+	s32 initiator:4;
 };
 
-/** @struc PATDescrT
-* Structure defining PAT area descriptor, needed for area refill procedures. */
-struct PATDescrT {
-	struct PATDescrT	*nextPatEntry;
-	struct PATAreaT	area;
-	struct PATCtrlT	ctrl;
-	unsigned long	data;
+struct pat {
+	struct pat *next;
+	struct pat_area area;
+	struct pat_ctrl ctrl;
+	u32 data;
 };
 
 /** @enum dmmPATStatusErrT
 * Defining enumarated identifiers for PAT area status error field. */
 enum dmmPATStatusErrT {
-	NO_ERROR				= 0x0,
-	INVALID_DESCR			= 0x1,
-	INVALID_DATA_PTR		= 0x2,
-	UNEXP_AREA_UPDATE		= 0x4,
-	UNEXP_CONTROL_UPDATE	= 0x8,
-	UNEXP_DATA_UPDATE		= 0x10,
-	UNEXP_ACCESS			= 0x20
+	NO_ERROR = 0x0,
+	INVALID_DESCR = 0x1,
+	INVALID_DATA_PTR = 0x2,
+	UNEXP_AREA_UPDATE = 0x4,
+	UNEXP_CONTROL_UPDATE = 0x8,
+	UNEXP_DATA_UPDATE = 0x10,
+	UNEXP_ACCESS = 0x20
 };
 
 /** @struc dmmPATStatusT
 * Structure defining PAT area status. */
 struct dmmPATStatusT {
 	enum dmmPATStatusErrT error;
-	unsigned char ready;
-	unsigned char validDescriptor;
-	unsigned char engineRunning;
-	unsigned char done;
-	unsigned char linkedReconfig;
-	unsigned char remainingLinesCounter;
+	u8 ready;
+	u8 validDescriptor;
+	u8 engineRunning;
+	u8 done;
+	u8 linkedReconfig;
+	u8 remainingLinesCounter;
 };
-
 
 u32 dmm_get_phys_page(void);
 void dmm_free_phys_page(u32 page_addr);
+s32 dmm_pat_refill(struct pat *desc, s32 pat_num, enum pat_mode mode,
+			s32 forced_refill);
 
-enum errorCodeT dmm_pat_refill(struct PATDescrT *patDesc,
-				signed long dmmPatAreaSel,
-				enum dmmPATRefillMethodT refillType,
-				int forcedRefill);
+u32 dmm_get_page(void);
+void dmm_free_page(u32 page_addr);
 
 #endif

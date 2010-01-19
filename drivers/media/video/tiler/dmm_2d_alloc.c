@@ -24,8 +24,9 @@
 
 #include "dmm_2d_alloc.h"
 #include "tiler_def.h"
-#include "../dmm/dmm_page_rep.h"
+#include "../dmm/dmm.h"
 
+#define __USE_DMM_MEM__
 #define DMM_ASSERT_BREAK printk(KERN_ERR "DMM Assert(Fail)\n"); while (1);
 
 /* ========================================================================== */
@@ -1617,7 +1618,9 @@ enum MSP_BOOL dealloc_2d_area(struct dmmTILERContCtxT *dmmTilerCtx,
 	mutex_unlock(&dmmTilerCtx->mtx);
 
 	if (delItm != NULL) {
+#ifndef __USE_DMM_MEM__
 		signed long i;
+#endif
 		enum errorCodeT eCode = DMM_NO_ERROR;
 		unsigned long numPages = 0x0;
 
@@ -1638,22 +1641,27 @@ enum MSP_BOOL dealloc_2d_area(struct dmmTILERContCtxT *dmmTilerCtx,
 			/* As currently the system is working with a memory page
 				pool leave it be.
 			*/
+#ifndef __USE_DMM_MEM__
 			for (i = 0;
 				i < numPages && eCode == DMM_NO_ERROR; i++) {
 					dmm_free_phys_page((unsigned long)
 					(delItm->pgAr.patPageEntries[i]));
 			}
+#endif
 		}
 
 		if (eCode == DMM_NO_ERROR && delItm->pgAr.patCustomPages == 0) {
+#ifndef __USE_DMM_MEM__
 			dma_free_coherent(NULL, delItm->pgAr.dma_size,
 			delItm->pgAr.dma_va,
 			delItm->pgAr.dma_pa);
 			delItm->pgAr.patPageEntries = NULL;
 			delItm->pgAr.patPageEntriesSpace = NULL;
+#endif
 		}
 
 		kfree(delItm);
+
 		return MSP_TRUE;
 	} else {
 		return MSP_FALSE;

@@ -71,10 +71,9 @@ struct tiler_buf_info {
 	s32 num_blocks;
 	struct tiler_block_info blocks[TILER_MAX_NUM_BLOCKS];
 	s32 offset;
-	struct list_head list; /* always last */
 };
 
-s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32*sys_addr);
+s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr);
 
 s32 tiler_free(u32 sys_addr);
 
