@@ -1,7 +1,7 @@
 /*
  * tiler_def.h
  *
- * tiler driver support functions for TI OMAP processors.
+ * TILER driver support functions for TI OMAP processors.
  *
  * Copyright (C) 2009-2010 Texas Instruments, Inc.
  *
@@ -19,15 +19,26 @@
 
 #define TILER_ALIAS_BASE    (0x60000000)
 #define TILER_ACC_MODE_SHIFT  (27)
+#define DMM_ACC_MODE_SHIFT  (27)
 
 #define TIL_ALIAS_ADDR(x, access_mode)\
 ((void *)(TILER_ALIAS_BASE | (u32)x | (access_mode << TILER_ACC_MODE_SHIFT)))
+
+#define TIL_ADDR(x, r, yi, xi, a)\
+((void *)((u32)x | (r << DMM_ROTATION_SHIFT) |\
+(yi << DMM_Y_INVERT_SHIFT) | (xi << DMM_X_INVERT_SHIFT) |\
+(a << DMM_ACC_MODE_SHIFT)))
+
 #define TILER_ALIAS_VIEW_CLEAR    (~0xE0000000)
 
 #define DMM_X_INVERT_SHIFT        (29)
 #define DMM_GET_X_INVERTED(x) ((((u32)x & (1<<DMM_X_INVERT_SHIFT)) > 0) ? 1 : 0)
 #define DMM_Y_INVERT_SHIFT        (30)
 #define DMM_GET_Y_INVERTED(x) ((((u32)x & (1<<DMM_Y_INVERT_SHIFT)) > 0) ? 1 : 0)
+
+#define DMM_ROTATION_SHIFT        (31)
+#define DMM_GET_ROTATED(x)\
+((((u32)x & ((u32)1<<DMM_ROTATION_SHIFT)) > 0) ? 1 : 0)
 
 /* -- redefine */
 enum errorCodeT {

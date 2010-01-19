@@ -68,55 +68,54 @@ static u32 fill_page_stack(struct mem *mem)
 
 static void dmm_free_page_stack(struct mem *mem)
 {
-	struct list_head *pos = NULL, *q = NULL;
+	struct list_head *pos = NULL;
 	struct mem *m = NULL;
 
-	list_for_each_prev_safe(pos, q, &mem->list) {
+	mutex_lock(&mtx);
+	list_for_each_prev(pos, &mem->list) {
 		m = list_entry(pos, struct mem, list);
-		mutex_lock(&mtx);
 		list_del(pos);
-		mutex_unlock(&mtx);
 		__free_page(m->pg);
 		kfree(m);
 	}
+	mutex_unlock(&mtx);
 }
 
 u32 dmm_get_page(void)
 {
-	struct list_head *pos = NULL, *q = NULL;
+	struct list_head *pos = NULL;
 	struct mem *m = NULL;
 
 	if (list_empty_careful(&free_list.list))
 		if (fill_page_stack(&free_list))
 			return 0;
 
-	list_for_each_prev_safe(pos, q, &free_list.list) {
+	mutex_lock(&mtx);
+	list_for_each_prev(pos, &free_list.list) {
 		m = list_entry(pos, struct mem, list);
-		mutex_lock(&mtx);
-		list_del(pos);
-		list_add_tail(&m->list, &used_list.list);
-		mutex_unlock(&mtx);
+		list_move_tail(&m->list, &used_list.list);
 		break;
 	}
+	mutex_unlock(&mtx);
+
 	return m->pa;
 }
 EXPORT_SYMBOL(dmm_get_page);
 
 void dmm_free_page(u32 page_addr)
 {
-	struct list_head *pos = NULL, *q = NULL;
+	struct list_head *pos = NULL;
 	struct mem *m = NULL;
 
-	list_for_each_prev_safe(pos, q, &used_list.list) {
+	mutex_lock(&mtx);
+	list_for_each_prev(pos, &used_list.list) {
 		m = list_entry(pos, struct mem, list);
 		if (m->pa == page_addr) {
-			mutex_lock(&mtx);
-			list_del(pos);
-			list_add_tail(&m->list, &free_list.list);
-			mutex_unlock(&mtx);
+			list_move_tail(&m->list, &free_list.list);
 			break;
 		}
 	}
+	mutex_unlock(&mtx);
 }
 EXPORT_SYMBOL(dmm_free_page);
 

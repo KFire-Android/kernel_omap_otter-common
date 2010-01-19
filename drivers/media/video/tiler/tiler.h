@@ -35,6 +35,9 @@
 #define TILIOC_URBUF _IOWR('z', 107, u32)
 #define TILIOC_QUERY_BLK _IOWR('z', 108, u32)
 
+/* TODO: add me to memmgr */
+#define TILIOC_UMBUF _IOWR('z', 109, u32)
+
 enum tiler_fmt {
 	TILFMT_MIN     = -1,
 	TILFMT_INVALID = -1,
@@ -73,24 +76,28 @@ struct tiler_buf_info {
 	s32 offset;
 };
 
+struct tiler_view_orient {
+	u8 rotate_90;
+	u8 x_invert;
+	u8 y_invert;
+};
+
 s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr);
 
 s32 tiler_free(u32 sys_addr);
 
 u32 tiler_get_natural_addr(void *sysPtr);
 
-void tiler_rotate_view(struct dmmViewOrientT *orient, u32 rotation);
+void tiler_rotate_view(struct tiler_view_orient *orient, u32 rotation);
 
 u32 tiler_stride(u32 tsptr);
 
-void tiler_alloc_packed_nv12(s32 *count, u32 width, u32 height,
-				void **y_sysptr, void **uv_sysptr,
-				void **y_allocptr, void **uv_allocptr,
-				s32 aligned);
+void tiler_alloc_packed_nv12(s32 *count, u32 width, u32 height, void **y_sysptr,
+				void **uv_sysptr, void **y_allocptr,
+				void **uv_allocptr, s32 aligned);
 
-void tiler_alloc_packed(s32 *count, enum tiler_fmt fmt, u32 width,
-				u32 height, void **sysptr, void **allocptr,
-				s32 aligned);
+void tiler_alloc_packed(s32 *count, enum tiler_fmt fmt, u32 width, u32 height,
+			void **sysptr, void **allocptr, s32 aligned);
 
 #endif
 
