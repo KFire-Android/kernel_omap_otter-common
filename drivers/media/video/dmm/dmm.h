@@ -81,30 +81,6 @@ struct pat {
 	u32 data;
 };
 
-/** @enum dmmPATStatusErrT
-* Defining enumarated identifiers for PAT area status error field. */
-enum dmmPATStatusErrT {
-	NO_ERROR = 0x0,
-	INVALID_DESCR = 0x1,
-	INVALID_DATA_PTR = 0x2,
-	UNEXP_AREA_UPDATE = 0x4,
-	UNEXP_CONTROL_UPDATE = 0x8,
-	UNEXP_DATA_UPDATE = 0x10,
-	UNEXP_ACCESS = 0x20
-};
-
-/** @struc dmmPATStatusT
-* Structure defining PAT area status. */
-struct dmmPATStatusT {
-	enum dmmPATStatusErrT error;
-	u8 ready;
-	u8 validDescriptor;
-	u8 engineRunning;
-	u8 done;
-	u8 linkedReconfig;
-	u8 remainingLinesCounter;
-};
-
 u32 dmm_get_phys_page(void);
 void dmm_free_phys_page(u32 page_addr);
 s32 dmm_pat_refill(struct pat *desc, enum pat_mode mode);
