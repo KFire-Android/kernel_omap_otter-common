@@ -68,10 +68,10 @@ struct pat_area {
 
 struct pat_ctrl {
 	s32 start:4;
-	s32 direction:4;
+	s32 dir:4;
 	s32 lut_id:8;
 	s32 sync:12;
-	s32 initiator:4;
+	s32 ini:4;
 };
 
 struct pat {
@@ -107,8 +107,7 @@ struct dmmPATStatusT {
 
 u32 dmm_get_phys_page(void);
 void dmm_free_phys_page(u32 page_addr);
-s32 dmm_pat_refill(struct pat *desc, s32 pat_num, enum pat_mode mode,
-			s32 forced_refill);
+s32 dmm_pat_refill(struct pat *desc, enum pat_mode mode);
 
 u32 dmm_get_page(void);
 void dmm_free_page(u32 page_addr);

@@ -202,7 +202,7 @@ u32 tiler_stride(u32 tsptr)
 	enum tiler_fmt fmt;
 
 	fmt = TILER_GET_ACC_MODE(tsptr);
-	
+
 	switch (fmt + 1) {
 	case TILFMT_8BIT:
 		return DMM_GET_ROTATED(tsptr) ?

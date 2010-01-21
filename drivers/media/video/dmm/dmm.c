@@ -28,19 +28,17 @@
 #include "dmm.h"
 #include "dmm_mem.h"
 
-/* TODO: remove */
-#include "../tiler/tiler_def.h"
-
+#undef __DEBUG__
 #define BITS_32(in_NbBits) ((((u32)1 << in_NbBits) - 1) | ((u32)1 << in_NbBits))
 #define BITFIELD_32(in_UpBit, in_LowBit)\
 	(BITS_32(in_UpBit) & ~((BITS_32(in_LowBit)) >> 1))
-#define BITFIELD BITFIELD_32
+#define BF BITFIELD_32
 
-#if 0
-#define regdump(x, y) printk(KERN_NOTICE "%s()::%d:%s=(0x%08x)\n", \
+#ifdef __DEBUG__
+#define DEBUG(x, y) printk(KERN_NOTICE "%s()::%d:%s=(0x%08x)\n", \
 				__func__, __LINE__, x, (s32)y);
 #else
-#define regdump(x, y)
+#define DEBUG(x, y)
 #endif
 
 static s32 dmm_major;
@@ -64,275 +62,123 @@ static struct platform_driver dmm_driver_ldm = {
 	.remove = NULL,
 };
 
-static void pat_ctrl_set(struct pat_ctrl *ctrl, s8 id)
+s32 dmm_pat_refill(struct pat *pd, enum pat_mode mode)
 {
-	void __iomem *reg = NULL;
-	u32 reg_val = 0x0;
-	u32 new_val = 0x0;
-	u32 bit_field = 0x0;
-	u32 field_pos = 0x0;
+	void __iomem *r = NULL;
+	u32 v = -1, w = -1;
 
-	/* set DMM_PAT_CTRL register */
-	/* TODO: casting as u32 */
+	/* Only manual refill supported */
+	if (mode != MANUAL)
+		return -EFAULT;
 
-	reg = (void __iomem *)(
-			(u32)dmm_base |
-			(u32)DMM_PAT_CTRL__0);
-	reg_val = __raw_readl(reg);
+	/*
+	 * Check that the DMM_PAT_STATUS register
+	 * has not reported an error.
+	*/
+	r = (void __iomem *)((u32)dmm_base | DMM_PAT_STATUS__0);
+	v = __raw_readl(r);
+	if ((v & 0xFC00) != 0) {
+		while (1)
+			printk(KERN_ERR "dmm_pat_refill() error.\n");
+	}
 
-	bit_field = BITFIELD(31, 28);
-	field_pos = 28;
-	new_val = (reg_val & (~(bit_field))) |
-			((((u32)ctrl->initiator) <<
-							field_pos) & bit_field);
-	__raw_writel(new_val, reg);
+	/* Set "next" register to NULL */
+	r = (void __iomem *)((u32)dmm_base | DMM_PAT_DESCR__0);
+	v = __raw_readl(r);
+	w = (v & (~(BF(31, 4)))) | ((((u32)NULL) << 4) & BF(31, 4));
+	__raw_writel(w, r);
 
-	reg_val = __raw_readl(reg);
-	bit_field = BITFIELD(16, 16);
-	field_pos = 16;
-	new_val = (reg_val & (~(bit_field))) |
-		((((u32)ctrl->sync) << field_pos) & bit_field);
-	__raw_writel(new_val, reg);
+	/* Set area to be refilled */
+	r = (void __iomem *)((u32)dmm_base | DMM_PAT_AREA__0);
+	v = __raw_readl(r);
+	w = (v & (~(BF(30, 24)))) | ((((s8)pd->area.y1) << 24) & BF(30, 24));
+	__raw_writel(w, r);
 
-	reg_val = __raw_readl(reg);
-	bit_field = BITFIELD(9, 8);
-	field_pos = 8;
-	new_val = (reg_val & (~(bit_field))) |
-		((((u32)ctrl->lut_id) << field_pos) & bit_field);
-	__raw_writel(new_val, reg);
+	v = __raw_readl(r);
+	w = (v & (~(BF(23, 16)))) | ((((s8)pd->area.x1) << 16) & BF(23, 16));
+	__raw_writel(w, r);
 
-	reg_val = __raw_readl(reg);
-	bit_field = BITFIELD(6, 4);
-	field_pos = 4;
-	new_val = (reg_val & (~(bit_field))) |
-		((((u32)ctrl->direction) << field_pos) & bit_field);
-	__raw_writel(new_val, reg);
+	v = __raw_readl(r);
+	w = (v & (~(BF(14, 8)))) | ((((s8)pd->area.y0) << 8) & BF(14, 8));
+	__raw_writel(w, r);
 
-	reg_val = __raw_readl(reg);
-	bit_field = BITFIELD(0, 0);
-	field_pos = 0;
-	new_val = (reg_val & (~(bit_field))) |
-		((((u32)ctrl->start) << field_pos) & bit_field);
-	__raw_writel(new_val, reg);
-
+	v = __raw_readl(r);
+	w = (v & (~(BF(7, 0)))) | ((((s8)pd->area.x0) << 0) & BF(7, 0));
+	__raw_writel(w, r);
 	dsb();
-}
 
-enum errorCodeT dmm_pat_refill_area_status_get(signed long dmmPatAreaStatSel,
-		struct dmmPATStatusT *areaStatus)
-{
-	enum errorCodeT eCode = DMM_NO_ERROR;
+#ifdef __DEBUG__
+	printk(KERN_NOTICE "\nx0=(%d),y0=(%d),x1=(%d),y1=(%d)\n",
+						(char)pd->area.x0,
+						(char)pd->area.y0,
+						(char)pd->area.x1,
+						(char)pd->area.y1);
+#endif
 
-	u32 stat = 0xffffffff;
-	void __iomem *statreg = (void __iomem *)
-				((u32)dmm_base | 0x4c0ul);
+	/* First, clear the DMM_PAT_IRQSTATUS register */
+	r = (void __iomem *)((u32)dmm_base | (u32)DMM_PAT_IRQSTATUS);
+	__raw_writel(0xFFFFFFFF, r);
+	dsb();
 
-	if (dmmPatAreaStatSel >= 0 && dmmPatAreaStatSel <= 3) {
-		stat = __raw_readl(statreg);
+	r = (void __iomem *)((u32)dmm_base | (u32)DMM_PAT_IRQSTATUS_RAW);
+	v = 0xFFFFFFFF;
 
-		areaStatus->remainingLinesCounter = stat & BITFIELD(24, 16);
-		areaStatus->error = (enum dmmPATStatusErrT)
-				    (stat & BITFIELD(15, 10));
-		areaStatus->linkedReconfig = stat & BITFIELD(4, 4);
-		areaStatus->done = stat & BITFIELD(3, 3);
-		areaStatus->engineRunning = stat & BITFIELD(2, 2);
-		areaStatus->validDescriptor = stat & BITFIELD(1, 1);
-		areaStatus->ready = stat & BITFIELD(0, 0);
-
-	} else {
-		eCode = DMM_WRONG_PARAM;
-		printk(KERN_ALERT "wrong parameter\n");
+	while (v != 0x0) {
+		v = __raw_readl(r);
+		DEBUG("DMM_PAT_IRQSTATUS_RAW", v);
 	}
 
-	return eCode;
-}
+	/* Fill data register */
+	r = (void __iomem *)((u32)dmm_base | DMM_PAT_DATA__0);
+	v = __raw_readl(r);
 
-s32 dmm_pat_refill(struct pat *patDesc, s32 dmmPatAreaSel,
-			enum pat_mode refillType, s32 forced_refill)
-{
-	enum errorCodeT eCode = DMM_NO_ERROR;
-	void __iomem *reg = NULL;
-	u32 regval = 0xffffffff;
-	u32 writeval = 0xffffffff;
-	u32 f = 0xffffffff; /* field */
-	u32 fp = 0xffffffff; /* field position */
-	struct pat pat_desc = {0};
+	/* Apply 4 bit lft shft to counter the 4 bit rt shft */
+	w = (v & (~(BF(31, 4)))) | ((((u32)(pd->data >> 4)) << 4) & BF(31, 4));
+	__raw_writel(w, r);
+	dsb();
 
-	struct dmmPATStatusT areaStat;
-	if (forced_refill == 0) {
-		eCode = dmm_pat_refill_area_status_get(
-				dmmPatAreaSel, &areaStat);
-
-		if (eCode == DMM_NO_ERROR) {
-			if (areaStat.ready == 0 || areaStat.engineRunning) {
-				printk(KERN_ALERT "hw not ready\n");
-				eCode = DMM_HRDW_NOT_READY;
-			}
-		}
+	/* Read back PAT_DATA__0 to see if write was successful */
+	v = 0x0;
+	while (v != pd->data) {
+		v = __raw_readl(r);
+		DEBUG("DMM_PAT_DATA__0", v);
 	}
 
-	if (dmmPatAreaSel < 0 || dmmPatAreaSel > 3) {
-		eCode = DMM_WRONG_PARAM;
-	} else if (eCode == DMM_NO_ERROR) {
-		if (refillType == AUTO) {
-			reg = (void __iomem *)
-				((u32)dmm_base |
-				(0x500ul + 0x0));
-			regval = __raw_readl(reg);
-			f  = BITFIELD(31, 4);
-			fp = 4;
-			writeval = (regval & (~(f))) |
-				   ((((u32)patDesc) << fp) & f);
-			__raw_writel(writeval, reg);
-		} else if (refillType == MANUAL) {
-			/* check that the DMM_PAT_STATUS register has not
-			 * reported an error.
-			 */
-			reg = (void __iomem *)(
-					(u32)dmm_base |
-						(u32)DMM_PAT_STATUS__0);
-			regval = __raw_readl(reg);
-			if ((regval & 0xFC00) != 0) {
-				while (1) {
-					printk(KERN_ERR "%s()::%d: ERROR\n",
-						__func__, __LINE__);
-				}
-			}
+	r = (void __iomem *)((u32)dmm_base | (u32)DMM_PAT_CTRL__0);
+	v = __raw_readl(r);
 
-			/* set DESC register to NULL */
-			reg = (void __iomem *)
-				((u32)dmm_base |
-				(0x500ul + 0x0));
-			regval = __raw_readl(reg);
-			f  = BITFIELD(31, 4);
-			fp = 4;
-			writeval = (regval & (~(f))) |
-				   ((((u32)NULL) << fp) & f);
-			__raw_writel(writeval, reg);
-			reg = (void __iomem *)
-				((u32)dmm_base |
-				(0x500ul + 0x4));
-			regval = __raw_readl(reg);
+	w = (v & (~(BF(31, 28)))) | ((((u32)pd->ctrl.ini) << 28) & BF(31, 28));
+	__raw_writel(w, r);
 
-			/* set area to be refilled */
-			f  = BITFIELD(30, 24);
-			fp = 24;
-			writeval = (regval & (~(f))) |
-				   ((((char)patDesc->area.y1) << fp) & f);
-			__raw_writel(writeval, reg);
+	v = __raw_readl(r);
+	w = (v & (~(BF(16, 16)))) | ((((u32)pd->ctrl.sync) << 16) & BF(16, 16));
+	__raw_writel(w, r);
 
-			regval = __raw_readl(reg);
-			f  = BITFIELD(23, 16);
-			fp = 16;
-			writeval = (regval & (~(f))) |
-				   ((((char)patDesc->area.x1) << fp) & f);
-			__raw_writel(writeval, reg);
+	v = __raw_readl(r);
+	w = (v & (~(BF(9, 8)))) | ((((u32)pd->ctrl.lut_id) << 8) & BF(9, 8));
+	__raw_writel(w, r);
 
-			regval = __raw_readl(reg);
-			f  = BITFIELD(14, 8);
-			fp = 8;
-			writeval = (regval & (~(f))) |
-				   ((((char)patDesc->area.y0) << fp) & f);
-			__raw_writel(writeval, reg);
+	v = __raw_readl(r);
+	w = (v & (~(BF(6, 4)))) | ((((u32)pd->ctrl.dir) << 4) & BF(6, 4));
+	__raw_writel(w, r);
 
-			regval = __raw_readl(reg);
-			f  = BITFIELD(7, 0);
-			fp = 0;
-			writeval = (regval & (~(f))) |
-				   ((((char)patDesc->area.x0) << fp) & f);
-			__raw_writel(writeval, reg);
+	v = __raw_readl(r);
+	w = (v & (~(BF(0, 0)))) | ((((u32)pd->ctrl.start) << 0) & BF(0, 0));
+	__raw_writel(w, r);
+	dsb();
 
-			printk(KERN_NOTICE
-				"\nx0=(%d),y0=(%d),x1=(%d),y1=(%d)\n",
-				(char)patDesc->area.x0,
-				(char)patDesc->area.y0,
-				(char)patDesc->area.x1,
-				(char)patDesc->area.y1);
-			dsb();
-
-			/* First, clear the DMM_PAT_IRQSTATUS register */
-			reg = (void __iomem *)(
-					(u32)dmm_base |
-					(u32)DMM_PAT_IRQSTATUS);
-			__raw_writel(0xFFFFFFFF, reg);
-			dsb();
-
-			reg = (void __iomem *)(
-					(u32)dmm_base |
-					(u32)DMM_PAT_IRQSTATUS_RAW);
-			regval = 0xFFFFFFFF;
-
-			while (regval != 0x0) {
-				regval = __raw_readl(reg);
-				regdump("DMM_PAT_IRQSTATUS_RAW", regval);
-			}
-
-			/* fill data register */
-			reg = (void __iomem *)
-			((u32)dmm_base | (0x500ul + 0xc));
-			regval = __raw_readl(reg);
-
-			/* Apply 4 bit lft shft to counter the 4 bit rt shft */
-			f  = BITFIELD(31, 4);
-			fp = 4;
-			writeval = (regval & (~(f))) | ((((u32)
-					(patDesc->data >> 4)) << fp) & f);
-			__raw_writel(writeval, reg);
-			dsb();
-
-			/* read back PAT_DATA__0 to see if it got set */
-			regval = 0x0;
-			while (regval != patDesc->data) {
-				regval = __raw_readl(reg);
-				regdump("DMM_PAT_DATA__0", regval);
-			}
-
-			pat_desc.ctrl.start = 1;
-			pat_desc.ctrl.direction = 0;
-			pat_desc.ctrl.lut_id = 0;
-			pat_desc.ctrl.sync = 0;
-			pat_desc.ctrl.initiator = 0;
-			pat_ctrl_set(&pat_desc.ctrl, 0);
-
-			/* Now, check if PAT_IRQSTATUS_RAW has been set after
-			the PAT has been refilled */
-			reg = (void __iomem *)(
-					(u32)dmm_base |
-					(u32)DMM_PAT_IRQSTATUS_RAW);
-			regval = 0x0;
-			while ((regval & 0x3) != 0x3) {
-				regval = __raw_readl(reg);
-				regdump("DMM_PAT_IRQSTATUS_RAW", regval);
-			}
-		} else {
-			eCode = DMM_WRONG_PARAM;
-		}
-		if (eCode == DMM_NO_ERROR) {
-			eCode = dmm_pat_refill_area_status_get(dmmPatAreaSel,
-							       &areaStat);
-
-			if (eCode == DMM_NO_ERROR) {
-				if (areaStat.validDescriptor == 0) {
-					eCode = DMM_HRDW_CONFIG_FAILED;
-					printk(KERN_ALERT "hw config fail\n");
-				}
-			}
-
-			while (!areaStat.done && !areaStat.ready &&
-					eCode == DMM_NO_ERROR) {
-				eCode = dmm_pat_refill_area_status_get(
-						dmmPatAreaSel,
-						&areaStat);
-			}
-
-			if (areaStat.error) {
-				eCode = DMM_HRDW_CONFIG_FAILED;
-				printk(KERN_ALERT "hw config fail\n");
-			}
-		}
+	/*
+	 * Now, check if PAT_IRQSTATUS_RAW has been
+	 * set after the PAT has been refilled
+	 */
+	r = (void __iomem *)((u32)dmm_base | (u32)DMM_PAT_IRQSTATUS_RAW);
+	v = 0x0;
+	while ((v & 0x3) != 0x3) {
+		v = __raw_readl(r);
+		DEBUG("DMM_PAT_IRQSTATUS_RAW", v);
 	}
 
-	return eCode;
+	return 0;
 }
 EXPORT_SYMBOL(dmm_pat_refill);
 

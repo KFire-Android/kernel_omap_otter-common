@@ -106,7 +106,7 @@ static s32 __set_area(enum tiler_fmt fmt, u32 width, u32 height, u32 *x_area,
 		width = ((width + TILER_PAGE - 1)/TILER_PAGE);
 		tiled_pages_per_ss_page = 1;
 
-		/* 
+		/*
 		 * For 1D blocks larger than the container width,
 		 * we need to allocate multiple rows.
 		 */
@@ -389,8 +389,8 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 			   area_desc->xPageCount - 1;
 	pat_desc.area.y1 = area_desc->y0 + area_desc->yPageOfst +
 			   area_desc->yPageCount - 1;
-	pat_desc.ctrl.direction = 0;
-	pat_desc.ctrl.initiator = 0;
+	pat_desc.ctrl.dir = 0;
+	pat_desc.ctrl.ini = 0;
 	pat_desc.ctrl.lut_id = 0;
 	pat_desc.ctrl.start = 1;
 	pat_desc.ctrl.sync = 0;
@@ -399,7 +399,7 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 	/* must be a 16-byte aligned physical address */
 	pat_desc.data = mi->page_pa;
 
-	if (dmm_pat_refill(&pat_desc, 0, MANUAL, 0))
+	if (dmm_pat_refill(&pat_desc, MANUAL))
 		goto release;
 	return 0;
 release:
@@ -410,12 +410,10 @@ release:
 		page_cache_release(page);
 	}
 free:
-	if (mi->pg_ptr)
-		kfree(mi->pg_ptr);
+	kfree(mi->pg_ptr);
 	if (mi->page && mi->page_pa)
 		dma_free_coherent(NULL, mi->size, mi->page, mi->page_pa);
-	if (mi)
-		kfree(mi);
+	kfree(mi);
 	return -ENOMEM;
 }
 
@@ -468,6 +466,64 @@ s32 tiler_free(u32 sys_addr)
 	return 0x0;
 }
 EXPORT_SYMBOL(tiler_free);
+
+/* :TODO: Currently we do not track enough information from alloc to get back
+   the actual width and height of the container, so we must make a guess.  We
+   do not even have enough information to get the virtual stride of the buffer,
+   which is the real reason for this ioctl */
+s32 tiler_find_buf(u32 sys_addr, struct tiler_block_info *blk)
+{
+	struct dmmTILERContPageAreaT *area_desc = NULL;
+	u32 x_area = -1, y_area = -1;
+
+	if (get_area(sys_addr, &x_area, &y_area))
+		return -EFAULT;
+
+	area_desc = search_2d_area(tilctx, x_area, y_area, 0, 0);
+	if (!area_desc)
+		return -EFAULT;
+
+	blk->ptr = NULL;
+	if (area_desc != NULL) {
+		s32 mode = TILER_GET_ACC_MODE(sys_addr);
+		blk->fmt = (mode + 1);
+		if (blk->fmt == TILFMT_PAGE) {
+			blk->dim.len = area_desc->xPageCount *
+					area_desc->yPageCount * TILER_PAGE;
+			blk->stride = 0;
+			blk->ssptr = (u32)TIL_ALIAS_ADDR(((area_desc->x0 |
+					(area_desc->y0 << 8)) << 12), mode);
+		} else {
+			blk->stride = blk->dim.area.width =
+				area_desc->xPageCount * TILER_BLOCK_WIDTH;
+			blk->dim.area.height =
+				area_desc->yPageCount * TILER_BLOCK_HEIGHT;
+			if (blk->fmt == TILFMT_8BIT) {
+				blk->ssptr = (u32)TIL_ALIAS_ADDR(
+							((area_desc->x0 << 6) |
+							(area_desc->y0 << 20)),
+							mode);
+			} else {
+				blk->ssptr = (u32)TIL_ALIAS_ADDR(
+							((area_desc->x0 << 7) |
+							(area_desc->y0 << 20)),
+							mode);
+				blk->stride <<= 1;
+				blk->dim.area.height >>= 1;
+				if (blk->fmt == TILFMT_32BIT)
+					blk->dim.area.width >>= 1;
+			}
+			blk->stride = (blk->stride + TILER_PAGE - 1) &
+							~(TILER_PAGE - 1);
+		}
+	} else {
+		blk->fmt = TILFMT_INVALID;
+		blk->dim.len = blk->stride = blk->ssptr = 0;
+		return -EFAULT;
+	}
+
+	return 0;
+}
 
 static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 			unsigned long arg)
@@ -695,8 +751,8 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 	pat_desc.area.y1 = area_desc->y0 + area_desc->yPageOfst +
 			   area_desc->yPageCount - 1;
 
-	pat_desc.ctrl.direction = 0;
-	pat_desc.ctrl.initiator = 0;
+	pat_desc.ctrl.dir = 0;
+	pat_desc.ctrl.ini = 0;
 	pat_desc.ctrl.lut_id = 0;
 	pat_desc.ctrl.start = 1;
 	pat_desc.ctrl.sync = 0;
@@ -705,7 +761,7 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 	/* must be a 16-byte aligned physical address */
 	pat_desc.data = mi->page_pa;
 
-	if (dmm_pat_refill(&pat_desc, 0, MANUAL, 0))
+	if (dmm_pat_refill(&pat_desc, MANUAL))
 		goto cleanup;
 
 	return 0x0;
