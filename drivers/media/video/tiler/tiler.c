@@ -679,9 +679,8 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 					sizeof(struct tiler_block_info)))
 			return -EFAULT;
 
-		/* TODO: only for d2c, so rework this later */
-		/*if (tiler_find_buf(block_info.ssptr, &block_info))
-			return -EFAULT;*/
+		if (tiler_find_buf(block_info.ssptr, &block_info))
+			return -EFAULT;
 
 		if (copy_to_user((void __user *)arg, &block_info,
 			sizeof(struct tiler_block_info)))
