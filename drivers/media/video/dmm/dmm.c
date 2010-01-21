@@ -16,13 +16,13 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/cdev.h>    /* struct cdev */
-#include <linux/kdev_t.h>  /* MKDEV() */
-#include <linux/fs.h>      /* register_chrdev_region() */
-#include <linux/device.h>  /* struct class */
+#include <linux/cdev.h>            /* struct cdev */
+#include <linux/kdev_t.h>          /* MKDEV() */
+#include <linux/fs.h>              /* register_chrdev_region() */
+#include <linux/device.h>          /* struct class */
 #include <linux/platform_device.h> /* platform_device() */
-#include <linux/err.h>     /* IS_ERR() */
-#include <linux/io.h> /* ioremap() */
+#include <linux/err.h>             /* IS_ERR() */
+#include <linux/io.h>              /* ioremap() */
 #include <linux/errno.h>
 
 #include "dmm.h"

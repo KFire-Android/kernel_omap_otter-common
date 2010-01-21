@@ -26,17 +26,15 @@
 
 #define TILER_MAX_NUM_BLOCKS 16
 
-#define TILIOC_GBUF  _IOWR('z', 101, u32)
-#define TILIOC_FBUF  _IOWR('z', 102, u32)
-#define TILIOC_GSSP  _IOWR('z', 103, u32)
-#define TILIOC_MBUF  _IOWR('z', 104, u32)
+#define TILIOC_GBUF  _IOWR('z', 100, u32)
+#define TILIOC_FBUF  _IOWR('z', 101, u32)
+#define TILIOC_GSSP  _IOWR('z', 102, u32)
+#define TILIOC_MBUF  _IOWR('z', 103, u32)
+#define TILIOC_UMBUF _IOWR('z', 104, u32)
 #define TILIOC_QBUF  _IOWR('z', 105, u32)
 #define TILIOC_RBUF  _IOWR('z', 106, u32)
 #define TILIOC_URBUF _IOWR('z', 107, u32)
 #define TILIOC_QUERY_BLK _IOWR('z', 108, u32)
-
-/* TODO: add me to memmgr */
-#define TILIOC_UMBUF _IOWR('z', 109, u32)
 
 enum tiler_fmt {
 	TILFMT_MIN     = -1,
