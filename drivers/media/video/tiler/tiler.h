@@ -47,11 +47,6 @@ enum tiler_fmt {
 	TILFMT_MAX     = 4
 };
 
-#define TILER_ACC_MODE_SHIFT  (27)
-#define TILER_ACC_MODE_MASK   (3)
-#define TILER_GET_ACC_MODE(x) ((enum tiler_fmt)\
-(((u32)x & (TILER_ACC_MODE_MASK<<TILER_ACC_MODE_SHIFT))>>TILER_ACC_MODE_SHIFT))
-
 struct area {
 	u16 width;
 	u16 height;

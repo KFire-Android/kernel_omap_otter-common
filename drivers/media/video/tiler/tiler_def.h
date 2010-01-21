@@ -17,6 +17,11 @@
 #ifndef TILER_DEF_H
 #define TILER_DEF_H
 
+#define TILER_ACC_MODE_SHIFT  (27)
+#define TILER_ACC_MODE_MASK   (3)
+#define TILER_GET_ACC_MODE(x) ((enum tiler_fmt)\
+(((u32)x & (TILER_ACC_MODE_MASK<<TILER_ACC_MODE_SHIFT))>>TILER_ACC_MODE_SHIFT))
+
 #define TILER_ALIAS_BASE    (0x60000000)
 #define TILER_ACC_MODE_SHIFT  (27)
 #define DMM_ACC_MODE_SHIFT  (27)
