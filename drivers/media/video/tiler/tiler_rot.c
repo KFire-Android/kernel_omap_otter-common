@@ -167,9 +167,9 @@ u32 tiler_reorient_addr(u32 tsptr, struct tiler_view_orient orient)
 }
 EXPORT_SYMBOL(tiler_reorient_addr);
 
-u32 tiler_get_natural_addr(void *sysPtr)
+u32 tiler_get_natural_addr(void *sys_ptr)
 {
-	return (u32)sysPtr & DMM_ALIAS_VIEW_CLEAR;
+	return (u32)sys_ptr & DMM_ALIAS_VIEW_CLEAR;
 }
 EXPORT_SYMBOL(tiler_get_natural_addr);
 

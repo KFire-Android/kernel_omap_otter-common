@@ -23,9 +23,17 @@
 
 #include "dmm_mem.h"
 
+/**
+ * Number of pages to allocate when
+ * refilling the free page stack.
+ */
 #define MAX 16
 #define DMM_PAGE 0x1000
 
+/**
+ * Used to keep track of the page struct ptrs
+ * and physical addresses of each page.
+ */
 struct mem {
 	struct list_head list;
 	struct page *pg;
@@ -55,6 +63,10 @@ static u32 fill_page_stack(struct mem *mem)
 
 		m->pa = page_to_phys(m->pg);
 
+		/**
+		 * Note: we need to flush the cache
+		 * entry for each page we allocate.
+		*/
 		dmac_flush_range((void *)page_address(m->pg),
 					(void *)page_address(m->pg) + DMM_PAGE);
 		outer_flush_range(m->pa, m->pa + DMM_PAGE);

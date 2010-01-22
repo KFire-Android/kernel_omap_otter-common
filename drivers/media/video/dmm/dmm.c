@@ -132,7 +132,7 @@ s32 dmm_pat_refill(struct pat *pd, enum pat_mode mode)
 	r = (void __iomem *)((u32)dmm_base | DMM_PAT_DATA__0);
 	v = __raw_readl(r);
 
-	/* Apply 4 bit lft shft to counter the 4 bit rt shft */
+	/* Apply 4 bit left shft to counter the 4 bit right shift */
 	w = (v & (~(BF(31, 4)))) | ((((u32)(pd->data >> 4)) << 4) & BF(31, 4));
 	__raw_writel(w, r);
 	dsb();
