@@ -19,6 +19,14 @@
 
 #include <linux/dma-mapping.h>
 
+enum errorCodeT {
+	DMM_NO_ERROR,
+	DMM_WRONG_PARAM,
+	DMM_HRDW_CONFIG_FAILED,
+	DMM_HRDW_NOT_READY,
+	DMM_SYS_ERROR
+};
+
 enum MSP_BOOL {
 	MSP_FALSE = 0,
 	MSP_TRUE

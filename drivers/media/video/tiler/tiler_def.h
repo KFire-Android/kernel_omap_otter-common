@@ -45,15 +45,6 @@
 #define DMM_GET_ROTATED(x)\
 ((((u32)x & ((u32)1<<DMM_ROTATION_SHIFT)) > 0) ? 1 : 0)
 
-/* -- redefine */
-enum errorCodeT {
-	DMM_NO_ERROR,
-	DMM_WRONG_PARAM,
-	DMM_HRDW_CONFIG_FAILED,
-	DMM_HRDW_NOT_READY,
-	DMM_SYS_ERROR
-};
-
 #define DMM_ALIAS_VIEW_CLEAR    (~0xE0000000)
 
 #define DMM_TILE_DIMM_X_MODE_8    (32)
