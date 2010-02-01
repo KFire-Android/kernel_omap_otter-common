@@ -349,6 +349,109 @@ __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
 }
 EXPORT_SYMBOL(__arm_ioremap);
 
+#define MAX_SECTIONS 4
+void __iomem *
+__arm_multi_strided_ioremap(int sections,
+			    unsigned long *phys_addr, size_t *phys_size,
+			    unsigned long *phys_stride,
+			    unsigned long *virt_stride,
+			    unsigned int mtype)
+{
+	unsigned long pfns[MAX_SECTIONS];
+	const struct mem_type *type;
+	unsigned long total_size = 0, j;
+	int err = 0, i;
+	unsigned long addr, addr_i, pstride, vstride;
+	struct vm_struct * area;
+
+	if (sections > MAX_SECTIONS)
+		return NULL;
+
+	for (i = 0; i < sections; i++) {
+		/* both physical and virtual strides must be both specified
+		   or neither specified */
+		pstride = ((phys_stride && phys_stride[i]) ?
+			   phys_stride[i] : phys_size[i]);
+		vstride = ((virt_stride && virt_stride[i]) ?
+			   virt_stride[i] : phys_size[i]);
+
+		if (!pstride ^ !vstride)
+			return NULL;
+
+		/*
+		* Don't allow wraparound or zero size.  Also, sections
+		* must end/begin on page boundary, and strides be page
+		* aligned
+		*
+		* For now, size must be multiple of physical stride.  This
+		* may be relaxed to contain only full virtual strides.  (E.g.
+		* not have to contain the waste after the last virtual block.)
+		*
+		*/
+		if (((phys_addr[i] | phys_size[i] |
+		      vstride | pstride) & ~PAGE_MASK) ||
+		    !phys_size[i] ||
+		    vstride > pstride ||
+		    (pstride && (phys_size[i] % pstride)) ||
+		    (phys_addr[i] + phys_size[i] - 1 < phys_addr[i]))
+			return NULL;
+
+		pfns[i] = __phys_to_pfn(phys_addr[i]);
+
+		/*
+		 * High mappings must be supersection aligned
+		 */
+		if (pfns[i] >= 0x100000 &&
+		    (__pfn_to_phys(pfns[i]) & ~SUPERSECTION_MASK))
+			return NULL;
+
+		total_size += phys_size[i] / pstride * vstride;
+	}
+
+	type = get_mem_type(mtype);
+	if (!type)
+		return NULL;
+
+	area = get_vm_area(total_size, VM_IOREMAP);
+	if (!area)
+		return NULL;
+	addr = addr_i = (unsigned long)area->addr;
+
+	for (i = 0; i < sections && !err; i++) {
+		printk(KERN_ERR "mapping %lx to %lx (%x)\n", __pfn_to_phys(pfns[i]), addr_i, phys_size[i]);
+		pstride = ((phys_stride && phys_stride[i]) ?
+			   phys_stride[i] : phys_size[i]);
+		vstride = ((virt_stride && virt_stride[i]) ?
+			   virt_stride[i] : phys_size[i]);
+		for (j = 0; j < phys_size[i]; j += pstride) {
+	#ifndef CONFIG_SMP
+			if (DOMAIN_IO == 0 &&
+			    (((cpu_architecture() >= CPU_ARCH_ARMv6) && (get_cr() & CR_XP)) ||
+			       cpu_is_xsc3()) && pfns[i] >= 0x100000 &&
+			       !((__pfn_to_phys(pfns[i]) | vstride | addr_i) & ~SUPERSECTION_MASK)) {
+				area->flags |= VM_ARM_SECTION_MAPPING;
+				err = remap_area_supersections(addr_i, pfns[i], size[i], type);
+			} else if (!((__pfn_to_phys(pfns[i]) | vstride | addr_i) & ~PMD_MASK)) {
+				area->flags |= VM_ARM_SECTION_MAPPING;
+				err = remap_area_sections(addr_i, pfns[i], vstride, type);
+			} else
+	#endif
+				err = remap_area_pages(addr_i, pfns[i], vstride, type);
+			pfns[i] += __phys_to_pfn(pstride);
+			addr_i += vstride;
+		}
+	}
+
+	if (err) {
+		vunmap((void *)addr);
+		return NULL;
+	}
+
+	flush_cache_vmap(addr, addr + total_size);
+	return (void __iomem *) addr;
+}
+EXPORT_SYMBOL(__arm_multi_strided_ioremap);
+
 void __iounmap(volatile void __iomem *io_addr)
 {
 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
