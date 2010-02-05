@@ -17,12 +17,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include "tiler.h"
-
-#define ROUND_UP_2P(a, b) (((a) + (b) - 1) & ~((b) - 1))
-#define DIVIDE_UP(a, b) (((a) + (b) - 1) / (b))
-#define ROUND_UP(a, b) (DIVIDE_UP(a, b) * (b))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#include "tiler_def.h"
 
 void tiler_packed_alloc_buf(int *count,
 			    enum tiler_fmt fmt,

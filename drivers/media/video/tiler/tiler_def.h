@@ -17,6 +17,12 @@
 #ifndef TILER_DEF_H
 #define TILER_DEF_H
 
+#define ROUND_UP_2P(a, b) (((a) + (b) - 1) & ~((b) - 1))
+#define DIVIDE_UP(a, b) (((a) + (b) - 1) / (b))
+#define ROUND_UP(a, b) (DIVIDE_UP(a, b) * (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #define TILER_ACC_MODE_SHIFT  (27)
 #define TILER_ACC_MODE_MASK   (3)
 #define TILER_GET_ACC_MODE(x) ((enum tiler_fmt)\
