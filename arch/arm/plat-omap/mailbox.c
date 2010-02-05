@@ -84,7 +84,13 @@ static int __mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
 
 int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
 {
+	/* Directly calling __mbox_msg_send since Tesla is already running
+	in a tasklet */
+	return __mbox_msg_send(mbox, msg);
 
+	/* FIXME Work queue is not used to send mailbox messages.
+	 Directly calling __mbox_msg_send().*/
+#if 0
 	struct request *rq;
 	struct request_queue *q = mbox->txq->queue;
 
@@ -96,6 +102,7 @@ int omap_mbox_msg_send(struct omap_mbox *mbox, mbox_msg_t msg)
 	tasklet_schedule(&mbox->txq->tasklet);
 
 	return 0;
+#endif
 }
 EXPORT_SYMBOL(omap_mbox_msg_send);
 
