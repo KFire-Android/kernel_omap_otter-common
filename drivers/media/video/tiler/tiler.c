@@ -34,7 +34,7 @@
 #include "tiler.h"
 #include "tiler_def.h"
 #include "../dmm/dmm.h"
-#include "tiler_allocator.h"
+#include "tam/tiler_allocator.h"
 
 struct tiler_dev {
 	struct cdev cdev;
