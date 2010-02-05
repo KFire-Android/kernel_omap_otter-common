@@ -459,57 +459,56 @@ EXPORT_SYMBOL(tiler_free);
    which is the real reason for this ioctl */
 s32 tiler_find_buf(u32 sys_addr, struct tiler_block_info *blk)
 {
-#if 0
-	struct dmmTILERContPageAreaT *area_desc = NULL;
+	struct area_spec area = {0};
 	u32 x_area = -1, y_area = -1;
+	u16 x_page = 0, y_page = 0;
+	s32 mode = -1;
 
-	if (get_area(sys_addr, &x_area, &y_area))
+	if (get_area(sys_addr & 0x0FFFF1000, &x_area, &y_area))
 		return -EFAULT;
 
-	area_desc = search_2d_area(tilctx, x_area, y_area, 0, 0);
-	if (!area_desc)
+	if (retrieve_parent_area(x_area, y_area, &area))
 		return -EFAULT;
+
+	x_page = area.x1 - area.x0 + 1;
+	y_page = area.y1 - area.y0 + 1;
 
 	blk->ptr = NULL;
-	if (area_desc != NULL) {
-		s32 mode = TILER_GET_ACC_MODE(sys_addr);
-		blk->fmt = (mode + 1);
-		if (blk->fmt == TILFMT_PAGE) {
-			blk->dim.len = area_desc->xPageCount *
-					area_desc->yPageCount * TILER_PAGE;
-			blk->stride = 0;
-			blk->ssptr = (u32)TIL_ALIAS_ADDR(((area_desc->x0 |
-					(area_desc->y0 << 8)) << 12), mode);
-		} else {
-			blk->stride = blk->dim.area.width =
-				area_desc->xPageCount * TILER_BLOCK_WIDTH;
-			blk->dim.area.height =
-				area_desc->yPageCount * TILER_BLOCK_HEIGHT;
-			if (blk->fmt == TILFMT_8BIT) {
-				blk->ssptr = (u32)TIL_ALIAS_ADDR(
-							((area_desc->x0 << 6) |
-							(area_desc->y0 << 20)),
-							mode);
-			} else {
-				blk->ssptr = (u32)TIL_ALIAS_ADDR(
-							((area_desc->x0 << 7) |
-							(area_desc->y0 << 20)),
-							mode);
-				blk->stride <<= 1;
-				blk->dim.area.height >>= 1;
-				if (blk->fmt == TILFMT_32BIT)
-					blk->dim.area.width >>= 1;
-			}
-			blk->stride = (blk->stride + TILER_PAGE - 1) &
-							~(TILER_PAGE - 1);
-		}
+
+	mode = TILER_GET_ACC_MODE(sys_addr);
+	blk->fmt = (mode + 1);
+	if (blk->fmt == TILFMT_PAGE) {
+		blk->dim.len = x_page * y_page * TILER_PAGE;
+		if (blk->dim.len == 0)
+			goto error;
+		blk->stride = 0;
+		blk->ssptr = (u32)TIL_ALIAS_ADDR(((area.x0 |
+						(area.y0 << 8)) << 12), mode);
 	} else {
+		blk->stride = blk->dim.area.width = x_page * TILER_BLOCK_WIDTH;
+		blk->dim.area.height = y_page * TILER_BLOCK_HEIGHT;
+		if (blk->dim.area.width == 0 || blk->dim.area.height == 0)
+			goto error;
+		if (blk->fmt == TILFMT_8BIT) {
+			blk->ssptr = (u32)TIL_ALIAS_ADDR(((area.x0 << 6) |
+							(area.y0 << 20)), mode);
+		} else {
+			blk->ssptr = (u32)TIL_ALIAS_ADDR(((area.x0 << 7) |
+							(area.y0 << 20)), mode);
+			blk->stride <<= 1;
+			blk->dim.area.height >>= 1;
+			if (blk->fmt == TILFMT_32BIT)
+				blk->dim.area.width >>= 1;
+		}
+		blk->stride = (blk->stride + TILER_PAGE - 1) &
+							~(TILER_PAGE - 1);
+	}
+	return 0;
+
+error:
 		blk->fmt = TILFMT_INVALID;
 		blk->dim.len = blk->stride = blk->ssptr = 0;
 		return -EFAULT;
-	}
-#endif
-	return 0;
 }
 
 static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,

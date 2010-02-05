@@ -97,4 +97,7 @@ s32 test_get_busy_neigh_stats(u16 width, u16 height,
 					struct neighbour_stats *neighbour_stat);
 
 s32 test_check_busy_tile(IN u16 x, u16 y);
+
+s32 retrieve_parent_area(u16 x0, u16 y0, struct area_spec *parent_area);
+
 #endif

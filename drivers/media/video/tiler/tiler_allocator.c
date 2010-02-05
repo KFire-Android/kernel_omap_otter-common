@@ -1729,3 +1729,41 @@ s32 test_check_busy(IN u16 x, u16 y)
 {
 	return (s32)g_area_container[x][y].is_occupied;
 }
+
+/**
+	@description: Retrieves the parent area of the page at x0, y0 if
+	occupied
+	@input:co-ordinates of the page (x0, y0) whoes parent area is required
+	@return 0 on success, non-0 error value on failure. On success
+
+	parent_area will contain co-ordinates (TL & BR corner) of the parent
+	area
+*/
+s32 retrieve_parent_area(u16 x0, u16 y0, struct area_spec *parent_area)
+{
+	if (parent_area == NULL) {
+		PE("NULL input found\n");
+		return TilerErrorInvalidArg;
+	}
+
+	if (x0 < 0 || x0 >= MAX_X_DIMMENSION || y0 < 0 ||
+							y0 >= MAX_Y_DIMMENSION){
+		PE("Invalid dimensions\n");
+		return TilerErrorInvalidDimension;
+	}
+
+	MUTEX_LOCK(&g_mutex);
+
+	assign(parent_area, 0, 0, 0, 0);
+
+	if (g_area_container[x0][y0].is_occupied) {
+		parent_area->x0 = g_area_container[x0][y0].parent_area.x0;
+		parent_area->y0 = g_area_container[x0][y0].parent_area.y0;
+		parent_area->x1 = g_area_container[x0][y0].parent_area.x1;
+		parent_area->y1 = g_area_container[x0][y0].parent_area.y1;
+	}
+
+	MUTEX_REL(&g_mutex);
+	return TilerErrorNone;
+}
+
