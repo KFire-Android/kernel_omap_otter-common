@@ -94,18 +94,23 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr);
  */
 s32 tiler_free(u32 sys_addr);
 
+u32 tiler_reorient_addr(u32 tsptr, struct tiler_view_orient orient);
+
 u32 tiler_get_natural_addr(void *sys_ptr);
+
+u32 tiler_reorient_topleft(u32 tsptr, struct tiler_view_orient orient,
+				u32 width, u32 height);
+
+u32 tiler_stride(u32 tsptr);
 
 void tiler_rotate_view(struct tiler_view_orient *orient, u32 rotation);
 
-u32 tiler_stride(u32 tsptr);
+void tiler_alloc_packed(s32 *count, enum tiler_fmt fmt, u32 width, u32 height,
+			void **sysptr, void **allocptr, s32 aligned);
 
 void tiler_alloc_packed_nv12(s32 *count, u32 width, u32 height, void **y_sysptr,
 				void **uv_sysptr, void **y_allocptr,
 				void **uv_allocptr, s32 aligned);
-
-void tiler_alloc_packed(s32 *count, enum tiler_fmt fmt, u32 width, u32 height,
-			void **sysptr, void **allocptr, s32 aligned);
 
 #endif
 
