@@ -69,7 +69,7 @@ void tiler_alloc_packed(s32 *count, enum tiler_fmt fmt, u32 width, u32 height,
 			     buf_width * (n_alloc - (m_alloc - 1) * m_per_a));
 
 		res = tiler_alloc(fmt, til_width * tiles, height,
-				      (u32 *)*sysptr + i);
+				      (u32 *)sysptr + i);
 		if (res != 0)
 			break;
 
