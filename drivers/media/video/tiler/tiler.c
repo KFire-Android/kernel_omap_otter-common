@@ -61,11 +61,12 @@ struct mem_info {
 	u32 *page;             /* virt addr to page-list */
 	dma_addr_t page_pa;    /* phys addr to page-list */
 	u32 size;              /* size of page-list */
-	u32 num_pg;           /* number of pages in page-list */
+	u32 num_pg;            /* number of pages in page-list */
 	s8 mapped;             /* flag to indicate user mapped mem */
 	u32 usr;               /* user space address */
 	u32 *pg_ptr;           /* list of struct page pointers */
-	struct area_spec area;
+	struct area_spec area; /* return struct from tiler area mgr */
+	u32 *mem;              /* pointer to list of phys addresses */
 };
 
 static s32 tiler_major;
@@ -427,8 +428,7 @@ s32 tiler_free(u32 sys_addr)
 				printk(KERN_NOTICE "warning: failed to\
 						unreserve tiler area.\n");
 			if (!mi->mapped) {
-				for (i = 0; i < mi->num_pg; i++)
-					dmm_free_page(mi->page[i]);
+				dmm_free_pages(mi->mem);
 			} else {
 				for (i = 0; i < mi->num_pg; i++) {
 					page = (struct page *)mi->pg_ptr[i];
@@ -681,7 +681,6 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 {
 	u16 num_page = 0, x_page = 0, y_page = 0;
-	u32 i = 0;
 	u8 x_area = 0, y_area = 0;
 	struct pat pat_desc = {0};
 	struct mem_info *mi = NULL;
@@ -731,11 +730,11 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 	}
 	memset(mi->page, 0x0, mi->size);
 
-	for (i = 0; i < num_page; i++) {
-		mi->page[i] = dmm_get_page();
-		if (mi->page[i] == 0x0)
-			goto cleanup;
-	}
+	mi->mem = dmm_get_pages(num_page);
+	if (!mi->mem)
+		goto cleanup;
+	memcpy(mi->page, mi->mem, mi->size);
+
 	mi->num_pg = num_page;
 	mi->sys_addr = *sys_addr;
 
