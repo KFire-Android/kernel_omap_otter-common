@@ -1,9 +1,9 @@
 /*
-* tiler_allocator.c
+* tcm.c
 *
 * Author: Ravi Ramachandra <r.ramachandra@ti.com>
 *
-* Tiler 2D and 1D allocation algorithm
+* Tiler 2D and 1D Container Management Algorithm.
 *
 * Copyright (C) 2009-2010 Texas Instruments, Inc.
 *
@@ -19,9 +19,9 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include "tiler_common.h"
-#include "tiler_allocator.h"
-#include "tiler_utils.h"
+#include "tcm_pri.h"
+#include "tcm.h"
+#include "tcm_utils.h"
 
 /*********************************************
  *        POSITIONING & OPTIMIZATION TWEAKS
@@ -60,6 +60,7 @@ struct area_spec g_div_ln_btw_64_and_32_align = {192, 0, 192, 96};
 u32 g_id;
 
 static struct mutex g_mutex;
+
 
 /* Individual selection criteria for different scan areas */
 static s32 g_scan_criteria_l2r_t2b = CR_BIAS_HORIZONTAL;

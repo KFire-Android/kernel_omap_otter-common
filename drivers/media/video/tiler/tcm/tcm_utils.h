@@ -1,8 +1,8 @@
 #ifndef _TILER_UTILS_H
 #define _TILER_UTILS_H
 
-#include "tiler_common.h"
-#include "tiler_debug.h"
+#include "tcm_pri.h"
+#include "tcm_dbg.h"
 
 #define AREA_STR(a_str, area) ({ \
 	sprintf(a_str, "(%03d %03d)-(%03d %03d)", (area)->x0, (area)->y0, \

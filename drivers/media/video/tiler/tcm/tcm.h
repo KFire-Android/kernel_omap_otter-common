@@ -1,9 +1,9 @@
 /*
- * tiler_allocator.h
+ * tcm.h
  *
  * Author: Ravi Ramachandra <r.ramachandra@ti.com>
  *
- * Tiler Allocator Interface functions for TI OMAP processors.
+ * Tiler Container manager functions for TI OMAP processors.
  *
  * Copyright (C) 2009-2010 Texas Instruments, Inc.
  *
@@ -16,11 +16,11 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef _TILER_ALLOCATOR_H_
-#define _TILER_ALLOCATOR_H_
+#ifndef _TCM_H_
+#define _TCM_H_
 
-#include "tiler_common.h"
-#include "tiler_utils.h"
+#include "tcm_pri.h"
+#include "tcm_utils.h"
 
 #define OCCUPIED           YES
 #define NOT_OCCUPIED    NO

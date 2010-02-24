@@ -1,5 +1,5 @@
-#ifndef _TILER_COMMON_H_
-#define _TILER_COMMON_H_
+#ifndef _TCM_PRIVATE_H_
+#define _TCM_PRIVATE_H_
 
 #define IN
 #define OUT
