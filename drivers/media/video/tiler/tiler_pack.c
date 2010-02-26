@@ -207,6 +207,7 @@ void tiler_alloc_packed_nv12(s32 *count, u32 width, u32 height, void **y_sysptr,
 	    !uv_sysptr || !uv_allocptr || *count <= 0) {
 		if (count)
 			*count = 0;
+		return;
 	}
 
 	y_width = DIVIDE_UP(width, 64);
