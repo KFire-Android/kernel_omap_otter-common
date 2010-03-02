@@ -145,7 +145,10 @@ u32 dmm_get_page(void)
 	}
 	mutex_unlock(&mtx);
 
-	return m->pa;
+	if (m != NULL)
+		return m->pa;
+	else
+		return 0x0;
 }
 EXPORT_SYMBOL(dmm_get_page);
 
@@ -250,15 +253,18 @@ u32 *dmm_get_pages(s32 n)
 		}
 		mutex_unlock(&mtx);
 
-		f->pa[i] = m->pa;
+		if (m != NULL)
+			f->pa[i] = m->pa;
+		else
+			goto cleanup;
 	}
 
 	mutex_lock(&mtx);
 	list_add(&f->list, &fast_list.list);
 	mutex_unlock(&mtx);
 
-	return f->pa;
-
+	if (f != NULL)
+		return f->pa;
 cleanup:
 	for (; i > 0; i--) {
 		mutex_lock(&mtx);
