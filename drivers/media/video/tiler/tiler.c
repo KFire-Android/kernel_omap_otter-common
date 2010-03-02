@@ -628,8 +628,9 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		memset(_b, 0x0, sizeof(struct __buf_info));
 
 		if (copy_from_user(&_b->buf_info, (void __user *)arg,
-					sizeof(struct tiler_buf_info)))
-			return -EFAULT;
+					sizeof(struct tiler_buf_info))) {
+			kfree(_b); return -EFAULT;
+		}
 
 		_b->buf_info.offset = id;
 		id += 0x1000;
@@ -639,8 +640,9 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		mutex_unlock(&mtx);
 
 		if (copy_to_user((void __user *)arg, &_b->buf_info,
-					sizeof(struct tiler_buf_info)))
-			return -EFAULT;
+					sizeof(struct tiler_buf_info))) {
+			kfree(_b); return -EFAULT;
+		}
 		break;
 	case TILIOC_URBUF:
 		if (copy_from_user(&buf_info, (void __user *)arg,
