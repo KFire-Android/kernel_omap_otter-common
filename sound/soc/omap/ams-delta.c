@@ -323,7 +323,7 @@ static void cx81801_receive(struct tty_struct *tty,
 					ARRAY_SIZE(ams_delta_hook_switch_pins),
 					ams_delta_hook_switch_pins);
 		if (ret)
-			dev_warn(codec->socdev->card->dev,
+			dev_warn(codec->dev,
 				"Failed to link hook switch to DAPM pins, "
 				"will continue with hook switch unlinked.\n");
 
@@ -383,7 +383,7 @@ static int ams_delta_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 
 	/* Set cpu DAI configuration */
-	return snd_soc_dai_set_fmt(rtd->dai->cpu_dai,
+	return snd_soc_dai_set_fmt(rtd->cpu_dai,
 				   SND_SOC_DAIFMT_DSP_A |
 				   SND_SOC_DAIFMT_NB_NF |
 				   SND_SOC_DAIFMT_CBM_CFM);
@@ -398,7 +398,7 @@ static struct snd_soc_ops ams_delta_ops = {
 static int ams_delta_set_bias_level(struct snd_soc_card *card,
 					enum snd_soc_bias_level level)
 {
-	struct snd_soc_codec *codec = card->codec;
+	struct snd_soc_codec *codec = card->rtd->codec;
 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
@@ -461,18 +461,19 @@ static void ams_delta_shutdown(struct snd_pcm_substream *substream)
  * Card initialization
  */
 
-static int ams_delta_cx20442_init(struct snd_soc_codec *codec)
+static int ams_delta_cx20442_init(struct snd_soc_pcm_runtime *rtd)
 {
-	struct snd_soc_dai *codec_dai = codec->dai;
-	struct snd_soc_card *card = codec->socdev->card;
+	struct snd_soc_codec *codec = rtd->codec;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_card *card = rtd->card;
 	int ret;
 	/* Codec is ready, now add/activate board specific controls */
 
 	/* Set up digital mute if not provided by the codec */
-	if (!codec_dai->ops) {
-		codec_dai->ops = &ams_delta_dai_ops;
-	} else if (!codec_dai->ops->digital_mute) {
-		codec_dai->ops->digital_mute = ams_delta_digital_mute;
+	if (!codec_dai->driver->ops) {
+		codec_dai->driver->ops = &ams_delta_dai_ops;
+	} else if (!codec_dai->driver->ops->digital_mute) {
+		codec_dai->driver->ops->digital_mute = ams_delta_digital_mute;
 	} else {
 		ams_delta_ops.startup = ams_delta_startup;
 		ams_delta_ops.shutdown = ams_delta_shutdown;
@@ -483,7 +484,7 @@ static int ams_delta_cx20442_init(struct snd_soc_codec *codec)
 
 	/* Add hook switch - can be used to control the codec from userspace
 	 * even if line discipline fails */
-	ret = snd_soc_jack_new(card, "hook_switch",
+	ret = snd_soc_jack_new(rtd->codec, "hook_switch",
 				SND_JACK_HEADSET, &ams_delta_hook_switch);
 	if (ret)
 		dev_warn(card->dev,
@@ -551,25 +552,20 @@ static int ams_delta_cx20442_init(struct snd_soc_codec *codec)
 static struct snd_soc_dai_link ams_delta_dai_link = {
 	.name = "CX20442",
 	.stream_name = "CX20442",
-	.cpu_dai = &omap_mcbsp_dai[0],
-	.codec_dai = &cx20442_dai,
+	.cpu_dai_name ="omap-mcbsp-dai.0",
+	.codec_dai_name = "cx20442-hifi",
 	.init = ams_delta_cx20442_init,
+	.platform_name = "omap-pcm-audio",
+	.codec_name = "cx20442-codec",
 	.ops = &ams_delta_ops,
 };
 
 /* Audio card driver */
 static struct snd_soc_card ams_delta_audio_card = {
 	.name = "AMS_DELTA",
-	.platform = &omap_soc_platform,
 	.dai_link = &ams_delta_dai_link,
 	.num_links = 1,
 	.set_bias_level = ams_delta_set_bias_level,
-};
-
-/* Audio subsystem */
-static struct snd_soc_device ams_delta_snd_soc_device = {
-	.card = &ams_delta_audio_card,
-	.codec_dev = &cx20442_codec_dev,
 };
 
 /* Module init/exit */
@@ -589,9 +585,7 @@ static int __init ams_delta_module_init(void)
 		return -ENOMEM;
 
 	platform_set_drvdata(ams_delta_audio_platform_device,
-				&ams_delta_snd_soc_device);
-	ams_delta_snd_soc_device.dev = &ams_delta_audio_platform_device->dev;
-	*(unsigned int *)ams_delta_dai_link.cpu_dai->private_data = OMAP_MCBSP1;
+				&ams_delta_audio_card);
 
 	ret = platform_device_add(ams_delta_audio_platform_device);
 	if (ret)
@@ -612,19 +606,6 @@ module_init(ams_delta_module_init);
 
 static void __exit ams_delta_module_exit(void)
 {
-	struct snd_soc_codec *codec;
-	struct tty_struct *tty;
-
-	if (ams_delta_audio_card.codec) {
-		codec = ams_delta_audio_card.codec;
-
-		if (codec->control_data) {
-			tty = codec->control_data;
-
-			tty_hangup(tty);
-		}
-	}
-
 	if (tty_unregister_ldisc(N_V253) != 0)
 		dev_warn(&ams_delta_audio_platform_device->dev,
 			"failed to unregister V253 line discipline\n");
