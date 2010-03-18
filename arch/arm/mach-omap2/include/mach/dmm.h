@@ -113,4 +113,16 @@ u32 dmm_get_page(void);
  */
 void dmm_free_page(u32 page_addr);
 
+/**
+ * Request a set of pages from the DMM free page stack.
+ * @return a pointer to a list of physical page addresses.
+ */
+u32 *dmm_get_pages(s32 n);
+
+/**
+ * Return a set of used pages to the DMM free page stack.
+ * @param list a pointer to a list of physical page addresses.
+ */
+void dmm_free_pages(u32 *list);
+
 #endif
