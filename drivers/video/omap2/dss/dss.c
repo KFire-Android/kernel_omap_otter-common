@@ -33,7 +33,11 @@
 #include <plat/display.h>
 #include "dss.h"
 
+#ifndef CONFIG_ARCH_OMAP4
 #define DSS_BASE			0x48050000
+#else
+#define DSS_BASE			0x58000000
+#endif
 
 #define DSS_SZ_REGS			SZ_512
 
