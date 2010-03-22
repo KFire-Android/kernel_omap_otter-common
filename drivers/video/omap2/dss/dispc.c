@@ -40,8 +40,11 @@
 
 #include "dss.h"
 
-/* DISPC */
-#define DISPC_BASE			0x48050400
+#ifndef CONFIG_ARCH_OMAP4
+#define DISPC_BASE		0x48050400
+#else
+#define DISPC_BASE		0x58001000
+#endif
 
 #define DISPC_SZ_REGS			SZ_1K
 
