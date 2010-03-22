@@ -42,7 +42,11 @@
 /*#define VERBOSE_IRQ*/
 #define DSI_CATCH_MISSING_TE
 
+#ifndef CONFIG_ARCH_OMAP4
 #define DSI_BASE		0x4804FC00
+#else
+#define DSI_BASE		0x58004000
+#endif
 
 struct dsi_reg { u16 idx; };
 
