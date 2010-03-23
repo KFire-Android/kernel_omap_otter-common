@@ -590,11 +590,16 @@ int dss_init(bool skip_init)
 	REG_FLD_MOD(DSS_CONTROL, 0, 2, 2);	/* venc clock mode = normal */
 #endif
 
-	r = request_irq(INT_24XX_DSS_IRQ,
-			cpu_is_omap24xx()
-			? dss_irq_handler_omap2
-			: dss_irq_handler_omap3,
-			0, "OMAP DSS", NULL);
+	if (!cpu_is_omap44xx())
+		r = request_irq(INT_24XX_DSS_IRQ,
+				cpu_is_omap24xx()
+				? dss_irq_handler_omap2
+				: dss_irq_handler_omap3,
+				0, "OMAP DSS", NULL);
+	else
+		r = request_irq(OMAP44XX_IRQ_DSS_DISPC,
+				dss_irq_handler_omap2,
+				0, "OMAP DSS", NULL);
 
 	if (r < 0) {
 		DSSERR("omap2 dss: request_irq failed\n");
@@ -622,7 +627,8 @@ int dss_init(bool skip_init)
 	return 0;
 
 fail2:
-	free_irq(INT_24XX_DSS_IRQ, NULL);
+	if (!cpu_is_omap44xx())
+		free_irq(INT_24XX_DSS_IRQ, NULL);
 fail1:
 	iounmap(dss.base);
 fail0:
@@ -634,8 +640,8 @@ void dss_exit(void)
 	if (cpu_is_omap34xx())
 		clk_put(dss.dpll4_m4_ck);
 
-	free_irq(INT_24XX_DSS_IRQ, NULL);
-
+	if (!cpu_is_omap44xx())
+		free_irq(INT_24XX_DSS_IRQ, NULL);
 	iounmap(dss.base);
 }
 
