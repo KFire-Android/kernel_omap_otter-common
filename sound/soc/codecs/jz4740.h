@@ -14,7 +14,7 @@
 #ifndef __SND_SOC_CODECS_JZ4740_CODEC_H__
 #define __SND_SOC_CODECS_JZ4740_CODEC_H__
 
-extern struct snd_soc_dai jz4740_codec_dai;
-extern struct snd_soc_codec_device soc_codec_dev_jz4740_codec;
+extern struct snd_soc_dai_driver jz4740_codec_dai;
+extern struct snd_soc_codec_driver soc_codec_dev_jz4740_codec;
 
 #endif
