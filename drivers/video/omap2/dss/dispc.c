@@ -986,6 +986,8 @@ static void dispc_read_plane_fifo_sizes(void)
 			size = FLD_GET(dispc_read_reg(fsz_reg[plane]), 8, 0);
 		else if (cpu_is_omap34xx())
 			size = FLD_GET(dispc_read_reg(fsz_reg[plane]), 10, 0);
+		else if (cpu_is_omap44xx())
+			size = FLD_GET(dispc_read_reg(fsz_reg[plane]), 15, 0);
 		else
 			BUG();
 
