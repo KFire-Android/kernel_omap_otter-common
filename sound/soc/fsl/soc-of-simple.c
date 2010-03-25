@@ -99,8 +99,8 @@ static void of_snd_soc_register_device(struct of_snd_soc_device *of_soc)
 
 }
 
-int of_snd_soc_register_codec(struct snd_soc_codec_device *codec_dev,
-			      void *codec_data, struct snd_soc_dai *dai,
+int of_snd_soc_register_codec(struct snd_soc_codec *codec,
+				  struct snd_soc_dai *dai,
 			      struct device_node *node)
 {
 	struct of_snd_soc_device *of_soc;
@@ -116,8 +116,6 @@ int of_snd_soc_register_codec(struct snd_soc_codec_device *codec_dev,
 	}
 
 	/* Store the codec data */
-	of_soc->device.codec_data = codec_data;
-	of_soc->device.codec_dev = codec_dev;
 	of_soc->dai_link.name = (char *)node->name;
 	of_soc->dai_link.stream_name = (char *)node->name;
 	of_soc->dai_link.codec_dai = dai;

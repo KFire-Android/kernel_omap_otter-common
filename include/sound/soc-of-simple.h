@@ -12,8 +12,8 @@
 #include <linux/of.h>
 #include <sound/soc.h>
 
-int of_snd_soc_register_codec(struct snd_soc_codec_device *codec_dev,
-			      void *codec_data, struct snd_soc_dai *dai,
+int of_snd_soc_register_codec(struct snd_soc_codec *codec,
+			      struct snd_soc_dai *dai,
 			      struct device_node *node);
 
 int of_snd_soc_register_platform(struct snd_soc_platform *platform,
