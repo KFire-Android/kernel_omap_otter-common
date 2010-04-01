@@ -33,6 +33,9 @@
 #endif
 #define MAX_MANAGERS	3
 
+/* TI Private V4L2 ioctls */
+#define V4L2_CID_TI_DISPC_OVERLAY	(V4L2_CID_PRIVATE_BASE + 0)
+
 /* Enum for Rotation
  * DSS understands rotation in 0, 1, 2, 3 context
  * while V4L2 driver understands it as 0, 90, 180, 270

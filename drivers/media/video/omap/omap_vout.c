@@ -2195,6 +2195,7 @@ static int vidioc_queryctrl(struct file *file, void *fh,
 		struct v4l2_queryctrl *ctrl)
 {
 	int ret = 0;
+	struct omap_vout_device *vout = fh;
 
 	switch (ctrl->id) {
 	case V4L2_CID_ROTATE:
@@ -2205,6 +2206,14 @@ static int vidioc_queryctrl(struct file *file, void *fh,
 		break;
 	case V4L2_CID_VFLIP:
 		ret = v4l2_ctrl_query_fill(ctrl, 0, 1, 1, 0);
+		break;
+	case V4L2_CID_TI_DISPC_OVERLAY:
+		/* not settable for now */
+		ret = v4l2_ctrl_query_fill(ctrl,
+					   vout->vid_info.overlays[0]->id,
+					   vout->vid_info.overlays[0]->id,
+					   1,
+					   vout->vid_info.overlays[0]->id);
 		break;
 	default:
 		ctrl->name[0] = '\0';
@@ -2240,6 +2249,9 @@ static int vidioc_g_ctrl(struct file *file, void *fh, struct v4l2_control *ctrl)
 	case V4L2_CID_VFLIP:
 		ctrl->value = vout->control[2].value;
 		break;
+	case V4L2_CID_TI_DISPC_OVERLAY:
+		ctrl->value = vout->vid_info.overlays[0]->id;
+		return 0;
 	default:
 		ret = -EINVAL;
 	}
