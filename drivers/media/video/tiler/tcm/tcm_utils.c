@@ -7,18 +7,19 @@
 /*
 * Assignment Utility Function
 */
-void assign(IN struct area_spec *a, IN u16 x0, IN u16 y0, IN u16 x1, IN u16 y1)
+void assign(IN struct tcm_area *a, IN u16 x0, IN u16 y0, IN u16 x1, IN u16 y1)
 {
-	a->x0 = x0;
-	a->x1 = x1;
-	a->y1 = y1;
-	a->y0 = y0;
+	a->p0.x = x0;
+	a->p0.y = y0;
+	a->p1.x = x1;
+	a->p1.y = y1;
+
 }
 
-void dump_area(struct area_spec *area)
+void dump_area(struct tcm_area *area)
 {
-	printk(KERN_NOTICE "(%d %d) - (%d %d)\n", area->x0, area->y0, area->x1,
-								area->y1);
+	printk(KERN_NOTICE "(%d %d) - (%d %d)\n", area->p0.x,
+		area->p0.y, area->p1.x, area->p1.y);
 }
 
 
@@ -26,15 +27,15 @@ void dump_area(struct area_spec *area)
  *      Inserts a given area at the end of a given list
  */
 s32 insert_element(INOUT struct area_spec_list **list,
-				IN struct area_spec *newArea, IN u16 area_type)
+				IN struct tcm_area *newArea, IN u16 area_type)
 {
 	struct area_spec_list *list_iter = *list;
 	struct area_spec_list *new_elem = NULL;
 	if (list_iter == NULL) {
 		list_iter = kmalloc(sizeof(struct area_spec_list), GFP_KERNEL);
 		/* P("Created new List: 0x%x\n",list_iter); */
-		assign(&list_iter->area, newArea->x0, newArea->y0,
-						newArea->x1, newArea->y1);
+		assign(&list_iter->area, newArea->p0.x, newArea->p0.y,
+						newArea->p1.x, newArea->p1.y);
 		list_iter->area_type = area_type;
 		list_iter->next = NULL;
 		*list = list_iter;
@@ -49,8 +50,8 @@ s32 insert_element(INOUT struct area_spec_list **list,
 	/* P("Adding to the end of list\n"); */
 	/*To Do: Check for malloc failures */
 	new_elem = kmalloc(sizeof(struct area_spec_list), GFP_KERNEL);
-	assign(&new_elem->area, newArea->x0, newArea->y0, newArea->x1,
-								newArea->y1);
+	assign(&new_elem->area, newArea->p0.x, newArea->p0.y, newArea->p1.x,
+								newArea->p1.y);
 	new_elem->area_type = area_type;
 	new_elem->next = NULL;
 	list_iter->next = new_elem;
@@ -58,21 +59,21 @@ s32 insert_element(INOUT struct area_spec_list **list,
 }
 
 s32 rem_element_with_match(struct area_spec_list **listHead,
-			struct area_spec *to_be_removed, u16 *area_type)
+			struct tcm_area *to_be_removed, u16 *area_type)
 {
 	struct area_spec_list *temp_list = NULL;
 	struct area_spec_list *matched_elem = NULL;
-	struct area_spec *cur_area = NULL;
+	struct tcm_area *cur_area = NULL;
 	u8 found_flag = NO;
 
 	/*If the area to be removed matchs the list head itself,
 	we need to put the next one as list head */
 	if (*listHead !=  NULL) {
 		cur_area = &(*listHead)->area;
-		if (cur_area->x0 == to_be_removed->x0 && cur_area->y0 ==
-			to_be_removed->y0 && cur_area->x1 ==
-			to_be_removed->x1 && cur_area->y1 ==
-			to_be_removed->y1) {
+		if (cur_area->p0.x == to_be_removed->p0.x && cur_area->p0.y ==
+			to_be_removed->p0.y && cur_area->p1.x ==
+			to_be_removed->p1.x && cur_area->p1.y ==
+			to_be_removed->p1.y) {
 			*area_type = (*listHead)->area_type;
 			P1("Match found, Now Removing Area : %s\n",
 				AREA_STR(a_str, cur_area));
@@ -90,10 +91,10 @@ s32 rem_element_with_match(struct area_spec_list **listHead,
 			we check for the second in list */
 		if (temp_list->next != NULL) {
 			cur_area = &temp_list->next->area;
-			if (cur_area->x0 == to_be_removed->x0 && cur_area->y0 ==
-				to_be_removed->y0 && cur_area->x1 ==
-				to_be_removed->x1 && cur_area->y1 ==
-				to_be_removed->y1) {
+			if (cur_area->p0.x == to_be_removed->p0.x
+				&& cur_area->p0.y == to_be_removed->p0.y
+				&& cur_area->p1.x == to_be_removed->p1.x
+				&& cur_area->p1.y == to_be_removed->p1.y) {
 				P1("Match found, Now Removing Area : %s\n",
 					AREA_STR(a_str, cur_area));
 				matched_elem = temp_list->next;
@@ -174,88 +175,5 @@ s32 dump_neigh_stats(struct neighbour_stats *neighbour)
 						neighbour->left_boundary);
 	P("Rigt Occ:Boundary  %d:%d\n", neighbour->right_occupied,
 						neighbour->right_boundary);
-	return TilerErrorNone;
-}
-
-s32 move_left(u16 x, u16 y, u32 num_of_pages, u16 *xx, u16 *yy)
-{
-	/* Num of Pages remaining to the left of the same ROW. */
-	u16 num_of_pages_left = x;
-	u16 remain_pages = 0;
-
-	/* I want this function to be really fast and dont take too much time,
-					so i will not do detailed checks */
-	if (x > MAX_X_DIMMENSION || y > MAX_Y_DIMMENSION  || xx == NULL ||
-								yy == NULL) {
-		PE("Error in input arguments\n");
-		return TilerErrorInvalidArg;
-	}
-
-	/*Checking if we are going to go out of bound with the given
-	num_of_pages */
-	if (num_of_pages > x + (y * MAX_X_DIMMENSION)) {
-		PE("Overflows off the top left corner, can go at the Max (%d)\
-			to left from (%d, %d)\n", (x + y * MAX_X_DIMMENSION),
-									x, y);
-		return TilerErrorOverFlow;
-	}
-
-	if (num_of_pages > num_of_pages_left) {
-		/* we fit the num of Pages Left on the same column */
-		remain_pages = num_of_pages - num_of_pages_left;
-
-		if (0 == remain_pages % MAX_X_DIMMENSION) {
-			*xx = 0;
-			*yy = y - remain_pages / MAX_X_DIMMENSION;
-		} else {
-			*xx = MAX_X_DIMMENSION - remain_pages %
-							MAX_X_DIMMENSION;
-			*yy = y - (1 + remain_pages / MAX_X_DIMMENSION);
-		}
-	} else {
-		*xx = x - num_of_pages;
-		*yy = y;
-	}
-
-	return TilerErrorNone;
-}
-
-s32 move_right(u16 x, u16 y, u32 num_of_pages, u16 *xx, u16 *yy)
-{
-	u32 avail_pages = (MAX_X_DIMMENSION - x - 1) +
-				(MAX_Y_DIMMENSION - y - 1) * MAX_X_DIMMENSION;
-	 /* Num of Pages remaining to the Right of the same ROW. */
-	u16 num_of_pages_right = MAX_X_DIMMENSION - 1 - x;
-	u16 remain_pages = 0;
-
-	if (x > MAX_X_DIMMENSION || y > MAX_Y_DIMMENSION || xx == NULL ||
-								yy == NULL) {
-		PE("Error in input arguments");
-		return TilerErrorInvalidArg;
-	}
-
-	/*Checking if we are going to go out of bound with the given
-	num_of_pages */
-	if (num_of_pages > avail_pages) {
-		PE("Overflows off the top Right corner, can go at the Max (%d)\
-			to Right from (%d, %d)\n", avail_pages, x, y);
-		return TilerErrorOverFlow;
-	}
-
-	if (num_of_pages > num_of_pages_right) {
-		remain_pages = num_of_pages - num_of_pages_right;
-
-		if (0 == remain_pages % MAX_X_DIMMENSION) {
-			*xx = MAX_X_DIMMENSION - 1;
-			*yy = y + remain_pages / MAX_X_DIMMENSION;
-		} else {
-			*xx = remain_pages % MAX_X_DIMMENSION - 1;
-			*yy = y + (1 + remain_pages / MAX_X_DIMMENSION);
-		}
-	} else {
-		*xx = x + num_of_pages;
-		*yy = y;
-	}
-
 	return TilerErrorNone;
 }
