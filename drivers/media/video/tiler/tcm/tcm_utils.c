@@ -36,6 +36,8 @@ s32 insert_element(INOUT struct area_spec_list **list,
 		/* P("Created new List: 0x%x\n",list_iter); */
 		assign(&list_iter->area, newArea->p0.x, newArea->p0.y,
 						newArea->p1.x, newArea->p1.y);
+		list_iter->area.tcm = newArea->tcm;
+		list_iter->area.type = newArea->type;
 		list_iter->area_type = area_type;
 		list_iter->next = NULL;
 		*list = list_iter;
@@ -52,6 +54,8 @@ s32 insert_element(INOUT struct area_spec_list **list,
 	new_elem = kmalloc(sizeof(struct area_spec_list), GFP_KERNEL);
 	assign(&new_elem->area, newArea->p0.x, newArea->p0.y, newArea->p1.x,
 								newArea->p1.y);
+	new_elem->area.tcm = newArea->tcm;
+	new_elem->area.type = newArea->type;
 	new_elem->area_type = area_type;
 	new_elem->next = NULL;
 	list_iter->next = new_elem;

@@ -145,6 +145,8 @@ struct tcm *sita_init(u16 width, u16 height, void *attr)
 		return tmp;
 	}
 
+	memset(pvt, 0, sizeof(struct sita_pvt));
+	pvt->res_list = NULL;
 
 	/*Updating the pointers to SiTA implementation APIs*/
 	tmp->height = height;
