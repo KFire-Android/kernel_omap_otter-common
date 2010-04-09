@@ -21,6 +21,8 @@
 #include "tcm_sita.h"
 #include "tcm_utils.h"
 
+#define X_SCAN_LIMITER	1
+#define Y_SCAN_LIMITER	1
 
 /* Individual selection criteria for different scan areas */
 static s32 g_scan_criteria_l2r_t2b = CR_BIAS_HORIZONTAL;
@@ -118,7 +120,7 @@ struct tcm *sita_init(u16 width, u16 height, void *attr)
 	s32 i = 0;
 	memset(&area, 0, sizeof(struct tcm_area));
 
-	if (!(width & height)) {
+	if (width == 0 ||  height == 0) {
 		PE("width/height is Zero\n");
 		return tmp;
 	}
@@ -143,15 +145,25 @@ struct tcm *sita_init(u16 width, u16 height, void *attr)
 		return tmp;
 	}
 
+
+	/*Updating the pointers to SiTA implementation APIs*/
+	tmp->height = height;
+	tmp->width = width;
+	tmp->reserve_2d = sita_reserve_2d;
+	tmp->reserve_1d = sita_reserve_1d;
+	tmp->get_parent = sita_get_parent;
+	tmp->free = sita_free;
+	tmp->deinit = sita_deinit;
+	tmp->pvt = (void *)pvt;
 	pvt->height = height;
 	pvt->width = width;
+
 	mutex_init(&(pvt->mtx));
 	pvt->tcm_map = NULL;
 
-
 	/* Creating tam map */
 	pvt->tcm_map = (struct tiler_page **)
-	       kmalloc(sizeof(struct tiler_page *) * pvt->height, GFP_KERNEL);
+	       kmalloc(sizeof(struct tiler_page *) * pvt->width, GFP_KERNEL);
 
 	if (pvt->tcm_map == NULL) {
 		kfree(pvt);
@@ -161,10 +173,10 @@ struct tcm *sita_init(u16 width, u16 height, void *attr)
 		return tmp;
 	}
 
-	for (i = 0; i < pvt->height; ++i) {
+	for (i = 0; i < pvt->width; ++i) {
 		pvt->tcm_map[i] = NULL;
 		pvt->tcm_map[i] = (struct tiler_page *)
-		kmalloc(sizeof(struct tiler_page) * pvt->width, GFP_KERNEL);
+		kmalloc(sizeof(struct tiler_page) * pvt->height, GFP_KERNEL);
 		if (pvt->tcm_map[i] == NULL) {
 			for (i -= 1; i >= 0; i--) {
 				kfree(pvt->tcm_map[i]);
@@ -199,14 +211,6 @@ struct tcm *sita_init(u16 width, u16 height, void *attr)
 	insert_area_with_tiler_page(tmp, &area, init_tile);
 	MUTEX_REL(&(pvt->mtx));
 
-	tmp->pvt = (void *)pvt;
-
-	/*Updating the pointers to SiTA implementation APIs*/
-	tmp->reserve_2d = sita_reserve_2d;
-	tmp->reserve_1d = sita_reserve_1d;
-	tmp->get_parent = sita_get_parent;
-	tmp->free = sita_free;
-	tmp->deinit = sita_deinit;
 	return tmp;
 }
 
