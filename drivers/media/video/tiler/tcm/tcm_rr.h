@@ -38,19 +38,14 @@
 				((align == ALIGN_16) ? 16 : 1)))
 
 /*Provide inclusive length between co-ordinates */
-#define INCL_LEN(high, low)		(high - low + 1)
-#define INCL_LEN_MOD(start, end)	((start > end) ? (start-end + 1) : \
-		(end - start + 1))
+#define INCL_LEN(high, low)		((high) - (low) + 1)
+#define INCL_LEN_MOD(start, end)   ((start) > (end) ? (start) - (end) + 1 : \
+		(end) - (start) + 1)
 
 #define TOTAL_BOUNDARY(stat) ((stat)->top_boundary + (stat)->bottom_boundary + \
 				(stat)->left_boundary + (stat)->right_boundary)
 #define TOTAL_OCCUPIED(stat) ((stat)->top_occupied + (stat)->bottom_occupied + \
 				(stat)->left_occupied + (stat)->right_occupied)
-
-
-#define MUTEX_LOCK(m)   (mutex_lock(m))
-#define MUTEX_REL(m)    (mutex_unlock(m))
-
 
 enum tiler_error {
 	TilerErrorNone = 0,
@@ -65,10 +60,10 @@ enum tiler_error {
 };
 
 enum Criteria {
-	CR_MAX_NEIGHS = 0x01,
-	CR_FIRST_FOUND = 0x10,
-	CR_BIAS_HORIZONTAL = 0x20,
-	CR_BIAS_VERTICAL = 0x40,
+	CR_MAX_NEIGHS       = 0x01,
+	CR_FIRST_FOUND      = 0x10,
+	CR_BIAS_HORIZONTAL  = 0x20,
+	CR_BIAS_VERTICAL    = 0x40,
 	CR_DIAGONAL_BALANCE = 0x80
 };
 
@@ -113,7 +108,6 @@ struct tiler_page {
 	u16 type;
 	u32 reserved;
 };
-
 
 struct sita_pvt {
 	u16 width;

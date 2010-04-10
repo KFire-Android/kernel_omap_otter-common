@@ -26,12 +26,13 @@
 
 #ifdef DEBUG
 #define P(fmt, args...) printk(KERN_NOTICE "%s()::[%d]\n", __func__, __LINE__);
-
 #else
 #define P(fmt, args...)
 #endif
+#define P0 P
 
 #define PE(fmt, args...) printk(KERN_ERR "%s()::[%d]\n", __func__, __LINE__);
+#define P5 PE
 
 #ifdef DEBUG_ALL
 #define L1
