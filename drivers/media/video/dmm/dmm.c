@@ -211,7 +211,7 @@ static s32 __init dmm_init(void)
 		dmm_major = MAJOR(dev);
 	}
 
-	dmm_device = kmalloc(sizeof(struct dmm_dev), GFP_KERNEL);
+	dmm_device = kmalloc(sizeof(*dmm_device), GFP_KERNEL);
 	if (!dmm_device) {
 		unregister_chrdev_region(dev, 1);
 		return -ENOMEM;

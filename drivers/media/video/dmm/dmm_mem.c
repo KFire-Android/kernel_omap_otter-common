@@ -83,10 +83,10 @@ static u32 fill_page_stack(struct mem *mem)
 	struct mem *m = NULL;
 
 	for (i = 0; i < MAX; i++) {
-		m = kmalloc(sizeof(struct mem), GFP_KERNEL);
+		m = kmalloc(sizeof(*m), GFP_KERNEL);
 		if (!m)
 			return -ENOMEM;
-		memset(m, 0x0, sizeof(struct mem));
+		memset(m, 0x0, sizeof(*m));
 
 		m->pg = alloc_page(GFP_KERNEL | GFP_DMA);
 		if (!m->pg) {
@@ -207,10 +207,10 @@ u32 *dmm_get_pages(s32 n)
 		if (fill_page_stack(&free_list))
 			return NULL;
 
-	f = kmalloc(sizeof(struct fast), GFP_KERNEL);
+	f = kmalloc(sizeof(*f), GFP_KERNEL);
 	if (!f)
 		return NULL;
-	memset(f, 0x0, sizeof(struct fast));
+	memset(f, 0x0, sizeof(*f));
 
 	/* array of mem struct pointers */
 	f->mem = kmalloc(n * 4, GFP_KERNEL);
