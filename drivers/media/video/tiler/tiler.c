@@ -59,11 +59,7 @@ struct __buf_info {
 struct mem_info {
 	struct list_head list;
 	u32 sys_addr;          /* system space (L3) tiler addr */
-	u32 *page;             /* virt addr to page-list */
-	dma_addr_t page_pa;    /* phys addr to page-list */
-	u32 size;              /* size of page-list */
 	u32 num_pg;            /* number of pages in page-list */
-	s8 mapped;             /* flag to indicate user mapped mem */
 	u32 usr;               /* user space address */
 	u32 *pg_ptr;           /* list of mapped struct page pointers */
 	struct tcm_area area;
@@ -241,19 +237,61 @@ static s32 tiler_mmap(struct file *filp, struct vm_area_struct *vma)
 	return 0;
 }
 
+static s32 tiler_pat_refill(struct tcm_area *area, u32 *ptr)
+{
+	s32 res = 0;
+	s32 size = tcm_sizeof(*area) * sizeof(*ptr);
+	u32 *page;
+	dma_addr_t page_pa;
+	struct pat pat_desc = {0};
+	struct tcm_area slice, area_s;
+
+	page = dma_alloc_coherent(NULL, size, &page_pa, GFP_ATOMIC);
+	if (!page)
+		return -ENOMEM;
+
+	/* send pat descriptor to dmm driver */
+	pat_desc.ctrl.dir = 0;
+	pat_desc.ctrl.ini = 0;
+	pat_desc.ctrl.lut_id = 0;
+	pat_desc.ctrl.start = 1;
+	pat_desc.ctrl.sync = 0;
+	pat_desc.next = NULL;
+
+	/* must be a 16-byte aligned physical address */
+	pat_desc.data = page_pa;
+
+	tcm_for_each_slice(slice, *area, area_s) {
+		pat_desc.area.x0 = slice.p0.x;
+		pat_desc.area.y0 = slice.p0.y;
+		pat_desc.area.x1 = slice.p1.x;
+		pat_desc.area.y1 = slice.p1.y;
+
+		memcpy(page, ptr, sizeof(*ptr) * tcm_sizeof(slice));
+		ptr += tcm_sizeof(slice);
+
+		if (dmm_pat_refill(&pat_desc, MANUAL)) {
+			res = -EFAULT;
+			break;
+		}
+	}
+
+	dma_free_coherent(NULL, size, page, page_pa);
+
+	return res;
+}
+
 static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 								u32 usr_addr)
 {
 	u16 x_area = 0, y_area = 0;
-	u32 i = 0, tmp = -1, *ptr;
+	u32 i = 0, tmp = -1;
 	u8 write = 0;
-	struct pat pat_desc = {0};
 	struct mem_info *mi = NULL;
 	struct page *page = NULL;
 	struct task_struct *curr_task = current;
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma = NULL;
-	struct tcm_area area, area_s;
 
 	/* we only support mapping a user buffer in page mode */
 	if (fmt != TILFMT_PAGE)
@@ -278,10 +316,16 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 
 	/* allocate pages */
 	mi->num_pg = tcm_sizeof(mi->area);
-	mi->size = mi->num_pg
-		 * sizeof(*ptr);
 	mi->sys_addr = *sys_addr;
 	mi->usr = usr_addr;
+
+	mi->mem = kmalloc(mi->num_pg * sizeof(*mi->mem), GFP_KERNEL);
+	if (!mi->mem)
+		goto free;
+
+	mi->pg_ptr = kmalloc(mi->num_pg * sizeof(*mi->pg_ptr), GFP_KERNEL);
+	if (!mi->pg_ptr)
+		goto free;
 
 	/*
 	 * Important Note: usr_addr is mapped from user
@@ -304,25 +348,8 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 	if (!vma) {
 		printk(KERN_ERR "Failed to get the vma region for "
 			"user buffer.\n");
-		up_read(&mm->mmap_sem);
-		kfree(mi);
-		return -EFAULT;
+		goto fault;
 	}
-
-	ptr = mi->page = dma_alloc_coherent(NULL, mi->size, &mi->page_pa,
-								GFP_ATOMIC);
-	if (!mi->page) {
-		up_read(&mm->mmap_sem);
-		goto free;
-	}
-	memset(mi->page, 0x0, mi->size);
-
-	mi->pg_ptr = kmalloc(mi->size, GFP_KERNEL);
-	if (!mi->pg_ptr) {
-		up_read(&mm->mmap_sem);
-		goto free;
-	}
-	memset(mi->pg_ptr, 0x0, mi->size);
 
 	if (vma->vm_flags & (VM_WRITE | VM_MAYWRITE))
 		write = 1;
@@ -336,48 +363,27 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 							"get_user_pages()\n");
 			}
 			mi->pg_ptr[i] = (u32)page;
-			mi->page[i] = page_to_phys(page);
+			mi->mem[i] = page_to_phys(page);
 			tmp += PAGE_SIZE;
 		} else {
 			printk(KERN_ERR "get_user_pages() failed\n");
-			up_read(&mm->mmap_sem);
-			goto free;
+			goto fault;
 		}
 	}
 	up_read(&mm->mmap_sem);
 
-	mi->mapped = 1;
 	mutex_lock(&mtx);
 	list_add(&mi->list, &mem_list.list);
 	mutex_unlock(&mtx);
 
-	/* send pat descriptor to dmm driver */
-	pat_desc.ctrl.dir = 0;
-	pat_desc.ctrl.ini = 0;
-	pat_desc.ctrl.lut_id = 0;
-	pat_desc.ctrl.start = 1;
-	pat_desc.ctrl.sync = 0;
-	pat_desc.next = NULL;
+	if (tiler_pat_refill(&mi->area, mi->mem))
+		goto release;
 
-	/* must be a 16-byte aligned physical address */
-	pat_desc.data = mi->page_pa;
-	tcm_for_each_slice(area, mi->area, area_s)
-	{
-		pat_desc.area.x0 = area.p0.x;
-		pat_desc.area.y0 = area.p0.y;
-		pat_desc.area.x1 = area.p1.x;
-		pat_desc.area.y1 = area.p1.y;
-
-		/* mi->page is not needed after PAT refill, so we can destroy */
-		if (ptr != mi->page)
-			memcpy(mi->page, ptr, sizeof(*ptr) * tcm_sizeof(area));
-		ptr += tcm_sizeof(area);
-
-		if (dmm_pat_refill(&pat_desc, MANUAL))
-			goto release;
-	}
-
+	/* for safety */
+	kfree(mi->mem);
+	mi->mem = NULL;
 	return 0;
+
 release:
 	for (i = 0; i < mi->num_pg; i++) {
 		page = (struct page *)mi->pg_ptr[i];
@@ -385,10 +391,15 @@ release:
 			SetPageDirty(page);
 		page_cache_release(page);
 	}
-free:
+fault:
+	up_read(&mm->mmap_sem);
+	kfree(mi->mem);
 	kfree(mi->pg_ptr);
-	if (mi->page && mi->page_pa)
-		dma_free_coherent(NULL, mi->size, mi->page, mi->page_pa);
+	kfree(mi);
+	return -EFAULT;
+free:
+	kfree(mi->mem);
+	kfree(mi->pg_ptr);
 	kfree(mi);
 	return -ENOMEM;
 }
@@ -408,9 +419,7 @@ s32 tiler_free(u32 sys_addr)
 			if (tcm_free(&mi->area))
 				printk(KERN_NOTICE "warning: failed to "
 						"unreserve tiler area.\n");
-			if (!mi->mapped) {
-				dmm_free_pages(mi->mem);
-			} else {
+			if (mi->pg_ptr) {
 				for (i = 0; i < mi->num_pg; i++) {
 					page = (struct page *)mi->pg_ptr[i];
 					if (!PageReserved(page))
@@ -418,9 +427,9 @@ s32 tiler_free(u32 sys_addr)
 					page_cache_release(page);
 				}
 				kfree(mi->pg_ptr);
+			} else {
+				dmm_free_pages(mi->mem);
 			}
-			dma_free_coherent(NULL, mi->size, mi->page,
-								mi->page_pa);
 			list_del(pos);
 			kfree(mi);
 		}
@@ -667,10 +676,8 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 {
 	u16 x_area = 0, y_area = 0, band;
-	u32 *ptr;
-	struct pat pat_desc = {0};
+
 	struct mem_info *mi = NULL;
-	struct tcm_area area, area_s;
 
 	/* reserve area in tiler container */
 	if (__adjust_area(fmt, width, height, &x_area, &y_area))
@@ -707,14 +714,8 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 
 	/* allocate pages */
 	mi->num_pg = tcm_sizeof(mi->area);
-	mi->size =  mi->num_pg * sizeof(*ptr);
-	mi->page = dma_alloc_coherent(NULL, mi->size, &mi->page_pa, GFP_ATOMIC);
-	if (!mi->page) {
-		kfree(mi); return -ENOMEM;
-	}
-	memset(mi->page, 0x0, mi->size);
 
-	ptr = mi->mem = dmm_get_pages(mi->num_pg);
+	mi->mem = dmm_get_pages(mi->num_pg);
 	if (!mi->mem)
 		goto cleanup;
 
@@ -724,36 +725,12 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 	list_add(&(mi->list), &mem_list.list);
 	mutex_unlock(&mtx);
 
-	/* send pat descriptor to dmm driver */
-	pat_desc.ctrl.dir = 0;
-	pat_desc.ctrl.ini = 0;
-	pat_desc.ctrl.lut_id = 0;
-	pat_desc.ctrl.start = 1;
-	pat_desc.ctrl.sync = 0;
-	pat_desc.next = NULL;
+	/* program PAT */
+	if (0 == tiler_pat_refill(&mi->area, mi->mem))
+		return 0x0;
 
-	/* must be a 16-byte aligned physical address */
-	pat_desc.data = mi->page_pa;
-
-	tcm_for_each_slice(area, mi->area, area_s) {
-		pat_desc.area.x0 = area.p0.x;
-		pat_desc.area.y0 = area.p0.y;
-		pat_desc.area.x1 = area.p1.x;
-		pat_desc.area.y1 = area.p1.y;
-
-		memcpy(mi->page, ptr, sizeof(*ptr) * tcm_sizeof(area));
-		ptr += tcm_sizeof(area);
-
-		if (dmm_pat_refill(&pat_desc, MANUAL))
-			goto cleanup;
-	}
-
-	/* for compatibility */
-	memcpy(mi->page, mi->mem, mi->size);
-
-	return 0x0;
 cleanup:
-	dma_free_coherent(NULL, mi->size, mi->page, mi->page_pa);
+	kfree(mi->mem);
 	kfree(mi);
 	return -ENOMEM;
 }
@@ -764,7 +741,6 @@ static void __exit tiler_exit(void)
 	struct __buf_info *_b = NULL;
 	struct mem_info *mi = NULL;
 	struct list_head *pos = NULL, *q = NULL;
-	u32 i = -1;
 
 	tcm_deinit(tcm);
 	/* remove any leftover info structs that haven't been unregistered */
@@ -782,11 +758,8 @@ static void __exit tiler_exit(void)
 	pos = NULL, q = NULL;
 	list_for_each_safe(pos, q, &mem_list.list) {
 		mi = list_entry(pos, struct mem_info, list);
-		if (!mi->mapped) {
-			for (i = 0; i < mi->num_pg; i++)
-				dmm_free_page(mi->page[i]);
-		}
-		dma_free_coherent(NULL, mi->size, mi->page, mi->page_pa);
+		if (!mi->pg_ptr)
+			dmm_free_pages(mi->mem);
 		list_del(pos);
 		kfree(mi);
 	}
