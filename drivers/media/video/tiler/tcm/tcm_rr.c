@@ -250,18 +250,8 @@ static s32 sita_reserve_1d(struct tcm *tcm, u32 num_of_pages,
 	struct sita_pvt *pvt = (struct sita_pvt *)tcm->pvt;
 
 	P1("Allocate %d pages\n", num_of_pages);
+	allocated_pages->type = TCM_1D;
 
-	/* Basic checks */
-	if (allocated_pages == NULL) {
-		PE("NULL input found\n");
-		return TilerErrorInvalidArg;
-	}
-	/* Delibrately checking outside to give out relavent error info */
-	if (num_of_pages > pvt->width * pvt->height) {
-		PE("num_of_pages exceed maximum pages available(%d)\n",
-		   pvt->width * pvt->height);
-		return TilerErrorNoRoom;
-	}
 	mutex_lock(&(pvt->mtx));
 #ifdef RESTRICT_1D
 	/* scan within predefined 1D boundary */
@@ -313,22 +303,14 @@ static s32 sita_reserve_2d(struct tcm *tcm, u16 h, u16 w, u8 align,
 
 	P1("\n\nStart of allocation 2D Area for WxH : (%d x %d) with Alignment"
 							"%d \n", w, h, stride);
+	allocated_area->type = TCM_2D;
 
-	/* Checking for input arguments */
-	if (allocated_area == NULL || tcm == NULL) {
-		PE("NULL input found\n");
-		return TilerErrorInvalidArg;
-	}
 	/* ALIGN_16 is currently NOT supported*/
 	if (align == ALIGN_16) {
 		PE("Align 16 NOT supported \n");
 		return TilerErrorNotSupported;
 	}
-	/*check if width and height are within limits */
-	if (w > pvt->width || w == 0 || h > pvt->height || h == 0) {
-		PE("Invalid dimension:: %d x %d\n", w, h);
-		return TilerErrorInvalidDimension;
-	}
+
 	mutex_lock(&(pvt->mtx));
 	ret = scan_areas_and_find_fit(tcm, w, h, stride, allocated_area);
 	if (ret != TilerErrorNone) {

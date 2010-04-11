@@ -125,7 +125,7 @@ static inline s32 tcm_deinit(struct tcm *tcm)
  *  	   -EINVAL: invalid area, -ENOMEM: not enough space for
  *  	    allocation.
  */
-static inline s32 tcm_reserve_2d(struct tcm *tcm, u16 height, u16 width,
+static inline s32 tcm_reserve_2d(struct tcm *tcm, u16 width, u16 height,
 				 u16 align, struct tcm_area *area)
 {
 	/* perform rudimentary error checking */
@@ -250,7 +250,7 @@ static inline void tcm_slice(struct tcm_area *parent, struct tcm_area *slice)
 	*slice = *parent;
 
 	/* check if we need to slice */
-	if (slice->type == TCM_1D &&
+	if (slice->tcm && slice->type == TCM_1D &&
 		slice->p0.y != slice->p1.y &&
 		(slice->p0.x || (slice->p1.x != slice->tcm->width - 1))) {
 		/* set end point of slice (start always remains) */
@@ -267,8 +267,6 @@ static inline void tcm_slice(struct tcm_area *parent, struct tcm_area *slice)
 
 /**
  * Verifies if a tcm area is logically valid.
- *
- * @author Lajos Molnar (3/17/2010)
  *
  * @param area		Pointer to tcm area
  *
@@ -292,6 +290,16 @@ static inline bool tcm_area_is_valid(struct tcm_area *area)
 	       );
 }
 
+/* calculate number of slots in an area */
+static inline u16 __tcm_sizeof(struct tcm_area *area)
+{
+	return (area->type == TCM_2D ?
+		(area->p1.x - area->p0.x + 1) * (area->p1.y - area->p0.y + 1) :
+		(area->p1.x - area->p0.x + 1) + (area->p1.y - area->p0.y) *
+							area->tcm->width);
+}
+#define tcm_sizeof(area) __tcm_sizeof(&(area))
+
 /**
  * Iterate through 2D slices of a valid area. Behaves
  * syntactically as a for(;;) statement.
@@ -304,10 +312,9 @@ static inline bool tcm_area_is_valid(struct tcm_area *area)
  *  			throughout the loop.
  *
  */
-#define tcm_for_each_slice(var, area) \
-	for (typeof(var) _parent = *area, \
-	     tcm_slice(_parent, &var); \
-	     var.tcm; tcm_slice(_parent, &var))
-
+#define tcm_for_each_slice(var, area, safe) \
+	for (safe = area, \
+	     tcm_slice(&safe, &var); \
+	     var.tcm; tcm_slice(&safe, &var))
 
 #endif /* _TCM_H_ */
