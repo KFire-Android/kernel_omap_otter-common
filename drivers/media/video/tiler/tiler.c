@@ -31,10 +31,10 @@
 #include <linux/dma-mapping.h>
 #include <linux/pagemap.h>         /* page_cache_release() */
 
-#include "tiler.h"
+#include <mach/tiler.h>
+#include <mach/dmm.h>
+#include "../dmm/dmm_mem.h"
 #include "tiler_def.h"
-#include "../dmm/dmm.h"
-
 #include "tcm/tcm_sita.h"	/* Algo Specific header */
 
 struct tiler_dev {
@@ -66,6 +66,8 @@ struct mem_info {
 	u32 *mem;              /* list of alloced phys addresses */
 };
 
+#define TILER_FORMATS 4
+
 static s32 tiler_major;
 static s32 tiler_minor;
 static struct tiler_dev *tiler_device;
@@ -74,7 +76,15 @@ static u32 id;
 static struct __buf_info buf_list;
 static struct mem_info mem_list;
 static struct mutex mtx;
-static struct tcm *tcm;
+static struct tcm *tcm[TILER_FORMATS];
+static struct tmm *tmm[TILER_FORMATS];
+
+#define TCM(fmt)        tcm[(fmt) - TILFMT_8BIT]
+#define TCM_SS(ssptr)   TCM(TILER_GET_ACC_MODE(ssptr))
+#define TCM_SET(fmt, i) tcm[(fmt) - TILFMT_8BIT] = i
+#define TMM(fmt)        tmm[(fmt) - TILFMT_8BIT]
+#define TMM_SS(ssptr)   TMM(TILER_GET_ACC_MODE(ssptr))
+#define TMM_SET(fmt, i) tmm[(fmt) - TILFMT_8BIT] = i
 
 static s32 __adjust_area(enum tiler_fmt fmt, u32 width, u32 height, u16 *x_area,
 		u16 *y_area)
@@ -127,7 +137,7 @@ static s32 get_area(u32 sys_addr, u32 *x_area, u32 *y_area)
 	sys_addr &= TILER_ALIAS_VIEW_CLEAR;
 	fmt = TILER_GET_ACC_MODE(sys_addr);
 
-	switch (fmt + 1) {
+	switch (fmt) {
 	case TILFMT_8BIT:
 		*x_area = DMM_HOR_X_PAGE_COOR_GET_8(sys_addr);
 		*y_area = DMM_HOR_Y_PAGE_COOR_GET_8(sys_addr);
@@ -237,40 +247,30 @@ static s32 tiler_mmap(struct file *filp, struct vm_area_struct *vma)
 	return 0;
 }
 
-static s32 tiler_pat_refill(struct tcm_area *area, u32 *ptr)
+static s32 tiler_pat_refill(struct tmm *tmm, struct tcm_area *area, u32 *ptr)
 {
 	s32 res = 0;
 	s32 size = tcm_sizeof(*area) * sizeof(*ptr);
 	u32 *page;
 	dma_addr_t page_pa;
-	struct pat pat_desc = {0};
+	struct pat_area p_area = {0};
 	struct tcm_area slice, area_s;
 
+	/* must be a 16-byte aligned physical address */
 	page = dma_alloc_coherent(NULL, size, &page_pa, GFP_ATOMIC);
 	if (!page)
 		return -ENOMEM;
 
-	/* send pat descriptor to dmm driver */
-	pat_desc.ctrl.dir = 0;
-	pat_desc.ctrl.ini = 0;
-	pat_desc.ctrl.lut_id = 0;
-	pat_desc.ctrl.start = 1;
-	pat_desc.ctrl.sync = 0;
-	pat_desc.next = NULL;
-
-	/* must be a 16-byte aligned physical address */
-	pat_desc.data = page_pa;
-
 	tcm_for_each_slice(slice, *area, area_s) {
-		pat_desc.area.x0 = slice.p0.x;
-		pat_desc.area.y0 = slice.p0.y;
-		pat_desc.area.x1 = slice.p1.x;
-		pat_desc.area.y1 = slice.p1.y;
+		p_area.x0 = slice.p0.x;
+		p_area.y0 = slice.p0.y;
+		p_area.x1 = slice.p1.x;
+		p_area.y1 = slice.p1.y;
 
 		memcpy(page, ptr, sizeof(*ptr) * tcm_sizeof(slice));
 		ptr += tcm_sizeof(slice);
 
-		if (dmm_pat_refill(&pat_desc, MANUAL)) {
+		if (tmm_map(tmm, p_area, page_pa)) {
 			res = -EFAULT;
 			break;
 		}
@@ -295,7 +295,11 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 
 	/* we only support mapping a user buffer in page mode */
 	if (fmt != TILFMT_PAGE)
-		return -EFAULT;
+		return -EPERM;
+
+	/* check if mapping is supported by tmm */
+	if (!tmm_can_map(TMM(fmt)))
+		return -EPERM;
 
 	/* reserve area in tiler container */
 	if (__adjust_area(fmt, width, height, &x_area, &y_area))
@@ -306,7 +310,7 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 		return -ENOMEM;
 	memset(mi, 0x0, sizeof(*mi));
 
-	if (tcm_reserve_1d(tcm, x_area * y_area, &mi->area)) {
+	if (tcm_reserve_1d(TCM(fmt), x_area * y_area, &mi->area)) {
 		kfree(mi);
 		return -ENOMEM;
 	}
@@ -376,7 +380,7 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 	list_add(&mi->list, &mem_list.list);
 	mutex_unlock(&mtx);
 
-	if (tiler_pat_refill(&mi->area, mi->mem))
+	if (tiler_pat_refill(TMM(fmt), &mi->area, mi->mem))
 		goto release;
 
 	/* for safety */
@@ -428,7 +432,7 @@ s32 tiler_free(u32 sys_addr)
 				}
 				kfree(mi->pg_ptr);
 			} else {
-				dmm_free_pages(mi->mem);
+				tmm_free(TMM_SS(mi->sys_addr), mi->mem);
 			}
 			list_del(pos);
 			kfree(mi);
@@ -461,14 +465,14 @@ s32 tiler_find_buf(u32 sys_addr, struct tiler_block_info *blk)
 	memset(&area, 0, sizeof(area));
 	pt.x = x_area;
 	pt.y = y_area;
-	if (tcm_get_parent(tcm, &pt, &area))
+	if (tcm_get_parent(TCM_SS(sys_addr), &pt, &area))
 		return -EFAULT;
 	x_page = area.p1.x - area.p0.x + 1;
 	y_page = area.p1.y - area.p0.y + 1;
 	blk->ptr = NULL;
 
 	mode = TILER_GET_ACC_MODE(sys_addr);
-	blk->fmt = (mode + 1);
+	blk->fmt = (mode);
 	if (blk->fmt == TILFMT_PAGE) {
 		blk->dim.len = x_page * y_page * TILER_PAGE;
 		if (blk->dim.len == 0)
@@ -693,13 +697,13 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 	case TILFMT_16BIT:
 	case TILFMT_32BIT:
 		band = fmt == TILFMT_8BIT ? ALIGN_64 : ALIGN_32;
-		if (tcm_reserve_2d(tcm, x_area, y_area, band, &mi->area)) {
+		if (tcm_reserve_2d(TCM(fmt), x_area, y_area, band, &mi->area)) {
 			kfree(mi);
 			return -ENOMEM;
 		}
 		break;
 	case TILFMT_PAGE:
-		if (tcm_reserve_1d(tcm, x_area * y_area, &mi->area)) {
+		if (tcm_reserve_1d(TCM(fmt), x_area * y_area, &mi->area)) {
 			kfree(mi);
 			return -ENOMEM;
 		}
@@ -711,23 +715,25 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 
 	/* formulate system space address */
 	*sys_addr = __get_alias_addr(fmt, mi->area.p0.x, mi->area.p0.y);
-
-	/* allocate pages */
-	mi->num_pg = tcm_sizeof(mi->area);
-
-	mi->mem = dmm_get_pages(mi->num_pg);
-	if (!mi->mem)
-		goto cleanup;
-
 	mi->sys_addr = *sys_addr;
+
+	/* allocate and map if mapping is supported */
+	if (tmm_can_map(TMM(fmt))) {
+		mi->num_pg = tcm_sizeof(mi->area);
+
+		mi->mem = tmm_get(TMM(fmt), mi->num_pg);
+		if (!mi->mem)
+			goto cleanup;
+
+		/* program PAT */
+		if (tiler_pat_refill(TMM(fmt), &mi->area, mi->mem))
+			goto cleanup;
+	}
 
 	mutex_lock(&mtx);
 	list_add(&(mi->list), &mem_list.list);
 	mutex_unlock(&mtx);
-
-	/* program PAT */
-	if (0 == tiler_pat_refill(&mi->area, mi->mem))
-		return 0x0;
+	return 0;
 
 cleanup:
 	kfree(mi->mem);
@@ -741,8 +747,8 @@ static void __exit tiler_exit(void)
 	struct __buf_info *_b = NULL;
 	struct mem_info *mi = NULL;
 	struct list_head *pos = NULL, *q = NULL;
+	int i, j;
 
-	tcm_deinit(tcm);
 	/* remove any leftover info structs that haven't been unregistered */
 	mutex_lock(&mtx);
 	pos = NULL, q = NULL;
@@ -759,11 +765,24 @@ static void __exit tiler_exit(void)
 	list_for_each_safe(pos, q, &mem_list.list) {
 		mi = list_entry(pos, struct mem_info, list);
 		if (!mi->pg_ptr)
-			dmm_free_pages(mi->mem);
+			tmm_free(TMM_SS(mi->sys_addr), mi->mem);
 		list_del(pos);
 		kfree(mi);
 	}
 	mutex_unlock(&mtx);
+
+	/* close containers only once */
+	for (i = TILFMT_8BIT; i <= TILFMT_MAX; i++) {
+		/* remove identical containers (tmm is unique per tcm) */
+		for (j = i + 1; j <= TILFMT_MAX; j++)
+			if (tcm[i] == tcm[j]) {
+				tcm[j] = NULL;
+				tmm[j] = NULL;
+			}
+
+		tcm_deinit(TCM(i));
+		tmm_deinit(TMM(i));
+	}
 
 	mutex_destroy(&mtx);
 	platform_driver_unregister(&tiler_driver_ldm);
@@ -796,7 +815,33 @@ static s32 __init tiler_init(void)
 	s32 r = -1;
 	struct device *device = NULL;
 	struct tcm_pt div_pt;
+	struct tcm *sita = NULL;
+	struct tmm *tmm_pat = NULL;
 
+	/* Allocate tiler container manager (we share 1 on OMAP4) */
+	div_pt.x = 192;   /* hardcoded default */
+	div_pt.y = 96;
+	sita = sita_init(256, 128, (void *)&div_pt);
+
+	TCM_SET(TILFMT_8BIT, sita);
+	TCM_SET(TILFMT_16BIT, sita);
+	TCM_SET(TILFMT_32BIT, sita);
+	TCM_SET(TILFMT_PAGE, sita);
+
+	/* Allocate tiler memory manager (must have 1 unique TMM per TCM ) */
+	tmm_pat = tmm_pat_init(0);
+	TMM_SET(TILFMT_8BIT, tmm_pat);
+	TMM_SET(TILFMT_16BIT, tmm_pat);
+	TMM_SET(TILFMT_32BIT, tmm_pat);
+	TMM_SET(TILFMT_PAGE, tmm_pat);
+
+	tiler_device = kmalloc(sizeof(*tiler_device), GFP_KERNEL);
+	if (!tiler_device || !sita || !tmm_pat) {
+		r = -ENOMEM;
+		goto error;
+	}
+
+	memset(tiler_device, 0x0, sizeof(*tiler_device));
 	if (tiler_major) {
 		dev = MKDEV(tiler_major, tiler_minor);
 		r = register_chrdev_region(dev, 1, "tiler");
@@ -804,13 +849,6 @@ static s32 __init tiler_init(void)
 		r = alloc_chrdev_region(&dev, tiler_minor, 1, "tiler");
 		tiler_major = MAJOR(dev);
 	}
-
-	tiler_device = kmalloc(sizeof(*tiler_device), GFP_KERNEL);
-	if (!tiler_device) {
-		unregister_chrdev_region(dev, 1);
-		return -ENOMEM;
-	}
-	memset(tiler_device, 0x0, sizeof(*tiler_device));
 
 	cdev_init(&tiler_device->cdev, &tiler_fops);
 	tiler_device->cdev.owner = THIS_MODULE;
@@ -824,7 +862,7 @@ static s32 __init tiler_init(void)
 
 	if (IS_ERR(tilerdev_class)) {
 		printk(KERN_ERR "class_create():failed\n");
-		goto EXIT;
+		goto error;
 	}
 
 	device = device_create(tilerdev_class, NULL, dev, NULL, "tiler");
@@ -838,13 +876,14 @@ static s32 __init tiler_init(void)
 	INIT_LIST_HEAD(&mem_list.list);
 	id = 0xda7a000;
 
-	/* Hardcoded for testing */
-	div_pt.x = 192;
-	div_pt.y = 96;
-	tcm = sita_init(256, 128, (void *)&div_pt);
-	/*To Do: Error Checking */
+error:
+	/* TODO: error handling for device registration */
+	if (r) {
+		kfree(tiler_device);
+		tcm_deinit(sita);
+		tmm_deinit(tmm_pat);
+	}
 
-EXIT:
 	return r;
 }
 

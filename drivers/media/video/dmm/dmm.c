@@ -25,7 +25,7 @@
 #include <linux/io.h>              /* ioremap() */
 #include <linux/errno.h>
 
-#include "dmm.h"
+#include <mach/dmm.h>
 #include "dmm_mem.h"
 
 #undef __DEBUG__
@@ -43,7 +43,6 @@
 
 static s32 dmm_major;
 static s32 dmm_minor;
-void __iomem *dmm_base;
 
 struct dmm_dev {
 	struct cdev cdev;
@@ -62,7 +61,7 @@ static struct platform_driver dmm_driver_ldm = {
 	.remove = NULL,
 };
 
-s32 dmm_pat_refill(struct pat *pd, enum pat_mode mode)
+s32 dmm_pat_refill(struct dmm *dmm, struct pat *pd, enum pat_mode mode)
 {
 	void __iomem *r = NULL;
 	u32 v = -1, w = -1;
@@ -75,7 +74,7 @@ s32 dmm_pat_refill(struct pat *pd, enum pat_mode mode)
 	 * Check that the DMM_PAT_STATUS register
 	 * has not reported an error.
 	*/
-	r = (void __iomem *)((u32)dmm_base | DMM_PAT_STATUS__0);
+	r = (void __iomem *)((u32)dmm->base | DMM_PAT_STATUS__0);
 	v = __raw_readl(r);
 	if ((v & 0xFC00) != 0) {
 		while (1)
@@ -83,13 +82,13 @@ s32 dmm_pat_refill(struct pat *pd, enum pat_mode mode)
 	}
 
 	/* Set "next" register to NULL */
-	r = (void __iomem *)((u32)dmm_base | DMM_PAT_DESCR__0);
+	r = (void __iomem *)((u32)dmm->base | DMM_PAT_DESCR__0);
 	v = __raw_readl(r);
 	w = (v & (~(BF(31, 4)))) | ((((u32)NULL) << 4) & BF(31, 4));
 	__raw_writel(w, r);
 
 	/* Set area to be refilled */
-	r = (void __iomem *)((u32)dmm_base | DMM_PAT_AREA__0);
+	r = (void __iomem *)((u32)dmm->base | DMM_PAT_AREA__0);
 	v = __raw_readl(r);
 	w = (v & (~(BF(30, 24)))) | ((((s8)pd->area.y1) << 24) & BF(30, 24));
 	__raw_writel(w, r);
@@ -116,11 +115,11 @@ s32 dmm_pat_refill(struct pat *pd, enum pat_mode mode)
 #endif
 
 	/* First, clear the DMM_PAT_IRQSTATUS register */
-	r = (void __iomem *)((u32)dmm_base | (u32)DMM_PAT_IRQSTATUS);
+	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_IRQSTATUS);
 	__raw_writel(0xFFFFFFFF, r);
 	dsb();
 
-	r = (void __iomem *)((u32)dmm_base | (u32)DMM_PAT_IRQSTATUS_RAW);
+	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_IRQSTATUS_RAW);
 	v = 0xFFFFFFFF;
 
 	while (v != 0x0) {
@@ -129,7 +128,7 @@ s32 dmm_pat_refill(struct pat *pd, enum pat_mode mode)
 	}
 
 	/* Fill data register */
-	r = (void __iomem *)((u32)dmm_base | DMM_PAT_DATA__0);
+	r = (void __iomem *)((u32)dmm->base | DMM_PAT_DATA__0);
 	v = __raw_readl(r);
 
 	/* Apply 4 bit left shft to counter the 4 bit right shift */
@@ -144,7 +143,7 @@ s32 dmm_pat_refill(struct pat *pd, enum pat_mode mode)
 		DEBUG("DMM_PAT_DATA__0", v);
 	}
 
-	r = (void __iomem *)((u32)dmm_base | (u32)DMM_PAT_CTRL__0);
+	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_CTRL__0);
 	v = __raw_readl(r);
 
 	w = (v & (~(BF(31, 28)))) | ((((u32)pd->ctrl.ini) << 28) & BF(31, 28));
@@ -171,7 +170,7 @@ s32 dmm_pat_refill(struct pat *pd, enum pat_mode mode)
 	 * Now, check if PAT_IRQSTATUS_RAW has been
 	 * set after the PAT has been refilled
 	 */
-	r = (void __iomem *)((u32)dmm_base | (u32)DMM_PAT_IRQSTATUS_RAW);
+	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_IRQSTATUS_RAW);
 	v = 0x0;
 	while ((v & 0x3) != 0x3) {
 		v = __raw_readl(r);
@@ -196,6 +195,54 @@ static const struct file_operations dmm_fops = {
 	.open    = dmm_open,
 	.release = dmm_release,
 };
+
+struct dmm *dmm_pat_init(u32 id)
+{
+	u32 base = 0;
+	struct dmm *dmm = NULL;
+	switch (id) {
+	case 0:
+		/* only support id 0 for now */
+		base = DMM_BASE;
+		break;
+	default:
+		return NULL;
+	}
+
+	dmm = kmalloc(sizeof(*dmm), GFP_KERNEL);
+	if (!dmm)
+		return NULL;
+
+	dmm->base = ioremap(base, DMM_SIZE);
+	if (!dmm->base) {
+		kfree(dmm);
+		return NULL;
+	}
+
+	__raw_writel(0x88888888, dmm->base + DMM_PAT_VIEW__0);
+	__raw_writel(0x88888888, dmm->base + DMM_PAT_VIEW__1);
+	__raw_writel(0x80808080, dmm->base + DMM_PAT_VIEW_MAP__0);
+	__raw_writel(0x80000000, dmm->base + DMM_PAT_VIEW_MAP_BASE);
+	__raw_writel(0x88888888, dmm->base + DMM_TILER_OR__0);
+	__raw_writel(0x88888888, dmm->base + DMM_TILER_OR__1);
+
+	return dmm;
+}
+EXPORT_SYMBOL(dmm_pat_init);
+
+/**
+ * Clean up the physical address translator.
+ * @param dmm    Device data
+ * @return an error status.
+ */
+void dmm_pat_release(struct dmm *dmm)
+{
+	if (dmm) {
+		iounmap(dmm->base);
+		kfree(dmm);
+	}
+}
+EXPORT_SYMBOL(dmm_pat_release);
 
 static s32 __init dmm_init(void)
 {
@@ -239,27 +286,12 @@ static s32 __init dmm_init(void)
 
 	r = platform_driver_register(&dmm_driver_ldm);
 
-	dmm_base = ioremap(DMM_BASE, DMM_SIZE);
-	if (!dmm_base)
-		return -ENOMEM;
-
-	__raw_writel(0x88888888, dmm_base + DMM_PAT_VIEW__0);
-	__raw_writel(0x88888888, dmm_base + DMM_PAT_VIEW__1);
-	__raw_writel(0x80808080, dmm_base + DMM_PAT_VIEW_MAP__0);
-	__raw_writel(0x80000000, dmm_base + DMM_PAT_VIEW_MAP_BASE);
-	__raw_writel(0x88888888, dmm_base + DMM_TILER_OR__0);
-	__raw_writel(0x88888888, dmm_base + DMM_TILER_OR__1);
-
-	if (dmm_init_mem())
-		return -ENOMEM;
 EXIT:
 	return r;
 }
 
 static void __exit dmm_exit(void)
 {
-	dmm_release_mem();
-	iounmap(dmm_base);
 	platform_driver_unregister(&dmm_driver_ldm);
 	cdev_del(&dmm_device->cdev);
 	kfree(dmm_device);

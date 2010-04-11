@@ -16,7 +16,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include "tiler.h"
+#include <mach/tiler.h>
 #include "tiler_def.h"
 
 void tiler_alloc_packed(s32 *count, enum tiler_fmt fmt, u32 width, u32 height,

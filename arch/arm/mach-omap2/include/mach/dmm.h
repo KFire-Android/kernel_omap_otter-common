@@ -94,35 +94,33 @@ struct pat {
 };
 
 /**
+ * DMM device data
+ */
+struct dmm {
+	void __iomem *base;
+};
+
+/**
+ * Create and initialize the physical address translator.
+ * @param id    PAT id
+ * @return pointer to device data
+ */
+struct dmm *dmm_pat_init(u32 id);
+
+/**
  * Program the physical address translator.
- * @param desc
- * @param mode
+ * @param dmm   Device data
+ * @param desc  PAT descriptor
+ * @param mode  programming mode
  * @return an error status.
  */
-s32 dmm_pat_refill(struct pat *desc, enum pat_mode mode);
+s32 dmm_pat_refill(struct dmm *dmm, struct pat *desc, enum pat_mode mode);
 
 /**
- * Request a page from the DMM free page stack.
- * @return a physical page address.
+ * Clean up the physical address translator.
+ * @param dmm    Device data
+ * @return an error status.
  */
-u32 dmm_get_page(void);
-
-/**
- * Return a used page to the DMM free page stack.
- * @param page_addr a physical page address.
- */
-void dmm_free_page(u32 page_addr);
-
-/**
- * Request a set of pages from the DMM free page stack.
- * @return a pointer to a list of physical page addresses.
- */
-u32 *dmm_get_pages(s32 n);
-
-/**
- * Return a set of used pages to the DMM free page stack.
- * @param list a pointer to a list of physical page addresses.
- */
-void dmm_free_pages(u32 *list);
+void dmm_pat_release(struct dmm *dmm);
 
 #endif

@@ -16,7 +16,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include "tiler.h"
+#include <mach/tiler.h>
 #include "tiler_def.h"
 
 #define DMM_SHIFT_PER_X_8 0
@@ -70,7 +70,7 @@ void tiler_get_natural_xy(u32 tsptr, u32 *x, u32 *y)
 
 	fmt = TILER_GET_ACC_MODE(tsptr);
 
-	switch (fmt + 1) {
+	switch (fmt) {
 	case TILFMT_8BIT:
 		x_bits = DMM_TILER_CONT_WIDTH_BITS_(8);
 		y_bits = DMM_TILER_CONT_HEIGHT_BITS_(8);
@@ -113,7 +113,7 @@ u32 tiler_get_address(struct tiler_view_orient orient,
 {
 	u32 x_bits, y_bits, tmp, x_mask, y_mask, alignment;
 
-	switch (fmt + 1) {
+	switch (fmt) {
 	case TILFMT_8BIT:
 		x_bits = DMM_TILER_CONT_WIDTH_BITS_(8);
 		y_bits = DMM_TILER_CONT_HEIGHT_BITS_(8);
@@ -203,7 +203,7 @@ u32 tiler_stride(u32 tsptr)
 
 	fmt = TILER_GET_ACC_MODE(tsptr);
 
-	switch (fmt + 1) {
+	switch (fmt) {
 	case TILFMT_8BIT:
 		return DMM_GET_ROTATED(tsptr) ?
 			DMM_TILER_STRIDE_90_(8) : DMM_TILER_STRIDE_0_(8);
