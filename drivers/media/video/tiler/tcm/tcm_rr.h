@@ -1,15 +1,23 @@
 /*
- * tcm_rr.h
+ * _tcm_sita.h
  *
- *  Created on: Mar 25, 2010
- *      Author: Ravikiran Ramachandra
+ * SImple Tiler Allocator (SiTA) private structures.
  *
- *      This header describes the private structures required
- *      for the implementation of (SImple Tiler Allocator) SiTA Algo.
+ * Author: Ravi Ramachandra <r.ramachandra@ti.com>
+ *
+ * Copyright (C) 2009-2010 Texas Instruments, Inc.
+ *
+ * This package is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * THIS PACKAGE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef TCM_RR_H_
-#define TCM_RR_H_
+#ifndef _TCM_SITA_H_
+#define _TCM_SITA_H_
 
 #include "tcm.h"
 #include "tcm_dbg.h"
@@ -126,4 +134,4 @@ struct sita_pvt {
 	u32 id;
 };
 
-#endif /* TCM_RR_H_ */
+#endif /* _TCM_SITA_H_ */

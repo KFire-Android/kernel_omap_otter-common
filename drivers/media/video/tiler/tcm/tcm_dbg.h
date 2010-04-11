@@ -18,11 +18,12 @@
 #ifndef _TILER_DEBUG_
 #define _TILER_DEBUG_
 
+/* TODO: once TCM debug prints are resolved, move these into tcm_utils.h */
+
 #undef DEBUG
 /* #define DEBUG_ENTRY_EXIT */
 
 #undef DEBUG_ALL
-
 
 #ifdef DEBUG
 #define P(fmt, args...) printk(KERN_NOTICE "%s()::[%d]\n", __func__, __LINE__);
@@ -58,5 +59,6 @@
 #else
 #define P3(args...)
 #endif
+
 #endif
 

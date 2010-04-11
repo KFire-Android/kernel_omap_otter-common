@@ -1,17 +1,18 @@
 /*
  * tcm.h
  *
- *  Created on: Mar 1, 2010
- *      Authors: Ravikiran Ramachandra, Lajos Molnar
+ * TILER container manager specification and support functions for TI
+ * processors.
  *
- *		Revision History:
- *		01/3/10: Defined basic structs,func ptr based 'struct tcm'
- *				 Defined basic APIs - Ravi
- *		17/3/10: Modified APIs with error checking, added additional
- *				 field struct tmc * to tcm_area.
- *				 Added 'tcm_slice' to retrieve topmost 2D slice
- *				 Added 'tcm_area_is_valid' functionality - Lajos
+ * Copyright (C) 2009-2010 Texas Instruments, Inc.
  *
+ * This package is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * THIS PACKAGE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
 #ifndef _TCM_H_
@@ -27,7 +28,6 @@
 #define ALIGN_32	0x1
 #define ALIGN_64	0x2
 #define ALIGN_16	0x3
-
 
 struct tcm;
 
@@ -66,6 +66,18 @@ struct tcm {
     BASIC TILER CONTAINER MANAGER INTERFACE
 =============================================================================*/
 
+/*
+ * NOTE:
+ *
+ * Since some basic parameter checking is done outside the TCM algorithms,
+ * TCM implementation do NOT have to check the following:
+ *
+ *   area pointer is NULL
+ *   width and height fits within container
+ *   number of pages is more than the size of the container
+ *
+ */
+
 /**
  * Template for <ALGO_NAME>_tcm_init method.  Define as:
  * TCM_INIT(<ALGO_NAME>_tcm_init)
@@ -82,8 +94,8 @@ struct tcm {
  *  	   manager.  NULL on failure.  DO NOT leak any memory on
  *  	   failure!
  */
-#define TCM_INIT(name) \
-struct tcm *name(u16 width, u16 height, void *attr);
+#define TCM_INIT(name, attr_t) \
+struct tcm *name(u16 width, u16 height, typeof(attr_t) *attr);
 
 /**
  * Deinitialize tiler container manager.
