@@ -1,7 +1,7 @@
 /*
- * dmm_mem.h
+ * tmm.h
  *
- * DMM driver support functions for TI OMAP processors.
+ * TMM interface definition for TI TILER.
  *
  * Copyright (C) 2009-2010 Texas Instruments, Inc.
  *
@@ -13,8 +13,8 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
-#ifndef DMM_MEM_H
-#define DMM_MEM_H
+#ifndef TMM_H
+#define TMM_H
 
 #include <mach/dmm.h>
 /**
@@ -86,6 +86,8 @@ void tmm_deinit(struct tmm *tmm)
 }
 
 /**
+ * TMM implementation for PAT support.
+ *
  * Initialize TMM for PAT with given id.
  */
 struct tmm *tmm_pat_init(u32 pat_id);

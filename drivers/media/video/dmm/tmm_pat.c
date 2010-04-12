@@ -1,5 +1,5 @@
 /*
- * dmm_mem.c
+ * tmm_pat.c
  *
  * DMM driver support functions for TI OMAP processors.
  *
@@ -21,7 +21,7 @@
 #include <linux/mutex.h>
 #include <linux/list.h>
 
-#include "dmm_mem.h"
+#include "tmm.h"
 
 /**
  * Number of pages to allocate when
@@ -255,7 +255,6 @@ static s32 tmm_pat_map(struct tmm *tmm, struct pat_area area, u32 page_pa)
 {
 	struct dmm_mem *pvt = (struct dmm_mem *) tmm->pvt;
 	struct pat pat_desc = {0};
-	s32 r = 0;
 
 	/* send pat descriptor to dmm driver */
 	pat_desc.ctrl.dir = 0;

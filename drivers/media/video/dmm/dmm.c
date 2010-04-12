@@ -26,7 +26,6 @@
 #include <linux/errno.h>
 
 #include <mach/dmm.h>
-#include "dmm_mem.h"
 
 #undef __DEBUG__
 #define BITS_32(in_NbBits) ((((u32)1 << in_NbBits) - 1) | ((u32)1 << in_NbBits))

@@ -33,7 +33,7 @@
 
 #include <mach/tiler.h>
 #include <mach/dmm.h>
-#include "../dmm/dmm_mem.h"
+#include "../dmm/tmm.h"
 #include "tiler_def.h"
 #include "tcm/tcm_sita.h"	/* Algo Specific header */
 
