@@ -20,8 +20,25 @@
 #include "tcm.h"
 
 #define AREA_FMT   "(%03d %03d)-(%03d %03d)"
-#define AREA(area) (area)->p0.x, (area)->p0.y, (area)->p1.x, (area)->p1.y
-#define PA(level, msg, area) P##level(msg " " AREA_FMT "\n", AREA(area))
+#define AREA(area) (area).p0.x, (area).p0.y, (area).p1.x, (area).p1.y
+
+/* TCM_ALG_NAME must be defined to use the debug methods */
+
+#ifdef DEBUG
+#define IFDEBUG(x) x
+#else
+#define IFDEBUG(x) do { if (0) x; } while (0)
+#endif
+
+#define P(level, fmt, ...) \
+	IFDEBUG(printk(level TCM_ALG_NAME ":%d:%s()" fmt "\n", \
+			__LINE__, __func__, ##__VA_ARGS__))
+
+#define P1(fmt, ...) P(KERN_NOTICE, fmt, ##__VA_ARGS__)
+#define P2(fmt, ...) P(KERN_INFO, fmt, ##__VA_ARGS__)
+#define P3(fmt, ...) P(KERN_DEBUG, fmt, ##__VA_ARGS__)
+
+#define PA(level, msg, p_area) P##level(msg " " AREA_FMT "\n", AREA(*(p_area)))
 
 /* assign coordinates to area */
 static inline
@@ -36,7 +53,7 @@ void assign(struct tcm_area *a, u16 x0, u16 y0, u16 x1, u16 y1)
 static inline
 void dump_area(struct tcm_area *area)
 {
-	printk(KERN_NOTICE AREA_FMT "\n", AREA(area));
+	printk(KERN_NOTICE AREA_FMT "\n", AREA(*area));
 }
 
 #endif

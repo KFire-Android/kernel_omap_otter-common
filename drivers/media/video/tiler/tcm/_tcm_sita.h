@@ -20,52 +20,21 @@
 #define _TCM_SITA_H_
 
 #include "tcm.h"
-#include "tcm_dbg.h"
-
-#define IN
-#define OUT
-#define INOUT
-
-#define YES             1
-#define NO              0
-
-#define OCCUPIED        YES
-#define NOT_OCCUPIED    NO
-
-#define FIT             YES
-#define NO_FIT          NO
 
 #define TL_CORNER       0
 #define TR_CORNER       1
 #define BL_CORNER       3
 #define BR_CORNER       4
 
-/*Note Alignment 64 gets the highest priority */
-#define ALIGN_STRIDE(align)	((align == ALIGN_64) ? 64 : \
-				((align == ALIGN_32) ? 32 : \
-				((align == ALIGN_16) ? 16 : 1)))
-
 /*Provide inclusive length between co-ordinates */
 #define INCL_LEN(high, low)		((high) - (low) + 1)
 #define INCL_LEN_MOD(start, end)   ((start) > (end) ? (start) - (end) + 1 : \
 		(end) - (start) + 1)
 
-#define TOTAL_BOUNDARY(stat) ((stat)->top_boundary + (stat)->bottom_boundary + \
+#define BOUNDARY(stat) ((stat)->top_boundary + (stat)->bottom_boundary + \
 				(stat)->left_boundary + (stat)->right_boundary)
-#define TOTAL_OCCUPIED(stat) ((stat)->top_occupied + (stat)->bottom_occupied + \
+#define OCCUPIED(stat) ((stat)->top_occupied + (stat)->bottom_occupied + \
 				(stat)->left_occupied + (stat)->right_occupied)
-
-enum tiler_error {
-	TilerErrorNone = 0,
-	TilerErrorGeneral = -1,
-	TilerErrorInvalidDimension = -2,
-	TilerErrorNoRoom = -3,
-	TilerErrorInvalidArg = -4,
-	TilerErrorMatchNotFound = -5,
-	TilerErrorOverFlow = -6,
-	TilerErrorInvalidScanArea = -7,
-	TilerErrorNotSupported = -8,
-};
 
 enum Criteria {
 	CR_MAX_NEIGHS       = 0x01,
@@ -76,19 +45,16 @@ enum Criteria {
 };
 
 struct nearness_factor {
-	s32 nf_x;
-	s32 nf_y;
+	s32 x;
+	s32 y;
 };
 
 /*
- * Linked list structure
+ * Area info kept
  */
-struct area_spec_list;
-
-struct area_spec_list {
+struct area_spec {
 	struct tcm_area area;
-	u16 area_type;
-	struct area_spec_list *next;
+	struct list_head list;
 };
 
 /*
@@ -107,31 +73,19 @@ struct neighbour_stats {
 	u16 bottom_occupied;
 };
 
-struct tiler_page {
-	/* is tiler_page Occupied */
-	u8 is_occupied;
-	/* Parent area to which this tiler_page belongs */
-	struct tcm_area parent_area;
-	/* 1D or 2D */
-	u16 type;
+struct slot {
+	u8 busy;		/* is slot occupied */
+	struct tcm_area parent; /* parent area */
 	u32 reserved;
 };
 
 struct sita_pvt {
 	u16 width;
 	u16 height;
-	/* This list keeps a track of all the allocations that happened in terms
-	of area allocated, this list is checked for removing any allocations */
-	struct area_spec_list *res_list;
-	/* mutex */
+	struct list_head res;	/* all allocations */
 	struct mutex mtx;
-	/* Divider point splitting the tiler container
-	horizontally and vertically */
-	struct tcm_pt div_pt;
-	/*map of busy/non busy tiler of a given container*/
-	struct tiler_page **tcm_map;
-	/*allocation counter, keeps rolling with */
-	u32 id;
+	struct tcm_pt div_pt;	/* divider point splitting container */
+	struct slot **map;	/* container slots */
 };
 
 #endif /* _TCM_SITA_H_ */

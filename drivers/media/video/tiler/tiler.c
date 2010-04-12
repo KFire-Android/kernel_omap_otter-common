@@ -121,10 +121,7 @@ static struct area_info *area_new(u16 width, u16 height, u16 align,
 	INIT_LIST_HEAD(&ai->area_list);
 
 	/* reserve an allocation area */
-	if (tcm_reserve_2d(tcm, width, height,
-			     align <= 1 ? ALIGN_NONE :
-			     align <= 32 ? ALIGN_32 : ALIGN_64,
-			     &ai->area)) {
+	if (tcm_reserve_2d(tcm, width, height, align, &ai->area)) {
 		kfree(ai);
 		return NULL;
 	}
@@ -343,7 +340,7 @@ static s32 __free(struct mem_info *mi)
 		list_del(&mi->area_list);
 
 	/* remove block from area first if 2D */
-	if (mi->area.type == TCM_2D) {
+	if (mi->area.is2d) {
 		ai = mi->ai;
 
 		/* check to see if area needs removing also */

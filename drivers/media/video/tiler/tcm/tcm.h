@@ -21,14 +21,6 @@
 #include <linux/init.h>
 #include <linux/module.h>
 
-#define TCM_1D 1 /* old:0 */
-#define TCM_2D 2 /* old:1 */
-
-#define ALIGN_NONE	0x0
-#define ALIGN_32	0x1
-#define ALIGN_64	0x2
-#define ALIGN_16	0x3
-
 struct tcm;
 
 struct tcm_pt {
@@ -37,7 +29,7 @@ struct tcm_pt {
 };
 
 struct tcm_area {
-	int type;		/* TCM_1D or 2D */
+	bool is2d;		/* whether are is 1d or 2d */
 	struct tcm    *tcm;	/* parent */
 	struct tcm_pt  p0;
 	struct tcm_pt  p1;
@@ -59,7 +51,7 @@ struct tcm {
 	s32 (*free)      (struct tcm *tcm, struct tcm_area *area);
 	s32 (*get_parent)(struct tcm *tcm, struct tcm_pt *pt,
 			  struct tcm_area *area);
-	s32 (*deinit)    (struct tcm *tcm);
+	void (*deinit)   (struct tcm *tcm);
 };
 
 /*=============================================================================
@@ -109,12 +101,10 @@ struct tcm *name(u16 width, u16 height, typeof(attr_t) *attr);
  *  	   even on failure.  Some error codes: -ENODEV: invalid
  *  	   manager.
  */
-static inline s32 tcm_deinit(struct tcm *tcm)
+static inline void tcm_deinit(struct tcm *tcm)
 {
 	if (tcm)
-		return tcm->deinit(tcm);
-	else
-		return -ENODEV;
+		tcm->deinit(tcm);
 }
 
 /**
@@ -262,7 +252,7 @@ static inline void tcm_slice(struct tcm_area *parent, struct tcm_area *slice)
 	*slice = *parent;
 
 	/* check if we need to slice */
-	if (slice->tcm && slice->type == TCM_1D &&
+	if (slice->tcm && !slice->is2d &&
 		slice->p0.y != slice->p1.y &&
 		(slice->p0.x || (slice->p1.x != slice->tcm->width - 1))) {
 		/* set end point of slice (start always remains) */
@@ -292,12 +282,12 @@ static inline bool tcm_area_is_valid(struct tcm_area *area)
 		area->p1.y < area->tcm->height &&
 		area->p0.y <= area->p1.y &&
 		/* 1D coordinate relationship + p0.x check */
-		((area->type == TCM_1D &&
+		((!area->is2d &&
 		  area->p0.x < area->tcm->width &&
 		  area->p0.x + area->p0.y * area->tcm->width <=
 		  area->p1.x + area->p1.y * area->tcm->width) ||
 		 /* 2D coordinate relationship */
-		 (area->type == TCM_2D &&
+		 (area->is2d &&
 		  area->p0.x <= area->p1.x))
 	       );
 }
@@ -317,10 +307,10 @@ static inline u16 __tcm_area_height(struct tcm_area *area)
 /* calculate number of slots in an area */
 static inline u16 __tcm_sizeof(struct tcm_area *area)
 {
-	return (area->type == TCM_2D ?
+	return area->is2d ?
 		__tcm_area_width(area) * __tcm_area_height(area) :
 		(area->p1.x - area->p0.x + 1) + (area->p1.y - area->p0.y) *
-							area->tcm->width);
+							area->tcm->width;
 }
 #define tcm_sizeof(area) __tcm_sizeof(&(area))
 #define tcm_awidth(area) __tcm_area_width(&(area))
