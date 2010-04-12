@@ -56,14 +56,38 @@ struct __buf_info {
 	struct tiler_buf_info buf_info;
 };
 
+/* per process info */
+struct gid_info {
+	struct list_head areas;		/* all areas in this pid/gid */
+	struct list_head reserved; 	/* areas pre-reserved */
+	struct list_head onedim;	/* all 1D areas in this pid/gid */
+} gi_main;
+
+struct list_head blocks;
+struct list_head bufs;
+
+struct area_info {
+	struct list_head area_list;	/* blocks in the same area */
+	u32 blocks;			/* blocks in this area */
+
+	struct list_head gid_list;	/* areas in this pid/gid */
+
+	struct tcm_area area;		/* area details */
+	struct gid_info *gi;		/* link to parent */
+};
+
 struct mem_info {
-	struct list_head list;
+	struct list_head global;	/* reserved / global blocks */
 	u32 sys_addr;          /* system space (L3) tiler addr */
 	u32 num_pg;            /* number of pages in page-list */
 	u32 usr;               /* user space address */
 	u32 *pg_ptr;           /* list of mapped struct page pointers */
 	struct tcm_area area;
 	u32 *mem;              /* list of alloced phys addresses */
+	u32 refs;              /* number of times referenced */
+
+	struct list_head area_list;	/* blocks in the same area */
+	struct area_info *ai;		/* area info */
 };
 
 #define TILER_FORMATS 4
@@ -73,8 +97,6 @@ static s32 tiler_minor;
 static struct tiler_dev *tiler_device;
 static struct class *tilerdev_class;
 static u32 id;
-static struct __buf_info buf_list;
-static struct mem_info mem_list;
 static struct mutex mtx;
 static struct tcm *tcm[TILER_FORMATS];
 static struct tmm *tmm[TILER_FORMATS];
@@ -86,32 +108,71 @@ static struct tmm *tmm[TILER_FORMATS];
 #define TMM_SS(ssptr)   TMM(TILER_GET_ACC_MODE(ssptr))
 #define TMM_SET(fmt, i) tmm[(fmt) - TILFMT_8BIT] = i
 
-static s32 __adjust_area(enum tiler_fmt fmt, u32 width, u32 height, u16 *x_area,
-		u16 *y_area)
+/* allocate an reserved area of size, alignment and link it to gi */
+static struct area_info *area_new(u16 width, u16 height, u16 align,
+				  struct tcm *tcm, struct gid_info *gi)
 {
+	struct area_info *ai = kmalloc(sizeof(*ai), GFP_KERNEL);
+	if (!ai)
+		return NULL;
+
+	/* set up empty area info */
+	memset(ai, 0x0, sizeof(*ai));
+	INIT_LIST_HEAD(&ai->area_list);
+
+	/* reserve an allocation area */
+	if (tcm_reserve_2d(tcm, width, height,
+			     align <= 1 ? ALIGN_NONE :
+			     align <= 32 ? ALIGN_32 : ALIGN_64,
+			     &ai->area)) {
+		kfree(ai);
+		return NULL;
+	}
+
+	ai->gi = gi;
+	mutex_lock(&mtx);
+	list_add_tail(&ai->gid_list, &gi->areas);
+	mutex_unlock(&mtx);
+	return ai;
+}
+
+/* free an area and return NULL */
+static inline void area_free(struct area_info *ai)
+{
+	if (ai) {
+		list_del(&ai->gid_list);
+		kfree(ai);
+	}
+}
+
+static s32 __analize_area(enum tiler_fmt fmt, u32 width, u32 height,
+			  u16 *x_area, u16 *y_area, u16 *band)
+{
+	/* x_area and y_area is in slots */
+	/* band is set to tiled slots per virtual page */
+
 	u32 x_pagedim = 0, y_pagedim = 0;
-	u16 tiled_pages_per_ss_page = 1;
 
 	switch (fmt) {
 	case TILFMT_8BIT:
 		x_pagedim = DMM_PAGE_DIMM_X_MODE_8;
 		y_pagedim = DMM_PAGE_DIMM_Y_MODE_8;
-		tiled_pages_per_ss_page = TILER_PAGE / x_pagedim;
+		*band = PAGE_SIZE / x_pagedim;
 		break;
 	case TILFMT_16BIT:
 		x_pagedim = DMM_PAGE_DIMM_X_MODE_16;
 		y_pagedim = DMM_PAGE_DIMM_Y_MODE_16;
-		tiled_pages_per_ss_page = TILER_PAGE / x_pagedim / 2;
+		*band = PAGE_SIZE / x_pagedim / 2;
 		break;
 	case TILFMT_32BIT:
 		x_pagedim = DMM_PAGE_DIMM_X_MODE_32;
 		y_pagedim = DMM_PAGE_DIMM_Y_MODE_32;
-		tiled_pages_per_ss_page = TILER_PAGE / x_pagedim / 4;
+		*band = PAGE_SIZE / x_pagedim / 4;
 		break;
 	case TILFMT_PAGE:
 		/* for 1D area keep the height (1), width is in tiler slots */
 		*x_area = DIV_ROUND_UP(width, TILER_PAGE);
-		*y_area = 1;
+		*y_area = *band = 1;
 
 		if (*x_area * *y_area > TILER_WIDTH * TILER_HEIGHT)
 			return -1;
@@ -123,12 +184,230 @@ static s32 __adjust_area(enum tiler_fmt fmt, u32 width, u32 height, u16 *x_area,
 	/* adjust and check 2D areas */
 	*x_area = DIV_ROUND_UP(width, x_pagedim);
 	*y_area = DIV_ROUND_UP(height, y_pagedim);
-	*x_area = ALIGN(*x_area, tiled_pages_per_ss_page);
 
 	if (*x_area > TILER_WIDTH || *y_area > TILER_HEIGHT)
 		return -1;
 	return 0x0;
 }
+
+/**
+ * Find a place where a 2D block would fit into a 2D area of the
+ * same height.
+ *
+ * @author a0194118 (3/19/2010)
+ *
+ * @param w	Width of the block.
+ * @param align	Alignment of the block.
+ * @param offs	Offset of the block (within alignment)
+ * @param ai	Pointer to area info
+ * @param next	Pointer to the variable where the next block
+ *  		will be stored.  The block should be inserted
+ *  		before this block.
+ *
+ * @return the end coordinate (x1 + 1) where a block would fit,
+ *  	   or 0 if it does not fit.
+ *
+ * mutex must be locked
+ */
+static u16 blk_find_fit(u16 w, u16 align, u16 offs,
+		     struct area_info *ai, struct list_head **before)
+{
+	int x = ai->area.p0.x + w + offs;
+	struct mem_info *mi;
+
+	/* area blocks are sorted by x */
+	list_for_each_entry(mi, &ai->area_list, area_list) {
+		/* check if buffer would fit before this area */
+		if (x <= mi->area.p0.x) {
+			*before = &mi->area_list;
+			return x;
+		}
+		x = ALIGN(mi->area.p1.x + 1 - offs, align) + w + offs;
+	}
+	*before = &ai->area_list;
+
+	/* check if buffer would fit after last area */
+	return (x <= ai->area.p1.x + 1) ? x : 0;
+}
+
+/* adds a block to an area with certain x coordinates */
+/* mutex must be locked */
+static inline
+struct mem_info *blk_add2area(struct mem_info *mi, struct area_info *ai,
+				u16 x0, u16 x1, struct list_head *before)
+{
+	mi->ai = ai;
+	mi->area = ai->area;
+	mi->area.p0.x = x0;
+	mi->area.p1.x = x1;
+	list_add_tail(&mi->area_list, before);
+	ai->blocks++;
+	return mi;
+}
+
+static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
+							struct tcm *tcm) {
+	struct gid_info *gi = &gi_main;
+	struct area_info *ai = NULL;
+	struct mem_info *mi = NULL;
+	struct list_head *before = NULL;
+	u16 x = 0;   /* this holds the end of a potential area */
+
+	/* allocate map info */
+
+	/* see if there is available prereserved space */
+	mutex_lock(&mtx);
+	list_for_each_entry(mi, &gi->reserved, global) {
+		if (mi->area.tcm == tcm &&
+		    tcm_aheight(mi->area) == h &&
+		    tcm_awidth(mi->area) == w &&
+		    (mi->area.p0.x & (align - 1)) == offs) {
+			/* this area is already set up */
+
+			/* remove from reserved list */
+			list_del(&mi->global);
+			goto done;
+
+		}
+	}
+	mutex_unlock(&mtx);
+
+	/* if not, reserve a block struct */
+	mi = kmalloc(sizeof(*mi), GFP_KERNEL);
+	if (!mi)
+		return mi;
+	memset(mi, 0, sizeof(*mi));
+
+	/* see if allocation fits in one of the existing areas */
+	/* this sets x, ai and before */
+	mutex_lock(&mtx);
+	list_for_each_entry(ai, &gi->areas, gid_list) {
+		if (ai->area.tcm == tcm &&
+		    tcm_aheight(ai->area) == h) {
+			x = blk_find_fit(w, align, offs, ai, &before);
+			if (x) {
+				blk_add2area(mi, ai, x - w, x - 1, before);
+				goto done;
+			}
+		}
+	}
+	mutex_unlock(&mtx);
+
+	/* if no area fit, reserve a new one */
+	ai = area_new(ALIGN(w + offs, max(band, align)), h,
+		      max(band, align), tcm, gi);
+	if (ai) {
+		mutex_lock(&mtx);
+		blk_add2area(mi, ai, ai->area.p0.x + offs,
+			     ai->area.p0.x + offs + w - 1,
+			     &ai->area_list);
+	} else {
+		/* clean up */
+		kfree(mi);
+		return NULL;
+	}
+
+done:
+	mutex_unlock(&mtx);
+	return mi;
+}
+
+/* mutex must be locked when calling these methods */
+
+/* free block and any freed areas */
+static s32 __free(struct mem_info *mi)
+{
+	struct area_info *ai = NULL;
+	struct page *page = NULL;
+	s32 res = 0;
+	u32 i;
+
+	/* release memory */
+	if (mi->pg_ptr) {
+		for (i = 0; i < mi->num_pg; i++) {
+			page = (struct page *)mi->pg_ptr[i];
+			if (page) {
+				if (!PageReserved(page))
+					SetPageDirty(page);
+				page_cache_release(page);
+			}
+		}
+		kfree(mi->pg_ptr);
+	} else if (mi->mem) {
+		tmm_free(TMM_SS(mi->sys_addr), mi->mem);
+	}
+	/* safe deletion as list may not have been assigned */
+	if (mi->global.next)
+		list_del(&mi->global);
+	if (mi->area_list.next)
+		list_del(&mi->area_list);
+
+	/* remove block from area first if 2D */
+	if (mi->area.type == TCM_2D) {
+		ai = mi->ai;
+
+		/* check to see if area needs removing also */
+		if (ai && !--ai->blocks) {
+			res = tcm_free(&ai->area);
+			list_del(&ai->gid_list);
+			kfree(ai);
+			ai = NULL;
+		}
+	} else {
+		/* remove 1D area */
+		res = tcm_free(&mi->area);
+	}
+	kfree(mi);
+	return res;
+}
+
+/* returns true if block was freed */
+static bool __chk_ref(struct mem_info *mi)
+{
+	/* check references */
+	if (mi->refs)
+		return 0;
+
+	if (__free(mi))
+		printk(KERN_ERR "error while removing tiler block\n");
+
+	return 1;
+}
+
+static inline s32 __dec_ref(struct mem_info *mi)
+{
+	if (mi->refs-- <= 1)
+		return __chk_ref(mi);
+	return 0;
+}
+
+static inline void __inc_ref(struct mem_info *mi)
+{
+	mi->refs++;
+}
+
+#if 0
+/**
+ * Free all unreferenced blocks
+ */
+static void free_blocks(struct gid_info *gi)
+{
+	struct area_info *ai, *ai_;
+	struct mem_info *mi, *mi_;
+
+	mutex_lock(&mtx);
+
+	list_for_each_entry_safe(ai, ai_, &gi->areas, area_list) {
+		list_for_each_entry_safe(mi, mi_, &ai->area_list, area_list)
+			__chk_ref(mi);
+	}
+
+	list_for_each_entry_safe(mi, mi_, &gi->onedim, area_list)
+		__chk_ref(mi);
+
+	mutex_unlock(&mtx);
+}
+#endif
 
 static s32 get_area(u32 sys_addr, u32 *x_area, u32 *y_area)
 {
@@ -190,6 +469,45 @@ static u32 __get_alias_addr(enum tiler_fmt fmt, u16 x, u16 y)
 		return (u32)TIL_ALIAS_ADDR(x << x_shft | y << y_shft, acc_mode);
 }
 
+static struct mem_info *__get_area(enum tiler_fmt fmt, u32 width, u32 height,
+				   u16 align, u16 offset)
+{
+	u16 x, y, band;
+	struct mem_info *mi = NULL;
+
+	/* calculate slot dimensions and band */
+	if (__analize_area(fmt, width, height, &x, &y, &band))
+		return NULL;
+
+	if (fmt == TILFMT_PAGE)	{
+		/* 1D areas don't pack */
+		mi = kmalloc(sizeof(*mi), GFP_KERNEL);
+		if (!mi)
+			return NULL;
+		memset(mi, 0x0, sizeof(*mi));
+
+		if (tcm_reserve_1d(TCM(fmt), x * y, &mi->area)) {
+			kfree(mi);
+			return NULL;
+		}
+
+		mutex_lock(&mtx);
+		list_add(&mi->area_list, &gi_main.onedim);
+	} else {
+		mi = get_2d_area(x, y, align ? : band, offset, band, TCM(fmt));
+		if (!mi)
+			return NULL;
+
+		mutex_lock(&mtx);
+	}
+
+	list_add(&mi->global, &blocks);
+	mutex_unlock(&mtx);
+
+	mi->sys_addr = __get_alias_addr(fmt, mi->area.p0.x, mi->area.p0.y);
+	return mi;
+}
+
 static s32 tiler_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct __buf_info *_b = NULL;
@@ -200,7 +518,7 @@ static s32 tiler_mmap(struct file *filp, struct vm_area_struct *vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
 	mutex_lock(&mtx);
-	list_for_each(pos, &buf_list.list) {
+	list_for_each(pos, &bufs) {
 		_b = list_entry(pos, struct __buf_info, list);
 		if ((vma->vm_pgoff << PAGE_SHIFT) == _b->buf_info.offset)
 			break;
@@ -284,9 +602,9 @@ static s32 tiler_pat_refill(struct tmm *tmm, struct tcm_area *area, u32 *ptr)
 static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 								u32 usr_addr)
 {
-	u16 x_area = 0, y_area = 0;
-	u32 i = 0, tmp = -1;
+	u32 i = 0, tmp = -1, *mem = NULL;
 	u8 write = 0;
+	s32 res = -ENOMEM;
 	struct mem_info *mi = NULL;
 	struct page *page = NULL;
 	struct task_struct *curr_task = current;
@@ -302,34 +620,25 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 		return -EPERM;
 
 	/* reserve area in tiler container */
-	if (__adjust_area(fmt, width, height, &x_area, &y_area))
-		return -EFAULT;
-
-	mi = kmalloc(sizeof(*mi), GFP_KERNEL);
+	mi = __get_area(fmt, width, height, 0, 0);
 	if (!mi)
 		return -ENOMEM;
-	memset(mi, 0x0, sizeof(*mi));
 
-	if (tcm_reserve_1d(TCM(fmt), x_area * y_area, &mi->area)) {
-		kfree(mi);
-		return -ENOMEM;
-	}
-
-	/* formulate system space address */
-	*sys_addr = __get_alias_addr(fmt, mi->area.p0.x, mi->area.p0.y);
+	*sys_addr = mi->sys_addr;
+	mi->usr = usr_addr;
 
 	/* allocate pages */
 	mi->num_pg = tcm_sizeof(mi->area);
-	mi->sys_addr = *sys_addr;
-	mi->usr = usr_addr;
 
-	mi->mem = kmalloc(mi->num_pg * sizeof(*mi->mem), GFP_KERNEL);
-	if (!mi->mem)
-		goto free;
+	mem = kmalloc(mi->num_pg * sizeof(*mem), GFP_KERNEL);
+	if (!mem)
+		goto done;
+	memset(mem, 0x0, sizeof(*mem) * mi->num_pg);
 
 	mi->pg_ptr = kmalloc(mi->num_pg * sizeof(*mi->pg_ptr), GFP_KERNEL);
 	if (!mi->pg_ptr)
-		goto free;
+		goto done;
+	memset(mi->pg_ptr, 0x0, sizeof(*mi->pg_ptr) * mi->num_pg);
 
 	/*
 	 * Important Note: usr_addr is mapped from user
@@ -339,6 +648,7 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 	 */
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, mi->usr);
+	res = -EFAULT;
 
 	/*
 	 * It is observed that under some circumstances, the user
@@ -367,7 +677,7 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 							"get_user_pages()\n");
 			}
 			mi->pg_ptr[i] = (u32)page;
-			mi->mem[i] = page_to_phys(page);
+			mem[i] = page_to_phys(page);
 			tmp += PAGE_SIZE;
 		} else {
 			printk(KERN_ERR "get_user_pages() failed\n");
@@ -376,71 +686,34 @@ static s32 map_buffer(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 	}
 	up_read(&mm->mmap_sem);
 
-	mutex_lock(&mtx);
-	list_add(&mi->list, &mem_list.list);
-	mutex_unlock(&mtx);
+	if (tiler_pat_refill(TMM(fmt), &mi->area, mem))
+		goto fault;
 
-	if (tiler_pat_refill(TMM(fmt), &mi->area, mi->mem))
-		goto release;
-
-	/* for safety */
-	kfree(mi->mem);
-	mi->mem = NULL;
-	return 0;
-
-release:
-	for (i = 0; i < mi->num_pg; i++) {
-		page = (struct page *)mi->pg_ptr[i];
-		if (!PageReserved(page))
-			SetPageDirty(page);
-		page_cache_release(page);
-	}
+	res = 0;
+	goto done;
 fault:
 	up_read(&mm->mmap_sem);
-	kfree(mi->mem);
-	kfree(mi->pg_ptr);
-	kfree(mi);
-	return -EFAULT;
-free:
-	kfree(mi->mem);
-	kfree(mi->pg_ptr);
-	kfree(mi);
-	return -ENOMEM;
+done:
+	if (res) {
+		mutex_lock(&mtx);
+		__free(mi);
+		mutex_unlock(&mtx);
+	}
+	kfree(mem);
+	return res;
 }
 
 s32 tiler_free(u32 sys_addr)
 {
-	u32 i = 0;
-	struct list_head *pos = NULL, *q = NULL;
-	struct mem_info *mi = NULL;
-	struct page *page = NULL;
+	struct mem_info *mi = NULL, *q = NULL;
 
 	mutex_lock(&mtx);
-	list_for_each_safe(pos, q, &mem_list.list) {
-		mi = list_entry(pos, struct mem_info, list);
-		if (mi->sys_addr == sys_addr) {
-
-			if (tcm_free(&mi->area))
-				printk(KERN_NOTICE "warning: failed to "
-						"unreserve tiler area.\n");
-			if (mi->pg_ptr) {
-				for (i = 0; i < mi->num_pg; i++) {
-					page = (struct page *)mi->pg_ptr[i];
-					if (!PageReserved(page))
-						SetPageDirty(page);
-					page_cache_release(page);
-				}
-				kfree(mi->pg_ptr);
-			} else {
-				tmm_free(TMM_SS(mi->sys_addr), mi->mem);
-			}
-			list_del(pos);
-			kfree(mi);
-		}
+	/* find block in global list and free it */
+	list_for_each_entry_safe(mi, q, &blocks, global) {
+		if (mi->sys_addr == sys_addr)
+			__chk_ref(mi);
 	}
 	mutex_unlock(&mtx);
-	if (!mi)
-		return -EFAULT;
 
 	/* for debugging, we can set the PAT entries to DMM_LISA_MAP__0 */
 	return 0x0;
@@ -459,7 +732,7 @@ s32 tiler_find_buf(u32 sys_addr, struct tiler_block_info *blk)
 	u16 x_page = 0, y_page = 0;
 	s32 mode = -1;
 
-	if (get_area(sys_addr & 0x0FFFF1000, &x_area, &y_area))
+	if (get_area(sys_addr & 0x0FFFFF000, &x_area, &y_area))
 		return -EFAULT;
 
 	memset(&area, 0, sizeof(area));
@@ -601,7 +874,7 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 			return -EFAULT;
 
 		mutex_lock(&mtx);
-		list_for_each(pos, &buf_list.list) {
+		list_for_each(pos, &bufs) {
 			_b = list_entry(pos, struct __buf_info, list);
 			if (buf_info.offset == _b->buf_info.offset) {
 				if (copy_to_user((void __user *)arg,
@@ -633,7 +906,7 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		id += 0x1000;
 
 		mutex_lock(&mtx);
-		list_add(&(_b->list), &buf_list.list);
+		list_add(&(_b->list), &bufs);
 		mutex_unlock(&mtx);
 
 		if (copy_to_user((void __user *)arg, &_b->buf_info,
@@ -647,7 +920,7 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 			return -EFAULT;
 
 		mutex_lock(&mtx);
-		list_for_each_safe(pos, q, &buf_list.list) {
+		list_for_each_safe(pos, q, &bufs) {
 			_b = list_entry(pos, struct __buf_info, list);
 			if (buf_info.offset == _b->buf_info.offset) {
 				list_del(pos);
@@ -679,43 +952,14 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 
 s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 {
-	u16 x_area = 0, y_area = 0, band;
-
 	struct mem_info *mi = NULL;
 
 	/* reserve area in tiler container */
-	if (__adjust_area(fmt, width, height, &x_area, &y_area))
-		return -EFAULT;
-
-	mi = kmalloc(sizeof(*mi), GFP_KERNEL);
+	mi = __get_area(fmt, width, height, 0, 0);
 	if (!mi)
 		return -ENOMEM;
-	memset(mi, 0x0, sizeof(*mi));
 
-	switch (fmt) {
-	case TILFMT_8BIT:
-	case TILFMT_16BIT:
-	case TILFMT_32BIT:
-		band = fmt == TILFMT_8BIT ? ALIGN_64 : ALIGN_32;
-		if (tcm_reserve_2d(TCM(fmt), x_area, y_area, band, &mi->area)) {
-			kfree(mi);
-			return -ENOMEM;
-		}
-		break;
-	case TILFMT_PAGE:
-		if (tcm_reserve_1d(TCM(fmt), x_area * y_area, &mi->area)) {
-			kfree(mi);
-			return -ENOMEM;
-		}
-		break;
-	default:
-		kfree(mi);
-		return -ENOMEM;
-	}
-
-	/* formulate system space address */
-	*sys_addr = __get_alias_addr(fmt, mi->area.p0.x, mi->area.p0.y);
-	mi->sys_addr = *sys_addr;
+	*sys_addr = mi->sys_addr;
 
 	/* allocate and map if mapping is supported */
 	if (tmm_can_map(TMM(fmt))) {
@@ -731,43 +975,39 @@ s32 tiler_alloc(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr)
 	}
 
 	mutex_lock(&mtx);
-	list_add(&(mi->list), &mem_list.list);
 	mutex_unlock(&mtx);
 	return 0;
 
 cleanup:
-	kfree(mi->mem);
-	kfree(mi);
+	mutex_lock(&mtx);
+	__free(mi);
+	mutex_unlock(&mtx);
 	return -ENOMEM;
 }
 EXPORT_SYMBOL(tiler_alloc);
 
 static void __exit tiler_exit(void)
 {
-	struct __buf_info *_b = NULL;
-	struct mem_info *mi = NULL;
-	struct list_head *pos = NULL, *q = NULL;
+	struct __buf_info *_b = NULL, *_b_ = NULL;
+	struct mem_info *mi = NULL, *mi_ = NULL;
 	int i, j;
 
-	/* remove any leftover info structs that haven't been unregistered */
 	mutex_lock(&mtx);
-	pos = NULL, q = NULL;
-	list_for_each_safe(pos, q, &buf_list.list) {
-		_b = list_entry(pos, struct __buf_info, list);
-		list_del(pos);
+
+	/* remove any buf info structs */
+	list_for_each_entry_safe(_b, _b_, &bufs, list) {
+		list_del(&_b->list);
 		kfree(_b);
 	}
-	mutex_unlock(&mtx);
 
 	/* free any remaining mem structures */
-	mutex_lock(&mtx);
-	pos = NULL, q = NULL;
-	list_for_each_safe(pos, q, &mem_list.list) {
-		mi = list_entry(pos, struct mem_info, list);
-		if (!mi->pg_ptr)
-			tmm_free(TMM_SS(mi->sys_addr), mi->mem);
-		list_del(pos);
-		kfree(mi);
+	list_for_each_entry_safe(mi, mi_, &blocks, global) {
+		mi->refs = 0;
+		__free(mi);
+	}
+	list_for_each_entry_safe(mi, mi_, &gi_main.reserved, global) {
+		mi->refs = 0;
+		__free(mi);
 	}
 	mutex_unlock(&mtx);
 
@@ -872,8 +1112,11 @@ static s32 __init tiler_init(void)
 	r = platform_driver_register(&tiler_driver_ldm);
 
 	mutex_init(&mtx);
-	INIT_LIST_HEAD(&buf_list.list);
-	INIT_LIST_HEAD(&mem_list.list);
+	INIT_LIST_HEAD(&bufs);
+	INIT_LIST_HEAD(&blocks);
+	INIT_LIST_HEAD(&gi_main.onedim);
+	INIT_LIST_HEAD(&gi_main.areas);
+	INIT_LIST_HEAD(&gi_main.reserved);
 	id = 0xda7a000;
 
 error:

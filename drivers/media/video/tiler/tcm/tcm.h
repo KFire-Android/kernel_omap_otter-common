@@ -302,15 +302,29 @@ static inline bool tcm_area_is_valid(struct tcm_area *area)
 	       );
 }
 
+/* calculate area width */
+static inline u16 __tcm_area_width(struct tcm_area *area)
+{
+	return area->p1.x - area->p0.x + 1;
+}
+
+/* calculate area height */
+static inline u16 __tcm_area_height(struct tcm_area *area)
+{
+	return area->p1.y - area->p0.y + 1;
+}
+
 /* calculate number of slots in an area */
 static inline u16 __tcm_sizeof(struct tcm_area *area)
 {
 	return (area->type == TCM_2D ?
-		(area->p1.x - area->p0.x + 1) * (area->p1.y - area->p0.y + 1) :
+		__tcm_area_width(area) * __tcm_area_height(area) :
 		(area->p1.x - area->p0.x + 1) + (area->p1.y - area->p0.y) *
 							area->tcm->width);
 }
 #define tcm_sizeof(area) __tcm_sizeof(&(area))
+#define tcm_awidth(area) __tcm_area_width(&(area))
+#define tcm_aheight(area) __tcm_area_height(&(area))
 
 /**
  * Iterate through 2D slices of a valid area. Behaves
