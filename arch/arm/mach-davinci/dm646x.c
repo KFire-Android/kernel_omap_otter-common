@@ -339,8 +339,8 @@ static struct clk_lookup dm646x_clks[] = {
 	CLK(NULL, "uart2", &uart2_clk),
 	CLK("i2c_davinci.1", NULL, &i2c_clk),
 	CLK(NULL, "gpio", &gpio_clk),
-	CLK("davinci-mcasp.0", NULL, &mcasp0_clk),
-	CLK("davinci-mcasp.1", NULL, &mcasp1_clk),
+	CLK("davinci-mcasp-dai.0", NULL, &mcasp0_clk),
+	CLK("davinci-mcasp-dai.1", NULL, &mcasp1_clk),
 	CLK(NULL, "aemif", &aemif_clk),
 	CLK("davinci_emac.1", NULL, &emac_clk),
 	CLK(NULL, "pwm0", &pwm0_clk),
@@ -635,14 +635,14 @@ static struct resource dm646x_mcasp1_resources[] = {
 };
 
 static struct platform_device dm646x_mcasp0_device = {
-	.name		= "davinci-mcasp",
+	.name		= "davinci-mcasp-dai",
 	.id		= 0,
 	.num_resources	= ARRAY_SIZE(dm646x_mcasp0_resources),
 	.resource	= dm646x_mcasp0_resources,
 };
 
 static struct platform_device dm646x_mcasp1_device = {
-	.name		= "davinci-mcasp",
+	.name		= "davinci-mcasp-dai",
 	.id		= 1,
 	.num_resources	= ARRAY_SIZE(dm646x_mcasp1_resources),
 	.resource	= dm646x_mcasp1_resources,

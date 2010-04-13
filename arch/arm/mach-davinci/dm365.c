@@ -459,7 +459,7 @@ static struct clk_lookup dm365_clks[] = {
 	CLK(NULL, "usb", &usb_clk),
 	CLK("davinci_emac.1", NULL, &emac_clk),
 	CLK("davinci_voicecodec", NULL, &voicecodec_clk),
-	CLK("davinci-asp.0", NULL, &asp0_clk),
+	CLK("davinci-asp-dai.0", NULL, &asp0_clk),
 	CLK(NULL, "rto", &rto_clk),
 	CLK(NULL, "mjcp", &mjcp_clk),
 	CLK(NULL, NULL, NULL),
@@ -906,7 +906,7 @@ static struct resource dm365_asp_resources[] = {
 };
 
 static struct platform_device dm365_asp_device = {
-	.name		= "davinci-asp",
+	.name		= "davinci-asp-dai",
 	.id		= 0,
 	.num_resources	= ARRAY_SIZE(dm365_asp_resources),
 	.resource	= dm365_asp_resources,

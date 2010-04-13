@@ -412,7 +412,7 @@ static struct resource da830_mcasp1_resources[] = {
 };
 
 static struct platform_device da830_mcasp1_device = {
-	.name		= "davinci-mcasp",
+	.name		= "davinci-mcasp-dai",
 	.id		= 1,
 	.num_resources	= ARRAY_SIZE(da830_mcasp1_resources),
 	.resource	= da830_mcasp1_resources,
@@ -440,7 +440,7 @@ static struct resource da850_mcasp_resources[] = {
 };
 
 static struct platform_device da850_mcasp_device = {
-	.name		= "davinci-mcasp",
+	.name		= "davinci-mcasp-dai",
 	.id		= 0,
 	.num_resources	= ARRAY_SIZE(da850_mcasp_resources),
 	.resource	= da850_mcasp_resources,
