@@ -236,16 +236,25 @@ static struct snd_pcm_ops imx_pcm_ops = {
 	.mmap		= snd_imx_pcm_mmap,
 };
 
+static int ssi_irq = 0;
+
 static int imx_pcm_fiq_new(struct snd_card *card, struct snd_soc_dai *dai,
 	struct snd_pcm *pcm)
 {
+	struct imx_ssi *ssi = snd_soc_dai_get_drvdata(dai);
 	int ret;
+
+	ret = claim_fiq(&fh);
+	if (ret) {
+		dev_err(dai->dev, "failed to claim fiq: %d", ret);
+		return ret;
+	}
 
 	ret = imx_pcm_new(card, dai, pcm);
 	if (ret)
 		return ret;
 
-	if (dai->playback.channels_min) {
+	if (dai->driver->playback.channels_min) {
 		struct snd_pcm_substream *substream =
 			pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream;
 		struct snd_dma_buffer *buf = &substream->dma_buffer;
@@ -253,7 +262,7 @@ static int imx_pcm_fiq_new(struct snd_card *card, struct snd_soc_dai *dai,
 		imx_ssi_fiq_tx_buffer = (unsigned long)buf->area;
 	}
 
-	if (dai->capture.channels_min) {
+	if (dai->driver->capture.channels_min) {
 		struct snd_pcm_substream *substream =
 			pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream;
 		struct snd_dma_buffer *buf = &substream->dma_buffer;
@@ -261,30 +270,8 @@ static int imx_pcm_fiq_new(struct snd_card *card, struct snd_soc_dai *dai,
 		imx_ssi_fiq_rx_buffer = (unsigned long)buf->area;
 	}
 
-	set_fiq_handler(&imx_ssi_fiq_start,
-		&imx_ssi_fiq_end - &imx_ssi_fiq_start);
-
-	return 0;
-}
-
-static struct snd_soc_platform imx_soc_platform_fiq = {
-	.pcm_ops 	= &imx_pcm_ops,
-	.pcm_new	= imx_pcm_fiq_new,
-	.pcm_free	= imx_pcm_free,
-};
-
-struct snd_soc_platform *imx_ssi_fiq_init(struct platform_device *pdev,
-		struct imx_ssi *ssi)
-{
-	int ret = 0;
-
-	ret = claim_fiq(&fh);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to claim fiq: %d", ret);
-		return ERR_PTR(ret);
-	}
-
 	mxc_set_irq_fiq(ssi->irq, 1);
+	ssi_irq = ssi->irq;
 
 	imx_pcm_fiq = ssi->irq;
 
@@ -293,13 +280,55 @@ struct snd_soc_platform *imx_ssi_fiq_init(struct platform_device *pdev,
 	ssi->dma_params_tx.burstsize = 4;
 	ssi->dma_params_rx.burstsize = 6;
 
-	return &imx_soc_platform_fiq;
+
+	set_fiq_handler(&imx_ssi_fiq_start,
+		&imx_ssi_fiq_end - &imx_ssi_fiq_start);
+
+	return 0;
 }
 
-void imx_ssi_fiq_exit(struct platform_device *pdev,
-		struct imx_ssi *ssi)
+static void imx_pcm_fiq_free(struct snd_pcm *pcm)
 {
-	mxc_set_irq_fiq(ssi->irq, 0);
+	mxc_set_irq_fiq(ssi_irq, 0);
 	release_fiq(&fh);
+	imx_pcm_free(pcm);
 }
 
+static struct snd_soc_platform_driver imx_soc_platform_fiq = {
+	.ops		= &imx_pcm_ops,
+	.pcm_new	= imx_pcm_fiq_new,
+	.pcm_free	= imx_pcm_fiq_free,
+};
+
+static int __devinit imx_soc_platform_probe(struct platform_device *pdev)
+{
+	return snd_soc_register_platform(&pdev->dev, &imx_soc_platform_fiq);
+}
+
+static int __devexit imx_soc_platform_remove(struct platform_device *pdev)
+{
+	snd_soc_unregister_platform(&pdev->dev);
+	return 0;
+}
+
+static struct platform_driver imx_pcm_driver = {
+	.driver = {
+			.name = "imx-fiq-pcm-audio",
+			.owner = THIS_MODULE,
+	},
+
+	.probe = imx_soc_platform_probe,
+	.remove = __devexit_p(imx_soc_platform_remove),
+};
+
+static int __init snd_imx_pcm_init(void)
+{
+	return platform_driver_register(&imx_pcm_driver);
+}
+module_init(snd_imx_pcm_init);
+
+static void __exit snd_imx_pcm_exit(void)
+{
+	platform_driver_unregister(&imx_pcm_driver);
+}
+module_exit(snd_imx_pcm_exit);
