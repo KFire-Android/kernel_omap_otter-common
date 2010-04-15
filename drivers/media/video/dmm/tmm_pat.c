@@ -298,6 +298,7 @@ struct tmm *tmm_pat_init(u32 pat_id)
 		tmm->get = tmm_pat_get_pages;
 		tmm->free = tmm_pat_free_pages;
 		tmm->map = tmm_pat_map;
+		tmm->clear = NULL;   /* not yet supported */
 
 		return tmm;
 	}

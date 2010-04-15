@@ -292,6 +292,21 @@ static inline bool tcm_area_is_valid(struct tcm_area *area)
 	       );
 }
 
+/* see if a coordinate is within an area */
+static inline bool __tcm_is_in(struct tcm_pt *p, struct tcm_area *a)
+{
+	u16 i;
+
+	if (a->is2d) {
+		return p->x >= a->p0.x && p->x <= a->p1.x &&
+		       p->y >= a->p0.y && p->y <= a->p1.y;
+	} else {
+		i = p->x + p->y * a->tcm->width;
+		return i >= a->p0.x + a->p0.y * a->tcm->width &&
+		       i <= a->p1.x + a->p1.y * a->tcm->width;
+	}
+}
+
 /* calculate area width */
 static inline u16 __tcm_area_width(struct tcm_area *area)
 {
@@ -315,6 +330,7 @@ static inline u16 __tcm_sizeof(struct tcm_area *area)
 #define tcm_sizeof(area) __tcm_sizeof(&(area))
 #define tcm_awidth(area) __tcm_area_width(&(area))
 #define tcm_aheight(area) __tcm_area_height(&(area))
+#define tcm_is_in(pt, area) __tcm_is_in(&(pt), &(area))
 
 /**
  * Iterate through 2D slices of a valid area. Behaves
