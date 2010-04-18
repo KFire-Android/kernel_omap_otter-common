@@ -148,7 +148,7 @@ config SND_OMAP_SOC_OMAP3_BEAGLE
 
 config SND_OMAP_SOC_ZOOM2
 	tristate "SoC Audio support for Zoom2"
-	depends on TWL4030_CORE && SND_OMAP_SOC && MACH_OMAP_ZOOM2
+	depends on TWL4030_CORE && SND_OMAP_SOC && (MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3)
 	select SND_OMAP_SOC_MCBSP
 	select SND_SOC_TWL4030
 	help
