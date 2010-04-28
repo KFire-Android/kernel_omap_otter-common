@@ -7,6 +7,7 @@
 #include <linux/workqueue.h>
 #include <linux/blkdev.h>
 #include <linux/interrupt.h>
+#include <linux/kfifo.h>
 
 typedef u32 mbox_msg_t;
 struct omap_mbox;
@@ -18,6 +19,8 @@ typedef int __bitwise omap_mbox_irq_t;
 typedef int __bitwise omap_mbox_type_t;
 #define OMAP_MBOX_TYPE1 ((__force omap_mbox_type_t) 1)
 #define OMAP_MBOX_TYPE2 ((__force omap_mbox_type_t) 2)
+
+#define MBOX_KFIFO_SIZE        (256)
 
 struct omap_mbox_ops {
 	omap_mbox_type_t	type;
@@ -42,7 +45,7 @@ struct omap_mbox_ops {
 
 struct omap_mbox_queue {
 	spinlock_t		lock;
-	struct request_queue	*queue;
+	struct kfifo            fifo;
 	struct work_struct	work;
 	struct tasklet_struct	tasklet;
 	int	(*callback)(void *);
