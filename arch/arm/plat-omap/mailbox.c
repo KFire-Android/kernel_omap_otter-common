@@ -25,11 +25,8 @@
 #include <linux/interrupt.h>
 #include <linux/device.h>
 #include <linux/delay.h>
-<<<<<<< HEAD
 #include <linux/slab.h>
-=======
 #include <linux/kfifo.h>
->>>>>>> 48a2878... omap: mailbox: convert block api to kfifo
 
 #include <plat/mailbox.h>
 
