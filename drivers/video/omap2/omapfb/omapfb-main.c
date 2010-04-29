@@ -1196,7 +1196,7 @@ static int omapfb_mmap(struct fb_info *fbi, struct vm_area_struct *vma)
 	if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
 		int k = 0, p = fix->line_length;
 
-		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+		vma->vm_page_prot = pgprot_dmacoherent(vma->vm_page_prot);
 		vma->vm_ops = &mmap_user_ops; /* &dmm_remap_vm_ops; */
 
 		/* we need to figure out the height of the block. */
