@@ -66,7 +66,7 @@ void tiler_alloc_packed(s32 *count, enum tiler_fmt fmt, u32 width, u32 height,
 		n_alloc = MIN(*count - i, m_per_a * n_per_m);
 		m_alloc = DIVIDE_UP(n_alloc, n_per_m);
 		tiles = ((m_alloc - 1) * map_width +
-			     buf_width * (n_alloc - (m_alloc - 1) * m_per_a));
+			 buf_width * (n_alloc - (m_alloc - 1) * n_per_m));
 
 		res = tiler_alloc(fmt, til_width * tiles, height,
 				      (u32 *)sysptr + i);
