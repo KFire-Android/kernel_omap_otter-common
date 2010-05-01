@@ -1237,7 +1237,7 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 		if (copy_to_user((void __user *)arg, &_b->buf_info,
 					sizeof(_b->buf_info))) {
 			_m_unregister_buf(_b);
-			kfree(_b); return -EFAULT;
+			return -EFAULT;
 		}
 		break;
 	case TILIOC_URBUF:
@@ -1363,7 +1363,7 @@ s32 tiler_reservex(u32 n, struct tiler_buf_info *b, pid_t pid)
 
 	for (i = 0; i < b->num_blocks; i++) {
 		/* check for NV12 reservations */
-		if (i < b->num_blocks + 1 &&
+		if (i + 1 < b->num_blocks &&
 		    b->blocks[i].fmt == TILFMT_8BIT &&
 		    b->blocks[i + 1].fmt == TILFMT_16BIT &&
 		    b->blocks[i].dim.area.height ==
@@ -1426,9 +1426,9 @@ static void __exit tiler_exit(void)
 	for (i = TILFMT_8BIT; i <= TILFMT_MAX; i++) {
 		/* remove identical containers (tmm is unique per tcm) */
 		for (j = i + 1; j <= TILFMT_MAX; j++)
-			if (tcm[i] == tcm[j]) {
-				tcm[j] = NULL;
-				tmm[j] = NULL;
+			if (TCM(i) == TCM(j)) {
+				TCM_SET(j, NULL);
+				TMM_SET(j, NULL);
 			}
 
 		tcm_deinit(TCM(i));
