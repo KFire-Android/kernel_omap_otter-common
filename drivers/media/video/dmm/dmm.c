@@ -177,6 +177,36 @@ s32 dmm_pat_refill(struct dmm *dmm, struct pat *pd, enum pat_mode mode)
 		DEBUG("DMM_PAT_IRQSTATUS_RAW", v);
 	}
 
+	/* Again, clear the DMM_PAT_IRQSTATUS register */
+	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_IRQSTATUS);
+	__raw_writel(0xFFFFFFFF, r);
+	dsb();
+
+	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_IRQSTATUS_RAW);
+	v = 0xFFFFFFFF;
+
+	while (v != 0x0) {
+		v = __raw_readl(r);
+		DEBUG("DMM_PAT_IRQSTATUS_RAW", v);
+	}
+
+	/* Again, set "next" register to NULL to clear any PAT STATUS errors */
+	r = (void __iomem *)((u32)dmm->base | DMM_PAT_DESCR__0);
+	v = __raw_readl(r);
+	w = (v & (~(BF(31, 4)))) | ((((u32)NULL) << 4) & BF(31, 4));
+	__raw_writel(w, r);
+
+	/*
+	 * Now, check that the DMM_PAT_STATUS register
+	 * has not reported an error before exiting.
+	*/
+	r = (void __iomem *)((u32)dmm->base | DMM_PAT_STATUS__0);
+	v = __raw_readl(r);
+	if ((v & 0xFC00) != 0) {
+		while (1)
+			printk(KERN_ERR "dmm_pat_refill() error.\n");
+	}
+
 	return 0;
 }
 EXPORT_SYMBOL(dmm_pat_refill);
