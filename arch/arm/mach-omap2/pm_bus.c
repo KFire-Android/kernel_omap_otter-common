@@ -68,3 +68,52 @@ int platform_pm_runtime_idle(struct device *dev)
 };
 #endif /* CONFIG_PM_RUNTIME */
 
+#ifdef CONFIG_SUSPEND
+int platform_pm_suspend_noirq(struct device *dev)
+{
+	struct device_driver *drv = dev->driver;
+	int ret = 0;
+
+	if (!drv)
+		return 0;
+
+	if (drv->pm) {
+		if (drv->pm->suspend_noirq)
+			ret = drv->pm->suspend_noirq(dev);
+	}
+
+	/*
+	 * The DPM core has done a 'get' to prevent runtime PM
+	 * transitions during system PM.  This put is to balance
+	 * out that get so that this device can now be runtime
+	 * suspended.
+	 */
+	pm_runtime_put_sync(dev);
+
+	return ret;
+}
+
+int platform_pm_resume_noirq(struct device *dev)
+{
+	struct device_driver *drv = dev->driver;
+	int ret = 0;
+
+	/*
+	 * This 'get' is to balance the 'put' in the above suspend_noirq
+	 * method so that the runtime PM usage counting is in the same
+	 * state it was when suspend was called.
+	 */
+	pr_debug("pm_runtime_get_sync for %s\n", dev_name(dev));
+	pm_runtime_get_sync(dev);
+
+	if (!drv)
+		return 0;
+
+	if (drv->pm) {
+		if (drv->pm->resume_noirq)
+			ret = drv->pm->resume_noirq(dev);
+	}
+
+	return ret;
+}
+#endif /* CONFIG_SUSPEND */
