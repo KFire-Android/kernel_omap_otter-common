@@ -15,6 +15,7 @@ obj-$(CONFIG_ARCH_OMAP16XX) += ocpi.o
 # OPP support in (OMAP3+ only at the moment)
 ifdef CONFIG_PM
 obj-$(CONFIG_ARCH_OMAP3) += opp.o
+obj-$(CONFIG_TWL4030_CORE) += opp_twl_tps.o
 endif
 
 # omap_device support (OMAP2+ only at the moment)
