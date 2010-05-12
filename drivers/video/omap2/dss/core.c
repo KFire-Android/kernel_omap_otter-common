@@ -224,16 +224,19 @@ err:
 
 static void dss_put_clocks(void)
 {
+#if 0
 	if (core.dss_96m_fck)
 		clk_put(core.dss_96m_fck);
 	clk_put(core.dss_54m_fck);
 	clk_put(core.dss1_fck);
 	clk_put(core.dss2_fck);
 	clk_put(core.dss_ick);
+#endif
 }
 
 unsigned long dss_clk_get_rate(enum dss_clock clk)
 {
+#if 0
 	switch (clk) {
 	case DSS_CLK_ICK:
 		return clk_get_rate(core.dss_ick);
@@ -248,7 +251,8 @@ unsigned long dss_clk_get_rate(enum dss_clock clk)
 	}
 
 	BUG();
-	return 0;
+#endif
+	return 153600000;
 }
 
 static unsigned count_clk_bits(enum dss_clock clks)
@@ -272,7 +276,7 @@ static unsigned count_clk_bits(enum dss_clock clks)
 static void dss_clk_enable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
-
+#if 0
 	if (clks & DSS_CLK_ICK)
 		clk_enable(core.dss_ick);
 	if (clks & DSS_CLK_FCK1)
@@ -283,7 +287,7 @@ static void dss_clk_enable_no_ctx(enum dss_clock clks)
 		clk_enable(core.dss_54m_fck);
 	if (clks & DSS_CLK_96M)
 		clk_enable(core.dss_96m_fck);
-
+#endif
 	core.num_clks_enabled += num_clks;
 }
 
@@ -300,7 +304,7 @@ void dss_clk_enable(enum dss_clock clks)
 static void dss_clk_disable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
-
+#if 0
 	if (clks & DSS_CLK_ICK)
 		clk_disable(core.dss_ick);
 	if (clks & DSS_CLK_FCK1)
@@ -311,7 +315,7 @@ static void dss_clk_disable_no_ctx(enum dss_clock clks)
 		clk_disable(core.dss_54m_fck);
 	if (clks & DSS_CLK_96M)
 		clk_disable(core.dss_96m_fck);
-
+#endif
 	core.num_clks_enabled -= num_clks;
 }
 
