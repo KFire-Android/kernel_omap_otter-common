@@ -3,6 +3,10 @@ config OMAP2_VRAM
 
 config OMAP2_VRFB
 	bool
+	depends on ARCH_OMAP2 || ARCH_OMAP3
+	default y if FB_OMAP2
+	help
+	  OMAP VRFB buffer support is efficient for rotation
 
 source "drivers/video/omap2/dss/Kconfig"
 source "drivers/video/omap2/omapfb/Kconfig"
