@@ -1,0 +1,308 @@
+OMAP HSI API's How To
+=====================
+
+The MIPI High Speed Synchronous Serial Interface (HSI) is a high speed
+communication interface that is used for connecting OMAP to a cellular modem
+engine.
+It is specified by the MIPI alliance (www.mipi.org). An introduction to the
+MIPI HSI working group can be found here: http://www.mipi.org/wgoverview.shtml
+
+The HSI interface supports full duplex communication over multiple channels and
+is capable of reaching speeds up to 200 Mbit/s.
+
+The OMAP HSI driver supports both OMAP MIPI HSI (as defined in
+MIPI documentation mipi_HSI-PL_specification_v01-01-00a.pdf) and OMAP SSI
+devices through different device files, and a generic SW driver.
+
+Please refer to the MIPI specifications for more details on this device.
+
+
+I OMAP HSI driver API overview
+-----------------------------
+
+A) HSI Bus, HSI channels and protocol drivers overview.
+
+The OMAP HSI driver implements the low-level support for the HSI device. It
+abstracts device specifics and provides a simple interface inside the kernel
+for data transmission on the HSI channels.
+The OMAP HSI driver does not implement any communication protocol.
+The SW layers using the OMAP HSI driver may implement a communication protocol
+if required, and are commonly called 'protocol drivers' in this document.
+
+The OMAP HSI abstracts the concept of HSI channels by creating an HSI bus and
+attaching HSI channel devices to it. (see Figure 1)
+
+Protocol drivers will then claim one or more HSI channels, after registering
+with the OMAP HSI driver.
+
+	+---------------------+		+----------------+
+	+  HSI channel device +		+  HSI protocol  +
+	+  (omap_hsi.pX-cY)   +	<-------+  driver        +
+	+---------------------+		+----------------+
+		|				|
+(/sys/bus/hsi/devices/omap_hsi.pX-cy)	(/sys/bus/hsi/drivers/hsi_protocol)
+		|				|
++----------------------------------------------------------------+
++			HSI bus					 +
++----------------------------------------------------------------+
+
+			Figure 1.
+
+(NOTE: omap_hsi.pX-cY represents the HSI channel Y on port X from the omap_hsi
+device)
+
+B) Data transfers
+
+The OMAP HSI driver exports an asynchronous interface for sending and receiving
+data over the HSI channels. Protocol drivers will register a set of read and
+write completion callbacks for each HSI channel they use.
+
+Protocol drivers call hsi_write/hsi_read functions to signal the OMAP HSI driver
+that is willing to write/read data to/from a channel. Transfers are completed
+only when the OMAP HSI driver calls the completion callback.
+
+An HSI channel can simultaneously have both a read and a write request
+pending, however, requests cannot be queued.
+
+It is safe to call hsi_write/hsi_read functions inside the callback functions.
+In fact, a protocol driver should normally re-issue the read request from within
+the read callback, in order to not miss any incoming messages.
+
+Note on read / write operations:
+A read or write is performed using a HSI internal DMA channel, unless the size
+of data to transmit is one 32bits Word, where the transmission is directly
+managed through interrupts.
+
+C) Error handling
+
+HSI is a multi channel interface but the channels share the same physical wires.
+Therefore, any transmission error potentially affects all the protocol drivers
+that sit on top of the HSI driver. Whenever an error occurs, it is broadcast
+to all protocol drivers.
+
+Errors are signaled to the protocol drivers through the port_event callback.
+
+Completion callbacks functions are only called when a transfer has succeess.
+
+D) Supported modes of operation
+
+The driver supports stream and frame transmission modes and synchronized and
+pipelined data flows.
+The driver implements the HSI support for the core MPU and not for the
+potential co-processors.
+
+
+II OMAP HSI API's
+-----------------
+
+A) Include
+
+#include<linux/hsi_driver_if.h>
+
+B) int hsi_register_driver(struct hsi_device_driver *driver);
+
+  Description: Register an HSI protocol driver
+
+  Parameter: A protocol driver declaration (see struct hsi_device_driver)
+
+C) void hsi_unregister_driver(struct hsi_device_driver *driver);
+
+  Description: Unregister an HSI protocol driver
+
+  Parameter: A protocol driver declaration (see struct hsi_device_driver)
+
+D) int hsi_open(struct hsi_device *dev);
+
+  Description: Open an HSI device channel
+
+  Parameter: The HSI channel
+
+E) int hsi_write(struct hsi_device *dev, u32 *data, unsigned int count);
+
+  Description: Send data through an HSI channel. The transfer is only completed
+  when the write_complete callback is called
+
+  Parameters:
+	- dev: HSI channel
+	- data: pointer to the data to send
+	- count: number of 32-bit words to be sent
+
+F) void hsi_write_cancel(struct hsi_device *dev);
+
+  Description: Cancel current pending write operation
+
+  Parameters: HSI channel
+
+G) int hsi_read(struct hsi_device *dev, u32 *data, unsigned int count);
+
+  Description: Receive data through an HSI channel. The transfer is only
+  completed when the read_complete callback is called
+
+  Parameters:
+	- dev: HSI channel
+	- data: pointer where to store the data
+	- count: number of 32-bit words to be read
+
+H) void hsi_read_cancel(struct hsi_device *dev);
+
+  Description: Cancel current pending read operation
+
+  Parameters: HSI channel
+
+I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
+
+  Description: Apply some control command to the port associated to the given
+  HSI channel
+
+  Parameters:
+	- dev: HSI channel
+	- command: command to execute
+	- arg: parameter for the control command
+
+  Commands:
+	- HSI_IOCTL_WAKE_UP:
+		Description: Set HSI wakeup line for the channel
+		Parameters: None
+	- HSI_IOCTL_WAKE_DOWN:
+		Description: Unset HSI wakeup line for the channel
+		Parameters: None
+	- HSI_IOCTL_SEND_BREAK:
+		Description: Send a HW BREAK frame in FRAME mode
+		Parameters: None
+	- HSI_IOCTL_WAKE:
+		Description: Get HST WAKE line status
+		Parameters: Pointer to a u32 variable to return result
+		(Result: 0 means wakeline DOWN, other result means wakeline UP)
+	- HSI_IOCTL_FLUSH_RX:
+		Description: Force the HSR to idle state
+		Parameters: None
+	- HSI_IOCTL_FLUSH_TX:
+		Description: Force the HST to idle state
+		Parameters: None
+	- HSI_IOCTL_CAWAKE:
+		Description: Get CAWAKE (HSR) line status
+		Parameters: Pointer to a u32 variable to return result
+		(Result: 0 means wakeline DOWN, other result means wakeline UP)
+	- HSI_IOCTL_SET_RX:
+		Description: Set HSR configuration
+		Parameters: Pointer to a hsr_ctx structure describing
+		configurable HSR parameters (mode, frame size, channels,
+		data flow type, bit-rate divisor)
+		Notes:
+		HSI: A special value (0x1000) can be passed as bit-rate divisor
+		to request the HSR so switch to auto-divisor mode (in this mode,
+		the HSR can receive at any speed, but the error detection is
+		deactivated). To exit this RX auto-divisor mode, a new divisor
+		must be programmed for HSI (can be 0), and the error-detection
+		is re-enabled.
+		SSI: The same special 0x1000 value is used to deactivate the SSR
+		timeout counter. This counter can be re-enabled by programming
+		the 0x1001 value as bit-rate divisor. The SSI does not accept
+		any other SSR bit-rate divisor values.
+	- HSI_IOCTL_GET_RX:
+		Description: Get HSR configuration
+		Parameters: Pointer to a Hsr_ctx structure describing
+		configurable HSR parameters (mode, frame size, channels,
+		data flow type, bit-rate divisor)
+	- HSI_IOCTL_SET_TX:
+		Description: Set HST configuration
+		Parameters: Pointer to a hst_ctx structure describing
+		configurable HST parameters (mode, frame size, divisor,
+		arb_mode, channels, data flow type)
+	- HSI_IOCTL_GET_TX:
+		Description: Get HST configuration
+		Parameters: Pointer to a hst_ctx structure describing
+		configurable SSR parameters (mode, frame size, divisor,
+		arb_mode, channels, data flow type)
+	Note that the Rx and Tx transmission speeds are configured through the
+	bit-rate divisor parameters. The HSI driver user shall take care of the
+	functional clock provided to the HSI and program the divisors
+	accordingly. Depending on the required speed and HSI device, some
+	constraints on OPP may have to be handled. This shall be managed by the
+	HSI driver user.
+
+J) void hsi_close(struct hsi_device *dev);
+
+  Description: Close an HSI channel
+
+  Parameters: The HSI channel to close
+
+K) Callback configuration functions:
+void hsi_set_read_cb(struct hsi_device *dev,
+		void (*read_cb)(struct hsi_device *dev, unsigned int size));
+void hsi_set_write_cb(struct hsi_device *dev,
+		void (*write_cb)(struct hsi_device *dev, unsigned int size));
+void hsi_set_port_event_cb(struct hsi_device *dev,
+				void (*port_event_cb)(struct hsi_device *dev,
+						unsigned int event, void *arg));
+
+  Description: Set the read, write and port-event callbacks for the HSI channel.
+  These functions are usually called in the probe function of the HSI protocol
+  driver to set completion callbacks for the asynchronous read and write
+  transfer, and manage the other HSI events.
+
+  Parameters:
+	- dev: HSI channel
+	- read_cb: Pointer to a callback function to signal that a read transfer
+		is completed. size is the number of words (32bits) received.
+	- write_cb: Pointer to a callback function to signal that a write
+		transfer is completed. size is the number of words (32bits) sent.
+	- port_event_cb: Pointer to a callback function to signal that a HSI
+		event has happened (events can be: Break frame detected, error,
+		cawake-up, cawake-down or HSR-data-available).
+
+L) struct hsi_device_driver
+
+Description: Protocol drivers pass this struct to the hsi_register_driver
+function in order to register with the OMAP HSI driver. Among other things it
+tells the OMAP HSI driver which channels the protocol driver wants to allocate
+for its use
+
+Declaration:
+struct hsi_device_driver {
+	unsigned long		ctrl_mask;
+	unsigned long		ch_mask[HSI_MAX_PORTS];
+	int			(*probe)(struct hsi_device *dev);
+	int			(*remove)(struct hsi_device *dev);
+	int			(*suspend)(struct hsi_device *dev,
+						pm_message_t mesg);
+	int			(*resume)(struct hsi_device *dev);
+	struct device_driver	driver;
+};
+
+Fields description:
+	ctrl_mask: HSI block ids to use
+	ch_mask[HSI_MAX_PORTS]: HSI channels to use
+	probe: Probe function
+		Parameters: HSI channel
+	remove: Remove function
+		Parameters: HSI channel
+
+Example:
+
+static struct hsi_device_driver hsi_protocol_driver = {
+	.ctrl_mask = ANY_HSI_CONTROLLER,
+	.ch_mask[0] = CHANNEL(0) | CHANNEL(1),
+	.probe = hsi_proto_probe,
+	.remove = __devexit_p(hsi_proto_remove),
+	.driver = {
+			.name = "hsi_protocol",
+	},
+};
+
+
+III) FUTURE WORK
+----------------
+ - Power management update and validation on OMAP 3430
+ - Clocks and power management implementation and validation on OMAP 4430
+ - hsi-char documentation
+
+
+=================================================
+Acknowledgements: The OMAP HSI driver is based on OMAP SSI driver, written by
+Carlos Chinea <carlos.chinea@nokia.com>.
+
+Contact: Sebastien Jan <s-jan@ti.com>
+
+Copyright (C) 2008 Nokia Corporation.
+Copyright (C) 2009 Texas Instruments, Inc.
