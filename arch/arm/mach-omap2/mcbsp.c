@@ -223,7 +223,7 @@ static struct omap_mcbsp_platform_data omap44xx_mcbsp_pdata[] = {
 #define OMAP44XX_MCBSP_PDATA_SZ		ARRAY_SIZE(omap44xx_mcbsp_pdata)
 #define OMAP44XX_MCBSP_REG_NUM		(OMAP_MCBSP_REG_RCCR / sizeof(u32) + 1)
 
-static void omap2_mcbsp_free(unsigned int id)
+static __attribute__ ((unused)) void omap2_mcbsp_free(unsigned int id)
 {
 	struct omap_mcbsp *mcbsp = mcbsp_ptr[id];
 
