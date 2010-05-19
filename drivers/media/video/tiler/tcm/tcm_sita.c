@@ -16,6 +16,7 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
  */
+#include <linux/slab.h>
 
 #include "_tcm_sita.h"
 #include "tcm_sita.h"

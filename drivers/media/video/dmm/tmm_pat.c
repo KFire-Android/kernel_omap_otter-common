@@ -20,6 +20,7 @@
 #include <asm/cacheflush.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
+#include <linux/slab.h>
 
 #include "tmm.h"
 

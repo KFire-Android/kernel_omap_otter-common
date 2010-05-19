@@ -24,6 +24,7 @@
 #include <linux/err.h>             /* IS_ERR() */
 #include <linux/io.h>              /* ioremap() */
 #include <linux/errno.h>
+#include <linux/slab.h>
 
 #include <mach/dmm.h>
 

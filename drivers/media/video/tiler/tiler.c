@@ -30,6 +30,7 @@
 #include <linux/mutex.h>
 #include <linux/dma-mapping.h>
 #include <linux/pagemap.h>         /* page_cache_release() */
+#include <linux/slab.h>
 
 #include <mach/tiler.h>
 #include <mach/dmm.h>
