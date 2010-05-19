@@ -162,6 +162,19 @@ static int twl_rtc_write_u8(u8 data, u8 reg)
 	return ret;
 }
 
+#ifdef CONFIG_ARCH_OMAP4
+static int twl_rtc_read(u8 *value, u8 reg, unsigned num_bytes)
+{
+	int ret = 0, i = 0;
+
+	for (i = 0; i < num_bytes; i++)
+		if (twl_rtc_read_u8(value + i, (reg + i)))
+			return ret;
+
+	return ret;
+}
+#endif
+
 /*
  * Cache the value for timer/alarm interrupts register; this is
  * only changed by callers holding rtc ops lock (or resume).
@@ -250,9 +263,12 @@ static int twl_rtc_read_time(struct device *dev, struct rtc_time *tm)
 	if (ret < 0)
 		return ret;
 
+#ifndef CONFIG_ARCH_OMAP4
 	ret = twl_i2c_read(TWL_MODULE_RTC, rtc_data,
 			(rtc_reg_map[REG_SECONDS_REG]), ALL_TIME_REGS);
-
+#else
+	ret = twl_rtc_read(rtc_data, REG_SECONDS_REG, ALL_TIME_REGS);
+#endif
 	if (ret < 0) {
 		dev_err(dev, "rtc_read_time error %d\n", ret);
 		return ret;
@@ -314,9 +330,12 @@ static int twl_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
 {
 	unsigned char rtc_data[ALL_TIME_REGS + 1];
 	int ret;
-
+#ifndef CONFIG_ARCH_OMAP4
 	ret = twl_i2c_read(TWL_MODULE_RTC, rtc_data,
 			(rtc_reg_map[REG_ALARM_SECONDS_REG]), ALL_TIME_REGS);
+#else
+	ret = twl_rtc_read(rtc_data, REG_ALARM_SECONDS_REG, ALL_TIME_REGS);
+#endif
 	if (ret < 0) {
 		dev_err(dev, "rtc_read_alarm error %d\n", ret);
 		return ret;
