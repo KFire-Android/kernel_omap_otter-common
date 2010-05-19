@@ -211,6 +211,13 @@ enum omap_overlay_manager_caps {
 	OMAP_DSS_OVL_MGR_CAP_DISPC = 1 << 0,
 };
 
+enum omap_overlay_zorder {
+	OMAP_DSS_OVL_ZORDER_0	= 0x0,
+	OMAP_DSS_OVL_ZORDER_1	= 0x1,
+	OMAP_DSS_OVL_ZORDER_2	= 0x2,
+	OMAP_DSS_OVL_ZORDER_3	= 0x3,
+};
+
 /* RFBI */
 
 struct rfbi_timings {
@@ -313,6 +320,7 @@ struct omap_overlay_info {
 	u16 out_width;	/* if 0, out_width == width */
 	u16 out_height;	/* if 0, out_height == height */
 	u8 global_alpha;
+	enum omap_overlay_zorder zorder;
 };
 
 struct omap_overlay {
