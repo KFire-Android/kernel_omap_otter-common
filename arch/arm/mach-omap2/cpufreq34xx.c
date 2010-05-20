@@ -91,11 +91,22 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 };
 static u32 omap36xx_opp_def_size = ARRAY_SIZE(omap36xx_opp_def_list);
 
+/* Temp variable to allow multiple calls */
+static u8 __initdata omap3_table_init;
+
 int __init omap3_pm_init_opp_table(void)
 {
 	struct omap_opp_def *opp_def, *omap3_opp_def_list;
 	u32 omap3_opp_def_size;
 	int i, r;
+
+	/*
+	 * Allow multiple calls, but initialize only if not already initalized
+	 * even if the previous call failed, coz, no reason we'd succeed again
+	 */
+	if (omap3_table_init)
+		return 0;
+	omap3_table_init = 1;
 
 	omap3_opp_def_list = cpu_is_omap3630() ? omap36xx_opp_def_list :
 				omap34xx_opp_def_list;
