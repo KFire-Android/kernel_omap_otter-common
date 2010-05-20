@@ -155,7 +155,7 @@ u32 tiler_get_address(struct tiler_view_orient orient,
 	return (u32)
 		TIL_ADDR((tmp << alignment), (orient.rotate_90 ? 1 : 0),
 			(orient.y_invert ? 1 : 0), (orient.x_invert ? 1 : 0),
-			fmt);
+			(fmt - 1));
 }
 
 u32 tiler_reorient_addr(u32 tsptr, struct tiler_view_orient orient)
