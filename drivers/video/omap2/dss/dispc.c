@@ -2588,7 +2588,7 @@ unsigned long dispc_fclk_rate(void)
 		r = dss_clk_get_rate(DSS_CLK_FCK1);
 	else
 #ifdef CONFIG_OMAP2_DSS_DSI
-		r = dsi_get_dsi1_pll_rate();
+		r = dsi_get_dsi1_pll_rate(DSI1);
 #else
 	BUG();
 #endif
@@ -3476,13 +3476,25 @@ int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 }
 
 #ifdef CONFIG_OMAP2_DSS_FAKE_VSYNC
-void dispc_fake_vsync_irq(void)
+void dispc_fake_vsync_irq(enum omap_dsi_index ix)
 {
 	u32 irqstatus = DISPC_IRQ_VSYNC;
 	int i;
 
 	WARN_ON(!in_interrupt());
 
+	switch (ix) {
+	case DSI1:
+		irqstatus = DISPC_IRQ_VSYNC;
+		break;
+	case DSI2:
+		irqstatus = DISPC_IRQ_VSYNC2;
+		break;
+	default:
+		DSSERR("Invalid display id for fake vsync\n");
+		return;
+	}
+	
 	for (i = 0; i < DISPC_MAX_NR_ISRS; i++) {
 		struct omap_dispc_isr_data *isr_data;
 		isr_data = &dispc.registered_isr[i];
@@ -3537,7 +3549,8 @@ static void _omap_dispc_initial_config(void)
 	dispc_write_reg(DISPC_SYSCONFIG, l);
 
 	/* FUNCGATED */
-	REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
+	if (!cpu_is_omap44xx())
+		REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
 
 	/* L3 firewall setting: enable access to OCM RAM */
 	/* XXX this should be somewhere in plat-omap */

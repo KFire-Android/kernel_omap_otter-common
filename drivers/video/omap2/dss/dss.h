@@ -330,7 +330,7 @@ void dispc_dump_clocks(struct seq_file *s);
 void dispc_dump_irqs(struct seq_file *s);
 void dispc_dump_regs(struct seq_file *s);
 void dispc_irq_handler(void);
-void dispc_fake_vsync_irq(void);
+void dispc_fake_vsync_irq(enum omap_dsi_index ix);
 
 void dispc_save_context(void);
 void dispc_restore_context(void);
