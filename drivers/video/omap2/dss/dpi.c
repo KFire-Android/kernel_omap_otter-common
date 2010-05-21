@@ -48,7 +48,7 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 	struct dispc_clock_info dispc_cinfo;
 	int r;
 
-	r = dsi_pll_calc_clock_div_pck(is_tft, pck_req, &dsi_cinfo,
+	r = dsi_pll_calc_clock_div_pck(DSI1, is_tft, pck_req, &dsi_cinfo,
 			&dispc_cinfo);
 	if (r)
 		return r;
@@ -197,7 +197,7 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 
 err4:
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	dsi_pll_uninit();
+	dsi_pll_uninit(DSI1);
 err3:
 	dss_clk_disable(DSS_CLK_FCK2);
 #endif
@@ -218,7 +218,7 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 	dss_select_dispc_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
-	dsi_pll_uninit();
+	dsi_pll_uninit(DSI1);
 	dss_clk_disable(DSS_CLK_FCK2);
 #endif
 
@@ -264,7 +264,7 @@ int dpi_check_timings(struct omap_dss_device *dssdev,
 	{
 		struct dsi_clock_info dsi_cinfo;
 		struct dispc_clock_info dispc_cinfo;
-		r = dsi_pll_calc_clock_div_pck(is_tft,
+		r = dsi_pll_calc_clock_div_pck(DSI1, is_tft,
 				timings->pixel_clock * 1000,
 				&dsi_cinfo, &dispc_cinfo);
 
