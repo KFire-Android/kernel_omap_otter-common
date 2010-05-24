@@ -219,6 +219,8 @@ void dss_recheck_connections(struct omap_dss_device *dssdev, bool force);
 int dss_init(bool skip_init);
 void dss_exit(void);
 
+void dss_switch_tv_hdmi(int hdmi);
+
 void dss_save_context(void);
 void dss_restore_context(void);
 
@@ -356,6 +358,9 @@ void dispc_enable_zorder(enum omap_plane plane, bool enable);
 
 void dispc_set_plane_ba0(enum omap_plane plane, u32 paddr);
 void dispc_set_plane_ba1(enum omap_plane plane, u32 paddr);
+void dispc_enable_gamma_table(bool enable);
+void dispc_set_idle_mode(void);
+
 void dispc_set_plane_pos(enum omap_plane plane, u16 x, u16 y);
 void dispc_set_plane_size(enum omap_plane plane, u16 width, u16 height);
 void dispc_set_channel_out(enum omap_plane plane,
@@ -375,6 +380,7 @@ int dispc_setup_plane(enum omap_plane plane,
 
 bool dispc_go_busy(enum omap_channel channel);
 void dispc_go(enum omap_channel channel);
+void dispc_enable_digit_out(bool enable);
 void dispc_enable_channel(enum omap_channel channel, bool enable);
 bool dispc_is_channel_enabled(enum omap_channel channel);
 int dispc_enable_plane(enum omap_plane plane, bool enable);
@@ -459,6 +465,12 @@ static inline void rfbi_exit(void)
 }
 #endif
 
+#ifdef CONFIG_OMAP2_DSS_HDMI
+int hdmi_init(struct platform_device *pdev, int code, int mode);
+void hdmi_exit(void);
+void hdmi_dump_regs(struct seq_file *s);
+int hdmi_init_display(struct omap_dss_device *display);
+#endif
 
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
 static inline void dss_collect_irq_stats(u32 irqstatus, unsigned *irq_arr)
