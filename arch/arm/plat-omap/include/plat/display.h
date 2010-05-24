@@ -62,6 +62,7 @@ enum omap_display_type {
 	OMAP_DISPLAY_TYPE_SDI		= 1 << 2,
 	OMAP_DISPLAY_TYPE_DSI		= 1 << 3,
 	OMAP_DISPLAY_TYPE_VENC		= 1 << 4,
+	OMAP_DISPLAY_TYPE_HDMI		= 1 << 5,
 };
 
 enum omap_plane {
@@ -291,6 +292,12 @@ int dsi_vc_send_null(enum omap_dsi_index ix, int channel);
 int dsi_vc_send_bta_sync(enum omap_dsi_index ix, int channel);
 
 /* Board specific data */
+#define PWM2ON		0x03
+#define PWM2OFF		0x04
+#define TOGGLE3		0x92
+#define HDMI_GPIO_60 60
+#define HDMI_GPIO_41 41
+
 struct omap_dss_board_info {
 	int (*get_last_off_on_transaction_id)(struct device *dev);
 	int num_devices;
@@ -567,6 +574,10 @@ struct omap_dss_driver {
 
 	int (*set_wss)(struct omap_dss_device *dssdev, u32 wss);
 	u32 (*get_wss)(struct omap_dss_device *dssdev);
+
+/*HDMI specific */
+	void (*get_edid)(struct omap_dss_device *dssdev);
+	void (*set_custom_edid_timing_code)(struct omap_dss_device *dssdev, int mode, int code);
 };
 
 int omap_dss_register_driver(struct omap_dss_driver *);
