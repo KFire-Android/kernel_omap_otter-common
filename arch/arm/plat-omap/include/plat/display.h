@@ -297,6 +297,10 @@ int dsi_vc_send_bta_sync(enum omap_dsi_index ix, int channel);
 #define TOGGLE3		0x92
 #define HDMI_GPIO_60 60
 #define HDMI_GPIO_41 41
+#define DLP_4430_GPIO_40	40
+#define DLP_4430_GPIO_44	44
+#define DLP_4430_GPIO_45	45
+#define DLP_4430_GPIO_59	59
 
 struct omap_dss_board_info {
 	int (*get_last_off_on_transaction_id)(struct device *dev);
@@ -580,6 +584,10 @@ struct omap_dss_driver {
 	void (*set_custom_edid_timing_code)(struct omap_dss_device *dssdev, int mode, int code);
 };
 
+struct pico_platform_data {
+	u8 gpio_intr;
+};
+
 int omap_dss_register_driver(struct omap_dss_driver *);
 void omap_dss_unregister_driver(struct omap_dss_driver *);
 
@@ -605,7 +613,8 @@ struct omap_overlay *omap_dss_get_overlay(int num);
 void omapdss_default_get_resolution(struct omap_dss_device *dssdev,
 		u16 *xres, u16 *yres);
 int omapdss_default_get_recommended_bpp(struct omap_dss_device *dssdev);
-
+bool dispc_go_busy(enum omap_channel channel);
+void dispc_go(enum omap_channel channel);
 typedef void (*omap_dispc_isr_t) (void *arg, u32 mask);
 int omap_dispc_register_isr(omap_dispc_isr_t isr, void *arg, u32 mask);
 int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask);
