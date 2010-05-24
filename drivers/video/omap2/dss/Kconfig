@@ -60,6 +60,12 @@ config OMAP2_DSS_VENC
 	help
 	  OMAP Video Encoder support for S-Video and composite TV-out.
 
+config OMAP2_DSS_HDMI
+	bool "HDMI support"
+        default n
+	help
+	  OMAP HDMI panel support.
+
 config OMAP2_DSS_SDI
 	bool "SDI support"
 	depends on ARCH_OMAP3
