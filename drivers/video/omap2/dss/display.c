@@ -282,6 +282,33 @@ static ssize_t display_wss_store(struct device *dev,
 	return size;
 }
 
+static ssize_t display_edid_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+
+
+		if (!dssdev->driver->get_edid)
+		return -ENOENT;
+	dssdev->driver->get_edid(dssdev);
+	return snprintf(buf, PAGE_SIZE, "EDID-Information");
+
+}
+static ssize_t display_custom_edid_timing_store(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	int val, code, mode;
+	val = simple_strtoul(buf, NULL, 0);
+	code = val / 10;
+	mode = val % 10;
+		if (!dssdev->driver->set_custom_edid_timing_code)
+			return -ENOENT;
+	dssdev->driver->set_custom_edid_timing_code(dssdev, code, mode);
+	return snprintf(buf, PAGE_SIZE, "EDID-Information %d mode % d code", mode, code);
+
+}
+
 static DEVICE_ATTR(enabled, S_IRUGO|S_IWUSR,
 		display_enabled_show, display_enabled_store);
 static DEVICE_ATTR(update_mode, S_IRUGO|S_IWUSR,
@@ -296,6 +323,8 @@ static DEVICE_ATTR(mirror, S_IRUGO|S_IWUSR,
 		display_mirror_show, display_mirror_store);
 static DEVICE_ATTR(wss, S_IRUGO|S_IWUSR,
 		display_wss_show, display_wss_store);
+static DEVICE_ATTR(custom_edid_timing, S_IRUGO|S_IWUSR,
+		display_edid_show, display_custom_edid_timing_store);
 
 static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_enabled,
@@ -305,6 +334,7 @@ static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_rotate,
 	&dev_attr_mirror,
 	&dev_attr_wss,
+	&dev_attr_custom_edid_timing,
 	NULL
 };
 
@@ -350,6 +380,7 @@ int omapdss_default_get_recommended_bpp(struct omap_dss_device *dssdev)
 			return 16;
 	case OMAP_DISPLAY_TYPE_VENC:
 	case OMAP_DISPLAY_TYPE_SDI:
+	case OMAP_DISPLAY_TYPE_HDMI:
 		return 24;
 	default:
 		BUG();
@@ -370,6 +401,9 @@ bool dss_use_replication(struct omap_dss_device *dssdev,
 
 	if (dssdev->type == OMAP_DISPLAY_TYPE_DPI &&
 			(dssdev->panel.config & OMAP_DSS_LCD_TFT) == 0)
+		return false;
+
+	if (dssdev->type == OMAP_DISPLAY_TYPE_HDMI)
 		return false;
 
 	switch (dssdev->type) {
@@ -414,6 +448,9 @@ void dss_init_device(struct platform_device *pdev,
 #ifdef CONFIG_OMAP2_DSS_VENC
 	case OMAP_DISPLAY_TYPE_VENC:
 #endif
+#ifdef CONFIG_OMAP2_DSS_HDMI
+	case OMAP_DISPLAY_TYPE_HDMI:
+#endif
 		break;
 	default:
 		DSSERR("Support for display '%s' not compiled in.\n",
@@ -445,6 +482,11 @@ void dss_init_device(struct platform_device *pdev,
 #ifdef CONFIG_OMAP2_DSS_DSI
 	case OMAP_DISPLAY_TYPE_DSI:
 		r = dsi_init_display(dssdev);
+		break;
+#endif
+#ifdef CONFIG_OMAP2_DSS_HDMI
+	case OMAP_DISPLAY_TYPE_HDMI:
+		r = hdmi_init_display(dssdev);
 		break;
 #endif
 	default:
