@@ -1656,9 +1656,9 @@ static int omapfb_allocate_all_fbs(struct omapfb2_device *fbdev)
 	}
 
 	for (i = 0; i < fbdev->num_fbs; i++) {
-		/* allocate memory automatically only for fb0, or if
+		/* allocate memory automatically only for fb0, fb1 and fb2 , or if
 		 * excplicitly defined with vram or plat data option */
-		if (i == 0 || vram_sizes[i] != 0) {
+		if (i == 0 || i == 1 || i == 2 || vram_sizes[i] != 0) {
 			r = omapfb_alloc_fbmem_display(fbdev->fbs[i],
 					vram_sizes[i], vram_paddrs[i]);
 
