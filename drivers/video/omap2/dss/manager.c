@@ -418,6 +418,7 @@ struct overlay_cache_data {
 
 	bool manual_update;
 	enum omap_overlay_zorder zorder;
+	u32 p_uv_addr; /* relevent for NV12 format only */
 };
 
 struct manager_cache_data {
@@ -853,7 +854,8 @@ static int configure_overlay(enum omap_plane plane)
 			c->rotation,
 			c->mirror,
 			c->global_alpha,
-			c->channel);
+			c->channel,
+			c->p_uv_addr);
 
 	if (r) {
 		/* this shouldn't happen */
@@ -1266,6 +1268,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		oc->dirty = true;
 
 		oc->paddr = ovl->info.paddr;
+		oc->p_uv_addr = ovl->info.p_uv_addr;
 		oc->vaddr = ovl->info.vaddr;
 		oc->screen_width = ovl->info.screen_width;
 		oc->width = ovl->info.width;
