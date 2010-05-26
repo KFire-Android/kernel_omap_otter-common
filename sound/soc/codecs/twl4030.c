@@ -320,15 +320,6 @@ static void twl4030_power_up(struct snd_soc_codec *codec)
 	twl4030_codec_enable(codec, 1);
 }
 
-/*
- * Unconditional power down
- */
-static void twl4030_power_down(struct snd_soc_codec *codec)
-{
-	/* power down */
-	twl4030_codec_enable(codec, 0);
-}
-
 /* Earpiece */
 static const struct snd_kcontrol_new twl4030_dapm_earpiece_controls[] = {
 	SOC_DAPM_SINGLE("Voice", TWL4030_REG_EAR_CTL, 0, 1, 0),
@@ -1608,7 +1599,7 @@ static int twl4030_set_bias_level(struct snd_soc_codec *codec,
 			twl4030_power_up(codec);
 		break;
 	case SND_SOC_BIAS_OFF:
-		twl4030_power_down(codec);
+		twl4030_codec_enable(codec, 0);
 		break;
 	}
 	codec->bias_level = level;
@@ -2322,7 +2313,7 @@ static int __devinit twl4030_codec_probe(struct platform_device *pdev)
 	return 0;
 
 error_codec:
-	twl4030_power_down(codec);
+	twl4030_codec_enable(codec, 0);
 	kfree(codec->reg_cache);
 error_cache:
 	kfree(twl4030);
