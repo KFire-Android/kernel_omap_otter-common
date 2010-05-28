@@ -122,23 +122,25 @@ static inline void map_dma_buffer(struct musb_request *request,
 static inline void unmap_dma_buffer(struct musb_request *request,
 				struct musb *musb)
 {
-	if (request->mapped) {
-		dma_unmap_single(musb->controller,
-			request->request.dma,
-			request->request.length,
-			request->tx
-				? DMA_TO_DEVICE
-				: DMA_FROM_DEVICE);
-		request->request.dma = DMA_ADDR_INVALID;
-		request->mapped = 0;
-	} else {
-		dma_sync_single_for_cpu(musb->controller,
-			request->request.dma,
-			request->request.length,
-			request->tx
-				? DMA_TO_DEVICE
-				: DMA_FROM_DEVICE);
+	if (request->request.dma != DMA_ADDR_INVALID) {
+		if (request->mapped) {
+			dma_unmap_single(musb->controller,
+				request->request.dma,
+				request->request.length,
+				request->tx
+					? DMA_TO_DEVICE
+					: DMA_FROM_DEVICE);
+			request->request.dma = DMA_ADDR_INVALID;
+			request->mapped = 0;
+		} else {
+			dma_sync_single_for_cpu(musb->controller,
+				request->request.dma,
+				request->request.length,
+				request->tx
+					? DMA_TO_DEVICE
+					: DMA_FROM_DEVICE);
 
+		}
 	}
 }
 
@@ -169,8 +171,12 @@ __acquires(ep->musb->lock)
 
 	ep->busy = 1;
 	spin_unlock(&musb->lock);
-	if (is_dma_capable() && ep->dma)
+	if (is_dma_capable() && ep->dma) {
+		struct dma_controller	*c = ep->musb->dma_controller;
+		c->channel_release(ep->dma);
+		ep->dma = NULL;
 		unmap_dma_buffer(req, musb);
+	}
 	if (request->status == 0)
 		DBG(5, "%s done request %p,  %d/%d\n",
 				ep->end_point.name, request,
@@ -294,13 +300,13 @@ static inline int max_ep_writesize(struct musb *musb, struct musb_ep *ep)
 static void txstate(struct musb *musb, struct musb_request *req)
 {
 	u8			epnum = req->epnum;
-	struct musb_ep		*musb_ep;
+	struct musb_ep		*musb_ep = req->ep;
 	void __iomem		*epio = musb->endpoints[epnum].regs;
 	struct usb_request	*request;
 	u16			fifo_count = 0, csr;
 	int			use_dma = 0;
-
-	musb_ep = req->ep;
+	struct musb_hw_ep	*hw_ep = musb_ep->hw_ep;
+	struct dma_controller	*c = musb->dma_controller;
 
 	/* we shouldn't get here while DMA is active ... but we do ... */
 	if (dma_channel_status(musb_ep->dma) == MUSB_DMA_STATUS_BUSY) {
@@ -332,9 +338,23 @@ static void txstate(struct musb *musb, struct musb_request *req)
 			csr);
 
 #ifndef	CONFIG_MUSB_PIO_ONLY
-	if (is_dma_capable() && musb_ep->dma) {
-		struct dma_controller	*c = musb->dma_controller;
+	if (is_dma_capable() && !musb_ep->dma) {
 
+		/*
+		 * allocate dma channel if not allocated
+		 * for this endpoint already
+		 */
+		musb_ep->dma = c->channel_alloc(c, hw_ep, musb_ep->is_in);
+
+		/*
+		 * channel allocation is successfull now map the
+		 * buffer to dma configure the DMA channel for
+		 * recieving the packets
+		 */
+		if (musb_ep->dma)
+			map_dma_buffer(req, musb);
+	}
+	if (musb_ep->dma) {
 		use_dma = (request->dma != DMA_ADDR_INVALID);
 
 		/* MUSB_TXCSR_P_ISO is still set correctly */
@@ -615,6 +635,7 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 	u16			len = musb_ep->packet_sz;
 	u16			csr = musb_readw(epio, MUSB_RXCSR);
 
+	struct musb_hw_ep	*hw_ep = musb_ep->hw_ep;
 	/* We shouldn't get here while DMA is active, but we do... */
 	if (dma_channel_status(musb_ep->dma) == MUSB_DMA_STATUS_BUSY) {
 		DBG(4, "DMA pending...\n");
@@ -627,6 +648,21 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 		return;
 	}
 
+	if (is_dma_capable() && !musb_ep->dma) {
+		struct dma_controller	*c = musb->dma_controller;
+		/*
+		 * Allocate dma channel if not allocated
+		 * for this endpoint already
+		 */
+		musb_ep->dma = c->channel_alloc(c, hw_ep, musb_ep->is_in);
+		/*
+		 * Channel allocation is successfull now map the buffer
+		 * to dma configure the DMA channel for recieving the
+		 * packets
+		 */
+		if (musb_ep->dma)
+			map_dma_buffer(req, musb);
+	}
 	if (is_cppi_enabled() && musb_ep->dma) {
 		struct dma_controller	*c = musb->dma_controller;
 		struct dma_channel	*channel = musb_ep->dma;
@@ -642,9 +678,10 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 				request->dma + request->actual,
 				request->length - request->actual)) {
 
-			/* make sure that if an rxpkt arrived after the irq,
-			 * the cppi engine will be ready to take it as soon
-			 * as DMA is enabled
+			/*
+			 * Make sure that if an rxpkt arrived after the
+			 * irq,the cppi engine will be ready to take it
+			 * as soon as DMA is enabled
 			 */
 			csr &= ~(MUSB_RXCSR_AUTOCLEAR
 					| MUSB_RXCSR_DMAMODE);
@@ -1010,20 +1047,13 @@ static int musb_gadget_enable(struct usb_ep *ep,
 	/* NOTE:  all the I/O code _should_ work fine without DMA, in case
 	 * for some reason you run out of channels here.
 	 */
-	if (is_dma_capable() && musb->dma_controller) {
-		struct dma_controller	*c = musb->dma_controller;
-
-		musb_ep->dma = c->channel_alloc(c, hw_ep,
-				(desc->bEndpointAddress & USB_DIR_IN));
-	} else
-		musb_ep->dma = NULL;
 
 	musb_ep->desc = desc;
 	musb_ep->busy = 0;
 	musb_ep->wedged = 0;
 	status = 0;
 
-	pr_debug("%s periph: enabled %s for %s %s, %smaxpacket %d\n",
+	pr_debug("%s periph: enabled %s for %s %s, maxpacket %d\n",
 			musb_driver_name, musb_ep->end_point.name,
 			({ char *s; switch (musb_ep->type) {
 			case USB_ENDPOINT_XFER_BULK:	s = "bulk"; break;
@@ -1031,7 +1061,6 @@ static int musb_gadget_enable(struct usb_ep *ep,
 			default:			s = "iso"; break;
 			}; s; }),
 			musb_ep->is_in ? "IN" : "OUT",
-			musb_ep->dma ? "dma, " : "",
 			musb_ep->packet_sz);
 
 	schedule_work(&musb->irq_work);
@@ -1173,13 +1202,8 @@ static int musb_gadget_queue(struct usb_ep *ep, struct usb_request *req,
 	request->epnum = musb_ep->current_epnum;
 	request->tx = musb_ep->is_in;
 
-	if (is_dma_capable() && musb_ep->dma)
-		map_dma_buffer(request, musb);
-	else if (!req->buf) 
+	if (!req->buf)
 		return -ENODATA;
-	else
-		request->mapped = 0;
-
 	spin_lock_irqsave(&musb->lock, lockflags);
 
 	/* don't queue if the ep is down */
