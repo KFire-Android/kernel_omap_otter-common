@@ -45,6 +45,8 @@
 #define ENABLE_GPADC	0x02
 #define REG_TOGGLE1	0x90
 
+#define TWL6030_GPADC_MASK		0x20
+
 struct twl6030_gpadc_data {
 	struct device		*dev;
 	struct mutex		lock;
@@ -61,11 +63,10 @@ const struct twl6030_gpadc_conversion_method twl6030_conversion_methods[] = {
 		.sel	= TWL6030_GPADC_RTSELECT_LSB,
 		.rbase	= TWL6030_GPADC_RTCH0_LSB,
 	},
-	[TWL6030_GPADC_SW1] = {
-		.rbase	= TWL6030_GPADC_GPCH0_LSB,
-		.ctrl	= TWL6030_GPADC_CTRL_P1,
-		.enable	= TWL6030_GPADC_CTRL_P1_SP1,
-	},
+	/*
+	 * TWL6030_GPADC_SW1 is not supported as
+	 * interrupt from RT and SW1 cannot be differentiated
+	 */
 	[TWL6030_GPADC_SW2] = {
 		.rbase	= TWL6030_GPADC_GPCH0_LSB,
 		.ctrl	= TWL6030_GPADC_CTRL_P2,
@@ -129,21 +130,25 @@ static int twl6030_gpadc_read_channels(struct twl6030_gpadc_data *gpadc,
 	return count;
 }
 
-static void twl6030_gpadc_enable_irq(void)
+static void twl6030_gpadc_enable_irq(u16 method)
 {
-	twl6030_interrupt_unmask(TWL6030_GPADC_INT_MASK, REG_INT_MSK_LINE_B);
-	twl6030_interrupt_unmask(TWL6030_GPADC_INT_MASK, REG_INT_MSK_STS_B);
+	twl6030_interrupt_unmask(TWL6030_GPADC_MASK << method,
+						REG_INT_MSK_LINE_B);
+	twl6030_interrupt_unmask(TWL6030_GPADC_MASK << method,
+						REG_INT_MSK_STS_B);
 }
 
-static void twl6030_gpadc_disable_irq(void)
+static void twl6030_gpadc_disable_irq(u16 method)
 {
-	twl6030_interrupt_mask(TWL6030_GPADC_INT_MASK, REG_INT_MSK_LINE_B);
-	twl6030_interrupt_mask(TWL6030_GPADC_INT_MASK, REG_INT_MSK_STS_B);
+	twl6030_interrupt_mask(TWL6030_GPADC_MASK << method,
+						REG_INT_MSK_LINE_B);
+	twl6030_interrupt_mask(TWL6030_GPADC_MASK << method,
+						REG_INT_MSK_STS_B);
 }
 
-static irqreturn_t twl6030_gpadc_irq_handler(int irq, void *_gpadc)
+static irqreturn_t twl6030_gpadc_irq_handler(int irq, void *_req)
 {
-	struct twl6030_gpadc_data *gpadc = _gpadc;
+	struct twl6030_gpadc_request *req = _req;
 
 #ifdef CONFIG_LOCKDEP
 	/* WORKAROUND for lockdep forcing IRQF_DISABLED on us, which
@@ -155,9 +160,10 @@ static irqreturn_t twl6030_gpadc_irq_handler(int irq, void *_gpadc)
 
 	/* Find the cause of the interrupt and enable the pending
 	   bit for the corresponding method */
-	/* gpadc->requests[i].result_pending = 1; */
+	twl6030_gpadc_disable_irq(req->method);
+	req->result_pending = 1;
 
-	schedule_work(&gpadc->ws);
+	schedule_work(&the_gpadc->ws);
 
 	return IRQ_HANDLED;
 }
@@ -200,6 +206,22 @@ static void twl6030_gpadc_work(struct work_struct *ws)
 	mutex_unlock(&gpadc->lock);
 }
 
+static int twl6030_gpadc_set_irq(struct twl6030_gpadc_data *gpadc,
+		struct twl6030_gpadc_request *req)
+{
+	struct twl6030_gpadc_request *p;
+
+	p = &gpadc->requests[req->method];
+	p->channels = req->channels;
+	p->method = req->method;
+	p->func_cb = req->func_cb;
+	p->type = req->type;
+
+	twl6030_gpadc_enable_irq(req->method);
+
+	return 0;
+}
+
 static inline void
 twl6030_gpadc_start_conversion(struct twl6030_gpadc_data *gpadc,
 			       int conv_method)
@@ -210,7 +232,6 @@ twl6030_gpadc_start_conversion(struct twl6030_gpadc_data *gpadc,
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, ENABLE_GPADC, REG_TOGGLE1);
 
 	switch (conv_method) {
-	case TWL6030_GPADC_SW1:
 	case TWL6030_GPADC_SW2:
 		twl6030_gpadc_write(gpadc, method->ctrl, method->enable);
 		break;
@@ -262,6 +283,20 @@ int twl6030_gpadc_conversion(struct twl6030_gpadc_request *req)
 		ch_lsb = req->channels & 0xff;
 		twl6030_gpadc_write(the_gpadc, method->sel + 1, ch_msb);
 		twl6030_gpadc_write(the_gpadc, method->sel, ch_lsb);
+	}
+
+	if ((req->type == TWL6030_GPADC_IRQ_ONESHOT) &&
+		 (req->func_cb != NULL)) {
+		twl6030_gpadc_set_irq(the_gpadc, req);
+		twl6030_gpadc_start_conversion(the_gpadc, req->method);
+		the_gpadc->requests[req->method].active = 1;
+		ret = 0;
+		goto out;
+	}
+
+	/* With RT method we should not be here anymore */
+	if (req->method == TWL6030_GPADC_RT) {
+		ret = -EINVAL;
 		goto out;
 	}
 
@@ -307,15 +342,17 @@ static long twl6030_gpadc_ioctl(struct file *filp, unsigned int cmd,
 			return -EINVAL;
 
 		req.channels = (1 << par.channel);
-		req.method	= TWL6030_GPADC_SW1;
+		req.method	= TWL6030_GPADC_SW2;
 		req.func_cb	= NULL;
 
 		val = twl6030_gpadc_conversion(&req);
-		if (val <= 0) {
-			par.status = -1;
-		} else {
+		if (likely(val > 0)) {
 			par.status = 0;
 			par.result = (u16)req.rbuf[par.channel];
+		} else if (val == 0) {
+			par.status = -ENODATA;
+		} else {
+			par.status = val;
 		}
 		break;
 					     }
@@ -367,14 +404,14 @@ static int __init twl6030_gpadc_probe(struct platform_device *pdev)
 	}
 
 	ret = request_irq(platform_get_irq(pdev, 0), twl6030_gpadc_irq_handler,
-			  0, "twl6030_gpadc", gpadc);
+			0, "twl6030_gpadc", &gpadc->requests[TWL6030_GPADC_RT]);
+	ret = request_irq(platform_get_irq(pdev, 1), twl6030_gpadc_irq_handler,
+		0, "twl6030_gpadc", &gpadc->requests[TWL6030_GPADC_SW2]);
 
 	if (ret) {
 		dev_dbg(&pdev->dev, "could not request irq\n");
 		goto err_irq;
 	}
-
-	twl6030_gpadc_enable_irq();
 
 	platform_set_drvdata(pdev, gpadc);
 	mutex_init(&gpadc->lock);
@@ -398,7 +435,8 @@ static int __exit twl6030_gpadc_remove(struct platform_device *pdev)
 {
 	struct twl6030_gpadc_data *gpadc = platform_get_drvdata(pdev);
 
-	twl6030_gpadc_disable_irq();
+	twl6030_gpadc_disable_irq(TWL6030_GPADC_RT);
+	twl6030_gpadc_disable_irq(TWL6030_GPADC_SW2);
 	free_irq(platform_get_irq(pdev, 0), gpadc);
 	cancel_work_sync(&gpadc->ws);
 	misc_deregister(&twl6030_gpadc_device);

@@ -65,7 +65,7 @@ static int twl6030_interrupt_mapping[24] = {
 	MMCDETECT_INTR_OFFSET,	/* Bit 11	MMC			*/
 	RSV_INTR_OFFSET,  	/* Bit 12	Reserved		*/
 	MADC_INTR_OFFSET,	/* Bit 13	GPADC_RT_EOC		*/
-	MADC_INTR_OFFSET,	/* Bit 14	GPADC_SW_EOC		*/
+	GPADCSW_INTR_OFFSET,	/* Bit 14	GPADC_SW_EOC		*/
 	GASGAUGE_INTR_OFFSET,	/* Bit 15	CC_AUTOCAL		*/
 
 	USBOTG_INTR_OFFSET,	/* Bit 16	ID_WKUP			*/

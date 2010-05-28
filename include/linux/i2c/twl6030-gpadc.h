@@ -51,7 +51,6 @@ struct twl6030_gpadc_request {
 
 enum conversion_methods {
 	TWL6030_GPADC_RT,
-	TWL6030_GPADC_SW1,
 	TWL6030_GPADC_SW2,
 	TWL6030_GPADC_NUM_METHODS
 };

@@ -532,7 +532,7 @@ static int twl6030battery_temperature(void)
 	int temp;
 
 	req.channels = (1 << 1) | (1 << 4);
-	req.method = TWL6030_GPADC_SW1;
+	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
 	twl6030_gpadc_conversion(&req);
@@ -551,7 +551,7 @@ static int twl6030battery_voltage(void)
 	int temp;
 
 	req.channels = (1 << 7);
-	req.method = TWL6030_GPADC_SW1;
+	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
 	twl6030_gpadc_conversion(&req);
@@ -604,7 +604,7 @@ static int twl6030backupbatt_voltage(void)
 	int temp;
 
 	req.channels = (1 << 8);
-	req.method = TWL6030_GPADC_SW1;
+	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
 	twl6030_gpadc_conversion(&req);
@@ -626,7 +626,7 @@ static int twl6030_vbus_voltage(void)
 	int temp;
 
 	req.channels = (1 << 10);
-	req.method = TWL6030_GPADC_SW1;
+	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
 	twl6030_gpadc_conversion(&req);
@@ -641,7 +641,7 @@ static int twl6030_id_level(void)
 	int temp;
 
 	req.channels = (1 << 14);
-	req.method = TWL6030_GPADC_SW1;
+	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
 	twl6030_gpadc_conversion(&req);
