@@ -1926,8 +1926,7 @@ static s32 pixinc(int pixels, u8 ps)
 		return;
 	}
 
-	printk(KERN_INFO
-		" colormode: %d, rotation: %d, ps: %d, width: %d,"
+	DSSDBG(" colormode: %d, rotation: %d, ps: %d, width: %d,"
 		" height: %d, row_inc:%d\n",
 		color_mode, rotation, ps, width, height, *row_inc);
 
@@ -2426,7 +2425,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		orient.x_invert ^= mir_x;
 		orient.y_invert ^= mir_y;
 
-		printk(KERN_INFO "RYX = %d %d %d\n", orient.rotate_90,
+		DSSDBG("RYX = %d %d %d\n", orient.rotate_90,
 				orient.x_invert, orient.y_invert);
 
 		if (orient.rotate_90 & 1) {
@@ -2436,7 +2435,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			tiler_height = height;
 			tiler_width = width;
 		}
-		printk(KERN_INFO "w, h = %ld %ld\n", tiler_width, tiler_height);
+		DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
 
 		paddr = tiler_reorient_topleft(tiler_get_natural_addr((void *)paddr),
 				orient, tiler_width, tiler_height);
@@ -2445,8 +2444,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			puv_addr = tiler_reorient_topleft(
 					tiler_get_natural_addr((void *)puv_addr),
 					orient, tiler_width/2, tiler_height/2);
-			printk(KERN_INFO
-				"rotated addresses: 0x%0x, 0x%0x\n",
+			DSSDBG("rotated addresses: 0x%0x, 0x%0x\n",
 						paddr, puv_addr);
 			/* set BURSTTYPE if rotation is non-zero */
 			REG_FLD_MOD(dispc_reg_att[plane], 0x1, 29, 29);
