@@ -58,6 +58,15 @@
 
 #define DRIVER_NAME			"twl"
 
+#if defined(CONFIG_TWL4030_BCI_BATTERY) || \
+	defined(CONFIG_TWL4030_BCI_BATTERY_MODULE) || \
+	defined(CONFIG_TWL6030_BCI_BATTERY) || \
+	defined(CONFIG_TWL6030_BCI_BATTERY_MODULE)
+#define twl_has_bci()		true
+#else
+#define twl_has_bci()		false
+#endif
+
 #if defined(CONFIG_KEYBOARD_TWL4030) || defined(CONFIG_KEYBOARD_TWL4030_MODULE)
 #define twl_has_keypad()	true
 #else
@@ -121,7 +130,7 @@
 /* Last - for index max*/
 #define TWL4030_MODULE_LAST		TWL4030_MODULE_SECURED_REG
 
-#define TWL_NUM_SLAVES		4
+#define TWL_NUM_SLAVES		5
 
 #if defined(CONFIG_INPUT_TWL4030_PWRBUTTON) \
 	|| defined(CONFIG_INPUT_TWL4030_PWRBUTTON_MODULE)
@@ -134,6 +143,7 @@
 #define SUB_CHIP_ID1 1
 #define SUB_CHIP_ID2 2
 #define SUB_CHIP_ID3 3
+#define SUB_CHIP_ID4 4
 
 #define TWL_MODULE_LAST TWL4030_MODULE_LAST
 
@@ -326,7 +336,7 @@ static struct twl_mapping twl6030_map[] = {
 	{ SUB_CHIP_ID2, TWL6030_BASEADD_ZERO },
 	{ SUB_CHIP_ID2, TWL6030_BASEADD_RSV },
 	{ SUB_CHIP_ID2, TWL6030_BASEADD_RSV },
-	{ SUB_CHIP_ID2, TWL6030_BASEADD_RSV },
+	{ SUB_CHIP_ID4, TWL6030_BASEADD_RSV },
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_MASTER },
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_SLAVE_MISC },
 
@@ -604,6 +614,15 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
+	if (twl_has_bci() && pdata->bci &&
+	    (features & TWL6030_CLASS)) {
+		child = add_child(1, "twl6030_bci",
+				pdata->bci, sizeof(*pdata->bci),
+				false,
+				pdata->irq_base + CHARGER_INTR_OFFSET,
+				pdata->irq_base + CHARGERFAULT_INTR_OFFSET);
+	}
+
 
 	if (twl_has_madc() && pdata->madc) {
 		child = add_child(2, "twl4030_madc",
@@ -995,6 +1014,9 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		struct twl_client	*twl = &twl_modules[i];
 
 		twl->address = client->addr + i;
+		if (i == 4)
+			twl->address = 0x6a;
+
 		if (i == 0)
 			twl->client = client;
 		else {

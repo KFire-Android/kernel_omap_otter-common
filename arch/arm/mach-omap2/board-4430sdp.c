@@ -562,6 +562,9 @@ static struct twl4030_madc_platform_data sdp4430_gpadc_data = {
 	.irq_line	= 1,
 };
 
+static struct twl4030_bci_platform_data sdp4430_bci_data = {
+};
+
 static struct twl4030_platform_data sdp4430_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
@@ -578,6 +581,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux2		= &sdp4430_vaux2,
 	.vaux3		= &sdp4430_vaux3,
 	.madc           = &sdp4430_gpadc_data,
+	.bci            = &sdp4430_bci_data,
 };
 
 static struct cma3000_platform_data cma3000_platform_data = {
