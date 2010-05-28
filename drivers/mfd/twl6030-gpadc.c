@@ -207,7 +207,7 @@ twl6030_gpadc_start_conversion(struct twl6030_gpadc_data *gpadc,
 	const struct twl6030_gpadc_conversion_method *method;
 
 	method = &twl6030_conversion_methods[conv_method];
-	twl_i2c_write_u8(TWL4030_MODULE_TEST, ENABLE_GPADC, REG_TOGGLE1);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, ENABLE_GPADC, REG_TOGGLE1);
 
 	switch (conv_method) {
 	case TWL6030_GPADC_SW1:

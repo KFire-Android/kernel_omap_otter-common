@@ -563,6 +563,11 @@ static struct twl4030_madc_platform_data sdp4430_gpadc_data = {
 };
 
 static struct twl4030_bci_platform_data sdp4430_bci_data = {
+	.monitoring_interval		= 10,
+	.max_charger_currentmA		= 1500,
+	.max_charger_voltagemV		= 4560,
+	.max_bat_voltagemV		= 4200,
+	.low_bat_voltagemV		= 3300,
 };
 
 static struct twl4030_platform_data sdp4430_twldata = {
