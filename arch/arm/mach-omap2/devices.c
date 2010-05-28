@@ -759,10 +759,18 @@ static inline void omap_hdq_init(void) {}
 #if defined(CONFIG_VIDEO_OMAP2_VOUT) || \
 	defined(CONFIG_VIDEO_OMAP2_VOUT_MODULE)
 #if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
+#ifdef CONFIG_ARCH_OMAP4
+static struct resource omap_vout_resource[4 - CONFIG_FB_OMAP2_NUM_FBS] = {
+#else
 static struct resource omap_vout_resource[3 - CONFIG_FB_OMAP2_NUM_FBS] = {
+#endif
 };
 #else
+#ifdef CONFIG_ARCH_OMAP4
+static struct resource omap_vout_resource[3] = {
+#else
 static struct resource omap_vout_resource[2] = {
+#endif
 };
 #endif
 
