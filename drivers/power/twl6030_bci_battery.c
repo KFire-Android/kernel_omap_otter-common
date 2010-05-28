@@ -25,6 +25,7 @@
 #include <linux/i2c/twl.h>
 #include <linux/power_supply.h>
 #include <linux/i2c/twl6030-gpadc.h>
+#include <linux/i2c/bq2415x.h>
 
 #define CONTROLLER_INT_MASK	0x00
 #define CONTROLLER_CTRL1	0x01
@@ -177,14 +178,6 @@
 #define REG_USB_ID_CTRL_SET	0x06
 #define ID_MEAS			0x01
 
-/* BQ24156 */
-#define REG_STATUS_CONTROL		0x00
-#define REG_CONTROL_REGISTER		0x01
-#define REG_CONTROL_BATTERY_VOLTAGE	0x02
-#define REG_BATTERY_TERMINATION		0x04
-#define REG_SPECIAL_CHARGER_VOLTAGE	0x05
-#define REG_SAFETY_LIMIT		0x06
-
 #define BBSPOR_CFG			0xE6
 #define		BB_CHG_EN		(1 << 3)
 
@@ -225,6 +218,7 @@ struct twl6030_bci_device_info {
 	struct delayed_work	twl6030_bci_monitor_work;
 	struct delayed_work	twl6030_bk_bci_monitor_work;
 };
+struct blocking_notifier_head notifier_list;
 
 static int charge_state;
 
@@ -334,24 +328,21 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 
 static void twl6030_stop_ac_charger(struct twl6030_bci_device_info *di)
 {
+	long int events;
 	di->charger_source = 0;
+	events = BQ2415x_STOP_CHARGING;
+	blocking_notifier_call_chain(&notifier_list, events, NULL);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 0, CONTROLLER_CTRL1);
 }
 
 static void twl6030_start_ac_charger(struct twl6030_bci_device_info *di)
 {
+	long int events;
+
 	dev_dbg(di->dev, "AC charger detected\n");
 	di->charger_source = POWER_SUPPLY_TYPE_MAINS;
-	twl_i2c_write_u8(TWL6030_MODULE_BQ, 0xC0,
-				REG_STATUS_CONTROL);
-	twl_i2c_write_u8(TWL6030_MODULE_BQ, 0xC8,
-				REG_CONTROL_REGISTER);
-	twl_i2c_write_u8(TWL6030_MODULE_BQ, 0x7C,
-				REG_CONTROL_BATTERY_VOLTAGE);
-	twl_i2c_write_u8(TWL6030_MODULE_BQ, 0x51,
-				REG_BATTERY_TERMINATION);
-	twl_i2c_write_u8(TWL6030_MODULE_BQ, 0x02,
-				REG_SPECIAL_CHARGER_VOLTAGE);
+	events = BQ2415x_START_CHARGING;
+	blocking_notifier_call_chain(&notifier_list, events, NULL);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
 			CONTROLLER_CTRL1_EN_CHARGER |
 			CONTROLLER_CTRL1_SEL_CHARGER,
@@ -369,6 +360,7 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	struct twl6030_bci_device_info *di = _di;
 	int ret;
 	int charger_fault = 0;
+	long int events;
 	u8 stat_toggle, stat_reset, stat_set = 0;
 	u8 present_charge_state;
 	u8 ac_or_vbus, no_ac_and_vbus;
@@ -400,6 +392,11 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	}
 
 	charge_state = present_charge_state;
+	if ((charge_state & VAC_DET) &&
+		(charge_state & CONTROLLER_STAT1_EXTCHRG_STATZ)) {
+		events = BQ2415x_CHARGER_FAULT;
+		blocking_notifier_call_chain(&notifier_list, events, NULL);
+	}
 
 	if (stat_reset & VBUS_DET) {
 		dev_dbg(di->dev, "usb removed\n");
@@ -762,17 +759,6 @@ static void twl6030_bci_battery_read_status(struct twl6030_bci_device_info *di)
 static void
 twl6030_bci_battery_update_status(struct twl6030_bci_device_info *di)
 {
-	if (di->charger_source == POWER_SUPPLY_TYPE_MAINS) {
-		/* reconfig params for ac charging & reset 32 second timer */
-		twl_i2c_write_u8(TWL6030_MODULE_BQ, 0xC0, REG_STATUS_CONTROL);
-		twl_i2c_write_u8(TWL6030_MODULE_BQ, 0xC8, REG_CONTROL_REGISTER);
-		twl_i2c_write_u8(TWL6030_MODULE_BQ, 0x7C,
-						REG_CONTROL_BATTERY_VOLTAGE);
-		twl_i2c_write_u8(TWL6030_MODULE_BQ, 0x51,
-						REG_BATTERY_TERMINATION);
-		twl_i2c_write_u8(TWL6030_MODULE_BQ, 0x02,
-						REG_SPECIAL_CHARGER_VOLTAGE);
-	}
 	twl6030_bci_battery_read_status(di);
 	di->charge_status = POWER_SUPPLY_STATUS_UNKNOWN;
 
@@ -898,6 +884,20 @@ static int twl6030_bci_battery_get_property(struct power_supply *psy,
 	}
 	return 0;
 }
+
+int twl6030_register_notifier(struct notifier_block *nb,
+				unsigned int events)
+{
+	return blocking_notifier_chain_register(&notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(twl6030_register_notifier);
+
+int twl6030_unregister_notifier(struct notifier_block *nb,
+				unsigned int events)
+{
+	return blocking_notifier_chain_unregister(&notifier_list, nb);
+}
+EXPORT_SYMBOL_GPL(twl6030_unregister_notifier);
 
 static ssize_t twl6030_bci_set_fgmode(struct device *dev,
 				  struct device_attribute *attr,
@@ -1086,6 +1086,7 @@ static int __init twl6030_bci_battery_probe(struct platform_device *pdev)
 		goto batt_failed;
 	}
 
+	BLOCKING_INIT_NOTIFIER_HEAD(&notifier_list);
 	INIT_DELAYED_WORK_DEFERRABLE(&di->twl6030_bci_monitor_work,
 				twl6030_bci_battery_work);
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
@@ -1117,8 +1118,6 @@ static int __init twl6030_bci_battery_probe(struct platform_device *pdev)
 						CONTROLLER_INT_MASK);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MASK_MCHARGERUSB_THMREG,
 						CHARGERUSB_INT_MASK);
-
-	twl_i2c_write_u8(TWL6030_MODULE_BQ, 0xa0, REG_SAFETY_LIMIT);
 
 	twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &controller_stat,
 		CONTROLLER_STAT1);
