@@ -166,7 +166,7 @@ void omap2_pm_dump(int mode, int resume, unsigned int us)
 
 static void pm_dbg_regset_store(u32 *ptr);
 
-struct dentry *pm_dbg_dir;
+struct dentry *pm_dbg_dir, *pm_dbg_main_dir;
 
 static int pm_dbg_init_done;
 
@@ -620,10 +620,11 @@ static int __init pm_dbg_init(void)
 				   &sleep_while_idle, &pm_dbg_option_fops);
 	(void) debugfs_create_file("wakeup_timer_seconds", S_IRUGO | S_IWUGO, d,
 				   &wakeup_timer_seconds, &pm_dbg_option_fops);
+	pm_dbg_main_dir = d;
 	pm_dbg_init_done = 1;
 
 	return 0;
 }
-arch_initcall(pm_dbg_init);
+postcore_initcall(pm_dbg_init);
 
 #endif
