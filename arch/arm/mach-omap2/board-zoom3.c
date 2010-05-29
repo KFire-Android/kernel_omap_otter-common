@@ -24,6 +24,7 @@
 
 #include "mux.h"
 #include "sdram-hynix-h8mbx00u0mer-0em.h"
+#include "smartreflex-class3.h"
 
 static void __init omap_zoom_map_io(void)
 {
@@ -69,6 +70,7 @@ static void __init omap_zoom_init(void)
 
 	omap_mux_init_gpio(64, OMAP_PIN_OUTPUT);
 	usb_ehci_init(&ehci_pdata);
+	sr_class3_init();
 }
 
 MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
