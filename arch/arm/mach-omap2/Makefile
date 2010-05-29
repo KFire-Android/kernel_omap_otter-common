@@ -57,7 +57,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o pm_bus.o cpuidle44xx.o \
 					   omap4-mpuss-lowpower.o sleep44xx.o
 
 obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
-obj-$(CONFIG_OMAP_SMARTREFLEX)          += smartreflex.o
+obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
 
 AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
 AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a
