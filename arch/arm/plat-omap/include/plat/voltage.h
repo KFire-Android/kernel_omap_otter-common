@@ -14,6 +14,11 @@
 #ifndef __ARCH_ARM_MACH_OMAP2_VOLTAGE_H
 #define __ARCH_ARM_MACH_OMAP2_VOLTAGE_H
 
+extern u32 enable_sr_vp_debug;
+#ifdef CONFIG_PM_DEBUG
+extern struct dentry *pm_dbg_main_dir;
+#endif
+
 #define VOLTSCALE_VPFORCEUPDATE		1
 #define VOLTSCALE_VCBYPASS		2
 

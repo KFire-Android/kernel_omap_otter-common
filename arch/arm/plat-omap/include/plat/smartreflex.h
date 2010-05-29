@@ -24,7 +24,6 @@
 #include <plat/voltage.h>
 
 #ifdef CONFIG_PM_DEBUG
-extern struct dentry *pm_dbg_main_dir;
 extern struct dentry *sr_dbg_dir;
 #endif
 

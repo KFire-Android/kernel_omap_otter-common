@@ -31,6 +31,7 @@
 #include <plat/board.h>
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
+#include <plat/voltage.h>
 
 #include "prm.h"
 #include "cm.h"
@@ -566,6 +567,16 @@ static int option_set(void *data, u64 val)
 		if (cpu_is_omap34xx())
 			omap3_pm_off_mode_enable(val);
 	}
+	if (option == &enable_sr_vp_debug && val)
+		pr_notice("Beware that enabling this option will allow user "
+			"to override the system defined vp and sr parameters "
+			"All the updated parameters will take effect next "
+			"time smartreflex is enabled. Also this option "
+			"disables the automatic vp errorgain and sr errormin "
+			"limit changes as per the voltage. Users will have "
+			"to explicitly write values into the debug fs "
+			"entries corresponding to these if they want to see "
+			"them changing according to the VDD voltage\n");
 
 	return 0;
 }
@@ -620,6 +631,8 @@ static int __init pm_dbg_init(void)
 				   &sleep_while_idle, &pm_dbg_option_fops);
 	(void) debugfs_create_file("wakeup_timer_seconds", S_IRUGO | S_IWUGO, d,
 				   &wakeup_timer_seconds, &pm_dbg_option_fops);
+	(void) debugfs_create_file("enable_sr_vp_debug",  S_IRUGO | S_IWUGO, d,
+				   &enable_sr_vp_debug, &pm_dbg_option_fops);
 	pm_dbg_main_dir = d;
 	pm_dbg_init_done = 1;
 
