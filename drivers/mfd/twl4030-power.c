@@ -31,6 +31,8 @@
 
 #include <asm/mach-types.h>
 
+#include <plat/smartreflex.h>
+
 static u8 twl4030_start_script_address = 0x2b;
 
 #define PWR_P1_SW_EVENTS	0x10
@@ -62,6 +64,10 @@ static u8 twl4030_start_script_address = 0x2b;
 #define	R_SEQ_ADD_WARM		PHY_TO_OFF_PM_MASTER(0x58)
 #define R_MEMORY_ADDRESS	PHY_TO_OFF_PM_MASTER(0x59)
 #define R_MEMORY_DATA		PHY_TO_OFF_PM_MASTER(0x5a)
+
+/* Smartreflex Control */
+#define R_DCDC_GLOBAL_CFG	PHY_TO_OFF_PM_RECEIVER(0x61)
+#define CFG_ENABLE_SRFLX	0x08
 
 #define R_PROTECT_KEY		0x0E
 #define R_KEY_1			0xC0
@@ -509,6 +515,29 @@ int twl4030_remove_script(u8 flags)
 		pr_err("TWL4030 Unable to relock registers\n");
 
 	return err;
+}
+
+/* API to enable smrtreflex on Triton side */
+static void twl4030_smartreflex_init(void)
+{
+	int ret = 0;
+	u8 read_val;
+
+	ret = twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &read_val,
+			R_DCDC_GLOBAL_CFG);
+	read_val |= CFG_ENABLE_SRFLX;
+	ret |= twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, read_val,
+			R_DCDC_GLOBAL_CFG);
+}
+
+struct omap_smartreflex_pmic_data twl4030_sr_data = {
+       .sr_pmic_init   = twl4030_smartreflex_init,
+};
+
+void __init twl4030_power_sr_init()
+{
+	/* Register the SR init API with the Smartreflex driver */
+	omap_sr_register_pmic(&twl4030_sr_data);
 }
 
 void __init twl4030_power_init(struct twl4030_power_data *twl4030_scripts)

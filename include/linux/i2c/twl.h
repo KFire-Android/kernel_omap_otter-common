@@ -596,6 +596,7 @@ struct twl4030_power_data {
 };
 
 extern void twl4030_power_init(struct twl4030_power_data *triton2_scripts);
+extern void twl4030_power_sr_init(void);
 extern int twl4030_remove_script(u8 flags);
 
 struct twl4030_codec_audio_data {
