@@ -2330,7 +2330,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		case OMAP_DSS_COLOR_XRGB15:
 			if (cpu_is_omap24xx())
 				return -EINVAL;
-			if (plane == OMAP_DSS_VIDEO1)
+			if (!cpu_is_omap44xx() && plane == OMAP_DSS_VIDEO1)
 				return -EINVAL;
 			break;
 
