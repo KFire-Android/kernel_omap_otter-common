@@ -112,6 +112,77 @@ void read_persistent_clock(struct timespec *ts)
 	*ts = *tsp;
 }
 
+/* ------------------------------------------------------------------------- */
+#define DEVNAME "timer32k"
+#include <linux/fs.h>
+#include <linux/timer-32k.h>
+
+static int omap_32k_ioctl(struct inode *inode, struct file *file,
+		unsigned int cmd, unsigned long arg)
+{
+	struct omap_32k_sync_device *omap = thecs;
+
+	if (!omap)
+		return -ENODEV;
+
+    switch (cmd) {
+		case OMAP_32K_READ: {
+			uint32_t *t = (uint32_t *)arg;
+			*t = omap_32k_sync_readl(omap->base, 0x10)
+							- omap->offset_32k;
+			return 0;
+		}
+		case OMAP_32K_READRAW: {
+			uint32_t *t = (uint32_t *)arg;
+			*t = omap_32k_sync_readl(omap->base, 0x10);
+			return 0;
+		}
+    }
+
+    return -EINVAL;
+}
+
+static int __init omap_32k_sync_register_chrdev(void)
+{
+	int major;
+	static struct file_operations fops = {
+		.ioctl = omap_32k_ioctl
+	};
+	static struct class *cls;
+	struct device *dev;
+
+	major = register_chrdev(0, DEVNAME, &fops);
+
+	if (major <= 0) {
+		printk(KERN_ERR "timer-32k-sync: unable to get major number\n");
+		goto exit_disable;
+	}
+
+	cls = class_create(THIS_MODULE, DEVNAME);
+
+	if (IS_ERR(cls)) {
+		printk(KERN_ERR "timer-32k-sync: unable to create device class\n");
+		goto exit_unregister;
+	}
+
+	dev = device_create(cls, NULL, MKDEV(major, 0), NULL, DEVNAME);
+
+	if (IS_ERR(dev)) {
+		printk(KERN_ERR "timer-32k-sync: unable to create device\n");
+		goto exit_destroy_class;
+	}
+
+	return 0;
+
+exit_destroy_class:
+	class_destroy(cls);
+exit_unregister:
+	unregister_chrdev(major, DEVNAME);
+exit_disable:
+	return -EBUSY;
+}
+/* ------------------------------------------------------------------------- */
+
 static int __init omap_32k_sync_probe(struct platform_device *pdev)
 {
 	struct omap_32k_sync_device             *omap;
@@ -186,6 +257,8 @@ static int __init omap_32k_sync_probe(struct platform_device *pdev)
 	 * we just registered ?
 	 */
 	thecs = omap;
+
+	omap_32k_sync_register_chrdev();
 
 	return 0;
 
