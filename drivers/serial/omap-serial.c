@@ -1035,19 +1035,21 @@ static struct uart_driver serial_omap_reg = {
 static int
 serial_omap_suspend(struct platform_device *pdev, pm_message_t state)
 {
+#ifndef CONFIG_SUSPEND
 	struct uart_omap_port *up = platform_get_drvdata(pdev);
-
 	if (up)
 		uart_suspend_port(&serial_omap_reg, &up->port);
+#endif
 	return 0;
 }
 
 static int serial_omap_resume(struct platform_device *dev)
 {
+#ifndef CONFIG_SUSPEND
 	struct uart_omap_port *up = platform_get_drvdata(dev);
-
 	if (up)
 		uart_resume_port(&serial_omap_reg, &up->port);
+#endif
 	return 0;
 }
 
