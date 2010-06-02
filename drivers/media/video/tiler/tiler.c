@@ -1486,7 +1486,7 @@ static s32 __init tiler_init(void)
 	struct tmm *tmm_pat = NULL;
 
 	/* Allocate tiler container manager (we share 1 on OMAP4) */
-	div_pt.x = (3 * TILER_WIDTH) / 4;   /* hardcoded default */
+	div_pt.x = TILER_WIDTH;   /* hardcoded default */
 	div_pt.y = (3 * TILER_HEIGHT) / 4;
 	sita = sita_init(TILER_WIDTH, TILER_HEIGHT, (void *)&div_pt);
 

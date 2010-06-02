@@ -242,7 +242,7 @@ struct tcm *sita_init(u16 width, u16 height, struct tcm_pt *attr)
 		}
 	}
 
-	if (attr && attr->x < pvt->width && attr->y < pvt->height) {
+	if (attr && attr->x <= pvt->width && attr->y <= pvt->height) {
 		pvt->div_pt.x = attr->x;
 		pvt->div_pt.y = attr->y;
 
