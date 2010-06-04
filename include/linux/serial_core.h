@@ -186,6 +186,9 @@
 #define PORT_ALTERA_JTAGUART	91
 #define PORT_ALTERA_UART	92
 
+/* TI OMAP-UART */
+#define PORT_OMAP	93
+
 #ifdef __KERNEL__
 
 #include <linux/compiler.h>
