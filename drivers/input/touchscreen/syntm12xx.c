@@ -1001,8 +1001,10 @@ static void syn_isr_work(struct work_struct *work)
 
 	mutex_lock(&sd->lock);
 
-	if (sd->f_measure)
-		sd->ts_work = cpu_clock(smp_processor_id());
+	if (sd->f_measure) {
+		sd->ts_work = cpu_clock(get_cpu());
+		put_cpu();
+	}
 
 	if (sd->func_descs_valid == 0) {
 		if (sd->failed_inits < MAX_FAILED_INITS) {
@@ -1029,7 +1031,8 @@ static void syn_isr_work(struct work_struct *work)
 
 out:
 	if (sd->f_measure) {
-		sd->ts_done = cpu_clock(smp_processor_id());
+		sd->ts_done = cpu_clock(get_cpu());
+		put_cpu();
 		syn_recalculate_latency_data(sd);
 		sd->f_measure = 0;
 	}
@@ -1046,7 +1049,8 @@ static irqreturn_t syn_isr(int irq, void *data)
 		r = queue_work(sd->wq, &sd->isr_work);
 		if (r) {
 			if (sd->f_measure == 0) {
-				sd->ts_intr = cpu_clock(smp_processor_id());
+				sd->ts_intr = cpu_clock(get_cpu());
+				put_cpu();
 				sd->f_measure = 1;
 			}
 			disable_irq_nosync(gpio_to_irq(sd->gpio_intr));
