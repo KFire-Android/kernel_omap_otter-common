@@ -1497,8 +1497,9 @@ static s32 __init tiler_init(void)
 	TMM_SET(TILFMT_32BIT, tmm_pat);
 	TMM_SET(TILFMT_PAGE, tmm_pat);
 
-	/* Array of physical pages for PAT programming, which must be a 16-byte
-	   aligned physical address
+	/**
+	  * Array of physical pages for PAT programming, which must be a 16-byte
+	  * aligned physical address
 	*/
 	dmac_va = dma_alloc_coherent(NULL, TILER_WIDTH * TILER_HEIGHT *
 					sizeof(*dmac_va), &dmac_pa, GFP_ATOMIC);

@@ -31,6 +31,12 @@
 #define MAX 16
 #define DMM_PAGE 0x1000
 
+/* Max pages in free page stack */
+#define PAGE_CAP (256 * 40)
+
+/* Number of pages currently allocated */
+static unsigned long count;
+
 /**
   * Used to keep track of mem per
   * dmm_get_pages call.
@@ -109,6 +115,7 @@ static u32 fill_page_stack(struct mem *mem, struct mutex *mtx)
 		outer_flush_range(m->pa, m->pa + DMM_PAGE);
 
 		mutex_lock(mtx);
+		count++;
 		list_add(&m->list, &mem->list);
 		mutex_unlock(mtx);
 	}
@@ -239,8 +246,15 @@ static void tmm_pat_free_pages(struct tmm *tmm, u32 *list)
 		f = list_entry(pos, struct fast, list);
 		if (f->pa[0] == list[0]) {
 			for (i = 0; i < f->num; i++) {
-				list_add(&((struct mem *)f->mem[i])->list,
-							&pvt->free_list.list);
+				if (count < PAGE_CAP) {
+					list_add(
+					&((struct mem *)f->mem[i])->list,
+					&pvt->free_list.list);
+				} else {
+					__free_page(
+						((struct mem *)f->mem[i])->pg);
+					count--;
+				}
 			}
 			list_del(pos);
 			kfree(f->pa);
@@ -289,6 +303,7 @@ struct tmm *tmm_pat_init(u32 pat_id)
 		INIT_LIST_HEAD(&pvt->fast_list.list);
 		mutex_init(&pvt->mtx);
 
+		count = 0;
 		if (list_empty_careful(&pvt->free_list.list))
 			if (fill_page_stack(&pvt->free_list, &pvt->mtx))
 				goto error;
