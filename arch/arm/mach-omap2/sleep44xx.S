@@ -53,6 +53,19 @@ restore_context:
         /*
 	 * Check  the wakeup CPU
 	 */
+#ifdef CONFIG_CACHE_L2X0
+	ldr	r2, =OMAP44XX_L2CACHE_BASE
+	ldr	r0, [r2, #L2X0_CTRL]
+	and	r0, #0x0f
+	cmp	r0, #1
+	beq	skip_l2en
+	mov     r0, #0x1
+	ldr     r12, =0x102		@ Enable L2 Cache controller
+	dsb
+	smc     #0
+	dsb
+skip_l2en:
+#endif
 	ldr	r3, =OMAP44XX_SAR_RAM_BASE
 	mov	r1, #0
 	mcr	p15, 0, r1, c7, c5, 0	@ Invalidate $I to PoU
@@ -151,6 +164,7 @@ context_save:
 	 */
 	ldr	r8, =sar_ram_base
 	ldr	r8, [r8]
+	str	r1, [r8, #L2X0_OFFSET]
 	ands	r0, r0, #0x0f
 	orreq	r8, r8, #CPU0_SAVE_OFFSET
 	orrne	r8, r8, #CPU1_SAVE_OFFSET
@@ -226,11 +240,30 @@ finished:
 	mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
 	dsb
 	isb
-do_WFI:
 	mov	r0, #0
 	mcr	p15, 0, r0, c7, c1, 0	@ ICIALLUIS
 	mcr	p15, 0, r0, c7, c1, 6	@ BPIALLIS
 	mcr	p15, 0, r0, c8, c3, 0
+#ifdef CONFIG_CACHE_L2X0
+	mrc	p15, 0, r0, c0, c0, 5	@ MPIDR
+	ands	r0, r0, #0x0f
+	bne	do_WFI
+l2x_clean:				@ Only for MPU OFF and last CPU
+	ldr	r8, =sar_ram_base
+	ldr	r8, [r8]
+	ldr	r0, [r8, #L2X0_OFFSET]
+	cmp	r0, #3
+	bne	do_WFI
+	ldr	r2, =l2cache_base
+	ldr	r2, [r2]
+	mov	r0, #0xff
+	str	r0, [r2, #L2X0_CLEAN_WAY]
+loop4:
+	ldr	r0, [r2, #L2X0_CLEAN_WAY]
+	ands	r0, r0, #0xff
+	bne	loop4
+#endif
+do_WFI:
 	ldr	r4, =sar_ram_base
 	ldr	r4, [r4]
 	ldr     r3, [r4, #SCU_OFFSET]
@@ -246,10 +279,10 @@ l2x_sync:
 	ldr	r1, [r1]
 	mov	r0, #0x0
 	str	r0, [r1, #L2X0_CACHE_SYNC]
-loop4:
+loop5:
 	ldr	r0, [r1, #L2X0_CACHE_SYNC]
 	ands	r0, r0, #0x1
-	bne	loop4
+	bne	loop5
 #endif
 	wfi				@ wait for interrupt
 
