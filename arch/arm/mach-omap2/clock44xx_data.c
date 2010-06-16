@@ -174,21 +174,27 @@ static struct clk sys_clkin_ck = {
 	.recalc		= &omap2_clksel_recalc,
 };
 
+static struct clk tie_low_clock_ck = {
+	.name		= "tie_low_clock_ck",
+	.rate		= 0,
+	.ops		= &clkops_null,
+};
+
 static struct clk utmi_phy_clkout_ck = {
 	.name		= "utmi_phy_clkout_ck",
-	.rate		= 12000000,
+	.rate		= 60000000,
 	.ops		= &clkops_null,
 };
 
 static struct clk xclk60mhsp1_ck = {
 	.name		= "xclk60mhsp1_ck",
-	.rate		= 12000000,
+	.rate		= 60000000,
 	.ops		= &clkops_null,
 };
 
 static struct clk xclk60mhsp2_ck = {
 	.name		= "xclk60mhsp2_ck",
-	.rate		= 12000000,
+	.rate		= 60000000,
 	.ops		= &clkops_null,
 };
 
@@ -200,39 +206,23 @@ static struct clk xclk60motg_ck = {
 
 /* Module clocks and DPLL outputs */
 
-static const struct clksel_rate div2_1to2_rates[] = {
-	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
-	{ .div = 2, .val = 1, .flags = RATE_IN_4430 },
-	{ .div = 0 },
-};
-
-static const struct clksel dpll_sys_ref_clk_div[] = {
-	{ .parent = &sys_clkin_ck, .rates = div2_1to2_rates },
-	{ .parent = NULL },
-};
-
-static struct clk dpll_sys_ref_clk = {
-	.name		= "dpll_sys_ref_clk",
-	.parent		= &sys_clkin_ck,
-	.clksel		= dpll_sys_ref_clk_div,
-	.clksel_reg	= OMAP4430_CM_DPLL_SYS_REF_CLKSEL,
-	.clksel_mask	= OMAP4430_CLKSEL_0_0_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &omap2_clksel_recalc,
-	.round_rate	= &omap2_clksel_round_rate,
-	.set_rate	= &omap2_clksel_set_rate,
-};
-
-static const struct clksel abe_dpll_refclk_mux_sel[] = {
-	{ .parent = &dpll_sys_ref_clk, .rates = div_1_0_rates },
+static const struct clksel abe_dpll_bypass_clk_mux_sel[] = {
+	{ .parent = &sys_clkin_ck, .rates = div_1_0_rates },
 	{ .parent = &sys_32k_ck, .rates = div_1_1_rates },
 	{ .parent = NULL },
 };
 
+static struct clk abe_dpll_bypass_clk_mux_ck = {
+	.name		= "abe_dpll_bypass_clk_mux_ck",
+	.parent		= &sys_clkin_ck,
+	.ops		= &clkops_null,
+	.recalc		= &followparent_recalc,
+};
+
 static struct clk abe_dpll_refclk_mux_ck = {
 	.name		= "abe_dpll_refclk_mux_ck",
-	.parent		= &dpll_sys_ref_clk,
-	.clksel		= abe_dpll_refclk_mux_sel,
+	.parent		= &sys_clkin_ck,
+	.clksel		= abe_dpll_bypass_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_ABE_PLL_REF_CLKSEL,
 	.clksel_mask	= OMAP4430_CLKSEL_0_0_MASK,
@@ -243,7 +233,7 @@ static struct clk abe_dpll_refclk_mux_ck = {
 /* DPLL_ABE */
 static struct dpll_data dpll_abe_dd = {
 	.mult_div1_reg	= OMAP4430_CM_CLKSEL_DPLL_ABE,
-	.clk_bypass	= &sys_clkin_ck,
+	.clk_bypass	= &abe_dpll_bypass_clk_mux_ck,
 	.clk_ref	= &abe_dpll_refclk_mux_ck,
 	.control_reg	= OMAP4430_CM_CLKMODE_DPLL_ABE,
 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
@@ -307,6 +297,12 @@ static struct clk abe_clk = {
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static const struct clksel_rate div2_1to2_rates[] = {
+	{ .div = 1, .val = 0, .flags = RATE_IN_4430 },
+	{ .div = 2, .val = 1, .flags = RATE_IN_4430 },
+	{ .div = 0 },
 };
 
 static const struct clksel aess_fclk_div[] = {
@@ -379,14 +375,14 @@ static struct clk dpll_abe_m3_ck = {
 };
 
 static const struct clksel core_hsd_byp_clk_mux_sel[] = {
-	{ .parent = &dpll_sys_ref_clk, .rates = div_1_0_rates },
+	{ .parent = &sys_clkin_ck, .rates = div_1_0_rates },
 	{ .parent = &dpll_abe_m3_ck, .rates = div_1_1_rates },
 	{ .parent = NULL },
 };
 
 static struct clk core_hsd_byp_clk_mux_ck = {
 	.name		= "core_hsd_byp_clk_mux_ck",
-	.parent		= &dpll_sys_ref_clk,
+	.parent		= &sys_clkin_ck,
 	.clksel		= core_hsd_byp_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_CLKSEL_DPLL_CORE,
@@ -399,7 +395,7 @@ static struct clk core_hsd_byp_clk_mux_ck = {
 static struct dpll_data dpll_core_dd = {
 	.mult_div1_reg	= OMAP4430_CM_CLKSEL_DPLL_CORE,
 	.clk_bypass	= &core_hsd_byp_clk_mux_ck,
-	.clk_ref	= &dpll_sys_ref_clk,
+	.clk_ref	= &sys_clkin_ck,
 	.control_reg	= OMAP4430_CM_CLKMODE_DPLL_CORE,
 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
 	.autoidle_reg	= OMAP4430_CM_AUTOIDLE_DPLL_CORE,
@@ -417,7 +413,7 @@ static struct dpll_data dpll_core_dd = {
 
 static struct clk dpll_core_ck = {
 	.name		= "dpll_core_ck",
-	.parent		= &dpll_sys_ref_clk,
+	.parent		= &sys_clkin_ck,
 	.dpll_data	= &dpll_core_dd,
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_null,
@@ -595,14 +591,14 @@ static struct clk dpll_core_m7_ck = {
 };
 
 static const struct clksel iva_hsd_byp_clk_mux_sel[] = {
-	{ .parent = &dpll_sys_ref_clk, .rates = div_1_0_rates },
+	{ .parent = &sys_clkin_ck, .rates = div_1_0_rates },
 	{ .parent = &div_iva_hs_clk, .rates = div_1_1_rates },
 	{ .parent = NULL },
 };
 
 static struct clk iva_hsd_byp_clk_mux_ck = {
 	.name		= "iva_hsd_byp_clk_mux_ck",
-	.parent		= &dpll_sys_ref_clk,
+	.parent		= &sys_clkin_ck,
 	.ops		= &clkops_null,
 	.recalc		= &followparent_recalc,
 };
@@ -611,7 +607,7 @@ static struct clk iva_hsd_byp_clk_mux_ck = {
 static struct dpll_data dpll_iva_dd = {
 	.mult_div1_reg	= OMAP4430_CM_CLKSEL_DPLL_IVA,
 	.clk_bypass	= &iva_hsd_byp_clk_mux_ck,
-	.clk_ref	= &dpll_sys_ref_clk,
+	.clk_ref	= &sys_clkin_ck,
 	.control_reg	= OMAP4430_CM_CLKMODE_DPLL_IVA,
 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
 	.autoidle_reg	= OMAP4430_CM_AUTOIDLE_DPLL_IVA,
@@ -629,7 +625,7 @@ static struct dpll_data dpll_iva_dd = {
 
 static struct clk dpll_iva_ck = {
 	.name		= "dpll_iva_ck",
-	.parent		= &dpll_sys_ref_clk,
+	.parent		= &sys_clkin_ck,
 	.dpll_data	= &dpll_iva_dd,
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_omap3_noncore_dpll_ops,
@@ -671,7 +667,7 @@ static struct clk dpll_iva_m5_ck = {
 static struct dpll_data dpll_mpu_dd = {
 	.mult_div1_reg	= OMAP4430_CM_CLKSEL_DPLL_MPU,
 	.clk_bypass	= &div_mpu_hs_clk,
-	.clk_ref	= &dpll_sys_ref_clk,
+	.clk_ref	= &sys_clkin_ck,
 	.control_reg	= OMAP4430_CM_CLKMODE_DPLL_MPU,
 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
 	.autoidle_reg	= OMAP4430_CM_AUTOIDLE_DPLL_MPU,
@@ -689,7 +685,7 @@ static struct dpll_data dpll_mpu_dd = {
 
 static struct clk dpll_mpu_ck = {
 	.name		= "dpll_mpu_ck",
-	.parent		= &dpll_sys_ref_clk,
+	.parent		= &sys_clkin_ck,
 	.dpll_data	= &dpll_mpu_dd,
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_omap3_noncore_dpll_ops,
@@ -723,14 +719,14 @@ static struct clk per_hs_clk_div_ck = {
 };
 
 static const struct clksel per_hsd_byp_clk_mux_sel[] = {
-	{ .parent = &dpll_sys_ref_clk, .rates = div_1_0_rates },
+	{ .parent = &sys_clkin_ck, .rates = div_1_0_rates },
 	{ .parent = &per_hs_clk_div_ck, .rates = div_1_1_rates },
 	{ .parent = NULL },
 };
 
 static struct clk per_hsd_byp_clk_mux_ck = {
 	.name		= "per_hsd_byp_clk_mux_ck",
-	.parent		= &dpll_sys_ref_clk,
+	.parent		= &sys_clkin_ck,
 	.clksel		= per_hsd_byp_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_CLKSEL_DPLL_PER,
@@ -743,7 +739,7 @@ static struct clk per_hsd_byp_clk_mux_ck = {
 static struct dpll_data dpll_per_dd = {
 	.mult_div1_reg	= OMAP4430_CM_CLKSEL_DPLL_PER,
 	.clk_bypass	= &per_hsd_byp_clk_mux_ck,
-	.clk_ref	= &dpll_sys_ref_clk,
+	.clk_ref	= &sys_clkin_ck,
 	.control_reg	= OMAP4430_CM_CLKMODE_DPLL_PER,
 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
 	.autoidle_reg	= OMAP4430_CM_AUTOIDLE_DPLL_PER,
@@ -761,7 +757,7 @@ static struct dpll_data dpll_per_dd = {
 
 static struct clk dpll_per_ck = {
 	.name		= "dpll_per_ck",
-	.parent		= &dpll_sys_ref_clk,
+	.parent		= &sys_clkin_ck,
 	.dpll_data	= &dpll_per_dd,
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_omap3_noncore_dpll_ops,
@@ -857,8 +853,8 @@ static struct clk dpll_per_m7_ck = {
 /* DPLL_UNIPRO */
 static struct dpll_data dpll_unipro_dd = {
 	.mult_div1_reg	= OMAP4430_CM_CLKSEL_DPLL_UNIPRO,
-	.clk_bypass	= &dpll_sys_ref_clk,
-	.clk_ref	= &dpll_sys_ref_clk,
+	.clk_bypass	= &sys_clkin_ck,
+	.clk_ref	= &sys_clkin_ck,
 	.control_reg	= OMAP4430_CM_CLKMODE_DPLL_UNIPRO,
 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
 	.autoidle_reg	= OMAP4430_CM_AUTOIDLE_DPLL_UNIPRO,
@@ -876,7 +872,7 @@ static struct dpll_data dpll_unipro_dd = {
 
 static struct clk dpll_unipro_ck = {
 	.name		= "dpll_unipro_ck",
-	.parent		= &dpll_sys_ref_clk,
+	.parent		= &sys_clkin_ck,
 	.dpll_data	= &dpll_unipro_dd,
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_omap3_noncore_dpll_ops,
@@ -914,7 +910,7 @@ static struct dpll_data dpll_usb_dd = {
 	.mult_div1_reg	= OMAP4430_CM_CLKSEL_DPLL_USB,
 	.clk_bypass	= &usb_hs_clk_div_ck,
 	.flags		= DPLL_J_TYPE | DPLL_NO_DCO_SEL,
-	.clk_ref	= &dpll_sys_ref_clk,
+	.clk_ref	= &sys_clkin_ck,
 	.control_reg	= OMAP4430_CM_CLKMODE_DPLL_USB,
 	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
 	.autoidle_reg	= OMAP4430_CM_AUTOIDLE_DPLL_USB,
@@ -932,7 +928,7 @@ static struct dpll_data dpll_usb_dd = {
 
 static struct clk dpll_usb_ck = {
 	.name		= "dpll_usb_ck",
-	.parent		= &dpll_sys_ref_clk,
+	.parent		= &sys_clkin_ck,
 	.dpll_data	= &dpll_usb_dd,
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_omap3_noncore_dpll_ops,
@@ -1221,7 +1217,7 @@ static struct clk per_abe_24m_fclk = {
 static const struct clksel pmd_stm_clock_mux_sel[] = {
 	{ .parent = &sys_clkin_ck, .rates = div_1_0_rates },
 	{ .parent = &dpll_core_m6_ck, .rates = div_1_1_rates },
-	{ .parent = &dpll_per_m7_ck, .rates = div_1_2_rates },
+	{ .parent = &tie_low_clock_ck, .rates = div_1_2_rates },
 	{ .parent = NULL },
 };
 
@@ -1239,10 +1235,15 @@ static struct clk pmd_trace_clk_mux_ck = {
 	.recalc		= &followparent_recalc,
 };
 
+static const struct clksel syc_clk_div_div[] = {
+	{ .parent = &sys_clkin_ck, .rates = div2_1to2_rates },
+	{ .parent = NULL },
+};
+
 static struct clk syc_clk_div_ck = {
 	.name		= "syc_clk_div_ck",
 	.parent		= &sys_clkin_ck,
-	.clksel		= dpll_sys_ref_clk_div,
+	.clksel		= syc_clk_div_div,
 	.clksel_reg	= OMAP4430_CM_ABE_DSS_SYS_CLKSEL,
 	.clksel_mask	= OMAP4430_CLKSEL_0_0_MASK,
 	.ops		= &clkops_null,
@@ -1486,26 +1487,9 @@ static struct clk gpmc_ick = {
 	.recalc		= &followparent_recalc,
 };
 
-static const struct clksel per_sgx_fclk_div[] = {
-	{ .parent = &dpll_per_m2x2_ck, .rates = div3_1to4_rates },
-	{ .parent = NULL },
-};
-
-static struct clk per_sgx_fclk = {
-	.name		= "per_sgx_fclk",
-	.parent		= &dpll_per_m2x2_ck,
-	.clksel		= per_sgx_fclk_div,
-	.clksel_reg	= OMAP4430_CM_GFX_GFX_CLKCTRL,
-	.clksel_mask	= OMAP4430_CLKSEL_PER_192M_MASK,
-	.ops		= &clkops_null,
-	.recalc		= &omap2_clksel_recalc,
-	.round_rate	= &omap2_clksel_round_rate,
-	.set_rate	= &omap2_clksel_set_rate,
-};
-
 static const struct clksel sgx_clk_mux_sel[] = {
 	{ .parent = &dpll_core_m7_ck, .rates = div_1_0_rates },
-	{ .parent = &per_sgx_fclk, .rates = div_1_1_rates },
+	{ .parent = &dpll_per_m7_ck, .rates = div_1_1_rates },
 	{ .parent = NULL },
 };
 
@@ -1534,11 +1518,16 @@ static struct clk hdq1w_fck = {
 	.recalc		= &followparent_recalc,
 };
 
+static const struct clksel hsi_fclk_div[] = {
+	{ .parent = &dpll_per_m2x2_ck, .rates = div3_1to4_rates },
+	{ .parent = NULL },
+};
+
 /* Merged hsi_fclk into hsi */
 static struct clk hsi_fck = {
 	.name		= "hsi_fck",
 	.parent		= &dpll_per_m2x2_ck,
-	.clksel		= per_sgx_fclk_div,
+	.clksel		= hsi_fclk_div,
 	.clksel_reg	= OMAP4430_CM_L3INIT_HSI_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_24_25_MASK,
 	.ops		= &clkops_omap4_dflt_wait,
@@ -1924,16 +1913,6 @@ static struct clk mmc5_fck = {
 	.recalc		= &followparent_recalc,
 };
 
-static struct clk ocp2scp_usb_phy_ick = {
-	.name		= "ocp2scp_usb_phy_ick",
-	.ops		= &clkops_omap4_dflt_wait,
-	.enable_reg	= OMAP4430_CM_L3INIT_USBPHYOCP2SCP_CLKCTRL,
-	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
-	.clkdm_name	= "l3_init_clkdm",
-	.parent		= &l4_div_ck,
-	.recalc		= &followparent_recalc,
-};
-
 static struct clk ocp_wp_noc_ick = {
 	.name		= "ocp_wp_noc_ick",
 	.ops		= &clkops_omap4_dflt_wait,
@@ -2024,17 +2003,11 @@ static struct clk smartreflex_mpu_fck = {
 	.recalc		= &followparent_recalc,
 };
 
-static const struct clksel dmt1_clk_mux_sel[] = {
-	{ .parent = &sys_clkin_ck, .rates = div_1_0_rates },
-	{ .parent = &sys_32k_ck, .rates = div_1_1_rates },
-	{ .parent = NULL },
-};
-
 /* Merged dmt1_clk_mux into timer1 */
 static struct clk timer1_fck = {
 	.name		= "timer1_fck",
 	.parent		= &sys_clkin_ck,
-	.clksel		= dmt1_clk_mux_sel,
+	.clksel		= abe_dpll_bypass_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_WKUP_TIMER1_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_MASK,
@@ -2049,7 +2022,7 @@ static struct clk timer1_fck = {
 static struct clk timer10_fck = {
 	.name		= "timer10_fck",
 	.parent		= &sys_clkin_ck,
-	.clksel		= dmt1_clk_mux_sel,
+	.clksel		= abe_dpll_bypass_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_L4PER_DMTIMER10_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_MASK,
@@ -2064,7 +2037,7 @@ static struct clk timer10_fck = {
 static struct clk timer11_fck = {
 	.name		= "timer11_fck",
 	.parent		= &sys_clkin_ck,
-	.clksel		= dmt1_clk_mux_sel,
+	.clksel		= abe_dpll_bypass_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_L4PER_DMTIMER11_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_MASK,
@@ -2079,7 +2052,7 @@ static struct clk timer11_fck = {
 static struct clk timer2_fck = {
 	.name		= "timer2_fck",
 	.parent		= &sys_clkin_ck,
-	.clksel		= dmt1_clk_mux_sel,
+	.clksel		= abe_dpll_bypass_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_L4PER_DMTIMER2_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_MASK,
@@ -2094,7 +2067,7 @@ static struct clk timer2_fck = {
 static struct clk timer3_fck = {
 	.name		= "timer3_fck",
 	.parent		= &sys_clkin_ck,
-	.clksel		= dmt1_clk_mux_sel,
+	.clksel		= abe_dpll_bypass_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_L4PER_DMTIMER3_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_MASK,
@@ -2109,7 +2082,7 @@ static struct clk timer3_fck = {
 static struct clk timer4_fck = {
 	.name		= "timer4_fck",
 	.parent		= &sys_clkin_ck,
-	.clksel		= dmt1_clk_mux_sel,
+	.clksel		= abe_dpll_bypass_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_L4PER_DMTIMER4_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_MASK,
@@ -2190,7 +2163,7 @@ static struct clk timer8_fck = {
 static struct clk timer9_fck = {
 	.name		= "timer9_fck",
 	.parent		= &sys_clkin_ck,
-	.clksel		= dmt1_clk_mux_sel,
+	.clksel		= abe_dpll_bypass_clk_mux_sel,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP4430_CM_L4PER_DMTIMER9_CLKCTRL,
 	.clksel_mask	= OMAP4430_CLKSEL_MASK,
@@ -2281,11 +2254,11 @@ static struct clk usb_tll_hs_ick = {
 	.recalc		= &followparent_recalc,
 };
 
-static struct clk usim_fck = {
-	.name		= "usim_fck",
+static struct clk usim_ick = {
+	.name		= "usim_ick",
 	.ops		= &clkops_omap4_dflt_wait,
 	.enable_reg	= OMAP4430_CM_WKUP_USIM_CLKCTRL,
-	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
 	.clkdm_name	= "l4_wkup_clkdm",
 	.parent		= &sys_32k_ck,
 	.recalc		= &followparent_recalc,
@@ -2440,11 +2413,12 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"virt_27000000_ck",		&virt_27000000_ck,	CK_443X),
 	CLK(NULL,	"virt_38400000_ck",		&virt_38400000_ck,	CK_443X),
 	CLK(NULL,	"sys_clkin_ck",			&sys_clkin_ck,	CK_443X),
+	CLK(NULL,	"tie_low_clock_ck",		&tie_low_clock_ck,	CK_443X),
 	CLK(NULL,	"utmi_phy_clkout_ck",		&utmi_phy_clkout_ck,	CK_443X),
 	CLK(NULL,	"xclk60mhsp1_ck",		&xclk60mhsp1_ck,	CK_443X),
 	CLK(NULL,	"xclk60mhsp2_ck",		&xclk60mhsp2_ck,	CK_443X),
 	CLK(NULL,	"xclk60motg_ck",		&xclk60motg_ck,	CK_443X),
-	CLK(NULL,	"dpll_sys_ref_clk",		&dpll_sys_ref_clk,	CK_443X),
+	CLK(NULL,	"abe_dpll_bypass_clk_mux_ck",	&abe_dpll_bypass_clk_mux_ck,	CK_443X),
 	CLK(NULL,	"abe_dpll_refclk_mux_ck",	&abe_dpll_refclk_mux_ck,	CK_443X),
 	CLK(NULL,	"dpll_abe_ck",			&dpll_abe_ck,	CK_443X),
 	CLK(NULL,	"dpll_abe_m2x2_ck",		&dpll_abe_m2x2_ck,	CK_443X),
@@ -2531,7 +2505,6 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"gpio5_ick",			&gpio5_ick,	CK_443X),
 	CLK(NULL,	"gpio6_ick",			&gpio6_ick,	CK_443X),
 	CLK(NULL,	"gpmc_ick",			&gpmc_ick,	CK_443X),
-	CLK(NULL,	"per_sgx_fclk",			&per_sgx_fclk,	CK_443X),
 	CLK(NULL,	"gpu_fck",			&gpu_fck,	CK_443X),
 	CLK("omap2_hdq.0",	"fck",				&hdq1w_fck,	CK_443X),
 	CLK(NULL,	"hsi_fck",			&hsi_fck,	CK_443X),
@@ -2565,7 +2538,6 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK("mmci-omap-hs.2",	"fck",				&mmc3_fck,	CK_443X),
 	CLK("mmci-omap-hs.3",	"fck",				&mmc4_fck,	CK_443X),
 	CLK("mmci-omap-hs.4",	"fck",				&mmc5_fck,	CK_443X),
-	CLK(NULL,	"ocp2scp_usb_phy_ick",		&ocp2scp_usb_phy_ick,	CK_443X),
 	CLK(NULL,	"ocp_wp_noc_ick",		&ocp_wp_noc_ick,	CK_443X),
 	CLK("omap_rng",	"ick",				&rng_ick,	CK_443X),
 	CLK(NULL,	"sha2md5_fck",			&sha2md5_fck,	CK_443X),
@@ -2594,7 +2566,7 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"usb_host_hs_fck",		&usb_host_hs_fck,	CK_443X),
 	CLK("musb_hdrc",	"ick",				&usb_otg_hs_ick,	CK_443X),
 	CLK(NULL,	"usb_tll_hs_ick",		&usb_tll_hs_ick,	CK_443X),
-	CLK(NULL,	"usim_fck",			&usim_fck,	CK_443X),
+	CLK(NULL,	"usim_ick",			&usim_ick,	CK_443X),
 	CLK("omap_wdt",	"fck",				&wd_timer2_fck,	CK_443X),
 	CLK(NULL,	"wd_timer3_fck",		&wd_timer3_fck,	CK_443X),
 	CLK(NULL,	"otg_60m_gfclk_ck",		&otg_60m_gfclk_ck,	CK_443X),
