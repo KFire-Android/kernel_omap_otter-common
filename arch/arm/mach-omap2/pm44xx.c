@@ -69,7 +69,7 @@ static int omap4_pm_suspend(void)
 	 * power state
 	 */
 	pwrdm_clear_all_prev_pwrst(mpu_pwrdm);
-	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
+	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_OFF);
 	omap4_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
 
 	/*

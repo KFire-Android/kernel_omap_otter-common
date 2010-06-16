@@ -26,7 +26,7 @@
  *	ON(Inactive)	OFF		ON(Inactive)
  *	OFF		OFF		CSWR
  *	OFF		OFF		OSWR (*TBD)
- *	OFF		OFF		OFF* (*TBD)
+ *	OFF		OFF		OFF
  *	----------------------------------------------
  *
  * Note: CPU0 is the master core and it is the last CPU to go down
@@ -422,6 +422,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 */
 cpu_prepare:
 	clear_cpu_prev_pwrst(cpu);
+	pwrdm_clear_all_prev_pwrst(mpuss_pd);
 	if (cpu)
 		pwrdm_set_next_pwrst(cpu1_pwrdm, power_state);
 	else
