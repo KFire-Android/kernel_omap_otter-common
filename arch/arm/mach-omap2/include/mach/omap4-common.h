@@ -22,6 +22,15 @@
 #define SAR_BANK4_OFFSET		0x3000
 
 /*
+ * Scratch pad memory offsets from SAR_BANK1
+ */
+#define CPU0_SAVE_OFFSET		0xb00
+#define CPU1_SAVE_OFFSET		0xc00
+#define MMU_OFFSET			0xd00
+#define SCU_OFFSET			0xd20
+
+#ifndef __ASSEMBLER__
+/*
  * wfi used in low power code. Directly opcode is used instead
  * of instruction to avoid mulit-omap build break
  */
@@ -42,5 +51,12 @@ extern void __iomem *sar_ram_base;
 
 extern void __init gic_init_irq(void);
 extern void omap_smc1(u32 fn, u32 arg);
+
+extern void __init omap4_mpuss_init(void);
+extern void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
+extern void __omap4_cpu_suspend(unsigned int cpu, unsigned int save_state);
+extern unsigned long *omap4_cpu_wakeup_addr(void);
+
+#endif
 
 #endif

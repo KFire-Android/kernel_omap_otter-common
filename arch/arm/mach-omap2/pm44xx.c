@@ -201,6 +201,8 @@ static int __init omap4_pm_init(void)
 		pr_err("Failed to setup powerdomains\n");
 		goto err2;
 	}
+
+	omap4_mpuss_init();
 #endif
 
 #ifdef CONFIG_SUSPEND
