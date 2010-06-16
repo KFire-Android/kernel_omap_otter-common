@@ -16,17 +16,21 @@
 
 #ifdef CONFIG_CPU_IDLE
 
-#define OMAP4_MAX_STATES	1
+#define OMAP4_MAX_STATES	2
+
 /* C1 - CPUx wfi + MPU inactive + CORE inactive */
 #define OMAP4_STATE_C1		0
+/* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR + Core inactive */
+#define OMAP4_STATE_C2		1
+
 
 struct omap4_processor_cx {
 	u8 valid;
 	u8 type;
 	u32 sleep_latency;
 	u32 wakeup_latency;
-	u32 core0_state;
-	u32 core1_state;
+	u32 cpu0_state;
+	u32 cpu1_state;
 	u32 mpu_state;
 	u32 core_state;
 	u32 threshold;
@@ -35,10 +39,13 @@ struct omap4_processor_cx {
 
 struct omap4_processor_cx omap4_power_states[OMAP4_MAX_STATES];
 struct omap4_processor_cx current_cx_state;
+struct powerdomain *mpu_pd, *cpu1_pd;
 
 static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 */
 	{1, 2, 2, 5},
+	/* C2 */
+	{1, 80, 80, 400},	/* FIXME: Profile the latency numbers */
 };
 
 /**
@@ -53,7 +60,9 @@ static struct cpuidle_params cpuidle_params_table[] = {
 static int omap4_enter_idle(struct cpuidle_device *dev,
 			struct cpuidle_state *state)
 {
+	struct omap4_processor_cx *cx = cpuidle_get_statedata(state);
 	struct timespec ts_preidle, ts_postidle, ts_idle;
+	u32 cpu1_state;
 
 	/* Used to keep track of the total time in idle */
 	getnstimeofday(&ts_preidle);
@@ -61,8 +70,38 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	local_irq_disable();
 	local_fiq_disable();
 
-	do_wfi();
+	/*
+	 * Do only WFI for non-boot CPU(aux cores)
+	 */
+	if (dev->cpu) {
+		do_wfi();
+		wmb();
+		goto return_sleep_time;
+	}
 
+	/*
+	 * Do only a WFI as long as CPU1 is online
+	 */
+	if (num_online_cpus() > 1) {
+		do_wfi();
+		wmb();
+		goto return_sleep_time;
+	}
+
+	/*
+	 * Hold on till CPU1 hits OFF
+	 */
+	cpu1_state = pwrdm_read_pwrst(cpu1_pd);
+	if (cpu1_state != PWRDM_POWER_OFF) {
+		do_wfi();
+		wmb();
+		goto return_sleep_time;
+	}
+
+	pwrdm_set_next_pwrst(mpu_pd, cx->mpu_state);
+	omap4_enter_lowpower(dev->cpu, cx->cpu0_state);
+
+return_sleep_time:
 	getnstimeofday(&ts_postidle);
 	ts_idle = timespec_sub(ts_postidle, ts_preidle);
 
@@ -79,6 +118,7 @@ DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
  *
  * Below is the desciption of each C state.
  * C1 : CPUx wfi + MPU inative + Core inactive
+ * C2: CPU0 OFF + CPU1 OFF + MPU CSWR + CORE inactive
  */
 void omap_init_power_states(void)
 {
@@ -92,10 +132,29 @@ void omap_init_power_states(void)
 			cpuidle_params_table[OMAP4_STATE_C1].wake_latency;
 	omap4_power_states[OMAP4_STATE_C1].threshold =
 			cpuidle_params_table[OMAP4_STATE_C1].threshold;
+	omap4_power_states[OMAP4_STATE_C1].cpu0_state = PWRDM_POWER_ON;
+	omap4_power_states[OMAP4_STATE_C1].cpu1_state = PWRDM_POWER_ON;
 	omap4_power_states[OMAP4_STATE_C1].mpu_state = PWRDM_POWER_ON;
 	omap4_power_states[OMAP4_STATE_C1].core_state = PWRDM_POWER_ON;
 	omap4_power_states[OMAP4_STATE_C1].flags = CPUIDLE_FLAG_TIME_VALID;
 
+	/*
+	 * C2 . CPU0 OFF + CPU1 OFF + MPU CSWR + CORE inactive
+	 */
+	omap4_power_states[OMAP4_STATE_C2].valid =
+			cpuidle_params_table[OMAP4_STATE_C2].valid;
+	omap4_power_states[OMAP4_STATE_C2].type = OMAP4_STATE_C2;
+	omap4_power_states[OMAP4_STATE_C2].sleep_latency =
+			cpuidle_params_table[OMAP4_STATE_C2].sleep_latency;
+	omap4_power_states[OMAP4_STATE_C2].wakeup_latency =
+			cpuidle_params_table[OMAP4_STATE_C2].wake_latency;
+	omap4_power_states[OMAP4_STATE_C2].threshold =
+			cpuidle_params_table[OMAP4_STATE_C2].threshold;
+	omap4_power_states[OMAP4_STATE_C2].cpu0_state = PWRDM_POWER_OFF;
+	omap4_power_states[OMAP4_STATE_C2].cpu1_state = PWRDM_POWER_OFF;
+	omap4_power_states[OMAP4_STATE_C2].mpu_state = PWRDM_POWER_RET;
+	omap4_power_states[OMAP4_STATE_C2].core_state = PWRDM_POWER_ON;
+	omap4_power_states[OMAP4_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID;
 }
 
 struct cpuidle_driver omap4_idle_driver = {
@@ -115,6 +174,9 @@ int __init omap4_idle_init(void)
 	struct omap4_processor_cx *cx;
 	struct cpuidle_state *state;
 	struct cpuidle_device *dev;
+
+	mpu_pd = pwrdm_lookup("mpu_pwrdm");
+	cpu1_pd = pwrdm_lookup("cpu1_pwrdm");
 
 	omap_init_power_states();
 	cpuidle_register_driver(&omap4_idle_driver);
