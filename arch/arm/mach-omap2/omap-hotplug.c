@@ -21,12 +21,19 @@
 
 #include <asm/cacheflush.h>
 #include <mach/omap4-common.h>
+#include <mach/omap4-wakeupgen.h>
+#include <plat/powerdomain.h>
 
 static DECLARE_COMPLETION(cpu_killed);
 
 int platform_cpu_kill(unsigned int cpu)
 {
-	return wait_for_completion_timeout(&cpu_killed, 5000);
+	int ret;
+
+	ret = wait_for_completion_timeout(&cpu_killed, 5000);
+	pr_notice("CPU%u: shutdown\n", cpu);
+
+	return ret;
 }
 
 /*
@@ -42,27 +49,30 @@ void platform_cpu_die(unsigned int cpu)
 			   this_cpu, cpu);
 		BUG();
 	}
-	pr_notice("CPU%u: shutdown\n", cpu);
 	complete(&cpu_killed);
 	flush_cache_all();
-	dsb();
+	wmb();
 
 	/*
 	 * we're ready for shutdown now, so do it
 	 */
 	if (omap_modify_auxcoreboot0(0x0, 0x200) != 0x0)
-		printk(KERN_CRIT "Secure clear status failed\n");
+		pr_err("Secure clear status failed\n");
 
 	for (;;) {
 		/*
-		 * Execute WFI
+		 * Enter into low power state
+		 * clear all interrupt wakeup sources
 		 */
-		do_wfi();
+		omap4_wakeupgen_clear_all(cpu);
+		omap4_enter_lowpower(cpu, PWRDM_POWER_OFF);
 
 		if (omap_read_auxcoreboot0() == cpu) {
 			/*
 			 * OK, proper wakeup, we're done
 			 */
+			this_cpu = hard_smp_processor_id();
+			omap4_wakeupgen_set_all(this_cpu);
 			break;
 		}
 		pr_debug("CPU%u: spurious wakeup call\n", cpu);
