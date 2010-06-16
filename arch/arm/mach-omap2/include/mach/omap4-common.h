@@ -14,6 +14,14 @@
 #define OMAP_ARCH_OMAP4_COMMON_H
 
 /*
+ * SAR BANK offsets from base address OMAP44XX_SAR_RAM_BASE
+ */
+#define SAR_BANK1_OFFSET		0x0000
+#define SAR_BANK2_OFFSET		0x1000
+#define SAR_BANK3_OFFSET		0x2000
+#define SAR_BANK4_OFFSET		0x3000
+
+/*
  * wfi used in low power code. Directly opcode is used instead
  * of instruction to avoid mulit-omap build break
  */
@@ -30,6 +38,7 @@ extern void __iomem *scu_base;
 
 extern void __iomem *gic_cpu_base_addr;
 extern void __iomem *gic_dist_base_addr;
+extern void __iomem *sar_ram_base;
 
 extern void __init gic_init_irq(void);
 extern void omap_smc1(u32 fn, u32 arg);

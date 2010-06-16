@@ -28,7 +28,7 @@ void __iomem *l2cache_base;
 
 void __iomem *gic_cpu_base_addr;
 void __iomem *gic_dist_base_addr;
-
+void __iomem *sar_ram_base;
 
 void __init gic_init_irq(void)
 {
@@ -73,3 +73,23 @@ static int __init omap_l2_cache_init(void)
 }
 early_initcall(omap_l2_cache_init);
 #endif
+/*
+ * SAR RAM used to save and restore the HW
+ * context in low power modes
+ */
+static int __init omap4_sar_ram_init(void)
+{
+	/*
+	 * To avoid code running on other OMAPs in
+	 * multi-omap builds
+	 */
+	if (!cpu_is_omap44xx())
+		return -ENODEV;
+
+	/* Static mapping, never released */
+	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_8K);
+	BUG_ON(!sar_ram_base);
+
+	return 0;
+}
+early_initcall(omap4_sar_ram_init);
