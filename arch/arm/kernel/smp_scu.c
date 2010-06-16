@@ -14,12 +14,6 @@
 #include <asm/smp_scu.h>
 #include <asm/cacheflush.h>
 
-#define SCU_CTRL		0x00
-#define SCU_CONFIG		0x04
-#define SCU_CPU_STATUS		0x08
-#define SCU_INVALIDATE		0x0c
-#define SCU_FPGA_REVISION	0x10
-
 /*
  * Get the number of CPU cores from the SCU configuration
  */
