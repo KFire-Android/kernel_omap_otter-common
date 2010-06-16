@@ -48,6 +48,7 @@
 
 #include <plat/powerdomain.h>
 #include <mach/omap4-common.h>
+#include <mach/omap4-wakeupgen.h>
 
 #ifdef CONFIG_SMP
 /*
@@ -406,6 +407,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 */
 	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
 		save_gic();
+		omap4_wakeupgen_save();
 		save_state = 3;
 	}
 
