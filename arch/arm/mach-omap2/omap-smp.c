@@ -25,6 +25,7 @@
 #include <asm/smp_scu.h>
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
+#include <plat/clockdomain.h>
 
 /* SCU base address */
 void __iomem *scu_base;
@@ -61,6 +62,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
 
 int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
+	struct clockdomain *cpu1_clkdm;
+	static bool booted;
 	/*
 	 * Set synchronisation state between this boot processor
 	 * and the secondary one
@@ -76,7 +79,22 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	omap_modify_auxcoreboot0(0x200, 0xfffffdff);
 	flush_cache_all();
 	smp_wmb();
-	smp_cross_call(cpumask_of(cpu));
+
+	/*
+	 * SGI isn't wakeup capable from low power states. This is
+	 * known limitation and can be worked around by using software
+	 * forced wake-up. After the wakeup, the CPU will restore it
+	 * to hw_auto. This code also gets initialised but pm init code
+	 * initialises the CPUx clockdomain to hw-auto mode
+	 */
+	if (booted) {
+		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
+		omap2_clkdm_wakeup(cpu1_clkdm);
+		smp_cross_call(cpumask_of(cpu));
+	} else {
+		set_event();
+		booted = true;
+	}
 
 	/*
 	 * Now the secondary core is starting up let it run its

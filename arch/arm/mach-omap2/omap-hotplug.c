@@ -23,6 +23,7 @@
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
 #include <plat/powerdomain.h>
+#include <plat/clockdomain.h>
 
 static DECLARE_COMPLETION(cpu_killed);
 
@@ -43,6 +44,7 @@ int platform_cpu_kill(unsigned int cpu)
 void platform_cpu_die(unsigned int cpu)
 {
 	unsigned int this_cpu = hard_smp_processor_id();
+	struct clockdomain *cpu1_clkdm;
 
 	if (cpu != this_cpu) {
 		pr_crit("platform_cpu_die running on %u, should be %u\n",
@@ -73,6 +75,12 @@ void platform_cpu_die(unsigned int cpu)
 			 */
 			this_cpu = hard_smp_processor_id();
 			omap4_wakeupgen_set_all(this_cpu);
+
+			/*
+			 * Restore clock domain to HW_AUTO
+			 */
+			cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
+			omap2_clkdm_allow_idle(cpu1_clkdm);
 			break;
 		}
 		pr_debug("CPU%u: spurious wakeup call\n", cpu);
