@@ -26,7 +26,8 @@ obj-$(CONFIG_DEBUG_FS)			+= omap_hwmod_debug.o
 obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
 obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
 obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
-obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
+obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o \
+					   omap4-wakeupgen.o
 
 AFLAGS_omap44xx-smc.o			:=-Wa,-march=armv7-a
 
