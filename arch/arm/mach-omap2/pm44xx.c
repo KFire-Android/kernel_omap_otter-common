@@ -16,9 +16,12 @@
 #include <linux/list.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/irq.h>
 
 #include <plat/powerdomain.h>
+#include <plat/clockdomain.h>
 #include <mach/omap4-common.h>
+#include <mach/omap4-wakeupgen.h>
 
 #include "prm.h"
 #include "pm.h"
@@ -36,6 +39,7 @@ struct power_state {
 };
 
 static LIST_HEAD(pwrst_list);
+static struct powerdomain *mpu_pwrdm;
 
 #ifdef CONFIG_SUSPEND
 static int omap4_pm_prepare(void)
@@ -46,7 +50,45 @@ static int omap4_pm_prepare(void)
 
 static int omap4_pm_suspend(void)
 {
-	do_wfi();
+	struct power_state *pwrst;
+	int state;
+	u32 cpu_id = 0;
+
+	/*
+	 * Clear all wakeup sources and keep
+	 * only Debug UART, Keypad and GPT1 interrupt
+	 * as a wakeup event from MPU/Device OFF
+	 */
+	omap4_wakeupgen_clear_all(cpu_id);
+	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_UART3);
+	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_KBD_CTL);
+	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_GPT1);
+
+	/*
+	 * Program the MPU and CPU0 to hit low
+	 * power state
+	 */
+	pwrdm_clear_all_prev_pwrst(mpu_pwrdm);
+	pwrdm_set_next_pwrst(mpu_pwrdm, PWRDM_POWER_RET);
+	omap4_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
+
+	/*
+	* Enable all wakeup sources post wakeup
+	*/
+	omap4_wakeupgen_set_all(cpu_id);
+
+	/* Print the previous power domain states */
+	pr_info("Read Powerdomain states as ...\n");
+	pr_info("0 : OFF, 1 : RETENTION, 2 : ON-INACTIVE, 3 : ON-ACTIVE\n");
+	list_for_each_entry(pwrst, &pwrst_list, node) {
+		if (!strcmp(pwrst->pwrdm->name, "cpu0_pwrdm") ||
+			(!strcmp(pwrst->pwrdm->name, "cpu1_pwrdm")) ||
+			(!strcmp(pwrst->pwrdm->name, "mpu_pwrdm"))) {
+			state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
+			pr_info("Powerdomain (%s) entered state %d\n",
+				       pwrst->pwrdm->name, state);
+		}
+	}
 	return 0;
 }
 
@@ -91,6 +133,23 @@ static struct platform_suspend_ops omap_pm_ops = {
 	.valid		= suspend_valid_only_mem,
 };
 #endif /* CONFIG_SUSPEND */
+
+/*
+ * Enable hw supervised mode for all clockdomains if it's
+ * supported. Initiate sleep transition for other clockdomains, if
+ * they are not used
+ */
+static int __attribute__ ((unused)) __init
+		clkdms_setup(struct clockdomain *clkdm, void *unused)
+{
+	if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
+		omap2_clkdm_allow_idle(clkdm);
+	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP &&
+			atomic_read(&clkdm->usecount) == 0)
+		omap2_clkdm_sleep(clkdm);
+	return 0;
+}
+
 
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 {
@@ -201,6 +260,14 @@ static int __init omap4_pm_init(void)
 		pr_err("Failed to setup powerdomains\n");
 		goto err2;
 	}
+
+	mpu_pwrdm = pwrdm_lookup("mpu_pwrdm");
+	if (!mpu_pwrdm) {
+		printk(KERN_ERR "Failed to get lookup for MPU pwrdm's\n");
+		goto err2;
+	}
+
+	(void) clkdm_for_each(clkdms_setup, NULL);
 
 	omap4_mpuss_init();
 #endif
