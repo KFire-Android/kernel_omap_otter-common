@@ -143,7 +143,11 @@ use_ttbr0:
 
 context_save:
 	/*
-	 * Check the targeted CPU
+	 * Check the targeted CPU and MPUSS
+	 * state to derive L2 state
+	 * 1 - CPUx L1 and logic lost: MPUSS CSWR
+	 * 2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
+	 * 3 - CPUx L1 and logic lost + GIC + L2 lost: MPUSS OFF
 	 */
 	ldr	r8, =sar_ram_base
 	ldr	r8, [r8]

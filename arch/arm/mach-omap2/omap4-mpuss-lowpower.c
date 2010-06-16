@@ -44,6 +44,7 @@
 #include <linux/smp.h>
 #include <asm/tlbflush.h>
 #include <asm/smp_scu.h>
+#include <asm/irq.h>
 
 #include <plat/powerdomain.h>
 #include <mach/omap4-common.h>
@@ -63,7 +64,34 @@
 #define CR_VALUE_OFFSET				0x02
 
 
-static struct powerdomain *cpu0_pwrdm, *cpu1_pwrdm;
+static struct powerdomain *cpu0_pwrdm, *cpu1_pwrdm, *mpuss_pd;
+
+/*
+ * GIC save restore offset from SAR_BANK3
+ */
+#define SAR_BACKUP_STATUS_OFFSET		0x500
+#define SAR_SECURE_RAM_SIZE_OFFSET		0x504
+#define SAR_SECRAM_SAVED_AT_OFFSET		0x508
+#define ICDISR_CPU0_OFFSET			0x50C
+#define ICDISR_CPU1_OFFSET			0x510
+#define ICDISR_SPI_OFFSET			0x514
+#define ICDISER_CPU0_OFFSET			0x524
+#define ICDISER_CPU1_OFFSET			0x528
+#define ICDISER_SPI_OFFSET			0x52C
+#define ICDIPR_SFI_CPU0_OFFSET			0x53C
+#define ICDIPR_PPI_CPU0_OFFSET			0x54C
+#define ICDIPR_SFI_CPU1_OFFSET			0x550
+#define ICDIPR_PPI_CPU1_OFFSET			0x560
+#define ICDIPR_SPI_OFFSET			0x564
+#define ICDIPTR_SPI_OFFSET			0x5E4
+#define ICDICFR_OFFSET				0x664
+#define SAR_BACKUP_STATUS_GIC_CPU0		0x1
+#define SAR_BACKUP_STATUS_GIC_CPU1		0x2
+
+/*
+ * GIC Save restore bank base
+ */
+void __iomem *sar_bank3_base;
 
 /*
  * Program the wakeup routine address for the CPU's
@@ -164,6 +192,156 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
 }
 
 /*
+ * Save GIC context in SAR RAM. Restore is done by ROM code
+ * GIC is lost only when MPU hits OSWR or OFF. It consist
+ * of a distributor and a per-cpu interface module
+ */
+static void save_gic(void)
+{
+	u32 max_spi_irq, max_spi_reg, reg_index, reg_value;
+
+	/*
+	 * GIC needs to be saved in SAR_BANK3
+	 */
+	sar_bank3_base = sar_ram_base + SAR_BANK3_OFFSET;
+
+	/*
+	 * Find out how many interrupts are supported.
+	 * The GIC only supports up to 1020 interrupt sources.
+	 */
+	max_spi_irq = readl(gic_dist_base_addr + GIC_DIST_CTR) & 0x1f;
+	max_spi_irq = (max_spi_irq + 1) * 32;
+	if (max_spi_irq > max(1020, NR_IRQS))
+		max_spi_irq = max(1020, NR_IRQS);
+	max_spi_irq = (max_spi_irq - 32);
+	max_spi_reg = max_spi_irq / 32;
+
+	/*
+	 * Force no Secure Interrupts CPU0 and CPU1
+	 */
+	writel(0xffffffff, sar_bank3_base + ICDISR_CPU0_OFFSET);
+	writel(0xffffffff, sar_bank3_base + ICDISR_CPU1_OFFSET);
+
+	/*
+	 * Save all SPI Interrupts secure status
+	 */
+	for (reg_index = 0; reg_index < max_spi_reg; reg_index++)
+		writel(0xffffffff,
+			sar_bank3_base + ICDISR_SPI_OFFSET + 4 * reg_index);
+
+	/*
+	 * Interrupt Set-Enable and Clear-Enable Registers
+	 * Save CPU 0 Enable (set, clear) Interrupts
+	 * Force no Interrupts CPU1
+	 * Read and Save all SPI Interrupts
+	 */
+	reg_value = readl(gic_dist_base_addr + GIC_DIST_ENABLE_SET);
+	writel(reg_value, sar_bank3_base + ICDISER_CPU0_OFFSET);
+	writel(0, sar_bank3_base + ICDISER_CPU1_OFFSET);
+
+
+	for (reg_index = 0; reg_index < max_spi_reg; reg_index++) {
+		reg_value = readl(gic_dist_base_addr +
+					0x104 + 4 * reg_index);
+		writel(reg_value,
+			sar_bank3_base + ICDISER_SPI_OFFSET + 4 * reg_index);
+	}
+
+	/*
+	 * Interrupt Priority Registers
+	 * Secure sw accesses, last 5 bits of the 8 bits (bit[7:3] are used)
+	 * Non-Secure sw accesses, last 4 bits (i.e. bits[7:4] are used)
+	 * But the Secure Bits[7:3] are shifted by 1 in Non-Secure access.
+	 * Secure (bits[7:3] << 1)== Non Secure bits[7:4]
+	 *
+	 * SGI - backup SGI
+	 */
+	for (reg_index = 0; reg_index < 4; reg_index++) {
+		reg_value = readl(gic_dist_base_addr +
+					GIC_DIST_PRI + 4 * reg_index);
+		/*
+		 * Save the priority bits of the Interrupts
+		 */
+		writel(reg_value >> 0x1,
+		sar_bank3_base + ICDIPR_SFI_CPU0_OFFSET + 4 * reg_index);
+		/*
+		 * Force the CPU1 interrupt
+		 */
+		writel(0,
+		sar_bank3_base + ICDIPR_SFI_CPU1_OFFSET + 4 * reg_index);
+	}
+	/*
+	 * PPI -  backup PPIs
+	 */
+	reg_value = readl(gic_dist_base_addr + GIC_DIST_PRI + 0x1c);
+	/*
+	 * Save the priority bits of the Interrupts
+	 */
+	writel(reg_value >> 0x1, sar_bank3_base + ICDIPR_PPI_CPU0_OFFSET);
+	/*
+	 * Force the CPU1 interrupt
+	 */
+	writel(0, sar_bank3_base + ICDIPR_PPI_CPU1_OFFSET);
+
+	/*
+	 * SPI - backup SPI
+	 * Interrupt priority regs - 4 interrupts/register
+	 */
+	for (reg_index = 0; reg_index < (max_spi_irq / 4); reg_index++) {
+		reg_value = readl(gic_dist_base_addr +
+				(GIC_DIST_PRI + 0x20) + 4 * reg_index);
+		writel(reg_value >> 0x1,
+			sar_bank3_base + ICDIPR_SPI_OFFSET + 4 * reg_index);
+	}
+
+	/*
+	 * Interrupt SPI TARGET - 4 interrupts/register
+	 */
+	for (reg_index = 0; reg_index < (max_spi_irq / 4); reg_index++) {
+		reg_value = readl(gic_dist_base_addr +
+				(GIC_DIST_TARGET + 0x20) + 4 * reg_index);
+		writel(reg_value,
+			sar_bank3_base + ICDIPTR_SPI_OFFSET + 4 * reg_index);
+	}
+
+	/*
+	 * Interrupt SPI Congigeration - 16 interrupts/register
+	 */
+	for (reg_index = 0; reg_index < (max_spi_irq / 16); reg_index++) {
+		reg_value = readl(gic_dist_base_addr +
+				(GIC_DIST_CONFIG + 0x08) + 4 * reg_index);
+		writel(reg_value,
+			sar_bank3_base + ICDICFR_OFFSET + 4 * reg_index);
+	}
+
+	/*
+	 * Set the Backup Bit Mask status for GIC
+	 */
+	reg_value = readl(sar_bank3_base + SAR_BACKUP_STATUS_OFFSET);
+	reg_value |= (SAR_BACKUP_STATUS_GIC_CPU0 | SAR_BACKUP_STATUS_GIC_CPU1);
+	writel(reg_value, sar_bank3_base + SAR_BACKUP_STATUS_OFFSET);
+}
+
+/*
+ * The CPU interface is per CPU
+ */
+static inline void enable_gic_cpu_interface(void)
+{
+	writel(0xf0, gic_cpu_base_addr + GIC_CPU_PRIMASK);
+	writel(1, gic_cpu_base_addr + GIC_CPU_CTRL);
+}
+
+/*
+ * Distributor is enabled by the master CPU
+ * Also clear the SAR backup status register
+ */
+static inline void enable_gic_distributor(void)
+{
+	writel(0x1, gic_dist_base_addr + GIC_DIST_CTRL);
+	writel(0x0, sar_bank3_base + SAR_BACKUP_STATUS_OFFSET);
+}
+
+/*
  * OMAP4 MPUSS Low Power Entry Function
  *
  * The purpose of this function is to manage low power programming
@@ -171,6 +349,20 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
  * Paramenters:
  *	cpu : CPU ID
  *	power_state: Targetted Low power state.
+ *
+ * MPUSS Low power states
+ * The basic rule is that the MPUSS power domain must be at the higher or
+ * equal power state (state that consume more power) than the higher of the
+ * two CPUs. For example, it is illegal for system power to be OFF, while
+ * the power of one or both of the CPU is DORMANT. When an illegal state is
+ * entered, then the hardware behavior is unpredictable.
+ *
+ * MPUSS state for the context save
+ * save_state =
+ *	0 - Nothing lost and no need to save: MPUSS INACTIVE
+ *	1 - CPUx L1 and logic lost: MPUSS CSWR
+ *	2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
+ *	3 - CPUx L1 and logic lost + GIC + L2 lost: MPUSS OFF
  */
 void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 {
@@ -209,6 +401,15 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	}
 
 	/*
+	 * Check MPUSS next state and save GIC if needed
+	 * GIC lost during MPU OFF and OSWR
+	 */
+	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
+		save_gic();
+		save_state = 3;
+	}
+
+	/*
 	 * Program the CPU targeted state
 	 */
 	clear_cpu_prev_pwrst(cpu);
@@ -232,14 +433,31 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		cpu_init();
 		restore_mmu_table_entry();
 	}
+
+	/*
+	 * Check MPUSS previous power state and enable
+	 * GIC if needed.
+	 */
+	if (pwrdm_read_prev_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
+		/*
+		 * Enable GIC distributor
+		 */
+		if (!wakeup_cpu)
+			enable_gic_distributor();
+		/*
+		 * Enable GIC cpu inrterface
+		 */
+		enable_gic_cpu_interface();
+	}
 }
 
 void __init omap4_mpuss_init(void)
 {
 	cpu0_pwrdm = pwrdm_lookup("cpu0_pwrdm");
 	cpu1_pwrdm = pwrdm_lookup("cpu1_pwrdm");
-	if (!cpu0_pwrdm || !cpu1_pwrdm)
-		pr_err("Failed to get lookup for CPUx pwrdm's\n");
+	mpuss_pd = pwrdm_lookup("mpu_pwrdm");
+	if (!cpu0_pwrdm || !cpu1_pwrdm || !mpuss_pd)
+		pr_err("Failed to get lookup for CPUx/MPUSS pwrdm's\n");
 }
 
 #else
