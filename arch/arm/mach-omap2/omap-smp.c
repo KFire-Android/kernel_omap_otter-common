@@ -27,7 +27,7 @@
 #include <mach/omap4-common.h>
 
 /* SCU base address */
-static void __iomem *scu_base;
+void __iomem *scu_base;
 
 /*
  * Use SCU config register to count number of cores
