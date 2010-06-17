@@ -12,18 +12,11 @@
  */
 
 #include <linux/io.h>
-#include <plat/cpu.h>
+#include <linux/errno.h>
+#include <linux/delay.h>
 #include <plat/powerdomain.h>
-#include <plat/clockdomain.h>
 #include <plat/prcm.h>
-
-#include "pm.h"
-#include "cm.h"
-#include "cm-regbits-34xx.h"
-#include "cm-regbits-44xx.h"
-#include "prm.h"
-#include "prm-regbits-34xx.h"
-#include "prm-regbits-44xx.h"
+#include "powerdomains.h"
 
 int omap2_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 {
@@ -50,9 +43,43 @@ int omap2_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
 				OMAP3430_LASTPOWERSTATEENTERED_MASK);
 }
 
+int omap2_pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
+{
+	u32 v;
+
+	v = pwrst << __ffs(OMAP3430_LOGICL1CACHERETSTATE_MASK);
+	prm_rmw_mod_reg_bits(OMAP3430_LOGICL1CACHERETSTATE_MASK, v,
+				pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL);
+
+	return 0;
+}
+
+int omap2_pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
+{
+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP2_PM_PWSTST,
+					OMAP3430_LOGICSTATEST_MASK);
+}
+
+
+int omap2_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
+{
+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST,
+					OMAP3430_LASTLOGICSTATEENTERED_MASK);
+}
+
+int omap2_pwrdm_read_logic_retst(struct powerdomain *pwrdm)
+{
+	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL,
+					OMAP3430_LOGICSTATEST_MASK);
+}
+
 struct pwrdm_functions omap2_pwrdm_functions = {
 	.pwrdm_set_next_pwrst	= omap2_pwrdm_set_next_pwrst,
 	.pwrdm_read_next_pwrst	= omap2_pwrdm_read_next_pwrst,
 	.pwrdm_read_pwrst	= omap2_pwrdm_read_pwrst,
 	.pwrdm_read_prev_pwrst	= omap2_pwrdm_read_prev_pwrst,
+	.pwrdm_set_logic_retst	= omap2_pwrdm_set_logic_retst,
+	.pwrdm_read_logic_pwrst	= omap2_pwrdm_read_logic_pwrst,
+	.pwrdm_read_prev_logic_pwrst	= omap2_pwrdm_read_prev_logic_pwrst,
+	.pwrdm_read_logic_retst	= omap2_pwrdm_read_logic_retst,
 };
