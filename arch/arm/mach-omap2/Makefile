@@ -95,6 +95,11 @@ obj-$(CONFIG_ARCH_OMAP2430)		+= omap_hwmod_2430_data.o
 obj-$(CONFIG_ARCH_OMAP3)		+= omap_hwmod_3xxx_data.o
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_hwmod_44xx_data.o
 
+#powerdomain framework
+obj-$(CONFIG_ARCH_OMAP2)		+= powerdomains2xxx.o
+obj-$(CONFIG_ARCH_OMAP3)		+= powerdomains2xxx.o
+obj-$(CONFIG_ARCH_OMAP4)		+= powerdomains44xx.o
+
 # EMU peripherals
 obj-$(CONFIG_OMAP3_EMU)			+= emu.o
 

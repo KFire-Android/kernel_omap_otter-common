@@ -319,7 +319,10 @@ void __init omap2_init_common_hw(struct omap_sdrc_params *sdrc_cs0,
 {
 	u8 skip_setup_idle = 0;
 
-	pwrdm_init(powerdomains_omap, NULL);
+	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+		pwrdm_init(powerdomains_omap, &omap2_pwrdm_functions);
+	else if (cpu_is_omap44xx())
+		pwrdm_init(powerdomains_omap, &omap4_pwrdm_functions);
 	clkdm_init(clockdomains_omap, clkdm_autodeps);
 	if (cpu_is_omap242x())
 		omap2420_hwmod_init();
