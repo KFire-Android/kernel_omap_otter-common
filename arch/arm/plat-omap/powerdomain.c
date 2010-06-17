@@ -80,6 +80,8 @@ static u16 pwrstst_reg_offs;
 /* pwrdm_list contains all registered struct powerdomains */
 static LIST_HEAD(pwrdm_list);
 
+static struct pwrdm_functions *arch_pwrdm;
+
 /* Private functions */
 
 static struct powerdomain *_pwrdm_lookup(const char *name)
@@ -218,7 +220,7 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
  * registered.  No return value.  XXX pwrdm_list is not really a
  * "list"; it is an array.  Rename appropriately.
  */
-void pwrdm_init(struct powerdomain **pwrdm_list)
+void pwrdm_init(struct powerdomain **pwrdm_list, struct pwrdm_functions * custom_funcs)
 {
 	struct powerdomain **p = NULL;
 
@@ -233,6 +235,13 @@ void pwrdm_init(struct powerdomain **pwrdm_list)
 							"this CPU\n");
 		return;
 	}
+
+	if (!custom_funcs) {
+		printk(KERN_ERR "No custom pwrdm functions registered\n");
+		BUG();
+	}
+
+	arch_pwrdm = custom_funcs;
 
 	if (pwrdm_list) {
 		for (p = pwrdm_list; *p; p++)
@@ -1073,4 +1082,3 @@ int pwrdm_post_transition(void)
 	pwrdm_for_each(_pwrdm_post_transition_cb, NULL);
 	return 0;
 }
-
