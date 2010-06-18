@@ -20,6 +20,7 @@
 
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/io.h>
 
 #include <plat/control.h>
 #include <plat/omap_hwmod.h>
@@ -41,6 +42,7 @@ static void __init sr_read_efuse(struct omap_sr_dev_data *dev_data,
 				struct omap_sr_data *sr_data)
 {
 	int i;
+	void __iomem *ctrl_base;
 
 	if (!dev_data || !dev_data->volts_supported || !dev_data->volt_data ||
 			!dev_data->efuse_nvalues_offs) {
@@ -72,9 +74,24 @@ static void __init sr_read_efuse(struct omap_sr_dev_data *dev_data,
 				dev_data->senpenable_shift);
 	}
 
-	for (i = 0; i < dev_data->volts_supported; i++)
-		dev_data->volt_data[i].sr_nvalue = omap_ctrl_readl(
+	if (cpu_is_omap44xx())
+		ctrl_base =  ioremap(0x4A002000, SZ_1K);
+
+	for (i = 0; i < dev_data->volts_supported; i++) {
+		if (cpu_is_omap44xx()) {
+			u16 offset = dev_data->efuse_nvalues_offs[i];
+
+			dev_data->volt_data[i].sr_nvalue =
+				__raw_readb(ctrl_base + offset) |
+				__raw_readb(ctrl_base + offset + 1) << 8 |
+				__raw_readb(ctrl_base + offset + 2) << 16;
+		} else {
+			dev_data->volt_data[i].sr_nvalue = omap_ctrl_readl(
 				dev_data->efuse_nvalues_offs[i]);
+		}
+	}
+	if (cpu_is_omap44xx())
+		iounmap(ctrl_base);
 }
 
 /*

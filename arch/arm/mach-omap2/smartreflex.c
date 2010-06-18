@@ -154,7 +154,10 @@ static void sr_set_clk_length(struct omap_sr *sr)
 	struct clk *sys_ck;
 	u32 sys_clk_speed;
 
-	sys_ck = clk_get(NULL, "sys_ck");
+	if (cpu_is_omap34xx())
+		sys_ck = clk_get(NULL, "sys_ck");
+	else
+		sys_ck = clk_get(NULL, "sys_clkin_ck");
 	sys_clk_speed = clk_get_rate(sys_ck);
 	clk_put(sys_ck);
 
@@ -189,7 +192,7 @@ static void sr_set_regfields(struct omap_sr *sr)
 	 * file or pmic specific data structure. In that case these structure
 	 * fields will have to be populated using the pdata or pmic structure.
 	 */
-	if (cpu_is_omap34xx()) {
+	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
 		sr->err_weight = OMAP3430_SR_ERRWEIGHT;
 		sr->err_maxlimit = OMAP3430_SR_ERRMAXLIMIT;
 		sr->accum_data = OMAP3430_SR_ACCUMDATA;
