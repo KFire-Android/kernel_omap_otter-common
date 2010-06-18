@@ -47,6 +47,7 @@
 #include <plat/hwspinlock.h>
 #include <plat/nokia-dsi-panel.h>
 #include "hsmmc.h"
+#include "smartreflex-class3.h"
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
@@ -567,6 +568,7 @@ static void __init omap_4430sdp_init_irq(void)
 	omap2_gp_clockevent_set_gptimer(1);
 #endif
 	gic_init_irq();
+	sr_class3_init();
 }
 
 static struct omap_musb_board_data musb_board_data = {
