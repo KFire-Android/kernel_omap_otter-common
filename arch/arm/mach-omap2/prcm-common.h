@@ -237,6 +237,8 @@
 #define OMAP24XX_ST_USB_MASK				(1 << 0)
 
 /* CM_FCLKEN_WKUP, CM_ICLKEN_WKUP, PM_WKEN_WKUP shared bits */
+#define OMAP24XX_EN_WDT2_SHIFT				3
+#define OMAP24XX_EN_WDT2_MASK				(1 << 3)
 #define OMAP24XX_EN_GPIOS_SHIFT				2
 #define OMAP24XX_EN_GPIOS_MASK				(1 << 2)
 #define OMAP24XX_EN_GPT1_SHIFT				0
@@ -344,6 +346,8 @@
 #define OMAP3430_ST_D2D_MASK				(1 << 3)
 
 /* CM_FCLKEN_WKUP, CM_ICLKEN_WKUP, PM_WKEN_WKUP shared bits */
+#define OMAP3430_EN_WDT2_SHIFT				5
+#define OMAP3430_EN_WDT2_MASK				(1 << 5)
 #define OMAP3430_EN_GPIO1_MASK				(1 << 3)
 #define OMAP3430_EN_GPIO1_SHIFT				3
 #define OMAP3430_EN_GPT12_MASK				(1 << 1)
