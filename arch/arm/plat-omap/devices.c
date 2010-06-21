@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/slab.h>
+#include <linux/err.h>
 
 #include <mach/hardware.h>
 #include <asm/mach-types.h>
@@ -30,6 +31,8 @@
 #include <plat/mcbsp.h>
 #include <plat/dsp_common.h>
 #include <plat/omap44xx.h>
+#include <plat/omap_hwmod.h>
+#include <plat/omap_device.h>
 
 #if	defined(CONFIG_OMAP_DSP) || defined(CONFIG_OMAP_DSP_MODULE)
 
@@ -360,6 +363,8 @@ static inline void omap_init_uwire(void) {}
 
 static struct resource wdt_resources[] = {
 	{
+		.start		= 0xfffeb000,
+		.end		= 0xfffeb07F,
 		.flags		= IORESOURCE_MEM,
 	},
 };
@@ -371,24 +376,39 @@ static struct platform_device omap_wdt_device = {
 	.resource	= wdt_resources,
 };
 
+struct omap_device_pm_latency omap_wdt_latency[] = {
+	[0] = {
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func   = omap_device_enable_hwmods,
+		.flags		 = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static int omap2_init_wdt(struct omap_hwmod *oh, void *user)
+{
+	int id = -1;
+	struct omap_device *od;
+	char *name = "omap_wdt";
+
+	if (!oh)
+		pr_err("Could not look up wdtimer2_hwmod\n");
+
+	od = omap_device_build(name, id, oh, NULL, 0,
+				omap_wdt_latency,
+				ARRAY_SIZE(omap_wdt_latency), 0);
+	WARN(IS_ERR(od), "Cant build omap_device for %s:%s.\n",
+				name, oh->name);
+	return 0;
+}
+
 static void omap_init_wdt(void)
 {
-	if (cpu_is_omap16xx())
-		wdt_resources[0].start = 0xfffeb000;
-	else if (cpu_is_omap2420())
-		wdt_resources[0].start = 0x48022000; /* WDT2 */
-	else if (cpu_is_omap2430())
-		wdt_resources[0].start = 0x49016000; /* WDT2 */
-	else if (cpu_is_omap343x())
-		wdt_resources[0].start = 0x48314000; /* WDT2 */
-	else if (cpu_is_omap44xx())
-		wdt_resources[0].start = 0x4a314000;
-	else
-		return;
-
-	wdt_resources[0].end = wdt_resources[0].start + 0x4f;
-
-	(void) platform_device_register(&omap_wdt_device);
+	if (cpu_class_is_omap2())
+		omap_hwmod_for_each_by_class("wd_timer", omap2_init_wdt,
+						NULL);
+	else if (cpu_is_omap16xx())
+		(void) platform_device_register(&omap_wdt_device);
+	return;
 }
 #else
 static inline void omap_init_wdt(void) {}
