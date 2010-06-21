@@ -765,6 +765,7 @@ static struct omap_hwmod *_lookup(const char *name)
 /**
  * _init_clocks - clk_get() all clocks associated with this hwmod
  * @oh: struct omap_hwmod *
+ * @data: context data pass by the caller (unused in this case)
  *
  * Called by omap_hwmod_late_init() (after omap2_clk_init()).
  * Resolves all clock names embedded in the hwmod.  Must be called
@@ -772,7 +773,7 @@ static struct omap_hwmod *_lookup(const char *name)
  * has not yet been registered or if the clocks have already been
  * initialized, 0 on success, or a non-zero error on failure.
  */
-static int _init_clocks(struct omap_hwmod *oh)
+static int _init_clocks(struct omap_hwmod *oh, void *data)
 {
 	int ret = 0;
 
@@ -1006,13 +1007,14 @@ static int _shutdown(struct omap_hwmod *oh)
 /**
  * _setup - do initial configuration of omap_hwmod
  * @oh: struct omap_hwmod *
+ * @data: context data pass by the caller (unused in this case)
  *
  * Writes the CLOCKACTIVITY bits @clockact to the hwmod @oh
  * OCP_SYSCONFIG register.  Must be called with omap_hwmod_mutex
  * held.  Returns -EINVAL if the hwmod is in the wrong state or returns
  * 0.
  */
-static int _setup(struct omap_hwmod *oh)
+static int _setup(struct omap_hwmod *oh, void *data)
 {
 	int i, r;
 
@@ -1185,15 +1187,17 @@ struct omap_hwmod *omap_hwmod_lookup(const char *name)
 /**
  * omap_hwmod_for_each - call function for each registered omap_hwmod
  * @fn: pointer to a callback function
+ * @user: arbitrary context data to pass to the callback function
  *
- * Call @fn for each registered omap_hwmod, passing @data to each
+ * Call @fn for each registered omap_hwmod, passing @oh and @data to each
  * function.  @fn must return 0 for success or any other value for
  * failure.  If @fn returns non-zero, the iteration across omap_hwmods
  * will stop and the non-zero return value will be passed to the
  * caller of omap_hwmod_for_each().  @fn is called with
  * omap_hwmod_for_each() held.
  */
-int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh))
+int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
+			      void *user)
 {
 	struct omap_hwmod *temp_oh;
 	int ret;
@@ -1203,7 +1207,7 @@ int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh))
 
 	mutex_lock(&omap_hwmod_mutex);
 	list_for_each_entry(temp_oh, &omap_hwmod_list, node) {
-		ret = (*fn)(temp_oh);
+		ret = (*fn)(temp_oh, user);
 		if (ret)
 			break;
 	}
@@ -1211,7 +1215,6 @@ int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh))
 
 	return ret;
 }
-
 
 /**
  * omap_hwmod_init - init omap_hwmod code and register hwmods
@@ -1260,14 +1263,14 @@ int omap_hwmod_late_init(void)
 	int r;
 
 	/* XXX check return value */
-	r = omap_hwmod_for_each(_init_clocks);
+	r = omap_hwmod_for_each(_init_clocks, NULL);
 	WARN(r, "omap_hwmod: omap_hwmod_late_init(): _init_clocks failed\n");
 
 	mpu_oh = omap_hwmod_lookup(MPU_INITIATOR_NAME);
 	WARN(!mpu_oh, "omap_hwmod: could not find MPU initiator hwmod %s\n",
 	     MPU_INITIATOR_NAME);
 
-	omap_hwmod_for_each(_setup);
+	omap_hwmod_for_each(_setup, NULL);
 
 	return 0;
 }
