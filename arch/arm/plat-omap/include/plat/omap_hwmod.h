@@ -394,7 +394,13 @@ struct omap_hwmod_omap4_prcm {
  * INITIALIZED: reset (optionally), initialized, enabled, disabled
  *              (optionally)
  *
- *
+ * _HWMOD_STATE_UNKNOWN
+ * _HWMOD_STATE_REGISTERED
+ * _HWMOD_STATE_CLKS_INITED
+ * _HWMOD_STATE_INITIALIZED
+ * _HWMOD_STATE_ENABLED
+ * _HWMOD_STATE_IDLE
+ * _HWMOD_STATE_DISABLED
  */
 #define _HWMOD_STATE_UNKNOWN			0
 #define _HWMOD_STATE_REGISTERED			1
@@ -403,6 +409,7 @@ struct omap_hwmod_omap4_prcm {
 #define _HWMOD_STATE_ENABLED			4
 #define _HWMOD_STATE_IDLE			5
 #define _HWMOD_STATE_DISABLED			6
+#define _HWMOD_STATE_LAST			_HWMOD_STATE_DISABLED
 
 /**
  * struct omap_hwmod_class - the type of an IP block
