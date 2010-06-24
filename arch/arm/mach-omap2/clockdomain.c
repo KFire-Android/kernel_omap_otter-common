@@ -898,16 +898,11 @@ void omap2_clkdm_allow_idle(struct clockdomain *clkdm)
 		 clkdm->name);
 
 	/*
-	 * XXX This should be removed once TI adds wakeup/sleep
-	 * dependency code and data for OMAP4.
+	 * OMAP4 doesn't need autodeps because at hardware level the dynamic
+	 * depedancy is enabled which should take care of this.
 	 */
-	if (cpu_is_omap44xx()) {
-		WARN_ONCE(1, "clockdomain: OMAP4 wakeup/sleep dependency "
-			  "support is not yet implemented\n");
-	} else {
-		if (atomic_read(&clkdm->usecount) > 0)
+	if ((atomic_read(&clkdm->usecount) > 0) && (!cpu_is_omap44xx()))
 			_clkdm_add_autodeps(clkdm);
-	}
 
 	_omap2_clkdm_set_hwsup(clkdm, 1);
 
@@ -940,16 +935,11 @@ void omap2_clkdm_deny_idle(struct clockdomain *clkdm)
 	_omap2_clkdm_set_hwsup(clkdm, 0);
 
 	/*
-	 * XXX This should be removed once TI adds wakeup/sleep
-	 * dependency code and data for OMAP4.
+	 * OMAP4 doesn't need autodeps because at hardware level the dynamic
+	 * depedancy is enabled which should take care of this.
 	 */
-	if (cpu_is_omap44xx()) {
-		WARN_ONCE(1, "clockdomain: OMAP4 wakeup/sleep dependency "
-			  "support is not yet implemented\n");
-	} else {
-		if (atomic_read(&clkdm->usecount) > 0)
-			_clkdm_del_autodeps(clkdm);
-	}
+	if ((atomic_read(&clkdm->usecount) > 0) && (!cpu_is_omap44xx()))
+		_clkdm_del_autodeps(clkdm);
 }
 
 
