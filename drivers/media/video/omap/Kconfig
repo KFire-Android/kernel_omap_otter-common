@@ -16,3 +16,12 @@ config OMAP2_VRFB
 	default y if VIDEO_OMAP2_VOUT
 	help
 	  VRFB used in V4L2 in OMAP2,3
+
+config OMAP3_ISP_RESIZER_ON_OVERLAY
+	bool "ISP resizer used in V4L2 in OMAP3 (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && VIDEO_OMAP34XX_ISP_RESIZER
+	default n
+	help
+	  Use ISP resizer on overlay instead of DSS resizer.
+	  Could increase performance of playing 720p clip but,
+	  have some issues when record 720p with camera.

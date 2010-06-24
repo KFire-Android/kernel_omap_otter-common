@@ -104,6 +104,11 @@ struct omap_vout_device {
 	int vid;
 	int opened;
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_OVERLAY
+	u32 rsz_configured;
+	u32 use_isp_rsz_for_downscale;
+#endif
+
 	/* we don't allow to change image fmt/size once buffer has
 	 * been allocated
 	 */

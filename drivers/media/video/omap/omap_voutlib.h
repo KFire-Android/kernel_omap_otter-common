@@ -12,6 +12,10 @@
 #ifndef OMAP_VOUTLIB_H
 #define OMAP_VOUTLIB_H
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_OVERLAY
+extern void omap_vout_set_max_downscale(int new_scale);
+#endif
+
 extern void omap_vout_default_crop(struct v4l2_pix_format *pix,
 		struct v4l2_framebuffer *fbuf, struct v4l2_rect *crop);
 
