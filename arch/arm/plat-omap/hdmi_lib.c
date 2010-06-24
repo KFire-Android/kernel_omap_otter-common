@@ -742,10 +742,12 @@ static int hdmi_core_audio_infoframe_avi(u32 name,
 	u16 offset;
 	int dbyte, dbyte_size;
 	u32 val;
+	char sum = 0, checksum = 0;
 
 	dbyte = HDMI_CORE_AV_AVI_DBYTE;
 	dbyte_size = HDMI_CORE_AV_AVI_DBYTE__ELSIZE;
 	/*info frame video*/
+	sum += 0x82 + 0x002 + 0x00D;
 	hdmi_write_reg(name, HDMI_CORE_AV_AVI_TYPE, 0x082);
 	hdmi_write_reg(name, HDMI_CORE_AV_AVI_VERS, 0x002);
 	hdmi_write_reg(name, HDMI_CORE_AV_AVI_LEN, 0x00D);
@@ -756,12 +758,14 @@ static int hdmi_core_audio_infoframe_avi(u32 name,
 		(info_avi.db1b_no_vert_hori_verthori << 2) |
 		(info_avi.db1s_0_1_2);
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (1 * dbyte_size);
 	val = (info_avi.db2c_no_itu601_itu709_extented << 6) |
 		(info_avi.db2m_no_43_169 << 4) |
 		(info_avi.db2r_same_43_169_149);
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (2 * dbyte_size);
 	val = (info_avi.db3itc_no_yes << 7) |
@@ -769,45 +773,59 @@ static int hdmi_core_audio_infoframe_avi(u32 name,
 		(info_avi.db3q_default_lr_fr << 2) |
 		(info_avi.db3sc_no_hori_vert_horivert);
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (3 * dbyte_size);
 	hdmi_write_reg(name, offset, info_avi.db4vic_videocode);
+	sum += info_avi.db4vic_videocode;
 
 	offset = dbyte + (4 * dbyte_size);
 	val = info_avi.db5pr_no_2_3_4_5_6_7_8_9_10;
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (5 * dbyte_size);
 	val = info_avi.db6_7_lineendoftop & 0x00FF;
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (6 * dbyte_size);
 	val = ((info_avi.db6_7_lineendoftop >> 8) & 0x00FF);
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (7 * dbyte_size);
 	val = info_avi.db8_9_linestartofbottom & 0x00FF;
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (8 * dbyte_size);
 	val = ((info_avi.db8_9_linestartofbottom >> 8) & 0x00FF);
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (9 * dbyte_size);
 	val = info_avi.db10_11_pixelendofleft & 0x00FF;
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (10 * dbyte_size);
 	val = ((info_avi.db10_11_pixelendofleft >> 8) & 0x00FF);
 	hdmi_write_reg(name, offset, val);
+	sum += val;
 
 	offset = dbyte + (11 * dbyte_size);
 	val = info_avi.db12_13_pixelstartofright & 0x00FF;
 	hdmi_write_reg(name, offset , val);
+	sum += val;
 
 	offset = dbyte + (12 * dbyte_size);
 	val = ((info_avi.db12_13_pixelstartofright >> 8) & 0x00FF);
 	hdmi_write_reg(name, offset, val);
+	sum += val;
+
+	checksum = 0x100 - sum;
+	hdmi_write_reg(name, HDMI_CORE_AV_AVI_CHSUM, checksum);
 
 	return 0;
 }
