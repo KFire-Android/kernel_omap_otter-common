@@ -153,6 +153,14 @@ config MACH_OMAP_3630SDP
 	depends on ARCH_OMAP3
 	select OMAP_PACKAGE_CBP
 
+config OMAP4_ES1
+	bool "OMAP 4430 ES1.0"
+	depends on ARCH_OMAP4
+	select PL310_ERRATA_588369
+	select ERRATA_OMAP4_AXI2OCP
+	help
+	Say Y if using OMAP4430 ES1.0 samples
+
 config MACH_OMAP_4430SDP
 	bool "OMAP 4430 SDP board"
 	depends on ARCH_OMAP4
@@ -177,6 +185,8 @@ config MACH_OMAP_4430SDP
 	select INPUT_KEYBOARD
 	select INPUT_TOUCHSCREEN
 	select TOUCHSCREEN_SYNTM12XX
+
+
 
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"
