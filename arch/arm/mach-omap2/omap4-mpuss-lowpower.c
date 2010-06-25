@@ -25,7 +25,7 @@
  *	ON(Inactive)	ON(Inactive)	ON(Inactive)
  *	ON(Inactive)	OFF		ON(Inactive)
  *	OFF		OFF		CSWR
- *	OFF		OFF		OSWR (*TBD)
+ *	OFF		OFF		OSWR
  *	OFF		OFF		OFF
  *	----------------------------------------------
  *
@@ -411,10 +411,27 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 * Check MPUSS next state and save GIC if needed
 	 * GIC lost during MPU OFF and OSWR
 	 */
-	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
+	switch (pwrdm_read_next_pwrst(mpuss_pd)) {
+	case PWRDM_POWER_ON:
+		/* No need to save MPUSS context */
+		break;
+	case PWRDM_POWER_RET:
+		/* MPUSS OSWR, logic lost */
+		if (pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF) {
+			save_gic();
+			omap4_wakeupgen_save();
+			save_state = 2;
+		}
+		break;
+	case PWRDM_POWER_OFF:
+		/* MPUSS OFF */
 		save_gic();
 		omap4_wakeupgen_save();
 		save_state = 3;
+		break;
+	default:
+		/* Fall through */
+		;
 	}
 
 	/*
@@ -448,7 +465,17 @@ cpu_prepare:
 	 * Check MPUSS previous power state and enable
 	 * GIC if needed.
 	 */
-	if (pwrdm_read_prev_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
+	switch (pwrdm_read_prev_pwrst(mpuss_pd)) {
+	case PWRDM_POWER_ON:
+		/* No need to restore */
+		break;
+	case PWRDM_POWER_RET:
+		/* FIXME:
+		 * if (pwrdm_read_prev_logic_pwrst(mpuss_pd) == PWRDM_POWER_OFF)
+		 */
+		if (omap_readl(0x4a306324) == PWRDM_POWER_OFF)
+			break;
+	case PWRDM_POWER_OFF:
 		/*
 		 * Enable GIC distributor
 		 */
@@ -458,6 +485,9 @@ cpu_prepare:
 		 * Enable GIC cpu inrterface
 		 */
 		enable_gic_cpu_interface();
+		break;
+	default:
+		;
 	}
 }
 
