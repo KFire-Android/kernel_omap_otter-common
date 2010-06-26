@@ -979,6 +979,14 @@ static inline void omap_hsmmc_reset_controller_fsm(struct omap_hsmmc_host *host,
 		(i++ < limit))
 		cpu_relax();
 
+	/*
+	 * On OMAP4 ES2 the SRC is zero in the first loop itself strangely
+	 * vs on ES1 it takes some time.
+	 * Could be a an issue on ES2 to indicate reset complete even before it is
+	 * complete.
+	 */
+	udelay(500);
+
 	if (OMAP_HSMMC_READ(host->base, SYSCTL) & bit)
 		dev_err(mmc_dev(host->mmc),
 			"Timeout waiting on controller reset in %s\n",
