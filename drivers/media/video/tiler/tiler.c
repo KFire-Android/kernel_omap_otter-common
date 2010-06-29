@@ -69,7 +69,7 @@ struct process_info {
 struct gid_info {
 	struct list_head by_pid;	/* other groups */
 	struct list_head areas;		/* all areas in this pid/gid */
-	struct list_head reserved; 	/* areas pre-reserved */
+	struct list_head reserved;	/* areas pre-reserved */
 	struct list_head onedim;	/* all 1D areas in this pid/gid */
 	u32 gid;			/* group ID */
 	struct process_info *pi;	/* parent */
@@ -278,11 +278,11 @@ static s32 __analize_area(enum tiler_fmt fmt, u32 width, u32 height,
  * @param offs	Offset of the block (within alignment)
  * @param ai	Pointer to area info
  * @param next	Pointer to the variable where the next block
- *  		will be stored.  The block should be inserted
- *  		before this block.
+ *              will be stored.  The block should be inserted
+ *              before this block.
  *
  * @return the end coordinate (x1 + 1) where a block would fit,
- *  	   or 0 if it does not fit.
+ *         or 0 if it does not fit.
  *
  * (must have mutex)
  */

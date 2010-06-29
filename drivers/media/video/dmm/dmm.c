@@ -104,7 +104,7 @@ s32 dmm_pat_refill(struct dmm *dmm, struct pat *pd, enum pat_mode mode)
 	v = __raw_readl(r);
 	w = (v & (~(BF(7, 0)))) | ((((s8)pd->area.x0) << 0) & BF(7, 0));
 	__raw_writel(w, r);
-	dsb();
+	wmb();
 
 #ifdef __DEBUG__
 	printk(KERN_NOTICE "\nx0=(%d),y0=(%d),x1=(%d),y1=(%d)\n",
@@ -117,7 +117,7 @@ s32 dmm_pat_refill(struct dmm *dmm, struct pat *pd, enum pat_mode mode)
 	/* First, clear the DMM_PAT_IRQSTATUS register */
 	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_IRQSTATUS);
 	__raw_writel(0xFFFFFFFF, r);
-	dsb();
+	wmb();
 
 	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_IRQSTATUS_RAW);
 	v = 0xFFFFFFFF;
@@ -134,7 +134,7 @@ s32 dmm_pat_refill(struct dmm *dmm, struct pat *pd, enum pat_mode mode)
 	/* Apply 4 bit left shft to counter the 4 bit right shift */
 	w = (v & (~(BF(31, 4)))) | ((((u32)(pd->data >> 4)) << 4) & BF(31, 4));
 	__raw_writel(w, r);
-	dsb();
+	wmb();
 
 	/* Read back PAT_DATA__0 to see if write was successful */
 	v = 0x0;
@@ -164,7 +164,7 @@ s32 dmm_pat_refill(struct dmm *dmm, struct pat *pd, enum pat_mode mode)
 	v = __raw_readl(r);
 	w = (v & (~(BF(0, 0)))) | ((((u32)pd->ctrl.start) << 0) & BF(0, 0));
 	__raw_writel(w, r);
-	dsb();
+	wmb();
 
 	/*
 	 * Now, check if PAT_IRQSTATUS_RAW has been
@@ -180,7 +180,7 @@ s32 dmm_pat_refill(struct dmm *dmm, struct pat *pd, enum pat_mode mode)
 	/* Again, clear the DMM_PAT_IRQSTATUS register */
 	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_IRQSTATUS);
 	__raw_writel(0xFFFFFFFF, r);
-	dsb();
+	wmb();
 
 	r = (void __iomem *)((u32)dmm->base | (u32)DMM_PAT_IRQSTATUS_RAW);
 	v = 0xFFFFFFFF;
