@@ -11,6 +11,7 @@
 
 #include <linux/sched.h>
 #include <linux/cpuidle.h>
+#include <linux/clockchips.h>
 #include <mach/omap4-common.h>
 #include "pm.h"
 
@@ -72,6 +73,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	struct omap4_processor_cx *cx = cpuidle_get_statedata(state);
 	struct timespec ts_preidle, ts_postidle, ts_idle;
 	u32 cpu1_state;
+	int cpu_id = smp_processor_id();
 
 	/* Used to keep track of the total time in idle */
 	getnstimeofday(&ts_preidle);
@@ -107,9 +109,15 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 		goto return_sleep_time;
 	}
 
+	if (cx->type > OMAP4_STATE_C1)
+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
+
 	pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
 	pwrdm_set_next_pwrst(mpu_pd, cx->mpu_state);
 	omap4_enter_lowpower(dev->cpu, cx->cpu0_state);
+
+	if (cx->type > OMAP4_STATE_C1)
+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
 
 return_sleep_time:
 	getnstimeofday(&ts_postidle);
@@ -117,6 +125,7 @@ return_sleep_time:
 
 	local_irq_enable();
 	local_fiq_enable();
+
 
 	return ts_idle.tv_nsec / NSEC_PER_USEC + ts_idle.tv_sec * USEC_PER_SEC;;
 }
