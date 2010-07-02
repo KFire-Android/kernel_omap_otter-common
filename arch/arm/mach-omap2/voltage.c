@@ -141,6 +141,8 @@ struct omap_vdd_info{
 	struct plist_head user_list;
 	struct mutex scaling_mutex;
 	int volt_data_count;
+	struct device **dev_list;
+	int dev_count;
 	unsigned long nominal_volt;
 	u8 cmdval_reg;
 	u8 vdd_sr_reg;
@@ -812,6 +814,9 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 	plist_head_init(&vdd->user_list, &vdd->user_lock);
 	/* Init the DVFS mutex */
 	mutex_init(&vdd->scaling_mutex);
+
+	/* Get the devices associated with this VDD */
+	vdd->dev_list = opp_init_voltage_params(&vdd->voltdm, &vdd->dev_count);
 
 #ifdef CONFIG_PM_DEBUG
 	strcpy(name, "vdd_");
@@ -1572,6 +1577,72 @@ struct voltagedomain *omap_voltage_domain_get(char *name)
 	}
 
 	return ERR_PTR(-EINVAL);
+}
+
+/**
+ * omap_voltage_scale : API to scale the devices associated with a
+ *			voltage domain vdd voltage.
+ * @volt_domain : the voltage domain to be scaled
+ * @volt : the new voltage for the voltage domain
+ *
+ * This API runs through the list of devices associated with the
+ * voltage domain and scales the device rates to those corresponding
+ * to the new voltage of the voltage domain. This API also scales
+ * the voltage domain voltage to the new value. Returns 0 on success
+ * else the error value.
+ */
+int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
+{
+	unsigned long curr_volt;
+	int is_volt_scaled = 0, i;
+	struct omap_vdd_info *vdd;
+
+	if (!voltdm || IS_ERR(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return -EINVAL;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+
+	mutex_lock(&vdd->scaling_mutex);
+
+	curr_volt = omap_voltage_get_nom_volt(voltdm);
+
+	if (curr_volt == volt) {
+		is_volt_scaled = 1;
+	} else if (curr_volt < volt) {
+		omap_voltage_scale_vdd(voltdm, volt);
+		is_volt_scaled = 1;
+	}
+
+	for (i = 0; i < vdd->dev_count; i++) {
+		struct omap_opp *opp;
+		unsigned long freq;
+
+		opp = opp_find_voltage(vdd->dev_list[i], volt);
+		if (IS_ERR(opp)) {
+			dev_err(vdd->dev_list[i], "%s: Unable to find OPP for"
+				"volt%ld\n", __func__, volt);
+			continue;
+		}
+
+		freq = opp_get_freq(opp);
+
+		if (freq == opp_get_rate(vdd->dev_list[i])) {
+			dev_info(vdd->dev_list[i], "%s: Already at the"
+				"requested rate %ld\n", __func__, freq);
+			continue;
+		}
+
+		opp_set_rate(vdd->dev_list[i], freq);
+	}
+
+	if (!is_volt_scaled)
+		omap_voltage_scale_vdd(voltdm, volt);
+
+	mutex_unlock(&vdd->scaling_mutex);
+
+	return 0;
 }
 
 /**
