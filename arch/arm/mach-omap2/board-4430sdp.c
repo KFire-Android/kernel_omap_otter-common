@@ -442,7 +442,9 @@ static int sdp4430_panel_enable_hdmi(struct omap_dss_device *dssdev)
 	gpio_set_value(HDMI_GPIO_60, 1);
 	gpio_set_value(HDMI_GPIO_41, 1);
 	gpio_set_value(HDMI_GPIO_60, 0);
-
+	gpio_set_value(HDMI_GPIO_41, 0);
+	gpio_set_value(HDMI_GPIO_60, 1);
+	gpio_set_value(HDMI_GPIO_41, 1);
 	return 0;
 }
 
