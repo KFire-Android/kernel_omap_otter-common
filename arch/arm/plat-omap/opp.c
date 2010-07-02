@@ -21,6 +21,7 @@
 
 #include <plat/opp.h>
 #include <plat/omap_device.h>
+#include <plat/voltage.h>
 
 /**
  * struct omap_opp - OMAP OPP description structure
@@ -51,6 +52,9 @@ struct device_opp {
 	struct list_head opp_list;
 	u32 opp_count;
 	u32 enabled_opp_count;
+
+	int (*set_rate)(struct device *dev, unsigned long rate);
+	unsigned long (*get_rate) (struct device *dev);
 };
 
 static LIST_HEAD(dev_opp_list);
@@ -342,6 +346,105 @@ struct omap_opp *opp_find_voltage(struct device *dev, unsigned long volt)
 	}
 
 	return opp;
+}
+
+/**
+ * opp_set_rate() - Change the operating frequency of the device
+ * @dev:	device pointer associated with the opp type
+ * @freq:	new frequency at which the device is to be operated.
+ *
+ * This API calls into the custom specified set rate API mentioned
+ * in the device opp table to change the operating frequency of the
+ * device. Returns error values in case of no device opp table for the
+ * device or missing set_rate API in the device opp table.
+ */
+int opp_set_rate(struct device *dev, unsigned long freq)
+{
+	struct device_opp *dev_opp;
+
+	if (!dev) {
+		pr_err("%s: Invalid device\n", __func__);
+		return -EINVAL;
+	}
+
+	dev_opp = find_device_opp(dev);
+	if (IS_ERR(dev_opp)) {
+		dev_err(dev, "%s: No device opp table\n", __func__);
+		return -ENODEV;
+	}
+
+	if (!dev_opp->set_rate) {
+		dev_err(dev, "%s: No set_rate API for scaling opp\n",
+			__func__);
+		return -ENODATA;
+	}
+
+	return dev_opp->set_rate(dev, freq);
+}
+
+/**
+ * opp_get_rate() - Get the operating frequency of the device
+ * @dev:	device pointer associated with the opp type
+ *
+ * This API calls into the custom specified get rate API mentioned
+ * in the device opp table to retrieve the operating frequency of the
+ * device. Returns 0 in case of no device opp table for the
+ * device or missing get_rate API in the device opp table else
+ * returns the rate at which the device is operating.
+ */
+unsigned long opp_get_rate(struct device *dev)
+{
+	struct device_opp *dev_opp;
+
+	if (!dev) {
+		pr_err("%s: Invalid device\n", __func__);
+		return 0;
+	}
+
+	dev_opp = find_device_opp(dev);
+	if (IS_ERR(dev_opp)) {
+		dev_err(dev, "%s: No device opp table\n", __func__);
+		return 0;
+	}
+
+	if (!dev_opp->get_rate) {
+		dev_err(dev, "%s: No set_rate API for scaling opp\n",
+			__func__);
+		return 0;
+	}
+
+	return dev_opp->get_rate(dev);
+}
+
+/**
+ * opp_populate_rate_fns() - Populates the device opp tables with set_rate
+ *				and get_rate API's
+ * @dev:	device pointer whose device opp table is to be populated.
+ * @set_rate:	the set_rate API
+ * @get_rate:	the get_rate API
+ *
+ * This API populates the device opp table corresponding to device <dev>
+ * with the specified set_rate and get_rate APIs passed as parameters.
+ */
+void opp_populate_rate_fns(struct device *dev,
+		int (*set_rate)(struct device *dev, unsigned long rate),
+		unsigned long (*get_rate) (struct device *dev))
+{
+	struct device_opp *dev_opp;
+
+	if (!dev || !set_rate || !get_rate) {
+		pr_err("%s: Invalid device or parameters\n", __func__);
+		return;
+	}
+
+	dev_opp = find_device_opp(dev);
+	if (IS_ERR(dev_opp)) {
+		dev_err(dev, "%s: No device opp table\n", __func__);
+		return;
+	}
+
+	dev_opp->set_rate = set_rate;
+	dev_opp->get_rate = get_rate;
 }
 
 /* wrapper to reuse converting opp_def to opp struct */

@@ -16,6 +16,7 @@
 
 #include <linux/err.h>
 #include <linux/cpufreq.h>
+#include <linux/clk.h>
 
 #include <plat/common.h>
 #include <plat/voltage.h>
@@ -51,7 +52,7 @@ struct omap_opp_def {
  * To point at the end of a terminator of a list of OPPs,
  * use OMAP_OPP_DEF(0, 0, 0)
  */
-#define OMAP_OPP_DEF(_hwmod_name, _enabled, _freq, _uv)	\
+#define OMAP_OPP_DEF(_hwmod_name, _enabled, _freq, _uv) \
 {						\
 	.hwmod_name	= _hwmod_name,		\
 	.enabled	= _enabled,		\
@@ -77,6 +78,14 @@ struct omap_opp *opp_find_freq_floor(struct device *dev, unsigned long *freq);
 struct omap_opp *opp_find_freq_ceil(struct device *dev, unsigned long *freq);
 
 struct omap_opp *opp_find_voltage(struct device *dev, unsigned long volt);
+
+int opp_set_rate(struct device *dev, unsigned long freq);
+
+unsigned long opp_get_rate(struct device *dev);
+
+void opp_populate_rate_fns(struct device *dev,
+		int (*set_rate)(struct device *dev, unsigned long rate),
+		unsigned long (*get_rate) (struct device *dev));
 
 int opp_add(const struct omap_opp_def *opp_def);
 
@@ -132,6 +141,23 @@ static inline struct omap_opp *opp_find_voltage(struct device *dev,
 						unsigned long volt)
 {
 	return ERR_PTR(-EINVAL);
+}
+
+static inline int opp_set_rate(struct device *dev, unsigned long freq)
+{
+	return -EINVAL;
+}
+
+static inline unsigned long opp_get_rate(struct device *dev)
+{
+	return 0;
+}
+
+static inline void opp_populate_rate_fns(struct device *dev,
+		int (*set_rate)(struct device *dev, unsigned long rate)
+		unsigned long (*get_rate) (struct device *dev))
+{
+	return;
 }
 
 static inline struct omap_opp *opp_add(struct omap_opp *oppl,
