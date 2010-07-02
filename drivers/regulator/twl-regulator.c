@@ -614,6 +614,17 @@ static int __devinit twlreg_probe(struct platform_device *pdev)
 	case TWL4030_REG_VINTDIG:
 		c->always_on = true;
 		break;
+	/*
+	 * TODO: This is needed for a Phoenix ES1.0 Errata.
+	 * Once, ES check for Phoenix is implemented. Make
+	 * this conditional only for ES1.
+	 */
+	case TWL6030_REG_VAUX3_6030:
+		/* Set duty-cycle to 100% */
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0, TWL6030_VIBCTRL);
+		/* Enable the Vibrator driver */
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 128, TWL6030_TOGGLE2);
+		break;
 	default:
 		break;
 	}
