@@ -29,6 +29,7 @@
 #include <mach/hardware.h>
 #include <plat/clock.h>
 #include <asm/system.h>
+#include <plat/omap_device.h>
 
 #if defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
 #include <plat/omap-pm.h>
@@ -117,7 +118,7 @@ static int omap_target(struct cpufreq_policy *policy,
 #elif defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
 	freq = target_freq * 1000;
 	if (opp_find_freq_ceil(mpu_dev, &freq))
-		omap_pm_cpu_set_freq(freq);
+		omap_device_set_rate(mpu_dev, mpu_dev, freq);
 #endif
 	return ret;
 }
