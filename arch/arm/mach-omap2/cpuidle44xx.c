@@ -16,12 +16,14 @@
 
 #ifdef CONFIG_CPU_IDLE
 
-#define OMAP4_MAX_STATES	2
+#define OMAP4_MAX_STATES	3
 
 /* C1 - CPUx wfi + MPU inactive + CORE inactive */
 #define OMAP4_STATE_C1		0
 /* C2 - CPU0 OFF + CPU1 OFF + MPU CSWR + Core inactive */
 #define OMAP4_STATE_C2		1
+/* C3 - CPU0 OFF + CPU1 OFF + MPU OFF + Core inactive */
+#define OMAP4_STATE_C3		2
 
 
 struct omap4_processor_cx {
@@ -46,6 +48,8 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	{1, 2, 2, 5},
 	/* C2 */
 	{1, 80, 80, 400},	/* FIXME: Profile the latency numbers */
+	/* C3 */
+	{1, 1500, 1500, 4000},	/* FIXME: Profile the latency numbers */
 };
 
 /**
@@ -155,6 +159,24 @@ void omap_init_power_states(void)
 	omap4_power_states[OMAP4_STATE_C2].mpu_state = PWRDM_POWER_RET;
 	omap4_power_states[OMAP4_STATE_C2].core_state = PWRDM_POWER_ON;
 	omap4_power_states[OMAP4_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID;
+
+	/*
+	 * C3 . CPU0 OFF + CPU1 OFF + MPU CSWR + CORE inactive
+	 */
+	omap4_power_states[OMAP4_STATE_C3].valid =
+			cpuidle_params_table[OMAP4_STATE_C3].valid;
+	omap4_power_states[OMAP4_STATE_C3].type = OMAP4_STATE_C3;
+	omap4_power_states[OMAP4_STATE_C3].sleep_latency =
+			cpuidle_params_table[OMAP4_STATE_C3].sleep_latency;
+	omap4_power_states[OMAP4_STATE_C3].wakeup_latency =
+			cpuidle_params_table[OMAP4_STATE_C3].wake_latency;
+	omap4_power_states[OMAP4_STATE_C3].threshold =
+			cpuidle_params_table[OMAP4_STATE_C3].threshold;
+	omap4_power_states[OMAP4_STATE_C3].cpu0_state = PWRDM_POWER_OFF;
+	omap4_power_states[OMAP4_STATE_C3].cpu1_state = PWRDM_POWER_OFF;
+	omap4_power_states[OMAP4_STATE_C3].mpu_state = PWRDM_POWER_OFF;
+	omap4_power_states[OMAP4_STATE_C3].core_state = PWRDM_POWER_ON;
+	omap4_power_states[OMAP4_STATE_C3].flags = CPUIDLE_FLAG_TIME_VALID;
 }
 
 struct cpuidle_driver omap4_idle_driver = {
