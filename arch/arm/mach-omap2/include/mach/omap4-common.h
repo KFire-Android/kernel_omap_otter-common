@@ -29,6 +29,8 @@
 #define MMU_OFFSET			0xd00
 #define SCU_OFFSET			0xd20
 #define L2X0_OFFSET			0xd24
+#define CPU0_TWD_OFFSET			0xd30
+#define CPU1_TWD_OFFSET			0xd38
 
 #ifndef __ASSEMBLER__
 /*

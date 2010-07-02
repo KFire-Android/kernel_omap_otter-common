@@ -45,6 +45,7 @@
 #include <asm/tlbflush.h>
 #include <asm/smp_scu.h>
 #include <asm/irq.h>
+#include <asm/smp_twd.h>
 
 #include <plat/powerdomain.h>
 #include <mach/omap4-common.h>
@@ -342,6 +343,55 @@ static inline void enable_gic_distributor(void)
 	writel(0x0, sar_bank3_base + SAR_BACKUP_STATUS_OFFSET);
 }
 
+#ifdef CONFIG_LOCAL_TIMERS
+
+/*
+ * Save per-cpu local timer context
+ */
+static inline void save_local_timers(unsigned int cpu_id)
+{
+	u32 reg_load, reg_ctrl;
+
+	reg_load = __raw_readl(twd_base + TWD_TIMER_LOAD);
+	reg_ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+
+	if (cpu_id) {
+		__raw_writel(reg_load, sar_ram_base + CPU1_TWD_OFFSET);
+		__raw_writel(reg_ctrl, sar_ram_base + CPU1_TWD_OFFSET + 0x04);
+	} else {
+		__raw_writel(reg_load, sar_ram_base + CPU0_TWD_OFFSET);
+		__raw_writel(reg_ctrl, sar_ram_base + CPU0_TWD_OFFSET + 0x04);
+	}
+}
+
+/*
+ * restore per-cpu local timer context
+ */
+static inline void restore_local_timers(unsigned int cpu_id)
+{
+	u32 reg_load, reg_ctrl;
+
+	if (cpu_id) {
+		reg_load = __raw_readl(sar_ram_base + CPU1_TWD_OFFSET);
+		reg_ctrl = __raw_readl(sar_ram_base + CPU1_TWD_OFFSET + 0x04);
+	} else {
+		reg_load = __raw_readl(sar_ram_base + CPU0_TWD_OFFSET);
+		reg_ctrl = __raw_readl(sar_ram_base + CPU0_TWD_OFFSET + 0x04);
+	}
+
+	__raw_writel(reg_load, twd_base + TWD_TIMER_LOAD);
+	__raw_writel(reg_ctrl, twd_base + TWD_TIMER_CONTROL);
+}
+
+#else
+
+static void save_local_timers(unsigned int cpu_id)
+{}
+static void restore_local_timers(unsigned int cpu_id)
+{}
+
+#endif
+
 /*
  * OMAP4 MPUSS Low Power Entry Function
  *
@@ -388,6 +438,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	case PWRDM_POWER_OFF:
 		save_state = 1;
 		setup_wakeup_routine(cpu);
+		save_local_timers(cpu);
 		break;
 	case PWRDM_POWER_RET:
 		/*
@@ -459,6 +510,7 @@ cpu_prepare:
 	if (read_cpu_prev_pwrst(wakeup_cpu) == PWRDM_POWER_OFF) {
 		cpu_init();
 		restore_mmu_table_entry();
+		restore_local_timers(wakeup_cpu);
 	}
 
 	/*
