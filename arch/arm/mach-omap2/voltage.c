@@ -98,6 +98,36 @@ struct vp_reg_val {
 };
 
 /**
+ * omap_vdd_dep_volt - Table containing the parent vdd voltage and the
+ *			dependent vdd voltage corresponding to it.
+ *
+ * @main_vdd_volt	: The main vdd voltage
+ * @dep_vdd_volt	: The voltage at which the dependent vdd should be
+ *			  when the main vdd is at <main_vdd_volt> voltage
+ */
+struct omap_vdd_dep_volt {
+	u32 main_vdd_volt;
+	u32 dep_vdd_volt;
+};
+
+/**
+ * omap_vdd_dep_info - Dependent vdd info
+ *
+ * @name		: Dependent vdd name
+ * @voltdm		: Dependent vdd pointer
+ * @dep_table		: Table containing the dependent vdd voltage
+ *			  corresponding to every main vdd voltage.
+ * @cur_dep_volt	: The voltage to which dependent vdd should be put
+ *			  to for the current main vdd voltage.
+ */
+struct omap_vdd_dep_info{
+	char *name;
+	struct voltagedomain *voltdm;
+	struct omap_vdd_dep_volt *dep_table;
+	unsigned long cur_dep_volt;
+};
+
+/**
  * omap_vdd_user_list	- The per vdd user list
  *
  * @dev		: The device asking for the vdd to be set at a particular
@@ -137,10 +167,12 @@ struct omap_vdd_info{
 	struct clk *volt_clk;
 	struct device *opp_dev;
 	struct voltagedomain voltdm;
+	struct omap_vdd_dep_info *dep_vdd_info;
 	spinlock_t user_lock;
 	struct plist_head user_list;
 	struct mutex scaling_mutex;
 	int volt_data_count;
+	int nr_dep_vdd;
 	struct device **dev_list;
 	int dev_count;
 	unsigned long nominal_volt;
@@ -1111,6 +1143,80 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	return 0;
 }
 
+static int calc_dep_vdd_volt(struct device *dev,
+		struct omap_vdd_info *main_vdd, unsigned long main_volt)
+{
+	struct omap_vdd_dep_info *dep_vdds;
+	int i, ret = 0;
+
+	if (!main_vdd->dep_vdd_info) {
+		pr_debug("%s: No dependent VDD's for vdd_%s\n",
+			__func__, main_vdd->voltdm.name);
+		return 0;
+	}
+
+	dep_vdds = main_vdd->dep_vdd_info;
+
+	for (i = 0; i < main_vdd->nr_dep_vdd; i++) {
+		struct omap_vdd_dep_volt *volt_table = dep_vdds[i].dep_table;
+		int nr_volt = 0;
+		unsigned long dep_volt = 0, act_volt = 0;
+
+		while (volt_table[nr_volt].main_vdd_volt != 0) {
+			if (volt_table[nr_volt].main_vdd_volt == main_volt) {
+				dep_volt = volt_table[nr_volt].dep_vdd_volt;
+				break;
+			}
+			nr_volt++;
+		}
+		if (!dep_volt) {
+			pr_warning("%s: Not able to find a matching volt for"
+				"vdd_%s corresponding to vdd_%s %ld volt\n",
+				__func__, dep_vdds[i].name,
+				main_vdd->voltdm.name, main_volt);
+			ret = -EINVAL;
+			continue;
+		}
+
+		if (!dep_vdds[i].voltdm)
+			dep_vdds[i].voltdm =
+				omap_voltage_domain_get(dep_vdds[i].name);
+
+		act_volt = dep_volt;
+
+		/* See if dep_volt is possible for the vdd*/
+		ret = omap_voltage_add_userreq(dep_vdds[i].voltdm, dev,
+				&act_volt);
+
+		/*
+		 * Currently we do not bother if the dep volt and act volt are
+		 * different. We could add a check if needed.
+		 */
+		dep_vdds[i].cur_dep_volt = act_volt;
+	}
+
+	return ret;
+}
+
+static int scale_dep_vdd(struct omap_vdd_info *main_vdd)
+{
+	struct omap_vdd_dep_info *dep_vdds;
+	int i;
+
+	if (!main_vdd->dep_vdd_info) {
+		pr_debug("%s: No dependent VDD's for vdd_%s\n",
+			__func__, main_vdd->voltdm.name);
+		return 0;
+	}
+
+	dep_vdds = main_vdd->dep_vdd_info;
+
+	for (i = 0; i < main_vdd->nr_dep_vdd; i++)
+		omap_voltage_scale(dep_vdds[i].voltdm,
+				dep_vdds[i].cur_dep_volt);
+	return 0;
+}
+
 /* Public functions */
 /**
  * omap_voltage_get_nom_volt : Gets the current non-auto-compensated voltage
@@ -1596,6 +1702,8 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	unsigned long curr_volt;
 	int is_volt_scaled = 0, i;
 	struct omap_vdd_info *vdd;
+	struct plist_node *node;
+	struct omap_vdd_user_list *user;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -1607,6 +1715,17 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	mutex_lock(&vdd->scaling_mutex);
 
 	curr_volt = omap_voltage_get_nom_volt(voltdm);
+
+	/* Find the device requesting the voltage scaling */
+	node = plist_first(&vdd->user_list);
+	user = container_of(node, struct omap_vdd_user_list, node);
+
+	/* calculate the voltages for dependent vdd's */
+	if (calc_dep_vdd_volt(user->dev, vdd, volt)) {
+		pr_warning("%s: Error in calculating dependent vdd voltages"
+			"for vdd_%s\n", __func__, voltdm->name);
+		return -EINVAL;
+	}
 
 	if (curr_volt == volt) {
 		is_volt_scaled = 1;
@@ -1641,6 +1760,9 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 		omap_voltage_scale_vdd(voltdm, volt);
 
 	mutex_unlock(&vdd->scaling_mutex);
+
+	/* Scale dependent vdds */
+	scale_dep_vdd(vdd);
 
 	return 0;
 }
