@@ -120,6 +120,10 @@ int omap_device_enable_clocks(struct omap_device *od);
 int omap_device_enable_wakeup(struct omap_device *od);
 int omap_device_disable_wakeup(struct omap_device *od);
 
+int omap_device_set_rate(struct device *req_dev, struct device *dev,
+			 unsigned long rate);
+unsigned long omap_device_get_rate(struct device *dev);
+
 /*
  * Entries should be kept in latency order ascending
  *

@@ -86,6 +86,8 @@
 
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
+#include <plat/opp.h>
+#include <plat/voltage.h>
 
 /* These parameters are passed to _omap_device_{de,}activate() */
 #define USE_WAKEUP_LAT			0
@@ -858,3 +860,96 @@ int omap_device_disable_wakeup(struct omap_device *od)
 	return 0;
 }
 
+/**
+ * omap_device_set_rate - Set a new rate at which the device is to operate
+ * @req_dev : pointer to the device requesting the scaling.
+ * @dev : pointer to the device that is to be scaled
+ * @rate : the rnew rate for the device.
+ *
+ * This API gets the device opp table associated with this device and
+ * tries putting the device to the requested rate and the voltage domain
+ * associated with the device to the voltage corresponding to the
+ * requested rate. Since multiple devices can be assocciated with a
+ * voltage domain this API finds out the possible voltage the
+ * voltage domain can enter and then decides on the final device
+ * rate. Return 0 on success else the error value
+ */
+int omap_device_set_rate(struct device *req_dev, struct device *dev,
+			unsigned long rate)
+{
+	struct omap_opp *opp;
+	unsigned long volt, freq, min_freq, max_freq;
+	struct voltagedomain *voltdm;
+	struct platform_device *pdev;
+	struct omap_device *od;
+	int ret;
+
+	pdev = container_of(dev, struct platform_device, dev);
+	od = _find_by_pdev(pdev);
+
+	/*
+	 * Figure out if the desired frquency lies between the
+	 * maximum and minimum possible for the particular device
+	 */
+	min_freq = 0;
+	if (IS_ERR(opp_find_freq_ceil(dev, &min_freq))) {
+		dev_err(dev, "%s: Unable to find lowest opp\n", __func__);
+		return -ENODEV;
+	}
+
+	max_freq = ULONG_MAX;
+	if (IS_ERR(opp_find_freq_floor(dev, &max_freq))) {
+		dev_err(dev, "%s: Unable to find highest opp\n", __func__);
+		return -ENODEV;
+	}
+
+	if (rate < min_freq)
+		freq = min_freq;
+	else if (rate > max_freq)
+		freq = max_freq;
+	else
+		freq = rate;
+
+	/* Get the possible rate from the opp layer */
+	opp = opp_find_freq_ceil(dev, &freq);
+	if (IS_ERR(opp)) {
+		dev_err(dev, "%s: Unable to find OPP for freq%ld\n",
+			__func__, rate);
+		return -ENODEV;
+	}
+	if (unlikely(freq != rate))
+		dev_warn(dev, "%s: Available freq %ld != dpll freq %ld.\n",
+			__func__, freq, rate);
+
+	/* Get the voltage corresponding to the requested frequency */
+	volt = opp_get_voltage(opp);
+
+	/*
+	 * Call into the voltage layer to get the final voltage possible
+	 * for the voltage domain associated with the device.
+	 */
+	voltdm = od->hwmods[0]->voltdm;
+	ret = omap_voltage_add_userreq(voltdm, req_dev, &volt);
+	if (ret) {
+		dev_err(dev, "%s: Unable to get the final volt for scaling\n",
+			__func__);
+		return ret;
+	}
+
+	/* Do the actual scaling */
+	return omap_voltage_scale(voltdm, volt);
+}
+EXPORT_SYMBOL(omap_device_set_rate);
+
+/**
+ * omap_device_get_rate - Gets the current operating rate of the device
+ * @dev - the device pointer
+ *
+ * This API returns the current operating rate of the device on success.
+ * Else returns the error value.
+ */
+unsigned long omap_device_get_rate(struct device *dev)
+{
+	return opp_get_rate(dev);
+}
+EXPORT_SYMBOL(omap_device_get_rate);
