@@ -31,7 +31,8 @@
 #include <asm/system.h>
 #include <plat/omap_device.h>
 
-#if defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4) \
+				&& !defined(CONFIG_OMAP_PM_NONE)
 #include <plat/omap-pm.h>
 #include <plat/opp.h>
 #endif
@@ -85,10 +86,11 @@ static int omap_target(struct cpufreq_policy *policy,
 		       unsigned int target_freq,
 		       unsigned int relation)
 {
-#ifdef CONFIG_ARCH_OMAP1
+#if defined(CONFIG_ARCH_OMAP1) || defined(CONFIG_ARCH_OMAP4)
 	struct cpufreq_freqs freqs;
 #endif
-#if defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4) && \
+		!defined(CONFIG_OMAP_PM_NONE)
 	unsigned long freq;
 	struct device *mpu_dev = omap2_get_mpuss_device();
 #endif
@@ -115,7 +117,8 @@ static int omap_target(struct cpufreq_policy *policy,
 #endif
 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-#elif defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
+#elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4) && \
+		!defined(CONFIG_OMAP_PM_NONE)
 	freq = target_freq * 1000;
 	if (opp_find_freq_ceil(mpu_dev, &freq))
 		omap_device_set_rate(mpu_dev, mpu_dev, freq);
@@ -123,11 +126,14 @@ static int omap_target(struct cpufreq_policy *policy,
 	return ret;
 }
 
-static int __init omap_cpu_init(struct cpufreq_policy *policy)
+static int omap_cpu_init(struct cpufreq_policy *policy)
 {
 	int result = 0;
+	if (cpu_is_omap44xx())
+		mpu_clk = clk_get(NULL, "dpll_mpu_ck");
+	else
+		mpu_clk = clk_get(NULL, MPU_CLK);
 
-	mpu_clk = clk_get(NULL, MPU_CLK);
 	if (IS_ERR(mpu_clk))
 		return PTR_ERR(mpu_clk);
 
@@ -136,7 +142,7 @@ static int __init omap_cpu_init(struct cpufreq_policy *policy)
 
 	policy->cur = policy->min = policy->max = omap_getspeed(0);
 
-	if (!cpu_is_omap34xx()) {
+	if (!(cpu_is_omap34xx() || cpu_is_omap44xx())) {
 		clk_init_cpufreq_table(&freq_table);
 	} else {
 		struct device *mpu_dev = omap2_get_mpuss_device();
