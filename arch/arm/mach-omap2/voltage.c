@@ -24,6 +24,9 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/debugfs.h>
+#include <linux/spinlock.h>
+#include <linux/plist.h>
+#include <linux/slab.h>
 
 #include <plat/omap-pm.h>
 #include <plat/omap34xx.h>
@@ -95,6 +98,20 @@ struct vp_reg_val {
 };
 
 /**
+ * omap_vdd_user_list	- The per vdd user list
+ *
+ * @dev		: The device asking for the vdd to be set at a particular
+ *		  voltage
+ * @node	: The list head entry
+ * @volt	: The voltage requested by the device <dev>
+ */
+struct omap_vdd_user_list {
+	struct device *dev;
+	struct plist_node node;
+	u32 volt;
+};
+
+/**
  * omap_vdd_info - Per Voltage Domain info
  *
  * @volt_data		: voltage table having the distinct voltages supported
@@ -105,6 +122,9 @@ struct vp_reg_val {
  *			  vp registers
  * @volt_clk		: the clock associated with the vdd.
  * @opp_dev		: the 'struct device' associated with this vdd.
+ * @user_lock		: the lock to be used by the plist user_list
+ * @user_list		: the list head maintaining the various users
+ *			  of this vdd with the voltage requested by each user.
  * @volt_data_count	: Number of distinct voltages supported by this vdd.
  * @nominal_volt	: Nominal voltaged for this vdd.
  * cmdval_reg		: Voltage controller cmdval register.
@@ -117,6 +137,9 @@ struct omap_vdd_info{
 	struct clk *volt_clk;
 	struct device *opp_dev;
 	struct voltagedomain voltdm;
+	spinlock_t user_lock;
+	struct plist_head user_list;
+	struct mutex scaling_mutex;
 	int volt_data_count;
 	unsigned long nominal_volt;
 	u8 cmdval_reg;
@@ -778,10 +801,17 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 	struct dentry *vdd_debug;
 	char name[16];
 #endif
+
 	if (cpu_is_omap34xx())
 		omap3_vdd_data_configure(vdd);
 	else if (cpu_is_omap44xx())
 		omap4_vdd_data_configure(vdd);
+
+	/* Init the plist */
+	spin_lock_init(&vdd->user_lock);
+	plist_head_init(&vdd->user_list, &vdd->user_lock);
+	/* Init the DVFS mutex */
+	mutex_init(&vdd->scaling_mutex);
 
 #ifdef CONFIG_PM_DEBUG
 	strcpy(name, "vdd_");
@@ -1136,6 +1166,70 @@ unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
 
 	curr_vsel = voltage_read_reg(vdd->vp_offs.voltage);
 	return omap_twl_vsel_to_uv(curr_vsel);
+}
+
+/**
+ * omap_voltage_add_userreq : API to keep track of various requests to
+ *			    scale the VDD and returns the best possible
+ *			    voltage the VDD can be put to.
+ * @volt_domain: pointer to the voltage domain.
+ * @dev : the device pointer.
+ * @volt : the voltage which is requested by the device.
+ *
+ * This API is to be called before the actual voltage scaling is
+ * done to determine what is the best possible voltage the VDD can
+ * be put to. This API adds the device <dev> in the user list of the
+ * vdd <volt_domain> with <volt> as the requested voltage. The user list
+ * is a plist with the priority element absolute voltage values.
+ * The API then finds the maximum of all the requested voltages for
+ * the VDD and returns it back through <volt> pointer itself.
+ * Returns error value in case of any errors.
+ */
+int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
+		unsigned long *volt)
+{
+	struct omap_vdd_info *vdd;
+	struct omap_vdd_user_list *user;
+	struct plist_node *node;
+	int found = 0;
+
+	if (!voltdm || IS_ERR(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return -EINVAL;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+
+	mutex_lock(&vdd->scaling_mutex);
+
+	plist_for_each_entry(user, &vdd->user_list, node) {
+		if (user->dev == dev) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found) {
+		user = kzalloc(sizeof(struct omap_vdd_user_list), GFP_KERNEL);
+		if (!user) {
+			pr_err("%s: Unable to creat a new user for vdd_%s\n",
+				__func__, voltdm->name);
+			mutex_unlock(&vdd->scaling_mutex);
+			return -ENOMEM;
+		}
+		user->dev = dev;
+	} else {
+		plist_del(&user->node, &vdd->user_list);
+	}
+
+	plist_node_init(&user->node, *volt);
+	plist_add(&user->node, &vdd->user_list);
+	node = plist_first(&vdd->user_list);
+	*volt = node->prio;
+
+	mutex_unlock(&vdd->scaling_mutex);
+
+	return 0;
 }
 
 /**

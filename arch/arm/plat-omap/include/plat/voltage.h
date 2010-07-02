@@ -144,6 +144,8 @@ struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
 		unsigned long volt);
 void omap_voltage_register_pmic(struct omap_volt_pmic_info *pmic_info);
 unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm);
+int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
+		unsigned long *volt);
 #ifdef CONFIG_PM
 void omap_voltage_init_vc(struct omap_volt_vc_data *setup_vc);
 void omap_change_voltscale_method(int voltscale_method);
