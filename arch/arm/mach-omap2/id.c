@@ -270,9 +270,9 @@ void __init omap3_check_revision(void)
 void __init omap4_check_revision(void)
 {
 	u32 idcode;
-	u16 hawkeye;
 	u8 rev;
-
+#if 0
+	u16 hawkeye;
 	/*
 	 * The IC rev detection is done with hawkeye and rev.
 	 * Note that rev does not map directly to defined processor
@@ -308,7 +308,36 @@ void __init omap4_check_revision(void)
 		omap_chip.oc |= CHIP_IS_OMAP4430ES2;
 		rev = 2;
 	}
-
+#endif
+	/*
+	 * FIXME: Temporary ID check hack.
+	 * Use ARM register to check the ES type
+	 */
+	idcode = read_cpuid(CPUID_ID);
+	if (((idcode >> 4) & 0xfff) == 0xc09) {
+		idcode &= 0xf;
+		switch (idcode) {
+		case 1:
+			omap_revision = OMAP4430_REV_ES1_0;
+			omap_chip.oc |= CHIP_IS_OMAP4430ES1;
+			rev = 1;
+			break;
+		case 2:
+			omap_revision = OMAP4430_REV_ES2_0;
+			omap_chip.oc |= CHIP_IS_OMAP4430ES2;
+			rev = 2;
+			break;
+		default:
+			omap_revision = OMAP4430_REV_ES2_0;
+			omap_chip.oc |= CHIP_IS_OMAP4430ES2;
+			rev = 2;
+		}
+	} else {
+		/* Assume the latest version */
+		omap_revision = OMAP4430_REV_ES2_0;
+		omap_chip.oc |= CHIP_IS_OMAP4430ES2;
+		rev = 2;
+	}
 	pr_info("OMAP%04x ES%d.0\n", omap_rev() >> 16, rev);
 }
 
