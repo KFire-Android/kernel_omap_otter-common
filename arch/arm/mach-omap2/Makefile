@@ -75,6 +75,9 @@ obj-$(CONFIG_ARCH_OMAP2)		+= cm.o
 obj-$(CONFIG_ARCH_OMAP3)		+= cm.o
 obj-$(CONFIG_ARCH_OMAP4)		+= cm4xxx.o
 
+# EMIF
+obj-$(CONFIG_ARCH_OMAP4)		+= emif.o
+
 # Clock framework
 obj-$(CONFIG_ARCH_OMAP2)		+= $(clock-common) clock2xxx.o \
 					   clkt2xxx_sys.o \
