@@ -296,9 +296,21 @@ static int omap_vout_allocate_vrfb_buffers(struct omap_vout_device *vout,
 int omap_vout_try_format(struct v4l2_pix_format *pix)
 {
 	int ifmt, bpp = 0;
+	int img_size = pix->height * pix->width;
 
-	pix->height = clamp(pix->height, (u32)VID_MIN_HEIGHT,
-						(u32)VID_MAX_HEIGHT);
+	if (img_size <= VID_MAX_HEIGHT * VID_MAX_WIDTH) {
+		if (cpu_is_omap34xx())
+			pix->height = clamp(pix->height,
+				(u32)VID_MIN_HEIGHT,
+				(u32)VID_MAX_WIDTH);
+		else
+			pix->height = clamp(pix->height,
+				(u32)VID_MIN_HEIGHT,
+				(u32)VID_MAX_HEIGHT);
+	} else {
+		pix->height = clamp(pix->height, (u32)VID_MIN_HEIGHT,
+			(u32)VID_MAX_HEIGHT);
+	}
 	pix->width = clamp(pix->width, (u32)VID_MIN_WIDTH, (u32)VID_MAX_WIDTH);
 
 	for (ifmt = 0; ifmt < NUM_OUTPUT_FORMATS; ifmt++) {
