@@ -136,6 +136,7 @@ int omap2_clkdm_wakeup(struct clockdomain *clkdm);
 int omap2_clkdm_sleep(struct clockdomain *clkdm);
 
 int omap2_clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk);
+int omap2_clkdm_clk_enable_post(struct clockdomain *clkdm, struct clk *clk);
 int omap2_clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk);
 
 #endif

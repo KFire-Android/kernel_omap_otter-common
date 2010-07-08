@@ -1010,6 +1010,19 @@ int omap2_clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
 	return 0;
 }
 
+int omap2_clkdm_clk_enable_post(struct clockdomain *clkdm, struct clk *clk)
+{
+	int v;
+
+	v = omap2_clkdm_clktrctrl_read(clkdm);
+
+	if ((v == OMAP34XX_CLKSTCTRL_FORCE_WAKEUP) &&
+				(clkdm->flags & CLKDM_CAN_HWSUP))
+		_omap2_clkdm_set_hwsup(clkdm, 1);
+
+	return 0;
+}
+
 /**
  * omap2_clkdm_clk_disable - remove an enabled downstream clock from this clkdm
  * @clkdm: struct clockdomain *

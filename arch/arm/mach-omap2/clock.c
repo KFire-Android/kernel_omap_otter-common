@@ -335,6 +335,15 @@ int omap2_clk_enable(struct clk *clk)
 		goto oce_err3;
 	}
 
+	if (clk->clkdm) {
+		ret = omap2_clkdm_clk_enable_post(clk->clkdm, clk);
+		if (ret) {
+			WARN(1, "clock: %s: could not enable clockdomain %s: "
+				"%d\n", clk->name, clk->clkdm->name, ret);
+			goto oce_err2;
+		}
+	}
+
 	return 0;
 
 oce_err3:
