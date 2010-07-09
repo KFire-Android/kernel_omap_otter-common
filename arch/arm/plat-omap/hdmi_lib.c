@@ -1188,6 +1188,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	hdmi_w1_video_config_interface(&VideoInterfaceParam);
 
+#if 0
 	/* hnagalla */
 	val = hdmi_read_reg(HDMI_WP, HDMI_WP_VIDEO_SIZE);
 
@@ -1196,6 +1197,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	hdmi_write_reg(HDMI_WP, HDMI_WP_VIDEO_SIZE, val);
 
 	hdmi_w1_audio_config();
+#endif
 
 	/****************************** CORE *******************************/
 	/************* configure core video part ********************************/
