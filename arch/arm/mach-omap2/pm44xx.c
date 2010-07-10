@@ -17,6 +17,7 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/irq.h>
+#include <linux/gpio.h>
 
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
@@ -85,6 +86,30 @@ int set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
 err:
 	return ret;
 }
+/* This is a common low power function called from suspend and
+ * cpuidle
+ */
+void omap4_enter_sleep(void)
+{
+	u32 cpu_id = 0;
+
+	omap_uart_prepare_idle(0);
+	omap_uart_prepare_idle(1);
+	omap_uart_prepare_idle(2);
+	omap_uart_prepare_idle(3);
+	omap2_gpio_prepare_for_idle(0);
+
+	omap4_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
+
+	omap2_gpio_resume_after_idle(0);
+	omap_uart_resume_idle(0);
+	omap_uart_resume_idle(1);
+	omap_uart_resume_idle(2);
+	omap_uart_resume_idle(3);
+
+	return;
+}
+
 
 #ifdef CONFIG_SUSPEND
 static int omap4_pm_prepare(void)
@@ -136,7 +161,8 @@ static int omap4_pm_suspend(void)
 				goto restore;
 	}
 
-	omap4_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
+	omap_uart_prepare_suspend();
+	omap4_enter_sleep();
 
 restore:
 	/* Print the previous power domain states */
