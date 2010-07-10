@@ -1996,8 +1996,11 @@ static const s8 *get_scaling_coef(int orig_size, int out_size,
 	/* ranges from 2 to 32 */
 	int two_m = 16 * orig_size / out_size;
 
-	if (orig_size > 4 * out_size || out_size > 8 * orig_size)
+	if (orig_size > 4 * out_size)
 		return fir5_zero;
+
+	if (out_size > 8 * orig_size)
+		return three_tap ? fir3_m8 : fir5_m8;
 
 	/* interlaced output needs at least M = 16 */
 	if (out_ilaced) {
@@ -2700,12 +2703,10 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 		unsigned long fclk = 0;
 
-		if (out_width < width / maxdownscale ||
-		   out_width > width * 8)
+		if (out_width < width / maxdownscale)
 			return -EINVAL;
 
-		if (out_height < height / maxdownscale ||
-		   out_height > height * 8)
+		if (out_height < height / maxdownscale)
 			return -EINVAL;
 
 		switch (color_mode) {
