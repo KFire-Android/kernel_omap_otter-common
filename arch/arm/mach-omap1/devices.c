@@ -28,6 +28,29 @@
 
 /*-------------------------------------------------------------------------*/
 
+#define OMAP16XX_TIMER_32K_BASE                0xfffbc400
+
+static struct resource omap_32k_resources[] = {
+	{
+		.start          = OMAP16XX_TIMER_32K_BASE,
+		.end            = SZ_4K,
+		.flags          = IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device omap_32k_device = {
+	.name                   = "omap-32k-sync-timer",
+	.id                     = -1,
+	.num_resources          = ARRAY_SIZE(omap_32k_resources),
+	.resource               = omap_32k_resources,
+};
+
+static void omap_init_32k(void)
+{
+	if (cpu_is_omap16xx())
+		(void) platform_device_register(&omap_32k_device);
+};
+
 #if defined(CONFIG_RTC_DRV_OMAP) || defined(CONFIG_RTC_DRV_OMAP_MODULE)
 
 #define	OMAP_RTC_BASE		0xfffb4800
@@ -295,6 +318,7 @@ static int __init omap1_init_devices(void)
 	 * in alphabetical order so they're easier to sort through.
 	 */
 
+	omap_init_32k();
 	omap_init_mbox();
 	omap_init_rtc();
 	omap_init_spi100k();

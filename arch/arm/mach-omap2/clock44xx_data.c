@@ -2431,6 +2431,7 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"secure_32k_clk_src_ck",	&secure_32k_clk_src_ck,	CK_443X),
 	CLK(NULL,	"slimbus_clk",			&slimbus_clk,	CK_443X),
 	CLK(NULL,	"sys_32k_ck",			&sys_32k_ck,	CK_443X),
+	CLK("omap-32k-sync-timer", "ick", 	&sys_32k_ck,	CK_443X),  /* XXX I think duplicate entry with different name should be ok, since there is no initialization/setup for this timer */
 	CLK(NULL,	"virt_12000000_ck",		&virt_12000000_ck,	CK_443X),
 	CLK(NULL,	"virt_13000000_ck",		&virt_13000000_ck,	CK_443X),
 	CLK(NULL,	"virt_16800000_ck",		&virt_16800000_ck,	CK_443X),

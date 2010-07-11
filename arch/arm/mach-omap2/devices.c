@@ -32,6 +32,43 @@
 
 #include "mux.h"
 
+static struct resource omap_32k_resources[] = {
+	{
+		.start          = -EINVAL,      /* gets changed later */
+		.end            = -EINVAL,      /* gets changed later */
+		.flags          = IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device omap_32k_device = {
+	.name                   = "omap-32k-sync-timer",
+	.id                     = -1,
+	.num_resources          = ARRAY_SIZE(omap_32k_resources),
+	.resource               = omap_32k_resources,
+};
+
+static void omap_init_32k(void)
+{
+	if (cpu_is_omap2420()) {
+		omap_32k_resources[0].start = OMAP2420_32KSYNCT_BASE;
+		omap_32k_resources[0].end = OMAP2420_32KSYNCT_BASE + SZ_4K;
+	} else if (cpu_is_omap2430()) {
+		omap_32k_resources[0].start = OMAP2430_32KSYNCT_BASE;
+		omap_32k_resources[0].end = OMAP2430_32KSYNCT_BASE + SZ_4K;
+	} else if (cpu_is_omap34xx()) {
+		omap_32k_resources[0].start = OMAP3430_32KSYNCT_BASE;
+		omap_32k_resources[0].end = OMAP3430_32KSYNCT_BASE + SZ_4K;
+	} else if (cpu_is_omap44xx()) {
+		omap_32k_resources[0].start = OMAP4430_32KSYNCT_BASE;
+		omap_32k_resources[0].end = OMAP4430_32KSYNCT_BASE + SZ_4K;
+	} else {        /* not supported */
+		return;
+	}
+
+
+	(void) platform_device_register(&omap_32k_device);
+};
+
 #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
 
 static struct resource cam_resources[] = {
@@ -901,6 +938,7 @@ static int __init omap2_init_devices(void)
 	 * in alphabetical order so they're easier to sort through.
 	 */
 	omap_hsmmc_reset();
+	omap_init_32k();
 	omap_init_camera();
 	omap_init_mbox();
 	omap_init_mcspi();
