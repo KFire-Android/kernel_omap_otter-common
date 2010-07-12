@@ -191,6 +191,12 @@ __setup("reboot=", reboot_setup);
 
 void machine_halt(void)
 {
+#ifdef CONFIG_SMP
+	smp_send_stop();
+#endif
+	printk(KERN_EMERG "System halted, OK to turn off power\n");
+	local_irq_disable();
+	while (1) ;
 }
 
 
