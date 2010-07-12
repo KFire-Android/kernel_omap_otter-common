@@ -50,8 +50,6 @@ struct omap_wb_device {
 
 	enum omap_color_mode dss_mode;
 
-	unsigned long						width;
-	unsigned long						height;
 	/* we don't allow to request new buffer when old buffers are
 	 * still mmaped
 	 */

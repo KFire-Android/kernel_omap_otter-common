@@ -4713,7 +4713,10 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	REG_FLD_MOD(dispc_reg_att[input_plane], 0x1, 10, 10);
 	REG_FLD_MOD(dispc_reg_att[input_plane], 0x1, 19, 19);
 	REG_FLD_MOD(dispc_reg_att[plane], source, 18, 16);
-
+#ifdef OMAP4430_REV_ES2_0
+	/* Memory to memory mode bit is set on ES 2.0 */
+	REG_FLD_MOD(dispc_reg_att[plane], 1, 19, 19);
+#endif
 	}
 
 	pix_inc = 0x1;

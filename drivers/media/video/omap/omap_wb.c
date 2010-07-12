@@ -80,8 +80,8 @@ int omap_setup_wb(struct omap_wb_device *wb_device, u32 addr, u32 uv_addr)
 	wb_info.info_dirty = true;
 	wb_info.capturemode = wb_device->capturemode;
 	wb_info.dss_mode = wb_device->dss_mode;
-	wb_info.height = wb_device->height;
-	wb_info.width = wb_device->width;
+	wb_info.height = wb_device->pix.height;
+	wb_info.width = wb_device->pix.width;
 	wb_info.source = wb_device->source;
 	wb_info.source_type = wb_device->source_type;
 	wb_info.paddr = addr;
@@ -414,6 +414,8 @@ static int vidioc_default_wb(struct file *file, void *fh,
 			printk(KERN_ERR WB_NAME "invalid dss_mode\n");
 			r = -EINVAL;
 			goto err;
+		} else {
+			wb->dss_mode = dss_mode;
 		}
 
 		mutex_unlock(&wb->lock);
@@ -888,8 +890,6 @@ static int __init omap_wb_setup_video_data(struct omap_wb_device *wb)
 	pix->priv = 0;
 	pix->colorspace = V4L2_COLORSPACE_JPEG;
 
-	wb->width = pix->width;
-	wb->height = pix->height;
 	wb->bpp = RGB565_BPP;
 	wb->enabled = false;
 	wb->buffer_allocated = 0;
