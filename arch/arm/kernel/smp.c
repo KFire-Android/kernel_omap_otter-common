@@ -254,6 +254,7 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 {
 	struct mm_struct *mm = &init_mm;
 	unsigned int cpu = smp_processor_id();
+	static bool booted;
 
 	/*
 	 * All kernel threads share the same mm context; grab a
@@ -279,7 +280,9 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
 
 	notify_cpu_starting(cpu);
 
-	calibrate_delay();
+	if (!booted)
+		calibrate_delay();
+	booted = true;
 
 	smp_store_cpu_info(cpu);
 
