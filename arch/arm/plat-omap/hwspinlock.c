@@ -309,6 +309,7 @@ static int __init hwspinlock_init(void)
 
 	return retval;
 }
+postcore_initcall(hwspinlock_init);
 
 /* Cleanup function */
 static void __exit hwspinlock_exit(void)
@@ -325,8 +326,6 @@ static void __exit hwspinlock_exit(void)
 	if (hwspinlock_module->is_init)
 		kfree(hwspinlocks);
 }
-
-module_init(hwspinlock_init);
 module_exit(hwspinlock_exit);
 
 MODULE_LICENSE("GPL v2");

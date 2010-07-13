@@ -67,5 +67,4 @@ int __init hwspinlocks_init(void)
 
 	return retval;
 }
-module_init(hwspinlocks_init);
-
+postcore_initcall(hwspinlocks_init);
