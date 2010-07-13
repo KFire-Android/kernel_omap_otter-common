@@ -5775,7 +5775,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 /*	&omap44xx_smartreflex_iva_hwmod, */
 /*	&omap44xx_smartreflex_mpu_hwmod, */
 	/* spinlock class */
-/*	&omap44xx_spinlock_hwmod, */
+	&omap44xx_spinlock_hwmod,
 	/* timer class */
 	&omap44xx_timer1_hwmod,
 	&omap44xx_timer2_hwmod,
