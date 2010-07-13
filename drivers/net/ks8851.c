@@ -504,7 +504,7 @@ static void ks8851_rx_pkts(struct ks8851_net *ks)
 			       ks->rc_rxqcr | RXQCR_SDA | RXQCR_ADRFE);
 
 		if (rxlen > 0) {
-			skb = netdev_alloc_skb(ks->netdev, rxlen + 2 + 8);
+			skb = netdev_alloc_skb(ks->netdev, rxlen + 2 + 8 + 4);
 			if (!skb) {
 				/* todo - dump frame and move on */
 			}
