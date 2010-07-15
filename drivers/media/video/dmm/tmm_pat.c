@@ -32,7 +32,7 @@
 #define DMM_PAGE 0x1000
 
 /* Max pages in free page stack */
-#define PAGE_CAP (256 * 40)
+#define PAGE_CAP (256 * 128)
 
 /* Number of pages currently allocated */
 static unsigned long count;
