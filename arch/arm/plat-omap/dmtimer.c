@@ -577,12 +577,6 @@ int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
 	ret = clk_set_parent(timer->fclk, dm_source_clocks[source]);
 	clk_enable(timer->fclk);
 
-	/*
-	 * When the functional clock disappears, too quick writes seem
-	 * to cause an abort. XXX Is this still necessary?
-	 */
-	__delay(150000);
-
 	return ret;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_set_source);
