@@ -795,6 +795,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
 /**
  * _wait_target_ready - wait for a module to leave slave idle
  * @oh: struct omap_hwmod *
+ * @data: not used; pass NULL
  *
  * Wait for a module @oh to leave slave idle.  Returns 0 if the module
  * does not have an IDLEST bit or if the module successfully leaves
@@ -1007,19 +1008,24 @@ static int _shutdown(struct omap_hwmod *oh)
 /**
  * _setup - do initial configuration of omap_hwmod
  * @oh: struct omap_hwmod *
- * @data: context data pass by the caller (unused in this case)
+ * @skip_setup_idle_p: do not idle hwmods at the end of the fn if 1
  *
  * Writes the CLOCKACTIVITY bits @clockact to the hwmod @oh
- * OCP_SYSCONFIG register.  Must be called with omap_hwmod_mutex
- * held.  Returns -EINVAL if the hwmod is in the wrong state or returns
- * 0.
+ * OCP_SYSCONFIG register.  Must be called with omap_hwmod_mutex held.
+ * @skip_setup_idle is intended to be used on a system that will not
+ * call omap_hwmod_enable() to enable devices (e.g., a system without
+ * PM runtime).  Returns -EINVAL if the hwmod is in the wrong state or
+ * returns 0.
  */
 static int _setup(struct omap_hwmod *oh, void *data)
 {
 	int i, r;
-
-	if (!oh)
+	u8 skip_setup_idle;
+	
+	if (!oh || !data)
 		return -EINVAL;
+
+	skip_setup_idle = *(u8 *)data;
 
 	/* Set iclk autoidle mode */
 	if (oh->slaves_cnt > 0) {
@@ -1073,7 +1079,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
 		}
 	}
 
-	if (!(oh->flags & HWMOD_INIT_NO_IDLE))
+	if (!(oh->flags & HWMOD_INIT_NO_IDLE) && !skip_setup_idle)
 		_omap_hwmod_idle(oh);
 
 	return 0;
@@ -1187,7 +1193,7 @@ struct omap_hwmod *omap_hwmod_lookup(const char *name)
 /**
  * omap_hwmod_for_each - call function for each registered omap_hwmod
  * @fn: pointer to a callback function
- * @user: arbitrary context data to pass to the callback function
+ * @data: void * data to pass to callback function
  *
  * Call @fn for each registered omap_hwmod, passing @oh and @data to each
  * function.  @fn must return 0 for success or any other value for
@@ -1197,7 +1203,7 @@ struct omap_hwmod *omap_hwmod_lookup(const char *name)
  * omap_hwmod_for_each() held.
  */
 int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
-			      void *user)
+			void *data)
 {
 	struct omap_hwmod *temp_oh;
 	int ret;
@@ -1207,7 +1213,7 @@ int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
 
 	mutex_lock(&omap_hwmod_mutex);
 	list_for_each_entry(temp_oh, &omap_hwmod_list, node) {
-		ret = (*fn)(temp_oh, user);
+		ret = (*fn)(temp_oh, data);
 		if (ret)
 			break;
 	}
@@ -1253,12 +1259,12 @@ int omap_hwmod_init(struct omap_hwmod **ohs)
 
 /**
  * omap_hwmod_late_init - do some post-clock framework initialization
- *
+ * @skip_setup_idle: if 1, do not idle hwmods in _setup()
  * Must be called after omap2_clk_init().  Resolves the struct clk names
  * to struct clk pointers for each registered omap_hwmod.  Also calls
  * _setup() on each hwmod.  Returns 0.
  */
-int omap_hwmod_late_init(void)
+int omap_hwmod_late_init(u8 skip_setup_idle)
 {
 	int r;
 
@@ -1270,7 +1276,11 @@ int omap_hwmod_late_init(void)
 	WARN(!mpu_oh, "omap_hwmod: could not find MPU initiator hwmod %s\n",
 	     MPU_INITIATOR_NAME);
 
-	omap_hwmod_for_each(_setup, NULL);
+	if (skip_setup_idle)
+		pr_debug("omap_hwmod: will leave hwmods enabled during setup\n");
+
+	omap_hwmod_for_each(_setup, &skip_setup_idle);
+
 
 	return 0;
 }

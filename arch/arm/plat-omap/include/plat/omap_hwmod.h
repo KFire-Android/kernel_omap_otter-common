@@ -507,8 +507,8 @@ int omap_hwmod_register(struct omap_hwmod *oh);
 int omap_hwmod_unregister(struct omap_hwmod *oh);
 struct omap_hwmod *omap_hwmod_lookup(const char *name);
 int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
-			void *user);
-int omap_hwmod_late_init(void);
+		void *data);
+int omap_hwmod_late_init(u8 skip_setup_idle);
 
 int omap_hwmod_enable(struct omap_hwmod *oh);
 int _omap_hwmod_enable(struct omap_hwmod *oh);
