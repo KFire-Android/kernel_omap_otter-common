@@ -690,7 +690,7 @@ static struct i2c_board_info __initdata cm_t35_i2c_boardinfo[] = {
 
 static void __init cm_t35_init_i2c(void)
 {
-	omap_register_i2c_bus(1, 2600, cm_t35_i2c_boardinfo,
+	omap_register_i2c_bus(1, 2600, NULL, cm_t35_i2c_boardinfo,
 			      ARRAY_SIZE(cm_t35_i2c_boardinfo));
 }
 

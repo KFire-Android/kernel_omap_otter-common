@@ -442,11 +442,11 @@ static struct i2c_board_info __initdata igep2_i2c_boardinfo[] = {
 
 static int __init igep2_i2c_init(void)
 {
-	omap_register_i2c_bus(1, 2600, igep2_i2c_boardinfo,
+	omap_register_i2c_bus(1, 2600, NULL, igep2_i2c_boardinfo,
 			ARRAY_SIZE(igep2_i2c_boardinfo));
 	/* Bus 3 is attached to the DVI port where devices like the pico DLP
 	 * projector don't work reliably with 400kHz */
-	omap_register_i2c_bus(3, 100, NULL, 0);
+	omap_register_i2c_bus(3, 100, NULL, NULL, 0);
 	return 0;
 }
 

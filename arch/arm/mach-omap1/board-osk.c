@@ -567,7 +567,7 @@ static void __init osk_init(void)
 		gpio_direction_input(OMAP_MPUIO(1));
 
 	omap_serial_init();
-	omap_register_i2c_bus(1, 400, osk_i2c_board_info,
+	omap_register_i2c_bus(1, 400, NULL, osk_i2c_board_info,
 			      ARRAY_SIZE(osk_i2c_board_info));
 	osk_mistral_init();
 }

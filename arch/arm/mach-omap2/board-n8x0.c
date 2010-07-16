@@ -626,7 +626,7 @@ static struct menelaus_platform_data n8x0_menelaus_platform_data = {
 static void __init n8x0_menelaus_init(void)
 {
 	n8x0_i2c_board_info_1[0].platform_data = &n8x0_menelaus_platform_data;
-	omap_register_i2c_bus(1, 400, n8x0_i2c_board_info_1,
+	omap_register_i2c_bus(1, 400, NULL, n8x0_i2c_board_info_1,
 			      ARRAY_SIZE(n8x0_i2c_board_info_1));
 }
 

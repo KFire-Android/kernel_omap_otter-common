@@ -183,9 +183,9 @@ static struct i2c_board_info __initdata sdp2430_i2c1_boardinfo[] = {
 
 static int __init omap2430_i2c_init(void)
 {
-	omap_register_i2c_bus(1, 100, sdp2430_i2c1_boardinfo,
+	omap_register_i2c_bus(1, 100, NULL, sdp2430_i2c1_boardinfo,
 			ARRAY_SIZE(sdp2430_i2c1_boardinfo));
-	omap_register_i2c_bus(2, 2600, sdp2430_i2c_boardinfo,
+	omap_register_i2c_bus(2, 2600, NULL, sdp2430_i2c_boardinfo,
 			ARRAY_SIZE(sdp2430_i2c_boardinfo));
 	return 0;
 }

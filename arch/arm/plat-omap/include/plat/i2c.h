@@ -21,12 +21,20 @@
 
 #include <linux/i2c.h>
 
+struct omap_i2c_bus_board_data {
+	struct hwspinlock *handle;
+	int (*hwspinlock_lock) (struct hwspinlock *handle);
+	int (*hwspinlock_unlock) (struct hwspinlock *handle);
+};
+
 #if defined(CONFIG_I2C_OMAP) || defined(CONFIG_I2C_OMAP_MODULE)
 extern int omap_register_i2c_bus(int bus_id, u32 clkrate,
+				 struct omap_i2c_bus_board_data *pdata,
 				 struct i2c_board_info const *info,
 				 unsigned len);
 #else
 static inline int omap_register_i2c_bus(int bus_id, u32 clkrate,
+				 struct omap_i2c_bus_board_data *pdata,
 				 struct i2c_board_info const *info,
 				 unsigned len)
 {

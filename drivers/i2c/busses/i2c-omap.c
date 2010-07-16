@@ -264,6 +264,30 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
 }
 
+static void omap_i2c_hwspinlock_lock(struct omap_i2c_dev *dev)
+{
+	struct platform_device *pdev;
+	struct omap_i2c_bus_platform_data *pdata;
+
+	pdev = container_of(dev->dev, struct platform_device, dev);
+	pdata = pdev->dev.platform_data;
+	if (pdata->hwspinlock_lock)
+		pdata->hwspinlock_lock(pdata->handle);
+
+}
+
+static void omap_i2c_hwspinlock_unlock(struct omap_i2c_dev *dev)
+{
+	struct platform_device *pdev;
+	struct omap_i2c_bus_platform_data *pdata;
+
+	pdev = container_of(dev->dev, struct platform_device, dev);
+	pdata = pdev->dev.platform_data;
+	if (pdata->hwspinlock_unlock)
+		pdata->hwspinlock_unlock(pdata->handle);
+
+}
+
 static void omap_i2c_unidle(struct omap_i2c_dev *dev)
 {
 	struct platform_device *pdev;
@@ -647,7 +671,15 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	int i;
 	int r;
 
+	/*
+	 * hwspinlock is used to time share the I2C module between A9 and Ducati
+	 * on OMAP4. To avoid spurious IRQ due to I2C transaction initiated on
+	 * Ducati sub system I2C IRQ is enabled and disabled on i2c transfers.
+	 */
+
+	omap_i2c_hwspinlock_lock(dev);
 	omap_i2c_unidle(dev);
+	enable_irq(dev->irq);
 
 	r = omap_i2c_wait_for_bb(dev);
 	if (r < 0)
@@ -662,7 +694,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	if (r == 0)
 		r = num;
 out:
+	disable_irq_nosync(dev->irq);
 	omap_i2c_idle(dev);
+	omap_i2c_hwspinlock_unlock(dev);
 	return r;
 }
 
@@ -1078,7 +1112,11 @@ omap_i2c_probe(struct platform_device *pdev)
 
 	dev_info(dev->dev, "bus %d rev%d.%d at %d kHz\n",
 		 pdev->id, dev->rev >> 4, dev->rev & 0xf, dev->speed);
-
+	/*
+	 * Disable IRQ to avoid spurious interrupts on multicore systems
+	 * sharing I2C module with drivers running on different cores.
+	 */
+	disable_irq_nosync(dev->irq);
 	omap_i2c_idle(dev);
 
 	adap = &dev->adapter;

@@ -204,10 +204,10 @@ static struct i2c_board_info __initdata am3517evm_i2c3_boardinfo[] = {
 
 static int __init am3517_evm_i2c_init(void)
 {
-	omap_register_i2c_bus(1, 400, NULL, 0);
-	omap_register_i2c_bus(2, 400, am3517evm_i2c2_boardinfo,
+	omap_register_i2c_bus(1, 400, NULL, NULL, 0);
+	omap_register_i2c_bus(2, 400, NULL, am3517evm_i2c2_boardinfo,
 			ARRAY_SIZE(am3517evm_i2c2_boardinfo));
-	omap_register_i2c_bus(3, 400, am3517evm_i2c3_boardinfo,
+	omap_register_i2c_bus(3, 400, NULL, am3517evm_i2c3_boardinfo,
 			ARRAY_SIZE(am3517evm_i2c3_boardinfo));
 
 	return 0;

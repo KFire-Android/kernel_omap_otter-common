@@ -391,11 +391,11 @@ static struct i2c_board_info __initdata devkit8000_i2c_boardinfo[] = {
 
 static int __init devkit8000_i2c_init(void)
 {
-	omap_register_i2c_bus(1, 2600, devkit8000_i2c_boardinfo,
+	omap_register_i2c_bus(1, 2600, NULL, devkit8000_i2c_boardinfo,
 			ARRAY_SIZE(devkit8000_i2c_boardinfo));
 	/* Bus 3 is attached to the DVI port where devices like the pico DLP
 	 * projector don't work reliably with 400kHz */
-	omap_register_i2c_bus(3, 400, NULL, 0);
+	omap_register_i2c_bus(3, 400, NULL, NULL, 0);
 	return 0;
 }
 

@@ -44,6 +44,7 @@
 #include <plat/mmc.h>
 #include <plat/syntm12xx.h>
 #include <plat/omap4-keypad.h>
+#include <plat/hwspinlock.h>
 #include <plat/nokia-dsi-panel.h>
 #include "hsmmc.h"
 
@@ -884,20 +885,42 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 		.irq = OMAP_GPIO_IRQ(OMAP4_CMA3000ACCL_GPIO),
 	},
 };
+
+static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_2_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_3_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_4_bus_pdata;
+
+void __init omap_i2c_hwspinlock_init(int bus_id, unsigned int spinlock_id,
+				struct omap_i2c_bus_board_data *pdata)
+{
+	pdata->handle = hwspinlock_request_specific(spinlock_id);
+	if (pdata->handle != NULL) {
+		pdata->hwspinlock_lock = hwspinlock_lock;
+		pdata->hwspinlock_unlock = hwspinlock_unlock;
+	} else {
+		pr_err("I2C hwspinlock request failed for bus %d\n", bus_id);
+	}
+}
+
 static int __init omap4_i2c_init(void)
 {
+	omap_i2c_hwspinlock_init(1, 0, &sdp4430_i2c_bus_pdata);
+	omap_i2c_hwspinlock_init(2, 1, &sdp4430_i2c_2_bus_pdata);
+	omap_i2c_hwspinlock_init(3, 2, &sdp4430_i2c_3_bus_pdata);
+	omap_i2c_hwspinlock_init(4, 3, &sdp4430_i2c_4_bus_pdata);
 	/*
 	 * Phoenix Audio IC needs I2C1 to
 	 * start with 400 KHz or less
 	 */
-	omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo,
-			ARRAY_SIZE(sdp4430_i2c_boardinfo));
-	omap_register_i2c_bus(2, 400, sdp4430_i2c_2_boardinfo,
-			ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
-	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
-			ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
-	omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo,
-				ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
+	omap_register_i2c_bus(1, 400, &sdp4430_i2c_bus_pdata,
+		sdp4430_i2c_boardinfo, ARRAY_SIZE(sdp4430_i2c_boardinfo));
+	omap_register_i2c_bus(2, 400, &sdp4430_i2c_2_bus_pdata,
+		sdp4430_i2c_2_boardinfo, ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
+	omap_register_i2c_bus(3, 400, &sdp4430_i2c_3_bus_pdata,
+		sdp4430_i2c_3_boardinfo, ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
+	omap_register_i2c_bus(4, 400, &sdp4430_i2c_4_bus_pdata,
+		sdp4430_i2c_4_boardinfo, ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
 	return 0;
 }
 

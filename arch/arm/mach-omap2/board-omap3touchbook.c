@@ -309,11 +309,11 @@ static struct i2c_board_info __initdata touchBook_i2c_boardinfo[] = {
 static int __init omap3_touchbook_i2c_init(void)
 {
 	/* Standard TouchBook bus */
-	omap_register_i2c_bus(1, 2600, touchbook_i2c_boardinfo,
+	omap_register_i2c_bus(1, 2600, NULL, touchbook_i2c_boardinfo,
 			ARRAY_SIZE(touchbook_i2c_boardinfo));
 
 	/* Additional TouchBook bus */
-	omap_register_i2c_bus(3, 100, touchBook_i2c_boardinfo,
+	omap_register_i2c_bus(3, 100, NULL, touchBook_i2c_boardinfo,
 			ARRAY_SIZE(touchBook_i2c_boardinfo));
 
 	return 0;

@@ -326,7 +326,7 @@ omap_palmz71_init(void)
 				ARRAY_SIZE(palmz71_boardinfo));
 	omap_usb_init(&palmz71_usb_config);
 	omap_serial_init();
-	omap_register_i2c_bus(1, 100, NULL, 0);
+	omap_register_i2c_bus(1, 100, NULL, NULL, 0);
 	palmz71_gpio_setup(0);
 }
 

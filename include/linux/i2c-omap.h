@@ -5,10 +5,13 @@
 
 struct omap_i2c_bus_platform_data {
 	u32	clkrate;
+	struct	hwspinlock *handle;
 	int	(*set_mpu_wkup_lat)(struct device *dev, long set);
 	int	(*device_enable) (struct platform_device *pdev);
 	int	(*device_shutdown) (struct platform_device *pdev);
 	int	(*device_idle) (struct platform_device *pdev);
+	int	(*hwspinlock_lock) (struct hwspinlock *handle);
+	int	(*hwspinlock_unlock) (struct hwspinlock *handle);
 };
 
 #endif

@@ -563,10 +563,10 @@ static int __init omap3_evm_i2c_init(void)
 	omap3evm_twldata.vmmc1 = &omap3evm_vmmc1;
 	omap3evm_twldata.vsim = &omap3evm_vsim;
 
-	omap_register_i2c_bus(1, 2600, omap3evm_i2c_boardinfo,
+	omap_register_i2c_bus(1, 2600, NULL, omap3evm_i2c_boardinfo,
 			ARRAY_SIZE(omap3evm_i2c_boardinfo));
-	omap_register_i2c_bus(2, 400, NULL, 0);
-	omap_register_i2c_bus(3, 400, NULL, 0);
+	omap_register_i2c_bus(2, 400, NULL, NULL, 0);
+	omap_register_i2c_bus(3, 400, NULL, NULL, 0);
 	return 0;
 }
 

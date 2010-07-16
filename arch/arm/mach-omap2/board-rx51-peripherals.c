@@ -744,11 +744,11 @@ static int __init rx51_i2c_init(void)
 		rx51_twldata.vaux3 = &rx51_vaux3_cam;
 	}
 	rx51_twldata.vmmc2 = &rx51_vmmc2;
-	omap_register_i2c_bus(1, 2200, rx51_peripherals_i2c_board_info_1,
+	omap_register_i2c_bus(1, 2200, NULL, rx51_peripherals_i2c_board_info_1,
 			      ARRAY_SIZE(rx51_peripherals_i2c_board_info_1));
-	omap_register_i2c_bus(2, 100, rx51_peripherals_i2c_board_info_2,
+	omap_register_i2c_bus(2, 100, NULL, rx51_peripherals_i2c_board_info_2,
 			      ARRAY_SIZE(rx51_peripherals_i2c_board_info_2));
-	omap_register_i2c_bus(3, 400, NULL, 0);
+	omap_register_i2c_bus(3, 400, NULL, NULL, 0);
 	return 0;
 }
 

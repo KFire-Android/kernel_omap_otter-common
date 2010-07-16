@@ -449,7 +449,7 @@ static void __init h2_init(void)
 	omap_board_config = h2_config;
 	omap_board_config_size = ARRAY_SIZE(h2_config);
 	omap_serial_init();
-	omap_register_i2c_bus(1, 100, h2_i2c_board_info,
+	omap_register_i2c_bus(1, 100, NULL, h2_i2c_board_info,
 			      ARRAY_SIZE(h2_i2c_board_info));
 	omap_usb_init(&h2_usb_config);
 	h2_mmc_init();

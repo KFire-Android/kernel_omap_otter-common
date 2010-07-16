@@ -261,6 +261,7 @@ subsys_initcall(omap_register_i2c_bus_cmdline);
  * Returns 0 on success or an error code.
  */
 int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
+			  struct omap_i2c_bus_board_data *pdata,
 			  struct i2c_board_info const *info,
 			  unsigned len)
 {
@@ -278,6 +279,14 @@ int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
 		i2c_pdata[bus_id - 1].clkrate = clkrate;
 
 	i2c_pdata[bus_id - 1].clkrate &= ~OMAP_I2C_CMDLINE_SETUP;
+
+	if ((pdata != NULL) && (pdata->handle != NULL)) {
+		i2c_pdata[bus_id - 1].handle = pdata->handle;
+		i2c_pdata[bus_id - 1].hwspinlock_lock
+						= pdata->hwspinlock_lock;
+		i2c_pdata[bus_id - 1].hwspinlock_unlock
+						= pdata->hwspinlock_unlock;
+	}
 
 	return omap_i2c_add_bus(bus_id);
 }
