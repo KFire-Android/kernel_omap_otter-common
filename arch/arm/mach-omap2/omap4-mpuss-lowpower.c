@@ -402,6 +402,12 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	}
 
 	/*
+	 * MPUSS book keeping should be executed by master
+	 * CPU only which is the last CPU to go down
+	 */
+	if (cpu)
+		goto cpu_prepare;
+	/*
 	 * Check MPUSS next state and save GIC if needed
 	 * GIC lost during MPU OFF and OSWR
 	 */
@@ -414,6 +420,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	/*
 	 * Program the CPU targeted state
 	 */
+cpu_prepare:
 	clear_cpu_prev_pwrst(cpu);
 	if (cpu)
 		pwrdm_set_next_pwrst(cpu1_pwrdm, power_state);
