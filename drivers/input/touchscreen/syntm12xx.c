@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
+#include <linux/slab.h>
 
 #include <plat/syntm12xx.h>
 
