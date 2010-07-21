@@ -39,7 +39,8 @@ config ARCH_OMAP4
 	select CPU_V7
 	select ARM_GIC
 	select ARM_ERRATA_720789
-
+	select ARM_THUMB
+	select ARM_THUMBEE
 endchoice
 
 comment "OMAP Feature Selections"
