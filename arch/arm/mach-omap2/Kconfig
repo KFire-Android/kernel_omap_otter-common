@@ -156,6 +156,7 @@ config MACH_OMAP_3630SDP
 config MACH_OMAP_4430SDP
 	bool "OMAP 4430 SDP board"
 	depends on ARCH_OMAP4
+	select HIGHMEM
 
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"
