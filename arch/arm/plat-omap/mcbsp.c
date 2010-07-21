@@ -46,6 +46,7 @@ void omap_mcbsp_write(struct omap_mcbsp *mcbsp, u16 reg, u32 val)
 		__raw_writel(val, mcbsp->io_base + reg);
 	}
 }
+EXPORT_SYMBOL(omap_mcbsp_write);
 
 int omap_mcbsp_read(struct omap_mcbsp *mcbsp, u16 reg, bool from_cache)
 {
@@ -60,6 +61,7 @@ int omap_mcbsp_read(struct omap_mcbsp *mcbsp, u16 reg, bool from_cache)
 				((u32 *)mcbsp->reg_cache)[reg / sizeof(u32)];
 	}
 }
+EXPORT_SYMBOL(omap_mcbsp_read);
 
 #ifdef CONFIG_ARCH_OMAP3
 void omap_mcbsp_st_write(struct omap_mcbsp *mcbsp, u16 reg, u32 val)
@@ -890,8 +892,6 @@ void omap_mcbsp_start(unsigned int id, int tx, int rx)
 	if (cpu_is_omap34xx())
 		omap_st_start(mcbsp);
 
-	mcbsp->rx_word_length = (MCBSP_READ_CACHE(mcbsp, RCR1) >> 5) & 0x7;
-	mcbsp->tx_word_length = (MCBSP_READ_CACHE(mcbsp, XCR1) >> 5) & 0x7;
 
 	idle = !((MCBSP_READ_CACHE(mcbsp, SPCR2) |
 			MCBSP_READ_CACHE(mcbsp, SPCR1)) & 1);

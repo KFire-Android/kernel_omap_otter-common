@@ -29,6 +29,7 @@
 
 #include <mach/hardware.h>
 #include <plat/clock.h>
+#include <plat/dma.h>
 
 #define OMAP7XX_MCBSP1_BASE	0xfffb1000
 #define OMAP7XX_MCBSP2_BASE	0xfffb1800
@@ -277,6 +278,94 @@
 #define SIDLEMODE(value)	((value)<<3)
 #define ENAWAKEUP		0x0004
 #define SOFTRST			0x0002
+#define OMAP_MCBSP_WORDLEN_NONE 255
+
+#define OMAP_MCBSP_MASTER                       1
+#define OMAP_MCBSP_SLAVE                        0
+
+/* McBSP interface operating mode */
+#define OMAP_MCBSP_MASTER                       1
+#define OMAP_MCBSP_SLAVE                        0
+#define OMAP_MCBSP_AUTO_RST_NONE                (0x0)
+#define OMAP_MCBSP_AUTO_RRST                    (0x1<<1)
+#define OMAP_MCBSP_AUTO_XRST                    (0x1<<2)
+
+/* SRG ENABLE/DISABLE state */
+#define OMAP_MCBSP_ENABLE_FSG_SRG               1
+#define OMAP_MCBSP_DISABLE_FSG_SRG              2
+/* mono to mono mode*/
+#define OMAP_MCBSP_SKIP_NONE                    (0x0)
+/* mono to stereo mode */
+#define OMAP_MCBSP_SKIP_FIRST                   (0x1<<1)
+#define OMAP_MCBSP_SKIP_SECOND                  (0x1<<2)
+/* RRST STATE */
+#define OMAP_MCBSP_RRST_DISABLE                 0
+#define OMAP_MCBSP_RRST_ENABLE                  1
+/*XRST STATE */
+#define OMAP_MCBSP_XRST_DISABLE                 0
+#define OMAP_MCBSP_XRST_ENABLE                  1
+
+#define OMAP_MCBSP_FRAME_SINGLEPHASE            1
+#define OMAP_MCBSP_FRAME_DUALPHASE              2
+
+/* Sample Rate Generator Clock source */
+#define OMAP_MCBSP_SRGCLKSRC_CLKS               1
+#define OMAP_MCBSP_SRGCLKSRC_FCLK               2
+#define OMAP_MCBSP_SRGCLKSRC_CLKR               3
+#define OMAP_MCBSP_SRGCLKSRC_CLKX               4
+/* SRG input clock polarity */
+#define OMAP_MCBSP_CLKS_POLARITY_RISING         1
+#define OMAP_MCBSP_CLKS_POLARITY_FALLING        2
+
+#define OMAP_MCBSP_CLKX_POLARITY_RISING         1
+#define OMAP_MCBSP_CLKX_POLARITY_FALLING        2
+
+#define OMAP_MCBSP_CLKR_POLARITY_RISING         1
+#define OMAP_MCBSP_CLKR_POLARITY_FALLING        2
+
+/* SRG Clock synchronization mode */
+#define OMAP_MCBSP_SRG_FREERUNNING              1
+#define OMAP_MCBSP_SRG_RUNNING                  2
+
+/* Frame Sync Source */
+#define OMAP_MCBSP_TXFSYNC_EXTERNAL             0
+#define OMAP_MCBSP_TXFSYNC_INTERNAL             1
+
+#define OMAP_MCBSP_RXFSYNC_EXTERNAL             0
+#define OMAP_MCBSP_RXFSYNC_INTERNAL             1
+
+#define OMAP_MCBSP_CLKRXSRC_EXTERNAL            1
+#define OMAP_MCBSP_CLKRXSRC_INTERNAL            2
+
+#define OMAP_MCBSP_CLKTXSRC_EXTERNAL            1
+#define OMAP_MCBSP_CLKTXSRC_INTERNAL            2
+
+/* Justification */
+#define OMAP_MCBSP_RJUST_ZEROMSB                0
+#define OMAP_MCBSP_RJUST_SIGNMSB                1
+#define OMAP_MCBSP_LJUST_ZEROLSB                2
+
+#define OMAP_MCBSP_DATADELAY0                   0
+#define OMAP_MCBSP_DATADELAY1                   1
+#define OMAP_MCBSP_DATADELAY2                   2
+
+/* Reverse mode  */
+#define OMAP_MCBSP_MSBFIRST                     0
+#define OMAP_MCBSP_LSBFIRST                     1
+
+/* Multi-Channel partition mode */
+#define OMAP_MCBSP_TWOPARTITION_MODE            0
+#define OMAP_MCBSP_EIGHTPARTITION_MODE          1
+
+/* Rx Multichannel selection */
+#define OMAP_MCBSP_RXMUTICH_DISABLE             0
+#define OMAP_MCBSP_RXMUTICH_ENABLE              1
+
+/* Tx Multichannel selection */
+#define OMAP_MCBSP_TXMUTICH_DISABLE             0
+#define OMAP_MCBSP_TXMUTICH_ENABLE              1
+
+#define OMAP_MCBSP_FRAMELEN_N(NUM_WORDS)        ((NUM_WORDS - 1) & 0x7F)
 
 /********************** McBSP SSELCR bit definitions ***********************/
 #define SIDETONEEN		0x0400
@@ -352,6 +441,22 @@ typedef enum {
 typedef int __bitwise omap_mcbsp_io_type_t;
 #define OMAP_MCBSP_IRQ_IO ((__force omap_mcbsp_io_type_t) 1)
 #define OMAP_MCBSP_POLL_IO ((__force omap_mcbsp_io_type_t) 2)
+#define omap_mcbsp_check_valid_id(id)   (id < omap_mcbsp_count)
+#define id_to_mcbsp_ptr(id)             mcbsp_ptr[id];
+
+typedef void (*omap_mcbsp_dma_cb) (u32 ch_status, void *arg);
+
+typedef struct omap_mcbsp_dma_transfer_parameters {
+
+	/* Skip the alternate element use fro stereo mode */
+	u8 skip_alt;
+	/* Automagically handle Transfer [XR]RST? */
+	u8   auto_reset;
+	/* callback function executed for every tx/rx completion */
+	omap_mcbsp_dma_cb callback;
+	/* word length of data */
+	u32 word_length1;
+} omap_mcbsp_dma_transfer_params;
 
 typedef enum {
 	OMAP_MCBSP_WORD_8 = 0,
@@ -453,6 +558,19 @@ struct omap_mcbsp {
 	struct omap_mcbsp_platform_data *pdata;
 	struct clk *iclk;
 	struct clk *fclk;
+
+	u8  auto_reset; /* Auto Reset */
+	u8  txskip_alt; /* Tx skip flags */
+	u8  rxskip_alt; /* Rx skip flags */
+	void  *rx_cb_arg;
+	void  *tx_cb_arg;
+	omap_mcbsp_dma_cb  rx_callback;
+	omap_mcbsp_dma_cb  tx_callback;
+	int  rx_dma_chain_state;
+	int  tx_dma_chain_state;
+	int  interface_mode; /* Master / Slave */
+	struct omap_dma_channel_params rx_params; /* Used For Rx FIFO */
+	int rx_config_done;
 #ifdef CONFIG_ARCH_OMAP3
 	struct omap_mcbsp_st_data *st_data;
 	int dma_op_mode;
@@ -460,6 +578,43 @@ struct omap_mcbsp {
 	u16 max_rx_thres;
 #endif
 	void *reg_cache;
+};
+struct omap_mcbsp_dma_transfer_params {
+	/* Skip the alternate element use fro stereo mode */
+	u8 skip_alt;
+	/* Automagically handle Transfer [XR]RST? */
+	u8   auto_reset;
+	/* callback function executed for every tx/rx completion */
+	omap_mcbsp_dma_cb callback;
+	/* word length of data */
+	u32 word_length1;
+};
+
+struct omap_mcbsp_cfg_param {
+	u8 fsync_src;
+	u8 fs_polarity;
+	u8 clk_polarity;
+	u8 clk_mode;
+	u8 frame_length1;
+	u8 frame_length2;
+	u8 word_length1;
+	u8 word_length2;
+	u8 justification;
+	u8 reverse_compand;
+	u8 phase;
+	u8 data_delay;
+};
+
+struct omap_mcbsp_srg_fsg_cfg {
+	u32 period;     /* Frame period */
+	u32 pulse_width; /* Frame width */
+	u8 fsgm;
+	u32 sample_rate;
+	u32 bits_per_sample;
+	u32 srg_src;
+	u8 sync_mode;   /* SRG free running mode */
+	u8 polarity;
+	u8 dlb;		 /* digital loopback mode */
 };
 extern struct omap_mcbsp **mcbsp_ptr;
 extern int omap_mcbsp_count, omap_mcbsp_cache_size;
@@ -502,6 +657,29 @@ int omap_mcbsp_spi_master_xmit_word_poll(unsigned int id, u32 word);
 int omap_mcbsp_spi_master_recv_word_poll(unsigned int id, u32 * word);
 
 
+int omap2_mcbsp_stop_datatx(unsigned int id);
+int omap2_mcbsp_stop_datarx(u32 id);
+int omap2_mcbsp_reset(unsigned int id);
+int omap2_mcbsp_transmitter_index(int id, int *ei, int *fi);
+int omap2_mcbsp_receiver_index(int id, int *ei, int *fi);
+extern int omap2_mcbsp_set_xrst(unsigned int id, u8 state);
+extern int omap2_mcbsp_set_rrst(unsigned int id, u8 state);
+extern int omap2_mcbsp_dma_recv_params(unsigned int id,
+			struct	omap_mcbsp_dma_transfer_params *rp);
+extern int omap2_mcbsp_dma_trans_params(unsigned int id,
+			struct	omap_mcbsp_dma_transfer_params *tp);
+extern int omap2_mcbsp_receive_data(unsigned int id, void *cbdata,
+				dma_addr_t buf_start_addr, u32 buf_size);
+extern int omap2_mcbsp_send_data(unsigned int id, void *cbdata,
+				dma_addr_t buf_start_addr, u32 buf_size);
+
+extern void omap_mcbsp_write(struct omap_mcbsp *mcbsp, u16 reg, u32 val);
+extern int omap_mcbsp_read(struct omap_mcbsp *mcbsp, u16 reg, bool from_cache);
+
+extern void omap2_mcbsp_params_cfg(unsigned int id, int interface_mode,
+				struct omap_mcbsp_cfg_param *rp,
+				struct omap_mcbsp_cfg_param *tp,
+				struct omap_mcbsp_srg_fsg_cfg *param);
 /* SPI specific API */
 void omap_mcbsp_set_spi_mode(unsigned int id, const struct omap_mcbsp_spi_cfg * spi_cfg);
 
