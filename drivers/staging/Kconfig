@@ -26,7 +26,7 @@ if STAGING
 
 config STAGING_EXCLUDE_BUILD
 	bool "Exclude Staging drivers from being built" if STAGING
-	default y
+	default n
 	---help---
 	  Are you sure you really want to build the staging drivers?
 	  They taint your kernel, don't live up to the normal Linux
