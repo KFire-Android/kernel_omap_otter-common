@@ -34,6 +34,7 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -129,8 +130,11 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	/* aess_clk has to be enabled to access hal register.
 	 * Disable the clk after it has been used.
 	 */
+	pm_runtime_get_sync(&pdev->dev);
+#ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_enable)
 		pdata->device_enable(pdev);
+#endif
 
 	abe_reset_hal();
 
@@ -176,8 +180,11 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	/* load the high-pass coefficient of IHF-Left */
 	abe_write_equalizer(EQ2R, &dl2_eq);
 
+	pm_runtime_get_sync(&pdev->dev);
+#ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_idle)
 		pdata->device_idle(pdev);
+#endif
 }
 
 /* Media DL1 volume control from -50 to 30 dB in 6 dB steps */
