@@ -28,7 +28,6 @@ struct omap_mcpdm_platform_data {
 	int (*device_enable) (struct platform_device *pdev);
 	int (*device_shutdown) (struct platform_device *pdev);
 	int (*device_idle) (struct platform_device *pdev);
-	int (*device_disable) (struct platform_device *pdev);
 };
 
 #endif

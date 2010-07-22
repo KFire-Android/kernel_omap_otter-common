@@ -29,7 +29,6 @@
 #include <linux/wait.h>
 #include <linux/interrupt.h>
 #include <linux/err.h>
-#include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/irq.h>
@@ -62,7 +61,6 @@ struct omap_mcpdm {
 
 	spinlock_t lock;
 	struct omap_mcpdm_platform_data *pdata;
-	struct clk *clk;
 	struct omap_mcpdm_link *downlink;
 	struct omap_mcpdm_link *uplink;
 	struct completion irq_completion;
@@ -389,7 +387,7 @@ int omap_mcpdm_request(struct omap_mcpdm*mcpdm)
 	int ret;
 	int ctrl;
 
-	pdev = container_of(mcpdm->dev, struct platform_device, dev);
+	pdev = to_platform_device(mcpdm->dev);
 	pdata = pdev->dev.platform_data;
 
 	if (pdata->device_enable)
@@ -427,8 +425,8 @@ int omap_mcpdm_request(struct omap_mcpdm*mcpdm)
 	return 0;
 
 err:
-	if (pdata->device_disable)
-		pdata->device_disable(pdev);
+	if (pdata->device_idle)
+		pdata->device_idle(pdev);
 	return ret;
 }
 
@@ -437,7 +435,7 @@ void omap_mcpdm_free(struct omap_mcpdm*mcpdm)
 	struct platform_device *pdev;
 	struct omap_mcpdm_platform_data *pdata;
 
-	pdev = container_of(mcpdm->dev, struct platform_device, dev);
+	pdev = to_platform_device(mcpdm->dev);
 	pdata = pdev->dev.platform_data;
 
 	spin_lock(&mcpdm->lock);
@@ -452,9 +450,6 @@ void omap_mcpdm_free(struct omap_mcpdm*mcpdm)
 	if (pdata->device_idle)
 		pdata->device_idle(pdev);
 
-#if 0
-	clk_disable(mcpdm->clk);
-#endif
 	free_irq(mcpdm->irq, (void *)mcpdm);
 }
 
@@ -673,10 +668,6 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 	struct omap_mcpdm_platform_data *pdata = pdev->dev.platform_data;
 
 	snd_soc_unregister_dai(&pdev->dev);
-
-#if 0
-	clk_put(mcpdm->clk);
-#endif
 
 	if (pdata->device_shutdown)
 		pdata->device_shutdown(pdev);
