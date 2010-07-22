@@ -497,14 +497,14 @@ static int omap_dss_probe(struct platform_device *pdev)
 {
 	struct omap_dss_board_info *pdata = pdev->dev.platform_data;
 	int skip_init = 0;
-	int r;
+	int r = 0;
 	int i;
 
 	core.pdev = pdev;
 
 	dss_init_overlay_managers(pdev);
 	dss_init_overlays(pdev);
-
+	if (!cpu_is_omap44xx())
 	r = dss_get_clocks();
 	if (r)
 		goto err_clocks;
