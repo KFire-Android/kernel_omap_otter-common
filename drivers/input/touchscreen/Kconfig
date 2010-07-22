@@ -3,7 +3,6 @@
 #
 menuconfig INPUT_TOUCHSCREEN
 	bool "Touchscreens"
-	default y
 	help
 	  Say Y here, and a list of supported touchscreens will be displayed.
 	  This option doesn't affect the kernel.
@@ -595,7 +594,6 @@ config TOUCHSCREEN_PCAP
 config TOUCHSCREEN_SYNTM12XX
 	tristate "Synaptic TM12xx touchscreen"
 	depends on I2C
-	default y
 	help
 	  Say Y here to enable support for Synaptic TM12xx
 	  series touchscreen controller.
