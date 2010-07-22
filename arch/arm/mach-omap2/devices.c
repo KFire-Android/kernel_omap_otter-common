@@ -29,6 +29,9 @@
 #include <mach/gpio.h>
 #include <plat/mmc.h>
 #include <plat/dma.h>
+#include <plat/omap_device.h>
+#include <plat/omap_hwmod.h>
+#include <plat/omap4-keypad.h>
 
 #include "mux.h"
 
@@ -175,6 +178,47 @@ static inline void omap_init_camera(void)
 {
 }
 #endif
+
+#ifdef CONFIG_ARCH_OMAP4 /* KEYBOARD */
+
+struct omap_device_pm_latency omap_keyboard_latency[] = {
+	{
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func   = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static int omap4_init_keypad(struct omap_hwmod *oh, void *user)
+{
+	struct omap_device *od;
+	struct omap4_keypad_platform_data *sdp4430_keypad_data;
+	unsigned int id = -1;
+	char *name = "omap4-keypad";
+
+	sdp4430_keypad_data = user;
+
+	od = omap_device_build(name, id, oh, sdp4430_keypad_data,
+			sizeof(struct omap4_keypad_platform_data),
+			omap_keyboard_latency,
+			ARRAY_SIZE(omap_keyboard_latency), 0);
+	WARN(IS_ERR(od), "Could not build omap_device for %s %s\n",
+		name, oh->name);
+
+	return 0;
+}
+
+int omap4_keypad_initialization(struct omap4_keypad_platform_data
+						*sdp4430_keypad_data)
+{
+	if (!cpu_is_omap44xx())
+		return -ENODEV;
+
+	return omap_hwmod_for_each_by_class("kbd", omap4_init_keypad,
+			sdp4430_keypad_data);
+}
+
+#endif /* KEYBOARD CONFIG_ARCH_OMAP4 */
 
 #if defined(CONFIG_OMAP_MBOX_FWK) || defined(CONFIG_OMAP_MBOX_FWK_MODULE)
 
