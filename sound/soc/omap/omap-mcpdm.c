@@ -33,6 +33,7 @@
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -390,8 +391,11 @@ int omap_mcpdm_request(struct omap_mcpdm*mcpdm)
 	pdev = to_platform_device(mcpdm->dev);
 	pdata = pdev->dev.platform_data;
 
+	pm_runtime_get_sync(&pdev->dev);
+#ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_enable)
 		pdata->device_enable(pdev);
+#endif
 
 	spin_lock(&mcpdm->lock);
 
@@ -425,8 +429,11 @@ int omap_mcpdm_request(struct omap_mcpdm*mcpdm)
 	return 0;
 
 err:
+	pm_runtime_put_sync(&pdev->dev);
+#ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_idle)
 		pdata->device_idle(pdev);
+#endif
 	return ret;
 }
 
@@ -447,8 +454,11 @@ void omap_mcpdm_free(struct omap_mcpdm*mcpdm)
 	mcpdm->free = 1;
 	spin_unlock(&mcpdm->lock);
 
+	pm_runtime_put_sync(&pdev->dev);
+#ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_idle)
 		pdata->device_idle(pdev);
+#endif
 
 	free_irq(mcpdm->irq, (void *)mcpdm);
 }
@@ -669,8 +679,11 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 
 	snd_soc_unregister_dai(&pdev->dev);
 
+	pm_runtime_put_sync(&pdev->dev);
+#ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_shutdown)
 		pdata->device_shutdown(pdev);
+#endif
 	iounmap(mcpdm->io_base);
 
 	kfree(mcpdm);
