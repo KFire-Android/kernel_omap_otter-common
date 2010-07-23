@@ -20,6 +20,7 @@
 #include <plat/l4_3xxx.h>
 #include <plat/i2c.h>
 #include <plat/omap34xx.h>
+#include <plat/serial.h>
 
 #include "omap_hwmod_common_data.h"
 
@@ -88,6 +89,9 @@ static struct omap_hwmod omap3xxx_l3_main_hwmod = {
 };
 
 static struct omap_hwmod omap3xxx_l4_wkup_hwmod;
+static struct omap_hwmod omap3xxx_uart1_hwmod;
+static struct omap_hwmod omap3xxx_uart2_hwmod;
+static struct omap_hwmod omap3xxx_uart3_hwmod;
 
 /* L4_CORE -> L4_WKUP interface */
 static struct omap_hwmod_ocp_if omap3xxx_l4_core__l4_wkup = {
@@ -96,6 +100,59 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__l4_wkup = {
 	.user	= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
+/* L4 CORE -> UART1 interface */
+static struct omap_hwmod_addr_space omap3xxx_uart1_addr_space[] = {
+	{
+		.pa_start	= OMAP3_UART1_BASE,
+		.pa_end		= OMAP3_UART1_BASE + SZ_8K - 1,
+		.flags		= ADDR_MAP_ON_INIT | ADDR_TYPE_RT,
+	},
+};
+
+static struct omap_hwmod_ocp_if omap3_l4_core__uart1 = {
+	.master		= &omap3xxx_l4_core_hwmod,
+	.slave		= &omap3xxx_uart1_hwmod,
+	.clk		= "uart1_ick",
+	.addr		= omap3xxx_uart1_addr_space,
+	.addr_cnt	= ARRAY_SIZE(omap3xxx_uart1_addr_space),
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* L4 CORE -> UART2 interface */
+static struct omap_hwmod_addr_space omap3xxx_uart2_addr_space[] = {
+	{
+		.pa_start	= OMAP3_UART2_BASE,
+		.pa_end		= OMAP3_UART2_BASE + SZ_1K - 1,
+		.flags		= ADDR_MAP_ON_INIT | ADDR_TYPE_RT,
+	},
+};
+
+static struct omap_hwmod_ocp_if omap3_l4_core__uart2 = {
+	.master		= &omap3xxx_l4_core_hwmod,
+	.slave		= &omap3xxx_uart2_hwmod,
+	.clk		= "uart2_ick",
+	.addr		= omap3xxx_uart2_addr_space,
+	.addr_cnt	= ARRAY_SIZE(omap3xxx_uart2_addr_space),
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* L4 PER -> UART3 interface */
+static struct omap_hwmod_addr_space omap3xxx_uart3_addr_space[] = {
+	{
+		.pa_start	= OMAP3_UART3_BASE,
+		.pa_end		= OMAP3_UART3_BASE + SZ_1K - 1,
+		.flags		= ADDR_MAP_ON_INIT | ADDR_TYPE_RT,
+	},
+};
+
+static struct omap_hwmod_ocp_if omap3_l4_per__uart3 = {
+	.master		= &omap3xxx_l4_per_hwmod,
+	.slave		= &omap3xxx_uart3_hwmod,
+	.clk		= "uart3_ick",
+	.addr		= omap3xxx_uart3_addr_space,
+	.addr_cnt	= ARRAY_SIZE(omap3xxx_uart3_addr_space),
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
 
 /* I2C IP block address space length (in bytes) */
 #define OMAP2_I2C_AS_LEN		128
@@ -186,6 +243,8 @@ static struct omap_hwmod_ocp_if *omap3xxx_l4_core_masters[] = {
 	&omap3_l4_core__i2c1,
 	&omap3_l4_core__i2c2,
 	&omap3_l4_core__i2c3,
+	&omap3_l4_core__uart1,
+	&omap3_l4_core__uart2,
 };
 
 /* L4 CORE */
@@ -207,6 +266,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_l4_per_slaves[] = {
 
 /* Master interfaces on the L4_PER interconnect */
 static struct omap_hwmod_ocp_if *omap3xxx_l4_per_masters[] = {
+	&omap3_l4_per__uart3,
 };
 
 /* L4 PER */
@@ -426,6 +486,135 @@ static struct omap_hwmod omap3xxx_i2c3_hwmod = {
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
 };
 
+/* UART common */
+
+static struct omap_hwmod_class_sysconfig uart_sysc = {
+	.rev_offs	= 0x50,
+	.sysc_offs	= 0x54,
+	.syss_offs	= 0x58,
+	.sysc_flags	= (SYSC_HAS_SIDLEMODE |
+			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
+			   SYSC_HAS_AUTOIDLE),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.sysc_fields    = &omap_hwmod_sysc_type1,
+};
+
+static struct omap_hwmod_class uart_class = {
+	.name = "uart",
+	.sysc = &uart_sysc,
+};
+
+/* UART1 */
+
+static struct omap_hwmod_irq_info uart1_mpu_irqs[] = {
+	{ .irq = INT_24XX_UART1_IRQ, },
+};
+
+static struct omap_hwmod_dma_info uart1_sdma_chs[] = {
+	{ .name = "tx",	.dma_req = OMAP24XX_DMA_UART1_TX, },
+	{ .name = "rx",	.dma_req = OMAP24XX_DMA_UART1_RX, },
+};
+
+static struct omap_hwmod_ocp_if *omap3xxx_uart1_slaves[] = {
+	&omap3_l4_core__uart1,
+};
+
+static struct omap_hwmod omap3xxx_uart1_hwmod = {
+	.name		= "uart1",
+	.mpu_irqs	= uart1_mpu_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(uart1_mpu_irqs),
+	.sdma_reqs	= uart1_sdma_chs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(uart1_sdma_chs),
+	.main_clk	= "uart1_fck",
+	.prcm		= {
+		.omap2 = {
+			.module_offs = CORE_MOD,
+			.prcm_reg_id = 1,
+			.module_bit = OMAP3430_EN_UART1_SHIFT,
+			.idlest_reg_id = 1,
+			.idlest_idle_bit = OMAP3430_EN_UART1_SHIFT,
+		},
+	},
+	.slaves		= omap3xxx_uart1_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap3xxx_uart1_slaves),
+	.class		= &uart_class,
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+};
+
+/* UART2 */
+
+static struct omap_hwmod_irq_info uart2_mpu_irqs[] = {
+	{ .irq = INT_24XX_UART2_IRQ, },
+};
+
+static struct omap_hwmod_dma_info uart2_sdma_chs[] = {
+	{ .name = "tx",	.dma_req = OMAP24XX_DMA_UART2_TX, },
+	{ .name = "rx",	.dma_req = OMAP24XX_DMA_UART2_RX, },
+};
+
+static struct omap_hwmod_ocp_if *omap3xxx_uart2_slaves[] = {
+	&omap3_l4_core__uart2,
+};
+
+static struct omap_hwmod omap3xxx_uart2_hwmod = {
+	.name		= "uart2",
+	.mpu_irqs	= uart2_mpu_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(uart2_mpu_irqs),
+	.sdma_reqs	= uart2_sdma_chs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(uart2_sdma_chs),
+	.main_clk	= "uart2_fck",
+	.prcm		= {
+		.omap2 = {
+			.module_offs = CORE_MOD,
+			.prcm_reg_id = 1,
+			.module_bit = OMAP3430_EN_UART2_SHIFT,
+			.idlest_reg_id = 1,
+			.idlest_idle_bit = OMAP3430_EN_UART2_SHIFT,
+		},
+	},
+	.slaves		= omap3xxx_uart2_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap3xxx_uart2_slaves),
+	.class		= &uart_class,
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+};
+
+/* UART3 */
+
+static struct omap_hwmod_irq_info uart3_mpu_irqs[] = {
+	{ .irq = INT_24XX_UART3_IRQ, },
+};
+
+static struct omap_hwmod_dma_info uart3_sdma_chs[] = {
+	{ .name = "tx",	.dma_req = OMAP24XX_DMA_UART3_TX, },
+	{ .name = "rx",	.dma_req = OMAP24XX_DMA_UART3_RX, },
+};
+
+static struct omap_hwmod_ocp_if *omap3xxx_uart3_slaves[] = {
+	&omap3_l4_per__uart3,
+};
+
+static struct omap_hwmod omap3xxx_uart3_hwmod = {
+	.name		= "uart3",
+	.mpu_irqs	= uart3_mpu_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(uart3_mpu_irqs),
+	.sdma_reqs	= uart3_sdma_chs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(uart3_sdma_chs),
+	.main_clk	= "uart3_fck",
+	.prcm		= {
+		.omap2 = {
+			.module_offs = OMAP3430_PER_MOD,
+			.prcm_reg_id = 1,
+			.module_bit = OMAP3430_EN_UART3_SHIFT,
+			.idlest_reg_id = 1,
+			.idlest_idle_bit = OMAP3430_EN_UART3_SHIFT,
+		},
+	},
+	.slaves		= omap3xxx_uart3_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap3xxx_uart3_slaves),
+	.class		= &uart_class,
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+};
+
 static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
 	&omap3xxx_l3_main_hwmod,
 	&omap3xxx_l4_core_hwmod,
@@ -436,6 +625,9 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
 	&omap3xxx_i2c1_hwmod,
 	&omap3xxx_i2c2_hwmod,
 	&omap3xxx_i2c3_hwmod,
+	&omap3xxx_uart1_hwmod,
+	&omap3xxx_uart2_hwmod,
+	&omap3xxx_uart3_hwmod,
 	NULL,
 };
 
@@ -443,5 +635,3 @@ int __init omap3xxx_hwmod_init(void)
 {
 	return omap_hwmod_init(omap3xxx_hwmods);
 }
-
-
