@@ -23,6 +23,8 @@
 #ifndef __OMAP2_DSS_H
 #define __OMAP2_DSS_H
 
+#include <linux/interrupt.h>
+
 #ifdef CONFIG_OMAP2_DSS_DEBUG_SUPPORT
 #define DEBUG
 #endif
@@ -270,7 +272,7 @@ void dsi_save_context(void);
 void dsi_restore_context(void);
 
 int dsi_init_display(struct omap_dss_device *display);
-void dsi_irq_handler(void);
+irqreturn_t dsi_irq_handler(int irq, void *arg);
 unsigned long dsi_get_dsi1_pll_rate(void);
 int dsi_pll_set_clock_div(struct dsi_clock_info *cinfo);
 int dsi_pll_calc_clock_div_pck(bool is_tft, unsigned long req_pck,

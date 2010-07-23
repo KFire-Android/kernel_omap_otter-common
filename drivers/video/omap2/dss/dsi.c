@@ -484,8 +484,10 @@ static void print_irq_status_cio(u32 status)
 
 static int debug_irq;
 
-/* called from dss */
-void dsi_irq_handler(void)
+/* called from dss in OMAP3, in OMAP4 there is a dedicated
+* interrupt line for DSI */
+irqreturn_t dsi_irq_handler(int irq, void *arg)
+
 {
 	u32 irqstatus, vcstatus, ciostatus;
 	int i;
@@ -569,6 +571,7 @@ void dsi_irq_handler(void)
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
 	spin_unlock(&dsi.irq_stats_lock);
 #endif
+	return IRQ_HANDLED;
 }
 
 
@@ -3263,6 +3266,12 @@ int dsi_init(struct platform_device *pdev)
 	INIT_DELAYED_WORK_DEFERRABLE(&dsi.framedone_timeout_work,
 			dsi_framedone_timeout_work_callback);
 
+	if (cpu_is_omap44xx()) {
+		r = request_irq(OMAP44XX_IRQ_DSS_DSI1, dsi_irq_handler,
+				0, "OMAP DSI", (void *)0);
+		if (r)
+			goto err2;
+	}
 #ifdef DSI_CATCH_MISSING_TE
 	init_timer(&dsi.te_timer);
 	dsi.te_timer.function = dsi_te_timeout;
@@ -3296,6 +3305,8 @@ int dsi_init(struct platform_device *pdev)
 	return 0;
 err2:
 	iounmap(dsi.base);
+	if (cpu_is_omap44xx())
+		free_irq(OMAP44XX_IRQ_DSS_DSI1, (void *)0);
 err1:
 	destroy_workqueue(dsi.workqueue);
 	return r;

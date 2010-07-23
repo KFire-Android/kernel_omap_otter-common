@@ -504,8 +504,8 @@ static irqreturn_t dss_irq_handler_omap3(int irq, void *arg)
 	if (irqstatus & (1<<0))	/* DISPC_IRQ */
 		dispc_irq_handler();
 #ifdef CONFIG_OMAP2_DSS_DSI
-	if (irqstatus & (1<<1))	/* DSI_IRQ */
-		dsi_irq_handler();
+	if (!cpu_is_omap44xx() && (irqstatus & (1<<1)))	/* DSI_IRQ */
+		dsi_irq_handler(0, NULL);
 #endif
 
 	return IRQ_HANDLED;
