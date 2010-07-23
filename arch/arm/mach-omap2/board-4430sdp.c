@@ -710,9 +710,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_twl6030_hsmmc_init(mmc);
 	/* OMAP4 SDP uses internal transceiver so register nop transceiver */
 	usb_nop_xceiv_register();
-	/* FIXME: allow multi-omap to boot until musb is updated for omap4 */
-	if (!cpu_is_omap44xx())
-		usb_musb_init(&musb_board_data);
+	usb_musb_init(&musb_board_data);
 
 	status = omap4_keypad_initialization(&sdp4430_keypad_data);
 	if(status)
