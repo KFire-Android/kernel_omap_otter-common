@@ -164,6 +164,7 @@ config MACH_OMAP_4430SDP
 	select LEDS_GPIO
 	select LEDS_GPIO_PLATFORM
 	select INPUT_CMA3000_I2C
+	select SENSORS_BH1780
 	select MISC_DEVICES
 	select BMP085
 	select STAGING
