@@ -161,6 +161,8 @@ config MACH_OMAP_4430SDP
 	select NEW_LEDS
 	select LEDS_CLASS
 	select LEDS_PWM
+	select LEDS_GPIO
+	select LEDS_GPIO_PLATFORM
 	select MISC_DEVICES
 	select BMP085
 	select STAGING

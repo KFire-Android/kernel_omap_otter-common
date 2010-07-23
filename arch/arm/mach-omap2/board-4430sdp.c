@@ -216,6 +216,54 @@ error1:
 	return status;
 }
 
+static struct gpio_led sdp4430_gpio_leds[] = {
+	{
+		.name	= "omap4:green:debug0",
+		.gpio	= 61,
+	},
+	{
+		.name	= "omap4:green:debug1",
+		.gpio	= 30,
+	},
+	{
+		.name	= "omap4:green:debug2",
+		.gpio	= 7,
+	},
+	{
+		.name	= "omap4:green:debug3",
+		.gpio	= 8,
+	},
+	{
+		.name	= "omap4:green:debug4",
+		.gpio	= 50,
+	},
+	{
+		.name	= "omap4:blue:user",
+		.gpio	= 169,
+	},
+	{
+		.name	= "omap4:red:user",
+		.gpio	= 170,
+	},
+	{
+		.name	= "omap4:green:user",
+		.gpio	= 139,
+	},
+};
+
+static struct gpio_led_platform_data sdp4430_led_data = {
+	.leds	= sdp4430_gpio_leds,
+	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
+};
+
+static struct platform_device sdp4430_leds_gpio = {
+	.name	= "leds-gpio",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &sdp4430_led_data,
+	},
+};
+
 static struct led_pwm sdp4430_pwm_leds[] = {
 	{
 	.name = "omap4:green:chrg",
@@ -284,6 +332,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_lcd_device,
 	&sdp4430_proximity_device,
 	&sdp4430_leds_pwm,
+	&sdp4430_leds_gpio,
 };
 
 static struct omap_lcd_config sdp4430_lcd_config __initdata = {
