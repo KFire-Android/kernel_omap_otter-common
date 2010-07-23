@@ -98,6 +98,7 @@
 #include <linux/kobject.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
+#include <linux/i2c/twl.h>
 
 #ifdef	CONFIG_ARM
 #include <mach/hardware.h>
@@ -1932,6 +1933,15 @@ static void musb_free(struct musb *musb)
 #endif
 }
 
+#define VUSB_CFG_STATE			0x72
+#define MISC2				0xE5
+#define CFG_LDO_PD2			0xF5
+#define VUSB_CFG_VOLTAGE		0x73
+#define VUSB_CFG_TRANS			0x71
+#define USB_VBUS_CTRL_SET		0x4
+#define USB_ID_CTRL_SET			0x6
+#define CHARGERUSB_CTRL1		0x8
+
 /*
  * Perform generic per-controller initialization.
  *
@@ -1959,12 +1969,65 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	switch (plat->mode) {
 	case MUSB_HOST:
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
+	if (cpu_is_omap44xx()) {
+		/* Program CFG_LDO_PD2 register and set VUSB bit */
+		twl_i2c_write_u8(TWL6030_MODULE_ID0 , 0x1, CFG_LDO_PD2);
+
+		/* Program MISC2 register and set bit VUSB_IN_VBAT */
+		twl_i2c_write_u8(TWL6030_MODULE_ID0 , 0x10, MISC2);
+
+		/*
+		 * Program the VUSB_CFG_VOLTAGE register to set the VUSB
+		 * voltage to 3.3V
+		 */
+		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x18,
+						VUSB_CFG_VOLTAGE);
+
+		/* Program the VUSB_CFG_TRANS for ACTIVE state. */
+		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x3F,
+					VUSB_CFG_TRANS);
+
+		/* Program the VUSB_CFG_STATE register to ON on all groups. */
+		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0xE1,
+					VUSB_CFG_STATE);
+
+		/* Program the USB_VBUS_CTRL_SET and set VBUS_ACT_COMP bit */
+		twl_i2c_write_u8(TWL_MODULE_USB, 0x4, USB_VBUS_CTRL_SET);
+
+		/*
+		 * Program the USB_ID_CTRL_SET register to enable GND drive
+		 * and the ID comparators
+		 */
+		twl_i2c_write_u8(TWL_MODULE_USB, 0x24, USB_ID_CTRL_SET);
+
+		/* Enable VBUS Valid, BValid, AValid. Clear SESSEND.*/
+		omap_writel(0x00000005, 0x4A00233C);
+
+		/* Delay supply of VBUS. This fixes bootup enumeration issue */
+		mdelay(500);
+
+		/*
+		 * Start driving VBUS. Set OPA_MODE bit in CHARGERUSB_CTRL1
+		 * register. This enables boost mode.
+		 */
+		twl_i2c_write_u8(TWL_MODULE_MAIN_CHARGE , 0x40,
+						CHARGERUSB_CTRL1);
+	}
 		break;
 #else
 		goto bad_config;
 #endif
 	case MUSB_PERIPHERAL:
 #ifdef CONFIG_USB_GADGET_MUSB_HDRC
+	/* FIXME */
+	/* TODO:- Phoenix Settings to be done from Phoenix Layer */
+	if (cpu_is_omap44xx()) {
+		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x21,
+				VUSB_CFG_STATE);
+		twl_i2c_write_u8(TWL6030_MODULE_ID0 , 0x10,
+					MISC2);
+		omap_writel(0x00000015, 0x4A00233C);
+	}
 		break;
 #else
 		goto bad_config;
