@@ -236,6 +236,17 @@ void dispc_save_context(void)
 	SR(SIZE_DIG);
 	SR(SIZE_LCD);
 
+	if (cpu_is_omap44xx()) {
+		SR(CONTROL2);
+		SR(DEFAULT_COLOR2);
+		SR(TRANS_COLOR2);
+		SR(SIZE_LCD2);
+		SR(TIMING_H2);
+		SR(TIMING_V2);
+		SR(POL_FREQ2);
+		SR(DIVISOR2);
+		SR(CONFIG2);
+	}
 	SR(GFX_BA0);
 	SR(GFX_BA1);
 	SR(GFX_POSITION);
@@ -255,6 +266,15 @@ void dispc_save_context(void)
 	SR(CPR_COEF_G);
 	SR(CPR_COEF_B);
 
+	if (cpu_is_omap44xx()) {
+		SR(CPR2_COEF_B);
+		SR(CPR2_COEF_G);
+		SR(CPR2_COEF_R);
+
+		SR(DATA2_CYCLE1);
+		SR(DATA2_CYCLE2);
+		SR(DATA2_CYCLE3);
+	}
 	SR(GFX_PRELOAD);
 
 	/* VID1 */
@@ -375,6 +395,22 @@ void dispc_restore_context(void)
 	RR(SIZE_DIG);
 	RR(SIZE_LCD);
 
+	if (cpu_is_omap44xx()) {
+		RR(DEFAULT_COLOR2);
+		RR(TRANS_COLOR2);
+		RR(CPR2_COEF_B);
+		RR(CPR2_COEF_G);
+		RR(CPR2_COEF_R);
+		RR(DATA2_CYCLE1);
+		RR(DATA2_CYCLE2);
+		RR(DATA2_CYCLE3);
+		RR(SIZE_LCD2);
+		RR(TIMING_H2);
+		RR(TIMING_V2);
+		RR(POL_FREQ2);
+		RR(DIVISOR2);
+		RR(CONFIG2);
+	}
 	RR(GFX_BA0);
 	RR(GFX_BA1);
 	RR(GFX_POSITION);
@@ -394,6 +430,15 @@ void dispc_restore_context(void)
 	RR(CPR_COEF_G);
 	RR(CPR_COEF_B);
 
+	if (cpu_is_omap44xx()) {
+		RR(CPR2_COEF_B);
+		RR(CPR2_COEF_G);
+		RR(CPR2_COEF_R);
+
+		RR(DATA2_CYCLE1);
+		RR(DATA2_CYCLE2);
+		RR(DATA2_CYCLE3);
+	}
 	RR(GFX_PRELOAD);
 
 	/* VID1 */
@@ -496,7 +541,8 @@ void dispc_restore_context(void)
 
 	/* enable last, because LCD & DIGIT enable are here */
 	RR(CONTROL);
-
+	if (cpu_is_omap44xx())
+		RR(CONTROL2);
 	/* clear spurious SYNC_LOST_DIGIT interrupts */
 	dispc_write_reg(DISPC_IRQSTATUS, DISPC_IRQ_SYNC_LOST_DIGIT);
 
