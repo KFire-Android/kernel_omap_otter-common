@@ -20,10 +20,12 @@
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl.h>
+#include <linux/i2c/cma3000.h>
 #include <linux/regulator/machine.h>
 #include <linux/input/sfh7741.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
+#include <linux/interrupt.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -46,6 +48,8 @@
 #define ETH_KS8851_QUART		138
 #define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
 #define OMAP4_SFH7741_ENABLE_GPIO		188
+
+#define OMAP4_CMA3000ACCL_GPIO		186
 
 static void omap_prox_activate(int state);
 static int omap_prox_read(void);
@@ -566,6 +570,18 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux3		= &sdp4430_vaux3,
 };
 
+static struct cma3000_platform_data cma3000_platform_data = {
+	.fuzz_x = 25,
+	.fuzz_y = 25,
+	.fuzz_z = 25,
+	.g_range = CMARANGE_8G,
+	.mode = CMAMODE_MOTDET,
+	.mdthr = 0x8,
+	.mdfftmr = 0x33,
+	.ffthr = 0x8,
+	.irqflags = IRQF_TRIGGER_HIGH,
+};
+
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("twl6030", 0x48),
@@ -598,6 +614,11 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 	},
 	{
 		I2C_BOARD_INFO("hmc5843", 0x1e),
+	},
+	{
+		I2C_BOARD_INFO("cma3000_accl", 0x1c),
+		.platform_data = &cma3000_platform_data,
+		.irq = OMAP_GPIO_IRQ(OMAP4_CMA3000ACCL_GPIO),
 	},
 };
 static int __init omap4_i2c_init(void)
@@ -667,6 +688,15 @@ fail1:
 	gpio_free(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
 }
 
+static void omap_cma3000accl_init(void)
+{
+	if (gpio_request(OMAP4_CMA3000ACCL_GPIO, "Accelerometer") < 0) {
+		pr_err("Accelerometer GPIO request failed\n");
+		return;
+	}
+	gpio_direction_input(OMAP4_CMA3000ACCL_GPIO);
+}
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -694,6 +724,7 @@ static void __init omap_4430sdp_init(void)
 				ARRAY_SIZE(sdp4430_spi_board_info));
 	}
 	omap_sfh7741prox_init();
+	omap_cma3000accl_init();
 }
 
 static void __init omap_4430sdp_map_io(void)
