@@ -415,7 +415,7 @@ static void dss_debug_dump_clocks(struct seq_file *s)
 	dss_dump_clocks(s);
 	dispc_dump_clocks(s);
 #ifdef CONFIG_OMAP2_DSS_DSI
-	dsi_dump_clocks(s);
+	dsi_dump_clocks(OMAP_DSS_CHANNEL_LCD, s);
 #endif
 }
 

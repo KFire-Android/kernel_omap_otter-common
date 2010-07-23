@@ -264,7 +264,8 @@ static inline void sdi_exit(void)
 int dsi_init(struct platform_device *pdev);
 void dsi_exit(void);
 
-void dsi_dump_clocks(struct seq_file *s);
+void dsi_dump_clocks(enum omap_channel channel,
+		struct seq_file *s);
 void dsi_dump_irqs(struct seq_file *s);
 void dsi_dump_regs(struct seq_file *s);
 
@@ -433,8 +434,9 @@ void rfbi_dump_regs(struct seq_file *s);
 
 int rfbi_configure(int rfbi_module, int bpp, int lines);
 void rfbi_enable_rfbi(bool enable);
-void rfbi_transfer_area(u16 width, u16 height,
-			     void (callback)(void *data), void *data);
+void rfbi_transfer_area(struct omap_dss_device *dssdev,
+		u16 width, u16 height,
+		void (callback)(void *data), void *data);
 void rfbi_set_timings(int rfbi_module, struct rfbi_timings *t);
 unsigned long rfbi_get_max_tx_rate(void);
 int rfbi_init_display(struct omap_dss_device *display);
