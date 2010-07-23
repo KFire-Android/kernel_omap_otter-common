@@ -75,6 +75,7 @@ struct dispc_reg { u16 idx; };
 #define DISPC_GLOBAL_ALPHA		DISPC_REG(0x0074)
 #define DISPC_SIZE_DIG			DISPC_REG(0x0078)
 #define DISPC_SIZE_LCD			DISPC_REG(0x007C)
+#define DISPC_GLOBAL_BUFFER		DISPC_REG(0x0800)
 
 /* DISPC GFX plane */
 #define DISPC_GFX_BA0			DISPC_REG(0x0080)
@@ -153,6 +154,98 @@ struct dispc_reg { u16 idx; };
 #define DISPC_POL_FREQ2		DISPC_REG(0x0408)
 #define DISPC_DIVISOR2		DISPC_REG(0x040C)
 #define DISPC_CONFIG2		DISPC_REG(0x0620)
+
+/******** registers related to VID3 and WB pipelines ****/
+/* DISPC Video plane, n = 0 for VID3, n = 1 for WB _VID_V3_WB_ */
+#define DISPC_VID_V3_WB_REG(n, idx) DISPC_REG(0x0300 + (n)*0x200 + idx)
+
+#define DISPC_VID_V3_WB_ACCU0(n)	       DISPC_VID_V3_WB_REG(n, 0x0000)
+#define DISPC_VID_V3_WB_ACCU1(n)	       DISPC_VID_V3_WB_REG(n, 0x0004)
+
+#define DISPC_VID_V3_WB_BA0(n)	 DISPC_VID_V3_WB_REG(n, 0x0008)
+#define DISPC_VID_V3_WB_BA1(n)	 DISPC_VID_V3_WB_REG(n, 0x000C)
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_V3_WB_FIR_COEF_H(n, i) DISPC_REG(0x0310+(n)*0x200+(i)*0x8)
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_V3_WB_FIR_COEF_HV(n, i) DISPC_REG(0x0314+(n)*0x200+(i)*0x8)
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_V3_WB_FIR_COEF_V(n, i) DISPC_REG(0x0350+(n)*0x200+(i)*0x4)
+
+#define DISPC_VID_V3_WB_ATTRIBUTES(n)	  DISPC_VID_V3_WB_REG(n, 0x0070)
+
+/* coef index i = {0, 1, 2, 3, 4} */
+#define DISPC_VID_V3_WB_CONV_COEF(n, i)	DISPC_REG(0x0374 + (n)*0x200 + (i)*0x4)
+
+#define DISPC_VID_V3_WB_BUF_SIZE_STATUS(n)     DISPC_VID_V3_WB_REG(n, 0x0088)
+#define DISPC_VID_V3_WB_BUF_THRESHOLD(n)       DISPC_VID_V3_WB_REG(n, 0x008C)
+#define DISPC_VID_V3_WB_FIR(n)	 DISPC_VID_V3_WB_REG(n, 0x0090)
+#define DISPC_VID_V3_WB_PICTURE_SIZE(n)	DISPC_VID_V3_WB_REG(n, 0x0094)
+#define DISPC_VID_V3_WB_PIXEL_INC(n)	   DISPC_VID_V3_WB_REG(n, 0x0098)
+
+#define DISPC_VID_VID3_POSITION		DISPC_REG(0x039C)
+#define DISPC_VID_VID3_PRELOAD	 DISPC_REG(0x03A0)
+#define DISPC_VID_VID3_PRELOAD	 DISPC_REG(0x03A0)
+
+#define DISPC_VID_V3_WB_ROW_INC(n)	     DISPC_VID_V3_WB_REG(n, 0x00A4)
+#define DISPC_VID_V3_WB_SIZE(n)		DISPC_VID_V3_WB_REG(n, 0x00A8)
+
+#define DISPC_VID_V3_WB_FIR2(n)		DISPC_REG(0x0724 + (n)*0x6C)
+				       /* n=0: VID3, n=1: WB*/
+
+#define DISPC_VID_V3_WB_ACCU2_0(n)     DISPC_REG(0x0728 + (n)*0x6C)
+				       /* n=0: VID3, n=1: WB*/
+#define DISPC_VID_V3_WB_ACCU2_1(n)     DISPC_REG(0x072C + (n)*0x6C)
+				       /* n=0: VID3, n=1: WB*/
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7}  n=0: VID3, n=1: WB */
+#define DISPC_VID_V3_WB_FIR_COEF_H2(n, i) DISPC_REG(0x0730+(n)*0x6C+(i)*0x8)
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_V3_WB_FIR_COEF_HV2(n, i) DISPC_REG(0x0734+(n)*0x6C+(i)*0x8)
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_V3_WB_FIR_COEF_V2(n, i) DISPC_REG(0x0770+(n)*0x6C+(i)*0x4)
+
+
+/*********End Vid3 and WB Registers ***************/
+
+/* DISPC Video plane,
+	       n = 0 for VID1
+	       n = 1 for VID2
+	       and n = 2 for VID3,
+	       n = 3 for WB*/
+
+#define DISPC_VID_OMAP4_REG(n, idx) DISPC_REG(0x0600 + (n)*0x04 + idx)
+
+#define DISPC_VID_BA_UV0(n)	    DISPC_VID_OMAP4_REG((n)*2, 0x0000)
+#define DISPC_VID_BA_UV1(n)	    DISPC_VID_OMAP4_REG((n)*2, 0x0004)
+
+#define DISPC_VID_ATTRIBUTES2(n)       DISPC_VID_OMAP4_REG(n, 0x0024)
+				       /* n = {0,1,2,3} */
+#define DISPC_GAMMA_TABLE(n)	   DISPC_VID_OMAP4_REG(n, 0x0030)
+				       /* n = {0,1,2,3} */
+
+/* VID1/VID2 specific new registers */
+#define DISPC_VID_FIR2(n)	      DISPC_REG(0x063C + (n)*0x6C)
+				       /* n=0: VID1, n=1: VID2*/
+
+#define DISPC_VID_ACCU2_0(n)	   DISPC_REG(0x0640 + (n)*0x6C)
+				       /* n=0: VID1, n=1: VID2*/
+#define DISPC_VID_ACCU2_1(n)	   DISPC_REG(0x0644 + (n)*0x6C)
+				       /* n=0: VID1, n=1: VID2*/
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7}  n=0: VID1, n=1: VID2 */
+#define DISPC_VID_FIR_COEF_H2(n, i)    DISPC_REG(0x0648 + (n)*0x6C + (i)*0x8)
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_FIR_COEF_HV2(n, i)   DISPC_REG(0x064C + (n)*0x6C + (i)*0x8)
+
+/* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
+#define DISPC_VID_FIR_COEF_V2(n, i)    DISPC_REG(0x0688 + (n)*0x6C + (i)*0x4)
+/*end of VID1/VID2 specific new registers*/
 
 #define DISPC_MAX_NR_ISRS		8
 
