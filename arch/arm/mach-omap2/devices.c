@@ -15,6 +15,8 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/clk.h>
+#include <linux/err.h>
+#include <linux/slab.h>
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
@@ -374,170 +376,66 @@ static inline void omap_init_sti(void) {}
 
 #include <plat/mcspi.h>
 
-#define OMAP2_MCSPI1_BASE		0x48098000
-#define OMAP2_MCSPI2_BASE		0x4809a000
-#define OMAP2_MCSPI3_BASE		0x480b8000
-#define OMAP2_MCSPI4_BASE		0x480ba000
-
-#define OMAP4_MCSPI1_BASE		0x48098100
-#define OMAP4_MCSPI2_BASE		0x4809a100
-#define OMAP4_MCSPI3_BASE		0x480b8100
-#define OMAP4_MCSPI4_BASE		0x480ba100
-
-static struct omap2_mcspi_platform_config omap2_mcspi1_config = {
-	.num_cs		= 4,
-	.force_cs_mode	= 1,
-};
-
-static struct resource omap2_mcspi1_resources[] = {
-	{
-		.start		= OMAP2_MCSPI1_BASE,
-		.end		= OMAP2_MCSPI1_BASE + 0xff,
-		.flags		= IORESOURCE_MEM,
+struct omap_device_pm_latency omap_mcspi_latency[] = {
+	[0] = {
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func   = omap_device_enable_hwmods,
+		.flags		 = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
 	},
 };
 
-static struct platform_device omap2_mcspi1 = {
-	.name		= "omap2_mcspi",
-	.id		= 1,
-	.num_resources	= ARRAY_SIZE(omap2_mcspi1_resources),
-	.resource	= omap2_mcspi1_resources,
-	.dev		= {
-		.platform_data = &omap2_mcspi1_config,
-	},
-};
-
-static struct omap2_mcspi_platform_config omap2_mcspi2_config = {
-	.num_cs		= 2,
-	.mode		= OMAP2_MCSPI_MASTER,
-	.dma_mode	= 0,
-	.force_cs_mode	= 0,
-	.fifo_depth	= 0,
-};
-
-static struct resource omap2_mcspi2_resources[] = {
-	{
-		.start		= OMAP2_MCSPI2_BASE,
-		.end		= OMAP2_MCSPI2_BASE + 0xff,
-		.flags		= IORESOURCE_MEM,
-	},
-};
-
-static struct platform_device omap2_mcspi2 = {
-	.name		= "omap2_mcspi",
-	.id		= 2,
-	.num_resources	= ARRAY_SIZE(omap2_mcspi2_resources),
-	.resource	= omap2_mcspi2_resources,
-	.dev		= {
-		.platform_data = &omap2_mcspi2_config,
-	},
-};
-
-#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
-	defined(CONFIG_ARCH_OMAP4)
-static struct omap2_mcspi_platform_config omap2_mcspi3_config = {
-	.num_cs		= 2,
-};
-
-static struct resource omap2_mcspi3_resources[] = {
-	{
-	.start		= OMAP2_MCSPI3_BASE,
-	.end		= OMAP2_MCSPI3_BASE + 0xff,
-	.flags		= IORESOURCE_MEM,
-	},
-};
-
-static struct platform_device omap2_mcspi3 = {
-	.name		= "omap2_mcspi",
-	.id		= 3,
-	.num_resources	= ARRAY_SIZE(omap2_mcspi3_resources),
-	.resource	= omap2_mcspi3_resources,
-	.dev		= {
-		.platform_data = &omap2_mcspi3_config,
-	},
-};
-#endif
-
-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-static struct omap2_mcspi_platform_config omap2_mcspi4_config = {
-	.num_cs		= 1,
-};
-
-static struct resource omap2_mcspi4_resources[] = {
-	{
-		.start		= OMAP2_MCSPI4_BASE,
-		.end		= OMAP2_MCSPI4_BASE + 0xff,
-		.flags		= IORESOURCE_MEM,
-	},
-};
-
-static struct platform_device omap2_mcspi4 = {
-	.name		= "omap2_mcspi",
-	.id		= 4,
-	.num_resources	= ARRAY_SIZE(omap2_mcspi4_resources),
-	.resource	= omap2_mcspi4_resources,
-	.dev		= {
-		.platform_data = &omap2_mcspi4_config,
-	},
-};
-#endif
-
-#ifdef CONFIG_ARCH_OMAP4
-static inline void omap4_mcspi_fixup(void)
+static int omap_mcspi_init(struct omap_hwmod *oh, void *user)
 {
-	omap2_mcspi1_resources[0].start	= OMAP4_MCSPI1_BASE;
-	omap2_mcspi1_resources[0].end	= OMAP4_MCSPI1_BASE + 0xff;
-	omap2_mcspi2_resources[0].start	= OMAP4_MCSPI2_BASE;
-	omap2_mcspi2_resources[0].end	= OMAP4_MCSPI2_BASE + 0xff;
-	omap2_mcspi3_resources[0].start	= OMAP4_MCSPI3_BASE;
-	omap2_mcspi3_resources[0].end	= OMAP4_MCSPI3_BASE + 0xff;
-	omap2_mcspi4_resources[0].start	= OMAP4_MCSPI4_BASE;
-	omap2_mcspi4_resources[0].end	= OMAP4_MCSPI4_BASE + 0xff;
-}
-#else
-static inline void omap4_mcspi_fixup(void)
-{
-}
-#endif
+	struct omap_device *od;
+	char *name = "omap2_mcspi";
+	struct omap2_mcspi_platform_config *pdata;
+	static int spi_num;
 
-#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
-	defined(CONFIG_ARCH_OMAP4)
-static inline void omap2_mcspi3_init(void)
-{
-	platform_device_register(&omap2_mcspi3);
-}
-#else
-static inline void omap2_mcspi3_init(void)
-{
-}
-#endif
+	pdata = kzalloc(sizeof(struct omap2_mcspi_platform_config),
+				GFP_KERNEL);
+	if (!pdata) {
+		pr_err("\nMemory allocation for Mcspi device failed\n");
+		return -ENOMEM;
+	}
 
-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
-static inline void omap2_mcspi4_init(void)
-{
-	platform_device_register(&omap2_mcspi4);
+	switch (spi_num) {
+	case 0:
+		pdata->num_cs = 4;
+		pdata->force_cs_mode = 1;
+		break;
+	case 1:
+		pdata->num_cs = 2;
+		pdata->mode = OMAP2_MCSPI_MASTER;
+		pdata->dma_mode = 1;
+		pdata->force_cs_mode = 0;
+		pdata->fifo_depth = 0;
+		break;
+	case 2:
+		pdata->num_cs = 2;
+		break;
+	case 3:
+		pdata->num_cs = 1;
+		break;
+	}
+
+	if (cpu_is_omap44xx())
+		pdata->regs_data = (u16 *)omap4_reg_map;
+	else
+		pdata->regs_data = (u16 *)omap2_reg_map;
+
+	od = omap_device_build(name, spi_num + 1, oh, pdata,
+				sizeof(*pdata),	omap_mcspi_latency,
+				ARRAY_SIZE(omap_mcspi_latency), 0);
+	WARN(IS_ERR(od), "\nCant build omap_device for %s:%s\n",
+				name, oh->name);
+	spi_num++;
+	return 0;
 }
-#else
-static inline void omap2_mcspi4_init(void)
-{
-}
-#endif
 
 static void omap_init_mcspi(void)
 {
-	if (cpu_is_omap44xx())
-		omap4_mcspi_fixup();
-
-	platform_device_register(&omap2_mcspi1);
-	platform_device_register(&omap2_mcspi2);
-
-	if (cpu_is_omap2430() || cpu_is_omap343x() || cpu_is_omap44xx())
-		omap2_mcspi3_init();
-
-	if (cpu_is_omap343x() || cpu_is_omap44xx())
-		omap2_mcspi4_init();
+	omap_hwmod_for_each_by_class("mcspi", omap_mcspi_init, NULL);
 }
-
 #else
 static inline void omap_init_mcspi(void) {}
 #endif
