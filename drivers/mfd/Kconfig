@@ -188,6 +188,17 @@ config MFD_TC35892
 	  additional drivers must be enabled in order to use the
 	  functionality of the device.
 
+config TWL6030_PWM
+	tristate "TWL6030 PWM (Pulse Width Modulator) Support"
+	depends on TWL4030_CORE
+	select HAVE_PWM
+	default n
+	help
+	  Support for TWL6030 PWM
+
+	  Say yes here if you want support for TWL6030 PWM.
+	  This is used to control charging LED brightness.
+
 config MFD_TMIO
 	bool
 	default n
