@@ -397,4 +397,12 @@ config INPUT_SFH7741
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called sfh7741.
+
+config INPUT_CMA3000_I2C
+	bool "VTI CMA3000 Tri-axis accelerometer"
+	depends on I2C && SYSFS
+	help
+	  Say Y here if you want to use VTI CMA3000 Accelerometer
+	  through I2C interface.
+
 endif
