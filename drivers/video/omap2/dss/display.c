@@ -29,6 +29,7 @@
 #include <linux/platform_device.h>
 
 #include <plat/display.h>
+#include <plat/cpu.h>
 #include "dss.h"
 
 static LIST_HEAD(display_list);
@@ -322,7 +323,11 @@ void default_get_overlay_fifo_thresholds(enum omap_plane plane,
 	unsigned burst_size_bytes;
 
 	*burst_size = OMAP_DSS_BURST_16x32;
-	burst_size_bytes = 16 * 32 / 8;
+	if (cpu_is_omap44xx())
+		burst_size_bytes = 8 * 128 / 8; /* OMAP4: highest
+							burst size is 8x128*/
+	else
+		burst_size_bytes = 16 * 32 / 8;
 
 	*fifo_high = fifo_size - 1;
 	*fifo_low = fifo_size - burst_size_bytes;
