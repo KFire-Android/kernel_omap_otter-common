@@ -689,12 +689,12 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 static int twl6040_add_widgets(struct snd_soc_codec *codec)
 {
-	snd_soc_dapm_new_controls(codec, twl6040_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, twl6040_dapm_widgets,
 				 ARRAY_SIZE(twl6040_dapm_widgets));
 
-	snd_soc_dapm_add_routes(codec, intercon, ARRAY_SIZE(intercon));
+	snd_soc_dapm_add_routes(codec->dapm, intercon, ARRAY_SIZE(intercon));
 
-	snd_soc_dapm_new_widgets(codec);
+	snd_soc_dapm_new_widgets(codec->dapm);
 
 	return 0;
 }
@@ -787,7 +787,7 @@ static int twl6040_set_bias_level(struct snd_soc_codec *codec,
 		break;
 	}
 
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 
 	return 0;
 }
@@ -1080,7 +1080,7 @@ static int twl6040_suspend(struct snd_soc_codec *codec, pm_message_t state)
 static int twl6040_resume(struct snd_soc_codec *codec)
 {
 	twl6040_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-	twl6040_set_bias_level(codec, codec->suspend_bias_level);
+	twl6040_set_bias_level(codec, codec->dapm->suspend_bias_level);
 
 	return 0;
 }

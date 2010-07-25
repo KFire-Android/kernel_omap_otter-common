@@ -2151,7 +2151,7 @@ int snd_soc_dapm_ignore_suspend(struct snd_soc_codec *codec, const char *pin)
 {
 	struct snd_soc_dapm_widget *w;
 
-	list_for_each_entry(w, &codec->dapm_widgets, list) {
+	list_for_each_entry(w, &codec->dapm->widgets, list) {
 		if (!strcmp(w->name, pin)) {
 			w->ignore_suspend = 1;
 			return 0;

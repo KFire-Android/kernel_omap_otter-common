@@ -922,7 +922,7 @@ static int soc_suspend(struct device *dev)
 	/* close any waiting streams and save state */
 	for (i = 0; i < card->num_rtd; i++) {
 		run_delayed_work(&card->rtd[i].delayed_work);
-		card->rtd[i].codec->suspend_bias_level = card->rtd[i].codec->bias_level;
+		card->rtd[i].codec->dapm->suspend_bias_level = card->rtd[i].codec->dapm->bias_level;
 	}
 
 	for (i = 0; i < card->num_rtd; i++) {
@@ -946,7 +946,7 @@ static int soc_suspend(struct device *dev)
 		/* If there are paths active then the CODEC will be held with
 		 * bias _ON and should not be suspended. */
 		if (!codec->suspended && codec->driver->suspend) {
-			switch (codec->bias_level) {
+			switch (codec->dapm->bias_level) {
 			case SND_SOC_BIAS_STANDBY:
 			case SND_SOC_BIAS_OFF:
 				codec->driver->suspend(codec, PMSG_SUSPEND);
@@ -1015,7 +1015,7 @@ static void soc_resume_deferred(struct work_struct *work)
 		 * resume.  Otherwise the suspend was suppressed.
 		 */
 		if (codec->driver->resume && codec->suspended) {
-			switch (codec->bias_level) {
+			switch (codec->dapm->bias_level) {
 			case SND_SOC_BIAS_STANDBY:
 			case SND_SOC_BIAS_OFF:
 				codec->driver->resume(codec);
