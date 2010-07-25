@@ -150,6 +150,9 @@ config SND_SOC_L3
 config SND_SOC_DA7210
         tristate
 
+config SND_SOC_DMIC
+	tristate
+
 config SND_SOC_PCM3008
        tristate
 
