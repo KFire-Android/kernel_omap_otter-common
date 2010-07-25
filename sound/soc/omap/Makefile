@@ -1,9 +1,11 @@
 # OMAP Platform Support
+snd-soc-omap-abe-objs := omap-abe.o
 snd-soc-omap-objs := omap-pcm.o
 snd-soc-omap-dmic-objs := omap-dmic.o
 snd-soc-omap-mcbsp-objs := omap-mcbsp.o
 snd-soc-omap-mcpdm-objs := omap-mcpdm.o mcpdm.o
 
+obj-$(CONFIG_SND_OMAP_SOC_ABE) += snd-soc-omap-abe.o
 obj-$(CONFIG_SND_OMAP_SOC) += snd-soc-omap.o
 obj-$(CONFIG_SND_OMAP_SOC_DMIC) += snd-soc-omap-dmic.o
 obj-$(CONFIG_SND_OMAP_SOC_MCBSP) += snd-soc-omap-mcbsp.o

@@ -9,6 +9,9 @@ config SND_OMAP_SOC_MCBSP
 config SND_OMAP_SOC_MCPDM
 	tristate
 
+config SND_OMAP_SOC_ABE
+	tristate
+
 config SND_OMAP_SOC_DMIC
 	tristate
 
