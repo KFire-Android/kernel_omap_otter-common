@@ -31,13 +31,19 @@
 #include <plat/hardware.h>
 #include <plat/mux.h>
 
-#include "mcpdm.h"
+#include "omap-mcpdm.h"
+#include "omap-abe.h"
 #include "omap-pcm.h"
+#include "omap-mcbsp.h"
 #include "../codecs/twl6040.h"
+
+#ifdef CONFIG_SND_OMAP_SOC_HDMI
+#include "omap-hdmi.h"
+#endif
 
 static int twl6040_power_mode;
 
-static int sdp4430_hw_params(struct snd_pcm_substream *substream,
+static int sdp4430_mcpdm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -63,8 +69,41 @@ static int sdp4430_hw_params(struct snd_pcm_substream *substream,
 	return ret;
 }
 
-static struct snd_soc_ops sdp4430_ops = {
-	.hw_params = sdp4430_hw_params,
+static struct snd_soc_ops sdp4430_mcpdm_ops = {
+	.hw_params = sdp4430_mcpdm_hw_params,
+};
+
+static int sdp4430_mcbsp_hw_params(struct snd_pcm_substream *substream,
+	struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	int ret;
+
+	/* Set cpu DAI configuration */
+	ret = snd_soc_dai_set_fmt(cpu_dai,
+				  SND_SOC_DAIFMT_I2S |
+				  SND_SOC_DAIFMT_NB_NF |
+				  SND_SOC_DAIFMT_CBS_CFS);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set cpu DAI configuration\n");
+		return ret;
+	}
+
+	// TODO: where does this clock come from (external source??) - do we need to enable it
+	/* Set McBSP clock to external */
+	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLKS_FCLK,
+				     64 * params_rate(params),
+				     SND_SOC_CLOCK_IN);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set cpu system clock\n");
+		return ret;
+	}
+	return 0;
+}
+
+static struct snd_soc_ops sdp4430_mcbsp_ops = {
+	.hw_params = sdp4430_mcbsp_hw_params,
 };
 
 /* Headset jack */
@@ -193,23 +232,327 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	return ret;
 }
 
+/* TODO: make this a separate BT CODEC driver or DUMMY */
+static struct snd_soc_dai_driver dai[] = {
+{
+	.name = "Bluetooth",
+	.playback = {
+		.stream_name = "Playback",
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_48000,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+	},
+	.capture = {
+		.stream_name = "Capture",
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_48000,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+	},
+},
+/* TODO: make this a separate FM CODEC driver or DUMMY */
+{
+	.name = "FM Digital",
+	.playback = {
+		.stream_name = "Playback",
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_48000,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+	},
+	.capture = {
+		.stream_name = "Capture",
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_48000,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+	},
+},
+/* TODO: make this a separate FM CODEC driver or DUMMY */
+{
+	.name = "MODEM",
+	.playback = {
+		.stream_name = "Playback",
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_48000,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+	},
+	.capture = {
+		.stream_name = "Capture",
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
+					SNDRV_PCM_RATE_48000,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE,
+	},
+}, };
+
 /* Digital audio interface glue - connects codec <--> CPU */
-static struct snd_soc_dai_link sdp4430_dai = {
-	.name = "TWL6040",
-	.stream_name = "TWL6040",
-	.cpu_dai_name ="omap-mcpdm-dai",
-	.codec_dai_name = "twl6040-hifi",
-	.platform_name = "omap-pcm-audio",
-	.codec_name = "twl6040-codec",
-	.init = sdp4430_twl6040_init,
-	.ops = &sdp4430_ops,
+static struct snd_soc_dai_link sdp4430_dai[] = {
+
+/*
+ * Frontend DAIs - i.e. userspace visible interfaces (ALSA PCMs)
+ */
+
+	{
+		.name = "SDP4430 Media",
+		.stream_name = "Multimedia",
+
+		/* ABE components - MM-UL2 & MM_DL */
+		.cpu_dai_name = "Media",
+		.platform_name = "omap-pcm-audio",
+
+		.dynamic = 1, /* codec DAI is dynamic */
+	},
+	{
+		.name = "SDP4430 Media Capture",
+		.stream_name = "Multimedia Capture",
+
+		/* ABE components - MM-UL 1 */
+		.cpu_dai_name = "Media Capture",
+		.platform_name = "omap-pcm-audio",
+
+		.dynamic = 1, /* codec DAI is dynamic */
+	},
+	{
+		.name = "SDP4430 Voice",
+		.stream_name = "Voice",
+
+		/* ABE components - VX-UL & VX-DL */
+		.cpu_dai_name = "Voice",
+		.platform_name = "omap-pcm-audio",
+
+		.dynamic = 1, /* codec DAI is dynamic */
+	},
+	{
+		.name = "SDP4430 Tones Playback",
+		.stream_name = "Tone Playback",
+
+		/* ABE components - TONES_DL */
+		.cpu_dai_name = "Tones",
+		.platform_name = "omap-pcm-audio",
+
+		.dynamic = 1, /* codec DAI is dynamic */
+	},
+	{
+		.name = "SDP4430 Vibra Playback",
+		.stream_name = "VIB-DL",
+
+		/* ABE components - DMIC UL 2 */
+		.cpu_dai_name = "Vibra",
+		.platform_name = "omap-pcm-audio",
+
+		.dynamic = 1, /* codec DAI is dynamic */
+	},
+
+/*
+ * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.
+ * Matched to above interfaces at runtime, based upon use case.
+ */
+
+	{
+		.name = OMAP_ABE_BE_PDM_DL1,
+		.stream_name = "HS Playback",
+
+		/* ABE components - DL1 */
+		.cpu_dai_name = "omap-mcpdm-dai",
+		.platform_name = "omap-dsp-audio",
+
+		/* Phoenix - DL1 DAC */
+		.codec_dai_name =  "twl6040-dl1",
+		.codec_name = "twl6040-codec",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.init = sdp4430_twl6040_init,
+		.ops = &sdp4430_mcpdm_ops,
+	},
+	{
+		.name = OMAP_ABE_BE_PDM_UL1,
+		.stream_name = "Capture",
+
+		/* ABE components - UL1 */
+		.cpu_dai_name = "omap-mcpdm-dai",
+		.platform_name = "omap-dsp-audio",
+
+		/* Phoenix - UL ADC */
+		.codec_dai_name =  "twl6040-ul",
+		.codec_name = "twl6040-codec",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.ops = &sdp4430_mcpdm_ops,
+	},
+	{
+		.name = OMAP_ABE_BE_PDM_DL2,
+		.stream_name = "HF Playback",
+
+		/* ABE components - DL2 */
+		.cpu_dai_name = "omap-mcpdm-dai",
+		.platform_name = "omap-dsp-audio",
+
+		/* Phoenix - DL2 DAC */
+		.codec_dai_name =  "twl6040-dl2",
+		.codec_name = "twl6040-codec",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.ops = &sdp4430_mcpdm_ops,
+	},
+	{
+		.name = OMAP_ABE_BE_PDM_VIB,
+		.stream_name = "Vibra",
+
+		/* ABE components - VIB1 DL */
+		.cpu_dai_name = "omap-mcpdm-dai",
+		.platform_name = "omap-dsp-audio",
+
+		/* Phoenix - PDM to PWM */
+		.codec_dai_name =  "twl6040-vib",
+		.codec_name = "twl6040-codec",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.ops = &sdp4430_mcpdm_ops,
+	},
+	{
+		.name = OMAP_ABE_BE_BT_VX,
+		.stream_name = "BT",
+
+		/* ABE components - MCBSP1 - BT-VX */
+		.cpu_dai_name = "omap-mcbsp-dai.0",
+		.platform_name = "omap-dsp-audio",
+
+		/* Bluetooth */
+		.codec_dai_name = "Bluetooth",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.no_codec = 1, /* TODO: have a dummy CODEC */
+		.ops = &sdp4430_mcbsp_ops,
+	},
+	{
+		.name = OMAP_ABE_BE_MM_EXT0,
+		.stream_name = "FM",
+
+		/* ABE components - MCBSP2 - MM-EXT */
+		.cpu_dai_name = "omap-mcbsp-dai.1",
+		.platform_name = "omap-dsp-audio",
+
+		/* FM */
+		.codec_dai_name = "FM Digital",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.no_codec = 1, /* TODO: have a dummy CODEC */
+		.ops = &sdp4430_mcbsp_ops,
+	},
+	{
+		.name = OMAP_ABE_BE_MM_EXT1,
+		.stream_name = "MODEM",
+
+		/* ABE components - MCBSP2 - MM-EXT */
+		.cpu_dai_name = "omap-mcbsp-dai.1",
+		.platform_name = "omap-dsp-audio",
+
+		/* MODEM */
+		.codec_dai_name = "MODEM",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.no_codec = 1, /* TODO: have a dummy CODEC */
+		.ops = &sdp4430_mcbsp_ops,
+	},
+	{
+		.name = OMAP_ABE_BE_DMIC1,
+		.stream_name = "D Mic 1",
+
+		/* ABE components - DMIC UL 1 */
+		.cpu_dai_name = "omap-dmic-dai.0",
+		.platform_name = "omap-dsp-audio",
+
+		/* DMIC 1 */
+		.codec_dai_name = "dmic-hifi",
+		.codec_name = "dmic-codec.0",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+	},
+	{
+		.name = OMAP_ABE_BE_DMIC2,
+		.stream_name = "D Mic 2",
+
+		/* ABE components - DMIC UL 1 */
+		.cpu_dai_name = "omap-dmic-dai.1",
+		.platform_name = "omap-dsp-audio",
+
+		/* DMIC 1 */
+		.codec_dai_name = "dmic-hifi",
+		.codec_name = "dmic-codec.1",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+	},
+	{
+		.name = OMAP_ABE_BE_DMIC3,
+		.stream_name = "D Mic 3",
+
+		/* ABE components - DMIC UL 2 */
+		.cpu_dai_name = "omap-dmic-dai.2",
+		.platform_name = "omap-dsp-audio",
+
+		/* DMIC 2 */
+		.codec_dai_name = "dmic-hifi",
+		.codec_name = "dmic-codec.2",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+	},
+#ifdef CONFIG_SND_OMAP_SOC_HDMI_LRG
+	{
+		.name = "hdmi",
+		.stream_name = "HDMI",
+
+		.cpu_dai_drv = &hdmi_dai,
+		.cpu_dai_name = 0,
+		.platform_name = "omap-pcm-audio",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.no_codec = 1, /* TODO: have a dummy CODEC */
+	},
+#endif
+	{
+		.name = "Debug to McBSP",
+		.stream_name = "Multimedia",
+
+		/* ABE components - MCBSP2 - MM-EXT */
+		.cpu_dai_name = "omap-mcbsp-dai.1",
+		.platform_name = "omap-pcm-audio",
+
+		/* FM */
+		.codec_dai_name = "FM Digital",
+
+		.no_codec = 1, /* TODO: have a dummy CODEC */
+		.ops = &sdp4430_mcbsp_ops,
+	},
+	{
+		.name = "Debug to McPDM",
+		.stream_name = "Multimedia",
+
+		/* ABE components - DL1 */
+		.cpu_dai_name = "omap-mcpdm-dai",
+		.platform_name = "omap-pcm-audio",
+
+		/* Phoenix - DL1 DAC */
+		.codec_dai_name =  "twl6040-dl1",
+		.codec_name = "twl6040-codec",
+
+		.ops = &sdp4430_mcpdm_ops,
+	}
 };
 
 /* Audio machine driver */
 static struct snd_soc_card snd_soc_sdp4430 = {
 	.name = "SDP4430",
-	.dai_link = &sdp4430_dai,
-	.num_links = 1,
+	.dai_link = sdp4430_dai,
+	.num_links = ARRAY_SIZE(sdp4430_dai),
 };
 
 static struct platform_device *sdp4430_snd_device;
@@ -229,6 +572,8 @@ static int __init sdp4430_soc_init(void)
 		printk(KERN_ERR "Platform device allocation failed\n");
 		return -ENOMEM;
 	}
+
+	snd_soc_register_dais(&sdp4430_snd_device->dev, dai, ARRAY_SIZE(dai));
 
 	platform_set_drvdata(sdp4430_snd_device, &snd_soc_sdp4430);
 
