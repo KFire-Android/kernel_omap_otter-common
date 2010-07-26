@@ -215,13 +215,15 @@ void dss_sdi_disable(void)
 
 void dss_dump_clocks(struct seq_file *s)
 {
-	unsigned long dpll4_ck_rate;
-	unsigned long dpll4_m4_ck_rate;
+	unsigned long dpll4_ck_rate = 0;
+	unsigned long dpll4_m4_ck_rate = 0;
 
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
-	dpll4_ck_rate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
-	dpll4_m4_ck_rate = clk_get_rate(dss.dpll4_m4_ck);
+	if (cpu_is_omap34xx()) {
+		dpll4_ck_rate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
+		dpll4_m4_ck_rate = clk_get_rate(dss.dpll4_m4_ck);
+	}
 
 	seq_printf(s, "- DSS -\n");
 
@@ -250,10 +252,13 @@ void dss_dump_regs(struct seq_file *s)
 	DUMPREG(DSS_REVISION);
 	DUMPREG(DSS_SYSCONFIG);
 	DUMPREG(DSS_SYSSTATUS);
-	DUMPREG(DSS_IRQSTATUS);
+	if (!cpu_is_omap44xx())
+		DUMPREG(DSS_IRQSTATUS);
 	DUMPREG(DSS_CONTROL);
+#ifdef CONFIG_OMAP2_DSS_SDI
 	DUMPREG(DSS_SDI_CONTROL);
 	DUMPREG(DSS_PLL_CONTROL);
+#endif
 	DUMPREG(DSS_SDI_STATUS);
 
 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
@@ -321,13 +326,15 @@ enum dss_clk_source dss_get_dsi_clk_source(void)
 /* calculate clock rates using dividers in cinfo */
 int dss_calc_clock_rates(struct dss_clock_info *cinfo)
 {
-	unsigned long prate;
+	unsigned long prate = 0;
 
 	if (cinfo->fck_div > (cpu_is_omap3630() ? 32 : 16) ||
 						cinfo->fck_div == 0)
 		return -EINVAL;
 
-	prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
+	if (cpu_is_omap34xx()) {
+		prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
+	}
 
 	cinfo->fck = prate / cinfo->fck_div;
 
