@@ -279,4 +279,53 @@ static inline void *snd_soc_dai_get_drvdata(struct snd_soc_dai *dai)
 	return dev_get_drvdata(dai->dev);
 }
 
+/* Backend DAI PCM ops */
+static inline int snd_soc_dai_startup(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	if (dai->driver->ops->startup)
+		return dai->driver->ops->startup(substream, dai);
+	return 0;
+}
+
+static inline void snd_soc_dai_shutdown(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	if (dai->driver->ops->shutdown)
+		dai->driver->ops->shutdown(substream, dai);
+}
+
+static inline int snd_soc_dai_hw_params(struct snd_pcm_substream * substream,
+		struct snd_pcm_hw_params *hw_params, struct snd_soc_dai *dai)
+{
+	if (dai->driver->ops->hw_params)
+		return dai->driver->ops->hw_params(substream, hw_params, dai);
+	return 0;
+}
+
+static inline int snd_soc_dai_hw_free(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	if (dai->driver->ops->hw_free)
+		return dai->driver->ops->hw_free(substream, dai);
+	return 0;
+}
+
+static inline int snd_soc_dai_prepare(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	if (dai->driver->ops->prepare)
+		return dai->driver->ops->prepare(substream, dai);
+	return 0;
+}
+
+static inline int snd_soc_dai_trigger(struct snd_pcm_substream *substream,
+	int cmd, struct snd_soc_dai *dai)
+{
+	if (dai->driver->ops->trigger)
+		return dai->driver->ops->trigger(substream, cmd, dai);
+	return 0;
+}
+
+
 #endif

@@ -265,6 +265,22 @@ int snd_soc_codec_set_cache_io(struct snd_soc_codec *codec,
 			       int addr_bits, int data_bits,
 			       enum snd_soc_control_type control);
 
+/* pcm <-> DAI connect */
+void snd_soc_free_pcms(struct snd_soc_codec *codec);
+int snd_soc_new_pcms(struct snd_soc_codec *codec, int idx, const char *xid);
+
+/* DAI operations - for backend DAIs */
+int snd_soc_pcm_open(struct snd_pcm_substream *substream);
+int snd_soc_pcm_close(struct snd_pcm_substream *substream);
+int snd_soc_pcm_prepare(struct snd_pcm_substream *substream);
+int snd_soc_pcm_hw_params(struct snd_pcm_substream *substream,
+				struct snd_pcm_hw_params *params);
+int snd_soc_pcm_hw_free(struct snd_pcm_substream *substream);
+int snd_soc_pcm_trigger(struct snd_pcm_substream *substream, int cmd);
+snd_pcm_uframes_t snd_soc_pcm_pointer(struct snd_pcm_substream *substream);
+struct snd_pcm_substream *snd_soc_get_dai_substream(struct snd_soc_card *card,
+		const char *dai_link, int stream);
+
 /* Utility functions to get clock rates from various things */
 int snd_soc_calc_frame_size(int sample_size, int channels, int tdm_slots);
 int snd_soc_params_to_frame_size(struct snd_pcm_hw_params *params);
@@ -547,6 +563,12 @@ struct snd_soc_dai_link {
 
 	/* Symmetry requirements */
 	unsigned int symmetric_rates:1;
+	/* No PCM created for this DAI link */
+	unsigned int no_pcm:1;
+	/* This DAI link can change CODEC and platform at runtime*/
+	unsigned int dynamic:1;
+	/* This DAI link has no codec side driver*/
+	unsigned int no_codec:1;
 
 	/* codec/machine specific init - e.g. add machine controls */
 	int (*init)(struct snd_soc_pcm_runtime *rtd);
@@ -602,6 +624,7 @@ struct snd_soc_pcm_runtime  {
 	struct device dev;
 	struct snd_soc_card *card;
 	struct snd_soc_dai_link *dai_link;
+	struct mutex pcm_mutex;
 
 	unsigned int complete:1;
 	unsigned int dev_registered:1;
