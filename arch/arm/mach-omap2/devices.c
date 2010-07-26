@@ -35,6 +35,7 @@
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap4-keypad.h>
+#include <sound/omap-abe-dsp.h>
 
 #include "mux.h"
 
@@ -316,6 +317,73 @@ static inline void omap_init_mbox(void)
 #else
 static inline void omap_init_mbox(void) { }
 #endif /* CONFIG_OMAP_MBOX_FWK */
+
+#if defined CONFIG_ARCH_OMAP4
+
+static struct omap4_abe_dsp_pdata omap4_abe_dsp_config = {
+	/* FIXME: dsp */
+//	int (*device_enable) (struct platform_device *pdev);
+	//int (*device_shutdown) (struct platform_device *pdev);
+//	int (*device_idle) (struct platform_device *pdev);
+};
+
+static struct platform_device codec_dmic0 = {
+	.name	= "dmic-codec",
+	.id	= 0,
+};
+
+static struct platform_device codec_dmic1 = {
+	.name	= "dmic-codec",
+	.id	= 1,
+};
+
+static struct platform_device codec_dmic2 = {
+	.name	= "dmic-codec",
+	.id	= 2,
+};
+
+static struct platform_device omap_abe_dai = {
+	.name	= "omap-abe-dai",
+	.id	= -1,
+};
+
+static struct platform_device omap_dsp_audio = {
+	.name	= "omap-dsp-audio",
+	.id	= -1,
+	.dev		= {
+		.platform_data = &omap4_abe_dsp_config,
+	},
+};
+
+static struct platform_device omap_dmic_dai0 = {
+	.name	= "omap-dmic-dai",
+	.id	= 0,
+};
+
+static struct platform_device omap_dmic_dai1 = {
+	.name	= "omap-dmic-dai",
+	.id	= 1,
+};
+
+static struct platform_device omap_dmic_dai2 = {
+	.name	= "omap-dmic-dai",
+	.id	= 2,
+};
+
+static inline void omap_init_abe(void)
+{
+	platform_device_register(&codec_dmic0);
+	platform_device_register(&codec_dmic1);
+	platform_device_register(&codec_dmic2);
+	platform_device_register(&omap_abe_dai);
+	platform_device_register(&omap_dsp_audio);
+	platform_device_register(&omap_dmic_dai0);
+	platform_device_register(&omap_dmic_dai1);
+	platform_device_register(&omap_dmic_dai2);
+}
+#else
+static inline void omap_init_abe(void) {}
+#endif
 
 #if defined(CONFIG_OMAP_STI)
 
@@ -852,6 +920,7 @@ static int __init omap2_init_devices(void)
 	 * in alphabetical order so they're easier to sort through.
 	 */
 	omap_init_32k();
+	omap_init_abe();
 	omap_init_audio();
 	omap_init_camera();
 	omap_init_mbox();
