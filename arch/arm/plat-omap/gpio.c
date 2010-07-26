@@ -1064,22 +1064,19 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
 	}
 #endif
-	if (!cpu_class_is_omap1()) {
-		if (!bank->mod_usage) {
-			void __iomem *reg = bank->base;
-			u32 ctrl;
-
-			if (cpu_is_omap24xx() || cpu_is_omap34xx())
-				reg += OMAP24XX_GPIO_CTRL;
-			else if (cpu_is_omap44xx())
-				reg += OMAP4_GPIO_CTRL;
-			ctrl = __raw_readl(reg);
-			/* Module is enabled, clocks are not gated */
-			ctrl &= 0xFFFFFFFE;
-			__raw_writel(ctrl, reg);
-		}
-		bank->mod_usage |= 1 << offset;
+	if ((!bank->mod_usage) && (!cpu_class_is_omap1())) {
+		void __iomem *reg = bank->base;
+		u32 ctrl;
+		if (bank->method == METHOD_GPIO_24XX)
+			reg += OMAP24XX_GPIO_CTRL;
+		else if (bank->method == METHOD_GPIO_44XX)
+			reg += OMAP4_GPIO_CTRL;
+		ctrl = __raw_readl(reg);
+		/* Module is enabled, clocks are not gated */
+		ctrl &= 0xFFFFFFFE;
+		__raw_writel(ctrl, reg);
 	}
+	bank->mod_usage |= 1 << offset;
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;
@@ -1112,21 +1109,19 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
 		__raw_writel(1 << offset, reg);
 	}
 #endif
-	if (!cpu_class_is_omap1()) {
-		bank->mod_usage &= ~(1 << offset);
-		if (!bank->mod_usage) {
-			void __iomem *reg = bank->base;
-			u32 ctrl;
+	bank->mod_usage &= ~(1 << offset);
+	if ((!bank->mod_usage) && (!cpu_class_is_omap1())) {
+		void __iomem *reg = bank->base;
+		u32 ctrl;
 
-			if (cpu_is_omap24xx() || cpu_is_omap34xx())
-				reg += OMAP24XX_GPIO_CTRL;
-			else if (cpu_is_omap44xx())
-				reg += OMAP4_GPIO_CTRL;
-			ctrl = __raw_readl(reg);
-			/* Module is disabled, clocks are gated */
-			ctrl |= 1;
-			__raw_writel(ctrl, reg);
-		}
+		if (bank->method == METHOD_GPIO_24XX)
+			reg += OMAP24XX_GPIO_CTRL;
+		else if (bank->method == METHOD_GPIO_44XX)
+			reg += OMAP4_GPIO_CTRL;
+		ctrl = __raw_readl(reg);
+		/* Module is disabled, clocks are gated */
+		ctrl |= 1;
+		__raw_writel(ctrl, reg);
 	}
 	_reset_gpio(bank, bank->chip.base + offset);
 	spin_unlock_irqrestore(&bank->lock, flags);
