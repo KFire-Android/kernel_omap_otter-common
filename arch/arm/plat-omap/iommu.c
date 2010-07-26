@@ -741,6 +741,26 @@ void eventfd_notification(struct iommu *obj)
 		eventfd_signal(fd_reg->evt_ctx, 1);
 }
 
+int iommu_notify_event(struct iommu *obj, int event, void *data) {
+	return blocking_notifier_call_chain(&obj->notifier, event, data);
+}
+
+int iommu_register_notifier(struct iommu *obj, struct notifier_block *nb)
+{
+	if (!nb)
+		return -EINVAL;
+	return blocking_notifier_chain_register(&obj->notifier, nb);
+}
+EXPORT_SYMBOL_GPL(iommu_register_notifier);
+
+int iommu_unregister_notifier(struct iommu *obj, struct notifier_block *nb)
+{
+	if (!nb)
+		return -EINVAL;
+	return blocking_notifier_chain_unregister(&obj->notifier, nb);
+}
+EXPORT_SYMBOL_GPL(iommu_unregister_notifier);
+
 /*
  *	Device IOMMU generic operations
  */
@@ -756,10 +776,9 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
 
 	eventfd_notification(obj);
 	/* Dynamic loading TLB or PTE */
-	if (obj->isr)
-		err = obj->isr(obj);
+	err = iommu_notify_event(obj, IOMMU_FAULT, data);
 
-	if (!err)
+	if (err == NOTIFY_OK)
 		return IRQ_HANDLED;
 	stat = iommu_report_fault(obj, &da);
 	if (!stat)
@@ -881,6 +900,7 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&obj->event_list);
 
 	obj->regbase = pdata->io_base;
+	BLOCKING_INIT_NOTIFIER_HEAD(&obj->notifier);
 
 	err = request_irq(pdata->irq, iommu_fault_handler, IRQF_SHARED,
 			  dev_name(&pdev->dev), obj);

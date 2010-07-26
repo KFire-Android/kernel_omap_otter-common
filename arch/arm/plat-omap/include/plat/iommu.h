@@ -45,7 +45,9 @@ struct iommu {
 
 	struct list_head	mmap;
 	struct mutex		mmap_lock; /* protect mmap */
-	int (*isr)(struct iommu *obj);
+
+	struct blocking_notifier_head	notifier;
+
 	void *ctx; /* iommu context: registres saved area */
 
 	struct platform_device *pdev;
@@ -105,6 +107,11 @@ struct iommu_functions {
 	ssize_t (*dump_ctx)(struct iommu *obj, char *buf, ssize_t len);
 };
 
+enum {
+	IOMMU_FAULT,
+	IOMMU_CLOSE,
+};
+
 struct iommu_platform_data {
 	const char *name;
 	const char *oh_name;
@@ -150,6 +157,12 @@ extern u32 iommu_arch_version(void);
 
 extern void iotlb_cr_to_e(struct cr_regs *cr, struct iotlb_entry *e);
 extern u32 iotlb_cr_to_virt(struct cr_regs *cr);
+
+extern int iommu_register_notifier(struct iommu *obj,
+						struct notifier_block *nb);
+extern int iommu_unregister_notifier(struct iommu *obj,
+						struct notifier_block *nb);
+extern int iommu_notify_event(struct iommu *obj, int event, void *data);
 
 extern int load_iotlb_entry(struct iommu *obj, struct iotlb_entry *e);
 extern void iommu_set_twl(struct iommu *obj, bool on);
