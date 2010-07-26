@@ -91,6 +91,9 @@ struct omap_gpio_platform_data {
 	struct omap_gpio_dev_attr *gpio_attr;
 };
 
+/* TODO: Analyze removing gpio_bank_count usage from driver code */
+extern int gpio_bank_count;
+
 extern int omap_gpio_init(void);	/* Call from board init only */
 extern void omap2_gpio_prepare_for_idle(int power_state);
 extern void omap2_gpio_resume_after_idle(void);
