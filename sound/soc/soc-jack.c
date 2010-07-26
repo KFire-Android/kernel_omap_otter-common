@@ -88,15 +88,15 @@ void snd_soc_jack_report(struct snd_soc_jack *jack, int status, int mask)
 			enable = !enable;
 
 		if (enable)
-			snd_soc_dapm_enable_pin(codec, pin->pin);
+			snd_soc_dapm_enable_pin(codec->dapm, pin->pin);
 		else
-			snd_soc_dapm_disable_pin(codec, pin->pin);
+			snd_soc_dapm_disable_pin(codec->dapm, pin->pin);
 	}
 
 	/* Report before the DAPM sync to help users updating micbias status */
 	blocking_notifier_call_chain(&jack->notifier, status, NULL);
 
-	snd_soc_dapm_sync(codec);
+	snd_soc_dapm_sync(codec->dapm);
 
 	snd_jack_report(jack->jack, status);
 

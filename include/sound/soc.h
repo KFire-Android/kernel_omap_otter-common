@@ -238,6 +238,7 @@ struct soc_enum;
 struct snd_soc_ac97_ops;
 struct snd_soc_jack;
 struct snd_soc_jack_pin;
+struct snd_soc_dapm_context;
 
 #ifdef CONFIG_GPIOLIB
 struct snd_soc_jack_gpio;
@@ -468,12 +469,7 @@ struct snd_soc_codec {
 	void *reg_cache;
 
 	/* dapm */
-	u32 pop_time;
-	struct list_head dapm_widgets;
-	struct list_head dapm_paths;
-	enum snd_soc_bias_level bias_level;
-	enum snd_soc_bias_level suspend_bias_level;
-	struct delayed_work delayed_work;
+	struct snd_soc_dapm_context *dapm;
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_codec_root;
@@ -547,6 +543,10 @@ struct snd_soc_platform {
 	struct snd_soc_card *card;
 	struct list_head list;
 	struct list_head card_list;
+	int num_dai;
+
+	/* dapm */
+	struct snd_soc_dapm_context *dapm;
 };
 
 struct snd_soc_dai_link {

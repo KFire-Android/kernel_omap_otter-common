@@ -259,18 +259,18 @@ static void soc_init_codec_debugfs(struct snd_soc_codec *codec)
 
 	codec->debugfs_pop_time = debugfs_create_u32("dapm_pop_time", 0744,
 						     codec->debugfs_codec_root,
-						     &codec->pop_time);
+						     &codec->dapm->pop_time);
 	if (!codec->debugfs_pop_time)
 		printk(KERN_WARNING
 		       "Failed to create pop time debugfs file\n");
 
-	codec->debugfs_dapm = debugfs_create_dir("dapm",
+	codec->dapm->debugfs_dapm = debugfs_create_dir("dapm",
 						 codec->debugfs_codec_root);
-	if (!codec->debugfs_dapm)
+	if (!codec->dapm->debugfs_dapm)
 		printk(KERN_WARNING
 		       "Failed to create DAPM debugfs directory\n");
 
-	snd_soc_dapm_debugfs_init(codec);
+	snd_soc_dapm_debugfs_init(codec->dapm);
 }
 
 static void soc_cleanup_codec_debugfs(struct snd_soc_codec *codec)
@@ -1289,6 +1289,10 @@ static void soc_remove_dai_link(struct snd_soc_card *card, int num)
 			if (err < 0)
 				printk(KERN_ERR "asoc: failed to remove %s\n", platform->name);
 		}
+
+		/* Make sure all DAPM widgets are freed */
+		snd_soc_dapm_free(platform->dapm);
+
 		platform->probed = 0;
 		list_del(&platform->card_list);
 		module_put(platform->dev->driver->owner);
@@ -1303,7 +1307,7 @@ static void soc_remove_dai_link(struct snd_soc_card *card, int num)
 		}
 
 		/* Make sure all DAPM widgets are freed */
-		snd_soc_dapm_free(codec);
+		snd_soc_dapm_free(codec->dapm);
 
 		soc_cleanup_codec_debugfs(codec);
 		device_remove_file(&rtd->dev, &dev_attr_codec_reg);
@@ -1361,6 +1365,9 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num)
 				return ret;
 			}
 		}
+		/* Make sure all DAPM widgets are instantiated */
+		snd_soc_dapm_new_widgets(platform->dapm);
+
 		cpu_dai->probed = 1;
 		/* mark cpu_dai as probed and add to card cpu_dai list */
 		list_add(&cpu_dai->card_list, &card->dai_dev_list);
@@ -1426,8 +1433,8 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num)
 	}
 
 	/* Make sure all DAPM widgets are instantiated */
-	snd_soc_dapm_new_widgets(codec);
-	snd_soc_dapm_sync(codec);
+	snd_soc_dapm_new_widgets(codec->dapm);
+	snd_soc_dapm_sync(codec->dapm);
 
 	/* register the rtd device */
 	rtd->dev.init_name = rtd->dai_link->stream_name;
@@ -2939,6 +2946,21 @@ static inline char *fmt_multiple_name(struct device *dev,
 	return kstrdup(dai_drv->name, GFP_KERNEL);
 }
 
+static struct snd_soc_dapm_context *soc_new_dapm_context(struct device *dev)
+{
+	struct snd_soc_dapm_context *dapm;
+
+	dapm = kzalloc(sizeof(struct snd_soc_dapm_context), GFP_KERNEL);
+	if (dapm) {
+			INIT_LIST_HEAD(&dapm->widgets);
+			INIT_LIST_HEAD(&dapm->paths);
+			dapm->bias_level = SND_SOC_BIAS_OFF;
+			dapm->dev = dev;
+	}
+	return dapm;
+}
+
+
 /**
  * snd_soc_register_dai - Register a DAI with the ASoC core
  *
@@ -3094,6 +3116,14 @@ int snd_soc_register_platform(struct device *dev,
 		return -ENOMEM;
 	}
 
+	platform->dapm = soc_new_dapm_context(dev);
+	if (platform->dapm == NULL) {
+		kfree(platform->name);
+		kfree(platform);
+		return -ENOMEM;
+	}
+	platform->dapm->platform = platform;
+
 	platform->dev = dev;
 	platform->driver = platform_drv;
 
@@ -3130,6 +3160,7 @@ found:
 
 	pr_debug("Unregistered platform '%s'\n", platform->name);
 	kfree(platform->name);
+	kfree(platform->dapm);
 	kfree(platform);
 }
 EXPORT_SYMBOL_GPL(snd_soc_unregister_platform);
@@ -3194,6 +3225,13 @@ int snd_soc_register_codec(struct device *dev,
 		kfree(codec);
 		return -ENOMEM;
 	}
+	codec->dapm = soc_new_dapm_context(dev);
+	if (codec->dapm == NULL) {
+		kfree(codec->name);
+		kfree(codec);
+		return -ENOMEM;
+	}
+	codec->dapm->codec = codec;
 
 	/* allocate CODEC register cache */
 	if (codec_drv->reg_cache_size && codec_drv->reg_word_size) {
@@ -3207,6 +3245,7 @@ int snd_soc_register_codec(struct device *dev,
 
 		if (codec->reg_cache == NULL) {
 			kfree(codec->name);
+			kfree(codec->dapm);
 			kfree(codec);
 			return -ENOMEM;
 		}
@@ -3214,11 +3253,8 @@ int snd_soc_register_codec(struct device *dev,
 
 	codec->dev = dev;
 	codec->driver = codec_drv;
-	codec->bias_level = SND_SOC_BIAS_OFF;
 	codec->num_dai = num_dai;
 	mutex_init(&codec->mutex);
-	INIT_LIST_HEAD(&codec->dapm_widgets);
-	INIT_LIST_HEAD(&codec->dapm_paths);
 
 	for (i = 0; i < num_dai; i++) {
 		fixup_codec_formats(&dai_drv[i].playback);
@@ -3245,6 +3281,7 @@ error:
 	if (codec->reg_cache)
 		kfree(codec->reg_cache);
 	kfree(codec->name);
+	kfree(codec->dapm);
 	kfree(codec);
 	return ret;
 }
@@ -3278,6 +3315,8 @@ found:
 
 	if (codec->reg_cache)
 		kfree(codec->reg_cache);
+	kfree(codec->name);
+	kfree(codec->dapm);
 	kfree(codec);
 }
 EXPORT_SYMBOL_GPL(snd_soc_unregister_codec);
