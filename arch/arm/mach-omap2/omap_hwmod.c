@@ -654,12 +654,6 @@ static void _sysc_enable(struct omap_hwmod *oh)
 		_set_master_standbymode(oh, idlemode, &v);
 	}
 
-	if (sf & SYSC_HAS_AUTOIDLE) {
-		idlemode = (oh->flags & HWMOD_NO_OCP_AUTOIDLE) ?
-			0 : 1;
-		_set_module_autoidle(oh, idlemode, &v);
-	}
-
 	/* XXX OCP ENAWAKEUP bit? */
 
 	/*
@@ -671,6 +665,18 @@ static void _sysc_enable(struct omap_hwmod *oh)
 	    (sf & SYSC_HAS_CLOCKACTIVITY))
 		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
 
+	_write_sysconfig(v, oh);
+
+	/* Set the auto idle bit only after setting the smartidle bit
+	 * as this is requirement for some modules like USBOTG
+	 * setting this will not have any impact on the other modues.
+	 */
+
+	if (sf & SYSC_HAS_AUTOIDLE) {
+		idlemode = (oh->flags & HWMOD_NO_OCP_AUTOIDLE) ?
+			0 : 1;
+		_set_module_autoidle(oh, idlemode, &v);
+	}
 	_write_sysconfig(v, oh);
 }
 
@@ -1021,7 +1027,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
 {
 	int i, r;
 	u8 skip_setup_idle;
-	
+
 	if (!oh || !data)
 		return -EINVAL;
 

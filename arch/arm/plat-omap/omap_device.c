@@ -756,3 +756,45 @@ int omap_device_enable_clocks(struct omap_device *od)
 	/* XXX pass along return value here? */
 	return 0;
 }
+
+/**
+ * omap_device_enable_wakeup - Enable the wakeup bit
+ * @od: struct omap_device *od
+ *
+ * Enable the wakup bit for omap_hwmods associated
+ * with the omap_device.  Returns 0.
+ */
+
+int omap_device_enable_wakeup(struct omap_device *od)
+{
+	struct omap_hwmod *oh;
+	int i;
+
+	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++)
+		omap_hwmod_enable_wakeup(oh);
+
+	/* XXX pass along return value here? */
+	return 0;
+}
+
+/**
+ * omap_device_disable_wakeup -Disable the wakeup bit
+ * @od: struct omap_device *od
+ *
+ * Disable the wakup bit for omap_hwmods associated
+ * with the omap_device.  Returns 0.
+ */
+
+
+int omap_device_disable_wakeup(struct omap_device *od)
+{
+	struct omap_hwmod *oh;
+	int i;
+
+	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++)
+		omap_hwmod_disable_wakeup(oh);
+
+	/* XXX pass along return value here? */
+	return 0;
+}
+
