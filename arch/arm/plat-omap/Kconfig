@@ -41,6 +41,8 @@ config ARCH_OMAP4
 	select ARM_ERRATA_720789
 	select ARM_THUMB
 	select ARM_THUMBEE
+	select DEVTMPFS
+	select UNIX
 endchoice
 
 comment "OMAP Feature Selections"
