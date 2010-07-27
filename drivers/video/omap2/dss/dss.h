@@ -229,7 +229,8 @@ int dss_sdi_enable(void);
 void dss_sdi_disable(void);
 
 void dss_select_dispc_clk_source(enum dss_clk_source clk_src);
-void dss_select_dsi_clk_source(enum dss_clk_source clk_src);
+void dss_select_dsi_clk_source(enum omap_dsi_index ix,
+		enum dss_clk_source clk_src);
 enum dss_clk_source dss_get_dispc_clk_source(void);
 enum dss_clk_source dss_get_dsi_clk_source(void);
 
@@ -263,25 +264,29 @@ static inline void sdi_exit(void)
 #ifdef CONFIG_OMAP2_DSS_DSI
 int dsi_init(struct platform_device *pdev);
 void dsi_exit(void);
+int dsi2_init(struct platform_device *pdev);
+void dsi2_exit(void);
 
-void dsi_dump_clocks(enum omap_channel channel,
-		struct seq_file *s);
-void dsi_dump_irqs(struct seq_file *s);
-void dsi_dump_regs(struct seq_file *s);
+void dsi_dump_clocks(enum omap_dsi_index ix,
+		enum omap_channel channel, struct seq_file *s);
+void dsi_dump_irqs(enum omap_dsi_index ix, struct seq_file *s);
+void dsi_dump_regs(enum omap_dsi_index ix, struct seq_file *s);
 
 void dsi_save_context(void);
 void dsi_restore_context(void);
 
 int dsi_init_display(struct omap_dss_device *display);
 irqreturn_t dsi_irq_handler(int irq, void *arg);
-unsigned long dsi_get_dsi1_pll_rate(void);
-int dsi_pll_set_clock_div(struct dsi_clock_info *cinfo);
-int dsi_pll_calc_clock_div_pck(bool is_tft, unsigned long req_pck,
+unsigned long dsi_get_dsi1_pll_rate(enum omap_dsi_index ix);
+int dsi_pll_set_clock_div(enum omap_dsi_index ix,
+		struct dsi_clock_info *cinfo);
+int dsi_pll_calc_clock_div_pck(enum omap_dsi_index ix,
+		bool is_tft, unsigned long req_pck,
 		struct dsi_clock_info *cinfo,
 		struct dispc_clock_info *dispc_cinfo);
 int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
 		bool enable_hsdiv);
-void dsi_pll_uninit(void);
+void dsi_pll_uninit(enum omap_dsi_index ix);
 void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
 		u32 *fifo_low, u32 *fifo_high);
