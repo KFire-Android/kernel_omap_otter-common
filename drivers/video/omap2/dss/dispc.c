@@ -1295,9 +1295,12 @@ void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high)
 	if (cpu_is_omap24xx())
 		dispc_write_reg(ftrs_reg[plane],
 				FLD_VAL(high, 24, 16) | FLD_VAL(low, 8, 0));
-	else
+	else if (cpu_is_omap34xx())
 		dispc_write_reg(ftrs_reg[plane],
 				FLD_VAL(high, 27, 16) | FLD_VAL(low, 11, 0));
+	else /* cpu is omap44xx */
+		dispc_write_reg(ftrs_reg[plane],
+				FLD_VAL(high, 31, 16) | FLD_VAL(low, 15, 0));
 
 	enable_clocks(0);
 }
