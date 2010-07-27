@@ -75,13 +75,13 @@ static struct omap_mcpdm_link omap_mcpdm_links[] = {
 	/* downlink */
 	{
 		.irq_mask = MCPDM_DN_IRQ_EMPTY | MCPDM_DN_IRQ_FULL,
-		.threshold = 1,
+		.threshold = 2,
 		.format = PDMOUTFORMAT_LJUST,
 	},
 	/* uplink */
 	{
 		.irq_mask = MCPDM_UP_IRQ_EMPTY | MCPDM_UP_IRQ_FULL,
-		.threshold = 1,
+		.threshold = 2,
 		.format = PDMOUTFORMAT_LJUST,
 	},
 };
