@@ -83,6 +83,27 @@ static inline u32 tilfmt_bpp(enum tiler_fmt fmt)
 		fmt == TILFMT_32BIT ? 4 : 0;
 }
 
+/* Event types */
+#define TILER_DEVICE_CLOSE	0
+
+/**
+ * Registers a notifier block with TILER driver.
+ *
+ * @param nb		notifier_block
+ *
+ * @return error status
+ */
+int tiler_reg_notifier(struct notifier_block *nb);
+
+/**
+ * Un-registers a notifier block with TILER driver.
+ *
+ * @param nb		notifier_block
+ *
+ * @return error status
+ */
+int tiler_unreg_notifier(struct notifier_block *nb);
+
 /**
  * Reserves a 1D or 2D TILER block area and memory for the
  * current process with group ID 0.

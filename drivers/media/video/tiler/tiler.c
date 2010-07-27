@@ -42,6 +42,8 @@
 
 struct tiler_dev {
 	struct cdev cdev;
+
+	struct blocking_notifier_head notifier;
 };
 
 struct platform_driver tiler_driver_ldm = {
@@ -1402,6 +1404,28 @@ s32 tiler_reserve(u32 n, struct tiler_buf_info *b)
 }
 EXPORT_SYMBOL(tiler_reserve);
 
+static int tiler_notify_event(int event, void *data)
+{
+	return blocking_notifier_call_chain(&tiler_device->notifier,
+								event, data);
+}
+
+int tiler_reg_notifier(struct notifier_block *nb)
+{
+	if (!nb)
+		return -EINVAL;
+	return blocking_notifier_chain_register(&tiler_device->notifier, nb);
+}
+EXPORT_SYMBOL(tiler_reg_notifier);
+
+int tiler_unreg_notifier(struct notifier_block *nb)
+{
+	if (!nb)
+		return -EINVAL;
+	return blocking_notifier_chain_unregister(&tiler_device->notifier, nb);
+}
+EXPORT_SYMBOL(tiler_unreg_notifier);
+
 static void __exit tiler_exit(void)
 {
 	struct process_info *pi = NULL, *pi_ = NULL;
@@ -1462,8 +1486,10 @@ static s32 tiler_release(struct inode *ip, struct file *filp)
 
 	mutex_lock(&mtx);
 	/* free resources if last device in this process */
-	if (0 == --pi->refs)
+	if (0 == --pi->refs) {
+		tiler_notify_event(TILER_DEVICE_CLOSE, NULL);
 		_m_free_process_info(pi);
+	}
 
 	mutex_unlock(&mtx);
 
@@ -1553,6 +1579,7 @@ static s32 __init tiler_init(void)
 	INIT_LIST_HEAD(&procs);
 	INIT_LIST_HEAD(&orphan_areas);
 	INIT_LIST_HEAD(&orphan_onedim);
+	BLOCKING_INIT_NOTIFIER_HEAD(&tiler_device->notifier);
 	id = 0xda7a000;
 
 error:
