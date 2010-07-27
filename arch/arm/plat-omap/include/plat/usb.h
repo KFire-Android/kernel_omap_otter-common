@@ -71,6 +71,13 @@ struct omap_musb_board_data {
 	unsigned extvbus:1;
 };
 
+enum musb_state {
+	save_context = 1,
+	disable_clk,
+	restore_context,
+	enable_clk,
+};
+
 enum musb_interface    {MUSB_INTERFACE_ULPI, MUSB_INTERFACE_UTMI};
 
 extern void usb_musb_init(struct omap_musb_board_data *board_data);
@@ -80,7 +87,7 @@ extern void usb_ehci_init(const struct ehci_hcd_omap_platform_data *pdata);
 extern void usb_ohci_init(const struct ohci_hcd_omap_platform_data *pdata);
 
 /* For saving and restoring the musb context during off/wakeup*/
-extern void musb_context_save_restore(int save);
+extern void musb_context_save_restore(enum musb_state state);
 #endif
 
 void omap_usb_init(struct omap_usb_config *pdata);

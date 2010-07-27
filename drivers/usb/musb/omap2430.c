@@ -31,6 +31,7 @@
 #include <linux/list.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/pm_runtime.h>
 
 #include "musb_core.h"
 #include "omap2430.h"
@@ -205,22 +206,6 @@ int __init musb_platform_init(struct musb *musb)
 	}
 
 	musb_platform_resume(musb);
-
-	l = musb_readl(musb->mregs, OTG_SYSCONFIG);
-	l &= ~ENABLEWAKEUP;	/* disable wakeup */
-	l &= ~NOSTDBY;		/* remove possible nostdby */
-	l |= SMARTSTDBY;	/* enable smart standby */
-	l &= ~AUTOIDLE;		/* disable auto idle */
-	l &= ~NOIDLE;		/* remove possible noidle */
-	l |= SMARTIDLE;		/* enable smart idle */
-	/*
-	 * MUSB AUTOIDLE don't work in 3430.
-	 * Workaround by Richard Woodruff/TI
-	 */
-	if (!cpu_is_omap3430())
-		l |= AUTOIDLE;		/* enable auto idle */
-	musb_writel(musb->mregs, OTG_SYSCONFIG, l);
-
 	l = musb_readl(musb->mregs, OTG_INTERFSEL);
 
 	if (data->interface_type == MUSB_INTERFACE_UTMI) {
@@ -253,22 +238,7 @@ int __init musb_platform_init(struct musb *musb)
 void musb_platform_save_context(struct musb *musb,
 		struct musb_context_registers *musb_context)
 {
-	/*
-	 * As per the omap-usbotg specification, configure it to forced standby
-	 * and  force idle mode when no activity on usb.
-	 */
 	void __iomem *musb_base = musb->mregs;
-
-	musb_writel(musb_base, OTG_FORCESTDBY, 0);
-
-	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
-				OTG_SYSCONFIG) & ~(NOSTDBY | SMARTSTDBY));
-
-	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
-					OTG_SYSCONFIG) & ~(AUTOIDLE));
-
-	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
-				OTG_SYSCONFIG) & ~(NOIDLE | SMARTIDLE));
 
 	musb_writel(musb_base, OTG_FORCESTDBY, 1);
 }
@@ -276,25 +246,18 @@ void musb_platform_save_context(struct musb *musb,
 void musb_platform_restore_context(struct musb *musb,
 		struct musb_context_registers *musb_context)
 {
-	/*
-	 * As per the omap-usbotg specification, configure it smart standby
-	 * and smart idle during operation.
-	 */
 	void __iomem *musb_base = musb->mregs;
 
 	musb_writel(musb_base, OTG_FORCESTDBY, 0);
-
-	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
-				OTG_SYSCONFIG) | (SMARTSTDBY));
-
-	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
-				OTG_SYSCONFIG) | (SMARTIDLE));
 }
 #endif
 
 static int musb_platform_suspend(struct musb *musb)
 {
 	u32 l;
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *pdata = dev->platform_data;
+	struct omap_hwmod *oh = pdata->oh;
 
 	if (!musb->clock)
 		return 0;
@@ -304,16 +267,9 @@ static int musb_platform_suspend(struct musb *musb)
 	l |= ENABLEFORCE;	/* enable MSTANDBY */
 	musb_writel(musb->mregs, OTG_FORCESTDBY, l);
 
-	l = musb_readl(musb->mregs, OTG_SYSCONFIG);
-	l |= ENABLEWAKEUP;	/* enable wakeup */
-	musb_writel(musb->mregs, OTG_SYSCONFIG, l);
-
+	pdata->enable_wakeup(oh->od);
 	otg_set_suspend(musb->xceiv, 1);
-
-	if (musb->set_clock)
-		musb->set_clock(musb->clock, 0);
-	else
-		clk_disable(musb->clock);
+	pm_runtime_put_sync(dev);
 
 	return 0;
 }
@@ -321,21 +277,18 @@ static int musb_platform_suspend(struct musb *musb)
 static int musb_platform_resume(struct musb *musb)
 {
 	u32 l;
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *pdata = dev->platform_data;
+	struct omap_hwmod *oh = pdata->oh;
 
 	if (!musb->clock)
 		return 0;
 
 	otg_set_suspend(musb->xceiv, 0);
+	pm_runtime_enable(dev);
+	pm_runtime_get_sync(dev);
 
-	if (musb->set_clock)
-		musb->set_clock(musb->clock, 1);
-	else
-		clk_enable(musb->clock);
-
-	l = musb_readl(musb->mregs, OTG_SYSCONFIG);
-	l &= ~ENABLEWAKEUP;	/* disable wakeup */
-	musb_writel(musb->mregs, OTG_SYSCONFIG, l);
-
+	pdata->disable_wakeup(oh->od);
 	l = musb_readl(musb->mregs, OTG_FORCESTDBY);
 	l &= ~ENABLEFORCE;	/* disable MSTANDBY */
 	musb_writel(musb->mregs, OTG_FORCESTDBY, l);

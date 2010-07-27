@@ -417,7 +417,9 @@ void omap_sram_idle(void)
 			omap3_core_save_context();
 			omap3_prcm_save_context();
 			/* Save MUSB context */
-			musb_context_save_restore(1);
+			musb_context_save_restore(save_context);
+		} else {
+			musb_context_save_restore(disable_clk);
 		}
 	}
 
@@ -461,7 +463,9 @@ void omap_sram_idle(void)
 			omap3_sram_restore_context();
 			omap2_sms_restore_context();
 			/* Restore MUSB context */
-			musb_context_save_restore(0);
+			musb_context_save_restore(restore_context);
+		} else {
+			musb_context_save_restore(enable_clk);
 		}
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);

@@ -23,14 +23,17 @@
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
+#include <linux/hardirq.h>
 
 #include <linux/usb/musb.h>
+#include <linux/pm_runtime.h>
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
 #include <plat/mux.h>
 #include <plat/usb.h>
 #include <plat/omap_device.h>
+#include <plat/omap_hwmod.h>
 
 #ifdef CONFIG_USB_MUSB_SOC
 
@@ -64,10 +67,30 @@ static struct musb_hdrc_platform_data musb_plat = {
 
 static u64 musb_dmamask = DMA_BIT_MASK(32);
 
+static int usb_idle_hwmod(struct omap_device *od)
+{
+	struct omap_hwmod *oh = *od->hwmods;
+	if (in_interrupt())
+		_omap_hwmod_idle(oh);
+	else
+		omap_device_idle_hwmods(od);
+	return 0;
+}
+
+static int usb_enable_hwmod(struct omap_device *od)
+{
+	struct omap_hwmod *oh = *od->hwmods;
+	if (in_interrupt())
+		_omap_hwmod_enable(oh);
+	else
+		omap_device_enable_hwmods(od);
+	return 0;
+}
+
 static struct omap_device_pm_latency omap_musb_latency[] = {
 	  {
-		.deactivate_func = omap_device_idle_hwmods,
-		.activate_func   = omap_device_enable_hwmods,
+		.deactivate_func = usb_idle_hwmod,
+		.activate_func	 = usb_enable_hwmod,
 		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
 	  },
 };
@@ -100,6 +123,18 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 		musb_plat.board_data = board_data;
 		musb_plat.power = board_data->power >> 1;
 		musb_plat.mode = board_data->mode;
+		musb_plat.device_enable = omap_device_enable;
+		musb_plat.device_idle = omap_device_idle;
+		musb_plat.enable_wakeup = omap_device_enable_wakeup;
+		musb_plat.disable_wakeup = omap_device_disable_wakeup;
+		/*
+		 * Errata 1.166 idle_req/ack is broken in omap3430
+		 * workaround is to disable the autodile bit for omap3430.
+		 */
+		if (cpu_is_omap3430())
+			oh->flags |= HWMOD_NO_OCP_AUTOIDLE;
+
+		musb_plat.oh = oh;
 		pdata = &musb_plat;
 
 		od = omap_device_build(name, bus_id, oh, pdata,
@@ -121,22 +156,67 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 	}
 }
 
-void musb_context_save_restore(int save)
+void musb_context_save_restore(enum musb_state state)
 {
 	struct omap_hwmod *oh = omap_hwmod_lookup("usb_otg_hs");
 	struct omap_device *od = oh->od;
 	struct platform_device *pdev = &od->pdev;
 	struct device *dev = &pdev->dev;
 	struct device_driver *drv = dev->driver;
+	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 
 	if (drv) {
 
 		const struct dev_pm_ops *pm = drv->pm;
+#ifdef CONFIG_PM_RUNTIME
 
-		if (save)
+		switch (state) {
+		case save_context:
+			/*Save the context, set the sysconfig setting to
+			 * force standby force idle during idle and disable
+			 * the clock.
+			 */
+			oh->flags |= HWMOD_SWSUP_SIDLE
+					| HWMOD_SWSUP_MSTANDBY;
 			pm->suspend(dev);
-		else
+			pdata->device_idle(pdev);
+			break;
+
+		case disable_clk:
+			/* set the sysconfig setting to force standby,
+			 * force idle during idle and disable
+			 * the clock.
+			 */
+			oh->flags |= HWMOD_SWSUP_SIDLE
+					| HWMOD_SWSUP_MSTANDBY;
+			pdata->device_idle(pdev);
+			break;
+
+		case restore_context:
+			/* Enable the clock, set the sysconfig setting back
+			 * to smart idle and smart stndby after wakeup.
+			 *restore the context.
+			 */
+			oh->flags &= ~(HWMOD_SWSUP_SIDLE
+					| HWMOD_SWSUP_MSTANDBY);
+			pdata->device_enable(pdev);
 			pm->resume_noirq(dev);
+			break;
+
+		case enable_clk:
+			/* set the sysconfig setting back to smart idle and
+			 * smart stndby after wakeup and enable the clock
+			 */
+			oh->flags &= ~(HWMOD_SWSUP_SIDLE
+					| HWMOD_SWSUP_MSTANDBY);
+			pdata->device_enable(pdev);
+			break;
+
+		default:
+			break;
+		}
+#endif
+
 	}
 }
 
