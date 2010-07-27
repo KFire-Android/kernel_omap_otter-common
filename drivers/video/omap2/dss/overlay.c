@@ -586,7 +586,8 @@ void dss_init_overlays(struct platform_device *pdev)
 		case 0:
 			ovl->name = "gfx";
 			ovl->id = OMAP_DSS_GFX;
-			ovl->supported_modes = cpu_is_omap34xx() ?
+			ovl->supported_modes = (cpu_is_omap44xx() |
+				cpu_is_omap34xx()) ?
 				OMAP_DSS_COLOR_GFX_OMAP3 :
 				OMAP_DSS_COLOR_GFX_OMAP2;
 			ovl->caps = OMAP_DSS_OVL_CAP_DISPC;
@@ -596,7 +597,8 @@ void dss_init_overlays(struct platform_device *pdev)
 		case 1:
 			ovl->name = "vid1";
 			ovl->id = OMAP_DSS_VIDEO1;
-			ovl->supported_modes = cpu_is_omap34xx() ?
+			ovl->supported_modes = (cpu_is_omap44xx() |
+				cpu_is_omap34xx()) ?
 				OMAP_DSS_COLOR_VID1_OMAP3 :
 				OMAP_DSS_COLOR_VID_OMAP2;
 			ovl->caps = OMAP_DSS_OVL_CAP_SCALE |
@@ -607,7 +609,8 @@ void dss_init_overlays(struct platform_device *pdev)
 		case 2:
 			ovl->name = "vid2";
 			ovl->id = OMAP_DSS_VIDEO2;
-			ovl->supported_modes = cpu_is_omap34xx() ?
+			ovl->supported_modes = (cpu_is_omap44xx() |
+				cpu_is_omap34xx()) ?
 				OMAP_DSS_COLOR_VID2_OMAP3 :
 				OMAP_DSS_COLOR_VID_OMAP2;
 			ovl->caps = OMAP_DSS_OVL_CAP_SCALE |
