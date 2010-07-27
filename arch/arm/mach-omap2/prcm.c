@@ -183,13 +183,41 @@ static inline void __omap_prcm_write(u32 value, void __iomem *base,
 /* Read a register in a PRM module */
 u32 prm_read_mod_reg(s16 module, u16 idx)
 {
-	return __omap_prcm_read(prm_base, module, idx);
+	u32 base = 0;
+
+	base = (module >> BASE_ID_SHIFT) & BASE_ID_MASK;
+	module &= MOD_MASK;
+
+	switch (base) {
+	case PRCM_MPU_BASE:
+		return __omap_prcm_read(prcm_mpu_base, module, idx);
+	case DEFAULT_BASE:
+		return __omap_prcm_read(prm_base, module, idx);
+	default:
+		pr_err("Unknown PRM submodule base\n");
+	}
+	return 0;
 }
 
 /* Write into a register in a PRM module */
 void prm_write_mod_reg(u32 val, s16 module, u16 idx)
 {
-	__omap_prcm_write(val, prm_base, module, idx);
+	u32 base = 0;
+
+	base = (module >> BASE_ID_SHIFT) & BASE_ID_MASK;
+	module &= MOD_MASK;
+
+	switch (base) {
+	case PRCM_MPU_BASE:
+		__omap_prcm_write(val, prcm_mpu_base, module, idx);
+		break;
+	case DEFAULT_BASE:
+		__omap_prcm_write(val, prm_base, module, idx);
+		break;
+	default:
+		pr_err("Unknown PRM submodule base\n");
+		break;
+	}
 }
 
 /* Read-modify-write a register in a PRM module. Caller must lock */
@@ -241,16 +269,50 @@ u32 omap4_prm_rmw_reg_bits(u32 mask, u32 bits, void __iomem *reg)
 
 	return v;
 }
+
 /* Read a register in a CM module */
 u32 cm_read_mod_reg(s16 module, u16 idx)
 {
-	return __omap_prcm_read(cm_base, module, idx);
+	u32 base = 0;
+
+	base = (module >> BASE_ID_SHIFT) & BASE_ID_MASK;
+	module &= MOD_MASK;
+
+	switch (base) {
+	case PRM_BASE:
+		return __omap_prcm_read(prm_base, module, idx);
+	case CM2_BASE:
+		return __omap_prcm_read(cm2_base, module, idx);
+	case DEFAULT_BASE:
+		return __omap_prcm_read(cm_base, module, idx);
+	default:
+		pr_err("Unknown CM submodule base\n");
+	}
+	return 0;
 }
 
 /* Write into a register in a CM module */
 void cm_write_mod_reg(u32 val, s16 module, u16 idx)
 {
-	__omap_prcm_write(val, cm_base, module, idx);
+	u32 base = 0;
+
+	base = (module >> BASE_ID_SHIFT) & BASE_ID_MASK;
+	module &= MOD_MASK;
+
+	switch (base) {
+	case PRM_BASE:
+		__omap_prcm_write(val, prm_base, module, idx);
+		break;
+	case CM2_BASE:
+		__omap_prcm_write(val, cm2_base, module, idx);
+		break;
+	case DEFAULT_BASE:
+		__omap_prcm_write(val, cm_base, module, idx);
+		break;
+	default:
+		pr_err("Unknown CM submodule base\n");
+		break;
+	}
 }
 
 /* Read-modify-write a register in a CM module. Caller must lock */
