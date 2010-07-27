@@ -272,12 +272,17 @@ void dss_select_dispc_clk_source(enum dss_clk_source clk_src)
 	if (clk_src == DSS_SRC_DSI1_PLL_FCLK)
 		dsi_wait_dsi1_pll_active();
 
-	REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* DISPC_CLK_SWITCH */
+	if (!cpu_is_omap44xx()) {
+		REG_FLD_MOD(DSS_CONTROL, b, 0, 0);      /* DISPC_CLK_SWITCH */
+	} else {
+		REG_FLD_MOD(DSS_CONTROL, b, 9, 8);      /* FCK_CLK_SWITCH */
+	}
 
 	dss.dispc_clk_source = clk_src;
 }
 
-void dss_select_dsi_clk_source(enum dss_clk_source clk_src)
+void dss_select_dsi_clk_source(enum omap_dsi_index ix,
+	enum dss_clk_source clk_src)
 {
 	int b;
 
@@ -289,7 +294,14 @@ void dss_select_dsi_clk_source(enum dss_clk_source clk_src)
 	if (clk_src == DSS_SRC_DSI2_PLL_FCLK)
 		dsi_wait_dsi2_pll_active();
 
-	REG_FLD_MOD(DSS_CONTROL, b, 1, 1);	/* DSI_CLK_SWITCH */
+	if (ix == DSI1) {
+		REG_FLD_MOD(DSS_CONTROL, b, 1, 1);	/* DSI_CLK_SWITCH */
+		if (cpu_is_omap44xx())
+			REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* LCD1_CLK_SWITCH */
+	} else {
+		REG_FLD_MOD(DSS_CONTROL, b, 10, 10);	/* DSI2_CLK_SWITCH */
+		REG_FLD_MOD(DSS_CONTROL, b, 12, 12);	/* LCD2_CLK_SWITCH */
+	}
 
 	dss.dsi_clk_source = clk_src;
 }
