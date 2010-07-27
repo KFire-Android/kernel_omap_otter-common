@@ -48,6 +48,7 @@
 #include <plat/vram.h>
 #include <plat/vrfb.h>
 #include <plat/display.h>
+#include <plat/cpu.h>
 
 #include "omap_voutlib.h"
 #include "omap_voutdef.h"
@@ -57,7 +58,6 @@ MODULE_AUTHOR("Texas Instruments");
 MODULE_DESCRIPTION("OMAP Video for Linux Video out driver");
 MODULE_LICENSE("GPL");
 
-#define OMAP_VIDEO3	2
 
 /* Driver Configuration macros */
 #define VOUT_NAME		"omap_vout"
@@ -65,6 +65,7 @@ MODULE_LICENSE("GPL");
 enum omap_vout_channels {
 	OMAP_VIDEO1,
 	OMAP_VIDEO2,
+	OMAP_VIDEO3,
 };
 
 enum dma_channel_state {
@@ -648,7 +649,7 @@ static int v4l2_rot_to_dss_rot(int v4l2_rotation,
  * start. This offset calculation is mainly required because of
  * the VRFB 32 pixels alignment with rotation.
  */
-static int omap_vout_calculate_offset(struct omap_vout_device *vout)
+static int omap_vout_calculate_offset(struct omap_vout_device *vout, int idx)
 {
 	struct omap_overlay *ovl;
 	enum dss_rotation rotation;
@@ -659,13 +660,13 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout)
 	struct omap_dss_device *cur_display;
 	struct v4l2_rect *crop = &vout->crop;
 	struct v4l2_pix_format *pix = &vout->pix;
-	int *cropped_offset = &vout->cropped_offset;
+	int *cropped_offset = vout->cropped_offset + idx;
 	int vr_ps = 1, ps = 2;
 #ifndef CONFIG_ARCH_OMAP4
 	int temp_ps = 2;
 	int offset = 0;
 #endif
-	int *cropped_uv_offset = &vout->cropped_uv_offset;
+	int *cropped_uv_offset = vout->cropped_uv_offset + idx;
 	int ctop = 0, cleft = 0, line_length = 0;
 	unsigned long addr = 0, uv_addr = 0;
 
@@ -770,12 +771,12 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout)
 	}
 #else
 	/* :TODO: change v4l2 to send TSPtr as tiled addresses to DSS2 */
-	addr = tiler_get_natural_addr(vout->queued_buf_addr[vout->cur_frm->i]);
+	addr = tiler_get_natural_addr(vout->queued_buf_addr[idx]);
 
 	if (OMAP_DSS_COLOR_NV12 == vout->dss_mode) {
 		*cropped_offset = tiler_stride(addr) * crop->top + crop->left;
 		uv_addr = tiler_get_natural_addr(
-			vout->queued_buf_uv_addr[vout->cur_frm->i]);
+			vout->queued_buf_uv_addr[idx]);
 		/* :TODO: only allow even crops for NV12 */
 		*cropped_uv_offset = tiler_stride(uv_addr) * (crop->top >> 1)
 			+ (crop->left & ~1);
@@ -1871,8 +1872,9 @@ static int vidioc_s_fmt_vid_overlay(struct file *file, void *fh,
 
 	ret = omap_vout_new_window(&vout->crop, &vout->win, &vout->fbuf, win);
 	if (!ret) {
-		/* Video1 plane does not support global alpha */
-		if (ovl->id == OMAP_DSS_VIDEO1)
+		/* Video1 plane does not support global alpha for OMAP 2/3 */
+		if ((cpu_is_omap24xx() || cpu_is_omap34xx()) &&
+			    ovl->id == OMAP_DSS_VIDEO1)
 			vout->win.global_alpha = 255;
 		else
 			vout->win.global_alpha = f->fmt.win.global_alpha;
@@ -1963,7 +1965,11 @@ static int vidioc_s_crop(struct file *file, void *fh, struct v4l2_crop *crop)
 	struct omap_overlay *ovl;
 	struct omap_video_timings *timing;
 
-	if (vout->streaming)
+	/* Currently we only allow changing the crop position while
+	   streaming.  */
+	if (vout->streaming &&
+	    (crop->c.height != vout->crop.height ||
+	     crop->c.width != vout->crop.width))
 		return -EBUSY;
 
 	mutex_lock(&vout->lock);
@@ -2220,6 +2226,7 @@ static int vidioc_qbuf(struct file *file, void *fh,
 {
 	struct omap_vout_device *vout = fh;
 	struct videobuf_queue *q = &vout->vbq;
+	int ret = 0;
 
 	if ((V4L2_BUF_TYPE_VIDEO_OUTPUT != buffer->type) ||
 			(buffer->index >= vout->buffer_allocated) ||
@@ -2241,7 +2248,13 @@ static int vidioc_qbuf(struct file *file, void *fh,
 		return -EINVAL;
 	}
 #endif
-	return videobuf_qbuf(q, buffer);
+	ret = videobuf_qbuf(q, buffer);
+	/* record buffer offset from crop window */
+	if (omap_vout_calculate_offset(vout, buffer->index)) {
+		printk(KERN_ERR "Could not calculate buffer offset\n");
+		return -EINVAL;
+	}
+	return ret;
 }
 
 static int vidioc_dqbuf(struct file *file, void *fh, struct v4l2_buffer *b)
@@ -2300,14 +2313,10 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 	vout->first_int = 1;
 
-	if (omap_vout_calculate_offset(vout)) {
-		ret = -EINVAL;
-		goto streamon_err1;
-	}
 	addr = (unsigned long) vout->queued_buf_addr[vout->cur_frm->i]
-		+ vout->cropped_offset;
+		+ vout->cropped_offset[vout->cur_frm->i];
 	uv_addr = (unsigned long) vout->queued_buf_uv_addr[vout->cur_frm->i]
-		+ vout->cropped_uv_offset;
+		+ vout->cropped_uv_offset[vout->cur_frm->i];
 
 	mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN |
 		DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_FRAMEDONE |
