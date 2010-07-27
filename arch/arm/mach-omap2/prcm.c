@@ -36,6 +36,7 @@
 #include "prm-regbits-44xx.h"
 
 static void __iomem *prm_base;
+static void __iomem *prcm_mpu_base;
 static void __iomem *cm_base;
 static void __iomem *cm2_base;
 
@@ -306,6 +307,10 @@ void __init omap2_set_globals_prcm(struct omap_globals *omap2_globals)
 	if (omap2_globals->prm) {
 		prm_base = ioremap(omap2_globals->prm, SZ_8K);
 		WARN_ON(!prm_base);
+	}
+	if (omap2_globals->prcm_mpu) {
+		prcm_mpu_base = ioremap(omap2_globals->prcm_mpu, SZ_8K);
+		WARN_ON(!prcm_mpu_base);
 	}
 	if (omap2_globals->cm) {
 		cm_base = ioremap(omap2_globals->cm, SZ_8K);

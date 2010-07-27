@@ -172,6 +172,7 @@ static struct omap_globals omap4_globals = {
 	.tap	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
 	.ctrl	= OMAP443X_CTRL_BASE,
 	.prm	= OMAP4430_PRM_BASE,
+	.prcm_mpu	= OMAP4430_PRCM_MPU_BASE,
 	.cm	= OMAP4430_CM_BASE,
 	.cm2	= OMAP4430_CM2_BASE,
 	.uart1_phys	= OMAP4_UART1_BASE,

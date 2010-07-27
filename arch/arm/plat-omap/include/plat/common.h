@@ -46,6 +46,7 @@ struct omap_globals {
 	unsigned long   sms;            /* SDRAM Memory Scheduler */
 	unsigned long   ctrl;           /* System Control Module */
 	unsigned long   prm;            /* Power and Reset Management */
+	unsigned long   prcm_mpu;	/* Local MPU PRM */
 	unsigned long   cm;             /* Clock Management */
 	unsigned long   cm2;
 	unsigned long	uart1_phys;
