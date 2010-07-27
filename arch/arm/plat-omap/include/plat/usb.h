@@ -79,6 +79,8 @@ extern void usb_ehci_init(const struct ehci_hcd_omap_platform_data *pdata);
 
 extern void usb_ohci_init(const struct ohci_hcd_omap_platform_data *pdata);
 
+/* For saving and restoring the musb context during off/wakeup*/
+extern void musb_context_save_restore(int save);
 #endif
 
 void omap_usb_init(struct omap_usb_config *pdata);

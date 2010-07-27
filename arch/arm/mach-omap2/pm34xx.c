@@ -39,6 +39,7 @@
 #include <plat/gpmc.h>
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
+#include <plat/usb.h>
 
 #include <asm/tlbflush.h>
 
@@ -415,6 +416,8 @@ void omap_sram_idle(void)
 		if (core_next_state == PWRDM_POWER_OFF) {
 			omap3_core_save_context();
 			omap3_prcm_save_context();
+			/* Save MUSB context */
+			musb_context_save_restore(1);
 		}
 	}
 
@@ -457,6 +460,8 @@ void omap_sram_idle(void)
 			omap3_prcm_restore_context();
 			omap3_sram_restore_context();
 			omap2_sms_restore_context();
+			/* Restore MUSB context */
+			musb_context_save_restore(0);
 		}
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);

@@ -2489,11 +2489,6 @@ static int musb_suspend(struct device *dev)
 	}
 
 	musb_save_context(musb);
-
-	if (musb->set_clock)
-		musb->set_clock(musb->clock, 0);
-	else
-		clk_disable(musb->clock);
 	spin_unlock_irqrestore(&musb->lock, flags);
 	return 0;
 }
@@ -2505,12 +2500,6 @@ static int musb_resume_noirq(struct device *dev)
 
 	if (!musb->clock)
 		return 0;
-
-	if (musb->set_clock)
-		musb->set_clock(musb->clock, 1);
-	else
-		clk_enable(musb->clock);
-
 	musb_restore_context(musb);
 
 	/* for static cmos like DaVinci, register values were preserved

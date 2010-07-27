@@ -121,6 +121,25 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 	}
 }
 
+void musb_context_save_restore(int save)
+{
+	struct omap_hwmod *oh = omap_hwmod_lookup("usb_otg_hs");
+	struct omap_device *od = oh->od;
+	struct platform_device *pdev = &od->pdev;
+	struct device *dev = &pdev->dev;
+	struct device_driver *drv = dev->driver;
+
+	if (drv) {
+
+		const struct dev_pm_ops *pm = drv->pm;
+
+		if (save)
+			pm->suspend(dev);
+		else
+			pm->resume_noirq(dev);
+	}
+}
+
 #else
 void __init usb_musb_init(struct omap_musb_board_data *board_data)
 {

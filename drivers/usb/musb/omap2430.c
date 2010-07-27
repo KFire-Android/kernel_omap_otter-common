@@ -253,15 +253,42 @@ int __init musb_platform_init(struct musb *musb)
 void musb_platform_save_context(struct musb *musb,
 		struct musb_context_registers *musb_context)
 {
-	musb_context->otg_sysconfig = musb_readl(musb->mregs, OTG_SYSCONFIG);
-	musb_context->otg_forcestandby = musb_readl(musb->mregs, OTG_FORCESTDBY);
+	/*
+	 * As per the omap-usbotg specification, configure it to forced standby
+	 * and  force idle mode when no activity on usb.
+	 */
+	void __iomem *musb_base = musb->mregs;
+
+	musb_writel(musb_base, OTG_FORCESTDBY, 0);
+
+	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
+				OTG_SYSCONFIG) & ~(NOSTDBY | SMARTSTDBY));
+
+	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
+					OTG_SYSCONFIG) & ~(AUTOIDLE));
+
+	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
+				OTG_SYSCONFIG) & ~(NOIDLE | SMARTIDLE));
+
+	musb_writel(musb_base, OTG_FORCESTDBY, 1);
 }
 
 void musb_platform_restore_context(struct musb *musb,
 		struct musb_context_registers *musb_context)
 {
-	musb_writel(musb->mregs, OTG_SYSCONFIG, musb_context->otg_sysconfig);
-	musb_writel(musb->mregs, OTG_FORCESTDBY, musb_context->otg_forcestandby);
+	/*
+	 * As per the omap-usbotg specification, configure it smart standby
+	 * and smart idle during operation.
+	 */
+	void __iomem *musb_base = musb->mregs;
+
+	musb_writel(musb_base, OTG_FORCESTDBY, 0);
+
+	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
+				OTG_SYSCONFIG) | (SMARTSTDBY));
+
+	musb_writel(musb_base, OTG_SYSCONFIG, musb_readl(musb_base,
+				OTG_SYSCONFIG) | (SMARTIDLE));
 }
 #endif
 
