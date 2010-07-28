@@ -387,6 +387,7 @@ int omap_mcpdm_request(struct omap_mcpdm*mcpdm)
 	struct platform_device *pdev;
 	struct omap_mcpdm_platform_data *pdata;
 	int ret;
+	int ctrl;
 
 	pdev = container_of(mcpdm->dev, struct platform_device, dev);
 	pdata = pdev->dev.platform_data;
@@ -415,6 +416,14 @@ int omap_mcpdm_request(struct omap_mcpdm*mcpdm)
 		dev_err(mcpdm->dev, "Request for McPDM IRQ failed\n");
 		goto err;
 	}
+
+	if (omap_rev() != OMAP4430_REV_ES1_0) {
+		/* Enable McPDM watch dog for ES above ES 1.0 to avoid saturation */
+		ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
+		ctrl |= WD_EN;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	}
+
 	return 0;
 
 err:
