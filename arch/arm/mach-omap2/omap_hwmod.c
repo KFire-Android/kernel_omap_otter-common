@@ -917,6 +917,16 @@ int _omap_hwmod_enable(struct omap_hwmod *oh)
 
 	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
 
+	/*
+	 * If an IP contains only one HW reset line, then de-assert it in order
+	 * to allow to enable the clocks. Otherwise the PRCM will return
+	 * Intransition status, and the init will failed.
+	 */
+	if ((((oh->_state == _HWMOD_STATE_INITIALIZED) &&
+	      !(oh->flags & HWMOD_INIT_NO_RESET)) ||
+	     (oh->_state == _HWMOD_STATE_DISABLED)) && oh->rst_lines_cnt == 1)
+		omap_hwmod_hardreset_deassert(oh, oh->rst_lines[0].name);
+
 	/* XXX mux balls */
 
 	_add_initiator_dep(oh, mpu_oh);
@@ -999,6 +1009,12 @@ static int _shutdown(struct omap_hwmod *oh)
 
 	if (oh->class->sysc)
 		_sysc_shutdown(oh);
+	/*
+	 * If an IP contains only one HW reset line, then assert it
+	 * before disabling the clocks and shutting down the IP.
+	 */
+	if (oh->rst_lines_cnt == 1)
+		omap_hwmod_hardreset_assert(oh, oh->rst_lines[0].name);
 
 	/* clocks and deps are already disabled in idle */
 	if (oh->_state == _HWMOD_STATE_ENABLED) {
@@ -1056,17 +1072,6 @@ static int _setup(struct omap_hwmod *oh, void *data)
 	}
 
 	oh->_state = _HWMOD_STATE_INITIALIZED;
-
-	/*
-	 * If an IP contains only one HW reset line, then de-assert it in order
-	 * to allow to enable the clocks. Otherwise the PRCM will return
-	 * Intransition status, and the init will failed.
-	 */
-	if (!(oh->flags & HWMOD_INIT_NO_RESET) && oh->rst_lines_cnt == 1) {
-		pr_debug("omap_hwmod:_setup: %s: reset %s\n",
-			 oh->name, oh->rst_lines[0].name);
-		omap_hwmod_hardreset_deassert(oh, oh->rst_lines[0].name);
-	}
 
 	r = _omap_hwmod_enable(oh);
 	if (r) {
