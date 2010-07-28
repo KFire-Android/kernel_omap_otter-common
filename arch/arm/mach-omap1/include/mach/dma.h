@@ -77,4 +77,70 @@
 #define OMAP1_DMA_CCR2(n)		(0x40 * (n) + 0x24)
 #define OMAP1_DMA_LCH_CTRL(n)		(0x40 * (n) + 0x2a)
 
+/* Dummy defines to support multi omap code */
+/* Channel specific registers */
+#define OMAP_DMA4_CCR(n)		0
+#define OMAP_DMA4_CSDP(n)		0
+#define OMAP_DMA4_CEN(n)		0
+#define OMAP_DMA4_CFN(n)		0
+#define OMAP_DMA4_COLOR(n)		0
+#define OMAP_DMA4_CSSA(n)		0
+#define OMAP_DMA4_CSEI(n)		0
+#define OMAP_DMA4_CSFI(n)		0
+#define OMAP_DMA4_CDSA(n)		0
+#define OMAP_DMA4_CDEI(n)		0
+#define OMAP_DMA4_CDFI(n)		0
+#define OMAP_DMA4_CSR(n)		0
+#define OMAP_DMA4_CICR(n)		0
+#define OMAP_DMA4_CLNK_CTRL(n)		0
+#define OMAP_DMA4_CH_BASE(n)		0
+#define OMAP_DMA4_CDAC(n)		0
+#define OMAP_DMA4_CSAC(n)		0
+
+/* Common registers */
+#define OMAP_DMA4_IRQENABLE_L0		0
+#define OMAP_DMA4_OCP_SYSCONFIG		0
+#define OMAP_DMA4_GCR			0
+#define OMAP_DMA4_IRQSTATUS_L0		0
+#define OMAP_DMA4_CAPS_2		0
+#define OMAP_DMA4_CAPS_3		0
+#define OMAP_DMA4_CAPS_4		0
+#define OMAP_DMA4_REVISION		0
+
+#define OMAP_DMA4_CCR2(n)		0
+#define OMAP_DMA4_LCH_CTRL(n)		0
+#define OMAP_DMA4_COLOR_L(n)		0
+#define OMAP_DMA4_COLOR_U(n)		0
+#define OMAP1_DMA_COLOR(n)		0
+#define OMAP_DMA4_CSSA_U(n)		0
+#define OMAP_DMA4_CSSA_L(n)		0
+#define OMAP1_DMA_CSSA(n)		0
+#define OMAP_DMA4_CDSA_U(n)		0
+#define OMAP_DMA4_CDSA_L(n)		0
+#define OMAP1_DMA_CDSA(n)		0
+#define OMAP_DMA4_CPC(n)		0
+
+#define OMAP1_DMA_IRQENABLE_L0		0
+#define OMAP1_DMA_IRQENABLE_L0		0
+#define OMAP1_DMA_IRQSTATUS_L0		0
+#define OMAP1_DMA_OCP_SYSCONFIG		0
+#define OMAP_DMA4_HW_ID			0
+#define OMAP_DMA4_CAPS_0_U		0
+#define OMAP_DMA4_CAPS_0_L		0
+#define OMAP_DMA4_CAPS_1_U		0
+#define OMAP_DMA4_CAPS_1_L		0
+#define OMAP_DMA4_GSCR			0
+#define OMAP1_DMA_REVISION		0
+
+struct omap_dma_lch {
+	int next_lch;
+	int dev_id;
+	u16 saved_csr;
+	u16 enabled_irqs;
+	const char *dev_name;
+	void (*callback)(int lch, u16 ch_status, void *data);
+	void *data;
+	long flags;
+};
+
 #endif /* __ASM_ARCH_OMAP1_DMA_H */

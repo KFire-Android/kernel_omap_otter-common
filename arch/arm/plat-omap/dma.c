@@ -15,6 +15,9 @@
  *
  * Support functions for the OMAP internal DMA channels.
  *
+ * Copyright (C) 2010 Texas Instruments
+ * Converted DMA library into DMA platform driver.
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -59,27 +62,6 @@ static struct omap_dma_global_context_registers {
 	u32 dma_ocp_sysconfig;
 	u32 dma_gcr;
 } omap_dma_global_context;
-
-struct omap_dma_lch {
-	int next_lch;
-	int dev_id;
-	u16 saved_csr;
-	u16 enabled_irqs;
-	const char *dev_name;
-	void (*callback)(int lch, u16 ch_status, void *data);
-	void *data;
-
-#ifndef CONFIG_ARCH_OMAP1
-	/* required for Dynamic chaining */
-	int prev_linked_ch;
-	int next_linked_ch;
-	int state;
-	int chain_id;
-
-	int status;
-#endif
-	long flags;
-};
 
 struct dma_link_info {
 	int *linked_dmach_q;
@@ -136,15 +118,10 @@ static int omap_dma_reserve_channels;
 
 static spinlock_t dma_chan_lock;
 static struct omap_dma_lch *dma_chan;
-static void __iomem *omap_dma_base;
 
-static const u8 omap1_dma_irq[OMAP1_LOGICAL_DMA_CH_COUNT] = {
-	INT_DMA_CH0_6, INT_DMA_CH1_7, INT_DMA_CH2_8, INT_DMA_CH3,
-	INT_DMA_CH4, INT_DMA_CH5, INT_1610_DMA_CH6, INT_1610_DMA_CH7,
-	INT_1610_DMA_CH8, INT_1610_DMA_CH9, INT_1610_DMA_CH10,
-	INT_1610_DMA_CH11, INT_1610_DMA_CH12, INT_1610_DMA_CH13,
-	INT_1610_DMA_CH14, INT_1610_DMA_CH15, INT_DMA_LCD
-};
+static void __iomem *omap_dma_base;
+static struct omap_system_dma_plat_info *p;
+static struct omap_dma_dev_attr *d;
 
 static inline void disable_lnk(int lch);
 static void omap_disable_channel_irq(int lch);
@@ -959,7 +936,7 @@ void omap_start_dma(int lch)
 
 	if (!omap_dma_in_1510_mode() && dma_chan[lch].next_lch != -1) {
 		int next_lch, cur_lch;
-		char dma_chan_link_map[OMAP_DMA4_LOGICAL_DMA_CH_COUNT];
+		char dma_chan_link_map[dma_chan_count];
 
 		dma_chan_link_map[lch] = 1;
 		/* Set the link register of the first channel */
@@ -1020,7 +997,7 @@ void omap_stop_dma(int lch)
 
 	if (!omap_dma_in_1510_mode() && dma_chan[lch].next_lch != -1) {
 		int next_lch, cur_lch = lch;
-		char dma_chan_link_map[OMAP_DMA4_LOGICAL_DMA_CH_COUNT];
+		char dma_chan_link_map[dma_chan_count];
 
 		memset(dma_chan_link_map, 0, sizeof(dma_chan_link_map));
 		do {
@@ -2036,57 +2013,56 @@ void omap_dma_global_context_restore(void)
 			omap_clear_dma(ch);
 }
 
-/*----------------------------------------------------------------------------*/
-
-static int __init omap_init_dma(void)
+static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 {
-	unsigned long base;
-	int ch, r;
+	struct omap_system_dma_plat_info *pdata = pdev->dev.platform_data;
+	struct resource *mem;
+	int ch, ret = 0;
+	int dma_irq;
+	char irq_name[14];
 
-	if (cpu_class_is_omap1()) {
-		base = OMAP1_DMA_BASE;
-		dma_lch_count = OMAP1_LOGICAL_DMA_CH_COUNT;
-	} else if (cpu_is_omap24xx()) {
-		base = OMAP24XX_DMA4_BASE;
-		dma_lch_count = OMAP_DMA4_LOGICAL_DMA_CH_COUNT;
-	} else if (cpu_is_omap34xx()) {
-		base = OMAP34XX_DMA4_BASE;
-		dma_lch_count = OMAP_DMA4_LOGICAL_DMA_CH_COUNT;
-	} else if (cpu_is_omap44xx()) {
-		base = OMAP44XX_DMA4_BASE;
-		dma_lch_count = OMAP_DMA4_LOGICAL_DMA_CH_COUNT;
-	} else {
-		pr_err("DMA init failed for unsupported omap\n");
-		return -ENODEV;
+	if (!pdata) {
+		dev_err(&pdev->dev, "%s: System DMA initialized without"
+			"platform data\n", __func__);
+		return -EINVAL;
 	}
 
-	omap_dma_base = ioremap(base, SZ_4K);
-	BUG_ON(!omap_dma_base);
+	p = pdata;
+	d = p->dma_attr;
+
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!mem) {
+		dev_err(&pdev->dev, "%s: no mem resource\n", __func__);
+		return -EINVAL;
+	}
+
+	omap_dma_base = ioremap(mem->start, resource_size(mem));
+	if (!omap_dma_base) {
+		dev_err(&pdev->dev, "%s: ioremap fail\n", __func__);
+		ret = -ENOMEM;
+		goto exit_release_region;
+	}
 
 	if (cpu_class_is_omap2() && omap_dma_reserve_channels
 			&& (omap_dma_reserve_channels <= dma_lch_count))
-		dma_lch_count = omap_dma_reserve_channels;
+		d->dma_lch_count = omap_dma_reserve_channels;
 
-	dma_chan = kzalloc(sizeof(struct omap_dma_lch) * dma_lch_count,
-				GFP_KERNEL);
-	if (!dma_chan) {
-		r = -ENOMEM;
-		goto out_unmap;
-	}
+	dma_lch_count		= d->dma_lch_count;
+	dma_chan_count		= d->dma_chan_count;
+	dma_chan		= d->dma_chan;
 
 	if (cpu_class_is_omap2()) {
 		dma_linked_lch = kzalloc(sizeof(struct dma_link_info) *
 						dma_lch_count, GFP_KERNEL);
 		if (!dma_linked_lch) {
-			r = -ENOMEM;
-			goto out_free;
+			ret = -ENOMEM;
+			goto exit_dma_chan;
 		}
 	}
+	enable_1510_mode = d->dma_dev_attr & ENABLE_1510_MODE;
 
 	if (cpu_is_omap15xx()) {
 		printk(KERN_INFO "DMA support for OMAP15xx initialized\n");
-		dma_chan_count = 9;
-		enable_1510_mode = 1;
 	} else if (cpu_is_omap16xx() || cpu_is_omap7xx()) {
 		printk(KERN_INFO "OMAP DMA hardware version %d\n",
 		       dma_read(HW_ID));
@@ -2104,21 +2080,14 @@ static int __init omap_init_dma(void)
 			w = dma_read(GSCR);
 			w |= 1 << 3;
 			dma_write(w, GSCR);
-			dma_chan_count = 16;
-		} else
-			dma_chan_count = 9;
+		}
 	} else if (cpu_class_is_omap2()) {
 		u8 revision = dma_read(REVISION) & 0xff;
 		printk(KERN_INFO "OMAP DMA hardware revision %d.%d\n",
 		       revision >> 4, revision & 0xf);
-		dma_chan_count = dma_lch_count;
-	} else {
-		dma_chan_count = 0;
-		return 0;
 	}
 
 	spin_lock_init(&dma_chan_lock);
-
 	for (ch = 0; ch < dma_chan_count; ch++) {
 		omap_clear_dma(ch);
 		if (cpu_class_is_omap2())
@@ -2135,19 +2104,29 @@ static int __init omap_init_dma(void)
 			 * request_irq() doesn't like dev_id (ie. ch) being
 			 * zero, so we have to kludge around this.
 			 */
-			r = request_irq(omap1_dma_irq[ch],
+			dma_irq = platform_get_irq_byname(pdev, irq_name);
+
+			if (dma_irq < 0) {
+				dev_err(&pdev->dev, "%s:unable to get irq\n",
+								__func__);
+				ret = dma_irq;
+				goto exit_unmap;
+			}
+			ret = request_irq(dma_irq,
 					omap1_dma_irq_handler, 0, "DMA",
 					(void *) (ch + 1));
-			if (r != 0) {
-				int i;
-
-				printk(KERN_ERR "unable to request IRQ %d "
-				       "for DMA (error %d)\n",
-				       omap1_dma_irq[ch], r);
-				for (i = 0; i < ch; i++)
-					free_irq(omap1_dma_irq[i],
-						 (void *) (i + 1));
-				goto out_free;
+			if (ret != 0) {
+				int irq_rel;
+				printk(KERN_ERR "unable to request IRQ %d"
+					"for DMA (error %d)\n", dma_irq, ret);
+				for (irq_rel = 0; irq_rel < ch;
+								irq_rel++) {
+					dma_irq = platform_get_irq(pdev,
+								irq_rel);
+					free_irq(dma_irq, (void *)
+							(irq_rel + 1));
+					goto exit_dma_chan;
+				}
 			}
 		}
 	}
@@ -2157,46 +2136,65 @@ static int __init omap_init_dma(void)
 				DMA_DEFAULT_FIFO_DEPTH, 0);
 
 	if (cpu_class_is_omap2()) {
-		int irq;
-		if (cpu_is_omap44xx())
-			irq = OMAP44XX_IRQ_SDMA_0;
-		else
-			irq = INT_24XX_SDMA_IRQ0;
-		setup_irq(irq, &omap24xx_dma_irq);
+		strcpy(irq_name, "dma_0");
+		dma_irq = platform_get_irq_byname(pdev, irq_name);
+		setup_irq(dma_irq, &omap24xx_dma_irq);
 	}
 
-	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
-		/* Enable smartidle idlemodes and autoidle */
-		u32 v = dma_read(OCP_SYSCONFIG);
-		v &= ~(DMA_SYSCONFIG_MIDLEMODE_MASK |
-				DMA_SYSCONFIG_SIDLEMODE_MASK |
-				DMA_SYSCONFIG_AUTOIDLE);
-		v |= (DMA_SYSCONFIG_MIDLEMODE(DMA_IDLEMODE_SMARTIDLE) |
-			DMA_SYSCONFIG_SIDLEMODE(DMA_IDLEMODE_SMARTIDLE) |
-			DMA_SYSCONFIG_AUTOIDLE);
-		dma_write(v , OCP_SYSCONFIG);
-		/* reserve dma channels 0 and 1 in high security devices */
-		if (cpu_is_omap34xx() &&
-			(omap_type() != OMAP2_DEVICE_TYPE_GP)) {
-			printk(KERN_INFO "Reserving DMA channels 0 and 1 for "
-					"HS ROM code\n");
-			dma_chan[0].dev_id = 0;
-			dma_chan[1].dev_id = 1;
-		}
+	/* reserve dma channels 0 and 1 in high security devices */
+	if (cpu_is_omap34xx() &&
+		(omap_type() != OMAP2_DEVICE_TYPE_GP)) {
+		printk(KERN_INFO "Reserving DMA channels 0 and 1 for "
+				"HS ROM code\n");
+		dma_chan[0].dev_id = 0;
+		dma_chan[1].dev_id = 1;
 	}
 
+	dev_info(&pdev->dev, "System DMA registered\n");
 	return 0;
 
-out_free:
+exit_dma_chan:
 	kfree(dma_chan);
-
-out_unmap:
+exit_unmap:
 	iounmap(omap_dma_base);
-
-	return r;
+exit_release_region:
+	release_mem_region(mem->start, resource_size(mem));
+	return ret;
 }
 
-arch_initcall(omap_init_dma);
+static int __devexit omap_system_dma_remove(struct platform_device *pdev)
+{
+	struct resource *mem;
+	iounmap(omap_dma_base);
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	release_mem_region(mem->start, resource_size(mem));
+	return 0;
+}
+
+static struct platform_driver omap_system_dma_driver = {
+	.probe		= omap_system_dma_probe,
+	.remove		= omap_system_dma_remove,
+	.driver		= {
+		.name	= "dma"
+	},
+};
+
+static int __init omap_system_dma_init(void)
+{
+	return platform_driver_register(&omap_system_dma_driver);
+}
+
+arch_initcall(omap_system_dma_init);
+
+static void __exit omap_system_dma_exit(void)
+{
+	platform_driver_unregister(&omap_system_dma_driver);
+}
+
+MODULE_DESCRIPTION("OMAP SYSTEM DMA DRIVER");
+MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:" DRIVER_NAME);
+MODULE_AUTHOR("Texas Instruments Inc");
 
 /*
  * Reserve the omap SDMA channels using cmdline bootarg

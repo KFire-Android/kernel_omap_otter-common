@@ -77,4 +77,87 @@
 #define OMAP_DMA4_CNDP(n)		(0x60 * (n) + 0xd4)
 #define OMAP_DMA4_CCDN(n)		(0x60 * (n) + 0xd8)
 
+
+/* Dummy defines for support multi omap code */
+/* Common registers */
+#define OMAP1_DMA_GCR				0
+#define OMAP1_DMA_HW_ID				0
+#define OMAP1_DMA_CAPS_0_U			0
+#define OMAP1_DMA_CAPS_0_L			0
+#define OMAP1_DMA_CAPS_1_U			0
+#define OMAP1_DMA_CAPS_1_L			0
+#define OMAP1_DMA_CAPS_2			0
+#define OMAP1_DMA_CAPS_3			0
+#define OMAP1_DMA_CAPS_4			0
+#define OMAP1_DMA_GSCR				0
+
+/* Channel specific registers */
+#define OMAP1_DMA_CH_BASE(n)			0
+#define OMAP1_DMA_CCR(n)			0
+#define OMAP1_DMA_CSDP(n)			0
+#define OMAP1_DMA_CCR2(n)			0
+#define OMAP1_DMA_CEN(n)			0
+#define OMAP1_DMA_CFN(n)			0
+#define OMAP1_DMA_LCH_CTRL(n)			0
+#define OMAP1_DMA_COLOR_L(n)			0
+#define OMAP1_DMA_COLOR_U(n)			0
+#define OMAP1_DMA_CSSA_U(n)			0
+#define OMAP1_DMA_CSSA_L(n)			0
+#define OMAP1_DMA_CSEI(n)			0
+#define OMAP1_DMA_CSFI(n)			0
+#define OMAP1_DMA_CDSA_U(n)			0
+#define OMAP1_DMA_CDSA_L(n)			0
+#define OMAP1_DMA_CDEI(n)			0
+#define OMAP1_DMA_CDFI(n)			0
+#define OMAP1_DMA_CSR(n)			0
+#define OMAP1_DMA_CICR(n)			0
+#define OMAP1_DMA_CLNK_CTRL(n)			0
+#define OMAP1_DMA_CPC(n)			0
+#define OMAP1_DMA_CDAC(n)			0
+#define OMAP1_DMA_CSAC(n)			0
+#define OMAP1_DMA_CCEN(n)			0
+#define OMAP1_DMA_CCFN(n)			0
+
+#define OMAP_DMA4_CCR2(n)			0
+#define OMAP_DMA4_LCH_CTRL(n)			0
+#define OMAP_DMA4_COLOR_L(n)			0
+#define OMAP_DMA4_COLOR_U(n)			0
+#define OMAP1_DMA_COLOR(n)			0
+#define OMAP_DMA4_CSSA_U(n)			0
+#define OMAP_DMA4_CSSA_L(n)			0
+#define OMAP1_DMA_CSSA(n)			0
+#define OMAP_DMA4_CDSA_U(n)			0
+#define OMAP_DMA4_CDSA_L(n)			0
+#define OMAP1_DMA_CDSA(n)			0
+#define OMAP_DMA4_CPC(n)			0
+
+#define OMAP1_DMA_IRQENABLE_L0			0
+#define OMAP1_DMA_IRQSTATUS_L0			0
+#define OMAP1_DMA_OCP_SYSCONFIG			0
+#define OMAP1_DMA_OCP_SYSCONFIG			0
+#define OMAP_DMA4_HW_ID				0
+#define OMAP_DMA4_CAPS_0_U			0
+#define OMAP_DMA4_CAPS_0_L			0
+#define OMAP_DMA4_CAPS_1_U			0
+#define OMAP_DMA4_CAPS_1_L			0
+#define OMAP_DMA4_GSCR				0
+#define OMAP1_DMA_REVISION			0
+
+struct omap_dma_lch {
+	int next_lch;
+	int dev_id;
+	u16 saved_csr;
+	u16 enabled_irqs;
+	const char *dev_name;
+	void (*callback)(int lch, u16 ch_status, void *data);
+	void *data;
+	long flags;
+	/* required for Dynamic chaining */
+	int prev_linked_ch;
+	int next_linked_ch;
+	int state;
+	int chain_id;
+	int status;
+};
+
 #endif /* __ASM_ARCH_OMAP2_DMA_H */
