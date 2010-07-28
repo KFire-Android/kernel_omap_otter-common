@@ -1610,6 +1610,78 @@ static void _dispc_set_scaling(enum omap_plane plane,
 	_dispc_set_vid_accu1(plane, 0, accu1);
 }
 
+static void _dispc_set_scaling_uv(enum omap_plane plane,
+		u16 orig_width, u16 orig_height,
+		u16 out_width, u16 out_height,
+		bool ilace, bool three_taps,
+		bool fieldmode, int scale_x, int scale_y)
+{
+	int i;
+	int fir_hinc, fir_vinc;
+	int accu0, accu1, accuh;
+	const s8 *hfir, *vfir;
+
+	if (scale_x) {
+		fir_hinc = 1024 * (orig_width - 1) / (out_width - 1);
+		if (fir_hinc > 4095)
+			fir_hinc = 4095;
+		hfir = get_scaling_coef(orig_width, out_width, 0, 0, 0);
+	} else {
+		fir_hinc = 0;
+		hfir = fir5_zero;
+		}
+
+	if (scale_y) {
+		fir_vinc = 1024 * (orig_height - 0) / (out_height - 0);
+		if (fir_vinc > 4095)
+			fir_vinc = 4095;
+		vfir = get_scaling_coef(orig_height, out_height, 0,
+					ilace, three_taps);
+	} else {
+		fir_vinc = 0;
+		vfir = fir5_zero;
+		}
+
+	for (i = 0; i < 8; i++, hfir++, vfir++) {
+		u32 h, hv, v;
+		h = ((hfir[0] & 0xFF) | ((hfir[8] << 8) & 0xFF00) |
+		     ((hfir[16] << 16) & 0xFF0000) |
+		     ((hfir[24] << 24) & 0xFF000000));
+		hv = ((hfir[32] & 0xFF) | ((vfir[8] << 8) & 0xFF00) |
+		      ((vfir[16] << 16) & 0xFF0000) |
+		      ((vfir[24] << 24) & 0xFF000000));
+		v = ((vfir[0] & 0xFF) | ((vfir[32] << 8) & 0xFF00));
+
+		_dispc_write_firh2_reg(plane, i, h);
+		_dispc_write_firhv2_reg(plane, i, hv);
+		_dispc_write_firv2_reg(plane, i, v);
+	}
+
+	/* set chroma resampling */
+	REG_FLD_MOD(DISPC_VID_ATTRIBUTES2(plane - 1),
+		(fir_hinc || fir_vinc) ? 1 : 0, 8, 8);
+
+	/* set H scaling */
+	REG_FLD_MOD(dispc_reg_att[plane], fir_hinc ? 1 : 0, 6, 6);
+
+	/* set V scaling */
+	REG_FLD_MOD(dispc_reg_att[plane], fir_vinc ? 1 : 0, 5, 5);
+
+	_dispc_set_fir2(plane, fir_hinc, fir_vinc);
+
+	if (ilace) {
+		accu0 = (-3 * fir_vinc / 4) % 1024;
+		accu1 = (-fir_vinc / 4) % 1024;
+	} else {
+		accu0 = accu1 = (-fir_vinc / 2) % 1024;
+	}
+	accuh = (-fir_hinc / 2) % 1024;
+
+	_dispc_set_vid_accu2_0(plane, 0x80, 0);
+	_dispc_set_vid_accu2_1(plane, 0x80, 0);
+	/* _dispc_set_vid_accu2_0(plane, accuh, accu0);
+	   _dispc_set_vid_accu2_1(plane, accuh, accu1); */
+}
 static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 		bool mirroring, enum omap_color_mode color_mode)
 {
@@ -2086,8 +2158,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		u8 global_alpha,
 		enum omap_channel channel, u32 puv_addr)
 {
-	const int maxdownscale = cpu_is_omap34xx() ? 4 : 2;
-	bool five_taps = 0;
+	const int maxdownscale = (cpu_is_omap34xx() | cpu_is_omap44xx()) ? 4 : 2;
+	bool three_taps = 0;
 	bool fieldmode = 0;
 	int cconv = 0;
 	unsigned offset0, offset1;
@@ -2097,7 +2169,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	unsigned int field_offset = 0;
 	u8 orientation = 0;
 	struct tiler_view_orient orient;
-	unsigned long mir_x = 0, mir_y = 0;
+	unsigned long r, mir_x = 0, mir_y = 0;
 	unsigned long tiler_width, tiler_height;
 
 	if (paddr == 0)
@@ -2187,32 +2259,36 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			return -EINVAL;
 		}
 
-		/* Must use 5-tap filter? */
-		five_taps = height > out_height * 2;
+		/* Must use 3-tap filter */
+		three_taps = width > 1280;
 
-		if (!five_taps) {
+		/* Should use 3-tap filter for upscaling, but HDMI gets
+		   out of sync if using 3-tap */
+		/* if (out_height > height)
+			three_taps = 1; */
+
+		if (three_taps) {
 			fclk = calc_fclk(channel, width, height,
 					out_width, out_height);
 
 			/* Try 5-tap filter if 3-tap fclk is too high */
 			if (cpu_is_omap34xx() && height > out_height &&
-					fclk > dispc_fclk_rate())
-				five_taps = true;
-		}
-
-		if (width > (2048 >> five_taps)) {
-			DSSERR("failed to set up scaling, fclk too low\n");
-			return -EINVAL;
-		}
-
-		if (five_taps)
+					fclk > dispc_fclk_rate()) {
+				printk(KERN_ERR
+					"Should use 5 tap but cannot\n");
+			}
+		} else {
 			fclk = calc_fclk_five_taps(channel, width, height,
-					out_width, out_height, color_mode);
+				out_width, out_height, color_mode);
+		}
 
+	if (!cpu_is_omap44xx())
+		if (width > (1024 << three_taps))
+			return -EINVAL;
 		DSSDBG("required fclk rate = %lu Hz\n", fclk);
 		DSSDBG("current fclk rate = %lu Hz\n", dispc_fclk_rate());
 
-		if (!fclk || fclk > dispc_fclk_rate()) {
+		if (fclk > dispc_fclk_rate()) {
 			DSSERR("failed to set up scaling, "
 					"required fclk rate = %lu Hz, "
 					"current fclk rate = %lu Hz\n",
@@ -2251,6 +2327,16 @@ static int _dispc_setup_plane(enum omap_plane plane,
 				(if rotation is applied before mirroring) */
 		memset(&orient, 0, sizeof(orient));
 		tiler_rotate_view(&orient, rotation * 90);
+		if (mirror) {
+			/* Horizontal mirroring */
+			if (rotation == 1 || rotation == 3)
+				mir_x = 1;
+			else
+				mir_y = 1;
+		} else {
+			mir_x = 0;
+			mir_y = 0;
+		}
 		orient.x_invert ^= mir_x;
 		orient.y_invert ^= mir_y;
 
@@ -2278,17 +2364,20 @@ static int _dispc_setup_plane(enum omap_plane plane,
 						paddr, puv_addr);
 			/* set BURSTTYPE if rotation is non-zero */
 			REG_FLD_MOD(dispc_reg_att[plane], 0x1, 29, 29);
-	} else if (rotation_type == OMAP_DSS_ROT_DMA)
-		calc_dma_rotation_offset(rotation, mirror,
+	} else
+		row_inc = 0x1;
+	if (!cpu_is_omap44xx()) {
+		if (rotation_type == OMAP_DSS_ROT_DMA)
+			calc_dma_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
-	else
-		calc_vrfb_rotation_offset(rotation, mirror,
+		else
+			calc_vrfb_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
-
+	}
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
 
@@ -2313,6 +2402,45 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	_dispc_set_pic_size(plane, width, height);
 
 	if (plane != OMAP_DSS_GFX) {
+		int scale_x = width != out_width;
+		int scale_y = height != out_height;
+		u16 out_ch_height = out_height;
+		u16 out_ch_width = out_width;
+		u16 ch_height = height;
+		u16 ch_width = width;
+		int scale_uv = 0;
+
+	if (cpu_is_omap44xx()) {
+		/* account for chroma decimation */
+		switch (color_mode) {
+		case OMAP_DSS_COLOR_NV12:
+			ch_height >>= 1; /* Y downsampled by 2 */
+		case OMAP_DSS_COLOR_YUV2:
+		case OMAP_DSS_COLOR_UYVY:
+			ch_width >>= 1; /* X downsampled by 2 */
+			/* must use FIR for YUV422 if rotated */
+			if (color_mode != OMAP_DSS_COLOR_NV12 && rotation % 4)
+				scale_x = scale_y = 1;
+			scale_uv = 1;
+			break;
+		default:
+			/* no UV scaling for RGB formats for now */
+			break;
+			}
+
+		if (out_ch_width != ch_width)
+			scale_x = true;
+		if (out_ch_height != ch_height)
+			scale_y = true;
+		/* set up UV scaling */
+		_dispc_set_scaling_uv(plane, ch_width, ch_height,
+			out_ch_width, out_ch_height, ilace,
+			three_taps, fieldmode, scale_uv && scale_x,
+			scale_uv && scale_y);
+		if (!scale_uv || (!scale_x && !scale_y))
+			/* :TRICKY: set chroma resampling for RGB formats */
+			REG_FLD_MOD(DISPC_VID_ATTRIBUTES2(plane - 1), 0, 8, 8);
+	}
 		_dispc_set_scaling(plane, width, height,
 				   out_width, out_height,
 				   ilace, three_taps, fieldmode,
@@ -2332,6 +2460,10 @@ static int _dispc_setup_plane(enum omap_plane plane,
 static void _dispc_enable_plane(enum omap_plane plane, bool enable)
 {
 	REG_FLD_MOD(dispc_reg_att[plane], enable ? 1 : 0, 0, 0);
+	if (!enable && cpu_is_omap44xx()) { /* clear out resizer related bits */
+		REG_FLD_MOD(dispc_reg_att[plane], 0x00, 6, 5);
+		REG_FLD_MOD(dispc_reg_att[plane], 0x00, 21, 21);
+	}
 }
 
 static void dispc_disable_isr(void *data, u32 mask)
