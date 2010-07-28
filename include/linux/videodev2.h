@@ -923,6 +923,41 @@ struct v4l2_ext_controls {
 	__u32 reserved[2];
 	struct v4l2_ext_control *controls;
 };
+/* Write back device for OMAP4 */
+enum v4l2_writeback_source {
+	V4L2_WB_LCD_1_MANAGER		= 0,
+	V4L2_WB_LCD_2_MANAGER		= 1,
+	V4L2_WB_TV_MANAGER			= 2,
+	V4L2_WB_OVERLAY0			= 3,
+	V4L2_WB_OVERLAY1			= 4,
+	V4L2_WB_OVERLAY2			= 5,
+	V4L2_WB_OVERLAY3			= 6
+};
+
+enum v4l2_writeback_source_type {
+	V4L2_WB_SOURCE_OVERLAY	= 0,
+	V4L2_WB_SOURCE_MANAGER	= 1
+};
+
+enum v4l2_writeback_capturemode {
+	V4L2_WB_CAPTURE_ALL = 0x0,
+	V4L2_WB_CAPTURE_1 = 0x1,
+	V4L2_WB_CAPTURE_1_OF_2 = 0x2,
+	V4L2_WB_CAPTURE_1_OF_3 = 0x3,
+	V4L2_WB_CAPTURE_1_OF_4 = 0x4,
+	V4L2_WB_CAPTURE_1_OF_5 = 0x5,
+	V4L2_WB_CAPTURE_1_OF_6 = 0x6,
+	V4L2_WB_CAPTURE_1_OF_7 = 0x7
+};
+
+struct v4l2_writeback_ioctl_data {
+    int								enabled;
+    int								info_dirty;
+    enum v4l2_writeback_source			source;
+    enum v4l2_writeback_source_type		source_type;
+    struct v4l2_pix_format				pix;
+    enum v4l2_writeback_capturemode		capturemode;
+};
 
 /*  Values for ctrl_class field */
 #define V4L2_CTRL_CLASS_USER 0x00980000	/* Old-style 'user' controls */
@@ -1041,11 +1076,11 @@ enum v4l2_colorfx {
 
 #define V4L2_CID_ROTATE				(V4L2_CID_BASE+34)
 #define V4L2_CID_BG_COLOR			(V4L2_CID_BASE+35)
-
 #define V4L2_CID_CHROMA_GAIN                    (V4L2_CID_BASE+36)
+#define V4L2_CID_WB                             (V4L2_CID_BASE+37)
 
 /* last CID + 1 */
-#define V4L2_CID_LASTP1                         (V4L2_CID_BASE+37)
+#define V4L2_CID_LASTP1                         (V4L2_CID_BASE+38)
 
 /*  MPEG-class control IDs defined by V4L2 */
 #define V4L2_CID_MPEG_BASE 			(V4L2_CTRL_CLASS_MPEG | 0x900)
@@ -1808,6 +1843,10 @@ struct v4l2_dbg_chip_ident {
 #define VIDIOC_G_AUDOUT_OLD    	_IOWR('V', 49, struct v4l2_audioout)
 #define VIDIOC_CROPCAP_OLD     	 _IOR('V', 58, struct v4l2_cropcap)
 #endif
+
+/* ioctls for Writeback Pipeline */
+#define VIDIOC_CUSTOM_G_WB     _IOWR('V', 255, struct v4l2_writeback_ioctl_data)
+#define VIDIOC_CUSTOM_S_WB     _IOW('V', 254, struct v4l2_writeback_ioctl_data)
 
 #define BASE_VIDIOC_PRIVATE	192		/* 192-255 are private */
 
