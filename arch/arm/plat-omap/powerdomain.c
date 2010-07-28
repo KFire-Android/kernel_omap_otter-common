@@ -26,19 +26,19 @@
 
 #include <asm/atomic.h>
 
-#include "cm.h"
-#include "cm-regbits-34xx.h"
-#include "cm-regbits-44xx.h"
-#include "prm.h"
-#include "prm-regbits-34xx.h"
-#include "prm-regbits-44xx.h"
+#include "../mach-omap2/cm.h"
+#include "../mach-omap2/cm-regbits-34xx.h"
+#include "../mach-omap2/cm-regbits-44xx.h"
+#include "../mach-omap2/prm.h"
+#include "../mach-omap2/prm-regbits-34xx.h"
+#include "../mach-omap2/prm-regbits-44xx.h"
 
 #include <plat/cpu.h>
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
 #include <plat/prcm.h>
 
-#include "pm.h"
+#include "../mach-omap2/pm.h"
 
 enum {
 	PWRDM_STATE_NOW = 0,
