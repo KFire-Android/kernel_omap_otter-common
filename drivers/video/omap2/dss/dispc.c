@@ -3056,13 +3056,15 @@ void dispc_enable_digit_out(bool enable)
 	/* XXX I understand from TRM that we should only wait for the
 	 * current field to complete. But it seems we have to wait
 	 * for both fields */
-	if (!wait_for_completion_timeout(&frame_done_completion,
+	if (!cpu_is_omap44xx()) {
+		if (!wait_for_completion_timeout(&frame_done_completion,
 				msecs_to_jiffies(100)))
-		DSSERR("timeout waiting for EVSYNC\n");
+			DSSERR("timeout waiting for EVSYNC\n");
 
-	if (!wait_for_completion_timeout(&frame_done_completion,
+		if (!wait_for_completion_timeout(&frame_done_completion,
 				msecs_to_jiffies(100)))
-		DSSERR("timeout waiting for EVSYNC\n");
+			DSSERR("timeout waiting for EVSYNC\n");
+	}
 
 	r = omap_dispc_unregister_isr(dispc_disable_isr,
 			&frame_done_completion,
