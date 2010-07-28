@@ -811,156 +811,23 @@ static void _dispc_write_firv2_reg(enum omap_plane plane, int reg, u32 value)
                 dispc_write_reg(DISPC_VID_V3_WB_FIR_COEF_V2(0, reg), value);
 }
 
-static void _dispc_set_scale_coef(enum omap_plane plane, int hscaleup,
-		int vscaleup, int five_taps)
+static void _dispc_set_scale_coef(enum omap_plane plane, const s8 *hfir,
+				  const s8 *vfir, int three_taps)
 {
-	/* Coefficients for horizontal up-sampling */
-	static const u32 coef_hup[8] = {
-		0x00800000,
-		0x0D7CF800,
-		0x1E70F5FF,
-		0x335FF5FE,
-		0xF74949F7,
-		0xF55F33FB,
-		0xF5701EFE,
-		0xF87C0DFF,
-	};
-
-	/* Coefficients for horizontal down-sampling */
-	static const u32 coef_hdown[8] = {
-		0x24382400,
-		0x28371FFE,
-		0x2C361BFB,
-		0x303516F9,
-		0x11343311,
-		0x1635300C,
-		0x1B362C08,
-		0x1F372804,
-	};
-
-	/* Coefficients for horizontal and vertical up-sampling */
-	static const u32 coef_hvup[2][8] = {
-		{
-		0x00800000,
-		0x037B02FF,
-		0x0C6F05FE,
-		0x205907FB,
-		0x00404000,
-		0x075920FE,
-		0x056F0CFF,
-		0x027B0300,
-		},
-		{
-		0x00800000,
-		0x0D7CF8FF,
-		0x1E70F5FE,
-		0x335FF5FB,
-		0xF7404000,
-		0xF55F33FE,
-		0xF5701EFF,
-		0xF87C0D00,
-		},
-	};
-
-	/* Coefficients for horizontal and vertical down-sampling */
-	static const u32 coef_hvdown[2][8] = {
-		{
-		0x24382400,
-		0x28391F04,
-		0x2D381B08,
-		0x3237170C,
-		0x123737F7,
-		0x173732F9,
-		0x1B382DFB,
-		0x1F3928FE,
-		},
-		{
-		0x24382400,
-		0x28371F04,
-		0x2C361B08,
-		0x3035160C,
-		0x113433F7,
-		0x163530F9,
-		0x1B362CFB,
-		0x1F3728FE,
-		},
-	};
-
-	/* Coefficients for vertical up-sampling */
-	static const u32 coef_vup[8] = {
-		0x00000000,
-		0x0000FF00,
-		0x0000FEFF,
-		0x0000FBFE,
-		0x000000F7,
-		0x0000FEFB,
-		0x0000FFFE,
-		0x000000FF,
-	};
-
-	/* Coefficients for vertical down-sampling */
-	static const u32 coef_vdown[8] = {
-		0x00000000,
-		0x000004FE,
-		0x000008FB,
-		0x00000CF9,
-		0x0000F711,
-		0x0000F90C,
-		0x0000FB08,
-		0x0000FE04,
-	};
-
-	const u32 *h_coef;
-	const u32 *hv_coef;
-	const u32 *hv_coef_mod;
-	const u32 *v_coef;
 	int i;
 
-	if (hscaleup)
-		h_coef = coef_hup;
-	else
-		h_coef = coef_hdown;
-
-	if (vscaleup) {
-		hv_coef = coef_hvup[five_taps];
-		v_coef = coef_vup;
-
-		if (hscaleup)
-			hv_coef_mod = NULL;
-		else
-			hv_coef_mod = coef_hvdown[five_taps];
-	} else {
-		hv_coef = coef_hvdown[five_taps];
-		v_coef = coef_vdown;
-
-		if (hscaleup)
-			hv_coef_mod = coef_hvup[five_taps];
-		else
-			hv_coef_mod = NULL;
-	}
-
-	for (i = 0; i < 8; i++) {
-		u32 h, hv;
-
-		h = h_coef[i];
-
-		hv = hv_coef[i];
-
-		if (hv_coef_mod) {
-			hv &= 0xffffff00;
-			hv |= (hv_coef_mod[i] & 0xff);
-		}
-
+	for (i = 0; i < 8; i++, hfir++, vfir++) {
+		u32 h, hv, v;
+		h = ((hfir[0] & 0xFF) | ((hfir[8] << 8) & 0xFF00) |
+		     ((hfir[16] << 16) & 0xFF0000) |
+		     ((hfir[24] << 24) & 0xFF000000));
+		hv = ((hfir[32] & 0xFF) | ((vfir[8] << 8) & 0xFF00) |
+		      ((vfir[16] << 16) & 0xFF0000) |
+		      ((vfir[24] << 24) & 0xFF000000));
+		v = ((vfir[0] & 0xFF) | ((vfir[32] << 8) & 0xFF00));
+	
 		_dispc_write_firh_reg(plane, i, h);
 		_dispc_write_firhv_reg(plane, i, hv);
-	}
-
-	if (!five_taps)
-		return;
-
-	for (i = 0; i < 8; i++) {
-		u32 v;
-		v = v_coef[i];
 		_dispc_write_firv_reg(plane, i, v);
 	}
 }
@@ -1526,49 +1393,203 @@ static void _dispc_set_vid_accu2_1(enum omap_plane plane, int haccu, int vaccu)
 	val = FLD_VAL(vaccu, 26, 16) | FLD_VAL(haccu, 10, 0);
 	dispc_write_reg(ac1_reg[plane-1], val);
 }
+
+static const s8 fir5_zero[] = {
+	 0,    0,    0,    0,    0,    0,    0,    0,
+	 0,    0,    0,    0,    0,    0,    0,    0,
+	 0,    0,    0,    0,    0,    0,    0,    0,
+	 0,    0,    0,    0,    0,    0,    0,    0,
+	 0,    0,    0,    0,    0,    0,    0,    0,
+};
+static const s8 fir3_m8[] = {
+	 0,    0,    0,    0,    0,    0,    0,    0,
+	 0,    2,    5,    7,    64,   32,   12,   3,
+	 128,  123,  111,  89,   64,   89,   111,  123,
+	 0,    3,    12,   32,   0,    7,    5,    2,
+	 0,    0,    0,    0,    0,    0,    0,    0,
+};
+static const s8 fir5_m8[] = {
+	 17,   18,   15,   9,   -18,  -6,    5,    13,
+	-20,  -27,  -30,  -27,   81,   47,   17,  -4,
+	 134,  127,  121,  105,  81,   105,  121,  127,
+	-20,  -4,    17,   47,  -18,  -27,  -30,  -27,
+	 17,   14,   5,   -6,    2,    9,    15,   19,
+};
+static const s8 fir5_m8b[] = {
+	 0,    0,   -1,   -2,   -9,   -5,   -2,   -1,
+	 0,   -8,   -11,  -11,   73,   51,   30,   13,
+	 128,  124,  112,  95,   73,   95,   112,  124,
+	 0,    13,   30,   51,  -9,   -11,  -11,  -8,
+	 0,   -1,   -2,   -5,    0,   -2,   -1,    0,
+};
+static const s8 fir5_m9[] = {
+	 8,    14,   17,   17,  -26,  -18,  -9,    1,
+	-8,   -21,  -27,  -30,   83,   56,   30,   8,
+	 128,  126,  117,  103,  83,   103,  117,  126,
+	-8,    8,    30,   56,  -26,  -30,  -27,  -21,
+	 8,    1,   -9,   -18,   14,   17,   17,   14,
+};
+static const s8 fir5_m10[] = {
+	-2,    5,    11,   15,  -28,  -24,  -18,  -10,
+	 2,   -12,  -22,  -27,   83,   62,   41,   20,
+	 128,  125,  116,  102,  83,   102,  116,  125,
+	 2,    20,   41,   62,  -28,  -27,  -22,  -12,
+	-2,   -10,  -18,  -24,   18,   15,   11,   5,
+};
+static const s8 fir5_m11[] = {
+	-12,  -4,    3,    9,   -26,  -27,  -24,  -19,
+	 12,  -3,   -15,  -22,   83,   67,   49,   30,
+	 128,  124,  115,  101,  83,   101,  115,  124,
+	 12,   30,   49,   67,  -26,  -22,  -15,  -3,
+	-12,  -19,  -24,  -27,   14,   9,    3,   -4,
+};
+static const s8 fir5_m12[] = {
+	-19,  -12,  -6,    1,   -21,  -25,  -26,  -24,
+	 21,   6,   -7,   -16,   82,   70,   55,   38,
+	 124,  120,  112,  98,   82,   98,   112,  120,
+	 21,   38,   55,   70,  -21,  -16,  -7,    6,
+	-19,  -24,  -26,  -25,   6,    1,   -6,   -12,
+};
+static const s8 fir5_m13[] = {
+	-22,  -18,  -12,  -6,   -17,  -22,  -25,  -25,
+	 27,   13,   0,   -10,   81,   71,   58,   43,
+	 118,  115,  107,  95,   81,   95,   107,  115,
+	 27,   43,   58,   71,  -17,  -10,   0,    13,
+	-22,  -25,  -25,  -22,   0,   -6,   -12,  -18,
+};
+static const s8 fir5_m14[] = {
+	-23,  -20,  -16,  -11,  -11,  -18,  -22,  -24,
+	 32,   18,   6,   -4,    78,   70,   59,   46,
+	 110,  108,  101,  91,   78,   91,   101,  108,
+	 32,   46,   59,   70,  -11,  -4,    6,    18,
+	-23,  -24,  -22,  -18,  -6,   -11,  -16,  -20,
+};
+static const s8 fir3_m16[] = {
+	 0,    0,    0,    0,    0,    0,    0,    0,
+	 36,   31,   27,   23,   55,   50,   45,   40,
+	 56,   57,   56,   55,   55,   55,   56,   57,
+	 36,   40,   45,   50,   18,   23,   27,   31,
+	 0,    0,    0,    0,    0,    0,    0,    0,
+};
+static const s8 fir5_m16[] = {
+	-20,  -21,  -19,  -17,  -2,   -9,   -14,  -18,
+	 37,   26,   15,   6,    73,   66,   58,   48,
+	 94,   93,   88,   82,   73,   82,   88,   93,
+	 37,   48,   58,   66,  -2,    6,    15,   26,
+	-20,  -18,  -14,  -9,   -14,  -17,  -19,  -21,
+};
+static const s8 fir5_m19[] = {
+	-12,  -14,  -16,  -16,   8,    1,   -4,   -9,
+	 38,   31,   22,   15,   64,   59,   53,   47,
+	 76,   72,   73,   69,   64,   69,   73,   72,
+	 38,   47,   53,   59,   8,    15,   22,   31,
+	-12,  -8,   -4,    1,   -16,  -16,  -16,  -13,
+};
+static const s8 fir5_m22[] = {
+	-6,   -8,   -11,  -13,   13,   8,    3,   -2,
+	 37,   32,   25,   19,   58,   53,   48,   44,
+	 66,   61,   63,   61,   58,   61,   63,   61,
+	 37,   44,   48,   53,   13,   19,   25,   32,
+	-6,   -1,    3,    8,   -14,  -13,  -11,  -7,
+};
+static const s8 fir5_m26[] = {
+	 1,   -2,   -5,   -8,    18,   13,   8,    4,
+	 36,   31,   27,   22,   51,   48,   44,   40,
+	 54,   55,   54,   53,   51,   53,   54,   55,
+	 36,   40,   44,   48,   18,   22,   27,   31,
+	 1,    4,    8,    13,  -10,  -8,   -5,   -2,
+};
+static const s8 fir5_m32[] = {
+	 7,    4,    1,   -1,    21,   17,   14,   10,
+	 34,   31,   27,   24,   45,   42,   39,   37,
+	 46,   46,   46,   46,   45,   46,   46,   46,
+	 34,   37,   39,   42,   21,   24,   28,   31,
+	 7,    10,   14,   17,  -4,   -1,    1,    4,
+};
+
+static const s8 *get_scaling_coef(int orig_size, int out_size,
+			    int orig_ilaced, int out_ilaced,
+			    int three_tap)
+{
+	/* ranges from 2 to 32 */
+	int two_m = 16 * orig_size / out_size;
+
+	if (orig_size > 4 * out_size || out_size > 8 * orig_size)
+		return fir5_zero;
+
+	/* interlaced output needs at least M = 16 */
+	if (out_ilaced) {
+		if (two_m < 32)
+			two_m = 32;
+	}
+
+	if (three_tap)
+		return two_m < 24 ? fir3_m8 : fir3_m16;
+
+	return orig_size < out_size ? fir5_m8b :
+		two_m < 17 ? fir5_m8 :
+		two_m < 19 ? fir5_m9 :
+		two_m < 21 ? fir5_m10 :
+		two_m < 23 ? fir5_m11 :
+		two_m < 25 ? fir5_m12 :
+		two_m < 27 ? fir5_m13 :
+		two_m < 30 ? fir5_m14 :
+		two_m < 35 ? fir5_m16 :
+		two_m < 41 ? fir5_m19 :
+		two_m < 48 ? fir5_m22 :
+		two_m < 58 ? fir5_m26 :
+		fir5_m32;
+}
 static void _dispc_set_scaling(enum omap_plane plane,
 		u16 orig_width, u16 orig_height,
 		u16 out_width, u16 out_height,
-		bool ilace, bool five_taps,
-		bool fieldmode)
+		bool ilace, bool three_taps,
+		bool fieldmode, int scale_x, int scale_y)
 {
 	int fir_hinc;
 	int fir_vinc;
-	int hscaleup, vscaleup;
 	int accu0 = 0;
 	int accu1 = 0;
 	u32 l;
-
+	const s8 *hfir, *vfir;
 	BUG_ON(plane == OMAP_DSS_GFX);
 
-	hscaleup = orig_width <= out_width;
-	vscaleup = orig_height <= out_height;
-
-	_dispc_set_scale_coef(plane, hscaleup, vscaleup, five_taps);
-
-	if (!orig_width || orig_width == out_width)
+	if (scale_x) {
+		fir_hinc = 1024 * (orig_width - 1) / (out_width - 1);
+		if (fir_hinc > 4095)
+			fir_hinc = 4095;
+		hfir = get_scaling_coef(orig_width, out_width, 0, 0, 0);
+	} else {
 		fir_hinc = 0;
-	else
-		fir_hinc = 1024 * orig_width / out_width;
+		hfir = fir5_zero;
+	}
 
-	if (!orig_height || orig_height == out_height)
+	if (scale_y) {
+		fir_vinc = 1024 * (orig_height - 1) / (out_height - 1);
+		if (fir_vinc > 4095)
+			fir_vinc = 4095;
+		vfir = get_scaling_coef(orig_height, out_height, 0, 0,
+					three_taps);
+	} else {	
 		fir_vinc = 0;
-	else
-		fir_vinc = 1024 * orig_height / out_height;
+		vfir = fir5_zero;
+	}
 
+	_dispc_set_scale_coef(plane, hfir, vfir, three_taps);
 	_dispc_set_fir(plane, fir_hinc, fir_vinc);
 
 	l = dispc_read_reg(dispc_reg_att[plane]);
-	l &= ~((0x0f << 5) | (0x3 << 21));
 
+	if (!cpu_is_omap44xx()) {
+		l &= ~((0x0f << 5) | (0x3 << 21));
+		l |= out_width > orig_width ? 0 : (1 << 7);
+		l |= out_height > orig_height ? 0 : (1 << 8);
+	} else
+		l &= ~((0x03 << 5) | (0x1 << 21));
 	l |= fir_hinc ? (1 << 5) : 0;
 	l |= fir_vinc ? (1 << 6) : 0;
 
-	l |= hscaleup ? 0 : (1 << 7);
-	l |= vscaleup ? 0 : (1 << 8);
-
-	l |= five_taps ? (1 << 21) : 0;
-	l |= five_taps ? (1 << 22) : 0;
+	l |= three_taps ? 0 : (1 << 21);
 
 	dispc_write_reg(dispc_reg_att[plane], l);
 
@@ -2294,7 +2315,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if (plane != OMAP_DSS_GFX) {
 		_dispc_set_scaling(plane, width, height,
 				   out_width, out_height,
-				   ilace, five_taps, fieldmode);
+				   ilace, three_taps, fieldmode,
+				   scale_x, scale_y);
 		_dispc_set_vid_size(plane, out_width, out_height);
 		_dispc_set_vid_color_conv(plane, cconv);
 	}
