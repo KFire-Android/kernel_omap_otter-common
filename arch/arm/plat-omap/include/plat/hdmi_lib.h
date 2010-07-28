@@ -420,7 +420,7 @@ int hdmi_w1_stop_audio_transfer(u32);
 int hdmi_w1_start_audio_transfer(u32);
 int HDMI_CORE_DDC_READEDID(u32 Core, u8 *data);
 int DSS_HDMI_CONFIG(HDMI_Timing_t timings, u32 video_format, u32 mode);
-
+void HDMI_W1_HPD_handler(int *r);
 int hdmi_lib_init(void);
 void hdmi_lib_exit(void);
 
