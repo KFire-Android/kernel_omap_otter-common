@@ -280,6 +280,7 @@ static void enable_board_wakeup_source(void)
 void __init zoom_peripherals_init(void)
 {
 	omap_i2c_init();
+	omap_serial_init();
 	usb_musb_init(&musb_board_data);
 	enable_board_wakeup_source();
 }
