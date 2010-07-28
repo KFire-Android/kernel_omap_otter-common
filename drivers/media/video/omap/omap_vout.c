@@ -1631,11 +1631,22 @@ static int omap_vout_release(struct file *file)
 	struct omapvideo_info *ovid;
 	struct omap_vout_device *vout = file->private_data;
 
-	v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev, "Entering %s\n", __func__);
-	ovid = &vout->vid_info;
-
 	if (!vout)
 		return 0;
+
+	mutex_lock(&vout->lock);
+	vout->opened -= 1;
+	if (vout->opened > 0) {
+		/* others still have this device open */
+		v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev,
+				"device still opened: %d\n", vout->opened);
+		mutex_unlock(&vout->lock);
+		return 0;
+	}
+	mutex_unlock(&vout->lock);
+
+	v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev, "Entering %s\n", __func__);
+	ovid = &vout->vid_info;
 
 	q = &vout->vbq;
 	/* Disable all the overlay managers connected with this interface */
@@ -1679,7 +1690,6 @@ static int omap_vout_release(struct file *file)
 	if (vout->mmap_count != 0)
 		vout->mmap_count = 0;
 
-	vout->opened -= 1;
 	file->private_data = NULL;
 
 	if (vout->buffer_allocated)
@@ -1695,16 +1705,20 @@ static int omap_vout_open(struct file *file)
 	struct omap_vout_device *vout = NULL;
 
 	vout = video_drvdata(file);
-	v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev, "Entering %s\n", __func__);
 
-	if (vout == NULL)
-		return -ENODEV;
 
-	/* for now, we only support single open */
-	if (vout->opened)
-		return -EBUSY;
-
+	mutex_lock(&vout->lock);
 	vout->opened += 1;
+	if (vout->opened > 1) {
+		v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev,
+				"device already opened: %d\n", vout->opened);
+		file->private_data = vout;
+		mutex_unlock(&vout->lock);
+		return 0;
+	}
+	mutex_unlock(&vout->lock);
+
+	v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev, "Entering %s\n", __func__);
 
 	file->private_data = vout;
 	vout->type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
@@ -1735,7 +1749,7 @@ static int vidioc_querycap(struct file *file, void *fh,
 	strlcpy(cap->driver, VOUT_NAME, sizeof(cap->driver));
 	strlcpy(cap->card, vout->vfd->name, sizeof(cap->card));
 	cap->bus_info[0] = '\0';
-	cap->capabilities = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_OUTPUT;
+	cap->capabilities = V4L2_CAP_STREAMING | V4L2_CAP_VIDEO_OUTPUT | V4L2_CAP_VIDEO_OVERLAY;
 
 	return 0;
 }
@@ -1916,7 +1930,44 @@ static int vidioc_s_fmt_vid_overlay(struct file *file, void *fh,
 
 		vout->win.chromakey = f->fmt.win.chromakey;
 	}
+
 	mutex_unlock(&vout->lock);
+
+	if (!ret) {
+		if (ovl->manager && ovl->manager->get_manager_info &&
+				ovl->manager->set_manager_info) {
+			struct omap_overlay_manager_info info;
+
+			ovl->manager->get_manager_info(ovl->manager, &info);
+
+			info.trans_key = vout->win.chromakey;
+
+			if (ovl->manager->set_manager_info(ovl->manager, &info))
+				return -EINVAL;
+		}
+
+		if (ovl->get_overlay_info && ovl->set_overlay_info) {
+			struct omap_overlay_info info;
+
+			ovl->get_overlay_info(ovl, &info);
+
+			/* @todo don't ignore rotation.. probably could refactor a bit
+			 * to have a single function to convert from v4l2 to dss window
+			 * position so the rotation logic is only in one place..
+			 */
+
+			info.pos_x = vout->win.w.left;
+			info.pos_y = vout->win.w.top;
+			info.out_width = vout->win.w.width;
+			info.out_height = vout->win.w.height;
+
+			if (ovl->set_overlay_info(ovl, &info))
+				return -EINVAL;
+		}
+
+		omapvid_apply_changes(vout);
+	}
+
 	return ret;
 }
 
@@ -2454,7 +2505,7 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 		}
 	}
 
-	/* Turn of the pipeline */
+	/* Turn off the pipeline */
 	ret = omapvid_apply_changes(vout);
 	if (ret)
 		v4l2_err(&vout->vid_dev->v4l2_dev, "failed to change mode in"
