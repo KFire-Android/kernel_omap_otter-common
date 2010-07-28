@@ -530,6 +530,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
 	int r;
 	u16 w;
+	static struct pm_qos_request_list *qos_handle;
 
 	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
 		msg->addr, msg->len, msg->flags, stop);
@@ -597,11 +598,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 	 * into arbitration and we're currently unable to recover from it.
 	 */
 	if (dev->set_mpu_wkup_lat != NULL)
-		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
+		dev->set_mpu_wkup_lat(&qos_handle, dev->latency);
 	r = wait_for_completion_timeout(&dev->cmd_complete,
 					OMAP_I2C_TIMEOUT);
 	if (dev->set_mpu_wkup_lat != NULL)
-		dev->set_mpu_wkup_lat(dev->dev, -1);
+		dev->set_mpu_wkup_lat(&qos_handle, -1);
 	dev->buf_len = 0;
 	if (r < 0)
 		return r;
