@@ -1487,7 +1487,7 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 	int r;
 	struct writeback_cache_data *wbc;
 
-	DSSDBG("omap_dss_mgr_apply(%s)\n", mgr->name);
+	DSSDBG("omap_dss_wb_apply(%s)\n", mgr->name);
 
 	spin_lock_irqsave(&dss_cache.lock, flags);
 
@@ -1567,7 +1567,14 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 		++num_planes_enabled;
 		wbc = &dss_cache.writeback_cache;
 
-		DSSDBG("dss_mgr_apply %d", wbc->enabled);
+		if (!wb->first_time) {
+			DSSDBG("entered wb_first time\n");
+			wbc->enabled = true;
+			wbc->source = wb->info.source;
+			wbc->source_type = wb->info.source_type;
+			wb->first_time = true;
+		}
+		DSSDBG("dss_wb_apply %d\n", wbc->enabled);
 		/* Configure Write-back - check for connect with this overlay*/
 		if ((wbc->enabled) &&
 			(omap_dss_check_wb(wbc, ovl->id , ovl->manager->id))) {

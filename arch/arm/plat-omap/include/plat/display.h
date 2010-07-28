@@ -488,7 +488,7 @@ struct omap_writeback {
 	struct list_head list;
 	bool								enabled;
 	bool								info_dirty;
-
+	bool								first_time;
 	/* mutex to control access to wb data */
 	struct mutex lock;
 	struct omap_writeback_info info;
@@ -673,6 +673,7 @@ struct omap_overlay_manager *omap_dss_get_overlay_manager(int num);
 
 int omap_dss_get_num_overlays(void);
 struct omap_overlay *omap_dss_get_overlay(int num);
+struct omap_writeback *omap_dss_get_wb(int num);
 
 void omapdss_default_get_resolution(struct omap_dss_device *dssdev,
 		u16 *xres, u16 *yres);

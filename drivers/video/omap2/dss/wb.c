@@ -98,15 +98,12 @@ bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId, int manag
 
 static bool dss_check_wb(struct omap_writeback *wb)
 {
-	bool result = true;
-	printk("srcty=%d(%s),src=%d", wb->info.source_type,
+	DSSDBG("srcty=%d(%s),src=%d", wb->info.source_type,
 	   wb->info.source_type == OMAP_WB_SOURCE_OVERLAY ? "OMAP_WB_SOURCE_OVERLAY" :
 	   wb->info.source_type == OMAP_WB_SOURCE_MANAGER ? "OMAP_WB_SOURCE_MANAGER" : "???",
 	   wb->info.source);
 
-
-	return result;
-
+	return 0;
 }
 
 static int omap_dss_wb_set_info(struct omap_writeback *wb,
@@ -114,7 +111,6 @@ static int omap_dss_wb_set_info(struct omap_writeback *wb,
 {
 	int r;
 	struct omap_writeback_info old_info;
-
 	old_info = wb->info;
 	wb->info = *info;
 
@@ -134,7 +130,6 @@ static void omap_dss_wb_get_info(struct omap_writeback *wb,
 {
 	*info = wb->info;
 }
-
 
 struct omap_writeback *omap_dss_get_wb(int num)
 {
@@ -171,6 +166,8 @@ void dss_init_writeback(struct platform_device *pdev)
 		wb->set_wb_info = &omap_dss_wb_set_info;
 		wb->get_wb_info = &omap_dss_wb_get_info;
 		mutex_init(&wb->lock);
+
+		omap_dss_add_wb(wb);
 
 		r = kobject_init_and_add(&wb->kobj, &writeback_ktype,
 				&pdev->dev.kobj, "writeback", 0);

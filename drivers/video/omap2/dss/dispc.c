@@ -4842,7 +4842,7 @@ void dispc_go_wb(void)
 		goto end;
 	}
 	REG_FLD_MOD(DISPC_CONTROL2, 1, 6, 6);
-    printk("dispc_go_wb");
+    DSSDBG("dispc_go_wb\n");
 end:
 	enable_clocks(0);
 }
