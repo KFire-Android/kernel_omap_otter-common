@@ -1047,10 +1047,10 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
 	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
 	unsigned long flags;
 
-	spin_lock_irqsave(&bank->lock, flags);
-
 	if (!bank->mod_usage)
 		pm_runtime_get_sync(bank->dev);
+
+	spin_lock_irqsave(&bank->lock, flags);
 
 	/* Set trigger to none. You need to enable the desired trigger with
 	 * request_irq() or set_irq_type().
@@ -1126,11 +1126,11 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
 		__raw_writel(ctrl, reg);
 	}
 
+	_reset_gpio(bank, bank->chip.base + offset);
+	spin_unlock_irqrestore(&bank->lock, flags);
 	if (!bank->mod_usage)
 		pm_runtime_put_sync(bank->dev);
 
-	_reset_gpio(bank, bank->chip.base + offset);
-	spin_unlock_irqrestore(&bank->lock, flags);
 }
 
 /*
