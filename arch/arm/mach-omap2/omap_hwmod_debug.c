@@ -179,7 +179,7 @@ static int _reset_get(void *data, u64 *val)
 	struct reset_info *info = data;
 	int state;
 
-	state = omap_hwmod_hw_reset_state(info->oh, info->name);
+	state = omap_hwmod_hardreset_state(info->oh, info->name);
 
 	pr_debug("_reset_get: %s:%d %d\n", info->name, info->rst_shift, state);
 
@@ -210,9 +210,9 @@ static int _reset_set(void *data, u64 val)
 					       val);
 
 	if (val == 1)
-		ret = omap_hwmod_reset_assert(info->oh, info->name);
+		ret = omap_hwmod_hardreset_assert(info->oh, info->name);
 	else if	(val == 0)
-		ret = omap_hwmod_reset_deassert(info->oh, info->name);
+		ret = omap_hwmod_hardreset_deassert(info->oh, info->name);
 
 	return ret;
 }
@@ -274,8 +274,8 @@ static int show_hwmod_summary(struct omap_hwmod *oh, void* param)
 	if (oh->rst_lines_cnt > 0)
 		seq_printf(s, "  resets(%d):\n", oh->rst_lines_cnt);
 	for (i = 0; i < oh->rst_lines_cnt; i++) {
-		int state = omap_hwmod_hw_reset_state(oh,
-						      oh->rst_lines[i].name);
+		int state = omap_hwmod_hardreset_state(oh,
+						       oh->rst_lines[i].name);
 		seq_printf(s, "    %s:%d\n", oh->rst_lines[i].name,
 			   state);
 	}

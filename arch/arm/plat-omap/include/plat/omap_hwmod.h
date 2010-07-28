@@ -519,9 +519,9 @@ int omap_hwmod_shutdown(struct omap_hwmod *oh);
 int omap_hwmod_enable_clocks(struct omap_hwmod *oh);
 int omap_hwmod_disable_clocks(struct omap_hwmod *oh);
 
-int omap_hwmod_reset_assert(struct omap_hwmod *oh, const char *name);
-int omap_hwmod_reset_deassert(struct omap_hwmod *oh, const char *name);
-int omap_hwmod_hw_reset_state(struct omap_hwmod *oh, const char *name);
+int omap_hwmod_hardreset_assert(struct omap_hwmod *oh, const char *name);
+int omap_hwmod_hardreset_deassert(struct omap_hwmod *oh, const char *name);
+int omap_hwmod_hardreset_state(struct omap_hwmod *oh, const char *name);
 
 int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode);
 

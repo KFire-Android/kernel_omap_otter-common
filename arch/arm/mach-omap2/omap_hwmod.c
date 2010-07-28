@@ -1065,7 +1065,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
 	if (!(oh->flags & HWMOD_INIT_NO_RESET) && oh->rst_lines_cnt == 1) {
 		pr_debug("omap_hwmod:_setup: %s: reset %s\n",
 			 oh->name, oh->rst_lines[0].name);
-		omap_hwmod_reset_deassert(oh, oh->rst_lines[0].name);
+		omap_hwmod_hardreset_deassert(oh, oh->rst_lines[0].name);
 	}
 
 	r = _omap_hwmod_enable(oh);
@@ -1477,6 +1477,7 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
 	return r;
 }
 
+/* offset between the reset control and the reset status registers */
 #define RST_CTRL_ST_OFFSET 4
 
 /**
@@ -1515,7 +1516,7 @@ u8 _lookup_reset(struct omap_hwmod *oh, const char *name)
  * an HW reset line to be assert / deassert in order to enable fully
  * the IP.
  */
-int omap_hwmod_reset_assert(struct omap_hwmod *oh, const char *name)
+int omap_hwmod_hardreset_assert(struct omap_hwmod *oh, const char *name)
 {
 	u8 shift;
 	u32 mask;
@@ -1540,7 +1541,7 @@ int omap_hwmod_reset_assert(struct omap_hwmod *oh, const char *name)
 }
 
 /**
- * omap_hwmod_reset_deassert - deassert the HW reset line of submodules
+ * omap_hwmod_hardreset_deassert - deassert the HW reset line of submodules
  * contained in the hwmod module.
  * @oh: struct omap_hwmod *
  * @name: name of the reset line to look up and deassert
@@ -1549,7 +1550,7 @@ int omap_hwmod_reset_assert(struct omap_hwmod *oh, const char *name)
  * an HW reset line to be assert / deassert in order to enable fully
  * the IP.
  */
-int omap_hwmod_reset_deassert(struct omap_hwmod *oh, const char *name)
+int omap_hwmod_hardreset_deassert(struct omap_hwmod *oh, const char *name)
 {
 	u8 shift;
 	u32 mask;
@@ -1600,7 +1601,7 @@ int omap_hwmod_reset_deassert(struct omap_hwmod *oh, const char *name)
  *
  * Return the state of the reset line.
  */
-int omap_hwmod_hw_reset_state(struct omap_hwmod *oh, const char *name)
+int omap_hwmod_hardreset_state(struct omap_hwmod *oh, const char *name)
 {
 	u8 shift;
 	u32 mask;
