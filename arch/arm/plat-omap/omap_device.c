@@ -587,6 +587,36 @@ int omap_device_shutdown(struct platform_device *pdev)
 }
 
 /**
+ * omap_device_reset - reset an omap_device
+ * @od: struct omap_device * to reset
+ *
+ * Reset omap_device @od by reseting all of the underlying omap_hwmods.
+ * Used when a driver need to put the HW in a known state after a error
+ * Returns -EINVAL if the omap_device is not currently enabled, or passes
+ * along the return value of omap_hwmod_reset().
+ */
+int omap_device_reset(struct platform_device *pdev)
+{
+	int ret = 0;
+	int i;
+	struct omap_device *od;
+	struct omap_hwmod *oh;
+
+	od = _find_by_pdev(pdev);
+
+	if (od->_state != OMAP_DEVICE_STATE_ENABLED) {
+		WARN(1, "omap_device: %s.%d: %s() called from invalid state %d\n",
+		     od->pdev.name, od->pdev.id, __func__, od->_state);
+		return -EINVAL;
+	}
+
+	for (i = 0, oh = *od->hwmods; i < od->hwmods_cnt; i++, oh++)
+		ret |= omap_hwmod_reset(oh);
+
+	return ret;
+}
+
+/**
  * omap_device_align_pm_lat - activate/deactivate device to match wakeup lat lim
  * @od: struct omap_device *
  *
