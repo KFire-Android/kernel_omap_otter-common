@@ -2967,7 +2967,7 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 							OMAP_DSS_UPDATE_AUTO);
 #else	/* MANUAL_UPDATE */
 				if (dssdrv->enable_te)
-					dssdrv->enable_te(def_display, 0);
+					dssdrv->enable_te(def_display, 1);
 				if (dssdrv->set_update_mode)
 					dssdrv->set_update_mode(def_display,
 							OMAP_DSS_UPDATE_MANUAL);
