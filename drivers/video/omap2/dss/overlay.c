@@ -699,7 +699,8 @@ void dss_recheck_connections(struct omap_dss_device *dssdev, bool force)
 			lcd2_mgr->set_device(lcd2_mgr, dssdev);
 			mgr = lcd2_mgr;
 		}
-	} else if (dssdev->type != OMAP_DISPLAY_TYPE_VENC) {
+	} else if (dssdev->type != OMAP_DISPLAY_TYPE_VENC
+		&& dssdev->type != OMAP_DISPLAY_TYPE_HDMI) {		
 		if (!lcd_mgr->device || force) {
 			if (lcd_mgr->device)
 				lcd_mgr->unset_device(lcd_mgr);
@@ -708,7 +709,8 @@ void dss_recheck_connections(struct omap_dss_device *dssdev, bool force)
 		}
 	}
 
-	if (dssdev->type == OMAP_DISPLAY_TYPE_VENC) {
+	if (dssdev->type == OMAP_DISPLAY_TYPE_VENC
+		|| dssdev->type == OMAP_DISPLAY_TYPE_HDMI) {
 		if (!tv_mgr->device || force) {
 			if (tv_mgr->device)
 				tv_mgr->unset_device(tv_mgr);

@@ -1180,6 +1180,25 @@ void dispc_enable_zorder(enum omap_plane plane, bool enable)
 
 }
 
+
+void dispc_set_idle_mode(void)
+{
+	u32 l;
+
+	l = dispc_read_reg(DISPC_SYSCONFIG);
+	l = FLD_MOD(l, 1, 13, 12);	/* MIDLEMODE: smart standby */
+	l = FLD_MOD(l, 1, 4, 3);	/* SIDLEMODE: smart idle */
+	l = FLD_MOD(l, 0, 2, 2);	/* ENWAKEUP */
+	l = FLD_MOD(l, 0, 0, 0);	/* AUTOIDLE */
+	dispc_write_reg(DISPC_SYSCONFIG, l);
+
+}
+
+void dispc_enable_gamma_table(bool enable)
+{
+	REG_FLD_MOD(DISPC_CONFIG, enable, 9, 9);
+}
+
 static void _dispc_set_vid_color_conv(enum omap_plane plane, bool enable)
 {
 	u32 val;
@@ -2535,7 +2554,7 @@ static void _enable_digit_out(bool enable)
 	REG_FLD_MOD(DISPC_CONTROL, enable ? 1 : 0, 1, 1);
 }
 
-static void dispc_enable_digit_out(bool enable)
+void dispc_enable_digit_out(bool enable)
 {
 	struct completion frame_done_completion;
 	int r;
@@ -3829,6 +3848,11 @@ static void dispc_error_worker(struct work_struct *work)
 	}
 
 	if (errors & DISPC_IRQ_SYNC_LOST_DIGIT) {
+
+	DSSERR("SYNC_LOST_DIGIT\n");
+/*commenting below code as with 1080P Decode we see a sync lost digit for
+first frame  as it takes long time to decode but it later recovers*/
+#if 0
 		struct omap_overlay_manager *manager = NULL;
 		bool enable = false;
 
@@ -3845,6 +3869,7 @@ static void dispc_error_worker(struct work_struct *work)
 				mgr->device->driver->disable(mgr->device);
 				break;
 			}
+
 		}
 
 		if (manager) {
@@ -3865,6 +3890,7 @@ static void dispc_error_worker(struct work_struct *work)
 			if (enable)
 				dssdev->driver->enable(dssdev);
 		}
+#endif
 	}
 
 	if (errors & DISPC_IRQ_OCP_ERR) {

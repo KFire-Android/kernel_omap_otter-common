@@ -68,6 +68,11 @@ unsigned int dss_debug;
 module_param_named(debug, dss_debug, bool, 0644);
 #endif
 
+static int hdmi_code = 16;
+static int hdmi_mode = 1;
+module_param_named(hdmicode, hdmi_code, int, 0644);
+module_param_named(hdmimode, hdmi_mode, int, 0644);
+
 /* CONTEXT */
 static int dss_get_ctx_id(void)
 {
@@ -579,6 +584,12 @@ static int omap_dss_probe(struct platform_device *pdev)
 		}
 	}
 
+	r = hdmi_init(pdev, hdmi_code, hdmi_mode);
+	if (r) {
+		DSSERR("Failed to initialize hdmi\n");
+		goto err_hdmi;
+	}
+
 	r = dss_initialize_debugfs();
 	if (r)
 		goto err_debugfs;
@@ -608,6 +619,8 @@ static int omap_dss_probe(struct platform_device *pdev)
 err_register:
 	dss_uninitialize_debugfs();
 err_debugfs:
+	hdmi_exit();
+err_hdmi:
 	if (cpu_is_omap44xx())
 		dsi2_exit();
 err_dsi2:
@@ -643,6 +656,7 @@ static int omap_dss_remove(struct platform_device *pdev)
 	dss_uninitialize_debugfs();
 
 	venc_exit();
+	hdmi_exit();
 	dispc_exit();
 	dpi_exit();
 	rfbi_exit();
