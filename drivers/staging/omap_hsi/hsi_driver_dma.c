@@ -88,12 +88,9 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 *data,
 	if ((size < 1) || (data == NULL))
 		return -EINVAL;
 
-	clk_enable(hsi_ctrl->hsi_clk);
-
 	lch = hsi_get_free_lch(hsi_ctrl);
 	if (lch >= hsi_ctrl->gdd_chan_count) {
 		dev_err(hsi_ctrl->dev, "No free GDD logical channels.\n");
-		clk_disable(hsi_ctrl->hsi_clk);
 		return -EBUSY;	/* No free GDD logical channels. */
 	}
 
@@ -153,11 +150,9 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 *data,
 	dma_addr_t dma_data;
 	u16 tmp;
 
-	clk_enable(hsi_ctrl->hsi_clk);
 	lch = hsi_get_free_lch(hsi_ctrl);
 	if (lch >= hsi_ctrl->gdd_chan_count) {
 		dev_err(hsi_ctrl->dev, "No free GDD logical channels.\n");
-		clk_disable(hsi_ctrl->hsi_clk);
 		return -EBUSY;	/* No free GDD logical channels. */
 	}
 
@@ -215,12 +210,10 @@ void hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 	if (lch < 0)
 		return;
 
-	clk_enable(hsi_ctrl->hsi_clk);
 	ccr = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	if (!(ccr & HSI_CCR_ENABLE)) {
 		dev_dbg(&hsi_ch->dev->device, LOG_NAME "Write cancel on not "
 		"enabled logical channel %d CCR REG 0x%08X\n", lch, ccr);
-		clk_disable(hsi_ctrl->hsi_clk);
 		return;
 	}
 
@@ -236,8 +229,6 @@ void hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 								buff_offset);
 
 	hsi_reset_ch_write(hsi_ch);
-	clk_disable(hsi_ctrl->hsi_clk);
-	clk_disable(hsi_ctrl->hsi_clk); /* FIXME - check if can be removed */
 }
 
 void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
@@ -257,12 +248,10 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 	 */
 	hsi_driver_read_interrupt(hsi_ch, NULL);
 
-	clk_enable(hsi_ctrl->hsi_clk);
 	reg = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	if (!(reg & HSI_CCR_ENABLE)) {
 		dev_dbg(&hsi_ch->dev->device, LOG_NAME "Read cancel on not "
 		"enable logical channel %d CCR REG 0x%08X\n", lch, reg);
-		clk_disable(hsi_ctrl->hsi_clk);
 		return;
 	}
 
@@ -278,8 +267,6 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 								buff_offset);
 
 	hsi_reset_ch_read(hsi_ch);
-	clk_disable(hsi_ctrl->hsi_clk);
-	clk_disable(hsi_ctrl->hsi_clk); /* FIXME - check if can be removed */
 }
 
 /**
@@ -386,10 +373,6 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 		hsi_port_event_handler(&hsi_ctrl->hsi_port[port - 1],
 							HSI_EVENT_ERROR, NULL);
 	}
-
-	/* Decrease clk usecount which was increased in
-	 * hsi_driver_{read,write}_dma() */
-	clk_disable(hsi_ctrl->hsi_clk);
 }
 
 static void do_hsi_gdd_tasklet(unsigned long device)
@@ -400,8 +383,6 @@ static void do_hsi_gdd_tasklet(unsigned long device)
 	u32 status_reg = 0;
 	u32 lch_served = 0;
 	unsigned int gdd_max_count = hsi_ctrl->gdd_chan_count;
-
-	clk_enable(hsi_ctrl->hsi_clk);
 
 	status_reg = hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
 
@@ -416,7 +397,6 @@ static void do_hsi_gdd_tasklet(unsigned long device)
 
 	status_reg = hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
 	status_reg &= hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
-	clk_disable(hsi_ctrl->hsi_clk);
 
 	if (status_reg)
 		tasklet_hi_schedule(&hsi_ctrl->hsi_gdd_tasklet);

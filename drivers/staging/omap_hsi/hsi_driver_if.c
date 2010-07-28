@@ -283,7 +283,6 @@ int hsi_open(struct hsi_device *dev)
 	/* NOTE: error and break are port events and do not need to be
 	 * enabled for HSI extended enable register */
 
-	clk_disable(hsi_ctrl->hsi_clk);
 	spin_unlock_bh(&hsi_ctrl->lock);
 
 	return 0;
@@ -519,7 +518,6 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		/* We only claim once the wake line per channel */
 		wake = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		if (!(wake & HSI_WAKE(channel))) {
-			clk_enable(hsi_ctrl->hsi_clk);
 			hsi_outl(HSI_WAKE(channel), base,
 					HSI_SYS_SET_WAKE_REG(port));
 		}
@@ -529,7 +527,6 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		if ((wake & HSI_WAKE(channel))) {
 			hsi_outl(HSI_WAKE(channel), base,
 						HSI_SYS_CLEAR_WAKE_REG(port));
-			clk_disable(hsi_ctrl->hsi_clk);
 		}
 		break;
 	case HSI_IOCTL_SEND_BREAK:
@@ -591,7 +588,6 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		break;
 	}
 out:
-	clk_disable(hsi_ctrl->hsi_clk);
 
 	return err;
 }

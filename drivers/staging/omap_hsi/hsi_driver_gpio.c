@@ -29,14 +29,12 @@ static void do_hsi_cawake_tasklet(unsigned long hsi_p)
 	if (hsi_cawake(port)) {
 		if (!hsi_ctrl->cawake_clk_enable) {
 			hsi_ctrl->cawake_clk_enable = 1;
-			clk_enable(hsi_ctrl->hsi_clk);
 		}
 		hsi_port_event_handler(port, HSI_EVENT_CAWAKE_UP, NULL);
 	} else {
 		hsi_port_event_handler(port, HSI_EVENT_CAWAKE_DOWN, NULL);
 		if (hsi_ctrl->cawake_clk_enable) {
 			hsi_ctrl->cawake_clk_enable = 0;
-			clk_disable(hsi_ctrl->hsi_clk);
 		}
 	}
 }

@@ -33,8 +33,6 @@ static int hsi_debug_show(struct seq_file *m, void *p)
 	struct hsi_dev *hsi_ctrl = m->private;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 
-	clk_enable(hsi_ctrl->hsi_clk);
-
 	seq_printf(m, "REVISION\t: 0x%08x\n",
 				hsi_inl(hsi_ctrl->base, HSI_SYS_REVISION_REG));
 	if (hsi_driver_device_is_hsi(pdev))
@@ -45,7 +43,6 @@ static int hsi_debug_show(struct seq_file *m, void *p)
 	seq_printf(m, "SYSSTATUS\t: 0x%08x\n",
 				hsi_inl(hsi_ctrl->base, HSI_SYS_SYSSTATUS_REG));
 
-	clk_disable(hsi_ctrl->hsi_clk);
 	return 0;
 }
 
@@ -58,8 +55,6 @@ static int hsi_debug_port_show(struct seq_file *m, void *p)
 	int ch, fifo;
 	long buff_offset;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
-
-	clk_enable(hsi_ctrl->hsi_clk);
 
 	if (hsi_port->cawake_gpio >= 0)
 		seq_printf(m, "CAWAKE\t\t: %d\n", hsi_cawake(hsi_port));
@@ -162,7 +157,6 @@ static int hsi_debug_port_show(struct seq_file *m, void *p)
 						hsi_inl(base,
 						HSI_HSR_DIVISOR_REG(port)));
 	}
-	clk_disable(hsi_ctrl->hsi_clk);
 	return 0;
 }
 
@@ -172,8 +166,6 @@ static int hsi_debug_gdd_show(struct seq_file *m, void *p)
 	void __iomem *base = hsi_ctrl->base;
 	int lch;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
-
-	clk_enable(hsi_ctrl->hsi_clk);
 
 	seq_printf(m, "GDD_MPU_STATUS\t: 0x%08x\n",
 				hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG));
@@ -217,8 +209,6 @@ static int hsi_debug_gdd_show(struct seq_file *m, void *p)
 			seq_printf(m, "CLNK_CTRL\t: 0x%04x\n",
 				hsi_inw(base, HSI_SSI_GDD_CLNK_CTRL_REG(lch)));
 	}
-
-	clk_disable(hsi_ctrl->hsi_clk);
 	return 0;
 }
 
@@ -256,9 +246,7 @@ static ssize_t hsi_port_counters_read(struct file *filep, char __user *buff,
 		goto hsi_cnt_rd_bk;
 	}
 
-	clk_enable(hsi_ctrl->hsi_clk);
 	reg = hsi_inl(base, HSI_HSR_COUNTERS_REG(port));
-	clk_disable(hsi_ctrl->hsi_clk);
 
 	if (hsi_driver_device_is_hsi(pdev)) {
 		sprintf(str, "FT:%d, TB:%d, FB:%d\n",
@@ -345,7 +333,6 @@ static ssize_t hsi_port_counters_write(struct file *filep,
 		return -EINVAL;
 	}
 
-	clk_enable(hsi_ctrl->hsi_clk);
 	if (hsi_driver_device_is_hsi(pdev)) {
 		if (nwords != 3) {
 			dev_warn(hsi_ctrl->dev, "HSI counters write usage: "
@@ -373,7 +360,6 @@ static ssize_t hsi_port_counters_write(struct file *filep,
 	*offp += count;
 
 hsi_cnt_w_bk1:
-	clk_disable(hsi_ctrl->hsi_clk);
 
 	return ret;
 }

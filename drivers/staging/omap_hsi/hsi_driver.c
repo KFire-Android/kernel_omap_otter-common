@@ -497,8 +497,6 @@ static int __init hsi_probe(struct platform_device *pd)
 
 	clk_enable(hsi_ctrl->hsi_clk);
 
-	clk_enable(hsi_ctrl->hsi_clk);
-
 	err = hsi_softreset(hsi_ctrl);
 	if (err < 0)
 		goto rollback2;
@@ -530,14 +528,11 @@ static int __init hsi_probe(struct platform_device *pd)
 	if (err < 0)
 		goto rollback3;
 
-	clk_disable(hsi_ctrl->hsi_clk);
-
 	return err;
 
 rollback3:
 	hsi_debug_remove_ctrl(hsi_ctrl);
 rollback2:
-	clk_disable(hsi_ctrl->hsi_clk);
 	hsi_controller_exit(hsi_ctrl);
 rollback1:
 	kfree(hsi_ctrl);
