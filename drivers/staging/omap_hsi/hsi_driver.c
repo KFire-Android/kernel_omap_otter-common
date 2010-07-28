@@ -619,6 +619,11 @@ static int __init hsi_driver_init(void)
 		goto rback2;
 	}
 
+	/* Set the CM_L3INIT_HSI_CLKCTRL to divide HSI_FCLK @192MHz by 2
+	 *  to make the HSI works even if the OPP50 is set
+	 * TODO : omap2_clk_set_parent() should be used */
+	omap_writel(0x01000001, 0X4A009338);
+
 	return 0;
 rback2:
 	hsi_debug_exit();
