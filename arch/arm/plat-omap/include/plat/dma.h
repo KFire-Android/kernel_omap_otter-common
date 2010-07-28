@@ -398,6 +398,22 @@
 #define DMA_CH_PRIO_HIGH		0x1
 #define DMA_CH_PRIO_LOW			0x0 /* Def */
 
+/* Attributes for OMAP DMA Contrllers */
+#define ENABLE_1510_MODE		(1 << 0)
+#define DMA_LINKED_LCH			(1 << 1)
+#define GLOBAL_PRIORITY			(1 << 2)
+#define RESERVE_CHANNEL			(1 << 3)
+#define SRC_PORT			(2 << 3)
+#define DST_PORT			(2 << 4)
+#define IS_CSSA_32			(2 << 5)
+#define IS_CDSA_32			(2 << 6)
+#define SRC_INDEX			(4 << 6)
+#define DST_INDEX			(4 << 7)
+#define IS_BURST_ONLY4			(4 << 8)
+#define CLEAR_CSR_ON_READ		(4 << 9)
+#define IS_WORD_16			(8 << 9)
+#define IS_RW_PRIORIY			(8 << 0xA)
+
 enum omap_dma_burst_mode {
 	OMAP_DMA_DATA_BURST_DIS = 0,
 	OMAP_DMA_DATA_BURST_4,
@@ -463,6 +479,12 @@ struct omap_dma_channel_params {
 #endif
 };
 
+struct omap_dma_dev_attr {
+	u32 dma_dev_attr;
+	u16 dma_lch_count;
+	u16 dma_chan_count;
+	struct omap_dma_lch *dma_chan;
+};
 
 extern void omap_set_dma_priority(int lch, int dst_port, int priority);
 extern int omap_request_dma(int dev_id, const char *dev_name,
