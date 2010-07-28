@@ -415,7 +415,8 @@ static void dss_debug_dump_clocks(struct seq_file *s)
 	dss_dump_clocks(s);
 	dispc_dump_clocks(s);
 #ifdef CONFIG_OMAP2_DSS_DSI
-	dsi_dump_clocks(OMAP_DSS_CHANNEL_LCD, s);
+	dsi_dump_clocks(DSI1, OMAP_DSS_CHANNEL_LCD, s);
+	dsi_dump_clocks(DSI2, OMAP_DSS_CHANNEL_LCD2, s);
 #endif
 }
 
@@ -566,7 +567,15 @@ static int omap_dss_probe(struct platform_device *pdev)
 		r = dsi_init(pdev);
 		if (r) {
 			DSSERR("Failed to initialize DSI\n");
-			goto err_dsi;
+			goto err_dsi1;
+		}
+
+		if (cpu_is_omap44xx()) {
+			r = dsi2_init(pdev);
+			if (r) {
+				DSSERR("Failed to initialize DSI2\n");
+				goto err_dsi2;
+			}
 		}
 	}
 
@@ -599,9 +608,12 @@ static int omap_dss_probe(struct platform_device *pdev)
 err_register:
 	dss_uninitialize_debugfs();
 err_debugfs:
-	if (cpu_is_omap34xx())
+	if (cpu_is_omap44xx())
+		dsi2_exit();
+err_dsi2:
+	if (!cpu_is_omap24xx())
 		dsi_exit();
-err_dsi:
+err_dsi1:
 	if (cpu_is_omap34xx())
 		sdi_exit();
 err_sdi:
@@ -634,9 +646,12 @@ static int omap_dss_remove(struct platform_device *pdev)
 	dispc_exit();
 	dpi_exit();
 	rfbi_exit();
-	if (cpu_is_omap34xx()) {
+	if (!cpu_is_omap24xx()) {
 		dsi_exit();
-		sdi_exit();
+		if (cpu_is_omap44xx())
+			dsi2_exit();
+		if (cpu_is_omap34xx())
+			sdi_exit();
 	}
 
 	dss_exit();
