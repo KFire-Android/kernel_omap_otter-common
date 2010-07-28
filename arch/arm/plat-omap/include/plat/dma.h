@@ -268,6 +268,14 @@
 #define IS_WORD_16			(8 << 9)
 #define IS_RW_PRIORIY			(8 << 0xA)
 
+/* Errata Definitions */
+#define	DMA_CHAINING_ERRATA		(1 << 0)
+#define	DMA_BUFF_DISABLE_ERRATA		(1 << 1)
+#define	OMAP3_3_ERRATUM			(1 << 2)
+#define	DMA_SYSCONFIG_ERRATA		(1 << 3)
+#define	DMA_CH_DISABLE_ERRATA		(1 << 4)
+#define	DMA_IRQ_STATUS_ERRATA		(1 << 5)
+
 enum omap_dma_burst_mode {
 	OMAP_DMA_DATA_BURST_DIS = 0,
 	OMAP_DMA_DATA_BURST_4,
@@ -345,6 +353,7 @@ struct omap_dma_dev_attr {
 struct omap_system_dma_plat_info {
 	struct omap_dma_dev_attr *dma_attr;
 	void __iomem *omap_dma_base;
+	u32 errata;
 };
 
 extern void omap_set_dma_priority(int lch, int dst_port, int priority);

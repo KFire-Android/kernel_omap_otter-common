@@ -170,6 +170,12 @@ static int __init omap1_system_dma_init(void)
 		goto exit_device_put;
 	}
 
+	/* Errata handling for all omap1 plus processors */
+	pdata->errata			= 0;
+
+	if (cpu_class_is_omap1() && !cpu_is_omap15xx())
+		pdata->errata		|= OMAP3_3_ERRATUM;
+
 	d = pdata->dma_attr;
 
 	/* Valid attributes for omap1 plus processors */

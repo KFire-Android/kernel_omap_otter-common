@@ -182,6 +182,25 @@ static inline void set_gdma_dev(int req, int dev)
 #define set_gdma_dev(req, dev)	do {} while (0)
 #endif
 
+static void dma_ocpsysconfig_errata(u32 *sys_cf, bool flag)
+{
+	u32 l;
+
+	/*
+	 * DMA Errata:
+	 * Special programming model needed to disable DMA before end of block
+	 */
+	if (!flag) {
+		*sys_cf = dma_read(OCP_SYSCONFIG);
+		l = *sys_cf;
+		/* Middle mode reg set no Standby */
+		l &= ~((1 << 12)|(1 << 13));
+		dma_write(l, OCP_SYSCONFIG);
+	} else
+		/* put back old value */
+		dma_write(*sys_cf, OCP_SYSCONFIG);
+}
+
 /* Omap1 only */
 static void clear_lch_regs(int lch)
 {
@@ -958,22 +977,16 @@ void omap_start_dma(int lch)
 
 			cur_lch = next_lch;
 		} while (next_lch != -1);
-	} else if (cpu_is_omap242x() ||
-		(cpu_is_omap243x() &&  omap_type() <= OMAP2430_REV_ES1_0)) {
-
-		/* Errata: Need to write lch even if not using chaining */
-		dma_write(lch, CLNK_CTRL(lch));
 	}
+
+	if (p->errata & DMA_CHAINING_ERRATA)
+		dma_write(lch, CLNK_CTRL(lch));
 
 	omap_enable_channel_irq(lch);
 
 	l = dma_read(CCR(lch));
 
-	/*
-	 * Errata: On ES2.0 BUFFERING disable must be set.
-	 * This will always fail on ES1.0
-	 */
-	if (cpu_is_omap24xx())
+	if (p->errata & DMA_BUFF_DISABLE_ERRATA)
 		l |= OMAP_DMA_CCR_EN;
 
 	l |= OMAP_DMA_CCR_EN;
@@ -1647,7 +1660,7 @@ int omap_stop_dma_chain_transfers(int chain_id)
 {
 	int *channels;
 	u32 l, i;
-	u32 sys_cf;
+	u32 get_sysconfig;
 
 	/* Check for input params */
 	if (unlikely((chain_id < 0 || chain_id >= dma_lch_count))) {
@@ -1662,15 +1675,8 @@ int omap_stop_dma_chain_transfers(int chain_id)
 	}
 	channels = dma_linked_lch[chain_id].linked_dmach_q;
 
-	/*
-	 * DMA Errata:
-	 * Special programming model needed to disable DMA before end of block
-	 */
-	sys_cf = dma_read(OCP_SYSCONFIG);
-	l = sys_cf;
-	/* Middle mode reg set no Standby */
-	l &= ~((1 << 12)|(1 << 13));
-	dma_write(l, OCP_SYSCONFIG);
+	if (p->errata & DMA_SYSCONFIG_ERRATA)
+		dma_ocpsysconfig_errata(&get_sysconfig, false);
 
 	for (i = 0; i < dma_linked_lch[chain_id].no_of_lchs_linked; i++) {
 
@@ -1689,8 +1695,8 @@ int omap_stop_dma_chain_transfers(int chain_id)
 	/* Reset the Queue pointers */
 	OMAP_DMA_CHAIN_QINIT(chain_id);
 
-	/* Errata - put in the old value */
-	dma_write(sys_cf, OCP_SYSCONFIG);
+	if (p->errata & DMA_SYSCONFIG_ERRATA)
+		dma_ocpsysconfig_errata(&get_sysconfig, true);
 
 	return 0;
 }

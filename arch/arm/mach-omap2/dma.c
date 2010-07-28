@@ -80,6 +80,40 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *user)
 
 	pdata->dma_attr		= (struct omap_dma_dev_attr *)oh->dev_attr;
 
+	/* Handling Errata's for all OMAP2PLUS processors */
+	pdata->errata			= 0;
+
+	if (cpu_is_omap242x() ||
+		(cpu_is_omap243x() &&  omap_type() <= OMAP2430_REV_ES1_0))
+		pdata->errata		= DMA_CHAINING_ERRATA;
+
+	/*
+	 * Errata: On ES2.0 BUFFERING disable must be set.
+	 * This will always fail on ES1.0
+	 */
+	if (cpu_is_omap24xx())
+		pdata->errata		|= DMA_BUFF_DISABLE_ERRATA;
+
+	/*
+	 * Errata: OMAP2: sDMA Channel is not disabled
+	 * after a transaction error. So we explicitely
+	 * disable the channel
+	 */
+	if (cpu_class_is_omap2())
+		pdata->errata		|= DMA_CH_DISABLE_ERRATA;
+
+	/* Errata: OMAP3 :
+	 * A bug in ROM code leaves IRQ status for channels 0 and 1 uncleared
+	 * after secure sram context save and restore. Hence we need to
+	 * manually clear those IRQs to avoid spurious interrupts. This
+	 * affects only secure devices.
+	 */
+	if (cpu_is_omap34xx() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
+		pdata->errata		|= DMA_IRQ_STATUS_ERRATA;
+
+	/* Errata3.3: Applicable for all omap2 plus */
+	pdata->errata			|= OMAP3_3_ERRATUM;
+
 	od = omap_device_build(name, 0, oh, pdata, sizeof(*pdata),
 			omap2_dma_latency, ARRAY_SIZE(omap2_dma_latency), 0);
 
