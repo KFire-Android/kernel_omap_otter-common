@@ -143,4 +143,6 @@ struct omap_dma_lch {
 	long flags;
 };
 
+/* Dummy function */
+extern void omap_clear_dma_sglist_mode(int lch);
 #endif /* __ASM_ARCH_OMAP1_DMA_H */

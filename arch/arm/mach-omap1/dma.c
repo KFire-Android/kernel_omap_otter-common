@@ -304,6 +304,11 @@ void omap_dma_set_global_params(int arb_rate, int max_fifo_depth, int tparams)
 }
 EXPORT_SYMBOL(omap_dma_set_global_params);
 
+void omap_clear_dma_sglist_mode(int lch)
+{
+	return;
+}
+
 static int __init omap1_system_dma_init(void)
 {
 	struct platform_device *pdev;
