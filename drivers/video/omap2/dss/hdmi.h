@@ -223,13 +223,18 @@ static void hdmi_get_timings(struct omap_dss_device *dssdev,
 static void hdmi_set_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings);
 static void hdmi_set_custom_edid_timing_code(struct omap_dss_device *dssdev, int code , int mode);
-static int hdmi_get_edid(struct omap_dss_device *dssdev);
+static void hdmi_get_edid(struct omap_dss_device *dssdev);
 static int hdmi_check_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings);
 static int hdmi_read_edid(struct omap_video_timings *);
 static int get_edid_timing_data(u8 *edid, u16 *pixel_clk, u16 *horizontal_res,
 			  u16 *vertical_res);
 void show_horz_vert_timing_info(u8 *edid);
+int hdmi_get_image_format(void);
+int hdmi_get_audio_format(void);
+static irqreturn_t hdmi_irq_handler(int irq, void *arg);
+static int hdmi_enable_hpd(struct omap_dss_device *dssdev);
+static void hdmi_power_off(struct omap_dss_device *dssdev);
 
 #ifdef __cplusplus
 };
