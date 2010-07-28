@@ -132,8 +132,10 @@ struct omap_abe_data {
 	struct abe_frontend_dai frontend[NUM_ABE_FRONTENDS];
 	struct abe_backend_dai be[NUM_ABE_BACKENDS][2];
 	int configure;
-	int mcpdm_dl_enable;
-	int mcpdm_ul_enable;
+	atomic_t mcpdm_dl_cnt;  /* McPDM DL port activation counter */
+	atomic_t mcpdm_ul_cnt;  /* McPDM UL port activation counter */
+	atomic_t mm_dl_cnt;     /* MM DL port activation counter */
+
 	struct clk *clk;
 
 	/* hwmod platform device */
@@ -203,8 +205,9 @@ static struct omap_abe_data abe_data = {
 			.active = ATOMIC_INIT(0),
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
-	.mcpdm_dl_enable = 0,
-	.mcpdm_ul_enable = 0,
+	.mcpdm_dl_cnt = ATOMIC_INIT(0),
+	.mcpdm_ul_cnt = ATOMIC_INIT(0),
+	.mm_dl_cnt = ATOMIC_INIT(0),
 	.configure = 0,
 };
 
@@ -1012,19 +1015,23 @@ static void capture_work_pdm_ul(struct work_struct *work)
 		abe_write_mixer(MIXAUDUL, MUTE_GAIN, RAMP_0MS,
 				MIX_AUDUL_INPUT_UPLINK);
 
-		/*Enable ABE_PDM_UL port */
-		abe_enable_data_transfer(PDM_UL_PORT);
+               if (!atomic_cmpxchg(&abe_data.mcpdm_ul_cnt, 0, 1)) {
+			/* Enable ABE_PDM_UL port */
+			abe_enable_data_transfer(PDM_UL_PORT);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
+
+			/* start OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+
+			/* TODO: enable PDM clock */
+
+		} else {
+			atomic_inc(&abe_data.mcpdm_ul_cnt);
+		}
 
 		/* Enable sDMA / Enable ABE MM_UL2 */
 		abe_enable_data_transfer(MM_UL2_PORT);
-
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
-
-		/* start OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
-
-		/* TODO: enable PDM clock */
 
 		/* Restore ABE GAINS AMIC */
 		abe_write_mixer(MIXAUDUL, GAIN_M6dB, RAMP_0MS,
@@ -1042,16 +1049,19 @@ static void capture_work_pdm_ul(struct work_struct *work)
 		/* Disable sDMA / Enable ABE MM_UL2 */
 		abe_disable_data_transfer(MM_UL2_PORT);
 
-		/*Disable ABE_PDM_UL port */
-		abe_disable_data_transfer(PDM_UL_PORT);
+		if (atomic_dec_and_test(&abe_data.mcpdm_ul_cnt)) {
+			/* Disable ABE_PDM_UL port */
+			abe_disable_data_transfer(PDM_UL_PORT);
 
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
 
-		/* stop OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+			/* stop OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
 
-		/* TODO: shutdown PDM clock */
+			/* TODO: shutdown PDM clock */
+
+		}
 		break;
 	default:
 		break;
@@ -1071,19 +1081,26 @@ static void playback_work_pdm_dl1(struct work_struct *work)
 
 	switch (be->cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		/* start ABE PDM DL1 */
-		abe_enable_data_transfer(PDM_DL_PORT);
+		if (!atomic_cmpxchg(&abe_data.mcpdm_dl_cnt, 0, 1)) {
+			/* start ABE PDM DL1 */
+			abe_enable_data_transfer(PDM_DL_PORT);
 
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
 
-		/* start OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+			/* start OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+		} else {
+			atomic_inc(&abe_data.mcpdm_dl_cnt);
+		}
 
 		/* TODO: unmute DL1 */
 
 		/* enable the transfer */
-		abe_enable_data_transfer(MM_DL_PORT);
+		if (!atomic_cmpxchg(&abe_data.mm_dl_cnt, 0, 1))
+			abe_enable_data_transfer(MM_DL_PORT);
+		else
+			atomic_inc(&abe_data.mm_dl_cnt);
 
 		/* unmute ABE_MM_DL */
 		abe_write_mixer(MIXDL1, GAIN_M6dB, RAMP_0MS, MIX_DL1_INPUT_MM_DL);
@@ -1104,21 +1121,24 @@ static void playback_work_pdm_dl1(struct work_struct *work)
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		/* disable the transfer */
-		abe_disable_data_transfer(MM_DL_PORT);
+		if (atomic_dec_and_test(&abe_data.mm_dl_cnt))
+			abe_disable_data_transfer(MM_DL_PORT);
 
 		/* mute ABE_MM_DL */
 		abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS, MIX_DL1_INPUT_MM_DL);
 
 		/* TODO :mute Phoenix */
 
-		/* stop ABE PDM DL1 */
-		abe_disable_data_transfer(PDM_DL_PORT);
+		if (atomic_dec_and_test(&abe_data.mcpdm_dl_cnt)) {
+			/* stop ABE PDM DL1 */
+			abe_disable_data_transfer(PDM_DL_PORT);
 
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
 
-		/* stop OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+			/* stop OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+		}
 		break;
 	default:
 		break;
@@ -1138,19 +1158,26 @@ static void playback_work_pdm_dl2(struct work_struct *work)
 
 	switch (be->cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		/* start ABE PDM DL1 */
-		abe_enable_data_transfer(PDM_DL_PORT);
+		if (!atomic_cmpxchg(&abe_data.mcpdm_dl_cnt, 0, 1)) {
+			/* start ABE PDM DL1 */
+			abe_enable_data_transfer(PDM_DL_PORT);
 
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
 
-		/* start OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+			/* start OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+		} else {
+			atomic_inc(&abe_data.mcpdm_dl_cnt);
+		}
 
 		/* TODO: unmute DL1 */
 
 		/* enable the transfer */
-		abe_enable_data_transfer(MM_DL_PORT);
+		if (!atomic_cmpxchg(&abe_data.mm_dl_cnt, 0, 1))
+			abe_enable_data_transfer(MM_DL_PORT);
+		else
+			atomic_inc(&abe_data.mm_dl_cnt);
 
 		/* unmute ABE_MM_DL */
 		abe_write_mixer(MIXDL2, GAIN_M6dB, RAMP_0MS, MIX_DL2_INPUT_MM_DL);
@@ -1171,21 +1198,24 @@ static void playback_work_pdm_dl2(struct work_struct *work)
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		/* disable the transfer */
-		abe_disable_data_transfer(MM_DL_PORT);
+		if (atomic_dec_and_test(&abe_data.mm_dl_cnt))
+			abe_disable_data_transfer(MM_DL_PORT);
 
 		/* mute ABE_MM_DL */
 		abe_write_mixer(MIXDL2, MUTE_GAIN, RAMP_0MS, MIX_DL2_INPUT_MM_DL);
 
 		/* TODO :mute Phoenix */
 
-		/* stop ABE PDM DL1 */
-		abe_disable_data_transfer(PDM_DL_PORT);
+		if (atomic_dec_and_test(&abe_data.mcpdm_dl_cnt)) {
+			/* stop ABE PDM DL1 */
+			abe_disable_data_transfer(PDM_DL_PORT);
 
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
 
-		/* stop OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+			/* stop OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+		}
 		break;
 	default:
 		break;
@@ -1205,14 +1235,18 @@ static void playback_work_pdm_vib(struct work_struct *work)
 
 	switch (be->cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		/* start ABE PDM DL1 */
-		abe_enable_data_transfer(PDM_DL_PORT);
+		if (!atomic_cmpxchg(&abe_data.mcpdm_dl_cnt, 0, 1)) {
+			/* start ABE PDM DL1 */
+			abe_enable_data_transfer(PDM_DL_PORT);
 
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
 
-		/* start OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+			/* start OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+		} else {
+			atomic_inc(&abe_data.mcpdm_dl_cnt);
+		}
 
 		/* enable the transfer */
 		abe_enable_data_transfer(VIB_DL_PORT);
@@ -1229,14 +1263,16 @@ static void playback_work_pdm_vib(struct work_struct *work)
 		/* disable the transfer */
 		abe_disable_data_transfer(VIB_DL_PORT);
 
-		/* stop ABE PDM DL1 */
-		abe_disable_data_transfer(PDM_DL_PORT);
+		if (atomic_dec_and_test(&abe_data.mcpdm_dl_cnt)) {
+			/* stop ABE PDM DL1 */
+			abe_disable_data_transfer(PDM_DL_PORT);
 
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
 
-		/* stop OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+			/* stop OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+		}
 		break;
 	default:
 		break;
@@ -1397,7 +1433,10 @@ static void playback_work_mm(struct work_struct *work)
 		/* TODO: unmute DL1 */
 
 		/* enable the transfer */
-		abe_enable_data_transfer(MM_DL_PORT);
+		if (!atomic_cmpxchg(&abe_data.mm_dl_cnt, 0, 1))
+			abe_enable_data_transfer(MM_DL_PORT);
+		else
+			atomic_inc(&abe_data.mm_dl_cnt);
 
 		/* unmute ABE_MM_DL */
 		abe_write_mixer(MIXDL1, GAIN_M6dB, RAMP_0MS, MIX_DL1_INPUT_VX_DL);
@@ -1418,7 +1457,8 @@ static void playback_work_mm(struct work_struct *work)
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		/* disable the transfer */
-		abe_disable_data_transfer(MM_DL_PORT);
+		if (atomic_dec_and_test(&abe_data.mm_dl_cnt))
+			abe_disable_data_transfer(MM_DL_PORT);
 
 		/* mute ABE_MM_DL */
 		abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS, MIX_DL1_INPUT_VX_DL);
@@ -1581,19 +1621,23 @@ static void capture_work_dmic2(struct work_struct *work)
 		abe_write_mixer(MIXAUDUL, MUTE_GAIN, RAMP_0MS,
 				MIX_AUDUL_INPUT_UPLINK);
 
-		/*Enable ABE_PDM_UL port */
-		abe_enable_data_transfer(PDM_UL_PORT);
+               if (!atomic_cmpxchg(&abe_data.mcpdm_ul_cnt, 0, 1)) {
+			/* Enable ABE_PDM_UL port */
+			abe_enable_data_transfer(PDM_UL_PORT);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
+
+			/* start OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+
+			/* TODO: enable PDM clock */
+
+		} else {
+			atomic_inc(&abe_data.mcpdm_ul_cnt);
+		}
 
 		/* Enable sDMA / Enable ABE MM_UL2 */
 		abe_enable_data_transfer(MM_UL2_PORT);
-
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
-
-		/* start OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
-
-		/* TODO: enable PDM clock */
 
 		/* Restore ABE GAINS AMIC */
 		abe_write_mixer(MIXAUDUL, GAIN_M6dB, RAMP_0MS,
@@ -1611,16 +1655,19 @@ static void capture_work_dmic2(struct work_struct *work)
 		/* Disable sDMA / Enable ABE MM_UL2 */
 		abe_disable_data_transfer(MM_UL2_PORT);
 
-		/*Disable ABE_PDM_UL port */
-		abe_disable_data_transfer(PDM_UL_PORT);
+		if (atomic_dec_and_test(&abe_data.mcpdm_ul_cnt)) {
+			/* Disable ABE_PDM_UL port */
+			abe_disable_data_transfer(PDM_UL_PORT);
 
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
 
-		/* stop OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+			/* stop OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
 
-		/* TODO: shutdown PDM clock */
+			/* TODO: shutdown PDM clock */
+
+		}
 		break;
 	default:
 		break;
@@ -1644,19 +1691,23 @@ static void capture_work_dmic3(struct work_struct *work)
 		abe_write_mixer(MIXAUDUL, MUTE_GAIN, RAMP_0MS,
 				MIX_AUDUL_INPUT_UPLINK);
 
-		/*Enable ABE_PDM_UL port */
-		abe_enable_data_transfer(PDM_UL_PORT);
+               if (!atomic_cmpxchg(&abe_data.mcpdm_ul_cnt, 0, 1)) {
+			/* Enable ABE_PDM_UL port */
+			abe_enable_data_transfer(PDM_UL_PORT);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
+
+			/* start OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+
+			/* TODO: enable PDM clock */
+
+		} else {
+			atomic_inc(&abe_data.mcpdm_ul_cnt);
+		}
 
 		/* Enable sDMA / Enable ABE MM_UL2 */
 		abe_enable_data_transfer(MM_UL2_PORT);
-
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
-
-		/* start OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
-
-		/* TODO: enable PDM clock */
 
 		/* Restore ABE GAINS AMIC */
 		abe_write_mixer(MIXAUDUL, GAIN_M6dB, RAMP_0MS,
@@ -1674,16 +1725,19 @@ static void capture_work_dmic3(struct work_struct *work)
 		/* Disable sDMA / Enable ABE MM_UL2 */
 		abe_disable_data_transfer(MM_UL2_PORT);
 
-		/*Disable ABE_PDM_UL port */
-		abe_disable_data_transfer(PDM_UL_PORT);
+		if (atomic_dec_and_test(&abe_data.mcpdm_ul_cnt)) {
+			/* Disable ABE_PDM_UL port */
+			abe_disable_data_transfer(PDM_UL_PORT);
 
-		/* DAI work must be started/stopped at least 250us after ABE */
-		udelay(250);
+			/* DAI work must be started/stopped at least 250us after ABE */
+			udelay(250);
 
-		/* stop OMAP McPDML IP */
-		snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
+			/* stop OMAP McPDML IP */
+			snd_soc_dai_trigger(be->substream, be->cmd, rtd->cpu_dai);
 
-		/* TODO: shutdown PDM clock */
+			/* TODO: shutdown PDM clock */
+
+		}
 		break;
 	default:
 		break;
