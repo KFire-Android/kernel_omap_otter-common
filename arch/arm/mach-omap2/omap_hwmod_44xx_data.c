@@ -23,6 +23,7 @@
 #include <plat/omap_hwmod.h>
 #include <plat/cpu.h>
 #include <plat/gpio.h>
+#include <plat/dma.h>
 
 #include "omap_hwmod_common_data.h"
 
@@ -869,12 +870,19 @@ static struct omap_hwmod_class omap44xx_dma_hwmod_class = {
 	.sysc = &omap44xx_dma_sysc,
 };
 
+/* dma attributes */
+static struct omap_dma_dev_attr dma_dev_attr = {
+	.dma_dev_attr = DMA_LINKED_LCH | GLOBAL_PRIORITY |
+				IS_CSSA_32 | IS_CDSA_32 | IS_RW_PRIORIY,
+	.dma_lch_count = OMAP_DMA4_LOGICAL_DMA_CH_COUNT,
+};
+
 /* dma_system */
 static struct omap_hwmod_irq_info omap44xx_dma_system_irqs[] = {
-	{ .name = "0", .irq = 12 + OMAP44XX_IRQ_GIC_START },
-	{ .name = "1", .irq = 13 + OMAP44XX_IRQ_GIC_START },
-	{ .name = "2", .irq = 14 + OMAP44XX_IRQ_GIC_START },
-	{ .name = "3", .irq = 15 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "dma_0", .irq = 12 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "dma_1", .irq = 13 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "dma_2", .irq = 14 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "dma_3", .irq = 15 + OMAP44XX_IRQ_GIC_START },
 };
 
 /* dma_system master ports */
@@ -920,6 +928,7 @@ static struct omap_hwmod omap44xx_dma_system_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_dma_system_slaves),
 	.masters	= omap44xx_dma_system_masters,
 	.masters_cnt	= ARRAY_SIZE(omap44xx_dma_system_masters),
+	.dev_attr	= &dma_dev_attr,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 
@@ -5668,7 +5677,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	/* counter class */
 	&omap44xx_counter_32k_hwmod,
 	/* dma class */
-/*	&omap44xx_dma_system_hwmod, */
+	&omap44xx_dma_system_hwmod,
 	/* dmic class */
 /*	&omap44xx_dmic_hwmod, */
 	/* dsp class */
