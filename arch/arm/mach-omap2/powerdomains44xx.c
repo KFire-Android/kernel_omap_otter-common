@@ -138,7 +138,14 @@ int omap4_pwrdm_read_mem_retst(struct powerdomain *pwrdm, u8 bank)
 
 int omap4_pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
 {
-	prm_write_mod_reg(0, pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST);
+	u32 reg;
+
+	prm_rmw_mod_reg_bits(OMAP4430_LASTPOWERSTATEENTERED_MASK,
+			0x3 << OMAP4430_LASTPOWERSTATEENTERED_SHIFT,
+				pwrdm->prcm_offs, OMAP4_PM_PWSTST);
+	reg = prm_read_mod_reg(pwrdm->prcm_offs, pwrdm->context_offset);
+	prm_write_mod_reg(reg, pwrdm->prcm_offs, pwrdm->context_offset);
+
 	return 0;
 }
 
