@@ -785,8 +785,25 @@ static void omap_init_vout(void)
 	if (platform_device_register(&omap_vout_device) < 0)
 		printk(KERN_ERR "Unable to register OMAP-VOUT device\n");
 }
+
+static struct resource sdp4430_wb_resource[1] = {
+};
+
+static struct platform_device sdp4430_wb_device = {
+	.name		= "omap_wb",
+	.num_resources	= ARRAY_SIZE(sdp4430_wb_resource),
+	.resource	= &sdp4430_wb_resource[0],
+	.id		= -1,
+};
+
+static void omap_init_wb(void)
+{
+		(void) platform_device_register(&sdp4430_wb_device);
+}
+
 #else
 static inline void omap_init_vout(void) {}
+static void omap_init_wb(void) {}
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -805,6 +822,8 @@ static int __init omap2_init_devices(void)
 	omap_init_sti();
 	omap_init_sham();
 	omap_init_vout();
+	if (cpu_is_omap44xx())
+		omap_init_wb();
 
 	return 0;
 }
