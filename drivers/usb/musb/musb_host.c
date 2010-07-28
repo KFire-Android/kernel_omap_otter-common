@@ -628,6 +628,11 @@ static bool musb_tx_dma_program(struct dma_controller *dma,
 	u8			mode;
 
 #ifdef	CONFIG_USB_INVENTRA_DMA
+	/*
+	 * Ensure the data reaches to main memory before starting
+	 * DMA transfer
+	 */
+	wmb();
 	if (length > channel->max_len)
 		length = channel->max_len;
 
