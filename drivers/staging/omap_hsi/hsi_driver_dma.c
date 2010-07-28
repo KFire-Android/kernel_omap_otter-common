@@ -355,7 +355,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			 */
 			hsi_driver_read_interrupt(ch, NULL);
 			spin_unlock(&hsi_ctrl->lock);
-			ch->read_done(ch->dev, size);
+			ch->read_done(ch->dev, size / 4);
 		} else {
 			dma_h = hsi_inl(base, HSI_GDD_CSSA_REG(gdd_lch));
 			size = hsi_inw(base, HSI_GDD_CEN_REG(gdd_lch)) * 4;
@@ -364,7 +364,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			ch = ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_write(ch);
 			spin_unlock(&hsi_ctrl->lock);
-			ch->write_done(ch->dev, size);
+			ch->write_done(ch->dev, size / 4);
 		}
 	} else {
 		dev_err(hsi_ctrl->dev, "Error  on GDD transfer "

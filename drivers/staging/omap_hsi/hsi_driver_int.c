@@ -131,7 +131,7 @@ static void do_channel_tx(struct hsi_channel *ch)
 				HSI_SYS_MPU_ENABLE_CH_REG(n_p, irq, n_ch));
 		hsi_reset_ch_write(ch);
 		spin_unlock(&hsi_ctrl->lock);
-		(*ch->write_done)(ch->dev, 4);
+		(*ch->write_done)(ch->dev, 1);
 	} else {
 		buff_offset = hsi_hst_buffer_reg(hsi_ctrl, n_p, n_ch);
 		if (buff_offset >= 0) {
@@ -181,7 +181,7 @@ static void do_channel_rx(struct hsi_channel *ch)
 				HSI_EVENT_HSR_DATAAVAILABLE, (void *)n_ch);
 
 	if (data_read)
-		(*ch->read_done)(ch->dev, 4);
+		(*ch->read_done)(ch->dev, 1);
 }
 
 /**
