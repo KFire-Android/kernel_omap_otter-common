@@ -858,7 +858,7 @@ static int dsi_pll_power(enum omap_dsi_index ix,
 }
 
 /* calculate clock rates using dividers in cinfo */
-static int dsi_calc_clock_rates(struct dsi_clock_info *cinfo)
+int dsi_calc_clock_rates(struct dsi_clock_info *cinfo)
 {
 	if (cinfo->regn == 0 || cinfo->regn > REGN_MAX)
 		return -EINVAL;

@@ -50,7 +50,7 @@
 #endif
 
 struct dispc_reg { u16 idx; };
-
+extern void __iomem  *dispc_base;
 #define DISPC_REG(idx)			((const struct dispc_reg) { idx })
 
 /* DISPC common */
@@ -727,7 +727,9 @@ void dispc_go(enum omap_channel channel)
 
 	if (cpu_is_omap44xx() && (channel == OMAP_DSS_CHANNEL_LCD2)) {
 		if (REG_GET(DISPC_CONTROL2, bit, bit) == 1) {
-			DSSERR("GO bit not down for channel %d\n", channel);
+			/* FIXME PICO DLP on Channel 2 needs GO bit to be UP
+			it will come as error so changing to DSSDBG*/
+			DSSDBG("GO bit not down for channel %d\n", channel);
 			goto end;
 		}
 	} else {
@@ -4072,7 +4074,7 @@ int dispc_init(void)
 
 	INIT_WORK(&dispc.error_work, dispc_error_worker);
 
-	dispc.base = ioremap(DISPC_BASE, DISPC_SZ_REGS);
+	dispc_base = dispc.base = ioremap(DISPC_BASE, DISPC_SZ_REGS);
 	if (!dispc.base) {
 		DSSERR("can't ioremap DISPC\n");
 		return -ENOMEM;

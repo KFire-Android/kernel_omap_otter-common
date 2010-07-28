@@ -1514,7 +1514,7 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 			mgr->id = OMAP_DSS_CHANNEL_LCD2;
 			mgr->supported_displays =
 				OMAP_DISPLAY_TYPE_DPI | OMAP_DISPLAY_TYPE_DBI |
-				OMAP_DISPLAY_TYPE_DSI;
+				OMAP_DISPLAY_TYPE_DSI ;
 			break;
 		}
 
