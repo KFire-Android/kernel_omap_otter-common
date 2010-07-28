@@ -241,6 +241,9 @@
 #define DMA_THREAD_FIFO_25		(0x02 << 14)
 #define DMA_THREAD_FIFO_50		(0x03 << 14)
 
+#define OMAP_DMA_ACTIVE			0x01
+#define OMAP2_DMA_CSR_CLEAR_MASK	0xffe
+
 /* Chaining modes*/
 #ifndef CONFIG_ARCH_OMAP1
 #define OMAP_DMA_STATIC_CHAIN		0x1
@@ -354,6 +357,16 @@ struct omap_system_dma_plat_info {
 	struct omap_dma_dev_attr *dma_attr;
 	void __iomem *omap_dma_base;
 	u32 errata;
+	void (*enable_irq_lch)(int lch);
+	void (*disable_irq_lch)(int lch);
+	void (*enable_lnk)(int lch);
+	void (*disable_lnk)(int lch);
+	void (*clear_lch_regs)(int lch);
+	int (*get_gdma_dev)(int req);
+	void (*set_gdma_dev)(int req, int dev);
+	void (*enable_channel_irq)(int lch);
+	void (*disable_channel_irq)(int lch);
+	void (*set_dma_chain_ch)(int free_ch);
 };
 
 extern void omap_set_dma_priority(int lch, int dst_port, int priority);
@@ -416,29 +429,6 @@ void omap_dma_global_context_save(void);
 void omap_dma_global_context_restore(void);
 
 extern void omap_dma_disable_irq(int lch);
-
-/* Chaining APIs */
-#ifndef CONFIG_ARCH_OMAP1
-extern int omap_request_dma_chain(int dev_id, const char *dev_name,
-				  void (*callback) (int lch, u16 ch_status,
-						    void *data),
-				  int *chain_id, int no_of_chans,
-				  int chain_mode,
-				  struct omap_dma_channel_params params);
-extern int omap_free_dma_chain(int chain_id);
-extern int omap_dma_chain_a_transfer(int chain_id, int src_start,
-				     int dest_start, int elem_count,
-				     int frame_count, void *callbk_data);
-extern int omap_start_dma_chain_transfers(int chain_id);
-extern int omap_stop_dma_chain_transfers(int chain_id);
-extern int omap_get_dma_chain_index(int chain_id, int *ei, int *fi);
-extern int omap_get_dma_chain_dst_pos(int chain_id);
-extern int omap_get_dma_chain_src_pos(int chain_id);
-
-extern int omap_modify_dma_chain_params(int chain_id,
-					struct omap_dma_channel_params params);
-extern int omap_dma_chain_status(int chain_id);
-#endif
 
 #if defined(CONFIG_ARCH_OMAP1) && defined(CONFIG_FB_OMAP)
 #include <mach/lcd_dma.h>
