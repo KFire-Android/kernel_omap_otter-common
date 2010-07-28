@@ -102,6 +102,7 @@ struct powerdomain {
 	const u8 pwrsts_logic_ret;
 	const u8 flags;
 	const u8 banks;
+	const s16 context_offset;
 	const u8 pwrsts_mem_ret[PWRDM_MAX_MEM_BANKS];
 	const u8 pwrsts_mem_on[PWRDM_MAX_MEM_BANKS];
 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
