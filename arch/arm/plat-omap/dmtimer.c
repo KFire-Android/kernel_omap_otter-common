@@ -10,6 +10,11 @@
  * Copyright (C) 2009 Texas Instruments
  * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
  *
+ * Copyright (C) 2010 Texas Instruments, Inc.
+ * Add hwmod support
+ * Thara Gopinath <thara@ti.com>
+ * Tarun Kanti DebBarma <tarun.kanti@ti.com>
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -37,8 +42,11 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/module.h>
+#include <linux/slab.h>
 #include <mach/hardware.h>
+#include <linux/pm_runtime.h>
 #include <plat/dmtimer.h>
+#include <plat/omap_device.h>
 #include <mach/irqs.h>
 
 /* register offsets */
@@ -151,136 +159,20 @@
 		(_OMAP_TIMER_TICK_INT_MASK_COUNT_OFFSET | (WP_TOWR << WPSHIFT))
 
 struct omap_dm_timer {
+	int id;
 	unsigned long phys_base;
+	unsigned long fclk_rate;
 	int irq;
-#ifdef CONFIG_ARCH_OMAP2PLUS
-	struct clk *iclk, *fclk;
-#endif
 	void __iomem *io_base;
 	unsigned reserved:1;
 	unsigned enabled:1;
 	unsigned posted:1;
+	unsigned is_intialized:1;
+	struct platform_device *pdev;
+	struct list_head node;
 };
 
-static int dm_timer_count;
-
-#ifdef CONFIG_ARCH_OMAP1
-static struct omap_dm_timer omap1_dm_timers[] = {
-	{ .phys_base = 0xfffb1400, .irq = INT_1610_GPTIMER1 },
-	{ .phys_base = 0xfffb1c00, .irq = INT_1610_GPTIMER2 },
-	{ .phys_base = 0xfffb2400, .irq = INT_1610_GPTIMER3 },
-	{ .phys_base = 0xfffb2c00, .irq = INT_1610_GPTIMER4 },
-	{ .phys_base = 0xfffb3400, .irq = INT_1610_GPTIMER5 },
-	{ .phys_base = 0xfffb3c00, .irq = INT_1610_GPTIMER6 },
-	{ .phys_base = 0xfffb7400, .irq = INT_1610_GPTIMER7 },
-	{ .phys_base = 0xfffbd400, .irq = INT_1610_GPTIMER8 },
-};
-
-static const int omap1_dm_timer_count = ARRAY_SIZE(omap1_dm_timers);
-
-#else
-#define omap1_dm_timers			NULL
-#define omap1_dm_timer_count		0
-#endif	/* CONFIG_ARCH_OMAP1 */
-
-#ifdef CONFIG_ARCH_OMAP2
-static struct omap_dm_timer omap2_dm_timers[] = {
-	{ .phys_base = 0x48028000, .irq = INT_24XX_GPTIMER1 },
-	{ .phys_base = 0x4802a000, .irq = INT_24XX_GPTIMER2 },
-	{ .phys_base = 0x48078000, .irq = INT_24XX_GPTIMER3 },
-	{ .phys_base = 0x4807a000, .irq = INT_24XX_GPTIMER4 },
-	{ .phys_base = 0x4807c000, .irq = INT_24XX_GPTIMER5 },
-	{ .phys_base = 0x4807e000, .irq = INT_24XX_GPTIMER6 },
-	{ .phys_base = 0x48080000, .irq = INT_24XX_GPTIMER7 },
-	{ .phys_base = 0x48082000, .irq = INT_24XX_GPTIMER8 },
-	{ .phys_base = 0x48084000, .irq = INT_24XX_GPTIMER9 },
-	{ .phys_base = 0x48086000, .irq = INT_24XX_GPTIMER10 },
-	{ .phys_base = 0x48088000, .irq = INT_24XX_GPTIMER11 },
-	{ .phys_base = 0x4808a000, .irq = INT_24XX_GPTIMER12 },
-};
-
-static const char *omap2_dm_source_names[] __initdata = {
-	"sys_ck",
-	"func_32k_ck",
-	"alt_ck",
-	NULL
-};
-
-static struct clk *omap2_dm_source_clocks[3];
-static const int omap2_dm_timer_count = ARRAY_SIZE(omap2_dm_timers);
-
-#else
-#define omap2_dm_timers			NULL
-#define omap2_dm_timer_count		0
-#define omap2_dm_source_names		NULL
-#define omap2_dm_source_clocks		NULL
-#endif	/* CONFIG_ARCH_OMAP2 */
-
-#ifdef CONFIG_ARCH_OMAP3
-static struct omap_dm_timer omap3_dm_timers[] = {
-	{ .phys_base = 0x48318000, .irq = INT_24XX_GPTIMER1 },
-	{ .phys_base = 0x49032000, .irq = INT_24XX_GPTIMER2 },
-	{ .phys_base = 0x49034000, .irq = INT_24XX_GPTIMER3 },
-	{ .phys_base = 0x49036000, .irq = INT_24XX_GPTIMER4 },
-	{ .phys_base = 0x49038000, .irq = INT_24XX_GPTIMER5 },
-	{ .phys_base = 0x4903A000, .irq = INT_24XX_GPTIMER6 },
-	{ .phys_base = 0x4903C000, .irq = INT_24XX_GPTIMER7 },
-	{ .phys_base = 0x4903E000, .irq = INT_24XX_GPTIMER8 },
-	{ .phys_base = 0x49040000, .irq = INT_24XX_GPTIMER9 },
-	{ .phys_base = 0x48086000, .irq = INT_24XX_GPTIMER10 },
-	{ .phys_base = 0x48088000, .irq = INT_24XX_GPTIMER11 },
-	{ .phys_base = 0x48304000, .irq = INT_34XX_GPT12_IRQ },
-};
-
-static const char *omap3_dm_source_names[] __initdata = {
-	"sys_ck",
-	"omap_32k_fck",
-	NULL
-};
-
-static struct clk *omap3_dm_source_clocks[2];
-static const int omap3_dm_timer_count = ARRAY_SIZE(omap3_dm_timers);
-
-#else
-#define omap3_dm_timers			NULL
-#define omap3_dm_timer_count		0
-#define omap3_dm_source_names		NULL
-#define omap3_dm_source_clocks		NULL
-#endif	/* CONFIG_ARCH_OMAP3 */
-
-#ifdef CONFIG_ARCH_OMAP4
-static struct omap_dm_timer omap4_dm_timers[] = {
-	{ .phys_base = 0x4a318000, .irq = OMAP44XX_IRQ_GPT1 },
-	{ .phys_base = 0x48032000, .irq = OMAP44XX_IRQ_GPT2 },
-	{ .phys_base = 0x48034000, .irq = OMAP44XX_IRQ_GPT3 },
-	{ .phys_base = 0x48036000, .irq = OMAP44XX_IRQ_GPT4 },
-	{ .phys_base = 0x40138000, .irq = OMAP44XX_IRQ_GPT5 },
-	{ .phys_base = 0x4013a000, .irq = OMAP44XX_IRQ_GPT6 },
-	{ .phys_base = 0x4013a000, .irq = OMAP44XX_IRQ_GPT7 },
-	{ .phys_base = 0x4013e000, .irq = OMAP44XX_IRQ_GPT8 },
-	{ .phys_base = 0x4803e000, .irq = OMAP44XX_IRQ_GPT9 },
-	{ .phys_base = 0x48086000, .irq = OMAP44XX_IRQ_GPT10 },
-	{ .phys_base = 0x48088000, .irq = OMAP44XX_IRQ_GPT11 },
-	{ .phys_base = 0x4a320000, .irq = OMAP44XX_IRQ_GPT12 },
-};
-static const char *omap4_dm_source_names[] __initdata = {
-	"sys_clkin_ck",
-	"sys_32k_ck",
-	NULL
-};
-static struct clk *omap4_dm_source_clocks[2];
-static const int omap4_dm_timer_count = ARRAY_SIZE(omap4_dm_timers);
-
-#else
-#define omap4_dm_timers			NULL
-#define omap4_dm_timer_count		0
-#define omap4_dm_source_names		NULL
-#define omap4_dm_source_clocks		NULL
-#endif	/* CONFIG_ARCH_OMAP4 */
-
-static struct omap_dm_timer *dm_timers;
-static const char **dm_source_names;
-static struct clk **dm_source_clocks;
+static LIST_HEAD(omap_timer_list);
 
 static spinlock_t dm_timer_lock;
 
@@ -330,24 +222,11 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
 
 static void omap_dm_timer_reset(struct omap_dm_timer *timer)
 {
-	u32 l;
-
 	if (!cpu_class_is_omap2() || timer != &dm_timers[0]) {
 		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
 		omap_dm_timer_wait_for_reset(timer);
 	}
 	omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
-
-	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_OCP_CFG_REG);
-	l |= 0x02 << 3;  /* Set to smart-idle mode */
-	l |= 0x2 << 8;   /* Set clock activity to perserve f-clock on idle */
-
-	/*
-	 * Enable wake-up on OMAP2 CPUs.
-	 */
-	if (cpu_class_is_omap2())
-		l |= 1 << 2;
-	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_REG, l);
 
 	/* Match hardware reset default of posted mode */
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG,
@@ -363,23 +242,24 @@ static void omap_dm_timer_prepare(struct omap_dm_timer *timer)
 
 struct omap_dm_timer *omap_dm_timer_request(void)
 {
-	struct omap_dm_timer *timer = NULL;
+	struct omap_dm_timer *timer;
 	unsigned long flags;
-	int i;
+	int found = 0;
 
 	spin_lock_irqsave(&dm_timer_lock, flags);
-	for (i = 0; i < dm_timer_count; i++) {
-		if (dm_timers[i].reserved)
+	list_for_each_entry(timer, &omap_timer_list, node) {
+		if (timer->reserved)
 			continue;
-
-		timer = &dm_timers[i];
 		timer->reserved = 1;
+		found = 1;
 		break;
 	}
 	spin_unlock_irqrestore(&dm_timer_lock, flags);
 
-	if (timer != NULL)
+	if (found)
 		omap_dm_timer_prepare(timer);
+	else
+		timer = NULL;
 
 	return timer;
 }
@@ -389,22 +269,22 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
 {
 	struct omap_dm_timer *timer;
 	unsigned long flags;
+	int found = 0;
 
 	spin_lock_irqsave(&dm_timer_lock, flags);
-	if (id <= 0 || id > dm_timer_count || dm_timers[id-1].reserved) {
-		spin_unlock_irqrestore(&dm_timer_lock, flags);
-		printk("BUG: warning at %s:%d/%s(): unable to get timer %d\n",
-		       __FILE__, __LINE__, __func__, id);
-		dump_stack();
-		return NULL;
+	list_for_each_entry(timer, &omap_timer_list, node) {
+		if (timer->id == id-1 && !timer->reserved) {
+			found = 1;
+			timer->reserved = 1;
+			break;
+		}
 	}
-
-	timer = &dm_timers[id-1];
-	timer->reserved = 1;
 	spin_unlock_irqrestore(&dm_timer_lock, flags);
 
-	omap_dm_timer_prepare(timer);
-
+	if (found)
+		omap_dm_timer_prepare(timer);
+	else
+		timer = NULL;
 	return timer;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_request_specific);
@@ -422,15 +302,12 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_free);
 
 void omap_dm_timer_enable(struct omap_dm_timer *timer)
 {
+	struct omap_dmtimer_platform_data *pd = timer->pdev->dev.platform_data;
+
 	if (timer->enabled)
 		return;
-
-#ifdef CONFIG_ARCH_OMAP2PLUS
-	if (cpu_class_is_omap2()) {
-		clk_enable(timer->fclk);
-		clk_enable(timer->iclk);
-	}
-#endif
+	if (pd->omap_dm_clk_enable)
+		pd->omap_dm_clk_enable(timer->pdev);
 
 	timer->enabled = 1;
 }
@@ -438,15 +315,13 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
 
 void omap_dm_timer_disable(struct omap_dm_timer *timer)
 {
+	struct omap_dmtimer_platform_data *pd = timer->pdev->dev.platform_data;
+
 	if (!timer->enabled)
 		return;
 
-#ifdef CONFIG_ARCH_OMAP2PLUS
-	if (cpu_class_is_omap2()) {
-		clk_disable(timer->iclk);
-		clk_disable(timer->fclk);
-	}
-#endif
+	if (pd->omap_dm_clk_disable)
+		pd->omap_dm_clk_disable(timer->pdev);
 
 	timer->enabled = 0;
 }
@@ -458,8 +333,6 @@ int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
 
-#if defined(CONFIG_ARCH_OMAP1)
-
 /**
  * omap_dm_timer_modify_idlect_mask - Check if any running timers use ARMXOR
  * @inputmask: current value of idlect mask
@@ -467,45 +340,42 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_get_irq);
 __u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
 {
 	int i;
+	u32 l;
+	struct omap_dm_timer *timer;
+
+	if (cpu_class_is_omap2())
+		return 0;
 
 	/* If ARMXOR cannot be idled this function call is unnecessary */
 	if (!(inputmask & (1 << 1)))
 		return inputmask;
-
+	i = 0;
 	/* If any active timer is using ARMXOR return modified mask */
-	for (i = 0; i < dm_timer_count; i++) {
-		u32 l;
-
-		l = omap_dm_timer_read_reg(&dm_timers[i], OMAP_TIMER_CTRL_REG);
+	list_for_each_entry(timer, &omap_timer_list, node) {
+		l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
 		if (l & OMAP_TIMER_CTRL_ST) {
 			if (((omap_readl(MOD_CONF_CTRL_1) >> (i * 2)) & 0x03) == 0)
 				inputmask &= ~(1 << 1);
 			else
 				inputmask &= ~(1 << 2);
 		}
+		i++;
 	}
 
 	return inputmask;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
 
-#else
-
 struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
 {
-	return timer->fclk;
+	struct omap_dmtimer_platform_data *pd = timer->pdev->dev.platform_data;
+
+	if (pd->omap_dm_get_timer_clk)
+		return pd->omap_dm_get_timer_clk(timer->pdev);
+
+	return NULL;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
-
-__u32 omap_dm_timer_modify_idlect_mask(__u32 inputmask)
-{
-	BUG();
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
-
-#endif
 
 void omap_dm_timer_trigger(struct omap_dm_timer *timer)
 {
@@ -540,48 +410,27 @@ void omap_dm_timer_stop(struct omap_dm_timer *timer)
 		  * Wait for functional clock period x 3.5 to make sure that
 		  * timer is stopped
 		  */
-		udelay(3500000 / clk_get_rate(timer->fclk) + 1);
-#endif
-	}
+		/* FIXME: causing div by zero error. check if this is needed */
+		/*udelay(3500000 / timer->fclk_rate + 1);*/
+
 	/* Ack possibly pending interrupt */
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_STAT_REG,
 			OMAP_TIMER_INT_OVERFLOW);
+#endif
+	}
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
 
-#ifdef CONFIG_ARCH_OMAP1
-
 int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
-{
-	int n = (timer - dm_timers) << 1;
-	u32 l;
+{	struct omap_dmtimer_platform_data *pd = timer->pdev->dev.platform_data;
 
-	l = omap_readl(MOD_CONF_CTRL_1) & ~(0x03 << n);
-	l |= source << n;
-	omap_writel(l, MOD_CONF_CTRL_1);
-
+	if (pd->omap_dm_set_source_clk)
+		timer->fclk_rate = pd->omap_dm_set_source_clk
+				(timer->pdev, source);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_set_source);
 
-#else
-
-int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
-{
-	int ret = -EINVAL;
-
-	if (source < 0 || source >= 3)
-		return -EINVAL;
-
-	clk_disable(timer->fclk);
-	ret = clk_set_parent(timer->fclk, dm_source_clocks[source]);
-	clk_enable(timer->fclk);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(omap_dm_timer_set_source);
-
-#endif
 
 void omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
 			    unsigned int load)
@@ -708,13 +557,9 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_write_counter);
 
 int omap_dm_timers_active(void)
 {
-	int i;
+	struct omap_dm_timer *timer;
 
-	for (i = 0; i < dm_timer_count; i++) {
-		struct omap_dm_timer *timer;
-
-		timer = &dm_timers[i];
-
+	list_for_each_entry(timer, &omap_timer_list, node) {
 		if (!timer->enabled)
 			continue;
 
@@ -727,61 +572,130 @@ int omap_dm_timers_active(void)
 }
 EXPORT_SYMBOL_GPL(omap_dm_timers_active);
 
-int __init omap_dm_timer_init(void)
+static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
 {
+	int ret = 0;
 	struct omap_dm_timer *timer;
-	int i, map_size = SZ_8K;	/* Module 4KB + L4 4KB except on omap1 */
+	int id = pdev->id;
+	struct resource *res;
+	struct omap_device *od;
+	struct omap_dmtimer_platform_data *pd;
 
-	if (!(cpu_is_omap16xx() || cpu_class_is_omap2()))
-		return -ENODEV;
+	if (!pdev || !pdev->dev.platform_data) {
+		pr_err("%s:Timer device initialized without platform data\n",
+		__func__);
+		return -EINVAL;
+	}
+	od = to_omap_device(pdev);
+	pd = pdev->dev.platform_data;
 
-	spin_lock_init(&dm_timer_lock);
+	dev_info(&pdev->dev, "%s:%s [id=%d]\n", __func__,
+			od->hwmods[0]->name, id);
 
-	if (cpu_class_is_omap1()) {
-		dm_timers = omap1_dm_timers;
-		dm_timer_count = omap1_dm_timer_count;
-		map_size = SZ_2K;
-	} else if (cpu_is_omap24xx()) {
-		dm_timers = omap2_dm_timers;
-		dm_timer_count = omap2_dm_timer_count;
-		dm_source_names = omap2_dm_source_names;
-		dm_source_clocks = omap2_dm_source_clocks;
-	} else if (cpu_is_omap34xx()) {
-		dm_timers = omap3_dm_timers;
-		dm_timer_count = omap3_dm_timer_count;
-		dm_source_names = omap3_dm_source_names;
-		dm_source_clocks = omap3_dm_source_clocks;
-	} else if (cpu_is_omap44xx()) {
-		dm_timers = omap4_dm_timers;
-		dm_timer_count = omap4_dm_timer_count;
-		dm_source_names = omap4_dm_source_names;
-		dm_source_clocks = omap4_dm_source_clocks;
+	/*
+	 * if timer is already initialized return.
+	 * this is especially true for millisecond timers
+	 */
+	list_for_each_entry(timer, &omap_timer_list, node) {
+		if (timer->id == pdev->id && timer->is_intialized)
+			return 0;
 	}
 
-	if (cpu_class_is_omap2())
-		for (i = 0; dm_source_names[i] != NULL; i++)
-			dm_source_clocks[i] = clk_get(NULL, dm_source_names[i]);
+	timer = kzalloc(sizeof(struct omap_dm_timer), GFP_KERNEL);
+	if (!timer) {
+		pr_err("%s: No memory for omap_dm_timer\n", __func__);
+		return -ENOMEM;
+	}
 
-	if (cpu_is_omap243x())
-		dm_timers[0].phys_base = 0x49018000;
+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	if (unlikely(!res)) {
+		pr_err("%s:timer%d has invalid IRQ resource\n",
+			__func__, id + 1);
+		ret = -ENODEV;
+		goto exit_1;
+	}
+	timer->irq = res->start;
 
-	for (i = 0; i < dm_timer_count; i++) {
-		timer = &dm_timers[i];
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (unlikely(!res)) {
+		pr_err("%s:timer%d has invalid memory resource\n",
+			__func__, id + 1);
+		ret = -ENOMEM;
+		goto exit_2;
+	}
+	timer->io_base = ioremap(res->start, resource_size(res));
+	if (!timer->io_base) {
+		dev_err(&pdev->dev, "%s: ioremap failed\n", __func__);
+		ret = -ENOMEM;
+		goto exit_3;
+	}
 
-		/* Static mapping, never released */
-		timer->io_base = ioremap(timer->phys_base, map_size);
-		BUG_ON(!timer->io_base);
+	timer->pdev = pdev;
+	timer->id = pdev->id;
+	timer->reserved = 0;
+	timer->is_intialized = 1;
+	list_add_tail(&timer->node, &omap_timer_list);
 
-#ifdef CONFIG_ARCH_OMAP2PLUS
-		if (cpu_class_is_omap2()) {
-			char clk_name[16];
-			sprintf(clk_name, "gpt%d_ick", i + 1);
-			timer->iclk = clk_get(NULL, clk_name);
-			sprintf(clk_name, "gpt%d_fck", i + 1);
-			timer->fclk = clk_get(NULL, clk_name);
-		}
+#ifdef CONFIG_PM_RUNTIME
+	if (pd->timer_ip_type != 1)
+		pm_runtime_enable(&pdev->dev);
 #endif
+	dev_info(&pdev->dev, "Timer%d registered\n", pdev->id);
+	goto exit_final;
+
+exit_3:
+	release_mem_region(res->start, resource_size(res));
+
+exit_2:
+	iounmap(timer->io_base);
+
+exit_1:
+	kfree(timer);
+
+exit_final:
+	return ret;
 	}
 
-	return 0;
+static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
+{
+	struct resource *res;
+	struct omap_dm_timer *timer;
+
+	list_for_each_entry(timer, &omap_timer_list, node) {
+		if (timer->id == pdev->id && timer->is_intialized) {
+			iounmap(timer->io_base);
+			res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+			release_mem_region(res->start, resource_size(res));
+			return 0;
+		}
+	}
+	return -EINVAL;
 }
+
+static struct platform_driver omap_dmtimer_driver = {
+	.probe          = omap_dm_timer_probe,
+	.remove			= omap_dm_timer_remove,
+	.driver         = {
+		.name   = "dmtimer",
+	},
+};
+
+static int __init omap_dm_timer_init(void)
+{
+	spin_lock_init(&dm_timer_lock);
+	return platform_driver_register(&omap_dmtimer_driver);
+}
+
+static void __exit omap_dm_timer_exit(void)
+{
+	platform_driver_unregister(&omap_dmtimer_driver);
+}
+
+early_platform_init("earlytimer", &omap_dmtimer_driver);
+module_init(omap_dm_timer_init);
+module_exit(omap_dm_timer_exit);
+
+MODULE_DESCRIPTION("OMAP DUAL MODE TIMER DRIVER");
+MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:" DRIVER_NAME);
+MODULE_AUTHOR("Texas Instruments Inc");

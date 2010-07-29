@@ -29,6 +29,8 @@
 #ifndef __ASM_ARCH_DMTIMER_H
 #define __ASM_ARCH_DMTIMER_H
 
+#include <linux/platform_device.h>
+
 /* clock sources */
 #define OMAP_TIMER_SRC_SYS_CLK			0x00
 #define OMAP_TIMER_SRC_32_KHZ			0x01
@@ -47,7 +49,16 @@
 struct omap_dm_timer;
 struct clk;
 
-int omap_dm_timer_init(void);
+struct omap_dmtimer_platform_data {
+	void (*omap_dm_clk_enable) (struct platform_device *pdev);
+	void (*omap_dm_clk_disable) (struct platform_device *pdev);
+	int (*omap_dm_set_source_clk)
+			(struct platform_device *pdev, int source);
+	struct clk* (*omap_dm_get_timer_clk) (struct platform_device *pdev);
+	int timer_ip_type;
+	int offset1;
+	int offset2;
+};
 
 struct omap_dm_timer *omap_dm_timer_request(void);
 struct omap_dm_timer *omap_dm_timer_request_specific(int timer_id);
