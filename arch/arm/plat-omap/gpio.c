@@ -1125,7 +1125,6 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
 	spin_unlock_irqrestore(&bank->lock, flags);
 	if (!bank->mod_usage)
 		pm_runtime_put_sync(bank->dev);
-
 }
 
 /*
@@ -1744,8 +1743,7 @@ static void omap_gpio_restore_context(struct device *dev);
 
 static int omap_gpio_suspend(struct device *dev)
 {
-	struct platform_device *pdev = container_of(dev,
-						struct platform_device, dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	void __iomem *wake_status;
 	void __iomem *wake_clear;
 	void __iomem *wake_set;
@@ -1785,8 +1783,7 @@ static int omap_gpio_suspend(struct device *dev)
 
 static int omap_gpio_resume(struct device *dev)
 {
-	struct platform_device *pdev = container_of(dev,
-						struct platform_device, dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
 	void __iomem *wake_clear;
 	void __iomem *wake_set;
@@ -1819,15 +1816,13 @@ static int omap_gpio_resume(struct device *dev)
 	return 0;
 }
 
-static int power_state;
 static int workaround_enabled;
 static bool save_restore_context;
 
 static int gpio_bank_runtime_suspend(struct device *dev)
 {
 	u32 l1, l2;
-	struct platform_device *pdev = container_of(dev,
-						struct platform_device, dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
 
 	if (bank->dbck_enable_mask)
@@ -1835,8 +1830,7 @@ static int gpio_bank_runtime_suspend(struct device *dev)
 
 	if (save_restore_context)
 		omap_gpio_save_context(dev);
-
-	if (power_state > PWRDM_POWER_OFF)
+	else
 		return 0;
 
 	/* If going to OFF, remove triggering for all
@@ -1879,18 +1873,17 @@ static int gpio_bank_runtime_suspend(struct device *dev)
 static int gpio_bank_runtime_resume(struct device *dev)
 {
 	u32 l, gen, gen0, gen1;
-	struct platform_device *pdev = container_of(dev,
-						struct platform_device, dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
 
 	if (bank->dbck_enable_mask)
 		clk_enable(bank->dbck);
 
-	if (!workaround_enabled)
+	if ((!workaround_enabled) || (!(bank->enabled_non_wakeup_gpios))) {
+		if (save_restore_context)
+			omap_gpio_restore_context(dev);
 		return 0;
-
-	if (!(bank->enabled_non_wakeup_gpios))
-		return 0;
+	}
 
 	if (bank->method == METHOD_GPIO_24XX) {
 		__raw_writel(bank->saved_fallingdetect,
@@ -1969,8 +1962,7 @@ static int gpio_bank_runtime_resume(struct device *dev)
 /* save the registers of bank */
 static void omap_gpio_save_context(struct device *dev)
 {
-	struct platform_device *pdev = container_of(dev,
-						struct platform_device, dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
 
 	if (bank->method == METHOD_GPIO_24XX) {
@@ -2021,8 +2013,7 @@ static void omap_gpio_save_context(struct device *dev)
 /* restore the required registers of bank 2-6 */
 static void omap_gpio_restore_context(struct device *dev)
 {
-	struct platform_device *pdev = container_of(dev,
-						struct platform_device, dev);
+	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
 
 	if (bank->method == METHOD_GPIO_24XX) {
@@ -2070,25 +2061,16 @@ static void omap_gpio_restore_context(struct device *dev)
 	}
 }
 
-static inline struct omap_device *_find_od_by_dev(struct device *dev)
+void omap2_gpio_prepare_for_idle(bool save_context)
 {
-	struct platform_device *pdev = container_of(dev,
-					struct platform_device, dev);
-	return container_of(pdev, struct omap_device, pdev);
-}
-
-void omap2_gpio_prepare_for_idle(int pwr_state)
-{
-#ifdef CONFIG_PM_RUNTIME
+#if defined(CONFIG_PM_RUNTIME) && defined(CONFIG_ARCH_OMAP2PLUS)
 	int i;
 
-	power_state = pwr_state;
-	if (power_state == PWRDM_POWER_OFF)
-		save_restore_context = true;
+	save_restore_context = save_context;
 
 	for (i = 0; i < gpio_bank_count; i++) {
 		struct gpio_bank *bank = &gpio_bank[i];
-		struct omap_device *od = _find_od_by_dev(bank->dev);
+		struct platform_device *pdev = to_platform_device(bank->dev);
 
 		/*
 		 * Only if the device is used & if it supports off-mode,
@@ -2096,25 +2078,26 @@ void omap2_gpio_prepare_for_idle(int pwr_state)
 		 */
 		if ((!bank->off_mode_support) || (!bank->mod_usage))
 			continue;
-		omap_device_idle_hwmods(od);
+		omap_device_idle(pdev);
 	}
 #endif
 }
 
-void omap2_gpio_resume_after_idle(void)
+void omap2_gpio_resume_after_idle(bool restore_context)
 {
-#ifdef CONFIG_PM_RUNTIME
+#if defined(CONFIG_PM_RUNTIME) && defined(CONFIG_ARCH_OMAP2PLUS)
 	int i;
+
+	save_restore_context = restore_context;
 
 	for (i = 0; i < gpio_bank_count; i++) {
 		struct gpio_bank *bank = &gpio_bank[i];
 		if ((bank->off_mode_support) && (bank->mod_usage)) {
-			struct omap_device *od = _find_od_by_dev(bank->dev);
-			omap_device_enable_hwmods(od);
+			struct platform_device *pdev = to_platform_device(bank->dev);
+			omap_device_enable(pdev);
 		}
 	}
 
-	save_restore_context = false;
 	workaround_enabled = 0;
 #endif
 }
