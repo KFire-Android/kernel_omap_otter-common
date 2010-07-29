@@ -23,7 +23,6 @@
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
-#include <linux/hardirq.h>
 
 #include <linux/usb/musb.h>
 #include <linux/pm_runtime.h>
@@ -70,7 +69,8 @@ static u64 musb_dmamask = DMA_BIT_MASK(32);
 static int usb_idle_hwmod(struct omap_device *od)
 {
 	struct omap_hwmod *oh = *od->hwmods;
-	if (in_interrupt())
+
+	if (irqs_disabled())
 		_omap_hwmod_idle(oh);
 	else
 		omap_device_idle_hwmods(od);
@@ -80,7 +80,8 @@ static int usb_idle_hwmod(struct omap_device *od)
 static int usb_enable_hwmod(struct omap_device *od)
 {
 	struct omap_hwmod *oh = *od->hwmods;
-	if (in_interrupt())
+
+	if (irqs_disabled())
 		_omap_hwmod_enable(oh);
 	else
 		omap_device_enable_hwmods(od);
@@ -163,12 +164,11 @@ void musb_context_save_restore(enum musb_state state)
 	struct platform_device *pdev = &od->pdev;
 	struct device *dev = &pdev->dev;
 	struct device_driver *drv = dev->driver;
-	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 
 	if (drv) {
-
-		const struct dev_pm_ops *pm = drv->pm;
 #ifdef CONFIG_PM_RUNTIME
+		struct musb_hdrc_platform_data *pdata = dev->platform_data;
+		const struct dev_pm_ops *pm = drv->pm;
 
 		switch (state) {
 		case save_context:
