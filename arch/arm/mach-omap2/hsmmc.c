@@ -17,6 +17,7 @@
 #include <plat/control.h>
 #include <plat/mmc.h>
 #include <plat/omap-pm.h>
+#include <plat/omap_device.h>
 
 #include "hsmmc.h"
 
@@ -208,6 +209,7 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	int nr_hsmmc = ARRAY_SIZE(hsmmc_data);
 	int i;
 	u32 reg;
+	int controller_cnt = 0;
 
 	if (!cpu_is_omap44xx()) {
 		if (cpu_is_omap2430()) {
@@ -243,6 +245,8 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 			pr_debug("MMC%d: already configured\n", c->mmc);
 			continue;
 		}
+
+		controller_cnt++;
 
 		mmc = kzalloc(sizeof(struct omap_mmc_platform_data),
 			      GFP_KERNEL);
@@ -341,7 +345,7 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 		hsmmc_data[c->mmc - 1] = mmc;
 	}
 
-	omap2_init_mmc(hsmmc_data, OMAP34XX_NR_MMC);
+	omap2_init_mmc(hsmmc_data, controller_cnt);
 
 	/* pass the device nodes back to board setup code */
 	for (c = controllers; c->mmc; c++) {

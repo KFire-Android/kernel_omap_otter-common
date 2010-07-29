@@ -74,6 +74,9 @@ static void omap_init_32k(void)
 	(void) platform_device_register(&omap_32k_device);
 };
 
+#include <plat/omap_device.h>
+#include <plat/omap_hwmod.h>
+
 #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
 
 static struct resource cam_resources[] = {
@@ -643,6 +646,18 @@ static inline void omap_hsmmc_reset(void) {}
 #if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE) || \
 	defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
 
+static struct omap_device_pm_latency omap_hsmmc_latency[] = {
+	[0] = {
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func	 = omap_device_enable_hwmods,
+		.flags		 = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+	/*
+	 * XXX There should also be an entry here to power off/on the
+	 * MMC regulators/PBIAS cells, etc.
+	 */
+};
+
 static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 			int controller_nr)
 {
@@ -750,67 +765,58 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 	}
 }
 
+#define MAX_OMAP_MMC_HWMOD_NAME_LEN		16
+
 void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
-			int nr_controllers)
+			   int nr_controllers)
 {
-	int i;
+	struct omap_hwmod *oh;
+	struct omap_device *od;
+	struct omap_device_pm_latency *ohl;
+	char oh_name[MAX_OMAP_MMC_HWMOD_NAME_LEN];
 	char *name;
+	int i, l;
+	int ohl_cnt = 0;
 
-	for (i = 0; i < nr_controllers; i++) {
-		unsigned long base, size;
-		unsigned int irq = 0;
+	if (cpu_is_omap2420()) {
+		name = "mmci-omap";
+	} else {
+		name = "mmci-omap-hs";
+		ohl = omap_hsmmc_latency;
+		ohl_cnt = ARRAY_SIZE(omap_hsmmc_latency);
+	}
 
-		if (!mmc_data[i])
-			continue;
+	/*
+	 * XXX This isn't a good way to set these up.  What if a board
+	 * uses MMC2 but not MMC1?
+	 */
+	for (i = 1; i <= nr_controllers; i++) {
+		int idx = i - 1;
 
-		omap2_mmc_mux(mmc_data[i], i);
-
-		switch (i) {
-		case 0:
-			base = OMAP2_MMC1_BASE;
-			irq = INT_24XX_MMC_IRQ;
-			break;
-		case 1:
-			base = OMAP2_MMC2_BASE;
-			irq = INT_24XX_MMC2_IRQ;
-			break;
-		case 2:
-			if (!cpu_is_omap44xx() && !cpu_is_omap34xx())
-				return;
-			base = OMAP3_MMC3_BASE;
-			irq = INT_34XX_MMC3_IRQ;
-			break;
-		case 3:
-			if (!cpu_is_omap44xx())
-				return;
-			base = OMAP4_MMC4_BASE + OMAP4_MMC_REG_OFFSET;
-			irq = OMAP44XX_IRQ_MMC4;
-			break;
-		case 4:
-			if (!cpu_is_omap44xx())
-				return;
-			base = OMAP4_MMC5_BASE + OMAP4_MMC_REG_OFFSET;
-			irq = OMAP44XX_IRQ_MMC5;
-			break;
-		default:
+		l = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
+			     "mmc%d", i);
+		WARN(l >= MAX_OMAP_MMC_HWMOD_NAME_LEN,
+		     "String buffer overflow in MMC%d device setup\n", i);
+		oh = omap_hwmod_lookup(oh_name);
+		if (!oh) {
+			pr_err("Could not look up %s\n", oh_name);
 			continue;
 		}
 
-		if (cpu_is_omap2420()) {
-			size = OMAP2420_MMC_SIZE;
-			name = "mmci-omap";
-		} else if (cpu_is_omap44xx()) {
-			if (i < 3) {
-				base += OMAP4_MMC_REG_OFFSET;
-				irq += OMAP44XX_IRQ_GIC_START;
-			}
-			size = OMAP4_HSMMC_SIZE;
-			name = "mmci-omap-hs";
-		} else {
-			size = OMAP3_HSMMC_SIZE;
-			name = "mmci-omap-hs";
-		}
-		omap_mmc_add(name, i, base, size, irq, mmc_data[i]);
+		mmc_data[idx]->dev_attr = oh->dev_attr;
+
+		omap2_mmc_mux(mmc_data[idx], idx);
+		od = omap_device_build(name, idx, oh, mmc_data[idx],
+				       sizeof(struct omap_mmc_platform_data),
+				       ohl, ohl_cnt, false);
+		WARN(IS_ERR(od), "Could not build omap_device for %s %s\n",
+		     name, oh_name);
+
+		/*
+		 * return device handle to board setup code
+		 * XXX Can this be removed?
+		 */
+		mmc_data[idx]->dev = &od->pdev.dev;
 	};
 }
 
