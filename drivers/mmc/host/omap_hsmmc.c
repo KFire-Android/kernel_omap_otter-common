@@ -1528,7 +1528,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		break;
 	}
 
-	if (pdata->dev_attr->flags & MMC_INTERNAL_XCVR) {
+	if (pdata->dev_attr->flags & MMC_SUPPORT_18V_3V) {
 		/* Only MMC1 can interface at 3V without some flavor
 		 * of external transceiver; but they all handle 1.8V.
 		 */
@@ -1612,7 +1612,7 @@ static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
 	u32 hctl, capa, value;
 
 	/* Only MMC1 supports 3.0V */
-	if (host->pdata->dev_attr->flags & MMC_INTERNAL_XCVR) {
+	if (host->pdata->dev_attr->flags & MMC_SUPPORT_18V_3V) {
 		hctl = SDVS30;
 		capa = VS30 | VS18;
 	} else {
