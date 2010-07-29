@@ -145,6 +145,15 @@
 #define TWL6030_CHARGER_CTRL_INT_MASK 	0x10
 #define TWL6030_CHARGER_FAULT_INT_MASK 	0x60
 
+#define TWL6030_MMCCTRL			0xEE
+#define VMMC_AUTO_OFF			(0x1 << 3)
+#define SW_FC				(0x1 << 2)
+#define STS_MMC				0x1
+
+#define TWL6030_CFG_INPUT_PUPD3		0xF2
+#define MMC_PU				(0x1 << 3)
+#define MMC_PD				(0x1 << 2)
+
 /* TWL6030 vibrator registers */
 #define TWL6030_VIBCTRL			0x9B
 #define TWL6030_VIBMODE			0x9C
@@ -193,6 +202,13 @@ int twl6030_register_notifier(struct notifier_block *nb,
 				unsigned int events);
 int twl6030_unregister_notifier(struct notifier_block *nb,
 				unsigned int events);
+
+/* Card detect Configuration for MMC1 Controller on OMAP4 */
+int twl6030_mmc_card_detect_config(void);
+
+/* MMC1 Controller on OMAP4 uses Phoenix irq for Card detect */
+int twl6030_mmc_card_detect(struct device *dev, int slot);
+
 
 /*----------------------------------------------------------------------*/
 
