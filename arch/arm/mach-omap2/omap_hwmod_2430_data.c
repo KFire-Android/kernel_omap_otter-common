@@ -85,6 +85,8 @@ static struct omap_hwmod omap2430_gpio3_hwmod;
 static struct omap_hwmod omap2430_gpio4_hwmod;
 static struct omap_hwmod omap2430_gpio5_hwmod;
 static struct omap_hwmod omap2430_wd_timer2_hwmod;
+static struct omap_hwmod omap2430_mmc1_hwmod;
+static struct omap_hwmod omap2430_mmc2_hwmod;
 
 /* I2C IP block address space length (in bytes) */
 #define OMAP2_I2C_AS_LEN		128
@@ -796,8 +798,8 @@ static struct omap_hwmod_irq_info mmc1_mpu_irqs[] = {
 };
 
 static struct omap_hwmod_dma_info mmc1_sdma_chs[] = {
-	{ .name = "tx",	.dma_ch = OMAP24XX_DMA_MMC1_TX, },
-	{ .name = "rx",	.dma_ch = OMAP24XX_DMA_MMC1_RX, },
+	{ .name = "tx",	.dma_req = OMAP24XX_DMA_MMC1_TX, },
+	{ .name = "rx",	.dma_req = OMAP24XX_DMA_MMC1_RX, },
 };
 
 static struct omap_hwmod_opt_clk mmc1_opt_clks[] = {
@@ -809,11 +811,11 @@ static struct omap_hwmod_ocp_if *omap2430_mmc1_slaves[] = {
 };
 
 static struct omap_hwmod omap2430_mmc1_hwmod = {
-	.name		= "mmc1_hwmod",
+	.name		= "mmc1",
 	.mpu_irqs	= mmc1_mpu_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(mmc1_mpu_irqs),
-	.sdma_chs	= mmc1_sdma_chs,
-	.sdma_chs_cnt	= ARRAY_SIZE(mmc1_sdma_chs),
+	.sdma_reqs	= mmc1_sdma_chs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(mmc1_sdma_chs),
 	.opt_clks	= mmc1_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(mmc1_opt_clks),
 	.main_clk	= "mmchs1_fck",
@@ -841,8 +843,8 @@ static struct omap_hwmod_irq_info mmc2_mpu_irqs[] = {
 };
 
 static struct omap_hwmod_dma_info mmc2_sdma_chs[] = {
-	{ .name = "tx",	.dma_ch = OMAP24XX_DMA_MMC2_TX, },
-	{ .name = "rx",	.dma_ch = OMAP24XX_DMA_MMC2_RX, },
+	{ .name = "tx",	.dma_req = OMAP24XX_DMA_MMC2_TX, },
+	{ .name = "rx",	.dma_req = OMAP24XX_DMA_MMC2_RX, },
 };
 
 static struct omap_hwmod_opt_clk mmc2_opt_clks[] = {
@@ -854,11 +856,11 @@ static struct omap_hwmod_ocp_if *omap2430_mmc2_slaves[] = {
 };
 
 static struct omap_hwmod omap2430_mmc2_hwmod = {
-	.name		= "mmc2_hwmod",
+	.name		= "mmc2",
 	.mpu_irqs	= mmc2_mpu_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(mmc2_mpu_irqs),
-	.sdma_chs	= mmc2_sdma_chs,
-	.sdma_chs_cnt	= ARRAY_SIZE(mmc2_sdma_chs),
+	.sdma_reqs	= mmc2_sdma_chs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(mmc2_sdma_chs),
 	.opt_clks	= mmc2_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(mmc2_opt_clks),
 	.main_clk	= "mmchs2_fck",
