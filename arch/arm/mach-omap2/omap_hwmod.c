@@ -1753,6 +1753,26 @@ void __iomem *omap_hwmod_get_mpu_rt_va(struct omap_hwmod *oh)
 }
 
 /**
+ * omap_hwmod_get_clk - returns pointer to this module's struct clk
+ * @oh: struct omap_hwmod *
+ *
+ * Return the struct clk pointer associated with the OMAP module
+ * Returns NULL on error, or a struct clk * on success.
+ */
+struct clk *omap_hwmod_get_clk(struct omap_hwmod *oh)
+{
+	if (!oh)
+		return NULL;
+
+	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
+		return NULL;
+
+	if (oh->_state == _HWMOD_STATE_UNKNOWN)
+		return NULL;
+
+	return oh->_clk;
+}
+/**
  * omap_hwmod_add_initiator_dep - add sleepdep from @init_oh to @oh
  * @oh: struct omap_hwmod *
  * @init_oh: struct omap_hwmod * (initiator)

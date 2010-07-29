@@ -4332,6 +4332,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_timer_1ms_sysc = {
 static struct omap_hwmod_class omap44xx_timer_1ms_hwmod_class = {
 	.name = "timer_1ms",
 	.sysc = &omap44xx_timer_1ms_sysc,
+	.rev = 1,
 };
 
 static struct omap_hwmod_class_sysconfig omap44xx_timer_sysc = {
@@ -4346,6 +4347,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_timer_sysc = {
 static struct omap_hwmod_class omap44xx_timer_hwmod_class = {
 	.name = "timer",
 	.sysc = &omap44xx_timer_sysc,
+	.rev = 2,
 };
 
 /* timer1 */
@@ -5762,7 +5764,6 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	/* spinlock class */
 /*	&omap44xx_spinlock_hwmod, */
 	/* timer class */
-#if 0
 	&omap44xx_timer1_hwmod,
 	&omap44xx_timer2_hwmod,
 	&omap44xx_timer3_hwmod,
@@ -5774,7 +5775,6 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_timer9_hwmod,
 	&omap44xx_timer10_hwmod,
 	&omap44xx_timer11_hwmod,
-#endif
 	/* uart class */
 	&omap44xx_uart1_hwmod,
 	&omap44xx_uart2_hwmod,

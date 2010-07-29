@@ -536,6 +536,7 @@ int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res);
 
 struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh);
 void __iomem *omap_hwmod_get_mpu_rt_va(struct omap_hwmod *oh);
+struct clk *omap_hwmod_get_clk(struct omap_hwmod *oh);
 
 int omap_hwmod_add_initiator_dep(struct omap_hwmod *oh,
 				 struct omap_hwmod *init_oh);
