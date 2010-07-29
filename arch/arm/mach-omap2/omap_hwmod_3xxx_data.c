@@ -1583,8 +1583,8 @@ static struct omap_hwmod_irq_info mmc1_mpu_irqs[] = {
 };
 
 static struct omap_hwmod_dma_info mmc1_sdma_chs[] = {
-	{ .name = "tx",	.dma_ch = OMAP24XX_DMA_MMC1_TX, },
-	{ .name = "rx",	.dma_ch = OMAP24XX_DMA_MMC1_RX, },
+	{ .name = "tx",	.dma_req = OMAP24XX_DMA_MMC1_TX, },
+	{ .name = "rx",	.dma_req = OMAP24XX_DMA_MMC1_RX, },
 };
 
 static struct omap_hwmod_opt_clk mmc1_opt_clks[] = {
@@ -1596,11 +1596,11 @@ static struct omap_hwmod_ocp_if *omap3xxx_mmc1_slaves[] = {
 };
 
 static struct omap_hwmod omap3xxx_mmc1_hwmod = {
-	.name		= "mmc1_hwmod",
+	.name		= "mmc1",
 	.mpu_irqs	= mmc1_mpu_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(mmc1_mpu_irqs),
-	.sdma_chs	= mmc1_sdma_chs,
-	.sdma_chs_cnt	= ARRAY_SIZE(mmc1_sdma_chs),
+	.sdma_reqs	= mmc1_sdma_chs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(mmc1_sdma_chs),
 	.opt_clks	= mmc1_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(mmc1_opt_clks),
 	.main_clk	= "mmchs1_fck",
@@ -1608,6 +1608,8 @@ static struct omap_hwmod omap3xxx_mmc1_hwmod = {
 		.omap2 = {
 			.prcm_reg_id = 1,
 			.module_bit = OMAP3430_GRPSEL_MMC1_SHIFT,
+			.idlest_reg_id = 1,
+			.idlest_idle_bit = OMAP3430_GRPSEL_MMC1_SHIFT,
 		},
 	},
 	.slaves		= omap3xxx_mmc1_slaves,
@@ -1628,8 +1630,8 @@ static struct omap_hwmod_irq_info mmc2_mpu_irqs[] = {
 };
 
 static struct omap_hwmod_dma_info mmc2_sdma_chs[] = {
-	{ .name = "tx",	.dma_ch = OMAP24XX_DMA_MMC2_TX, },
-	{ .name = "rx",	.dma_ch = OMAP24XX_DMA_MMC2_RX, },
+	{ .name = "tx",	.dma_req = OMAP24XX_DMA_MMC2_TX, },
+	{ .name = "rx",	.dma_req = OMAP24XX_DMA_MMC2_RX, },
 };
 
 static struct omap_hwmod_opt_clk mmc2_opt_clks[] = {
@@ -1641,11 +1643,11 @@ static struct omap_hwmod_ocp_if *omap3xxx_mmc2_slaves[] = {
 };
 
 static struct omap_hwmod omap3xxx_mmc2_hwmod = {
-	.name		= "mmc2_hwmod",
+	.name		= "mmc2",
 	.mpu_irqs	= mmc2_mpu_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(mmc2_mpu_irqs),
-	.sdma_chs	= mmc2_sdma_chs,
-	.sdma_chs_cnt	= ARRAY_SIZE(mmc2_sdma_chs),
+	.sdma_reqs	= mmc2_sdma_chs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(mmc2_sdma_chs),
 	.opt_clks	= mmc2_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(mmc2_opt_clks),
 	.main_clk	= "mmchs2_fck",
@@ -1653,6 +1655,8 @@ static struct omap_hwmod omap3xxx_mmc2_hwmod = {
 		.omap2 = {
 			.prcm_reg_id = 1,
 			.module_bit = OMAP3430_GRPSEL_MMC2_SHIFT,
+			.idlest_reg_id = 1,
+			.idlest_idle_bit = OMAP3430_GRPSEL_MMC2_SHIFT,
 		},
 	},
 	.slaves		= omap3xxx_mmc2_slaves,
@@ -1671,8 +1675,8 @@ static struct omap_hwmod_irq_info mmc3_mpu_irqs[] = {
 };
 
 static struct omap_hwmod_dma_info mmc3_sdma_chs[] = {
-	{ .name = "tx",	.dma_ch = OMAP34XX_DMA_MMC3_TX, },
-	{ .name = "rx",	.dma_ch = OMAP34XX_DMA_MMC3_RX, },
+	{ .name = "tx",	.dma_req = OMAP34XX_DMA_MMC3_TX, },
+	{ .name = "rx",	.dma_req = OMAP34XX_DMA_MMC3_RX, },
 };
 
 static struct omap_hwmod_opt_clk mmc3_opt_clks[] = {
@@ -1684,11 +1688,11 @@ static struct omap_hwmod_ocp_if *omap3xxx_mmc3_slaves[] = {
 };
 
 static struct omap_hwmod omap3xxx_mmc3_hwmod = {
-	.name		= "mmc3_hwmod",
+	.name		= "mmc3",
 	.mpu_irqs	= mmc3_mpu_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(mmc3_mpu_irqs),
-	.sdma_chs	= mmc3_sdma_chs,
-	.sdma_chs_cnt	= ARRAY_SIZE(mmc3_sdma_chs),
+	.sdma_reqs	= mmc3_sdma_chs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(mmc3_sdma_chs),
 	.opt_clks	= mmc3_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(mmc3_opt_clks),
 	.main_clk	= "mmchs3_fck",
@@ -1696,6 +1700,8 @@ static struct omap_hwmod omap3xxx_mmc3_hwmod = {
 		.omap2 = {
 			.prcm_reg_id = 1,
 			.module_bit = OMAP3430ES2_GRPSEL_MMC3_SHIFT,
+			.idlest_reg_id = 1,
+			.idlest_idle_bit = OMAP3430ES2_GRPSEL_MMC3_SHIFT,
 		},
 	},
 	.slaves		= omap3xxx_mmc3_slaves,
