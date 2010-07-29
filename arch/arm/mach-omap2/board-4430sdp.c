@@ -376,6 +376,9 @@ static struct omap2_hsmmc_info mmc[] = {
 		.mmc		= 1,
 		.wires		= 8,
 		.gpio_wp	= -EINVAL,
+#ifdef CONFIG_PM_RUNTIME
+		.power_saving	= true,
+#endif
 	},
 	{
 		.mmc		= 2,
@@ -384,6 +387,9 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_165_195,
 		.nonremovable   = true,
+#ifdef CONFIG_PM_RUNTIME
+		.power_saving	= true,
+#endif
 	},
 	{}	/* Terminator */
 };

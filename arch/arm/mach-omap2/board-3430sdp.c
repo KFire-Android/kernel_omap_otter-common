@@ -354,11 +354,17 @@ static struct omap2_hsmmc_info mmc[] = {
 		 */
 		.wires		= 8,
 		.gpio_wp	= 4,
+#ifdef CONFIG_PM_RUNTIME
+		.power_saving	= true,
+#endif
 	},
 	{
 		.mmc		= 2,
 		.wires		= 8,
 		.gpio_wp	= 7,
+#ifdef CONFIG_PM_RUNTIME
+		.power_saving	= true,
+#endif
 	},
 	{}	/* Terminator */
 };
