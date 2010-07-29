@@ -43,6 +43,8 @@ config ARCH_OMAP4
 	select ARM_THUMBEE
 	select DEVTMPFS
 	select UNIX
+	select PM
+	select PM_RUNTIME if PM
 endchoice
 
 comment "OMAP Feature Selections"
