@@ -43,6 +43,14 @@
 
 #define OMAP_MMC_MAX_SLOTS	2
 
+/* omap_hwmod integration data */
+#define MMC_INTERNAL_XCVR		(1 << 0)
+#define MMC_SUPPORTS_EXTERNAL_XCVR	(1 << 1)
+
+struct mmc_dev_attr {
+	u8 flags;
+};
+
 struct omap_mmc_platform_data {
 	/* back-link to device */
 	struct device *dev;
