@@ -266,6 +266,12 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 		mmc->slots[0].internal_clock = !c->ext_clock;
 		mmc->dma_mask = 0xffffffff;
 
+		/* Register offset Mapping */
+		if (cpu_is_omap44xx())
+			mmc->regs_map = (u16 *) omap4_mmc_reg_map;
+		else
+			mmc->regs_map = (u16 *) omap3_mmc_reg_map;
+
 		mmc->get_context_loss_count = hsmmc_get_context_loss;
 
 		mmc->slots[0].switch_pin = c->gpio_cd;

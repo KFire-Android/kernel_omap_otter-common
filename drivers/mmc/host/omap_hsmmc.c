@@ -40,25 +40,6 @@
 #include <plat/mmc.h>
 #include <plat/cpu.h>
 
-/* OMAP HSMMC Host Controller Registers */
-#define OMAP_HSMMC_SYSCONFIG	0x0010
-#define OMAP_HSMMC_SYSSTATUS	0x0014
-#define OMAP_HSMMC_CON		0x002C
-#define OMAP_HSMMC_BLK		0x0104
-#define OMAP_HSMMC_ARG		0x0108
-#define OMAP_HSMMC_CMD		0x010C
-#define OMAP_HSMMC_RSP10	0x0110
-#define OMAP_HSMMC_RSP32	0x0114
-#define OMAP_HSMMC_RSP54	0x0118
-#define OMAP_HSMMC_RSP76	0x011C
-#define OMAP_HSMMC_DATA		0x0120
-#define OMAP_HSMMC_HCTL		0x0128
-#define OMAP_HSMMC_SYSCTL	0x012C
-#define OMAP_HSMMC_STAT		0x0130
-#define OMAP_HSMMC_IE		0x0134
-#define OMAP_HSMMC_ISE		0x0138
-#define OMAP_HSMMC_CAPA		0x0140
-
 #define VS18			(1 << 26)
 #define VS30			(1 << 25)
 #define SDVS18			(0x5 << 9)
@@ -135,11 +116,11 @@
 /*
  * MMC Host controller read/write API's
  */
-#define OMAP_HSMMC_READ(base, reg)	\
-	__raw_readl((base) + OMAP_HSMMC_##reg)
+#define OMAP_HSMMC_READ(host, reg) \
+	__raw_readl((host->base) + (host->regs[OMAP_HSMMC_##reg]))
 
-#define OMAP_HSMMC_WRITE(base, reg, val) \
-	__raw_writel((val), (base) + OMAP_HSMMC_##reg)
+#define OMAP_HSMMC_WRITE(host, reg, val) \
+	__raw_writel((val), (host->base) + (host->regs[OMAP_HSMMC_##reg]))
 
 struct omap_hsmmc_host {
 	struct	device		*dev;
@@ -168,6 +149,7 @@ struct omap_hsmmc_host {
 	unsigned int		dma_sg_idx;
 	unsigned char		bus_mode;
 	unsigned char		power_mode;
+	u16			*regs;
 	u32			*buffer;
 	u32			bytesleft;
 	int			suspended;
@@ -517,9 +499,9 @@ static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
  */
 static void omap_hsmmc_stop_clock(struct omap_hsmmc_host *host)
 {
-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-		OMAP_HSMMC_READ(host->base, SYSCTL) & ~CEN);
-	if ((OMAP_HSMMC_READ(host->base, SYSCTL) & CEN) != 0x0)
+	OMAP_HSMMC_WRITE(host, SYSCTL,
+		OMAP_HSMMC_READ(host, SYSCTL) & ~CEN);
+	if ((OMAP_HSMMC_READ(host, SYSCTL) & CEN) != 0x0)
 		dev_dbg(mmc_dev(host->mmc), "MMC Clock is not stoped\n");
 }
 
@@ -532,16 +514,16 @@ static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host)
 	else
 		irq_mask = INT_EN_MASK;
 
-	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
-	OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
-	OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
+	OMAP_HSMMC_WRITE(host, STAT, STAT_CLEAR);
+	OMAP_HSMMC_WRITE(host, ISE, irq_mask);
+	OMAP_HSMMC_WRITE(host, IE, irq_mask);
 }
 
 static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
 {
-	OMAP_HSMMC_WRITE(host->base, ISE, 0);
-	OMAP_HSMMC_WRITE(host->base, IE, 0);
-	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+	OMAP_HSMMC_WRITE(host, ISE, 0);
+	OMAP_HSMMC_WRITE(host, IE, 0);
+	OMAP_HSMMC_WRITE(host, STAT, STAT_CLEAR);
 }
 
 #ifdef CONFIG_PM
@@ -572,19 +554,19 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 
 	/* Wait for hardware reset */
 	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
-	while ((OMAP_HSMMC_READ(host->base, SYSSTATUS) & RESETDONE) != RESETDONE
+	while ((OMAP_HSMMC_READ(host, SYSSTATUS) & RESETDONE) != RESETDONE
 		&& time_before(jiffies, timeout))
 		;
 
 	/* Do software reset */
-	OMAP_HSMMC_WRITE(host->base, SYSCONFIG, SOFTRESET);
+	OMAP_HSMMC_WRITE(host, SYSCONFIG, SOFTRESET);
 	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
-	while ((OMAP_HSMMC_READ(host->base, SYSSTATUS) & RESETDONE) != RESETDONE
+	while ((OMAP_HSMMC_READ(host, SYSSTATUS) & RESETDONE) != RESETDONE
 		&& time_before(jiffies, timeout))
 		;
 
-	OMAP_HSMMC_WRITE(host->base, SYSCONFIG,
-			OMAP_HSMMC_READ(host->base, SYSCONFIG) | AUTOIDLE);
+	OMAP_HSMMC_WRITE(host, SYSCONFIG,
+			OMAP_HSMMC_READ(host, SYSCONFIG) | AUTOIDLE);
 
 	if (host->id == OMAP_MMC1_DEVID) {
 		if (host->power_mode != MMC_POWER_OFF &&
@@ -598,17 +580,17 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 		capa = VS18;
 	}
 
-	OMAP_HSMMC_WRITE(host->base, HCTL,
-			OMAP_HSMMC_READ(host->base, HCTL) | hctl);
+	OMAP_HSMMC_WRITE(host, HCTL,
+			OMAP_HSMMC_READ(host, HCTL) | hctl);
 
-	OMAP_HSMMC_WRITE(host->base, CAPA,
-			OMAP_HSMMC_READ(host->base, CAPA) | capa);
+	OMAP_HSMMC_WRITE(host, CAPA,
+			OMAP_HSMMC_READ(host, CAPA) | capa);
 
-	OMAP_HSMMC_WRITE(host->base, HCTL,
-			OMAP_HSMMC_READ(host->base, HCTL) | SDBP);
+	OMAP_HSMMC_WRITE(host, HCTL,
+			OMAP_HSMMC_READ(host, HCTL) | SDBP);
 
 	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
-	while ((OMAP_HSMMC_READ(host->base, HCTL) & SDBP) != SDBP
+	while ((OMAP_HSMMC_READ(host, HCTL) & SDBP) != SDBP
 		&& time_before(jiffies, timeout))
 		;
 
@@ -618,20 +600,20 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 	if (host->power_mode == MMC_POWER_OFF)
 		goto out;
 
-	con = OMAP_HSMMC_READ(host->base, CON);
+	con = OMAP_HSMMC_READ(host, CON);
 	switch (ios->bus_width) {
 	case MMC_BUS_WIDTH_8:
-		OMAP_HSMMC_WRITE(host->base, CON, con | DW8);
+		OMAP_HSMMC_WRITE(host, CON, con | DW8);
 		break;
 	case MMC_BUS_WIDTH_4:
-		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
-		OMAP_HSMMC_WRITE(host->base, HCTL,
-			OMAP_HSMMC_READ(host->base, HCTL) | FOUR_BIT);
+		OMAP_HSMMC_WRITE(host, CON, con & ~DW8);
+		OMAP_HSMMC_WRITE(host, HCTL,
+			OMAP_HSMMC_READ(host, HCTL) | FOUR_BIT);
 		break;
 	case MMC_BUS_WIDTH_1:
-		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
-		OMAP_HSMMC_WRITE(host->base, HCTL,
-			OMAP_HSMMC_READ(host->base, HCTL) & ~FOUR_BIT);
+		OMAP_HSMMC_WRITE(host, CON, con & ~DW8);
+		OMAP_HSMMC_WRITE(host, HCTL,
+			OMAP_HSMMC_READ(host, HCTL) & ~FOUR_BIT);
 		break;
 	}
 
@@ -647,25 +629,23 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 			dsor = 250;
 	}
 
-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-		OMAP_HSMMC_READ(host->base, SYSCTL) & ~CEN);
-	OMAP_HSMMC_WRITE(host->base, SYSCTL, (dsor << 6) | (DTO << 16));
-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+	OMAP_HSMMC_WRITE(host, SYSCTL, OMAP_HSMMC_READ(host, SYSCTL) & ~CEN);
+	OMAP_HSMMC_WRITE(host, SYSCTL, (dsor << 6) | (DTO << 16));
+	OMAP_HSMMC_WRITE(host, SYSCTL, OMAP_HSMMC_READ(host, SYSCTL) | ICE);
 
 	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
-	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
+	while ((OMAP_HSMMC_READ(host, SYSCTL) & ICS) != ICS
 		&& time_before(jiffies, timeout))
 		;
 
-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-		OMAP_HSMMC_READ(host->base, SYSCTL) | CEN);
+	OMAP_HSMMC_WRITE(host, SYSCTL,
+		OMAP_HSMMC_READ(host, SYSCTL) | CEN);
 
-	con = OMAP_HSMMC_READ(host->base, CON);
+	con = OMAP_HSMMC_READ(host, CON);
 	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN)
-		OMAP_HSMMC_WRITE(host->base, CON, con | OD);
+		OMAP_HSMMC_WRITE(host, CON, con | OD);
 	else
-		OMAP_HSMMC_WRITE(host->base, CON, con & ~OD);
+		OMAP_HSMMC_WRITE(host, CON, con & ~OD);
 out:
 	host->context_loss = context_loss;
 
@@ -716,20 +696,20 @@ static void send_init_stream(struct omap_hsmmc_host *host)
 
 	disable_irq(host->irq);
 
-	OMAP_HSMMC_WRITE(host->base, IE, INT_EN_MASK);
-	OMAP_HSMMC_WRITE(host->base, CON,
-		OMAP_HSMMC_READ(host->base, CON) | INIT_STREAM);
-	OMAP_HSMMC_WRITE(host->base, CMD, INIT_STREAM_CMD);
+	OMAP_HSMMC_WRITE(host, IE, INT_EN_MASK);
+	OMAP_HSMMC_WRITE(host, CON,
+		OMAP_HSMMC_READ(host, CON) | INIT_STREAM);
+	OMAP_HSMMC_WRITE(host, CMD, INIT_STREAM_CMD);
 
 	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
 	while ((reg != CC) && time_before(jiffies, timeout))
-		reg = OMAP_HSMMC_READ(host->base, STAT) & CC;
+		reg = OMAP_HSMMC_READ(host, STAT) & CC;
 
-	OMAP_HSMMC_WRITE(host->base, CON,
-		OMAP_HSMMC_READ(host->base, CON) & ~INIT_STREAM);
+	OMAP_HSMMC_WRITE(host, CON,
+		OMAP_HSMMC_READ(host, CON) & ~INIT_STREAM);
 
-	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
-	OMAP_HSMMC_READ(host->base, STAT);
+	OMAP_HSMMC_WRITE(host, STAT, STAT_CLEAR);
+	OMAP_HSMMC_READ(host, STAT);
 
 	enable_irq(host->irq);
 }
@@ -818,8 +798,8 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 
 	host->req_in_progress = 1;
 
-	OMAP_HSMMC_WRITE(host->base, ARG, cmd->arg);
-	OMAP_HSMMC_WRITE(host->base, CMD, cmdreg);
+	OMAP_HSMMC_WRITE(host, ARG, cmd->arg);
+	OMAP_HSMMC_WRITE(host, CMD, cmdreg);
 }
 
 static int
@@ -893,13 +873,13 @@ omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 	if (cmd->flags & MMC_RSP_PRESENT) {
 		if (cmd->flags & MMC_RSP_136) {
 			/* response type 2 */
-			cmd->resp[3] = OMAP_HSMMC_READ(host->base, RSP10);
-			cmd->resp[2] = OMAP_HSMMC_READ(host->base, RSP32);
-			cmd->resp[1] = OMAP_HSMMC_READ(host->base, RSP54);
-			cmd->resp[0] = OMAP_HSMMC_READ(host->base, RSP76);
+			cmd->resp[3] = OMAP_HSMMC_READ(host, RSP10);
+			cmd->resp[2] = OMAP_HSMMC_READ(host, RSP32);
+			cmd->resp[1] = OMAP_HSMMC_READ(host, RSP54);
+			cmd->resp[0] = OMAP_HSMMC_READ(host, RSP76);
 		} else {
 			/* response types 1, 1b, 3, 4, 5, 6 */
-			cmd->resp[0] = OMAP_HSMMC_READ(host->base, RSP10);
+			cmd->resp[0] = OMAP_HSMMC_READ(host, RSP10);
 		}
 	}
 	if ((host->data == NULL && !host->response_busy) || cmd->error)
@@ -972,10 +952,10 @@ static inline void omap_hsmmc_reset_controller_fsm(struct omap_hsmmc_host *host,
 	unsigned long limit = (loops_per_jiffy *
 				msecs_to_jiffies(MMC_TIMEOUT_MS));
 
-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-			 OMAP_HSMMC_READ(host->base, SYSCTL) | bit);
+	OMAP_HSMMC_WRITE(host, SYSCTL,
+			 OMAP_HSMMC_READ(host, SYSCTL) | bit);
 
-	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & bit) &&
+	while ((OMAP_HSMMC_READ(host, SYSCTL) & bit) &&
 		(i++ < limit))
 		cpu_relax();
 
@@ -987,7 +967,7 @@ static inline void omap_hsmmc_reset_controller_fsm(struct omap_hsmmc_host *host,
 	 */
 	udelay(500);
 
-	if (OMAP_HSMMC_READ(host->base, SYSCTL) & bit)
+	if (OMAP_HSMMC_READ(host, SYSCTL) & bit)
 		dev_err(mmc_dev(host->mmc),
 			"Timeout waiting on controller reset in %s\n",
 			__func__);
@@ -1000,9 +980,9 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
 
 	if (!host->req_in_progress) {
 		do {
-			OMAP_HSMMC_WRITE(host->base, STAT, status);
+			OMAP_HSMMC_WRITE(host, STAT, status);
 			/* Flush posted write */
-			status = OMAP_HSMMC_READ(host->base, STAT);
+			status = OMAP_HSMMC_READ(host, STAT);
 		} while (status & INT_EN_MASK);
 		return;
 	}
@@ -1059,7 +1039,7 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
 		}
 	}
 
-	OMAP_HSMMC_WRITE(host->base, STAT, status);
+	OMAP_HSMMC_WRITE(host, STAT, status);
 
 	if (end_cmd || ((status & CC) && host->cmd))
 		omap_hsmmc_cmd_done(host, host->cmd);
@@ -1075,11 +1055,11 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
 	struct omap_hsmmc_host *host = dev_id;
 	int status;
 
-	status = OMAP_HSMMC_READ(host->base, STAT);
+	status = OMAP_HSMMC_READ(host, STAT);
 	do {
 		omap_hsmmc_do_irq(host, status);
 		/* Flush posted write */
-		status = OMAP_HSMMC_READ(host->base, STAT);
+		status = OMAP_HSMMC_READ(host, STAT);
 	} while (status & INT_EN_MASK);
 
 	return IRQ_HANDLED;
@@ -1089,10 +1069,10 @@ static void set_sd_bus_power(struct omap_hsmmc_host *host)
 {
 	unsigned long i;
 
-	OMAP_HSMMC_WRITE(host->base, HCTL,
-			 OMAP_HSMMC_READ(host->base, HCTL) | SDBP);
+	OMAP_HSMMC_WRITE(host, HCTL,
+			 OMAP_HSMMC_READ(host, HCTL) | SDBP);
 	for (i = 0; i < loops_per_jiffy; i++) {
-		if (OMAP_HSMMC_READ(host->base, HCTL) & SDBP)
+		if (OMAP_HSMMC_READ(host, HCTL) & SDBP)
 			break;
 		cpu_relax();
 	}
@@ -1129,9 +1109,9 @@ static int omap_hsmmc_switch_opcond(struct omap_hsmmc_host *host, int vdd)
 	if (ret != 0)
 		goto err;
 
-	OMAP_HSMMC_WRITE(host->base, HCTL,
-		OMAP_HSMMC_READ(host->base, HCTL) & SDVSCLR);
-	reg_val = OMAP_HSMMC_READ(host->base, HCTL);
+	OMAP_HSMMC_WRITE(host, HCTL,
+		OMAP_HSMMC_READ(host, HCTL) & SDVSCLR);
+	reg_val = OMAP_HSMMC_READ(host, HCTL);
 
 	/*
 	 * If a MMC dual voltage card is detected, the set_ios fn calls
@@ -1153,7 +1133,7 @@ static int omap_hsmmc_switch_opcond(struct omap_hsmmc_host *host, int vdd)
 	else
 		reg_val |= SDVS30;
 
-	OMAP_HSMMC_WRITE(host->base, HCTL, reg_val);
+	OMAP_HSMMC_WRITE(host, HCTL, reg_val);
 	set_sd_bus_power(host);
 
 	return 0;
@@ -1249,12 +1229,12 @@ static void omap_hsmmc_config_dma_params(struct omap_hsmmc_host *host,
 	dma_ch = host->dma_ch;
 	if (data->flags & MMC_DATA_WRITE) {
 		omap_set_dma_dest_params(dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
-			(host->mapbase + OMAP_HSMMC_DATA), 0, 0);
+			(host->mapbase + host->regs[OMAP_HSMMC_DATA]), 0, 0);
 		omap_set_dma_src_params(dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
 			sg_dma_address(sgl), 0, 0);
 	} else {
 		omap_set_dma_src_params(dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
-			(host->mapbase + OMAP_HSMMC_DATA), 0, 0);
+			(host->mapbase + host->regs[OMAP_HSMMC_DATA]), 0, 0);
 		omap_set_dma_dest_params(dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
 			sg_dma_address(sgl), 0, 0);
 	}
@@ -1367,7 +1347,7 @@ static void set_data_timeout(struct omap_hsmmc_host *host,
 	unsigned int timeout, cycle_ns;
 	uint32_t reg, clkd, dto = 0;
 
-	reg = OMAP_HSMMC_READ(host->base, SYSCTL);
+	reg = OMAP_HSMMC_READ(host, SYSCTL);
 	clkd = (reg & CLKD_MASK) >> CLKD_SHIFT;
 	if (clkd == 0)
 		clkd = 1;
@@ -1394,7 +1374,7 @@ static void set_data_timeout(struct omap_hsmmc_host *host,
 
 	reg &= ~DTO_MASK;
 	reg |= dto << DTO_SHIFT;
-	OMAP_HSMMC_WRITE(host->base, SYSCTL, reg);
+	OMAP_HSMMC_WRITE(host, SYSCTL, reg);
 }
 
 /*
@@ -1407,7 +1387,7 @@ omap_hsmmc_prepare_data(struct omap_hsmmc_host *host, struct mmc_request *req)
 	host->data = req->data;
 
 	if (req->data == NULL) {
-		OMAP_HSMMC_WRITE(host->base, BLK, 0);
+		OMAP_HSMMC_WRITE(host, BLK, 0);
 		/*
 		 * Set an arbitrary 100ms data timeout for commands with
 		 * busy signal.
@@ -1417,7 +1397,7 @@ omap_hsmmc_prepare_data(struct omap_hsmmc_host *host, struct mmc_request *req)
 		return 0;
 	}
 
-	OMAP_HSMMC_WRITE(host->base, BLK, (req->data->blksz)
+	OMAP_HSMMC_WRITE(host, BLK, (req->data->blksz)
 					| (req->data->blocks << 16));
 	set_data_timeout(host, req->data->timeout_ns, req->data->timeout_clks);
 
@@ -1509,20 +1489,20 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 	/* FIXME: set registers based only on changes to ios */
 
-	con = OMAP_HSMMC_READ(host->base, CON);
+	con = OMAP_HSMMC_READ(host, CON);
 	switch (mmc->ios.bus_width) {
 	case MMC_BUS_WIDTH_8:
-		OMAP_HSMMC_WRITE(host->base, CON, con | DW8);
+		OMAP_HSMMC_WRITE(host, CON, con | DW8);
 		break;
 	case MMC_BUS_WIDTH_4:
-		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
-		OMAP_HSMMC_WRITE(host->base, HCTL,
-			OMAP_HSMMC_READ(host->base, HCTL) | FOUR_BIT);
+		OMAP_HSMMC_WRITE(host, CON, con & ~DW8);
+		OMAP_HSMMC_WRITE(host, HCTL,
+			OMAP_HSMMC_READ(host, HCTL) | FOUR_BIT);
 		break;
 	case MMC_BUS_WIDTH_1:
-		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
-		OMAP_HSMMC_WRITE(host->base, HCTL,
-			OMAP_HSMMC_READ(host->base, HCTL) & ~FOUR_BIT);
+		OMAP_HSMMC_WRITE(host, CON, con & ~DW8);
+		OMAP_HSMMC_WRITE(host, HCTL,
+			OMAP_HSMMC_READ(host, HCTL) & ~FOUR_BIT);
 		break;
 	}
 
@@ -1530,7 +1510,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		/* Only MMC1 can interface at 3V without some flavor
 		 * of external transceiver; but they all handle 1.8V.
 		 */
-		if ((OMAP_HSMMC_READ(host->base, HCTL) & SDVSDET) &&
+		if ((OMAP_HSMMC_READ(host, HCTL) & SDVSDET) &&
 			(ios->vdd == DUAL_VOLT_OCR_BIT)) {
 				/*
 				 * The mmc_select_voltage fn of the core does
@@ -1556,30 +1536,30 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			dsor = 250;
 	}
 	omap_hsmmc_stop_clock(host);
-	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
+	regval = OMAP_HSMMC_READ(host, SYSCTL);
 	regval = regval & ~(CLKD_MASK);
 	regval = regval | (dsor << 6) | (DTO << 16);
-	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+	OMAP_HSMMC_WRITE(host, SYSCTL, regval);
+	OMAP_HSMMC_WRITE(host, SYSCTL,
+		OMAP_HSMMC_READ(host, SYSCTL) | ICE);
 
 	/* Wait till the ICS bit is set */
 	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
-	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
+	while ((OMAP_HSMMC_READ(host, SYSCTL) & ICS) != ICS
 		&& time_before(jiffies, timeout))
 		msleep(1);
 
-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-		OMAP_HSMMC_READ(host->base, SYSCTL) | CEN);
+	OMAP_HSMMC_WRITE(host, SYSCTL,
+		OMAP_HSMMC_READ(host, SYSCTL) | CEN);
 
 	if (do_send_init_stream)
 		send_init_stream(host);
 
-	con = OMAP_HSMMC_READ(host->base, CON);
+	con = OMAP_HSMMC_READ(host, CON);
 	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN)
-		OMAP_HSMMC_WRITE(host->base, CON, con | OD);
+		OMAP_HSMMC_WRITE(host, CON, con | OD);
 	else
-		OMAP_HSMMC_WRITE(host->base, CON, con & ~OD);
+		OMAP_HSMMC_WRITE(host, CON, con & ~OD);
 
 	if (host->power_mode == MMC_POWER_OFF)
 		mmc_host_disable(host->mmc);
@@ -1618,15 +1598,15 @@ static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
 		capa = VS18;
 	}
 
-	value = OMAP_HSMMC_READ(host->base, HCTL) & ~SDVS_MASK;
-	OMAP_HSMMC_WRITE(host->base, HCTL, value | hctl);
+	value = OMAP_HSMMC_READ(host, HCTL) & ~SDVS_MASK;
+	OMAP_HSMMC_WRITE(host, HCTL, value | hctl);
 
-	value = OMAP_HSMMC_READ(host->base, CAPA);
-	OMAP_HSMMC_WRITE(host->base, CAPA, value | capa);
+	value = OMAP_HSMMC_READ(host, CAPA);
+	OMAP_HSMMC_WRITE(host, CAPA, value | capa);
 
 	/* Set the controller to AUTO IDLE mode */
-	value = OMAP_HSMMC_READ(host->base, SYSCONFIG);
-	OMAP_HSMMC_WRITE(host->base, SYSCONFIG, value | AUTOIDLE);
+	value = OMAP_HSMMC_READ(host, SYSCONFIG);
+	OMAP_HSMMC_WRITE(host, SYSCONFIG, value | AUTOIDLE);
 
 	/* Set SD bus power bit */
 	set_sd_bus_power(host);
@@ -1909,19 +1889,19 @@ static int omap_hsmmc_regs_show(struct seq_file *s, void *data)
 	pm_runtime_get_sync(host->dev);
 
 	seq_printf(s, "SYSCONFIG:\t0x%08x\n",
-			OMAP_HSMMC_READ(host->base, SYSCONFIG));
+			OMAP_HSMMC_READ(host, SYSCONFIG));
 	seq_printf(s, "CON:\t\t0x%08x\n",
-			OMAP_HSMMC_READ(host->base, CON));
+			OMAP_HSMMC_READ(host, CON));
 	seq_printf(s, "HCTL:\t\t0x%08x\n",
-			OMAP_HSMMC_READ(host->base, HCTL));
+			OMAP_HSMMC_READ(host, HCTL));
 	seq_printf(s, "SYSCTL:\t\t0x%08x\n",
-			OMAP_HSMMC_READ(host->base, SYSCTL));
+			OMAP_HSMMC_READ(host, SYSCTL));
 	seq_printf(s, "IE:\t\t0x%08x\n",
-			OMAP_HSMMC_READ(host->base, IE));
+			OMAP_HSMMC_READ(host, IE));
 	seq_printf(s, "ISE:\t\t0x%08x\n",
-			OMAP_HSMMC_READ(host->base, ISE));
+			OMAP_HSMMC_READ(host, ISE));
 	seq_printf(s, "CAPA:\t\t0x%08x\n",
-			OMAP_HSMMC_READ(host->base, CAPA));
+			OMAP_HSMMC_READ(host, CAPA));
 
 	pm_runtime_put_sync(host->dev);
 
@@ -2005,6 +1985,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	host->slot_id	= 0;
 	host->mapbase	= res->start;
 	host->base	= ioremap(host->mapbase, SZ_4K);
+	host->regs	= (u16 *) pdata->regs_map;
 	host->power_mode = MMC_POWER_OFF;
 
 	platform_set_drvdata(pdev, host);
@@ -2272,8 +2253,8 @@ static int omap_hsmmc_suspend(struct device *dev)
 		ret = mmc_suspend_host(host->mmc);
 		if (ret == 0) {
 			omap_hsmmc_disable_irq(host);
-			OMAP_HSMMC_WRITE(host->base, HCTL,
-				OMAP_HSMMC_READ(host->base, HCTL) & ~SDBP);
+			OMAP_HSMMC_WRITE(host, HCTL,
+				OMAP_HSMMC_READ(host, HCTL) & ~SDBP);
 			mmc_host_disable(host->mmc);
 
 			if (host->got_dbclk)
