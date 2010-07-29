@@ -77,8 +77,6 @@
 #define OMAP7XX_GPIO_INT_STATUS		0x14
 
 #define OMAP24XX_GPIO_REVISION		0x0000
-#define OMAP24XX_GPIO_SYSCONFIG		0x0010
-#define OMAP24XX_GPIO_SYSSTATUS		0x0014
 #define OMAP24XX_GPIO_IRQSTATUS1	0x0018
 #define OMAP24XX_GPIO_IRQSTATUS2	0x0028
 #define OMAP24XX_GPIO_IRQENABLE2	0x002c
@@ -102,7 +100,6 @@
 #define OMAP24XX_GPIO_SETDATAOUT	0x0094
 
 #define OMAP4_GPIO_REVISION		0x0000
-#define OMAP4_GPIO_SYSCONFIG		0x0010
 #define OMAP4_GPIO_EOI			0x0020
 #define OMAP4_GPIO_IRQSTATUSRAW0	0x0024
 #define OMAP4_GPIO_IRQSTATUSRAW1	0x0028
@@ -114,7 +111,6 @@
 #define OMAP4_GPIO_IRQSTATUSCLR1	0x0040
 #define OMAP4_GPIO_IRQWAKEN0		0x0044
 #define OMAP4_GPIO_IRQWAKEN1		0x0048
-#define OMAP4_GPIO_SYSSTATUS		0x0114
 #define OMAP4_GPIO_IRQENABLE1		0x011c
 #define OMAP4_GPIO_WAKE_EN		0x0120
 #define OMAP4_GPIO_IRQSTATUS2		0x0128
@@ -137,7 +133,6 @@
 #define OMAP4_GPIO_SETDATAOUT		0x0194
 
 struct omap_gpio_regs {
-	u32 sysconfig;
 	u32 irqenable1;
 	u32 irqenable2;
 	u32 wake_en;
@@ -1979,8 +1974,6 @@ static void omap_gpio_save_context(struct device *dev)
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
 
 	if (bank->method == METHOD_GPIO_24XX) {
-		bank->gpio_context.sysconfig =
-			__raw_readl(bank->base + OMAP24XX_GPIO_SYSCONFIG);
 		bank->gpio_context.irqenable1 =
 			__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE1);
 		bank->gpio_context.irqenable2 =
@@ -2002,8 +1995,6 @@ static void omap_gpio_save_context(struct device *dev)
 		bank->gpio_context.dataout =
 			__raw_readl(bank->base + OMAP24XX_GPIO_DATAOUT);
 	} else if (bank->method == METHOD_GPIO_44XX) {
-		bank->gpio_context.sysconfig =
-			__raw_readl(bank->base + OMAP4_GPIO_SYSCONFIG);
 		bank->gpio_context.irqenable1 =
 			__raw_readl(bank->base + OMAP4_GPIO_IRQENABLE1);
 		bank->gpio_context.irqenable2 =
@@ -2035,8 +2026,6 @@ static void omap_gpio_restore_context(struct device *dev)
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
 
 	if (bank->method == METHOD_GPIO_24XX) {
-		__raw_writel(bank->gpio_context.sysconfig,
-				bank->base + OMAP24XX_GPIO_SYSCONFIG);
 		__raw_writel(bank->gpio_context.irqenable1,
 				bank->base + OMAP24XX_GPIO_IRQENABLE1);
 		__raw_writel(bank->gpio_context.irqenable2,
@@ -2058,8 +2047,6 @@ static void omap_gpio_restore_context(struct device *dev)
 		__raw_writel(bank->gpio_context.dataout,
 				bank->base + OMAP24XX_GPIO_DATAOUT);
 	} else if (bank->method == METHOD_GPIO_44XX) {
-		__raw_writel(bank->gpio_context.sysconfig,
-				bank->base + OMAP4_GPIO_SYSCONFIG);
 		__raw_writel(bank->gpio_context.irqenable1,
 				bank->base + OMAP4_GPIO_IRQENABLE1);
 		__raw_writel(bank->gpio_context.irqenable2,
