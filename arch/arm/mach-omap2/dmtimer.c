@@ -192,6 +192,13 @@ static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
 	pdata->omap_dm_get_timer_clk = omap2_dm_timer_get_fclk;
 
 	pdata->timer_ip_type = oh->class->rev;
+	if (pdata->timer_ip_type == 1) {
+		pdata->offset1 = 0;
+		pdata->offset2 = 0;
+	} else {
+		pdata->offset1 = 0x10;
+		pdata->offset2 = 0x14;
+	}
 
 	if (unlikely(!strcmp(oh->name, "timer10")))
 		id = 9;
@@ -241,6 +248,13 @@ static int __init omap2_dm_timer_init(struct omap_hwmod *oh, void *user)
 	 * OMAP4 millisecond timers (GPT1, GPT2, GPT10).
 	 */
 	pdata->timer_ip_type = oh->class->rev;
+	if (unlikely(pdata->timer_ip_type == 1)) {
+		pdata->offset1 = 0x0;
+		pdata->offset2 = 0x0;
+	} else {
+		pdata->offset1 = 0x10;
+		pdata->offset2 = 0x14;
+	}
 
 	if (unlikely(!strcmp(oh->name, "timer10")))
 		id = 9;
