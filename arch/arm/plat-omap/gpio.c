@@ -1821,7 +1821,6 @@ static bool save_restore_context;
 
 static int gpio_bank_runtime_suspend(struct device *dev)
 {
-	u32 l1, l2;
 	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
 
@@ -1840,27 +1839,35 @@ static int gpio_bank_runtime_suspend(struct device *dev)
 		return 0;
 
 	if (bank->method == METHOD_GPIO_24XX) {
+		u32 l1, l2;
+
 		bank->saved_datain = __raw_readl(bank->base +
 					OMAP24XX_GPIO_DATAIN);
+
 		l1 = __raw_readl(bank->base +
 					OMAP24XX_GPIO_FALLINGDETECT);
 		l2 = __raw_readl(bank->base + OMAP24XX_GPIO_RISINGDETECT);
-	} else if (bank->method == METHOD_GPIO_44XX) {
-		bank->saved_datain = __raw_readl(bank->base +
-					OMAP4_GPIO_DATAIN);
-		l1 = __raw_readl(bank->base + OMAP4_GPIO_FALLINGDETECT);
-		l2 = __raw_readl(bank->base + OMAP4_GPIO_RISINGDETECT);
-	}
 
-	bank->saved_fallingdetect = l1;
-	bank->saved_risingdetect = l2;
-	l1 &= ~bank->enabled_non_wakeup_gpios;
-	l2 &= ~bank->enabled_non_wakeup_gpios;
+		bank->saved_fallingdetect = l1;
+		bank->saved_risingdetect = l2;
+		l1 &= ~bank->enabled_non_wakeup_gpios;
+		l2 &= ~bank->enabled_non_wakeup_gpios;
 
-	if (bank->method == METHOD_GPIO_24XX) {
 		__raw_writel(l1, bank->base + OMAP24XX_GPIO_FALLINGDETECT);
 		__raw_writel(l2, bank->base + OMAP24XX_GPIO_RISINGDETECT);
 	} else if (bank->method == METHOD_GPIO_44XX) {
+		u32 l1, l2;
+
+		bank->saved_datain = __raw_readl(bank->base +
+						OMAP4_GPIO_DATAIN);
+		l1 = __raw_readl(bank->base + OMAP4_GPIO_FALLINGDETECT);
+		l2 = __raw_readl(bank->base + OMAP4_GPIO_RISINGDETECT);
+
+		bank->saved_fallingdetect = l1;
+		bank->saved_risingdetect = l2;
+		l1 &= ~bank->enabled_non_wakeup_gpios;
+		l2 &= ~bank->enabled_non_wakeup_gpios;
+
 		__raw_writel(l1, bank->base + OMAP4_GPIO_FALLINGDETECT);
 		__raw_writel(l2, bank->base + OMAP4_GPIO_RISINGDETECT);
 	}
@@ -1872,7 +1879,6 @@ static int gpio_bank_runtime_suspend(struct device *dev)
 
 static int gpio_bank_runtime_resume(struct device *dev)
 {
-	u32 l, gen, gen0, gen1;
 	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
 
@@ -1886,45 +1892,39 @@ static int gpio_bank_runtime_resume(struct device *dev)
 	}
 
 	if (bank->method == METHOD_GPIO_24XX) {
+		u32 l, gen, gen0, gen1;
+
 		__raw_writel(bank->saved_fallingdetect,
 				 bank->base + OMAP24XX_GPIO_FALLINGDETECT);
 		__raw_writel(bank->saved_risingdetect,
 				 bank->base + OMAP24XX_GPIO_RISINGDETECT);
 		l = __raw_readl(bank->base + OMAP24XX_GPIO_DATAIN);
-	} else if (bank->method == METHOD_GPIO_44XX) {
-		__raw_writel(bank->saved_fallingdetect,
-				 bank->base + OMAP4_GPIO_FALLINGDETECT);
-		__raw_writel(bank->saved_risingdetect,
-				 bank->base + OMAP4_GPIO_RISINGDETECT);
-		l = __raw_readl(bank->base + OMAP4_GPIO_DATAIN);
-	}
 
-	/* Check if any of the non-wakeup interrupt GPIOs have changed
-	 * state.  If so, generate an IRQ by software.  This is
-	 * horribly racy, but it's the best we can do to work around
-	 * this silicon bug. */
-	l ^= bank->saved_datain;
-	l &= bank->enabled_non_wakeup_gpios;
+		/* Check if any of the non-wakeup interrupt GPIOs have changed
+		 * state.  If so, generate an IRQ by software.  This is
+		 * horribly racy, but it's the best we can do to work around
+		 * this silicon bug. */
+		l ^= bank->saved_datain;
+		l &= bank->enabled_non_wakeup_gpios;
 
-	/*
-	 * No need to generate IRQs for the rising edge for gpio IRQs
-	 * configured with falling edge only; and vice versa.
-	 */
-	gen0 = l & bank->saved_fallingdetect;
-	gen0 &= bank->saved_datain;
+		/*
+		 * No need to generate IRQs for the rising edge for gpio IRQs
+		 * configured with falling edge only; and vice versa.
+		 */
+		gen0 = l & bank->saved_fallingdetect;
+		gen0 &= bank->saved_datain;
 
-	gen1 = l & bank->saved_risingdetect;
-	gen1 &= ~(bank->saved_datain);
+		gen1 = l & bank->saved_risingdetect;
+		gen1 &= ~(bank->saved_datain);
 
-	/* FIXME: Consider GPIO IRQs with level detections properly! */
-	gen = l & (~(bank->saved_fallingdetect) & ~(bank->saved_risingdetect));
-	/* Consider all GPIO IRQs needed to be updated */
-	gen |= gen0 | gen1;
+		/* FIXME: Consider GPIO IRQs with level detections properly! */
+		gen = l & (~(bank->saved_fallingdetect) & ~(bank->saved_risingdetect));
+		/* Consider all GPIO IRQs needed to be updated */
+		gen |= gen0 | gen1;
 
-	if (gen) {
-		u32 old0, old1;
+		if (gen) {
+			u32 old0, old1;
 
-		if (bank->method == METHOD_GPIO_24XX) {
 			old0 = __raw_readl(bank->base +
 					OMAP24XX_GPIO_LEVELDETECT0);
 			old1 = __raw_readl(bank->base +
@@ -1937,7 +1937,41 @@ static int gpio_bank_runtime_resume(struct device *dev)
 					OMAP24XX_GPIO_LEVELDETECT0);
 			__raw_writel(old1, bank->base +
 					OMAP24XX_GPIO_LEVELDETECT1);
-		} else if (bank->method == METHOD_GPIO_44XX) {
+		}
+	} else if (bank->method == METHOD_GPIO_44XX) {
+		u32 l, gen, gen0, gen1;
+
+		__raw_writel(bank->saved_fallingdetect,
+				 bank->base + OMAP4_GPIO_FALLINGDETECT);
+		__raw_writel(bank->saved_risingdetect,
+				 bank->base + OMAP4_GPIO_RISINGDETECT);
+		l = __raw_readl(bank->base + OMAP4_GPIO_DATAIN);
+
+		/* Check if any of the non-wakeup interrupt GPIOs have changed
+		 * state.  If so, generate an IRQ by software.  This is
+		 * horribly racy, but it's the best we can do to work around
+		 * this silicon bug. */
+		l ^= bank->saved_datain;
+		l &= bank->enabled_non_wakeup_gpios;
+
+		/*
+		 * No need to generate IRQs for the rising edge for gpio IRQs
+		 * configured with falling edge only; and vice versa.
+		 */
+		gen0 = l & bank->saved_fallingdetect;
+		gen0 &= bank->saved_datain;
+
+		gen1 = l & bank->saved_risingdetect;
+		gen1 &= ~(bank->saved_datain);
+
+		/* FIXME: Consider GPIO IRQs with level detections properly! */
+		gen = l & (~(bank->saved_fallingdetect) & ~(bank->saved_risingdetect));
+		/* Consider all GPIO IRQs needed to be updated */
+		gen |= gen0 | gen1;
+
+		if (gen) {
+			u32 old0, old1;
+
 			old0 = __raw_readl(bank->base +
 						OMAP4_GPIO_LEVELDETECT0);
 			old1 = __raw_readl(bank->base +
