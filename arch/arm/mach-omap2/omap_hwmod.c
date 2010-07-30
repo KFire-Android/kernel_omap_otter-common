@@ -922,9 +922,8 @@ int _omap_hwmod_enable(struct omap_hwmod *oh)
 	 * to allow to enable the clocks. Otherwise the PRCM will return
 	 * Intransition status, and the init will failed.
 	 */
-	if ((((oh->_state == _HWMOD_STATE_INITIALIZED) &&
-	      !(oh->flags & HWMOD_INIT_NO_RESET)) ||
-	     (oh->_state == _HWMOD_STATE_DISABLED)) && oh->rst_lines_cnt == 1)
+	if ((oh->_state == _HWMOD_STATE_INITIALIZED ||
+	     oh->_state == _HWMOD_STATE_DISABLED) && oh->rst_lines_cnt == 1)
 		omap_hwmod_hardreset_deassert(oh, oh->rst_lines[0].name);
 
 	/* XXX mux balls */
@@ -1072,6 +1071,16 @@ static int _setup(struct omap_hwmod *oh, void *data)
 	}
 
 	oh->_state = _HWMOD_STATE_INITIALIZED;
+
+	/*
+	 * In the case of hwmod with hardreset that should not be
+	 * de-assert at boot time, we have to keep the module
+	 * initialized, because we cannot enable it properly with the
+	 * reset asserted. Exit without warning because that behavior is
+	 * expected.
+	 */
+	if ((oh->flags & HWMOD_INIT_NO_RESET) && oh->rst_lines_cnt == 1)
+		return 0;
 
 	r = _omap_hwmod_enable(oh);
 	if (r) {
@@ -1575,9 +1584,16 @@ int omap_hwmod_hardreset_deassert(struct omap_hwmod *oh, const char *name)
 
 	mask = 1 << shift;
 
+	/* Check the current status to avoid de-asserting the line twice */
+	if (omap4_prm_read_bits_shift(oh->prcm.omap4.rstctrl_reg, mask) == 0) {
+		pr_warning("omap_hwmod: %s: reset already de-asserted\n",
+			   oh->name);
+		return 0;
+	}
+
 	/* Clear the reset status by writing 1 to the status bit */
-	omap4_prm_rmw_reg_bits(mask, mask, oh->prcm.omap4.rstctrl_reg
-					   + RST_CTRL_ST_OFFSET);
+	omap4_prm_rmw_reg_bits(0xffffffff, mask, oh->prcm.omap4.rstctrl_reg
+						 + RST_CTRL_ST_OFFSET);
 	/* de-assert the reset control line */
 	omap4_prm_rmw_reg_bits(mask, 0, oh->prcm.omap4.rstctrl_reg);
 	/* wait the status to be set */
