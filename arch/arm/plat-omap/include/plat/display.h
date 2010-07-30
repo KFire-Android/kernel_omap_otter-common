@@ -45,6 +45,9 @@
 #define DISPC_IRQ_SYNC_LOST_2  (1 << 17)
 #define DISPC_IRQ_VSYNC2		(1 << 18)
 #define DISPC_IRQ_ACBIAS_COUNT_STAT2	(1 << 21)
+#define DISPC_IRQ_VID3_END_WIN         (1 << 19)
+#define DISPC_IRQ_VID3_FIFO_UNDERFLOW  (1 << 20)
+					/* VID3_BUF_UNDERFLOW*/
 #define DISPC_IRQ_FRAMEDONE2		(1 << 22)
 
 #define DISPC_IRQ_FRAMEDONE_DIG        (1 << 24) /* FRAMEDONE_TV*/
@@ -64,7 +67,8 @@ enum omap_display_type {
 enum omap_plane {
 	OMAP_DSS_GFX	= 0,
 	OMAP_DSS_VIDEO1	= 1,
-	OMAP_DSS_VIDEO2	= 2
+	OMAP_DSS_VIDEO2	= 2,
+	OMAP_DSS_VIDEO3	= 3,
 };
 
 enum omap_channel {
@@ -119,6 +123,8 @@ enum omap_color_mode {
 		OMAP_DSS_COLOR_RGB24P | OMAP_DSS_COLOR_YUV2 |
 		OMAP_DSS_COLOR_UYVY | OMAP_DSS_COLOR_ARGB32 |
 		OMAP_DSS_COLOR_RGBA32 | OMAP_DSS_COLOR_RGBX32,
+
+	OMAP_DSS_COLOR_VID3_OMAP3 = OMAP_DSS_COLOR_VID2_OMAP3,
 };
 
 enum omap_lcd_display_type {
