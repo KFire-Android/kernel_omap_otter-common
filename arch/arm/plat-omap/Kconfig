@@ -43,7 +43,7 @@ config ARCH_OMAP4
 	select ARM_THUMBEE
 	select DEVTMPFS
 	select UNIX
-	select PM
+	select PM if !OMAP4_ES1
 	select PM_RUNTIME if PM
 endchoice
 

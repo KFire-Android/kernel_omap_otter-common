@@ -66,6 +66,21 @@ static struct irqaction omap2_gp_timer_irq = {
 	.handler	= omap2_gp_timer_interrupt,
 };
 
+#ifdef CONFIG_ERRATA_OMAP4_AXI2OCP
+static struct omap_dm_timer *gptimer2;
+static irqreturn_t gpt2_timer_interrupt(int irq, void *dev_id)
+{
+	omap_dm_timer_write_status(gptimer2, OMAP_TIMER_INT_OVERFLOW);
+	return IRQ_HANDLED;
+}
+
+static struct irqaction gpt2_timer_irq = {
+	.name		= "gpt2 timer",
+	.flags		= IRQF_DISABLED,
+	.handler	= gpt2_timer_interrupt,
+};
+#endif
+
 static int omap2_gp_timer_set_next_event(unsigned long cycles,
 					 struct clock_event_device *evt)
 {
@@ -168,6 +183,29 @@ static void __init omap2_gp_clockevent_init(void)
 	clockevents_register_device(&clockevent_gpt);
 }
 
+#ifdef CONFIG_ERRATA_OMAP4_AXI2OCP
+static int __init omap4_setup_gpt2(void)
+{
+	/*  Set up GPT2 for the WA */
+	gptimer2 = omap_dm_timer_request_specific(2);
+	BUG_ON(gptimer2 == NULL);
+
+	printk(KERN_INFO "Enabling AXI2OCP errata Fix \n");
+	omap_dm_timer_set_source(gptimer2, OMAP_TIMER_SRC_32_KHZ);
+	gpt2_timer_irq.dev_id = (void *)gptimer2;
+	setup_irq(omap_dm_timer_get_irq(gptimer2), &gpt2_timer_irq);
+	omap_dm_timer_set_int_enable(gptimer2, OMAP_TIMER_INT_OVERFLOW);
+	/*
+	 * Timer reload value is used based on mpu @ 600 MHz
+	 * And hence bridge is at 300 MHz. 65K cycle = 216 uS
+	 * 6 * 1/32 kHz => ~187 us
+	 */
+	omap_dm_timer_set_load_start(gptimer2, 1, 0xffffff06);
+
+	return 0;
+}
+late_initcall(omap4_setup_gpt2);
+#endif
 /* Clocksource code */
 
 #ifdef CONFIG_OMAP_32K_TIMER

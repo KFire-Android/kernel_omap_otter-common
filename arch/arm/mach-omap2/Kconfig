@@ -188,6 +188,19 @@ config MACH_OMAP_4430SDP
 
 
 
+config ERRATA_OMAP4_AXI2OCP
+	bool "OMAP 4430 axi2ocp errata workaround"
+	depends on ARCH_OMAP4
+	help
+	Pending response counter logic is incorrectly implemented
+	It decrements by only 1 even when there are 2+ responses in the
+	same cycle. If 2 MCMDs send out bridge at the same time counter
+	increments by.1 but when it decrement for 2 responses counter does
+	not go beyond 0.
+	Work-around:
+	Any new request before timer max out resets the timer. With this hang
+	issue will not happen.
+
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"
 	depends on ARCH_OMAP3
