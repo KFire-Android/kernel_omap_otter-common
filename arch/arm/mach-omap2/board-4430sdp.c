@@ -27,6 +27,7 @@
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -38,10 +39,12 @@
 #include <plat/common.h>
 #include <plat/control.h>
 #include <plat/timer-gp.h>
+#include <plat/display.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/syntm12xx.h>
 #include <plat/omap4-keypad.h>
+#include <plat/nokia-dsi-panel.h>
 #include "hsmmc.h"
 
 #define ETH_KS8851_IRQ			34
@@ -328,16 +331,77 @@ static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
 
 /* End Synaptic Touchscreen TM-01217 */
 
-static struct platform_device sdp4430_lcd_device = {
-	.name		= "sdp4430_lcd",
-	.id		= -1,
+int dsi_set_backlight(struct omap_dss_device *dssdev, int level)
+{
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, 0x03);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, 0x04);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, 0x92);
+
+	mdelay(120);
+	gpio_set_value(27, 0);
+	mdelay(120);
+	gpio_set_value(27, 1);
+
+	return 0;
+}
+
+static struct nokia_dsi_panel_data dsi_panel = {
+		.name	= "taal",
+		.reset_gpio	= 102,
+		.use_ext_te	= false,
+		.ext_te_gpio	= 101,
+		.use_esd_check	= false,
+		.set_backlight	= dsi_set_backlight,
 };
 
-static struct platform_device *sdp4430_devices[] __initdata = {
+static struct omap_dss_device sdp4430_lcd_device = {
+	.name			= "lcd",
+	.driver_name		= "taal",
+	.type			= OMAP_DISPLAY_TYPE_DSI,
+	.data			= &dsi_panel,
+	.phy.dsi		= {
+		.clk_lane	= 1,
+		.clk_pol	= 0,
+		.data1_lane	= 2,
+		.data1_pol	= 0,
+		.data2_lane	= 3,
+		.data2_pol	= 0,
+		.div		= {
+			.lck_div	= 1,
+			.pck_div	= 4,
+			.regm		= 175,
+			.regn		= 19,
+			.regm3		= 4,
+			.regm4		= 4,
+			.lp_clk_div	= 8,
+		},
+	},
+	.channel 		= OMAP_DSS_CHANNEL_LCD,
+};
+
+static struct omap_dss_device *sdp4430_dss_devices[] = {
 	&sdp4430_lcd_device,
 	&sdp4430_proximity_device,
 	&sdp4430_leds_pwm,
 	&sdp4430_leds_gpio,
+};
+
+static struct omap_dss_board_info sdp4430_dss_data = {
+	.num_devices	=	ARRAY_SIZE(sdp4430_dss_devices),
+	.devices	=	sdp4430_dss_devices,
+	.default_device	=	&sdp4430_lcd_device,
+};
+
+static struct platform_device sdp4430_dss_device = {
+	.name	=	"omapdss",
+	.id	=	-1,
+	.dev	= {
+		.platform_data = &sdp4430_dss_data,
+	},
+};
+
+static struct platform_device *sdp4430_devices[] __initdata = {
+	&sdp4430_dss_device,
 };
 
 static struct omap_lcd_config sdp4430_lcd_config __initdata = {
@@ -742,11 +806,28 @@ static void omap_cma3000accl_init(void)
 	gpio_direction_input(OMAP4_CMA3000ACCL_GPIO);
 }
 
+static void __init omap4_display_init(void)
+{
+	void __iomem *phymux_base = NULL;
+	unsigned int dsimux = 0xFFFFFFFF;
+	phymux_base = ioremap(0x4A100000, 0x1000);
+	/* Turning on DSI PHY Mux*/
+	__raw_writel(dsimux, phymux_base+0x618);
+	dsimux = __raw_readl(phymux_base+0x618);
+
+	/* Panel Taal reset and backlight GPIO init */
+	gpio_request(dsi_panel.reset_gpio, "dsi1_en_gpio");
+	gpio_direction_output(dsi_panel.reset_gpio, 0);
+	gpio_request(27, "dsi1_bl_gpio");
+	gpio_direction_output(27, 1);
+}
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
 
 	omap4_i2c_init();
+	omap4_display_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	omap_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
