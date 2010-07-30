@@ -28,7 +28,6 @@ struct iotlb_entry {
 struct iommu {
 	const char	*name;
 	struct module	*owner;
-	struct clk	*clk;
 	void __iomem	*regbase;
 	struct device	*dev;
 
@@ -101,8 +100,10 @@ struct iommu_functions {
 
 struct iommu_platform_data {
 	const char *name;
-	const char *clk_name;
+	const char *oh_name;
 	const int nr_tlb_entries;
+	int irq;
+	void __iomem *io_base;
 };
 
 #if defined(CONFIG_ARCH_OMAP1)
