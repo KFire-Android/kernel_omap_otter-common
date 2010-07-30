@@ -133,7 +133,9 @@ struct dispc_reg { u16 idx; };
 					 DISPC_IRQ_VID1_FIFO_UNDERFLOW | \
 					 DISPC_IRQ_VID2_FIFO_UNDERFLOW | \
 					 DISPC_IRQ_SYNC_LOST | \
-					 DISPC_IRQ_SYNC_LOST_DIGIT)
+					DISPC_IRQ_SYNC_LOST_DIGIT | \
+					(cpu_is_omap44xx() ? \
+					DISPC_IRQ_SYNC_LOST_2 : 0))
 
 /* OMAP4 new global registers */
 #define DISPC_CONTROL2		DISPC_REG(0x0238)
@@ -1820,20 +1822,27 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 	struct completion frame_done_completion;
 	bool is_on;
 	int r;
+	int irq;
 
 	enable_clocks(1);
 
 	/* When we disable LCD output, we need to wait until frame is done.
 	 * Otherwise the DSS is still working, and turning off the clocks
 	 * prevents DSS from going to OFF mode */
-	is_on = REG_GET(DISPC_CONTROL, 0, 0);
+	if (OMAP_DSS_CHANNEL_LCD2 == channel) {
+		is_on = REG_GET(DISPC_CONTROL2, 0, 0);
+		irq = DISPC_IRQ_FRAMEDONE2;
+	} else {
+		is_on = REG_GET(DISPC_CONTROL, 0, 0);
+		irq = DISPC_IRQ_FRAMEDONE;
+	}
 
 	if (!enable && is_on) {
 		init_completion(&frame_done_completion);
 
 		r = omap_dispc_register_isr(dispc_disable_isr,
 				&frame_done_completion,
-				DISPC_IRQ_FRAMEDONE);
+				irq);
 
 		if (r)
 			DSSERR("failed to register FRAMEDONE isr\n");
@@ -1848,7 +1857,7 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 
 		r = omap_dispc_unregister_isr(dispc_disable_isr,
 				&frame_done_completion,
-				DISPC_IRQ_FRAMEDONE);
+				irq);
 
 		if (r)
 			DSSERR("failed to unregister FRAMEDONE isr\n");
@@ -2486,6 +2495,12 @@ void dispc_dump_irqs(struct seq_file *s)
 	PIS(SYNC_LOST);
 	PIS(SYNC_LOST_DIGIT);
 	PIS(WAKEUP);
+	if (cpu_is_omap44xx()) {
+		PIS(FRAMEDONE2);
+		PIS(VSYNC2);
+		PIS(ACBIAS_COUNT_STAT2);
+		PIS(SYNC_LOST_2);
+	}
 #undef PIS
 }
 #endif
@@ -3090,6 +3105,45 @@ static void dispc_error_worker(struct work_struct *work)
 			mdelay(50);
 			if (enable)
 				dssdev->driver->enable(dssdev);
+		}
+	}
+
+	if (errors & DISPC_IRQ_SYNC_LOST_2) {
+		struct omap_overlay_manager *manager = NULL;
+		bool enable = false;
+
+		DSSERR("SYNC_LOST for LCD2, disabling LCD2\n");
+
+		for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
+			struct omap_overlay_manager *mgr;
+			mgr = omap_dss_get_overlay_manager(i);
+
+			if (mgr->id == OMAP_DSS_CHANNEL_LCD2) {
+				manager = mgr;
+				enable = mgr->device->state ==
+						OMAP_DSS_DISPLAY_ACTIVE;
+				mgr->device->driver->disable(mgr->device);
+				break;
+			}
+		}
+
+		if (manager) {
+			for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
+				struct omap_overlay *ovl;
+				ovl = omap_dss_get_overlay(i);
+
+				if (!(ovl->caps & OMAP_DSS_OVL_CAP_DISPC))
+					continue;
+
+				if (ovl->id != 0 && ovl->manager == manager)
+					dispc_enable_plane(ovl->id, 0);
+			}
+
+			dispc_go(manager->id);
+			mdelay(50);
+			if (enable)
+				manager->device->driver->enable(
+							manager->device);
 		}
 	}
 
