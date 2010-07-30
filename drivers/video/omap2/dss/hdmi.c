@@ -46,6 +46,24 @@
 #include "dss.h"
 #include "hdmi.h"
 
+static int hdmi_enable_display(struct omap_dss_device *dssdev);
+static void hdmi_disable_display(struct omap_dss_device *dssdev);
+static int hdmi_display_suspend(struct omap_dss_device *dssdev);
+static int hdmi_display_resume(struct omap_dss_device *dssdev);
+static void hdmi_get_timings(struct omap_dss_device *dssdev,
+			struct omap_video_timings *timings);
+static void hdmi_set_timings(struct omap_dss_device *dssdev,
+			struct omap_video_timings *timings);
+static void hdmi_set_custom_edid_timing_code(struct omap_dss_device *dssdev, int code , int mode);
+static void hdmi_get_edid(struct omap_dss_device *dssdev);
+static int hdmi_check_timings(struct omap_dss_device *dssdev,
+			struct omap_video_timings *timings);
+static int hdmi_read_edid(struct omap_video_timings *);
+static int get_edid_timing_data(u8 *edid);
+static irqreturn_t hdmi_irq_handler(int irq, void *arg);
+static int hdmi_enable_hpd(struct omap_dss_device *dssdev);
+static void hdmi_power_off(struct omap_dss_device *dssdev);
+
 #define HDMI_PLLCTRL		0x58006200
 #define HDMI_PHY		0x58006300
 
@@ -70,7 +88,8 @@ u8 hpd_mode = 0, custom_set = 0;
 #define HDMI_TXPHY_PAD_CFG_CTRL			0xCul
 
 /*This is the structure which has all supported timing values that OMAP4 supports*/
-struct omap_video_timings all_timings_direct[31] = { {640, 480, 25200, 96, 16, 48, 2, 10, 33},
+const struct omap_video_timings all_timings_direct[31] = {
+						{640, 480, 25200, 96, 16, 48, 2, 10, 33},
 						{1280, 720, 74250, 40, 440, 220, 5, 5, 20},
 						{1280, 720, 74250, 40, 110, 220, 5, 5, 20},
 						{720, 480, 27000, 62, 16, 60, 6, 9, 30},
@@ -108,18 +127,24 @@ int code_index[31] = {1, 19, 4, 2, 37, 6, 21, 20, 5, 16, 17, 29, 31, 35,
 			0X2F, 0x3A, 0X51, 0X52, 0x16, 0x29, 0x39};
 
 /*This is revere static mapping which maps the CEA / VESA code to the corresponding timing values*/
-int code_cea[39] = {-1, 0, 3, 3, 2, 8, 5, 5, -1, -1, -1, -1, -1, -1, -1, -1, 9,
-			10, 10, 1, 7, 6, 6 , -1, -1, -1, -1, -1, -1, 11, 11,
-			12, -1, -1, -1, 13, 13, 4, 4};
+/* note: table is 10 entries per line to make it easier to find index.. */
+int code_cea[39] = {
+		-1,  0,  3,  3,  2,  8,  5,  5, -1, -1,
+		-1, -1, -1, -1, -1, -1,  9, 10, 10,  1,
+		7,   6,  6, -1, -1, -1, -1, -1, -1, 11,
+		11, 12, -1, -1, -1, 13, 13,  4,  4};
 
-int code_vesa[83] = {-1, -1, -1, -1, 14, -1, -1, -1, -1, 15, -1, -1, -1, -1, 16,
-			-1, 22, -1, -1, -1, -1, -1, 28, 17, -1, -1, -1, -1, 18,
-			-1, -1, -1, 20, -1, -1, 21, -1, -1, -1, 19, -1, 29, 23,
-			-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-			30, 25, -1, -1, -1, -1, -1, -1, -1 , -1, -1, -1, -1, -1,
-			-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 26, 27};
-
-
+/* note: table is 10 entries per line to make it easier to find index.. */
+int code_vesa[83] = {
+		-1, -1, -1, -1, 14, -1, -1, -1, -1, 15,
+		-1, -1, -1, -1, 16, -1, 22, -1, -1, -1,
+		-1, -1, 28, 17, -1, -1, -1, -1, 18, -1,
+		-1, -1, 20, -1, -1, 21, -1, -1, -1, 19,
+		-1, 29, 23, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, 30, 25, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, 26, 27};
 
 static struct {
 	void __iomem *base_phy;
@@ -127,14 +152,30 @@ static struct {
 	struct mutex lock;
 	int code;
 	int mode;
-	HDMI_Timing_t ti;
+	struct hdmi_config cfg;
 } hdmi;
 
-static struct hdmi_cm {
+struct hdmi_cm {
 	int code;
 	int mode;
 };
 struct omap_video_timings edid_timings;
+
+static void update_cfg (struct hdmi_config *cfg, struct omap_video_timings *timings)
+{
+	cfg->ppl = timings->x_res;
+	cfg->lpp = timings->y_res;
+	cfg->hbp = timings->hbp;
+	cfg->hfp = timings->hfp;
+	cfg->hsw = timings->hsw;
+	cfg->vbp = timings->vbp;
+	cfg->vfp = timings->vfp;
+	cfg->vsw = timings->vsw;
+	cfg->pixel_clock = timings->pixel_clock;
+	cfg->interlace = 0;  // XXX get this from EDID
+	cfg->v_pol = 1;      // XXX get this from EDID
+	cfg->h_pol = 1;      // XXX get this from EDID
+}
 
 static inline void hdmi_write_reg(u32 base, u16 idx, u32 val)
 {
@@ -609,16 +650,9 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 			r = -EIO;
 			goto err;
 		}
-	} else {
-		hdmi.ti.pixelPerLine = p->x_res;
-		hdmi.ti.linePerPanel = p->y_res;
-		hdmi.ti.horizontalBackPorch = p->hbp;
-		hdmi.ti.horizontalFrontPorch = p->hfp;
-		hdmi.ti.horizontalSyncPulse = p->hsw;
-		hdmi.ti.verticalBackPorch = p->vbp;
-		hdmi.ti.verticalFrontPorch = p->vfp;
-		hdmi.ti.verticalSyncPulse = p->vsw;
 	}
+
+	update_cfg(&hdmi.cfg, p);
 
 	DSSDBG("hdmi_power on x_res= %d y_res = %d", \
 		dssdev->panel.timings.x_res, dssdev->panel.timings.y_res);
@@ -649,7 +683,9 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 		goto err;
 	}
 
-	DSS_HDMI_CONFIG(hdmi.ti, hdmi.code, hdmi.mode);
+	hdmi.cfg.hdmi_dvi = hdmi.mode;
+	hdmi.cfg.video_format = hdmi.code;
+	hdmi_lib_enable(&hdmi.cfg);
 
 	/* these settings are independent of overlays */
 	dss_switch_tv_hdmi(1);
@@ -681,7 +717,9 @@ int hdmi_min_enable(void)
 	if (r) {
 		DSSERR("Failed to start PHY\n");
 	}
-	DSS_HDMI_CONFIG(hdmi.ti, hdmi.code, hdmi.mode);
+	hdmi.cfg.hdmi_dvi = hdmi.mode;
+	hdmi.cfg.video_format = hdmi.code;
+	hdmi_lib_enable(&hdmi.cfg);
 	return 0;
 }
 
@@ -1169,14 +1207,6 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 	}
 	tp = &edid_timings;
 	*dp = edid_timings;
-	hdmi.ti.pixelPerLine = tp->x_res;
-	hdmi.ti.linePerPanel = tp->y_res;
-	hdmi.ti.horizontalBackPorch = tp->hbp;
-	hdmi.ti.horizontalFrontPorch = tp->hfp;
-	hdmi.ti.horizontalSyncPulse = tp->hsw;
-	hdmi.ti.verticalBackPorch = tp->vbp;
-	hdmi.ti.verticalFrontPorch = tp->vfp;
-	hdmi.ti.verticalSyncPulse = tp->vsw;
 	DSSDBG(KERN_INFO"hdmi read EDID:\n");
 	print_omap_video_timings(tp);
 	return r;

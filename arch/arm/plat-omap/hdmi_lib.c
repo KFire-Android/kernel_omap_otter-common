@@ -1470,30 +1470,3 @@ int hdmi_w1_start_audio_transfer(u32 instanceName)
 	printk(KERN_INFO "Start audio transfer...\n");
 	return 0;
 }
-
-int DSS_HDMI_CONFIG(HDMI_Timing_t timings, u32 video_format,
-	u32 mode)
-{
-	int err;
-	struct hdmi_config data;
-
-	data.ppl = timings.pixelPerLine;
-	data.lpp = timings.linePerPanel;
-	data.pixel_clock = timings.pplclk;
-
-	data.hsw = timings.horizontalSyncPulse;
-	data.hfp = timings.horizontalFrontPorch;
-	data.hbp = timings.horizontalBackPorch;
-	data.vsw = timings.verticalSyncPulse;
-	data.vfp = timings.verticalFrontPorch;
-	data.vbp = timings.verticalBackPorch;
-
-	data.h_pol = 1;
-	data.v_pol = 1;
-	data.hdmi_dvi = mode;
-	data.video_format = video_format;
-
-	err = hdmi_lib_enable(&data);
-	return err;
-}
-
