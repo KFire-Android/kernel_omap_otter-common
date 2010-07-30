@@ -27,6 +27,7 @@
 #include <linux/jiffies.h>
 #include <linux/list.h>
 #include <linux/platform_device.h>
+#include <linux/slab.h>
 
 #include <plat/display.h>
 #include <plat/cpu.h>
@@ -705,3 +706,47 @@ void omap_dss_stop_device(struct omap_dss_device *dssdev)
 }
 EXPORT_SYMBOL(omap_dss_stop_device);
 
+/* since omap_dss_update_size can be called in irq context, schedule work from
+ * work-queue to deliver notification to client..
+ */
+struct update_size_work {
+	struct work_struct work;
+	struct omap_dss_device *dssdev;
+	int w, h;
+};
+
+static void update_size_worker(struct work_struct *work)
+{
+	struct update_size_work *usw =
+		container_of(work, struct update_size_work, work);
+	if (usw->dssdev->size_notify) {
+		usw->dssdev->size_notify(usw->dssdev->size_notify_arg, usw->w, usw->h);
+	}
+	kfree(work);
+}
+
+/**
+ * Called by lower level driver to notify about a change in resolution, for
+ * example in response to a hot-plug event..
+ */
+void omap_dss_update_size(struct omap_dss_device *dssdev, int w, int h)
+{
+	struct update_size_work *usw =
+			kmalloc(sizeof(struct update_size_work), GFP_KERNEL);
+	if (usw) {
+		INIT_WORK(&usw->work, update_size_worker);
+		usw->dssdev = dssdev;
+		usw->w = w;
+		usw->h = h;
+		schedule_work(&usw->work);
+	}
+}
+EXPORT_SYMBOL(omap_dss_update_size);
+
+void omap_dss_set_size_notify(struct omap_dss_device *dssdev,
+		void (*notify)(void *arg, int w, int h), void *arg)
+{
+	dssdev->size_notify_arg = arg;
+	dssdev->size_notify = notify;
+}
+EXPORT_SYMBOL(omap_dss_set_size_notify);

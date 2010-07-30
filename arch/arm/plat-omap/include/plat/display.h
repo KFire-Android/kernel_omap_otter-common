@@ -587,6 +587,10 @@ struct omap_dss_device {
 	enum omap_dss_display_state state;
 	enum omap_channel channel;
 
+	/* callbacks to notify dssdev client */
+	void *size_notify_arg;
+	void (*size_notify)(void *arg, int w, int h);
+
 	/* platform specific  */
 	int (*platform_enable)(struct omap_dss_device *dssdev);
 	void (*platform_disable)(struct omap_dss_device *dssdev);
@@ -667,6 +671,9 @@ struct omap_dss_device *omap_dss_find_device(void *data,
 
 int omap_dss_start_device(struct omap_dss_device *dssdev);
 void omap_dss_stop_device(struct omap_dss_device *dssdev);
+
+void omap_dss_update_size(struct omap_dss_device *dssdev, int w, int h);
+void omap_dss_set_size_notify(struct omap_dss_device *dssdev, void (*notify)(void *arg, int w, int h), void *arg);
 
 int omap_dss_get_num_overlay_managers(void);
 struct omap_overlay_manager *omap_dss_get_overlay_manager(int num);

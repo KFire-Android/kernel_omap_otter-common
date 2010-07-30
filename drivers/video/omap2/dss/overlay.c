@@ -40,6 +40,7 @@
 
 static int num_overlays;
 static struct list_head overlay_list;
+static struct omap_overlay *dispc_overlays[4];
 
 static ssize_t overlay_name_show(struct omap_overlay *ovl, char *buf)
 {
@@ -554,12 +555,8 @@ EXPORT_SYMBOL(omap_dss_get_num_overlays);
 
 struct omap_overlay *omap_dss_get_overlay(int num)
 {
-	int i = 0;
-	struct omap_overlay *ovl;
-
-	list_for_each_entry(ovl, &overlay_list, list) {
-		if (i++ == num)
-			return ovl;
+	if (num < num_overlays) {
+		return dispc_overlays[num];
 	}
 
 	return NULL;
@@ -571,8 +568,6 @@ static void omap_dss_add_overlay(struct omap_overlay *overlay)
 	++num_overlays;
 	list_add_tail(&overlay->list, &overlay_list);
 }
-
-static struct omap_overlay *dispc_overlays[4];
 
 void dss_overlay_setup_dispc_manager(struct omap_overlay_manager *mgr)
 {
