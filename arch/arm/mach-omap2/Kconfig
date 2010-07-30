@@ -166,6 +166,7 @@ config MACH_OMAP_4430SDP
 	depends on ARCH_OMAP4
 	select HIGHMEM
 	select TWL6030_PWM
+	select TWL6030_GPADC
 	select NEW_LEDS
 	select LEDS_CLASS
 	select LEDS_PWM
