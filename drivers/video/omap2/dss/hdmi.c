@@ -69,7 +69,7 @@ static void hdmi_power_off(struct omap_dss_device *dssdev);
 
 u16 current_descriptor_addrs;
 u8		edid[HDMI_EDID_MAX_LENGTH] = {0};
-u8		edid_set = 0;
+u8		edid_set = false;
 u8		header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
 u8 hpd_mode = 0, custom_set = 0;
 /* PLL */
@@ -494,6 +494,23 @@ static int hdmi_phy_off(u32 name)
 }
 
 /* driver */
+static int get_timings_index(void)
+{
+	int code;
+
+	if (hdmi.mode == 0)
+		code = code_vesa[hdmi.code];
+	else
+		code = code_cea[hdmi.code];
+
+	if (code == -1)	{
+		code = 9;
+		hdmi.code = 16;
+		hdmi.mode = 1;
+	}
+	return code;
+}
+
 static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 {
 	int code;
@@ -502,19 +519,13 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 	dssdev->panel.config = OMAP_DSS_LCD_TFT |
 			OMAP_DSS_LCD_IVS | OMAP_DSS_LCD_IHS;
 
-	if	(hdmi.mode == 0)
-		code = code_vesa[hdmi.code];
-	else
-		code = code_cea[hdmi.code];
-	if (code == -1)	{
-		code = 9;
-		hdmi.code = 16;
-		hdmi.mode = 1;
-	}
+	code = get_timings_index();
 
 	dssdev->panel.timings = all_timings_direct[code];
 	printk("hdmi_panel_probe x_res= %d y_res = %d", \
 		dssdev->panel.timings.x_res, dssdev->panel.timings.y_res);
+
+	mdelay(50);
 
 	return 0;
 }
@@ -622,37 +633,37 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 {
 	int r = 0;
 	int code = 0;
+	int dirty = false;
 	struct omap_video_timings *p;
 	struct hdmi_pll_info pll_data;
 
 	int clkin, n, phy;
-
-	if (hdmi.mode == 0)
-		code = code_vesa[hdmi.code];
-	else
-		code = code_cea[hdmi.code];
-	if (code == -1)	{
-		code = 9;
-		hdmi.code = 16;
-		hdmi.mode = 1;
-	}
-
-	dssdev->panel.timings = all_timings_direct[code];
 
 	hdmi_enable_clocks(1);
 
 	p = &dssdev->panel.timings;
 
 	if (!custom_set) {
+
+		code = get_timings_index();
+
 		DSSDBG("No edid set thus will be calling hdmi_read_edid");
 		r = hdmi_read_edid(p);
 		if (r) {
 			r = -EIO;
 			goto err;
 		}
+		if (get_timings_index() != code) {
+			dirty = true;
+		}
+	} else {
+		dirty = true;
 	}
 
 	update_cfg(&hdmi.cfg, p);
+
+	code = get_timings_index();
+	dssdev->panel.timings = all_timings_direct[code];
 
 	DSSDBG("hdmi_power on x_res= %d y_res = %d", \
 		dssdev->panel.timings.x_res, dssdev->panel.timings.y_res);
@@ -776,7 +787,7 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	if (dssdev->platform_disable)
 		dssdev->platform_disable(dssdev);
 
-	edid_set = 0;
+	edid_set = false;
 	hdmi_enable_clocks(0);
 
 	/* reset to default */
@@ -1175,40 +1186,34 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 {
 	int r = 0, i = 0 , flag = 0 , ret, code;
 
-	struct omap_video_timings *tp;
-
 	memset(edid, 0, HDMI_EDID_MAX_LENGTH);
-	tp = dp;
 
-	if (edid_set != 1) {
+	if (!edid_set) {
 		ret = HDMI_CORE_DDC_READEDID(HDMI_CORE_SYS, edid);
 	}
-	if (ret != 0) {
+	if (ret != 0)
 		printk(KERN_WARNING "HDMI failed to read E-EDID\n");
-			hdmi.code = 4; /*setting default value of 640 480 VGA*/
-			hdmi.mode = 0;
-			code = code_vesa[hdmi.code];
-			edid_timings = all_timings_direct[code];
-
-	} else {
-		for (i = 0x00; i < 0x08; i++) {
-			if (edid[i] == header[i])
-				continue;
-			else {
-			flag = 1;
-			break;
-			}
+	else {
+		if (!memcmp(edid, header, sizeof(header))) {
+			/* search for timings of default resolution */
+			if (get_edid_timing_data(edid))
+				edid_set = true;
 		}
-		if (flag == 0)
-			edid_set = 1;
-		/* search for timings of default resolution */
-		 get_edid_timing_data(edid);
 
 	}
-	tp = &edid_timings;
-	*dp = edid_timings;
+
+	if (!edid_set) {
+		DSSDBG("fallback to VGA\n");
+		hdmi.code = 4; /*setting default value of 640 480 VGA*/
+		hdmi.mode = 0;
+	}
+	code = get_timings_index();
+
+	*dp = all_timings_direct[code];
+
 	DSSDBG(KERN_INFO"hdmi read EDID:\n");
-	print_omap_video_timings(tp);
+	print_omap_video_timings(dp);
+
 	return r;
 }
 
