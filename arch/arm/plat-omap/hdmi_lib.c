@@ -439,39 +439,39 @@ int hdmi_core_ddc_edid(u8 *pEDID)
 		edid_backup[i] = pEDID[i];
 
 #ifdef DEBUG_EDID
-	DBG("Header:\n");
+	DBG("\nHeader:");
 	for (i = 0x00; i < 0x08; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("Vendor & Product:\n");
+		DBG(" %02x", pEDID[i]);
+	DBG("\nVendor & Product:");
 	for (i = 0x08; i < 0x12; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("EDID Structure:\n");
+		DBG(" %02x", pEDID[i]);
+	DBG("\nEDID Structure:");
 	for (i = 0x12; i < 0x14; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("Basic Display Parameter:\n");
+		DBG(" %02x", pEDID[i]);
+	DBG("\nBasic Display Parameter:");
 	for (i = 0x14; i < 0x19; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("Color Characteristics:\n");
+		DBG(" %02x", pEDID[i]);
+	DBG("\nColor Characteristics:");
 	for (i = 0x19; i < 0x23; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("Established timings:\n");
+		DBG(" %02x", pEDID[i]);
+	DBG("\nEstablished timings:");
 	for (i = 0x23; i < 0x26; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("Standart timings:\n");
+		DBG(" %02x", pEDID[i]);
+	DBG("Standard timings:\n");
 	for (i = 0x26; i < 0x36; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("Detailed timing1:\n");
+		DBG("\n%02x", pEDID[i]);
+	DBG("\nDetailed timing1:");
 	for (i = 0x36; i < 0x48; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("Detailed timing2:\n");
+		DBG("\n%02x", pEDID[i]);
+	DBG("\nDetailed timing2:");
 	for (i = 0x48; i < 0x5a; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("Detailed timing3:\n");
+		DBG("\n%02x", pEDID[i]);
+	DBG("\nDetailed timing3:");
 	for (i = 0x5a; i < 0x6c; i++)
-		DBG("%02x\n", pEDID[i]);
-	DBG("Detailed timing4:\n");
+		DBG(" %02x", pEDID[i]);
+	DBG("\nDetailed timing4:");
 	for (i = 0x6c; i < 0x7e; i++)
-		DBG("%02x\n", pEDID[i]);
+		DBG(" %02x", pEDID[i]);
 #endif
 	if (checksum != 0) {
 		printk("E-EDID checksum failed!!");

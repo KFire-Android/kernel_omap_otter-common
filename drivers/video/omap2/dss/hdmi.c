@@ -211,6 +211,23 @@ struct hdmi_pll_info {
 	u16 dcofreq;
 };
 
+static inline void print_omap_video_timings(struct omap_video_timings *timings)
+{
+	extern unsigned int dss_debug;
+	if (dss_debug) {
+		printk(KERN_DEBUG "Timing Info:\n");
+		printk(KERN_DEBUG "  pixel_clk = %d\n", timings->pixel_clock);
+		printk(KERN_DEBUG "  x_res     = %d\n", timings->x_res);
+		printk(KERN_DEBUG "  y_res     = %d\n", timings->y_res);
+		printk(KERN_DEBUG "  hfp       = %d\n", timings->hfp);
+		printk(KERN_DEBUG "  hsw       = %d\n", timings->hsw);
+		printk(KERN_DEBUG "  hbp       = %d\n", timings->hbp);
+		printk(KERN_DEBUG "  vfp       = %d\n", timings->vfp);
+		printk(KERN_DEBUG "  vsw       = %d\n", timings->vsw);
+		printk(KERN_DEBUG "  vbp       = %d\n", timings->vbp);
+	}
+}
+
 static void compute_pll(int clkin, int phy,
 	int n, struct hdmi_pll_info *pi)
 {
@@ -972,28 +989,9 @@ static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
 					cm.mode = 1;
 				else
 					cm.mode = 0;
-				printk(KERN_INFO "Hdmi_code = %d mode = %d ",\
-					cm.code, cm.mode);
-				printk(KERN_INFO "Timing Info "
-					"pixel_clk		= %d\n"
-					"Xresolution		=%d\n"
-					"yresolution		=%d\n"
-					"hfp			= %d\n"
-					"hsw			= %d\n"
-					"hbp			= %d\n"
-					"vfp			= %d\n"
-					"vsw			= %d\n"
-					"vbp			= %d\n",
-					temp.pixel_clock,
-					temp.x_res,
-					temp.y_res,
-					temp.hfp,
-					temp.hsw,
-					temp.hbp,
-					temp.vfp,
-					temp.vsw,
-					temp.vbp);
-					break;
+				DSSDBG("Hdmi_code = %d mode = %d\n", cm.code, cm.mode);
+				print_omap_video_timings(&temp);
+				break;
 			 }
 		}
 
@@ -1179,23 +1177,8 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 	hdmi.ti.verticalBackPorch = tp->vbp;
 	hdmi.ti.verticalFrontPorch = tp->vfp;
 	hdmi.ti.verticalSyncPulse = tp->vsw;
-	DSSDBG(KERN_INFO"hdmi read EDID "
-			"Xresolution		=%d\n"
-			"yresolution		=%d\n"
-			"hfp			= %d\n"
-			"hsw			= %d\n"
-			"hbp			= %d\n"
-			"vfp			= %d\n"
-			"vsw			= %d\n"
-			"vbp			= %d\n",
-		hdmi.ti.pixelPerLine,
-		hdmi.ti.linePerPanel,
-		hdmi.ti.horizontalFrontPorch,
-		hdmi.ti.horizontalSyncPulse,
-		hdmi.ti.horizontalBackPorch,
-		hdmi.ti.verticalFrontPorch,
-		hdmi.ti.verticalSyncPulse,
-		hdmi.ti.verticalBackPorch);
+	DSSDBG(KERN_INFO"hdmi read EDID:\n");
+	print_omap_video_timings(tp);
 	return r;
 }
 
@@ -1235,26 +1218,7 @@ void get_horz_vert_timing_info(int current_descriptor_addrs, u8 *edid , struct o
 				      edid[current_descriptor_addrs + 6]) -
 		(timings->vfp + timings->vsw);
 
-	DSSDBG(KERN_INFO
-			"Xresolution		=%d\n"
-			"yresolution		=%d\n"
-			"pixel_clk		= %d\n"
-			"hfp			= %d\n"
-			"hsw			= %d\n"
-			"hbp			= %d\n"
-			"vfp			= %d\n"
-			"vsw			= %d\n"
-			"vbp			= %d\n",
-		timings->x_res,
-		timings->y_res,
-		timings->pixel_clock,
-		timings->hfp,
-		timings->hsw,
-		timings->hbp,
-		timings->vfp,
-		timings->vsw,
-		timings->vbp);
-
+	print_omap_video_timings(timings);
 }
 
 /*------------------------------------------------------------------------------
