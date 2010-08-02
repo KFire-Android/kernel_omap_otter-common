@@ -140,7 +140,7 @@ static void finish_reset(struct uhci_hcd *uhci)
 	uhci->rh_state = UHCI_RH_RESET;
 	uhci->is_stopped = UHCI_IS_STOPPED;
 	uhci_to_hcd(uhci)->state = HC_STATE_HALT;
-	uhci_to_hcd(uhci)->poll_rh = 0;
+	clear_bit(HCD_FLAG_POLL_RH, &uhci_to_hcd(uhci)->flags);
 
 	uhci->dead = 0;		/* Full reset resurrects the controller */
 }
@@ -176,6 +176,8 @@ static void check_and_reset_hc(struct uhci_hcd *uhci)
  */
 static void configure_hc(struct uhci_hcd *uhci)
 {
+	struct pci_dev *pdev = to_pci_dev(uhci_dev(uhci));
+
 	/* Set the frame length to the default: 1 ms exactly */
 	outb(USBSOF_DEFAULT, uhci->io_addr + USBSOF);
 
@@ -191,8 +193,11 @@ static void configure_hc(struct uhci_hcd *uhci)
 	mb();
 
 	/* Enable PIRQ */
-	pci_write_config_word(to_pci_dev(uhci_dev(uhci)), USBLEGSUP,
-			USBLEGSUP_DEFAULT);
+	pci_write_config_word(pdev, USBLEGSUP, USBLEGSUP_DEFAULT);
+
+	/* Disable platform-specific non-PME# wakeup */
+	if (pdev->vendor == PCI_VENDOR_ID_INTEL)
+		pci_write_config_byte(pdev, USBRES_INTEL, 0);
 }
 
 
@@ -344,7 +349,10 @@ __acquires(uhci->lock)
 	/* If interrupts don't work and remote wakeup is enabled then
 	 * the suspended root hub needs to be polled.
 	 */
-	uhci_to_hcd(uhci)->poll_rh = (!int_enable && wakeup_enable);
+	if (!int_enable && wakeup_enable)
+		set_bit(HCD_FLAG_POLL_RH, &uhci_to_hcd(uhci)->flags);
+	else
+		clear_bit(HCD_FLAG_POLL_RH, &uhci_to_hcd(uhci)->flags);
 
 	uhci_scan_schedule(uhci);
 	uhci_fsbr_off(uhci);
@@ -363,7 +371,7 @@ static void start_rh(struct uhci_hcd *uhci)
 			uhci->io_addr + USBINTR);
 	mb();
 	uhci->rh_state = UHCI_RH_RUNNING;
-	uhci_to_hcd(uhci)->poll_rh = 1;
+	set_bit(HCD_FLAG_POLL_RH, &uhci_to_hcd(uhci)->flags);
 }
 
 static void wakeup_rh(struct uhci_hcd *uhci)
@@ -691,7 +699,9 @@ static int uhci_start(struct usb_hcd *hcd)
 
 	configure_hc(uhci);
 	uhci->is_initialized = 1;
+	spin_lock_irq(&uhci->lock);
 	start_rh(uhci);
+	spin_unlock_irq(&uhci->lock);
 	return 0;
 
 /*
@@ -731,7 +741,7 @@ static void uhci_stop(struct usb_hcd *hcd)
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 
 	spin_lock_irq(&uhci->lock);
-	if (test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags) && !uhci->dead)
+	if (HCD_HW_ACCESSIBLE(hcd) && !uhci->dead)
 		uhci_hc_died(uhci);
 	uhci_scan_schedule(uhci);
 	spin_unlock_irq(&uhci->lock);
@@ -748,7 +758,7 @@ static int uhci_rh_suspend(struct usb_hcd *hcd)
 	int rc = 0;
 
 	spin_lock_irq(&uhci->lock);
-	if (!test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags))
+	if (!HCD_HW_ACCESSIBLE(hcd))
 		rc = -ESHUTDOWN;
 	else if (uhci->dead)
 		;		/* Dead controllers tell no tales */
@@ -775,7 +785,7 @@ static int uhci_rh_resume(struct usb_hcd *hcd)
 	int rc = 0;
 
 	spin_lock_irq(&uhci->lock);
-	if (!test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags))
+	if (!HCD_HW_ACCESSIBLE(hcd))
 		rc = -ESHUTDOWN;
 	else if (!uhci->dead)
 		wakeup_rh(uhci);
@@ -783,15 +793,16 @@ static int uhci_rh_resume(struct usb_hcd *hcd)
 	return rc;
 }
 
-static int uhci_pci_suspend(struct usb_hcd *hcd)
+static int uhci_pci_suspend(struct usb_hcd *hcd, bool do_wakeup)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
+	struct pci_dev *pdev = to_pci_dev(uhci_dev(uhci));
 	int rc = 0;
 
 	dev_dbg(uhci_dev(uhci), "%s\n", __func__);
 
 	spin_lock_irq(&uhci->lock);
-	if (!test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags) || uhci->dead)
+	if (!HCD_HW_ACCESSIBLE(hcd) || uhci->dead)
 		goto done_okay;		/* Already suspended or dead */
 
 	if (uhci->rh_state > UHCI_RH_SUSPENDED) {
@@ -803,11 +814,15 @@ static int uhci_pci_suspend(struct usb_hcd *hcd)
 	/* All PCI host controllers are required to disable IRQ generation
 	 * at the source, so we must turn off PIRQ.
 	 */
-	pci_write_config_word(to_pci_dev(uhci_dev(uhci)), USBLEGSUP, 0);
-	mb();
-	hcd->poll_rh = 0;
+	pci_write_config_word(pdev, USBLEGSUP, 0);
+	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);
 
-	/* FIXME: Enable non-PME# remote wakeup? */
+	/* Enable platform-specific non-PME# wakeup */
+	if (do_wakeup) {
+		if (pdev->vendor == PCI_VENDOR_ID_INTEL)
+			pci_write_config_byte(pdev, USBRES_INTEL,
+					USBPORT1EN | USBPORT2EN);
+	}
 
 done_okay:
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
@@ -826,15 +841,12 @@ static int uhci_pci_resume(struct usb_hcd *hcd, bool hibernated)
 	 * even if the controller was dead.
 	 */
 	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-	mb();
 
 	spin_lock_irq(&uhci->lock);
 
 	/* Make sure resume from hibernation re-enumerates everything */
 	if (hibernated)
 		uhci_hc_died(uhci);
-
-	/* FIXME: Disable non-PME# remote wakeup? */
 
 	/* The firmware or a boot kernel may have changed the controller
 	 * settings during a system wakeup.  Check it and reconfigure
@@ -845,22 +857,20 @@ static int uhci_pci_resume(struct usb_hcd *hcd, bool hibernated)
 	/* If the controller was dead before, it's back alive now */
 	configure_hc(uhci);
 
-	if (uhci->rh_state == UHCI_RH_RESET) {
-
-		/* The controller had to be reset */
+	/* Tell the core if the controller had to be reset */
+	if (uhci->rh_state == UHCI_RH_RESET)
 		usb_root_hub_lost_power(hcd->self.root_hub);
-		suspend_rh(uhci, UHCI_RH_SUSPENDED);
-	}
 
 	spin_unlock_irq(&uhci->lock);
 
 	/* If interrupts don't work and remote wakeup is enabled then
 	 * the suspended root hub needs to be polled.
 	 */
-	if (!uhci->RD_enable && hcd->self.root_hub->do_remote_wakeup) {
-		hcd->poll_rh = 1;
-		usb_hcd_poll_rh_status(hcd);
-	}
+	if (!uhci->RD_enable && hcd->self.root_hub->do_remote_wakeup)
+		set_bit(HCD_FLAG_POLL_RH, &hcd->flags);
+
+	/* Does the root hub have a port wakeup pending? */
+	usb_hcd_poll_rh_status(hcd);
 	return 0;
 }
 #endif

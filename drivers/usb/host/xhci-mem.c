@@ -1112,8 +1112,18 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 	ep_ctx = xhci_get_ep_ctx(xhci, virt_dev->in_ctx, ep_index);
 
 	/* Set up the endpoint ring */
-	virt_dev->eps[ep_index].new_ring =
-		xhci_ring_alloc(xhci, 1, true, mem_flags);
+	/*
+	 * Isochronous endpoint ring needs bigger size because one isoc URB
+	 * carries multiple packets and it will insert multiple tds to the
+	 * ring.
+	 * This should be replaced with dynamic ring resizing in the future.
+	 */
+	if (usb_endpoint_xfer_isoc(&ep->desc))
+		virt_dev->eps[ep_index].new_ring =
+			xhci_ring_alloc(xhci, 8, true, mem_flags);
+	else
+		virt_dev->eps[ep_index].new_ring =
+			xhci_ring_alloc(xhci, 1, true, mem_flags);
 	if (!virt_dev->eps[ep_index].new_ring) {
 		/* Attempt to use the ring cache */
 		if (virt_dev->num_rings_cached == 0)
@@ -1124,6 +1134,7 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 		virt_dev->num_rings_cached--;
 		xhci_reinit_cached_ring(xhci, virt_dev->eps[ep_index].new_ring);
 	}
+	virt_dev->eps[ep_index].skip = false;
 	ep_ring = virt_dev->eps[ep_index].new_ring;
 	ep_ctx->deq = ep_ring->first_seg->dma | ep_ring->cycle_state;
 
@@ -1389,6 +1400,22 @@ struct xhci_command *xhci_alloc_command(struct xhci_hcd *xhci,
 	return command;
 }
 
+void xhci_urb_free_priv(struct xhci_hcd *xhci, struct urb_priv *urb_priv)
+{
+	int last;
+
+	if (!urb_priv)
+		return;
+
+	last = urb_priv->length - 1;
+	if (last >= 0) {
+		int	i;
+		for (i = 0; i <= last; i++)
+			kfree(urb_priv->td[i]);
+	}
+	kfree(urb_priv);
+}
+
 void xhci_free_command(struct xhci_hcd *xhci,
 		struct xhci_command *command)
 {
@@ -1588,7 +1615,7 @@ static int xhci_check_trb_in_td_math(struct xhci_hcd *xhci, gfp_t mem_flags)
 	unsigned int num_tests;
 	int i, ret;
 
-	num_tests = sizeof(simple_test_vector) / sizeof(simple_test_vector[0]);
+	num_tests = ARRAY_SIZE(simple_test_vector);
 	for (i = 0; i < num_tests; i++) {
 		ret = xhci_test_trb_in_td(xhci,
 				xhci->event_ring->first_seg,
@@ -1601,7 +1628,7 @@ static int xhci_check_trb_in_td_math(struct xhci_hcd *xhci, gfp_t mem_flags)
 			return ret;
 	}
 
-	num_tests = sizeof(complex_test_vector) / sizeof(complex_test_vector[0]);
+	num_tests = ARRAY_SIZE(complex_test_vector);
 	for (i = 0; i < num_tests; i++) {
 		ret = xhci_test_trb_in_td(xhci,
 				complex_test_vector[i].input_seg,
