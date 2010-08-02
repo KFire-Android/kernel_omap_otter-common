@@ -156,6 +156,8 @@ struct omap_vout_device {
 	enum v4l2_buf_type type;
 	struct videobuf_queue vbq;
 	int io_allowed;
-
+	/* writeback variables*/
+	bool wb_enabled;
+	bool buf_empty;
 };
 #endif	/* ifndef OMAP_VOUTDEF_H */
