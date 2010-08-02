@@ -22,9 +22,15 @@
 #define RGB_VRFB_BPP    1
 #define MAX_CID		3
 #define MAC_VRFB_CTXS	4
+#ifdef CONFIG_ARCH_OMAP4
+#define MAX_VOUT_DEV	3
+#define MAX_OVLS	4
+#define MAX_DISPLAYS	4
+#else
 #define MAX_VOUT_DEV	2
 #define MAX_OVLS	3
 #define MAX_DISPLAYS	3
+#endif
 #define MAX_MANAGERS	3
 
 /* Enum for Rotation
