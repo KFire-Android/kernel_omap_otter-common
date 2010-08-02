@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35-rc5
-# Mon Aug  2 15:19:33 2010
+# Mon Aug  2 15:23:48 2010
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -1097,7 +1097,7 @@ CONFIG_FB_OMAP2_NUM_FBS=2
 # CONFIG_PANEL_GENERIC is not set
 # CONFIG_PANEL_SHARP_LS037V7DW01 is not set
 # CONFIG_PANEL_SHARP_LQ043T1DG01 is not set
-# CONFIG_PANEL_PICO_DLP is not set
+CONFIG_PANEL_PICO_DLP=y
 CONFIG_PANEL_TAAL=y
 # CONFIG_PANEL_TOPPOLY_TDO35S is not set
 # CONFIG_PANEL_TPO_TD043MTEA1 is not set
