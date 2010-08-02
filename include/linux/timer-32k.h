@@ -16,6 +16,11 @@
 #define OMAP_32K_READRAW    _IOWR('t', 1, uint32_t)
 
 #ifndef __KERNEL__
+
+#include <stdint.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+
 static inline uint32_t __omap_32k_call(int nr)
 {
 	static int fd;
