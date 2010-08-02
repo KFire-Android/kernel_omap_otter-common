@@ -2218,8 +2218,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 		/* Assuming Nothing was given by board, Core use's 1-Bit */
 	default:
 		/* Completely unexpected.. Core goes with 1-Bit Width */
-		dev_crit(mmc_dev(host->name), "Invalid width %d\n used!"
-			"using 1 instead\n", mmc_slot(host).wired);
+		dev_crit(mmc_dev(host->mmc), "Invalid width %d\n used!"
+			"using 1 instead\n", mmc_slot(host).wires);
 	}
 
 	if (mmc_slot(host).nonremovable)
@@ -2390,7 +2390,6 @@ static int omap_hsmmc_suspend(struct device *dev)
 	int ret = 0;
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_hsmmc_host *host = platform_get_drvdata(pdev);
-	pm_message_t state = PMSG_SUSPEND; /* unused by MMC core */
 
 	if (host && host->suspended)
 		return 0;
