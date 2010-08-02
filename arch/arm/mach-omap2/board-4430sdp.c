@@ -336,11 +336,31 @@ int dsi_set_backlight(struct omap_dss_device *dssdev, int level)
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, 0x03);
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, 0x04);
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, 0x92);
+	if (dssdev->channel == OMAP_DSS_CHANNEL_LCD) {
+		mdelay(500);
+		gpio_set_value(102, 1);
+		mdelay(500);
+		gpio_set_value(102, 0);
+		mdelay(500);
+		gpio_set_value(102, 1);
 
-	mdelay(120);
-	gpio_set_value(27, 0);
-	mdelay(120);
-	gpio_set_value(27, 1);
+		mdelay(120);
+		gpio_set_value(27, 0);
+		mdelay(120);
+		gpio_set_value(27, 1);
+	}else{
+                mdelay(500);
+                gpio_set_value(104, 1);
+                mdelay(500);
+                gpio_set_value(104, 0);
+                mdelay(500);
+                gpio_set_value(104, 1);
+
+                mdelay(120);
+                gpio_set_value(59, 0);
+                mdelay(120);
+                gpio_set_value(59, 1);
+	}
 
 	return 0;
 }
@@ -352,6 +372,15 @@ static struct nokia_dsi_panel_data dsi_panel = {
 		.ext_te_gpio	= 101,
 		.use_esd_check	= false,
 		.set_backlight	= dsi_set_backlight,
+};
+
+static struct nokia_dsi_panel_data dsi2_panel = {
+                .name   = "taal2",
+                .reset_gpio     = 104,
+                .use_ext_te     = false,
+                .ext_te_gpio    = 103,
+                .use_esd_check  = false,
+                .set_backlight  = dsi_set_backlight,
 };
 
 static struct omap_dss_device sdp4430_lcd_device = {
@@ -379,8 +408,34 @@ static struct omap_dss_device sdp4430_lcd_device = {
 	.channel 		= OMAP_DSS_CHANNEL_LCD,
 };
 
+static struct omap_dss_device sdp4430_lcd2_device = {
+	.name                   = "lcd2",
+        .driver_name            = "taal2",
+        .type                   = OMAP_DISPLAY_TYPE_DSI,
+        .data                   = &dsi2_panel,
+        .phy.dsi                = {
+		.clk_lane       = 1,
+                .clk_pol        = 0,
+                .data1_lane     = 2,
+                .data1_pol      = 0,
+                .data2_lane     = 3,
+                .data2_pol      = 0,
+                .div            = {
+			.lck_div        = 1,
+                        .pck_div        = 4,
+                        .regm           = 175,
+                        .regn           = 19,
+                        .regm3          = 4,
+                        .regm4          = 4,
+                        .lp_clk_div     = 8,
+		},
+	},
+	.channel		= OMAP_DSS_CHANNEL_LCD2,
+};
+
 static struct omap_dss_device *sdp4430_dss_devices[] = {
 	&sdp4430_lcd_device,
+	&sdp4430_lcd2_device,
 	&sdp4430_proximity_device,
 	&sdp4430_leds_pwm,
 	&sdp4430_leds_gpio,
@@ -820,6 +875,12 @@ static void __init omap4_display_init(void)
 	gpio_direction_output(dsi_panel.reset_gpio, 0);
 	gpio_request(27, "dsi1_bl_gpio");
 	gpio_direction_output(27, 1);
+
+        gpio_request(dsi2_panel.reset_gpio, "dsi2_en_gpio");
+        gpio_direction_output(dsi2_panel.reset_gpio, 0);
+        gpio_request(59, "dsi2_bl_gpio");
+        gpio_direction_output(59, 1);
+
 }
 
 static void __init omap_4430sdp_init(void)
