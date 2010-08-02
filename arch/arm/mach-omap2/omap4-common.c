@@ -64,7 +64,10 @@ static int __init omap_l2_cache_init(void)
 	 * 32KB way size, 16-way associativity,
 	 * parity disabled
 	 */
-	l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
+	if (omap_rev() == OMAP4430_REV_ES2_0)
+		l2x0_init(l2cache_base, 0x0e070000, 0xc0000fff);
+	else
+		l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
 
 	return 0;
 }
