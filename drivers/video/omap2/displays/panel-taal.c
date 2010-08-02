@@ -66,6 +66,7 @@
 #define TAAL_ESD_CHECK_PERIOD	msecs_to_jiffies(5000)
 
 static irqreturn_t taal_te_isr(int irq, void *data);
+static irqreturn_t taal_te_isr2(int irq, void *data);
 static void taal_te_timeout_work_callback(struct work_struct *work);
 static int _taal_enable_te(struct omap_dss_device *dssdev, bool enable);
 static void te_work_callback(struct work_struct *work);
@@ -791,15 +792,20 @@ static int taal_probe(struct omap_dss_device *dssdev)
 
 	if (panel_data->use_ext_te || td->force_update) {
 		int gpio = panel_data->ext_te_gpio;
-		int val;
+		int val, regoffset = 0x90;
 		void __iomem *phymux_base = NULL;
+
 
 		if (cpu_is_omap44xx()) {
 			phymux_base = ioremap(0x4A100000, 0x1000);
-			val = __raw_readl(phymux_base + 0x90);
+
+			if (dssdev->channel == OMAP_DSS_CHANNEL_LCD2)
+				regoffset = 0x94;
+
+			val = __raw_readl(phymux_base + regoffset);
 			val = val & 0xFFFFFFE0;
 			val = val | 0x11B;
-			__raw_writel(val, phymux_base + 0x90);
+			__raw_writel(val, phymux_base + regoffset);
 		}
 
 		r = gpio_request(gpio, "taal irq");
@@ -810,10 +816,16 @@ static int taal_probe(struct omap_dss_device *dssdev)
 
 		gpio_direction_input(gpio);
 
-		r = request_irq(gpio_to_irq(gpio), taal_te_isr,
+		if (dssdev->channel == OMAP_DSS_CHANNEL_LCD) {
+			r = request_irq(gpio_to_irq(gpio), taal_te_isr,
 				IRQF_DISABLED | IRQF_TRIGGER_RISING,
 				"taal vsync", dssdev);
-
+		} else {
+			r = request_irq(gpio_to_irq(gpio), taal_te_isr2,
+				IRQF_DISABLED | IRQF_TRIGGER_RISING,
+				"taal vsync2", dssdev);
+			td->te_enabled = true;
+		}
 		if (r) {
 			dev_err(&dssdev->dev, "IRQ request failed\n");
 			gpio_free(gpio);
@@ -826,6 +838,7 @@ static int taal_probe(struct omap_dss_device *dssdev)
 			INIT_WORK(&td->te_framedone_work, te_work_callback);
 
 		dev_dbg(&dssdev->dev, "Using GPIO TE\n");
+		iounmap(phymux_base);
 	}
 
 	r = sysfs_create_group(&dssdev->dev.kobj, &taal_attr_group);
@@ -1170,9 +1183,6 @@ static irqreturn_t taal_te_isr(int irq, void *data)
 	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
 	int old;
 	int r;
-        enum omap_dsi_index ix;
-
-        ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
 	if (td->force_update) {
 		schedule_work(&td->te_framedone_work);
@@ -1197,8 +1207,42 @@ static irqreturn_t taal_te_isr(int irq, void *data)
 	return IRQ_HANDLED;
 err:
 	dev_err(&dssdev->dev, "start update failed\n");
-	dsi_bus_unlock(ix);
+	dsi_bus_unlock(DSI1);
 	return IRQ_HANDLED;
+}
+
+static irqreturn_t taal_te_isr2(int irq, void *data)
+{
+        struct omap_dss_device *dssdev = data;
+        struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+        int old;
+        int r;
+        
+	if (td->force_update) {
+                schedule_work(&td->te_framedone_work);
+                return IRQ_HANDLED;
+        }
+
+        old = atomic_cmpxchg(&td->do_update, 1, 0);
+
+        if (old) {
+                cancel_delayed_work(&td->te_timeout_work);
+
+                r = omap_dsi_update(dssdev, TCH,
+                                td->update_region.x,
+                                td->update_region.y,
+                                td->update_region.w,
+                                td->update_region.h,
+                                taal_framedone_cb, dssdev);
+                if (r)
+                        goto err;
+        }
+
+        return IRQ_HANDLED;
+err:
+        dev_err(&dssdev->dev, "start update failed\n");
+        dsi_bus_unlock(DSI2);
+        return IRQ_HANDLED;
 }
 
 static void taal_te_timeout_work_callback(struct work_struct *work)
