@@ -260,17 +260,19 @@ void dss_dump_regs(struct seq_file *s)
 #undef DUMPREG
 }
 
-void dss_select_dispc_clk_source(enum dss_clk_source clk_src)
+void dss_select_dispc_clk_source(enum omap_dsi_index ix,
+	enum dss_clk_source clk_src)
 {
 	int b;
 
 	BUG_ON(clk_src != DSS_SRC_DSI1_PLL_FCLK &&
 			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
 
-	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
+	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 :
+			(ix == DSI1 ? 1 : 2);
 
 	if (clk_src == DSS_SRC_DSI1_PLL_FCLK)
-		dsi_wait_dsi1_pll_active();
+		dsi_wait_dsi1_pll_active(ix);
 
 	if (!cpu_is_omap44xx()) {
 		REG_FLD_MOD(DSS_CONTROL, b, 0, 0);      /* DISPC_CLK_SWITCH */
@@ -292,7 +294,7 @@ void dss_select_dsi_clk_source(enum omap_dsi_index ix,
 	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
 
 	if (clk_src == DSS_SRC_DSI2_PLL_FCLK)
-		dsi_wait_dsi2_pll_active();
+		dsi_wait_dsi2_pll_active(ix);
 
 	if (ix == DSI1) {
 		REG_FLD_MOD(DSS_CONTROL, b, 1, 1);	/* DSI_CLK_SWITCH */

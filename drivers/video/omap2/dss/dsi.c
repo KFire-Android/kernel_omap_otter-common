@@ -3409,7 +3409,7 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	if (r)
 		goto err1;
 
-	dss_select_dispc_clk_source(DSS_SRC_DSI1_PLL_FCLK);
+	dss_select_dispc_clk_source(ix, DSS_SRC_DSI1_PLL_FCLK);
 	dss_select_dsi_clk_source(ix, DSS_SRC_DSI2_PLL_FCLK);
 
 	DSSDBG("PLL OK\n");
@@ -3451,7 +3451,7 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 err3:
 	dsi_complexio_uninit(ix);
 err2:
-	dss_select_dispc_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
+	dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 	dss_select_dsi_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 err1:
 	dsi_pll_uninit(ix);
@@ -3471,7 +3471,7 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev)
 	dsi_vc_enable(ix, 2, 0);
 	dsi_vc_enable(ix, 3, 0);
 
-	dss_select_dispc_clk_source(DSS_SRC_DSS1_ALWON_FCLK);
+	dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 	dss_select_dsi_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 	dsi_complexio_uninit(ix);
 	dsi_pll_uninit(ix);
@@ -3617,15 +3617,15 @@ int dsi_init_display(struct omap_dss_device *dssdev)
 	return 0;
 }
 
-void dsi_wait_dsi1_pll_active(void)
+void dsi_wait_dsi1_pll_active(enum omap_dsi_index ix)
 {
-	if (wait_for_bit_change(DSI1, DSI_PLL_STATUS, 7, 1) != 1)
+	if (wait_for_bit_change(ix, DSI_PLL_STATUS, 7, 1) != 1)
 		DSSERR("DSI1 PLL clock not active\n");
 }
 
-void dsi_wait_dsi2_pll_active(void)
+void dsi_wait_dsi2_pll_active(enum omap_dsi_index ix)
 {
-	if (wait_for_bit_change(DSI2, DSI_PLL_STATUS, 8, 1) != 1)
+	if (wait_for_bit_change(ix, DSI_PLL_STATUS, 8, 1) != 1)
 		DSSERR("DSI2 PLL clock not active\n");
 }
 

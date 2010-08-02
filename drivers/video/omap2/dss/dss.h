@@ -266,7 +266,8 @@ void dss_sdi_init(u8 datapairs);
 int dss_sdi_enable(void);
 void dss_sdi_disable(void);
 
-void dss_select_dispc_clk_source(enum dss_clk_source clk_src);
+void dss_select_dispc_clk_source(enum omap_dsi_index ix,
+		enum dss_clk_source clk_src);
 void dss_select_dsi_clk_source(enum omap_dsi_index ix,
 		enum dss_clk_source clk_src);
 enum dss_clk_source dss_get_dispc_clk_source(void);
@@ -329,8 +330,8 @@ void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
 		u32 *fifo_low, u32 *fifo_high);
 int dsi_calc_clock_rates(struct dsi_clock_info *cinfo);
-void dsi_wait_dsi1_pll_active(void);
-void dsi_wait_dsi2_pll_active(void);
+void dsi_wait_dsi1_pll_active(enum omap_dsi_index ix);
+void dsi_wait_dsi2_pll_active(enum omap_dsi_index ix);
 #else
 static inline int dsi_init(struct platform_device *pdev)
 {
