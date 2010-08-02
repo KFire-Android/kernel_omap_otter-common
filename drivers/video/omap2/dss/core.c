@@ -514,6 +514,10 @@ static int omap_dss_probe(struct platform_device *pdev)
 
 	dss_init_overlay_managers(pdev);
 	dss_init_overlays(pdev);
+
+	if (cpu_is_omap44xx())
+		dss_init_writeback(pdev); /*Write back init*/
+
 	if (!cpu_is_omap44xx())
 	r = dss_get_clocks();
 	if (r)

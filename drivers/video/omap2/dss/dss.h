@@ -20,6 +20,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <plat/display.h>
 #ifndef __OMAP2_DSS_H
 #define __OMAP2_DSS_H
 
@@ -167,6 +168,38 @@ struct dsi_clock_info {
 	bool use_dss2_fck;
 };
 
+/*TODO: Move this structure to manager.c*/
+struct writeback_cache_data {
+	/* If true, cache changed, but not written to shadow registers. Set
+	 * in apply(), cleared when registers written. */
+	bool dirty;
+	/* If true, shadow registers contain changed values not yet in real
+	 * registers. Set when writing to shadow registers, cleared at
+	 * VSYNC/EVSYNC */
+	bool shadow_dirty;
+
+	bool enabled;
+
+	u32 paddr;
+	u32 puv_addr; /* relevant for NV12 format only */
+
+	u16 width;
+	u16 height;
+	u16 input_width;
+	u16 input_height;
+
+	enum omap_color_mode 				color_mode;
+	enum omap_color_mode 				input_color_mode;
+	enum omap_writeback_capturemode 	capturemode;
+	enum omap_writeback_source_type 	source_type;
+	enum omap_writeback_source			source;
+
+	enum omap_burst_size 				burst_size;
+	u32 								fifo_low;
+	u32 								fifo_high;
+
+};
+
 struct seq_file;
 struct platform_device;
 
@@ -214,6 +247,9 @@ void dss_overlay_setup_dispc_manager(struct omap_overlay_manager *mgr);
 void dss_overlay_setup_l4_manager(struct omap_overlay_manager *mgr);
 #endif
 void dss_recheck_connections(struct omap_dss_device *dssdev, bool force);
+/* Write back */
+void dss_init_writeback(struct platform_device *pdev);
+bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId, int managerId);
 
 /* DSS */
 int dss_init(bool skip_init);
@@ -424,7 +460,8 @@ int dispc_set_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
 int dispc_get_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
-
+void dispc_go_wb(void);
+int dispc_setup_wb(struct writeback_cache_data *wb);
 
 /* VENC */
 #ifdef CONFIG_OMAP2_DSS_VENC
