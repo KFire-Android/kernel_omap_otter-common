@@ -180,7 +180,7 @@ enum {
 };
 
 struct pm_module_def {
-	char name[8]; /* Name of the module */
+	char name[16]; /* Name of the module */
 	short type; /* CM or PRM */
 	unsigned short offset;
 	int low; /* First register address on this module */
@@ -220,6 +220,55 @@ static const struct pm_module_def omap3_pm_reg_modules[] = {
 	{ "GLBL", MOD_PRM, OMAP3430_GR_MOD, 0x20, 0xe4 },
 	{ "NEON", MOD_PRM, OMAP3430_NEON_MOD, 0x58, 0xe8 },
 	{ "USB", MOD_PRM, OMAP3430ES2_USBHOST_MOD, 0x58, 0xe8 },
+	{ "", 0, 0, 0, 0 },
+};
+
+static const struct pm_module_def omap4_pm_reg_modules[] = {
+	{ "OCP_CM1", MOD_CM, OMAP4430_CM1_OCP_SOCKET_MOD, 0x0, 0x40 },
+	{ "CKGEN_CM1", MOD_CM, OMAP4430_CM1_CKGEN_MOD, 0x0, 0x180 },
+	{ "MPU", MOD_CM, OMAP4430_CM1_MPU_MOD, 0x0, 0x20 },
+	{ "TESLA", MOD_CM, OMAP4430_CM1_TESLA_MOD, 0x0, 0x20 },
+	{ "ABE", MOD_CM, OMAP4430_CM1_ABE_MOD, 0x0, 0x88 },
+	{ "RESTORE", MOD_CM, OMAP4430_CM1_RESTORE_MOD, 0x0, 0x40 },
+
+	{ "OCP_CM2", MOD_CM, OMAP4430_CM2_OCP_SOCKET_MOD, 0x0, 0x40 },
+	{ "CKGEN_CM2", MOD_CM, OMAP4430_CM2_CKGEN_MOD, 0x0, 0xec },
+	{ "ALWAYS_ON", MOD_CM, OMAP4430_CM2_ALWAYS_ON_MOD, 0x0, 0x40 },
+	{ "CORE", MOD_CM, OMAP4430_CM2_CORE_MOD, 0x0, 0x740 },
+	{ "IVAHD", MOD_CM, OMAP4430_CM2_IVAHD_MOD, 0x0, 0x28 },
+	{ "CAM", MOD_CM, OMAP4430_CM2_CAM_MOD, 0x0, 0x28 },
+	{ "DSS", MOD_CM, OMAP4430_CM2_DSS_MOD, 0x0, 0x28 },
+	{ "GFX", MOD_CM, OMAP4430_CM2_GFX_MOD, 0x0, 0x20 },
+	{ "L3INIT", MOD_CM, OMAP4430_CM2_L3INIT_MOD, 0x0, 0xe0 },
+	{ "L4PER", MOD_CM, OMAP4430_CM2_L4PER_MOD, 0x0, 0x1d8 },
+	{ "CEFUSE", MOD_CM, OMAP4430_CM2_CEFUSE_MOD, 0x0, 0x20 },
+	{ "RESTORE", MOD_CM, OMAP4430_CM2_RESTORE_MOD, 0x0, 0x5c },
+
+	{ "EMU_CM", MOD_CM, OMAP4430_PRM_EMU_CM_MOD, 0x0, 0x20 },
+	{ "WKUP_CM", MOD_CM, OMAP4430_PRM_WKUP_CM_MOD, 0x0, 0x88 },
+
+	{ "OCP", MOD_PRM, OMAP4430_PRM_OCP_SOCKET_MOD, 0x0, 0x40 },
+	{ "CKGEN", MOD_PRM, OMAP4430_PRM_CKGEN_MOD, 0x0, 0x10 },
+	{ "MPU", MOD_PRM, OMAP4430_PRM_MPU_MOD, 0x0, 0x24 },
+	{ "TESLA", MOD_PRM, OMAP4430_PRM_TESLA_MOD, 0x0, 0x24 },
+	{ "ABE", MOD_PRM, OMAP4430_PRM_ABE_MOD, 0x0, 0x8c },
+	{ "ALWAYS_ON", MOD_PRM, OMAP4430_PRM_ALWAYS_ON_MOD, 0x24, 0x3c },
+	{ "CORE", MOD_PRM, OMAP4430_PRM_CORE_MOD, 0x0, 0x744 },
+	{ "IVAHD", MOD_PRM, OMAP4430_PRM_IVAHD_MOD, 0x0, 0x2c },
+	{ "CAM", MOD_PRM, OMAP4430_PRM_CAM_MOD, 0x0, 0x2c },
+	{ "DSS", MOD_PRM, OMAP4430_PRM_DSS_MOD, 0x0, 0x2c },
+	{ "GFX", MOD_PRM, OMAP4430_PRM_GFX_MOD, 0x0, 0x24 },
+	{ "L3INIT", MOD_PRM, OMAP4430_PRM_L3INIT_MOD, 0x0, 0xe4 },
+	{ "L4PER", MOD_PRM, OMAP4430_PRM_L4PER_MOD, 0x0, 0x1dc },
+	{ "CEFUSE", MOD_PRM, OMAP4430_PRM_CEFUSE_MOD, 0x0, 0x24 },
+	{ "WKUP", MOD_PRM, OMAP4430_PRM_WKUP_MOD, 0x24, 0x84 },
+	{ "EMU", MOD_PRM, OMAP4430_PRM_EMU_MOD, 0x0, 0x24 },
+	{ "DEVICE", MOD_PRM, OMAP4430_PRM_DEVICE_MOD, 0x0, 0xf8 },
+
+	{ "MPU_OCP", MOD_PRM, OMAP4430_PRCM_MPU_OCP_SOCKET_PRCM_MOD, 0x0, 0x0 },
+	{ "MPU_DEVICE", MOD_PRM, OMAP4430_PRCM_MPU_DEVICE_PRM_MOD, 0x0, 0x4 },
+	{ "MPU_CPU0", MOD_PRM, OMAP4430_PRCM_MPU_CPU0_MOD, 0x0, 0x18 },
+	{ "MPU_CPU1", MOD_PRM, OMAP4430_PRCM_MPU_CPU1_MOD, 0x0, 0x18 },
 	{ "", 0, 0, 0, 0 },
 };
 
@@ -612,10 +661,10 @@ static int __init pm_dbg_init(void)
 
 	if (cpu_is_omap34xx())
 		pm_dbg_reg_modules = omap3_pm_reg_modules;
-	else if (!cpu_is_omap44xx()) {
+	else if (cpu_is_omap44xx())
+		pm_dbg_reg_modules = omap4_pm_reg_modules;
+	else
 		printk(KERN_ERR "%s: only OMAP3 supported\n", __func__);
-		return -ENODEV;
-	}
 
 	d = debugfs_create_dir("pm_debug", NULL);
 	if (IS_ERR(d))
