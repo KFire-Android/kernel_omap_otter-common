@@ -525,9 +525,6 @@ static struct omap_dss_device *sdp4430_dss_devices[] = {
 #ifdef CONFIG_PANEL_PICO_DLP
 	&sdp4430_picoDLP_device,
 #endif
-	&sdp4430_proximity_device,
-	&sdp4430_leds_pwm,
-	&sdp4430_leds_gpio,
 };
 
 static struct omap_dss_board_info sdp4430_dss_data = {
@@ -546,6 +543,9 @@ static struct platform_device sdp4430_dss_device = {
 
 static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_dss_device,
+	&sdp4430_proximity_device,
+	&sdp4430_leds_pwm,
+	&sdp4430_leds_gpio,
 };
 
 static struct omap_lcd_config sdp4430_lcd_config __initdata = {
