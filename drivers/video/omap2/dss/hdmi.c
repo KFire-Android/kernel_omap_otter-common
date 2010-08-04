@@ -223,6 +223,25 @@ static inline u32 hdmi_read_reg(u32 base, u16 idx)
 #define REG_FLD_MOD(b, i, v, s, e) \
 	hdmi_write_reg(b, i, FLD_MOD(hdmi_read_reg(b, i), v, s, e))
 
+
+
+static ssize_t hdmi_edid_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	memcpy(buf, edid, HDMI_EDID_MAX_LENGTH);
+	return HDMI_EDID_MAX_LENGTH;
+}
+
+static ssize_t hdmi_edid_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	return 0;
+}
+
+static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
+
+
 /*
  * refclk = (sys_clk/(highfreq+1))/(n+1)
  * so refclk = 38.4/2/(n+1) = 19.2/(n+1)
@@ -1182,6 +1201,14 @@ static int hdmi_check_timings(struct omap_dss_device *dssdev,
 int hdmi_init_display(struct omap_dss_device *dssdev)
 {
 	printk("init_display\n");
+
+	/* register HDMI specific sysfs files */
+	/* note: custom_edid_timing should perhaps be moved here too,
+	 * instead of generic code?  Or edid sysfs file should be moved
+	 * to generic code.. either way they should be in same place..
+	 */
+	if (device_create_file(&dssdev->dev, &dev_attr_edid))
+		DSSERR("failed to create sysfs file\n");
 
 	return 0;
 }
