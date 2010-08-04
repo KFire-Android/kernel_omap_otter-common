@@ -172,7 +172,6 @@ static void update_cfg (struct hdmi_config *cfg, struct omap_video_timings *timi
 	cfg->vfp = timings->vfp;
 	cfg->vsw = timings->vsw;
 	cfg->pixel_clock = timings->pixel_clock;
-	cfg->interlace = 0;  // XXX get this from EDID
 	cfg->v_pol = 1;      // XXX get this from EDID
 	cfg->h_pol = 1;      // XXX get this from EDID
 }
@@ -719,6 +718,19 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	hdmi.cfg.hdmi_dvi = hdmi.mode;
 	hdmi.cfg.video_format = hdmi.code;
+
+	if ((hdmi.mode)) {
+		switch (hdmi.code) {
+		case 20:
+		case 5:
+		case 6:
+		case 21:
+			hdmi.cfg.interlace = 1;
+		default:
+			hdmi.cfg.interlace = 0;
+		}
+	}
+
 	hdmi_lib_enable(&hdmi.cfg);
 
 	/* these settings are independent of overlays */
