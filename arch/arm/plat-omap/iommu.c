@@ -16,7 +16,6 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
-#include <linux/clk.h>
 #include <linux/platform_device.h>
 
 #include <asm/cacheflush.h>
@@ -261,9 +260,8 @@ int load_iotlb_entry(struct iommu *obj, struct iotlb_entry *e)
 	}
 
 	cr = iotlb_alloc_cr(obj, e);
-	if (IS_ERR(cr)) {
+	if (IS_ERR(cr))
 		return PTR_ERR(cr);
-	}
 
 	iotlb_load_cr(obj, cr);
 	kfree(cr);
@@ -433,22 +431,15 @@ EXPORT_SYMBOL_GPL(foreach_iommu_device);
  */
 static void flush_iopgd_range(u32 *first, u32 *last)
 {
-	/* FIXME: L2 cache should be taken care of if it exists */
-	do {
-		asm("mcr	p15, 0, %0, c7, c10, 1 @ flush_pgd"
-		    : : "r" (first));
-		first += L1_CACHE_BYTES / sizeof(*first);
-	} while (first <= last);
+	dmac_flush_range(first, last);
+	outer_flush_range(virt_to_phys(first), virt_to_phys(last));
 }
+
 
 static void flush_iopte_range(u32 *first, u32 *last)
 {
-	/* FIXME: L2 cache should be taken care of if it exists */
-	do {
-		asm("mcr	p15, 0, %0, c7, c10, 1 @ flush_pte"
-		    : : "r" (first));
-		first += L1_CACHE_BYTES / sizeof(*first);
-	} while (first <= last);
+	dmac_flush_range(first, last);
+	outer_flush_range(virt_to_phys(first), virt_to_phys(last));
 }
 
 static void iopte_free(u32 *iopte)
@@ -712,7 +703,7 @@ size_t iopgtable_clear_entry(struct iommu *obj, u32 da)
 }
 EXPORT_SYMBOL_GPL(iopgtable_clear_entry);
 
-static void iopgtable_clear_entry_all(struct iommu *obj)
+void iopgtable_clear_entry_all(struct iommu *obj)
 {
 	int i;
 
@@ -739,7 +730,7 @@ static void iopgtable_clear_entry_all(struct iommu *obj)
 
 	spin_unlock(&obj->page_table_lock);
 }
-
+EXPORT_SYMBOL_GPL(iopgtable_clear_entry_all);
 /*
  *	Device IOMMU generic operations
  */
@@ -814,6 +805,7 @@ struct iommu *iommu_get(const char *name)
 	if (!try_module_get(obj->owner))
 		goto err_module;
 
+	iommu_set_twl(obj, true);
 	mutex_unlock(&obj->iommu_lock);
 	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
 	return obj;
@@ -933,6 +925,7 @@ static void iopte_cachep_ctor(void *iopte)
 {
 	clean_dcache_area(iopte, IOPTE_TABLE_SIZE);
 }
+
 
 static int __init omap_iommu_init(void)
 {
