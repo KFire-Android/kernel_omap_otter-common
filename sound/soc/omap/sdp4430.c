@@ -21,6 +21,7 @@
 
 #include <linux/clk.h>
 #include <linux/platform_device.h>
+#include <linux/i2c.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
@@ -42,6 +43,27 @@
 #endif
 
 static int twl6040_power_mode;
+
+static struct i2c_client *tps61305_client;
+static struct i2c_board_info tps61305_hwmon_info = {
+        I2C_BOARD_INFO("tps61305", 0x33),
+};
+
+static int sdp4430_tps61305_configure(void)
+{
+	u8 data[2];
+
+	data[0] = 0x01;
+	data[1] = 0x60;
+	if (i2c_master_send(tps61305_client, data, 2) != 2)
+		printk(KERN_ERR "I2C write to TSP61305 failed\n");
+
+	data[0] = 0x02;
+	if (i2c_master_send(tps61305_client, data, 2) != 2)
+		printk(KERN_ERR "I2C write to TSP61305 failed\n");
+
+	return 0;
+}
 
 static int sdp4430_mcpdm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
@@ -559,6 +581,7 @@ static struct platform_device *sdp4430_snd_device;
 
 static int __init sdp4430_soc_init(void)
 {
+	struct i2c_adapter *adapter;
 	int ret;
 
 	if (!machine_is_omap_4430sdp()) {
@@ -581,6 +604,20 @@ static int __init sdp4430_soc_init(void)
 	if (ret)
 		goto err;
 
+        adapter = i2c_get_adapter(1);
+        if (!adapter) {
+                printk(KERN_ERR "can't get i2c adapter\n");
+                return -ENODEV;
+        }
+
+        tps61305_client = i2c_new_device(adapter, &tps61305_hwmon_info);
+        if (!tps61305_client) {
+                printk(KERN_ERR "can't add i2c device\n");
+                return -ENODEV;
+        }
+
+        sdp4430_tps61305_configure();
+
 	/* Codec starts in HP mode */
 	twl6040_power_mode = 1;
 
@@ -596,6 +633,7 @@ module_init(sdp4430_soc_init);
 static void __exit sdp4430_soc_exit(void)
 {
 	platform_device_unregister(sdp4430_snd_device);
+	i2c_unregister_device(tps61305_client);
 }
 module_exit(sdp4430_soc_exit);
 
