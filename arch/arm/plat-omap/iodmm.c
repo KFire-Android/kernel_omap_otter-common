@@ -58,7 +58,6 @@ struct dmm_map_object *add_mapping_info(struct iodmm_struct *obj,
 	pr_debug("%s: adding map info: va 0x%x virt 0x%x size 0x%x\n",
 						__func__, va,
 						da, size);
-
 	map_obj = kzalloc(sizeof(struct dmm_map_object), GFP_KERNEL);
 	if (!map_obj) {
 		pr_err("%s: kzalloc failed\n", __func__);
@@ -79,7 +78,6 @@ struct dmm_map_object *add_mapping_info(struct iodmm_struct *obj,
 	map_obj->size = size;
 	map_obj->num_usr_pgs = num_usr_pgs;
 	map_obj->gen_pool = gen_pool;
-
 	spin_lock(&obj->dmm_map_lock);
 	list_add(&map_obj->link, &obj->map_list);
 	spin_unlock(&obj->dmm_map_lock);
@@ -120,7 +118,8 @@ static void remove_mapping_information(struct iodmm_struct *obj,
 
 		if (!match_exact_map_obj(map_obj, da, size)) {
 			pr_debug("%s: match, deleting map info\n", __func__);
-			gen_pool_free(map_obj->gen_pool, da, size);
+			if (map_obj->gen_pool != POOL_NONE)
+				gen_pool_free(map_obj->gen_pool, da, size);
 			list_del(&map_obj->link);
 			kfree(map_obj->dma_info.sg);
 			kfree(map_obj->pages);
@@ -153,18 +152,18 @@ static struct dmm_map_object *find_containing_mapping(
 				struct iodmm_struct *obj,
 				u32 va, u32 size)
 {
-	struct dmm_map_object *map_obj;
+	struct dmm_map_object *map_obj, *temp_map;
 	pr_debug("%s: looking for va 0x%x size 0x%x\n", __func__,
 						va, size);
 
 	spin_lock(&obj->dmm_map_lock);
-	list_for_each_entry(map_obj, &obj->map_list, link) {
+	list_for_each_entry_safe(map_obj, temp_map, &obj->map_list, link) {
 		pr_debug("%s: candidate: va 0x%x virt 0x%x size 0x%x\n",
 						__func__,
 						map_obj->va,
 						map_obj->da,
 						map_obj->size);
-		if (match_containing_map_obj(map_obj, va, size)) {
+		if (!match_containing_map_obj(map_obj, va, map_obj->size)) {
 			pr_debug("%s: match!\n", __func__);
 			goto out;
 		}
@@ -620,24 +619,22 @@ int io_to_device_map(struct iommu *mmu, u32 io_addr, u32 da, u32 size,
  */
 int user_to_device_unmap(struct iommu *mmu, u32 da, unsigned size)
 {
-	unsigned i;
-	struct sg_table *sgt;
-	struct scatterlist *sg;
-	const unsigned max_sz = SG_MAX_SINGLE_ALLOC * PAGE_SIZE;
+	unsigned total = size;
+	unsigned start = da;
 
-	while (size) {
-		size -= min(max_sz, size);
-		sgt = iommu_vunmap(mmu, da);
-		if (!sgt)
-			return -EFAULT;
-
-		for_each_sg(sgt->sgl, sg, sgt->nents, i)
-			put_page(sg_page(sg));
-
-		sg_free_table(sgt);
-		kfree(sgt);
-		da += max_sz;
+	while (total > 0) {
+		size_t bytes;
+		bytes = iopgtable_clear_entry(mmu, start);
+		if (bytes == 0)
+			bytes = PAGE_SIZE;
+		else
+			dev_dbg(mmu->dev, "%s: unmap %08x(%x) %08x\n",
+				__func__, start, bytes);
+		BUG_ON(!IS_ALIGNED(bytes, PAGE_SIZE));
+		total -= bytes;
+		start += bytes;
 	}
+	BUG_ON(total);
 	return 0;
 }
 
@@ -652,27 +649,18 @@ int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 	u32 pa_align, da_align, size_align, tmp_addr;
 	int err;
 
-	if ((flags & IOVMF_DA_ANON) || (flags & IOVMF_DA_PHYS)) {
-		gen_pool = POOL_NONE;
-		found = true;
-	} else {
-		list_for_each_entry(pool, &iovmm_obj->mmap_pool, list) {
-			if (pool->pool_id == pool_id) {
-				gen_pool = pool->genpool;
-				found = true;
-				break;
-			}
+	list_for_each_entry(pool, &iovmm_obj->mmap_pool, list) {
+		if (pool->pool_id == pool_id) {
+			gen_pool = pool->genpool;
+			found = true;
+			break;
 		}
 	}
 	if (found == false) {
 		err = -EINVAL;
 		goto err;
 	}
-
-	if ((flags & IOVMF_DA_ANON) || (flags & IOVMF_DA_PHYS))
-		da_align = *da;
-	else
-		da_align = gen_pool_alloc(gen_pool, bytes);
+	da_align = gen_pool_alloc(gen_pool, bytes);
 
 	/* Calculate the page-aligned PA, VA and size */
 	pa_align = round_down((u32) va, PAGE_SIZE);
@@ -680,23 +668,20 @@ int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 
 	/* Mapped address = MSB of VA | LSB of PA */
 	tmp_addr = (da_align | ((u32) va & (PAGE_SIZE - 1)));
-
 	dmm_obj = add_mapping_info(obj, gen_pool, pa_align, tmp_addr,
 							size_align);
 	if (!dmm_obj)
 		goto err;
-
 	if (flags & IOVMF_DA_PHYS) {
-		err = phys_to_device_map(iovmm_obj->iommu, pa_align, da,
-						size_align, dmm_obj->pages);
+		err = phys_to_device_map(iovmm_obj->iommu, pa_align,
+					da, size_align, dmm_obj->pages);
 	} else if (flags & IOVMF_DA_ANON) {
-		err = io_to_device_map(iovmm_obj->iommu, pa_align, da,
-						size_align, dmm_obj->pages);
+		err = io_to_device_map(iovmm_obj->iommu, pa_align,
+					da, size_align, dmm_obj->pages);
 	} else {
-		err = user_to_device_map(iovmm_obj->iommu, pa_align, da_align,
-						size_align, dmm_obj->pages);
+		err = user_to_device_map(iovmm_obj->iommu, pa_align,
+					da_align, size_align, dmm_obj->pages);
 	}
-
 	if ((!err) && (flags & IOVMF_DA_USER))
 		*da = tmp_addr;
 
@@ -739,10 +724,10 @@ int user_un_map(struct iodmm_struct *obj, u32 map_addr)
 	* from dmm_map_list, so that mapped memory resource tracking
 	* remains uptodate
 	*/
-	remove_mapping_information(obj, va_align, size_align);
+	remove_mapping_information(obj, map_obj->da, map_obj->size);
 	return 0;
 err:
-       return status;
+	return status;
 }
 
 void user_remove_resources(struct iodmm_struct *obj)
@@ -753,10 +738,10 @@ void user_remove_resources(struct iodmm_struct *obj)
 
 	/* Free DMM mapped memory resources */
 	list_for_each_entry_safe(map_obj, temp_map, &obj->map_list, link) {
-		status = user_un_map(obj, map_obj->da);
+		status = user_un_map(obj, map_obj->va);
 		if (status) {
 			pr_err("%s: proc_un_map failed!"
-			       " status = 0x%x\n", __func__, status);
+				" status = 0x%x\n", __func__, status);
 		}
 	}
 }

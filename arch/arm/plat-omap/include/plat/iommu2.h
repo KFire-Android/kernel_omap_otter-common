@@ -42,6 +42,11 @@
 /*
  * MMU Register bit definitions
  */
+#define PAGE_SIZE_4KB                   0x1000
+#define PAGE_SIZE_64KB                  0x10000
+#define PAGE_SIZE_1MB                   0x100000
+#define PAGE_SIZE_16MB                  0x1000000
+
 #define MMU_LOCK_BASE_SHIFT	10
 #define MMU_LOCK_BASE_MASK	(0x1f << MMU_LOCK_BASE_SHIFT)
 #define MMU_LOCK_BASE(x)	\

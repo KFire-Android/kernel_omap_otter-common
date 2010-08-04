@@ -133,19 +133,46 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 	}
 	case IOVMM_IOCSETPTEENT:
 	{
+
 		struct iotlb_entry e;
 		int size;
+		int page_sz;
 		struct dmm_map_object *dmm_obj;
-
 		size = copy_from_user(&e, (void __user *)args,
 				sizeof(struct iotlb_entry));
 		if (size) {
 			ret = -EINVAL;
 			goto err_user_buf;
 		}
-		dmm_obj = add_mapping_info(obj, -1, e.pa, e.da, e.pgsz);
+		page_sz = e.pgsz;
+		switch (page_sz) {
+		case MMU_CAM_PGSZ_16M:
+			size = PAGE_SIZE_16MB;
+			break;
+		case MMU_CAM_PGSZ_1M:
+			size = PAGE_SIZE_1MB;
+			break;
+		case MMU_CAM_PGSZ_64K:
+			size = PAGE_SIZE_64KB;
+			break;
+		case MMU_CAM_PGSZ_4K:
+			size = PAGE_SIZE_4KB;
+			break;
+		default:
+			size = 0;
+			goto err_user_buf;
+			break;
+		}
+		dmm_obj = add_mapping_info(obj, -1, e.pa, e.da, size);
 
 		iopgtable_store_entry(obj->iovmm->iommu, &e);
+		break;
+	}
+
+	case IOVMM_IOCCLEARPTEENTRIES:
+	{
+		iopgtable_clear_entry_all(obj->iovmm->iommu);
+		flush_iotlb_all(obj->iovmm->iommu);
 		break;
 	}
 
