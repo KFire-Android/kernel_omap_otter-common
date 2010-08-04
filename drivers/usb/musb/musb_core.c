@@ -2003,15 +2003,6 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 		/* Enable VBUS Valid, BValid, AValid. Clear SESSEND.*/
 		omap_writel(0x00000005, 0x4A00233C);
 
-		/* Delay supply of VBUS. This fixes bootup enumeration issue */
-		mdelay(500);
-
-		/*
-		 * Start driving VBUS. Set OPA_MODE bit in CHARGERUSB_CTRL1
-		 * register. This enables boost mode.
-		 */
-		twl_i2c_write_u8(TWL_MODULE_MAIN_CHARGE , 0x40,
-						CHARGERUSB_CTRL1);
 	}
 		break;
 #else
@@ -2224,6 +2215,17 @@ bad_config:
 			? "DMA" : "PIO",
 			musb->nIrq);
 
+	if (cpu_is_omap44xx()) {
+		/* Delay supply of VBUS. This fixes bootup enumeration issue */
+		mdelay(500);
+
+		/*
+		 * Start driving VBUS. Set OPA_MODE bit in CHARGERUSB_CTRL1
+		 * register. This enables boost mode.
+		 */
+		twl_i2c_write_u8(TWL_MODULE_MAIN_CHARGE , 0x40,
+						CHARGERUSB_CTRL1);
+	}
 	return 0;
 
 fail5:
