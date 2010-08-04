@@ -15,7 +15,7 @@
 #include <linux/vmalloc.h>
 #include <linux/device.h>
 #include <linux/scatterlist.h>
-
+#include <linux/platform_device.h>
 #include <asm/cacheflush.h>
 #include <asm/mach/map.h>
 
@@ -23,6 +23,15 @@
 #include <plat/iovmm.h>
 
 #include "iopgtable.h"
+
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/device.h>
+#include <linux/file.h>
+#include <linux/poll.h>
+#include <linux/swap.h>
+#include <linux/genalloc.h>
+
 
 /*
  * A device driver needs to create address mappings between:
@@ -58,7 +67,267 @@
  *	'*':	not yet, but feasible.
  */
 
+#define OMAP_IOVMM_NAME "iovmm-omap"
+
+static atomic_t		num_of_iovmmus;
+static struct class	*omap_iovmm_class;
+static dev_t		omap_iovmm_dev;
 static struct kmem_cache *iovm_area_cachep;
+
+static int omap_create_vmm_pool(struct iodmm_struct *obj, int pool_id, int size,
+									int sa)
+{
+	struct iovmm_pool *pool;
+	struct iovmm_device *iovmm = obj->iovmm;
+
+	pool = kzalloc(sizeof(struct iovmm_pool), GFP_ATOMIC);
+	if (!pool)
+		goto err_out;
+
+	pool->pool_id = pool_id;
+	pool->da_begin = sa;
+	pool->da_end = sa + size;
+	pool->genpool = gen_pool_create(10, -1);
+	gen_pool_add(pool->genpool, pool->da_begin, size, -1);
+	INIT_LIST_HEAD(&pool->list);
+	list_add_tail(&pool->list, &iovmm->mmap_pool);
+	return 0;
+
+err_out:
+	return -ENOMEM;
+}
+
+static int omap_delete_vmm_pool(struct iovm_struct *obj, int pool_id, int size)
+{
+/*FIX ME: ADD CODE HERE*/
+	return 0;
+}
+
+static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
+				unsigned int cmd, unsigned long args)
+{
+	struct iodmm_struct *obj;
+	int ret = 0;
+	obj = (struct iodmm_struct *)filp->private_data;
+	if (!obj)
+		return -EINVAL;
+
+	if (_IOC_TYPE(cmd) != IOVMM_IOC_MAGIC)
+		return -ENOTTY;
+
+	switch (cmd) {
+	case IOVMM_IOCSETTLBENT:
+	{
+		struct iotlb_entry e;
+		int size;
+		size = copy_from_user(&e, (void __user *)args,
+					sizeof(struct iotlb_entry));
+		if (size) {
+			ret = -EINVAL;
+			goto err_user_buf;
+		}
+		load_iotlb_entry(obj->iovmm->iommu, &e);
+		break;
+	}
+	case IOVMM_IOCSETPTEENT:
+	{
+		struct iotlb_entry e;
+		int size;
+		struct dmm_map_object *dmm_obj;
+
+		size = copy_from_user(&e, (void __user *)args,
+				sizeof(struct iotlb_entry));
+		if (size) {
+			ret = -EINVAL;
+			goto err_user_buf;
+		}
+		dmm_obj = add_mapping_info(obj, -1, e.pa, e.da, e.pgsz);
+
+		iopgtable_store_entry(obj->iovmm->iommu, &e);
+		break;
+	}
+
+	case IOVMM_IOCCREATEPOOL:
+	{
+		struct iovmm_pool_info pool_info;
+		int size;
+
+		size = copy_from_user(&pool_info, (void __user *)args,
+						sizeof(struct iovmm_pool_info));
+		if (size) {
+			ret = -EINVAL;
+			goto err_user_buf;
+		}
+		omap_create_vmm_pool(obj, pool_info.pool_id, pool_info.size,
+							pool_info.da_begin);
+		break;
+	}
+	case IOVMM_IOCMEMMAP:
+	{
+		struct  dmm_map_info map_info;
+		int size;
+		int status;
+
+		size = copy_from_user(&map_info, (void __user *)args,
+						sizeof(struct dmm_map_info));
+
+		status = dmm_user(obj, map_info.mem_pool_id,
+					map_info.da, map_info.mpu_addr,
+					map_info.size, map_info.flags);
+		copy_to_user((void __user *)args, &map_info,
+					sizeof(struct dmm_map_info));
+		ret = status;
+		break;
+	}
+	case IOVMM_IOCMEMUNMAP:
+	{
+		u32 da;
+		int size;
+		int status;
+
+		size = copy_from_user(&da, (void __user *)args, sizeof(u32));
+		if (size) {
+			ret = -EINVAL;
+			goto err_user_buf;
+		}
+		status = user_un_map(obj, da);
+		ret = status;
+		break;
+	}
+	case IOVMM_IOCDATOPA:
+	case IOVMM_IOCMEMFLUSH:
+	case IOVMM_IOCMEMINV:
+	case IOVMM_IOCDELETEPOOL:
+	default:
+		return -ENOTTY;
+	}
+err_user_buf:
+	return ret;
+
+}
+
+static int omap_iovmm_open(struct inode *inode, struct file *filp)
+{
+	struct iodmm_struct *iodmm;
+	struct iovmm_device *obj;
+
+	obj = container_of(inode->i_cdev, struct iovmm_device, cdev);
+
+	iodmm = kzalloc(sizeof(struct iodmm_struct), GFP_KERNEL);
+	INIT_LIST_HEAD(&iodmm->map_list);
+	spin_lock_init(&iodmm->dmm_map_lock);
+
+	iodmm->iovmm = obj;
+	obj->iommu = iommu_get(obj->name);
+	filp->private_data = iodmm;
+
+	return 0;
+
+}
+static int omap_iovmm_release(struct inode *inode, struct file *filp)
+{
+	int status = 0;
+	struct iodmm_struct *obj;
+
+	if (!filp->private_data) {
+		status = -EIO;
+		goto err;
+	}
+	obj = filp->private_data;
+	flush_signals(current);
+	user_remove_resources(obj);
+	iommu_put(obj->iovmm->iommu);
+	kfree(obj);
+	filp->private_data = NULL;
+
+err:
+	return status;
+}
+
+static const struct file_operations omap_iovmm_fops = {
+	.owner		=	THIS_MODULE,
+	.open		=	omap_iovmm_open,
+	.release	=	omap_iovmm_release,
+	.ioctl		=	omap_iovmm_ioctl,
+};
+
+static int __devinit omap_iovmm_probe(struct platform_device *pdev)
+{
+	int err = -ENODEV;
+	int major, minor;
+	struct device *tmpdev;
+	struct iommu_platform_data *pdata =
+			(struct iommu_platform_data *)pdev->dev.platform_data;
+	int ret = 0;
+	struct iovmm_device *obj;
+
+	obj = kzalloc(sizeof(struct iovm_struct), GFP_KERNEL);
+
+	major = MAJOR(omap_iovmm_dev);
+	minor = atomic_read(&num_of_iovmmus);
+	atomic_inc(&num_of_iovmmus);
+
+	obj->minor = minor;
+	obj->name = pdata->name;
+	INIT_LIST_HEAD(&obj->mmap_pool);
+
+	cdev_init(&obj->cdev, &omap_iovmm_fops);
+	obj->cdev.owner = THIS_MODULE;
+	ret = cdev_add(&obj->cdev, MKDEV(major, minor), 1);
+	if (ret) {
+		dev_err(&pdev->dev, "%s: cdev_add failed: %d\n", __func__, ret);
+		goto err_cdev;
+	}
+
+	tmpdev = device_create(omap_iovmm_class, NULL,
+				MKDEV(major, minor),
+				NULL,
+				OMAP_IOVMM_NAME "%d", minor);
+	if (IS_ERR(tmpdev)) {
+		ret = PTR_ERR(tmpdev);
+		pr_err("%s: device_create failed: %d\n", __func__, ret);
+		goto clean_cdev;
+	}
+
+	pr_info("%s initialized %s, major: %d, base-minor: %d\n",
+			OMAP_IOVMM_NAME,
+			pdata->name,
+			MAJOR(omap_iovmm_dev),
+			minor);
+	platform_set_drvdata(pdev, obj);
+	return 0;
+clean_cdev:
+	cdev_del(&obj->cdev);
+err_cdev:
+	return err;
+}
+
+static int __devexit omap_iovmm_remove(struct platform_device *pdev)
+{
+	struct iovmm_device *obj = platform_get_drvdata(pdev);
+	int major = MAJOR(omap_iovmm_dev);
+	device_destroy(omap_iovmm_class, MKDEV(major, obj->minor));
+	cdev_del(&obj->cdev);
+	platform_set_drvdata(pdev, NULL);
+	iopgtable_clear_entry_all(obj->iommu);
+	iommu_put(obj->iommu);
+	free_pages((unsigned long)obj->iommu->iopgd,
+				get_order(IOPGD_TABLE_SIZE));
+	kfree(obj);
+	return 0;
+
+}
+
+
+
+static struct platform_driver omap_iovmm_driver = {
+	.probe	= omap_iovmm_probe,
+	.remove	= __devexit_p(omap_iovmm_remove),
+	.driver	= {
+		.name	= "omap-iovmm",
+	},
+};
+
 
 /* return total bytes of sg buffers */
 static size_t sgtable_len(const struct sg_table *sgt)
@@ -268,10 +537,8 @@ static struct iovm_struct *alloc_iovm_area(struct iommu *obj, u32 da,
 
 	if (!obj || !bytes)
 		return ERR_PTR(-EINVAL);
-
 	start = da;
 	alignement = PAGE_SIZE;
-
 	if (flags & IOVMF_DA_ANON) {
 		/*
 		 * Reserve the first page for NULL
@@ -281,22 +548,17 @@ static struct iovm_struct *alloc_iovm_area(struct iommu *obj, u32 da,
 			alignement = iopgsz_max(bytes);
 		start = roundup(start, alignement);
 	}
-
 	tmp = NULL;
 	if (list_empty(&obj->mmap))
 		goto found;
-
 	prev_end = 0;
 	list_for_each_entry(tmp, &obj->mmap, list) {
 
-		if (prev_end >= start)
-			break;
-
-		if (start + bytes < tmp->da_start)
+		if ((prev_end <= start) && (start + bytes < tmp->da_start))
 			goto found;
 
 		if (flags & IOVMF_DA_ANON)
-			start = roundup(tmp->da_end + 1, alignement);
+			start = roundup(tmp->da_end, alignement);
 
 		prev_end = tmp->da_end;
 	}
@@ -876,19 +1138,46 @@ void iommu_kfree(struct iommu *obj, u32 da)
 }
 EXPORT_SYMBOL_GPL(iommu_kfree);
 
+static int iommu_dmm(struct iodmm_struct *obj, u32 pool_id, u32 *da,
+			u32 va, size_t bytes, u32 flags)
+{
+	int err = 0;
+
+	err = dmm_user(obj, pool_id, da, va, bytes, flags);
+	return err;
+}
 
 static int __init iovmm_init(void)
 {
 	const unsigned long flags = SLAB_HWCACHE_ALIGN;
 	struct kmem_cache *p;
+	int num, ret;
 
 	p = kmem_cache_create("iovm_area_cache", sizeof(struct iovm_struct), 0,
 			      flags, NULL);
 	if (!p)
 		return -ENOMEM;
-	iovm_area_cachep = p;
 
-	return 0;
+	iovm_area_cachep = p;
+	num = iommu_get_plat_data_size();
+	ret = alloc_chrdev_region(&omap_iovmm_dev, 0, num, OMAP_IOVMM_NAME);
+	if (ret) {
+		pr_err("%s: alloc_chrdev_region failed: %d\n", __func__, ret);
+		goto out;
+	}
+	omap_iovmm_class = class_create(THIS_MODULE, OMAP_IOVMM_NAME);
+	if (IS_ERR(omap_iovmm_class)) {
+		ret = PTR_ERR(omap_iovmm_class);
+		pr_err("%s: class_create failed: %d\n", __func__, ret);
+		goto unreg_region;
+	}
+	atomic_set(&num_of_iovmmus, 0);
+
+	return platform_driver_register(&omap_iovmm_driver);
+unreg_region:
+	unregister_chrdev_region(omap_iovmm_dev, num);
+out:
+	return ret;
 }
 module_init(iovmm_init);
 
