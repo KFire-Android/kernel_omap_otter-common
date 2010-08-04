@@ -1321,7 +1321,9 @@ static int map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 	 */
 
 	if (usb_endpoint_xfer_control(&urb->ep->desc)) {
-		if (hcd->self.uses_dma) {
+		if (hcd->self.uses_pio_for_control) {
+			urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+		} else if (hcd->self.uses_dma) {
 			urb->setup_dma = dma_map_single(
 					hcd->self.controller,
 					urb->setup_packet,
