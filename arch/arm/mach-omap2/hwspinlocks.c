@@ -39,6 +39,14 @@
 #define LOCK_BASE_OFFSET		0x0800
 #define LOCK_OFFSET(i)			(LOCK_BASE_OFFSET + 0x4 * (i))
 
+struct omap_device_pm_latency omap_spinlock_latency[] = {
+	{
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func   = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	}
+};
+
 /* Initialization function */
 int __init hwspinlocks_init(void)
 {
@@ -63,7 +71,8 @@ int __init hwspinlocks_init(void)
 	pdata->lock_base_offset = LOCK_BASE_OFFSET;
 
 	omap_device_build(pdev_name, 0, oh, pdata,
-			sizeof(struct hwspinlock_plat_info), NULL, 0, false);
+		sizeof(struct hwspinlock_plat_info), omap_spinlock_latency,
+		ARRAY_SIZE(omap_spinlock_latency), false);
 
 	return retval;
 }

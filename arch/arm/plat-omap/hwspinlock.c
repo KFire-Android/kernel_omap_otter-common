@@ -116,7 +116,7 @@ int hwspinlock_lock(struct hwspinlock *handle)
 	if (WARN_ON(in_irq()))
 		return -EPERM;
 
-	if (pm_runtime_get(&handle->pdev->dev) < 0)
+	if (pm_runtime_get_sync(&handle->pdev->dev) < 0)
 		return -ENODEV;
 
 	/* Attempt to acquire the lock by reading from it */
@@ -139,14 +139,14 @@ int hwspinlock_trylock(struct hwspinlock *handle)
 	if (WARN_ON(in_irq()))
 		return -EPERM;
 
-	if (pm_runtime_get(&handle->pdev->dev) < 0)
+	if (pm_runtime_get_sync(&handle->pdev->dev) < 0)
 		return -ENODEV;
 
 	/* Attempt to acquire the lock by reading from it */
 	retval = readl(handle->lock_reg);
 
 	if (retval == HWSPINLOCK_BUSY)
-		pm_runtime_put(&handle->pdev->dev);
+		pm_runtime_put_sync(&handle->pdev->dev);
 
 	return retval;
 }
@@ -161,7 +161,7 @@ int hwspinlock_unlock(struct hwspinlock *handle)
 	/* Release it by writing 0 to it */
 	writel(0, handle->lock_reg);
 
-	pm_runtime_put(&handle->pdev->dev);
+	pm_runtime_put_sync(&handle->pdev->dev);
 
 	return 0;
 }
@@ -288,6 +288,7 @@ static int __devinit hwspinlock_probe(struct platform_device *pdev)
 		hwspinlocks[id].lock_reg	= io_base + pdata->
 					lock_base_offset + sizeof(u32) * id;
 	}
+	pm_runtime_enable(&pdev->dev);
 
 	return 0;
 }
