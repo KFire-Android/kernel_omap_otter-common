@@ -13,6 +13,7 @@
 #ifndef __MACH_IOMMU_H
 #define __MACH_IOMMU_H
 
+#include <linux/list.h>
 
 struct iotlb_entry {
 	u32 da;
@@ -46,6 +47,9 @@ struct iommu {
 	struct mutex		mmap_lock; /* protect mmap */
 	int (*isr)(struct iommu *obj);
 	void *ctx; /* iommu context: registres saved area */
+
+	struct platform_device *pdev;
+	struct list_head event_list;
 };
 
 struct cr_regs {
@@ -63,6 +67,12 @@ struct cr_regs {
 		};
 		u32 ram;
 	};
+};
+
+struct iommu_event_ntfy {
+	u32     fd;
+	struct eventfd_ctx *evt_ctx;
+	struct list_head list;
 };
 
 struct iotlb_lock {

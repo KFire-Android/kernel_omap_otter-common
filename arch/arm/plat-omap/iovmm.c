@@ -16,6 +16,7 @@
 #include <linux/device.h>
 #include <linux/scatterlist.h>
 #include <linux/platform_device.h>
+#include <linux/eventfd.h>
 #include <asm/cacheflush.h>
 #include <asm/mach/map.h>
 
@@ -109,6 +110,7 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 	struct iodmm_struct *obj;
 	int ret = 0;
 	obj = (struct iodmm_struct *)filp->private_data;
+
 	if (!obj)
 		return -EINVAL;
 
@@ -192,6 +194,46 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 		}
 		status = user_un_map(obj, da);
 		ret = status;
+		break;
+	}
+	case IOMMU_IOCEVENTREG:
+	{
+		int fd;
+		int size;
+		struct iommu_event_ntfy *fd_reg;
+
+		size = copy_from_user(&fd, (void __user *)args, sizeof(int));
+		if (size) {
+			ret = -EINVAL;
+			goto err_user_buf;
+		}
+
+		fd_reg = kzalloc(sizeof(struct iommu_event_ntfy), GFP_KERNEL);
+		fd_reg->fd = fd;
+		fd_reg->evt_ctx = eventfd_ctx_fdget(fd);
+		INIT_LIST_HEAD(&fd_reg->list);
+		list_add_tail(&fd_reg->list, &obj->iovmm->iommu->event_list);
+		break;
+	}
+	case IOMMU_IOCEVENTUNREG:
+	{
+		int fd;
+		int size;
+		struct iommu_event_ntfy *fd_reg, *temp_reg;
+
+		size = copy_from_user(&fd, (void __user *)args, sizeof(int));
+		if (size) {
+			ret = -EINVAL;
+			goto err_user_buf;
+		}
+		/* Free DMM mapped memory resources */
+		list_for_each_entry_safe(fd_reg, temp_reg,
+				&obj->iovmm->iommu->event_list, list) {
+			if (fd_reg->fd == fd) {
+				list_del(&fd_reg->list);
+				kfree(fd_reg);
+			}
+		}
 		break;
 	}
 	case IOVMM_IOCDATOPA:

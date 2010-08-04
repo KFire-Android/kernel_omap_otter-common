@@ -17,6 +17,7 @@
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/platform_device.h>
+#include <linux/eventfd.h>
 
 #include <asm/cacheflush.h>
 
@@ -731,6 +732,15 @@ void iopgtable_clear_entry_all(struct iommu *obj)
 	spin_unlock(&obj->page_table_lock);
 }
 EXPORT_SYMBOL_GPL(iopgtable_clear_entry_all);
+
+void eventfd_notification(struct iommu *obj)
+{
+	struct iommu_event_ntfy *fd_reg;
+
+	list_for_each_entry(fd_reg, &obj->event_list, list)
+		eventfd_signal(fd_reg->evt_ctx, 1);
+}
+
 /*
  *	Device IOMMU generic operations
  */
@@ -744,6 +754,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
 	if (!obj->refcount)
 		return IRQ_NONE;
 
+	eventfd_notification(obj);
 	/* Dynamic loading TLB or PTE */
 	if (obj->isr)
 		err = obj->isr(obj);
@@ -866,6 +877,8 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 	mutex_init(&obj->mmap_lock);
 	spin_lock_init(&obj->page_table_lock);
 	INIT_LIST_HEAD(&obj->mmap);
+
+	INIT_LIST_HEAD(&obj->event_list);
 
 	obj->regbase = pdata->io_base;
 
