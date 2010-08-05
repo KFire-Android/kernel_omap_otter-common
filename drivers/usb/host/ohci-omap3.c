@@ -135,8 +135,8 @@ struct ohci_hcd_omap3 {
 	struct device		*dev;
 
 	struct clk		*usbhost_ick;
-	struct clk		*usbhost2_120m_fck;
-	struct clk		*usbhost1_48m_fck;
+	struct clk		*usbhost_hs_fck;
+	struct clk		*usbhost_fs_fck;
 	struct clk		*usbtll_fck;
 	struct clk		*usbtll_ick;
 
@@ -157,11 +157,11 @@ static void ohci_omap3_clock_power(struct ohci_hcd_omap3 *omap, int on)
 		clk_enable(omap->usbtll_ick);
 		clk_enable(omap->usbtll_fck);
 		clk_enable(omap->usbhost_ick);
-		clk_enable(omap->usbhost1_48m_fck);
-		clk_enable(omap->usbhost2_120m_fck);
+		clk_enable(omap->usbhost_fs_fck);
+		clk_enable(omap->usbhost_hs_fck);
 	} else {
-		clk_disable(omap->usbhost2_120m_fck);
-		clk_disable(omap->usbhost1_48m_fck);
+		clk_disable(omap->usbhost_hs_fck);
+		clk_disable(omap->usbhost_fs_fck);
 		clk_disable(omap->usbhost_ick);
 		clk_disable(omap->usbtll_fck);
 		clk_disable(omap->usbtll_ick);
@@ -297,18 +297,18 @@ static int omap3_start_ohci(struct ohci_hcd_omap3 *omap, struct usb_hcd *hcd)
 		goto err_host_ick;
 	}
 
-	omap->usbhost2_120m_fck = clk_get(omap->dev, "usbhost_120m_fck");
-	if (IS_ERR(omap->usbhost2_120m_fck)) {
+	omap->usbhost_hs_fck = clk_get(omap->dev, "usbhost_120m_fck");
+	if (IS_ERR(omap->usbhost_hs_fck)) {
 		dev_err(omap->dev, "could not get usbhost_120m_fck\n");
-		ret = PTR_ERR(omap->usbhost2_120m_fck);
-		goto err_host_120m_fck;
+		ret = PTR_ERR(omap->usbhost_hs_fck);
+		goto err_host_hs_fck;
 	}
 
-	omap->usbhost1_48m_fck = clk_get(omap->dev, "usbhost_48m_fck");
-	if (IS_ERR(omap->usbhost1_48m_fck)) {
+	omap->usbhost_fs_fck = clk_get(omap->dev, "usbhost_48m_fck");
+	if (IS_ERR(omap->usbhost_fs_fck)) {
 		dev_err(omap->dev, "could not get usbhost_48m_fck\n");
-		ret = PTR_ERR(omap->usbhost1_48m_fck);
-		goto err_host_48m_fck;
+		ret = PTR_ERR(omap->usbhost_fs_fck);
+		goto err_host_fs_fck;
 	}
 
 	omap->usbtll_fck = clk_get(omap->dev, "usbtll_fck");
@@ -434,12 +434,12 @@ err_tll_ick:
 	clk_put(omap->usbtll_fck);
 
 err_tll_fck:
-	clk_put(omap->usbhost1_48m_fck);
+	clk_put(omap->usbhost_fs_fck);
 
-err_host_48m_fck:
-	clk_put(omap->usbhost2_120m_fck);
+err_host_fs_fck:
+	clk_put(omap->usbhost_hs_fck);
 
-err_host_120m_fck:
+err_host_hs_fck:
 	clk_put(omap->usbhost_ick);
 
 err_host_ick:
@@ -501,14 +501,14 @@ static void omap3_stop_ohci(struct ohci_hcd_omap3 *omap, struct usb_hcd *hcd)
 		omap->usbhost_ick = NULL;
 	}
 
-	if (omap->usbhost1_48m_fck != NULL) {
-		clk_put(omap->usbhost1_48m_fck);
-		omap->usbhost1_48m_fck = NULL;
+	if (omap->usbhost_fs_fck != NULL) {
+		clk_put(omap->usbhost_fs_fck);
+		omap->usbhost_fs_fck = NULL;
 	}
 
-	if (omap->usbhost2_120m_fck != NULL) {
-		clk_put(omap->usbhost2_120m_fck);
-		omap->usbhost2_120m_fck = NULL;
+	if (omap->usbhost_hs_fck != NULL) {
+		clk_put(omap->usbhost_hs_fck);
+		omap->usbhost_hs_fck = NULL;
 	}
 
 	if (omap->usbtll_ick != NULL) {
