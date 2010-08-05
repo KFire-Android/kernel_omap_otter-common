@@ -365,22 +365,15 @@ void __init usb_ehci_init(const struct ehci_hcd_omap_platform_data *pdata)
 
 static struct resource ohci_resources[] = {
 	{
-		.start	= OMAP34XX_OHCI_BASE,
-		.end	= OMAP34XX_OHCI_BASE + SZ_1K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
-		.start	= OMAP34XX_UHH_CONFIG_BASE,
-		.end	= OMAP34XX_UHH_CONFIG_BASE + SZ_1K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
-		.start	= OMAP34XX_USBTLL_BASE,
-		.end	= OMAP34XX_USBTLL_BASE + SZ_4K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{	/* general IRQ */
-		.start	= INT_34XX_OHCI_IRQ,
 		.flags	= IORESOURCE_IRQ,
 	}
 };
@@ -495,13 +488,117 @@ static void setup_ohci_io_mux(const enum ohci_omap3_port_mode *port_mode)
 	}
 }
 
+static void setup_4430ohci_io_mux(const enum ohci_omap3_port_mode *port_mode)
+{
+	/* FIXME: This funtion should use Mux frame work functions;
+	 * for now, we are hardcodeing it
+	 * This function will be later replaced by MUX framework API.
+	 */
+	switch (port_mode[0]) {
+	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
+	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
+
+		/* usbb1_mm_rxdp */
+		omap_writew(0x001D, 0x4A1000C4);
+
+		/* usbb1_mm_rxdm */
+		omap_writew(0x001D, 0x4A1000C8);
+
+	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
+	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
+
+		/* usbb1_mm_rxrcv */
+		omap_writew(0x001D, 0x4A1000CA);
+
+	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
+
+		/* usbb1_mm_txen */
+		omap_writew(0x001D, 0x4A1000D0);
+
+	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
+
+		/* usbb1_mm_txdat */
+		omap_writew(0x001D, 0x4A1000CE);
+
+		/* usbb1_mm_txse0 */
+		omap_writew(0x001D, 0x4A1000CC);
+		break;
+
+	case OMAP_OHCI_PORT_MODE_UNUSED:
+	default:
+		break;
+	}
+
+	switch (port_mode[1]) {
+	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
+	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
+
+		/* usbb2_mm_rxdp */
+		omap_writew(0x010C, 0x4A1000F8);
+
+		/* usbb2_mm_rxdm */
+		omap_writew(0x010C, 0x4A1000F6);
+
+	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
+	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
+
+		/* usbb2_mm_rxrcv */
+		omap_writew(0x010C, 0x4A1000FA);
+
+	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
+
+		/* usbb2_mm_txen */
+		omap_writew(0x080C, 0x4A1000FC);
+
+	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
+
+		/* usbb2_mm_txdat */
+		omap_writew(0x000C, 0x4A100112);
+
+		/* usbb2_mm_txse0 */
+		omap_writew(0x000C, 0x4A100110);
+		break;
+
+	case OMAP_OHCI_PORT_MODE_UNUSED:
+	default:
+		break;
+	}
+}
+
+
+
 void __init usb_ohci_init(const struct ohci_hcd_omap_platform_data *pdata)
 {
 	platform_device_add_data(&ohci_device, pdata, sizeof(*pdata));
 
 	/* Setup Pin IO MUX for OHCI */
-	if (cpu_is_omap34xx())
+	if (cpu_is_omap34xx()) {
+		ohci_resources[0].start	= OMAP34XX_OHCI_BASE;
+		ohci_resources[0].end	= OMAP34XX_OHCI_BASE + SZ_1K - 1;
+		ohci_resources[1].start	= OMAP34XX_UHH_CONFIG_BASE;
+		ohci_resources[1].end	= OMAP34XX_UHH_CONFIG_BASE + SZ_1K - 1;
+		ohci_resources[2].start	= OMAP34XX_USBTLL_BASE;
+		ohci_resources[2].end	= OMAP34XX_USBTLL_BASE + SZ_4K - 1;
+		ohci_resources[3].start = INT_34XX_OHCI_IRQ;
 		setup_ohci_io_mux(pdata->port_mode);
+	} else if (cpu_is_omap44xx()) {
+		ohci_resources[0].start	= OMAP44XX_HSUSB_OHCI_BASE;
+		ohci_resources[0].end	= OMAP44XX_HSUSB_OHCI_BASE + SZ_1K - 1;
+		ohci_resources[1].start	= OMAP44XX_UHH_CONFIG_BASE;
+		ohci_resources[1].end	= OMAP44XX_UHH_CONFIG_BASE + SZ_1K - 1;
+		ohci_resources[2].start	= OMAP44XX_USBTLL_BASE;
+		ohci_resources[2].end	= OMAP44XX_USBTLL_BASE + SZ_4K - 1;
+		ohci_resources[3].start = OMAP44XX_IRQ_OHCI;
+		setup_4430ohci_io_mux(pdata->port_mode);
+	}
 
 	if (platform_device_register(&ohci_device) < 0) {
 		pr_err("Unable to register FS-USB (OHCI) device\n");
