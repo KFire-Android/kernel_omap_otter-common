@@ -340,25 +340,11 @@ int dsi_set_backlight(struct omap_dss_device *dssdev, int level)
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, 0x04);
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, 0x92);
 	if (dssdev->channel == OMAP_DSS_CHANNEL_LCD) {
-		mdelay(500);
-		gpio_set_value(102, 1);
-		mdelay(500);
-		gpio_set_value(102, 0);
-		mdelay(500);
-		gpio_set_value(102, 1);
-
 		mdelay(120);
 		gpio_set_value(27, 0);
 		mdelay(120);
 		gpio_set_value(27, 1);
 	}else{
-                mdelay(500);
-                gpio_set_value(104, 1);
-                mdelay(500);
-                gpio_set_value(104, 0);
-                mdelay(500);
-                gpio_set_value(104, 1);
-
                 mdelay(120);
                 gpio_set_value(59, 0);
                 mdelay(120);

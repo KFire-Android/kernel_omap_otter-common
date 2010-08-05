@@ -530,8 +530,97 @@ irqreturn_t dsi_irq_handler(int irq, void *arg)
 	enum omap_dsi_index ix = DSI1;
 	struct dsi_struct *p_dsi;
 
-	if (cpu_is_omap44xx() && irq == OMAP44XX_IRQ_DSS_DSI2)
-		ix = DSI2;
+	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
+
+	irqstatus = dsi_read_reg(ix, DSI_IRQSTATUS);
+
+#ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
+	spin_lock(&p_dsi->irq_stats_lock);
+	p_dsi->irq_stats.irq_count++;
+	dss_collect_irq_stats(irqstatus, p_dsi->irq_stats.dsi_irqs);
+#endif
+
+	if (irqstatus & DSI_IRQ_ERROR_MASK) {
+		DSSERR("DSI error, irqstatus %x\n", irqstatus);
+		print_irq_status(irqstatus);
+		spin_lock(&p_dsi->errors_lock);
+		p_dsi->errors |= irqstatus & DSI_IRQ_ERROR_MASK;
+		spin_unlock(&p_dsi->errors_lock);
+	} else if (debug_irq) {
+		print_irq_status(irqstatus);
+	}
+
+#ifdef DSI_CATCH_MISSING_TE
+	if (irqstatus & DSI_IRQ_TE_TRIGGER)
+		del_timer(&p_dsi->te_timer);
+#endif
+
+	for (i = 0; i < 4; ++i) {
+		if ((irqstatus & (1<<i)) == 0)
+			continue;
+
+		vcstatus = dsi_read_reg(ix, DSI_VC_IRQSTATUS(i));
+
+#ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
+		dss_collect_irq_stats(vcstatus, p_dsi->irq_stats.vc_irqs[i]);
+#endif
+
+		if (vcstatus & DSI_VC_IRQ_BTA){
+			complete(&p_dsi->bta_completion);
+
+			if (p_dsi->bta_callback)
+				p_dsi->bta_callback(ix);
+		}
+
+		if (vcstatus & DSI_VC_IRQ_ERROR_MASK) {
+			DSSERR("DSI VC(%d) error, vc irqstatus %x\n",
+				       i, vcstatus);
+			print_irq_status_vc(i, vcstatus);
+		} else if (debug_irq) {
+			print_irq_status_vc(i, vcstatus);
+		}
+
+		dsi_write_reg(ix, DSI_VC_IRQSTATUS(i), vcstatus);
+		/* flush posted write */
+		dsi_read_reg(ix, DSI_VC_IRQSTATUS(i));
+	}
+
+	if (irqstatus & DSI_IRQ_COMPLEXIO_ERR) {
+		ciostatus = dsi_read_reg(ix, DSI_COMPLEXIO_IRQ_STATUS);
+
+#ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
+		dss_collect_irq_stats(ciostatus, p_dsi->irq_stats.cio_irqs);
+#endif
+
+		dsi_write_reg(ix, DSI_COMPLEXIO_IRQ_STATUS, ciostatus);
+		/* flush posted write */
+		dsi_read_reg(ix, DSI_COMPLEXIO_IRQ_STATUS);
+
+		if (ciostatus & DSI_CIO_IRQ_ERROR_MASK) {
+			DSSERR("DSI CIO error, cio irqstatus %x\n", ciostatus);
+			print_irq_status_cio(ciostatus);
+		} else if (debug_irq) {
+			print_irq_status_cio(ciostatus);
+		}
+	}
+
+	dsi_write_reg(ix, DSI_IRQSTATUS, irqstatus & ~DSI_IRQ_CHANNEL_MASK);
+	/* flush posted write */
+	dsi_read_reg(ix, DSI_IRQSTATUS);
+
+#ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
+	spin_unlock(&p_dsi->irq_stats_lock);
+#endif
+	return IRQ_HANDLED;
+}
+
+irqreturn_t dsi2_irq_handler(int irq, void *arg)
+
+{
+	u32 irqstatus, vcstatus, ciostatus;
+	int i;
+	enum omap_dsi_index ix = DSI2;
+	struct dsi_struct *p_dsi;
 
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
@@ -2724,7 +2813,7 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 	r = dsi_read_reg(ix, DSI_CLK_TIMING);
 	r = FLD_MOD(r, ddr_clk_pre, 15, 8);
 	r = FLD_MOD(r, ddr_clk_post, 7, 0);
-	dsi_write_reg(ix, DSI_CLK_TIMING, cpu_is_omap44xx() ? 0x0000120D : r);
+	dsi_write_reg(ix, DSI_CLK_TIMING, r);
 
 	DSSDBG("ddr_clk_pre %u, ddr_clk_post %u\n",
 			ddr_clk_pre,
@@ -2983,7 +3072,7 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 	if (p_dsi->te_enabled) {
 		/* disable LP_RX_TO, so that we can receive TE.  Time to wait
 		 * for TE is longer than the timer allows */
-		REG_FLD_MOD(ix, DSI_TIMING2, 0, 15, 15); /* LP_RX_TO */
+		REG_FLD_MOD(ix, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15); /* LP_RX_TO */
 
 		if (cpu_is_omap44xx())
 			dsi_vc_send_bta(ix, 0);
@@ -3037,7 +3126,7 @@ static void dsi_handle_framedone(enum omap_dsi_index ix, int error)
 
 	if (p_dsi->te_enabled) {
 		/* enable LP_RX_TO again after the TE */
-		REG_FLD_MOD(ix, DSI_TIMING2, 1, 15, 15); /* LP_RX_TO */
+		REG_FLD_MOD(ix, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15); /* LP_RX_TO */
 	}
 
 	/* RX_FIFO_NOT_EMPTY */
@@ -3109,7 +3198,7 @@ static void dsi_framedone_irq_callback(void *data, u32 mask)
 
 	if (p_dsi->te_enabled) {
 		/* enable LP_RX_TO again after the TE */
-		REG_FLD_MOD(DSI1, DSI_TIMING2, 1, 15, 15); /* LP_RX_TO */
+		REG_FLD_MOD(DSI1, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15); /* LP_RX_TO */
 	}
 
 	/* Send BTA after the frame. We need this for the TE to work, as TE
@@ -3159,7 +3248,7 @@ static void dsi2_framedone_irq_callback(void *data, u32 mask)
 
         if (p_dsi->te_enabled) {
                 /* enable LP_RX_TO again after the TE */
-                REG_FLD_MOD(DSI2, DSI_TIMING2, 1, 15, 15); /* LP_RX_TO */
+                REG_FLD_MOD(DSI2, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15); /* LP_RX_TO */
         }
 
         /* Send BTA after the frame. We need this for the TE to work, as TE
@@ -3442,11 +3531,12 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	dsi_if_enable(ix, 1);
 	dsi_force_tx_stop_mode_io(ix);
 
+#ifndef OMAP4430_REV_ES2_0
 	/* OMAP4 trim registers */
 	dsi_write_reg(ix, DSI_DSIPHY_CFG12, 0x58);
 	dsi_write_reg(ix, DSI_DSIPHY_CFG14, 0xAA05C800);
 	dsi_write_reg(ix, DSI_DSIPHY_CFG8, 0xC2E);
-
+#endif
 	return 0;
 err3:
 	dsi_complexio_uninit(ix);
@@ -3727,8 +3817,8 @@ int dsi2_init(struct platform_device *pdev)
 	INIT_DELAYED_WORK_DEFERRABLE(&dsi2.framedone_timeout_work,
 			dsi2_framedone_timeout_work_callback);
 
-       r = request_irq(OMAP44XX_IRQ_DSS_DSI2, dsi_irq_handler,
-                  0, "OMAP DSI2", (void *)0);
+        r = request_irq(OMAP44XX_IRQ_DSS_DSI2, dsi2_irq_handler,
+			0, "OMAP DSI2", (void *)0);
         if (r)
            goto err2;
 

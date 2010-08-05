@@ -70,6 +70,7 @@ static irqreturn_t taal_te_isr2(int irq, void *data);
 static void taal_te_timeout_work_callback(struct work_struct *work);
 static int _taal_enable_te(struct omap_dss_device *dssdev, bool enable);
 static void te_work_callback(struct work_struct *work);
+static void te2_work_callback(struct work_struct *work);
 static int taal_update(struct omap_dss_device *dssdev,
 				u16 x, u16 y, u16 w, u16 h);
 
@@ -241,6 +242,7 @@ struct taal_data {
 		u16 h;
 	} update_region;
 	struct delayed_work te_timeout_work;
+	struct workqueue_struct *te_wq;
 	struct work_struct te_framedone_work;
 
 	bool use_dsi_bl;
@@ -833,9 +835,19 @@ static int taal_probe(struct omap_dss_device *dssdev)
 		}
 
 		INIT_DELAYED_WORK_DEFERRABLE(&td->te_timeout_work,
-					taal_te_timeout_work_callback);
-		if (td->force_update)
-			INIT_WORK(&td->te_framedone_work, te_work_callback);
+				taal_te_timeout_work_callback);
+
+		if (td->force_update) {
+			if (dssdev->channel == OMAP_DSS_CHANNEL_LCD) {
+				td->te_wq = create_workqueue("taal wq");
+				INIT_WORK(&td->te_framedone_work,
+					te_work_callback);
+			} else {
+				td->te_wq = create_workqueue("taal2 wq");
+				INIT_WORK(&td->te_framedone_work,
+					te2_work_callback);
+			}
+		}
 
 		dev_dbg(&dssdev->dev, "Using GPIO TE\n");
 		iounmap(phymux_base);
@@ -1134,6 +1146,8 @@ static int taal_resume(struct omap_dss_device *dssdev)
 
 	dsi_bus_lock(ix);
 
+	td->te_enabled = 1;
+
 	r = taal_power_on(dssdev);
 
 	dsi_bus_unlock(ix);
@@ -1177,6 +1191,16 @@ static void te_work_callback(struct work_struct *work)
 	taal_update(dssdev, 0, 0, x_res, y_res);
 }
 
+static void te2_work_callback(struct work_struct *work)
+{
+	struct taal_data *td = container_of(work, struct taal_data,
+					te_framedone_work);
+	struct omap_dss_device *dssdev = td->dssdev;
+	u16 x_res = dssdev->panel.timings.x_res;
+	u16 y_res = dssdev->panel.timings.y_res;
+
+	taal_update(dssdev, 0, 0, x_res, y_res);
+}
 static irqreturn_t taal_te_isr(int irq, void *data)
 {
 	struct omap_dss_device *dssdev = data;
@@ -1185,7 +1209,7 @@ static irqreturn_t taal_te_isr(int irq, void *data)
 	int r;
 
 	if (td->force_update) {
-		schedule_work(&td->te_framedone_work);
+		queue_work(td->te_wq, &td->te_framedone_work);
 		return IRQ_HANDLED;
 	}
 
@@ -1219,7 +1243,7 @@ static irqreturn_t taal_te_isr2(int irq, void *data)
         int r;
         
 	if (td->force_update) {
-                schedule_work(&td->te_framedone_work);
+		queue_work(td->te_wq, &td->te_framedone_work);
                 return IRQ_HANDLED;
         }
 

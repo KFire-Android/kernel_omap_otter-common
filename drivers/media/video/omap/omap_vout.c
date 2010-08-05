@@ -1166,10 +1166,10 @@ venc:
 	vout->next_frm->state = VIDEOBUF_ACTIVE;
 	addr = (unsigned long)
 		vout->queued_buf_addr[vout->next_frm->i] +
-		vout->cropped_offset;
+		vout->cropped_offset[vout->next_frm->i];
 	uv_addr = (unsigned long)vout->queued_buf_uv_addr[
 		vout->next_frm->i]
-		+ vout->cropped_uv_offset;
+		+ vout->cropped_uv_offset[vout->next_frm->i];
 
 	/* First save the configuration in ovelray structure */
 	ret = omapvid_init(vout, addr, uv_addr);
