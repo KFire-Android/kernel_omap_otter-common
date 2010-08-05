@@ -530,6 +530,10 @@ struct snd_soc_platform_driver {
 
 	/* platform stream ops */
 	struct snd_pcm_ops *ops;
+
+	/* platform DAPM IO TODO: refactor this */
+	unsigned int (*read)(struct snd_soc_platform *, unsigned int);
+	int (*write)(struct snd_soc_platform *, unsigned int, unsigned int);
 };
 
 struct snd_soc_platform {
@@ -680,6 +684,19 @@ static inline unsigned int snd_soc_write(struct snd_soc_codec *codec,
 					 unsigned int reg, unsigned int val)
 {
 	return codec->driver->write(codec, reg, val);
+}
+
+/* platform DAPM IO - refactor */
+static inline unsigned int snd_soc_platform_read(struct snd_soc_platform *platform,
+					unsigned int reg)
+{
+	return platform->driver->read(platform, reg);
+}
+
+static inline unsigned int snd_soc_platform_write(struct snd_soc_platform *platform,
+					 unsigned int reg, unsigned int val)
+{
+	return platform->driver->write(platform, reg, val);
 }
 
 /* device driver data */

@@ -1384,6 +1384,7 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num)
 	platform->snd_card = codec->snd_card = card->snd_card;
 	codec_dai->codec = codec;
 	codec->card = card;
+	platform->card = card;
 	cpu_dai->platform = platform;
 	rtd->card = card;
 	rtd->dev.parent = card->dev;

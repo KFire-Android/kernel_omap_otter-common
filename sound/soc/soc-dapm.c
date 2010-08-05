@@ -28,7 +28,7 @@
  *    o Support for reduced codec oversampling rates.
  *    o Support for reduced codec bias currents.
  */
-
+#define DEBUG
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -110,6 +110,52 @@ static inline struct snd_soc_dapm_widget *dapm_cnew_widget(
 	return kmemdup(_widget, sizeof(*_widget), GFP_KERNEL);
 }
 
+static int soc_widget_read(struct snd_soc_dapm_widget *w, int reg)
+{
+	if (w->codec)
+		return snd_soc_read(w->codec, reg);
+	else if  (w->platform)
+		return snd_soc_platform_read(w->platform, w->reg);
+	return 0;
+}
+
+static int soc_widget_write(struct snd_soc_dapm_widget *w,int reg, int val)
+{
+	if (w->codec)
+		return snd_soc_write(w->codec, w->reg, val);
+	else if  (w->platform)
+		return snd_soc_platform_write(w->platform, w->reg, val);
+	return 0;
+}
+
+int soc_widget_update_bits(struct snd_soc_dapm_widget *w, unsigned short reg,
+				unsigned int mask, unsigned int value)
+{
+	int change;
+	unsigned int old, new;
+
+	old = soc_widget_read(w, reg);
+	new = (old & ~mask) | value;
+	change = old != new;
+//	if (change)
+		soc_widget_write(w, reg, new);
+
+	return change;
+}
+
+int soc_widget_test_bits(struct snd_soc_dapm_widget *w, unsigned short reg,
+				unsigned int mask, unsigned int value)
+{
+	int change;
+	unsigned int old, new;
+
+	old = soc_widget_read(w, reg);
+	new = (old & ~mask) | value;
+	change = old != new;
+
+	return change;
+}
+
 /**
  * snd_soc_dapm_set_bias_level - set the bias level for the system
  * @card: audio device
@@ -154,16 +200,6 @@ static int snd_soc_dapm_set_bias_level(struct snd_soc_card *card,
 	return ret;
 }
 
-static inline int snd_soc_widget_read(struct snd_soc_dapm_widget *w, int reg)
-{
-	if (w->codec)
-		return snd_soc_read(w->codec, reg);
-	else if (w->platform)
-		return 0;// tmp - LRG implement
-	else
-		return 0;
-}
-
 /* set up initial codec paths */
 static void dapm_set_path_status(struct snd_soc_dapm_widget *w,
 	struct snd_soc_dapm_path *p, int i)
@@ -181,7 +217,7 @@ static void dapm_set_path_status(struct snd_soc_dapm_widget *w,
 		unsigned int mask = (1 << fls(max)) - 1;
 		unsigned int invert = mc->invert;
 
-		val = snd_soc_widget_read(w, reg);
+		val = soc_widget_read(w, reg);
 		val = (val >> shift) & mask;
 
 		if ((invert && !val) || (!invert && val))
@@ -196,7 +232,7 @@ static void dapm_set_path_status(struct snd_soc_dapm_widget *w,
 
 		for (bitmask = 1; bitmask < e->max; bitmask <<= 1)
 		;
-		val = snd_soc_widget_read(w, e->reg);
+		val = soc_widget_read(w, e->reg);
 		item = (val >> e->shift_l) & (bitmask - 1);
 
 		p->connect = 0;
@@ -211,7 +247,7 @@ static void dapm_set_path_status(struct snd_soc_dapm_widget *w,
 			w->kcontrols[i].private_value;
 		int val, item;
 
-		val = snd_soc_widget_read(w, e->reg);
+		val = soc_widget_read(w, e->reg);
 		val = (val >> e->shift_l) & e->mask;
 		for (item = 0; item < e->max; item++) {
 			if (val == e->values[item])
@@ -299,7 +335,6 @@ static int dapm_update_bits(struct snd_soc_dapm_widget *widget)
 {
 	int change, power;
 	unsigned int old, new;
-	struct snd_soc_codec *codec = widget->codec;
 	struct snd_soc_dapm_context *dapm = widget->dapm;
 
 	/* check for valid widgets */
@@ -315,7 +350,7 @@ static int dapm_update_bits(struct snd_soc_dapm_widget *widget)
 	if (widget->invert)
 		power = (power ? 0:1);
 
-	old = snd_soc_read(codec, widget->reg);
+	old = soc_widget_read(widget, widget->reg);
 	new = (old & ~(0x1 << widget->shift)) | (power << widget->shift);
 
 	change = old != new;
@@ -324,9 +359,11 @@ static int dapm_update_bits(struct snd_soc_dapm_widget *widget)
 			widget->name, widget->power ? "on" : "off",
 			dapm->pop_time);
 		pop_wait(dapm->pop_time);
-		snd_soc_write(codec, widget->reg, new);
+		soc_widget_write(widget, widget->reg, new);
 	}
 	pr_debug("reg %x old %x new %x change %d\n", widget->reg,
+		 old, new, change);
+		printk("reg %x old %x new %x change %d\n", widget->reg,
 		 old, new, change);
 	return change;
 }
@@ -593,7 +630,7 @@ int dapm_reg_event(struct snd_soc_dapm_widget *w,
 	else
 		val = w->off_val;
 
-	snd_soc_update_bits(w->codec, -(w->reg + 1),
+	soc_widget_update_bits(w, -(w->reg + 1),
 			    w->mask << w->shift, val << w->shift);
 
 	return 0;
@@ -750,7 +787,7 @@ static void dapm_seq_insert(struct snd_soc_dapm_widget *new_widget,
 static void dapm_seq_run_coalesced(struct snd_soc_dapm_context *dapm,
 				   struct list_head *pending)
 {
-	struct snd_soc_dapm_widget *w;
+	struct snd_soc_dapm_widget *w, *wf;
 	int reg, power, ret;
 	unsigned int value = 0;
 	unsigned int mask = 0;
@@ -758,6 +795,8 @@ static void dapm_seq_run_coalesced(struct snd_soc_dapm_context *dapm,
 
 	reg = list_first_entry(pending, struct snd_soc_dapm_widget,
 			       power_list)->reg;
+	wf = list_first_entry(pending, struct snd_soc_dapm_widget,
+			       power_list);
 
 	list_for_each_entry(w, pending, power_list) {
 		cur_mask = 1 << w->shift;
@@ -804,8 +843,7 @@ static void dapm_seq_run_coalesced(struct snd_soc_dapm_context *dapm,
 			"pop test : Applying 0x%x/0x%x to %x in %dms\n",
 			value, mask, reg, dapm->pop_time);
 		pop_wait(dapm->pop_time);
-		if (dapm->codec)
-			snd_soc_update_bits(dapm->codec, reg, mask, value);
+		soc_widget_update_bits(wf, reg, mask, value);
 	}
 
 	list_for_each_entry(w, pending, power_list) {
@@ -1592,10 +1630,10 @@ int snd_soc_dapm_get_volsw(struct snd_kcontrol *kcontrol,
 	unsigned int mask = (1 << fls(max)) - 1;
 
 	ucontrol->value.integer.value[0] =
-		(snd_soc_read(widget->codec, reg) >> shift) & mask;
+		(soc_widget_read(widget, reg) >> shift) & mask;
 	if (shift != rshift)
 		ucontrol->value.integer.value[1] =
-			(snd_soc_read(widget->codec, reg) >> rshift) & mask;
+			(soc_widget_read(widget, reg) >> rshift) & mask;
 	if (invert) {
 		ucontrol->value.integer.value[0] =
 			max - ucontrol->value.integer.value[0];
@@ -1650,7 +1688,7 @@ int snd_soc_dapm_put_volsw(struct snd_kcontrol *kcontrol,
 	mutex_lock(&widget->codec->mutex);
 	widget->value = val;
 
-	if (snd_soc_test_bits(widget->codec, reg, val_mask, val)) {
+	if (soc_widget_test_bits(widget, reg, val_mask, val)) {
 		if (val)
 			/* new connection */
 			connect = invert ? 0:1;
@@ -1670,12 +1708,12 @@ int snd_soc_dapm_put_volsw(struct snd_kcontrol *kcontrol,
 				goto out;
 			}
 		}
-		ret = snd_soc_update_bits(widget->codec, reg, val_mask, val);
+		ret = soc_widget_update_bits(widget, reg, val_mask, val);
 		if (widget->event_flags & SND_SOC_DAPM_POST_REG)
 			ret = widget->event(widget, kcontrol,
 						SND_SOC_DAPM_POST_REG);
 	} else
-		ret = snd_soc_update_bits(widget->codec, reg, val_mask, val);
+		ret = soc_widget_update_bits(widget, reg, val_mask, val);
 
 out:
 	mutex_unlock(&widget->codec->mutex);
@@ -1701,7 +1739,7 @@ int snd_soc_dapm_get_enum_double(struct snd_kcontrol *kcontrol,
 
 	for (bitmask = 1; bitmask < e->max; bitmask <<= 1)
 		;
-	val = snd_soc_read(widget->codec, e->reg);
+	val = soc_widget_read(widget, e->reg);
 	ucontrol->value.enumerated.item[0] = (val >> e->shift_l) & (bitmask - 1);
 	if (e->shift_l != e->shift_r)
 		ucontrol->value.enumerated.item[1] =
@@ -1745,7 +1783,7 @@ int snd_soc_dapm_put_enum_double(struct snd_kcontrol *kcontrol,
 
 	mutex_lock(&widget->codec->mutex);
 	widget->value = val;
-	change = snd_soc_test_bits(widget->codec, e->reg, mask, val);
+	change = soc_widget_test_bits(widget, e->reg, mask, val);
 	snd_soc_dapm_mux_update_power(widget, kcontrol, change, mux, e);
 
 	if (widget->event_flags & SND_SOC_DAPM_PRE_REG) {
@@ -1755,7 +1793,7 @@ int snd_soc_dapm_put_enum_double(struct snd_kcontrol *kcontrol,
 			goto out;
 	}
 
-	ret = snd_soc_update_bits(widget->codec, e->reg, mask, val);
+	ret = soc_widget_update_bits(widget, e->reg, mask, val);
 
 	if (widget->event_flags & SND_SOC_DAPM_POST_REG)
 		ret = widget->event(widget,
@@ -1835,7 +1873,7 @@ int snd_soc_dapm_get_value_enum_double(struct snd_kcontrol *kcontrol,
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
 	unsigned int reg_val, val, mux;
 
-	reg_val = snd_soc_read(widget->codec, e->reg);
+	reg_val = soc_widget_read(widget, e->reg);
 	val = (reg_val >> e->shift_l) & e->mask;
 	for (mux = 0; mux < e->max; mux++) {
 		if (val == e->values[mux])
@@ -1891,7 +1929,7 @@ int snd_soc_dapm_put_value_enum_double(struct snd_kcontrol *kcontrol,
 
 	mutex_lock(&widget->codec->mutex);
 	widget->value = val;
-	change = snd_soc_test_bits(widget->codec, e->reg, mask, val);
+	change = soc_widget_test_bits(widget, e->reg, mask, val);
 	snd_soc_dapm_mux_update_power(widget, kcontrol, change, mux, e);
 
 	if (widget->event_flags & SND_SOC_DAPM_PRE_REG) {
@@ -1901,7 +1939,7 @@ int snd_soc_dapm_put_value_enum_double(struct snd_kcontrol *kcontrol,
 			goto out;
 	}
 
-	ret = snd_soc_update_bits(widget->codec, e->reg, mask, val);
+	ret = soc_widget_update_bits(widget, e->reg, mask, val);
 
 	if (widget->event_flags & SND_SOC_DAPM_POST_REG)
 		ret = widget->event(widget,
