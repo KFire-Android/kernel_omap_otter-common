@@ -42,6 +42,7 @@
 #include <plat/cpu.h>
 #include <plat/hdmi_lib.h>
 #include <plat/gpio.h>
+#include <linux/slab.h>
 
 #include "dss.h"
 #include "hdmi.h"
@@ -769,20 +770,19 @@ int hdmi_min_enable(void)
 	return 0;
 }
 
-static irqreturn_t hdmi_irq_handler(int irq, void *arg)
+void hdmi_work_queue(struct hdmi_work_struct *work)
 {
-	int r = 0;
 	struct omap_dss_device *dssdev = NULL;
 	const char *buf = "hdmi";
+	int r = ((struct hdmi_work_struct *)work)->r;
+
 	int match(struct omap_dss_device *dssdev2 , void *data)
-	 {
+	{
 		const char *str = data;
 		return sysfs_streq(dssdev2->name , str);
-	 }
+	}
 	dssdev = omap_dss_find_device((void *)buf , match);
 	DSSDBG("found hdmi handle %s" , dssdev->name);
-	HDMI_W1_HPD_handler(&r);
-	DSSDBG("r = %d", r);
 
 	if ((r == 4 || r == 2) && (hpd_mode == 1)) {
 		hdmi_phy_off(HDMI_WP);
@@ -791,23 +791,56 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 		mdelay(1000);
 		printk(KERN_INFO "Display enabled");
 	}
-	if (r == 1 || r == 4) {
+	if (r == 1 || r == 4)
 		hpd_mode = 0;
-	}
+
 	if ((r == 3) && (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)) {
 		printk(KERN_INFO "Display disabled");
 		hdmi_power_off(dssdev);
 		hpd_mode = 1;
+		/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
+		omap_writel(0x01180118, 0x4A100098);
+		/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
+		omap_writel(0x01180118 , 0x4A10009C);
+		/* CONTROL_HDMI_TX_PHY */
+		omap_writel(0x10000000, 0x4A100610);
 
-		if (dssdev->platform_disable)
-			dssdev->platform_disable(dssdev);
+		if (dssdev->platform_enable)
+			dssdev->platform_enable(dssdev);
 
 		hdmi_min_enable();
 	}
 
-	return IRQ_HANDLED;
-
+	kfree(work);
 }
+
+static irqreturn_t hdmi_irq_handler(int irq, void *arg)
+{
+	struct work_struct *work;
+	int r = 0;
+
+	HDMI_W1_HPD_handler(&r);
+	printk("r = %d", r);
+
+	if ((r == 4 || r == 2) && (hpd_mode == 1)) {
+		hdmi_phy_off(HDMI_WP);
+		hdmi_enable_clocks(1);
+	}
+
+	work = kmalloc(sizeof(struct hdmi_work_struct), GFP_KERNEL);
+
+	if (work) {
+		printk("r = %d", r);
+		INIT_WORK(work, hdmi_work_queue);
+		((struct hdmi_work_struct *)work)->r = r;
+		schedule_work(work);
+	} else {
+		printk(KERN_ERR "Cannot allocate memory to create work");
+	}
+
+	return IRQ_HANDLED;
+}
+
 
 static void hdmi_power_off(struct omap_dss_device *dssdev)
 {
