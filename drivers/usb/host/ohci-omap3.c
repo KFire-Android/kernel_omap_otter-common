@@ -245,7 +245,8 @@ static unsigned ohci_omap3_fslsmode(enum ohci_omap3_port_mode mode)
 	}
 }
 
-static void ohci_omap3_tll_config(struct ohci_hcd_omap3 *omap)
+static void ohci_omap3_tll_config(struct ohci_hcd_omap3 *omap,
+					u8 tll_channel_count)
 {
 	u32 reg;
 	int i;
@@ -263,7 +264,7 @@ static void ohci_omap3_tll_config(struct ohci_hcd_omap3 *omap)
 	 * REVISIT: Only the 3-pin and 4-pin PHY modes have
 	 * actually been tested.
 	 */
-	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+	for (i = 0; i < tll_channel_count; i++) {
 
 		/* Enable only those channels that are actually used */
 		if (omap->port_mode[i] == OMAP_OHCI_PORT_MODE_UNUSED)
@@ -422,7 +423,7 @@ static int omap3_start_ohci(struct ohci_hcd_omap3 *omap, struct usb_hcd *hcd)
 	ohci_omap_writel(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
 	dev_dbg(omap->dev, "UHH setup done, uhh_hostconfig=%x\n", reg);
 
-	ohci_omap3_tll_config(omap);
+	ohci_omap3_tll_config(omap, OMAP_TLL_CHANNEL_COUNT);
 
 	return 0;
 
