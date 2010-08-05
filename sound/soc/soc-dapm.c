@@ -1159,7 +1159,7 @@ void snd_soc_dapm_debugfs_init(struct snd_soc_dapm_context *dapm)
 #endif
 
 /* test and update the power status of a mux widget */
-static int dapm_mux_update_power(struct snd_soc_dapm_widget *widget,
+int snd_soc_dapm_mux_update_power(struct snd_soc_dapm_widget *widget,
 				 struct snd_kcontrol *kcontrol, int change,
 				 int mux, struct soc_enum *e)
 {
@@ -1194,10 +1194,11 @@ static int dapm_mux_update_power(struct snd_soc_dapm_widget *widget,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(snd_soc_dapm_mux_update_power);
 
 /* test and update the power status of a mixer or switch widget */
-static int dapm_mixer_update_power(struct snd_soc_dapm_widget *widget,
-				   struct snd_kcontrol *kcontrol, int connect)
+int snd_soc_dapm_mixer_update_power(struct snd_soc_dapm_widget *widget,
+		struct snd_kcontrol *kcontrol, int connect)
 {
 	struct snd_soc_dapm_path *path;
 	int found = 0;
@@ -1223,6 +1224,7 @@ static int dapm_mixer_update_power(struct snd_soc_dapm_widget *widget,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(snd_soc_dapm_mixer_update_power);
 
 /* show dapm widget status in sys fs */
 static ssize_t widget_show(struct snd_soc_dapm_context *dapm,
@@ -1656,7 +1658,7 @@ int snd_soc_dapm_put_volsw(struct snd_kcontrol *kcontrol,
 			/* old connection must be powered down */
 			connect = invert ? 1:0;
 
-		dapm_mixer_update_power(widget, kcontrol, connect);
+		snd_soc_dapm_mixer_update_power(widget, kcontrol, connect);
 	}
 
 	if (widget->event) {
@@ -1744,7 +1746,7 @@ int snd_soc_dapm_put_enum_double(struct snd_kcontrol *kcontrol,
 	mutex_lock(&widget->codec->mutex);
 	widget->value = val;
 	change = snd_soc_test_bits(widget->codec, e->reg, mask, val);
-	dapm_mux_update_power(widget, kcontrol, change, mux, e);
+	snd_soc_dapm_mux_update_power(widget, kcontrol, change, mux, e);
 
 	if (widget->event_flags & SND_SOC_DAPM_PRE_REG) {
 		ret = widget->event(widget,
@@ -1806,7 +1808,7 @@ int snd_soc_dapm_put_enum_virt(struct snd_kcontrol *kcontrol,
 
 	change = widget->value != ucontrol->value.enumerated.item[0];
 	widget->value = ucontrol->value.enumerated.item[0];
-	dapm_mux_update_power(widget, kcontrol, change, widget->value, e);
+	snd_soc_dapm_mux_update_power(widget, kcontrol, change, widget->value, e);
 
 	mutex_unlock(&widget->codec->mutex);
 	return ret;
@@ -1890,7 +1892,7 @@ int snd_soc_dapm_put_value_enum_double(struct snd_kcontrol *kcontrol,
 	mutex_lock(&widget->codec->mutex);
 	widget->value = val;
 	change = snd_soc_test_bits(widget->codec, e->reg, mask, val);
-	dapm_mux_update_power(widget, kcontrol, change, mux, e);
+	snd_soc_dapm_mux_update_power(widget, kcontrol, change, mux, e);
 
 	if (widget->event_flags & SND_SOC_DAPM_PRE_REG) {
 		ret = widget->event(widget,
