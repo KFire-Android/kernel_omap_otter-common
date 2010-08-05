@@ -278,6 +278,35 @@ static void soc_cleanup_codec_debugfs(struct snd_soc_codec *codec)
 	debugfs_remove_recursive(codec->debugfs_codec_root);
 }
 
+static void soc_init_platform_debugfs(struct snd_soc_platform *platform)
+{
+	char platform_root[128];
+
+	snprintf(platform_root, sizeof(platform_root),
+			"%s", dev_name(platform->dev));
+
+	platform->debugfs_platform_root = debugfs_create_dir(platform_root,
+						       debugfs_root);
+	if (!platform->debugfs_platform_root) {
+		printk(KERN_WARNING
+		       "ASoC: Failed to create platform debugfs directory\n");
+		return;
+	}
+
+	platform->dapm->debugfs_dapm = debugfs_create_dir("dapm",
+						 platform->debugfs_platform_root);
+	if (!platform->dapm->debugfs_dapm)
+		printk(KERN_WARNING
+		       "Failed to create DAPM debugfs directory\n");
+
+	snd_soc_dapm_debugfs_init(platform->dapm);
+}
+
+static void soc_cleanup_platform_debugfs(struct snd_soc_platform *platform)
+{
+	debugfs_remove_recursive(platform->debugfs_platform_root);
+}
+
 #else
 
 static inline void soc_init_codec_debugfs(struct snd_soc_codec *codec)
@@ -285,6 +314,14 @@ static inline void soc_init_codec_debugfs(struct snd_soc_codec *codec)
 }
 
 static inline void soc_cleanup_codec_debugfs(struct snd_soc_codec *codec)
+{
+}
+
+static inline void soc_init_platform_debugfs(struct snd_soc_platform *platform)
+{
+}
+
+static inline void soc_cleanup_platform_debugfs(struct snd_soc_platform *platform)
 {
 }
 #endif
@@ -1293,6 +1330,7 @@ static void soc_remove_dai_link(struct snd_soc_card *card, int num)
 		/* Make sure all DAPM widgets are freed */
 		snd_soc_dapm_free(platform->dapm);
 
+		soc_cleanup_platform_debugfs(platform);
 		platform->probed = 0;
 		list_del(&platform->card_list);
 		module_put(platform->dev->driver->owner);
@@ -1462,6 +1500,7 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num)
 		printk(KERN_WARNING "asoc: failed to add codec sysfs files\n");
 
 	soc_init_codec_debugfs(codec);
+	soc_init_platform_debugfs(platform);
 
 	/* create the pcm */
 	ret = soc_new_pcm(rtd, num);

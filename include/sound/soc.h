@@ -549,6 +549,11 @@ struct snd_soc_platform {
 
 	/* dapm */
 	struct snd_soc_dapm_context *dapm;
+
+#ifdef CONFIG_DEBUG_FS
+	struct dentry *debugfs_platform_root;
+	struct dentry *debugfs_dapm;
+#endif
 };
 
 struct snd_soc_dai_link {
