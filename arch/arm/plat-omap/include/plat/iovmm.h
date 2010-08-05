@@ -70,6 +70,13 @@ struct dmm_map_info {
 	u32 flags;
 };
 
+struct dmm_dma_info {
+	void *pva;
+	u32 ul_size;
+	enum dma_data_direction dir;
+};
+
+
 struct dmm_map_object {
 	struct list_head link;
 	u32 da;
@@ -194,6 +201,10 @@ extern int device_invalidate_memory(struct iodmm_struct *obj, void *pva,
 								u32 size);
 extern void user_remove_resources(struct iodmm_struct *obj);
 extern int user_un_map(struct iodmm_struct *obj, u32 map_addr);
+extern int proc_begin_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
+					enum dma_data_direction dir);
+extern int proc_end_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
+					enum dma_data_direction dir);
 
 
 #endif /* __IOMMU_MMAP_H */

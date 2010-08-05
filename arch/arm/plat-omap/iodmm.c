@@ -118,7 +118,7 @@ static void remove_mapping_information(struct iodmm_struct *obj,
 
 		if (!match_exact_map_obj(map_obj, da, size)) {
 			pr_debug("%s: match, deleting map info\n", __func__);
-			if (map_obj->gen_pool != POOL_NONE)
+			if (map_obj->gen_pool != NULL)
 				gen_pool_free(map_obj->gen_pool, da, size);
 			list_del(&map_obj->link);
 			kfree(map_obj->dma_info.sg);
@@ -198,13 +198,11 @@ static inline struct page *get_mapping_page(struct dmm_map_object *map_obj,
 {
 	pr_debug("%s: looking for pg_i %d, num_usr_pgs: %d\n", __func__,
 					pg_i, map_obj->num_usr_pgs);
-
 	if (pg_i < 0 || pg_i >= map_obj->num_usr_pgs) {
 		pr_err("%s: requested pg_i %d is out of mapped range\n",
 				__func__, pg_i);
 		return NULL;
 	}
-
 	return map_obj->pages[pg_i];
 }
 
@@ -221,12 +219,13 @@ static int build_dma_sg(struct dmm_map_object *map_obj, unsigned long start,
 	while (len) {
 		page = get_mapping_page(map_obj, pg_i);
 		if (!page) {
-			pr_err("%s: no page for %08lx\n", __func__, start);
+			pr_err("%s: no page for %08lx, pg_i is %x\n", __func__,
+								start, pg_i);
 			ret = -EINVAL;
 			goto out;
 		} else if (IS_ERR(page)) {
 			pr_err("%s: err page for %08lx(%lu)\n", __func__, start,
-			       PTR_ERR(page));
+					PTR_ERR(page));
 			ret = PTR_ERR(page);
 			goto out;
 		}
@@ -346,24 +345,25 @@ int proc_begin_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
 {
 	/* Keep STATUS here for future additions to this function */
 	int status = 0;
+	u32 va_align;
 	struct dmm_map_object *map_obj;
 	struct device *dev = obj->iovmm->iommu->dev;
+	va_align = round_down((u32)pva, PAGE_SIZE);
 
 	pr_debug("%s: addr 0x%x, size 0x%x, type %d\n", __func__,
-							(u32)pva,
+							(u32)va_align,
 							ul_size, dir);
-
 	/* find requested memory are in cached mapping information */
-	map_obj = find_containing_mapping(obj, (u32) pva, ul_size);
+	map_obj = find_containing_mapping(obj, (u32) va_align, ul_size);
 	if (!map_obj) {
 		pr_err("%s: find_containing_mapping failed\n", __func__);
 		status = -EFAULT;
 		goto err_out;
 	}
 
-	if (memory_give_ownership(dev, map_obj, (u32) pva, ul_size, dir)) {
-		pr_err("%s: InValid address parameters %p %x\n",
-			       __func__, pva, ul_size);
+	if (memory_give_ownership(dev, map_obj, (u32) va_align, ul_size, dir)) {
+		pr_err("%s: InValid address parameters %x %x\n",
+			       __func__, va_align, ul_size);
 		status = -EFAULT;
 	}
 
@@ -377,15 +377,17 @@ int proc_end_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
 {
 	/* Keep STATUS here for future additions to this function */
 	int status = 0;
+	u32 va_align;
 	struct dmm_map_object *map_obj;
 	struct device *dev = obj->iovmm->iommu->dev;
+	va_align = round_down((u32)pva, PAGE_SIZE);
 
 	pr_debug("%s: addr 0x%x, size 0x%x, type %d\n", __func__,
-							(u32)pva,
+							(u32)va_align,
 							ul_size, dir);
 
 	/* find requested memory are in cached mapping information */
-	map_obj = find_containing_mapping(obj, (u32) pva, ul_size);
+	map_obj = find_containing_mapping(obj, (u32) va_align, ul_size);
 	if (!map_obj) {
 		pr_err("%s: find_containing_mapping failed\n", __func__);
 		status = -EFAULT;
@@ -479,8 +481,6 @@ int user_to_device_map(struct iommu *mmu, u32 uva, u32 da, u32 size,
 	for (pg_i = 0; pg_i < pages; pg_i++) {
 		pg_num = get_user_pages(current, mm, uva, 1,
 						w, 1, usr_pgs, NULL);
-		printk(KERN_INFO "User VA is 0x%x and Physical is 0x%xand Da"
-				"is 0x%x\n", uva, page_to_phys(*usr_pgs), da);
 		if (pg_num > 0) {
 			if (page_count(*usr_pgs) < 1) {
 				pr_err("Bad page count after doing"
@@ -500,8 +500,9 @@ int user_to_device_map(struct iommu *mmu, u32 uva, u32 da, u32 size,
 			iopgtable_store_entry(mmu, &tlb_entry);
 			da += PAGE_SIZE;
 			uva += PAGE_SIZE;
+			usr_pgs++;
 		} else {
-			pr_err("DSPBRIDGE: get_user_pages FAILED,"
+			pr_err("get_user_pages FAILED,"
 				"MPU addr = 0x%x,"
 				"vma->vm_flags = 0x%lx,"
 				"get_user_pages Err"
@@ -533,9 +534,6 @@ int phys_to_device_map(struct iommu *mmu, u32 phys, u32 da, u32 size,
 						struct page **usr_pgs)
 {
 	int res = 0;
-	int w;
-	u32 pg_num;
-	u32 status;
 	int pg_i;
 	unsigned int pages;
 	struct iotlb_entry tlb_entry;
@@ -546,7 +544,6 @@ int phys_to_device_map(struct iommu *mmu, u32 phys, u32 da, u32 size,
 	pages = size / PAGE_SIZE;
 
 	for (pg_i = 0; pg_i < pages; pg_i++) {
-		printk("Phys Addr is 0x%x and Da is 0x%x\n", phys, da);
 		tlb_entry.pgsz = MMU_CAM_PGSZ_4K;
 		tlb_entry.prsvd = MMU_CAM_P;
 		tlb_entry.valid = MMU_CAM_V;
@@ -590,8 +587,6 @@ int io_to_device_map(struct iommu *mmu, u32 io_addr, u32 da, u32 size,
 	pages = size / PAGE_SIZE;
 
 	for (pg_i = 0; pg_i < pages; pg_i++) {
-		printk(KERN_INFO "Phys Addr is 0x%x and Da is 0x%x\n",
-							io_addr, da);
 		tlb_entry.pgsz = MMU_CAM_PGSZ_4K;
 		tlb_entry.prsvd = MMU_CAM_P;
 		tlb_entry.valid = MMU_CAM_V;
@@ -628,7 +623,7 @@ int user_to_device_unmap(struct iommu *mmu, u32 da, unsigned size)
 		if (bytes == 0)
 			bytes = PAGE_SIZE;
 		else
-			dev_dbg(mmu->dev, "%s: unmap %08x(%x) %08x\n",
+			dev_dbg(mmu->dev, "%s: unmap 0x%x 0x%x\n",
 				__func__, start, bytes);
 		BUG_ON(!IS_ALIGNED(bytes, PAGE_SIZE));
 		total -= bytes;
@@ -672,16 +667,9 @@ int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 							size_align);
 	if (!dmm_obj)
 		goto err;
-	if (flags & IOVMF_DA_PHYS) {
-		err = phys_to_device_map(iovmm_obj->iommu, pa_align,
-					da, size_align, dmm_obj->pages);
-	} else if (flags & IOVMF_DA_ANON) {
-		err = io_to_device_map(iovmm_obj->iommu, pa_align,
-					da, size_align, dmm_obj->pages);
-	} else {
-		err = user_to_device_map(iovmm_obj->iommu, pa_align,
-					da_align, size_align, dmm_obj->pages);
-	}
+
+	err = user_to_device_map(iovmm_obj->iommu, pa_align,
+				da_align, size_align, dmm_obj->pages);
 	if ((!err) && (flags & IOVMF_DA_USER))
 		*da = tmp_addr;
 

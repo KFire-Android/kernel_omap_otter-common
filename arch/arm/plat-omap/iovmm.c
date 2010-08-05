@@ -98,12 +98,6 @@ err_out:
 	return -ENOMEM;
 }
 
-static int omap_delete_vmm_pool(struct iovm_struct *obj, int pool_id, int size)
-{
-/*FIX ME: ADD CODE HERE*/
-	return 0;
-}
-
 static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 				unsigned int cmd, unsigned long args)
 {
@@ -163,7 +157,7 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 			goto err_user_buf;
 			break;
 		}
-		dmm_obj = add_mapping_info(obj, -1, e.pa, e.da, size);
+		dmm_obj = add_mapping_info(obj, NULL, e.pa, e.da, size);
 
 		iopgtable_store_entry(obj->iovmm->iommu, &e);
 		break;
@@ -263,9 +257,39 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 		}
 		break;
 	}
-	case IOVMM_IOCDATOPA:
 	case IOVMM_IOCMEMFLUSH:
+	{
+		int size;
+		int status;
+		struct dmm_dma_info dma_info;
+		size = copy_from_user(&dma_info, (void __user *)args,
+						sizeof(struct dmm_dma_info));
+		if (size) {
+			ret = -EINVAL;
+			goto err_user_buf;
+		}
+		status = proc_begin_dma(obj, dma_info.pva, dma_info.ul_size,
+								dma_info.dir);
+		ret = status;
+		break;
+	}
 	case IOVMM_IOCMEMINV:
+	{
+		int size;
+		int status;
+		struct dmm_dma_info dma_info;
+		size = copy_from_user(&dma_info, (void __user *)args,
+						sizeof(struct dmm_dma_info));
+		if (size) {
+			ret = -EINVAL;
+			goto err_user_buf;
+		}
+		status = proc_end_dma(obj, dma_info.pva, dma_info.ul_size,
+								dma_info.dir);
+		ret = status;
+		break;
+	}
+	case IOVMM_IOCDATOPA:
 	case IOVMM_IOCDELETEPOOL:
 	default:
 		return -ENOTTY;
@@ -1206,15 +1230,6 @@ void iommu_kfree(struct iommu *obj, u32 da)
 	sgtable_free(sgt);
 }
 EXPORT_SYMBOL_GPL(iommu_kfree);
-
-static int iommu_dmm(struct iodmm_struct *obj, u32 pool_id, u32 *da,
-			u32 va, size_t bytes, u32 flags)
-{
-	int err = 0;
-
-	err = dmm_user(obj, pool_id, da, va, bytes, flags);
-	return err;
-}
 
 static int __init iovmm_init(void)
 {
