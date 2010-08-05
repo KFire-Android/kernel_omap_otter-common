@@ -356,6 +356,8 @@ struct syn {
 
 	unsigned long        t_count;
 	unsigned long        f_measure;
+
+	int                  virtualized;
 };
 
 static int syn_initialize(struct syn *sd);
@@ -804,6 +806,10 @@ static void syn_touch_report_data(struct syn *sd, int dev_number)
 			d->finger_state);
 		goto out;
 	}
+
+	if (sd->virtualized && pdata->swap_xy &&
+			dev_name(&sd->client->dev)[0] != '2')
+		d->x = sd->touch_caps.max_x + d->x;
 
 	if (pdata->swap_xy) {
 		input_report_abs(idev, ABS_X, d->y);
@@ -2792,6 +2798,50 @@ static ssize_t syn_show_attr_latency(struct device *dev,
 	return l;
 }
 
+static ssize_t syn_show_attr_virtualized(struct device *dev,
+				       struct device_attribute *attr,
+				       char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct syn *sd = platform_get_drvdata(pdev);
+	const ssize_t size = PAGE_SIZE;
+	ssize_t l = 0;
+
+	mutex_lock(&sd->lock);
+
+	l += snprintf(buf + l, size - l, "%d\n", sd->virtualized);
+
+	mutex_unlock(&sd->lock);
+
+	return l;
+}
+
+static ssize_t syn_store_attr_virtualized(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct syn *sd = platform_get_drvdata(pdev);
+	int val;
+
+	if (sscanf(buf, "%i", &val) != 1) {
+		dev_info(&sd->client->dev,
+			 "error parsing virtualized\n");
+		return count;
+	}
+
+	if (val & (~0x01))
+		return count;
+
+	mutex_lock(&sd->lock);
+	sd->virtualized = val;
+	mutex_unlock(&sd->lock);
+
+	return count;
+}
+
+
+
 static DEVICE_ATTR(flash, S_IWUSR | S_IRUGO,
 		   syn_show_attr_flash, syn_store_attr_flash);
 
@@ -2833,6 +2883,9 @@ static DEVICE_ATTR(debug, S_IRUGO | S_IWUSR,
 static DEVICE_ATTR(latency, S_IRUGO | S_IWUSR,
 		   syn_show_attr_latency, syn_store_attr_latency);
 
+static DEVICE_ATTR(virtualized, S_IRUGO | S_IWUSR,
+		   syn_show_attr_virtualized, syn_store_attr_virtualized);
+
 static struct attribute *syn_attrs[] = {
 	&dev_attr_flash.attr,
 	&dev_attr_product_id.attr,
@@ -2848,6 +2901,7 @@ static struct attribute *syn_attrs[] = {
 	&dev_attr_dump.attr,
 	&dev_attr_debug.attr,
 	&dev_attr_latency.attr,
+	&dev_attr_virtualized.attr,
 	NULL,
 };
 
