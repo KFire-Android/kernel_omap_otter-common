@@ -481,14 +481,21 @@ static struct clk dpll_core_m5_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+static struct clk dpll_core_m5x2_ck = {
+	.name		= "dpll_core_m5x2_ck",
+	.parent		= &dpll_core_m5_ck,
+	.ops		= &clkops_null,
+	.recalc		= &omap3_clkoutx2_recalc,
+};
+
 static const struct clksel div_core_div[] = {
-	{ .parent = &dpll_core_m5_ck, .rates = div2_1to2_rates },
+	{ .parent = &dpll_core_m5x2_ck, .rates = div2_1to2_rates },
 	{ .parent = NULL },
 };
 
 static struct clk div_core_ck = {
 	.name		= "div_core_ck",
-	.parent		= &dpll_core_m5_ck,
+	.parent		= &dpll_core_m5x2_ck,
 	.clksel		= div_core_div,
 	.clksel_reg	= OMAP4430_CM_CLKSEL_CORE,
 	.clksel_mask	= OMAP4430_CLKSEL_CORE_MASK,
@@ -507,13 +514,13 @@ static const struct clksel_rate div4_1to8_rates[] = {
 };
 
 static const struct clksel div_iva_hs_clk_div[] = {
-	{ .parent = &dpll_core_m5_ck, .rates = div4_1to8_rates },
+	{ .parent = &dpll_core_m5x2_ck, .rates = div4_1to8_rates },
 	{ .parent = NULL },
 };
 
 static struct clk div_iva_hs_clk = {
 	.name		= "div_iva_hs_clk",
-	.parent		= &dpll_core_m5_ck,
+	.parent		= &dpll_core_m5x2_ck,
 	.clksel		= div_iva_hs_clk_div,
 	.clksel_reg	= OMAP4430_CM_BYPCLK_DPLL_IVA,
 	.clksel_mask	= OMAP4430_CLKSEL_0_1_MASK,
@@ -525,7 +532,7 @@ static struct clk div_iva_hs_clk = {
 
 static struct clk div_mpu_hs_clk = {
 	.name		= "div_mpu_hs_clk",
-	.parent		= &dpll_core_m5_ck,
+	.parent		= &dpll_core_m5x2_ck,
 	.clksel		= div_iva_hs_clk_div,
 	.clksel_reg	= OMAP4430_CM_BYPCLK_DPLL_MPU,
 	.clksel_mask	= OMAP4430_CLKSEL_0_1_MASK,
@@ -651,6 +658,13 @@ static struct clk dpll_iva_m4_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+static struct clk dpll_iva_m4x2_ck = {
+	.name		= "dpll_iva_m4x2_ck",
+	.parent		= &dpll_iva_m4_ck,
+	.ops		= &clkops_null,
+	.recalc		= &omap3_clkoutx2_recalc,
+};
+
 static struct clk dpll_iva_m5_ck = {
 	.name		= "dpll_iva_m5_ck",
 	.parent		= &dpll_iva_ck,
@@ -661,6 +675,13 @@ static struct clk dpll_iva_m5_ck = {
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
+};
+
+static struct clk dpll_iva_m5x2_ck = {
+	.name		= "dpll_iva_m5x2_ck",
+	.parent		= &dpll_iva_m5_ck,
+	.ops		= &clkops_null,
+	.recalc		= &omap3_clkoutx2_recalc,
 };
 
 /* DPLL_MPU */
@@ -1340,7 +1361,7 @@ static struct clk dsp_fck = {
 	.enable_reg	= OMAP4430_CM_TESLA_TESLA_CLKCTRL,
 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
 	.clkdm_name	= "tesla_clkdm",
-	.parent		= &dpll_iva_m4_ck,
+	.parent		= &dpll_iva_m4x2_ck,
 	.recalc		= &followparent_recalc,
 };
 
@@ -1605,7 +1626,7 @@ static struct clk iva_fck = {
 	.enable_reg	= OMAP4430_CM_IVAHD_IVAHD_CLKCTRL,
 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
 	.clkdm_name	= "ivahd_clkdm",
-	.parent		= &dpll_iva_m5_ck,
+	.parent		= &dpll_iva_m5x2_ck,
 	.recalc		= &followparent_recalc,
 };
 
@@ -1949,7 +1970,7 @@ static struct clk sl2if_ick = {
 	.enable_reg	= OMAP4430_CM_IVAHD_SL2_CLKCTRL,
 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
 	.clkdm_name	= "ivahd_clkdm",
-	.parent		= &dpll_iva_m5_ck,
+	.parent		= &dpll_iva_m5x2_ck,
 	.recalc		= &followparent_recalc,
 };
 
@@ -2433,6 +2454,7 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"dpll_core_m2_ck",		&dpll_core_m2_ck,	CK_443X),
 	CLK(NULL,	"ddrphy_ck",			&ddrphy_ck,	CK_443X),
 	CLK(NULL,	"dpll_core_m5_ck",		&dpll_core_m5_ck,	CK_443X),
+	CLK(NULL,	"dpll_core_m5x2_ck",		&dpll_core_m5x2_ck,	CK_443X),
 	CLK(NULL,	"div_core_ck",			&div_core_ck,	CK_443X),
 	CLK(NULL,	"div_iva_hs_clk",		&div_iva_hs_clk,	CK_443X),
 	CLK(NULL,	"div_mpu_hs_clk",		&div_mpu_hs_clk,	CK_443X),
@@ -2444,7 +2466,9 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"iva_hsd_byp_clk_mux_ck",	&iva_hsd_byp_clk_mux_ck,	CK_443X),
 	CLK(NULL,	"dpll_iva_ck",			&dpll_iva_ck,	CK_443X),
 	CLK(NULL,	"dpll_iva_m4_ck",		&dpll_iva_m4_ck,	CK_443X),
+	CLK(NULL,	"dpll_iva_m4x2_ck",		&dpll_iva_m4x2_ck,	CK_443X),
 	CLK(NULL,	"dpll_iva_m5_ck",		&dpll_iva_m5_ck,	CK_443X),
+	CLK(NULL,	"dpll_iva_m5x2_ck",		&dpll_iva_m5x2_ck,	CK_443X),
 	CLK(NULL,	"dpll_mpu_ck",			&dpll_mpu_ck,	CK_443X),
 	CLK(NULL,	"dpll_mpu_m2_ck",		&dpll_mpu_m2_ck,	CK_443X),
 	CLK(NULL,	"per_hs_clk_div_ck",		&per_hs_clk_div_ck,	CK_443X),
