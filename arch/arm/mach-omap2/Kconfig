@@ -192,6 +192,10 @@ config MACH_OMAP_4430SDP
 
 
 
+config MACH_OMAP4_PANDA
+	bool "OMAP4 based Panda board"
+	depends on ARCH_OMAP4
+
 config ERRATA_OMAP4_AXI2OCP
 	bool "OMAP 4430 axi2ocp errata workaround"
 	depends on ARCH_OMAP4
