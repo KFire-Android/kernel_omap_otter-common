@@ -1743,7 +1743,7 @@ int omap_dss_wb_flush()
 		}
 	printk(KERN_ERR"flush dispc data");
 	dispc_flush_wb(wbc);
-
+	return 0;
 
 }
 EXPORT_SYMBOL(omap_dss_wb_flush);
