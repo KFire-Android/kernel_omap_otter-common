@@ -1580,7 +1580,6 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct omap_hsmmc_host *host = mmc_priv(mmc);
-	struct omap_mmc_platform_data *pdata = host->pdata;
 	u16 dsor = 0;
 	unsigned long regval;
 	unsigned long timeout;
@@ -1627,7 +1626,6 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		break;
 	}
 
-	if (pdata->dev_attr->flags & MMC_SUPPORT_18V_3V) {
 		/* Only MMC1 can interface at 3V without some flavor
 		 * of external transceiver; but they all handle 1.8V.
 		 */
@@ -1643,7 +1641,6 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 				dev_dbg(mmc_dev(host->mmc),
 						"Switch operation failed\n");
 		}
-	}
 
 	if (ios->clock) {
 		dsor = OMAP_MMC_MASTER_CLOCK / ios->clock;
@@ -1711,12 +1708,12 @@ static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
 	u32 hctl, capa, value;
 
 	/* Only MMC1 supports 3.0V */
-	if (host->pdata->dev_attr->flags & MMC_SUPPORT_18V_3V) {
-		hctl = SDVS30;
-		capa = VS30 | VS18;
-	} else {
+	if (mmc_slot(host).ocr_mask == MMC_VDD_165_195) {
 		hctl = SDVS18;
 		capa = VS18;
+	} else {
+		hctl = SDVS30;
+		capa = VS30 | VS18;
 	}
 
 	if (host->dma_type == ADMA_XFER)

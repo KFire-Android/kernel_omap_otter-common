@@ -2280,11 +2280,6 @@ static struct omap_hwmod_class mmc_class = {
 
 
 /* MMC/SD/SDIO1 */
-
-static struct mmc_dev_attr mmc1_dev_attr = {
-	.flags = MMC_SUPPORT_18V_3V,
-};
-
 static struct omap_hwmod_irq_info mmc1_mpu_irqs[] = {
 	{ .irq = INT_24XX_MMC_IRQ, },
 };
@@ -2322,15 +2317,10 @@ static struct omap_hwmod omap3xxx_mmc1_hwmod = {
 	.slaves		= omap3xxx_mmc1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_mmc1_slaves),
 	.class		= &mmc_class,
-	.dev_attr	= &mmc1_dev_attr,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
 };
 
 /* MMC/SD/SDIO2 */
-
-static struct mmc_dev_attr mmc2_dev_attr = {
-	.flags =  MMC_SUPPORT_18V,
-};
 
 static struct omap_hwmod_irq_info mmc2_mpu_irqs[] = {
 	{ .irq = INT_24XX_MMC2_IRQ, },
@@ -2369,14 +2359,10 @@ static struct omap_hwmod omap3xxx_mmc2_hwmod = {
 	.slaves		= omap3xxx_mmc2_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_mmc2_slaves),
 	.class		= &mmc_class,
-	.dev_attr	= &mmc2_dev_attr,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
 };
 
 /* MMC/SD/SDIO3 */
-
-static struct mmc_dev_attr mmc3_dev_attr;
-
 static struct omap_hwmod_irq_info mmc3_mpu_irqs[] = {
 	{ .irq = INT_34XX_MMC3_IRQ, },
 };
@@ -2414,7 +2400,6 @@ static struct omap_hwmod omap3xxx_mmc3_hwmod = {
 	.slaves		= omap3xxx_mmc3_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_mmc3_slaves),
 	.class		= &mmc_class,
-	.dev_attr	= &mmc3_dev_attr,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
 };
 
