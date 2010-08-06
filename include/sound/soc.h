@@ -281,6 +281,8 @@ int snd_soc_pcm_trigger(struct snd_pcm_substream *substream, int cmd);
 snd_pcm_uframes_t snd_soc_pcm_pointer(struct snd_pcm_substream *substream);
 struct snd_pcm_substream *snd_soc_get_dai_substream(struct snd_soc_card *card,
 		const char *dai_link, int stream);
+struct snd_soc_pcm_runtime *snd_soc_get_pcm_runtime(struct snd_soc_card *card,
+		const char *dai_link);
 
 /* Utility functions to get clock rates from various things */
 int snd_soc_calc_frame_size(int sample_size, int channels, int tdm_slots);
