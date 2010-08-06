@@ -608,6 +608,10 @@ struct twl4030_codec_audio_data {
 	unsigned int reset_registers:1;
 	unsigned int hs_extmute:1;
 	void (*set_hs_extmute)(int mute);
+
+	/* twl6040 */
+	int audpwron_gpio;	/* audio power-on gpio */
+	int naudint_irq;	/* audio interrupt */
 };
 
 struct twl4030_codec_vibra_data {
@@ -619,10 +623,6 @@ struct twl4030_codec_data {
 	unsigned int	audio_mclk;
 	struct twl4030_codec_audio_data		*audio;
 	struct twl4030_codec_vibra_data		*vibra;
-
-	/* twl6040 */
-	int audpwron_gpio;	/* audio power-on gpio */
-	int naudint_irq;	/* audio interrupt */
 };
 
 struct twl4030_platform_data {

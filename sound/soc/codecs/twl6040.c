@@ -1102,7 +1102,7 @@ EXPORT_SYMBOL_GPL(twl6040_hs_jack_detect);
 
 static int twl6040_probe(struct snd_soc_codec *codec)
 {
-	struct twl4030_codec_data *twl_codec = codec->dev->platform_data;
+	struct twl4030_codec_audio_data *twl_codec = codec->dev->platform_data;
 	struct twl6040_data *priv;
 	int audpwron, naudint;
 	int ret = 0;
@@ -1115,11 +1115,10 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 
 	twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &icrev, TWL6040_REG_ASICREV);
 
-	if (twl_codec && (icrev > 0)) {
+	if (twl_codec && (icrev > 0))
 		audpwron = twl_codec->audpwron_gpio;
-	} else {
+	else
 		audpwron = -EINVAL;
-	}
 
 	if (twl_codec)
 		naudint = twl_codec->naudint_irq;

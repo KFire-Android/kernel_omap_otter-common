@@ -207,6 +207,12 @@ config TWL6030_GPADC
 	  Say yes here if you want support for the TWL6030 General Purpose
 	  A/D Convertor.
 
+config TWL6040_CODEC
+	bool
+	depends on TWL4030_CORE
+	select MFD_CORE
+	default n
+
 config MFD_TMIO
 	bool
 	default n
