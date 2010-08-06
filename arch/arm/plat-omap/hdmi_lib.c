@@ -1154,7 +1154,7 @@ static int hdmi_w1_audio_config(void)
 
 int hdmi_lib_enable(struct hdmi_config *cfg)
 {
-	u32 r;
+	u32 r, deep_color;
 
 	u32 av_name = HDMI_CORE_AV;
 
@@ -1213,9 +1213,8 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	val &= 0x0FFFFFFF;
 	val |= ((0x1f) << 27); /* wakeup */
 	hdmi_write_reg(HDMI_WP, HDMI_WP_VIDEO_SIZE, val);
-
-	hdmi_w1_audio_config();
 #endif
+	hdmi_w1_audio_config();
 
 	/****************************** CORE *******************************/
 	/************* configure core video part ********************************/
@@ -1232,7 +1231,29 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	audio_cfg.fs = 0x02;
 	audio_cfg.if_fs = 0x00;
 	audio_cfg.n = 6144;
-	audio_cfg.cts = 74250;
+
+	r = hdmi_read_reg(HDMI_WP, HDMI_WP_VIDEO_CFG);
+	switch(r & 0x03) {
+	case 1:
+		deep_color = 100;
+		break;
+	case 2:
+		deep_color = 125;
+		break;
+	case 3:
+		deep_color = 150;
+		break;
+	case 4:
+		printk(KERN_ERR "Invalid deep color configuration, "
+				"using no deep-color\n");
+		deep_color = 100;
+		break;
+	}
+
+	if (omap_rev() == OMAP4430_REV_ES1_0)
+		audio_cfg.cts = cfg->pixel_clock;
+	else
+		audio_cfg.cts = (cfg->pixel_clock * deep_color) / 100;
 
 	/* audio channel */
 	audio_cfg.if_sample_size = 0x0;
@@ -1240,13 +1261,16 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	audio_cfg.if_channel_number = 2;
 	audio_cfg.if_audio_channel_location = 0x00;
 
-	/* TODO: Is this configuration correct? */
-	audio_cfg.aud_par_busclk = (((128 * 31) - 1) << 8);
-	audio_cfg.cts_mode = 0;
+	if (omap_rev() == OMAP4430_REV_ES1_0) {
+		audio_cfg.aud_par_busclk = (((128 * 31) - 1) << 8);
+		audio_cfg.cts_mode = CTS_MODE_HW;
+	} else {
+		audio_cfg.aud_par_busclk = 0;
+		audio_cfg.cts_mode = CTS_MODE_SW;
+	}
 
 	r = hdmi_core_video_config(&v_core_cfg);
 
-	/* hnagalla */
 	hdmi_core_audio_config(av_name, &audio_cfg);
 	hdmi_core_audio_mode_enable(av_name);
 
