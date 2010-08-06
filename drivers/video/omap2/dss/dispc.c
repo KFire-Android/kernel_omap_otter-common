@@ -4680,23 +4680,27 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 			printk("KERN_ERR dispc_setup_wb out_height not in range ");
 			return -EINVAL;
 		}
+
 		switch (color_mode) {
 		case OMAP_DSS_COLOR_RGB16:
 		case OMAP_DSS_COLOR_RGB24P:
-		case OMAP_DSS_COLOR_RGB24U:
 		case OMAP_DSS_COLOR_ARGB16:
-		case OMAP_DSS_COLOR_ARGB32:
-		case OMAP_DSS_COLOR_RGBA32:
 		case OMAP_DSS_COLOR_RGBA12:
 		case OMAP_DSS_COLOR_XRGB12:
 		case OMAP_DSS_COLOR_ARGB16_1555:
 		case OMAP_DSS_COLOR_RGBX24_32_ALGN:
 		case OMAP_DSS_COLOR_XRGB15:
+			REG_FLD_MOD(dispc_reg_att[plane], 0x1, 10, 10);
 			break;
-
+		case OMAP_DSS_COLOR_ARGB32:
+		case OMAP_DSS_COLOR_RGBA32:
+		case OMAP_DSS_COLOR_RGB24U:
+			REG_FLD_MOD(dispc_reg_att[plane], 0x0, 10, 10);
+			break;
 		case OMAP_DSS_COLOR_NV12:
 		case OMAP_DSS_COLOR_YUV2:
 		case OMAP_DSS_COLOR_UYVY:
+			REG_FLD_MOD(dispc_reg_att[plane], 0x0, 10, 10);
 			cconv = 1;
 			break;
 
