@@ -1305,6 +1305,41 @@ static struct platform_driver serial_omap_driver = {
 	},
 };
 
+/**
+ * omap_uart_active() - Check if any ports managed by this
+ * driver are currently busy.
+ * Basically used for DMA mode check before putting it to
+ * force idle mode for errata 2.15 implementation.
+ */
+
+int omap_uart_active(int num)
+{
+	struct uart_omap_port *up = ui[num];
+	struct circ_buf *xmit;
+	unsigned int status;
+
+	/* check for recent driver activity */
+	/* if from now to last activty < 5 second keep clocks on */
+	if ((jiffies_to_msecs(jiffies - up->port_activity) < 5000))
+		return 1;
+
+	xmit = &up->port.state->xmit;
+	if (!(uart_circ_empty(xmit) || uart_tx_stopped(&up->port)))
+		return 1;
+
+	status = serial_in(up, UART_LSR);
+	/* TX hardware not empty */
+	if (!(status & (UART_LSR_TEMT | UART_LSR_THRE)))
+		return 1;
+
+	/* Any rx activity? */
+	if (status & UART_LSR_DR)
+		return 1;
+
+	return 0;
+}
+EXPORT_SYMBOL(omap_uart_active);
+
 int __init serial_omap_init(void)
 {
 	int ret;

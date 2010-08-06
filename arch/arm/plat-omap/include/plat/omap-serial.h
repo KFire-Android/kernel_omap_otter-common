@@ -126,4 +126,5 @@ struct uart_omap_port {
 	unsigned long		port_activity;
 };
 
+int omap_uart_active(int num);
 #endif /* __OMAP_SERIAL_H__ */

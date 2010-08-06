@@ -346,6 +346,16 @@ static void omap_uart_idle_timer(unsigned long data)
 {
 	struct omap_uart_state *uart = (struct omap_uart_state *)data;
 
+#ifdef CONFIG_SERIAL_OMAP
+	/* check if the uart port is active
+	 * if port is active then dont allow
+	 * sleep.
+	 */
+	if (omap_uart_active(uart->num)) {
+		omap_uart_block_sleep(uart);
+		return;
+	}
+#endif
 	omap_uart_allow_sleep(uart);
 }
 
@@ -755,7 +765,6 @@ void __init omap_serial_init_port(int port)
 	omap_uart_enable_clocks(uart);
 	omap_uart_idle_init(uart);
 	omap_uart_reset(uart);
-	omap_hwmod_enable_wakeup(uart->oh);
 	omap_uart_disable_clocks(uart);
 
 	/*
