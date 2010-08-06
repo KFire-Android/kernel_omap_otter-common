@@ -130,6 +130,9 @@
 #define OMAP4_UHH_SYSCONFIG_SOFTRESET			(1 << 0)
 
 #define OMAP4_TLL_CHANNEL_COUNT				2
+
+#define OMAP3_UHH_REVISION				0x00000010
+#define OMAP4_UHH_REVISION				0x50700100
 /*-------------------------------------------------------------------------*/
 
 static inline void ohci_omap_writel(void __iomem *base, u32 reg, u32 val)
@@ -337,7 +340,9 @@ static int omap3_start_ohci(struct ohci_hcd_omap3 *omap, struct usb_hcd *hcd)
 
 	dev_dbg(omap->dev, "starting TI OHCI USB Controller\n");
 
-	if (cpu_is_omap44xx()) {
+	reg = ohci_omap_readl(omap->uhh_base, OMAP_UHH_REVISION);
+
+	if (reg == OMAP4_UHH_REVISION) {
 		/* Enable clocks for OMAP4 USBHOST */
 		omap->usbhost_fs_fck = clk_get(omap->dev, "usb_host_fs_fck");
 		if (IS_ERR(omap->usbhost_fs_fck)) {
@@ -454,7 +459,7 @@ err_44host_fs_fck:
 
 		return ret;
 
-	} else {
+	} else if (reg == OMAP3_UHH_REVISION) {
 		/* Get all the clock handles we need */
 		omap->usbhost_ick = clk_get(omap->dev, "usbhost_ick");
 		if (IS_ERR(omap->usbhost_ick)) {
