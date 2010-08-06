@@ -594,7 +594,7 @@ static int __init pm_dbg_init(void)
 
 	if (cpu_is_omap34xx())
 		pm_dbg_reg_modules = omap3_pm_reg_modules;
-	else {
+	else if (!cpu_is_omap44xx()) {
 		printk(KERN_ERR "%s: only OMAP3 supported\n", __func__);
 		return -ENODEV;
 	}
