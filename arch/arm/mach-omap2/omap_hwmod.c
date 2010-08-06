@@ -633,7 +633,7 @@ static void __iomem *_find_mpu_rt_base(struct omap_hwmod *oh, u8 index)
  */
 static void _sysc_enable(struct omap_hwmod *oh)
 {
-	u8 idlemode, sf;
+	u8 s_idlemode = 0, m_idlemode = 0, a_idlemode = 0, sf;
 	u32 v;
 
 	if (!oh->class->sysc)
@@ -643,18 +643,16 @@ static void _sysc_enable(struct omap_hwmod *oh)
 	sf = oh->class->sysc->sysc_flags;
 
 	if (sf & SYSC_HAS_SIDLEMODE) {
-		idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
+		s_idlemode = (oh->flags & HWMOD_SWSUP_SIDLE) ?
 			HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
-		_set_slave_idlemode(oh, idlemode, &v);
+		_set_slave_idlemode(oh, s_idlemode, &v);
 	}
 
 	if (sf & SYSC_HAS_MIDLEMODE) {
-		idlemode = (oh->flags & HWMOD_SWSUP_MSTANDBY) ?
+		m_idlemode = (oh->flags & HWMOD_SWSUP_MSTANDBY) ?
 			HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
-		_set_master_standbymode(oh, idlemode, &v);
+		_set_master_standbymode(oh, m_idlemode, &v);
 	}
-
-	/* XXX OCP ENAWAKEUP bit? */
 
 	/*
 	 * XXX The clock framework should handle this, by
@@ -665,19 +663,22 @@ static void _sysc_enable(struct omap_hwmod *oh)
 	    (sf & SYSC_HAS_CLOCKACTIVITY))
 		_set_clockactivity(oh, oh->class->sysc->clockact, &v);
 
-	_write_sysconfig(v, oh);
-
 	/* Set the auto idle bit only after setting the smartidle bit
 	 * as this is requirement for some modules like USBOTG
 	 * setting this will not have any impact on the other modues.
 	 */
 
 	if (sf & SYSC_HAS_AUTOIDLE) {
-		idlemode = (oh->flags & HWMOD_NO_OCP_AUTOIDLE) ?
+		a_idlemode = (oh->flags & HWMOD_NO_OCP_AUTOIDLE) ?
 			0 : 1;
-		_set_module_autoidle(oh, idlemode, &v);
+		_set_module_autoidle(oh, a_idlemode, &v);
 	}
+
 	_write_sysconfig(v, oh);
+
+	/* If slave port is in SMARTIDLE, also enable wakeup */
+	if ((sf & SYSC_HAS_SIDLEMODE) && (s_idlemode == HWMOD_IDLEMODE_SMART))
+		_enable_wakeup(oh);
 }
 
 /**
