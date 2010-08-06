@@ -54,6 +54,11 @@
 
 #define QQVGA_WIDTH		160
 #define QQVGA_HEIGHT	120
+#define WB_MIN_WIDTH		2
+#define WB_MIN_HEIGHT		2
+#define WB_MAX_WIDTH		2048
+#define WB_MAX_HEIGHT		2048
+
 
 struct mutex wb_lock;
 static struct videobuf_queue_ops video_vbq_ops;
@@ -83,6 +88,8 @@ int omap_setup_wb(struct omap_wb_device *wb_device, u32 addr, u32 uv_addr)
 	wb_info.dss_mode = wb_device->dss_mode;
 	wb_info.height = wb_device->pix.height;
 	wb_info.width = wb_device->pix.width;
+	wb_info.out_height = wb_device->win.w.height;
+	wb_info.out_width = wb_device->win.w.width;
 	wb_info.source = wb_device->source;
 	wb_info.source_type = wb_device->source_type;
 	wb_info.paddr = addr;
@@ -92,8 +99,8 @@ int omap_setup_wb(struct omap_wb_device *wb_device, u32 addr, u32 uv_addr)
 			"omap_write back struct contents :\n"
 			"enabled = %d\n infodirty = %d\n"
 			"capturemode = %d\n dss_mode = %d\n"
-			"height = %d\n width = %d\n source = %d\n"
-			"source_type = %d\n paddr =%x\n puvaddr = %x\n",
+			"height = %ld\n width = %ld\n source = %d\n"
+			"source_type = %d\n paddr =%lx\n puvaddr = %lx\n",
 			wb_info.enabled, wb_info.info_dirty, wb_info.capturemode,
 			wb_info.dss_mode, wb_info.height, wb_info.width,
 			wb_info.source, wb_info.source_type, wb_info.paddr,
@@ -178,6 +185,15 @@ static int vidioc_s_fmt_vid_wb(struct file *file, void *fh,
 	/* try & set the new output format */
 	wb->bpp = bpp;
 	wb->pix = f->fmt.pix;
+
+	wb->win.w.width = wb->pix.width;
+	wb->win.w.height = wb->pix.height;
+
+	/* we need to get curr_display dimensions for wb pipeline */
+	wb->win.w.left = ((864 - wb->win.w.width) >> 1) & ~1;
+	wb->win.w.top = ((480 - wb->win.w.height) >> 1) & ~1;
+
+	wb->dss_mode = color_mode;
 
 	mutex_unlock(&wb->lock);
 
@@ -379,6 +395,8 @@ static int vidioc_streamoff(struct file *file, void *fh,
 
 	omap_dispc_unregister_isr(omap_wb_isr, wb, mask);
 
+	omap_dss_wb_flush();
+
 	INIT_LIST_HEAD(&wb->dma_queue);
 	videobuf_streamoff(&wb->vbq);
 	videobuf_queue_cancel(&wb->vbq);
@@ -390,53 +408,32 @@ static int vidioc_default_wb(struct file *file, void *fh,
 {
 	struct v4l2_writeback_ioctl_data *wb_data = NULL;
 	struct omap_wb_device *wb = fh;
-	int r = -1;
-	enum omap_color_mode dss_mode;
+	wb_data  = (struct v4l2_writeback_ioctl_data *)arg;
 
 	switch (cmd) {
 	case VIDIOC_CUSTOM_S_WB:
-		wb_data  = (struct v4l2_writeback_ioctl_data *)arg;
-
 		if (!wb_data) {
-			return -EINVAL;
 			printk(KERN_ERR WB_NAME "error in S_WB\n");
+			goto err;
 		}
 		mutex_lock(&wb->lock);
 		wb->enabled = wb_data->enabled;
-		wb->pix = wb_data->pix;
 		wb->source = wb_data->source;
 		wb->capturemode = wb_data->capturemode;
-		/* source type hardcoded for now */
-		wb->source_type = V4L2_WB_SOURCE_OVERLAY;
-
-		dss_mode = video_mode_to_dss_mode(&wb->pix);
-
-		if (dss_mode == -EINVAL) {
-			printk(KERN_ERR WB_NAME "invalid dss_mode\n");
-			r = -EINVAL;
-			goto err;
-		} else {
-			wb->dss_mode = dss_mode;
-		}
-
+		wb->source_type = wb_data->source_type;
 		mutex_unlock(&wb->lock);
 
 		break;
 
 	case VIDIOC_CUSTOM_G_WB:
-		wb_data  = (struct v4l2_writeback_ioctl_data *)arg;
-
 		if (!wb_data) {
 			printk(KERN_ERR WB_NAME "error in G_WB\n");
-			return -EINVAL;
+			goto err;
 		}
 		mutex_lock(&wb->lock);
-
-		wb_data->pix = wb->pix;
 		wb_data->source = wb->source;
 		wb_data->capturemode = wb->capturemode;
-		wb_data->source_type = V4L2_WB_SOURCE_OVERLAY;
-
+		wb_data->source_type = wb->source_type;
 		mutex_unlock(&wb->lock);
 
 		break;
@@ -445,15 +442,15 @@ static int vidioc_default_wb(struct file *file, void *fh,
 	}
 	return 0;
 
-	err:
+err:
 	mutex_unlock(&wb->lock);
-	return r;
+	return -EINVAL;
 }
 
 static const struct v4l2_ioctl_ops wb_ioctl_fops = {
 	.vidioc_querycap	= vidioc_querycap,
-	.vidioc_g_fmt_vid_cap	= vidioc_g_fmt_vid_wb,
-	.vidioc_s_fmt_vid_cap	= vidioc_s_fmt_vid_wb,
+	.vidioc_g_fmt_vid_cap	= vidioc_g_fmt_vid_cap,
+	.vidioc_s_fmt_vid_cap	= vidioc_s_fmt_vid_cap,
 	.vidioc_reqbufs		= vidioc_reqbufs,
 	.vidioc_querybuf	= vidioc_querybuf,
 	.vidioc_qbuf		= vidioc_qbuf,
