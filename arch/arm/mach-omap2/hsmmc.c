@@ -31,7 +31,7 @@ static u16 control_mmc1;
 
 static struct hsmmc_controller {
 	char				name[HSMMC_NAME_LEN + 1];
-} hsmmc[OMAP34XX_NR_MMC];
+} hsmmc[OMAP44XX_NR_MMC];
 
 #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
 
@@ -201,7 +201,7 @@ static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
 	return 0;
 }
 
-static struct omap_mmc_platform_data *hsmmc_data[OMAP34XX_NR_MMC] __initdata;
+static struct omap_mmc_platform_data *hsmmc_data[OMAP44XX_NR_MMC] __initdata;
 
 void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 {
@@ -339,6 +339,12 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 				mmc->slots[0].before_set_reg = hsmmc23_before_set_reg;
 				mmc->slots[0].after_set_reg = NULL;
 			}
+			break;
+		case 4:
+		case 5:
+			/* TODO Update required */
+			mmc->slots[0].before_set_reg = NULL;
+			mmc->slots[0].after_set_reg = NULL;
 			break;
 		default:
 			pr_err("MMC%d configuration not supported!\n", c->mmc);
