@@ -4852,6 +4852,22 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 }
 
+void dispc_flush_wb(struct writeback_cache_data *wb)
+{
+	enum omap_writeback_source	source = wb->source;
+	enum omap_plane plane = OMAP_DSS_WB;
+	enum omap_plane input_plane;
+
+	if (source > OMAP_WB_TV_MANAGER) {
+		input_plane = (source - 3);
+	REG_FLD_MOD(dispc_reg_att[input_plane], 0x0, 31, 30);
+	#ifdef OMAP4430_REV_ES2_0
+	/* Memory to memory mode bit is set on ES 2.0 */
+	REG_FLD_MOD(dispc_reg_att[plane], 0, 19, 19);
+	#endif
+	}
+}
+
 void dispc_go_wb(void)
 {
 	enable_clocks(1);

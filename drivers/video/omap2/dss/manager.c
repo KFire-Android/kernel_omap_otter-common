@@ -1567,13 +1567,10 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 		++num_planes_enabled;
 		wbc = &dss_cache.writeback_cache;
 
-		if (!wb->first_time) {
-			DSSDBG("entered wb_first time\n");
-			wbc->enabled = true;
-			wbc->source = wb->info.source;
-			wbc->source_type = wb->info.source_type;
-			wb->first_time = true;
-		}
+		wbc->enabled = true;
+		wbc->source = wb->info.source;
+		wbc->source_type = wb->info.source_type;
+
 		DSSDBG("dss_wb_apply %d\n", wbc->enabled);
 		/* Configure Write-back - check for connect with this overlay*/
 		if ((wbc->enabled) &&
@@ -1597,10 +1594,10 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 				wbc->color_mode = wb->info.dss_mode;
 				wbc->input_color_mode = oc->color_mode;
 				/*OMAP_DSS_COLOR_ARGB32;  */
-				wbc->width = wb->info.width;
-				wbc->height = wb->info.height;
-				wbc->input_width = ovl->info.width;
-				wbc->input_height = ovl->info.height;
+				wbc->width = wb->info.out_width;
+				wbc->height = wb->info.out_height;
+				wbc->input_width = wb->info.width;
+				wbc->input_height = wb->info.height;
 
 				wbc->paddr = wb->info.paddr;
 				wbc->puv_addr = wb->info.puv_addr;
@@ -1735,6 +1732,21 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 }
 
 EXPORT_SYMBOL(omap_dss_wb_apply);
+
+int omap_dss_wb_flush()
+{
+	struct writeback_cache_data *wbc;
+	wbc = &dss_cache.writeback_cache;
+	if (wbc->enabled) {
+		wbc->enabled = false;
+		wbc->dirty = true;
+		}
+	printk(KERN_ERR"flush dispc data");
+	dispc_flush_wb(wbc);
+
+
+}
+EXPORT_SYMBOL(omap_dss_wb_flush);
 
 static int dss_check_manager(struct omap_overlay_manager *mgr)
 {

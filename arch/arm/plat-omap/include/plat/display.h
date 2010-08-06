@@ -475,6 +475,8 @@ struct omap_writeback_info {
 		enum omap_writeback_source_type 	source_type;
 		unsigned long				width;
 		unsigned long				height;
+		unsigned long				out_width;
+		unsigned long				out_height;
 		enum omap_color_mode			dss_mode;
 		enum omap_writeback_capturemode 	capturemode;
 		unsigned long				paddr;

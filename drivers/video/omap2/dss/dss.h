@@ -462,6 +462,7 @@ int dispc_set_clock_div(enum omap_channel channel,
 int dispc_get_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
 void dispc_go_wb(void);
+void dispc_flush_wb(struct writeback_cache_data *wb);
 int dispc_setup_wb(struct writeback_cache_data *wb);
 
 /* VENC */

@@ -68,6 +68,7 @@ enum omap_color_mode video_mode_to_dss_mode(
 			struct v4l2_pix_format *pix);
 void omap_wb_isr(void *arg, unsigned int irqstatus);
 int	omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *wb);
+int omap_dss_wb_flush();
 
 int omap_setup_wb(struct omap_wb_device *wb_device, u32 addr, u32 uv_addr)
 {
