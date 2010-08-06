@@ -1154,7 +1154,7 @@ static int hdmi_w1_audio_config(void)
 
 int hdmi_lib_enable(struct hdmi_config *cfg)
 {
-	u32 r, val;
+	u32 r;
 
 	u32 av_name = HDMI_CORE_AV;
 

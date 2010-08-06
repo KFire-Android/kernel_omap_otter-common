@@ -1260,7 +1260,7 @@ int hdmi_init_display(struct omap_dss_device *dssdev)
 
 static int hdmi_read_edid(struct omap_video_timings *dp)
 {
-	int r = 0, i = 0 , flag = 0 , ret, code;
+	int r = 0, ret, code;
 
 	memset(edid, 0, HDMI_EDID_MAX_LENGTH);
 
