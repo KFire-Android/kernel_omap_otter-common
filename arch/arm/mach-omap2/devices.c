@@ -771,15 +771,14 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 
 #define MAX_OMAP_MMC_HWMOD_NAME_LEN		16
 
-void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
-			   int nr_controllers)
+void __init omap2_init_mmc(struct omap_mmc_platform_data *mmc_data, int ctrl_nr)
 {
 	struct omap_hwmod *oh;
 	struct omap_device *od;
 	struct omap_device_pm_latency *ohl;
 	char oh_name[MAX_OMAP_MMC_HWMOD_NAME_LEN];
 	char *name;
-	int i, l;
+	int l;
 	int ohl_cnt = 0;
 
 	if (cpu_is_omap2420()) {
@@ -790,38 +789,30 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data **mmc_data,
 		ohl_cnt = ARRAY_SIZE(omap_hsmmc_latency);
 	}
 
+	l = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
+		     "mmc%d", ctrl_nr);
+	WARN(l >= MAX_OMAP_MMC_HWMOD_NAME_LEN,
+	     "String buffer overflow in MMC%d device setup\n", ctrl_nr);
+	oh = omap_hwmod_lookup(oh_name);
+	if (!oh) {
+		pr_err("Could not look up %s\n", oh_name);
+		return;
+	}
+
+	mmc_data->dev_attr = oh->dev_attr;
+
+	omap2_mmc_mux(mmc_data, ctrl_nr - 1);
+	od = omap_device_build(name, ctrl_nr - 1, oh, mmc_data,
+			       sizeof(struct omap_mmc_platform_data),
+			       ohl, ohl_cnt, false);
+	WARN(IS_ERR(od), "Could not build omap_device for %s %s\n",
+	     name, oh_name);
+
 	/*
-	 * XXX This isn't a good way to set these up.  What if a board
-	 * uses MMC2 but not MMC1?
+	 * return device handle to board setup code
+	 * required to populate for regulator framework structure
 	 */
-	for (i = 1; i <= nr_controllers; i++) {
-		int idx = i - 1;
-
-		l = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
-			     "mmc%d", i);
-		WARN(l >= MAX_OMAP_MMC_HWMOD_NAME_LEN,
-		     "String buffer overflow in MMC%d device setup\n", i);
-		oh = omap_hwmod_lookup(oh_name);
-		if (!oh) {
-			pr_err("Could not look up %s\n", oh_name);
-			continue;
-		}
-
-		mmc_data[idx]->dev_attr = oh->dev_attr;
-
-		omap2_mmc_mux(mmc_data[idx], idx);
-		od = omap_device_build(name, idx, oh, mmc_data[idx],
-				       sizeof(struct omap_mmc_platform_data),
-				       ohl, ohl_cnt, false);
-		WARN(IS_ERR(od), "Could not build omap_device for %s %s\n",
-		     name, oh_name);
-
-		/*
-		 * return device handle to board setup code
-		 * XXX Can this be removed?
-		 */
-		mmc_data[idx]->dev = &od->pdev.dev;
-	};
+	mmc_data->dev = &od->pdev.dev;
 }
 
 #endif
