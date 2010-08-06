@@ -1257,11 +1257,20 @@ static void _dispc_setup_color_conv_coef(void)
 		298,  409,    0,  298, -208, -100,  298,    0,  517, 0,
 	};
 
+	const struct wb_color_conv_coef {
+		int  yr,  crr,  cbr,   yg,  crg,  cbg,   yb,  crb,  cbb;
+		int  full_range;
+	}  ctbl_wbt601_5 = {
+		66,  112,  -38, 129, -94, -74,  25, -18,  112, 0,
+	};
+
 	const struct color_conv_coef *ct;
+	const struct wb_color_conv_coef *ct_wb;
 
 #define CVAL(x, y) (FLD_VAL(x, 26, 16) | FLD_VAL(y, 10, 0))
 
 	ct = &ctbl_bt601_5;
+	ct_wb = &ctbl_wbt601_5;
 
 	dispc_write_reg(DISPC_VID_CONV_COEF(0, 0), CVAL(ct->rcr, ct->ry));
 	dispc_write_reg(DISPC_VID_CONV_COEF(0, 1), CVAL(ct->gy,	 ct->rcb));
@@ -1288,17 +1297,17 @@ static void _dispc_setup_color_conv_coef(void)
 		REG_FLD_MOD(DISPC_VID_V3_WB_ATTRIBUTES(0), ct->full_range, 11, 11);
 		/* Writeback */
 		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(1, 0),
-			CVAL(ct->rcr, ct->ry));
+			CVAL(ct_wb->yg, ct_wb->yr));
 		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(1, 1),
-			CVAL(ct->gy,  ct->rcb));
+			CVAL(ct_wb->crr,  ct_wb->yb));
 		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(1, 2),
-			CVAL(ct->gcb, ct->gcr));
+			CVAL(ct_wb->crb, ct_wb->crg));
 		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(1, 3),
-			CVAL(ct->bcr, ct->by));
+			CVAL(ct_wb->cbg, ct_wb->cbr));
 		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(1, 4),
-			CVAL(0,	ct->bcb));
+			CVAL(0,	ct_wb->cbb));
 
-		REG_FLD_MOD(DISPC_VID_V3_WB_ATTRIBUTES(1), ct->full_range, 11, 11);
+		REG_FLD_MOD(DISPC_VID_V3_WB_ATTRIBUTES(1), ct_wb->full_range, 11, 11);
 
 	}
 
@@ -4812,6 +4821,9 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 		;
 	}
 
+	_dispc_set_vid_size(plane, out_width, out_height);
+	_dispc_set_vid_color_conv(plane, cconv);
+
 	/* we must scale NV12 format */
 	scale_x = width != out_width || ch_width != out_ch_width;
 	scale_y = height != out_height || ch_height != out_ch_height;
@@ -4828,9 +4840,6 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 		/* set chroma resampling */
 		REG_FLD_MOD(DISPC_VID_ATTRIBUTES2(plane - 1), 0, 8, 8);
 	}
-
-	_dispc_set_vid_size(plane, out_width, out_height);
-	_dispc_set_vid_color_conv(plane, cconv);
 
 	pix_inc = dispc_read_reg(dispc_reg_att[plane]);
 	DSSDBG("vid[%d] attributes = %x\n", plane, pix_inc);
