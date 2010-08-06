@@ -27,6 +27,12 @@ extern struct dentry *pm_dbg_main_dir;
 #define OMAP3_VDD1_SR_CONTROL_REG		0x00
 #define OMAP3_VDD2_SR_CONTROL_REG		0x01
 
+/* Voltage SR parameters for OMAP4 */
+#define OMAP4_SRI2C_SLAVE_ADDR			0x12
+#define OMAP4_VDD_MPU_SR_VOLT_REG		0x55
+#define OMAP4_VDD_IVA_SR_VOLT_REG		0x5B
+#define OMAP4_VDD_CORE_SR_VOLT_REG		0x61
+
 /*
  * Omap3 VP register specific values. Maybe these need to come from
  * board file or PMIC data structure
@@ -56,7 +62,19 @@ extern struct dentry *pm_dbg_main_dir;
 #define OMAP3630_VP2_VLIMITTO_VDDMIN		0x18
 #define OMAP3630_VP2_VLIMITTO_VDDMAX		0x30
 
-/* TODO OMAP4 VP register values if the same file is used for OMAP4*/
+/* OMAP4 VP register values */
+#define OMAP4_VP_CONFIG_ERROROFFSET		0x00
+#define	OMAP4_VP_VSTEPMIN_SMPSWAITTIMEMIN	0x3C
+#define OMAP4_VP_VSTEPMIN_VSTEPMIN		0x1
+#define OMAP4_VP_VSTEPMAX_SMPSWAITTIMEMAX	0x3C
+#define OMAP4_VP_VSTEPMAX_VSTEPMAX		0x04
+#define OMAP4_VP_VLIMITTO_TIMEOUT_US		0x200
+#define OMAP4_VP_MPU_VLIMITTO_VDDMIN		0x18
+#define OMAP4_VP_MPU_VLIMITTO_VDDMAX		0x3C
+#define OMAP4_VP_IVA_VLIMITTO_VDDMIN		0x18
+#define OMAP4_VP_IVA_VLIMITTO_VDDMAX		0x3C
+#define OMAP4_VP_CORE_VLIMITTO_VDDMIN		0x18
+#define OMAP4_VP_CORE_VLIMITTO_VDDMAX		0x30
 
 /**
  * voltagedomain - omap voltage domain global structure
