@@ -247,6 +247,24 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *fh,
 	return 0;
 }
 
+static int vidioc_s_fmt_vid_overlay(struct file *file, void *fh,
+			struct v4l2_format *f)
+{
+	int ret = 0;
+	struct omap_wb_device *wb = fh;
+	struct v4l2_window *win = &f->fmt.win;
+
+	mutex_lock(&wb->lock);
+	/* No boundry checks for wb window for now */
+	wb->win.w.left = win->w.left;
+	wb->win.w.top = win->w.top;
+	wb->win.w.width = win->w.width;
+	wb->win.w.height = win->w.height;
+	mutex_unlock(&wb->lock);
+
+	return ret;
+}
+
 static int vidioc_reqbufs(struct file *file, void *fh,
 			struct v4l2_requestbuffers *req)
 {
@@ -494,6 +512,20 @@ err:
 	return -EINVAL;
 }
 
+static int vidioc_g_fmt_vid_overlay(struct file *file, void *fh,
+			struct v4l2_format *f)
+{
+
+	struct omap_wb_device *wb = fh;
+	struct v4l2_window *win = &f->fmt.win;
+
+	win->w = wb->win.w;
+	win->field = wb->win.field;
+	win->global_alpha = wb->win.global_alpha;
+
+	return 0;
+}
+
 static const struct v4l2_ioctl_ops wb_ioctl_fops = {
 	.vidioc_querycap	= vidioc_querycap,
 	.vidioc_g_fmt_vid_cap	= vidioc_g_fmt_vid_cap,
@@ -504,6 +536,8 @@ static const struct v4l2_ioctl_ops wb_ioctl_fops = {
 	.vidioc_dqbuf		= vidioc_dqbuf,
 	.vidioc_streamon	= vidioc_streamon,
 	.vidioc_streamoff	= vidioc_streamoff,
+	.vidioc_s_fmt_vid_overlay = vidioc_s_fmt_vid_overlay,
+	.vidioc_g_fmt_vid_overlay = vidioc_g_fmt_vid_overlay,
 	.vidioc_default		= vidioc_default_wb,
 };
 
