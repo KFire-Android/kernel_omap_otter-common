@@ -1052,7 +1052,7 @@ static struct snd_soc_dai_driver twl6040_dai[] = {
 {
 	.name = "twl6040-vib",
 	.playback = {
-		.stream_name = "Vibra",
+		.stream_name = "Vibra Playback",
 		.channels_min = 2,
 		.channels_max = 2,
 		.rates = SNDRV_PCM_RATE_CONTINUOUS,
