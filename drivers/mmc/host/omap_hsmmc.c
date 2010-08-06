@@ -2181,6 +2181,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 							" clk failed\n");
 	}
 
+#if 0
 	ctrlr_caps = OMAP_HSMMC_READ(host, CAPA);
 	if (ctrlr_caps & CAPA_ADMA_SUPPORT) {
 		/* FIXME: passing the device structure fails
@@ -2193,6 +2194,9 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	} else {
 			host->dma_type = SDMA_XFER;
 	}
+#endif
+	host->dma_type = SDMA_XFER;
+
 	dev_dbg(mmc_dev(host->mmc), "DMA Mode=%d\n", host->dma_type);
 
 	/* Since we do only SG emulation, we can have as many segs
