@@ -16,6 +16,7 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/err.h>
+#include <linux/i2c/twl.h>
 
 #include <mach/hardware.h>
 #include <asm/mach-types.h>
@@ -290,6 +291,45 @@ fail:
 
 /*-------------------------------------------------------------------------*/
 
+#if defined(SND_OMAP_SOC_ABE_DSP)
+
+static struct omap_device_pm_latency omap_aess_latency[] = {
+	{
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static void omap_init_aess(void)
+{
+	struct omap_hwmod *oh;
+	struct omap_device *od;
+	struct twl6040_code_data *pdata;
+
+	oh = omap_hwmod_lookup("aess");
+	if (!oh)
+		printk (KERN_ERR "Could not look up aess hw_mod\n");
+
+
+	pdata->device_enable = omap_device_enable;
+	pdata->device_idle = omap_device_idle;
+	pdata->device_shutdown = omap_device_shutdown;
+
+	od = omap_device_build("omap-aess", -1, oh, pdata,
+				sizeof(struct omap_aess_platform_data),
+				omap_aess_latency,
+				ARRAY_SIZE(omap_aess_latency), 0);
+
+	if (od <= 0)
+		printk(KERN_ERR "Could not build omap_device for omap-aess\n");
+}
+#else
+static inline void omap_init_aess(void) {}
+#endif
+
+/*-------------------------------------------------------------------------*/
+
 #if defined(CONFIG_HW_RANDOM_OMAP) || defined(CONFIG_HW_RANDOM_OMAP_MODULE)
 
 #ifdef CONFIG_ARCH_OMAP2
@@ -447,6 +487,7 @@ static int __init omap_init_devices(void)
 	/* please keep these calls, and their implementations above,
 	 * in alphabetical order so they're easier to sort through.
 	 */
+	omap_init_aess();
 	omap_init_dsp();
 	omap_init_kp();
 	omap_init_rng();

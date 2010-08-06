@@ -1274,32 +1274,6 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 
 	INIT_DELAYED_WORK(&abe->delayed_work,close_delayed_work);
 
-	// TODO: both hwmod calls are failing atm
-	oh = omap_hwmod_lookup("aess");
-	if (!oh) {
-		printk (KERN_ERR "could not look up aess hw_mod\n");
-		//ret = -ENODEV;
-		//goto err;
-	}
-
-	od = omap_device_build("omap-aess", -1, oh, pdata,
-				sizeof(struct omap4_abe_dsp_pdata),
-				omap_aess_latency,
-				ARRAY_SIZE(omap_aess_latency), 0);
-
-	if (IS_ERR_OR_NULL(od)) {
-		printk(KERN_ERR "could not build omap_device for omap-aess\n");
-		//ret = PTR_ERR(od);
-		//goto err;
-	}
-
-#if 0
-	ret = omap_device_enable(pdev);
-	if (ret < 0) {
-		printk(KERN_ERR "%s: could not enable aess\n", __func__);
-		goto err;
-	}
-#endif
 	ret = snd_soc_register_platform(&pdev->dev,
 			&omap_aess_platform);
 	if (ret == 0)
@@ -1316,7 +1290,6 @@ static int __devexit abe_engine_remove(struct platform_device *pdev)
 	struct abe_data *priv = dev_get_drvdata(&pdev->dev);
 
 	snd_soc_unregister_platform(&pdev->dev);
-	//omap_device_shutdown(pdev);
 
 	kfree(priv);
 	return 0;
