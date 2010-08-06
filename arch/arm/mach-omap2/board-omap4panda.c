@@ -379,7 +379,7 @@ static struct i2c_board_info __initdata panda_i2c_boardinfo[] = {
 static int __init omap4_i2c_init(void)
 {
 	/* Phoenix Audio IC needs I2C1 to start with 400 KHz and less */
-	omap_register_i2c_bus(1, 400, panda_i2c_boardinfo,
+	omap_register_i2c_bus(1, 400, NULL, panda_i2c_boardinfo,
 				ARRAY_SIZE(panda_i2c_boardinfo));
 	return 0;
 }
