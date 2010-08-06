@@ -234,6 +234,13 @@ struct dsi_irq_stats {
 	unsigned cio_irqs[32];
 };
 
+struct error_recovery {
+	struct work_struct recovery_work;
+	struct omap_dss_device *dssdev;
+	bool enabled;
+	bool recovering;
+};
+
 static struct dsi_struct
 {
 	void __iomem	*base;
@@ -285,6 +292,8 @@ static struct dsi_struct
 #endif
 	int debug_read;
 	int debug_write;
+
+	struct error_recovery recover;
 
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
 	spinlock_t irq_stats_lock;
@@ -520,6 +529,15 @@ static void print_irq_status_cio(u32 status)
 
 static int debug_irq;
 
+static void schedule_error_recovery(enum omap_dsi_index ix)
+{
+	struct dsi_struct *p_dsi;
+	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
+
+	if (p_dsi->recover.enabled && !p_dsi->recover.recovering)
+		schedule_work(&p_dsi->recover.recovery_work);
+}
+
 /* called from dss in OMAP3, in OMAP4 there is a dedicated
 * interrupt line for DSI */
 irqreturn_t dsi_irq_handler(int irq, void *arg)
@@ -543,6 +561,7 @@ irqreturn_t dsi_irq_handler(int irq, void *arg)
 		spin_lock(&dsi1.errors_lock);
 		dsi1.errors |= irqstatus & DSI_IRQ_ERROR_MASK;
 		spin_unlock(&dsi1.errors_lock);
+		schedule_error_recovery(ix);
 	} else if (debug_irq) {
 		print_irq_status(irqstatus);
 	}
@@ -573,6 +592,7 @@ irqreturn_t dsi_irq_handler(int irq, void *arg)
 			DSSERR("DSI VC(%d) error, vc irqstatus %x\n",
 				       i, vcstatus);
 			print_irq_status_vc(i, vcstatus);
+			schedule_error_recovery(ix);
 		} else if (debug_irq) {
 			print_irq_status_vc(i, vcstatus);
 		}
@@ -632,6 +652,7 @@ irqreturn_t dsi2_irq_handler(int irq, void *arg)
 		spin_lock(&dsi2.errors_lock);
 		dsi2.errors |= irqstatus & DSI_IRQ_ERROR_MASK;
 		spin_unlock(&dsi2.errors_lock);
+		schedule_error_recovery(ix);
 	} else if (debug_irq) {
 		print_irq_status(irqstatus);
 	}
@@ -662,6 +683,7 @@ irqreturn_t dsi2_irq_handler(int irq, void *arg)
 			DSSERR("DSI VC(%d) error, vc irqstatus %x\n",
 				       i, vcstatus);
 			print_irq_status_vc(i, vcstatus);
+			schedule_error_recovery(ix);
 		} else if (debug_irq) {
 			print_irq_status_vc(i, vcstatus);
 		}
@@ -3616,6 +3638,8 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 	if (r)
 		goto err2;
 
+	p_dsi->recover.enabled = true;
+
 	mutex_unlock(&p_dsi->lock);
 
 	return 0;
@@ -3656,6 +3680,8 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 
 	omap_dss_stop_device(dssdev);
 
+	p_dsi->recover.enabled = false;
+
 	mutex_unlock(&p_dsi->lock);
 }
 EXPORT_SYMBOL(omapdss_dsi_display_disable);
@@ -3669,6 +3695,17 @@ int omapdss_dsi_enable_te(struct omap_dss_device *dssdev, bool enable)
 	return 0;
 }
 EXPORT_SYMBOL(omapdss_dsi_enable_te);
+
+bool omap_dsi_recovery_state(enum omap_dsi_index ix)
+{
+	struct dsi_struct *p_dsi;
+
+	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
+
+	return p_dsi->recover.recovering;
+
+}
+EXPORT_SYMBOL(omap_dsi_recovery_state);
 
 void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
@@ -3698,6 +3735,8 @@ int dsi_init_display(struct omap_dss_device *dssdev)
 	p_dsi->vc[0].dssdev = dssdev;
 	p_dsi->vc[1].dssdev = dssdev;
 
+	p_dsi->recover.dssdev = dssdev;
+
 	return 0;
 }
 
@@ -3711,6 +3750,77 @@ void dsi_wait_dsi2_pll_active(enum omap_dsi_index ix)
 {
 	if (wait_for_bit_change(ix, DSI_PLL_STATUS, 8, 1) != 1)
 		DSSERR("DSI2 PLL clock not active\n");
+}
+
+static void dsi_error_recovery_worker(struct work_struct *work)
+{
+	u32 r;
+	struct dsi_struct *p_dsi;
+	enum omap_dsi_index ix;
+	struct error_recovery *recover;
+
+	recover = container_of(work, struct error_recovery,
+					recovery_work);
+	recover->recovering = true;
+	ix = (recover->dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
+	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
+
+	mutex_lock(&p_dsi->lock);
+	dsi_bus_lock(ix);
+
+	DSSERR("DSI error, ESD detected DSI%d\n", ix + 1);
+
+	if (!recover->enabled) {
+		DSSERR("recovery not enabled\n");
+		goto err;
+	}
+
+	enable_clocks(1);
+	dsi_enable_pll_clock(ix, 1);
+
+	dsi_force_tx_stop_mode_io(ix);
+
+	r = dsi_read_reg(ix, DSI_TIMING1);
+	r = FLD_MOD(r, 0, 15, 15);	/* FORCE_TX_STOP_MODE_IO */
+	dsi_write_reg(ix, DSI_TIMING1, r);
+
+	dsi_vc_enable(ix, 0, 0);
+	dsi_vc_enable(ix, 1, 0);
+
+	dsi_if_enable(ix, 0);
+
+	dsi_vc_enable(ix, 0, 1);
+	dsi_vc_enable(ix, 1, 1);
+
+	dsi_if_enable(ix, 1);
+
+	dsi_force_tx_stop_mode_io(ix);
+
+	enable_clocks(0);
+	dsi_enable_pll_clock(ix, 0);
+
+
+	/* Now check to ensure there is communication. */
+	/* If not, we need to hard reset */
+	if (recover->dssdev->driver->run_test) {
+		dsi_bus_unlock(ix);
+		mutex_unlock(&p_dsi->lock);
+
+		if (recover->dssdev->driver->run_test(recover->dssdev, 1) != 0) {
+			DSSERR("DSS IF reset failed, resetting panel taal%d\n", ix + 1);
+			recover->dssdev->driver->disable(recover->dssdev);
+			mdelay(10);
+			recover->dssdev->driver->enable(recover->dssdev);
+			recover->recovering = false;
+		}
+		return;
+	}
+
+	recover->recovering = false;
+
+	dsi_bus_unlock(ix);
+err:
+	mutex_unlock(&p_dsi->lock);
 }
 
 int dsi_init(struct platform_device *pdev)
@@ -3745,6 +3855,12 @@ int dsi_init(struct platform_device *pdev)
 		if (r)
 			goto err2;
 	}
+
+	dsi1.recover.dssdev = 0;
+	dsi1.recover.enabled = false;
+	dsi1.recover.recovering = false;
+	INIT_WORK(&dsi1.recover.recovery_work,
+		dsi_error_recovery_worker);
 #ifdef DSI_CATCH_MISSING_TE
 	init_timer(&dsi1.te_timer);
 	dsi1.te_timer.function = dsi_te_timeout;
@@ -3816,6 +3932,12 @@ int dsi2_init(struct platform_device *pdev)
         if (r)
            goto err2;
 
+
+	dsi2.recover.dssdev = 0;
+	dsi2.recover.enabled = false;
+	dsi2.recover.recovering = false;
+	INIT_WORK(&dsi2.recover.recovery_work,
+		dsi_error_recovery_worker);
 #ifdef DSI_CATCH_MISSING_TE
 	init_timer(&dsi2.te_timer);
 	dsi2.te_timer.function = dsi2_te_timeout;
