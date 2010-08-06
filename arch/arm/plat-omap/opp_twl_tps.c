@@ -14,6 +14,7 @@
  */
 
 #include <plat/opp_twl_tps.h>
+#include <plat/cpu.h>
 
 /**
  * omap_twl_vsel_to_vdc - convert TWL/TPS VSEL value to microvolts DC
@@ -24,6 +25,9 @@
  */
 unsigned long omap_twl_vsel_to_uv(const u8 vsel)
 {
+	if (cpu_is_omap44xx())
+		return ((((vsel - 1) * 125) + 7000)) * 100;
+
 	return (((vsel * 125) + 6000)) * 100;
 }
 
@@ -37,5 +41,8 @@ unsigned long omap_twl_vsel_to_uv(const u8 vsel)
 u8 omap_twl_uv_to_vsel(unsigned long uv)
 {
 	/* Round up to higher voltage */
+	if (cpu_is_omap44xx())
+		return DIV_ROUND_UP(uv - 700000, 12500) + 1;
+
 	return DIV_ROUND_UP(uv - 600000, 12500);
 }
