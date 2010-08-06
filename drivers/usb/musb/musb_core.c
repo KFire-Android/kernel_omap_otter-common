@@ -2215,6 +2215,7 @@ bad_config:
 			? "DMA" : "PIO",
 			musb->nIrq);
 
+#ifdef CONFIG_USB_MUSB_HDRC_HCD
 	if (cpu_is_omap44xx()) {
 		/* Delay supply of VBUS. This fixes bootup enumeration issue */
 		mdelay(500);
@@ -2226,6 +2227,7 @@ bad_config:
 		twl_i2c_write_u8(TWL_MODULE_MAIN_CHARGE , 0x40,
 						CHARGERUSB_CTRL1);
 	}
+#endif
 	return 0;
 
 fail5:
