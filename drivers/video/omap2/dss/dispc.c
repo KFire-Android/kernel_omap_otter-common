@@ -2755,14 +2755,12 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			return -EINVAL;
 		}
 
+#ifndef OMAP4430_REV_ES2_0
 		/* Must use 3-tap filter */
 		three_taps = width > 1280;
-
-		/* Should use 3-tap filter for upscaling, but HDMI gets
-		   out of sync if using 3-tap */
-		/* if (out_height > height)
-			three_taps = 1; */
-
+#else
+		three_taps = 0;
+#endif
 		if (three_taps) {
 			fclk = calc_fclk(channel, width, height,
 					out_width, out_height);
@@ -2784,7 +2782,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		DSSDBG("required fclk rate = %lu Hz\n", fclk);
 		DSSDBG("current fclk rate = %lu Hz\n", dispc_fclk_rate());
 
-		if (fclk > dispc_fclk_rate()) {
+		if (!cpu_is_omap44xx() && fclk > dispc_fclk_rate()) {
 			DSSERR("failed to set up scaling, "
 					"required fclk rate = %lu Hz, "
 					"current fclk rate = %lu Hz\n",
