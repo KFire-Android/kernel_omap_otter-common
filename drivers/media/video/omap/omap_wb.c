@@ -133,6 +133,59 @@ err:
 	return r;
 }
 
+int omap_wb_try_format(enum omap_color_mode *color_mode,
+			struct v4l2_pix_format *pix)
+{
+	int bpp = 0;
+
+	pix->height = clamp(pix->height, (u32)WB_MIN_HEIGHT,
+			(u32)WB_MAX_HEIGHT);
+	pix->width = clamp(pix->width, (u32)WB_MIN_WIDTH, (u32)WB_MAX_WIDTH);
+
+	switch (pix->pixelformat) {
+	case V4L2_PIX_FMT_RGB565:
+	case V4L2_PIX_FMT_RGB565X:
+		*color_mode = OMAP_DSS_COLOR_RGB16;
+		bpp = RGB565_BPP;
+		break;
+	case V4L2_PIX_FMT_RGB24:
+		*color_mode = OMAP_DSS_COLOR_RGB24P;
+		bpp = RGB24_BPP;
+		break;
+	case V4L2_PIX_FMT_BGR32:
+		*color_mode = OMAP_DSS_COLOR_RGBX32;
+		bpp = RGB32_BPP;
+	case V4L2_PIX_FMT_YUYV:
+		*color_mode = OMAP_DSS_COLOR_YUV2;
+		bpp = YUYV_BPP;
+		break;
+	case V4L2_PIX_FMT_UYVY:
+		*color_mode = OMAP_DSS_COLOR_UYVY;
+		bpp = YUYV_BPP;
+		break;
+	case V4L2_PIX_FMT_NV12:
+		*color_mode = OMAP_DSS_COLOR_NV12;
+		bpp = 1; /* TODO: check this? */
+		break;
+	case V4L2_PIX_FMT_RGB32:
+	default:
+		*color_mode = OMAP_DSS_COLOR_ARGB32;
+		bpp = RGB32_BPP;
+		break;
+	}
+
+	pix->colorspace = V4L2_COLORSPACE_SRGB;
+	pix->field = V4L2_FIELD_ANY;
+	pix->priv = 0;
+
+	pix->bytesperline = pix->width * bpp;
+	pix->bytesperline = (pix->bytesperline + PAGE_SIZE - 1) &
+		~(PAGE_SIZE - 1);
+	pix->sizeimage = pix->bytesperline * pix->height;
+
+	return bpp;
+}
+
 /*
  *
  * IOCTL interface.
@@ -152,7 +205,7 @@ static int vidioc_querycap(struct file *file, void *fh,
 	return 0;
 }
 
-static int vidioc_g_fmt_vid_wb(struct file *file, void *fh,
+static int vidioc_g_fmt_vid_cap(struct file *file, void *fh,
 			struct v4l2_format *f)
 {
 	struct omap_wb_device *wb = fh;
@@ -162,25 +215,19 @@ static int vidioc_g_fmt_vid_wb(struct file *file, void *fh,
 
 }
 
-static int vidioc_s_fmt_vid_wb(struct file *file, void *fh,
+static int vidioc_s_fmt_vid_cap(struct file *file, void *fh,
 			struct v4l2_format *f)
 {
 	struct omap_wb_device *wb = fh;
 	int bpp;
+	enum omap_color_mode color_mode;
 
 	if (wb->streaming)
 		return -EBUSY;
 
 	mutex_lock(&wb->lock);
 
-	bpp = omap_vout_try_format(&f->fmt.pix);
-
-	if (V4L2_PIX_FMT_NV12 == f->fmt.pix.pixelformat)
-		f->fmt.pix.sizeimage = f->fmt.pix.width *
-					f->fmt.pix.height * 3/2;
-	else
-		f->fmt.pix.sizeimage = f->fmt.pix.width *
-					f->fmt.pix.height * bpp;
+	bpp = omap_wb_try_format(&color_mode, &f->fmt.pix);
 
 	/* try & set the new output format */
 	wb->bpp = bpp;
@@ -888,7 +935,7 @@ static int __init omap_wb_setup_video_data(struct omap_wb_device *wb)
 	pix->priv = 0;
 	pix->colorspace = V4L2_COLORSPACE_JPEG;
 
-	wb->bpp = RGB565_BPP;
+	wb->bpp = RGB32_BPP;
 	wb->enabled = false;
 	wb->buffer_allocated = 0;
 	wb->capturemode = V4L2_WB_CAPTURE_ALL;
