@@ -25,7 +25,8 @@
 #include <plat/omap_device.h>
 #include <linux/pm_runtime.h>
 
-static int timer_id __initdata;
+static int early_timer_count __initdata;
+static int is_early_init __initdata = 1;
 
 static char *omap2_dm_source_names[] __initdata = {
 	"sys_ck",
@@ -54,23 +55,19 @@ static struct clk **omap_dm_source_clocks;
 
 static void omap2_dm_timer_enable(struct platform_device *pdev)
 {
-#ifdef CONFIG_PM_RUNTIME
 	if (pm_runtime_get_sync(&pdev->dev))
 		dev_warn(&pdev->dev, "%s: Unable to enable the timer%d\n",
 			__func__, pdev->id);
-#endif
 }
 
 static void omap2_dm_timer_disable(struct platform_device *pdev)
 {
-#ifdef CONFIG_PM_RUNTIME
 	if (pm_runtime_put_sync(&pdev->dev))
 		dev_warn(&pdev->dev, "%s: Unable to disable the timer%d\n",
 			__func__, pdev->id);
-#endif
 }
 
-static void omap2_dm_ms_timer_enable(struct platform_device *pdev)
+static void omap2_dm_early_timer_enable(struct platform_device *pdev)
 {
 #ifdef CONFIG_PM_RUNTIME
 	/* when pm_runtime is enabled, it is still inactive at this point
@@ -82,7 +79,7 @@ static void omap2_dm_ms_timer_enable(struct platform_device *pdev)
 #endif
 }
 
-static void omap2_dm_ms_timer_disable(struct platform_device *pdev)
+static void omap2_dm_early_timer_disable(struct platform_device *pdev)
 {
 #ifdef CONFIG_PM_RUNTIME
 	/* when pm_runtime is enabled, it is still inactive at this point
@@ -104,18 +101,22 @@ static int omap2_dm_timer_set_src(struct platform_device *pdev,
 			__func__);
 		return -EINVAL;
 	}
-	clk_disable(timer_clk);
+
+	if (unlikely(is_early_init))
+		clk_disable(timer_clk);
+	else
+		omap_device_idle(pdev);
+
 	ret = clk_set_parent(timer_clk, omap_dm_source_clocks[source]);
 	if (ret)
 		dev_warn(&pdev->dev, "%s: Not able to change "
 			"fclk source\n", __func__);
-	clk_enable(timer_clk);
 
-	/*
-	 * When the functional clock disappears, too quick writes seem
-	 * to cause an abort. XXX Is this still necessary?
-	 */
-	__delay(150000);
+	if (unlikely(is_early_init))
+		clk_enable(timer_clk);
+	else
+		omap_device_enable(pdev);
+
 	return ret;
 }
 
@@ -129,6 +130,24 @@ static int omap2_dm_timer_set_clk(struct platform_device *pdev, int source)
 struct clk *omap2_dm_timer_get_fclk(struct platform_device *pdev)
 {
 	return clk_get(&pdev->dev, "fck");
+}
+
+static int omap2_dm_early_timer_set_clk
+			(struct platform_device *pdev, int source)
+{
+	struct omap_device *odev = to_omap_device(pdev);
+
+	return omap2_dm_timer_set_src(pdev,
+			omap_hwmod_get_clk(odev->hwmods[0]),
+			source);
+}
+
+static struct clk *omap2_dm_early_timer_get_fclk
+				(struct platform_device *pdev)
+{
+	struct omap_device *odev = to_omap_device(pdev);
+
+	return omap_hwmod_get_clk(odev->hwmods[0]);
 }
 
 /* One time initializations */
@@ -177,7 +196,6 @@ static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
 	return -EINVAL;
 	}
 
-	id = timer_id;
 	pr_debug("%s:%s\n", __func__, oh->name);
 
 	pdata = kzalloc(sizeof(struct omap_dmtimer_platform_data),
@@ -186,24 +204,35 @@ static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
 		pr_err("%s: No memory for [%s]\n", __func__, oh->name);
 		return -ENOMEM;
 	}
-	pdata->omap_dm_clk_enable = omap2_dm_ms_timer_enable;
-	pdata->omap_dm_clk_disable = omap2_dm_ms_timer_disable;
-	pdata->omap_dm_set_source_clk = omap2_dm_timer_set_clk;
-	pdata->omap_dm_get_timer_clk = omap2_dm_timer_get_fclk;
+	pdata->omap_dm_clk_enable = omap2_dm_early_timer_enable;
+	pdata->omap_dm_clk_disable = omap2_dm_early_timer_disable;
+	pdata->omap_dm_set_source_clk = omap2_dm_early_timer_set_clk;
+	pdata->omap_dm_get_timer_clk = omap2_dm_early_timer_get_fclk;
 
 	pdata->timer_ip_type = oh->class->rev;
-	if (pdata->timer_ip_type == 1) {
+
+	if (pdata->timer_ip_type == OMAP_TIMER_IP_LEGACY) {
 		pdata->offset1 = 0;
 		pdata->offset2 = 0;
 	} else {
 		pdata->offset1 = 0x10;
 		pdata->offset2 = 0x14;
 	}
+	/*
+	 * extract the id from name
+	 * this is not the best implementation, but the cleanest with
+	 * the existing constraints: (1) early timers are not sequential,
+	 * 1/2/10 (2) export APIs use id's to identify corresponding
+	 * timers (3) non-early timers initialization have to track the
+	 * id's already used by early timers.
+	 *
+	 * well, the ideal solution would have been to have an 'id' field
+	 * in struct omap_hwmod {}. otherwise, we have to have devattr
+	 * for all timers.
+	 */
+	sscanf(oh->name, "timer%2d", &id);
 
-	if (unlikely(!strcmp(oh->name, "timer10")))
-		id = 9;
-
-	od = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
+	od = omap_device_build(name, id - 1, oh, pdata, sizeof(*pdata),
 			omap2_dmtimer_latency,
 			ARRAY_SIZE(omap2_dmtimer_latency), 1);
 	if (IS_ERR(od)) {
@@ -211,7 +240,7 @@ static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
 			__func__, name, oh->name);
 		kfree(pdata);
 	}
-	timer_id++;
+	early_timer_count++;
 	return 0;
 }
 
@@ -226,8 +255,6 @@ static int __init omap2_dm_timer_init(struct omap_hwmod *oh, void *user)
 		pr_err("%s:NULL hwmod pointer (oh)\n", __func__);
 		return -EINVAL;
 	}
-
-	id = timer_id;
 	pr_debug("%s:%s\n", __func__, oh->name);
 
 	pdata = kzalloc(sizeof(struct omap_dmtimer_platform_data), GFP_KERNEL);
@@ -248,25 +275,28 @@ static int __init omap2_dm_timer_init(struct omap_hwmod *oh, void *user)
 	 * OMAP4 millisecond timers (GPT1, GPT2, GPT10).
 	 */
 	pdata->timer_ip_type = oh->class->rev;
-	if (unlikely(pdata->timer_ip_type == 1)) {
+	if (unlikely(pdata->timer_ip_type == OMAP_TIMER_IP_LEGACY)) {
 		pdata->offset1 = 0x0;
 		pdata->offset2 = 0x0;
 	} else {
 		pdata->offset1 = 0x10;
 		pdata->offset2 = 0x14;
 	}
+	/*
+	* extract the id from name
+	* this is not the best implementation, but the cleanest with
+	* the existing constraints: (1) early timers are not sequential,
+	* 1/2/10 (2) export APIs use id's to identify corresponding
+	* timers (3) non-early timers initialization have to track the
+	* id's already used by early timers.
+	*
+	* well, the ideal solution would have been to have an 'id' field
+	* in struct omap_hwmod {}. otherwise we have to have devattr for
+	* all timers.
+	*/
+	sscanf(oh->name, "timer%2d", &id);
 
-	if (unlikely(!strcmp(oh->name, "timer10")))
-		id = 9;
-	else
-		timer_id++;
-
-	if (unlikely(!strcmp(oh->name, "timer11"))) {
-		id = 10;
-		timer_id++;
-	}
-
-	od = omap_device_build(name, id, oh,
+	od = omap_device_build(name, id - 1, oh,
 			pdata, sizeof(*pdata),
 			omap2_dmtimer_latency,
 			ARRAY_SIZE(omap2_dmtimer_latency), 0);
@@ -278,17 +308,18 @@ static int __init omap2_dm_timer_init(struct omap_hwmod *oh, void *user)
 
 void __init omap2_dm_timer_early_init(void)
 {
-	timer_id = 0;
 	omap_hwmod_for_each_by_class("timer_1ms",
 				omap_dm_timer_early_init, NULL);
 	omap2_dm_timer_setup();
 	early_platform_driver_register_all("earlytimer");
-	early_platform_driver_probe("earlytimer", timer_id+1, 0);
+	early_platform_driver_probe("earlytimer", early_timer_count + 1, 0);
 }
 
 static int __init omap_timer_init(void)
 {
-	timer_id = 0;
+	/* disable early init flag */
+	is_early_init = 0;
+
 	/* register all timers again */
 	omap_hwmod_for_each_by_class("timer_1ms", omap2_dm_timer_init, NULL);
 	omap_hwmod_for_each_by_class("timer", omap2_dm_timer_init, NULL);

@@ -25,6 +25,7 @@
 #include <plat/gpio.h>
 #include <plat/dma.h>
 #include <plat/mmc.h>
+#include <plat/dmtimer.h>
 
 #include "omap_hwmod_common_data.h"
 
@@ -4345,7 +4346,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_timer_1ms_sysc = {
 static struct omap_hwmod_class omap44xx_timer_1ms_hwmod_class = {
 	.name = "timer_1ms",
 	.sysc = &omap44xx_timer_1ms_sysc,
-	.rev = 1,
+	.rev = OMAP_TIMER_IP_LEGACY,
 };
 
 static struct omap_hwmod_class_sysconfig omap44xx_timer_sysc = {
@@ -4360,7 +4361,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_timer_sysc = {
 static struct omap_hwmod_class omap44xx_timer_hwmod_class = {
 	.name = "timer",
 	.sysc = &omap44xx_timer_sysc,
-	.rev = 2,
+	.rev = OMAP_TIMER_IP_VERSION_2,
 };
 
 /* timer1 */
