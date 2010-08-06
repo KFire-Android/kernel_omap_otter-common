@@ -139,13 +139,27 @@ extern const struct clksel_rate gpt_32k_rates[];
 extern const struct clksel_rate gpt_sys_rates[];
 extern const struct clksel_rate gfx_l3_rates[];
 
-#if defined(CONFIG_ARCH_OMAP2) && defined(CONFIG_CPU_FREQ)
+#ifdef CONFIG_CPU_FREQ
+
+#ifdef CONFIG_ARCH_OMAP2
 extern void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
 extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
 #else
 #define omap2_clk_init_cpufreq_table	0
 #define omap2_clk_exit_cpufreq_table	0
 #endif
+
+#ifdef CONFIG_ARCH_OMAP3
+extern void omap3_clk_init_cpufreq_table
+		(struct cpufreq_frequency_table **table);
+extern void omap3_clk_exit_cpufreq_table
+		(struct cpufreq_frequency_table **table);
+#else
+#define omap3_clk_init_cpufreq_table	0
+#define omap3_clk_exit_cpufreq_table	0
+#endif
+
+#endif /* CONFIG_CPU_FREQ */
 
 extern const struct clkops clkops_omap3_noncore_dpll_ops;
 

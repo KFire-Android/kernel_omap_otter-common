@@ -20,6 +20,8 @@
 #include <linux/kernel.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/err.h>
+#include <linux/cpufreq.h>
 
 #include <plat/clock.h>
 
@@ -124,3 +126,35 @@ const struct clkops clkops_omap3430es2_hsotgusb_wait = {
 	.find_idlest	= omap3430es2_clk_hsotgusb_find_idlest,
 	.find_companion = omap2_clk_dflt_find_companion,
 };
+
+#ifdef CONFIG_CPU_FREQ
+static struct cpufreq_frequency_table freq_table[MAX_VDD1_OPP+1];
+
+void omap3_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
+{
+	struct omap_opp *prcm;
+	int i = 0;
+
+	if (!mpu_opps)
+		return;
+
+	prcm = mpu_opps + MAX_VDD1_OPP;
+	for (; prcm->rate; prcm--) {
+		freq_table[i].index = i;
+		freq_table[i].frequency = prcm->rate / 1000;
+		i++;
+	}
+
+	if (i == 0) {
+		printk(KERN_WARNING "%s: failed to initialize frequency \
+								table\n",
+								__func__);
+		return;
+	}
+
+	freq_table[i].index = i;
+	freq_table[i].frequency = CPUFREQ_TABLE_END;
+
+	*table = &freq_table[0];
+}
+#endif

@@ -8,6 +8,10 @@
  *
  *  Based on cpu-sa1110.c, Copyright (C) 2001 Russell King
  *
+ * Copyright (C) 2007-2008 Texas Instruments, Inc.
+ * Updated to support OMAP3
+ * Rajendra Nayak <rnayak@ti.com>
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -26,12 +30,18 @@
 #include <plat/clock.h>
 #include <asm/system.h>
 
+#if defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
+#include <plat/omap-pm.h>
+#endif
+
 #define VERY_HI_RATE	900000000
 
 static struct cpufreq_frequency_table *freq_table;
 
 #ifdef CONFIG_ARCH_OMAP1
 #define MPU_CLK		"mpu"
+#elif CONFIG_ARCH_OMAP3
+#define MPU_CLK		"arm_fck"
 #else
 #define MPU_CLK		"virt_prcm_set"
 #endif
@@ -73,7 +83,9 @@ static int omap_target(struct cpufreq_policy *policy,
 		       unsigned int target_freq,
 		       unsigned int relation)
 {
+#ifdef CONFIG_ARCH_OMAP1
 	struct cpufreq_freqs freqs;
+#endif
 	int ret = 0;
 
 	/* Ensure desired rate is within allowed range.  Some govenors
@@ -83,13 +95,13 @@ static int omap_target(struct cpufreq_policy *policy,
 	if (target_freq > policy->max)
 		target_freq = policy->max;
 
+#ifdef CONFIG_ARCH_OMAP1
 	freqs.old = omap_getspeed(0);
 	freqs.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
 	freqs.cpu = 0;
 
 	if (freqs.old == freqs.new)
 		return ret;
-
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 #ifdef CONFIG_CPU_FREQ_DEBUG
 	printk(KERN_DEBUG "cpufreq-omap: transition: %u --> %u\n",
@@ -97,7 +109,18 @@ static int omap_target(struct cpufreq_policy *policy,
 #endif
 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-
+#elif defined(CONFIG_ARCH_OMAP3) && !defined(CONFIG_OMAP_PM_NONE)
+	if (mpu_opps) {
+		int ind;
+		for (ind = 1; ind <= MAX_VDD1_OPP; ind++) {
+			if (mpu_opps[ind].rate/1000 >= target_freq) {
+				omap_pm_cpu_set_freq
+					(mpu_opps[ind].rate);
+				break;
+			}
+		}
+	}
+#endif
 	return ret;
 }
 
@@ -125,6 +148,10 @@ static int __init omap_cpu_init(struct cpufreq_policy *policy)
 		policy->cpuinfo.max_freq = clk_round_rate(mpu_clk,
 							VERY_HI_RATE) / 1000;
 	}
+
+	policy->min = policy->cpuinfo.min_freq;
+	policy->max = policy->cpuinfo.max_freq;
+	policy->cur = omap_getspeed(0);
 
 	/* FIXME: what's the actual transition time? */
 	policy->cpuinfo.transition_latency = 300 * 1000;
@@ -160,7 +187,7 @@ static int __init omap_cpufreq_init(void)
 	return cpufreq_register_driver(&omap_driver);
 }
 
-arch_initcall(omap_cpufreq_init);
+late_initcall(omap_cpufreq_init);
 
 /*
  * if ever we want to remove this, upon cleanup call:

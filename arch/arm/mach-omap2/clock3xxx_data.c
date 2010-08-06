@@ -3476,6 +3476,8 @@ int __init omap3xxx_clk_init(void)
 	else
 		dpll4_dd = dpll4_dd_34xx;
 
+	omap2_clk_functions.clk_init_cpufreq_table =
+		omap3_clk_init_cpufreq_table;
 	clk_init(&omap2_clk_functions);
 
 	for (c = omap3xxx_clks; c < omap3xxx_clks + ARRAY_SIZE(omap3xxx_clks);
