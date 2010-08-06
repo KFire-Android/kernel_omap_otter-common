@@ -159,37 +159,61 @@ static void mbox_rx_work(struct work_struct *work)
  */
 static void __mbox_tx_interrupt(struct omap_mbox *mbox)
 {
-	omap_mbox_disable_irq(mbox, IRQ_TX);
-	ack_mbox_irq(mbox, IRQ_TX);
-	tasklet_schedule(&mbox->txq->tasklet);
+	struct omap_mbox **tmp;
+	struct omap_mbox *mbox_curr;
+
+	tmp = &mboxes;
+	while (*tmp) {
+		mbox_curr = *tmp;
+		if (!mbox_fifo_full(mbox_curr)) {
+			omap_mbox_disable_irq(mbox_curr, IRQ_TX);
+			ack_mbox_irq(mbox_curr, IRQ_TX);
+			tasklet_schedule(&mbox_curr->txq->tasklet);
+		}
+		tmp = &(*tmp)->next;
+	}
 }
 
 static void __mbox_rx_interrupt(struct omap_mbox *mbox)
 {
-	struct omap_mbox_queue *mq = mbox->rxq;
+	struct omap_mbox_queue *mq;
 	mbox_msg_t msg;
 	int len;
+	struct omap_mbox **tmp;
+	struct omap_mbox *mbox_curr;
+	bool msg_rx;
 
-	while (!mbox_fifo_empty(mbox)) {
-		if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
-			omap_mbox_disable_irq(mbox, IRQ_RX);
-			rq_full = true;
-			goto nomem;
+	tmp = &mboxes;
+	while (*tmp) {
+		mbox_curr = *tmp;
+		mq = mbox_curr->rxq;
+		msg_rx = false;
+		while (!mbox_fifo_empty(mbox_curr)) {
+			msg_rx = true;
+			if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
+				omap_mbox_disable_irq(mbox_curr, IRQ_RX);
+				rq_full = true;
+				goto nomem;
+			}
+
+			msg = mbox_fifo_read(mbox_curr);
+
+			len = kfifo_in(&mq->fifo, (unsigned char *)&msg,
+								sizeof(msg));
+			if (unlikely(len != sizeof(msg)))
+				pr_err("%s: kfifo_in anomaly detected\n",
+								__func__);
+			if (mbox->ops->type == OMAP_MBOX_TYPE1)
+				break;
 		}
-
-		msg = mbox_fifo_read(mbox);
-
-		len = kfifo_in(&mq->fifo, (unsigned char *)&msg, sizeof(msg));
-		if (unlikely(len != sizeof(msg)))
-			pr_err("%s: kfifo_in anomaly detected\n", __func__);
-		if (mbox->ops->type == OMAP_MBOX_TYPE1)
-			break;
-	}
-
-	/* no more messages in the fifo. clear IRQ source. */
-	ack_mbox_irq(mbox, IRQ_RX);
+		/* no more messages in the fifo. clear IRQ source. */
+		if (msg_rx)
+			ack_mbox_irq(mbox_curr, IRQ_RX);
 nomem:
-	queue_work(mboxd, &mbox->rxq->work);
+		queue_work(mboxd, &mbox->rxq->work);
+
+		tmp = &(*tmp)->next;
+	}
 }
 
 static irqreturn_t mbox_interrupt(int irq, void *p)
