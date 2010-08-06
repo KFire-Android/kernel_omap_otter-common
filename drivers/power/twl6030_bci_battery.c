@@ -320,7 +320,6 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 	twl6030_config_cinlimit_reg(di, di->max_charger_currentmA);
 	twl6030_config_voreg_reg(di, di->max_bat_voltagemV);
 	twl6030_config_iterm_reg(di, di->termination_currentmA);
-	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, TERM, CHARGERUSB_CTRL1);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
 			CONTROLLER_CTRL1_EN_CHARGER,
 			CONTROLLER_CTRL1);
