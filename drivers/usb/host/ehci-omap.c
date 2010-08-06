@@ -152,6 +152,8 @@
 #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
 #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
 
+#define OMAP3_UHH_REVISION				0x00000010
+#define OMAP4_UHH_REVISION				0x50700100
 /*-------------------------------------------------------------------------*/
 
 static inline void ehci_omap_writel(void __iomem *base, u32 reg, u32 val)
@@ -326,7 +328,9 @@ static int omap_start_ehc(struct ehci_hcd_omap *omap, struct usb_hcd *hcd)
 		udelay(10);
 	}
 
-	if (cpu_is_omap44xx()) {
+	reg = ehci_omap_readl(omap->uhh_base, OMAP_UHH_REVISION);
+
+	if (reg == OMAP4_UHH_REVISION) {
 		/* Enable clocks for OMAP4 USBHOST */
 		omap->usbhost_hs_fck = clk_get(omap->dev, "usb_host_hs_fck");
 		if (IS_ERR(omap->usbhost_hs_fck)) {
@@ -488,7 +492,7 @@ err_44host_fs_fck:
 
 		goto err_host;
 
-		} else {
+	} else if (reg == OMAP3_UHH_REVISION) {
 
 		/* Enable Clocks for USBHOST */
 		omap->usbhost_ick = clk_get(omap->dev, "usbhost_ick");
