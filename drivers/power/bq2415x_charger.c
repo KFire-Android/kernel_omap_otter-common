@@ -366,7 +366,7 @@ static ssize_t bq2415x_set_enable_itermination(struct device *dev,
 
 static ssize_t bq2415x_show_enable_itermination(struct device *dev,
 				  struct device_attribute *attr,
-				  const char *buf, size_t count)
+				  char *buf)
 {
 	unsigned long val;
 	struct bq2415x_device_info *di = dev_get_drvdata(dev);

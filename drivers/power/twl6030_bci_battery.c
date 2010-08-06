@@ -916,7 +916,7 @@ static ssize_t twl6030_bci_set_fgmode(struct device *dev,
 
 static ssize_t twl6030_bci_show_fgmode(struct device *dev,
 				  struct device_attribute *attr,
-				  const char *buf, size_t count)
+				  char *buf)
 {
 	unsigned long val;
 	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
@@ -941,7 +941,7 @@ static ssize_t twl6030_bci_set_charge_src(struct device *dev,
 
 static ssize_t twl6030_bci_show_charge_src(struct device *dev,
 				  struct device_attribute *attr,
-				  const char *buf, size_t count)
+				  char *buf)
 {
 	unsigned long val;
 	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
@@ -952,7 +952,7 @@ static ssize_t twl6030_bci_show_charge_src(struct device *dev,
 
 static ssize_t twl6030_bci_show_vbus_voltage(struct device *dev,
 				  struct device_attribute *attr,
-				  const char *buf, size_t count)
+				  char *buf)
 {
 	unsigned long val;
 
@@ -963,7 +963,7 @@ static ssize_t twl6030_bci_show_vbus_voltage(struct device *dev,
 
 static ssize_t twl6030_bci_show_id_level(struct device *dev,
 				  struct device_attribute *attr,
-				  const char *buf, size_t count)
+				  char *buf)
 {
 	unsigned long val;
 
