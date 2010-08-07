@@ -29,6 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/seq_file.h>
 #include <linux/clk.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/display.h>
 #include "dss.h"
@@ -128,6 +129,30 @@ void dss_restore_context(void)
 #undef SR
 #undef RR
 
+void dss_clk_enable()
+{
+	use_count++;
+
+	if (use_count > 1)
+		return;
+	else if (use_count == 1)
+		pm_runtime_get_sync(&dss.pdev->dev);
+
+	return;
+}
+
+void dss_clk_disable()
+{
+	use_count--;
+
+	if (use_count < 0)
+		use_count = 0;
+	else if (use_count == 0)
+		pm_runtime_put_sync(&dss.pdev->dev);
+
+	return;
+}
+
 void dss_sdi_init(u8 datapairs)
 {
 	u32 l;
@@ -220,7 +245,7 @@ void dss_dump_clocks(struct seq_file *s)
 	unsigned long dpll4_ck_rate = 0;
 	unsigned long dpll4_m4_ck_rate = 0;
 
-	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_enable();
 
 	if (cpu_is_omap34xx()) {
 		dpll4_ck_rate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
@@ -242,14 +267,14 @@ void dss_dump_clocks(struct seq_file *s)
 			dpll4_ck_rate / dpll4_m4_ck_rate,
 			dss_clk_get_rate(DSS_CLK_FCK1));
 
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_disable();
 }
 
 void dss_dump_regs(struct seq_file *s)
 {
 #define DUMPREG(r) seq_printf(s, "%-35s %08x\n", #r, dss_read_reg(r))
 
-	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_enable();
 
 	DUMPREG(DSS_REVISION);
 	DUMPREG(DSS_SYSCONFIG);
@@ -263,7 +288,7 @@ void dss_dump_regs(struct seq_file *s)
 #endif
 	DUMPREG(DSS_SDI_STATUS);
 
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_disable();
 #undef DUMPREG
 }
 
@@ -598,6 +623,7 @@ int dss_init(bool skip_init, struct platform_device *pdev)
 		r = -ENOMEM;
 		goto fail0;
 	}
+	dss_clk_enable();
 
 	if (!skip_init) {
 		/* disable LCD and DIGIT output. This seems to fix the synclost
@@ -663,7 +689,7 @@ int dss_init(bool skip_init, struct platform_device *pdev)
 	rev = dss_read_reg(DSS_REVISION);
 	printk(KERN_INFO "OMAP DSS rev %d.%d\n",
 			FLD_GET(rev, 7, 4), FLD_GET(rev, 3, 0));
-
+	dss_clk_disable();
 	return 0;
 
 fail2:

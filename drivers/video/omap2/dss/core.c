@@ -32,6 +32,7 @@
 #include <linux/io.h>
 #include <linux/device.h>
 #include <linux/regulator/consumer.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/display.h>
 #include <plat/clock.h>
@@ -100,6 +101,7 @@ int dss_need_ctx_restore(void)
 	}
 }
 
+#ifdef HWMOD
 static void save_all_ctx(void)
 {
 	DSSDBG("save context\n");
@@ -129,6 +131,7 @@ static void restore_all_ctx(void)
 
 	dss_clk_disable_all_no_ctx();
 }
+#endif
 
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_OMAP2_DSS_DEBUG_SUPPORT)
 /* CLOCKS */
@@ -158,6 +161,7 @@ static void core_dump_clocks(struct seq_file *s)
 }
 #endif /* defined(CONFIG_DEBUG_FS) && defined(CONFIG_OMAP2_DSS_DEBUG_SUPPORT) */
 
+#ifdef HWMOD
 static int dss_get_clock(struct clk **clock, const char *clk_name)
 {
 	struct clk *clk;
@@ -225,19 +229,16 @@ err:
 
 static void dss_put_clocks(void)
 {
-#if 0
 	if (core.dss_96m_fck)
 		clk_put(core.dss_96m_fck);
 	clk_put(core.dss_54m_fck);
 	clk_put(core.dss1_fck);
 	clk_put(core.dss2_fck);
 	clk_put(core.dss_ick);
-#endif
 }
 
 unsigned long dss_clk_get_rate(enum dss_clock clk)
 {
-#if 0
 	switch (clk) {
 	case DSS_CLK_ICK:
 		return clk_get_rate(core.dss_ick);
@@ -252,7 +253,6 @@ unsigned long dss_clk_get_rate(enum dss_clock clk)
 	}
 
 	BUG();
-#endif
 	return 153600000;
 }
 
@@ -277,7 +277,7 @@ static unsigned count_clk_bits(enum dss_clock clks)
 static void dss_clk_enable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
-#if 0
+
 	if (clks & DSS_CLK_ICK)
 		clk_enable(core.dss_ick);
 	if (clks & DSS_CLK_FCK1)
@@ -288,24 +288,14 @@ static void dss_clk_enable_no_ctx(enum dss_clock clks)
 		clk_enable(core.dss_54m_fck);
 	if (clks & DSS_CLK_96M)
 		clk_enable(core.dss_96m_fck);
-#endif
+
 	core.num_clks_enabled += num_clks;
-}
-
-void dss_clk_enable(enum dss_clock clks)
-{
-	bool check_ctx = core.num_clks_enabled == 0;
-
-	dss_clk_enable_no_ctx(clks);
-
-	if (check_ctx && cpu_is_omap34xx() && dss_need_ctx_restore())
-		restore_all_ctx();
 }
 
 static void dss_clk_disable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
-#if 0
+
 	if (clks & DSS_CLK_ICK)
 		clk_disable(core.dss_ick);
 	if (clks & DSS_CLK_FCK1)
@@ -316,22 +306,8 @@ static void dss_clk_disable_no_ctx(enum dss_clock clks)
 		clk_disable(core.dss_54m_fck);
 	if (clks & DSS_CLK_96M)
 		clk_disable(core.dss_96m_fck);
-#endif
+
 	core.num_clks_enabled -= num_clks;
-}
-
-void dss_clk_disable(enum dss_clock clks)
-{
-	if (cpu_is_omap34xx()) {
-		unsigned num_clks = count_clk_bits(clks);
-
-		BUG_ON(core.num_clks_enabled < num_clks);
-
-		if (core.num_clks_enabled == num_clks)
-			save_all_ctx();
-	}
-
-	dss_clk_disable_no_ctx(clks);
 }
 
 static void dss_clk_enable_all_no_ctx(void)
@@ -363,6 +339,38 @@ static void dss_clk_disable_all(void)
 		clks |= DSS_CLK_96M;
 	dss_clk_disable(clks);
 }
+#else
+
+unsigned long dss_clk_get_rate(enum dss_clock clk)
+{
+	return 153600000;
+}
+
+static void dss_put_clocks(void)
+{
+	return;
+}
+
+static void dss_clk_enable_no_ctx(enum dss_clock clks)
+{
+	return;
+}
+
+static void dss_clk_disable_no_ctx(enum dss_clock clks)
+{
+	return;
+}
+
+static void dss_clk_enable_all_no_ctx()
+{
+	return;
+}
+
+static void dss_clk_disable_all_no_ctx()
+{
+	return;
+}
+#endif
 
 /* REGULATORS */
 
@@ -502,7 +510,9 @@ static inline void dss_uninitialize_debugfs(void)
 static int omap_dss_probe(struct platform_device *pdev)
 {
 	struct omap_dss_board_info *pdata = pdev->dev.platform_data;
+#ifdef HWMOD
 	int skip_init = 0;
+#endif
 	int r = 0;
 	int i;
 
@@ -536,7 +546,7 @@ static int omap_dss_probe(struct platform_device *pdev)
 		DSSERR("Failed to initialize DSS\n");
 		goto err_dss;
 	}
-
+	dss_clk_disable_all_no_ctx();
 	r = rfbi_init();
 	if (r) {
 		DSSERR("Failed to initialize rfbi\n");
@@ -752,6 +762,7 @@ static int omap_dsshw_probe(struct platform_device *pdev)
 	int skip_init = 0;
 	int r;
 
+	pm_runtime_enable(&pdev->dev);
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	/* DISPC_CONTROL */
 	if (omap_readl(0x48050440) & 1)	/* LCD enabled? */

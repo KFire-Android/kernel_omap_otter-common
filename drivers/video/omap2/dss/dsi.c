@@ -801,9 +801,9 @@ static void dsi_vc_disable_bta_irq(enum omap_dsi_index ix,
 static inline void enable_clocks(bool enable)
 {
 	if (enable)
-		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+		dss_clk_enable();
 	else
-		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+		dss_clk_disable();
 }
 
 /* source clock for DSI PLL. this could also be PCLKFREE */
@@ -813,9 +813,9 @@ static inline void dsi_enable_pll_clock(enum omap_dsi_index ix,
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
 	if (enable)
-		dss_clk_enable(DSS_CLK_FCK2);
+		dss_clk_enable();
 	else
-		dss_clk_disable(DSS_CLK_FCK2);
+		dss_clk_disable();
 
 	if (enable && p_dsi->pll_locked) {
 		if (wait_for_bit_change(ix, DSI_PLL_STATUS, 1, 1) != 1)
@@ -1515,7 +1515,7 @@ void dsi_dump_regs(enum omap_dsi_index ix, struct seq_file *s)
 {
 #define DUMPREG(ix, r) seq_printf(s, "%-35s %08x\n", #r, dsi_read_reg(ix, r))
 
-	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_enable();
 
 	DUMPREG(ix, DSI_REVISION);
 	DUMPREG(ix, DSI_SYSCONFIG);
@@ -1587,7 +1587,7 @@ void dsi_dump_regs(enum omap_dsi_index ix, struct seq_file *s)
 	DUMPREG(ix, DSI_PLL_CONFIGURATION1);
 	DUMPREG(ix, DSI_PLL_CONFIGURATION2);
 
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_disable();
 #undef DUMPREG
 }
 

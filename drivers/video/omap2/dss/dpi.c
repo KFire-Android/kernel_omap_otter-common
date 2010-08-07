@@ -39,6 +39,7 @@ static struct {
 	struct regulator *vdds_dsi_reg;
 } dpi;
 
+#ifdef HWMOD
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 		unsigned long pck_req, unsigned long *fck, int *lck_div,
@@ -80,6 +81,7 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 
 	return 0;
 }
+#endif
 #else
 static int dpi_set_dispc_clk(enum omap_channel channel, bool is_tft,
 		unsigned long pck_req, unsigned long *fck, int *lck_div,
@@ -123,7 +125,7 @@ static int dpi_set_mode(struct omap_dss_device *dssdev)
 	if (dssdev->channel == OMAP_DSS_CHANNEL_LCD2)
 		lcd_channel_ix = 1;
 
-	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_enable();
 
 	if (dssdev->channel == OMAP_DSS_CHANNEL_LCD2)
 		dispc_set_pol_freq(OMAP_DSS_CHANNEL_LCD2, dssdev->panel.config,
@@ -164,7 +166,7 @@ err1:
 	dsi_pll_uninit(lcd_channel_ix);
 #endif
 err0:
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_disable();
 	return r;
 }
 
@@ -231,14 +233,14 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 			goto err1;
 	}
 
-	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_enable();
 
 	r = dpi_basic_init(dssdev);
 	if (r)
 		goto err2;
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	dss_clk_enable(DSS_CLK_FCK2);
+	dss_clk_enable();
 	r = dsi_pll_init(dssdev, 0, 1);
 	if (r)
 		goto err3;
@@ -260,10 +262,10 @@ err4:
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 	dsi_pll_uninit(lcd_channel_ix);
 err3:
-	dss_clk_disable(DSS_CLK_FCK2);
+	dss_clk_disable();
 #endif
 err2:
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_disable();
 	if (cpu_is_omap34xx())
 		regulator_disable(dpi.vdds_dsi_reg);
 err1:
@@ -281,14 +283,14 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 		lcd_channel_ix = 1;
 
 	dssdev->manager->disable(dssdev->manager);
-
+#ifdef HWMOD
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 	dss_select_dispc_clk_source(lcd_channel_ix, DSS_SRC_DSS1_ALWON_FCLK);
 	dsi_pll_uninit(lcd_channel_ix);
-	dss_clk_disable(DSS_CLK_FCK2);
+	dss_clk_disable();
 #endif
-
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+#endif
+	dss_clk_disable();
 
 	if (cpu_is_omap34xx())
 		regulator_disable(dpi.vdds_dsi_reg);

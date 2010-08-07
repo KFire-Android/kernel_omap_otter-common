@@ -510,7 +510,7 @@ static int omap_dss_set_manager(struct omap_overlay *ovl,
 
 	ovl->manager = mgr;
 
-	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_enable();
 	/* XXX: on manual update display, in auto update mode, a bug happens
 	 * here. When an overlay is first enabled on LCD, then it's disabled,
 	 * and the manager is changed to TV, we sometimes get SYNC_LOST_DIGIT
@@ -519,7 +519,7 @@ static int omap_dss_set_manager(struct omap_overlay *ovl,
 	 * but I don't understand how or why. */
 	msleep(40);
 	dispc_set_channel_out(ovl->id, mgr->id);
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_clk_disable();
 
 	return 0;
 }
