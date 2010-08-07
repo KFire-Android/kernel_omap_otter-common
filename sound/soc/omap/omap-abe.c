@@ -41,6 +41,7 @@
 #include "omap-mcpdm.h"
 #include "omap-pcm.h"
 #include "omap-abe.h"
+#include "omap-abe-dsp.h"
 #include "abe/abe_main.h"
 
 
@@ -55,22 +56,7 @@
  * 1) Get DAI params from HAL and pass onto DAI drivers ? (are params static ??, i.e. can I just use a table)
  */
 
-
-#define NUM_ABE_BACKENDS		10
 #define NUM_ABE_FRONTENDS		5
-
-
-
-#define ABE_DAI_PDM_UL			0
-#define ABE_DAI_PDM_DL1			1
-#define ABE_DAI_PDM_DL2			2
-#define ABE_DAI_PDM_VIB			3
-#define ABE_DAI_BT_VX			4
-#define ABE_DAI_MM_EXT0			5
-#define ABE_DAI_MM_EXT1				6
-#define ABE_DAI_DMIC1			7
-#define ABE_DAI_DMIC2			8
-#define ABE_DAI_DMIC3			9
 
 /* Frontend DAI Playback / Capture Support Matrix */
 static const struct {
@@ -83,34 +69,24 @@ static const struct {
 	{{1, 0,},}, /* playback only supported on PCM4  - Vibra */
 };
 
+#define NUM_ABE_BACKENDS		11
+
 /* Backend DAI Playback / Capture Support Matrix */
 static const struct {
+	const char *id;
 	int dir[2];
 } be_stream[] = {
-	{{0, 1,},}, /* capture only supported on PDM UL*/
-	{{1, 0,},}, /* playback only supported on PDM DL1 */
-	{{1, 0,},}, /* playback only supported on PDM DL2 */
-	{{1, 0,},}, /* playback only supported on PDM VIB */
-	{{1, 1,},}, /* playback and capture supported on BT VX */
-	{{1, 1,},}, /* playback and capture supported on MM EXT */
-	{{1, 1,},}, /* playback and capture supported on VX EXT */
-	{{0, 1,},}, /* capture only supported on DMIC1 */
-	{{0, 1,},}, /* capture only supported on DMIC2 */
-	{{0, 1,},}, /* capture only supported on DMIC3 */
-};
-
-/* Backend DAIs */
-static const char *be_id[] = {
-	OMAP_ABE_BE_PDM_UL1,
-	OMAP_ABE_BE_PDM_DL1,
-	OMAP_ABE_BE_PDM_DL2,
-	OMAP_ABE_BE_PDM_VIB,
-	OMAP_ABE_BE_BT_VX,
-	OMAP_ABE_BE_MM_EXT0,
-	OMAP_ABE_BE_MM_EXT1,
-	OMAP_ABE_BE_DMIC1,
-	OMAP_ABE_BE_DMIC2,
-	OMAP_ABE_BE_DMIC3,
+	{OMAP_ABE_BE_PDM_UL1, {0, 1,},}, /* capture only supported on PDM UL*/
+	{OMAP_ABE_BE_PDM_DL1, {1, 0,},}, /* playback only supported on PDM DL1 */
+	{OMAP_ABE_BE_PDM_DL2, {1, 0,},}, /* playback only supported on PDM DL2 */
+	{OMAP_ABE_BE_PDM_VIB, {1, 0,},}, /* playback only supported on PDM VIB */
+	{OMAP_ABE_BE_BT_VX, {1, 0,},}, /* playback supported on BT VX_DL */
+	{OMAP_ABE_BE_BT_VX, {0, 1,},}, /* playback and capture supported on BT VX_UL */
+	{OMAP_ABE_BE_MM_EXT0, {1, 0,},}, /* playback supported on MM EXT_DL */
+	{OMAP_ABE_BE_MM_EXT0, {0, 1,},}, /* capture supported on MM EXT_UL */
+	{OMAP_ABE_BE_DMIC0, {0, 1,},}, /* capture only supported on DMIC0 */
+	{OMAP_ABE_BE_DMIC1, {0, 1,},}, /* capture only supported on DMIC1 */
+	{OMAP_ABE_BE_DMIC2, {0, 1,},}, /* capture only supported on DMIC2 */
 };
 
 struct abe_backend_dai {
@@ -126,6 +102,7 @@ struct abe_backend_dai {
 struct abe_frontend_dai {
 	/* each frontend ALSA PCM can access several backend DAIs */
 	int be_enabled[NUM_ABE_BACKENDS];
+	struct omap_aess_fe *fe;
 };
 
 struct omap_abe_data {
@@ -163,30 +140,22 @@ static struct omap_abe_data abe_data = {
 			.active = ATOMIC_INIT(0),
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
-	/* BT VX */
-	.be[ABE_DAI_BT_VX][SNDRV_PCM_STREAM_PLAYBACK] = {
+	/* BT VX DL */
+	.be[ABE_DAI_BT_VX_DL][SNDRV_PCM_STREAM_PLAYBACK] = {
 			.active = ATOMIC_INIT(0),
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
-	.be[ABE_DAI_BT_VX][SNDRV_PCM_STREAM_CAPTURE] = {
-			.active = ATOMIC_INIT(0),
-			.lock = SPIN_LOCK_UNLOCKED,
-	},
-	/* FM */
-	.be[ABE_DAI_MM_EXT0][SNDRV_PCM_STREAM_PLAYBACK] = {
-			.active = ATOMIC_INIT(0),
-			.lock = SPIN_LOCK_UNLOCKED,
-	},
-	.be[ABE_DAI_MM_EXT0][SNDRV_PCM_STREAM_CAPTURE] = {
+	/* BT_VX_UL */
+	.be[ABE_DAI_BT_VX_UL][SNDRV_PCM_STREAM_CAPTURE] = {
 			.active = ATOMIC_INIT(0),
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
 	/* MODEM */
-	.be[ABE_DAI_MM_EXT1][SNDRV_PCM_STREAM_PLAYBACK] = {
+	.be[ABE_DAI_MM_DL][SNDRV_PCM_STREAM_PLAYBACK] = {
 			.active = ATOMIC_INIT(0),
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
-	.be[ABE_DAI_MM_EXT1][SNDRV_PCM_STREAM_CAPTURE] = {
+	.be[ABE_DAI_MM_UL][SNDRV_PCM_STREAM_CAPTURE] = {
 			.active = ATOMIC_INIT(0),
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
@@ -231,259 +200,6 @@ static struct omap_pcm_dma_data omap_abe_dai_dma_params[] = {
 		.sync_mode = OMAP_DMA_SYNC_PACKET,
 	},
 };
-
-static int abe_get_pcm0_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[0];
-	int idx = kcontrol->private_value;
-
-	ucontrol->value.integer.value[0] = fe->be_enabled[idx];
-	return 0;
-}
-
-static int abe_set_pcm0_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[0];
-	int idx = kcontrol->private_value;
-	struct abe_backend_dai *be_playback =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_PLAYBACK];
-	struct abe_backend_dai *be_capture =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_CAPTURE];
-
-	if (fe->be_enabled[idx] == ucontrol->value.integer.value[0])
-		return 0;
-
-	mutex_lock(&fe_mutex);
-	if (atomic_read(&be_playback->active) || atomic_read(&be_capture->active)) {
-		mutex_unlock(&fe_mutex);
-		return 0;
-	}
-
-	fe->be_enabled[idx] = ucontrol->value.integer.value[0];
-	mutex_unlock(&fe_mutex);
-	return 1;
-}
-
-/* PCM0 is multimedia playback and capture */
-static const struct snd_kcontrol_new abe_pcm0_controls[] = {
-	SOC_SINGLE_BOOL_EXT("PCM0 UL Switch", ABE_DAI_PDM_UL,
-			abe_get_pcm0_backend_status, abe_set_pcm0_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM0 DL1 Switch", ABE_DAI_PDM_DL1,
-			abe_get_pcm0_backend_status, abe_set_pcm0_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM0 DL2 Switch", ABE_DAI_PDM_DL2,
-			abe_get_pcm0_backend_status, abe_set_pcm0_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM0 BT Switch", ABE_DAI_BT_VX,
-			abe_get_pcm0_backend_status, abe_set_pcm0_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM0 FM Switch", ABE_DAI_MM_EXT0,
-			abe_get_pcm0_backend_status, abe_set_pcm0_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM0 MODEM Switch", ABE_DAI_MM_EXT1,
-			abe_get_pcm0_backend_status, abe_set_pcm0_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM0 DMic1  Switch", ABE_DAI_DMIC1,
-			abe_get_pcm0_backend_status, abe_set_pcm0_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM0 DMic2 Switch", ABE_DAI_DMIC2,
-			abe_get_pcm0_backend_status, abe_set_pcm0_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM0 DMic3 Switch", ABE_DAI_DMIC3,
-			abe_get_pcm0_backend_status, abe_set_pcm0_backend_status),
-};
-
-static int abe_get_pcm1_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[1];
-	int idx = kcontrol->private_value;
-
-	ucontrol->value.integer.value[0] = fe->be_enabled[idx];
-	return 0;
-}
-
-static int abe_set_pcm1_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[1];
-	int idx = kcontrol->private_value;
-	struct abe_backend_dai *be_playback =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_PLAYBACK];
-	struct abe_backend_dai *be_capture =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_CAPTURE];
-
-	if (fe->be_enabled[idx] == ucontrol->value.integer.value[0])
-		return 0;
-
-	mutex_lock(&fe_mutex);
-	if (atomic_read(&be_playback->active) || atomic_read(&be_capture->active)) {
-		mutex_unlock(&fe_mutex);
-		return 0;
-	}
-
-	fe->be_enabled[idx] = ucontrol->value.integer.value[0];
-	mutex_unlock(&fe_mutex);
-	return 1;
-}
-
-/* PCM1 is multimedia capture */
-static const struct snd_kcontrol_new abe_pcm1_controls[] = {
-	SOC_SINGLE_BOOL_EXT("PCM1 UL Switch", ABE_DAI_PDM_UL,
-			abe_get_pcm1_backend_status, abe_set_pcm1_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM1 BT Switch", ABE_DAI_BT_VX,
-			abe_get_pcm1_backend_status, abe_set_pcm1_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM1 FM Switch", ABE_DAI_MM_EXT0,
-			abe_get_pcm1_backend_status, abe_set_pcm1_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM1 MODEM Switch", ABE_DAI_MM_EXT1,
-			abe_get_pcm1_backend_status, abe_set_pcm1_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM1 DMic1  Switch", ABE_DAI_DMIC1,
-			abe_get_pcm1_backend_status, abe_set_pcm1_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM1 DMic2 Switch", ABE_DAI_DMIC2,
-			abe_get_pcm1_backend_status, abe_set_pcm1_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM1 DMic3 Switch", ABE_DAI_DMIC3,
-			abe_get_pcm1_backend_status, abe_set_pcm1_backend_status),
-};
-
-static int abe_get_pcm2_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[2];
-	int idx = kcontrol->private_value;
-
-	ucontrol->value.integer.value[0] = fe->be_enabled[idx];
-	return 0;
-}
-
-static int abe_set_pcm2_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[2];
-	int idx = kcontrol->private_value;
-	struct abe_backend_dai *be_playback =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_PLAYBACK];
-	struct abe_backend_dai *be_capture =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_CAPTURE];
-
-	if (fe->be_enabled[idx] == ucontrol->value.integer.value[0])
-		return 0;
-
-	mutex_lock(&fe_mutex);
-	if (atomic_read(&be_playback->active) || atomic_read(&be_capture->active)) {
-		mutex_unlock(&fe_mutex);
-		return 0;
-	}
-
-	fe->be_enabled[idx] = ucontrol->value.integer.value[0];
-	mutex_unlock(&fe_mutex);
-	return 1;
-}
-
-/* PCM 2 is Voice */
-static const struct snd_kcontrol_new abe_pcm2_controls[] = {
-	SOC_SINGLE_BOOL_EXT("PCM2 UL Switch", ABE_DAI_PDM_UL,
-			abe_get_pcm2_backend_status, abe_set_pcm2_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM2 DL1 Switch", ABE_DAI_PDM_DL1,
-			abe_get_pcm2_backend_status, abe_set_pcm2_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM2 DL2 Switch", ABE_DAI_PDM_DL2,
-			abe_get_pcm2_backend_status, abe_set_pcm2_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM2 BT Switch", ABE_DAI_BT_VX,
-			abe_get_pcm2_backend_status, abe_set_pcm2_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM2 FM Switch", ABE_DAI_MM_EXT0,
-			abe_get_pcm2_backend_status, abe_set_pcm2_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM2 MODEM Switch", ABE_DAI_MM_EXT1,
-			abe_get_pcm2_backend_status, abe_set_pcm2_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM2 DMic1  Switch", ABE_DAI_DMIC1,
-			abe_get_pcm2_backend_status, abe_set_pcm2_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM2 DMic2 Switch", ABE_DAI_DMIC2,
-			abe_get_pcm2_backend_status, abe_set_pcm2_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM2 DMic3 Switch", ABE_DAI_DMIC3,
-			abe_get_pcm2_backend_status, abe_set_pcm2_backend_status),
-};
-
-static int abe_get_pcm3_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[3];
-	int idx = kcontrol->private_value;
-
-	ucontrol->value.integer.value[0] = fe->be_enabled[idx];
-	return 0;
-}
-
-static int abe_set_pcm3_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[3];
-	int idx = kcontrol->private_value;
-	struct abe_backend_dai *be_playback =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_PLAYBACK];
-	struct abe_backend_dai *be_capture =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_CAPTURE];
-
-	if (fe->be_enabled[idx] == ucontrol->value.integer.value[0])
-		return 0;
-
-	mutex_lock(&fe_mutex);
-	if (atomic_read(&be_playback->active) || atomic_read(&be_capture->active)) {
-		mutex_unlock(&fe_mutex);
-		return 0;
-	}
-
-	fe->be_enabled[idx] = ucontrol->value.integer.value[0];
-	mutex_unlock(&fe_mutex);
-	return 1;
-}
-
-/* PCM 3 is Tones */
-static const struct snd_kcontrol_new abe_pcm3_controls[] = {
-	SOC_SINGLE_BOOL_EXT("PCM3 DL1 Switch", ABE_DAI_PDM_DL1,
-			abe_get_pcm3_backend_status, abe_set_pcm3_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM3 DL2 Switch", ABE_DAI_PDM_DL2,
-			abe_get_pcm3_backend_status, abe_set_pcm3_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM3 BT Switch", ABE_DAI_BT_VX,
-			abe_get_pcm3_backend_status, abe_set_pcm3_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM3 FM Switch", ABE_DAI_MM_EXT0,
-			abe_get_pcm3_backend_status, abe_set_pcm3_backend_status),
-	SOC_SINGLE_BOOL_EXT("PCM3 MODEM Switch", ABE_DAI_MM_EXT1,
-			abe_get_pcm3_backend_status, abe_set_pcm3_backend_status),
-};
-
-static int abe_get_pcm4_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[4];
-	int idx = kcontrol->private_value;
-
-	ucontrol->value.integer.value[0] = fe->be_enabled[idx];
-	return 0;
-}
-
-static int abe_set_pcm4_backend_status(struct snd_kcontrol *kcontrol,
-	struct snd_ctl_elem_value *ucontrol)
-{
-	struct abe_frontend_dai *fe = &abe_data.frontend[4];
-	int idx = kcontrol->private_value;
-	struct abe_backend_dai *be_playback =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_PLAYBACK];
-	struct abe_backend_dai *be_capture =
-		&abe_data.be[idx][SNDRV_PCM_STREAM_CAPTURE];
-
-	if (fe->be_enabled[idx] == ucontrol->value.integer.value[0])
-		return 0;
-
-	mutex_lock(&fe_mutex);
-	if (atomic_read(&be_playback->active) || atomic_read(&be_capture->active)) {
-		mutex_unlock(&fe_mutex);
-		return 0;
-	}
-
-	fe->be_enabled[idx] = ucontrol->value.integer.value[0];
-	mutex_unlock(&fe_mutex);
-	return 1;
-}
-
-/* PCM 4 is Vibra frontend */
-static const struct snd_kcontrol_new abe_pcm4_controls[] = {
-	SOC_SINGLE_BOOL_EXT("PCM4 VIbra Switch", ABE_DAI_PDM_VIB,
-			abe_get_pcm4_backend_status, abe_set_pcm4_backend_status),
-};
-
 
 /* Frontend PCM Operations */
 
@@ -598,18 +314,12 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 static void abe_fe_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
-/* TODO: who does hwmod really belong too ?? CODEC/ABE/HAL ?? */
-#if 0
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_codec *codec = rtd->codec;
-	struct omap_abe_data *priv = snd_soc_dai_get_drvdata(dai);
-	struct twl4030_codec_data *pdata = codec->dev->platform_data;
-	struct platform_device *pdev = priv->pdev;
 
+}
 
-	//if(!--priv->configure && pdata->device_idle)
-	//	pdata->device_idle(pdev);
-#endif
+static int omap_abe_get_be(struct abe_frontend_dai *fe, int fe_id)
+{
+	return 0;
 }
 
 /* Frontend --> Backend ALSA PCM OPS */
@@ -620,9 +330,18 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_card *card = rtd->card;
 	struct abe_frontend_dai *fe = &abe_data.frontend[dai->id];
+	struct omap_aess_fe *aess_fe;
 	int ret = 0, i, started = 0;
 
 	printk("%s: frontend %s %d\n", __func__, rtd->dai_link->name, dai->id);
+
+
+
+	aess_fe = omap_aess_get_be_status(dai->id);
+	if (aess_fe == NULL) {
+		dev_err(rtd->cpu_dai->dev, "could not get valid frontend\n");
+		return -EINVAL;
+	}
 
 	/* only startup backends that are either sinks or sources to this frontend DAI */
 	for (i = 0; i < NUM_ABE_BACKENDS; i++) {
@@ -646,12 +365,12 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 		spin_lock(&be->lock);
 
 		/* enable backend DAI for this stream direction */
-		be->substream = snd_soc_get_dai_substream(card, be_id[i],
+		be->substream = snd_soc_get_dai_substream(card, be_stream[i].id,
 			substream->stream);
 		if (be->substream == NULL) {
 			spin_unlock(&be->lock);
 			printk(KERN_ERR "%s: could not get backend"
-				" substream %s\n", __func__, be_id[i]);
+				" substream %s\n", __func__, be_stream[i].id);
 			ret = -ENODEV;
 			goto unwind;
 		}
@@ -668,7 +387,7 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 	/* did we start any valid DAIs */
 	if (!started) {
 		printk("%s: no backends started\n", __func__);
-		return -EINVAL;
+	//	return -EINVAL;
 	}
 
 	/* start the frontend */
@@ -830,7 +549,8 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 		case ABE_DAI_PDM_DL2:
 		case ABE_DAI_PDM_VIB:
 			break;
-		case ABE_DAI_BT_VX	:
+		case ABE_DAI_BT_VX_UL:
+		case ABE_DAI_BT_VX_DL:
 		// TODO create params for McBSP DAI -
 		//ALSO what about other paths ?????? with different source and sinks
 			/* 16bit, 8kHz, stereo for BT  */
@@ -841,7 +561,8 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 			else
 				abe_connect_serial_port(VX_DL_PORT, &format, MCBSP1_TX);
 			break;
-		case ABE_DAI_MM_EXT0:
+		case ABE_DAI_MM_UL:
+		case ABE_DAI_MM_DL:
 		// TODO create params for McBSP DAI
 			/* 16bit, 48kHz, stereo for FM  */
 			format.f = 48000;
@@ -852,6 +573,7 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 				abe_connect_serial_port(MM_DL_PORT, &format, MCBSP1_TX);
 			// TODO create params for McBSP DAI
 			break;
+#if 0 // TODO:
 		case ABE_DAI_MM_EXT1:
 		// TODO create params for McBSP DAI
 			/* 16bit, 8kHz, stereo for MODEM  */
@@ -862,9 +584,10 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 			else
 				abe_connect_serial_port(VX_DL_PORT, &format, MCBSP2_TX);
 			break;
+#endif
+		case ABE_DAI_DMIC0:
 		case ABE_DAI_DMIC1:
 		case ABE_DAI_DMIC2:
-		case ABE_DAI_DMIC3:
 			break;
 		};
 
@@ -1544,7 +1267,7 @@ static void capture_work_mm(struct work_struct *work)
 }
 
 /* work for ABE DMIC1 backend */
-static void capture_work_dmic1(struct work_struct *work)
+static void capture_work_dmic0(struct work_struct *work)
 {
 	struct abe_backend_dai *be =
 			container_of(work, struct abe_backend_dai, work);
@@ -1607,7 +1330,7 @@ static void capture_work_dmic1(struct work_struct *work)
 }
 
 /* work for ABE DMIC2 backend */
-static void capture_work_dmic2(struct work_struct *work)
+static void capture_work_dmic1(struct work_struct *work)
 {
 	struct abe_backend_dai *be =
 			container_of(work, struct abe_backend_dai, work);
@@ -1677,7 +1400,7 @@ static void capture_work_dmic2(struct work_struct *work)
 }
 
 /* work for ABE DMIC3 backend */
-static void capture_work_dmic3(struct work_struct *work)
+static void capture_work_dmic2(struct work_struct *work)
 {
 	struct abe_backend_dai *be =
 			container_of(work, struct abe_backend_dai, work);
@@ -1768,36 +1491,25 @@ static int omap_abe_dai_probe(struct snd_soc_dai *dai)
 		playback_work_pdm_vib);
 
 	/* MCBSP Voice */
-	INIT_WORK(&abe_data.be[ABE_DAI_BT_VX][SNDRV_PCM_STREAM_PLAYBACK].work,
+	INIT_WORK(&abe_data.be[ABE_DAI_BT_VX_DL][SNDRV_PCM_STREAM_PLAYBACK].work,
 		playback_work_vx);
-	INIT_WORK(&abe_data.be[ABE_DAI_BT_VX][SNDRV_PCM_STREAM_CAPTURE].work,
+	INIT_WORK(&abe_data.be[ABE_DAI_BT_VX_UL][SNDRV_PCM_STREAM_CAPTURE].work,
 		capture_work_vx);
 
 	/* MCBSP Media */
-	INIT_WORK(&abe_data.be[ABE_DAI_MM_EXT0][SNDRV_PCM_STREAM_PLAYBACK].work,
+	INIT_WORK(&abe_data.be[ABE_DAI_MM_DL][SNDRV_PCM_STREAM_PLAYBACK].work,
 		playback_work_mm);
-	INIT_WORK(&abe_data.be[ABE_DAI_MM_EXT0][SNDRV_PCM_STREAM_CAPTURE].work,
+	INIT_WORK(&abe_data.be[ABE_DAI_MM_UL][SNDRV_PCM_STREAM_CAPTURE].work,
 		capture_work_mm);
 
 	/* DMIC 1,2,3 */
+	INIT_WORK(&abe_data.be[ABE_DAI_DMIC0][SNDRV_PCM_STREAM_CAPTURE].work,
+		capture_work_dmic0);
 	INIT_WORK(&abe_data.be[ABE_DAI_DMIC1][SNDRV_PCM_STREAM_CAPTURE].work,
 		capture_work_dmic1);
 	INIT_WORK(&abe_data.be[ABE_DAI_DMIC2][SNDRV_PCM_STREAM_CAPTURE].work,
 		capture_work_dmic2);
-	INIT_WORK(&abe_data.be[ABE_DAI_DMIC3][SNDRV_PCM_STREAM_CAPTURE].work,
-		capture_work_dmic3);
 
-	/* Add frontend <-> backened routing controls */
-	snd_soc_add_platform_controls(dai->platform, abe_pcm0_controls,
-				ARRAY_SIZE(abe_pcm0_controls));
-	snd_soc_add_platform_controls(dai->platform, abe_pcm1_controls,
-				ARRAY_SIZE(abe_pcm1_controls));
-	snd_soc_add_platform_controls(dai->platform, abe_pcm2_controls,
-				ARRAY_SIZE(abe_pcm2_controls));
-	snd_soc_add_platform_controls(dai->platform, abe_pcm3_controls,
-				ARRAY_SIZE(abe_pcm3_controls));
-	snd_soc_add_platform_controls(dai->platform, abe_pcm4_controls,
-				ARRAY_SIZE(abe_pcm4_controls));
 	return 0;
 }
 

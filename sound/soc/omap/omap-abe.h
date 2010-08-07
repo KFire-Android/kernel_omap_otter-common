@@ -30,15 +30,29 @@
 #define ABE_FRONTEND_DAI_TONES		3
 #define ABE_FRONTEND_DAI_VIBRA		4
 
+/* This must currently match the BE order in DSP */
+#define ABE_DAI_PDM_UL			0
+#define ABE_DAI_PDM_DL1			1
+#define ABE_DAI_PDM_DL2			2
+#define ABE_DAI_PDM_VIB			3
+#define ABE_DAI_BT_VX_UL			4
+#define ABE_DAI_BT_VX_DL			5
+#define ABE_DAI_MM_UL			6
+#define ABE_DAI_MM_DL				7
+#define ABE_DAI_DMIC0			8
+#define ABE_DAI_DMIC1			9
+#define ABE_DAI_DMIC2			10
+
 #define OMAP_ABE_BE_PDM_DL1		"(Backend) PDM-DL1"
 #define OMAP_ABE_BE_PDM_UL1		"(Backend) PDM-UL1"
 #define OMAP_ABE_BE_PDM_DL2		"(Backend) PDM-DL2"
 #define OMAP_ABE_BE_PDM_VIB		"(Backend) PDM-VIB"
-#define OMAP_ABE_BE_DMIC1		"(Backend) DMIC1"
-#define OMAP_ABE_BE_DMIC2		"(Backend) DMIC2"
-#define OMAP_ABE_BE_DMIC3		"(Backend) DMIC3"
 #define OMAP_ABE_BE_BT_VX			"(Backend) BT-VX"
 #define OMAP_ABE_BE_MM_EXT0		"(Backend) FM-EXT"
 #define OMAP_ABE_BE_MM_EXT1		"(Backend) MODEM-EXT"
+#define OMAP_ABE_BE_DMIC0		"(Backend) DMIC0"
+#define OMAP_ABE_BE_DMIC1		"(Backend) DMIC1"
+#define OMAP_ABE_BE_DMIC2		"(Backend) DMIC2"
+
 
 #endif	/* End of __OMAP_MCPDM_H__ */
