@@ -585,11 +585,14 @@ void dss_switch_tv_hdmi(int hdmi)
 
 int dss_init(bool skip_init, struct platform_device *pdev)
 {
-	int r;
+	int r = 0, dss_irq;
 	u32 rev;
+	struct resource *dss_mem;
 
 	dss.pdata = pdev->dev.platform_data;
 	dss.pdev = pdev;
+	dss_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	dss.base = ioremap(dss_mem->start, resource_size(dss_mem));
 	if (!dss.base) {
 		DSSERR("can't ioremap DSS\n");
 		r = -ENOMEM;
@@ -631,10 +634,12 @@ int dss_init(bool skip_init, struct platform_device *pdev)
 				? dss_irq_handler_omap2
 				: dss_irq_handler_omap3,
 				0, "OMAP DSS", NULL);
-	else
-		r = request_irq(OMAP44XX_IRQ_DSS_DISPC,
+	else {
+		dss_irq = platform_get_irq(pdev, 0);
+		r = request_irq(dss_irq,
 				dss_irq_handler_omap2,
 				0, "OMAP DSS", NULL);
+	}
 
 	if (r < 0) {
 		DSSERR("omap2 dss: request_irq failed\n");

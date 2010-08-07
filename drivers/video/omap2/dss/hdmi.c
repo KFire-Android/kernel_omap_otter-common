@@ -612,19 +612,21 @@ static struct omap_dss_driver hdmi_driver = {
 
 int hdmi_init(struct platform_device *pdev)
 {
-	int r = 0;
+	int r = 0, hdmi_irq;
+	struct resource *hdmi_mem;
 	printk("Enter hdmi_init()\n");
 
 	hdmi.pdata = pdev->dev.platform_data;
 	hdmi.pdev = pdev;
 	mutex_init(&hdmi.lock);
 
-	hdmi.base_pll = ioremap(HDMI_PLLCTRL, 64);
+	hdmi_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	hdmi.base_pll = ioremap(hdmi_mem->start, resource_size(hdmi_mem));
 	if (!hdmi.base_pll) {
 		ERR("can't ioremap pll\n");
 		return -ENOMEM;
 	}
-	hdmi.base_phy = ioremap(HDMI_PHY, 64);
+	hdmi.base_phy = ioremap((hdmi_mem->start + 0x100), 64);
 
 	if (!hdmi.base_phy) {
 		ERR("can't ioremap phy\n");
@@ -636,7 +638,9 @@ int hdmi_init(struct platform_device *pdev)
 	hdmi_lib_init();
 
 	hdmi_enable_clocks(0);
-	r = request_irq(OMAP44XX_IRQ_DSS_HDMI, hdmi_irq_handler,
+	hdmi_irq = platform_get_irq(pdev, 0);
+	r = request_irq(hdmi_irq,
+				hdmi_irq_handler,
 			0, "OMAP HDMI", (void *)0);
 
 
