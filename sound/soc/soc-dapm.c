@@ -156,6 +156,121 @@ int soc_widget_test_bits(struct snd_soc_dapm_widget *w, unsigned short reg,
 	return change;
 }
 
+#define MAX_HOPS 16
+
+static void scenario_clear_paths(struct snd_soc_dapm_context *dapm)
+{
+	struct snd_soc_dapm_path *p;
+	struct snd_soc_dapm_widget *w;
+	struct list_head *l;
+
+	list_for_each(l, &dapm->paths) {
+		p = list_entry(l, struct snd_soc_dapm_path, list);
+		p->length = 0;
+	}
+	list_for_each(l, &dapm->widgets) {
+		w = list_entry(l, struct snd_soc_dapm_widget, list);
+		w->hops = 0;
+	}
+}
+
+/*
+ * find all the paths between source and sink
+ */
+static int scenario_find_paths (struct snd_soc_dapm_context *dapm,
+		struct snd_soc_dapm_widget *source, struct snd_soc_dapm_widget *sink,
+		int hops)
+{
+	struct list_head *lp;
+	struct snd_soc_dapm_path *path;
+	int dist = 0;
+
+	if (hops > MAX_HOPS)
+		return 0;
+
+	if (source == sink) {
+		printk("soc: found route with length %d\n", hops);
+		dapm->num_valid_paths++;
+		return 1;
+	}
+
+	if (source->hops && source->hops <= hops)
+		return 0;
+	source->hops = hops;
+
+	list_for_each(lp, &source->sinks) {
+		path = list_entry(lp, struct snd_soc_dapm_path, list_source);
+
+		if (path->length && path->length <= hops)
+			continue;
+
+		if (path->sink && scenario_find_paths(dapm, path->sink, sink, hops + 1)) {
+			path->length = hops;
+			if (!dist || dist > path->length)
+				dist = path->length;
+		}
+	}
+
+	return dist;
+}
+
+/*
+ * traverse the tree from sink to source via the shortest path
+ */
+static int scenario_get_paths(struct snd_soc_dapm_context *dapm,
+		struct snd_soc_dapm_widget *source, struct snd_soc_dapm_widget *sink)
+{
+	dapm->num_valid_paths = 0;
+	scenario_find_paths(dapm, source, sink, 1);
+	return dapm->num_valid_paths;
+}
+
+/**
+ * snd_soc_scenario_set_path - set new scenario path
+ * @codec: the soc codec
+ * @scenario: the sceanrio path
+ *
+ * Sets up a new audio path within the audio susbsytem.
+ *
+ * Returns 0 for success.
+ */
+int snd_soc_scenario_set_path(struct snd_soc_dapm_context *dapm,
+	char *source_name, char *sink_name)
+{
+	struct snd_soc_dapm_widget *sink = NULL, *source = NULL;
+	struct list_head *l = NULL;
+	int routes;
+
+	/* find source */
+	list_for_each(l, &dapm->widgets) {
+		struct snd_soc_dapm_widget *w;
+		w = list_entry(l, struct snd_soc_dapm_widget, list);
+
+		if(!source && !strncmp(w->name, source_name, 16)) {
+			source = w;
+			continue;
+		}
+		if(!sink && !strncmp(w->name, sink_name, 16)) {
+			sink = w;
+		}
+	}
+
+	if(!source) {
+		printk(KERN_ERR "soc: invalid scenario source %s\n", source_name);
+		return -EINVAL;
+	}
+	if(!sink) {
+		printk(KERN_ERR "soc: invalid scenario sink %s\n", sink_name);
+		return -EINVAL;
+	}
+
+	routes = scenario_get_paths(dapm, source, sink);
+	scenario_clear_paths(dapm);
+
+	return routes;
+}
+EXPORT_SYMBOL_GPL(snd_soc_scenario_set_path);
+
 /**
  * snd_soc_dapm_set_bias_level - set the bias level for the system
  * @card: audio device
