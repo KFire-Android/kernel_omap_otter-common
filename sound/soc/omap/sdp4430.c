@@ -486,8 +486,8 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.ops = &sdp4430_mcbsp_ops,
 	},
 	{
-		.name = OMAP_ABE_BE_DMIC1,
-		.stream_name = "D Mic 1",
+		.name = OMAP_ABE_BE_DMIC0,
+		.stream_name = "D Mic 0",
 
 		/* ABE components - DMIC UL 1 */
 		.cpu_dai_name = "omap-dmic-dai.0",
@@ -500,8 +500,8 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 	},
 	{
-		.name = OMAP_ABE_BE_DMIC2,
-		.stream_name = "D Mic 2",
+		.name = OMAP_ABE_BE_DMIC1,
+		.stream_name = "D Mic 1",
 
 		/* ABE components - DMIC UL 1 */
 		.cpu_dai_name = "omap-dmic-dai.1",
@@ -514,8 +514,8 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 	},
 	{
-		.name = OMAP_ABE_BE_DMIC3,
-		.stream_name = "D Mic 3",
+		.name = OMAP_ABE_BE_DMIC2,
+		.stream_name = "D Mic 2",
 
 		/* ABE components - DMIC UL 2 */
 		.cpu_dai_name = "omap-dmic-dai.2",
