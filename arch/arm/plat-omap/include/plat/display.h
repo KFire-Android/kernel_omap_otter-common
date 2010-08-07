@@ -24,6 +24,8 @@
 #include <linux/kobject.h>
 #include <linux/device.h>
 #include <asm/atomic.h>
+#include <plat/omap_hwmod.h>
+#include <plat/omap_device.h>
 
 #define DISPC_IRQ_FRAMEDONE		(1 << 0)
 #define DISPC_IRQ_VSYNC			(1 << 1)
@@ -332,6 +334,16 @@ struct omap_dss_board_info {
 	int num_devices;
 	struct omap_dss_device **devices;
 	struct omap_dss_device *default_device;
+};
+extern void omap_display_init(struct omap_dss_board_info *board_data);
+
+struct omap_display_platform_data{
+	char name[16];
+	int hwmod_count;
+	struct omap_dss_board_info *board_data;
+	int (*device_enable)(struct platform_device *pdev);
+	int (*device_shutdown)(struct platform_device *pdev);
+	int (*device_idle)(struct platform_device *pdev);
 };
 
 struct omap_video_timings {

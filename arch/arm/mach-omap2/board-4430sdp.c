@@ -41,6 +41,8 @@
 #include <plat/timer-gp.h>
 #include <plat/display.h>
 #include <plat/usb.h>
+#include <plat/omap_device.h>
+#include <plat/omap_hwmod.h>
 #include <plat/mmc.h>
 #include <plat/syntm12xx.h>
 #include <plat/omap4-keypad.h>
@@ -522,33 +524,14 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.default_device	=	&sdp4430_lcd_device,
 };
 
-static struct platform_device sdp4430_dss_device = {
-	.name	=	"omapdss",
-	.id	=	-1,
-	.dev	= {
-		.platform_data = &sdp4430_dss_data,
-	},
-};
-
 static struct platform_device *sdp4430_devices[] __initdata = {
-	&sdp4430_dss_device,
 	&sdp4430_proximity_device,
 	&sdp4430_leds_pwm,
 	&sdp4430_leds_gpio,
 };
 
-static struct omap_lcd_config sdp4430_lcd_config __initdata = {
-	.ctrl_name	= "internal",
-};
-
-static struct omap_board_config_kernel sdp4430_config[] __initdata = {
-	{ OMAP_TAG_LCD,		&sdp4430_lcd_config },
-};
-
 static void __init omap_4430sdp_init_irq(void)
 {
-	omap_board_config = sdp4430_config;
-	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
 	omap2_init_common_hw(NULL, NULL);
 #ifdef CONFIG_OMAP_32K_TIMER
 	omap2_gp_clockevent_set_gptimer(1);
@@ -1064,6 +1047,7 @@ static void __init omap_4430sdp_init(void)
 	}
 	omap_sfh7741prox_init();
 	omap_cma3000accl_init();
+	omap_display_init(&sdp4430_dss_data);
 }
 
 static void __init omap_4430sdp_map_io(void)

@@ -30,6 +30,7 @@
 #include <plat/mux.h>
 #include <mach/gpio.h>
 #include <plat/mmc.h>
+#include <plat/display.h>
 #include <plat/dma.h>
 #include <plat/mcbsp.h>
 #include <plat/omap_device.h>
@@ -852,6 +853,73 @@ static inline void omap_hdq_init(void) {}
 #endif
 
 /*---------------------------------------------------------------------------*/
+#ifdef CONFIG_OMAP2_DSS
+
+#define MAX_OMAP_DSS_HWMOD_NAME_LEN 16
+static const char dssname[] = "dss";
+struct omap_device *od;
+
+static struct omap_device_pm_latency omap_dss_latency[] = {
+	[0] = {
+		.deactivate_func	= omap_device_idle_hwmods,
+		.activate_func		= omap_device_enable_hwmods,
+		.flags			= OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+		},
+};
+
+static struct platform_device omap_display_device = {
+	.name		= "omapdss",
+	.id		= -1,
+	.dev		= {
+		.platform_data = NULL,
+	},
+};
+void __init omap_display_init(struct omap_dss_board_info *board_data)
+{
+	struct omap_hwmod *oh;
+	char oh_name[7][MAX_OMAP_DSS_HWMOD_NAME_LEN] = {"dss", "dss_dispc", "dss_dsi1", "dss_dsi2", "dss_hdmi", "dss_rfbi", "dss_venc"};
+	int l, idx, i;
+	struct omap_display_platform_data pdata;
+	idx = 1;
+
+	for (i = 0; i < 7; i++)	{
+		l = snprintf(oh_name[i], MAX_OMAP_DSS_HWMOD_NAME_LEN, oh_name[i]);
+		WARN(l >= MAX_OMAP_DSS_HWMOD_NAME_LEN,
+		"String buffer overflow in DSS device setup\n");
+
+		oh = omap_hwmod_lookup(oh_name[i]);
+
+		if (!oh) {
+			pr_err("Could not look up %s\n", oh_name[i]);
+			return;
+		}
+
+		strcpy(pdata.name, oh_name[i]);
+		pdata.hwmod_count	= 2;
+		pdata.board_data	= board_data;
+		pdata.board_data->get_last_off_on_transaction_id = NULL;
+
+		pdata.device_enable	= omap_device_enable;
+		pdata.device_idle	= omap_device_idle;
+		pdata.device_shutdown	= omap_device_shutdown;
+		od = omap_device_build(oh_name[i], -1, oh, &pdata,
+			sizeof(struct omap_display_platform_data),
+			omap_dss_latency,
+			ARRAY_SIZE(omap_dss_latency), 0);
+		WARN((IS_ERR(od)), "Could not build omap_device for %s %s\n",
+			dssname, oh_name[i]);
+	}
+	omap_display_device.dev.platform_data = board_data;
+	if (platform_device_register(&omap_display_device) < 0)
+		printk(KERN_ERR "Unable to register OMAP-Display device\n");
+
+	return;
+}
+#else
+void __init display_init(struct omap_dss_board_info *board_data)
+{
+}
+#endif
 
 #if defined(CONFIG_VIDEO_OMAP2_VOUT) || \
 	defined(CONFIG_VIDEO_OMAP2_VOUT_MODULE)
