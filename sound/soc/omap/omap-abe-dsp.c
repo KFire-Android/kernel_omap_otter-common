@@ -71,6 +71,7 @@
 #define ABE_MM_UL2(x)		(x + ABE_NUM_MIXERS + 8)
 #define ABE_VX_UL(x)			(x + ABE_NUM_MIXERS + 10)
 #define ABE_WIDGET(x)		(x + ABE_NUM_MIXERS + ABE_NUM_MUXES)
+//#define ABE_BE_WIDGET(x)		(x + ABE_NUM_MIXERS + ABE_NUM_MUXES)
 
 #define VIRT_SWITCH	0
 
@@ -152,7 +153,7 @@ static int abe_dsp_write(struct snd_soc_platform *platform, unsigned int reg,
 static void abe_init_engine(struct snd_soc_platform *platform)
 {
 	struct abe_data *priv = snd_soc_platform_get_drvdata(platform);
-#ifndef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM_RUNTIME
 	struct omap4_abe_dsp_pdata *pdata = priv->abe_pdata;
 #endif
 	struct platform_device *pdev = priv->pdev;
@@ -170,7 +171,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	 * Disable the clk after it has been used.
 	 */
 	pm_runtime_get_sync(&pdev->dev);
-#ifndef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM_RUNTIME
 	if (pdata->device_enable)
 		pdata->device_enable(pdev);
 #endif
@@ -220,7 +221,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	abe_write_equalizer(EQ2R, &dl2_eq);
 
 	pm_runtime_get_sync(&pdev->dev);
-#ifndef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM_RUNTIME
 	if (pdata->device_idle)
 		pdata->device_idle(pdev);
 #endif
@@ -712,22 +713,22 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			ABE_WIDGET(1), ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_OUT("VX_UL", "Voice Capture", 0,
 			ABE_WIDGET(2), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_OUT("MM_UL1", "Multimedia Capture1", 0,
+	SND_SOC_DAPM_AIF_OUT("MM_UL1", "MultiMedia1 Capture", 0,
 			ABE_WIDGET(3), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_OUT("MM_UL2", "Multimedia Capture2", 0,
+	SND_SOC_DAPM_AIF_OUT("MM_UL2", "MultiMedia2 Capture", 0,
 			ABE_WIDGET(4), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_IN("MM_DL", " Multimedia Playback", 0,
+	SND_SOC_DAPM_AIF_IN("MM_DL", " MultiMedia1 Playback", 0,
 			ABE_WIDGET(5), ABE_OPP_25, 0),
 	SND_SOC_DAPM_AIF_IN("VIB_DL", "Vibra Playback", 0,
 			ABE_WIDGET(6), ABE_OPP_100, 0),
 
 	/* Backend DAIs  - TODO: maybe should match stream names of TWL6040 etc ?? */
 	// FIXME: must match BE order in abe_dai.h
-	SND_SOC_DAPM_AIF_IN("PDM_UL1", "Capture", 0,
+	SND_SOC_DAPM_AIF_IN("PDM_UL1", "Analog Capture", 0,
 			ABE_WIDGET(7), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_OUT("PDM_DL1", "Headset Playback", 0,
+	SND_SOC_DAPM_AIF_OUT("PDM_DL1", "HS Playback", 0,
 			ABE_WIDGET(8), ABE_OPP_25, 0),
-	SND_SOC_DAPM_AIF_OUT("PDM_DL2", "Handsfree Playback", 0,
+	SND_SOC_DAPM_AIF_OUT("PDM_DL2", "HF Playback", 0,
 			ABE_WIDGET(9), ABE_OPP_100, 0),
 	SND_SOC_DAPM_AIF_OUT("PDM_VIB", "Vibra Playback", 0,
 			ABE_WIDGET(10), ABE_OPP_100, 0),
@@ -1161,23 +1162,13 @@ static int  abe_remove(struct snd_soc_platform *platform)
 	return 0;
 }
 
-static int aess_early_startup(struct snd_pcm_substream *substream)
+static int aess_open(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_dai *dai = rtd->cpu_dai;
 	int i;
 	char *sink[] = {"PDM_DL1", "PDM_DL2", "BT_VX_DL", "MM_EXT_DL"};
-
-	for (i = 0; i < 4; i++)
-		printk("Path MM_DL to %s got %d\n",sink[i],
-			snd_soc_scenario_set_path(platform->dapm,"MM_DL", sink[i]));
-	return 0;
-#if 0
-	struct snd_soc_pcm_runtime  *rtdb, *rtd = substream->private_data;
-	struct snd_soc_dai *dai = rtd->cpu_dai;
-
-	// TODO: make snd_soc_dapm_stream_event pass 1st arg dapm_context
-	rtdb = snd_soc_get_pcm_runtime(rtd->card, OMAP_ABE_BE_PDM_DL1);
 
 	mutex_lock(&abe->mutex);
 
@@ -1186,47 +1177,37 @@ static int aess_early_startup(struct snd_pcm_substream *substream)
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtdb, "Multimedia Playback",
+			snd_soc_dapm_stream_event(rtd, "Multimedia Playback",
 					SND_SOC_DAPM_STREAM_START);
 		else
-			snd_soc_dapm_stream_event(rtdb, "Multimedia Capture2",
+			snd_soc_dapm_stream_event(rtd, "Multimedia Capture2",
 					SND_SOC_DAPM_STREAM_START);
 		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
-		snd_soc_dapm_stream_event(rtdb, "Multimedia Capture1",
+		snd_soc_dapm_stream_event(rtd, "Multimedia Capture1",
 				SND_SOC_DAPM_STREAM_START);
 		break;
 	case ABE_FRONTEND_DAI_VOICE:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtdb, "Voice Playback",
+			snd_soc_dapm_stream_event(rtd, "Voice Playback",
 					SND_SOC_DAPM_STREAM_START);
 		else
-			snd_soc_dapm_stream_event(rtdb, "Voice Capture",
+			snd_soc_dapm_stream_event(rtd, "Voice Capture",
 					SND_SOC_DAPM_STREAM_START);
 		break;
 	case ABE_FRONTEND_DAI_TONES:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtdb, "Tones Playback",
+			snd_soc_dapm_stream_event(rtd, "Tones Playback",
 					SND_SOC_DAPM_STREAM_START);
 		break;
 	case ABE_FRONTEND_DAI_VIBRA:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtdb, "Vibra Playback",
+			snd_soc_dapm_stream_event(rtd, "Vibra Playback",
 					SND_SOC_DAPM_STREAM_START);
 		break;
 	}
 
 	mutex_unlock(&abe->mutex);
-	return 0;
-#endif
-}
-
-static int aess_open(struct snd_pcm_substream *substream)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_platform *platform = rtd->platform;
-	int i;
-	char *sink[] = {"PDM_DL1", "PDM_DL2", "BT_VX_DL", "MM_EXT_DL"};
 
 	for (i = 0; i < 4; i++)
 		printk("Path MM_DL to %s got %d\n",sink[i],
@@ -1251,12 +1232,9 @@ static int aess_prepare(struct snd_pcm_substream *substream)
 
 static int aess_close(struct snd_pcm_substream *substream)
 {
-	struct snd_soc_pcm_runtime  *rtdb, *rtd = substream->private_data;
+	struct snd_soc_pcm_runtime  *rtd = substream->private_data;
 	struct snd_soc_dai *dai = rtd->cpu_dai;
 	int i, opp = 0;
-
-	// TODO: make snd_soc_dapm_stream_event pass 1st arg dapm_context
-	rtdb = snd_soc_get_pcm_runtime(rtd->card, OMAP_ABE_BE_PDM_DL1);
 
 	mutex_lock(&abe->mutex);
 
@@ -1265,32 +1243,32 @@ static int aess_close(struct snd_pcm_substream *substream)
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtdb, "Multimedia Playback",
+			snd_soc_dapm_stream_event(rtd, "Multimedia Playback",
 					SND_SOC_DAPM_STREAM_STOP);
 		else
-			snd_soc_dapm_stream_event(rtdb, "Multimedia Capture2",
+			snd_soc_dapm_stream_event(rtd, "Multimedia Capture2",
 					SND_SOC_DAPM_STREAM_STOP);
 		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
-		snd_soc_dapm_stream_event(rtdb, "Multimedia Capture1",
+		snd_soc_dapm_stream_event(rtd, "Multimedia Capture1",
 				SND_SOC_DAPM_STREAM_STOP);
 		break;
 	case ABE_FRONTEND_DAI_VOICE:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtdb, "Voice Playback",
+			snd_soc_dapm_stream_event(rtd, "Voice Playback",
 					SND_SOC_DAPM_STREAM_STOP);
 		else
-			snd_soc_dapm_stream_event(rtdb, "Voice Capture",
+			snd_soc_dapm_stream_event(rtd, "Voice Capture",
 					SND_SOC_DAPM_STREAM_STOP);
 		break;
 	case ABE_FRONTEND_DAI_TONES:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtdb, "Tones Playback",
+			snd_soc_dapm_stream_event(rtd, "Tones Playback",
 					SND_SOC_DAPM_STREAM_STOP);
 		break;
 	case ABE_FRONTEND_DAI_VIBRA:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtdb, "Vibra Playback",
+			snd_soc_dapm_stream_event(rtd, "Vibra Playback",
 					SND_SOC_DAPM_STREAM_STOP);
 		break;
 	}
