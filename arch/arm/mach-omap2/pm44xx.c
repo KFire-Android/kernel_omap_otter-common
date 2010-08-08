@@ -55,6 +55,12 @@ static int omap4_pm_suspend(void)
 	u32 cpu_id = 0;
 
 	/*
+	 * Wakeup timer from suspend
+	 */
+	if (wakeup_timer_seconds || wakeup_timer_milliseconds)
+		omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
+					 wakeup_timer_milliseconds);
+	/*
 	 * Clear all wakeup sources and keep
 	 * only Debug UART, Keypad and GPT1 interrupt
 	 * as a wakeup event from MPU/Device OFF
