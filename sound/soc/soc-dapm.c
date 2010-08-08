@@ -115,16 +115,16 @@ static int soc_widget_read(struct snd_soc_dapm_widget *w, int reg)
 	if (w->codec)
 		return snd_soc_read(w->codec, reg);
 	else if  (w->platform)
-		return snd_soc_platform_read(w->platform, w->reg);
+		return snd_soc_platform_read(w->platform, reg);
 	return 0;
 }
 
 static int soc_widget_write(struct snd_soc_dapm_widget *w,int reg, int val)
 {
 	if (w->codec)
-		return snd_soc_write(w->codec, w->reg, val);
+		return snd_soc_write(w->codec, reg, val);
 	else if  (w->platform)
-		return snd_soc_platform_write(w->platform, w->reg, val);
+		return snd_soc_platform_write(w->platform, reg, val);
 	return 0;
 }
 
@@ -137,7 +137,7 @@ int soc_widget_update_bits(struct snd_soc_dapm_widget *w, unsigned short reg,
 	old = soc_widget_read(w, reg);
 	new = (old & ~mask) | value;
 	change = old != new;
-//	if (change)
+	if (change)
 		soc_widget_write(w, reg, new);
 
 	return change;
@@ -172,6 +172,7 @@ static void scenario_clear_paths(struct snd_soc_dapm_context *dapm)
 		w = list_entry(l, struct snd_soc_dapm_widget, list);
 		w->hops = 0;
 	}
+	dapm_clear_walk(dapm);
 }
 
 /*
@@ -235,7 +236,7 @@ static int scenario_get_paths(struct snd_soc_dapm_context *dapm,
  * Returns 0 for success.
  */
 int snd_soc_scenario_set_path(struct snd_soc_dapm_context *dapm,
-	char *source_name, char *sink_name)
+	const char *source_name, const char *sink_name)
 {
 	struct snd_soc_dapm_widget *sink = NULL, *source = NULL;
 	struct list_head *l = NULL;
@@ -1721,6 +1722,23 @@ int snd_soc_dapm_new_widgets(struct snd_soc_dapm_context *dapm)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_dapm_new_widgets);
+
+const char *snd_soc_dapm_get_aif(struct snd_soc_dapm_context *dapm,
+		const char *stream_name, enum snd_soc_dapm_type type)
+{
+	struct snd_soc_dapm_widget *w;
+
+	list_for_each_entry(w, &dapm->widgets, list) {
+
+		if (!w->sname)
+			continue;
+
+		if (w->id == type && strstr(w->sname, stream_name))
+			return w->name;
+	}
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(snd_soc_dapm_get_aif);
 
 /**
  * snd_soc_dapm_get_volsw - dapm mixer get callback
