@@ -254,6 +254,9 @@ enum snd_soc_control_type {
 	SND_SOC_SPI,
 };
 
+/* Max number of Backend DAIs */
+#define SND_SOC_MAX_BE		8
+
 int snd_soc_register_platform(struct device *dev,
 		struct snd_soc_platform_driver *platform_drv);
 void snd_soc_unregister_platform(struct device *dev);
@@ -582,6 +585,8 @@ struct snd_soc_dai_link {
 	unsigned int dynamic:1;
 	/* This DAI link has no codec side driver*/
 	unsigned int no_codec:1;
+	/* This DAI has a Backend ID */
+	unsigned int be_id;
 
 	/* codec/machine specific init - e.g. add machine controls */
 	int (*init)(struct snd_soc_pcm_runtime *rtd);
@@ -641,6 +646,12 @@ struct snd_soc_pcm_runtime  {
 
 	unsigned int complete:1;
 	unsigned int dev_registered:1;
+
+	/* BE runtime data */
+	unsigned int fe_clients;
+	unsigned int num_be;
+	unsigned int be_active;
+	struct snd_soc_pcm_runtime *be_rtd[SND_SOC_MAX_BE];
 
 	/* Symmetry data - only valid if symmetry is being enforced */
 	unsigned int rate;

@@ -22,6 +22,8 @@
  *   o Support TDM on PCM and I2S
  */
 
+ #define DEBUG
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -385,6 +387,108 @@ static int soc_pcm_apply_symmetry(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_card *card = rtd->card;
+	int i, num;
+	const char *fe_aif = NULL, *be_aif;
+	enum snd_soc_dapm_type fe_type, be_type;
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		fe_type = snd_soc_dapm_aif_in;
+		be_type = snd_soc_dapm_aif_out;
+	} else {
+		fe_type = snd_soc_dapm_aif_out;
+		be_type = snd_soc_dapm_aif_in;
+	}
+
+	/* search card for valid frontend steams */
+	for (i = 0; i < card->num_links; i++) {
+
+		/* check for frontend */
+		if (card->rtd[i].dai_link->dynamic)
+			continue;
+
+		/* frontends must not belong to this platform */
+		if (card->rtd[i].platform != platform) {
+
+			fe_aif = snd_soc_dapm_get_aif(card->rtd[i].platform->dapm,
+					cpu_dai->driver->name, fe_type);
+
+			if (fe_aif == NULL)
+				dev_dbg(&rtd->dev, "cant find frontend for stream %s\n",
+						cpu_dai->driver->name);
+			else
+				break;
+		}
+	}
+
+	if (fe_aif == NULL) {
+		dev_err(&rtd->dev, "no frontend widgets for stream %s\n",
+						cpu_dai->driver->name);
+		return 0;
+	} else
+		dev_dbg(&rtd->dev, "got fe %s\n", fe_aif);
+
+	/* search card for valid backends */
+	for (i = 0; i < card->num_links; i++) {
+
+		/* check for frontend */
+		if (card->rtd[i].dai_link->dynamic)
+			continue;
+
+		/* backends must not belong to this platform */
+		if (card->rtd[i].dai_link->no_pcm && card->rtd[i].platform != platform) {
+
+			be_aif = snd_soc_dapm_get_aif(card->rtd[i].platform->dapm,
+					card->rtd[i].dai_link->stream_name, be_type);
+			if (be_aif == NULL) {
+				dev_dbg(&rtd->dev, "no backend widget for stream %s\n",
+						card->rtd[i].dai_link->stream_name);
+				continue;
+			}
+			dev_dbg(&rtd->dev, "got be %s\n", be_aif);
+
+			/* check for valid path */
+			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+				num = snd_soc_scenario_set_path(card->rtd[i].platform->dapm, fe_aif, be_aif);
+			} else {
+				num = snd_soc_scenario_set_path(card->rtd[i].platform->dapm, be_aif, fe_aif);
+			}
+
+			/* add backend if we have space */
+			if (num > 0) {
+				if (rtd->num_be == SND_SOC_MAX_BE)
+					dev_dbg(&rtd->dev, "no more backends permitted\n");
+				else {
+					printk("got %d for %s %s\n", num, fe_aif, be_aif);
+					rtd->be_rtd[rtd->num_be++] = &card->rtd[i];
+					card->rtd[i].fe_clients++;
+				}
+			}
+		}
+	}
+printk("got %d BE \n", rtd->num_be);
+	return rtd->num_be ? rtd->num_be : -EINVAL;
+}
+EXPORT_SYMBOL_GPL(snd_soc_get_backend_dais);
+
+void snd_soc_put_backend_dais(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	int i;
+
+	for (i = 0; i < rtd->num_be; i++) {
+		rtd->be_rtd[i]->fe_clients--;
+		rtd->be_rtd[i] = NULL;
+	}
+	rtd->num_be = 0;
+}
+EXPORT_SYMBOL_GPL(snd_soc_put_backend_dais);
+
 /*
  * Called by ALSA when a PCM substream is opened, the runtime->hw record is
  * then initialized and any private data can be allocated. This also calls
@@ -403,6 +507,22 @@ int snd_soc_pcm_open(struct snd_pcm_substream *substream)
 	int ret = 0;
 
 	mutex_lock(&rtd->pcm_mutex);
+
+	/* Work out backend DAI's if we are a frontend */
+	if (rtd->dai_link->dynamic) {
+		ret = snd_soc_get_backend_dais(substream);
+		if (ret < 0) {
+			printk(KERN_ERR "asoc: no valid backend routes for PCM: %s\n",
+					dev_name(&rtd->dev));
+			goto out;
+		}
+	}
+
+	/* Are we the backend and already enabled */
+	if (rtd->dai_link->no_pcm) {
+		if (rtd->be_active++)
+			goto out;
+	}
 
 	/* startup the audio subsystem */
 	if (cpu_dai->driver->ops->startup) {
@@ -533,6 +653,7 @@ no_pcm:
 	cpu_dai->active++;
 	codec_dai->active++;
 	rtd->codec->active++;
+
 	mutex_unlock(&rtd->pcm_mutex);
 	return 0;
 
@@ -613,6 +734,12 @@ int snd_soc_pcm_close(struct snd_pcm_substream *substream)
 	cpu_dai->active--;
 	codec_dai->active--;
 	codec->active--;
+
+	if (rtd->dai_link->no_pcm)
+		rtd->be_active--;
+
+	if (rtd->dai_link->dynamic)
+		snd_soc_put_backend_dais(substream);
 
 	/* Muting the DAC suppresses artifacts caused during digital
 	 * shutdown, for example from stopping clocks.
