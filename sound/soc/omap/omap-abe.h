@@ -31,17 +31,16 @@
 #define ABE_FRONTEND_DAI_VIBRA		4
 
 /* This must currently match the BE order in DSP */
-#define ABE_DAI_PDM_UL			0
-#define ABE_DAI_PDM_DL1			1
-#define ABE_DAI_PDM_DL2			2
-#define ABE_DAI_PDM_VIB			3
-#define ABE_DAI_BT_VX_UL			4
-#define ABE_DAI_BT_VX_DL			5
-#define ABE_DAI_MM_UL			6
-#define ABE_DAI_MM_DL				7
-#define ABE_DAI_DMIC0			8
-#define ABE_DAI_DMIC1			9
-#define ABE_DAI_DMIC2			10
+#define OMAP_ABE_DAI_PDM_UL			0
+#define OMAP_ABE_DAI_PDM_DL1			1
+#define OMAP_ABE_DAI_PDM_DL2			2
+#define OMAP_ABE_DAI_PDM_VIB			3
+#define OMAP_ABE_DAI_BT_VX			4
+#define OMAP_ABE_DAI_MM_FM			5
+#define OMAP_ABE_DAI_MODEM			6
+#define OMAP_ABE_DAI_DMIC0			7
+#define OMAP_ABE_DAI_DMIC1			8
+#define OMAP_ABE_DAI_DMIC2			9
 
 #define OMAP_ABE_BE_PDM_DL1		"(Backend) PDM-DL1"
 #define OMAP_ABE_BE_PDM_UL1		"(Backend) PDM-UL1"
