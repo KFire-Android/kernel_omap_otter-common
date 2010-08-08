@@ -328,7 +328,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "Multimedia",
 
 		/* ABE components - MM-UL2 & MM_DL */
-		.cpu_dai_name = "Media",
+		.cpu_dai_name = "MultiMedia1",
 		.platform_name = "omap-pcm-audio",
 
 		.dynamic = 1, /* codec DAI is dynamic */
@@ -338,7 +338,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "Multimedia Capture",
 
 		/* ABE components - MM-UL 1 */
-		.cpu_dai_name = "Media Capture",
+		.cpu_dai_name = "MultiMedia2",
 		.platform_name = "omap-pcm-audio",
 
 		.dynamic = 1, /* codec DAI is dynamic */
@@ -394,10 +394,11 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.init = sdp4430_twl6040_init,
 		.ops = &sdp4430_mcpdm_ops,
+		.be_id = OMAP_ABE_DAI_PDM_DL1,
 	},
 	{
 		.name = OMAP_ABE_BE_PDM_UL1,
-		.stream_name = "Capture",
+		.stream_name = "Analog Capture",
 
 		/* ABE components - UL1 */
 		.cpu_dai_name = "omap-mcpdm-dai",
@@ -409,6 +410,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.ops = &sdp4430_mcpdm_ops,
+		.be_id = OMAP_ABE_DAI_PDM_UL,
 	},
 	{
 		.name = OMAP_ABE_BE_PDM_DL2,
@@ -424,6 +426,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.ops = &sdp4430_mcpdm_ops,
+		.be_id = OMAP_ABE_DAI_PDM_DL2,
 	},
 	{
 		.name = OMAP_ABE_BE_PDM_VIB,
@@ -439,6 +442,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.ops = &sdp4430_mcpdm_ops,
+		.be_id = OMAP_ABE_DAI_PDM_VIB,
 	},
 	{
 		.name = OMAP_ABE_BE_BT_VX,
@@ -454,6 +458,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.no_codec = 1, /* TODO: have a dummy CODEC */
 		.ops = &sdp4430_mcbsp_ops,
+		.be_id = OMAP_ABE_DAI_BT_VX,
 	},
 	{
 		.name = OMAP_ABE_BE_MM_EXT0,
@@ -469,6 +474,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.no_codec = 1, /* TODO: have a dummy CODEC */
 		.ops = &sdp4430_mcbsp_ops,
+		.be_id = OMAP_ABE_DAI_MM_FM,
 	},
 	{
 		.name = OMAP_ABE_BE_MM_EXT1,
@@ -484,6 +490,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.no_codec = 1, /* TODO: have a dummy CODEC */
 		.ops = &sdp4430_mcbsp_ops,
+		.be_id = OMAP_ABE_DAI_MODEM,
 	},
 	{
 		.name = OMAP_ABE_BE_DMIC0,
@@ -498,6 +505,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.codec_name = "dmic-codec.0",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_id = OMAP_ABE_DAI_DMIC0,
 	},
 	{
 		.name = OMAP_ABE_BE_DMIC1,
@@ -512,6 +520,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.codec_name = "dmic-codec.1",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_id = OMAP_ABE_DAI_DMIC1,
 	},
 	{
 		.name = OMAP_ABE_BE_DMIC2,
@@ -526,6 +535,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.codec_name = "dmic-codec.2",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_id = OMAP_ABE_DAI_DMIC2,
 	},
 #ifdef CONFIG_SND_OMAP_SOC_HDMI_LRG
 	{
@@ -556,7 +566,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 	},
 	{
 		.name = "Debug to McPDM",
-		.stream_name = "Multimedia",
+		.stream_name = "Headset Playback",
 
 		/* ABE components - DL1 */
 		.cpu_dai_name = "omap-mcpdm-dai",
