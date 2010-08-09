@@ -1646,7 +1646,13 @@ void dispc_set_idle_mode(void)
 	l = FLD_MOD(l, 1, 13, 12);	/* MIDLEMODE: smart standby */
 	l = FLD_MOD(l, 1, 4, 3);	/* SIDLEMODE: smart idle */
 	l = FLD_MOD(l, 0, 2, 2);	/* ENWAKEUP */
+
+	/* Setting AUTOIDLE to 0 causes DSI
+	 * framedone timeouts on ES2.0
+	 */
+#if 0
 	l = FLD_MOD(l, 0, 0, 0);	/* AUTOIDLE */
+#endif
 	dispc_write_reg(DISPC_SYSCONFIG, l);
 
 }
