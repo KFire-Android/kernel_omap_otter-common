@@ -1305,9 +1305,6 @@ static struct omap_device_pm_latency omap_aess_latency[] = {
 
 static int __devinit abe_engine_probe(struct platform_device *pdev)
 {
-	struct omap4_abe_dsp_pdata *pdata = dev_get_platdata(&pdev->dev);
-	struct omap_hwmod *oh;
-	struct omap_device *od;
 	int ret;
 
 	abe = kzalloc(sizeof(struct abe_data), GFP_KERNEL);

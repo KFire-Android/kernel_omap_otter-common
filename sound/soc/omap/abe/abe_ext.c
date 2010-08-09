@@ -10,6 +10,7 @@
 
 #include "abe_main.h"
 
+#if 0
 /*
  *  ABE_DEFAULT_IRQ_PINGPONG_PLAYER
  *
@@ -100,6 +101,7 @@ void abe_default_irq_pingpong_player_32bits(void)
 
 	abe_set_ping_pong_buffer(MM_DL_PORT, n_bytes);
 }
+#endif
 /*
  * ABE_DEFAULT_IRQ_APS_ADAPTATION
  *
