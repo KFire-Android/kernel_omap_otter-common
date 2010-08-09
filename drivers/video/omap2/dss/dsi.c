@@ -3531,7 +3531,7 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	dsi_if_enable(ix, 1);
 	dsi_force_tx_stop_mode_io(ix);
 
-#ifndef OMAP4430_REV_ES2_0
+#ifdef CONFIG_OMAP4_ES1
 	/* OMAP4 trim registers */
 	dsi_write_reg(ix, DSI_DSIPHY_CFG12, 0x58);
 	dsi_write_reg(ix, DSI_DSIPHY_CFG14, 0xAA05C800);
