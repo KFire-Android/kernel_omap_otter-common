@@ -1315,6 +1315,8 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	dev_set_drvdata(&pdev->dev, abe);
 
+	pm_runtime_enable(&pdev->dev);
+
 	abe->abe_pdata = pdev->dev.platform_data;
 	abe->pdev = pdev;
 

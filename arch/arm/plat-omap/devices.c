@@ -305,12 +305,19 @@ static void omap_init_aess(void)
 {
 	struct omap_hwmod *oh;
 	struct omap_device *od;
-	struct twl6040_code_data *pdata;
+	struct omap4_abe_dsp_pdata *pdata;
 
 	oh = omap_hwmod_lookup("aess");
-	if (!oh)
+	if (!oh) {
 		printk (KERN_ERR "Could not look up aess hw_mod\n");
+		return;
+	}
 
+	pdata = kzalloc(sizeof(struct omap4_abe_dsp_pdata), GFP_KERNEL);
+	if (!pdata) {
+		printk(KERN_ERR "Could not allocate platform data\n");
+		return;
+	}
 
 	pdata->device_enable = omap_device_enable;
 	pdata->device_idle = omap_device_idle;
@@ -321,7 +328,7 @@ static void omap_init_aess(void)
 				omap_aess_latency,
 				ARRAY_SIZE(omap_aess_latency), 0);
 
-	if (od <= 0)
+	if (IS_ERR(od))
 		printk(KERN_ERR "Could not build omap_device for omap-aess\n");
 }
 #else
