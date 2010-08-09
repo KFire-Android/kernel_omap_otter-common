@@ -45,6 +45,8 @@
 #include <sound/soc-dapm.h>
 #include <sound/initval.h>
 
+static inline void dapm_clear_walk(struct snd_soc_dapm_context *dapm);
+
 /* dapm power sequences - make this per codec in the future */
 static int dapm_up_seq[] = {
 	[snd_soc_dapm_pre] = 0,
