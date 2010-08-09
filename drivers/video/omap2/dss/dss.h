@@ -252,7 +252,7 @@ void dss_init_writeback(struct platform_device *pdev);
 bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId, int managerId);
 
 /* DSS */
-int dss_init(bool skip_init);
+int dss_init(bool skip_init, struct platform_device *pdev);
 void dss_exit(void);
 
 void dss_switch_tv_hdmi(int hdmi);
@@ -364,7 +364,7 @@ static inline void dpi_exit(void)
 #endif
 
 /* DISPC */
-int dispc_init(void);
+int dispc_init(struct platform_device *pdev);
 void dispc_exit(void);
 void dispc_dump_clocks(struct seq_file *s);
 void dispc_dump_irqs(struct seq_file *s);

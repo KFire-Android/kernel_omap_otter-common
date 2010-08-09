@@ -76,6 +76,8 @@ static struct {
 	enum dss_clk_source dispc_clk_source;
 
 	u32		ctx[DSS_SZ_REGS / sizeof(u32)];
+	struct omap_display_platform_data *pdata;
+	struct platform_device *pdev;
 } dss;
 
 static int _omap_dss_wait_reset(void);
@@ -581,12 +583,13 @@ void dss_switch_tv_hdmi(int hdmi)
 		REG_FLD_MOD(DSS_CONTROL, 0, 9, 8);
 }
 
-int dss_init(bool skip_init)
+int dss_init(bool skip_init, struct platform_device *pdev)
 {
 	int r;
 	u32 rev;
 
-	dss.base = ioremap(DSS_BASE, DSS_SZ_REGS);
+	dss.pdata = pdev->dev.platform_data;
+	dss.pdev = pdev;
 	if (!dss.base) {
 		DSSERR("can't ioremap DSS\n");
 		r = -ENOMEM;

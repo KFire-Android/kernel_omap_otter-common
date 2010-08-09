@@ -154,6 +154,8 @@ static struct {
 	int code;
 	int mode;
 	struct hdmi_config cfg;
+	struct omap_display_platform_data *pdata;
+	struct platform_device *pdev;
 } hdmi;
 
 struct hdmi_cm {
@@ -613,6 +615,8 @@ int hdmi_init(struct platform_device *pdev)
 	int r = 0;
 	printk("Enter hdmi_init()\n");
 
+	hdmi.pdata = pdev->dev.platform_data;
+	hdmi.pdev = pdev;
 	mutex_init(&hdmi.lock);
 
 	hdmi.base_pll = ioremap(HDMI_PLLCTRL, 64);

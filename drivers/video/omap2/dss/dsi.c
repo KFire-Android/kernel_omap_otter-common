@@ -299,6 +299,8 @@ static struct dsi_struct
 	spinlock_t irq_stats_lock;
 	struct dsi_irq_stats irq_stats;
 #endif
+	struct omap_display_platform_data *pdata;
+	struct platform_device *pdev;
 } dsi1, dsi2;
 
 #ifdef DEBUG
@@ -3828,6 +3830,8 @@ int dsi_init(struct platform_device *pdev)
 	u32 rev;
 	int r;
 	enum omap_dsi_index ix = DSI1;
+	dsi1.pdata = pdev->dev.platform_data;
+	dsi1.pdev = pdev;
 
 	spin_lock_init(&dsi1.errors_lock);
 	dsi1.errors = 0;
@@ -3906,6 +3910,8 @@ int dsi2_init(struct platform_device *pdev)
 	u32 rev;
 	int r;
 	enum omap_dsi_index ix = DSI2;
+	dsi2.pdata = pdev->dev.platform_data;
+	dsi2.pdev = pdev;
 
 	spin_lock_init(&dsi2.errors_lock);
 	dsi2.errors = 0;
