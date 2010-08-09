@@ -582,13 +582,13 @@ static int omap_dss_probe(struct platform_device *pdev)
 			}
 		}
 	}
-
+#ifdef CONFIG_OMAP2_DSS_HDMI
 	r = hdmi_init(pdev);
 	if (r) {
 		DSSERR("Failed to initialize hdmi\n");
 		goto err_hdmi;
 	}
-
+#endif
 	r = dss_initialize_debugfs();
 	if (r)
 		goto err_debugfs;
@@ -618,8 +618,10 @@ static int omap_dss_probe(struct platform_device *pdev)
 err_register:
 	dss_uninitialize_debugfs();
 err_debugfs:
+#ifdef CONFIG_OMAP2_DSS_HDMI
 	hdmi_exit();
 err_hdmi:
+#endif
 	if (cpu_is_omap44xx())
 		dsi2_exit();
 err_dsi2:
@@ -655,7 +657,9 @@ static int omap_dss_remove(struct platform_device *pdev)
 	dss_uninitialize_debugfs();
 
 	venc_exit();
+#ifdef CONFIG_OMAP2_DSS_HDMI
 	hdmi_exit();
+#endif
 	dispc_exit();
 	dpi_exit();
 	rfbi_exit();

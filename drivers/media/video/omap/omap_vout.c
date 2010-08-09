@@ -1051,9 +1051,7 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 	struct omap_vout_device *vout = (struct omap_vout_device *)arg;
 	u32 flags;
 	int irq = 0;
-#if !(CONFIG_OMAP2_DSS_HDMI)
-	u32 fid;
-#endif
+
 	if (!vout->streaming)
 		return;
 
@@ -1097,7 +1095,7 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 		}
 #endif
 		break;
-#if CONFIG_OMAP2_DSS_HDMI
+#ifdef CONFIG_OMAP2_DSS_HDMI
 	case OMAP_DISPLAY_TYPE_HDMI:
 		if (!(irqstatus & DISPC_IRQ_EVSYNC_EVEN))
 			goto vout_isr_err;
@@ -1156,7 +1154,7 @@ wb:
 		goto vout_isr_err;
 	}
 
-#if !(CONFIG_OMAP2_DSS_HDMI)
+#ifndef CONFIG_OMAP2_DSS_HDMI
 venc:
 #endif
 	vout->next_frm = list_entry(vout->dma_queue.next,
