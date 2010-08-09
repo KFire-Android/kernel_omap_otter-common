@@ -1165,10 +1165,7 @@ static int  abe_remove(struct snd_soc_platform *platform)
 static int aess_open(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_platform *platform = rtd->platform;
 	struct snd_soc_dai *dai = rtd->cpu_dai;
-	int i;
-	char *sink[] = {"PDM_DL1", "PDM_DL2", "BT_VX_DL", "MM_EXT_DL"};
 
 	mutex_lock(&abe->mutex);
 
@@ -1208,10 +1205,6 @@ static int aess_open(struct snd_pcm_substream *substream)
 	}
 
 	mutex_unlock(&abe->mutex);
-
-	for (i = 0; i < 4; i++)
-		printk("Path MM_DL to %s got %d\n",sink[i],
-			snd_soc_scenario_set_path(platform->dapm,"MM_DL", sink[i]));
 	return 0;
 }
 
