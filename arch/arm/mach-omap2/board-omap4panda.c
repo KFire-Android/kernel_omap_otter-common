@@ -48,11 +48,13 @@
 #include <plat/syntm12xx.h>
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
+#include <plat/hwspinlock.h>
 #include "hsmmc.h"
 
 #define HUB_POWER 1
 #define HUB_NRESET 39
 
+#ifdef CONFIG_OMAP2_DSS_HDMI
 static int panda_panel_enable_hdmi(struct omap_dss_device *dssdev)
 {
 	gpio_request(HDMI_GPIO_60 , "hdmi_gpio_60");
@@ -110,6 +112,23 @@ static struct platform_device panda_dss_device = {
 static struct platform_device *panda_devices[] __initdata = {
 	&panda_dss_device,
 };
+
+static void __init omap4_display_init(void)
+{
+	void __iomem *phymux_base = NULL;
+	unsigned int dsimux = 0xFFFFFFFF;
+	phymux_base = ioremap(0x4A100000, 0x1000);
+	/* Turning on DSI PHY Mux*/
+	__raw_writel(dsimux, phymux_base+0x618);
+	dsimux = __raw_readl(phymux_base+0x618);
+}
+#else
+
+static struct platform_device *panda_devices[] __initdata = {};
+
+static void __init omap4_display_init(void) {}
+
+#endif
 
 static struct omap_board_config_kernel panda_config[] __initdata = {
 };
@@ -376,23 +395,28 @@ static struct i2c_board_info __initdata panda_i2c_boardinfo[] = {
 	},
 };
 
+static struct omap_i2c_bus_board_data __initdata panda_i2c_bus_pdata;
+static void __init omap_i2c_hwspinlock_init(int bus_id, unsigned int spinlock_id,
+				struct omap_i2c_bus_board_data *pdata)
+{
+	pdata->handle = hwspinlock_request_specific(spinlock_id);
+	if (pdata->handle != NULL) {
+		pdata->hwspinlock_lock = hwspinlock_lock;
+		pdata->hwspinlock_unlock = hwspinlock_unlock;
+	} else {
+		pr_err("I2C hwspinlock request failed for bus %d\n", bus_id);
+	}
+}
+
 static int __init omap4_i2c_init(void)
 {
+	omap_i2c_hwspinlock_init(1, 0, &panda_i2c_bus_pdata);
 	/* Phoenix Audio IC needs I2C1 to start with 400 KHz and less */
-	omap_register_i2c_bus(1, 400, NULL, panda_i2c_boardinfo,
-				ARRAY_SIZE(panda_i2c_boardinfo));
+	omap_register_i2c_bus(1, 400, &panda_i2c_bus_pdata,
+				panda_i2c_boardinfo, ARRAY_SIZE(panda_i2c_boardinfo));
 	return 0;
 }
 
-static void __init omap4_display_init(void)
-{
-	void __iomem *phymux_base = NULL;
-	unsigned int dsimux = 0xFFFFFFFF;
-	phymux_base = ioremap(0x4A100000, 0x1000);
-	/* Turning on DSI PHY Mux*/
-	__raw_writel(dsimux, phymux_base+0x618);
-	dsimux = __raw_readl(phymux_base+0x618);
-}
 
 static void __init omap4_ehci_init(void)
 {
@@ -418,14 +442,12 @@ static void __init omap4_ehci_init(void)
 
 static void __init omap_panda_init(void)
 {
-	int status;
 
 	omap4_i2c_init();
 	omap4_display_init();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 	omap_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
-
 
 	/* OMAP4 Panda uses internal transceiver so register nop transceiver */
 	usb_nop_xceiv_register();
