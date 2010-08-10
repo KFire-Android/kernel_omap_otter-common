@@ -1334,6 +1334,19 @@ EXPORT_SYMBOL(mmc_resume_host);
 
 #endif
 
+#ifdef CONFIG_TIWLAN_SDIO
+void mmc_set_embedded_sdio_data(struct mmc_host *host,
+				struct sdio_cis *cis,
+				struct sdio_embedded_func *funcs,
+				unsigned int quirks)
+{
+       host->embedded_sdio_data.cis = cis;
+       host->embedded_sdio_data.funcs = funcs;
+	host->embedded_sdio_data.quirks = quirks;
+}
+EXPORT_SYMBOL(mmc_set_embedded_sdio_data);
+#endif
+
 static int __init mmc_init(void)
 {
 	int ret;
