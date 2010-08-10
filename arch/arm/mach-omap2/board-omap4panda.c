@@ -334,15 +334,15 @@ static struct regulator_init_data panda_vusb = {
 	},
 };
 
-static struct twl4030_codec_data twl6040_codec = {
-#ifdef CONFIG_OMAP4_AUDIO_PWRON
+static struct twl4030_codec_audio_data twl6040_audio = {
+	.audio_mclk	= 38400000,
 	.audpwron_gpio  = 127,
-#else
-	/* provide GPIO number above the valid value
-	 * to mean there is no GPIO connected. */
-	.audpwron_gpio  = 1024,
 	.naudint_irq    = OMAP44XX_IRQ_SYS_2N,
-#endif
+};
+
+static struct twl4030_codec_data twl6040_codec = {
+	.audio_mclk	= 38400000,
+	.audio	= &twl6040_audio,
 };
 
 static struct twl4030_madc_platform_data panda_gpadc_data = {
