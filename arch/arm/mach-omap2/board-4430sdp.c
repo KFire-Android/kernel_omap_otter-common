@@ -524,10 +524,19 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.default_device	=	&sdp4430_lcd_device,
 };
 
+/* wl128x BT, FM, GPS connectivity chip */
+static int gpios[] = {55, -1, -1};
+static struct platform_device wl128x_device = {
+	.name		= "kim",
+	.id		= -1,
+	.dev.platform_data = &gpios,
+};
+
 static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_proximity_device,
 	&sdp4430_leds_pwm,
 	&sdp4430_leds_gpio,
+	&wl128x_device,
 };
 
 static void __init omap_4430sdp_init_irq(void)
@@ -630,6 +639,13 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	omap2_hsmmc_init(controllers);
 	for (c = controllers; c->mmc; c++)
 		omap4_twl6030_hsmmc_set_late_init(c->dev);
+
+#ifdef CONFIG_TIWLAN_SDIO
+	/* The controller that is connected to the 128x device
+	should hould have the card detect gpio disabled. This is
+	achieved by initializing it with a negative value */
+	c[CONFIG_TIWLAN_MMC_CONTROLLER - 1].gpio_cd = -EINVAL;
+#endif
 
 	return 0;
 }
@@ -991,6 +1007,39 @@ fail1:
 	gpio_free(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
 }
 
+#ifdef CONFIG_TIWLAN_SDIO
+static void pad_config(unsigned long pad_addr, u32 andmask, u32 ormask)
+{
+	int val;
+	 u32 *addr;
+
+	addr = (u32 *) ioremap(pad_addr, 4);
+	if (!addr) {
+		printk(KERN_ERR"OMAP_pad_config: ioremap failed with addr %lx\n",
+		pad_addr);
+	return;
+	}
+
+	val =  __raw_readl(addr);
+	val &= andmask;
+	val |= ormask;
+	__raw_writel(val, addr);
+
+	iounmap(addr);
+}
+
+void wlan_1283_config()
+{
+	pad_config(0x4A100078, 0xFFECFFFF, 0x00030000);
+	pad_config(0x4A10007C, 0xFFFFFFEF, 0x0000000B);
+	if (gpio_request(54, NULL) != 0)
+		printk(KERN_ERR "GPIO 54 request failed\n");
+	gpio_direction_output(54, 0);
+	return ;
+}
+#endif
+
+
 static void omap_cma3000accl_init(void)
 {
 	if (gpio_request(OMAP4_CMA3000ACCL_GPIO, "Accelerometer") < 0) {
@@ -1031,6 +1080,10 @@ static void __init omap_4430sdp_init(void)
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	omap_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
+
+#ifdef CONFIG_TIWLAN_SDIO
+	wlan_1283_config();
+#endif
 
 	/* Power on the ULPI PHY */
 	if (gpio_is_valid(OMAP4SDP_MDM_PWR_EN_GPIO)) {
