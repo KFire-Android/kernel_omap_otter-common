@@ -12,7 +12,7 @@
 
 #include <linux/platform_device.h>
 #include <linux/err.h>
-
+#include <linux/slab.h>
 #include <plat/iommu.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
@@ -43,9 +43,11 @@ static struct iommu_platform_data omap3_devices_data[] = {
 #endif
 };
 #define NR_OMAP3_IOMMU_DEVICES ARRAY_SIZE(omap3_devices_data)
+static struct platform_device *omap3_iommu_pdev[NR_OMAP3_IOMMU_DEVICES];
 #else
 #define omap3_devices_data	NULL
 #define NR_OMAP3_IOMMU_DEVICES	0
+#define omap3_iommu_pdev        NULL
 #endif
 
 #ifdef CONFIG_ARCH_OMAP4
@@ -62,10 +64,14 @@ static struct iommu_platform_data omap4_devices_data[] = {
 	},
 };
 #define NR_OMAP4_IOMMU_DEVICES ARRAY_SIZE(omap4_devices_data)
+static struct platform_device *omap4_iommu_pdev[NR_OMAP4_IOMMU_DEVICES];
 #else
 #define omap4_devices_data	NULL
 #define NR_OMAP4_IOMMU_DEVICES	0
+#define omap4_iommu_pdev        NULL
 #endif
+
+static struct platform_device **omap_iommu_pdev;
 
 static struct omap_device_pm_latency omap_iommu_latency[] = {
 	[0] = {
@@ -92,13 +98,16 @@ static int __init omap_iommu_init(void)
 	struct omap_hwmod *oh;
 	struct omap_device *od;
 	struct omap_device_pm_latency *ohl;
+	struct platform_device *pdev;
 
 	if (cpu_is_omap34xx()) {
 		devices_data = omap3_devices_data;
 		num_iommu_devices = NR_OMAP3_IOMMU_DEVICES;
+		omap_iommu_pdev = omap3_iommu_pdev;
 	} else if (cpu_is_omap44xx()) {
 		devices_data = omap4_devices_data;
 		num_iommu_devices = NR_OMAP4_IOMMU_DEVICES;
+		omap_iommu_pdev = omap4_iommu_pdev;
 	} else
 		return -ENODEV;
 
@@ -122,15 +131,25 @@ static int __init omap_iommu_init(void)
 					ohl, ohl_cnt, false);
 		WARN(IS_ERR(od), "Could not build omap_device"
 				"for %s %s\n", "omap-iommu", data->oh_name);
-		od = omap_device_build("omap-iovmm", i, oh,
-					data, sizeof(*data),
-					ohl, ohl_cnt, false);
-		WARN(IS_ERR(od), "Could not build omap_device"
-				"for %s %s\n", "omap-iovmm", data->oh_name);
+
+		pdev = platform_device_alloc("omap-iovmm", i);
+		if (pdev) {
+			platform_device_add_data(pdev, data, sizeof(*data));
+			platform_device_add(pdev);
+		}
+		omap_iommu_pdev[i] = pdev;
 	}
 	return 0;
 }
 module_init(omap_iommu_init);
+
+static void __exit omap_iommu_exit(void)
+{
+	int i;
+	for (i = 0; i < num_iommu_devices; i++)
+		platform_device_unregister(omap_iommu_pdev[i]);
+}
+module_exit(omap_iommu_exit);
 
 MODULE_AUTHOR("Hiroshi DOYU");
 MODULE_AUTHOR("Hari Kanigeri");
