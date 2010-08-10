@@ -381,6 +381,14 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 
 	spin_lock(&fe->lock);
 	for (i = 0; i < rtd->num_be; i++) {
+		struct snd_pcm_substream *be_substream =
+			rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
+		if (be_substream == NULL) {
+			dev_dbg(&rtd->dev, "%s no be for %d\n", __func__, substream->stream);
+			spin_unlock(&fe->lock);
+			return;
+		}
+
 		/* close backend stream if inactive */
 		snd_soc_pcm_close(rtd->be_rtd[i]->pcm->streams[substream->stream].substream);
 		abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]--;
@@ -404,6 +412,12 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	/* only hw_params backends that are either sinks or
 	 * sources to this frontend DAI */
 	for (i = 0; i < rtd->num_be; i++) {
+		struct snd_pcm_substream *be_substream =
+			rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
+		if (be_substream == NULL) {
+			dev_dbg(&rtd->dev, "%s no be for %d\n", __func__, substream->stream);
+			return -EINVAL;
+		}
 
 		ret = snd_soc_pcm_hw_params(rtd->be_rtd[i]->pcm->streams[substream->stream].substream,
 			params);
@@ -456,6 +470,12 @@ static int omap_abe_dai_prepare(struct snd_pcm_substream *substream,
 	 * this frontend DAI */
 
 	for (i = 0; i < rtd->num_be; i++) {
+		struct snd_pcm_substream *be_substream =
+			rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
+		if (be_substream == NULL) {
+			dev_dbg(&rtd->dev, "%s no be for %d\n", __func__,substream->stream);
+			return -EINVAL;
+		}
 		/* close backend stream if inactive */
 		snd_soc_pcm_prepare(rtd->be_rtd[i]->pcm->streams[substream->stream].substream);
 	}
@@ -473,6 +493,13 @@ static int omap_abe_dai_hw_free(struct snd_pcm_substream *substream,
 	/* only hw_params backends that are either sinks or sources
 	 * to this frontend DAI */
 	for (i = 0; i < rtd->num_be; i++) {
+		struct snd_pcm_substream *be_substream =
+			rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
+		if (be_substream == NULL) {
+			dev_dbg(&rtd->dev, "%s no be for %d\n", __func__, substream->stream);
+			return -EINVAL;
+		}
+
 		snd_soc_pcm_hw_free(rtd->be_rtd[i]->pcm->streams[substream->stream].substream);
 	}
 
