@@ -80,6 +80,32 @@ config MACH_OMAP3EVM
 	depends on ARCH_OMAP3
 	select OMAP_PACKAGE_CBB
 
+config WIFI_CONTROL_FUNC
+        bool "Enable WiFi control function abstraction"
+        depends on MACH_OMAP_4430SDP
+        select WIRELESS_EXT
+        select WEXT_CORE
+        select WEXT_PROC
+        select WEXT_PRIV
+        default Y
+        help
+           Enables Power/Reset/Carddetect function abstraction
+config TIWLAN_SDIO
+        bool "TI WLAN Enhanced SDIO Contoller support"
+        depends on MMC_OMAP || MMC_OMAP_MODULE || MMC_OMAP_HS || MMC_OMAP_HS_MODULE
+        help
+           Say Y here if you want to be able to use TI's WLAN device using the
+           SDIO interface. If unsure, say N.
+config TIWLAN_MMC_CONTROLLER
+        int "MMC Controller number that TI WLAN chip is connected to"
+        range 1 5
+        depends on TIWLAN_SDIO
+        default "5"
+        help
+          Choose the number of the MMC controller that TI WLAN chip is
+          connected to. TI WLAN has SDIO host controller that will control
+          this MMC port.
+
 config MACH_OMAP3517EVM
 	bool "OMAP3517/ AM3517 EVM board"
 	depends on ARCH_OMAP3
