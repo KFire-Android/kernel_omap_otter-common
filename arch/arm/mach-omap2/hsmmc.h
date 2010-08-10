@@ -25,6 +25,12 @@ struct omap2_hsmmc_info {
 	void (*remux)(struct device *dev, int slot, int power_on);
 };
 
+#ifdef CONFIG_TIWLAN_SDIO
+int omap_wifi_status_register(void (*callback)(int card_present,
+        void *dev_id), void *dev_id);
+int omap_wifi_status(int irq);
+#endif
+
 #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
 
 void omap2_hsmmc_init(struct omap2_hsmmc_info *);
