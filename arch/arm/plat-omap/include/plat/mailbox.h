@@ -8,6 +8,7 @@
 #include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/kfifo.h>
+#include <linux/notifier.h>
 
 typedef u32 mbox_msg_t;
 struct omap_mbox;
@@ -68,13 +69,16 @@ struct omap_mbox {
 	void			*priv;
 
 	void			(*err_notify)(void);
+
+	int			use_count;
+	struct blocking_notifier_head	notifier;
 };
 
 int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
 void omap_mbox_init_seq(struct omap_mbox *);
 
-struct omap_mbox *omap_mbox_get(const char *);
-void omap_mbox_put(struct omap_mbox *);
+struct omap_mbox *omap_mbox_get(const char *, struct notifier_block *nb);
+void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb);
 
 int omap_mbox_register(struct device *parent, struct omap_mbox *);
 int omap_mbox_unregister(struct omap_mbox *);
