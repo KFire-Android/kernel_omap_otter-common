@@ -1012,12 +1012,14 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 		.name = "MultiMedia1",
 		.probe = omap_abe_dai_probe,
 		.playback = {
+			.stream_name = "MultiMedia1 Playback",
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.capture = {
+			.stream_name = "MultiMedia1 Capture",
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_48000,
@@ -1028,6 +1030,7 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 	{	/* Multimedia Capture */
 		.name = "MultiMedia2",
 		.capture = {
+			.stream_name = "MultiMedia2 Capture",
 			.channels_min = 2,
 			.channels_max = 8,
 			.rates = SNDRV_PCM_RATE_48000,
@@ -1038,12 +1041,14 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 	{	/* Voice Playback and Capture */
 		.name = "Voice",
 		.playback = {
+			.stream_name = "Voice Playback",
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000,
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.capture = {
+			.stream_name = "Voice Capture",
 			.channels_min = 2,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000,
@@ -1054,6 +1059,7 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 	{	/* Tones Playback */
 		.name = "Tones",
 		.playback = {
+			.stream_name = "Tones Playback",
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
@@ -1064,6 +1070,7 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 	{	/* Vibra */
 		.name = "Vibra",
 		.playback = {
+			.stream_name = "Vibra Playback",
 			.channels_min = 2,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_CONTINUOUS,
