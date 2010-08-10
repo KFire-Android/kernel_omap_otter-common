@@ -138,7 +138,7 @@ int soc_widget_update_bits(struct snd_soc_dapm_widget *w, unsigned short reg,
 	old = soc_widget_read(w, reg);
 	new = (old & ~mask) | value;
 	change = old != new;
-	if (change)
+	//if (change)
 		soc_widget_write(w, reg, new);
 
 	return change;
@@ -200,13 +200,17 @@ static int scenario_find_paths (struct snd_soc_dapm_context *dapm,
 		return 0;
 	source->hops = hops;
 
+	/* check all the output paths on this source widget */
 	list_for_each(lp, &source->sinks) {
 		path = list_entry(lp, struct snd_soc_dapm_path, list_source);
 
+		/* been here before ? */
 		if (path->length && path->length <= hops)
 			continue;
 
-		if (path->sink && scenario_find_paths(dapm, path->sink, sink, hops + 1)) {
+		/* check down the next path if connected */
+		if (path->sink && path->connect &&
+				scenario_find_paths(dapm, path->sink, sink, hops + 1)) {
 			path->length = hops;
 			if (!dist || dist > path->length)
 				dist = path->length;
@@ -223,6 +227,8 @@ static int scenario_get_paths(struct snd_soc_dapm_context *dapm,
 		struct snd_soc_dapm_widget *source, struct snd_soc_dapm_widget *sink)
 {
 	dapm->num_valid_paths = 0;
+	dev_dbg(dapm->dev, "check path from %s to %s\n",
+			source->name, sink->name);
 	scenario_find_paths(dapm, source, sink, 1);
 	return dapm->num_valid_paths;
 }
@@ -2261,16 +2267,25 @@ static void soc_dapm_stream_event(struct snd_soc_dapm_context *dapm,
 int snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd,
 	const char *stream, int event)
 {
-	struct snd_soc_codec *codec = rtd->codec;
-	struct snd_soc_platform *platform = rtd->platform;
+	int i;
 
 	if (stream == NULL)
 		return 0;
 
-	mutex_lock(&codec->mutex);
-	soc_dapm_stream_event(codec->dapm, stream, event);
-	mutex_unlock(&codec->mutex);
-	soc_dapm_stream_event(platform->dapm, stream, event);
+	if (rtd->dai_link->dynamic) {
+		for (i = 0; i < rtd->num_be; i++) {
+			struct snd_soc_platform *platform = rtd->be_rtd[i]->platform;
+
+			soc_dapm_stream_event(platform->dapm, stream, event);
+		}
+	} else {
+		struct snd_soc_codec *codec = rtd->codec;
+
+		mutex_lock(&codec->mutex);
+		soc_dapm_stream_event(codec->dapm, stream, event);
+		mutex_unlock(&codec->mutex);
+	}
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_dapm_stream_event);
