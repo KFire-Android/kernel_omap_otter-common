@@ -211,6 +211,17 @@ struct mmc_host {
 
 	struct dentry		*debugfs_root;
 
+#ifdef CONFIG_TIWLAN_SDIO
+	struct {
+		struct sdio_cis         *cis;
+		struct sdio_embedded_func   *funcs;
+		unsigned int quirks;    /* embedded sdio card quirks */
+#define MMC_QUIRK_VDD_165_195  (1<<0)  /* do not ignore MMC_VDD_165_195 */
+#define MMC_QUIRK_LENIENT_FUNC0  (1<<1)
+	/* allow SDIO FN0 writes outside of VS CCCR */
+	} embedded_sdio_data;
+#endif
+
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
@@ -218,6 +229,13 @@ extern struct mmc_host *mmc_alloc_host(int extra, struct device *);
 extern int mmc_add_host(struct mmc_host *);
 extern void mmc_remove_host(struct mmc_host *);
 extern void mmc_free_host(struct mmc_host *);
+
+#ifdef CONFIG_TIWLAN_SDIO
+extern void mmc_set_embedded_sdio_data(struct mmc_host *host,
+       struct sdio_cis *cis,
+       struct sdio_embedded_func *funcs,
+	unsigned int quirks);
+#endif
 
 static inline void *mmc_priv(struct mmc_host *host)
 {
