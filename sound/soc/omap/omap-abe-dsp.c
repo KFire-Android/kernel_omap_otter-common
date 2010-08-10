@@ -1323,14 +1323,6 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.write = abe_dsp_write,
 };
 
-static struct omap_device_pm_latency omap_aess_latency[] = {
-	{
-		.deactivate_func = omap_device_idle_hwmods,
-		.activate_func = omap_device_enable_hwmods,
-		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-	},
-};
-
 static int __devinit abe_engine_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -1351,9 +1343,7 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 			&omap_aess_platform);
 	if (ret == 0)
 		return 0;
-#if 0
-err:
-#endif
+
 	kfree(abe);
 	return ret;
 }
