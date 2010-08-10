@@ -462,14 +462,14 @@ int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 				if (rtd->num_be == SND_SOC_MAX_BE)
 					dev_dbg(&rtd->dev, "no more backends permitted\n");
 				else {
-					printk("got %d for %s %s\n", num, fe_aif, be_aif);
+					dev_dbg(&rtd->dev, "Active path for %s to %s\n", fe_aif, be_aif);
 					rtd->be_rtd[rtd->num_be++] = &card->rtd[i];
 					card->rtd[i].fe_clients++;
 				}
 			}
 		}
 	}
-printk("got %d BE \n", rtd->num_be);
+
 	return rtd->num_be ? rtd->num_be : -EINVAL;
 }
 EXPORT_SYMBOL_GPL(snd_soc_get_backend_dais);
