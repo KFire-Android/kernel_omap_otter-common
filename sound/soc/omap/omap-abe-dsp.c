@@ -141,7 +141,7 @@ static int abe_dsp_write(struct snd_soc_platform *platform, unsigned int reg,
 	struct abe_data *priv = snd_soc_platform_get_drvdata(platform);
 	priv->dapm[reg] = val;
 
-	printk("fe: %d widget %d %s\n", abe->fe_id,
+	dev_dbg(platform->dev, "fe: %d widget %d %s\n", abe->fe_id,
 			reg - ABE_WIDGET_START, val ? "on" : "off");
 
 	if (reg >= ABE_BE_START && reg < ABE_BE_END)
@@ -157,7 +157,6 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	struct omap4_abe_dsp_pdata *pdata = priv->abe_pdata;
 #endif
 	struct platform_device *pdev = priv->pdev;
-	abe_opp_t OPP = ABE_OPP100;
 	abe_equ_t dl2_eq;
 
 	dl2_eq.equ_length = 25;
@@ -182,7 +181,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 
 
 	/* Config OPP 100 for now */
-	abe_set_opp_processing(OPP);
+	abe_set_opp_processing(ABE_OPP100);
 
 	/* "tick" of the audio engine */
 	abe_write_event_generator(EVENT_TIMER);
@@ -722,7 +721,7 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	SND_SOC_DAPM_AIF_IN("VIB_DL", "Vibra Playback", 0,
 			ABE_WIDGET(6), ABE_OPP_100, 0),
 
-	/* Backend DAIs  - TODO: maybe should match stream names of TWL6040 etc ?? */
+	/* Backend DAIs  */
 	// FIXME: must match BE order in abe_dai.h
 	SND_SOC_DAPM_AIF_IN("PDM_UL1", "Analog Capture", 0,
 			ABE_WIDGET(7), ABE_OPP_50, 0),
@@ -1210,6 +1209,7 @@ static int aess_open(struct snd_pcm_substream *substream)
 
 static int aess_prepare(struct snd_pcm_substream *substream)
 {
+	struct snd_soc_pcm_runtime  *rtd = substream->private_data;
 	int i, opp = 0;
 
 	mutex_lock(&abe->mutex);
@@ -1217,7 +1217,21 @@ static int aess_prepare(struct snd_pcm_substream *substream)
 	/* now calculate OPP level based upon DAPM widget status */
 	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++)
 		opp |= abe->dapm[i];
-	printk("OPP level at start is %d\n", (1 << (fls(opp) - 1)) * 25);
+	opp = (1 << (fls(opp) - 1)) * 25;
+	dev_dbg(&rtd->dev, "OPP level at prepare is %d\n", opp);
+
+	switch (opp) {
+	case 25:
+		//abe_set_opp_processing(ABE_OPP25);
+		break;
+	case 50:
+		//abe_set_opp_processing(ABE_OPP50);
+		break;
+	case 100:
+	default:
+		abe_set_opp_processing(ABE_OPP100);
+		break;
+	}
 
 	mutex_unlock(&abe->mutex);
 	return 0;
@@ -1269,7 +1283,21 @@ static int aess_close(struct snd_pcm_substream *substream)
 	/* now calculate OPP level based upon DAPM widget status */
 	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++)
 		opp |= abe->dapm[i];
-	printk("OPP level at close is %d\n", (1 << (fls(opp) - 1)) * 25);
+	opp = (1 << (fls(opp) - 1)) * 25;
+	dev_dbg(&rtd->dev, "OPP level at close is %d\n", opp);
+
+	switch (opp) {
+	case 25:
+		//abe_set_opp_processing(ABE_OPP25);
+		break;
+	case 50:
+		//abe_set_opp_processing(ABE_OPP50);
+		break;
+	case 100:
+	default:
+		abe_set_opp_processing(ABE_OPP100);
+		break;
+	}
 
 	mutex_unlock(&abe->mutex);
 	return 0;
