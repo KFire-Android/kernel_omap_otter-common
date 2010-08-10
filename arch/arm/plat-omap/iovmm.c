@@ -315,7 +315,6 @@ static int omap_iovmm_open(struct inode *inode, struct file *filp)
 	filp->private_data = iodmm;
 
 	return 0;
-
 }
 static int omap_iovmm_release(struct inode *inode, struct file *filp)
 {

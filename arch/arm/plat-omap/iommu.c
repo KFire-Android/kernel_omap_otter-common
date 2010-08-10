@@ -819,6 +819,7 @@ struct iommu *iommu_get(const char *name)
 	int err = -ENOMEM;
 	struct device *dev;
 	struct iommu *obj;
+	int rev;
 	dev = driver_find_device(&omap_iommu_driver.driver, NULL, (void *)name,
 				 device_match_by_alias);
 	if (!dev)
@@ -830,12 +831,16 @@ struct iommu *iommu_get(const char *name)
 		err = iommu_enable(obj);
 		if (err)
 			goto err_enable;
+		if (!strcmp(obj->name, "ducati")) {
+			rev = GET_OMAP_REVISION();
+			if (rev == 0x0)
+				iommu_set_twl(obj, false);
+		}
+
 		flush_iotlb_all(obj);
 	}
 	if (!try_module_get(obj->owner))
 		goto err_module;
-
-	iommu_set_twl(obj, true);
 	mutex_unlock(&obj->iommu_lock);
 	dev_dbg(obj->dev, "%s: %s\n", __func__, obj->name);
 	return obj;
