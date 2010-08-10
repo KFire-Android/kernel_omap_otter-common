@@ -686,6 +686,7 @@ static void close_delayed_work(struct work_struct *work)
 	struct snd_soc_pcm_runtime *rtd =
 			container_of(work, struct snd_soc_pcm_runtime, delayed_work.work);
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 
 	mutex_lock(&rtd->pcm_mutex);
 
@@ -697,9 +698,14 @@ static void close_delayed_work(struct work_struct *work)
 	/* are we waiting on this codec DAI stream */
 	if (codec_dai->pop_wait == 1) {
 		codec_dai->pop_wait = 0;
-		snd_soc_dapm_stream_event(rtd,
-			codec_dai->driver->playback.stream_name,
-			SND_SOC_DAPM_STREAM_STOP);
+		if (rtd->dai_link->dynamic)
+			snd_soc_dapm_stream_event(rtd,
+					cpu_dai->driver->playback.stream_name,
+					SND_SOC_DAPM_STREAM_STOP);
+		else
+			snd_soc_dapm_stream_event(rtd,
+					codec_dai->driver->playback.stream_name,
+					SND_SOC_DAPM_STREAM_STOP);
 	}
 
 	mutex_unlock(&rtd->pcm_mutex);
@@ -765,9 +771,14 @@ int snd_soc_pcm_close(struct snd_pcm_substream *substream)
 			msecs_to_jiffies(rtd->pmdown_time));
 	} else {
 		/* capture streams can be powered down now */
-		snd_soc_dapm_stream_event(rtd,
-			codec_dai->driver->capture.stream_name,
-			SND_SOC_DAPM_STREAM_STOP);
+		if (rtd->dai_link->dynamic)
+			snd_soc_dapm_stream_event(rtd,
+					cpu_dai->driver->capture.stream_name,
+					SND_SOC_DAPM_STREAM_STOP);
+		else
+			snd_soc_dapm_stream_event(rtd,
+					codec_dai->driver->capture.stream_name,
+					SND_SOC_DAPM_STREAM_STOP);
 	}
 
 	mutex_unlock(&rtd->pcm_mutex);
@@ -830,15 +841,25 @@ int snd_soc_pcm_prepare(struct snd_pcm_substream *substream)
 		cancel_delayed_work(&rtd->delayed_work);
 	}
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		snd_soc_dapm_stream_event(rtd,
+	if (rtd->dai_link->dynamic) {
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_soc_dapm_stream_event(rtd,
+					  cpu_dai->driver->playback.stream_name,
+					  SND_SOC_DAPM_STREAM_START);
+		else
+			snd_soc_dapm_stream_event(rtd,
+					  cpu_dai->driver->capture.stream_name,
+					  SND_SOC_DAPM_STREAM_START);
+	} else {
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_soc_dapm_stream_event(rtd,
 					  codec_dai->driver->playback.stream_name,
 					  SND_SOC_DAPM_STREAM_START);
-	else
-		snd_soc_dapm_stream_event(rtd,
+		else
+			snd_soc_dapm_stream_event(rtd,
 					  codec_dai->driver->capture.stream_name,
 					  SND_SOC_DAPM_STREAM_START);
-
+	}
 	snd_soc_dai_digital_mute(codec_dai, 0);
 
 out:
