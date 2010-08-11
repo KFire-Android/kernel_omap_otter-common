@@ -218,6 +218,7 @@ struct ehci_hcd_omap {
 	 * Each PHY can have a separate regulator.
 	 */
 	struct regulator        *regulator[OMAP3_HS_USB_PORTS];
+	unsigned 		uhh_revision;
 };
 
 /*-------------------------------------------------------------------------*/
@@ -306,7 +307,7 @@ static int omap_start_ehc(struct ehci_hcd_omap *omap, struct usb_hcd *hcd)
 	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
 	u8 tll_ch_mask = 0;
 	unsigned reg = 0;
-	int ret = 0;
+	int ret = -ENODEV;
 
 	dev_dbg(omap->dev, "starting TI EHCI USB Controller\n");
 
@@ -328,9 +329,9 @@ static int omap_start_ehc(struct ehci_hcd_omap *omap, struct usb_hcd *hcd)
 		udelay(10);
 	}
 
-	reg = ehci_omap_readl(omap->uhh_base, OMAP_UHH_REVISION);
+	omap->uhh_revision = ehci_omap_readl(omap->uhh_base, OMAP_UHH_REVISION);
 
-	if (reg == OMAP4_UHH_REVISION) {
+	if (omap->uhh_revision == OMAP4_UHH_REVISION) {
 		/* Enable clocks for OMAP4 USBHOST */
 		omap->usbhost_hs_fck = clk_get(omap->dev, "usb_host_hs_fck");
 		if (IS_ERR(omap->usbhost_hs_fck)) {
@@ -492,7 +493,7 @@ err_44host_fs_fck:
 
 		goto err_host;
 
-	} else if (reg == OMAP3_UHH_REVISION) {
+	} else if (omap->uhh_revision == OMAP3_UHH_REVISION) {
 
 		/* Enable Clocks for USBHOST */
 		omap->usbhost_ick = clk_get(omap->dev, "usbhost_ick");
@@ -700,19 +701,18 @@ static void omap_stop_ehc(struct ehci_hcd_omap *omap, struct usb_hcd *hcd)
 	dev_dbg(omap->dev, "stopping TI EHCI USB Controller\n");
 
 	/* Reset OMAP modules for insmod/rmmod to work */
-	if	(cpu_is_omap44xx()) {
+	if (omap->uhh_revision == OMAP4_UHH_REVISION)
 		ehci_omap_writel(omap->uhh_base, OMAP_UHH_SYSCONFIG,
 					OMAP4_UHH_SYSCONFIG_SOFTRESET);
-	} else {
+	else
 		ehci_omap_writel(omap->uhh_base, OMAP_UHH_SYSCONFIG,
-			OMAP_UHH_SYSCONFIG_SOFTRESET);
+					OMAP_UHH_SYSCONFIG_SOFTRESET);
 	while (!(ehci_omap_readl(omap->uhh_base, OMAP_UHH_SYSSTATUS)
 				& (1 << 0))) {
 		cpu_relax();
 
 		if (time_after(jiffies, timeout))
 			dev_dbg(omap->dev, "operation timed out\n");
-	}
 	}
 
 	while (!(ehci_omap_readl(omap->uhh_base, OMAP_UHH_SYSSTATUS)
