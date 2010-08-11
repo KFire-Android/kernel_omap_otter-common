@@ -3872,7 +3872,7 @@ int dsi_init(struct platform_device *pdev)
 	dsi1.te_timer.data = 0;
 #endif
 
-	dsi1_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	dsi1_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	dsi1.base = ioremap(dsi1_mem->start, resource_size(dsi1_mem));
 	if (!dsi1.base) {
 		DSSERR("can't ioremap DSI\n");
@@ -3955,7 +3955,7 @@ int dsi2_init(struct platform_device *pdev)
 #endif
 	dsi2.te_enabled = true;
 
-	dsi2_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	dsi2_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	dsi2.base = ioremap(dsi2_mem->start, resource_size(dsi2_mem));
 	if (!dsi2.base) {
 		DSSERR("can't ioremap DSI2\n");

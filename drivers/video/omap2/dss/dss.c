@@ -616,7 +616,7 @@ int dss_init(bool skip_init, struct platform_device *pdev)
 
 	dss.pdata = pdev->dev.platform_data;
 	dss.pdev = pdev;
-	dss_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	dss_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	dss.base = ioremap(dss_mem->start, resource_size(dss_mem));
 	if (!dss.base) {
 		DSSERR("can't ioremap DSS\n");

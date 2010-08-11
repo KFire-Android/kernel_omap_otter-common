@@ -618,13 +618,13 @@ int hdmi_init(struct platform_device *pdev)
 	hdmi.pdev = pdev;
 	mutex_init(&hdmi.lock);
 
-	hdmi_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	hdmi.base_pll = ioremap(hdmi_mem->start, resource_size(hdmi_mem));
+	hdmi_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	hdmi.base_pll = ioremap((hdmi_mem->start + 0x200), resource_size(hdmi_mem));
 	if (!hdmi.base_pll) {
 		ERR("can't ioremap pll\n");
 		return -ENOMEM;
 	}
-	hdmi.base_phy = ioremap((hdmi_mem->start + 0x100), 64);
+	hdmi.base_phy = ioremap((hdmi_mem->start + 0x300), 64);
 
 	if (!hdmi.base_phy) {
 		ERR("can't ioremap phy\n");
