@@ -55,16 +55,20 @@ static struct clk **omap_dm_source_clocks;
 
 static void omap2_dm_timer_enable(struct platform_device *pdev)
 {
-	if (pm_runtime_get_sync(&pdev->dev))
-		dev_warn(&pdev->dev, "%s: Unable to enable the timer%d\n",
-			__func__, pdev->id);
+	if (!pdev) {
+		dev_err(&pdev->dev, "%s: invalid pdev\n", __func__);
+		return;
+	}
+	pm_runtime_get_sync(&pdev->dev);
 }
 
 static void omap2_dm_timer_disable(struct platform_device *pdev)
 {
-	if (pm_runtime_put_sync(&pdev->dev))
-		dev_warn(&pdev->dev, "%s: Unable to disable the timer%d\n",
-			__func__, pdev->id);
+	if (!pdev) {
+		dev_err(&pdev->dev, "%s: invalid pdev\n", __func__);
+		return;
+	}
+	pm_runtime_put_sync(&pdev->dev);
 }
 
 static void omap2_dm_early_timer_enable(struct platform_device *pdev)
@@ -102,20 +106,28 @@ static int omap2_dm_timer_set_src(struct platform_device *pdev,
 		return -EINVAL;
 	}
 
+#ifndef CONFIG_PM_RUNTIME
+	clk_disable(timer_clk); /* enabled in hwmod */
+#else
 	if (unlikely(is_early_init))
-		clk_disable(timer_clk);
-	else
 		omap_device_idle(pdev);
+	else
+		pm_runtime_put_sync(&pdev->dev);
+#endif
 
 	ret = clk_set_parent(timer_clk, omap_dm_source_clocks[source]);
 	if (ret)
 		dev_warn(&pdev->dev, "%s: Not able to change "
 			"fclk source\n", __func__);
 
+#ifndef CONFIG_PM_RUNTIME
+	clk_enable(timer_clk);
+#else
 	if (unlikely(is_early_init))
-		clk_enable(timer_clk);
-	else
 		omap_device_enable(pdev);
+	else
+		pm_runtime_get_sync(&pdev->dev);
+#endif
 
 	return ret;
 }
