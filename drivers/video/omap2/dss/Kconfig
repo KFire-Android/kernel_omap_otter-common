@@ -56,7 +56,7 @@ config OMAP2_DSS_RFBI
 
 config OMAP2_DSS_VENC
 	bool "VENC support"
-        default y
+        default n
 	help
 	  OMAP Video Encoder support for S-Video and composite TV-out.
 
@@ -98,7 +98,7 @@ config OMAP2_DSS_USE_DSI_PLL
 
 config OMAP2_DSS_FAKE_VSYNC
 	bool "Fake VSYNC irq from manual update displays"
-	default n
+	default y
 	help
 	  If this is selected, DSI will generate a fake DISPC VSYNC interrupt
 	  when DSI has sent a frame. This is only needed with DSI or RFBI

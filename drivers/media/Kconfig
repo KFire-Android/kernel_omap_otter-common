@@ -5,6 +5,7 @@
 menuconfig MEDIA_SUPPORT
 	tristate "Multimedia support"
 	depends on HAS_IOMEM
+	default y
 	help
 	  If you want to use Video for Linux, DVB for Linux, or DAB adapters,
 	  enable this option and other options below.
