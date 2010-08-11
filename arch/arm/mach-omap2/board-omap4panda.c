@@ -124,7 +124,23 @@ static void __init omap4_display_init(void)
 }
 #else
 
-static struct platform_device *panda_devices[] __initdata = {};
+/* wl127x BT, FM, GPS connectivity chip */
+static int gpios[] = {46, -1, -1};
+static struct platform_device wl127x_device = {
+       .name           = "kim",
+       .id             = -1,
+       .dev.platform_data = &gpios,
+};
+
+struct platform_device *st_get_plat_device(void)
+{
+    return &wl127x_device;
+}
+EXPORT_SYMBOL(st_get_plat_device);
+
+static struct platform_device *panda_devices[] __initdata = {
+	&wl127x_device,
+};
 
 static void __init omap4_display_init(void) {}
 
