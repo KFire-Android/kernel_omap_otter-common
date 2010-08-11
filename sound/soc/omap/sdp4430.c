@@ -314,7 +314,18 @@ static struct snd_soc_dai_driver dai[] = {
 					SNDRV_PCM_RATE_48000,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
-}, };
+},
+{
+	.name = "HDMI",
+	.playback = {
+		.stream_name = "Playback",
+		.channels_min = 2,
+		.channels_max = 8,
+		.rates = SNDRV_PCM_RATE_48000,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
+	},
+},
+};
 
 /* Digital audio interface glue - connects codec <--> CPU */
 static struct snd_soc_dai_link sdp4430_dai[] = {
@@ -373,7 +384,6 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		.dynamic = 1, /* codec DAI is dynamic */
 	},
-
 /*
  * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.
  * Matched to above interfaces at runtime, based upon use case.
@@ -537,19 +547,18 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.be_id = OMAP_ABE_DAI_DMIC2,
 	},
-#ifdef CONFIG_SND_OMAP_SOC_HDMI_LRG
 	{
 		.name = "hdmi",
 		.stream_name = "HDMI",
 
-		.cpu_dai_drv = &hdmi_dai,
-		.cpu_dai_name = 0,
+		.cpu_dai_name = "hdmi-dai",
 		.platform_name = "omap-pcm-audio",
 
-		.no_pcm = 1, /* don't create ALSA pcm for this */
-		.no_codec = 1, /* TODO: have a dummy CODEC */
+		/* HDMI*/
+		.codec_dai_name = "HDMI",
+
+		.no_codec = 1,
 	},
-#endif
 	{
 		.name = "Debug to McBSP",
 		.stream_name = "Multimedia",
