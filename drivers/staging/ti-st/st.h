@@ -28,7 +28,7 @@
 /* TODO:
  * Move the following to tty.h upon acceptance
  */
-#define N_TI_WL	20	/* Ldisc for TI's WL BT, FM, GPS combo chips */
+#define N_TI_WL	22	/* Ldisc for TI's WL BT, FM, GPS combo chips */
 
 /**
  * enum kim_gpio_state - Few protocols such as FM have ACTIVE LOW
