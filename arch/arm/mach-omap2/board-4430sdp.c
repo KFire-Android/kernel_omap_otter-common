@@ -563,20 +563,20 @@ static struct omap_musb_board_data musb_board_data = {
 
 static struct omap2_hsmmc_info mmc[] = {
 	{
-		.mmc		= 1,
-		.wires		= 8,
-		.gpio_wp	= -EINVAL,
-#ifdef CONFIG_PM_RUNTIME
-		.power_saving	= true,
-#endif
-	},
-	{
 		.mmc		= 2,
 		.wires		= 8,
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_165_195,
 		.nonremovable   = true,
+#ifdef CONFIG_PM_RUNTIME
+		.power_saving	= true,
+#endif
+	},
+	{
+		.mmc		= 1,
+		.wires		= 8,
+		.gpio_wp	= -EINVAL,
 #ifdef CONFIG_PM_RUNTIME
 		.power_saving	= true,
 #endif
