@@ -22,6 +22,8 @@
  *   o Support TDM on PCM and I2S
  */
 
+#define DEBUG
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -448,14 +450,12 @@ int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 						card->rtd[i].dai_link->stream_name);
 				continue;
 			}
-			dev_dbg(&rtd->dev, "got be %s\n", be_aif);
+			dev_dbg(&rtd->dev, "got be %s for stream %s\n", be_aif,
+					card->rtd[i].dai_link->stream_name);
 
 			/* check for valid path */
-			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-				num = snd_soc_scenario_set_path(card->rtd[i].platform->dapm, fe_aif, be_aif);
-			} else {
-				num = snd_soc_scenario_set_path(card->rtd[i].platform->dapm, be_aif, fe_aif);
-			}
+			num = snd_soc_scenario_set_path(card->rtd[i].platform->dapm,
+						fe_aif, be_aif, substream->stream);
 
 			/* add backend if we have space */
 			if (num > 0) {
