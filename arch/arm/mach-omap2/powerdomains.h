@@ -88,16 +88,10 @@ static struct powerdomain wkup_omap2_pwrdm = {
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP24XX | CHIP_IS_OMAP3430),
 };
 
-extern struct pwrdm_functions omap2_pwrdm_functions;
-#else
-static struct pwrdm_functions omap2_pwrdm_functions;
 #endif
 
-#ifdef CONFIG_ARCH_OMAP4
+extern struct pwrdm_functions omap2_pwrdm_functions;
 extern struct pwrdm_functions omap4_pwrdm_functions;
-#else
-static struct pwrdm_functions omap4_pwrdm_functions;
-#endif
 
 int _get_mem_bank_onstate_mask(u8 bank);
 int _get_mem_bank_retst_mask(u8 bank);

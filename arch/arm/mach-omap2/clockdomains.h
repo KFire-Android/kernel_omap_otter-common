@@ -55,6 +55,7 @@
  * These can share data since they will never be present simultaneously
  * on the same device.
  */
+#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
 static struct clkdm_dep gfx_sgx_wkdeps[] = {
 	{
 		.clkdm_name = "core_l3_clkdm",
@@ -80,7 +81,7 @@ static struct clkdm_dep gfx_sgx_wkdeps[] = {
 	},
 	{ NULL },
 };
-
+#endif
 
 /* 24XX-specific possible dependencies */
 
