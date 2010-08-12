@@ -103,6 +103,7 @@ static struct omap_dss_device panda_hdmi_device = {
 	.phy.dpi.data_lines = 24,
 	.platform_enable = panda_panel_enable_hdmi,
 	.platform_disable = panda_panel_disable_hdmi,
+	.channel = OMAP_DSS_CHANNEL_DIGIT,
 };
 
 static struct omap_dss_device *panda_dss_devices[] = {
@@ -115,16 +116,7 @@ static struct omap_dss_board_info panda_dss_data = {
 	.default_device	=	&panda_hdmi_device,
 };
 
-static struct platform_device panda_dss_device = {
-	.name	=	"omapdss",
-	.id	=	-1,
-	.dev	= {
-		.platform_data = &panda_dss_data,
-	},
-};
-
 static struct platform_device *panda_devices[] __initdata = {
-	&panda_dss_device,
 	&wl127x_device
 };
 
@@ -147,13 +139,8 @@ static void __init omap4_display_init(void) {}
 
 #endif
 
-static struct omap_board_config_kernel panda_config[] __initdata = {
-};
-
 static void __init omap_panda_init_irq(void)
 {
-	omap_board_config = panda_config;
-	omap_board_config_size = ARRAY_SIZE(panda_config);
 	omap2_init_common_hw(NULL, NULL);
 #ifdef CONFIG_OMAP_32K_TIMER
 	omap2_gp_clockevent_set_gptimer(1);
@@ -516,6 +503,7 @@ static void __init omap_panda_init(void)
 	usb_nop_xceiv_register();
 	usb_musb_init(&musb_board_data);
 	omap4_ehci_init();
+	omap_display_init(&panda_dss_data);
 
 }
 
