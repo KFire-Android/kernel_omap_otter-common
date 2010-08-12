@@ -79,6 +79,12 @@ static struct platform_device sdp4430_proximity_device = {
 	},
 };
 
+
+static struct platform_device sdp4430_hdmi_audio_device = {
+	.name		= "hdmi-dai",
+	.id		= -1,
+};
+
 static int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
 	KEY(0, 1, KEY_R),
@@ -537,6 +543,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_leds_pwm,
 	&sdp4430_leds_gpio,
 	&wl128x_device,
+	&sdp4430_hdmi_audio_device,
 };
 
 static void __init omap_4430sdp_init_irq(void)
