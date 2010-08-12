@@ -54,6 +54,20 @@
 #define HUB_POWER 1
 #define HUB_NRESET 39
 
+/* wl127x BT, FM, GPS connectivity chip */
+static int gpios[] = {46, -1, -1};
+static struct platform_device wl127x_device = {
+       .name           = "kim",
+       .id             = -1,
+       .dev.platform_data = &gpios,
+};
+
+struct platform_device *st_get_plat_device(void)
+{
+    return &wl127x_device;
+}
+EXPORT_SYMBOL(st_get_plat_device);
+
 #ifdef CONFIG_OMAP2_DSS_HDMI
 static int panda_panel_enable_hdmi(struct omap_dss_device *dssdev)
 {
@@ -111,6 +125,7 @@ static struct platform_device panda_dss_device = {
 
 static struct platform_device *panda_devices[] __initdata = {
 	&panda_dss_device,
+	&wl127x_device
 };
 
 static void __init omap4_display_init(void)
@@ -123,20 +138,6 @@ static void __init omap4_display_init(void)
 	dsimux = __raw_readl(phymux_base+0x618);
 }
 #else
-
-/* wl127x BT, FM, GPS connectivity chip */
-static int gpios[] = {46, -1, -1};
-static struct platform_device wl127x_device = {
-       .name           = "kim",
-       .id             = -1,
-       .dev.platform_data = &gpios,
-};
-
-struct platform_device *st_get_plat_device(void)
-{
-    return &wl127x_device;
-}
-EXPORT_SYMBOL(st_get_plat_device);
 
 static struct platform_device *panda_devices[] __initdata = {
 	&wl127x_device,
