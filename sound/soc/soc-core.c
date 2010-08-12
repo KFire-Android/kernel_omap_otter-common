@@ -1719,12 +1719,13 @@ static void snd_soc_instantiate_card(struct snd_soc_card *card)
 	}
 	card->snd_card->dev = card->dev;
 
+#ifdef CONFIG_PM
+	/* deferred resume work */
+	INIT_WORK(&card->deferred_resume_work, soc_resume_deferred);
+#endif
+
 	/* initialise the sound card only once */
 	if (card->probe) {
-#ifdef CONFIG_PM
-		/* deferred resume work */
-		INIT_WORK(&card->deferred_resume_work, soc_resume_deferred);
-#endif
 		ret = card->probe(pdev);
 		if (ret < 0)
 			goto card_probe_error;
