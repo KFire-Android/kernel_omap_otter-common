@@ -33,6 +33,13 @@
 /* TODO: Enable when FM TX is supported */
 /* #include "fmdrv_tx.h" */
 
+#ifndef DEBUG
+#ifdef pr_info
+#undef pr_info
+#define pr_info(fmt, arg...)
+#endif
+#endif
+
 static struct video_device *gradio_dev;
 static unsigned char radio_disconnected;
 

@@ -23,6 +23,13 @@
 #include "fmdrv_common.h"
 #include "fmdrv_rx.h"
 
+#ifndef DEBUG
+#ifdef pr_info
+#undef pr_info
+#define pr_info(fmt, arg...)
+#endif
+#endif
+
 void fm_rx_reset_rds_cache(struct fmdrv_ops *fmdev)
 {
 	fmdev->rx.rds.flag = FM_RDS_DISABLE;

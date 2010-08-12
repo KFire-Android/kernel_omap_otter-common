@@ -41,6 +41,13 @@
 /* TODO: Enable when FM TX is supported */
 /* #include "fmdrv_tx.h" */
 
+#ifndef DEBUG
+#ifdef pr_info
+#undef pr_info
+#define pr_info(fmt, arg...)
+#endif
+#endif
+
 /* FM chip register table */
 static struct fm_reg_table fm_reg_info[] = {
 	/* ----- FM RX registers -------*/
