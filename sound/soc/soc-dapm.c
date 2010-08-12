@@ -251,8 +251,8 @@ static int scenario_find_capture_paths (struct snd_soc_dapm_context *dapm,
 	list_for_each(lp, &sink->sources) {
 		path = list_entry(lp, struct snd_soc_dapm_path, list_sink);
 
-		dev_dbg(dapm->dev,"try sink %s path %s len %d connect %d hops %d\n",
-				sink->name, path->name, path->length, path->connect, hops);
+		dev_dbg(dapm->dev,"try source %s path %s len %d connect %d hops %d\n",
+				source->name, path->name, path->length, path->connect, hops);
 
 		/* been here before ? */
 		if (path->length && path->length <= hops)
@@ -260,7 +260,7 @@ static int scenario_find_capture_paths (struct snd_soc_dapm_context *dapm,
 
 		/* check down the next path if connected */
 		if (path->source && path->connect &&
-				scenario_find_capture_paths(dapm, path->source, source, hops + 1)) {
+				scenario_find_capture_paths(dapm, source, path->source, hops + 1)) {
 			path->length = hops;
 			if (!dist || dist > path->length)
 				dist = path->length;
@@ -287,9 +287,9 @@ static int scenario_get_capture_paths(struct snd_soc_dapm_context *dapm,
 		struct snd_soc_dapm_widget *source, struct snd_soc_dapm_widget *sink)
 {
 	dapm->num_valid_paths = 0;
-	dev_dbg(dapm->dev, "check capture  path from %s to %s\n",
+	dev_dbg(dapm->dev, "check capture  path to %s from %s\n",
 			source->name, sink->name);
-	scenario_find_capture_paths(dapm, source, sink, 1);
+	scenario_find_capture_paths(dapm, sink, source, 1);
 	return dapm->num_valid_paths;
 }
 
