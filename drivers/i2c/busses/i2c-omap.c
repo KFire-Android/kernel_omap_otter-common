@@ -179,7 +179,7 @@ struct omap_i2c_dev {
 	struct completion	cmd_complete;
 	struct resource		*ioarea;
 	u32			latency;	/* maximum mpu wkup latency */
-	void			(*set_mpu_wkup_lat)(struct device *dev,
+	int			(*set_mpu_wkup_lat)(struct pm_qos_request_list **qos_request,
 						    long latency);
 	u32			speed;		/* Speed of bus in Khz */
 	u16			cmd_err;
