@@ -72,16 +72,15 @@ static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
 static void omap_hdmi_dai_shutdown(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
-	int err = 0;
 #ifdef CONFIG_HDMI_NO_IP_MODULE
-	err = hdmi_w1_wrapper_disable(HDMI_WP);
+	hdmi_w1_wrapper_disable(HDMI_WP);
 #else
 	if (hdmi_audio_core.module_loaded)
-		err = hdmi_audio_core.wrapper_disable(HDMI_WP);
+		hdmi_audio_core.wrapper_disable(HDMI_WP);
 	else
 		printk(KERN_WARNING "Warning: hdmi_core.ko is not enabled");
 #endif
-	return err;
+	return;
 }
 
 static int omap_hdmi_dai_trigger(struct snd_pcm_substream *substream, int cmd,
@@ -128,7 +127,6 @@ static int omap_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 				    struct snd_pcm_hw_params *params,
 				    struct snd_soc_dai *dai)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	int err = 0;
 
 	switch (params_format(params)) {
@@ -236,18 +234,6 @@ void hdmi_audio_core_stub_init(void)
 	hdmi_audio_core.ip_exit = audio_stub_lib_exit;
 	hdmi_audio_core.module_loaded = 0;
 }
-
-void hdmi_audio_core_lib_set(struct hdmi_ip_driver *ipc)
-{
-	hdmi_audio_core.module_loaded = ipc->module_loaded;
-	if (ipc->module_loaded) {
-		hdmi_audio_core.wrapper_enable = ipc->wrapper_enable;
-		hdmi_audio_core.wrapper_disable = ipc->wrapper_disable;
-		hdmi_audio_core.start_audio = ipc->start_audio;
-		hdmi_audio_core.stop_audio = ipc->stop_audio;
-	}
-}
-EXPORT_SYMBOL(hdmi_audio_core_lib_set);
 
 #endif
 
