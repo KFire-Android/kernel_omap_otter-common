@@ -21,6 +21,13 @@
 #define pr_fmt(fmt) "(stll) :" fmt
 #include "st_ll.h"
 
+#ifndef DEBUG
+#ifdef pr_info
+#undef pr_info
+#define pr_info(fmt, arg...)
+#endif
+#endif
+
 /**********************************************************************/
 /* internal functions */
 static void send_ll_cmd(struct st_data_s *st_data,

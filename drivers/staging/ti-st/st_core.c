@@ -38,7 +38,13 @@
 #include "st_ll.h"
 #include "st.h"
 
-#define VERBOSE
+#ifndef DEBUG
+#ifdef pr_info
+#undef pr_info
+#define pr_info(fmt, arg...)
+#endif
+#endif
+
 /* strings to be used for rfkill entries and by
  * ST Core to be used for sysfs debug entry
  */

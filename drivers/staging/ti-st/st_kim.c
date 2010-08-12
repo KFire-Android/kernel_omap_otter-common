@@ -37,6 +37,12 @@
 #include <net/bluetooth/hci_core.h>
 #include <net/bluetooth/hci.h>
 
+#ifndef DEBUG
+#ifdef pr_info
+#undef pr_info
+#define pr_info(fmt, arg...)
+#endif
+#endif
 
 static int kim_probe(struct platform_device *pdev);
 static int kim_remove(struct platform_device *pdev);
