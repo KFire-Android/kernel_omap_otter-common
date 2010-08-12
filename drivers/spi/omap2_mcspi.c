@@ -462,7 +462,7 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 	unsigned int		count, c, bytes_per_transfer;
 	unsigned long		base, tx_reg, rx_reg;
 	int			word_len, data_type, element_count;
-	int			elements, frame_count, sync_type;
+	int			elements = 0, frame_count, sync_type;
 	u32			l;
 	u8			* rx;
 	const u8		* tx;
