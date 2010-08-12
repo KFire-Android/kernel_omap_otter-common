@@ -962,7 +962,7 @@ int twl4030_init_chip_irq(const char *chip);
 int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end);
 int twl6030_exit_irq(void);
 
-static int twl_remove(struct i2c_client *client)
+static int __devexit twl_remove(struct i2c_client *client)
 {
 	unsigned i;
 	int status;
@@ -987,7 +987,7 @@ static int twl_remove(struct i2c_client *client)
 }
 
 /* NOTE:  this driver only handles a single twl4030/tps659x0 chip */
-static int __init
+static int __devinit
 twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	int				status;
@@ -1107,7 +1107,7 @@ static struct i2c_driver twl_driver = {
 	.driver.name	= DRIVER_NAME,
 	.id_table	= twl_ids,
 	.probe		= twl_probe,
-	.remove		= twl_remove,
+	.remove		= __devexit_p(twl_remove),
 };
 
 static int __init twl_init(void)

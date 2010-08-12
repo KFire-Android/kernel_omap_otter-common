@@ -380,7 +380,7 @@ static struct miscdevice twl6030_gpadc_device = {
 	.fops = &twl6030_gpadc_fileops
 };
 
-static int __init twl6030_gpadc_probe(struct platform_device *pdev)
+static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 {
 	struct twl6030_gpadc_data *gpadc;
 	struct twl6030_gpadc_platform_data *pdata = pdev->dev.platform_data;
@@ -431,7 +431,7 @@ err_pdata:
 	return ret;
 }
 
-static int __exit twl6030_gpadc_remove(struct platform_device *pdev)
+static int __devexit twl6030_gpadc_remove(struct platform_device *pdev)
 {
 	struct twl6030_gpadc_data *gpadc = platform_get_drvdata(pdev);
 
@@ -446,7 +446,7 @@ static int __exit twl6030_gpadc_remove(struct platform_device *pdev)
 
 static struct platform_driver twl6030_gpadc_driver = {
 	.probe		= twl6030_gpadc_probe,
-	.remove		= __exit_p(twl6030_gpadc_remove),
+	.remove		= __devexit_p(twl6030_gpadc_remove),
 	.driver		= {
 		.name	= "twl6030_gpadc",
 		.owner	= THIS_MODULE,

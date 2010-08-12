@@ -388,7 +388,7 @@ static const struct attribute_group bq2415x_attr_group = {
 	.attrs = bq2415x_attributes,
 };
 
-static int __init bq2415x_charger_probe(struct i2c_client *client,
+static int __devinit bq2415x_charger_probe(struct i2c_client *client,
 				 const struct i2c_device_id *id)
 {
 	struct bq2415x_device_info *di;
@@ -457,7 +457,7 @@ err_kfree:
 	return ret;
 }
 
-static int __exit bq2415x_charger_remove(struct i2c_client *client)
+static int __devexit bq2415x_charger_remove(struct i2c_client *client)
 {
 	struct bq2415x_device_info *di = i2c_get_clientdata(client);
 
@@ -477,7 +477,7 @@ static const struct i2c_device_id bq2415x_id[] = {
 
 static struct i2c_driver bq2415x_charger_driver = {
 	.probe		= bq2415x_charger_probe,
-	.remove		= __exit_p(bq2415x_charger_remove),
+	.remove		= __devexit_p(bq2415x_charger_remove),
 	.id_table	= bq2415x_id,
 	.driver		= {
 		.name	= "bq2415x_charger",

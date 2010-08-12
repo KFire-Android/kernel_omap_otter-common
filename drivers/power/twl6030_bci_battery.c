@@ -997,7 +997,7 @@ static char *twl6030_bci_supplied_to[] = {
 	"twl6030_bci_battery",
 };
 
-static int __init twl6030_bci_battery_probe(struct platform_device *pdev)
+static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 {
 	struct twl4030_bci_platform_data *pdata = pdev->dev.platform_data;
 	struct twl6030_bci_device_info *di;
@@ -1157,7 +1157,7 @@ temp_setup_fail:
 	return ret;
 }
 
-static int __exit twl6030_bci_battery_remove(struct platform_device *pdev)
+static int __devexit twl6030_bci_battery_remove(struct platform_device *pdev)
 {
 	struct twl6030_bci_device_info *di = platform_get_drvdata(pdev);
 	int irq;
@@ -1216,7 +1216,7 @@ static int twl6030_bci_battery_resume(struct platform_device *pdev)
 
 static struct platform_driver twl6030_bci_battery_driver = {
 	.probe		= twl6030_bci_battery_probe,
-	.remove		= __exit_p(twl6030_bci_battery_remove),
+	.remove		= __devexit_p(twl6030_bci_battery_remove),
 	.suspend	= twl6030_bci_battery_suspend,
 	.resume		= twl6030_bci_battery_resume,
 	.driver		= {
