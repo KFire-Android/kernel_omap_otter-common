@@ -256,6 +256,7 @@ static int omap_mcbsp_dai_startup(struct snd_pcm_substream *substream,
 		* Rule for the buffer size. We should not allow
 		* smaller buffer than the FIFO size to avoid underruns
 		*/
+#if 0 // FIXME: All BE must support hw_rules and constraints */
 		snd_pcm_hw_rule_add(substream->runtime, 0,
 				    SNDRV_PCM_HW_PARAM_CHANNELS,
 				    omap_mcbsp_hwrule_min_buffersize,
@@ -265,6 +266,7 @@ static int omap_mcbsp_dai_startup(struct snd_pcm_substream *substream,
 		/* Make sure, that the period size is always even */
 		snd_pcm_hw_constraint_step(substream->runtime, 0,
 					   SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 2);
+#endif
 	}
 
 	return err;
