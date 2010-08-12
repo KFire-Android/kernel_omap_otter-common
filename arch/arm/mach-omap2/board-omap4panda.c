@@ -192,6 +192,16 @@ static struct omap2_hsmmc_info mmc[] = {
 		.wires		= 8,
 		.gpio_wp	= -EINVAL,
 	},
+	{
+		.mmc            = 5,
+		.wires          = 8,
+		.gpio_cd        = -EINVAL,
+		.gpio_wp        = 4,
+		.ocr_mask       = MMC_VDD_165_195,
+#ifdef CONFIG_PM_RUNTIME
+		.power_saving   = true,
+#endif
+	},
 	{}	/* Terminator */
 };
 
@@ -457,6 +467,38 @@ static void __init omap4_ehci_init(void)
 
 }
 
+#ifdef CONFIG_TIWLAN_SDIO
+static void pad_config(unsigned long pad_addr, u32 andmask, u32 ormask)
+{
+	int val;
+	u32 *addr;
+
+	addr = (u32 *) ioremap(pad_addr, 4);
+	if (!addr) {
+		printk(KERN_ERR"OMAP_pad_config: ioremap failed with addr %lx\n",
+		pad_addr);
+	return;
+	}
+
+	val =  __raw_readl(addr);
+	val &= andmask;
+	val |= ormask;
+	__raw_writel(val, addr);
+
+	iounmap(addr);
+}
+
+void wlan_1273_config()
+{
+	pad_config(0x4A100078, 0xFFECFFFF, 0x00030000);
+	pad_config(0x4A100064, 0xFFEFFFFF, 0x000B0000);
+	if (gpio_request(43, NULL) != 0)
+		printk(KERN_ERR "GPIO 43 request failed\n");
+	gpio_direction_output(43, 0);
+	return ;
+}
+#endif
+
 static void __init omap_panda_init(void)
 {
 
@@ -465,6 +507,10 @@ static void __init omap_panda_init(void)
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 	omap_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
+
+#ifdef CONFIG_TIWLAN_SDIO
+	wlan_1273_config();
+#endif
 
 	/* OMAP4 Panda uses internal transceiver so register nop transceiver */
 	usb_nop_xceiv_register();
