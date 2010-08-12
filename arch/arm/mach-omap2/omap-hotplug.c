@@ -67,8 +67,12 @@ void platform_cpu_die(unsigned int cpu)
 		 * clear all interrupt wakeup sources
 		 */
 		omap4_wakeupgen_clear_all(cpu);
+#ifdef CONFIG_PM
 		omap4_enter_lowpower(cpu, PWRDM_POWER_OFF);
-
+#else
+		wmb();
+		do_wfi();
+#endif
 		if (omap_read_auxcoreboot0() == cpu) {
 			/*
 			 * OK, proper wakeup, we're done
