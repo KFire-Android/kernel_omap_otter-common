@@ -52,7 +52,7 @@
 #define OMAP3430ES2_USBHOST_MOD				0xc00
 
 #define BITS(n_bit)	\
-	(((1 << n_bit) - 1) | (1 << n_bit))
+	(((1U << n_bit) - 1) | (1U << n_bit))
 
 #define BITFIELD(l_bit, u_bit)	\
 	(BITS(u_bit) & ~((BITS(l_bit)) >> 1))

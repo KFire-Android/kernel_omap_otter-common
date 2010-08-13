@@ -852,6 +852,10 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 		vc_valid = OMAP3430_VALID_MASK;
 		vc_bypass_val_reg_offs = OMAP3_PRM_VC_BYPASS_VAL_OFFSET;
 		sr_i2c_slave_addr = OMAP3_SRI2C_SLAVE_ADDR;
+	} else {
+		pr_warning("%s: vc bypass method of voltage scaling"
+			"not supported\n", __func__);
+		return -EINVAL;
 	}
 
 	/* Get volt_data corresponding to target_volt */
