@@ -73,7 +73,7 @@ enum omap_color_mode video_mode_to_dss_mode(
 			struct v4l2_pix_format *pix);
 void omap_wb_isr(void *arg, unsigned int irqstatus);
 int	omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *wb);
-int omap_dss_wb_flush();
+int omap_dss_wb_flush(void);
 
 int omap_setup_wb(struct omap_wb_device *wb_device, u32 addr, u32 uv_addr)
 {
@@ -468,7 +468,7 @@ static int vidioc_streamoff(struct file *file, void *fh,
 	return 0;
 }
 
-static int vidioc_default_wb(struct file *file, void *fh,
+static long vidioc_default(struct file *file, void *fh,
 			     int cmd, void *arg)
 {
 	struct v4l2_writeback_ioctl_data *wb_data = NULL;
@@ -538,7 +538,7 @@ static const struct v4l2_ioctl_ops wb_ioctl_fops = {
 	.vidioc_streamoff	= vidioc_streamoff,
 	.vidioc_s_fmt_vid_overlay = vidioc_s_fmt_vid_overlay,
 	.vidioc_g_fmt_vid_overlay = vidioc_g_fmt_vid_overlay,
-	.vidioc_default		= vidioc_default_wb,
+	.vidioc_default		= vidioc_default,
 };
 
 static void omap_wb_tiler_buffer_free(struct omap_wb_device *wb,
@@ -836,7 +836,7 @@ static int omap_wb_mmap(struct file *file, struct vm_area_struct *vma)
 
 	/* UV Buffer in case of NV12 format */
 	if (OMAP_DSS_COLOR_NV12 == wb->dss_mode) {
-		pos = wb->buf_phy_uv_addr[i];
+		pos = (void*) wb->buf_phy_uv_addr[i];
 		/* UV buffer is 2 bpp, but half size, so p remains */
 		m_increment = 2*64*TILER_WIDTH;
 
@@ -1156,7 +1156,8 @@ void omap_wb_isr(void *arg, unsigned int irqstatus)
 	int r = 0;
 	struct omap_wb_device *wb =
 	    (struct omap_wb_device *) arg;
-	u32 addr, uv_addr, flags;
+	u32 addr, uv_addr;
+	unsigned long flags;
 
 	spin_lock_irqsave(&wb->vbq_lock, flags);
 

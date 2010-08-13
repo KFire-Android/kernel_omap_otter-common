@@ -804,7 +804,7 @@ enum omap_color_mode video_mode_to_dss_mode(struct v4l2_pix_format *pix)
 	ovid = &vout->vid_info;
 	ovl = ovid->overlays[0];
 #else
-	enum omap_color_mode mode;
+	enum omap_color_mode mode = 1 << 0;
 #endif
 	switch (pix->pixelformat) {
 	case V4L2_PIX_FMT_NV12:
@@ -1042,14 +1042,13 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 void omap_vout_isr(void *arg, unsigned int irqstatus)
 {
 	int ret;
-	u32 addr, fid;
-	u32 uv_addr;
+	u32 addr, uv_addr;
 	struct omap_overlay *ovl;
 	struct timeval timevalue;
 	struct omapvideo_info *ovid;
 	struct omap_dss_device *cur_display;
 	struct omap_vout_device *vout = (struct omap_vout_device *)arg;
-	u32 flags;
+	unsigned long flags;
 	int irq = 0;
 
 	if (!vout->streaming)
