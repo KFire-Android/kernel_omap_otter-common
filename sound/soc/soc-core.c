@@ -22,7 +22,7 @@
  *   o Support TDM on PCM and I2S
  */
 
-#define DEBUG
+//#define DEBUG
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -742,9 +742,6 @@ int snd_soc_pcm_close(struct snd_pcm_substream *substream)
 	if (rtd->dai_link->no_pcm)
 		rtd->be_active--;
 
-	if (rtd->dai_link->dynamic)
-		snd_soc_put_backend_dais(substream);
-
 	/* Muting the DAC suppresses artifacts caused during digital
 	 * shutdown, for example from stopping clocks.
 	 */
@@ -780,6 +777,9 @@ int snd_soc_pcm_close(struct snd_pcm_substream *substream)
 					codec_dai->driver->capture.stream_name,
 					SND_SOC_DAPM_STREAM_STOP);
 	}
+
+	if (rtd->dai_link->dynamic)
+		snd_soc_put_backend_dais(substream);
 
 	mutex_unlock(&rtd->pcm_mutex);
 	return 0;
