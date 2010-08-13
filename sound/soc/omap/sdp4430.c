@@ -44,23 +44,24 @@
 
 static int twl6040_power_mode;
 
-static struct i2c_client *tps61305_client;
-static struct i2c_board_info tps61305_hwmon_info = {
-        I2C_BOARD_INFO("tps61305", 0x33),
+static struct i2c_client *tps6130x_client;
+static struct i2c_board_info tps6130x_hwmon_info = {
+	I2C_BOARD_INFO("tps6130x", 0x33),
 };
 
-static int sdp4430_tps61305_configure(void)
+/* configure the TPS6130x Handsfree Boost Converter */
+static int sdp4430_tps6130x_configure(void)
 {
 	u8 data[2];
 
 	data[0] = 0x01;
 	data[1] = 0x60;
-	if (i2c_master_send(tps61305_client, data, 2) != 2)
-		printk(KERN_ERR "I2C write to TSP61305 failed\n");
+	if (i2c_master_send(tps6130x_client, data, 2) != 2)
+		printk(KERN_ERR "I2C write to TPS6130x failed\n");
 
 	data[0] = 0x02;
-	if (i2c_master_send(tps61305_client, data, 2) != 2)
-		printk(KERN_ERR "I2C write to TSP61305 failed\n");
+	if (i2c_master_send(tps6130x_client, data, 2) != 2)
+		printk(KERN_ERR "I2C write to TPS6130x failed\n");
 
 	return 0;
 }
@@ -629,13 +630,15 @@ static int __init sdp4430_soc_init(void)
                 return -ENODEV;
         }
 
-        tps61305_client = i2c_new_device(adapter, &tps61305_hwmon_info);
-        if (!tps61305_client) {
+	tps6130x_client = i2c_new_device(adapter, &tps6130x_hwmon_info);
+	if (!tps6130x_client) {
                 printk(KERN_ERR "can't add i2c device\n");
                 return -ENODEV;
         }
 
-        sdp4430_tps61305_configure();
+	/* Only configure the TPS6130x on SDP4430 */
+	if (machine_is_omap_4430sdp())
+		sdp4430_tps6130x_configure();
 
 	/* Codec starts in HP mode */
 	twl6040_power_mode = 1;
@@ -652,7 +655,7 @@ module_init(sdp4430_soc_init);
 static void __exit sdp4430_soc_exit(void)
 {
 	platform_device_unregister(sdp4430_snd_device);
-	i2c_unregister_device(tps61305_client);
+	i2c_unregister_device(tps6130x_client);
 }
 module_exit(sdp4430_soc_exit);
 
