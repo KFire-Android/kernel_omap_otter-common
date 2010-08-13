@@ -604,7 +604,7 @@ static int __init sdp4430_soc_init(void)
 	struct i2c_adapter *adapter;
 	int ret;
 
-	if (!machine_is_omap_4430sdp() && !machone_is_omap4_panda()) {
+	if (!machine_is_omap_4430sdp() && !machine_is_omap4_panda()) {
 		pr_debug("Not SDP4430 or PandaBoard!\n");
 		return -ENODEV;
 	}
