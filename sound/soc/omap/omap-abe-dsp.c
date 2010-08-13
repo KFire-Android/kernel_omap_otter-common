@@ -153,7 +153,7 @@ static int abe_dsp_write(struct snd_soc_platform *platform, unsigned int reg,
 static void abe_init_engine(struct snd_soc_platform *platform)
 {
 	struct abe_data *priv = snd_soc_platform_get_drvdata(platform);
-#ifdef CONFIG_PM_RUNTIME
+#ifndef CONFIG_PM_RUNTIME
 	struct omap4_abe_dsp_pdata *pdata = priv->abe_pdata;
 #endif
 	struct platform_device *pdev = priv->pdev;
@@ -171,7 +171,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	 * Disable the clk after it has been used.
 	 */
 	pm_runtime_get_sync(&pdev->dev);
-#ifdef CONFIG_PM_RUNTIME
+#ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_enable)
 		pdata->device_enable(pdev);
 #endif
@@ -221,7 +221,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	abe_write_equalizer(EQ2R, &dl2_eq);
 
 	pm_runtime_get_sync(&pdev->dev);
-#ifdef CONFIG_PM_RUNTIME
+#ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_idle)
 		pdata->device_idle(pdev);
 #endif
