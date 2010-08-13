@@ -186,11 +186,6 @@ static struct platform_driver hdmi_dai_driver = {
 
 static int __init hdmi_dai_init(void)
 {
-#ifdef CONFIG_HDMI_NO_IP_MODULE
-	hdmi_lib_init();
-#else
-	hdmi_audio_core_stub_init();
-#endif
 	return platform_driver_register(&hdmi_dai_driver);
 }
 module_init(hdmi_dai_init);
