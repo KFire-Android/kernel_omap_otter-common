@@ -60,7 +60,7 @@
 // TODO: make all these into virtual registers or similar */
 #define ABE_NUM_MIXERS		21
 #define ABE_NUM_MUXES		12
-#define ABE_NUM_WIDGETS	41	/* TODO - refine this val */
+#define ABE_NUM_WIDGETS	42	/* TODO - refine this val */
 #define ABE_NUM_DAPM_REG		\
 	(ABE_NUM_MIXERS + ABE_NUM_MUXES + ABE_NUM_WIDGETS)
 #define ABE_WIDGET_START	(ABE_NUM_MIXERS + ABE_NUM_MUXES)
@@ -118,6 +118,19 @@ struct abe_data {
 	int tones_dl2_volume;
 	int voice_dl2_volume;
 	int capture_dl2_volume;
+
+	int sdt_up_volume;
+	int sdt_dl1_volume;
+
+	int audul_mm_volume;
+	int audul_tones_volume;
+	int audul_ul_volume;
+	int audul_vx_volume;
+
+	int vxrec_mm_volume;
+	int vxrec_tones_volume;
+	int vxrec_vx_ul_volume;
+	int vxrec_vx_dl_volume;
 };
 
 static struct abe_data *abe;
@@ -252,9 +265,35 @@ static DECLARE_TLV_DB_SCALE(voice_dl2_tlv, -5000, 600, 3000);
 /* Media DL2 volume control from -50 to 30 dB in 6 dB steps */
 static DECLARE_TLV_DB_SCALE(capture_dl2_tlv, -5000, 600, 3000);
 
-static const struct snd_kcontrol_new abe_snd_controls[] = {
+/* SDT volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(sdt_ul_tlv, -5000, 600, 3000);
 
-};
+/* SDT volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(sdt_dl_tlv, -5000, 600, 3000);
+
+/* AUDUL volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(audul_mm_tlv, -5000, 600, 3000);
+
+/* AUDUL volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(audul_tones_tlv, -5000, 600, 3000);
+
+/* AUDUL volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(audul_vx_ul_tlv, -5000, 600, 3000);
+
+/* AUDUL volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(audul_vx_dl_tlv, -5000, 600, 3000);
+
+/* VXREC volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(vxrec_mm_dl_tlv, -5000, 600, 3000);
+
+/* VXREC volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(vxrec_tones_tlv, -5000, 600, 3000);
+
+/* VXREC volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(vxrec_vx_dl_tlv, -5000, 600, 3000);
+
+/* VXREC volume control from -50 to 30 dB in 6 dB steps */
+static DECLARE_TLV_DB_SCALE(vxrec_vx_ul_tlv, -5000, 600, 3000);
 
 //TODO: we have to use the shift value atm to represent register id due to current HAL
 static int dl1_put_mixer(struct snd_kcontrol *kcontrol,
@@ -415,6 +454,98 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
+
+static int volume_put_sdt_mixer(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+
+	// TODO get ramp times from kcontrol
+	switch (mc->reg) {
+	case MIX_SDT_INPUT_UP_MIXER:
+		abe_write_mixer(MIXSDT, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->sdt_up_volume = ucontrol->value.integer.value[0];
+		return 1;
+	case MIX_SDT_INPUT_DL1_MIXER:
+		abe_write_mixer(MIXSDT, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->sdt_dl1_volume = ucontrol->value.integer.value[0];
+		return 1;
+	}
+
+	return 0;
+}
+
+static int volume_put_audul_mixer(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+
+	// TODO get ramp times from kcontrol
+	switch (mc->reg) {
+	case MIX_AUDUL_INPUT_MM_DL:
+		abe_write_mixer(MIXAUDUL, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->audul_mm_volume = ucontrol->value.integer.value[0];
+		return 1;
+	case MIX_AUDUL_INPUT_TONES:
+		abe_write_mixer(MIXAUDUL, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->audul_tones_volume = ucontrol->value.integer.value[0];
+		return 1;
+	case MIX_AUDUL_INPUT_UPLINK:
+		abe_write_mixer(MIXAUDUL, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->audul_ul_volume = ucontrol->value.integer.value[0];
+		return 1;
+	case MIX_AUDUL_INPUT_VX_DL:
+		abe_write_mixer(MIXAUDUL, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->audul_vx_volume = ucontrol->value.integer.value[0];
+		return 1;
+
+	}
+
+	return 0;
+}
+
+static int volume_put_vxrec_mixer(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+
+	// TODO get ramp times from kcontrol
+	switch (mc->reg) {
+	case MIX_VXREC_INPUT_MM_DL:
+		abe_write_mixer(MIXVXREC, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->vxrec_mm_volume = ucontrol->value.integer.value[0];
+		return 1;
+	case MIX_VXREC_INPUT_TONES:
+		abe_write_mixer(MIXVXREC, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->vxrec_tones_volume = ucontrol->value.integer.value[0];
+		return 1;
+	case MIX_VXREC_INPUT_VX_UL:
+		abe_write_mixer(MIXVXREC, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->vxrec_vx_ul_volume = ucontrol->value.integer.value[0];
+		return 1;
+	case MIX_VXREC_INPUT_VX_DL:
+		abe_write_mixer(MIXVXREC, -5000 + (ucontrol->value.integer.value[0] * 600),
+				RAMP_0MS, mc->reg);
+		abe->vxrec_vx_dl_volume = ucontrol->value.integer.value[0];
+		return 1;
+
+	}
+
+	return 0;
+}
+
 static int volume_put_dl1_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
@@ -522,6 +653,72 @@ static int volume_get_dl2_mixer(struct snd_kcontrol *kcontrol,
 		return 0;
 	case MIX_DL2_INPUT_VX_DL:
 		ucontrol->value.integer.value[0] = abe->voice_dl2_volume;
+		return 0;
+	}
+
+	return 1;
+}
+
+static int volume_get_audul_mixer(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+
+	switch (mc->reg) {
+	case MIX_AUDUL_INPUT_MM_DL:
+		ucontrol->value.integer.value[0] = abe->audul_mm_volume;
+		return 0;
+	case MIX_AUDUL_INPUT_TONES:
+		ucontrol->value.integer.value[0] = abe->audul_tones_volume;
+		return 0;
+	case MIX_AUDUL_INPUT_UPLINK:
+		ucontrol->value.integer.value[0] = abe->audul_ul_volume;
+		return 0;
+	case MIX_AUDUL_INPUT_VX_DL:
+		ucontrol->value.integer.value[0] = abe->audul_vx_volume;
+		return 0;
+	}
+
+	return 1;
+}
+
+static int volume_get_vxrec_mixer(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+
+	switch (mc->reg) {
+	case MIX_VXREC_INPUT_MM_DL:
+		ucontrol->value.integer.value[0] = abe->vxrec_mm_volume;
+		return 0;
+	case MIX_VXREC_INPUT_TONES:
+		ucontrol->value.integer.value[0] = abe->vxrec_tones_volume;
+		return 0;
+	case MIX_VXREC_INPUT_VX_UL:
+		ucontrol->value.integer.value[0] = abe->vxrec_vx_ul_volume;
+		return 0;
+	case MIX_VXREC_INPUT_VX_DL:
+		ucontrol->value.integer.value[0] = abe->vxrec_vx_dl_volume;
+		return 0;
+	}
+
+	return 1;
+}
+
+static int volume_get_sdt_mixer(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+
+	switch (mc->reg) {
+	case MIX_SDT_INPUT_UP_MIXER:
+		ucontrol->value.integer.value[0] = abe->sdt_up_volume;
+		return 0;
+	case MIX_SDT_INPUT_DL1_MIXER:
+		ucontrol->value.integer.value[0] = abe->sdt_dl1_volume;
 		return 0;
 	}
 
@@ -675,6 +872,11 @@ static const struct snd_kcontrol_new pdm_ul1_switch_controls =
 	SOC_SINGLE_EXT("Switch", VIRT_SWITCH, 21, 1, 0,
 			abe_get_mixer, abe_put_switch);
 
+/* Virtual DL2 -> MM_EXT Switch */
+static const struct snd_kcontrol_new mm_ext_dl2_switch_controls =
+	SOC_SINGLE_EXT("Switch", VIRT_SWITCH, 22, 1, 0,
+			abe_get_mixer, abe_put_switch);
+
 static const struct snd_kcontrol_new abe_controls[] = {
 	/* DL1 mixer gains */
 	SOC_SINGLE_EXT_TLV("DL1 Media Playback Volume",
@@ -703,6 +905,42 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	SOC_SINGLE_EXT_TLV("DL2 Capture Playback Volume",
 		MIX_DL2_INPUT_MM_UL2, 0, 14, 0,
 		volume_get_dl2_mixer, volume_put_dl2_mixer, capture_dl2_tlv),
+
+	/* VXREC mixer gains */
+	SOC_SINGLE_EXT_TLV("VXREC Media Volume",
+		MIX_VXREC_INPUT_MM_DL, 0, 14, 0,
+		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_mm_dl_tlv),
+	SOC_SINGLE_EXT_TLV("VXREC Tones Volume",
+		MIX_VXREC_INPUT_TONES, 0, 14, 0,
+		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_tones_tlv),
+	SOC_SINGLE_EXT_TLV("VXREC Voice DL Volume",
+		MIX_VXREC_INPUT_VX_UL, 0, 14, 0,
+		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_vx_dl_tlv),
+	SOC_SINGLE_EXT_TLV("VXREC Voice UL Volume",
+		MIX_VXREC_INPUT_VX_DL, 0, 14, 0,
+		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_vx_ul_tlv),
+
+	/* AUDUL mixer gains */
+	SOC_SINGLE_EXT_TLV("AUDUL Media Volume",
+		MIX_AUDUL_INPUT_MM_DL, 0, 14, 0,
+		volume_get_audul_mixer, volume_put_audul_mixer, audul_mm_tlv),
+	SOC_SINGLE_EXT_TLV("AUDUL Tones Volume",
+		MIX_AUDUL_INPUT_TONES, 0, 14, 0,
+		volume_get_audul_mixer, volume_put_audul_mixer, audul_tones_tlv),
+	SOC_SINGLE_EXT_TLV("AUDUL Voice UL Volume",
+		MIX_AUDUL_INPUT_UPLINK, 0, 14, 0,
+		volume_get_audul_mixer, volume_put_audul_mixer, audul_vx_ul_tlv),
+	SOC_SINGLE_EXT_TLV("AUDUL Voice DL Volume",
+		MIX_AUDUL_INPUT_VX_DL, 0, 14, 0,
+		volume_get_audul_mixer, volume_put_audul_mixer, audul_vx_dl_tlv),
+
+	/* SDT mixer gains */
+	SOC_SINGLE_EXT_TLV("SDT UL Volume",
+		MIX_SDT_INPUT_UP_MIXER, 0, 14, 0,
+		volume_get_sdt_mixer, volume_put_sdt_mixer, sdt_ul_tlv),
+	SOC_SINGLE_EXT_TLV("SDT DL Volume",
+		MIX_SDT_INPUT_DL1_MIXER, 0, 14, 0,
+		volume_get_sdt_mixer, volume_put_sdt_mixer, sdt_dl_tlv),
 };
 
 static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
@@ -830,6 +1068,10 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	/* Virtual PDM_UL1 Switch */
 	SND_SOC_DAPM_MIXER("AMIC_UL PDM",
 			ABE_WIDGET(40), ABE_OPP_50, 0, &pdm_ul1_switch_controls, 1),
+
+	/* Virtual DL2 -> MM_EXT Switch */
+	SND_SOC_DAPM_MIXER("MM_EXT DL2",
+			ABE_WIDGET(41), ABE_OPP_50, 0, &mm_ext_dl2_switch_controls, 1),
 
 	/* Virtual to join MM_EXT and PDM+UL1 switches */
 	SND_SOC_DAPM_MIXER("AMIC_UL", SND_SOC_NOPM, 0, 0, NULL, 0),
@@ -1061,6 +1303,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"DL2 Capture VMixer", NULL, "MUX_UL11"},
 	{"DL2 Mixer", "Multimedia", "MM_DL"},
 	{"PDM_DL2", NULL, "DL2 Mixer"},
+
+	/* DL2 -> MM_EXT_DL */
+	{"MM_EXT DL2", NULL, "DL2 Mixer"},
+	{"MM_EXT_DL", "Switch", "MM_EXT DL2"},
 
 	/* VxREC Mixer */
 	{"Capture Mixer", "Tones", "TONES_DL"},
