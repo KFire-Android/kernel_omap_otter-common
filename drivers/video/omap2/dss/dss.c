@@ -129,6 +129,8 @@ void dss_restore_context(void)
 #undef SR
 #undef RR
 
+static int use_count;
+
 void dss_clk_enable()
 {
 	use_count++;
