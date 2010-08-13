@@ -980,7 +980,7 @@ err:
 /* apply var to the overlay */
 int omapfb_apply_changes(struct fb_info *fbi, int init)
 {
-	int r = 0;
+	int r = 0, rotation = 0;
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct fb_var_screeninfo *var = &fbi->var;
 	struct omap_overlay *ovl;
@@ -1009,7 +1009,7 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 		}
 
 		if (init || (ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0) {
-			int rotation = (var->rotate + ofbi->rotation[i]) % 4;
+			rotation = (var->rotate + ofbi->rotation[i]) % 4;
 			if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
 					outw = var->xres;
 					outh = var->yres;
@@ -1028,7 +1028,7 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 			DBG("its vid pipeline so sclaing is enabled, still\
 				we will not scale for output size,\
 				just maintain the input size");
-			int rotation = (var->rotate + ofbi->rotation[i]) % 4;
+			rotation = (var->rotate + ofbi->rotation[i]) % 4;
 			if (rotation == FB_ROTATE_CW ||
 					rotation == FB_ROTATE_CCW) {
 				outw = var->yres;
@@ -1476,7 +1476,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omapfb2_mem_region *rg;
-	void __iomem *vaddr;
+	void __iomem *vaddr = NULL;
 	int r;
 	u16 h = 0, w = 0;
 	unsigned long pstride;
@@ -1502,7 +1502,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 			w = fbi->fix.line_length /
 				(fbi->var.bits_per_pixel >> 3);
 			h = size / fbi->fix.line_length;
-			err = tiler_alloc(TILFMT_32BIT, w, h, &paddr);
+			err = tiler_alloc(TILFMT_32BIT, w, h, (u32 *)&paddr);
 			if (err != 0x0)
 				return -ENOMEM;
 			r = 0;
@@ -1529,7 +1529,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 			return -ENOMEM;
 		}
 	} else if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
-		pstride = tiler_stride(tiler_get_natural_addr(paddr));
+		pstride = tiler_stride(tiler_get_natural_addr((void *)&paddr));
 		psize = h * pstride;
 		vaddr = __arm_multi_strided_ioremap(1, &paddr, &psize,
 			&pstride, (unsigned long *) &fbi->fix.line_length,
