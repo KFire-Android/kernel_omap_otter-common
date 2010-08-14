@@ -448,6 +448,48 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.supported_be = modem_be,
 		.num_be = ARRAY_SIZE(modem_be),
 	},
+#ifdef CONFIG_SND_OMAP_SOC_HDMI
+	{
+		.name = "hdmi",
+		.stream_name = "HDMI",
+
+		.cpu_dai_name = "hdmi-dai",
+		.platform_name = "omap-pcm-audio",
+
+		/* HDMI*/
+		.codec_dai_name = "HDMI",
+
+		.no_codec = 1,
+	},
+#endif
+	{
+		.name = "Legacy McBSP",
+		.stream_name = "Multimedia",
+
+		/* ABE components - MCBSP2 - MM-EXT */
+		.cpu_dai_name = "omap-mcbsp-dai.1",
+		.platform_name = "omap-pcm-audio",
+
+		/* FM */
+		.codec_dai_name = "FM Digital",
+
+		.no_codec = 1, /* TODO: have a dummy CODEC */
+		.ops = &sdp4430_mcbsp_ops,
+	},
+	{
+		.name = "Legacy McPDM",
+		.stream_name = "Headset Playback",
+
+		/* ABE components - DL1 */
+		.cpu_dai_name = "omap-mcpdm-dai",
+		.platform_name = "omap-pcm-audio",
+
+		/* Phoenix - DL1 DAC */
+		.codec_dai_name =  "twl6040-dl1",
+		.codec_name = "twl6040-codec",
+
+		.ops = &sdp4430_mcpdm_ops,
+	},
 /*
  * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.
  * Matched to above interfaces at runtime, based upon use case.
@@ -611,46 +653,6 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.be_id = OMAP_ABE_DAI_DMIC2,
 	},
-	{
-		.name = "hdmi",
-		.stream_name = "HDMI",
-
-		.cpu_dai_name = "hdmi-dai",
-		.platform_name = "omap-pcm-audio",
-
-		/* HDMI*/
-		.codec_dai_name = "HDMI",
-
-		.no_codec = 1,
-	},
-	{
-		.name = "Debug to McBSP",
-		.stream_name = "Multimedia",
-
-		/* ABE components - MCBSP2 - MM-EXT */
-		.cpu_dai_name = "omap-mcbsp-dai.1",
-		.platform_name = "omap-pcm-audio",
-
-		/* FM */
-		.codec_dai_name = "FM Digital",
-
-		.no_codec = 1, /* TODO: have a dummy CODEC */
-		.ops = &sdp4430_mcbsp_ops,
-	},
-	{
-		.name = "Debug to McPDM",
-		.stream_name = "Headset Playback",
-
-		/* ABE components - DL1 */
-		.cpu_dai_name = "omap-mcpdm-dai",
-		.platform_name = "omap-pcm-audio",
-
-		/* Phoenix - DL1 DAC */
-		.codec_dai_name =  "twl6040-dl1",
-		.codec_name = "twl6040-codec",
-
-		.ops = &sdp4430_mcpdm_ops,
-	}
 };
 
 /* Audio machine driver */
