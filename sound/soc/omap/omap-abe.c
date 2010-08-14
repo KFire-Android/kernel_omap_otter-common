@@ -58,7 +58,7 @@
  * 1) Get DAI params from HAL and pass onto DAI drivers ? (are params static ??, i.e. can I just use a table)
  */
 
-#define NUM_ABE_FRONTENDS		5
+#define NUM_ABE_FRONTENDS		6
 #define NUM_ABE_BACKENDS		11
 
 #if 0
@@ -146,6 +146,14 @@ static struct omap_abe_data abe_data = {
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
 
+	/* ABE_FRONTEND_DAI_MODEM */
+	.frontend[ABE_FRONTEND_DAI_MODEM][SNDRV_PCM_STREAM_PLAYBACK] = {
+			.lock = SPIN_LOCK_UNLOCKED,
+	},
+	.frontend[ABE_FRONTEND_DAI_MODEM][SNDRV_PCM_STREAM_CAPTURE] = {
+			.lock = SPIN_LOCK_UNLOCKED,
+	},
+
 	.configure = 0,
 };
 
@@ -222,7 +230,7 @@ static int abe_fe_startup(struct snd_pcm_substream *substream,
 		// TODO: replace with 6 Mux config in userspace
 		abe_set_router_configuration(UPROUTE, UPROUTE_CONFIG_AMIC,
 			(abe_router_t *)abe_router_ul_table_preset[UPROUTE_CONFIG_AMIC]);
-
+#if 0
 		// TODO: move to UCM control
 		abe_write_gain(GAINS_DL1, GAIN_M6dB,  RAMP_0MS, GAIN_LEFT_OFFSET);
 		abe_write_gain(GAINS_DL1, GAIN_M6dB,  RAMP_0MS, GAIN_RIGHT_OFFSET);
@@ -234,6 +242,7 @@ static int abe_fe_startup(struct snd_pcm_substream *substream,
 
 		abe_write_gain(GAINS_SPLIT, GAIN_M6dB, RAMP_0MS, GAIN_LEFT_OFFSET);
 		abe_write_gain(GAINS_SPLIT, GAIN_M6dB, RAMP_0MS, GAIN_RIGHT_OFFSET);
+#endif
 	}
 
 	return 0;
@@ -318,6 +327,16 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 			abe_read_port_address(VIB_DL_PORT, &dma_params);
 		} else
 			return -EINVAL;
+	case ABE_FRONTEND_DAI_MODEM:
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			dma_req = OMAP44XX_DMA_ABE_REQ_6;
+			abe_connect_cbpr_dmareq_port(VIB_DL_PORT, &format, ABE_CBPR6_IDX,
+					&dma_sink);
+			abe_read_port_address(VIB_DL_PORT, &dma_params);
+		} else {
+
+		}
+
         break;
 	}
 
@@ -1134,6 +1153,17 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 		.name = "Vibra",
 		.playback = {
 			.stream_name = "Vibra Playback",
+			.channels_min = 2,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_CONTINUOUS,
+			.formats = OMAP_ABE_FORMATS,
+		},
+		.ops = &omap_abe_dai_ops,
+	},
+	{	/* MODEM */
+		.name = "MODEM",
+		.playback = {
+			.stream_name = "MODEM",
 			.channels_min = 2,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_CONTINUOUS,
