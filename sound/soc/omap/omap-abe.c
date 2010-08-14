@@ -105,8 +105,6 @@ struct omap_abe_data {
 	struct abe_frontend_dai frontend[NUM_ABE_FRONTENDS][2];
 	int be_active[NUM_ABE_BACKENDS][2];
 
-	int configure;
-
 	struct clk *clk;
 
 	/* hwmod platform device */
@@ -153,8 +151,6 @@ static struct omap_abe_data abe_data = {
 	.frontend[ABE_FRONTEND_DAI_MODEM][SNDRV_PCM_STREAM_CAPTURE] = {
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
-
-	.configure = 0,
 };
 
 /* frontend mutex */
@@ -209,41 +205,12 @@ static inline int be_is_pending(struct snd_soc_pcm_runtime *be_rtd, int stream)
 static int abe_fe_startup(struct snd_pcm_substream *substream,
 			struct snd_soc_dai *dai)
 {
-	//struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	//struct snd_soc_codec *codec = rtd->codec;
-	struct omap_abe_data *priv = snd_soc_dai_get_drvdata(dai);
-	//struct twl4030_codec_data *pdata = codec->dev->platform_data;
-	//struct platform_device *pdev = priv->pdev;
-
 	/* TODO: complete HW  pcm for backends */
 #if 0
 	snd_pcm_hw_constraint_list(substream->runtime, 0,
 				SNDRV_PCM_HW_PARAM_RATE,
 				priv->sysclk_constraints);
 #endif
-
-	if (!priv->configure++) {
-
-		//if (pdata->device_enable)
-		//	pdata->device_enable(pdev);
-
-		// TODO: replace with 6 Mux config in userspace
-		abe_set_router_configuration(UPROUTE, UPROUTE_CONFIG_AMIC,
-			(abe_router_t *)abe_router_ul_table_preset[UPROUTE_CONFIG_AMIC]);
-#if 0
-		// TODO: move to UCM control
-		abe_write_gain(GAINS_DL1, GAIN_M6dB,  RAMP_0MS, GAIN_LEFT_OFFSET);
-		abe_write_gain(GAINS_DL1, GAIN_M6dB,  RAMP_0MS, GAIN_RIGHT_OFFSET);
-		abe_write_gain(GAINS_DL2, GAIN_M6dB,  RAMP_0MS, GAIN_LEFT_OFFSET);
-		abe_write_gain(GAINS_DL2, GAIN_M6dB,  RAMP_0MS, GAIN_RIGHT_OFFSET);
-
-		abe_write_gain(GAINS_AMIC, GAIN_M6dB, RAMP_0MS, GAIN_LEFT_OFFSET);
-		abe_write_gain(GAINS_AMIC, GAIN_M6dB, RAMP_0MS, GAIN_RIGHT_OFFSET);
-
-		abe_write_gain(GAINS_SPLIT, GAIN_M6dB, RAMP_0MS, GAIN_LEFT_OFFSET);
-		abe_write_gain(GAINS_SPLIT, GAIN_M6dB, RAMP_0MS, GAIN_RIGHT_OFFSET);
-#endif
-	}
 
 	return 0;
 }
@@ -1086,6 +1053,12 @@ static int omap_abe_dai_probe(struct snd_soc_dai *dai)
 	INIT_WORK(&abe_data.frontend[ABE_FRONTEND_DAI_VIBRA][SNDRV_PCM_STREAM_PLAYBACK].work,
 		playback_work);
 
+	/* MODEM */
+	INIT_WORK(&abe_data.frontend[ABE_FRONTEND_DAI_MODEM][SNDRV_PCM_STREAM_CAPTURE].work,
+		capture_work);
+	INIT_WORK(&abe_data.frontend[ABE_FRONTEND_DAI_MODEM][SNDRV_PCM_STREAM_PLAYBACK].work,
+		playback_work);
+
 	return 0;
 }
 
@@ -1160,13 +1133,20 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 		},
 		.ops = &omap_abe_dai_ops,
 	},
-	{	/* MODEM */
+	{	/* MODEM Voice Playback and Capture */
 		.name = "MODEM",
 		.playback = {
-			.stream_name = "MODEM",
-			.channels_min = 2,
-			.channels_max = 2,
-			.rates = SNDRV_PCM_RATE_CONTINUOUS,
+			.stream_name = "Voice Playback",
+			.channels_min = 1,
+			.channels_max = 1,
+			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000,
+			.formats = OMAP_ABE_FORMATS,
+		},
+		.capture = {
+			.stream_name = "Voice Capture",
+			.channels_min = 1,
+			.channels_max = 1,
+			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000,
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,
