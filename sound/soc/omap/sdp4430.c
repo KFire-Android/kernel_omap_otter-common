@@ -328,6 +328,47 @@ static struct snd_soc_dai_driver dai[] = {
 },
 };
 
+static const char *mm1_be[] = {
+		OMAP_ABE_BE_PDM_DL1,
+		OMAP_ABE_BE_PDM_UL1,
+		OMAP_ABE_BE_PDM_DL2,
+		OMAP_ABE_BE_BT_VX,
+		OMAP_ABE_BE_MM_EXT0,
+		OMAP_ABE_BE_DMIC0,
+		OMAP_ABE_BE_DMIC1,
+		OMAP_ABE_BE_DMIC2,
+};
+
+static const char *mm2_be[] = {
+		OMAP_ABE_BE_PDM_UL1,
+		OMAP_ABE_BE_BT_VX,
+		OMAP_ABE_BE_MM_EXT0,
+		OMAP_ABE_BE_DMIC0,
+		OMAP_ABE_BE_DMIC1,
+		OMAP_ABE_BE_DMIC2,
+};
+
+static const char *tones_be[] = {
+		OMAP_ABE_BE_PDM_DL1,
+		OMAP_ABE_BE_PDM_DL2,
+		OMAP_ABE_BE_BT_VX,
+		OMAP_ABE_BE_MM_EXT0,
+};
+
+static const char *vib_be[] = {
+		OMAP_ABE_BE_PDM_VIB,
+};
+
+static const char *modem_be[] = {
+		OMAP_ABE_BE_PDM_DL1,
+		OMAP_ABE_BE_PDM_UL1,
+		OMAP_ABE_BE_PDM_DL2,
+		OMAP_ABE_BE_BT_VX,
+		OMAP_ABE_BE_DMIC0,
+		OMAP_ABE_BE_DMIC1,
+		OMAP_ABE_BE_DMIC2,
+};
+
 /* Digital audio interface glue - connects codec <--> CPU */
 static struct snd_soc_dai_link sdp4430_dai[] = {
 
@@ -343,7 +384,9 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.cpu_dai_name = "MultiMedia1",
 		.platform_name = "omap-pcm-audio",
 
-		.dynamic = 1, /* codec DAI is dynamic */
+		.dynamic = 1, /* BE is dynamic */
+		.supported_be = mm1_be,
+		.num_be = ARRAY_SIZE(mm1_be),
 	},
 	{
 		.name = "SDP4430 Media Capture",
@@ -353,7 +396,9 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.cpu_dai_name = "MultiMedia2",
 		.platform_name = "omap-pcm-audio",
 
-		.dynamic = 1, /* codec DAI is dynamic */
+		.dynamic = 1, /* BE is dynamic */
+		.supported_be = mm2_be,
+		.num_be = ARRAY_SIZE(mm2_be),
 	},
 	{
 		.name = "SDP4430 Voice",
@@ -363,7 +408,9 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.cpu_dai_name = "Voice",
 		.platform_name = "omap-pcm-audio",
 
-		.dynamic = 1, /* codec DAI is dynamic */
+		.dynamic = 1, /* BE is dynamic */
+		.supported_be = mm1_be,
+		.num_be = ARRAY_SIZE(mm1_be),
 	},
 	{
 		.name = "SDP4430 Tones Playback",
@@ -373,7 +420,9 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.cpu_dai_name = "Tones",
 		.platform_name = "omap-pcm-audio",
 
-		.dynamic = 1, /* codec DAI is dynamic */
+		.dynamic = 1, /* BE is dynamic */
+		.supported_be = tones_be,
+		.num_be = ARRAY_SIZE(tones_be),
 	},
 	{
 		.name = "SDP4430 Vibra Playback",
@@ -383,7 +432,21 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.cpu_dai_name = "Vibra",
 		.platform_name = "omap-pcm-audio",
 
-		.dynamic = 1, /* codec DAI is dynamic */
+		.dynamic = 1, /* BE is dynamic */
+		.supported_be = vib_be,
+		.num_be = ARRAY_SIZE(vib_be),
+	},
+	{
+		.name = "SDP4430 MODEM",
+		.stream_name = "MODEM",
+
+		/* ABE components - MODEM  */
+		.cpu_dai_name = "MODEM",
+		.platform_name = "omap-dsp-audio",
+
+		.dynamic = 1, /* BE is dynamic */
+		.supported_be = modem_be,
+		.num_be = ARRAY_SIZE(modem_be),
 	},
 /*
  * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.
