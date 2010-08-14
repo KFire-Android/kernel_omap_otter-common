@@ -574,6 +574,10 @@ struct snd_soc_dai_link {
 	const char *cpu_dai_name;
 	const char *codec_dai_name;
 
+	/* supported BE */
+	const char **supported_be;
+	int num_be;
+
 	/* Keep DAI active over suspend */
 	unsigned int ignore_suspend:1;
 

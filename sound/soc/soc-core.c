@@ -22,7 +22,7 @@
  *   o Support TDM on PCM and I2S
  */
 
-//#define DEBUG
+#define DEBUG
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -378,10 +378,21 @@ static int soc_pcm_apply_symmetry(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+static int is_be_supported(struct snd_soc_pcm_runtime *rtd, const char *link)
+{
+	int i;
+
+	for (i= 0; i < rtd->dai_link->num_be; i++) {
+	//	dev_dbg(&rtd->dev, "link: %s be %s\n", link, rtd->dai_link->supported_be[i]);
+		if(!strcmp(rtd->dai_link->supported_be[i], link))
+			return 1;
+	}
+	return 0;
+}
+
 int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_platform *platform = rtd->platform;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *card = rtd->card;
 	int i, num;
@@ -403,18 +414,14 @@ int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 		if (card->rtd[i].dai_link->dynamic)
 			continue;
 
-		/* frontends must not belong to this platform */
-		if (card->rtd[i].platform != platform) {
+		fe_aif = snd_soc_dapm_get_aif(card->rtd[i].platform->dapm,
+				cpu_dai->driver->name, fe_type);
 
-			fe_aif = snd_soc_dapm_get_aif(card->rtd[i].platform->dapm,
-					cpu_dai->driver->name, fe_type);
-
-			if (fe_aif == NULL)
-				dev_dbg(&rtd->dev, "cant find frontend for stream %s\n",
-						cpu_dai->driver->name);
-			else
+		if (fe_aif == NULL)
+			dev_dbg(&rtd->dev, "cant find frontend for stream %s\n",
+					cpu_dai->driver->name);
+		else
 				break;
-		}
 	}
 
 	if (fe_aif == NULL) {
@@ -431,8 +438,13 @@ int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 		if (card->rtd[i].dai_link->dynamic)
 			continue;
 
-		/* backends must not belong to this platform */
-		if (card->rtd[i].dai_link->no_pcm && card->rtd[i].platform != platform) {
+		/* backends must belong to this frontend */
+		if (card->rtd[i].dai_link->no_pcm) {
+
+			dev_dbg(&rtd->dev, "trying BE %s\n", card->rtd[i].dai_link->name);
+
+			if (!is_be_supported(rtd, card->rtd[i].dai_link->name))
+				continue;
 
 			be_aif = snd_soc_dapm_get_aif(card->rtd[i].platform->dapm,
 					card->rtd[i].dai_link->stream_name, be_type);
@@ -453,7 +465,7 @@ int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 				if (rtd->num_be == SND_SOC_MAX_BE)
 					dev_dbg(&rtd->dev, "no more backends permitted\n");
 				else {
-					dev_dbg(&rtd->dev, "Active path for %s to %s\n", fe_aif, be_aif);
+					dev_dbg(&rtd->dev, "active path for %s to %s\n", fe_aif, be_aif);
 					rtd->be_rtd[rtd->num_be++] = &card->rtd[i];
 					card->rtd[i].fe_clients++;
 				}
@@ -1945,6 +1957,8 @@ static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 	if (capture)
 		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &soc_pcm_ops);
 
+	if (!platform->driver->pcm_new)
+		goto out;
 	ret = platform->driver->pcm_new(rtd->card->snd_card, codec_dai, pcm);
 	if (ret < 0) {
 		printk(KERN_ERR "asoc: platform pcm constructor failed\n");
@@ -1952,6 +1966,7 @@ static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 	}
 
 out:
+
 	pcm->private_free = platform->driver->pcm_free;
 	printk(KERN_INFO "asoc: %s <-> %s mapping ok\n", codec_dai->name,
 		cpu_dai->name);
