@@ -29,7 +29,7 @@
  *    o Support for reduced codec bias currents.
  */
 
- //#define DEBUG
+#define DEBUG
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -194,7 +194,7 @@ static int scenario_find_playback_paths (struct snd_soc_dapm_context *dapm,
 		return 0;
 
 	if (source == sink) {
-		dev_dbg(dapm->dev,"found route with length %d\n", hops);
+		dev_dbg(dapm->dev,"** found route with length %d\n", hops);
 		dapm->num_valid_paths++;
 		return 1;
 	}
@@ -207,8 +207,8 @@ static int scenario_find_playback_paths (struct snd_soc_dapm_context *dapm,
 	list_for_each(lp, &source->sinks) {
 		path = list_entry(lp, struct snd_soc_dapm_path, list_source);
 
-		dev_dbg(dapm->dev,"try source %s path %s len %d connect %d hops %d\n",
-				source->name, path->name, path->length, path->connect, hops);
+		dev_dbg(dapm->dev,"%d:try source %s path %s len %d connect %d\n",
+				hops, source->name, path->name, path->length, path->connect);
 
 		/* been here before ? */
 		if (path->length && path->length <= hops)
@@ -238,7 +238,7 @@ static int scenario_find_capture_paths (struct snd_soc_dapm_context *dapm,
 		return 0;
 
 	if (source == sink) {
-		dev_dbg(dapm->dev,"found route with length %d\n", hops);
+		dev_dbg(dapm->dev,"** found route with length %d\n", hops);
 		dapm->num_valid_paths++;
 		return 1;
 	}
@@ -251,8 +251,8 @@ static int scenario_find_capture_paths (struct snd_soc_dapm_context *dapm,
 	list_for_each(lp, &sink->sources) {
 		path = list_entry(lp, struct snd_soc_dapm_path, list_sink);
 
-		dev_dbg(dapm->dev,"try source %s path %s len %d connect %d hops %d\n",
-				source->name, path->name, path->length, path->connect, hops);
+		dev_dbg(dapm->dev,"%d:try sink %s path %s len %d connect %d\n",
+				hops, sink->name, path->name, path->length, path->connect);
 
 		/* been here before ? */
 		if (path->length && path->length <= hops)
