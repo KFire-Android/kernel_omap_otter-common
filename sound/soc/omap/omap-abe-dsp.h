@@ -24,10 +24,5 @@
 #ifndef __OMAP_ABE_DSP_H__
 #define __OMAP_ABE_DSP_H__
 
-struct omap_aess_fe {
-	int active[13];
-};
-
-struct omap_aess_fe *omap_aess_get_be_status(int fe);
 
 #endif	/* End of __OMAP_MCPDM_H__ */

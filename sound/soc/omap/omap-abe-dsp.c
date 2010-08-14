@@ -21,7 +21,7 @@
  *
  */
 
-#define DEBUG
+//#define DEBUG
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -104,7 +104,6 @@ struct abe_data {
 	struct mutex mutex;
 
 	int fe_id;
-	struct omap_aess_fe fe[5];
 
 	/* DAPM mixer config - TODO: some of this can be replaced with HAL update */
 	u32 dapm[ABE_NUM_DAPM_REG];
@@ -158,10 +157,6 @@ static int abe_dsp_write(struct snd_soc_platform *platform, unsigned int reg,
 
 	dev_dbg(platform->dev, "fe: %d widget %d %s\n", abe->fe_id,
 			reg - ABE_WIDGET_START, val ? "on" : "off");
-
-	if (reg >= ABE_BE_START && reg < ABE_BE_END)
-		abe->fe[abe->fe_id].active[reg - ABE_BE_START] = val;
-
 	return 0;
 }
 
@@ -174,7 +169,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	struct platform_device *pdev = priv->pdev;
 	abe_equ_t dl2_eq;
 
-	dl2_eq.equ_length = 25;
+	dl2_eq.equ_length = ARRAY_SIZE(DL2_COEF);
 
 	/* build the coefficient parameter for the equalizer api */
 	memcpy(dl2_eq.coef.type1, DL2_COEF, sizeof(DL2_COEF));
@@ -200,7 +195,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 
 	/* "tick" of the audio engine */
 	abe_write_event_generator(EVENT_TIMER);
-
+#if 0
 	/* TODO: make these ALSA kcontrols */
 	abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS, MIX_DL1_INPUT_MM_DL);
 	abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS, MIX_DL1_INPUT_MM_UL2);
@@ -227,7 +222,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	abe_write_mixer(MIXVXREC, MUTE_GAIN, RAMP_0MS, MIX_VXREC_INPUT_VX_DL);
 	abe_write_mixer(MIXVXREC, MUTE_GAIN, RAMP_0MS, MIX_VXREC_INPUT_MM_DL);
 	abe_write_mixer(MIXVXREC, MUTE_GAIN, RAMP_0MS, MIX_VXREC_INPUT_VX_UL);
-
+#endif
 	/* load the high-pass coefficient of IHF-Right */
 	abe_write_equalizer(EQ2L, &dl2_eq);
 
@@ -240,6 +235,10 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 		pdata->device_idle(pdev);
 #endif
 }
+
+/*
+ * These TLV settings will need fine tuned for each individual control
+ */
 
 /* Media DL1 volume control from -50 to 30 dB in 6 dB steps */
 static DECLARE_TLV_DB_SCALE(mm_dl1_tlv, -5000, 600, 3000);
@@ -952,9 +951,10 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			ABE_WIDGET(1), ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_OUT("VX_UL", "Voice Capture", 0,
 			ABE_WIDGET(2), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_OUT("MM_UL1", "MultiMedia1 Capture", 0,
+	/* the MM_UL mapping is intentional */
+	SND_SOC_DAPM_AIF_OUT("MM_UL1", "MultiMedia2 Capture", 0,
 			ABE_WIDGET(3), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_OUT("MM_UL2", "MultiMedia2 Capture", 0,
+	SND_SOC_DAPM_AIF_OUT("MM_UL2", "MultiMedia1 Capture", 0,
 			ABE_WIDGET(4), ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_IN("MM_DL", " MultiMedia1 Playback", 0,
 			ABE_WIDGET(5), ABE_OPP_25, 0),
@@ -1421,8 +1421,11 @@ static int aess_prepare(struct snd_pcm_substream *substream)
 	mutex_lock(&abe->mutex);
 
 	/* now calculate OPP level based upon DAPM widget status */
-	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++)
+	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++) {
+		dev_dbg(&rtd->dev, "opp w %d val 0x%x\n", i, abe->dapm[i]);
 		opp |= abe->dapm[i];
+	}
+
 	opp = (1 << (fls(opp) - 1)) * 25;
 	dev_dbg(&rtd->dev, "OPP level at prepare is %d\n", opp);
 
@@ -1487,8 +1490,10 @@ static int aess_close(struct snd_pcm_substream *substream)
 	}
 
 	/* now calculate OPP level based upon DAPM widget status */
-	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++)
+	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++) {
+		dev_dbg(&rtd->dev, "opp w %d val 0x%x\n", i, abe->dapm[i]);
 		opp |= abe->dapm[i];
+	}
 	opp = (1 << (fls(opp) - 1)) * 25;
 	dev_dbg(&rtd->dev, "OPP level at close is %d\n", opp);
 
@@ -1508,12 +1513,6 @@ static int aess_close(struct snd_pcm_substream *substream)
 	mutex_unlock(&abe->mutex);
 	return 0;
 }
-
-struct omap_aess_fe *omap_aess_get_be_status(int fe)
-{
-	return &abe->fe[fe];
-}
-EXPORT_SYMBOL_GPL(omap_aess_get_be_status);
 
 static struct snd_pcm_ops omap_aess_pcm_ops = {
 	.open = aess_open,
