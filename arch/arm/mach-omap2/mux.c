@@ -49,7 +49,6 @@ struct omap_mux_entry {
 	struct list_head	node;
 };
 
-static unsigned long mux_phys;
 static void __iomem *mux_base;
 
 u16 omap_mux_read(u16 reg)
@@ -373,6 +372,7 @@ int __init omap2_mux_init(void)
 #ifdef CONFIG_ARCH_OMAP3
 static LIST_HEAD(muxmodes);
 static DEFINE_MUTEX(muxmode_mutex);
+static unsigned long mux_phys;
 
 #ifdef CONFIG_OMAP_MUX
 
