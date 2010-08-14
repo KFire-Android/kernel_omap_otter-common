@@ -57,8 +57,8 @@
 // TODO: change to S16 and use ARM SIMD to re-format to S32
 #define ABE_FORMATS	 (SNDRV_PCM_FMTBIT_S32_LE)
 
-// TODO: make all these into virtual registers or similar */
-#define ABE_NUM_MIXERS		21
+// TODO: make all these into virtual registers or similar - split out by type */
+#define ABE_NUM_MIXERS		22
 #define ABE_NUM_MUXES		12
 #define ABE_NUM_WIDGETS	42	/* TODO - refine this val */
 #define ABE_NUM_DAPM_REG		\
@@ -67,6 +67,7 @@
 #define ABE_WIDGET_END	(ABE_WIDGET_START + ABE_NUM_WIDGETS)
 #define ABE_BE_START		(ABE_WIDGET_START + 7)
 #define ABE_BE_END	(ABE_BE_START + 10)
+#define ABE_MUX_BASE	ABE_NUM_MIXERS
 
 /* Uplink MUX path identifiers from ROUTE_UL */
 #define ABE_MM_UL1(x)		(x + ABE_NUM_MIXERS)
@@ -130,6 +131,8 @@ struct abe_data {
 	int vxrec_tones_volume;
 	int vxrec_vx_ul_volume;
 	int vxrec_vx_dl_volume;
+
+	abe_router_t router[16];
 };
 
 static struct abe_data *abe;
@@ -195,34 +198,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 
 	/* "tick" of the audio engine */
 	abe_write_event_generator(EVENT_TIMER);
-#if 0
-	/* TODO: make these ALSA kcontrols */
-	abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS, MIX_DL1_INPUT_MM_DL);
-	abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS, MIX_DL1_INPUT_MM_UL2);
-	abe_write_mixer(MIXDL1, GAIN_M6dB, RAMP_0MS, MIX_DL1_INPUT_VX_DL);
-	abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS, MIX_DL1_INPUT_TONES);
 
-	abe_write_mixer(MIXDL2, GAIN_M6dB, RAMP_0MS, MIX_DL2_INPUT_TONES);
-	abe_write_mixer(MIXDL2, MUTE_GAIN, RAMP_0MS, MIX_DL2_INPUT_VX_DL);
-	abe_write_mixer(MIXDL2, GAIN_M6dB, RAMP_0MS, MIX_DL2_INPUT_MM_DL);
-	abe_write_mixer(MIXDL2, MUTE_GAIN, RAMP_0MS, MIX_DL2_INPUT_MM_UL2);
-
-	abe_write_mixer(MIXSDT, MUTE_GAIN, RAMP_0MS, MIX_SDT_INPUT_UP_MIXER);
-	abe_write_mixer(MIXSDT, GAIN_0dB, RAMP_0MS, MIX_SDT_INPUT_DL1_MIXER);
-
-	abe_write_mixer(MIXECHO, MUTE_GAIN, RAMP_0MS, GAIN_LEFT_OFFSET);
-	abe_write_mixer(MIXECHO, MUTE_GAIN, RAMP_0MS, GAIN_RIGHT_OFFSET);
-
-	abe_write_mixer(MIXAUDUL, MUTE_GAIN, RAMP_0MS, MIX_AUDUL_INPUT_TONES);
-	abe_write_mixer(MIXAUDUL, GAIN_M6dB, RAMP_0MS, MIX_AUDUL_INPUT_UPLINK);
-	abe_write_mixer(MIXAUDUL, MUTE_GAIN, RAMP_0MS, MIX_AUDUL_INPUT_MM_DL);
-	abe_write_mixer(MIXAUDUL, MUTE_GAIN, RAMP_0MS, MIX_AUDUL_INPUT_VX_DL);
-
-	abe_write_mixer(MIXVXREC, MUTE_GAIN, RAMP_0MS, MIX_VXREC_INPUT_TONES);
-	abe_write_mixer(MIXVXREC, MUTE_GAIN, RAMP_0MS, MIX_VXREC_INPUT_VX_DL);
-	abe_write_mixer(MIXVXREC, MUTE_GAIN, RAMP_0MS, MIX_VXREC_INPUT_MM_DL);
-	abe_write_mixer(MIXVXREC, MUTE_GAIN, RAMP_0MS, MIX_VXREC_INPUT_VX_UL);
-#endif
 	/* load the high-pass coefficient of IHF-Right */
 	abe_write_equalizer(EQ2L, &dl2_eq);
 
@@ -410,14 +386,43 @@ static int abe_get_mixer(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/* router IDs that match our mixer strings */
+static const abe_router_t router[] = {
+		ZERO_labelID, /* strangely this is not 0 */
+		DMIC1_L_labelID, DMIC1_R_labelID,
+		DMIC2_L_labelID, DMIC2_R_labelID,
+		DMIC3_L_labelID, DMIC3_R_labelID,
+		BT_UL_L_labelID, BT_UL_R_labelID,
+		AMIC_L_labelID, AMIC_R_labelID,
+		VX_REC_L_labelID, VX_REC_R_labelID,
+};
+
 static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_dapm_widget *widget = snd_kcontrol_chip(kcontrol);
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
 	int mux = ucontrol->value.enumerated.item[0];
+	int reg = e->reg - ABE_MUX_BASE, i;
 
-	// TODO: set mux via HAL
+	if (mux >= ARRAY_SIZE(router))
+		return 0;
+
+	if (reg < 8) {
+		/* 0  .. 9   = MM_UL */
+		abe->router[reg] = router[mux];
+	} else if (reg < 12) {
+		/* 10 .. 11  = MM_UL2 */
+		/* 12 .. 13  = VX_UL */
+		abe->router[reg + 2] = router[mux];
+	}
+
+	for (i = 0; i < ARRAY_SIZE(router); i++)
+		dev_dbg(widget->dapm->dev, "router table [%d] = %d\n", i, abe->router[i]);
+
+	/* 2nd arg here is unused */
+	abe_set_router_configuration(UPROUTE, 0, abe->router);
+
 	abe->dapm[e->reg] = ucontrol->value.integer.value[0];
 	snd_soc_dapm_mux_update_power(widget, kcontrol, abe->dapm[e->reg], mux, e);
 	return 1;
@@ -1530,12 +1535,16 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 
 static int __devinit abe_engine_probe(struct platform_device *pdev)
 {
-	int ret;
+	int ret, i;
 
 	abe = kzalloc(sizeof(struct abe_data), GFP_KERNEL);
 	if (abe == NULL)
 		return -ENOMEM;
 	dev_set_drvdata(&pdev->dev, abe);
+
+	/* ZERO_labelID should really be 0 */
+	for (i = 0; i < 16; i++)
+		abe->router[i] = ZERO_labelID;
 
 	pm_runtime_enable(&pdev->dev);
 
