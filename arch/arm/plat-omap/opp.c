@@ -192,15 +192,20 @@ struct omap_opp *opp_find_freq_exact(struct device *dev,
 {
 	struct device_opp *dev_opp;
 	struct omap_opp *temp_opp, *opp = ERR_PTR(-ENODEV);
+	unsigned long req_freq = freq / 1000000;
 
 	dev_opp = find_device_opp(dev);
 	if (IS_ERR(dev_opp))
 		return opp;
 
 	list_for_each_entry(temp_opp, &dev_opp->opp_list, node) {
-		if (temp_opp->enabled && temp_opp->rate == freq) {
-			opp = temp_opp;
-			break;
+		if (temp_opp->enabled) {
+			unsigned long rate = temp_opp->rate / 1000000;
+
+			if (rate == req_freq) {
+				opp = temp_opp;
+				break;
+			}
 		}
 	}
 
@@ -238,16 +243,21 @@ struct omap_opp *opp_find_freq_ceil(struct device *dev, unsigned long *freq)
 {
 	struct device_opp *dev_opp;
 	struct omap_opp *temp_opp, *opp = ERR_PTR(-ENODEV);
+	unsigned long req_freq = *freq / 1000000;
 
 	dev_opp = find_device_opp(dev);
 	if (IS_ERR(dev_opp))
 		return opp;
 
 	list_for_each_entry(temp_opp, &dev_opp->opp_list, node) {
-		if (temp_opp->enabled && temp_opp->rate >= *freq) {
-			opp = temp_opp;
-			*freq = opp->rate;
-			break;
+		if (temp_opp->enabled) {
+			unsigned long rate = temp_opp->rate / 1000000;
+
+			if (rate >= req_freq) {
+				opp = temp_opp;
+				*freq = opp->rate;
+				break;
+			}
 		}
 	}
 
@@ -285,16 +295,21 @@ struct omap_opp *opp_find_freq_floor(struct device *dev, unsigned long *freq)
 {
 	struct device_opp *dev_opp;
 	struct omap_opp *temp_opp, *opp = ERR_PTR(-ENODEV);
+	unsigned long req_freq = *freq / 1000000;
 
 	dev_opp = find_device_opp(dev);
 	if (IS_ERR(dev_opp))
 		return opp;
 
 	list_for_each_entry_reverse(temp_opp, &dev_opp->opp_list, node) {
-		if (temp_opp->enabled && temp_opp->rate <= *freq) {
-			opp = temp_opp;
-			*freq = opp->rate;
-			break;
+		if (temp_opp->enabled) {
+			unsigned long rate = temp_opp->rate / 1000000;
+
+			if (rate <= req_freq) {
+				opp = temp_opp;
+				*freq = opp->rate;
+				break;
+			}
 		}
 	}
 
