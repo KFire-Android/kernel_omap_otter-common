@@ -83,6 +83,8 @@
 #define ABE_OPP_50		1
 #define ABE_OPP_100		2
 
+#define ABE_ROUTES_UL		14
+
 /*
  * ABE driver
  *
@@ -405,7 +407,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 	int mux = ucontrol->value.enumerated.item[0];
 	int reg = e->reg - ABE_MUX_BASE, i;
 
-	if (mux >= ARRAY_SIZE(router))
+	if (mux >= ABE_ROUTES_UL)
 		return 0;
 
 	if (reg < 8) {
@@ -417,7 +419,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 		abe->router[reg + 2] = router[mux];
 	}
 
-	for (i = 0; i < ARRAY_SIZE(router); i++)
+	for (i = 0; i < ABE_ROUTES_UL; i++)
 		dev_dbg(widget->dapm->dev, "router table [%d] = %d\n", i, abe->router[i]);
 
 	/* 2nd arg here is unused */
