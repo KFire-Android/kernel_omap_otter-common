@@ -247,20 +247,20 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 					&dma_sink);
 			abe_read_port_address(MM_DL_PORT, &dma_params);
 		} else {
-			dma_req = OMAP44XX_DMA_ABE_REQ_4;
-			abe_connect_cbpr_dmareq_port(MM_UL2_PORT, &format,  ABE_CBPR4_IDX,
+			dma_req = OMAP44XX_DMA_ABE_REQ_3;
+			abe_connect_cbpr_dmareq_port(MM_UL_PORT, &format,  ABE_CBPR3_IDX,
 					&dma_sink);
-			abe_read_port_address(MM_UL2_PORT, &dma_params);
+			abe_read_port_address(MM_UL_PORT, &dma_params);
 		}
         break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			return -EINVAL;
 		else {
-			dma_req = OMAP44XX_DMA_ABE_REQ_3;
-			abe_connect_cbpr_dmareq_port(MM_UL_PORT, &format,  ABE_CBPR3_IDX,
+			dma_req = OMAP44XX_DMA_ABE_REQ_4;
+			abe_connect_cbpr_dmareq_port(MM_UL2_PORT, &format,  ABE_CBPR4_IDX,
 					&dma_sink);
-			abe_read_port_address(MM_UL_PORT, &dma_params);
+			abe_read_port_address(MM_UL2_PORT, &dma_params);
 		}
         break;
 	case ABE_FRONTEND_DAI_VOICE:
