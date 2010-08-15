@@ -419,7 +419,8 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 		abe->router[reg + 2] = router[mux];
 	}
 
-	for (i = 0; i < ABE_ROUTES_UL; i++)
+	/* there is a 2 slot gap in the table, making it ABE_ROUTES_UL + 2 in size */
+	for (i = 0; i < ABE_ROUTES_UL + 2; i++)
 		dev_dbg(widget->dapm->dev, "router table [%d] = %d\n", i, abe->router[i]);
 
 	/* 2nd arg here is unused */
@@ -1545,7 +1546,7 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 	dev_set_drvdata(&pdev->dev, abe);
 
 	/* ZERO_labelID should really be 0 */
-	for (i = 0; i < 16; i++)
+	for (i = 0; i < ABE_ROUTES_UL + 2; i++)
 		abe->router[i] = ZERO_labelID;
 
 	pm_runtime_enable(&pdev->dev);
