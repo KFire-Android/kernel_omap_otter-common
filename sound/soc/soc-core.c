@@ -383,7 +383,6 @@ static int is_be_supported(struct snd_soc_pcm_runtime *rtd, const char *link)
 	int i;
 
 	for (i= 0; i < rtd->dai_link->num_be; i++) {
-	//	dev_dbg(&rtd->dev, "link: %s be %s\n", link, rtd->dai_link->supported_be[i]);
 		if(!strcmp(rtd->dai_link->supported_be[i], link))
 			return 1;
 	}
