@@ -106,6 +106,7 @@ struct omap_abe_data {
 	int be_active[NUM_ABE_BACKENDS][2];
 
 	struct clk *clk;
+	struct workqueue_struct *workqueue;
 
 	/* hwmod platform device */
 	struct platform_device *pdev;
@@ -470,7 +471,7 @@ static int omap_abe_dai_trigger(struct snd_pcm_substream *substream,
 	spin_unlock(&fe->lock);
 
 	/* perform the backend trigger work */
-	schedule_work(&fe->work);
+	queue_work(abe_data.workqueue, &fe->work);
 
 	return 0;
 }
@@ -1059,6 +1060,15 @@ static int omap_abe_dai_probe(struct snd_soc_dai *dai)
 	INIT_WORK(&abe_data.frontend[ABE_FRONTEND_DAI_MODEM][SNDRV_PCM_STREAM_PLAYBACK].work,
 		playback_work);
 
+	abe_data.workqueue = create_singlethread_workqueue("omap-abe");
+	if (abe_data.workqueue == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static int omap_abe_dai_remove(struct snd_soc_dai *dai)
+{
+	destroy_workqueue(abe_data.workqueue);
 	return 0;
 }
 
@@ -1066,6 +1076,7 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 	{	/* Multimedia Playback and Capture */
 		.name = "MultiMedia1",
 		.probe = omap_abe_dai_probe,
+		.remove = omap_abe_dai_remove,
 		.playback = {
 			.stream_name = "MultiMedia1 Playback",
 			.channels_min = 1,
