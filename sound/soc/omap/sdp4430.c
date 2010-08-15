@@ -438,9 +438,9 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 	},
 	{
 		.name = "SDP4430 MODEM",
-		.stream_name = "MODEM",
+		.stream_name = "Voice",
 
-		/* ABE components - MODEM  */
+		/* ABE components - MODEM <-> McBSP2 */
 		.cpu_dai_name = "MODEM",
 		.platform_name = "omap-dsp-audio",
 
