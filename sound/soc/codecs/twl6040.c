@@ -429,8 +429,6 @@ static void twl6040_pga_hs_work(struct work_struct *work)
 	struct twl6040_output *headset = &priv->headset;
 	int i, headset_complete;
 
-if (headset->ramp == TWL6040_RAMP_DOWN)
-	printk("start HS %lu\n", jiffies);
 	/* do we need to ramp at all ? */
 	if (headset->ramp == TWL6040_RAMP_NONE)
 		return;
@@ -453,10 +451,9 @@ if (headset->ramp == TWL6040_RAMP_DOWN)
 	}
 
 
-	if (headset->ramp == TWL6040_RAMP_DOWN) {
+	if (headset->ramp == TWL6040_RAMP_DOWN)
 		complete(&headset->ramp_done);
-		printk("complte HS %lu\n", jiffies);
-	}
+
 	headset->ramp = TWL6040_RAMP_NONE;
 }
 
