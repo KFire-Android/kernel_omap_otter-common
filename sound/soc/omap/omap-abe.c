@@ -99,6 +99,7 @@ struct abe_frontend_dai {
 	struct work_struct work;
 	int cmd;
 	struct snd_pcm_substream *substream;
+	struct snd_pcm_substream *modem_substream[2];
 };
 
 struct omap_abe_data {
@@ -295,16 +296,22 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 			abe_read_port_address(VIB_DL_PORT, &dma_params);
 		} else
 			return -EINVAL;
+		break;
+	/* MODEM is special case where data IO is performed by McBSP2
+	 * directly onto VX_DL and VX_UL (instead of SDMA).
+	 */
 	case ABE_FRONTEND_DAI_MODEM:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			dma_req = OMAP44XX_DMA_ABE_REQ_6;
-			abe_connect_cbpr_dmareq_port(VIB_DL_PORT, &format, ABE_CBPR6_IDX,
-					&dma_sink);
-			abe_read_port_address(VIB_DL_PORT, &dma_params);
+			/* Vx_DL connection to McBSP 2 ports */
+			format.f = 8000;
+			format.samp_format = STEREO_RSHIFTED_16;
+			abe_connect_serial_port(VX_DL_PORT, &format, MCBSP2_RX);
 		} else {
-
+			/* Vx_UL connection to McBSP 2 ports */
+			format.f = 8000;
+			format.samp_format = STEREO_RSHIFTED_16;
+			abe_connect_serial_port(VX_UL_PORT, &format, MCBSP2_TX);
 		}
-
         break;
 	}
 
@@ -327,7 +334,6 @@ static void abe_fe_shutdown(struct snd_pcm_substream *substream,
 	//				&dma_sink);
 }
 
-
 /* Frontend --> Backend ALSA PCM OPS */
 
 static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
@@ -341,6 +347,27 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 			rtd->dai_link->name, dai->id);
 
 	spin_lock(&fe->lock);
+
+	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
+		struct snd_soc_pcm_runtime *modem_rtd;
+		struct snd_soc_dai *dai;
+
+		fe->modem_substream[substream->stream] =
+				snd_soc_get_dai_substream(rtd->card,
+						OMAP_ABE_BE_MM_EXT1, substream->stream);
+		if (fe->modem_substream[substream->stream] == NULL) {
+			ret = -ENODEV;
+			goto err;
+		}
+
+		modem_rtd = fe->modem_substream[substream->stream]->private_data;
+		dai = modem_rtd->cpu_dai;
+		ret = snd_soc_dai_startup(fe->modem_substream[substream->stream],dai);
+		if (ret < 0) {
+			dev_err(&modem_rtd->dev, "failed to open DAI %d\n", ret);
+			goto err;
+		}
+	}
 
 	/* only startup backends that are either sinks or sources to this frontend DAI */
 	for (i = 0; i < rtd->num_be; i++) {
@@ -383,6 +410,7 @@ unwind:
 				rtd->be_rtd[i]->dai_link->be_id, i,
 				abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]);
 	}
+err:
 	spin_unlock(&fe->lock);
 	return ret;
 }
@@ -720,6 +748,7 @@ static void enable_fe_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 		if (stream == SNDRV_PCM_STREAM_CAPTURE)
 			abe_enable_data_transfer(MM_UL2_PORT);
 		break;
+	case ABE_FRONTEND_DAI_MODEM:
 	case ABE_FRONTEND_DAI_VOICE:
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			abe_enable_data_transfer(VX_DL_PORT);
@@ -815,6 +844,7 @@ static void disable_fe_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 		if (stream == SNDRV_PCM_STREAM_CAPTURE)
 			abe_disable_data_transfer(MM_UL2_PORT);
 		break;
+	case ABE_FRONTEND_DAI_MODEM:
 	case ABE_FRONTEND_DAI_VOICE:
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			abe_disable_data_transfer(VX_DL_PORT);
