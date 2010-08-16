@@ -251,7 +251,9 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 		fd_reg->fd = fd;
 		fd_reg->evt_ctx = eventfd_ctx_fdget(fd);
 		INIT_LIST_HEAD(&fd_reg->list);
+		spin_lock_irq(&obj->iovmm->iommu->event_lock);
 		list_add_tail(&fd_reg->list, &obj->iovmm->iommu->event_list);
+		spin_unlock_irq(&obj->iovmm->iommu->event_lock);
 		break;
 	}
 	case IOMMU_IOCEVENTUNREG:
@@ -266,6 +268,7 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 			goto err_user_buf;
 		}
 		/* Free DMM mapped memory resources */
+		spin_lock_irq(&obj->iovmm->iommu->event_lock);
 		list_for_each_entry_safe(fd_reg, temp_reg,
 				&obj->iovmm->iommu->event_list, list) {
 			if (fd_reg->fd == fd) {
@@ -273,6 +276,7 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 				kfree(fd_reg);
 			}
 		}
+		spin_unlock_irq(&obj->iovmm->iommu->event_lock);
 		break;
 	}
 	case IOVMM_IOCMEMFLUSH:

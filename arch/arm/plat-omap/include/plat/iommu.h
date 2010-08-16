@@ -52,6 +52,7 @@ struct iommu {
 
 	struct platform_device *pdev;
 	struct list_head event_list;
+	spinlock_t event_lock;
 };
 
 struct cr_regs {

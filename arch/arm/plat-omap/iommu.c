@@ -902,6 +902,7 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 	spin_lock_init(&obj->page_table_lock);
 	INIT_LIST_HEAD(&obj->mmap);
 
+	spin_lock_init(&obj->event_lock);
 	INIT_LIST_HEAD(&obj->event_list);
 
 	obj->regbase = pdata->io_base;
