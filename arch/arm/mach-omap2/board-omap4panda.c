@@ -69,6 +69,11 @@ struct platform_device *st_get_plat_device(void)
 EXPORT_SYMBOL(st_get_plat_device);
 
 #ifdef CONFIG_OMAP2_DSS_HDMI
+static struct platform_device sdp4430_hdmi_audio_device = {
+	.name		= "hdmi-dai",
+	.id		= -1,
+};
+
 static int panda_panel_enable_hdmi(struct omap_dss_device *dssdev)
 {
 	gpio_request(HDMI_GPIO_60 , "hdmi_gpio_60");
@@ -117,6 +122,7 @@ static struct omap_dss_board_info panda_dss_data = {
 };
 
 static struct platform_device *panda_devices[] __initdata = {
+	&sdp4430_hdmi_audio_device,
 	&wl127x_device
 };
 
