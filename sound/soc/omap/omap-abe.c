@@ -21,8 +21,6 @@
  *
  */
 
-#define DEBUG
-
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -99,7 +97,6 @@ struct abe_frontend_dai {
 	struct work_struct work;
 	int cmd;
 	struct snd_pcm_substream *substream;
-	struct snd_pcm_substream *modem_substream[2];
 };
 
 struct omap_abe_data {
@@ -111,6 +108,10 @@ struct omap_abe_data {
 
 	/* hwmod platform device */
 	struct platform_device *pdev;
+
+	/* MODEM FE*/
+	struct snd_pcm_substream *modem_substream[2];
+	struct snd_soc_dai *modem_dai;
 };
 
 static struct omap_abe_data abe_data = {
@@ -202,11 +203,29 @@ static inline int be_is_pending(struct snd_soc_pcm_runtime *be_rtd, int stream)
 	return abe_data.be_active[be_rtd->dai_link->be_id][stream] == 1 ? 1 : 0;
 }
 
+static int modem_get_dai(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_pcm_runtime *modem_rtd;
+
+	abe_data.modem_substream[substream->stream] =
+			snd_soc_get_dai_substream(rtd->card,
+					OMAP_ABE_BE_MM_EXT1, substream->stream);
+	if (abe_data.modem_substream[substream->stream] == NULL)
+		return -ENODEV;
+
+	modem_rtd = abe_data.modem_substream[substream->stream]->private_data;
+	abe_data.modem_dai = modem_rtd->cpu_dai;
+	return 0;
+}
+
 /* Frontend PCM Operations */
 
 static int abe_fe_startup(struct snd_pcm_substream *substream,
 			struct snd_soc_dai *dai)
 {
+	int ret = 0;
+
 	/* TODO: complete HW  pcm for backends */
 #if 0
 	snd_pcm_hw_constraint_list(substream->runtime, 0,
@@ -214,7 +233,23 @@ static int abe_fe_startup(struct snd_pcm_substream *substream,
 				priv->sysclk_constraints);
 #endif
 
-	return 0;
+	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
+
+		ret = modem_get_dai(substream);
+		if (ret < 0) {
+			dev_err(dai->dev, "failed to get MODEM DAI\n");
+			return ret;
+		}
+
+		ret = snd_soc_dai_startup(abe_data.modem_substream[substream->stream],
+				abe_data.modem_dai);
+		if (ret < 0) {
+			dev_err(abe_data.modem_dai->dev, "failed to open DAI %d\n", ret);
+			return ret;
+		}
+	}
+
+	return ret;
 }
 
 static int abe_fe_hw_params(struct snd_pcm_substream *substream,
@@ -224,7 +259,7 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 	abe_data_format_t format;
 	abe_dma_t dma_sink;
 	abe_dma_t dma_params;
-	int dma_req;
+	int dma_req, ret;
 
 	switch (params_channels(params)) {
 	case 1:
@@ -267,7 +302,6 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
         break;
 	case ABE_FRONTEND_DAI_VOICE:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-
 			dma_req = OMAP44XX_DMA_ABE_REQ_1;
 			abe_connect_cbpr_dmareq_port(VX_DL_PORT, &format, ABE_CBPR1_IDX,
 					&dma_sink);
@@ -297,20 +331,24 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 		} else
 			return -EINVAL;
 		break;
-	/* MODEM is special case where data IO is performed by McBSP2
-	 * directly onto VX_DL and VX_UL (instead of SDMA).
-	 */
 	case ABE_FRONTEND_DAI_MODEM:
+		/* MODEM is special case where data IO is performed by McBSP2
+		 * directly onto VX_DL and VX_UL (instead of SDMA).
+		 */
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			/* Vx_DL connection to McBSP 2 ports */
 			format.f = 8000;
 			format.samp_format = STEREO_RSHIFTED_16;
+			dma_req = OMAP44XX_DMA_ABE_REQ_1;
 			abe_connect_serial_port(VX_DL_PORT, &format, MCBSP2_RX);
+			abe_read_port_address(VX_DL_PORT, &dma_params);
 		} else {
 			/* Vx_UL connection to McBSP 2 ports */
 			format.f = 8000;
 			format.samp_format = STEREO_RSHIFTED_16;
+			dma_req = OMAP44XX_DMA_ABE_REQ_2;
 			abe_connect_serial_port(VX_UL_PORT, &format, MCBSP2_TX);
+			abe_read_port_address(VX_UL_PORT, &dma_params);
 		}
         break;
 	}
@@ -320,15 +358,81 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 	omap_abe_dai_dma_params[substream->stream].port_addr =
 					(unsigned long)dma_params.data;
 	omap_abe_dai_dma_params[substream->stream].packet_size = dma_params.iter;
+
+	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
+		/* call hw_params on McBSP with correct DMA data */
+		snd_soc_dai_set_dma_data(abe_data.modem_dai, substream,
+				&omap_abe_dai_dma_params[substream->stream]);
+
+		ret = snd_soc_dai_hw_params(abe_data.modem_substream[substream->stream],
+				params, abe_data.modem_dai);
+		if (ret < 0)
+			dev_err(abe_data.modem_dai->dev, "MODEM hw_params failed\n");
+		return ret;
+	}
+
 	snd_soc_dai_set_dma_data(dai, substream,
-		&omap_abe_dai_dma_params[substream->stream]);
+				&omap_abe_dai_dma_params[substream->stream]);
 
 	return 0;
+}
+
+static int abe_fe_prepare(struct snd_pcm_substream *substream,
+				  struct snd_soc_dai *dai)
+{
+	int ret = 0;
+
+	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
+		ret = snd_soc_dai_prepare(abe_data.modem_substream[substream->stream],
+				abe_data.modem_dai);
+		if (ret < 0) {
+			dev_err(abe_data.modem_dai->dev, "MODEM prepare failed\n");
+			return ret;
+		}
+	}
+	return ret;
+}
+
+static int abe_fe_trigger(struct snd_pcm_substream *substream,
+				  int cmd, struct snd_soc_dai *dai)
+{
+	int ret = 0;
+	//TODO: how do we sequence this with ABE ???
+	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
+		ret = snd_soc_dai_trigger(abe_data.modem_substream[substream->stream],
+				cmd, abe_data.modem_dai);
+		if (ret < 0) {
+			dev_err(abe_data.modem_dai->dev, "MODEM trigger failed\n");
+			return ret;
+		}
+	}
+	return ret;
+}
+
+static int abe_fe_hw_free(struct snd_pcm_substream *substream,
+				  struct snd_soc_dai *dai)
+{
+	int ret = 0;
+
+	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
+		ret = snd_soc_dai_hw_free(abe_data.modem_substream[substream->stream],
+				abe_data.modem_dai);
+		if (ret < 0) {
+			dev_err(abe_data.modem_dai->dev, "MODEM hw_free failed\n");
+			return ret;
+		}
+	}
+	return ret;
 }
 
 static void abe_fe_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
+
+	if (dai->id == ABE_FRONTEND_DAI_MODEM)
+		snd_soc_dai_startup(abe_data.modem_substream[substream->stream],
+				abe_data.modem_dai);
+
 	//TODO: Do we need to do reset this stuff i.e. :-
 	//abe_connect_cbpr_dmareq_port(VIB_DL_PORT, &format, ABE_CBPR6_IDX,
 	//				&dma_sink);
@@ -347,27 +451,6 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 			rtd->dai_link->name, dai->id);
 
 	spin_lock(&fe->lock);
-
-	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
-		struct snd_soc_pcm_runtime *modem_rtd;
-		struct snd_soc_dai *dai;
-
-		fe->modem_substream[substream->stream] =
-				snd_soc_get_dai_substream(rtd->card,
-						OMAP_ABE_BE_MM_EXT1, substream->stream);
-		if (fe->modem_substream[substream->stream] == NULL) {
-			ret = -ENODEV;
-			goto err;
-		}
-
-		modem_rtd = fe->modem_substream[substream->stream]->private_data;
-		dai = modem_rtd->cpu_dai;
-		ret = snd_soc_dai_startup(fe->modem_substream[substream->stream],dai);
-		if (ret < 0) {
-			dev_err(&modem_rtd->dev, "failed to open DAI %d\n", ret);
-			goto err;
-		}
-	}
 
 	/* only startup backends that are either sinks or sources to this frontend DAI */
 	for (i = 0; i < rtd->num_be; i++) {
@@ -410,7 +493,6 @@ unwind:
 				rtd->be_rtd[i]->dai_link->be_id, i,
 				abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]);
 	}
-err:
 	spin_unlock(&fe->lock);
 	return ret;
 }
@@ -490,8 +572,16 @@ static int omap_abe_dai_trigger(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct abe_frontend_dai *fe = &abe_data.frontend[dai->id][substream->stream];
+	int ret;
 
 	dev_dbg(dai->dev,"%s: frontend %s \n", __func__, rtd->dai_link->name);
+
+	/* call prepare on the frontend. TODO: do we handle MODEM as sequence */
+	ret = abe_fe_trigger(substream, cmd, dai);
+	if (ret < 0) {
+		dev_err(dai->dev,"%s: frontend trigger failed\n", __func__);
+		return ret;
+	}
 
 	spin_lock(&fe->lock);
 	fe->cmd = cmd;
@@ -525,6 +615,11 @@ static int omap_abe_dai_prepare(struct snd_pcm_substream *substream,
 		snd_soc_pcm_prepare(rtd->be_rtd[i]->pcm->streams[substream->stream].substream);
 	}
 
+	/* call prepare on the frontend */
+	ret = abe_fe_prepare(substream, dai);
+	if (ret < 0)
+		dev_err(dai->dev,"%s: frontend prepare failed\n", __func__);
+
 	return ret;
 }
 
@@ -535,6 +630,12 @@ static int omap_abe_dai_hw_free(struct snd_pcm_substream *substream,
 	int ret = 0, i;
 
 	dev_dbg(dai->dev,"%s: frontend %s \n", __func__, rtd->dai_link->name);
+
+	/* call hw_free on the frontend */
+	ret = abe_fe_hw_free(substream, dai);
+	if (ret < 0)
+		dev_err(dai->dev,"%s: frontend hw_free failed\n", __func__);
+
 	/* only hw_params backends that are either sinks or sources
 	 * to this frontend DAI */
 	for (i = 0; i < rtd->num_be; i++) {
