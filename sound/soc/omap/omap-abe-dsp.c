@@ -21,8 +21,6 @@
  *
  */
 
-//#define DEBUG
-
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -37,9 +35,11 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/dma-mapping.h>
 
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
+#include <plat/dma.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -60,7 +60,7 @@
 // TODO: make all these into virtual registers or similar - split out by type */
 #define ABE_NUM_MIXERS		22
 #define ABE_NUM_MUXES		12
-#define ABE_NUM_WIDGETS	42	/* TODO - refine this val */
+#define ABE_NUM_WIDGETS	44	/* TODO - refine this val */
 #define ABE_NUM_DAPM_REG		\
 	(ABE_NUM_MIXERS + ABE_NUM_MUXES + ABE_NUM_WIDGETS)
 #define ABE_WIDGET_START	(ABE_NUM_MIXERS + ABE_NUM_MUXES)
@@ -84,6 +84,22 @@
 #define ABE_OPP_100		2
 
 #define ABE_ROUTES_UL		14
+
+/* TODO: fine tune for MODEM */
+static const struct snd_pcm_hardware omap_abe_hardware = {
+	.info			= SNDRV_PCM_INFO_MMAP |
+				  SNDRV_PCM_INFO_MMAP_VALID |
+				  SNDRV_PCM_INFO_INTERLEAVED |
+				  SNDRV_PCM_INFO_PAUSE |
+				  SNDRV_PCM_INFO_RESUME,
+	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
+				  SNDRV_PCM_FMTBIT_S32_LE,
+	.period_bytes_min	= 32,
+	.period_bytes_max	= 64 * 1024,
+	.periods_min		= 2,
+	.periods_max		= 255,
+	.buffer_bytes_max	= 128 * 1024,
+};
 
 /*
  * ABE driver
@@ -160,8 +176,8 @@ static int abe_dsp_write(struct snd_soc_platform *platform, unsigned int reg,
 	struct abe_data *priv = snd_soc_platform_get_drvdata(platform);
 	priv->dapm[reg] = val;
 
-	dev_dbg(platform->dev, "fe: %d widget %d %s\n", abe->fe_id,
-			reg - ABE_WIDGET_START, val ? "on" : "off");
+	//dev_dbg(platform->dev, "fe: %d widget %d %s\n", abe->fe_id,
+	//		reg - ABE_WIDGET_START, val ? "on" : "off");
 	return 0;
 }
 
@@ -968,83 +984,87 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			ABE_WIDGET(5), ABE_OPP_25, 0),
 	SND_SOC_DAPM_AIF_IN("VIB_DL", "Vibra Playback", 0,
 			ABE_WIDGET(6), ABE_OPP_100, 0),
+	SND_SOC_DAPM_AIF_IN("MODEM_DL", "MODEM Playback", 0,
+			ABE_WIDGET(7), ABE_OPP_50, 0),
+	SND_SOC_DAPM_AIF_OUT("MODEM_UL", "MODEM Capture", 0,
+			ABE_WIDGET(8), ABE_OPP_50, 0),
 
 	/* Backend DAIs  */
 	// FIXME: must match BE order in abe_dai.h
 	SND_SOC_DAPM_AIF_IN("PDM_UL1", "Analog Capture", 0,
-			ABE_WIDGET(7), ABE_OPP_50, 0),
+			ABE_WIDGET(9), ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_OUT("PDM_DL1", "HS Playback", 0,
-			ABE_WIDGET(8), ABE_OPP_25, 0),
+			ABE_WIDGET(10), ABE_OPP_25, 0),
 	SND_SOC_DAPM_AIF_OUT("PDM_DL2", "HF Playback", 0,
-			ABE_WIDGET(9), ABE_OPP_100, 0),
+			ABE_WIDGET(11), ABE_OPP_100, 0),
 	SND_SOC_DAPM_AIF_OUT("PDM_VIB", "Vibra Playback", 0,
-			ABE_WIDGET(10), ABE_OPP_100, 0),
+			ABE_WIDGET(12), ABE_OPP_100, 0),
 	SND_SOC_DAPM_AIF_IN("BT_VX_UL", "BT Capture", 0,
-			ABE_WIDGET(11), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_OUT("BT_VX_DL", "BT Playback", 0,
-			ABE_WIDGET(12), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_IN("MM_EXT_UL", "FM Capture", 0,
 			ABE_WIDGET(13), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_OUT("MM_EXT_DL", "FM Playback", 0,
-			ABE_WIDGET(14), ABE_OPP_25, 0),
-	SND_SOC_DAPM_AIF_IN("DMIC0", "DMIC0 Capture", 0,
+	SND_SOC_DAPM_AIF_OUT("BT_VX_DL", "BT Playback", 0,
+			ABE_WIDGET(14), ABE_OPP_50, 0),
+	SND_SOC_DAPM_AIF_IN("MM_EXT_UL", "FM Capture", 0,
 			ABE_WIDGET(15), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_IN("DMIC1", "DMIC1 Capture", 0,
-			ABE_WIDGET(16), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_IN("DMIC2", "DMIC2 Capture", 0,
+	SND_SOC_DAPM_AIF_OUT("MM_EXT_DL", "FM Playback", 0,
+			ABE_WIDGET(16), ABE_OPP_25, 0),
+	SND_SOC_DAPM_AIF_IN("DMIC0", "DMIC0 Capture", 0,
 			ABE_WIDGET(17), ABE_OPP_50, 0),
+	SND_SOC_DAPM_AIF_IN("DMIC1", "DMIC1 Capture", 0,
+			ABE_WIDGET(18), ABE_OPP_50, 0),
+	SND_SOC_DAPM_AIF_IN("DMIC2", "DMIC2 Capture", 0,
+			ABE_WIDGET(19), ABE_OPP_50, 0),
 
 	/* ROUTE_UL Capture Muxes */
 	SND_SOC_DAPM_MUX("MUX_UL00",
-			ABE_WIDGET(18), ABE_OPP_50, 0, &mm_ul00_control),
+			ABE_WIDGET(20), ABE_OPP_50, 0, &mm_ul00_control),
 	SND_SOC_DAPM_MUX("MUX_UL01",
-			ABE_WIDGET(19), ABE_OPP_50, 0, &mm_ul01_control),
+			ABE_WIDGET(21), ABE_OPP_50, 0, &mm_ul01_control),
 	SND_SOC_DAPM_MUX("MUX_UL02",
-			ABE_WIDGET(20), ABE_OPP_50, 0, &mm_ul02_control),
+			ABE_WIDGET(22), ABE_OPP_50, 0, &mm_ul02_control),
 	SND_SOC_DAPM_MUX("MUX_UL03",
-			ABE_WIDGET(21), ABE_OPP_50, 0, &mm_ul03_control),
+			ABE_WIDGET(23), ABE_OPP_50, 0, &mm_ul03_control),
 	SND_SOC_DAPM_MUX("MUX_UL04",
-			ABE_WIDGET(22), ABE_OPP_50, 0, &mm_ul04_control),
+			ABE_WIDGET(24), ABE_OPP_50, 0, &mm_ul04_control),
 	SND_SOC_DAPM_MUX("MUX_UL05",
-			ABE_WIDGET(23), ABE_OPP_50, 0, &mm_ul05_control),
+			ABE_WIDGET(25), ABE_OPP_50, 0, &mm_ul05_control),
 	SND_SOC_DAPM_MUX("MUX_UL06",
-			ABE_WIDGET(24), ABE_OPP_50, 0, &mm_ul06_control),
+			ABE_WIDGET(26), ABE_OPP_50, 0, &mm_ul06_control),
 	SND_SOC_DAPM_MUX("MUX_UL07",
-			ABE_WIDGET(25), ABE_OPP_50, 0, &mm_ul07_control),
+			ABE_WIDGET(27), ABE_OPP_50, 0, &mm_ul07_control),
 	SND_SOC_DAPM_MUX("MUX_UL10",
-			ABE_WIDGET(26), ABE_OPP_50, 0, &mm_ul10_control),
+			ABE_WIDGET(28), ABE_OPP_50, 0, &mm_ul10_control),
 	SND_SOC_DAPM_MUX("MUX_UL11",
-			ABE_WIDGET(27), ABE_OPP_50, 0, &mm_ul11_control),
+			ABE_WIDGET(29), ABE_OPP_50, 0, &mm_ul11_control),
 	SND_SOC_DAPM_MUX("MUX_VX0",
-			ABE_WIDGET(28), ABE_OPP_50, 0, &mm_vx0_control),
+			ABE_WIDGET(30), ABE_OPP_50, 0, &mm_vx0_control),
 	SND_SOC_DAPM_MUX("MUX_VX1",
-			ABE_WIDGET(29), ABE_OPP_50, 0, &mm_vx1_control),
+			ABE_WIDGET(31), ABE_OPP_50, 0, &mm_vx1_control),
 
 	/* DL1 & DL2 Playback Mixers */
 	SND_SOC_DAPM_MIXER("DL1 Mixer",
-			ABE_WIDGET(30), ABE_OPP_25, 0, dl1_mixer_controls,
+			ABE_WIDGET(32), ABE_OPP_25, 0, dl1_mixer_controls,
 			ARRAY_SIZE(dl1_mixer_controls)),
 	SND_SOC_DAPM_MIXER("DL2 Mixer",
-			ABE_WIDGET(31), ABE_OPP_100, 0, dl2_mixer_controls,
+			ABE_WIDGET(33), ABE_OPP_100, 0, dl2_mixer_controls,
 			ARRAY_SIZE(dl2_mixer_controls)),
 
 	/* DL1 Mixer Input volumes ?????*/
 	SND_SOC_DAPM_PGA("DL1 Media Volume",
-			ABE_WIDGET(32), 0, 0, NULL, 0),
+			ABE_WIDGET(34), 0, 0, NULL, 0),
 
 	/* AUDIO_UL_MIXER */
 	SND_SOC_DAPM_MIXER("Voice Capture Mixer",
-			ABE_WIDGET(33), ABE_OPP_50, 0, audio_ul_mixer_controls,
+			ABE_WIDGET(35), ABE_OPP_50, 0, audio_ul_mixer_controls,
 			ARRAY_SIZE(audio_ul_mixer_controls)),
 
 	/* VX_REC_MIXER */
 	SND_SOC_DAPM_MIXER("Capture Mixer",
-			ABE_WIDGET(34), ABE_OPP_50, 0, vx_rec_mixer_controls,
+			ABE_WIDGET(36), ABE_OPP_50, 0, vx_rec_mixer_controls,
 			ARRAY_SIZE(vx_rec_mixer_controls)),
 
 	/* SDT_MIXER  - TODO: shoult this not be OPP25 ??? */
 	SND_SOC_DAPM_MIXER("Sidetone Mixer",
-			ABE_WIDGET(35), ABE_OPP_50, 0, sdt_mixer_controls,
+			ABE_WIDGET(37), ABE_OPP_50, 0, sdt_mixer_controls,
 			ARRAY_SIZE(sdt_mixer_controls)),
 
 	/*
@@ -1054,15 +1074,15 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 
 	/* Virtual PDM_DL1 Switch */
 	SND_SOC_DAPM_MIXER("DL1 PDM",
-			ABE_WIDGET(36), ABE_OPP_25, 0, &pdm_dl1_switch_controls, 1),
+			ABE_WIDGET(38), ABE_OPP_25, 0, &pdm_dl1_switch_controls, 1),
 
 	/* Virtual BT_VX_DL Switch */
 	SND_SOC_DAPM_MIXER("DL1 BT_VX",
-			ABE_WIDGET(37), ABE_OPP_50, 0, &bt_vx_dl_switch_controls, 1),
+			ABE_WIDGET(39), ABE_OPP_50, 0, &bt_vx_dl_switch_controls, 1),
 
 	/* Virtual MM_EXT_DL Switch TODO: confrm OPP level here */
 	SND_SOC_DAPM_MIXER("DL1 MM_EXT",
-			ABE_WIDGET(38), ABE_OPP_50, 0, &mm_ext_dl_switch_controls, 1),
+			ABE_WIDGET(40), ABE_OPP_50, 0, &mm_ext_dl_switch_controls, 1),
 
 	/*
 	 * The Following three are virtual switches to select the input port
@@ -1071,15 +1091,15 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 
 	/* Virtual MM_EXT_UL Switch */
 	SND_SOC_DAPM_MIXER("AMIC_UL MM_EXT",
-			ABE_WIDGET(39), ABE_OPP_50, 0, &mm_ext_ul_switch_controls, 1),
+			ABE_WIDGET(41), ABE_OPP_50, 0, &mm_ext_ul_switch_controls, 1),
 
 	/* Virtual PDM_UL1 Switch */
 	SND_SOC_DAPM_MIXER("AMIC_UL PDM",
-			ABE_WIDGET(40), ABE_OPP_50, 0, &pdm_ul1_switch_controls, 1),
+			ABE_WIDGET(42), ABE_OPP_50, 0, &pdm_ul1_switch_controls, 1),
 
 	/* Virtual DL2 -> MM_EXT Switch */
 	SND_SOC_DAPM_MIXER("MM_EXT DL2",
-			ABE_WIDGET(41), ABE_OPP_50, 0, &mm_ext_dl2_switch_controls, 1),
+			ABE_WIDGET(43), ABE_OPP_50, 0, &mm_ext_dl2_switch_controls, 1),
 
 	/* Virtual to join MM_EXT and PDM+UL1 switches */
 	SND_SOC_DAPM_MIXER("AMIC_UL", SND_SOC_NOPM, 0, 0, NULL, 0),
@@ -1089,6 +1109,10 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	SND_SOC_DAPM_MIXER("Voice Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("DL1 Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("DL2 Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
+
+	/* Virtual MODEM and VX_UL mixer */
+	SND_SOC_DAPM_MIXER("VX UL VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
+	SND_SOC_DAPM_MIXER("VX DL VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 
 	/* Virtual Pins to force backends ON atm */
 	SND_SOC_DAPM_OUTPUT("BE_OUT"),
@@ -1104,8 +1128,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL00", "DMic1R", "DMIC1"},
 	{"MUX_UL00", "DMic2L", "DMIC2"},
 	{"MUX_UL00", "DMic2R", "DMIC2"},
-	{"MUX_UL00", "BT Left", "VX_UL"},
-	{"MUX_UL00", "BT Right", "VX_UL"},
+	{"MUX_UL00", "BT Left", "VX UL VMixer"},
+	{"MUX_UL00", "BT Right", "VX UL VMixer"},
 	{"MUX_UL00", "AMic0", "AMIC_UL"},
 	{"MUX_UL00", "AMic1", "AMIC_UL"},
 	{"MUX_UL00", "VX Left", "Capture Mixer"},
@@ -1119,8 +1143,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL01", "DMic1R", "DMIC1"},
 	{"MUX_UL01", "DMic2L", "DMIC2"},
 	{"MUX_UL01", "DMic2R", "DMIC2"},
-	{"MUX_UL01", "BT Left", "VX_UL"},
-	{"MUX_UL01", "BT Right", "VX_UL"},
+	{"MUX_UL01", "BT Left", "VX UL VMixer"},
+	{"MUX_UL01", "BT Right", "VX UL VMixer"},
 	{"MUX_UL01", "AMic0", "AMIC_UL"},
 	{"MUX_UL01", "AMic1", "AMIC_UL"},
 	{"MUX_UL01", "VX Left", "Capture Mixer"},
@@ -1134,8 +1158,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL02", "DMic1R", "DMIC1"},
 	{"MUX_UL02", "DMic2L", "DMIC2"},
 	{"MUX_UL02", "DMic2R", "DMIC2"},
-	{"MUX_UL02", "BT Left", "VX_UL"},
-	{"MUX_UL02", "BT Right", "VX_UL"},
+	{"MUX_UL02", "BT Left", "VX UL VMixer"},
+	{"MUX_UL02", "BT Right", "VX UL VMixer"},
 	{"MUX_UL02", "AMic0", "AMIC_UL"},
 	{"MUX_UL02", "AMic1", "AMIC_UL"},
 	{"MUX_UL02", "VX Left", "Capture Mixer"},
@@ -1149,8 +1173,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL03", "DMic1R", "DMIC1"},
 	{"MUX_UL03", "DMic2L", "DMIC2"},
 	{"MUX_UL03", "DMic2R", "DMIC2"},
-	{"MUX_UL03", "BT Left", "VX_UL"},
-	{"MUX_UL03", "BT Right", "VX_UL"},
+	{"MUX_UL03", "BT Left", "VX UL VMixer"},
+	{"MUX_UL03", "BT Right", "VX UL VMixer"},
 	{"MUX_UL03", "AMic0", "AMIC_UL"},
 	{"MUX_UL03", "AMic1", "AMIC_UL"},
 	{"MUX_UL03", "VX Left", "Capture Mixer"},
@@ -1164,8 +1188,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL04", "DMic1R", "DMIC1"},
 	{"MUX_UL04", "DMic2L", "DMIC2"},
 	{"MUX_UL04", "DMic2R", "DMIC2"},
-	{"MUX_UL04", "BT Left", "VX_UL"},
-	{"MUX_UL04", "BT Right", "VX_UL"},
+	{"MUX_UL04", "BT Left", "VX UL VMixer"},
+	{"MUX_UL04", "BT Right", "VX UL VMixer"},
 	{"MUX_UL04", "AMic0", "AMIC_UL"},
 	{"MUX_UL04", "AMic1", "AMIC_UL"},
 	{"MUX_UL04", "VX Left", "Capture Mixer"},
@@ -1179,8 +1203,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL05", "DMic1R", "DMIC1"},
 	{"MUX_UL05", "DMic2L", "DMIC2"},
 	{"MUX_UL05", "DMic2R", "DMIC2"},
-	{"MUX_UL05", "BT Left", "VX_UL"},
-	{"MUX_UL05", "BT Right", "VX_UL"},
+	{"MUX_UL05", "BT Left", "VX UL VMixer"},
+	{"MUX_UL05", "BT Right", "VX UL VMixer"},
 	{"MUX_UL05", "AMic0", "AMIC_UL"},
 	{"MUX_UL05", "AMic1", "AMIC_UL"},
 	{"MUX_UL05", "VX Left", "Capture Mixer"},
@@ -1194,8 +1218,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL06", "DMic1R", "DMIC1"},
 	{"MUX_UL06", "DMic2L", "DMIC2"},
 	{"MUX_UL06", "DMic2R", "DMIC2"},
-	{"MUX_UL06", "BT Left", "VX_UL"},
-	{"MUX_UL06", "BT Right", "VX_UL"},
+	{"MUX_UL06", "BT Left", "VX UL VMixer"},
+	{"MUX_UL06", "BT Right", "VX UL VMixer"},
 	{"MUX_UL06", "AMic0", "AMIC_UL"},
 	{"MUX_UL06", "AMic1", "AMIC_UL"},
 	{"MUX_UL06", "VX Left", "Capture Mixer"},
@@ -1209,8 +1233,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL07", "DMic1R", "DMIC1"},
 	{"MUX_UL07", "DMic2L", "DMIC2"},
 	{"MUX_UL07", "DMic2R", "DMIC2"},
-	{"MUX_UL07", "BT Left", "VX_UL"},
-	{"MUX_UL07", "BT Right", "VX_UL"},
+	{"MUX_UL07", "BT Left", "VX UL VMixer"},
+	{"MUX_UL07", "BT Right", "VX UL VMixer"},
 	{"MUX_UL07", "AMic0", "AMIC_UL"},
 	{"MUX_UL07", "AMic1", "AMIC_UL"},
 	{"MUX_UL07", "VX Left", "Capture Mixer"},
@@ -1224,8 +1248,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL10", "DMic1R", "DMIC1"},
 	{"MUX_UL10", "DMic2L", "DMIC2"},
 	{"MUX_UL10", "DMic2R", "DMIC2"},
-	{"MUX_UL10", "BT Left", "VX_UL"},
-	{"MUX_UL10", "BT Right", "VX_UL"},
+	{"MUX_UL10", "BT Left", "VX UL VMixer"},
+	{"MUX_UL10", "BT Right", "VX UL VMixer"},
 	{"MUX_UL10", "AMic0", "AMIC_UL"},
 	{"MUX_UL10", "AMic1", "AMIC_UL"},
 	{"MUX_UL10", "VX Left", "Capture Mixer"},
@@ -1239,8 +1263,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL11", "DMic1R", "DMIC1"},
 	{"MUX_UL11", "DMic2L", "DMIC2"},
 	{"MUX_UL11", "DMic2R", "DMIC2"},
-	{"MUX_UL11", "BT Left", "VX_UL"},
-	{"MUX_UL11", "BT Right", "VX_UL"},
+	{"MUX_UL11", "BT Left", "VX UL VMixer"},
+	{"MUX_UL11", "BT Right", "VX UL VMixer"},
 	{"MUX_UL11", "AMic0", "AMIC_UL"},
 	{"MUX_UL11", "AMic1", "AMIC_UL"},
 	{"MUX_UL11", "VX Left", "Capture Mixer"},
@@ -1254,8 +1278,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_VX0", "DMic1R", "DMIC1"},
 	{"MUX_VX0", "DMic2L", "DMIC2"},
 	{"MUX_VX0", "DMic2R", "DMIC2"},
-	{"MUX_VX0", "BT Left", "VX_UL"},
-	{"MUX_VX0", "BT Right", "VX_UL"},
+	{"MUX_VX0", "BT Left", "VX UL VMixer"},
+	{"MUX_VX0", "BT Right", "VX UL VMixer"},
 	{"MUX_VX0", "AMic0", "AMIC_UL"},
 	{"MUX_VX0", "AMic1", "AMIC_UL"},
 	{"MUX_VX0", "VX Left", "Capture Mixer"},
@@ -1268,8 +1292,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_VX1", "DMic1R", "DMIC1"},
 	{"MUX_VX1", "DMic2L", "DMIC2"},
 	{"MUX_VX1", "DMic2R", "DMIC2"},
-	{"MUX_VX1", "BT Left", "VX_UL"},
-	{"MUX_VX1", "BT Right", "VX_UL"},
+	{"MUX_VX1", "BT Left", "VX UL VMixer"},
+	{"MUX_VX1", "BT Right", "VX UL VMixer"},
 	{"MUX_VX1", "AMic0", "AMIC_UL"},
 	{"MUX_VX1", "AMic1", "AMIC_UL"},
 	{"MUX_VX1", "VX Left", "Capture Mixer"},
@@ -1283,7 +1307,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 	/* Headset (DL1)  playback path */
 	{"DL1 Mixer", "Tones", "TONES_DL"},
-	{"DL1 Mixer", "Voice", "VX_DL"},
+	{"DL1 Mixer", "Voice", "VX DL VMixer"},
 	{"DL1 Mixer", "Capture", "DL1 Capture VMixer"},
 	{"DL1 Capture VMixer", NULL, "MUX_UL10"},
 	{"DL1 Capture VMixer", NULL, "MUX_UL11"},
@@ -1305,7 +1329,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 	/* Handsfree (DL2) playback path */
 	{"DL2 Mixer", "Tones", "TONES_DL"},
-	{"DL2 Mixer", "Voice", "VX_DL"},
+	{"DL2 Mixer", "Voice", "VX DL VMixer"},
 	{"DL2 Mixer", "Capture", "DL2 Capture VMixer"},
 	{"DL2 Capture VMixer", NULL, "MUX_UL10"},
 	{"DL2 Capture VMixer", NULL, "MUX_UL11"},
@@ -1318,8 +1342,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 	/* VxREC Mixer */
 	{"Capture Mixer", "Tones", "TONES_DL"},
-	{"Capture Mixer", "Voice Playback", "VX_DL"},
-	{"Capture Mixer", "Voice Capture", "VX_UL"},
+	{"Capture Mixer", "Voice Playback", "VX DL VMixer"},
+	{"Capture Mixer", "Voice Capture", "VX UL VMixer"},
 	{"Capture Mixer", "Media Playback", "MM_DL"},
 
 	/* Audio UL mixer */
@@ -1328,10 +1352,16 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"Voice Capture Mixer", "Capture", "Voice Capture VMixer"},
 	{"Voice Capture VMixer", NULL, "MUX_VX0"},
 	{"Voice Capture VMixer", NULL, "MUX_VX1"},
-	{"VX_UL", NULL, "Voice Capture Mixer"},
+	{"VX UL VMixer", NULL, "Voice Capture Mixer"},
 
 	/* Vibra */
 	{"PDM_VIB", NULL, "VIB_DL"},
+
+	/* VX and MODEM */
+	{"VX_UL", NULL, "VX UL VMixer"},
+	{"MODEM_UL", NULL, "VX UL VMixer"},
+	{"VX DL VMixer", NULL, "VX_DL"},
+	{"VX DL VMixer", NULL, "MODEM_DL"},
 
 	/* Backend Enablement - TODO: maybe re-work*/
 	{"BE_OUT", NULL, "PDM_DL1"},
@@ -1383,6 +1413,9 @@ static int aess_open(struct snd_pcm_substream *substream)
 	mutex_lock(&abe->mutex);
 
 	abe->fe_id = dai->id;
+	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
+
+//	snd_soc_set_runtime_hwparams(substream, &omap_abe_hardware);
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
@@ -1415,9 +1448,27 @@ static int aess_open(struct snd_pcm_substream *substream)
 			snd_soc_dapm_stream_event(rtd, "Vibra Playback",
 					SND_SOC_DAPM_STREAM_START);
 		break;
+	case ABE_FRONTEND_DAI_MODEM:
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_soc_dapm_stream_event(rtd, "MODEM Playback",
+					SND_SOC_DAPM_STREAM_START);
+		else
+			snd_soc_dapm_stream_event(rtd, "MODEM Capture",
+					SND_SOC_DAPM_STREAM_START);
+		break;
 	}
 
 	mutex_unlock(&abe->mutex);
+	return 0;
+}
+
+static int aess_hw_params(struct snd_pcm_substream *substream,
+	struct snd_pcm_hw_params *params)
+{
+//	struct snd_pcm_runtime *runtime = substream->runtime;
+
+//	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+//	runtime->dma_bytes = params_buffer_bytes(params);
 	return 0;
 }
 
@@ -1428,9 +1479,11 @@ static int aess_prepare(struct snd_pcm_substream *substream)
 
 	mutex_lock(&abe->mutex);
 
+	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, rtd->cpu_dai->id);
+
 	/* now calculate OPP level based upon DAPM widget status */
 	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++) {
-		dev_dbg(&rtd->dev, "opp w %d val 0x%x\n", i, abe->dapm[i]);
+	//	dev_dbg(&rtd->dev, "opp w %d val 0x%x\n", i, abe->dapm[i]);
 		opp |= abe->dapm[i];
 	}
 
@@ -1463,6 +1516,7 @@ static int aess_close(struct snd_pcm_substream *substream)
 	mutex_lock(&abe->mutex);
 
 	abe->fe_id = dai->id;
+	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
@@ -1495,11 +1549,19 @@ static int aess_close(struct snd_pcm_substream *substream)
 			snd_soc_dapm_stream_event(rtd, "Vibra Playback",
 					SND_SOC_DAPM_STREAM_STOP);
 		break;
+	case ABE_FRONTEND_DAI_MODEM:
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_soc_dapm_stream_event(rtd, "MODEM Playback",
+					SND_SOC_DAPM_STREAM_STOP);
+		else
+			snd_soc_dapm_stream_event(rtd, "MODEM Capture",
+					SND_SOC_DAPM_STREAM_STOP);
+		break;
 	}
 
 	/* now calculate OPP level based upon DAPM widget status */
 	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++) {
-		dev_dbg(&rtd->dev, "opp w %d val 0x%x\n", i, abe->dapm[i]);
+	//	dev_dbg(&rtd->dev, "opp w %d val 0x%x\n", i, abe->dapm[i]);
 		opp |= abe->dapm[i];
 	}
 	opp = (1 << (fls(opp) - 1)) * 25;
@@ -1518,20 +1580,97 @@ static int aess_close(struct snd_pcm_substream *substream)
 		break;
 	}
 
+//	snd_pcm_set_runtime_buffer(substream, NULL);
+
 	mutex_unlock(&abe->mutex);
 	return 0;
 }
 
 static struct snd_pcm_ops omap_aess_pcm_ops = {
 	.open = aess_open,
+	.hw_params	= aess_hw_params,
 	.prepare	= aess_prepare,
 	.close	= aess_close,
 };
+
+#if 0
+static u64 omap_pcm_dmamask = DMA_BIT_MASK(64);
+
+static int omap_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
+	int stream)
+{
+	struct snd_pcm_substream *substream = pcm->streams[stream].substream;
+	struct snd_dma_buffer *buf = &substream->dma_buffer;
+	size_t size = omap_abe_hardware.buffer_bytes_max;
+
+	buf->dev.type = SNDRV_DMA_TYPE_DEV;
+	buf->dev.dev = pcm->card->dev;
+	buf->private_data = NULL;
+	buf->area = dma_alloc_writecombine(pcm->card->dev, size,
+					   &buf->addr, GFP_KERNEL);
+	if (!buf->area)
+		return -ENOMEM;
+
+	buf->bytes = size;
+	return 0;
+}
+
+static void omap_pcm_free_dma_buffers(struct snd_pcm *pcm)
+{
+	struct snd_pcm_substream *substream;
+	struct snd_dma_buffer *buf;
+	int stream;
+
+	for (stream = 0; stream < 2; stream++) {
+		substream = pcm->streams[stream].substream;
+		if (!substream)
+			continue;
+
+		buf = &substream->dma_buffer;
+		if (!buf->area)
+			continue;
+
+		dma_free_writecombine(pcm->card->dev, buf->bytes,
+				      buf->area, buf->addr);
+		buf->area = NULL;
+	}
+}
+
+static int omap_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
+		 struct snd_pcm *pcm)
+{
+	int ret = 0;
+
+	if (!card->dev->dma_mask)
+		card->dev->dma_mask = &omap_pcm_dmamask;
+	if (!card->dev->coherent_dma_mask)
+		card->dev->coherent_dma_mask = DMA_BIT_MASK(64);
+
+	if (dai->driver->playback.channels_min) {
+		ret = omap_pcm_preallocate_dma_buffer(pcm,
+			SNDRV_PCM_STREAM_PLAYBACK);
+		if (ret)
+			goto out;
+	}
+
+	if (dai->driver->capture.channels_min) {
+		ret = omap_pcm_preallocate_dma_buffer(pcm,
+			SNDRV_PCM_STREAM_CAPTURE);
+		if (ret)
+			goto out;
+	}
+
+out:
+	return ret;
+}
+#endif
 
 static struct snd_soc_platform_driver omap_aess_platform = {
 	.ops	= &omap_aess_pcm_ops,
 	.probe = abe_probe,
 	.remove = abe_remove,
+	//.pcm_new	= omap_pcm_new,
+	//.pcm_free	= omap_pcm_free_dma_buffers,
 	.read = abe_dsp_read,
 	.write = abe_dsp_write,
 };
