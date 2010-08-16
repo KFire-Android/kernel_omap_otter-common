@@ -139,6 +139,7 @@ static void __init omap4_display_init(void)
 
 static struct platform_device *panda_devices[] __initdata = {
 	&wl127x_device,
+	&sdp4430_hdmi_audio_device,
 };
 
 static void __init omap4_display_init(void) {}
