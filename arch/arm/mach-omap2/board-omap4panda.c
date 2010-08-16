@@ -503,8 +503,9 @@ static void __init omap_panda_init(void)
 	usb_nop_xceiv_register();
 	usb_musb_init(&musb_board_data);
 	omap4_ehci_init();
+#ifdef CONFIG_OMAP2_DSS_HDMI
 	omap_display_init(&panda_dss_data);
-
+#endif
 }
 
 static void __init omap_panda_map_io(void)
