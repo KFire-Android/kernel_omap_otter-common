@@ -55,11 +55,12 @@ static struct {
 	struct regulator *vdda_dac_reg;
 	struct omap_dss_board_info *pdata;
 } core;
-
+#ifdef HWMOD
 static void dss_clk_enable_all_no_ctx(void);
 static void dss_clk_disable_all_no_ctx(void);
 static void dss_clk_enable_no_ctx(enum dss_clock clks);
 static void dss_clk_disable_no_ctx(enum dss_clock clks);
+#endif
 
 static char *def_disp_name;
 module_param_named(def_disp, def_disp_name, charp, 0);
@@ -350,26 +351,6 @@ static void dss_put_clocks(void)
 {
 	return;
 }
-
-static void dss_clk_enable_no_ctx(enum dss_clock clks)
-{
-	return;
-}
-
-static void dss_clk_disable_no_ctx(enum dss_clock clks)
-{
-	return;
-}
-
-static void dss_clk_enable_all_no_ctx()
-{
-	return;
-}
-
-static void dss_clk_disable_all_no_ctx()
-{
-	return;
-}
 #endif
 
 /* REGULATORS */
@@ -631,11 +612,11 @@ static int omap_dss_probe(struct platform_device *pdev)
 err_register:
 	dss_uninitialize_debugfs();
 err_debugfs:
+#ifdef HWMOD
 #ifdef CONFIG_OMAP2_DSS_HDMI
 	hdmi_exit();
 err_hdmi:
 #endif
-#ifdef HWMOD
 	if (cpu_is_omap44xx())
 		dsi2_exit();
 err_dsi2:
