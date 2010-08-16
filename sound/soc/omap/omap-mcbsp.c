@@ -207,6 +207,7 @@ static void omap_mcbsp_set_threshold(struct snd_pcm_substream *substream)
 		omap_mcbsp_set_rx_threshold(mcbsp_data->bus_id, words);
 }
 
+#if 0
 static int omap_mcbsp_hwrule_min_buffersize(struct snd_pcm_hw_params *params,
 				    struct snd_pcm_hw_rule *rule)
 {
@@ -225,6 +226,7 @@ static int omap_mcbsp_hwrule_min_buffersize(struct snd_pcm_hw_params *params,
 	frames.integer = 1;
 	return snd_interval_refine(buffer_size, &frames);
 }
+#endif
 
 static int omap_mcbsp_dai_startup(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *cpu_dai)

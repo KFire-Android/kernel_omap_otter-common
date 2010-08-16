@@ -679,8 +679,10 @@ exit:
 static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 {
 	struct omap_mcpdm *mcpdm = platform_get_drvdata(pdev);
-	struct omap_mcpdm_platform_data *pdata = pdev->dev.platform_data;
+	struct omap_mcpdm_platform_data *pdata;
 	struct resource *res;
+
+	pdata = pdev->dev.platform_data;
 
 	snd_soc_unregister_dai(&pdev->dev);
 
