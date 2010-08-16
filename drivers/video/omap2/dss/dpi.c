@@ -116,8 +116,8 @@ static int dpi_set_dispc_clk(enum omap_channel channel, bool is_tft,
 static int dpi_set_mode(struct omap_dss_device *dssdev)
 {
 	struct omap_video_timings *t = &dssdev->panel.timings;
-	int lck_div, pck_div;
-	unsigned long fck;
+	int lck_div = 0, pck_div = 0;
+	unsigned long fck = 0;
 	unsigned long pck;
 	bool is_tft;
 	int r = 0, lcd_channel_ix = 0;

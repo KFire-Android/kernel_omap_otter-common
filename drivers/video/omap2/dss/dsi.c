@@ -1847,6 +1847,7 @@ static int _dsi_reset(enum omap_dsi_index ix)
 	return _dsi_wait_reset(ix);
 }
 
+#if 0
 static void dsi_reset_tx_fifo(enum omap_dsi_index ix, int channel)
 {
 	u32 mask;
@@ -1860,6 +1861,7 @@ static void dsi_reset_tx_fifo(enum omap_dsi_index ix, int channel)
 
 	dsi_write_reg(ix, DSI_TX_FIFO_VC_SIZE, l);
 }
+#endif
 
 static void dsi_config_tx_fifo(enum omap_dsi_index ix,
 	enum fifo_size size1, enum fifo_size size2,

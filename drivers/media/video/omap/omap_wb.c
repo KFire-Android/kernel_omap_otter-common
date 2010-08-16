@@ -70,7 +70,7 @@ MODULE_PARM_DESC(debug_wb, "Debug level (0-1)");
 
 int omap_vout_try_format(struct v4l2_pix_format *pix);
 enum omap_color_mode video_mode_to_dss_mode(
-			struct v4l2_pix_format *pix);
+		struct v4l2_pix_format *pix);
 void omap_wb_isr(void *arg, unsigned int irqstatus);
 int	omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *wb);
 int omap_dss_wb_flush(void);
@@ -300,15 +300,15 @@ static int vidioc_reqbufs(struct file *file, void *fh,
 		}
 
 		videobuf_mmap_free(q);
-		} else if (q->bufs[0] && (V4L2_MEMORY_USERPTR == q->bufs[0]->memory)) {
-			if (wb->buffer_allocated) {
-				videobuf_mmap_free(q);
-				for (i = 0; i < wb->buffer_allocated; i++) {
-					kfree(q->bufs[i]);
-					q->bufs[i] = NULL;
-				}
-				wb->buffer_allocated = 0;
+	} else if (q->bufs[0] && (V4L2_MEMORY_USERPTR == q->bufs[0]->memory)) {
+		if (wb->buffer_allocated) {
+			videobuf_mmap_free(q);
+			for (i = 0; i < wb->buffer_allocated; i++) {
+				kfree(q->bufs[i]);
+				q->bufs[i] = NULL;
 			}
+			wb->buffer_allocated = 0;
+		}
 	}
 	/*store the memory type in data structure */
 	wb->memory = req->memory;

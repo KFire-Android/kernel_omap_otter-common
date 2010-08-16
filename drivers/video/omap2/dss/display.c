@@ -296,7 +296,7 @@ static ssize_t display_edid_show(struct device *dev,
 
 }
 static ssize_t display_custom_edid_timing_store(struct device *dev,
-		struct device_attribute *attr, char *buf)
+		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 	int val, code, mode;
@@ -306,7 +306,7 @@ static ssize_t display_custom_edid_timing_store(struct device *dev,
 		if (!dssdev->driver->set_custom_edid_timing_code)
 			return -ENOENT;
 	dssdev->driver->set_custom_edid_timing_code(dssdev, code, mode);
-	return snprintf(buf, PAGE_SIZE, "EDID-Information %d mode % d code", mode, code);
+	return snprintf((char *)buf, PAGE_SIZE, "EDID-Information %d mode % d code", mode, code);
 
 }
 

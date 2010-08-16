@@ -514,7 +514,7 @@ static int omap_dss_unset_device(struct omap_overlay_manager *mgr)
 static int dss_mgr_wait_for_vsync(struct omap_overlay_manager *mgr)
 {
 	unsigned long timeout = msecs_to_jiffies(500);
-	u32 irq;
+	u32 irq = 0;
 
 	if (mgr->device->type == OMAP_DISPLAY_TYPE_VENC)
 		irq = DISPC_IRQ_EVSYNC_ODD;
@@ -884,10 +884,10 @@ static int configure_overlay(enum omap_plane plane)
 	if (cpu_is_omap44xx()) {
 		struct writeback_cache_data *wb;
 		wb = &dss_cache.writeback_cache;
-		/*if  writeback is enabled and input  source is the current overlay
-		set writeback values and enable wb plane before source plane*/
+		/* If  writeback is enabled and input  source is the current overlay
+		set writeback values and enable wb plane before source plane */
 		if ((wb->enabled) &&
-		(omap_dss_check_wb(wb, plane, c->channel))) {
+			(omap_dss_check_wb(wb, plane, c->channel))) {
 			/* writeback is enabled for this plane - set accordingly */
 			dispc_setup_wb(wb);
 			wb->dirty = false;
@@ -966,7 +966,7 @@ static int configure_dispc(void)
 		mgr_go[oc->channel] = true;
 		else
 			if (!omap_dss_check_wb(wb, i, -1))
-				/*skip manager go if WB enabled*/
+				/* skip manager go if WB enabled */
 				mgr_go[oc->channel] = true;
 	}
 
@@ -991,10 +991,11 @@ static int configure_dispc(void)
 		mgr_go[i] = true;
 	}
 	if (cpu_is_omap44xx()) {
-		/*Enable WB plane and source plane */
+		/* Enable WB plane and source plane */
 		DSSDBG("configure manager wb->shadow_dirty = %d", wb->shadow_dirty);
 		if (wb->shadow_dirty && wb->enabled) {
-			DSSDBG("dispc_go_wb_is called after enabling input plane and then WB");
+			DSSDBG("dispc_go_wb_is called after enabling"
+					"input plane and then WB\n");
 			switch (wb->source) {
 			case OMAP_WB_OVERLAY0:
 			case OMAP_WB_OVERLAY1:
@@ -1005,7 +1006,10 @@ static int configure_dispc(void)
 			case OMAP_WB_LCD_1_MANAGER:
 			case OMAP_WB_LCD_2_MANAGER:
 			case OMAP_WB_TV_MANAGER:
-				break;/*Do nothing As of now as we dont support Manager yet with WB*/
+				/* Do nothing as of now as we dont
+				 * support Manager yet with WB
+				 */
+				break;
 			}
 			dispc_go_wb();
 			wb->shadow_dirty = false;
@@ -1593,7 +1597,6 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 
 				wbc->color_mode = wb->info.dss_mode;
 				wbc->input_color_mode = oc->color_mode;
-				/*OMAP_DSS_COLOR_ARGB32;  */
 				wbc->width = wb->info.out_width;
 				wbc->height = wb->info.out_height;
 				wbc->input_width = wb->info.width;
@@ -1733,7 +1736,7 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 
 EXPORT_SYMBOL(omap_dss_wb_apply);
 
-int omap_dss_wb_flush()
+int omap_dss_wb_flush(void)
 {
 	struct writeback_cache_data *wbc;
 	wbc = &dss_cache.writeback_cache;
@@ -1741,7 +1744,7 @@ int omap_dss_wb_flush()
 		wbc->enabled = false;
 		wbc->dirty = true;
 		}
-	printk(KERN_ERR"flush dispc data");
+	DSSDBG("flush dispc data\n");
 	dispc_flush_wb(wbc);
 	return 0;
 

@@ -64,7 +64,7 @@ static struct kobj_type writeback_ktype = {
 bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId, int managerId)
 {
 	bool result = false;
-	DSSDBG("ovl=%d,mgr=%d,srcty=%d(%s),src=%d",
+	DSSDBG("ovl=%d,mgr=%d,srcty=%d(%s),src=%d\n",
 	   overlayId, managerId, wb->source_type,
 	   wb->source_type == OMAP_WB_SOURCE_OVERLAY ? "OMAP_WB_SOURCE_OVERLAY" :
 	   wb->source_type == OMAP_WB_SOURCE_MANAGER ? "OMAP_WB_SOURCE_MANAGER" : "???",
@@ -98,7 +98,7 @@ bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId, int manag
 
 static bool dss_check_wb(struct omap_writeback *wb)
 {
-	DSSDBG("srcty=%d(%s),src=%d", wb->info.source_type,
+	DSSDBG("srcty=%d(%s),src=%d\n", wb->info.source_type,
 	   wb->info.source_type == OMAP_WB_SOURCE_OVERLAY ? "OMAP_WB_SOURCE_OVERLAY" :
 	   wb->info.source_type == OMAP_WB_SOURCE_MANAGER ? "OMAP_WB_SOURCE_MANAGER" : "???",
 	   wb->info.source);

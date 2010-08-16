@@ -265,8 +265,9 @@ struct omap_dispc_isr_data {
 static const struct dispc_reg dispc_reg_att[] = { DISPC_GFX_ATTRIBUTES,
 	DISPC_VID_ATTRIBUTES(0),
 	DISPC_VID_ATTRIBUTES(1),
-	DISPC_VID_V3_WB_ATTRIBUTES(0), /* VID 3 pipeline */
-	DISPC_VID_V3_WB_ATTRIBUTES(1)};/* WB pipeline */
+	DISPC_VID_V3_WB_ATTRIBUTES(0),	/* VID 3 pipeline */
+	DISPC_VID_V3_WB_ATTRIBUTES(1),	/* WB pipeline */
+	};
 
 
 struct dispc_irq_stats {
@@ -1326,8 +1327,8 @@ static void _dispc_set_plane_ba0(enum omap_plane plane, u32 paddr)
 		DISPC_VID_BA0(0),
 		DISPC_VID_BA0(1) };
 	if (cpu_is_omap44xx()) {
-		ba0_reg[3] = DISPC_VID_V3_WB_BA0(0); /* VID 3 pipeline*/
-		ba0_reg[4] = DISPC_VID_V3_WB_BA0(1); /* WB pipeline*/
+		ba0_reg[3] = DISPC_VID_V3_WB_BA0(0);	/* VID 3 pipeline*/
+		ba0_reg[4] = DISPC_VID_V3_WB_BA0(1);	/* WB pipeline*/
 	}
 
 	dispc_write_reg(ba0_reg[plane], paddr);
@@ -1339,8 +1340,8 @@ static void _dispc_set_plane_ba1(enum omap_plane plane, u32 paddr)
 				      DISPC_VID_BA1(0),
 				      DISPC_VID_BA1(1) };
 	if (cpu_is_omap44xx()) {
-		ba1_reg[3] = DISPC_VID_V3_WB_BA1(0); /* VID 3 pipeline*/
-		ba1_reg[4] = DISPC_VID_V3_WB_BA1(1); /* WB pipeline*/
+		ba1_reg[3] = DISPC_VID_V3_WB_BA1(0);	/* VID 3 pipeline*/
+		ba1_reg[4] = DISPC_VID_V3_WB_BA1(1);	/* WB pipeline*/
 	}
 
 	dispc_write_reg(ba1_reg[plane], paddr);
@@ -1350,8 +1351,8 @@ static void _dispc_set_plane_ba_uv0(enum omap_plane plane, u32 paddr)
 {
 	const struct dispc_reg ba_uv0_reg[] = { DISPC_VID_BA_UV0(0),
 				DISPC_VID_BA_UV0(1),
-				DISPC_VID_BA_UV0(2), /* VID 3 pipeline*/
-				DISPC_VID_BA_UV0(3), /* WB pipeline*/
+				DISPC_VID_BA_UV0(2),	/* VID 3 pipeline*/
+				DISPC_VID_BA_UV0(3),	/* WB pipeline*/
 	};
 
 	BUG_ON(plane == OMAP_DSS_GFX);
@@ -1382,7 +1383,7 @@ static void _dispc_set_plane_pos(enum omap_plane plane, int x, int y)
 				      DISPC_VID_POSITION(1) };
 	u32 val = FLD_VAL(y, 26, 16) | FLD_VAL(x, 10, 0);
 	if (cpu_is_omap44xx())
-		pos_reg[3] = DISPC_VID_VID3_POSITION; /* VID 3 pipeline*/
+		pos_reg[3] = DISPC_VID_VID3_POSITION;	/* VID 3 pipeline*/
 
 	dispc_write_reg(pos_reg[plane], val);
 }
@@ -1394,8 +1395,8 @@ static void _dispc_set_pic_size(enum omap_plane plane, int width, int height)
 				      DISPC_VID_PICTURE_SIZE(1) };
 	u32 val = FLD_VAL(height - 1, 26, 16) | FLD_VAL(width - 1, 10, 0);
 	if (cpu_is_omap44xx()) {
-		siz_reg[3] = DISPC_VID_V3_WB_PICTURE_SIZE(0); /* VID3 pipeline*/
-		siz_reg[4] = DISPC_VID_V3_WB_PICTURE_SIZE(1); /* WB pipeline*/
+		siz_reg[3] = DISPC_VID_V3_WB_PICTURE_SIZE(0);	/* VID3 pipeline*/
+		siz_reg[4] = DISPC_VID_V3_WB_PICTURE_SIZE(1);	/* WB pipeline*/
 	}
 	dispc_write_reg(siz_reg[plane], val);
 }
@@ -1406,8 +1407,8 @@ static void _dispc_set_vid_size(enum omap_plane plane, int width, int height)
 	struct dispc_reg vsi_reg[4] = { DISPC_VID_SIZE(0),
 				      DISPC_VID_SIZE(1) };
 	if (cpu_is_omap44xx()) {
-		vsi_reg[2] = DISPC_VID_V3_WB_SIZE(0); /* VID 3 pipeline*/
-		vsi_reg[3] = DISPC_VID_V3_WB_SIZE(1); /* WB pipeline*/
+		vsi_reg[2] = DISPC_VID_V3_WB_SIZE(0);	/* VID 3 pipeline*/
+		vsi_reg[3] = DISPC_VID_V3_WB_SIZE(1);	/* WB pipeline*/
 	}
 
 	BUG_ON(plane == OMAP_DSS_GFX);
@@ -1442,7 +1443,7 @@ static void _dispc_set_pix_inc(enum omap_plane plane, s32 inc)
 				     DISPC_VID_PIXEL_INC(1) };
 	if (cpu_is_omap44xx()) {
 		ri_reg[3] = DISPC_VID_V3_WB_PIXEL_INC(0);
-		ri_reg[4] = DISPC_VID_V3_WB_PIXEL_INC(1); /* WB pipeline*/
+		ri_reg[4] = DISPC_VID_V3_WB_PIXEL_INC(1);	/* WB pipeline*/
 	}
 	dispc_write_reg(ri_reg[plane], inc);
 }
@@ -1454,7 +1455,7 @@ static void _dispc_set_row_inc(enum omap_plane plane, s32 inc)
 				     DISPC_VID_ROW_INC(1)};
 	if (cpu_is_omap44xx()) {
 		ri_reg[3] = DISPC_VID_V3_WB_ROW_INC(0);
-		ri_reg[4] = DISPC_VID_V3_WB_ROW_INC(1); /* WB pipeline*/
+		ri_reg[4] = DISPC_VID_V3_WB_ROW_INC(1);	/* WB pipeline*/
 	}
 
 	dispc_write_reg(ri_reg[plane], inc);
@@ -1601,7 +1602,7 @@ void dispc_set_burst_size(enum omap_plane plane,
 	case OMAP_DSS_VIDEO1:
 	case OMAP_DSS_VIDEO2:
 	case OMAP_DSS_VIDEO3:
-	case OMAP_DSS_WB: /* WB pipeline */
+	case OMAP_DSS_WB:	/* WB pipeline */
 		shift = 14;
 		break;
 	default:
@@ -1771,7 +1772,7 @@ void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high)
 	else if (cpu_is_omap34xx())
 		dispc_write_reg(ftrs_reg[plane],
 				FLD_VAL(high, 27, 16) | FLD_VAL(low, 11, 0));
-	else /* cpu is omap44xx */
+	else	/* cpu is omap44xx */
 		dispc_write_reg(ftrs_reg[plane],
 				FLD_VAL(high, 31, 16) | FLD_VAL(low, 15, 0));
 
@@ -1795,7 +1796,7 @@ static void _dispc_set_fir(enum omap_plane plane, int hinc, int vinc)
 				      DISPC_VID_FIR(1) };
 	if (cpu_is_omap44xx()) {
 		fir_reg[2] = DISPC_VID_V3_WB_FIR(0);
-		fir_reg[3] = DISPC_VID_V3_WB_FIR(1); /* WB pipeline*/
+		fir_reg[3] = DISPC_VID_V3_WB_FIR(1);	/* WB pipeline*/
 	}
 	BUG_ON(plane == OMAP_DSS_GFX);
 
@@ -1812,8 +1813,8 @@ static void _dispc_set_vid_accu0(enum omap_plane plane, int haccu, int vaccu)
 	struct dispc_reg ac0_reg[4] = { DISPC_VID_ACCU0(0),
 				      DISPC_VID_ACCU0(1) };
 	if (cpu_is_omap44xx()) {
-		ac0_reg[2] = DISPC_VID_V3_WB_ACCU0(0); /* VID 3 pipeline*/
-		ac0_reg[3] = DISPC_VID_V3_WB_ACCU0(1); /* WB pipeline*/
+		ac0_reg[2] = DISPC_VID_V3_WB_ACCU0(0);	/* VID 3 pipeline*/
+		ac0_reg[3] = DISPC_VID_V3_WB_ACCU0(1);	/* WB pipeline*/
 	}
 
 	BUG_ON(plane == OMAP_DSS_GFX);
@@ -1832,8 +1833,8 @@ static void _dispc_set_vid_accu1(enum omap_plane plane, int haccu, int vaccu)
 					DISPC_VID_ACCU1(1) };
 
 	if (cpu_is_omap44xx()){
-		ac1_reg[2] = DISPC_VID_V3_WB_ACCU1(0); /* VID 3 pipeline*/
-		ac1_reg[3] = DISPC_VID_V3_WB_ACCU1(1); /* WB pipeline*/
+		ac1_reg[2] = DISPC_VID_V3_WB_ACCU1(0);	/* VID 3 pipeline*/
+		ac1_reg[3] = DISPC_VID_V3_WB_ACCU1(1);	/* WB pipeline*/
 	}
 	BUG_ON(plane == OMAP_DSS_GFX);
 	if (cpu_is_omap44xx())
@@ -1869,7 +1870,7 @@ static void _dispc_set_vid_accu2_0(enum omap_plane plane, int haccu, int vaccu)
 	const struct dispc_reg ac0_reg[] = { DISPC_VID_ACCU2_0(0),
 					DISPC_VID_ACCU2_0(1),
 					DISPC_VID_V3_WB_ACCU2_0(0),
-					DISPC_VID_V3_WB_ACCU2_0(1) /* WB */
+					DISPC_VID_V3_WB_ACCU2_0(1),	/* WB */
 	};
 
 	BUG_ON(plane == OMAP_DSS_GFX);
@@ -1884,7 +1885,7 @@ static void _dispc_set_vid_accu2_1(enum omap_plane plane, int haccu, int vaccu)
 	const struct dispc_reg ac1_reg[] = { DISPC_VID_ACCU2_1(0),
 					DISPC_VID_ACCU2_1(1),
 					DISPC_VID_V3_WB_ACCU2_1(0),
-					DISPC_VID_V3_WB_ACCU2_1(1)
+					DISPC_VID_V3_WB_ACCU2_1(1),	/* WB */
 	};
 
 	BUG_ON(plane == OMAP_DSS_GFX);
@@ -2757,7 +2758,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			return -EINVAL;
 		}
 
-#ifndef OMAP4430_REV_ES2_0
+#ifdef CONFIG_OMAP4_ES1
 		/* Must use 3-tap filter */
 		three_taps = width > 1280;
 #else
@@ -4669,26 +4670,26 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	s32 pix_inc;
 	u16 frame_height = height;
 
-	DSSDBG("dispc_setup_wb");
-	DSSDBG("Maxds = %d", maxdownscale);
-	DSSDBG("out_width, width = %d, %d", (int) out_width, (int) width);
-	DSSDBG("out_height, height = %d, %d", (int) out_height, (int) height);
+	DSSDBG("dispc_setup_wb\n");
+	DSSDBG("Maxds = %d\n", maxdownscale);
+	DSSDBG("out_width, width = %d, %d\n", (int) out_width, (int) width);
+	DSSDBG("out_height, height = %d, %d\n", (int) out_height, (int) height);
 
 	if (paddr == 0) {
-		printk("KERN_ERR dispc_setup_wb paddr NULL");
+		printk(KERN_ERR "dispc_setup_wb paddr NULL\n");
 		return -EINVAL;
 		}
 	{
 		/* validate color format and 5taps*/
 
 		if (out_width < width / maxdownscale ||
-		   out_width > width * 8){
-			printk("KERN_ERR dispc_setup_wb out_width not in range ");
+				out_width > width * 8) {
+			printk(KERN_ERR "dispc_setup_wb out_width not in range\n");
 			return -EINVAL;
 		}
 		if (out_height < height / maxdownscale ||
-		   out_height > height * 8){
-			printk("KERN_ERR dispc_setup_wb out_height not in range ");
+				out_height > height * 8){
+			printk(KERN_ERR "dispc_setup_wb out_height not in range\n");
 			return -EINVAL;
 		}
 
@@ -4723,23 +4724,28 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	if (width > 1280)
 		three_taps = 1;
 
-/* we handle ONLY overlays as source yet, NOT Managers */
-/* TODO: remove this check once managers are accepted as source */
+	/* We handle ONLY overlays as source yet, NOT Managers */
+	/* TODO: remove this check once managers are accepted as source */
 	if (source > OMAP_WB_TV_MANAGER) {
 		input_plane = (source - 3);
 
-	DSSDBG("input pipeline is not an overlay manager so overlay %d is configured ", input_plane);
-	/* Set the channel out for input source: DISPC_VIDX_ATTRIBUTES[31:30] CHANNELOUT2 as WB (0x3)*/
-	REG_FLD_MOD(dispc_reg_att[input_plane], 0x3, 31, 30);
-	/* Set the channel out for input source: DISPC_VIDX_ATTRIBUTES[16] CHANNELOUT as LCD / WB (0x0)*/
-	REG_FLD_MOD(dispc_reg_att[input_plane], 0x0, 16, 16);
+		DSSDBG("input pipeline is not an overlay manager"
+				"so overlay %d is configured\n", input_plane);
+		/* Set the channel out for input source: DISPC_VIDX_ATTRIBUTES[31:30]
+		 * CHANNELOUT2 as WB (0x3)
+		 */
+		REG_FLD_MOD(dispc_reg_att[input_plane], 0x3, 31, 30);
+		/* Set the channel out for input source: DISPC_VIDX_ATTRIBUTES[16]
+		 * CHANNELOUT as LCD / WB (0x0)
+		 */
+		REG_FLD_MOD(dispc_reg_att[input_plane], 0x0, 16, 16);
 
-	REG_FLD_MOD(dispc_reg_att[input_plane], 0x1, 10, 10);
-	REG_FLD_MOD(dispc_reg_att[input_plane], 0x1, 19, 19);
-	REG_FLD_MOD(dispc_reg_att[plane], source, 18, 16);
+		REG_FLD_MOD(dispc_reg_att[input_plane], 0x1, 10, 10);
+		REG_FLD_MOD(dispc_reg_att[input_plane], 0x1, 19, 19);
+		REG_FLD_MOD(dispc_reg_att[plane], source, 18, 16);
 #ifndef CONFIG_OMAP4_ES1
-	/* Memory to memory mode bit is set on ES 2.0 */
-	REG_FLD_MOD(dispc_reg_att[plane], 1, 19, 19);
+		/* Memory to memory mode bit is set on ES 2.0 */
+		REG_FLD_MOD(dispc_reg_att[plane], 1, 19, 19);
 #endif
 	}
 
@@ -4781,8 +4787,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 			puv_addr = tiler_reorient_topleft(
 					tiler_get_natural_addr((void *)puv_addr),
 					orient, tiler_width/2, tiler_height/2);
-			DSSDBG(
-				"rotated addresses: 0x%0x, 0x%0x\n",
+			DSSDBG("rotated addresses: 0x%0x, 0x%0x\n",
 						paddr, puv_addr);
 			/* set BURSTTYPE if rotation is non-zero */
 			REG_FLD_MOD(dispc_reg_att[plane], 0x1, 8, 8);
@@ -4843,14 +4848,14 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	scale_x = width != out_width || ch_width != out_ch_width;
 	scale_y = height != out_height || ch_height != out_ch_height;
 	_dispc_set_scaling(plane, width, height,
-			   out_width, out_height,
-			   0, three_taps, false, scale_x, scale_y);
+			out_width, out_height,
+			0, three_taps, false, scale_x, scale_y);
 
 	if (out_ch_width != out_width) {
 		/* this is true for YUV formats */
 		_dispc_set_scaling_uv(plane, ch_width, ch_height,
-				      out_ch_width, out_ch_height, 0,
-				      three_taps, false, scale_x, scale_y);
+				out_ch_width, out_ch_height, 0,
+				three_taps, false, scale_x, scale_y);
 	} else {
 		/* set chroma resampling */
 		REG_FLD_MOD(DISPC_VID_ATTRIBUTES2(plane - 1), 0, 8, 8);
@@ -4865,17 +4870,17 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 void dispc_flush_wb(struct writeback_cache_data *wb)
 {
-	enum omap_writeback_source	source = wb->source;
+	enum omap_writeback_source source = wb->source;
 	enum omap_plane plane = OMAP_DSS_WB;
 	enum omap_plane input_plane;
 
 	if (source > OMAP_WB_TV_MANAGER) {
 		input_plane = (source - 3);
-	REG_FLD_MOD(dispc_reg_att[input_plane], 0x0, 31, 30);
-	#ifdef OMAP4430_REV_ES2_0
-	/* Memory to memory mode bit is set on ES 2.0 */
-	REG_FLD_MOD(dispc_reg_att[plane], 0, 19, 19);
-	#endif
+		REG_FLD_MOD(dispc_reg_att[input_plane], 0x0, 31, 30);
+#ifndef CONFIG_OMAP4_ES1
+		/* Memory to memory mode bit is set on ES 2.0 */
+		REG_FLD_MOD(dispc_reg_att[plane], 0, 19, 19);
+#endif
 	}
 }
 
@@ -4888,7 +4893,7 @@ void dispc_go_wb(void)
 		goto end;
 	}
 	REG_FLD_MOD(DISPC_CONTROL2, 1, 6, 6);
-    DSSDBG("dispc_go_wb\n");
+	DSSDBG("dispc_go_wb\n");
 end:
 	enable_clocks(0);
 }
