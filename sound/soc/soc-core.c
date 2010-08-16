@@ -22,8 +22,6 @@
  *   o Support TDM on PCM and I2S
  */
 
-#define DEBUG
-
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -415,12 +413,6 @@ int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 
 		fe_aif = snd_soc_dapm_get_aif(card->rtd[i].platform->dapm,
 				cpu_dai->driver->name, fe_type);
-
-		if (fe_aif == NULL)
-			dev_dbg(&rtd->dev, "cant find frontend for stream %s\n",
-					cpu_dai->driver->name);
-		else
-				break;
 	}
 
 	if (fe_aif == NULL) {
@@ -439,8 +431,6 @@ int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 
 		/* backends must belong to this frontend */
 		if (card->rtd[i].dai_link->no_pcm) {
-
-			dev_dbg(&rtd->dev, "trying BE %s\n", card->rtd[i].dai_link->name);
 
 			if (!is_be_supported(rtd, card->rtd[i].dai_link->name))
 				continue;
@@ -464,7 +454,7 @@ int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 				if (rtd->num_be == SND_SOC_MAX_BE)
 					dev_dbg(&rtd->dev, "no more backends permitted\n");
 				else {
-					dev_dbg(&rtd->dev, "active path for %s to %s\n", fe_aif, be_aif);
+					dev_dbg(&rtd->dev, "** active path for %s to %s\n", fe_aif, be_aif);
 					rtd->be_rtd[rtd->num_be++] = &card->rtd[i];
 					card->rtd[i].fe_clients++;
 				}
@@ -655,6 +645,7 @@ no_pcm:
 	rtd->codec->active++;
 
 	mutex_unlock(&rtd->pcm_mutex);
+
 	return 0;
 
 config_err:
@@ -674,6 +665,7 @@ platform_err:
 		cpu_dai->driver->ops->shutdown(substream, cpu_dai);
 out:
 	mutex_unlock(&rtd->pcm_mutex);
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(snd_soc_pcm_open);
@@ -2131,6 +2123,10 @@ int snd_soc_set_runtime_hwparams(struct snd_pcm_substream *substream,
 	const struct snd_pcm_hardware *hw)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
+
+	if (!runtime)
+		return 0;
+
 	runtime->hw.info = hw->info;
 	runtime->hw.formats = hw->formats;
 	runtime->hw.period_bytes_min = hw->period_bytes_min;
