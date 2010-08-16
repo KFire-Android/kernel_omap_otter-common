@@ -394,7 +394,7 @@ int proc_end_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
 		goto err_out;
 	}
 
-	if (memory_regain_ownership(dev, map_obj, (u32) pva, ul_size, dir)) {
+	if (memory_regain_ownership(dev, map_obj, va_align, ul_size, dir)) {
 		pr_err("%s: InValid address parameters %p %x\n",
 		       __func__, pva, ul_size);
 		status = -EFAULT;
@@ -456,6 +456,7 @@ int user_to_device_map(struct iommu *mmu, u32 uva, u32 da, u32 size,
 	u32 pa;
 	unsigned int pages;
 	struct iotlb_entry tlb_entry;
+	struct page *mapped_page;
 
 	if (!size || !usr_pgs)
 		return -EINVAL;
@@ -480,27 +481,28 @@ int user_to_device_map(struct iommu *mmu, u32 uva, u32 da, u32 size,
 
 	for (pg_i = 0; pg_i < pages; pg_i++) {
 		pg_num = get_user_pages(current, mm, uva, 1,
-						w, 1, usr_pgs, NULL);
+						w, 1, &mapped_page, NULL);
 		if (pg_num > 0) {
-			if (page_count(*usr_pgs) < 1) {
+			if (page_count(mapped_page) < 1) {
 				pr_err("Bad page count after doing"
 					"get_user_pages on"
 					"user buffer\n");
 				break;
 			}
 			tlb_entry.pgsz = MMU_CAM_PGSZ_4K;
-			tlb_entry.prsvd = MMU_CAM_P;
+			tlb_entry.prsvd = 0;
 			tlb_entry.valid = MMU_CAM_V;
-			tlb_entry.elsz = MMU_RAM_ELSZ_8;
+			tlb_entry.elsz = MMU_RAM_ELSZ_32;
 			tlb_entry.endian = MMU_RAM_ENDIAN_LITTLE;
-			tlb_entry.mixed = 0;
+			tlb_entry.mixed = MMU_RAM_MIXED;
 			tlb_entry.da = da;
-			pa = page_to_phys(*usr_pgs);
+			pa = page_to_phys(mapped_page);
 			tlb_entry.pa = (u32)pa;
 			iopgtable_store_entry(mmu, &tlb_entry);
+			if (usr_pgs)
+				usr_pgs[pg_i] = mapped_page;
 			da += PAGE_SIZE;
 			uva += PAGE_SIZE;
-			usr_pgs++;
 		} else {
 			pr_err("get_user_pages FAILED,"
 				"MPU addr = 0x%x,"

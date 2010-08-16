@@ -98,6 +98,24 @@ err_out:
 	return -ENOMEM;
 }
 
+static int omap_delete_vmm_pool(struct iodmm_struct *obj, int pool_id)
+{
+	struct iovmm_pool *pool;
+	struct iovmm_device *iovmm_obj = obj->iovmm;
+	struct list_head *_pool, *_next_pool;
+
+	list_for_each_safe(_pool, _next_pool, &iovmm_obj->mmap_pool) {
+		pool = list_entry(_pool, struct iovmm_pool, list);
+		if (pool->pool_id == pool_id) {
+			gen_pool_destroy(pool->genpool);
+			list_del(&pool->list);
+			kfree(pool);
+			return 0;
+		}
+	}
+	return -ENODEV;
+}
+
 static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 				unsigned int cmd, unsigned long args)
 {
@@ -289,8 +307,21 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 		ret = status;
 		break;
 	}
-	case IOVMM_IOCDATOPA:
 	case IOVMM_IOCDELETEPOOL:
+	{
+		int pool_id;
+		int size;
+
+		size = copy_from_user(&pool_id, (void __user *)args,
+							sizeof(int));
+		if (size) {
+			ret = -EINVAL;
+			goto err_user_buf;
+		}
+		ret = omap_delete_vmm_pool(obj, pool_id);
+		break;
+	}
+	case IOVMM_IOCDATOPA:
 	default:
 		return -ENOTTY;
 	}
