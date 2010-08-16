@@ -277,7 +277,7 @@ EXPORT_SYMBOL(twl6030_mmc_card_detect_config);
 int twl6030_mmc_card_detect(struct device *dev, int slot)
 {
 	int ret = -EIO;
-	u8 read_reg;
+	u8 read_reg = 0;
 	struct platform_device *pdev = container_of(dev,
 					struct platform_device, dev);
 
