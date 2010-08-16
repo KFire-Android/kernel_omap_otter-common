@@ -363,14 +363,6 @@ static struct twl4030_madc_platform_data panda_gpadc_data = {
 	.irq_line	= 1,
 };
 
-static struct twl4030_bci_platform_data panda_bci_data = {
-	.monitoring_interval		= 10,
-	.max_charger_currentmA		= 1500,
-	.max_charger_voltagemV		= 4560,
-	.max_bat_voltagemV		= 4200,
-	.low_bat_voltagemV		= 3300,
-};
-
 static struct twl4030_platform_data panda_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
@@ -385,15 +377,9 @@ static struct twl4030_platform_data panda_twldata = {
 	.vaux2		= &panda_vaux2,
 	.vaux3		= &panda_vaux3,
 	.madc           = &panda_gpadc_data,
-	.bci            = &panda_bci_data,
 
 	/* children */
 	.codec		= &twl6040_codec,
-};
-
-static struct bq2415x_platform_data panda_bqdata = {
-	.max_charger_voltagemA = 4200,
-	.max_charger_currentmA = 1550,
 };
 
 static struct i2c_board_info __initdata panda_i2c_boardinfo[] = {
@@ -402,10 +388,6 @@ static struct i2c_board_info __initdata panda_i2c_boardinfo[] = {
 		.flags = I2C_CLIENT_WAKE,
 		.irq = OMAP44XX_IRQ_SYS_1N,
 		.platform_data = &panda_twldata,
-	},
-	{
-		I2C_BOARD_INFO("bq24156", 0x6a),
-		.platform_data = &panda_bqdata,
 	},
 };
 
