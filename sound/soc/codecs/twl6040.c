@@ -451,9 +451,11 @@ static void twl6040_pga_hs_work(struct work_struct *work)
 	}
 
 
-	if (headset->ramp == TWL6040_RAMP_DOWN)
+	if (headset->ramp == TWL6040_RAMP_DOWN) {
+		headset->active = 0;
 		complete(&headset->ramp_done);
-
+	} else
+		headset->active = 1;
 	headset->ramp = TWL6040_RAMP_NONE;
 }
 
@@ -487,8 +489,11 @@ static void twl6040_pga_hf_work(struct work_struct *work)
 	}
 
 
-	if (handsfree->ramp == TWL6040_RAMP_DOWN)
+	if (handsfree->ramp == TWL6040_RAMP_DOWN) {
+		handsfree->active = 0;
 		complete(&handsfree->ramp_done);
+	} else
+		handsfree->active = 1;
 	handsfree->ramp = TWL6040_RAMP_NONE;
 }
 
@@ -526,21 +531,19 @@ static int pga_event(struct snd_soc_dapm_widget *w,
 		if (out->active)
 			break;
 
-		out->ramp = TWL6040_RAMP_UP;
-		out->active = 1;
-
-		if (!delayed_work_pending(work))
+		if (!delayed_work_pending(work)) {
+			out->ramp = TWL6040_RAMP_UP;
 			queue_delayed_work(queue, work,
 					msecs_to_jiffies(100));
+		}
 		break;
 
 	case SND_SOC_DAPM_PRE_PMD:
 		if (!out->active)
 			break;
 
-		out->ramp = TWL6040_RAMP_DOWN;
-
 		if (!delayed_work_pending(work)) {
+			out->ramp = TWL6040_RAMP_DOWN;
 			INIT_COMPLETION(out->ramp_done);
 
 			queue_delayed_work(queue, work,
@@ -549,8 +552,6 @@ static int pga_event(struct snd_soc_dapm_widget *w,
 			wait_for_completion_timeout(&out->ramp_done,
 					msecs_to_jiffies(2000));
 		}
-
-		out->active = 0;
 		break;
 	}
 
