@@ -1062,10 +1062,11 @@ static void omap2_mcspi_work(struct work_struct *work)
 	struct omap2_mcspi	*mcspi;
 
 	mcspi = container_of(work, struct omap2_mcspi, work);
-	spin_lock_irq(&mcspi->lock);
 
 	if (omap2_mcspi_enable_clocks(mcspi) < 0)
-		goto out;
+		return;
+
+	spin_lock_irq(&mcspi->lock);
 
 	/* We only enable one channel at a time -- the one whose message is
 	 * at the head of the queue -- although this controller would gladly
@@ -1189,10 +1190,9 @@ static void omap2_mcspi_work(struct work_struct *work)
 		spin_lock_irq(&mcspi->lock);
 	}
 
-	omap2_mcspi_disable_clocks(mcspi);
-
-out:
 	spin_unlock_irq(&mcspi->lock);
+
+	omap2_mcspi_disable_clocks(mcspi);
 }
 
 static int omap2_mcspi_transfer(struct spi_device *spi, struct spi_message *m)
