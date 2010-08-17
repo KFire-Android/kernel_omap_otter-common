@@ -80,10 +80,30 @@ static int omap_dmic_dai_hw_free(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+
+static int omap_dmic_dai_trigger(struct snd_pcm_substream *substream,
+				  int cmd, struct snd_soc_dai *dai)
+{
+//	struct omap_dmic_data *dmic_priv = snd_soc_dai_get_drvdata(dai);
+
+
+	return 0;
+}
+
+static int omap_dmic_dai_prepare(struct snd_pcm_substream *substream,
+				  struct snd_soc_dai *dai)
+{
+//	struct omap_dmic_data *dmic_priv = snd_soc_dai_get_drvdata(dai);
+
+	return 0;
+}
+
 static struct snd_soc_dai_ops omap_dmic_dai_ops = {
 	.startup	= omap_dmic_dai_startup,
 	.shutdown	= omap_dmic_dai_shutdown,
 	.hw_params	= omap_dmic_dai_hw_params,
+	.prepare	= omap_dmic_dai_prepare,
+	.trigger	= omap_dmic_dai_trigger,
 	.hw_free	= omap_dmic_dai_hw_free,
 };
 
