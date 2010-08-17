@@ -635,6 +635,33 @@ int user_to_device_unmap(struct iommu *mmu, u32 da, unsigned size)
 	return 0;
 }
 
+/*
+ *  ======== user_va2_pa ========
+ *  Purpose:
+ *      This function walks through the page tables to convert a userland
+ *      virtual address to physical address
+ */
+static u32 user_va2_pa(struct mm_struct *mm, u32 address)
+{
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t *ptep, pte;
+
+	pgd = pgd_offset(mm, address);
+	if (!(pgd_none(*pgd) || pgd_bad(*pgd))) {
+		pmd = pmd_offset(pgd, address);
+		if (!(pmd_none(*pmd) || pmd_bad(*pmd))) {
+			ptep = pte_offset_map(pmd, address);
+			if (ptep) {
+				pte = *ptep;
+				if (pte_present(pte))
+					return pte & PAGE_MASK;
+			}
+		}
+	}
+	return 0;
+}
+
 int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 				u32 va, size_t bytes, u32 flags)
 {
@@ -645,6 +672,25 @@ int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 	struct iovmm_device *iovmm_obj = obj->iovmm;
 	u32 pa_align, da_align, size_align, tmp_addr;
 	int err;
+	int i, num_of_pages;
+	struct page *pg;
+
+	if (flags == IOVMF_DA_PHYS) {
+		/* Calculate the page-aligned PA, VA and size */
+		pa_align = round_down((u32) va, PAGE_SIZE);
+		size_align = round_up(bytes + va - pa_align, PAGE_SIZE);
+		da_align = user_va2_pa(current->mm, va);
+		*da = (da_align | (va & (PAGE_SIZE - 1)));
+		dmm_obj = add_mapping_info(obj, NULL, va, da_align,
+							size_align);
+		num_of_pages = size_align/PAGE_SIZE;
+		for (i = 0; i < num_of_pages; i++) {
+			pg = phys_to_page(da_align);
+			da_align += PAGE_SIZE;
+			dmm_obj->pages[i] = pg;
+		}
+		return 0;
+	}
 
 	list_for_each_entry(pool, &iovmm_obj->mmap_pool, list) {
 		if (pool->pool_id == pool_id) {

@@ -100,6 +100,11 @@ err_out:
 
 static int omap_delete_vmm_pool(struct iodmm_struct *obj, int pool_id)
 {
+	/*
+	 TBD: This is broken due to unmap not workign
+	 Enable this once unmap is woring
+	*/
+#if 0
 	struct iovmm_pool *pool;
 	struct iovmm_device *iovmm_obj = obj->iovmm;
 	struct list_head *_pool, *_next_pool;
@@ -114,6 +119,8 @@ static int omap_delete_vmm_pool(struct iodmm_struct *obj, int pool_id)
 		}
 	}
 	return -ENODEV;
+#endif
+	return 0;
 }
 
 static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
