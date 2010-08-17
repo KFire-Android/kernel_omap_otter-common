@@ -510,6 +510,13 @@ int snd_soc_pcm_open(struct snd_pcm_substream *substream)
 
 	/* Are we the backend and already enabled */
 	if (rtd->dai_link->no_pcm) {
+
+		if (rtd->fe_clients == 0) {
+			dev_err(&rtd->dev, "operations not permitted on backend DAI\n");
+			ret = -ENODEV;
+			goto out;
+		}
+
 		if (rtd->be_active++)
 			goto out;
 	}
