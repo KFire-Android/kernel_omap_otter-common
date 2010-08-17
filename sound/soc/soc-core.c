@@ -1038,6 +1038,72 @@ snd_pcm_uframes_t snd_soc_pcm_pointer(struct snd_pcm_substream *substream)
 }
 EXPORT_SYMBOL_GPL(snd_soc_pcm_pointer);
 
+
+int snd_soc_pcm_copy(struct snd_pcm_substream *substream, int channel,
+		    snd_pcm_uframes_t pos,
+		    void __user *buf, snd_pcm_uframes_t count)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_platform *platform = rtd->platform;
+
+	if (platform->driver->ops->copy)
+		return platform->driver->ops->copy(substream, channel, pos, buf, count);
+	return -EINVAL;
+}
+
+int snd_soc_pcm_silence(struct snd_pcm_substream *substream, int channel,
+		       snd_pcm_uframes_t pos, snd_pcm_uframes_t count)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_platform *platform = rtd->platform;
+
+	if (platform->driver->ops->silence)
+		return platform->driver->ops->silence(substream, channel, pos, count);
+	return -EINVAL;
+}
+
+struct page *snd_soc_pcm_page(struct snd_pcm_substream *substream,
+	     unsigned long offset)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_platform *platform = rtd->platform;
+
+	if (platform->driver->ops->page)
+		return platform->driver->ops->page(substream, offset);
+	return NULL;
+}
+
+int snd_soc_pcm_mmap(struct snd_pcm_substream *substream, struct vm_area_struct *vma)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_platform *platform = rtd->platform;
+
+	if (platform->driver->ops->mmap)
+		return platform->driver->ops->mmap(substream, vma);
+	return -EINVAL;
+}
+
+int snd_soc_pcm_ack(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_platform *platform = rtd->platform;
+
+	if (platform->driver->ops->ack)
+		return platform->driver->ops->ack(substream);
+	return -EINVAL;
+}
+
+int snd_soc_pcm_ioctl(struct snd_pcm_substream *substream,
+		     unsigned int cmd, void *arg)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_platform *platform = rtd->platform;
+
+	if (platform->driver->ops->ioctl)
+		return platform->driver->ops->ioctl(substream, cmd, arg);
+	return snd_pcm_lib_ioctl(substream, cmd, arg);
+}
+
 /* ASoC PCM operations */
 static struct snd_pcm_ops soc_pcm_ops = {
 	.open		= snd_soc_pcm_open,
@@ -1047,6 +1113,12 @@ static struct snd_pcm_ops soc_pcm_ops = {
 	.prepare	= snd_soc_pcm_prepare,
 	.trigger	= snd_soc_pcm_trigger,
 	.pointer	= snd_soc_pcm_pointer,
+	.copy		= snd_soc_pcm_copy,
+	.silence	= snd_soc_pcm_silence,
+	.page		= snd_soc_pcm_page,
+	.mmap		= snd_soc_pcm_mmap,
+	.ack		= snd_soc_pcm_ack,
+	.ioctl		= snd_soc_pcm_ioctl,
 };
 
 struct snd_pcm_substream *snd_soc_get_dai_substream(struct snd_soc_card *card,
@@ -1933,14 +2005,6 @@ static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 			pcm->streams[1].substream->private_data = rtd;
 		goto out;
 	}
-
-	soc_pcm_ops.mmap = platform->driver->ops->mmap;
-	soc_pcm_ops.pointer = platform->driver->ops->pointer;
-	soc_pcm_ops.ioctl = platform->driver->ops->ioctl;
-	soc_pcm_ops.copy = platform->driver->ops->copy;
-	soc_pcm_ops.silence = platform->driver->ops->silence;
-	soc_pcm_ops.ack = platform->driver->ops->ack;
-	soc_pcm_ops.page = platform->driver->ops->page;
 
 	if (playback)
 		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &soc_pcm_ops);
