@@ -34,6 +34,7 @@
 #include <sound/pcm_params.h>
 #include <sound/initval.h>
 #include <sound/soc.h>
+#include <sound/soc-dapm.h>
 
 #include <plat/control.h>
 #include <plat/dma-44xx.h>
@@ -438,6 +439,42 @@ static void abe_fe_shutdown(struct snd_pcm_substream *substream,
 	//				&dma_sink);
 }
 
+static void abe_be_dapm(struct snd_soc_pcm_runtime *rtd,
+		int id, int stream, int cmd)
+{
+	switch (id) {
+	case ABE_FRONTEND_DAI_MEDIA:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_soc_dapm_stream_event(rtd, "Multimedia Playback",cmd);
+		else
+			snd_soc_dapm_stream_event(rtd, "Multimedia Capture2",cmd);
+		break;
+	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
+		snd_soc_dapm_stream_event(rtd, "Multimedia Capture1",cmd);
+		break;
+	case ABE_FRONTEND_DAI_VOICE:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_soc_dapm_stream_event(rtd, "Voice Playback",cmd);
+		else
+			snd_soc_dapm_stream_event(rtd, "Voice Capture",cmd);
+		break;
+	case ABE_FRONTEND_DAI_TONES:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_soc_dapm_stream_event(rtd, "Tones Playback",cmd);
+		break;
+	case ABE_FRONTEND_DAI_VIBRA:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_soc_dapm_stream_event(rtd, "Vibra Playback",cmd);
+		break;
+	case ABE_FRONTEND_DAI_MODEM:
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+			snd_soc_dapm_stream_event(rtd, "MODEM Playback",cmd);
+		else
+			snd_soc_dapm_stream_event(rtd, "MODEM Capture",cmd);
+		break;
+	}
+}
+
 /* Frontend --> Backend ALSA PCM OPS */
 
 static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
@@ -529,6 +566,8 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 
 	/* now shutdown the frontend */
 	abe_fe_shutdown(substream, dai);
+
+	abe_be_dapm(rtd, dai->id, substream->stream, SND_SOC_DAPM_STREAM_STOP);
 }
 
 static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
@@ -611,7 +650,7 @@ static int omap_abe_dai_prepare(struct snd_pcm_substream *substream,
 			dev_dbg(&rtd->dev, "%s no be for %d\n", __func__,substream->stream);
 			return -EINVAL;
 		}
-		/* close backend stream if inactive */
+		/* prepare backend stream */
 		snd_soc_pcm_prepare(rtd->be_rtd[i]->pcm->streams[substream->stream].substream);
 	}
 
@@ -619,6 +658,8 @@ static int omap_abe_dai_prepare(struct snd_pcm_substream *substream,
 	ret = abe_fe_prepare(substream, dai);
 	if (ret < 0)
 		dev_err(dai->dev,"%s: frontend prepare failed\n", __func__);
+
+	abe_be_dapm(rtd, dai->id, substream->stream, SND_SOC_DAPM_STREAM_START);
 
 	return ret;
 }
