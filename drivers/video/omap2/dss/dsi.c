@@ -2154,11 +2154,13 @@ static u16 dsi_vc_flush_receive_data(enum omap_dsi_index ix,
 		u32 val;
 		u8 dt;
 		val = dsi_read_reg(ix, DSI_VC_SHORT_PACKET_HEADER(channel));
-		DSSERR("\trawval %#08x\n", val);
+		if (!cpu_is_omap44xx())
+			DSSERR("\trawval %#08x\n", val);
                 dt = FLD_GET(val, 5, 0);
 		if (dt == DSI_DT_RX_ACK_WITH_ERR) {
 			u16 err = FLD_GET(val, 23, 8);
-			dsi_show_rx_ack_with_err(err);
+			if (!cpu_is_omap44xx())
+				dsi_show_rx_ack_with_err(err);
 		} else if (dt == DSI_DT_RX_SHORT_READ_1) {
 			DSSERR("\tDCS short response, 1 byte: %#x\n",
 					FLD_GET(val, 23, 8));
@@ -2187,7 +2189,8 @@ static int dsi_vc_send_bta(enum omap_dsi_index ix, int channel)
 
 	if (REG_GET(ix, DSI_VC_CTRL(channel), 20, 20)) {
 		/* RX_FIFO_NOT_EMPTY */
-		DSSERR("rx fifo not empty when sending BTA, dumping data:\n");
+		if (!cpu_is_omap44xx())
+			DSSERR("rx fifo not empty when sending BTA, dumping data:\n");
 		dsi_vc_flush_receive_data(ix, channel);
 	}
 
@@ -3151,7 +3154,8 @@ static void dsi_handle_framedone(enum omap_dsi_index ix, int error)
 
 	/* RX_FIFO_NOT_EMPTY */
 	if (REG_GET(ix, DSI_VC_CTRL(channel), 20, 20)) {
-		DSSERR("Received error during frame transfer:\n");
+		if (!cpu_is_omap44xx())
+			DSSERR("Received error during frame transfer:\n");
 		dsi_vc_flush_receive_data(ix, channel);
 		if (!error)
 			error = -EIO;
