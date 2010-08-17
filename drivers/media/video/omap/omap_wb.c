@@ -80,31 +80,36 @@ int omap_setup_wb(struct omap_wb_device *wb_device, u32 addr, u32 uv_addr)
 	struct omap_writeback *wb;
 	struct omap_overlay_manager *mgr = NULL;
 	struct omap_writeback_info wb_info;
+	struct omap_overlay *ovl = NULL;
 	int r = 0;
 	int i = 0;
 	wb_info.enabled = true;
 	wb_info.info_dirty = true;
 	wb_info.capturemode = wb_device->capturemode;
 	wb_info.dss_mode = wb_device->dss_mode;
-	wb_info.height = wb_device->pix.height;
-	wb_info.width = wb_device->pix.width;
-	wb_info.out_height = wb_device->win.w.height;
-	wb_info.out_width = wb_device->win.w.width;
+	wb_info.out_height = wb_device->pix.height;
+	wb_info.out_width = wb_device->pix.width;
 	wb_info.source = wb_device->source;
 	wb_info.source_type = wb_device->source_type;
 	wb_info.paddr = addr;
 	wb_info.puv_addr = uv_addr;
 
+	ovl = omap_dss_get_overlay(wb_info.source - 3);
+
+	wb_info.height = ovl->info.out_height;
+	wb_info.width = ovl->info.out_width;
+
 	v4l2_dbg(1, debug_wb, &wb_device->wb_dev->v4l2_dev,
 			"omap_write back struct contents :\n"
 			"enabled = %d\n infodirty = %d\n"
 			"capturemode = %d\n dss_mode = %d\n"
-			"height = %ld\n width = %ld\n source = %d\n"
+			"height = %ld\n width = %ld\n out_height = %ld\n"
+			"out_width = %ld\n source = %d\n"
 			"source_type = %d\n paddr =%lx\n puvaddr = %lx\n",
 			wb_info.enabled, wb_info.info_dirty, wb_info.capturemode,
 			wb_info.dss_mode, wb_info.height, wb_info.width,
-			wb_info.source, wb_info.source_type, wb_info.paddr,
-			wb_info.puv_addr);
+			wb_info.out_height, wb_info.out_width, wb_info.source,
+			wb_info.source_type, wb_info.paddr, wb_info.puv_addr);
 
 	for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
 			/* Fix : checking for mgr will shift to DSS2 */

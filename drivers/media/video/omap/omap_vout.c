@@ -241,6 +241,7 @@ static void omap_vout_free_buffer(unsigned long virtaddr, u32 phys_addr,
 }
 
 #ifndef CONFIG_ARCH_OMAP4
+/*
  * Function for allocating video buffers
  */
 static int omap_vout_allocate_vrfb_buffers(struct omap_vout_device *vout,
@@ -909,21 +910,21 @@ int omapvid_setup_overlay(struct omap_vout_device *vout,
 	info.out_height = outh;
 	info.global_alpha =
 		vout->vid_info.overlays[0]->info.global_alpha;
-#ifndef CONFIG_ARCH_OMAP4
-	if (!rotation_enabled(vout)) {
-		info.rotation = 0;
-		info.rotation_type = OMAP_DSS_ROT_DMA;
-		info.screen_width = pixwidth;
+	if (!cpu_is_omap44xx()) {
+		if (!rotation_enabled(vout)) {
+			info.rotation = 0;
+			info.rotation_type = OMAP_DSS_ROT_DMA;
+			info.screen_width = pixwidth;
+		} else {
+			info.rotation = vout->rotation;
+			info.rotation_type = OMAP_DSS_ROT_VRFB;
+			info.screen_width = 2048;
+		}
 	} else {
+		info.rotation_type = OMAP_DSS_ROT_TILER;
+		info.screen_width = pixwidth;
 		info.rotation = vout->rotation;
-		info.rotation_type = OMAP_DSS_ROT_VRFB;
-		info.screen_width = 2048;
 	}
-#else
-	info.rotation_type = OMAP_DSS_ROT_TILER;
-	info.screen_width = pixwidth;
-	info.rotation = vout->rotation;
-#endif
 
 	v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev,
 		"%s enable=%d addr=%x width=%d\n height=%d color_mode=%d\n"
@@ -1050,7 +1051,9 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 	struct omap_vout_device *vout = (struct omap_vout_device *)arg;
 	unsigned long flags;
 	int irq = 0;
-
+#ifndef CONFIG_OMAP2_DSS_HDMI
+	u32 fid;
+#endif
 	if (!vout->streaming)
 		return;
 
@@ -1258,7 +1261,6 @@ static int omap_vout_buffer_setup(struct videobuf_queue *q, unsigned int *count,
 	*count = vout->buffer_allocated = i;
 
 #else
-
 	/* tiler_alloc_buf to be called here
 	pre-requisites: rotation, format?
 	based on that buffers will be allocated.
@@ -1422,10 +1424,10 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 	 * from this array will be used to configure DSS */
 	vout->queued_buf_addr[vb->i] = (u8 *)
 		vout->vrfb_context[vb->i].paddr[rotation];
-#else /* TILER to be used */
+#else	/* TILER to be used */
 
 	/* Here, we need to use the physical addresses given by Tiler:
-	*/
+	  */
 	dmabuf = vout->buf_phy_addr[vb->i];
 	vout->queued_buf_addr[vb->i] = (u8 *) vout->buf_phy_addr[vb->i];
 	vout->queued_buf_uv_addr[vb->i] = (u8 *) vout->buf_phy_uv_addr[vb->i];
@@ -1837,17 +1839,14 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 
 	/* get the framebuffer parameters */
 
-#ifndef CONFIG_ARCH_OMAP4
-	if (rotate_90_or_270(vout)) {
+	if (!cpu_is_omap44xx() && rotate_90_or_270(vout)) {
 		vout->fbuf.fmt.height = timing->x_res;
 		vout->fbuf.fmt.width = timing->y_res;
 	} else {
-#endif
 		vout->fbuf.fmt.height = timing->y_res;
 		vout->fbuf.fmt.width = timing->x_res;
-#ifndef CONFIG_ARCH_OMAP4
 	}
-#endif
+
 	/* change to samller size is OK */
 
 	bpp = omap_vout_try_format(&f->fmt.pix);
