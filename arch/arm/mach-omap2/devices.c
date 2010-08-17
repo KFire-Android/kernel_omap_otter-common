@@ -916,7 +916,7 @@ void __init omap_display_init(struct omap_dss_board_info *board_data)
 	return;
 }
 #else
-void __init display_init(struct omap_dss_board_info *board_data)
+void __init omap_display_init(struct omap_dss_board_info *board_data)
 {
 }
 #endif
