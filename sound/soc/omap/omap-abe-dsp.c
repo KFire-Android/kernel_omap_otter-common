@@ -21,6 +21,8 @@
  *
  */
 
+#undef DEBUG
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -1415,48 +1417,8 @@ static int aess_open(struct snd_pcm_substream *substream)
 	abe->fe_id = dai->id;
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
-//	snd_soc_set_runtime_hwparams(substream, &omap_abe_hardware);
-
-	switch (dai->id) {
-	case ABE_FRONTEND_DAI_MEDIA:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "Multimedia Playback",
-					SND_SOC_DAPM_STREAM_START);
-		else
-			snd_soc_dapm_stream_event(rtd, "Multimedia Capture2",
-					SND_SOC_DAPM_STREAM_START);
-		break;
-	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
-		snd_soc_dapm_stream_event(rtd, "Multimedia Capture1",
-				SND_SOC_DAPM_STREAM_START);
-		break;
-	case ABE_FRONTEND_DAI_VOICE:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "Voice Playback",
-					SND_SOC_DAPM_STREAM_START);
-		else
-			snd_soc_dapm_stream_event(rtd, "Voice Capture",
-					SND_SOC_DAPM_STREAM_START);
-		break;
-	case ABE_FRONTEND_DAI_TONES:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "Tones Playback",
-					SND_SOC_DAPM_STREAM_START);
-		break;
-	case ABE_FRONTEND_DAI_VIBRA:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "Vibra Playback",
-					SND_SOC_DAPM_STREAM_START);
-		break;
-	case ABE_FRONTEND_DAI_MODEM:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "MODEM Playback",
-					SND_SOC_DAPM_STREAM_START);
-		else
-			snd_soc_dapm_stream_event(rtd, "MODEM Capture",
-					SND_SOC_DAPM_STREAM_START);
-		break;
-	}
+	if (dai->id == ABE_FRONTEND_DAI_MODEM)
+		snd_soc_set_runtime_hwparams(substream, &omap_abe_hardware);
 
 	mutex_unlock(&abe->mutex);
 	return 0;
@@ -1517,47 +1479,6 @@ static int aess_close(struct snd_pcm_substream *substream)
 
 	abe->fe_id = dai->id;
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
-
-	switch (dai->id) {
-	case ABE_FRONTEND_DAI_MEDIA:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "Multimedia Playback",
-					SND_SOC_DAPM_STREAM_STOP);
-		else
-			snd_soc_dapm_stream_event(rtd, "Multimedia Capture2",
-					SND_SOC_DAPM_STREAM_STOP);
-		break;
-	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
-		snd_soc_dapm_stream_event(rtd, "Multimedia Capture1",
-				SND_SOC_DAPM_STREAM_STOP);
-		break;
-	case ABE_FRONTEND_DAI_VOICE:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "Voice Playback",
-					SND_SOC_DAPM_STREAM_STOP);
-		else
-			snd_soc_dapm_stream_event(rtd, "Voice Capture",
-					SND_SOC_DAPM_STREAM_STOP);
-		break;
-	case ABE_FRONTEND_DAI_TONES:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "Tones Playback",
-					SND_SOC_DAPM_STREAM_STOP);
-		break;
-	case ABE_FRONTEND_DAI_VIBRA:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "Vibra Playback",
-					SND_SOC_DAPM_STREAM_STOP);
-		break;
-	case ABE_FRONTEND_DAI_MODEM:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd, "MODEM Playback",
-					SND_SOC_DAPM_STREAM_STOP);
-		else
-			snd_soc_dapm_stream_event(rtd, "MODEM Capture",
-					SND_SOC_DAPM_STREAM_STOP);
-		break;
-	}
 
 	/* now calculate OPP level based upon DAPM widget status */
 	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++) {
