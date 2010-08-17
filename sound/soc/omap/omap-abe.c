@@ -798,6 +798,8 @@ static void enable_be_ports(struct snd_soc_pcm_runtime *rtd,  int stream)
 			break;
 		case OMAP_ABE_DAI_PDM_UL:
 			if (be_is_pending(be_rtd, stream))
+				if (!be_is_pending(be_rtd,0))
+					abe_select_main_port(PDM_UL_PORT);
 				abe_dai_enable_data_transfer(PDM_UL_PORT);
 			break;
 		case OMAP_ABE_DAI_BT_VX:
@@ -888,18 +890,25 @@ static void disable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 		case OMAP_ABE_DAI_PDM_DL1:
 			if (be_is_pending(be_rtd, stream))
 				abe_dai_disable_data_transfer(PDM_DL_PORT);
+			if (be_is_pending(be_rtd,1))
+					abe_select_main_port(PDM_UL_PORT);
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
 			if (be_is_pending(be_rtd, stream))
 				abe_dai_disable_data_transfer(PDM_DL2_PORT);
+			if (be_is_pending(be_rtd,1))
+					abe_select_main_port(PDM_UL_PORT);
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
 			if (be_is_pending(be_rtd, stream))
 				abe_dai_disable_data_transfer(PDM_VIB_PORT);
 			break;
 		case OMAP_ABE_DAI_PDM_UL:
-			if (be_is_pending(be_rtd, stream))
-				abe_dai_disable_data_transfer(PDM_UL_PORT);
+			if (be_is_pending(be_rtd, stream)) {
+				if(!be_is_pending(be_rtd, 0))
+					abe_dai_disable_data_transfer(PDM_UL_PORT);
+				abe_select_main_port(PDM_DL_PORT);
+			}
 			break;
 		case OMAP_ABE_DAI_BT_VX:
 			if (stream == SNDRV_PCM_STREAM_PLAYBACK)
