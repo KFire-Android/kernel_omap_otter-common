@@ -250,7 +250,10 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	ret = snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
 				hs_jack_pins);
 
-	twl6040_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
+	if (machine_is_omap_4430sdp())
+		twl6040_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
+	else
+		snd_soc_jack_report(&hs_jack, 1, SND_JACK_HEADSET);
 
 	return ret;
 }
