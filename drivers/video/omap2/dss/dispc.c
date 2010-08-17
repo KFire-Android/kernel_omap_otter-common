@@ -4692,6 +4692,8 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 			printk(KERN_ERR "dispc_setup_wb out_height not in range\n");
 			return -EINVAL;
 		}
+		/* validate color format and 5taps*/
+		DSSDBG(KERN_ERR"%d color mode %d input color mode", color_mode, wb->input_color_mode);
 
 		switch (color_mode) {
 		case OMAP_DSS_COLOR_RGB16:
@@ -4819,7 +4821,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	out_ch_width = out_width;
 	out_ch_height = out_height;
 
-	/* account for output color decimation */
+	/* we must scale NV12 format */
 	switch (color_mode) {
 	case OMAP_DSS_COLOR_NV12:
 		out_ch_height >>= 1;
@@ -4830,37 +4832,29 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 		;
 	}
 
-	/* account for input color decimation */
-	switch (wb->input_color_mode) {
-	case OMAP_DSS_COLOR_NV12:
-		ch_height >>= 1;
-	case OMAP_DSS_COLOR_UYVY:
-	case OMAP_DSS_COLOR_YUV2:
-		ch_width >>= 1;
-	default:
-		;
-	}
-
-	_dispc_set_vid_size(plane, out_width, out_height);
-	_dispc_set_vid_color_conv(plane, cconv);
+	DSSDBG("WB ch_width %d ch_height %d out_ch_width %d out_ch_height %d",
+		ch_width, ch_height, out_ch_width, out_ch_height);
 
 	/* we must scale NV12 format */
 	scale_x = width != out_width || ch_width != out_ch_width;
 	scale_y = height != out_height || ch_height != out_ch_height;
+
+	DSSDBG(KERN_ERR"%d scale_x %d scale y ", scale_x, scale_y);
+	_dispc_set_vid_size(plane, out_width, out_height);
+
 	_dispc_set_scaling(plane, width, height,
 			out_width, out_height,
 			0, three_taps, false, scale_x, scale_y);
 
-	if (out_ch_width != out_width) {
+	if (ch_width != width) {
 		/* this is true for YUV formats */
+		printk(KERN_ERR "scale uv set");
 		_dispc_set_scaling_uv(plane, ch_width, ch_height,
 				out_ch_width, out_ch_height, 0,
 				three_taps, false, scale_x, scale_y);
-	} else {
-		/* set chroma resampling */
-		REG_FLD_MOD(DISPC_VID_ATTRIBUTES2(plane - 1), 0, 8, 8);
 	}
 
+	_dispc_set_vid_color_conv(plane, cconv);
 	pix_inc = dispc_read_reg(dispc_reg_att[plane]);
 	DSSDBG("vid[%d] attributes = %x\n", plane, pix_inc);
 
