@@ -4561,7 +4561,7 @@ int dispc_init(struct platform_device *pdev)
 	INIT_WORK(&dispc.error_work, dispc_error_worker);
 
 	dispc_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	dispc.base = ioremap(dispc_mem->start, resource_size(dispc_mem));
+	dispc_base = dispc.base = ioremap(dispc_mem->start, resource_size(dispc_mem));
 	if (!dispc.base) {
 		DSSERR("can't ioremap DISPC\n");
 		return -ENOMEM;
