@@ -306,7 +306,7 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 
 		test_rate = clk->parent->rate / clkr->div;
 
-		if (test_rate <= target_rate)
+		if ((test_rate / 1000000) <= (target_rate / 1000000))
 			break; /* found it */
 	}
 
