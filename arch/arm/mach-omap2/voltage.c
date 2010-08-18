@@ -348,6 +348,23 @@ static struct omap_volt_data omap44xx_vdd_core_volt_data[] = {
 	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
 };
 
+/* OMAP 3430 MPU Core VDD dependency table */
+static struct omap_vdd_dep_volt omap34xx_vdd1_vdd2_data[] = {
+	{.main_vdd_volt = 975000, .dep_vdd_volt = 1050000},
+	{.main_vdd_volt = 1075000, .dep_vdd_volt = 1050000},
+	{.main_vdd_volt = 1200000, .dep_vdd_volt = 1150000},
+	{.main_vdd_volt = 1270000, .dep_vdd_volt = 1150000},
+	{.main_vdd_volt = 1350000, .dep_vdd_volt = 1150000},
+	{.main_vdd_volt = 0, .dep_vdd_volt = 0},
+};
+
+static struct omap_vdd_dep_info omap34xx_vdd1_dep_info[] = {
+	{
+		.name	= "core",
+		.dep_table = omap34xx_vdd1_vdd2_data,
+	},
+};
+
 /* By default VPFORCEUPDATE is the chosen method of voltage scaling */
 static bool voltscale_vpforceupdate = true;
 
@@ -523,6 +540,8 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 			vdd->volt_data = omap34xx_vdd1_volt_data;
 			vdd->volt_data_count =
 					ARRAY_SIZE(omap34xx_vdd1_volt_data);
+			vdd->dep_vdd_info = omap34xx_vdd1_dep_info;
+			vdd->nr_dep_vdd = ARRAY_SIZE(omap34xx_vdd1_dep_info);
 		}
 		vdd->volt_clk = clk_get(NULL, "dpll1_ck");
 		WARN(IS_ERR(vdd->volt_clk), "unable to get clock for vdd_%s\n",
