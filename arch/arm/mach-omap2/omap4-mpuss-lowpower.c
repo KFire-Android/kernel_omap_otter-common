@@ -165,15 +165,17 @@ static void restore_mmu_table_entry(void)
  */
 static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
 {
-	u32 scu_pwr_st, regvalue;
+	u32 scu_pwr_st, regvalue, l1_state;
 
 	switch (cpu_state) {
 	case PWRDM_POWER_RET:
 		/* DORMANT */
 		scu_pwr_st = 0x02;
+		l1_state = 0x00;
 		break;
 	case PWRDM_POWER_OFF:
 		scu_pwr_st = 0x03;
+		l1_state = 0xff;
 		break;
 	default:
 		/* Not supported */
@@ -191,6 +193,8 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
 	 * to scratchpad memory
 	 */
 	writel(regvalue, sar_ram_base + SCU_OFFSET);
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+		writel(l1_state, sar_ram_base + SCU_OFFSET + 0x04);
 }
 
 /*
@@ -565,6 +569,15 @@ void __init omap4_mpuss_init(void)
 	mpuss_pd = pwrdm_lookup("mpu_pwrdm");
 	if (!cpu0_pwrdm || !cpu1_pwrdm || !mpuss_pd)
 		pr_err("Failed to get lookup for CPUx/MPUSS pwrdm's\n");
+
+	/*
+	 * Check the OMAP type and store it to scratchpad
+	 */
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+		writel(0x1, sar_ram_base + OMAP_TYPE_OFFSET);
+	else
+		writel(0x0, sar_ram_base + OMAP_TYPE_OFFSET);
+
 }
 
 #else
