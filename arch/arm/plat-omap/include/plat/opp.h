@@ -18,6 +18,7 @@
 #include <linux/cpufreq.h>
 
 #include <plat/common.h>
+#include <plat/voltage.h>
 
 /**
  * struct omap_opp_def - OMAP OPP Definition
@@ -89,6 +90,9 @@ u8 __deprecated opp_get_opp_id(struct omap_opp *opp);
 
 void opp_init_cpufreq_table(struct device *dev,
 			    struct cpufreq_frequency_table **table);
+
+struct device **opp_init_voltage_params(struct voltagedomain *voltdm,
+					int *dev_count);
 #else
 static inline unsigned long opp_get_voltage(const struct omap_opp *opp)
 {
@@ -160,6 +164,11 @@ static inline u8 __deprecated opp_get_opp_id(struct omap_opp *opp)
 static inline
 void opp_init_cpufreq_table(struct omap_opp *opps,
 			    struct cpufreq_frequency_table **table)
+{
+}
+
+static inline struct device **opp_init_voltage_params(
+			struct voltagedomain *voltdm, int *dev_count)
 {
 }
 

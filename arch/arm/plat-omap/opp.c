@@ -526,3 +526,31 @@ void opp_init_cpufreq_table(struct device *dev,
 
 	*table = &freq_table[0];
 }
+
+struct device **opp_init_voltage_params(struct voltagedomain *voltdm,
+					int *dev_count)
+{
+	struct device_opp *dev_opp;
+	struct device **dev_list;
+	int count = 0, i = 0;
+
+	list_for_each_entry(dev_opp, &dev_opp_list, node) {
+		if (!dev_opp->oh->vdd_name)
+			continue;
+
+		if (!strcmp(dev_opp->oh->vdd_name, voltdm->name)) {
+			dev_opp->oh->voltdm = voltdm;
+			count++;
+		}
+	}
+
+	dev_list = kzalloc(sizeof(struct device *) * count, GFP_KERNEL);
+
+	list_for_each_entry(dev_opp, &dev_opp_list, node) {
+		if (dev_opp->oh->voltdm == voltdm)
+			dev_list[i++] = dev_opp->dev;
+	}
+
+	*dev_count = count;
+	return dev_list;
+}
