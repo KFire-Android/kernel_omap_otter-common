@@ -19,6 +19,7 @@
 #include <plat/common.h>
 
 #include "omap3-opp.h"
+#include "opp44xx.h"
 
 static struct omap_device_pm_latency *pm_lats;
 
@@ -94,7 +95,10 @@ static void omap2_init_processor_devices(void)
 static int __init omap2_common_pm_init(void)
 {
 	omap2_init_processor_devices();
-	omap3_pm_init_opp_table();
+	if (cpu_is_omap34xx())
+		omap3_pm_init_opp_table();
+	else if (cpu_is_omap44xx())
+		omap4_pm_init_opp_table();
 
 	omap_pm_if_init();
 
