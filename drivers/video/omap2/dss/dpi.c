@@ -39,7 +39,6 @@ static struct {
 	struct regulator *vdds_dsi_reg;
 } dpi;
 
-#ifdef HWMOD
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 		unsigned long pck_req, unsigned long *fck, int *lck_div,
@@ -65,11 +64,11 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 		dsi_cinfo.highfreq = 0;
 		dsi_calc_clock_rates(&dsi_cinfo);
 	}
-	r = dsi_pll_set_clock_div(lcd_channel_ix, &dsi_cinfo);
+	r = dsi_pll_set_clock_div(channel, &dsi_cinfo);
 	if (r)
 		return r;
 
-	dss_select_dispc_clk_source(lcd_channel_ix, DSS_SRC_DSI1_PLL_FCLK);
+	dss_select_dispc_clk_source(channel, DSS_SRC_DSI1_PLL_FCLK);
 
 	r = dispc_set_clock_div(channel, &dispc_cinfo);
 	if (r)
@@ -81,7 +80,6 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 
 	return 0;
 }
-#endif
 #else
 static int dpi_set_dispc_clk(enum omap_channel channel, bool is_tft,
 		unsigned long pck_req, unsigned long *fck, int *lck_div,
