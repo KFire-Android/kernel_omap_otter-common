@@ -25,6 +25,7 @@ config ST_BT
 
 config ST_FM
 	tristate "fm driver for ST"
+	depends on VIDEO_DEV
 	select TI_ST
 	help
 	  This enables the FM driver for TI BT/FM/GPS combo devices
