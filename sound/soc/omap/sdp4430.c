@@ -473,6 +473,21 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		.ops = &sdp4430_mcpdm_ops,
 	},
+	{
+		.name = "Legacy DMIC",
+		.stream_name = "DMIC Capture",
+
+		/* ABE components - DMIC0 */
+		.cpu_dai_name = "omap-dmic-dai.0",
+		.platform_name = "omap-pcm-audio",
+
+		/* DMIC codec */
+		.codec_dai_name = "dmic-hifi",
+		.codec_name = "dmic-codec.0",
+
+		.ops = &sdp4430_mcpdm_ops,
+	},
+
 /*
  * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.
  * Matched to above interfaces at runtime, based upon use case.
