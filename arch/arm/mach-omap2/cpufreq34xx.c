@@ -24,7 +24,21 @@
 
 #include <plat/opp.h>
 #include <plat/cpu.h>
+#include <plat/clock.h>
+
+#include "cm-regbits-34xx.h"
+#include "prm.h"
 #include "omap3-opp.h"
+
+static int omap3_mpu_set_rate(struct device *dev, unsigned long rate);
+static int omap3_iva_set_rate(struct device *dev, unsigned long rate);
+static int omap3_l3_set_rate(struct device *dev, unsigned long rate);
+
+static unsigned long omap3_mpu_get_rate(struct device *dev);
+static unsigned long omap3_iva_get_rate(struct device *dev);
+static unsigned long omap3_l3_get_rate(struct device *dev);
+
+struct clk *dpll1_clk, *dpll2_clk, *dpll3_clk;
 
 static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
 	/* MPU OPP1 */
@@ -91,12 +105,82 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 };
 static u32 omap36xx_opp_def_size = ARRAY_SIZE(omap36xx_opp_def_list);
 
+
+static int omap3_mpu_set_rate(struct device *dev, unsigned long rate)
+{
+	unsigned long cur_rate = omap3_mpu_get_rate(dev);
+	int ret;
+
+#ifdef CONFIG_CPU_FREQ
+	struct cpufreq_freqs freqs_notify;
+
+	freqs_notify.old = cur_rate / 1000;
+	freqs_notify.new = rate / 1000;
+	freqs_notify.cpu = 0;
+	/* Send pre notification to CPUFreq */
+	cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
+#endif
+	ret = clk_set_rate(dpll1_clk, rate);
+	if (ret) {
+		dev_warn(dev, "%s: Unable to set rate to %ld\n",
+			__func__, rate);
+		return ret;
+	}
+
+#ifdef CONFIG_CPU_FREQ
+	/* Send a post notification to CPUFreq */
+	cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
+#endif
+
+#ifndef CONFIG_CPU_FREQ
+	/*Update loops_per_jiffy if processor speed is being changed*/
+	loops_per_jiffy = compute_lpj(loops_per_jiffy,
+			cur_rate / 1000, rate / 1000);
+#endif
+	return 0;
+}
+
+static unsigned long omap3_mpu_get_rate(struct device *dev)
+{
+	return dpll1_clk->rate;
+}
+
+static int omap3_iva_set_rate(struct device *dev, unsigned long rate)
+{
+	return clk_set_rate(dpll2_clk, rate);
+}
+
+static unsigned long omap3_iva_get_rate(struct device *dev)
+{
+	return dpll2_clk->rate;
+}
+
+static int omap3_l3_set_rate(struct device *dev, unsigned long rate)
+{
+	int l3_div;
+
+	l3_div = cm_read_mod_reg(CORE_MOD, CM_CLKSEL) &
+			OMAP3430_CLKSEL_L3_MASK;
+
+	return clk_set_rate(dpll3_clk, rate * l3_div);
+}
+
+static unsigned long omap3_l3_get_rate(struct device *dev)
+{
+	int l3_div;
+
+	l3_div = cm_read_mod_reg(CORE_MOD, CM_CLKSEL) &
+			OMAP3430_CLKSEL_L3_MASK;
+	return dpll3_clk->rate / l3_div;
+}
+
 /* Temp variable to allow multiple calls */
 static u8 __initdata omap3_table_init;
 
 int __init omap3_pm_init_opp_table(void)
 {
 	struct omap_opp_def *opp_def, *omap3_opp_def_list;
+	struct device *dev;
 	u32 omap3_opp_def_size;
 	int i, r;
 
@@ -120,5 +204,26 @@ int __init omap3_pm_init_opp_table(void)
 			pr_err("unable to add OPP %ld Hz for %s\n",
 				opp_def->freq, opp_def->hwmod_name);
 	}
+
+	dpll1_clk = clk_get(NULL, "dpll1_ck");
+	dpll2_clk = clk_get(NULL, "dpll2_ck");
+	dpll3_clk = clk_get(NULL, "dpll3_m2_ck");
+
+	/* Populate the set rate and get rate for mpu, iva and l3 device */
+	dev = omap2_get_mpuss_device();
+	if (dev)
+		opp_populate_rate_fns(dev, omap3_mpu_set_rate,
+				omap3_mpu_get_rate);
+
+	dev = omap2_get_iva_device();
+	if (dev)
+		opp_populate_rate_fns(dev, omap3_iva_set_rate,
+				omap3_iva_get_rate);
+
+	dev = omap2_get_l3_device();
+	if (dev)
+		opp_populate_rate_fns(dev, omap3_l3_set_rate,
+				omap3_l3_get_rate);
+
 	return 0;
 }
