@@ -24,10 +24,12 @@
 
 #include <linux/err.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
-#include <linux/device.h>
 #include <linux/scatterlist.h>
 #include <linux/platform_device.h>
+#include <linux/pagemap.h>
+#include <linux/kernel.h>
+#include <linux/genalloc.h>
+
 #include <asm/cacheflush.h>
 #include <asm/mach/map.h>
 
@@ -35,17 +37,6 @@
 #include <plat/iovmm.h>
 
 #include "iopgtable.h"
-
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/device.h>
-#include <linux/file.h>
-#include <linux/poll.h>
-#include <linux/swap.h>
-#include <linux/genalloc.h>
-
-
-#define POOL_NONE      -1
 
 /* remember mapping information */
 struct dmm_map_object *add_mapping_info(struct iodmm_struct *obj,
@@ -135,22 +126,30 @@ out:
 }
 
 static int match_containing_map_obj(struct dmm_map_object *map_obj,
-					u32 va, u32 size)
+				u32 va, u32 da, bool check_va, u32 size)
 {
 	u32 res;
-	u32 map_obj_end = map_obj->va + map_obj->size;
+	u32 map_obj_end;
 
-	if ((va >= map_obj->va) && (va + size <= map_obj_end))
-		res = 0;
-	else
-		res = -ENODATA;
-
+	if (check_va) {
+		map_obj_end = map_obj->va + map_obj->size;
+		if ((va >= map_obj->va) && (va + size <= map_obj_end))
+			res = 0;
+		else
+			res = -ENODATA;
+	} else {
+		if (da == map_obj->da)
+			res = 0;
+		else
+			res = -ENODATA;
+	}
 	return res;
 }
 
 static struct dmm_map_object *find_containing_mapping(
 				struct iodmm_struct *obj,
-				u32 va, u32 size)
+				u32 va, u32 da, bool check_va,
+				u32 size)
 {
 	struct dmm_map_object *map_obj, *temp_map;
 	pr_debug("%s: looking for va 0x%x size 0x%x\n", __func__,
@@ -163,7 +162,8 @@ static struct dmm_map_object *find_containing_mapping(
 						map_obj->va,
 						map_obj->da,
 						map_obj->size);
-		if (!match_containing_map_obj(map_obj, va, map_obj->size)) {
+		if (!match_containing_map_obj(map_obj, va, da, check_va,
+							map_obj->size)) {
 			pr_debug("%s: match!\n", __func__);
 			goto out;
 		}
@@ -354,7 +354,8 @@ int proc_begin_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
 							(u32)va_align,
 							ul_size, dir);
 	/* find requested memory are in cached mapping information */
-	map_obj = find_containing_mapping(obj, (u32) va_align, ul_size);
+	map_obj = find_containing_mapping(obj, (u32) va_align, 0, true,
+								ul_size);
 	if (!map_obj) {
 		pr_err("%s: find_containing_mapping failed\n", __func__);
 		status = -EFAULT;
@@ -387,7 +388,8 @@ int proc_end_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
 							ul_size, dir);
 
 	/* find requested memory are in cached mapping information */
-	map_obj = find_containing_mapping(obj, (u32) va_align, ul_size);
+	map_obj = find_containing_mapping(obj, (u32) va_align, 0, true,
+								ul_size);
 	if (!map_obj) {
 		pr_err("%s: find_containing_mapping failed\n", __func__);
 		status = -EFAULT;
@@ -405,11 +407,13 @@ err_out:
 	return status;
 }
 
-/*
- *  ======== device_flush_memory ========
- *  Purpose:
- *     Flush cache
- */
+/**
+ * device_flush_memory - Flushes the memory specified
+ * @obj:	target dmm object
+ * @pva		User address to be flushed
+ * @size	Size of the buffer to be flushed
+ * Flushes the memory specified
+ **/
 int device_flush_memory(struct iodmm_struct *obj, void *pva,
 			     u32 ul_size, u32 ul_flags)
 {
@@ -418,18 +422,19 @@ int device_flush_memory(struct iodmm_struct *obj, void *pva,
 	return proc_begin_dma(obj, pva, ul_size, dir);
 }
 
-/*
- *  ======== proc_invalidate_memory ========
- *  Purpose:
- *     Invalidates the memory specified
- */
+/**
+ * device_invalidate_memory - Invalidates the memory specified
+ * @obj:	target dmm object
+ * @pva		User address to be invalidated
+ * @size	Size of the buffer to be invalidated
+ * Invalidates the memory specified
+ **/
 int device_invalidate_memory(struct iodmm_struct *obj, void *pva, u32 size)
 {
 	enum dma_data_direction dir = DMA_FROM_DEVICE;
 
 	return proc_begin_dma(obj, pva, size, dir);
 }
-
 
 /**
  * user_to_device_map() - maps user to dsp virtual address
@@ -463,21 +468,10 @@ int user_to_device_map(struct iommu *mmu, u32 uva, u32 da, u32 size,
 
 	pages = size / PAGE_SIZE;
 
-	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, uva);
-	while (vma && (uva + size > vma->vm_end))
-		vma = find_vma(mm, vma->vm_end + 1);
 
-	if (!vma) {
-		pr_err("%s: Failed to get VMA region for 0x%x (%d)\n",
-						__func__, uva, size);
-		up_read(&mm->mmap_sem);
-		res = -EINVAL;
-		goto end;
-	}
 	if (vma->vm_flags & (VM_WRITE | VM_MAYWRITE))
 		w = 1;
-	up_read(&mm->mmap_sem);
 
 	for (pg_i = 0; pg_i < pages; pg_i++) {
 		pg_num = get_user_pages(current, mm, uva, 1,
@@ -516,13 +510,12 @@ int user_to_device_map(struct iommu *mmu, u32 uva, u32 da, u32 size,
 			break;
 		}
 	}
-end:
 	return res;
 }
 
 /**
  * phys_to_device_map() - maps physical addr
- * to dsp virtual address
+ * to device virtual address
  * @mmu:       Pointer to iommu handle.
  * @uva:               Virtual user space address.
  * @da         DSP address
@@ -562,52 +555,8 @@ int phys_to_device_map(struct iommu *mmu, u32 phys, u32 da, u32 size,
 	return res;
 }
 
-
 /**
- * io_to_device_map() - maps io addr
- * to device virtual address
- * @mmu:       Pointer to iommu handle.
- * @uva:               Virtual user space address.
- * @da         DSP address
- * @size               Buffer size to map.
- * @usr_pgs    struct page array pointer where the user pages will be stored
- *
- * This function maps a user space buffer into DSP virtual address.
- *
- */
-int io_to_device_map(struct iommu *mmu, u32 io_addr, u32 da, u32 size,
-						struct page **usr_pgs)
-{
-	int res = 0;
-	int pg_i;
-	unsigned int pages;
-	struct iotlb_entry tlb_entry;
-
-	if (!size || !usr_pgs)
-		return -EINVAL;
-
-	pages = size / PAGE_SIZE;
-
-	for (pg_i = 0; pg_i < pages; pg_i++) {
-		tlb_entry.pgsz = MMU_CAM_PGSZ_4K;
-		tlb_entry.prsvd = MMU_CAM_P;
-		tlb_entry.valid = MMU_CAM_V;
-		tlb_entry.elsz = MMU_RAM_ELSZ_8;
-		tlb_entry.endian = MMU_RAM_ENDIAN_LITTLE;
-		tlb_entry.mixed = 0;
-		tlb_entry.da = da;
-		tlb_entry.pa = (u32)io_addr;
-		iopgtable_store_entry(mmu, &tlb_entry);
-		da += PAGE_SIZE;
-		io_addr += PAGE_SIZE;
-	}
-
-	return res;
-}
-
-
-/**
- * user_to_device_unmap() - unmaps DSP virtual buffer.
+ * user_to_device_unmap() - unmaps Device virtual buffer.
  * @mmu:	Pointer to iommu handle.
  * @da		DSP address
  *
@@ -631,7 +580,6 @@ int user_to_device_unmap(struct iommu *mmu, u32 da, unsigned size)
 		total -= bytes;
 		start += bytes;
 	}
-	BUG_ON(total);
 	return 0;
 }
 
@@ -662,6 +610,17 @@ static u32 user_va2_pa(struct mm_struct *mm, u32 address)
 	return 0;
 }
 
+/**
+ * dmm_user - Maps user buffer to Device address
+ * @obj:	target dmm object
+ * @pool_id:	DMM pool id
+ * @da:		Mapped Device Address
+ * @va:		User virtual Address
+ * @bytes	Size of the buffer to be mapped
+ * flags	flags on how to interpret user buffer
+ *
+ * Maps given user buffer to Device address
+ **/
 int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 				u32 va, size_t bytes, u32 flags)
 {
@@ -671,25 +630,93 @@ int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 	struct dmm_map_object *dmm_obj;
 	struct iovmm_device *iovmm_obj = obj->iovmm;
 	u32 pa_align, da_align, size_align, tmp_addr;
-	int err;
+	int err = 0;
 	int i, num_of_pages;
 	struct page *pg;
+	struct vm_area_struct *vma;
+	struct mm_struct *mm = current->mm;
 
+	/*
+	 * Important Note: va is mapped from user application process
+	 * to current process - it must lie completely within the current
+	 * virtual memory address space in order to be of use to us here!
+	 */
+	down_read(&mm->mmap_sem);
+
+	/* Calculate the page-aligned PA, VA and size */
+	pa_align = round_down((u32) va, PAGE_SIZE);
+	size_align = round_up(bytes + va - pa_align, PAGE_SIZE);
+
+	/*
+	 * Hack hack for Tiler. Remove this after proper testing
+	 * Tiler buffers should have VM_IO flag and that should
+	 * take care of instead of check with IOVMF_DA_PHYS
+	 */
 	if (flags == IOVMF_DA_PHYS) {
-		/* Calculate the page-aligned PA, VA and size */
-		pa_align = round_down((u32) va, PAGE_SIZE);
-		size_align = round_up(bytes + va - pa_align, PAGE_SIZE);
 		da_align = user_va2_pa(current->mm, va);
 		*da = (da_align | (va & (PAGE_SIZE - 1)));
 		dmm_obj = add_mapping_info(obj, NULL, va, da_align,
 							size_align);
+		if (dmm_obj == NULL) {
+			err = -EINVAL;
+			goto err;
+		}
 		num_of_pages = size_align/PAGE_SIZE;
 		for (i = 0; i < num_of_pages; i++) {
 			pg = phys_to_page(da_align);
 			da_align += PAGE_SIZE;
 			dmm_obj->pages[i] = pg;
 		}
-		return 0;
+		err = 0;
+		goto err;
+	}
+
+	vma = find_vma(mm, va);
+	if (vma) {
+		dev_dbg(iovmm_obj->iommu->dev,
+			"VMAfor UserBuf: ul_mpu_addr=%x, ul_num_bytes=%x, "
+			"vm_start=%lx, vm_end=%lx, vm_flags=%lx\n", va,
+			bytes, vma->vm_start, vma->vm_end,
+			vma->vm_flags);
+	}
+	/*
+	 * It is observed that under some circumstances, the user buffer is
+	 * spread across several VMAs. So loop through and check if the entire
+	 * user buffer is covered
+	 */
+	while ((vma) && (va + bytes > vma->vm_end)) {
+		/* jump to the next VMA region */
+		vma = find_vma(mm, vma->vm_end + 1);
+		dev_dbg(iovmm_obj->iommu->dev,
+			"VMA for UserBuf ul_mpu_addr=%x ul_num_bytes=%x, "
+			"vm_start=%lx, vm_end=%lx, vm_flags=%lx\n", va,
+			bytes, vma->vm_start, vma->vm_end,
+			vma->vm_flags);
+	}
+	if (!vma) {
+		pr_err("%s: Failed to get VMA region for 0x%x (%d)\n",
+		       __func__, va, bytes);
+		err = -EINVAL;
+		goto err;
+	}
+
+	if (vma->vm_flags & VM_IO) {
+		da_align = user_va2_pa(current->mm, va);
+		*da = (da_align | (va & (PAGE_SIZE - 1)));
+		dmm_obj = add_mapping_info(obj, NULL, va, da_align,
+							size_align);
+		if (dmm_obj == NULL) {
+			err = -EINVAL;
+			goto err;
+		}
+		num_of_pages = size_align/PAGE_SIZE;
+		for (i = 0; i < num_of_pages; i++) {
+			pg = phys_to_page(da_align);
+			da_align += PAGE_SIZE;
+			dmm_obj->pages[i] = pg;
+		}
+		err = 0;
+		goto err;
 	}
 
 	list_for_each_entry(pool, &iovmm_obj->mmap_pool, list) {
@@ -705,10 +732,6 @@ int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 	}
 	da_align = gen_pool_alloc(gen_pool, bytes);
 
-	/* Calculate the page-aligned PA, VA and size */
-	pa_align = round_down((u32) va, PAGE_SIZE);
-	size_align = round_up(bytes + va - pa_align, PAGE_SIZE);
-
 	/* Mapped address = MSB of VA | LSB of PA */
 	tmp_addr = (da_align | ((u32) va & (PAGE_SIZE - 1)));
 	dmm_obj = add_mapping_info(obj, gen_pool, pa_align, tmp_addr,
@@ -721,24 +744,27 @@ int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 	if ((!err) && (flags & IOVMF_DA_USER))
 		*da = tmp_addr;
 
-	return 0;
-
 err:
+	up_read(&mm->mmap_sem);
 	return err;
 }
 
-
-/*
- *  ======== proc_un_map ========
- *  Purpose:
- *      Removes a MPU buffer mapping from the DSP address space.
- */
+/**
+ * user_un_map - Removes User's mapped address
+ * @obj:	target dmm object
+ * @map_addr	Mapped address that needs to be unmapped
+ *
+ * removes user's dmm buffer mapping
+ **/
 int user_un_map(struct iodmm_struct *obj, u32 map_addr)
 {
 	int status = 0;
 	u32 va_align;
 	u32 size_align;
 	struct dmm_map_object *map_obj;
+	int i;
+	struct page *pg;
+
 	va_align = round_down(map_addr, PAGE_SIZE);
 
 	/*
@@ -746,7 +772,7 @@ int user_un_map(struct iodmm_struct *obj, u32 map_addr)
 	* This function returns error if the VA is not mapped
 	*/
 	/* find requested memory are in cached mapping information */
-	map_obj = find_containing_mapping(obj, (u32)va_align, 0);
+	map_obj = find_containing_mapping(obj, 0, map_addr, false, 0);
 	if (!map_obj)
 		goto err;
 	size_align = map_obj->size;
@@ -755,17 +781,37 @@ int user_un_map(struct iodmm_struct *obj, u32 map_addr)
 							size_align);
 	if (status)
 		goto err;
+
+	i = size_align/PAGE_SIZE;
+	while (i--) {
+		pg = map_obj->pages[i];
+		if (pfn_valid(page_to_pfn(pg))) {
+			if (page_count(pg) < 1)
+				pr_info("%s UNMAP FAILURE !!!\n", __func__);
+			else {
+				SetPageDirty(pg);
+				page_cache_release(pg);
+			}
+		}
+	}
 	/*
 	* A successful unmap should be followed by removal of map_obj
 	* from dmm_map_list, so that mapped memory resource tracking
 	* remains uptodate
 	*/
 	remove_mapping_information(obj, map_obj->da, map_obj->size);
+
 	return 0;
 err:
 	return status;
 }
 
+/**
+ * user_remove_resources - Removes User's dmm resources
+ * @obj:	target dmm object
+ *
+ * removes user's dmm resources
+ **/
 void user_remove_resources(struct iodmm_struct *obj)
 {
 
@@ -774,7 +820,7 @@ void user_remove_resources(struct iodmm_struct *obj)
 
 	/* Free DMM mapped memory resources */
 	list_for_each_entry_safe(map_obj, temp_map, &obj->map_list, link) {
-		status = user_un_map(obj, map_obj->va);
+		status = user_un_map(obj, map_obj->da);
 		if (status) {
 			pr_err("%s: proc_un_map failed!"
 				" status = 0x%x\n", __func__, status);

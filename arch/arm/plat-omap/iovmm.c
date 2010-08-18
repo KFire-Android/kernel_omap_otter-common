@@ -88,7 +88,7 @@ static int omap_create_vmm_pool(struct iodmm_struct *obj, int pool_id, int size,
 	pool->pool_id = pool_id;
 	pool->da_begin = sa;
 	pool->da_end = sa + size;
-	pool->genpool = gen_pool_create(10, -1);
+	pool->genpool = gen_pool_create(12, -1);
 	gen_pool_add(pool->genpool, pool->da_begin, size, -1);
 	INIT_LIST_HEAD(&pool->list);
 	list_add_tail(&pool->list, &iovmm->mmap_pool);
@@ -100,11 +100,6 @@ err_out:
 
 static int omap_delete_vmm_pool(struct iodmm_struct *obj, int pool_id)
 {
-	/*
-	 TBD: This is broken due to unmap not workign
-	 Enable this once unmap is woring
-	*/
-#if 0
 	struct iovmm_pool *pool;
 	struct iovmm_device *iovmm_obj = obj->iovmm;
 	struct list_head *_pool, *_next_pool;
@@ -119,8 +114,6 @@ static int omap_delete_vmm_pool(struct iodmm_struct *obj, int pool_id)
 		}
 	}
 	return -ENODEV;
-#endif
-	return 0;
 }
 
 static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
@@ -152,7 +145,6 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 	}
 	case IOVMM_IOCSETPTEENT:
 	{
-
 		struct iotlb_entry e;
 		int size;
 		int page_sz;
@@ -185,13 +177,6 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 		dmm_obj = add_mapping_info(obj, NULL, e.pa, e.da, size);
 
 		iopgtable_store_entry(obj->iovmm->iommu, &e);
-		break;
-	}
-
-	case IOVMM_IOCCLEARPTEENTRIES:
-	{
-		iopgtable_clear_entry_all(obj->iovmm->iommu);
-		flush_iotlb_all(obj->iovmm->iommu);
 		break;
 	}
 
@@ -231,7 +216,7 @@ static int omap_iovmm_ioctl(struct inode *inode, struct file *filp,
 	{
 		u32 da;
 		int size;
-		int status;
+		int status = 0;
 
 		size = copy_from_user(&da, (void __user *)args, sizeof(u32));
 		if (size) {
