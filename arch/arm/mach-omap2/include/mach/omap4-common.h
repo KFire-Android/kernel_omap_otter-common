@@ -69,6 +69,7 @@ extern void __iomem *scu_base;
 extern void __iomem *gic_cpu_base_addr;
 extern void __iomem *gic_dist_base_addr;
 extern void __iomem *sar_ram_base;
+extern dma_addr_t omap4_secure_ram_phys;
 
 extern void __init gic_init_irq(void);
 extern void omap_smc1(u32 fn, u32 arg);

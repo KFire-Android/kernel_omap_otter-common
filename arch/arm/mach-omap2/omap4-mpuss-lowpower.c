@@ -42,6 +42,8 @@
 #include <linux/io.h>
 #include <linux/errno.h>
 #include <linux/smp.h>
+#include <linux/dma-mapping.h>
+
 #include <asm/tlbflush.h>
 #include <asm/smp_scu.h>
 #include <asm/irq.h>
@@ -65,7 +67,17 @@
 #define TABLE_VALUE_OFFSET			0x00
 #define CR_VALUE_OFFSET				0x02
 
+/*
+ * Maximum Secure memory storage size.
+ */
+#define OMAP4_SECURE_RAM_STORAGE		(88 * SZ_1K)
 
+/*
+ * Physical address of secure memory storage
+ */
+dma_addr_t omap4_secure_ram_phys;
+
+static void *secure_ram;
 static struct powerdomain *cpu0_pwrdm, *cpu1_pwrdm, *mpuss_pd;
 
 /*
@@ -344,7 +356,36 @@ static inline void enable_gic_cpu_interface(void)
 static inline void enable_gic_distributor(void)
 {
 	writel(0x1, gic_dist_base_addr + GIC_DIST_CTRL);
-	writel(0x0, sar_bank3_base + SAR_BACKUP_STATUS_OFFSET);
+	if (omap_type() == OMAP2_DEVICE_TYPE_GP)
+		writel(0x0, sar_bank3_base + SAR_BACKUP_STATUS_OFFSET);
+}
+
+/*
+ * API to save GIC and Wakeupgen using secure API
+ * for HS/EMU device
+ */
+static void save_gic_wakeupgen_secure(void)
+{
+	u32 ret;
+	ret = omap4_secure_dispatcher(HAL_SAVEGIC_INDEX,
+					FLAG_IRQFIQ_MASK | FLAG_START_CRITICAL,
+					0, 0, 0, 0, 0);
+	if (!ret)
+		pr_debug("GIC and Wakeupgen context save failed\n");
+}
+
+/*
+ * API to save Secure RAM using secure API
+ * for HS/EMU device
+ */
+static void save_secure_ram(void)
+{
+	u32 ret;
+	ret = omap4_secure_dispatcher(HAL_SAVESECURERAM_INDEX,
+					FLAG_IRQFIQ_MASK | FLAG_START_CRITICAL,
+					1, omap4_secure_ram_phys, 0, 0, 0);
+	if (!ret)
+		pr_debug("Secure ram context save failed\n");
 }
 
 #ifdef CONFIG_LOCAL_TIMERS
@@ -473,15 +514,24 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	case PWRDM_POWER_RET:
 		/* MPUSS OSWR, logic lost */
 		if (pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF) {
-			save_gic();
-			omap4_wakeupgen_save();
+			if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+				save_gic_wakeupgen_secure();
+			} else {
+				save_gic();
+				omap4_wakeupgen_save();
+			}
 			save_state = 2;
 		}
 		break;
 	case PWRDM_POWER_OFF:
 		/* MPUSS OFF */
-		save_gic();
-		omap4_wakeupgen_save();
+		if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+			save_secure_ram();
+			save_gic_wakeupgen_secure();
+		} else {
+			save_gic();
+			omap4_wakeupgen_save();
+		}
 		save_state = 3;
 		break;
 	default:
@@ -573,10 +623,16 @@ void __init omap4_mpuss_init(void)
 	/*
 	 * Check the OMAP type and store it to scratchpad
 	 */
-	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+		/* Memory not released */
+		secure_ram = dma_alloc_coherent(NULL, OMAP4_SECURE_RAM_STORAGE,
+			(dma_addr_t *)&omap4_secure_ram_phys, GFP_KERNEL);
+		if (!secure_ram)
+			pr_err("Unable to allocate secure ram storage\n");
 		writel(0x1, sar_ram_base + OMAP_TYPE_OFFSET);
-	else
+	} else {
 		writel(0x0, sar_ram_base + OMAP_TYPE_OFFSET);
+	}
 
 }
 
