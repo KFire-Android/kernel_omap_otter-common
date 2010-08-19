@@ -33,6 +33,23 @@
 #define CPU1_TWD_OFFSET			0xd38
 #define OMAP_TYPE_OFFSET		0xd48
 
+/*
+ * Secure low power context save/restore API index
+ */
+#define HAL_SAVESECURERAM_INDEX		0x1a
+#define HAL_SAVEHW_INDEX		0x1b
+#define HAL_SAVEALL_INDEX		0x1c
+#define HAL_SAVEGIC_INDEX		0x1d
+
+/*
+ * Secure HAL API flags
+ */
+#define FLAG_START_CRITICAL		0x4
+#define FLAG_IRQFIQ_MASK		0x3
+#define FLAG_IRQ_ENABLE			0x2
+#define FLAG_FIQ_ENABLE			0x1
+#define NO_FLAG				0x0
+
 #ifndef __ASSEMBLER__
 /*
  * wfi used in low power code. Directly opcode is used instead
@@ -55,7 +72,9 @@ extern void __iomem *sar_ram_base;
 
 extern void __init gic_init_irq(void);
 extern void omap_smc1(u32 fn, u32 arg);
-
+extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
+extern u32 omap4_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
+				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
 extern void __init omap4_mpuss_init(void);
 extern void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
 extern void __omap4_cpu_suspend(unsigned int cpu, unsigned int save_state);
