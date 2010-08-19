@@ -91,36 +91,13 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 };
 static u32 omap36xx_opp_def_size = ARRAY_SIZE(omap36xx_opp_def_list);
 
-static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
-	/* MPU OPP1 - OPP50 */
-	OMAP_OPP_DEF("mpu", true, 300000000, 930000),
-	/* MPU OPP2 - OPP100 */
-	OMAP_OPP_DEF("mpu", true, 600000000, 1100000),
-	/* MPU OPP3 - OPP-Turbo */
-	OMAP_OPP_DEF("mpu", true, 800000000, 1260000),
-	/* MPU OPP4 - OPP-SB */
-	OMAP_OPP_DEF("mpu", true, 1008000000, 1350000),
-	/* IVA OPP1 - OPP50 */
-	OMAP_OPP_DEF("iva", true,  133028570, 930000),
-	/* IVA OPP2 - OPP100 */
-	OMAP_OPP_DEF("iva", true,  266057142, 1100000),
-	/* IVA OPP3 - OPP-Turbo */
-	OMAP_OPP_DEF("iva", false, 332000000, 1260000),
-	/* L3 OPP1 - OPP50 */
-	OMAP_OPP_DEF("l3_main_1", true, 100000000, 930000),
-	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
-	OMAP_OPP_DEF("l3_main_1", true, 200000000, 1100000),
-};
-
-static u32 omap44xx_opp_def_size = ARRAY_SIZE(omap44xx_opp_def_list);
-
 /* Temp variable to allow multiple calls */
 static u8 __initdata omap3_table_init;
 
 int __init omap3_pm_init_opp_table(void)
 {
 	struct omap_opp_def *opp_def, *omap3_opp_def_list;
-	u32 omap_opp_def_size;
+	u32 omap3_opp_def_size;
 	int i, r;
 
 	/*
@@ -131,17 +108,13 @@ int __init omap3_pm_init_opp_table(void)
 		return 0;
 	omap3_table_init = 1;
 
-	if (cpu_is_omap44xx()) {
-		opp_def = omap44xx_opp_def_list;
-		omap_opp_def_size = omap44xx_opp_def_size;
-	} else {
-		omap3_opp_def_list = cpu_is_omap3630() ? omap36xx_opp_def_list :
-				omap34xx_opp_def_list;
-		omap_opp_def_size = cpu_is_omap3630() ? omap36xx_opp_def_size :
-				omap34xx_opp_def_size;
-		opp_def = omap3_opp_def_list;
-	}
-	for (i = 0; i < omap_opp_def_size; i++) {
+	omap3_opp_def_list = cpu_is_omap3630() ? omap36xx_opp_def_list :
+			omap34xx_opp_def_list;
+	omap3_opp_def_size = cpu_is_omap3630() ? omap36xx_opp_def_size :
+			omap34xx_opp_def_size;
+
+	opp_def = omap3_opp_def_list;
+	for (i = 0; i < omap3_opp_def_size; i++) {
 		r = opp_add(opp_def++);
 		if (r)
 			pr_err("unable to add OPP %ld Hz for %s\n",

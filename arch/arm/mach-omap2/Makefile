@@ -55,7 +55,7 @@ obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o voltage.o \
 					   cpuidle34xx.o pm_bus.o cpufreq34xx.o
 obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o pm_bus.o cpuidle44xx.o \
 					   omap4-mpuss-lowpower.o sleep44xx.o \
-					   cpufreq34xx.o voltage.o
+					   voltage.o
 
 obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
 obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o

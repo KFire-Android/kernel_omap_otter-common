@@ -94,8 +94,8 @@ static void omap2_init_processor_devices(void)
 static int __init omap2_common_pm_init(void)
 {
 	omap2_init_processor_devices();
-	if (cpu_is_omap34xx() || cpu_is_omap44xx())
-		omap3_pm_init_opp_table();
+	omap3_pm_init_opp_table();
+
 	omap_pm_if_init();
 
 	return 0;
