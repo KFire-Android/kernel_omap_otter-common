@@ -92,9 +92,13 @@ E.g.:
 		+-- x-loader
 
 To select the default configuration for X-loader type:
-    For SDP and Blaze boards:
+    For ES1.0 SDP and Blaze boards:
+	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_MPU_600MHz_config
+    For ES2.0 SDP and Blaze boards:
 	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
-    For Panda boards:
+    For ES1.0 Panda boards:
+	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_600_config
+    For ES2.0 Panda boards:
 	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430panda_config
 
 To build the X-loader image type:
@@ -104,15 +108,8 @@ To build the X-loader image type:
 The above step will create a MLO image, which can be copied into the
 MMC/SD card for booting via MMC/SD.
 
-NOTE:	1 GHz (default configuration) is not stable on all ES1.0 devices. 
-	You must always use omap4430sdp_MPU_600MHz_config for ES1.0. 
-
-3.2.3 Compiling X-loader (for booting from eMMC)
-
-Follow same steps as above to create an MLO image. A configuration header needs
-to be added at the begining of this MLO to create an image 'x-load.ch.bin' that
-can be written to the eMMC for eMMC-booting. Please contact your TI
-representative for obtaining the configuration header.
+For booting from eMMC flash this MLO at sector 0x0 or sector 0x100. See
+section 3.3.2 for detailed instructions for flashing and booting from eMMC.
 
 3.2.4 Compiling the Kernel
 
@@ -158,16 +155,15 @@ using one of the following options.
 
 Option 1:
 Use a debugger or OMAPFlasher tool to download x-loader (with configuration
-header, e.g. x-load.ch.bin) as well as u-boot.bin into
+header, e.g. MLO) as well as u-boot.bin into
 SDRAM and run u-boot from SDRAM.
 
 Option 2:
-Boot via a removable MMC card following the instructions in section 3.3.1, but
-additionally keep the x-load.ch.bin that you want to flash to eMMC in the same
-removable MMC card. After booting from removable MMC, copy the x-load.ch.bin
+Boot via a removable MMC card following the instructions in section 3.3.1. 
+After booting from removable MMC, copy the MLO
 and u-boot.bin from the MMC to RAM using the following commands:
 OMAP44XX SDP # mmcinit 0
-OMAP44XX SDP # fatload mmc 0 [Ram Address X] x-load.ch.bin
+OMAP44XX SDP # fatload mmc 0 [Ram Address X] MLO
 OMAP44XX SDP # fatload mmc 0 [Ram Address Y] u-boot.bin
 
 Once the x-loader and u-boot binaries are in RAM, use the following commands
@@ -257,24 +253,11 @@ http://omappedia.org/wiki/Write_Back_pipeline_usage_guide
 
 3.5 Enabling Power Management Features
 
-All PM features are disabled in the default OMAP4 kernel configuration
+All PM features are enabled by default in OMAP4 kernel configuration
 (omap_4430sdp_defconfig).
-All clocks are still kept enabled on bootloader.
-
-To test PM features please use omap4_pm_defconfig. Note that PM features
-on OMAP4430 ES1.0 can only be verified on a EMU device. The EMU device needs
-the x-loader signed with the right PPA release.
-
-omap4_pm_defconfig does not enable Tick suppression. To do so enable these
-options manually.
-
-Enable the following options in menuconfig
-	Kernel Features ---> Use local timer interrupts
-	Kernel Features ---> Tickless System
-	Kernel Features ---> High Resolution Timer support
-
-omap4_pm_defconfig has VFP support disabled due to a know issue with enabling
-FPU on ES1. Please do not enable VFP support.
+ 
+Note that PM features on OMAP4430 ES1.0 are not supported and hence 
+all PM features are disabled once CONFIG_OMAP4_ES1 is selected.
 
 3.5.1 CPU Hotplug
 
