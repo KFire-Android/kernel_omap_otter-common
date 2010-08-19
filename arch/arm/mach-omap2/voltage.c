@@ -365,6 +365,36 @@ static struct omap_vdd_dep_info omap34xx_vdd1_dep_info[] = {
 	},
 };
 
+/* OMAP 4430 MPU Core VDD dependency table */
+static struct omap_vdd_dep_volt omap44xx_vddmpu_vddcore_data[] = {
+	{.main_vdd_volt = 930000, .dep_vdd_volt = 930000},
+	{.main_vdd_volt = 1100000, .dep_vdd_volt = 1100000},
+	{.main_vdd_volt = 1260000, .dep_vdd_volt = 1100000},
+	{.main_vdd_volt = 1350000, .dep_vdd_volt = 1100000},
+	{.main_vdd_volt = 0, .dep_vdd_volt = 0},
+};
+
+static struct omap_vdd_dep_volt omap44xx_vddiva_vddcore_data[] = {
+	{.main_vdd_volt = 930000, .dep_vdd_volt = 930000},
+	{.main_vdd_volt = 1100000, .dep_vdd_volt = 1100000},
+	{.main_vdd_volt = 1260000, .dep_vdd_volt = 1100000},
+	{.main_vdd_volt = 0, .dep_vdd_volt = 0},
+};
+
+static struct omap_vdd_dep_info omap44xx_vddmpu_dep_info[] = {
+	{
+		.name	= "core",
+		.dep_table = omap44xx_vddmpu_vddcore_data,
+	},
+};
+
+static struct omap_vdd_dep_info omap44xx_vddiva_dep_info[] = {
+	{
+		.name	= "core",
+		.dep_table = omap44xx_vddiva_vddcore_data,
+	},
+};
+
 /* By default VPFORCEUPDATE is the chosen method of voltage scaling */
 static bool voltscale_vpforceupdate = true;
 
@@ -699,6 +729,8 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 		vdd->vp_reg.vlimitto_vddmax = OMAP4_VP_MPU_VLIMITTO_VDDMAX;
 		vdd->volt_data = omap44xx_vdd_mpu_volt_data;
 		vdd->volt_data_count = ARRAY_SIZE(omap44xx_vdd_mpu_volt_data);
+		vdd->dep_vdd_info = omap44xx_vddmpu_dep_info;
+		vdd->nr_dep_vdd = ARRAY_SIZE(omap44xx_vddmpu_dep_info);
 		vdd->volt_clk = clk_get(NULL, "dpll_mpu_ck");
 		WARN(IS_ERR(vdd->volt_clk), "unable to get clock for vdd_%s\n",
 				vdd->voltdm.name);
@@ -725,6 +757,8 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 		vdd->vp_reg.vlimitto_vddmax = OMAP4_VP_IVA_VLIMITTO_VDDMAX;
 		vdd->volt_data = omap44xx_vdd_iva_volt_data;
 		vdd->volt_data_count = ARRAY_SIZE(omap44xx_vdd_iva_volt_data);
+		vdd->dep_vdd_info = omap44xx_vddiva_dep_info;
+		vdd->nr_dep_vdd = ARRAY_SIZE(omap44xx_vddiva_dep_info);
 		vdd->volt_clk = clk_get(NULL, "dpll_iva_m5x2_ck");
 		WARN(IS_ERR(vdd->volt_clk), "unable to get clock for vdd_%s\n",
 				vdd->voltdm.name);
