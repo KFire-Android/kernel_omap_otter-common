@@ -4333,10 +4333,7 @@ static void dispc_error_worker(struct work_struct *work)
 
 	if (errors & DISPC_IRQ_SYNC_LOST_DIGIT) {
 
-	DSSERR("SYNC_LOST_DIGIT\n");
-/*commenting below code as with 1080P Decode we see a sync lost digit for
-first frame  as it takes long time to decode but it later recovers*/
-#if 0
+		DSSERR("SYNC_LOST_DIGIT\n");
 		struct omap_overlay_manager *manager = NULL;
 		bool enable = false;
 
@@ -4374,7 +4371,7 @@ first frame  as it takes long time to decode but it later recovers*/
 			if (enable)
 				dssdev->driver->enable(dssdev);
 		}
-#endif
+
 	}
 
 	if (errors & DISPC_IRQ_OCP_ERR) {
