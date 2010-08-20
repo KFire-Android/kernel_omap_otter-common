@@ -50,6 +50,7 @@
 #include <asm/smp_twd.h>
 
 #include <plat/powerdomain.h>
+#include <plat/clockdomain.h>
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
 
@@ -614,6 +615,8 @@ cpu_prepare:
 
 void __init omap4_mpuss_init(void)
 {
+	struct clockdomain *l4_secure_clkdm;
+
 	cpu0_pwrdm = pwrdm_lookup("cpu0_pwrdm");
 	cpu1_pwrdm = pwrdm_lookup("cpu1_pwrdm");
 	mpuss_pd = pwrdm_lookup("mpu_pwrdm");
@@ -630,6 +633,10 @@ void __init omap4_mpuss_init(void)
 		if (!secure_ram)
 			pr_err("Unable to allocate secure ram storage\n");
 		writel(0x1, sar_ram_base + OMAP_TYPE_OFFSET);
+
+		/* FIXME: HWSUP isn't working for l4_secure_clkdm */
+		l4_secure_clkdm = clkdm_lookup("l4_secure_clkdm");
+		omap2_clkdm_wakeup(l4_secure_clkdm);
 	} else {
 		writel(0x0, sar_ram_base + OMAP_TYPE_OFFSET);
 	}
