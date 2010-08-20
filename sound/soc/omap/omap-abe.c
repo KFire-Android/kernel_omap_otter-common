@@ -864,7 +864,6 @@ static void enable_be_ports(struct snd_soc_pcm_runtime *rtd,  int stream)
 			}
 			break;
 		case OMAP_ABE_DAI_MM_FM:
-		case OMAP_ABE_DAI_MODEM:
 			if (be_is_pending(be_rtd, stream)) {
 				if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 					/* MM_EXT connection to McBSP 2 ports */
