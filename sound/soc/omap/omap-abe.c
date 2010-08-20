@@ -816,6 +816,7 @@ static inline void abe_dai_enable_data_transfer(int port)
 static void enable_be_ports(struct snd_soc_pcm_runtime *rtd,  int stream)
 {
 	struct snd_soc_pcm_runtime *be_rtd;
+	abe_data_format_t format;
 	int i;
 
 	for (i = 0; i < rtd->num_be; i++) {
@@ -845,20 +846,42 @@ static void enable_be_ports(struct snd_soc_pcm_runtime *rtd,  int stream)
 			break;
 		case OMAP_ABE_DAI_BT_VX:
 			if (be_is_pending(be_rtd, stream)) {
-				if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+				if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+					/* BT_DL connection to McBSP 1 ports */
+					format.f = 8000;
+					format.samp_format = STEREO_RSHIFTED_16;
+					abe_connect_serial_port(BT_VX_DL_PORT,
+								&format, MCBSP1_RX);
 					abe_dai_enable_data_transfer(BT_VX_DL_PORT);
-				else
+				} else {
+					/* BT_UL connection to McBSP 1 ports */
+					format.f = 8000;
+					format.samp_format = STEREO_RSHIFTED_16;
+					abe_connect_serial_port(BT_VX_UL_PORT,
+								&format, MCBSP1_TX);
 					abe_dai_enable_data_transfer(BT_VX_UL_PORT);
 				}
+			}
 			break;
 		case OMAP_ABE_DAI_MM_FM:
 		case OMAP_ABE_DAI_MODEM:
 			if (be_is_pending(be_rtd, stream)) {
-				if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+				if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+					/* MM_EXT connection to McBSP 2 ports */
+					format.f = 8000;
+					format.samp_format = STEREO_RSHIFTED_16;
+					abe_connect_serial_port(MM_EXT_OUT_PORT,
+								&format, MCBSP2_RX);
 					abe_dai_enable_data_transfer(MM_EXT_OUT_PORT);
-				else
+				} else {
+					/* MM_EXT connection to McBSP 2 ports */
+					format.f = 8000;
+					format.samp_format = STEREO_RSHIFTED_16;
+					abe_connect_serial_port(MM_EXT_IN_PORT,
+								&format, MCBSP2_TX);
 					abe_dai_enable_data_transfer(MM_EXT_IN_PORT);
 				}
+			}
 			break;
 		case OMAP_ABE_DAI_DMIC0:
 			if (be_is_pending(be_rtd, stream))
