@@ -386,6 +386,12 @@ NOTE:
 		- FBdev and V4L2 API support
 		- Primary and Secondary DSI and HDMI displays
 		- Simultaneous rendering on all 3 displays
+		- Blanking of display after inactivity timer
+		- Suspend and Resume on all the displays
+			- Primary LCD
+			- Secondary LCD
+			- HDMI
+			- Pico DLP
 	Tiler memory manager.
 
 - WLAN
