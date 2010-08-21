@@ -779,9 +779,6 @@ static s32 tiler_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	/* don't allow mremap */
-	vma->vm_flags |= VM_DONTEXPAND | VM_RESERVED;
-
 	mutex_lock(&mtx);
 	list_for_each(pos, &pi->bufs) {
 		_b = list_entry(pos, struct __buf_info, by_pid);
