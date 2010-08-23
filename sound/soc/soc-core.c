@@ -1918,10 +1918,17 @@ static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 	snprintf(new_name, sizeof(new_name), "%s %s-%d",
 			rtd->dai_link->stream_name, codec_dai->name, num);
 
-	if (codec_dai->driver->playback.channels_min)
-		playback = 1;
-	if (codec_dai->driver->capture.channels_min)
-		capture = 1;
+	if (rtd->dai_link->dynamic) {
+		if (rtd->dai_link->fe_playback_channels)
+			playback = 1;
+		if (rtd->dai_link->fe_capture_channels)
+			capture = 1;
+	} else {
+		if (codec_dai->driver->playback.channels_min)
+			playback = 1;
+		if (codec_dai->driver->capture.channels_min)
+			capture = 1;
+	}
 
 	dev_dbg(rtd->card->dev, "registered pcm #%d %s\n",num,new_name);
 	ret = snd_pcm_new(rtd->card->snd_card, new_name,

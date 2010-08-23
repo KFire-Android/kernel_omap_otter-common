@@ -577,6 +577,9 @@ struct snd_soc_dai_link {
 	/* supported BE */
 	const char **supported_be;
 	int num_be;
+	int fe_playback_channels;
+	int fe_capture_channels;
+
 
 	/* Keep DAI active over suspend */
 	unsigned int ignore_suspend:1;
