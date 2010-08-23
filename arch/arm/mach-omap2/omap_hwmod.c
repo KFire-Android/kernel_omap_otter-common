@@ -545,6 +545,36 @@ static int _disable_clocks(struct omap_hwmod *oh)
 	return 0;
 }
 
+static void _enable_optional_clocks(struct omap_hwmod *oh)
+{
+	struct omap_hwmod_opt_clk *oc;
+	int i;
+
+	pr_warning("omap_hwmod: %s: enabling optional clocks\n", oh->name);
+
+	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
+		if (oc->_clk) {
+			pr_warning("omap_hwmod: enable %s:%s\n", oc->role,
+				   oc->_clk->name);
+			clk_enable(oc->_clk);
+		}
+}
+
+static void _disable_optional_clocks(struct omap_hwmod *oh)
+{
+	struct omap_hwmod_opt_clk *oc;
+	int i;
+
+	pr_warning("omap_hwmod: %s: disabling optional clocks\n", oh->name);
+
+	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
+		if (oc->_clk) {
+			pr_warning("omap_hwmod: disable %s:%s\n", oc->role,
+				   oc->_clk->name);
+			clk_disable(oc->_clk);
+		}
+}
+
 /**
  * _find_mpu_port_index - find hwmod OCP slave port ID intended for MPU use
  * @oh: struct omap_hwmod *
@@ -854,8 +884,9 @@ static int _wait_target_ready(struct omap_hwmod *oh)
  */
 static int _reset(struct omap_hwmod *oh)
 {
-	u32 r, v;
+	u32 v;
 	int c = 0;
+	int ret = 0;
 
 	if (!oh->class->sysc ||
 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET) ||
@@ -869,12 +900,16 @@ static int _reset(struct omap_hwmod *oh)
 		return -EINVAL;
 	}
 
-	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
+	/* For some modules, all optionnal clocks need to be enabled as well */
+	if (oh->flags & HWMOD_CONTROL_OPT_CLKS_IN_RESET)
+		_enable_optional_clocks(oh);
+
+	pr_warning("omap_hwmod: %s: resetting\n", oh->name);
 
 	v = oh->_sysc_cache;
-	r = _set_softreset(oh, &v);
-	if (r)
-		return r;
+	ret = _set_softreset(oh, &v);
+	if (ret)
+		goto dis_opt_clks;
 	_write_sysconfig(v, oh);
 
 	omap_test_timeout((omap_hwmod_readl(oh, oh->class->sysc->syss_offs) &
@@ -892,7 +927,13 @@ static int _reset(struct omap_hwmod *oh)
 	 * _wait_target_ready() or _reset()
 	 */
 
-	return (c == MAX_MODULE_RESET_WAIT) ? -ETIMEDOUT : 0;
+	ret = (c == MAX_MODULE_RESET_WAIT) ? -ETIMEDOUT : 0;
+
+dis_opt_clks:
+	if (oh->flags & HWMOD_CONTROL_OPT_CLKS_IN_RESET)
+		_disable_optional_clocks(oh);
+
+	return ret;
 }
 
 /**
