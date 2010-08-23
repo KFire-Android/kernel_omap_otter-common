@@ -410,6 +410,8 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.dynamic = 1, /* BE is dynamic */
 		.supported_be = mm1_be,
 		.num_be = ARRAY_SIZE(mm1_be),
+		.fe_playback_channels = 2,
+		.fe_capture_channels = 2,
 	},
 	{
 		.name = "SDP4430 Media Capture",
@@ -422,6 +424,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.dynamic = 1, /* BE is dynamic */
 		.supported_be = mm2_be,
 		.num_be = ARRAY_SIZE(mm2_be),
+		.fe_capture_channels = 8,
 	},
 	{
 		.name = "SDP4430 Voice",
@@ -434,6 +437,8 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.dynamic = 1, /* BE is dynamic */
 		.supported_be = mm1_be,
 		.num_be = ARRAY_SIZE(mm1_be),
+		.fe_playback_channels = 2,
+		.fe_capture_channels = 2,
 	},
 	{
 		.name = "SDP4430 Tones Playback",
@@ -446,6 +451,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.dynamic = 1, /* BE is dynamic */
 		.supported_be = tones_be,
 		.num_be = ARRAY_SIZE(tones_be),
+		.fe_playback_channels = 2,
 	},
 	{
 		.name = "SDP4430 Vibra Playback",
@@ -458,6 +464,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.dynamic = 1, /* BE is dynamic */
 		.supported_be = vib_be,
 		.num_be = ARRAY_SIZE(vib_be),
+		.fe_playback_channels = 2,
 	},
 	{
 		.name = "SDP4430 MODEM",
@@ -470,6 +477,8 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.dynamic = 1, /* BE is dynamic */
 		.supported_be = modem_be,
 		.num_be = ARRAY_SIZE(modem_be),
+		.fe_playback_channels = 2,
+		.fe_capture_channels = 2,
 	},
 #ifdef CONFIG_SND_OMAP_SOC_HDMI
 	{
