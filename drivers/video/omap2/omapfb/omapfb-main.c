@@ -1193,7 +1193,7 @@ static int omapfb_mmap(struct fb_info *fbi, struct vm_area_struct *vma)
 
 	DBG("user mmap region start %lx, len %d, off %lx\n", start, len, off);
 
-	vma->vm_private_data = ofbi;
+	vma->vm_private_data = rg;
 	if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
 		int k = 0, p = fix->line_length;
 
