@@ -29,6 +29,7 @@
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/omapfb.h>
+#include <linux/console.h>
 
 #include <plat/display.h>
 #include <plat/vram.h>
@@ -2006,6 +2007,84 @@ static void omapfb_free_resources(struct omapfb2_device *fbdev)
 	kfree(fbdev);
 }
 
+static void size_notify(struct fb_info *fbi, int w, int h)
+{
+	struct fb_var_screeninfo var = fbi->var;
+	struct fb_var_screeninfo saved_var = fbi->var;
+	int orig_flags;
+
+	DBG("size_notify: %dx%d\n", w, h);
+
+	var.activate |= FB_ACTIVATE_FORCE | FB_ACTIVATE_ALL | FB_ACTIVATE_NOW;
+	var.xres = w;
+	var.yres = h;
+	var.xres_virtual = w;
+	var.yres_virtual = h;
+
+	acquire_console_sem();
+
+	/* this ensures fbdev clients, like the console driver, get notified about
+	 * the change:
+	 */
+	orig_flags = fbi->flags;
+	fbi->flags |= FBINFO_MISC_USEREVENT;
+	fb_set_var(fbi, &var);
+	fbi->flags &= ~FBINFO_MISC_USEREVENT;
+
+	/* now delete old mode:
+	 */
+	saved_var.activate |= FB_ACTIVATE_INV_MODE;
+	fbi->flags |= FBINFO_MISC_USEREVENT;
+	fb_set_var(fbi, &saved_var);
+	fbi->flags = orig_flags;
+
+	release_console_sem();
+}
+
+struct omapfb_notifier_block {
+	struct notifier_block notifier;
+	struct omapfb2_device *fbdev;
+};
+
+static int omapfb_notifier(struct notifier_block *nb,
+		unsigned long evt, void *arg)
+{
+	struct omapfb_notifier_block *notifier =
+			container_of(nb, struct omapfb_notifier_block, notifier);
+	struct omap_dss_device *dssdev = arg;
+	struct omapfb2_device *fbdev = notifier->fbdev;
+	int keep = false;
+	int i;
+
+	/* figure out if this event pertains to this omapfb device:
+	 */
+	for (i = 0; i < fbdev->num_managers; i++) {
+		if (fbdev->managers[i]->device == dssdev) {
+			keep = true;
+			break;
+		}
+	}
+
+	if (!keep)
+		return NOTIFY_DONE;
+
+	/* the event pertains to us.. see if we care:
+	 */
+	switch (evt) {
+		case OMAP_DSS_SIZE_CHANGE: {
+			u16 w, h;
+			dssdev->driver->get_resolution(dssdev, &w, &h);
+			for (i = 0; i < fbdev->num_fbs; i++)
+				size_notify(fbdev->fbs[i], w, h);
+			break;
+		}
+		default:  /* don't care about other events for now */
+			break;
+	}
+
+	return NOTIFY_OK;
+}
+
 static int omapfb_create_framebuffers(struct omapfb2_device *fbdev)
 {
 	int r, i;
@@ -2324,6 +2403,7 @@ static int omapfb_probe(struct platform_device *pdev)
 	fbdev->num_displays = 0;
 	dssdev = NULL;
 	for_each_dss_dev(dssdev) {
+		struct omapfb_notifier_block *notifier;
 		omap_dss_get_device(dssdev);
 
 		if (!dssdev->driver) {
@@ -2332,6 +2412,11 @@ static int omapfb_probe(struct platform_device *pdev)
 		}
 
 		fbdev->displays[fbdev->num_displays++] = dssdev;
+
+		notifier = kzalloc(sizeof(struct omapfb_notifier_block), GFP_KERNEL);
+		notifier->notifier.notifier_call = omapfb_notifier;
+		notifier->fbdev = fbdev;
+		omap_dss_add_notify(dssdev, &notifier->notifier);
 	}
 
 	if (r)
