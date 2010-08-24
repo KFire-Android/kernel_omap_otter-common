@@ -107,7 +107,6 @@ struct mmc_data {
 #define MMC_DATA_WRITE	(1 << 8)
 #define MMC_DATA_READ	(1 << 9)
 #define MMC_DATA_STREAM	(1 << 10)
-#define MMC_DDR_MODE	(1 << 11)
 
 	unsigned int		bytes_xfered;
 
@@ -134,6 +133,8 @@ extern void mmc_wait_for_req(struct mmc_host *, struct mmc_request *);
 extern int mmc_wait_for_cmd(struct mmc_host *, struct mmc_command *, int);
 extern int mmc_wait_for_app_cmd(struct mmc_host *, struct mmc_card *,
 	struct mmc_command *, int);
+
+extern int mmc_set_blocklen(struct mmc_card *card, unsigned int blocklen);
 
 extern void mmc_set_data_timeout(struct mmc_data *, const struct mmc_card *);
 extern unsigned int mmc_align_data_size(struct mmc_card *, unsigned int);
