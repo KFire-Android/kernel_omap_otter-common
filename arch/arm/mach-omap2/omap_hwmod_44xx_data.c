@@ -5404,14 +5404,14 @@ static struct omap_hwmod omap44xx_usb_host_hs_hwmod = {
  */
 
 static struct omap_hwmod_class_sysconfig omap44xx_usb_otg_hs_sysc = {
-
 	.rev_offs	= 0x0400,
 	.sysc_offs	= 0x0404,
 	.syss_offs	= 0x0408,
-	.sysc_flags	= SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE|
-			  SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
-			  SYSC_HAS_AUTOIDLE,
-	.idlemodes	= SIDLE_FORCE | SIDLE_NO | SIDLE_SMART,
+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_ENAWAKEUP |
+			   SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE |
+			   SYSC_HAS_SOFTRESET),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
 	.sysc_fields	= &omap_hwmod_sysc_type1,
 };
 
