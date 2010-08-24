@@ -1342,10 +1342,10 @@ static struct omap_hwmod_ocp_if *omap44xx_dss_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk dss_opt_clks[] = {
-	{ .role = "tv_clk", .clk = "extalt_clkin_ck" },
-	{ .role = "dssclk", .clk = "dpll_per_m5_ck" },
-	{ .role = "sys_clk", .clk = "syc_clk_div_ck" },
-	{ .role = "48mhz_clk", .clk = "func_48mc_fclk" },
+	{ .role = "sys_clk", .clk = "dss_sys_clk" },
+	{ .role = "tv_clk", .clk = "dss_tv_clk" },
+	{ .role = "dss_clk", .clk = "dss_dss_clk" },
+	{ .role = "48mhz_clk", .clk = "dss_48mhz_clk" },
 };
 
 static struct omap_hwmod omap44xx_dss_hwmod = {
@@ -1360,7 +1360,7 @@ static struct omap_hwmod omap44xx_dss_hwmod = {
 		},
 	},
 	.opt_clks	= dss_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(dss_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(dss_opt_clks),
 	.slaves		= omap44xx_dss_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_slaves),
 	.masters	= omap44xx_dss_masters,
@@ -1676,7 +1676,7 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio1_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
-	{ .role = "dbclk", .clk = "sys_32k_ck" },
+	{ .role = "dbclk", .clk = "gpio1_dbclk" },
 };
 
 static struct omap_hwmod omap44xx_gpio1_hwmod = {
@@ -1690,7 +1690,7 @@ static struct omap_hwmod omap44xx_gpio1_hwmod = {
 		},
 	},
 	.opt_clks	= gpio1_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(gpio1_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(gpio1_opt_clks),
 	.dev_attr	= &gpio1_dev_attr,
 	.slaves		= omap44xx_gpio1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio1_slaves),
@@ -1727,12 +1727,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio2_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk gpio2_opt_clks[] = {
-	{ .role = "dbclk", .clk = "sys_32k_ck" },
+	{ .role = "dbclk", .clk = "gpio2_dbclk" },
 };
 
 static struct omap_hwmod omap44xx_gpio2_hwmod = {
 	.name		= "gpio2",
 	.class		= &omap44xx_gpio_hwmod_class,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 	.mpu_irqs	= omap44xx_gpio2_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio2_irqs),
 	.prcm = {
@@ -1741,7 +1742,7 @@ static struct omap_hwmod omap44xx_gpio2_hwmod = {
 		},
 	},
 	.opt_clks	= gpio2_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(gpio2_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(gpio2_opt_clks),
 	.dev_attr	= &gpio_dev_attr,
 	.slaves		= omap44xx_gpio2_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio2_slaves),
@@ -1778,12 +1779,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio3_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk gpio3_opt_clks[] = {
-	{ .role = "dbclk", .clk = "sys_32k_ck" },
+	{ .role = "dbclk", .clk = "gpio3_dbclk" },
 };
 
 static struct omap_hwmod omap44xx_gpio3_hwmod = {
 	.name		= "gpio3",
 	.class		= &omap44xx_gpio_hwmod_class,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 	.mpu_irqs	= omap44xx_gpio3_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio3_irqs),
 	.prcm = {
@@ -1792,7 +1794,7 @@ static struct omap_hwmod omap44xx_gpio3_hwmod = {
 		},
 	},
 	.opt_clks	= gpio3_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(gpio3_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(gpio3_opt_clks),
 	.dev_attr	= &gpio_dev_attr,
 	.slaves		= omap44xx_gpio3_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio3_slaves),
@@ -1829,12 +1831,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio4_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk gpio4_opt_clks[] = {
-	{ .role = "dbclk", .clk = "sys_32k_ck" },
+	{ .role = "dbclk", .clk = "gpio4_dbclk" },
 };
 
 static struct omap_hwmod omap44xx_gpio4_hwmod = {
 	.name		= "gpio4",
 	.class		= &omap44xx_gpio_hwmod_class,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 	.mpu_irqs	= omap44xx_gpio4_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio4_irqs),
 	.prcm = {
@@ -1843,7 +1846,7 @@ static struct omap_hwmod omap44xx_gpio4_hwmod = {
 		},
 	},
 	.opt_clks	= gpio4_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(gpio4_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(gpio4_opt_clks),
 	.dev_attr	= &gpio_dev_attr,
 	.slaves		= omap44xx_gpio4_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio4_slaves),
@@ -1880,12 +1883,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio5_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk gpio5_opt_clks[] = {
-	{ .role = "dbclk", .clk = "sys_32k_ck" },
+	{ .role = "dbclk", .clk = "gpio5_dbclk" },
 };
 
 static struct omap_hwmod omap44xx_gpio5_hwmod = {
 	.name		= "gpio5",
 	.class		= &omap44xx_gpio_hwmod_class,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 	.mpu_irqs	= omap44xx_gpio5_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio5_irqs),
 	.prcm = {
@@ -1894,7 +1898,7 @@ static struct omap_hwmod omap44xx_gpio5_hwmod = {
 		},
 	},
 	.opt_clks	= gpio5_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(gpio5_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(gpio5_opt_clks),
 	.dev_attr	= &gpio_dev_attr,
 	.slaves		= omap44xx_gpio5_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio5_slaves),
@@ -1931,12 +1935,13 @@ static struct omap_hwmod_ocp_if *omap44xx_gpio6_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk gpio6_opt_clks[] = {
-	{ .role = "dbclk", .clk = "sys_32k_ck" },
+	{ .role = "dbclk", .clk = "gpio6_dbclk" },
 };
 
 static struct omap_hwmod omap44xx_gpio6_hwmod = {
 	.name		= "gpio6",
 	.class		= &omap44xx_gpio_hwmod_class,
+	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
 	.mpu_irqs	= omap44xx_gpio6_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_gpio6_irqs),
 	.prcm = {
@@ -1945,7 +1950,7 @@ static struct omap_hwmod omap44xx_gpio6_hwmod = {
 		},
 	},
 	.opt_clks	= gpio6_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(gpio6_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(gpio6_opt_clks),
 	.dev_attr	= &gpio_dev_attr,
 	.slaves		= omap44xx_gpio6_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio6_slaves),
@@ -2608,7 +2613,7 @@ static struct omap_hwmod_ocp_if *omap44xx_iss_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk iss_opt_clks[] = {
-	{ .role = "ctrlclk", .clk = "func_96m_fclk" },
+	{ .role = "ctrlclk", .clk = "iss_ctrlclk" },
 };
 
 static struct omap_hwmod omap44xx_iss_hwmod = {
@@ -2625,7 +2630,7 @@ static struct omap_hwmod omap44xx_iss_hwmod = {
 		},
 	},
 	.opt_clks	= iss_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(iss_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(iss_opt_clks),
 	.slaves		= omap44xx_iss_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_iss_slaves),
 	.masters	= omap44xx_iss_masters,
@@ -4028,10 +4033,10 @@ static struct omap_hwmod_ocp_if *omap44xx_slimbus1_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk slimbus1_opt_clks[] = {
-	{ .role = "slimbus_clk_11_11", .clk = "slimbus_clk" },
-	{ .role = "fclk0", .clk = "abe_24m_fclk" },
-	{ .role = "fclk1", .clk = "func_24m_clk" },
-	{ .role = "fclk2", .clk = "pad_clks_ck" },
+	{ .role = "fclk_1", .clk = "slimbus1_fclk_1" },
+	{ .role = "fclk_0", .clk = "slimbus1_fclk_0" },
+	{ .role = "fclk_2", .clk = "slimbus1_fclk_2" },
+	{ .role = "slimbus_clk", .clk = "slimbus1_slimbus_clk" },
 };
 
 static struct omap_hwmod omap44xx_slimbus1_hwmod = {
@@ -4048,7 +4053,7 @@ static struct omap_hwmod omap44xx_slimbus1_hwmod = {
 		},
 	},
 	.opt_clks	= slimbus1_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(slimbus1_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(slimbus1_opt_clks),
 	.slaves		= omap44xx_slimbus1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_slimbus1_slaves),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
@@ -4095,9 +4100,9 @@ static struct omap_hwmod_ocp_if *omap44xx_slimbus2_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk slimbus2_opt_clks[] = {
-	{ .role = "perabe24m_gfclk", .clk = "per_abe_24m_fclk" },
-	{ .role = "slimbus_clk", .clk = "pad_slimbus_core_clks_ck" },
-	{ .role = "per24mc_gfclk", .clk = "func_24mc_fclk" },
+	{ .role = "fclk_1", .clk = "slimbus2_fclk_1" },
+	{ .role = "fclk_0", .clk = "slimbus2_fclk_0" },
+	{ .role = "slimbus_clk", .clk = "slimbus2_slimbus_clk" },
 };
 
 static struct omap_hwmod omap44xx_slimbus2_hwmod = {
@@ -4114,7 +4119,7 @@ static struct omap_hwmod omap44xx_slimbus2_hwmod = {
 		},
 	},
 	.opt_clks	= slimbus2_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(slimbus2_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(slimbus2_opt_clks),
 	.slaves		= omap44xx_slimbus2_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_slimbus2_slaves),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
@@ -5358,13 +5363,15 @@ static struct omap_hwmod_ocp_if *omap44xx_usb_host_hs_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk usb_host_hs_opt_clks[] = {
-	{ .role = "usb_host_fs_fck", .clk = "usb_host_fs_fck" },
-	{ .role = "utmi_p2_clk", .clk = "utmi_p2_gfclk_ck" },
-	{ .role = "utmi_p1_clk", .clk = "utmi_p1_gfclk_ck" },
-	{ .role = "xclk60mhsp1_ck", .clk = "xclk60mhsp1_ck" },
-	{ .role = "xclk60mhsp2_ck", .clk = "xclk60mhsp2_ck" },
+	{ .role = "utmi_p3_clk", .clk = "usb_host_hs_utmi_p3_clk" },
+	{ .role = "hsic60m_p1_clk", .clk = "usb_host_hs_hsic60m_p1_clk" },
+	{ .role = "hsic60m_p2_clk", .clk = "usb_host_hs_hsic60m_p2_clk" },
+	{ .role = "utmi_p1_clk", .clk = "usb_host_hs_utmi_p1_clk" },
+	{ .role = "utmi_p2_clk", .clk = "usb_host_hs_utmi_p2_clk" },
+	{ .role = "hsic480m_p1_clk", .clk = "usb_host_hs_hsic480m_p1_clk" },
+	{ .role = "hsic480m_p2_clk", .clk = "usb_host_hs_hsic480m_p2_clk" },
+	{ .role = "func48mclk", .clk = "usb_host_hs_func48mclk" },
 };
-
 static struct omap_hwmod omap44xx_usb_host_hs_hwmod = {
 	.name		= "usb_uhh_hs",
 	.class		= &omap44xx_usb_host_hs_hwmod_class,
@@ -5377,7 +5384,7 @@ static struct omap_hwmod omap44xx_usb_host_hs_hwmod = {
 		},
 	},
 	.opt_clks	= usb_host_hs_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(usb_host_hs_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(usb_host_hs_opt_clks),
 	.slaves		= omap44xx_usb_host_hs_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_usb_host_hs_slaves),
 	.masters	= omap44xx_usb_host_hs_masters,
@@ -5444,7 +5451,7 @@ static struct omap_hwmod_ocp_if *omap44xx_usb_otg_hs_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk usb_otg_hs_opt_clks[] = {
-	{ .role = "xclk", .clk = "otg_60m_gfclk_ck" },
+	{ .role = "xclk", .clk = "usb_otg_hs_xclk" },
 };
 
 static struct omap_hwmod omap44xx_usb_otg_hs_hwmod = {
@@ -5459,7 +5466,7 @@ static struct omap_hwmod omap44xx_usb_otg_hs_hwmod = {
 		},
 	},
 	.opt_clks	= usb_otg_hs_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(usb_otg_hs_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(usb_otg_hs_opt_clks),
 	.slaves		= omap44xx_usb_otg_hs_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_usb_otg_hs_slaves),
 	.masters	= omap44xx_usb_otg_hs_masters,
@@ -5517,9 +5524,9 @@ static struct omap_hwmod_ocp_if *omap44xx_usb_tll_hs_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk usb_tll_hs_opt_clks[] = {
-	{ .role = "usb_ch1_clk", .clk = "init_60m_fclk" },
-	{ .role = "usb_ch0_clk", .clk = "init_60m_fclk" },
-	{ .role = "usb_ch2_clk", .clk = "init_60m_fclk" },
+	{ .role = "usb_ch2_clk", .clk = "usb_tll_hs_usb_ch2_clk" },
+	{ .role = "usb_ch0_clk", .clk = "usb_tll_hs_usb_ch0_clk" },
+	{ .role = "usb_ch1_clk", .clk = "usb_tll_hs_usb_ch1_clk" },
 };
 
 static struct omap_hwmod omap44xx_usb_tll_hs_hwmod = {
@@ -5534,7 +5541,7 @@ static struct omap_hwmod omap44xx_usb_tll_hs_hwmod = {
 		},
 	},
 	.opt_clks	= usb_tll_hs_opt_clks,
-	.opt_clks_cnt = ARRAY_SIZE(usb_tll_hs_opt_clks),
+	.opt_clks_cnt	= ARRAY_SIZE(usb_tll_hs_opt_clks),
 	.slaves		= omap44xx_usb_tll_hs_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_usb_tll_hs_slaves),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
