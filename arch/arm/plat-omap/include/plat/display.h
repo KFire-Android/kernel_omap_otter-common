@@ -23,6 +23,7 @@
 #include <linux/list.h>
 #include <linux/kobject.h>
 #include <linux/device.h>
+#include <linux/notifier.h>
 #include <asm/atomic.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -601,9 +602,7 @@ struct omap_dss_device {
 	enum omap_dss_display_state state;
 	enum omap_channel channel;
 
-	/* callbacks to notify dssdev client */
-	void *size_notify_arg;
-	void (*size_notify)(void *arg, int w, int h);
+	struct blocking_notifier_head notifier;
 
 	/* platform specific  */
 	int (*platform_enable)(struct omap_dss_device *dssdev);
@@ -686,8 +685,18 @@ struct omap_dss_device *omap_dss_find_device(void *data,
 int omap_dss_start_device(struct omap_dss_device *dssdev);
 void omap_dss_stop_device(struct omap_dss_device *dssdev);
 
-void omap_dss_update_size(struct omap_dss_device *dssdev, int w, int h);
-void omap_dss_set_size_notify(struct omap_dss_device *dssdev, void (*notify)(void *arg, int w, int h), void *arg);
+/* the event id of the event that occurred is passed in as the second arg
+ * to the notifier function, and the dssdev is passed as the third.
+ */
+enum omap_dss_event {
+	OMAP_DSS_SIZE_CHANGE
+	/* possibly add additional events, like hot-plug connect/disconnect */
+};
+
+void omap_dss_notify(struct omap_dss_device *dssdev, enum omap_dss_event evt);
+void omap_dss_add_notify(struct omap_dss_device *dssdev, struct notifier_block *nb);
+void omap_dss_remove_notify(struct omap_dss_device *dssdev, struct notifier_block *nb);
+
 
 int omap_dss_get_num_overlay_managers(void);
 struct omap_overlay_manager *omap_dss_get_overlay_manager(int num);

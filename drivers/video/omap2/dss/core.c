@@ -1111,6 +1111,9 @@ int omap_dss_register_device(struct omap_dss_device *dssdev)
 	dssdev->dev.parent = &dss_bus;
 	dssdev->dev.release = omap_dss_dev_release;
 	dev_set_name(&dssdev->dev, "display%d", dev_num++);
+
+	BLOCKING_INIT_NOTIFIER_HEAD(&dssdev->notifier);
+
 	return device_register(&dssdev->dev);
 }
 

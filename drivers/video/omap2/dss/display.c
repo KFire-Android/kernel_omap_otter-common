@@ -709,44 +709,47 @@ EXPORT_SYMBOL(omap_dss_stop_device);
 /* since omap_dss_update_size can be called in irq context, schedule work from
  * work-queue to deliver notification to client..
  */
-struct update_size_work {
+struct notify_work {
 	struct work_struct work;
 	struct omap_dss_device *dssdev;
-	int w, h;
+	enum omap_dss_event evt;
 };
 
-static void update_size_worker(struct work_struct *work)
+static void notify_worker(struct work_struct *work)
 {
-	struct update_size_work *usw =
-		container_of(work, struct update_size_work, work);
-	if (usw->dssdev->size_notify) {
-		usw->dssdev->size_notify(usw->dssdev->size_notify_arg, usw->w, usw->h);
-	}
+	struct notify_work *nw =
+		container_of(work, struct notify_work, work);
+	struct omap_dss_device *dssdev = nw->dssdev;
+	blocking_notifier_call_chain(&dssdev->notifier, nw->evt, dssdev);
 	kfree(work);
 }
 
 /**
- * Called by lower level driver to notify about a change in resolution, for
- * example in response to a hot-plug event..
+ * Called by lower level driver to notify about a change in resolution, etc.
  */
-void omap_dss_update_size(struct omap_dss_device *dssdev, int w, int h)
+void omap_dss_notify(struct omap_dss_device *dssdev, enum omap_dss_event evt)
 {
-	struct update_size_work *usw =
-			kmalloc(sizeof(struct update_size_work), GFP_KERNEL);
-	if (usw) {
-		INIT_WORK(&usw->work, update_size_worker);
-		usw->dssdev = dssdev;
-		usw->w = w;
-		usw->h = h;
-		schedule_work(&usw->work);
+	struct notify_work *nw =
+			kmalloc(sizeof(struct notify_work), GFP_KERNEL);
+	if (nw) {
+		INIT_WORK(&nw->work, notify_worker);
+		nw->dssdev = dssdev;
+		nw->evt = evt;
+		schedule_work(&nw->work);
 	}
 }
-EXPORT_SYMBOL(omap_dss_update_size);
+EXPORT_SYMBOL(omap_dss_notify);
 
-void omap_dss_set_size_notify(struct omap_dss_device *dssdev,
-		void (*notify)(void *arg, int w, int h), void *arg)
+void omap_dss_add_notify(struct omap_dss_device *dssdev,
+		struct notifier_block *nb)
 {
-	dssdev->size_notify_arg = arg;
-	dssdev->size_notify = notify;
+	blocking_notifier_chain_register(&dssdev->notifier, nb);
 }
-EXPORT_SYMBOL(omap_dss_set_size_notify);
+EXPORT_SYMBOL(omap_dss_add_notify);
+
+void omap_dss_remove_notify(struct omap_dss_device *dssdev,
+		struct notifier_block *nb)
+{
+	blocking_notifier_chain_unregister(&dssdev->notifier, nb);
+}
+EXPORT_SYMBOL(omap_dss_remove_notify);

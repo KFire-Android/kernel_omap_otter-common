@@ -705,7 +705,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	dispc_enable_digit_out(0);
 
 	if (dirty) {
-		omap_dss_update_size(dssdev, p->x_res, p->y_res);
+		omap_dss_notify(dssdev, OMAP_DSS_SIZE_CHANGE);
 	}
 
 	/* config the PLL and PHY first */
