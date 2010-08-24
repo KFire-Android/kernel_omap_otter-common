@@ -1306,7 +1306,7 @@ static struct omap_hwmod_irq_info omap44xx_dss_irqs[] = {
 static struct omap_hwmod_addr_space omap44xx_dss_addrs[] = {
 	{
 		.pa_start	= 0x48040000,
-		.pa_end		= 0x48047fff,
+		.pa_end		= 0x4804007f,
 		.flags		= ADDR_TYPE_RT
 	},
 };
@@ -1324,7 +1324,7 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__dss = {
 static struct omap_hwmod_addr_space omap44xx_dss_dma_addrs[] = {
 	{
 		.pa_start	= 0x58000000,
-		.pa_end		= 0x58007fff,
+		.pa_end		= 0x5800007f,
 		.flags		= ADDR_TYPE_RT
 	},
 };
