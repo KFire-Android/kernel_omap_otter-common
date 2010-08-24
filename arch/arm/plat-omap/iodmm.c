@@ -648,25 +648,13 @@ int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 	size_align = round_up(bytes + va - pa_align, PAGE_SIZE);
 
 	/*
-	 * Hack hack for Tiler. Remove this after proper testing
-	 * Tiler buffers should have VM_IO flag and that should
-	 * take care of instead of check with IOVMF_DA_PHYS
+	 * Hack hack for Tiler. Don't add mapping information
+	 * for Tiler buffers since they are already pre-mapped
+	 * in TLB
 	 */
 	if (flags == IOVMF_DA_PHYS) {
 		da_align = user_va2_pa(current->mm, va);
 		*da = (da_align | (va & (PAGE_SIZE - 1)));
-		dmm_obj = add_mapping_info(obj, NULL, va, da_align,
-							size_align);
-		if (dmm_obj == NULL) {
-			err = -EINVAL;
-			goto err;
-		}
-		num_of_pages = size_align/PAGE_SIZE;
-		for (i = 0; i < num_of_pages; i++) {
-			pg = phys_to_page(da_align);
-			da_align += PAGE_SIZE;
-			dmm_obj->pages[i] = pg;
-		}
 		err = 0;
 		goto err;
 	}
