@@ -30,6 +30,7 @@
 #define ABE_FRONTEND_DAI_TONES		3
 #define ABE_FRONTEND_DAI_VIBRA		4
 #define ABE_FRONTEND_DAI_MODEM		5
+#define ABE_FRONTEND_DAI_LP_MEDIA		6
 
 /* This must currently match the BE order in DSP */
 #define OMAP_ABE_DAI_PDM_UL			0

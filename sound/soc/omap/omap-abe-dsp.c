@@ -87,7 +87,7 @@
 
 #define ABE_ROUTES_UL		14
 
-/* TODO: fine tune for MODEM */
+/* TODO: fine tune for ping pong - buffer is 2 periods of 12k each*/
 static const struct snd_pcm_hardware omap_abe_hardware = {
 	.info			= SNDRV_PCM_INFO_MMAP |
 				  SNDRV_PCM_INFO_MMAP_VALID |
@@ -96,11 +96,11 @@ static const struct snd_pcm_hardware omap_abe_hardware = {
 				  SNDRV_PCM_INFO_RESUME,
 	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
 				  SNDRV_PCM_FMTBIT_S32_LE,
-	.period_bytes_min	= 32,
-	.period_bytes_max	= 64 * 1024,
+	.period_bytes_min	= 12 * 1024,
+	.period_bytes_max	= 12 * 1024,
 	.periods_min		= 2,
-	.periods_max		= 255,
-	.buffer_bytes_max	= 128 * 1024,
+	.periods_max		= 2,
+	.buffer_bytes_max	= 12 * 1024 * 2,
 };
 
 /*
@@ -1417,9 +1417,14 @@ static int aess_open(struct snd_pcm_substream *substream)
 	abe->fe_id = dai->id;
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
-	if (dai->id == ABE_FRONTEND_DAI_MODEM)
+	switch (dai->id) {
+	case ABE_FRONTEND_DAI_MODEM:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
 		snd_soc_set_runtime_hwparams(substream, &omap_abe_hardware);
-
+		break;
+	default:
+		break;
+	}
 	mutex_unlock(&abe->mutex);
 	return 0;
 }
@@ -1433,11 +1438,16 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
-	if (dai->id != ABE_FRONTEND_DAI_MODEM)
-		return 0;
+	switch (dai->id) {
+	case ABE_FRONTEND_DAI_MODEM:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
+		snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+		runtime->dma_bytes = params_buffer_bytes(params);
+		break;
+	default:
+		break;
+	}
 
-	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
-	runtime->dma_bytes = params_buffer_bytes(params);
 	return 0;
 }
 
@@ -1512,15 +1522,35 @@ static int aess_close(struct snd_pcm_substream *substream)
 	return 0;
 }
 
+static int aess_mmap(struct snd_pcm_substream *substream,
+	struct vm_area_struct *vma)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	int ret;
+
+	/* TODO: we may need to check for underrun. */
+
+	ret = dma_mmap_writecombine(substream->pcm->card->dev, vma,
+				     runtime->dma_area,
+				     runtime->dma_addr,
+				     runtime->dma_bytes);
+	if (ret < 0)
+		return ret;
+
+	/* TODO: tell ABE we have new period. */
+	/* abe_blah(); */
+}
+
 static struct snd_pcm_ops omap_aess_pcm_ops = {
 	.open = aess_open,
 	.hw_params	= aess_hw_params,
 	.prepare	= aess_prepare,
 	.close	= aess_close,
+	.mmap		= aess_mmap,
 };
 
-/* This is all temp to convince MODEM we are a DMA channel */
-/* Will be replaced when we have buffereless transfer implemented */
+/* TODO: MODEM doesn't need this although low power mmpa() does */
+/* TODO: We need the buffer less IOCTL() to support MODEM */
 static u64 omap_pcm_dmamask = DMA_BIT_MASK(64);
 
 static int omap_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
@@ -1573,14 +1603,14 @@ static int omap_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
 	if (!card->dev->coherent_dma_mask)
 		card->dev->coherent_dma_mask = DMA_BIT_MASK(64);
 
-	if (dai->driver->playback.channels_min) {
+	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
 		ret = omap_pcm_preallocate_dma_buffer(pcm,
 			SNDRV_PCM_STREAM_PLAYBACK);
 		if (ret)
 			goto out;
 	}
 
-	if (dai->driver->capture.channels_min) {
+	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
 		ret = omap_pcm_preallocate_dma_buffer(pcm,
 			SNDRV_PCM_STREAM_CAPTURE);
 		if (ret)

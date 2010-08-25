@@ -480,6 +480,19 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.fe_playback_channels = 2,
 		.fe_capture_channels = 2,
 	},
+	{
+		.name = "SDP4430 Media LP",
+		.stream_name = "Multimedia",
+
+		/* ABE components - MM-DL (mmap) */
+		.cpu_dai_name = "MultiMedia1",
+		.platform_name = "omap-dsp-audio",
+
+		.dynamic = 1, /* BE is dynamic */
+		.supported_be = tones_be,
+		.num_be = ARRAY_SIZE(tones_be),
+		.fe_playback_channels = 2,
+	},
 #ifdef CONFIG_SND_OMAP_SOC_HDMI
 	{
 		.name = "hdmi",

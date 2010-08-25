@@ -57,7 +57,7 @@
  * 1) Get DAI params from HAL and pass onto DAI drivers ? (are params static ??, i.e. can I just use a table)
  */
 
-#define NUM_ABE_FRONTENDS		6
+#define NUM_ABE_FRONTENDS		7
 #define NUM_ABE_BACKENDS		11
 
 #if 0
@@ -153,6 +153,11 @@ static struct omap_abe_data abe_data = {
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
 	.frontend[ABE_FRONTEND_DAI_MODEM][SNDRV_PCM_STREAM_CAPTURE] = {
+			.lock = SPIN_LOCK_UNLOCKED,
+	},
+
+	/* ABE_FRONTEND_LP_HIFI */
+	.frontend[ABE_FRONTEND_DAI_LP_MEDIA][SNDRV_PCM_STREAM_PLAYBACK] = {
 			.lock = SPIN_LOCK_UNLOCKED,
 	},
 };
@@ -279,6 +284,7 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			dma_req = OMAP44XX_DMA_ABE_REQ_0;
 			abe_connect_cbpr_dmareq_port(MM_DL_PORT, &format, ABE_CBPR0_IDX,
@@ -444,6 +450,7 @@ static void abe_be_dapm(struct snd_soc_pcm_runtime *rtd,
 {
 	switch (id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			snd_soc_dapm_stream_event(rtd, "Multimedia Playback",cmd);
 		else
@@ -905,6 +912,7 @@ static void enable_fe_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			abe_enable_data_transfer(MM_DL_PORT);
 		else
@@ -1008,6 +1016,7 @@ static void disable_fe_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			abe_disable_data_transfer(MM_DL_PORT);
 		else
@@ -1043,6 +1052,7 @@ static void mute_fe_port(struct snd_soc_pcm_runtime *rtd, int stream)
 
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 	//	if (stream == SNDRV_PCM_STREAM_CAPTURE)
 		break;
@@ -1062,6 +1072,7 @@ static void unmute_fe_port(struct snd_soc_pcm_runtime *rtd, int stream)
 
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+	case ABE_FRONTEND_DAI_LP_MEDIA:
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 	//	if (stream == SNDRV_PCM_STREAM_CAPTURE)
 		break;
@@ -1263,6 +1274,10 @@ static int omap_abe_dai_probe(struct snd_soc_dai *dai)
 	INIT_WORK(&abe_data.frontend[ABE_FRONTEND_DAI_MODEM][SNDRV_PCM_STREAM_PLAYBACK].work,
 		playback_work);
 
+	/* MM LP */
+	INIT_WORK(&abe_data.frontend[ABE_FRONTEND_DAI_LP_MEDIA][SNDRV_PCM_STREAM_PLAYBACK].work,
+		playback_work);
+
 	abe_data.workqueue = create_singlethread_workqueue("omap-abe");
 	if (abe_data.workqueue == NULL)
 		return -ENOMEM;
@@ -1364,6 +1379,16 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,
+	},
+	{	/* Low Power HiFi Playback */
+		.name = "MultiMedia1 LP",
+		.playback = {
+			.stream_name = "MultiMedia1 Playback",
+			.channels_min = 2,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
+			.formats = OMAP_ABE_FORMATS,
+		},
 	},
 };
 
