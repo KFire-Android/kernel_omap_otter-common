@@ -1539,6 +1539,7 @@ static int aess_mmap(struct snd_pcm_substream *substream,
 
 	/* TODO: tell ABE we have new period. */
 	/* abe_blah(); */
+	return 0;
 }
 
 static struct snd_pcm_ops omap_aess_pcm_ops = {
@@ -1549,11 +1550,11 @@ static struct snd_pcm_ops omap_aess_pcm_ops = {
 	.mmap		= aess_mmap,
 };
 
-/* TODO: MODEM doesn't need this although low power mmpa() does */
+/* TODO: MODEM doesn't need this although low power mmap() does */
 /* TODO: We need the buffer less IOCTL() to support MODEM */
 static u64 omap_pcm_dmamask = DMA_BIT_MASK(64);
 
-static int omap_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
+static int aess_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
 	int stream)
 {
 	struct snd_pcm_substream *substream = pcm->streams[stream].substream;
@@ -1565,14 +1566,16 @@ static int omap_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
 	buf->private_data = NULL;
 	buf->area = dma_alloc_writecombine(pcm->card->dev, size,
 					   &buf->addr, GFP_KERNEL);
+
 	if (!buf->area)
 		return -ENOMEM;
 
 	buf->bytes = size;
+
 	return 0;
 }
 
-static void omap_pcm_free_dma_buffers(struct snd_pcm *pcm)
+static void aess_pcm_free_dma_buffers(struct snd_pcm *pcm)
 {
 	struct snd_pcm_substream *substream;
 	struct snd_dma_buffer *buf;
@@ -1593,7 +1596,7 @@ static void omap_pcm_free_dma_buffers(struct snd_pcm *pcm)
 	}
 }
 
-static int omap_pcm_new(struct snd_soc_pcm_runtime *rtd)
+static int aess_pcm_new(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_card *card = rtd->card->snd_card;
 	struct snd_pcm *pcm = rtd->pcm;
@@ -1605,14 +1608,14 @@ static int omap_pcm_new(struct snd_soc_pcm_runtime *rtd)
 		card->dev->coherent_dma_mask = DMA_BIT_MASK(64);
 
 	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
-		ret = omap_pcm_preallocate_dma_buffer(pcm,
+		ret = aess_pcm_preallocate_dma_buffer(pcm,
 			SNDRV_PCM_STREAM_PLAYBACK);
 		if (ret)
 			goto out;
 	}
 
-	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
-		ret = omap_pcm_preallocate_dma_buffer(pcm,
+	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
+		ret = aess_pcm_preallocate_dma_buffer(pcm,
 			SNDRV_PCM_STREAM_CAPTURE);
 		if (ret)
 			goto out;
@@ -1626,8 +1629,8 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.ops	= &omap_aess_pcm_ops,
 	.probe = abe_probe,
 	.remove = abe_remove,
-	.pcm_new	= omap_pcm_new,
-	.pcm_free	= omap_pcm_free_dma_buffers,
+	.pcm_new	= aess_pcm_new,
+	.pcm_free	= aess_pcm_free_dma_buffers,
 	.read = abe_dsp_read,
 	.write = abe_dsp_write,
 };
