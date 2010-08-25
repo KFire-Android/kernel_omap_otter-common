@@ -283,6 +283,10 @@ static ssize_t omap2_iommu_dump_ctx(struct iommu *obj, char *buf, ssize_t len)
 	pr_reg(READ_CAM);
 	pr_reg(READ_RAM);
 	pr_reg(EMU_FAULT_AD);
+if (cpu_is_omap44xx()) {
+	pr_reg(FAULT_PC);
+	pr_reg(FAULT_STATUS);
+}
 out:
 	return p - buf;
 }

@@ -36,6 +36,8 @@
 #define MMU_READ_CAM		0x68
 #define MMU_READ_RAM		0x6c
 #define MMU_EMU_FAULT_AD	0x70
+#define MMU_FAULT_PC		0x80
+#define MMU_FAULT_STATUS	0x84
 
 /*
  * MMU Register bit definitions
