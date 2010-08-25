@@ -226,6 +226,8 @@ static void omap_init_mcpdm(void)
 	pdata->device_enable = omap_device_enable;
 	pdata->device_idle = omap_device_idle;
 	pdata->device_shutdown = omap_device_shutdown;
+	pdata->irq = OMAP44XX_IRQ_MCPDM;
+	pdata->phys_base = OMAP44XX_MCPDM_BASE;
 
 	od = omap_device_build("omap-mcpdm-dai", -1, oh, pdata,
 				sizeof(struct omap_mcpdm_platform_data),
