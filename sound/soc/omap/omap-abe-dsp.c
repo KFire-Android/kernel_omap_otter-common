@@ -124,6 +124,9 @@ struct abe_data {
 	struct delayed_work delayed_work;
 	struct mutex mutex;
 
+	void __iomem *io_base;
+	int irq;
+
 	int fe_id;
 
 	/* DAPM mixer config - TODO: some of this can be replaced with HAL update */
@@ -183,7 +186,13 @@ static int abe_dsp_write(struct snd_soc_platform *platform, unsigned int reg,
 	return 0;
 }
 
-static void abe_init_engine(struct snd_soc_platform *platform)
+static irqreturn_t abe_irq_handler(int irq, void *dev_id)
+{
+	/* TODO: handle underruns/overruns/errors */
+	return IRQ_HANDLED;
+}
+
+static int abe_init_engine(struct snd_soc_platform *platform)
 {
 	struct abe_data *priv = snd_soc_platform_get_drvdata(platform);
 #ifndef CONFIG_PM_RUNTIME
@@ -191,13 +200,9 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 #endif
 	struct platform_device *pdev = priv->pdev;
 	abe_equ_t dl2_eq;
+	int ret = 0;
 
-	dl2_eq.equ_length = ARRAY_SIZE(DL2_COEF);
-
-	/* build the coefficient parameter for the equalizer api */
-	memcpy(dl2_eq.coef.type1, DL2_COEF, sizeof(DL2_COEF));
-
-	abe_init_mem();
+	abe_init_mem(abe->io_base);
 
 	/* aess_clk has to be enabled to access hal register.
 	 * Disable the clk after it has been used.
@@ -208,16 +213,28 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 		pdata->device_enable(pdev);
 #endif
 
+	ret = request_irq(abe->irq, abe_irq_handler,
+				0, "ABE", (void *)abe);
+	if (ret) {
+		dev_err(platform->dev, "request for ABE IRQ %d failed %d\n",
+				abe->irq, ret);
+		return ret;
+	}
+
 	abe_reset_hal();
 
 	abe_load_fw();	// TODO: use fw API here
-
 
 	/* Config OPP 100 for now */
 	abe_set_opp_processing(ABE_OPP100);
 
 	/* "tick" of the audio engine */
 	abe_write_event_generator(EVENT_TIMER);
+
+	dl2_eq.equ_length = ARRAY_SIZE(DL2_COEF);
+
+	/* build the coefficient parameter for the equalizer api */
+	memcpy(dl2_eq.coef.type1, DL2_COEF, sizeof(DL2_COEF));
 
 	/* load the high-pass coefficient of IHF-Right */
 	abe_write_equalizer(EQ2L, &dl2_eq);
@@ -230,6 +247,7 @@ static void abe_init_engine(struct snd_soc_platform *platform)
 	if (pdata->device_idle)
 		pdata->device_idle(pdev);
 #endif
+	return ret;
 }
 
 /*
@@ -1637,7 +1655,8 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 
 static int __devinit abe_engine_probe(struct platform_device *pdev)
 {
-	int ret, i;
+	struct resource *res;
+	int ret = -EINVAL, i;
 
 	abe = kzalloc(sizeof(struct abe_data), GFP_KERNEL);
 	if (abe == NULL)
@@ -1647,6 +1666,24 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 	/* ZERO_labelID should really be 0 */
 	for (i = 0; i < ABE_ROUTES_UL + 2; i++)
 		abe->router[i] = ZERO_labelID;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (res == NULL) {
+		dev_err(&pdev->dev, "no resource\n");
+		goto err;
+	}
+
+	abe->io_base = ioremap(res->start, resource_size(res));
+	if (!abe->io_base) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	abe->irq = platform_get_irq(pdev, 0);
+	if (abe->irq < 0) {
+		ret = abe->irq;
+		goto err_irq;
+	}
 
 	pm_runtime_enable(&pdev->dev);
 
@@ -1660,6 +1697,9 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 	if (ret == 0)
 		return 0;
 
+err_irq:
+	iounmap(abe->io_base);
+err:
 	kfree(abe);
 	return ret;
 }
@@ -1676,7 +1716,7 @@ static int __devexit abe_engine_remove(struct platform_device *pdev)
 
 static struct platform_driver omap_aess_driver = {
 	.driver = {
-		.name = "omap-dsp-audio",
+		.name = "omap-aess-audio",
 		.owner = THIS_MODULE,
 	},
 	.probe = abe_engine_probe,
