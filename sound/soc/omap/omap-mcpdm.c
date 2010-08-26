@@ -658,8 +658,8 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 	}
 
 	mcpdm->irq = platform_get_irq(pdev, 0);
-	if (!mcpdm->irq) {
-		ret = -EINVAL;
+	if (mcpdm->irq < 0) {
+		ret = mcpdm->irq;
 		goto err_irq;
 	}
 
