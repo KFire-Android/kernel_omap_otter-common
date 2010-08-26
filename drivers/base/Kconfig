@@ -39,6 +39,7 @@ config DEVTMPFS
 config DEVTMPFS_MOUNT
 	bool "Automount devtmpfs at /dev, after the kernel mounted the rootfs"
 	depends on DEVTMPFS
+	default y
 	help
 	  This will instruct the kernel to automatically mount the
 	  devtmpfs filesystem at /dev, directly after the kernel has
