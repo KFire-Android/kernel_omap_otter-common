@@ -472,7 +472,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MODEM <-> McBSP2 */
 		.cpu_dai_name = "MODEM",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		.dynamic = 1, /* BE is dynamic */
 		.supported_be = modem_be,
@@ -486,7 +486,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MM-DL (mmap) */
 		.cpu_dai_name = "MultiMedia1",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		.dynamic = 1, /* BE is dynamic */
 		.supported_be = tones_be,
@@ -561,7 +561,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - DL1 */
 		.cpu_dai_name = "omap-mcpdm-dai",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* Phoenix - DL1 DAC */
 		.codec_dai_name =  "twl6040-dl1",
@@ -578,7 +578,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - UL1 */
 		.cpu_dai_name = "omap-mcpdm-dai",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* Phoenix - UL ADC */
 		.codec_dai_name =  "twl6040-ul",
@@ -594,7 +594,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - DL2 */
 		.cpu_dai_name = "omap-mcpdm-dai",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* Phoenix - DL2 DAC */
 		.codec_dai_name =  "twl6040-dl2",
@@ -610,7 +610,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - VIB1 DL */
 		.cpu_dai_name = "omap-mcpdm-dai",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* Phoenix - PDM to PWM */
 		.codec_dai_name =  "twl6040-vib",
@@ -626,7 +626,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MCBSP1 - BT-VX */
 		.cpu_dai_name = "omap-mcbsp-dai.0",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* Bluetooth */
 		.codec_dai_name = "Bluetooth",
@@ -642,7 +642,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MCBSP2 - MM-EXT */
 		.cpu_dai_name = "omap-mcbsp-dai.1",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* FM */
 		.codec_dai_name = "FM Digital",
@@ -658,7 +658,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - MCBSP2 - MM-EXT */
 		.cpu_dai_name = "omap-mcbsp-dai.1",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* MODEM */
 		.codec_dai_name = "MODEM",
@@ -674,7 +674,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - DMIC UL 1 */
 		.cpu_dai_name = "omap-dmic-dai.0",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* DMIC 1 */
 		.codec_dai_name = "dmic-hifi",
@@ -689,7 +689,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - DMIC UL 1 */
 		.cpu_dai_name = "omap-dmic-dai.1",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* DMIC 1 */
 		.codec_dai_name = "dmic-hifi",
@@ -704,7 +704,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		/* ABE components - DMIC UL 2 */
 		.cpu_dai_name = "omap-dmic-dai.2",
-		.platform_name = "omap-dsp-audio",
+		.platform_name = "omap-aess-audio",
 
 		/* DMIC 2 */
 		.codec_dai_name = "dmic-hifi",
