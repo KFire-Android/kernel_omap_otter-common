@@ -759,7 +759,6 @@ static struct snd_soc_codec_driver soc_codec_dev_wm8940 = {
 static __devinit int wm8940_i2c_probe(struct i2c_client *i2c,
 				      const struct i2c_device_id *id)
 {
-	int ret;
 	struct wm8940_priv *wm8940;
 	int ret;
 

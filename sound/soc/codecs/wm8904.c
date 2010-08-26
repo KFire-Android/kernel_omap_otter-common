@@ -1474,7 +1474,7 @@ static int wm8904_add_widgets(struct snd_soc_codec *codec)
 		break;
 	}
 
-	snd_soc_dapm_new_widgets(codec);
+	snd_soc_dapm_new_widgets(codec->dapm);
 	return 0;
 }
 
@@ -2384,8 +2384,7 @@ static int wm8904_probe(struct snd_soc_codec *codec)
 	default:
 		dev_err(codec->dev, "Unknown device type %d\n",
 			wm8904->devtype);
-		ret = -EINVAL;
-		goto err;
+		return -EINVAL;
 	}
 
 
@@ -2487,8 +2486,6 @@ static int wm8904_probe(struct snd_soc_codec *codec)
 
 	return 0;
 
-err_codec:
-	snd_soc_unregister_codec(codec);
 err_enable:
 	regulator_bulk_disable(ARRAY_SIZE(wm8904->supplies), wm8904->supplies);
 err_get:

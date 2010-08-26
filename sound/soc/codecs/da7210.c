@@ -538,10 +538,10 @@ static int da7210_probe(struct snd_soc_codec *codec)
 	/* Activate all enabled subsystem */
 	da7210_write(codec, DA7210_STARTUP1, DA7210_SC_MST_EN);
 
-	snd_soc_add_controls(da7210_codec, da7210_snd_controls,
+	snd_soc_add_controls(codec, da7210_snd_controls,
 			     ARRAY_SIZE(da7210_snd_controls));
 
-	dev_info(&pdev->dev, "DA7210 Audio Codec %s\n", DA7210_VERSION);
+	dev_info(codec->dev, "DA7210 Audio Codec %s\n", DA7210_VERSION);
 
 	return 0;
 }

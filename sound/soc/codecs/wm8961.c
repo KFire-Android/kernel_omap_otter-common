@@ -988,7 +988,7 @@ static int wm8961_probe(struct snd_soc_codec *codec)
 	ret = wm8961_reset(codec);
 	if (ret < 0) {
 		dev_err(codec->dev, "Failed to issue reset\n");
-		goto err;
+		return ret;
 	}
 
 	/* Enable class W */
