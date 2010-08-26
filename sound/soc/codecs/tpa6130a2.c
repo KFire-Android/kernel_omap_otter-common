@@ -378,10 +378,10 @@ int tpa6130a2_add_controls(struct snd_soc_codec *codec)
 	BUG_ON(tpa6130a2_client == NULL);
 	data = i2c_get_clientdata(tpa6130a2_client);
 
-	snd_soc_dapm_new_controls(codec, tpa6130a2_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, tpa6130a2_dapm_widgets,
 				ARRAY_SIZE(tpa6130a2_dapm_widgets));
 
-	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
+	snd_soc_dapm_add_routes(codec->dapm, audio_map, ARRAY_SIZE(audio_map));
 
 	if (data->id == TPA6140A2)
 		return snd_soc_add_controls(codec, tpa6140a2_controls,

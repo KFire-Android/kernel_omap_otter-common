@@ -969,7 +969,7 @@ static int wm8993_set_bias_level(struct snd_soc_codec *codec,
 		break;
 
 	case SND_SOC_BIAS_STANDBY:
-		if (codec->bias_level == SND_SOC_BIAS_OFF) {
+		if (codec->dapm->bias_level == SND_SOC_BIAS_OFF) {
 			ret = regulator_bulk_enable(ARRAY_SIZE(wm8993->supplies),
 						    wm8993->supplies);
 			if (ret != 0)
@@ -1044,7 +1044,7 @@ static int wm8993_set_bias_level(struct snd_soc_codec *codec,
 		break;
 	}
 
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 
 	return 0;
 }
@@ -1505,11 +1505,11 @@ static int wm8993_probe(struct snd_soc_codec *codec)
 				     ARRAY_SIZE(wm8993_eq_controls));
 	}
 
-	snd_soc_dapm_new_controls(codec, wm8993_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, wm8993_dapm_widgets,
 				  ARRAY_SIZE(wm8993_dapm_widgets));
 	wm_hubs_add_analogue_controls(codec);
 
-	snd_soc_dapm_add_routes(codec, routes, ARRAY_SIZE(routes));
+	snd_soc_dapm_add_routes(codec->dapm, routes, ARRAY_SIZE(routes));
 	wm_hubs_add_analogue_routes(codec, wm8993->pdata.lineout1_diff,
 				    wm8993->pdata.lineout2_diff);
 

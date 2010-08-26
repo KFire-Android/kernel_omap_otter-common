@@ -208,7 +208,7 @@ static int snd_soc_dapm_put_volsw_aic3x(struct snd_kcontrol *kcontrol,
 
 	if (snd_soc_test_bits(widget->codec, reg, val_mask, val)) {
 		/* find dapm widget path assoc with kcontrol */
-		list_for_each_entry(path, &widget->codec->dapm_paths, list) {
+		list_for_each_entry(path, &widget->dapm->paths, list) {
 			if (path->kcontrol != kcontrol)
 				continue;
 
@@ -224,7 +224,7 @@ static int snd_soc_dapm_put_volsw_aic3x(struct snd_kcontrol *kcontrol,
 		}
 
 		if (found)
-			snd_soc_dapm_sync(widget->codec);
+			snd_soc_dapm_sync(widget->dapm);
 	}
 
 	ret = snd_soc_update_bits(widget->codec, reg, val_mask, val);
@@ -761,11 +761,11 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 static int aic3x_add_widgets(struct snd_soc_codec *codec)
 {
-	snd_soc_dapm_new_controls(codec, aic3x_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, aic3x_dapm_widgets,
 				  ARRAY_SIZE(aic3x_dapm_widgets));
 
 	/* set up audio path interconnects */
-	snd_soc_dapm_add_routes(codec, intercon, ARRAY_SIZE(intercon));
+	snd_soc_dapm_add_routes(codec->dapm, intercon, ARRAY_SIZE(intercon));
 
 	return 0;
 }
@@ -1032,7 +1032,7 @@ static int aic3x_set_bias_level(struct snd_soc_codec *codec,
 		}
 		break;
 	}
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 
 	return 0;
 }

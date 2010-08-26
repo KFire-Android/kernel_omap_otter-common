@@ -207,10 +207,10 @@ static const struct snd_soc_dapm_route audio_conn[] = {
 
 static int ssm2602_add_widgets(struct snd_soc_codec *codec)
 {
-	snd_soc_dapm_new_controls(codec, ssm2602_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, ssm2602_dapm_widgets,
 				  ARRAY_SIZE(ssm2602_dapm_widgets));
 
-	snd_soc_dapm_add_routes(codec, audio_conn, ARRAY_SIZE(audio_conn));
+	snd_soc_dapm_add_routes(codec->dapm, audio_conn, ARRAY_SIZE(audio_conn));
 
 	return 0;
 }
@@ -493,7 +493,7 @@ static int ssm2602_set_bias_level(struct snd_soc_codec *codec,
 		break;
 
 	}
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 	return 0;
 }
 
@@ -560,7 +560,7 @@ static int ssm2602_probe(struct snd_soc_codec *codec)
 
 	pr_info("ssm2602 Audio Codec %s", SSM2602_VERSION);
 
-	codec->bias_level = SND_SOC_BIAS_OFF,
+	codec->dapm->bias_level = SND_SOC_BIAS_OFF,
 	codec->control_data = ssm2602->control_data;
 
 	ssm2602_reset(codec);

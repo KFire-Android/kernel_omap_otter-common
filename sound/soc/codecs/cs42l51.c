@@ -550,9 +550,9 @@ static int cs42l51_probe(struct snd_soc_codec *codec)
 
 	snd_soc_add_controls(codec, cs42l51_snd_controls,
 		ARRAY_SIZE(cs42l51_snd_controls));
-	snd_soc_dapm_new_controls(codec, cs42l51_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, cs42l51_dapm_widgets,
 		ARRAY_SIZE(cs42l51_dapm_widgets));
-	snd_soc_dapm_add_routes(codec, cs42l51_routes,
+	snd_soc_dapm_add_routes(codec->dapm, cs42l51_routes,
 		ARRAY_SIZE(cs42l51_routes));
 
 	return 0;

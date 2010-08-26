@@ -3084,7 +3084,7 @@ static int wm8994_set_bias_level(struct snd_soc_codec *codec,
 		break;
 
 	case SND_SOC_BIAS_STANDBY:
-		if (codec->bias_level == SND_SOC_BIAS_OFF) {
+		if (codec->dapm->bias_level == SND_SOC_BIAS_OFF) {
 			/* Tweak DC servo configuration for improved
 			 * performance. */
 			snd_soc_write(codec, 0x102, 0x3);
@@ -3123,7 +3123,7 @@ static int wm8994_set_bias_level(struct snd_soc_codec *codec,
 		break;
 
 	case SND_SOC_BIAS_OFF:
-		if (codec->bias_level == SND_SOC_BIAS_STANDBY) {
+		if (codec->dapm->bias_level == SND_SOC_BIAS_STANDBY) {
 			/* Switch over to startup biases */
 			snd_soc_update_bits(codec, WM8994_ANTIPOP_2,
 					    WM8994_BIAS_SRC |
@@ -3158,7 +3158,7 @@ static int wm8994_set_bias_level(struct snd_soc_codec *codec,
 		}
 		break;
 	}
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 	return 0;
 }
 
@@ -3997,10 +3997,10 @@ static int wm8994_codec_probe(struct snd_soc_codec *codec)
 	wm_hubs_add_analogue_controls(codec);
 	snd_soc_add_controls(codec, wm8994_snd_controls,
 			     ARRAY_SIZE(wm8994_snd_controls));
-	snd_soc_dapm_new_controls(codec, wm8994_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, wm8994_dapm_widgets,
 				  ARRAY_SIZE(wm8994_dapm_widgets));
 	wm_hubs_add_analogue_routes(codec, 0, 0);
-	snd_soc_dapm_add_routes(codec, intercon, ARRAY_SIZE(intercon));
+	snd_soc_dapm_add_routes(codec->dapm, intercon, ARRAY_SIZE(intercon));
 
 	return 0;
 

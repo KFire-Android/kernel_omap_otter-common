@@ -89,10 +89,10 @@ static const struct snd_soc_dapm_route cx20442_audio_map[] = {
 
 static int cx20442_add_widgets(struct snd_soc_codec *codec)
 {
-	snd_soc_dapm_new_controls(codec, cx20442_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, cx20442_dapm_widgets,
 				  ARRAY_SIZE(cx20442_dapm_widgets));
 
-	snd_soc_dapm_add_routes(codec, cx20442_audio_map,
+	snd_soc_dapm_add_routes(codec->dapm, cx20442_audio_map,
 				ARRAY_SIZE(cx20442_audio_map));
 
 	return 0;

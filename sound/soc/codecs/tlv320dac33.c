@@ -604,11 +604,11 @@ static const struct snd_soc_dapm_route audio_map[] = {
 
 static int dac33_add_widgets(struct snd_soc_codec *codec)
 {
-	snd_soc_dapm_new_controls(codec, dac33_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, dac33_dapm_widgets,
 				  ARRAY_SIZE(dac33_dapm_widgets));
 
 	/* set up audio path interconnects */
-	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
+	snd_soc_dapm_add_routes(codec->dapm, audio_map, ARRAY_SIZE(audio_map));
 
 	return 0;
 }
@@ -625,7 +625,7 @@ static int dac33_set_bias_level(struct snd_soc_codec *codec,
 	case SND_SOC_BIAS_PREPARE:
 		break;
 	case SND_SOC_BIAS_STANDBY:
-		if (codec->bias_level == SND_SOC_BIAS_OFF) {
+		if (codec->dapm->bias_level == SND_SOC_BIAS_OFF) {
 			/* Coming from OFF, switch on the codec */
 			ret = dac33_hard_power(codec, 1);
 			if (ret != 0)
@@ -636,14 +636,14 @@ static int dac33_set_bias_level(struct snd_soc_codec *codec,
 		break;
 	case SND_SOC_BIAS_OFF:
 		/* Do not power off, when the codec is already off */
-		if (codec->bias_level == SND_SOC_BIAS_OFF)
+		if (codec->dapm->bias_level == SND_SOC_BIAS_OFF)
 			return 0;
 		ret = dac33_hard_power(codec, 0);
 		if (ret != 0)
 			return ret;
 		break;
 	}
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 
 	return 0;
 }

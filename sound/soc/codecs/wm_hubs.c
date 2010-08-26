@@ -819,7 +819,7 @@ int wm_hubs_add_analogue_controls(struct snd_soc_codec *codec)
 	snd_soc_add_controls(codec, analogue_snd_controls,
 			     ARRAY_SIZE(analogue_snd_controls));
 
-	snd_soc_dapm_new_controls(codec, analogue_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, analogue_dapm_widgets,
 				  ARRAY_SIZE(analogue_dapm_widgets));
 	return 0;
 }
@@ -828,24 +828,24 @@ EXPORT_SYMBOL_GPL(wm_hubs_add_analogue_controls);
 int wm_hubs_add_analogue_routes(struct snd_soc_codec *codec,
 				int lineout1_diff, int lineout2_diff)
 {
-	snd_soc_dapm_add_routes(codec, analogue_routes,
+	snd_soc_dapm_add_routes(codec->dapm, analogue_routes,
 				ARRAY_SIZE(analogue_routes));
 
 	if (lineout1_diff)
-		snd_soc_dapm_add_routes(codec,
+		snd_soc_dapm_add_routes(codec->dapm,
 					lineout1_diff_routes,
 					ARRAY_SIZE(lineout1_diff_routes));
 	else
-		snd_soc_dapm_add_routes(codec,
+		snd_soc_dapm_add_routes(codec->dapm,
 					lineout1_se_routes,
 					ARRAY_SIZE(lineout1_se_routes));
 
 	if (lineout2_diff)
-		snd_soc_dapm_add_routes(codec,
+		snd_soc_dapm_add_routes(codec->dapm,
 					lineout2_diff_routes,
 					ARRAY_SIZE(lineout2_diff_routes));
 	else
-		snd_soc_dapm_add_routes(codec,
+		snd_soc_dapm_add_routes(codec->dapm,
 					lineout2_se_routes,
 					ARRAY_SIZE(lineout2_se_routes));
 

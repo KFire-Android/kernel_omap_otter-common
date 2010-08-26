@@ -391,11 +391,11 @@ static int set_sample_rate_control(struct snd_soc_codec *codec, int mclk,
 
 static int tlv320aic23_add_widgets(struct snd_soc_codec *codec)
 {
-	snd_soc_dapm_new_controls(codec, tlv320aic23_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, tlv320aic23_dapm_widgets,
 				  ARRAY_SIZE(tlv320aic23_dapm_widgets));
 
 	/* set up audio path interconnects */
-	snd_soc_dapm_add_routes(codec, intercon, ARRAY_SIZE(intercon));
+	snd_soc_dapm_add_routes(codec->dapm, intercon, ARRAY_SIZE(intercon));
 
 	return 0;
 }
@@ -574,7 +574,7 @@ static int tlv320aic23_set_bias_level(struct snd_soc_codec *codec,
 		tlv320aic23_write(codec, TLV320AIC23_PWR, 0xffff);
 		break;
 	}
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 	return 0;
 }
 

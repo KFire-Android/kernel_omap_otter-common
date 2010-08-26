@@ -788,7 +788,7 @@ static int wm8350_add_widgets(struct snd_soc_codec *codec)
 {
 	int ret;
 
-	ret = snd_soc_dapm_new_controls(codec,
+	ret = snd_soc_dapm_new_controls(codec->dapm,
 					wm8350_dapm_widgets,
 					ARRAY_SIZE(wm8350_dapm_widgets));
 	if (ret != 0) {
@@ -797,7 +797,7 @@ static int wm8350_add_widgets(struct snd_soc_codec *codec)
 	}
 
 	/* set up audio paths */
-	ret = snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
+	ret = snd_soc_dapm_add_routes(codec->dapm, audio_map, ARRAY_SIZE(audio_map));
 	if (ret != 0) {
 		dev_err(codec->dev, "DAPM route register failed\n");
 		return ret;
@@ -1184,7 +1184,7 @@ static int wm8350_set_bias_level(struct snd_soc_codec *codec,
 		break;
 
 	case SND_SOC_BIAS_STANDBY:
-		if (codec->bias_level == SND_SOC_BIAS_OFF) {
+		if (codec->dapm->bias_level == SND_SOC_BIAS_OFF) {
 			ret = regulator_bulk_enable(ARRAY_SIZE(priv->supplies),
 						    priv->supplies);
 			if (ret != 0)
@@ -1317,7 +1317,7 @@ static int wm8350_set_bias_level(struct snd_soc_codec *codec,
 				       priv->supplies);
 		break;
 	}
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 	return 0;
 }
 

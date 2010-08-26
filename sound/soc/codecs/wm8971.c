@@ -336,10 +336,10 @@ static const struct snd_soc_dapm_route audio_map[] = {
 
 static int wm8971_add_widgets(struct snd_soc_codec *codec)
 {
-	snd_soc_dapm_new_controls(codec, wm8971_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, wm8971_dapm_widgets,
 				  ARRAY_SIZE(wm8971_dapm_widgets));
 
-	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
+	snd_soc_dapm_add_routes(codec->dapm, audio_map, ARRAY_SIZE(audio_map));
 
 	return 0;
 }
@@ -556,7 +556,7 @@ static int wm8971_set_bias_level(struct snd_soc_codec *codec,
 		snd_soc_write(codec, WM8971_PWR1, 0x0001);
 		break;
 	}
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 	return 0;
 }
 
@@ -595,7 +595,7 @@ static void wm8971_work(struct work_struct *work)
 {
 	struct snd_soc_codec *codec =
 		container_of(work, struct snd_soc_codec, delayed_work.work);
-	wm8971_set_bias_level(codec, codec->bias_level);
+	wm8971_set_bias_level(codec, codec->dapm->bias_level);
 }
 
 static int wm8971_suspend(struct snd_soc_codec *codec, pm_message_t state)
@@ -623,10 +623,10 @@ static int wm8971_resume(struct snd_soc_codec *codec)
 	wm8971_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
 	/* charge wm8971 caps */
-	if (codec->suspend_bias_level == SND_SOC_BIAS_ON) {
+	if (codec->dapm->suspend_bias_level == SND_SOC_BIAS_ON) {
 		reg = snd_soc_read(codec, WM8971_PWR1) & 0xfe3e;
 		snd_soc_write(codec, WM8971_PWR1, reg | 0x01c0);
-		codec->bias_level = SND_SOC_BIAS_ON;
+		codec->dapm->bias_level = SND_SOC_BIAS_ON;
 		queue_delayed_work(wm8971_workq, &codec->delayed_work,
 			msecs_to_jiffies(1000));
 	}
@@ -659,7 +659,7 @@ static int wm8971_probe(struct snd_soc_codec *codec)
 	/* charge output caps - set vmid to 5k for quick power up */
 	reg = snd_soc_read(codec, WM8971_PWR1) & 0xfe3e;
 	snd_soc_write(codec, WM8971_PWR1, reg | 0x01c0);
-	codec->bias_level = SND_SOC_BIAS_STANDBY;
+	codec->dapm->bias_level = SND_SOC_BIAS_STANDBY;
 	queue_delayed_work(wm8971_workq, &codec->delayed_work,
 		msecs_to_jiffies(1000));
 

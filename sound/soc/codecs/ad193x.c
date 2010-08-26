@@ -385,9 +385,9 @@ static int ad193x_probe(struct snd_soc_codec *codec)
 
 	snd_soc_add_controls(codec, ad193x_snd_controls,
 			     ARRAY_SIZE(ad193x_snd_controls));
-	snd_soc_dapm_new_controls(codec, ad193x_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, ad193x_dapm_widgets,
 				  ARRAY_SIZE(ad193x_dapm_widgets));
-	snd_soc_dapm_add_routes(codec, audio_paths, ARRAY_SIZE(audio_paths));
+	snd_soc_dapm_add_routes(codec->dapm, audio_paths, ARRAY_SIZE(audio_paths));
 
 	return ret;
 }

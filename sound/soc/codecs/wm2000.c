@@ -712,12 +712,12 @@ int wm2000_add_controls(struct snd_soc_codec *codec)
 		return -ENODEV;
 	}
 
-	ret = snd_soc_dapm_new_controls(codec, wm2000_dapm_widgets,
+	ret = snd_soc_dapm_new_controls(codec->dapm, wm2000_dapm_widgets,
 					ARRAY_SIZE(wm2000_dapm_widgets));
 	if (ret < 0)
 		return ret;
 
-	ret = snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
+	ret = snd_soc_dapm_add_routes(codec->dapm, audio_map, ARRAY_SIZE(audio_map));
 	if (ret < 0)
 		return ret;
 

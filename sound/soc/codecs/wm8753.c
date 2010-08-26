@@ -671,10 +671,10 @@ static const struct snd_soc_dapm_route audio_map[] = {
 
 static int wm8753_add_widgets(struct snd_soc_codec *codec)
 {
-	snd_soc_dapm_new_controls(codec, wm8753_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, wm8753_dapm_widgets,
 				  ARRAY_SIZE(wm8753_dapm_widgets));
 
-	snd_soc_dapm_add_routes(codec, audio_map, ARRAY_SIZE(audio_map));
+	snd_soc_dapm_add_routes(codec->dapm, audio_map, ARRAY_SIZE(audio_map));
 
 	return 0;
 }
@@ -1293,7 +1293,7 @@ static int wm8753_set_bias_level(struct snd_soc_codec *codec,
 		wm8753_write(codec, WM8753_PWR1, 0x0001);
 		break;
 	}
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 	return 0;
 }
 
@@ -1485,7 +1485,7 @@ static void wm8753_work(struct work_struct *work)
 {
 	struct snd_soc_codec *codec =
 		container_of(work, struct snd_soc_codec, delayed_work.work);
-	wm8753_set_bias_level(codec, codec->bias_level);
+	wm8753_set_bias_level(codec, codec->dapm->bias_level);
 }
 
 static int wm8753_suspend(struct snd_soc_codec *codec, pm_message_t state)
@@ -1517,9 +1517,9 @@ static int wm8753_resume(struct snd_soc_codec *codec)
 	wm8753_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 
 	/* charge wm8753 caps */
-	if (codec->suspend_bias_level == SND_SOC_BIAS_ON) {
+	if (codec->dapm->suspend_bias_level == SND_SOC_BIAS_ON) {
 		wm8753_set_bias_level(codec, SND_SOC_BIAS_PREPARE);
-		codec->bias_level = SND_SOC_BIAS_ON;
+		codec->dapm->bias_level = SND_SOC_BIAS_ON;
 		schedule_delayed_work(&codec->delayed_work,
 			msecs_to_jiffies(caps_charge));
 	}
@@ -1551,7 +1551,7 @@ static int wm8753_probe(struct snd_soc_codec *codec)
 	struct wm8753_priv *wm8753 = snd_soc_codec_get_drvdata(codec);
 	int ret = 0, reg;
 
-	codec->bias_level = SND_SOC_BIAS_OFF,
+	codec->dapm->bias_level = SND_SOC_BIAS_OFF,
 	codec->control_data = wm8753->control_data;
 	INIT_DELAYED_WORK(&codec->delayed_work, wm8753_work);
 

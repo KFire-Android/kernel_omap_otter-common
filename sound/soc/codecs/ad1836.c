@@ -252,9 +252,9 @@ static int ad1836_probe(struct snd_soc_codec *codec)
 
 	snd_soc_add_controls(codec, ad1836_snd_controls,
 			     ARRAY_SIZE(ad1836_snd_controls));
-	snd_soc_dapm_new_controls(codec, ad1836_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, ad1836_dapm_widgets,
 				  ARRAY_SIZE(ad1836_dapm_widgets));
-	snd_soc_dapm_add_routes(codec, audio_paths, ARRAY_SIZE(audio_paths));
+	snd_soc_dapm_add_routes(codec->dapm, audio_paths, ARRAY_SIZE(audio_paths));
 
 	return ret;
 }

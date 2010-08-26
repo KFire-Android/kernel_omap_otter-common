@@ -153,10 +153,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 static int wm8731_add_widgets(struct snd_soc_codec *codec)
 {
-	snd_soc_dapm_new_controls(codec, wm8731_dapm_widgets,
+	snd_soc_dapm_new_controls(codec->dapm, wm8731_dapm_widgets,
 				  ARRAY_SIZE(wm8731_dapm_widgets));
 
-	snd_soc_dapm_add_routes(codec, intercon, ARRAY_SIZE(intercon));
+	snd_soc_dapm_add_routes(codec->dapm, intercon, ARRAY_SIZE(intercon));
 
 	return 0;
 }
@@ -373,7 +373,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
 	case SND_SOC_BIAS_PREPARE:
 		break;
 	case SND_SOC_BIAS_STANDBY:
-		if (codec->bias_level == SND_SOC_BIAS_OFF) {
+		if (codec->dapm->bias_level == SND_SOC_BIAS_OFF) {
 			ret = regulator_bulk_enable(ARRAY_SIZE(wm8731->supplies),
 						    wm8731->supplies);
 			if (ret != 0)
@@ -402,7 +402,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
 				       wm8731->supplies);
 		break;
 	}
-	codec->bias_level = level;
+	codec->dapm->bias_level = level;
 	return 0;
 }
 
@@ -462,7 +462,7 @@ static int wm8731_probe(struct snd_soc_codec *codec)
 	struct wm8731_priv *wm8731 = snd_soc_codec_get_drvdata(codec);
 	int ret = 0, i;
 
-	codec->bias_level = SND_SOC_BIAS_OFF,
+	codec->dapm->bias_level = SND_SOC_BIAS_OFF,
 	codec->control_data = wm8731->control_data;
 
 	ret = snd_soc_codec_set_cache_io(codec, 7, 9, wm8731->control_type);
