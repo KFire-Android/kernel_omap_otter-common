@@ -35,6 +35,7 @@
 #include <plat/omap44xx.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
+#include <sound/omap-abe-dsp.h>
 
 #if	defined(CONFIG_OMAP_DSP) || defined(CONFIG_OMAP_DSP_MODULE)
 
@@ -226,8 +227,6 @@ static void omap_init_mcpdm(void)
 	pdata->device_enable = omap_device_enable;
 	pdata->device_idle = omap_device_idle;
 	pdata->device_shutdown = omap_device_shutdown;
-	pdata->irq = OMAP44XX_IRQ_MCPDM;
-	pdata->phys_base = OMAP44XX_MCPDM_BASE;
 
 	od = omap_device_build("omap-mcpdm-dai", -1, oh, pdata,
 				sizeof(struct omap_mcpdm_platform_data),
@@ -293,8 +292,45 @@ fail:
 
 /*-------------------------------------------------------------------------*/
 
-#if defined(SND_OMAP_SOC_ABE_DSP)
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DSP) || \
+	defined(CONFIG_SND_OMAP_SOC_ABE_DSP_MODULE)
+#if 1
+	/* TODO: hwmod is not ready for AESS ABE atm so just use normal pdev */
 
+static struct resource aess_resources[] = {
+	{
+		.start		= L4_ABE_44XX_PHYS,
+		.end		= L4_ABE_44XX_PHYS + SZ_1M,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.start		= OMAP44XX_IRQ_ABE,
+		.flags		= IORESOURCE_IRQ,
+	},
+};
+
+static struct omap4_abe_dsp_pdata aess_pdata = {
+	.device_enable = omap_device_enable,
+	.device_shutdown	= omap_device_shutdown,
+	.device_idle	= omap_device_idle,
+};
+
+static struct platform_device omap_aess_device = {
+	.name		= "omap-aess-audio",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(aess_resources),
+	.resource	= aess_resources,
+	.dev = {
+		.platform_data = &aess_pdata,
+	},
+};
+
+static void omap_init_aess(void)
+{
+	(void) platform_device_register(&omap_aess_device);
+}
+
+#else
 static struct omap_device_pm_latency omap_aess_latency[] = {
 	{
 		.deactivate_func = omap_device_idle_hwmods,
@@ -325,14 +361,15 @@ static void omap_init_aess(void)
 	pdata->device_idle = omap_device_idle;
 	pdata->device_shutdown = omap_device_shutdown;
 
-	od = omap_device_build("omap-aess", -1, oh, pdata,
-				sizeof(struct omap_aess_platform_data),
+	od = omap_device_build("omap-aess-audio", -1, oh, pdata,
+				sizeof(struct omap4_abe_dsp_pdata),
 				omap_aess_latency,
 				ARRAY_SIZE(omap_aess_latency), 0);
 
 	if (IS_ERR(od))
-		printk(KERN_ERR "Could not build omap_device for omap-aess\n");
+		printk(KERN_ERR "Could not build omap_device for omap-aess-audio\n");
 }
+#endif
 #else
 static inline void omap_init_aess(void) {}
 #endif
