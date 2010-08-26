@@ -988,6 +988,35 @@ int _omap_hwmod_idle(struct omap_hwmod *oh)
 }
 
 /**
+ * omap_hwmod_set_module_autoidle - set the hwmod's OCP slave autoidle
+ * @oh: struct omap_hwmod *
+ * @autoidle: desired AUTOIDLE bitfield value (0 or 1)
+ *
+ * Sets the IP block's OCP slave autoidle in hardware, and updates our
+ * local copy. Intended to be used by drivers that have some erratum
+ * that requires direct manipulation of the AUTOIDLE bits.  Returns
+ * -EINVAL if @oh is null, or passes along the return value from
+ * _set_module_autoidle().
+ */
+int omap_hwmod_set_module_autoidle(struct omap_hwmod *oh, u8 autoidle)
+{
+	u32 v;
+	int retval = 0;
+
+	if (!oh)
+		return -EINVAL;
+
+	v = oh->_sysc_cache;
+
+	retval = _set_module_autoidle(oh, autoidle, &v);
+
+	if (!retval)
+		_write_sysconfig(v, oh);
+
+	return retval;
+}
+
+/**
  * _shutdown - shutdown an omap_hwmod
  * @oh: struct omap_hwmod *
  *

@@ -524,6 +524,7 @@ int omap_hwmod_hardreset_deassert(struct omap_hwmod *oh, const char *name);
 int omap_hwmod_hardreset_state(struct omap_hwmod *oh, const char *name);
 
 int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode);
+int omap_hwmod_set_module_autoidle(struct omap_hwmod *oh, u8 autoidle);
 
 int omap_hwmod_reset(struct omap_hwmod *oh);
 void omap_hwmod_ocp_barrier(struct omap_hwmod *oh);
