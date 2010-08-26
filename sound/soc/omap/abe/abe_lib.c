@@ -13,9 +13,9 @@
 
 void __iomem *io_base;
 
-void abe_init_mem()
+void abe_init_mem(void __iomem *_io_base)
 {
-	io_base = ioremap(L4_ABE_44XX_PHYS, SZ_1M);
+	io_base = _io_base;
 }
 
 #define ABE_PMEM_BASE_OFFSET_MPU	0xe0000

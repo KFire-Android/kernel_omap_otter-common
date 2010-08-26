@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-void abe_init_mem(void);
+void abe_init_mem(void __iomem *io_base);
 void abe_translate_gain_format(abe_uint32 f, abe_float g1, abe_float *g2);
 void abe_translate_ramp_format(abe_float g1, abe_float *g2);
 
