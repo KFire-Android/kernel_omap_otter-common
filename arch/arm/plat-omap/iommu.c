@@ -362,6 +362,69 @@ void iommu_set_twl(struct iommu *obj, bool on)
 }
 EXPORT_SYMBOL_GPL(iommu_set_twl);
 
+/**
+ * save_tlb_entries - save a num of locked tlb entries
+ * @obj:	target iommu
+ *
+ */
+static int iommu_save_tlb_entries(struct iommu *obj)
+{
+	int i;
+	struct cr_regs cr_tmp;
+	struct iotlb_entry *e = obj->tlbs_e;
+
+	if (!obj || !obj->tlbs_e)
+		goto error;
+
+	for_each_iotlb_cr(obj, obj->nr_tlb_entries, i, cr_tmp) {
+		iotlb_cr_to_e(&cr_tmp, e);
+		e++;
+
+		dev_dbg(obj->dev, "%s: [%02x] %08x %08x\n", __func__,
+					i, cr_tmp.cam, cr_tmp.ram);
+	}
+
+	return 0;
+error:
+	return -EINVAL;
+}
+
+/**
+ * restore_tlb_entries - restor a num of locked tlb entries
+ * @obj:	target iommu
+ *
+ * Function used to restore exclusively the valid TLB entries
+ * based on the e->valid value
+ *
+ */
+static int iommu_restore_tlb_entries(struct iommu *obj)
+{
+	int i;
+	int status;
+	struct iotlb_entry *e = obj->tlbs_e;
+
+	if (!obj || !obj->tlbs_e)
+		goto error;
+
+	for (i = 0; i < obj->nr_tlb_entries; i++) {
+		if (!e->valid) {
+			e++;
+			continue;
+		}
+		status = load_iotlb_entry(obj, e);
+		if (status)
+			goto error;
+		e++;
+
+		dev_dbg(obj->dev, "%s: [%02x] %08x\n", __func__,
+					i, e->pa);
+	}
+
+	return 0;
+error:
+	return -EINVAL;
+}
+
 #if defined(CONFIG_OMAP_IOMMU_DEBUG_MODULE)
 
 ssize_t iommu_dump_ctx(struct iommu *obj, char *buf, ssize_t bytes)
@@ -897,6 +960,10 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 	obj->dev = &pdev->dev;
 	obj->pdev = pdev;
 	obj->ctx = (void *)obj + sizeof(*obj);
+	obj->tlbs_e = kzalloc(sizeof(struct iotlb_entry) * obj->nr_tlb_entries,
+							GFP_KERNEL);
+	if (!obj->tlbs_e)
+		goto error;
 
 	mutex_init(&obj->iommu_lock);
 	mutex_init(&obj->mmap_lock);
@@ -912,7 +979,7 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 	err = request_irq(pdata->irq, iommu_fault_handler, IRQF_SHARED,
 			  dev_name(&pdev->dev), obj);
 	if (err < 0)
-		goto err_irq;
+		goto error;
 	platform_set_drvdata(pdev, obj);
 
 	p = (void *)__get_free_pages(GFP_KERNEL, get_order(IOPGD_TABLE_SIZE));
@@ -931,7 +998,7 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 
 err_pgd:
 	free_irq(pdata->irq, obj);
-err_irq:
+error:
 	kfree(obj);
 	return err;
 }

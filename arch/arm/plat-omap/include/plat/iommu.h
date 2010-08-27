@@ -49,6 +49,7 @@ struct iommu {
 	struct blocking_notifier_head	notifier;
 
 	void *ctx; /* iommu context: registres saved area */
+	struct iotlb_entry *tlbs_e;/* iommu tlbs context: saved area */
 
 	struct platform_device *pdev;
 	struct list_head event_list;

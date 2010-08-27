@@ -318,6 +318,7 @@ static void omap2_cr_to_e(struct cr_regs *cr, struct iotlb_entry *e)
 	e->da		= cr->cam & MMU_CAM_VATAG_MASK;
 	e->pa		= cr->ram & MMU_RAM_PADDR_MASK;
 	e->valid	= cr->cam & MMU_CAM_V;
+	e->prsvd	= cr->cam & MMU_CAM_P;
 	e->pgsz		= cr->cam & MMU_CAM_PGSZ_MASK;
 	e->endian	= cr->ram & MMU_RAM_ENDIAN_MASK;
 	e->elsz		= cr->ram & MMU_RAM_ELSZ_MASK;
