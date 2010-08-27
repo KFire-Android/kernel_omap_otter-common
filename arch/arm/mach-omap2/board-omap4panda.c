@@ -51,8 +51,9 @@
 #include <plat/hwspinlock.h>
 #include "hsmmc.h"
 
-#define HUB_POWER 1
-#define HUB_NRESET 39
+#define GPIO_HUB_POWER 1
+#define GPIO_HUB_NRESET_39 39
+#define GPIO_HUB_NRESET_62 62
 #define GPIO_BOARD_ID0 182
 #define GPIO_BOARD_ID1 101
 #define GPIO_BOARD_ID2 171
@@ -426,24 +427,46 @@ static int __init omap4_i2c_init(void)
 
 static void __init omap4_ehci_init(void)
 {
+	int hub_nreset, ret;
+
+	if (board_revision)
+		hub_nreset = GPIO_HUB_NRESET_62;
+	else
+		hub_nreset = GPIO_HUB_NRESET_39;
+
 	/* disable the power to the usb hub prior to init */
-	gpio_request(HUB_POWER , "hub_power");
-	gpio_export(HUB_POWER, 0);
-	gpio_direction_output(HUB_POWER, 0);
-	gpio_set_value(HUB_POWER, 0);
+	ret = gpio_request(GPIO_HUB_POWER, "hub_power");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", GPIO_HUB_POWER);
+		goto error1;
+	}
+	gpio_export(GPIO_HUB_POWER, 0);
+	gpio_direction_output(GPIO_HUB_POWER, 0);
+	gpio_set_value(GPIO_HUB_POWER, 0);
 
 	/* reset phy+hub */
-	gpio_request(HUB_NRESET , "hub_nreset");
-	gpio_export(HUB_NRESET, 0);
-	gpio_direction_output(HUB_NRESET, 0);
-	gpio_set_value(HUB_NRESET, 0);
-	gpio_set_value(HUB_NRESET, 1);
+	ret = gpio_request(hub_nreset, "hub_nreset");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", hub_nreset);
+		goto error2;
+	}
+	gpio_export(hub_nreset, 0);
+	gpio_direction_output(hub_nreset, 0);
+	gpio_set_value(hub_nreset, 0);
+	gpio_set_value(hub_nreset, 1);
 
 	usb_uhhtll_init(&usbhs_pdata);
 	usb_ehci_init();
 
 	/* enable power to hub */
-	gpio_set_value(HUB_POWER, 1);
+	gpio_set_value(GPIO_HUB_POWER, 1);
+	return;
+
+error2:
+	gpio_free(GPIO_HUB_POWER);
+error1:
+	pr_err("Unable to initialize EHCI power/reset\n");
+	return;
 
 }
 
