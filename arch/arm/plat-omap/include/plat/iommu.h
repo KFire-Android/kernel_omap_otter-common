@@ -48,7 +48,6 @@ struct iommu {
 
 	struct blocking_notifier_head	notifier;
 
-	void *ctx; /* iommu context: registres saved area */
 	struct iotlb_entry *tlbs_e;/* iommu tlbs context: saved area */
 
 	struct platform_device *pdev;
@@ -104,8 +103,6 @@ struct iommu_functions {
 
 	u32 (*get_pte_attr)(struct iotlb_entry *e);
 
-	void (*save_ctx)(struct iommu *obj);
-	void (*restore_ctx)(struct iommu *obj);
 	ssize_t (*dump_ctx)(struct iommu *obj, char *buf, ssize_t len);
 };
 
@@ -179,8 +176,10 @@ extern void iopgtable_clear_entry_all(struct iommu *obj);
 extern struct iommu *iommu_get(const char *name);
 extern void iommu_put(struct iommu *obj);
 
-extern void iommu_save_ctx(struct iommu *obj);
-extern void iommu_restore_ctx(struct iommu *obj);
+u32 iommu_save_ctx(struct iommu *obj);
+u32 iommu_restore_ctx(struct iommu *obj);
+u32 iommu_save_tlb_entries(struct iommu *obj);
+u32 iommu_restore_tlb_entries(struct iommu *obj);
 
 extern int install_iommu_arch(const struct iommu_functions *ops);
 extern void uninstall_iommu_arch(const struct iommu_functions *ops);

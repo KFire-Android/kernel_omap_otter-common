@@ -72,9 +72,19 @@ EXPORT_SYMBOL_GPL(uninstall_iommu_arch);
  * iommu_save_ctx - Save registers for pm off-mode support
  * @obj:	target iommu
  **/
-void iommu_save_ctx(struct iommu *obj)
+u32 iommu_save_ctx(struct iommu *obj)
 {
-	arch_iommu->save_ctx(obj);
+	u32 err;
+
+	err = iommu_save_tlb_entries(obj);
+	if (err)
+		goto error;
+
+	arch_iommu->disable(obj);
+
+	return 0;
+error:
+	return err;
 }
 EXPORT_SYMBOL_GPL(iommu_save_ctx);
 
@@ -82,9 +92,21 @@ EXPORT_SYMBOL_GPL(iommu_save_ctx);
  * iommu_restore_ctx - Restore registers for pm off-mode support
  * @obj:	target iommu
  **/
-void iommu_restore_ctx(struct iommu *obj)
+u32 iommu_restore_ctx(struct iommu *obj)
 {
-	arch_iommu->restore_ctx(obj);
+	u32 err;
+
+	err = arch_iommu->enable(obj);
+	if (err)
+		goto error;
+
+	err = iommu_restore_tlb_entries(obj);
+	if (err)
+		goto error;
+
+	return 0;
+error:
+	return err;
 }
 EXPORT_SYMBOL_GPL(iommu_restore_ctx);
 
@@ -367,7 +389,7 @@ EXPORT_SYMBOL_GPL(iommu_set_twl);
  * @obj:	target iommu
  *
  */
-static int iommu_save_tlb_entries(struct iommu *obj)
+u32 iommu_save_tlb_entries(struct iommu *obj)
 {
 	int i;
 	struct cr_regs cr_tmp;
@@ -397,7 +419,7 @@ error:
  * based on the e->valid value
  *
  */
-static int iommu_restore_tlb_entries(struct iommu *obj)
+u32 iommu_restore_tlb_entries(struct iommu *obj)
 {
 	int i;
 	int status;
@@ -951,7 +973,7 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 	struct iommu *obj;
 	struct iommu_platform_data *pdata = pdev->dev.platform_data;
 
-	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
+	obj = kzalloc(sizeof(*obj), GFP_KERNEL);
 	if (!obj)
 		return -ENOMEM;
 
@@ -959,7 +981,6 @@ static int __devinit omap_iommu_probe(struct platform_device *pdev)
 	obj->name = pdata->name;
 	obj->dev = &pdev->dev;
 	obj->pdev = pdev;
-	obj->ctx = (void *)obj + sizeof(*obj);
 	obj->tlbs_e = kzalloc(sizeof(struct iotlb_entry) * obj->nr_tlb_entries,
 							GFP_KERNEL);
 	if (!obj->tlbs_e)

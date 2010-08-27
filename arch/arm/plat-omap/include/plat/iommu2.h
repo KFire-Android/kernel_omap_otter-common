@@ -37,8 +37,6 @@
 #define MMU_READ_RAM		0x6c
 #define MMU_EMU_FAULT_AD	0x70
 
-#define MMU_REG_SIZE		256
-
 /*
  * MMU Register bit definitions
  */
