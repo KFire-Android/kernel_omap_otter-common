@@ -85,7 +85,7 @@ struct iotlb_lock {
 
 /* architecture specific functions */
 struct iommu_functions {
-	unsigned long	version;
+	u32 (*get_version)(struct iommu *obj);
 
 	int (*enable)(struct iommu *obj);
 	void (*disable)(struct iommu *obj);
@@ -152,7 +152,7 @@ struct iommu_platform_data {
 /*
  * global functions
  */
-extern u32 iommu_arch_version(void);
+extern u32 iommu_arch_version(struct iommu *obj);
 
 extern void iotlb_cr_to_e(struct cr_regs *cr, struct iotlb_entry *e);
 extern u32 iotlb_cr_to_virt(struct cr_regs *cr);

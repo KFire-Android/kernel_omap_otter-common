@@ -113,9 +113,9 @@ EXPORT_SYMBOL_GPL(iommu_restore_ctx);
 /**
  * iommu_arch_version - Return running iommu arch version
  **/
-u32 iommu_arch_version(void)
+u32 iommu_arch_version(struct iommu *obj)
 {
-	return arch_iommu->version;
+	return arch_iommu->get_version(obj);
 }
 EXPORT_SYMBOL_GPL(iommu_arch_version);
 

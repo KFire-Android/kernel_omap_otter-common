@@ -32,7 +32,8 @@ static struct dentry *iommu_debug_root;
 static ssize_t debug_read_ver(struct file *file, char __user *userbuf,
 			      size_t count, loff_t *ppos)
 {
-	u32 ver = iommu_arch_version();
+	struct iommu *obj = file->private_data;
+	u32 ver = iommu_arch_version(obj);
 	char buf[MAXCOLUMN], *p = buf;
 
 	p += sprintf(p, "H/W version: %d.%d\n", (ver >> 4) & 0xf , ver & 0xf);

@@ -85,6 +85,11 @@ static void omap2_iommu_set_twl(struct iommu *obj, bool on)
 	iommu_write_reg(obj, l, MMU_CNTL);
 }
 
+static u32 omap2_get_version(struct iommu *obj)
+{
+	return iommu_read_reg(obj, MMU_REVISION);
+}
+
 static int omap2_iommu_enable(struct iommu *obj)
 {
 	u32 l, pa;
@@ -304,7 +309,7 @@ static void omap2_cr_to_e(struct cr_regs *cr, struct iotlb_entry *e)
 }
 
 static const struct iommu_functions omap2_iommu_ops = {
-	.version	= IOMMU_ARCH_VERSION,
+	.get_version	= omap2_get_version,
 
 	.enable		= omap2_iommu_enable,
 	.disable	= omap2_iommu_disable,
