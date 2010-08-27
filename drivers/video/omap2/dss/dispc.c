@@ -4333,10 +4333,10 @@ static void dispc_error_worker(struct work_struct *work)
 
 	if (errors & DISPC_IRQ_SYNC_LOST_DIGIT) {
 
-		DSSERR("SYNC_LOST_DIGIT\n");
 		struct omap_overlay_manager *manager = NULL;
 		bool enable = false;
 
+		DSSERR("SYNC_LOST_DIGIT\n");
 		DSSERR("SYNC_LOST_DIGIT, disabling TV\n");
 
 		for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
