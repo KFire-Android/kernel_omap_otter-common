@@ -53,6 +53,11 @@
 
 #define HUB_POWER 1
 #define HUB_NRESET 39
+#define GPIO_BOARD_ID0 182
+#define GPIO_BOARD_ID1 101
+#define GPIO_BOARD_ID2 171
+
+static int board_revision;
 
 /* wl127x BT, FM, GPS connectivity chip */
 static int gpios[] = {46, -1, -1};
@@ -474,8 +479,53 @@ void wlan_1273_config()
 }
 #endif
 
+static void __init panda_boardrev_init(void)
+{
+	int ret;
+
+	ret = gpio_request(GPIO_BOARD_ID0, "board_id0");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", GPIO_BOARD_ID0);
+		goto error1;
+	}
+
+	ret = gpio_request(GPIO_BOARD_ID1, "board_id1");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", GPIO_BOARD_ID1);
+		goto error2;
+	}
+
+	ret = gpio_request(GPIO_BOARD_ID2, "board_id2");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", GPIO_BOARD_ID2);
+		goto error3;
+	}
+	gpio_export(GPIO_BOARD_ID0, 0);
+	gpio_export(GPIO_BOARD_ID1, 0);
+	gpio_export(GPIO_BOARD_ID2, 0);
+
+	board_revision = gpio_get_value(GPIO_BOARD_ID0);
+	board_revision |= (gpio_get_value(GPIO_BOARD_ID1)<<1);
+	board_revision |= (gpio_get_value(GPIO_BOARD_ID2)<<2);
+
+	pr_info("PandaBoard Revision: %03d\n", board_revision);
+	return;
+
+error3:
+	gpio_free(GPIO_BOARD_ID1);
+error2:
+	gpio_free(GPIO_BOARD_ID0);
+error1:
+	board_revision = 0;
+	pr_err("Unable to detemine PandaBoard Revision\n");
+	return;
+
+}
+
 static void __init omap_panda_init(void)
 {
+
+	panda_boardrev_init();
 
 	omap4_i2c_init();
 	omap4_display_init();
