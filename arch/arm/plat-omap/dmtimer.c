@@ -33,7 +33,6 @@
  * with this program; if not, write  to the Free Software Foundation, Inc.,
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
@@ -339,6 +338,7 @@ void omap_dm_timer_enable(struct omap_dm_timer *timer)
 
 	if (timer->enabled)
 		return;
+
 	if (pdata->omap_dm_clk_enable)
 		pdata->omap_dm_clk_enable(timer->pdev);
 
@@ -349,7 +349,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
 void omap_dm_timer_disable(struct omap_dm_timer *timer)
 {
 	struct omap_dmtimer_platform_data *pdata = \
-				timer->pdev->dev.platform_data;
+		timer->pdev->dev.platform_data;
 
 	if (!timer->enabled)
 		return;
@@ -359,6 +359,7 @@ void omap_dm_timer_disable(struct omap_dm_timer *timer)
 
 	timer->enabled = 0;
 }
+
 EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
 
 int omap_dm_timer_get_irq(struct omap_dm_timer *timer)
@@ -634,6 +635,7 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
 	struct omap_dm_timer *timer;
 	struct resource *res;
 	struct omap_dmtimer_platform_data *pdata = pdev->dev.platform_data;
+	bool enabled =  false;
 
 	if (!pdev || !pdev->dev.platform_data) {
 		pr_err("%s:Timer device initialized without platform data\n",
@@ -651,9 +653,28 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
 	 */
 	list_for_each_entry(timer, &omap_timer_list, node)
 		if (timer->id == pdev->id) {
-			/*kfree(timer->pdev);*/ /* free the early platform data */
-			timer->pdev = pdev; /* replace with new platform data */
+			/*
+			 * Before switching to pm_runtime, disable
+			 * timer clock using old timer->pdev handle.
+			 */
+			if (timer->enabled) {
+				omap_dm_timer_disable(timer);
+				enabled = true;
+			}
+
+			/* replace early platform device with new allocation */
+			timer->pdev = pdev;
+
 			pm_runtime_enable(&pdev->dev);
+
+			/*
+			 * Enable timer clock using new timer->pdev
+			 * handle which now uses pm_runtime api. this is needed
+			 * to ensure device clock in  mandated state before
+			 * making clock state transitions.
+			 */
+			if (enabled)
+				omap_dm_timer_enable(timer);
 			return 0;
 		}
 	timer = kzalloc(sizeof(struct omap_dm_timer), GFP_KERNEL);

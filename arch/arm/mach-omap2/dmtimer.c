@@ -12,7 +12,6 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -59,7 +58,10 @@ static void omap2_dm_timer_enable(struct platform_device *pdev)
 		dev_err(&pdev->dev, "%s: invalid pdev\n", __func__);
 		return;
 	}
-	pm_runtime_get_sync(&pdev->dev);
+
+	if (pm_runtime_get_sync(&pdev->dev))
+		dev_warn(&pdev->dev, "%s: pm_runtime_get_sync FAILED\n",
+			__func__);
 }
 
 static void omap2_dm_timer_disable(struct platform_device *pdev)
@@ -68,7 +70,10 @@ static void omap2_dm_timer_disable(struct platform_device *pdev)
 		dev_err(&pdev->dev, "%s: invalid pdev\n", __func__);
 		return;
 	}
-	pm_runtime_put_sync(&pdev->dev);
+
+	if (pm_runtime_put_sync(&pdev->dev))
+		dev_warn(&pdev->dev, "%s: pm_runtime_put_sync FAILED\n",
+			__func__);
 }
 
 static void omap2_dm_early_timer_enable(struct platform_device *pdev)
@@ -111,8 +116,13 @@ static int omap2_dm_timer_set_src(struct platform_device *pdev,
 #else
 	if (unlikely(is_early_init))
 		omap_device_idle(pdev);
-	else
-		pm_runtime_put_sync(&pdev->dev);
+	else {
+		ret = pm_runtime_put_sync(&pdev->dev);
+		if (unlikely(ret))
+			dev_warn(&pdev->dev,
+			"%s: pm_runtime_put_sync FAILED(%d)\n",
+			__func__, ret);
+	}
 #endif
 
 	ret = clk_set_parent(timer_clk, omap_dm_source_clocks[source]);
@@ -125,8 +135,13 @@ static int omap2_dm_timer_set_src(struct platform_device *pdev,
 #else
 	if (unlikely(is_early_init))
 		omap_device_enable(pdev);
-	else
-		pm_runtime_get_sync(&pdev->dev);
+	else {
+		ret = pm_runtime_get_sync(&pdev->dev);
+		if (unlikely(ret))
+			dev_warn(&pdev->dev,
+			"%s: pm_runtime_get_sync FAILED(%d)\n",
+			__func__, ret);
+	}
 #endif
 
 	return ret;
@@ -204,8 +219,8 @@ static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
 	struct omap_device *od;
 
 	if (!oh) {
-		pr_err("%s:Could not find [%s]\n", __func__, oh->name);
-	return -EINVAL;
+		pr_err("%s: Could not find [%s]\n", __func__, oh->name);
+		return -EINVAL;
 	}
 
 	pr_debug("%s:%s\n", __func__, oh->name);
