@@ -112,10 +112,16 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	if (cx->type > OMAP4_STATE_C1)
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu_id);
 
+#ifdef CONFIG_PM_DEBUG
+	pwrdm_pre_transition();
+#endif
 	pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
 	pwrdm_set_next_pwrst(mpu_pd, cx->mpu_state);
 	omap4_enter_lowpower(dev->cpu, cx->cpu0_state);
 
+#ifdef CONFIG_PM_DEBUG
+	pwrdm_post_transition();
+#endif
 	if (cx->type > OMAP4_STATE_C1)
 		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
 

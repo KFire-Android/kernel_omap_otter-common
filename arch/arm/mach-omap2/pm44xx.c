@@ -60,6 +60,10 @@ static int omap4_pm_suspend(void)
 	if (wakeup_timer_seconds || wakeup_timer_milliseconds)
 		omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
 					 wakeup_timer_milliseconds);
+#ifdef CONFIG_PM_DEBUG
+	pwrdm_pre_transition();
+#endif
+
 	/*
 	 * Clear all wakeup sources and keep
 	 * only Debug UART, Keypad and GPT1 interrupt
@@ -95,6 +99,10 @@ static int omap4_pm_suspend(void)
 				       pwrst->pwrdm->name, state);
 		}
 	}
+
+#ifdef CONFIG_PM_DEBUG
+	pwrdm_post_transition();
+#endif
 	return 0;
 }
 

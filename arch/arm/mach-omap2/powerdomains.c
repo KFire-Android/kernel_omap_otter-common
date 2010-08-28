@@ -122,6 +122,8 @@ int _get_mem_bank_lastmemst_mask(u8 bank)
 		return OMAP3430_LASTSHAREDL2CACHEFLATSTATEENTERED_MASK;
 	case 3:
 		return OMAP3430_LASTL2FLATMEMSTATEENTERED_MASK;
+	case 4:
+		return OMAP4430_OCP_NRET_BANK_STATEST_MASK;
 	default:
 		WARN_ON(1); /* should never happen */
 		return -EEXIST;
