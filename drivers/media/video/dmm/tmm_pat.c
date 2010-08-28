@@ -203,16 +203,18 @@ static u32 *tmm_pat_get_pages(struct tmm *tmm, s32 n)
 		 */
 		list_for_each_safe(pos, q, &pvt->free_list.list) {
 			m = list_entry(pos, struct mem, list);
-			f->mem[i] = m;
 			list_del(pos);
 			break;
 		}
 		mutex_unlock(&pvt->mtx);
 
-		if (m != NULL)
+		if (m != NULL) {
+			f->mem[i] = m;
 			f->pa[i] = m->pa;
-		else
+		}
+		else {
 			goto cleanup;
+		}
 	}
 
 	mutex_lock(&pvt->mtx);
