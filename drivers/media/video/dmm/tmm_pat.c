@@ -195,6 +195,7 @@ static u32 *tmm_pat_get_pages(struct tmm *tmm, s32 n)
 		mutex_lock(&pvt->mtx);
 		pos = NULL;
 		q = NULL;
+		m = NULL;
 
 		/*
 		 * remove one mem struct from the free list and
