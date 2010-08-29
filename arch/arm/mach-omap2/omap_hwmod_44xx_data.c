@@ -3501,8 +3501,8 @@ static struct omap_hwmod omap44xx_mcspi4_hwmod = {
 
 static struct omap_hwmod_class_sysconfig omap44xx_mmc_sysc = {
 	.rev_offs	= 0x0000,
-	.sysc_offs	= 0x0110,
-	.syss_offs	= 0x0114,
+	.sysc_offs	= 0x0010,
+	.syss_offs	= 0x0014,
 	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_EMUFREE |
 			   SYSC_HAS_SOFTRESET | SYSC_HAS_MIDLEMODE),
 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
