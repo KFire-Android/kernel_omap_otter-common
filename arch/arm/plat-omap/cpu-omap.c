@@ -25,10 +25,12 @@
 #include <linux/err.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/cpu.h>
 
 #include <mach/hardware.h>
 #include <plat/clock.h>
 #include <asm/system.h>
+#include <asm/cpu.h>
 #include <plat/omap_device.h>
 
 #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4) \
@@ -50,6 +52,11 @@ static struct cpufreq_frequency_table *freq_table;
 #endif
 
 static struct clk *mpu_clk;
+
+#ifdef CONFIG_SMP
+static cpumask_var_t omap4_cpumask;
+static int cpus_initialized;
+#endif
 
 /* TODO: Add support for SDRAM timing changes */
 
@@ -75,7 +82,7 @@ static unsigned int omap_getspeed(unsigned int cpu)
 {
 	unsigned long rate;
 
-	if (cpu)
+	if (cpu >= num_online_cpus())
 		return 0;
 
 	rate = clk_get_rate(mpu_clk) / 1000;
@@ -95,6 +102,13 @@ static int omap_target(struct cpufreq_policy *policy,
 	struct device *mpu_dev = omap2_get_mpuss_device();
 #endif
 	int ret = 0;
+
+#ifdef CONFIG_SMP
+	int i;
+	/* Wait untill all CPU's are initialized */
+	if (unlikely(cpus_initialized < num_online_cpus()))
+		return ret;
+#endif
 
 	/* Ensure desired rate is within allowed range.  Some govenors
 	 * (ondemand) will just pass target_freq=0 to get the minimum. */
@@ -119,9 +133,26 @@ static int omap_target(struct cpufreq_policy *policy,
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 #elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4) && \
 		!defined(CONFIG_OMAP_PM_NONE)
+#ifdef CONFIG_SMP
+	freqs.old = omap_getspeed(policy->cpu);
+	freqs.cpu = policy->cpu;
+#endif
+
 	freq = target_freq * 1000;
 	if (opp_find_freq_ceil(mpu_dev, &freq))
 		omap_device_set_rate(mpu_dev, mpu_dev, freq);
+#ifdef CONFIG_SMP
+	/*
+	 * Note that loops_per_jiffy is not updated on SMP systems in
+	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
+	 * on frequency transition. We need to update all dependent cpus
+	 */
+	freqs.new = omap_getspeed(policy->cpu);
+	for_each_cpu(i, policy->cpus)
+		per_cpu(cpu_data, i).loops_per_jiffy =
+		cpufreq_scale(per_cpu(cpu_data, i).loops_per_jiffy,
+				freqs.old, freqs.new);
+#endif
 #endif
 	return ret;
 }
@@ -137,10 +168,10 @@ static int omap_cpu_init(struct cpufreq_policy *policy)
 	if (IS_ERR(mpu_clk))
 		return PTR_ERR(mpu_clk);
 
-	if (policy->cpu != 0)
+	if (policy->cpu >= num_online_cpus())
 		return -EINVAL;
 
-	policy->cur = policy->min = policy->max = omap_getspeed(0);
+	policy->cur = policy->min = policy->max = omap_getspeed(policy->cpu);
 
 	if (!(cpu_is_omap34xx() || cpu_is_omap44xx())) {
 		clk_init_cpufreq_table(&freq_table);
@@ -163,10 +194,24 @@ static int omap_cpu_init(struct cpufreq_policy *policy)
 
 	policy->min = policy->cpuinfo.min_freq;
 	policy->max = policy->cpuinfo.max_freq;
-	policy->cur = omap_getspeed(0);
+	policy->cur = omap_getspeed(policy->cpu);
 
 	/* FIXME: what's the actual transition time? */
 	policy->cpuinfo.transition_latency = 300 * 1000;
+
+#ifdef CONFIG_SMP
+	/*
+	 * On OMAP4i, both processors share the same voltage and
+	 * the same clock, but have dedicated power domains. So both
+	 * cores needs to be scaled together and hence needs software
+	 * co-ordination. Use cpufreq affected_cpus interface to handle
+	 * this scenario.
+	 */
+	policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
+	cpumask_or(omap4_cpumask, cpumask_of(policy->cpu), omap4_cpumask);
+	cpumask_copy(policy->cpus, omap4_cpumask);
+	cpus_initialized++;
+#endif
 
 	return 0;
 }
