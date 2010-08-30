@@ -432,8 +432,8 @@ static struct i2c_board_info __initdata panda_i2c_boardinfo[] = {
 };
 
 static struct omap_i2c_bus_board_data __initdata panda_i2c_bus_pdata;
-static void __init omap_i2c_hwspinlock_init(int bus_id, unsigned int spinlock_id,
-				struct omap_i2c_bus_board_data *pdata)
+static void __init omap_i2c_hwspinlock_init(int bus_id,
+		unsigned int spinlock_id, struct omap_i2c_bus_board_data *pdata)
 {
 	pdata->handle = hwspinlock_request_specific(spinlock_id);
 	if (pdata->handle != NULL) {
@@ -449,7 +449,7 @@ static int __init omap4_i2c_init(void)
 	omap_i2c_hwspinlock_init(1, 0, &panda_i2c_bus_pdata);
 	/* Phoenix Audio IC needs I2C1 to start with 400 KHz and less */
 	omap_register_i2c_bus(1, 400, &panda_i2c_bus_pdata,
-				panda_i2c_boardinfo, ARRAY_SIZE(panda_i2c_boardinfo));
+		panda_i2c_boardinfo, ARRAY_SIZE(panda_i2c_boardinfo));
 	return 0;
 }
 
