@@ -85,8 +85,8 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	 * Do only WFI for non-boot CPU(aux cores)
 	 */
 	if (dev->cpu) {
-		do_wfi();
 		wmb();
+		do_wfi();
 		goto return_sleep_time;
 	}
 
@@ -94,8 +94,8 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	 * Do only a WFI as long as CPU1 is online
 	 */
 	if (num_online_cpus() > 1) {
-		do_wfi();
 		wmb();
+		do_wfi();
 		goto return_sleep_time;
 	}
 
@@ -104,8 +104,8 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	 */
 	cpu1_state = pwrdm_read_pwrst(cpu1_pd);
 	if (cpu1_state != PWRDM_POWER_OFF) {
-		do_wfi();
 		wmb();
+		do_wfi();
 		goto return_sleep_time;
 	}
 
