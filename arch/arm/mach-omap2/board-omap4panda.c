@@ -24,12 +24,9 @@
 #include <linux/gpio.h>
 #include <linux/usb/otg.h>
 #include <linux/i2c/twl.h>
-#include <linux/i2c/cma3000.h>
-#include <linux/i2c/bq2415x.h>
 #include <linux/regulator/machine.h>
 #include <linux/spi/spi.h>
 #include <linux/interrupt.h>
-#include <linux/input/sfh7741.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -46,9 +43,7 @@
 #include <plat/usb.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
-#include <plat/syntm12xx.h>
 #include <plat/mmc.h>
-#include <plat/omap4-keypad.h>
 #include <plat/hwspinlock.h>
 #include "hsmmc.h"
 
