@@ -1,48 +1,63 @@
 /*
- * ==========================================================================
- *               Texas Instruments OMAP(TM) Platform Firmware
- * (c) Copyright 2009, Texas Instruments Incorporated.  All Rights Reserved.
+ * ALSA SoC OMAP ABE driver
  *
- *  Use of this firmware is controlled by the terms and conditions found
- *  in the license agreement under which this firmware has been supplied.
- * ==========================================================================
+ * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
+ * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+ * 02110-1301 USA
  */
 
 #ifndef _ABE_MAIN_H_
 #define _ABE_MAIN_H_
 
-#include "abe_dm_addr.h"
-#include "abe_cm_addr.h"
-#include "abe_def.h"
-#include "abe_typ.h"
-#include "abe_dbg.h"
-#include "abe_ext.h"
-#include "abe_lib.h"
-#include "abe_ref.h"
-#include "abe_api.h"
-//#include "ABE_DAT.h"
+#ifdef __cplusplus
 
-#include "abe_typedef.h"
-#include "abe_functionsId.h"
-#include "abe_taskId.h"
+extern "C" {
+#endif
+
+#include <linux/io.h>
+
 #include "abe_dm_addr.h"
 #include "abe_sm_addr.h"
 #include "abe_cm_addr.h"
+
+#include "abe_def.h"
+#include "abe_typ.h"
+#include "abe_ext.h"
+#include "abe_dbg.h"
+#include "abe_lib.h"
+#include "abe_ref.h"
+#include "abe_api.h"
+
+
+
+#include "abe_typedef.h"
+#include "abe_functionsid.h"
+#include "abe_taskid.h"
 #include "abe_initxxx_labels.h"
 
 #include "abe_fw.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+/* pipe connection to the TARGET simulator */
+#define ABE_DEBUG_CHECKERS              0       
 
-#define ABE_HAL_VERSION		0x00000002L
-#define ABE_FW_VERSION		0x00000000L
-#define ABE_HW_VERSION		0x00000000L
+/* simulator data extracted from a text-file */
+#define ABE_DEBUG_HWFILE                0       
 
-#define ABE_DEBUG_CHECKERS	0	/* pipe connection to the TARGET simulator */
-#define ABE_DEBUG_HWFILE	0	/* simulator data extracted from a text-file */
-#define ABE_DEBUG_LL_LOG	0	/* low-level log files */
+/* low-level log files */
+#define ABE_DEBUG_LL_LOG                0       
 
 #define ABE_DEBUG (ABE_DEBUG_CHECKERS | ABE_DEBUG_HWFILE | ABE_DEBUG_LL_LOG)
 
@@ -50,4 +65,4 @@ extern "C" {
 }
 #endif
 
-#endif	/* _ABE_MAIN_H_ */
+#endif /* _ABE_MAIN_H_ */
