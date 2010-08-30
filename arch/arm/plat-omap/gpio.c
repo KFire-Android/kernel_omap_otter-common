@@ -172,6 +172,7 @@ struct gpio_bank {
 	struct omap_gpio_regs gpio_context;
 	bool dbck_flag;
 	bool off_mode_support;
+	u8 id;
 };
 
 /*
@@ -183,6 +184,8 @@ static int bank_width;
 
 /* TODO: Analyze removing gpio_bank_count usage from driver code */
 int gpio_bank_count;
+
+static void omap_gpio_mod_init(struct gpio_bank *bank);
 
 static inline struct gpio_bank *get_gpio_bank(int gpio)
 {
@@ -1042,8 +1045,10 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
 	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
 	unsigned long flags;
 
-	if (!bank->mod_usage)
+	if (!bank->mod_usage) {
 		pm_runtime_get_sync(bank->dev);
+		omap_gpio_mod_init(bank);
+	}
 
 	spin_lock_irqsave(&bank->lock, flags);
 
@@ -1562,7 +1567,7 @@ static inline int init_gpio_info(struct platform_device *pdev)
 	return 0;
 }
 
-static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
+static void omap_gpio_mod_init(struct gpio_bank *bank)
 {
 	if (cpu_class_is_omap2()) {
 		if (cpu_is_omap44xx()) {
@@ -1582,17 +1587,13 @@ static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
 
 			/* Initialize interface clk ungated, module enabled */
 			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
-			/* Enable autoidle for the OCP interface */
-			omap_writel(1 << 0, 0x48306814);
 		} else if (cpu_is_omap24xx()) {
 			static const u32 non_wakeup_gpios[] = {
 				0xe203ffc0, 0x08700040
 			};
-			if (id < ARRAY_SIZE(non_wakeup_gpios))
-				bank->non_wakeup_gpios = non_wakeup_gpios[id];
-
-			/* Enable autoidle for the OCP interface */
-			omap_writel(1 << 0, 0x48019010);
+			if (bank->id < ARRAY_SIZE(non_wakeup_gpios))
+				bank->non_wakeup_gpios =
+						non_wakeup_gpios[bank->id];
 		}
 	} else if (cpu_class_is_omap1()) {
 		if (bank_is_mpuio(bank))
@@ -1709,6 +1710,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 	bank->dbck_flag = pdata->gpio_attr->dbck_flag;
 	bank->off_mode_support = pdata->gpio_attr->off_mode_support;
 	bank_width = pdata->gpio_attr->bank_width;
+	bank->id = id;
 
 	spin_lock_init(&bank->lock);
 
@@ -1726,8 +1728,9 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 	}
 
 	pm_runtime_enable(bank->dev);
+	pm_runtime_get_sync(bank->dev);
 
-	omap_gpio_mod_init(bank, id);
+	omap_gpio_mod_init(bank);
 	omap_gpio_chip_init(bank);
 
 	if (!gpio_init_done) {
@@ -1735,6 +1738,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 		gpio_init_done = 1;
 	}
 
+	pm_runtime_put_sync(bank->dev);
 	return 0;
 }
 
