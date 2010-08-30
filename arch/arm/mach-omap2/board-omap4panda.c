@@ -20,6 +20,7 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
+#include <linux/leds.h>
 #include <linux/gpio.h>
 #include <linux/usb/otg.h>
 #include <linux/i2c/twl.h>
@@ -73,6 +74,32 @@ struct platform_device *st_get_plat_device(void)
     return &wl127x_device;
 }
 EXPORT_SYMBOL(st_get_plat_device);
+
+static struct gpio_led gpio_leds[] = {
+	{
+		.name			= "pandaboard::status1",
+		.default_trigger	= "heartbeat",
+		.gpio			= 7,
+	},
+	{
+		.name			= "pandaboard::status2",
+		.default_trigger	= "mmc0",
+		.gpio			= 8,
+	},
+};
+
+static struct gpio_led_platform_data gpio_led_info = {
+	.leds		= gpio_leds,
+	.num_leds	= ARRAY_SIZE(gpio_leds),
+};
+
+static struct platform_device leds_gpio = {
+	.name	= "leds-gpio",
+	.id	= -1,
+	.dev	= {
+		.platform_data	= &gpio_led_info,
+	},
+};
 
 #ifdef CONFIG_OMAP2_DSS_HDMI
 static struct platform_device sdp4430_hdmi_audio_device = {
@@ -128,6 +155,7 @@ static struct omap_dss_board_info panda_dss_data = {
 };
 
 static struct platform_device *panda_devices[] __initdata = {
+	&leds_gpio,
 	&sdp4430_hdmi_audio_device,
 	&wl127x_device
 };
@@ -144,6 +172,7 @@ static void __init omap4_display_init(void)
 #else
 
 static struct platform_device *panda_devices[] __initdata = {
+	&leds_gpio,
 	&wl127x_device,
 	&sdp4430_hdmi_audio_device,
 };
