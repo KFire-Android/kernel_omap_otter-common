@@ -1325,12 +1325,12 @@ static int soc_resume(struct device *dev)
 		if (cpu_dai->driver->ac97_control) {
 			dev_dbg(dev, "Resuming AC97 immediately\n");
 			soc_resume_deferred(&card->deferred_resume_work);
-		} else {
-			dev_dbg(dev, "Scheduling resume work\n");
-			if (!schedule_work(&card->deferred_resume_work))
-				dev_err(dev, "resume work item may be lost\n");
+			return 0;
 		}
 	}
+	dev_dbg(dev, "Scheduling resume work\n");
+	if (!schedule_work(&card->deferred_resume_work))
+		dev_err(dev, "resume work item may be lost\n");
 
 	return 0;
 }
