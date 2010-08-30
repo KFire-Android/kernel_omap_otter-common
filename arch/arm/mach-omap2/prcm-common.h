@@ -70,9 +70,9 @@
 #define CM2_BASE	0x3
 
 /* CM1 instances */
-#define BASE_ID_SHIFT	14
+#define BASE_ID_SHIFT	13
 #define BASE_ID_MASK	0x3
-#define MOD_MASK	0x3FFF
+#define MOD_MASK	0x1FFF
 
 #define PRM_BASE_ID		(PRM_BASE << BASE_ID_SHIFT)
 #define PRCM_MPU_BASE_ID	(PRCM_MPU_BASE << BASE_ID_SHIFT)
