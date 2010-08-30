@@ -22,6 +22,7 @@
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
 #include <plat/serial.h>
+#include <plat/usb.h>
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
 
@@ -123,6 +124,9 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap2_gpio_prepare_for_idle(0);
 	}
 
+	if (core_next_state < PWRDM_POWER_ON)
+		musb_context_save_restore(disable_clk);
+
 	/* Set GATE_CTRL for PER M3 and CORE M3 to '0' */
 	cm_rmw_mod_reg_bits(OMAP4430_DPLL_CLKOUTHIF_GATE_CTRL_MASK, 0,
 		OMAP4430_CM1_CKGEN_MOD,	OMAP4_CM_DIV_M3_DPLL_CORE_OFFSET);
@@ -131,6 +135,9 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 
 
 	omap4_enter_lowpower(cpu, power_state);
+
+	if (core_next_state < PWRDM_POWER_ON)
+		musb_context_save_restore(enable_clk);
 
 	/* Set GATE_CTRL for PER M3 and CORE M3 to '1' */
 	cm_rmw_mod_reg_bits(OMAP4430_DPLL_CLKOUTHIF_GATE_CTRL_MASK,
