@@ -185,7 +185,7 @@ u32 prm_read_mod_reg(s16 module, u16 idx)
 {
 	u32 base = 0;
 
-	base = (module >> BASE_ID_SHIFT) & BASE_ID_MASK;
+	base = abs(module) & BASE_ID_MASK;
 	module &= MOD_MASK;
 
 	switch (base) {
@@ -204,7 +204,7 @@ void prm_write_mod_reg(u32 val, s16 module, u16 idx)
 {
 	u32 base = 0;
 
-	base = (module >> BASE_ID_SHIFT) & BASE_ID_MASK;
+	base = abs(module) & BASE_ID_MASK;
 	module &= MOD_MASK;
 
 	switch (base) {
@@ -275,7 +275,7 @@ u32 cm_read_mod_reg(s16 module, u16 idx)
 {
 	u32 base = 0;
 
-	base = (module >> BASE_ID_SHIFT) & BASE_ID_MASK;
+	base = abs(module) & BASE_ID_MASK;
 	module &= MOD_MASK;
 
 	switch (base) {
@@ -296,7 +296,7 @@ void cm_write_mod_reg(u32 val, s16 module, u16 idx)
 {
 	u32 base = 0;
 
-	base = (module >> BASE_ID_SHIFT) & BASE_ID_MASK;
+	base = abs(module) & BASE_ID_MASK;
 	module &= MOD_MASK;
 
 	switch (base) {
