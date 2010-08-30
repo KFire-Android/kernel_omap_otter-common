@@ -57,6 +57,7 @@
 						  * state without waking up the
 						  * powerdomain
 						  */
+#define PWRDM_HAS_LASTPOWERSTATEENT	(1 << 3)
 
 /*
  * Number of memory banks that are power-controllable.	On OMAP4430, the

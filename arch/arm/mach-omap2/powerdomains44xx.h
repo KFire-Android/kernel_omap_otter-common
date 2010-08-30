@@ -55,7 +55,8 @@ static struct powerdomain core_44xx_pwrdm = {
 		[3] = PWRDM_POWER_ON,	/* ducati_l2ram */
 		[4] = PWRDM_POWER_ON,	/* ducati_unicache */
 	},
-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE |
+				PWRDM_HAS_LASTPOWERSTATEENT,
 };
 
 /* gfx_44xx_pwrdm: 3D accelerator power domain */
@@ -92,7 +93,8 @@ static struct powerdomain abe_44xx_pwrdm = {
 		[0] = PWRDM_POWER_ON,	/* aessmem */
 		[1] = PWRDM_POWER_ON,	/* periphmem */
 	},
-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE |
+				PWRDM_HAS_LASTPOWERSTATEENT,
 };
 
 /* dss_44xx_pwrdm: Display subsystem power domain */
@@ -132,7 +134,8 @@ static struct powerdomain tesla_44xx_pwrdm = {
 		[1] = PWRDM_POWER_ON,	/* tesla_l1 */
 		[2] = PWRDM_POWER_ON,	/* tesla_l2 */
 	},
-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE |
+				 PWRDM_HAS_LASTPOWERSTATEENT,
 };
 
 /* wkup_44xx_pwrdm: Wake-up power domain */
@@ -166,6 +169,7 @@ static struct powerdomain cpu0_44xx_pwrdm = {
 	.pwrsts_mem_on	= {
 		[0] = PWRDM_POWER_ON,	/* cpu0_l1 */
 	},
+	.flags		= PWRDM_HAS_LASTPOWERSTATEENT,
 };
 
 /* cpu1_44xx_pwrdm: MPU1 processor and Neon coprocessor power domain */
@@ -183,6 +187,7 @@ static struct powerdomain cpu1_44xx_pwrdm = {
 	.pwrsts_mem_on	= {
 		[0] = PWRDM_POWER_ON,	/* cpu1_l1 */
 	},
+	.flags		= PWRDM_HAS_LASTPOWERSTATEENT,
 };
 
 /* emu_44xx_pwrdm: Emulation power domain */
@@ -220,6 +225,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
 		[1] = PWRDM_POWER_ON,	/* mpu_l2 */
 		[2] = PWRDM_POWER_ON,	/* mpu_ram */
 	},
+	.flags		= PWRDM_HAS_LASTPOWERSTATEENT,
 };
 
 /* ivahd_44xx_pwrdm: IVA-HD power domain */
@@ -243,7 +249,8 @@ static struct powerdomain ivahd_44xx_pwrdm = {
 		[2] = PWRDM_POWER_ON,	/* tcm1_mem */
 		[3] = PWRDM_POWER_ON,	/* tcm2_mem */
 	},
-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE |
+				 PWRDM_HAS_LASTPOWERSTATEENT,
 };
 
 /* cam_44xx_pwrdm: Camera subsystem power domain */
@@ -278,7 +285,8 @@ static struct powerdomain l3init_44xx_pwrdm = {
 	.pwrsts_mem_on	= {
 		[0] = PWRDM_POWER_ON,	/* l3init_bank1 */
 	},
-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE |
+				 PWRDM_HAS_LASTPOWERSTATEENT,
 };
 
 /* l4per_44xx_pwrdm: Target peripherals power domain */
@@ -298,7 +306,8 @@ static struct powerdomain l4per_44xx_pwrdm = {
 		[0] = PWRDM_POWER_ON,	/* nonretained_bank */
 		[1] = PWRDM_POWER_ON,	/* retained_bank */
 	},
-	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		= PWRDM_HAS_LOWPOWERSTATECHANGE |
+				 PWRDM_HAS_LASTPOWERSTATEENT,
 };
 
 /*

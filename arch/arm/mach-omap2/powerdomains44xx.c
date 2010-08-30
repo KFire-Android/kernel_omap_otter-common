@@ -40,8 +40,11 @@ int omap4_pwrdm_read_pwrst(struct powerdomain *pwrdm)
 
 int omap4_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
 {
-	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP4_PM_PWSTST,
-				OMAP4430_LASTPOWERSTATEENTERED_MASK);
+	if (pwrdm->flags & PWRDM_HAS_LASTPOWERSTATEENT)
+		return prm_read_mod_bits_shift(pwrdm->prcm_offs,
+			OMAP4_PM_PWSTST, OMAP4430_LASTPOWERSTATEENTERED_MASK);
+	else
+		return -EINVAL;
 }
 
 int omap4_pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
