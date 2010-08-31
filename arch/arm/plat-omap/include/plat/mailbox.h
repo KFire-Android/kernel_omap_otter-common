@@ -71,6 +71,8 @@ struct omap_mbox {
 	void			(*err_notify)(void);
 
 	int			use_count;
+	int			nr_mbox_users;
+	int			nr_mbox;
 	struct blocking_notifier_head	notifier;
 };
 
