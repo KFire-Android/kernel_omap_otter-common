@@ -643,13 +643,6 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	for (c = controllers; c->mmc; c++)
 		omap4_twl6030_hsmmc_set_late_init(c->dev);
 
-#ifdef CONFIG_TIWLAN_SDIO
-	/* The controller that is connected to the 128x device
-	should hould have the card detect gpio disabled. This is
-	achieved by initializing it with a negative value */
-	c[CONFIG_TIWLAN_MMC_CONTROLLER - 1].gpio_cd = -EINVAL;
-#endif
-
 	return 0;
 }
 
