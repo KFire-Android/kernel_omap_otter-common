@@ -1318,6 +1318,24 @@ static int twl6040_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
+{
+	struct snd_soc_codec *codec = codec_dai->codec;
+
+	if (mute) {
+		if (codec->active == 1) {
+			twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0x1D,
+							TWL6040_REG_HFRGAIN);
+			twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0x1D,
+							TWL6040_REG_HFLGAIN);
+			twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0xFF,
+							TWL6040_REG_HSGAIN);
+		}
+	}
+
+	return 0;
+}
+
 static int twl6040_prepare(struct snd_pcm_substream *substream,
 			struct snd_soc_dai *dai)
 {
@@ -1462,6 +1480,7 @@ static int twl6040_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 static struct snd_soc_dai_ops twl6040_dai_ops = {
 	.startup	= twl6040_startup,
 	.hw_params	= twl6040_hw_params,
+	.digital_mute   = twl6040_mute,
 	.prepare	= twl6040_prepare,
 	.set_sysclk	= twl6040_set_dai_sysclk,
 };
