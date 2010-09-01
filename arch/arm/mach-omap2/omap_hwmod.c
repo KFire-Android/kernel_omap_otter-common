@@ -881,6 +881,10 @@ static int _wait_target_ready(struct omap_hwmod *oh)
  * held.  Returns -EINVAL if the hwmod cannot be reset this way or if
  * the hwmod is in the wrong state, -ETIMEDOUT if the module did not
  * reset in time, or 0 upon success.
+ * In OMAP3 a specific SYSSTATUS register is used to get the reset status
+ * Starting in OMAP4, some IPs does not have SYSSTATUS register and instead
+ * use the SYSC softreset bit to provide the status.
+ * Some IP like McBSP does have a reset control but no reset status.
  */
 static int _reset(struct omap_hwmod *oh)
 {
@@ -889,8 +893,7 @@ static int _reset(struct omap_hwmod *oh)
 	int ret = 0;
 
 	if (!oh->class->sysc ||
-	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET) ||
-	    (oh->class->sysc->sysc_flags & SYSS_MISSING))
+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET))
 		return -EINVAL;
 
 	/* clocks must be on for this operation */
@@ -912,9 +915,16 @@ static int _reset(struct omap_hwmod *oh)
 		goto dis_opt_clks;
 	_write_sysconfig(v, oh);
 
-	omap_test_timeout((omap_hwmod_readl(oh, oh->class->sysc->syss_offs) &
-			   SYSS_RESETDONE_MASK),
-			  MAX_MODULE_RESET_WAIT, c);
+	if (oh->class->sysc->sysc_flags & SYSS_HAS_RESET_STATUS)
+		omap_test_timeout((omap_hwmod_readl(oh,
+						    oh->class->sysc->syss_offs)
+				   & SYSS_RESETDONE_MASK),
+				  MAX_MODULE_RESET_WAIT, c);
+	else if (oh->class->sysc->sysc_flags & SYSC_HAS_RESET_STATUS)
+		omap_test_timeout(!(omap_hwmod_readl(oh,
+						     oh->class->sysc->sysc_offs)
+				   & SYSC_TYPE2_SOFTRESET_MASK),
+				  MAX_MODULE_RESET_WAIT, c);
 
 	if (c == MAX_MODULE_RESET_WAIT)
 		pr_warning("omap_hwmod: %s: failed to reset in %d usec\n",
