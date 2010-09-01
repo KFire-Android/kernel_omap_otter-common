@@ -12,12 +12,20 @@
 #include <linux/sched.h>
 #include <linux/cpuidle.h>
 #include <linux/clockchips.h>
+#include <linux/gpio.h>
+#include <linux/delay.h>
 #include <mach/omap4-common.h>
+#include <mach/omap4-wakeupgen.h>
 #include "pm.h"
+#include "prm.h"
+#include "pm.h"
+#include "cm.h"
+#include "cm-regbits-44xx.h"
+#include "clock.h"
 
 #ifdef CONFIG_CPU_IDLE
 
-#define OMAP4_MAX_STATES	4
+#define OMAP4_MAX_STATES	5
 
 /* C1 - CPUx wfi + MPU inactive + CORE inactive */
 #define OMAP4_STATE_C1		0
@@ -27,6 +35,8 @@
 #define OMAP4_STATE_C3		2
 /* C3 - CPU0 OFF + CPU1 OFF + MPU OFF + Core inactive */
 #define OMAP4_STATE_C4		3
+/* C3 - CPU0 OFF + CPU1 OFF + MPU OFF + Core RET */
+#define OMAP4_STATE_C5		4
 
 
 struct omap4_processor_cx {
@@ -45,7 +55,7 @@ struct omap4_processor_cx {
 
 struct omap4_processor_cx omap4_power_states[OMAP4_MAX_STATES];
 struct omap4_processor_cx current_cx_state;
-struct powerdomain *mpu_pd, *cpu1_pd;
+struct powerdomain *mpu_pd, *cpu1_pd, *core_pd;
 
 static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 */
@@ -56,7 +66,16 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	{1, 1500, 1500, 3500},	/* FIXME: Profile the latency numbers */
 	/* C4 */
 	{1, 1500, 1500, 4000},	/* FIXME: Profile the latency numbers */
+	/* C5 */
+	{1, 5000, 5000, 10000},
 };
+
+static int omap4_idle_bm_check(void)
+{
+	if (!omap4_can_sleep())
+		return 1;
+	return 0;
+}
 
 /**
  * omap4_enter_idle - Programs OMAP4 to enter the specified state
@@ -116,8 +135,10 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	pwrdm_pre_transition();
 #endif
 	pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
-	pwrdm_set_next_pwrst(mpu_pd, cx->mpu_state);
-	omap4_enter_lowpower(dev->cpu, cx->cpu0_state);
+	set_pwrdm_state(mpu_pd, cx->mpu_state);
+	set_pwrdm_state(core_pd, cx->core_state);
+
+	omap4_enter_sleep(dev->cpu, cx->cpu0_state);
 
 #ifdef CONFIG_PM_DEBUG
 	pwrdm_post_transition();
@@ -134,6 +155,27 @@ return_sleep_time:
 
 
 	return ts_idle.tv_nsec / NSEC_PER_USEC + ts_idle.tv_sec * USEC_PER_SEC;;
+}
+
+/**
+ * omap4_enter_idle_bm - Checks for any bus activity
+ * @dev: cpuidle device
+ * @state: The target state to be programmed
+ *
+ * Used for C states with CPUIDLE_FLAG_CHECK_BM flag set. This
+ * function checks for any pending activity and then programs the
+ * device to the specified or a safer state.
+ */
+static int omap4_enter_idle_bm(struct cpuidle_device *dev,
+			       struct cpuidle_state *state)
+{
+	if ((state->flags & CPUIDLE_FLAG_CHECK_BM) && omap4_idle_bm_check()) {
+		BUG_ON(!dev->safe_state);
+		state = dev->safe_state;
+	}
+
+	dev->last_state = state;
+	return omap4_enter_idle(dev, state);
 }
 
 DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
@@ -220,6 +262,26 @@ void omap_init_power_states(void)
 	omap4_power_states[OMAP4_STATE_C4].mpu_logic_state = PWRDM_POWER_OFF;
 	omap4_power_states[OMAP4_STATE_C4].core_state = PWRDM_POWER_ON;
 	omap4_power_states[OMAP4_STATE_C4].flags = CPUIDLE_FLAG_TIME_VALID;
+
+	/*
+	 * C5 . CPU0 OFF + CPU1 OFF + MPU CSWR + CORE CSWR
+	 */
+	omap4_power_states[OMAP4_STATE_C5].valid =
+			cpuidle_params_table[OMAP4_STATE_C5].valid;
+	omap4_power_states[OMAP4_STATE_C5].type = OMAP4_STATE_C5;
+	omap4_power_states[OMAP4_STATE_C5].sleep_latency =
+			cpuidle_params_table[OMAP4_STATE_C5].sleep_latency;
+	omap4_power_states[OMAP4_STATE_C5].wakeup_latency =
+			cpuidle_params_table[OMAP4_STATE_C5].wake_latency;
+	omap4_power_states[OMAP4_STATE_C5].threshold =
+			cpuidle_params_table[OMAP4_STATE_C5].threshold;
+	omap4_power_states[OMAP4_STATE_C5].cpu0_state = PWRDM_POWER_OFF;
+	omap4_power_states[OMAP4_STATE_C5].cpu1_state = PWRDM_POWER_OFF;
+	omap4_power_states[OMAP4_STATE_C5].mpu_state = PWRDM_POWER_OFF;
+	omap4_power_states[OMAP4_STATE_C5].mpu_logic_state = PWRDM_POWER_OFF;
+	omap4_power_states[OMAP4_STATE_C5].core_state = PWRDM_POWER_RET;
+	omap4_power_states[OMAP4_STATE_C5].flags = CPUIDLE_FLAG_TIME_VALID
+						| CPUIDLE_FLAG_CHECK_BM;
 }
 
 struct cpuidle_driver omap4_idle_driver = {
@@ -242,6 +304,7 @@ int __init omap4_idle_init(void)
 
 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
 	cpu1_pd = pwrdm_lookup("cpu1_pwrdm");
+	core_pd = pwrdm_lookup("core_pwrdm");
 
 	omap_init_power_states();
 	cpuidle_register_driver(&omap4_idle_driver);
@@ -262,7 +325,10 @@ int __init omap4_idle_init(void)
 							cx->wakeup_latency;
 			state->target_residency = cx->threshold;
 			state->flags = cx->flags;
-			state->enter = omap4_enter_idle;
+			if (cx->type == OMAP4_STATE_C1)
+				dev->safe_state = state;
+			state->enter = (state->flags & CPUIDLE_FLAG_CHECK_BM) ?
+					omap4_enter_idle_bm : omap4_enter_idle;
 			sprintf(state->name, "C%d", count+1);
 			count++;
 		}
