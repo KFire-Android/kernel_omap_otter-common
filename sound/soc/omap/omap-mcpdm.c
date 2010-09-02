@@ -23,6 +23,8 @@
  *
  */
 
+#undef DEBUG
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -50,7 +52,6 @@
 
 struct omap_mcpdm_data {
 	struct omap_mcpdm_link *links;
-	int active;
 };
 
 struct omap_mcpdm {
@@ -68,6 +69,7 @@ struct omap_mcpdm {
 
 	int dn_channels;
 	int up_channels;
+	int dl_active;
 };
 
 static struct omap_mcpdm_link omap_mcpdm_links[] = {
@@ -118,7 +120,7 @@ static inline int omap_mcpdm_read(struct omap_mcpdm *mcpdm, u16 reg)
 	return __raw_readl(mcpdm->io_base + reg);
 }
 
-#ifdef MCPDM_DEBUG
+#ifdef DEBUG
 static void omap_mcpdm_reg_dump(struct omap_mcpdm *mcpdm)
 {
 	dev_dbg(mcpdm->dev, "***********************\n");
@@ -152,6 +154,8 @@ static void omap_mcpdm_reg_dump(struct omap_mcpdm *mcpdm)
 			omap_mcpdm_read(mcpdm, MCPDM_DN_OFFSET));
 	dev_dbg(mcpdm->dev, "***********************\n");
 }
+#else
+static void omap_mcpdm_reg_dump(struct omap_mcpdm *mcpdm) {}
 #endif
 
 /*
@@ -184,9 +188,6 @@ static void omap_mcpdm_reset_playback(struct omap_mcpdm * mcpdm,
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
-/* HACK - FIXME:  */
-static int users[2] = {0, 0};
-
 /*
  * Enables the transfer through the PDM interface to/from the Phoenix
  * codec by enabling the corresponding UP or DN channels.
@@ -200,8 +201,7 @@ void omap_mcpdm_start(struct omap_mcpdm * mcpdm, int stream)
 	else
 		ctrl |= mcpdm->dn_channels;
 
-	if (users[stream]++ == 0)
-		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
 /*
@@ -214,11 +214,13 @@ void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, int stream)
 
 	if (stream)
 		ctrl &= ~mcpdm->up_channels;
-	else
-		ctrl &= ~mcpdm->dn_channels;
+	else {
+		if (mcpdm->dl_active > 1)
+			return;
 
-	if (--users[stream] == 0)
-		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		ctrl &= ~mcpdm->dn_channels;
+	}
+	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
 /*
@@ -251,7 +253,6 @@ int omap_mcpdm_capture_open(struct omap_mcpdm *mcpdm,
 
 	/* Uplink channels */
 	mcpdm->up_channels = uplink->channels & (PDM_UP_MASK | PDM_STATUS_MASK);
-
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 
 	return 0;
@@ -287,7 +288,6 @@ int omap_mcpdm_playback_open(struct omap_mcpdm *mcpdm,
 
 	/* Downlink channels */
 	mcpdm->dn_channels = (PDM_DN_MASK | PDM_CMD_MASK);
-
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 
 	return 0;
@@ -471,7 +471,7 @@ void omap_mcpdm_free(struct omap_mcpdm*mcpdm)
 /* Enable/disable DC offset cancelation for the analog
  * headset path (PDM channels 1 and 2).
  */
-int omap_mcpdm_set_offset(struct omap_mcpdm*mcpdm,
+int omap_mcpdm_set_offset(struct omap_mcpdm *mcpdm,
 		int offset1, int offset2)
 {
 	int offset;
@@ -501,22 +501,18 @@ int omap_mcpdm_set_offset(struct omap_mcpdm*mcpdm,
 static int omap_mcpdm_dai_startup(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
-	struct omap_mcpdm*mcpdm = snd_soc_dai_get_drvdata(dai);
-	int err = 0;
+	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 
-	if (!dai->active)
-		err = omap_mcpdm_request(mcpdm);
-
-	return err;
+	mcpdm->dl_active++;
+	return 0;
 }
 
 static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
-	struct omap_mcpdm*mcpdm = snd_soc_dai_get_drvdata(dai);
+	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 
-	if (!dai->active)
-		omap_mcpdm_free(mcpdm);
+	mcpdm->dl_active--;
 }
 
 static int omap_mcpdm_dai_hw_params(struct snd_pcm_substream *substream,
@@ -583,6 +579,9 @@ static int omap_mcpdm_dai_trigger(struct snd_pcm_substream *substream,
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 	int stream = substream->stream;
 
+	dev_dbg(dai->dev, "cmd %d\n", cmd);
+	omap_mcpdm_reg_dump(mcpdm);
+
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 		omap_mcpdm_start(mcpdm, stream);
@@ -611,13 +610,39 @@ static struct snd_soc_dai_ops omap_mcpdm_dai_ops = {
 #define OMAP_MCPDM_RATES	(SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000)
 #define OMAP_MCPDM_FORMATS	(SNDRV_PCM_FMTBIT_S32_LE)
 
-static struct snd_soc_dai_driver omap_mcpdm_dai = {
+static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
+{
+	.name = "mcpdm-dl1",
 	.playback = {
 		.channels_min = 1,
-		.channels_max = 4,
+		.channels_max = 2,
 		.rates = OMAP_MCPDM_RATES,
 		.formats = OMAP_MCPDM_FORMATS,
 	},
+	.ops = &omap_mcpdm_dai_ops,
+},
+{
+	.name = "mcpdm-dl2",
+	.playback = {
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = OMAP_MCPDM_RATES,
+		.formats = OMAP_MCPDM_FORMATS,
+	},
+	.ops = &omap_mcpdm_dai_ops,
+},
+{
+	.name = "mcpdm-vib",
+	.playback = {
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = OMAP_MCPDM_RATES,
+		.formats = OMAP_MCPDM_FORMATS,
+	},
+	.ops = &omap_mcpdm_dai_ops,
+},
+{
+	.name = "mcpdm-ul1",
 	.capture = {
 		.channels_min = 1,
 		.channels_max = 2,
@@ -625,7 +650,7 @@ static struct snd_soc_dai_driver omap_mcpdm_dai = {
 		.formats = OMAP_MCPDM_FORMATS,
 	},
 	.ops = &omap_mcpdm_dai_ops,
-};
+}, };
 
 static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 {
@@ -634,10 +659,9 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 	int ret = 0;
 
 	mcpdm = kzalloc(sizeof(struct omap_mcpdm), GFP_KERNEL);
-	if (!mcpdm) {
-		ret = -ENOMEM;
-		goto exit;
-	}
+	if (!mcpdm)
+		return -ENOMEM;
+
 	platform_set_drvdata(pdev, mcpdm);
 	mcpdm->downlink = &omap_mcpdm_links[0];
 	mcpdm->uplink = &omap_mcpdm_links[1];
@@ -654,7 +678,7 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 	mcpdm->io_base = ioremap(res->start, resource_size(res));
 	if (!mcpdm->io_base) {
 		ret = -ENOMEM;
-		goto err_iomap;
+		goto err_resource;
 	}
 
 	mcpdm->irq = platform_get_irq(pdev, 0);
@@ -667,17 +691,21 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 
 	mcpdm->dev = &pdev->dev;
 
-	ret = snd_soc_register_dai(&pdev->dev, &omap_mcpdm_dai);
+	ret = omap_mcpdm_request(mcpdm);
+	if (ret < 0)
+		goto err_req;
+
+	ret = snd_soc_register_dais(&pdev->dev, omap_mcpdm_dai,
+			ARRAY_SIZE(omap_mcpdm_dai));
 	if (ret == 0)
 		return 0;
 
+err_req:
+	omap_mcpdm_free(mcpdm);
 err_irq:
 	iounmap(mcpdm->io_base);
-err_iomap:
-	release_mem_region(res->start, resource_size(res));
 err_resource:
 	kfree(mcpdm);
-exit:
 	return ret;
 }
 
@@ -685,12 +713,11 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 {
 	struct omap_mcpdm *mcpdm = platform_get_drvdata(pdev);
 	struct omap_mcpdm_platform_data *pdata;
-	struct resource *res;
 
 	pdata = pdev->dev.platform_data;
 
-	snd_soc_unregister_dai(&pdev->dev);
-
+	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_mcpdm_dai));
+	omap_mcpdm_free(mcpdm);
 	pm_runtime_put_sync(&pdev->dev);
 #ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_shutdown)
@@ -698,8 +725,6 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 #endif
 	iounmap(mcpdm->io_base);
 	free_irq(mcpdm->irq, (void *)mcpdm);
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	release_mem_region(res->start, resource_size(res));
 	kfree(mcpdm);
 	return 0;
 }
