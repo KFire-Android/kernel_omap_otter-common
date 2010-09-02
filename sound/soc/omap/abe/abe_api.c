@@ -263,7 +263,7 @@ EXPORT_SYMBOL(abe_read_hardware_configuration);
  * for the delivery of "end of time sequenced tasks" notifications, some are
  * originated from the Ping-Pong protocols, some are generated from
  * the embedded debugger when the firmware stops on programmable break-points,
- * etc …
+ * etc
  */
 abehal_status abe_irq_processing (void)
 {
@@ -1600,6 +1600,7 @@ EXPORT_SYMBOL(abe_write_mixer);
 abehal_status abe_read_gain (u32 id, u32 *f_g, u32 p)
 {
 	u32 mixer_target, mixer_offset;
+	int i;
 
 	_log(id_read_gain,id,(u32)f_g,p)
 
@@ -1658,6 +1659,16 @@ abehal_status abe_read_gain (u32 id, u32 *f_g, u32 p)
 	/* load the S_G_Target SMEM table */
 	abe_block_copy (COPY_FROM_ABE_TO_HOST, ABE_SMEM, mixer_target,
 			(u32*)f_g, sizeof(*f_g));
+
+	for (i = 0; i < sizeof_db2lin_table; i++) {
+		if (abe_db2lin_table[i] == *f_g)
+			goto found;
+	}
+	*f_g = 0;
+	return -1;
+
+found:
+	*f_g = (i * 100) + min_mdb;
 
 	return 0;
 }
