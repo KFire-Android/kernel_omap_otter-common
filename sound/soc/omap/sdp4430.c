@@ -526,7 +526,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "Headset Playback",
 
 		/* ABE components - DL1 */
-		.cpu_dai_name = "omap-mcpdm-dai",
+		.cpu_dai_name = "mcpdm-dl1",
 		.platform_name = "omap-pcm-audio",
 
 		/* Phoenix - DL1 DAC */
@@ -560,7 +560,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "HS Playback",
 
 		/* ABE components - DL1 */
-		.cpu_dai_name = "omap-mcpdm-dai",
+		.cpu_dai_name = "mcpdm-dl1",
 		.platform_name = "omap-aess-audio",
 
 		/* Phoenix - DL1 DAC */
@@ -577,7 +577,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "Analog Capture",
 
 		/* ABE components - UL1 */
-		.cpu_dai_name = "omap-mcpdm-dai",
+		.cpu_dai_name = "mcpdm-ul1",
 		.platform_name = "omap-aess-audio",
 
 		/* Phoenix - UL ADC */
@@ -593,7 +593,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "HF Playback",
 
 		/* ABE components - DL2 */
-		.cpu_dai_name = "omap-mcpdm-dai",
+		.cpu_dai_name = "mcpdm-dl2",
 		.platform_name = "omap-aess-audio",
 
 		/* Phoenix - DL2 DAC */
@@ -609,7 +609,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "Vibra",
 
 		/* ABE components - VIB1 DL */
-		.cpu_dai_name = "omap-mcpdm-dai",
+		.cpu_dai_name = "mcpdm-vib",
 		.platform_name = "omap-aess-audio",
 
 		/* Phoenix - PDM to PWM */
