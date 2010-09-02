@@ -35,6 +35,7 @@
 #define PTMSYNCREQ_EN_OFFSET			0x6D0
 #define SAR_BACKUP_STATUS_OFFSET		0x500
 #define SAR_BACKUP_STATUS_WAKEUPGEN		0x10
+#define SECURE_L3FW_IRQ_MASK			0xfffff8ff
 
 /* Wakeupgen Base addres */
 void __iomem *wakeupgen_base;
@@ -119,7 +120,7 @@ static int __wakeupgen_irq_all(unsigned int cpu, unsigned int reg)
 	if ((cpu > NR_CPUS) || (omap_rev() == OMAP4430_REV_ES1_0))
 		return -EPERM;
 
-	for (reg_index = 0; reg_index < 4; reg_index++) {
+	for (reg_index = 1; reg_index < 4; reg_index++) {
 		if (cpu)
 			writel(reg, wakeupgen_base + OMAP4_WKG_ENB_A_1
 							+ (4 * reg_index));
@@ -128,6 +129,16 @@ static int __wakeupgen_irq_all(unsigned int cpu, unsigned int reg)
 							+ (4 * reg_index));
 	}
 
+	/*
+	 * Maintain the Secure and L3 interrupt state which can potentialy
+	 * gate low power state
+	 */
+	if (cpu)
+		writel((reg & SECURE_L3FW_IRQ_MASK),
+				wakeupgen_base + OMAP4_WKG_ENB_A_1);
+	else
+		writel((reg & SECURE_L3FW_IRQ_MASK),
+				wakeupgen_base + OMAP4_WKG_ENB_A_0);
 	return 0;
 }
 
@@ -146,6 +157,13 @@ static int __init omap4_wakeupgen_init(void)
 	/* Static mapping, never released */
 	wakeupgen_base = ioremap(OMAP44XX_WKUPGEN_BASE, SZ_4K);
 	BUG_ON(!wakeupgen_base);
+
+	/*
+	 * Disable Secure and L3 interrupts which can potentialy
+	 * gate low power state
+	 */
+	writel(SECURE_L3FW_IRQ_MASK, wakeupgen_base + OMAP4_WKG_ENB_A_0);
+	writel(SECURE_L3FW_IRQ_MASK, wakeupgen_base + OMAP4_WKG_ENB_A_1);
 
 	return 0;
 }
