@@ -632,7 +632,7 @@ static s32 scan_r2l_b2t(struct tcm *tcm, u16 w, u16 h, u16 stride,
  * the 'area' area contains TL and BR corners of the allocated area
  *
  */
-s32 scan_l2r_t2b(struct tcm *tcm, u16 w, u16 h, u16 stride,
+static s32 scan_l2r_t2b(struct tcm *tcm, u16 w, u16 h, u16 stride,
 		 struct tcm_area *field, struct tcm_area *area)
 {
 	s32 xx = 0, yy = 0;
