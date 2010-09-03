@@ -46,7 +46,7 @@ struct tiler_dev {
 	struct blocking_notifier_head notifier;
 };
 
-struct platform_driver tiler_driver_ldm = {
+static struct platform_driver tiler_driver_ldm = {
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = "tiler",
@@ -77,10 +77,10 @@ struct gid_info {
 	struct process_info *pi;	/* parent */
 };
 
-struct list_head blocks;
-struct list_head procs;
-struct list_head orphan_areas;
-struct list_head orphan_onedim;
+static struct list_head blocks;
+static struct list_head procs;
+static struct list_head orphan_areas;
+static struct list_head orphan_onedim;
 
 struct area_info {
 	struct list_head by_gid;	/* areas in this pid/gid */
@@ -987,7 +987,7 @@ s32 tiler_map(enum tiler_fmt fmt, u32 width, u32 height, u32 *sys_addr,
 }
 EXPORT_SYMBOL(tiler_map);
 
-s32 free_block(u32 sys_addr, struct process_info *pi)
+static s32 free_block(u32 sys_addr, struct process_info *pi)
 {
 	struct gid_info *gi = NULL;
 	struct area_info *ai = NULL;
@@ -1053,7 +1053,7 @@ EXPORT_SYMBOL(tiler_free);
    the actual width and height of the container, so we must make a guess.  We
    do not even have enough information to get the virtual stride of the buffer,
    which is the real reason for this ioctl */
-s32 find_block(u32 sys_addr, struct tiler_block_info *blk)
+static s32 find_block(u32 sys_addr, struct tiler_block_info *blk)
 {
 	struct mem_info *i;
 	struct tcm_pt pt;
@@ -1270,7 +1270,7 @@ static s32 tiler_ioctl(struct inode *ip, struct file *filp, u32 cmd,
 	return 0x0;
 }
 
-s32 alloc_block(enum tiler_fmt fmt, u32 width, u32 height,
+static s32 alloc_block(enum tiler_fmt fmt, u32 width, u32 height,
 		   u32 align, u32 offs, u32 gid, struct process_info *pi,
 		   u32 *sys_addr)
 {
