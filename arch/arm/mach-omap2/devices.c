@@ -36,6 +36,7 @@
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap4-keypad.h>
+#include <plat/mcbsp.h>
 #include <sound/omap-abe-dsp.h>
 
 #include "mux.h"
