@@ -63,7 +63,7 @@
 #define DMM_TILER_STRIDE_90_(N) \
 	(DMM_TILER_THE(CONT_HEIGHT) << DMM_SHIFT_PER_X_##N)
 
-void tiler_get_natural_xy(u32 tsptr, u32 *x, u32 *y)
+static void tiler_get_natural_xy(u32 tsptr, u32 *x, u32 *y)
 {
 	u32 x_bits, y_bits, offset;
 	enum tiler_fmt fmt;
@@ -108,7 +108,7 @@ void tiler_get_natural_xy(u32 tsptr, u32 *x, u32 *y)
 		*y ^= DMM_TILER_MASK(y_bits);
 }
 
-u32 tiler_get_address(struct tiler_view_orient orient,
+static u32 tiler_get_address(struct tiler_view_orient orient,
 			enum tiler_fmt fmt, u32 x, u32 y)
 {
 	u32 x_bits, y_bits, tmp, x_mask, y_mask, alignment;
