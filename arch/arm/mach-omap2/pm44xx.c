@@ -18,10 +18,13 @@
 #include <linux/slab.h>
 #include <linux/irq.h>
 #include <linux/gpio.h>
+#include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
 #include <plat/serial.h>
+#include <plat/common.h>
 #include <plat/usb.h>
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
@@ -30,6 +33,7 @@
 #include "pm.h"
 #include "cm.h"
 #include "cm-regbits-44xx.h"
+#include "prm-regbits-44xx.h"
 #include "clock.h"
 
 struct power_state {
@@ -47,12 +51,32 @@ static struct powerdomain *mpu_pwrdm;
 static struct powerdomain *mpu_pwrdm, *cpu0_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
 
+#define MAX_IOPAD_LATCH_TIME 1000
+
 int omap4_can_sleep(void)
 {
 	if (!omap_uart_can_sleep())
 		return 0;
 	return 1;
 }
+
+void omap4_trigger_ioctrl(void)
+{
+	int i = 0;
+
+	/* Trigger WUCLKIN enable */
+	prm_rmw_mod_reg_bits(OMAP4430_WUCLK_CTRL_MASK, OMAP4430_WUCLK_CTRL_MASK,
+		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET);
+	omap_test_timeout(
+		((prm_read_mod_reg(OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET)
+		>> OMAP4430_WUCLK_STATUS_SHIFT) == 1),
+		MAX_IOPAD_LATCH_TIME, i);
+	/* Trigger WUCLKIN disable */
+	prm_rmw_mod_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
+		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET);
+	return;
+}
+
 
 /* This sets pwrdm state (other than mpu & core. Currently only ON &
  * RET are supported. Function is assuming that clkdm doesn't have
@@ -122,6 +146,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_uart_prepare_idle(2);
 		omap_uart_prepare_idle(3);
 		omap2_gpio_prepare_for_idle(0);
+		omap4_trigger_ioctrl();
 	}
 
 	if (core_next_state < PWRDM_POWER_ON)
@@ -159,6 +184,29 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 }
 
 
+static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
+{
+	u32 irqenable_mpu, irqstatus_mpu;
+
+	irqenable_mpu = prm_read_mod_reg(OMAP4430_PRM_OCP_SOCKET_MOD,
+					 OMAP4_PRM_IRQENABLE_MPU_OFFSET);
+	irqstatus_mpu = prm_read_mod_reg(OMAP4430_PRM_OCP_SOCKET_MOD,
+					 OMAP4_PRM_IRQSTATUS_MPU_OFFSET);
+
+	/* Check if a IO_ST interrupt */
+	if (irqstatus_mpu & OMAP4430_IO_ST_MASK) {
+		omap4_trigger_ioctrl();
+	}
+
+	/* Clear the interrupt */
+	irqstatus_mpu &= irqenable_mpu;
+	prm_write_mod_reg(irqstatus_mpu, OMAP4430_PRM_OCP_SOCKET_MOD,
+					OMAP4_PRM_IRQSTATUS_MPU_OFFSET);
+
+	return IRQ_HANDLED;
+}
+
+
 #ifdef CONFIG_SUSPEND
 static int omap4_pm_prepare(void)
 {
@@ -191,6 +239,7 @@ static int omap4_pm_suspend(void)
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_UART3);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_KBD_CTL);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_GPT1);
+	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_PRCM);
 
 	/* Read current next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node)
@@ -389,6 +438,14 @@ static void __init prcm_setup_regs(void)
 		OMAP4430_CM2_CKGEN_MOD, OMAP4_CM_CLKDCOLDO_DPLL_USB_OFFSET);
 	cm_rmw_mod_reg_bits(OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK, 0x0,
 		OMAP4430_CM2_CKGEN_MOD,	OMAP4_CM_DIV_M2_DPLL_UNIPRO_OFFSET);
+
+	/* Enable IO_ST interrupt */
+	prm_rmw_mod_reg_bits(OMAP4430_IO_ST_MASK, OMAP4430_IO_ST_MASK,
+		OMAP4430_PRM_OCP_SOCKET_MOD, OMAP4_PRM_IRQENABLE_MPU_OFFSET);
+
+	/* Enable GLOBAL_WUEN */
+	prm_rmw_mod_reg_bits(OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_GLOBAL_WUEN_MASK,
+		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET);
 }
 
 /**
@@ -408,6 +465,15 @@ static int __init omap4_pm_init(void)
 
 #ifdef CONFIG_PM
 	prcm_setup_regs();
+
+	ret = request_irq(OMAP44XX_IRQ_PRCM,
+			  (irq_handler_t)prcm_interrupt_handler,
+			  IRQF_DISABLED, "prcm", NULL);
+	if (ret) {
+		printk(KERN_ERR "request_irq failed to register for 0x%x\n",
+		       OMAP44XX_IRQ_PRCM);
+		goto err2;
+	}
 
 	ret = pwrdm_for_each(pwrdms_setup, NULL);
 	if (ret) {

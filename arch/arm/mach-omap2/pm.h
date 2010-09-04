@@ -25,6 +25,7 @@ extern int omap3_idle_init(void);
 extern int omap4_idle_init(void);
 extern int omap4_can_sleep(void);
 extern void omap4_enter_sleep(unsigned int cpu, unsigned int power_state);
+extern void omap4_trigger_ioctrl(void);
 
 struct cpuidle_params {
 	u8  valid;
