@@ -275,6 +275,12 @@ static void omap_uart_enable_wakeup(struct omap_uart_state *uart)
 		v |= OMAP3_PADCONF_WAKEUPENABLE0;
 		omap_ctrl_writew(v, uart->padconf);
 	}
+
+	if (cpu_is_omap44xx() && uart->padconf) {
+		u32 v = omap_readl(uart->padconf);
+		v |= OMAP44XX_PADCONF_WAKEUPENABLE0;
+		omap_writel(v, uart->padconf);
+	}
 }
 
 static void omap_uart_disable_wakeup(struct omap_uart_state *uart)
@@ -507,7 +513,20 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 		uart->wk_en = 0;
 		uart->wk_st = 0;
 		uart->wk_mask = 0;
-		uart->padconf = 0;
+		switch (uart->num) {
+		case 0:
+			uart->padconf = 0x4A1000E4;
+			break;
+		case 1:
+			uart->padconf = 0x4A10011C;
+			break;
+		case 2:
+			uart->padconf = 0x4A100144;
+			break;
+		case 3:
+			uart->padconf = 0x4A10015C;
+			break;
+		}
 	}
 
 	uart->irqflags |= IRQF_SHARED;
@@ -779,7 +798,8 @@ void __init omap_serial_init_port(int port)
 	omap_uart_block_sleep(uart);
 	uart->timeout = DEFAULT_TIMEOUT;
 
-	if ((cpu_is_omap34xx() && uart->padconf) ||
+	if (((cpu_is_omap34xx() || cpu_is_omap44xx())
+		 && uart->padconf) ||
 	    (uart->wk_en && uart->wk_mask)) {
 		device_init_wakeup(&od->pdev.dev, true);
 		DEV_CREATE_FILE(&od->pdev.dev, &dev_attr_sleep_timeout);

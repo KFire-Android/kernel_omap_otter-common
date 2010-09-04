@@ -239,6 +239,15 @@
 /* 44xx-only CONTROL_GENERAL register offsets */
 #define OMAP44XX_CONTROL_MMC1			0x628
 #define OMAP44XX_CONTROL_PBIAS_LITE		0x600
+
+/* CONTROL_PADCONF_X bits */
+#define OMAP44XX_PADCONF_WAKEUPEVENT0	(1 << 15)
+#define OMAP44XX_PADCONF_WAKEUPEVENT1	(1 << 30)
+#define OMAP44XX_PADCONF_WAKEUPENABLE0	(1 << 14)
+#define OMAP44XX_PADCONF_WAKEUPENABLE1	(1 << 31)
+#define OMAP44XX_PADCONF_OFFMODEENABLE0	(1 << 9)
+#define OMAP44XX_PADCONF_OFFMODEENABLE1	(1 << 25)
+
 /*
  * REVISIT: This list of registers is not comprehensive - there are more
  * that should be added.
