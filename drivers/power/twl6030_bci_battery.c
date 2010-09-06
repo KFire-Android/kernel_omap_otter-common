@@ -183,7 +183,6 @@
 
 
 /* Ptr to thermistor table */
-int *therm_tbl;
 static const unsigned int fuelgauge_rate[4] = {4, 16, 64, 256};
 
 struct twl6030_bci_device_info {
@@ -218,7 +217,7 @@ struct twl6030_bci_device_info {
 	struct delayed_work	twl6030_bci_monitor_work;
 	struct delayed_work	twl6030_bk_bci_monitor_work;
 };
-struct blocking_notifier_head notifier_list;
+static struct blocking_notifier_head notifier_list;
 
 static int charge_state;
 
@@ -902,7 +901,7 @@ static ssize_t twl6030_bci_set_fgmode(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
-	unsigned long val;
+	long val;
 	int status = count;
 	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
 
@@ -929,7 +928,7 @@ static ssize_t twl6030_bci_set_charge_src(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
-	unsigned long val;
+	long val;
 	int status = count;
 	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
 

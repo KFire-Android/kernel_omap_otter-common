@@ -927,8 +927,8 @@ static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_2_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_3_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_4_bus_pdata;
 
-void __init omap_i2c_hwspinlock_init(int bus_id, unsigned int spinlock_id,
-				struct omap_i2c_bus_board_data *pdata)
+static void __init omap_i2c_hwspinlock_init(int bus_id, unsigned int
+			spinlock_id, struct omap_i2c_bus_board_data *pdata)
 {
 	pdata->handle = hwspinlock_request_specific(spinlock_id);
 	if (pdata->handle != NULL) {
