@@ -797,6 +797,7 @@ void hdmi_work_queue(struct hdmi_work_struct *work)
 		hdmi_enable_clocks(1);
 		hdmi_power_on(dssdev);
 		mdelay(1000);
+		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 		printk(KERN_INFO "Display enabled");
 	}
 	if (r == 1 || r == 4)
@@ -806,17 +807,9 @@ void hdmi_work_queue(struct hdmi_work_struct *work)
 		printk(KERN_INFO "Display disabled");
 		hdmi_power_off(dssdev);
 		hpd_mode = 1;
-		/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
-		omap_writel(0x01180118, 0x4A100098);
-		/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
-		omap_writel(0x01180118 , 0x4A10009C);
-		/* CONTROL_HDMI_TX_PHY */
-		omap_writel(0x10000000, 0x4A100610);
+		hdmi_enable_hpd(dssdev);
+		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 
-		if (dssdev->platform_enable)
-			dssdev->platform_enable(dssdev);
-
-		hdmi_min_enable();
 	}
 
 	kfree(work);
