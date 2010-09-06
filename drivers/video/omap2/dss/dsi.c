@@ -204,8 +204,8 @@ struct dsi_reg { u16 idx; };
 #define FINT_MIN (cpu_is_omap44xx() ? 750000 : 500000)
 #define REGN_MAX (cpu_is_omap44xx() ? (1 << 8) : (1 << 7))
 #define REGM_MAX (cpu_is_omap44xx() ? ((1 << 12) - 1) : ((1 << 11) - 1))
-#define REGM3_MAX (cpu_is_omap44xx() ? (1 << 5) : (1 << 4))
-#define REGM4_MAX (cpu_is_omap44xx() ? (1 << 5) : (1 << 4))
+#define REGM_DISPC_MAX (cpu_is_omap44xx() ? (1 << 5) : (1 << 4))
+#define REGM_DSI_MAX (cpu_is_omap44xx() ? (1 << 5) : (1 << 4))
 #define LP_DIV_MAX ((1 << 13) - 1)
 
 enum fifo_size {
@@ -871,16 +871,16 @@ static inline int dsi_if_enable(enum omap_dsi_index ix,
 	return 0;
 }
 
-unsigned long dsi_get_dsi1_pll_rate(enum omap_dsi_index ix)
+unsigned long dsi_get_pll_dispc_rate(enum omap_dsi_index ix)
 {
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
-	return p_dsi->current_cinfo.dsi1_pll_fclk;
+	return p_dsi->current_cinfo.dsi_pll_dispc_fclk;
 }
 
-static unsigned long dsi_get_dsi2_pll_rate(enum omap_dsi_index ix)
+static unsigned long dsi_get_pll_dsi_rate(enum omap_dsi_index ix)
 {
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
-	return p_dsi->current_cinfo.dsi2_pll_fclk;
+	return p_dsi->current_cinfo.dsi_pll_dsi_fclk;
 }
 
 static unsigned long dsi_get_txbyteclkhs(enum omap_dsi_index ix)
@@ -898,7 +898,7 @@ static unsigned long dsi_fclk_rate(enum omap_dsi_index ix)
 		r = dss_clk_get_rate(DSS_CLK_FCK1);
 	} else {
 		/* DSI FCLK source is DSI2_PLL_FCLK */
-		r = dsi_get_dsi2_pll_rate(ix);
+		r = dsi_get_pll_dsi_rate(ix);
 	}
 
 	return r;
@@ -973,10 +973,10 @@ int dsi_calc_clock_rates(struct dsi_clock_info *cinfo)
 	if (cinfo->regm == 0 || cinfo->regm > REGM_MAX)
 		return -EINVAL;
 
-	if (cinfo->regm3 > REGM3_MAX)
+	if (cinfo->regm_dispc > REGM_DISPC_MAX)
 		return -EINVAL;
 
-	if (cinfo->regm4 > REGM4_MAX)
+	if (cinfo->regm_dsi > REGM_DSI_MAX)
 		return -EINVAL;
 
 	if (cinfo->use_dss2_fck) {
@@ -1005,15 +1005,15 @@ int dsi_calc_clock_rates(struct dsi_clock_info *cinfo)
 	if (cinfo->clkin4ddr > 1800 * 1000 * 1000)
 		return -EINVAL;
 
-	if (cinfo->regm3 > 0)
-		cinfo->dsi1_pll_fclk = cinfo->clkin4ddr / cinfo->regm3;
+	if (cinfo->regm_dispc > 0)
+		cinfo->dsi_pll_dispc_fclk = cinfo->clkin4ddr / cinfo->regm_dispc;
 	else
-		cinfo->dsi1_pll_fclk = 0;
+		cinfo->dsi_pll_dispc_fclk = 0;
 
-	if (cinfo->regm4 > 0)
-		cinfo->dsi2_pll_fclk = cinfo->clkin4ddr / cinfo->regm4;
+	if (cinfo->regm_dsi > 0)
+		cinfo->dsi_pll_dsi_fclk = cinfo->clkin4ddr / cinfo->regm_dsi;
 	else
-		cinfo->dsi2_pll_fclk = 0;
+		cinfo->dsi_pll_dsi_fclk = 0;
 
 	return 0;
 }
@@ -1036,8 +1036,8 @@ int dsi_pll_calc_clock_div_pck(enum omap_dsi_index ix,
 			p_dsi->cache_cinfo.clkin == dss_clk_fck2) {
 		DSSDBG("DSI clock info found from cache\n");
 		*dsi_cinfo = p_dsi->cache_cinfo;
-		dispc_find_clk_divs(is_tft, req_pck, dsi_cinfo->dsi1_pll_fclk,
-				dispc_cinfo);
+		dispc_find_clk_divs(is_tft, req_pck,
+				dsi_cinfo->dsi_pll_dispc_fclk, dispc_cinfo);
 		return 0;
 	}
 
@@ -1086,29 +1086,30 @@ retry:
 				break;
 
 			/* DSI1_PLL_FCLK(MHz) = DSIPHY(MHz) / regm3  < 173MHz */
-			for (cur.regm3 = 1; cur.regm3 < REGM3_MAX;
-					++cur.regm3) {
+			for (cur.regm_dispc = 1; cur.regm_dispc < REGM_DISPC_MAX;
+					++cur.regm_dispc) {
 				struct dispc_clock_info cur_dispc;
-				cur.dsi1_pll_fclk = cur.clkin4ddr / cur.regm3;
+				cur.dsi_pll_dispc_fclk =
+					cur.clkin4ddr / cur.regm_dispc;
 
 				/* this will narrow down the search a bit,
 				 * but still give pixclocks below what was
 				 * requested */
-				if (cur.dsi1_pll_fclk  < req_pck)
+				if (cur.dsi_pll_dispc_fclk  < req_pck)
 					break;
 
-				if (cur.dsi1_pll_fclk > DISPC_MAX_FCK)
+				if (cur.dsi_pll_dispc_fclk > DISPC_MAX_FCK)
 					continue;
 
 				if (min_fck_per_pck &&
-					cur.dsi1_pll_fclk <
+					cur.dsi_pll_dispc_fclk <
 						req_pck * min_fck_per_pck)
 					continue;
 
 				match = 1;
 
 				dispc_find_clk_divs(is_tft, req_pck,
-						cur.dsi1_pll_fclk,
+						cur.dsi_pll_dispc_fclk,
 						&cur_dispc);
 
 				if (abs(cur_dispc.pck - req_pck) <
@@ -1138,8 +1139,8 @@ found:
 	}
 
 	/* DSI2_PLL_FCLK (regm4) is not used */
-	best.regm4 = 0;
-	best.dsi2_pll_fclk = 0;
+	best.regm_dsi = 0;
+	best.dsi_pll_dsi_fclk = 0;
 
 	if (dsi_cinfo)
 		*dsi_cinfo = best;
@@ -1165,13 +1166,13 @@ int dsi_pll_set_clock_div(enum omap_dsi_index ix,
 
 	p_dsi->current_cinfo.fint = cinfo->fint;
 	p_dsi->current_cinfo.clkin4ddr = cinfo->clkin4ddr;
-	p_dsi->current_cinfo.dsi1_pll_fclk = cinfo->dsi1_pll_fclk;
-	p_dsi->current_cinfo.dsi2_pll_fclk = cinfo->dsi2_pll_fclk;
+	p_dsi->current_cinfo.dsi_pll_dispc_fclk = cinfo->dsi_pll_dispc_fclk;
+	p_dsi->current_cinfo.dsi_pll_dsi_fclk = cinfo->dsi_pll_dsi_fclk;
 
 	p_dsi->current_cinfo.regn = cinfo->regn;
 	p_dsi->current_cinfo.regm = cinfo->regm;
-	p_dsi->current_cinfo.regm3 = cinfo->regm3;
-	p_dsi->current_cinfo.regm4 = cinfo->regm4;
+	p_dsi->current_cinfo.regm_dispc = cinfo->regm_dispc;
+	p_dsi->current_cinfo.regm_dsi = cinfo->regm_dsi;
 
 	DSSDBG("DSI Fint %ld\n", cinfo->fint);
 
@@ -1194,9 +1195,9 @@ int dsi_pll_set_clock_div(enum omap_dsi_index ix,
 	DSSDBG("Clock lane freq %ld Hz\n", cinfo->clkin4ddr / 4);
 
 	DSSDBG("regm3 = %d, dsi1_pll_fclk = %lu\n",
-			cinfo->regm3, cinfo->dsi1_pll_fclk);
+			cinfo->regm_dispc, cinfo->dsi_pll_dispc_fclk);
 	DSSDBG("regm4 = %d, dsi2_pll_fclk = %lu\n",
-			cinfo->regm4, cinfo->dsi2_pll_fclk);
+			cinfo->regm_dsi, cinfo->dsi_pll_dsi_fclk);
 
 	REG_FLD_MOD(ix, DSI_PLL_CONTROL, 0,
 			0, 0); /* DSI_PLL_AUTOMODE = manual */
@@ -1207,10 +1208,10 @@ int dsi_pll_set_clock_div(enum omap_dsi_index ix,
 			1);		/* DSI_PLL_REGN */
 	l = FLD_MOD(l, cinfo->regm, (cpu_is_omap44xx()) ? 20 : 18,
 			(cpu_is_omap44xx()) ? 9 : 8);	/* DSI_PLL_REGM */
-	l = FLD_MOD(l, cinfo->regm3 > 0 ? cinfo->regm3 - 1 : 0,
+	l = FLD_MOD(l, cinfo->regm_dispc > 0 ? cinfo->regm_dispc - 1 : 0,
 			(cpu_is_omap44xx()) ? 25 : 22,
 			(cpu_is_omap44xx()) ? 21 : 19);	/* DSI_CLOCK_DIV */
-	l = FLD_MOD(l, cinfo->regm4 > 0 ? cinfo->regm4 - 1 : 0,
+	l = FLD_MOD(l, cinfo->regm_dsi > 0 ? cinfo->regm_dsi - 1 : 0,
 			(cpu_is_omap44xx()) ? 30 : 26,
 			(cpu_is_omap44xx()) ? 26 : 23);	/* DSIPROTO_CLOCK_DIV */
 	dsi_write_reg(ix, DSI_PLL_CONFIGURATION1, l);
@@ -1387,14 +1388,14 @@ void dsi_dump_clocks(enum omap_dsi_index ix, enum omap_channel channel,
 			cinfo->clkin4ddr, cinfo->regm);
 
 	seq_printf(s,	"dsi1_pll_fck\t%-16luregm3 %u\t(%s)\n",
-			cinfo->dsi1_pll_fclk,
-			cinfo->regm3,
+			cinfo->dsi_pll_dispc_fclk,
+			cinfo->regm_dispc,
 			dss_get_dispc_clk_source() == DSS_SRC_DSS1_ALWON_FCLK ?
 			"off" : "on");
 
 	seq_printf(s,	"dsi2_pll_fck\t%-16luregm4 %u\t(%s)\n",
-			cinfo->dsi2_pll_fclk,
-			cinfo->regm4,
+			cinfo->dsi_pll_dsi_fclk,
+			cinfo->regm_dsi,
 			dss_get_dsi_clk_source() == DSS_SRC_DSS1_ALWON_FCLK ?
 			"off" : "on");
 
@@ -3456,8 +3457,8 @@ static int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev)
 	cinfo.use_dss2_fck = true;
 	cinfo.regn  = dssdev->phy.dsi.div.regn;
 	cinfo.regm  = dssdev->phy.dsi.div.regm;
-	cinfo.regm3 = dssdev->phy.dsi.div.regm3;
-	cinfo.regm4 = dssdev->phy.dsi.div.regm4;
+	cinfo.regm_dispc = dssdev->phy.dsi.div.regm_dispc;
+	cinfo.regm_dsi = dssdev->phy.dsi.div.regm_dsi;
 	r = dsi_calc_clock_rates(&cinfo);
 	if (r) {
 		DSSERR("Failed to calc dsi clocks\n");
@@ -3482,7 +3483,7 @@ static int dsi_configure_dispc_clocks(struct omap_dss_device *dssdev)
 
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
-	fck = dsi_get_dsi1_pll_rate(ix);
+	fck = dsi_get_pll_dispc_rate(ix);
 
 	dispc_cinfo.lck_div = dssdev->phy.dsi.div.lck_div;
 	dispc_cinfo.pck_div = dssdev->phy.dsi.div.pck_div;
@@ -3753,13 +3754,13 @@ int dsi_init_display(struct omap_dss_device *dssdev)
 	return 0;
 }
 
-void dsi_wait_dsi1_pll_active(enum omap_dsi_index ix)
+void dsi_wait_pll_dispc_active(enum omap_dsi_index ix)
 {
 	if (wait_for_bit_change(ix, DSI_PLL_STATUS, 7, 1) != 1)
 		DSSERR("DSI1 PLL clock not active\n");
 }
 
-void dsi_wait_dsi2_pll_active(enum omap_dsi_index ix)
+void dsi_wait_pll_dsi_active(enum omap_dsi_index ix)
 {
 	if (wait_for_bit_change(ix, DSI_PLL_STATUS, 8, 1) != 1)
 		DSSERR("DSI2 PLL clock not active\n");

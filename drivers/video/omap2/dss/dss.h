@@ -151,16 +151,16 @@ struct dsi_clock_info {
 	unsigned long fint;
 	unsigned long clkin4ddr;
 	unsigned long clkin;
-	unsigned long dsi1_pll_fclk;
-	unsigned long dsi2_pll_fclk;
+	unsigned long dsi_pll_dispc_fclk;	/* DSI1_PLL_CLK for OMAP3 */
+	unsigned long dsi_pll_dsi_fclk;		/* DSI2_PLL_CLK for OMAP3 */
 
 	unsigned long lp_clk;
 
 	/* dividers */
 	u16 regn;
 	u16 regm;
-	u16 regm3;
-	u16 regm4;
+	u16 regm_dispc;
+	u16 regm_dsi;
 
 	u16 lp_clk_div;
 
@@ -316,7 +316,7 @@ void dsi_restore_context(void);
 
 int dsi_init_display(struct omap_dss_device *display);
 irqreturn_t dsi_irq_handler(int irq, void *arg);
-unsigned long dsi_get_dsi1_pll_rate(enum omap_dsi_index ix);
+unsigned long dsi_get_pll_dispc_rate(enum omap_dsi_index ix);
 int dsi_pll_set_clock_div(enum omap_dsi_index ix,
 		struct dsi_clock_info *cinfo);
 int dsi_pll_calc_clock_div_pck(enum omap_dsi_index ix,
@@ -330,8 +330,8 @@ void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
 		u32 *fifo_low, u32 *fifo_high);
 int dsi_calc_clock_rates(struct dsi_clock_info *cinfo);
-void dsi_wait_dsi1_pll_active(enum omap_dsi_index ix);
-void dsi_wait_dsi2_pll_active(enum omap_dsi_index ix);
+void dsi_wait_pll_dispc_active(enum omap_dsi_index ix);
+void dsi_wait_pll_dsi_active(enum omap_dsi_index ix);
 #else
 static inline int dsi_init(struct platform_device *pdev)
 {
@@ -340,10 +340,10 @@ static inline int dsi_init(struct platform_device *pdev)
 static inline void dsi_exit(void)
 {
 }
-static inline void dsi_wait_dsi1_pll_active(void)
+static inline void dsi_wait_pll_dispc_active(enum omap_dsi_index ix)
 {
 }
-static inline void dsi_wait_dsi2_pll_active(void)
+static inline void dsi_wait_pll_dsi_active(enum omap_dsi_index ix)
 {
 }
 #endif
