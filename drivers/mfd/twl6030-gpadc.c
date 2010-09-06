@@ -270,6 +270,12 @@ int twl6030_gpadc_conversion(struct twl6030_gpadc_request *req)
 
 	mutex_lock(&the_gpadc->lock);
 
+	if (req->method > TWL6030_GPADC_SW2) {
+		dev_err(the_gpadc->dev, "unsupported conversion method\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
 	/* Do we have a conversion request ongoing */
 	if (the_gpadc->requests[req->method].active) {
 		ret = -EBUSY;
