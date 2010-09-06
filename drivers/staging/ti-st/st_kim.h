@@ -32,6 +32,8 @@
  */
 #define LDISC_TIME	500
 #define CMD_RESP_TIME	500
+#define CMD_WR_TIME	5000  /* 5 sec */
+
 #define MAKEWORD(a, b)  ((unsigned short)(((unsigned char)(a)) \
 	| ((unsigned short)((unsigned char)(b))) << 8))
 
