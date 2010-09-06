@@ -1290,12 +1290,19 @@ void unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
 				urb->transfer_dma,
 				urb->transfer_buffer_length,
 				dir);
-	else if (urb->transfer_flags & URB_DMA_MAP_SINGLE)
+	else if (urb->transfer_flags & URB_DMA_MAP_SINGLE) {
 		dma_unmap_single(hcd->self.controller,
 				urb->transfer_dma,
 				urb->transfer_buffer_length,
 				dir);
-	else if (urb->transfer_flags & URB_MAP_LOCAL)
+		if (urb->bounce_buffer) {
+			if (dir == DMA_FROM_DEVICE)
+				memcpy(urb->transfer_buffer,
+					urb->bounce_buffer,
+					urb->transfer_buffer_length);
+			kfree(urb->bounce_buffer);
+		}
+	} else if (urb->transfer_flags & URB_MAP_LOCAL)
 		hcd_free_coherent(urb->dev->bus,
 				&urb->transfer_dma,
 				&urb->transfer_buffer,
@@ -1380,16 +1387,40 @@ static int map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 				else
 					urb->transfer_flags |= URB_DMA_MAP_PAGE;
 			} else {
-				urb->transfer_dma = dma_map_single(
-						hcd->self.controller,
-						urb->transfer_buffer,
+				void *buffer = urb->transfer_buffer;
+
+				if (IS_ALIGNED((unsigned long)buffer,
+					1 << hcd->driver->dma_align_shift))
+					urb->bounce_buffer = NULL;
+				else {
+					if (dir == DMA_TO_DEVICE)
+						buffer = kmemdup(
+							buffer,
 						urb->transfer_buffer_length,
-						dir);
-				if (dma_mapping_error(hcd->self.controller,
-						urb->transfer_dma))
-					ret = -EAGAIN;
-				else
+							mem_flags);
+					else
+						buffer = kmalloc(
+						urb->transfer_buffer_length,
+							mem_flags);
+
+					if (!buffer)
+						ret = -ENOMEM;
+					urb->bounce_buffer = buffer;
+				}
+
+				if (buffer) {
+					urb->transfer_dma = dma_map_single(
+							hcd->self.controller,
+							buffer,
+						urb->transfer_buffer_length,
+							dir);
+					if (dma_mapping_error(
+							hcd->self.controller,
+							urb->transfer_dma))
+						ret = -EAGAIN;
+					else
 					urb->transfer_flags |= URB_DMA_MAP_SINGLE;
+				}
 			}
 		} else if (hcd->driver->flags & HCD_LOCAL_MEM) {
 			ret = hcd_alloc_coherent(

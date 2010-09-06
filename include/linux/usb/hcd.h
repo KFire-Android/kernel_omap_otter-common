@@ -193,6 +193,8 @@ struct hc_driver {
 	const char	*description;	/* "ehci-hcd" etc */
 	const char	*product_desc;	/* product/vendor string */
 	size_t		hcd_priv_size;	/* size of private data */
+	unsigned	dma_align_shift; /* Aligment requirement for DMA:
+						0=byte 1=2 byte, 2=4 byte... */
 
 	/* irq handler */
 	irqreturn_t	(*irq) (struct usb_hcd *hcd);

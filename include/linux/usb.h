@@ -1184,6 +1184,7 @@ struct urb {
 	atomic_t use_count;		/* concurrent submissions counter */
 	atomic_t reject;		/* submissions will fail */
 	int unlinked;			/* unlink error code */
+	void *bounce_buffer;		/* DMA bounce buffer for alignment */
 
 	/* public: documented fields in the urb that can be used by drivers */
 	struct list_head urb_list;	/* list head for use by the urb's
