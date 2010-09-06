@@ -22,7 +22,7 @@
  *                                      related timing
  *				May 2010 Added support of Hot Plug Detect
  *				July 2010 Redesigned HDMI EDID for Auto-detect of timing
- *
+ *				August 2010 Char device user space control for HDMI
  */
 
 #define DSS_SUBSYS_NAME "HDMI"
@@ -43,6 +43,8 @@
 #include <plat/hdmi_lib.h>
 #include <plat/gpio.h>
 #include <linux/slab.h>
+#include <linux/cdev.h>
+#include <linux/fs.h>
 
 #include "dss.h"
 #include "hdmi.h"
@@ -64,6 +66,23 @@ static int get_edid_timing_data(u8 *edid);
 static irqreturn_t hdmi_irq_handler(int irq, void *arg);
 static int hdmi_enable_hpd(struct omap_dss_device *dssdev);
 static void hdmi_power_off(struct omap_dss_device *dssdev);
+static int hdmi_open(struct inode *inode, struct file *filp);
+static int hdmi_release(struct inode *inode, struct file *filp);
+static int hdmi_ioctl(struct inode *inode, struct file *file,
+					  unsigned int cmd, unsigned long arg);
+
+
+/*Structures for chardevice move this to panel*/
+static int hdmi_major;
+static struct cdev hdmi_cdev;
+static dev_t hdmi_dev_id;
+/*This is a basic structure read and write ioctls will be added to configure parameters*/
+static struct file_operations hdmi_fops = {
+	.owner = THIS_MODULE,
+	.open = hdmi_open,
+	.release = hdmi_release,
+	.ioctl = hdmi_ioctl,
+};
 
 #define HDMI_PLLCTRL		0x58006200
 #define HDMI_PHY		0x58006300
@@ -280,7 +299,48 @@ int hdmi_hot_plug_event_send(struct omap_dss_device *dssdev, int onoff)
 	return r;
 }
 
+static int hdmi_open(struct inode *inode, struct file *filp)
+{
+	return 0;
+}
 
+static int hdmi_release(struct inode *inode, struct file *filp)
+{
+	return 0;
+}
+
+static int hdmi_ioctl(struct inode *inode, struct file *file,
+					  unsigned int cmd, unsigned long arg)
+{
+	struct omap_dss_device *dssdev = NULL;
+	const char *buf = "hdmi";
+	int r = 0;
+	int match(struct omap_dss_device *dssdev2 , void *data)
+	{
+		const char *str = data;
+		return sysfs_streq(dssdev2->name , str);
+	}
+	dssdev = omap_dss_find_device((void *)buf , match);
+
+	switch (cmd) {
+	case HDMI_ENABLE:
+		r = hdmi_enable_display(dssdev);
+		break;
+
+	case HDMI_DISABLE:
+		hdmi_disable_display(dssdev);
+		break;
+	case HDMI_READ_EDID:
+		hdmi_get_edid(dssdev);
+		break;
+	default:
+		r = -EINVAL;
+		DSSDBG("Un-recoganized command");
+		break;
+	}
+
+	return r;
+}
 /*
  * refclk = (sys_clk/(highfreq+1))/(n+1)
  * so refclk = 38.4/2/(n+1) = 19.2/(n+1)
@@ -673,6 +733,29 @@ int hdmi_init(struct platform_device *pdev)
 	hdmi_lib_init();
 
 	hdmi_enable_clocks(0);
+	/* Get the major number for this module */
+	r = alloc_chrdev_region(&hdmi_dev_id, 0, 1, "hdmi_panel");
+	if (r) {
+		printk("HDMI: Cound not register character device\n");
+		return -ENOMEM;
+	}
+
+	hdmi_major = MAJOR(hdmi_dev_id);
+
+	/* initialize character device */
+	cdev_init(&hdmi_cdev, &hdmi_fops);
+
+	hdmi_cdev.owner = THIS_MODULE;
+	hdmi_cdev.ops = &hdmi_fops;
+
+	/* add char driver */
+	r = cdev_add(&hdmi_cdev, hdmi_dev_id, 1);
+	if (r) {
+		printk("HDMI: Could not add hdmi char driver\n");
+		unregister_chrdev_region(hdmi_dev_id, 1);
+		return -ENOMEM;
+	}
+
 	hdmi_irq = platform_get_irq(pdev, 0);
 	r = request_irq(hdmi_irq,
 				hdmi_irq_handler,
