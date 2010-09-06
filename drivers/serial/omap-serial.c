@@ -144,7 +144,8 @@ static void serial_omap_stop_rx(struct uart_port *port)
 	serial_out(up, UART_IER, up->ier);
 }
 
-static inline void receive_chars(struct uart_omap_port *up, int *status)
+static inline void
+receive_chars(struct uart_omap_port *up, unsigned int *status)
 {
 	struct tty_struct *tty = up->port.state->port.tty;
 	unsigned int flag;
@@ -1004,7 +1005,7 @@ static inline void serial_omap_add_console_port(struct uart_omap_port *up)
 
 #endif
 
-struct uart_ops serial_omap_pops = {
+static struct uart_ops serial_omap_pops = {
 	.tx_empty	= serial_omap_tx_empty,
 	.set_mctrl	= serial_omap_set_mctrl,
 	.get_mctrl	= serial_omap_get_mctrl,
@@ -1342,7 +1343,7 @@ int omap_uart_active(int num)
 }
 EXPORT_SYMBOL(omap_uart_active);
 
-int __init serial_omap_init(void)
+static int __init serial_omap_init(void)
 {
 	int ret;
 
@@ -1355,7 +1356,7 @@ int __init serial_omap_init(void)
 	return ret;
 }
 
-void __exit serial_omap_exit(void)
+static void __exit serial_omap_exit(void)
 {
 	platform_driver_unregister(&serial_omap_driver);
 	uart_unregister_driver(&serial_omap_reg);
