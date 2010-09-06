@@ -971,7 +971,11 @@ int omap2_clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
 	if (!clkdm || !clk)
 		return -EINVAL;
 
-	if (atomic_inc_return(&clkdm->usecount) > 1)
+	/*
+	 * On omap44xx() usecounting does not make sense as the clkdm
+	 * state needs to be toggled for every module enable
+	 */
+	if ((atomic_inc_return(&clkdm->usecount) > 1) && !cpu_is_omap44xx())
 		return 0;
 
 	/* Clockdomain now has one enabled downstream clock */
