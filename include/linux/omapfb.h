@@ -257,6 +257,11 @@ struct omapfb_platform_data {
 extern void omapfb_set_platform_data(struct omapfb_platform_data *data);
 extern void omapfb_set_ctrl_platform_data(void *pdata);
 extern void omapfb_reserve_sdram(void);
+extern unsigned long omapfb_reserve_sram(unsigned long sram_pstart,
+				  unsigned long sram_vstart,
+				  unsigned long sram_size,
+				  unsigned long pstart_avail,
+				  unsigned long size_avail);
 
 #endif
 

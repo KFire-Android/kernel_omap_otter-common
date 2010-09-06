@@ -386,3 +386,4 @@ unsigned long omapfb_reserve_sram(unsigned long sram_pstart,
 }
 
 #endif
+EXPORT_SYMBOL(omapfb_reserve_sram);

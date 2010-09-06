@@ -64,12 +64,12 @@ int omap_mcbsp_read(struct omap_mcbsp *mcbsp, u16 reg, bool from_cache)
 EXPORT_SYMBOL(omap_mcbsp_read);
 
 #ifdef CONFIG_ARCH_OMAP3
-void omap_mcbsp_st_write(struct omap_mcbsp *mcbsp, u16 reg, u32 val)
+static void omap_mcbsp_st_write(struct omap_mcbsp *mcbsp, u16 reg, u32 val)
 {
 	__raw_writel(val, mcbsp->st_data->io_base_st + reg);
 }
 
-int omap_mcbsp_st_read(struct omap_mcbsp *mcbsp, u16 reg)
+static int omap_mcbsp_st_read(struct omap_mcbsp *mcbsp, u16 reg)
 {
 	return __raw_readl(mcbsp->st_data->io_base_st + reg);
 }
@@ -1645,7 +1645,7 @@ static const struct attribute_group sidetone_attr_group = {
 	.attrs = (struct attribute **)sidetone_attrs,
 };
 
-int __devinit omap_st_add(struct omap_mcbsp *mcbsp)
+static int __devinit omap_st_add(struct omap_mcbsp *mcbsp)
 {
 	struct omap_mcbsp_platform_data *pdata = mcbsp->pdata;
 	struct omap_mcbsp_st_data *st_data;
