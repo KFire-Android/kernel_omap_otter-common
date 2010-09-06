@@ -1400,11 +1400,3 @@ static int get_edid_timing_data(u8 *edid)
 	return 1;
 
 }
-
-void hdmi_dump_regs(struct seq_file *s)
-{
-	DSSDBG("0x4a100060 x%x\n", omap_readl(0x4A100060));
-	DSSDBG("0x4A100088 x%x\n", omap_readl(0x4A100088));
-	DSSDBG("0x48055134 x%x\n", omap_readl(0x48055134));
-	DSSDBG("0x48055194 x%x\n", omap_readl(0x48055194));
-}
