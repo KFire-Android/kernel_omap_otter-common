@@ -410,6 +410,10 @@ int dss_check_overlay(struct omap_overlay *ovl, struct omap_dss_device *dssdev)
 
 	dssdev->driver->get_resolution(dssdev, &dw, &dh);
 
+	/* y resolution to be doubled in case of interlaced HDMI */
+	if ((ovl->info.field == IBUF_IDEV) || (ovl->info.field == PBUF_IDEV))
+		dh *= 2;
+
 	DSSDBG("check_overlay %d: (%d,%d %dx%d -> %dx%d) disp (%dx%d)\n",
 			ovl->id,
 			info->pos_x, info->pos_y,

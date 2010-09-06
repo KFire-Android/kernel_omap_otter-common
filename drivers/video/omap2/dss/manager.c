@@ -410,7 +410,7 @@ struct overlay_cache_data {
 
 	enum omap_channel channel;
 	bool replication;
-	bool ilace;
+	enum device_n_buffer_type ilace;
 
 	enum omap_burst_size burst_size;
 	u32 fifo_low;
@@ -419,6 +419,11 @@ struct overlay_cache_data {
 	bool manual_update;
 	enum omap_overlay_zorder zorder;
 	u32 p_uv_addr; /* relevent for NV12 format only */
+	u16 pic_width; /* for ilace */
+	u16 pic_height; /* for ilace */
+	u32 ibufpdev_offset; /* for ilace buffer &
+		progressive display device offset*/
+	u16 ibufpdev_flag; /* for ilace buffer and progressive display device */
 };
 
 struct manager_cache_data {
@@ -853,6 +858,23 @@ static int configure_overlay(enum omap_plane plane)
 		}
 	}
 
+#ifdef CONFIG_ARCH_OMAP4
+	if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
+		u16 height, pic_height;
+		s32 row_inc;
+		if (c->ilace == IBUF_PDEV) {
+			height = h/2;
+			pic_height = c->pic_height/2;
+
+			calc_tiler_row_rotation(c->rotation,
+			w, height, c->color_mode, &row_inc,
+			&c->ibufpdev_offset, c->ilace, c->pic_width,
+			pic_height);
+
+			c->ibufpdev_flag = 0;
+		}
+	}
+#endif
 	r = dispc_setup_plane(plane,
 			paddr,
 			c->screen_width,
@@ -866,7 +888,9 @@ static int configure_overlay(enum omap_plane plane)
 			c->mirror,
 			c->global_alpha,
 			c->channel,
-			c->p_uv_addr);
+			c->p_uv_addr,
+			c->pic_width,
+			c->pic_height);
 
 	if (r) {
 		/* this shouldn't happen */
@@ -1329,6 +1353,8 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		oc->screen_width = ovl->info.screen_width;
 		oc->width = ovl->info.width;
 		oc->height = ovl->info.height;
+		oc->pic_width = ovl->info.pic_width;
+		oc->pic_height = ovl->info.pic_height;
 		oc->color_mode = ovl->info.color_mode;
 		oc->rotation = ovl->info.rotation;
 		oc->rotation_type = ovl->info.rotation_type;
@@ -1343,7 +1369,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		oc->replication =
 			dss_use_replication(dssdev, ovl->info.color_mode);
 
-		oc->ilace = dssdev->type == OMAP_DISPLAY_TYPE_VENC;
+		oc->ilace = ovl->info.field;
 
 		oc->channel = ovl->manager->id;
 
@@ -1936,6 +1962,16 @@ int omap_dss_get_num_overlay_managers(void)
 {
 	return num_managers;
 }
+
+u16 *get_offset_cnt(int id, u32 *offset)
+{
+	struct overlay_cache_data *oc;
+	oc = &dss_cache.overlay_cache[id];
+	*offset = oc->ibufpdev_offset;
+	return &oc->ibufpdev_flag;
+
+}
+
 EXPORT_SYMBOL(omap_dss_get_num_overlay_managers);
 
 struct omap_overlay_manager *omap_dss_get_overlay_manager(int num)

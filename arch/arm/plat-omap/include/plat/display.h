@@ -261,6 +261,14 @@ enum omap_writeback_capturemode {
 	OMAP_WB_CAPTURE_1_OF_6 = 0x6,
 	OMAP_WB_CAPTURE_1_OF_7 = 0x7
 };
+
+enum device_n_buffer_type {
+       PBUF_PDEV = 0,
+       PBUF_IDEV = 1,
+       IBUF_IDEV = 2,
+       IBUF_PDEV = 3,
+};
+
 /* RFBI */
 
 struct rfbi_timings {
@@ -329,6 +337,8 @@ int dsi_vc_send_bta_sync(enum omap_dsi_index ix, int channel);
 #define DLP_4430_GPIO_44	44
 #define DLP_4430_GPIO_45	45
 #define DLP_4430_GPIO_59	59
+#define PROGRESSIVE 0
+#define INTERLACED  1
 
 struct omap_dss_board_info {
 	int (*get_last_off_on_transaction_id)(struct device *dev);
@@ -397,6 +407,9 @@ struct omap_overlay_info {
 	u8 global_alpha;
 	enum omap_overlay_zorder zorder;
 	u32 p_uv_addr; /* relevant for NV12 format only */
+	enum device_n_buffer_type field;
+	u16 pic_width; /* for interlacing with cropping this is required */
+	u16 pic_height; /* for interlacing with cropping this is required */
 };
 
 struct omap_overlay {
@@ -754,5 +767,16 @@ int omap_rfbi_prepare_update(struct omap_dss_device *dssdev,
 int omap_rfbi_update(struct omap_dss_device *dssdev,
 		u16 x, u16 y, u16 w, u16 h,
 		void (*callback)(void *), void *data);
+void calc_tiler_row_rotation(u8 rotation,
+		u16 width, u16 height,
+		enum omap_color_mode color_mode,
+		s32 *row_inc,
+		unsigned *offset1,
+		enum device_n_buffer_type  ilace,
+		u16 pic_width,
+		u16 pic_height);
 
+void change_base_address(u32 offset, u16 *flag, int id);
+u16 *get_offset_cnt(int id, u32 *offset);
+int nature_of_hdmi(void);
 #endif

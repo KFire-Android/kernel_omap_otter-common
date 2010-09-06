@@ -296,7 +296,6 @@ int omap_vout_try_format(struct v4l2_pix_format *pix)
 		ifmt = 0;
 
 	pix->pixelformat = omap_formats[ifmt].pixelformat;
-	pix->field = V4L2_FIELD_ANY;
 	pix->priv = 0;
 
 	switch (pix->pixelformat) {
@@ -1040,6 +1039,74 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 	return 0;
 }
 
+static int interlace_display(struct omap_vout_device *vout, u32 irqstatus,
+					struct timeval timevalue, u32 flags)
+{
+       unsigned long fid;
+	if (vout->first_int) {
+		vout->first_int = 0;
+		spin_unlock_irqrestore(&vout->vbq_lock, flags);
+		return 0;
+	}
+	if (irqstatus & DISPC_IRQ_EVSYNC_ODD) {
+		fid = 1;
+	} else if (irqstatus & DISPC_IRQ_EVSYNC_EVEN) {
+		fid = 0;
+	} else {
+		spin_unlock_irqrestore(&vout->vbq_lock, flags);
+		return 0;
+	 }
+	vout->field_id ^= 1;
+	if (fid != vout->field_id) {
+		if (0 == fid)
+			vout->field_id = fid;
+
+		spin_unlock_irqrestore(&vout->vbq_lock, flags);
+		return 0;
+	}
+	if (0 == fid) {
+		if (vout->cur_frm == vout->next_frm) {
+			spin_unlock_irqrestore(&vout->vbq_lock, flags);
+			return 0;
+		}
+		vout->cur_frm->ts = timevalue;
+		vout->cur_frm->state = VIDEOBUF_DONE;
+		wake_up_interruptible(&vout->cur_frm->done);
+		vout->cur_frm = vout->next_frm;
+		return 1;
+		} else if (1 == fid) {
+			if (list_empty(&vout->dma_queue) ||
+				(vout->cur_frm != vout->next_frm)) {
+				spin_unlock_irqrestore(&vout->vbq_lock, flags);
+				return 0;
+			}
+			return 2;
+		}
+	return 3;
+}
+
+static int i_to_p_base_address_change(struct omap_vout_device *vout,
+						unsigned long flags)
+{
+       u16 *cnt;
+       u32 offset;
+
+       struct omap_overlay *ovl;
+       struct omapvideo_info *ovid;
+
+       ovid = &(vout->vid_info);
+       ovl = ovid->overlays[0];
+
+       cnt = get_offset_cnt(ovl->id, &offset);
+       change_base_address(offset, cnt, ovl->id);
+       if (*cnt == 1) {
+		*cnt = 2;
+		spin_unlock_irqrestore(&vout->vbq_lock, flags);
+		return 1;
+	 }
+	return 0;
+}
+
 void omap_vout_isr(void *arg, unsigned int irqstatus)
 {
 	int ret;
@@ -1051,9 +1118,6 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 	struct omap_vout_device *vout = (struct omap_vout_device *)arg;
 	unsigned long flags;
 	int irq = 0;
-#ifndef CONFIG_OMAP2_DSS_HDMI
-	u32 fid;
-#endif
 	if (!vout->streaming)
 		return;
 
@@ -1086,6 +1150,16 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 	case OMAP_DISPLAY_TYPE_DSI:
 		if (!(irqstatus & irq))
 			goto vout_isr_err;
+		else if (ovl->info.field == IBUF_PDEV) {
+			if ((irq == DISPC_IRQ_FRAMEDONE) ||
+				(irq == DISPC_IRQ_FRAMEDONE2)) {
+				ret = i_to_p_base_address_change(vout, flags);
+				if (ret == 1) {
+					dispc_go(cur_display->channel);
+					return;
+				}
+			}
+		}
 		break;
 	case OMAP_DISPLAY_TYPE_DPI:
 		if (!(irqstatus & (DISPC_IRQ_VSYNC | DISPC_IRQ_VSYNC2)))
@@ -1099,45 +1173,37 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 		break;
 #ifdef CONFIG_OMAP2_DSS_HDMI
 	case OMAP_DISPLAY_TYPE_HDMI:
-		if (!(irqstatus & DISPC_IRQ_EVSYNC_EVEN))
-			goto vout_isr_err;
-
-		break;
+		if (ovl->info.field == PBUF_PDEV) {
+			if (!(irqstatus & DISPC_IRQ_EVSYNC_EVEN))
+				goto vout_isr_err;
+		} else if (ovl->info.field == IBUF_PDEV) {
+			if (irqstatus & DISPC_IRQ_EVSYNC_EVEN) {
+				ret = i_to_p_base_address_change(vout, flags);
+				if (ret == 1) {
+					dispc_go(cur_display->channel);
+					return;
+				}
+			}
+		} else if (ovl->info.field == IBUF_IDEV) {
+			ret = interlace_display(vout, irqstatus,
+				timevalue, flags);
+				if (ret == 0)
+					return;
+				else if (ret == 1)
+					goto vout_isr_err;
+				else if (ret == 2)
+					goto intlace;
+	}
+	break;
 #else
 	case OMAP_DISPLAY_TYPE_VENC:
-		if (vout->first_int) {
-			vout->first_int = 0;
+		ret = interlace_display(vout, irqstatus, timevalue, flags);
+		if (ret == 0)
+			return;
+		else if (ret == 1)
 			goto vout_isr_err;
-		}
-		if (irqstatus & DISPC_IRQ_EVSYNC_ODD)
-			fid = 1;
-		else if (irqstatus & DISPC_IRQ_EVSYNC_EVEN)
-			fid = 0;
-		else
-			goto vout_isr_err;
-		fid = 1;
-		vout->field_id ^= 1;
-		if (fid != vout->field_id) {
-			if (0 == fid)
-				vout->field_id = fid;
-
-			goto vout_isr_err;
-		}
-		if (0 == fid) {
-			if (vout->cur_frm == vout->next_frm)
-				goto vout_isr_err;
-			vout->cur_frm->ts = timevalue;
-			vout->cur_frm->state = VIDEOBUF_DONE;
-			wake_up_interruptible(&vout->cur_frm->done);
-			vout->cur_frm = vout->next_frm;
-			goto vout_isr_err;
-		} else if (1 == fid) {
-			if (list_empty(&vout->dma_queue) ||
-			    (vout->cur_frm != vout->next_frm)) {
-				goto vout_isr_err;
-			}
-			goto venc;
-		}
+		else if (ret == 2)
+			goto intlace;
 #endif
 	default:
 		goto vout_isr_err;
@@ -1156,9 +1222,7 @@ wb:
 		goto vout_isr_err;
 	}
 
-#ifndef CONFIG_OMAP2_DSS_HDMI
-venc:
-#endif
+intlace:
 	vout->next_frm = list_entry(vout->dma_queue.next,
 			struct videobuf_buffer, queue);
 	list_del(&vout->next_frm->queue);
@@ -1813,6 +1877,10 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	struct omapvideo_info *ovid;
 	struct omap_video_timings *timing;
 	struct omap_vout_device *vout = fh;
+	u16 multiplier = 1;
+	u8 device_type = PROGRESSIVE;
+	/* default is progressive buffer and progressive display */
+	enum device_n_buffer_type dev_buf_type = PBUF_PDEV;
 
 	if (vout->streaming)
 		return -EBUSY;
@@ -1829,6 +1897,28 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	}
 	timing = &ovl->manager->device->panel.timings;
 
+	/* validate the combination of input buffer & device type.
+	   Code needs to be added for interlaced LCD display */
+	if (ovl->manager->device->type == OMAP_DISPLAY_TYPE_HDMI)
+			device_type = nature_of_hdmi();
+
+	if (f->fmt.pix.field != V4L2_FIELD_NONE &&
+		f->fmt.pix.field != V4L2_FIELD_SEQ_TB)
+		f->fmt.pix.field = V4L2_FIELD_NONE;
+
+	if ((f->fmt.pix.field == V4L2_FIELD_NONE) &&
+		(device_type == PROGRESSIVE))
+		dev_buf_type = PBUF_PDEV;
+	else if ((f->fmt.pix.field == V4L2_FIELD_NONE) &&
+		(device_type == INTERLACED))
+		dev_buf_type = PBUF_IDEV;
+	else if ((f->fmt.pix.field == V4L2_FIELD_SEQ_TB) &&
+		(device_type == INTERLACED))
+		dev_buf_type = IBUF_IDEV;
+	else if ((f->fmt.pix.field == V4L2_FIELD_SEQ_TB) &&
+		(device_type == PROGRESSIVE))
+		dev_buf_type = IBUF_PDEV;
+
 	/* We dont support RGB24-packed mode if vrfb rotation
 	 * is enabled*/
 	if ((rotation_enabled(vout)) &&
@@ -1837,13 +1927,16 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 		goto s_fmt_vid_out_exit;
 	}
 
-	/* get the framebuffer parameters */
+	/* y resolution to be doubled in case of interlaced HDMI */
+	if ((ovl->info.field == IBUF_IDEV) || (ovl->info.field == PBUF_IDEV))
+		multiplier = 2;
 
+	/* get the framebuffer parameters */
 	if (!cpu_is_omap44xx() && rotate_90_or_270(vout)) {
 		vout->fbuf.fmt.height = timing->x_res;
-		vout->fbuf.fmt.width = timing->y_res;
+		vout->fbuf.fmt.width = timing->y_res * multiplier;
 	} else {
-		vout->fbuf.fmt.height = timing->y_res;
+		vout->fbuf.fmt.height = timing->y_res * multiplier;
 		vout->fbuf.fmt.width = timing->x_res;
 	}
 
@@ -1860,6 +1953,9 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	vout->bpp = bpp;
 	vout->pix = f->fmt.pix;
 	vout->vrfb_bpp = 1;
+	ovl->info.field = dev_buf_type;
+	ovl->info.pic_width = f->fmt.pix.width;
+	ovl->info.pic_height = f->fmt.pix.height;
 
 	/* If YUYV then vrfb bpp is 2, for  others its 1 */
 	if (V4L2_PIX_FMT_YUYV == vout->pix.pixelformat ||
@@ -2042,6 +2138,7 @@ static int vidioc_g_crop(struct file *file, void *fh, struct v4l2_crop *crop)
 static int vidioc_s_crop(struct file *file, void *fh, struct v4l2_crop *crop)
 {
 	int ret = -EINVAL;
+	int multiplier = 1;
 	struct omap_vout_device *vout = fh;
 	struct omapvideo_info *ovid;
 	struct omap_overlay *ovl;
@@ -2065,11 +2162,15 @@ static int vidioc_s_crop(struct file *file, void *fh, struct v4l2_crop *crop)
 	/* get the display device attached to the overlay */
 	timing = &ovl->manager->device->panel.timings;
 
+	 /* y resolution to be doubled in case of interlaced HDMI */
+	 if ((ovl->info.field == IBUF_IDEV) || (ovl->info.field == PBUF_IDEV))
+		multiplier = 2;
+
 	if (rotate_90_or_270(vout)) {
 		vout->fbuf.fmt.height = timing->x_res;
-		vout->fbuf.fmt.width = timing->y_res;
+		vout->fbuf.fmt.width = timing->y_res * multiplier;
 	} else {
-		vout->fbuf.fmt.height = timing->y_res;
+		vout->fbuf.fmt.height = timing->y_res * multiplier ;
 		vout->fbuf.fmt.width = timing->x_res;
 	}
 
@@ -2321,6 +2422,7 @@ static int vidioc_qbuf(struct file *file, void *fh,
 	struct videobuf_queue *q = &vout->vbq;
 	int ret = 0;
 	u32 addr = 0, uv_addr = 0;
+	q->field = vout->pix.field;
 
 	if ((V4L2_BUF_TYPE_VIDEO_OUTPUT != buffer->type) ||
 			(buffer->index >= vout->buffer_allocated) ||

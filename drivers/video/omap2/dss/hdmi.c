@@ -1545,3 +1545,20 @@ static int get_edid_timing_data(u8 *edid)
 	return 1;
 
 }
+
+int nature_of_hdmi(void)
+{
+	if ((hdmi.mode)) {
+		switch (hdmi.code) {
+		case 5:
+		case 6:
+		case 20:
+		case 21:
+			return INTERLACED;
+		default:
+			return PROGRESSIVE;
+		}
+	}
+	return PROGRESSIVE;
+}
+
