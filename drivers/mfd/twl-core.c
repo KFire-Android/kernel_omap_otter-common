@@ -956,12 +956,6 @@ static void clocks_init(struct device *dev,
 
 /*----------------------------------------------------------------------*/
 
-int twl4030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end);
-int twl4030_exit_irq(void);
-int twl4030_init_chip_irq(const char *chip);
-int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end);
-int twl6030_exit_irq(void);
-
 static int __devexit twl_remove(struct i2c_client *client)
 {
 	unsigned i;

@@ -197,6 +197,11 @@ int twl_i2c_read(u8 mod_no, u8 *value, u8 reg, unsigned num_bytes);
 
 int twl6030_interrupt_unmask(u8 bit_mask, u8 offset);
 int twl6030_interrupt_mask(u8 bit_mask, u8 offset);
+int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end);
+int twl6030_exit_irq(void);
+int twl4030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end);
+int twl4030_exit_irq(void);
+int twl4030_init_chip_irq(const char *chip);
 
 int twl6030_register_notifier(struct notifier_block *nb,
 				unsigned int events);
