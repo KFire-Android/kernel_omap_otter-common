@@ -843,6 +843,7 @@ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
 
 	return ret;
 }
+EXPORT_SYMBOL(pwrdm_set_lowpwrstchange);
 
 /**
  * pwrdm_wait_transition - wait for powerdomain power transition to finish

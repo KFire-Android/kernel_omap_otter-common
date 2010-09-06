@@ -138,6 +138,7 @@ int __init omap2_gp_clockevent_set_gptimer(u8 id)
 
 	return 0;
 }
+EXPORT_SYMBOL(omap2_gp_clockevent_set_gptimer);
 
 static void __init omap2_gp_clockevent_init(void)
 {

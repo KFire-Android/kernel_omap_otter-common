@@ -34,6 +34,8 @@
 #include <plat/onenand.h>
 #include <plat/gpmc-smc91x.h>
 
+#include <mach/board-rx51.h>
+
 #include "mux.h"
 #include "hsmmc.h"
 
