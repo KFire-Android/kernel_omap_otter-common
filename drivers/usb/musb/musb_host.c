@@ -2318,6 +2318,7 @@ const struct hc_driver musb_hc_driver = {
 	.description		= "musb-hcd",
 	.product_desc		= "MUSB HDRC host driver",
 	.hcd_priv_size		= sizeof(struct musb),
+	.dma_align_shift	= 2,
 	.flags			= HCD_USB2 | HCD_MEMORY,
 
 	/* not using irq handler or reset hooks from usbcore, since
