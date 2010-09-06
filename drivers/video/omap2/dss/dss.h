@@ -123,9 +123,20 @@ enum dss_clock {
 };
 
 enum dss_clk_source {
+	/* OMAP 3*/
 	DSS_SRC_DSI1_PLL_FCLK,
 	DSS_SRC_DSI2_PLL_FCLK,
+
+	/* common */
 	DSS_SRC_DSS1_ALWON_FCLK,
+
+	/* OMAP 4 */
+	DSS_SRC_PLL1_CLK1,
+	DSS_SRC_PLL2_CLK1,
+	DSS_SRC_PLL3_CLK1,
+	DSS_SRC_PLL1_CLK2,
+	DSS_SRC_PLL2_CLK2,
+	DSS_SRC_PLL1_CLK4,
 };
 
 struct dss_clock_info {
@@ -151,9 +162,11 @@ struct dsi_clock_info {
 	unsigned long fint;
 	unsigned long clkin4ddr;
 	unsigned long clkin;
-	unsigned long dsi_pll_dispc_fclk;	/* DSI1_PLL_CLK for OMAP3 */
-	unsigned long dsi_pll_dsi_fclk;		/* DSI2_PLL_CLK for OMAP3 */
+	unsigned long dsi_pll_dispc_fclk;	/* DSI1_PLL_CLK for OMAP3
+						  * PLLx_CLK1 for OMAP4 */
 
+	unsigned long dsi_pll_dsi_fclk;		/* DSI2_PLL_CLK for OMAP3
+						  * PLLx_CLK2 for OMAP4 */
 	unsigned long lp_clk;
 
 	/* dividers */
@@ -270,8 +283,11 @@ void dss_select_dispc_clk_source(enum omap_dsi_index ix,
 		enum dss_clk_source clk_src);
 void dss_select_dsi_clk_source(enum omap_dsi_index ix,
 		enum dss_clk_source clk_src);
+void dss_select_lcd_clk_source(enum omap_dsi_index ix,
+		enum dss_clk_source clk_src);
 enum dss_clk_source dss_get_dispc_clk_source(void);
-enum dss_clk_source dss_get_dsi_clk_source(void);
+enum dss_clk_source dss_get_dsi_clk_source(enum omap_dsi_index ix);
+enum dss_clk_source dss_get_lcd_clk_source(enum omap_dsi_index ix);
 
 void dss_set_venc_output(enum omap_dss_venc_type type);
 void dss_set_dac_pwrdn_bgz(bool enable);

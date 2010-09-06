@@ -73,8 +73,11 @@ static struct {
 	struct dss_clock_info cache_dss_cinfo;
 	struct dispc_clock_info cache_dispc_cinfo;
 
-	enum dss_clk_source dsi_clk_source;
+	enum dss_clk_source dsi1_clk_source;
+	enum dss_clk_source dsi2_clk_source;
 	enum dss_clk_source dispc_clk_source;
+	enum dss_clk_source lcd1_clk_source;
+	enum dss_clk_source lcd2_clk_source;
 
 	u32		ctx[DSS_SZ_REGS / sizeof(u32)];
 	struct omap_display_platform_data *pdata;
@@ -299,20 +302,29 @@ void dss_select_dispc_clk_source(enum omap_dsi_index ix,
 {
 	int b;
 
-	BUG_ON(clk_src != DSS_SRC_DSI1_PLL_FCLK &&
+	if (cpu_is_omap44xx()) {
+		BUG_ON(clk_src != DSS_SRC_DSS1_ALWON_FCLK &&
+			clk_src != DSS_SRC_PLL1_CLK1 &&
+			clk_src != DSS_SRC_PLL2_CLK1 &&
+			clk_src != DSS_SRC_PLL3_CLK1);
+
+		b = clk_src - 2;
+	} else {
+		BUG_ON(clk_src != DSS_SRC_DSI1_PLL_FCLK &&
 			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
 
-	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 :
-			(ix == DSI1 ? 1 : 2);
+		b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
+	}
 
-	if (clk_src == DSS_SRC_DSI1_PLL_FCLK)
+	if (clk_src == DSS_SRC_DSI1_PLL_FCLK ||
+			clk_src == DSS_SRC_PLL1_CLK1 ||
+			clk_src == DSS_SRC_PLL2_CLK1)
 		dsi_wait_pll_dispc_active(ix);
 
-	if (!cpu_is_omap44xx()) {
-		REG_FLD_MOD(DSS_CONTROL, b, 0, 0);      /* DISPC_CLK_SWITCH */
-	} else {
-		REG_FLD_MOD(DSS_CONTROL, b, 9, 8);      /* FCK_CLK_SWITCH */
-	}
+	if (!cpu_is_omap44xx())
+		REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* DISPC_CLK_SWITCH */
+	else
+		REG_FLD_MOD(DSS_CONTROL, b, 9, 8);	/* FCK_CLK_SWITCH */
 
 	dss.dispc_clk_source = clk_src;
 }
@@ -322,24 +334,53 @@ void dss_select_dsi_clk_source(enum omap_dsi_index ix,
 {
 	int b;
 
-	BUG_ON(clk_src != DSS_SRC_DSI2_PLL_FCLK &&
+	if (cpu_is_omap44xx()) {
+		BUG_ON((clk_src != DSS_SRC_PLL1_CLK2 && ix == DSI1) &&
+			(clk_src != DSS_SRC_PLL2_CLK2 && ix == DSI2) &&
 			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
+	} else {
+		BUG_ON(clk_src != DSS_SRC_DSI2_PLL_FCLK &&
+			clk_src != DSS_SRC_DSS1_ALWON_FCLK);
+	}
 
 	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
 
-	if (clk_src == DSS_SRC_DSI2_PLL_FCLK)
+	if (clk_src == DSS_SRC_DSI2_PLL_FCLK ||
+			clk_src == DSS_SRC_PLL1_CLK2 ||
+			clk_src == DSS_SRC_PLL2_CLK2)
 		dsi_wait_pll_dsi_active(ix);
 
 	if (ix == DSI1) {
 		REG_FLD_MOD(DSS_CONTROL, b, 1, 1);	/* DSI_CLK_SWITCH */
-		if (cpu_is_omap44xx())
-			REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* LCD1_CLK_SWITCH */
+		dss.dsi1_clk_source = clk_src;
 	} else {
 		REG_FLD_MOD(DSS_CONTROL, b, 10, 10);	/* DSI2_CLK_SWITCH */
-		REG_FLD_MOD(DSS_CONTROL, b, 12, 12);	/* LCD2_CLK_SWITCH */
+		dss.dsi2_clk_source = clk_src;
 	}
 
-	dss.dsi_clk_source = clk_src;
+}
+
+void dss_select_lcd_clk_source(enum omap_dsi_index ix,
+	enum dss_clk_source clk_src)
+{
+	int b;
+
+	if (!cpu_is_omap44xx())
+		BUG();
+
+	BUG_ON((clk_src != DSS_SRC_PLL1_CLK1 && ix == DSI1) &&
+		(clk_src != DSS_SRC_PLL2_CLK1 && ix == DSI2) &&
+		clk_src != DSS_SRC_DSS1_ALWON_FCLK);
+
+	b = clk_src == DSS_SRC_DSS1_ALWON_FCLK ? 0 : 1;
+
+	if (ix == DSI1) {
+		REG_FLD_MOD(DSS_CONTROL, b, 0, 0);	/* LCD1_CLK_SWITCH */
+		dss.lcd1_clk_source = clk_src;
+	} else {
+		REG_FLD_MOD(DSS_CONTROL, b, 12, 12);	/* LCD2_CLK_SWITCH */
+		dss.lcd1_clk_source = clk_src;
+	}
 }
 
 enum dss_clk_source dss_get_dispc_clk_source(void)
@@ -347,9 +388,20 @@ enum dss_clk_source dss_get_dispc_clk_source(void)
 	return dss.dispc_clk_source;
 }
 
-enum dss_clk_source dss_get_dsi_clk_source(void)
+enum dss_clk_source dss_get_dsi_clk_source(enum omap_dsi_index ix)
 {
-	return dss.dsi_clk_source;
+	if (ix == DSI1)
+		return dss.dsi1_clk_source;
+	else
+		return dss.dsi2_clk_source;
+}
+
+enum dss_clk_source dss_get_lcd_clk_source(enum omap_dsi_index ix)
+{
+	if (ix == DSI1)
+		return dss.lcd1_clk_source;
+	else
+		return dss.lcd2_clk_source;
 }
 
 /* calculate clock rates using dividers in cinfo */
@@ -683,7 +735,10 @@ int dss_init(bool skip_init, struct platform_device *pdev)
 		}
 	}
 
-	dss.dsi_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.dsi1_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.dsi2_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.lcd1_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
+	dss.lcd2_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
 	dss.dispc_clk_source = DSS_SRC_DSS1_ALWON_FCLK;
 
 	dss_save_context();

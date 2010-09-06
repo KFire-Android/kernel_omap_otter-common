@@ -3536,17 +3536,26 @@ static void dispc_get_lcd_divisor(enum omap_channel channel,
 
 unsigned long dispc_fclk_rate(void)
 {
-	unsigned long r = 0;
-
-	if (dss_get_dispc_clk_source() == DSS_SRC_DSS1_ALWON_FCLK)
-		r = dss_clk_get_rate(DSS_CLK_FCK1);
-	else
+	switch (dss_get_dispc_clk_source()) {
+	case DSS_SRC_DSS1_ALWON_FCLK:
+		return dss_clk_get_rate(DSS_CLK_FCK1);
 #ifdef CONFIG_OMAP2_DSS_DSI
-		r = dsi_get_pll_dispc_rate(DSI1);
+	case DSS_SRC_DSI1_PLL_FCLK:
+	case DSS_SRC_PLL1_CLK1:
+		return dsi_get_pll_dispc_rate(DSI1);
+	case DSS_SRC_PLL2_CLK1:
+		return dsi_get_pll_dispc_rate(DSI2);
 #else
-	BUG();
+	case DSS_SRC_DSI1_PLL_FCLK:
+	case DSS_SRC_PLL1_CLK1:
+	case DSS_SRC_PLL2_CLK1:
+		BUG();
 #endif
-	return r;
+	case DSS_SRC_PLL3_CLK1:
+		return 0;
+	default:
+		BUG();
+	}
 }
 
 unsigned long dispc_lclk_rate(enum omap_channel channel)
@@ -3587,6 +3596,7 @@ unsigned long dispc_pclk_rate(enum omap_channel channel)
 void dispc_dump_clocks(struct seq_file *s)
 {
 	int lcd, pcd;
+	char *dispc_src;
 
 	enable_clocks(1);
 
@@ -3594,9 +3604,26 @@ void dispc_dump_clocks(struct seq_file *s)
 
 	seq_printf(s, "- DISPC -\n");
 
-	seq_printf(s, "dispc fclk source = %s\n",
-			dss_get_dispc_clk_source() == DSS_SRC_DSS1_ALWON_FCLK ?
-			"dss1_alwon_fclk" : "dsi1_pll_fclk");
+	switch (dss_get_dispc_clk_source()) {
+	case DSS_SRC_DSS1_ALWON_FCLK:
+		dispc_src = "dss1_alwon_fclk";
+		break;
+	case DSS_SRC_DSI1_PLL_FCLK:
+		dispc_src = "dsi1_pll_fclk";
+		break;
+	case DSS_SRC_PLL1_CLK1:
+		dispc_src = "pll1_clk1";
+		break;
+	case DSS_SRC_PLL2_CLK1:
+		dispc_src = "pll2_clk1";
+	case DSS_SRC_PLL3_CLK1:
+		dispc_src = "pll3_clk1";
+		break;
+	default:
+		BUG();
+	}
+
+	seq_printf(s, "dispc fclk source = %s\n", dispc_src);
 
 	seq_printf(s, "fck\t\t%-16lu\n", dispc_fclk_rate());
 	seq_printf(s, "lck\t\t%-16lulck div\t%u\n",

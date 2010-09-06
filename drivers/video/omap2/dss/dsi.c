@@ -893,7 +893,7 @@ static unsigned long dsi_fclk_rate(enum omap_dsi_index ix)
 {
 	unsigned long r;
 
-	if (dss_get_dsi_clk_source() == DSS_SRC_DSS1_ALWON_FCLK) {
+	if (dss_get_dsi_clk_source(ix) == DSS_SRC_DSS1_ALWON_FCLK) {
 		/* DSI FCLK source is DSS1_ALWON_FCK, which is dss1_fck */
 		r = dss_clk_get_rate(DSS_CLK_FCK1);
 	} else {
@@ -1085,7 +1085,8 @@ retry:
 			if (cur.clkin4ddr > 1800 * 1000 * 1000)
 				break;
 
-			/* DSI1_PLL_FCLK(MHz) = DSIPHY(MHz) / regm3  < 173MHz */
+			/* OMAP3: DSI1_PLL_FCLK(MHz) = DSIPHY(MHz) / regm3  < 173MHz
+			 * OMAP4: PLLx_CLK1(MHz) = DSIPHY(MHz) / regm4 < 173MHz */
 			for (cur.regm_dispc = 1; cur.regm_dispc < REGM_DISPC_MAX;
 					++cur.regm_dispc) {
 				struct dispc_clock_info cur_dispc;
@@ -1138,7 +1139,8 @@ found:
 		return -EINVAL;
 	}
 
-	/* DSI2_PLL_FCLK (regm4) is not used */
+	/* OMAP3: DSI2_PLL_FCLK (regm4) is not used
+	 * OMAP4: PLLx_CLK2 (regm5) is not used */
 	best.regm_dsi = 0;
 	best.dsi_pll_dsi_fclk = 0;
 
@@ -1194,9 +1196,11 @@ int dsi_pll_set_clock_div(enum omap_dsi_index ix,
 
 	DSSDBG("Clock lane freq %ld Hz\n", cinfo->clkin4ddr / 4);
 
-	DSSDBG("regm3 = %d, dsi1_pll_fclk = %lu\n",
+	DSSDBG("regm3(OMAP3) / regm4(OMAP4) = %d,"
+		" dsi1_pll_fclk(OMAP3) / pllx_clk1(OMAP4) = %lu\n",
 			cinfo->regm_dispc, cinfo->dsi_pll_dispc_fclk);
-	DSSDBG("regm4 = %d, dsi2_pll_fclk = %lu\n",
+	DSSDBG("regm4(OMAP3) / regm5(OMAP4) = %d,"
+		" dsi2_pll_fclk(OMAP3) / pllx_clk2(OMAP4) = %lu\n",
 			cinfo->regm_dsi, cinfo->dsi_pll_dsi_fclk);
 
 	REG_FLD_MOD(ix, DSI_PLL_CONTROL, 0,
@@ -1387,23 +1391,26 @@ void dsi_dump_clocks(enum omap_dsi_index ix, enum omap_channel channel,
 	seq_printf(s,	"CLKIN4DDR\t%-16luregm %u\n",
 			cinfo->clkin4ddr, cinfo->regm);
 
-	seq_printf(s,	"dsi1_pll_fck\t%-16luregm3 %u\t(%s)\n",
+	seq_printf(s,	"dsi1_pll_fck(OMAP3) / pllx_clk1(OMAP4)"
+			"\t%-16luregm3(OMAP3) / regm4(OMAP4) %u\t(%s)\n",
 			cinfo->dsi_pll_dispc_fclk,
 			cinfo->regm_dispc,
 			dss_get_dispc_clk_source() == DSS_SRC_DSS1_ALWON_FCLK ?
 			"off" : "on");
 
-	seq_printf(s,	"dsi2_pll_fck\t%-16luregm4 %u\t(%s)\n",
+	seq_printf(s,	"dsi2_pll_fck(OMAP3) / pllx_clk2(OMAP4)"
+			"\t%-16luregm4(OMAP3) / regm5(OMAP4)  %u\t(%s)\n",
 			cinfo->dsi_pll_dsi_fclk,
 			cinfo->regm_dsi,
-			dss_get_dsi_clk_source() == DSS_SRC_DSS1_ALWON_FCLK ?
+			dss_get_dsi_clk_source(ix) == DSS_SRC_DSS1_ALWON_FCLK ?
 			"off" : "on");
 
 	seq_printf(s,	"- DSI -\n");
 
 	seq_printf(s,	"dsi fclk source = %s\n",
-			dss_get_dsi_clk_source() == DSS_SRC_DSS1_ALWON_FCLK ?
-			"dss1_alwon_fclk" : "dsi2_pll_fclk");
+			dss_get_dsi_clk_source(ix) == DSS_SRC_DSS1_ALWON_FCLK ?
+			"dss1_alwon_fclk" : "dsi2_pll_fclk(OMAP3) / "
+			"pllx_clk2(OMAP4)");
 
 	seq_printf(s,	"DSI_FCLK\t%lu\n", dsi_fclk_rate(ix));
 
@@ -3523,8 +3530,19 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	if (r)
 		goto err1;
 
-	dss_select_dispc_clk_source(ix, DSS_SRC_DSI1_PLL_FCLK);
-	dss_select_dsi_clk_source(ix, DSS_SRC_DSI2_PLL_FCLK);
+	if (cpu_is_omap44xx()) {
+		dss_select_dispc_clk_source(ix, (ix == DSI1) ?
+			DSS_SRC_PLL1_CLK1 : DSS_SRC_PLL2_CLK1);
+		dss_select_dsi_clk_source(ix, (ix == DSI1) ?
+			DSS_SRC_PLL1_CLK2 : DSS_SRC_PLL1_CLK2);
+		dss_select_lcd_clk_source(ix, (ix == DSI1) ?
+			DSS_SRC_PLL1_CLK1 : DSS_SRC_PLL2_CLK1);
+	} else {
+		dss_select_dispc_clk_source(ix,
+				DSS_SRC_DSI1_PLL_FCLK);
+		dss_select_dsi_clk_source(ix,
+				DSS_SRC_DSI2_PLL_FCLK);
+	}
 
 	DSSDBG("PLL OK\n");
 
@@ -3568,6 +3586,8 @@ err3:
 err2:
 	dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 	dss_select_dsi_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
+	if (cpu_is_omap44xx())
+		dss_select_lcd_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 err1:
 	dsi_pll_uninit(ix);
 err0:
@@ -3588,6 +3608,8 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev)
 
 	dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 	dss_select_dsi_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
+	if (cpu_is_omap44xx())
+		dss_select_lcd_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 	dsi_complexio_uninit(ix);
 	dsi_pll_uninit(ix);
 }

@@ -47,6 +47,9 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 	struct dsi_clock_info dsi_cinfo;
 	struct dispc_clock_info dispc_cinfo;
 	int r;
+	enum omap_dsi_index ix;
+
+	ix = (channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
 	if (!cpu_is_omap44xx()) {
 	r = dsi_pll_calc_clock_div_pck(channel, is_tft, pck_req, &dsi_cinfo,
@@ -68,7 +71,11 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 	if (r)
 		return r;
 
-	dss_select_dispc_clk_source(channel, DSS_SRC_DSI1_PLL_FCLK);
+	if (cpu_is_omap44xx())
+		dss_select_dispc_clk_source(ix, (ix == DSI1) ?
+			DSS_SRC_PLL1_CLK1 : DSS_SRC_PLL2_CLK1);
+	else
+		dss_select_dispc_clk_source(ix, DSS_SRC_DSI1_PLL_FCLK);
 
 	r = dispc_set_clock_div(channel, &dispc_cinfo);
 	if (r)
