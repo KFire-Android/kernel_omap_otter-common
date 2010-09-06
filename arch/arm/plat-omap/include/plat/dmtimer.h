@@ -51,6 +51,8 @@
 #define OMAP_TIMER_IP_VERSION_2			0x2
 
 struct omap_dm_timer;
+extern struct omap_dm_timer *gptimer_wakeup;
+extern struct sys_timer omap_timer;
 struct clk;
 
 struct omap_dmtimer_platform_data {
