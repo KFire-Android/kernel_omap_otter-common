@@ -1992,6 +1992,7 @@ static void dsi_vc_initial_config(enum omap_dsi_index ix, int channel)
 	r = FLD_MOD(r, 0, 9, 9); /* MODE_SPEED, high speed on/off */
 	if (cpu_is_omap44xx()) {
 		r = FLD_MOD(r, 3, 11, 10);	/* OCP_WIDTH */
+		r = FLD_MOD(r, 3, 19, 17);
 		r = FLD_MOD(r, 1, 12, 12);	/*RGB565_ORDER*/
 	}
 	r = FLD_MOD(r, 4, 29, 27); /* DMA_RX_REQ_NB = no dma */
@@ -2162,13 +2163,11 @@ static u16 dsi_vc_flush_receive_data(enum omap_dsi_index ix,
 		u32 val;
 		u8 dt;
 		val = dsi_read_reg(ix, DSI_VC_SHORT_PACKET_HEADER(channel));
-		if (!cpu_is_omap44xx())
-			DSSERR("\trawval %#08x\n", val);
+		DSSERR("\trawval %#08x\n", val);
                 dt = FLD_GET(val, 5, 0);
 		if (dt == DSI_DT_RX_ACK_WITH_ERR) {
 			u16 err = FLD_GET(val, 23, 8);
-			if (!cpu_is_omap44xx())
-				dsi_show_rx_ack_with_err(err);
+			dsi_show_rx_ack_with_err(err);
 		} else if (dt == DSI_DT_RX_SHORT_READ_1) {
 			DSSERR("\tDCS short response, 1 byte: %#x\n",
 					FLD_GET(val, 23, 8));
@@ -2197,8 +2196,7 @@ static int dsi_vc_send_bta(enum omap_dsi_index ix, int channel)
 
 	if (REG_GET(ix, DSI_VC_CTRL(channel), 20, 20)) {
 		/* RX_FIFO_NOT_EMPTY */
-		if (!cpu_is_omap44xx())
-			DSSERR("rx fifo not empty when sending BTA, dumping data:\n");
+		DSSERR("rx fifo not empty when sending BTA, dumping data:\n");
 		dsi_vc_flush_receive_data(ix, channel);
 	}
 
@@ -3162,8 +3160,7 @@ static void dsi_handle_framedone(enum omap_dsi_index ix, int error)
 
 	/* RX_FIFO_NOT_EMPTY */
 	if (REG_GET(ix, DSI_VC_CTRL(channel), 20, 20)) {
-		if (!cpu_is_omap44xx())
-			DSSERR("Received error during frame transfer:\n");
+		DSSERR("Received error during frame transfer:\n");
 		dsi_vc_flush_receive_data(ix, channel);
 		if (!error)
 			error = -EIO;
@@ -3415,20 +3412,7 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 
 	dispc_set_tft_data_lines(dssdev->channel, dssdev->ctrl.pixel_size);
 
-	if (cpu_is_omap44xx()) {
-		struct omap_video_timings timings = {
-			.hsw		= 4+1,
-			.hfp		= 4+1,
-			.hbp		= 4+1,
-			.vsw		= 0+1,
-			.vfp		= 0,
-			.vbp		= 1,
-			.x_res	= 864,
-			.y_res	= 480,
-		};
-
-		dispc_set_lcd_timings(dssdev->channel, &timings);
-	} else {
+	{
 		struct omap_video_timings timings = {
 			.hsw		= 1,
 			.hfp		= 1,
@@ -3436,11 +3420,12 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 			.vsw		= 1,
 			.vfp		= 0,
 			.vbp		= 0,
+			.x_res		= 864,
+			.y_res		= 480,
 		};
 
 		dispc_set_lcd_timings(dssdev->channel, &timings);
 	}
-
 	return 0;
 }
 
