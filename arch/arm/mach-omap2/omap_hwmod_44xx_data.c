@@ -5312,13 +5312,13 @@ static struct omap_hwmod omap44xx_usb_host_fs_hwmod = {
  */
 
 static struct omap_hwmod_class omap44xx_usb_host_hs_hwmod_class = {
-	.name = "usb_host_hs",
-};
-
-/* usb_host_hs */
-static struct omap_hwmod_irq_info omap44xx_usb_host_hs_irqs[] = {
-	{ .name = "ohci", .irq = 76 + OMAP44XX_IRQ_GIC_START },
-	{ .name = "ehci", .irq = 77 + OMAP44XX_IRQ_GIC_START },
+	.name = "usb_uhh",
+	.sysc = NULL,
+	/* REVISIT : The Sync configuration of USBHS UHH is not matching
+	 * bit positions of UHH_SYSCONFIG register  with the definations
+	 * SYSC_HAS_SIDLEMODE , SYSC_HAS_MIDLEMODE, SYSC_HAS_ENAWAKEUP
+	 * SYSC_HAS_SOFTRESET  and  SYSC_HAS_AUTOIDLE
+	 */
 };
 
 /* usb_host_hs master ports */
@@ -5326,10 +5326,11 @@ static struct omap_hwmod_ocp_if *omap44xx_usb_host_hs_masters[] = {
 	&omap44xx_usb_host_hs__l3_main_2,
 };
 
+/* includes UHH and TLL base */
 static struct omap_hwmod_addr_space omap44xx_usb_host_hs_addrs[] = {
 	{
 		.pa_start	= 0x4a064000,
-		.pa_end		= 0x4a064fff,
+		.pa_end		= 0x4a0647ff,
 		.flags		= ADDR_TYPE_RT
 	},
 };
@@ -5350,21 +5351,18 @@ static struct omap_hwmod_ocp_if *omap44xx_usb_host_hs_slaves[] = {
 };
 
 static struct omap_hwmod_opt_clk usb_host_hs_opt_clks[] = {
-	{ .role = "hsic60m_p2_clk", .clk = "init_60m_fclk" },
+	{ .role = "usb_host_fs_fck", .clk = "usb_host_fs_fck" },
 	{ .role = "utmi_p2_clk", .clk = "utmi_p2_gfclk_ck" },
 	{ .role = "utmi_p1_clk", .clk = "utmi_p1_gfclk_ck" },
-	{ .role = "hsic60m_p1_clk", .clk = "init_60m_fclk" },
-	{ .role = "hsic480m_p1_clk", .clk = "dpll_usb_m2_ck" },
-	{ .role = "utmi_p3_clk", .clk = "init_60m_fclk" },
-	{ .role = "hsic480m_p2_clk", .clk = "dpll_usb_m2_ck" },
-	{ .role = "func48mclk", .clk = "func_48mc_fclk" },
+	{ .role = "xclk60mhsp1_ck", .clk = "xclk60mhsp1_ck" },
+	{ .role = "xclk60mhsp2_ck", .clk = "xclk60mhsp2_ck" },
 };
 
 static struct omap_hwmod omap44xx_usb_host_hs_hwmod = {
-	.name		= "usb_host_hs",
+	.name		= "usb_uhh_hs",
 	.class		= &omap44xx_usb_host_hs_hwmod_class,
-	.mpu_irqs	= omap44xx_usb_host_hs_irqs,
-	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_usb_host_hs_irqs),
+	.mpu_irqs	= NULL,
+	.mpu_irqs_cnt	= 0,
 	.main_clk	= "usb_host_hs_fck",
 	.prcm = {
 		.omap4 = {
@@ -5379,6 +5377,7 @@ static struct omap_hwmod omap44xx_usb_host_hs_hwmod = {
 	.masters_cnt	= ARRAY_SIZE(omap44xx_usb_host_hs_masters),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
+
 
 /*
  * 'usb_otg_hs' class
@@ -5490,7 +5489,7 @@ static struct omap_hwmod_irq_info omap44xx_usb_tll_hs_irqs[] = {
 static struct omap_hwmod_addr_space omap44xx_usb_tll_hs_addrs[] = {
 	{
 		.pa_start	= 0x4a062000,
-		.pa_end		= 0x4a0627ff,
+		.pa_end		= 0x4a063fff,
 		.flags		= ADDR_TYPE_RT
 	},
 };
@@ -5860,11 +5859,11 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	/* usb_host_fs class */
 /*	&omap44xx_usb_host_fs_hwmod, */
 	/* usb_host_hs class */
-/*	&omap44xx_usb_host_hs_hwmod, */
+	&omap44xx_usb_host_hs_hwmod,
 	/* usb_otg_hs class */
 	&omap44xx_usb_otg_hs_hwmod,
 	/* usb_tll_hs class */
-/*	&omap44xx_usb_tll_hs_hwmod, */
+	&omap44xx_usb_tll_hs_hwmod,
 	/* wd_timer class */
 	&omap44xx_wd_timer2_hwmod,
 /*	&omap44xx_wd_timer3_hwmod, */
