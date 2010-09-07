@@ -671,6 +671,9 @@ platform_err:
 	if (cpu_dai->driver->ops->shutdown)
 		cpu_dai->driver->ops->shutdown(substream, cpu_dai);
 out:
+	if (rtd->dai_link->dynamic)
+		snd_soc_put_backend_dais(substream);
+
 	mutex_unlock(&rtd->pcm_mutex);
 
 	return ret;
