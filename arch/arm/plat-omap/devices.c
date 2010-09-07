@@ -294,7 +294,7 @@ fail:
 
 #if defined(CONFIG_SND_OMAP_SOC_ABE_DSP) || \
 	defined(CONFIG_SND_OMAP_SOC_ABE_DSP_MODULE)
-#if 1
+#if 0
 	/* TODO: hwmod is not ready for AESS ABE atm so just use normal pdev */
 
 static struct resource aess_resources[] = {
@@ -345,7 +345,7 @@ static void omap_init_aess(void)
 	struct omap_device *od;
 	struct omap4_abe_dsp_pdata *pdata;
 
-	oh = omap_hwmod_lookup("aess");
+	oh = omap_hwmod_lookup("omap-aess-audio");
 	if (!oh) {
 		printk (KERN_ERR "Could not look up aess hw_mod\n");
 		return;

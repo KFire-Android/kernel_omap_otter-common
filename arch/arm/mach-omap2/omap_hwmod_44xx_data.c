@@ -621,7 +621,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_aess_sysc = {
 };
 
 static struct omap_hwmod_class omap44xx_aess_hwmod_class = {
-	.name = "aess",
+	.name = "omap-aess-audio",
 	.sysc = &omap44xx_aess_sysc,
 };
 
@@ -648,8 +648,8 @@ static struct omap_hwmod_ocp_if *omap44xx_aess_masters[] = {
 
 static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
 	{
-		.pa_start	= 0x401f1000,
-		.pa_end		= 0x401f11ff,
+		.pa_start	= 0x49000000,
+		.pa_end		= 0x491f11ff,
 		.flags		= ADDR_TYPE_RT
 	},
 };
@@ -689,7 +689,7 @@ static struct omap_hwmod_ocp_if *omap44xx_aess_slaves[] = {
 };
 
 static struct omap_hwmod omap44xx_aess_hwmod = {
-	.name		= "aess",
+	.name		= "omap-aess-audio",
 	.class		= &omap44xx_aess_hwmod_class,
 	.mpu_irqs	= omap44xx_aess_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_aess_irqs),
@@ -5878,7 +5878,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_l4_wkup_hwmod,
 
 	/* aess class */
-/*	&omap44xx_aess_hwmod, */
+	&omap44xx_aess_hwmod,
 	/* counter class */
 	&omap44xx_counter_32k_hwmod,
 	/* dma class */
