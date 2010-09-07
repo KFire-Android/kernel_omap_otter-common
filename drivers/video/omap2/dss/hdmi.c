@@ -147,7 +147,8 @@ int code_vesa[83] = {
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, 26, 27};
 
-static struct {
+struct hdmi {
+	struct kobject kobj;
 	void __iomem *base_phy;
 	void __iomem *base_pll;
 	struct mutex lock;
@@ -156,7 +157,8 @@ static struct {
 	struct hdmi_config cfg;
 	struct omap_display_platform_data *pdata;
 	struct platform_device *pdev;
-} hdmi;
+};
+struct hdmi hdmi;
 
 struct hdmi_cm {
 	int code;
@@ -242,6 +244,41 @@ static ssize_t hdmi_edid_store(struct device *dev,
 }
 
 static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
+
+static struct device_attribute *hdmi_sysfs_attrs[] = {
+	NULL
+};
+
+static struct kobj_type hdmi_ktype = {
+	.sysfs_ops = &kobj_sysfs_ops,
+	.default_attrs = hdmi_sysfs_attrs,
+};
+
+
+int hdmi_hot_plug_event_send(struct omap_dss_device *dssdev, int onoff)
+{
+	int r = 0;
+	static int created;
+	printk("hot plug event %d", onoff);
+	if (onoff) {
+		if (!created) {
+			r = kobject_init_and_add(&hdmi.kobj, &hdmi_ktype,
+					&dssdev->dev.kobj, "hdmi", 0);
+			if (r)
+				DSSERR("failed to create sysfs file\n");
+
+			kobject_uevent(&hdmi.kobj, KOBJ_ADD);
+			created = 1;
+		} else
+			kobject_uevent(&hdmi.kobj, KOBJ_ADD);
+
+	} else {
+			kobject_uevent(&hdmi.kobj, KOBJ_REMOVE);
+
+	}
+
+	return r;
+}
 
 
 /*
@@ -759,6 +796,8 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	dispc_enable_digit_out(1);
 
+	hdmi_hot_plug_event_send(dssdev, 1);
+
 	return 0;
 err:
 	return r;
@@ -822,6 +861,7 @@ void hdmi_work_queue(struct work_struct *work)
 			(dssdev->state != OMAP_DSS_DISPLAY_DISABLED)) {
 		DSSDBG("Display disabled\n");
 		edid_set = false;
+		hdmi_hot_plug_event_send(dssdev, 0);
 		hdmi_enable_hpd(dssdev);
 		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 
@@ -887,6 +927,7 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	edid_set = false;
 	hdmi_enable_clocks(0);
 
+	hdmi_hot_plug_event_send(dssdev, 0);
 	/* reset to default */
 
 }
