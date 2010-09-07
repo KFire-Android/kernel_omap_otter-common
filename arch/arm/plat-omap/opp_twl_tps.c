@@ -13,8 +13,14 @@
  * XXX This code should be part of some other TWL/TPS code.
  */
 
+#include <linux/i2c/twl.h>
+
 #include <plat/opp_twl_tps.h>
-#include <plat/cpu.h>
+
+static bool is_offset_valid;
+static u8 smps_offset;
+
+#define REG_SMPS_OFFSET		0xE0
 
 /**
  * omap_twl_vsel_to_vdc - convert TWL/TPS VSEL value to microvolts DC
@@ -25,8 +31,20 @@
  */
 unsigned long omap_twl_vsel_to_uv(const u8 vsel)
 {
-	if (cpu_is_omap44xx())
-		return ((((vsel - 1) * 125) + 7000)) * 100;
+	if (twl_class_is_6030()) {
+		if (!is_offset_valid) {
+			twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset, 0xE0);
+			is_offset_valid = true;
+		}
+
+		if (smps_offset & 0x8) {
+			return ((((vsel - 1) * 125) + 7000)) * 100;
+		} else {
+			if (vsel == 0x3A)
+				return 1350000;
+			return ((((vsel - 1) * 125) + 6000)) * 100;
+		}
+	}
 
 	return (((vsel * 125) + 6000)) * 100;
 }
@@ -41,8 +59,20 @@ unsigned long omap_twl_vsel_to_uv(const u8 vsel)
 u8 omap_twl_uv_to_vsel(unsigned long uv)
 {
 	/* Round up to higher voltage */
-	if (cpu_is_omap44xx())
-		return DIV_ROUND_UP(uv - 700000, 12500) + 1;
+	if (twl_class_is_6030()) {
+		if (!is_offset_valid) {
+			twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset, 0xE0);
+			is_offset_valid = true;
+		}
+
+		if (smps_offset & 0x8) {
+			return DIV_ROUND_UP(uv - 700000, 12500) + 1;
+		} else {
+			if (uv == 1350000)
+				return 0x3A;
+			return DIV_ROUND_UP(uv - 600000, 12500) + 1;
+		}
+	}
 
 	return DIV_ROUND_UP(uv - 600000, 12500);
 }
