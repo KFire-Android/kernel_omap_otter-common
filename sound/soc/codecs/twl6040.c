@@ -18,7 +18,7 @@
  * 02110-1301 USA
  *
  */
-
+#define DEBUG
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -1614,6 +1614,17 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 			goto gpio2_err;
 
 		priv->codec_powered = 0;
+
+		/* enable only codec ready interrupt */
+		twl6040_write(codec, TWL6040_REG_INTMR,
+					~TWL6040_READYMSK & TWL6040_ALLINT_MSK);
+
+		/* reset interrupt status to allow correct power up sequence */
+		twl6040_read_reg_volatile(codec, TWL6040_REG_INTID);
+	} else {
+		/* no interrupts at all */
+		twl6040_write_reg_cache(codec, TWL6040_REG_INTMR,
+						TWL6040_ALLINT_MSK);
 	}
 
 	if (naudint) {
@@ -1624,16 +1635,6 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 				"twl6040_codec", codec);
 		if (ret)
 			goto gpio2_err;
-	} else {
-		if (gpio_is_valid(audpwron)) {
-			/* enable only codec ready interrupt */
-			twl6040_write_reg_cache(codec, TWL6040_REG_INTMR,
-					~TWL6040_READYMSK & TWL6040_ALLINT_MSK);
-		} else {
-			/* no interrupts at all */
-			twl6040_write_reg_cache(codec, TWL6040_REG_INTMR,
-						TWL6040_ALLINT_MSK);
-		}
 	}
 
 	/* init vio registers */
