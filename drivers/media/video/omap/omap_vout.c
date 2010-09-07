@@ -78,8 +78,8 @@ enum dma_channel_state {
 
 /* Max Resolution supported by the driver */
 #ifdef CONFIG_ARCH_OMAP4
-#define VID_MAX_WIDTH		2048	/* Largest width */
-#define VID_MAX_HEIGHT		2048	/* Largest height */
+#define VID_MAX_WIDTH		4096	/* Largest width */
+#define VID_MAX_HEIGHT		4096	/* Largest height */
 #else
 #define VID_MAX_WIDTH		1280	/* Largest width */
 #define VID_MAX_HEIGHT		720	/* Largest height */
