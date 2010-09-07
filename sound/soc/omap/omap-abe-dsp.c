@@ -124,6 +124,8 @@ struct abe_data {
 	struct delayed_work delayed_work;
 	struct mutex mutex;
 
+	struct clk *clk;
+
 	void __iomem *io_base;
 	int irq;
 
@@ -185,10 +187,6 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 	 * Disable the clk after it has been used.
 	 */
 	pm_runtime_get_sync(&pdev->dev);
-#ifndef CONFIG_PM_RUNTIME
-	if (pdata->device_enable)
-		pdata->device_enable(pdev);
-#endif
 
 	ret = request_irq(abe->irq, abe_irq_handler,
 				0, "ABE", (void *)abe);
@@ -219,11 +217,7 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 	/* load the high-pass coefficient of IHF-Left */
 	abe_write_equalizer(EQ2R, &dl2_eq);
 
-	pm_runtime_get_sync(&pdev->dev);
-#ifndef CONFIG_PM_RUNTIME
-	if (pdata->device_idle)
-		pdata->device_idle(pdev);
-#endif
+	pm_runtime_put_sync(&pdev->dev);
 	return ret;
 }
 
@@ -293,6 +287,11 @@ static int dl1_put_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
@@ -300,6 +299,7 @@ static int dl1_put_mixer(struct snd_kcontrol *kcontrol,
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 	}
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 1;
 }
@@ -311,6 +311,11 @@ static int dl2_put_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
@@ -319,6 +324,7 @@ static int dl2_put_mixer(struct snd_kcontrol *kcontrol,
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 	}
 
+	pm_runtime_put_sync(&pdev->dev);
 	return 1;
 }
 
@@ -329,6 +335,11 @@ static int audio_ul_put_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
@@ -336,6 +347,7 @@ static int audio_ul_put_mixer(struct snd_kcontrol *kcontrol,
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 	}
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 1;
 }
@@ -347,6 +359,11 @@ static int vxrec_put_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
@@ -354,6 +371,7 @@ static int vxrec_put_mixer(struct snd_kcontrol *kcontrol,
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 	}
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 1;
 }
@@ -365,6 +383,11 @@ static int sdt_put_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
@@ -372,6 +395,7 @@ static int sdt_put_mixer(struct snd_kcontrol *kcontrol,
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 	}
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 1;
 }
@@ -406,6 +430,11 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 	int mux = ucontrol->value.enumerated.item[0];
 	int reg = e->reg - ABE_MUX_BASE, i;
 
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+
 	if (mux >= ABE_ROUTES_UL)
 		return 0;
 
@@ -427,6 +456,8 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 
 	abe->dapm[e->reg] = ucontrol->value.integer.value[0];
 	snd_soc_dapm_mux_update_power(widget, kcontrol, abe->dapm[e->reg], mux, e);
+	pm_runtime_put_sync(&pdev->dev);
+
 	return 1;
 }
 
@@ -450,6 +481,11 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
@@ -457,6 +493,8 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 	}
+	pm_runtime_put_sync(&pdev->dev);
+
 	return 1;
 }
 
@@ -467,8 +505,15 @@ static int volume_put_sdt_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+
 	abe_write_mixer(MIXSDT, -5000 + (ucontrol->value.integer.value[0] * 600),
 				RAMP_0MS, mc->reg);
+	pm_runtime_put_sync(&pdev->dev);
+
 	return 1;
 }
 
@@ -478,8 +523,14 @@ static int volume_put_audul_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
 	abe_write_mixer(MIXAUDUL, -5000 + (ucontrol->value.integer.value[0] * 600),
 				RAMP_0MS, mc->reg);
+	pm_runtime_put_sync(&pdev->dev);
+
 	return 1;
 }
 
@@ -488,9 +539,14 @@ static int volume_put_vxrec_mixer(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 
+	pm_runtime_get_sync(&pdev->dev);
 	abe_write_mixer(MIXVXREC, -5000 + (ucontrol->value.integer.value[0] * 600),
 				RAMP_0MS, mc->reg);
+	pm_runtime_put_sync(&pdev->dev);
+
 	return 1;
 }
 
@@ -499,9 +555,14 @@ static int volume_put_dl1_mixer(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 
+	pm_runtime_get_sync(&pdev->dev);
 	abe_write_mixer(MIXDL1, -5000 + (ucontrol->value.integer.value[0] * 600),
 				RAMP_0MS, mc->reg);
+	pm_runtime_put_sync(&pdev->dev);
+
 	return 1;
 }
 
@@ -510,9 +571,14 @@ static int volume_put_dl2_mixer(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 
+	pm_runtime_get_sync(&pdev->dev);
 	abe_write_mixer(MIXDL2, -5000 + (ucontrol->value.integer.value[0] * 600),
 				RAMP_0MS, mc->reg);
+	pm_runtime_put_sync(&pdev->dev);
+
 	return 1;
 }
 
@@ -522,9 +588,13 @@ static int volume_get_dl1_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 	u32 val;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 
+	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXDL1, &val, mc->reg);
 	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
 }
@@ -534,10 +604,14 @@ static int volume_get_dl2_mixer(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 	u32 val;
 
+	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXDL2, &val, mc->reg);
 	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
 }
@@ -547,10 +621,14 @@ static int volume_get_audul_mixer(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 	u32 val;
 
+	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXAUDUL, &val, mc->reg);
 	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
 }
@@ -560,10 +638,14 @@ static int volume_get_vxrec_mixer(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 	u32 val;
 
+	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXVXREC, &val, mc->reg);
 	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
 }
@@ -573,10 +655,14 @@ static int volume_get_sdt_mixer(struct snd_kcontrol *kcontrol,
 {
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 	u32 val;
 
+	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXSDT, &val, mc->reg);
 	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
 }
@@ -1231,12 +1317,15 @@ static int aess_open(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *dai = rtd->cpu_dai;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 
 	mutex_lock(&abe->mutex);
 
 	abe->fe_id = dai->id;
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
+	pm_runtime_get_sync(&pdev->dev);
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MODEM:
 	case ABE_FRONTEND_DAI_LP_MEDIA:
@@ -1245,6 +1334,7 @@ static int aess_open(struct snd_pcm_substream *substream)
 	default:
 		break;
 	}
+
 	mutex_unlock(&abe->mutex);
 	return 0;
 }
@@ -1310,6 +1400,9 @@ static int aess_close(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime  *rtd = substream->private_data;
 	struct snd_soc_dai *dai = rtd->cpu_dai;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
 	int i, opp = 0;
 
 	mutex_lock(&abe->mutex);
@@ -1337,6 +1430,7 @@ static int aess_close(struct snd_pcm_substream *substream)
 		abe_set_opp_processing(ABE_OPP100);
 		break;
 	}
+	pm_runtime_put_sync(&pdev->dev);
 
 	mutex_unlock(&abe->mutex);
 	return 0;
