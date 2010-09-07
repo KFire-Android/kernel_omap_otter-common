@@ -23,7 +23,7 @@
  *
  */
 
-#undef DEBUG
+#define DEBUG
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -70,6 +70,11 @@ struct omap_mcpdm {
 	int dn_channels;
 	int up_channels;
 	int dl_active;
+	int ul_active;
+
+	/* DC offset */
+	int dl1_offset;
+	int dl2_offset;
 };
 
 static struct omap_mcpdm_link omap_mcpdm_links[] = {
@@ -215,9 +220,10 @@ void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, int stream)
 	if (stream)
 		ctrl &= ~mcpdm->up_channels;
 	else {
+	pr_debug("*** %s active %d\n", __func__, mcpdm->dl_active);
 		if (mcpdm->dl_active > 1)
 			return;
-
+	pr_debug("*** %s\n", __func__);
 		ctrl &= ~mcpdm->dn_channels;
 	}
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
@@ -386,7 +392,7 @@ static irqreturn_t omap_mcpdm_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-int omap_mcpdm_request(struct omap_mcpdm*mcpdm)
+int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 {
 	struct platform_device *pdev;
 	struct omap_mcpdm_platform_data *pdata;
@@ -442,7 +448,7 @@ err:
 	return ret;
 }
 
-void omap_mcpdm_free(struct omap_mcpdm*mcpdm)
+void omap_mcpdm_free(struct omap_mcpdm *mcpdm)
 {
 	struct platform_device *pdev;
 	struct omap_mcpdm_platform_data *pdata;
@@ -471,24 +477,25 @@ void omap_mcpdm_free(struct omap_mcpdm*mcpdm)
 /* Enable/disable DC offset cancelation for the analog
  * headset path (PDM channels 1 and 2).
  */
-int omap_mcpdm_set_offset(struct omap_mcpdm *mcpdm,
-		int offset1, int offset2)
+static int omap_mcpdm_set_offset(struct omap_mcpdm *mcpdm)
 {
 	int offset;
 
-	if ((offset1 > DN_OFST_MAX) || (offset2 > DN_OFST_MAX))
+	if ((mcpdm->dl1_offset > DN_OFST_MAX) ||
+					(mcpdm->dl2_offset > DN_OFST_MAX))
 		return -EINVAL;
 
-	offset = (offset1 << DN_OFST_RX1) | (offset2 << DN_OFST_RX2);
+	offset = (mcpdm->dl1_offset << DN_OFST_RX1) |
+			(mcpdm->dl2_offset << DN_OFST_RX2);
 
 	/* offset cancellation for channel 1 */
-	if (offset1)
+	if (mcpdm->dl1_offset)
 		offset |= DN_OFST_RX1_EN;
 	else
 		offset &= ~DN_OFST_RX1_EN;
 
 	/* offset cancellation for channel 2 */
-	if (offset2)
+	if (mcpdm->dl2_offset)
 		offset |= DN_OFST_RX2_EN;
 	else
 		offset &= ~DN_OFST_RX2_EN;
@@ -504,10 +511,17 @@ static int omap_mcpdm_dai_startup(struct snd_pcm_substream *substream,
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 	int err = 0;
 
-	if (!dai->active)
-		err = omap_mcpdm_request(mcpdm);
+	dev_dbg(dai->dev, "%s: active %d\n", __func__, dai->active);
 
-	mcpdm->dl_active++;
+	if (!dai->active && mcpdm->free) {
+		err = omap_mcpdm_request(mcpdm);
+		omap_mcpdm_set_offset(mcpdm);
+	}
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		mcpdm->dl_active++;
+	else
+		mcpdm->ul_active++;
 	return err;
 }
 
@@ -516,10 +530,21 @@ static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 {
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 
-	if (!dai->active)
-		omap_mcpdm_free(mcpdm);
+	dev_dbg(dai->dev, "%s: active %d\n", __func__, dai->active);
 
-	mcpdm->dl_active--;
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		mcpdm->dl_active--;
+		if (mcpdm->dl_active == 0)
+			omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
+	} else
+		mcpdm->ul_active--;
+
+	if (!dai->active) {
+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
+		if (!mcpdm->free && !mcpdm->dl_active && !mcpdm->ul_active)
+			omap_mcpdm_free(mcpdm);
+	}
 }
 
 static int omap_mcpdm_dai_hw_params(struct snd_pcm_substream *substream,
@@ -529,6 +554,9 @@ static int omap_mcpdm_dai_hw_params(struct snd_pcm_substream *substream,
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 	int stream = substream->stream;
 	int channels, err, link_mask = 0;
+
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK && mcpdm->dl_active > 1)
+		return 0;
 
 	snd_soc_dai_set_dma_data(dai, substream,
 				 &omap_mcpdm_dai_dma_params[stream]);
@@ -569,13 +597,8 @@ static int omap_mcpdm_dai_hw_params(struct snd_pcm_substream *substream,
 static int omap_mcpdm_dai_hw_free(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
-	struct omap_mcpdm*mcpdm = snd_soc_dai_get_drvdata(dai);
-	int err;
-
-	if (substream->stream ==  SNDRV_PCM_STREAM_PLAYBACK)
-		err = omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
-	else
-		err = omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
+	/* struct omap_mcpdm*mcpdm = snd_soc_dai_get_drvdata(dai); */
+	int err = 0;
 
 	return err;
 }
@@ -697,6 +720,10 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 
 	mcpdm->dev = &pdev->dev;
+
+	/* TODO: values will be different per device, read from FS */
+	mcpdm->dl1_offset = 0x10;
+	mcpdm->dl2_offset = 0x10;
 
 	ret = snd_soc_register_dais(&pdev->dev, omap_mcpdm_dai,
 			ARRAY_SIZE(omap_mcpdm_dai));

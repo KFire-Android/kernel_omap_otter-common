@@ -123,9 +123,4 @@ struct omap_mcpdm_link {
 	int channels;
 };
 
-struct omap_mcpdm;
-
-extern int omap_mcpdm_set_offset(struct omap_mcpdm *mcpdm,
-		int offset1, int offset2);
-
 #endif	/* End of __OMAP_MCPDM_H__ */
