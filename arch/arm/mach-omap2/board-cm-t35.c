@@ -613,10 +613,10 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}	/* Terminator */
 };
 
-static struct ehci_hcd_omap_platform_data ehci_pdata __initdata = {
-	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[1] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+static struct usbhs_omap_platform_data usbhs_pdata __initdata = {
+	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 
 	.phy_reset  = true,
 	.reset_gpio_port[0]  = -EINVAL,
@@ -650,10 +650,11 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
 	cm_t35_vsim_supply.dev = mmc[0].dev;
 
 	/* setup USB with proper PHY reset GPIOs */
-	ehci_pdata.reset_gpio_port[0] = gpio + 6;
-	ehci_pdata.reset_gpio_port[1] = gpio + 7;
+	usbhs_pdata.reset_gpio_port[0] = gpio + 6;
+	usbhs_pdata.reset_gpio_port[1] = gpio + 7;
 
-	usb_ehci_init(&ehci_pdata);
+	usb_uhhtll_init(&usbhs_pdata);
+	usb_ehci_init();
 
 	return 0;
 }

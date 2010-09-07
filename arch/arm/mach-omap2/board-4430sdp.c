@@ -906,20 +906,14 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 	},
 };
 
-static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
-	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
+	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.phy_reset  = false,
 	.reset_gpio_port[0]  = -EINVAL,
 	.reset_gpio_port[1]  = -EINVAL,
 	.reset_gpio_port[2]  = -EINVAL
-};
-
-static const struct ohci_hcd_omap_platform_data ohci_pdata __initconst = {
-	.port_mode[0] = OMAP_OHCI_PORT_MODE_UNUSED,
-	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
-	.port_mode[2] = OMAP_OHCI_PORT_MODE_UNUSED,
 };
 
 static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_bus_pdata;
@@ -1094,8 +1088,9 @@ static void __init omap_4430sdp_init(void)
 		gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
 		gpio_direction_output(OMAP4SDP_MDM_PWR_EN_GPIO, 1);
 	}
-	usb_ehci_init(&ehci_pdata);
-	usb_ohci_init(&ohci_pdata);
+	usb_uhhtll_init(&usbhs_pdata);
+	usb_ehci_init();
+	usb_ohci_init();
 	/* OMAP4 SDP uses internal transceiver so register nop transceiver */
 	usb_nop_xceiv_register();
 	usb_musb_init(&musb_board_data);

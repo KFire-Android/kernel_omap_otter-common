@@ -52,10 +52,10 @@ static struct omap_board_mux board_mux[] __initdata = {
 #define board_mux	NULL
 #endif
 
-static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
-	.port_mode[0]		= EHCI_HCD_OMAP_MODE_UNKNOWN,
-	.port_mode[1]		= EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[2]		= EHCI_HCD_OMAP_MODE_UNKNOWN,
+static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
+	.port_mode[0]		= OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[1]		= OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[2]		= OMAP_USBHS_PORT_MODE_UNUSED,
 	.phy_reset		= true,
 	.reset_gpio_port[0]	= -EINVAL,
 	.reset_gpio_port[1]	= 64,
@@ -69,7 +69,8 @@ static void __init omap_zoom_init(void)
 	zoom_debugboard_init();
 
 	omap_mux_init_gpio(64, OMAP_PIN_OUTPUT);
-	usb_ehci_init(&ehci_pdata);
+	usb_uhhtll_init(&usbhs_pdata);
+	usb_ehci_init();
 	sr_class3_init();
 }
 

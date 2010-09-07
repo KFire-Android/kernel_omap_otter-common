@@ -55,11 +55,11 @@ static void enable_board_wakeup_source(void)
 		OMAP_WAKEUP_EN | OMAP_PIN_INPUT_PULLUP);
 }
 
-static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
+static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 
-	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[1] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 
 	.phy_reset  = true,
 	.reset_gpio_port[0]  = 126,
@@ -100,7 +100,8 @@ static void __init omap_sdp_init(void)
 	zoom_peripherals_init();
 	board_smc91x_init();
 	enable_board_wakeup_source();
-	usb_ehci_init(&ehci_pdata);
+	usb_uhhtll_init(&usbhs_pdata);
+	usb_ehci_init();
 	sr_class3_init();
 }
 

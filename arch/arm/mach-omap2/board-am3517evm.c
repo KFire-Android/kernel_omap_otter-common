@@ -373,15 +373,15 @@ static void __init am3517_evm_init_irq(void)
 	omap_init_irq();
 }
 
-static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
-	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
+static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
+	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
 #if defined(CONFIG_PANEL_SHARP_LQ043T1DG01) || \
 		defined(CONFIG_PANEL_SHARP_LQ043T1DG01_MODULE)
-	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
 #else
-	.port_mode[1] = EHCI_HCD_OMAP_MODE_PHY,
+	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
 #endif
-	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 
 	.phy_reset  = true,
 	.reset_gpio_port[0]  = 57,
@@ -445,7 +445,8 @@ static void __init am3517_evm_init(void)
 
 	/* Configure GPIO for EHCI port */
 	omap_mux_init_gpio(57, OMAP_PIN_OUTPUT);
-	usb_ehci_init(&ehci_pdata);
+	usb_uhhtll_init(&usbhs_pdata);
+	usb_ehci_init();
 	am3517_evm_hecc_init(&am3517_evm_hecc_pdata);
 	/* DSS */
 	am3517_evm_display_init();

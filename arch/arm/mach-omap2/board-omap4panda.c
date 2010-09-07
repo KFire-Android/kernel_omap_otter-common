@@ -167,12 +167,10 @@ static struct omap_musb_board_data musb_board_data = {
 	.power			= 100,
 };
 
-static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
-
-	.port_mode[0] = EHCI_HCD_OMAP_MODE_PHY,
-	.port_mode[1] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-	.port_mode[2] = EHCI_HCD_OMAP_MODE_UNKNOWN,
-
+static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
+	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.phy_reset  = false,
 	.reset_gpio_port[0]  = -EINVAL,
 	.reset_gpio_port[1]  = -EINVAL,
@@ -436,7 +434,8 @@ static void __init omap4_ehci_init(void)
 	gpio_set_value(HUB_NRESET, 0);
 	gpio_set_value(HUB_NRESET, 1);
 
-	usb_ehci_init(&ehci_pdata);
+	usb_uhhtll_init(&usbhs_pdata);
+	usb_ehci_init();
 
 	/* enable power to hub */
 	gpio_set_value(HUB_POWER, 1);
