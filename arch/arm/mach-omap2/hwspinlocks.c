@@ -56,6 +56,9 @@ int __init hwspinlocks_init(void)
 	struct omap_hwmod *oh;
 	char *oh_name, *pdev_name;
 
+	if (!cpu_is_omap44xx())
+		return -EINVAL;
+
 	oh_name = "spinlock";
 	oh = omap_hwmod_lookup(oh_name);
 	if (WARN_ON(oh == NULL))
