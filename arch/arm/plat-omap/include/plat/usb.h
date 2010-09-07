@@ -4,7 +4,9 @@
 #define	__ASM_ARCH_OMAP_USB_H
 
 #include <linux/usb/musb.h>
+#include <linux/platform_device.h>
 #include <plat/board.h>
+
 
 #define OMAP3_HS_USB_PORTS	3
 
@@ -47,8 +49,10 @@ struct usbhs_omap_platform_data {
 };
 
 struct uhhtll_apis {
+	void	*prvdata;
 	int	(*get_platform_data) (struct usbhs_omap_platform_data *);
-	int	(*enable) (enum driver_type , int);
+	int	(*enable) (enum driver_type , int, struct platform_device *,
+				void*);
 };
 
 /*-------------------------------------------------------------------------*/

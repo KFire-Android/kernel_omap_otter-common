@@ -74,6 +74,10 @@ static struct omap_hwmod omap44xx_sl2if_hwmod;
 static struct omap_hwmod omap44xx_usb_host_fs_hwmod;
 static struct omap_hwmod omap44xx_usb_host_hs_hwmod;
 static struct omap_hwmod omap44xx_usb_otg_hs_hwmod;
+static struct omap_hwmod omap44xx_usb_tll_hs_hwmod;
+static struct omap_hwmod omap44xx_usbhs_ehci_hwmod;
+static struct omap_hwmod omap44xx_usbhs_ohci_hwmod;
+
 
 /*
  * Interconnects hwmod structures
@@ -5331,7 +5335,7 @@ static struct omap_hwmod_addr_space omap44xx_usb_host_hs_addrs[] = {
 	{
 		.pa_start	= 0x4a064000,
 		.pa_end		= 0x4a0647ff,
-		.flags		= ADDR_TYPE_RT
+		.flags		= ADDR_MAP_ON_INIT
 	},
 };
 
@@ -5481,7 +5485,6 @@ static struct omap_hwmod_class omap44xx_usb_tll_hs_hwmod_class = {
 };
 
 /* usb_tll_hs */
-static struct omap_hwmod omap44xx_usb_tll_hs_hwmod;
 static struct omap_hwmod_irq_info omap44xx_usb_tll_hs_irqs[] = {
 	{ .irq = 78 + OMAP44XX_IRQ_GIC_START },
 };
@@ -5532,6 +5535,130 @@ static struct omap_hwmod omap44xx_usb_tll_hs_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_usb_tll_hs_slaves),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
+
+/*
+ * 'usb_host_ehci' class
+ * EHCI controller
+ */
+
+static struct omap_hwmod_class omap44xx_usbhs_ehci_hwmod_class = {
+	.name = "usb_ehci",
+};
+
+/* usb_host_hs */
+static struct omap_hwmod_irq_info omap44xx_usbhs_ehci_irqs[] = {
+	{ .name = "ehci", .irq = 77 + OMAP44XX_IRQ_GIC_START },
+};
+
+/* usb_host_hs master ports */
+static struct omap_hwmod_ocp_if *omap44xx_usbhs_ehci_masters[] = {
+	&omap44xx_usb_host_hs__l3_main_2,
+};
+
+/* includes UHH and TLL base */
+static struct omap_hwmod_addr_space omap44xx_usbhs_ehci_addrs[] = {
+	{
+		.pa_start	= 0x4A064C00,
+		.pa_end		= 0x4A064FFF,
+		.flags		= ADDR_MAP_ON_INIT
+	},
+};
+
+/* l4_cfg -> usb_host_hs */
+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__usbhs_ehci = {
+	.master		= &omap44xx_l4_cfg_hwmod,
+	.slave		= &omap44xx_usbhs_ehci_hwmod,
+	.clk		= "l4_div_ck",
+	.addr		= omap44xx_usbhs_ehci_addrs,
+	.addr_cnt	= ARRAY_SIZE(omap44xx_usbhs_ehci_addrs),
+	.user		= OCP_USER_SDMA,
+};
+
+/* usb_host_hs slave ports */
+static struct omap_hwmod_ocp_if *omap44xx_usbhs_ehci_slaves[] = {
+	&omap44xx_l4_cfg__usbhs_ehci,
+};
+
+static struct omap_hwmod omap44xx_usbhs_ehci_hwmod = {
+	.name		= "usbhs_ehci",
+	.class		= &omap44xx_usbhs_ehci_hwmod_class,
+	.mpu_irqs	= omap44xx_usbhs_ehci_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_usbhs_ehci_irqs),
+	.main_clk	= NULL,
+	.prcm = {
+		.omap4 = {
+			.clkctrl_reg = NULL,
+		},
+	},
+	.slaves		= omap44xx_usbhs_ehci_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap44xx_usbhs_ehci_slaves),
+	.masters	= omap44xx_usbhs_ehci_masters,
+	.masters_cnt	= ARRAY_SIZE(omap44xx_usbhs_ehci_masters),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+};
+
+
+/*
+ * 'usb_host_ohci' class
+ * OHCI controller
+ */
+
+static struct omap_hwmod_class omap44xx_usbhs_ohci_hwmod_class = {
+	.name = "usb_ohci",
+};
+
+/* usb_host_hs */
+static struct omap_hwmod_irq_info omap44xx_usbhs_ohci_irqs[] = {
+	{ .name = "ohci", .irq = 76 + OMAP44XX_IRQ_GIC_START },
+};
+
+/* usb_host_hs master ports */
+static struct omap_hwmod_ocp_if *omap44xx_usbhs_ohci_masters[] = {
+	&omap44xx_usb_host_hs__l3_main_2,
+};
+
+/* includes UHH and TLL base */
+static struct omap_hwmod_addr_space omap44xx_usbhs_ohci_addrs[] = {
+	{
+		.pa_start	= 0x4A064800,
+		.pa_end		= 0x4A064BFF,
+		.flags		= ADDR_MAP_ON_INIT
+	},
+};
+
+/* l4_cfg -> usb_host_hs */
+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__usbhs_ohci = {
+	.master		= &omap44xx_l4_cfg_hwmod,
+	.slave		= &omap44xx_usbhs_ohci_hwmod,
+	.clk		= "l4_div_ck",
+	.addr		= omap44xx_usbhs_ohci_addrs,
+	.addr_cnt	= ARRAY_SIZE(omap44xx_usbhs_ohci_addrs),
+	.user		= OCP_USER_SDMA,
+};
+
+/* usb_host_hs slave ports */
+static struct omap_hwmod_ocp_if *omap44xx_usbhs_ohci_slaves[] = {
+	&omap44xx_l4_cfg__usbhs_ohci,
+};
+
+static struct omap_hwmod omap44xx_usbhs_ohci_hwmod = {
+	.name		= "usbhs_ohci",
+	.class		= &omap44xx_usbhs_ohci_hwmod_class,
+	.mpu_irqs	= omap44xx_usbhs_ohci_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_usbhs_ohci_irqs),
+	.main_clk	= NULL,
+	.prcm = {
+		.omap4 = {
+			.clkctrl_reg = NULL,
+		},
+	},
+	.slaves		= omap44xx_usbhs_ohci_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap44xx_usbhs_ohci_slaves),
+	.masters	= omap44xx_usbhs_ohci_masters,
+	.masters_cnt	= ARRAY_SIZE(omap44xx_usbhs_ohci_masters),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+};
+
 
 /*
  * 'venc' class
@@ -5864,6 +5991,8 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_usb_otg_hs_hwmod,
 	/* usb_tll_hs class */
 	&omap44xx_usb_tll_hs_hwmod,
+	&omap44xx_usbhs_ehci_hwmod,
+	&omap44xx_usbhs_ohci_hwmod,
 	/* wd_timer class */
 	&omap44xx_wd_timer2_hwmod,
 /*	&omap44xx_wd_timer3_hwmod, */

@@ -181,30 +181,42 @@ struct uhhtll_hcd_omap {
 	int			count;
 
 	struct usbhs_omap_platform_data platdata;
-	struct usbhs_hwmod_apis apis;
+	struct usbhs_hwmod_apis *apis;
 };
 
 
-static int uhhtll_drv_enable(enum driver_type drv_type, int enable);
+static int uhhtll_drv_enable(enum driver_type drvtype,
+				int enable,
+				struct platform_device *pdev,
+				void *prvdata);
 
 static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata);
 
+static struct usbhs_hwmod_apis hmd_apis = {
+	.device_enable	= omap_device_enable,
+	.device_idle	= omap_device_idle,
+	.enable_wakeup	= omap_device_enable_wakeup,
+	.disable_wakeup	= omap_device_disable_wakeup,
+};
+
+static struct omap_device_pm_latency omap_uhhtll_latency[] = {
+	  {
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func	 = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	  },
+};
 
 static struct uhhtll_hcd_omap uhhtll = {
 	.pdev = NULL,
-	.apis = {
-		.device_enable	= omap_device_enable,
-		.device_idle	= omap_device_idle,
-		.enable_wakeup	= omap_device_enable_wakeup,
-		.disable_wakeup	= omap_device_disable_wakeup,
-	},
+	.apis = &hmd_apis,
 };
 
 static struct uhhtll_apis uhhtll_export = {
-	.get_platform_data = uhhtll_get_platform_data,
-	.enable = uhhtll_drv_enable
+	.prvdata		= &hmd_apis,
+	.get_platform_data	= uhhtll_get_platform_data,
+	.enable			= uhhtll_drv_enable
 };
-
 
 static void setup_ehci_io_mux(const enum usbhs_omap3_port_mode *port_mode);
 static void setup_ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode);
@@ -376,7 +388,7 @@ static int uhhtll_enable(struct uhhtll_hcd_omap *omap)
 	if (omap->count > 0)
 		goto ok_end;
 
-	ret = omap->apis.device_enable(omap->pdev);
+	ret = omap->apis->device_enable(omap->pdev);
 
 	if (ret != 0)
 		return ret;
@@ -614,12 +626,14 @@ static void uhhtll_disable(struct uhhtll_hcd_omap *omap)
 			omap->usbtll_fck = NULL;
 		}
 
-		omap->apis.device_idle(omap->pdev);
+		omap->apis->device_idle(omap->pdev);
 	}
 
 }
 
-static int uhhtll_ehci_enable(struct uhhtll_hcd_omap *omap)
+static int uhhtll_ehci_enable(struct uhhtll_hcd_omap *omap,
+				struct platform_device *pdev,
+				struct usbhs_hwmod_apis *hmd_apis)
 {
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
 	char supply[7];
@@ -668,10 +682,14 @@ static int uhhtll_ehci_enable(struct uhhtll_hcd_omap *omap)
 
 
 	ret = uhhtll_enable(omap);
-
 	if (ret != 0)
-		return ret;
+		goto err_end;
 
+	if (hmd_apis) {
+		ret = hmd_apis->device_enable(pdev);
+		if (ret != 0)
+			goto err_host;
+	}
 
 	if (cpu_is_omap44xx()) {
 
@@ -892,6 +910,7 @@ err_xclk60mhsp1_ck:
 
 err_host:
 	uhhtll_disable(omap);
+err_end:
 	if (pdata->phy_reset) {
 		if (gpio_is_valid(pdata->reset_gpio_port[0]))
 			gpio_free(pdata->reset_gpio_port[0]);
@@ -919,7 +938,9 @@ host_ok:
 
 }
 
-static int uhhtll_ehci_disable(struct uhhtll_hcd_omap *omap)
+static int uhhtll_ehci_disable(struct uhhtll_hcd_omap *omap,
+				struct platform_device *pdev,
+				struct usbhs_hwmod_apis *hmd_apis)
 {
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
 
@@ -956,6 +977,8 @@ static int uhhtll_ehci_disable(struct uhhtll_hcd_omap *omap)
 		}
 	}
 
+	if (hmd_apis)
+		hmd_apis->device_idle(pdev);
 
 	uhhtll_disable(omap);
 
@@ -1077,7 +1100,9 @@ static void ohci_omap3_tll_config(struct uhhtll_hcd_omap *omap,
 }
 
 
-static int uhhtll_ohci_enable(struct uhhtll_hcd_omap *omap)
+static int uhhtll_ohci_enable(struct uhhtll_hcd_omap *omap,
+				struct platform_device *pdev,
+				struct usbhs_hwmod_apis *hmd_apis)
 {
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
 	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
@@ -1088,10 +1113,14 @@ static int uhhtll_ohci_enable(struct uhhtll_hcd_omap *omap)
 
 
 	ret = uhhtll_enable(omap);
-
 	if (ret != 0)
 		return ret;
 
+	if (hmd_apis) {
+		ret = hmd_apis->device_enable(pdev);
+		if (ret != 0)
+			goto err_end;
+	}
 
 	if (cpu_is_omap44xx()) {
 
@@ -1238,7 +1267,9 @@ err_end:
 
 }
 
-static int uuhhtll_ohci_disable(struct uhhtll_hcd_omap *omap)
+static int uuhhtll_ohci_disable(struct uhhtll_hcd_omap *omap,
+				struct platform_device *pdev,
+				struct usbhs_hwmod_apis *hmd_apis)
 {
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
 
@@ -1260,6 +1291,9 @@ static int uuhhtll_ohci_disable(struct uhhtll_hcd_omap *omap)
 			omap->utmi_p2_fck = NULL;
 		}
 	}
+
+	if (hmd_apis)
+		hmd_apis->device_idle(pdev);
 
 	uhhtll_disable(omap);
 
@@ -1287,7 +1321,9 @@ static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata)
 }
 
 
-static int uhhtll_drv_enable(enum driver_type drvtype,	int enable)
+static int uhhtll_drv_enable(enum driver_type drvtype,	int enable,
+				struct platform_device *pdev,
+				void *prvdata)
 {
 	struct uhhtll_hcd_omap *omap = &uhhtll;
 	int ret = -ENODEV;
@@ -1301,27 +1337,18 @@ static int uhhtll_drv_enable(enum driver_type drvtype,	int enable)
 
 	if (drvtype == OMAP_EHCI)
 		ret = (enable != 0) ?
-			uhhtll_ehci_enable(omap) :
-			uhhtll_ehci_disable(omap);
+			uhhtll_ehci_enable(omap, pdev, prvdata) :
+			uhhtll_ehci_disable(omap, pdev, prvdata);
 	else if (drvtype == OMAP_OHCI)
 		ret = (enable != 0) ?
-			uhhtll_ohci_enable(omap) :
-			uuhhtll_ohci_disable(omap);
+			uhhtll_ohci_enable(omap, pdev, prvdata) :
+			uuhhtll_ohci_disable(omap, pdev, prvdata);
 
 	up(&omap->mutex);
 
 
 	return ret;
 }
-
-
-static struct omap_device_pm_latency omap_uhhtll_latency[] = {
-	  {
-		.deactivate_func = omap_device_idle_hwmods,
-		.activate_func	 = omap_device_enable_hwmods,
-		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-	  },
-};
 
 
 
@@ -1383,27 +1410,10 @@ void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 
 #if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
 
-static struct resource ehci_resources[] = {
-	{
-		.flags	= IORESOURCE_MEM,
-	},
-	{         /* general IRQ */
-		.flags   = IORESOURCE_IRQ,
-	}
-};
 
+static const char ehciname[] = "ehci-omap";
+#define USBHS_EHCI_HWMODNAME				"usbhs_ehci"
 static u64 ehci_dmamask = ~(u32)0;
-static struct platform_device ehci_device = {
-	.name           = "ehci-omap",
-	.id             = 0,
-	.dev = {
-		.dma_mask               = &ehci_dmamask,
-		.coherent_dma_mask      = 0xffffffff,
-		.platform_data          = NULL,
-	},
-	.num_resources  = ARRAY_SIZE(ehci_resources),
-	.resource       = ehci_resources,
-};
 
 /* MUX settings for EHCI pins */
 /*
@@ -1668,23 +1678,36 @@ static void setup_4430ehci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 
 void __init usb_ehci_init(void)
 {
-	platform_device_add_data(&ehci_device, &uhhtll_export,
-				sizeof(uhhtll_export));
+	struct omap_hwmod *oh;
+	struct omap_device *od;
+	int  bus_id = -1;
+	struct platform_device	*pdev;
+	struct device	*dev;
 
-	if (cpu_is_omap34xx()) {
-		ehci_resources[0].start	= OMAP34XX_EHCI_BASE;
-		ehci_resources[0].end	= OMAP34XX_EHCI_BASE + SZ_1K - 1;
-		ehci_resources[1].start = INT_34XX_EHCI_IRQ;
+	oh = omap_hwmod_lookup(USBHS_EHCI_HWMODNAME);
 
-	} else if (cpu_is_omap44xx()) {
-		ehci_resources[0].start	= OMAP44XX_HSUSB_EHCI_BASE;
-		ehci_resources[0].end	= OMAP44XX_HSUSB_EHCI_BASE + SZ_1K - 1;
-		ehci_resources[1].start = OMAP44XX_IRQ_EHCI;
+	if (!oh) {
+		pr_err("Could not look up %s\n", USBHS_EHCI_HWMODNAME);
+		return;
 	}
 
-	if (platform_device_register(&ehci_device) < 0) {
-		printk(KERN_ERR "Unable to register HS-USB (EHCI) device\n");
+	od = omap_device_build(ehciname, bus_id, oh,
+				(void *)&uhhtll_export, sizeof(uhhtll_export),
+				omap_uhhtll_latency,
+				ARRAY_SIZE(omap_uhhtll_latency), false);
+
+	if (IS_ERR(od)) {
+		pr_err("Could not build hwmod device %s\n",
+			USBHS_EHCI_HWMODNAME);
 		return;
+	} else {
+		pdev = &od->pdev;
+		dev = &pdev->dev;
+		get_device(dev);
+		dev->dma_mask = &ehci_dmamask;
+		dev->coherent_dma_mask = 0xffffffff;
+		put_device(dev);
+
 	}
 }
 
@@ -1710,27 +1733,11 @@ static void setup_4430ehci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 #define USB_UHHTLL_HCD_MODULE
 #endif
 
-static struct resource ohci_resources[] = {
-	{
-		.flags	= IORESOURCE_MEM,
-	},
-	{	/* general IRQ */
-		.flags	= IORESOURCE_IRQ,
-	}
-};
+
+static const char ohciname[] = "ohci-omap3";
+#define USBHS_OHCI_HWMODNAME				"usbhs_ohci"
 
 static u64 ohci_dmamask = DMA_BIT_MASK(32);
-
-static struct platform_device ohci_device = {
-	.name		= "ohci-omap3",
-	.id		= 0,
-	.dev = {
-		.dma_mask		= &ohci_dmamask,
-		.coherent_dma_mask	= 0xffffffff,
-	},
-	.num_resources	= ARRAY_SIZE(ohci_resources),
-	.resource	= ohci_resources,
-};
 
 static void setup_ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 {
@@ -1918,23 +1925,36 @@ static void setup_4430ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 
 void __init usb_ohci_init(void)
 {
-	platform_device_add_data(&ohci_device, &uhhtll_export,
-				sizeof(uhhtll_export));
+	struct omap_hwmod *oh;
+	struct omap_device *od;
+	int  bus_id = -1;
+	struct platform_device	*pdev;
+	struct device	*dev;
 
+	oh = omap_hwmod_lookup(USBHS_OHCI_HWMODNAME);
 
-	if (cpu_is_omap34xx()) {
-		ohci_resources[0].start	= OMAP34XX_OHCI_BASE;
-		ohci_resources[0].end	= OMAP34XX_OHCI_BASE + SZ_1K - 1;
-		ohci_resources[1].start = INT_34XX_OHCI_IRQ;
-	} else if (cpu_is_omap44xx()) {
-		ohci_resources[0].start	= OMAP44XX_HSUSB_OHCI_BASE;
-		ohci_resources[0].end	= OMAP44XX_HSUSB_OHCI_BASE + SZ_1K - 1;
-		ohci_resources[1].start = OMAP44XX_IRQ_OHCI;
+	if (!oh) {
+		pr_err("Could not look up %s\n", USBHS_OHCI_HWMODNAME);
+		return;
 	}
 
-	if (platform_device_register(&ohci_device) < 0) {
-		pr_err("Unable to register FS-USB (OHCI) device\n");
+	od = omap_device_build(ohciname, bus_id, oh,
+				(void *)&uhhtll_export, sizeof(uhhtll_export),
+				omap_uhhtll_latency,
+				ARRAY_SIZE(omap_uhhtll_latency), false);
+
+	if (IS_ERR(od)) {
+		pr_err("Could not build hwmod device %s\n",
+			USBHS_OHCI_HWMODNAME);
 		return;
+	} else {
+		pdev = &od->pdev;
+		dev = &pdev->dev;
+		get_device(dev);
+		dev->dma_mask = &ohci_dmamask;
+		dev->coherent_dma_mask = 0xffffffff;
+		put_device(dev);
+
 	}
 }
 
