@@ -2856,9 +2856,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if(cpu_is_omap44xx()) {
 		/* check if tiler address; else set row_inc = 1*/
 		if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
-			struct tiler_view_orient orient;
-			u8 mir_x = 0, mir_y = 0;
-			unsigned long tiler_width, tiler_height;
+			struct tiler_view_orient orient = {0};
+			u32 tiler_width = width, tiler_height = height;
 
 			calc_tiler_row_rotation(rotation, width, height,
 						color_mode, &row_inc, &offset1,
@@ -2867,42 +2866,20 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			if (ilace & OMAP_FLAG_ISWAP)
 				swap(offset0, offset1);
 
-			/* get rotated top-left coordinate
-					(if rotation is applied before mirroring) */
-			memset(&orient, 0, sizeof(orient));
-
-			if (rotation & 1)
-				rotation ^= 2;
-
-			tiler_rotate_view(&orient, rotation * 90);
-
-			if (mirror) {
-				if (rotation & 1)
-					mir_x = 1;
-				else
-					mir_y = 1;
-			}
-			orient.x_invert ^= mir_x;
-			orient.y_invert ^= mir_y;
+			/* mirroring is applied before rotataion */
+			orient.y_invert = mirror ? 1 : 0;
+			tiler_rotate_view(&orient, -rotation * 90);
 
 			DSSDBG("RXY = %d %d %d\n", orient.rotate_90,
 					orient.x_invert, orient.y_invert);
 
-			if (orient.rotate_90 & 1) {
-				tiler_height = width;
-				if (color_mode == OMAP_DSS_COLOR_YUV2
-						|| color_mode == OMAP_DSS_COLOR_UYVY)
-					tiler_width = height / 2 ;
-				else
-					tiler_width = height;
-			} else {
-				tiler_height = height;
-				if (color_mode == OMAP_DSS_COLOR_YUV2
-						|| color_mode == OMAP_DSS_COLOR_UYVY)
-					tiler_width = width / 2;
-				else
-					tiler_width = width;
-			}
+			if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+			    color_mode == OMAP_DSS_COLOR_UYVY)
+				tiler_width /= 2;
+
+			if (orient.rotate_90 & 1)
+				swap(tiler_width, tiler_height);
+
 			DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
 
 			paddr = tiler_reorient_topleft(tiler_get_natural_addr((void *)paddr),
@@ -4755,11 +4732,10 @@ void change_base_address(int plane, u32 p_uv_addr)
 /* Writeback*/
 int dispc_setup_wb(struct writeback_cache_data *wb)
 {
-	unsigned long mir_x, mir_y;
 	unsigned long tiler_width, tiler_height;
-	u8 orientation = 0, rotation = 0, mirror = 0 ;
+	u8 rotation = 0, mirror = 0 ;
 	int ch_width, ch_height, out_ch_width, out_ch_height, scale_x, scale_y;
-	struct tiler_view_orient orient;
+	struct tiler_view_orient orient = {0};
 	u32 paddr = wb->paddr;
 	u32 puv_addr = wb->puv_addr; /* relevant for NV12 format only */
 	u16 out_width = wb->width;
@@ -4871,37 +4847,23 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 	pix_inc = 0x1;
 	if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
+		tiler_width = width, tiler_height = height;
+
 		calc_tiler_row_rotation(rotation, width, frame_height,
 						color_mode, &row_inc,
 						&offset1, ilace,
 						pic_height);
 
-		orientation = calc_tiler_orientation(rotation, (u8)mirror);
-		/* get rotated top-left coordinate
-				(if rotation is applied before mirroring) */
-		memset(&orient, 0, sizeof(orient));
-		tiler_rotate_view(&orient, rotation * 90);
+		/* mirroring is applied before rotataion */
+		orient.y_invert = mirror ? 1 : 0;
+		tiler_rotate_view(&orient, -rotation * 90);
 
-		if (mirror) {
-			/* Horizontal mirroring */
-			if (rotation == 1 || rotation == 3)
-				mir_x = 1;
-			else
-				mir_y = 1;
-		} else {
-			mir_x = 0;
-			mir_y = 0;
-		}
-		orient.x_invert ^= mir_x;
-		orient.y_invert ^= mir_y;
+		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+		    color_mode == OMAP_DSS_COLOR_UYVY)
+			tiler_width /= 2;
 
-		if (orient.rotate_90 & 1) {
-			tiler_height = width;
-			tiler_width = height;
-		} else {
-			tiler_height = height;
-			tiler_width = width;
-		}
+		if (orient.rotate_90 & 1)
+			swap(tiler_width, tiler_height);
 
 		paddr = tiler_reorient_topleft(tiler_get_natural_addr((void *)paddr),
 				orient, tiler_width, tiler_height);
