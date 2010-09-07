@@ -22,6 +22,9 @@
 #ifndef _ABE_API_H_
 #define _ABE_API_H_
 
+#include <linux/io.h>
+
+void  abe_init_mem(void __iomem *iomem);
 
 /**
  * abe_reset_hal - reset the ABE/HAL

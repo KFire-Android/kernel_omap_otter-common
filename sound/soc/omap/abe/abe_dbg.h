@@ -167,4 +167,8 @@
 /*
  * MACROS
  */
-//#define _log(x,y,z,t) {if(x&abe_dbg_mask)abe_dbg_log(x,y,z,t);}#define _log(x,y,z,t) ;
+#ifdef CONFIG_OMAP_ABE_DEBUG
+#define _log(x,y,z,t) {if(x&abe_dbg_mask)abe_dbg_log(x,y,z,t);}
+#else
+#define _log(x,y,z,t) {;}
+#endif

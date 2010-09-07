@@ -21,7 +21,11 @@
 
 
 #include "abe_main.h"
-#include "abe_ext.h"
+
+
+#if PC_SIMULATION
+#include <stdlib.h>
+#endif
 
 #define ABE_PMEM_BASE_OFFSET_MPU	0xe0000
 #define ABE_CMEM_BASE_OFFSET_MPU	0xa0000
@@ -41,10 +45,6 @@ void abe_init_mem(void __iomem *_io_base)
 	io_base = _io_base;
 }
 
-#if PC_SIMULATION
-#include <stdlib.h>
-#endif
-
 /**
 * abe_fprintf
 * @line: character line to be printed
@@ -59,7 +59,7 @@ void abe_init_mem(void __iomem *_io_base)
  * TBD
  *
  */
-void abe_read_feature_from_port (u32 x)
+void abe_read_feature_from_port(u32 x)
 {
 }
 
@@ -70,7 +70,7 @@ void abe_read_feature_from_port (u32 x)
  * TBD
  *
  */
-void abe_write_feature_to_port (u32 x)
+void abe_write_feature_to_port(u32 x)
 {
 }
 
@@ -80,7 +80,7 @@ void abe_write_feature_to_port (u32 x)
  *
  * TBD
  */
-void abe_read_fifo (u32 x)
+void abe_read_fifo(u32 x)
 {
 }
 
@@ -95,41 +95,42 @@ void abe_read_fifo (u32 x)
  * write DMEM FIFO and update FIFO descriptor, it is assumed that FIFO descriptor
  * is located in DMEM
  */
-void abe_write_fifo (u32 memory_bank, u32 descr_addr, u32 *data, u32 nb_data32)
+void abe_write_fifo(u32 memory_bank, u32 descr_addr, u32 *data, u32 nb_data32)
 {
 	u32 fifo_addr[4];
 	u32 i;
 
 	/* read FIFO descriptor from DMEM */
 	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM, descr_addr,
-		       &fifo_addr[0], 4*sizeof(u32));
+		       &fifo_addr[0], 4 * sizeof(u32));
 
 	/* WRITE ptr < FIFO start address */
-	if ( fifo_addr[1] < fifo_addr[2])
-		abe_dbg_error_log (ABE_FW_FIFO_WRITE_PTR_ERR);
+	if (fifo_addr[1] < fifo_addr[2])
+		abe_dbg_error_log(ABE_FW_FIFO_WRITE_PTR_ERR);
 
 	/* WRITE ptr > FIFO end address */
-	if ( fifo_addr[1] > fifo_addr[3])
-		abe_dbg_error_log (ABE_FW_FIFO_WRITE_PTR_ERR);
+	if (fifo_addr[1] > fifo_addr[3])
+		abe_dbg_error_log(ABE_FW_FIFO_WRITE_PTR_ERR);
 
-	switch ( memory_bank ) {
-	case	ABE_DMEM :
-		for (i=0; i<nb_data32; i++) {
+	switch (memory_bank) {
+	case ABE_DMEM:
+		for (i = 0; i < nb_data32; i++) {
 			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
-				       (s32) fifo_addr[1], (u32*) (data+i), 4);
+				       (s32) fifo_addr[1], (u32 *) (data + i),
+				       4);
 
 			/* increment WRITE pointer */
 			fifo_addr[1] = fifo_addr[1] + 4;
 			if (fifo_addr[1] > fifo_addr[3])
 				fifo_addr[1] = fifo_addr[2];
 			if (fifo_addr[1] == fifo_addr[0])
-				abe_dbg_error_log (ABE_FW_FIFO_WRITE_PTR_ERR);
+				abe_dbg_error_log(ABE_FW_FIFO_WRITE_PTR_ERR);
 		}
 		/* update WRITE pointer in DMEM */
-		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, descr_addr+
+		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, descr_addr +
 			       sizeof(u32), &fifo_addr[1], 4);
 		break;
-	default :
+	default:
 		/* printf("currently only DMEM FIFO write supported ERROR\n"); */
 		break;
 	}
@@ -147,8 +148,8 @@ void abe_write_fifo (u32 memory_bank, u32 descr_addr, u32 *data, u32 nb_data32)
  *
  * Memory transfer to/from ABE to MPU
  */
-void abe_block_copy (u32 direction, u32 memory_bank, u32 address,
-		     u32 *data, u32 nb_bytes)
+void abe_block_copy(u32 direction, u32 memory_bank, u32 address,
+		    u32 *data, u32 nb_bytes)
 {
 	u32 i;
 	u32 base_address = 0, *src_ptr, *dst_ptr, n;
@@ -177,14 +178,14 @@ void abe_block_copy (u32 direction, u32 memory_bank, u32 address,
 	}
 
 	if (direction == COPY_FROM_HOST_TO_ABE) {
-		dst_ptr = (u32 *)(base_address + address);
-		src_ptr = (u32 *)data;
+		dst_ptr = (u32 *) (base_address + address);
+		src_ptr = (u32 *) data;
 	} else {
-		dst_ptr = (u32 *)data;
-		src_ptr = (u32 *)(base_address + address);
+		dst_ptr = (u32 *) data;
+		src_ptr = (u32 *) (base_address + address);
 	}
 
-	n = (nb_bytes/4);
+	n = (nb_bytes / 4);
 
 	for (i = 0; i < n; i++)
 		*dst_ptr++ = *src_ptr++;
@@ -208,17 +209,15 @@ void abe_block_copy (u32 direction, u32 memory_bank, u32 address,
  * none
  */
 
-void abe_write_dmem (u32 address, u32 *data, u32 nb_bytes)
-void abe_read_dmem (u32 address, u32 *data, u32 nb_bytes)
-void abe_write_cmem (u32 address, u32 *data, u32 nb_bytes)
-void abe_read_cmem (u32 address, u32 *data, u32 nb_bytes)
-void abe_write_smem (u32 address, u32 *data, u32 nb_bytes)
-void abe_read_smem (u32 address, u32 *data, u32 nb_bytes)
-void abe_write_atc (u32 address, u32 *data, u32 nb_bytes)
-void abe_read_atc (u32 address, u32 *data, u32 nb_bytes)
+void abe_write_dmem(u32 address, u32 *data, u32 nb_bytes)
+void abe_read_dmem(u32 address, u32 *data, u32 nb_bytes)
+void abe_write_cmem(u32 address, u32 *data, u32 nb_bytes)
+void abe_read_cmem(u32 address, u32 *data, u32 nb_bytes)
+void abe_write_smem(u32 address, u32 *data, u32 nb_bytes)
+void abe_read_smem(u32 address, u32 *data, u32 nb_bytes)
+void abe_write_atc(u32 address, u32 *data, u32 nb_bytes)
+void abe_read_atc(u32 address, u32 *data, u32 nb_bytes)
 #endif
-
-
 /**
  * abe_reset_mem
  *
@@ -228,7 +227,7 @@ void abe_read_atc (u32 address, u32 *data, u32 nb_bytes)
  *
  * Reset ABE memory
  */
-void abe_reset_mem (u32 memory_bank, u32 address, u32 nb_bytes)
+void abe_reset_mem(u32 memory_bank, u32 address, u32 nb_bytes)
 {
 	u32 i;
 	u32 *dst_ptr, n;
@@ -248,7 +247,7 @@ void abe_reset_mem (u32 memory_bank, u32 address, u32 nb_bytes)
 
 	dst_ptr = (u32 *) (base_address + address);
 
-	n = (nb_bytes/4);
+	n = (nb_bytes / 4);
 
 	for (i = 0; i < n; i++)
 		*dst_ptr++ = 0;
@@ -259,7 +258,7 @@ void abe_reset_mem (u32 memory_bank, u32 address, u32 nb_bytes)
  *
  * checks the internal status of ABE and HAL
  */
-void abe_monitoring (void)
+void abe_monitoring(void)
 {
 	abe_dbg_param = 0;
 }
@@ -274,7 +273,7 @@ void abe_monitoring (void)
  * and the multiplier factor to apply during data move with DMEM
  *
  */
-void abe_format_switch (abe_data_format_t *f, u32 *iter, u32 *mulfac)
+void abe_format_switch(abe_data_format_t *f, u32 *iter, u32 *mulfac)
 {
 	u32 n_freq;
 
@@ -297,7 +296,7 @@ void abe_format_switch (abe_data_format_t *f, u32 *iter, u32 *mulfac)
 	case 96000:
 		n_freq = 24;
 		break;
-	default /*case 48000*/:
+	default /* case 48000 */ :
 		n_freq = 12;
 		break;
 	}
@@ -349,11 +348,11 @@ void abe_format_switch (abe_data_format_t *f, u32 *iter, u32 *mulfac)
  *
  * translates the sampling and data length to ITER number for the DMA
  */
-u32 abe_dma_port_iteration (abe_data_format_t *f)
+u32 abe_dma_port_iteration(abe_data_format_t *f)
 {
 	u32 iter, mulfac;
 
-	abe_format_switch (f, &iter, &mulfac);
+	abe_format_switch(f, &iter, &mulfac);
 
 	return iter;
 }
@@ -364,11 +363,11 @@ u32 abe_dma_port_iteration (abe_data_format_t *f)
  *
  * returns the multiplier factor to apply during data move with DMEM
  */
-u32 abe_dma_port_iter_factor (abe_data_format_t *f)
+u32 abe_dma_port_iter_factor(abe_data_format_t *f)
 {
 	u32 iter, mulfac;
 
-	abe_format_switch (f, &iter, &mulfac);
+	abe_format_switch(f, &iter, &mulfac);
 
 	return mulfac;
 }
@@ -380,7 +379,7 @@ u32 abe_dma_port_iter_factor (abe_data_format_t *f)
  *
  * returns the index of the function doing the copy in I/O tasks
  */
-u32 abe_dma_port_copy_subroutine_id (u32 port_id)
+u32 abe_dma_port_copy_subroutine_id(u32 port_id)
 {
 	u32 sub_id;
 

@@ -25,6 +25,8 @@
 /* Tuning is done on PC ? */
 #define PC_SIMULATION 0
 
+#include <linux/module.h>
+
 #if PC_SIMULATION
 extern void target_server_read_pmem  (u32 address,	 u32 *data, u32 nb_words_32bits);
 extern void target_server_write_pmem (u32 address,	 u32 *data, u32 nb_words_32bits);

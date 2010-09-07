@@ -1,23 +1,20 @@
-/* =============================================================================
-*             Texas Instruments OMAP(TM) Platform Software
-*  (c) Copyright 2009 Texas Instruments Incorporated.  All Rights Reserved.
-*
-*  Use of this software is controlled by the terms and conditions found 
-*  in the license agreement under which this software has been supplied.
-* =========================================================================== */
-/**
- * @file  ABE_SYS.H
+/*
+ * ALSA SoC OMAP ABE driver
  *
- * Headers for system calls and includes
+ * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
+ * 		Liam Girdwood <lrg@slimlogic.co.uk>
  *
- * @path 
- * @rev     01.00
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+ * 02110-1301 USA
  */
-/* ---------------------------------------------------------------------------- 
-*! 
-*! Revision History
-*! ===================================
-*! 27-Nov-2008 Original (LLF)
-*! 05-Jun-2009 V05 release
-* =========================================================================== */
-

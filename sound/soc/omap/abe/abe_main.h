@@ -22,11 +22,6 @@
 #ifndef _ABE_MAIN_H_
 #define _ABE_MAIN_H_
 
-#ifdef __cplusplus
-
-extern "C" {
-#endif
-
 #include <linux/io.h>
 
 #include "abe_dm_addr.h"
@@ -61,8 +56,5 @@ extern "C" {
 
 #define ABE_DEBUG (ABE_DEBUG_CHECKERS | ABE_DEBUG_HWFILE | ABE_DEBUG_LL_LOG)
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* _ABE_MAIN_H_ */

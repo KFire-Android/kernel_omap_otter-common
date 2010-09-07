@@ -47,7 +47,7 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		NODRIFT, NOCALLBACK, 0, 0,
 		{
 			SNK_P, DMIC_PORT_PROT,
-			{dmem_dmic, dmem_dmic_size, DMIC_ITER}
+			{{dmem_dmic, dmem_dmic_size, DMIC_ITER}}
 		},
 		{0, 0},
 		{EQMIC, 0}, "DMIC"
@@ -57,7 +57,7 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		NODRIFT, NOCALLBACK, smem_amic, 0,
 		{
 			SNK_P, MCPDMUL_PORT_PROT,
-			{dmem_amic, dmem_amic_size, MCPDM_UL_ITER}
+			{{dmem_amic, dmem_amic_size, MCPDM_UL_ITER}}
 		},
 		{0, 0},
 		{EQMIC, 0},	"PDM_UL"
@@ -66,11 +66,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, { 8000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, smem_bt_vx_ul, 0,
 		{
-			SNK_P, SERIAL_PORT_PROT, {
+			SNK_P, SERIAL_PORT_PROT,
+			{{
 				MCBSP1_DMA_TX*ATC_SIZE,
 				dmem_bt_vx_ul,dmem_bt_vx_ul_size,
 				1 * SCHED_LOOP_8kHz
-			}
+			}}
 		},
 		{0, 0}, {0},	"BT_VX_UL"
 	},
@@ -78,11 +79,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, smem_mm_ul, 0,
 		{
-			SRC_P, DMAREQ_PORT_PROT, {
+			SRC_P, DMAREQ_PORT_PROT,
+			{{
 				CBPr_DMA_RTX3*ATC_SIZE,
 				dmem_mm_ul,dmem_mm_ul_size,
 				10 * SCHED_LOOP_48kHz, ABE_DMASTATUS_RAW,(1<<3)
-			}
+			}}
 		},
 		{CIRCULAR_BUFFER_PERIPHERAL_R__3, 120},
 		{UPROUTE, 0}, "MM_UL"
@@ -91,11 +93,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, smem_mm_ul2,0,
 		{
-			SRC_P, DMAREQ_PORT_PROT, {
+			SRC_P, DMAREQ_PORT_PROT,
+			{{
 				CBPr_DMA_RTX4*ATC_SIZE,
 				dmem_mm_ul2,dmem_mm_ul2_size,
 				2 * SCHED_LOOP_48kHz, ABE_DMASTATUS_RAW,(1<<4)
-			}
+			}}
 		},
 		{CIRCULAR_BUFFER_PERIPHERAL_R__4, 24},
 		{UPROUTE, 0}, "MM_UL2"
@@ -104,11 +107,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, { 8000, MONO_MSB},
 		NODRIFT, NOCALLBACK, smem_vx_ul, 0,
 		{
-			SRC_P, DMAREQ_PORT_PROT, {
+			SRC_P, DMAREQ_PORT_PROT,
+			{{
 				CBPr_DMA_RTX2*ATC_SIZE,
 				dmem_vx_ul,dmem_vx_ul_size,
 				1 * SCHED_LOOP_8kHz, ABE_DMASTATUS_RAW,(1<<2)
-			}
+			}}
 		}, {
 			CIRCULAR_BUFFER_PERIPHERAL_R__2, 2
 		},
@@ -118,11 +122,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, smem_mm_dl_opp100, 0,
 		{
-			SNK_P, PINGPONG_PORT_PROT, {
+			SNK_P, PINGPONG_PORT_PROT,
+			{{
 				CBPr_DMA_RTX0*ATC_SIZE,
 				dmem_mm_dl,dmem_mm_dl_size,
 				2 * SCHED_LOOP_48kHz, ABE_DMASTATUS_RAW,(1<<0)
-			}
+			}}
 		},
 		{CIRCULAR_BUFFER_PERIPHERAL_R__0, 24},
 		{ASRC3, 0}, "MM_DL"
@@ -131,11 +136,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, { 8000, MONO_MSB},
 		NODRIFT, NOCALLBACK, smem_vx_dl, 0,
 		{
-			SNK_P, DMAREQ_PORT_PROT, {
+			SNK_P, DMAREQ_PORT_PROT,
+			{{
 				CBPr_DMA_RTX1*ATC_SIZE,
 				dmem_vx_dl,dmem_vx_dl_size,
 				1 * SCHED_LOOP_8kHz, ABE_DMASTATUS_RAW,(1<<1)
-			}
+			}}
 		},
 		{CIRCULAR_BUFFER_PERIPHERAL_R__1, 2},
 		{ASRC1, 0}, "VX_DL"
@@ -144,11 +150,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, smem_tones_dl, 0,
 		{
-			SNK_P, DMAREQ_PORT_PROT, {
+			SNK_P, DMAREQ_PORT_PROT,
+			{{
 				CBPr_DMA_RTX5*ATC_SIZE,
 				dmem_tones_dl,dmem_tones_dl_size,
 				2 * SCHED_LOOP_48kHz, ABE_DMASTATUS_RAW,(1<<5)
-			}
+			}}
 		},
 		{CIRCULAR_BUFFER_PERIPHERAL_R__5, 24},
 		{0}, "TONES_DL"
@@ -157,11 +164,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {24000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, smem_vib, 0,
 		{
-			SNK_P, DMAREQ_PORT_PROT, {
+			SNK_P, DMAREQ_PORT_PROT,
+			{{
 				CBPr_DMA_RTX6*ATC_SIZE,
 				dmem_vib_dl,dmem_vib_dl_size,
 				2 * SCHED_LOOP_24kHz, ABE_DMASTATUS_RAW,(1<<6)
-			}
+			}}
 		},
 		{CIRCULAR_BUFFER_PERIPHERAL_R__6, 12},
 		{0}, "VIB_DL"
@@ -170,11 +178,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, { 8000, MONO_MSB},
 		NODRIFT, NOCALLBACK, smem_bt_vx_dl, 0,
 		{
-			SRC_P, SERIAL_PORT_PROT, {
+			SRC_P, SERIAL_PORT_PROT,
+			{{
 				MCBSP1_DMA_RX*ATC_SIZE,
 				dmem_bt_vx_dl,dmem_bt_vx_dl_size,
 				1 * SCHED_LOOP_8kHz,
-			}
+			}}
 		},
 		{0, 0}, {0}, "BT_VX_DL"
 	},
@@ -182,8 +191,13 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 	/* PDM_DL */ {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {96000, SIX_MSB},
 		NODRIFT, NOCALLBACK, 0,0,
-		{SRC_P, MCPDMDL_PORT_PROT, {dmem_mcpdm, dmem_mcpdm_size}}, {0, 0},
-		{MIXDL1, EQ1, APS1, MIXDL2, EQ2L, EQ2R, APS2L, APS2R,0}, "PDM_DL"
+		{
+			SRC_P, MCPDMDL_PORT_PROT,
+			{{dmem_mcpdm, dmem_mcpdm_size}}
+		},
+		{0, 0},
+		{MIXDL1, EQ1, APS1, MIXDL2, EQ2L, EQ2R, APS2L, APS2R,0},
+		"PDM_DL"
 	},
 
 	/* MM_EXT_OUT*/
@@ -191,11 +205,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, smem_mm_ext_out, 0,
 		{
-			SRC_P, SERIAL_PORT_PROT,   {
+			SRC_P, SERIAL_PORT_PROT,
+			{{
 				MCBSP1_DMA_TX*ATC_SIZE,
 				dmem_mm_ext_out,dmem_mm_ext_out_size,
 				2 * SCHED_LOOP_48kHz
-			}
+			}}
 		}, {0, 0}, {0}, "MM_EXT_OUT"
 	},
 
@@ -204,11 +219,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, smem_mm_ext_in, 0,
 		{
-			SNK_P, SERIAL_PORT_PROT,   {
+			SNK_P, SERIAL_PORT_PROT,
+			{{
 				MCBSP1_DMA_RX*ATC_SIZE,
 				dmem_mm_ext_in ,dmem_mm_ext_in_size,
 				2 * SCHED_LOOP_48kHz
-			}
+			}}
 		},
 		{0, 0}, {0}, "MM_EXT_IN"
 	},
@@ -217,11 +233,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, 0, 0,
 		{
-			SRC_P, TDM_SERIAL_PORT_PROT,{
+			SRC_P, TDM_SERIAL_PORT_PROT,
+			{{
 				MCBSP3_DMA_TX*ATC_SIZE,
 				dmem_mm_ext_out,dmem_mm_ext_out_size,
 				2 * SCHED_LOOP_48kHz
-			}
+			}}
 		},
 		{0, 0}, {0}, "TDM_OUT"
 	},
@@ -230,11 +247,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, STEREO_MSB},
 		NODRIFT, NOCALLBACK, 0, 0,
 		{
-			SRC_P, TDM_SERIAL_PORT_PROT,{
+			SRC_P, TDM_SERIAL_PORT_PROT,
+			{{
 				MCBSP3_DMA_RX*ATC_SIZE,
 				dmem_mm_ext_in ,dmem_mm_ext_in_size,
 				2 * SCHED_LOOP_48kHz
-			}
+			}}
 		},
 		{0, 0}, {0}, "TDM_IN"
 	},
@@ -243,11 +261,12 @@ const abe_port_t abe_port_init [LAST_PORT_ID] = {
 		OMAP_ABE_PORT_ACTIVITY_IDLE, {48000, MONO_MSB},
 		NODRIFT, NOCALLBACK, 0,0,
 		{
-			SRC_P, DMAREQ_PORT_PROT, {
+			SRC_P, DMAREQ_PORT_PROT,
+			{{
 				CBPr_DMA_RTX7*ATC_SIZE,
 				dmem_mm_trace,dmem_mm_trace_size,
 				2 * SCHED_LOOP_48kHz,ABE_DMASTATUS_RAW,(1<<4)
-			}
+			}}
 		}, {CIRCULAR_BUFFER_PERIPHERAL_R__7, 24},
 		{FEAT_SEQ, FEAT_CTL, FEAT_GAINS, 0}, "SCHD_DBG"
 	},
@@ -615,8 +634,20 @@ PtrFun pFun;
 pFun = sin;
 y = (* pFun) (x);
 */ /* mask, { time id param tag1} */
-const abe_sequence_t seq_null = {NOMASK, {CL_M1, 0, 0,0,0,0, 0 },
-	{CL_M1, 0, 0,0,0,0, 0 }
+const abe_sequence_t seq_null = {
+	NOMASK,
+	{
+		CL_M1,
+		0,
+		{0,0,0,0},
+		0
+	},
+	{
+		CL_M1,
+		0,
+		{0,0,0,0},
+		0
+	},
 };
 
 /* table of new subroutines called in the sequence */
