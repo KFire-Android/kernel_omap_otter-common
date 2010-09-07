@@ -2850,77 +2850,71 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	/* Fields are independent but interleaved in memory. */
 	if (fieldmode)
 		field_offset = 1;
-	pix_inc = 0x1;
-	offset0 = 0x0;
-	offset1 = 0x0;
-	if(cpu_is_omap44xx()) {
-		/* check if tiler address; else set row_inc = 1*/
-		if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
-			struct tiler_view_orient orient = {0};
-			u32 tiler_width = width, tiler_height = height;
 
-			calc_tiler_row_rotation(rotation, width, height,
-						color_mode, &row_inc, &offset1,
-						ilace, pic_height);
+	/* default values */
+	row_inc = pix_inc = 0x1;
+	offset0 = offset1 = 0x0;
 
-			if (ilace & OMAP_FLAG_ISWAP)
-				swap(offset0, offset1);
+	if (rotation_type == OMAP_DSS_ROT_TILER) {
+		struct tiler_view_orient orient = {0};
+		unsigned long tiler_width = width, tiler_height = height;
 
-			/* mirroring is applied before rotataion */
-			orient.y_invert = mirror ? 1 : 0;
-			tiler_rotate_view(&orient, -rotation * 90);
+		calc_tiler_row_rotation(rotation, width, height,
+					color_mode, &row_inc, &offset1,
+					ilace, pic_height);
 
-			DSSDBG("RXY = %d %d %d\n", orient.rotate_90,
-					orient.x_invert, orient.y_invert);
+		if (ilace & OMAP_FLAG_ISWAP)
+			swap(offset0, offset1);
 
-			if (color_mode == OMAP_DSS_COLOR_YUV2 ||
-			    color_mode == OMAP_DSS_COLOR_UYVY)
-				tiler_width /= 2;
+		/* mirroring is applied before rotataion */
+		orient.y_invert = mirror ? 1 : 0;
+		tiler_rotate_view(&orient, -rotation * 90);
 
-			if (orient.rotate_90 & 1)
-				swap(tiler_width, tiler_height);
+		DSSDBG("RXY = %d %d %d\n", orient.rotate_90,
+				orient.x_invert, orient.y_invert);
 
-			DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
+		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+		    color_mode == OMAP_DSS_COLOR_UYVY)
+			tiler_width /= 2;
 
-			paddr = tiler_reorient_topleft(tiler_get_natural_addr((void *)paddr),
+		if (orient.rotate_90 & 1)
+			swap(tiler_width, tiler_height);
+
+		DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
+
+		paddr = tiler_reorient_topleft(
+					tiler_get_natural_addr((void *)paddr),
 					orient, tiler_width, tiler_height);
 
-			if (puv_addr)
-				puv_addr = tiler_reorient_topleft(
-					tiler_get_natural_addr(
-					(void *) puv_addr), orient,
-					tiler_width/2, tiler_height/2);
+		if (puv_addr)
+			puv_addr = tiler_reorient_topleft(
+				tiler_get_natural_addr(
+				(void *) puv_addr), orient,
+				tiler_width/2, tiler_height/2);
 
-			/*
-			 * BA1 used as temporary storage to pointer to lower
-			 * half of interlaced buffer on progressive display
-			 */
-			if ((ilace & OMAP_FLAG_IBUF) &&
-			    !(ilace & OMAP_FLAG_IDEV)) {
-				dispc_write_reg(DISPC_VID_BA1(plane - 1),
-						paddr + offset1);
-				/* UV offset is 1/2 Y offset for even offsets */
-				if (puv_addr)
-					dispc_write_reg(
-						DISPC_VID_BA_UV1(plane - 1),
+		/*
+		 * BA1 used as temporary storage to pointer to lower
+		 * half of interlaced buffer on progressive display
+		 */
+		if ((ilace & OMAP_FLAG_IBUF) && !(ilace & OMAP_FLAG_IDEV)) {
+			dispc_write_reg(DISPC_VID_BA1(plane - 1),
+							paddr + offset1);
+			/* UV offset is 1/2 Y offset for even offsets */
+			if (puv_addr)
+				dispc_write_reg(DISPC_VID_BA_UV1(plane - 1),
 						puv_addr + offset1 / 2);
-			}
-			DSSDBG("rotated addresses: 0x%0x, 0x%0x\n",
+		}
+		DSSDBG("rotated addresses: 0x%0x, 0x%0x\n",
 							paddr, puv_addr);
-			/* set BURSTTYPE if rotation is non-zero */
-			REG_FLD_MOD(dispc_reg_att[plane], 0x1, 29, 29);
-		} else
-			row_inc = 0x1;
-	}
-	if (!cpu_is_omap44xx()) {
-		row_inc = 0x1;
-		if (rotation_type == OMAP_DSS_ROT_DMA)
-			calc_dma_rotation_offset(rotation, mirror,
+		/* set BURSTTYPE if rotation is non-zero */
+		REG_FLD_MOD(dispc_reg_att[plane], 0x1, 29, 29);
+	} else if (rotation_type == OMAP_DSS_ROT_DMA) {
+		calc_dma_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
-		else
-			calc_vrfb_rotation_offset(rotation, mirror,
+	} else if (rotation_type == OMAP_DSS_ROT_VRFB) {
+		calc_vrfb_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
 				fieldmode, field_offset,
 				&offset0, &offset1, &row_inc, &pix_inc);
