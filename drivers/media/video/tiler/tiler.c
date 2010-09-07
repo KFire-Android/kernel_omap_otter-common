@@ -392,7 +392,7 @@ done:
 static void _m_try_free_group(struct gid_info *gi)
 {
 	if (gi && list_empty(&gi->areas) && list_empty(&gi->onedim)) {
-		BUG_ON(!list_empty(&gi->reserved));
+		WARN_ON(!list_empty(&gi->reserved));
 		list_del(&gi->by_pid);
 
 		/* if group is tracking kernel objects, we may free even
@@ -594,7 +594,7 @@ static void _m_free_process_info(struct process_info *pi)
 	list_for_each_entry_safe(_b, _b_, &pi->bufs, by_pid)
 		_m_unregister_buf(_b);
 
-	BUG_ON(!list_empty(&pi->bufs));
+	WARN_ON(!list_empty(&pi->bufs));
 
 	/* free all allocated blocks, and remove unreferenced ones */
 	list_for_each_entry_safe(gi, gi_, &pi->groups, by_pid) {
@@ -630,13 +630,13 @@ static void _m_free_process_info(struct process_info *pi)
 		/* if group is still alive reserved list should have been
 		   emptied as there should be no reference on those blocks */
 		if (need2free) {
-			BUG_ON(!list_empty(&gi->onedim));
-			BUG_ON(!list_empty(&gi->areas));
+			WARN_ON(!list_empty(&gi->onedim));
+			WARN_ON(!list_empty(&gi->areas));
 			_m_try_free_group(gi);
 		}
 	}
 
-	BUG_ON(!list_empty(&pi->groups));
+	WARN_ON(!list_empty(&pi->groups));
 	list_del(&pi->list);
 	kfree(pi);
 }
@@ -1435,10 +1435,10 @@ static void __exit tiler_exit(void)
 		_m_free_process_info(pi);
 
 	/* all lists should have cleared */
-	BUG_ON(!list_empty(&blocks));
-	BUG_ON(!list_empty(&procs));
-	BUG_ON(!list_empty(&orphan_onedim));
-	BUG_ON(!list_empty(&orphan_areas));
+	WARN_ON(!list_empty(&blocks));
+	WARN_ON(!list_empty(&procs));
+	WARN_ON(!list_empty(&orphan_onedim));
+	WARN_ON(!list_empty(&orphan_areas));
 
 	mutex_unlock(&mtx);
 
