@@ -269,7 +269,6 @@ static int musb_platform_suspend(struct musb *musb)
 
 	pdata->enable_wakeup(oh->od);
 	otg_set_suspend(musb->xceiv, 1);
-	pm_runtime_put_sync(dev);
 
 	return 0;
 }
