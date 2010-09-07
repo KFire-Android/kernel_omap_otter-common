@@ -375,7 +375,8 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 		case 3:
 			if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
 				/* off-chip level shifting, or none */
-				mmc->slots[0].before_set_reg = hsmmc23_before_set_reg;
+				mmc->slots[0].before_set_reg =
+						hsmmc23_before_set_reg;
 				mmc->slots[0].after_set_reg = NULL;
 			}
 			break;

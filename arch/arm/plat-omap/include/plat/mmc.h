@@ -87,7 +87,7 @@ enum {
 	OMAP_HSMMC_REV,
 };
 
-const static u16 omap3_mmc_reg_map[] = {
+static const u16 omap3_mmc_reg_map[] = {
 	[OMAP_HSMMC_SYSCONFIG] = 0x0010,
 	[OMAP_HSMMC_SYSSTATUS] = 0x0014,
 	[OMAP_HSMMC_CON] = 0x002C,
@@ -108,7 +108,7 @@ const static u16 omap3_mmc_reg_map[] = {
 	[OMAP_HSMMC_CAPA] = 0x0140,
 };
 
-const static u16 omap4_mmc_reg_map[] = {
+static const u16 omap4_mmc_reg_map[] = {
 	[OMAP_HSMMC_SYSCONFIG] = 0x0110,
 	[OMAP_HSMMC_SYSSTATUS] = 0x0114,
 	[OMAP_HSMMC_CON] = 0x012C,

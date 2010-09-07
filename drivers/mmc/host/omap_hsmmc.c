@@ -860,7 +860,8 @@ omap_hsmmc_get_dma_dir(struct omap_hsmmc_host *host, struct mmc_data *data)
 		return DMA_FROM_DEVICE;
 }
 
-static void omap_hsmmc_request_done(struct omap_hsmmc_host *host, struct mmc_request *mrq)
+static void omap_hsmmc_request_done(struct omap_hsmmc_host *host,
+					struct mmc_request *mrq)
 {
 	int dma_ch;
 
@@ -1011,8 +1012,8 @@ static inline void omap_hsmmc_reset_controller_fsm(struct omap_hsmmc_host *host,
 	/*
 	 * On OMAP4 ES2 the SRC is zero in the first loop itself strangely
 	 * vs on ES1 it takes some time.
-	 * Could be a an issue on ES2 to indicate reset complete even before it is
-	 * complete.
+	 * Could be a an issue on ES2 to indicate reset complete even before
+	 * it is complete.
 	 */
 	udelay(500);
 
@@ -2109,7 +2110,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	struct omap_hsmmc_host *host = NULL;
 	struct resource *res;
 	int ret, irq;
-#if 0
+#ifdef ADMA
 	int ctrlr_caps;
 #endif
 
@@ -2232,7 +2233,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 							" clk failed\n");
 	}
 
-#if 0
+#ifdef ADMA
 	ctrlr_caps = OMAP_HSMMC_READ(host, CAPA);
 	if (ctrlr_caps & CAPA_ADMA_SUPPORT) {
 		/* FIXME: passing the device structure fails
@@ -2518,9 +2519,8 @@ static int omap_hsmmc_resume(struct device *dev)
 		return 0;
 
 	if (host) {
-		if (mmc_host_enable(host->mmc) != 0) {
+		if (mmc_host_enable(host->mmc) != 0)
 			goto clk_en_err;
-		}
 
 		if (host->got_dbclk)
 			clk_enable(host->dbclk);
