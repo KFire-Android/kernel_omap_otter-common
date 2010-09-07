@@ -413,6 +413,7 @@ struct omap_overlay_info {
 	u16 out_width;	/* if 0, out_width == width */
 	u16 out_height;	/* if 0, out_height == height */
 	u8 global_alpha;
+	u16 min_x_decim, max_x_decim, min_y_decim, max_y_decim;
 	enum omap_overlay_zorder zorder;
 	u32 p_uv_addr; /* relevant for NV12 format only */
 	enum device_n_buffer_type field;

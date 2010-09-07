@@ -411,6 +411,7 @@ struct overlay_cache_data {
 	enum omap_channel channel;
 	bool replication;
 	enum device_n_buffer_type ilace;
+	u16 min_x_decim, max_x_decim, min_y_decim, max_y_decim;
 
 	enum omap_burst_size burst_size;
 	u32 fifo_low;
@@ -753,6 +754,8 @@ static int configure_overlay(enum omap_plane plane)
 	u16 x, y, w, h;
 	u32 paddr;
 	int r;
+	u16 x_decim, y_decim;
+	bool three_tap;
 	u16 orig_w, orig_h, orig_outw, orig_outh;
 
 	DSSDBGF("%d", plane);
@@ -858,14 +861,20 @@ static int configure_overlay(enum omap_plane plane)
 		}
 	}
 
-	r = dispc_setup_plane(plane,
+	r = dispc_scaling_decision(w, h, outw, outh,
+			       plane, c->color_mode, c->channel,
+			       c->rotation, c->min_x_decim, c->max_x_decim,
+			       c->min_y_decim, c->max_y_decim,
+			       &x_decim, &y_decim, &three_tap);
+
+	r = r ? : dispc_setup_plane(plane,
 			paddr,
 			c->screen_width,
 			x, y,
 			w, h,
 			outw, outh,
 			c->color_mode,
-			c->ilace,
+			c->ilace, x_decim, y_decim, three_tap,
 			c->rotation_type,
 			c->rotation,
 			c->mirror,
@@ -875,7 +884,7 @@ static int configure_overlay(enum omap_plane plane)
 			c->pic_height);
 
 	if (r) {
-		/* this shouldn't happen */
+		/* this shouldn't happen unless scaling is unsupported */
 		DSSERR("dispc_setup_plane failed for ovl %d\n", plane);
 		dispc_enable_plane(plane, 0);
 		return r;
@@ -1346,6 +1355,10 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		oc->out_width = ovl->info.out_width;
 		oc->out_height = ovl->info.out_height;
 		oc->global_alpha = ovl->info.global_alpha;
+		oc->min_x_decim = ovl->info.min_x_decim;
+		oc->max_x_decim = ovl->info.max_x_decim;
+		oc->min_y_decim = ovl->info.min_y_decim;
+		oc->max_y_decim = ovl->info.max_y_decim;
 		oc->zorder = ovl->info.zorder;
 
 		oc->replication =
@@ -1561,6 +1574,10 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 		oc->out_width = ovl->info.out_width;
 		oc->out_height = ovl->info.out_height;
 		oc->global_alpha = ovl->info.global_alpha;
+		oc->min_x_decim = ovl->info.min_x_decim;
+		oc->max_x_decim = ovl->info.max_x_decim;
+		oc->min_y_decim = ovl->info.min_y_decim;
+		oc->max_y_decim = ovl->info.max_y_decim;
 
 		oc->replication =
 			dss_use_replication(dssdev, ovl->info.color_mode);
