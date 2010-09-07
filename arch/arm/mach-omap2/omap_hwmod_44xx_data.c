@@ -3180,7 +3180,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_mcpdm_sysc = {
 };
 
 static struct omap_hwmod_class omap44xx_mcpdm_hwmod_class = {
-	.name = "mcpdm",
+	.name = "omap-mcpdm-dai",
 	.sysc = &omap44xx_mcpdm_sysc,
 };
 
