@@ -214,11 +214,6 @@ typedef struct {
  }
 HDMI_EDID;
 
-struct hdmi_work_struct {
-	struct work_struct work;
-	int r;
-};
-
 void show_horz_vert_timing_info(u8 *edid);
 int hdmi_get_image_format(void);
 int hdmi_get_audio_format(void);

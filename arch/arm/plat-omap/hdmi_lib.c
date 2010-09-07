@@ -1019,6 +1019,7 @@ int hdmi_w1_set_wait_srest(void)
 /* PHY_PWR_CMD */
 int hdmi_w1_set_wait_phy_pwr(HDMI_PhyPwr_t val)
 {
+	DBG("*** Set PHY power mode to %d\n", val);
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_PWR_CTRL, val, 7, 6);
 
 	if (hdmi_w1_wait_for_bit_change(HDMI_WP,
@@ -1447,32 +1448,28 @@ void HDMI_W1_HPD_handler(int *r)
 	hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
 	mdelay(30);
 	*r = 0;
-	if ((count == 0) && ((val & 0x02000000) == 0x02000000) &&
-		((set & 0x00000002) != 0x00000002)) {
-		*r = 2;
-		DBG("First interrupt physical attach but not HPD");
+
+	if (val & 0x02000000) {
+		DBG("connect, ");
+		*r |= HDMI_CONNECT;
+	}
+	if (set & 0x00000002) {
+		DBG("hpd (count=%d), ", count_hpd);
+		*r |= HDMI_HPD;
+		if (count_hpd == 0)
+			*r |= HDMI_FIRST_HPD;
+		count_hpd++;
+	}
+
+	if ((val & 0x04000000) && !(set & 0x00000002)) {
+		DBG("disconnect, ");
+		*r |= HDMI_DISCONNECT;
 		count_hpd = 0;
 	}
-	count++;
 	hdmi_set_irqs();
-	DBG("%d count and count_hpd %d", count, count_hpd);
-	if ((set & 0x00000002) == 0x00000002) {
-		if (count_hpd == 0) {
-			*r = 4;
-			count_hpd++;
-			goto end;
-		} else
-			*r = 1;
-		DBG("HPD is set you can read edid");
-	}
-	if (((val & 0x04000000) == 0x04000000) && (count_hpd == 0)) {
-		*r = 3;
-		count = 0;
-		count_hpd = 0;
-	}
+
 	intr =  hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
-	DBG("%x hdmi_core_sys_sys_intr\n", intr);
-	end: /*Do nothing*/;
+	DBG("intr=%08x\n", intr);
 }
 
 

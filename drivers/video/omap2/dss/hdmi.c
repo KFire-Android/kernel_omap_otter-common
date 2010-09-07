@@ -778,11 +778,15 @@ int hdmi_min_enable(void)
 	return 0;
 }
 
-void hdmi_work_queue(struct hdmi_work_struct *work)
+static spinlock_t irqstatus_lock = SPIN_LOCK_UNLOCKED;
+static volatile int irqstatus;
+
+void hdmi_work_queue(struct work_struct *work)
 {
 	struct omap_dss_device *dssdev = NULL;
 	const char *buf = "hdmi";
-	int r = ((struct hdmi_work_struct *)work)->r;
+	int r;
+	unsigned long flags;
 
 	int match(struct omap_dss_device *dssdev2 , void *data)
 	{
@@ -792,21 +796,32 @@ void hdmi_work_queue(struct hdmi_work_struct *work)
 	dssdev = omap_dss_find_device((void *)buf , match);
 	DSSDBG("found hdmi handle %s" , dssdev->name);
 
-	if ((r == 4 || r == 2) && (hpd_mode == 1)) {
-		hdmi_phy_off(HDMI_WP);
+	spin_lock_irqsave(&irqstatus_lock, flags);
+	r = irqstatus;
+	irqstatus = 0;
+	spin_unlock_irqrestore(&irqstatus_lock, flags);
+
+	DSSDBG("irqstatus=%08x\n", r);
+
+	if (r & HDMI_DISCONNECT)
+		hpd_mode = 1;
+
+	if ((r & (HDMI_CONNECT|HDMI_FIRST_HPD)) && (hpd_mode == 1) &&
+			(dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)) {
+		DSSDBG("enabling display\n");
 		hdmi_enable_clocks(1);
 		hdmi_power_on(dssdev);
 		mdelay(1000);
 		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 		printk(KERN_INFO "Display enabled");
 	}
-	if (r == 1 || r == 4)
+	if (r & HDMI_HPD)
 		hpd_mode = 0;
 
-	if ((r == 3) && (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)) {
-		printk(KERN_INFO "Display disabled");
-		hdmi_power_off(dssdev);
-		hpd_mode = 1;
+	if ((r & HDMI_DISCONNECT) && !(r & HDMI_CONNECT) &&
+			(dssdev->state != OMAP_DSS_DISPLAY_DISABLED)) {
+		DSSDBG("Display disabled\n");
+		edid_set = false;
 		hdmi_enable_hpd(dssdev);
 		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 
@@ -818,25 +833,38 @@ void hdmi_work_queue(struct hdmi_work_struct *work)
 static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 {
 	struct work_struct *work;
+	unsigned long flags;
 	int r = 0;
+	int work_pending;
 
 	HDMI_W1_HPD_handler(&r);
-	printk("r = %d", r);
+	DSSDBG("r=%08x, prev irqstatus=%08x\n", r, irqstatus);
 
-	if ((r == 4 || r == 2) && (hpd_mode == 1)) {
-		hdmi_phy_off(HDMI_WP);
+	/* what if HDMI_CONNECT and HDMI_FIRST_HPD come as two distinct interrupts?
+	 * will doing this twice cause an issue?
+	 */
+	if ((r & (HDMI_CONNECT|HDMI_FIRST_HPD)) && (hpd_mode == 1)) {
 		hdmi_enable_clocks(1);
 	}
 
-	work = kmalloc(sizeof(struct hdmi_work_struct), GFP_KERNEL);
-
-	if (work) {
-		printk("r = %d", r);
-		INIT_WORK(work, hdmi_work_queue);
-		((struct hdmi_work_struct *)work)->r = r;
-		schedule_work(work);
+	spin_lock_irqsave(&irqstatus_lock, flags);
+	work_pending = irqstatus;
+	if ((r & HDMI_DISCONNECT) && !(r & HDMI_CONNECT)) {
+		irqstatus = HDMI_DISCONNECT;
 	} else {
-		printk(KERN_ERR "Cannot allocate memory to create work");
+		irqstatus |= r;
+	}
+	spin_unlock_irqrestore(&irqstatus_lock, flags);
+
+	if (r && !work_pending) {
+		work = kmalloc(sizeof(struct work_struct), GFP_KERNEL);
+
+		if (work) {
+			INIT_WORK(work, hdmi_work_queue);
+			schedule_work(work);
+		} else {
+			printk(KERN_ERR "Cannot allocate memory to create work");
+		}
 	}
 
 	return IRQ_HANDLED;
