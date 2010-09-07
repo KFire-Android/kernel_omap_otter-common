@@ -502,15 +502,22 @@ static int omap_mcpdm_dai_startup(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
+	int err = 0;
+
+	if (!dai->active)
+		err = omap_mcpdm_request(mcpdm);
 
 	mcpdm->dl_active++;
-	return 0;
+	return err;
 }
 
 static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
+
+	if (!dai->active)
+		omap_mcpdm_free(mcpdm);
 
 	mcpdm->dl_active--;
 }
@@ -691,17 +698,10 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 
 	mcpdm->dev = &pdev->dev;
 
-	ret = omap_mcpdm_request(mcpdm);
-	if (ret < 0)
-		goto err_req;
-
 	ret = snd_soc_register_dais(&pdev->dev, omap_mcpdm_dai,
 			ARRAY_SIZE(omap_mcpdm_dai));
 	if (ret == 0)
 		return 0;
-
-err_req:
-	omap_mcpdm_free(mcpdm);
 err_irq:
 	iounmap(mcpdm->io_base);
 err_resource:
@@ -717,7 +717,6 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 	pdata = pdev->dev.platform_data;
 
 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_mcpdm_dai));
-	omap_mcpdm_free(mcpdm);
 	pm_runtime_put_sync(&pdev->dev);
 #ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_shutdown)
