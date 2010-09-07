@@ -411,6 +411,16 @@ static void omap2_mcspi_set_master_mode(struct spi_master *master)
 	omap2_mcspi_ctx[master->bus_num - 1].modulctrl = l;
 }
 
+static void omap2_mcspi_set_slave_mode(struct spi_master *master)
+{
+	u32 l;
+
+	l = mcspi_read_reg(master, OMAP2_MCSPI_MODULCTRL);
+	MOD_REG_BIT(l, OMAP2_MCSPI_MODULCTRL_STEST, 0);
+	MOD_REG_BIT(l, OMAP2_MCSPI_MODULCTRL_MS, 1);
+	mcspi_write_reg(master, OMAP2_MCSPI_MODULCTRL, l);
+}
+
 static int mcspi_wait_for_reg_bit(void __iomem *reg, unsigned long bit)
 {
 	unsigned long timeout;
@@ -881,9 +891,10 @@ static int omap2_mcspi_setup_transfer(struct spi_device *spi,
 		l &= ~(OMAP2_MCSPI_CHCONF_IS|OMAP2_MCSPI_CHCONF_DPE1);
 		l |= OMAP2_MCSPI_CHCONF_DPE0;
 	} else {
-		return -EINVAL;
+		l |= OMAP2_MCSPI_CHCONF_IS;
+		l |= OMAP2_MCSPI_CHCONF_DPE1;
+		l &= ~OMAP2_MCSPI_CHCONF_DPE0;
 	}
-
 
 	/* wordlength */
 	l &= ~OMAP2_MCSPI_CHCONF_WL_MASK;
@@ -1284,7 +1295,6 @@ static int __init omap2_mcspi_reset(struct omap2_mcspi *mcspi)
 {
 	struct spi_master	*master = mcspi->master;
 	u32			tmp;
-	u32			error = 0;
 
 	if (omap2_mcspi_enable_clocks(mcspi) < 0)
 		return -1;
@@ -1296,10 +1306,10 @@ static int __init omap2_mcspi_reset(struct omap2_mcspi *mcspi)
 	if (mcspi->mcspi_mode == OMAP2_MCSPI_MASTER)
 		omap2_mcspi_set_master_mode(master);
 	else
-		error = -EINVAL;
+		omap2_mcspi_set_slave_mode(master);
 
 	omap2_mcspi_disable_clocks(mcspi);
-	return error;
+	return 0;
 }
 
 static int omap_mcspi_runtime_suspend(struct device *dev)
@@ -1349,7 +1359,7 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
 
 	mcspi = spi_master_get_devdata(master);
 	mcspi->master = master;
-	mcspi->mcspi_mode = OMAP2_MCSPI_MASTER;
+	mcspi->mcspi_mode = pdata->mode;
 	mcspi->dma_mode = pdata->dma_mode;
 	mcspi->force_cs_mode = pdata->force_cs_mode;
 	mcspi->regs = pdata->regs_data;
