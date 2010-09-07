@@ -131,8 +131,6 @@
 
 #define OMAP4_TLL_CHANNEL_COUNT				2
 
-#define OMAP3_UHH_REVISION				0x00000010
-#define OMAP4_UHH_REVISION				0x50700100
 /*-------------------------------------------------------------------------*/
 
 static inline void ohci_omap_writel(void __iomem *base, u32 reg, u32 val)
@@ -178,7 +176,6 @@ struct ohci_hcd_omap3 {
 	void __iomem		*ohci_base;
 
 	unsigned		es2_compatibility:1;
-	unsigned 		uhh_revision;
 };
 
 /*-------------------------------------------------------------------------*/
@@ -337,13 +334,12 @@ static int omap3_start_ohci(struct ohci_hcd_omap3 *omap, struct usb_hcd *hcd)
 {
 	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
 	u32 reg = 0;
-	int ret = -ENODEV;
+	int ret = 0;
 
 	dev_dbg(omap->dev, "starting TI OHCI USB Controller\n");
 
-	omap->uhh_revision = ohci_omap_readl(omap->uhh_base, OMAP_UHH_REVISION);
 
-	if (omap->uhh_revision == OMAP4_UHH_REVISION) {
+	if (cpu_is_omap44xx()) {
 		/* Enable clocks for OMAP4 USBHOST */
 		omap->usbhost_fs_fck = clk_get(omap->dev, "usb_host_fs_fck");
 		if (IS_ERR(omap->usbhost_fs_fck)) {
@@ -458,7 +454,7 @@ err_xclk60mhsp1_ck:
 err_44host_fs_fck:
 		clk_put(omap->usbhost_hs_fck);
 
-	} else if (omap->uhh_revision == OMAP3_UHH_REVISION) {
+	} else {
 		/* Get all the clock handles we need */
 		omap->usbhost_ick = clk_get(omap->dev, "usbhost_ick");
 		if (IS_ERR(omap->usbhost_ick)) {
@@ -624,7 +620,7 @@ static void omap3_stop_ohci(struct ohci_hcd_omap3 *omap, struct usb_hcd *hcd)
 	dev_dbg(omap->dev, "stopping TI EHCI USB Controller\n");
 
 	/* Reset USBHOST for insmod/rmmod to work */
-	if (omap->uhh_revision == OMAP4_UHH_REVISION)
+	if (cpu_is_omap44xx())
 		ohci_omap_writel(omap->uhh_base, OMAP_UHH_SYSCONFIG,
 					OMAP4_UHH_SYSCONFIG_SOFTRESET);
 	else
