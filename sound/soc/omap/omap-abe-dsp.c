@@ -1427,10 +1427,17 @@ static int aess_open(struct snd_pcm_substream *substream)
 static int aess_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
-//	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *dai = rtd->cpu_dai;
 
-//	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
-//	runtime->dma_bytes = params_buffer_bytes(params);
+	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
+
+	if (dai->id != ABE_FRONTEND_DAI_MODEM)
+		return 0;
+
+	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+	runtime->dma_bytes = params_buffer_bytes(params);
 	return 0;
 }
 
@@ -1501,8 +1508,6 @@ static int aess_close(struct snd_pcm_substream *substream)
 		break;
 	}
 
-//	snd_pcm_set_runtime_buffer(substream, NULL);
-
 	mutex_unlock(&abe->mutex);
 	return 0;
 }
@@ -1514,7 +1519,8 @@ static struct snd_pcm_ops omap_aess_pcm_ops = {
 	.close	= aess_close,
 };
 
-#if 0
+/* This is all temp to convince MODEM we are a DMA channel */
+/* Will be replaced when we have buffereless transfer implemented */
 static u64 omap_pcm_dmamask = DMA_BIT_MASK(64);
 
 static int omap_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
@@ -1584,14 +1590,13 @@ static int omap_pcm_new(struct snd_card *card, struct snd_soc_dai *dai,
 out:
 	return ret;
 }
-#endif
 
 static struct snd_soc_platform_driver omap_aess_platform = {
 	.ops	= &omap_aess_pcm_ops,
 	.probe = abe_probe,
 	.remove = abe_remove,
-	//.pcm_new	= omap_pcm_new,
-	//.pcm_free	= omap_pcm_free_dma_buffers,
+	.pcm_new	= omap_pcm_new,
+	.pcm_free	= omap_pcm_free_dma_buffers,
 	.read = abe_dsp_read,
 	.write = abe_dsp_write,
 };

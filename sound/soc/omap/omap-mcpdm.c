@@ -184,6 +184,9 @@ static void omap_mcpdm_reset_playback(struct omap_mcpdm * mcpdm,
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
+/* HACK - FIXME:  */
+static int users[2] = {0, 0};
+
 /*
  * Enables the transfer through the PDM interface to/from the Phoenix
  * codec by enabling the corresponding UP or DN channels.
@@ -197,7 +200,8 @@ void omap_mcpdm_start(struct omap_mcpdm * mcpdm, int stream)
 	else
 		ctrl |= mcpdm->dn_channels;
 
-	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	if (users[stream]++ == 0)
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
 /*
@@ -213,7 +217,8 @@ void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, int stream)
 	else
 		ctrl &= ~mcpdm->dn_channels;
 
-	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	if (--users[stream] == 0)
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
 /*

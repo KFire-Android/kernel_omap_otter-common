@@ -431,7 +431,7 @@ static void abe_fe_shutdown(struct snd_pcm_substream *substream,
 {
 
 	if (dai->id == ABE_FRONTEND_DAI_MODEM)
-		snd_soc_dai_startup(abe_data.modem_substream[substream->stream],
+		snd_soc_dai_shutdown(abe_data.modem_substream[substream->stream],
 				abe_data.modem_dai);
 
 	//TODO: Do we need to do reset this stuff i.e. :-

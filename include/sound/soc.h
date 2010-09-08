@@ -752,6 +752,11 @@ static inline void *snd_soc_pcm_get_drvdata(struct snd_soc_pcm_runtime *rtd)
 	return dev_get_drvdata(&rtd->dev);
 }
 
+static inline int snd_soc_is_backend(struct snd_soc_pcm_runtime *rtd)
+{
+	return rtd->dai_link->no_pcm;
+}
+
 #include <sound/soc-dai.h>
 
 #endif

@@ -547,8 +547,7 @@ static int dapm_update_bits(struct snd_soc_dapm_widget *widget)
 	}
 	pr_debug("reg %x old %x new %x change %d\n", widget->reg,
 		 old, new, change);
-		printk("reg %x old %x new %x change %d\n", widget->reg,
-		 old, new, change);
+
 	return change;
 }
 
@@ -971,16 +970,15 @@ static void dapm_seq_insert(struct snd_soc_dapm_widget *new_widget,
 static void dapm_seq_run_coalesced(struct snd_soc_dapm_context *dapm,
 				   struct list_head *pending)
 {
-	struct snd_soc_dapm_widget *w, *wf;
+	struct snd_soc_dapm_widget *w, *_w;
 	int reg, power, ret;
 	unsigned int value = 0;
 	unsigned int mask = 0;
 	unsigned int cur_mask;
 
-	reg = list_first_entry(pending, struct snd_soc_dapm_widget,
-			       power_list)->reg;
-	wf = list_first_entry(pending, struct snd_soc_dapm_widget,
-			       power_list);
+	_w = list_first_entry(pending, struct snd_soc_dapm_widget,
+				power_list);
+	reg = _w->reg;
 
 	list_for_each_entry(w, pending, power_list) {
 		cur_mask = 1 << w->shift;
@@ -1027,7 +1025,7 @@ static void dapm_seq_run_coalesced(struct snd_soc_dapm_context *dapm,
 			"pop test : Applying 0x%x/0x%x to %x in %dms\n",
 			value, mask, reg, dapm->pop_time);
 		pop_wait(dapm->pop_time);
-		soc_widget_update_bits(wf, reg, mask, value);
+		soc_widget_update_bits(_w, reg, mask, value);
 	}
 
 	list_for_each_entry(w, pending, power_list) {
