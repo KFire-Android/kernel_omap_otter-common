@@ -1004,9 +1004,6 @@ int omap2_clkdm_clk_enable_post(struct clockdomain *clkdm, struct clk *clk)
 {
 	int v;
 
-	if (!cpu_is_omap44xx())
-		return 0;
-
 	v = omap2_clkdm_clktrctrl_read(clkdm);
 
 	if ((v == OMAP34XX_CLKSTCTRL_FORCE_WAKEUP) &&
