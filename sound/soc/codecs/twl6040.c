@@ -1544,6 +1544,7 @@ static int twl6040_suspend(struct snd_soc_codec *codec, pm_message_t state)
 
 static int twl6040_resume(struct snd_soc_codec *codec)
 {
+	/* TODO: read HS jack insertion status */
 	twl6040_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
 	twl6040_set_bias_level(codec, codec->dapm->suspend_bias_level);
 
@@ -1667,6 +1668,8 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	snd_soc_add_controls(codec, twl6040_snd_controls,
 				ARRAY_SIZE(twl6040_snd_controls));
 	twl6040_add_widgets(codec);
+
+	/* TODO: read HS jack insertion status */
 
 	return 0;
 
