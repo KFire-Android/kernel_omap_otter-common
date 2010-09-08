@@ -1352,69 +1352,6 @@ static int uhhtll_drv_enable(enum driver_type drvtype,	int enable,
 
 
 
-void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
-{
-	struct omap_hwmod *oh[2];
-	struct omap_device *od;
-	int  bus_id = -1;
-
-	if (cpu_is_omap34xx()) {
-		setup_ehci_io_mux(pdata->port_mode);
-		setup_ohci_io_mux(pdata->port_mode);
-	} else if (cpu_is_omap44xx()) {
-		setup_4430ehci_io_mux(pdata->port_mode);
-		setup_4430ohci_io_mux(pdata->port_mode);
-	}
-
-	oh[0] = omap_hwmod_lookup(USB_UHH_HS_HWMODNAME);
-
-	if (!oh[0]) {
-		pr_err("Could not look up %s\n", USB_UHH_HS_HWMODNAME);
-		return;
-	}
-
-	oh[1] = omap_hwmod_lookup(USB_TLL_HS_HWMODNAME);
-	if (!oh[1]) {
-		pr_err("Could not look up %s\n", USB_TLL_HS_HWMODNAME);
-		return;
-	}
-
-	od = omap_device_build_ss(uhhtllname, bus_id, oh, 2,
-				(void *)pdata, sizeof(*pdata),
-				omap_uhhtll_latency,
-				ARRAY_SIZE(omap_uhhtll_latency), false);
-
-	if (IS_ERR(od)) {
-		pr_err("Could not build hwmod devices %s and %s\n",
-			USB_UHH_HS_HWMODNAME, USB_TLL_HS_HWMODNAME);
-		return;
-	}
-
-	sema_init(&uhhtll.mutex, 1);
-
-	if (platform_driver_register(&uhhtll_hcd_omap_driver) < 0) {
-		pr_err("Unable to register HSUSB UHH TLL driver\n");
-		return;
-	}
-
-}
-
-#else
-
-void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
-{
-}
-
-#endif
-
-
-#if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
-
-
-static const char ehciname[] = "ehci-omap";
-#define USBHS_EHCI_HWMODNAME				"usbhs_ehci"
-static u64 ehci_dmamask = ~(u32)0;
-
 /* MUX settings for EHCI pins */
 /*
  * setup_ehci_io_mux - initialize IO pad mux for USBHOST
@@ -1676,69 +1613,6 @@ static void setup_4430ehci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 	return;
 }
 
-void __init usb_ehci_init(void)
-{
-	struct omap_hwmod *oh;
-	struct omap_device *od;
-	int  bus_id = -1;
-	struct platform_device	*pdev;
-	struct device	*dev;
-
-	oh = omap_hwmod_lookup(USBHS_EHCI_HWMODNAME);
-
-	if (!oh) {
-		pr_err("Could not look up %s\n", USBHS_EHCI_HWMODNAME);
-		return;
-	}
-
-	od = omap_device_build(ehciname, bus_id, oh,
-				(void *)&uhhtll_export, sizeof(uhhtll_export),
-				omap_uhhtll_latency,
-				ARRAY_SIZE(omap_uhhtll_latency), false);
-
-	if (IS_ERR(od)) {
-		pr_err("Could not build hwmod device %s\n",
-			USBHS_EHCI_HWMODNAME);
-		return;
-	} else {
-		pdev = &od->pdev;
-		dev = &pdev->dev;
-		get_device(dev);
-		dev->dma_mask = &ehci_dmamask;
-		dev->coherent_dma_mask = 0xffffffff;
-		put_device(dev);
-
-	}
-}
-
-#else
-
-void __init usb_ehci_init(void)
-{
-}
-
-static void setup_ehci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
-{
-}
-
-static void setup_4430ehci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
-{
-}
-
-#endif /* CONFIG_USB_EHCI_HCD */
-
-#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-
-#ifndef USB_UHHTLL_HCD_MODULE
-#define USB_UHHTLL_HCD_MODULE
-#endif
-
-
-static const char ohciname[] = "ohci-omap3";
-#define USBHS_OHCI_HWMODNAME				"usbhs_ohci"
-
-static u64 ohci_dmamask = DMA_BIT_MASK(32);
-
 static void setup_ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 {
 	switch (port_mode[0]) {
@@ -1923,6 +1797,129 @@ static void setup_4430ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 
 
 
+
+
+
+void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
+{
+	struct omap_hwmod *oh[2];
+	struct omap_device *od;
+	int  bus_id = -1;
+
+	if (cpu_is_omap34xx()) {
+		setup_ehci_io_mux(pdata->port_mode);
+		setup_ohci_io_mux(pdata->port_mode);
+	} else if (cpu_is_omap44xx()) {
+		setup_4430ehci_io_mux(pdata->port_mode);
+		setup_4430ohci_io_mux(pdata->port_mode);
+	}
+
+	oh[0] = omap_hwmod_lookup(USB_UHH_HS_HWMODNAME);
+
+	if (!oh[0]) {
+		pr_err("Could not look up %s\n", USB_UHH_HS_HWMODNAME);
+		return;
+	}
+
+	oh[1] = omap_hwmod_lookup(USB_TLL_HS_HWMODNAME);
+	if (!oh[1]) {
+		pr_err("Could not look up %s\n", USB_TLL_HS_HWMODNAME);
+		return;
+	}
+
+	od = omap_device_build_ss(uhhtllname, bus_id, oh, 2,
+				(void *)pdata, sizeof(*pdata),
+				omap_uhhtll_latency,
+				ARRAY_SIZE(omap_uhhtll_latency), false);
+
+	if (IS_ERR(od)) {
+		pr_err("Could not build hwmod devices %s and %s\n",
+			USB_UHH_HS_HWMODNAME, USB_TLL_HS_HWMODNAME);
+		return;
+	}
+
+	sema_init(&uhhtll.mutex, 1);
+
+	if (platform_driver_register(&uhhtll_hcd_omap_driver) < 0) {
+		pr_err("Unable to register HSUSB UHH TLL driver\n");
+		return;
+	}
+
+}
+
+#else
+
+void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
+{
+}
+
+#endif
+
+
+#if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
+
+
+static const char ehciname[] = "ehci-omap";
+#define USBHS_EHCI_HWMODNAME				"usbhs_ehci"
+static u64 ehci_dmamask = ~(u32)0;
+
+
+void __init usb_ehci_init(void)
+{
+	struct omap_hwmod *oh;
+	struct omap_device *od;
+	int  bus_id = -1;
+	struct platform_device	*pdev;
+	struct device	*dev;
+
+	oh = omap_hwmod_lookup(USBHS_EHCI_HWMODNAME);
+
+	if (!oh) {
+		pr_err("Could not look up %s\n", USBHS_EHCI_HWMODNAME);
+		return;
+	}
+
+	od = omap_device_build(ehciname, bus_id, oh,
+				(void *)&uhhtll_export, sizeof(uhhtll_export),
+				omap_uhhtll_latency,
+				ARRAY_SIZE(omap_uhhtll_latency), false);
+
+	if (IS_ERR(od)) {
+		pr_err("Could not build hwmod device %s\n",
+			USBHS_EHCI_HWMODNAME);
+		return;
+	} else {
+		pdev = &od->pdev;
+		dev = &pdev->dev;
+		get_device(dev);
+		dev->dma_mask = &ehci_dmamask;
+		dev->coherent_dma_mask = 0xffffffff;
+		put_device(dev);
+
+	}
+}
+
+#else
+
+void __init usb_ehci_init(void)
+{
+}
+
+#endif /* CONFIG_USB_EHCI_HCD */
+
+#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
+
+#ifndef USB_UHHTLL_HCD_MODULE
+#define USB_UHHTLL_HCD_MODULE
+#endif
+
+
+static const char ohciname[] = "ohci-omap3";
+#define USBHS_OHCI_HWMODNAME				"usbhs_ohci"
+
+static u64 ohci_dmamask = DMA_BIT_MASK(32);
+
+
 void __init usb_ohci_init(void)
 {
 	struct omap_hwmod *oh;
@@ -1961,14 +1958,6 @@ void __init usb_ohci_init(void)
 #else
 
 void __init usb_ohci_init(void)
-{
-}
-
-static void setup_ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
-{
-}
-
-static void setup_4430ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 {
 }
 #endif /* CONFIG_USB_OHCI_HCD */
