@@ -50,6 +50,11 @@
 #include "omap-mcpdm.h"
 #include "omap-pcm.h"
 
+enum dai_status {
+	PDM_STOPPED = 0,
+	PDM_STARTED,
+};
+
 struct omap_mcpdm_data {
 	struct omap_mcpdm_link *links;
 };
@@ -66,6 +71,8 @@ struct omap_mcpdm {
 	struct omap_mcpdm_link *downlink;
 	struct omap_mcpdm_link *uplink;
 	struct completion irq_completion;
+
+	enum dai_status status[4];
 
 	int dn_channels;
 	int up_channels;
@@ -193,13 +200,29 @@ static void omap_mcpdm_reset_playback(struct omap_mcpdm * mcpdm,
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
+static inline int omap_mcdpm_dl_stop_ready(struct omap_mcpdm *mcpdm)
+{
+	int i;
+
+	/* check the 3 DL DAIs */
+	for (i = 0; i < 3; i++) {
+		if (mcpdm->status[i] == PDM_STARTED)
+			return 0;
+	}
+
+	return 1;
+}
+
 /*
  * Enables the transfer through the PDM interface to/from the Phoenix
  * codec by enabling the corresponding UP or DN channels.
  */
-void omap_mcpdm_start(struct omap_mcpdm * mcpdm, int stream)
+static void omap_mcpdm_start(struct omap_mcpdm *mcpdm, struct snd_soc_dai *dai,
+		int stream)
 {
 	int ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
+
+	mcpdm->status[dai->id] = PDM_STARTED;
 
 	if (stream)
 		ctrl |= mcpdm->up_channels;
@@ -213,18 +236,20 @@ void omap_mcpdm_start(struct omap_mcpdm * mcpdm, int stream)
  * Disables the transfer through the PDM interface to/from the Phoenix
  * codec by disabling the corresponding UP or DN channels.
  */
-void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, int stream)
+static void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, struct snd_soc_dai *dai,
+		int stream)
 {
 	int ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
+
+	mcpdm->status[dai->id] = PDM_STOPPED;
 
 	if (stream)
 		ctrl &= ~mcpdm->up_channels;
 	else {
-	pr_debug("*** %s active %d\n", __func__, mcpdm->dl_active);
-		if (mcpdm->dl_active > 1)
+		if (!omap_mcdpm_dl_stop_ready(mcpdm))
 			return;
-	pr_debug("*** %s\n", __func__);
 		ctrl &= ~mcpdm->dn_channels;
+		dev_dbg(dai->dev, "%s: stop %d\n", __func__, dai->id);
 	}
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
@@ -555,9 +580,6 @@ static int omap_mcpdm_dai_hw_params(struct snd_pcm_substream *substream,
 	int stream = substream->stream;
 	int channels, err, link_mask = 0;
 
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK && mcpdm->dl_active > 1)
-		return 0;
-
 	snd_soc_dai_set_dma_data(dai, substream,
 				 &omap_mcpdm_dai_dma_params[stream]);
 
@@ -614,14 +636,14 @@ static int omap_mcpdm_dai_trigger(struct snd_pcm_substream *substream,
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		omap_mcpdm_start(mcpdm, stream);
+		omap_mcpdm_start(mcpdm, dai, stream);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		omap_mcpdm_stop(mcpdm, stream);
+		omap_mcpdm_stop(mcpdm, dai, stream);
 		break;
 	default:
 		break;
