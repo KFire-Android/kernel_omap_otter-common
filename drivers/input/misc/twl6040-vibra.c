@@ -111,8 +111,6 @@ static void vibra_play_work(struct work_struct *work)
 	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
 			0x32, TWL6040_REG_VIBDATR);
 
-	if(info->enabled)
-		vibra_disable(info);
 }
 
 static int vibra_play(struct input_dev *input, void *data,
