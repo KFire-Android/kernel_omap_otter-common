@@ -1212,10 +1212,12 @@ static void trigger_be_ports(struct abe_frontend_dai *fe,
 
 	for (i = 0; i < rtd->num_be; i++) {
 		be_rtd = rtd->be_rtd[i];
-		dev_dbg(&rtd->dev, "%s: be ID=%d cmd %d\n",
-				__func__, be_rtd->dai_link->be_id, fe->cmd);
+		dev_dbg(&rtd->dev, "%s: be ID=%d cmd %d act %d\n",
+				__func__, be_rtd->dai_link->be_id, fe->cmd,
+				abe_data.be_active[be_rtd->dai_link->be_id][fe->substream->stream]);
 
-		snd_soc_dai_trigger(fe->substream, fe->cmd, be_rtd->cpu_dai);
+		if (be_is_pending(be_rtd, fe->substream->stream))
+			snd_soc_dai_trigger(fe->substream, fe->cmd, be_rtd->cpu_dai);
 	}
 }
 
