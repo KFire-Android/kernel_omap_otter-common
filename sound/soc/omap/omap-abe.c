@@ -110,6 +110,12 @@ struct abe_capture_controls {
 	int amic_vol;
 };
 
+/* logical -> physical DAI status */
+enum dai_status {
+	DAI_STOPPED = 0,
+	DAI_STARTED,
+};
+
 struct abe_frontend_dai {
 
 	/* trigger work */
@@ -137,10 +143,10 @@ struct omap_abe_data {
 	struct snd_pcm_substream *modem_substream[2];
 	struct snd_soc_dai *modem_dai;
 
-	/* reference counting - HAL should really do this */
-	int mcpdm_dl_cnt;
-	int mcpdm_ul_cnt;
-	int dmic_cnt;
+	/* reference counting and port status - HAL should really do this */
+	enum dai_status dmic_status[3];
+	enum dai_status pdm_dl_status[3];
+	enum dai_status pdm_ul_status;
 
 };
 
@@ -194,69 +200,32 @@ static inline int be_is_pending(struct snd_soc_pcm_runtime *be_rtd, int stream)
 }
 
 /*
- * TODO: all this ref counting should go away with HAL 1.x
+ * consolidate our 3 PDM and DMICs.
  */
-
-static inline void pdm_dl_inc_active(void)
+static inline int pdm_ready(struct omap_abe_data *abe)
 {
-	abe_data.mcpdm_dl_cnt++;
-	pr_debug("%s %d\n", __func__, abe_data.mcpdm_dl_cnt);
+	int i;
+
+	/* check the 3 DL DAIs */
+	for (i = 0; i < 3; i++) {
+		if (abe->pdm_dl_status[i] == DAI_STARTED)
+			return 0;
+	}
+
+	return 1;
 }
 
-static inline void pdm_dl_dec_active(void)
+static inline int dmic_ready(struct omap_abe_data *abe)
 {
-	abe_data.mcpdm_dl_cnt--;
-	pr_debug("%s %d\n", __func__, abe_data.mcpdm_dl_cnt);
-}
+	int i;
 
-static inline int pdm_dl_active(void)
-{
-	return abe_data.mcpdm_ul_cnt;
-}
+	/* check the 3 DMIC DAIs */
+	for (i = 0; i < 3; i++) {
+		if (abe->dmic_status[i] == DAI_STARTED)
+			return 0;
+	}
 
-/* iff the PDM has one user can we start and stop the port */
-static inline int pdm_dl_is_pending(void)
-{
-	return abe_data.mcpdm_dl_cnt == 1 ? 1 : 0;
-}
-
-static inline void pdm_ul_inc_active(void)
-{
-	abe_data.mcpdm_ul_cnt++;
-	pr_debug("%s %d\n", __func__, abe_data.mcpdm_ul_cnt);
-}
-
-static inline void pdm_ul_dec_active(void)
-{
-	abe_data.mcpdm_ul_cnt--;
-	pr_debug("%s %d\n", __func__, abe_data.mcpdm_ul_cnt);
-}
-
-/* iff the PDM has one user can we start and stop the port */
-static inline int pdm_ul_is_pending(void)
-{
-	return abe_data.mcpdm_ul_cnt == 1 ? 1 : 0;
-}
-
-static inline int pdm_ul_active(void)
-{
-	return abe_data.mcpdm_ul_cnt;
-}
-
-static inline void dmic_inc_active(void)
-{
-	abe_data.dmic_cnt++;
-}
-
-static inline void dmic_dec_active(void)
-{
-	abe_data.dmic_cnt--;
-}
-
-/* iff the DMIC has one user can we start and stop the port */
-static inline int dmic_is_pending(void)
-{
-	return abe_data.dmic_cnt == 1 ? 1 : 0;
+	return 1;
 }
 
 static int modem_get_dai(struct snd_pcm_substream *substream)
@@ -553,9 +522,6 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 
 		/* update BE ref counts */
 		be_inc_active(rtd->be_rtd[i], substream->stream);
-		dev_dbg(&rtd->dev,"%s: inc active %s:%d at %d act %d\n", __func__,
-				rtd->be_rtd[i]->dai_link->name, rtd->be_rtd[i]->dai_link->be_id, i,
-				abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]);
 
 		if (be_is_pending(rtd->be_rtd[i], substream->stream)) {
 			ret = snd_soc_pcm_open(be_substream);
@@ -564,23 +530,6 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 			dev_dbg(&rtd->dev, "%s: open %s:%d at %d act %d\n", __func__,
 				rtd->be_rtd[i]->dai_link->name, rtd->be_rtd[i]->dai_link->be_id, i,
 				abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]);
-		}
-
-		switch (rtd->be_rtd[i]->dai_link->be_id) {
-		case OMAP_ABE_DAI_PDM_UL:
-			pdm_ul_inc_active();
-			break;
-		case OMAP_ABE_DAI_PDM_DL1:
-		case OMAP_ABE_DAI_PDM_DL2:
-			pdm_dl_inc_active();
-			break;
-		case OMAP_ABE_DAI_DMIC0:
-		case OMAP_ABE_DAI_DMIC1:
-		case OMAP_ABE_DAI_DMIC2:
-			dmic_inc_active();
-			break;
-		default:
-			break;
 		}
 	}
 
@@ -606,24 +555,6 @@ unwind:
 				abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]);
 		}
 		be_dec_active(rtd->be_rtd[i], substream->stream);
-
-		switch (rtd->be_rtd[i]->dai_link->be_id) {
-		case OMAP_ABE_DAI_PDM_UL:
-			pdm_ul_dec_active();
-			break;
-		case OMAP_ABE_DAI_PDM_DL1:
-		case OMAP_ABE_DAI_PDM_DL2:
-			pdm_dl_dec_active();
-			break;
-		case OMAP_ABE_DAI_DMIC0:
-		case OMAP_ABE_DAI_DMIC1:
-		case OMAP_ABE_DAI_DMIC2:
-			dmic_dec_active();
-			break;
-		default:
-			break;
-		}
-
 	}
 
 	return ret;
@@ -654,28 +585,7 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 				abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]);
 		}
 
-		dev_dbg(&rtd->dev,"%s: decrement %s:%d at %d act %d\n", __func__,
-				rtd->be_rtd[i]->dai_link->name, rtd->be_rtd[i]->dai_link->be_id, i,
-				abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]);
-
 		be_dec_active(rtd->be_rtd[i], substream->stream);
-
-		switch(rtd->be_rtd[i]->dai_link->be_id) {
-		case OMAP_ABE_DAI_PDM_UL:
-			pdm_ul_dec_active();
-			break;
-		case OMAP_ABE_DAI_PDM_DL1:
-		case OMAP_ABE_DAI_PDM_DL2:
-			pdm_dl_dec_active();
-			break;
-		case OMAP_ABE_DAI_DMIC0:
-		case OMAP_ABE_DAI_DMIC1:
-		case OMAP_ABE_DAI_DMIC2:
-			dmic_dec_active();
-			break;
-		default:
-			break;
-		}
 	}
 
 	/* now shutdown the frontend */
@@ -1020,22 +930,26 @@ static void enable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 
 		switch (be_rtd->dai_link->be_id) {
 		case OMAP_ABE_DAI_PDM_DL1:
-			if (be_is_pending(be_rtd, stream) && pdm_dl_is_pending())
+			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data))
 				abe_dai_enable_data_transfer(PDM_DL_PORT);
+			abe_data.pdm_dl_status[0] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
-			if (be_is_pending(be_rtd, stream) && pdm_dl_is_pending())
+			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data))
 				abe_dai_enable_data_transfer(PDM_DL_PORT);
+			abe_data.pdm_dl_status[1] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
-			if (be_is_pending(be_rtd, stream) && pdm_dl_is_pending())
+			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data))
 				abe_dai_enable_data_transfer(PDM_DL_PORT);
+			abe_data.pdm_dl_status[2] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_PDM_UL:
 			if (be_is_pending(be_rtd, stream)) {
 				abe_select_main_port(PDM_UL_PORT);
 				abe_dai_enable_data_transfer(PDM_UL_PORT);
 			}
+			abe_data.pdm_ul_status = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_BT_VX:
 			if (be_is_pending(be_rtd, stream)) {
@@ -1076,16 +990,19 @@ static void enable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 			}
 			break;
 		case OMAP_ABE_DAI_DMIC0:
-			if (be_is_pending(be_rtd, stream) && dmic_is_pending())
+			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
 				abe_dai_enable_data_transfer(DMIC_PORT);
+			abe_data.dmic_status[0] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_DMIC1:
-			if (be_is_pending(be_rtd, stream) && dmic_is_pending())
+			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
 				abe_dai_enable_data_transfer(DMIC_PORT1);
+			abe_data.dmic_status[1] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_DMIC2:
-			if (be_is_pending(be_rtd, stream) && dmic_is_pending())
+			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
 				abe_dai_enable_data_transfer(DMIC_PORT2);
+			abe_data.dmic_status[2] = DAI_STARTED;
 			break;
 		}
 	}
@@ -1147,33 +1064,37 @@ static void disable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 		// TODO: main port active logic will be moved into HAL
 		switch (be_rtd->dai_link->be_id) {
 		case OMAP_ABE_DAI_PDM_DL1:
-			if (be_is_pending(be_rtd, stream) && pdm_dl_is_pending()) {
+			abe_data.pdm_dl_status[0] = DAI_STOPPED;
+			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data)) {
 				abe_dai_disable_data_transfer(PDM_DL_PORT);
 
 				/* switch main port to UL since DL is inactive */
-				if (pdm_ul_active())
+				if (abe_data.pdm_ul_status == DAI_STARTED)
 					abe_select_main_port(PDM_UL_PORT);
 			}
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
-			if (be_is_pending(be_rtd, stream) && pdm_dl_is_pending()) {
+			abe_data.pdm_dl_status[1] = DAI_STOPPED;
+			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data)) {
 				abe_dai_disable_data_transfer(PDM_DL2_PORT);
 
 				/* switch main port to UL since DL is inactive */
-				if (pdm_ul_active())
+				if (abe_data.pdm_ul_status == DAI_STARTED)
 					abe_select_main_port(PDM_UL_PORT);
 			}
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
-			if (be_is_pending(be_rtd, stream) && pdm_dl_is_pending())
+			abe_data.pdm_dl_status[2] = DAI_STOPPED;
+			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data))
 				abe_dai_disable_data_transfer(PDM_VIB_PORT);
 			break;
 		case OMAP_ABE_DAI_PDM_UL:
+			abe_data.pdm_ul_status = DAI_STOPPED;
 			if (be_is_pending(be_rtd, stream)) {
 				abe_dai_disable_data_transfer(PDM_UL_PORT);
 
 				/* switch main port to DL since UL is inactive */
-				if (pdm_dl_active())
+				if (!pdm_ready(&abe_data))
 					abe_select_main_port(PDM_DL_PORT);
 			}
 			break;
@@ -1190,15 +1111,18 @@ static void disable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 			else
 				abe_dai_disable_data_transfer(MM_EXT_IN_PORT);
 		case OMAP_ABE_DAI_DMIC0:
-			if (be_is_pending(be_rtd, stream) && dmic_is_pending())
+			abe_data.dmic_status[0] = DAI_STOPPED;
+			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
 				abe_dai_disable_data_transfer(DMIC_PORT);
 			break;
 		case OMAP_ABE_DAI_DMIC1:
-			if (be_is_pending(be_rtd, stream) && dmic_is_pending())
+			abe_data.dmic_status[1] = DAI_STOPPED;
+			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
 				abe_dai_disable_data_transfer(DMIC_PORT1);
 			break;
 		case OMAP_ABE_DAI_DMIC2:
-			if (be_is_pending(be_rtd, stream) && dmic_is_pending())
+			abe_data.dmic_status[2] = DAI_STOPPED;
+			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
 				abe_dai_disable_data_transfer(DMIC_PORT2);
 			break;
 		}
@@ -1291,8 +1215,7 @@ static void trigger_be_ports(struct abe_frontend_dai *fe,
 		dev_dbg(&rtd->dev, "%s: be ID=%d cmd %d\n",
 				__func__, be_rtd->dai_link->be_id, fe->cmd);
 
-		if (be_is_pending(be_rtd, fe->substream->stream))
-			snd_soc_dai_trigger(fe->substream, fe->cmd, be_rtd->cpu_dai);
+		snd_soc_dai_trigger(fe->substream, fe->cmd, be_rtd->cpu_dai);
 	}
 }
 
