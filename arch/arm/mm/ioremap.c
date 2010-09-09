@@ -430,7 +430,7 @@ __arm_multi_strided_ioremap(int sections,
 			       cpu_is_xsc3()) && pfns[i] >= 0x100000 &&
 			       !((__pfn_to_phys(pfns[i]) | vstride | addr_i) & ~SUPERSECTION_MASK)) {
 				area->flags |= VM_ARM_SECTION_MAPPING;
-				err = remap_area_supersections(addr_i, pfns[i], size[i], type);
+				err = remap_area_supersections(addr_i, pfns[i], phys_size[i], type);
 			} else if (!((__pfn_to_phys(pfns[i]) | vstride | addr_i) & ~PMD_MASK)) {
 				area->flags |= VM_ARM_SECTION_MAPPING;
 				err = remap_area_sections(addr_i, pfns[i], vstride, type);
