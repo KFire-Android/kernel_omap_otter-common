@@ -1,0 +1,7 @@
+
+obj-$(CONFIG_OMAP_DEVICE_HANDLER)        += devh.o
+
+ccflags-y += -Wno-strict-prototypes
+
+#Header files
+ccflags-y += -Iarch/arm/plat-omap/include/syslink
