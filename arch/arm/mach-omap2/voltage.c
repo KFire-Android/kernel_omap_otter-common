@@ -1389,7 +1389,7 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 
 	plist_node_init(&user->node, *volt);
 	plist_add(&user->node, &vdd->user_list);
-	node = plist_first(&vdd->user_list);
+	node = plist_last(&vdd->user_list);
 	*volt = node->prio;
 
 	mutex_unlock(&vdd->scaling_mutex);
