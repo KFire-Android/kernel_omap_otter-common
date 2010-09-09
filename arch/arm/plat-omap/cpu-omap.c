@@ -33,8 +33,7 @@
 #include <asm/cpu.h>
 #include <plat/omap_device.h>
 
-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4) \
-				&& !defined(CONFIG_OMAP_PM_NONE)
+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 #include <plat/omap-pm.h>
 #include <plat/opp.h>
 #endif
@@ -96,8 +95,7 @@ static int omap_target(struct cpufreq_policy *policy,
 #if defined(CONFIG_ARCH_OMAP1) || defined(CONFIG_ARCH_OMAP4)
 	struct cpufreq_freqs freqs;
 #endif
-#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4) && \
-		!defined(CONFIG_OMAP_PM_NONE)
+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 	unsigned long freq;
 	struct device *mpu_dev = omap2_get_mpuss_device();
 #endif
@@ -131,8 +129,7 @@ static int omap_target(struct cpufreq_policy *policy,
 #endif
 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-#elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4) && \
-		!defined(CONFIG_OMAP_PM_NONE)
+#elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 #ifdef CONFIG_SMP
 	freqs.old = omap_getspeed(policy->cpu);
 	freqs.cpu = policy->cpu;

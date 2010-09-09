@@ -21,7 +21,14 @@ extern void omap3_pm_off_mode_enable(int);
 extern void omap_sram_idle(void);
 extern int omap3_can_sleep(void);
 extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+#ifdef CONFIG_PM
 extern int omap4_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+#else
+static inline int omap4_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+{
+	return 0;
+}
+#endif
 extern int omap3_idle_init(void);
 extern int omap4_idle_init(void);
 extern int omap4_can_sleep(void);

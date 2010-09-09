@@ -113,25 +113,25 @@ static inline unsigned long opp_get_freq(const struct omap_opp *opp)
 	return 0;
 }
 
-static inline int opp_get_opp_count(struct omap_opp *oppl)
+static inline int opp_get_opp_count(struct device *dev)
 {
 	return 0;
 }
 
-static inline struct omap_opp *opp_find_freq_exact(struct omap_opp *oppl,
+static inline struct omap_opp *opp_find_freq_exact(struct device *dev,
 						   unsigned long freq,
 						   bool enabled)
 {
 	return ERR_PTR(-EINVAL);
 }
 
-static inline struct omap_opp *opp_find_freq_floor(struct omap_opp *oppl,
+static inline struct omap_opp *opp_find_freq_floor(struct device *dev,
 						   unsigned long *freq)
 {
 	return ERR_PTR(-EINVAL);
 }
 
-static inline struct omap_opp *opp_find_freq_ceil(struct omap_opp *oppl,
+static inline struct omap_opp *opp_find_freq_ceil(struct device *dev,
 						  unsigned long *freq)
 {
 	return ERR_PTR(-EINVAL);
@@ -154,7 +154,7 @@ static inline unsigned long opp_get_rate(struct device *dev)
 }
 
 static inline void opp_populate_rate_fns(struct device *dev,
-		int (*set_rate)(struct device *dev, unsigned long rate)
+		int (*set_rate)(struct device *dev, unsigned long rate),
 		unsigned long (*get_rate) (struct device *dev))
 {
 	return;
@@ -177,7 +177,7 @@ static inline int opp_disable(struct omap_opp *opp)
 }
 
 static inline struct omap_opp *__deprecated
-opp_find_by_opp_id(struct omap_opp *opps, u8 opp_id)
+opp_find_by_opp_id(struct device *dev, u8 opp_id)
 {
 	return ERR_PTR(-EINVAL);
 }
@@ -188,7 +188,7 @@ static inline u8 __deprecated opp_get_opp_id(struct omap_opp *opp)
 }
 
 static inline
-void opp_init_cpufreq_table(struct omap_opp *opps,
+void opp_init_cpufreq_table(struct device *dev,
 			    struct cpufreq_frequency_table **table)
 {
 }
@@ -196,6 +196,7 @@ void opp_init_cpufreq_table(struct omap_opp *opps,
 static inline struct device **opp_init_voltage_params(
 			struct voltagedomain *voltdm, int *dev_count)
 {
+	return ERR_PTR(-EINVAL);
 }
 
 #endif		/* CONFIG_PM */
