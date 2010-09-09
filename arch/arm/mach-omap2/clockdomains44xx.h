@@ -160,7 +160,7 @@ static struct clockdomain l4_ao_44xx_clkdm = {
 	.pwrdm		  = { .name = "always_on_core_pwrdm" },
 	.clkstctrl_reg	  = OMAP4430_CM_ALWON_CLKSTCTRL,
 	.clktrctrl_mask	  = OMAP4430_CLKTRCTRL_MASK,
-	.flags		  = CLKDM_CAN_FORCE_WAKEUP,
+	.flags		  = CLKDM_CAN_FORCE_WAKEUP | CLKDM_CAN_HWSUP,
 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 
