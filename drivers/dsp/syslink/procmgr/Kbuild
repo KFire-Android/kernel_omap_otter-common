@@ -1,0 +1,9 @@
+libomap_syslink_proc = processor.o procmgr.o procmgr_drv.o
+
+obj-$(CONFIG_SYSLINK_PROC)        += syslink_proc.o
+syslink_proc-objs = $(libomap_syslink_proc)
+
+ccflags-y += -Wno-strict-prototypes
+
+#Header files
+ccflags-y += -Iarch/arm/plat-omap/include/syslink

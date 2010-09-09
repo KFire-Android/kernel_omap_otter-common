@@ -1,0 +1,9 @@
+libomap_proc4430 = proc4430.o proc4430_drv.o
+
+obj-$(CONFIG_SYSLINK_PROC)        += syslink_proc4430.o
+syslink_proc4430-objs = $(libomap_proc4430)
+
+ccflags-y += -Wno-strict-prototypes -DUSE_LEVEL_1_MACROS
+
+#Header files
+ccflags-y += -Iarch/arm/plat-omap/include/syslink
