@@ -18,7 +18,7 @@
  * 02110-1301 USA
  *
  */
-#define DEBUG
+#undef DEBUG
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
