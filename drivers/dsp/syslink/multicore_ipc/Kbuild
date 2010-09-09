@@ -1,0 +1,30 @@
+libsyslink_ipc = multiproc.o multiproc_ioctl.o nameserver.o \
+nameserver_ioctl.o nameserver_remote.o nameserver_remotenotify.o \
+listmp.o listmp_ioctl.o sharedregion.o sharedregion_ioctl.o \
+gate.o gatepeterson.o gatehwspinlock.o gatemp.o gatemp_ioctl.o \
+heap.o heapmemmp.o heapmemmp_ioctl.o heapbufmp.o heapbufmp_ioctl.o \
+messageq.o messageq_ioctl.o transportshm.o transportshm_setup.o \
+platform.o ipc.o sysipc_ioctl.o ipc_ioctl.o ipc_drv.o \
+../omap_notify/notify_driver.o ../omap_notify/notify.o \
+../omap_notify/drv_notify.o ../omap_notify/plat/omap4_notify_setup.o \
+../notify_ducatidriver/notify_ducati.o ../ipu_pm/ipu_pm.o
+
+libsyslink_platform = platform_mem.o
+
+obj-$(CONFIG_MPU_SYSLINK_IPC)        += syslink_ipc.o
+syslink_ipc-objs = $(libservices) $(libsyslink_ipc)
+
+obj-$(CONFIG_MPU_SYSLINK_PLATFORM)        += syslink_platform.o
+syslink_platform-objs = $(libservices) $(libsyslink_platform)
+
+ccflags-y += -Wno-strict-prototypes
+
+#Machine dependent
+ccflags-y += -D_TI_ -D_DB_TIOMAP -DTMS32060 \
+                -DTICFG_PROC_VER -DTICFG_EVM_TYPE -DCHNL_SMCLASS \
+                -DCHNL_MESSAGES -DUSE_LEVEL_1_MACROS  \
+                -DCONFIG_DISABLE_BRIDGE_PM -DDSP_TRACEBUF_DISABLED
+
+#Header files
+ccflags-y += -Iarch/arm/plat-omap/include
+ccflags-y += -Iarch/arm/plat-omap/include/syslink
