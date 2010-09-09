@@ -112,4 +112,6 @@ source "drivers/staging/Kconfig"
 
 source "drivers/platform/Kconfig"
 
+source "drivers/dsp/syslink/Kconfig"
+
 endmenu

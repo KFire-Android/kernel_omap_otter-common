@@ -1,0 +1,81 @@
+
+
+menuconfig Sys_Link
+	bool "Sys_Link"
+	depends on ARCH_OMAP4
+	default y
+
+if Sys_Link
+
+config  SYSLINK_PROC
+        tristate "Syslink ProcMgr"
+        default y
+	help
+           Syslink Proc manager
+
+config  SYSLINK_PROC4430
+        tristate "Proc 4430"
+        depends on SYSLINK_PROC
+        default y
+        help
+           Ducati Proc implementation
+
+config  DUCATI_BASEIMAGE_PHYS_ADDR
+	hex "Physical Address where the Ducati is loaded"
+	depends on SYSLINK_PROC4430
+	default 0x9CF00000
+	help
+	  Specify the physical address where the Ducati image will be
+	  loaded.
+
+config  SYSLINK_DUCATI_PM
+        tristate "DUCATI POWER MANAGEMENT"
+        depends on SYSLINK_PROC && SYSLINK_PROC4430
+        default n
+        help
+           Ducati Power Management Implementation
+
+config  OMAP_DEVICE_HANDLER
+        tristate "Device Handler"
+        depends on OMAP_IOMMU
+        select OMAP_REMOTE_PROC
+        select MPU_SYSLINK_IPC
+        default y
+        help
+          Select this to enable the Device Handler.  The Device Handler
+          is a module that handles device-specific events.  Events handled
+          include process termination.
+
+config MPU_SYSLINK_PLATFORM
+        tristate "Syslink Platform Module"
+        default y
+        help
+          Syslink Platform Module
+
+config MPU_SYSLINK_IPC
+        tristate "Syslink IPC Module"
+        depends on SYSLINK_PROC4430
+        default y
+        select OMAP_MBOX_FWK
+        select OMAP_REMOTE_PROC
+        help
+          Syslink IPC Module (includes Notify)
+
+config SYSLINK_USE_SYSMGR
+        bool "Enable SYS MGR setup"
+        depends on MPU_SYSLINK_IPC && SYSLINK_PROC
+        default y
+        help
+          This is the experimental option to enable SYS manager setup
+
+config SYSLINK_IOMMU_ENABLE
+        bool
+        select OMAP_IOMMU
+	select OMAP_USER_DMM
+	default y
+
+config SYSLINK_RECOVERY
+        bool "Enable Syslink Fault Recovery"
+	default y
+
+endif
