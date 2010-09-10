@@ -467,6 +467,9 @@ static void abe_fe_shutdown(struct snd_pcm_substream *substream,
 static void abe_be_dapm(struct snd_soc_pcm_runtime *rtd,
 		int id, int stream, int cmd)
 {
+	dev_dbg(&rtd->dev, "%s: id %d stream %d cmd %d\n",
+			__func__, id, stream, cmd);
+
 	switch (id) {
 	case ABE_FRONTEND_DAI_MEDIA:
 	case ABE_FRONTEND_DAI_LP_MEDIA:
@@ -518,7 +521,7 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 				rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
 
 		if (be_substream == NULL)
-			goto unwind;
+			continue;
 
 		/* update BE ref counts */
 		be_inc_active(rtd->be_rtd[i], substream->stream);
@@ -547,13 +550,21 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 unwind:
 	/* disable any enabled and non active backends */
 	for (--i; i >= 0; i--) {
+		struct snd_pcm_substream *be_substream =
+				rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
+
+		if (be_substream == NULL)
+			continue;
+
 		if (be_is_pending(rtd->be_rtd[i], substream->stream)) {
-			snd_soc_pcm_close(rtd->be_rtd[i]->pcm->streams[substream->stream].substream);
+
+			snd_soc_pcm_close(be_substream);
 
 			dev_dbg(&rtd->dev, "%s: open-err-close %s:%d at %d act %d\n", __func__,
 				rtd->be_rtd[i]->dai_link->name, rtd->be_rtd[i]->dai_link->be_id, i,
 				abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]);
 		}
+
 		be_dec_active(rtd->be_rtd[i], substream->stream);
 	}
 
@@ -572,14 +583,14 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 	for (i = 0; i < rtd->num_be; i++) {
 		struct snd_pcm_substream *be_substream =
 			rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
-		if (be_substream == NULL) {
-			dev_dbg(&rtd->dev, "%s no be for %d\n", __func__, substream->stream);
-			return;
-		}
+
+		if (be_substream == NULL)
+			continue;
 
 		/* close backend stream if inactive */
 		if (be_is_pending(rtd->be_rtd[i], substream->stream)) {
 			snd_soc_pcm_close(rtd->be_rtd[i]->pcm->streams[substream->stream].substream);
+
 			dev_dbg(&rtd->dev,"%s: close %s:%d at %d act %d\n", __func__,
 				rtd->be_rtd[i]->dai_link->name, rtd->be_rtd[i]->dai_link->be_id, i,
 				abe_data.be_active[rtd->be_rtd[i]->dai_link->be_id][substream->stream]);
@@ -610,10 +621,9 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	for (i = 0; i < rtd->num_be; i++) {
 		struct snd_pcm_substream *be_substream =
 			rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
-		if (be_substream == NULL) {
-			dev_dbg(&rtd->dev, "%s no be for %d\n", __func__, substream->stream);
-			return -EINVAL;
-		}
+
+		if (be_substream == NULL)
+			continue;
 
 		if (be_is_pending(rtd->be_rtd[i], substream->stream)) {
 			ret = snd_soc_pcm_hw_params(
@@ -672,10 +682,9 @@ static int omap_abe_dai_prepare(struct snd_pcm_substream *substream,
 	for (i = 0; i < rtd->num_be; i++) {
 		struct snd_pcm_substream *be_substream =
 			rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
-		if (be_substream == NULL) {
-			dev_dbg(&rtd->dev, "%s no be for %d\n", __func__,substream->stream);
-			return -EINVAL;
-		}
+
+		if (be_substream == NULL)
+			continue;
 
 		/* prepare backend stream */
 		if (be_is_pending(rtd->be_rtd[i], substream->stream))
@@ -714,10 +723,9 @@ static int omap_abe_dai_hw_free(struct snd_pcm_substream *substream,
 	for (i = 0; i < rtd->num_be; i++) {
 		struct snd_pcm_substream *be_substream =
 			rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
-		if (be_substream == NULL) {
-			dev_dbg(&rtd->dev, "%s no be for %d\n", __func__, substream->stream);
-			return -EINVAL;
-		}
+
+		if (be_substream == NULL)
+			continue;
 
 		if (be_is_pending(rtd->be_rtd[i], substream->stream))
 			snd_soc_pcm_hw_free(rtd->be_rtd[i]->pcm->streams[substream->stream].substream);
