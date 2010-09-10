@@ -1,0 +1,8 @@
+config SECURITY_MIDDLEWARE_COMPONENT
+	bool "Enable SMC Driver"
+	default n
+	help
+	  This option adds kernel support for communication with the SMC
+	  Protected Application.
+
+	  If you are unsure how to answer this question, answer N.
