@@ -134,7 +134,7 @@ struct abe_data {
 	/* DAPM mixer config - TODO: some of this can be replaced with HAL update */
 	u32 dapm[ABE_NUM_DAPM_REG];
 
-	u32 router[16];
+	u16 router[16];
 };
 
 static struct abe_data *abe;
