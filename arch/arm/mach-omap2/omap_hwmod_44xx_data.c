@@ -5876,7 +5876,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_l3_main_2_hwmod,
 	&omap44xx_l3_main_3_hwmod,
 	/* l4 class */
+#if 0
 	&omap44xx_l4_abe_hwmod,
+#endif
 	&omap44xx_l4_cfg_hwmod,
 	&omap44xx_l4_per_hwmod,
 	&omap44xx_l4_wkup_hwmod,
@@ -5890,6 +5892,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	/* dmic class */
 /*	&omap44xx_dmic_hwmod, */
 	/* dsp class */
+#if 0
 	&omap44xx_dsp_hwmod,
 	&omap44xx_dsp_c0_hwmod,
 	/* dss class */
@@ -5900,6 +5903,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_dss_hdmi_hwmod,
 	&omap44xx_dss_rfbi_hwmod,
 	&omap44xx_dss_venc_hwmod,
+#endif
 	/* elm class */
 /*	&omap44xx_elm_hwmod, */
 	/* emif class */
@@ -5915,7 +5919,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_gpio5_hwmod,
 	&omap44xx_gpio6_hwmod,
 	/* gpmc class */
+#if 0
 	&omap44xx_gpmc_hwmod,
+#endif
 	/* gpu class */
 	&omap44xx_gpu_hwmod,
 	/* hsi class */
@@ -5926,6 +5932,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_i2c3_hwmod,
 	&omap44xx_i2c4_hwmod,
 	/* ipu class */
+#if 0
 	&omap44xx_ipu_hwmod,
 	&omap44xx_ipu_c0_hwmod,
 	&omap44xx_ipu_c1_hwmod,
@@ -5935,6 +5942,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_iva_hwmod,
 	&omap44xx_iva_seq0_hwmod,
 	&omap44xx_iva_seq1_hwmod,
+#endif
 	/* kbd class */
 	&omap44xx_kbd_hwmod,
 	/* mailbox class */
@@ -5945,7 +5953,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_mcbsp3_hwmod,
 	&omap44xx_mcbsp4_hwmod,
 	/* mcpdm class */
+#if 0
 	&omap44xx_mcpdm_hwmod,
+#endif
 	/* mcspi class */
 	&omap44xx_mcspi1_hwmod,
 	&omap44xx_mcspi2_hwmod,
@@ -5965,9 +5975,11 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 /*	&omap44xx_slimbus1_hwmod, */
 /*	&omap44xx_slimbus2_hwmod, */
 	/* smartreflex class */
+#if 0
 	&omap44xx_smartreflex_core_hwmod,
 	&omap44xx_smartreflex_iva_hwmod,
 	&omap44xx_smartreflex_mpu_hwmod,
+#endif
 	/* spinlock class */
 	&omap44xx_spinlock_hwmod,
 	/* timer class */
@@ -5975,10 +5987,12 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_timer2_hwmod,
 	&omap44xx_timer3_hwmod,
 	&omap44xx_timer4_hwmod,
+#if 0
 	&omap44xx_timer5_hwmod,
 	&omap44xx_timer6_hwmod,
 	&omap44xx_timer7_hwmod,
 	&omap44xx_timer8_hwmod,
+#endif
 	&omap44xx_timer9_hwmod,
 	&omap44xx_timer10_hwmod,
 	&omap44xx_timer11_hwmod,

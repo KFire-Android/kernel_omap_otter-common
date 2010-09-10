@@ -53,7 +53,7 @@
  * disabled via sysfs. This also causes that any deeper omap sleep states are
  * blocked. 
  */
-#define DEFAULT_TIMEOUT 0
+#define DEFAULT_TIMEOUT 5
 
 #define MAX_UART_HWMOD_NAME_LEN		16
 
