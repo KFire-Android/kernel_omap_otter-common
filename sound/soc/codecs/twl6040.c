@@ -1320,6 +1320,8 @@ static int twl6040_hw_params(struct snd_pcm_substream *substream,
 
 static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
 {
+/* TODO: this needs full evaluation */
+#if 0
 	struct snd_soc_codec *codec = codec_dai->codec;
 
 	if (mute) {
@@ -1332,7 +1334,7 @@ static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
 							TWL6040_REG_HSGAIN);
 		}
 	}
-
+#endif
 	return 0;
 }
 
