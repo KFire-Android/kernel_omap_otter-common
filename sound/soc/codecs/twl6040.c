@@ -708,13 +708,21 @@ static void twl6040_audint_work(struct work_struct *work)
 		/* Debounce */
 		msleep(200);
 		report = jack->report;
-		snd_soc_jack_report(jack->jack, report, jack->report);
+
+		/*
+		 * Early interrupt, CODEC driver cannot report jack status
+		 * since jack is not registered yet. MACHINE driver will
+		 * register jack and report status thru twl6040_hs_jack_detect
+		 */
+		if (jack->jack)
+			snd_soc_jack_report(jack->jack, report, jack->report);
 	}
 
 	if (intid & TWL6040_UNPLUGINT) {
 		/* Debounce */
 		msleep(200);
-		snd_soc_jack_report(jack->jack, report, jack->report);
+		if (jack->jack)
+			snd_soc_jack_report(jack->jack, report, jack->report);
 	}
 
 	if (intid & TWL6040_HFINT)
