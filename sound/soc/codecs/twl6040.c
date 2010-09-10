@@ -29,6 +29,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/i2c/twl.h>
+#include <linux/switch.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -74,6 +75,7 @@ struct twl6040_output {
 struct twl6040_jack_data {
 	struct snd_soc_jack *jack;
 	int report;
+	struct switch_dev sdev;
 };
 
 /* codec private data */
@@ -742,6 +744,8 @@ static void twl6040_audint_work(struct work_struct *work)
 		 */
 		if (jack->jack)
 			snd_soc_jack_report(jack->jack, report, jack->report);
+
+		switch_set_state(&jack->sdev, !!report);
 	}
 
 	if (intid & TWL6040_UNPLUGINT) {
@@ -749,6 +753,8 @@ static void twl6040_audint_work(struct work_struct *work)
 		msleep(200);
 		if (jack->jack)
 			snd_soc_jack_report(jack->jack, report, jack->report);
+
+		switch_set_state(&jack->sdev, !!report);
 	}
 
 	if (intid & TWL6040_HFINT)
@@ -1609,7 +1615,7 @@ void twl6040_hs_jack_detect(struct snd_soc_codec *codec,
 			    struct snd_soc_jack *jack, int report)
 {
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
-	int status;
+	int status, state;
 
 	priv->hs_jack.jack = jack;
 	priv->hs_jack.report = report;
@@ -1617,9 +1623,12 @@ void twl6040_hs_jack_detect(struct snd_soc_codec *codec,
 	/* Sync status */
 	status = twl6040_read_reg_volatile(codec, TWL6040_REG_STATUS);
 	if(status & TWL6040_PLUGCOMP)
-		snd_soc_jack_report(jack, report, report);
+		state = report;
 	else
-		snd_soc_jack_report(jack, 0, report);
+		state = 0;
+
+	snd_soc_jack_report(jack, state, report);
+	switch_set_state(&priv->hs_jack.sdev, !!state);
 }
 EXPORT_SYMBOL_GPL(twl6040_hs_jack_detect);
 
@@ -1627,6 +1636,7 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 {
 	struct twl4030_codec_audio_data *twl_codec = codec->dev->platform_data;
 	struct twl6040_data *priv;
+	struct twl6040_jack_data *jack;
 	int audpwron, naudint;
 	int ret = 0;
 	u8 icrev, intmr = TWL6040_ALLINT_MSK;
@@ -1661,6 +1671,15 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	omap_writew(0x0118, 0x4A1001A0);
 
 	INIT_WORK(&priv->audint_work, twl6040_audint_work);
+
+	/* switch-class based headset detection */
+	jack = &priv->hs_jack;
+	jack->sdev.name = "h2w";
+	ret = switch_dev_register(&jack->sdev);
+	if (ret) {
+		dev_err(codec->dev, "error registering switch device %d\n", ret);
+		goto switch_err;
+	}
 
 	if (gpio_is_valid(audpwron)) {
 		ret = gpio_request(audpwron, "audpwron");
@@ -1732,6 +1751,8 @@ gpio2_err:
 	if (gpio_is_valid(audpwron))
 		gpio_free(audpwron);
 gpio1_err:
+	switch_dev_unregister(&jack->sdev);
+switch_err:
 	kfree(priv);
 	return ret;
 }
@@ -1739,6 +1760,7 @@ gpio1_err:
 static int twl6040_remove(struct snd_soc_codec *codec)
 {
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+	struct twl6040_jack_data *jack = &priv->hs_jack;
 	int audpwron = priv->audpwron;
 	int naudint = priv->naudint;
 
@@ -1751,6 +1773,7 @@ static int twl6040_remove(struct snd_soc_codec *codec)
 		free_irq(naudint, codec);
 
 	cancel_work_sync(&priv->audint_work);
+	switch_dev_unregister(&jack->sdev);
 	destroy_workqueue(priv->hf_workqueue);
 	destroy_workqueue(priv->hs_workqueue);
 	kfree(priv);
