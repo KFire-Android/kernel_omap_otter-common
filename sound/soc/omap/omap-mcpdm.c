@@ -36,6 +36,7 @@
 #include <linux/irq.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/workqueue.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -65,6 +66,8 @@ struct omap_mcpdm {
 	void __iomem *io_base;
 	u8 free;
 	int irq;
+	struct workqueue_struct *workqueue;
+	struct delayed_work delayed_work;
 
 	spinlock_t lock;
 	struct omap_mcpdm_platform_data *pdata;
@@ -487,10 +490,12 @@ void omap_mcpdm_free(struct omap_mcpdm *mcpdm)
 		spin_unlock(&mcpdm->lock);
 		return;
 	}
+
 	mcpdm->free = 1;
 	spin_unlock(&mcpdm->lock);
 
 	pm_runtime_put_sync(&pdev->dev);
+
 #ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_idle)
 		pdata->device_idle(pdev);
@@ -557,19 +562,32 @@ static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 
 	dev_dbg(dai->dev, "%s: active %d\n", __func__, dai->active);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		mcpdm->dl_active--;
-		if (mcpdm->dl_active == 0)
-			omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
-	} else
+	else
 		mcpdm->ul_active--;
 
 	if (!dai->active) {
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
-		if (!mcpdm->free && !mcpdm->dl_active && !mcpdm->ul_active)
-			omap_mcpdm_free(mcpdm);
+		if (mcpdm->dl_active == 0 && substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+				queue_delayed_work(mcpdm->workqueue, &mcpdm->delayed_work,
+						msecs_to_jiffies(11000)); // TODO: pdata ?
 	}
+
+}
+
+/* work to delay McPDM shutdown */
+static void playback_work(struct work_struct *work)
+{
+	struct omap_mcpdm *mcpdm =
+			container_of(work, struct omap_mcpdm, delayed_work.work);
+
+	if (!mcpdm->dl_active)
+		omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
+
+	if (!mcpdm->free && !mcpdm->dl_active && !mcpdm->ul_active)
+		omap_mcpdm_free(mcpdm);
 }
 
 static int omap_mcpdm_dai_hw_params(struct snd_pcm_substream *substream,
@@ -743,14 +761,21 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 
 	mcpdm->dev = &pdev->dev;
 
-	/* TODO: values will be different per device, read from FS */
-	mcpdm->dl1_offset = 0x10;
-	mcpdm->dl2_offset = 0x10;
+	// TODO: values will be different per device, read from FS
+	mcpdm->dl1_offset = 0x1F;
+	mcpdm->dl2_offset = 0x1F;
+
+	mcpdm->workqueue = create_singlethread_workqueue("mcpdm");
+	if (mcpdm->workqueue == NULL)
+		goto err_work;
+	INIT_DELAYED_WORK(&mcpdm->delayed_work, playback_work);
 
 	ret = snd_soc_register_dais(&pdev->dev, omap_mcpdm_dai,
 			ARRAY_SIZE(omap_mcpdm_dai));
 	if (ret == 0)
 		return 0;
+err_work:
+	free_irq(mcpdm->irq, mcpdm);
 err_irq:
 	iounmap(mcpdm->io_base);
 err_resource:
@@ -767,6 +792,7 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 
 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_mcpdm_dai));
 	pm_runtime_put_sync(&pdev->dev);
+	destroy_workqueue(mcpdm->workqueue);
 #ifndef CONFIG_PM_RUNTIME
 	if (pdata->device_shutdown)
 		pdata->device_shutdown(pdev);
