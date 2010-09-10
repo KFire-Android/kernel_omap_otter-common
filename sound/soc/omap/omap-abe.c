@@ -954,7 +954,9 @@ static void enable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 			break;
 		case OMAP_ABE_DAI_PDM_UL:
 			if (be_is_pending(be_rtd, stream)) {
-				abe_select_main_port(PDM_UL_PORT);
+			/* switch main port to UL since DL is inactive */
+				if (pdm_ready(&abe_data))
+					abe_select_main_port(PDM_UL_PORT);
 				abe_dai_enable_data_transfer(PDM_UL_PORT);
 			}
 			abe_data.pdm_ul_status = DAI_STARTED;
@@ -1100,9 +1102,8 @@ static void disable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 			abe_data.pdm_ul_status = DAI_STOPPED;
 			if (be_is_pending(be_rtd, stream)) {
 				abe_dai_disable_data_transfer(PDM_UL_PORT);
-
 				/* switch main port to DL since UL is inactive */
-				if (!pdm_ready(&abe_data))
+				if (pdm_ready(&abe_data))
 					abe_select_main_port(PDM_DL_PORT);
 			}
 			break;
