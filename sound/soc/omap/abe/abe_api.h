@@ -442,7 +442,7 @@ abehal_status abe_read_mixer (u32 id, u32 *f_g, u32 p);
  * route the samples to three directions : REC1 mixer, 2 EANC DMIC source of
  * filtering and MM recording audio path.
  */
-abehal_status abe_set_router_configuration (u32 id, u32 k, u32 *param);
+abehal_status abe_set_router_configuration (u32 id, u32 k, u16 *param);
 
 /**
  * abe_select_data_source

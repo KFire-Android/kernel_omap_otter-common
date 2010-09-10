@@ -1736,7 +1736,7 @@ EXPORT_SYMBOL(abe_read_mixer);
  * indexes 14 .. 15 = RESERVED (NULL)
  *	ZERO_labelID, ZERO_labelID,
  */
-abehal_status abe_set_router_configuration(u32 id, u32 k, u32 * param)
+abehal_status abe_set_router_configuration(u32 id, u32 k, u16 * param)
 {
 
   _log(id_set_router_configuration, id, (u32) param, (u32) param >> 8)
