@@ -1185,17 +1185,31 @@ static void disable_fe_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 	}
 }
 
-// TODO: finish this
-static void mute_fe_port(struct snd_soc_pcm_runtime *rtd, int stream)
+/* TODO: finish this */
+static void mute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runtime *rtd, int stream)
 {
+	struct snd_soc_pcm_runtime *be_rtd;
+
 	dev_dbg(&rtd->dev, "%s: fe ID=%d stream %d\n",
 			__func__, rtd->cpu_dai->id, stream);
 
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_read_mixer(MIXDL2, &fe->playback.dl2_vol,
+				MIX_DL2_INPUT_MM_DL);
+			abe_write_mixer(MIXDL2, MUTE_GAIN, RAMP_0MS,
+				MIX_DL2_INPUT_MM_DL);
+		}
 	case ABE_FRONTEND_DAI_LP_MEDIA:
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_read_mixer(MIXDL1, &fe->playback.dl1_vol,
+				MIX_DL1_INPUT_MM_DL);
+			abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS,
+				MIX_DL1_INPUT_MM_DL);
+		}
+		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
-	//	if (stream == SNDRV_PCM_STREAM_CAPTURE)
 		break;
 	case ABE_FRONTEND_DAI_VOICE:
 	case ABE_FRONTEND_DAI_TONES:
@@ -1205,17 +1219,27 @@ static void mute_fe_port(struct snd_soc_pcm_runtime *rtd, int stream)
 	}
 }
 
-// TODO: finish this
-static void unmute_fe_port(struct snd_soc_pcm_runtime *rtd, int stream)
+/* TODO: finish this */
+static void unmute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runtime *rtd, int stream)
 {
+	struct snd_soc_pcm_runtime *be_rtd;
+
 	dev_dbg(&rtd->dev, "%s: fe ID=%d stream %d\n",
 			__func__, rtd->cpu_dai->id, stream);
 
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_write_mixer(MIXDL2, fe->playback.dl2_vol,
+				 RAMP_0MS, MIX_DL2_INPUT_MM_DL);
+		}
 	case ABE_FRONTEND_DAI_LP_MEDIA:
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_write_mixer(MIXDL1, fe->playback.dl1_vol,
+				 RAMP_0MS, MIX_DL1_INPUT_MM_DL);
+		}
+		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
-	//	if (stream == SNDRV_PCM_STREAM_CAPTURE)
 		break;
 	case ABE_FRONTEND_DAI_VOICE:
 	case ABE_FRONTEND_DAI_TONES:
@@ -1335,28 +1359,28 @@ static void playback_work(struct work_struct *work)
 		enable_fe_ports(rtd, SNDRV_PCM_STREAM_PLAYBACK);
 
 		/* unmute ABE_MM_DL */
-		unmute_fe_port(rtd, SNDRV_PCM_STREAM_PLAYBACK);
+		unmute_fe_port(fe, rtd, SNDRV_PCM_STREAM_PLAYBACK);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		/* Enable Frontend sDMA  */
 		enable_fe_ports(rtd, SNDRV_PCM_STREAM_PLAYBACK);
 
 		/* unmute ABE_MM_DL */
-		unmute_fe_port(rtd, SNDRV_PCM_STREAM_PLAYBACK);
+		unmute_fe_port(fe, rtd, SNDRV_PCM_STREAM_PLAYBACK);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		/* Enable Frontend sDMA  */
 		disable_fe_ports(rtd, SNDRV_PCM_STREAM_PLAYBACK);
 
 		/* mute ABE_MM_DL */
-		mute_fe_port(rtd, SNDRV_PCM_STREAM_PLAYBACK);
+		mute_fe_port(fe, rtd, SNDRV_PCM_STREAM_PLAYBACK);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 		/* disable the transfer */
 		disable_fe_ports(rtd, SNDRV_PCM_STREAM_PLAYBACK);
 
 		/* mute ABE_MM_DL */
-		mute_fe_port(rtd, SNDRV_PCM_STREAM_PLAYBACK);
+		mute_fe_port(fe, rtd, SNDRV_PCM_STREAM_PLAYBACK);
 
 		/* TODO :mute Phoenix */
 
