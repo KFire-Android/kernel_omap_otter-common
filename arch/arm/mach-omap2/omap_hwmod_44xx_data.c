@@ -5926,6 +5926,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 #if 0
 	&omap44xx_dsp_hwmod,
 	&omap44xx_dsp_c0_hwmod,
+#endif
 	/* dss class */
 	&omap44xx_dss_hwmod,
 	&omap44xx_dss_dispc_hwmod,
@@ -5934,7 +5935,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_dss_hdmi_hwmod,
 	&omap44xx_dss_rfbi_hwmod,
 	&omap44xx_dss_venc_hwmod,
-#endif
+
 	/* elm class */
 /*	&omap44xx_elm_hwmod, */
 	/* emif class */
