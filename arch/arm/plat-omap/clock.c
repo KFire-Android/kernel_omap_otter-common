@@ -334,6 +334,7 @@ struct clk *omap_clk_get_by_name(const char *name)
 
 	return ret;
 }
+EXPORT_SYMBOL(omap_clk_get_by_name);
 
 /*
  * Low level helpers
