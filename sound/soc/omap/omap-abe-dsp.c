@@ -737,9 +737,9 @@ static const struct snd_kcontrol_new mm_vx1_control =
 
 /* DL1 mixer paths */
 static const struct snd_kcontrol_new dl1_mixer_controls[] = {
-	SOC_SINGLE_EXT("Tones", MIX_DL2_INPUT_TONES, 0, 1, 0,
+	SOC_SINGLE_EXT("Tones", MIX_DL1_INPUT_TONES, 0, 1, 0,
 		abe_get_mixer, dl1_put_mixer),
-	SOC_SINGLE_EXT("Voice", MIX_DL2_INPUT_VX_DL, 1, 1, 0,
+	SOC_SINGLE_EXT("Voice", MIX_DL1_INPUT_VX_DL, 1, 1, 0,
 		abe_get_mixer, dl1_put_mixer),
 	SOC_SINGLE_EXT("Capture", MIX_DL1_INPUT_MM_UL2, 2, 1, 0,
 		abe_get_mixer, dl1_put_mixer),
