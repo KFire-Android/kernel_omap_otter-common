@@ -226,6 +226,8 @@ struct bus_type *dss_get_bus(void);
 struct regulator *dss_get_vdds_dsi(void);
 struct regulator *dss_get_vdds_sdi(void);
 struct regulator *dss_get_vdda_dac(void);
+void dss_opt_clock_enable(void);
+void dss_opt_clock_disable(void);
 
 /* display */
 int dss_suspend_all_devices(void);

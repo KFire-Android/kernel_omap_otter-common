@@ -325,6 +325,20 @@ void dss_clk_enable(enum dss_clock clks)
 	if (check_ctx && cpu_is_omap34xx() && dss_need_ctx_restore())
 		restore_all_ctx();
 }
+void dss_opt_clock_enable()
+{
+	clk_enable(core.dss_ick);
+	clk_enable(core.dss1_fck);
+
+} EXPORT_SYMBOL(dss_opt_clock_enable);
+
+void dss_opt_clock_disable()
+{
+	clk_disable(core.dss_ick);
+	clk_disable(core.dss1_fck);
+
+} EXPORT_SYMBOL(dss_opt_clock_disable);
+
 static void dss_clk_disable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
@@ -779,6 +793,11 @@ static int omap_dsshw_probe(struct platform_device *pdev)
 	int r;
 
 	pm_runtime_enable(&pdev->dev);
+	r = dss_get_clocks();
+	if (r)
+		goto err_dss;
+
+	dss_clk_enable_all_no_ctx();
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	/* DISPC_CONTROL */
 	if (omap_readl(0x48050440) & 1)	/* LCD enabled? */
