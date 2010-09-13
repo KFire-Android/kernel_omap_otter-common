@@ -16,6 +16,9 @@
 
 #include <linux/types.h>
 #include <linux/list.h>
+#include <linux/plist.h>
+#include <linux/mutex.h>
+#include <linux/spinlock.h>
 
 #include <asm/atomic.h>
 
@@ -74,6 +77,16 @@
 /* XXX A completely arbitrary number. What is reasonable here? */
 #define PWRDM_TRANSITION_BAILOUT 100000
 
+/* Powerdomain functional power states */
+#define PWRDM_FUNC_PWRST_OFF	0x0
+#define PWRDM_FUNC_PWRST_OSWR	0x1
+#define PWRDM_FUNC_PWRST_CSWR	0x2
+#define PWRDM_FUNC_PWRST_ON	0x3
+
+#define PWRDM_MAX_FUNC_PWRSTS	4
+
+#define UNSUP_STATE -1
+
 struct clockdomain;
 struct powerdomain;
 
@@ -94,6 +107,10 @@ struct powerdomain;
  * @state_counter:
  * @timer:
  * @state_timer:
+ * @wakeup_lat: Wakeup latencies for possible powerdomain power states
+ * @wakeuplat_lock: spinlock for plist
+ * @wakeuplat_dev_list: plist_head linking all devices placing constraint
+ * @wakeuplat_mutex: mutex to protect per powerdomain list ops
  */
 struct powerdomain {
 	const char *name;
@@ -117,6 +134,16 @@ struct powerdomain {
 	s64 timer;
 	s64 state_timer[PWRDM_MAX_PWRSTS];
 #endif
+	const u32 wakeup_lat[PWRDM_MAX_FUNC_PWRSTS];
+	spinlock_t wakeuplat_lock;
+	struct plist_head wakeuplat_dev_list;
+	struct mutex wakeuplat_mutex;
+};
+
+struct wakeuplat_dev_list {
+	struct device *dev;
+	unsigned long constraint_us;
+	struct plist_node node;
 };
 
 struct pwrdm_functions {
@@ -185,5 +212,11 @@ int pwrdm_clkdm_state_switch(struct clockdomain *clkdm);
 int pwrdm_pre_transition(void);
 int pwrdm_post_transition(void);
 int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
+
+int pwrdm_wakeuplat_set_constraint(struct powerdomain *pwrdm,
+				   struct device *dev, unsigned long t);
+int pwrdm_wakeuplat_release_constraint(struct powerdomain *pwrdm,
+				       struct device *dev);
+int pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm);
 
 #endif
