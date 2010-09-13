@@ -266,15 +266,18 @@ static struct gpio_led sdp4430_gpio_leds[] = {
 		.gpio	= 50,
 	},
 	{
-		.name	= "omap4:blue:user",
+		.name	= "blue",
+		.default_trigger = "timer",
 		.gpio	= 169,
 	},
 	{
-		.name	= "omap4:red:user",
+		.name	= "red",
+		.default_trigger = "timer",
 		.gpio	= 170,
 	},
 	{
-		.name	= "omap4:green:user",
+		.name	= "green",
+		.default_trigger = "timer",
 		.gpio	= 139,
 	},
 };
