@@ -137,6 +137,8 @@ struct abe_data {
 	unsigned int dl21_equ_profile;
 	unsigned int amic_equ_profile;
 
+	int active;
+
 	/* DAPM mixer config - TODO: some of this can be replaced with HAL update */
 	u32 dapm[ABE_NUM_DAPM_REG];
 
@@ -1520,6 +1522,8 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 static int aess_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime  *rtd = substream->private_data;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
 	int i, opp = 0;
 
 	mutex_lock(&abe->mutex);
@@ -1537,16 +1541,22 @@ static int aess_prepare(struct snd_pcm_substream *substream)
 
 	switch (opp) {
 	case 25:
-		//abe_set_opp_processing(ABE_OPP25);
+		/* OPP25 is not ready to be used */
+		abe_set_opp_processing(ABE_OPP50);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 50:
-		//abe_set_opp_processing(ABE_OPP50);
+		abe_set_opp_processing(ABE_OPP50);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 100:
 	default:
 		abe_set_opp_processing(ABE_OPP100);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
 		break;
 	}
+
+	abe->active++;
 
 	mutex_unlock(&abe->mutex);
 	return 0;
@@ -1576,17 +1586,24 @@ static int aess_close(struct snd_pcm_substream *substream)
 
 	switch (opp) {
 	case 25:
-		//abe_set_opp_processing(ABE_OPP25);
+		/* OPP25 is not ready to be used */
+		abe_set_opp_processing(ABE_OPP50);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 50:
-		//abe_set_opp_processing(ABE_OPP50);
+		abe_set_opp_processing(ABE_OPP50);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 100:
 	default:
 		abe_set_opp_processing(ABE_OPP100);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
 		break;
 	}
 	pm_runtime_put_sync(&pdev->dev);
+
+	if (!--abe->active)
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 0);
 
 	mutex_unlock(&abe->mutex);
 	return 0;
