@@ -682,7 +682,9 @@ int dss_init(bool skip_init, struct platform_device *pdev)
 		 */
 		msleep(50);
 
-		_omap_dss_reset();
+		/* In OMAP44xx HWMOD would take care of resetting the module */
+		if (cpu_is_omap44xx())
+			_omap_dss_reset();
 	}
 
 	/* autoidle */
