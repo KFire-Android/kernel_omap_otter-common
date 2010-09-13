@@ -302,6 +302,9 @@ static void dss_clk_enable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
 
+	if (cpu_is_omap44xx())
+		return;
+
 	if (clks & DSS_CLK_ICK)
 		clk_enable(core.dss_ick);
 	if (clks & DSS_CLK_FCK1)
@@ -342,6 +345,9 @@ void dss_opt_clock_disable()
 static void dss_clk_disable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
+
+	if (cpu_is_omap44xx())
+		return;
 
 	if (clks & DSS_CLK_ICK)
 		clk_disable(core.dss_ick);

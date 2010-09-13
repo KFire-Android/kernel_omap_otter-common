@@ -665,6 +665,8 @@ int dss_init(bool skip_init, struct platform_device *pdev)
 		goto fail0;
 	}
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_FCK2 | DSS_CLK_54M | DSS_CLK_96M);
+	dss_opt_clock_enable();
+	dss_mainclk_enable();
 
 	if (!skip_init) {
 		/* disable LCD and DIGIT output. This seems to fix the synclost
