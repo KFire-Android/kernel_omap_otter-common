@@ -66,7 +66,6 @@ static int _init_omap_device(char *name, struct device **new_dev)
 	if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
 		 __func__, name))
 		return -ENODEV;
-
 	od = omap_device_build(oh->name, 0, oh, NULL, 0, pm_lats, 0, false);
 	if (WARN(IS_ERR(od), "%s: could not build omap_device for %s\n",
 		 __func__, name))
@@ -82,10 +81,22 @@ static int _init_omap_device(char *name, struct device **new_dev)
  */
 static void omap2_init_processor_devices(void)
 {
+	struct omap_hwmod *oh;
+
 	_init_omap_device("mpu", &mpu_dev);
+#if 0
 	_init_omap_device("iva", &iva_dev);
 	if (cpu_is_omap44xx())
 		_init_omap_device("dsp", &dsp_dev);
+#endif
+	oh = omap_hwmod_lookup("iva");
+	if (oh && oh->od)
+		iva_dev = &oh->od->pdev.dev;
+
+	oh = omap_hwmod_lookup("dsp");
+	if (oh && oh->od)
+		dsp_dev = &oh->od->pdev.dev;
+
 	if (cpu_is_omap44xx())
 		_init_omap_device("l3_main_1", &l3_dev);
 	else
