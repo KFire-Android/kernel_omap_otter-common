@@ -33,6 +33,11 @@ config PANEL_TAAL
         help
           Taal DSI command mode panel from TPO.
 
+config PANEL_NEC_NL8048HL11_01B
+        tristate "NEC NL8048HL11-01B Panel"
+        help
+          LCD Panel used in the Zoom boards
+
 config PANEL_TOPPOLY_TDO35S
         tristate "Toppoly TDO35S LCD Panel support"
         depends on OMAP2_DSS
