@@ -1623,10 +1623,11 @@ void dispc_set_zorder(enum omap_plane plane,
 	u32 val;
 
 	BUG_ON(plane == OMAP_DSS_WB);
+	enable_clocks(1);
 	val = dispc_read_reg(dispc_reg_att[plane]);
 	val = FLD_MOD(val, zorder, 27, 26);
 	dispc_write_reg(dispc_reg_att[plane], val);
-
+	enable_clocks(0);
 }
 
 void dispc_enable_zorder(enum omap_plane plane, bool enable)
@@ -1634,10 +1635,11 @@ void dispc_enable_zorder(enum omap_plane plane, bool enable)
 	u32 val;
 
 	BUG_ON(plane == OMAP_DSS_WB);
+	enable_clocks(1);
 	val = dispc_read_reg(dispc_reg_att[plane]);
 	val = FLD_MOD(val, enable, 25, 25);
 	dispc_write_reg(dispc_reg_att[plane], val);
-
+	enable_clocks(0);
 }
 
 
