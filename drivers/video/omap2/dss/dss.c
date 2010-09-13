@@ -131,6 +131,19 @@ void dss_restore_context(void)
 
 #undef SR
 #undef RR
+void dss_mainclk_enable()
+{
+		pm_runtime_get_sync(&dss.pdev->dev);
+
+	return;
+} EXPORT_SYMBOL(dss_mainclk_enable);
+
+void dss_mainclk_disable()
+{
+		pm_runtime_put_sync(&dss.pdev->dev);
+
+	return;
+} EXPORT_SYMBOL(dss_mainclk_disable);
 
 void dss_sdi_init(u8 datapairs)
 {
