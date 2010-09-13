@@ -6006,11 +6006,11 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 /*	&omap44xx_slimbus1_hwmod, */
 /*	&omap44xx_slimbus2_hwmod, */
 	/* smartreflex class */
-#if 0
+
 	&omap44xx_smartreflex_core_hwmod,
 	&omap44xx_smartreflex_iva_hwmod,
 	&omap44xx_smartreflex_mpu_hwmod,
-#endif
+
 	/* spinlock class */
 	&omap44xx_spinlock_hwmod,
 	/* timer class */
