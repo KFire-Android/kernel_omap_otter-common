@@ -1080,9 +1080,9 @@ void dispc_restore_context(void)
 static inline void enable_clocks(bool enable)
 {
 	if (enable)
-		dss_clk_enable();
+		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	else
-		dss_clk_disable();
+		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 }
 
 bool dispc_go_busy(enum omap_channel channel)
@@ -3718,7 +3718,7 @@ void dispc_dump_regs(struct seq_file *s)
 {
 #define DUMPREG(r) seq_printf(s, "%-35s %08x\n", #r, dispc_read_reg(r))
 
-	dss_clk_enable();
+	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	DUMPREG(DISPC_REVISION);
 	DUMPREG(DISPC_SYSCONFIG);
@@ -3874,7 +3874,7 @@ void dispc_dump_regs(struct seq_file *s)
 	DUMPREG(DISPC_VID_PRELOAD(0));
 	DUMPREG(DISPC_VID_PRELOAD(1));
 
-	dss_clk_disable();
+	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 #undef DUMPREG
 }
 

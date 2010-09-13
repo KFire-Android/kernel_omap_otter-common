@@ -55,12 +55,11 @@ static struct {
 	struct regulator *vdda_dac_reg;
 	struct omap_dss_board_info *pdata;
 } core;
-#ifdef HWMOD
+
 static void dss_clk_enable_all_no_ctx(void);
 static void dss_clk_disable_all_no_ctx(void);
 static void dss_clk_enable_no_ctx(enum dss_clock clks);
 static void dss_clk_disable_no_ctx(enum dss_clock clks);
-#endif
 
 static char *def_disp_name;
 module_param_named(def_disp, def_disp_name, charp, 0);
@@ -102,7 +101,6 @@ int dss_need_ctx_restore(void)
 	}
 }
 
-#ifdef HWMOD
 static void save_all_ctx(void)
 {
 	DSSDBG("save context\n");
@@ -132,7 +130,6 @@ static void restore_all_ctx(void)
 
 	dss_clk_disable_all_no_ctx();
 }
-#endif
 
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_OMAP2_DSS_DEBUG_SUPPORT)
 /* CLOCKS */
@@ -162,12 +159,14 @@ static void core_dump_clocks(struct seq_file *s)
 }
 #endif /* defined(CONFIG_DEBUG_FS) && defined(CONFIG_OMAP2_DSS_DEBUG_SUPPORT) */
 
-#ifdef HWMOD
 static int dss_get_clock(struct clk **clock, const char *clk_name)
 {
 	struct clk *clk;
 
-	clk = clk_get(&core.pdev->dev, clk_name);
+	if (cpu_is_omap44xx())
+		clk = clk_get(NULL, clk_name);
+	else
+		clk = clk_get(&core.pdev->dev, clk_name);
 
 	if (IS_ERR(clk)) {
 		DSSERR("can't get clock %s", clk_name);
@@ -191,25 +190,49 @@ static int dss_get_clocks(void)
 	core.dss_54m_fck = NULL;
 	core.dss_96m_fck = NULL;
 
-	r = dss_get_clock(&core.dss_ick, "ick");
-	if (r)
-		goto err;
+	if (cpu_is_omap44xx()) {
+		r = dss_get_clock(&core.dss_ick, "dss_sys_clk");
+		if (r)
+			goto err;
 
-	r = dss_get_clock(&core.dss1_fck, "dss1_fck");
-	if (r)
-		goto err;
+		r = dss_get_clock(&core.dss1_fck, "dss_dss_clk");
+		if (r)
+			goto err;
 
-	r = dss_get_clock(&core.dss2_fck, "dss2_fck");
-	if (r)
-		goto err;
+		r = dss_get_clock(&core.dss2_fck, "dss_dss_clk");
+		if (r)
+			goto err;
 
-	r = dss_get_clock(&core.dss_54m_fck, "tv_fck");
-	if (r)
-		goto err;
+		r = dss_get_clock(&core.dss_54m_fck, "dss_tv_clk");
+		if (r)
+			goto err;
 
-	r = dss_get_clock(&core.dss_96m_fck, "video_fck");
-	if (r)
-		goto err;
+		r = dss_get_clock(&core.dss_96m_fck, "dss_48mhz_clk");
+		if (r)
+			goto err;
+
+	} else {
+
+		r = dss_get_clock(&core.dss_ick, "ick");
+		if (r)
+			goto err;
+
+		r = dss_get_clock(&core.dss1_fck, "dss1_fck");
+		if (r)
+			goto err;
+
+		r = dss_get_clock(&core.dss2_fck, "dss2_fck");
+		if (r)
+			goto err;
+
+		r = dss_get_clock(&core.dss_54m_fck, "tv_fck");
+		if (r)
+			goto err;
+
+		r = dss_get_clock(&core.dss_96m_fck, "video_fck");
+		if (r)
+			goto err;
+	}
 
 	return 0;
 
@@ -293,6 +316,15 @@ static void dss_clk_enable_no_ctx(enum dss_clock clks)
 	core.num_clks_enabled += num_clks;
 }
 
+void dss_clk_enable(enum dss_clock clks)
+{
+	bool check_ctx = core.num_clks_enabled == 0;
+
+	dss_clk_enable_no_ctx(clks);
+
+	if (check_ctx && cpu_is_omap34xx() && dss_need_ctx_restore())
+		restore_all_ctx();
+}
 static void dss_clk_disable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
@@ -308,7 +340,20 @@ static void dss_clk_disable_no_ctx(enum dss_clock clks)
 	if (clks & DSS_CLK_96M)
 		clk_disable(core.dss_96m_fck);
 
-	core.num_clks_enabled -= num_clks;
+}
+
+void dss_clk_disable(enum dss_clock clks)
+{
+	if (cpu_is_omap34xx()) {
+		unsigned num_clks = count_clk_bits(clks);
+
+		BUG_ON(core.num_clks_enabled < num_clks);
+
+		if (core.num_clks_enabled == num_clks)
+			save_all_ctx();
+	}
+
+	dss_clk_disable_no_ctx(clks);
 }
 
 static void dss_clk_enable_all_no_ctx(void)
@@ -340,18 +385,6 @@ static void dss_clk_disable_all(void)
 		clks |= DSS_CLK_96M;
 	dss_clk_disable(clks);
 }
-#else
-
-unsigned long dss_clk_get_rate(enum dss_clock clk)
-{
-	return 153600000;
-}
-
-static void dss_put_clocks(void)
-{
-	return;
-}
-#endif
 
 /* REGULATORS */
 
@@ -608,9 +641,7 @@ static int omap_dss_probe(struct platform_device *pdev)
 		if (def_disp_name && strcmp(def_disp_name, dssdev->name) == 0)
 			pdata->default_device = dssdev;
 	}
-#ifdef HWMOD
 	dss_clk_disable_all();
-#endif 
 	return 0;
 
 err_register:
@@ -642,8 +673,8 @@ err_rfbi:
 err_dss:
 	dss_clk_disable_all_no_ctx();
 	dss_put_clocks();
-err_clocks:
 #endif
+err_clocks:
 	return r;
 }
 
@@ -762,13 +793,11 @@ static int omap_dsshw_probe(struct platform_device *pdev)
 	return 0;
 
 err_dss:
-	dss_clk_disable();
 	return r;
 }
 static int omap_dsshw_remove(struct platform_device *pdev)
 {
 	dss_exit();
-	dss_clk_disable();
 
 	return 0;
 }
@@ -784,7 +813,6 @@ static int omap_dispchw_probe(struct platform_device *pdev)
 
 	return 0;
 err_dispc:
-	dss_clk_disable();
 	return r;
 }
 
@@ -792,7 +820,6 @@ static int omap_dispchw_remove(struct platform_device *pdev)
 {
 	dispc_exit();
 	dpi_exit();
-	dss_clk_disable();
 
 	return 0;
 }
@@ -809,14 +836,12 @@ static int omap_dsihw_probe(struct platform_device *pdev)
 	return 0;
 
 err_dsi:
-	dss_clk_disable();
 	return r;
 }
 
 static int omap_dsihw_remove(struct platform_device *pdev)
 {
 	dsi_exit();
-	dss_clk_disable();
 	return 0;
 }
 
@@ -838,7 +863,6 @@ err_dsi2:
 static int omap_dsi2hw_remove(struct platform_device *pdev)
 {
 	dsi2_exit();
-	dss_clk_disable();
 	return 0;
 }
 
@@ -860,7 +884,6 @@ err_hdmi:
 static int omap_hdmihw_remove(struct platform_device *pdev)
 {
 	hdmi_exit();
-	dss_clk_disable();
 	return 0;
 }
 #endif

@@ -679,9 +679,11 @@ static int hdmi_panel_resume(struct omap_dss_device *dssdev)
 static void hdmi_enable_clocks(int enable)
 {
 	if (enable)
-		dss_clk_enable();
+		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_54M |
+				DSS_CLK_96M);
 	else
-		dss_clk_disable();
+		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_54M |
+				DSS_CLK_96M);
 }
 
 static struct omap_dss_driver hdmi_driver = {

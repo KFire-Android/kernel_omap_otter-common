@@ -957,6 +957,7 @@ static int configure_dispc(void)
 	r = 0;
 	busy = false;
 
+	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	for (i = 0; i < num_mgrs; i++) {
 		mgr_busy[i] = dispc_go_busy(i);
 		mgr_go[i] = false;
@@ -1058,7 +1059,7 @@ static int configure_dispc(void)
 		r = 1;
 	else
 		r = 0;
-
+	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	return r;
 }
 
@@ -1482,7 +1483,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	}
 
 	r = 0;
-	dss_clk_enable();
+	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	if (!dss_cache.irq_enabled) {
 		r = omap_dispc_register_isr(dss_apply_irq_handler, NULL,
 				DISPC_IRQ_VSYNC	| DISPC_IRQ_EVSYNC_ODD |
@@ -1491,7 +1492,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		dss_cache.irq_enabled = true;
 	}
 	configure_dispc();
-	dss_clk_disable();
+	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	spin_unlock_irqrestore(&dss_cache.lock, flags);
 
@@ -1744,7 +1745,7 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 	}
 
 	r = 0;
-	dss_clk_enable();
+	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	if (!dss_cache.irq_enabled) {
 		r = omap_dispc_register_isr(dss_apply_irq_handler, NULL,
 				DISPC_IRQ_VSYNC	| DISPC_IRQ_EVSYNC_ODD |
@@ -1753,7 +1754,7 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 		dss_cache.irq_enabled = true;
 	}
 	configure_dispc();
-	dss_clk_disable();
+	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	spin_unlock_irqrestore(&dss_cache.lock, flags);
 

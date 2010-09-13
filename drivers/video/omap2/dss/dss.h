@@ -217,8 +217,8 @@ struct seq_file;
 struct platform_device;
 
 /* core */
-void dss_clk_enable(void);
-void dss_clk_disable(void);
+void dss_clk_enable(enum dss_clock clks);
+void dss_clk_disable(enum dss_clock clks);
 unsigned long dss_clk_get_rate(enum dss_clock clk);
 int dss_need_ctx_restore(void);
 void dss_dump_clocks(struct seq_file *s);
