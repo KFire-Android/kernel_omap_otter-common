@@ -876,10 +876,16 @@ static void mute_be_playback(struct abe_frontend_dai *fe)
 
 		switch (be_rtd->dai_link->be_id) {
 		case OMAP_ABE_DAI_PDM_DL1:
-			mute_fe_playback(fe, be_rtd, MIXDL1, &fe->playback.dl1_vol);
+			abe_write_gain(GAINS_DL1, MUTE_GAIN, RAMP_5MS,
+				GAIN_LEFT_OFFSET);
+			abe_write_gain(GAINS_DL1, MUTE_GAIN, RAMP_5MS,
+				GAIN_RIGHT_OFFSET);
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
-			mute_fe_playback(fe, be_rtd, MIXDL2, &fe->playback.dl2_vol);
+			abe_write_gain(GAINS_DL2, MUTE_GAIN, RAMP_5MS,
+				GAIN_LEFT_OFFSET);
+			abe_write_gain(GAINS_DL2, MUTE_GAIN, RAMP_5MS,
+				GAIN_RIGHT_OFFSET);
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
 		case OMAP_ABE_DAI_BT_VX:
@@ -903,10 +909,16 @@ static void unmute_be_playback(struct abe_frontend_dai *fe)
 
 		switch (be_rtd->dai_link->be_id) {
 		case OMAP_ABE_DAI_PDM_DL1:
-			unmute_fe_playback(fe, be_rtd, MIXDL1, fe->playback.dl1_vol);
+			abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_5MS,
+				GAIN_LEFT_OFFSET);
+			abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_5MS,
+				GAIN_RIGHT_OFFSET);
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
-			unmute_fe_playback(fe, be_rtd, MIXDL2, fe->playback.dl2_vol);
+			abe_write_gain(GAINS_DL2, GAIN_0dB, RAMP_5MS,
+				GAIN_LEFT_OFFSET);
+			abe_write_gain(GAINS_DL2, GAIN_0dB, RAMP_5MS,
+				GAIN_RIGHT_OFFSET);
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
 		case OMAP_ABE_DAI_BT_VX:
