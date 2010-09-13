@@ -3088,7 +3088,8 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 	 * the same goes for any DSS interrupts, but for some reason I have not
 	 * seen the problem anywhere else than here.
 	 */
-	dispc_disable_sidle();
+	if (!cpu_is_omap44xx())
+		dispc_disable_sidle();
 
 	dsi_perf_mark_start(ix);
 
