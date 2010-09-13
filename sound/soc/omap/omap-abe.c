@@ -98,6 +98,8 @@ static const struct {
 struct abe_playback_controls {
 	int dl1_vol;
 	int dl2_vol;
+	int tones1_vol;
+	int tones2_vol;
 };
 
 /*
@@ -1213,6 +1215,19 @@ static void mute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runtime
 		break;
 	case ABE_FRONTEND_DAI_VOICE:
 	case ABE_FRONTEND_DAI_TONES:
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_read_mixer(MIXDL2, &fe->playback.tones1_vol,
+				MIX_DL2_INPUT_TONES);
+			abe_write_mixer(MIXDL2, MUTE_GAIN, RAMP_0MS,
+				MIX_DL2_INPUT_TONES);
+		}
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_read_mixer(MIXDL1, &fe->playback.tones2_vol,
+				MIX_DL1_INPUT_TONES);
+			abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS,
+				MIX_DL1_INPUT_TONES);
+		}
+		break;
 	case ABE_FRONTEND_DAI_VIBRA:
 
 		break;
@@ -1243,6 +1258,15 @@ static void unmute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runti
 		break;
 	case ABE_FRONTEND_DAI_VOICE:
 	case ABE_FRONTEND_DAI_TONES:
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_write_mixer(MIXDL2, fe->playback.tones2_vol,
+				 RAMP_0MS, MIX_DL2_INPUT_TONES);
+		}
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_write_mixer(MIXDL1, fe->playback.tones1_vol,
+				 RAMP_0MS, MIX_DL1_INPUT_TONES);
+		}
+		break;
 	case ABE_FRONTEND_DAI_VIBRA:
 
 		break;
