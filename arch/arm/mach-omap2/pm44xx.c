@@ -81,7 +81,7 @@ void omap4_trigger_ioctrl(void)
 /* This sets pwrdm state (other than mpu & core. Currently only ON &
  * RET are supported. Function is assuming that clkdm doesn't have
  * hw_sup mode enabled. */
-int set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+int omap4_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
 {
 	u32 cur_state;
 	int sleep_switch = 0;
@@ -257,7 +257,7 @@ static int omap4_pm_suspend(void)
 		 * state in the omap4_pm_suspend function
 		 */
 		if (strcmp(pwrst->pwrdm->name, "cpu1_pwrdm"))
-			if (set_pwrdm_state(pwrst->pwrdm, PWRDM_POWER_RET))
+			if (omap4_set_pwrdm_state(pwrst->pwrdm, PWRDM_POWER_RET))
 				goto restore;
 	}
 
@@ -283,7 +283,7 @@ restore:
 	/* restore next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node)
 		if (strcmp(pwrst->pwrdm->name, "cpu1_pwrdm"))
-			set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
+			omap4_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
 
 #ifdef CONFIG_PM_DEBUG
 	pwrdm_post_transition();
@@ -369,7 +369,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	pwrst->next_state = PWRDM_POWER_RET;
 	list_add(&pwrst->node, &pwrst_list);
 
-	return set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+	return omap4_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 }
 
 static void __init prcm_setup_regs(void)

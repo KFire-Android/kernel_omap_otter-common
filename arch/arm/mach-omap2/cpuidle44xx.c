@@ -135,8 +135,8 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	pwrdm_pre_transition();
 #endif
 	pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
-	set_pwrdm_state(mpu_pd, cx->mpu_state);
-	set_pwrdm_state(core_pd, cx->core_state);
+	omap4_set_pwrdm_state(mpu_pd, cx->mpu_state);
+	omap4_set_pwrdm_state(core_pd, cx->core_state);
 
 	omap4_enter_sleep(dev->cpu, cx->cpu0_state);
 
