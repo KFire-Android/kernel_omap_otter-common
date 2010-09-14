@@ -617,6 +617,55 @@ int dss_resume_all_devices(void)
 	return bus_for_each_dev(bus, NULL, NULL, dss_resume_device);
 }
 
+static int dss_check_state_disabled(struct device *dev, void *data)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+
+	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED ||
+			dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		return 0;
+	else
+		return -EINVAL;
+}
+
+/* disables mainclk if all devices are suspended /disabled */
+int dss_mainclk_state_disable(bool do_clk_disable)
+{
+	int r;
+	struct bus_type *bus = dss_get_bus();
+
+	r = bus_for_each_dev(bus, NULL, NULL, dss_check_state_disabled);
+
+	if (r) {
+		/* All devices are not disabled /suspended */
+		return -EINVAL;
+	} else {
+		if (do_clk_disable) {
+			save_all_ctx();
+			dss_mainclk_disable();
+		}
+		return 0;
+	}
+}
+
+/* enables mainclk if all devices are suspended /disabled */
+int dss_mainclk_state_enable(void)
+{
+	int r;
+	struct bus_type *bus = dss_get_bus();
+
+	r = bus_for_each_dev(bus, NULL, NULL, dss_check_state_disabled);
+
+	if (r) {
+		/* All devices are not disabled /suspended */
+		return -EINVAL;
+	} else {
+		dss_mainclk_enable();
+		restore_all_ctx();
+		return 0;
+	}
+}
+
 static int dss_disable_device(struct device *dev, void *data)
 {
 	struct omap_dss_device *dssdev = to_dss_device(dev);

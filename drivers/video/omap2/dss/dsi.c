@@ -3628,6 +3628,9 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 
 	DSSDBG("dsi_display_enable\n");
 
+	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		dss_mainclk_state_enable();
+
 	WARN_ON(!dsi_bus_is_locked(ix));
 
 	mutex_lock(&p_dsi->lock);
@@ -3698,6 +3701,10 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 	omap_dss_stop_device(dssdev);
 
 	p_dsi->recover.enabled = false;
+
+	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+
+	dss_mainclk_state_disable(true);
 
 	mutex_unlock(&p_dsi->lock);
 }

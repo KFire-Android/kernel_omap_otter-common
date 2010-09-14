@@ -101,7 +101,7 @@ int dss_need_ctx_restore(void)
 	}
 }
 
-static void save_all_ctx(void)
+void save_all_ctx(void)
 {
 	DSSDBG("save context\n");
 
@@ -116,7 +116,7 @@ static void save_all_ctx(void)
 	dss_clk_disable_no_ctx(DSS_CLK_ICK | DSS_CLK_FCK1);
 }
 
-static void restore_all_ctx(void)
+void restore_all_ctx(void)
 {
 	DSSDBG("restore context\n");
 
@@ -332,15 +332,27 @@ void dss_opt_clock_enable()
 {
 	clk_enable(core.dss_ick);
 	clk_enable(core.dss1_fck);
-
-} EXPORT_SYMBOL(dss_opt_clock_enable);
+}
 
 void dss_opt_clock_disable()
 {
 	clk_disable(core.dss_ick);
 	clk_disable(core.dss1_fck);
+}
 
-} EXPORT_SYMBOL(dss_opt_clock_disable);
+void omap_dss_prepare_idle(void)
+{
+	if (!dss_mainclk_state_disable(false))
+		dss_opt_clock_disable();
+}
+EXPORT_SYMBOL(omap_dss_prepare_idle);
+
+void omap_dss_resume_idle(void)
+{
+	if (!dss_mainclk_state_disable(false))
+		dss_opt_clock_enable();
+}
+EXPORT_SYMBOL(omap_dss_resume_idle);
 
 static void dss_clk_disable_no_ctx(enum dss_clock clks)
 {

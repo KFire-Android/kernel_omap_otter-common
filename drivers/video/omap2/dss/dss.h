@@ -228,6 +228,8 @@ struct regulator *dss_get_vdds_sdi(void);
 struct regulator *dss_get_vdda_dac(void);
 void dss_opt_clock_enable(void);
 void dss_opt_clock_disable(void);
+void save_all_ctx(void);
+void restore_all_ctx(void);
 
 /* display */
 int dss_suspend_all_devices(void);
@@ -243,6 +245,8 @@ bool dss_use_replication(struct omap_dss_device *dssdev,
 void default_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
 		u32 *fifo_low, u32 *fifo_high);
+int dss_mainclk_state_disable(bool do_clk_disable);
+int dss_mainclk_state_enable(void);
 
 /* manager */
 int dss_init_overlay_managers(struct platform_device *pdev);
@@ -301,6 +305,8 @@ int dss_get_clock_div(struct dss_clock_info *cinfo);
 int dss_calc_clock_div(bool is_tft, unsigned long req_pck,
 		struct dss_clock_info *dss_cinfo,
 		struct dispc_clock_info *dispc_cinfo);
+void dss_mainclk_enable(void);
+void dss_mainclk_disable(void);
 
 /* SDI */
 #ifdef CONFIG_OMAP2_DSS_SDI
