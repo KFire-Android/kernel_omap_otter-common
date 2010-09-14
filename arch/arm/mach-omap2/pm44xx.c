@@ -26,6 +26,8 @@
 #include <plat/serial.h>
 #include <plat/common.h>
 #include <plat/usb.h>
+#include <plat/display.h>
+
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
 
@@ -141,6 +143,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
 
 	if (core_next_state < PWRDM_POWER_ON) {
+		omap_dss_prepare_idle();
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
 		omap_uart_prepare_idle(2);
@@ -173,6 +176,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		OMAP4430_CM2_CKGEN_MOD,	OMAP4_CM_DIV_M3_DPLL_PER_OFFSET);
 
 	if (core_next_state < PWRDM_POWER_ON) {
+		omap_dss_resume_idle();
 		omap2_gpio_resume_after_idle(0);
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);
