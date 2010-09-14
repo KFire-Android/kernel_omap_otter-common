@@ -332,12 +332,14 @@ void dss_opt_clock_enable()
 {
 	clk_enable(core.dss_ick);
 	clk_enable(core.dss1_fck);
+	clk_enable(core.dss_96m_fck);
 }
 
 void dss_opt_clock_disable()
 {
 	clk_disable(core.dss_ick);
 	clk_disable(core.dss1_fck);
+	clk_disable(core.dss_96m_fck);
 }
 
 void omap_dss_prepare_idle(void)
