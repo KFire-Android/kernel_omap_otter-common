@@ -623,7 +623,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 	}
 
 
-	if (twl_has_madc() && pdata->madc) {
+	if (twl_has_madc() && pdata->madc && twl_class_is_4030()) {
 		child = add_child(2, "twl4030_madc",
 				pdata->madc, sizeof(*pdata->madc),
 				true, pdata->irq_base + MADC_INTR_OFFSET, 0);
@@ -631,7 +631,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			return PTR_ERR(child);
 	}
 
-	if (twl_has_madc() && pdata->madc) {
+	if (twl_has_madc() && pdata->madc && twl_class_is_6030()) {
 		child = add_child(1, "twl6030_gpadc",
 				pdata->madc, sizeof(*pdata->madc),
 				true, pdata->irq_base + MADC_INTR_OFFSET,
