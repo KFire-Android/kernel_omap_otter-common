@@ -1198,17 +1198,11 @@ static void mute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runtime
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
-			abe_read_mixer(MIXDL2, &fe->playback.dl2_vol,
-				MIX_DL2_INPUT_MM_DL);
-			abe_write_mixer(MIXDL2, MUTE_GAIN, RAMP_0MS,
-				MIX_DL2_INPUT_MM_DL);
+			abe_mute_gain(MIXDL2, MIX_DL2_INPUT_MM_DL);
 		}
 	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
-			abe_read_mixer(MIXDL1, &fe->playback.dl1_vol,
-				MIX_DL1_INPUT_MM_DL);
-			abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS,
-				MIX_DL1_INPUT_MM_DL);
+			abe_mute_gain(MIXDL1, MIX_DL1_INPUT_MM_DL);
 		}
 		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
@@ -1216,16 +1210,10 @@ static void mute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runtime
 	case ABE_FRONTEND_DAI_VOICE:
 	case ABE_FRONTEND_DAI_TONES:
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
-			abe_read_mixer(MIXDL2, &fe->playback.tones1_vol,
-				MIX_DL2_INPUT_TONES);
-			abe_write_mixer(MIXDL2, MUTE_GAIN, RAMP_0MS,
-				MIX_DL2_INPUT_TONES);
+			abe_mute_gain(MIXDL2, MIX_DL2_INPUT_TONES);
 		}
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
-			abe_read_mixer(MIXDL1, &fe->playback.tones2_vol,
-				MIX_DL1_INPUT_TONES);
-			abe_write_mixer(MIXDL1, MUTE_GAIN, RAMP_0MS,
-				MIX_DL1_INPUT_TONES);
+			abe_mute_gain(MIXDL1, MIX_DL1_INPUT_TONES);
 		}
 		break;
 	case ABE_FRONTEND_DAI_VIBRA:
@@ -1245,13 +1233,11 @@ static void unmute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runti
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
-			abe_write_mixer(MIXDL2, fe->playback.dl2_vol,
-				 RAMP_0MS, MIX_DL2_INPUT_MM_DL);
+			abe_unmute_gain(MIXDL2, MIX_DL2_INPUT_MM_DL);
 		}
 	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
-			abe_write_mixer(MIXDL1, fe->playback.dl1_vol,
-				 RAMP_0MS, MIX_DL1_INPUT_MM_DL);
+			abe_unmute_gain(MIXDL1, MIX_DL1_INPUT_MM_DL);
 		}
 		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
@@ -1259,12 +1245,10 @@ static void unmute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runti
 	case ABE_FRONTEND_DAI_VOICE:
 	case ABE_FRONTEND_DAI_TONES:
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
-			abe_write_mixer(MIXDL2, fe->playback.tones2_vol,
-				 RAMP_0MS, MIX_DL2_INPUT_TONES);
+			abe_unmute_gain(MIXDL2, MIX_DL2_INPUT_TONES);
 		}
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
-			abe_write_mixer(MIXDL1, fe->playback.tones1_vol,
-				 RAMP_0MS, MIX_DL1_INPUT_TONES);
+			abe_unmute_gain(MIXDL1, MIX_DL1_INPUT_TONES);
 		}
 		break;
 	case ABE_FRONTEND_DAI_VIBRA:
