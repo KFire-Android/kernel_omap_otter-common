@@ -50,7 +50,7 @@
 #endif
 
 struct dispc_reg { u16 idx; };
-extern void __iomem  *dispc_base;
+void __iomem  *dispc_base;
 #define DISPC_REG(idx)			((const struct dispc_reg) { idx })
 
 /* DISPC common */
