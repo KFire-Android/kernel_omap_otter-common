@@ -287,7 +287,7 @@ static struct platform_driver omap4_keypad_driver = {
 	.probe		= omap4_keypad_probe,
 	.remove		= __devexit_p(omap4_keypad_remove),
 	.driver		= {
-		.name	= "omap4-keypad",
+		.name	= "omap-keypad",
 		.owner	= THIS_MODULE,
 	},
 };
