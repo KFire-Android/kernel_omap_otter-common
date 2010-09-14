@@ -692,7 +692,7 @@ static int uhhtll_ehci_enable(struct uhhtll_hcd_omap *omap,
 			reg &= OMAP_UHH_HOST_PORT1_RESET;
 
 			omap->utmi_p1_fck = clk_get(&omap->pdev->dev,
-					"utmi_p1_gfclk_ck");
+					"utmi_p1_gfclk");
 			if (IS_ERR(omap->utmi_p1_fck)) {
 				ret = PTR_ERR(omap->utmi_p1_fck);
 				goto err_host;
@@ -735,7 +735,7 @@ static int uhhtll_ehci_enable(struct uhhtll_hcd_omap *omap,
 			reg &= OMAP_UHH_HOST_PORT2_RESET;
 
 			omap->utmi_p2_fck = clk_get(&omap->pdev->dev,
-					"utmi_p2_gfclk_ck");
+					"utmi_p2_gfclk");
 			if (IS_ERR(omap->utmi_p2_fck)) {
 				ret = PTR_ERR(omap->utmi_p2_fck);
 				goto err_utmi_p2_fck;
@@ -1123,7 +1123,7 @@ static int uhhtll_ohci_enable(struct uhhtll_hcd_omap *omap,
 			reg |= OMAP_UHH_HOST_P1_SET_ULPITLL;
 
 			omap->utmi_p1_fck = clk_get(&omap->pdev->dev,
-						"utmi_p1_gfclk_ck");
+						"utmi_p1_gfclk");
 			if (IS_ERR(omap->utmi_p1_fck)) {
 				ret = PTR_ERR(omap->utmi_p1_fck);
 				goto err_end;
@@ -1135,7 +1135,7 @@ static int uhhtll_ohci_enable(struct uhhtll_hcd_omap *omap,
 			reg &= OMAP_UHH_HOST_PORT2_RESET;
 			reg |= OMAP_UHH_HOST_P2_SET_ULPITLL;
 			omap->utmi_p2_fck = clk_get(&omap->pdev->dev,
-						"utmi_p2_gfclk_ck");
+						"utmi_p2_gfclk");
 			if (IS_ERR(omap->utmi_p2_fck)) {
 				ret = PTR_ERR(omap->utmi_p2_fck);
 				goto err_utmi_p1_fck;
