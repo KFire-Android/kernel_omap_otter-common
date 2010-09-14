@@ -49,7 +49,9 @@
 #include <plat/vrfb.h>
 #include <plat/display.h>
 #include <plat/cpu.h>
-
+#ifdef CONFIG_PM
+#include <plat/omap-pm.h>
+#endif
 #include "omap_voutlib.h"
 #include "omap_voutdef.h"
 
@@ -2485,6 +2487,8 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 	struct omap_vout_device *vout = fh;
 	struct videobuf_queue *q = &vout->vbq;
 	struct omapvideo_info *ovid = &vout->vid_info;
+	struct vout_platform_data *pdata =
+		(((vout->vid_dev)->v4l2_dev).dev)->platform_data;
 
 	mutex_lock(&vout->lock);
 
@@ -2531,6 +2535,20 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 	omap_dispc_register_isr(omap_vout_isr, vout, mask);
 
+#ifdef CONFIG_PM
+	if (pdata->set_min_bus_tput) {
+		if (cpu_is_omap3630() || cpu_is_omap4430()) {
+			pdata->set_min_bus_tput(
+				((vout->vid_dev)->v4l2_dev).dev ,
+					OCP_INITIATOR_AGENT, 200 * 1000 * 4);
+		} else {
+			pdata->set_min_bus_tput(
+				((vout->vid_dev)->v4l2_dev).dev ,
+					OCP_INITIATOR_AGENT, 166 * 1000 * 4);
+		}
+	}
+#endif
+
 	for (j = 0; j < ovid->num_overlays; j++) {
 		struct omap_overlay *ovl = ovid->overlays[j];
 
@@ -2574,6 +2592,8 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 	int ret = 0, j;
 	struct omap_vout_device *vout = fh;
 	struct omapvideo_info *ovid = &vout->vid_info;
+	struct vout_platform_data *pdata =
+		(((vout->vid_dev)->v4l2_dev).dev)->platform_data;
 
 	if (!vout->streaming)
 		return -EINVAL;
@@ -2612,6 +2632,12 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 	INIT_LIST_HEAD(&vout->dma_queue);
 	ret = videobuf_streamoff(&vout->vbq);
 
+#ifdef CONFIG_PM
+	if (pdata->set_min_bus_tput)
+		pdata->set_min_bus_tput(
+			((vout->vid_dev)->v4l2_dev).dev,
+				OCP_INITIATOR_AGENT, 0);
+#endif
 	return ret;
 }
 

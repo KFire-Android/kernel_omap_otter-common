@@ -39,6 +39,14 @@
 #include <plat/mcbsp.h>
 
 #include "mux.h"
+#ifdef CONFIG_PM
+#include <plat/omap-pm.h>
+#include <plat/vrfb.h>
+#include <linux/videodev2.h>
+#include <media/videobuf-dma-contig.h>
+#include <media/v4l2-device.h>
+#include "../drivers/media/video/omap/omap_voutdef.h"
+#endif
 
 static struct resource omap_32k_resources[] = {
 	{
@@ -923,11 +931,28 @@ static struct resource omap_vout_resource[2] = {
 };
 #endif
 
+#ifdef CONFIG_PM
+struct vout_platform_data omap_vout_data = {
+	.set_min_bus_tput = omap_pm_set_min_bus_tput,
+	.set_max_mpu_wakeup_lat =  omap_pm_set_max_mpu_wakeup_lat,
+	.set_cpu_freq = omap_pm_cpu_set_freq,
+};
+#endif
+
 static struct platform_device omap_vout_device = {
 	.name		= "omap_vout",
 	.num_resources	= ARRAY_SIZE(omap_vout_resource),
 	.resource 	= &omap_vout_resource[0],
 	.id		= -1,
+#ifdef CONFIG_PM
+	.dev	= {
+		.platform_data = &omap_vout_data,
+	}
+#else
+	.dev	= {
+		.platform_data = NULL,
+	}
+#endif
 };
 static void omap_init_vout(void)
 {

@@ -160,4 +160,11 @@ struct omap_vout_device {
 	bool wb_enabled;
 	bool buf_empty;
 };
+
+struct vout_platform_data {
+	void (*set_min_bus_tput)(struct device *dev, u8 agent_id,
+			unsigned long r);
+	void (*set_max_mpu_wakeup_lat)(struct device *dev, long t);
+	void (*set_cpu_freq)(unsigned long f);
+};
 #endif	/* ifndef OMAP_VOUTDEF_H */
