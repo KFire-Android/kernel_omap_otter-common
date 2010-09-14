@@ -1066,14 +1066,19 @@ static inline void create_debug_files (struct ehci_hcd *ehci)
 	ehci->debug_registers = debugfs_create_file("registers", S_IRUGO,
 						    ehci->debug_dir, bus,
 						    &debug_registers_fops);
-
-	ehci->debug_registers = debugfs_create_file("lpm", S_IRUGO|S_IWUGO,
-						    ehci->debug_dir, bus,
-						    &debug_lpm_fops);
 	if (!ehci->debug_registers)
 		goto registers_error;
+
+	ehci->debug_lpm = debugfs_create_file("lpm", S_IRUGO|S_IWUGO,
+						    ehci->debug_dir, bus,
+						    &debug_lpm_fops);
+	if (!ehci->debug_lpm)
+		goto lpm_error;
+
 	return;
 
+lpm_error:
+	debugfs_remove(ehci->debug_registers);
 registers_error:
 	debugfs_remove(ehci->debug_periodic);
 periodic_error:
@@ -1088,6 +1093,7 @@ dir_error:
 
 static inline void remove_debug_files (struct ehci_hcd *ehci)
 {
+	debugfs_remove(ehci->debug_lpm);
 	debugfs_remove(ehci->debug_registers);
 	debugfs_remove(ehci->debug_periodic);
 	debugfs_remove(ehci->debug_async);
