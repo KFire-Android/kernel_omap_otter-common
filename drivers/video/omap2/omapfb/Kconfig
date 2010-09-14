@@ -1,6 +1,7 @@
 menuconfig FB_OMAP2
         tristate "OMAP2/3/4 frame buffer support (EXPERIMENTAL)"
         depends on FB && OMAP2_DSS
+	default y
 
 	select OMAP2_VRAM
         select FB_CFB_FILLRECT
@@ -20,7 +21,8 @@ config FB_OMAP2_DEBUG_SUPPORT
 config FB_OMAP2_NUM_FBS
 	int "Number of framebuffers"
 	range 1 10
-	default 3
+	default 1  if ARCH_OMAP2 || ARCH_OMAP3
+	default 3  if ARCH_OMAP4
 	depends on FB_OMAP2
 	help
 	  Select the number of framebuffers created. OMAP2/3 has 3 overlays
