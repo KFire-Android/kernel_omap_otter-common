@@ -395,15 +395,6 @@ static int uhhtll_enable(struct uhhtll_hcd_omap *omap)
 
 	if (cpu_is_omap44xx()) {
 
-		/* OMAP4 clocks */
-		omap->usbhost_fs_fck = clk_get(&omap->pdev->dev,
-						"usb_host_fs_fck");
-		if (IS_ERR(omap->usbhost_fs_fck)) {
-			ret = PTR_ERR(omap->usbhost_fs_fck);
-			goto err_end;
-		}
-		clk_enable(omap->usbhost_fs_fck);
-
 		/* Put UHH in NoIdle/NoStandby mode */
 		reg = uhhtll_omap_read(omap->uhh_base, OMAP_UHH_SYSCONFIG);
 		reg &= OMAP_UHH_SYSCONFIG_IDLEMODE_RESET;
