@@ -1697,7 +1697,7 @@ CONFIG_IIO=y
 #
 # Magnetometer sensors
 #
-CONFIG_SENSORS_HMC5843=y
+# CONFIG_SENSORS_HMC5843 is not set
 
 #
 # Triggers - standalone
