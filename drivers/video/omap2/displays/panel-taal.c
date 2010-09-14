@@ -419,7 +419,7 @@ static int taal_set_update_window(enum omap_dsi_index ix,
 	u16 x2 = x + w - 1;
 	u16 y1 = y;
 	u16 y2 = y + h - 1;
-
+#if 0
 	u8 buf[5];
 	buf[0] = DCS_COLUMN_ADDR;
 	buf[1] = (x1 >> 8) & 0xff;
@@ -440,6 +440,7 @@ static int taal_set_update_window(enum omap_dsi_index ix,
 	r = dsi_vc_dcs_write_nosync(ix, TCH, buf, sizeof(buf));
 	if (r)
 		return r;
+#endif
 
 	dsi_vc_send_bta_sync(ix, TCH);
 
