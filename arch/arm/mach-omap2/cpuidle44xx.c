@@ -245,7 +245,7 @@ void omap_init_power_states(void)
 	omap4_power_states[OMAP4_STATE_C3].flags = CPUIDLE_FLAG_TIME_VALID;
 
 	/*
-	 * C4 . CPU0 OFF + CPU1 OFF + MPU CSWR + CORE inactive
+	 * C4 . CPU0 OFF + CPU1 OFF + MPU OFF + CORE inactive
 	 */
 	omap4_power_states[OMAP4_STATE_C4].valid =
 			cpuidle_params_table[OMAP4_STATE_C4].valid;
@@ -264,7 +264,7 @@ void omap_init_power_states(void)
 	omap4_power_states[OMAP4_STATE_C4].flags = CPUIDLE_FLAG_TIME_VALID;
 
 	/*
-	 * C5 . CPU0 OFF + CPU1 OFF + MPU CSWR + CORE CSWR
+	 * C5 . CPU0 OFF + CPU1 OFF + MPU OFF + CORE CSWR
 	 */
 	omap4_power_states[OMAP4_STATE_C5].valid =
 			cpuidle_params_table[OMAP4_STATE_C5].valid;
