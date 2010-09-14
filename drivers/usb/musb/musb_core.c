@@ -456,6 +456,7 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 				u8 devctl, u8 power)
 {
 	irqreturn_t handled = IRQ_NONE;
+	int state;
 
 	DBG(3, "<== Power=%02x, DevCtl=%02x, int_usb=0x%x\n", power, devctl,
 		int_usb);
@@ -643,6 +644,11 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 	if (int_usb & MUSB_INTR_SUSPEND) {
 		DBG(1, "SUSPEND (%s) devctl %02x power %02x\n",
 				otg_state_string(musb), devctl, power);
+
+		/* Enable suspend */
+		state = musb_readb(musb->mregs, MUSB_POWER);
+		state |= MUSB_POWER_ENSUSPEND;
+		musb_writeb(musb->mregs, MUSB_POWER, state);
 		handled = IRQ_HANDLED;
 
 		switch (musb->xceiv->state) {

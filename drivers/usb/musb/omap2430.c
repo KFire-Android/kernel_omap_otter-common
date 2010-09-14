@@ -205,7 +205,21 @@ int __init musb_platform_init(struct musb *musb)
 		return -ENODEV;
 	}
 
+	/* disable the optional 60M clock if enabled by romcode*/
+	l = omap_readl(0x4A009360);
+	l &= ~0x00000100;
+	omap_writel(l, 0x4A009360);
+
+	/* Fixme this can be enabled when load the gadget driver also*/
 	musb_platform_resume(musb);
+
+	/*powerup the phy as romcode would have put the phy in some state
+	* which is impacting the core retention if the gadget driver is not
+	* loaded.
+	*/
+#ifdef CONFIG_USB_MUSB_HDRC_HCD
+	omap_writel(0x0, 0x4A002300);
+#endif
 	l = musb_readl(musb->mregs, OTG_INTERFSEL);
 
 	if (data->interface_type == MUSB_INTERFACE_UTMI) {
@@ -286,6 +300,9 @@ static int musb_platform_resume(struct musb *musb)
 	otg_set_suspend(musb->xceiv, 0);
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
+
+	/* Enable the phy clocks*/
+	omap_writel(0x101, 0x4A0093E0);
 
 	pdata->disable_wakeup(oh->od);
 	l = musb_readl(musb->mregs, OTG_FORCESTDBY);

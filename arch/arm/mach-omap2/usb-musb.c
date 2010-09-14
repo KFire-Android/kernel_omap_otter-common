@@ -154,6 +154,8 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 			dev->coherent_dma_mask = musb_dmamask;
 			put_device(dev);
 		}
+		/*Suspend the phy*/
+		omap_writel(0x1, 0x4A002300);
 	}
 }
 
@@ -164,6 +166,8 @@ void musb_context_save_restore(enum musb_state state)
 	struct platform_device *pdev = &od->pdev;
 	struct device *dev = &pdev->dev;
 	struct device_driver *drv = dev->driver;
+	struct musb_hdrc_platform_data *plat = dev->platform_data;
+	struct omap_musb_board_data *bdata = plat->board_data;
 
 	if (drv) {
 #ifdef CONFIG_PM_RUNTIME
@@ -183,6 +187,7 @@ void musb_context_save_restore(enum musb_state state)
 			break;
 
 		case disable_clk:
+
 			/* set the sysconfig setting to force standby,
 			 * force idle during idle and disable
 			 * the clock.
@@ -190,6 +195,16 @@ void musb_context_save_restore(enum musb_state state)
 			oh->flags |= HWMOD_SWSUP_SIDLE
 					| HWMOD_SWSUP_MSTANDBY;
 			pdata->device_idle(pdev);
+			/* Disable the phy clock*/
+			omap_writel(0x0, 0x4A0093E0);
+
+			/* FIXME This is not required once the phoenix
+			 *framework is in place. We can powerup the PHY
+			 *once the cable connected.
+			 */
+			if (bdata->mode == MUSB_HOST)
+				/*powerdown  the phy in case of host mode*/
+				omap_writel(0x1, 0x4A002300);
 			break;
 
 		case restore_context:
@@ -204,6 +219,16 @@ void musb_context_save_restore(enum musb_state state)
 			break;
 
 		case enable_clk:
+			/* FIXME This is not required once the phoenix
+			 *framework is in place. We can powerup the PHY
+			 *once the cable connected.
+			 */
+			if (bdata->mode == MUSB_HOST)
+				/*powerup  the phy in case of host mode*/
+				omap_writel(0, 0x4A002300);
+			/* enable the phy clock*/
+			omap_writel(0x101, 0x4A0093E0);
+
 			/* set the sysconfig setting back to smart idle and
 			 * smart stndby after wakeup and enable the clock
 			 */
