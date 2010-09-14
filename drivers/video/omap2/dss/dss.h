@@ -364,6 +364,13 @@ static inline int dsi_init(struct platform_device *pdev)
 static inline void dsi_exit(void)
 {
 }
+static inline int dsi2_init(struct platform_device *pdev)
+{
+        return 0;
+}
+static inline void dsi2_exit(void)
+{
+}
 static inline void dsi_wait_pll_dispc_active(enum omap_dsi_index ix)
 {
 }
