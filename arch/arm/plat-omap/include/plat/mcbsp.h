@@ -513,15 +513,11 @@ struct omap_mcbsp_ops {
 };
 
 struct omap_mcbsp_platform_data {
-	unsigned long phys_base;
-	u8 dma_rx_sync, dma_tx_sync;
-	u16 rx_irq, tx_irq;
 	struct omap_mcbsp_ops *ops;
-#ifdef CONFIG_ARCH_OMAP3
-	/* Sidetone block for McBSP 2 and 3 */
 	unsigned long phys_base_st;
 	u16 buffer_size;
-#endif
+	int dma_op_mode;
+	struct omap_hwmod **oh;
 };
 
 struct omap_mcbsp_st_data {
@@ -563,8 +559,6 @@ struct omap_mcbsp {
 	/* Protect the field .free, while checking if the mcbsp is in use */
 	spinlock_t lock;
 	struct omap_mcbsp_platform_data *pdata;
-	struct clk *iclk;
-	struct clk *fclk;
 
 	u8  auto_reset; /* Auto Reset */
 	u8  txskip_alt; /* Tx skip flags */
@@ -578,13 +572,12 @@ struct omap_mcbsp {
 	int  interface_mode; /* Master / Slave */
 	struct omap_dma_channel_params rx_params; /* Used For Rx FIFO */
 	int rx_config_done;
-#ifdef CONFIG_ARCH_OMAP3
 	struct omap_mcbsp_st_data *st_data;
 	int dma_op_mode;
 	u16 max_tx_thres;
 	u16 max_rx_thres;
-#endif
 	void *reg_cache;
+	struct omap_hwmod **oh;
 };
 struct omap_mcbsp_dma_transfer_params {
 	/* Skip the alternate element use fro stereo mode */

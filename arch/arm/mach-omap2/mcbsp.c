@@ -25,6 +25,12 @@
 #include <plat/cpu.h>
 #include <plat/mcbsp.h>
 #include <plat/dma.h>
+#include <plat/omap_hwmod.h>
+#include <plat/omap_device.h>
+#include <linux/pm_runtime.h>
+
+static struct omap_hwmod *oh_st_device[] = {NULL, NULL};
+static int no_of_st;
 
 #define OMAP_MCBSP_READ(mcbsp, reg) \
 			omap_mcbsp_read(mcbsp, OMAP_MCBSP_REG_##reg, 0)
@@ -54,174 +60,6 @@ static struct omap_mcbsp_ops omap2_mcbsp_ops = {
 	.request	= omap2_mcbsp_request,
 };
 
-#ifdef CONFIG_ARCH_OMAP2420
-static struct omap_mcbsp_platform_data omap2420_mcbsp_pdata[] = {
-	{
-		.phys_base	= OMAP24XX_MCBSP1_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP1_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
-		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-	},
-	{
-		.phys_base	= OMAP24XX_MCBSP2_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP2_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
-		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-	},
-};
-#define OMAP2420_MCBSP_PDATA_SZ		ARRAY_SIZE(omap2420_mcbsp_pdata)
-#define OMAP2420_MCBSP_REG_NUM		(OMAP_MCBSP_REG_RCCR / sizeof(u32) + 1)
-#else
-#define omap2420_mcbsp_pdata		NULL
-#define OMAP2420_MCBSP_PDATA_SZ		0
-#define OMAP2420_MCBSP_REG_NUM		0
-#endif
-
-#ifdef CONFIG_ARCH_OMAP2430
-static struct omap_mcbsp_platform_data omap2430_mcbsp_pdata[] = {
-	{
-		.phys_base	= OMAP24XX_MCBSP1_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP1_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
-		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-	},
-	{
-		.phys_base	= OMAP24XX_MCBSP2_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP2_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
-		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-	},
-	{
-		.phys_base	= OMAP2430_MCBSP3_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP3_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP3_TX,
-		.rx_irq		= INT_24XX_MCBSP3_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP3_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-	},
-	{
-		.phys_base	= OMAP2430_MCBSP4_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP4_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP4_TX,
-		.rx_irq		= INT_24XX_MCBSP4_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP4_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-	},
-	{
-		.phys_base	= OMAP2430_MCBSP5_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP5_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP5_TX,
-		.rx_irq		= INT_24XX_MCBSP5_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP5_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-	},
-};
-#define OMAP2430_MCBSP_PDATA_SZ		ARRAY_SIZE(omap2430_mcbsp_pdata)
-#define OMAP2430_MCBSP_REG_NUM		(OMAP_MCBSP_REG_RCCR / sizeof(u32) + 1)
-#else
-#define omap2430_mcbsp_pdata		NULL
-#define OMAP2430_MCBSP_PDATA_SZ		0
-#define OMAP2430_MCBSP_REG_NUM		0
-#endif
-
-#ifdef CONFIG_ARCH_OMAP3
-static struct omap_mcbsp_platform_data omap34xx_mcbsp_pdata[] = {
-	{
-		.phys_base	= OMAP34XX_MCBSP1_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP1_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP1_TX,
-		.rx_irq		= INT_24XX_MCBSP1_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP1_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-		.buffer_size	= 0x80, /* The FIFO has 128 locations */
-	},
-	{
-		.phys_base	= OMAP34XX_MCBSP2_BASE,
-		.phys_base_st	= OMAP34XX_MCBSP2_ST_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP2_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP2_TX,
-		.rx_irq		= INT_24XX_MCBSP2_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP2_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-		.buffer_size	= 0x500, /* The FIFO has 1024 + 256 locations */
-	},
-	{
-		.phys_base	= OMAP34XX_MCBSP3_BASE,
-		.phys_base_st	= OMAP34XX_MCBSP3_ST_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP3_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP3_TX,
-		.rx_irq		= INT_24XX_MCBSP3_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP3_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-		.buffer_size	= 0x80, /* The FIFO has 128 locations */
-	},
-	{
-		.phys_base	= OMAP34XX_MCBSP4_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP4_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP4_TX,
-		.rx_irq		= INT_24XX_MCBSP4_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP4_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-		.buffer_size	= 0x80, /* The FIFO has 128 locations */
-	},
-	{
-		.phys_base	= OMAP34XX_MCBSP5_BASE,
-		.dma_rx_sync	= OMAP24XX_DMA_MCBSP5_RX,
-		.dma_tx_sync	= OMAP24XX_DMA_MCBSP5_TX,
-		.rx_irq		= INT_24XX_MCBSP5_IRQ_RX,
-		.tx_irq		= INT_24XX_MCBSP5_IRQ_TX,
-		.ops		= &omap2_mcbsp_ops,
-		.buffer_size	= 0x80, /* The FIFO has 128 locations */
-	},
-};
-#define OMAP34XX_MCBSP_PDATA_SZ		ARRAY_SIZE(omap34xx_mcbsp_pdata)
-#define OMAP34XX_MCBSP_REG_NUM		(OMAP_MCBSP_REG_RCCR / sizeof(u32) + 1)
-#else
-#define omap34xx_mcbsp_pdata		NULL
-#define OMAP34XX_MCBSP_PDATA_SZ		0
-#define OMAP34XX_MCBSP_REG_NUM		0
-#endif
-
-static struct omap_mcbsp_platform_data omap44xx_mcbsp_pdata[] = {
-	{
-		.phys_base      = OMAP44XX_MCBSP1_BASE,
-		.dma_rx_sync    = OMAP44XX_DMA_MCBSP1_RX,
-		.dma_tx_sync    = OMAP44XX_DMA_MCBSP1_TX,
-		.tx_irq         = OMAP44XX_IRQ_MCBSP1,
-		.ops            = &omap2_mcbsp_ops,
-	},
-	{
-		.phys_base      = OMAP44XX_MCBSP2_BASE,
-		.dma_rx_sync    = OMAP44XX_DMA_MCBSP2_RX,
-		.dma_tx_sync    = OMAP44XX_DMA_MCBSP2_TX,
-		.tx_irq         = OMAP44XX_IRQ_MCBSP2,
-		.ops            = &omap2_mcbsp_ops,
-	},
-	{
-		.phys_base      = OMAP44XX_MCBSP3_BASE,
-		.dma_rx_sync    = OMAP44XX_DMA_MCBSP3_RX,
-		.dma_tx_sync    = OMAP44XX_DMA_MCBSP3_TX,
-		.tx_irq         = OMAP44XX_IRQ_MCBSP3,
-		.ops            = &omap2_mcbsp_ops,
-	},
-	{
-		.phys_base      = OMAP44XX_MCBSP4_BASE,
-		.dma_rx_sync    = OMAP44XX_DMA_MCBSP4_RX,
-		.dma_tx_sync    = OMAP44XX_DMA_MCBSP4_TX,
-		.tx_irq         = OMAP44XX_IRQ_MCBSP4,
-		.ops            = &omap2_mcbsp_ops,
-	},
-};
-#define OMAP44XX_MCBSP_PDATA_SZ		ARRAY_SIZE(omap44xx_mcbsp_pdata)
-#define OMAP44XX_MCBSP_REG_NUM		(OMAP_MCBSP_REG_RCCR / sizeof(u32) + 1)
 
 static __attribute__ ((unused)) void omap2_mcbsp_free(unsigned int id)
 {
@@ -939,13 +777,13 @@ void omap2_mcbsp_set_srg_cfg_param(unsigned int id, int interface_mode,
 {
 	struct omap_mcbsp *mcbsp = mcbsp_ptr[id];
 	void __iomem *io_base;
-	u32 clk_rate, clkgdv;
+/*	u32 clk_rate, clkgdv;*/
 	io_base = mcbsp->io_base;
 
 	mcbsp->interface_mode = interface_mode;
 	mcbsp_cfg->srgr1 = FWID(param->pulse_width);
 
-	if (interface_mode == OMAP_MCBSP_MASTER) {
+/*	if (interface_mode == OMAP_MCBSP_MASTER) {
 		clk_rate = clk_get_rate(mcbsp->fclk);
 		clkgdv = clk_rate / (param->sample_rate *
 				(param->bits_per_sample - 1));
@@ -953,6 +791,7 @@ void omap2_mcbsp_set_srg_cfg_param(unsigned int id, int interface_mode,
 			clkgdv = 0xFF;
 		mcbsp_cfg->srgr1 = mcbsp_cfg->srgr1 | CLKGDV(clkgdv);
 	}
+ */
 	if (param->dlb)
 		mcbsp_cfg->spcr1 = mcbsp_cfg->spcr1 & ~(ALB);
 
@@ -1044,39 +883,101 @@ void omap2_mcbsp_params_cfg(unsigned int id, int interface_mode,
 	return;
 }
 EXPORT_SYMBOL(omap2_mcbsp_params_cfg);
-static int __init omap2_mcbsp_init(void)
+
+struct omap_device_pm_latency omap2_mcbsp_latency[] = {
+	{
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func   = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static int omap_init_mcbsp(struct omap_hwmod *oh, void *user)
 {
-	if (cpu_is_omap2420()) {
-		omap_mcbsp_count = OMAP2420_MCBSP_PDATA_SZ;
-		omap_mcbsp_cache_size = OMAP2420_MCBSP_REG_NUM * sizeof(u16);
-	} else if (cpu_is_omap2430()) {
-		omap_mcbsp_count = OMAP2430_MCBSP_PDATA_SZ;
-		omap_mcbsp_cache_size = OMAP2430_MCBSP_REG_NUM * sizeof(u32);
-	} else if (cpu_is_omap34xx()) {
-		omap_mcbsp_count = OMAP34XX_MCBSP_PDATA_SZ;
-		omap_mcbsp_cache_size = OMAP34XX_MCBSP_REG_NUM * sizeof(u32);
-	} else if (cpu_is_omap44xx()) {
-		omap_mcbsp_count = OMAP44XX_MCBSP_PDATA_SZ;
-		omap_mcbsp_cache_size = OMAP44XX_MCBSP_REG_NUM * sizeof(u32);
+	int id, count = 1, i;
+	char *name = "omap-mcbsp";
+	char dev_name[16];
+	struct omap_hwmod *oh_device[2];
+	struct omap_mcbsp_platform_data *pdata;
+	struct omap_device *od;
+
+	if (!oh) {
+		pr_err("%s:NULL hwmod pointer (oh)\n", __func__);
+		return -EINVAL;
 	}
 
-	mcbsp_ptr = kzalloc(omap_mcbsp_count * sizeof(struct omap_mcbsp *),
-								GFP_KERNEL);
-	if (!mcbsp_ptr)
+	pdata = kzalloc(sizeof(struct omap_mcbsp_platform_data), GFP_KERNEL);
+	if (!pdata) {
+		pr_err("%s: No memory for mcbsp\n", __func__);
 		return -ENOMEM;
+	}
+	pdata->ops = &omap2_mcbsp_ops;
 
-	if (cpu_is_omap2420())
-		omap_mcbsp_register_board_cfg(omap2420_mcbsp_pdata,
-						OMAP2420_MCBSP_PDATA_SZ);
-	if (cpu_is_omap2430())
-		omap_mcbsp_register_board_cfg(omap2430_mcbsp_pdata,
-						OMAP2430_MCBSP_PDATA_SZ);
-	if (cpu_is_omap34xx())
-		omap_mcbsp_register_board_cfg(omap34xx_mcbsp_pdata,
-						OMAP34XX_MCBSP_PDATA_SZ);
-	if (cpu_is_omap44xx())
-		omap_mcbsp_register_board_cfg(omap44xx_mcbsp_pdata,
-						OMAP44XX_MCBSP_PDATA_SZ);
+	if (cpu_is_omap34xx()) {
+		pdata->dma_op_mode = MCBSP_DMA_MODE_ELEMENT;
+		if (id == 2)
+			pdata->buffer_size = 0x500;
+		else
+			pdata->buffer_size = 0x80;
+	} else {
+		pdata->dma_op_mode = -EINVAL;
+		pdata->buffer_size = 0;
+	}
+
+	sscanf(oh->name, "mcbsp%d", &id);
+	sprintf(dev_name, "mcbsp%d_sidetone", id);
+	oh_device[0] = oh;
+
+	for (i = 0; i < no_of_st ; i++) {
+		if (!strcmp(dev_name, oh_st_device[i]->name)) {
+			oh_device[1] = oh_st_device[i];
+			count++;
+		}
+	}
+
+	pdata->oh = kzalloc(sizeof(struct omap_mcbsp_platform_data) * count,
+				GFP_KERNEL);
+	if (!pdata->oh) {
+		pr_err("%s: No memory for mcbsp pdata oh\n", __func__);
+		return -ENOMEM;
+	}
+	memcpy(pdata->oh, oh_device, sizeof(struct omap_hwmod *) * count);
+
+	od = omap_device_build_ss(name, id - 1, oh_device, count, pdata,
+				sizeof(*pdata), omap2_mcbsp_latency,
+				ARRAY_SIZE(omap2_mcbsp_latency), false);
+	if (IS_ERR(od))  {
+		pr_err("%s: Cant build omap_device for %s:%s.\n", __func__,
+					name, oh->name);
+		kfree(pdata);
+		return PTR_ERR(od);
+	}
+	omap_mcbsp_count++;
+	return 0;
+}
+
+static int omap_mcbsp_st(struct omap_hwmod *oh, void *user)
+{
+	if (!oh) {
+		pr_err("%s:NULL hwmod pointer (oh)\n", __func__);
+		return -EINVAL;
+	}
+	oh_st_device[no_of_st++] = oh;
+	return 0;
+}
+
+static int __init omap2_mcbsp_init(void)
+{
+	omap_hwmod_for_each_by_class("mcbsp_sidetone", omap_mcbsp_st,
+					NULL);
+	omap_hwmod_for_each_by_class("mcbsp", omap_init_mcbsp, NULL);
+
+	mcbsp_ptr = kzalloc(omap_mcbsp_count * sizeof(struct omap_mcbsp *),
+				GFP_KERNEL);
+	if (!mcbsp_ptr) {
+		pr_err("%s: No memory for mcbsp\n", __func__);
+		return -ENOMEM;
+	}
 
 	return omap_mcbsp_init();
 }
