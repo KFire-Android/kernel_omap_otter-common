@@ -705,7 +705,7 @@ func_end:
 		size = copy_to_user((void __user *) cmd_args,
 					(const void *) &common_args,
 					sizeof(struct notify_cmd_args));
-		if (size < 0)
+		if (size)
 			os_status = -EFAULT;
 	}
 	return os_status;
