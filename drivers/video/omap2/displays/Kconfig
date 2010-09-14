@@ -3,6 +3,7 @@ menu "OMAP2/3 Display Device Drivers"
 
 config PANEL_GENERIC
         tristate "Generic Panel"
+	default y
         help
 	  Generic panel driver.
 	  Used for DVI output for Beagle and OMAP3 SDP.
@@ -10,6 +11,7 @@ config PANEL_GENERIC
 config PANEL_SHARP_LS037V7DW01
         tristate "Sharp LS037V7DW01 LCD Panel"
         depends on OMAP2_DSS
+	default y
         select BACKLIGHT_CLASS_DEVICE
         help
           LCD Panel used in TI's SDP3430 and EVM boards
@@ -35,6 +37,8 @@ config PANEL_TAAL
 
 config PANEL_NEC_NL8048HL11_01B
         tristate "NEC NL8048HL11-01B Panel"
+	depends on OMAP2_DSS
+	default y
         help
           LCD Panel used in the Zoom boards
 
