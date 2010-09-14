@@ -1610,6 +1610,7 @@ static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
 static struct omap_hwmod omap44xx_fdif_hwmod = {
 	.name		= "fdif",
 	.class		= &omap44xx_fdif_hwmod_class,
+	.flags		= HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap44xx_fdif_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_fdif_irqs),
 	.main_clk	= "fdif_fck",
@@ -5982,7 +5983,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_ipu_c0_hwmod,
 	&omap44xx_ipu_c1_hwmod,
 	/* iss class */
-/*	&omap44xx_iss_hwmod, */
+	&omap44xx_iss_hwmod,
 	/* iva class */
 	&omap44xx_iva_hwmod,
 	&omap44xx_iva_seq0_hwmod,
@@ -5990,7 +5991,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	/* kbd class */
 	&omap44xx_kbd_hwmod,
 	/* mailbox class */
-/*	&omap44xx_mailbox_hwmod, */
+	&omap44xx_mailbox_hwmod,
 	/* mcbsp class */
 	&omap44xx_mcbsp1_hwmod,
 	&omap44xx_mcbsp2_hwmod,
