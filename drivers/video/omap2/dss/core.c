@@ -676,7 +676,9 @@ static int omap_dss_probe(struct platform_device *pdev)
 		if (def_disp_name && strcmp(def_disp_name, dssdev->name) == 0)
 			pdata->default_device = dssdev;
 	}
+#ifdef HWMOD
 	dss_clk_disable_all();
+#endif
 	return 0;
 
 err_register:
@@ -814,6 +816,7 @@ static int omap_dsshw_probe(struct platform_device *pdev)
 	int r;
 
 	pm_runtime_enable(&pdev->dev);
+	core.pdev = pdev;
 	r = dss_get_clocks();
 	if (r)
 		goto err_dss;
