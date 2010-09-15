@@ -34,7 +34,6 @@
 static struct workqueue_struct *mboxd;
 static struct omap_mbox *mboxes;
 static DEFINE_MUTEX(mboxes_lock);
-static bool rq_full;
 
 static int mbox_configured;
 
@@ -152,6 +151,12 @@ static void mbox_rx_work(struct work_struct *work)
 
 		blocking_notifier_call_chain(&mq->mbox->notifier, len,
 							(void *)msg);
+		spin_lock_irq(&mq->lock);
+		if (mq->full) {
+			mq->full = false;
+			omap_mbox_enable_irq(mq->mbox, IRQ_RX);
+		}
+		spin_unlock_irq(&mq->lock);
 	}
 }
 
@@ -193,7 +198,7 @@ static void __mbox_rx_interrupt(struct omap_mbox *mbox)
 			msg_rx = true;
 			if (unlikely(kfifo_avail(&mq->fifo) < sizeof(msg))) {
 				omap_mbox_disable_irq(mbox_curr, IRQ_RX);
-				rq_full = true;
+				mq->full = true;
 				goto nomem;
 			}
 
