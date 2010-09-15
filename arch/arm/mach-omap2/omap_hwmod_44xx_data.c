@@ -5939,10 +5939,8 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	/* dmic class */
 /*	&omap44xx_dmic_hwmod, */
 	/* dsp class */
-#if 0
 	&omap44xx_dsp_hwmod,
 	&omap44xx_dsp_c0_hwmod,
-#endif
 	/* dss class */
 	&omap44xx_dss_hwmod,
 	&omap44xx_dss_dispc_hwmod,
@@ -5980,7 +5978,6 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_i2c3_hwmod,
 	&omap44xx_i2c4_hwmod,
 	/* ipu class */
-#if 0
 	&omap44xx_ipu_hwmod,
 	&omap44xx_ipu_c0_hwmod,
 	&omap44xx_ipu_c1_hwmod,
@@ -5990,7 +5987,6 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_iva_hwmod,
 	&omap44xx_iva_seq0_hwmod,
 	&omap44xx_iva_seq1_hwmod,
-#endif
 	/* kbd class */
 	&omap44xx_kbd_hwmod,
 	/* mailbox class */
