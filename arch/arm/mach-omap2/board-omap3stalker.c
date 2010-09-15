@@ -523,10 +523,10 @@ static int __init omap3_stalker_i2c_init(void)
 	omap3stalker_twldata.vmmc1 = &omap3stalker_vmmc1;
 	omap3stalker_twldata.vsim = &omap3stalker_vsim;
 
-	omap_register_i2c_bus(1, 2600, omap3stalker_i2c_boardinfo,
+	omap_register_i2c_bus(1, 2600, NULL, omap3stalker_i2c_boardinfo,
 			      ARRAY_SIZE(omap3stalker_i2c_boardinfo));
-	omap_register_i2c_bus(2, 400, NULL, 0);
-	omap_register_i2c_bus(3, 400, omap3stalker_i2c_boardinfo3,
+	omap_register_i2c_bus(2, 400, NULL, NULL, 0);
+	omap_register_i2c_bus(3, 400, NULL, omap3stalker_i2c_boardinfo3,
 			      ARRAY_SIZE(omap3stalker_i2c_boardinfo3));
 	return 0;
 }
