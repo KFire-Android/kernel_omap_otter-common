@@ -893,6 +893,7 @@ static int _reset(struct omap_hwmod *oh)
 	int ret = 0;
 
 	if (!oh->class->sysc ||
+	    !(oh->class->sysc->sysc_flags & SYSC_HAS_RESET_STATUS) ||
 	    !(oh->class->sysc->sysc_flags & SYSC_HAS_SOFTRESET))
 		return -EINVAL;
 
