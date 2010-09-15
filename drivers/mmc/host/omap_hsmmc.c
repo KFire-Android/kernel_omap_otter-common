@@ -68,6 +68,7 @@
 #define MSBS			(1 << 5)
 #define BCE			(1 << 1)
 #define FOUR_BIT		(1 << 1)
+#define DDR			(1 << 19)
 #define DW8			(1 << 5)
 #define CC			0x1
 #define TC			0x02
@@ -622,6 +623,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 	OMAP_HSMMC_WRITE(host, SYSCONFIG,
 			OMAP_HSMMC_READ(host, SYSCONFIG) | AUTOIDLE);
 
+
 	if (host->id == OMAP_MMC1_DEVID) {
 		if (host->power_mode != MMC_POWER_OFF &&
 		    (1 << ios->vdd) <= MMC_VDD_23_24)
@@ -655,6 +657,11 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 		goto out;
 
 	con = OMAP_HSMMC_READ(host, CON);
+	/* configure in DDR mode */
+	if (ios->ddr)
+		con |= DDR;
+	else
+		con &= ~DDR;
 	switch (ios->bus_width) {
 	case MMC_BUS_WIDTH_8:
 		OMAP_HSMMC_WRITE(host, CON, con | DW8);
@@ -1693,6 +1700,11 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	/* FIXME: set registers based only on changes to ios */
 
 	con = OMAP_HSMMC_READ(host, CON);
+	/* configure in DDR mode */
+	if (ios->ddr)
+		con |= DDR;
+	else
+		con &= ~DDR;
 	switch (mmc->ios.bus_width) {
 	case MMC_BUS_WIDTH_8:
 		OMAP_HSMMC_WRITE(host, CON, con | DW8);
