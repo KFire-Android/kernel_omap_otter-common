@@ -916,21 +916,26 @@ static int twl6040_hw_params(struct snd_pcm_substream *substream,
 
 static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
 {
-/* TODO: this needs full evaluation */
-#if 0
 	struct snd_soc_codec *codec = codec_dai->codec;
+	int hs_gain, hfl_gain, hfr_gain;
+
+	hfl_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HFLGAIN);
+	hfr_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HFRGAIN);
+	hs_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HSGAIN);
 
 	if (mute) {
-		if (codec->active == 1) {
-			twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0x1D,
-							TWL6040_REG_HFRGAIN);
-			twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0x1D,
-							TWL6040_REG_HFLGAIN);
-			twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0xFF,
-							TWL6040_REG_HSGAIN);
-		}
+		twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0x1D,
+				 TWL6040_REG_HFLGAIN);
+		twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0x1D,
+				 TWL6040_REG_HFRGAIN);
+		twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0xFF,
+				 TWL6040_REG_HSGAIN);
+	} else {
+		twl6040_write(codec, TWL6040_REG_HFLGAIN, hfl_gain);
+		twl6040_write(codec, TWL6040_REG_HFRGAIN, hfr_gain);
+		twl6040_write(codec, TWL6040_REG_HSGAIN, hs_gain);
 	}
-#endif
+
 	return 0;
 }
 
