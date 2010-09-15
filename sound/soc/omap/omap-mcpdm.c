@@ -50,11 +50,9 @@
 #include <plat/mcbsp.h>
 #include "omap-mcpdm.h"
 #include "omap-pcm.h"
-
-enum dai_status {
-	PDM_STOPPED = 0,
-	PDM_STARTED,
-};
+#ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
+#include "abe/abe_main.h"
+#endif
 
 struct omap_mcpdm_data {
 	struct omap_mcpdm_link *links;
@@ -68,14 +66,15 @@ struct omap_mcpdm {
 	int irq;
 	struct workqueue_struct *workqueue;
 	struct delayed_work delayed_work;
+#ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
+	struct delayed_work delayed_abe_work;
+#endif
 
 	spinlock_t lock;
 	struct omap_mcpdm_platform_data *pdata;
 	struct omap_mcpdm_link *downlink;
 	struct omap_mcpdm_link *uplink;
 	struct completion irq_completion;
-
-	enum dai_status status[4];
 
 	int dn_channels;
 	int up_channels;
@@ -203,29 +202,13 @@ static void omap_mcpdm_reset_playback(struct omap_mcpdm * mcpdm,
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
-static inline int omap_mcdpm_dl_stop_ready(struct omap_mcpdm *mcpdm)
-{
-	int i;
-
-	/* check the 3 DL DAIs */
-	for (i = 0; i < 3; i++) {
-		if (mcpdm->status[i] == PDM_STARTED)
-			return 0;
-	}
-
-	return 1;
-}
-
 /*
  * Enables the transfer through the PDM interface to/from the Phoenix
  * codec by enabling the corresponding UP or DN channels.
  */
-static void omap_mcpdm_start(struct omap_mcpdm *mcpdm, struct snd_soc_dai *dai,
-		int stream)
+static void omap_mcpdm_start(struct omap_mcpdm *mcpdm, int stream)
 {
 	int ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
-
-	mcpdm->status[dai->id] = PDM_STARTED;
 
 	if (stream)
 		ctrl |= mcpdm->up_channels;
@@ -239,21 +222,15 @@ static void omap_mcpdm_start(struct omap_mcpdm *mcpdm, struct snd_soc_dai *dai,
  * Disables the transfer through the PDM interface to/from the Phoenix
  * codec by disabling the corresponding UP or DN channels.
  */
-static void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, struct snd_soc_dai *dai,
-		int stream)
+static void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, int stream)
 {
 	int ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
 
-	mcpdm->status[dai->id] = PDM_STOPPED;
-
 	if (stream)
 		ctrl &= ~mcpdm->up_channels;
-	else {
-		if (!omap_mcdpm_dl_stop_ready(mcpdm))
-			return;
+	else
 		ctrl &= ~mcpdm->dn_channels;
-		dev_dbg(dai->dev, "%s: stop %d\n", __func__, dai->id);
-	}
+
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 }
 
@@ -321,7 +298,7 @@ int omap_mcpdm_playback_open(struct omap_mcpdm *mcpdm,
 	ctrl |= downlink->format & PDMOUTFORMAT;
 
 	/* Downlink channels */
-	mcpdm->dn_channels = (PDM_DN_MASK | PDM_CMD_MASK);
+	mcpdm->dn_channels = downlink->channels & (PDM_DN_MASK | PDM_CMD_MASK);
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 
 	return 0;
@@ -548,10 +525,6 @@ static int omap_mcpdm_dai_startup(struct snd_pcm_substream *substream,
 		omap_mcpdm_set_offset(mcpdm);
 	}
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mcpdm->dl_active++;
-	else
-		mcpdm->ul_active++;
 	return err;
 }
 
@@ -562,17 +535,12 @@ static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 
 	dev_dbg(dai->dev, "%s: active %d\n", __func__, dai->active);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mcpdm->dl_active--;
-	else
-		mcpdm->ul_active--;
-
 	if (!dai->active) {
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
-		if (mcpdm->dl_active == 0 && substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 				queue_delayed_work(mcpdm->workqueue, &mcpdm->delayed_work,
-						msecs_to_jiffies(11000)); // TODO: pdata ?
+						msecs_to_jiffies(11000)); /* TODO: pdata ? */
 	}
 
 }
@@ -654,14 +622,14 @@ static int omap_mcpdm_dai_trigger(struct snd_pcm_substream *substream,
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		omap_mcpdm_start(mcpdm, dai, stream);
+		omap_mcpdm_start(mcpdm, stream);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		omap_mcpdm_stop(mcpdm, dai, stream);
+		omap_mcpdm_stop(mcpdm, stream);
 		break;
 	default:
 		break;
@@ -674,13 +642,129 @@ static struct snd_soc_dai_ops omap_mcpdm_dai_ops = {
 	.shutdown	= omap_mcpdm_dai_shutdown,
 	.hw_params	= omap_mcpdm_dai_hw_params,
 	.hw_free	= omap_mcpdm_dai_hw_free,
-	.trigger = omap_mcpdm_dai_trigger,
+	.trigger	= omap_mcpdm_dai_trigger,
 };
+
+#ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
+static int omap_mcpdm_abe_dai_startup(struct snd_pcm_substream *substream,
+				  struct snd_soc_dai *dai)
+{
+	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
+	int err = 0;
+
+	err = omap_mcpdm_dai_startup(substream, dai);
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		mcpdm->dl_active++;
+	else
+		mcpdm->ul_active++;
+	return err;
+}
+
+static void omap_mcpdm_abe_dai_shutdown(struct snd_pcm_substream *substream,
+				    struct snd_soc_dai *dai)
+{
+	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
+
+	dev_dbg(dai->dev, "%s: active %d\n", __func__, dai->active);
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		mcpdm->dl_active--;
+	else
+		mcpdm->ul_active--;
+
+	if (!dai->active) {
+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
+		if (mcpdm->dl_active == 0 && substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+				queue_delayed_work(mcpdm->workqueue, &mcpdm->delayed_abe_work,
+						msecs_to_jiffies(11000)); /* TODO: pdata ? */
+	}
+
+}
+
+/* work to delay McPDM shutdown */
+static void playback_abe_work(struct work_struct *work)
+{
+	struct omap_mcpdm *mcpdm =
+			container_of(work, struct omap_mcpdm, delayed_abe_work.work);
+
+	spin_lock(&mcpdm->lock);
+	if (!mcpdm->dl_active) {
+		omap_mcpdm_stop(mcpdm, SNDRV_PCM_STREAM_PLAYBACK);
+		abe_disable_data_transfer(PDM_DL_PORT);
+		udelay(250);
+		omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
+	}
+	spin_unlock(&mcpdm->lock);
+
+	if (!mcpdm->free && !mcpdm->dl_active && !mcpdm->ul_active)
+		omap_mcpdm_free(mcpdm);
+}
+
+static int omap_mcpdm_abe_dai_hw_params(struct snd_pcm_substream *substream,
+				    struct snd_pcm_hw_params *params,
+				    struct snd_soc_dai *dai)
+{
+	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
+	int stream = substream->stream;
+	int err = 0, ctrl;
+
+	snd_soc_dai_set_dma_data(dai, substream,
+				 &omap_mcpdm_dai_dma_params[stream]);
+
+	spin_lock(&mcpdm->lock);
+	ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		cancel_delayed_work(&mcpdm->delayed_abe_work);
+		/* Check if McPDM is already started */
+		if ((ctrl & (PDM_DN_MASK | PDM_CMD_MASK)) == 0 ) {
+			mcpdm->downlink->channels = (PDM_DN_MASK | PDM_CMD_MASK);
+			err = omap_mcpdm_playback_open(mcpdm, &omap_mcpdm_links[0]);
+			abe_enable_data_transfer(PDM_DL_PORT);
+			udelay(250);
+			omap_mcpdm_start(mcpdm, stream);
+		}
+	} else {
+		mcpdm->uplink->channels = 0x0003;
+		err = omap_mcpdm_capture_open(mcpdm, &omap_mcpdm_links[1]);
+	}
+	spin_unlock(&mcpdm->lock);
+
+	return err;
+}
+
+static int omap_mcpdm_abe_dai_hw_free(struct snd_pcm_substream *substream,
+				  struct snd_soc_dai *dai)
+{
+	return omap_mcpdm_dai_hw_free(substream, dai);
+}
+
+static int omap_mcpdm_abe_dai_trigger(struct snd_pcm_substream *substream,
+				  int cmd, struct snd_soc_dai *dai)
+{
+
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		omap_mcpdm_dai_trigger(substream, cmd,  dai);
+	}
+
+	return 0;
+}
+
+static struct snd_soc_dai_ops omap_mcpdm_abe_dai_ops = {
+	.startup	= omap_mcpdm_abe_dai_startup,
+	.shutdown	= omap_mcpdm_abe_dai_shutdown,
+	.hw_params	= omap_mcpdm_abe_dai_hw_params,
+	.hw_free	= omap_mcpdm_abe_dai_hw_free,
+	.trigger 	= omap_mcpdm_abe_dai_trigger,
+};
+#endif
 
 #define OMAP_MCPDM_RATES	(SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000)
 #define OMAP_MCPDM_FORMATS	(SNDRV_PCM_FMTBIT_S32_LE)
 
 static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
+#ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
 {
 	.name = "mcpdm-dl1",
 	.playback = {
@@ -689,7 +773,7 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 		.rates = OMAP_MCPDM_RATES,
 		.formats = OMAP_MCPDM_FORMATS,
 	},
-	.ops = &omap_mcpdm_dai_ops,
+	.ops = &omap_mcpdm_abe_dai_ops,
 },
 {
 	.name = "mcpdm-dl2",
@@ -699,7 +783,7 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 		.rates = OMAP_MCPDM_RATES,
 		.formats = OMAP_MCPDM_FORMATS,
 	},
-	.ops = &omap_mcpdm_dai_ops,
+	.ops = &omap_mcpdm_abe_dai_ops,
 },
 {
 	.name = "mcpdm-vib",
@@ -709,10 +793,31 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 		.rates = OMAP_MCPDM_RATES,
 		.formats = OMAP_MCPDM_FORMATS,
 	},
-	.ops = &omap_mcpdm_dai_ops,
+	.ops = &omap_mcpdm_abe_dai_ops,
 },
 {
 	.name = "mcpdm-ul1",
+	.capture = {
+		.channels_min = 1,
+		.channels_max = 2,
+		.rates = OMAP_MCPDM_RATES,
+		.formats = OMAP_MCPDM_FORMATS,
+	},
+	.ops = &omap_mcpdm_abe_dai_ops,
+},
+#endif
+{
+	.name = "mcpdm-dl",
+	.playback = {
+		.channels_min = 1,
+		.channels_max = 4,
+		.rates = OMAP_MCPDM_RATES,
+		.formats = OMAP_MCPDM_FORMATS,
+	},
+	.ops = &omap_mcpdm_dai_ops,
+},
+{
+	.name = "mcpdm-ul",
 	.capture = {
 		.channels_min = 1,
 		.channels_max = 2,
@@ -761,7 +866,7 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 
 	mcpdm->dev = &pdev->dev;
 
-	// TODO: values will be different per device, read from FS
+	/* TODO: values will be different per device, read from FS */
 	mcpdm->dl1_offset = 0x1F;
 	mcpdm->dl2_offset = 0x1F;
 
@@ -769,7 +874,9 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 	if (mcpdm->workqueue == NULL)
 		goto err_work;
 	INIT_DELAYED_WORK(&mcpdm->delayed_work, playback_work);
-
+#ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
+	INIT_DELAYED_WORK(&mcpdm->delayed_abe_work, playback_abe_work);
+#endif
 	ret = snd_soc_register_dais(&pdev->dev, omap_mcpdm_dai,
 			ARRAY_SIZE(omap_mcpdm_dai));
 	if (ret == 0)

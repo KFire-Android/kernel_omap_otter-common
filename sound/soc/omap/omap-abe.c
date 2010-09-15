@@ -934,7 +934,8 @@ static void unmute_be_playback(struct abe_frontend_dai *fe)
 static inline void abe_dai_enable_data_transfer(int port)
 {
 	pr_debug("%s : port %d\n", __func__, port);
-	abe_enable_data_transfer(port);
+	if (port != PDM_DL_PORT)
+		abe_enable_data_transfer(port);
 }
 
 static void enable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
@@ -1070,7 +1071,8 @@ static void enable_fe_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 static inline void abe_dai_disable_data_transfer(int port)
 {
 	pr_debug("%s : port %d\n", __func__, port);
-	abe_disable_data_transfer(port);
+	if (port != PDM_DL_PORT)
+		abe_disable_data_transfer(port);
 }
 
 static void disable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
