@@ -392,7 +392,10 @@ abehal_status abe_write_aps (u32 id, abe_aps_t *param);
  * in mute state". A mixer is disabled with a network reconfiguration
  * corresponding to an OPP value.
  */
-abehal_status abe_write_gain (u32 id, u32 f_g, u32 ramp, u32 p);
+abehal_status abe_mute_gain(u32 id, u32 p);
+abehal_status abe_unmute_gain(u32 id, u32 p);
+abehal_status abe_update_gain(u32 id, u32 f_g, u32 ramp, u32 p);
+abehal_status abe_write_gain(u32 id, u32 f_g, u32 ramp, u32 p);
 
 /**
  * abe_write_mixer

@@ -24,6 +24,26 @@
 #include "abe_initxxx_labels.h"
 #include "abe_dbg.h"
 
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/init.h>
+#include <linux/delay.h>
+#include <linux/pm.h>
+#include <linux/i2c.h>
+#include <linux/gpio.h>
+#include <linux/platform_device.h>
+#include <linux/workqueue.h>
+#include <linux/clk.h>
+#include <linux/err.h>
+#include <linux/slab.h>
+#include <linux/pm_runtime.h>
+
+struct abe_gain {
+	u32 gain;
+	int mute;
+};
+struct abe_gain *abe_gain_table;
+
 /**
  * abe_reset_hal - reset the ABE/HAL
  * @rdev: regulator source
@@ -48,6 +68,8 @@ abehal_status abe_reset_hal(void)
   abe_dbg_mask = (abe_dbg_t) (0);
 #endif
   abe_hw_configuration();
+	abe_gain_table = kzalloc(sizeof(struct abe_gain)*34, GFP_KERNEL);
+
 
   return 0;
 }
@@ -1455,11 +1477,107 @@ abehal_status abe_write_aps(u32 id, abe_aps_t * param)
   _log(id_write_aps, id, 0, 0)
     return 0;
 }
-
 EXPORT_SYMBOL(abe_write_aps);
 
+int abe_get_gain_index(u32 id, u32 p)
+{
+	int index;
+
+	switch (id) {
+	default:
+	case GAINS_DMIC1:
+		index = 0;
+		break;
+	case GAINS_DMIC2:
+		index = 2;
+		break;
+	case GAINS_DMIC3:
+		index = 4;
+		break;
+	case GAINS_AMIC:
+		index = 6;
+		break;
+	case GAINS_DL1:
+		index = 8;
+		break;
+	case GAINS_DL2:
+		index = 10;
+		break;
+	case GAINS_SPLIT:
+		index = 12;
+		break;
+	case MIXDL1:
+		index = 14;
+		break;
+	case MIXDL2:
+		index = 18;
+		break;
+	case MIXECHO:
+		index = 22;
+		break;
+	case MIXSDT:
+		index = 24;
+		break;
+	case MIXVXREC:
+		index = 26;
+		break;
+	case MIXAUDUL:
+		index = 30;
+		break;
+	}
+	index += p;
+
+	return(index);
+
+}
+
 /**
- * abe_write_mixer
+ * abe_mute_gain
+ * @id: name of the mixer
+ * @p: port corresponding to the above gains
+ *
+ * Mute ABE gain
+ */
+abehal_status abe_mute_gain(u32 id, u32 p)
+{
+	int index;
+
+	index = abe_get_gain_index(id, p);
+
+	if (abe_gain_table[index].mute == 0) {
+		abe_gain_table[index].mute = 1;
+		abe_read_gain(id, &abe_gain_table[index].gain, p);
+		abe_update_gain(id, MUTE_GAIN, RAMP_5MS, p);
+	} else
+		abe_gain_table[index].mute = 1;
+	return 0;
+
+}
+EXPORT_SYMBOL(abe_mute_gain);
+
+
+/**
+ * abe_unmute_gain
+ * @id: name of the mixer
+ * @p: port corresponding to the above gains
+ *
+ * UnMute ABE gain
+ */
+abehal_status abe_unmute_gain(u32 id, u32 p)
+{
+	int index;
+
+	index = abe_get_gain_index(id, p);
+
+	abe_gain_table[index].mute = 0;
+	abe_update_gain(id, abe_gain_table[index].gain, RAMP_5MS, p);
+
+	return 0;
+}
+EXPORT_SYMBOL(abe_unmute_gain);
+
+/**
+ * abe_update_gain
  * @id: name of the mixer
  * @param: list of input gains of the mixer
  * @p: list of port corresponding to the above gains
@@ -1470,7 +1588,7 @@ EXPORT_SYMBOL(abe_write_aps);
  * in mute state". A mixer is disabled with a network reconfiguration
  * corresponding to an OPP value.
  */
-abehal_status abe_write_gain(u32 id, u32 f_g, u32 ramp, u32 p)
+abehal_status abe_update_gain(u32 id, u32 f_g, u32 ramp, u32 p)
 {
   u32 lin_g, mixer_target, mixer_offset;
   s32 gain_index;
@@ -1582,7 +1700,22 @@ abehal_status abe_write_gain(u32 id, u32 f_g, u32 ramp, u32 p)
 
   return 0;
 }
+EXPORT_SYMBOL(abe_update_gain);
 
+abehal_status abe_write_gain (u32 id, u32 f_g, u32 ramp, u32 p)
+{
+	int index;
+
+	index = abe_get_gain_index(id, p);
+
+	if (abe_gain_table[index].mute == 0) {
+		abe_gain_table[index].gain = f_g;
+		abe_update_gain(id, f_g,ramp, p);
+	} else
+		abe_gain_table[index].gain = f_g;
+
+	return 0;
+}
 EXPORT_SYMBOL(abe_write_gain);
 
 /**
