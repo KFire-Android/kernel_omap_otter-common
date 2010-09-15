@@ -870,12 +870,37 @@ static struct platform_device omap_display_device = {
 void __init omap_display_init(struct omap_dss_board_info *board_data)
 {
 	struct omap_hwmod *oh;
-	char oh_name[7][MAX_OMAP_DSS_HWMOD_NAME_LEN] = {"dss", "dss_dispc", "dss_dsi1", "dss_dsi2", "dss_hdmi", "dss_rfbi", "dss_venc"};
+	char oh_name_omap4[7][MAX_OMAP_DSS_HWMOD_NAME_LEN] = {"dss",
+			"dss_dispc",
+			"dss_dsi1",
+			"dss_dsi2",
+			"dss_hdmi",
+			"dss_rfbi",
+			"dss_venc"};
+	char oh_name_omap3[5][MAX_OMAP_DSS_HWMOD_NAME_LEN] = {"dss",
+			"dss_dispc",
+			"dss_dsi1",
+			"dss_rfbi",
+			"dss_venc"
+			};
+
+	char (*oh_name)[MAX_OMAP_DSS_HWMOD_NAME_LEN];
 	int l, idx, i;
 	struct omap_display_platform_data pdata;
 	idx = 1;
+	int count = 0;
 
-	for (i = 0; i < 7; i++)	{
+        if(cpu_is_omap44xx())
+	{
+		oh_name =  &oh_name_omap4[0];
+		count = 7;
+        }
+	else
+	{
+		oh_name =  &oh_name_omap3[0];
+		count = 5;
+	}
+	for (i = 0; i < count; i++)	{
 		l = snprintf(oh_name[i], MAX_OMAP_DSS_HWMOD_NAME_LEN, oh_name[i]);
 		WARN(l >= MAX_OMAP_DSS_HWMOD_NAME_LEN,
 		"String buffer overflow in DSS device setup\n");
