@@ -799,7 +799,7 @@ static void unmute_be_capture(struct snd_soc_pcm_runtime *rtd)
 		}
 	}
 }
-
+#if 0
 static void mute_fe_playback(struct abe_frontend_dai *fe,
 		struct snd_soc_pcm_runtime *be_rtd, int mixer, int *volume)
 {
@@ -864,7 +864,7 @@ static void unmute_fe_playback(struct abe_frontend_dai *fe,
 		break;
 	}
 }
-
+#endif
 static void mute_be_playback(struct abe_frontend_dai *fe)
 {
 	struct snd_soc_pcm_runtime *rtd = fe->substream->private_data;
@@ -1192,7 +1192,6 @@ static void disable_fe_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 /* TODO: finish this */
 static void mute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runtime *rtd, int stream)
 {
-	struct snd_soc_pcm_runtime *be_rtd;
 
 	dev_dbg(&rtd->dev, "%s: fe ID=%d stream %d\n",
 			__func__, rtd->cpu_dai->id, stream);
@@ -1227,7 +1226,6 @@ static void mute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runtime
 /* TODO: finish this */
 static void unmute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runtime *rtd, int stream)
 {
-	struct snd_soc_pcm_runtime *be_rtd;
 
 	dev_dbg(&rtd->dev, "%s: fe ID=%d stream %d\n",
 			__func__, rtd->cpu_dai->id, stream);
