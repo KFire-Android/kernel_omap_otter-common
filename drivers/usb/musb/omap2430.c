@@ -293,6 +293,8 @@ static int musb_platform_resume(struct musb *musb)
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_hwmod *oh = pdata->oh;
+	struct clk *phyclk;
+	struct clk *clk48m;
 
 	if (!musb->clock)
 		return 0;
@@ -302,7 +304,10 @@ static int musb_platform_resume(struct musb *musb)
 	pm_runtime_get_sync(dev);
 
 	/* Enable the phy clocks*/
-	omap_writel(0x101, 0x4A0093E0);
+	phyclk = clk_get(NULL, "ocp2scp_usb_phy_ick");
+	clk_enable(phyclk);
+	clk48m = clk_get(NULL, "ocp2scp_usb_phy_phy_48m");
+	clk_enable(clk48m);
 
 	pdata->disable_wakeup(oh->od);
 	l = musb_readl(musb->mregs, OTG_FORCESTDBY);
