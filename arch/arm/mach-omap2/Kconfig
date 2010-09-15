@@ -206,7 +206,8 @@ config MACH_OMAP_4430SDP
 #	select SENSORS_BH1780
 	select INPUT_BH1780
 	select MISC_DEVICES
-	select BMP085
+#	select BMP085
+	select INPUT_BMP085
 	select STAGING
 	select IIO
 #	select SENSORS_HMC5843
