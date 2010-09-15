@@ -38,6 +38,7 @@
 #define MMU_EMU_FAULT_AD	0x70
 #define MMU_FAULT_PC		0x80
 #define MMU_FAULT_STATUS	0x84
+#define MMU_GP_REG		0x88
 
 /*
  * MMU Register bit definitions
