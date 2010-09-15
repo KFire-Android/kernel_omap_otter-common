@@ -112,8 +112,6 @@ obj-$(CONFIG_OMAP_MBOX_FWK)		+= mailbox_mach.o
 mailbox_mach-objs			:= mailbox.o
 
 ifeq ($(CONFIG_OMAP_REMOTE_PROC),y)
-obj-$(CONFIG_ARCH_OMAP2)		+= remoteproc24xx.o
-obj-$(CONFIG_ARCH_OMAP3)		+= remoteproc3xxx.o
 obj-$(CONFIG_ARCH_OMAP4)		+= remoteproc44xx.o
 endif
 iommu-y					+= iommu2.o omap-iommu.o
