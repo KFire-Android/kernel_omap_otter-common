@@ -30,6 +30,7 @@
 #include <linux/kernel.h>
 #include <linux/genalloc.h>
 
+#include <linux/sched.h>
 #include <asm/cacheflush.h>
 #include <asm/mach/map.h>
 #include <linux/dma-mapping.h>
