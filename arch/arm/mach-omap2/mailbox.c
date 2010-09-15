@@ -207,7 +207,10 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
 	struct omap_mbox2_priv *p = (struct omap_mbox2_priv *)mbox->priv;
 	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
 	l = mbox_read_reg(p->irqdisable);
-	l &= ~bit;
+	if (cpu_is_omap44xx())
+		l |= bit;
+	else
+		l &= ~bit;
 	mbox_write_reg(l, p->irqdisable);
 }
 
