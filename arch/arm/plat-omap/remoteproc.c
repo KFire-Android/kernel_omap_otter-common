@@ -36,7 +36,6 @@
 
 #define OMAP_RPROC_NAME "omap-rproc"
 
-
 static struct class *omap_rproc_class;
 static dev_t omap_rproc_dev;
 static atomic_t num_of_rprocs;
@@ -425,8 +424,13 @@ EXPORT_SYMBOL_GPL(omap_rproc_put);
 
 static int __init omap_rproc_init(void)
 {
-	int num = omap_get_num_of_remoteproc();
+	int num;
 	int ret;
+
+	if (cpu_is_omap44xx())
+		num = NR_RPROC_OMAP4_DEVICES;
+	else
+		return 0;
 
 	ret = alloc_chrdev_region(&omap_rproc_dev, 0, num, OMAP_RPROC_NAME);
 	if (ret) {
@@ -460,7 +464,12 @@ module_init(omap_rproc_init);
 
 static void __exit omap_rproc_exit(void)
 {
-	int num = omap_get_num_of_remoteproc();
+	int num;
+
+	if (cpu_is_omap44xx())
+		num = NR_RPROC_OMAP4_DEVICES;
+	else
+		return;
 
 	class_destroy(omap_rproc_class);
 	unregister_chrdev_region(omap_rproc_dev, num);

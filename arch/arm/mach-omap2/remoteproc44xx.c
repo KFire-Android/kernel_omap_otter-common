@@ -205,14 +205,7 @@ struct omap_rproc_platform_data *omap4_get_rproc_data(void)
 
 #define NR_RPROC_DEVICES ARRAY_SIZE(omap4_rproc_data)
 
-static struct omap_device *omap4_rproc_pdev[NR_RPROC_DEVICES];
-
-int omap_get_num_of_remoteproc(void)
-{
-	return NR_RPROC_DEVICES;
-}
-EXPORT_SYMBOL(omap_get_num_of_remoteproc);
-
+static struct omap_device *omap4_rproc_pdev[NR_RPROC_OMAP4_DEVICES];
 
 static int __init omap4_rproc_init(void)
 {
@@ -229,7 +222,7 @@ static int __init omap4_rproc_init(void)
 
 
 	rproc_data = omap4_get_rproc_data();
-	rproc_data_size = omap_get_num_of_remoteproc();
+	rproc_data_size = NR_RPROC_OMAP4_DEVICES;
 
 	for (i = 0; i < rproc_data_size; i++) {
 		oh_name = rproc_data[i].oh_name;

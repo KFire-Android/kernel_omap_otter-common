@@ -36,6 +36,12 @@
 
 #define RPROC_IOC_MAXNR		(3)
 
+#ifdef CONFIG_ARCH_OMAP4
+#define NR_RPROC_OMAP4_DEVICES 3
+#else
+#define NR_RPROC_OMAP4_DEVICES 0
+#endif
+
 struct omap_rproc;
 
 struct omap_rproc_ops {
@@ -104,7 +110,4 @@ extern void omap_rproc_put(struct omap_rproc *obj);
 struct omap_rproc_platform_data *omap3_get_rproc_data(void);
 int omap3_get_rproc_data_size(void);
 struct omap_rproc_platform_data *omap4_get_rproc_data(void);
-int omap4_get_rproc_data_size(void);
-int omap_get_num_of_remoteproc(void);
-
 #endif /* REMOTEPROC_H */
