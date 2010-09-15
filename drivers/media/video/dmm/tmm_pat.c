@@ -211,8 +211,7 @@ static u32 *tmm_pat_get_pages(struct tmm *tmm, s32 n)
 		if (m != NULL) {
 			f->mem[i] = m;
 			f->pa[i] = m->pa;
-		}
-		else {
+		} else {
 			goto cleanup;
 		}
 	}
