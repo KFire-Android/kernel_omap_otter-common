@@ -185,7 +185,6 @@ static struct omap_dss_device zoom_tv_device = {
 
 static struct omap_dss_device *zoom_dss_devices[] = {
 	&zoom_lcd_device,
-	&zoom_tv_device,
 };
 
 static struct omap_dss_board_info zoom_dss_data = {
