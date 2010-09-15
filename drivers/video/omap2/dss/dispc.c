@@ -4616,8 +4616,10 @@ int dispc_init(struct platform_device *pdev)
 #endif
 
 	INIT_WORK(&dispc.error_work, dispc_error_worker);
-
-	dispc_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if(cpu_is_omap44xx())
+		dispc_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	else
+		dispc_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	dispc_base = dispc.base = ioremap(dispc_mem->start, resource_size(dispc_mem));
 	if (!dispc.base) {
 		DSSERR("can't ioremap DISPC\n");
