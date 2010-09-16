@@ -1209,6 +1209,13 @@ static void mute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runtime
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 		break;
 	case ABE_FRONTEND_DAI_VOICE:
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_mute_gain(MIXDL2, MIX_DL2_INPUT_VX_DL);
+		}
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_mute_gain(MIXDL1, MIX_DL1_INPUT_VX_DL);
+		}
+		break;
 	case ABE_FRONTEND_DAI_TONES:
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
 			abe_mute_gain(MIXDL2, MIX_DL2_INPUT_TONES);
@@ -1243,6 +1250,13 @@ static void unmute_fe_port(struct abe_frontend_dai *fe, struct snd_soc_pcm_runti
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 		break;
 	case ABE_FRONTEND_DAI_VOICE:
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_unmute_gain(MIXDL2, MIX_DL2_INPUT_VX_DL);
+		}
+		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
+			abe_unmute_gain(MIXDL1, MIX_DL1_INPUT_VX_DL);
+		}
+		break;
 	case ABE_FRONTEND_DAI_TONES:
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
 			abe_unmute_gain(MIXDL2, MIX_DL2_INPUT_TONES);
