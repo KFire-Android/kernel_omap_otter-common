@@ -1317,6 +1317,8 @@ static void capture_work(struct work_struct *work)
 
 		/* Restore ABE GAINS AMIC */
 		unmute_be_capture(rtd);
+
+		init_completion(&fe->trigger_done);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		/* Enable sDMA / Enable ABE MM_UL2 */
@@ -1382,6 +1384,8 @@ static void playback_work(struct work_struct *work)
 
 		/* unmute ABE_MM_DL */
 		unmute_fe_port(fe, rtd, SNDRV_PCM_STREAM_PLAYBACK);
+
+		init_completion(&fe->trigger_done);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		/* Enable Frontend sDMA  */
