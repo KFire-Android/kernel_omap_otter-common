@@ -225,59 +225,59 @@ static int abe_init_engine(struct snd_soc_platform *platform)
  * These TLV settings will need fine tuned for each individual control
  */
 
-/* Media DL1 volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(mm_dl1_tlv, -5000, 600, 3000);
+/* Media DL1 volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(mm_dl1_tlv, -12000, 100, 3000);
 
-/* Media DL1 volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(tones_dl1_tlv, -5000, 600, 3000);
+/* Media DL1 volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(tones_dl1_tlv, -12000, 100, 3000);
 
-/* Media DL1 volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(voice_dl1_tlv, -5000, 600, 3000);
+/* Media DL1 volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(voice_dl1_tlv, -12000, 100, 3000);
 
-/* Media DL1 volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(capture_dl1_tlv, -5000, 600, 3000);
+/* Media DL1 volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(capture_dl1_tlv, -12000, 100, 3000);
 
-/* Media DL2 volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(mm_dl2_tlv, -5000, 600, 3000);
+/* Media DL2 volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(mm_dl2_tlv, -12000, 100, 3000);
 
-/* Media DL2 volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(tones_dl2_tlv, -5000, 600, 3000);
+/* Media DL2 volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(tones_dl2_tlv, -12000, 100, 3000);
 
-/* Media DL2 volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(voice_dl2_tlv, -5000, 600, 3000);
+/* Media DL2 volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(voice_dl2_tlv, -12000, 100, 3000);
 
-/* Media DL2 volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(capture_dl2_tlv, -5000, 600, 3000);
+/* Media DL2 volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(capture_dl2_tlv, -12000, 100, 3000);
 
-/* SDT volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(sdt_ul_tlv, -5000, 600, 3000);
+/* SDT volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(sdt_ul_tlv, -12000, 100, 3000);
 
-/* SDT volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(sdt_dl_tlv, -5000, 600, 3000);
+/* SDT volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(sdt_dl_tlv, -12000, 100, 3000);
 
-/* AUDUL volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(audul_mm_tlv, -5000, 600, 3000);
+/* AUDUL volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(audul_mm_tlv, -12000, 100, 3000);
 
-/* AUDUL volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(audul_tones_tlv, -5000, 600, 3000);
+/* AUDUL volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(audul_tones_tlv, -12000, 100, 3000);
 
-/* AUDUL volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(audul_vx_ul_tlv, -5000, 600, 3000);
+/* AUDUL volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(audul_vx_ul_tlv, -12000, 100, 3000);
 
-/* AUDUL volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(audul_vx_dl_tlv, -5000, 600, 3000);
+/* AUDUL volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(audul_vx_dl_tlv, -12000, 100, 3000);
 
-/* VXREC volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(vxrec_mm_dl_tlv, -5000, 600, 3000);
+/* VXREC volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(vxrec_mm_dl_tlv, -12000, 100, 3000);
 
-/* VXREC volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(vxrec_tones_tlv, -5000, 600, 3000);
+/* VXREC volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(vxrec_tones_tlv, -12000, 100, 3000);
 
-/* VXREC volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(vxrec_vx_dl_tlv, -5000, 600, 3000);
+/* VXREC volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(vxrec_vx_dl_tlv, -12000, 100, 3000);
 
-/* VXREC volume control from -50 to 30 dB in 6 dB steps */
-static DECLARE_TLV_DB_SCALE(vxrec_vx_ul_tlv, -5000, 600, 3000);
+/* VXREC volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(vxrec_vx_ul_tlv, -12000, 100, 3000);
 
 //TODO: we have to use the shift value atm to represent register id due to current HAL
 static int dl1_put_mixer(struct snd_kcontrol *kcontrol,
@@ -510,7 +510,7 @@ static int volume_put_sdt_mixer(struct snd_kcontrol *kcontrol,
 
 	pm_runtime_get_sync(&pdev->dev);
 
-	abe_write_mixer(MIXSDT, -5000 + (ucontrol->value.integer.value[0] * 600),
+	abe_write_mixer(MIXSDT, -12000 + (ucontrol->value.integer.value[0] * 100),
 				RAMP_0MS, mc->reg);
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -527,7 +527,7 @@ static int volume_put_audul_mixer(struct snd_kcontrol *kcontrol,
 	struct platform_device *pdev = abe->pdev;
 
 	pm_runtime_get_sync(&pdev->dev);
-	abe_write_mixer(MIXAUDUL, -5000 + (ucontrol->value.integer.value[0] * 600),
+	abe_write_mixer(MIXAUDUL, -12000 + (ucontrol->value.integer.value[0] * 100),
 				RAMP_0MS, mc->reg);
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -543,7 +543,7 @@ static int volume_put_vxrec_mixer(struct snd_kcontrol *kcontrol,
 	struct platform_device *pdev = abe->pdev;
 
 	pm_runtime_get_sync(&pdev->dev);
-	abe_write_mixer(MIXVXREC, -5000 + (ucontrol->value.integer.value[0] * 600),
+	abe_write_mixer(MIXVXREC, -12000 + (ucontrol->value.integer.value[0] * 100),
 				RAMP_0MS, mc->reg);
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -559,7 +559,7 @@ static int volume_put_dl1_mixer(struct snd_kcontrol *kcontrol,
 	struct platform_device *pdev = abe->pdev;
 
 	pm_runtime_get_sync(&pdev->dev);
-	abe_write_mixer(MIXDL1, -5000 + (ucontrol->value.integer.value[0] * 600),
+	abe_write_mixer(MIXDL1, -12000 + (ucontrol->value.integer.value[0] * 100),
 				RAMP_0MS, mc->reg);
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -575,7 +575,7 @@ static int volume_put_dl2_mixer(struct snd_kcontrol *kcontrol,
 	struct platform_device *pdev = abe->pdev;
 
 	pm_runtime_get_sync(&pdev->dev);
-	abe_write_mixer(MIXDL2, -5000 + (ucontrol->value.integer.value[0] * 600),
+	abe_write_mixer(MIXDL2, -12000 + (ucontrol->value.integer.value[0] * 100),
 				RAMP_0MS, mc->reg);
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -593,7 +593,7 @@ static int volume_get_dl1_mixer(struct snd_kcontrol *kcontrol,
 
 	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXDL1, &val, mc->reg);
-	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	ucontrol->value.integer.value[0] = (val + 12000) / 100;
 	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
@@ -610,7 +610,7 @@ static int volume_get_dl2_mixer(struct snd_kcontrol *kcontrol,
 
 	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXDL2, &val, mc->reg);
-	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	ucontrol->value.integer.value[0] = (val + 12000) / 100;
 	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
@@ -627,7 +627,7 @@ static int volume_get_audul_mixer(struct snd_kcontrol *kcontrol,
 
 	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXAUDUL, &val, mc->reg);
-	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	ucontrol->value.integer.value[0] = (val + 12000) / 100;
 	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
@@ -644,7 +644,7 @@ static int volume_get_vxrec_mixer(struct snd_kcontrol *kcontrol,
 
 	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXVXREC, &val, mc->reg);
-	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	ucontrol->value.integer.value[0] = (val + 12000) / 100;
 	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
@@ -661,7 +661,7 @@ static int volume_get_sdt_mixer(struct snd_kcontrol *kcontrol,
 
 	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXSDT, &val, mc->reg);
-	ucontrol->value.integer.value[0] = (val + 5000) / 600;
+	ucontrol->value.integer.value[0] = (val + 12000) / 100;
 	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
@@ -817,66 +817,66 @@ static const struct snd_kcontrol_new pdm_ul1_switch_controls =
 static const struct snd_kcontrol_new abe_controls[] = {
 	/* DL1 mixer gains */
 	SOC_SINGLE_EXT_TLV("DL1 Media Playback Volume",
-		MIX_DL1_INPUT_MM_DL, 0, 14, 0,
+		MIX_DL1_INPUT_MM_DL, 0, 149, 0,
 		volume_get_dl1_mixer, volume_put_dl1_mixer, mm_dl1_tlv),
 	SOC_SINGLE_EXT_TLV("DL1 Tones Playback Volume",
-		MIX_DL1_INPUT_TONES, 0, 14, 0,
+		MIX_DL1_INPUT_TONES, 0, 149, 0,
 		volume_get_dl1_mixer, volume_put_dl1_mixer, tones_dl1_tlv),
 	SOC_SINGLE_EXT_TLV("DL1 Voice Playback Volume",
-		MIX_DL1_INPUT_VX_DL, 0, 14, 0,
+		MIX_DL1_INPUT_VX_DL, 0, 149, 0,
 		volume_get_dl1_mixer, volume_put_dl1_mixer, voice_dl1_tlv),
 	SOC_SINGLE_EXT_TLV("DL1 Capture Playback Volume",
-		MIX_DL1_INPUT_MM_UL2, 0, 14, 0,
+		MIX_DL1_INPUT_MM_UL2, 0, 149, 0,
 		volume_get_dl1_mixer, volume_put_dl1_mixer, capture_dl1_tlv),
 
 	/* DL2 mixer gains */
 	SOC_SINGLE_EXT_TLV("DL2 Media Playback Volume",
-		MIX_DL2_INPUT_MM_DL, 0, 14, 0,
+		MIX_DL2_INPUT_MM_DL, 0, 149, 0,
 		volume_get_dl2_mixer, volume_put_dl2_mixer, mm_dl2_tlv),
 	SOC_SINGLE_EXT_TLV("DL2 Tones Playback Volume",
-		MIX_DL2_INPUT_TONES, 0, 14, 0,
+		MIX_DL2_INPUT_TONES, 0, 149, 0,
 		volume_get_dl2_mixer, volume_put_dl2_mixer, tones_dl2_tlv),
 	SOC_SINGLE_EXT_TLV("DL2 Voice Playback Volume",
-		MIX_DL2_INPUT_VX_DL, 0, 14, 0,
+		MIX_DL2_INPUT_VX_DL, 0, 149, 0,
 		volume_get_dl2_mixer, volume_put_dl2_mixer, voice_dl2_tlv),
 	SOC_SINGLE_EXT_TLV("DL2 Capture Playback Volume",
-		MIX_DL2_INPUT_MM_UL2, 0, 14, 0,
+		MIX_DL2_INPUT_MM_UL2, 0, 149, 0,
 		volume_get_dl2_mixer, volume_put_dl2_mixer, capture_dl2_tlv),
 
 	/* VXREC mixer gains */
 	SOC_SINGLE_EXT_TLV("VXREC Media Volume",
-		MIX_VXREC_INPUT_MM_DL, 0, 14, 0,
+		MIX_VXREC_INPUT_MM_DL, 0, 149, 0,
 		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_mm_dl_tlv),
 	SOC_SINGLE_EXT_TLV("VXREC Tones Volume",
-		MIX_VXREC_INPUT_TONES, 0, 14, 0,
+		MIX_VXREC_INPUT_TONES, 0, 149, 0,
 		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_tones_tlv),
 	SOC_SINGLE_EXT_TLV("VXREC Voice DL Volume",
-		MIX_VXREC_INPUT_VX_UL, 0, 14, 0,
+		MIX_VXREC_INPUT_VX_UL, 0, 149, 0,
 		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_vx_dl_tlv),
 	SOC_SINGLE_EXT_TLV("VXREC Voice UL Volume",
-		MIX_VXREC_INPUT_VX_DL, 0, 14, 0,
+		MIX_VXREC_INPUT_VX_DL, 0, 149, 0,
 		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_vx_ul_tlv),
 
 	/* AUDUL mixer gains */
 	SOC_SINGLE_EXT_TLV("AUDUL Media Volume",
-		MIX_AUDUL_INPUT_MM_DL, 0, 14, 0,
+		MIX_AUDUL_INPUT_MM_DL, 0, 149, 0,
 		volume_get_audul_mixer, volume_put_audul_mixer, audul_mm_tlv),
 	SOC_SINGLE_EXT_TLV("AUDUL Tones Volume",
-		MIX_AUDUL_INPUT_TONES, 0, 14, 0,
+		MIX_AUDUL_INPUT_TONES, 0, 149, 0,
 		volume_get_audul_mixer, volume_put_audul_mixer, audul_tones_tlv),
 	SOC_SINGLE_EXT_TLV("AUDUL Voice UL Volume",
-		MIX_AUDUL_INPUT_UPLINK, 0, 14, 0,
+		MIX_AUDUL_INPUT_UPLINK, 0, 149, 0,
 		volume_get_audul_mixer, volume_put_audul_mixer, audul_vx_ul_tlv),
 	SOC_SINGLE_EXT_TLV("AUDUL Voice DL Volume",
-		MIX_AUDUL_INPUT_VX_DL, 0, 14, 0,
+		MIX_AUDUL_INPUT_VX_DL, 0, 149, 0,
 		volume_get_audul_mixer, volume_put_audul_mixer, audul_vx_dl_tlv),
 
 	/* SDT mixer gains */
 	SOC_SINGLE_EXT_TLV("SDT UL Volume",
-		MIX_SDT_INPUT_UP_MIXER, 0, 14, 0,
+		MIX_SDT_INPUT_UP_MIXER, 0, 149, 0,
 		volume_get_sdt_mixer, volume_put_sdt_mixer, sdt_ul_tlv),
 	SOC_SINGLE_EXT_TLV("SDT DL Volume",
-		MIX_SDT_INPUT_DL1_MIXER, 0, 14, 0,
+		MIX_SDT_INPUT_DL1_MIXER, 0, 149, 0,
 		volume_get_sdt_mixer, volume_put_sdt_mixer, sdt_dl_tlv),
 };
 
