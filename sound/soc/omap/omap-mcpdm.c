@@ -51,6 +51,7 @@
 #include "omap-mcpdm.h"
 #include "omap-pcm.h"
 #ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
+#include "omap-abe-dsp.h"
 #include "abe/abe_main.h"
 #endif
 
@@ -691,9 +692,9 @@ static void playback_abe_work(struct work_struct *work)
 
 	spin_lock(&mcpdm->lock);
 	if (!mcpdm->dl_active) {
-		omap_mcpdm_stop(mcpdm, SNDRV_PCM_STREAM_PLAYBACK);
-		abe_disable_data_transfer(PDM_DL_PORT);
+		abe_dsp_disable_data_transfer(PDM_DL_PORT);
 		udelay(250);
+		omap_mcpdm_stop(mcpdm, SNDRV_PCM_STREAM_PLAYBACK);
 		omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
 	}
 	spin_unlock(&mcpdm->lock);
@@ -721,7 +722,7 @@ static int omap_mcpdm_abe_dai_hw_params(struct snd_pcm_substream *substream,
 		if ((ctrl & (PDM_DN_MASK | PDM_CMD_MASK)) == 0 ) {
 			mcpdm->downlink->channels = (PDM_DN_MASK | PDM_CMD_MASK);
 			err = omap_mcpdm_playback_open(mcpdm, &omap_mcpdm_links[0]);
-			abe_enable_data_transfer(PDM_DL_PORT);
+			abe_dsp_enable_data_transfer(PDM_DL_PORT);
 			udelay(250);
 			omap_mcpdm_start(mcpdm, stream);
 		}

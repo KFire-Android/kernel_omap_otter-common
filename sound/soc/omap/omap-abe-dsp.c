@@ -221,6 +221,24 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 	return ret;
 }
 
+void abe_dsp_enable_data_transfer(int port)
+{
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+	abe_enable_data_transfer(port);
+}
+
+void abe_dsp_disable_data_transfer(int port)
+{
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	abe_enable_data_transfer(port);
+	pm_runtime_put_sync(&pdev->dev);
+}
+
 /*
  * These TLV settings will need fine tuned for each individual control
  */
