@@ -71,8 +71,7 @@
 #define TESLA 0
 #define HW_AUTO 3
 #define CM_DUCATI_M3_CLKSTCTRL 0x4A008900
-
-
+#define SL2_RESOURCE 10
 
 #define proc_supported(proc_id) (proc_id == SYS_M3 || proc_id == APP_M3)
 
@@ -1085,7 +1084,8 @@ static inline int ipu_pm_get_aux_clk(int proc_id, u32 rcb_num)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
-	u32 tmp = 0;
+	u32 a_clk = 0;
+	u32 a_clk_req = 0;
 	int pm_aux_clk_num;
 
 	/* get the handle to proper ipu pm object */
@@ -1110,14 +1110,22 @@ static inline int ipu_pm_get_aux_clk(int proc_id, u32 rcb_num)
 
 	if (AUX_CLK_USE_MASK & (1 << pm_aux_clk_num)) {
 		/* Build the value to write */
-		MASK_SET_FIELD(tmp, AUX_CLK_ENABLE, 0x1);
-		MASK_SET_FIELD(tmp, AUX_CLK_SRCSELECT, 0x2);
+		MASK_SET_FIELD(a_clk, AUX_CLK_ENABLE, AUX_CLK_ENA);
+		MASK_SET_FIELD(a_clk, AUX_CLK_SRCSELECT, PER_DPLL_CLK);
+		MASK_SET_FIELD(a_clk, AUX_CLK_CLKDIV, 0xA);
+		MASK_SET_FIELD(a_clk_req, AUX_CLK_REQ_MAPPING, pm_aux_clk_num);
+		MASK_SET_FIELD(a_clk_req, AUX_CLK_REQ_POLARITY, POL_GAT_HIGH);
 
 		/* Clear the bit in the usage mask */
 		AUX_CLK_USE_MASK &= ~(1 << pm_aux_clk_num);
 
-		/* Enabling aux clock */
-		__raw_writel(tmp, AUX_CLK_REG(pm_aux_clk_num));
+		/* Enable and configure aux clock */
+		__raw_writel(a_clk, AUX_CLK_REG(pm_aux_clk_num));
+		/* Configure aux clock req */
+		__raw_writel(a_clk_req, AUX_CLK_REG_REQ(pm_aux_clk_num));
+		pr_info("AUX_CLK_REG_%d | [0x%x] | [0x%x]\\n", pm_aux_clk_num,
+				__raw_readl(AUX_CLK_REG(pm_aux_clk_num)),
+				__raw_readl(AUX_CLK_REG_REQ(pm_aux_clk_num)));
 
 		/* Store the aux clk addres in the RCB */
 		rcb_p->mod_base_addr =
@@ -1260,11 +1268,13 @@ static inline int ipu_pm_get_iva_hd(int proc_id, u32 rcb_num)
 		return PM_UNSUPPORTED;
 
 	pr_info("Request IVA_HD\n");
+
+#ifdef CONFIG_OMAP_PM
 	retval = omap_pm_set_max_mpu_wakeup_lat(&pm_qos_handle,
 						IPU_PM_MM_MPU_LAT_CONSTRAINT);
 	if (retval)
 		return PM_UNSUPPORTED;
-
+#endif
 	retval = ipu_pm_module_start(rcb_p->sub_type);
 	if (retval)
 		return PM_UNSUPPORTED;
@@ -1451,6 +1461,11 @@ static inline int ipu_pm_get_ivaseq1(int proc_id, u32 rcb_num)
 	if (retval)
 		return PM_UNSUPPORTED;
 
+	/*Requesting SL2*/
+	retval = ipu_pm_module_start(SL2_RESOURCE);
+	if (retval)
+		return PM_UNSUPPORTED;
+
 	params->pm_ivaseq1_counter++;
 
 	return PM_SUCCESS;
@@ -1485,14 +1500,26 @@ static inline int ipu_pm_get_iss(int proc_id, u32 rcb_num)
 		return PM_UNSUPPORTED;
 
 	pr_info("Request ISS\n");
+
+#ifdef CONFIG_OMAP_PM
 	retval = omap_pm_set_max_mpu_wakeup_lat(&pm_qos_handle,
 						IPU_PM_MM_MPU_LAT_CONSTRAINT);
 	if (retval)
 		return PM_UNSUPPORTED;
-
+#endif
 	retval = ipu_pm_module_start(rcb_p->sub_type);
 	if (retval)
 		return PM_UNSUPPORTED;
+
+	/* FIXME:
+	 * enable OPTFCLKEN_CTRLCLK for camera sensors
+	 * should be moved to a separate function for
+	 * independent control this also duplicates the
+	 * above call to avoid read modify write locking.
+	 */
+	cm_write_mod_reg((OPTFCLKEN | CAM_ENABLED),
+					OMAP4430_CM2_CAM_MOD,
+					OMAP4_CM_CAM_ISS_CLKCTRL_OFFSET);
 
 	params->pm_iss_counter++;
 
@@ -1711,7 +1738,8 @@ static inline int ipu_pm_rel_aux_clk(int proc_id, u32 rcb_num)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
-	u32 tmp = 0;
+	u32 a_clk = 0;
+	u32 a_clk_req = 0;
 	int pm_aux_clk_num;
 
 	/* get the handle to proper ipu pm object */
@@ -1735,11 +1763,16 @@ static inline int ipu_pm_rel_aux_clk(int proc_id, u32 rcb_num)
 		return PM_NO_AUX_CLK;
 
 	/* Build the value to write */
-	MASK_SET_FIELD(tmp, AUX_CLK_ENABLE, 0x0);
-	MASK_SET_FIELD(tmp, AUX_CLK_SRCSELECT, 0x0);
+	MASK_SET_FIELD(a_clk, AUX_CLK_ENABLE, 0x0);
+	MASK_SET_FIELD(a_clk, AUX_CLK_SRCSELECT, 0x0);
+	MASK_SET_FIELD(a_clk, AUX_CLK_CLKDIV, 0x0);
+	MASK_SET_FIELD(a_clk_req, AUX_CLK_REQ_MAPPING, 0x0);
+	MASK_SET_FIELD(a_clk_req, AUX_CLK_REQ_POLARITY, 0x0);
 
-	/* Disabling aux clock */
-	__raw_writel(tmp, AUX_CLK_REG(pm_aux_clk_num));
+	/* Disable and reset to defualt configuration aux clock */
+	__raw_writel(a_clk, AUX_CLK_REG(pm_aux_clk_num));
+	/* Reset to default configuration aux clock req */
+	__raw_writel(a_clk_req, AUX_CLK_REG_REQ(pm_aux_clk_num));
 
 	/* Set the usage mask for reuse */
 	AUX_CLK_USE_MASK |= (1 << pm_aux_clk_num);
@@ -1998,19 +2031,24 @@ static inline int ipu_pm_rel_iva_hd(int proc_id, u32 rcb_num)
 	if (!params->pm_iva_hd_counter)
 		goto error;
 
+	/* Releasing SL2 */
+	retval = ipu_pm_module_stop(SL2_RESOURCE);
+	if (retval)
+		return PM_UNSUPPORTED;
+
 	retval = ipu_pm_module_stop(rcb_p->sub_type);
 	if (retval)
 		return PM_UNSUPPORTED;
 
 	params->pm_iva_hd_counter--;
-
+#ifdef CONFIG_OMAP_PM
 	if (params->pm_iva_hd_counter == 0 && params->pm_iss_counter == 0) {
 		retval = omap_pm_set_max_mpu_wakeup_lat(&pm_qos_handle,
 						IPU_PM_NO_MPU_LAT_CONSTRAINT);
 		if (retval)
 			goto error;
 	}
-
+#endif
 	return PM_SUCCESS;
 error:
 	return PM_UNSUPPORTED;
@@ -2132,15 +2170,25 @@ static inline int ipu_pm_rel_iss(int proc_id, u32 rcb_num)
 	if (retval)
 		return PM_UNSUPPORTED;
 
-	params->pm_iss_counter--;
+	/* FIXME:
+	 * disable OPTFCLKEN_CTRLCLK for camera sensors
+	 * should be moved to a separate function for
+	 * independent control this also duplicates the
+	 * above call to avoid read modify write locking
+	 */
+	cm_write_mod_reg(CAM_DISABLED,
+				OMAP4430_CM2_CAM_MOD,
+				OMAP4_CM_CAM_ISS_CLKCTRL_OFFSET);
 
+	params->pm_iss_counter--;
+#ifdef CONFIG_OMAP_PM
 	if (params->pm_iva_hd_counter == 0 && params->pm_iss_counter == 0) {
 		retval = omap_pm_set_max_mpu_wakeup_lat(&pm_qos_handle,
 						IPU_PM_NO_MPU_LAT_CONSTRAINT);
 		if (retval)
 			goto error;
 	}
-
+#endif
 	return PM_SUCCESS;
 error:
 	return PM_UNSUPPORTED;
@@ -3155,7 +3203,7 @@ int ipu_pm_restore_ctx(int proc_id)
 	}
 
 	/* FIXME:This will be avoided with a change in Ducati. */
-	handle->rcb_table->pm_flags.idleAllowed = 0;
+	handle->rcb_table->pm_flags.idleAllowed = 1;
 
 #ifdef CONFIG_SYSLINK_DUCATI_PM
 
