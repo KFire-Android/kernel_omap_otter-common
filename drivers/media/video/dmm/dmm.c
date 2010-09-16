@@ -280,6 +280,9 @@ static s32 __init dmm_init(void)
 	s32 r = -1;
 	struct device *device = NULL;
 
+	if (!cpu_is_omap44xx())
+		return 0;
+
 	if (dmm_major) {
 		dev = MKDEV(dmm_major, dmm_minor);
 		r = register_chrdev_region(dev, 1, "dmm");

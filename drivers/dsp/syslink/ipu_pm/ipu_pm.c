@@ -57,6 +57,8 @@
 #include <linux/i2c/twl.h>
 
 /* Module headers */
+#include <plat/ipu_dev.h>
+#include "../../../../arch/arm/mach-omap2/cm.h"
 #include "ipu_pm.h"
 
 /** ============================================================================
@@ -67,6 +69,10 @@
 #define SYS_M3 2
 #define APP_M3 1
 #define TESLA 0
+#define HW_AUTO 3
+#define CM_DUCATI_M3_CLKSTCTRL 0x4A008900
+
+
 
 #define proc_supported(proc_id) (proc_id == SYS_M3 || proc_id == APP_M3)
 
@@ -246,7 +252,7 @@ static struct omap_rproc *app_rproc;
 static struct omap_mbox *ducati_mbox;
 static struct iommu *ducati_iommu;
 static bool first_time = 1;
-static struct omap_dm_timer *pm_gpt;
+/* static struct omap_dm_timer *pm_gpt; */
 
 /* Ducati Interrupt Capable Gptimers */
 static int ipu_timer_list[NUM_IPU_TIMERS] = {
@@ -299,6 +305,7 @@ static struct ipu_pm_params pm_params = {
 
 static void __iomem *sysm3Idle;
 static void __iomem *appm3Idle;
+static void __iomem *cm_ducati_clkstctrl;
 
 /*
   Request a resource on behalf of an IPU client
@@ -519,7 +526,7 @@ static void ipu_pm_work(struct work_struct *work)
 
 	while (kfifo_len(&handle->fifo) >= sizeof(im)) {
 		spin_lock_irq(&handle->lock);
-		kfifo_out(&handle->fifo, &im, sizeof(im));
+		retval = kfifo_out(&handle->fifo, &im, sizeof(im));
 		spin_unlock_irq(&handle->lock);
 
 		/* Get the payload */
@@ -1258,6 +1265,10 @@ static inline int ipu_pm_get_iva_hd(int proc_id, u32 rcb_num)
 	if (retval)
 		return PM_UNSUPPORTED;
 
+	retval = ipu_pm_module_start(rcb_p->sub_type);
+	if (retval)
+		return PM_UNSUPPORTED;
+
 	params->pm_iva_hd_counter++;
 
 	return PM_SUCCESS;
@@ -1293,8 +1304,9 @@ static inline int ipu_pm_get_fdif(int proc_id, u32 rcb_num)
 		return PM_UNSUPPORTED;
 
 	retval = ipu_pm_module_start(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_start( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
+	if (retval)
+		return PM_UNSUPPORTED;
+
 	params->pm_fdif_counter++;
 
 	return PM_SUCCESS;
@@ -1309,7 +1321,6 @@ static inline int ipu_pm_get_mpu(int proc_id, u32 rcb_num)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
-	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -1329,9 +1340,6 @@ static inline int ipu_pm_get_mpu(int proc_id, u32 rcb_num)
 	if (params->pm_mpu_counter)
 		return PM_UNSUPPORTED;
 
-	retval = ipu_pm_module_start(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_start( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
 	params->pm_mpu_counter++;
 
 	return PM_SUCCESS;
@@ -1346,7 +1354,6 @@ static inline int ipu_pm_get_ipu(int proc_id, u32 rcb_num)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
-	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -1366,9 +1373,6 @@ static inline int ipu_pm_get_ipu(int proc_id, u32 rcb_num)
 	if (params->pm_ipu_counter)
 		return PM_UNSUPPORTED;
 
-	retval = ipu_pm_module_start(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_start( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
 	params->pm_ipu_counter++;
 
 	return PM_SUCCESS;
@@ -1406,8 +1410,9 @@ static inline int ipu_pm_get_ivaseq0(int proc_id, u32 rcb_num)
 		return PM_UNSUPPORTED;
 
 	retval = ipu_pm_module_start(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_start( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
+	if (retval)
+		return PM_UNSUPPORTED;
+
 	params->pm_ivaseq0_counter++;
 
 	return PM_SUCCESS;
@@ -1443,8 +1448,9 @@ static inline int ipu_pm_get_ivaseq1(int proc_id, u32 rcb_num)
 		return PM_UNSUPPORTED;
 
 	retval = ipu_pm_module_start(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_start( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
+	if (retval)
+		return PM_UNSUPPORTED;
+
 	params->pm_ivaseq1_counter++;
 
 	return PM_SUCCESS;
@@ -1481,6 +1487,10 @@ static inline int ipu_pm_get_iss(int proc_id, u32 rcb_num)
 	pr_info("Request ISS\n");
 	retval = omap_pm_set_max_mpu_wakeup_lat(&pm_qos_handle,
 						IPU_PM_MM_MPU_LAT_CONSTRAINT);
+	if (retval)
+		return PM_UNSUPPORTED;
+
+	retval = ipu_pm_module_start(rcb_p->sub_type);
 	if (retval)
 		return PM_UNSUPPORTED;
 
@@ -1876,8 +1886,9 @@ static inline int ipu_pm_rel_fdif(int proc_id, u32 rcb_num)
 		goto error;
 
 	retval = ipu_pm_module_stop(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_stop( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
+	if (retval)
+		return PM_UNSUPPORTED;
+
 	params->pm_fdif_counter--;
 
 	return PM_SUCCESS;
@@ -1894,7 +1905,6 @@ static inline int ipu_pm_rel_mpu(int proc_id, u32 rcb_num)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
-	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -1915,9 +1925,6 @@ static inline int ipu_pm_rel_mpu(int proc_id, u32 rcb_num)
 	if (!params->pm_mpu_counter)
 		goto error;
 
-	retval = ipu_pm_module_stop(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_stop( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
 	params->pm_mpu_counter--;
 
 	return PM_SUCCESS;
@@ -1934,7 +1941,6 @@ static inline int ipu_pm_rel_ipu(int proc_id, u32 rcb_num)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
-	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -1955,9 +1961,6 @@ static inline int ipu_pm_rel_ipu(int proc_id, u32 rcb_num)
 	if (!params->pm_ipu_counter)
 		goto error;
 
-	retval = ipu_pm_module_stop(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_stop( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
 	params->pm_ipu_counter--;
 
 	return PM_SUCCESS;
@@ -1994,6 +1997,10 @@ static inline int ipu_pm_rel_iva_hd(int proc_id, u32 rcb_num)
 
 	if (!params->pm_iva_hd_counter)
 		goto error;
+
+	retval = ipu_pm_module_stop(rcb_p->sub_type);
+	if (retval)
+		return PM_UNSUPPORTED;
 
 	params->pm_iva_hd_counter--;
 
@@ -2040,8 +2047,9 @@ static inline int ipu_pm_rel_ivaseq0(int proc_id, u32 rcb_num)
 		goto error;
 
 	retval = ipu_pm_module_stop(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_stop( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
+	if (retval)
+		return PM_UNSUPPORTED;
+
 	params->pm_ivaseq0_counter--;
 
 	return PM_SUCCESS;
@@ -2080,8 +2088,9 @@ static inline int ipu_pm_rel_ivaseq1(int proc_id, u32 rcb_num)
 		goto error;
 
 	retval = ipu_pm_module_stop(rcb_p->sub_type);
-	printk(KERN_ERR "@@@@ cop_module_stop( ) %s @@@@\n",
-		retval ? "Failed" : "Successful");
+	if (retval)
+		return PM_UNSUPPORTED;
+
 	params->pm_ivaseq1_counter--;
 
 	return PM_SUCCESS;
@@ -2118,6 +2127,10 @@ static inline int ipu_pm_rel_iss(int proc_id, u32 rcb_num)
 
 	if (!params->pm_iss_counter)
 		goto error;
+
+	retval = ipu_pm_module_stop(rcb_p->sub_type);
+	if (retval)
+		return PM_UNSUPPORTED;
 
 	params->pm_iss_counter--;
 
@@ -3113,8 +3126,10 @@ EXPORT_SYMBOL(ipu_pm_save_ctx);
 int ipu_pm_restore_ctx(int proc_id)
 {
 	int retval = 0;
+#ifdef CONFIG_SYSLINK_DUCATI_PM
 	int sys_loaded;
 	int app_loaded;
+#endif
 	struct ipu_pm_object *handle;
 
 	/*If feature not supported by proc, return*/
@@ -3133,9 +3148,16 @@ int ipu_pm_restore_ctx(int proc_id)
 	*/
 	if (first_time) {
 		handle->rcb_table->state_flag |= ENABLE_IPU_HIB;
-		handle->rcb_table->pm_flags.hibernateAllowed = 1;
+		handle->rcb_table->pm_flags.hibernateAllowed = 0;
+		handle->rcb_table->pm_flags.idleAllowed = 0;
 		first_time = 0;
+		__raw_writel(HW_AUTO, cm_ducati_clkstctrl);
 	}
+
+	/* FIXME:This will be avoided with a change in Ducati. */
+	handle->rcb_table->pm_flags.idleAllowed = 0;
+
+#ifdef CONFIG_SYSLINK_DUCATI_PM
 
 	/* Check if the M3 was loaded */
 	sys_loaded = (ipu_pm_get_state(proc_id) & SYS_PROC_LOADED) >>
@@ -3169,31 +3191,16 @@ int ipu_pm_restore_ctx(int proc_id)
 		goto error;
 exit:
 	mutex_unlock(ipu_pm_state.gate_handle);
-	return 0;
+#endif
+	return retval;
+#ifdef CONFIG_SYSLINK_DUCATI_PM
 error:
 	mutex_unlock(ipu_pm_state.gate_handle);
 	pr_info("Aborting restoring process\n");
 	return -EINVAL;
+#endif
 }
 EXPORT_SYMBOL(ipu_pm_restore_ctx);
-
-/*
-  Function to start a module
- *
- */
-int ipu_pm_module_start(unsigned res_type)
-{
-	return 0;
-}
-
-/*
-  Function to stop a module
- *
- */
-int ipu_pm_module_stop(unsigned res_type)
-{
-	return 0;
-}
 
 /*
   Get the default configuration for the ipu_pm module.
@@ -3304,9 +3311,17 @@ int ipu_pm_setup(struct ipu_pm_config *cfg)
 		goto exit;
 	}
 
-	pm_gpt = omap_dm_timer_request_specific(GP_TIMER_3);
+	cm_ducati_clkstctrl = ioremap(CM_DUCATI_M3_CLKSTCTRL, sizeof(u32));
+
+	if (!cm_ducati_clkstctrl) {
+		retval = -ENOMEM;
+		goto exit;
+	}
+
+	/*Hibernation disable. GPTIMER 3 only used for hibernation*/
+	/*pm_gpt = omap_dm_timer_request_specific(GP_TIMER_3);
 	if (pm_gpt == NULL)
-		retval = -EINVAL;
+		retval = -EINVAL;*/
 
 	return retval;
 exit:
@@ -3480,7 +3495,10 @@ int ipu_pm_destroy(void)
 	iommu_put(ducati_iommu);
 	ducati_iommu = NULL;
 	first_time = 1;
-	omap_dm_timer_free(pm_gpt);
+
+	/*Hibernation disable. GPTIMER 3 only used for hibernation*/
+	/*omap_dm_timer_free(pm_gpt);*/
+
 	return retval;
 exit:
 	if (retval < 0)

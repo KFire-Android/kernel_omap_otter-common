@@ -1509,6 +1509,9 @@ static s32 __init tiler_init(void)
 	struct tcm *sita = NULL;
 	struct tmm *tmm_pat = NULL;
 
+	if (!cpu_is_omap44xx())
+		return 0;
+
 	/**
 	  * Array of physical pages for PAT programming, which must be a 16-byte
 	  * aligned physical address

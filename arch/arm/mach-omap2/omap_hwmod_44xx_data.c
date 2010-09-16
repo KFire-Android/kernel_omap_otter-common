@@ -1610,6 +1610,7 @@ static struct omap_hwmod_ocp_if *omap44xx_fdif_slaves[] = {
 static struct omap_hwmod omap44xx_fdif_hwmod = {
 	.name		= "fdif",
 	.class		= &omap44xx_fdif_hwmod_class,
+	.flags		= HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap44xx_fdif_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_fdif_irqs),
 	.main_clk	= "fdif_fck",
@@ -2595,19 +2596,20 @@ static struct omap_hwmod omap44xx_ipu_hwmod = {
  * external images sensor pixel data processor
  */
 
-static struct omap_hwmod_class_sysconfig omap44xx_iss_sysc = {
-	.rev_offs	= 0x0000,
-	.sysc_offs	= 0x0010,
-	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
-			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-	.sysc_fields	= &omap_hwmod_sysc_type2,
-};
+/* static struct omap_hwmod_class_sysconfig omap44xx_iss_sysc = {
+ *	.rev_offs	= 0x0000,
+ *	.sysc_offs	= 0x0010,
+ *	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
+ *			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
+ *	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+ *			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
+ *	.sysc_fields	= &omap_hwmod_sysc_type2,
+ *};
+ */
 
 static struct omap_hwmod_class omap44xx_iss_hwmod_class = {
 	.name = "iss",
-	.sysc = &omap44xx_iss_sysc,
+	/* .sysc = &omap44xx_iss_sysc, */
 };
 
 /* iss */
@@ -5982,7 +5984,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_ipu_c0_hwmod,
 	&omap44xx_ipu_c1_hwmod,
 	/* iss class */
-/*	&omap44xx_iss_hwmod, */
+	&omap44xx_iss_hwmod,
 	/* iva class */
 	&omap44xx_iva_hwmod,
 	&omap44xx_iva_seq0_hwmod,
@@ -5990,7 +5992,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	/* kbd class */
 	&omap44xx_kbd_hwmod,
 	/* mailbox class */
-/*	&omap44xx_mailbox_hwmod, */
+	&omap44xx_mailbox_hwmod,
 	/* mcbsp class */
 	&omap44xx_mcbsp1_hwmod,
 	&omap44xx_mcbsp2_hwmod,
