@@ -111,6 +111,7 @@
 #define I2C_BUS_MAX 4
 #define REGULATOR_MIN 1
 #define REGULATOR_MAX 1
+
 #define AUX_CLK_MIN 1
 #define AUX_CLK_MAX 3
 
@@ -158,6 +159,19 @@
 #define SCRM_AUX_CLK_REQ_POLARITY_MASK	0x00000001
 #define SCRM_AUX_CLK_REQ_ACCURACY_MASK	0x00000002
 #define SCRM_AUX_CLK_REQ_MAPPING_MASK	0x0000001C
+/* Auxiliar Clocks/Req values */
+#define SYSTEM_SRC			0x0
+#define CORE_DPLL_SRC			0x1
+#define PER_DPLL_CLK			0x2
+#define POL_GAT_LOW			0x0
+#define POL_GAT_HIGH			0x1
+#define AUX_CLK_DIS			0x0
+#define AUX_CLK_ENA			0x1
+/* ISS OPT Clocks */
+#define OPTFCLKEN			(1 << 8)
+#define CAM_ENABLED			0x2
+#define CAM_DISABLED			0x0
+
 
 /* Macro to set a val in a bitfield*/
 #define MASK_SET_FIELD(tmp, bitfield, val)	{	\
