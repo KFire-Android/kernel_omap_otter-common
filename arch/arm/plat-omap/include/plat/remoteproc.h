@@ -75,6 +75,7 @@ struct omap_rproc_platform_data {
 	struct omap_rproc_ops *ops;
 	char *name;
 	char *oh_name;
+	int timer_id;
 };
 
 struct omap_rproc {
@@ -86,6 +87,8 @@ struct omap_rproc {
 	int minor;
 	struct blocking_notifier_head	notifier;
 	struct mutex lock;
+	int timer_id;
+	struct omap_dm_timer *dmtimer;
 };
 
 struct omap_rproc_start_args {

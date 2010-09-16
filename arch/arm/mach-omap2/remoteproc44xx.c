@@ -24,16 +24,11 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <plat/remoteproc.h>
+#include <plat/dmtimer.h>
 
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 
-#include "cm.h"
-#include "prm.h"
-
-#define ABE_GPTIMER_MODULE_ENABLE		0x2
-#define ABE_GPTIMER_MODULE_DISABLE		0x0
-#define ABE_GPTIMER_IDLEST_MASK			0x30000
 
 static inline int proc44x_start(struct device *dev, u32 start_addr)
 {
@@ -42,12 +37,17 @@ static inline int proc44x_start(struct device *dev, u32 start_addr)
 						to_platform_device(dev));
 	int ret = 0;
 
-	if (!strcmp(obj->name, "tesla")) {
-		dev_info(dev, "Enable GPTIMER5 for Tesla BIOS Clock\n");
-		/* Enable the GPTIMER5 clock */
-		cm_write_mod_reg(ABE_GPTIMER_MODULE_ENABLE,
-				OMAP4430_CM1_ABE_MOD,
-				OMAP4_CM1_ABE_TIMER5_CLKCTRL_OFFSET);
+	/* Enable the Timer that would be used by co-processor */
+	if (obj->timer_id) {
+		obj->dmtimer =
+			omap_dm_timer_request_specific(obj->timer_id);
+		if (!obj->dmtimer) {
+			ret = -EBUSY;
+			goto err_start;
+		}
+		omap_dm_timer_set_int_enable(obj->dmtimer,
+						OMAP_TIMER_INT_OVERFLOW);
+		omap_dm_timer_set_source(obj->dmtimer, OMAP_TIMER_SRC_SYS_CLK);
 	}
 
 	ret = omap_device_enable(pdev);
@@ -74,11 +74,9 @@ static inline int proc44x_stop(struct device *dev)
 		if (ret)
 			dev_err(dev, "%s err 0x%x\n", __func__, ret);
 
-		if (!strcmp(obj->name, "tesla")) {
-			dev_info(dev, "disable GPTIMER5\n");
-			cm_write_mod_reg(ABE_GPTIMER_MODULE_DISABLE,
-					OMAP4430_CM1_ABE_MOD,
-					OMAP4_CM1_ABE_TIMER5_CLKCTRL_OFFSET);
+		if (obj->dmtimer) {
+			omap_dm_timer_free(obj->dmtimer);
+			obj->dmtimer = NULL;
 		}
 	}
 
@@ -98,12 +96,8 @@ static inline int proc44x_sleep(struct device *dev)
 		if (ret)
 			dev_err(dev, "%s err 0x%x\n", __func__, ret);
 
-		if (!strcmp(obj->name, "tesla")) {
-			dev_info(dev, "disable GPTIMER5\n");
-			cm_write_mod_reg(ABE_GPTIMER_MODULE_DISABLE,
-					OMAP4430_CM1_ABE_MOD,
-					OMAP4_CM1_ABE_TIMER5_CLKCTRL_OFFSET);
-		}
+		if (obj->dmtimer)
+			omap_dm_timer_disable(obj->dmtimer);
 	}
 
 	obj->state = OMAP_RPROC_HIBERNATING;
@@ -117,13 +111,8 @@ static inline int proc44x_wakeup(struct device *dev)
 						to_platform_device(dev));
 	int ret = 0;
 
-	if (!strcmp(obj->name, "tesla")) {
-		dev_info(dev, "Enable GPTIMER5 for Tesla BIOS Clock\n");
-		/* Enable the GPTIMER5 clock */
-		cm_write_mod_reg(ABE_GPTIMER_MODULE_ENABLE,
-				OMAP4430_CM1_ABE_MOD,
-				OMAP4_CM1_ABE_TIMER5_CLKCTRL_OFFSET);
-	}
+	if (obj->dmtimer)
+		omap_dm_timer_enable(obj->dmtimer);
 
 	ret = omap_device_enable(pdev);
 	if (ret)
@@ -175,16 +164,19 @@ static struct omap_rproc_platform_data omap4_rproc_data[] = {
 		.name = "tesla",
 		.ops = &omap4_tesla_ops,
 		.oh_name = "dsp_c0",
+		.timer_id = 5,
 	},
 	{
 		.name = "ducati-proc0",
 		.ops = &omap4_ducati0_ops,
 		.oh_name = "ipu_c0",
+		.timer_id = 3,
 	},
 	{
 		.name = "ducati-proc1",
 		.ops = &omap4_ducati1_ops,
 		.oh_name = "ipu_c1",
+		.timer_id = 4,
 	},
 };
 
