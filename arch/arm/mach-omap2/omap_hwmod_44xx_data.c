@@ -1559,19 +1559,20 @@ static struct omap_hwmod omap44xx_emif2_hwmod = {
  * face detection hw accelerator module
  */
 
-static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
-	.rev_offs	= 0x0000,
-	.sysc_offs	= 0x0010,
-	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
-			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-	.sysc_fields	= &omap_hwmod_sysc_type2,
-};
+/* static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
+ *	.rev_offs	= 0x0000,
+ *	.sysc_offs	= 0x0010,
+ *	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
+ *			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
+ *	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+ *			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
+ *	.sysc_fields	= &omap_hwmod_sysc_type2,
+ *};
+ */
 
 static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
 	.name = "fdif",
-	.sysc = &omap44xx_fdif_sysc,
+	/* .sysc = &omap44xx_fdif_sysc, */
 };
 
 /* fdif */
@@ -5958,7 +5959,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_emif1_hwmod,
 	&omap44xx_emif2_hwmod,
 	/* fdif class */
-/*	&omap44xx_fdif_hwmod, */
+	&omap44xx_fdif_hwmod,
 	/* gpio class */
 	&omap44xx_gpio1_hwmod,
 	&omap44xx_gpio2_hwmod,
@@ -6016,7 +6017,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	/* mpu class */
 	&omap44xx_mpu_hwmod,
 	/* sl2if class */
-/*	&omap44xx_sl2if_hwmod, */
+	&omap44xx_sl2if_hwmod,
 	/* slimbus class */
 /*	&omap44xx_slimbus1_hwmod, */
 /*	&omap44xx_slimbus2_hwmod, */
