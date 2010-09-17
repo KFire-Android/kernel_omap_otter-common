@@ -53,6 +53,7 @@
 #include <sound/omap-abe-dsp.h>
 
 #include "omap-abe-dsp.h"
+#include "omap-abe-coef.h"
 #include "omap-abe.h"
 #include "abe/abe_main.h"
 
@@ -131,6 +132,11 @@ struct abe_data {
 
 	int fe_id;
 
+	unsigned int dl1_equ_profile;
+	unsigned int dl20_equ_profile;
+	unsigned int dl21_equ_profile;
+	unsigned int amic_equ_profile;
+
 	/* DAPM mixer config - TODO: some of this can be replaced with HAL update */
 	u32 dapm[ABE_NUM_DAPM_REG];
 
@@ -138,13 +144,6 @@ struct abe_data {
 };
 
 static struct abe_data *abe;
-
-/* TODO: use int - do we need to reload these over time ? */
-static const s32 DL2_COEF [25] =	{
-		-7554223, 708210, -708206, 7554225,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 6802833, -682266, 731554
-};
 
 // TODO: map to the new version of HAL
 static unsigned int abe_dsp_read(struct snd_soc_platform *platform,
@@ -206,18 +205,31 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 	/* "tick" of the audio engine */
 	abe_write_event_generator(EVENT_TIMER);
 
-	dl2_eq.equ_length = ARRAY_SIZE(DL2_COEF);
+	dl2_eq.equ_length = NBDL2COEFFS;
 
 	/* build the coefficient parameter for the equalizer api */
-	memcpy(dl2_eq.coef.type1, DL2_COEF, sizeof(DL2_COEF));
+	memcpy(dl2_eq.coef.type1, dl20_equ_coeffs[1],
+				sizeof(dl20_equ_coeffs[1]));
 
 	/* load the high-pass coefficient of IHF-Right */
 	abe_write_equalizer(EQ2L, &dl2_eq);
+	abe->dl20_equ_profile = 1;
+
+	/* build the coefficient parameter for the equalizer api */
+	memcpy(dl2_eq.coef.type1, dl21_equ_coeffs[1],
+				sizeof(dl21_equ_coeffs[1]));
 
 	/* load the high-pass coefficient of IHF-Left */
 	abe_write_equalizer(EQ2R, &dl2_eq);
+	abe->dl21_equ_profile = 1;
 
 	pm_runtime_put_sync(&pdev->dev);
+
+	/* set initial state to all-pass with gain=1 coefficients */
+	abe->amic_equ_profile = 0;
+	abe->dl1_equ_profile = 0;
+
+
 	return ret;
 }
 
@@ -685,6 +697,116 @@ static int volume_get_sdt_mixer(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int abe_get_equalizer(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_enum *eqc = (struct soc_enum *)kcontrol->private_value;
+	switch (eqc->reg) {
+	case EQ1:
+		ucontrol->value.integer.value[0] = abe->dl1_equ_profile;
+		break;
+	case EQ2L:
+		ucontrol->value.integer.value[0] = abe->dl20_equ_profile;
+		break;
+	case EQ2R:
+		ucontrol->value.integer.value[0] = abe->dl21_equ_profile;
+		break;
+	case EQMIC:
+		ucontrol->value.integer.value[0] = abe->amic_equ_profile;
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+	struct soc_enum *eqc = (struct soc_enum *)kcontrol->private_value;
+	u16 val = ucontrol->value.enumerated.item[0];
+	abe_equ_t equ_params;
+
+	switch (eqc->reg) {
+	case EQ1:
+		equ_params.equ_length = NBDL1COEFFS;
+		memcpy(equ_params.coef.type1, dl1_equ_coeffs[val],
+				sizeof(dl1_equ_coeffs[val]));
+		abe->dl1_equ_profile = val;
+		break;
+	case EQ2L:
+		equ_params.equ_length = NBDL2COEFFS;
+		memcpy(equ_params.coef.type1, dl20_equ_coeffs[val],
+				sizeof(dl20_equ_coeffs[val]));
+		abe->dl20_equ_profile = val;
+		break;
+	case EQ2R:
+		equ_params.equ_length = NBDL2COEFFS;
+		memcpy(equ_params.coef.type1, dl21_equ_coeffs[val],
+				sizeof(dl21_equ_coeffs[val]));
+		abe->dl21_equ_profile = val;
+		break;
+	case EQMIC:
+		equ_params.equ_length = NBAMICCOEFFS;
+		memcpy(equ_params.coef.type1, amic_equ_coeffs[val],
+				sizeof(amic_equ_coeffs[val]));
+		abe->amic_equ_profile = val;
+		break;
+	default:
+		break;
+	}
+
+	pm_runtime_get_sync(&pdev->dev);
+	abe_write_equalizer(eqc->reg, &equ_params);
+	pm_runtime_put_sync(&pdev->dev);
+
+	return 1;
+}
+
+static const char *dl1_equ_texts[] = {
+	"Flat response. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.25",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.1",
+};
+
+static const char *dl20_equ_texts[] = {
+	"Flat response. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.25",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.1",
+
+};
+
+static const char *dl21_equ_texts[] = {
+	"Flat response. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.25",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.1",
+};
+
+static const char *amic_equ_texts[] = {
+	"High-pass with 20kHz cut-off frequency. Gain = 1",
+	"High-pass with 20kHz cut-off frequency. Gain = 0.25",
+	"High-pass with 20kHz cut-off frequency. Gain = 0.125",
+};
+
+
+static const struct soc_enum dl1_equalizer_enum =
+	SOC_ENUM_SINGLE(EQ1, 0, NBDL1EQ_PROFILES, dl1_equ_texts);
+
+static const struct soc_enum dl20_equalizer_enum =
+	SOC_ENUM_SINGLE(EQ2L, 0, NBDL20EQ_PROFILES, dl20_equ_texts);
+
+static const struct soc_enum dl21_equalizer_enum =
+	SOC_ENUM_SINGLE(EQ2R, 0, NBDL21EQ_PROFILES, dl21_equ_texts);
+
+static const struct soc_enum amic_equalizer_enum =
+	SOC_ENUM_SINGLE(EQMIC, 0, NBAMICEQ_PROFILES, amic_equ_texts);
+
 static const char *route_ul_texts[] =
 	{"None", "DMic0L", "DMic0R", "DMic1L", "DMic1R", "DMic2L", "DMic2R",
 	"BT Left", "BT Right", "AMic0", "AMic1", "VX Left", "VX Right"};
@@ -896,6 +1018,22 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	SOC_SINGLE_EXT_TLV("SDT DL Volume",
 		MIX_SDT_INPUT_DL1_MIXER, 0, 149, 0,
 		volume_get_sdt_mixer, volume_put_sdt_mixer, sdt_dl_tlv),
+
+	SOC_ENUM_EXT("DL1 Equalizer Profile",
+			dl1_equalizer_enum ,
+			abe_get_equalizer, abe_put_equalizer),
+
+	SOC_ENUM_EXT("DL2 Left Equalizer Profile",
+			dl20_equalizer_enum ,
+			abe_get_equalizer, abe_put_equalizer),
+
+	SOC_ENUM_EXT("DL2 Rigth Equalizer Profile",
+			dl21_equalizer_enum ,
+			abe_get_equalizer, abe_put_equalizer),
+
+	SOC_ENUM_EXT("AMIC Equalizer Profile",
+			amic_equalizer_enum ,
+			abe_get_equalizer, abe_put_equalizer),
 };
 
 static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
