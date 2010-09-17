@@ -63,6 +63,9 @@ struct twl6040_output {
 	u16 active;
 	u16 left_vol;
 	u16 right_vol;
+	u16 left_step;
+	u16 right_step;
+	unsigned int step_delay;
 	u16 ramp;
 	u16 mute;
 	struct completion ramp_done;
@@ -296,7 +299,8 @@ static void twl6040_init_vdd_regs(struct snd_soc_codec *codec)
 /*
  * Ramp HS PGA volume to minimise pops at stream startup and shutdown.
  */
-static inline int twl6040_hs_ramp_step(struct snd_soc_codec *codec)
+static inline int twl6040_hs_ramp_step(struct snd_soc_codec *codec,
+			unsigned int left_step, unsigned int right_step)
 {
 
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
@@ -305,13 +309,14 @@ static inline int twl6040_hs_ramp_step(struct snd_soc_codec *codec)
 	u8 reg, val;
 
 	/* left channel */
+	left_step = (left_step > 0xF) ? 0xF : left_step;
 	reg = twl6040_read_reg_cache(codec, TWL6040_REG_HSGAIN);
 	val = (~reg & TWL6040_HSL_VOL_MASK);
 
 	if (headset->ramp == TWL6040_RAMP_UP) {
 		/* ramp step up */
 		if (val < headset->left_vol) {
-			val++;
+			val += left_step;
 			reg &= ~TWL6040_HSL_VOL_MASK;
 			twl6040_write(codec, TWL6040_REG_HSGAIN,
 					(reg | (~val & TWL6040_HSL_VOL_MASK)));
@@ -321,7 +326,7 @@ static inline int twl6040_hs_ramp_step(struct snd_soc_codec *codec)
 	} else if (headset->ramp == TWL6040_RAMP_DOWN) {
 		/* ramp step down */
 		if (val > 0x0) {
-			val--;
+			val -= left_step;
 			reg &= ~TWL6040_HSL_VOL_MASK;
 			twl6040_write(codec, TWL6040_REG_HSGAIN, reg |
 						(~val & TWL6040_HSL_VOL_MASK));
@@ -331,13 +336,14 @@ static inline int twl6040_hs_ramp_step(struct snd_soc_codec *codec)
 	}
 
 	/* right channel */
+	right_step = (right_step > 0xF) ? 0xF : right_step;
 	reg = twl6040_read_reg_cache(codec, TWL6040_REG_HSGAIN);
 	val = (~reg & TWL6040_HSR_VOL_MASK) >> TWL6040_HSR_VOL_SHIFT;
 
 	if (headset->ramp == TWL6040_RAMP_UP) {
 		/* ramp step up */
 		if (val < headset->right_vol) {
-			val++;
+			val += right_step;
 			reg &= ~TWL6040_HSR_VOL_MASK;
 			twl6040_write(codec, TWL6040_REG_HSGAIN,
 					 (reg | (~val << TWL6040_HSR_VOL_SHIFT)));
@@ -347,7 +353,7 @@ static inline int twl6040_hs_ramp_step(struct snd_soc_codec *codec)
 	} else if (headset->ramp == TWL6040_RAMP_DOWN) {
 		/* ramp step down */
 		if (val > 0x0) {
-			val--;
+			val -= right_step;
 			reg &= ~TWL6040_HSR_VOL_MASK;
 			twl6040_write(codec, TWL6040_REG_HSGAIN,
 					 reg | (~val << TWL6040_HSR_VOL_SHIFT));
@@ -362,7 +368,8 @@ static inline int twl6040_hs_ramp_step(struct snd_soc_codec *codec)
 /*
  * Ramp HF PGA volume to minimise pops at stream startup and shutdown.
  */
-static inline int twl6040_hf_ramp_step(struct snd_soc_codec *codec)
+static inline int twl6040_hf_ramp_step(struct snd_soc_codec *codec,
+			unsigned int left_step, unsigned int right_step)
 {
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 	struct twl6040_output *handsfree = &priv->handsfree;
@@ -370,13 +377,14 @@ static inline int twl6040_hf_ramp_step(struct snd_soc_codec *codec)
 	u16 reg, val;
 
 	/* left channel */
+	left_step = (left_step > 0x1D) ? 0x1D : left_step;
 	reg = twl6040_read_reg_cache(codec, TWL6040_REG_HFLGAIN);
 	reg = 0x1D - reg;
 	val = (reg & TWL6040_HF_VOL_MASK);
 	if (handsfree->ramp == TWL6040_RAMP_UP) {
 		/* ramp step up */
 		if (val < handsfree->left_vol) {
-			val++;
+			val += left_step;
 			reg &= ~TWL6040_HF_VOL_MASK;
 			twl6040_write(codec, TWL6040_REG_HFLGAIN, reg | (0x1D - val));
 		} else {
@@ -385,7 +393,7 @@ static inline int twl6040_hf_ramp_step(struct snd_soc_codec *codec)
 	} else if (handsfree->ramp == TWL6040_RAMP_DOWN) {
 		/* ramp step down */
 		if (val > 0) {
-			val--;
+			val -= left_step;
 			reg &= ~TWL6040_HF_VOL_MASK;
 			twl6040_write(codec, TWL6040_REG_HFLGAIN, reg | (0x1D - val));
 		} else {
@@ -394,13 +402,14 @@ static inline int twl6040_hf_ramp_step(struct snd_soc_codec *codec)
 	}
 
 	/* right channel */
+	right_step = (right_step > 0x1D) ? 0x1D : right_step;
 	reg = twl6040_read_reg_cache(codec, TWL6040_REG_HFRGAIN);
 	reg = 0x1D - reg;
 	val = (reg & TWL6040_HF_VOL_MASK);
 	if (handsfree->ramp == TWL6040_RAMP_UP) {
 		/* ramp step up */
 		if (val < handsfree->right_vol) {
-			val++;
+			val += right_step;
 			reg &= ~TWL6040_HF_VOL_MASK;
 			twl6040_write(codec, TWL6040_REG_HFRGAIN, reg | (0x1D - val));
 		} else {
@@ -409,7 +418,7 @@ static inline int twl6040_hf_ramp_step(struct snd_soc_codec *codec)
 	} else if (handsfree->ramp == TWL6040_RAMP_DOWN) {
 		/* ramp step down */
 		if (val > 0) {
-			val--;
+			val -= right_step;
 			reg &= ~TWL6040_HF_VOL_MASK;
 			twl6040_write(codec, TWL6040_REG_HFRGAIN, reg | (0x1D - val));
 		}
@@ -428,6 +437,7 @@ static void twl6040_pga_hs_work(struct work_struct *work)
 		container_of(work, struct twl6040_data, hs_delayed_work.work);
 	struct snd_soc_codec *codec = priv->codec;
 	struct twl6040_output *headset = &priv->headset;
+	unsigned int delay = headset->step_delay;
 	int i, headset_complete;
 
 	/* do we need to ramp at all ? */
@@ -438,7 +448,9 @@ static void twl6040_pga_hs_work(struct work_struct *work)
 	for (i = 0; i <= 16; i++) {
 		headset_complete = 1;
 		if (headset->ramp != TWL6040_RAMP_NONE)
-			headset_complete = twl6040_hs_ramp_step(codec);
+			headset_complete = twl6040_hs_ramp_step(codec,
+							headset->left_step,
+							headset->right_step);
 
 		/* ramp finished ? */
 		if (headset_complete)
@@ -446,9 +458,10 @@ static void twl6040_pga_hs_work(struct work_struct *work)
 
 		/* TODO: tune - delay is longer over 0dB as increases are larger */
 		if (i >= 8)
-			schedule_timeout_interruptible(msecs_to_jiffies(75));
+			schedule_timeout_interruptible(msecs_to_jiffies(delay +
+						       (delay >> 1)));
 		else
-			schedule_timeout_interruptible(msecs_to_jiffies(50));
+			schedule_timeout_interruptible(msecs_to_jiffies(delay));
 	}
 
 
@@ -466,6 +479,7 @@ static void twl6040_pga_hf_work(struct work_struct *work)
 		container_of(work, struct twl6040_data, hf_delayed_work.work);
 	struct snd_soc_codec *codec = priv->codec;
 	struct twl6040_output *handsfree = &priv->handsfree;
+	unsigned int delay = handsfree->step_delay;
 	int i, handsfree_complete;
 
 	/* do we need to ramp at all ? */
@@ -476,7 +490,9 @@ static void twl6040_pga_hf_work(struct work_struct *work)
 	for (i = 0; i <= 32; i++) {
 		handsfree_complete = 1;
 		if (handsfree->ramp != TWL6040_RAMP_NONE)
-			handsfree_complete = twl6040_hf_ramp_step(codec);
+			handsfree_complete = twl6040_hf_ramp_step(codec,
+							handsfree->left_step,
+							handsfree->right_step);
 
 		/* ramp finished ? */
 		if (handsfree_complete)
@@ -484,9 +500,10 @@ static void twl6040_pga_hf_work(struct work_struct *work)
 
 		/* TODO: tune - delay is longer over 0dB as increases are larger */
 		if (i >= 16)
-			schedule_timeout_interruptible(msecs_to_jiffies(50));
+			schedule_timeout_interruptible(msecs_to_jiffies(delay +
+						       (delay >> 1)));
 		else
-			schedule_timeout_interruptible(msecs_to_jiffies(20));
+			schedule_timeout_interruptible(msecs_to_jiffies(delay));
 	}
 
 
@@ -513,11 +530,13 @@ static int pga_event(struct snd_soc_dapm_widget *w,
 		out = &priv->headset;
 		work = &priv->hs_delayed_work;
 		queue = priv->hs_workqueue;
+		out->step_delay = 5;	/* 5 ms between volume ramp steps */
 		break;
 	case 4:
 		out = &priv->handsfree;
 		work = &priv->hf_delayed_work;
 		queue = priv->hf_workqueue;
+		out->step_delay = 5;	/* 5 ms between volume ramp steps */
 		if (SND_SOC_DAPM_EVENT_ON(event))
 			priv->non_lp++;
 		else
@@ -532,10 +551,14 @@ static int pga_event(struct snd_soc_dapm_widget *w,
 		if (out->active)
 			break;
 
+		/* don't use volume ramp for power-up */
+		out->left_step = out->left_vol;
+		out->right_step = out->right_vol;
+
 		if (!delayed_work_pending(work)) {
 			out->ramp = TWL6040_RAMP_UP;
 			queue_delayed_work(queue, work,
-					msecs_to_jiffies(100));
+					msecs_to_jiffies(1));
 		}
 		break;
 
@@ -544,6 +567,9 @@ static int pga_event(struct snd_soc_dapm_widget *w,
 			break;
 
 		if (!delayed_work_pending(work)) {
+			/* use volume ramp for power-down */
+			out->left_step = 1;
+			out->right_step = 1;
 			out->ramp = TWL6040_RAMP_DOWN;
 			INIT_COMPLETION(out->ramp_done);
 
