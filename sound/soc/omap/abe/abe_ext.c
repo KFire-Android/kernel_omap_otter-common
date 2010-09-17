@@ -28,6 +28,7 @@
  */
 void abe_default_irq_pingpong_player (void)
 {
+#if 0
 #define N_SAMPLES_MAX ((int)(1024))	/* ping-pong access to MM_DL at 48kHz Mono with 20ms packet sizes */
 
 	static s32 idx;
@@ -68,6 +69,7 @@ const s32 audio_pattern [8] = {16383,16383,16383,16383,-16384,-16384,-16384,-163
 	 */
 	abe_block_copy (COPY_FROM_HOST_TO_ABE, ABE_DMEM, dst, (u32 *)&(temp[0]), n_bytes);
 	abe_set_ping_pong_buffer (MM_DL_PORT, n_bytes);
+#endif
 }
 
 /**
@@ -79,6 +81,7 @@ const s32 audio_pattern [8] = {16383,16383,16383,16383,-16384,-16384,-16384,-163
  */
 void abe_default_irq_pingpong_player_32bits (void)
 {
+#if 0
 	/* ping-pong access to MM_DL at 48kHz Mono with 20ms packet sizes */
 	static s32 idx;
 	u32 i, dst, n_samples, n_bytes;
@@ -110,6 +113,7 @@ void abe_default_irq_pingpong_player_32bits (void)
 	abe_block_copy (COPY_FROM_HOST_TO_ABE, ABE_DMEM, dst, (u32 *)&(temp[0]), n_bytes);
 
 	abe_set_ping_pong_buffer (MM_DL_PORT, n_bytes);
+#endif
 }
 
 /**
