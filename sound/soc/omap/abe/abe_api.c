@@ -1875,7 +1875,7 @@ abehal_status abe_set_router_configuration(u32 id, u32 k, u16 * param)
   _log(id_set_router_configuration, id, (u32) param, (u32) param >> 8)
 
     abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
-		   D_aUplinkRouting_ADDR, param,
+		   D_aUplinkRouting_ADDR, (u32 *) param,
 		   D_aUplinkRouting_sizeof);
 
   return 0;
