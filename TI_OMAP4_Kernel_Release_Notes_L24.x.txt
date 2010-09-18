@@ -1,9 +1,9 @@
-17 August 2010
+17 September 2010
 
 
 1.  Introduction
 ----------------
-This document accompanies OMAP(TM) Software Release L24.9 based on Linux 2.6.35
+This document accompanies OMAP(TM) Software Release L24.10 based on Linux 2.6.35
 on OMAP4430 SDP, Blaze and Panda boards. The document specifies details about:
 	- downloading the source code and building the images
 	- supported features
@@ -13,31 +13,22 @@ on OMAP4430 SDP, Blaze and Panda boards. The document specifies details about:
 ------------------
 This is a release of the Linux Baseport for OMAP4430. It supports the
 OMAP4 SDP, Blaze and Panda boards. The kernel is based on Linux version 2.6.35
-from open source. U-boot is based on open-source version 1.1.4.
+from open source. U-boot is based on open-source version v2010-09
 
 NOTE that the Kernel for SDP, Blaze and Panda boards is the same. However the
 bootloaders for Panda are in separate GITs compared to the ones for SDP and Blaze. 
 L24.10 onwards the same bootloader codebase will support all the boards.
 
-2.1 Bootloaders for SDP and Blaze boards
+2.1 Bootloaders for SDP, Blaze, and Panda boards
 The u-boot source can be obtained via GIT from:
-  http://dev.omapzoom.org/?p=bootloader/u-boot.git;a=shortlog;h=refs/heads/omap4_dev
+  http://dev.omapzoom.org/?p=bootloader/u-boot.git;a=shortlog;h=refs/heads/omap_upstream
 
 The x-loader source can be obtained via GIT from:
   http://dev.omapzoom.org/?p=bootloader/x-loader.git;a=shortlog;h=refs/heads/omap4_dev
 
-2.2 Bootloaders for Panda boards
-The u-boot source can be obtained via GIT from:
-  GIT:      git://gitorious.org/pandaboard/u-boot.git
-  Branch: omap4_panda
-
-The x-loader source can be obtained via GIT from:
-  GIT:      git://gitorious.org/pandaboard/x-loader.git
-  Branch: omap4_panda
-
 2.3 Kernel for all boards (SDP, Blaze, Panda)
 The kernel source can be obtained via GIT from:
-  http://dev.omapzoom.org/?p=integration/kernel-omap4.git;a=shortlog;h=refs/heads/L24.9
+  http://dev.omapzoom.org/?p=integration/kernel-omap4.git;a=shortlog;h=refs/heads/L24.10
 
 Components that are supported in the release:
    X-loader, U-Boot, OS Kernel (SMP), Phoenix power IC, UART, GP Timer, GPIO, Watchdog,
@@ -72,9 +63,9 @@ needed tool chain. Refer to section 5 for tool chain information.
 
 To select the default configuration for U-Boot type:
     For SDP and Blaze boards:
-	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
+	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4_sdp4430_config
     For Panda boards:
-	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430panda_config
+	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4_panda_config
 
 To build the U-Boot image type:
 	# make CROSS_COMPILE=arm-none-linux-gnueabi-
@@ -85,11 +76,9 @@ To build the U-Boot image type:
 Set the environment variable PATH such that cross compile binaries point to the
 needed tool chain. Refer to section 5 for tool chain information.
 
-U-boot needs to be placed in a directory parallel to x-loader and compiled first.
-E.g.:
-	[DIR] omap4
-		+-- u-boot
-		+-- x-loader
+Please note that the restriction requiring x-loader to be in the same directory
+as u-boot has been removed. Now x-loader can be built independently. You need
+not even have a u-boot directory to build x-loader.
 
 To select the default configuration for X-loader type:
     For ES1.0 SDP and Blaze boards:
@@ -97,19 +86,19 @@ To select the default configuration for X-loader type:
     For ES2.0 SDP and Blaze boards:
 	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
     For ES1.0 Panda boards:
-	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_600_config
+	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430panda_MPU_600MHz_config
     For ES2.0 Panda boards:
 	# make CROSS_COMPILE=arm-none-linux-gnueabi- omap4430panda_config
 
 To build the X-loader image type:
-	# make CROSS_COMPILE=arm-none-linux-gnueabi-
 	# make ift CROSS_COMPILE=arm-none-linux-gnueabi-
 
 The above step will create a MLO image, which can be copied into the
 MMC/SD card for booting via MMC/SD.
 
-For booting from eMMC flash this MLO at sector 0x0 or sector 0x100. See
-section 3.3.2 for detailed instructions for flashing and booting from eMMC.
+For booting from eMMC flash this MLO at sector 0x100(Address: 0x20000).
+See section 3.3.2 for detailed instructions for flashing and booting
+from eMMC.
 
 3.2.4 Compiling the Kernel
 
@@ -155,33 +144,39 @@ using one of the following options.
 
 Option 1:
 Use a debugger or OMAPFlasher tool to download x-loader (with configuration
-header, e.g. MLO) as well as u-boot.bin into
-SDRAM and run u-boot from SDRAM.
+header, e.g. MLO) as well as u-boot.bin into SDRAM and run u-boot from SDRAM.
 
 Option 2:
 Boot via a removable MMC card following the instructions in section 3.3.1. 
-After booting from removable MMC, copy the MLO
-and u-boot.bin from the MMC to RAM using the following commands:
-OMAP44XX SDP # mmcinit 0
-OMAP44XX SDP # fatload mmc 0 [Ram Address X] MLO
-OMAP44XX SDP # fatload mmc 0 [Ram Address Y] u-boot.bin
+After booting from removable MMC, copy the MLO and u-boot.bin from the MMC
+to RAM using the following u-boot commands:
+1.	MMC initialization
+		mmc rescan <device>
+2.	FAT read
+		fatload mmc <device> <dest-addr> <file>
+3.	raw write
+		mmc write <device> <src-addr> <dest-sector> <num-sectors>
+Device numbers:
+External SD/MMC card => MMC 1 => device = 0
+eMMC				 => MMC 2 => device = 1
+Number of bytes per sector: 512
+All parameters should be in hex
 
-Once the x-loader and u-boot binaries are in RAM, use the following commands
-to copy them to eMMC.
+Example flashing sequence:
+	OMAP4430 SDP # mmc rescan 0
+	OMAP4430 SDP # fatls mmc 0
+	OMAP4430 SDP # fatload mmc 0 80000000 MLO
+				reading mlo
+	20104 bytes read
+	OMAP4430 SDP # mmc write 1 80000000 0x100 0x28
+	OMAP4430 SDP # fatload mmc 0 80000000 u-boot.bin
+	reading u-boot.bin
+	146652 bytes read
+	OMAP4430 SDP # mmc write 1 80000000 0x400 0x11F
 
-1) Erase all EMMC contents
-OMAP44XX SDP # mmcinit 1
-OMAP44XX SDP # mmc 1 erase 0x0 0x800000
-2) Flash x-loader
-OMAP44XX SDP # mmc 1 erase  0x100  [size of x-loader in hex]
-OMAP44XX SDP # mmc 1 write [Ram Address X]  0x100  [size of x-loader in hex]
-Note: Ram address X is address where x-loader is downloaded in RAM using either the
-debugger, OMAPFlasher or removable MMC.
-3) Flash u-boot.bin
-OMAP44XX SDP # mmc 1 erase  0x400  [size]
-OMAP44XX SDP # mmc  1 write  [Ram Address Y]  0x400  [size]
-Note: Ram address Y is address where u-boot is downloaded in RAM using either the
-debugger, OMAPFlasher or removable MMC.
+Please note that 0x28 above is the number of sectors in 20104
+rounded up => RU(20104/512)
+Similarly 0x11F is number of sectors in 146652 bytes rounded up.
 
 Set the board switch settings as follows to boot the board from eMMC:
 	S9 - 1-off, 2-on, 3-on, 4-on
@@ -236,12 +231,7 @@ on OMAP4 SDP and Blaze boards. This is not supported on Panda boards as
 eMMC is not available on Panda boards.
 
 On SDP and Blaze, the environment variables  are stored on a RAW partition
-of size 1MB on eMMC starting from sector 0x700 to sector 0x7FF. 
-The usage is as below:
-    - Just typing saveenv prompts user to press 'y' or 'Y'  once user confirms 
-      env is saved to eMMC or else throws message "Cannot save env to eMMC'
-    - Typing "saveenv -f"  forcefully updates env without user intervention.
-
+of size 128KB on eMMC starting from sector 0x700 to sector 0x7FF. 
 
 3.4 Using FB and V4L2 Display driver
 
@@ -314,11 +304,9 @@ aplay -D hd_audio file.wav
 
 4.1 New Features
 
-- EHCI and OHCI are supported for functionality. These drivers do not support 
-  Power Management and hence are disabled in the default kernel configuration.
-- Himem support is enabled by default.
-- Power management (CONFIG_PM) is enabled by default for OMAP4430 ES2.0, while
-  it is disabled for OMAP4430 ES1.0.
+- Power management to achieve Core CSWR.
+- Mainline version of u-boot.
+- SDP, Blaze and Panda supported in the same codebase of x-loader and u-boot.
 
 4.2 Supported Features
 
@@ -368,8 +356,7 @@ aplay -D hd_audio file.wav
 NOTE:
 	- Power management (CONFIG_PM) is enabled by default for OMAP4430 ES2.0, 
 	  while it is disabled for OMAP4430 ES1.0.
-	- All clocks are still kept enabled on bootloader.
-	- These features can only be validated on EMU devices with omap4_pm_defconfig
+	- Most of the unused clocks are now disabled in bootloader.
 
 - Audio
 	Audio playback to Phoenix Hand-free, Head set output devices.
@@ -392,7 +379,10 @@ NOTE:
 			- Secondary LCD
 			- HDMI
 			- Pico DLP
-	Tiler memory manager.
+		- Tiler memory manager
+		- Write-Back
+		- Interlacing support
+
 
 - WLAN
 
@@ -408,48 +398,50 @@ Refer to Program schedule.
 
 4.5 Defects Fixed in This Release
 
-OMAPS00219723	MMC: sometimes the order of detection of eMMC and external SD card is wrong
-OMAPS00221981	eMMC device shall be stable at /dev/mmcblk0
-OMAPS00219502	IRQ 93 - I2C ISR not correctly handled
-OMAPS00218080	PT: Robustness: EXT2-fs (mmcblk1p1): error: ext2_lookup is generated after certain number of iterations
-OMAPS00214020	ethernet doesn't get configured with L24.4 kernel
-OMAPS00215563	Not able to wakeup from suspend state
-OMAPS00216039	L24x: Tick suppression won't work because of the LOCAL A9 timer aren't wakeup capable
-OMAPS00216037	L24x: CPUx comes out of low power mode when there is an enevt om CPUy
-OMAPS00220851	DMA test case failures - Descriptor loading and SMP
-OMAPS00219141	u-boot net root path is too short
-OMAPS00221839	MUSB (OTG) in Host mode: enumeration failure if USB device connected before blaze boot
-OMAPS00215668	MUSB driver in device mode has problems with unaligned DMA.
-OMAPS00221528	MUSB Host :- Fix the default DMA mapping of control transfer buffers
-OMAPS00221512	USB: MUSB Host: Data transfers (Write to USB disk) fails with FAT errors
-OMAPS00219663	1080p to WVGA downscaling of YUYV does not work
-OMAPS00218554	HDMI panel shows tearing when 3 different 3D apps are executed
-OMAPS00222043	On display-next branch or L24.8 if we disable HDMI in menuconfig, build error is observed
-OMAPS00213825	Kernel crash when many processes have been scheduled
-OMAPS00216449	Problems are seen with NFS when 'tcp' option is not specified in bootargs.
-OMAPS00214020	ethernet doesn't get configured with L24.4 kernel
+OMAPS00223748	CPUIdle transitions are stoped during System Use Case execution (MPU held in ON)
+OMAPS00223948	CPUIdle does not hit CORE CSWR following Suspend/Resume
+OMAPS00223171   Basic playback in 44.1kHz stereo is performed too fast.
+OMAPS00223208   At the end of playback, a loud pop is audible
+OMAPS00223173   Basic playback in 44.1kHz monoaural does not work
+OMAPS00223202   Audio files with non-native sample rates are not played with the correct sample rate
+OMAPS00223179   Audio has bad quality when recorded from headset microphone
+OMAPS00223193   When recording from sub microphone through MM_UL in monoaural file contains only silence.
+OMAPS00223178   Audio mutes when setting gain to its maximum value or greater
+OMAPS00223194   When mixing TONES_DL and MM_DL in DL1 mixer, end of playback of one stream causes the other to be stopped.
+OMAPS00223202   Audio files with non-native sample rates are not played with the correct sample rate
+OMAPS00223205   Vibrator as an input driver fails to activate.
 
 4.6 Open Defects
 
-OMAPS00215651	MUSB driver in host mode has problems with unaligned DMA
+OMAPS00181435	Need NEON support for VSTAB and 3A algorithms in assembly code on ARM
+OMAPS00189562	Support for USB HOST type detection in baseport
+OMAPS00189728	Transmitted (string) data from OMAP3430 through UART3 would be occasionally corrupted on Host PC side.(L23.8)
+OMAPS00192987	Phonebook: Cannot add contact in SIM phonebook
+OMAPS00192992	MM: USB enumeration issue when USB cable is unplugged
 OMAPS00217993	Display on Primary LCD does not wakeup when USB is active
 OMAPS00218029	PT_PPM: Low USB-MS throughputs metrics for write operations
 OMAPS00220506	omap-serial driver is unstable during bluetooth file transfer stress testing.
 OMAPS00221541	UART trasfers fails at 3.5Mbps baudrate with DMA mode.
+OMAPS00221726	PT_PPM: Low USB-MS throughputs metrics for read operations
 OMAPS00222079	MMC corruption on reading when ADMA is used
-OMAPS00222347	[PT][Endurance] Transfer: PTLv1.3.8: Dxfer failed after some  iterations
+OMAPS00222347	[PT][Endurance] Transfer: PTLv1.4: Dxfer failed after some  iterations
 OMAPS00222789	At random times, booting is not completed and the SDP hangs.
-OMAPS00222925	USB Host - Chapter 9 control,in out test case failure
-OMAPS00221067	omaplfb relies on the FB2OFB definition, which is not defined by the headers of the Ubuntu kernel headers
-OMAPS00219789	V4L2 error observed when rendering frames from Video decode testcases
-OMAPS00216592	There is no way available for dynamically setting/resetting dithering bit
-OMAPS00213906	180 degree rotation of yuv format shows a bluish tinge
-OMAPS00220816	PicoDLP shows a junk buffer at the bottom of the frame
-OMAPS00219829	PT_PPM: AV Playback: FPS numbers for Video Playback via HDMI are below validation criteria
-OMAPS00220581	L_JPEGDEC_FUNCTIONAL_001: multiple dark lines are seen when image is displayed
-OMAPS00222834	HDMI as a default device is giving OCP errors
-OMAPS00222915	HDMI driver must not periodically wake up the system to enable ESD chip detecting plug insertion
-OMAPS00222943 Key press cannot wakeup system
+OMAPS00222986	Function of mass storage is not stable after OMAP3 been waked up by plugging in USB cable
+OMAPS00222987	EHCI performance numbers are low
+OMAPS00222989	Random failures in the Mass storage (thumbdrive) detection by OHCI controller
+OMAPS00223646	PM Suspend last power state traces are not valid for DSS, CAM, EMU and SGX.
+OMAPS00223678	PT Robustness, Image Display + Data transfer : Data Transfer gives kernel panic after 450~950 iterations
+OMAPS00223733	Need to provide o-profile support in L24.x
+OMAPS00224011	HWMOD: Smart-Reflex is broken on L24.9-pm branch (IVA-VCORE2, SR disable)
+OMAPS00224083	Kernel Hang on L24.9-pm branch with ubuntu filesystem when cpufreq is enabled
+OMAPS00224090	CPUFreq drivers are not handling M2 post-dividers for OPP50<->OPP100 (leading to Dpll relocks)
+OMAPS00224119	memory robustness tests crashing with highmem activated
+OMAPS00224227	Kernel crash after suspend with CPUFreq enabled
+OMAPS00224228	Kernel Crash with DVFS enabled when hotplugging out CPU1
+OMAPS00224258	PT Automation: Kernel BUG message appears when doing file transfer while other MM operation is performed
+OMAPS00224434	Handling PHY suspend in host mode for core retention support
+OMAPS00224571	Handling PHY suspend in host mode for core retention support
+OMAPS00224605	The USB keyboard and mouse are not working in OHCI
 
 
 4.7 Open Change Requests
@@ -457,15 +449,8 @@ None
 
 4.8 Rejected Defects
 
-OMAPS00221558	HSMMC : Copying same file twice on MMC and when run "cmp" will throw error
-OMAPS00218323	PT_Adhoc:Audio Playback of a file stored in SD card, Terminal hangs while SD is removed.
-OMAPS00221850	UST OTG ( as HOST): CDC-ACM class issue
-OMAPS00219388	Secondary display corruption with L24.6
 
 4.9 Postponed Defects
-
-OMAPS00221726	PT_PPM: Low USB-MS throughputs metrics for read operations
-OMAPS00216446	Disabling "auto update" on DSI would impact the V4l2 drivers that have the ISRs hooked up for FRAMEDONE already.
 
 
 4.10 Limitations
