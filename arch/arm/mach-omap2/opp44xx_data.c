@@ -26,6 +26,7 @@
 
 #include <plat/opp.h>
 #include <plat/clock.h>
+#include <plat/omap_device.h>
 
 #include "cm-regbits-34xx.h"
 #include "prm.h"
@@ -33,6 +34,7 @@
 
 static struct clk *dpll_mpu_clk, *iva_clk, *dsp_clk, *l3_clk;
 static struct clk *core_m3_clk, *core_m6_clk, *per_m3_clk, *per_m6_clk;
+static struct clk *abe_clk, *sgx_clk, *fdif_clk;
 
 static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	/* MPU OPP1 - OPP50 */
@@ -55,19 +57,16 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	OMAP_OPP_DEF("dsp", true, 465600000, 1100000),
 	/* DSP OPP3 - OPPTB */
 	OMAP_OPP_DEF("dsp", false, 498000000, 1260000),
-#if 0
 	/* ABE OPP1 - OPP50 */
-	OMAP_OPP_DEF("l4_abe", true, 98300000, 930000),
+	OMAP_OPP_DEF("aess", true, 98300000, 930000),
 	/* ABE OPP2 - OPP100 */
-	OMAP_OPP_DEF("l4_abe", true, 196600000, 1100000),
+	OMAP_OPP_DEF("aess", true, 196600000, 1100000),
 	/* ABE OPP3 - OPPTB */
-	OMAP_OPP_DEF("l4_abe", false, 196600000, 1260000),
-#endif
+	OMAP_OPP_DEF("aess", false, 196600000, 1260000),
 	/* L3 OPP1 - OPP50 */
 	OMAP_OPP_DEF("l3_main_1", true, 100000000, 930000),
 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
 	OMAP_OPP_DEF("l3_main_1", true, 200000000, 1100000),
-#if 0
 	/* CAM FDIF OPP1 - OPP50 */
 	OMAP_OPP_DEF("fdif", true, 64000000, 930000),
 	/* CAM FDIF OPP2 - OPP100 */
@@ -76,7 +75,6 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	OMAP_OPP_DEF("gpu", true, 100000000, 930000),
 	/* SGX OPP2 - OPP100 */
 	OMAP_OPP_DEF("gpu", true, 200000000, 1100000),
-#endif
 };
 
 #define	L3_OPP50_RATE			100000000
@@ -214,6 +212,53 @@ static unsigned long omap4_l3_get_rate(struct device *dev)
 	return l3_clk->rate;
 }
 
+static int omap4_abe_set_rate(struct device *dev, unsigned long rate)
+{
+	unsigned long round_rate;
+
+	round_rate = clk_round_rate(abe_clk, rate / 2);
+
+	return clk_set_rate(abe_clk, round_rate);
+}
+
+static unsigned long omap4_abe_get_rate(struct device *dev)
+{
+	return abe_clk->rate * 2;
+}
+
+static int omap4_sgx_set_rate(struct device *dev, unsigned long rate)
+{
+	return clk_set_rate(sgx_clk, rate / 2);
+}
+
+static unsigned long omap4_sgx_get_rate(struct device *dev)
+{
+	return sgx_clk->rate * 2;
+}
+
+static int omap4_fdif_set_rate(struct device *dev, unsigned long rate)
+{
+	return clk_set_rate(fdif_clk, rate / 2);
+}
+
+static unsigned long omap4_fdif_get_rate(struct device *dev)
+{
+	return fdif_clk->rate * 2;
+}
+
+struct device *find_dev_ptr(char *name)
+{
+
+	struct omap_hwmod *oh;
+	struct device *dev = NULL;
+
+	oh = omap_hwmod_lookup(name);
+	if (oh && oh->od)
+		dev = &oh->od->pdev.dev;
+
+	return dev;
+}
+
 /* Temp variable to allow multiple calls */
 static u8 __initdata omap4_table_init;
 
@@ -235,10 +280,11 @@ int __init omap4_pm_init_opp_table(void)
 	opp_def = omap44xx_opp_def_list;
 
 	for (i = 0; i < omap44xx_opp_def_size; i++) {
-		r = opp_add(opp_def++);
+		r = opp_add(opp_def);
 		if (r)
 			pr_err("unable to add OPP %ld Hz for %s\n",
 				opp_def->freq, opp_def->hwmod_name);
+		opp_def++;
 	}
 
 	dpll_mpu_clk = clk_get(NULL, "dpll_mpu_ck");
@@ -247,8 +293,11 @@ int __init omap4_pm_init_opp_table(void)
 	l3_clk = clk_get(NULL, "dpll_core_m5_ck");
 	core_m3_clk = clk_get(NULL, "dpll_core_m3_ck");
 	core_m6_clk = clk_get(NULL, "dpll_core_m6_ck");
+	sgx_clk = clk_get(NULL, "dpll_core_m7_ck");
 	per_m3_clk = clk_get(NULL, "dpll_per_m3_ck");
 	per_m6_clk = clk_get(NULL, "dpll_per_m6_ck");
+	abe_clk = clk_get(NULL, "abe_clk");
+	fdif_clk = clk_get(NULL, "fdif_fck");
 
 	/* Populate the set rate and get rate for mpu, iva, dsp and l3 device */
 	dev = omap2_get_mpuss_device();
@@ -270,6 +319,21 @@ int __init omap4_pm_init_opp_table(void)
 	if (dev)
 		opp_populate_rate_fns(dev, omap4_l3_set_rate,
 				omap4_l3_get_rate);
+
+	dev = find_dev_ptr("aess");
+	if (dev)
+		opp_populate_rate_fns(dev, omap4_abe_set_rate,
+				omap4_abe_get_rate);
+
+	dev = find_dev_ptr("gpu");
+	if (dev)
+		opp_populate_rate_fns(dev, omap4_sgx_set_rate,
+				omap4_sgx_get_rate);
+
+	dev = find_dev_ptr("fdif");
+	if (dev)
+		opp_populate_rate_fns(dev, omap4_fdif_set_rate,
+				omap4_fdif_get_rate);
 
 	return 0;
 }

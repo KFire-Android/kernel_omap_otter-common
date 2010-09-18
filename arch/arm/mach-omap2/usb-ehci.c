@@ -110,6 +110,8 @@
 #define OMAP_UHH_HOSTCONFIG_P2_CONNECT_STATUS		(1 << 9)
 #define OMAP_UHH_HOSTCONFIG_P3_CONNECT_STATUS		(1 << 10)
 
+#define OMAP4_UHH_HOSTCONFIG_APP_START_CLK		(1 << 31)
+
 /* OMAP4 specific */
 #define OMAP_UHH_SYSCONFIG_IDLEMODE_RESET		(~(0xC))
 #define OMAP_UHH_SYSCONFIG_FIDLEMODE_SET		(0 << 2)
@@ -411,6 +413,13 @@ static int uhhtll_enable(struct uhhtll_hcd_omap *omap)
 			OMAP_UHH_HOSTCONFIG_INCR8_BURST_EN |
 			OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN);
 		reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
+
+		/*
+		 * FIXME: This bit is currently undocumented.
+		 * Update this commennt after the documentation
+		 * is properly updated
+		 */
+		reg |= OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
 
 		uhhtll_omap_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
 

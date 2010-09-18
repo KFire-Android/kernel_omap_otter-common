@@ -262,8 +262,7 @@ int twl6030_mmc_card_detect_config(void)
 		pr_err("twl6030: Failed to read CFG_INPUT_PUPD3, error %d\n",
 									ret);
 	}
-	reg_val &= ~MMC_PU;
-	reg_val |= MMC_PD;
+	reg_val &= ~(MMC_PU | MMC_PD);
 	ret = twl_i2c_write_u8(TWL6030_MODULE_ID0, reg_val,
 						TWL6030_CFG_INPUT_PUPD3);
 	if (ret < 0) {
