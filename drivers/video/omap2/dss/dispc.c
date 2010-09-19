@@ -2926,6 +2926,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
 
+	_dispc_set_channel_out(plane, channel);
 	_dispc_set_color_mode(plane, color_mode);
 
 	_dispc_set_plane_ba0(plane, paddr + offset0);
