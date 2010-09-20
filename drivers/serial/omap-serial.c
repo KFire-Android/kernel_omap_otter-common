@@ -32,6 +32,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/clk.h>
 #include <linux/serial_core.h>
+#include <linux/wakelock.h>
 
 #include <asm/irq.h>
 #include <plat/dma.h>
@@ -39,6 +40,7 @@
 #include <plat/omap-serial.h>
 
 static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+static struct wake_lock uart_lock;
 
 /* Forward declaration of functions */
 static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
@@ -337,6 +339,11 @@ static unsigned int check_modem_status(struct uart_omap_port *up)
 	return status;
 }
 
+static inline bool omap_is_console_port(struct uart_port *port)
+{
+	return port->cons && port->cons->index == port->line;
+}
+
 /**
  * serial_omap_irq() - This handles the interrupt from one port
  * @irq: uart port irq number
@@ -347,6 +354,9 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	struct uart_omap_port *up = dev_id;
 	unsigned int iir, lsr;
 	unsigned long flags;
+
+	if (omap_is_console_port(&up->port))
+		wake_lock_timeout(&uart_lock, 5 * HZ);
 
 	iir = serial_in(up, UART_IIR);
 	if (iir & UART_IIR_NO_INT)
@@ -1044,10 +1054,15 @@ serial_omap_suspend(struct platform_device *pdev, pm_message_t state)
 	return 0;
 }
 
+
 static int serial_omap_resume(struct platform_device *dev)
 {
-#ifndef CONFIG_SUSPEND
 	struct uart_omap_port *up = platform_get_drvdata(dev);
+
+	if (omap_is_console_port(&up->port))
+		wake_lock_timeout(&uart_lock, 5 * HZ);
+
+#ifndef CONFIG_SUSPEND
 	if (up)
 		uart_resume_port(&serial_omap_reg, &up->port);
 #endif
@@ -1347,6 +1362,7 @@ static int __init serial_omap_init(void)
 {
 	int ret;
 
+	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
 	ret = uart_register_driver(&serial_omap_reg);
 	if (ret != 0)
 		return ret;
