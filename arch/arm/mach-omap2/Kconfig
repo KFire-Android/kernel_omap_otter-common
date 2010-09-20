@@ -193,6 +193,7 @@ config MACH_OMAP_4430SDP
 	select HIGHMEM
 	select TWL6030_PWM
 	select TWL6030_GPADC
+	select TWL6040_VIB
 	select NEW_LEDS
 	select LEDS_CLASS
 	select LEDS_PWM
