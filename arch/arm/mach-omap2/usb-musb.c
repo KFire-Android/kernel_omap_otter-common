@@ -155,7 +155,8 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 			put_device(dev);
 		}
 		/*Suspend the phy*/
-		omap_writel(0x1, 0x4A002300);
+		if (cpu_is_omap44xx())
+			omap_writel(0x1, 0x4A002300);
 	}
 }
 
@@ -198,16 +199,18 @@ void musb_context_save_restore(enum musb_state state)
 				oh->flags |= HWMOD_SWSUP_SIDLE
 						| HWMOD_SWSUP_MSTANDBY;
 				pdata->device_idle(pdev);
-				/* Disable the phy clock*/
-				omap_writel(0x0, 0x4A0093E0);
+				if (cpu_is_omap44xx()) {
+					/* Disable the phy clock*/
+					omap_writel(0x0, 0x4A0093E0);
 
 				/* FIXME This is not required once the phoenix
 				 *framework is in place. We can powerup the PHY
 				 *once the cable connected.
 				 */
-				if (bdata->mode == MUSB_HOST)
-					/*powerdown  the phy */
-					omap_writel(0x1, 0x4A002300);
+					if (bdata->mode == MUSB_HOST)
+						/*powerdown  the phy */
+						omap_writel(0x1, 0x4A002300);
+				}
 				break;
 
 				case restore_context:
@@ -226,11 +229,13 @@ void musb_context_save_restore(enum musb_state state)
 				 *framework is in place. We can powerup the PHY
 				 *once the cable connected.
 				 */
-				if (bdata->mode == MUSB_HOST)
-					/*powerup  the phy */
-					omap_writel(0, 0x4A002300);
-				/* enable the phy clock*/
-				omap_writel(0x101, 0x4A0093E0);
+				if (cpu_is_omap44xx()) {
+					if (bdata->mode == MUSB_HOST)
+						/*powerup  the phy */
+						omap_writel(0, 0x4A002300);
+					/* enable the phy clock*/
+					omap_writel(0x101, 0x4A0093E0);
+				}
 
 				/* set the sysconfig setting back to smart idle
 				 * and smart stndby after wakeup and enable

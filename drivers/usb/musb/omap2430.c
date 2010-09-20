@@ -218,10 +218,12 @@ int __init musb_platform_init(struct musb *musb)
 		return -ENODEV;
 	}
 
-	/* disable the optional 60M clock if enabled by romcode*/
-	l = omap_readl(0x4A009360);
-	l &= ~0x00000100;
-	omap_writel(l, 0x4A009360);
+	if (cpu_is_omap44xx()) {
+		/* disable the optional 60M clock if enabled by romcode*/
+		l = omap_readl(0x4A009360);
+		l &= ~0x00000100;
+		omap_writel(l, 0x4A009360);
+	}
 
 	/* Fixme this can be enabled when load the gadget driver also*/
 	musb_platform_resume(musb);
@@ -231,7 +233,8 @@ int __init musb_platform_init(struct musb *musb)
 	* loaded.
 	*/
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
-	omap_writel(0x0, 0x4A002300);
+	if (cpu_is_omap44xx())
+		omap_writel(0x0, 0x4A002300);
 #endif
 	l = musb_readl(musb->mregs, OTG_INTERFSEL);
 
