@@ -28,6 +28,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
+#include <linux/twl6040-vib.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -304,6 +305,21 @@ static struct platform_device sdp4430_leds_pwm = {
 		.platform_data = &sdp4430_pwm_data,
 	},
 };
+
+static struct twl6040_vib_platform_data sdp4430_vib_data = {
+	.max_timeout = 15000,
+	.active_low = 0,
+	.initial_vibrate = 0,
+};
+
+static struct platform_device sdp4430_vib = {
+	.name           = VIB_NAME,
+	.id             = -1,
+	.dev            = {
+		.platform_data  = &sdp4430_vib_data,
+	},
+};
+
 /* Begin Synaptic Touchscreen TM-01217 */
 
 static char *tm12xx_idev_names[] = {
@@ -540,6 +556,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_leds_gpio,
 	&wl128x_device,
 	&sdp4430_hdmi_audio_device,
+	&sdp4430_vib,
 };
 
 static void __init omap_4430sdp_init_irq(void)
