@@ -126,6 +126,18 @@
 #define TWL6040_HSDACMODER		0x02
 #define TWL6040_HSDRVMODER		0x08
 
+/* VIBCTLL (0x18) fields */
+
+#define TWL6040_VIBCTRLLN               0x10
+#define TWL6040_VIBCTRLLP               0x04
+#define TWL6040_VIBENAL                 0x01
+
+/* VIBCTLL (0x19) fields */
+
+#define TWL6040_VIBCTRLRN               0x10
+#define TWL6040_VIBCTRLRP               0x04
+#define TWL6040_VIBENAR                 0x01
+
 /* ACCCTL (0x2D) fields */
 
 #define TWL6040_RESETSPLIT		0x04

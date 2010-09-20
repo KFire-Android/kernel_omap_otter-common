@@ -333,6 +333,11 @@ config SENSORS_AK8975
 	  If you say yes here you get support for Asahi Kasei's
 	  orientation sensor AK8975.
 
+config TWL6040_VIB
+	bool "TWL6040 Vibrator"
+	depends on TWL4030_CORE
+	default n
+
 config EP93XX_PWM
 	tristate "EP93xx PWM support"
 	depends on ARCH_EP93XX
