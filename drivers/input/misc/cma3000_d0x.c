@@ -191,6 +191,67 @@ static ssize_t cma3000_store_attr_enable(struct device *dev,
 	return 1;
 }
 
+static ssize_t cma3000_show_attr_delay(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
+
+	return sprintf(buf, "%d\n", data->req_rate);
+}
+
+static ssize_t cma3000_store_attr_delay(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
+	unsigned long interval;
+	int error;
+	int i;
+
+	if (data->enabled == CMAMODE_DEFAULT ||
+		data->enabled == CMAMODE_POFF) {
+		dev_info(&data->client->dev, "%s:Accel was not enabled\n",
+			__func__);
+		return 1;
+	}
+
+	error = strict_strtoul(buf, 0, &interval);
+	if (error)
+		return error;
+
+	if (interval < 0)
+		return -EINVAL;
+
+	if (interval == 0) {
+		/* Set to the fastest speed */
+		i = (ARRAY_SIZE(cma3000_measure_interval) - 1);
+
+	} else if (interval > cma3000_measure_interval[0]) {
+		/* Set to the slowest speed */
+		i = 0;
+	} else {
+		for (i = 0; i < ARRAY_SIZE(cma3000_measure_interval); i++) {
+			if (cma3000_measure_interval[i] == interval)
+				break;
+
+			/* The array is from slowest to fastest */
+			if ((cma3000_measure_interval[i] < interval) &&
+			(cma3000_measure_interval[i + 1] > interval))
+				break;
+		}
+	}
+
+	data->req_rate = cma3000_measure_interval[i];
+
+	cma3000_set_mode(data, i + 1);
+
+	return 1;
+
+}
+
 static ssize_t cma3000_show_attr_grange(struct device *dev,
 				       struct device_attribute *attr,
 				       char *buf)
@@ -406,6 +467,9 @@ static DEVICE_ATTR(mode, S_IWUSR | S_IRUGO,
 static DEVICE_ATTR(enable, S_IWUSR | S_IRUGO,
 		cma3000_show_attr_enable, cma3000_store_attr_enable);
 
+static DEVICE_ATTR(delay, S_IWUSR | S_IRUGO,
+		cma3000_show_attr_delay, cma3000_store_attr_delay);
+
 static DEVICE_ATTR(grange, S_IWUSR | S_IRUGO,
 		cma3000_show_attr_grange, cma3000_store_attr_grange);
 
@@ -422,6 +486,7 @@ static DEVICE_ATTR(ffthr, S_IWUSR | S_IRUGO,
 static struct attribute *cma_attrs[] = {
 	&dev_attr_mode.attr,
 	&dev_attr_enable.attr,
+	&dev_attr_delay.attr,
 	&dev_attr_grange.attr,
 	&dev_attr_mdthr.attr,
 	&dev_attr_mdfftmr.attr,
