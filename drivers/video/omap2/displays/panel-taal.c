@@ -414,7 +414,7 @@ static int taal_set_addr_mode(enum omap_dsi_index ix,
 static int taal_set_update_window(enum omap_dsi_index ix,
 	u16 x, u16 y, u16 w, u16 h)
 {
-	int r;
+	int r = 0;
 	u16 x1 = x;
 	u16 x2 = x + w - 1;
 	u16 y1 = y;
