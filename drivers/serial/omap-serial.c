@@ -1058,9 +1058,18 @@ serial_omap_suspend(struct platform_device *pdev, pm_message_t state)
 static int serial_omap_resume(struct platform_device *dev)
 {
 	struct uart_omap_port *up = platform_get_drvdata(dev);
+	u32 reg = 0x48020004; /* Console: UART3: UART_IER */
 
-	if (omap_is_console_port(&up->port))
+	if (omap_is_console_port(&up->port)) {
 		wake_lock_timeout(&uart_lock, 5 * HZ);
+
+		/* HACK: REVISIT: Omap4: Console: Enable interrupts:
+		* Interrupts on omap4 UART3 are not getting enabled
+		* this portion of code will have to be remove later
+		*/
+		if (cpu_is_omap44xx() && !omap_readl(reg))
+			omap_writel(5, reg);
+	}
 
 #ifndef CONFIG_SUSPEND
 	if (up)
