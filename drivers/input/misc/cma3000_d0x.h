@@ -34,6 +34,7 @@ struct cma3000_accl_data {
 	/* mutex for sysfs operations */
 	struct mutex mutex;
 	int bit_to_mg;
+	int enabled;
 };
 
 int cma3000_set(struct cma3000_accl_data *, u8, u8, char *);

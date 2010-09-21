@@ -80,6 +80,41 @@ static int mode_to_mg[8][2] = {
 	{0, 0},
 };
 
+/* interval between samples for the different rates, in msecs */
+static const unsigned int cma3000_measure_interval[] = {
+	1000 / 40, 1000 / 10, 1000 / 400
+};
+
+static int cma3000_set_mode(struct cma3000_accl_data *data, int val)
+{
+	uint8_t ctrl;
+	int error = 0;
+
+	mutex_lock(&data->mutex);
+	val &= (CMA3000_MODEMASK >> 1);
+	ctrl = cma3000_read(data, CMA3000_CTRL, "ctrl");
+	if (ctrl < 0) {
+		error = ctrl;
+		goto err_op2_failed;
+	}
+
+	ctrl &= ~CMA3000_MODEMASK;
+	ctrl |= (val << 1);
+
+	error = cma3000_set(data, CMA3000_CTRL, ctrl, "ctrl");
+	if (error < 0)
+		goto err_op1_failed;
+
+	/* Settling time delay required after mode change */
+	msleep(CMA3000_SETDELAY);
+
+err_op1_failed:
+err_op2_failed:
+	mutex_unlock(&data->mutex);
+	return error;
+
+}
+
 static ssize_t cma3000_show_attr_mode(struct device *dev,
 				     struct device_attribute *attr,
 				     char *buf)
@@ -103,47 +138,57 @@ static ssize_t cma3000_store_attr_mode(struct device *dev,
 	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
 	unsigned long val;
 	int error;
-	uint8_t ctrl;
 
 	error = strict_strtoul(buf, 0, &val);
 	if (error)
-		goto err_op3_failed;
+		return error;
 
-	if (val < CMAMODE_DEFAULT || val > CMAMODE_POFF) {
-		error = -EINVAL;
-		goto err_op3_failed;
-	}
+	if (val < CMAMODE_DEFAULT || val > CMAMODE_POFF)
+		return -EINVAL;
 
-	mutex_lock(&data->mutex);
-	val &= (CMA3000_MODEMASK >> 1);
-	ctrl = cma3000_read(data, CMA3000_CTRL, "ctrl");
-	if (ctrl < 0) {
-		error = ctrl;
-		goto err_op2_failed;
-	}
+	return cma3000_set_mode(data, val);
 
-	ctrl &= ~CMA3000_MODEMASK;
-	ctrl |= (val << 1);
-	data->pdata.mode = val;
-	disable_irq(data->client->irq);
+}
 
-	error = cma3000_set(data, CMA3000_CTRL, ctrl, "ctrl");
-	if (error < 0)
-		goto err_op1_failed;
+static ssize_t cma3000_show_attr_enable(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	uint8_t mode;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
 
-	/* Settling time delay required after mode change */
-	msleep(CMA3000_SETDELAY);
+	mode = cma3000_read(data, CMA3000_CTRL, "ctrl");
+	if (mode < 0)
+		return mode;
 
-	enable_irq(data->client->irq);
-	mutex_unlock(&data->mutex);
-	return count;
+	return sprintf(buf, "%d\n", (mode & CMA3000_MODEMASK) >> 1);
+}
 
-err_op1_failed:
-	enable_irq(data->client->irq);
-err_op2_failed:
-	mutex_unlock(&data->mutex);
-err_op3_failed:
-	return error;
+static ssize_t cma3000_store_attr_enable(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
+	unsigned long val;
+	int error;
+
+	error = strict_strtoul(buf, 0, &val);
+	if (error)
+		return error;
+
+	if (val < CMAMODE_DEFAULT || val > CMAMODE_POFF)
+		return -EINVAL;
+
+	if (val == CMAMODE_DEFAULT || val == CMAMODE_POFF)
+		data->enabled = val;
+	else
+		data->enabled = data->pdata.mode;
+
+	cma3000_set_mode(data, data->enabled);
+
+	return 1;
 }
 
 static ssize_t cma3000_show_attr_grange(struct device *dev,
@@ -358,6 +403,9 @@ static ssize_t cma3000_store_attr_ffthr(struct device *dev,
 static DEVICE_ATTR(mode, S_IWUSR | S_IRUGO,
 		cma3000_show_attr_mode, cma3000_store_attr_mode);
 
+static DEVICE_ATTR(enable, S_IWUSR | S_IRUGO,
+		cma3000_show_attr_enable, cma3000_store_attr_enable);
+
 static DEVICE_ATTR(grange, S_IWUSR | S_IRUGO,
 		cma3000_show_attr_grange, cma3000_store_attr_grange);
 
@@ -373,6 +421,7 @@ static DEVICE_ATTR(ffthr, S_IWUSR | S_IRUGO,
 
 static struct attribute *cma_attrs[] = {
 	&dev_attr_mode.attr,
+	&dev_attr_enable.attr,
 	&dev_attr_grange.attr,
 	&dev_attr_mdthr.attr,
 	&dev_attr_mdfftmr.attr,
@@ -547,6 +596,7 @@ int cma3000_init(struct cma3000_accl_data *data)
 	fuzz_z = data->pdata.fuzz_z;
 	g_range = data->pdata.g_range;
 	irqflags = data->pdata.irqflags;
+	data->enabled = 0;
 
 	data->input_dev = input_allocate_device();
 	if (data->input_dev == NULL) {
@@ -602,6 +652,9 @@ int cma3000_init(struct cma3000_accl_data *data)
 			"failed to create sysfs entries\n");
 		goto err_op1_failed;
 	}
+
+	cma3000_set_mode(data, data->enabled);
+
 	return 0;
 
 err_op1_failed:
