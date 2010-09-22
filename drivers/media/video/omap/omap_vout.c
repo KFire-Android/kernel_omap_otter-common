@@ -3216,11 +3216,14 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 
 	for (i = 0; i < vid_dev->num_displays; i++) {
 		struct omap_dss_device *display = vid_dev->displays[i];
+		struct omap_dss_driver *dssdrv = display->driver;
 
-		if (display->driver->update)
-			display->driver->update(display, 0, 0,
-					display->panel.timings.x_res,
-					display->panel.timings.y_res);
+		if (dssdrv->get_update_mode &&
+			OMAP_DSS_UPDATE_MANUAL == dssdrv->get_update_mode(display))
+			if (display->driver->update)
+				display->driver->update(display, 0, 0,
+						display->panel.timings.x_res,
+						display->panel.timings.y_res);
 	}
 	return 0;
 
