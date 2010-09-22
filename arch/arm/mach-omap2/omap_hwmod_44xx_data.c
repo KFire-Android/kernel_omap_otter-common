@@ -2959,8 +2959,8 @@ static struct omap_hwmod_dma_info omap44xx_mcbsp1_sdma_reqs[] = {
 
 static struct omap_hwmod_addr_space omap44xx_mcbsp1_addrs[] = {
 	{
-		.pa_start	= 0x40122000,
-		.pa_end		= 0x401220ff,
+		.pa_start	= 0x49022000,
+		.pa_end		= 0x490220ff,
 		.flags		= ADDR_TYPE_RT
 	},
 };
@@ -3031,8 +3031,8 @@ static struct omap_hwmod_dma_info omap44xx_mcbsp2_sdma_reqs[] = {
 
 static struct omap_hwmod_addr_space omap44xx_mcbsp2_addrs[] = {
 	{
-		.pa_start	= 0x40124000,
-		.pa_end		= 0x401240ff,
+		.pa_start	= 0x49024000,
+		.pa_end		= 0x490240ff,
 		.flags		= ADDR_TYPE_RT
 	},
 };
@@ -3103,8 +3103,8 @@ static struct omap_hwmod_dma_info omap44xx_mcbsp3_sdma_reqs[] = {
 
 static struct omap_hwmod_addr_space omap44xx_mcbsp3_addrs[] = {
 	{
-		.pa_start	= 0x40126000,
-		.pa_end		= 0x401260ff,
+		.pa_start	= 0x49026000,
+		.pa_end		= 0x490260ff,
 		.flags		= ADDR_TYPE_RT
 	},
 };
