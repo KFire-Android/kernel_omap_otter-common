@@ -64,12 +64,6 @@ static struct platform_device wl127x_device = {
        .dev.platform_data = &gpios,
 };
 
-struct platform_device *st_get_plat_device(void)
-{
-    return &wl127x_device;
-}
-EXPORT_SYMBOL(st_get_plat_device);
-
 static struct gpio_led gpio_leds[] = {
 	{
 		.name			= "pandaboard::status1",
