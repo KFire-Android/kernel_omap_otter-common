@@ -201,6 +201,7 @@ enum omap_dss_display_state {
 	OMAP_DSS_DISPLAY_DISABLED = 0,
 	OMAP_DSS_DISPLAY_ACTIVE,
 	OMAP_DSS_DISPLAY_SUSPENDED,
+	OMAP_DSS_DISPLAY_TRANSITION,
 };
 
 /* XXX perhaps this should be removed */
