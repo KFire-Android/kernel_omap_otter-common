@@ -26,6 +26,7 @@
 #include <linux/input/sfh7741.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
+#include <linux/leds-omap4430sdp-display.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/twl6040-vib.h>
@@ -60,6 +61,13 @@
 
 #define OMAP4_CMA3000ACCL_GPIO		186
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
+
+#define LED_SEC_DISP_GPIO 27
+#define DSI2_GPIO_59	59
+
+#define LED_PWM2ON		0x03
+#define LED_PWM2OFF		0x04
+#define LED_TOGGLE3		0x92
 
 static void omap_prox_activate(int state);
 static int omap_prox_read(void);
@@ -360,9 +368,9 @@ static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
 
 int dsi_set_backlight(struct omap_dss_device *dssdev, int level)
 {
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, 0x03);
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, 0x04);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, 0x92);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
 	if (dssdev->channel == OMAP_DSS_CHANNEL_LCD) {
 		mdelay(120);
 		gpio_set_value(27, 0);
@@ -377,6 +385,62 @@ int dsi_set_backlight(struct omap_dss_device *dssdev, int level)
 
 	return 0;
 }
+
+static void sdp4430_set_primary_brightness(u8 brightness)
+{
+	if (brightness > 1) {
+		if (brightness == 255)
+			brightness = 0x7f;
+		else
+			brightness = (~(brightness/2)) & 0x7f;
+
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
+		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
+	} else if (brightness <= 1) {
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
+	}
+}
+
+static void sdp4430_set_secondary_brightness(u8 brightness)
+{
+	if (brightness > 0)
+		brightness = 1;
+
+	gpio_set_value(LED_SEC_DISP_GPIO, brightness);
+}
+
+static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
+	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
+	.primary_display_set = sdp4430_set_primary_brightness,
+	.secondary_display_set = sdp4430_set_secondary_brightness,
+};
+
+static void __init omap_disp_led_init(void)
+{
+	/* Seconday backlight control */
+	gpio_request(DSI2_GPIO_59, "dsi2_bl_gpio");
+	gpio_direction_output(DSI2_GPIO_59, 0);
+
+	if (sdp4430_disp_led_data.flags & LEDS_CTRL_AS_ONE_DISPLAY) {
+		pr_info("%s: Configuring as one display LED\n", __func__);
+		gpio_set_value(DSI2_GPIO_59, 1);
+	}
+
+	gpio_request(LED_SEC_DISP_GPIO, "dsi1_bl_gpio");
+	gpio_direction_output(LED_SEC_DISP_GPIO, 1);
+	mdelay(120);
+	gpio_set_value(LED_SEC_DISP_GPIO, 0);
+
+}
+
+static struct platform_device sdp4430_disp_led = {
+	.name	=	"display_led",
+	.id	=	-1,
+	.dev	= {
+		.platform_data = &sdp4430_disp_led_data,
+	},
+};
 
 static struct nokia_dsi_panel_data dsi_panel = {
 		.name	= "taal",
@@ -557,6 +621,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 	&wl128x_device,
 	&sdp4430_hdmi_audio_device,
 	&sdp4430_vib,
+	&sdp4430_disp_led,
 };
 
 static void __init omap_4430sdp_init_irq(void)
@@ -1075,14 +1140,9 @@ static void __init omap4_display_init(void)
 	/* Panel Taal reset and backlight GPIO init */
 	gpio_request(dsi_panel.reset_gpio, "dsi1_en_gpio");
 	gpio_direction_output(dsi_panel.reset_gpio, 0);
-	gpio_request(27, "dsi1_bl_gpio");
-	gpio_direction_output(27, 1);
 
         gpio_request(dsi2_panel.reset_gpio, "dsi2_en_gpio");
         gpio_direction_output(dsi2_panel.reset_gpio, 0);
-        gpio_request(59, "dsi2_bl_gpio");
-        gpio_direction_output(59, 1);
-
 }
 
 static void __init omap_4430sdp_init(void)
@@ -1091,6 +1151,7 @@ static void __init omap_4430sdp_init(void)
 
 	omap4_i2c_init();
 	omap4_display_init();
+	omap_disp_led_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	omap_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
