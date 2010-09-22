@@ -6034,8 +6034,8 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_timer2_hwmod,
 	&omap44xx_timer3_hwmod,
 	&omap44xx_timer4_hwmod,
-#if 0
 	&omap44xx_timer5_hwmod,
+#if 0
 	&omap44xx_timer6_hwmod,
 	&omap44xx_timer7_hwmod,
 	&omap44xx_timer8_hwmod,
