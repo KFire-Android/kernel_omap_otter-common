@@ -517,6 +517,7 @@ struct omap_mcbsp_platform_data {
 	unsigned long phys_base_st;
 	u16 buffer_size;
 	int dma_op_mode;
+	struct clk *fclk;
 	struct omap_hwmod **oh;
 };
 
@@ -539,6 +540,7 @@ struct omap_mcbsp {
 	omap_mcbsp_word_length rx_word_length;
 	omap_mcbsp_word_length tx_word_length;
 
+	struct clk *fclk;
 	omap_mcbsp_io_type_t io_type; /* IRQ or poll */
 	/* IRQ based TX/RX */
 	int rx_irq;
