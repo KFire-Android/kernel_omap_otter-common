@@ -44,3 +44,4 @@ obj-$(CONFIG_INPUT_SFH7741)		+= sfh7741.o
 obj-$(CONFIG_INPUT_CMA3000_I2C)		+= cma3000_d0x.o cma3000_d0x_i2c.o
 obj-$(CONFIG_INPUT_BH1780)		+= bh1780gli.o
 obj-$(CONFIG_INPUT_HMC5843)		+= hmc5843.o
+obj-$(CONFIG_INPUT_BMP085)		+= bmp085.o

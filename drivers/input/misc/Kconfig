@@ -447,4 +447,10 @@ config INPUT_HMC5843
 	  Say Y here to add support for the Honeywell HMC 5843 3-Axis
 	  Magnetometer (digital compass).
 
+config INPUT_BMP085
+	bool "BMP085 digital pressure sensor"
+	depends on I2C && SYSFS
+	help
+	  If you say yes here you get support for the Bosch Sensortec
+	  BMP086 digital pressure sensor
 endif
