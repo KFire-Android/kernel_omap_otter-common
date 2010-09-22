@@ -777,13 +777,13 @@ void omap2_mcbsp_set_srg_cfg_param(unsigned int id, int interface_mode,
 {
 	struct omap_mcbsp *mcbsp = mcbsp_ptr[id];
 	void __iomem *io_base;
-/*	u32 clk_rate, clkgdv;*/
+	u32 clk_rate, clkgdv;
 	io_base = mcbsp->io_base;
 
 	mcbsp->interface_mode = interface_mode;
 	mcbsp_cfg->srgr1 = FWID(param->pulse_width);
 
-/*	if (interface_mode == OMAP_MCBSP_MASTER) {
+	if (interface_mode == OMAP_MCBSP_MASTER) {
 		clk_rate = clk_get_rate(mcbsp->fclk);
 		clkgdv = clk_rate / (param->sample_rate *
 				(param->bits_per_sample - 1));
@@ -791,7 +791,7 @@ void omap2_mcbsp_set_srg_cfg_param(unsigned int id, int interface_mode,
 			clkgdv = 0xFF;
 		mcbsp_cfg->srgr1 = mcbsp_cfg->srgr1 | CLKGDV(clkgdv);
 	}
- */
+
 	if (param->dlb)
 		mcbsp_cfg->spcr1 = mcbsp_cfg->spcr1 & ~(ALB);
 
@@ -912,6 +912,7 @@ static int omap_init_mcbsp(struct omap_hwmod *oh, void *user)
 		return -ENOMEM;
 	}
 	pdata->ops = &omap2_mcbsp_ops;
+	pdata->fclk = omap_hwmod_get_clk(oh);
 
 	if (cpu_is_omap34xx()) {
 		pdata->dma_op_mode = MCBSP_DMA_MODE_ELEMENT;
