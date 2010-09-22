@@ -176,12 +176,12 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		OMAP4430_CM2_CKGEN_MOD,	OMAP4_CM_DIV_M3_DPLL_PER_OFFSET);
 
 	if (core_next_state < PWRDM_POWER_ON) {
-		omap_dss_resume_idle();
 		omap2_gpio_resume_after_idle(0);
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);
 		omap_uart_resume_idle(2);
 		omap_uart_resume_idle(3);
+		omap_dss_resume_idle();
 	}
 
 	return;
