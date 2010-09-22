@@ -33,8 +33,12 @@
 #define RPROC_IOCSTART		_IO(RPROC_IOC_MAGIC, 1)
 #define RPROC_IOCSTOP		_IO(RPROC_IOC_MAGIC, 2)
 #define RPROC_IOCGETSTATE	_IOR(RPROC_IOC_MAGIC, 3, int)
+#define RPROC_IOCREGEVENT	_IOR(RPROC_IOC_MAGIC, 4, \
+					struct omap_rproc_reg_event_args)
+#define RPROC_IOCUNREGEVENT	_IOR(RPROC_IOC_MAGIC, 5, \
+					struct omap_rproc_reg_event_args)
 
-#define RPROC_IOC_MAXNR		(3)
+#define RPROC_IOC_MAXNR		(5)
 
 #ifdef CONFIG_ARCH_OMAP4
 #define NR_RPROC_OMAP4_DEVICES 3
@@ -71,6 +75,12 @@ enum {
 	OMAP_RPROC_HIBERNATING,
 };
 
+enum {
+	PROC_ERROR = 1,
+	PROC_STOP,
+	PROC_START,
+};
+
 struct omap_rproc_platform_data {
 	struct omap_rproc_ops *ops;
 	char *name;
@@ -89,10 +99,25 @@ struct omap_rproc {
 	struct mutex lock;
 	int timer_id;
 	struct omap_dm_timer *dmtimer;
+	struct list_head event_list;
+	spinlock_t event_lock;
+};
+
+struct omap_rproc_ntfy {
+	struct list_head list;
+	int fd;
+	struct eventfd_ctx *evt_ctx;
+	u32 event;
 };
 
 struct omap_rproc_start_args {
 	u32 start_addr;
+};
+
+struct omap_rproc_reg_event_args {
+	u16 pro_id;
+	int fd;
+	u32 event;
 };
 
 extern int rproc_start(struct omap_rproc *rproc, const void __user *arg);
