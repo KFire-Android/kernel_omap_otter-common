@@ -517,6 +517,8 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 	dev_dbg(dai->dev, "%s: frontend %s %d\n", __func__,
 			rtd->dai_link->name, dai->id);
 
+	mutex_lock(&fe_mutex);
+
 	/* only startup backends that are either sinks or sources to this frontend DAI */
 	for (i = 0; i < rtd->num_be; i++) {
 		struct snd_pcm_substream *be_substream =
@@ -547,6 +549,7 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 
 	dev_dbg(dai->dev,"%s: frontend finished %s %d\n", __func__,
 			rtd->dai_link->name, dai->id);
+	mutex_unlock(&fe_mutex);
 	return 0;
 
 unwind:
@@ -570,6 +573,7 @@ unwind:
 		be_dec_active(rtd->be_rtd[i], substream->stream);
 	}
 
+	mutex_unlock(&fe_mutex);
 	return ret;
 }
 
@@ -581,6 +585,8 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 
 	dev_dbg(dai->dev,"%s: frontend %s \n", __func__, rtd->dai_link->name);
 	/* only shutdown backends that are either sinks or sources to this frontend DAI */
+
+	mutex_lock(&fe_mutex);
 
 	for (i = 0; i < rtd->num_be; i++) {
 		struct snd_pcm_substream *be_substream =
@@ -606,6 +612,7 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 
 	abe_be_dapm(rtd, dai->id, substream->stream, SND_SOC_DAPM_STREAM_STOP);
 	dev_dbg(dai->dev,"%s: frontend %s completed !\n", __func__, rtd->dai_link->name);
+	mutex_unlock(&fe_mutex);
 }
 
 static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
@@ -616,6 +623,8 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	int i, ret;
 
 	dev_dbg(dai->dev,"%s: frontend %s \n", __func__, rtd->dai_link->name);
+
+	mutex_lock(&fe_mutex);
 
 	// TODO: generate our own hw params for backend DAI
 	/* only hw_params backends that are either sinks or
@@ -633,7 +642,7 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 					params);
 			if (ret < 0) {
 				dev_err(&rtd->dev, "%s: be hw_params failed %d\n", __func__, ret);
-				return ret;
+				goto out;
 			}
 		}
 	}
@@ -643,6 +652,8 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	if (ret < 0)
 		dev_err(dai->dev,"%s: frontend hw_params failed\n", __func__);
 
+out:
+	mutex_unlock(&fe_mutex);
 	return ret;
 }
 
@@ -681,6 +692,8 @@ static int omap_abe_dai_prepare(struct snd_pcm_substream *substream,
 	/* only prepare backends that are either sinks or sources to
 	 * this frontend DAI */
 
+	mutex_lock(&fe_mutex);
+
 	for (i = 0; i < rtd->num_be; i++) {
 		struct snd_pcm_substream *be_substream =
 			rtd->be_rtd[i]->pcm->streams[substream->stream].substream;
@@ -700,6 +713,7 @@ static int omap_abe_dai_prepare(struct snd_pcm_substream *substream,
 
 	abe_be_dapm(rtd, dai->id, substream->stream, SND_SOC_DAPM_STREAM_START);
 
+	mutex_unlock(&fe_mutex);
 	return ret;
 }
 
@@ -714,6 +728,8 @@ static int omap_abe_dai_hw_free(struct snd_pcm_substream *substream,
 
 	/* wait on trigger completing */
 	wait_for_completion_timeout(&fe->trigger_done, msecs_to_jiffies(500));
+
+	mutex_lock(&fe_mutex);
 
 	/* call hw_free on the frontend */
 	ret = abe_fe_hw_free(substream, dai);
@@ -733,6 +749,7 @@ static int omap_abe_dai_hw_free(struct snd_pcm_substream *substream,
 			snd_soc_pcm_hw_free(rtd->be_rtd[i]->pcm->streams[substream->stream].substream);
 	}
 
+	mutex_unlock(&fe_mutex);
 	return ret;
 }
 
