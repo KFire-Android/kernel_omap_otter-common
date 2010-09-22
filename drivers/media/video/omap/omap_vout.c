@@ -305,7 +305,7 @@ int omap_vout_try_format(struct v4l2_pix_format *pix)
 	case V4L2_PIX_FMT_UYVY:
 	default:
 		pix->colorspace = V4L2_COLORSPACE_JPEG;
-		bpp = YUYV_BPP;
+		bpp = 4;
 		break;
 	case V4L2_PIX_FMT_RGB565:
 	case V4L2_PIX_FMT_RGB565X:
@@ -552,6 +552,7 @@ static int omap_vout_tiler_buffer_setup(struct omap_vout_device *vout,
 {
 	int i, aligned = 1;
 	enum tiler_fmt fmt;
+	int width;
 
 	/* normalize buffers to allocate so we stay within bounds */
 	int start = (startindex < 0) ? 0 : startindex;
@@ -578,8 +579,13 @@ static int omap_vout_tiler_buffer_setup(struct omap_vout_device *vout,
 			bpp == 4 ? TILFMT_32BIT : TILFMT_INVALID);
 		if (fmt == TILFMT_INVALID)
 			return -ENOMEM;
+		if ((OMAP_DSS_COLOR_YUV2 == video_mode_to_dss_mode(pix))
+			|| (OMAP_DSS_COLOR_UYVY == video_mode_to_dss_mode(pix)))
+			width = pix->width >> 1;
+		else
+			width = pix->width;
 
-		tiler_alloc_packed(&n_alloc, fmt, pix->width,
+		tiler_alloc_packed(&n_alloc, fmt, width,
 			pix->height,
 			(void **) vout->buf_phy_addr + start,
 			(void **) vout->buf_phy_addr_alloced + start,
