@@ -1054,7 +1054,7 @@ void pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm)
 		break;
 	}
 
-	if (pwrdm->state != new_state) {
+	if (pwrdm_read_pwrst(pwrdm) != new_state) {
 		if (cpu_is_omap44xx())
 			omap4_set_pwrdm_state(pwrdm, new_state);
 		else if (cpu_is_omap34xx())
@@ -1062,7 +1062,7 @@ void pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm)
 	}
 
 	pr_debug("OMAP PM: %s pwrst: curr= %d, prev= %d next= %d "
-			"wkuplat_min= %lu, state= %d\n", pwrdm->name,
+			"wkuplat_min= %lu, set_state= %d\n", pwrdm->name,
 		pwrdm_read_pwrst(pwrdm), pwrdm_read_prev_pwrst(pwrdm),
 		pwrdm_read_next_pwrst(pwrdm), min_latency, new_state);
 }
