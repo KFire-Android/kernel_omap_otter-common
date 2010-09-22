@@ -217,6 +217,6 @@ int pwrdm_wakeuplat_set_constraint(struct powerdomain *pwrdm,
 				   struct device *dev, unsigned long t);
 int pwrdm_wakeuplat_release_constraint(struct powerdomain *pwrdm,
 				       struct device *dev);
-int pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm);
+void pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm);
 
 #endif
