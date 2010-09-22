@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/i2c/twl.h>
 #include <linux/switch.h>
+#include <linux/mfd/twl6040-codec.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>

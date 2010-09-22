@@ -26,7 +26,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/twl6040-vib.h>
-#include "../../sound/soc/codecs/twl6040.h"
+#include <linux/mfd/twl6040-codec.h>
 #include "../staging/android/timed_output.h"
 
 struct vib_data {
