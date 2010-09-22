@@ -439,4 +439,12 @@ config INPUT_CMA3000_I2C
 	  Say Y here if you want to use VTI CMA3000 Accelerometer
 	  through I2C interface.
 
+config INPUT_HMC5843
+	bool "Honeywell HMC5843 3-Axis Magnetometer"
+	depends on I2C && SYSFS
+	select INPUT_POLLDEV
+	help
+	  Say Y here to add support for the Honeywell HMC 5843 3-Axis
+	  Magnetometer (digital compass).
+
 endif
