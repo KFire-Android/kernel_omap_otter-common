@@ -82,7 +82,7 @@ static int mode_to_mg[8][2] = {
 
 /* interval between samples for the different rates, in msecs */
 static const unsigned int cma3000_measure_interval[] = {
-	1000 / 40, 1000 / 10, 1000 / 400
+	0, 1000 / 10, 1000 / 400, 1000 / 40,
 };
 
 static int cma3000_set_mode(struct cma3000_accl_data *data, int val)
@@ -227,26 +227,18 @@ static ssize_t cma3000_store_attr_delay(struct device *dev,
 
 	if (interval == 0) {
 		/* Set to the fastest speed */
-		i = (ARRAY_SIZE(cma3000_measure_interval) - 1);
-
-	} else if (interval > cma3000_measure_interval[0]) {
-		/* Set to the slowest speed */
-		i = 0;
+		i = CMAMODE_MEAS400;
 	} else {
-		for (i = 0; i < ARRAY_SIZE(cma3000_measure_interval); i++) {
-			if (cma3000_measure_interval[i] == interval)
-				break;
-
-			/* The array is from slowest to fastest */
-			if ((cma3000_measure_interval[i] < interval) &&
-			(cma3000_measure_interval[i + 1] > interval))
-				break;
-		}
+		if (interval < cma3000_measure_interval[CMAMODE_MEAS100])
+			i = CMAMODE_MEAS400;
+		else if (interval < cma3000_measure_interval[CMAMODE_MEAS40])
+			i = CMAMODE_MEAS100;
+		else
+			i = CMAMODE_MEAS40;
 	}
 
 	data->req_rate = cma3000_measure_interval[i];
-
-	cma3000_set_mode(data, i + 1);
+	cma3000_set_mode(data, i);
 
 	return 1;
 
