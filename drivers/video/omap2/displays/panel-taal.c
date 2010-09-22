@@ -1091,8 +1091,11 @@ static void taal_disable(struct omap_dss_device *dssdev)
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return -EINVAL;
 
-	if (td->force_update)
+	if (td->force_update) {
+		dsi_bus_lock(ix);
 		_taal_enable_te(dssdev, 0);
+		dsi_bus_unlock(ix);
+	}
 
 	mutex_lock(&td->lock);
 
@@ -1128,7 +1131,9 @@ static int taal_suspend(struct omap_dss_device *dssdev)
 		goto err;
 	}
 	if (td->force_update) {
+		dsi_bus_lock(ix);
 		_taal_enable_te(dssdev, 0);
+		dsi_bus_unlock(ix);
 		destroy_workqueue(td->te_wq);
 	}
 
