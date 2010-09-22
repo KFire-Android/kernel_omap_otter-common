@@ -29,6 +29,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/i2c/twl.h>
+#include <linux/mfd/twl6040-codec.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
