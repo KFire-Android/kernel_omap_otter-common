@@ -1805,7 +1805,7 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 		freq = opp_get_freq(opp);
 
 		if (freq == opp_get_rate(vdd->dev_list[i])) {
-			dev_info(vdd->dev_list[i], "%s: Already at the"
+			dev_dbg(vdd->dev_list[i], "%s: Already at the"
 				"requested rate %ld\n", __func__, freq);
 			continue;
 		}
