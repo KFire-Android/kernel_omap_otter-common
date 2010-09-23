@@ -328,20 +328,12 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 			goto remove;
 	}
 
-#ifdef CONFIG_MMC_EMBEDDED_SDIO
-	if (host->embedded_sdio_data.cccr)
-		memcpy(&card->cccr, host->embedded_sdio_data.cccr, sizeof(struct sdio_cccr));
-	else {
-#endif
 		/*
 		 * Read the common registers.
 		 */
 		err = sdio_read_cccr(card);
 		if (err)
 			goto remove;
-#ifdef CONFIG_MMC_EMBEDDED_SDIO
-	}
-#endif
 
 #ifdef CONFIG_TIWLAN_SDIO
 	if (host->embedded_sdio_data.cis)
@@ -597,11 +589,6 @@ int mmc_attach_sdio(struct mmc_host *host, u32 ocr)
 	 */
 	funcs = (ocr & 0x70000000) >> 28;
 	card->sdio_funcs = 0;
-
-#ifdef CONFIG_MMC_EMBEDDED_SDIO
-	if (host->embedded_sdio_data.funcs)
-		card->sdio_funcs = funcs = host->embedded_sdio_data.num_funcs;
-#endif
 
 	/*
 	 * If needed, disconnect card detection pull-up resistor.
