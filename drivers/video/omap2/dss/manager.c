@@ -857,24 +857,23 @@ static int configure_overlay(enum omap_plane plane)
 				w -= 1;
 		}
 	}
+	if (cpu_is_omap44xx()){
+		if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
+			u16 height, pic_height;
+			s32 row_inc;
+			if (c->ilace == IBUF_PDEV) {
+				height = h/2;
+				pic_height = c->pic_height/2;
 
-#ifdef CONFIG_ARCH_OMAP4
-	if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
-		u16 height, pic_height;
-		s32 row_inc;
-		if (c->ilace == IBUF_PDEV) {
-			height = h/2;
-			pic_height = c->pic_height/2;
+				calc_tiler_row_rotation(c->rotation,
+				w, height, c->color_mode, &row_inc,
+				&c->ibufpdev_offset, c->ilace, c->pic_width,
+				pic_height);
 
-			calc_tiler_row_rotation(c->rotation,
-			w, height, c->color_mode, &row_inc,
-			&c->ibufpdev_offset, c->ilace, c->pic_width,
-			pic_height);
-
-			c->ibufpdev_flag = 0;
+				c->ibufpdev_flag = 0;
+			}
 		}
 	}
-#endif
 	r = dispc_setup_plane(plane,
 			paddr,
 			c->screen_width,
