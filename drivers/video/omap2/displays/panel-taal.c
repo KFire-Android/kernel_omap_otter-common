@@ -415,11 +415,12 @@ static int taal_set_update_window(enum omap_dsi_index ix,
 	u16 x, u16 y, u16 w, u16 h)
 {
 	int r = 0;
+#if 0
 	u16 x1 = x;
 	u16 x2 = x + w - 1;
 	u16 y1 = y;
 	u16 y2 = y + h - 1;
-#if 0
+
 	u8 buf[5];
 	buf[0] = DCS_COLUMN_ADDR;
 	buf[1] = (x1 >> 8) & 0xff;
@@ -1089,7 +1090,7 @@ static void taal_disable(struct omap_dss_device *dssdev)
 	dev_dbg(&dssdev->dev, "disable\n");
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
-		return -EINVAL;
+		return ;
 
 	if (td->force_update) {
 		dsi_bus_lock(ix);

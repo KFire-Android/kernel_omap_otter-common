@@ -358,7 +358,8 @@ EXPORT_SYMBOL(omap_dss_resume_idle);
 
 static void dss_clk_disable_no_ctx(enum dss_clock clks)
 {
-	unsigned num_clks = count_clk_bits(clks);
+	unsigned num_clks;
+	num_clks = count_clk_bits(clks);
 
 	if (cpu_is_omap44xx())
 		return;
@@ -707,8 +708,8 @@ err_rfbi:
 err_dss:
 	dss_clk_disable_all_no_ctx();
 	dss_put_clocks();
-#endif
 err_clocks:
+#endif
 	return r;
 }
 
