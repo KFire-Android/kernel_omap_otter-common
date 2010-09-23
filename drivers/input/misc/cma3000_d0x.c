@@ -146,7 +146,9 @@ static ssize_t cma3000_store_attr_mode(struct device *dev,
 	if (val < CMAMODE_DEFAULT || val > CMAMODE_POFF)
 		return -EINVAL;
 
-	return cma3000_set_mode(data, val);
+	cma3000_set_mode(data, val);
+
+	return count;
 
 }
 
@@ -188,7 +190,7 @@ static ssize_t cma3000_store_attr_enable(struct device *dev,
 
 	cma3000_set_mode(data, data->enabled);
 
-	return 1;
+	return count;
 }
 
 static ssize_t cma3000_show_attr_delay(struct device *dev,
