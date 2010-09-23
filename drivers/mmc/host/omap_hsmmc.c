@@ -1005,17 +1005,17 @@ static inline void omap_hsmmc_reset_controller_fsm(struct omap_hsmmc_host *host,
 	OMAP_HSMMC_WRITE(host, SYSCTL,
 			 OMAP_HSMMC_READ(host, SYSCTL) | bit);
 
+	/* OMAP4 ES2 and greater has an updated reset logic.
+	 * Monitor a 0->1 transition first */
+	if (mmc_slot(host).features & HSMMC_HAS_UPDATED_RESET) {
+		while ((!(OMAP_HSMMC_READ(host, SYSCTL) & bit))
+						&& (i++ < limit))
+			cpu_relax();
+	}
+	i = 0;
 	while ((OMAP_HSMMC_READ(host, SYSCTL) & bit) &&
 		(i++ < limit))
 		cpu_relax();
-
-	/*
-	 * On OMAP4 ES2 the SRC is zero in the first loop itself strangely
-	 * vs on ES1 it takes some time.
-	 * Could be a an issue on ES2 to indicate reset complete even before
-	 * it is complete.
-	 */
-	udelay(500);
 
 	if (OMAP_HSMMC_READ(host, SYSCTL) & bit)
 		dev_err(mmc_dev(host->mmc),
