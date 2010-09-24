@@ -264,7 +264,7 @@ static ssize_t hdmi_edid_store(struct device *dev,
 
 static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
 
-static struct device_attribute *hdmi_sysfs_attrs[] = {
+static struct attribute *hdmi_sysfs_attrs[] = {
 	NULL
 };
 
