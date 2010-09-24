@@ -521,6 +521,10 @@ static int dss_mgr_wait_for_vsync(struct omap_overlay_manager *mgr)
 	unsigned long timeout = msecs_to_jiffies(500);
 	u32 irq = 0;
 
+	/* If display is not active simply return */
+	if (mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE)
+		return 0;
+
 	if (mgr->device->type == OMAP_DISPLAY_TYPE_VENC)
 		irq = DISPC_IRQ_EVSYNC_ODD;
 	else if (mgr->device->type == OMAP_DISPLAY_TYPE_HDMI)
