@@ -1680,7 +1680,8 @@ static int fm_download_firmware(struct fmdrv_ops *fmdev,
 
 	ret = request_firmware(&fw_entry, firmware_name,
 				&fmdev->radio_dev->dev);
-	if (ret < 0) {
+	if ((ret < 0) || (fw_entry == NULL) || (fw_entry->data == NULL) ||
+			(fw_entry->size == 0)) {
 		pr_err("(fmdrv): Unable to read firmware(%s) content\n",
 			   firmware_name);
 		goto exit;
@@ -1696,7 +1697,7 @@ static int fm_download_firmware(struct fmdrv_ops *fmdev,
 		pr_err("(fmdrv): %s not a legal TI firmware file",
 			firmware_name);
 		ret = -EINVAL;
-		goto rel_fw;
+		goto exit;
 	}
 	pr_info("(fmdrv): Firmware(%s) magic number : 0x%x", firmware_name,
 		   fw_header->magic);
@@ -1714,7 +1715,7 @@ static int fm_download_firmware(struct fmdrv_ops *fmdev,
 				action->size, &fmdev->maintask_completion,
 				NULL, NULL);
 			if (ret < 0)
-				goto rel_fw;
+				goto exit;
 
 			cmd_cnt++;
 			break;
@@ -1729,10 +1730,9 @@ static int fm_download_firmware(struct fmdrv_ops *fmdev,
 		fw_len -= (sizeof(struct bts_action) + (action->size));
 	}
 	pr_info("(fmdrv): Firmare commands(%d) loaded to the chip", cmd_cnt);
-rel_fw:
+exit:
 	release_firmware(fw_entry);
 	clear_bit(FM_FIRMWARE_DW_INPROGRESS, &fmdev->flag);
-exit:
 	return ret;
 }
 

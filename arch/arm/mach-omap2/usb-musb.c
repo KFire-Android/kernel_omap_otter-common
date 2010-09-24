@@ -381,7 +381,8 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 			put_device(dev);
 		}
 		/*Suspend the phy*/
-		omap_writel(0x1, 0x4A002300);
+		if (cpu_is_omap44xx())
+			omap_writel(0x1, 0x4A002300);
 
 		usb_gadget_init();
 	}
@@ -402,72 +403,81 @@ void musb_context_save_restore(enum musb_state state)
 		struct musb_hdrc_platform_data *pdata = dev->platform_data;
 		const struct dev_pm_ops *pm = drv->pm;
 
-		switch (state) {
-		case save_context:
-			/*Save the context, set the sysconfig setting to
-			 * force standby force idle during idle and disable
-			 * the clock.
-			 */
-			oh->flags |= HWMOD_SWSUP_SIDLE
-					| HWMOD_SWSUP_MSTANDBY;
-			pm->suspend(dev);
-			pdata->device_idle(pdev);
-			break;
+		if (plat->is_usb_active)
+			if (!pdata->is_usb_active(dev)) {
 
-		case disable_clk:
+				switch (state) {
+				case save_context:
+				/*Save the context, set the sysconfig setting
+				 *  to force standby force idle during idle and
+				 *  disable the clock.
+				 */
+				oh->flags |= HWMOD_SWSUP_SIDLE
+						| HWMOD_SWSUP_MSTANDBY;
+				pm->suspend(dev);
+				pdata->device_idle(pdev);
+				break;
 
-			/* set the sysconfig setting to force standby,
-			 * force idle during idle and disable
-			 * the clock.
-			 */
-			oh->flags |= HWMOD_SWSUP_SIDLE
-					| HWMOD_SWSUP_MSTANDBY;
-			pdata->device_idle(pdev);
-			/* Disable the phy clock*/
-			omap_writel(0x0, 0x4A0093E0);
+				case disable_clk:
 
-			/* FIXME This is not required once the phoenix
-			 *framework is in place. We can powerup the PHY
-			 *once the cable connected.
-			 */
-			if (bdata->mode == MUSB_HOST)
-				/*powerdown  the phy in case of host mode*/
-				omap_writel(0x1, 0x4A002300);
-			break;
+				/* set the sysconfig setting to force standby,
+				 * force idle during idle and disable
+				 * the clock.
+				 */
+				oh->flags |= HWMOD_SWSUP_SIDLE
+						| HWMOD_SWSUP_MSTANDBY;
+				pdata->device_idle(pdev);
+				if (cpu_is_omap44xx()) {
+					/* Disable the phy clock*/
+					omap_writel(0x0, 0x4A0093E0);
 
-		case restore_context:
-			/* Enable the clock, set the sysconfig setting back
-			 * to smart idle and smart stndby after wakeup.
-			 *restore the context.
-			 */
-			oh->flags &= ~(HWMOD_SWSUP_SIDLE
-					| HWMOD_SWSUP_MSTANDBY);
-			pdata->device_enable(pdev);
-			pm->resume_noirq(dev);
-			break;
+				/* FIXME This is not required once the phoenix
+				 *framework is in place. We can powerup the PHY
+				 *once the cable connected.
+				 */
+					if (bdata->mode == MUSB_HOST)
+						/*powerdown  the phy */
+						omap_writel(0x1, 0x4A002300);
+				}
+				break;
 
-		case enable_clk:
-			/* FIXME This is not required once the phoenix
-			 *framework is in place. We can powerup the PHY
-			 *once the cable connected.
-			 */
-			if (bdata->mode == MUSB_HOST)
-				/*powerup  the phy in case of host mode*/
-				omap_writel(0, 0x4A002300);
-			/* enable the phy clock*/
-			omap_writel(0x101, 0x4A0093E0);
+				case restore_context:
+				/* Enable the clock, set the sysconfig setting
+				 * back to smart idle and smart stndby
+				 * after wakeup, restore the context.
+				 */
+				oh->flags &= ~(HWMOD_SWSUP_SIDLE
+						| HWMOD_SWSUP_MSTANDBY);
+				pdata->device_enable(pdev);
+				pm->resume_noirq(dev);
+				break;
 
-			/* set the sysconfig setting back to smart idle and
-			 * smart stndby after wakeup and enable the clock
-			 */
-			oh->flags &= ~(HWMOD_SWSUP_SIDLE
-					| HWMOD_SWSUP_MSTANDBY);
-			pdata->device_enable(pdev);
-			break;
+				case enable_clk:
+				/* FIXME This is not required once the phoenix
+				 *framework is in place. We can powerup the PHY
+				 *once the cable connected.
+				 */
+				if (cpu_is_omap44xx()) {
+					if (bdata->mode == MUSB_HOST)
+						/*powerup  the phy */
+						omap_writel(0, 0x4A002300);
+					/* enable the phy clock*/
+					omap_writel(0x101, 0x4A0093E0);
+				}
 
-		default:
-			break;
-		}
+				/* set the sysconfig setting back to smart idle
+				 * and smart stndby after wakeup and enable
+				 * the clock.
+				 */
+				oh->flags &= ~(HWMOD_SWSUP_SIDLE
+						| HWMOD_SWSUP_MSTANDBY);
+				pdata->device_enable(pdev);
+				break;
+
+				default:
+					break;
+				}
+			}
 #endif
 
 	}

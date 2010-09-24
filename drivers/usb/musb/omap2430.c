@@ -188,6 +188,19 @@ int musb_platform_set_mode(struct musb *musb, u8 musb_mode)
 	return 0;
 }
 
+int is_musb_active(struct device *dev)
+{
+	struct musb *musb;
+
+#ifdef CONFIG_USB_MUSB_HDRC_HCD
+	/* usbcore insists dev->driver_data is a "struct hcd *" */
+	musb = hcd_to_musb(dev_get_drvdata(dev));
+#else
+	musb = dev_get_drvdata(dev);
+#endif
+	return musb->is_active;
+}
+
 int __init musb_platform_init(struct musb *musb)
 {
 	u32 l;
@@ -205,10 +218,12 @@ int __init musb_platform_init(struct musb *musb)
 		return -ENODEV;
 	}
 
-	/* disable the optional 60M clock if enabled by romcode*/
-	l = omap_readl(0x4A009360);
-	l &= ~0x00000100;
-	omap_writel(l, 0x4A009360);
+	if (cpu_is_omap44xx()) {
+		/* disable the optional 60M clock if enabled by romcode*/
+		l = omap_readl(0x4A009360);
+		l &= ~0x00000100;
+		omap_writel(l, 0x4A009360);
+	}
 
 	/* Fixme this can be enabled when load the gadget driver also*/
 	musb_platform_resume(musb);
@@ -218,7 +233,8 @@ int __init musb_platform_init(struct musb *musb)
 	* loaded.
 	*/
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
-	omap_writel(0x0, 0x4A002300);
+	if (cpu_is_omap44xx())
+		omap_writel(0x0, 0x4A002300);
 #endif
 	l = musb_readl(musb->mregs, OTG_INTERFSEL);
 
@@ -244,6 +260,7 @@ int __init musb_platform_init(struct musb *musb)
 		musb->board_set_vbus = omap_set_vbus;
 
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
+	plat->is_usb_active = is_musb_active;
 
 	return 0;
 }

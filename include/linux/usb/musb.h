@@ -130,6 +130,9 @@ struct musb_hdrc_platform_data {
 	/* Architecture specific board data	*/
 	void		*board_data;
 
+	/* check usb device active state*/
+	int		(*is_usb_active)(struct device *dev);
+
 	/* omap hwmod data structure	 */
 	struct	omap_hwmod *oh;
 

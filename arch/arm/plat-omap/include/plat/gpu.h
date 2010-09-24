@@ -23,9 +23,9 @@
 #include <linux/platform_device.h>
 
 struct gpu_platform_data {
-	void (*set_min_bus_tput)(struct device *dev, u8 agent_id,
-						unsigned long r);
-	int (*device_enable) (struct platform_device *pdev);
+        int(*set_max_mpu_wakeup_lat)(struct pm_qos_request_list **qos_request,long t);
+        int(*set_min_bus_tput)(struct device *dev,u8 agent_id,unsigned long r);	
+        int (*device_enable) (struct platform_device *pdev);
 	int (*device_shutdown) (struct platform_device *pdev);
 	int (*device_idle) (struct platform_device *pdev);
 };

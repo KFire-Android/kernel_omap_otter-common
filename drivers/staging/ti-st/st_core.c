@@ -132,7 +132,8 @@ void st_send_frame(enum proto_type protoid, struct st_data_s *st_gdata)
 	     || st_gdata->list[protoid] == NULL)) {
 		pr_err("protocol %d not registered, no data to send?",
 			   protoid);
-		kfree_skb(st_gdata->rx_skb);
+		if (st_gdata != NULL && st_gdata->rx_skb != NULL)
+			kfree_skb(st_gdata->rx_skb);
 		return;
 	}
 	/* this cannot fail

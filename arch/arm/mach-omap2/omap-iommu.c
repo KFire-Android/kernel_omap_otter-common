@@ -136,7 +136,7 @@ static int __init omap_iommu_init(void)
 	}
 	return 0;
 }
-module_init(omap_iommu_init);
+postcore_initcall(omap_iommu_init);
 
 static void __exit omap_iommu_exit(void)
 {

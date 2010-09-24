@@ -134,6 +134,9 @@ static int omap2_iommu_enable(struct iommu *obj)
 
 	omap2_iommu_set_twl(obj, true);
 
+	if (cpu_is_omap44xx())
+		iommu_write_reg(obj, 0x1, MMU_GP_REG);
+
 	return 0;
 }
 

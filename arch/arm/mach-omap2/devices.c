@@ -36,6 +36,7 @@
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap4-keypad.h>
+#include <plat/omap-pm.h>
 #include <plat/mcbsp.h>
 
 #include "mux.h"
@@ -1025,7 +1026,8 @@ static void omap_init_gpu(void)
 		pr_err("omap_init_gpu: Platform data memory allocation failed\n");
 		return;
 	}
-
+        pdata->set_max_mpu_wakeup_lat =omap_pm_set_max_mpu_wakeup_lat;
+        pdata->set_min_bus_tput = omap_pm_set_min_bus_tput;
 	pdata->device_enable = omap_device_enable;
 	pdata->device_idle = omap_device_idle;
 	pdata->device_shutdown = omap_device_shutdown;

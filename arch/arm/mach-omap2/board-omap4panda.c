@@ -20,15 +20,13 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
+#include <linux/leds.h>
 #include <linux/gpio.h>
 #include <linux/usb/otg.h>
 #include <linux/i2c/twl.h>
-#include <linux/i2c/cma3000.h>
-#include <linux/i2c/bq2415x.h>
 #include <linux/regulator/machine.h>
 #include <linux/spi/spi.h>
 #include <linux/interrupt.h>
-#include <linux/input/sfh7741.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -45,14 +43,18 @@
 #include <plat/usb.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
-#include <plat/syntm12xx.h>
 #include <plat/mmc.h>
-#include <plat/omap4-keypad.h>
 #include <plat/hwspinlock.h>
 #include "hsmmc.h"
 
-#define HUB_POWER 1
-#define HUB_NRESET 39
+#define GPIO_HUB_POWER 1
+#define GPIO_HUB_NRESET_39 39
+#define GPIO_HUB_NRESET_62 62
+#define GPIO_BOARD_ID0 182
+#define GPIO_BOARD_ID1 101
+#define GPIO_BOARD_ID2 171
+
+static int board_revision;
 
 /* wl127x BT, FM, GPS connectivity chip */
 static int gpios[] = {46, -1, -1};
@@ -62,11 +64,31 @@ static struct platform_device wl127x_device = {
        .dev.platform_data = &gpios,
 };
 
-struct platform_device *st_get_plat_device(void)
-{
-    return &wl127x_device;
-}
-EXPORT_SYMBOL(st_get_plat_device);
+static struct gpio_led gpio_leds[] = {
+	{
+		.name			= "pandaboard::status1",
+		.default_trigger	= "heartbeat",
+		.gpio			= 7,
+	},
+	{
+		.name			= "pandaboard::status2",
+		.default_trigger	= "mmc0",
+		.gpio			= 8,
+	},
+};
+
+static struct gpio_led_platform_data gpio_led_info = {
+	.leds		= gpio_leds,
+	.num_leds	= ARRAY_SIZE(gpio_leds),
+};
+
+static struct platform_device leds_gpio = {
+	.name	= "leds-gpio",
+	.id	= -1,
+	.dev	= {
+		.platform_data	= &gpio_led_info,
+	},
+};
 
 #ifdef CONFIG_OMAP2_DSS_HDMI
 static struct platform_device sdp4430_hdmi_audio_device = {
@@ -122,6 +144,7 @@ static struct omap_dss_board_info panda_dss_data = {
 };
 
 static struct platform_device *panda_devices[] __initdata = {
+	&leds_gpio,
 	&sdp4430_hdmi_audio_device,
 	&wl127x_device
 };
@@ -138,6 +161,7 @@ static void __init omap4_display_init(void)
 #else
 
 static struct platform_device *panda_devices[] __initdata = {
+	&leds_gpio,
 	&wl127x_device,
 	&sdp4430_hdmi_audio_device,
 };
@@ -397,8 +421,8 @@ static struct i2c_board_info __initdata panda_i2c_boardinfo[] = {
 };
 
 static struct omap_i2c_bus_board_data __initdata panda_i2c_bus_pdata;
-static void __init omap_i2c_hwspinlock_init(int bus_id, unsigned int spinlock_id,
-				struct omap_i2c_bus_board_data *pdata)
+static void __init omap_i2c_hwspinlock_init(int bus_id,
+		unsigned int spinlock_id, struct omap_i2c_bus_board_data *pdata)
 {
 	pdata->handle = hwspinlock_request_specific(spinlock_id);
 	if (pdata->handle != NULL) {
@@ -414,31 +438,53 @@ static int __init omap4_i2c_init(void)
 	omap_i2c_hwspinlock_init(1, 0, &panda_i2c_bus_pdata);
 	/* Phoenix Audio IC needs I2C1 to start with 400 KHz and less */
 	omap_register_i2c_bus(1, 400, &panda_i2c_bus_pdata,
-				panda_i2c_boardinfo, ARRAY_SIZE(panda_i2c_boardinfo));
+		panda_i2c_boardinfo, ARRAY_SIZE(panda_i2c_boardinfo));
 	return 0;
 }
 
 
 static void __init omap4_ehci_init(void)
 {
+	int hub_nreset, ret;
+
+	if (board_revision)
+		hub_nreset = GPIO_HUB_NRESET_62;
+	else
+		hub_nreset = GPIO_HUB_NRESET_39;
+
 	/* disable the power to the usb hub prior to init */
-	gpio_request(HUB_POWER , "hub_power");
-	gpio_export(HUB_POWER, 0);
-	gpio_direction_output(HUB_POWER, 0);
-	gpio_set_value(HUB_POWER, 0);
+	ret = gpio_request(GPIO_HUB_POWER, "hub_power");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", GPIO_HUB_POWER);
+		goto error1;
+	}
+	gpio_export(GPIO_HUB_POWER, 0);
+	gpio_direction_output(GPIO_HUB_POWER, 0);
+	gpio_set_value(GPIO_HUB_POWER, 0);
 
 	/* reset phy+hub */
-	gpio_request(HUB_NRESET , "hub_nreset");
-	gpio_export(HUB_NRESET, 0);
-	gpio_direction_output(HUB_NRESET, 0);
-	gpio_set_value(HUB_NRESET, 0);
-	gpio_set_value(HUB_NRESET, 1);
+	ret = gpio_request(hub_nreset, "hub_nreset");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", hub_nreset);
+		goto error2;
+	}
+	gpio_export(hub_nreset, 0);
+	gpio_direction_output(hub_nreset, 0);
+	gpio_set_value(hub_nreset, 0);
+	gpio_set_value(hub_nreset, 1);
 
 	usb_uhhtll_init(&usbhs_pdata);
 	usb_ehci_init();
 
 	/* enable power to hub */
-	gpio_set_value(HUB_POWER, 1);
+	gpio_set_value(GPIO_HUB_POWER, 1);
+	return;
+
+error2:
+	gpio_free(GPIO_HUB_POWER);
+error1:
+	pr_err("Unable to initialize EHCI power/reset\n");
+	return;
 
 }
 
@@ -474,8 +520,53 @@ void wlan_1273_config()
 }
 #endif
 
+static void __init panda_boardrev_init(void)
+{
+	int ret;
+
+	ret = gpio_request(GPIO_BOARD_ID0, "board_id0");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", GPIO_BOARD_ID0);
+		goto error1;
+	}
+
+	ret = gpio_request(GPIO_BOARD_ID1, "board_id1");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", GPIO_BOARD_ID1);
+		goto error2;
+	}
+
+	ret = gpio_request(GPIO_BOARD_ID2, "board_id2");
+	if (ret) {
+		pr_err("Cannot request GPIO %d\n", GPIO_BOARD_ID2);
+		goto error3;
+	}
+	gpio_export(GPIO_BOARD_ID0, 0);
+	gpio_export(GPIO_BOARD_ID1, 0);
+	gpio_export(GPIO_BOARD_ID2, 0);
+
+	board_revision = gpio_get_value(GPIO_BOARD_ID0);
+	board_revision |= (gpio_get_value(GPIO_BOARD_ID1)<<1);
+	board_revision |= (gpio_get_value(GPIO_BOARD_ID2)<<2);
+
+	pr_info("PandaBoard Revision: %03d\n", board_revision);
+	return;
+
+error3:
+	gpio_free(GPIO_BOARD_ID1);
+error2:
+	gpio_free(GPIO_BOARD_ID0);
+error1:
+	board_revision = 0;
+	pr_err("Unable to detemine PandaBoard Revision\n");
+	return;
+
+}
+
 static void __init omap_panda_init(void)
 {
+
+	panda_boardrev_init();
 
 	omap4_i2c_init();
 	omap4_display_init();

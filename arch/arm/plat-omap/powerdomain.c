@@ -913,8 +913,7 @@ int pwrdm_post_transition(void)
  * If the requesting device already exists in the list, old value is
  * overwritten. Checks whether current power state is still adequate.
  * Returns -EINVAL if the powerdomain or device pointer is NULL,
- * or -ENOMEM if kmalloc fails, or -ERANGE if constraint can't be met,
- * or returns 0 upon success.
+ * or -ENOMEM if kmalloc fails, or returns 0 upon success.
  */
 int pwrdm_wakeuplat_set_constraint (struct powerdomain *pwrdm,
 				    struct device *dev, unsigned long t)
@@ -955,7 +954,7 @@ int pwrdm_wakeuplat_set_constraint (struct powerdomain *pwrdm,
 	plist_add(&user->node, &pwrdm->wakeuplat_dev_list);
 	user->node.prio = user->constraint_us = t;
 
-	ret = pwrdm_wakeuplat_update_pwrst(pwrdm);
+	pwrdm_wakeuplat_update_pwrst(pwrdm);
 
 exit_set:
 	mutex_unlock(&pwrdm->wakeuplat_mutex);
@@ -1002,7 +1001,7 @@ int pwrdm_wakeuplat_release_constraint (struct powerdomain *pwrdm,
 	plist_del(&user->node, &pwrdm->wakeuplat_dev_list);
 	kfree(user);
 
-	ret = pwrdm_wakeuplat_update_pwrst(pwrdm);
+	pwrdm_wakeuplat_update_pwrst(pwrdm);
 
 exit_rls:
 	mutex_unlock(&pwrdm->wakeuplat_mutex);
@@ -1017,14 +1016,11 @@ exit_rls:
  * Finds minimum latency value from all entries in the list and
  * the power domain power state neeting the constraint. Programs
  * new state if it is different from current power state.
- * Returns -EINVAL if the powerdomain or device pointer is NULL or
- * no such entry exists in the list, or -ERANGE if constraint can't be met,
- * or returns 0 upon success.
  */
-int pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm)
+void pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm)
 {
 	struct plist_node *node;
-	int ret = 0, new_state;
+	int new_state;
 	unsigned long min_latency = -1;
 
 	if (!plist_head_empty(&pwrdm->wakeuplat_dev_list)) {
@@ -1039,17 +1035,26 @@ int pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm)
 			break;
 	}
 
-	/* No power state wkuplat met constraint. Keep power domain ON. */
-	if (new_state == PWRDM_MAX_PWRSTS) {
-		new_state = PWRDM_FUNC_PWRST_ON;
-		ret = -ERANGE;
+	switch (new_state) {
+	case PWRDM_FUNC_PWRST_OFF:
+		new_state = PWRDM_POWER_OFF;
+		break;
+	case PWRDM_FUNC_PWRST_OSWR:
+		pwrdm_set_logic_retst(pwrdm, PWRDM_POWER_OFF);
+	case PWRDM_FUNC_PWRST_CSWR:
+		new_state = PWRDM_POWER_RET;
+		break;
+	case PWRDM_FUNC_PWRST_ON:
+		new_state = PWRDM_POWER_ON;
+		break;
+	default:
+		pr_warn("OMAP PM: requested latency constraint not supported "
+			"%s set to ON state\n", pwrdm->name);
+		new_state = PWRDM_POWER_ON;
+		break;
 	}
 
-	/* OSWR is not supported, set CSWR instead. TODO: add OSWR support */
-	if (new_state == PWRDM_FUNC_PWRST_OSWR)
-		new_state = PWRDM_FUNC_PWRST_CSWR;
-
-	if (pwrdm->state != new_state) {
+	if (pwrdm_read_pwrst(pwrdm) != new_state) {
 		if (cpu_is_omap44xx())
 			omap4_set_pwrdm_state(pwrdm, new_state);
 		else if (cpu_is_omap34xx())
@@ -1057,9 +1062,7 @@ int pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm)
 	}
 
 	pr_debug("OMAP PM: %s pwrst: curr= %d, prev= %d next= %d "
-			"wkuplat_min= %lu, state= %d\n", pwrdm->name,
+			"wkuplat_min= %lu, set_state= %d\n", pwrdm->name,
 		pwrdm_read_pwrst(pwrdm), pwrdm_read_prev_pwrst(pwrdm),
 		pwrdm_read_next_pwrst(pwrdm), min_latency, new_state);
-
-	return ret;
 }

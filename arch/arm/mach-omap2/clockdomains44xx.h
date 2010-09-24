@@ -71,7 +71,7 @@ static struct clockdomain ivahd_44xx_clkdm = {
 	.pwrdm		  = { .name = "ivahd_pwrdm" },
 	.clkstctrl_reg	  = OMAP4430_CM_IVAHD_CLKSTCTRL,
 	.clktrctrl_mask	  = OMAP4430_CLKTRCTRL_MASK,
-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+	.flags		  = CLKDM_CAN_SWSUP,
 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 
@@ -205,7 +205,7 @@ static struct clockdomain iss_44xx_clkdm = {
 	.pwrdm		  = { .name = "cam_pwrdm" },
 	.clkstctrl_reg	  = OMAP4430_CM_CAM_CLKSTCTRL,
 	.clktrctrl_mask	  = OMAP4430_CLKTRCTRL_MASK,
-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+	.flags		  = CLKDM_CAN_SWSUP,
 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 

@@ -176,6 +176,12 @@ static struct omap_ipupm_mod_platform_data omap_ipupm_data[] = {
 			| IPUPM_CAPS_EXTINIT,
 		.ops = &omap_ipupm_ops,
 	},
+	{
+		.name = "omap-ipu-pm",
+		.oh_name = "sl2if",
+		.caps = IPUPM_CAPS_START | IPUPM_CAPS_STOP,
+		.ops = &omap_ipupm_ops,
+	},
 };
 
 struct omap_ipupm_mod_platform_data *ipupm_get_plat_data(void)

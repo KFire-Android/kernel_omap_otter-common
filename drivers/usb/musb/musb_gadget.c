@@ -1774,8 +1774,9 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 	DBG(3, "registering driver %s\n", driver->function);
 	spin_lock_irqsave(&musb->lock, flags);
 
-	/* put the phy in normal operation mode*/
-	omap_writel(0x0, 0x4A002300);
+	if (cpu_is_omap44xx())
+		/* put the phy in normal operation mode*/
+		omap_writel(0x0, 0x4A002300);
 
 	if (musb->gadget_driver) {
 		DBG(1, "%s is already bound to %s\n",
@@ -1863,6 +1864,10 @@ static void stop_activity(struct musb *musb, struct usb_gadget_driver *driver)
 		musb->softconnect = 0;
 		musb_pullup(musb, 0);
 	}
+	if (cpu_is_omap44xx())
+		/* put the phy in normal operation mode*/
+		omap_writel(0x1, 0x4A002300);
+
 	musb_stop(musb);
 
 	/* killing any outstanding requests will quiesce the driver;
