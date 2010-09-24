@@ -320,6 +320,8 @@ scu_gp_clear:
 skip_gp:
 	dsb				@ Issue a write memory barrier
 #ifdef CONFIG_CACHE_L2X0
+	ldr	r1, =l2cache_base
+	ldr	r1, [r1]
 	mov	r0, #0x0
 	str	r0, [r1, #L2X0_CACHE_SYNC]
 loop6:
