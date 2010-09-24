@@ -1301,10 +1301,6 @@ int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
 
 	DSSDBG("PLL init\n");
 
-	/* The SCPClk is required for PLL registers on OMAP4 */
-	if (cpu_is_omap44xx())
-		REG_FLD_MOD(ix, DSI_CLK_CTRL, 1, 14, 14);
-
 	enable_clocks(1);
 	dsi_enable_pll_clock(ix, 1);
 
@@ -3505,6 +3501,10 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
+
+	/* The SCPClk is required for PLL and complexio registers on OMAP4 */
+	if (cpu_is_omap44xx())
+		REG_FLD_MOD(ix, DSI_CLK_CTRL, 1, 14, 14);
 
 	_dsi_print_reset_status(ix);
 
