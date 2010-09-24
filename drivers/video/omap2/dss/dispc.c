@@ -1706,6 +1706,13 @@ void dispc_set_lcd_size(enum omap_channel channel, u16 width, u16 height)
 	enable_clocks(0);
 }
 
+#ifndef CONFIG_OMAP4_ES1
+void dispc_set_tv_divisor(void)
+{
+	dispc_write_reg(DISPC_DIVISOR1, FLD_VAL(1, 23, 16) | FLD_VAL(1, 7, 0));
+}
+#endif
+
 void dispc_set_digit_size(u16 width, u16 height)
 {
 	u32 val;
