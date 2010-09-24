@@ -386,6 +386,13 @@ struct omap_video_timings {
 	u16 vbp;	/* Vertical back porch */
 };
 
+struct omap_color_conv_coef {
+	int  ry,  rcr,  rcb;
+	int  gy,  gcr,  gcb;
+	int  by,  bcr,  bcb;
+	int  full_range;
+};
+
 #ifdef CONFIG_OMAP2_DSS_VENC
 /* Hardcoded timings for tv modes. Venc only uses these to
  * identify the mode, and does not actually use the configs
@@ -745,6 +752,9 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask);
 int omap_dispc_wait_for_irq_timeout(u32 irqmask, unsigned long timeout);
 int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 		unsigned long timeout);
+void dispc_get_default_color_conv_coef(struct omap_color_conv_coef *ct);
+void dispc_set_color_conv_coef(enum omap_plane plane,
+		struct omap_color_conv_coef *ct);
 
 #define to_dss_driver(x) container_of((x), struct omap_dss_driver, driver)
 #define to_dss_device(x) container_of((x), struct omap_dss_device, dev)

@@ -280,6 +280,14 @@ struct dispc_irq_stats {
 	unsigned irqs[32];
 };
 
+/* default color conversion coefficients */
+static const struct omap_color_conv_coef ctbl_bt601_5 = {
+	298,  409,    0,
+	298, -208, -100,
+	298,    0,  517,
+	0,
+};
+
 static struct {
 	void __iomem    *base;
 
@@ -1257,13 +1265,6 @@ static void _dispc_set_scale_coef(enum omap_plane plane, const s8 *hfir,
 
 static void _dispc_setup_color_conv_coef(void)
 {
-	const struct color_conv_coef {
-		int  ry,  rcr,  rcb,   gy,  gcr,  gcb,   by,  bcr,  bcb;
-		int  full_range;
-	}  ctbl_bt601_5 = {
-		298,  409,    0,  298, -208, -100,  298,    0,  517, 0,
-	};
-
 	const struct wb_color_conv_coef {
 		int  yr,  crr,  cbr,   yg,  crg,  cbg,   yb,  crb,  cbb;
 		int  full_range;
@@ -1271,7 +1272,7 @@ static void _dispc_setup_color_conv_coef(void)
 		66,  112,  -38, 129, -94, -74,  25, -18,  112, 0,
 	};
 
-	const struct color_conv_coef *ct;
+	const struct omap_color_conv_coef *ct;
 	const struct wb_color_conv_coef *ct_wb;
 
 #define CVAL(x, y) (FLD_VAL(x, 26, 16) | FLD_VAL(y, 10, 0))
@@ -1324,6 +1325,56 @@ static void _dispc_setup_color_conv_coef(void)
 	REG_FLD_MOD(DISPC_VID_ATTRIBUTES(1), ct->full_range, 11, 11);
 }
 
+void dispc_get_default_color_conv_coef(struct omap_color_conv_coef *ct)
+{
+	*ct = ctbl_bt601_5;
+}
+
+void dispc_set_color_conv_coef(enum omap_plane plane,
+		struct omap_color_conv_coef *ct)
+{
+#define CVAL(x, y) (FLD_VAL(x, 26, 16) | FLD_VAL(y, 10, 0))
+
+	enable_clocks(1);
+	switch (plane) {
+	case OMAP_DSS_VIDEO1:
+	case OMAP_DSS_VIDEO2:
+		dispc_write_reg(DISPC_VID_CONV_COEF(plane-1, 0),
+			CVAL(ct->rcr, ct->ry));
+		dispc_write_reg(DISPC_VID_CONV_COEF(plane-1, 1),
+			CVAL(ct->gy,	 ct->rcb));
+		dispc_write_reg(DISPC_VID_CONV_COEF(plane-1, 2),
+			CVAL(ct->gcb, ct->gcr));
+		dispc_write_reg(DISPC_VID_CONV_COEF(plane-1, 3),
+			CVAL(ct->bcr, ct->by));
+		dispc_write_reg(DISPC_VID_CONV_COEF(plane-1, 4),
+			CVAL(0,       ct->bcb));
+		REG_FLD_MOD(DISPC_VID_ATTRIBUTES(plane-1),
+			ct->full_range, 11, 11);
+		break;
+#ifdef CONFIG_ARCH_OMAP4
+	case OMAP_DSS_VIDEO3:
+		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(0, 0),
+			CVAL(ct->rcr, ct->ry));
+		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(0, 1),
+			CVAL(ct->gy, ct->rcb));
+		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(0, 2),
+			CVAL(ct->gcb, ct->gcr));
+		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(0, 3),
+			CVAL(ct->bcr, ct->by));
+		dispc_write_reg(DISPC_VID_V3_WB_CONV_COEF(0, 4),
+			CVAL(0,	ct->bcb));
+		REG_FLD_MOD(DISPC_VID_V3_WB_ATTRIBUTES(0),
+			ct->full_range, 11, 11);
+		break;
+#endif
+	default:
+		break;
+	}
+
+	enable_clocks(0);
+#undef CVAL
+}
 
 static void _dispc_set_plane_ba0(enum omap_plane plane, u32 paddr)
 {
