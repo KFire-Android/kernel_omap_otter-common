@@ -245,7 +245,9 @@ static u32 cam2_prev_volt;
 static struct ipu_pm_object *pm_handle_appm3;
 static struct ipu_pm_object *pm_handle_sysm3;
 static struct workqueue_struct *ipu_wq;
+#ifdef CONFIG_OMAP_PM
 static struct pm_qos_request_list *pm_qos_handle;
+#endif
 static struct omap_rproc *sys_rproc;
 static struct omap_rproc *app_rproc;
 static struct omap_mbox *ducati_mbox;
@@ -2257,6 +2259,7 @@ static inline int ipu_pm_req_cstr_ipu(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2279,11 +2282,21 @@ static inline int ipu_pm_req_cstr_ipu(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Request perfomance Cstr IPU:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						IPU_PM_CORE,
+						perf);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Request latency Cstr IPU:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_CORE,
+						   lat);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2307,6 +2320,7 @@ static inline int ipu_pm_req_cstr_l3_bus(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2334,6 +2348,11 @@ static inline int ipu_pm_req_cstr_l3_bus(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Request latency Cstr L3 Bus:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_CORE,
+						   lat);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2357,6 +2376,7 @@ static inline int ipu_pm_req_cstr_iva_hd(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2379,11 +2399,21 @@ static inline int ipu_pm_req_cstr_iva_hd(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Request perfomance Cstr IVA HD:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						rcb_p->sub_type,
+						perf);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Request latency Cstr IVA HD:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   rcb_p->sub_type,
+						   lat);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2407,6 +2437,7 @@ static inline int ipu_pm_req_cstr_iss(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2425,15 +2456,25 @@ static inline int ipu_pm_req_cstr_iss(int proc_id, u32 rcb_num)
 	/* Get the configurable constraints */
 	cstr_flags = rcb_p->data[0];
 
-	/* TODO: call the baseport APIs */
+	/* Call the baseport APIs */
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Request perfomance Cstr ISS:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						IPU_PM_CORE,
+						perf);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Request latency Cstr ISS:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_SELF,
+						   lat);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2457,6 +2498,7 @@ static inline int ipu_pm_req_cstr_mpu(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2479,11 +2521,21 @@ static inline int ipu_pm_req_cstr_mpu(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Request perfomance Cstr MPU:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						IPU_PM_MPU,
+						perf);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Request latency Cstr MPU:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_MPU,
+						   lat);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2558,6 +2610,7 @@ static inline int ipu_pm_rel_cstr_ipu(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2580,11 +2633,21 @@ static inline int ipu_pm_rel_cstr_ipu(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Release perfomance Cstr IPU:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						IPU_PM_CORE,
+						NO_FREQ_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Release latency Cstr IPU:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_CORE,
+						   NO_LAT_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2608,6 +2671,7 @@ static inline int ipu_pm_rel_cstr_l3_bus(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2635,6 +2699,11 @@ static inline int ipu_pm_rel_cstr_l3_bus(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Release latency Cstr L3 Bus:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_CORE,
+						   NO_LAT_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2658,6 +2727,7 @@ static inline int ipu_pm_rel_cstr_iva_hd(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2680,11 +2750,21 @@ static inline int ipu_pm_rel_cstr_iva_hd(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Release perfomance Cstr IVA HD:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						rcb_p->sub_type,
+						NO_FREQ_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Release latency Cstr IVA HD:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   rcb_p->sub_type,
+						   NO_LAT_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2708,6 +2788,7 @@ static inline int ipu_pm_rel_cstr_iss(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2730,11 +2811,21 @@ static inline int ipu_pm_rel_cstr_iss(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Release perfomance Cstr ISS:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						IPU_PM_CORE,
+						NO_FREQ_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Release latency Cstr ISS:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_SELF,
+						   NO_LAT_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2758,6 +2849,7 @@ static inline int ipu_pm_rel_cstr_mpu(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2780,11 +2872,21 @@ static inline int ipu_pm_rel_cstr_mpu(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Release perfomance Cstr MPU:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						IPU_PM_MPU,
+						NO_FREQ_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Release latency Cstr MPU:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_MPU,
+						   NO_LAT_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {

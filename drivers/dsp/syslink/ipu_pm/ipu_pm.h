@@ -101,6 +101,9 @@
 
 #define IPU_PM_MM_MPU_LAT_CONSTRAINT	10
 #define IPU_PM_NO_MPU_LAT_CONSTRAINT	-1
+#define NO_FREQ_CONSTRAINT		0
+#define NO_LAT_CONSTRAINT		-1
+
 
 #define RCB_SIZE 8
 
@@ -474,6 +477,12 @@ int ipu_pm_module_start(unsigned res_type);
 
 /* Function to stop a module */
 int ipu_pm_module_stop(unsigned res_type);
+
+/* Function to set a module's frequency constraint */
+int ipu_pm_module_set_rate(unsigned rsrc, unsigned target_rsrc, unsigned rate);
+
+/* Function to set a module's latency constraint */
+int ipu_pm_module_set_latency(unsigned rsrc, unsigned target_rsrc, int latency);
 
 /* Function to get ducati state flag from share memory */
 u32 ipu_pm_get_state(int proc_id);

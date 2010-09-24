@@ -40,7 +40,7 @@
 
 #define IPU_PM_IOC_MAXNR		3
 
-#define IPUPM_CAPS_START_BIT	0
+#define IPUPM_CAPS_START_BIT		0
 #define IPUPM_CAPS_STOP_BIT		1
 #define IPUPM_CAPS_PERF_BIT		2
 #define IPUPM_CAPS_LAT_BIT		3
@@ -48,11 +48,15 @@
 /* omap_device built elsewhere */
 #define IPUPM_CAPS_EXTINIT_BIT		5
 #define IPUPM_CAPS_START		(1 << IPUPM_CAPS_START_BIT)
-#define IPUPM_CAPS_STOP		(1 << IPUPM_CAPS_STOP_BIT)
-#define IPUPM_CAPS_PERF		(1 << IPUPM_CAPS_PERF_BIT)
+#define IPUPM_CAPS_STOP			(1 << IPUPM_CAPS_STOP_BIT)
+#define IPUPM_CAPS_PERF			(1 << IPUPM_CAPS_PERF_BIT)
 #define IPUPM_CAPS_LAT			(1 << IPUPM_CAPS_LAT_BIT)
 #define IPUPM_CAPS_BDW			(1 << IPUPM_CAPS_BDW_BIT)
 #define IPUPM_CAPS_EXTINIT		(1 << IPUPM_CAPS_EXTINIT_BIT)
+
+#define IPU_PM_SELF			100
+#define IPU_PM_MPU			101
+#define IPU_PM_CORE			102
 
 struct omap_ipupm_mod;
 
@@ -63,11 +67,13 @@ struct omap_ipupm_mod_ops {
 
 struct omap_ipupm_mod_platform_data {
 	struct platform_device *pdev;
+	struct device *dev;
 	char *name;
 	char *oh_name;
 	struct omap_hwmod *oh;
 	struct kobject kobj;
 	u32 caps;
+	struct pm_qos_request_list *qos_request;
 	struct omap_ipupm_mod_ops *ops;
 };
 
@@ -86,5 +92,11 @@ struct ipu_pm_dev {
 
 extern int ipu_pm_module_start(unsigned rsrc);
 extern int ipu_pm_module_stop(unsigned rsrc);
+extern int ipu_pm_module_set_rate(unsigned rsrc,
+				  unsigned target_rsrc,
+				  unsigned rate);
+extern int ipu_pm_module_set_latency(unsigned rsrc,
+				     unsigned target_rsrc,
+				     int latency);
 
 #endif /* IPU_PM_H */
