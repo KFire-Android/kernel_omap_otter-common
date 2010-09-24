@@ -485,10 +485,6 @@ static long fm_rx_task(struct fmdrv_chr_ops *fm_chr_dev)
 	struct sk_buff *skb;
 	unsigned long flags = 0;
 
-#ifdef VERBOSE
-	int len;
-#endif
-
 	FM_CHR_DRV_START();
 
 	skb = NULL;
@@ -737,10 +733,6 @@ static ssize_t fm_chr_write(struct file *fil, const char __user *data,
 	struct sk_buff *skb;
 	struct fmdrv_chr_ops *fm_chr_dev = fil->private_data;
 
-#ifdef VERBOSE
-	int len;
-#endif
-
 	FM_CHR_DRV_START();
 
 	err = FM_CHR_DRV_SUCCESS;
@@ -768,9 +760,8 @@ static ssize_t fm_chr_write(struct file *fil, const char __user *data,
 	}
 #ifdef VERBOSE
 	printk(KERN_INFO "Write: Before conversion\n");
-	for (len = 0; ((skb) && (len < skb->len)); len++)
-		printk(KERN_INFO "0x%02x ", skb->data[len]);
-	printk("\n");
+	print_hex_dump(KERN_INFO, "<out<", DUMP_PREFIX_NONE,
+			16, 1, data, size, 0);
 #endif
 
 	/* Convert the Channel-1 command packet to Channel-8 command packet */
@@ -782,9 +773,8 @@ static ssize_t fm_chr_write(struct file *fil, const char __user *data,
 	}
 #ifdef VERBOSE
 	printk(KERN_INFO "Write: After conversion\n");
-	for (len = 0; ((skb) && (len < skb->len)); len++)
-		printk(KERN_INFO "0x%02x ", skb->data[len]);
-	printk("\n");
+	print_hex_dump(KERN_INFO, "<out<", DUMP_PREFIX_NONE,
+			16, 1, skb->data, skb->len, 0);
 #endif
 
 	/* Write to ST driver through FM_ST interface */
@@ -846,9 +836,8 @@ static ssize_t fm_chr_read(struct file *fil, char __user *data, size_t size,
 	}
 #ifdef VERBOSE
 	printk(KERN_INFO "Read: Before conversion\n");
-	for (len = 0; len < skb->len; len++)
-		printk(KERN_INFO "0x%02x ", skb->data[len]);
-	printk("\n");
+	print_hex_dump(KERN_INFO, ">in>", DUMP_PREFIX_NONE,
+			16, 1, skb->data, skb->len, 0);
 #endif
 
 	/* Convert if the response packet is of Channel-8 type */
@@ -869,9 +858,8 @@ static ssize_t fm_chr_read(struct file *fil, char __user *data, size_t size,
 	}
 #ifdef VERBOSE
 	printk(KERN_INFO "Read: After conversion\n");
-	for (len = 0; (ch4_skb != NULL) && len < (ch4_skb->len); len++)
-		printk(KERN_INFO "0x%02x ", ch4_skb->data[len]);
-	printk("\n");
+	print_hex_dump(KERN_INFO, ">in>", DUMP_PREFIX_NONE,
+			16, 1, ch4_skb->data, ch4_skb->len, 0);
 #endif
 
 	if (size >= ch4_skb->len) {

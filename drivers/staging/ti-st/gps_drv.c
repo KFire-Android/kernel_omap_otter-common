@@ -130,10 +130,6 @@ long gpsdrv_st_recv(void *arg, struct sk_buff *skb)
 	struct gpsdrv_event_hdr gpsdrv_hdr = { 0x00, 0x0000 };
 	struct gpsdrv_data *hgps = (struct gpsdrv_data *)arg;
 
-#ifdef VERBOSE
-	unsigned int i;
-#endif
-
 	/* SKB is NULL */
 	if (NULL == skb) {
 		GPSDRV_ERR("Input SKB is NULL");
@@ -156,8 +152,8 @@ long gpsdrv_st_recv(void *arg, struct sk_buff *skb)
 	}
 #ifdef VERBOSE
 	printk(KERN_INFO"data start >>\n");
-	for (i = 0; i < skb->len; i++)
-		printk(KERN_INFO " %x ", skb->data[i]);
+	print_hex_dump(KERN_INFO, ">in>", DUMP_PREFIX_NONE,
+			16, 1, skb->data, skb->len, 0);
 	printk(KERN_INFO"\n<< end\n");
 #endif
 	/* Check the Opcode */
@@ -472,8 +468,8 @@ ssize_t gpsdrv_read(struct file *file, char __user *data, size_t size,
 	}
 
 #ifdef VERBOSE
-	for (len = 0; (skb) && (len < skb->len); len++)
-		GPSDRV_DBG(" %x ", skb->data[len]);
+	print_hex_dump(KERN_INFO, ">in>", DUMP_PREFIX_NONE,
+			16, 1, skb->data, skb->len, 0);
 #endif
 
 	/* Forward the data to the user */
@@ -509,9 +505,6 @@ ssize_t gpsdrv_read(struct file *file, char __user *data, size_t size,
 ssize_t gpsdrv_write(struct file *file, const char __user *data,
 			 size_t size, loff_t *offset)
 {
-#ifdef VERBOSE
-	long count = 0;
-#endif
 	unsigned char channel = GPS_CH9_PKT_NUMBER; /* GPS Channel number */
 	/* Initialize gpsdrv_event_hdr with write opcode */
 	struct gpsdrv_event_hdr gpsdrv_hdr = { GPS_CH9_OP_WRITE, 0x0000 };
@@ -561,10 +554,11 @@ ssize_t gpsdrv_write(struct file *file, const char __user *data,
 		kfree_skb(skb);
 		return GPS_ERR_CPY_FRM_USR;
 	}
+
 #ifdef VERBOSE
 	GPSDRV_VER("start data..");
-	for (count = 0; count < size; count++)
-		printk(" 0x%02x ", skb->data[count]);
+	print_hex_dump(KERN_INFO, "<out<", DUMP_PREFIX_NONE,
+			16, 1, skb->data, size);
 	GPSDRV_VER("\n..end data");
 #endif
 
