@@ -873,6 +873,13 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	/* do not fall into any sort of idle */
 	dispc_set_idle_mode();
 
+#ifndef CONFIG_OMAP4_ES1
+	/*The default reset value for DISPC.DIVISOR1 LCD is 4
+	* in ES2.0 and the clock will run at 1/4th the speed
+	* resulting in the sync_lost_digit */
+	dispc_set_tv_divisor();
+#endif
+
 	/* tv size */
 	dispc_set_digit_size(dssdev->panel.timings.x_res,
 			dssdev->panel.timings.y_res);
