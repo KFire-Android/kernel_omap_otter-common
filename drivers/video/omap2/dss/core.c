@@ -411,6 +411,7 @@ static void dss_clk_disable_all_no_ctx(void)
 	dss_clk_disable_no_ctx(clks);
 }
 
+#ifdef HWMOD
 static void dss_clk_disable_all(void)
 {
 	enum dss_clock clks;
@@ -420,6 +421,7 @@ static void dss_clk_disable_all(void)
 		clks |= DSS_CLK_96M;
 	dss_clk_disable(clks);
 }
+#endif
 
 /* REGULATORS */
 
