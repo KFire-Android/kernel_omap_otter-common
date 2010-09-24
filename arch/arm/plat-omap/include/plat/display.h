@@ -277,6 +277,49 @@ enum device_n_buffer_type {
 	IBUF_PDEV_SWAP	= OMAP_FLAG_IBUF | OMAP_FLAG_ISWAP,
 };
 
+/* Stereoscopic Panel types
+ * row, column, overunder, sidebyside options
+ * are with respect to native scan order
+*/
+enum s3d_disp_type {
+	S3D_DISP_NONE = 0,
+	S3D_DISP_FRAME_SEQ,
+	S3D_DISP_ROW_IL,
+	S3D_DISP_COL_IL,
+	S3D_DISP_PIX_IL,
+	S3D_DISP_CHECKB,
+	S3D_DISP_OVERUNDER,
+	S3D_DISP_SIDEBYSIDE,
+};
+
+/* Subsampling direction is based on native panel scan order.
+*/
+enum s3d_disp_sub_sampling {
+	S3D_DISP_SUB_SAMPLE_NONE = 0,
+	S3D_DISP_SUB_SAMPLE_V,
+	S3D_DISP_SUB_SAMPLE_H,
+};
+
+/* Indicates if display expects left view first followed by right or viceversa
+ * For row interlaved displays, defines first row view
+ * For column interleaved displays, defines first column view
+ * For checkerboard, defines first pixel view
+ * For overunder, defines top view
+ * For sidebyside, defines west view
+*/
+enum s3d_disp_order {
+	S3D_DISP_ORDER_L = 0,
+	S3D_DISP_ORDER_R = 1,
+};
+
+/* Indicates current view
+ * Used mainly for displays that need to trigger a sync signal
+*/
+enum s3d_disp_view {
+	S3D_DISP_VIEW_L = 0,
+	S3D_DISP_VIEW_R,
+};
+
 /* RFBI */
 
 struct rfbi_timings {
@@ -544,6 +587,17 @@ struct omap_writeback {
 
 };
 
+struct s3d_disp_info {
+	enum s3d_disp_type type;
+	enum s3d_disp_sub_sampling sub_samp;
+	enum s3d_disp_order order;
+	/* Gap between left and right views
+	 * For over/under units are lines
+	 * For sidebyside units are pixels
+	  *For other types ignored*/
+	unsigned int gap;
+};
+
 struct omap_dss_device {
 	struct device dev;
 
@@ -601,6 +655,7 @@ struct omap_dss_device {
 		int acb;	/* ac-bias pin frequency */
 
 		enum omap_panel_config config;
+		struct s3d_disp_info s3d_info;
 	} panel;
 
 	struct {
@@ -700,6 +755,19 @@ struct omap_dss_driver {
 	void (*get_edid)(struct omap_dss_device *dssdev);
 	void (*set_custom_edid_timing_code)(struct omap_dss_device *dssdev, int mode, int code);
 	int (*hpd_enable)(struct omap_dss_device *dssdev);
+
+	/* S3D specific */
+	/* Used for displays that can switch 3D mode on/off
+	3D only displays should return non-zero value when trying to disable */
+	int (*enable_s3d)(struct omap_dss_device *dssdev, bool enable);
+	/* 3D only panels should return true always */
+	bool (*get_s3d_enabled)(struct omap_dss_device *dssdev);
+	/* Only used for frame sequential displays*/
+	int (*set_s3d_view)(struct omap_dss_device *dssdev, enum s3d_disp_view view);
+	/*Some displays may accept multiple 3D packing formats (like HDMI)
+	 *hence we add capability to choose the most optimal one given a source
+	 *Returns non-zero if the type was not supported*/
+	int (*set_s3d_disp_type)(struct omap_dss_device *dssdev, struct s3d_disp_info *info);
 };
 
 struct pico_platform_data {
