@@ -1136,8 +1136,7 @@ static void disable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 			if (be_is_pending(be_rtd, stream)) {
 				abe_dai_disable_data_transfer(PDM_UL_PORT);
 				/* switch main port to DL since UL is inactive */
-				if (pdm_ready(&abe_data))
-					abe_select_main_port(PDM_DL_PORT);
+				abe_select_main_port(PDM_DL_PORT);
 			}
 			break;
 		case OMAP_ABE_DAI_BT_VX:
