@@ -523,13 +523,13 @@ int dss_check_overlay(struct omap_overlay *ovl, struct omap_dss_device *dssdev)
 			outh = info->out_height;
 	}
 
-	if (dw < info->pos_x + outw) {
+	if ((dw < info->pos_x + outw) && !info->out_wb) {
 		DSSDBG("check_overlay failed 1: %d < %d + %d\n",
 				dw, info->pos_x, outw);
 		return -EINVAL;
 	}
 
-	if (dh < info->pos_y + outh) {
+	if ((dh < info->pos_y + outh) && !info->out_wb) {
 		DSSDBG("check_overlay failed 2: %d < %d + %d\n",
 				dh, info->pos_y, outh);
 		return -EINVAL;

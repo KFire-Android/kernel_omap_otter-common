@@ -425,6 +425,7 @@ struct omap_overlay_info {
 	u32 p_uv_addr; /* relevant for NV12 format only */
 	enum device_n_buffer_type field;
 	u16 pic_height; /* for interlacing with cropping this is required */
+	bool out_wb; /* true when this overlay only feeds wb pipeline*/
 };
 
 struct omap_overlay {
