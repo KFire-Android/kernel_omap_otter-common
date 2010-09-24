@@ -451,18 +451,18 @@ int snd_soc_get_backend_dais(struct snd_pcm_substream *substream)
 
 			/* add backend if we have space */
 			if (num > 0) {
-				if (rtd->num_be == SND_SOC_MAX_BE)
+				if (rtd->num_be[substream->stream] == SND_SOC_MAX_BE)
 					dev_dbg(&rtd->dev, "no more backends permitted\n");
 				else {
 					dev_dbg(&rtd->dev, "** active path for %s to %s\n", fe_aif, be_aif);
-					rtd->be_rtd[rtd->num_be++] = &card->rtd[i];
+					rtd->be_rtd[rtd->num_be[substream->stream]++][substream->stream] = &card->rtd[i];
 					card->rtd[i].fe_clients++;
 				}
 			}
 		}
 	}
 
-	return rtd->num_be ? rtd->num_be : -EINVAL;
+	return rtd->num_be[substream->stream] ? rtd->num_be[substream->stream] : -EINVAL;
 }
 EXPORT_SYMBOL_GPL(snd_soc_get_backend_dais);
 
@@ -471,11 +471,11 @@ void snd_soc_put_backend_dais(struct snd_pcm_substream *substream)
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	int i;
 
-	for (i = 0; i < rtd->num_be; i++) {
-		rtd->be_rtd[i]->fe_clients--;
-		rtd->be_rtd[i] = NULL;
+	for (i = 0; i < rtd->num_be[substream->stream]; i++) {
+		rtd->be_rtd[i][substream->stream]->fe_clients--;
+		rtd->be_rtd[i][substream->stream] = NULL;
 	}
-	rtd->num_be = 0;
+	rtd->num_be[substream->stream] = 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_put_backend_dais);
 
@@ -703,11 +703,11 @@ static void close_delayed_work(struct work_struct *work)
 	if (codec_dai->pop_wait == 1) {
 		codec_dai->pop_wait = 0;
 		if (rtd->dai_link->dynamic)
-			snd_soc_dapm_stream_event(rtd,
+			snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_PLAYBACK,
 					cpu_dai->driver->playback.stream_name,
 					SND_SOC_DAPM_STREAM_STOP);
 		else
-			snd_soc_dapm_stream_event(rtd,
+			snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_PLAYBACK,
 					codec_dai->driver->playback.stream_name,
 					SND_SOC_DAPM_STREAM_STOP);
 	}
@@ -773,11 +773,11 @@ int snd_soc_pcm_close(struct snd_pcm_substream *substream)
 	} else {
 		/* capture streams can be powered down now */
 		if (rtd->dai_link->dynamic)
-			snd_soc_dapm_stream_event(rtd,
+			snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_CAPTURE,
 					cpu_dai->driver->capture.stream_name,
 					SND_SOC_DAPM_STREAM_STOP);
 		else
-			snd_soc_dapm_stream_event(rtd,
+			snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_CAPTURE,
 					codec_dai->driver->capture.stream_name,
 					SND_SOC_DAPM_STREAM_STOP);
 	}
@@ -847,20 +847,20 @@ int snd_soc_pcm_prepare(struct snd_pcm_substream *substream)
 
 	if (rtd->dai_link->dynamic) {
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd,
+			snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_PLAYBACK,
 					  cpu_dai->driver->playback.stream_name,
 					  SND_SOC_DAPM_STREAM_START);
 		else
-			snd_soc_dapm_stream_event(rtd,
+			snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_CAPTURE,
 					  cpu_dai->driver->capture.stream_name,
 					  SND_SOC_DAPM_STREAM_START);
 	} else {
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			snd_soc_dapm_stream_event(rtd,
+			snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_PLAYBACK,
 					  codec_dai->driver->playback.stream_name,
 					  SND_SOC_DAPM_STREAM_START);
 		else
-			snd_soc_dapm_stream_event(rtd,
+			snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_CAPTURE,
 					  codec_dai->driver->capture.stream_name,
 					  SND_SOC_DAPM_STREAM_START);
 	}
@@ -1164,12 +1164,12 @@ static int soc_suspend(struct device *dev)
 			continue;
 
 		if (driver->playback.stream_name != NULL)
-			snd_soc_dapm_stream_event(&card->rtd[i], driver->playback.stream_name,
-				SND_SOC_DAPM_STREAM_SUSPEND);
+			snd_soc_dapm_stream_event(&card->rtd[i], SNDRV_PCM_STREAM_PLAYBACK,
+				driver->playback.stream_name, SND_SOC_DAPM_STREAM_SUSPEND);
 
 		if (driver->capture.stream_name != NULL)
-			snd_soc_dapm_stream_event(&card->rtd[i], driver->capture.stream_name,
-				SND_SOC_DAPM_STREAM_SUSPEND);
+			snd_soc_dapm_stream_event(&card->rtd[i], SNDRV_PCM_STREAM_CAPTURE,
+				driver->capture.stream_name, SND_SOC_DAPM_STREAM_SUSPEND);
 	}
 
 	/* suspend all CODECs */
@@ -1267,12 +1267,12 @@ static void soc_resume_deferred(struct work_struct *work)
 			continue;
 
 		if (driver->playback.stream_name != NULL)
-			snd_soc_dapm_stream_event(&card->rtd[i], driver->playback.stream_name,
-				SND_SOC_DAPM_STREAM_RESUME);
+			snd_soc_dapm_stream_event(&card->rtd[i], SNDRV_PCM_STREAM_PLAYBACK,
+				driver->playback.stream_name, SND_SOC_DAPM_STREAM_RESUME);
 
 		if (driver->capture.stream_name != NULL)
-			snd_soc_dapm_stream_event(&card->rtd[i], driver->capture.stream_name,
-				SND_SOC_DAPM_STREAM_RESUME);
+			snd_soc_dapm_stream_event(&card->rtd[i], SNDRV_PCM_STREAM_CAPTURE,
+				driver->capture.stream_name, SND_SOC_DAPM_STREAM_RESUME);
 	}
 
 	/* unmute any active DACs */
