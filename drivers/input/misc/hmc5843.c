@@ -67,6 +67,7 @@ struct hmc5843 {
 	int			index;
 
 	int 			req_poll_rate;
+	int			enable;
 };
 
 /* interval between samples for the different rates, in msecs */
@@ -328,6 +329,16 @@ static ssize_t hmc5843_store_mode(struct device *dev,
 static DEVICE_ATTR(mode, S_IWUSR | S_IRUGO, hmc5843_show_mode,
 		hmc5843_store_mode);
 
+static ssize_t hmc5843_show_enable(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct hmc5843 *hmc5843 = i2c_get_clientdata(client);
+
+	return sprintf(buf, "%d\n", hmc5843->enable);
+}
+
 static ssize_t hmc5843_store_enable(struct device *dev,
 				     struct device_attribute *attr,
 				     const char *buf, size_t count)
@@ -345,15 +356,25 @@ static ssize_t hmc5843_store_enable(struct device *dev,
 	if (val < 0 || val > 1)
 		return -EINVAL;
 
-	if (val == 0)
-		cancel_delayed_work_sync(&hmc5843->input_work);
+	if (val)
+		hmc5843->mode = HMC5843_MODE_REPEAT;
 	else
-		schedule_delayed_work(&hmc5843->input_work, 0);
-#endif
+		hmc5843->mode = HMC5843_MODE_SLEEP;
 
-	return 1;
+	error = hmc5843_write_register(hmc5843, HMC5843_MODE_REG);
+
+	if (error == 0) {
+		if (val == 0)
+			cancel_delayed_work_sync(&hmc5843->input_work);
+		else
+			schedule_delayed_work(&hmc5843->input_work, 0);
+
+		hmc5843->enable = val;
+	}
+#endif
+	return count;
 }
-static DEVICE_ATTR(enable, S_IWUSR | S_IRUGO, NULL,
+static DEVICE_ATTR(enable, S_IWUSR | S_IRUGO, hmc5843_show_enable,
 		hmc5843_store_enable);
 
 static struct attribute *hmc5843_attributes[] = {
@@ -552,6 +573,7 @@ static int __devinit hmc5843_i2c_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, hmc5843);
 
 	hmc5843->req_poll_rate = 200;
+	hmc5843->enable = 0;
 
 	status = hmc5843_device_init(hmc5843);
 	if (status)
@@ -587,37 +609,35 @@ static int __devexit hmc5843_i2c_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
-static int hmc5843_suspend(struct device *dev)
+static int hmc5843_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-	struct i2c_client *client = dev_get_drvdata(dev);
 	struct hmc5843 *hmc5843 = i2c_get_clientdata(client);
 
 	/* save our current mode for resume and put device to sleep */
 	int m = hmc5843->mode;
+#ifdef HMC5843_USE_WORK_QUEUES
+	cancel_delayed_work_sync(&hmc5843->input_work);
+#endif
 	hmc5843->mode = HMC5843_MODE_SLEEP;
 	hmc5843_write_register(hmc5843, HMC5843_MODE_REG);
 	hmc5843->mode = m;
 	return 0;
 }
 
-static int hmc5843_resume(struct device *dev)
+static int hmc5843_resume(struct i2c_client *client)
 {
-	struct i2c_client *client = dev_get_drvdata(dev);
 	struct hmc5843 *hmc5843 = i2c_get_clientdata(client);
 
 	/* restore whatever mode we were in before suspending */
-	hmc5843_write_register(hmc5843, HMC5843_MODE_REG);
+	if (hmc5843->enable != 0) {
+		hmc5843_write_register(hmc5843, HMC5843_MODE_REG);
+#ifdef HMC5843_USE_WORK_QUEUES
+		schedule_delayed_work(&hmc5843->input_work, 0);
+#endif
+	}
 	return 0;
 }
 
-static struct dev_pm_ops hmc5843_dev_pm_ops = {
-	.suspend	= hmc5843_suspend,
-	.resume		= hmc5843_resume,
-};
-
-#define HMC5843_DEV_PM_OPS (&hmc5843_dev_pm_ops)
-#else
-#define	HMC5843_DEV_PM_OPS NULL
 #endif
 
 static const struct i2c_device_id hmc5843_id[] = {
@@ -631,11 +651,14 @@ static struct i2c_driver hmc5843_i2c_driver = {
 	.driver		= {
 		.name	= "hmc5843",
 		.owner	= THIS_MODULE,
-		.pm	= HMC5843_DEV_PM_OPS,
 	},
 	.probe		= hmc5843_i2c_probe,
 	.remove		= __devexit_p(hmc5843_i2c_remove),
 	.id_table	= hmc5843_id,
+#ifdef CONFIG_PM
+	.suspend = hmc5843_suspend,
+	.resume	= hmc5843_resume,
+#endif
 };
 
 static int __init hmc5843_init(void)
