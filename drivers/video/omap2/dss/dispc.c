@@ -4909,7 +4909,8 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	       width, height,
 	       (void *)paddr, (void *)puv_addr, out_width, out_height);
 
-	_dispc_set_pic_size(plane, width, height);
+	/*WB PIC_SIZE is the final destination size*/
+	_dispc_set_pic_size(plane, out_width, out_height);
 	dispc_setup_plane_fifo(plane, fifo_low, fifo_high);
 
 	/* non interlaced */
@@ -4937,7 +4938,8 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	scale_y = height != out_height || ch_height != out_ch_height;
 
 	DSSDBG(KERN_ERR"%d scale_x %d scale y ", scale_x, scale_y);
-	_dispc_set_vid_size(plane, out_width, out_height);
+	/*WB size is the size delivered by Video pipeline*/
+	_dispc_set_vid_size(plane, width, height);
 
 	_dispc_set_scaling(plane, width, height,
 			out_width, out_height,
