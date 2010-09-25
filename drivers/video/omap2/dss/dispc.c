@@ -250,6 +250,12 @@ void __iomem  *dispc_base;
 
 #define DISPC_MAX_NR_ISRS		8
 
+#ifdef CONFIG_ARCH_OMAP4
+#define DISPC_NUM_PIPELINES 5
+#else
+#define DISPC_NUM_PIPELINES 3
+#endif
+
 struct omap_dispc_isr_data {
 	omap_dispc_isr_t	isr;
 	void			*arg;
@@ -291,7 +297,7 @@ static const struct omap_color_conv_coef ctbl_bt601_5 = {
 static struct {
 	void __iomem    *base;
 
-	u32	fifo_size[3];
+	u32	fifo_size[DISPC_NUM_PIPELINES];
 
 	spinlock_t irq_lock;
 	u32 irq_error_mask;
