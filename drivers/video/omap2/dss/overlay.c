@@ -693,6 +693,7 @@ void dss_init_overlays(struct platform_device *pdev)
 
 		BUG_ON(ovl == NULL);
 
+		mutex_init(&ovl->lock);
 		switch (i) {
 		case 0:
 			ovl->name = "gfx";

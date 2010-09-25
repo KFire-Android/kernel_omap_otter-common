@@ -488,6 +488,10 @@ struct omap_overlay {
 	/* if true, info has been changed, but not applied() yet */
 	bool info_dirty;
 
+	/* if true, overlay resource is used by an instance of a driver*/
+	bool in_use;
+	struct mutex lock;
+
 	int (*set_manager)(struct omap_overlay *ovl,
 		struct omap_overlay_manager *mgr);
 	int (*unset_manager)(struct omap_overlay *ovl);
