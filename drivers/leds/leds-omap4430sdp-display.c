@@ -208,6 +208,9 @@ static int omap4430_sdp_display_probe(struct platform_device *pdev)
 
 	}
 #endif
+	if (info->led_pdata->display_led_init)
+		info->led_pdata->display_led_init();
+
 	pr_info("%s:Exit\n", __func__);
 
 	return ret;

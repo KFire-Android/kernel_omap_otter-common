@@ -26,6 +26,7 @@
 
 struct omap4430_sdp_disp_led_platform_data {
 	int flags;
+	void (*display_led_init)(void);
 	void (*primary_display_set)(u8 value);
 	void (*secondary_display_set)(u8 value);
 };
