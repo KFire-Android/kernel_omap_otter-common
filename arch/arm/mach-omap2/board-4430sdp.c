@@ -445,6 +445,14 @@ static struct platform_device sdp4430_disp_led = {
 	},
 };
 
+static struct platform_device sdp4430_keypad_led = {
+	.name	=	"keypad_led",
+	.id	=	-1,
+	.dev	= {
+		.platform_data = NULL,
+	},
+};
+
 static struct nokia_dsi_panel_data dsi_panel = {
 		.name	= "taal",
 		.reset_gpio	= 102,
@@ -625,6 +633,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_hdmi_audio_device,
 	&sdp4430_vib,
 	&sdp4430_disp_led,
+	&sdp4430_keypad_led,
 };
 
 static void __init omap_4430sdp_init_irq(void)
