@@ -170,7 +170,7 @@ void __init omap2_set_globals_36xx(void)
 static struct omap_globals omap4_globals = {
 	.class	= OMAP443X_CLASS,
 	.tap	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
-	.ctrl	= OMAP443X_CTRL_BASE,	/* FIXME: Move this to control core */
+	.ctrl	= OMAP443X_SCM_BASE,
 	.ctrl_pad	= OMAP443X_CTRL_BASE,
 	.prm	= OMAP4430_PRM_BASE,
 	.prcm_mpu	= OMAP4430_PRCM_MPU_BASE,
