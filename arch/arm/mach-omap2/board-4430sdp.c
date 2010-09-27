@@ -297,7 +297,7 @@ static struct platform_device sdp4430_leds_gpio = {
 
 static struct led_pwm sdp4430_pwm_leds[] = {
 	{
-	.name = "omap4:green:chrg",
+	.name = "battery-led",
 	.pwm_id = 1,
 	.max_brightness = 255,
 	.pwm_period_ns = 7812500,
