@@ -1,4 +1,4 @@
-17 September 2010
+27 September 2010
 
 
 1.  Introduction
@@ -398,59 +398,74 @@ Refer to Program schedule.
 
 4.5 Defects Fixed in This Release
 
-OMAPS00223748	CPUIdle transitions are stoped during System Use Case execution (MPU held in ON)
-OMAPS00223948	CPUIdle does not hit CORE CSWR following Suspend/Resume
-OMAPS00223171   Basic playback in 44.1kHz stereo is performed too fast.
-OMAPS00223208   At the end of playback, a loud pop is audible
-OMAPS00223173   Basic playback in 44.1kHz monoaural does not work
-OMAPS00223202   Audio files with non-native sample rates are not played with the correct sample rate
-OMAPS00223179   Audio has bad quality when recorded from headset microphone
-OMAPS00223193   When recording from sub microphone through MM_UL in monoaural file contains only silence.
-OMAPS00223178   Audio mutes when setting gain to its maximum value or greater
-OMAPS00223194   When mixing TONES_DL and MM_DL in DL1 mixer, end of playback of one stream causes the other to be stopped.
-OMAPS00223202   Audio files with non-native sample rates are not played with the correct sample rate
-OMAPS00223205   Vibrator as an input driver fails to activate.
+OMAPS00219723	MMC: sometimes the order of detection of eMMC and external SD card is wrong
+OMAPS00221981	eMMC device shall be stable at /dev/mmcblk0
+OMAPS00219502	IRQ 93 - I2C ISR not correctly handled
+OMAPS00218080	PT: Robustness: EXT2-fs (mmcblk1p1): error: ext2_lookup is generated after certain number of iterations
+OMAPS00214020	ethernet doesn't get configured with L24.4 kernel
+OMAPS00215563	Not able to wakeup from suspend state
+OMAPS00216039	L24x: Tick suppression won't work because of the LOCAL A9 timer aren't wakeup capable
+OMAPS00216037	L24x: CPUx comes out of low power mode when there is an enevt om CPUy
+OMAPS00220851	DMA test case failures - Descriptor loading and SMP
+OMAPS00219141	u-boot net root path is too short
+OMAPS00221839	MUSB (OTG) in Host mode: enumeration failure if USB device connected before blaze boot
+OMAPS00215668	MUSB driver in device mode has problems with unaligned DMA.
+OMAPS00221528	MUSB Host :- Fix the default DMA mapping of control transfer buffers
+OMAPS00221512	USB: MUSB Host: Data transfers (Write to USB disk) fails with FAT errors
+OMAPS00213825	Kernel crash when many processes have been scheduled
+OMAPS00216449	Problems are seen with NFS when 'tcp' option is not specified in bootargs.
+OMAPS00214020	ethernet doesn't get configured with L24.4 kernel
+OMAPS00223050	White screen on  HDMI TV
+OMAPS00223633	Display: DSI 250 ms timeout following PM Suspend
+OMAPS00219789	V4L2 error observed when rendering frames from Video decode testcases
+OMAPS00222749	With VSTAB enabled, 1080p preview fails.
+OMAPS00222908	OMAPFB is not working with TILER buffer on L24.9
+ 
+
 
 4.6 Open Defects
 
-OMAPS00181435	Need NEON support for VSTAB and 3A algorithms in assembly code on ARM
-OMAPS00189562	Support for USB HOST type detection in baseport
-OMAPS00189728	Transmitted (string) data from OMAP3430 through UART3 would be occasionally corrupted on Host PC side.(L23.8)
-OMAPS00192987	Phonebook: Cannot add contact in SIM phonebook
-OMAPS00192992	MM: USB enumeration issue when USB cable is unplugged
+OMAPS00215651	MUSB driver in host mode has problems with unaligned DMA
 OMAPS00217993	Display on Primary LCD does not wakeup when USB is active
 OMAPS00218029	PT_PPM: Low USB-MS throughputs metrics for write operations
 OMAPS00220506	omap-serial driver is unstable during bluetooth file transfer stress testing.
 OMAPS00221541	UART trasfers fails at 3.5Mbps baudrate with DMA mode.
-OMAPS00221726	PT_PPM: Low USB-MS throughputs metrics for read operations
 OMAPS00222079	MMC corruption on reading when ADMA is used
-OMAPS00222347	[PT][Endurance] Transfer: PTLv1.4: Dxfer failed after some  iterations
+OMAPS00222347	[PT][Endurance] Transfer: PTLv1.3.8: Dxfer failed after some  iterations
 OMAPS00222789	At random times, booting is not completed and the SDP hangs.
-OMAPS00222986	Function of mass storage is not stable after OMAP3 been waked up by plugging in USB cable
-OMAPS00222987	EHCI performance numbers are low
-OMAPS00222989	Random failures in the Mass storage (thumbdrive) detection by OHCI controller
-OMAPS00223646	PM Suspend last power state traces are not valid for DSS, CAM, EMU and SGX.
-OMAPS00223678	PT Robustness, Image Display + Data transfer : Data Transfer gives kernel panic after 450~950 iterations
-OMAPS00223733	Need to provide o-profile support in L24.x
-OMAPS00224011	HWMOD: Smart-Reflex is broken on L24.9-pm branch (IVA-VCORE2, SR disable)
-OMAPS00224083	Kernel Hang on L24.9-pm branch with ubuntu filesystem when cpufreq is enabled
-OMAPS00224090	CPUFreq drivers are not handling M2 post-dividers for OPP50<->OPP100 (leading to Dpll relocks)
-OMAPS00224119	memory robustness tests crashing with highmem activated
-OMAPS00224227	Kernel crash after suspend with CPUFreq enabled
-OMAPS00224228	Kernel Crash with DVFS enabled when hotplugging out CPU1
-OMAPS00224258	PT Automation: Kernel BUG message appears when doing file transfer while other MM operation is performed
-OMAPS00224434	Handling PHY suspend in host mode for core retention support
-OMAPS00224571	Handling PHY suspend in host mode for core retention support
-OMAPS00224605	The USB keyboard and mouse are not working in OHCI
-
+OMAPS00222925	USB Host - Chapter 9 control,in out test case failure
+OMAPS00222943	Key press cannot wakeup system
+OMAPS00213906	180 degree rotation of yuv format shows a bluish tinge
+OMAPS00220581	L_JPEGDEC_FUNCTIONAL_001: multiple dark lines are seen when image is displayed
+OMAPS00220816	PicoDLP shows a junk buffer at the bottom of the frame
+OMAPS00221067	omaplfb relies on the FB2OFB definition, which is not defined by the headers of the Ubuntu kernel headers
+OMAPS00223203	Writeback color conversion and upscaling is not working
+OMAPS00223301	Sync Lost is observed when hdmi settings change is done through sysfs
+OMAPS00223435	Display unblank takes to much time ~10 sec.
+OMAPS00223490	Upscaling 512*612 resolution to 1080p for formats  RGB/NV12/YUV fails
+OMAPS00223493	Support for 4/8/12/18 bpp mode is not working for framebuffer
+OMAPS00224153	HPD with DVI is not working properly
+OMAPS00224263	HDMI hotplug detection doesn't work consistently in some TVs
+OMAPS00224600	FB not resizing based on the HDMI timing update
+OMAPS00224611	DSI errors are seen while system wide suspend and resume
 
 4.7 Open Change Requests
 None
 
 4.8 Rejected Defects
 
+OMAPS00221558	HSMMC : Copying same file twice on MMC and when run "cmp" will throw error
+OMAPS00218323	PT_Adhoc:Audio Playback of a file stored in SD card, Terminal hangs while SD is removed.
+OMAPS00221850	UST OTG ( as HOST): CDC-ACM class issue
+OMAPS00224344	Add support for horizontal flip in DSS driver
+OMAPS00219829	PT_PPM: AV Playback: FPS numbers for Video Playback via HDMI are below validation criteria
+OMAPS00222915	HDMI driver must not periodically wake up the system to enable ESD chip detecting plug insertion
+ 
 
 4.9 Postponed Defects
+
+OMAPS00221726	PT_PPM: Low USB-MS throughputs metrics for read operations
+OMAPS00216446	Disabling "auto update" on DSI would impact the V4l2 drivers that have the ISRs hooked up for FRAMEDONE already.
 
 
 4.10 Limitations
