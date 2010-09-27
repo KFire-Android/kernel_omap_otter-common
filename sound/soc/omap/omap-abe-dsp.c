@@ -1543,16 +1543,16 @@ static int aess_prepare(struct snd_pcm_substream *substream)
 	case 25:
 		/* OPP25 is not ready to be used */
 		abe_set_opp_processing(ABE_OPP50);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
 		break;
 	case 50:
 		abe_set_opp_processing(ABE_OPP50);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
 		break;
 	case 100:
 	default:
 		abe_set_opp_processing(ABE_OPP100);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 196600000);
 		break;
 	}
 
@@ -1588,16 +1588,16 @@ static int aess_close(struct snd_pcm_substream *substream)
 	case 25:
 		/* OPP25 is not ready to be used */
 		abe_set_opp_processing(ABE_OPP50);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
 		break;
 	case 50:
 		abe_set_opp_processing(ABE_OPP50);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
 		break;
 	case 100:
 	default:
 		abe_set_opp_processing(ABE_OPP100);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 196600000);
 		break;
 	}
 	pm_runtime_put_sync(&pdev->dev);
