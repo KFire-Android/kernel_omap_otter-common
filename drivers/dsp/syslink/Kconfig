@@ -78,4 +78,14 @@ config SYSLINK_RECOVERY
         bool "Enable Syslink Fault Recovery"
 	default y
 
+config DMM_DMA_API
+	bool "Enable DMA APIs for flushing"
+	depends on SYSLINK_IOMMU_ENABLE
+	default n
+	help
+	   Setting this would enable DMA APIs in Kernel for Mapped buffers
+	   cache maintainance. Not setting this option will allow unrestricted
+	   cache operations on the userspace buffers. This option would be
+	   made default once the code is stabilized
+
 endif

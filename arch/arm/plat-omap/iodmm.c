@@ -5,7 +5,6 @@
  *
  * Authors: Ramesh Gupta <grgupta@ti.com>
  *          Hari Kanigeri <h-kanigeri2@ti.com>
- *          Ohad Ben-Cohen <ohad@wizery.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -40,6 +39,7 @@
 
 #include "iopgtable.h"
 
+#ifndef CONFIG_DMM_DMA_API
 /* Hack hack code to handle MM buffers */
 int temp_user_dma_op(unsigned long start, unsigned long end, int op)
 {
@@ -115,6 +115,7 @@ int temp_user_dma_op(unsigned long start, unsigned long end, int op)
 	up_read(&mm->mmap_sem);
 	return 0;
 }
+#endif
 
 /* remember mapping information */
 static struct dmm_map_object *add_mapping_info(struct iodmm_struct *obj,
@@ -249,7 +250,21 @@ out:
 	return map_obj;
 }
 
-#if 0
+
+static inline struct page *get_mapping_page(struct dmm_map_object *map_obj,
+								int pg_i)
+{
+	pr_debug("%s: looking for pg_i %d, num_usr_pgs: %d\n", __func__,
+					pg_i, map_obj->num_usr_pgs);
+	if (pg_i < 0 || pg_i >= map_obj->num_usr_pgs) {
+		pr_err("%s: requested pg_i %d is out of mapped range\n",
+				__func__, pg_i);
+		return NULL;
+	}
+	return map_obj->pages[pg_i];
+}
+
+#ifdef CONFIG_DMM_DMA_API
 static int find_first_page_in_cache(struct dmm_map_object *map_obj,
 					unsigned long va)
 {
@@ -265,22 +280,7 @@ static int find_first_page_in_cache(struct dmm_map_object *map_obj,
 	pr_debug("%s: first page is %d\n", __func__, pg_index);
 	return pg_index;
 }
-#endif
 
-static inline struct page *get_mapping_page(struct dmm_map_object *map_obj,
-								int pg_i)
-{
-	pr_debug("%s: looking for pg_i %d, num_usr_pgs: %d\n", __func__,
-					pg_i, map_obj->num_usr_pgs);
-	if (pg_i < 0 || pg_i >= map_obj->num_usr_pgs) {
-		pr_err("%s: requested pg_i %d is out of mapped range\n",
-				__func__, pg_i);
-		return NULL;
-	}
-	return map_obj->pages[pg_i];
-}
-
-#if 0
 /* Cache operation against kernel address instead of users */
 static int build_dma_sg(struct dmm_map_object *map_obj, unsigned long start,
 						ssize_t len, int pg_i)
@@ -347,10 +347,6 @@ static int memory_regain_ownership(struct device *dev,
 	dma_unmap_sg(dev, dma_info->sg, num_pages, dma_info->dir);
 
 	pr_debug("%s: dma_map_sg unmapped\n", __func__);
-
-	kfree(dma_info->sg);
-
-	map_obj->dma_info.sg = NULL;
 
 out:
 	return ret;
@@ -420,8 +416,7 @@ int proc_begin_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
 					enum dma_data_direction dir)
 {
 	int status = 0;
-	u32 end = (u32)pva + ul_size;
-#if 0
+#ifdef CONFIG_DMM_DMA_API
 	u32 va_align;
 	struct dmm_map_object *map_obj;
 	struct device *dev = obj->iovmm->iommu->dev;
@@ -448,8 +443,11 @@ int proc_begin_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
 
 err_out:
 	mutex_unlock(&obj->iovmm->dmm_map_lock);
-#endif
+#else
+
+	u32 end = (u32)pva + ul_size;
 	status = temp_user_dma_op((u32)pva, end, 3);
+#endif
 	return status;
 }
 
@@ -457,8 +455,7 @@ int proc_end_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
 			enum dma_data_direction dir)
 {
 	int status = 0;
-	u32 end = (u32)pva + ul_size;
-#if 0
+#ifdef CONFIG_DMM_DMA_API
 	u32 va_align;
 	struct dmm_map_object *map_obj;
 	struct device *dev = obj->iovmm->iommu->dev;
@@ -487,8 +484,10 @@ int proc_end_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
 
 err_out:
 	mutex_unlock(&obj->iovmm->dmm_map_lock);
-#endif
+#else
+	u32 end = (u32)pva + ul_size;
 	status = temp_user_dma_op((u32)pva, end, 1);
+#endif
 	return status;
 }
 
@@ -850,7 +849,6 @@ int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
 				da_align, size_align, dmm_obj->pages);
 	if (err)
 		remove_mapping_information(obj, tmp_addr, size_align);
-
 err:
 	mutex_unlock(&iovmm_obj->dmm_map_lock);
 	up_read(&mm->mmap_sem);

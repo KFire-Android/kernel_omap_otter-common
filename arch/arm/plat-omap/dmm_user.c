@@ -112,9 +112,8 @@ static int omap_dmm_ioctl(struct inode *inode, struct file *filp,
 		status = dmm_user(obj, map_info.mem_pool_id,
 					map_info.da, map_info.mpu_addr,
 					map_info.size, map_info.flags);
-		copy_to_user((void __user *)args, &map_info,
+		ret = copy_to_user((void __user *)args, &map_info,
 					sizeof(struct dmm_map_info));
-		ret = status;
 		break;
 	}
 	case DMM_IOCMEMUNMAP:
