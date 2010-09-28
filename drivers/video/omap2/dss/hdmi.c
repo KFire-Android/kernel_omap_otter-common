@@ -264,7 +264,7 @@ static ssize_t hdmi_edid_store(struct device *dev,
 
 static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
 
-static struct device_attribute *hdmi_sysfs_attrs[] = {
+static struct attribute *hdmi_sysfs_attrs[] = {
 	NULL
 };
 
@@ -872,6 +872,13 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	/* do not fall into any sort of idle */
 	dispc_set_idle_mode();
+
+#ifndef CONFIG_OMAP4_ES1
+	/*The default reset value for DISPC.DIVISOR1 LCD is 4
+	* in ES2.0 and the clock will run at 1/4th the speed
+	* resulting in the sync_lost_digit */
+	dispc_set_tv_divisor();
+#endif
 
 	/* tv size */
 	dispc_set_digit_size(dssdev->panel.timings.x_res,

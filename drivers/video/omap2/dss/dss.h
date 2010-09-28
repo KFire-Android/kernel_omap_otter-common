@@ -364,6 +364,13 @@ static inline int dsi_init(struct platform_device *pdev)
 static inline void dsi_exit(void)
 {
 }
+static inline int dsi2_init(struct platform_device *pdev)
+{
+        return 0;
+}
+static inline void dsi2_exit(void)
+{
+}
 static inline void dsi_wait_pll_dispc_active(enum omap_dsi_index ix)
 {
 }
@@ -408,6 +415,9 @@ void dispc_pck_free_enable(bool enable);
 void dispc_enable_fifohandcheck(enum omap_channel channel, bool enable);
 
 void dispc_set_lcd_size(enum omap_channel channel, u16 width, u16 height);
+#ifndef CONFIG_OMAP4_ES1
+void dispc_set_tv_divisor(void);
+#endif
 void dispc_set_digit_size(u16 width, u16 height);
 u32 dispc_get_plane_fifo_size(enum omap_plane plane);
 void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high);

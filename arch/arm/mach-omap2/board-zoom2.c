@@ -81,6 +81,7 @@ static void __init omap_zoom2_init(void)
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
 	zoom_peripherals_init();
 	zoom_debugboard_init();
+	zoom_display_init(OMAP_DSS_VENC_TYPE_COMPOSITE);
 }
 
 static void __init omap_zoom2_map_io(void)

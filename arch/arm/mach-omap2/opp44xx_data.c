@@ -38,9 +38,9 @@ static struct clk *abe_clk, *sgx_clk, *fdif_clk;
 
 static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	/* MPU OPP1 - OPP50 */
-	OMAP_OPP_DEF("mpu", true, 300000000, 1100000),
+	OMAP_OPP_DEF("mpu", true, 300000000, 930000),
 	/* MPU OPP2 - OPP100 */
-	OMAP_OPP_DEF("mpu", true, 600000000, 1200000),
+	OMAP_OPP_DEF("mpu", true, 600000000, 1100000),
 	/* MPU OPP3 - OPP-Turbo */
 	OMAP_OPP_DEF("mpu", true, 800000000, 1260000),
 	/* MPU OPP4 - OPP-SB */
@@ -58,11 +58,11 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	/* DSP OPP3 - OPPTB */
 	OMAP_OPP_DEF("dsp", false, 498000000, 1260000),
 	/* ABE OPP1 - OPP50 */
-	OMAP_OPP_DEF("aess", true, 98300000, 930000),
+	OMAP_OPP_DEF("omap-aess-audio", true, 98300000, 930000),
 	/* ABE OPP2 - OPP100 */
-	OMAP_OPP_DEF("aess", true, 196600000, 1100000),
+	OMAP_OPP_DEF("omap-aess-audio", true, 196600000, 1100000),
 	/* ABE OPP3 - OPPTB */
-	OMAP_OPP_DEF("aess", false, 196600000, 1260000),
+	OMAP_OPP_DEF("omap-aess-audio", false, 196600000, 1260000),
 	/* L3 OPP1 - OPP50 */
 	OMAP_OPP_DEF("l3_main_1", true, 100000000, 930000),
 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
@@ -320,7 +320,7 @@ int __init omap4_pm_init_opp_table(void)
 		opp_populate_rate_fns(dev, omap4_l3_set_rate,
 				omap4_l3_get_rate);
 
-	dev = find_dev_ptr("aess");
+	dev = find_dev_ptr("omap-aess-audio");
 	if (dev)
 		opp_populate_rate_fns(dev, omap4_abe_set_rate,
 				omap4_abe_get_rate);

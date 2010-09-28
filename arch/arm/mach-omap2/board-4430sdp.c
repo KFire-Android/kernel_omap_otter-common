@@ -1148,6 +1148,17 @@ static void __init omap4_display_init(void)
         gpio_direction_output(dsi2_panel.reset_gpio, 0);
 }
 
+static void enable_board_wakeup_source(void)
+{
+	u16 padconf;
+
+	/* NOTE: Use mx framework when available */
+	/* Enable IO wakeup for the gpio used for primary touchscreen */
+	padconf = omap_readw(CONTROL_CORE_PAD1_GPMC_AD11);
+	padconf |= OMAP44XX_PADCONF_WAKEUPENABLE0;
+	omap_writew(padconf, CONTROL_CORE_PAD1_GPMC_AD11);
+}
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1191,6 +1202,7 @@ static void __init omap_4430sdp_init(void)
 	omap_sfh7741prox_init();
 	omap_cma3000accl_init();
 	omap_display_init(&sdp4430_dss_data);
+	enable_board_wakeup_source();
 }
 
 static void __init omap_4430sdp_map_io(void)

@@ -42,7 +42,7 @@
 #define DSI_CONTROL2         (0x238)
 
 static  int display_control_reg   = (0x58000000 + 0x1000);
-void __iomem  *dispc_base;
+extern void __iomem  *dispc_base;
 
 static struct omap_video_timings pico_ls_timings = {
 	.x_res	        = 864,

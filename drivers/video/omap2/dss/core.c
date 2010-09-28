@@ -358,7 +358,8 @@ EXPORT_SYMBOL(omap_dss_resume_idle);
 
 static void dss_clk_disable_no_ctx(enum dss_clock clks)
 {
-	unsigned num_clks = count_clk_bits(clks);
+	unsigned num_clks;
+	num_clks = count_clk_bits(clks);
 
 	if (cpu_is_omap44xx())
 		return;
@@ -410,6 +411,7 @@ static void dss_clk_disable_all_no_ctx(void)
 	dss_clk_disable_no_ctx(clks);
 }
 
+#ifdef HWMOD
 static void dss_clk_disable_all(void)
 {
 	enum dss_clock clks;
@@ -419,6 +421,7 @@ static void dss_clk_disable_all(void)
 		clks |= DSS_CLK_96M;
 	dss_clk_disable(clks);
 }
+#endif
 
 /* REGULATORS */
 
@@ -675,7 +678,9 @@ static int omap_dss_probe(struct platform_device *pdev)
 		if (def_disp_name && strcmp(def_disp_name, dssdev->name) == 0)
 			pdata->default_device = dssdev;
 	}
+#ifdef HWMOD
 	dss_clk_disable_all();
+#endif
 	return 0;
 
 err_register:
@@ -707,8 +712,8 @@ err_rfbi:
 err_dss:
 	dss_clk_disable_all_no_ctx();
 	dss_put_clocks();
-#endif
 err_clocks:
+#endif
 	return r;
 }
 
@@ -813,6 +818,7 @@ static int omap_dsshw_probe(struct platform_device *pdev)
 	int r;
 
 	pm_runtime_enable(&pdev->dev);
+	core.pdev = pdev;
 	r = dss_get_clocks();
 	if (r)
 		goto err_dss;

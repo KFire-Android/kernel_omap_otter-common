@@ -3631,6 +3631,8 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
 		dss_mainclk_state_enable();
 
+	dssdev->state = OMAP_DSS_DISPLAY_TRANSITION;
+
 	WARN_ON(!dsi_bus_is_locked(ix));
 
 	mutex_lock(&p_dsi->lock);
@@ -3715,11 +3717,7 @@ int omapdss_dsi_enable_te(struct omap_dss_device *dssdev, bool enable)
 	struct dsi_struct *p_dsi;
 	p_dsi = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? &dsi1 : &dsi2;
 
-	mutex_lock(&p_dsi->lock);
-
 	p_dsi->te_enabled = enable;
-
-	mutex_unlock(&p_dsi->lock);
 
 	return 0;
 }

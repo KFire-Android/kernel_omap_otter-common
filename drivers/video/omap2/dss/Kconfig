@@ -1,6 +1,7 @@
 menuconfig OMAP2_DSS
         tristate "OMAP2/3/4 Display Subsystem support (EXPERIMENTAL)"
         depends on ARCH_OMAP2 || ARCH_OMAP3 || ARCH_OMAP4
+	default y
         help
           OMAP2/3/4 Display Subsystem support.
 
@@ -9,7 +10,7 @@ if OMAP2_DSS
 config OMAP2_VRAM_SIZE
 	int "VRAM size (MB)"
 	range 0 32
-	default 0
+	default 4
 	help
 	  The amount of SDRAM to reserve at boot time for video RAM use.
 	  This VRAM will be used by omapfb and other drivers that need
@@ -108,7 +109,8 @@ config OMAP2_DSS_FAKE_VSYNC
 config OMAP2_DSS_MIN_FCK_PER_PCK
 	int "Minimum FCK/PCK ratio (for scaling)"
 	range 0 32
-	default 0
+	default 4  if ARCH_OMAP2 || ARCH_OMAP3
+	default 0  if ARCH_OMAP4
 	help
 	  This can be used to adjust the minimum FCK/PCK ratio.
 

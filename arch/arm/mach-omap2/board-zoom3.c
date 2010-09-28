@@ -67,6 +67,7 @@ static void __init omap_zoom_init(void)
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 	zoom_peripherals_init();
 	zoom_debugboard_init();
+	zoom_display_init(OMAP_DSS_VENC_TYPE_COMPOSITE);
 
 	omap_mux_init_gpio(64, OMAP_PIN_OUTPUT);
 	usb_uhhtll_init(&usbhs_pdata);

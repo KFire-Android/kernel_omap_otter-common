@@ -331,8 +331,8 @@ static struct omap_volt_data omap36xx_vdd2_volt_data[] = {
  * driver after reading the efuse.
  */
 static struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
-	{.volt_nominal = 1100000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C},
-	{.volt_nominal = 1200000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
+	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C},
+	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
 	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23},
 	{.volt_nominal = 1350000, .sr_errminlimit = 0xFA, .vp_errgain = 0x27},
 };
@@ -367,8 +367,8 @@ static struct omap_vdd_dep_info omap34xx_vdd1_dep_info[] = {
 
 /* OMAP 4430 MPU Core VDD dependency table */
 static struct omap_vdd_dep_volt omap44xx_vddmpu_vddcore_data[] = {
-	{.main_vdd_volt = 1100000, .dep_vdd_volt = 930000},
-	{.main_vdd_volt = 1200000, .dep_vdd_volt = 1100000},
+	{.main_vdd_volt = 930000, .dep_vdd_volt = 930000},
+	{.main_vdd_volt = 1100000, .dep_vdd_volt = 1100000},
 	{.main_vdd_volt = 1260000, .dep_vdd_volt = 1100000},
 	{.main_vdd_volt = 1350000, .dep_vdd_volt = 1100000},
 	{.main_vdd_volt = 0, .dep_vdd_volt = 0},
