@@ -1518,8 +1518,8 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 		},
 		.capture = {
 			.stream_name = "MultiMedia1 Capture",
-			.channels_min = 1,
-			.channels_max = 2,
+			.channels_min = 2,
+			.channels_max = 8,
 			.rates = SNDRV_PCM_RATE_48000,
 			.formats = OMAP_ABE_FORMATS,
 		},
@@ -1529,8 +1529,8 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 		.name = "MultiMedia2",
 		.capture = {
 			.stream_name = "MultiMedia2 Capture",
-			.channels_min = 2,
-			.channels_max = 8,
+			.channels_min = 1,
+			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_48000,
 			.formats = OMAP_ABE_FORMATS,
 		},
@@ -1547,7 +1547,7 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 		},
 		.capture = {
 			.stream_name = "Voice Capture",
-			.channels_min = 2,
+			.channels_min = 1,
 			.channels_max = 2,
 			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000,
 			.formats = OMAP_ABE_FORMATS,
