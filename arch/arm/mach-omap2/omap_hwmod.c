@@ -995,6 +995,7 @@ int _omap_hwmod_enable(struct omap_hwmod *oh)
 			_sysc_enable(oh);
 		}
 	} else {
+		_disable_clocks(oh);
 		pr_debug("omap_hwmod: %s: _wait_target_ready: %d\n",
 			 oh->name, r);
 	}
