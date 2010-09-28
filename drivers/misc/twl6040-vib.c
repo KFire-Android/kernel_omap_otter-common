@@ -129,6 +129,11 @@ static void vib_enable(struct timed_output_dev *dev, int value)
 	    container_of(dev, struct vib_data, dev);
 	unsigned long flags;
 
+	if (value < 0) {
+		pr_err("%s: Invalid vibrator timer value\n", __func__);
+		return;
+	}
+
 	spin_lock_irqsave(&data->lock, flags);
 	hrtimer_cancel(&data->timer);
 
