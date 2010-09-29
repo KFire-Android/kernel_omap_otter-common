@@ -1,4 +1,4 @@
-/* 
+/*
         FW 05.10  MEMORY SIZES
 */
 #define ABE_DMEM_SIZE_OPTIMIZED 16384

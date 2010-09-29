@@ -18,20 +18,18 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA
  */
-
-void abe_init_subroutine_table (void);
-
+void abe_init_subroutine_table(void);
 /*
  * Register Programming Examples
  *
  * 1. Power on sequence
  *
- * The modules HSLDO, NCP, LSLDO, LPPLL are enabled/disabled automatically by 
- * the TWL6040 power state machine after pin AUDPWRON transitions from 0 ' 1. 
+ * The modules HSLDO, NCP, LSLDO, LPPLL are enabled/disabled automatically by
+ * the TWL6040 power state machine after pin AUDPWRON transitions from 0 ' 1.
  * No register writes are necessary.
  *
- * For the purposes of test it is possible to bypass the power state machine 
- * and manually enable these modules in the same order as described in Fig 2-XX. 
+ * For the purposes of test it is possible to bypass the power state machine
+ * and manually enable these modules in the same order as described in Fig 2-XX.
  * This can be done after VIO comes up and I2C register writes are possible.
  *
  * The manual sequence could be as follows
@@ -40,10 +38,10 @@ void abe_init_subroutine_table (void);
  * LDOCTL = 0x05 (Enable LSLDO)
  * LPPLLCTL = 0x09 (Enable LPPLL with output frequency = 19.2MHz)
  *
- * Please see Fig 2-64 for details on details to be maintained between successive 
+ * Please see Fig 2-64 for details on details to be maintained between successive
  * I2C register writes.
  *
- * Further if the system MCLK is active the HPPLL could be enabled instead of the 
+ * Further if the system MCLK is active the HPPLL could be enabled instead of the
  * LPPLL.
  * (a) For a square wave where slicer is not required
  * HPPLLCTL = 0x11 (Select HPPLL output, Enable HPPLL)
@@ -51,7 +49,6 @@ void abe_init_subroutine_table (void);
  * HPPLLCTL = 0x19 (Select HPPLL output, Enable Slicer, Enable HPPLL)
  *
  */
-
 /*
  * 2. Setting up a stereo UPLINK path through MICAMPL, MICAMPR input amplifiers
  * AMICBCTL = 0x10
@@ -61,7 +58,6 @@ void abe_init_subroutine_table (void);
  * MICRCTL = 0x0D (Select SMIC input, Enable ADC)
  *
  */
-
 /*
  * 3. Setting up a stereo headset MP3 playback DNLINK path
  * Please see section 2.3.1.1 for details
@@ -78,7 +74,6 @@ void abe_init_subroutine_table (void);
  * HSRCTL = 0x25 (Close HSDACR switch)
  *
  */
-
 /*
  * (a) LP
  * HSGAIN = 0x22 (-4 dB gain on L and R amplifiers)
@@ -92,7 +87,6 @@ void abe_init_subroutine_table (void);
  * HSRCTL = 0x2F (Close HSDACR switch)
  *
  */
-
 /*
  * 4. Setting up a stereo FM playback path on headset
  * (a) HP
@@ -108,7 +102,6 @@ void abe_init_subroutine_table (void);
  *
  *
  */
-
 /*
  * (b) LP
  * LINEGAIN = 0x1B (0dB gain on L and R inputs)
@@ -122,8 +115,6 @@ void abe_init_subroutine_table (void);
  * HSRCTL = 0x4C (Close FMLOOP switch)
  *
  */
-
-
 /*
  * 5. Setting up a handset call
  *
@@ -139,7 +130,7 @@ void abe_init_subroutine_table (void);
  *
  * HSLCTL = 0x01 (Enable HSDACL, HP mode)
  * Wait 80us
- * EARCTL = 0x03 (Enable EAR, Gain = min, by default enabling EAR connects 
+ * EARCTL = 0x03 (Enable EAR, Gain = min, by default enabling EAR connects
  * HSDACL output to EAR)
  *
  */

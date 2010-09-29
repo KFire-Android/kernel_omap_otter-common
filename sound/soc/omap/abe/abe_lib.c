@@ -18,23 +18,29 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA
  */
-
-
 #include "abe_main.h"
-
-
 #if PC_SIMULATION
 #include <stdlib.h>
 #endif
-
 #define ABE_PMEM_BASE_OFFSET_MPU	0xe0000
 #define ABE_CMEM_BASE_OFFSET_MPU	0xa0000
 #define ABE_SMEM_BASE_OFFSET_MPU	0xc0000
 #define ABE_DMEM_BASE_OFFSET_MPU	0x80000
 #define ABE_ATC_BASE_OFFSET_MPU		0xf1000
-
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/init.h>
+#include <linux/delay.h>
+#include <linux/pm.h>
+#include <linux/i2c.h>
+#include <linux/gpio.h>
+#include <linux/platform_device.h>
+#include <linux/workqueue.h>
+#include <linux/clk.h>
+#include <linux/err.h>
+#include <linux/slab.h>
+#include <linux/pm_runtime.h>
 void __iomem *io_base;
-
 /**
  * abe_init_mem - Allocate Kernel space memory map for ABE
  *
@@ -44,14 +50,12 @@ void abe_init_mem(void __iomem *_io_base)
 {
 	io_base = _io_base;
 }
-
 /**
 * abe_fprintf
 * @line: character line to be printed
 *
 * Print ABE debug messages.
 */
-
 /**
  * abe_read_feature_from_port
  * @x: d
@@ -62,7 +66,6 @@ void abe_init_mem(void __iomem *_io_base)
 void abe_read_feature_from_port(u32 x)
 {
 }
-
 /**
  * abe_write_feature_to_port
  * @x: d
@@ -73,7 +76,6 @@ void abe_read_feature_from_port(u32 x)
 void abe_write_feature_to_port(u32 x)
 {
 }
-
 /**
  * abe_read_fifo
  * @x: d
@@ -83,7 +85,6 @@ void abe_write_feature_to_port(u32 x)
 void abe_read_fifo(u32 x)
 {
 }
-
 /**
  * abe_write_fifo
  * @mem_bank: currently only ABE_DMEM supported
@@ -99,26 +100,21 @@ void abe_write_fifo(u32 memory_bank, u32 descr_addr, u32 *data, u32 nb_data32)
 {
 	u32 fifo_addr[4];
 	u32 i;
-
 	/* read FIFO descriptor from DMEM */
 	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM, descr_addr,
 		       &fifo_addr[0], 4 * sizeof(u32));
-
 	/* WRITE ptr < FIFO start address */
 	if (fifo_addr[1] < fifo_addr[2])
 		abe_dbg_error_log(ABE_FW_FIFO_WRITE_PTR_ERR);
-
 	/* WRITE ptr > FIFO end address */
 	if (fifo_addr[1] > fifo_addr[3])
 		abe_dbg_error_log(ABE_FW_FIFO_WRITE_PTR_ERR);
-
 	switch (memory_bank) {
 	case ABE_DMEM:
 		for (i = 0; i < nb_data32; i++) {
 			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 				       (s32) fifo_addr[1], (u32 *) (data + i),
 				       4);
-
 			/* increment WRITE pointer */
 			fifo_addr[1] = fifo_addr[1] + 4;
 			if (fifo_addr[1] > fifo_addr[3])
@@ -134,10 +130,7 @@ void abe_write_fifo(u32 memory_bank, u32 descr_addr, u32 *data, u32 nb_data32)
 		/* printf("currently only DMEM FIFO write supported ERROR\n"); */
 		break;
 	}
-
-
 }
-
 /**
  * abe_block_copy
  * @direction: direction of the data move (Read/Write)
@@ -153,7 +146,6 @@ void abe_block_copy(u32 direction, u32 memory_bank, u32 address,
 {
 	u32 i;
 	u32 base_address = 0, *src_ptr, *dst_ptr, n;
-
 	switch (memory_bank) {
 	case ABE_PMEM:
 		base_address = (u32) io_base + ABE_PMEM_BASE_OFFSET_MPU;
@@ -176,7 +168,6 @@ void abe_block_copy(u32 direction, u32 memory_bank, u32 address,
 		abe_dbg_error_log(ABE_BLOCK_COPY_ERR);
 		break;
 	}
-
 	if (direction == COPY_FROM_HOST_TO_ABE) {
 		dst_ptr = (u32 *) (base_address + address);
 		src_ptr = (u32 *) data;
@@ -184,15 +175,10 @@ void abe_block_copy(u32 direction, u32 memory_bank, u32 address,
 		dst_ptr = (u32 *) data;
 		src_ptr = (u32 *) (base_address + address);
 	}
-
 	n = (nb_bytes / 4);
-
 	for (i = 0; i < n; i++)
 		*dst_ptr++ = *src_ptr++;
-
 }
-
-
 #if 0
 /*
  * ABE_SINGLE_COPY
@@ -208,15 +194,14 @@ void abe_block_copy(u32 direction, u32 memory_bank, u32 address,
  * Return value :
  * none
  */
-
 void abe_write_dmem(u32 address, u32 *data, u32 nb_bytes)
-void abe_read_dmem(u32 address, u32 *data, u32 nb_bytes)
-void abe_write_cmem(u32 address, u32 *data, u32 nb_bytes)
-void abe_read_cmem(u32 address, u32 *data, u32 nb_bytes)
-void abe_write_smem(u32 address, u32 *data, u32 nb_bytes)
-void abe_read_smem(u32 address, u32 *data, u32 nb_bytes)
-void abe_write_atc(u32 address, u32 *data, u32 nb_bytes)
-void abe_read_atc(u32 address, u32 *data, u32 nb_bytes)
+     void abe_read_dmem(u32 address, u32 *data, u32 nb_bytes)
+     void abe_write_cmem(u32 address, u32 *data, u32 nb_bytes)
+     void abe_read_cmem(u32 address, u32 *data, u32 nb_bytes)
+     void abe_write_smem(u32 address, u32 *data, u32 nb_bytes)
+     void abe_read_smem(u32 address, u32 *data, u32 nb_bytes)
+     void abe_write_atc(u32 address, u32 *data, u32 nb_bytes)
+     void abe_read_atc(u32 address, u32 *data, u32 nb_bytes)
 #endif
 /**
  * abe_reset_mem
@@ -227,12 +212,11 @@ void abe_read_atc(u32 address, u32 *data, u32 nb_bytes)
  *
  * Reset ABE memory
  */
-void abe_reset_mem(u32 memory_bank, u32 address, u32 nb_bytes)
+     void abe_reset_mem(u32 memory_bank, u32 address, u32 nb_bytes)
 {
 	u32 i;
 	u32 *dst_ptr, n;
 	u32 base_address = 0;
-
 	switch (memory_bank) {
 	case ABE_SMEM:
 		base_address = (u32) io_base + ABE_SMEM_BASE_OFFSET_MPU;
@@ -244,15 +228,11 @@ void abe_reset_mem(u32 memory_bank, u32 address, u32 nb_bytes)
 		base_address = (u32) io_base + ABE_CMEM_BASE_OFFSET_MPU;
 		break;
 	}
-
 	dst_ptr = (u32 *) (base_address + address);
-
 	n = (nb_bytes / 4);
-
 	for (i = 0; i < n; i++)
 		*dst_ptr++ = 0;
 }
-
 /**
  * abe_monitoring
  *
@@ -262,7 +242,6 @@ void abe_monitoring(void)
 {
 	abe_dbg_param = 0;
 }
-
 /**
  * abe_format_switch
  * @f: port format
@@ -276,10 +255,8 @@ void abe_monitoring(void)
 void abe_format_switch(abe_data_format_t *f, u32 *iter, u32 *mulfac)
 {
 	u32 n_freq;
-
 #if FW_SCHED_LOOP_FREQ==4000
 	switch (f->f) {
-
 		/* nb of samples processed by scheduling loop */
 	case 8000:
 		n_freq = 2;
@@ -296,7 +273,7 @@ void abe_format_switch(abe_data_format_t *f, u32 *iter, u32 *mulfac)
 	case 96000:
 		n_freq = 24;
 		break;
-	default /* case 48000 */ :
+	default/*case 48000 */ :
 		n_freq = 12;
 		break;
 	}
@@ -341,7 +318,6 @@ void abe_format_switch(abe_data_format_t *f, u32 *iter, u32 *mulfac)
 	}
 	*iter = (n_freq * (*mulfac));
 }
-
 /**
  * abe_dma_port_iteration
  * @f: port format
@@ -351,12 +327,9 @@ void abe_format_switch(abe_data_format_t *f, u32 *iter, u32 *mulfac)
 u32 abe_dma_port_iteration(abe_data_format_t *f)
 {
 	u32 iter, mulfac;
-
 	abe_format_switch(f, &iter, &mulfac);
-
 	return iter;
 }
-
 /**
  * abe_dma_port_iter_factor
  * @f: port format
@@ -366,12 +339,9 @@ u32 abe_dma_port_iteration(abe_data_format_t *f)
 u32 abe_dma_port_iter_factor(abe_data_format_t *f)
 {
 	u32 iter, mulfac;
-
 	abe_format_switch(f, &iter, &mulfac);
-
 	return mulfac;
 }
-
 /**
  * abe_dma_port_copy_subroutine_id
  *
@@ -382,7 +352,6 @@ u32 abe_dma_port_iter_factor(abe_data_format_t *f)
 u32 abe_dma_port_copy_subroutine_id(u32 port_id)
 {
 	u32 sub_id;
-
 	if (abe_port[port_id].protocol.direction == ABE_ATC_DIRECTION_IN) {
 		switch (abe_port[port_id].format.samp_format) {
 		case MONO_MSB:
@@ -449,4 +418,108 @@ u32 abe_dma_port_copy_subroutine_id(u32 port_id)
 		}
 	}
 	return sub_id;
+}
+/**
+ * abe_int_2_float
+ * returns a mantissa on 16 bits and the exponent
+ * 0x4000.0000 leads to M=0x4000 X=15
+ * 0x0004.0000 leads to M=0x4000 X=4
+ * 0x0000.0001 leads to M=0x4000 X=-14
+ *
+ */
+void abe_int_2_float16(u32 data, u32 *mantissa, u32 *exp)
+{
+	u32 i;
+	*exp = 0;
+	*mantissa = 0;
+	for (i = 0; i < 32; i++) {
+		if ((1 << i) > data)
+			break;
+	}
+	*exp = i - 15;
+	*mantissa = (*exp > 0) ? data >> (*exp) : data << (*exp);
+}
+/**
+ * abe_gain_offset
+ * returns the offset to firmware data structures
+ *
+ */
+void abe_gain_offset(u32 id, u32 *mixer_offset)
+{
+	switch (id) {
+	default:
+	case GAINS_DMIC1:
+		*mixer_offset = dmic1_gains_offset;
+		break;
+	case GAINS_DMIC2:
+		*mixer_offset = dmic2_gains_offset;
+		break;
+	case GAINS_DMIC3:
+		*mixer_offset = dmic3_gains_offset;
+		break;
+	case GAINS_AMIC:
+		*mixer_offset = amic_gains_offset;
+		break;
+	case GAINS_DL1:
+		*mixer_offset = dl1_gains_offset;
+		break;
+	case GAINS_DL2:
+		*mixer_offset = dl2_gains_offset;
+		break;
+	case GAINS_SPLIT:
+		*mixer_offset = splitters_gains_offset;
+		break;
+	case MIXDL1:
+		*mixer_offset = mixer_dl1_offset;
+		break;
+	case MIXDL2:
+		*mixer_offset = mixer_dl2_offset;
+		break;
+	case MIXECHO:
+		*mixer_offset = mixer_echo_offset;
+		break;
+	case MIXSDT:
+		*mixer_offset = mixer_sdt_offset;
+		break;
+	case MIXVXREC:
+		*mixer_offset = mixer_vxrec_offset;
+		break;
+	case MIXAUDUL:
+		*mixer_offset = mixer_audul_offset;
+		break;
+	}
+}
+/**
+ * abe_decide_main_port - Select stynchronization port for Event generator.
+ * @id: audio port name
+ *
+ * tells the FW which is the reference stream for adjusting
+ * the processing on 23/24/25 slots
+ *
+ * takes the first port in a list which is slave on the data interface
+ */
+u32 abe_valid_port_for_synchro(u32 id)
+{
+	if ((abe_port[id].protocol.protocol_switch ==
+	     DMAREQ_PORT_PROT) ||
+	    (abe_port[id].protocol.protocol_switch ==
+	     PINGPONG_PORT_PROT) ||
+	    (abe_port[id].status != OMAP_ABE_PORT_ACTIVITY_RUNNING))
+		return 0;
+	else
+		return 1;
+}
+void abe_decide_main_port(u32 id)
+{
+	u32 i;
+	if (abe_valid_port_for_synchro(id)) {
+		for (i = 0; i < (LAST_PORT_ID - 1); i++) {
+			printk("Port (%d,%d) %d\n", i, abe_port_priority[i],
+			       abe_port[abe_port_priority[i]].status);
+			if (abe_port[abe_port_priority[i]].status ==
+			    OMAP_ABE_PORT_ACTIVITY_RUNNING)
+				break;
+		}
+		abe_select_main_port(abe_port_priority[i]);
+	}
 }

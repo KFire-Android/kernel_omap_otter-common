@@ -18,9 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA
  */
-
 #include "abe_main.h"
-
 /*
  * DEFINE
  */
@@ -28,7 +26,6 @@
 #define TERMINAL_OUTPUT 1
 #define LINE_OUTPUT 2
 #define DEBUG_TRACE_OUTPUT 3
-
 /*
  *	Debug trace format
  *	TIME 2 bytes from ABE : 4kHz period of the FW scheduler
@@ -36,21 +33,14 @@
  * From 0 to 16 bytes : parameters of the subroutine
  * on every 32 dumps a tag is pushed on the debug trace : 0x55555555
  */
-
-
 #define dbg_bitfield_offset 8
-
 #define dbg_api_calls 0
 #define dbg_mapi (1L << (dbg_api_calls + dbg_bitfield_offset))
-
 #define dbg_external_data_access 1
 #define dbg_mdata (1L << (dbg_external_data_access + dbg_bitfield_offset))
-
 #define dbg_err_codes 2
 #define dbg_merr (1L << (dbg_api_calls + dbg_bitfield_offset))
-
 #define ABE_DBG_MAGIC_NUMBER 0x55555555
-
 /*
  * IDs used for traces
  */
@@ -122,8 +112,6 @@
 #define id_remote_debugger_interface (66 + dbg_mapi)
 #define id_enable_test_pattern (67 + dbg_mapi)
 #define id_connect_tdm_port (68 + dbg_mapi)
-
-
 /*
  * IDs used for error codes
  */
@@ -135,40 +123,27 @@
 #define ABE_SET_ATC_MEMORY_CONFIG_ERR (5 + dbg_merr)
 #define ABE_PROTOCOL_ERROR (6 + dbg_merr)
 #define ABE_PARAMETER_ERROR (7 + dbg_merr)
-
 /*  port programmed while still running */
 #define ABE_PORT_REPROGRAMMING (8 + dbg_merr)
 #define ABE_READ_USE_CASE_OPP_ERR (9 + dbg_merr)
 #define ABE_PARAMETER_OVERFLOW (10 + dbg_merr)
 #define ABE_FW_FIFO_WRITE_PTR_ERR (11 + dbg_merr)
-
-
 /*
  * IDs used for error codes
  */
 /* error in the LIB.C file */
 #define ERR_LIB (1 << 1)
-
 /* error in the API.C file */
 #define ERR_API (1 << 2)
-
 /* error in the INI.C file */
 #define ERR_INI (1 << 3)
-
 /* error in the SEQ.C file */
 #define ERR_SEQ (1 << 4)
-
 /* error in the DBG.C file */
 #define ERR_DBG (1 << 5)
-
 /* error in the DBG.C file */
 #define ERR_EXT (1 << 6)
-
 /*
  * MACROS
  */
-#ifdef CONFIG_OMAP_ABE_DEBUG
-#define _log(x,y,z,t) {if(x&abe_dbg_mask)abe_dbg_log(x,y,z,t);}
-#else
-#define _log(x,y,z,t) {;}
-#endif
+#define _log(x,y,z,t) {}
