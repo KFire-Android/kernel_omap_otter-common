@@ -249,7 +249,7 @@ void abe_dsp_disable_data_transfer(int port)
 	/* TODO: do not use abe global structure to assign pdev */
 	struct platform_device *pdev = abe->pdev;
 
-	abe_enable_data_transfer(port);
+	abe_disable_data_transfer(port);
 	pm_runtime_put_sync(&pdev->dev);
 }
 
@@ -484,7 +484,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 		dev_dbg(widget->dapm->dev, "router table [%d] = %d\n", i, abe->router[i]);
 
 	/* 2nd arg here is unused */
-	abe_set_router_configuration(UPROUTE, 0, abe->router);
+	abe_set_router_configuration(UPROUTE, 0, (u32 *)abe->router);
 
 	abe->dapm[e->reg] = ucontrol->value.integer.value[0];
 	snd_soc_dapm_mux_update_power(widget, kcontrol, abe->dapm[e->reg], mux, e);
@@ -713,7 +713,7 @@ static int abe_get_equalizer(struct snd_kcontrol *kcontrol,
 	case EQ2R:
 		ucontrol->value.integer.value[0] = abe->dl21_equ_profile;
 		break;
-	case EQMIC:
+	case EQAMIC:
 		ucontrol->value.integer.value[0] = abe->amic_equ_profile;
 		break;
 	default:
@@ -751,7 +751,7 @@ static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
 				sizeof(dl21_equ_coeffs[val]));
 		abe->dl21_equ_profile = val;
 		break;
-	case EQMIC:
+	case EQAMIC:
 		equ_params.equ_length = NBAMICCOEFFS;
 		memcpy(equ_params.coef.type1, amic_equ_coeffs[val],
 				sizeof(amic_equ_coeffs[val]));
@@ -807,7 +807,7 @@ static const struct soc_enum dl21_equalizer_enum =
 	SOC_ENUM_SINGLE(EQ2R, 0, NBDL21EQ_PROFILES, dl21_equ_texts);
 
 static const struct soc_enum amic_equalizer_enum =
-	SOC_ENUM_SINGLE(EQMIC, 0, NBAMICEQ_PROFILES, amic_equ_texts);
+	SOC_ENUM_SINGLE(EQAMIC, 0, NBAMICEQ_PROFILES, amic_equ_texts);
 
 static const char *route_ul_texts[] =
 	{"None", "DMic0L", "DMic0R", "DMic1L", "DMic1R", "DMic2L", "DMic2R",
