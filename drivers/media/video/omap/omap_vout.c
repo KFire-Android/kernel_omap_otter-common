@@ -552,7 +552,6 @@ static int omap_vout_tiler_buffer_setup(struct omap_vout_device *vout,
 {
 	int i, aligned = 1;
 	enum tiler_fmt fmt;
-	int width;
 
 	/* normalize buffers to allocate so we stay within bounds */
 	int start = (startindex < 0) ? 0 : startindex;
@@ -573,17 +572,22 @@ static int omap_vout_tiler_buffer_setup(struct omap_vout_device *vout,
 			(void **) vout->buf_phy_uv_addr_alloced + start,
 			aligned);
 	} else {
+		unsigned int width = pix->width;
+		switch (video_mode_to_dss_mode(pix)) {
+		case OMAP_DSS_COLOR_UYVY:
+		case OMAP_DSS_COLOR_YUV2:
+			width /= 2;
+			bpp = 4;
+			break;
+		default:
+			break;
+		}
 		/* Only bpp of 1, 2, and 4 is supported by tiler */
 		fmt = (bpp == 1 ? TILFMT_8BIT :
 			bpp == 2 ? TILFMT_16BIT :
 			bpp == 4 ? TILFMT_32BIT : TILFMT_INVALID);
 		if (fmt == TILFMT_INVALID)
 			return -ENOMEM;
-		if ((OMAP_DSS_COLOR_YUV2 == video_mode_to_dss_mode(pix))
-			|| (OMAP_DSS_COLOR_UYVY == video_mode_to_dss_mode(pix)))
-			width = pix->width >> 1;
-		else
-			width = pix->width;
 
 		tiler_alloc_packed(&n_alloc, fmt, width,
 			pix->height,

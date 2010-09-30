@@ -2256,10 +2256,12 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 			else
 				REG_FLD_MOD(dispc_reg_att[plane], 0x1, 22, 22);
 		}
-
-		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
-				color_mode == OMAP_DSS_COLOR_UYVY)
+		/* Set the rotation value for pipeline */
+		if (color_mode == OMAP_DSS_COLOR_UYVY ||
+			color_mode == OMAP_DSS_COLOR_YUV2)
 			REG_FLD_MOD(dispc_reg_att[plane], rotation, 13, 12);
+		else
+			REG_FLD_MOD(dispc_reg_att[plane], 0, 13, 12);
 	}
 }
 
@@ -2320,12 +2322,7 @@ void calc_tiler_row_rotation(u8 rotation,
 	switch (color_mode) {
 	case OMAP_DSS_COLOR_RGB16:
 	case OMAP_DSS_COLOR_ARGB16:
-
-	case OMAP_DSS_COLOR_YUV2:
-	case OMAP_DSS_COLOR_UYVY:
-		ps = 4;
-		if (!(rotation & 1))
-			width >>= 1;
+		ps = 2;
 		break;
 
 	case OMAP_DSS_COLOR_RGB24P:
@@ -2333,6 +2330,8 @@ void calc_tiler_row_rotation(u8 rotation,
 	case OMAP_DSS_COLOR_ARGB32:
 	case OMAP_DSS_COLOR_RGBA32:
 	case OMAP_DSS_COLOR_RGBX32:
+	case OMAP_DSS_COLOR_YUV2:
+	case OMAP_DSS_COLOR_UYVY:
 		ps = 4;
 		break;
 
@@ -2347,6 +2346,9 @@ void calc_tiler_row_rotation(u8 rotation,
 	switch (rotation) {
 	case 0:
 	case 2:
+		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+			color_mode == OMAP_DSS_COLOR_UYVY)
+			width /= 2;
 		line_size = (1 == ps) ? 16384 : 32768 ;
 		break;
 
@@ -2878,18 +2880,19 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 			if (orient.rotate_90 & 1) {
 				tiler_height = width;
-				if (color_mode == OMAP_DSS_COLOR_YUV2
-						|| color_mode == OMAP_DSS_COLOR_UYVY)
-					tiler_width = height / 2 ;
-				else
-					tiler_width = height;
+				tiler_width = height;
 			} else {
 				tiler_height = height;
-				if (color_mode == OMAP_DSS_COLOR_YUV2
-						|| color_mode == OMAP_DSS_COLOR_UYVY)
-					tiler_width = width / 2;
-				else
-					tiler_width = width;
+				tiler_width = width;
+			}
+
+			switch (color_mode) {
+			case OMAP_DSS_COLOR_YUV2:
+			case OMAP_DSS_COLOR_UYVY:
+				tiler_width /= 2;
+				break;
+			default:
+				break;
 			}
 			DSSDBG("w, h = %ld %ld\n", tiler_width, tiler_height);
 
@@ -2956,14 +2959,16 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		/* account for chroma decimation */
 		switch (color_mode) {
 		case OMAP_DSS_COLOR_NV12:
-			ch_height >>= 1; /* Y downsampled by 2 */
+			ch_height >>= 1; /* UV is subsampled by 2 vertically*/
 		case OMAP_DSS_COLOR_YUV2:
 		case OMAP_DSS_COLOR_UYVY:
+			/*For YUV422 with rotation, we don't upsample chroma*/
+			if (!(rotation & 1) ||
+				color_mode == OMAP_DSS_COLOR_NV12)
+				ch_width >>= 1; /* UV is subsampled by 2 horz.*/
 			/* must use FIR for YUV422 if rotated */
 			if (color_mode != OMAP_DSS_COLOR_NV12 && rotation % 4)
 				scale_x = scale_y = 1;
-			if (!(rotation & 1))
-				ch_width >>= 1; /* X downsampled by 2 */
 			scale_uv = 1;
 			break;
 		default:
