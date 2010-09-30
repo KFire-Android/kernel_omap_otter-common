@@ -146,6 +146,7 @@ static ssize_t cma3000_store_attr_mode(struct device *dev,
 	if (val < CMAMODE_DEFAULT || val > CMAMODE_POFF)
 		return -EINVAL;
 
+	data->enabled = val;
 	cma3000_set_mode(data, val);
 
 	return count;
@@ -579,6 +580,10 @@ int cma3000_poweron(struct cma3000_accl_data *data)
 	mdfftmr = data->pdata.mdfftmr;
 	ffthr = data->pdata.ffthr;
 
+	if (data->enabled == CMAMODE_DEFAULT ||
+	    data->enabled == CMAMODE_POFF)
+		return 0;
+
 	if (mode < CMAMODE_DEFAULT || mode > CMAMODE_POFF) {
 		data->pdata.mode = CMAMODE_MOTDET;
 		mode = data->pdata.mode;
@@ -609,12 +614,20 @@ int cma3000_poweron(struct cma3000_accl_data *data)
 
 	mdelay(CMA3000_SETDELAY);
 
+	enable_irq(data->client->irq);
+
 	return 0;
 }
 
 int cma3000_poweroff(struct cma3000_accl_data *data)
 {
 	int ret;
+
+	if (data->enabled == CMAMODE_DEFAULT ||
+	    data->enabled == CMAMODE_POFF)
+		return 0;
+	else
+		disable_irq_nosync(data->client->irq);
 
 	ret = cma3000_set(data, CMA3000_CTRL, CMAMODE_POFF, "Mode setting");
 	mdelay(CMA3000_SETDELAY);
