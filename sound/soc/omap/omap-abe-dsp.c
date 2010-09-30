@@ -250,6 +250,11 @@ void abe_dsp_disable_data_transfer(int port)
 	struct platform_device *pdev = abe->pdev;
 
 	abe_disable_data_transfer(port);
+	udelay(250);
+/*
+	abe_stop_event_generator();
+	udelay(500);
+*/
 	pm_runtime_put_sync(&pdev->dev);
 }
 
@@ -1484,6 +1489,10 @@ static int aess_open(struct snd_pcm_substream *substream)
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
 	pm_runtime_get_sync(&pdev->dev);
+
+	abe_reset_hal();
+	abe_write_event_generator(EVENT_TIMER);
+
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MODEM:
 	case ABE_FRONTEND_DAI_LP_MEDIA:
@@ -1505,6 +1514,7 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai = rtd->cpu_dai;
 
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
+
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MODEM:
