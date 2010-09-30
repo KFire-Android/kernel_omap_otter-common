@@ -930,15 +930,15 @@ static DECLARE_TLV_DB_SCALE(mic_preamp_tlv, -600, 600, 0);
 
 /*
  * MICGAIN volume control:
- * from 6 to 30 dB in 6 dB steps
+ * from -6 to 30 dB in 6 dB steps
  */
-static DECLARE_TLV_DB_SCALE(mic_amp_tlv, 600, 600, 0);
+static DECLARE_TLV_DB_SCALE(mic_amp_tlv, -600, 600, 0);
 
 /*
  * AFMGAIN volume control:
  * from 18 to 24 dB in 6 dB steps
  */
-static DECLARE_TLV_DB_SCALE(afm_amp_tlv, 600, 600, 0);
+static DECLARE_TLV_DB_SCALE(afm_amp_tlv, 1800, 600, 0);
 
 
 /*
