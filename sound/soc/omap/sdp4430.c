@@ -291,7 +291,7 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	if (machine_is_omap_4430sdp())
 		twl6040_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
 	else
-		snd_soc_jack_report(&hs_jack, 1, SND_JACK_HEADSET);
+		snd_soc_jack_report(&hs_jack, SND_JACK_HEADSET, SND_JACK_HEADSET);
 
 	/* wait 10 seconds before switching of HS power */
 	rtd->pmdown_time = 10000;
