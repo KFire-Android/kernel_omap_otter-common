@@ -108,6 +108,13 @@ abehal_status abe_select_main_port(u32 id);
  */
 abehal_status abe_write_event_generator(u32 e);
 /**
+ * abe_stop_event_generator - Stop event generator source
+ *
+ * Stop the event genrator of AESS. No more event will be send to AESS engine.
+ * Upper layer needs to wait 1/96kHz to be sure that engine reach IDLE instruction
+ */
+abehal_status abe_stop_event_generator(void);
+/**
  * abe_read_use_case_opp() - description for void abe_read_use_case_opp().
  *
  * returns the expected min OPP for a given use_case list

@@ -35,6 +35,7 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+
 /**
  * abe_reset_hal - reset the ABE/HAL
  * @rdev: regulator source
@@ -368,6 +369,23 @@ abehal_status abe_write_event_generator(u32 e)
 	return 0;
 }
 EXPORT_SYMBOL(abe_write_event_generator);
+/**
+ * abe_stop_event_generator - Stop event generator source
+ *
+ * Stop the event genrator of AESS. No more event will be send to AESS engine.
+ * Upper layer needs to wait 1/96kHz to be sure that engine reach IDLE instruction
+ */
+abehal_status abe_stop_event_generator(void)
+{
+	u32 event_gen;
+
+	/* Stop the event Generator */
+	event_gen = 0;
+	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_ATC,
+			       EVENT_GENERATOR_START, &event_gen, 4);
+	return 0;
+}
+EXPORT_SYMBOL(abe_stop_event_generator);
 /**
  * abe_read_use_case_opp() - description for void abe_read_use_case_opp().
  *
