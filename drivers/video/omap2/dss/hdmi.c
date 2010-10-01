@@ -268,7 +268,23 @@ static ssize_t hdmi_edid_store(struct device *dev,
 	return 0;
 }
 
+static ssize_t hdmi_yuv_supported(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	bool enabled = hdmi_tv_yuv_supported(edid);
+	return snprintf(buf, PAGE_SIZE, "%s\n", enabled ? "true" : "false");
+}
+
+static ssize_t hdmi_yuv_set(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	return 0;
+}
+
 static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
+static DEVICE_ATTR(yuv, S_IRUGO, hdmi_yuv_supported, hdmi_yuv_set);
+
 
 static struct attribute *hdmi_sysfs_attrs[] = {
 	NULL
@@ -1289,7 +1305,16 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 	u8 i = 0, flag = 0;
 	int count, offset, effective_addrs, current_descriptor_addrs = 0;
 	struct HDMI_EDID * edid_st = (struct HDMI_EDID *)edid;
+	struct image_format *img_format;
+	struct audio_format *aud_format;
+	struct deep_color *vsdb_format;
+	struct latency *lat;
 	struct omap_video_timings timings;
+
+	img_format = kzalloc(sizeof(*img_format), GFP_KERNEL);
+	aud_format = kzalloc(sizeof(*aud_format), GFP_KERNEL);
+	vsdb_format = kzalloc(sizeof(*vsdb_format), GFP_KERNEL);
+	lat = kzalloc(sizeof(*lat), GFP_KERNEL);
 
 	if (edid_set != 1) {
 		printk(KERN_WARNING "Display doesnt seem to be enabled invalid read\n");
@@ -1359,7 +1384,32 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 			}
 		}
 	}
+	hdmi_get_image_format(edid, img_format);
+	printk("%d audio length\n", img_format->length);
+	for (i = 0 ; i < img_format->length ; i++)
+		printk("%d %d pref code\n", img_format->fmt[i].pref, img_format->fmt[i].code);
 
+	hdmi_get_audio_format(edid, aud_format);
+	printk("%d audio length\n", aud_format->length);
+	for (i = 0 ; i < aud_format->length ; i++)
+		printk("%d %d format num_of_channels\n", aud_format->fmt[i].format,
+		aud_format->fmt[i].num_of_ch);
+
+	hdmi_deep_color_support_info(edid, vsdb_format);
+	printk("%d deep color bit 30 %d  deep color 36 bit %d max tmds freq",
+		vsdb_format->bit_30, vsdb_format->bit_36, vsdb_format->max_tmds_freq);
+
+	hdmi_get_av_delay(edid, lat);
+	printk("%d vid_latency %d aud_latency %d interlaced vid latency"
+		"%d interlaced aud latency", lat->vid_latency, lat->aud_latency,
+		lat->int_vid_latency, lat->int_aud_latency);
+
+	printk("YUV supported %d", hdmi_tv_yuv_supported(edid));
+
+	kfree(img_format);
+	kfree(aud_format);
+	kfree(vsdb_format);
+	kfree(lat);
 }
 
 
@@ -1384,6 +1434,8 @@ int hdmi_init_display(struct omap_dss_device *dssdev)
 	 * to generic code.. either way they should be in same place..
 	 */
 	if (device_create_file(&dssdev->dev, &dev_attr_edid))
+		DSSERR("failed to create sysfs file\n");
+	if (device_create_file(&dssdev->dev, &dev_attr_yuv))
 		DSSERR("failed to create sysfs file\n");
 
 	return 0;
