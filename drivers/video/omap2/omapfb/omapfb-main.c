@@ -913,7 +913,7 @@ int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 	if (ofbi->region->size)
 		omapfb_calc_addr(ofbi, var, fix, rotation,
 				 &data_start_p, &data_start_v);
-	
+
 	r = fb_mode_to_dss_mode(var, &mode);
 	if (r) {
 		DBG("fb_mode_to_dss_mode failed");
@@ -1134,7 +1134,7 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 	r = omapfb_apply_changes(fbi, 0);
 
 	omapfb_put_mem_region(ofbi->region);
-	
+
 	if (display && display->driver->update)
 		display->driver->update(display, 0, 0, var->xres, var->yres);
 
@@ -2046,6 +2046,24 @@ struct omapfb_notifier_block {
 	struct omapfb2_device *fbdev;
 };
 
+static int omapfb_notify_fb(struct fb_info *fbi,
+		unsigned long evt, struct omap_dss_device *dssdev)
+{
+	switch (evt) {
+	case OMAP_DSS_SIZE_CHANGE:
+		{
+			u16 w, h;
+
+			dssdev->driver->get_resolution(dssdev, &w, &h);
+			size_notify(fbi, w, h);
+		}
+		return NOTIFY_OK;
+
+	default:  /* don't care about other events for now */
+		return NOTIFY_DONE;
+	}
+}
+
 static int omapfb_notifier(struct notifier_block *nb,
 		unsigned long evt, void *arg)
 {
@@ -2053,36 +2071,26 @@ static int omapfb_notifier(struct notifier_block *nb,
 			container_of(nb, struct omapfb_notifier_block, notifier);
 	struct omap_dss_device *dssdev = arg;
 	struct omapfb2_device *fbdev = notifier->fbdev;
-	int keep = false;
-	int i;
+	int i, j, r, res = NOTIFY_DONE;
 
-	/* figure out if this event pertains to this omapfb device:
-	 */
-	for (i = 0; i < fbdev->num_managers; i++) {
-		if (fbdev->managers[i]->device == dssdev) {
-			keep = true;
-			break;
+	/* notify fbs (with overlays) on this device */
+	for (i = 0; i < fbdev->num_fbs; i++) {
+		struct fb_info *fbi = fbdev->fbs[i];
+		struct omapfb_info *ofbi = FB2OFB(fbi);
+
+		/* keep the largest status if multiple fbs are affected */
+
+		for (j = 0; j < ofbi->num_overlays; j++) {
+			if (ofbi->overlays[j]->manager->device == dssdev) {
+				r = omapfb_notify_fb(fbi, evt, dssdev);
+				res = max(res, r);
+				break;
+			}
 		}
+
 	}
 
-	if (!keep)
-		return NOTIFY_DONE;
-
-	/* the event pertains to us.. see if we care:
-	 */
-	switch (evt) {
-		case OMAP_DSS_SIZE_CHANGE: {
-			u16 w, h;
-			dssdev->driver->get_resolution(dssdev, &w, &h);
-			for (i = 0; i < fbdev->num_fbs; i++)
-				size_notify(fbdev->fbs[i], w, h);
-			break;
-		}
-		default:  /* don't care about other events for now */
-			break;
-	}
-
-	return NOTIFY_OK;
+	return res;
 }
 
 static int omapfb_create_framebuffers(struct omapfb2_device *fbdev)
