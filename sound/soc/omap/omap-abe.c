@@ -297,6 +297,24 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 	case 2:
 		format.samp_format = STEREO_MSB;
 		break;
+	case 3:
+		format.samp_format = THREE_MSB;
+		break;
+	case 4:
+		format.samp_format = FOUR_MSB;
+		break;
+	case 5:
+		format.samp_format = FIVE_MSB;
+		break;
+	case 6 :
+		format.samp_format = SIX_MSB;
+		break;
+	case 7 :
+		format.samp_format = SEVEN_MSB;
+		break;
+	case 8:
+		format.samp_format = EIGHT_MSB;
+		break;
 	default:
 		dev_err(dai->dev, "%d channels not supported",
 			params_channels(params));
@@ -480,10 +498,10 @@ static void abe_be_dapm(struct snd_soc_pcm_runtime *rtd,
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			snd_soc_dapm_stream_event(rtd, stream, "Multimedia Playback",cmd);
 		else
-			snd_soc_dapm_stream_event(rtd, stream, "Multimedia Capture2",cmd);
+			snd_soc_dapm_stream_event(rtd, stream, "Multimedia Capture1",cmd);
 		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
-		snd_soc_dapm_stream_event(rtd, stream, "Multimedia Capture1",cmd);
+		snd_soc_dapm_stream_event(rtd, stream, "Multimedia Capture2",cmd);
 		break;
 	case ABE_FRONTEND_DAI_VOICE:
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)

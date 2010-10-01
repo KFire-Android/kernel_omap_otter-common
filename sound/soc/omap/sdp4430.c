@@ -404,7 +404,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.name = "SDP4430 Media",
 		.stream_name = "Multimedia",
 
-		/* ABE components - MM-UL2 & MM_DL */
+		/* ABE components - MM-UL & MM_DL */
 		.cpu_dai_name = "MultiMedia1",
 		.platform_name = "omap-pcm-audio",
 
@@ -412,20 +412,20 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.supported_be = mm1_be,
 		.num_be = ARRAY_SIZE(mm1_be),
 		.fe_playback_channels = 2,
-		.fe_capture_channels = 2,
+		.fe_capture_channels = 8,
 	},
 	{
 		.name = "SDP4430 Media Capture",
 		.stream_name = "Multimedia Capture",
 
-		/* ABE components - MM-UL 1 */
+		/* ABE components - MM-UL2 */
 		.cpu_dai_name = "MultiMedia2",
 		.platform_name = "omap-pcm-audio",
 
 		.dynamic = 1, /* BE is dynamic */
 		.supported_be = mm2_be,
 		.num_be = ARRAY_SIZE(mm2_be),
-		.fe_capture_channels = 8,
+		.fe_capture_channels = 2,
 	},
 	{
 		.name = "SDP4430 Voice",
