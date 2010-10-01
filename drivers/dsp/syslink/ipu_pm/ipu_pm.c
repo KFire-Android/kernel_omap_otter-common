@@ -3432,19 +3432,6 @@ int ipu_pm_setup(struct ipu_pm_config *cfg)
 	sys_rproc = NULL;
 	app_rproc = NULL;
 
-	/* Get mailbox and iommu to save/restore */
-	/* FIXME: This is not ready for Tesla */
-	ducati_mbox = omap_mbox_get("mailbox-2", NULL);
-	if (ducati_mbox == NULL) {
-		retval = -ENOMEM;
-		goto exit;
-	}
-	ducati_iommu = iommu_get("ducati");
-	if (ducati_iommu == NULL) {
-		retval = -ENOMEM;
-		goto exit;
-	}
-
 	memcpy(&ipu_pm_state.cfg, cfg, sizeof(struct ipu_pm_config));
 	ipu_pm_state.is_setup = true;
 
@@ -3507,27 +3494,54 @@ int ipu_pm_attach(u16 remote_proc_id, void *shared_addr)
 
 	retval = ipu_pm_init_transport(handle);
 
-	/* Get remote processor handle to save/restore */
-	if (remote_proc_id == SYS_M3) {
-		sys_rproc = omap_rproc_get("ducati-proc0");
-		if (sys_rproc == NULL) {
-			retval = -ENOMEM;
-			goto exit;
-		}
-	} else if (remote_proc_id == APP_M3) {
-		app_rproc = omap_rproc_get("ducati-proc1");
-		if (app_rproc == NULL) {
-			retval = -ENOMEM;
-			goto exit;
-		}
-	}
-
 	if (retval < 0)
 		goto exit;
 
 	/* FIXME the physical address should be calculated */
 	pr_info("ipu_pm_attach at va0x%x pa0x9cf00400\n",
 			(unsigned int)shared_addr);
+
+	/* Get remote processor handle to save/restore */
+	if (remote_proc_id == SYS_M3 && IS_ERR_OR_NULL(sys_rproc)) {
+		sys_rproc = omap_rproc_get("ducati-proc0");
+		if (sys_rproc == NULL) {
+			retval = PTR_ERR(sys_rproc);
+			pr_err("%s %d failed to get sysm3 handle",
+						__func__, __LINE__);
+			goto exit;
+		}
+	} else if (remote_proc_id == APP_M3 && IS_ERR_OR_NULL(app_rproc)) {
+		app_rproc = omap_rproc_get("ducati-proc1");
+		if (IS_ERR_OR_NULL(app_rproc)) {
+			retval = PTR_ERR(app_rproc);
+			pr_err("%s %d failed to get appm3 handle",
+						__func__, __LINE__);
+			goto exit;
+		}
+	}
+
+	/* Get iommu for save/restore */
+	if (IS_ERR_OR_NULL(ducati_iommu)) {
+		ducati_iommu = iommu_get("ducati");
+		if (IS_ERR_OR_NULL(ducati_iommu)) {
+			retval = PTR_ERR(ducati_iommu);
+			pr_err("%s %d failed to get iommu handle",
+						__func__, __LINE__);
+			goto exit;
+		}
+	}
+
+	/* Get mailbox for save/restore */
+	/* FIXME: This is not ready for Tesla */
+	if (IS_ERR_OR_NULL(ducati_mbox)) {
+		ducati_mbox = omap_mbox_get("mailbox-2", NULL);
+		if (IS_ERR_OR_NULL(ducati_mbox)) {
+			retval = PTR_ERR(ducati_mbox);
+			pr_err("%s %d failed to get mailbox handle",
+						__func__, __LINE__);
+			goto exit;
+		}
+	}
 
 	return retval;
 exit:
@@ -3548,6 +3562,22 @@ int ipu_pm_detach(u16 remote_proc_id)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	int retval = 0;
+
+	iommu_put(ducati_iommu);
+	ducati_iommu = NULL;
+
+	if (remote_proc_id == SYS_M3) {
+		omap_rproc_put(sys_rproc);
+		sys_rproc = NULL;
+	} else if (remote_proc_id == APP_M3) {
+		omap_rproc_put(app_rproc);
+		app_rproc = NULL;
+	}
+
+	if (!IS_ERR_OR_NULL(ducati_mbox)) {
+		omap_mbox_put(ducati_mbox, NULL);
+		ducati_mbox = NULL;
+	}
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(remote_proc_id);
@@ -3586,13 +3616,7 @@ int ipu_pm_detach(u16 remote_proc_id)
 
 	/* Deleting the handle based on remote_proc_id */
 	ipu_pm_delete(handle);
-	if (remote_proc_id == SYS_M3) {
-		omap_rproc_put(sys_rproc);
-		sys_rproc = NULL;
-	} else if (remote_proc_id == APP_M3) {
-		omap_rproc_put(app_rproc);
-		app_rproc = NULL;
-	}
+
 	return retval;
 exit:
 	pr_err("ipu_pm_detach failed handle null retval 0x%x", retval);
@@ -3640,10 +3664,6 @@ int ipu_pm_destroy(void)
 	/* Delete the wq for req/rel resources */
 	destroy_workqueue(ipu_wq);
 
-	omap_mbox_put(ducati_mbox, NULL);
-	ducati_mbox = NULL;
-	iommu_put(ducati_iommu);
-	ducati_iommu = NULL;
 	first_time = 1;
 
 	/*Hibernation disable. GPTIMER 3 only used for hibernation*/
