@@ -47,7 +47,7 @@
 #include <linux/fs.h>
 
 #include "dss.h"
-#include "hdmi.h"
+#include <plat/edid.h>
 
 static int hdmi_enable_display(struct omap_dss_device *dssdev);
 static void hdmi_disable_display(struct omap_dss_device *dssdev);
@@ -62,7 +62,7 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev);
 static int hdmi_check_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings);
 static int hdmi_read_edid(struct omap_video_timings *);
-static int get_edid_timing_data(u8 *edid);
+static int get_edid_timing_data(struct HDMI_EDID *edid);
 static irqreturn_t hdmi_irq_handler(int irq, void *arg);
 static int hdmi_enable_hpd(struct omap_dss_device *dssdev);
 static void hdmi_power_off(struct omap_dss_device *dssdev);
@@ -87,11 +87,17 @@ static struct file_operations hdmi_fops = {
 #define HDMI_PLLCTRL		0x58006200
 #define HDMI_PHY		0x58006300
 
-u16 current_descriptor_addrs;
 u8		edid[HDMI_EDID_MAX_LENGTH] = {0};
 u8		edid_set = false;
 u8		header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
 u8 hpd_mode = 0, custom_set = 0;
+
+enum hdmi_ioctl_cmds {
+	HDMI_ENABLE,
+	HDMI_DISABLE,
+	HDMI_READ_EDID,
+};
+
 /* PLL */
 #define PLLCTRL_PLL_CONTROL				0x0ul
 #define PLLCTRL_PLL_STATUS				0x4ul
@@ -1281,7 +1287,10 @@ static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
 static void hdmi_get_edid(struct omap_dss_device *dssdev)
 {
 	u8 i = 0, flag = 0;
-	int count, offset, effective_addrs;
+	int count, offset, effective_addrs, current_descriptor_addrs = 0;
+	struct HDMI_EDID * edid_st = (struct HDMI_EDID *)edid;
+	struct omap_video_timings timings;
+
 	if (edid_set != 1) {
 		printk(KERN_WARNING "Display doesnt seem to be enabled invalid read\n");
 	if (HDMI_CORE_DDC_READEDID(HDMI_CORE_SYS, edid) != 0) {
@@ -1327,7 +1336,9 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 		current_descriptor_addrs =
 			EDID_DESCRIPTOR_BLOCK0_ADDRESS +
 			count * EDID_TIMING_DESCRIPTOR_SIZE;
-		show_horz_vert_timing_info(edid);
+			printk("Extension 0 Block %d", count);
+			get_edid_timing_info(&edid_st->DTD[count], &timings);
+			print_omap_video_timings(&timings);
 		}
 	if (edid[0x7e] != 0x00) {
 		offset = edid[EDID_DESCRIPTOR_BLOCK1_ADDRESS + 2];
@@ -1341,58 +1352,16 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 			      count++) {
 			current_descriptor_addrs = effective_addrs +
 			count * EDID_TIMING_DESCRIPTOR_SIZE;
-		show_horz_vert_timing_info(edid);
+			printk("Extension 1 Block %d", count);
+			get_eedid_timing_info(current_descriptor_addrs, edid ,
+			&timings);
+			print_omap_video_timings(&timings);
 			}
 		}
-
-
 	}
-	hdmi_get_image_format();
-	hdmi_get_audio_format();
 
 }
-void show_horz_vert_timing_info(u8 *edid)
-{
-	struct omap_video_timings timings_value;
 
-	printk(KERN_INFO
-			 "EDID DTD block address	= 0x%x\n",
-			 current_descriptor_addrs
-			 );
-	/*X and Y resolution */
-	timings_value.x_res = (((edid[current_descriptor_addrs + 4] & 0xF0) << 4) |
-			 edid[current_descriptor_addrs + 2]);
-	timings_value.y_res = (((edid[current_descriptor_addrs + 7] & 0xF0) << 4) |
-			 edid[current_descriptor_addrs + 5]);
-	timings_value.pixel_clock = ((edid[current_descriptor_addrs + 1] << 8) |
-					edid[current_descriptor_addrs]);
-
-	timings_value.pixel_clock = 10 * timings_value.pixel_clock;
-
-	/*HORIZONTAL FRONT PORCH */
-	timings_value.hfp = edid[current_descriptor_addrs + 8];
-	/*HORIZONTAL SYNC WIDTH */
-	timings_value.hsw = edid[current_descriptor_addrs + 9];
-	/*HORIZONTAL BACK PORCH */
-	timings_value.hbp = (((edid[current_descriptor_addrs + 4]
-					  & 0x0F) << 8) |
-					edid[current_descriptor_addrs + 3]) -
-		(timings_value.hfp + timings_value.hsw);
-	/*VERTICAL FRONT PORCH */
-	timings_value.vfp = ((edid[current_descriptor_addrs + 10] &
-				       0xF0) >> 4);
-	/*VERTICAL SYNC WIDTH */
-	timings_value.vsw = (edid[current_descriptor_addrs + 10] &
-				      0x0F);
-	/*VERTICAL BACK PORCH */
-	timings_value.vbp = (((edid[current_descriptor_addrs + 7] &
-					0x0F) << 8) |
-				      edid[current_descriptor_addrs + 6]) -
-		(timings_value.vfp + timings_value.vsw);
-
-	hdmi_get_code(&timings_value);
-
-}
 
 static int hdmi_check_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings)
@@ -1434,7 +1403,7 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 	else {
 		if (!memcmp(edid, header, sizeof(header))) {
 			/* search for timings of default resolution */
-			if (get_edid_timing_data(edid))
+			if (get_edid_timing_data((struct HDMI_EDID *) edid))
 				edid_set = true;
 		}
 
@@ -1455,44 +1424,6 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 	return r;
 }
 
-u16 current_descriptor_addrs;
-
-void get_horz_vert_timing_info(int current_descriptor_addrs, u8 *edid , struct omap_video_timings *timings)
-{
-		/*X and Y resolution */
-	timings->x_res = (((edid[current_descriptor_addrs + 4] & 0xF0) << 4) |
-			 edid[current_descriptor_addrs + 2]);
-	timings->y_res = (((edid[current_descriptor_addrs + 7] & 0xF0) << 4) |
-			 edid[current_descriptor_addrs + 5]);
-
-	timings->pixel_clock = ((edid[current_descriptor_addrs + 1] << 8) |
-					edid[current_descriptor_addrs]);
-
-	timings->pixel_clock = 10 * timings->pixel_clock;
-
-	/*HORIZONTAL FRONT PORCH */
-	timings->hfp = edid[current_descriptor_addrs + 8];
-	/*HORIZONTAL SYNC WIDTH */
-	timings->hsw = edid[current_descriptor_addrs + 9];
-	/*HORIZONTAL BACK PORCH */
-	timings->hbp = (((edid[current_descriptor_addrs + 4]
-					  & 0x0F) << 8) |
-					edid[current_descriptor_addrs + 3]) -
-		(timings->hfp + timings->hsw);
-	/*VERTICAL FRONT PORCH */
-	timings->vfp = ((edid[current_descriptor_addrs + 10] &
-				       0xF0) >> 4);
-	/*VERTICAL SYNC WIDTH */
-	timings->vsw = (edid[current_descriptor_addrs + 10] &
-				      0x0F);
-	/*VERTICAL BACK PORCH */
-	timings->vbp = (((edid[current_descriptor_addrs + 7] &
-					0x0F) << 8) |
-				      edid[current_descriptor_addrs + 6]) -
-		(timings->vfp + timings->vsw);
-
-	print_omap_video_timings(timings);
-}
 
 /*------------------------------------------------------------------------------
  | Function    : get_edid_timing_data
@@ -1503,16 +1434,15 @@ void get_horz_vert_timing_info(int current_descriptor_addrs, u8 *edid , struct o
  |
  | Returns     : void
  +----------------------------------------------------------------------------*/
-static int get_edid_timing_data(u8 *edid)
+static int get_edid_timing_data(struct HDMI_EDID *edid)
 {
-	u8 count, code;
+	u8 count, code, offset = 0, effective_addrs = 0, current_descriptor_addrs = 0;
 	struct hdmi_cm cm;
 	/* Seach block 0, there are 4 DTDs arranged in priority order */
 	for (count = 0; count < EDID_SIZE_BLOCK0_TIMING_DESCRIPTOR; count++) {
-		current_descriptor_addrs =
-			EDID_DESCRIPTOR_BLOCK0_ADDRESS +
-			count * EDID_TIMING_DESCRIPTOR_SIZE;
-		get_horz_vert_timing_info(current_descriptor_addrs, edid, &edid_timings);
+		get_edid_timing_info(&edid->DTD[count], &edid_timings);
+		DSSDBG("Block0 [%d] timings:", count);
+		print_omap_video_timings(&edid_timings);
 		cm = hdmi_get_code(&edid_timings);
 		DSSDBG("Block0[%d] value matches code = %d , mode = %d",\
 			count, cm.code, cm.mode);
@@ -1526,12 +1456,15 @@ static int get_edid_timing_data(u8 *edid)
 		}
 
 	}
-	if (edid[0x7e] != 0x00) {
+	if (edid->extension_edid != 0x00) {
+		offset = edid->offset_dtd;
+		if (offset != 0)
+			effective_addrs = EDID_DESCRIPTOR_BLOCK1_ADDRESS
+				+ offset;
 		for (count = 0; count < EDID_SIZE_BLOCK1_TIMING_DESCRIPTOR; count++) {
 			current_descriptor_addrs =
-			EDID_DESCRIPTOR_BLOCK1_ADDRESS +
-			count * EDID_TIMING_DESCRIPTOR_SIZE;
-			get_horz_vert_timing_info(current_descriptor_addrs, edid,\
+				effective_addrs + count * EDID_TIMING_DESCRIPTOR_SIZE;
+			get_eedid_timing_info(current_descriptor_addrs, (u8 *)edid,\
 							&edid_timings);
 			cm = hdmi_get_code(&edid_timings);
 			DSSDBG("Block1[%d] value matches code = %d , mode = %d",\
@@ -1547,6 +1480,20 @@ static int get_edid_timing_data(u8 *edid)
 
 		}
 	}
+	/*As last resort, check for best standard timing supported:*/
+	if (edid->timing_1 & 0x01) {
+		DSSDBG("800x600@60Hz\n");
+		hdmi.mode = 0;
+		hdmi.code = 9;
+		return 1;
+	}
+	if (edid->timing_2 & 0x08) {
+		DSSDBG("1024x768@60Hz\n");
+		hdmi.mode = 0;
+		hdmi.code = 16;
+		return 1;
+	}
+
 	hdmi.code = 4; /*setting default value of 640 480 VGA*/
 	hdmi.mode = 0;
 	code = code_vesa[hdmi.code];
