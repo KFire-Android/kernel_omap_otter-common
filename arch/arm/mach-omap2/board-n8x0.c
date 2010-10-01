@@ -543,7 +543,7 @@ static void __init n8x0_mmc_init(void)
 	}
 
 	mmc_data[0] = &mmc1_data;
-	omap2_init_mmc(mmc_data, OMAP24XX_NR_MMC);
+	omap2_init_mmc(mmc_data[0], OMAP24XX_NR_MMC);
 }
 #else
 
