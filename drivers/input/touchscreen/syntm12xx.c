@@ -27,6 +27,10 @@
 #include <linux/firmware.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+
 #include <plat/syntm12xx.h>
 
 #define DRIVER_DESC       "Synaptic TM12xx Touchscreen Driver"
@@ -309,6 +313,8 @@ struct syn {
 	struct workqueue_struct *wq;
 	struct work_struct   isr_work;
 
+	struct early_suspend		early_suspend;
+
 	struct func_desc     *control;
 	u8                   device_control_ctrl; /* saved state */
 
@@ -359,6 +365,12 @@ struct syn {
 
 	int                  virtualized;
 };
+#ifdef CONFIG_PM
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void syn_ts_early_suspend(struct early_suspend *handler);
+static void syn_ts_late_resume(struct early_suspend *handler);
+#endif
+#endif
 
 static int syn_initialize(struct syn *sd);
 static int syn_reset_device(struct syn *sd);
@@ -3400,6 +3412,13 @@ static int syn_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto err_free_irq;
 	}
 
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	sd->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+	sd->early_suspend.suspend = syn_ts_early_suspend;
+	sd->early_suspend.resume = syn_ts_late_resume;
+	register_early_suspend(&sd->early_suspend);
+#endif
 	mutex_unlock(&sd->lock);
 
 	return 0;
@@ -3495,8 +3514,24 @@ static int syn_resume(struct i2c_client *client)
 	return 0;
 }
 
-#endif
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void syn_ts_early_suspend(struct early_suspend *handler)
+{
+	struct syn *sd;
 
+	sd = container_of(handler, struct syn, early_suspend);
+	syn_suspend(sd->client, PMSG_SUSPEND);
+}
+
+static void syn_ts_late_resume(struct early_suspend *handler)
+{
+	struct syn *sd;
+
+	sd = container_of(handler, struct syn, early_suspend);
+	syn_resume(sd->client);
+}
+#endif
+#endif
 
 static const struct i2c_device_id syn_id[] = {
 	{ "tm12xx_ts_primary", 0 },
@@ -3512,7 +3547,10 @@ static struct i2c_driver syn_i2c_driver = {
 	.remove         = __exit_p(syn_remove),
 	.id_table       = syn_id,
 
-#ifdef CONFIG_PM
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	.suspend        = NULL,
+	.resume         = NULL,
+#else
 	.suspend        = syn_suspend,
 	.resume         = syn_resume,
 #endif
