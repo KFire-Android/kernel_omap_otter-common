@@ -764,13 +764,11 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 		if (use_mode_1) {
 					transfer_size = min(request->length,
 							channel->max_len);
+					musb_ep->dma->desired_mode = 1;
 		} else {
 					transfer_size = len;
+					musb_ep->dma->desired_mode = 0;
 		}
-					if (transfer_size <= musb_ep->packet_sz)
-						musb_ep->dma->desired_mode = 0;
-					else
-						musb_ep->dma->desired_mode = 1;
 
 					use_dma = c->channel_program(
 							channel,
