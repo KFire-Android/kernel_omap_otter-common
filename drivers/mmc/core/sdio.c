@@ -659,6 +659,11 @@ int mmc_attach_sdio(struct mmc_host *host, u32 ocr)
 		err = sdio_init_func(host->card, i + 1);
 		if (err)
 			goto remove;
+
+		/*
+		 * Enable Runtime PM for this func
+		 */
+		pm_runtime_enable(&card->sdio_func[i]->dev);
 #ifdef CONFIG_TIWLAN_SDIO
 	}
 #endif
