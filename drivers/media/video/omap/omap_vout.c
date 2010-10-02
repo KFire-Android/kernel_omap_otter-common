@@ -1149,7 +1149,9 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 		if (!(irqstatus & irq))
 			goto vout_isr_err;
 
-		if (ovl->info.field == IBUF_PDEV &&
+		/* display 2nd field for interlaced buffers if progressive */
+		if ((ovl->info.field & OMAP_FLAG_IBUF) &&
+		    !(ovl->info.field & OMAP_FLAG_IDEV) &&
 		    (irq == DISPC_IRQ_FRAMEDONE ||
 		     irq == DISPC_IRQ_FRAMEDONE2)) {
 			if (i_to_p_base_address_change(vout))
@@ -1169,23 +1171,18 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 		break;
 #ifdef CONFIG_OMAP2_DSS_HDMI
 	case OMAP_DISPLAY_TYPE_HDMI:
-		switch (ovl->info.field) {
-		case PBUF_PDEV:
-			if (!(irqstatus & DISPC_IRQ_EVSYNC_EVEN))
-				goto vout_isr_err;
-			break;
-
-		case IBUF_PDEV:
-			if (irqstatus & DISPC_IRQ_EVSYNC_EVEN)
-				if (i_to_p_base_address_change(vout))
-					goto vout_isr_err;
-			break;
-
-		case IBUF_IDEV:
-		case PBUF_IDEV:
+		if (ovl->info.field & OMAP_FLAG_IDEV) {
 			if (interlace_display(vout, irqstatus, timevalue))
 				goto intlace;
 			else
+				goto vout_isr_err;
+		} else if (ovl->info.field & OMAP_FLAG_IBUF) {
+			if (irqstatus & DISPC_IRQ_EVSYNC_EVEN) {
+				if (i_to_p_base_address_change(vout))
+					goto vout_isr_err;
+			}
+		} else {
+			if (!(irqstatus & DISPC_IRQ_EVSYNC_EVEN))
 				goto vout_isr_err;
 		}
 		break;
@@ -1870,8 +1867,7 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	struct omap_vout_device *vout = fh;
 	u16 multiplier = 1;
 	bool interlace = false;
-	/* default is progressive buffer and progressive display */
-	enum device_n_buffer_type dev_buf_type = PBUF_PDEV;
+	enum device_n_buffer_type dev_buf_type;
 
 	if (vout->streaming)
 		return -EBUSY;
@@ -1893,17 +1889,49 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	if (ovl->manager->device->type == OMAP_DISPLAY_TYPE_HDMI)
 		interlace = is_hdmi_interlaced();
 
-	if (f->fmt.pix.field != V4L2_FIELD_SEQ_TB)
+	switch (f->fmt.pix.field) {
+	case V4L2_FIELD_ANY:
+		/* default to no interlacing */
 		f->fmt.pix.field = V4L2_FIELD_NONE;
 
-	if (f->fmt.pix.field == V4L2_FIELD_NONE && !interlace)
-		dev_buf_type = PBUF_PDEV;
-	else if (f->fmt.pix.field == V4L2_FIELD_NONE && interlace)
-		dev_buf_type = PBUF_IDEV;
-	else if (f->fmt.pix.field == V4L2_FIELD_SEQ_TB && interlace)
-		dev_buf_type = IBUF_IDEV;
-	else if (f->fmt.pix.field == V4L2_FIELD_SEQ_TB && !interlace)
-		dev_buf_type = IBUF_PDEV;
+		/* fall through to V4L2_FIELD_NONE */
+	case V4L2_FIELD_TOP:
+	case V4L2_FIELD_BOTTOM:
+		/* These are really non-interlaced, so treat as FIELD_NONE */
+
+	case V4L2_FIELD_NONE:
+		/* Treat progressive images as TB interleaved */
+
+	case V4L2_FIELD_INTERLACED:
+	case V4L2_FIELD_INTERLACED_TB:
+		/*
+		 * We don't provide deinterlacing, so simply display these
+		 * on progressive displays
+		 */
+		dev_buf_type = interlace ? PBUF_IDEV : PBUF_PDEV;
+		break;
+
+	case V4L2_FIELD_INTERLACED_BT:
+		/* switch fields for interlaced buffers.  We cannot display
+		   these on progressive display */
+		if (!interlace)
+			return -EINVAL;
+		dev_buf_type = PBUF_IDEV_SWAP;
+		break;
+
+	case V4L2_FIELD_SEQ_TB:
+		dev_buf_type = interlace ? IBUF_IDEV : IBUF_PDEV;
+		break;
+
+	case V4L2_FIELD_SEQ_BT:
+		dev_buf_type = interlace ? IBUF_IDEV_SWAP : IBUF_PDEV_SWAP;
+		break;
+
+	case V4L2_FIELD_ALTERNATE:
+		/* no support for this format  */
+	default:
+		return -EINVAL;
+	}
 
 	/* TODO: check if TILER ADAPTATION is needed here. */
 	/* We dont support RGB24-packed mode if vrfb rotation
@@ -1915,8 +1943,8 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	}
 
 	/* get the framebuffer parameters */
-	/* y resolution to be doubled in case of interlaced HDMI */
-	if (ovl->info.field == IBUF_IDEV || ovl->info.field == PBUF_IDEV)
+	/* y resolution to be doubled in case of interlaced output */
+	if (dev_buf_type & OMAP_FLAG_IDEV)
 		multiplier = 2;
 
 	if (!cpu_is_omap44xx() && rotate_90_or_270(vout)) {
@@ -2148,8 +2176,8 @@ static int vidioc_s_crop(struct file *file, void *fh, struct v4l2_crop *crop)
 	/* get the display device attached to the overlay */
 	timing = &ovl->manager->device->panel.timings;
 
-	 /* y resolution to be doubled in case of interlaced HDMI */
-	 if (ovl->info.field == IBUF_IDEV || ovl->info.field == PBUF_IDEV)
+	/* y resolution to be doubled in case of interlaced output */
+	if (ovl->info.field & OMAP_FLAG_IDEV)
 		multiplier = 2;
 
 	if (rotate_90_or_270(vout)) {

@@ -264,10 +264,17 @@ enum omap_writeback_capturemode {
 };
 
 enum device_n_buffer_type {
-       PBUF_PDEV = 0,
-       PBUF_IDEV = 1,
-       IBUF_IDEV = 2,
-       IBUF_PDEV = 3,
+	OMAP_FLAG_IDEV = 1,	/* interlaced device */
+	OMAP_FLAG_IBUF = 2,	/* sequentially interlaced buffer */
+	OMAP_FLAG_ISWAP = 4,	/* bottom-top interlacing */
+
+	PBUF_PDEV	= 0,
+	PBUF_IDEV	= OMAP_FLAG_IDEV,
+	PBUF_IDEV_SWAP	= OMAP_FLAG_IDEV | OMAP_FLAG_ISWAP,
+	IBUF_IDEV	= OMAP_FLAG_IBUF | OMAP_FLAG_IDEV,
+	IBUF_IDEV_SWAP	= OMAP_FLAG_IBUF | OMAP_FLAG_IDEV | OMAP_FLAG_ISWAP,
+	IBUF_PDEV	= OMAP_FLAG_IBUF,
+	IBUF_PDEV_SWAP	= OMAP_FLAG_IBUF | OMAP_FLAG_ISWAP,
 };
 
 /* RFBI */

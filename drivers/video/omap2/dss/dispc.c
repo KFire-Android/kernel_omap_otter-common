@@ -2183,12 +2183,17 @@ static void _dispc_set_scaling_uv(enum omap_plane plane,
 
 	_dispc_set_fir2(plane, fir_hinc, fir_vinc);
 
-	if (ilace == IBUF_IDEV) {
+	if ((ilace & OMAP_FLAG_IBUF) &&
+	    (ilace & OMAP_FLAG_IDEV)) {
 		accu0 = (-3 * fir_vinc / 4) % 1024;
 		accu1 = (-fir_vinc / 4) % 1024;
 	} else {
 		accu0 = accu1 = (-fir_vinc / 2) % 1024;
 	}
+
+	if (ilace & OMAP_FLAG_ISWAP)
+		swap(accu0, accu1);
+
 	accuh = (-fir_hinc / 2) % 1024;
 
 	_dispc_set_vid_accu2_0(plane, 0x80, 0);
@@ -2359,15 +2364,17 @@ static void calc_tiler_row_rotation(u8 rotation,
 		return;
 	}
 
-	*row_inc = line_size + 1 - (width * ps) +
-		(ilace == PBUF_IDEV ? line_size : 0);
+	/* assume TB. We worry about swapping top/bottom outside of this call */
+	*row_inc = line_size + 1 - (width * ps);
 
-	if (ilace == IBUF_IDEV || ilace == IBUF_PDEV)
+	if (ilace & OMAP_FLAG_IBUF) {
 		/* bottom half of image is the odd frame */
 		*offset1 = line_size * pic_height;
-	else if (ilace == PBUF_IDEV)
+	} else if (ilace & OMAP_FLAG_IDEV) {
 		/* even and odd frames are interleaved */
 		*offset1 = line_size;
+		*row_inc += line_size;
+	}
 
 	DSSDBG(" colormode: %d, rotation: %d, ps: %d, width: %d,"
 		" height: %d, row_inc:%d\n",
@@ -2705,14 +2712,16 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 	if (ilace != PBUF_PDEV) {
 #ifdef CONFIG_OMAP2_DSS_HDMI
+		/* HDMI output */
 		height /= 2;
 #else
+		/* VENC output */
 		if (fieldmode)
 			height /= 2;
 #endif
 		pos_y /= 2;
 		pic_height /= 2;
-		if ((ilace == IBUF_IDEV) || (ilace == PBUF_IDEV))
+		if (ilace & OMAP_FLAG_IDEV)
 			out_height /= 2;
 
 		DSSDBG("adjusting for ilace: height %d, pos_y %d, "
@@ -2855,6 +2864,9 @@ static int _dispc_setup_plane(enum omap_plane plane,
 						color_mode, &row_inc, &offset1,
 						ilace, pic_height);
 
+			if (ilace & OMAP_FLAG_ISWAP)
+				swap(offset0, offset1);
+
 			/* get rotated top-left coordinate
 					(if rotation is applied before mirroring) */
 			memset(&orient, 0, sizeof(orient));
@@ -2898,13 +2910,16 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 			if (puv_addr)
 				puv_addr = tiler_reorient_topleft(
-						tiler_get_natural_addr((void *)puv_addr),
-						orient, tiler_width/2, tiler_height/2);
+					tiler_get_natural_addr(
+					(void *) puv_addr), orient,
+					tiler_width/2, tiler_height/2);
+
 			/*
 			 * BA1 used as temporary storage to pointer to lower
 			 * half of interlaced buffer on progressive display
 			 */
-			if (ilace == IBUF_PDEV) {
+			if ((ilace & OMAP_FLAG_IBUF) &&
+			    !(ilace & OMAP_FLAG_IDEV)) {
 				dispc_write_reg(DISPC_VID_BA1(plane - 1),
 						paddr + offset1);
 				/* UV offset is 1/2 Y offset for even offsets */
