@@ -409,7 +409,6 @@ struct omap_overlay_info {
 	enum omap_overlay_zorder zorder;
 	u32 p_uv_addr; /* relevant for NV12 format only */
 	enum device_n_buffer_type field;
-	u16 pic_width; /* for interlacing with cropping this is required */
 	u16 pic_height; /* for interlacing with cropping this is required */
 };
 
@@ -771,16 +770,8 @@ int omap_rfbi_prepare_update(struct omap_dss_device *dssdev,
 int omap_rfbi_update(struct omap_dss_device *dssdev,
 		u16 x, u16 y, u16 w, u16 h,
 		void (*callback)(void *), void *data);
-void calc_tiler_row_rotation(u8 rotation,
-		u16 width, u16 height,
-		enum omap_color_mode color_mode,
-		s32 *row_inc,
-		unsigned *offset1,
-		enum device_n_buffer_type  ilace,
-		u16 pic_width,
-		u16 pic_height);
 
-void change_base_address(u32 offset, u16 *flag, int id);
-u16 *get_offset_cnt(int id, u32 *offset);
-int nature_of_hdmi(void);
+void change_base_address(int id, u32 p_uv_addr);
+bool is_hdmi_interlaced(void);
+
 #endif

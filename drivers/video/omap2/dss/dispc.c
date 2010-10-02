@@ -1242,7 +1242,7 @@ static void _dispc_set_scale_coef(enum omap_plane plane, const s8 *hfir,
 		      ((vfir[16] << 16) & 0xFF0000) |
 		      ((vfir[24] << 24) & 0xFF000000));
 		v = ((vfir[0] & 0xFF) | ((vfir[32] << 8) & 0xFF00));
-	
+
 		_dispc_write_firh_reg(plane, i, h);
 		_dispc_write_firhv_reg(plane, i, hv);
 		_dispc_write_firv_reg(plane, i, v);
@@ -1838,7 +1838,7 @@ static void _dispc_set_vid_accu0(enum omap_plane plane, int haccu, int vaccu)
 static void _dispc_set_vid_accu1(enum omap_plane plane, int haccu, int vaccu)
 {
 	u32 val;
-	struct dispc_reg ac1_reg[4] = { DISPC_VID_ACCU1(0),				      
+	struct dispc_reg ac1_reg[4] = { DISPC_VID_ACCU1(0),
 					DISPC_VID_ACCU1(1) };
 
 	if (cpu_is_omap44xx()){
@@ -2082,7 +2082,7 @@ static void _dispc_set_scaling(enum omap_plane plane,
 			fir_vinc = 4095;
 		vfir = get_scaling_coef(orig_height, out_height, 0, 0,
 					three_taps);
-	} else {	
+	} else {
 		fir_vinc = 0;
 		vfir = fir5_zero;
 	}
@@ -2304,13 +2304,12 @@ static s32 pixinc(int pixels, u8 ps)
 		BUG();
 }
 
-void calc_tiler_row_rotation(u8 rotation,
+static void calc_tiler_row_rotation(u8 rotation,
 		u16 width, u16 height,
 		enum omap_color_mode color_mode,
 		s32 *row_inc,
 		unsigned *offset1,
 		enum device_n_buffer_type  ilace,
-		u16 pic_width,
 		u16 pic_height)
  {
 	u8 ps = 1;
@@ -2361,11 +2360,13 @@ void calc_tiler_row_rotation(u8 rotation,
 	}
 
 	*row_inc = line_size + 1 - (width * ps) +
-		((ilace == PBUF_IDEV) ? line_size : 0);
+		(ilace == PBUF_IDEV ? line_size : 0);
 
-	if ((ilace == IBUF_IDEV) || (ilace == IBUF_PDEV))
+	if (ilace == IBUF_IDEV || ilace == IBUF_PDEV)
+		/* bottom half of image is the odd frame */
 		*offset1 = line_size * pic_height;
 	else if (ilace == PBUF_IDEV)
+		/* even and odd frames are interleaved */
 		*offset1 = line_size;
 
 	DSSDBG(" colormode: %d, rotation: %d, ps: %d, width: %d,"
@@ -2684,7 +2685,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		u8 rotation, int mirror,
 		u8 global_alpha,
 		enum omap_channel channel, u32 puv_addr,
-		u16 pic_width, u16 pic_height)
+		u16 pic_height)
 {
 	const int maxdownscale = (cpu_is_omap34xx() | cpu_is_omap44xx()) ? 4 : 2;
 	bool three_taps = 0;
@@ -2702,8 +2703,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if (ilace && height == out_height)
 		fieldmode = 1;
 
-	if ((ilace == IBUF_IDEV) || (ilace == IBUF_PDEV) ||
-		(ilace == PBUF_IDEV)) {
+	if (ilace != PBUF_PDEV) {
 #ifdef CONFIG_OMAP2_DSS_HDMI
 		height /= 2;
 #else
@@ -2853,7 +2853,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 			calc_tiler_row_rotation(rotation, width, height,
 						color_mode, &row_inc, &offset1,
-						ilace, pic_width, pic_height);
+						ilace, pic_height);
 
 			/* get rotated top-left coordinate
 					(if rotation is applied before mirroring) */
@@ -2900,10 +2900,23 @@ static int _dispc_setup_plane(enum omap_plane plane,
 				puv_addr = tiler_reorient_topleft(
 						tiler_get_natural_addr((void *)puv_addr),
 						orient, tiler_width/2, tiler_height/2);
-				DSSDBG("rotated addresses: 0x%0x, 0x%0x\n",
+			/*
+			 * BA1 used as temporary storage to pointer to lower
+			 * half of interlaced buffer on progressive display
+			 */
+			if (ilace == IBUF_PDEV) {
+				dispc_write_reg(DISPC_VID_BA1(plane - 1),
+						paddr + offset1);
+				/* UV offset is 1/2 Y offset for even offsets */
+				if (puv_addr)
+					dispc_write_reg(
+						DISPC_VID_BA_UV1(plane - 1),
+						puv_addr + offset1 / 2);
+			}
+			DSSDBG("rotated addresses: 0x%0x, 0x%0x\n",
 							paddr, puv_addr);
-				/* set BURSTTYPE if rotation is non-zero */
-				REG_FLD_MOD(dispc_reg_att[plane], 0x1, 29, 29);
+			/* set BURSTTYPE if rotation is non-zero */
+			REG_FLD_MOD(dispc_reg_att[plane], 0x1, 29, 29);
 		} else
 			row_inc = 0x1;
 	}
@@ -4442,7 +4455,6 @@ static void dispc_error_worker(struct work_struct *work)
 			if (enable)
 				dssdev->driver->enable(dssdev);
 		}
-
 	}
 
 	if (errors & DISPC_IRQ_OCP_ERR) {
@@ -4541,7 +4553,7 @@ void dispc_fake_vsync_irq(enum omap_dsi_index ix)
 		DSSERR("Invalid display id for fake vsync\n");
 		return;
 	}
-	
+
 	for (i = 0; i < DISPC_MAX_NR_ISRS; i++) {
 		struct omap_dispc_isr_data *isr_data;
 		isr_data = &dispc.registered_isr[i];
@@ -4671,16 +4683,16 @@ int dispc_enable_plane(enum omap_plane plane, bool enable)
 }
 
 int dispc_setup_plane(enum omap_plane plane,
-		       u32 paddr, u16 screen_width,
-		       u16 pos_x, u16 pos_y,
-		       u16 width, u16 height,
-		       u16 out_width, u16 out_height,
-		       enum omap_color_mode color_mode,
-		       enum device_n_buffer_type ilace,
-		       enum omap_dss_rotation_type rotation_type,
-		       u8 rotation, bool mirror, u8 global_alpha,
-		       enum omap_channel channel, u32 puv_addr,
-		       u16 pic_width, u16 pic_height)
+			u32 paddr, u16 screen_width,
+			u16 pos_x, u16 pos_y,
+			u16 width, u16 height,
+			u16 out_width, u16 out_height,
+			enum omap_color_mode color_mode,
+			enum device_n_buffer_type ilace,
+			enum omap_dss_rotation_type rotation_type,
+			u8 rotation, bool mirror, u8 global_alpha,
+			enum omap_channel channel, u32 puv_addr,
+			u16 pic_height)
 
 {
 	int r = 0;
@@ -4705,23 +4717,24 @@ int dispc_setup_plane(enum omap_plane plane,
 			   rotation, mirror,
 			   global_alpha,
 			   channel, puv_addr,
-			   pic_width, pic_height);
+			   pic_height);
 
 	enable_clocks(0);
 
 	return r;
 }
 
-void change_base_address(u32 offset, u16 *flag, int id)
+/* retrives the new adress from BA1 and puts it into BA0 */
+void change_base_address(int plane, u32 p_uv_addr)
+
 {
-       u32 val;
-       if (*flag == 0) {
-		val = dispc_read_reg(DISPC_VID_BA0(id - 1));
-		dispc_write_reg(DISPC_VID_BA0(id - 1), val+offset);
-		val = dispc_read_reg(DISPC_VID_BA_UV0(id - 1));
-		dispc_write_reg(DISPC_VID_BA_UV0(id - 1), val+offset);
-		*flag = *flag + 1;
-       }
+	u32 val;
+	val = dispc_read_reg(DISPC_VID_BA1(plane - 1));
+	dispc_write_reg(DISPC_VID_BA0(plane - 1), val);
+	if (p_uv_addr) {
+		val = dispc_read_reg(DISPC_VID_BA_UV1(plane - 1));
+		dispc_write_reg(DISPC_VID_BA_UV0(plane - 1), val);
+	}
 }
 
 /* Writeback*/
@@ -4741,7 +4754,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 	unsigned offset1 = 0;
 	enum device_n_buffer_type ilace = PBUF_PDEV;
-	u16 pic_width = 0, pic_height = 0;/* not required in case
+	u16 pic_height = 0;/* not required in case
 		of progressive cases */
 
 	enum omap_color_mode color_mode = wb->color_mode;  /* output color */
@@ -4846,7 +4859,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 		calc_tiler_row_rotation(rotation, width, frame_height,
 						color_mode, &row_inc,
 						&offset1, ilace,
-						pic_width, pic_height);
+						pic_height);
 
 		orientation = calc_tiler_orientation(rotation, (u8)mirror);
 		/* get rotated top-left coordinate
@@ -4882,10 +4895,11 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 			puv_addr = tiler_reorient_topleft(
 					tiler_get_natural_addr((void *)puv_addr),
 					orient, tiler_width/2, tiler_height/2);
-			DSSDBG("rotated addresses: 0x%0x, 0x%0x\n",
+
+		DSSDBG("rotated addresses: 0x%0x, 0x%0x\n",
 						paddr, puv_addr);
-			/* set BURSTTYPE if rotation is non-zero */
-			REG_FLD_MOD(dispc_reg_att[plane], 0x1, 8, 8);
+		/* set BURSTTYPE if rotation is non-zero */
+		REG_FLD_MOD(dispc_reg_att[plane], 0x1, 8, 8);
 	} else
 	row_inc = 1;
 

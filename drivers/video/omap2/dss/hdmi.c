@@ -1555,19 +1555,7 @@ static int get_edid_timing_data(u8 *edid)
 
 }
 
-int nature_of_hdmi(void)
+bool is_hdmi_interlaced(void)
 {
-	if ((hdmi.mode)) {
-		switch (hdmi.code) {
-		case 5:
-		case 6:
-		case 20:
-		case 21:
-			return INTERLACED;
-		default:
-			return PROGRESSIVE;
-		}
-	}
-	return PROGRESSIVE;
+	return hdmi.cfg.interlace;
 }
-
