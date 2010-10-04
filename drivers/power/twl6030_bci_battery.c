@@ -1,7 +1,7 @@
 /*
  * linux/drivers/power/twl6030_bci_battery.c
  *
- * OMAP2430/3430 BCI battery driver for Linux
+ * OMAP4:TWL6030 battery driver for Linux
  *
  * Copyright (C) 2008-2009 Texas Instruments, Inc.
  * Author: Texas Instruments, Inc.
@@ -44,23 +44,25 @@
 #define CHARGERUSB_CINLIMIT	0x0E
 #define CHARGERUSB_CTRLLIMIT1	0x0F
 #define CHARGERUSB_CTRLLIMIT2	0x10
+#define ANTICOLLAPSE_CTRL1	0x11
+#define ANTICOLLAPSE_CTRL2	0x12
 
-#define REG_FG_REG_00	0x00
-#define REG_FG_REG_01	0x01
-#define REG_FG_REG_02	0x02
-#define REG_FG_REG_03	0x03
-#define REG_FG_REG_04	0x04
-#define REG_FG_REG_05	0x05
-#define REG_FG_REG_06	0x06
-#define REG_FG_REG_07	0x07
-#define REG_FG_REG_08	0x08
-#define REG_FG_REG_09	0x09
-#define REG_FG_REG_10	0x0A
-#define REG_FG_REG_11	0x0B
+#define FG_REG_00	0x00
+#define FG_REG_01	0x01
+#define FG_REG_02	0x02
+#define FG_REG_03	0x03
+#define FG_REG_04	0x04
+#define FG_REG_05	0x05
+#define FG_REG_06	0x06
+#define FG_REG_07	0x07
+#define FG_REG_08	0x08
+#define FG_REG_09	0x09
+#define FG_REG_10	0x0A
+#define FG_REG_11	0x0B
 
 /* CONTROLLER_INT_MASK */
-#define MVAC_FAULT		(1 << 6)
-#define MAC_EOC			(1 << 5)
+#define MVAC_FAULT		(1 << 7)
+#define MAC_EOC			(1 << 6)
 #define MBAT_REMOVED		(1 << 4)
 #define MFAULT_WDG		(1 << 3)
 #define MBAT_TEMP		(1 << 2)
@@ -154,8 +156,22 @@
 #define CHARGERUSB_CTRLLIMIT2_1500	0x0E
 #define		LOCK_LIMIT		(1 << 4)
 
+/* ANTICOLLAPSE_CTRL2 */
+#define BUCK_VTH_SHIFT			5
+
+/* FG_REG_00 */
+#define CC_ACTIVE_MODE_SHIFT	6
+#define CC_AUTOCLEAR		(1 << 2)
+#define CC_CAL_EN		(1 << 1)
+#define CC_PAUSE		(1 << 0)
+
 #define REG_TOGGLE1		0x90
-#define ENABLE_FUELGUAGE	0x20
+#define FGDITHS			(1 << 7)
+#define FGDITHR			(1 << 6)
+#define FGS			(1 << 5)
+#define FGR			(1 << 4)
+
+#define PWDNSTATUS2		0x94
 
 /* TWL6030_GPADC_CTRL */
 #define GPADC_CTRL_TEMP1_EN	(1 << 0)    /* input ch 1 */
@@ -187,8 +203,9 @@ static const unsigned int fuelgauge_rate[4] = {4, 16, 64, 256};
 
 struct twl6030_bci_device_info {
 	struct device		*dev;
+	int			*battery_tmp_tbl;
+	unsigned int		tblsize;
 
-	unsigned long		update_time;
 	int			voltage_uV;
 	int			bk_voltage_uV;
 	int			current_uA;
@@ -204,47 +221,77 @@ struct twl6030_bci_device_info {
 	int			timer_n1;
 	s32			charge_n1;
 	s32			charge_n2;
+	s16			cc_offset;
+	u8			usb_online;
+	u8			ac_online;
+	u8			stat1;
+	u8			status_int1;
+	u8			status_int2;
 
+	u8			watchdog_duration;
+	u16			current_avg_interval;
 	u16			monitoring_interval;
+	unsigned int		min_vbus;
 	unsigned int		max_charger_voltagemV;
 	unsigned int		max_charger_currentmA;
-	unsigned int		max_bat_voltagemV;
+	unsigned int		charger_incurrentmA;
+	unsigned int		charger_outcurrentmA;
+	unsigned int		regulation_voltagemV;
 	unsigned int		low_bat_voltagemV;
 	unsigned int		termination_currentmA;
 
 	struct power_supply	bat;
+	struct power_supply	usb;
+	struct power_supply	ac;
 	struct power_supply	bk_bat;
 	struct delayed_work	twl6030_bci_monitor_work;
-	struct delayed_work	twl6030_bk_bci_monitor_work;
+	struct delayed_work	twl6030_current_avg_work;
 };
 static struct blocking_notifier_head notifier_list;
 
-static int charge_state;
+static void twl6030_config_min_vbus_reg(struct twl6030_bci_device_info *di,
+						unsigned int value)
+{
+	u8 rd_reg = 0;
+	if (value > 4760 || value < 4200) {
+		dev_dbg(di->dev, "invalid min vbus\n");
+		return;
+	}
+
+	twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg, ANTICOLLAPSE_CTRL2);
+	rd_reg = rd_reg & 0x1F;
+	rd_reg = rd_reg | (((value - 4200)/80) << BUCK_VTH_SHIFT);
+	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, rd_reg, ANTICOLLAPSE_CTRL2);
+
+	return;
+}
 
 static void twl6030_config_iterm_reg(struct twl6030_bci_device_info *di,
 						unsigned int term_currentmA)
 {
-	if (term_currentmA > 400)
+	if ((term_currentmA > 400) || (term_currentmA < 50)) {
 		dev_dbg(di->dev, "invalid termination current\n");
-	if (term_currentmA == 0)
 		return;
+	}
 
-	term_currentmA = ((term_currentmA - 50)/50 - 1) << 5;
+	term_currentmA = ((term_currentmA - 50)/50) << 5;
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, term_currentmA,
 						CHARGERUSB_CTRL2);
-		return;
+	return;
 }
 
 static void twl6030_config_voreg_reg(struct twl6030_bci_device_info *di,
 							unsigned int voltagemV)
 {
-	if ((voltagemV < 3500) || (voltagemV > 4760))
+	if ((voltagemV < 3500) || (voltagemV > 4760)) {
 		dev_dbg(di->dev, "invalid charger_voltagemV\n");
+		return;
+	}
 
 	voltagemV = (voltagemV - 3500) / 20;
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, voltagemV,
 						CHARGERUSB_VOREG);
-		return;
+	return;
 }
 
 static void twl6030_config_vichrg_reg(struct twl6030_bci_device_info *di,
@@ -254,12 +301,14 @@ static void twl6030_config_vichrg_reg(struct twl6030_bci_device_info *di,
 		currentmA = (currentmA - 300) / 50;
 	else if ((currentmA >= 500) && (currentmA <= 1500))
 		currentmA = (currentmA - 500) / 100 + 4;
-	else
+	else {
 		dev_dbg(di->dev, "invalid charger_currentmA\n");
+		return;
+	}
 
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, currentmA,
 						CHARGERUSB_VICHRG);
-		return;
+	return;
 }
 
 static void twl6030_config_cinlimit_reg(struct twl6030_bci_device_info *di,
@@ -269,24 +318,28 @@ static void twl6030_config_cinlimit_reg(struct twl6030_bci_device_info *di,
 		currentmA = (currentmA - 50) / 50;
 	else if (currentmA >= 750)
 		currentmA = (800 - 50) / 50;
-	else
+	else {
 		dev_dbg(di->dev, "invalid input current limit\n");
-
-	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, CHARGERUSB_CIN_LIMIT_NONE,
-					CHARGERUSB_CINLIMIT);
 		return;
+	}
+
+	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, currentmA,
+					CHARGERUSB_CINLIMIT);
+	return;
 }
 
 static void twl6030_config_limit1_reg(struct twl6030_bci_device_info *di,
 							unsigned int voltagemV)
 {
-	if ((voltagemV < 3500) || (voltagemV > 4760))
+	if ((voltagemV < 3500) || (voltagemV > 4760)) {
 		dev_dbg(di->dev, "invalid max_charger_voltagemV\n");
+		return;
+	}
 
 	voltagemV = (voltagemV - 3500) / 20;
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, voltagemV,
 						CHARGERUSB_CTRLLIMIT1);
-		return;
+	return;
 }
 
 static void twl6030_config_limit2_reg(struct twl6030_bci_device_info *di,
@@ -296,28 +349,32 @@ static void twl6030_config_limit2_reg(struct twl6030_bci_device_info *di,
 		currentmA = (currentmA - 300) / 50;
 	else if ((currentmA >= 500) && (currentmA <= 1500))
 		currentmA = (currentmA - 500) / 100 + 4;
-	else
+	else {
 		dev_dbg(di->dev, "invalid max_charger_currentmA\n");
+		return;
+	}
 
 	currentmA |= LOCK_LIMIT;
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, currentmA,
 						CHARGERUSB_CTRLLIMIT2);
-		return;
+	return;
 }
 
 static void twl6030_stop_usb_charger(struct twl6030_bci_device_info *di)
 {
 	di->charger_source = 0;
+	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 0, CONTROLLER_CTRL1);
 }
 
 static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 {
 	di->charger_source = POWER_SUPPLY_TYPE_USB;
+	di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 	dev_dbg(di->dev, "USB charger detected\n");
-	twl6030_config_vichrg_reg(di, di->max_charger_currentmA);
-	twl6030_config_cinlimit_reg(di, di->max_charger_currentmA);
-	twl6030_config_voreg_reg(di, di->max_bat_voltagemV);
+	twl6030_config_vichrg_reg(di, di->charger_outcurrentmA);
+	twl6030_config_cinlimit_reg(di, di->charger_incurrentmA);
+	twl6030_config_voreg_reg(di, di->regulation_voltagemV);
 	twl6030_config_iterm_reg(di, di->termination_currentmA);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
 			CONTROLLER_CTRL1_EN_CHARGER,
@@ -328,6 +385,7 @@ static void twl6030_stop_ac_charger(struct twl6030_bci_device_info *di)
 {
 	long int events;
 	di->charger_source = 0;
+	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
 	events = BQ2415x_STOP_CHARGING;
 	blocking_notifier_call_chain(&notifier_list, events, NULL);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 0, CONTROLLER_CTRL1);
@@ -339,6 +397,7 @@ static void twl6030_start_ac_charger(struct twl6030_bci_device_info *di)
 
 	dev_dbg(di->dev, "AC charger detected\n");
 	di->charger_source = POWER_SUPPLY_TYPE_MAINS;
+	di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 	events = BQ2415x_START_CHARGING;
 	blocking_notifier_call_chain(&notifier_list, events, NULL);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
@@ -346,6 +405,15 @@ static void twl6030_start_ac_charger(struct twl6030_bci_device_info *di)
 			CONTROLLER_CTRL1_SEL_CHARGER,
 			CONTROLLER_CTRL1);
 }
+
+static void twl6030_stop_charger(struct twl6030_bci_device_info *di)
+{
+	if (di->charger_source == POWER_SUPPLY_TYPE_MAINS)
+		twl6030_stop_ac_charger(di);
+	else if (di->charger_source == POWER_SUPPLY_TYPE_USB)
+		twl6030_stop_usb_charger(di);
+}
+
 /*
  * Interrupt service routine
  *
@@ -360,22 +428,16 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	int charger_fault = 0;
 	long int events;
 	u8 stat_toggle, stat_reset, stat_set = 0;
+	u8 charge_state;
 	u8 present_charge_state;
 	u8 ac_or_vbus, no_ac_and_vbus;
-
-#ifdef CONFIG_LOCKDEP
-	/* WORKAROUND for lockdep forcing IRQF_DISABLED on us, which
-	 * we don't want and can't tolerate.  Although it might be
-	 * friendlier not to borrow this thread context...
-	 */
-	local_irq_enable();
-#endif
 
 	/* read charger controller_stat1 */
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &present_charge_state,
 		CONTROLLER_STAT1);
 	if (ret)
 		return IRQ_NONE;
+	charge_state = di->stat1;
 
 	stat_toggle = charge_state ^ present_charge_state;
 	stat_set = stat_toggle & present_charge_state;
@@ -390,6 +452,7 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	}
 
 	charge_state = present_charge_state;
+	di->stat1 = present_charge_state;
 	if ((charge_state & VAC_DET) &&
 		(charge_state & CONTROLLER_STAT1_EXTCHRG_STATZ)) {
 		events = BQ2415x_CHARGER_FAULT;
@@ -397,13 +460,15 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	}
 
 	if (stat_reset & VBUS_DET) {
+		di->usb_online = 0;
 		dev_dbg(di->dev, "usb removed\n");
-			twl6030_stop_usb_charger(di);
+		twl6030_stop_usb_charger(di);
 		if (present_charge_state & VAC_DET)
 			twl6030_start_ac_charger(di);
 
 	}
 	if (stat_set & VBUS_DET) {
+		di->usb_online = POWER_SUPPLY_TYPE_USB;
 		if ((present_charge_state & VAC_DET) && (di->vac_priority == 2))
 			dev_dbg(di->dev,
 				"USB charger detected, continue with VAC\n");
@@ -412,12 +477,14 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	}
 
 	if (stat_reset & VAC_DET) {
+		di->ac_online = 0;
 		dev_dbg(di->dev, "vac removed\n");
 		twl6030_stop_ac_charger(di);
 		if (present_charge_state & VBUS_DET)
 			twl6030_start_usb_charger(di);
 	}
 	if (stat_set & VAC_DET) {
+		di->ac_online = POWER_SUPPLY_TYPE_MAINS;
 		if ((present_charge_state & VBUS_DET) &&
 						(di->vac_priority == 3))
 			dev_dbg(di->dev,
@@ -467,6 +534,8 @@ static irqreturn_t twl6030charger_fault_interrupt(int irq, void *_di)
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &usb_charge_sts2,
 						CHARGERUSB_STATUS_INT2);
 
+	di->status_int1 = usb_charge_sts1;
+	di->status_int2 = usb_charge_sts2;
 	if (usb_charge_sts & CURRENT_TERM_INT)
 		dev_dbg(di->dev, "USB CURRENT_TERM_INT\n");
 	if (usb_charge_sts & CHARGERUSB_THMREG)
@@ -517,131 +586,57 @@ static irqreturn_t twl6030charger_fault_interrupt(int irq, void *_di)
 	return IRQ_HANDLED;
 }
 
-/*
- * Return battery temperature
- * Or < 0 on failure.
- */
-static int twl6030battery_temperature(void)
+static void twl6030battery_current(struct twl6030_bci_device_info *di)
 {
-	struct twl6030_gpadc_request req;
-	int temp;
+	int ret;
+	u16 read_value;
+	s16 temp;
+	int current_now;
 
-	req.channels = (1 << 1) | (1 << 4);
-	req.method = TWL6030_GPADC_SW2;
-	req.active = 0;
-	req.func_cb = NULL;
-	twl6030_gpadc_conversion(&req);
-	temp = (u16)req.rbuf[4];
+	/* FG_REG_10, 11 is 14 bit signed instantaneous current sample value */
+	ret = twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *)&read_value,
+								FG_REG_10, 2);
+	if (ret < 0) {
+		dev_dbg(di->dev, "failed to read FG_REG_10: current_now\n");
+		return;
+	}
 
-	return temp;
-}
-
-/*
- * Return battery voltage
- * Or < 0 on failure.
- */
-static int twl6030battery_voltage(void)
-{
-	struct twl6030_gpadc_request req;
-	int temp;
-
-	req.channels = (1 << 7);
-	req.method = TWL6030_GPADC_SW2;
-	req.active = 0;
-	req.func_cb = NULL;
-	twl6030_gpadc_conversion(&req);
-
-	/*
-	 * multiply by 5/1024 for external scaling
-	 * and 1000 to convert to mV
-	 */
-	temp = ((u16)req.rbuf[7]);
-
-	return  temp;
-
-}
-
-/*
- * Return the battery current
- * Or < 0 on failure.
- */
-static int twl6030battery_current(struct twl6030_bci_device_info *di)
-{
-	int temp, ret;
-	u8 read_value1, read_value2;
-
-	ret = twl_i2c_read_u8(TWL6030_MODULE_GASGAUGE, &read_value1,
-							REG_FG_REG_10);
-	ret = twl_i2c_read_u8(TWL6030_MODULE_GASGAUGE, &read_value2,
-							REG_FG_REG_11);
-	temp = (read_value2 << 8) + read_value1;
-	if (temp >= 0x2000)
-		temp = -(0x3fff - temp); /* 10bit -ive number to 16 bit +ive */
+	temp = ((s16)(read_value << 2) >> 2);
+	current_now = temp - di->cc_offset;
 
 	/* current drawn per sec */
-	temp = temp * fuelgauge_rate[di->fuelgauge_mode];
+	current_now = current_now * fuelgauge_rate[di->fuelgauge_mode];
 	/* current in mAmperes */
-	temp = temp * 3000/4096/4;
+	current_now = (current_now * 3000) >> 14;
 	/* current in uAmperes */
-	temp = temp * 1000;
+	current_now = current_now * 1000;
+	di->current_uA = current_now;
 
-	return temp; /* current in uA */
-
+	return;
 }
 
 /*
- * Return the battery backup voltage
+ * Return channel value
  * Or < 0 on failure.
  */
-static int twl6030backupbatt_voltage(void)
+static int twl6030_get_gpadc_conversion(int channel_no)
 {
 	struct twl6030_gpadc_request req;
-	int temp;
+	int temp = 0;
+	int ret;
 
-	req.channels = (1 << 8);
+	req.channels = (1 << channel_no);
 	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
-	twl6030_gpadc_conversion(&req);
+	ret = twl6030_gpadc_conversion(&req);
+	if (ret < 0)
+		return ret;
 
-	/*
-	 * multiply by 6.25/1024 for external scaling
-	 * and 1000000 to convert to uV
-	 */
+	if (req.rbuf[channel_no] > 0)
+		temp = req.rbuf[channel_no];
 
-	temp = ((u16)req.rbuf[8]);
-
-	return  temp;
-}
-
-static int twl6030_vbus_voltage(void)
-{
-	struct twl6030_gpadc_request req;
-	int temp;
-
-	req.channels = (1 << 10);
-	req.method = TWL6030_GPADC_SW2;
-	req.active = 0;
-	req.func_cb = NULL;
-	twl6030_gpadc_conversion(&req);
-	temp = ((u16)req.rbuf[10]);
-
-	return  temp;
-}
-
-static int twl6030_id_level(void)
-{
-	struct twl6030_gpadc_request req;
-	int temp;
-
-	req.channels = (1 << 14);
-	req.method = TWL6030_GPADC_SW2;
-	req.active = 0;
-	req.func_cb = NULL;
-	twl6030_gpadc_conversion(&req);
-	temp = ((u16)req.rbuf[14]);
-
-	return  temp;
+	return temp;
 }
 
 /*
@@ -703,11 +698,11 @@ static int twl6030battery_current_setup(void)
 	int ret;
 	u8 rd_reg;
 
-	ret = twl_i2c_read_u8(TWL6030_MODULE_ID1, &rd_reg, REG_TOGGLE1);
-	rd_reg = rd_reg | ENABLE_FUELGUAGE;
+	ret = twl_i2c_read_u8(TWL6030_MODULE_ID1, &rd_reg, PWDNSTATUS2);
+	rd_reg = (rd_reg & 0x30) >> 2;
+	rd_reg = rd_reg | FGDITHS | FGS;
 	ret |= twl_i2c_write_u8(TWL6030_MODULE_ID1, rd_reg, REG_TOGGLE1);
-	ret |= twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, (1 << 1),
-							REG_FG_REG_00);
+	ret |= twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, CC_CAL_EN, FG_REG_00);
 
 	return ret;
 }
@@ -718,74 +713,134 @@ static enum power_supply_property twl6030_bci_battery_props[] = {
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
-	POWER_SUPPLY_PROP_CHARGE_AVG,
-	POWER_SUPPLY_PROP_CHARGE_FULL,
-	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
+	POWER_SUPPLY_PROP_CURRENT_AVG,
 	POWER_SUPPLY_PROP_CAPACITY,
 	POWER_SUPPLY_PROP_TEMP,
+};
+
+static enum power_supply_property twl6030_usb_props[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
+};
+
+static enum power_supply_property twl6030_ac_props[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 };
 
 static enum power_supply_property twl6030_bk_bci_battery_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 };
 
-static void
-twl6030_bk_bci_battery_read_status(struct twl6030_bci_device_info *di)
+static void twl6030_current_avg(struct work_struct *work)
 {
-	di->bk_voltage_uV = twl6030backupbatt_voltage();
-}
-
-static void twl6030_bk_bci_battery_work(struct work_struct *work)
-{
+	s32 samples;
+	s16 cc_offset;
+	int current_avg_uA;
 	struct twl6030_bci_device_info *di = container_of(work,
 		struct twl6030_bci_device_info,
-		twl6030_bk_bci_monitor_work.work);
+		twl6030_current_avg_work.work);
 
-	twl6030_bk_bci_battery_read_status(di);
-	schedule_delayed_work(&di->twl6030_bk_bci_monitor_work,
-		msecs_to_jiffies(1000 * di->monitoring_interval));
-}
+	di->charge_n2 = di->charge_n1;
+	di->timer_n2 = di->timer_n1;
 
-static void twl6030_bci_battery_read_status(struct twl6030_bci_device_info *di)
-{
-	di->temp_C = twl6030battery_temperature();
-	di->voltage_uV = twl6030battery_voltage();
-	di->current_uA = twl6030battery_current(di);
-}
+	/* FG_REG_01, 02, 03 is 24 bit unsigned sample counter value */
+	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &di->timer_n1,
+							FG_REG_01, 3);
+	/*
+	 * FG_REG_04, 5, 6, 7 is 32 bit signed accumulator value
+	 * accumulates instantaneous current value
+	 */
+	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &di->charge_n1,
+							FG_REG_04, 4);
+	/* FG_REG_08, 09 is 10 bit signed calibration offset value */
+	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &cc_offset,
+							FG_REG_08, 2);
+	cc_offset = ((s16)(cc_offset << 6) >> 6);
+	di->cc_offset = cc_offset;
 
-static void
-twl6030_bci_battery_update_status(struct twl6030_bci_device_info *di)
-{
-	twl6030_bci_battery_read_status(di);
-	di->charge_status = POWER_SUPPLY_STATUS_UNKNOWN;
+	samples = di->timer_n1 - di->timer_n2;
+	/* check for timer overflow */
+	if (di->timer_n1 < di->timer_n2)
+		samples = samples + (1 << 24);
 
-	if (power_supply_am_i_supplied(&di->bat))
-		di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
-	else
-		di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+	cc_offset = cc_offset * samples;
+	current_avg_uA = ((di->charge_n1 - di->charge_n2 - cc_offset)
+							* 3000) >> 12;
+	if (samples)
+		current_avg_uA = current_avg_uA / samples;
+	di->current_avg_uA = current_avg_uA * 1000;
+
+	schedule_delayed_work(&di->twl6030_current_avg_work,
+		msecs_to_jiffies(1000 * di->current_avg_interval));
 }
 
 static void twl6030_bci_battery_work(struct work_struct *work)
 {
 	struct twl6030_bci_device_info *di = container_of(work,
 		struct twl6030_bci_device_info, twl6030_bci_monitor_work.work);
+	struct twl6030_gpadc_request req;
+	int adc_code;
+	int temp;
+	int ret;
 
-	twl6030_bci_battery_update_status(di);
-	di->charge_n2 = di->charge_n1;
-	di->timer_n2 = di->timer_n1;
-	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &di->timer_n1,
-							REG_FG_REG_01, 3);
-	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &di->charge_n1,
-							REG_FG_REG_04, 4);
-
-	di->current_avg_uA = ((di->charge_n1 - di->charge_n2) * 3000/4096/4);
-	di->current_avg_uA = di->current_avg_uA / di->monitoring_interval;
-	di->current_avg_uA = di->current_avg_uA * 1000;
+	req.channels = (1 << 1) | (1 << 7) | (1 << 8);
+	req.method = TWL6030_GPADC_SW2;
+	req.active = 0;
+	req.func_cb = NULL;
+	ret = twl6030_gpadc_conversion(&req);
 
 	schedule_delayed_work(&di->twl6030_bci_monitor_work,
 			msecs_to_jiffies(1000 * di->monitoring_interval));
+	if (ret < 0) {
+		dev_dbg(di->dev, "gpadc conversion failed: %d\n", ret);
+		return;
+	}
+
+	if (req.rbuf[7] > 0)
+		di->voltage_uV = req.rbuf[7];
+	if (req.rbuf[8] > 0)
+		di->bk_voltage_uV = req.rbuf[8];
+
+	if (di->battery_tmp_tbl == NULL)
+		return;
+
+	if (req.rbuf[1] > 100 && req.rbuf[1] < 950) {
+		adc_code = req.rbuf[1];
+		for (temp = 0; temp < di->tblsize; temp++) {
+			if (adc_code >= di->battery_tmp_tbl[temp])
+				break;
+		}
+
+		/* first 2 values are for negative temperature */
+		di->temp_C = (temp - 2) * 10; /* in tenths of degree Celsius */
+	}
 }
 
+static void twl6030_current_mode_changed(struct twl6030_bci_device_info *di)
+{
+
+	/* FG_REG_01, 02, 03 is 24 bit unsigned sample counter value */
+	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &di->timer_n1,
+							FG_REG_01, 3);
+	/*
+	 * FG_REG_04, 5, 6, 7 is 32 bit signed accumulator value
+	 * accumulates instantaneous current value
+	 */
+	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &di->charge_n1,
+							FG_REG_04, 4);
+
+	cancel_delayed_work(&di->twl6030_current_avg_work);
+	schedule_delayed_work(&di->twl6030_current_avg_work,
+		msecs_to_jiffies(1000 * di->current_avg_interval));
+}
+
+static void twl6030_work_interval_changed(struct twl6030_bci_device_info *di)
+{
+	cancel_delayed_work(&di->twl6030_bci_monitor_work);
+	schedule_delayed_work(&di->twl6030_bci_monitor_work,
+		msecs_to_jiffies(1000 * di->monitoring_interval));
+}
 
 #define to_twl6030_bci_device_info(x) container_of((x), \
 			struct twl6030_bci_device_info, bat);
@@ -796,6 +851,52 @@ static void twl6030_bci_battery_external_power_changed(struct power_supply *psy)
 
 	cancel_delayed_work(&di->twl6030_bci_monitor_work);
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
+}
+
+#define to_twl6030_ac_device_info(x) container_of((x), \
+		struct twl6030_bci_device_info, ac);
+
+static int twl6030_ac_get_property(struct power_supply *psy,
+					enum power_supply_property psp,
+					union power_supply_propval *val)
+{
+	struct twl6030_bci_device_info *di = to_twl6030_ac_device_info(psy);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = di->ac_online;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		val->intval = twl6030_get_gpadc_conversion(9);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+#define to_twl6030_usb_device_info(x) container_of((x), \
+		struct twl6030_bci_device_info, usb);
+
+static int twl6030_usb_get_property(struct power_supply *psy,
+					enum power_supply_property psp,
+					union power_supply_propval *val)
+{
+	struct twl6030_bci_device_info *di = to_twl6030_usb_device_info(psy);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = di->usb_online;
+		break;
+	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		val->intval = twl6030_get_gpadc_conversion(10);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 #define to_twl6030_bk_bci_device_info(x) container_of((x), \
@@ -829,17 +930,13 @@ static int twl6030_bci_battery_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
 		val->intval = di->charge_status;
-		return 0;
-	default:
 		break;
-	}
-
-	switch (psp) {
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
+		di->voltage_uV = twl6030_get_gpadc_conversion(7);
 		val->intval = di->voltage_uV * 1000;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
-		di->current_uA = twl6030battery_current(di);
+		twl6030battery_current(di);
 		val->intval = di->current_uA;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
@@ -848,14 +945,8 @@ static int twl6030_bci_battery_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = di->charger_source;
 		break;
-	case POWER_SUPPLY_PROP_CHARGE_AVG:
+	case POWER_SUPPLY_PROP_CURRENT_AVG:
 		val->intval = di->current_avg_uA;
-		break;
-	case POWER_SUPPLY_PROP_CHARGE_FULL:
-		val->intval = 2200000;
-		break;
-	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
-		val->intval = 2200000;
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		val->intval = di->bat_health;
@@ -896,9 +987,8 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 }
 EXPORT_SYMBOL_GPL(twl6030_unregister_notifier);
 
-static ssize_t twl6030_bci_set_fgmode(struct device *dev,
-				  struct device_attribute *attr,
-				  const char *buf, size_t count)
+static ssize_t set_fg_mode(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
 {
 	long val;
 	int status = count;
@@ -907,83 +997,438 @@ static ssize_t twl6030_bci_set_fgmode(struct device *dev,
 	if ((strict_strtol(buf, 10, &val) < 0) || (val > 3))
 		return -EINVAL;
 	di->fuelgauge_mode = val;
-	twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, (val << 6),
-							REG_FG_REG_00);
+	twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, (val << 6) | CC_CAL_EN,
+							FG_REG_00);
+	twl6030_current_mode_changed(di);
 	return status;
 }
 
-static ssize_t twl6030_bci_show_fgmode(struct device *dev,
-				  struct device_attribute *attr,
-				  char *buf)
+static ssize_t show_fg_mode(struct device *dev,
+		struct device_attribute *attr, char *buf)
 {
-	unsigned long val;
+	int val;
 	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
 
 	val = di->fuelgauge_mode;
-	return sprintf(buf, "%lu\n", val);
+	return sprintf(buf, "%d\n", val);
 }
 
-static ssize_t twl6030_bci_set_charge_src(struct device *dev,
-				  struct device_attribute *attr,
+static ssize_t set_charge_src(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 2) || (val > 3))
+		return -EINVAL;
+	di->vac_priority = val;
+	return status;
+}
+
+static ssize_t show_charge_src(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->vac_priority;
+	return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t show_vbus_voltage(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int val;
+
+	val = twl6030_get_gpadc_conversion(10);
+
+	return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t show_id_level(struct device *dev, struct device_attribute *attr,
+							char *buf)
+{
+	int val;
+
+	val = twl6030_get_gpadc_conversion(14);
+
+	return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t set_watchdog(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 1) || (val > 127))
+		return -EINVAL;
+	di->watchdog_duration = val;
+	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, val, CONTROLLER_WDG);
+
+	return status;
+}
+
+static ssize_t show_watchdog(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->watchdog_duration;
+	return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t show_fg_counter(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int fg_counter = 0;
+
+	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &fg_counter,
+							FG_REG_01, 3);
+	return sprintf(buf, "%d\n", fg_counter);
+}
+
+static ssize_t show_fg_accumulator(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	long fg_accum = 0;
+
+	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &fg_accum, FG_REG_04, 4);
+
+	return sprintf(buf, "%ld\n", fg_accum);
+}
+
+static ssize_t show_fg_offset(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	s16 fg_offset = 0;
+
+	twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &fg_offset, FG_REG_08, 2);
+	fg_offset = ((s16)(fg_offset << 6) >> 6);
+
+	return sprintf(buf, "%d\n", fg_offset);
+}
+
+static ssize_t set_fg_clear(struct device *dev, struct device_attribute *attr,
+						const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val != 1))
+		return -EINVAL;
+	twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, CC_AUTOCLEAR, FG_REG_00);
+
+	return status;
+}
+
+static ssize_t set_fg_cal(struct device *dev, struct device_attribute *attr,
+						const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val != 1))
+		return -EINVAL;
+	twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, CC_CAL_EN, FG_REG_00);
+
+	return status;
+}
+
+static ssize_t set_charging(struct device *dev, struct device_attribute *attr,
+					  const char *buf, size_t count)
+{
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	if (strncmp(buf, "startac", 7) == 0) {
+		if (di->charger_source == POWER_SUPPLY_TYPE_USB)
+			twl6030_stop_usb_charger(di);
+		twl6030_start_ac_charger(di);
+	} else if (strncmp(buf, "startusb", 8) == 0) {
+		if (di->charger_source == POWER_SUPPLY_TYPE_MAINS)
+			twl6030_stop_ac_charger(di);
+		twl6030_start_usb_charger(di);
+	} else if (strncmp(buf, "stop" , 4) == 0)
+		twl6030_stop_charger(di);
+	else
+		return -EINVAL;
+
+	return status;
+}
+
+static ssize_t set_regulation_voltage(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 3500)
+				|| (val > di->max_charger_voltagemV))
+		return -EINVAL;
+	di->regulation_voltagemV = val;
+	twl6030_config_voreg_reg(di, val);
+
+	return status;
+}
+
+static ssize_t show_regulation_voltage(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	unsigned int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->regulation_voltagemV;
+	return sprintf(buf, "%u\n", val);
+}
+
+static ssize_t set_termination_current(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 50) || (val > 400))
+		return -EINVAL;
+	di->termination_currentmA = val;
+	twl6030_config_iterm_reg(di, val);
+
+	return status;
+}
+
+static ssize_t show_termination_current(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	unsigned int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->termination_currentmA;
+	return sprintf(buf, "%u\n", val);
+}
+
+static ssize_t set_cin_limit(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 50) || (val > 1500))
+		return -EINVAL;
+	di->charger_incurrentmA = val;
+	twl6030_config_cinlimit_reg(di, val);
+
+	return status;
+}
+
+static ssize_t show_cin_limit(struct device *dev, struct device_attribute *attr,
+								  char *buf)
+{
+	unsigned int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->charger_incurrentmA;
+	return sprintf(buf, "%u\n", val);
+}
+
+static ssize_t set_charge_current(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 300)
+				|| (val > di->max_charger_currentmA))
+		return -EINVAL;
+	di->charger_outcurrentmA = val;
+	twl6030_config_vichrg_reg(di, val);
+
+	return status;
+}
+
+static ssize_t show_charge_current(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	unsigned int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->charger_outcurrentmA;
+	return sprintf(buf, "%u\n", val);
+}
+
+static ssize_t set_min_vbus(struct device *dev, struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
 	long val;
 	int status = count;
 	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
 
-	if ((strict_strtol(buf, 10, &val) < 0) || (val > 3))
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 4200) || (val > 4760))
 		return -EINVAL;
-	di->vac_priority = val;
+	di->min_vbus = val;
+	twl6030_config_min_vbus_reg(di, val);
+
 	return status;
 }
 
-static ssize_t twl6030_bci_show_charge_src(struct device *dev,
-				  struct device_attribute *attr,
+static ssize_t show_min_vbus(struct device *dev, struct device_attribute *attr,
 				  char *buf)
 {
-	unsigned long val;
+	unsigned int val;
 	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
 
-	val = di->vac_priority;
-	return sprintf(buf, "%lu\n", val);
+	val = di->min_vbus;
+	return sprintf(buf, "%u\n", val);
 }
 
-static ssize_t twl6030_bci_show_vbus_voltage(struct device *dev,
-				  struct device_attribute *attr,
-				  char *buf)
+static ssize_t set_current_avg_interval(struct device *dev,
+	  struct device_attribute *attr, const char *buf, size_t count)
 {
-	unsigned long val;
+	long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
 
-	val = twl6030_vbus_voltage();
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 10) || (val > 3600))
+		return -EINVAL;
+	di->current_avg_interval = val;
+	twl6030_current_mode_changed(di);
 
-	return sprintf(buf, "%lu\n", val);
+	return status;
 }
 
-static ssize_t twl6030_bci_show_id_level(struct device *dev,
-				  struct device_attribute *attr,
-				  char *buf)
+static ssize_t show_current_avg_interval(struct device *dev,
+				  struct device_attribute *attr, char *buf)
 {
-	unsigned long val;
+	unsigned int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
 
-	val = twl6030_id_level();
-
-	return sprintf(buf, "%lu\n", val);
+	val = di->current_avg_interval;
+	return sprintf(buf, "%u\n", val);
 }
 
-static DEVICE_ATTR(mode, S_IWUSR | S_IRUGO, twl6030_bci_show_fgmode,
-		twl6030_bci_set_fgmode);
-static DEVICE_ATTR(charge_src, S_IWUSR | S_IRUGO, twl6030_bci_show_charge_src,
-		twl6030_bci_set_charge_src);
-static DEVICE_ATTR(vbus_voltage, S_IWUSR | S_IRUGO,
-		twl6030_bci_show_vbus_voltage, NULL);
-static DEVICE_ATTR(id_level, S_IWUSR | S_IRUGO, twl6030_bci_show_id_level,
-		NULL);
+static ssize_t set_monitoring_interval(struct device *dev,
+	  struct device_attribute *attr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 10) || (val > 3600))
+		return -EINVAL;
+	di->monitoring_interval = val;
+	twl6030_work_interval_changed(di);
+
+	return status;
+}
+
+static ssize_t show_monitoring_interval(struct device *dev,
+		  struct device_attribute *attr, char *buf)
+{
+	unsigned int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->monitoring_interval;
+	return sprintf(buf, "%u\n", val);
+}
+
+static ssize_t show_bsi(struct device *dev,
+		  struct device_attribute *attr, char *buf)
+{
+	int val;
+
+	val = twl6030_get_gpadc_conversion(0);
+	return sprintf(buf, "%d\n", val);
+}
+
+static ssize_t show_stat1(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	unsigned val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->stat1;
+	return sprintf(buf, "%u\n", val);
+}
+
+static ssize_t show_status_int1(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	unsigned val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->status_int1;
+	return sprintf(buf, "%u\n", val);
+}
+
+static ssize_t show_status_int2(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	unsigned val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->status_int2;
+	return sprintf(buf, "%u\n", val);
+}
+
+static DEVICE_ATTR(fg_mode, S_IWUSR | S_IRUGO, show_fg_mode, set_fg_mode);
+static DEVICE_ATTR(charge_src, S_IWUSR | S_IRUGO, show_charge_src,
+		set_charge_src);
+static DEVICE_ATTR(vbus_voltage, S_IRUGO, show_vbus_voltage, NULL);
+static DEVICE_ATTR(id_level, S_IRUGO, show_id_level, NULL);
+static DEVICE_ATTR(watchdog, S_IWUSR | S_IRUGO, show_watchdog, set_watchdog);
+static DEVICE_ATTR(fg_counter, S_IRUGO, show_fg_counter, NULL);
+static DEVICE_ATTR(fg_accumulator, S_IRUGO, show_fg_accumulator, NULL);
+static DEVICE_ATTR(fg_offset, S_IRUGO, show_fg_offset, NULL);
+static DEVICE_ATTR(fg_clear, S_IWUSR, NULL, set_fg_clear);
+static DEVICE_ATTR(fg_cal, S_IWUSR, NULL, set_fg_cal);
+static DEVICE_ATTR(charging, S_IWUSR | S_IRUGO, NULL, set_charging);
+static DEVICE_ATTR(regulation_voltage, S_IWUSR | S_IRUGO,
+		show_regulation_voltage, set_regulation_voltage);
+static DEVICE_ATTR(termination_current, S_IWUSR | S_IRUGO,
+		show_termination_current, set_termination_current);
+static DEVICE_ATTR(cin_limit, S_IWUSR | S_IRUGO, show_cin_limit,
+		set_cin_limit);
+static DEVICE_ATTR(charge_current, S_IWUSR | S_IRUGO, show_charge_current,
+		set_charge_current);
+static DEVICE_ATTR(min_vbus, S_IWUSR | S_IRUGO, show_min_vbus, set_min_vbus);
+static DEVICE_ATTR(monitoring_interval, S_IWUSR | S_IRUGO,
+		show_monitoring_interval, set_monitoring_interval);
+static DEVICE_ATTR(current_avg_interval, S_IWUSR | S_IRUGO,
+		show_current_avg_interval, set_current_avg_interval);
+static DEVICE_ATTR(bsi, S_IRUGO, show_bsi, NULL);
+static DEVICE_ATTR(stat1, S_IRUGO, show_stat1, NULL);
+static DEVICE_ATTR(status_int1, S_IRUGO, show_status_int1, NULL);
+static DEVICE_ATTR(status_int2, S_IRUGO, show_status_int2, NULL);
 
 static struct attribute *twl6030_bci_attributes[] = {
-	&dev_attr_mode.attr,
+	&dev_attr_fg_mode.attr,
 	&dev_attr_charge_src.attr,
 	&dev_attr_vbus_voltage.attr,
 	&dev_attr_id_level.attr,
+	&dev_attr_watchdog.attr,
+	&dev_attr_fg_counter.attr,
+	&dev_attr_fg_accumulator.attr,
+	&dev_attr_fg_offset.attr,
+	&dev_attr_fg_clear.attr,
+	&dev_attr_fg_cal.attr,
+	&dev_attr_charging.attr,
+	&dev_attr_regulation_voltage.attr,
+	&dev_attr_termination_current.attr,
+	&dev_attr_cin_limit.attr,
+	&dev_attr_charge_current.attr,
+	&dev_attr_min_vbus.attr,
+	&dev_attr_monitoring_interval.attr,
+	&dev_attr_current_avg_interval.attr,
+	&dev_attr_bsi.attr,
+	&dev_attr_stat1.attr,
+	&dev_attr_status_int1.attr,
+	&dev_attr_status_int2.attr,
 	NULL,
 };
 
@@ -992,7 +1437,7 @@ static const struct attribute_group twl6030_bci_attr_group = {
 };
 
 static char *twl6030_bci_supplied_to[] = {
-	"twl6030_bci_battery",
+	"twl6030_battery",
 };
 
 static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
@@ -1012,15 +1457,25 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err_pdata;
 	}
-	di->monitoring_interval = pdata->monitoring_interval;
+
+	if (pdata->monitoring_interval == 0) {
+		di->monitoring_interval = 10;
+		di->current_avg_interval = 10;
+	} else {
+		di->monitoring_interval = pdata->monitoring_interval;
+		di->current_avg_interval = pdata->monitoring_interval;
+	}
+
 	di->max_charger_currentmA = pdata->max_charger_currentmA;
-	di->max_charger_voltagemV = pdata->max_charger_voltagemV;
+	di->max_charger_voltagemV = pdata->max_bat_voltagemV;
 	di->termination_currentmA = pdata->termination_currentmA;
-	di->max_bat_voltagemV = pdata->max_bat_voltagemV;
+	di->regulation_voltagemV = pdata->max_bat_voltagemV;
 	di->low_bat_voltagemV = pdata->low_bat_voltagemV;
+	di->battery_tmp_tbl = pdata->battery_tmp_tbl;
+	di->tblsize = pdata->tblsize;
 
 	di->dev = &pdev->dev;
-	di->bat.name = "twl6030_bci_battery";
+	di->bat.name = "twl6030_battery";
 	di->bat.supplied_to = twl6030_bci_supplied_to;
 	di->bat.num_supplicants = ARRAY_SIZE(twl6030_bci_supplied_to);
 	di->bat.type = POWER_SUPPLY_TYPE_BATTERY;
@@ -1030,14 +1485,25 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->bat.external_power_changed =
 			twl6030_bci_battery_external_power_changed;
 
-	di->charge_status = POWER_SUPPLY_STATUS_UNKNOWN;
+	di->usb.name = "twl6030_usb";
+	di->usb.type = POWER_SUPPLY_TYPE_USB;
+	di->usb.properties = twl6030_usb_props;
+	di->usb.num_properties = ARRAY_SIZE(twl6030_usb_props);
+	di->usb.get_property = twl6030_usb_get_property;
 
-	di->bk_bat.name = "twl6030_bci_bk_battery";
+	di->ac.name = "twl6030_ac";
+	di->ac.type = POWER_SUPPLY_TYPE_MAINS;
+	di->ac.properties = twl6030_ac_props;
+	di->ac.num_properties = ARRAY_SIZE(twl6030_ac_props);
+	di->ac.get_property = twl6030_ac_get_property;
+
+	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+
+	di->bk_bat.name = "twl6030_bk_battery";
 	di->bk_bat.type = POWER_SUPPLY_TYPE_BATTERY;
 	di->bk_bat.properties = twl6030_bk_bci_battery_props;
 	di->bk_bat.num_properties = ARRAY_SIZE(twl6030_bk_bci_battery_props);
 	di->bk_bat.get_property = twl6030_bk_bci_battery_get_property;
-	di->bk_bat.external_power_changed = NULL;
 
 	di->vac_priority = 2;
 	platform_set_drvdata(pdev, di);
@@ -1049,17 +1515,17 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	/* request charger fault interruption */
 	irq = platform_get_irq(pdev, 1);
-	ret = request_irq(irq, twl6030charger_fault_interrupt,
+	ret = request_threaded_irq(irq, NULL, twl6030charger_fault_interrupt,
 		0, "twl_bci_fault", di);
 	if (ret) {
 		dev_dbg(&pdev->dev, "could not request irq %d, status %d\n",
 			irq, ret);
-		goto batt_irq_fail;
+		goto temp_setup_fail;
 	}
 
 	/* request charger ctrl interruption */
 	irq = platform_get_irq(pdev, 0);
-	ret = request_irq(irq, twl6030charger_ctrl_interrupt,
+	ret = request_threaded_irq(irq, NULL, twl6030charger_ctrl_interrupt,
 		0, "twl_bci_ctrl", di);
 
 	if (ret) {
@@ -1067,15 +1533,6 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 			irq, ret);
 		goto chg_irq_fail;
 	}
-
-	twl6030_interrupt_unmask(TWL6030_CHARGER_CTRL_INT_MASK,
-						REG_INT_MSK_LINE_C);
-	twl6030_interrupt_unmask(TWL6030_CHARGER_CTRL_INT_MASK,
-						REG_INT_MSK_STS_C);
-	twl6030_interrupt_unmask(TWL6030_CHARGER_FAULT_INT_MASK,
-						REG_INT_MSK_LINE_C);
-	twl6030_interrupt_unmask(TWL6030_CHARGER_FAULT_INT_MASK,
-						REG_INT_MSK_STS_C);
 
 	ret = power_supply_register(&pdev->dev, &di->bat);
 	if (ret) {
@@ -1088,6 +1545,18 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 				twl6030_bci_battery_work);
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
 
+	ret = power_supply_register(&pdev->dev, &di->usb);
+	if (ret) {
+		dev_dbg(&pdev->dev, "failed to register usb power supply\n");
+		goto usb_failed;
+	}
+
+	ret = power_supply_register(&pdev->dev, &di->ac);
+	if (ret) {
+		dev_dbg(&pdev->dev, "failed to register ac power supply\n");
+		goto ac_failed;
+	}
+
 	ret = power_supply_register(&pdev->dev, &di->bk_bat);
 	if (ret) {
 		dev_dbg(&pdev->dev, "failed to register backup battery\n");
@@ -1096,9 +1565,9 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->charge_n1 = 0;
 	di->timer_n1 = 0;
 
-	INIT_DELAYED_WORK_DEFERRABLE(&di->twl6030_bk_bci_monitor_work,
-				twl6030_bk_bci_battery_work);
-	schedule_delayed_work(&di->twl6030_bk_bci_monitor_work, 500);
+	INIT_DELAYED_WORK_DEFERRABLE(&di->twl6030_current_avg_work,
+						twl6030_current_avg);
+	schedule_delayed_work(&di->twl6030_current_avg_work, 500);
 
 	ret = twl6030battery_voltage_setup();
 	if (ret)
@@ -1109,7 +1578,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "current measurement setup failed\n");
 
 	/* initialize for USB charging */
-	twl6030_config_limit1_reg(di, di->max_charger_voltagemV);
+	twl6030_config_limit1_reg(di, pdata->max_charger_voltagemV);
 	twl6030_config_limit2_reg(di, di->max_charger_currentmA);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MBAT_TEMP,
 						CONTROLLER_INT_MASK);
@@ -1119,20 +1588,35 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &controller_stat,
 		CONTROLLER_STAT1);
 
-	di->voltage_uV = twl6030battery_voltage();
+	di->charger_incurrentmA = di->max_charger_currentmA;
+	di->charger_outcurrentmA = di->max_charger_currentmA;
+	di->watchdog_duration = 32;
+	di->voltage_uV = twl6030_get_gpadc_conversion(7);
 	dev_info(&pdev->dev, "Battery Voltage at Bootup is %d mV\n",
 							di->voltage_uV);
 
-	if (controller_stat & VBUS_DET)
+	if (controller_stat & VBUS_DET) {
+		di->usb_online = POWER_SUPPLY_TYPE_USB;
 		twl6030_start_usb_charger(di);
+	}
 
-	if (controller_stat & VAC_DET)
+	if (controller_stat & VAC_DET) {
+		di->ac_online = POWER_SUPPLY_TYPE_MAINS;
 		twl6030_start_ac_charger(di);
+	}
 
 	ret = twl6030backupbatt_setup();
 	if (ret)
 		dev_dbg(&pdev->dev, "Backup Bat charging setup failed\n");
 
+	twl6030_interrupt_unmask(TWL6030_CHARGER_CTRL_INT_MASK,
+						REG_INT_MSK_LINE_C);
+	twl6030_interrupt_unmask(TWL6030_CHARGER_CTRL_INT_MASK,
+						REG_INT_MSK_STS_C);
+	twl6030_interrupt_unmask(TWL6030_CHARGER_FAULT_INT_MASK,
+						REG_INT_MSK_LINE_C);
+	twl6030_interrupt_unmask(TWL6030_CHARGER_FAULT_INT_MASK,
+						REG_INT_MSK_STS_C);
 
 	ret = sysfs_create_group(&pdev->dev.kobj, &twl6030_bci_attr_group);
 	if (ret)
@@ -1141,15 +1625,20 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	return 0;
 
 bk_batt_failed:
+	power_supply_unregister(&di->ac);
+ac_failed:
+	power_supply_unregister(&di->usb);
+usb_failed:
+	cancel_delayed_work(&di->twl6030_bci_monitor_work);
 	power_supply_unregister(&di->bat);
 batt_failed:
 	free_irq(irq, di);
 chg_irq_fail:
 	irq = platform_get_irq(pdev, 1);
-	free_irq(irq, NULL);
-err_pdata:
-batt_irq_fail:
+	free_irq(irq, di);
 temp_setup_fail:
+	platform_set_drvdata(pdev, NULL);
+err_pdata:
 	kfree(di);
 
 	return ret;
@@ -1177,9 +1666,11 @@ static int __devexit twl6030_bci_battery_remove(struct platform_device *pdev)
 
 	sysfs_remove_group(&pdev->dev.kobj, &twl6030_bci_attr_group);
 	cancel_delayed_work(&di->twl6030_bci_monitor_work);
-	cancel_delayed_work(&di->twl6030_bk_bci_monitor_work);
+	cancel_delayed_work(&di->twl6030_current_avg_work);
 	flush_scheduled_work();
 	power_supply_unregister(&di->bat);
+	power_supply_unregister(&di->usb);
+	power_supply_unregister(&di->ac);
 	power_supply_unregister(&di->bk_bat);
 	platform_set_drvdata(pdev, NULL);
 	kfree(di);
@@ -1192,19 +1683,31 @@ static int twl6030_bci_battery_suspend(struct platform_device *pdev,
 	pm_message_t state)
 {
 	struct twl6030_bci_device_info *di = platform_get_drvdata(pdev);
+	u8 rd_reg;
 
-	di->charge_status = POWER_SUPPLY_STATUS_UNKNOWN;
+	/* mask to prevent wakeup due to 32s timeout from External charger */
+	twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg, CONTROLLER_INT_MASK);
+	rd_reg |= MVAC_FAULT;
+	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MBAT_TEMP,
+						CONTROLLER_INT_MASK);
+
 	cancel_delayed_work(&di->twl6030_bci_monitor_work);
-	cancel_delayed_work(&di->twl6030_bk_bci_monitor_work);
+	cancel_delayed_work(&di->twl6030_current_avg_work);
 	return 0;
 }
 
 static int twl6030_bci_battery_resume(struct platform_device *pdev)
 {
 	struct twl6030_bci_device_info *di = platform_get_drvdata(pdev);
+	u8 rd_reg;
+
+	twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg, CONTROLLER_INT_MASK);
+	rd_reg &= ~(0xFF & MVAC_FAULT);
+	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MBAT_TEMP,
+						CONTROLLER_INT_MASK);
 
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
-	schedule_delayed_work(&di->twl6030_bk_bci_monitor_work, 50);
+	schedule_delayed_work(&di->twl6030_current_avg_work, 50);
 	return 0;
 }
 #else
@@ -1222,10 +1725,6 @@ static struct platform_driver twl6030_bci_battery_driver = {
 	},
 };
 
-MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:twl6030_bci");
-MODULE_AUTHOR("Texas Instruments Inc");
-
 static int __init twl6030_battery_init(void)
 {
 	return platform_driver_register(&twl6030_bci_battery_driver);
@@ -1238,3 +1737,6 @@ static void __exit twl6030_battery_exit(void)
 }
 module_exit(twl6030_battery_exit);
 
+MODULE_LICENSE("GPL");
+MODULE_ALIAS("platform:twl6030_bci");
+MODULE_AUTHOR("Texas Instruments Inc");

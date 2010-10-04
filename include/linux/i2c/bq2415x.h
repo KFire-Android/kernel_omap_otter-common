@@ -33,7 +33,7 @@
 
 struct bq2415x_platform_data {
 	int max_charger_currentmA;
-	int max_charger_voltagemA;
+	int max_charger_voltagemV;
 	int termination_currentmA;
 };
 
