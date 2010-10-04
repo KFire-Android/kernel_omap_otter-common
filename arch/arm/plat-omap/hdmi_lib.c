@@ -191,6 +191,7 @@ static struct {
 	void __iomem *base_core;     /*0*/
 	void __iomem *base_core_av;  /*1*/
 	void __iomem *base_wp;       /*2*/
+	struct hdmi_core_infoframe_avi avi_param;
 	struct mutex hdmi_lock;
 } hdmi;
 
@@ -718,8 +719,29 @@ static int hdmi_core_audio_config(u32 name,
 	return ret;
 }
 
-static int hdmi_core_audio_infoframe_avi(u32 name,
-	struct hdmi_core_infoframe_avi info_avi)
+int hdmi_core_read_avi_infoframe(struct hdmi_core_infoframe_avi *info_avi)
+{
+	info_avi->db1y_rgb_yuv422_yuv444 = hdmi.avi_param.db1y_rgb_yuv422_yuv444;
+	info_avi->db1a_active_format_off_on = hdmi.avi_param.db1a_active_format_off_on;
+	info_avi->db1b_no_vert_hori_verthori = hdmi.avi_param.db1b_no_vert_hori_verthori;
+	info_avi->db1s_0_1_2 = hdmi.avi_param.db1s_0_1_2;
+	info_avi->db2c_no_itu601_itu709_extented = 							hdmi.avi_param.db2c_no_itu601_itu709_extented;
+	info_avi->db2m_no_43_169 = hdmi.avi_param.db2m_no_43_169;
+	info_avi->db2r_same_43_169_149 = hdmi.avi_param.db2r_same_43_169_149;
+	info_avi->db3itc_no_yes = hdmi.avi_param.db3itc_no_yes;
+	info_avi->db3ec_xvyuv601_xvyuv709 = hdmi.avi_param.db3ec_xvyuv601_xvyuv709;
+	info_avi->db3q_default_lr_fr = hdmi.avi_param.db3q_default_lr_fr;
+	info_avi->db3sc_no_hori_vert_horivert = hdmi.avi_param.db3sc_no_hori_vert_horivert;
+	info_avi->db4vic_videocode = hdmi.avi_param.db4vic_videocode;
+	info_avi->db5pr_no_2_3_4_5_6_7_8_9_10 = hdmi.avi_param.db5pr_no_2_3_4_5_6_7_8_9_10;
+	info_avi->db6_7_lineendoftop = hdmi.avi_param.db6_7_lineendoftop;
+	info_avi->db8_9_linestartofbottom = hdmi.avi_param.db8_9_linestartofbottom;
+	info_avi->db10_11_pixelendofleft = hdmi.avi_param.db10_11_pixelendofleft;
+	info_avi->db12_13_pixelstartofright = hdmi.avi_param.db12_13_pixelstartofright;
+	return 0;
+}
+
+static int hdmi_core_audio_infoframe_avi(struct hdmi_core_infoframe_avi info_avi)
 {
 	u16 offset;
 	int dbyte, dbyte_size;
@@ -730,23 +752,23 @@ static int hdmi_core_audio_infoframe_avi(u32 name,
 	dbyte_size = HDMI_CORE_AV_AVI_DBYTE__ELSIZE;
 	/*info frame video*/
 	sum += 0x82 + 0x002 + 0x00D;
-	hdmi_write_reg(name, HDMI_CORE_AV_AVI_TYPE, 0x082);
-	hdmi_write_reg(name, HDMI_CORE_AV_AVI_VERS, 0x002);
-	hdmi_write_reg(name, HDMI_CORE_AV_AVI_LEN, 0x00D);
+	hdmi_write_reg(HDMI_CORE_AV, HDMI_CORE_AV_AVI_TYPE, 0x082);
+	hdmi_write_reg(HDMI_CORE_AV, HDMI_CORE_AV_AVI_VERS, 0x002);
+	hdmi_write_reg(HDMI_CORE_AV, HDMI_CORE_AV_AVI_LEN, 0x00D);
 
 	offset = dbyte + (0 * dbyte_size);
 	val = (info_avi.db1y_rgb_yuv422_yuv444 << 5) |
 		(info_avi.db1a_active_format_off_on << 4) |
 		(info_avi.db1b_no_vert_hori_verthori << 2) |
 		(info_avi.db1s_0_1_2);
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (1 * dbyte_size);
 	val = (info_avi.db2c_no_itu601_itu709_extented << 6) |
 		(info_avi.db2m_no_43_169 << 4) |
 		(info_avi.db2r_same_43_169_149);
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (2 * dbyte_size);
@@ -754,60 +776,60 @@ static int hdmi_core_audio_infoframe_avi(u32 name,
 		(info_avi.db3ec_xvyuv601_xvyuv709 << 4) |
 		(info_avi.db3q_default_lr_fr << 2) |
 		(info_avi.db3sc_no_hori_vert_horivert);
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (3 * dbyte_size);
-	hdmi_write_reg(name, offset, info_avi.db4vic_videocode);
+	hdmi_write_reg(HDMI_CORE_AV, offset, info_avi.db4vic_videocode);
 	sum += info_avi.db4vic_videocode;
 
 	offset = dbyte + (4 * dbyte_size);
 	val = info_avi.db5pr_no_2_3_4_5_6_7_8_9_10;
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (5 * dbyte_size);
 	val = info_avi.db6_7_lineendoftop & 0x00FF;
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (6 * dbyte_size);
 	val = ((info_avi.db6_7_lineendoftop >> 8) & 0x00FF);
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (7 * dbyte_size);
 	val = info_avi.db8_9_linestartofbottom & 0x00FF;
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (8 * dbyte_size);
 	val = ((info_avi.db8_9_linestartofbottom >> 8) & 0x00FF);
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (9 * dbyte_size);
 	val = info_avi.db10_11_pixelendofleft & 0x00FF;
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (10 * dbyte_size);
 	val = ((info_avi.db10_11_pixelendofleft >> 8) & 0x00FF);
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	offset = dbyte + (11 * dbyte_size);
 	val = info_avi.db12_13_pixelstartofright & 0x00FF;
-	hdmi_write_reg(name, offset , val);
+	hdmi_write_reg(HDMI_CORE_AV, offset , val);
 	sum += val;
 
 	offset = dbyte + (12 * dbyte_size);
 	val = ((info_avi.db12_13_pixelstartofright >> 8) & 0x00FF);
-	hdmi_write_reg(name, offset, val);
+	hdmi_write_reg(HDMI_CORE_AV, offset, val);
 	sum += val;
 
 	checksum = 0x100 - sum;
-	hdmi_write_reg(name, HDMI_CORE_AV_AVI_CHSUM, checksum);
+	hdmi_write_reg(HDMI_CORE_AV, HDMI_CORE_AV_AVI_CHSUM, checksum);
 
 	return 0;
 }
@@ -1150,7 +1172,6 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	struct hdmi_audio_dma audio_dma;
 
 	/*HDMI core*/
-	struct hdmi_core_infoframe_avi avi_param;
 	struct hdmi_core_video_config_t v_core_cfg;
 	struct hdmi_core_audio_config audio_cfg;
 	struct hdmi_core_packet_enable_repeat repeat_param;
@@ -1161,7 +1182,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	hdmi_core_init(&v_core_cfg,
 		&audio_cfg,
-		&avi_param,
+		&hdmi.avi_param,
 		&repeat_param);
 
 	/* Enable PLL Lock and UnLock intrerrupts */
@@ -1262,26 +1283,26 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	/*configure packet*/
 	/*info frame video see doc CEA861-D page 65*/
-	avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_RGB;
-	avi_param.db1a_active_format_off_on =
+	hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_RGB;
+	hdmi.avi_param.db1a_active_format_off_on =
 		INFOFRAME_AVI_DB1A_ACTIVE_FORMAT_OFF;
-	avi_param.db1b_no_vert_hori_verthori = INFOFRAME_AVI_DB1B_NO;
-	avi_param.db1s_0_1_2 = INFOFRAME_AVI_DB1S_0;
-	avi_param.db2c_no_itu601_itu709_extented = INFOFRAME_AVI_DB2C_NO;
-	avi_param.db2m_no_43_169 = INFOFRAME_AVI_DB2M_NO;
-	avi_param.db2r_same_43_169_149 = INFOFRAME_AVI_DB2R_SAME;
-	avi_param.db3itc_no_yes = INFOFRAME_AVI_DB3ITC_NO;
-	avi_param.db3ec_xvyuv601_xvyuv709 = INFOFRAME_AVI_DB3EC_XVYUV601;
-	avi_param.db3q_default_lr_fr = INFOFRAME_AVI_DB3Q_DEFAULT;
-	avi_param.db3sc_no_hori_vert_horivert = INFOFRAME_AVI_DB3SC_NO;
-	avi_param.db4vic_videocode = cfg->video_format;
-	avi_param.db5pr_no_2_3_4_5_6_7_8_9_10 = INFOFRAME_AVI_DB5PR_NO;
-	avi_param.db6_7_lineendoftop = 0;
-	avi_param.db8_9_linestartofbottom = 0;
-	avi_param.db10_11_pixelendofleft = 0;
-	avi_param.db12_13_pixelstartofright = 0;
+	hdmi.avi_param.db1b_no_vert_hori_verthori = INFOFRAME_AVI_DB1B_NO;
+	hdmi.avi_param.db1s_0_1_2 = INFOFRAME_AVI_DB1S_0;
+	hdmi.avi_param.db2c_no_itu601_itu709_extented = INFOFRAME_AVI_DB2C_NO;
+	hdmi.avi_param.db2m_no_43_169 = INFOFRAME_AVI_DB2M_NO;
+	hdmi.avi_param.db2r_same_43_169_149 = INFOFRAME_AVI_DB2R_SAME;
+	hdmi.avi_param.db3itc_no_yes = INFOFRAME_AVI_DB3ITC_NO;
+	hdmi.avi_param.db3ec_xvyuv601_xvyuv709 = INFOFRAME_AVI_DB3EC_XVYUV601;
+	hdmi.avi_param.db3q_default_lr_fr = INFOFRAME_AVI_DB3Q_DEFAULT;
+	hdmi.avi_param.db3sc_no_hori_vert_horivert = INFOFRAME_AVI_DB3SC_NO;
+	hdmi.avi_param.db4vic_videocode = cfg->video_format;
+	hdmi.avi_param.db5pr_no_2_3_4_5_6_7_8_9_10 = INFOFRAME_AVI_DB5PR_NO;
+	hdmi.avi_param.db6_7_lineendoftop = 0;
+	hdmi.avi_param.db8_9_linestartofbottom = 0;
+	hdmi.avi_param.db10_11_pixelendofleft = 0;
+	hdmi.avi_param.db12_13_pixelstartofright = 0;
 
-	r = hdmi_core_audio_infoframe_avi(av_name, avi_param);
+	r = hdmi_core_audio_infoframe_avi(hdmi.avi_param);
 
 	/*enable/repeat the infoframe*/
 	repeat_param.AVIInfoFrameED = PACKETENABLE;
