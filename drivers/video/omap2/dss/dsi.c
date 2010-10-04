@@ -2225,7 +2225,8 @@ int dsi_vc_send_bta_sync(enum omap_dsi_index ix, int channel)
 	err = dsi_get_errors(ix);
 	if (err) {
 		DSSERR("Error while sending BTA: %x\n", err);
-		r = -EIO;
+		/* Just report the error, don't return with BTA as failed
+		 * That is done already in wait for timeout above */
 		goto err;
 	}
 err:
