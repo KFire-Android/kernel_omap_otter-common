@@ -1021,14 +1021,14 @@ static void enable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 				if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 					/* BT_DL connection to McBSP 1 ports */
 					format.f = 8000;
-					format.samp_format = STEREO_RSHIFTED_16;
+					format.samp_format = MONO_RSHIFTED_16;
 					abe_connect_serial_port(BT_VX_DL_PORT,
 								&format, MCBSP1_RX);
 					abe_dai_enable_data_transfer(BT_VX_DL_PORT);
 				} else {
 					/* BT_UL connection to McBSP 1 ports */
 					format.f = 8000;
-					format.samp_format = STEREO_RSHIFTED_16;
+					format.samp_format = MONO_RSHIFTED_16;
 					abe_connect_serial_port(BT_VX_UL_PORT,
 								&format, MCBSP1_TX);
 					abe_dai_enable_data_transfer(BT_VX_UL_PORT);
@@ -1039,14 +1039,14 @@ static void enable_be_ports(struct snd_soc_pcm_runtime *rtd, int stream)
 			if (be_is_pending(be_rtd, stream)) {
 				if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 					/* MM_EXT connection to McBSP 2 ports */
-					format.f = 8000;
+					format.f = 48000;
 					format.samp_format = STEREO_RSHIFTED_16;
 					abe_connect_serial_port(MM_EXT_OUT_PORT,
 								&format, MCBSP2_RX);
 					abe_dai_enable_data_transfer(MM_EXT_OUT_PORT);
 				} else {
 					/* MM_EXT connection to McBSP 2 ports */
-					format.f = 8000;
+					format.f = 48000;
 					format.samp_format = STEREO_RSHIFTED_16;
 					abe_connect_serial_port(MM_EXT_IN_PORT,
 								&format, MCBSP2_TX);
