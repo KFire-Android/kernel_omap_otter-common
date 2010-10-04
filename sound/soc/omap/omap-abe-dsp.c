@@ -1075,7 +1075,7 @@ static const struct snd_kcontrol_new abe_controls[] = {
 			dl20_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
-	SOC_ENUM_EXT("DL2 Rigth Equalizer Profile",
+	SOC_ENUM_EXT("DL2 Right Equalizer Profile",
 			dl21_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
