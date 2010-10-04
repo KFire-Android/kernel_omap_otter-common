@@ -279,11 +279,18 @@ static ssize_t hdmi_yuv_set(struct device *dev,
 		struct device_attribute *attr,
 		const char *buf, size_t size)
 {
-	return 0;
+	int enabled;
+	enabled = simple_strtoul(buf, NULL, 10);
+	if (enabled)
+		hdmi_configure_csc(RGB_TO_YUV);
+	else
+		hdmi_configure_csc(RGB);
+
+	return size;
 }
 
 static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
-static DEVICE_ATTR(yuv, S_IRUGO, hdmi_yuv_supported, hdmi_yuv_set);
+static DEVICE_ATTR(yuv, S_IRUGO | S_IWUSR, hdmi_yuv_supported, hdmi_yuv_set);
 
 
 static struct attribute *hdmi_sysfs_attrs[] = {

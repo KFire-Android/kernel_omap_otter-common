@@ -68,6 +68,7 @@
 #define HDMI_CORE_SYS__SYS_STAT					0x24ul
 #define HDMI_CORE_SYS__VID_ACEN					0x124ul
 #define HDMI_CORE_SYS__VID_MODE					0x128ul
+#define HDMI_CORE_SYS__VID_CTRL					0x120ul
 #define HDMI_CORE_SYS__INTR_STATE				0x1C0ul
 #define HDMI_CORE_SYS__INTR1					0x1C4ul
 #define HDMI_CORE_SYS__INTR2					0x1C8ul
@@ -834,6 +835,41 @@ static int hdmi_core_audio_infoframe_avi(struct hdmi_core_infoframe_avi info_avi
 	return 0;
 }
 
+int hdmi_configure_csc(enum hdmi_core_av_csc csc)
+{
+	int var;
+	switch (csc) {
+	/*Setting the AVI infroframe to respective color mode
+	* As the quantization is in default mode ie it selects
+	* full range for RGB (except for VGA ) and limited range
+	* for YUV we dont have to make any changes for this */
+	case RGB:
+			hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_RGB;
+			hdmi_core_audio_infoframe_avi(hdmi.avi_param);
+			var = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN);
+			var = FLD_MOD(var, 0, 2, 2);
+			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN, var);
+			break;
+	case RGB_TO_YUV:
+			hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_YUV422;
+			hdmi_core_audio_infoframe_avi(hdmi.avi_param);
+			var = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN);
+			var = FLD_MOD(var, 1, 2, 2);
+			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN, var);
+			break;
+	case YUV_TO_RGB:
+			hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_RGB;
+			hdmi_core_audio_infoframe_avi(hdmi.avi_param);
+			var = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_MODE);
+			var = FLD_MOD(var, 1, 3, 3);
+			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_MODE, var);
+			break;
+	default:
+			break;
+	}
+	return 0;
+
+}
 static int hdmi_core_av_packet_config(u32 name,
 	struct hdmi_core_packet_enable_repeat r_p)
 {
