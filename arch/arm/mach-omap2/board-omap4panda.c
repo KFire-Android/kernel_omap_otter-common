@@ -508,7 +508,7 @@ static void pad_config(unsigned long pad_addr, u32 andmask, u32 ormask)
 	iounmap(addr);
 }
 
-void wlan_1273_config()
+void wlan_1273_config(void)
 {
 	pad_config(0x4A100078, 0xFFECFFFF, 0x00030000);
 	pad_config(0x4A100064, 0xFFEFFFFF, 0x000B0000);
