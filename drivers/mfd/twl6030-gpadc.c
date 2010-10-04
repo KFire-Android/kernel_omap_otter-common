@@ -36,6 +36,7 @@
 #include <linux/platform_device.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
+#include <linux/hwmon-sysfs.h>
 #include <linux/i2c/twl.h>
 #include <linux/i2c/twl6030-gpadc.h>
 
@@ -44,8 +45,109 @@
 #define TWL6030_GPADC_PFX	"twl6030-gpadc: "
 #define ENABLE_GPADC	0x02
 #define REG_TOGGLE1	0x90
+#define GPADCS		(1 << 1)
+#define GPADCR		(1 << 0)
 
 #define TWL6030_GPADC_MASK		0x20
+#define SCALE				(1 << 15)
+
+struct twl6030_calibration {
+	s32 gain_error;
+	s32 offset_error;
+};
+
+struct twl6030_ideal_code {
+	s16 code1;
+	s16 code2;
+};
+
+static struct twl6030_calibration twl6030_calib_tbl[17];
+static const u32 calibration_bit_map = 0x47FF;
+
+/* Trim address where measured offset from ideal code is stored */
+static const u8 twl6030_trim_addr[17] = {
+	0xCD, /* CHANNEL 0 */
+	0xD1, /* CHANNEL 1 */
+	0xD9, /* CHANNEL 2 */
+	0xD1, /* CHANNEL 3 */
+	0xD1, /* CHANNEL 4 */
+	0xD1, /* CHANNEL 5 */
+	0xD1, /* CHANNEL 6 */
+	0xD3, /* CHANNEL 7 */
+	0xCF, /* CHANNEL 8 */
+	0xD5, /* CHANNEL 9 */
+	0xD7, /* CHANNEL 10 */
+	0x00, /* CHANNEL 11 */
+	0x00, /* CHANNEL 12 */
+	0x00, /* CHANNEL 13 */
+	0xDB, /* CHANNEL 14 */
+	0x00, /* CHANNEL 15 */
+	0x00, /* CHANNEL 16 */
+};
+
+/*
+ * actual scaler gain is multiplied by 8 for fixed point operation
+ * 1.875 * 8 = 15
+ */
+static const u16 twl6030_gain[17] = {
+	1142,	/* CHANNEL 0 */
+	8,	/* CHANNEL 1 */
+
+	/* 1.875 */
+	15,	/* CHANNEL 2 */
+
+	8,	/* CHANNEL 3 */
+	8,	/* CHANNEL 4 */
+	8,	/* CHANNEL 5 */
+	8,	/* CHANNEL 6 */
+
+	/* 5 */
+	40,	/* CHANNEL 7 */
+
+	/* 6.25 */
+	50,	/* CHANNEL 8 */
+
+	/* 11.25 */
+	90,	/* CHANNEL 9 */
+
+	/* 6.875 */
+	55,	/* CHANNEL 10 */
+
+	/* 1.875 */
+	15,	/* CHANNEL 11 */
+	8,	/* CHANNEL 12 */
+	8,	/* CHANNEL 13 */
+
+	/* 6.875 */
+	55,	/* CHANNEL 14 */
+
+	8,	/* CHANNEL 15 */
+	8,	/* CHANNEL 16 */
+};
+
+/*
+ * calibration not needed for channel 11, 12, 13, 15 and 16
+ * calibration offset is same for channel 1, 3, 4, 5
+ */
+static const struct twl6030_ideal_code twl6030_ideal[17] = {
+	{116,	745},	/* CHANNEL 0 */
+	{82,	900},	/* CHANNEL 1 */
+	{55,	818},	/* CHANNEL 2 */
+	{82,	900},	/* CHANNEL 3 */
+	{82,	900},	/* CHANNEL 4 */
+	{82,	900},	/* CHANNEL 5 */
+	{82,	900},	/* CHANNEL 6 */
+	{614,	941},	/* CHANNEL 7 */
+	{82,	688},	/* CHANNEL 8 */
+	{182,	818},	/* CHANNEL 9 */
+	{149,	818},	/* CHANNEL 10 */
+	{0,	0},	/* CHANNEL 11 */
+	{0,	0},	/* CHANNEL 12 */
+	{0,	0},	/* CHANNEL 13 */
+	{48,	714},	/* CHANNEL 14 */
+	{0,	0},	/* CHANNEL 15 */
+	{0,	0},	/* CHANNEL 16 */
+};
 
 struct twl6030_gpadc_data {
 	struct device		*dev;
@@ -73,6 +175,64 @@ const struct twl6030_gpadc_conversion_method twl6030_conversion_methods[] = {
 		.enable = TWL6030_GPADC_CTRL_P2_SP2,
 	},
 };
+
+static ssize_t show_gain(struct device *dev,
+		struct device_attribute *devattr, char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	int value;
+	int status;
+
+	value = twl6030_calib_tbl[attr->index].gain_error;
+
+	status = sprintf(buf, "%d\n", value);
+	return status;
+}
+
+static ssize_t set_gain(struct device *dev,
+	struct device_attribute *devattr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 15000)
+							|| (val > 60000))
+		return -EINVAL;
+
+	twl6030_calib_tbl[attr->index].gain_error = val;
+
+	return status;
+}
+
+static ssize_t show_offset(struct device *dev,
+		struct device_attribute *devattr, char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	int value;
+	int status;
+
+	value = twl6030_calib_tbl[attr->index].offset_error;
+
+	status = sprintf(buf, "%d\n", value);
+	return status;
+}
+
+static ssize_t set_offset(struct device *dev,
+	struct device_attribute *devattr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 15000)
+							|| (val > 60000))
+		return -EINVAL;
+
+	twl6030_calib_tbl[attr->index].offset_error = val;
+
+	return status;
+}
 
 static int twl6030_gpadc_read(struct twl6030_gpadc_data *gpadc, u8 reg)
 {
@@ -112,19 +272,46 @@ static int twl6030_gpadc_channel_raw_read(struct twl6030_gpadc_data *gpadc,
 }
 
 static int twl6030_gpadc_read_channels(struct twl6030_gpadc_data *gpadc,
-		u8 reg_base, u16 channels, int *buf)
+		u8 reg_base, u16 channels, struct twl6030_gpadc_request *req)
 {
 	int count = 0;
 	u8 reg, i;
-
-	if (unlikely(!buf))
-		return 0;
+	s32 gain_error;
+	s32 offset_error;
+	s32 raw_code;
+	s32 corrected_code;
+	s32 channel_value;
+	s32 raw_channel_value;
 
 	for (i = 0; i < TWL6030_GPADC_MAX_CHANNELS; i++) {
 		if (channels & (1<<i)) {
-			reg = reg_base + 2*i;
-			buf[i] = twl6030_gpadc_channel_raw_read(gpadc, reg);
+			reg = reg_base + 2 * i;
+			raw_code = twl6030_gpadc_channel_raw_read(gpadc, reg);
+			req->buf[i].raw_code = raw_code;
 			count++;
+			/*
+			 * multiply by 1000 to convert the unit to milli
+			 * division by 1024 (>> 10) for 10 bit ADC
+			 * division by 8 (>> 3) for actual scaler gain
+			 */
+			raw_channel_value = (raw_code * twl6030_gain[i]
+								* 1000) >> 13;
+			req->buf[i].raw_channel_value = raw_channel_value;
+
+			if (~calibration_bit_map & (1 << i)) {
+				req->buf[i].code = raw_code;
+				req->rbuf[i] = raw_channel_value;
+				continue;
+			}
+
+			gain_error = twl6030_calib_tbl[i].gain_error;
+			offset_error = twl6030_calib_tbl[i].offset_error;
+			corrected_code = (raw_code * SCALE - offset_error)
+								/ gain_error;
+			channel_value = (corrected_code * twl6030_gain[i]
+								* 1000) >> 13;
+			req->buf[i].code = corrected_code;
+			req->rbuf[i] = channel_value;
 		}
 	}
 	return count;
@@ -190,7 +377,7 @@ static void twl6030_gpadc_work(struct work_struct *ws)
 
 		/* Read results */
 		len = twl6030_gpadc_read_channels(gpadc, method->rbase,
-						 r->channels, r->rbuf);
+						 r->channels, r);
 
 		/* Return results to caller */
 		if (r->func_cb != NULL) {
@@ -229,7 +416,7 @@ twl6030_gpadc_start_conversion(struct twl6030_gpadc_data *gpadc,
 	const struct twl6030_gpadc_conversion_method *method;
 
 	method = &twl6030_conversion_methods[conv_method];
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, ENABLE_GPADC, REG_TOGGLE1);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, GPADCS, REG_TOGGLE1);
 
 	switch (conv_method) {
 	case TWL6030_GPADC_SW2:
@@ -318,7 +505,7 @@ int twl6030_gpadc_conversion(struct twl6030_gpadc_request *req)
 	}
 
 	ret = twl6030_gpadc_read_channels(the_gpadc, method->rbase,
-					  req->channels, req->rbuf);
+					  req->channels, req);
 	the_gpadc->requests[req->method].active = 0;
 
 out:
@@ -328,6 +515,58 @@ out:
 }
 EXPORT_SYMBOL(twl6030_gpadc_conversion);
 
+#define in_gain(index) \
+static SENSOR_DEVICE_ATTR(in##index##_gain, S_IRUGO|S_IWUSR, show_gain, \
+	set_gain, index); \
+static SENSOR_DEVICE_ATTR(in##index##_offset, S_IRUGO|S_IWUSR, show_offset, \
+	set_offset, index)
+
+in_gain(0);
+in_gain(1);
+in_gain(2);
+in_gain(3);
+in_gain(4);
+in_gain(5);
+in_gain(6);
+in_gain(7);
+in_gain(8);
+in_gain(9);
+in_gain(10);
+in_gain(11);
+in_gain(12);
+in_gain(13);
+in_gain(14);
+in_gain(15);
+in_gain(16);
+
+#define IN_ATTRS(X)\
+	&sensor_dev_attr_in##X##_gain.dev_attr.attr,	\
+	&sensor_dev_attr_in##X##_offset.dev_attr.attr	\
+
+static struct attribute *twl6030_gpadc_attributes[] = {
+	IN_ATTRS(0),
+	IN_ATTRS(1),
+	IN_ATTRS(2),
+	IN_ATTRS(3),
+	IN_ATTRS(4),
+	IN_ATTRS(5),
+	IN_ATTRS(6),
+	IN_ATTRS(7),
+	IN_ATTRS(8),
+	IN_ATTRS(9),
+	IN_ATTRS(10),
+	IN_ATTRS(11),
+	IN_ATTRS(12),
+	IN_ATTRS(13),
+	IN_ATTRS(14),
+	IN_ATTRS(15),
+	IN_ATTRS(16),
+	NULL
+};
+
+static const struct attribute_group twl6030_gpadc_group = {
+	.attrs = twl6030_gpadc_attributes,
+};
 
 static long twl6030_gpadc_ioctl(struct file *filp, unsigned int cmd,
 			       unsigned long arg)
@@ -390,6 +629,11 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 {
 	struct twl6030_gpadc_data *gpadc;
 	struct twl6030_gpadc_platform_data *pdata = pdev->dev.platform_data;
+	s8 delta_error1 = 0, delta_error2 = 0;
+	s16 ideal_code1, ideal_code2;
+	s32 gain_error_1;
+	s32 offset_error;
+	u8 index;
 	int ret;
 
 	gpadc = kzalloc(sizeof *gpadc, GFP_KERNEL);
@@ -423,7 +667,33 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 	mutex_init(&gpadc->lock);
 	INIT_WORK(&gpadc->ws, twl6030_gpadc_work);
 
+	for (index = 0; index < TWL6030_GPADC_MAX_CHANNELS; index++) {
+		if (~calibration_bit_map & (1 << index))
+			continue;
+
+		twl_i2c_read_u8(TWL6030_MODULE_ID2, &delta_error1,
+					twl6030_trim_addr[index]);
+		twl_i2c_read_u8(TWL6030_MODULE_ID2, &delta_error2,
+					(twl6030_trim_addr[index] + 1));
+		/* convert 7 bit to 8 bit signed number */
+		delta_error1 = ((s8)(delta_error1 << 1) >> 1);
+		delta_error2 = ((s8)(delta_error2 << 1) >> 1);
+		ideal_code1 = twl6030_ideal[index].code1;
+		ideal_code2 = twl6030_ideal[index].code2;
+
+		gain_error_1 = (delta_error2 - delta_error1) * SCALE
+						/ (ideal_code2 - ideal_code1);
+		offset_error = delta_error1 * SCALE - gain_error_1
+							*  ideal_code1;
+		twl6030_calib_tbl[index].gain_error = gain_error_1 + SCALE;
+		twl6030_calib_tbl[index].offset_error = offset_error;
+	}
+
 	the_gpadc = gpadc;
+
+	ret = sysfs_create_group(&pdev->dev.kobj, &twl6030_gpadc_group);
+	if (ret)
+		dev_err(&pdev->dev, "could not create sysfs files\n");
 
 	return 0;
 
@@ -444,6 +714,7 @@ static int __devexit twl6030_gpadc_remove(struct platform_device *pdev)
 	twl6030_gpadc_disable_irq(TWL6030_GPADC_RT);
 	twl6030_gpadc_disable_irq(TWL6030_GPADC_SW2);
 	free_irq(platform_get_irq(pdev, 0), gpadc);
+	sysfs_remove_group(&pdev->dev.kobj, &twl6030_gpadc_group);
 	cancel_work_sync(&gpadc->ws);
 	misc_deregister(&twl6030_gpadc_device);
 

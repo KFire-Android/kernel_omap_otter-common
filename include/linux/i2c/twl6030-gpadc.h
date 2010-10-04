@@ -38,6 +38,17 @@ struct twl6030_gpadc_conversion_method {
 
 #define TWL6030_GPADC_MAX_CHANNELS 17
 
+/*
+ * raw_code - raw adc value
+ * raw_channel_value - adc * channel gain
+ * code - calibrated adc value
+ */
+struct twl6030_value {
+	int raw_code;
+	int raw_channel_value;
+	int code;
+};
+
 struct twl6030_gpadc_request {
 	u16 channels;
 	u16 do_avg;
@@ -47,6 +58,7 @@ struct twl6030_gpadc_request {
 	int result_pending;
 	int rbuf[TWL6030_GPADC_MAX_CHANNELS];
 	void (*func_cb)(int len, int channels, int *buf);
+	struct twl6030_value buf[TWL6030_GPADC_MAX_CHANNELS];
 };
 
 enum conversion_methods {

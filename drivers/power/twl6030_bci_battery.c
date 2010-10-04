@@ -555,7 +555,7 @@ static int twl6030battery_voltage(void)
 	 * multiply by 5/1024 for external scaling
 	 * and 1000 to convert to mV
 	 */
-	temp = ((u16)req.rbuf[7] * 5 * 1000) >> 10;
+	temp = ((u16)req.rbuf[7]);
 
 	return  temp;
 
@@ -609,8 +609,7 @@ static int twl6030backupbatt_voltage(void)
 	 * and 1000000 to convert to uV
 	 */
 
-	temp = ((u16)req.rbuf[8] * 1000000) >> 10;
-	temp = (temp * 25) >> 2;
+	temp = ((u16)req.rbuf[8]);
 
 	return  temp;
 }
@@ -625,7 +624,7 @@ static int twl6030_vbus_voltage(void)
 	req.active = 0;
 	req.func_cb = NULL;
 	twl6030_gpadc_conversion(&req);
-	temp = ((u16)req.rbuf[10] * 6875) >> 10;
+	temp = ((u16)req.rbuf[10]);
 
 	return  temp;
 }
@@ -640,7 +639,7 @@ static int twl6030_id_level(void)
 	req.active = 0;
 	req.func_cb = NULL;
 	twl6030_gpadc_conversion(&req);
-	temp = ((u16)req.rbuf[14] * 6875) >> 10;
+	temp = ((u16)req.rbuf[14]);
 
 	return  temp;
 }
@@ -671,7 +670,7 @@ static int twl6030battery_temp_setup(void)
 	u8 rd_reg;
 
 	ret = twl_i2c_read_u8(TWL_MODULE_MADC, &rd_reg, TWL6030_GPADC_CTRL);
-	rd_reg |= ENABLE_ISOURCE | GPADC_CTRL_TEMP1_EN | GPADC_CTRL_TEMP2_EN |
+	rd_reg |= GPADC_CTRL_TEMP1_EN | GPADC_CTRL_TEMP2_EN |
 		GPADC_CTRL_TEMP1_EN_MONITOR | GPADC_CTRL_TEMP2_EN_MONITOR |
 		GPADC_CTRL_SCALER_DIV4;
 	ret |= twl_i2c_write_u8(TWL_MODULE_MADC, rd_reg, TWL6030_GPADC_CTRL);
@@ -810,7 +809,7 @@ static int twl6030_bk_bci_battery_get_property(struct power_supply *psy,
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = di->bk_voltage_uV;
+		val->intval = di->bk_voltage_uV * 1000;
 		break;
 	default:
 		return -EINVAL;
