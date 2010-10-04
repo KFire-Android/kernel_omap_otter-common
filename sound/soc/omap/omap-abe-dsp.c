@@ -137,6 +137,7 @@ struct abe_data {
 	unsigned int dl21_equ_profile;
 	unsigned int sdt_equ_profile;
 	unsigned int amic_equ_profile;
+	unsigned int dmic_equ_profile;
 
 	int active;
 
@@ -230,6 +231,7 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 
 	/* set initial state to all-pass with gain=1 coefficients */
 	abe->amic_equ_profile = 0;
+	abe->dmic_equ_profile = 0;
 	abe->dl1_equ_profile = 0;
 	abe->sdt_equ_profile = 0;
 
@@ -723,6 +725,9 @@ static int abe_get_equalizer(struct snd_kcontrol *kcontrol,
 	case EQAMIC:
 		ucontrol->value.integer.value[0] = abe->amic_equ_profile;
 		break;
+	case EQDMIC:
+		ucontrol->value.integer.value[0] = abe->dmic_equ_profile;
+		break;
 	case EQSDT:
 		ucontrol->value.integer.value[0] = abe->sdt_equ_profile;
 		break;
@@ -766,6 +771,12 @@ static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
 		memcpy(equ_params.coef.type1, amic_equ_coeffs[val],
 				sizeof(amic_equ_coeffs[val]));
 		abe->amic_equ_profile = val;
+		break;
+	case EQDMIC:
+		equ_params.equ_length = NBDMICCOEFFS;
+		memcpy(equ_params.coef.type1, dmic_equ_coeffs[val],
+				sizeof(dmic_equ_coeffs[val]));
+		abe->dmic_equ_profile = val;
 		break;
 	case EQSDT:
 		equ_params.equ_length = NBSDTCOEFFS;
@@ -812,6 +823,12 @@ static const char *amic_equ_texts[] = {
 	"High-pass with 20kHz cut-off frequency. Gain = 0.125",
 };
 
+static const char *dmic_equ_texts[] = {
+	"High-pass with 20kHz cut-off frequency. Gain = 1",
+	"High-pass with 20kHz cut-off frequency. Gain = 0.25",
+	"High-pass with 20kHz cut-off frequency. Gain = 0.125",
+};
+
 static const char *sdt_equ_texts[] = {
 	"Flat response. Gain = 1",
 	"High-pass with 800Hz cut-off frequency. Gain = 1",
@@ -831,6 +848,9 @@ static const struct soc_enum dl21_equalizer_enum =
 
 static const struct soc_enum amic_equalizer_enum =
 	SOC_ENUM_SINGLE(EQAMIC, 0, NBAMICEQ_PROFILES, amic_equ_texts);
+
+static const struct soc_enum dmic_equalizer_enum =
+	SOC_ENUM_SINGLE(EQDMIC, 0, NBDMICEQ_PROFILES, dmic_equ_texts);
 
 static const struct soc_enum sdt_equalizer_enum =
 	SOC_ENUM_SINGLE(EQSDT, 0, NBSDTEQ_PROFILES, sdt_equ_texts);
@@ -1061,6 +1081,10 @@ static const struct snd_kcontrol_new abe_controls[] = {
 
 	SOC_ENUM_EXT("AMIC Equalizer Profile",
 			amic_equalizer_enum ,
+			abe_get_equalizer, abe_put_equalizer),
+
+	SOC_ENUM_EXT("DMIC Equalizer Profile",
+			dmic_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
 	SOC_ENUM_EXT("Sidetone Equalizer Profile",

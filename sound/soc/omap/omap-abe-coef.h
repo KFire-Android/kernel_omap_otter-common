@@ -40,6 +40,8 @@
 #define NBAMICCOEFFS 19     /* Number of coefficients of AMICEQ profiles */
 #define NBSDTEQ_PROFILES 4  /* Number of supported SDTEQ profiles */
 #define NBSDTCOEFFS 9       /* Number of coefficients for SDTEQ profiles */
+#define NBDMICEQ_PROFILES 3 /* Number of supported DMICEQ profiles */
+#define NBDMICCOEFFS 19     /* Number of coefficients of DMICEQ profiles */
 
 /*
  * Coefficients for DL1EQ
@@ -123,6 +125,32 @@ const s32 dl21_equ_coeffs[NBDL20EQ_PROFILES][NBDL2COEFFS] = {
 };
 
 /*
+ * Coefficients for DMICEQ
+ */
+const u32 dmic_equ_coeffs[NBDMICEQ_PROFILES][NBDMICCOEFFS] = {
+/* 20kHz cut-off frequency and Gain = 1 */
+				{-4119413, -192384, -341428, -348088,
+				-151380, 151380, 348088, 341428, 192384,
+				4119419, 1938156, -6935719, 775202,
+				-1801934, 2997698, -3692214, 3406822,
+				-2280190, 1042982},
+
+/* 20kHz cut-off frequency and Gain = 0.25 */
+				{-1029873, -3078121, -5462817, -5569389,
+				-2422069, 2422071, 5569391, 5462819,
+				3078123, 1029875, 1938188, -6935811,
+				775210, -1801950, 2997722, -3692238,
+				3406838, -2280198, 1042982},
+
+/* 20kHz cut-off frequency and Gain = 0.125 */
+				{-514937, -1539061, -2731409, -2784693,
+				-1211033, 1211035, 2784695, 2731411,
+				1539063, 514939, 1938188, -6935811,
+				775210, -1801950, 2997722, -3692238,
+				3406838, -2280198, 1042982},
+};
+
+/*
  * Coefficients for AMICEQ
  */
 const u32 amic_equ_coeffs[NBAMICEQ_PROFILES][NBAMICCOEFFS] = {
@@ -147,6 +175,7 @@ const u32 amic_equ_coeffs[NBAMICEQ_PROFILES][NBAMICCOEFFS] = {
 				775210, -1801950, 2997722, -3692238,
 				3406838, -2280198, 1042982},
 };
+
 
 /*
  * Coefficients for SDTEQ
