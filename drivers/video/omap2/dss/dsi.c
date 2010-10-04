@@ -3628,8 +3628,7 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 
 	DSSDBG("dsi_display_enable\n");
 
-	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
-		dss_mainclk_state_enable();
+	dss_mainclk_state_enable();
 
 	dssdev->state = OMAP_DSS_DISPLAY_TRANSITION;
 

@@ -305,7 +305,7 @@ int dss_get_clock_div(struct dss_clock_info *cinfo);
 int dss_calc_clock_div(bool is_tft, unsigned long req_pck,
 		struct dss_clock_info *dss_cinfo,
 		struct dispc_clock_info *dispc_cinfo);
-void dss_mainclk_enable(void);
+int dss_mainclk_enable(void);
 void dss_mainclk_disable(void);
 
 /* SDI */
