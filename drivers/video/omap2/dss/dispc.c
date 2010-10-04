@@ -4195,6 +4195,9 @@ int omap_dispc_register_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 	if (isr == NULL)
 		return -EINVAL;
 
+	if (!dss_get_mainclk_state())
+		return -EINVAL;
+
 	spin_lock_irqsave(&dispc.irq_lock, flags);
 
 	/* check for duplicate entry */
@@ -4242,6 +4245,9 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 	unsigned long flags;
 	int ret = -EINVAL;
 	struct omap_dispc_isr_data *isr_data;
+
+	if (!dss_get_mainclk_state())
+		return -EINVAL;
 
 	spin_lock_irqsave(&dispc.irq_lock, flags);
 
