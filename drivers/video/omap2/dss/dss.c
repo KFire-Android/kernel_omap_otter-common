@@ -134,6 +134,11 @@ void dss_restore_context(void)
 #undef SR
 #undef RR
 
+bool dss_get_mainclk_state()
+{
+	return dss.mainclk_state;
+}
+
 int dss_mainclk_enable()
 {
 	if (!dss.mainclk_state) {
