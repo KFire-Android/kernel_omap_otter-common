@@ -80,6 +80,7 @@ extern void __init omap4_mpuss_init(void);
 extern void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
 extern void __omap4_cpu_suspend(unsigned int cpu, unsigned int save_state);
 extern unsigned long *omap4_cpu_wakeup_addr(void);
+extern int omap4_set_freq_update(void);
 
 #endif
 
