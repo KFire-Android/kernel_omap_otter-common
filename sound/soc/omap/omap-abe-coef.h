@@ -38,6 +38,8 @@
 #define NBDL2COEFFS 25      /* Number of coefficients of DL2EQ profiles */
 #define NBAMICEQ_PROFILES 3 /* Number of supported AMICEQ profiles */
 #define NBAMICCOEFFS 19     /* Number of coefficients of AMICEQ profiles */
+#define NBSDTEQ_PROFILES 4  /* Number of supported SDTEQ profiles */
+#define NBSDTCOEFFS 9       /* Number of coefficients for SDTEQ profiles */
 
 /*
  * Coefficients for DL1EQ
@@ -144,6 +146,26 @@ const u32 amic_equ_coeffs[NBAMICEQ_PROFILES][NBAMICCOEFFS] = {
 				1539063, 514939, 1938188, -6935811,
 				775210, -1801950, 2997722, -3692238,
 				3406838, -2280198, 1042982},
+};
+
+/*
+ * Coefficients for SDTEQ
+ */
+const u32 sdt_equ_coeffs[NBSDTEQ_PROFILES][NBSDTCOEFFS] = {
+/* Flat response with Gain =1 */
+				{0, 0, 0, 0, 0x040002, 0, 0, 0, 0},
+
+/* 800Hz cut-off frequency and Gain = 1  */
+				{0, -7554223, 708210, -708206, 7554225,
+				0, 6802833, -682266, 731554},
+
+/* 800Hz cut-off frequency and Gain = 0.25 */
+				{0, -3777112, 5665669, -5665667, 3777112,
+				0, 6802833, -682266, 731554},
+
+/* 800Hz cut-off frequency and Gain = 0.1 */
+				{0, -1510844, 4532536, -4532536, 1510844,
+				0, 6802833, -682266, 731554}
 };
 
 #endif	/* End of __OMAP_ABE_COEFFICIENTS_H__ */

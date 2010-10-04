@@ -135,6 +135,7 @@ struct abe_data {
 	unsigned int dl1_equ_profile;
 	unsigned int dl20_equ_profile;
 	unsigned int dl21_equ_profile;
+	unsigned int sdt_equ_profile;
 	unsigned int amic_equ_profile;
 
 	int active;
@@ -230,6 +231,7 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 	/* set initial state to all-pass with gain=1 coefficients */
 	abe->amic_equ_profile = 0;
 	abe->dl1_equ_profile = 0;
+	abe->sdt_equ_profile = 0;
 
 
 	return ret;
@@ -721,6 +723,9 @@ static int abe_get_equalizer(struct snd_kcontrol *kcontrol,
 	case EQAMIC:
 		ucontrol->value.integer.value[0] = abe->amic_equ_profile;
 		break;
+	case EQSDT:
+		ucontrol->value.integer.value[0] = abe->sdt_equ_profile;
+		break;
 	default:
 		break;
 	}
@@ -762,6 +767,12 @@ static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
 				sizeof(amic_equ_coeffs[val]));
 		abe->amic_equ_profile = val;
 		break;
+	case EQSDT:
+		equ_params.equ_length = NBSDTCOEFFS;
+		memcpy(equ_params.coef.type1, sdt_equ_coeffs[val],
+				sizeof(sdt_equ_coeffs[val]));
+		abe->sdt_equ_profile = val;
+		break;
 	default:
 		break;
 	}
@@ -801,6 +812,13 @@ static const char *amic_equ_texts[] = {
 	"High-pass with 20kHz cut-off frequency. Gain = 0.125",
 };
 
+static const char *sdt_equ_texts[] = {
+	"Flat response. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.25",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.1",
+};
+
 
 static const struct soc_enum dl1_equalizer_enum =
 	SOC_ENUM_SINGLE(EQ1, 0, NBDL1EQ_PROFILES, dl1_equ_texts);
@@ -813,6 +831,9 @@ static const struct soc_enum dl21_equalizer_enum =
 
 static const struct soc_enum amic_equalizer_enum =
 	SOC_ENUM_SINGLE(EQAMIC, 0, NBAMICEQ_PROFILES, amic_equ_texts);
+
+static const struct soc_enum sdt_equalizer_enum =
+	SOC_ENUM_SINGLE(EQSDT, 0, NBSDTEQ_PROFILES, sdt_equ_texts);
 
 static const char *route_ul_texts[] =
 	{"None", "DMic0L", "DMic0R", "DMic1L", "DMic1R", "DMic2L", "DMic2R",
@@ -1040,6 +1061,10 @@ static const struct snd_kcontrol_new abe_controls[] = {
 
 	SOC_ENUM_EXT("AMIC Equalizer Profile",
 			amic_equalizer_enum ,
+			abe_get_equalizer, abe_put_equalizer),
+
+	SOC_ENUM_EXT("Sidetone Equalizer Profile",
+			sdt_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 };
 
