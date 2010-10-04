@@ -133,6 +133,14 @@ config USB_EHCI_MXC
 	---help---
 	  Variation of ARC USB block used in some Freescale chips.
 
+config USB_EHCI_HCD_OMAP3
+	bool "EHCI support for OMAP3 and later chips"
+	depends on USB_EHCI_HCD && (ARCH_OMAP3 || ARCH_OMAP4)
+	default y
+	--- help ---
+	  Enables support for the on-chip EHCI controller on
+	  OMAP3 and later chips.
+
 config USB_EHCI_HCD_PPC_OF
 	bool "EHCI support for PPC USB controller on OF platform bus"
 	depends on USB_EHCI_HCD && PPC_OF
@@ -230,14 +238,6 @@ config USB_OHCI_HCD_OMAP3
 	default y
 	---help---
 	  Enables support for the on-chip OHCI controller on
-	  OMAP3 and later chips.
-
-config USB_EHCI_HCD_OMAP3
-	bool "EHCI support for OMAP3 and later chips"
-	depends on USB_EHCI_HCD && (ARCH_OMAP3 || ARCH_OMAP4)
-	default y
-	--- help ---
-	  Enables support for the on-chip EHCI controller on
 	  OMAP3 and later chips.
 
 config USB_OHCI_HCD_PPC_SOC
