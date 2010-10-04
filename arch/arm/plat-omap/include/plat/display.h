@@ -406,6 +406,7 @@ struct omap_overlay_info {
 	u16 out_width;	/* if 0, out_width == width */
 	u16 out_height;	/* if 0, out_height == height */
 	u8 global_alpha;
+	u16 min_x_decim, max_x_decim, min_y_decim, max_y_decim;
 	enum omap_overlay_zorder zorder;
 	u32 p_uv_addr; /* relevant for NV12 format only */
 	enum device_n_buffer_type field;
@@ -772,8 +773,9 @@ int omap_rfbi_update(struct omap_dss_device *dssdev,
 		u16 x, u16 y, u16 w, u16 h,
 		void (*callback)(void *), void *data);
 void calc_tiler_row_rotation(u8 rotation,
-		u16 width, u16 height,
+		u16 width,
 		enum omap_color_mode color_mode,
+		int y_decim,
 		s32 *row_inc,
 		unsigned *offset1,
 		enum device_n_buffer_type  ilace,

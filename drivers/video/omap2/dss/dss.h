@@ -438,6 +438,14 @@ void dispc_set_plane_size(enum omap_plane plane, u16 width, u16 height);
 void dispc_set_channel_out(enum omap_plane plane,
 		enum omap_channel channel_out);
 
+int dispc_scaling_decision(u16 width, u16 height,
+			    u16 out_width, u16 out_height,
+			    enum omap_plane plane,
+			    enum omap_color_mode color_mode,
+			    enum omap_channel channel, u8 rotation,
+			    u16 min_x_decim, u16 max_x_decim,
+			    u16 min_y_decim, u16 max_y_decim,
+			    u16 *x_decim, u16 *y_decim, bool *three_tap);
 int dispc_setup_plane(enum omap_plane plane,
 		      u32 paddr, u16 screen_width,
 		      u16 pos_x, u16 pos_y,
@@ -445,6 +453,7 @@ int dispc_setup_plane(enum omap_plane plane,
 		      u16 out_width, u16 out_height,
 		      enum omap_color_mode color_mode,
 		      enum device_n_buffer_type ilace,
+		      int x_decim, int y_decim, bool three_tap,
 		      enum omap_dss_rotation_type rotation_type,
 		      u8 rotation, bool mirror,
 		      u8 global_alpha, enum omap_channel channel,
