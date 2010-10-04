@@ -292,40 +292,10 @@ static ssize_t hdmi_yuv_set(struct device *dev,
 static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
 static DEVICE_ATTR(yuv, S_IRUGO | S_IWUSR, hdmi_yuv_supported, hdmi_yuv_set);
 
-
-static struct attribute *hdmi_sysfs_attrs[] = {
-	NULL
-};
-
-static struct kobj_type hdmi_ktype = {
-	.sysfs_ops = &kobj_sysfs_ops,
-	.default_attrs = hdmi_sysfs_attrs,
-};
-
-
 int hdmi_hot_plug_event_send(struct omap_dss_device *dssdev, int onoff)
 {
-	int r = 0;
-	static int created;
 	printk("hot plug event %d", onoff);
-	if (onoff) {
-		if (!created) {
-			r = kobject_init_and_add(&hdmi.kobj, &hdmi_ktype,
-					&dssdev->dev.kobj, "hdmi", 0);
-			if (r)
-				DSSERR("failed to create sysfs file\n");
-
-			kobject_uevent(&hdmi.kobj, KOBJ_ADD);
-			created = 1;
-		} else
-			kobject_uevent(&hdmi.kobj, KOBJ_ADD);
-
-	} else {
-			kobject_uevent(&hdmi.kobj, KOBJ_REMOVE);
-
-	}
-
-	return r;
+	return kobject_uevent(&dssdev->dev.kobj, onoff ? KOBJ_ADD : KOBJ_REMOVE);
 }
 
 static int hdmi_open(struct inode *inode, struct file *filp)
