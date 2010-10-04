@@ -257,7 +257,6 @@ static bool first_time = 1;
 
 /* Ducati Interrupt Capable Gptimers */
 static int ipu_timer_list[NUM_IPU_TIMERS] = {
-	GP_TIMER_4,
 	GP_TIMER_9,
 	GP_TIMER_11};
 
