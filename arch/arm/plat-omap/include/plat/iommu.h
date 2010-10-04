@@ -46,7 +46,7 @@ struct iommu {
 	struct list_head	mmap;
 	struct mutex		mmap_lock; /* protect mmap */
 
-	struct blocking_notifier_head	notifier;
+	struct raw_notifier_head	notifier;
 
 	struct iotlb_entry *tlbs_e;/* iommu tlbs context: saved area */
 

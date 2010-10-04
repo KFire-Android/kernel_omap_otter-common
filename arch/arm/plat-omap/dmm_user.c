@@ -244,7 +244,15 @@ static int omap_dmm_release(struct inode *inode, struct file *filp)
 	}
 	obj = filp->private_data;
 	flush_signals(current);
-	iommu_notify_event(obj->iovmm->iommu, IOMMU_CLOSE, NULL);
+
+	status = mutex_lock_interruptible(&obj->iovmm->dmm_map_lock);
+	if (status == 0) {
+		iommu_notify_event(obj->iovmm->iommu, IOMMU_CLOSE, NULL);
+		mutex_unlock(&obj->iovmm->dmm_map_lock);
+	} else {
+		pr_err("%s mutex_lock_interruptible returned 0x%x\n",
+						__func__, status);
+	}
 	user_remove_resources(obj);
 	iommu_put(obj->iovmm->iommu);
 	kfree(obj);
