@@ -190,7 +190,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	omap->ehci->caps = hcd->regs;
 	omap->ehci_base = hcd->regs;
 
-	ret = uhhtllp->enable(OMAP_EHCI, 1, pdev, uhhtllp->prvdata);
+	ret = uhhtllp->enable(OMAP_EHCI, pdev);
 	if (ret) {
 		dev_dbg(&pdev->dev, "failed to start ehci\n");
 		goto err_uhh_ioremap;
@@ -238,7 +238,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_hcd:
-	uhhtllp->enable(OMAP_EHCI, 0, pdev, uhhtllp->prvdata);;
+	uhhtllp->disable(OMAP_EHCI, pdev);
 
 err_uhh_ioremap:
 	iounmap(hcd->regs);
@@ -271,7 +271,7 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
 	struct usb_hcd *hcd = ehci_to_hcd(omap->ehci);
 
 	usb_remove_hcd(hcd);
-	uhhtllp->enable(OMAP_EHCI, 0, pdev, uhhtllp->prvdata);;
+	uhhtllp->disable(OMAP_EHCI, pdev);
 	iounmap(hcd->regs);
 	usb_put_hcd(hcd);
 	kfree(omap);
@@ -288,19 +288,58 @@ static void ehci_hcd_omap_shutdown(struct platform_device *pdev)
 		hcd->driver->shutdown(hcd);
 }
 
+
+#ifdef	CONFIG_PM
+
+static int ehci_hcd_omap_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
+
+	dev_dbg(dev, "ehci_hcd_omap_suspend\n");
+	return uhhtllp->suspend(OMAP_EHCI, pdev);
+}
+
+static int ehci_hcd_omap_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct ehci_hcd_omap *omap = platform_get_drvdata(pdev);
+	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
+	int ret;
+
+	dev_dbg(dev, "ehci_hcd_omap_resume\n");
+	ret = uhhtllp->resume(OMAP_EHCI, pdev);
+
+	/* Route All ports to this controller again */
+	ehci_writel(omap->ehci, FLAG_CF, &omap->ehci->regs->configured_flag);
+
+	/* powerup the ports */
+	ehci_port_power(omap->ehci, 1);
+	return ret;
+}
+
+static const struct dev_pm_ops ehci_hcd_omap_dev_pm_ops = {
+	.suspend	= ehci_hcd_omap_suspend,
+	.resume		= ehci_hcd_omap_resume,
+};
+
+#define EHCI_HCD_OMAP_DEV_PM_OPS (&ehci_hcd_omap_dev_pm_ops)
+#else
+#define	EHCI_HCD_OMAP_DEV_PM_OPS	NULL
+#endif
+
+
 static struct platform_driver ehci_hcd_omap_driver = {
 	.probe			= ehci_hcd_omap_probe,
 	.remove			= ehci_hcd_omap_remove,
 	.shutdown		= ehci_hcd_omap_shutdown,
-	/*.suspend		= ehci_hcd_omap_suspend, */
-	/*.resume		= ehci_hcd_omap_resume, */
 	.driver = {
 		.name		= "ehci-omap",
+		.pm		= EHCI_HCD_OMAP_DEV_PM_OPS,
 	}
 };
 
 /*-------------------------------------------------------------------------*/
-
 static const struct hc_driver ehci_omap_hc_driver = {
 	.description		= hcd_name,
 	.product_desc		= "OMAP-EHCI Host Controller",
@@ -340,7 +379,6 @@ static const struct hc_driver ehci_omap_hc_driver = {
 	.hub_control		= ehci_hub_control,
 	.bus_suspend		= ehci_bus_suspend,
 	.bus_resume		= ehci_bus_resume,
-
 	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
 };
 

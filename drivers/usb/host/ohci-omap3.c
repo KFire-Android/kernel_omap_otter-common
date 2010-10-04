@@ -201,7 +201,7 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 	/* we know this is the memory we want, no need to ioremap again */
 	omap->ohci_base = hcd->regs;
 
-	ret = uhhtllp->enable(OMAP_OHCI, 1, pdev, uhhtllp->prvdata);
+	ret = uhhtllp->enable(OMAP_OHCI, pdev);
 	if (ret) {
 		dev_dbg(&pdev->dev, "failed to start ohci\n");
 		goto err_uhh_ioremap;
@@ -218,7 +218,7 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_hcd:
-	uhhtllp->enable(OMAP_OHCI, 0, pdev, uhhtllp->prvdata);
+	uhhtllp->disable(OMAP_OHCI, pdev);
 
 err_uhh_ioremap:
 	iounmap(hcd->regs);
@@ -253,7 +253,7 @@ static int __devexit ohci_hcd_omap3_remove(struct platform_device *pdev)
 	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
 
 	usb_remove_hcd(hcd);
-	uhhtllp->enable(OMAP_OHCI, 0, pdev, uhhtllp->prvdata);
+	uhhtllp->disable(OMAP_OHCI, pdev);
 	iounmap(hcd->regs);
 	usb_put_hcd(hcd);
 	kfree(omap);
@@ -270,12 +270,48 @@ static void ohci_hcd_omap3_shutdown(struct platform_device *pdev)
 		hcd->driver->shutdown(hcd);
 }
 
+
+#ifdef	CONFIG_PM
+
+static int ohci_hcd_omap_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
+
+	dev_err(dev, "ohci_hcd_omap_suspend\n");
+	return uhhtllp->suspend(OMAP_OHCI, pdev);
+}
+
+static int ohci_hcd_omap_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
+
+	dev_err(dev, "ohci_hcd_omap_resume\n");
+	return uhhtllp->resume(OMAP_OHCI, pdev);
+
+}
+
+static const struct dev_pm_ops ohci_hcd_omap_dev_pm_ops = {
+	.suspend	= ohci_hcd_omap_suspend,
+	.resume		= ohci_hcd_omap_resume,
+};
+
+#define OHCI_HCD_OMAP_DEV_PM_OPS (&ohci_hcd_omap_dev_pm_ops)
+#else
+#define	OHCI_HCD_OMAP_DEV_PM_OPS	NULL
+#endif
+
+
+
+
 static struct platform_driver ohci_hcd_omap3_driver = {
 	.probe		= ohci_hcd_omap3_probe,
 	.remove		= __devexit_p(ohci_hcd_omap3_remove),
 	.shutdown	= ohci_hcd_omap3_shutdown,
 	.driver		= {
 		.name	= "ohci-omap3",
+		.pm		= OHCI_HCD_OMAP_DEV_PM_OPS,
 	},
 };
 
