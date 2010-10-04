@@ -81,6 +81,11 @@ enum {
 	PROC_START,
 };
 
+struct omap_rproc_common_args {
+	int status;
+};
+
+
 struct omap_rproc_platform_data {
 	struct omap_rproc_ops *ops;
 	char *name;
@@ -115,6 +120,7 @@ struct omap_rproc_start_args {
 };
 
 struct omap_rproc_reg_event_args {
+	struct omap_rproc_common_args cargs;
 	u16 pro_id;
 	int fd;
 	u32 event;

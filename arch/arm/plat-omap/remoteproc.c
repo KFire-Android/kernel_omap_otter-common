@@ -356,7 +356,10 @@ static int omap_rproc_ioctl(struct inode *inode, struct file *filp,
 		return -ENOTTY;
 	}
 
-	return rc;
+	/* First element of arg is the status */
+	copy_to_user((void __user *)arg, &rc, sizeof(rc));
+
+	return 0;
 }
 
 static int omap_rproc_mmap(struct file *filp, struct vm_area_struct *vma)
