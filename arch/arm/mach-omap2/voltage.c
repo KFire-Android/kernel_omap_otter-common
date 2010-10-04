@@ -713,7 +713,45 @@ static void __init omap4_init_voltagecontroller(void)
 	voltage_write_reg(OMAP4_PRM_VC_CFG_I2C_CLK_OFFSET,
 			(0x60 << OMAP4430_SCLL_SHIFT |
 			0x26 << OMAP4430_SCLH_SHIFT));
-	/* TODO: Configure setup times and CMD_VAL values*/
+
+	/* setup the VOLTSETUP* registers for RET and SLEEP */
+	/*
+	 * TODO: Relook at the prescal and count settings. For now conservative
+	 * values of 0x3 for prescal, translating to ramp-up/down counter being
+	 * incremented every 512 system clock cycles and a count value of 0xF is
+	 * used.
+	 */
+	voltage_write_reg(OMAP4_PRM_VOLTSETUP_CORE_RET_SLEEP_OFFSET,
+		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+	voltage_write_reg(OMAP4_PRM_VOLTSETUP_IVA_RET_SLEEP_OFFSET,
+		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+	voltage_write_reg(OMAP4_PRM_VOLTSETUP_MPU_RET_SLEEP_OFFSET,
+		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+
+	voltage_write_reg(OMAP4_PRM_VC_VAL_CMD_VDD_MPU_L_OFFSET,
+			(vc_config.vdd0_on << OMAP4430_ON_SHIFT) |
+			(vc_config.vdd0_onlp << OMAP4430_ONLP_SHIFT) |
+			(vc_config.vdd0_ret << OMAP4430_RET_SHIFT) |
+			(vc_config.vdd0_off << OMAP4430_OFF_SHIFT));
+	voltage_write_reg(OMAP4_PRM_VC_VAL_CMD_VDD_CORE_L_OFFSET,
+			(vc_config.vdd1_on << OMAP4430_ON_SHIFT) |
+			(vc_config.vdd1_onlp << OMAP4430_ONLP_SHIFT) |
+			(vc_config.vdd1_ret << OMAP4430_RET_SHIFT) |
+			(vc_config.vdd1_off << OMAP4430_OFF_SHIFT));
+	voltage_write_reg(OMAP4_PRM_VC_VAL_CMD_VDD_IVA_L_OFFSET,
+			(vc_config.vdd2_on << OMAP4430_ON_SHIFT) |
+			(vc_config.vdd2_onlp << OMAP4430_ONLP_SHIFT) |
+			(vc_config.vdd2_ret << OMAP4430_RET_SHIFT) |
+			(vc_config.vdd2_off << OMAP4430_OFF_SHIFT));
 }
 
 /* Sets up all the VDD related info for OMAP4 */
@@ -1616,6 +1654,10 @@ void __init omap_voltage_init_vc(struct omap_volt_vc_data *setup_vc)
 	vc_config.vdd1_onlp = setup_vc->vdd1_onlp;
 	vc_config.vdd1_ret = setup_vc->vdd1_ret;
 	vc_config.vdd1_off = setup_vc->vdd1_off;
+	vc_config.vdd2_on = setup_vc->vdd1_on;
+	vc_config.vdd2_onlp = setup_vc->vdd1_onlp;
+	vc_config.vdd2_ret = setup_vc->vdd1_ret;
+	vc_config.vdd2_off = setup_vc->vdd1_off;
 }
 
 /**

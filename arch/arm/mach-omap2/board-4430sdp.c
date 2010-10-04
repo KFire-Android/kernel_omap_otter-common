@@ -1093,6 +1093,21 @@ static void enable_board_wakeup_source(void)
 	omap_writew(padconf, CONTROL_CORE_PAD1_GPMC_AD11);
 }
 
+static struct omap_volt_vc_data vc_config = {
+	.vdd0_on = 0x3a,        /* 1.35v */
+	.vdd0_onlp = 0x3a,      /* 1.35v */
+	.vdd0_ret = 0x14,       /* 0.8375v */
+	.vdd0_off = 0x01,       /* 0.6v */
+	.vdd1_on = 0x29,        /* 1.1v */
+	.vdd1_onlp = 0x29,      /* 1.1v */
+	.vdd1_ret = 0x14,       /* 0.8375v */
+	.vdd1_off = 0x01,       /* 0.6v */
+	.vdd2_on = 0x29,        /* 1.1v */
+	.vdd2_onlp = 0x29,      /* 1.1v */
+	.vdd2_ret = 0x14,       /* .8375v */
+	.vdd2_off = 0x01,       /* 0.6v */
+};
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1136,6 +1151,7 @@ static void __init omap_4430sdp_init(void)
 	omap_cma3000accl_init();
 	omap_display_init(&sdp4430_dss_data);
 	enable_board_wakeup_source();
+	omap_voltage_init_vc(&vc_config);
 }
 
 static void __init omap_4430sdp_map_io(void)
