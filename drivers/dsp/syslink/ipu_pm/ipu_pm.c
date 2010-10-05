@@ -2208,6 +2208,7 @@ static inline int ipu_pm_req_cstr_fdif(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2230,11 +2231,21 @@ static inline int ipu_pm_req_cstr_fdif(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Request perfomance Cstr FDIF:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						IPU_PM_CORE,
+						perf);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Request latency Cstr FDIF:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_SELF,
+						   lat);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2357,6 +2368,11 @@ static inline int ipu_pm_req_cstr_l3_bus(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_BW_MASK) {
 		bw = rcb_p->data[3];
 		pr_info("Request bandwidth Cstr L3 Bus:%d\n", bw);
+		retval = ipu_pm_module_set_bandwidth(rcb_p->sub_type,
+						     rcb_p->sub_type,
+						     bw);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	return PM_SUCCESS;
@@ -2559,6 +2575,7 @@ static inline int ipu_pm_rel_cstr_fdif(int proc_id, u32 rcb_num)
 	int lat;
 	int bw;
 	u32 cstr_flags;
+	int retval;
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
@@ -2581,11 +2598,21 @@ static inline int ipu_pm_rel_cstr_fdif(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_PERF_MASK) {
 		perf = rcb_p->data[1];
 		pr_info("Release perfomance Cstr FDIF:%d\n", perf);
+		retval = ipu_pm_module_set_rate(rcb_p->sub_type,
+						IPU_PM_CORE,
+						NO_FREQ_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_LAT_MASK) {
 		lat = rcb_p->data[2];
 		pr_info("Release latency Cstr FDIF:%d\n", lat);
+		retval = ipu_pm_module_set_latency(rcb_p->sub_type,
+						   IPU_PM_SELF,
+						   NO_LAT_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	if (cstr_flags & PM_CSTR_BW_MASK) {
@@ -2708,6 +2735,11 @@ static inline int ipu_pm_rel_cstr_l3_bus(int proc_id, u32 rcb_num)
 	if (cstr_flags & PM_CSTR_BW_MASK) {
 		bw = rcb_p->data[3];
 		pr_info("Release bandwidth Cstr L3 Bus:%d\n", bw);
+		retval = ipu_pm_module_set_bandwidth(rcb_p->sub_type,
+						     rcb_p->sub_type,
+						     NO_BW_CONSTRAINT);
+		if (retval)
+			return PM_UNSUPPORTED;
 	}
 
 	return PM_SUCCESS;

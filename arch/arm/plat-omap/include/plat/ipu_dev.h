@@ -98,5 +98,8 @@ extern int ipu_pm_module_set_rate(unsigned rsrc,
 extern int ipu_pm_module_set_latency(unsigned rsrc,
 				     unsigned target_rsrc,
 				     int latency);
+extern int ipu_pm_module_set_bandwidth(unsigned rsrc,
+				       unsigned target_rsrc,
+				       int bandwidth);
 
 #endif /* IPU_PM_H */

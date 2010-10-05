@@ -171,6 +171,36 @@ err_ret:
 }
 EXPORT_SYMBOL(ipu_pm_module_set_latency);
 
+inline int ipu_pm_module_set_bandwidth(unsigned rsrc,
+				       unsigned target_rsrc,
+				       int bandwidth)
+{
+	int ret = 0;
+	struct omap_ipupm_mod_platform_data *pd;
+
+	pd = ipupm_get_plat_data();
+
+	if ((pd[target_rsrc].caps & IPUPM_CAPS_BDW) == 0) {
+		pr_err("device set bandwidth not supported for %s",
+			pd[target_rsrc].oh_name);
+		ret = -EINVAL;
+	} else {
+#ifdef CONFIG_OMAP_PM
+		struct device *dp;
+		dp = omap2_get_l3_device();
+		ret = omap_pm_set_min_bus_tput(dp,
+					       OCP_INITIATOR_AGENT,
+					       bandwidth);
+#endif
+	}
+
+	if (ret)
+		pr_err("module set bandwidth failed %s",
+						pd[target_rsrc].oh_name);
+	return ret;
+}
+EXPORT_SYMBOL(ipu_pm_module_set_bandwidth);
+
 static struct omap_device *od_iva;
 
 /* FIXME: not in use now
@@ -200,7 +230,8 @@ static struct omap_ipupm_mod_platform_data omap_ipupm_data[] = {
 	{
 		.name = "omap-ipu-pm",
 		.oh_name = "fdif",
-		.caps = IPUPM_CAPS_START | IPUPM_CAPS_STOP,
+		.caps = IPUPM_CAPS_START | IPUPM_CAPS_STOP
+			| IPUPM_CAPS_PERF | IPUPM_CAPS_LAT,
 		.ops = &omap_ipupm_ops,
 	},
 	{
@@ -254,7 +285,8 @@ static struct omap_ipupm_mod_platform_data omap_ipupm_data[] = {
 	{
 		.name = "omap-ipu-pm",
 		.oh_name = "l3_main_1",
-		.caps = IPUPM_CAPS_LAT | IPUPM_CAPS_EXTINIT,
+		.caps = IPUPM_CAPS_LAT | IPUPM_CAPS_BDW
+			| IPUPM_CAPS_EXTINIT,
 		.ops = &omap_ipupm_ops,
 	},
 	{
