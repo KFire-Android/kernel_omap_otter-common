@@ -785,6 +785,9 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	int clkin, n, phy;
 
+	code = get_timings_index();
+	dssdev->panel.timings = all_timings_direct[code];
+
 	hdmi_enable_clocks(1);
 
 	p = &dssdev->panel.timings;
