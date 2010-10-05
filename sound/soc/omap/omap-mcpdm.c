@@ -409,10 +409,6 @@ int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 	pdata = pdev->dev.platform_data;
 
 	pm_runtime_get_sync(&pdev->dev);
-#ifndef CONFIG_PM_RUNTIME
-	if (pdata->device_enable)
-		pdata->device_enable(pdev);
-#endif
 
 	spin_lock(&mcpdm->lock);
 
@@ -447,10 +443,6 @@ int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 
 err:
 	pm_runtime_put_sync(&pdev->dev);
-#ifndef CONFIG_PM_RUNTIME
-	if (pdata->device_idle)
-		pdata->device_idle(pdev);
-#endif
 	return ret;
 }
 
@@ -473,11 +465,6 @@ void omap_mcpdm_free(struct omap_mcpdm *mcpdm)
 	spin_unlock(&mcpdm->lock);
 
 	pm_runtime_put_sync(&pdev->dev);
-
-#ifndef CONFIG_PM_RUNTIME
-	if (pdata->device_idle)
-		pdata->device_idle(pdev);
-#endif
 
 	free_irq(mcpdm->irq, (void *)mcpdm);
 }
@@ -901,10 +888,6 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_mcpdm_dai));
 	pm_runtime_put_sync(&pdev->dev);
 	destroy_workqueue(mcpdm->workqueue);
-#ifndef CONFIG_PM_RUNTIME
-	if (pdata->device_shutdown)
-		pdata->device_shutdown(pdev);
-#endif
 	iounmap(mcpdm->io_base);
 	free_irq(mcpdm->irq, (void *)mcpdm);
 	kfree(mcpdm);
