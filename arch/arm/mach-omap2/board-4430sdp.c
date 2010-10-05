@@ -369,24 +369,11 @@ static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
 
 /* End Synaptic Touchscreen TM-01217 */
 
-int dsi_set_backlight(struct omap_dss_device *dssdev, int level)
+static void __init sdp4430_init_display_led(void)
 {
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-	if (dssdev->channel == OMAP_DSS_CHANNEL_LCD) {
-		mdelay(120);
-		gpio_set_value(27, 0);
-		mdelay(120);
-		gpio_set_value(27, 1);
-	}else{
-                mdelay(120);
-                gpio_set_value(59, 0);
-                mdelay(120);
-                gpio_set_value(59, 1);
-	}
-
-	return 0;
 }
 
 static void sdp4430_set_primary_brightness(u8 brightness)
@@ -415,6 +402,7 @@ static void sdp4430_set_secondary_brightness(u8 brightness)
 
 static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
 	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
+	.display_led_init = sdp4430_init_display_led,
 	.primary_display_set = sdp4430_set_primary_brightness,
 	.secondary_display_set = sdp4430_set_secondary_brightness,
 };
@@ -459,7 +447,7 @@ static struct nokia_dsi_panel_data dsi_panel = {
 		.use_ext_te	= false,
 		.ext_te_gpio	= 101,
 		.use_esd_check	= false,
-		.set_backlight	= dsi_set_backlight,
+		.set_backlight	= NULL,
 };
 
 static struct nokia_dsi_panel_data dsi2_panel = {
@@ -468,7 +456,7 @@ static struct nokia_dsi_panel_data dsi2_panel = {
                 .use_ext_te     = false,
                 .ext_te_gpio    = 103,
                 .use_esd_check  = false,
-                .set_backlight  = dsi_set_backlight,
+                .set_backlight  = NULL,
 };
 
 static struct omap_dss_device sdp4430_lcd_device = {
@@ -626,13 +614,13 @@ static struct platform_device wl128x_device = {
 };
 
 static struct platform_device *sdp4430_devices[] __initdata = {
+	&sdp4430_disp_led,
 	&sdp4430_proximity_device,
 	&sdp4430_leds_pwm,
 	&sdp4430_leds_gpio,
 	&wl128x_device,
 	&sdp4430_hdmi_audio_device,
 	&sdp4430_vib,
-	&sdp4430_disp_led,
 	&sdp4430_keypad_led,
 };
 
