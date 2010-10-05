@@ -46,9 +46,11 @@ void rproc_eventfd_ntfy(struct omap_rproc *obj, int event)
 {
 	struct omap_rproc_ntfy *fd_reg;
 
+	spin_lock_irq(&obj->event_lock);
 	list_for_each_entry(fd_reg, &obj->event_list, list)
 		if (fd_reg->event == event)
 			eventfd_signal(fd_reg->evt_ctx, 1);
+	spin_unlock_irq(&obj->event_lock);
 }
 
 int rproc_start(struct omap_rproc *rproc, const void __user *arg)
