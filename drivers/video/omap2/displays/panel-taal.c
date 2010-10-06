@@ -509,6 +509,29 @@ static void taal_get_timings(struct omap_dss_device *dssdev,
 	*timings = dssdev->panel.timings;
 }
 
+static void taal_set_timings(struct omap_dss_device *dssdev,
+			struct omap_video_timings *timings)
+{
+	dssdev->panel.timings.x_res = timings->x_res;
+	dssdev->panel.timings.y_res = timings->y_res;
+	dssdev->panel.timings.pixel_clock = timings->pixel_clock;
+	dssdev->panel.timings.hsw = timings->hsw;
+	dssdev->panel.timings.hfp = timings->hfp;
+	dssdev->panel.timings.hbp = timings->hbp;
+	dssdev->panel.timings.vsw = timings->vsw;
+	dssdev->panel.timings.vfp = timings->vfp;
+	dssdev->panel.timings.vbp = timings->vbp;
+}
+
+static int taal_check_timings(struct omap_dss_device *dssdev,
+			struct omap_video_timings *timings)
+{
+	if (timings->x_res != 864 || timings->y_res != 480)
+		return -EINVAL;
+
+	return 0;
+}
+
 static void taal_get_resolution(struct omap_dss_device *dssdev,
 		u16 *xres, u16 *yres)
 {
@@ -1753,6 +1776,8 @@ static struct omap_dss_driver taal_driver = {
 	.memory_read	= taal_memory_read,
 
 	.get_timings	= taal_get_timings,
+	.set_timings	= taal_set_timings,
+	.check_timings	= taal_check_timings,
 
 	.driver         = {
 		.name   = "taal",
@@ -1789,6 +1814,8 @@ static struct omap_dss_driver taal2_driver = {
 	.memory_read	= taal_memory_read,
 
 	.get_timings	= taal_get_timings,
+	.set_timings	= taal_set_timings,
+	.check_timings	= taal_check_timings,
 
 	.driver         = {
 		.name   = "taal2",
