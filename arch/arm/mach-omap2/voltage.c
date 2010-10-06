@@ -1342,7 +1342,7 @@ unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
 	 * Use higher freq voltage even if an exact match is not available
 	 * we are probably masking a clock framework bug, so warn
 	 */
-	if (unlikely(freq != vdd->volt_clk->rate))
+	if (unlikely((freq / 1000000) != (vdd->volt_clk->rate / 1000000)))
 		pr_warning("%s: Available freq %ld != dpll freq %ld.\n",
 			__func__, freq, vdd->volt_clk->rate);
 
@@ -1846,11 +1846,8 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 
 		freq = opp_get_freq(opp);
 
-		if (freq == opp_get_rate(vdd->dev_list[i])) {
-			dev_info(vdd->dev_list[i], "%s: Already at the"
-				"requested rate %ld\n", __func__, freq);
+		if (freq == opp_get_rate(vdd->dev_list[i]))
 			continue;
-		}
 
 		opp_set_rate(vdd->dev_list[i], freq);
 	}
