@@ -1131,8 +1131,6 @@ static void __init omap_4430sdp_init(void)
 	usb_uhhtll_init(&usbhs_pdata);
 	usb_ehci_init();
 	usb_ohci_init();
-	/* OMAP4 SDP uses internal transceiver so register nop transceiver */
-	usb_nop_xceiv_register();
 	usb_musb_init(&musb_board_data);
 
 	status = omap4_keypad_initialization(&sdp4430_keypad_data);
