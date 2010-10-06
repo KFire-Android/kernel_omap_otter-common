@@ -332,10 +332,13 @@ void dsi_exit(void);
 int dsi2_init(struct platform_device *pdev);
 void dsi2_exit(void);
 
-void dsi_dump_clocks(enum omap_dsi_index ix,
-		enum omap_channel channel, struct seq_file *s);
-void dsi_dump_irqs(enum omap_dsi_index ix, struct seq_file *s);
-void dsi_dump_regs(enum omap_dsi_index ix, struct seq_file *s);
+void dsi1_dump_clocks(struct seq_file *s);
+void dsi1_dump_irqs(struct seq_file *s);
+void dsi1_dump_regs(struct seq_file *s);
+
+void dsi2_dump_clocks(struct seq_file *s);
+void dsi2_dump_irqs(struct seq_file *s);
+void dsi2_dump_regs(struct seq_file *s);
 
 void dsi_save_context(void);
 void dsi_restore_context(void);

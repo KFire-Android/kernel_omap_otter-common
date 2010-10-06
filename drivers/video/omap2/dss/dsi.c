@@ -299,6 +299,8 @@ static struct dsi_struct
 	spinlock_t irq_stats_lock;
 	struct dsi_irq_stats irq_stats;
 #endif
+	bool enabled;
+
 	struct omap_display_platform_data *pdata;
 	struct platform_device *pdev;
 } dsi1, dsi2;
@@ -1365,11 +1367,12 @@ void dsi_pll_uninit(enum omap_dsi_index ix)
 	DSSDBG("PLL uninit done\n");
 }
 
-void dsi_dump_clocks(enum omap_dsi_index ix, enum omap_channel channel, 
-	struct seq_file *s)
+static void dsi_dump_clocks(enum omap_dsi_index ix, struct seq_file *s)
 {
 	int clksel;
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
+	enum omap_channel channel = (ix == DSI1) ? OMAP_DSS_CHANNEL_LCD :
+				OMAP_DSS_CHANNEL_LCD2;
 	struct dsi_clock_info *cinfo = &p_dsi->current_cinfo;
 
 	enable_clocks(1);
@@ -1425,8 +1428,20 @@ void dsi_dump_clocks(enum omap_dsi_index ix, enum omap_channel channel,
 	enable_clocks(0);
 }
 
+void dsi1_dump_clocks(struct seq_file *s)
+{
+	if (dsi1.enabled)
+		dsi_dump_clocks(DSI1, s);
+}
+
+void dsi2_dump_clocks(struct seq_file *s)
+{
+	if (cpu_is_omap44xx() && dsi2.enabled)
+		dsi_dump_clocks(DSI2, s);
+}
+
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
-void dsi_dump_irqs(enum omap_dsi_index ix, struct seq_file *s)
+static void dsi_dump_irqs(enum omap_dsi_index ix, struct seq_file *s)
 {
 	unsigned long flags;
 	struct dsi_irq_stats stats;
@@ -1513,10 +1528,23 @@ void dsi_dump_irqs(enum omap_dsi_index ix, struct seq_file *s)
 	PIS(ULPSACTIVENOT_ALL1);
 #undef PIS
 }
+
+void dsi1_dump_irqs(struct seq_file *s)
+{
+	if (dsi1.enabled)
+		dsi_dump_irqs(DSI1, s);
+}
+
+void dsi2_dump_irqs(struct seq_file *s)
+{
+	if (cpu_is_omap44xx() && dsi2.enabled)
+		dsi_dump_irqs(DSI2, s);
+}
 #endif
 
-void dsi_dump_regs(enum omap_dsi_index ix, struct seq_file *s)
+static void dsi_dump_regs(enum omap_dsi_index ix, struct seq_file *s)
 {
+
 #define DUMPREG(ix, r) seq_printf(s, "%-35s %08x\n", #r, dsi_read_reg(ix, r))
 
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
@@ -1593,6 +1621,18 @@ void dsi_dump_regs(enum omap_dsi_index ix, struct seq_file *s)
 
 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 #undef DUMPREG
+}
+
+void dsi1_dump_regs(struct seq_file *s)
+{
+	if (dsi1.enabled)
+		dsi_dump_regs(DSI1, s);
+}
+
+void dsi2_dump_regs(struct seq_file *s)
+{
+	if (cpu_is_omap44xx() && dsi2.enabled)
+		dsi_dump_regs(DSI2, s);
 }
 
 enum dsi_complexio_power_state {
@@ -3661,7 +3701,7 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 		goto err2;
 
 	p_dsi->recover.enabled = true;
-
+	p_dsi->enabled = true;
 	mutex_unlock(&p_dsi->lock);
 
 	return 0;
@@ -3707,6 +3747,8 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 	/* cut clocks(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	dss_mainclk_state_disable(true);
+
+	p_dsi->enabled = false;
 
 	mutex_unlock(&p_dsi->lock);
 }
