@@ -1285,6 +1285,7 @@ static struct omap_hwmod omap44xx_dsp_hwmod = {
 	.masters	= omap44xx_dsp_masters,
 	.masters_cnt	= ARRAY_SIZE(omap44xx_dsp_masters),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+	.flags		= HWMOD_INIT_NO_RESET,
 };
 
 /*
