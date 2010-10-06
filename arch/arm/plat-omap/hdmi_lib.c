@@ -1408,42 +1408,54 @@ int hdmi_set_irqs(void)
 /* Interrupt handler*/
 void HDMI_W1_HPD_handler(int *r)
 {
-	u32 val, intr, set;
+	u32 val, set = 0, hpd_intr;
+
 	mdelay(30);
+	DBG("-------------DEBUG-------------------");
+	DBG("%x hdmi_wp_irqstatus\n", \
+		hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS));
+	DBG("%x hdmi_core_intr_state\n", \
+		hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR_STATE));
+	DBG("%x hdmi_core_irqstate\n", \
+		hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1));
+	DBG("%x hdmi_core_sys_sys_stat\n", \
+		hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__SYS_STAT));
+	DBG("-------------DEBUG-------------------");
+
 	val = hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
-	DBG("%x hdmi_wp_irqstatus\n", val);
 	mdelay(30);
-	set = 0;
+
 	set = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__SYS_STAT);
-	DBG("%x hdmi_core_sys_sys_stat\n", set);
 	mdelay(30);
+
+	hpd_intr = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
+	mdelay(30);
+
 	hdmi_write_reg(HDMI_WP, HDMI_WP_IRQSTATUS, val);
 	/* flush posted write */
 	hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
 	mdelay(30);
-	*r = 0;
 
 	if (val & 0x02000000) {
 		DBG("connect, ");
-		*r |= HDMI_CONNECT;
+		*r = HDMI_CONNECT;
 	}
-	if (set & 0x00000002) {
-		DBG("hpd (count=%d), ", count_hpd);
-		*r |= HDMI_HPD;
-		if (count_hpd == 0)
-			*r |= HDMI_FIRST_HPD;
-		count_hpd++;
+	if (hpd_intr & 0x00000040) {
+		if  (set & 0x00000002)
+			*r = HDMI_HPD;
+		else
+			*r = HDMI_DISCONNECT;
 	}
-
-	if ((val & 0x04000000) && !(set & 0x00000002)) {
-		DBG("disconnect, ");
-		*r |= HDMI_DISCONNECT;
-		count_hpd = 0;
+	if ((val & 0x04000000) && (!(val & 0x02000000))) {
+		DBG("Disconnect");
+		*r = HDMI_DISCONNECT;
 	}
+	/* flush posted write */
+	hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1, hpd_intr);
+	mdelay(30);
 	hdmi_set_irqs();
-
-	intr =  hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
-	DBG("intr=%08x\n", intr);
+	/*Read to flush*/
+	hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
 }
 
 

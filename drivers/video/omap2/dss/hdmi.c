@@ -890,8 +890,6 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	dispc_enable_digit_out(1);
 
-	hdmi_hot_plug_event_send(dssdev, 1);
-
 	return 0;
 err:
 	return r;
@@ -934,31 +932,46 @@ void hdmi_work_queue(struct work_struct *work)
 	irqstatus = 0;
 	spin_unlock_irqrestore(&irqstatus_lock, flags);
 
-	DSSDBG("irqstatus=%08x\n", r);
+	printk("irqstatus=%08x\n hdp_mode = %d dssdev->state = %d",\
+		r, hpd_mode, dssdev->state);
 
-	if (r & HDMI_DISCONNECT)
+	if (r & HDMI_DISCONNECT) {
+		DSSDBG("Display disabled\n");
+		printk("disconnect");
+		HDMI_W1_StopVideoFrame(HDMI_WP);
+		if (dssdev->platform_disable)
+			dssdev->platform_disable(dssdev);
+			dispc_enable_digit_out(0);
+		HDMI_W1_SetWaitPllPwrState(HDMI_WP, HDMI_PLLPWRCMD_ALLOFF);
+		edid_set = false;
+		hdmi_enable_clocks(0);
+		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+		hdmi_enable_hpd(dssdev);
 		hpd_mode = 1;
+		hdmi_hot_plug_event_send(dssdev, 0);
+	}
 
-	if ((r & (HDMI_CONNECT|HDMI_FIRST_HPD)) && (hpd_mode == 1) &&
-			(dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)) {
-		DSSDBG("enabling display\n");
+	if (r & (HDMI_CONNECT) && (hpd_mode == 1) &&
+		(dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)) {
+
+		printk(KERN_INFO"Physical Connect\n");
 		hdmi_enable_clocks(1);
 		hdmi_power_on(dssdev);
 		mdelay(1000);
-		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-		printk(KERN_INFO "Display enabled");
+
 	}
-	if (r & HDMI_HPD)
-		hpd_mode = 0;
 
-	if ((r & HDMI_DISCONNECT) && !(r & HDMI_CONNECT) &&
-			(dssdev->state != OMAP_DSS_DISPLAY_DISABLED)) {
-		DSSDBG("Display disabled\n");
-		edid_set = false;
-		hdmi_hot_plug_event_send(dssdev, 0);
-		hdmi_enable_hpd(dssdev);
-		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+	if (r & (HDMI_HPD) && (hpd_mode == 1) &&
+		dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
+		mdelay(1000);
+		printk(KERN_INFO"connect 1");
+		printk(KERN_INFO"enabling display\n");
+		hdmi_enable_clocks(1);
+		hdmi_power_on(dssdev);
 
+		hdmi_hot_plug_event_send(dssdev, 1);
+
+		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 	}
 
 	kfree(work);
@@ -972,21 +985,18 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 	int work_pending;
 
 	HDMI_W1_HPD_handler(&r);
-	DSSDBG("r=%08x, prev irqstatus=%08x\n", r, irqstatus);
+	printk("r=%08x, prev irqstatus=%08x\n", r, irqstatus);
 
-	/* what if HDMI_CONNECT and HDMI_FIRST_HPD come as two distinct interrupts?
-	 * will doing this twice cause an issue?
-	 */
-	if ((r & (HDMI_CONNECT|HDMI_FIRST_HPD)) && (hpd_mode == 1)) {
+	if (((r & HDMI_CONNECT) || (r & HDMI_HPD)) &&  (hpd_mode == 1))
 		hdmi_enable_clocks(1);
-	}
+
 
 	spin_lock_irqsave(&irqstatus_lock, flags);
 	work_pending = irqstatus;
-	if ((r & HDMI_DISCONNECT) && !(r & HDMI_CONNECT)) {
+	if ((r & HDMI_DISCONNECT)) {
 		irqstatus = HDMI_DISCONNECT;
 	} else {
-		irqstatus |= r;
+		irqstatus = r;
 	}
 	spin_unlock_irqrestore(&irqstatus_lock, flags);
 
@@ -1003,7 +1013,6 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 
 	return IRQ_HANDLED;
 }
-
 
 static void hdmi_power_off(struct omap_dss_device *dssdev)
 {
@@ -1060,6 +1069,9 @@ static int hdmi_enable_display(struct omap_dss_device *dssdev)
 		dssdev->platform_enable(dssdev);
 
 	r = hdmi_power_on(dssdev);
+
+	hdmi_hot_plug_event_send(dssdev, 1);
+
 	if (r) {
 		DSSERR("failed to power on device\n");
 		goto err;
@@ -1091,8 +1103,6 @@ static int hdmi_enable_hpd(struct omap_dss_device *dssdev)
 		r = -EINVAL;
 		goto err;
 	}
-
-	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 
 	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
 	omap_writel(0x01180118, 0x4A100098);
@@ -1196,6 +1206,9 @@ static int hdmi_display_resume(struct omap_dss_device *dssdev)
 		dssdev->platform_enable(dssdev);
 
 	r = hdmi_power_on(dssdev);
+
+	hdmi_hot_plug_event_send(dssdev, 1);
+
 	if (r) {
 		DSSERR("failed to power on device\n");
 		goto err;
