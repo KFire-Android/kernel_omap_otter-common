@@ -104,7 +104,7 @@ int platform_pm_resume_noirq(struct device *dev)
 	 * state it was when suspend was called.
 	 */
 	pr_debug("pm_runtime_get_sync for %s\n", dev_name(dev));
-	pm_runtime_get_sync(dev);
+	pm_runtime_get_noresume(dev);
 
 	if (!drv)
 		return 0;
