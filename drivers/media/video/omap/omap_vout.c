@@ -2543,13 +2543,7 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 	if (vout->wb_enabled)
 		mask |= DISPC_IRQ_FRAMEDONE_WB;
 
-	ret = omap_dispc_register_isr(omap_vout_isr, vout, mask);
-	if (ret) {
-		v4l2_err(&vout->vid_dev->v4l2_dev,
-				"failed to register vout_isr\n");
-		goto streamon_err1;
-	}
-
+	omap_dispc_register_isr(omap_vout_isr, vout, mask);
 
 #ifdef CONFIG_PM
 	if (pdata->set_min_bus_tput) {
@@ -2622,12 +2616,7 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 	if (vout->wb_enabled)
 			mask |= DISPC_IRQ_FRAMEDONE_WB;
 
-	ret = omap_dispc_unregister_isr(omap_vout_isr, vout, mask);
-	if (ret) {
-		v4l2_err(&vout->vid_dev->v4l2_dev,
-				"failed to unregister vout_isr\n");
-		return ret;
-	}
+	omap_dispc_unregister_isr(omap_vout_isr, vout, mask);
 
 	for (j = 0; j < ovid->num_overlays; j++) {
 		struct omap_overlay *ovl = ovid->overlays[j];
