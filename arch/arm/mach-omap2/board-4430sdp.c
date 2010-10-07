@@ -33,6 +33,9 @@
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
+#include <mach/emif.h>
+#include <mach/lpddr2-elpida.h>
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -1029,6 +1032,23 @@ static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_2_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_3_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_4_bus_pdata;
 
+/*
+ * LPDDR2 Configeration Data:
+ * The memory organisation is as below :
+ *	EMIF1 - CS0 -	2 Gb
+ *		CS1 -	2 Gb
+ *	EMIF2 - CS0 -	2 Gb
+ *		CS1 -	2 Gb
+ *	--------------------
+ *	TOTAL -		8 Gb
+ *
+ * Same devices installed on EMIF1 and EMIF2
+ */
+static __initdata struct emif_device_details emif_devices = {
+	.cs0_device = &elpida_2G_S4,
+	.cs1_device = &elpida_2G_S4
+};
+
 static void __init omap_i2c_hwspinlock_init(int bus_id, unsigned int
 			spinlock_id, struct omap_i2c_bus_board_data *pdata)
 {
@@ -1203,6 +1223,8 @@ static void __init omap_4430sdp_init(void)
 {
 	int status;
 
+	omap_emif_setup_device_details(&emif_devices, &emif_devices);
+	omap_init_emif_timings();
 	omap4_i2c_init();
 	omap4_display_init();
 	omap_disp_led_init();

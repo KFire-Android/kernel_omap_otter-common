@@ -27,6 +27,7 @@
 #include <mach/dmm-44xx.h>
 #include <mach/emif.h>
 #include <mach/lpddr2-jedec.h>
+#include <mach/omap4-common.h>
 
 /* Utility macro for masking and setting a field in a register/variable */
 #define mask_n_set(reg, shift, msk, val) \
@@ -74,6 +75,7 @@ void cancel_out(u32 *num, u32 *den)
 	do_cancel_out(num, den, 13);
 	do_cancel_out(num, den, 17);
 }
+
 /*
  * Get the period in ns (in fraction form) for a given frequency:
  * Getting it in fraction form is for better accuracy in integer arithmetics
@@ -687,13 +689,15 @@ static void handle_temp_alert(void __iomem *base, u32 emif_nr)
 		   tmp_temperature_level != SDRAM_TEMP_RESERVED_4) {
 		setup_temperature_sensitive_regs(emif_nr,
 						 emif_curr_regs[emif_nr]);
+		/*
+		 * EMIF de-rated timings register needs to be setup using
+		 * freq update method only
+		 */
+		omap4_set_freq_update();
 	}
 	/* Do the printing after handling the temperature change */
 	print_temp_alert(emif_nr, old_temperature_level,
 			 emif_temperature_level[emif_nr]);
-	/*
-	 * FIXME: Relock at the same frequency to change timings
-	 */
 }
 
 static void setup_volt_sensitive_registers(u32 emif_nr, struct emif_regs *regs,
@@ -1093,6 +1097,8 @@ postcore_initcall(omap_emif_register);
  */
 int omap_emif_notify_voltage(u32 volt_state)
 {
+	int ret;
+
 	if (emif_curr_regs[EMIF1])
 		setup_volt_sensitive_registers(EMIF1, emif_curr_regs[EMIF1],
 					       volt_state);
@@ -1106,6 +1112,14 @@ int omap_emif_notify_voltage(u32 volt_state)
 		       " initial setup - ignoring the notification");
 		return -EINVAL;
 	}
+
+	/*
+	 * EMIF read-idle control needs to be setup using
+	 * freq update method only
+	 */
+	ret = omap4_set_freq_update();
+	if (ret)
+		return ret;
 
 	return 0;
 }
@@ -1170,4 +1184,35 @@ int omap_emif_setup_device_details(
 	}
 
 	return 0;
+}
+
+/*
+ * omap_init_emif_timings - reprogram EMIF timing parameters
+ *
+ * Sets the CORE DPLL3 M2 divider to the same value that it's at
+ * currently.  This has the effect of setting the EMIF DDR AC timing
+ * registers to the values currently defined by the kernel.
+ */
+void __init omap_init_emif_timings(void)
+{
+	struct clk *dpll_core_m2_clk;
+	int ret;
+	long rate;
+
+	 /* FREQ_UPDATE sequence isn't supported on early vesion */
+	if (omap_rev() == OMAP4430_REV_ES1_0)
+		return;
+
+	dpll_core_m2_clk = clk_get(NULL, "dpll_core_m2_ck");
+	if (!dpll_core_m2_clk)
+		pr_err("Could not get LPDDR2 clock - dpll_core_m2_ck\n");
+
+	rate = clk_get_rate(dpll_core_m2_clk);
+	pr_info("Reprogramming LPDDR2 timingsto %ld Hz\n", rate >> 1);
+
+	ret = clk_set_rate(dpll_core_m2_clk, rate);
+	if (ret)
+		pr_err("Unable to set LPDDR2 rate to %ld:\n", rate);
+
+	clk_put(dpll_core_m2_clk);
 }
