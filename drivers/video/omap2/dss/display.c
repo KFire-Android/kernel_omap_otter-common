@@ -660,8 +660,9 @@ int dss_mainclk_state_enable(void)
 		/* All devices are not disabled /suspended */
 		return -EINVAL;
 	} else {
-		dss_mainclk_enable();
-		restore_all_ctx();
+		r = dss_mainclk_enable();
+		if (!r)
+			restore_all_ctx();
 		return 0;
 	}
 }

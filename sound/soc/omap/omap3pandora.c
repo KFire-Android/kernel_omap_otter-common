@@ -173,26 +173,26 @@ static int omap3pandora_out_init(struct snd_soc_pcm_runtime *rtd)
 	int ret;
 
 	/* All TWL4030 output pins are floating */
-	snd_soc_dapm_nc_pin(codec, "EARPIECE");
-	snd_soc_dapm_nc_pin(codec, "PREDRIVEL");
-	snd_soc_dapm_nc_pin(codec, "PREDRIVER");
-	snd_soc_dapm_nc_pin(codec, "HSOL");
-	snd_soc_dapm_nc_pin(codec, "HSOR");
-	snd_soc_dapm_nc_pin(codec, "CARKITL");
-	snd_soc_dapm_nc_pin(codec, "CARKITR");
-	snd_soc_dapm_nc_pin(codec, "HFL");
-	snd_soc_dapm_nc_pin(codec, "HFR");
-	snd_soc_dapm_nc_pin(codec, "VIBRA");
+	snd_soc_dapm_nc_pin(codec->dapm, "EARPIECE");
+	snd_soc_dapm_nc_pin(codec->dapm, "PREDRIVEL");
+	snd_soc_dapm_nc_pin(codec->dapm, "PREDRIVER");
+	snd_soc_dapm_nc_pin(codec->dapm, "HSOL");
+	snd_soc_dapm_nc_pin(codec->dapm, "HSOR");
+	snd_soc_dapm_nc_pin(codec->dapm, "CARKITL");
+	snd_soc_dapm_nc_pin(codec->dapm, "CARKITR");
+	snd_soc_dapm_nc_pin(codec->dapm, "HFL");
+	snd_soc_dapm_nc_pin(codec->dapm, "HFR");
+	snd_soc_dapm_nc_pin(codec->dapm, "VIBRA");
 
-	ret = snd_soc_dapm_new_controls(codec, omap3pandora_out_dapm_widgets,
+	ret = snd_soc_dapm_new_controls(codec->dapm, omap3pandora_out_dapm_widgets,
 				ARRAY_SIZE(omap3pandora_out_dapm_widgets));
 	if (ret < 0)
 		return ret;
 
-	snd_soc_dapm_add_routes(codec, omap3pandora_out_map,
+	snd_soc_dapm_add_routes(codec->dapm, omap3pandora_out_map,
 		ARRAY_SIZE(omap3pandora_out_map));
 
-	return snd_soc_dapm_sync(codec);
+	return snd_soc_dapm_sync(codec->dapm);
 }
 
 static int omap3pandora_in_init(struct snd_soc_pcm_runtime *rtd)
@@ -201,20 +201,20 @@ static int omap3pandora_in_init(struct snd_soc_pcm_runtime *rtd)
 	int ret;
 
 	/* Not comnnected */
-	snd_soc_dapm_nc_pin(codec, "HSMIC");
-	snd_soc_dapm_nc_pin(codec, "CARKITMIC");
-	snd_soc_dapm_nc_pin(codec, "DIGIMIC0");
-	snd_soc_dapm_nc_pin(codec, "DIGIMIC1");
+	snd_soc_dapm_nc_pin(codec->dapm, "HSMIC");
+	snd_soc_dapm_nc_pin(codec->dapm, "CARKITMIC");
+	snd_soc_dapm_nc_pin(codec->dapm, "DIGIMIC0");
+	snd_soc_dapm_nc_pin(codec->dapm, "DIGIMIC1");
 
-	ret = snd_soc_dapm_new_controls(codec, omap3pandora_in_dapm_widgets,
+	ret = snd_soc_dapm_new_controls(codec->dapm, omap3pandora_in_dapm_widgets,
 				ARRAY_SIZE(omap3pandora_in_dapm_widgets));
 	if (ret < 0)
 		return ret;
 
-	snd_soc_dapm_add_routes(codec, omap3pandora_in_map,
+	snd_soc_dapm_add_routes(codec->dapm, omap3pandora_in_map,
 		ARRAY_SIZE(omap3pandora_in_map));
 
-	return snd_soc_dapm_sync(codec);
+	return snd_soc_dapm_sync(codec->dapm);
 }
 
 static struct snd_soc_ops omap3pandora_ops = {

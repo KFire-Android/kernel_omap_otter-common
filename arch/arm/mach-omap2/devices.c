@@ -885,10 +885,9 @@ void __init omap_display_init(struct omap_dss_board_info *board_data)
 			};
 
 	char (*oh_name)[MAX_OMAP_DSS_HWMOD_NAME_LEN];
-	int l, idx, i;
+	int l, i, idx = 0, count = 0;
 	struct omap_display_platform_data pdata;
 	idx = 1;
-	int count = 0;
 
         if(cpu_is_omap44xx())
 	{

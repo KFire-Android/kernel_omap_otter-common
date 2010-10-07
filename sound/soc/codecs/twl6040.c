@@ -480,15 +480,15 @@ static DECLARE_TLV_DB_SCALE(mic_preamp_tlv, -600, 600, 0);
 
 /*
  * MICGAIN volume control:
- * from 6 to 30 dB in 6 dB steps
+ * from -6 to 30 dB in 6 dB steps
  */
-static DECLARE_TLV_DB_SCALE(mic_amp_tlv, 600, 600, 0);
+static DECLARE_TLV_DB_SCALE(mic_amp_tlv, -600, 600, 0);
 
 /*
  * AFMGAIN volume control:
  * from 18 to 24 dB in 6 dB steps
  */
-static DECLARE_TLV_DB_SCALE(afm_amp_tlv, 600, 600, 0);
+static DECLARE_TLV_DB_SCALE(afm_amp_tlv, 1800, 600, 0);
 
 
 /*
@@ -750,7 +750,7 @@ static int twl6040_power_up_completion(struct snd_soc_codec *codec,
 	u8 intid;
 
 	time_left = wait_for_completion_timeout(&priv->ready,
-				msecs_to_jiffies(48));
+				msecs_to_jiffies(144));
 
 	if (!time_left) {
 		twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &intid,

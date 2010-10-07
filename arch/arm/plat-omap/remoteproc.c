@@ -31,6 +31,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
+#include <linux/eventfd.h>
 
 #include <plat/remoteproc.h>
 
@@ -40,6 +41,17 @@ static struct class *omap_rproc_class;
 static dev_t omap_rproc_dev;
 static atomic_t num_of_rprocs;
 
+
+void rproc_eventfd_ntfy(struct omap_rproc *obj, int event)
+{
+	struct omap_rproc_ntfy *fd_reg;
+
+	spin_lock_irq(&obj->event_lock);
+	list_for_each_entry(fd_reg, &obj->event_list, list)
+		if (fd_reg->event == event)
+			eventfd_signal(fd_reg->evt_ctx, 1);
+	spin_unlock_irq(&obj->event_lock);
+}
 
 int rproc_start(struct omap_rproc *rproc, const void __user *arg)
 {
@@ -66,8 +78,10 @@ int rproc_start(struct omap_rproc *rproc, const void __user *arg)
 
 	ret = pdata->ops->start(rproc->dev, start_args.start_addr);
 
-	if (!ret)
+	if (!ret) {
 		omap_rproc_notify_event(rproc, OMAP_RPROC_START, NULL);
+		rproc_eventfd_ntfy(rproc, PROC_START);
+	}
 
 	mutex_unlock(&rproc->lock);
 
@@ -92,8 +106,10 @@ int rproc_stop(struct omap_rproc *rproc)
 
 	ret = pdata->ops->stop(rproc->dev);
 
-	if (!ret)
+	if (!ret) {
 		omap_rproc_notify_event(rproc, OMAP_RPROC_STOP, NULL);
+		rproc_eventfd_ntfy(rproc, PROC_STOP);
+	}
 
 	mutex_unlock(&rproc->lock);
 
@@ -159,6 +175,79 @@ static inline int rproc_get_state(struct omap_rproc *rproc)
 		return -EINVAL;
 
 	return pdata->ops->get_state(rproc->dev);
+}
+
+int rproc_reg_user_event(struct omap_rproc *rproc, const void __user *arg)
+{
+	struct omap_rproc_ntfy *fd_reg;
+	int state;
+	struct omap_rproc_reg_event_args args;
+	int size;
+
+	size = copy_from_user(&args, arg,
+			sizeof(struct omap_rproc_reg_event_args));
+	if (size)
+		return -EINVAL;
+
+	fd_reg = kzalloc(sizeof(struct omap_rproc_ntfy), GFP_KERNEL);
+	if (!fd_reg)
+		return -ENOMEM;
+
+	fd_reg->fd = args.fd;
+	fd_reg->evt_ctx = eventfd_ctx_fdget(args.fd);
+	fd_reg->event = args.event;
+
+	INIT_LIST_HEAD(&fd_reg->list);
+
+	spin_lock_irq(&rproc->event_lock);
+	list_add_tail(&fd_reg->list, &rproc->event_list);
+	spin_unlock_irq(&rproc->event_lock);
+
+	/*
+	 * Check the state of remote proc and send the notification
+	 * if it is already in the desired state.
+	 */
+	state = rproc_get_state(rproc);
+
+	switch (state) {
+	case OMAP_RPROC_RUNNING:
+	case OMAP_RPROC_HIBERNATING:
+		if (args.event == PROC_START)
+			rproc_eventfd_ntfy(rproc, args.event);
+		break;
+	case OMAP_RPROC_STOPPED:
+		if (args.event == PROC_STOP)
+			rproc_eventfd_ntfy(rproc, args.event);
+		break;
+	}
+
+	return 0;
+}
+
+int rproc_unreg_user_event(struct omap_rproc *rproc, const void __user *arg)
+{
+	struct omap_rproc_ntfy *fd_reg, *temp_reg;
+	struct omap_rproc_reg_event_args args;
+	int size;
+	int ret = -ENOENT;
+
+	size = copy_from_user(&args, arg,
+			sizeof(struct omap_rproc_reg_event_args));
+	if (size)
+		return -EINVAL;
+
+	spin_lock_irq(&rproc->event_lock);
+	list_for_each_entry_safe(fd_reg, temp_reg,
+			&rproc->event_list, list) {
+		if (fd_reg->fd == args.fd) {
+			list_del(&fd_reg->list);
+			kfree(fd_reg);
+			ret = 0;
+			break;
+		}
+	}
+	spin_unlock_irq(&rproc->event_lock);
+	return ret;
 }
 
 int omap_rproc_notify_event(struct omap_rproc *rproc, int event, void *data)
@@ -257,12 +346,20 @@ static int omap_rproc_ioctl(struct inode *inode, struct file *filp,
 	case RPROC_IOCGETSTATE:
 		rc = rproc_get_state(rproc);
 		break;
-
+	case RPROC_IOCREGEVENT:
+		rc = rproc_reg_user_event(rproc, (const void __user *) arg);
+		break;
+	case RPROC_IOCUNREGEVENT:
+		rc = rproc_unreg_user_event(rproc, (const void __user *) arg);
+		break;
 	default:
 		return -ENOTTY;
 	}
 
-	return rc;
+	/* First element of arg is the status */
+	copy_to_user((void __user *)arg, &rc, sizeof(rc));
+
+	return 0;
 }
 
 static int omap_rproc_mmap(struct file *filp, struct vm_area_struct *vma)
@@ -323,6 +420,9 @@ static int omap_rproc_probe(struct platform_device *pdev)
 
 	mutex_init(&rproc->lock);
 	BLOCKING_INIT_NOTIFIER_HEAD(&rproc->notifier);
+
+	spin_lock_init(&rproc->event_lock);
+	INIT_LIST_HEAD(&rproc->event_list);
 
 	cdev_init(&rproc->cdev, &omap_rproc_fops);
 	rproc->cdev.owner = THIS_MODULE;

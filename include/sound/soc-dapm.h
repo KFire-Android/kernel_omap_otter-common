@@ -338,7 +338,7 @@ const char *snd_soc_dapm_get_aif(struct snd_soc_dapm_context *dapm,
 
 /* dapm events */
 int snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd,
-	const char *stream, int event);
+	int dir, const char *stream, int event);
 void snd_soc_dapm_shutdown(struct snd_soc_card *card);
 
 /* external DAPM widget events */

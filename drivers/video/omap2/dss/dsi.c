@@ -1301,10 +1301,6 @@ int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
 
 	DSSDBG("PLL init\n");
 
-	/* The SCPClk is required for PLL registers on OMAP4 */
-	if (cpu_is_omap44xx())
-		REG_FLD_MOD(ix, DSI_CLK_CTRL, 1, 14, 14);
-
 	enable_clocks(1);
 	dsi_enable_pll_clock(ix, 1);
 
@@ -2229,7 +2225,8 @@ int dsi_vc_send_bta_sync(enum omap_dsi_index ix, int channel)
 	err = dsi_get_errors(ix);
 	if (err) {
 		DSSERR("Error while sending BTA: %x\n", err);
-		r = -EIO;
+		/* Just report the error, don't return with BTA as failed
+		 * That is done already in wait for timeout above */
 		goto err;
 	}
 err:
@@ -3506,6 +3503,10 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
+	/* The SCPClk is required for PLL and complexio registers on OMAP4 */
+	if (cpu_is_omap44xx())
+		REG_FLD_MOD(ix, DSI_CLK_CTRL, 1, 14, 14);
+
 	_dsi_print_reset_status(ix);
 
 	r = dsi_pll_init(dssdev, true, true);
@@ -3628,8 +3629,9 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 
 	DSSDBG("dsi_display_enable\n");
 
-	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
-		dss_mainclk_state_enable();
+	dss_mainclk_state_enable();
+
+	dssdev->state = OMAP_DSS_DISPLAY_TRANSITION;
 
 	dssdev->state = OMAP_DSS_DISPLAY_TRANSITION;
 

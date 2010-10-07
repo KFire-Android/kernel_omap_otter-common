@@ -442,6 +442,10 @@ static int vidioc_streamon(struct file *file, void *fh,
 	mask = DISPC_IRQ_FRAMEDONE_WB;
 
 	r = omap_dispc_register_isr(omap_wb_isr, wb, mask);
+	if (r) {
+		printk(KERN_ERR WB_NAME "Failed to register wb_isr\n");
+		return r;
+	}
 
 	r = omap_setup_wb(wb, addr, uv_addr);
 	if (r)
@@ -456,6 +460,7 @@ static int vidioc_streamoff(struct file *file, void *fh,
 {
 	struct omap_wb_device *wb = fh;
 	u32 mask = 0;
+	int r = 0;
 
 	if (!wb->streaming)
 		return -EINVAL;
@@ -463,8 +468,11 @@ static int vidioc_streamoff(struct file *file, void *fh,
 	wb->streaming = 0;
 	mask = DISPC_IRQ_FRAMEDONE_WB;
 
-	omap_dispc_unregister_isr(omap_wb_isr, wb, mask);
-
+	r = omap_dispc_unregister_isr(omap_wb_isr, wb, mask);
+	if (r) {
+		printk(KERN_ERR WB_NAME "Failed to unregister wb_isr\n");
+		return r;
+	}
 	omap_dss_wb_flush();
 
 	INIT_LIST_HEAD(&wb->dma_queue);

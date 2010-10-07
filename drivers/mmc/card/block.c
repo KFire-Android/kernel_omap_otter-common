@@ -451,7 +451,6 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 				spin_lock_irq(&md->lock);
 				ret = __blk_end_request(req, -EIO, brq.data.blksz);
 				spin_unlock_irq(&md->lock);
-				continue;
 			}
 			goto cmd_err;
 		}

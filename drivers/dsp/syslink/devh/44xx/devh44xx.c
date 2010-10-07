@@ -45,6 +45,7 @@ struct omap_devh_runtime_info {
 	int brd_state;
 	struct iommu *iommu;
 	struct omap_rproc *rproc;
+	pid_t mgr_pid;
 };
 
 enum {
@@ -119,6 +120,9 @@ static int devh44xx_sysm3_iommu_notifier_call(struct notifier_block *nb,
 
 	switch ((int)val) {
 	case IOMMU_CLOSE:
+		if (pinfo->rproc->state != OMAP_RPROC_STOPPED
+			&& pinfo->mgr_pid == current->tgid)
+			rproc_stop(pinfo->rproc);
 		return devh44xx_notifier_call(nb, val, v, pdata);
 	case IOMMU_FAULT:
 		pinfo->brd_state = DEVH_BRDST_ERROR;
@@ -142,6 +146,9 @@ static int devh44xx_appm3_iommu_notifier_call(struct notifier_block *nb,
 
 	switch ((int)val) {
 	case IOMMU_CLOSE:
+		if (pinfo->rproc->state != OMAP_RPROC_STOPPED
+			&& pinfo->mgr_pid == current->tgid)
+			rproc_stop(pinfo->rproc);
 		return devh44xx_notifier_call(nb, val, v, pdata);
 	case IOMMU_FAULT:
 		pinfo->brd_state = DEVH_BRDST_ERROR;
@@ -165,6 +172,9 @@ static int devh44xx_tesla_iommu_notifier_call(struct notifier_block *nb,
 
 	switch ((int)val) {
 	case IOMMU_CLOSE:
+		if (pinfo->rproc->state != OMAP_RPROC_STOPPED
+			&& pinfo->mgr_pid == current->tgid)
+			rproc_stop(pinfo->rproc);
 		return devh44xx_notifier_call(nb, val, v, pdata);
 	case IOMMU_FAULT:
 		pinfo->brd_state = DEVH_BRDST_ERROR;
@@ -251,6 +261,7 @@ static int devh44xx_sysm3_rproc_notifier_call(struct notifier_block *nb,
 	switch ((int)val) {
 	case OMAP_RPROC_START:
 		pinfo->brd_state = DEVH_BRDST_RUNNING;
+		pinfo->mgr_pid = current->tgid;
 		pinfo->iommu = iommu_get("ducati");
 		if (pinfo->iommu != ERR_PTR(-ENODEV) &&
 			pinfo->iommu != ERR_PTR(-EINVAL))
@@ -288,6 +299,7 @@ static int devh44xx_appm3_rproc_notifier_call(struct notifier_block *nb,
 	switch ((int)val) {
 	case OMAP_RPROC_START:
 		pinfo->brd_state = DEVH_BRDST_RUNNING;
+		pinfo->mgr_pid = current->tgid;
 		pinfo->iommu = iommu_get("ducati");
 		if (pinfo->iommu != ERR_PTR(-ENODEV) &&
 			pinfo->iommu != ERR_PTR(-EINVAL))
@@ -325,6 +337,7 @@ static int devh44xx_tesla_rproc_notifier_call(struct notifier_block *nb,
 	switch ((int)val) {
 	case OMAP_RPROC_START:
 		pinfo->brd_state = DEVH_BRDST_RUNNING;
+		pinfo->mgr_pid = current->tgid;
 		pinfo->iommu = iommu_get("tesla");
 		if (pinfo->iommu != ERR_PTR(-ENODEV) &&
 			pinfo->iommu != ERR_PTR(-EINVAL))

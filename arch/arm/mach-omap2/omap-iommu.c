@@ -113,6 +113,8 @@ static int __init omap_iommu_init(void)
 		struct iommu_platform_data *data = &devices_data[i];
 
 		oh = omap_hwmod_lookup(data->oh_name);
+		if (oh == NULL)
+			continue;
 		data->io_base = oh->_mpu_rt_va;
 		data->irq = oh->mpu_irqs[0].irq;
 

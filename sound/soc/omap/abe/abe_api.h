@@ -18,14 +18,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA
  */
-
 #ifndef _ABE_API_H_
 #define _ABE_API_H_
-
-#include <linux/io.h>
-
-void  abe_init_mem(void __iomem *iomem);
-
 /**
  * abe_reset_hal - reset the ABE/HAL
  * @rdev: regulator source
@@ -35,8 +29,7 @@ void  abe_init_mem(void __iomem *iomem);
  * default AESS registers.
  * Called after a PRCM cold-start reset of ABE
  */
-abehal_status abe_reset_hal (void);
-
+abehal_status abe_reset_hal(void);
 /**
  * abe_load_fw_param - Load ABE Firmware memories
  * @PMEM: Pointer of Program memory data
@@ -52,8 +45,7 @@ abehal_status abe_reset_hal (void);
  * generator to let execution start, read the version number returned from
  * this execution.
  */
-abehal_status abe_load_fw_param (u32 *FW);
-
+abehal_status abe_load_fw_param(u32 *FW);
 /**
  * abe_load_fw - Load ABE Firmware and initialize memories
  *
@@ -61,15 +53,13 @@ abehal_status abe_load_fw_param (u32 *FW);
  * generator to let execution start, read the version number returned from
  * this execution.
  */
-abehal_status abe_load_fw (void);
-
+abehal_status abe_load_fw(void);
 /**
  * abe_read_hardware_configuration - Return default HW periferals configuration
  * @u: use-case description list (pointer)
  * @o: opp mode (pointer)
  * @hw: pointer to the output HW structure
  *
-
  * Parameter :
  * U : use-case description list (pointer)
  * H : pointer to the output structure
@@ -79,8 +69,8 @@ abehal_status abe_load_fw (void);
  * will be upgraded in FW06
  * return a structure with the HW thresholds compatible with the HAL/FW/AESS_ATC
  */
-abehal_status abe_read_hardware_configuration (u32 *u, u32 *o, abe_hw_config_init_t *hw);
-
+abehal_status abe_read_hardware_configuration(u32 *u, u32 *o,
+					      abe_hw_config_init_t *hw);
 /**
  * abe_irq_processing - Process ABE interrupt
  *
@@ -92,8 +82,7 @@ abehal_status abe_read_hardware_configuration (u32 *u, u32 *o, abe_hw_config_ini
  * the embedded debugger when the firmware stops on programmable break-points,
  * etc …
  */
-abehal_status abe_irq_processing (void);
-
+abehal_status abe_irq_processing(void);
 /**
  * abe_select_main_port - Select stynchronization port for Event generator.
  * @id: audio port name
@@ -101,8 +90,7 @@ abehal_status abe_irq_processing (void);
  * tells the FW which is the reference stream for adjusting
  * the processing on 23/24/25 slots
  */
-abehal_status abe_select_main_port (u32 id);
-
+abehal_status abe_select_main_port(u32 id);
 /**
  * abe_write_event_generator - Select event generator source
  * @e: Event Generation Counter, McPDM, DMIC or default.
@@ -118,15 +106,20 @@ abehal_status abe_select_main_port (u32 id);
  * The ratio is (MCLK/96000)+(1<<1) = 2050
  * (1<<1) in order to have the same speed at 50% and 100% OPP (only 15 MSB bits are used at OPP50%)
  */
-abehal_status abe_write_event_generator (u32 e);
-
+abehal_status abe_write_event_generator(u32 e);
+/**
+ * abe_stop_event_generator - Stop event generator source
+ *
+ * Stop the event genrator of AESS. No more event will be send to AESS engine.
+ * Upper layer needs to wait 1/96kHz to be sure that engine reach IDLE instruction
+ */
+abehal_status abe_stop_event_generator(void);
 /**
  * abe_read_use_case_opp() - description for void abe_read_use_case_opp().
  *
  * returns the expected min OPP for a given use_case list
  */
-abehal_status abe_read_use_case_opp (u32 *u, u32 *o);
-
+abehal_status abe_read_use_case_opp(u32 *u, u32 *o);
 /**
  * abe_set_opp_processing - Set OPP mode for ABE Firmware
  * @opp: OOPP mode
@@ -142,8 +135,7 @@ abehal_status abe_read_use_case_opp (u32 *u, u32 *o);
  * this switch.
  *
  */
-abehal_status abe_set_opp_processing (u32 opp);
-
+abehal_status abe_set_opp_processing(u32 opp);
 /**
  * abe_set_ping_pong_buffer
  * @port: ABE port ID
@@ -152,9 +144,7 @@ abehal_status abe_set_opp_processing (u32 opp);
  * Updates the next ping-pong buffer with "size" bytes copied from the
  * host processor. This API notifies the FW that the data transfer is done.
  */
-abehal_status abe_set_ping_pong_buffer (u32 port, u32 n_bytes);
-
-
+abehal_status abe_set_ping_pong_buffer(u32 port, u32 n_bytes);
 /**
  * abe_read_next_ping_pong_buffer
  * @port: ABE portID
@@ -163,8 +153,7 @@ abehal_status abe_set_ping_pong_buffer (u32 port, u32 n_bytes);
  *
  * Tell the next base address of the next ping_pong Buffer and its size
  */
-abehal_status abe_read_next_ping_pong_buffer (u32 port, u32 *p, u32 *n);
-
+abehal_status abe_read_next_ping_pong_buffer(u32 port, u32 *p, u32 *n);
 /**
  * abe_init_ping_pong_buffer
  * @id: ABE port ID
@@ -175,8 +164,8 @@ abehal_status abe_read_next_ping_pong_buffer (u32 port, u32 *p, u32 *n);
  *
  * Computes the base address of the ping_pong buffers
  */
-abehal_status abe_init_ping_pong_buffer (u32 id, u32 size_bytes, u32 n_buffers, u32 *p);
-
+abehal_status abe_init_ping_pong_buffer(u32 id, u32 size_bytes, u32 n_buffers,
+					u32 *p);
 /**
  * abe_plug_subroutine
  * @id: returned sequence index after plugging a new subroutine
@@ -186,16 +175,15 @@ abehal_status abe_init_ping_pong_buffer (u32 id, u32 size_bytes, u32 n_buffers, 
  *
  * register a list of subroutines for call-back purpose
  */
-abehal_status abe_plug_subroutine (u32 *id, abe_subroutine2 f, u32 n, u32* params);
-
+abehal_status abe_plug_subroutine(u32 *id, abe_subroutine2 f, u32 n,
+				  u32 *params);
 /**
  * abe_set_sequence_time_accuracy
  * @fast: fast counter
  * @slow: slow counter
  *
  */
-abehal_status abe_set_sequence_time_accuracy (u32 fast, u32 slow);
-
+abehal_status abe_set_sequence_time_accuracy(u32 fast, u32 slow);
 /**
  * abe_reset_port
  * @id: ABE port ID
@@ -204,8 +192,7 @@ abehal_status abe_set_sequence_time_accuracy (u32 fast, u32 slow);
  * processing features.
  * Clears the internal AE buffers.
  */
-abehal_status abe_reset_port (u32 id);
-
+abehal_status abe_reset_port(u32 id);
 /**
  * abe_read_remaining_data
  * @id:	ABE port_ID
@@ -213,8 +200,7 @@ abehal_status abe_reset_port (u32 id);
  *
  * computes the remaining amount of data in the buffer.
  */
-abehal_status abe_read_remaining_data (u32 port, u32 *n);
-
+abehal_status abe_read_remaining_data(u32 port, u32 *n);
 /**
  * abe_disable_data_transfer
  * @id: ABE port id
@@ -223,8 +209,7 @@ abehal_status abe_read_remaining_data (u32 port, u32 *n);
  * disable the IO task (@f = 0)
  * clear ATC DMEM buffer, ATC enabled
  */
-abehal_status abe_disable_data_transfer (u32 id);
-
+abehal_status abe_disable_data_transfer(u32 id);
 /**
  * abe_enable_data_transfer
  * @ip: ABE port id
@@ -233,8 +218,7 @@ abehal_status abe_disable_data_transfer (u32 id);
  * reset ATC pointers
  * enable the IO task (@f <> 0)
  */
-abehal_status abe_enable_data_transfer (u32 id);
-
+abehal_status abe_enable_data_transfer(u32 id);
 /**
  * abe_set_dmic_filter
  * @d: DMIC decimation ratio : 16/25/32/40
@@ -244,8 +228,7 @@ abehal_status abe_enable_data_transfer (u32 id);
  * roll-off at 20kHz.
  * The default table is loaded with the DMIC 2.4MHz recommended configuration.
  */
-abehal_status abe_set_dmic_filter (u32 d);
-
+abehal_status abe_set_dmic_filter(u32 d);
 /**
  * abe_connect_cbpr_dmareq_port
  * @id: port name
@@ -257,10 +240,8 @@ abehal_status abe_set_dmic_filter (u32 d);
  * enables the data echange between a DMA and the ABE through the
  *	CBPr registers of AESS.
  */
-
-abehal_status abe_connect_cbpr_dmareq_port (u32 id, abe_data_format_t *f, u32 d,
-				   abe_dma_t *returned_dma_t);
-
+abehal_status abe_connect_cbpr_dmareq_port(u32 id, abe_data_format_t *f, u32 d,
+					   abe_dma_t *returned_dma_t);
 /**
  * abe_connect_dmareq_ping_pong_port
  * @id: port name
@@ -274,9 +255,9 @@ abehal_status abe_connect_cbpr_dmareq_port (u32 id, abe_data_format_t *f, u32 d,
  * the DMEM memory of ABE. On each dma_request activation the DMA will exchange
  * "s" bytes and switch to the "pong" buffer for a new buffer exchange.
  */
-abehal_status abe_connect_dmareq_ping_pong_port (u32 id, abe_data_format_t *f,
-					u32 d, u32 s, abe_dma_t *returned_dma_t);
-
+abehal_status abe_connect_dmareq_ping_pong_port(u32 id, abe_data_format_t *f,
+						u32 d, u32 s,
+						abe_dma_t *returned_dma_t);
 /**
  * abe_connect_irq_ping_pong_port
  * @id: port name
@@ -292,10 +273,9 @@ abehal_status abe_connect_dmareq_ping_pong_port (u32 id, abe_data_format_t *f,
  * "abe_set_ping_pong_buffer" to notify the new amount of samples in the
  * pong buffer.
  */
-abehal_status abe_connect_irq_ping_pong_port (u32 id, abe_data_format_t *f,
-				     u32 subroutine_id, u32 size,
-				     u32 *sink, u32 dsp_mcu_flag);
-
+abehal_status abe_connect_irq_ping_pong_port(u32 id, abe_data_format_t *f,
+					     u32 subroutine_id, u32 size,
+					     u32 *sink, u32 dsp_mcu_flag);
 /**
  * abe_connect_serial_port()
  * @id: port name
@@ -307,8 +287,8 @@ abehal_status abe_connect_irq_ping_pong_port (u32 id, abe_data_format_t *f,
  * voice streams to VX_UL, VX_DL, BT_VX_UL, BT_VX_DL. It abstracts the
  * abe_write_port API.
  */
-abehal_status abe_connect_serial_port (u32 id, abe_data_format_t *f, u32 mcbsp_id);
-
+abehal_status abe_connect_serial_port(u32 id, abe_data_format_t *f,
+				      u32 mcbsp_id);
 /**
  * abe_connect_slimbus_port
  * @id: port name
@@ -319,9 +299,8 @@ abehal_status abe_connect_serial_port (u32 id, abe_data_format_t *f, u32 mcbsp_i
  * enables the data echanges between 1/2 SB and an ATC buffers in
  * DMEM.
  */
-abehal_status abe_connect_slimbus_port (u32 id, abe_data_format_t *f,
-			       u32 sb_port1, u32 sb_port2);
-
+abehal_status abe_connect_slimbus_port(u32 id, abe_data_format_t *f,
+				       u32 sb_port1, u32 sb_port2);
 /**
  * abe_connect_tdm_port
  * @id: port name
@@ -332,8 +311,7 @@ abehal_status abe_connect_slimbus_port (u32 id, abe_data_format_t *f,
  * enables the data echanges between TDM McBSP ATC buffers in
  * DMEM and 1/2 SMEM buffers
  */
-abehal_status abe_connect_tdm_port (u32 id, abe_data_format_t *f, u32 mcbsp_id);
-
+abehal_status abe_connect_tdm_port(u32 id, abe_data_format_t *f, u32 mcbsp_id);
 /**
  * abe_read_port_address
  * @dma: output pointer to the DMA iteration and data destination pointer
@@ -342,8 +320,7 @@ abehal_status abe_connect_tdm_port (u32 id, abe_data_format_t *f, u32 mcbsp_id);
  * Depending on the protocol being used, adds the base address offset L3
  * (DMA) or MPU (ARM)
  */
-abehal_status abe_read_port_address (u32 port, abe_dma_t *dma2);
-
+abehal_status abe_read_port_address(u32 port, abe_dma_t *dma2);
 /**
  * abe_write_equalizer
  * @id: name of the equalizer
@@ -351,8 +328,7 @@ abehal_status abe_read_port_address (u32 port, abe_dma_t *dma2);
  *
  * Load the coefficients in CMEM.
  */
-abehal_status abe_write_equalizer (u32 id, abe_equ_t *param);
-
+abehal_status abe_write_equalizer(u32 id, abe_equ_t *param);
 /**
  * abe_write_asrc
  * @id: name of the port
@@ -365,21 +341,19 @@ abehal_status abe_write_equalizer (u32 id, abe_equ_t *param);
  * or vice versa, there will be click in the output signal. Loading the drift
  * value with zero disables the feature.
  */
-abehal_status abe_write_asrc (u32 port, s32 dppm);
-
+abehal_status abe_write_asrc(u32 port, s32 dppm);
 /**
  * abe_write_aps
  * @id: name of the aps filter
  * @param: table of filter coefficients
  *
- * Load the filters and thresholds coefficients in FW memory. This API
+ * Load the filters and thresholds coefficients in FW memory. This AP
  * can be called when the corresponding APS is not activated. After
  * reloading the firmware the default coefficients corresponds to "no APS
  * activated".
  * Loading all the coefficients value with zero disables the feature.
  */
-abehal_status abe_write_aps (u32 id, abe_aps_t *param);
-
+abehal_status abe_write_aps(u32 id, abe_aps_t *param);
 /**
  * abe_write_mixer
  * @id: name of the mixer
@@ -392,11 +366,10 @@ abehal_status abe_write_aps (u32 id, abe_aps_t *param);
  * in mute state". A mixer is disabled with a network reconfiguration
  * corresponding to an OPP value.
  */
+abehal_status abe_write_gain(u32 id, s32 f_g, u32 ramp, u32 p);
+abehal_status abe_use_compensated_gain(u32 on_off);
 abehal_status abe_mute_gain(u32 id, u32 p);
 abehal_status abe_unmute_gain(u32 id, u32 p);
-abehal_status abe_update_gain(u32 id, u32 f_g, u32 ramp, u32 p);
-abehal_status abe_write_gain(u32 id, u32 f_g, u32 ramp, u32 p);
-
 /**
  * abe_write_mixer
  * @id: name of the mixer
@@ -409,8 +382,7 @@ abehal_status abe_write_gain(u32 id, u32 f_g, u32 ramp, u32 p);
  * gain in mute state". A mixer is disabled with a network reconfiguration
  * corresponding to an OPP value.
  */
-abehal_status abe_write_mixer (u32 id, u32 f_g, u32 f_ramp, u32 p);
-
+abehal_status abe_write_mixer(u32 id, s32 f_g, u32 f_ramp, u32 p);
 /**
  * abe_read_gain
  * @id: name of the mixer
@@ -418,8 +390,7 @@ abehal_status abe_write_mixer (u32 id, u32 f_g, u32 f_ramp, u32 p);
  * @p: list of port corresponding to the above gains
  *
  */
-abehal_status abe_read_gain (u32 id, u32 *f_g, u32 p);
-
+abehal_status abe_read_gain(u32 id, u32 *f_g, u32 p);
 /**
  * abe_read_mixer
  * @id: name of the mixer
@@ -432,7 +403,7 @@ abehal_status abe_read_gain (u32 id, u32 *f_g, u32 p);
  * gain in mute state". A mixer is disabled with a network reconfiguration
  * corresponding to an OPP value.
  */
-abehal_status abe_read_mixer (u32 id, u32 *f_g, u32 p);
+abehal_status abe_read_mixer(u32 id, u32 *f_g, u32 p);
 /**
  * abe_set_router_configuration
  * @Id: name of the router
@@ -445,14 +416,12 @@ abehal_status abe_read_mixer (u32 id, u32 *f_g, u32 p);
  * route the samples to three directions : REC1 mixer, 2 EANC DMIC source of
  * filtering and MM recording audio path.
  */
-abehal_status abe_set_router_configuration (u32 id, u32 k, u16 *param);
-
+abehal_status abe_set_router_configuration(u32 id, u32 k, u32 *param);
 /**
  * abe_select_data_source
  * @@@
  */
-abehal_status abe_select_data_source (u32 port_id, u32 smem_source);
-
+abehal_status abe_select_data_source(u32 port_id, u32 smem_source);
 /**
  * ABE_READ_DEBUG_TRACE
  *
@@ -469,8 +438,7 @@ abehal_status abe_select_data_source (u32 port_id, u32 smem_source);
  * Return value :
  *	None.
  */
-abehal_status abe_read_debug_trace (u32 *data, u32 *n);
-
+abehal_status abe_read_debug_trace(u32 *data, u32 *n);
 /**
  * abe_connect_debug_trace
  * @dma2:pointer to the DMEM trace buffer
@@ -478,29 +446,24 @@ abehal_status abe_read_debug_trace (u32 *data, u32 *n);
  * returns the address and size of the real-time debug trace buffer,
  * the content of which will vary from one firmware release to an other
  */
-abehal_status abe_connect_debug_trace (abe_dma_t *dma2);
-
+abehal_status abe_connect_debug_trace(abe_dma_t *dma2);
 /**
  * abe_set_debug_trace
  * @debug: debug ID from a list to be defined
  *
  * load a mask which filters the debug trace to dedicated types of data
  */
-abehal_status abe_set_debug_trace (abe_dbg_t debug);
-
+abehal_status abe_set_debug_trace(abe_dbg_t debug);
 /**
  * abe_remote_debugger_interface
  *
  * interpretation of the UART stream from the remote debugger commands.
  * The commands consist in setting break points, loading parameter
  */
-abehal_status abe_remote_debugger_interface (u32 n, u8 *p);
-
+abehal_status abe_remote_debugger_interface(u32 n, u8 *p);
 /**
  * abe_enable_test_pattern
  *
  */
-abehal_status abe_enable_test_pattern (u32 smem_id, u32 on_off);
-
-
+abehal_status abe_enable_test_pattern(u32 smem_id, u32 on_off);
 #endif/* _ABE_API_H_ */

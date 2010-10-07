@@ -135,7 +135,9 @@ struct abe_data {
 	unsigned int dl1_equ_profile;
 	unsigned int dl20_equ_profile;
 	unsigned int dl21_equ_profile;
+	unsigned int sdt_equ_profile;
 	unsigned int amic_equ_profile;
+	unsigned int dmic_equ_profile;
 
 	int active;
 
@@ -229,7 +231,9 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 
 	/* set initial state to all-pass with gain=1 coefficients */
 	abe->amic_equ_profile = 0;
+	abe->dmic_equ_profile = 0;
 	abe->dl1_equ_profile = 0;
+	abe->sdt_equ_profile = 0;
 
 
 	return ret;
@@ -250,6 +254,11 @@ void abe_dsp_disable_data_transfer(int port)
 	struct platform_device *pdev = abe->pdev;
 
 	abe_disable_data_transfer(port);
+	udelay(250);
+/*
+	abe_stop_event_generator();
+	udelay(500);
+*/
 	pm_runtime_put_sync(&pdev->dev);
 }
 
@@ -484,7 +493,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 		dev_dbg(widget->dapm->dev, "router table [%d] = %d\n", i, abe->router[i]);
 
 	/* 2nd arg here is unused */
-	abe_set_router_configuration(UPROUTE, 0, abe->router);
+	abe_set_router_configuration(UPROUTE, 0, (u32 *)abe->router);
 
 	abe->dapm[e->reg] = ucontrol->value.integer.value[0];
 	snd_soc_dapm_mux_update_power(widget, kcontrol, abe->dapm[e->reg], mux, e);
@@ -713,8 +722,14 @@ static int abe_get_equalizer(struct snd_kcontrol *kcontrol,
 	case EQ2R:
 		ucontrol->value.integer.value[0] = abe->dl21_equ_profile;
 		break;
-	case EQMIC:
+	case EQAMIC:
 		ucontrol->value.integer.value[0] = abe->amic_equ_profile;
+		break;
+	case EQDMIC:
+		ucontrol->value.integer.value[0] = abe->dmic_equ_profile;
+		break;
+	case EQSDT:
+		ucontrol->value.integer.value[0] = abe->sdt_equ_profile;
 		break;
 	default:
 		break;
@@ -751,11 +766,23 @@ static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
 				sizeof(dl21_equ_coeffs[val]));
 		abe->dl21_equ_profile = val;
 		break;
-	case EQMIC:
+	case EQAMIC:
 		equ_params.equ_length = NBAMICCOEFFS;
 		memcpy(equ_params.coef.type1, amic_equ_coeffs[val],
 				sizeof(amic_equ_coeffs[val]));
 		abe->amic_equ_profile = val;
+		break;
+	case EQDMIC:
+		equ_params.equ_length = NBDMICCOEFFS;
+		memcpy(equ_params.coef.type1, dmic_equ_coeffs[val],
+				sizeof(dmic_equ_coeffs[val]));
+		abe->dmic_equ_profile = val;
+		break;
+	case EQSDT:
+		equ_params.equ_length = NBSDTCOEFFS;
+		memcpy(equ_params.coef.type1, sdt_equ_coeffs[val],
+				sizeof(sdt_equ_coeffs[val]));
+		abe->sdt_equ_profile = val;
 		break;
 	default:
 		break;
@@ -796,6 +823,19 @@ static const char *amic_equ_texts[] = {
 	"High-pass with 20kHz cut-off frequency. Gain = 0.125",
 };
 
+static const char *dmic_equ_texts[] = {
+	"High-pass with 20kHz cut-off frequency. Gain = 1",
+	"High-pass with 20kHz cut-off frequency. Gain = 0.25",
+	"High-pass with 20kHz cut-off frequency. Gain = 0.125",
+};
+
+static const char *sdt_equ_texts[] = {
+	"Flat response. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 1",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.25",
+	"High-pass with 800Hz cut-off frequency. Gain = 0.1",
+};
+
 
 static const struct soc_enum dl1_equalizer_enum =
 	SOC_ENUM_SINGLE(EQ1, 0, NBDL1EQ_PROFILES, dl1_equ_texts);
@@ -807,7 +847,13 @@ static const struct soc_enum dl21_equalizer_enum =
 	SOC_ENUM_SINGLE(EQ2R, 0, NBDL21EQ_PROFILES, dl21_equ_texts);
 
 static const struct soc_enum amic_equalizer_enum =
-	SOC_ENUM_SINGLE(EQMIC, 0, NBAMICEQ_PROFILES, amic_equ_texts);
+	SOC_ENUM_SINGLE(EQAMIC, 0, NBAMICEQ_PROFILES, amic_equ_texts);
+
+static const struct soc_enum dmic_equalizer_enum =
+	SOC_ENUM_SINGLE(EQDMIC, 0, NBDMICEQ_PROFILES, dmic_equ_texts);
+
+static const struct soc_enum sdt_equalizer_enum =
+	SOC_ENUM_SINGLE(EQSDT, 0, NBSDTEQ_PROFILES, sdt_equ_texts);
 
 static const char *route_ul_texts[] =
 	{"None", "DMic0L", "DMic0R", "DMic1L", "DMic1R", "DMic2L", "DMic2R",
@@ -1029,12 +1075,20 @@ static const struct snd_kcontrol_new abe_controls[] = {
 			dl20_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
-	SOC_ENUM_EXT("DL2 Rigth Equalizer Profile",
+	SOC_ENUM_EXT("DL2 Right Equalizer Profile",
 			dl21_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
 	SOC_ENUM_EXT("AMIC Equalizer Profile",
 			amic_equalizer_enum ,
+			abe_get_equalizer, abe_put_equalizer),
+
+	SOC_ENUM_EXT("DMIC Equalizer Profile",
+			dmic_equalizer_enum ,
+			abe_get_equalizer, abe_put_equalizer),
+
+	SOC_ENUM_EXT("Sidetone Equalizer Profile",
+			sdt_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 };
 
@@ -1048,9 +1102,9 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	SND_SOC_DAPM_AIF_OUT("VX_UL", "Voice Capture", 0,
 			ABE_WIDGET(2), ABE_OPP_50, 0),
 	/* the MM_UL mapping is intentional */
-	SND_SOC_DAPM_AIF_OUT("MM_UL1", "MultiMedia2 Capture", 0,
+	SND_SOC_DAPM_AIF_OUT("MM_UL1", "MultiMedia1 Capture", 0,
 			ABE_WIDGET(3), ABE_OPP_50, 0),
-	SND_SOC_DAPM_AIF_OUT("MM_UL2", "MultiMedia1 Capture", 0,
+	SND_SOC_DAPM_AIF_OUT("MM_UL2", "MultiMedia2 Capture", 0,
 			ABE_WIDGET(4), ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_IN("MM_DL", " MultiMedia1 Playback", 0,
 			ABE_WIDGET(5), ABE_OPP_25, 0),
@@ -1510,6 +1564,7 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
+
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MODEM:
 	case ABE_FRONTEND_DAI_LP_MEDIA:
@@ -1547,16 +1602,19 @@ static int aess_prepare(struct snd_pcm_substream *substream)
 	case 25:
 		/* OPP25 is not ready to be used */
 		abe_set_opp_processing(ABE_OPP50);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
+		udelay(250);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 50:
 		abe_set_opp_processing(ABE_OPP50);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
+		udelay(250);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 100:
 	default:
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
 		abe_set_opp_processing(ABE_OPP100);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 196600000);
+		udelay(250);
 		break;
 	}
 
@@ -1592,16 +1650,19 @@ static int aess_close(struct snd_pcm_substream *substream)
 	case 25:
 		/* OPP25 is not ready to be used */
 		abe_set_opp_processing(ABE_OPP50);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
+		udelay(250);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 50:
 		abe_set_opp_processing(ABE_OPP50);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
+		udelay(250);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 100:
 	default:
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
 		abe_set_opp_processing(ABE_OPP100);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 196600000);
+		udelay(250);
 		break;
 	}
 	pm_runtime_put_sync(&pdev->dev);

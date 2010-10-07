@@ -79,6 +79,8 @@ static struct {
 	enum dss_clk_source lcd1_clk_source;
 	enum dss_clk_source lcd2_clk_source;
 
+	bool mainclk_state;
+
 	u32		ctx[DSS_SZ_REGS / sizeof(u32)];
 	struct omap_display_platform_data *pdata;
 	struct platform_device *pdev;
@@ -131,16 +133,29 @@ void dss_restore_context(void)
 
 #undef SR
 #undef RR
-void dss_mainclk_enable()
+
+bool dss_get_mainclk_state()
 {
-	pm_runtime_get_sync(&dss.pdev->dev);
-	return;
+	return dss.mainclk_state;
+}
+
+int dss_mainclk_enable()
+{
+	if (!dss.mainclk_state) {
+		pm_runtime_get_sync(&dss.pdev->dev);
+		dss.mainclk_state = true;
+		return 0;
+	}
+
+	return -EINVAL;
 }
 
 void dss_mainclk_disable()
 {
-	pm_runtime_put_sync(&dss.pdev->dev);
-	return;
+	if (dss.mainclk_state) {
+		pm_runtime_put_sync(&dss.pdev->dev);
+		dss.mainclk_state = false;
+	}
 }
 
 void dss_sdi_init(u8 datapairs)

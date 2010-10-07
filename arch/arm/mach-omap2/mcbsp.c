@@ -850,10 +850,10 @@ void omap2_mcbsp_set_srg_cfg_param(unsigned int id, int interface_mode,
 	else if (param->sync_mode == OMAP_MCBSP_SRG_RUNNING)
 		mcbsp_cfg->srgr2 = mcbsp_cfg->srgr2 | (GSYNC);
 
-	mcbsp_cfg->xccr = OMAP_MCBSP_READ(mcbsp, XCCR);
+	mcbsp_cfg->xccr = OMAP_MCBSP_READ(mcbsp, XCCR) & ~(XDISABLE);
 	if (param->dlb)
 		mcbsp_cfg->xccr = mcbsp_cfg->xccr | (DILB);
-	mcbsp_cfg->rccr = OMAP_MCBSP_READ(mcbsp, RCCR);
+	mcbsp_cfg->rccr = OMAP_MCBSP_READ(mcbsp, RCCR) & ~(RDISABLE);
 
 	return;
 	}

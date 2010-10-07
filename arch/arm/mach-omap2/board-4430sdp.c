@@ -868,12 +868,26 @@ static struct twl4030_madc_platform_data sdp4430_gpadc_data = {
 	.irq_line	= 1,
 };
 
+static int sdp4430_batt_table[] = {
+	/* adc code for temperature in degree C */
+	929, 925, /* -2 ,-1 */
+	920, 917, 912, 908, 904, 899, 895, 890, 885, 880, /* 00 - 09 */
+	875, 869, 864, 858, 853, 847, 841, 835, 829, 823, /* 10 - 19 */
+	816, 810, 804, 797, 790, 783, 776, 769, 762, 755, /* 20 - 29 */
+	748, 740, 732, 725, 718, 710, 703, 695, 687, 679, /* 30 - 39 */
+	671, 663, 655, 647, 639, 631, 623, 615, 607, 599, /* 40 - 49 */
+	591, 583, 575, 567, 559, 551, 543, 535, 527, 519, /* 50 - 59 */
+	511, 504, 496 /* 60 - 62 */
+};
+
 static struct twl4030_bci_platform_data sdp4430_bci_data = {
 	.monitoring_interval		= 10,
 	.max_charger_currentmA		= 1500,
 	.max_charger_voltagemV		= 4560,
 	.max_bat_voltagemV		= 4200,
 	.low_bat_voltagemV		= 3300,
+	.battery_tmp_tbl		= sdp4430_batt_table,
+	.tblsize			= ARRAY_SIZE(sdp4430_batt_table),
 };
 
 static struct twl4030_codec_audio_data twl6040_audio = {
@@ -915,7 +929,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 };
 
 static struct bq2415x_platform_data sdp4430_bqdata = {
-	.max_charger_voltagemA = 4200,
+	.max_charger_voltagemV = 4200,
 	.max_charger_currentmA = 1550,
 };
 
@@ -1107,7 +1121,7 @@ static void pad_config(unsigned long pad_addr, u32 andmask, u32 ormask)
 	iounmap(addr);
 }
 
-void wlan_1283_config()
+void wlan_1283_config(void)
 {
 	pad_config(0x4A100078, 0xFFECFFFF, 0x00030000);
 	pad_config(0x4A10007C, 0xFFFFFFEF, 0x0000000B);
@@ -1147,14 +1161,31 @@ static void __init omap4_display_init(void)
 
 static void enable_board_wakeup_source(void)
 {
+	/* Android does not have touchscreen as wakeup source */
+#if !defined(CONFIG_ANDROID)
 	u16 padconf;
-
 	/* NOTE: Use mx framework when available */
 	/* Enable IO wakeup for the gpio used for primary touchscreen */
 	padconf = omap_readw(CONTROL_CORE_PAD1_GPMC_AD11);
 	padconf |= OMAP44XX_PADCONF_WAKEUPENABLE0;
 	omap_writew(padconf, CONTROL_CORE_PAD1_GPMC_AD11);
+#endif
 }
+
+static struct omap_volt_vc_data vc_config = {
+	.vdd0_on = 0x3a,        /* 1.35v */
+	.vdd0_onlp = 0x3a,      /* 1.35v */
+	.vdd0_ret = 0x14,       /* 0.8375v */
+	.vdd0_off = 0x01,       /* 0.6v */
+	.vdd1_on = 0x29,        /* 1.1v */
+	.vdd1_onlp = 0x29,      /* 1.1v */
+	.vdd1_ret = 0x14,       /* 0.8375v */
+	.vdd1_off = 0x01,       /* 0.6v */
+	.vdd2_on = 0x29,        /* 1.1v */
+	.vdd2_onlp = 0x29,      /* 1.1v */
+	.vdd2_ret = 0x14,       /* .8375v */
+	.vdd2_off = 0x01,       /* 0.6v */
+};
 
 static void __init omap_4430sdp_init(void)
 {
@@ -1180,8 +1211,6 @@ static void __init omap_4430sdp_init(void)
 	usb_uhhtll_init(&usbhs_pdata);
 	usb_ehci_init();
 	usb_ohci_init();
-	/* OMAP4 SDP uses internal transceiver so register nop transceiver */
-	usb_nop_xceiv_register();
 	usb_musb_init(&musb_board_data);
 
 	status = omap4_keypad_initialization(&sdp4430_keypad_data);
@@ -1200,6 +1229,7 @@ static void __init omap_4430sdp_init(void)
 	omap_cma3000accl_init();
 	omap_display_init(&sdp4430_dss_data);
 	enable_board_wakeup_source();
+	omap_voltage_init_vc(&vc_config);
 }
 
 static void __init omap_4430sdp_map_io(void)

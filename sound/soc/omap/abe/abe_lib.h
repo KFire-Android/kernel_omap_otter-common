@@ -18,7 +18,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA
  */
-
 /**
  * abe_fprintf
 	 *
@@ -30,8 +29,7 @@
 	 *  Return value :
 	 *      None.
 	 */
-void abe_fprintf (char *line);
-
+void abe_fprintf(char *line);
 /*
  *  ABE_READ_FEATURE_FROM_PORT
  *
@@ -44,8 +42,7 @@ void abe_fprintf (char *line);
  *  Return value :
  *
  */
-void    abe_read_feature_from_port (u32 x);
-
+void abe_read_feature_from_port(u32 x);
 /*
  *  ABE_WRITE_FEATURE_TO_PORT
  *
@@ -58,8 +55,7 @@ void    abe_read_feature_from_port (u32 x);
  *  Return value :
  *
  */
-void    abe_write_feature_to_port (u32 x);
-
+void abe_write_feature_to_port(u32 x);
 /*
  *  ABE_READ_FIFO
  *
@@ -72,8 +68,7 @@ void    abe_write_feature_to_port (u32 x);
  *  Return value :
  *
  */
-void    abe_read_fifo (u32 x);
-
+void abe_read_fifo(u32 x);
 /*
  *  ABE_WRITE_FIFO
  *
@@ -91,9 +86,7 @@ void    abe_read_fifo (u32 x);
  *  Return value :
  *      none
  */
-void    abe_write_fifo (u32 mem_bank, u32 addr, u32 *data, u32 nb_data32);
-
-
+void abe_write_fifo(u32 mem_bank, u32 addr, u32 *data, u32 nb_data32);
 /*
  *  ABE_BLOCK_COPY
  *
@@ -110,9 +103,8 @@ void    abe_write_fifo (u32 mem_bank, u32 addr, u32 *data, u32 nb_data32);
  *  Return value :
  *      none
  */
-void abe_block_copy  (u32 direction, u32 memory_bank, u32 address, u32 *data,
-		      u32 nb);
-
+void abe_block_copy(u32 direction, u32 memory_bank, u32 address, u32 *data,
+		    u32 nb);
 /*
  *  ABE_RESET_MEM
  *
@@ -127,6 +119,4 @@ void abe_block_copy  (u32 direction, u32 memory_bank, u32 address, u32 *data,
  *  Return value :
  *      none
  */
-void  abe_reset_mem  (u32 memory_bank, u32 address, u32 nb_bytes);
-
-
+void abe_reset_mem(u32 memory_bank, u32 address, u32 nb_bytes);

@@ -253,7 +253,7 @@ static int omap_mcbsp_dai_startup(struct snd_pcm_substream *substream,
 	 * 2 channels (stereo): size is 128 / 2 = 64 frames (2 * 64 words)
 	 * 4 channels: size is 128 / 4 = 32 frames (4 * 32 words)
 	 */
-	if (cpu_is_omap343x() || cpu_is_omap44xx()) {
+	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
 		/*
 		* Rule for the buffer size. We should not allow
 		* smaller buffer than the FIFO size to avoid underruns
@@ -360,7 +360,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	} else if (cpu_is_omap2430()) {
 		dma = omap24xx_dma_reqs[bus_id][substream->stream];
 		port = omap2430_mcbsp_port[bus_id][substream->stream];
-	} else if (cpu_is_omap343x()) {
+	} else if (cpu_is_omap34xx()) {
 		dma = omap24xx_dma_reqs[bus_id][substream->stream];
 		port = omap34xx_mcbsp_port[bus_id][substream->stream];
 	 } else if (cpu_is_omap44xx()) {
@@ -381,7 +381,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	default:
 		return -EINVAL;
 	}
-	if (cpu_is_omap343x()) {
+	if (cpu_is_omap34xx()) {
 		dma_data->set_threshold = omap_mcbsp_set_threshold;
 		/* TODO: Currently, MODE_ELEMENT == MODE_FRAME */
 		if (omap_mcbsp_get_dma_op_mode(bus_id) ==
@@ -648,7 +648,7 @@ static int omap_mcbsp_dai_set_clks_src(struct omap_mcbsp_data *mcbsp_data,
 	if (cpu_is_omap2420() && mcbsp_data->bus_id > 1)
 		return -EINVAL;
 
-	if (cpu_is_omap343x())
+	if (cpu_is_omap34xx())
 		reg_devconf1 = OMAP343X_CONTROL_DEVCONF1;
 
 	switch (mcbsp_data->bus_id) {

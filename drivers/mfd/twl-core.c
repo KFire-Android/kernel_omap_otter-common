@@ -105,7 +105,8 @@
 #define twl_has_rtc()	false
 #endif
 
-#if defined(CONFIG_TWL4030_USB) || defined(CONFIG_TWL4030_USB_MODULE)
+#if defined(CONFIG_TWL4030_USB) || defined(CONFIG_TWL4030_USB_MODULE) ||\
+    defined(CONFIG_TWL6030_USB) || defined(CONFIG_TWL6030_USB_MODULE)
 #define twl_has_usb()	true
 #else
 #define twl_has_usb()	false
@@ -713,6 +714,17 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			usb1v8.dev = child;
 			usb3v1.dev = child;
 		}
+	}
+	if (twl_has_usb() && twl_class_is_6030()) {
+		child = add_child(0, "twl6030_usb",
+		pdata->usb, sizeof(*pdata->usb),
+		true,
+		/* irq0 = USB_PRES, irq1 = USB */
+		pdata->irq_base + USBOTG_INTR_OFFSET,
+		pdata->irq_base + USB_PRES_INTR_OFFSET);
+
+	if (IS_ERR(child))
+		return PTR_ERR(child);
 	}
 
 	if (twl_has_watchdog()) {

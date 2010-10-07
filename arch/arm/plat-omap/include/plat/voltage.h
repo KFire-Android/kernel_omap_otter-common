@@ -129,6 +129,11 @@ struct omap_volt_vc_data {
 	u16 vdd1_onlp;
 	u16 vdd1_ret;
 	u16 vdd1_off;
+/* PRM_VC_CMD_VAL_2 specific bits */
+	u16 vdd2_on;
+	u16 vdd2_onlp;
+	u16 vdd2_ret;
+	u16 vdd2_off;
 };
 
 struct voltagedomain *omap_voltage_domain_get(char *name);

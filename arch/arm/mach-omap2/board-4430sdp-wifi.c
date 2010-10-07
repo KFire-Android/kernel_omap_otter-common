@@ -46,7 +46,7 @@ int omap_wifi_status_register(void (*callback)(int card_present,
 	return 0;
 }
 
-int omap_wifi_status(int irq)
+int omap_wifi_status(struct device *dev, int slot)
 {
 	return sdp4430_wifi_cd;
 }

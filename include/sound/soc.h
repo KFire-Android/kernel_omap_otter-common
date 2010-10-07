@@ -658,9 +658,9 @@ struct snd_soc_pcm_runtime  {
 
 	/* BE runtime data */
 	unsigned int fe_clients;
-	unsigned int num_be;
+	unsigned int num_be[2];
 	unsigned int be_active;
-	struct snd_soc_pcm_runtime *be_rtd[SND_SOC_MAX_BE];
+	struct snd_soc_pcm_runtime *be_rtd[SND_SOC_MAX_BE][2];
 
 	/* Symmetry data - only valid if symmetry is being enforced */
 	unsigned int rate;

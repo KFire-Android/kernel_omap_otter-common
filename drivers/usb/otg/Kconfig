@@ -59,6 +59,15 @@ config TWL4030_USB
 	  This transceiver supports high and full speed devices plus,
 	  in host mode, low speed.
 
+config TWL6030_USB
+	tristate "TWL6030 USB Transceiver Driver"
+	depends on TWL4030_CORE
+	select USB_OTG_UTILS
+	help
+	  Enable this to support the USB OTG transceiver on TWL6030
+	  family chips. this tranciever has the VBUS and ID GND and OTG
+	  event capability. This tranciever does not have the USB PHY like TWL4030.
+
 config NOP_USB_XCEIV
 	tristate "NOP USB Transceiver Driver"
 	select USB_OTG_UTILS

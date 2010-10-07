@@ -27,6 +27,8 @@
 #include <plat/common.h>
 #include <plat/usb.h>
 #include <plat/display.h>
+#include <plat/smartreflex.h>
+#include <plat/voltage.h>
 
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
@@ -52,6 +54,8 @@ static struct powerdomain *mpu_pwrdm;
 
 static struct powerdomain *mpu_pwrdm, *cpu0_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
+
+static struct voltagedomain *vdd_mpu, *vdd_iva, *vdd_core;
 
 #define MAX_IOPAD_LATCH_TIME 1000
 
@@ -132,6 +136,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	int cpu0_next_state = PWRDM_POWER_ON;
 	int per_next_state = PWRDM_POWER_ON;
 	int core_next_state = PWRDM_POWER_ON;
+	int mpu_next_state = PWRDM_POWER_ON;
 
 	pwrdm_clear_all_prev_pwrst(cpu0_pwrdm);
 	pwrdm_clear_all_prev_pwrst(mpu_pwrdm);
@@ -141,8 +146,30 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	cpu0_next_state = pwrdm_read_next_pwrst(cpu0_pwrdm);
 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
+	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+
+	if (mpu_next_state < PWRDM_POWER_ON) {
+		/* Disable SR for MPU VDD */
+		omap_smartreflex_disable(vdd_mpu);
+		/* Enable AUTO RET for mpu */
+		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_MPU_L_MASK,
+			0x2 << OMAP4430_AUTO_CTRL_VDD_MPU_L_SHIFT,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
+	}
 
 	if (core_next_state < PWRDM_POWER_ON) {
+		/*
+		 * NOTE: IVA can hit RET outside of cpuidle and
+		 * hence this is not the right (optimal) place
+		 * to enable IVA AUTO RET. But since enabling AUTO
+		 * RET requires SR to be disabled, its done here
+		 * for now. Needs a relook to see if this can be
+		 * optimized.
+		 */
+		/* Disable SR for CORE and IVA VDD*/
+		omap_smartreflex_disable(vdd_iva);
+		omap_smartreflex_disable(vdd_core);
+
 		omap_dss_prepare_idle();
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
@@ -150,6 +177,14 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_uart_prepare_idle(3);
 		omap2_gpio_prepare_for_idle(0);
 		omap4_trigger_ioctrl();
+
+		/* Enable AUTO RET for IVA and CORE */
+		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK,
+			0x2 << OMAP4430_AUTO_CTRL_VDD_IVA_L_SHIFT,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
+		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK,
+			0x2 << OMAP4430_AUTO_CTRL_VDD_CORE_L_SHIFT,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
 	}
 
 	if (core_next_state < PWRDM_POWER_ON)
@@ -176,12 +211,30 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		OMAP4430_CM2_CKGEN_MOD,	OMAP4_CM_DIV_M3_DPLL_PER_OFFSET);
 
 	if (core_next_state < PWRDM_POWER_ON) {
+		/* Disable AUTO RET for IVA and CORE */
+		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK, 0x0,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
+		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK, 0x0,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
+
 		omap2_gpio_resume_after_idle(0);
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);
 		omap_uart_resume_idle(2);
 		omap_uart_resume_idle(3);
 		omap_dss_resume_idle();
+
+		/* Enable SR for IVA and CORE */
+		omap_smartreflex_enable(vdd_iva);
+		omap_smartreflex_enable(vdd_core);
+	}
+
+	if (mpu_next_state < PWRDM_POWER_ON) {
+		/* Disable AUTO RET for mpu */
+		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_MPU_L_MASK, 0x0,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
+		/* Enable SR for MPU VDD */
+		omap_smartreflex_enable(vdd_mpu);
 	}
 
 	return;
@@ -454,6 +507,7 @@ static void __init prcm_setup_regs(void)
 	/* Enable GLOBAL_WUEN */
 	prm_rmw_mod_reg_bits(OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_GLOBAL_WUEN_MASK,
 		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET);
+
 }
 
 /**
@@ -496,6 +550,25 @@ static int __init omap4_pm_init(void)
 	}
 
 	(void) clkdm_for_each(clkdms_setup, NULL);
+
+	/* Get handles for VDD's for enabling/disabling SR */
+	vdd_mpu = omap_voltage_domain_get("mpu");
+	if (IS_ERR(vdd_mpu)) {
+		printk(KERN_ERR "Failed to get handle for VDD MPU\n");
+		goto err2;
+	}
+
+	vdd_iva = omap_voltage_domain_get("iva");
+	if (IS_ERR(vdd_iva)) {
+		printk(KERN_ERR "Failed to get handle for VDD IVA\n");
+		goto err2;
+	}
+
+	vdd_core = omap_voltage_domain_get("core");
+	if (IS_ERR(vdd_core)) {
+		printk(KERN_ERR "Failed to get handle for VDD CORE\n");
+		goto err2;
+	}
 
 	omap4_mpuss_init();
 #endif

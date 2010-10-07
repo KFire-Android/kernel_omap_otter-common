@@ -38,7 +38,7 @@ static inline int proc44x_start(struct device *dev, u32 start_addr)
 	int ret = 0;
 
 	/* Enable the Timer that would be used by co-processor */
-	if (obj->timer_id) {
+	if (obj->timer_id >= 0) {
 		obj->dmtimer =
 			omap_dm_timer_request_specific(obj->timer_id);
 		if (!obj->dmtimer) {
@@ -170,13 +170,13 @@ static struct omap_rproc_platform_data omap4_rproc_data[] = {
 		.name = "ducati-proc0",
 		.ops = &omap4_ducati0_ops,
 		.oh_name = "ipu_c0",
-		.timer_id = 3,
+		.timer_id = -1,
 	},
 	{
 		.name = "ducati-proc1",
 		.ops = &omap4_ducati1_ops,
 		.oh_name = "ipu_c1",
-		.timer_id = 4,
+		.timer_id = -1,
 	},
 };
 

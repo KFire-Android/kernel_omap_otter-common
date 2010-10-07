@@ -1976,39 +1976,8 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	case MUSB_HOST:
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
 	if (cpu_is_omap44xx()) {
-		/* Program CFG_LDO_PD2 register and set VUSB bit */
-		twl_i2c_write_u8(TWL6030_MODULE_ID0 , 0x1, CFG_LDO_PD2);
-
-		/* Program MISC2 register and set bit VUSB_IN_VBAT */
-		twl_i2c_write_u8(TWL6030_MODULE_ID0 , 0x10, MISC2);
-
-		/*
-		 * Program the VUSB_CFG_VOLTAGE register to set the VUSB
-		 * voltage to 3.3V
-		 */
-		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x18,
-						VUSB_CFG_VOLTAGE);
-
-		/* Program the VUSB_CFG_TRANS for ACTIVE state. */
-		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x3F,
-					VUSB_CFG_TRANS);
-
-		/* Program the VUSB_CFG_STATE register to ON on all groups. */
-		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0xE1,
-					VUSB_CFG_STATE);
-
-		/* Program the USB_VBUS_CTRL_SET and set VBUS_ACT_COMP bit */
-		twl_i2c_write_u8(TWL_MODULE_USB, 0x4, USB_VBUS_CTRL_SET);
-
-		/*
-		 * Program the USB_ID_CTRL_SET register to enable GND drive
-		 * and the ID comparators
-		 */
-		twl_i2c_write_u8(TWL_MODULE_USB, 0x24, USB_ID_CTRL_SET);
-
 		/* Enable VBUS Valid, BValid, AValid. Clear SESSEND.*/
 		omap_writel(0x00000005, 0x4A00233C);
-
 	}
 		break;
 #else
@@ -2019,10 +1988,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	/* FIXME */
 	/* TODO:- Phoenix Settings to be done from Phoenix Layer */
 	if (cpu_is_omap44xx()) {
-		twl_i2c_write_u8(TWL_MODULE_PM_RECEIVER, 0x21,
-				VUSB_CFG_STATE);
-		twl_i2c_write_u8(TWL6030_MODULE_ID0 , 0x10,
-					MISC2);
+		/* Enable VBUS Valid, BValid, AValid. Clear SESSEND.*/
 		omap_writel(0x00000015, 0x4A00233C);
 	}
 		break;

@@ -2330,7 +2330,7 @@ static void soc_dapm_stream_event(struct snd_soc_dapm_context *dapm,
  * Returns 0 for success else error.
  */
 int snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd,
-	const char *stream, int event)
+	int dir, const char *stream, int event)
 {
 	int i;
 
@@ -2338,8 +2338,8 @@ int snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd,
 		return 0;
 
 	if (rtd->dai_link->dynamic) {
-		for (i = 0; i < rtd->num_be; i++) {
-			struct snd_soc_platform *platform = rtd->be_rtd[i]->platform;
+		for (i = 0; i < rtd->num_be[dir]; i++) {
+			struct snd_soc_platform *platform = rtd->be_rtd[i][dir]->platform;
 
 			soc_dapm_stream_event(platform->dapm, stream, event);
 		}

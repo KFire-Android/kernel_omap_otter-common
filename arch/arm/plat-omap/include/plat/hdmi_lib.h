@@ -395,6 +395,12 @@ enum hdmi_core_if_sample_size{
 	IF_24BIT_PER_SAMPLE = 0x3
 };
 
+enum hdmi_core_av_csc{
+	RGB	= 0x0,
+	RGB_TO_YUV = 0x1,
+	YUV_TO_RGB = 0x2
+};
+
 struct hdmi_core_audio_config {
 	enum hdmi_core_fs		fs; /* 0=32KHz - 1=44.1KHz */
 	u32				n;
@@ -428,6 +434,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg);
 void HDMI_W1_HPD_handler(int *r);
 int hdmi_lib_init(void);
 void hdmi_lib_exit(void);
+int hdmi_configure_csc(enum hdmi_core_av_csc csc);
 
 #endif
 
