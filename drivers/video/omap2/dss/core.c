@@ -147,6 +147,7 @@ static void core_dump_clocks(struct seq_file *s)
 	seq_printf(s, "- CORE -\n");
 
 	seq_printf(s, "internal clk count\t\t%u\n", core.num_clks_enabled);
+	seq_printf(s, "mainclk count\t\t%u\n", dss_get_mainclk_state());
 
 	for (i = 0; i < 5; i++) {
 		if (!clocks[i])
@@ -472,8 +473,10 @@ struct regulator *dss_get_vdda_dac(void)
 static void dss_debug_dump_clocks(struct seq_file *s)
 {
 	core_dump_clocks(s);
-	dss_dump_clocks(s);
-	dispc_dump_clocks(s);
+	if (dss_get_mainclk_state()) {
+		dss_dump_clocks(s);
+		dispc_dump_clocks(s);
+	}
 #ifdef CONFIG_OMAP2_DSS_DSI
 	dsi_dump_clocks(DSI1, OMAP_DSS_CHANNEL_LCD, s);
 	dsi_dump_clocks(DSI2, OMAP_DSS_CHANNEL_LCD2, s);
