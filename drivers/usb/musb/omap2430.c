@@ -320,11 +320,13 @@ static int musb_platform_resume(struct musb *musb)
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
 
-	/* Enable the phy clocks*/
-	phyclk = clk_get(NULL, "ocp2scp_usb_phy_ick");
-	clk_enable(phyclk);
-	clk48m = clk_get(NULL, "ocp2scp_usb_phy_phy_48m");
-	clk_enable(clk48m);
+	if (cpu_is_omap44xx()) {
+		/* Enable the phy clocks*/
+		phyclk = clk_get(NULL, "ocp2scp_usb_phy_ick");
+		clk_enable(phyclk);
+		clk48m = clk_get(NULL, "ocp2scp_usb_phy_phy_48m");
+		clk_enable(clk48m);
+	}
 
 	pdata->disable_wakeup(oh->od);
 	l = musb_readl(musb->mregs, OTG_FORCESTDBY);

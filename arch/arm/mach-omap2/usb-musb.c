@@ -487,4 +487,7 @@ void musb_context_save_restore(enum musb_state state)
 void __init usb_musb_init(struct omap_musb_board_data *board_data)
 {
 }
+void musb_context_save_restore(enum musb_state state)
+{
+}
 #endif /* CONFIG_USB_MUSB_SOC */

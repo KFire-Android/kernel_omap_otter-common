@@ -1503,7 +1503,12 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 			w = fbi->fix.line_length /
 				(fbi->var.bits_per_pixel >> 3);
 			h = size / fbi->fix.line_length;
-			err = tiler_alloc(TILFMT_32BIT, w, h, (u32 *)&paddr);
+			if (fbi->var.bits_per_pixel == 16)
+				err = tiler_alloc(TILFMT_16BIT, w, h,
+							(u32 *)&paddr);
+			else
+				err = tiler_alloc(TILFMT_32BIT, w, h,
+							(u32 *)&paddr);
 			if (err != 0x0)
 				return -ENOMEM;
 			r = 0;
@@ -1584,8 +1589,14 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 	}
 
 	if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
-		fbi->var.bits_per_pixel = 32;  /* always 32-bit for tiler */
-		bytespp = fbi->var.bits_per_pixel >> 3;
+		if (bytespp == 2) {
+			fbi->var.bits_per_pixel = 16;
+			bytespp = fbi->var.bits_per_pixel >> 3;
+		} else {
+			/* Default: 32-bit for tiler */
+			fbi->var.bits_per_pixel = 32;
+			bytespp = fbi->var.bits_per_pixel >> 3;
+		}
 	}
 	if (!size) {
 		u16 w, h;
