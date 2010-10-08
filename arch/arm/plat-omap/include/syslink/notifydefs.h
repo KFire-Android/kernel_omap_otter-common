@@ -86,6 +86,8 @@ struct notify_object {
 	/* List of event callbacks registered */
 	struct list_head event_list[NOTIFY_MAXEVENTS];
 	/* List of event listeners registered */
+	struct mutex lock;
+	/* Lock for event_list */
 };
 
 

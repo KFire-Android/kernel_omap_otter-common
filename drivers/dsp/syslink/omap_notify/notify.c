@@ -218,6 +218,7 @@ struct notify_object *notify_create(void *driver_handle, u16 remote_proc_id,
 	obj->remote_proc_id = remote_proc_id;
 	obj->line_id = line_id;
 	obj->nesting = 0;
+	mutex_init(&obj->lock);
 
 	for (i = 0; i < notify_state.cfg.num_events; i++)
 		INIT_LIST_HEAD(&obj->event_list[i]);
@@ -333,36 +334,35 @@ int notify_register_event(u16 proc_id, u16 line_id, u32 event_id,
 		goto exit;
 	}
 
-	if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-		WARN_ON(1);
 	driver_handle = notify_get_driver_handle(proc_id, line_id);
 	if (WARN_ON(driver_handle == NULL)) {
 		status = NOTIFY_E_DRIVERNOTREGISTERED;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	if (WARN_ON(driver_handle->is_init != NOTIFY_DRIVERINITSTATUS_DONE)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj = (struct notify_object *)driver_handle->notify_handle;
 	if (WARN_ON(obj == NULL)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	listener = kmalloc(sizeof(struct notify_event_listener), GFP_KERNEL);
 	if (listener == NULL) {
 		status = NOTIFY_E_MEMORY;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	listener->callback.fn_notify_cbck = notify_callback_fxn;
 	listener->callback.cbck_arg = cbck_arg;
 
 	event_list = &(obj->event_list[stripped_event_id]);
 	list_was_empty = list_empty(event_list);
+	mutex_lock_killable(&obj->lock);
 	list_add_tail((struct list_head *) listener, event_list);
-	mutex_unlock(notify_state.gate_handle);
+	mutex_unlock(&obj->lock);
 	if (list_was_empty) {
 		/* Registering this event for the first time. Need to
 		 * register the callback function.
@@ -371,10 +371,7 @@ int notify_register_event(u16 proc_id, u16 line_id, u32 event_id,
 					event_id, _notify_exec_many,
 					(uint *) obj);
 	}
-	goto exit;
 
-exit_unlock_mutex:
-	mutex_unlock(notify_state.gate_handle);
 exit:
 	if (status < 0)
 		pr_err("notify_register_event failed! status = 0x%x", status);
@@ -421,27 +418,25 @@ int notify_register_event_single(u16 proc_id, u16 line_id, u32 event_id,
 		goto exit;
 	}
 
-	if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-		WARN_ON(1);
 	driver_handle = notify_get_driver_handle(proc_id, line_id);
 	if (WARN_ON(driver_handle == NULL)) {
 		status = NOTIFY_E_DRIVERNOTREGISTERED;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	if (WARN_ON(driver_handle->is_init != NOTIFY_DRIVERINITSTATUS_DONE)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj = (struct notify_object *)driver_handle->notify_handle;
 	if (WARN_ON(obj == NULL)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	if (obj->callbacks[stripped_event_id].fn_notify_cbck != NULL) {
 		status = NOTIFY_E_ALREADYEXISTS;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj->callbacks[stripped_event_id].fn_notify_cbck = notify_callback_fxn;
@@ -451,9 +446,6 @@ int notify_register_event_single(u16 proc_id, u16 line_id, u32 event_id,
 		status = driver_handle->fxn_table.register_event(driver_handle,
 							stripped_event_id);
 	}
-
-exit_unlock_mutex:
-	mutex_unlock(notify_state.gate_handle);
 exit:
 	if (status < 0) {
 		pr_err("notify_register_event_single failed! "
@@ -506,56 +498,50 @@ int notify_unregister_event(u16 proc_id, u16 line_id, u32 event_id,
 		goto exit;
 	}
 
-	if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-		WARN_ON(1);
 	driver_handle = notify_get_driver_handle(proc_id, line_id);
 	if (WARN_ON(driver_handle == NULL)) {
 		status = NOTIFY_E_DRIVERNOTREGISTERED;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	if (WARN_ON(driver_handle->is_init != NOTIFY_DRIVERINITSTATUS_DONE)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj = (struct notify_object *)driver_handle->notify_handle;
 	if (WARN_ON(obj == NULL)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	event_list = &(obj->event_list[stripped_event_id]);
 	if (list_empty(event_list)) {
 		status = NOTIFY_E_NOTFOUND;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
+	mutex_lock_killable(&obj->lock);
 	list_for_each_entry(listener, event_list, element) {
 		/* Hash not matches, take next node */
 		if ((listener->callback.fn_notify_cbck == notify_callback_fxn)
 			&& (listener->callback.cbck_arg == cbck_arg)) {
+			list_del((struct list_head *)listener);
 			found = true;
 			break;
 		}
 	}
 	if (found == false) {
 		status = NOTIFY_E_NOTFOUND;
-		goto exit_unlock_mutex;
+		mutex_unlock(&obj->lock);
+		goto exit;
 	}
-	/*sys_key = Gate_enterSystem();*/
-	list_del((struct list_head *)listener);
-	/*Gate_leaveSystem(sys_key);*/
-	mutex_unlock(notify_state.gate_handle);
 
 	if (list_empty(event_list)) {
 		status = notify_unregister_event_single(proc_id, line_id,
 								event_id);
 	}
+	mutex_unlock(&obj->lock);
 	kfree(listener);
-	goto exit;
-
-exit_unlock_mutex:
-	mutex_unlock(notify_state.gate_handle);
 exit:
 	if (status < 0) {
 		pr_err("notify_unregister_event failed! "
@@ -599,28 +585,25 @@ int notify_unregister_event_single(u16 proc_id, u16 line_id, u32 event_id)
 		goto exit;
 	}
 
-	status = mutex_lock_interruptible(notify_state.gate_handle);
-	if (status)
-		goto exit;
 	driver_handle = notify_get_driver_handle(proc_id, line_id);
 	if (WARN_ON(driver_handle == NULL)) {
 		status = NOTIFY_E_DRIVERNOTREGISTERED;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	if (WARN_ON(driver_handle->is_init != NOTIFY_DRIVERINITSTATUS_DONE)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj = (struct notify_object *)driver_handle->notify_handle;
 	if (WARN_ON(obj == NULL)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	if (obj->callbacks[stripped_event_id].fn_notify_cbck == NULL) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj->callbacks[stripped_event_id].fn_notify_cbck = NULL;
@@ -629,9 +612,6 @@ int notify_unregister_event_single(u16 proc_id, u16 line_id, u32 event_id)
 		status = driver_handle->fxn_table.unregister_event(
 					driver_handle, stripped_event_id);
 	}
-
-exit_unlock_mutex:
-	mutex_unlock(notify_state.gate_handle);
 exit:
 	if (status < 0) {
 		pr_err("notify_unregister_event_single failed! "
@@ -675,22 +655,20 @@ int notify_send_event(u16 proc_id, u16 line_id, u32 event_id, u32 payload,
 		goto exit;
 	}
 
-	if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-			WARN_ON(1);
 	driver_handle = notify_get_driver_handle(proc_id, line_id);
 	if (WARN_ON(driver_handle == NULL)) {
 		status = NOTIFY_E_DRIVERNOTREGISTERED;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	if (WARN_ON(driver_handle->is_init != NOTIFY_DRIVERINITSTATUS_DONE)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj = (struct notify_object *)driver_handle->notify_handle;
 	if (WARN_ON(obj == NULL)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	/* Maybe the proc is shutdown this functions will check and
@@ -699,7 +677,7 @@ int notify_send_event(u16 proc_id, u16 line_id, u32 event_id, u32 payload,
 	 * the ducati_clkstctrl mode*/
 	status = ipu_pm_restore_ctx(proc_id);
 	if (status)
-		goto exit_unlock_mutex;
+		goto exit;
 
 	if (proc_id != multiproc_self()) {
 		status = driver_handle->fxn_table.send_event(driver_handle,
@@ -718,19 +696,11 @@ int notify_send_event(u16 proc_id, u16 line_id, u32 event_id, u32 payload,
 			/* Event is disabled */
 			status = NOTIFY_E_EVTDISABLED;
 		} else {
-			/* Leave critical section protection. */
-			mutex_unlock(notify_state.gate_handle);
 			/* Execute the callback function registered to the
 			 * event */
 			notify_exec(obj, event_id, payload);
-			/* Enter critical section protection. TBD: nesting */
-			if (mutex_lock_interruptible(notify_state.gate_handle))
-				WARN_ON(1);
 		}
 	}
-
-exit_unlock_mutex:
-	mutex_unlock(notify_state.gate_handle);
 exit:
 	if (status < 0)
 		pr_err("notify_send_event failed! status = 0x%x", status);
@@ -765,24 +735,23 @@ u32 notify_disable(u16 proc_id, u16 line_id)
 		goto exit;
 	}
 
-	if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-		WARN_ON(1);
 	driver_handle = notify_get_driver_handle(proc_id, line_id);
 	if (WARN_ON(driver_handle == NULL)) {
 		status = NOTIFY_E_DRIVERNOTREGISTERED;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	if (WARN_ON(driver_handle->is_init != NOTIFY_DRIVERINITSTATUS_DONE)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj = (struct notify_object *)driver_handle->notify_handle;
 	if (WARN_ON(obj == NULL)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
+	mutex_lock_killable(&obj->lock);
 	obj->nesting++;
 	if (obj->nesting == 1) {
 		/* Disable receiving all events */
@@ -790,9 +759,7 @@ u32 notify_disable(u16 proc_id, u16 line_id)
 			driver_handle->fxn_table.disable(driver_handle);
 	}
 	key = obj->nesting;
-
-exit_unlock_mutex:
-	mutex_unlock(notify_state.gate_handle);
+	mutex_unlock(&obj->lock);
 exit:
 	if (status < 0)
 		pr_err("notify_disable failed! status = 0x%x", status);
@@ -827,38 +794,35 @@ void notify_restore(u16 proc_id, u16 line_id, u32 key)
 		goto exit;
 	}
 
-	if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-		WARN_ON(1);
 	driver_handle = notify_get_driver_handle(proc_id, line_id);
 	if (WARN_ON(driver_handle == NULL)) {
 		status = NOTIFY_E_DRIVERNOTREGISTERED;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	if (WARN_ON(driver_handle->is_init != NOTIFY_DRIVERINITSTATUS_DONE)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj = (struct notify_object *)driver_handle->notify_handle;
 	if (WARN_ON(obj == NULL)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	if (key != obj->nesting) {
 		status = NOTIFY_E_INVALIDSTATE;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
+	mutex_lock_killable(&obj->lock);
 	obj->nesting--;
 	if (obj->nesting == 0) {
 		/* Enable receiving events */
 		if (proc_id != multiproc_self())
 			driver_handle->fxn_table.enable(driver_handle);
 	}
-
-exit_unlock_mutex:
-	mutex_unlock(notify_state.gate_handle);
+	mutex_unlock(&obj->lock);
 exit:
 	if (status < 0)
 		pr_err("notify_restore failed! status = 0x%x", status);
@@ -901,22 +865,20 @@ void notify_disable_event(u16 proc_id, u16 line_id, u32 event_id)
 		goto exit;
 	}
 
-	if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-		WARN_ON(1);
 	driver_handle = notify_get_driver_handle(proc_id, line_id);
 	if (WARN_ON(driver_handle == NULL)) {
 		status = NOTIFY_E_DRIVERNOTREGISTERED;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	if (WARN_ON(driver_handle->is_init != NOTIFY_DRIVERINITSTATUS_DONE)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj = (struct notify_object *)driver_handle->notify_handle;
 	if (WARN_ON(obj == NULL)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	if (proc_id != multiproc_self()) {
@@ -926,9 +888,6 @@ void notify_disable_event(u16 proc_id, u16 line_id, u32 event_id)
 		clear_bit(stripped_event_id,
 			(unsigned long *) &notify_state.local_enable_mask);
 	}
-
-exit_unlock_mutex:
-	mutex_unlock(notify_state.gate_handle);
 exit:
 	if (status < 0)
 		pr_err("notify_disable_event failed! status = 0x%x", status);
@@ -971,22 +930,20 @@ void notify_enable_event(u16 proc_id, u16 line_id, u32 event_id)
 		goto exit;
 	}
 
-	if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-		WARN_ON(1);
 	driver_handle = notify_get_driver_handle(proc_id, line_id);
 	if (WARN_ON(driver_handle == NULL)) {
 		status = NOTIFY_E_DRIVERNOTREGISTERED;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 	if (WARN_ON(driver_handle->is_init != NOTIFY_DRIVERINITSTATUS_DONE)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	obj = (struct notify_object *)driver_handle->notify_handle;
 	if (WARN_ON(obj == NULL)) {
 		status = NOTIFY_E_FAIL;
-		goto exit_unlock_mutex;
+		goto exit;
 	}
 
 	if (proc_id != multiproc_self()) {
@@ -996,9 +953,6 @@ void notify_enable_event(u16 proc_id, u16 line_id, u32 event_id)
 		set_bit(stripped_event_id,
 			(unsigned long *)&notify_state.local_enable_mask);
 	}
-
-exit_unlock_mutex:
-	mutex_unlock(notify_state.gate_handle);
 exit:
 	if (status < 0)
 		pr_err("notify_enable_event failed! status = 0x%x", status);
@@ -1129,19 +1083,12 @@ static void _notify_exec_many(u16 proc_id, u16 line_id, u32 event_id, uint *arg,
 	event_list = &(obj->event_list[event_id]);
 
 	/* Enter critical section protection. */
-	if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-		WARN_ON(1);
+	mutex_lock_killable(&obj->lock);
 	/* Use "NULL" to get the first EventListener on the list */
 	list_for_each_entry(listener, event_list, element) {
-		/* Leave critical section protection. */
-		mutex_unlock(notify_state.gate_handle);
 		listener->callback.fn_notify_cbck(proc_id, line_id, event_id,
 				listener->callback.cbck_arg, payload);
-		/* Enter critical section protection. */
-		if (mutex_lock_interruptible(notify_state.gate_handle) != 0)
-			WARN_ON(1);
 	}
-
 	/* Leave critical section protection. */
-	mutex_unlock(notify_state.gate_handle);
+	mutex_unlock(&obj->lock);
 }
