@@ -4987,12 +4987,12 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 		orient.y_invert = mirror ? 1 : 0;
 		tiler_rotate_view(&orient, -rotation * 90);
 
+		if (orient.rotate_90 & 1)
+			swap(tiler_width, tiler_height);
+
 		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
 		    color_mode == OMAP_DSS_COLOR_UYVY)
 			tiler_width /= 2;
-
-		if (orient.rotate_90 & 1)
-			swap(tiler_width, tiler_height);
 
 		paddr = tiler_reorient_topleft(tiler_get_natural_addr((void *)paddr),
 				orient, tiler_width, tiler_height);
