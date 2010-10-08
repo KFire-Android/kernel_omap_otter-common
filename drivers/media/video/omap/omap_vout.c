@@ -305,7 +305,7 @@ int omap_vout_try_format(struct v4l2_pix_format *pix)
 	case V4L2_PIX_FMT_UYVY:
 	default:
 		pix->colorspace = V4L2_COLORSPACE_JPEG;
-		bpp = 4;
+		bpp = YUYV_BPP;
 		break;
 	case V4L2_PIX_FMT_RGB565:
 	case V4L2_PIX_FMT_RGB565X:
