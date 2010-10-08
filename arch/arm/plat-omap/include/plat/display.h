@@ -264,10 +264,17 @@ enum omap_writeback_capturemode {
 };
 
 enum device_n_buffer_type {
-       PBUF_PDEV = 0,
-       PBUF_IDEV = 1,
-       IBUF_IDEV = 2,
-       IBUF_PDEV = 3,
+	OMAP_FLAG_IDEV = 1,	/* interlaced device */
+	OMAP_FLAG_IBUF = 2,	/* sequentially interlaced buffer */
+	OMAP_FLAG_ISWAP = 4,	/* bottom-top interlacing */
+
+	PBUF_PDEV	= 0,
+	PBUF_IDEV	= OMAP_FLAG_IDEV,
+	PBUF_IDEV_SWAP	= OMAP_FLAG_IDEV | OMAP_FLAG_ISWAP,
+	IBUF_IDEV	= OMAP_FLAG_IBUF | OMAP_FLAG_IDEV,
+	IBUF_IDEV_SWAP	= OMAP_FLAG_IBUF | OMAP_FLAG_IDEV | OMAP_FLAG_ISWAP,
+	IBUF_PDEV	= OMAP_FLAG_IBUF,
+	IBUF_PDEV_SWAP	= OMAP_FLAG_IBUF | OMAP_FLAG_ISWAP,
 };
 
 /* RFBI */
@@ -410,7 +417,6 @@ struct omap_overlay_info {
 	enum omap_overlay_zorder zorder;
 	u32 p_uv_addr; /* relevant for NV12 format only */
 	enum device_n_buffer_type field;
-	u16 pic_width; /* for interlacing with cropping this is required */
 	u16 pic_height; /* for interlacing with cropping this is required */
 };
 
@@ -772,17 +778,8 @@ int omap_rfbi_prepare_update(struct omap_dss_device *dssdev,
 int omap_rfbi_update(struct omap_dss_device *dssdev,
 		u16 x, u16 y, u16 w, u16 h,
 		void (*callback)(void *), void *data);
-void calc_tiler_row_rotation(u8 rotation,
-		u16 width,
-		enum omap_color_mode color_mode,
-		int y_decim,
-		s32 *row_inc,
-		unsigned *offset1,
-		enum device_n_buffer_type  ilace,
-		u16 pic_width,
-		u16 pic_height);
 
-void change_base_address(u32 offset, u16 *flag, int id);
-u16 *get_offset_cnt(int id, u32 *offset);
-int nature_of_hdmi(void);
+void change_base_address(int id, u32 p_uv_addr);
+bool is_hdmi_interlaced(void);
+
 #endif
