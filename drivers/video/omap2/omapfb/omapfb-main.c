@@ -1799,19 +1799,31 @@ int omapfb_realloc_fbmem(struct fb_info *fbi, unsigned long size, int type)
 {
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct omapfb2_device *fbdev = ofbi->fbdev;
+	struct fb_var_screeninfo *var = &fbi->var;
 	struct omap_dss_device *display = fb2display(fbi);
 	struct omapfb2_mem_region *rg = ofbi->region;
 	unsigned long old_size = rg->size;
 	unsigned long old_paddr = rg->paddr;
 	int old_type = rg->type;
 	int r;
+	unsigned int w, h, bytespp;
+	w = var->xres;
+	h = var->yres;
+	bytespp = var->bits_per_pixel >> 0x3;
 
 	if (type > OMAPFB_MEMTYPE_MAX)
 		return -EINVAL;
 
+	if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
+		/* round up width to tiler size */
+		w = ALIGN(w, PAGE_SIZE / bytespp);
+		size = w * h * bytespp;
+	}
 	size = PAGE_ALIGN(size);
 
-	if (old_size == size && old_type == type)
+	/* If TILER buffer is used, irrespective of size, continue */
+	if (ofbi->rotation_type != OMAP_DSS_ROT_TILER &&
+			old_size == size && old_type == type)
 		return 0;
 
 	if (display && display->driver->sync)
@@ -1859,9 +1871,11 @@ int omapfb_realloc_fbmem(struct fb_info *fbi, unsigned long size, int type)
 			goto err;
 		memcpy(&fbi->var, &new_var, sizeof(fbi->var));
 		set_fb_fix(fbi);
-		r = setup_vrfb_rotation(fbi);
-		if (r)
-			goto err;
+		if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
+			r = setup_vrfb_rotation(fbi);
+			if (r)
+				goto err;
+		}
 	}
 
 	return 0;
