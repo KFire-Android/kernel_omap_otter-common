@@ -33,6 +33,9 @@
 #include <linux/device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 
 #include <plat/display.h>
 #include <plat/clock.h>
@@ -988,6 +991,22 @@ static struct platform_driver omap_hdmihw_driver = {
 };
 #endif
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static struct early_suspend dss_early_suspend_info;
+
+void dss_early_suspend(struct early_suspend *h)
+{
+	printk(KERN_ERR "in dss_early_suspend\n");
+	dss_suspend_all_devices();
+}
+
+void dss_early_resume(struct early_suspend *h)
+{
+	printk(KERN_ERR "in dss_early_resume\n");
+	dss_resume_all_devices();
+}
+#endif
+
 /* BUS */
 static int dss_bus_match(struct device *dev, struct device_driver *driver)
 {
@@ -1194,6 +1213,17 @@ static int omap_dss_bus_register(void)
 		return r;
 	}
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	printk(KERN_ERR "b4 dss register_early_suspend\n");
+	if (dss_early_suspend_info.suspend == NULL) {
+		printk(KERN_ERR "in dss register_early_suspend\n");
+		dss_early_suspend_info.suspend = dss_early_suspend;
+		dss_early_suspend_info.resume = dss_early_resume;
+		dss_early_suspend_info.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+		register_early_suspend(&dss_early_suspend_info);
+	}
+#endif
+
 	return 0;
 }
 
@@ -1202,6 +1232,12 @@ static int omap_dss_bus_register(void)
 #ifdef CONFIG_OMAP2_DSS_MODULE
 static void omap_dss_bus_unregister(void)
 {
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	if (dss_early_suspend_info.suspend)
+		unregister_early_suspend(&dss_early_suspend_info);
+	dss_early_suspend_info.suspend = NULL;
+#endif
+
 	device_unregister(&dss_bus);
 
 	bus_unregister(&dss_bus_type);
