@@ -388,16 +388,16 @@ static inline void print_omap_video_timings(struct omap_video_timings *timings)
 {
 	extern unsigned int dss_debug;
 	if (dss_debug) {
-		printk(KERN_DEBUG "Timing Info:\n");
-		printk(KERN_DEBUG "  pixel_clk = %d\n", timings->pixel_clock);
-		printk(KERN_DEBUG "  x_res     = %d\n", timings->x_res);
-		printk(KERN_DEBUG "  y_res     = %d\n", timings->y_res);
-		printk(KERN_DEBUG "  hfp       = %d\n", timings->hfp);
-		printk(KERN_DEBUG "  hsw       = %d\n", timings->hsw);
-		printk(KERN_DEBUG "  hbp       = %d\n", timings->hbp);
-		printk(KERN_DEBUG "  vfp       = %d\n", timings->vfp);
-		printk(KERN_DEBUG "  vsw       = %d\n", timings->vsw);
-		printk(KERN_DEBUG "  vbp       = %d\n", timings->vbp);
+		printk(KERN_INFO "Timing Info:\n");
+		printk(KERN_INFO "  pixel_clk = %d\n", timings->pixel_clock);
+		printk(KERN_INFO "  x_res     = %d\n", timings->x_res);
+		printk(KERN_INFO "  y_res     = %d\n", timings->y_res);
+		printk(KERN_INFO "  hfp       = %d\n", timings->hfp);
+		printk(KERN_INFO "  hsw       = %d\n", timings->hsw);
+		printk(KERN_INFO "  hbp       = %d\n", timings->hbp);
+		printk(KERN_INFO "  vfp       = %d\n", timings->vfp);
+		printk(KERN_INFO "  vsw       = %d\n", timings->vsw);
+		printk(KERN_INFO "  vbp       = %d\n", timings->vbp);
 	}
 }
 
@@ -1302,7 +1302,7 @@ static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
 
 static void hdmi_get_edid(struct omap_dss_device *dssdev)
 {
-	u8 i = 0, flag = 0;
+	u8 i = 0, flag = 0, mark = 0;
 	int count, offset, effective_addrs, current_descriptor_addrs = 0;
 	struct HDMI_EDID * edid_st = (struct HDMI_EDID *)edid;
 	struct image_format *img_format;
@@ -1363,7 +1363,13 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 			count * EDID_TIMING_DESCRIPTOR_SIZE;
 			printk("Extension 0 Block %d", count);
 			get_edid_timing_info(&edid_st->DTD[count], &timings);
+			if (!dss_debug) {
+				dss_debug = 1;
+				mark = 1;
+			}
 			print_omap_video_timings(&timings);
+			if (mark)
+				dss_debug = 0;
 		}
 	if (edid[0x7e] != 0x00) {
 		offset = edid[EDID_DESCRIPTOR_BLOCK1_ADDRESS + 2];
@@ -1380,7 +1386,13 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 			printk("Extension 1 Block %d", count);
 			get_eedid_timing_info(current_descriptor_addrs, edid ,
 			&timings);
+			if (!dss_debug) {
+				dss_debug = 1;
+				mark = 1;
+			}
 			print_omap_video_timings(&timings);
+			if (mark)
+				dss_debug = 0;
 			}
 		}
 	}
