@@ -2712,6 +2712,7 @@ int dispc_scaling_decision(u16 width, u16 height,
 	unsigned long fclk = 0, fclk5 = 0;
 	int min_factor, max_factor;	/* decimation search limits */
 	int x, y;			/* decimation search variables */
+	unsigned long fclk_max = dispc_fclk_rate();
 
 	/* restrict search region based on whether we can decimate */
 	if (!can_decimate_x) {
@@ -2779,9 +2780,9 @@ int dispc_scaling_decision(u16 width, u16 height,
 			*three_tap = in_width > 1024;
 		else if (omap_rev() == OMAP4430_REV_ES1_0)
 			*three_tap = in_width > 1280;
-		else
-			/* use 3-tap unless downscaling by more than 2 */
-			*three_tap = out_height * 2 >= in_height;
+
+		/* Also use 3-tap if downscaling by 2 or less */
+		*three_tap |= out_height * 2 >= in_height;
 
 		/*
 		 * Predecimation on OMAP4 still fetches the whole lines
@@ -2797,6 +2798,9 @@ int dispc_scaling_decision(u16 width, u16 height,
 			in_width, x, in_height, y, out_width, out_height,
 			fclk, fclk5);
 
+		/* Use 3-tap if 5-tap clock requirement is too high */
+		*three_tap |= fclk5 > fclk_max;
+
 		/* for now we always use 5-tap unless 3-tap is required */
 		if (!*three_tap)
 			fclk = fclk5;
@@ -2806,13 +2810,13 @@ int dispc_scaling_decision(u16 width, u16 height,
 			goto loop;
 
 		DSSDBG("required fclk rate = %lu Hz\n", fclk);
-		DSSDBG("current fclk rate = %lu Hz\n", dispc_fclk_rate());
+		DSSDBG("current fclk rate = %lu Hz\n", fclk_max);
 
-		if (fclk > dispc_fclk_rate()) {
+		if (fclk > fclk_max) {
 			DSSERR("failed to set up scaling, "
 					"required fclk rate = %lu Hz, "
 					"current fclk rate = %lu Hz\n",
-					fclk, dispc_fclk_rate());
+					fclk, fclk_max);
 			goto loop;
 		}
 		break;
