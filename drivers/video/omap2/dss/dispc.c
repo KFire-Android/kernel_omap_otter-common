@@ -262,6 +262,10 @@ struct omap_dispc_isr_data {
 #define REG_FLD_MOD(idx, val, start, end)				\
 	dispc_write_reg(idx, FLD_MOD(dispc_read_reg(idx), val, start, end))
 
+#define IS_VIDEO_PIPELINE(plane) \
+	((plane == OMAP_DSS_VIDEO1) || (plane == OMAP_DSS_VIDEO2) \
+		|| (plane == OMAP_DSS_VIDEO3))
+
 static const struct dispc_reg dispc_reg_att[] = { DISPC_GFX_ATTRIBUTES,
 	DISPC_VID_ATTRIBUTES(0),
 	DISPC_VID_ATTRIBUTES(1),
@@ -2864,6 +2868,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
 	int bpp = color_mode_to_bpp(color_mode) / 8;
+	bool source_of_WB = false;
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -3044,7 +3049,12 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
 
-	_dispc_set_channel_out(plane, channel);
+	if (IS_VIDEO_PIPELINE(plane))
+		if ((REG_GET(dispc_reg_att[plane], 16, 16) == 0) &&
+			(REG_GET(dispc_reg_att[plane], 31, 30) == 0x3))
+				source_of_WB = true;
+	if (!source_of_WB)
+		_dispc_set_channel_out(plane, channel);
 	_dispc_set_color_mode(plane, color_mode);
 
 	_dispc_set_plane_ba0(plane, paddr + offset0);
@@ -4891,7 +4901,6 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	int cconv = 0;
 	s32 row_inc;
 	s32 pix_inc;
-	u16 frame_height = height;
 
 	DSSDBG("dispc_setup_wb\n");
 	DSSDBG("Maxds = %d\n", maxdownscale);
@@ -4978,8 +4987,9 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
 		tiler_width = width, tiler_height = height;
 
-		calc_tiler_row_rotation(rotation, width, frame_height,
-						color_mode, &row_inc,
+		calc_tiler_row_rotation(rotation, out_width,
+						color_mode, 1, /* y_decim = 1 */
+						&row_inc,
 						&offset1, ilace,
 						pic_height);
 
