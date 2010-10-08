@@ -126,7 +126,7 @@ static struct twl4030_keypad_data zoom_kp_twl4030_data = {
 	.keymap_data	= &board_map_data,
 	.rows		= 8,
 	.cols		= 8,
-	.rep		= 1,
+	.rep		= 0,
 };
 
 static struct regulator_consumer_supply zoom_vmmc1_supply = {
