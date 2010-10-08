@@ -662,11 +662,14 @@ void dss_switch_tv_hdmi(int hdmi)
 		REG_FLD_MOD(DSS_CONTROL, 0, 9, 8);
 }
 
-int dss_init(bool skip_init, struct platform_device *pdev)
+extern int dss_base_count;
+
+int dss_init(struct platform_device *pdev)
 {
 	int r = 0, dss_irq;
 	u32 rev;
 	struct resource *dss_mem;
+	bool skip_init = false;
 
 	dss.pdata = pdev->dev.platform_data;
 	dss.pdev = pdev;
@@ -684,6 +687,12 @@ int dss_init(bool skip_init, struct platform_device *pdev)
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_FCK2 | DSS_CLK_54M | DSS_CLK_96M);
 	dss_opt_clock_enable();
 	dss_mainclk_enable();
+
+#ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
+	/* DISPC_CONTROL */
+	if (omap_readl(0x48050440) & 1)	/* LCD enabled? */
+		skip_init = true;
+#endif
 
 	if (!skip_init) {
 		/* disable LCD and DIGIT output. This seems to fix the synclost

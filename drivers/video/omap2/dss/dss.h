@@ -271,7 +271,7 @@ void dss_init_writeback(struct platform_device *pdev);
 bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId, int managerId);
 
 /* DSS */
-int dss_init(bool skip_init, struct platform_device *pdev);
+int dss_init(struct platform_device *pdev);
 void dss_exit(void);
 
 void dss_switch_tv_hdmi(int hdmi);
