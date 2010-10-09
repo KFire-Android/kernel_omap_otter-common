@@ -706,9 +706,6 @@ struct omap_dss_device *omap_dss_find_device(void *data,
 int omap_dss_start_device(struct omap_dss_device *dssdev);
 void omap_dss_stop_device(struct omap_dss_device *dssdev);
 
-extern void omap_dss_prepare_idle(void);
-extern void omap_dss_resume_idle(void);
-
 /* the event id of the event that occurred is passed in as the second arg
  * to the notifier function, and the dssdev is passed as the third.
  */

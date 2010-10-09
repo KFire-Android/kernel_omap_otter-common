@@ -933,9 +933,6 @@ void __init omap_display_init(struct omap_dss_board_info *board_data)
 	return;
 }
 #else
-void omap_dss_prepare_idle(void){};
-void omap_dss_resume_idle(void){};
-
 void __init omap_display_init(struct omap_dss_board_info *board_data)
 {
 }
