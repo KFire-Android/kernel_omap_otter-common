@@ -1048,6 +1048,11 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	hdmi_enable_clocks(0);
 
 	hdmi_hot_plug_event_send(dssdev, 0);
+
+	/* cut clock(s) */
+	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+	dss_mainclk_state_disable(true);
+
 	/* reset to default */
 
 }
@@ -1063,8 +1068,6 @@ static int hdmi_start_display(struct omap_dss_device *dssdev)
 
 	free_irq(OMAP44XX_IRQ_DSS_HDMI, NULL);
 
-	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-
 	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
 	omap_writel(0x01180118, 0x4A100098);
 	/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
@@ -1075,6 +1078,8 @@ static int hdmi_start_display(struct omap_dss_device *dssdev)
 	if (dssdev->platform_enable)
 		dssdev->platform_enable(dssdev);
 
+	/* enable clock(s) */
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 	dss_mainclk_state_enable();
 
 	r = hdmi_set_power(dssdev);

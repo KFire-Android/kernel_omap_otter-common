@@ -234,6 +234,10 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
+	/* turn on clock(s) */
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
+	dss_mainclk_state_enable();
+
 	r = dpi_basic_init(dssdev);
 	if (r)
 		goto err2;
@@ -289,6 +293,11 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 	dss_clk_disable(DSS_CLK_FCK2);
 #endif
 #endif
+
+	/* cut clock(s) */
+	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+	dss_mainclk_state_disable(true);
+
 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	if (cpu_is_omap34xx() && !cpu_is_omap3630())
