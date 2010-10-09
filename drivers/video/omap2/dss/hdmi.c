@@ -1052,21 +1052,10 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 
 }
 
-static int hdmi_enable_display(struct omap_dss_device *dssdev)
+static int hdmi_start_display(struct omap_dss_device *dssdev)
 {
-	int r = 0;
-	DSSDBG("ENTER hdmi_enable_display()\n");
-
-	mutex_lock(&hdmi.lock);
-
-	is_hdmi_on = is_hpd_on = true;
-	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) {
-		r = -EINVAL;
-		goto err;
-	}
-
 	/* the tv overlay manager is shared*/
-	r = omap_dss_start_device(dssdev);
+	int r = omap_dss_start_device(dssdev);
 	if (r) {
 		DSSERR("failed to start device\n");
 		goto err;
@@ -1086,10 +1075,9 @@ static int hdmi_enable_display(struct omap_dss_device *dssdev)
 	if (dssdev->platform_enable)
 		dssdev->platform_enable(dssdev);
 
-	r = hdmi_power_on(dssdev);
+	dss_mainclk_state_enable();
 
-	hdmi_hot_plug_event_send(dssdev, 1);
-
+	r = hdmi_set_power(dssdev);
 	if (r) {
 		DSSERR("failed to power on device\n");
 		goto err;
@@ -1098,9 +1086,7 @@ static int hdmi_enable_display(struct omap_dss_device *dssdev)
 			0, "OMAP HDMI", (void *)0);
 
 err:
-	mutex_unlock(&hdmi.lock);
 	return r;
-
 }
 
 static int hdmi_enable_hpd(struct omap_dss_device *dssdev)
@@ -1108,42 +1094,56 @@ static int hdmi_enable_hpd(struct omap_dss_device *dssdev)
 	int r = 0;
 	DSSDBG("ENTER hdmi_enable_hpd()\n");
 
-	mutex_lock(&hdmi.lock);
-
 	is_hpd_on = true;
 	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
 		dssdev->activate_after_resume = true;
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
-		goto err;
+		return 0;
 
-	/* the tv overlay manager is shared*/
-	r = omap_dss_start_device(dssdev);
-	if (r) {
-		DSSERR("failed to start device\n");
-		goto err;
-	}
-
-	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
-	omap_writel(0x01180118, 0x4A100098);
-	/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
-	omap_writel(0x01180118 , 0x4A10009C);
-	/* CONTROL_HDMI_TX_PHY */
-	omap_writel(0x10000000, 0x4A100610);
-
-	if (dssdev->platform_enable)
-		dssdev->platform_enable(dssdev);
+	mutex_lock(&hdmi.lock);
 
 	hpd_mode = 1;
-	r = hdmi_min_enable();
-	if (r) {
-		DSSERR("failed to power on device\n");
-		goto err;
-	}
+	r = hdmi_start_display(dssdev);
+	if (!r)
+		hpd_mode = 0;
 
-err:
 	mutex_unlock(&hdmi.lock);
 	return r;
+}
+
+static int hdmi_enable_display(struct omap_dss_device *dssdev)
+{
+	int r = 0;
+	bool was_hdmi_on = is_hdmi_on;
+
+	DSSDBG("ENTER hdmi_enable_display()\n");
+
+	is_hdmi_on = is_hpd_on = true;
+	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		return 0;
+
+	mutex_lock(&hdmi.lock);
+
+	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
+		/* turn on full power if HDMI was only on HPD */
+		r = was_hdmi_on ? 0 : hdmi_set_power(dssdev);
+	else
+		r = hdmi_start_display(dssdev);
+
+	if (!r)
+		hdmi_hot_plug_event_send(dssdev, 1);
+
+	mutex_unlock(&hdmi.lock);
+
+	return r;
+}
+
+static void hdmi_stop_display(struct omap_dss_device *dssdev)
+{
+	omap_dss_stop_device(dssdev);
+
+	hdmi_power_off(dssdev);
 }
 
 static void hdmi_disable_display(struct omap_dss_device *dssdev)
@@ -1152,47 +1152,36 @@ static void hdmi_disable_display(struct omap_dss_device *dssdev)
 
 	mutex_lock(&hdmi.lock);
 
-	/* turn off HPD on disable */
 	is_hdmi_on = is_hpd_on = false;
 
-	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED)
-		goto end;
+	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
+		hdmi_stop_display(dssdev);
 
-	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED) {
-		/* suspended is the same as disabled with venc */
-		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
-		goto end;
-	}
+	/*setting to default only in case of disable and not suspend*/
+	hdmi.code = 16;
+	hdmi.mode = 1 ;
+
+	mutex_unlock(&hdmi.lock);
 
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
-	omap_dss_stop_device(dssdev);
-
-	hdmi_power_off(dssdev);
-
-	hdmi.code = 16;
-	hdmi.mode = 1 ; /*setting to default only in case of disable and not suspend*/
-end:
-	mutex_unlock(&hdmi.lock);
 }
 
 static int hdmi_display_suspend(struct omap_dss_device *dssdev)
 {
-	int r = 0;
-
 	DSSDBG("hdmi_display_suspend\n");
-		mutex_lock(&hdmi.lock);
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
-		goto end;
+		return -EINVAL;
+
+	mutex_lock(&hdmi.lock);
+
+	hdmi_stop_display(dssdev);
+
+	mutex_unlock(&hdmi.lock);
 
 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
 
-	omap_dss_stop_device(dssdev);
-
-	hdmi_power_off(dssdev);
-end:
-	mutex_unlock(&hdmi.lock);
-	return r;
+	return 0;
 }
 
 static int hdmi_display_resume(struct omap_dss_device *dssdev)
@@ -1200,44 +1189,15 @@ static int hdmi_display_resume(struct omap_dss_device *dssdev)
 	int r = 0;
 
 	DSSDBG("hdmi_display_resume\n");
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
+		return -EINVAL;
+
 	mutex_lock(&hdmi.lock);
 
-	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
-		r = -EINVAL;
-		goto err;
-	}
-
-	/* the tv overlay manager is shared*/
-	r = omap_dss_start_device(dssdev);
-	if (r) {
-		DSSERR("failed to start device\n");
-		goto err;
-	}
-
-	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-
-	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
-	omap_writel(0x01180118, 0x4A100098);
-	/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
-	omap_writel(0x01180118 , 0x4A10009C);
-	/* CONTROL_HDMI_TX_PHY */
-	omap_writel(0x10000000, 0x4A100610);
-
-	if (dssdev->platform_enable)
-		dssdev->platform_enable(dssdev);
-
-	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-	r = hdmi_set_power(dssdev);
-
-	if (r) {
-		DSSERR("failed to power on device\n");
-		hdmi_disable_display(dssdev);
-		goto err;
-	} else {
+	r = hdmi_start_display(dssdev);
+	if (!r && hdmi_power == HDMI_POWER_FULL)
 		hdmi_hot_plug_event_send(dssdev, 1);
-	}
 
-err:
 	mutex_unlock(&hdmi.lock);
 
 	return r;
