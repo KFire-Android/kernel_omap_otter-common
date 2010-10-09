@@ -651,8 +651,12 @@ static int dss_resume_device(struct device *dev, void *data)
 
 	if (dssdev->activate_after_resume && dssdev->driver->resume) {
 		r = dssdev->driver->resume(dssdev);
-		if (r)
+		if (r) {
+			DSSERR("Failed to resume %s device (%d), disabling\n",
+				dssdev->name, r);
+			dssdev->driver->disable(dssdev);
 			return r;
+		}
 	} else {
 		/* disabled may not be the same as suspended so call handler */
 		dssdev->driver->disable(dssdev);
