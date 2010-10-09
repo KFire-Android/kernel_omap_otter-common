@@ -141,20 +141,22 @@ bool dss_get_mainclk_state()
 
 int dss_mainclk_enable()
 {
+	int ret = 0;
+
 	if (!dss.mainclk_state) {
-		pm_runtime_get_sync(&dss.pdev->dev);
-		dss.mainclk_state = true;
-		return 0;
+		ret = pm_runtime_get_sync(&dss.pdev->dev);
+		if (!ret)
+			dss.mainclk_state = true;
 	}
 
-	return -EINVAL;
+	return ret;
 }
 
 void dss_mainclk_disable()
 {
 	if (dss.mainclk_state) {
-		pm_runtime_put_sync(&dss.pdev->dev);
 		dss.mainclk_state = false;
+		pm_runtime_put_sync(&dss.pdev->dev);
 	}
 }
 

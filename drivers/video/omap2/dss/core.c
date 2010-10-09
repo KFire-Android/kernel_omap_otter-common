@@ -329,11 +329,21 @@ void dss_clk_enable(enum dss_clock clks)
 	if (check_ctx && cpu_is_omap34xx() && dss_need_ctx_restore())
 		restore_all_ctx();
 }
-void dss_opt_clock_enable()
+
+int dss_opt_clock_enable()
 {
-	clk_enable(core.dss_ick);
-	clk_enable(core.dss1_fck);
-	clk_enable(core.dss_96m_fck);
+	int r = clk_enable(core.dss_ick);
+	if (!r) {
+		r = clk_enable(core.dss1_fck);
+		if (!r) {
+			r = clk_enable(core.dss_96m_fck);
+			if (!r)
+				return 0;
+			clk_disable(core.dss1_fck);
+		}
+		clk_disable(core.dss_ick);
+	}
+	return r;
 }
 
 void dss_opt_clock_disable()
