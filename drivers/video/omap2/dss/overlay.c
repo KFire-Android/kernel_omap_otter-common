@@ -601,6 +601,10 @@ static int omap_dss_set_manager(struct omap_overlay *ovl,
 
 	ovl->manager = mgr;
 
+	/* do not set channel out if DSS is off */
+	if (!dss_get_mainclk_state())
+		return 0;
+
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	/* XXX: on manual update display, in auto update mode, a bug happens
 	 * here. When an overlay is first enabled on LCD, then it's disabled,
