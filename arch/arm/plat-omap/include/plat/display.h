@@ -745,6 +745,9 @@ int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 #define to_dss_driver(x) container_of((x), struct omap_dss_driver, driver)
 #define to_dss_device(x) container_of((x), struct omap_dss_device, dev)
 
+int omapdss_display_enable(struct omap_dss_device *dssdev);
+void omapdss_display_disable(struct omap_dss_device *dssdev);
+
 void omapdss_dsi_vc_enable_hs(enum omap_dsi_index ix, int channel,
 	bool enable);
 int omapdss_dsi_enable_te(struct omap_dss_device *dssdev, bool enable);

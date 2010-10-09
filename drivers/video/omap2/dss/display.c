@@ -35,6 +35,48 @@
 
 static LIST_HEAD(display_list);
 
+int omapdss_display_enable(struct omap_dss_device *dssdev)
+{
+	int r = 0;
+
+	/* store resume info for suspended displays */
+	switch (dssdev->state) {
+	case OMAP_DSS_DISPLAY_SUSPENDED:
+		dssdev->activate_after_resume = true;
+		break;
+	case OMAP_DSS_DISPLAY_DISABLED:
+		if (dssdev->driver)
+			r = dssdev->driver->enable(dssdev);
+		if (r) {
+			DSSERR("Failed to enable %s device (%d), disabling\n",
+				dssdev->name, r);
+			dssdev->driver->disable(dssdev);
+		}
+		break;
+	default:
+		break;
+	}
+
+	return r;
+}
+EXPORT_SYMBOL(omapdss_display_enable);
+
+void omapdss_display_disable(struct omap_dss_device *dssdev)
+{
+	/* store resume info for suspended displays */
+	switch (dssdev->state) {
+	case OMAP_DSS_DISPLAY_SUSPENDED:
+		dssdev->activate_after_resume = false;
+		break;
+	case OMAP_DSS_DISPLAY_DISABLED:
+		break;
+	default:
+		dssdev->driver->disable(dssdev);
+		break;
+	}
+}
+EXPORT_SYMBOL(omapdss_display_disable);
+
 static ssize_t display_enabled_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
