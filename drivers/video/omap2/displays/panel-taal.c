@@ -1036,25 +1036,21 @@ static void taal_prepare_workqueue(struct omap_dss_device *dssdev)
 		td->te_wq = create_singlethread_workqueue("taal2 wq");
 }
 
-static int taal_enable(struct omap_dss_device *dssdev)
+static int taal_start(struct omap_dss_device *dssdev)
 {
 	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
 	struct nokia_dsi_panel_data *panel_data = get_panel_data(dssdev);
-	int r;
+	int r = 0;
 	enum omap_dsi_index ix;
 
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
-	dev_dbg(&dssdev->dev, "enable\n");
-
-	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) {
-		r = -EINVAL;
-		goto err;
-	}
 	mutex_lock(&td->lock);
 
-	if (td->force_update)
+	if (td->force_update) {
 		td->te_enabled = 1;
+		taal_prepare_workqueue(dssdev);
+	}
 
 	dsi_bus_lock(ix);
 
@@ -1062,75 +1058,27 @@ static int taal_enable(struct omap_dss_device *dssdev)
 
 	dsi_bus_unlock(ix);
 
-	if (r)
-		goto err;
+	if (r) {
+		dev_dbg(&dssdev->dev, "enable failed\n");
+		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+	} else {
+		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
+		if (panel_data->use_esd_check)
+			queue_delayed_work(td->esd_wq, &td->esd_work,
+					TAAL_ESD_CHECK_PERIOD);
+	}
 
-	if (panel_data->use_esd_check)
-		queue_delayed_work(td->esd_wq, &td->esd_work,
-				TAAL_ESD_CHECK_PERIOD);
-
-	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-
-	mutex_unlock(&td->lock);
-
-	return 0;
-err:
-	dev_dbg(&dssdev->dev, "enable failed\n");
 	mutex_unlock(&td->lock);
 	return r;
 }
 
-static void taal_disable(struct omap_dss_device *dssdev)
+static void taal_stop(struct omap_dss_device *dssdev)
 {
 	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
 	enum omap_dsi_index ix;
 
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
-	dev_dbg(&dssdev->dev, "disable\n");
-
-	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
-		return ;
-
-	if (td->force_update) {
-		dsi_bus_lock(ix);
-		_taal_enable_te(dssdev, 0);
-		dsi_bus_unlock(ix);
-	}
-
-	mutex_lock(&td->lock);
-
-	if (td->force_update)
-		td->te_enabled = 0;
-
-	cancel_delayed_work(&td->esd_work);
-
-	dsi_bus_lock(ix);
-
-	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
-		taal_power_off(dssdev);
-
-	dsi_bus_unlock(ix);
-
-	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
-
-	mutex_unlock(&td->lock);
-}
-
-static int taal_suspend(struct omap_dss_device *dssdev)
-{
-	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
-	int r;
-	enum omap_dsi_index ix;
-
-	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
-
-	dev_dbg(&dssdev->dev, "suspend\n");
-
-	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
-		r = -EINVAL;
-		goto err;
-	}
 	if (td->force_update) {
 		dsi_bus_lock(ix);
 		_taal_enable_te(dssdev, 0);
@@ -1151,60 +1099,52 @@ static int taal_suspend(struct omap_dss_device *dssdev)
 
 	dsi_bus_unlock(ix);
 
+	mutex_unlock(&td->lock);
+}
+
+static void taal_disable(struct omap_dss_device *dssdev)
+{
+	dev_dbg(&dssdev->dev, "disable\n");
+
+	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE ||
+	    dssdev->state == OMAP_DSS_DISPLAY_TRANSITION)
+		taal_stop(dssdev);
+
+	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+}
+
+static int taal_suspend(struct omap_dss_device *dssdev)
+{
+	dev_dbg(&dssdev->dev, "suspend\n");
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
+		return -EINVAL;
+
+	taal_stop(dssdev);
+
 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
 
-	mutex_unlock(&td->lock);
-
 	return 0;
-err:
-	mutex_unlock(&td->lock);
-	return r;
+}
+
+static int taal_enable(struct omap_dss_device *dssdev)
+{
+	dev_dbg(&dssdev->dev, "enable\n");
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
+		return -EINVAL;
+
+	return taal_start(dssdev);
 }
 
 static int taal_resume(struct omap_dss_device *dssdev)
 {
-	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
-	struct nokia_dsi_panel_data *panel_data = get_panel_data(dssdev);
-	int r;
-	enum omap_dsi_index ix;
-
-	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
-
 	dev_dbg(&dssdev->dev, "resume\n");
 
-	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
-		r = -EINVAL;
-		goto err;
-	}
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
+		return -EINVAL;
 
-	mutex_lock(&td->lock);
-
-	if (td->force_update) {
-		td->te_enabled = 1;
-		taal_prepare_workqueue(dssdev);
-	}
-
-	dsi_bus_lock(ix);
-
-	r = taal_power_on(dssdev);
-
-	dsi_bus_unlock(ix);
-
-	if (r) {
-		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
-	} else {
-		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-		if (panel_data->use_esd_check)
-			queue_delayed_work(td->esd_wq, &td->esd_work,
-					TAAL_ESD_CHECK_PERIOD);
-	}
-
-	mutex_unlock(&td->lock);
-
-	return r;
-err:
-	mutex_unlock(&td->lock);
-	return r;
+	return taal_start(dssdev);
 }
 
 static void taal_framedone_cb(int err, void *data)
