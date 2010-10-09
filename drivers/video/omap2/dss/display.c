@@ -81,7 +81,13 @@ static ssize_t display_enabled_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct omap_dss_device *dssdev = to_dss_device(dev);
-	bool enabled = dssdev->state != OMAP_DSS_DISPLAY_DISABLED;
+	bool enabled;
+
+	/* show resume info for suspended displays */
+	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		enabled = dssdev->activate_after_resume;
+	else
+		enabled  = dssdev->state != OMAP_DSS_DISPLAY_DISABLED;
 
 	return snprintf(buf, PAGE_SIZE, "%d\n", enabled);
 }
@@ -91,21 +97,15 @@ static ssize_t display_enabled_store(struct device *dev,
 		const char *buf, size_t size)
 {
 	struct omap_dss_device *dssdev = to_dss_device(dev);
-	bool enabled, r;
+	bool enabled = simple_strtoul(buf, NULL, 10);
+	int r = 0;
 
-	enabled = simple_strtoul(buf, NULL, 10);
+	if (enabled)
+		r = omapdss_display_enable(dssdev);
+	else
+		omapdss_display_disable(dssdev);
 
-	if (enabled != (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)) {
-		if (enabled) {
-			r = dssdev->driver->enable(dssdev);
-			if (r)
-				return r;
-		} else {
-			dssdev->driver->disable(dssdev);
-		}
-	}
-
-	return size;
+	return r ? : size;
 }
 
 static ssize_t display_upd_mode_show(struct device *dev,

@@ -323,11 +323,11 @@ static int hdmi_ioctl(struct inode *inode, struct file *file,
 
 	switch (cmd) {
 	case HDMI_ENABLE:
-		r = hdmi_enable_display(dssdev);
+		r = omapdss_display_enable(dssdev);
 		break;
 
 	case HDMI_DISABLE:
-		hdmi_disable_display(dssdev);
+		omapdss_display_disable(dssdev);
 		break;
 	case HDMI_READ_EDID:
 		hdmi_get_edid(dssdev);

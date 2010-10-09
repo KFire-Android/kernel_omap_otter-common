@@ -3191,14 +3191,10 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 		if (def_display) {
 			struct omap_dss_driver *dssdrv = def_display->driver;
 
-			ret = dssdrv->enable(def_display);
+			ret = omapdss_display_enable(def_display);
 			if (ret) {
-				/* Here we are not considering a error
-				 *  as display may be enabled by frame
-				 *  buffer driver
-				 */
-				dev_warn(&pdev->dev,
-					"'%s' Display already enabled\n",
+				dev_err(&pdev->dev,
+					"Failed to enable '%s' display\n",
 					def_display->name);
 			}
 			/* set the update mode */

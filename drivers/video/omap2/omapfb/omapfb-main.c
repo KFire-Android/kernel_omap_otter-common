@@ -2487,7 +2487,7 @@ static int omapfb_probe(struct platform_device *pdev)
 	if (def_display) {
 		struct omap_dss_driver *dssdrv = def_display->driver;
 
-		r = def_display->driver->enable(def_display);
+		r = omapdss_display_enable(def_display);
 		if (r) {
 			dev_warn(fbdev->dev, "Failed to enable display '%s'\n",
 					def_display->name);
