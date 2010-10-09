@@ -303,6 +303,7 @@ static void dss_clk_enable_no_ctx(enum dss_clock clks)
 {
 	unsigned num_clks = count_clk_bits(clks);
 
+	/* don't do aggressive clock cutting on OMAP4 */
 	if (cpu_is_omap44xx())
 		return;
 

@@ -139,14 +139,28 @@ bool dss_get_mainclk_state()
 	return dss.mainclk_state;
 }
 
+/*
+ * OMAP4 does not allow aggressive DSS clock cutting, so we must keep the
+ * clocks enabled during display use.  These next two methods on OMAP4
+ * enable and disable all DSS clocks (main and needed optional).
+ */
 int dss_mainclk_enable()
 {
 	int ret = 0;
 
 	if (!dss.mainclk_state) {
-		ret = pm_runtime_get_sync(&dss.pdev->dev);
+		if (cpu_is_omap44xx())
+			ret = dss_opt_clock_enable();
+
+		if (!ret)
+			ret = pm_runtime_get_sync(&dss.pdev->dev);
+		else
+			dss_opt_clock_disable();
+
 		if (!ret)
 			dss.mainclk_state = true;
+	} else {
+		return -EBUSY;
 	}
 
 	return ret;
@@ -157,6 +171,9 @@ void dss_mainclk_disable()
 	if (dss.mainclk_state) {
 		dss.mainclk_state = false;
 		pm_runtime_put_sync(&dss.pdev->dev);
+
+		if (cpu_is_omap44xx())
+			dss_opt_clock_disable();
 	}
 }
 
@@ -687,7 +704,6 @@ int dss_init(struct platform_device *pdev)
 		goto fail0;
 	}
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_FCK2 | DSS_CLK_54M | DSS_CLK_96M);
-	dss_opt_clock_enable();
 	dss_mainclk_enable();
 
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
