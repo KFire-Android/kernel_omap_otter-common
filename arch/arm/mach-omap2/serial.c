@@ -313,11 +313,7 @@ static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
 		if (uart->dma_enabled)
 			idlemode = HWMOD_IDLEMODE_FORCE;
 		else {
-			/* REVISIT: need to find the root cause */
-			if (cpu_is_omap44xx() && uart->num == 2)
-				idlemode = HWMOD_IDLEMODE_FORCE;
-			else
-				idlemode = HWMOD_IDLEMODE_SMART;
+			idlemode = HWMOD_IDLEMODE_SMART;
 		}
 	} else {
 		idlemode = HWMOD_IDLEMODE_NO;
