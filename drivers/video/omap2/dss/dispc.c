@@ -1642,6 +1642,32 @@ static void _dispc_set_channel_out(enum omap_plane plane,
 	dispc_write_reg(dispc_reg_att[plane], val);
 }
 
+static void _dispc_set_wb_channel_out(enum omap_plane plane)
+{
+	int shift;
+	u32 val;
+
+	switch (plane) {
+	case OMAP_DSS_GFX:
+		shift = 8;
+		break;
+	case OMAP_DSS_VIDEO1:
+	case OMAP_DSS_VIDEO2:
+	case OMAP_DSS_VIDEO3:
+		shift = 16;
+		break;
+	default:
+		BUG();
+		return;
+	}
+
+	val = dispc_read_reg(dispc_reg_att[plane]);
+	val = FLD_MOD(val, 0, shift, shift);
+	val = FLD_MOD(val, 3, 31, 30);
+
+	dispc_write_reg(dispc_reg_att[plane], val);
+}
+
 void dispc_set_burst_size(enum omap_plane plane,
 		enum omap_burst_size burst_size)
 {
@@ -2911,7 +2937,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		u8 rotation, int mirror,
 		u8 global_alpha,
 		enum omap_channel channel, u32 puv_addr,
-		u16 pic_height)
+		u16 pic_height, bool wb_source)
 {
 	bool fieldmode = 0;
 	int cconv = 0;
@@ -2921,7 +2947,6 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
 	int bpp = color_mode_to_bpp(color_mode) / 8;
-	bool source_of_WB = false;
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -3102,11 +3127,9 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	DSSDBG("offset0 %u, offset1 %u, row_inc %d, pix_inc %d\n",
 			offset0, offset1, row_inc, pix_inc);
 
-	if (IS_VIDEO_PIPELINE(plane))
-		if ((REG_GET(dispc_reg_att[plane], 16, 16) == 0) &&
-			(REG_GET(dispc_reg_att[plane], 31, 30) == 0x3))
-				source_of_WB = true;
-	if (!source_of_WB)
+	if (wb_source)
+		_dispc_set_wb_channel_out(plane);
+	else
 		_dispc_set_channel_out(plane, channel);
 	_dispc_set_color_mode(plane, color_mode);
 
@@ -4873,7 +4896,7 @@ int dispc_setup_plane(enum omap_plane plane,
 			enum omap_dss_rotation_type rotation_type,
 			u8 rotation, bool mirror, u8 global_alpha,
 			enum omap_channel channel, u32 puv_addr,
-			u16 pic_height)
+			u16 pic_height, bool wb_source)
 
 {
 	int r = 0;
@@ -4899,7 +4922,7 @@ int dispc_setup_plane(enum omap_plane plane,
 			   rotation, mirror,
 			   global_alpha,
 			   channel, puv_addr,
-			   pic_height);
+			   pic_height, wb_source);
 
 	enable_clocks(0);
 
@@ -4946,7 +4969,6 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	enum omap_writeback_source			source = wb->source;
 
 	enum omap_plane plane = OMAP_DSS_WB;
-	enum omap_plane input_plane;
 
 	const int maxdownscale = 2;
 	bool three_taps = 0;
@@ -5013,21 +5035,6 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	/* We handle ONLY overlays as source yet, NOT Managers */
 	/* TODO: remove this check once managers are accepted as source */
 	if (source > OMAP_WB_TV_MANAGER) {
-		input_plane = (source - 3);
-
-		DSSDBG("input pipeline is not an overlay manager"
-				"so overlay %d is configured\n", input_plane);
-		/* Set the channel out for input source: DISPC_VIDX_ATTRIBUTES[31:30]
-		 * CHANNELOUT2 as WB (0x3)
-		 */
-		REG_FLD_MOD(dispc_reg_att[input_plane], 0x3, 31, 30);
-		/* Set the channel out for input source: DISPC_VIDX_ATTRIBUTES[16]
-		 * CHANNELOUT as LCD / WB (0x0)
-		 */
-		REG_FLD_MOD(dispc_reg_att[input_plane], 0x0, 16, 16);
-
-		REG_FLD_MOD(dispc_reg_att[input_plane], 0x1, 10, 10);
-		REG_FLD_MOD(dispc_reg_att[input_plane], 0x1, 19, 19);
 		REG_FLD_MOD(dispc_reg_att[plane], source, 18, 16);
 #ifndef CONFIG_OMAP4_ES1
 		/* Memory to memory mode bit is set on ES 2.0 */
@@ -5196,3 +5203,14 @@ void dispc_go_wb(void)
 end:
 	enable_clocks(0);
 }
+
+void dispc_cancel_go_wb(void)
+{
+	enable_clocks(1);
+
+	if (REG_GET(DISPC_CONTROL2, 6, 6) == 1) {
+		REG_FLD_MOD(DISPC_CONTROL2, 0, 6, 6);
+	}
+	enable_clocks(0);
+}
+

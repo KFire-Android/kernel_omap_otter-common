@@ -463,7 +463,7 @@ int dispc_setup_plane(enum omap_plane plane,
 		      enum omap_dss_rotation_type rotation_type,
 		      u8 rotation, bool mirror,
 		      u8 global_alpha, enum omap_channel channel,
-		      u32 puv_addr, u16 pic_height);
+		      u32 puv_addr, u16 pic_height, bool wb_source);
 
 bool dispc_go_busy(enum omap_channel channel);
 void dispc_go(enum omap_channel channel);
@@ -511,6 +511,7 @@ int dispc_set_clock_div(enum omap_channel channel,
 int dispc_get_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
 void dispc_go_wb(void);
+void dispc_cancel_go_wb(void);
 void dispc_flush_wb(struct writeback_cache_data *wb);
 int dispc_setup_wb(struct writeback_cache_data *wb);
 
