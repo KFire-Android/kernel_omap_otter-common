@@ -3132,7 +3132,7 @@ static int omap_vout_remove(struct platform_device *pdev)
 
 	for (k = 0; k < vid_dev->num_displays; k++) {
 		if (vid_dev->displays[k]->state != OMAP_DSS_DISPLAY_DISABLED)
-			vid_dev->displays[k]->driver->disable(vid_dev->displays[k]);
+			omapdss_display_disable(vid_dev->displays[k]);
 
 		omap_dss_put_device(vid_dev->displays[k]);
 	}
@@ -3254,7 +3254,7 @@ probe_err1:
 			def_display = ovl->manager->device;
 
 		if (def_display && def_display->driver)
-			def_display->driver->disable(def_display);
+			omapdss_display_disable(def_display);
 	}
 probe_err0:
 	kfree(vid_dev);

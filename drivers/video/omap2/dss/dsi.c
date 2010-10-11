@@ -3835,9 +3835,9 @@ static void dsi_error_recovery_worker(struct work_struct *work)
 
 		if (recover->dssdev->driver->run_test(recover->dssdev, 1) != 0) {
 			DSSERR("DSS IF reset failed, resetting panel taal%d\n", ix + 1);
-			recover->dssdev->driver->disable(recover->dssdev);
+			omapdss_display_disable(recover->dssdev);
 			mdelay(10);
-			recover->dssdev->driver->enable(recover->dssdev);
+			omapdss_display_enable(recover->dssdev);
 			recover->recovering = false;
 		}
 		return;

@@ -2009,7 +2009,7 @@ static void omapfb_free_resources(struct omapfb2_device *fbdev)
 
 	for (i = 0; i < fbdev->num_displays; i++) {
 		if (fbdev->displays[i]->state != OMAP_DSS_DISPLAY_DISABLED)
-			fbdev->displays[i]->driver->disable(fbdev->displays[i]);
+			omapdss_display_disable(fbdev->displays[i]);
 
 		omap_dss_put_device(fbdev->displays[i]);
 	}
