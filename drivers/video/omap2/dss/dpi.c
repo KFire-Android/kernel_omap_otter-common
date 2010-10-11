@@ -254,10 +254,12 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 
 	mdelay(2);
 
-	if (cpu_is_omap44xx())
-		dpi_start_auto_update(dssdev);
+	if (dssdev->manager) {
+		if (cpu_is_omap44xx())
+			dpi_start_auto_update(dssdev);
 
-	dssdev->manager->enable(dssdev->manager);
+		dssdev->manager->enable(dssdev->manager);
+	}
 
 	return 0;
 
@@ -284,7 +286,8 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
-	dssdev->manager->disable(dssdev->manager);
+	if (dssdev->manager)
+		dssdev->manager->disable(dssdev->manager);
 
 #ifdef HWMOD
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL

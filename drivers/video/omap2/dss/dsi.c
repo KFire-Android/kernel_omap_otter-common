@@ -2380,7 +2380,7 @@ static int dsi_vc_send_short(enum omap_dsi_index ix,
 	u32 r;
 	u8 data_id;
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
- 
+
 	WARN_ON(!dsi_bus_is_locked(ix));
 
 	if (p_dsi->debug_write)
@@ -3187,7 +3187,7 @@ static void dsi_handle_framedone(enum omap_dsi_index ix, int error)
 
 	p_dsi->bta_callback = NULL;
 
-	if (error == -ETIMEDOUT)
+	if (error == -ETIMEDOUT && device->manager)
 		/* Ensures recovery of DISPC after a failed lcd_enable*/
 		device->manager->disable(device->manager);
 
@@ -3376,7 +3376,8 @@ int omap_dsi_prepare_update(struct omap_dss_device *dssdev,
 
 	dsi_perf_mark_setup(ix);
 
-	if (dssdev->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
+	if (dssdev->manager &&
+	    (dssdev->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC)) {
 		dss_setup_partial_planes(dssdev, x, y, w, h,
 				enlarge_update_area);
 		dispc_set_lcd_size(dssdev->channel, *w, *h);
@@ -3405,21 +3406,23 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 	 * see rather obscure HW error happening, as DSS halts. */
 	BUG_ON(x % 2 == 1);
 
-	if (dssdev->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
-		p_dsi->framedone_callback = callback;
-		p_dsi->framedone_data = data;
+	if (dssdev->manager) {
+		if (dssdev->manager->caps & OMAP_DSS_OVL_MGR_CAP_DISPC) {
+			p_dsi->framedone_callback = callback;
+			p_dsi->framedone_data = data;
 
-		p_dsi->update_region.x = x;
-		p_dsi->update_region.y = y;
-		p_dsi->update_region.w = w;
-		p_dsi->update_region.h = h;
-		p_dsi->update_region.device = dssdev;
+			p_dsi->update_region.x = x;
+			p_dsi->update_region.y = y;
+			p_dsi->update_region.w = w;
+			p_dsi->update_region.h = h;
+			p_dsi->update_region.device = dssdev;
 
-		dsi_update_screen_dispc(dssdev, x, y, w, h);
-	} else {
-		dsi_update_screen_l4(dssdev, x, y, w, h);
-		dsi_perf_show(ix, "L4");
-		callback(0, data);
+			dsi_update_screen_dispc(dssdev, x, y, w, h);
+		} else {
+			dsi_update_screen_l4(dssdev, x, y, w, h);
+			dsi_perf_show(ix, "L4");
+			callback(0, data);
+		}
 	}
 
 	return 0;
@@ -3431,7 +3434,7 @@ EXPORT_SYMBOL(omap_dsi_update);
 static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 {
 	int r;
- 
+
 	r = omap_dispc_register_isr((dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
 			dsi_framedone_irq_callback : dsi2_framedone_irq_callback,
 			NULL, (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
@@ -3625,7 +3628,7 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev)
 {
 	enum omap_dsi_index ix;
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
-   
+
 	/* disable interface */
 	dsi_if_enable(ix, 0);
 	dsi_vc_enable(ix, 0, 0);
@@ -4059,8 +4062,8 @@ void dsi_exit(void)
 void dsi2_exit(void)
 {
 	iounmap(dsi2.base);
-	
+
 	destroy_workqueue(dsi2.workqueue);
-	
+
 	DSSDBG("omap_dsi2_exit\n");
 }
