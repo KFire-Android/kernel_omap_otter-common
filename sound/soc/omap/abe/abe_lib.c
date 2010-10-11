@@ -500,11 +500,8 @@ void abe_gain_offset(u32 id, u32 *mixer_offset)
  */
 u32 abe_valid_port_for_synchro(u32 id)
 {
-	if ((abe_port[id].protocol.protocol_switch ==
-	     DMAREQ_PORT_PROT) ||
-	    (abe_port[id].protocol.protocol_switch ==
-	     PINGPONG_PORT_PROT) ||
-	    (abe_port[id].status != OMAP_ABE_PORT_ACTIVITY_RUNNING))
+	if ((abe_port[id].protocol.protocol_switch == DMAREQ_PORT_PROT) ||
+		(abe_port[id].protocol.protocol_switch == PINGPONG_PORT_PROT))
 		return 0;
 	else
 		return 1;
@@ -512,14 +509,16 @@ u32 abe_valid_port_for_synchro(u32 id)
 void abe_decide_main_port(u32 id)
 {
 	u32 i;
+
 	if (abe_valid_port_for_synchro(id)) {
 		for (i = 0; i < (LAST_PORT_ID - 1); i++) {
-			printk("Port (%d,%d) %d\n", i, abe_port_priority[i],
-			       abe_port[abe_port_priority[i]].status);
 			if (abe_port[abe_port_priority[i]].status ==
-			    OMAP_ABE_PORT_ACTIVITY_RUNNING)
+					OMAP_ABE_PORT_ACTIVITY_RUNNING)
 				break;
 		}
-		abe_select_main_port(abe_port_priority[i]);
+
+		if (i < (LAST_PORT_ID - 1))
+			id = abe_port_priority[i];
+		abe_select_main_port(id);
 	}
 }
