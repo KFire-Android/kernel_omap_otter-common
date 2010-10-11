@@ -524,6 +524,7 @@ struct omap_writeback_info {
 		unsigned long				paddr;
 		/* NV12 support*/
 		unsigned long				puv_addr;
+		unsigned int				line_skip;
 
 };
 

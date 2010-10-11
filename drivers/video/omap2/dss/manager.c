@@ -1635,6 +1635,7 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 				wbc->height = wb->info.out_height;
 				wbc->input_width = wb->info.width;
 				wbc->input_height = wb->info.height;
+				wbc->line_skip = wb->info.line_skip;
 
 				wbc->paddr = wb->info.paddr;
 				wbc->puv_addr = wb->info.puv_addr;

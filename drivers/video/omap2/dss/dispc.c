@@ -4932,6 +4932,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	u16 out_height	= wb->height;
 	u16 width = wb->input_width;
 	u16 height = wb->input_height;
+	u32 lines_to_skip = wb->line_skip;
 
 	unsigned offset1 = 0;
 	enum device_n_buffer_type ilace = PBUF_PDEV;
@@ -5039,7 +5040,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 		tiler_width = width, tiler_height = height;
 
 		calc_tiler_row_rotation(rotation, out_width,
-						color_mode, 1, /* y_decim = 1 */
+						color_mode, lines_to_skip+1, /* y_decim = 1 */
 						&row_inc,
 						&offset1, ilace,
 						pic_height);
@@ -5067,8 +5068,36 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 						paddr, puv_addr);
 		/* set BURSTTYPE if rotation is non-zero */
 		REG_FLD_MOD(dispc_reg_att[plane], 0x1, 8, 8);
-	} else
-	row_inc = 1;
+	} else {
+		row_inc = 1;
+		if (lines_to_skip) {
+			u8 ps;
+			switch (color_mode) {
+			case OMAP_DSS_COLOR_RGB16:
+			case OMAP_DSS_COLOR_ARGB16:
+
+			case OMAP_DSS_COLOR_YUV2:
+			case OMAP_DSS_COLOR_UYVY:
+				ps = 2;
+				break;
+
+			case OMAP_DSS_COLOR_RGB24P:
+			case OMAP_DSS_COLOR_RGB24U:
+			case OMAP_DSS_COLOR_ARGB32:
+			case OMAP_DSS_COLOR_RGBA32:
+			case OMAP_DSS_COLOR_RGBX32:
+				ps = 4;
+				break;
+			case OMAP_DSS_COLOR_NV12:
+				ps = 1;
+				break;
+			default:
+				BUG();
+				return -EINVAL;
+			}
+			row_inc += width * ps * lines_to_skip;
+		}
+	}
 
 
 	_dispc_set_color_mode(plane, color_mode);
