@@ -23,6 +23,7 @@
  *				May 2010 Added support of Hot Plug Detect
  *				July 2010 Redesigned HDMI EDID for Auto-detect of timing
  *				August 2010 Char device user space control for HDMI
+ * Munish <munish@ti.com>	Sep 2010 Added support for Mandatory S3D formats
  */
 
 #define DSS_SUBSYS_NAME "HDMI"
@@ -71,7 +72,10 @@ static int hdmi_open(struct inode *inode, struct file *filp);
 static int hdmi_release(struct inode *inode, struct file *filp);
 static int hdmi_ioctl(struct inode *inode, struct file *file,
 					  unsigned int cmd, unsigned long arg);
-
+static bool hdmi_get_s3d_enabled(struct omap_dss_device *dssdev);
+static int hdmi_enable_s3d(struct omap_dss_device *dssdev, bool enable);
+static int hdmi_set_s3d_disp_type(struct omap_dss_device *dssdev,
+		struct s3d_disp_info *info);
 
 /*Structures for chardevice move this to panel*/
 static int hdmi_major;
@@ -110,6 +114,32 @@ enum hdmi_ioctl_cmds {
 	HDMI_READ_EDID,
 };
 
+enum hdmi_s3d_frame_structure {
+	HDMI_S3D_FRAME_PACKING          = 0,
+	HDMI_S3D_FIELD_ALTERNATIVE      = 1,
+	HDMI_S3D_LINE_ALTERNATIVE       = 2,
+	HDMI_S3D_SIDE_BY_SIDE_FULL      = 3,
+	HDMI_S3D_L_DEPTH                = 4,
+	HDMI_S3D_L_DEPTH_GP_GP_DEPTH    = 5,
+	HDMI_S3D_SIDE_BY_SIDE_HALF      = 8
+};
+
+/* Subsampling types used for Sterioscopic 3D over HDMI. Below HOR
+stands for Horizontal, QUI for Quinxcunx Subsampling, O for odd fields,
+E for Even fields, L for left view and R for Right view*/
+enum hdmi_s3d_subsampling_type {
+	HDMI_S3D_HOR_OL_OR = 0,/*horizontal subsampling with odd fields
+		from left view and even fields from the right view*/
+	HDMI_S3D_HOR_OL_ER = 1,
+	HDMI_S3D_HOR_EL_OR = 2,
+	HDMI_S3D_HOR_EL_ER = 3,
+	HDMI_S3D_QUI_OL_OR = 4,
+	HDMI_S3D_QUI_OL_ER = 5,
+	HDMI_S3D_QUI_EL_OR = 6,
+	HDMI_S3D_QUI_EL_ER = 7
+};
+
+
 /* PLL */
 #define PLLCTRL_PLL_CONTROL				0x0ul
 #define PLLCTRL_PLL_STATUS				0x4ul
@@ -126,7 +156,7 @@ enum hdmi_ioctl_cmds {
 #define HDMI_TXPHY_PAD_CFG_CTRL			0xCul
 
 /*This is the structure which has all supported timing values that OMAP4 supports*/
-const struct omap_video_timings all_timings_direct[31] = {
+const struct omap_video_timings all_timings_direct[34] = {
 						{640, 480, 25200, 96, 16, 48, 2, 10, 33},
 						{1280, 720, 74250, 40, 440, 220, 5, 5, 20},
 						{1280, 720, 74250, 40, 110, 220, 5, 5, 20},
@@ -158,13 +188,17 @@ const struct omap_video_timings all_timings_direct[31] = {
 						{1920, 1080, 148500, 44, 88, 80, 5, 4, 36},
 						{1280, 768, 68250, 32, 48, 80, 7, 3, 12},
 						{1400, 1050, 101000, 32, 48, 80, 4, 3, 23},
-						{1680, 1050, 119000, 32, 48, 80, 6, 3, 21} };
+						{1680, 1050, 119000, 32, 48, 80, 6, 3, 21},
+						/*supported 3d timings UNDEROVER full frame*/
+						{1280, 1470, 148350, 40, 110, 220, 5, 5, 20},
+						{1280, 1470, 148500, 40, 110, 220, 5, 5, 20},
+						{1280, 1470, 148500, 40, 440, 220, 5, 5, 20} };
 
 /*This is a static Mapping array which maps the timing values with corresponding CEA / VESA code*/
-int code_index[31] = {1, 19, 4, 2, 37, 6, 21, 20, 5, 16, 17, 29, 31, 35,
+int code_index[34] = {1, 19, 4, 2, 37, 6, 21, 20, 5, 16, 17, 29, 31, 35,
 			/* <--14 CEA 17--> vesa*/
 			4, 9, 0xE, 0x17, 0x1C, 0x27, 0x20, 0x23, 0x10, 0x2A,
-			0X2F, 0x3A, 0X51, 0X52, 0x16, 0x29, 0x39};
+			0X2F, 0x3A, 0X51, 0X52, 0x16, 0x29, 0x39, 4, 4, 19};
 
 /*This is revere static mapping which maps the CEA / VESA code to the corresponding timing values*/
 /* note: table is 10 entries per line to make it easier to find index.. */
@@ -173,6 +207,16 @@ int code_cea[39] = {
 		-1, -1, -1, -1, -1, -1,  9, 10, 10,  1,
 		7,   6,  6, -1, -1, -1, -1, -1, -1, 11,
 		11, 12, -1, -1, -1, 13, 13,  4,  4};
+
+/*
+ * This is a reverse static mapping array that maps the CEA / VESA codes to
+ * the corresponding 3d timing values
+ */
+static int s3d_code_cea[39] = {
+	-1, -1, -1, -1, 32, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, 33, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1
+};
 
 /* note: table is 10 entries per line to make it easier to find index.. */
 int code_vesa[83] = {
@@ -186,6 +230,12 @@ int code_vesa[83] = {
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, 26, 27};
 
+static struct hdmi_s3d_info {
+	bool subsamp;
+	int  structure;
+	int  subsamp_pos;
+} hdmi_s3d;
+
 struct hdmi {
 	struct kobject kobj;
 	void __iomem *base_phy;
@@ -193,6 +243,7 @@ struct hdmi {
 	struct mutex lock;
 	int code;
 	int mode;
+	bool s3d_enabled;
 	struct hdmi_config cfg;
 	struct omap_display_platform_data *pdata;
 	struct platform_device *pdev;
@@ -642,6 +693,20 @@ static int hdmi_phy_off(u32 name)
 	return 0;
 }
 
+static int get_s3d_timings_index(void)
+{
+	int code;
+
+	code = s3d_code_cea[hdmi.code];
+
+	if (code == -1) {
+		hdmi.s3d_enabled = false;
+		code = 9;
+		hdmi.code = 16;
+		hdmi.mode = 1;
+	}
+	return code;
+}
 /* driver */
 static int get_timings_index(void)
 {
@@ -737,6 +802,11 @@ static struct omap_dss_driver hdmi_driver = {
 	.get_edid	= hdmi_get_edid,
 	.set_custom_edid_timing_code	= hdmi_set_custom_edid_timing_code,
 	.hpd_enable	=	hdmi_enable_hpd,
+
+	.enable_s3d = hdmi_enable_s3d,
+	.get_s3d_enabled = hdmi_get_s3d_enabled,
+	.set_s3d_disp_type = hdmi_set_s3d_disp_type,
+
 	.driver			= {
 		.name   = "hdmi_panel",
 		.owner  = THIS_MODULE,
@@ -749,6 +819,10 @@ int hdmi_init(struct platform_device *pdev)
 	int r = 0, hdmi_irq;
 	struct resource *hdmi_mem;
 	printk("Enter hdmi_init()\n");
+
+	hdmi_s3d.structure = HDMI_S3D_FRAME_PACKING;
+	hdmi_s3d.subsamp = false;
+	hdmi_s3d.subsamp_pos = 0;
 
 	hdmi.pdata = pdev->dev.platform_data;
 	hdmi.pdev = pdev;
@@ -850,7 +924,10 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	update_cfg(&hdmi.cfg, p);
 
-	code = get_timings_index();
+	if (hdmi.s3d_enabled && (hdmi_s3d.structure == HDMI_S3D_FRAME_PACKING))
+		code = get_s3d_timings_index();
+	else
+		code = get_timings_index();
 	dssdev->panel.timings = all_timings_direct[code];
 
 	DSSDBG("hdmi_power on x_res= %d y_res = %d", \
@@ -884,6 +961,14 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 		DSSERR("Failed to start PHY\n");
 		r = -EIO;
 		goto err;
+	}
+
+	if (hdmi.s3d_enabled) {
+		hdmi.cfg.vsi_enabled = true;
+		hdmi.cfg.s3d_structure = hdmi_s3d.structure;
+		hdmi.cfg.subsamp_pos = hdmi_s3d.subsamp_pos;
+	} else {
+		hdmi.cfg.vsi_enabled = false;
 	}
 
 	hdmi.cfg.hdmi_dvi = hdmi.mode;
@@ -944,6 +1029,16 @@ int hdmi_min_enable(void)
 	if (r) {
 		DSSERR("Failed to start PHY\n");
 	}
+
+
+	if (hdmi.s3d_enabled) {
+		hdmi.cfg.vsi_enabled = true;
+		hdmi.cfg.s3d_structure = hdmi_s3d.structure;
+		hdmi.cfg.subsamp_pos = hdmi_s3d.subsamp_pos;
+	} else {
+		hdmi.cfg.vsi_enabled = false;
+	}
+
 	hdmi.cfg.hdmi_dvi = hdmi.mode;
 	hdmi.cfg.video_format = hdmi.code;
 	hdmi_lib_enable(&hdmi.cfg);
@@ -1487,6 +1582,98 @@ static int hdmi_check_timings(struct omap_dss_device *dssdev,
 	return -EINVAL;
 }
 
+static int hdmi_set_s3d_disp_type(struct omap_dss_device *dssdev,
+						struct s3d_disp_info *info)
+{
+	int r = -EINVAL;
+	struct hdmi_s3d_info tinfo;
+
+	tinfo.structure = 0;
+	tinfo.subsamp = false;
+	tinfo.subsamp_pos = 0;
+
+	printk(KERN_INFO"set s3d\n");
+
+	switch (info->type) {
+	case S3D_DISP_OVERUNDER:
+		if (info->sub_samp == S3D_DISP_SUB_SAMPLE_NONE) {
+			tinfo.structure = HDMI_S3D_FRAME_PACKING;
+			r = 0;
+		} else {
+			goto err;
+		}
+		break;
+	case S3D_DISP_SIDEBYSIDE:
+		if (info->sub_samp == S3D_DISP_SUB_SAMPLE_H) {
+			tinfo.structure = HDMI_S3D_SIDE_BY_SIDE_HALF;
+			tinfo.subsamp = true;
+			tinfo.subsamp_pos = HDMI_S3D_HOR_EL_ER;
+			r = 0;
+		} else {
+			goto err;
+		}
+		break;
+	default:
+		goto err;
+	}
+	hdmi_s3d = tinfo;
+err:
+	return r;
+}
+
+static int hdmi_enable_s3d(struct omap_dss_device *dssdev, bool enable)
+{
+	int r = -EINVAL;
+
+	printk(KERN_INFO"enable_s3d flag = %d\n", enable);
+	if (enable == true) {
+		/*enable format*/
+		hdmi_disable_display(dssdev);
+		hdmi.s3d_enabled = true;
+		r = hdmi_enable_display(dssdev);
+		if (r == 0 && hdmi.s3d_enabled == true) {
+			switch (hdmi_s3d.structure) {
+			case HDMI_S3D_FRAME_PACKING:
+				dssdev->panel.s3d_info.type =
+							S3D_DISP_OVERUNDER;
+				dssdev->panel.s3d_info.gap = 30;
+				if (hdmi_s3d.subsamp == true)
+					dssdev->panel.s3d_info.sub_samp =
+							S3D_DISP_SUB_SAMPLE_V;
+				break;
+			case HDMI_S3D_SIDE_BY_SIDE_HALF:
+				dssdev->panel.s3d_info.type =
+							S3D_DISP_SIDEBYSIDE;
+				dssdev->panel.s3d_info.gap = 0;
+				if (hdmi_s3d.subsamp == true)
+					dssdev->panel.s3d_info.sub_samp =
+							S3D_DISP_SUB_SAMPLE_H;
+				break;
+			default:
+				r = -EINVAL;
+				break;
+			}
+			dssdev->panel.s3d_info.order = S3D_DISP_ORDER_L;
+		}
+	} else {
+		hdmi.s3d_enabled = false;
+		hdmi.code = 16;
+		hdmi.mode = 1;
+
+		hdmi_disable_display(dssdev);
+		r = hdmi_enable_display(dssdev);
+	}
+
+	return r;
+}
+
+
+static bool hdmi_get_s3d_enabled(struct omap_dss_device *dssdev)
+{
+	return hdmi.s3d_enabled;
+}
+
+
 int hdmi_init_display(struct omap_dss_device *dssdev)
 {
 	printk("init_display\n");
@@ -1517,6 +1704,14 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 		printk(KERN_WARNING "HDMI failed to read E-EDID\n");
 	else {
 		if (!memcmp(edid, header, sizeof(header))) {
+			if (hdmi.s3d_enabled) {
+				if (!hdmi_s3d_supported(edid)) {
+					printk(KERN_INFO "TV does not Support 3D");
+					hdmi.s3d_enabled = false;
+					ret = -EINVAL;
+				}
+				printk(KERN_INFO "TV Supports 3D");
+			}
 			/* search for timings of default resolution */
 			if (get_edid_timing_data((struct HDMI_EDID *) edid))
 				edid_set = true;
@@ -1529,7 +1724,10 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 		hdmi.code = 4; /*setting default value of 640 480 VGA*/
 		hdmi.mode = 0;
 	}
-	code = get_timings_index();
+	if (hdmi.s3d_enabled && hdmi_s3d.structure == HDMI_S3D_FRAME_PACKING)
+		code = get_s3d_timings_index();
+	else
+		code = get_timings_index();
 
 	*dp = all_timings_direct[code];
 
@@ -1563,6 +1761,8 @@ static int get_edid_timing_data(struct HDMI_EDID *edid)
 			count, cm.code, cm.mode);
 		if (cm.code == -1)
 			continue;
+		else if (hdmi.s3d_enabled && s3d_code_cea[cm.code] == -1)
+			continue;
 		else {
 			hdmi.code = cm.code;
 			hdmi.mode = cm.mode;
@@ -1585,6 +1785,8 @@ static int get_edid_timing_data(struct HDMI_EDID *edid)
 			DSSDBG("Block1[%d] value matches code = %d , mode = %d",\
 				count, cm.code, cm.mode);
 			if (cm.code == -1)
+				continue;
+			else if (hdmi.s3d_enabled && s3d_code_cea[cm.code] == -1)
 				continue;
 			else {
 				hdmi.code = cm.code;

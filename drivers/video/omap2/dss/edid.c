@@ -349,3 +349,29 @@ int hdmi_tv_yuv_supported(u8 *edid)
 	}
 	return 0;
 }
+
+bool hdmi_s3d_supported(u8 *edid)
+{
+	bool s3d_support = false;
+	int offset, current_byte;
+	if (!hdmi_get_datablock_offset(edid, DATABLOCK_VENDOR, &offset)) {
+		offset += 8;
+		current_byte = edid[offset++];
+		/*Latency_Fields_Present?*/
+		if (current_byte & 0x80)
+			offset += 2;
+		/*I_Latency_Fields_Present?*/
+		if (current_byte & 0x40)
+			offset += 2;
+		/*HDMI_Video_present?*/
+		if (current_byte & 0x20) {
+			current_byte = edid[offset];
+			/*3D_Present?*/
+			if (current_byte & 0x80) {
+				printk(KERN_INFO "S3D supported");
+				s3d_support = true;
+			}
+		}
+	}
+	return s3d_support;
+}

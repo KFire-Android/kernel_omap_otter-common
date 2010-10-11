@@ -360,6 +360,11 @@ typedef struct HDMI_Timing_label {
 	u32	pplclk;
 } HDMI_Timing_t, *pHDMI_Timing_t;
 
+struct hdmi_s3d_config {
+	int structure;
+	int s3d_ext_data;
+};
+
 struct hdmi_config {
 	u16 ppl;	/* pixel per line */
 	u16 lpp;	/* line per panel */
@@ -375,6 +380,9 @@ struct hdmi_config {
 	u16 v_pol;
 	u16 hdmi_dvi;
 	u16 video_format;
+	u16 s3d_structure;/*Frame Structure for the S3D Frame*/
+	u16 subsamp_pos; /*Subsampling used in Vendor Specific Infoframe */
+	int vsi_enabled; /* Vender Specific InfoFrame enabled/disabled*/
 };
 
 enum hdmi_core_if_fs {

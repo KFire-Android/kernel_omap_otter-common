@@ -24,6 +24,7 @@
  * MythriPk <mythripk@ti.com>	Apr 2010 Modified to read extended EDID partition
  *				and handle checksum with and without extension
  *				May 2010 Added support for Hot Plug Detect.
+ * Munish <munish@ti.com>	Sep 2010 Added VS Infoframe for S3D support
  *
  */
 
@@ -870,6 +871,42 @@ int hdmi_configure_csc(enum hdmi_core_av_csc csc)
 	return 0;
 
 }
+
+static int hdmi_core_vsi_infoframe(u32 name,
+	struct hdmi_s3d_config info_s3d)
+{
+	u16 offset;
+	u8 sum = 0, i;
+	/*For side-by-side(HALF) we need to specify subsampling in 3D_ext_data*/
+	int length = info_s3d.structure >= 0x07 ? 6 : 5;
+	u8 info_frame_packet[] = {
+		0x81, /*Vendor-Specific InfoFrame*/
+		0x01, /*InfoFrame version number per CEA-861-D*/
+		length, /*InfoFrame length, excluding checksum and header*/
+		0x00, /*Checksum*/
+		0x03, 0x0C, 0x00, /*24-bit IEEE Registration Ident*/
+		0x40, /*3D format indication preset, 3D_Struct follows*/
+		info_s3d.structure << 4, /*3D_Struct, no 3D_Meta*/
+		info_s3d.s3d_ext_data << 4,/*3D_Ext_Data*/
+		};
+
+	/*Adding packet header and checksum length*/
+	length += 4;
+
+	/*Checksum is packet_header+checksum+infoframe_length = 0*/
+	for (i = 0; i < length; i++)
+		sum += info_frame_packet[i];
+	info_frame_packet[3] = 0x100-sum;
+
+	offset = HDMI_CORE_AV__GEN_DBYTE;
+	for (i = 0; i < length; i++) {
+		hdmi_write_reg(name, offset, info_frame_packet[i]);
+		offset += HDMI_CORE_AV__GEN_DBYTE__ELSIZE;
+	}
+
+	return 0;
+}
+
 static int hdmi_core_av_packet_config(u32 name,
 	struct hdmi_core_packet_enable_repeat r_p)
 {
@@ -1206,6 +1243,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	struct hdmi_irq_vector IrqHdmiVectorEnable;
 	struct hdmi_audio_format audio_fmt;
 	struct hdmi_audio_dma audio_dma;
+	struct hdmi_s3d_config s3d_param;
 
 	/*HDMI core*/
 	struct hdmi_core_video_config_t v_core_cfg;
@@ -1339,6 +1377,16 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	hdmi.avi_param.db12_13_pixelstartofright = 0;
 
 	r = hdmi_core_audio_infoframe_avi(hdmi.avi_param);
+
+	if (cfg->vsi_enabled == true) {
+		s3d_param.structure = cfg->s3d_structure;
+		s3d_param.s3d_ext_data = cfg->subsamp_pos;
+		hdmi_core_vsi_infoframe(av_name, s3d_param);
+
+		/*enable/repeat the vendor specific infoframe*/
+		repeat_param.GenericPacketED = PACKETENABLE;
+		repeat_param.GenericPacketRepeat = PACKETREPEATON;
+	}
 
 	/*enable/repeat the infoframe*/
 	repeat_param.AVIInfoFrameED = PACKETENABLE;
