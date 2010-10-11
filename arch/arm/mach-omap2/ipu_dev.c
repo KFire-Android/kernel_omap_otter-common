@@ -201,8 +201,6 @@ inline int ipu_pm_module_set_bandwidth(unsigned rsrc,
 }
 EXPORT_SYMBOL(ipu_pm_module_set_bandwidth);
 
-static struct omap_device *od_iva;
-
 /* FIXME: not in use now
  * static struct omap_ipupm_mod_ops omap_ipu_ops = {
  *	.start = NULL,
@@ -330,6 +328,7 @@ static int __init omap_ipussdev_init(void)
 {
 	int status = -ENODEV;
 	int i;
+	int first = 1;
 	struct omap_hwmod *oh;
 	struct omap_device *od;
 	char *oh_name;
@@ -368,7 +367,11 @@ static int __init omap_ipussdev_init(void)
 		WARN(status, "Could not build omap_device for %s %s\n",
 							pdev_name, oh_name);
 		if (!status) {
-			od_iva = od;
+			/* Save the id of the first registered dev */
+			if (first) {
+				ipu_pm_first_dev = od->pdev.id;
+				first = 0;
+			}
 			omap_ipupm_data[i].pdev = &od->pdev;
 			omap_ipupm_data[i].dev = &od->pdev.dev;
 		}

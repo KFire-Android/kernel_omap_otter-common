@@ -65,10 +65,6 @@
  *  Macros and types
  *  ============================================================================
  */
-#define A9 3
-#define SYS_M3 2
-#define APP_M3 1
-#define TESLA 0
 #define HW_AUTO 3
 #define CM_DUCATI_M3_CLKSTCTRL 0x4A008900
 #define SL2_RESOURCE 10
@@ -82,6 +78,8 @@
 
 #define SYSM3_IDLE_FLAG_PHY_ADDR 0x9E0502D8
 #define APPM3_IDLE_FLAG_PHY_ADDR 0x9E0502DC
+
+#define _is_valid_event(e) ((PM_FIRST_EVENT <= e && e <= PM_LAST_EVENT) ? 1 : 0)
 
 #define NUM_IDLE_CORES	((__raw_readl(appm3Idle) << 1) + \
 				(__raw_readl(sysm3Idle)))
@@ -253,6 +251,7 @@ static struct omap_rproc *app_rproc;
 static struct omap_mbox *ducati_mbox;
 static struct iommu *ducati_iommu;
 static bool first_time = 1;
+static bool mpu_hib_ipu;
 /* static struct omap_dm_timer *pm_gpt; */
 
 /* Ducati Interrupt Capable Gptimers */
@@ -285,6 +284,7 @@ static struct ipu_pm_params pm_params = {
 	.pm_iva_hd_counter = 0,
 	.pm_ivaseq0_counter = 0,
 	.pm_ivaseq1_counter = 0,
+	.pm_sl2if_counter = 0,
 	.pm_l3_bus_counter = 0,
 	.pm_mpu_counter = 0,
 	.pm_sdmachan_counter = 0,
@@ -608,22 +608,20 @@ void ipu_pm_callback(u16 proc_id, u16 line_id, u32 event_id,
 EXPORT_SYMBOL(ipu_pm_callback);
 
 
-/*
-  Function for PM notifications Callback
- *
+/* Function for PM notifications Callback
+ * This functions receives an event coming from
+ * remote proc as an ack.
+ * Post semaphore based in eventType (payload)
+ * If PM_HIBERNATE is received the save_ctx is triggered
+ * in order to put remote proc in reset.
  */
 void ipu_pm_notify_callback(u16 proc_id, u16 line_id, u32 event_id,
 					uint *arg, u32 payload)
 {
-	/**
-	 * Post semaphore based in eventType (payload);
-	 * IPU has alreay finished the process for the
-	 * notification
-	 */
-	/* Get the payload */
 	struct ipu_pm_object *handle;
 	union message_slicer pm_msg;
 	struct ipu_pm_params *params;
+	enum pm_event_type event;
 	int retval;
 
 	/* get the handle to proper ipu pm object */
@@ -635,32 +633,27 @@ void ipu_pm_notify_callback(u16 proc_id, u16 line_id, u32 event_id,
 		return;
 
 	pm_msg.whole = payload;
-	if (pm_msg.fields.msg_type == PM_NOTIFY_HIBERNATE) {
-		/* Remote proc requested hibernate */
-		/* Remote Proc is ready to hibernate */
+	/* get the event type sent by remote proc */
+	event = pm_msg.fields.msg_subtype;
+	if (!_is_valid_event(event))
+		goto error;
+	if (event == PM_HIBERNATE) {
+		/* Remote Proc is ready to hibernate
+		 * PM_HIBERNATE is a one way notification
+		 * Remote proc to Host proc
+		 */
+		pr_debug("Remote Proc is ready to hibernate\n");
 		retval = ipu_pm_save_ctx(proc_id);
 		if (retval)
-			pr_info("Unable to stop proc %d\n", proc_id);
+			pr_err("Unable to stop proc %d\n", proc_id);
 	} else {
-		switch (pm_msg.fields.msg_subtype) {
-		case PM_SUSPEND:
-			handle->pm_event[PM_SUSPEND].pm_msg = payload;
-			up(&handle->pm_event[PM_SUSPEND].sem_handle);
-			break;
-		case PM_RESUME:
-			handle->pm_event[PM_RESUME].pm_msg = payload;
-			up(&handle->pm_event[PM_RESUME].sem_handle);
-			break;
-		case PM_HIBERNATE:
-			handle->pm_event[PM_HIBERNATE].pm_msg = payload;
-			up(&handle->pm_event[PM_HIBERNATE].sem_handle);
-			break;
-		case PM_PID_DEATH:
-			handle->pm_event[PM_PID_DEATH].pm_msg = payload;
-			up(&handle->pm_event[PM_PID_DEATH].sem_handle);
-			break;
-		}
+		pr_debug("Remote Proc received %d event\n", event);
+		handle->pm_event[event].pm_msg = payload;
+		up(&handle->pm_event[event].sem_handle);
 	}
+	return;
+error:
+	pr_err("Unknow event received from remote proc: %d\n", event);
 }
 EXPORT_SYMBOL(ipu_pm_notify_callback);
 
@@ -749,34 +742,7 @@ int ipu_pm_notifications(enum pm_event_type event_type, void *data)
 				goto error;
 			break;
 		case PM_HIBERNATE:
-			pm_msg.fields.msg_type = PM_NOTIFICATIONS;
-			pm_msg.fields.msg_subtype = PM_HIBERNATE;
-			pm_msg.fields.parm = PM_SUCCESS;
-			/* put general purpose message in share memory */
-			handle->rcb_table->gp_msg = (unsigned)data;
-			/* send the request to IPU*/
-			retval = notify_send_event(
-					params->remote_proc_id,
-					params->line_id,
-					params->pm_notification_event | \
-						(NOTIFY_SYSTEMKEY << 16),
-					(unsigned int)pm_msg.whole,
-					true);
-			if (retval < 0)
-				goto error_send;
-			/* wait until event from IPU (ipu_pm_notify_callback)*/
-			retval = down_timeout
-					(&handle->pm_event[PM_HIBERNATE]
-					.sem_handle,
-					msecs_to_jiffies(params->timeout));
-			pm_msg.whole = handle->pm_event[PM_HIBERNATE].pm_msg;
-			if (WARN_ON((retval < 0) ||
-					(pm_msg.fields.parm != PM_SUCCESS)))
-				goto error;
-			else {
-				/*Remote Proc is ready to hibernate*/
-				pm_ack = ipu_pm_save_ctx(proc_id);
-			}
+			pr_err("PM_HIBERNATE event currently not supported\n");
 			break;
 		case PM_PID_DEATH:
 			/* Just send the message to appm3 since is the one
@@ -814,9 +780,9 @@ int ipu_pm_notifications(enum pm_event_type event_type, void *data)
 	return pm_ack;
 
 error_send:
-	pr_err("Error notify_send event\n");
+	pr_err("Error notify_send event %d to proc %d\n", event_type, proc_id);
 error:
-	pr_err("Error sending Notification events\n");
+	pr_err("Error sending Notification event %d\n", event_type);
 	return -EBUSY;
 }
 EXPORT_SYMBOL(ipu_pm_notifications);
@@ -1466,13 +1432,14 @@ static inline int ipu_pm_get_ivaseq1(int proc_id, u32 rcb_num)
 	retval = ipu_pm_module_start(rcb_p->sub_type);
 	if (retval)
 		return PM_UNSUPPORTED;
+	params->pm_ivaseq1_counter++;
 
 	/*Requesting SL2*/
+	/* FIXME: sl2if should be moved to a independent function */
 	retval = ipu_pm_module_start(SL2_RESOURCE);
 	if (retval)
 		return PM_UNSUPPORTED;
-
-	params->pm_ivaseq1_counter++;
+	params->pm_sl2if_counter++;
 
 	return PM_SUCCESS;
 }
@@ -2038,9 +2005,13 @@ static inline int ipu_pm_rel_iva_hd(int proc_id, u32 rcb_num)
 		goto error;
 
 	/* Releasing SL2 */
-	retval = ipu_pm_module_stop(SL2_RESOURCE);
-	if (retval)
-		return PM_UNSUPPORTED;
+	/* FIXME: sl2if should be moved to a independent function */
+	if (params->pm_sl2if_counter) {
+		retval = ipu_pm_module_stop(SL2_RESOURCE);
+		if (retval)
+			return PM_UNSUPPORTED;
+		params->pm_sl2if_counter--;
+	}
 
 	retval = ipu_pm_module_stop(rcb_p->sub_type);
 	if (retval)
@@ -3246,14 +3217,18 @@ int ipu_pm_save_ctx(int proc_id)
 
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(proc_id);
-	if (WARN_ON(unlikely(handle == NULL)))
-		return -EINVAL;
+	if (unlikely(handle == NULL))
+		return 0;
 
-	/* Check if the M3 was loaded */
+	/* get M3's load flag */
 	sys_loaded = (ipu_pm_get_state(proc_id) & SYS_PROC_LOADED) >>
 								PROC_LD_SHIFT;
 	app_loaded = (ipu_pm_get_state(proc_id) & APP_PROC_LOADED) >>
 								PROC_LD_SHIFT;
+
+	/* If already down don't kill it twice */
+	if (ipu_pm_get_state(proc_id) & SYS_PROC_DOWN)
+		goto exit;
 
 	/* Because of the current scheme, we need to check
 	 * if APPM3 is enable and we need to shut it down too
@@ -3281,12 +3256,20 @@ int ipu_pm_save_ctx(int proc_id)
 
 		/* Check for APPM3, if loaded reset first */
 		if (app_loaded) {
+			pr_info("Sleep APPM3\n");
 			retval = rproc_sleep(app_rproc);
+			cm_write_mod_reg(HW_AUTO,
+					 OMAP4430_CM2_CORE_MOD,
+					 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 			if (retval)
 				goto error;
 			handle->rcb_table->state_flag |= APP_PROC_DOWN;
 		}
+		pr_info("Sleep SYSM3\n");
 		retval = rproc_sleep(sys_rproc);
+		cm_write_mod_reg(HW_AUTO,
+				 OMAP4430_CM2_CORE_MOD,
+				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 		if (retval)
 			goto error;
 		handle->rcb_table->state_flag |= SYS_PROC_DOWN;
@@ -3299,7 +3282,7 @@ exit:
 	return 0;
 error:
 	mutex_unlock(ipu_pm_state.gate_handle);
-	pr_info("Aborting hibernation process\n");
+	pr_debug("Aborting hibernation process\n");
 	return -EINVAL;
 }
 EXPORT_SYMBOL(ipu_pm_save_ctx);
@@ -3312,10 +3295,8 @@ EXPORT_SYMBOL(ipu_pm_save_ctx);
 int ipu_pm_restore_ctx(int proc_id)
 {
 	int retval = 0;
-#ifdef CONFIG_SYSLINK_DUCATI_PM
 	int sys_loaded;
 	int app_loaded;
-#endif
 	struct ipu_pm_object *handle;
 
 	/*If feature not supported by proc, return*/
@@ -3328,22 +3309,25 @@ int ipu_pm_restore_ctx(int proc_id)
 	if (WARN_ON(unlikely(handle == NULL)))
 		return -EINVAL;
 
-	/* By default Ducati Hibernation is disable
-	 * enabling just the first time and if
-	 * CONFIG_SYSLINK_DUCATI_PM is defined
+	/* FIXME: This needs mor analysis.
+	 * Since the sync of IPU and MPU is done this is a safe place
+	 * to switch to HW_AUTO to allow transition of clocks to gated
+	 * supervised by HW.
 	*/
 	if (first_time) {
-		handle->rcb_table->state_flag |= ENABLE_IPU_HIB;
-		handle->rcb_table->pm_flags.hibernateAllowed = 0;
-		handle->rcb_table->pm_flags.idleAllowed = 0;
-		first_time = 0;
-		__raw_writel(HW_AUTO, cm_ducati_clkstctrl);
-	}
-
-	/* FIXME:This will be avoided with a change in Ducati. */
-	handle->rcb_table->pm_flags.idleAllowed = 1;
-
+		/* Enable/disable ipu hibernation*/
 #ifdef CONFIG_SYSLINK_DUCATI_PM
+		handle->rcb_table->pm_flags.hibernateAllowed = 1;
+#else
+		handle->rcb_table->pm_flags.hibernateAllowed = 0;
+#endif
+		pr_info("hibernateAllowed=%d\n",
+				handle->rcb_table->pm_flags.hibernateAllowed);
+		first_time = 0;
+		cm_write_mod_reg(HW_AUTO,
+				 OMAP4430_CM2_CORE_MOD,
+				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
+	}
 
 	/* Check if the M3 was loaded */
 	sys_loaded = (ipu_pm_get_state(proc_id) & SYS_PROC_LOADED) >>
@@ -3363,12 +3347,20 @@ int ipu_pm_restore_ctx(int proc_id)
 
 		omap_mbox_restore_ctx(ducati_mbox);
 		iommu_restore_ctx(ducati_iommu);
+		pr_info("Wakeup SYSM3\n");
 		retval = rproc_wakeup(sys_rproc);
+		cm_write_mod_reg(HW_AUTO,
+				 OMAP4430_CM2_CORE_MOD,
+				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 		if (retval)
 			goto error;
 		handle->rcb_table->state_flag &= ~SYS_PROC_DOWN;
 		if (ipu_pm_get_state(proc_id) & APP_PROC_LOADED) {
+			pr_info("Wakeup APPM3\n");
 			retval = rproc_wakeup(app_rproc);
+			cm_write_mod_reg(HW_AUTO,
+				 OMAP4430_CM2_CORE_MOD,
+				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 			if (retval)
 				goto error;
 			handle->rcb_table->state_flag &= ~APP_PROC_DOWN;
@@ -3377,14 +3369,11 @@ int ipu_pm_restore_ctx(int proc_id)
 		goto error;
 exit:
 	mutex_unlock(ipu_pm_state.gate_handle);
-#endif
 	return retval;
-#ifdef CONFIG_SYSLINK_DUCATI_PM
 error:
 	mutex_unlock(ipu_pm_state.gate_handle);
-	pr_info("Aborting restoring process\n");
+	pr_debug("Aborting restoring process\n");
 	return -EINVAL;
-#endif
 }
 EXPORT_SYMBOL(ipu_pm_restore_ctx);
 
@@ -3495,6 +3484,8 @@ int ipu_pm_setup(struct ipu_pm_config *cfg)
 	/*pm_gpt = omap_dm_timer_request_specific(GP_TIMER_3);
 	if (pm_gpt == NULL)
 		retval = -EINVAL;*/
+	/* Reset hibernation from MPU flag */
+	mpu_hib_ipu = 0;
 
 	return retval;
 exit:
@@ -3649,6 +3640,9 @@ int ipu_pm_detach(u16 remote_proc_id)
 		pr_err("Error registering notify event\n");
 		goto exit;
 	}
+
+	/* Reset the state_flag */
+	handle->rcb_table->state_flag = 0;
 
 	/* Deleting the handle based on remote_proc_id */
 	ipu_pm_delete(handle);

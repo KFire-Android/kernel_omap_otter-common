@@ -90,6 +90,8 @@ struct ipu_pm_dev {
 	struct cdev cdev;
 };
 
+extern int ipu_pm_first_dev;
+
 extern int ipu_pm_module_start(unsigned rsrc);
 extern int ipu_pm_module_stop(unsigned rsrc);
 extern int ipu_pm_module_set_rate(unsigned rsrc,

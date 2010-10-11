@@ -95,6 +95,12 @@
 /* Suspend/resume/other... */
 #define NUMBER_PM_EVENTS 4
 
+/* Processors id's */
+#define A9 3
+#define SYS_M3 2
+#define APP_M3 1
+#define TESLA 0
+
 #define PM_CSTR_PERF_MASK	0x00000001
 #define PM_CSTR_LAT_MASK	0x00000002
 #define PM_CSTR_BW_MASK		0x00000004
@@ -287,11 +293,20 @@ enum res_type{
 	AUX_CLK,
 };
 
-enum pm_event_type{PM_SUSPEND,
+/* Events can start at any number but
+ * should be always consecutive
+ */
+#define PM_FIRST_EVENT	0
+
+enum pm_event_type{PM_SUSPEND = PM_FIRST_EVENT,
 	PM_RESUME,
 	PM_PID_DEATH,
 	PM_HIBERNATE
 };
+
+#define PM_LAST_EVENT	((sizeof(enum pm_event_type) / sizeof(void))	\
+							+ PM_FIRST_EVENT\
+								- 1)
 
 struct rcb_message {
 	unsigned rcb_flag:1;
@@ -366,6 +381,7 @@ struct ipu_pm_params {
 	int pm_iva_hd_counter;
 	int pm_ivaseq0_counter;
 	int pm_ivaseq1_counter;
+	int pm_sl2if_counter;
 	int pm_l3_bus_counter;
 	int pm_mpu_counter;
 	int pm_sdmachan_counter;

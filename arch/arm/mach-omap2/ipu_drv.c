@@ -47,6 +47,7 @@
 static struct class *omap_ipu_pm_class;
 static dev_t omap_ipu_pm_dev;
 
+int ipu_pm_first_dev;
 
 static struct proc_dir_entry *ipu_pm_proc_entry;
 /* we could iterate over something much more
@@ -189,12 +190,72 @@ static int __devinit ipu_pm_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static int ipu_pm_drv_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	int retval = 0;
+
+	if (pdev->id == ipu_pm_first_dev) {
+		pr_debug("%s.%d ASKED TO SUSPEND", pdev->name, pdev->id);
+		/* save any local context,
+		 * BIOS timers could be saved locally or on Ducati
+		 */
+
+		/* call our notification function */
+		retval = ipu_pm_notifications(PM_SUSPEND, NULL);
+
+		/* FIXME: Currently sending SUSPEND is enough to send
+		 * Ducati to hibernate, save ctx can be called at this
+		 * point to save ctx and reset remote procs
+		 * Currently the save ctx process can be called using
+		 * which ever proc_id, maybe this will change when
+		 * Tesla support is added.
+		 */
+		/* sysm3 is handling hibernation of ducati currently */
+		ipu_pm_save_ctx(SYS_M3);
+
+		/* return result, should be zero if all Ducati clients
+		 * returned zero else fail code
+		 */
+	}
+
+	return retval;
+}
+
+static int ipu_pm_drv_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	int retval = 0;
+
+	if (pdev->id == ipu_pm_first_dev) {
+		pr_debug("%s.%d ASKED TO RESUME", pdev->name, pdev->id);
+		/* restore any local context,
+		 * BIOS timers could be restored locally or on Ducati
+		 */
+
+		/* call our notification function */
+		retval = ipu_pm_notifications(PM_RESUME, NULL);
+
+		/* return result, should be zero if all Ducati clients
+		 * returned zero else fail code
+		 */
+	}
+
+	return retval;
+}
+
+static const struct dev_pm_ops ipu_pm_ops = {
+	.suspend = ipu_pm_drv_suspend,
+	.resume  = ipu_pm_drv_resume,
+};
+
 static struct platform_driver ipu_pm_driver = {
 	.probe          = ipu_pm_probe,
 	/*.remove			= ipu_pm_remove, */
 	.driver         = {
 		.name   = IPU_DRIVER_NAME,
 		.owner = THIS_MODULE,
+		.pm = &ipu_pm_ops,
 	},
 };
 
