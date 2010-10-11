@@ -1173,18 +1173,18 @@ static void enable_board_wakeup_source(void)
 }
 
 static struct omap_volt_vc_data vc_config = {
-	.vdd0_on = 0x3a,        /* 1.35v */
-	.vdd0_onlp = 0x3a,      /* 1.35v */
-	.vdd0_ret = 0x14,       /* 0.8375v */
-	.vdd0_off = 0x01,       /* 0.6v */
-	.vdd1_on = 0x29,        /* 1.1v */
-	.vdd1_onlp = 0x29,      /* 1.1v */
-	.vdd1_ret = 0x14,       /* 0.8375v */
-	.vdd1_off = 0x01,       /* 0.6v */
-	.vdd2_on = 0x29,        /* 1.1v */
-	.vdd2_onlp = 0x29,      /* 1.1v */
-	.vdd2_ret = 0x14,       /* .8375v */
-	.vdd2_off = 0x01,       /* 0.6v */
+	.vdd0_on = 1350000,        /* 1.35v */
+	.vdd0_onlp = 1350000,      /* 1.35v */
+	.vdd0_ret = 837500,       /* 0.8375v */
+	.vdd0_off = 600000,       /* 0.6v */
+	.vdd1_on = 1100000,        /* 1.1v */
+	.vdd1_onlp = 1100000,      /* 1.1v */
+	.vdd1_ret = 837500,       /* 0.8375v */
+	.vdd1_off = 600000,       /* 0.6v */
+	.vdd2_on = 1100000,        /* 1.1v */
+	.vdd2_onlp = 1100000,      /* 1.1v */
+	.vdd2_ret = 837500,       /* .8375v */
+	.vdd2_off = 600000,       /* 0.6v */
 };
 
 static void __init omap_4430sdp_init(void)
