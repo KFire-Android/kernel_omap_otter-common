@@ -894,7 +894,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	/* bypass TV gamma table*/
 	dispc_enable_gamma_table(0);
 
-	/* do not fall into any sort of idle */
+	/* allow idle mode */
 	dispc_set_idle_mode();
 
 #ifndef CONFIG_OMAP4_ES1

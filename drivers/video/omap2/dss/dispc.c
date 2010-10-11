@@ -1652,9 +1652,10 @@ void dispc_set_idle_mode(void)
 	u32 l;
 
 	l = dispc_read_reg(DISPC_SYSCONFIG);
-	l = FLD_MOD(l, 1, 13, 12);	/* MIDLEMODE: smart standby */
-	l = FLD_MOD(l, 1, 4, 3);	/* SIDLEMODE: smart idle */
-	l = FLD_MOD(l, 0, 2, 2);	/* ENWAKEUP */
+	l = FLD_MOD(l, 2, 13, 12);	/* MIDLEMODE: smart standby */
+	l = FLD_MOD(l, 2, 4, 3);	/* SIDLEMODE: smart idle */
+	l = FLD_MOD(l, 1, 2, 2);	/* ENWAKEUP */
+	l = FLD_MOD(l, 1, 0, 0);	/* AUTOIDLE */
 
 	/* Setting AUTOIDLE to 0 causes DSI
 	 * framedone timeouts on ES2.0
