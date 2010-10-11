@@ -80,9 +80,15 @@ abehal_status abe_read_hardware_configuration(u32 *u, u32 *o,
  * for the delivery of "end of time sequenced tasks" notifications, some are
  * originated from the Ping-Pong protocols, some are generated from
  * the embedded debugger when the firmware stops on programmable break-points,
- * etc …
+ * etc
  */
 abehal_status abe_irq_processing(void);
+/**
+ * abe_irq_clear - clear ABE interrupt
+ *
+ * This subroutine is call to clear MCU Irq
+ */
+abehal_status abe_irq_clear(void);
 /**
  * abe_select_main_port - Select stynchronization port for Event generator.
  * @id: audio port name

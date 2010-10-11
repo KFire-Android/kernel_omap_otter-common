@@ -246,11 +246,10 @@ EXPORT_SYMBOL(abe_read_hardware_configuration);
  * for the delivery of "end of time sequenced tasks" notifications, some are
  * originated from the Ping-Pong protocols, some are generated from
  * the embedded debugger when the firmware stops on programmable break-points,
- * etc �
+ * etc
  */
 abehal_status abe_irq_processing(void)
 {
-	u32 clear_abe_irq;
 	u32 abe_irq_dbg_write_ptr, i, cmem_src, sm_cm;
 	abe_irq_data_t IRQ_data;
 #define IrqFiFoMask ((D_McuIrqFifo_sizeof >> 2) -1)
@@ -293,12 +292,24 @@ abehal_status abe_irq_processing(void)
 		}
 	}
 	abe_monitoring();
-	clear_abe_irq = 1;
-	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_ATC, ABE_MCU_IRQSTATUS,
-		       &clear_abe_irq, 4);
 	return 0;
 }
 EXPORT_SYMBOL(abe_irq_processing);
+/**
+ * abe_irq_clear - clear ABE interrupt
+ *
+ * This subroutine is call to clear MCU Irq
+ */
+abehal_status abe_irq_clear(void)
+{
+	u32 clear_abe_irq = 1;
+	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_ATC, ABE_MCU_IRQSTATUS,
+		       &clear_abe_irq, 4);
+
+	return 0;
+}
+EXPORT_SYMBOL(abe_irq_clear);
+
 /**
  * abe_select_main_port - Select stynchronization port for Event generator.
  * @id: audio port name
