@@ -39,6 +39,10 @@ int omapdss_display_enable(struct omap_dss_device *dssdev)
 {
 	int r = 0;
 
+	/* use smart_enable if present */
+	if (dssdev->driver->smart_enable)
+		return dssdev->driver->smart_enable(dssdev);
+
 	/* store resume info for suspended displays */
 	switch (dssdev->state) {
 	case OMAP_DSS_DISPLAY_SUSPENDED:
@@ -83,8 +87,12 @@ static ssize_t display_enabled_show(struct device *dev,
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 	bool enabled;
 
+
+	/* use smart_disable if present */
+	if (dssdev->driver->smart_is_enabled)
+		enabled = dssdev->driver->smart_is_enabled(dssdev);
 	/* show resume info for suspended displays */
-	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+	else if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
 		enabled = dssdev->activate_after_resume;
 	else
 		enabled  = dssdev->state != OMAP_DSS_DISPLAY_DISABLED;

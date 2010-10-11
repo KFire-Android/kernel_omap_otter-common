@@ -667,6 +667,11 @@ static void hdmi_panel_remove(struct omap_dss_device *dssdev)
 
 }
 
+static bool hdmi_panel_is_enabled(struct omap_dss_device *dssdev)
+{
+	return is_hdmi_on;
+}
+
 static int hdmi_panel_enable(struct omap_dss_device *dssdev)
 {
 	hdmi_enable_display(dssdev);
@@ -706,6 +711,9 @@ static struct omap_dss_driver hdmi_driver = {
 
 	.enable		= hdmi_panel_enable,
 	.disable	= hdmi_panel_disable,
+	/* we will remove the .enable as soon as noone is using it */
+	.smart_enable	= hdmi_panel_enable,
+	.smart_is_enabled	= hdmi_panel_is_enabled,
 	.suspend	= hdmi_panel_suspend,
 	.resume		= hdmi_panel_resume,
 	.get_timings	= hdmi_get_timings,
