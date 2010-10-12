@@ -270,8 +270,8 @@ do_WFI:
 	cmp	r9, #0x1		@ Check for HS device
 	bne	scu_gp_set
 	orr	r4, r4, #SCU_OFFSET
-	ldr     r0, [r4, #0x04]
-	ldr     r1, [r4, #0x08]
+	ldr     r0, [r4]
+	ldr     r1, [r4, #0x04]
 	stmfd   r13!, {r4-r12, r14}
 	ldr	r12, =0x108		@ SCU power state secure API
 	smc	#0

@@ -197,10 +197,11 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
 	}
 
 	regvalue = readl(scu_base + SCU_CPU_STATUS);
-	if (cpu_id)
-		regvalue |= scu_pwr_st << 8;
-	else
-		regvalue |= scu_pwr_st;
+	regvalue |= scu_pwr_st;
+
+	/* Secure API doesn't expect shiftet value */
+	if ((cpu_id) && (omap_type() == OMAP2_DEVICE_TYPE_GP))
+		regvalue = regvalue << 8;
 
 	/*
 	 * Store the SCU power status value
