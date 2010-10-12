@@ -2781,6 +2781,7 @@ int dispc_scaling_decision(u16 width, u16 height,
 			goto loop;
 
 		/* Must use 3-tap filter */
+		*three_tap = false;
 		if (!cpu_is_omap44xx())
 			*three_tap = in_width > 1024;
 		else if (omap_rev() == OMAP4430_REV_ES1_0)
@@ -2817,19 +2818,19 @@ int dispc_scaling_decision(u16 width, u16 height,
 		DSSDBG("required fclk rate = %lu Hz\n", fclk);
 		DSSDBG("current fclk rate = %lu Hz\n", fclk_max);
 
-		if (fclk > fclk_max) {
-			DSSERR("failed to set up scaling, "
-					"required fclk rate = %lu Hz, "
-					"current fclk rate = %lu Hz\n",
-					fclk, fclk_max);
+		if (fclk > fclk_max)
 			goto loop;
-		}
 		break;
 
 loop:
 		/* err if exhausted search region */
-		if (x == max_x_decim && y == max_y_decim)
+		if (x == max_x_decim && y == max_y_decim) {
+			DSSERR("failed to set up scaling, "
+					"required fclk rate = %lu Hz, "
+					"current fclk rate = %lu Hz\n",
+					fclk, fclk_max);
 			return -EINVAL;
+		}
 
 		/* get to next factor */
 		if (x == y) {
