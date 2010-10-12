@@ -57,6 +57,10 @@ static struct {
 	struct regulator *vdds_sdi_reg;
 	struct regulator *vdda_dac_reg;
 	struct omap_dss_board_info *pdata;
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	struct early_suspend dss_early_suspend_info;
+#endif
 } core;
 
 static void dss_clk_enable_all_no_ctx(void);
@@ -810,6 +814,20 @@ static int omap_dss_resume(struct platform_device *pdev)
 	return dss_resume_all_devices();
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void dss_early_suspend(struct early_suspend *h)
+{
+	DSSDBG("%s\n", __func__);
+	omap_dss_suspend(core.pdev, PMSG_SUSPEND);
+}
+
+static void dss_late_resume(struct early_suspend *h)
+{
+	DSSDBG("%s\n", __func__);
+	omap_dss_resume(core.pdev);
+}
+#endif
+
 static int omap_dsshw_probe(struct platform_device *pdev)
 {
 	int r;
@@ -939,8 +957,13 @@ static struct platform_driver omap_dsshw_driver = {
 	.probe          = omap_dsshw_probe,
 	.remove         = omap_dsshw_remove,
 	.shutdown	= NULL,
-	.suspend	= NULL, /* temporarily remove omap_dss_suspend */
-	.resume		= NULL, /* temporarily remove omap_dss_resume */
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	.suspend	= NULL,
+	.resume		= NULL,
+#else
+	.suspend	= omap_dss_suspend,
+	.resume		= omap_dss_resume,
+#endif
 	.driver         = {
 		.name   = "dss",
 		.owner  = THIS_MODULE,
@@ -995,22 +1018,6 @@ static struct platform_driver omap_hdmihw_driver = {
 		.owner	= THIS_MODULE,
 	},
 };
-#endif
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static struct early_suspend dss_early_suspend_info;
-
-void dss_early_suspend(struct early_suspend *h)
-{
-	printk(KERN_ERR "in dss_early_suspend\n");
-	dss_suspend_all_devices();
-}
-
-void dss_early_resume(struct early_suspend *h)
-{
-	printk(KERN_ERR "in dss_early_resume\n");
-	dss_resume_all_devices();
-}
 #endif
 
 /* BUS */
@@ -1220,14 +1227,10 @@ static int omap_dss_bus_register(void)
 	}
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	printk(KERN_ERR "b4 dss register_early_suspend\n");
-	if (dss_early_suspend_info.suspend == NULL) {
-		printk(KERN_ERR "in dss register_early_suspend\n");
-		dss_early_suspend_info.suspend = dss_early_suspend;
-		dss_early_suspend_info.resume = dss_early_resume;
-		dss_early_suspend_info.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
-		register_early_suspend(&dss_early_suspend_info);
-	}
+	core.dss_early_suspend_info.suspend = dss_early_suspend;
+	core.dss_early_suspend_info.resume = dss_late_resume;
+	core.dss_early_suspend_info.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+	register_early_suspend(&core.dss_early_suspend_info);
 #endif
 
 	return 0;
@@ -1239,9 +1242,7 @@ static int omap_dss_bus_register(void)
 static void omap_dss_bus_unregister(void)
 {
 #ifdef CONFIG_HAS_EARLYSUSPEND
-	if (dss_early_suspend_info.suspend)
-		unregister_early_suspend(&dss_early_suspend_info);
-	dss_early_suspend_info.suspend = NULL;
+	unregister_early_suspend(&core.dss_early_suspend_info);
 #endif
 
 	device_unregister(&dss_bus);
