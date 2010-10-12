@@ -3491,7 +3491,7 @@ static int syn_suspend(struct i2c_client *client, pm_message_t msg)
 	sd->device_control_ctrl = r & 0xff;
 
 	r = syn_write_u8(sd, sd->control->control + DEVICE_CONTROL_CTRL,
-			 DEVICE_CONTROL_SLEEP_SENSOR);
+			 DEVICE_CONTROL_SLEEP_NORMAL);
 out:
 	mutex_unlock(&sd->lock);
 
