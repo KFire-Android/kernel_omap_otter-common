@@ -72,26 +72,6 @@
 #define LED_PWM2OFF		0x04
 #define LED_TOGGLE3		0x92
 
-static void omap_prox_activate(int state);
-static int omap_prox_read(void);
-
-
-static struct sfh7741_platform_data omap_sfh7741_data = {
-		.irq = OMAP_GPIO_IRQ(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO),
-		.prox_enable = 1,
-		.activate_func = omap_prox_activate,
-		.read_prox = omap_prox_read,
-};
-
-static struct platform_device sdp4430_proximity_device = {
-	.name		= "sfh7741",
-	.id		= 1,
-	.dev		= {
-		.platform_data = &omap_sfh7741_data,
-	},
-};
-
-
 static struct platform_device sdp4430_hdmi_audio_device = {
 	.name		= "hdmi-dai",
 	.id		= -1,
@@ -180,6 +160,79 @@ static struct omap4_keypad_platform_data sdp4430_keypad_data = {
 	.keymap_data		= &sdp4430_keymap_data,
 	.rows			= 8,
 	.cols			= 8,
+};
+
+/* Proximity Sensor */
+static void omap_prox_activate(int state)
+{
+	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , state);
+}
+
+static int omap_prox_read(void)
+{
+	int proximity;
+	proximity = gpio_get_value(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+#ifdef CONFIG_ANDROID
+	/* Invert the output from the prox sensor for Android as 0 should
+	be near and 1 should be far */
+	return !proximity;
+#else
+	return proximity;
+#endif
+}
+
+static void omap_sfh7741prox_init(void)
+{
+	int  error;
+
+	error = gpio_request(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, "sfh7741");
+	if (error < 0) {
+		pr_err("%s: GPIO configuration failed: GPIO %d, error %d\n"
+			, __func__, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, error);
+		return ;
+	}
+
+	error = gpio_direction_input(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+	if (error < 0) {
+		pr_err("Proximity GPIO input configuration failed\n");
+		goto fail1;
+	}
+
+	error = gpio_request(OMAP4_SFH7741_ENABLE_GPIO, "sfh7741");
+	if (error < 0) {
+		pr_err("failed to request GPIO %d, error %d\n",
+			OMAP4_SFH7741_ENABLE_GPIO, error);
+		goto fail1;
+	}
+
+	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 1);
+	if (error < 0) {
+		pr_err("%s: GPIO configuration failed: GPIO %d,\
+			error %d\n",__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
+		goto fail3;
+	}
+	return;
+
+fail3:
+	gpio_free(OMAP4_SFH7741_ENABLE_GPIO);
+fail1:
+	gpio_free(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+}
+
+static struct sfh7741_platform_data omap_sfh7741_data = {
+	.flags = SFH7741_WAKEABLE_INT,
+	.irq = OMAP_GPIO_IRQ(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO),
+	.prox_enable = 0,
+	.activate_func = omap_prox_activate,
+	.read_prox = omap_prox_read,
+};
+
+static struct platform_device sdp4430_proximity_device = {
+	.name		= SFH7741_NAME,
+	.id		= 1,
+	.dev		= {
+		.platform_data = &omap_sfh7741_data,
+	},
 };
 
 static struct spi_board_info sdp4430_spi_board_info[] __initdata = {
@@ -1084,56 +1137,6 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus(4, 400, &sdp4430_i2c_4_bus_pdata,
 		sdp4430_i2c_4_boardinfo, ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
 	return 0;
-}
-
-static void omap_prox_activate(int state)
-{
-	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , state);
-}
-
-static int omap_prox_read(void)
-{
-	int proximity;
-	proximity = gpio_get_value(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	return proximity;
-}
-
-static void omap_sfh7741prox_init(void)
-{
-	int  error;
-
-	error = gpio_request(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, "sfh7741");
-	if (error < 0) {
-		pr_err("%s: GPIO configuration failed: GPIO %d, error %d\n"
-			, __func__, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, error);
-		return ;
-	}
-
-	error = gpio_direction_input(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	if (error < 0) {
-		pr_err("Proximity GPIO input configuration failed\n");
-		goto fail1;
-	}
-
-	error = gpio_request(OMAP4_SFH7741_ENABLE_GPIO, "sfh7741");
-	if (error < 0) {
-		pr_err("failed to request GPIO %d, error %d\n",
-			OMAP4_SFH7741_ENABLE_GPIO, error);
-		goto fail1;
-	}
-
-	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 1);
-	if (error < 0) {
-		pr_err("%s: GPIO configuration failed: GPIO %d, error %d\n",
-			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
-		goto fail3;
-	}
-	return;
-
-fail3:
-	gpio_free(OMAP4_SFH7741_ENABLE_GPIO);
-fail1:
-	gpio_free(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
 }
 
 #ifdef CONFIG_TIWLAN_SDIO
