@@ -27,6 +27,10 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
+
 #define BH1780_REG_CONTROL     0x80
 #define BH1780_REG_PARTID      0x8A
 #define BH1780_REG_MANFID      0x8B
@@ -54,13 +58,22 @@ struct bh1780_data {
 	struct delayed_work input_work;
 	struct i2c_client *client;
 	struct mutex lock;
-
+#ifdef CONFIG_HAS_EARLYSUSPEND
+       struct early_suspend early_suspend;
+#endif
 	int current_lux;
 	int old_lux;
 	int power_state;
 	int suspend_power_state;
 	int req_poll_rate;
 };
+
+#ifdef CONFIG_PM
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void bh1780gli_early_suspend(struct early_suspend *handler);
+static void bh1780gli_late_resume(struct early_suspend *handler);
+#endif
+#endif
 
 static int bh1780_write(struct bh1780_data *ddata, u8 reg, u8 val, char *msg)
 {
@@ -281,7 +294,14 @@ static int __devinit bh1780_probe(struct i2c_client *client,
 		goto err_sysfs_failed;
 
 	bh1780_set_power(ddata, BH1780_PON);
-
+#ifdef CONFIG_PM
+#ifdef CONFIG_HAS_EARLYSUSPEND
+       ddata->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
+       ddata->early_suspend.suspend = bh1780gli_early_suspend;
+       ddata->early_suspend.resume = bh1780gli_late_resume;
+       register_early_suspend(&ddata->early_suspend);
+#endif
+#endif
 	return 0;
 
 err_sysfs_failed:
@@ -335,7 +355,7 @@ static int bh1780_resume(struct i2c_client *client)
 
 	if (ddata->suspend_power_state == BH1780_PON) {
 		if (als_debug)
-			pr_info("%s:Setting prox state to %i\n",
+			pr_info("%s:Setting als state to %i\n",
 				__func__, ddata->suspend_power_state);
 
 		ddata->power_state = ddata->suspend_power_state;
@@ -348,6 +368,25 @@ static int bh1780_resume(struct i2c_client *client)
 
 	return 0;
 }
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void bh1780gli_early_suspend(struct early_suspend *handler)
+{
+	struct bh1780_data *ddata;
+
+	ddata = container_of(handler, struct bh1780_data, early_suspend);
+	bh1780_suspend(ddata->client, PMSG_SUSPEND);
+}
+
+static void bh1780gli_late_resume(struct early_suspend *handler)
+{
+	struct bh1780_data *ddata;
+
+	ddata = container_of(handler, struct bh1780_data, early_suspend);
+	bh1780_resume(ddata->client);
+}
+#endif
+
 #else
 #define bh1780_suspend NULL
 #define bh1780_resume NULL
@@ -362,8 +401,10 @@ static struct i2c_driver bh1780_driver = {
 	.probe		= bh1780_probe,
 	.remove		= bh1780_remove,
 	.id_table	= bh1780_id,
+#ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend	= bh1780_suspend,
 	.resume		= bh1780_resume,
+#endif
 	.driver = {
 		.name = "bh1780"
 	},
