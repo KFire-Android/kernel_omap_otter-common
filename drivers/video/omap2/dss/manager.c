@@ -1277,8 +1277,8 @@ static void dss_apply_irq_handler(void *data, u32 mask)
 
 	omap_dispc_unregister_isr(dss_apply_irq_handler, NULL,
 			DISPC_IRQ_VSYNC	| DISPC_IRQ_EVSYNC_ODD |
-			DISPC_IRQ_EVSYNC_EVEN | (cpu_is_omap44xx()) ?
-			DISPC_IRQ_VSYNC2 : 0);
+			DISPC_IRQ_EVSYNC_EVEN | (cpu_is_omap44xx() ?
+			DISPC_IRQ_VSYNC2 : 0));
 	dss_cache.irq_enabled = false;
 
 end:
@@ -1487,7 +1487,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		r = omap_dispc_register_isr(dss_apply_irq_handler, NULL,
 				DISPC_IRQ_VSYNC	| DISPC_IRQ_EVSYNC_ODD |
 				DISPC_IRQ_EVSYNC_EVEN |
-				(cpu_is_omap44xx()) ? DISPC_IRQ_VSYNC2 : 0);
+				(cpu_is_omap44xx() ? DISPC_IRQ_VSYNC2 : 0));
 		dss_cache.irq_enabled = true;
 	}
 	configure_dispc();
