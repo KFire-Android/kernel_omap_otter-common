@@ -1551,6 +1551,8 @@ static int aess_open(struct snd_pcm_substream *substream)
 		break;
 	}
 
+	abe->active++;
+
 	mutex_unlock(&abe->mutex);
 	return 0;
 }
@@ -1617,8 +1619,6 @@ static int aess_prepare(struct snd_pcm_substream *substream)
 		udelay(250);
 		break;
 	}
-
-	abe->active++;
 
 	mutex_unlock(&abe->mutex);
 	return 0;
