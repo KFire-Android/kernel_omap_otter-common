@@ -39,6 +39,9 @@
 #include <linux/irq.h>
 #include <linux/videodev2.h>
 #include <linux/slab.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 
 #include <media/videobuf-dma-contig.h>
 #include <media/v4l2-device.h>
@@ -2484,6 +2487,62 @@ static void fake_display_buffer(struct omap_vout_device *vout)
 	}
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static struct omap_vout_early_suspend {
+	struct early_suspend suspend;
+	struct platform_device *pdev;
+} early_suspend_info;
+
+static void omap_vout_early_suspend(struct early_suspend *h)
+{
+	int k;
+	unsigned long flags;
+	struct platform_device *pdev = container_of(h,
+			struct omap_vout_early_suspend, suspend)->pdev;
+	struct v4l2_device *v4l2_dev = platform_get_drvdata(pdev);
+	struct omap2video_device *vid_dev = container_of(v4l2_dev,
+			struct omap2video_device, v4l2_dev);
+
+	for (k = 0; k < pdev->num_resources; k++) {
+		struct omap_vout_device *vout = vid_dev->vouts[k];
+		spin_lock_irqsave(&vout->vbq_lock, flags);
+
+		/* for now turn off all vouts */
+		vout->ignore = true;
+
+		/* handle all frames in the queue */
+		if (vout->streaming) {
+			/* process frames until there is <=1 in queue */
+			while (vout->dma_queue.next != vout->dma_queue.prev)
+				fake_display_buffer(vout);
+		}
+		spin_unlock_irqrestore(&vout->vbq_lock, flags);
+	}
+}
+
+static void omap_vout_late_resume(struct early_suspend *h)
+{
+	int k;
+	unsigned long flags;
+	struct platform_device *pdev = container_of(h,
+			struct omap_vout_early_suspend, suspend)->pdev;
+	struct v4l2_device *v4l2_dev = platform_get_drvdata(pdev);
+	struct omap2video_device *vid_dev = container_of(v4l2_dev,
+			struct omap2video_device, v4l2_dev);
+
+	for (k = 0; k < pdev->num_resources; k++) {
+		struct omap_vout_device *vout = vid_dev->vouts[k];
+		spin_lock_irqsave(&vout->vbq_lock, flags);
+		/* see if vout needs to ignore frames */
+
+		/* for now turn on all vouts */
+		vout->ignore = false;
+
+		spin_unlock_irqrestore(&vout->vbq_lock, flags);
+	}
+}
+#endif
+
 static int vidioc_qbuf(struct file *file, void *fh,
 			struct v4l2_buffer *buffer)
 {
@@ -2523,7 +2582,7 @@ static int vidioc_qbuf(struct file *file, void *fh,
 		return -EINVAL;
 	}
 
-	if (vout->streaming && has_suspended_display(vout)) {
+	if (vout->streaming && (vout->ignore || has_suspended_display(vout))) {
 		/* we could return an error, but we want to simulate normal
 		   processing of this buffer */
 		spin_lock_irqsave(&vout->vbq_lock, flags);
@@ -2572,8 +2631,9 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 	mutex_lock(&vout->lock);
 
-	if (vout->streaming || has_suspended_display(vout)) {
+	if (vout->streaming || (vout->ignore || has_suspended_display(vout))) {
 		ret = -EBUSY;
+		printk(KERN_ERR "streamon while ignored\n");
 		goto streamon_err;
 	}
 
@@ -3179,6 +3239,10 @@ static int omap_vout_remove(struct platform_device *pdev)
 	struct omap2video_device *vid_dev = container_of(v4l2_dev, struct
 			omap2video_device, v4l2_dev);
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&early_suspend_info.suspend);
+#endif
+
 	v4l2_device_unregister(v4l2_dev);
 	for (k = 0; k < pdev->num_resources; k++)
 		omap_vout_cleanup_device(vid_dev->vouts[k]);
@@ -3295,6 +3359,15 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 						display->panel.timings.x_res,
 						display->panel.timings.y_res);
 	}
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	early_suspend_info.suspend.suspend = omap_vout_early_suspend;
+	early_suspend_info.suspend.resume = omap_vout_late_resume;
+	early_suspend_info.suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
+	early_suspend_info.pdev = pdev;
+	register_early_suspend(&early_suspend_info.suspend);
+#endif
+
 	return 0;
 
 probe_err2:
