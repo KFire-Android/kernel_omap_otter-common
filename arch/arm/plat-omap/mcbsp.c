@@ -54,14 +54,20 @@ EXPORT_SYMBOL(omap_mcbsp_write);
 int omap_mcbsp_read(struct omap_mcbsp *mcbsp, u16 reg, bool from_cache)
 {
 	if (cpu_class_is_omap1()) {
-		return !from_cache ? __raw_readw(mcbsp->io_base + reg) :
-				((u16 *)mcbsp->reg_cache)[reg / sizeof(u16)];
+		return !from_cache ? ((u16 *)mcbsp->reg_cache)[reg /
+				sizeof(u16)] = __raw_readw(mcbsp->io_base +
+				reg) : ((u16 *)mcbsp->reg_cache)[reg /
+				sizeof(u16)];
 	} else if (cpu_is_omap2420()) {
-		return !from_cache ? __raw_readw(mcbsp->io_base + reg) :
-				((u16 *)mcbsp->reg_cache)[reg / sizeof(u32)];
+		return !from_cache ? ((u16 *)mcbsp->reg_cache)[reg /
+				sizeof(u32)] = __raw_readw(mcbsp->io_base +
+				reg) : ((u16 *)mcbsp->reg_cache)[reg /
+				sizeof(u32)];
 	} else {
-		return !from_cache ? __raw_readl(mcbsp->io_base + reg) :
-				((u32 *)mcbsp->reg_cache)[reg / sizeof(u32)];
+		return !from_cache ? ((u32 *)mcbsp->reg_cache)[reg /
+				sizeof(u32)] = __raw_readl(mcbsp->io_base +
+				reg) : ((u32 *)mcbsp->reg_cache)[reg /
+				sizeof(u32)];
 	}
 }
 EXPORT_SYMBOL(omap_mcbsp_read);
@@ -92,6 +98,20 @@ static int omap_mcbsp_st_read(struct omap_mcbsp *mcbsp, u16 reg)
 			omap_mcbsp_st_read(mcbsp, OMAP_ST_REG_##reg)
 #define MCBSP_ST_WRITE(mcbsp, reg, val) \
 			omap_mcbsp_st_write(mcbsp, OMAP_ST_REG_##reg, val)
+
+/*Stores the context of mcbsp register in reg_cache*/
+static void omap_mcbsp_save_context(struct omap_mcbsp *mcbsp)
+{
+	MCBSP_READ(mcbsp, SYSCON);
+}
+
+/*restores the context of mcbsp register from reg_cache to the MCBSP register*/
+static void  omap_mcbsp_restore_context(struct omap_mcbsp *mcbsp)
+{
+	unsigned int w;
+	w = MCBSP_READ_CACHE(mcbsp, SYSCON);
+	MCBSP_WRITE(mcbsp, SYSCON, w);
+}
 
 static void omap_mcbsp_dump_reg(u8 id)
 {
@@ -728,7 +748,6 @@ EXPORT_SYMBOL(omap_mcbsp_set_io_type);
 int omap_mcbsp_request(unsigned int id)
 {
 	struct omap_mcbsp *mcbsp;
-	void *reg_cache;
 	int err;
 
 	if (!omap_mcbsp_check_valid_id(id)) {
@@ -736,11 +755,6 @@ int omap_mcbsp_request(unsigned int id)
 		return -ENODEV;
 	}
 	mcbsp = id_to_mcbsp_ptr(id);
-
-	reg_cache = kzalloc(omap_mcbsp_cache_size, GFP_KERNEL);
-	if (!reg_cache) {
-		return -ENOMEM;
-	}
 
 	spin_lock(&mcbsp->lock);
 	if (!mcbsp->free) {
@@ -751,13 +765,14 @@ int omap_mcbsp_request(unsigned int id)
 	}
 
 	mcbsp->free = 0;
-	mcbsp->reg_cache = reg_cache;
 	spin_unlock(&mcbsp->lock);
 
 	if (mcbsp->pdata && mcbsp->pdata->ops && mcbsp->pdata->ops->request)
 		mcbsp->pdata->ops->request(id);
 
 	pm_runtime_get_sync(mcbsp->dev);
+
+	omap_mcbsp_restore_context(mcbsp);
 
 	/* Do procedure specific to omap34xx arch, if applicable */
 	omap34xx_mcbsp_request(mcbsp);
@@ -809,10 +824,8 @@ err_clk_disable:
 
 	spin_lock(&mcbsp->lock);
 	mcbsp->free = 1;
-	mcbsp->reg_cache = NULL;
 err_kfree:
 	spin_unlock(&mcbsp->lock);
-	kfree(reg_cache);
 
 	return err;
 }
@@ -851,11 +864,8 @@ void omap_mcbsp_free(unsigned int id)
 		dev_err(mcbsp->dev, "McBSP%d was not reserved\n", mcbsp->id);
 	else
 		mcbsp->free = 1;
-	mcbsp->reg_cache = NULL;
 	spin_unlock(&mcbsp->lock);
 
-	if (reg_cache)
-		kfree(reg_cache);
 }
 EXPORT_SYMBOL(omap_mcbsp_free);
 
@@ -1641,6 +1651,7 @@ static int __devinit omap_mcbsp_probe(struct platform_device *pdev)
 	struct omap_mcbsp *mcbsp;
 	int id = pdev->id;
 	struct resource *res;
+	void *reg_cache;
 	int ret = 0;
 
 	if (!pdata) {
@@ -1739,7 +1750,6 @@ static int __devinit omap_mcbsp_probe(struct platform_device *pdev)
 			ret = -ENOMEM;
 			goto err;
 		}
-		printk(KERN_ERR"sidetone res->start = %x\n", res->start);
 		mcbsp->st_data->io_base_st = ioremap(res->start,
 					resource_size(res));
 		if (!mcbsp->st_data->io_base_st) {
@@ -1751,6 +1761,18 @@ static int __devinit omap_mcbsp_probe(struct platform_device *pdev)
 		if (ret)
 			goto err_sysfs;
 	}
+
+	reg_cache = kzalloc(omap_mcbsp_cache_size, GFP_KERNEL);
+	if (!reg_cache) {
+		ret = -ENOMEM;
+		goto err_sysfs;
+	}
+
+	mcbsp->reg_cache = reg_cache;
+
+	pm_runtime_get_sync(mcbsp->dev);
+	omap_mcbsp_save_context(mcbsp);
+	pm_runtime_put_sync(mcbsp->dev);
 
 	return 0;
 
