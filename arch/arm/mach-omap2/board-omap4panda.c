@@ -577,8 +577,6 @@ static void __init omap_panda_init(void)
 	wlan_1273_config();
 #endif
 
-	/* OMAP4 Panda uses internal transceiver so register nop transceiver */
-	usb_nop_xceiv_register();
 	usb_musb_init(&musb_board_data);
 	omap4_ehci_init();
 #ifdef CONFIG_OMAP2_DSS_HDMI

@@ -39,6 +39,80 @@
 
 static struct timer_list musb_idle_timer;
 
+ void musb_enable_vbus(struct musb *musb)
+ {
+	 int val;
+
+	/* enable VBUS valid, id groung*/
+	omap_writel(0x00000005, 0x4A00233C);
+
+	/* start the session */
+	val = omap_readb(0x4A0AB060);
+	val |= 0x1;
+	omap_writel(val, 0x4A0AB060);
+
+	while (musb_readb(musb->mregs, MUSB_DEVCTL)&0x80) {
+		mdelay(20);
+		DBG(1, "devcontrol before vbus=%x\n", musb_readb(musb->mregs,
+						 MUSB_DEVCTL));
+	}
+	if (musb->xceiv->set_vbus)
+		otg_set_vbus(musb->xceiv, 1);
+
+ }
+
+ /* blocking notifier support */
+int musb_notifier_call(struct notifier_block *nb,
+		unsigned long event, void *unused)
+{
+	struct musb	*musb = container_of(nb, struct musb, nb);
+	static int hostmode;
+
+	switch (event) {
+	case USB_EVENT_ID:
+		DBG(1, "ID GND\n");
+		musb->is_active = 1;
+		if (omap_readl(0x4A002300)&0x1) {
+			omap_writel(0x0, 0x4A002300);
+			mdelay(500);
+		}
+		hostmode = 1;
+		musb_enable_vbus(musb);
+		break;
+
+	case USB_EVENT_VBUS:
+		DBG(1, "VBUS Connect\n");
+		musb->is_active = 1;
+		if (omap_readl(0x4A002300)&0x1) {
+			omap_writel(0x0, 0x4A002300);
+			mdelay(400);
+		}
+		if (!hostmode) {
+			/* Enable VBUS Valid, BValid, AValid. Clear SESSEND.*/
+			omap_writel(0x00000015, 0x4A00233C);
+		}
+		break;
+
+	case USB_EVENT_NONE:
+		DBG(1, "VBUS Disconnect\n");
+		omap_writel(0x00000018, 0x4A00233C);
+
+		if (musb->xceiv->set_vbus)
+			otg_set_vbus(musb->xceiv, 0);
+
+		/* put the phy in powerdown mode*/
+		omap_writel(0x1, 0x4A002300);
+		hostmode = 0;
+
+		break;
+	default:
+		DBG(1, "ID float\n");
+		return NOTIFY_DONE;
+	}
+
+	return NOTIFY_OK;
+}
+
 static void musb_do_idle(unsigned long _musb)
 {
 	struct musb	*musb = (void *)_musb;
@@ -207,6 +281,7 @@ int __init musb_platform_init(struct musb *musb)
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
 	struct omap_musb_board_data *data = plat->board_data;
+	int status;
 
 	/* We require some kind of external transceiver, hooked
 	 * up through ULPI.  TWL4030-family PMICs include one,
@@ -223,6 +298,7 @@ int __init musb_platform_init(struct musb *musb)
 		l = omap_readl(0x4A009360);
 		l &= ~0x00000100;
 		omap_writel(l, 0x4A009360);
+		omap_writel(0x1, 0x4A002300);
 	}
 
 	/* Fixme this can be enabled when load the gadget driver also*/
@@ -232,10 +308,6 @@ int __init musb_platform_init(struct musb *musb)
 	* which is impacting the core retention if the gadget driver is not
 	* loaded.
 	*/
-#ifdef CONFIG_USB_MUSB_HDRC_HCD
-	if (cpu_is_omap44xx())
-		omap_writel(0x0, 0x4A002300);
-#endif
 	l = musb_readl(musb->mregs, OTG_INTERFSEL);
 
 	if (data->interface_type == MUSB_INTERFACE_UTMI) {
@@ -262,6 +334,12 @@ int __init musb_platform_init(struct musb *musb)
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 	plat->is_usb_active = is_musb_active;
 
+	if (cpu_is_omap44xx())
+		/* register for transciever notification*/
+		status = otg_register_notifier(musb->xceiv, &musb->nb);
+
+	if (status)
+		DBG(1, "notification register failed\n");
 	return 0;
 }
 

@@ -5520,6 +5520,7 @@ static struct omap_hwmod omap44xx_usb_otg_hs_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_usb_otg_hs_slaves),
 	.masters	= omap44xx_usb_otg_hs_masters,
 	.masters_cnt	= ARRAY_SIZE(omap44xx_usb_otg_hs_masters),
+	.flags		= HWMOD_SWSUP_MSTANDBY | HWMOD_SWSUP_SIDLE,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
 

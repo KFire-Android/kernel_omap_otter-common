@@ -99,6 +99,7 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/i2c/twl.h>
+#include <linux/pm_runtime.h>
 
 #ifdef	CONFIG_ARM
 #include <mach/hardware.h>
@@ -1898,6 +1899,7 @@ allocate_instance(struct device *dev,
 	}
 
 	musb->controller = dev;
+	musb->nb.notifier_call = musb_notifier_call;
 	return musb;
 }
 
@@ -1939,15 +1941,6 @@ static void musb_free(struct musb *musb)
 #endif
 }
 
-#define VUSB_CFG_STATE			0x72
-#define MISC2				0xE5
-#define CFG_LDO_PD2			0xF5
-#define VUSB_CFG_VOLTAGE		0x73
-#define VUSB_CFG_TRANS			0x71
-#define USB_VBUS_CTRL_SET		0x4
-#define USB_ID_CTRL_SET			0x6
-#define CHARGERUSB_CTRL1		0x8
-
 /*
  * Perform generic per-controller initialization.
  *
@@ -1959,7 +1952,7 @@ static void musb_free(struct musb *musb)
 static int __init
 musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 {
-	int			status;
+	int			status, val;
 	struct musb		*musb;
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
 
@@ -1975,22 +1968,12 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	switch (plat->mode) {
 	case MUSB_HOST:
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
-	if (cpu_is_omap44xx()) {
-		/* Enable VBUS Valid, BValid, AValid. Clear SESSEND.*/
-		omap_writel(0x00000005, 0x4A00233C);
-	}
 		break;
 #else
 		goto bad_config;
 #endif
 	case MUSB_PERIPHERAL:
 #ifdef CONFIG_USB_GADGET_MUSB_HDRC
-	/* FIXME */
-	/* TODO:- Phoenix Settings to be done from Phoenix Layer */
-	if (cpu_is_omap44xx()) {
-		/* Enable VBUS Valid, BValid, AValid. Clear SESSEND.*/
-		omap_writel(0x00000015, 0x4A00233C);
-	}
 		break;
 #else
 		goto bad_config;
@@ -2010,6 +1993,7 @@ bad_config:
 	/* allocate */
 	musb = allocate_instance(dev, plat->config, ctrl);
 	if (!musb) {
+		dev_err(dev, "NO MEM");
 		status = -ENOMEM;
 		goto fail0;
 	}
@@ -2149,6 +2133,7 @@ bad_config:
 					& MUSB_DEVCTL_BDEVICE
 				? 'B' : 'A'));
 
+		otg_init(musb->xceiv);
 	} else /* peripheral is enabled */ {
 		MUSB_DEV_MODE(musb);
 		musb->xceiv->default_a = 0;
@@ -2187,19 +2172,6 @@ bad_config:
 			? "DMA" : "PIO",
 			musb->nIrq);
 
-#ifdef CONFIG_USB_MUSB_HDRC_HCD
-	if (cpu_is_omap44xx()) {
-		/* Delay supply of VBUS. This fixes bootup enumeration issue */
-		mdelay(500);
-
-		/*
-		 * Start driving VBUS. Set OPA_MODE bit in CHARGERUSB_CTRL1
-		 * register. This enables boost mode.
-		 */
-		twl_i2c_write_u8(TWL_MODULE_MAIN_CHARGE , 0x40,
-						CHARGERUSB_CTRL1);
-	}
-#endif
 	return 0;
 
 fail5:

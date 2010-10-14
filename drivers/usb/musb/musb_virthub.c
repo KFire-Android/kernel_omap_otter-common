@@ -63,7 +63,7 @@ static void musb_port_suspend(struct musb *musb, bool do_suspend)
 		int retries = 10000;
 
 		power &= ~MUSB_POWER_RESUME;
-		power |= MUSB_POWER_SUSPENDM;
+		power |= MUSB_POWER_SUSPENDM | MUSB_POWER_ENSUSPEND;
 		musb_writeb(mbase, MUSB_POWER, power);
 
 		/* Needed for OPT A tests */
@@ -101,7 +101,7 @@ static void musb_port_suspend(struct musb *musb, bool do_suspend)
 				otg_state_string(musb));
 		}
 	} else if (power & MUSB_POWER_SUSPENDM) {
-		power &= ~MUSB_POWER_SUSPENDM;
+		power &= ~MUSB_POWER_SUSPENDM | ~MUSB_POWER_ENSUSPEND;
 		power |= MUSB_POWER_RESUME;
 		musb_writeb(mbase, MUSB_POWER, power);
 

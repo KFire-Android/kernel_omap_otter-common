@@ -359,6 +359,7 @@ struct musb {
 	struct timer_list	otg_timer;
 #endif
 
+	struct notifier_block	nb;
 	/* called with IRQs blocked; ON/nonzero implies starting a session,
 	 * and waiting at least a_wait_vrise_tmout.
 	 */
@@ -491,6 +492,10 @@ extern void musb_platform_save_context(struct musb *musb,
 		struct musb_context_registers *musb_context);
 extern void musb_platform_restore_context(struct musb *musb,
 		struct musb_context_registers *musb_context);
+
+int musb_notifier_call(struct notifier_block *nb,
+		unsigned long event, void *unused);
+
 #else
 #define musb_platform_save_context(m, x)	do {} while (0)
 #define musb_platform_restore_context(m, x)	do {} while (0)

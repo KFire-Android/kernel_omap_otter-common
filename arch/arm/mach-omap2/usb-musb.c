@@ -380,7 +380,7 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 			dev->coherent_dma_mask = musb_dmamask;
 			put_device(dev);
 		}
-		/*Suspend the phy*/
+		/*powerdown the phy*/
 		if (cpu_is_omap44xx())
 			omap_writel(0x1, 0x4A002300);
 
@@ -412,8 +412,6 @@ void musb_context_save_restore(enum musb_state state)
 				 *  to force standby force idle during idle and
 				 *  disable the clock.
 				 */
-				oh->flags |= HWMOD_SWSUP_SIDLE
-						| HWMOD_SWSUP_MSTANDBY;
 				pm->suspend(dev);
 				pdata->device_idle(pdev);
 				break;
@@ -424,54 +422,37 @@ void musb_context_save_restore(enum musb_state state)
 				 * force idle during idle and disable
 				 * the clock.
 				 */
-				oh->flags |= HWMOD_SWSUP_SIDLE
-						| HWMOD_SWSUP_MSTANDBY;
-				pdata->device_idle(pdev);
 				if (cpu_is_omap44xx()) {
 					/* Disable the phy clock*/
 					omap_writel(0x0, 0x4A0093E0);
-
-				/* FIXME This is not required once the phoenix
-				 *framework is in place. We can powerup the PHY
-				 *once the cable connected.
-				 */
-					if (bdata->mode == MUSB_HOST)
-						/*powerdown  the phy */
-						omap_writel(0x1, 0x4A002300);
+					/* Enable ENABLEFORCE bit*/
+					omap_writel(0x1, 0x4A0AB414);
 				}
+
+				pdata->device_idle(pdev);
 				break;
 
 				case restore_context:
 				/* Enable the clock, set the sysconfig setting
-				 * back to smart idle and smart stndby
+				 * back to no idle and no stndby
 				 * after wakeup, restore the context.
 				 */
-				oh->flags &= ~(HWMOD_SWSUP_SIDLE
-						| HWMOD_SWSUP_MSTANDBY);
 				pdata->device_enable(pdev);
 				pm->resume_noirq(dev);
 				break;
 
 				case enable_clk:
-				/* FIXME This is not required once the phoenix
-				 *framework is in place. We can powerup the PHY
-				 *once the cable connected.
-				 */
-				if (cpu_is_omap44xx()) {
-					if (bdata->mode == MUSB_HOST)
-						/*powerup  the phy */
-						omap_writel(0, 0x4A002300);
-					/* enable the phy clock*/
-					omap_writel(0x101, 0x4A0093E0);
-				}
-
-				/* set the sysconfig setting back to smart idle
-				 * and smart stndby after wakeup and enable
+				/* set the sysconfig setting back to no idle
+				 * and no stndby after wakeup and enable
 				 * the clock.
 				 */
-				oh->flags &= ~(HWMOD_SWSUP_SIDLE
-						| HWMOD_SWSUP_MSTANDBY);
 				pdata->device_enable(pdev);
+
+				if (cpu_is_omap44xx()) {
+					omap_writel(0x101, 0x4A0093E0);
+					/* Disable ENABLEFORCE bit*/
+					omap_writel(0x0, 0x4A0AB414);
+				}
 				break;
 
 				default:

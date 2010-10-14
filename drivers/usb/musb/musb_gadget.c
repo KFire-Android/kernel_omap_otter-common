@@ -1860,6 +1860,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 			} else {
 				hcd->self.uses_pio_for_control = 1;
 			}
+			otg_init(musb->xceiv);
 		}
 	}
 
@@ -1884,7 +1885,7 @@ static void stop_activity(struct musb *musb, struct usb_gadget_driver *driver)
 		musb_pullup(musb, 0);
 	}
 	if (cpu_is_omap44xx())
-		/* put the phy in normal operation mode*/
+		/* put the phy into powerdown mode*/
 		omap_writel(0x1, 0x4A002300);
 
 	musb_stop(musb);
@@ -1962,6 +1963,8 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 
 	if (is_otg_enabled(musb) && retval == 0) {
 		usb_remove_hcd(musb_to_hcd(musb));
+		if (musb->xceiv->set_vbus)
+			otg_set_vbus(musb->xceiv, 0);
 		/* FIXME we need to be able to register another
 		 * gadget driver here and have everything work;
 		 * that currently misbehaves.
