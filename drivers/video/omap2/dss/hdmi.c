@@ -94,6 +94,7 @@ enum hdmi_power_state {
 
 static bool is_hdmi_on;		/* whether full power is needed */
 static bool is_hpd_on;		/* whether hpd is enabled */
+static bool user_hpd_state;	/* user hpd state */
 
 #define HDMI_PLLCTRL		0x58006200
 #define HDMI_PHY		0x58006300
@@ -305,10 +306,20 @@ static ssize_t hdmi_yuv_set(struct device *dev,
 static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
 static DEVICE_ATTR(yuv, S_IRUGO | S_IWUSR, hdmi_yuv_supported, hdmi_yuv_set);
 
-int hdmi_hot_plug_event_send(struct omap_dss_device *dssdev, int onoff)
+int set_hdmi_hot_plug_status(struct omap_dss_device *dssdev, bool onoff)
 {
-	printk("hot plug event %d", onoff);
-	return kobject_uevent(&dssdev->dev.kobj, onoff ? KOBJ_ADD : KOBJ_REMOVE);
+	int ret = 0;
+
+	if (onoff != user_hpd_state) {
+		DSSINFO("hot plug event %d", onoff);
+		ret = kobject_uevent(&dssdev->dev.kobj,
+					onoff ? KOBJ_ADD : KOBJ_REMOVE);
+		user_hpd_state = onoff;
+	}
+
+	if (ret)
+		DSSWARN("error sending hot plug event %d (%d)", onoff, ret);
+	return ret;
 }
 
 static int hdmi_open(struct inode *inode, struct file *filp)
@@ -972,28 +983,34 @@ void hdmi_work_queue(struct work_struct *work)
 		hdmi_enable_clocks(0);
 		hdmi_set_power(dssdev);
 		hpd_mode = 1;
-		hdmi_hot_plug_event_send(dssdev, 0);
+		set_hdmi_hot_plug_status(dssdev, false);
 	}
 
-	if (r & (HDMI_CONNECT) && (hpd_mode == 1) &&
+	if ((r & HDMI_CONNECT) && (hpd_mode == 1) &&
 		(hdmi_power != HDMI_POWER_FULL)) {
 
 		DSSINFO("Physical Connect\n");
+
+		/* turn on clocks on connect */
 		hdmi_enable_clocks(1);
 		is_hdmi_on = true;
 		hdmi_set_power(dssdev);
 		mdelay(1000);
 	}
 
-	if (r & (HDMI_HPD) && (hpd_mode == 1) &&
-		hdmi_power != HDMI_POWER_FULL) {
-		mdelay(1000);
-		DSSINFO("Connect 1 - Enabling display\n");
-		hdmi_enable_clocks(1);
-		is_hdmi_on = true;
-		hdmi_set_power(dssdev);
+	if ((r & HDMI_HPD) && (hpd_mode == 1)) {
 
-		hdmi_hot_plug_event_send(dssdev, 1);
+		mdelay(1000);
+
+		/* HDMI should already be full on, but just in case */
+		if (hdmi_power != HDMI_POWER_FULL) {
+			DSSINFO("Connect 1 - Enabling display\n");
+			hdmi_enable_clocks(1);
+			is_hdmi_on = true;
+			hdmi_set_power(dssdev);
+		}
+
+		set_hdmi_hot_plug_status(dssdev, true);
 	}
 
 	kfree(work);
@@ -1015,11 +1032,11 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 
 	spin_lock_irqsave(&irqstatus_lock, flags);
 	work_pending = irqstatus;
-	if ((r & HDMI_DISCONNECT)) {
-		irqstatus = HDMI_DISCONNECT;
-	} else {
-		irqstatus = r;
-	}
+	if (r & HDMI_DISCONNECT)
+		irqstatus &= ~HDMI_CONNECT;
+	if (r & HDMI_CONNECT)
+		irqstatus &= ~HDMI_DISCONNECT;
+	irqstatus |= r;
 	spin_unlock_irqrestore(&irqstatus_lock, flags);
 
 	if (r && !work_pending) {
@@ -1053,7 +1070,7 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	edid_set = false;
 	hdmi_enable_clocks(0);
 
-	hdmi_hot_plug_event_send(dssdev, 0);
+	set_hdmi_hot_plug_status(dssdev, false);
 
 	/* cut clock(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
@@ -1143,7 +1160,7 @@ static int hdmi_enable_display(struct omap_dss_device *dssdev)
 		r = hdmi_start_display(dssdev);
 
 	if (!r)
-		hdmi_hot_plug_event_send(dssdev, 1);
+		set_hdmi_hot_plug_status(dssdev, true);
 
 	mutex_unlock(&hdmi.lock);
 
@@ -1207,7 +1224,7 @@ static int hdmi_display_resume(struct omap_dss_device *dssdev)
 
 	r = hdmi_start_display(dssdev);
 	if (!r && hdmi_power == HDMI_POWER_FULL)
-		hdmi_hot_plug_event_send(dssdev, 1);
+		set_hdmi_hot_plug_status(dssdev, true);
 
 	mutex_unlock(&hdmi.lock);
 
