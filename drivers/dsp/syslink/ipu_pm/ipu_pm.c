@@ -779,6 +779,11 @@ int ipu_pm_notifications(enum pm_event_type event_type, void *data)
 			}
 			break;
 		case PM_PID_DEATH:
+			/* Just send the message to appm3 since is the one
+			 * running the resource manager.
+			 */
+			if (proc_id == SYS_M3)
+				break;
 			pm_msg.fields.msg_type = PM_NOTIFICATIONS;
 			pm_msg.fields.msg_subtype = PM_PID_DEATH;
 			pm_msg.fields.parm = PM_SUCCESS;
