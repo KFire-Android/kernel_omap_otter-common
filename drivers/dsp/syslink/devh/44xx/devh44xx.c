@@ -379,7 +379,11 @@ static int devh44xx_sysm3_tiler_notifier_call(struct notifier_block *nb,
 
 	switch ((int)val) {
 	case TILER_DEVICE_CLOSE:
+#if defined(CONFIG_TILER_PID_KILL_NOTIFICATIONS)
 		return devh44xx_notifier_call(nb, val, v, pdata);
+#else
+		return 0;
+#endif
 	default:
 		return 0;
 	}
@@ -393,7 +397,11 @@ static int devh44xx_appm3_tiler_notifier_call(struct notifier_block *nb,
 
 	switch ((int)val) {
 	case TILER_DEVICE_CLOSE:
+#if defined(CONFIG_TILER_PID_KILL_NOTIFICATIONS)
 		return devh44xx_notifier_call(nb, val, v, pdata);
+#else
+		return 0;
+#endif
 	default:
 		return 0;
 	}
@@ -407,7 +415,11 @@ static int devh44xx_tesla_tiler_notifier_call(struct notifier_block *nb,
 
 	switch ((int)val) {
 	case TILER_DEVICE_CLOSE:
+#if defined(CONFIG_TILER_PID_KILL_NOTIFICATIONS)
 		return devh44xx_notifier_call(nb, val, v, pdata);
+#else
+		return 0;
+#endif
 	default:
 		return 0;
 	}

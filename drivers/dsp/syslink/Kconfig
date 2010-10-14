@@ -88,4 +88,10 @@ config DMM_DMA_API
 	   cache operations on the userspace buffers. This option would be
 	   made default once the code is stabilized
 
+config TILER_PID_KILL_NOTIFICATIONS
+	bool "TILER Event Notification"
+	default n
+	help
+	   This is the temporary hack to disable tiler notification
+	   on PID_DEATH.
 endif
