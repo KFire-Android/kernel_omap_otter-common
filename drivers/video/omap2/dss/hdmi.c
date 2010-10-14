@@ -1116,7 +1116,7 @@ static int hdmi_enable_hpd(struct omap_dss_device *dssdev)
 
 	hpd_mode = 1;
 	r = hdmi_start_display(dssdev);
-	if (!r)
+	if (r)
 		hpd_mode = 0;
 
 	mutex_unlock(&hdmi.lock);
