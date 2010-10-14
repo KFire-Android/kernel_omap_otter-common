@@ -493,14 +493,21 @@ extern void musb_platform_save_context(struct musb *musb,
 extern void musb_platform_restore_context(struct musb *musb,
 		struct musb_context_registers *musb_context);
 
-int musb_notifier_call(struct notifier_block *nb,
-		unsigned long event, void *unused);
-
 #else
 #define musb_platform_save_context(m, x)	do {} while (0)
 #define musb_platform_restore_context(m, x)	do {} while (0)
 #endif
 
+#endif
+
+#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
+    defined(CONFIG_ARCH_OMAP4)
+
+extern int musb_notifier_call(struct notifier_block *nb,
+		unsigned long event, void *unused);
+
+#else
+#define musb_notifier_call(m,x,y)		do {} while (0)
 #endif
 
 static inline void musb_set_vbus(struct musb *musb, int is_on)

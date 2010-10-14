@@ -334,12 +334,13 @@ int __init musb_platform_init(struct musb *musb)
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 	plat->is_usb_active = is_musb_active;
 
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap44xx()) {
 		/* register for transciever notification*/
 		status = otg_register_notifier(musb->xceiv, &musb->nb);
 
 	if (status)
 		DBG(1, "notification register failed\n");
+	}
 	return 0;
 }
 

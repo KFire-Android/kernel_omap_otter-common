@@ -1952,7 +1952,7 @@ static void musb_free(struct musb *musb)
 static int __init
 musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 {
-	int			status, val;
+	int			status;
 	struct musb		*musb;
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
 

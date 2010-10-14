@@ -396,7 +396,6 @@ void musb_context_save_restore(enum musb_state state)
 	struct device *dev = &pdev->dev;
 	struct device_driver *drv = dev->driver;
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
-	struct omap_musb_board_data *bdata = plat->board_data;
 
 	if (drv) {
 #ifdef CONFIG_PM_RUNTIME
@@ -466,6 +465,9 @@ void musb_context_save_restore(enum musb_state state)
 
 #else
 void __init usb_musb_init(struct omap_musb_board_data *board_data)
+{
+}
+void musb_context_save_restore(enum musb_state state)
 {
 }
 #endif /* CONFIG_USB_MUSB_SOC */
