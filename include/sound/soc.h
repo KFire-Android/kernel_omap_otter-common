@@ -257,6 +257,10 @@ enum snd_soc_control_type {
 /* Max number of Backend DAIs */
 #define SND_SOC_MAX_BE		8
 
+/* DAI Link Host Mode Support */
+#define SND_SOC_DAI_LINK_NO_HOST		0x1
+#define SND_SOC_DAI_LINK_OPT_HOST		0x2
+
 int snd_soc_register_platform(struct device *dev,
 		struct snd_soc_platform_driver *platform_drv);
 void snd_soc_unregister_platform(struct device *dev);
@@ -594,6 +598,8 @@ struct snd_soc_dai_link {
 	unsigned int no_codec:1;
 	/* This DAI has a Backend ID */
 	unsigned int be_id;
+	/* This DAI can support no host IO (no pcm data is copied to from host) */
+	unsigned int no_host_mode:2;
 
 	/* codec/machine specific init - e.g. add machine controls */
 	int (*init)(struct snd_soc_pcm_runtime *rtd);
