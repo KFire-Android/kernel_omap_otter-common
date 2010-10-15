@@ -1,0 +1,156 @@
+# =====================================================================
+# L27.7.1 OMAP4 Froyo Release
+# =====================================================================
+
+Author: Leed Aguilar / Vikram Pandita
+Date: Oct 15th 2010
+Target Release: L27.7.1
+
+# =====================================================================
+# Configuration Settings
+# =====================================================================
+
+[KERNEL]
+Repo   : git://git.omapzoom.org/kernel/omap.git
+Branch : p-android-omap-2.6.35
+Commit : android-2.6.32-2.2-omap4.7v1
+Config : android_4430_defconfig
+
+[U-BOOT]
+Repo   : git://git.omapzoom.org/repo/u-boot.git
+Branch : omap4_dev
+Tag:   : L27.7.1
+Commit : 0e685295040b140a8b90d1b299e635a4eb1d5684
+Config : omap4430sdp_config
+
+[X-LOADER]
+Repo   : git://git.omapzoom.org/repo/x-loader.git
+Branch : omap4_dev
+Tag:   : L27.7.1
+Commit : 8876b8613d21df15e1dd17d933f8bd708dee6aba
+Config : omap4430sdp_config
+
+OS: Linux 2.6.35
+Platform: SDP4430 OMAP4 ES2.0 EMU with ARM-A9-SMP@1Gz,DDR@200Mhz, ES1.1 phoenix
+Toolchain: arm-none-linux-gnueabi-gcc (Sourcery G++ Lite 2010q1-202) 4.4.1
+
+
+# =====================================================================
+# Cloning/Compile information
+# =====================================================================
+
+Kernel:
+-------
+1. git clone git://git.omapzoom.org/kernel/omap.git; cd omap/
+2. git checkout -b L27.7v1 android-2.6.32-2.2-omap4.7v1
+3. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- android_4430_defconfig
+4. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- uImage
+** Output: uImage
+
+u-boot:
+-------
+1. git clone  git://git.omapzoom.org/repo/u-boot.git; cd u-boot/
+2. git checkout -b L27.7v1 0e685295040b140a8b90d1b299e635a4eb1d5684
+3. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
+4. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi-
+** Output: u-boot.bin
+
+x-loader:
+---------
+1. git clone git://git.omapzoom.org/repo/x-loader.git; cd x-loader/
+2. git checkout -b L27.7v1 8876b8613d21df15e1dd17d933f8bd708dee6aba
+3. make ARCH=arm CCROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
+4. make ARCH=arm CCROSS_COMPILE=arm-none-linux-gnueabi- ift
+
+
+# =====================================================================
+# Release Notes
+# =====================================================================
+
+Install: Sourcery G++ Lite 2010q1-202 for ARM GNU/Linux
+http://www.codesourcery.com/sgpp/lite/arm/portal/release1293
+
+
+* Sample bootargs for MMC boot:
+setenv bootargs 'console=ttyO2,115200n8 root=/dev/mmcblk1p2 rw rootdelay=2 \
+init=/init androidboot.console=ttyO2 mem=458M@0x80000000 mem=512M@0xA0000000'
+setenv bootcmd 'mmcinit 0;fatload mmc 0 0x80000000 uImage;bootm 0x80000000'
+run bootcmd
+
+* This Release is intended to be used for Android Froyo 2.2
+
+How obtain the Android source code:
+$ repo init -u git://git.omapzoom.org/platform/omapmanifest.git -b froyo
+$ cp device/ti/blaze/buildspec.mk.default buildspec.mk
+$ make -j2
+Output:
+See filesystem in:
+      out/target/product/blaze/...
+          * root/
+          * system/
+
+For more information on how to compile the Android Filesystem visit:
+http://omappedia.org/wiki/Android_Getting_Started#Building_Android
+
+[HIGHLIGHTS]
+
+Supported Features:
+        OS Kernel (SMP)
+        Phoenix power IC,
+        UART,
+        GP Timer,
+        GPIO,
+        Watchdog,
+        NEON,
+        I2C,
+        MMC/SD/eMMC ,
+        Ethernet,
+        RTC,
+        SDMA (including descriptor loading),
+        Keypad,
+        Touch screen,
+        McSPI,
+        McBSP,
+        Mentor USB,
+        EHCI,
+        OHCI,
+        Phoenix General Purpose ADC,
+        Battery Charging.
+        Proximity sensor
+        Accelerometer sensor
+        Ambient Light sensor
+        Temperature sensor
+        Digital Compass
+        Pressure Sensor
+        LED (PWM and GPIO)
+
+- Power Management Frameworks
+        - Clock framework
+        - Clockdomain framework
+        - Powerdomain framework
+        - Regulator framework
+        - CPUidle with support upto MPU CSWR
+        - System wide suspend with support upto CORE CSWR
+	- hwmod framework
+
+[ADB over USB SUPPORT]
+
+Linux PC:
+http://omappedia.com/wiki/Support_Tools#Android_Gadget_ADB:_Linux_PC_Host
+
+Windows PC:
+http://omappedia.com/wiki/Support_Tools#Android_Gadget_ADB:_Windows_PC_Host
+
+More info about ADB can be found here:
+http://omappedia.org/wiki/Support_Tools
+
+
+# =====================================================================
+# Known issues
+# =====================================================================
+
+- DVFS (cpufreq) is not supported
+- CPU Hotplug is not supported in CPU Idle path on EMU devices, but it
+  works fine for GP devices
+
+# ======================================================================
