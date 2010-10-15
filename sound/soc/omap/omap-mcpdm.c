@@ -662,8 +662,11 @@ static void omap_mcpdm_abe_dai_shutdown(struct snd_pcm_substream *substream,
 		mcpdm->ul_active--;
 
 	if (!dai->active) {
-		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		if (mcpdm->ul_active == 0 && substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
+			if (!mcpdm->free && !mcpdm->ul_active && !mcpdm->dn_channels)
+				omap_mcpdm_free(mcpdm);
+		}
 		if (mcpdm->dl_active == 0 && substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 				queue_delayed_work(mcpdm->workqueue, &mcpdm->delayed_abe_work,
 						msecs_to_jiffies(11000)); /* TODO: pdata ? */
