@@ -1544,6 +1544,7 @@ static int aess_open(struct snd_pcm_substream *substream)
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MODEM:
+		break;
 	case ABE_FRONTEND_DAI_LP_MEDIA:
 		snd_soc_set_runtime_hwparams(substream, &omap_abe_hardware);
 		break;
@@ -1569,6 +1570,7 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MODEM:
+		break;
 	case ABE_FRONTEND_DAI_LP_MEDIA:
 		snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
 		runtime->dma_bytes = params_buffer_bytes(params);
@@ -1753,6 +1755,9 @@ static int aess_pcm_new(struct snd_soc_pcm_runtime *rtd)
 	struct snd_card *card = rtd->card->snd_card;
 	struct snd_pcm *pcm = rtd->pcm;
 	int ret = 0;
+
+	if (rtd->dai_link->no_host_mode)
+		return 0;
 
 	if (!card->dev->dma_mask)
 		card->dev->dma_mask = &omap_pcm_dmamask;
