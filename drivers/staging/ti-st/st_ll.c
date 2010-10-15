@@ -44,7 +44,7 @@ static void ll_device_want_to_sleep(struct st_data_s *st_data)
 	pr_debug("%s", __func__);
 	/* sanity check */
 	if (st_data->ll_state != ST_LL_AWAKE)
-		pr_err("ERR hcill: ST_LL_GO_TO_SLEEP_IND"
+		pr_info("ERR hcill: ST_LL_GO_TO_SLEEP_IND"
 			  "in state %ld", st_data->ll_state);
 
 	send_ll_cmd(st_data, LL_SLEEP_ACK);
@@ -61,15 +61,15 @@ static void ll_device_want_to_wakeup(struct st_data_s *st_data)
 		break;
 	case ST_LL_ASLEEP_TO_AWAKE:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind while waiting for Wake ack");
+		pr_info("duplicate wake_ind while waiting for Wake ack");
 		break;
 	case ST_LL_AWAKE:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind already AWAKE");
+		pr_info("duplicate wake_ind already AWAKE");
 		break;
 	case ST_LL_AWAKE_TO_ASLEEP:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind");
+		pr_info("duplicate wake_ind");
 		break;
 	}
 	/* update state */
@@ -101,7 +101,7 @@ void st_ll_wakeup(struct st_data_s *ll)
 		ll->ll_state = ST_LL_ASLEEP_TO_AWAKE;
 	} else {
 		/* don't send the duplicate wake_indication */
-		pr_err(" Chip already AWAKE ");
+		pr_info(" Chip already AWAKE ");
 	}
 }
 
@@ -122,7 +122,7 @@ unsigned long st_ll_sleep_state(struct st_data_s *st_data,
 		ll_device_want_to_sleep(st_data);
 		break;
 	case LL_SLEEP_ACK:	/* sleep ack */
-		pr_err("sleep ack rcvd: host shouldn't");
+		pr_info("sleep ack rcvd: host shouldn't");
 		break;
 	case LL_WAKE_UP_IND:	/* wake ind */
 		pr_info("wake indication recvd");
