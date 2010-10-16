@@ -239,7 +239,7 @@ static void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, int stream)
  * Configures McPDM uplink for audio recording.
  * This function should be called before omap_mcpdm_start.
  */
-int omap_mcpdm_capture_open(struct omap_mcpdm *mcpdm,
+static int omap_mcpdm_capture_open(struct omap_mcpdm *mcpdm,
 		struct omap_mcpdm_link *uplink)
 {
 	int irq_mask = 0;
@@ -274,7 +274,7 @@ int omap_mcpdm_capture_open(struct omap_mcpdm *mcpdm,
  * Configures McPDM downlink for audio playback.
  * This function should be called before omap_mcpdm_start.
  */
-int omap_mcpdm_playback_open(struct omap_mcpdm *mcpdm,
+static int omap_mcpdm_playback_open(struct omap_mcpdm *mcpdm,
 		struct omap_mcpdm_link *downlink)
 {
 	int irq_mask = 0;
@@ -309,7 +309,7 @@ int omap_mcpdm_playback_open(struct omap_mcpdm *mcpdm,
  * Cleans McPDM uplink configuration.
  * This function should be called when the stream is closed.
  */
-int omap_mcpdm_capture_close(struct omap_mcpdm *mcpdm,
+static int omap_mcpdm_capture_close(struct omap_mcpdm *mcpdm,
 		struct omap_mcpdm_link *uplink)
 {
 	int irq_mask = 0;
@@ -331,7 +331,7 @@ int omap_mcpdm_capture_close(struct omap_mcpdm *mcpdm,
  * Cleans McPDM downlink configuration.
  * This function should be called when the stream is closed.
  */
-int omap_mcpdm_playback_close(struct omap_mcpdm *mcpdm,
+static int omap_mcpdm_playback_close(struct omap_mcpdm *mcpdm,
 		struct omap_mcpdm_link *downlink)
 {
 	int irq_mask = 0;
@@ -398,7 +398,7 @@ static irqreturn_t omap_mcpdm_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
+static int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 {
 	struct platform_device *pdev;
 	struct omap_mcpdm_platform_data *pdata;
@@ -446,7 +446,7 @@ err:
 	return ret;
 }
 
-void omap_mcpdm_free(struct omap_mcpdm *mcpdm)
+static void omap_mcpdm_free(struct omap_mcpdm *mcpdm)
 {
 	struct platform_device *pdev;
 	struct omap_mcpdm_platform_data *pdata;
@@ -638,15 +638,17 @@ static int omap_mcpdm_abe_dai_startup(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
-	int err = 0;
+	int ret;
 
-	err = omap_mcpdm_dai_startup(substream, dai);
+	ret = omap_mcpdm_dai_startup(substream, dai);
+	if (ret < 0)
+		return ret;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		mcpdm->dl_active++;
 	else
 		mcpdm->ul_active++;
-	return err;
+	return ret;
 }
 
 static void omap_mcpdm_abe_dai_shutdown(struct snd_pcm_substream *substream,
@@ -699,37 +701,42 @@ static int omap_mcpdm_abe_dai_hw_params(struct snd_pcm_substream *substream,
 {
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 	int stream = substream->stream;
-	int err = 0, ctrl;
+	int ret = 0;
 
 	snd_soc_dai_set_dma_data(dai, substream,
 				 &omap_mcpdm_dai_dma_params[stream]);
 
 	spin_lock(&mcpdm->lock);
-	ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
+
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		u32 ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
+
+		/* make sure we stop any pre-existing shutdown */
 		cancel_delayed_work(&mcpdm->delayed_abe_work);
+
 		/* Check if McPDM is already started */
 		if ((ctrl & (PDM_DN_MASK | PDM_CMD_MASK)) == 0 ) {
 			mcpdm->downlink->channels = (PDM_DN_MASK | PDM_CMD_MASK);
-			err = omap_mcpdm_playback_open(mcpdm, &omap_mcpdm_links[0]);
+
+			ret = omap_mcpdm_playback_open(mcpdm, &omap_mcpdm_links[0]);
+			if (ret < 0)
+				goto out;
+
+			/* enable the DL port and wait 250us before starting McPDM */
 			abe_dsp_enable_data_transfer(PDM_DL_PORT);
 			udelay(250);
 			omap_mcpdm_start(mcpdm, stream);
 		}
 	} else {
 		mcpdm->uplink->channels = 0x0003;
-		err = omap_mcpdm_capture_open(mcpdm, &omap_mcpdm_links[1]);
+		ret = omap_mcpdm_capture_open(mcpdm, &omap_mcpdm_links[1]);
 	}
+
+out:
 	spin_unlock(&mcpdm->lock);
-
-	return err;
+	return ret;
 }
 
-static int omap_mcpdm_abe_dai_hw_free(struct snd_pcm_substream *substream,
-				  struct snd_soc_dai *dai)
-{
-	return omap_mcpdm_dai_hw_free(substream, dai);
-}
 
 static int omap_mcpdm_abe_dai_trigger(struct snd_pcm_substream *substream,
 				  int cmd, struct snd_soc_dai *dai)
@@ -746,7 +753,7 @@ static struct snd_soc_dai_ops omap_mcpdm_abe_dai_ops = {
 	.startup	= omap_mcpdm_abe_dai_startup,
 	.shutdown	= omap_mcpdm_abe_dai_shutdown,
 	.hw_params	= omap_mcpdm_abe_dai_hw_params,
-	.hw_free	= omap_mcpdm_abe_dai_hw_free,
+	.hw_free	= omap_mcpdm_dai_hw_free,
 	.trigger 	= omap_mcpdm_abe_dai_trigger,
 };
 #endif
