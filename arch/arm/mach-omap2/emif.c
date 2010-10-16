@@ -5,6 +5,7 @@
  *
  * Santosh Shilimkar <santosh.shilimkar@ti.com>
  * Aneesh V <aneesh@ti.com>
+ * Vibhore Vardhan <vvardhan@ti.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -720,31 +721,61 @@ static void setup_volt_sensitive_registers(u32 emif_nr, struct emif_regs *regs,
 	return;
 }
 
+
+static void __init setup_emif_interrupts(void __iomem *base)
+{
+	u32 temp;
+	/* Clear any pendining interrupts */
+	__raw_writel(0xFFFFFFFF, base + OMAP44XX_EMIF_IRQSTATUS_SYS);
+	__raw_writel(0xFFFFFFFF, base + OMAP44XX_EMIF_IRQSTATUS_LL);
+
+	/* Enable the relevant interrupts for both LL and SYS*/
+	temp = OMAP44XX_REG_EN_TA_SYS_MASK | OMAP44XX_REG_EN_ERR_SYS_MASK;
+	__raw_writel(temp, base + OMAP44XX_EMIF_IRQENABLE_SET_SYS);
+	__raw_writel(temp, base + OMAP44XX_EMIF_IRQENABLE_SET_LL);
+
+	/* Dummy read to make sure writes are complete */
+	__raw_readl(base + OMAP44XX_EMIF_IRQENABLE_SET_LL);
+}
 /*
  * Interrupt Handler for EMIF1 and EMIF2
  */
 static irqreturn_t emif_interrupt_handler(int irq, void *dev_id)
 {
+	void __iomem *base;
+	u32 sys, ll;
+	u8 emif_nr = EMIF1;
+
+	if (emif[EMIF2].irq == irq)
+		emif_nr = EMIF2;
+
+	base = emif[emif_nr].base;
+
+	sys = __raw_readl(base + OMAP44XX_EMIF_IRQSTATUS_SYS);
+
 	/*
-	 * TBD: Thermal management
+	 * Handle temperature alert
+	 * Temperature alert should be same for both ports
+	 * So, it's enough to process it for only one of the ports
 	 */
+	if (sys & OMAP44XX_REG_TA_SYS_MASK)
+		handle_temp_alert(base, emif_nr);
+
+	if (sys & OMAP44XX_REG_ERR_SYS_MASK)
+		pr_err("EMIF: Access error from EMIF%d SYS port - %x",
+			emif_nr, sys);
+
+	ll = __raw_readl(base + OMAP44XX_EMIF_IRQSTATUS_LL);
+
+	if (ll & OMAP44XX_REG_ERR_LL_MASK)
+		pr_err("EMIF Error: Access error from EMIF%d LL port - %x",
+			emif_nr, ll);
+
+	/* Clear the status */
+	__raw_writel(sys, base + OMAP44XX_EMIF_IRQSTATUS_SYS);
+	__raw_writel(ll, base + OMAP44XX_EMIF_IRQSTATUS_LL);
 
 	return IRQ_HANDLED;
-}
-
-static void __init setup_emif_interrupts(void __iomem *base)
-{
-	/*
-	 * TBD: Thermal management:
-	 * Setup the temperature alret interrupt
-	 * Enable the temparature alert interrupt
-	 */
-
-	/*
-	 * Clear any pendining interrupts
-	 */
-	__raw_writel(0x0, base + OMAP44XX_EMIF_IRQENABLE_CLR_SYS);
-	__raw_writel(0x0, base + OMAP44XX_EMIF_IRQENABLE_CLR_LL);
 }
 
 static int __devinit omap_emif_probe(struct platform_device *pdev)
