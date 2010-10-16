@@ -681,7 +681,7 @@ static void playback_abe_work(struct work_struct *work)
 			container_of(work, struct omap_mcpdm, delayed_abe_work.work);
 
 	spin_lock(&mcpdm->lock);
-	if (!mcpdm->dl_active) {
+	if (!mcpdm->dl_active && mcpdm->dn_channels) {
 		abe_dsp_disable_data_transfer(PDM_DL_PORT);
 		udelay(250);
 		omap_mcpdm_stop(mcpdm, SNDRV_PCM_STREAM_PLAYBACK);
