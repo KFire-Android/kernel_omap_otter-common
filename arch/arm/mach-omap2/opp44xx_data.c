@@ -169,18 +169,8 @@ static unsigned long compute_lpj(unsigned long ref, u_int div, u_int mult)
 
 static int omap4_mpu_set_rate(struct device *dev, unsigned long rate)
 {
-	unsigned long cur_rate = omap4_mpu_get_rate(dev);
 	int ret;
 
-#ifdef CONFIG_CPU_FREQ
-	struct cpufreq_freqs freqs_notify;
-
-	freqs_notify.old = cur_rate / 1000;
-	freqs_notify.new = rate / 1000;
-	freqs_notify.cpu = 0;
-	/* Send pre notification to CPUFreq */
-	cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
-#endif
 	ret = clk_set_rate(dpll_mpu_clk, rate);
 	if (ret) {
 		dev_warn(dev, "%s: Unable to set rate to %ld\n",
@@ -188,16 +178,6 @@ static int omap4_mpu_set_rate(struct device *dev, unsigned long rate)
 		return ret;
 	}
 
-#ifdef CONFIG_CPU_FREQ
-	/* Send a post notification to CPUFreq */
-	cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
-#endif
-
-#ifndef CONFIG_CPU_FREQ
-	/*Update loops_per_jiffy if processor speed is being changed*/
-	loops_per_jiffy = compute_lpj(loops_per_jiffy,
-			cur_rate / 1000, rate / 1000);
-#endif
 	return 0;
 }
 

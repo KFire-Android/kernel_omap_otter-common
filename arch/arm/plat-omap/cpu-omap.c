@@ -96,13 +96,14 @@ static int omap_target(struct cpufreq_policy *policy,
 	struct cpufreq_freqs freqs;
 #endif
 #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
+	int i;
 	unsigned long freq;
+	struct cpufreq_freqs freqs_notify;
 	struct device *mpu_dev = omap2_get_mpuss_device();
-#endif
 	int ret = 0;
+#endif
 
 #ifdef CONFIG_SMP
-	int i;
 	/* Wait untill all CPU's are initialized */
 	if (unlikely(cpus_initialized < num_online_cpus()))
 		return ret;
@@ -131,8 +132,18 @@ static int omap_target(struct cpufreq_policy *policy,
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 #elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 #ifdef CONFIG_SMP
-	freqs.old = omap_getspeed(policy->cpu);
+	freqs.old = omap_getspeed(policy->cpu);;
+	freqs_notify.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
 	freqs.cpu = policy->cpu;
+
+	if (freqs.old == freqs.new)
+		return ret;
+
+	/* notifiers */
+	for_each_cpu(i, policy->cpus) {
+		freqs.cpu = i;
+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+	}
 #endif
 
 	freq = target_freq * 1000;
@@ -149,6 +160,14 @@ static int omap_target(struct cpufreq_policy *policy,
 		per_cpu(cpu_data, i).loops_per_jiffy =
 		cpufreq_scale(per_cpu(cpu_data, i).loops_per_jiffy,
 				freqs.old, freqs.new);
+#endif
+
+#ifdef CONFIG_SMP
+		/* notifiers */
+	for_each_cpu(i, policy->cpus) {
+		freqs.cpu = i;
+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+	}
 #endif
 #endif
 	return ret;
