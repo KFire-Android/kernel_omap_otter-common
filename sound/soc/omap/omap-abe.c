@@ -126,23 +126,83 @@ static DEFINE_MUTEX(fe_mutex);
 
 /*
  * Stream DMA parameters
- * FIXME: make this array[5][2] and put in priv data, otherwise we clobber it
- * upon opening new FEs.
  */
-static struct omap_pcm_dma_data omap_abe_dai_dma_params[] = {
+static struct omap_pcm_dma_data omap_abe_dai_dma_params[7][2] = {
+{
 	{
-		.name = "Audio Playback",
+		.name = "Media Playback",
 		.dma_req = OMAP44XX_DMA_ABE_REQ_0,
 		.data_type = OMAP_DMA_DATA_TYPE_S32,
 		.sync_mode = OMAP_DMA_SYNC_PACKET,
 	},
 	{
-		.name = "Audio Capture",
+		.name = "Media Capture1",
+		.dma_req = OMAP44XX_DMA_ABE_REQ_3,
+		.data_type = OMAP_DMA_DATA_TYPE_S32,
+		.sync_mode = OMAP_DMA_SYNC_PACKET,
+	},
+},
+{
+	{},
+	{
+		.name = "Media Capture2",
+		.dma_req = OMAP44XX_DMA_ABE_REQ_4,
+		.data_type = OMAP_DMA_DATA_TYPE_S32,
+		.sync_mode = OMAP_DMA_SYNC_PACKET,
+	},
+},
+{
+	{
+		.name = "Voice Playback",
+		.dma_req = OMAP44XX_DMA_ABE_REQ_1,
+		.data_type = OMAP_DMA_DATA_TYPE_S32,
+		.sync_mode = OMAP_DMA_SYNC_PACKET,
+	},
+	{
+		.name = "Voice Capture",
 		.dma_req = OMAP44XX_DMA_ABE_REQ_2,
 		.data_type = OMAP_DMA_DATA_TYPE_S32,
 		.sync_mode = OMAP_DMA_SYNC_PACKET,
 	},
-};
+},
+{
+	{
+		.name = "Tones Playback",
+		.dma_req = OMAP44XX_DMA_ABE_REQ_5,
+		.data_type = OMAP_DMA_DATA_TYPE_S32,
+		.sync_mode = OMAP_DMA_SYNC_PACKET,
+	},{},
+},
+{
+	{
+		.name = "Vibra Playback",
+		.dma_req = OMAP44XX_DMA_ABE_REQ_6,
+		.data_type = OMAP_DMA_DATA_TYPE_S32,
+		.sync_mode = OMAP_DMA_SYNC_PACKET,
+	},{},
+},
+{
+	{
+		.name = "MODEM Playback",
+		.dma_req = OMAP44XX_DMA_ABE_REQ_1,
+		.data_type = OMAP_DMA_DATA_TYPE_S32,
+		.sync_mode = OMAP_DMA_SYNC_PACKET,
+	},
+	{
+		.name = "MODEM Capture",
+		.dma_req = OMAP44XX_DMA_ABE_REQ_2,
+		.data_type = OMAP_DMA_DATA_TYPE_S32,
+		.sync_mode = OMAP_DMA_SYNC_PACKET,
+	},
+},
+{
+	{
+		.name = "Low Power Playback",
+		.dma_req = OMAP44XX_DMA_ABE_REQ_0,
+		.data_type = OMAP_DMA_DATA_TYPE_S32,
+		.sync_mode = OMAP_DMA_SYNC_PACKET,
+	},{},
+},};
 
 /*
  * Caller holds lock for be_active calls.
@@ -253,7 +313,7 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 	abe_data_format_t format;
 	abe_dma_t dma_sink;
 	abe_dma_t dma_params;
-	int dma_req, ret;
+	int ret;
 
 	switch (params_channels(params)) {
 	case 1:
@@ -292,12 +352,10 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 	case ABE_FRONTEND_DAI_MEDIA:
 	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			dma_req = OMAP44XX_DMA_ABE_REQ_0;
 			abe_connect_cbpr_dmareq_port(MM_DL_PORT, &format, ABE_CBPR0_IDX,
 					&dma_sink);
 			abe_read_port_address(MM_DL_PORT, &dma_params);
 		} else {
-			dma_req = OMAP44XX_DMA_ABE_REQ_3;
 			abe_connect_cbpr_dmareq_port(MM_UL_PORT, &format,  ABE_CBPR3_IDX,
 					&dma_sink);
 			abe_read_port_address(MM_UL_PORT, &dma_params);
@@ -307,7 +365,6 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			return -EINVAL;
 		else {
-			dma_req = OMAP44XX_DMA_ABE_REQ_4;
 			abe_connect_cbpr_dmareq_port(MM_UL2_PORT, &format,  ABE_CBPR4_IDX,
 					&dma_sink);
 			abe_read_port_address(MM_UL2_PORT, &dma_params);
@@ -315,12 +372,10 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
         break;
 	case ABE_FRONTEND_DAI_VOICE:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			dma_req = OMAP44XX_DMA_ABE_REQ_1;
 			abe_connect_cbpr_dmareq_port(VX_DL_PORT, &format, ABE_CBPR1_IDX,
 					&dma_sink);
 			abe_read_port_address(VX_DL_PORT, &dma_params);
 		} else {
-			dma_req = OMAP44XX_DMA_ABE_REQ_2;
 			abe_connect_cbpr_dmareq_port(VX_UL_PORT, &format,  ABE_CBPR2_IDX,
 					&dma_sink);
 			abe_read_port_address(VX_UL_PORT, &dma_params);
@@ -328,7 +383,6 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
         break;
 	case ABE_FRONTEND_DAI_TONES:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			dma_req = OMAP44XX_DMA_ABE_REQ_5;
 			abe_connect_cbpr_dmareq_port(TONES_DL_PORT, &format, ABE_CBPR5_IDX,
 					&dma_sink);
 			abe_read_port_address(TONES_DL_PORT, &dma_params);
@@ -337,7 +391,6 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
         break;
 	case ABE_FRONTEND_DAI_VIBRA:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			dma_req = OMAP44XX_DMA_ABE_REQ_6;
 			abe_connect_cbpr_dmareq_port(VIB_DL_PORT, &format, ABE_CBPR6_IDX,
 					&dma_sink);
 			abe_read_port_address(VIB_DL_PORT, &dma_params);
@@ -352,14 +405,12 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 			/* Vx_DL connection to McBSP 2 ports */
 			format.f = 8000;
 			format.samp_format = STEREO_RSHIFTED_16;
-			dma_req = OMAP44XX_DMA_ABE_REQ_1;
 			abe_connect_serial_port(VX_DL_PORT, &format, MCBSP2_RX);
 			abe_read_port_address(VX_DL_PORT, &dma_params);
 		} else {
 			/* Vx_UL connection to McBSP 2 ports */
 			format.f = 8000;
 			format.samp_format = STEREO_RSHIFTED_16;
-			dma_req = OMAP44XX_DMA_ABE_REQ_2;
 			abe_connect_serial_port(VX_UL_PORT, &format, MCBSP2_TX);
 			abe_read_port_address(VX_UL_PORT, &dma_params);
 		}
@@ -367,15 +418,15 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	/* configure frontend SDMA data */
-	omap_abe_dai_dma_params[substream->stream].dma_req = dma_req;
-	omap_abe_dai_dma_params[substream->stream].port_addr =
-					(unsigned long)dma_params.data;
-	omap_abe_dai_dma_params[substream->stream].packet_size = dma_params.iter;
+	omap_abe_dai_dma_params[dai->id][substream->stream].port_addr =
+			(unsigned long)dma_params.data;
+	omap_abe_dai_dma_params[dai->id][substream->stream].packet_size =
+			dma_params.iter;
 
 	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
 		/* call hw_params on McBSP with correct DMA data */
 		snd_soc_dai_set_dma_data(abe_data.modem_dai, substream,
-				&omap_abe_dai_dma_params[substream->stream]);
+				&omap_abe_dai_dma_params[dai->id][substream->stream]);
 
 		ret = snd_soc_dai_hw_params(abe_data.modem_substream[substream->stream],
 				params, abe_data.modem_dai);
@@ -385,7 +436,7 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	snd_soc_dai_set_dma_data(dai, substream,
-				&omap_abe_dai_dma_params[substream->stream]);
+				&omap_abe_dai_dma_params[dai->id][substream->stream]);
 
 	return 0;
 }
