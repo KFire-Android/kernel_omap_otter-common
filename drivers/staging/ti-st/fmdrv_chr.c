@@ -969,7 +969,6 @@ void fm_chr_exit(void)
 	FM_CHR_DRV_VER(" Freeing up %d", fm_chr_major);
 
 	device_destroy(fm_chr_class, MKDEV(fm_chr_major, 0));
-	class_unregister(fm_chr_class);
 	class_destroy(fm_chr_class);
 	unregister_chrdev(fm_chr_major, FM_CHAR_DEVICE_NAME);
 }

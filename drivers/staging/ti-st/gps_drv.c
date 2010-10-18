@@ -767,7 +767,6 @@ static int __init gpsdrv_init(void)
 	if (IS_ERR(gpsdrv_dev)) {
 		GPSDRV_ERR(" Error in class_create");
 		unregister_chrdev(gpsdrv_major, DEVICE_NAME);
-		class_unregister(gpsdrv_class);
 		class_destroy(gpsdrv_class);
 		return GPS_ERR_CLASS;
 	}
@@ -787,7 +786,6 @@ static void __exit gpsdrv_exit(void)
 	GPSDRV_VER(" Bye.. freeing up %d", gpsdrv_major);
 
 	device_destroy(gpsdrv_class, MKDEV(gpsdrv_major, 0));
-	class_unregister(gpsdrv_class);
 	class_destroy(gpsdrv_class);
 	unregister_chrdev(gpsdrv_major, DEVICE_NAME);
 }
