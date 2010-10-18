@@ -1386,10 +1386,12 @@ EXPORT_SYMBOL(mmc_resume_host);
 #ifdef CONFIG_TIWLAN_SDIO
 void mmc_set_embedded_sdio_data(struct mmc_host *host,
 				struct sdio_cis *cis,
+				struct sdio_cccr *cccr,
 				struct sdio_embedded_func *funcs,
 				unsigned int quirks)
 {
        host->embedded_sdio_data.cis = cis;
+	host->embedded_sdio_data.cccr = cccr;
        host->embedded_sdio_data.funcs = funcs;
 	host->embedded_sdio_data.quirks = quirks;
 }

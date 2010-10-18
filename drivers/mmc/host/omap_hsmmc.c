@@ -2164,6 +2164,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 		if (pdata->slots[0].embedded_sdio != NULL) {
 			mmc_set_embedded_sdio_data(mmc,
 			&pdata->slots[0].embedded_sdio->cis,
+			&pdata->slots[0].embedded_sdio->cccr,
 			pdata->slots[0].embedded_sdio->funcs,
 			pdata->slots[0].embedded_sdio->quirks);
 		}

@@ -51,9 +51,10 @@
 
 #ifdef CONFIG_TIWLAN_SDIO
 struct embedded_sdio_data {
-struct sdio_cis cis;
-struct sdio_embedded_func *funcs;
-unsigned int quirks;
+	struct sdio_cis cis;
+	struct sdio_cccr cccr;
+	struct sdio_embedded_func *funcs;
+	unsigned int quirks;
 };
 #endif
 

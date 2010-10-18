@@ -227,6 +227,14 @@ static struct embedded_sdio_data omap_wifi_emb_data = {
 		.blksize        = 512,
 		.max_dtr        = 24000000,
 	},
+	.cccr   = {
+		.multi_block	= 1,
+		.low_speed	= 0,
+		.wide_bus	= 1,
+		.high_power	= 0,
+		.high_speed	= 0,
+		.disable_cd	= 1,
+	},
 	.funcs  = wifi_func_array,
 	.quirks = MMC_QUIRK_VDD_165_195 | MMC_QUIRK_LENIENT_FUNC0,
 };

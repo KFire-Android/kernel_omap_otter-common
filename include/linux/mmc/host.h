@@ -218,6 +218,7 @@ struct mmc_host {
 #ifdef CONFIG_TIWLAN_SDIO
 	struct {
 		struct sdio_cis         *cis;
+		struct sdio_cccr	*cccr;
 		struct sdio_embedded_func   *funcs;
 		unsigned int quirks;    /* embedded sdio card quirks */
 #define MMC_QUIRK_VDD_165_195  (1<<0)  /* do not ignore MMC_VDD_165_195 */
@@ -237,6 +238,7 @@ extern void mmc_free_host(struct mmc_host *);
 #ifdef CONFIG_TIWLAN_SDIO
 extern void mmc_set_embedded_sdio_data(struct mmc_host *host,
        struct sdio_cis *cis,
+	struct sdio_cccr *cccr,
        struct sdio_embedded_func *funcs,
 	unsigned int quirks);
 #endif
