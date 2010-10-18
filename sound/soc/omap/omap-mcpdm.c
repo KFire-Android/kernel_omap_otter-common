@@ -48,6 +48,7 @@
 #include <plat/dma.h>
 #include <plat/mcpdm.h>
 #include <plat/mcbsp.h>
+#include <plat/omap_hwmod.h>
 #include "omap-mcpdm.h"
 #include "omap-pcm.h"
 #ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
@@ -828,8 +829,14 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 {
 	struct omap_mcpdm *mcpdm;
-	struct resource *res;
+	struct omap_hwmod *oh;
 	int ret = 0;
+
+	oh = omap_hwmod_lookup("omap-mcpdm-dai");
+	if (oh == NULL) {
+		dev_err(&pdev->dev, "no hwmod device found\n");
+		return -ENODEV;
+	}
 
 	mcpdm = kzalloc(sizeof(struct omap_mcpdm), GFP_KERNEL);
 	if (!mcpdm)
@@ -839,25 +846,19 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 	mcpdm->downlink = &omap_mcpdm_links[0];
 	mcpdm->uplink = &omap_mcpdm_links[1];
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (res == NULL) {
-		dev_err(&pdev->dev, "no resource\n");
-		goto err_resource;
-	}
-
 	spin_lock_init(&mcpdm->lock);
 	mcpdm->free = 1;
 
-	mcpdm->io_base = ioremap(res->start, resource_size(res));
+	mcpdm->io_base = omap_hwmod_get_mpu_rt_va(oh);
 	if (!mcpdm->io_base) {
 		ret = -ENOMEM;
-		goto err_resource;
+		goto err;
 	}
 
 	mcpdm->irq = platform_get_irq(pdev, 0);
 	if (mcpdm->irq < 0) {
 		ret = mcpdm->irq;
-		goto err_irq;
+		goto err;
 	}
 
 	pm_runtime_enable(&pdev->dev);
@@ -881,9 +882,7 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 		return 0;
 err_work:
 	free_irq(mcpdm->irq, mcpdm);
-err_irq:
-	iounmap(mcpdm->io_base);
-err_resource:
+err:
 	kfree(mcpdm);
 	return ret;
 }
@@ -898,7 +897,6 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_mcpdm_dai));
 	pm_runtime_put_sync(&pdev->dev);
 	destroy_workqueue(mcpdm->workqueue);
-	iounmap(mcpdm->io_base);
 	free_irq(mcpdm->irq, (void *)mcpdm);
 	kfree(mcpdm);
 	return 0;
