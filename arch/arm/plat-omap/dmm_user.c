@@ -132,7 +132,15 @@ static int omap_dmm_release(struct inode *inode, struct file *filp)
 
 	status = mutex_lock_interruptible(&obj->iovmm->dmm_map_lock);
 	if (status == 0) {
-		iommu_notify_event(obj->iovmm->iommu, IOMMU_CLOSE, NULL);
+		/*
+		 * Report to remote Processor of the cleanup of these
+		 * resources before cleaning in order to avoid MMU fault
+		 * type of behavior
+		 */
+		if (!list_empty(&obj->map_list)) {
+			iommu_notify_event(obj->iovmm->iommu, IOMMU_CLOSE,
+								NULL);
+		}
 		mutex_unlock(&obj->iovmm->dmm_map_lock);
 	} else {
 		pr_err("%s mutex_lock_interruptible returned 0x%x\n",
