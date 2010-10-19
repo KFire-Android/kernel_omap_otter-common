@@ -53,12 +53,8 @@ struct iovmm_pool_info {
 
 /* used to cache dma mapping information */
 struct device_dma_map_info {
-	/* direction of DMA in action, or DMA_NONE */
-	enum dma_data_direction	dir;
 	/* number of elements requested by us */
 	int	num_pages;
-	/* number of elements returned from dma_map_sg */
-	int	sg_num;
 	/* list of buffers used in this DMA action */
 	struct scatterlist	*sg;
 };
@@ -68,7 +64,7 @@ struct dmm_map_info {
 	u32	*da;
 	u32	num_of_buf;
 	u32	size;
-	u32	mem_pool_id;
+	u32	pool_id;
 	u32	flags;
 };
 
@@ -100,22 +96,31 @@ struct iovmm_device {
 	struct iommu		*iommu;
 	const char		*name;
 	/* List of memory pool it manages */
-	struct list_head	mmap_pool;
+	struct list_head        mmap_pool;
 	struct mutex		dmm_map_lock;
 	int			minor;
 	struct cdev		cdev;
+	int			refcount;
 };
 
 /* user dmm functions */
-int dmm_user(struct iodmm_struct *obj, u32 pool_id, u32 *da,
-					u32 va, size_t bytes, u32 flags);
+int dmm_user(struct iodmm_struct *obj,  void __user *args);
+
 void user_remove_resources(struct iodmm_struct *obj);
-int user_un_map(struct iodmm_struct *obj, u32 map_addr);
-int proc_begin_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
-					enum dma_data_direction dir);
-int proc_end_dma(struct iodmm_struct *obj, void *pva, u32 ul_size,
-					enum dma_data_direction dir);
-int omap_create_dmm_pool(struct iodmm_struct *obj, int pool_id, int size,
-									int sa);
-int omap_delete_dmm_pool(struct iodmm_struct *obj, int pool_id);
+
+int user_un_map(struct iodmm_struct *obj, const void __user *args);
+
+int proc_begin_dma(struct iodmm_struct *obj, const void __user *args);
+
+int proc_end_dma(struct iodmm_struct *obj, const void __user *args);
+
+int omap_create_dmm_pool(struct iodmm_struct *obj, const void __user *args);
+
+int omap_delete_dmm_pools(struct iodmm_struct *obj);
+
+int program_tlb_entry(struct iodmm_struct *obj, const void __user *args);
+
+int register_mmufault(struct iodmm_struct *obj, const void __user *args);
+
+int unregister_mmufault(struct iodmm_struct *obj, const void __user *args);
 #endif

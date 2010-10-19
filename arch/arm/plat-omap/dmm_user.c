@@ -30,12 +30,10 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
-#include <linux/eventfd.h>
 
 #include <plat/iommu.h>
 #include <plat/iovmm.h>
 #include <plat/dmm_user.h>
-#include "iopgtable.h"
 
 
 #define OMAP_DMM_NAME "iovmm-omap"
@@ -59,161 +57,46 @@ static int omap_dmm_ioctl(struct inode *inode, struct file *filp,
 
 	switch (cmd) {
 	case DMM_IOCSETTLBENT:
-	{
-		struct iotlb_entry e;
-		int size;
-		size = copy_from_user(&e, (void __user *)args,
-					sizeof(struct iotlb_entry));
-		if (size) {
-			ret = -EINVAL;
-			goto err_user_buf;
-		}
-		load_iotlb_entry(obj->iovmm->iommu, &e);
+		/* FIXME: re-visit this check to perform
+		   proper permission checks */
+		/* if (!capable(CAP_SYS_ADMIN))
+		   return -EPERM; */
+		ret = program_tlb_entry(obj, (const void __user *)args);
 		break;
-	}
 	case DMM_IOCCREATEPOOL:
-	{
-		struct iovmm_pool_info pool_info;
-		int size;
-
-		size = copy_from_user(&pool_info, (void __user *)args,
-						sizeof(struct iovmm_pool_info));
-		if (size) {
-			ret = -EINVAL;
-			goto err_user_buf;
-		}
-		omap_create_dmm_pool(obj, pool_info.pool_id, pool_info.size,
-							pool_info.da_begin);
+		/* FIXME: re-visit this check to perform
+		   proper permission checks */
+		/* if (!capable(CAP_SYS_ADMIN))
+		   return -EPERM; */
+		ret = omap_create_dmm_pool(obj, (const void __user *)args);
 		break;
-	}
-	case DMM_IOCDELETEPOOL:
-	{
-		int pool_id;
-		int size;
-
-		size = copy_from_user(&pool_id, (void __user *)args,
-							sizeof(int));
-		if (size) {
-			ret = -EINVAL;
-			goto err_user_buf;
-		}
-		ret = omap_delete_dmm_pool(obj, pool_id);
-		break;
-	}
 	case DMM_IOCMEMMAP:
-	{
-		struct  dmm_map_info map_info;
-		int size;
-		int status;
-
-		size = copy_from_user(&map_info, (void __user *)args,
-						sizeof(struct dmm_map_info));
-
-		status = dmm_user(obj, map_info.mem_pool_id,
-					map_info.da, map_info.mpu_addr,
-					map_info.size, map_info.flags);
-		ret = copy_to_user((void __user *)args, &map_info,
-					sizeof(struct dmm_map_info));
+		ret = dmm_user(obj, (void __user *)args);
 		break;
-	}
 	case DMM_IOCMEMUNMAP:
-	{
-		u32 da;
-		int size;
-		int status = 0;
-
-		size = copy_from_user(&da, (void __user *)args, sizeof(u32));
-		if (size) {
-			ret = -EINVAL;
-			goto err_user_buf;
-		}
-		status = user_un_map(obj, da);
-		ret = status;
+		ret = user_un_map(obj, (const void __user *)args);
 		break;
-	}
 	case IOMMU_IOCEVENTREG:
-	{
-		int fd;
-		int size;
-		struct iommu_event_ntfy *fd_reg;
-
-		size = copy_from_user(&fd, (void __user *)args, sizeof(int));
-		if (size) {
-			ret = -EINVAL;
-			goto err_user_buf;
-		}
-
-		fd_reg = kzalloc(sizeof(struct iommu_event_ntfy), GFP_KERNEL);
-		fd_reg->fd = fd;
-		fd_reg->evt_ctx = eventfd_ctx_fdget(fd);
-		INIT_LIST_HEAD(&fd_reg->list);
-		spin_lock_irq(&obj->iovmm->iommu->event_lock);
-		list_add_tail(&fd_reg->list, &obj->iovmm->iommu->event_list);
-		spin_unlock_irq(&obj->iovmm->iommu->event_lock);
+		ret = register_mmufault(obj, (const void __user *)args);
 		break;
-	}
 	case IOMMU_IOCEVENTUNREG:
-	{
-		int fd;
-		int size;
-		struct iommu_event_ntfy *fd_reg, *temp_reg;
-
-		size = copy_from_user(&fd, (void __user *)args, sizeof(int));
-		if (size) {
-			ret = -EINVAL;
-			goto err_user_buf;
-		}
-		/* Free DMM mapped memory resources */
-		spin_lock_irq(&obj->iovmm->iommu->event_lock);
-		list_for_each_entry_safe(fd_reg, temp_reg,
-				&obj->iovmm->iommu->event_list, list) {
-			if (fd_reg->fd == fd) {
-				list_del(&fd_reg->list);
-				kfree(fd_reg);
-			}
-		}
-		spin_unlock_irq(&obj->iovmm->iommu->event_lock);
+		ret = register_mmufault(obj, (const void __user *)args);
 		break;
-	}
 	case DMM_IOCMEMFLUSH:
-	{
-		int size;
-		int status;
-		struct dmm_dma_info dma_info;
-		size = copy_from_user(&dma_info, (void __user *)args,
-						sizeof(struct dmm_dma_info));
-		if (size) {
-			ret = -EINVAL;
-			goto err_user_buf;
-		}
-		status = proc_begin_dma(obj, dma_info.pva, dma_info.ul_size,
-								dma_info.dir);
-		ret = status;
+		ret = proc_begin_dma(obj, (void __user *)args);
 		break;
-	}
 	case DMM_IOCMEMINV:
-	{
-		int size;
-		int status;
-		struct dmm_dma_info dma_info;
-		size = copy_from_user(&dma_info, (void __user *)args,
-						sizeof(struct dmm_dma_info));
-		if (size) {
-			ret = -EINVAL;
-			goto err_user_buf;
-		}
-		status = proc_end_dma(obj, dma_info.pva, dma_info.ul_size,
-								dma_info.dir);
-		ret = status;
+		ret = proc_end_dma(obj, (void __user *)args);
 		break;
-	}
+	/* This ioctl can be deprecated */
+	case DMM_IOCDELETEPOOL:
+		break;
 	case DMM_IOCDATOPA:
 	default:
 		return -ENOTTY;
 	}
-err_user_buf:
-	return ret;
 
+	return ret;
 }
 
 static int omap_dmm_open(struct inode *inode, struct file *filp)
@@ -222,6 +105,7 @@ static int omap_dmm_open(struct inode *inode, struct file *filp)
 	struct iovmm_device *obj;
 
 	obj = container_of(inode->i_cdev, struct iovmm_device, cdev);
+	obj->refcount++;
 
 	iodmm = kzalloc(sizeof(struct iodmm_struct), GFP_KERNEL);
 	INIT_LIST_HEAD(&iodmm->map_list);
@@ -240,9 +124,10 @@ static int omap_dmm_release(struct inode *inode, struct file *filp)
 
 	if (!filp->private_data) {
 		status = -EIO;
-		goto err;
+		goto err_out;
 	}
 	obj = filp->private_data;
+
 	flush_signals(current);
 
 	status = mutex_lock_interruptible(&obj->iovmm->dmm_map_lock);
@@ -253,12 +138,19 @@ static int omap_dmm_release(struct inode *inode, struct file *filp)
 		pr_err("%s mutex_lock_interruptible returned 0x%x\n",
 						__func__, status);
 	}
+
 	user_remove_resources(obj);
 	iommu_put(obj->iovmm->iommu);
+
+	/* Delete all the DMM pools after the reference count goes to zero */
+	if (--obj->iovmm->refcount == 0)
+		omap_delete_dmm_pools(obj);
+
 	kfree(obj);
+
 	filp->private_data = NULL;
 
-err:
+err_out:
 	return status;
 }
 
@@ -316,6 +208,7 @@ static int __devinit omap_dmm_probe(struct platform_device *pdev)
 	mutex_init(&obj->dmm_map_lock);
 	platform_set_drvdata(pdev, obj);
 	return 0;
+
 clean_cdev:
 	cdev_del(&obj->cdev);
 err_cdev:
@@ -326,14 +219,12 @@ static int __devexit omap_dmm_remove(struct platform_device *pdev)
 {
 	struct iovmm_device *obj = platform_get_drvdata(pdev);
 	int major = MAJOR(omap_dmm_dev);
+
 	device_destroy(omap_dmm_class, MKDEV(major, obj->minor));
 	cdev_del(&obj->cdev);
 	platform_set_drvdata(pdev, NULL);
-	iopgtable_clear_entry_all(obj->iommu);
-	iommu_put(obj->iommu);
-	free_pages((unsigned long)obj->iommu->iopgd,
-				get_order(IOPGD_TABLE_SIZE));
 	kfree(obj);
+
 	return 0;
 
 }
