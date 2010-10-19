@@ -306,7 +306,7 @@ static ssize_t hdmi_yuv_set(struct device *dev,
 static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
 static DEVICE_ATTR(yuv, S_IRUGO | S_IWUSR, hdmi_yuv_supported, hdmi_yuv_set);
 
-int set_hdmi_hot_plug_status(struct omap_dss_device *dssdev, bool onoff)
+static int set_hdmi_hot_plug_status(struct omap_dss_device *dssdev, bool onoff)
 {
 	int ret = 0;
 
@@ -314,11 +314,16 @@ int set_hdmi_hot_plug_status(struct omap_dss_device *dssdev, bool onoff)
 		DSSINFO("hot plug event %d", onoff);
 		ret = kobject_uevent(&dssdev->dev.kobj,
 					onoff ? KOBJ_ADD : KOBJ_REMOVE);
+		if (ret)
+			DSSWARN("error sending hot plug event %d (%d)",
+								onoff, ret);
+		/*
+		 * TRICKY: we update status here as kobject_uevent seems to
+		 * always return an error for now.
+		 */
 		user_hpd_state = onoff;
 	}
 
-	if (ret)
-		DSSWARN("error sending hot plug event %d (%d)", onoff, ret);
 	return ret;
 }
 
@@ -971,6 +976,16 @@ void hdmi_work_queue(struct work_struct *work)
 		"hdmi_power = %d", r, hpd_mode, dssdev->state, hdmi_power);
 
 	if ((r & HDMI_DISCONNECT) && (hdmi_power == HDMI_POWER_FULL)) {
+		set_hdmi_hot_plug_status(dssdev, false);
+		/* ignore return value for now */
+
+		/*
+		 * WORKAROUND: wait before turning off HDMI.  This may give
+		 * audio/video enough time to stop operations.  However, if
+		 * user reconnects HDMI, response will be delayed.
+		 */
+		mdelay(1000);
+
 		DSSINFO("Display disabled\n");
 		HDMI_W1_StopVideoFrame(HDMI_WP);
 		if (dssdev->platform_disable)
@@ -983,7 +998,6 @@ void hdmi_work_queue(struct work_struct *work)
 		hdmi_enable_clocks(0);
 		hdmi_set_power(dssdev);
 		hpd_mode = 1;
-		set_hdmi_hot_plug_status(dssdev, false);
 	}
 
 	if ((r & HDMI_CONNECT) && (hpd_mode == 1) &&
@@ -1002,8 +1016,11 @@ void hdmi_work_queue(struct work_struct *work)
 
 		mdelay(1000);
 
-		/* HDMI should already be full on, but just in case */
-		if (hdmi_power != HDMI_POWER_FULL) {
+		/*
+		 * HDMI should already be full on. We use this to read EDID
+		 * the first time we enable HDMI via HPD.
+		 */
+		if (!user_hpd_state) {
 			DSSINFO("Connect 1 - Enabling display\n");
 			hdmi_enable_clocks(1);
 			is_hdmi_on = true;
@@ -1011,6 +1028,7 @@ void hdmi_work_queue(struct work_struct *work)
 		}
 
 		set_hdmi_hot_plug_status(dssdev, true);
+		/* ignore return value for now */
 	}
 
 	kfree(work);
@@ -1071,6 +1089,7 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	hdmi_enable_clocks(0);
 
 	set_hdmi_hot_plug_status(dssdev, false);
+	/* ignore return value for now */
 
 	/* cut clock(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
@@ -1161,6 +1180,7 @@ static int hdmi_enable_display(struct omap_dss_device *dssdev)
 
 	if (!r)
 		set_hdmi_hot_plug_status(dssdev, true);
+		/* ignore return value for now */
 
 	mutex_unlock(&hdmi.lock);
 
@@ -1593,4 +1613,3 @@ bool is_hdmi_interlaced(void)
 {
 	return hdmi.cfg.interlace;
 }
-
