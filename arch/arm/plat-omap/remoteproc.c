@@ -42,7 +42,7 @@ static dev_t omap_rproc_dev;
 static atomic_t num_of_rprocs;
 
 
-void rproc_eventfd_ntfy(struct omap_rproc *obj, int event)
+static void rproc_eventfd_ntfy(struct omap_rproc *obj, int event)
 {
 	struct omap_rproc_ntfy *fd_reg;
 
@@ -177,7 +177,8 @@ static inline int rproc_get_state(struct omap_rproc *rproc)
 	return pdata->ops->get_state(rproc->dev);
 }
 
-int rproc_reg_user_event(struct omap_rproc *rproc, const void __user *arg)
+static int rproc_reg_user_event(struct omap_rproc *rproc,
+				const void __user *arg)
 {
 	struct omap_rproc_ntfy *fd_reg;
 	int state;
@@ -224,7 +225,8 @@ int rproc_reg_user_event(struct omap_rproc *rproc, const void __user *arg)
 	return 0;
 }
 
-int rproc_unreg_user_event(struct omap_rproc *rproc, const void __user *arg)
+static int rproc_unreg_user_event(struct omap_rproc *rproc,
+				const void __user *arg)
 {
 	struct omap_rproc_ntfy *fd_reg, *temp_reg;
 	struct omap_rproc_reg_event_args args;
