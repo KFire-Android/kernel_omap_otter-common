@@ -131,13 +131,24 @@ static int sdp4430_mcbsp_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	int ret;
+	int ret = 0;
+	unsigned int be_id;
 
-	/* Set cpu DAI configuration */
-	ret = snd_soc_dai_set_fmt(cpu_dai,
+        be_id = rtd->dai_link->be_id;
+
+	if (be_id == OMAP_ABE_DAI_MM_FM) {
+		/* Set cpu DAI configuration */
+		ret = snd_soc_dai_set_fmt(cpu_dai,
 				  SND_SOC_DAIFMT_I2S |
 				  SND_SOC_DAIFMT_NB_NF |
 				  SND_SOC_DAIFMT_CBM_CFM);
+	} else if (be_id == OMAP_ABE_DAI_BT_VX) {
+	        ret = snd_soc_dai_set_fmt(cpu_dai,
+                                  SND_SOC_DAIFMT_DSP_B |
+                                  SND_SOC_DAIFMT_NB_IF |
+                                  SND_SOC_DAIFMT_CBM_CFM);
+	}
+
 	if (ret < 0) {
 		printk(KERN_ERR "can't set cpu DAI configuration\n");
 		return ret;
