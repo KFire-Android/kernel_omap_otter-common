@@ -75,8 +75,9 @@ void omap4_trigger_ioctrl(void)
 	prm_rmw_mod_reg_bits(OMAP4430_WUCLK_CTRL_MASK, OMAP4430_WUCLK_CTRL_MASK,
 		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET);
 	omap_test_timeout(
-		((prm_read_mod_reg(OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET)
-		>> OMAP4430_WUCLK_STATUS_SHIFT) == 1),
+		(prm_read_mod_reg(OMAP4430_PRM_DEVICE_MOD,
+				OMAP4_PRM_IO_PMCTRL_OFFSET)
+			& OMAP4430_WUCLK_STATUS_MASK),
 		MAX_IOPAD_LATCH_TIME, i);
 	/* Trigger WUCLKIN disable */
 	prm_rmw_mod_reg_bits(OMAP4430_WUCLK_CTRL_MASK, 0x0,
