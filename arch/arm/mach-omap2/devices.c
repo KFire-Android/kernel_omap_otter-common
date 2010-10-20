@@ -675,7 +675,7 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 		omap_cfg_reg(F20_24XX_MMC_DAT0);
 		omap_cfg_reg(F19_24XX_MMC_DAT_DIR0);
 		omap_cfg_reg(G18_24XX_MMC_CMD_DIR);
-		if (mmc_controller->slots[0].wires == 4) {
+		if (mmc_controller->slots[0].caps & MMC_CAP_4_BIT_DATA) {
 			omap_cfg_reg(H14_24XX_MMC_DAT1);
 			omap_cfg_reg(E19_24XX_MMC_DAT2);
 			omap_cfg_reg(D19_24XX_MMC_DAT3);
@@ -703,8 +703,8 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 				OMAP_PIN_INPUT_PULLUP);
 			omap_mux_init_signal("sdmmc1_dat0",
 				OMAP_PIN_INPUT_PULLUP);
-			if (mmc_controller->slots[0].wires == 4 ||
-				mmc_controller->slots[0].wires == 8) {
+			if (mmc_controller->slots[0].caps &
+				(MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA)) {
 				omap_mux_init_signal("sdmmc1_dat1",
 					OMAP_PIN_INPUT_PULLUP);
 				omap_mux_init_signal("sdmmc1_dat2",
@@ -712,7 +712,8 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 				omap_mux_init_signal("sdmmc1_dat3",
 					OMAP_PIN_INPUT_PULLUP);
 			}
-			if (mmc_controller->slots[0].wires == 8) {
+			if (mmc_controller->slots[0].caps &
+						MMC_CAP_8_BIT_DATA) {
 				omap_mux_init_signal("sdmmc1_dat4",
 					OMAP_PIN_INPUT_PULLUP);
 				omap_mux_init_signal("sdmmc1_dat5",
@@ -736,8 +737,8 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 			 * For 8 wire configurations, Lines DAT4, 5, 6 and 7 need to be muxed
 			 * in the board-*.c files
 			 */
-			if (mmc_controller->slots[0].wires == 4 ||
-				mmc_controller->slots[0].wires == 8) {
+			if (mmc_controller->slots[0].caps &
+				(MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA)) {
 				omap_mux_init_signal("sdmmc2_dat1",
 					OMAP_PIN_INPUT_PULLUP);
 				omap_mux_init_signal("sdmmc2_dat2",
@@ -745,7 +746,8 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 				omap_mux_init_signal("sdmmc2_dat3",
 					OMAP_PIN_INPUT_PULLUP);
 			}
-			if (mmc_controller->slots[0].wires == 8) {
+			if (mmc_controller->slots[0].caps &
+							MMC_CAP_8_BIT_DATA) {
 				omap_mux_init_signal("sdmmc2_dat4.sdmmc2_dat4",
 					OMAP_PIN_INPUT_PULLUP);
 				omap_mux_init_signal("sdmmc2_dat5.sdmmc2_dat5",

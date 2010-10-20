@@ -207,12 +207,12 @@ static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 1,
-		.wires		= 8,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
 		.gpio_wp	= -EINVAL,
 	},
 	{
 		.mmc            = 5,
-		.wires          = 8,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
 		.gpio_cd        = -EINVAL,
 		.gpio_wp        = 4,
 		.ocr_mask       = MMC_VDD_165_195,
