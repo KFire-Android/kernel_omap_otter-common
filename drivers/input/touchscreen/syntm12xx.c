@@ -313,7 +313,9 @@ struct syn {
 	struct workqueue_struct *wq;
 	struct work_struct   isr_work;
 
+	#ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend		early_suspend;
+	#endif
 
 	struct func_desc     *control;
 	u8                   device_control_ctrl; /* saved state */
