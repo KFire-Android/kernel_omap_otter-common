@@ -14,6 +14,8 @@
 #ifndef __ARCH_ARM_MACH_OMAP2_VOLTAGE_H
 #define __ARCH_ARM_MACH_OMAP2_VOLTAGE_H
 
+#include <linux/notifier.h>
+
 extern u32 enable_sr_vp_debug;
 #ifdef CONFIG_PM_DEBUG
 extern struct dentry *pm_dbg_main_dir;
@@ -21,6 +23,9 @@ extern struct dentry *pm_dbg_main_dir;
 
 #define VOLTSCALE_VPFORCEUPDATE		1
 #define VOLTSCALE_VCBYPASS		2
+
+#define VOLTAGE_PRECHANGE	0
+#define VOLTAGE_POSTCHANGE	1
 
 /* Voltage SR Parameters for OMAP3*/
 #define OMAP3_SRI2C_SLAVE_ADDR			0x12
@@ -136,6 +141,12 @@ struct omap_volt_vc_data {
 	u32 vdd2_off;
 };
 
+/* Voltage change notifier structure */
+struct omap_volt_change_info {
+	unsigned long curr_volt;
+	unsigned long target_volt;
+};
+
 struct voltagedomain *omap_voltage_domain_get(char *name);
 unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm);
 void omap_vp_enable(struct voltagedomain *voltdm);
@@ -156,9 +167,24 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt);
 #ifdef CONFIG_PM
 void omap_voltage_init_vc(struct omap_volt_vc_data *setup_vc);
 void omap_change_voltscale_method(int voltscale_method);
+int omap_voltage_register_notifier(struct voltagedomain *voltdm,
+		struct notifier_block *nb);
+int omap_voltage_unregister_notifier(struct voltagedomain *voltdm,
+		struct notifier_block *nb);
 #else
 static inline void omap_voltage_init_vc(struct omap_volt_vc_data *setup_vc) {}
 static inline  void omap_change_voltscale_method(int voltscale_method) {}
+static inline int omap_voltage_register_notifier(
+		struct voltagedomain *voltdm, struct notifier_block *nb)
+{
+	return 0;
+}
+
+static inline int omap_voltage_unregister_notifier(
+		 struct voltagedomain *voltdm, struct notifier_block *nb)
+{
+	return 0;
+}
 #endif
 
 #endif

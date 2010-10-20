@@ -172,11 +172,13 @@ struct omap_vdd_info{
 	spinlock_t user_lock;
 	struct plist_head user_list;
 	struct mutex scaling_mutex;
+	struct srcu_notifier_head volt_change_notify_list;
 	int volt_data_count;
 	int nr_dep_vdd;
 	struct device **dev_list;
 	int dev_count;
 	unsigned long nominal_volt;
+	unsigned long curr_volt;
 	u8 cmdval_reg;
 	u8 vdd_sr_reg;
 };
@@ -623,7 +625,7 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 		return;
 	}
 
-	curr_volt = omap_voltage_get_nom_volt(&vdd->voltdm);
+	curr_volt = vdd->curr_volt = omap_voltage_get_nom_volt(&vdd->voltdm);
 	if (!curr_volt) {
 		pr_warning("%s: unable to find current voltage for vdd_%s\n",
 			__func__, vdd->voltdm.name);
@@ -839,7 +841,7 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 		return;
 	}
 
-	curr_volt = omap_voltage_get_nom_volt(&vdd->voltdm);
+	curr_volt = vdd->curr_volt = omap_voltage_get_nom_volt(&vdd->voltdm);
 	if (!curr_volt) {
 		pr_warning("%s: unable to find current voltage for vdd_%s\n",
 			__func__, vdd->voltdm.name);
@@ -969,6 +971,9 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 
 	/* Get the devices associated with this VDD */
 	vdd->dev_list = opp_init_voltage_params(&vdd->voltdm, &vdd->dev_count);
+
+	/* Init the voltage change notifier list */
+	srcu_init_notifier_head(&vdd->volt_change_notify_list);
 
 #ifdef CONFIG_PM_DEBUG
 	strcpy(name, "vdd_");
@@ -1112,6 +1117,9 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 	smps_delay = ((smps_steps * volt_pmic_info.step_size) /
 			volt_pmic_info.slew_rate) + 2;
 	udelay(smps_delay);
+
+	vdd->curr_volt = target_volt;
+
 	return 0;
 }
 
@@ -1260,6 +1268,7 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	vpconfig &= ~vdd->vp_reg.vpconfig_forceupdate;
 	voltage_write_reg(vdd->vp_offs.vpconfig, vpconfig);
 
+	vdd->curr_volt = target_volt;
 	return 0;
 }
 
@@ -1587,6 +1596,8 @@ int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
 		unsigned long target_volt)
 {
 	struct omap_vdd_info *vdd;
+	struct omap_volt_change_info v_info;
+	int ret;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -1595,13 +1606,23 @@ int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
+	v_info.curr_volt = vdd->curr_volt;
+	v_info.target_volt = target_volt;
+
+	srcu_notifier_call_chain(&vdd->volt_change_notify_list,
+		VOLTAGE_PRECHANGE, (void *)&v_info);
+
 	if (voltscale_vpforceupdate)
-		return vp_forceupdate_scale_voltage(vdd, target_volt);
+		ret = vp_forceupdate_scale_voltage(vdd, target_volt);
 	else
-		return vc_bypass_scale_voltage(vdd, target_volt);
+		ret =  vc_bypass_scale_voltage(vdd, target_volt);
+
+	if (!ret)
+		srcu_notifier_call_chain(&vdd->volt_change_notify_list,
+			VOLTAGE_POSTCHANGE, (void *)&v_info);
+
+	return ret;
 }
-
-
 
 /**
  * omap_voltage_reset : Resets the voltage of a particular voltage domain
@@ -1892,6 +1913,35 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	scale_dep_vdd(vdd);
 
 	return 0;
+}
+
+int omap_voltage_register_notifier(struct voltagedomain *voltdm,
+		struct notifier_block *nb)
+{
+	struct omap_vdd_info *vdd;
+
+	if (!voltdm || IS_ERR(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return -EINVAL;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	return srcu_notifier_chain_register(&vdd->volt_change_notify_list, nb);
+}
+
+int omap_voltage_unregister_notifier(struct voltagedomain *voltdm,
+		struct notifier_block *nb)
+{
+	struct omap_vdd_info *vdd;
+
+	if (!voltdm || IS_ERR(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return -EINVAL;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	return srcu_notifier_chain_unregister(
+				&vdd->volt_change_notify_list, nb);
 }
 
 /**
