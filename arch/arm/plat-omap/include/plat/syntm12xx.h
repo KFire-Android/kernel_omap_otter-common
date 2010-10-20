@@ -5,6 +5,9 @@
 #ifndef __TM12XX_TS_H
 #define __TM12XX_TS_H
 
+#define SYNTM12XX_SLEEP_ON_SUSPEND	0
+#define SYNTM12XX_ON_ON_SUSPEND	1
+
 struct tm12xx_ts_platform_data {
 	int      gpio_intr;
 
@@ -13,6 +16,7 @@ struct tm12xx_ts_platform_data {
 	unsigned num_buttons;  /* Registered buttons */
 	u8       repeat;       /* Input dev Repeat enable */
 	u8       swap_xy;      /* ControllerX==InputDevY...*/
+	int	suspend_state; /* Indicate IC state during suspend */
 };
 
 #endif

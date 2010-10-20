@@ -366,6 +366,7 @@ struct syn {
 	unsigned long        f_measure;
 
 	int                  virtualized;
+	int                  suspend_mode;
 };
 #ifdef CONFIG_PM
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -3351,6 +3352,11 @@ static int syn_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	sd->gpio_intr = pdata->gpio_intr;
 
+	if (pdata->suspend_state == SYNTM12XX_SLEEP_ON_SUSPEND)
+		sd->suspend_mode = DEVICE_CONTROL_SLEEP_SENSOR;
+	else
+		sd->suspend_mode = DEVICE_CONTROL_SLEEP_NORMAL;
+
 	r = syn_read_func_descs(sd);
 	if (r < 0) {
 		dev_err(&client->dev, "error reading func descs\n");
@@ -3493,7 +3499,7 @@ static int syn_suspend(struct i2c_client *client, pm_message_t msg)
 	sd->device_control_ctrl = r & 0xff;
 
 	r = syn_write_u8(sd, sd->control->control + DEVICE_CONTROL_CTRL,
-			 DEVICE_CONTROL_SLEEP_NORMAL);
+			 sd->suspend_mode);
 out:
 	mutex_unlock(&sd->lock);
 
