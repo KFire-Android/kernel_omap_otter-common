@@ -1092,6 +1092,13 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	set_hdmi_hot_plug_status(dssdev, false);
 	/* ignore return value for now */
 
+	/*
+	 * WORKAROUND: wait before turning off HDMI.  This may give
+	 * audio/video enough time to stop operations.  However, if
+	 * user reconnects HDMI, response will be delayed.
+	 */
+	mdelay(1000);
+
 	/* cut clock(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	dss_mainclk_state_disable(true);
