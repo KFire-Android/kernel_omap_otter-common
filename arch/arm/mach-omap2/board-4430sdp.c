@@ -356,6 +356,12 @@ static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
 		.num_buttons = ARRAY_SIZE(tm12xx_button_map),
 		.repeat = 0,
 		.swap_xy = 1,
+	/* Android does not have touchscreen as wakeup source */
+#if !defined(CONFIG_ANDROID)
+		.suspend_state = SYNTM12XX_ON_ON_SUSPEND,
+#else
+		.suspend_state = SYNTM12XX_SLEEP_ON_SUSPEND,
+#endif
 	},
 	{ /* Secondary Controller */
 		.gpio_intr = 36,
@@ -364,6 +370,12 @@ static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
 		.num_buttons = ARRAY_SIZE(tm12xx_button_map),
 		.repeat = 0,
 		.swap_xy = 1,
+	/* Android does not have touchscreen as wakeup source */
+#if !defined(CONFIG_ANDROID)
+		.suspend_state = SYNTM12XX_ON_ON_SUSPEND,
+#else
+		.suspend_state = SYNTM12XX_SLEEP_ON_SUSPEND,
+#endif
 	},
 };
 
