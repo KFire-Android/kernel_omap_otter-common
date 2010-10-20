@@ -414,6 +414,12 @@ struct hdmi_core_audio_config {
 	enum hdmi_cea_code		if_audio_channel_location;
  };
 
+struct hdmi_notifier {
+	void (*hpd_notifier)(int state, void *data);
+	void *private_data;
+	struct list_head list;
+};
+
 #define HDMI_CONNECT      0x01
 #define HDMI_DISCONNECT   0x02
 #define HDMI_HPD          0x04
@@ -435,6 +441,10 @@ void HDMI_W1_HPD_handler(int *r);
 int hdmi_lib_init(void);
 void hdmi_lib_exit(void);
 int hdmi_configure_csc(enum hdmi_core_av_csc csc);
+
+void hdmi_add_notifier(struct hdmi_notifier *notifier);
+void hdmi_remove_notifier(struct hdmi_notifier *notifier);
+void hdmi_notify_hpd(int state);
 
 #endif
 

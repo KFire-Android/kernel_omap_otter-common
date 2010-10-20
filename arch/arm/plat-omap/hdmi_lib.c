@@ -1533,3 +1533,30 @@ int hdmi_w1_start_audio_transfer(u32 instanceName)
 	printk(KERN_INFO "Start audio transfer...\n");
 	return 0;
 }
+
+static LIST_HEAD(hdmi_notifier_head);
+
+void hdmi_add_notifier(struct hdmi_notifier *notifier)
+{
+	list_add_tail(&notifier->list, &hdmi_notifier_head);
+}
+
+void hdmi_remove_notifier(struct hdmi_notifier *notifier)
+{
+	struct hdmi_notifier *cur, *next;
+
+	list_for_each_entry_safe(cur, next, &hdmi_notifier_head, list) {
+		if (cur == notifier)
+			list_del(&cur->list);
+	}
+}
+
+void hdmi_notify_hpd(int state)
+{
+	struct hdmi_notifier *cur;
+
+	list_for_each_entry(cur, &hdmi_notifier_head, list) {
+		if (cur->hpd_notifier)
+			cur->hpd_notifier(state, cur->private_data);
+	}
+}
