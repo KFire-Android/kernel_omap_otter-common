@@ -594,15 +594,6 @@ static int omap_mcpdm_dai_hw_params(struct snd_pcm_substream *substream,
 	return err;
 }
 
-static int omap_mcpdm_dai_hw_free(struct snd_pcm_substream *substream,
-				  struct snd_soc_dai *dai)
-{
-	/* struct omap_mcpdm*mcpdm = snd_soc_dai_get_drvdata(dai); */
-	int err = 0;
-
-	return err;
-}
-
 static int omap_mcpdm_dai_trigger(struct snd_pcm_substream *substream,
 				  int cmd, struct snd_soc_dai *dai)
 {
@@ -633,7 +624,6 @@ static struct snd_soc_dai_ops omap_mcpdm_dai_ops = {
 	.startup	= omap_mcpdm_dai_startup,
 	.shutdown	= omap_mcpdm_dai_shutdown,
 	.hw_params	= omap_mcpdm_dai_hw_params,
-	.hw_free	= omap_mcpdm_dai_hw_free,
 	.trigger	= omap_mcpdm_dai_trigger,
 };
 
@@ -741,7 +731,7 @@ static int omap_mcpdm_abe_dai_hw_params(struct snd_pcm_substream *substream,
 		}
 		spin_unlock(&mcpdm->lock);
 	} else {
-		mcpdm->uplink->channels = 0x0003;
+		mcpdm->uplink->channels = PDM_UP1_EN | PDM_UP2_EN;
 		ret = omap_mcpdm_capture_open(mcpdm, &omap_mcpdm_links[1]);
 	}
 
@@ -753,10 +743,8 @@ out:
 static int omap_mcpdm_abe_dai_trigger(struct snd_pcm_substream *substream,
 				  int cmd, struct snd_soc_dai *dai)
 {
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		omap_mcpdm_dai_trigger(substream, cmd,  dai);
-	}
 
 	return 0;
 }
@@ -765,7 +753,6 @@ static struct snd_soc_dai_ops omap_mcpdm_abe_dai_ops = {
 	.startup	= omap_mcpdm_abe_dai_startup,
 	.shutdown	= omap_mcpdm_abe_dai_shutdown,
 	.hw_params	= omap_mcpdm_abe_dai_hw_params,
-	.hw_free	= omap_mcpdm_dai_hw_free,
 	.trigger 	= omap_mcpdm_abe_dai_trigger,
 };
 #endif
