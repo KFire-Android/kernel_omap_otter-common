@@ -311,6 +311,7 @@ static int set_hdmi_hot_plug_status(struct omap_dss_device *dssdev, bool onoff)
 	int ret = 0;
 
 	if (onoff != user_hpd_state) {
+		hdmi_notify_hpd(onoff);
 		DSSINFO("hot plug event %d", onoff);
 		ret = kobject_uevent(&dssdev->dev.kobj,
 					onoff ? KOBJ_ADD : KOBJ_REMOVE);
