@@ -666,7 +666,8 @@ static struct omap_musb_board_data musb_board_data = {
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 2,
-		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
+					MMC_CAP_1_8V_DDR,
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_165_195,
@@ -677,7 +678,8 @@ static struct omap2_hsmmc_info mmc[] = {
 	},
 	{
 		.mmc		= 1,
-		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
+					MMC_CAP_1_8V_DDR,
 		.gpio_wp	= -EINVAL,
 #ifdef CONFIG_PM_RUNTIME
 		.power_saving	= true,
