@@ -271,6 +271,9 @@ void __init omap4_check_revision(void)
 {
 	u32 idcode;
 	u8 rev;
+	u8 dot;
+	u8 *type;
+
 #if 0
 	u16 hawkeye;
 	/*
@@ -321,24 +324,54 @@ void __init omap4_check_revision(void)
 			omap_revision = OMAP4430_REV_ES1_0;
 			omap_chip.oc |= CHIP_IS_OMAP4430ES1;
 			rev = 1;
+			dot = 0;
 			break;
 		case 2:
-			omap_revision = OMAP4430_REV_ES2_0;
-			omap_chip.oc |= CHIP_IS_OMAP4430ES2;
-			rev = 2;
+			if (0x3b95c02f == read_tap_reg(OMAP_TAP_IDCODE)) {
+				omap_revision = OMAP4430_REV_ES2_1;
+				omap_chip.oc |= CHIP_IS_OMAP4430ES2_1;
+				rev = 2;
+				dot = 1;
+			} else {
+				omap_revision = OMAP4430_REV_ES2_0;
+				omap_chip.oc |= CHIP_IS_OMAP4430ES2;
+				rev = 2;
+				dot = 0;
+			}
 			break;
 		default:
-			omap_revision = OMAP4430_REV_ES2_0;
-			omap_chip.oc |= CHIP_IS_OMAP4430ES2;
+			omap_revision = OMAP4430_REV_ES2_1;
+			omap_chip.oc |= CHIP_IS_OMAP4430ES2_1;
 			rev = 2;
+			dot = 1;
 		}
 	} else {
 		/* Assume the latest version */
-		omap_revision = OMAP4430_REV_ES2_0;
-		omap_chip.oc |= CHIP_IS_OMAP4430ES2;
+		omap_revision = OMAP4430_REV_ES2_1;
+		omap_chip.oc |= CHIP_IS_OMAP4430ES2_1;
 		rev = 2;
+		dot = 1;
 	}
-	pr_info("OMAP%04x ES%d.0\n", omap_rev() >> 16, rev);
+
+	switch (omap_type()) {
+	case OMAP2_DEVICE_TYPE_GP:
+		type = "GP";
+		break;
+	case OMAP2_DEVICE_TYPE_EMU:
+		type = "EMU";
+		break;
+	case OMAP2_DEVICE_TYPE_SEC:
+		type = "HS";
+	break;
+	default:
+		type = "bad-type";
+		break;
+	}
+
+	pr_info("***********************");
+	pr_info("OMAP%04x ES%d.%d type(%s)\n",
+			omap_rev() >> 16, rev, dot, type);
+	pr_info("***********************");
 }
 
 #define OMAP3_SHOW_FEATURE(feat)		\

@@ -388,6 +388,7 @@ IS_OMAP_TYPE(3517, 0x3517)
 #define OMAP443X_CLASS		0x44300044
 #define OMAP4430_REV_ES1_0	0x44300044
 #define OMAP4430_REV_ES2_0	0x44301044
+#define OMAP4430_REV_ES2_1	0x44302044
 
 /*
  * omap_chip bits
@@ -413,11 +414,13 @@ IS_OMAP_TYPE(3517, 0x3517)
 #define CHIP_IS_OMAP3630ES1		(1 << 7)
 #define CHIP_IS_OMAP4430ES1		(1 << 8)
 #define CHIP_IS_OMAP4430ES2		(1 << 9)
+#define CHIP_IS_OMAP4430ES2_1		(1 << 10)
 
 #define CHIP_IS_OMAP24XX		(CHIP_IS_OMAP2420 | CHIP_IS_OMAP2430)
 
 #define CHIP_IS_OMAP4430		(CHIP_IS_OMAP4430ES1 | \
-						CHIP_IS_OMAP4430ES2)
+						CHIP_IS_OMAP4430ES2 |\
+						CHIP_IS_OMAP4430ES2_1)
 
 /*
  * "GE" here represents "greater than or equal to" in terms of ES
