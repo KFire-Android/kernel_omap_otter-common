@@ -43,6 +43,12 @@
 
 #ifdef CONFIG_HDMI_NO_IP_MODULE
 #include <plat/hdmi_lib.h>
+
+struct omap_hdmi_data {
+	struct hdmi_notifier notifier;
+};
+
+struct omap_hdmi_data hdmi_data;
 #else
 struct hdmi_ip_driver hdmi_audio_core;
 #endif
@@ -54,11 +60,27 @@ static struct omap_pcm_dma_data omap_hdmi_dai_dma_params = {
 	.sync_mode = OMAP_DMA_SYNC_PACKET,
 };
 
+#ifdef CONFIG_HDMI_NO_IP_MODULE
+static void hdmi_hpd_notifier(int state, void *data)
+{
+	struct snd_pcm_substream *substream = data;
+
+	if (!state && substream)
+		snd_pcm_stop(substream, SNDRV_PCM_STATE_DISCONNECTED);
+}
+#endif
+
 static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	int err = 0;
 #ifdef CONFIG_HDMI_NO_IP_MODULE
+	struct hdmi_notifier *notifier = &hdmi_data.notifier;
+
+	notifier->hpd_notifier = hdmi_hpd_notifier;
+	notifier->private_data = substream;
+	hdmi_add_notifier(notifier);
+
 	err = hdmi_w1_wrapper_enable(HDMI_WP);
 #else
 	if (hdmi_audio_core.module_loaded)
@@ -73,7 +95,12 @@ static void omap_hdmi_dai_shutdown(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
 #ifdef CONFIG_HDMI_NO_IP_MODULE
+	struct hdmi_notifier *notifier = &hdmi_data.notifier;
+
 	hdmi_w1_wrapper_disable(HDMI_WP);
+
+	hdmi_remove_notifier(notifier);
+	notifier->private_data = NULL;
 #else
 	if (hdmi_audio_core.module_loaded)
 		hdmi_audio_core.wrapper_disable(HDMI_WP);
