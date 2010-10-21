@@ -63,7 +63,7 @@
 // TODO: make all these into virtual registers or similar - split out by type */
 #define ABE_NUM_MIXERS		22
 #define ABE_NUM_MUXES		12
-#define ABE_NUM_WIDGETS	44	/* TODO - refine this val */
+#define ABE_NUM_WIDGETS	        46	/* TODO - refine this val */
 #define ABE_NUM_DAPM_REG		\
 	(ABE_NUM_MIXERS + ABE_NUM_MUXES + ABE_NUM_WIDGETS)
 #define ABE_WIDGET_START	(ABE_NUM_MIXERS + ABE_NUM_MUXES)
@@ -1114,6 +1114,8 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			ABE_WIDGET(4), ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_IN("MM_DL", " MultiMedia1 Playback", 0,
 			ABE_WIDGET(5), ABE_OPP_25, 0),
+	SND_SOC_DAPM_AIF_IN("MM_DL_LP", " MultiMedia1 LP Playback", 0,
+			ABE_WIDGET(5), ABE_OPP_25, 0),
 	SND_SOC_DAPM_AIF_IN("VIB_DL", "Vibra Playback", 0,
 			ABE_WIDGET(6), ABE_OPP_100, 0),
 	SND_SOC_DAPM_AIF_IN("MODEM_DL", "MODEM Playback", 0,
@@ -1237,6 +1239,9 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	SND_SOC_DAPM_MIXER("Voice Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("DL1 Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("DL2 Capture VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
+
+	/* Join our MM_DL and MM_DL_LP playback */
+	SND_SOC_DAPM_MIXER("MM_DL VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 
 	/* Virtual MODEM and VX_UL mixer */
 	SND_SOC_DAPM_MIXER("VX UL VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
@@ -1439,7 +1444,9 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"DL1 Mixer", "Capture", "DL1 Capture VMixer"},
 	{"DL1 Capture VMixer", NULL, "MUX_UL10"},
 	{"DL1 Capture VMixer", NULL, "MUX_UL11"},
-	{"DL1 Mixer", "Multimedia", "MM_DL"},
+	{"DL1 Mixer", "Multimedia", "MM_DL VMixer"},
+	{"MM_DL VMixer", NULL, "MM_DL"},
+	{"MM_DL VMixer", NULL, "MM_DL_LP"},
 
 	/* Sidetone Mixer */
 	{"Sidetone Mixer", "Playback", "DL1 Mixer"},
@@ -1461,18 +1468,24 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"DL2 Mixer", "Capture", "DL2 Capture VMixer"},
 	{"DL2 Capture VMixer", NULL, "MUX_UL10"},
 	{"DL2 Capture VMixer", NULL, "MUX_UL11"},
-	{"DL2 Mixer", "Multimedia", "MM_DL"},
+	{"DL2 Mixer", "Multimedia", "MM_DL VMixer"},
+	{"MM_DL VMixer", NULL, "MM_DL"},
+	{"MM_DL VMixer", NULL, "MM_DL_LP"},
 	{"PDM_DL2", NULL, "DL2 Mixer"},
 
 	/* VxREC Mixer */
 	{"Capture Mixer", "Tones", "TONES_DL"},
 	{"Capture Mixer", "Voice Playback", "VX DL VMixer"},
 	{"Capture Mixer", "Voice Capture", "VX UL VMixer"},
-	{"Capture Mixer", "Media Playback", "MM_DL"},
+	{"Capture Mixer", "Media Playback", "MM_DL VMixer"},
+	{"MM_DL VMixer", NULL, "MM_DL"},
+	{"MM_DL VMixer", NULL, "MM_DL_LP"},
 
 	/* Audio UL mixer */
 	{"Voice Capture Mixer", "Tones Playback", "TONES_DL"},
-	{"Voice Capture Mixer", "Media Playback", "MM_DL"},
+	{"Voice Capture Mixer", "Media Playback", "MM_DL VMixer"},
+	{"MM_DL VMixer", NULL, "MM_DL"},
+	{"MM_DL VMixer", NULL, "MM_DL_LP"},
 	{"Voice Capture Mixer", "Capture", "Voice Capture VMixer"},
 	{"Voice Capture VMixer", NULL, "MUX_VX0"},
 	{"Voice Capture VMixer", NULL, "MUX_VX1"},
