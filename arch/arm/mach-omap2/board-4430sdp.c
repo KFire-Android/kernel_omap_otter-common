@@ -1123,7 +1123,7 @@ static void pad_config(unsigned long pad_addr, u32 andmask, u32 ormask)
 
 void wlan_1283_config(void)
 {
-	pad_config(0x4A100078, 0xFFECFFFF, 0x00030000);
+	pad_config(0x4A100078, 0x0000FFFF, 0x41030000);
 	pad_config(0x4A10007C, 0xFFFFFFEF, 0x0000000B);
 	if (gpio_request(54, NULL) != 0)
 		printk(KERN_ERR "GPIO 54 request failed\n");
