@@ -350,7 +350,6 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
-	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			abe_connect_cbpr_dmareq_port(MM_DL_PORT, &format, ABE_CBPR0_IDX,
 					&dma_sink);
@@ -360,6 +359,9 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 					&dma_sink);
 			abe_read_port_address(MM_UL_PORT, &dma_params);
 		}
+        break;
+	case ABE_FRONTEND_DAI_LP_MEDIA:
+		return 0;
         break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
@@ -1569,12 +1571,13 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 	{	/* Low Power HiFi Playback */
 		.name = "MultiMedia1 LP",
 		.playback = {
-			.stream_name = "MultiMedia1 Playback",
+			.stream_name = "MultiMedia1 LP Playback",
 			.channels_min = 2,
 			.channels_max = 2,
-			.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
-			.formats = OMAP_ABE_FORMATS,
+			.rates = SNDRV_PCM_RATE_44100,
+			.formats = OMAP_ABE_FORMATS | SNDRV_PCM_FMTBIT_S16_LE,
 		},
+		.ops = &omap_abe_dai_ops,
 	},
 };
 
