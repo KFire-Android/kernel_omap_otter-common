@@ -393,6 +393,10 @@ static const char *modem_be[] = {
 		OMAP_ABE_BE_DMIC2,
 };
 
+static const char *mm_lp_be[] = {
+		OMAP_ABE_BE_PDM_DL1,
+};
+
 /* Digital audio interface glue - connects codec <--> CPU */
 static struct snd_soc_dai_link sdp4430_dai[] = {
 
@@ -489,12 +493,12 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "Multimedia",
 
 		/* ABE components - MM-DL (mmap) */
-		.cpu_dai_name = "MultiMedia1",
+		.cpu_dai_name = "MultiMedia1 LP",
 		.platform_name = "omap-aess-audio",
 
 		.dynamic = 1, /* BE is dynamic */
-		.supported_be = tones_be,
-		.num_be = ARRAY_SIZE(tones_be),
+		.supported_be = mm_lp_be,
+		.num_be = ARRAY_SIZE(mm_lp_be),
 		.fe_playback_channels = 2,
 	},
 #ifdef CONFIG_SND_OMAP_SOC_HDMI
