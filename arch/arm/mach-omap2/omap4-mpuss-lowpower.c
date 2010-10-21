@@ -371,7 +371,7 @@ static void save_gic_wakeupgen_secure(void)
 {
 	u32 ret;
 	ret = omap4_secure_dispatcher(HAL_SAVEGIC_INDEX,
-					FLAG_IRQFIQ_MASK | FLAG_START_CRITICAL,
+					FLAG_START_CRITICAL,
 					0, 0, 0, 0, 0);
 	if (ret)
 		pr_debug("GIC and Wakeupgen context save failed\n");
@@ -389,7 +389,7 @@ static void save_secure_ram(void)
 	omap2_clkdm_wakeup(l4_secure_clkdm);
 
 	ret = omap4_secure_dispatcher(HAL_SAVESECURERAM_INDEX,
-					FLAG_IRQFIQ_MASK | FLAG_START_CRITICAL,
+					FLAG_START_CRITICAL,
 					1, omap4_secure_ram_phys, 0, 0, 0);
 	if (ret)
 		pr_debug("Secure ram context save failed\n");

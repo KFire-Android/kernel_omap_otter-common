@@ -46,7 +46,7 @@ END(omap4_cpu_wakeup_addr)
 ENTRY(__omap4_cpu_suspend)
 	stmfd	sp!, {r0-r12, lr}	@ save registers on stack
 	cmp	r1, #0x0
-	beq	do_WFI
+	beq	do_OnlyWFI
 	bne	context_save		@ Save context if needed
 
 restore_context:
@@ -122,6 +122,17 @@ use_ttbr0:
 	add	r1, r1, r4 		@ r1 has value of table entry
 	lsr	r4, #18			@ Address of table entry
 	add	r2, r4			@ r2 - location needs to be modified
+
+#ifdef CONFIG_CACHE_L2X0
+	/* Clean and invalidate L2 cache line */
+	ldr	r5, =OMAP44XX_L2CACHE_BASE
+	str	r2, [r5, #0x7f0]
+restorewait_l2:
+	ldr	r0, [r5, #0x7f0]
+	ands	r0, #1
+	bne	restorewait_l2
+#endif
+
 	/*
 	 * Storing previous entry of location being modified
 	 */
@@ -152,6 +163,11 @@ use_ttbr0:
 	and	r4, r2
 	mcr	p15, 0, r4, c1, c0, 0
 
+	dsb
+	isb
+	ldr	r0, =restoremmu_on
+	bx	r0
+restoremmu_on:
 	ldmfd	sp!, {r0-r12, pc}	@ restore regs and return
 
 context_save:
@@ -198,19 +214,36 @@ context_save:
 	mrc	p15, 0, r4, c1, c0, 0	@ save control register
 	stmia	r8!, {r4}
 
-clean_inv_l1:				@ cache-v7.S routine used here
+	/* Check of the device is a GP device or HS device */
+	ldr	r4, =sar_ram_base
+	ldr	r4, [r4]
+	ldr	r9, [r4, #OMAP_TYPE_OFFSET]
+	cmp	r9, #0x1		@ Check for HS device
+	beq suspend_HS_Device
+
+suspend_GP_Device:
+	/* GP Device Suspend procedure */
+	/* Check if the L1$ must be cleaned or not */
+	ldr	r4, =sar_ram_base
+	ldr	r4, [r4]
+	orr	r4, r4, #SCU_OFFSET
+	ldr	r1, [r4, #0x04]
+	cmp	r1, #0x0
+	beq	do_GP_bypass_CleanL1
+
+do_GP_CleanL1:	@ cache-v7.S routine used here
 	dmb				@ ensure ordering with previous accesses
 	mrc	p15, 1, r0, c0, c0, 1	@ read clidr
 	ands	r3, r0, #0x7000000	@ extract loc from clidr
 	mov	r3, r3, lsr #23		@ left align loc bit field
-	beq	finished		@ if loc is 0, then no need to clean
+	beq	do_GP_CleanL1_finished		@ if loc is 0, then no need to clean
 	mov	r10, #0			@ start clean at cache level 0
-loop1:
+do_GP_CleanL1_loopcachenum:
 	add	r2, r10, r10, lsr #1	@ work out 3x current cache level
 	mov	r1, r0, lsr r2		@ extract cache type bits from clidr
 	and	r1, r1, #7		@ mask bits for current cache only
 	cmp	r1, #2			@ see what cache we have at this level
-	blt	skip			@ skip if no cache, or just i-cache
+	blt	do_GP_CleanL1_skip		@ skip if no cache, or just i-cache
 	mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
 	isb				@ isb to sych the new cssr&csidr
 	mrc	p15, 1, r1, c0, c0, 0	@ read the new csidr
@@ -221,21 +254,21 @@ loop1:
 	clz	r5, r4			@ find bit position way size increment
 	ldr	r7, =0x7fff
 	ands	r7, r7, r1, lsr #13	@ extract max number of the index size
-loop2:
+do_GP_CleanL1_loopcacheindex:
 	mov	r9, r4			@ create working copy of max way size
-loop3:
+do_GP_CleanL1_loopcacheway:
 	orr	r11, r10, r9, lsl r5	@ factor way and cache number into r11
 	orr	r11, r11, r7, lsl r2	@ factor index number into r11
-	mcr	p15, 0, r11, c7, c14, 2	@ clean & invalidate by set/way
+	mcr	p15, 0, r11, c7, c10, 2	@ clean by set/way
 	subs	r9, r9, #1		@ decrement the way
-	bge	loop3
+	bge	do_GP_CleanL1_loopcacheway
 	subs	r7, r7, #1		@ decrement the index
-	bge	loop2
-skip:
+	bge	do_GP_CleanL1_loopcacheindex
+do_GP_CleanL1_skip:
 	add	r10, r10, #2		@ increment cache number
 	cmp	r3, r10
-	bgt	loop1
-finished:
+	bgt	do_GP_CleanL1_loopcachenum
+do_GP_CleanL1_finished:
 	mov	r10, #0			@ swith back to cache level 0
 	mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
 	dsb
@@ -244,59 +277,89 @@ finished:
 	mcr	p15, 0, r0, c7, c1, 0	@ ICIALLUIS
 	mcr	p15, 0, r0, c7, c1, 6	@ BPIALLIS
 	mcr	p15, 0, r0, c8, c3, 0
+
+do_GP_bypass_CleanL1:
+	/* we are on GP device write directly in SCU Power Status register */
+	ldr	r4, =sar_ram_base
+	ldr	r4, [r4]
+	ldr	r3, [r4, #SCU_OFFSET]
+	ldr	r2, =scu_base		@ Take CPUx out of coherency
+	ldr	r2, [r2]
+	str	r3, [r2, #0x08]
+	b	do_L2CleanInv
+
+suspend_HS_Device:
+	/* HS Device Suspend procedure */
+	/* Call the Secure Service to setup the SCU Power Status
+	 * register and clean the L1$ (to clean L1 Secure data)
+	 */
+	/* Get the API parameters */
+	ldr r4, =sar_ram_base
+	ldr r4, [r4]
+	orr	r4, r4, #SCU_OFFSET
+	ldr	r0, [r4]
+	ldr	r1, [r4, #0x04]
+	stmfd	r13!, {r4-r12, r14}
+	ldr	r12, =0x108		@ SCU power state secure API
+	smc	#0
+	ldmfd	r13!, {r4-r12, r14}
+
+	/* back from Secure that did the L1 Cache clean if necessary */
+
+do_L2CleanInv:
 #ifdef CONFIG_CACHE_L2X0
-	mrc	p15, 0, r0, c0, c0, 5	@ MPIDR
-	ands	r0, r0, #0x0f
-	bne	do_WFI
-l2x_clean:				@ Only for MPU OFF and last CPU
+	/* Clean and invalidate L2$ procedure */
+	/* first check if the L2$ must be cleaned and invalidated or not */
 	ldr	r8, =sar_ram_base
 	ldr	r8, [r8]
 	ldr	r0, [r8, #L2X0_OFFSET]
 	cmp	r0, #3
-	bne	do_WFI
+	bne	bypass_L2CleanInv
+
+	/* L2$ must be cleaned and invalidated */
+	/* Clean First */
 	ldr	r2, =l2cache_base
 	ldr	r2, [r2]
-	mov	r0, #0xff
+	ldr	r0, =0xffff
 	str	r0, [r2, #L2X0_CLEAN_WAY]
-loop4:
+
+do_L2CleanInv_cleanloop:
 	ldr	r0, [r2, #L2X0_CLEAN_WAY]
-	ands	r0, r0, #0xff
-	bne	loop4
-#endif
-do_WFI:
-	ldr	r4, =sar_ram_base
-	ldr	r4, [r4]
-	ldr     r9, [r4, #OMAP_TYPE_OFFSET]
-	cmp	r9, #0x1		@ Check for HS device
-	bne	scu_gp_set
-	orr	r4, r4, #SCU_OFFSET
-	ldr     r0, [r4]
-	ldr     r1, [r4, #0x04]
-	stmfd   r13!, {r4-r12, r14}
-	ldr	r12, =0x108		@ SCU power state secure API
-	smc	#0
-	ldmfd   r13!, {r4-r12, r14}
-	b	skip_gp_set
-scu_gp_set:
-	ldr     r3, [r4, #SCU_OFFSET]
-	ldr	r2, =scu_base		@ Take CPUx out of coherency
-	ldr	r2, [r2]
-	str	r3, [r2, #0x08]
-skip_gp_set:
-	isb
-	dsb				@ Necessary barriers before wfi
-	dmb
-#ifdef CONFIG_CACHE_L2X0
-l2x_sync:
-	ldr	r1, =l2cache_base
-	ldr	r1, [r1]
-	mov	r0, #0x0
-	str	r0, [r1, #L2X0_CACHE_SYNC]
-loop5:
-	ldr	r0, [r1, #L2X0_CACHE_SYNC]
+	cmp	r0, #0
+	bne	do_L2CleanInv_cleanloop
+
+	/* L2 CACHE SYNCH */
+	mov	r0, #0
+	str	r0, [r2, #L2X0_CACHE_SYNC]
+do_L2CleanInv_cleancachesyncloop:
+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
 	ands	r0, r0, #0x1
-	bne	loop5
-#endif
+	bne	do_L2CleanInv_cleancachesyncloop
+
+	/* Invalidate L2$ Cache after the clean */
+	ldr	r0, =0xffff
+	str	r0, [r2, #0x77c]
+do_L2CleanInv_invloop:
+	ldr	r0, [r2, #0x77c]
+	cmp	r0, #0
+	bne	do_L2CleanInv_invloop
+
+	/* L2 CACHE SYNCH */
+	mov	r0, #0
+	str	r0, [r2, #L2X0_CACHE_SYNC]
+do_L2CleanInv_invcachesyncloop:
+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
+	ands	r0, r0, #0x1
+	bne	do_L2CleanInv_invcachesyncloop
+
+bypass_L2CleanInv:
+#endif // CONFIG_CACHE_L2X0
+	dsb	/* Ensure completion of all pending data action*/
+
+	/* just to be sure all write done */
+	dmb
+	isb
+
 	wfi				@ wait for interrupt
 
 	/*
@@ -305,19 +368,24 @@ loop5:
 	 * to be cleared o.w CPUs may deadlock because
 	 * of coherency
 	 */
-	cmp	r9, #0x1
-	bne	scu_gp_clear
-	mov     r0, #0x00
-	mov     r1, #0xff
-	stmfd   r13!, {r4-r12, r14}
+	ldr	r4, =sar_ram_base
+	ldr	r4, [r4]
+	ldr	r9, [r4, #OMAP_TYPE_OFFSET]
+	cmp	r9, #0x1	@ R9 contains the device type
+	bne	wakeup_scu_gp_clear
+	mov	r0, #0x00	@ Force SCU Power State to ON
+	mov	r1, #0x00	@ Don't clean the L1$
+	stmfd	r13!, {r4-r12, r14}
 	ldr	r12, =0x108		@ SCU power state secure API
 	smc	#0
-	ldmfd   r13!, {r4-r12, r14}
-	b	skip_gp
-scu_gp_clear:
+	ldmfd	r13!, {r4-r12, r14}
+
+	b	wakeup_exit
+wakeup_scu_gp_clear:
 	ldr	r3, =SCU_CLEAR_STATE
 	str	r3, [r2, #0x08]
-skip_gp:
+
+wakeup_exit:
 	dsb				@ Issue a write memory barrier
 #ifdef CONFIG_CACHE_L2X0
 	ldr	r1, =l2cache_base
@@ -329,6 +397,18 @@ loop6:
 	ands	r0, r0, #0x1
 	bne	loop6
 #endif
+	b	exit_suspend
+
+do_OnlyWFI:
+	dsb	/* Ensure completion of all pending data action*/
+
+	/* just to be sure all write done */
+	dmb
+	isb
+
+	wfi				@ wait for interrupt
+
+exit_suspend:
 	ldmfd	sp!, {r0-r12, pc}	@ restore regs and return
 
 END(__omap4_cpu_suspend)

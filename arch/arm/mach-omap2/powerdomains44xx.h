@@ -192,7 +192,7 @@ static struct powerdomain cpu0_44xx_pwrdm = {
 	.pwrsts		  = PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 1,
-	.context_offset	  = 0x18,
+	.context_offset	  = OMAP4_RM_CPU0_CPU0_CONTEXT_OFFSET,
 	.pwrsts_mem_ret	= {
 		[0] = PWRSTS_OFF_RET,	/* cpu0_l1 */
 	},
@@ -216,7 +216,7 @@ static struct powerdomain cpu1_44xx_pwrdm = {
 	.pwrsts		  = PWRSTS_OFF_RET_ON,
 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
 	.banks		  = 1,
-	.context_offset	  = 0x18,
+	.context_offset	  = OMAP4_RM_CPU1_CPU1_CONTEXT_OFFSET,
 	.pwrsts_mem_ret	= {
 		[0] = PWRSTS_OFF_RET,	/* cpu1_l1 */
 	},
