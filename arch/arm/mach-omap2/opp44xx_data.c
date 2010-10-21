@@ -36,6 +36,52 @@ static struct clk *dpll_mpu_clk, *iva_clk, *dsp_clk, *l3_clk, *core_m2_clk;
 static struct clk *core_m3_clk, *core_m6_clk, *per_m3_clk, *per_m6_clk;
 static struct clk *abe_clk, *sgx_clk, *fdif_clk;
 
+/*
+ * Separate OPP table is needed for pre ES2.1 chips as emif cannot be scaled.
+ * This table needs to be maintained only temporarily till everybody
+ * migrates to ES2.1
+ */
+static struct omap_opp_def __initdata omap44xx_pre_es2_1_opp_def_list[] = {
+	/* MPU OPP1 - OPP50 */
+	OMAP_OPP_DEF("mpu", true, 300000000, 930000),
+	/* MPU OPP2 - OPP100 */
+	OMAP_OPP_DEF("mpu", true, 600000000, 1100000),
+	/* MPU OPP3 - OPP-Turbo */
+	OMAP_OPP_DEF("mpu", true, 800000000, 1260000),
+	/* MPU OPP4 - OPP-SB */
+	OMAP_OPP_DEF("mpu", true, 1008000000, 1350000),
+	/* IVA OPP1 - OPP50 */
+	OMAP_OPP_DEF("iva", true,  133000000, 930000),
+	/* IVA OPP2 - OPP100 */
+	OMAP_OPP_DEF("iva", true,  266000000, 1100000),
+	/* IVA OPP3 - OPP-Turbo */
+	OMAP_OPP_DEF("iva", false, 332000000, 1260000),
+	/* DSP OPP1 - OPP50 */
+	OMAP_OPP_DEF("dsp", true, 232800000, 930000),
+	/* DSP OPP2 - OPP100 */
+	OMAP_OPP_DEF("dsp", true, 465600000, 1100000),
+	/* DSP OPP3 - OPPTB */
+	OMAP_OPP_DEF("dsp", false, 498000000, 1260000),
+	/* ABE OPP1 - OPP50 */
+	OMAP_OPP_DEF("omap-aess-audio", true, 98300000, 930000),
+	/* ABE OPP2 - OPP100 */
+	OMAP_OPP_DEF("omap-aess-audio", true, 196600000, 1100000),
+	/* ABE OPP3 - OPPTB */
+	OMAP_OPP_DEF("omap-aess-audio", false, 196600000, 1260000),
+	/* L3 OPP1 - OPP50 */
+	OMAP_OPP_DEF("l3_main_1", true, 100000000, 930000),
+	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
+	OMAP_OPP_DEF("l3_main_1", true, 200000000, 1100000),
+	/* CAM FDIF OPP1 - OPP50 */
+	OMAP_OPP_DEF("fdif", true, 64000000, 930000),
+	/* CAM FDIF OPP2 - OPP100 */
+	OMAP_OPP_DEF("fdif", true, 128000000, 1100000),
+	/* SGX OPP1 - OPP50 */
+	OMAP_OPP_DEF("gpu", true, 100000000, 930000),
+	/* SGX OPP2 - OPP100 */
+	OMAP_OPP_DEF("gpu", true, 200000000, 1100000),
+};
+
 static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	/* MPU OPP1 - OPP50 */
 	OMAP_OPP_DEF("mpu", true, 300000000, 930000),
@@ -295,7 +341,10 @@ int __init omap4_pm_init_opp_table(void)
 		return 0;
 	omap4_table_init = 1;
 
-	opp_def = omap44xx_opp_def_list;
+	if (omap_rev() <= OMAP4430_REV_ES2_0)
+		opp_def = omap44xx_pre_es2_1_opp_def_list;
+	else
+		opp_def = omap44xx_opp_def_list;
 
 	for (i = 0; i < omap44xx_opp_def_size; i++) {
 		r = opp_add(opp_def);
@@ -339,15 +388,22 @@ int __init omap4_pm_init_opp_table(void)
 		opp_populate_rate_fns(dev, omap4_l3_set_rate,
 				omap4_l3_get_rate);
 
-	dev = find_dev_ptr("emif1");
-	if (dev)
-		opp_populate_rate_fns(dev, omap4_emif_set_rate,
-				omap4_emif_get_rate);
+	/*
+	 * This is a temporary hack since emif clocks cannot be scaled
+	 * on ES1.0 and ES2.0. Once everybody has migrated to ES2.1 this
+	 * check can be remove.
+	 */
+	if (omap_rev() > OMAP4430_REV_ES2_0) {
+		dev = find_dev_ptr("emif1");
+		if (dev)
+			opp_populate_rate_fns(dev, omap4_emif_set_rate,
+					omap4_emif_get_rate);
 
-	dev = find_dev_ptr("emif2");
-	if (dev)
-		opp_populate_rate_fns(dev, omap4_emif_set_rate,
-				omap4_emif_get_rate);
+		dev = find_dev_ptr("emif2");
+		if (dev)
+			opp_populate_rate_fns(dev, omap4_emif_set_rate,
+					omap4_emif_get_rate);
+	}
 
 	dev = find_dev_ptr("omap-aess-audio");
 	if (dev)
