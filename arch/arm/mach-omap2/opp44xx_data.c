@@ -32,7 +32,7 @@
 #include "prm.h"
 #include "opp44xx.h"
 
-static struct clk *dpll_mpu_clk, *iva_clk, *dsp_clk, *l3_clk;
+static struct clk *dpll_mpu_clk, *iva_clk, *dsp_clk, *l3_clk, *core_m2_clk;
 static struct clk *core_m3_clk, *core_m6_clk, *per_m3_clk, *per_m6_clk;
 static struct clk *abe_clk, *sgx_clk, *fdif_clk;
 
@@ -67,6 +67,14 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	OMAP_OPP_DEF("l3_main_1", true, 100000000, 930000),
 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
 	OMAP_OPP_DEF("l3_main_1", true, 200000000, 1100000),
+	/*EMIF1 OPP1 - OPP50 */
+	OMAP_OPP_DEF("emif1", true, 400000000, 930000),
+	/*EMIF1 OPP2 - OPP100 */
+	OMAP_OPP_DEF("emif1", true, 800000000, 1100000),
+	/*EMIF2 OPP1 - OPP50 */
+	OMAP_OPP_DEF("emif2", true, 400000000, 930000),
+	/*EMIF2 OPP2 - OPP100 */
+	OMAP_OPP_DEF("emif2", true, 800000000, 1100000),
 	/* CAM FDIF OPP1 - OPP50 */
 	OMAP_OPP_DEF("fdif", true, 64000000, 930000),
 	/* CAM FDIF OPP2 - OPP100 */
@@ -212,6 +220,16 @@ static unsigned long omap4_l3_get_rate(struct device *dev)
 	return l3_clk->rate;
 }
 
+static int omap4_emif_set_rate(struct device *dev, unsigned long rate)
+{
+	return clk_set_rate(core_m2_clk, rate);
+}
+
+static unsigned long omap4_emif_get_rate(struct device *dev)
+{
+	return core_m2_clk->rate;
+}
+
 static int omap4_abe_set_rate(struct device *dev, unsigned long rate)
 {
 	unsigned long round_rate;
@@ -291,6 +309,7 @@ int __init omap4_pm_init_opp_table(void)
 	iva_clk = clk_get(NULL, "dpll_iva_m5_ck");
 	dsp_clk = clk_get(NULL, "dpll_iva_m4_ck");
 	l3_clk = clk_get(NULL, "dpll_core_m5_ck");
+	core_m2_clk = clk_get(NULL, "dpll_core_m2_ck");
 	core_m3_clk = clk_get(NULL, "dpll_core_m3_ck");
 	core_m6_clk = clk_get(NULL, "dpll_core_m6_ck");
 	sgx_clk = clk_get(NULL, "dpll_core_m7_ck");
@@ -319,6 +338,16 @@ int __init omap4_pm_init_opp_table(void)
 	if (dev)
 		opp_populate_rate_fns(dev, omap4_l3_set_rate,
 				omap4_l3_get_rate);
+
+	dev = find_dev_ptr("emif1");
+	if (dev)
+		opp_populate_rate_fns(dev, omap4_emif_set_rate,
+				omap4_emif_get_rate);
+
+	dev = find_dev_ptr("emif2");
+	if (dev)
+		opp_populate_rate_fns(dev, omap4_emif_set_rate,
+				omap4_emif_get_rate);
 
 	dev = find_dev_ptr("omap-aess-audio");
 	if (dev)
