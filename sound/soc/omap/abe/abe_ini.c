@@ -583,6 +583,7 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 	if (prot->protocol_switch == PINGPONG_PORT_PROT) {
 		/* MM_DL managed in ping-pong */
 		if (MM_DL_PORT == id) {
+#if 0
 			abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
 				       D_multiFrame_ADDR,
 				       (u32 *) MultiFrame, sizeof(MultiFrame));
@@ -591,6 +592,7 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 				       D_multiFrame_ADDR, (u32 *) MultiFrame,
 				       sizeof(MultiFrame));
+#endif
 		} else {
 			abe_dbg_param |= ERR_API;
 			abe_dbg_error_log(ABE_PARAMETER_ERROR);
@@ -875,6 +877,34 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 							    (ABE_SIODescriptor));
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       sio_desc_address, (u32 *) &desc, sizeof(desc));
+	}
+}
+void abe_enable_irq_transfer(u32 id)
+{
+	/* MM_DL managed in ping-pong */
+	if (MM_DL_PORT == id) {
+		abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
+			       D_multiFrame_ADDR,
+			       (u32 *) MultiFrame, sizeof(MultiFrame));
+		MultiFrame[TASK_IO_MM_DL_SLT][TASK_IO_MM_DL_IDX] =
+			ABE_TASK_ID(C_ABE_FW_TASK_IO_PING_PONG);
+		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
+			       D_multiFrame_ADDR, (u32 *) MultiFrame,
+				       sizeof(MultiFrame));
+	}
+}
+
+void abe_disable_irq_transfer(u32 id)
+{
+	/* MM_DL managed in ping-pong */
+	if (MM_DL_PORT == id) {
+		abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
+			       D_multiFrame_ADDR,
+			       (u32 *) MultiFrame, sizeof(MultiFrame));
+		MultiFrame[TASK_IO_MM_DL_SLT][TASK_IO_MM_DL_IDX] = 0;
+		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
+			       D_multiFrame_ADDR, (u32 *) MultiFrame,
+			       sizeof(MultiFrame));
 	}
 }
 /**
