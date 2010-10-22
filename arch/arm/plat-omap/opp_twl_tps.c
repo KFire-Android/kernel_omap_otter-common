@@ -76,3 +76,51 @@ u8 omap_twl_uv_to_vsel(unsigned long uv)
 
 	return DIV_ROUND_UP(uv - 600000, 12500);
 }
+
+/**
+ * omap_twl_*_cmd - Generate the twl command given the vsel value
+ * vsel: TWL/TPS VSEL value to be embedded in the cmd
+ *
+ * Returns the CMD value to be programmed in the TWL6030 command register
+ * The CMD register on twl6030 is defined as below
+ * <Bit 7:6>	| <Bit 5:0>
+ * <Command>	| <vsel/voltage value>
+ *
+ * Where value of command can be the following
+ * 00: ON Force Voltage: The power resource is set in ON mode with the voltage
+ *	value defined in the 6 LSB bits of the command register VCORE*_CFG_FORCE
+ * 01: ON: The power resource is set in ON mode with the voltage value defined
+ *	in the VCORE1/2/3_CFG_VOLTAGE voltage register
+ * 10: SLEEP Force Voltage: The power resource is set in SLEEP mode with the
+ *	voltage value defined in the 6 LSB bits of the command register
+ *	VCORE*_CFG_FORCE
+ * 11: SLEEP: The power resource is set in SLEEP mode with the voltage value
+ *	defined in the VCORE*_CFG_VOLTAGE voltage register
+ */
+u8 omap_twl_onforce_cmd(const u8 vsel)
+{
+	if (!twl_class_is_6030())
+		return vsel;
+	return (0x0 << 6) | (vsel & 0x3f);
+}
+
+u8 omap_twl_on_cmd(const u8 vsel)
+{
+	if (!twl_class_is_6030())
+		return vsel;
+	return (0x1 << 6) | (vsel & 0x3f);
+}
+
+u8 omap_twl_sleepforce_cmd(const u8 vsel)
+{
+	if (!twl_class_is_6030())
+		return vsel;
+	return (0x2 << 6) | (vsel & 0x3f);
+}
+
+u8 omap_twl_sleep_cmd(const u8 vsel)
+{
+	if (!twl_class_is_6030())
+		return vsel;
+	return (0x3 << 6) | (vsel & 0x3f);
+}

@@ -17,5 +17,9 @@
 
 unsigned long omap_twl_vsel_to_uv(const u8 vsel);
 u8 omap_twl_uv_to_vsel(unsigned long uV);
+u8 omap_twl_onforce_cmd(const u8 vsel);
+u8 omap_twl_on_cmd(const u8 vsel);
+u8 omap_twl_sleepforce_cmd(const u8 vsel);
+u8 omap_twl_sleep_cmd(const u8 vsel);
 
 #endif

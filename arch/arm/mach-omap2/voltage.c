@@ -692,7 +692,7 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 /* OMAP4 specific voltage init functions */
 static void __init omap4_init_voltagecontroller(void)
 {
-	u8 vsel_on, vsel_onlp, vsel_ret, vsel_off;
+	u8 on_cmd, onlp_cmd, ret_cmd, off_cmd;
 
 	voltage_write_reg(OMAP4_PRM_VC_SMPS_SA_OFFSET,
 			(OMAP4_SRI2C_SLAVE_ADDR <<
@@ -751,35 +751,35 @@ static void __init omap4_init_voltagecontroller(void)
 		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
 		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
 
-	vsel_on = omap_twl_uv_to_vsel(vc_config.vdd0_on);
-	vsel_onlp = omap_twl_uv_to_vsel(vc_config.vdd0_onlp);
-	vsel_ret = omap_twl_uv_to_vsel(vc_config.vdd0_ret);
-	vsel_off = omap_twl_uv_to_vsel(vc_config.vdd0_off);
+	on_cmd = omap_twl_onforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd0_on));
+	onlp_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd0_onlp));
+	ret_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd0_ret));
+	off_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd0_off));
 	voltage_write_reg(OMAP4_PRM_VC_VAL_CMD_VDD_MPU_L_OFFSET,
-			(vsel_on << OMAP4430_ON_SHIFT) |
-			(vsel_onlp << OMAP4430_ONLP_SHIFT) |
-			(vsel_ret << OMAP4430_RET_SHIFT) |
-			(vsel_off << OMAP4430_OFF_SHIFT));
+			(on_cmd << OMAP4430_ON_SHIFT) |
+			(onlp_cmd << OMAP4430_ONLP_SHIFT) |
+			(ret_cmd << OMAP4430_RET_SHIFT) |
+			(off_cmd << OMAP4430_OFF_SHIFT));
 
-	vsel_on = omap_twl_uv_to_vsel(vc_config.vdd1_on);
-	vsel_onlp = omap_twl_uv_to_vsel(vc_config.vdd1_onlp);
-	vsel_ret = omap_twl_uv_to_vsel(vc_config.vdd1_ret);
-	vsel_off = omap_twl_uv_to_vsel(vc_config.vdd1_off);
+	on_cmd = omap_twl_onforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd1_on));
+	onlp_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd1_onlp));
+	ret_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd1_ret));
+	off_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd1_off));
 	voltage_write_reg(OMAP4_PRM_VC_VAL_CMD_VDD_CORE_L_OFFSET,
-			(vsel_on << OMAP4430_ON_SHIFT) |
-			(vsel_onlp << OMAP4430_ONLP_SHIFT) |
-			(vsel_ret << OMAP4430_RET_SHIFT) |
-			(vsel_off << OMAP4430_OFF_SHIFT));
+			(on_cmd << OMAP4430_ON_SHIFT) |
+			(onlp_cmd << OMAP4430_ONLP_SHIFT) |
+			(ret_cmd << OMAP4430_RET_SHIFT) |
+			(off_cmd << OMAP4430_OFF_SHIFT));
 
-	vsel_on = omap_twl_uv_to_vsel(vc_config.vdd2_on);
-	vsel_onlp = omap_twl_uv_to_vsel(vc_config.vdd2_onlp);
-	vsel_ret = omap_twl_uv_to_vsel(vc_config.vdd2_ret);
-	vsel_off = omap_twl_uv_to_vsel(vc_config.vdd2_off);
+	on_cmd = omap_twl_onforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd2_on));
+	onlp_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd2_onlp));
+	ret_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd2_ret));
+	off_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd2_off));
 	voltage_write_reg(OMAP4_PRM_VC_VAL_CMD_VDD_IVA_L_OFFSET,
-			(vsel_on << OMAP4430_ON_SHIFT) |
-			(vsel_onlp << OMAP4430_ONLP_SHIFT) |
-			(vsel_ret << OMAP4430_RET_SHIFT) |
-			(vsel_off << OMAP4430_OFF_SHIFT));
+			(on_cmd << OMAP4430_ON_SHIFT) |
+			(onlp_cmd << OMAP4430_ONLP_SHIFT) |
+			(ret_cmd << OMAP4430_RET_SHIFT) |
+			(off_cmd << OMAP4430_OFF_SHIFT));
 }
 
 /* Sets up all the VDD related info for OMAP4 */
