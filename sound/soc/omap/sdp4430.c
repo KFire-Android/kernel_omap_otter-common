@@ -356,16 +356,14 @@ static struct snd_soc_dai_driver dai[] = {
 		.stream_name = "Playback",
 		.channels_min = 1,
 		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
-					SNDRV_PCM_RATE_48000,
+		.rates = SNDRV_PCM_RATE_48000,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
 	.capture = {
 		.stream_name = "Capture",
 		.channels_min = 1,
 		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
-					SNDRV_PCM_RATE_48000,
+		.rates = SNDRV_PCM_RATE_48000,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
 },
