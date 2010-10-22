@@ -400,10 +400,10 @@ u32 iommu_save_tlb_entries(struct iommu *obj)
 
 	for_each_iotlb_cr(obj, obj->nr_tlb_entries, i, cr_tmp) {
 		iotlb_cr_to_e(&cr_tmp, e);
+		dev_dbg(obj->dev, "%s: %08x %08x %d %d %d", __func__, e->da,
+						      e->pa, e->pgsz, e->prsvd,
+						      e->valid);
 		e++;
-
-		dev_dbg(obj->dev, "%s: [%02x] %08x %08x\n", __func__,
-					i, cr_tmp.cam, cr_tmp.ram);
 	}
 
 	return 0;
@@ -429,17 +429,17 @@ u32 iommu_restore_tlb_entries(struct iommu *obj)
 		goto error;
 
 	for (i = 0; i < obj->nr_tlb_entries; i++) {
-		if (!e->valid) {
+		if (!e->prsvd) {
 			e++;
 			continue;
 		}
+		dev_dbg(obj->dev, "%s: %08x %08x %d %d %d", __func__, e->da,
+						      e->pa, e->pgsz, e->prsvd,
+						      e->valid);
 		status = load_iotlb_entry(obj, e);
 		if (status)
 			goto error;
 		e++;
-
-		dev_dbg(obj->dev, "%s: [%02x] %08x\n", __func__,
-					i, e->pa);
 	}
 
 	return 0;
