@@ -419,6 +419,8 @@ static void omap2_mcspi_set_slave_mode(struct spi_master *master)
 	MOD_REG_BIT(l, OMAP2_MCSPI_MODULCTRL_STEST, 0);
 	MOD_REG_BIT(l, OMAP2_MCSPI_MODULCTRL_MS, 1);
 	mcspi_write_reg(master, OMAP2_MCSPI_MODULCTRL, l);
+
+	omap2_mcspi_ctx[master->bus_num - 1].modulctrl = l;
 }
 
 static int mcspi_wait_for_reg_bit(void __iomem *reg, unsigned long bit)
