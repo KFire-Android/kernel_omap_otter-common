@@ -78,7 +78,6 @@ struct twl6040_data {
 	unsigned int sysclk;
 	struct snd_pcm_hw_constraint_list *sysclk_constraints;
 	struct completion ready;
-	struct work_struct audint_work;
 	struct snd_soc_codec *codec;
 };
 
@@ -409,17 +408,14 @@ static int twl6040_power_mode_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
-static void twl6040_audint_work(struct work_struct *work)
+/* audio interrupt handler */
+static irqreturn_t twl6040_naudint_handler(int irq, void *data)
 {
-	struct snd_soc_codec *codec;
-	struct twl6040_data *priv;
-	struct twl6040_jack_data *jack;
+	struct snd_soc_codec *codec = data;
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+	struct twl6040_jack_data *jack = &priv->hs_jack;
 	int report = 0;
 	u8 intid;
-
-	priv = container_of(work, struct twl6040_data, audint_work);
-	codec = priv->codec;
-	jack = &priv->hs_jack;
 
 	twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &intid, TWL6040_REG_INTID);
 
@@ -459,15 +455,6 @@ static void twl6040_audint_work(struct work_struct *work)
 
 	if (intid & TWL6040_READYINT)
 		complete(&priv->ready);
-}
-
-/* audio interrupt handler */
-static irqreturn_t twl6040_naudint_handler(int irq, void *data)
-{
-	struct snd_soc_codec *codec = data;
-	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
-
-	schedule_work(&priv->audint_work);
 
 	return IRQ_HANDLED;
 }
@@ -1214,8 +1201,6 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	/* Disable safe mode in SYS_NIRQ PAD */
 	omap_writew(0x0118, 0x4A1001A0);
 
-	INIT_WORK(&priv->audint_work, twl6040_audint_work);
-
 	/* switch-class based headset detection */
 	jack = &priv->hs_jack;
 	jack->sdev.name = "h2w";
@@ -1298,7 +1283,6 @@ static int twl6040_remove(struct snd_soc_codec *codec)
 	if (naudint)
 		free_irq(naudint, codec);
 
-	cancel_work_sync(&priv->audint_work);
 	switch_dev_unregister(&jack->sdev);
 	kfree(priv);
 
