@@ -45,6 +45,7 @@ struct power_state {
 	u32 next_state;
 #ifdef CONFIG_SUSPEND
 	u32 saved_state;
+	u32 saved_logic_state;
 #endif
 	struct list_head node;
 };
@@ -301,8 +302,11 @@ static int omap4_pm_suspend(void)
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_SYS_1N);
 
 	/* Read current next_pwrsts */
-	list_for_each_entry(pwrst, &pwrst_list, node)
+	list_for_each_entry(pwrst, &pwrst_list, node) {
 		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
+		pwrst->saved_logic_state = pwrdm_read_logic_retst(pwrst->pwrdm);
+	}
+
 	/* program all powerdomains to sleep */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		pwrdm_clear_all_prev_pwrst(pwrst->pwrdm);
@@ -312,9 +316,15 @@ static int omap4_pm_suspend(void)
 		 * Hence we do not have to program non core cpu (cpu1) target
 		 * state in the omap4_pm_suspend function
 		 */
-		if (strcmp(pwrst->pwrdm->name, "cpu1_pwrdm"))
-			if (omap4_set_pwrdm_state(pwrst->pwrdm, PWRDM_POWER_RET))
+		if (strcmp(pwrst->pwrdm->name, "cpu1_pwrdm")) {
+			if ((pwrst->pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET)
+			 && (omap_rev() >= OMAP4430_REV_ES2_1))
+				pwrdm_set_logic_retst(pwrst->pwrdm,
+							PWRDM_POWER_OFF);
+			if (omap4_set_pwrdm_state(pwrst->pwrdm,
+							PWRDM_POWER_RET))
 				goto restore;
+		}
 	}
 
 	omap_uart_prepare_suspend();
@@ -337,9 +347,13 @@ restore:
 	}
 
 	/* restore next_pwrsts */
-	list_for_each_entry(pwrst, &pwrst_list, node)
-		if (strcmp(pwrst->pwrdm->name, "cpu1_pwrdm"))
+	list_for_each_entry(pwrst, &pwrst_list, node) {
+		if (strcmp(pwrst->pwrdm->name, "cpu1_pwrdm")) {
 			omap4_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
+			pwrdm_set_logic_retst(pwrst->pwrdm,
+						pwrst->saved_logic_state);
+		}
+	}
 
 #ifdef CONFIG_PM_DEBUG
 	pwrdm_post_transition();
