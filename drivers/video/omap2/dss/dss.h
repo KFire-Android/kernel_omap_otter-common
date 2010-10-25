@@ -202,15 +202,15 @@ struct writeback_cache_data {
 	u16 input_height;
 	u32 line_skip;
 
-	enum omap_color_mode 				color_mode;
-	enum omap_color_mode 				input_color_mode;
-	enum omap_writeback_capturemode 	capturemode;
-	enum omap_writeback_source_type 	source_type;
-	enum omap_writeback_source			source;
+	enum omap_color_mode			color_mode;
+	enum omap_color_mode			input_color_mode;
+	enum omap_writeback_capturemode	capturemode;
+	enum omap_writeback_source_type	source_type;
+	enum omap_writeback_source		source;
 
-	enum omap_burst_size 				burst_size;
-	u32 								fifo_low;
-	u32 								fifo_high;
+	enum omap_burst_size	burst_size;
+	u32						fifo_low;
+	u32						fifo_high;
 
 };
 
@@ -269,7 +269,8 @@ void dss_overlay_setup_l4_manager(struct omap_overlay_manager *mgr);
 void dss_recheck_connections(struct omap_dss_device *dssdev, bool force);
 /* Write back */
 void dss_init_writeback(struct platform_device *pdev);
-bool omap_dss_check_wb(struct writeback_cache_data *wb, int overlayId, int managerId);
+bool omap_dss_check_wb(struct writeback_cache_data *wb,
+		int overlayId, int managerId);
 
 /* DSS */
 int dss_init(struct platform_device *pdev);
@@ -372,7 +373,7 @@ static inline void dsi_exit(void)
 }
 static inline int dsi2_init(struct platform_device *pdev)
 {
-        return 0;
+	return 0;
 }
 static inline void dsi2_exit(void)
 {
@@ -431,7 +432,7 @@ void dispc_enable_fifomerge(bool enable);
 void dispc_set_burst_size(enum omap_plane plane,
 		enum omap_burst_size burst_size);
 void dispc_set_zorder(enum omap_plane plane,
-			enum omap_overlay_zorder zorder);
+		enum omap_overlay_zorder zorder);
 void dispc_enable_zorder(enum omap_plane plane, bool enable);
 
 void dispc_set_plane_ba0(enum omap_plane plane, u32 paddr);
@@ -445,25 +446,25 @@ void dispc_set_channel_out(enum omap_plane plane,
 		enum omap_channel channel_out);
 
 int dispc_scaling_decision(u16 width, u16 height,
-			    u16 out_width, u16 out_height,
-			    enum omap_plane plane,
-			    enum omap_color_mode color_mode,
-			    enum omap_channel channel, u8 rotation,
-			    u16 min_x_decim, u16 max_x_decim,
-			    u16 min_y_decim, u16 max_y_decim,
-			    u16 *x_decim, u16 *y_decim, bool *three_tap);
+		u16 out_width, u16 out_height,
+		enum omap_plane plane,
+		enum omap_color_mode color_mode,
+		enum omap_channel channel, u8 rotation,
+		u16 min_x_decim, u16 max_x_decim,
+		u16 min_y_decim, u16 max_y_decim,
+		u16 *x_decim, u16 *y_decim, bool *three_tap);
 int dispc_setup_plane(enum omap_plane plane,
-		      u32 paddr, u16 screen_width,
-		      u16 pos_x, u16 pos_y,
-		      u16 width, u16 height,
-		      u16 out_width, u16 out_height,
-		      enum omap_color_mode color_mode,
-		      enum device_n_buffer_type ilace,
-		      int x_decim, int y_decim, bool three_tap,
-		      enum omap_dss_rotation_type rotation_type,
-		      u8 rotation, bool mirror,
-		      u8 global_alpha, enum omap_channel channel,
-		      u32 puv_addr, u16 pic_height, bool wb_source);
+		u32 paddr, u16 screen_width,
+		u16 pos_x, u16 pos_y,
+		u16 width, u16 height,
+		u16 out_width, u16 out_height,
+		enum omap_color_mode color_mode,
+		enum device_n_buffer_type ilace,
+		int x_decim, int y_decim, bool three_tap,
+		enum omap_dss_rotation_type rotation_type,
+		u8 rotation, bool mirror,
+		u8 global_alpha, enum omap_channel channel,
+		u32 puv_addr, u16 pic_height, bool wb_source);
 
 bool dispc_go_busy(enum omap_channel channel);
 void dispc_go(enum omap_channel channel);
@@ -474,11 +475,11 @@ int dispc_enable_plane(enum omap_plane plane, bool enable);
 void dispc_enable_replication(enum omap_plane plane, bool enable);
 
 void dispc_set_parallel_interface_mode(enum omap_channel channel,
-				enum omap_parallel_interface_mode mode);
+		enum omap_parallel_interface_mode mode);
 void dispc_set_tft_data_lines(enum omap_channel channel,
-						u8 data_lines);
+		u8 data_lines);
 void dispc_set_lcd_display_type(enum omap_channel channel,
-				enum omap_lcd_display_type type);
+		enum omap_lcd_display_type type);
 void dispc_set_loadmode(enum omap_dss_load_mode mode);
 
 void dispc_set_default_color(enum omap_channel channel, u32 color);
@@ -496,12 +497,12 @@ bool dispc_alpha_blending_enabled(enum omap_channel ch);
 
 bool dispc_lcd_timings_ok(struct omap_video_timings *timings);
 void dispc_set_lcd_timings(enum omap_channel channel,
-				struct omap_video_timings *timings);
+		struct omap_video_timings *timings);
 unsigned long dispc_fclk_rate(void);
 unsigned long dispc_lclk_rate(enum omap_channel channel);
 unsigned long dispc_pclk_rate(enum omap_channel channel);
 void dispc_set_pol_freq(enum omap_channel channel,
-			enum omap_panel_config config, u8 acbi, u8 acb);
+		enum omap_panel_config config, u8 acbi, u8 acb);
 void dispc_find_clk_divs(bool is_tft, unsigned long req_pck, unsigned long fck,
 		struct dispc_clock_info *cinfo);
 int dispc_calc_clock_rates(unsigned long dispc_fclk_rate,
