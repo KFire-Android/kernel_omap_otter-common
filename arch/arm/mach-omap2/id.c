@@ -267,12 +267,19 @@ void __init omap3_check_revision(void)
 	}
 }
 
+#define MAX_ID_STRING		(4*8 + 1)
+#define DIE_ID_REG_BASE		(L4_44XX_PHYS + 0x2000)
+#define DIE_ID_REG_OFFSET	0x200
+
 void __init omap4_check_revision(void)
 {
 	u32 idcode;
 	u8 rev;
 	u8 dot;
 	u8 *type;
+	u32 id[4] = { 0 };
+	u32 reg;
+	u8 id_string[MAX_ID_STRING];
 
 #if 0
 	u16 hawkeye;
@@ -371,6 +378,26 @@ void __init omap4_check_revision(void)
 	pr_info("***********************");
 	pr_info("OMAP%04x ES%d.%d type(%s)\n",
 			omap_rev() >> 16, rev, dot, type);
+	pr_info("id-code  (%x)\n", read_tap_reg(OMAP_TAP_IDCODE));
+
+	reg = DIE_ID_REG_BASE + DIE_ID_REG_OFFSET;
+	/* Get Die-id */
+	id[0] = omap_readl(reg);
+	id[1] = omap_readl(reg + 0x8);
+	id[2] = omap_readl(reg + 0xC);
+	id[3] = omap_readl(reg + 0x10);
+	/* die-id string */
+	snprintf(id_string, MAX_ID_STRING, "%08X-%08X-%08X-%08X",
+						id[3], id[2],
+						id[1], id[0]);
+	pr_info("Die-id   (%s)\n", id_string);
+
+	/* Get prod-id */
+	id[0] = omap_readl(reg + 0x14);
+	id[1] = omap_readl(reg + 0x18);
+	snprintf(id_string, MAX_ID_STRING, "%08X-%08X",
+						id[1], id[0]);
+	pr_info("Prod-id  (%s)\n", id_string);
 	pr_info("***********************");
 }
 
