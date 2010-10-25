@@ -268,6 +268,17 @@ static void usb_gadget_init(void)
 
 static void usb_gadget_init(void)
 {
+	int l;
+
+	if (cpu_is_omap44xx()) {
+		/* disable the optional 60M clock if enabled by romcode*/
+		l = omap_readl(0x4A009360);
+		l &= ~0x00000100;
+		omap_writel(l, 0x4A009360);
+		/*powerdown the phy*/
+		omap_writel(0x1, 0x4A002300);
+	}
+
 }
 
 #endif /* CONFIG_ANDROID */
@@ -466,6 +477,17 @@ void musb_context_save_restore(enum musb_state state)
 #else
 void __init usb_musb_init(struct omap_musb_board_data *board_data)
 {
+	int l;
+
+	if (cpu_is_omap44xx()) {
+		/* disable the optional 60M clock if enabled by romcode*/
+		l = omap_readl(0x4A009360);
+		l &= ~0x00000100;
+		omap_writel(l, 0x4A009360);
+		/*powerdown the phy*/
+		omap_writel(0x1, 0x4A002300);
+	}
+
 }
 void musb_context_save_restore(enum musb_state state)
 {
