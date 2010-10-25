@@ -419,6 +419,10 @@ static int musb_platform_resume(struct musb *musb)
 int musb_platform_exit(struct musb *musb)
 {
 
+	if (cpu_is_omap44xx()) {
+		/* register for transciever notification*/
+		otg_unregister_notifier(musb->xceiv, &musb->nb);
+	}
 	musb_platform_suspend(musb);
 
 	return 0;
