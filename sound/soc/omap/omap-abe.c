@@ -559,8 +559,9 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 
 	/* only startup BE DAIs that are either sinks or sources to this FE DAI */
 	for (i = 0; i < rtd->num_be[stream]; i++) {
+		struct snd_soc_pcm_runtime *be_rtd = rtd->be_rtd[i][stream];
 		struct snd_pcm_substream *be_substream =
-				rtd->be_rtd[i][stream]->pcm->streams[stream].substream;
+			be_rtd->pcm->streams[stream].substream;
 
 		if (be_substream == NULL)
 			continue;
@@ -569,6 +570,7 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 		be_inc_active(rtd->be_rtd[i][stream], stream);
 
 		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
+			be_rtd->current_fe = dai->id;
 			ret = snd_soc_pcm_open(be_substream);
 			if (ret < 0)
 				goto unwind;
@@ -594,14 +596,15 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 unwind:
 	/* disable any enabled and non active backends */
 	for (--i; i >= 0; i--) {
+		struct snd_soc_pcm_runtime *be_rtd = rtd->be_rtd[i][stream];
 		struct snd_pcm_substream *be_substream =
-				rtd->be_rtd[i][stream]->pcm->streams[stream].substream;
+			be_rtd->pcm->streams[stream].substream;
 
 		if (be_substream == NULL)
 			continue;
 
 		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
-
+			be_rtd->current_fe = dai->id;
 			snd_soc_pcm_close(be_substream);
 
 			dev_dbg(&rtd->dev, "%s: open-err-close %s:%d at %d act %d\n", __func__,
@@ -629,14 +632,16 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 	mutex_lock(&fe_mutex);
 
 	for (i = 0; i < rtd->num_be[stream]; i++) {
+		struct snd_soc_pcm_runtime *be_rtd = rtd->be_rtd[i][stream];
 		struct snd_pcm_substream *be_substream =
-			rtd->be_rtd[i][stream]->pcm->streams[stream].substream;
+			be_rtd->pcm->streams[stream].substream;
 
 		if (be_substream == NULL)
 			continue;
 
 		/* close backend stream if inactive */
 		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
+			be_rtd->current_fe = dai->id;
 			snd_soc_pcm_close(be_substream);
 
 			dev_dbg(&rtd->dev,"%s: close %s:%d at %d act %d\n", __func__,
@@ -671,13 +676,15 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	/* only hw_params backends that are either sinks or
 	 * sources to this frontend DAI */
 	for (i = 0; i < rtd->num_be[stream]; i++) {
+		struct snd_soc_pcm_runtime *be_rtd = rtd->be_rtd[i][stream];
 		struct snd_pcm_substream *be_substream =
-			rtd->be_rtd[i][stream]->pcm->streams[stream].substream;
+			be_rtd->pcm->streams[stream].substream;
 
 		if (be_substream == NULL)
 			continue;
 
 		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
+			be_rtd->current_fe = dai->id;
 			ret = snd_soc_pcm_hw_params(be_substream, params);
 			if (ret < 0) {
 				dev_err(&rtd->dev, "%s: backend hw_params failed %d\n",
@@ -733,15 +740,18 @@ static int omap_abe_dai_prepare(struct snd_pcm_substream *substream,
 	mutex_lock(&fe_mutex);
 
 	for (i = 0; i < rtd->num_be[stream]; i++) {
+		struct snd_soc_pcm_runtime *be_rtd = rtd->be_rtd[i][stream];
 		struct snd_pcm_substream *be_substream =
-			rtd->be_rtd[i][stream]->pcm->streams[stream].substream;
+			be_rtd->pcm->streams[stream].substream;
 
 		if (be_substream == NULL)
 			continue;
 
 		/* prepare backend stream */
-		if (be_is_pending(rtd->be_rtd[i][stream], stream))
+		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
+			be_rtd->current_fe = dai->id;
 			snd_soc_pcm_prepare(be_substream);
+		}
 	}
 
 	/* call prepare on the frontend */
@@ -773,14 +783,17 @@ static int omap_abe_dai_hw_free(struct snd_pcm_substream *substream,
 	/* only hw_params backends that are either sinks or sources
 	 * to this frontend DAI */
 	for (i = 0; i < rtd->num_be[stream]; i++) {
+		struct snd_soc_pcm_runtime *be_rtd = rtd->be_rtd[i][stream];
 		struct snd_pcm_substream *be_substream =
-			rtd->be_rtd[i][stream]->pcm->streams[stream].substream;
+			be_rtd->pcm->streams[stream].substream;
 
 		if (be_substream == NULL)
 			continue;
 
-		if (be_is_pending(rtd->be_rtd[i][stream], stream))
+		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
+			be_rtd->current_fe = dai->id;
 			snd_soc_pcm_hw_free(be_substream);
+		}
 	}
 
 	mutex_unlock(&fe_mutex);
