@@ -65,9 +65,9 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	/* C3 */
 	{1, 1500, 1500, 3500},	/* FIXME: Profile the latency numbers */
 	/* C4 */
-	{1, 1500, 1500, 4000},	/* FIXME: Profile the latency numbers */
+	{0, 1500, 1500, 4000},	/* FIXME: Profile the latency numbers */
 	/* C5 */
-	{1, 5000, 5000, 10000},
+	{0, 5000, 5000, 10000},
 };
 
 static int omap4_idle_bm_check(void)
