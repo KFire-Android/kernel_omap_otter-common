@@ -452,7 +452,7 @@ void st_int_recv(void *disc_data,
 		case ST_GPS:
 			/* for GPS */
 			st_gdata->rx_skb =
-			    alloc_skb(300 /*GPS_MAX_FRAME_SIZE */ , GFP_ATOMIC);
+			    alloc_skb(GPS_MAX_FRAME_SIZE  , GFP_ATOMIC);
 			if (!st_gdata->rx_skb) {
 				pr_err("Can't allocate mem for new packet");
 				st_gdata->rx_state = ST_W4_PACKET_TYPE;

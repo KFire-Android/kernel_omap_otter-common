@@ -28,6 +28,8 @@
 #define ST_NOTEMPTY	1
 #define ST_EMPTY	0
 
+/*GPS Buffer size */
+#define GPS_MAX_FRAME_SIZE 300
 /*
  * possible st_states
  */
