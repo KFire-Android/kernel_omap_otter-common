@@ -574,7 +574,7 @@ static int __exit hsi_remove(struct platform_device *pd)
 
 int hsi_driver_device_is_hsi(struct platform_device *dev)
 {
-	struct platform_device_id *id = platform_get_device_id(dev);
+	const struct platform_device_id *id = platform_get_device_id(dev);
 	return (id->driver_data == HSI_DRV_DEVICE_HSI);
 }
 
