@@ -187,6 +187,7 @@ obj-$(CONFIG_DMM_OMAP)  += dmm/
 obj-$(CONFIG_TILER_OMAP)  += tiler/
 
 obj-$(CONFIG_ARCH_OMAP)	+= omap/
+obj-$(CONFIG_VIDEO_OMAP_GFX) += omapgfx/
 
 EXTRA_CFLAGS += -Idrivers/media/dvb/dvb-core
 EXTRA_CFLAGS += -Idrivers/media/dvb/frontends
