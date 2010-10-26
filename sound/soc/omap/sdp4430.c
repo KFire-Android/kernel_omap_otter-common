@@ -44,6 +44,7 @@
 #endif
 
 static int twl6040_power_mode;
+static int mcbsp_cfg;
 
 static struct i2c_client *tps6130x_client;
 static struct i2c_board_info tps6130x_hwmon_info = {
@@ -72,8 +73,12 @@ static int sdp4430_mcpdm_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_pcm_runtime *modem_rtd;
+	struct snd_pcm_substream *modem_substream[2];
 	int clk_id, freq;
-	int ret;
+	int ret = 0, fe_id;
+
+	fe_id = rtd->current_fe;
 
 	if (twl6040_power_mode) {
 		clk_id = TWL6040_SYSCLK_SEL_HPPLL;
@@ -89,6 +94,30 @@ static int sdp4430_mcpdm_hw_params(struct snd_pcm_substream *substream,
 	if (ret) {
 		printk(KERN_ERR "can't set codec system clock\n");
 		return ret;
+	}
+
+	if (fe_id == ABE_FRONTEND_DAI_MODEM) {
+		if (!mcbsp_cfg) {
+			modem_substream[substream->stream] =
+				snd_soc_get_dai_substream(rtd->card,
+							OMAP_ABE_BE_MM_EXT1,
+							substream->stream);
+			if (modem_substream[substream->stream] == NULL)
+				return -ENODEV;
+
+			modem_rtd = modem_substream[substream->stream]->private_data;
+
+			/* Set cpu DAI configuration */
+			ret = snd_soc_dai_set_fmt(modem_rtd->cpu_dai,
+					  SND_SOC_DAIFMT_I2S |
+					  SND_SOC_DAIFMT_NB_NF |
+					  SND_SOC_DAIFMT_CBM_CFM);
+			mcbsp_cfg = 1;
+		}
+		if (ret < 0) {
+			printk(KERN_ERR "can't set Modem cpu DAI configuration\n");
+			return ret;
+		}
 	}
 	return ret;
 }
