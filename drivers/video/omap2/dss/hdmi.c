@@ -552,6 +552,7 @@ static int hdmi_pll_init(int refsel, int dcofreq, struct hdmi_pll_info *fmt, u16
 
 	/* wait for bit change */
 	while (FLD_GET(hdmi_read_reg(pll, PLLCTRL_PLL_GO), 0, 0))
+		;
 
 	/* Wait till the lock bit is set */
 	/* read PLL status */
