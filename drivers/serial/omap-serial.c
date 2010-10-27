@@ -1046,11 +1046,10 @@ static struct uart_driver serial_omap_reg = {
 static int
 serial_omap_suspend(struct platform_device *pdev, pm_message_t state)
 {
-#ifndef CONFIG_SUSPEND
 	struct uart_omap_port *up = platform_get_drvdata(pdev);
 	if (up)
 		uart_suspend_port(&serial_omap_reg, &up->port);
-#endif
+
 	return 0;
 }
 
@@ -1062,10 +1061,9 @@ static int serial_omap_resume(struct platform_device *dev)
 	if (omap_is_console_port(&up->port))
 		wake_lock_timeout(&uart_lock, 5 * HZ);
 
-#ifndef CONFIG_SUSPEND
 	if (up)
 		uart_resume_port(&serial_omap_reg, &up->port);
-#endif
+
 	return 0;
 }
 
