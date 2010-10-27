@@ -324,6 +324,7 @@ static void omap_fw_error_handler(u32 ctrl_sec_err_status,
 			kerrlog_firewall_sourcename[err_source_firewall],
 			readl((kerror_log_fw+LOGICAL_ADDR_ERRORLOG)));
 			writel(kerror_log_val, kerror_log_fw);
+			dump_stack();
 		}
 	} else {
 		kerror_log_fw = (u32)l3_base[3] +
@@ -334,6 +335,7 @@ static void omap_fw_error_handler(u32 ctrl_sec_err_status,
 		kerrlog_firewall_sourcename[err_source_firewall],	\
 		readl((kerror_log_fw+LOGICAL_ADDR_ERRORLOG)));		\
 		writel(kerror_log_val, kerror_log_fw);
+		dump_stack();
 	}
 
 	/* Clear control status bits . This has to be tested*/
@@ -406,6 +408,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *dev_id)
 					pr_crit("L3 standard error: SOURCE:%s"
 						"at address 0x%x\n",
 						source_name, readl(slave_addr));
+					dump_stack();
 				} else {
 					/* Then this is a Fire Wall Error */
 					omap_fw_error_handler(
@@ -423,6 +426,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *dev_id)
 				/* clear the std error log*/
 				writel((stderrlog_main_reg_val |
 					CLEAR_STDERR_LOG), stderrlog_main);
+				dump_stack();
 				break;
 			default:
 				/* Nothing to be handled here as of now */
