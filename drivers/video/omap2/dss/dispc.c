@@ -3070,6 +3070,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if (rotation_type == OMAP_DSS_ROT_TILER) {
 		struct tiler_view_orient orient = {0};
 		unsigned long tiler_width = width, tiler_height = height;
+		u8 mir_x = 0, mir_y = 0;
 
 		pix_inc = 1 + (x_decim - 1) * bpp;
 		calc_tiler_row_rotation(rotation, width * x_decim,
@@ -3080,8 +3081,19 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			swap(offset0, offset1);
 
 		/* mirroring is applied before rotataion */
-		orient.y_invert = mirror ? 1 : 0;
-		tiler_rotate_view(&orient, -rotation * 90);
+		if (rotation & 1)
+			rotation ^= 2;
+
+		tiler_rotate_view(&orient, rotation * 90);
+
+		if (mirror) {
+			if (rotation & 1)
+				mir_x = 1;
+			else
+				mir_y = 1;
+		}
+		orient.x_invert ^= mir_x;
+		orient.y_invert ^= mir_y;
 
 		DSSDBG("RXY = %d %d %d\n", orient.rotate_90,
 				orient.x_invert, orient.y_invert);
@@ -5054,6 +5066,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 	pix_inc = 0x1;
 	if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
+		u8 mir_x = 0, mir_y = 0;
 		tiler_width = width, tiler_height = height;
 
 		calc_tiler_row_rotation(rotation, out_width,
@@ -5063,8 +5076,20 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 			pic_height);
 
 		/* mirroring is applied before rotataion */
-		orient.y_invert = mirror ? 1 : 0;
-		tiler_rotate_view(&orient, -rotation * 90);
+		/* mirroring is applied before rotataion */
+		if (rotation & 1)
+			rotation ^= 2;
+
+		tiler_rotate_view(&orient, rotation * 90);
+
+		if (mirror) {
+			if (rotation & 1)
+				mir_x = 1;
+			else
+				mir_y = 1;
+		}
+		orient.x_invert ^= mir_x;
+		orient.y_invert ^= mir_y;
 
 		if (orient.rotate_90 & 1)
 			swap(tiler_width, tiler_height);
