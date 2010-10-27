@@ -2157,24 +2157,24 @@ static void _dispc_set_scaling(enum omap_plane plane,
 	BUG_ON(plane == OMAP_DSS_GFX);
 
 	if (scale_x) {
-		fir_hinc = 1024 * (orig_width - 1) / (out_width - 1);
+		fir_hinc = (1024 * orig_width) / out_width;
 		if (fir_hinc > 4095)
 			fir_hinc = 4095;
 		hfir = get_scaling_coef(orig_width, out_width, 0, 0, 0);
 	} else {
-		fir_hinc = 0;
-		hfir = fir5_zero;
+		fir_hinc = 1024;
+		hfir = fir3_m8;
 	}
 
 	if (scale_y) {
-		fir_vinc = 1024 * (orig_height - 1) / (out_height - 1);
+		fir_vinc = (1024 * orig_height) / out_height;
 		if (fir_vinc > 4095)
 			fir_vinc = 4095;
 		vfir = get_scaling_coef(orig_height, out_height, 0, 0,
 					three_taps);
 	} else {
-		fir_vinc = 0;
-		vfir = fir5_zero;
+		fir_vinc = 1024;
+		vfir = fir3_m8;
 	}
 
 	_dispc_set_scale_coef(plane, hfir, vfir, three_taps);
@@ -2224,24 +2224,24 @@ static void _dispc_set_scaling_uv(enum omap_plane plane,
 	const s8 *hfir, *vfir;
 
 	if (scale_x) {
-		fir_hinc = 1024 * (orig_width - 1) / (out_width - 1);
+		fir_hinc = (1024 * orig_width) / out_width;
 		if (fir_hinc > 4095)
 			fir_hinc = 4095;
 		hfir = get_scaling_coef(orig_width, out_width, 0, 0, 0);
 	} else {
-		fir_hinc = 0;
-		hfir = fir5_zero;
+		fir_hinc = 1024;
+		hfir = fir3_m8;
 		}
 
 	if (scale_y) {
-		fir_vinc = 1024 * (orig_height - 1) / (out_height - 1);
+		fir_vinc = (1024 * orig_height) / out_height;
 		if (fir_vinc > 4095)
 			fir_vinc = 4095;
 		vfir = get_scaling_coef(orig_height, out_height, 0,
 					ilace, three_taps);
 	} else {
-		fir_vinc = 0;
-		vfir = fir5_zero;
+		fir_vinc = 1024;
+		vfir = fir3_m8;
 		}
 
 	for (i = 0; i < 8; i++, hfir++, vfir++) {
@@ -2260,16 +2260,16 @@ static void _dispc_set_scaling_uv(enum omap_plane plane,
 		if (three_taps && v)
 			printk(KERN_ERR "three_tap v is %x\n", v);
 	}
-
-	/* set chroma resampling */
-	REG_FLD_MOD(DISPC_VID_ATTRIBUTES2(plane - 1),
-		(fir_hinc || fir_vinc) ? 1 : 0, 8, 8);
+	/* set chroma resampling. Not applicable for WB plane*/
+	if (plane != OMAP_DSS_WB)
+		REG_FLD_MOD(DISPC_VID_ATTRIBUTES2(plane - 1),
+			(fir_hinc || fir_vinc) ? 1 : 0, 8, 8);
 
 	/* set H scaling */
-	REG_FLD_MOD(dispc_reg_att[plane], fir_hinc ? 1 : 0, 6, 6);
+	REG_FLD_MOD(dispc_reg_att[plane], fir_hinc ? 1 : 0, 5, 5);
 
 	/* set V scaling */
-	REG_FLD_MOD(dispc_reg_att[plane], fir_vinc ? 1 : 0, 5, 5);
+	REG_FLD_MOD(dispc_reg_att[plane], fir_vinc ? 1 : 0, 6, 6);
 
 	_dispc_set_fir2(plane, fir_hinc, fir_vinc);
 
@@ -5067,7 +5067,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	pix_inc = 0x1;
 	if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
 		u8 mir_x = 0, mir_y = 0;
-		tiler_width = width, tiler_height = height;
+		tiler_width = out_width, tiler_height = out_height;
 
 		calc_tiler_row_rotation(rotation, out_width,
 			color_mode, lines_to_skip+1, /* y_decim = 1 */
@@ -5150,6 +5150,12 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	if (OMAP_DSS_COLOR_NV12 == color_mode) {
 		_dispc_set_plane_ba_uv0(plane, puv_addr);
 		_dispc_set_plane_ba_uv1(plane, puv_addr);
+
+		/* DOUBLESTRIDE : 0 for 90-, 270-; 1 for 0- and 180- */
+		if (rotation == 1 || rotation == 3)
+			REG_FLD_MOD(dispc_reg_att[plane], 0x0, 22, 22);
+		else
+			REG_FLD_MOD(dispc_reg_att[plane], 0x1, 22, 22);
 	}
 	_dispc_set_row_inc(plane, row_inc);
 	_dispc_set_pix_inc(plane, pix_inc);
@@ -5194,9 +5200,9 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 			out_width, out_height,
 			0, three_taps, false, scale_x, scale_y);
 
-	if (ch_width != width) {
+	if (out_ch_width != out_width) {
 		/* this is true for YUV formats */
-		printk(KERN_ERR "scale uv set");
+		DSSDBG("scale uv set");
 		_dispc_set_scaling_uv(plane, ch_width, ch_height,
 				out_ch_width, out_ch_height, 0,
 				three_taps, false, scale_x, scale_y);
