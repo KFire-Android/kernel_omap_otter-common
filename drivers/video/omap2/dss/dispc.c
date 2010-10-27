@@ -2295,55 +2295,59 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 		bool mirroring, enum omap_color_mode color_mode)
 {
 	BUG_ON(plane == OMAP_DSS_WB);
-	if (!cpu_is_omap44xx()) {
-		if (color_mode == OMAP_DSS_COLOR_YUV2 ||
-				color_mode == OMAP_DSS_COLOR_UYVY) {
-			int vidrot = 0;
 
-			if (mirroring) {
-				switch (rotation) {
-				case OMAP_DSS_ROT_0:
-					vidrot = 2;
-					break;
-				case OMAP_DSS_ROT_90:
-					vidrot = 1;
-					break;
-				case OMAP_DSS_ROT_180:
-					vidrot = 0;
-					break;
-				case OMAP_DSS_ROT_270:
-					vidrot = 3;
-					break;
-				}
-			} else {
-				switch (rotation) {
-				case OMAP_DSS_ROT_0:
-					vidrot = 0;
-					break;
-				case OMAP_DSS_ROT_90:
-					vidrot = 1;
-					break;
-				case OMAP_DSS_ROT_180:
-					vidrot = 2;
-					break;
-				case OMAP_DSS_ROT_270:
-					vidrot = 3;
-					break;
-				}
+	if (color_mode == OMAP_DSS_COLOR_YUV2 ||
+			color_mode == OMAP_DSS_COLOR_UYVY) {
+		int vidrot = 0;
+
+		if (mirroring) {
+			switch (rotation) {
+			case OMAP_DSS_ROT_0:
+				vidrot = 2;
+				break;
+			case OMAP_DSS_ROT_90:
+				vidrot = 1;
+				break;
+			case OMAP_DSS_ROT_180:
+				vidrot = 0;
+				break;
+			case OMAP_DSS_ROT_270:
+				vidrot = 3;
+				break;
 			}
+		} else {
+			switch (rotation) {
+			case OMAP_DSS_ROT_0:
+				vidrot = 0;
+				break;
+			case OMAP_DSS_ROT_90:
+				vidrot = 1;
+				break;
+			case OMAP_DSS_ROT_180:
+				vidrot = 2;
+				break;
+			case OMAP_DSS_ROT_270:
+				vidrot = 3;
+				break;
+			}
+		}
 
-			REG_FLD_MOD(dispc_reg_att[plane], vidrot, 13, 12);
+		REG_FLD_MOD(dispc_reg_att[plane], vidrot, 13, 12);
 
+		if (!cpu_is_omap44xx()) {
 			if (rotation == OMAP_DSS_ROT_90 ||
 					rotation == OMAP_DSS_ROT_270)
 				REG_FLD_MOD(dispc_reg_att[plane], 0x1, 18, 18);
 			else
 				REG_FLD_MOD(dispc_reg_att[plane], 0x0, 18, 18);
-		} else {
-			REG_FLD_MOD(dispc_reg_att[plane], 0, 13, 12);
-			REG_FLD_MOD(dispc_reg_att[plane], 0, 18, 18);
 		}
-	} else if (plane != OMAP_DSS_GFX) {
+	} else {
+		REG_FLD_MOD(dispc_reg_att[plane], 0, 13, 12);
+		if (!cpu_is_omap44xx())
+			REG_FLD_MOD(dispc_reg_att[plane], 0, 18, 18);
+	}
+
+	if (plane != OMAP_DSS_GFX) {
 		if (color_mode == OMAP_DSS_COLOR_NV12) {
 			/* DOUBLESTRIDE : 0 for 90-, 270-; 1 for 0- and 180- */
 			if (rotation == 1 || rotation == 3)
@@ -2351,12 +2355,6 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 			else
 				REG_FLD_MOD(dispc_reg_att[plane], 0x1, 22, 22);
 		}
-		/* Set the rotation value for pipeline */
-		if (color_mode == OMAP_DSS_COLOR_UYVY ||
-			color_mode == OMAP_DSS_COLOR_YUV2)
-			REG_FLD_MOD(dispc_reg_att[plane], rotation, 13, 12);
-		else
-			REG_FLD_MOD(dispc_reg_att[plane], 0, 13, 12);
 	}
 }
 
@@ -3071,6 +3069,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		struct tiler_view_orient orient = {0};
 		unsigned long tiler_width = width, tiler_height = height;
 		u8 mir_x = 0, mir_y = 0;
+		u8 tiler_rotation = rotation;
 
 		pix_inc = 1 + (x_decim - 1) * bpp;
 		calc_tiler_row_rotation(rotation, width * x_decim,
@@ -3081,10 +3080,10 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			swap(offset0, offset1);
 
 		/* mirroring is applied before rotataion */
-		if (rotation & 1)
-			rotation ^= 2;
+		if (tiler_rotation & 1)
+			tiler_rotation ^= 2;
 
-		tiler_rotate_view(&orient, rotation * 90);
+		tiler_rotate_view(&orient, tiler_rotation * 90);
 
 		if (mirror) {
 			if (rotation & 1)
