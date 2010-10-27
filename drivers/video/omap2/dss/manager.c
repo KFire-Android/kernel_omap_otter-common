@@ -1023,7 +1023,6 @@ static int configure_dispc(void)
 			case OMAP_WB_OVERLAY2:
 			case OMAP_WB_OVERLAY3:
 				dispc_enable_plane(wb->source - 3, 1);
-				dispc_go_wb();
 				wb->shadow_dirty = false;
 				dispc_enable_plane(OMAP_DSS_WB, 1);
 				break;
@@ -1033,6 +1032,10 @@ static int configure_dispc(void)
 				/* Do nothing as of now as we dont
 				 * support Manager yet with WB
 				 */
+				/* WB GO bit has to be used only in case of
+				 * capture mode and not in memory mode
+				 */
+				dispc_go_wb();
 				break;
 			}
 		} else if (wb->dirty && !wb->enabled) {
