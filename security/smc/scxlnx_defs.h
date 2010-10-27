@@ -29,6 +29,7 @@
 #include <linux/sysdev.h>
 #include <linux/sysfs.h>
 #include <linux/timer.h>
+#include <linux/sched.h>
 
 #include "scx_sm_protocol.h"
 
