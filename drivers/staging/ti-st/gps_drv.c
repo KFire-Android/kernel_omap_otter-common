@@ -183,7 +183,7 @@ long gpsdrv_st_recv(void *arg, struct sk_buff *skb)
 			tasklet_schedule(&hgps->gpsdrv_tx_tsklet);
 		}
 		/* Free the received command complete SKB */
-		kfree(skb);
+		kfree_skb(skb);
 	}
 
 	return GPS_SUCCESS;
@@ -486,7 +486,7 @@ ssize_t gpsdrv_read(struct file *file, char __user *data, size_t size,
 	}
 
 	len = skb->len;
-	kfree(skb);
+	kfree_skb(skb);
 	printk(KERN_DEBUG  "gpsdrv: total size read= %d", len);
 	return len;
 }
