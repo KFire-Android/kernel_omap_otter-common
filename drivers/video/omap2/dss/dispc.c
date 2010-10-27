@@ -202,13 +202,13 @@ void __iomem  *dispc_base;
 					/* n=0: VID3, n=1: WB*/
 
 /* coef index i = {0, 1, 2, 3, 4, 5, 6, 7}  n=0: VID3, n=1: WB */
-#define DISPC_VID_V3_WB_FIR_COEF_H2(n, i) DISPC_REG(0x0730+(n)*0x6C+(i)*0x8)
+#define DISPC_VID_V3_WB_FIR_COEF_H2(n, i) DISPC_REG(0x0730+(n)*0x70+(i)*0x8)
 
 /* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
-#define DISPC_VID_V3_WB_FIR_COEF_HV2(n, i) DISPC_REG(0x0734+(n)*0x6C+(i)*0x8)
+#define DISPC_VID_V3_WB_FIR_COEF_HV2(n, i) DISPC_REG(0x0734+(n)*0x70+(i)*0x8)
 
 /* coef index i = {0, 1, 2, 3, 4, 5, 6, 7} */
-#define DISPC_VID_V3_WB_FIR_COEF_V2(n, i) DISPC_REG(0x0770+(n)*0x6C+(i)*0x4)
+#define DISPC_VID_V3_WB_FIR_COEF_V2(n, i) DISPC_REG(0x0770+(n)*0x70+(i)*0x4)
 
 
 /*********End Vid3 and WB Registers ***************/
