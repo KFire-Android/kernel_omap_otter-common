@@ -606,6 +606,16 @@ static int omap_wb_tiler_buffer_setup(struct omap_wb_device *wb,
 			(void **) wb->buf_phy_uv_addr_alloced + start,
 			aligned);
 	} else {
+		unsigned int width = pix->width;
+		switch (video_mode_to_dss_mode(pix)) {
+		case OMAP_DSS_COLOR_UYVY:
+		case OMAP_DSS_COLOR_YUV2:
+			width /= 2;
+			bpp = 4;
+			break;
+		default:
+			break;
+		}
 		/* Only bpp of 1, 2, and 4 is supported by tiler */
 		fmt = (bpp == 1 ? TILFMT_8BIT :
 			bpp == 2 ? TILFMT_16BIT :
@@ -613,7 +623,7 @@ static int omap_wb_tiler_buffer_setup(struct omap_wb_device *wb,
 		if (fmt == TILFMT_INVALID)
 			return -ENOMEM;
 
-		tiler_alloc_packed(&n_alloc, fmt, pix->width,
+		tiler_alloc_packed(&n_alloc, fmt, width,
 			pix->height,
 			(void **) wb->buf_phy_addr + start,
 			(void **) wb->buf_phy_addr_alloced + start,
