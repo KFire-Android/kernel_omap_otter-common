@@ -879,7 +879,7 @@ static int hdmi_core_vsi_infoframe(u32 name,
 	u16 offset;
 	u8 sum = 0, i;
 	/*For side-by-side(HALF) we need to specify subsampling in 3D_ext_data*/
-	int length = info_s3d.structure >= 0x07 ? 6 : 5;
+	int length = info_s3d.structure > 0x07 ? 6 : 5;
 	u8 info_frame_packet[] = {
 		0x81, /*Vendor-Specific InfoFrame*/
 		0x01, /*InfoFrame version number per CEA-861-D*/
@@ -1379,7 +1379,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	r = hdmi_core_audio_infoframe_avi(hdmi.avi_param);
 
-	if (cfg->vsi_enabled == true) {
+	if (cfg->vsi_enabled) {
 		s3d_param.structure = cfg->s3d_structure;
 		s3d_param.s3d_ext_data = cfg->subsamp_pos;
 		hdmi_core_vsi_infoframe(av_name, s3d_param);
@@ -1619,5 +1619,15 @@ void hdmi_notify_hpd(int state)
 	list_for_each_entry_safe(cur, next, &hdmi.notifier_head, list) {
 		if (cur->hpd_notifier)
 			cur->hpd_notifier(state, cur->private_data);
+	}
+}
+
+void hdmi_notify_pwrchange(int state)
+{
+	struct hdmi_notifier *cur, *next;
+
+	list_for_each_entry_safe(cur, next, &hdmi.notifier_head, list) {
+		if (cur->pwrchange_notifier)
+			cur->pwrchange_notifier(state, cur->private_data);
 	}
 }

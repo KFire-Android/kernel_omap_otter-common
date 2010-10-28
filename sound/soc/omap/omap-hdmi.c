@@ -68,6 +68,18 @@ static void hdmi_hpd_notifier(int state, void *data)
 	if (!state && substream)
 		snd_pcm_stop(substream, SNDRV_PCM_STATE_DISCONNECTED);
 }
+
+static void hdmi_pwrchange_notifier(int state, void *data)
+{
+	if (state) {
+		hdmi_w1_wrapper_enable(HDMI_WP);
+		hdmi_w1_start_audio_transfer(HDMI_WP);
+	} else {
+		hdmi_w1_stop_audio_transfer(HDMI_WP);
+		hdmi_w1_wrapper_disable(HDMI_WP);
+	}
+}
+
 #endif
 
 static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
@@ -78,6 +90,7 @@ static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
 	struct hdmi_notifier *notifier = &hdmi_data.notifier;
 
 	notifier->hpd_notifier = hdmi_hpd_notifier;
+	notifier->pwrchange_notifier = hdmi_pwrchange_notifier;
 	notifier->private_data = substream;
 	hdmi_add_notifier(notifier);
 

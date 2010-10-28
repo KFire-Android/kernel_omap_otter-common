@@ -368,7 +368,7 @@ bool hdmi_s3d_supported(u8 *edid)
 			current_byte = edid[offset];
 			/*3D_Present?*/
 			if (current_byte & 0x80) {
-				printk(KERN_INFO "S3D supported");
+				printk(KERN_INFO "S3D supported\n");
 				s3d_support = true;
 			}
 		}

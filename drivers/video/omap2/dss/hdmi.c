@@ -100,6 +100,12 @@ static bool is_hdmi_on;		/* whether full power is needed */
 static bool is_hpd_on;		/* whether hpd is enabled */
 static bool user_hpd_state;	/* user hpd state */
 
+struct workqueue_struct *irq_wq;
+static unsigned int irq_wq_items;
+
+static bool ignore_irq;
+static bool hdmi_connected;
+
 #define HDMI_PLLCTRL		0x58006200
 #define HDMI_PHY		0x58006300
 
@@ -844,6 +850,7 @@ int hdmi_init(struct platform_device *pdev)
 	hdmi_s3d.structure = HDMI_S3D_FRAME_PACKING;
 	hdmi_s3d.subsamp = false;
 	hdmi_s3d.subsamp_pos = 0;
+	hdmi.s3d_enabled = false;
 
 	hdmi.pdata = pdev->dev.platform_data;
 	hdmi.pdev = pdev;
@@ -890,11 +897,12 @@ int hdmi_init(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	irq_wq = create_singlethread_workqueue("HDMI WQ");
+
 	hdmi_irq = platform_get_irq(pdev, 0);
 	r = request_irq(hdmi_irq,
 				hdmi_irq_handler,
 			0, "OMAP HDMI", (void *)0);
-
 
 	return omap_dss_register_driver(&hdmi_driver);
 
@@ -1105,6 +1113,7 @@ void hdmi_work_queue(struct work_struct *work)
 		mdelay(1000);
 
 		DSSINFO("Display disabled\n");
+		mutex_lock(&hdmi.lock);
 		HDMI_W1_StopVideoFrame(HDMI_WP);
 		if (dssdev->platform_disable)
 			dssdev->platform_disable(dssdev);
@@ -1116,6 +1125,7 @@ void hdmi_work_queue(struct work_struct *work)
 		hdmi_enable_clocks(0);
 		hdmi_set_power(dssdev);
 		hpd_mode = 1;
+		mutex_unlock(&hdmi.lock);
 	}
 
 	if ((r & HDMI_CONNECT) && (hpd_mode == 1) &&
@@ -1123,10 +1133,12 @@ void hdmi_work_queue(struct work_struct *work)
 
 		DSSINFO("Physical Connect\n");
 
+		mutex_lock(&hdmi.lock);
 		/* turn on clocks on connect */
 		hdmi_enable_clocks(1);
 		is_hdmi_on = true;
 		hdmi_set_power(dssdev);
+		mutex_unlock(&hdmi.lock);
 		mdelay(1000);
 	}
 
@@ -1140,57 +1152,70 @@ void hdmi_work_queue(struct work_struct *work)
 		 */
 		if (!user_hpd_state) {
 			DSSINFO("Connect 1 - Enabling display\n");
+			mutex_lock(&hdmi.lock);
 			hdmi_enable_clocks(1);
 			is_hdmi_on = true;
 			hdmi_set_power(dssdev);
+			mutex_unlock(&hdmi.lock);
 		}
 
 		set_hdmi_hot_plug_status(dssdev, true);
 		/* ignore return value for now */
 	}
-
+	spin_lock_irqsave(&irqstatus_lock, flags);
+	irq_wq_items--;
+	spin_unlock_irqrestore(&irqstatus_lock, flags);
 	kfree(work);
 }
 
-static irqreturn_t hdmi_irq_handler(int irq, void *arg)
+static inline void hdmi_handle_irq_work(void)
 {
 	struct work_struct *work;
+	work = kmalloc(sizeof(struct work_struct), GFP_KERNEL);
+
+	if (work) {
+		irq_wq_items++;
+		INIT_WORK(work, hdmi_work_queue);
+		queue_work(irq_wq, work);
+	} else {
+		printk(KERN_ERR "Cannot allocate memory to create work");
+	}
+}
+static irqreturn_t hdmi_irq_handler(int irq, void *arg)
+{
 	unsigned long flags;
 	int r = 0;
 	int work_pending;
-
 	HDMI_W1_HPD_handler(&r);
 	DSSDBG("r=%08x, prev irqstatus=%08x\n", r, irqstatus);
 
-	if (((r & HDMI_CONNECT) || (r & HDMI_HPD)) &&  (hpd_mode == 1))
+	if (((r & HDMI_CONNECT) || (r & HDMI_HPD)) &&  (hpd_mode == 1)) {
 		hdmi_enable_clocks(1);
-
+		hdmi_connected = true;
+	}
 
 	spin_lock_irqsave(&irqstatus_lock, flags);
 	work_pending = irqstatus;
-	if (r & HDMI_DISCONNECT)
+	if (r & HDMI_DISCONNECT) {
 		irqstatus &= ~HDMI_CONNECT;
+		hdmi_connected = false;
+	}
 	if (r & HDMI_CONNECT)
 		irqstatus &= ~HDMI_DISCONNECT;
+
 	irqstatus |= r;
+	if (r && !work_pending && !ignore_irq)
+		hdmi_handle_irq_work();
+
 	spin_unlock_irqrestore(&irqstatus_lock, flags);
-
-	if (r && !work_pending) {
-		work = kmalloc(sizeof(struct work_struct), GFP_KERNEL);
-
-		if (work) {
-			INIT_WORK(work, hdmi_work_queue);
-			schedule_work(work);
-		} else {
-			printk(KERN_ERR "Cannot allocate memory to create work");
-		}
-	}
 
 	return IRQ_HANDLED;
 }
 
-static void hdmi_power_off(struct omap_dss_device *dssdev)
+static void hdmi_power_off_phy(struct omap_dss_device *dssdev)
 {
+	edid_set = false;
+
 	HDMI_W1_StopVideoFrame(HDMI_WP);
 
 	hdmi_power = HDMI_POWER_OFF;
@@ -1199,11 +1224,15 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	hdmi_phy_off(HDMI_WP);
 
 	HDMI_W1_SetWaitPllPwrState(HDMI_WP, HDMI_PLLPWRCMD_ALLOFF);
+}
+
+static void hdmi_power_off(struct omap_dss_device *dssdev)
+{
+	hdmi_power_off_phy(dssdev);
 
 	if (dssdev->platform_disable)
 		dssdev->platform_disable(dssdev);
 
-	edid_set = false;
 	hdmi_enable_clocks(0);
 
 	set_hdmi_hot_plug_status(dssdev, false);
@@ -1614,8 +1643,6 @@ static int hdmi_set_s3d_disp_type(struct omap_dss_device *dssdev,
 	tinfo.subsamp = false;
 	tinfo.subsamp_pos = 0;
 
-	printk(KERN_INFO"set s3d\n");
-
 	switch (info->type) {
 	case S3D_DISP_OVERUNDER:
 		if (info->sub_samp == S3D_DISP_SUB_SAMPLE_NONE) {
@@ -1646,44 +1673,95 @@ err:
 static int hdmi_enable_s3d(struct omap_dss_device *dssdev, bool enable)
 {
 	int r = -EINVAL;
+	unsigned long flags;
 
-	printk(KERN_INFO"enable_s3d flag = %d\n", enable);
-	if (enable == true) {
-		/*enable format*/
-		hdmi_disable_display(dssdev);
-		hdmi.s3d_enabled = true;
-		r = hdmi_enable_display(dssdev);
-		if (r == 0 && hdmi.s3d_enabled == true) {
-			switch (hdmi_s3d.structure) {
-			case HDMI_S3D_FRAME_PACKING:
-				dssdev->panel.s3d_info.type =
-							S3D_DISP_OVERUNDER;
-				dssdev->panel.s3d_info.gap = 30;
-				if (hdmi_s3d.subsamp == true)
-					dssdev->panel.s3d_info.sub_samp =
-							S3D_DISP_SUB_SAMPLE_V;
-				break;
-			case HDMI_S3D_SIDE_BY_SIDE_HALF:
-				dssdev->panel.s3d_info.type =
-							S3D_DISP_SIDEBYSIDE;
-				dssdev->panel.s3d_info.gap = 0;
-				if (hdmi_s3d.subsamp == true)
-					dssdev->panel.s3d_info.sub_samp =
-							S3D_DISP_SUB_SAMPLE_H;
-				break;
-			default:
-				r = -EINVAL;
-				break;
-			}
-			dssdev->panel.s3d_info.order = S3D_DISP_ORDER_L;
-		}
-	} else {
+	if (hdmi.s3d_enabled == enable)
+		return 0;
+
+	dssdev->panel.s3d_info.type = S3D_DISP_NONE;
+	hdmi.s3d_enabled = enable;
+
+retry:
+	/*Wait until all IRQ work has been processed, as there could be
+	 *pending hotplug events to be generated. */
+	flush_workqueue(irq_wq);
+
+	/*synch with IRQ handler, to start ignoring interrupts, since
+	*later a power off/power on sequence will be done to change timings
+	*once S3D support is found and hotplug events are not desired*/
+	spin_lock_irqsave(&irqstatus_lock, flags);
+	ignore_irq = true;
+	/*An interrupt could have executed before aquiring spinlock*/
+	if (irq_wq_items) {
+		spin_unlock_irqrestore(&irqstatus_lock, flags);
+		goto retry;
+	}
+
+	/*Now we are guaranteed there is no pending IRQ work items*/
+	/*It's possible the last IRQ work item has shut down the display*/
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE || !hdmi_connected) {
+		ignore_irq = false;
+		spin_unlock_irqrestore(&irqstatus_lock, flags);
 		hdmi.s3d_enabled = false;
-		hdmi.code = 16;
-		hdmi.mode = 1;
+		return r;
+	}
+	spin_unlock_irqrestore(&irqstatus_lock, flags);
 
-		hdmi_disable_display(dssdev);
-		r = hdmi_enable_display(dssdev);
+	/*Timings change between S3D and 2D mode, hence phy needs to be off
+	 before updating timings. Interrupts will be ignored during this
+	 sequence to avoid queuing work items that generate hotplug events*/
+	mutex_lock(&hdmi.lock);
+	hdmi_notify_pwrchange(HDMI_POWERPHYOFF);
+	hdmi_power_off_phy(dssdev);
+	r = hdmi_power_on(dssdev);
+	hdmi_notify_pwrchange(HDMI_POWERPHYON);
+	mutex_unlock(&hdmi.lock);
+
+	/*Any HDMI IRQs have been ignored to this point, let's check if
+	 the display is still connected.*/
+	spin_lock_irqsave(&irqstatus_lock, flags);
+	ignore_irq = false;
+	if (!hdmi_connected) {
+		r = -EINVAL;
+		hdmi_handle_irq_work();
+	} else {
+		irqstatus = 0;
+	}
+	spin_unlock_irqrestore(&irqstatus_lock, flags);
+
+	/*hdmi.s3d_enabled will be updated when powering display up*/
+	/*if there's no S3D support it will be reset to false */
+	if (r == 0 && hdmi.s3d_enabled) {
+		switch (hdmi_s3d.structure) {
+		case HDMI_S3D_FRAME_PACKING:
+			dssdev->panel.s3d_info.type = S3D_DISP_OVERUNDER;
+			dssdev->panel.s3d_info.gap = 30;
+			if (hdmi_s3d.subsamp)
+				dssdev->panel.s3d_info.sub_samp = S3D_DISP_SUB_SAMPLE_V;
+			break;
+		case HDMI_S3D_SIDE_BY_SIDE_HALF:
+			dssdev->panel.s3d_info.type = S3D_DISP_SIDEBYSIDE;
+			dssdev->panel.s3d_info.gap = 0;
+			if (hdmi_s3d.subsamp)
+				dssdev->panel.s3d_info.sub_samp = S3D_DISP_SUB_SAMPLE_H;
+			break;
+		default:
+			dssdev->panel.s3d_info.type = S3D_DISP_OVERUNDER;
+			dssdev->panel.s3d_info.gap = 0;
+			dssdev->panel.s3d_info.sub_samp = S3D_DISP_SUB_SAMPLE_V;
+			break;
+		}
+		dssdev->panel.s3d_info.order = S3D_DISP_ORDER_L;
+	} else if (r) {
+		DSSDBG("hdmi_enable_s3d: error enabling HDMI(%d)\n", r);
+		hdmi.s3d_enabled = false;
+	} else if (!hdmi.s3d_enabled && enable) {
+		DSSDBG("hdmi_enable_s3d: No S3D support\n");
+		/*Fallback to subsampled side-by-side packing*/
+		dssdev->panel.s3d_info.type = S3D_DISP_SIDEBYSIDE;
+		dssdev->panel.s3d_info.gap = 0;
+		dssdev->panel.s3d_info.sub_samp = S3D_DISP_SUB_SAMPLE_H;
+		dssdev->panel.s3d_info.order = S3D_DISP_ORDER_L;
 	}
 
 	return r;
@@ -1727,18 +1805,13 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 	else {
 		if (!memcmp(edid, header, sizeof(header))) {
 			if (hdmi.s3d_enabled) {
-				if (!hdmi_s3d_supported(edid)) {
-					printk(KERN_INFO "TV does not Support 3D");
-					hdmi.s3d_enabled = false;
-					ret = -EINVAL;
-				}
-				printk(KERN_INFO "TV Supports 3D");
+				/*Update flag to convey if sink supports 3D*/
+				hdmi.s3d_enabled = hdmi_s3d_supported(edid);
 			}
 			/* search for timings of default resolution */
 			if (get_edid_timing_data((struct HDMI_EDID *) edid))
 				edid_set = true;
 		}
-
 	}
 
 	if (!edid_set) {

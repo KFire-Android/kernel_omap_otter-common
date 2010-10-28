@@ -424,6 +424,7 @@ struct hdmi_core_audio_config {
 
 struct hdmi_notifier {
 	void (*hpd_notifier)(int state, void *data);
+	void (*pwrchange_notifier)(int state, void *data);
 	void *private_data;
 	struct list_head list;
 };
@@ -432,6 +433,9 @@ struct hdmi_notifier {
 #define HDMI_DISCONNECT   0x02
 #define HDMI_HPD          0x04
 #define HDMI_FIRST_HPD    0x08
+
+#define HDMI_POWERPHYOFF  0x00
+#define HDMI_POWERPHYON   0x01
 
 /* Function prototype */
 int HDMI_W1_StopVideoFrame(u32);
@@ -453,6 +457,7 @@ int hdmi_configure_csc(enum hdmi_core_av_csc csc);
 void hdmi_add_notifier(struct hdmi_notifier *notifier);
 void hdmi_remove_notifier(struct hdmi_notifier *notifier);
 void hdmi_notify_hpd(int state);
+void hdmi_notify_pwrchange(int state);
 
 #endif
 

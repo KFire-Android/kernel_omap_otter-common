@@ -618,31 +618,6 @@ static struct omap_dss_device *get_display(const unsigned int idx)
 	return dssdev;
 }
 
-static int conf_update_mode(struct omap_dss_device *display)
-{
-	struct omap_dss_driver *driver;
-	driver = display->driver;
-	/* set the update mode */
-	if (display->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
-#ifdef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
-		if (driver->enable_te)
-			driver->enable_te(display, 1);
-		if (driver->set_update_mode)
-			driver->set_update_mode(display, OMAP_DSS_UPDATE_AUTO);
-#else /* MANUAL_UPDATE */
-		if (driver->enable_te)
-			driver->enable_te(display, 0);
-		if (driver->set_update_mode)
-			driver->set_update_mode(display,
-						 OMAP_DSS_UPDATE_MANUAL);
-#endif
-	} else {
-		if (driver->set_update_mode)
-			driver->set_update_mode(display, OMAP_DSS_UPDATE_AUTO);
-	}
-	return 0;
-}
-
 /* Caller holds the dev mutex */
 static int change_display(struct s3d_ovl_device *dev,
 				struct omap_dss_device *display)
@@ -653,6 +628,11 @@ static int change_display(struct s3d_ovl_device *dev,
 	if (!display) {
 		S3DERR("null display\n");
 		return -EINVAL;
+	}
+
+	if (dev->streaming) {
+		S3DERR("cannot change display while streaming!\n");
+		return -EBUSY;
 	}
 
 	mgr = display->manager;
@@ -674,14 +654,12 @@ static int change_display(struct s3d_ovl_device *dev,
 	}
 
 	if (mgr->device != display) {
-		if (mgr->device->state != OMAP_DSS_DISPLAY_DISABLED)
-			mgr->device->driver->disable(mgr->device);
-
-		r = mgr->unset_device(mgr);
-
-		if (r || mgr->device) {
-			S3DERR("failed to unbind display from manager\n");
-			return r;
+		if (mgr->device) {
+			r = mgr->unset_device(mgr);
+			if (r || mgr->device) {
+				S3DERR("failed to unbind display from manager\n");
+				return r;
+			}
 		}
 
 		r = mgr->set_device(mgr, display);
@@ -690,21 +668,24 @@ static int change_display(struct s3d_ovl_device *dev,
 			return r;
 		}
 
-		if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
-			r = display->driver->enable(display);
+		r = mgr->apply(mgr);
 		if (r) {
-			S3DERR("failed to enable display '%s'\n", display->name);
+			S3DERR("failed to apply manager changes\n");
 			return r;
 		}
 	}
 
+	r = omapdss_display_enable(display);
+	if (r) {
+		S3DERR("failed to enable display '%s'\n", display->name);
+		return r;
+	}
+
 	/*TODO: recalculate resources based on display type and allocate them */
-	/* needs to be properly synchronized with ISR,
-	 * assuring no lost videobufs */
+	/* needs to be properly synchronized with ISR, assuring no lost videobufs */
 
 	omap_dss_put_device(dev->cur_disp);
 	dev->cur_disp = display;
-	conf_update_mode(display);
 	return 0;
 }
 
@@ -1537,8 +1518,14 @@ static int change_s3d_mode(struct s3d_ovl_device *dev,
 	disp = dev->cur_disp;
 	enable_s3d = (mode == V4L2_S3D_MODE_ON) && !dev->override_s3d_disp;
 
-	if (disp && disp->driver && disp->driver->enable_s3d)
+	if (disp && disp->driver && disp->driver->enable_s3d) {
 		r = disp->driver->enable_s3d(dev->cur_disp, enable_s3d);
+		if (enable_s3d && r) {
+			S3DWARN("failed to enable S3D display\n");
+			/*fallback to anaglyph mode*/
+			mode = dev->s3d_mode = V4L2_S3D_MODE_ANAGLYPH;
+		}
+	}
 
 	if(disp->panel.s3d_info.type == S3D_DISP_NONE &&
 		mode == V4L2_S3D_MODE_ON &&
@@ -2695,7 +2682,6 @@ static int vidioc_s_ctrl(struct file *file, void *fh, struct v4l2_control *a)
 	case V4L2_CID_PRIVATE_DISPLAY_ID:
 		{
 			int r;
-
 			mutex_lock(&dev->lock);
 			r = change_display(dev, get_display(a->value));
 			if (!r)
@@ -2805,9 +2791,10 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 	if(def_disp_id != -1 && def_disp_id != dev->cur_disp_idx) {
 		r = change_display(dev,get_display(def_disp_id));
-		if(r) {
+		if (r)
 			S3DERR("failed to change display(%d)\n", r);
-		}
+		else
+			dev->cur_disp_idx = def_disp_id;
 	}
 
 	/*Display resolution may change, so it's called before
