@@ -11,13 +11,9 @@
 #ifndef _OMAP4_ABE_DSP_H
 #define _OMAP4_ABE_DSP_H
 
-#include <linux/platform_device.h>
-
 struct omap4_abe_dsp_pdata {
-	/* aess */
-	int (*device_enable) (struct platform_device *pdev);
-	int (*device_shutdown) (struct platform_device *pdev);
-	int (*device_idle) (struct platform_device *pdev);
+	/* Return context loss count due to PM states changing */
+	int (*get_context_loss_count)(struct device *dev);
 };
 
 #endif

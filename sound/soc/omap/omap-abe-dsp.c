@@ -147,6 +147,8 @@ struct abe_data {
 
 	u16 router[16];
 
+	int loss_count;
+
 	struct snd_pcm_substream *psubs;
 
 };
@@ -1857,9 +1859,59 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.stream_event = aess_stream_event,
 };
 
+#if CONFIG_PM
+static int aess_suspend(struct device *dev)
+{
+	struct platform_device *pdev;
+	struct omap4_abe_dsp_pdata *pdata;
+	struct abe_data *abe = dev_get_drvdata(dev);
+
+	pdev = to_platform_device(dev);
+	pdata = pdev->dev.platform_data;
+
+	if (pdata->get_context_loss_count)
+		abe->loss_count = pdata->get_context_loss_count(dev);
+
+	return 0;
+}
+
+static int aess_resume(struct device *dev)
+{
+	struct platform_device *pdev;
+	struct omap4_abe_dsp_pdata *pdata;
+	struct abe_data *abe = dev_get_drvdata(dev);
+	int loss_count = 0;
+
+	pdev = to_platform_device(dev);
+	pdata = pdev->dev.platform_data;
+
+	if (pdata->get_context_loss_count)
+		loss_count = pdata->get_context_loss_count(dev);
+
+	pm_runtime_get_sync(&pdev->dev);
+
+	if (loss_count != abe->loss_count)
+		abe_reload_fw();
+
+	pm_runtime_put_sync(&pdev->dev);
+
+	return 0;
+}
+
+#else
+#define aess_runtime_suspend	NULL
+#define aess_runtime_resume	NULL
+#endif
+
+static const struct dev_pm_ops aess_pm_ops = {
+	.suspend = aess_suspend,
+	.resume = aess_resume,
+};
+
 static int __devinit abe_engine_probe(struct platform_device *pdev)
 {
 	struct omap_hwmod *oh;
+	struct omap4_abe_dsp_pdata *pdata = pdev->dev.platform_data;
 	int ret = -EINVAL, i;
 
 	oh = omap_hwmod_lookup("omap-aess-audio");
@@ -1891,7 +1943,7 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(&pdev->dev);
 
-	abe->abe_pdata = pdev->dev.platform_data;
+	abe->abe_pdata = pdata;
 	abe->pdev = pdev;
 
 	mutex_init(&abe->mutex);
@@ -1919,6 +1971,7 @@ static struct platform_driver omap_aess_driver = {
 	.driver = {
 		.name = "omap-aess-audio",
 		.owner = THIS_MODULE,
+		.pm = &aess_pm_ops,
 	},
 	.probe = abe_engine_probe,
 	.remove = __devexit_p(abe_engine_remove),

@@ -35,6 +35,7 @@
 #include <plat/omap44xx.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
+#include <plat/omap-pm.h>
 #include <sound/omap-abe-dsp.h>
 
 #if	defined(CONFIG_OMAP_DSP) || defined(CONFIG_OMAP_DSP_MODULE)
@@ -391,14 +392,14 @@ static void omap_init_aess(void)
 		return;
 	}
 
-	pdata->device_enable = omap_device_enable;
-	pdata->device_idle = omap_device_idle;
-	pdata->device_shutdown = omap_device_shutdown;
+	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
 
 	od = omap_device_build("omap-aess-audio", -1, oh, pdata,
 				sizeof(struct omap4_abe_dsp_pdata),
 				omap_aess_latency,
 				ARRAY_SIZE(omap_aess_latency), 0);
+
+	kfree(pdata);
 
 	if (IS_ERR(od))
 		printk(KERN_ERR "Could not build omap_device for omap-aess-audio\n");
