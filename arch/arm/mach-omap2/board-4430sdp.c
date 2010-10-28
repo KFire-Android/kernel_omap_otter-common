@@ -466,12 +466,12 @@ static struct nokia_dsi_panel_data dsi_panel = {
 };
 
 static struct nokia_dsi_panel_data dsi2_panel = {
-                .name   = "taal2",
-                .reset_gpio     = 104,
-                .use_ext_te     = false,
-                .ext_te_gpio    = 103,
-                .use_esd_check  = false,
-                .set_backlight  = NULL,
+		.name   = "taal2",
+		.reset_gpio     = 104,
+		.use_ext_te     = false,
+		.ext_te_gpio    = 103,
+		.use_esd_check  = false,
+		.set_backlight  = NULL,
 };
 
 static struct omap_dss_device sdp4430_lcd_device = {
@@ -496,7 +496,7 @@ static struct omap_dss_device sdp4430_lcd_device = {
 			.lp_clk_div	= 8,
 		},
 	},
-	.channel 		= OMAP_DSS_CHANNEL_LCD,
+	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
 
 static struct omap_dss_device sdp4430_lcd2_device = {
@@ -580,13 +580,15 @@ static int sdp4430_panel_enable_pico_DLP(struct omap_dss_device *dssdev)
 	gpio_set_value(DLP_4430_GPIO_40, 1);
 	mdelay(1000);
 
-	/*FIXME with the MLO gpio changes , gpio read is not retuning correct value even though
-	it is  set in hardware so the check is comment till the problem is fixed */
+	/*FIXME with the MLO gpio changes ,
+	gpio read is not retuning correct value even though
+	it is  set in hardware so the check is comment till
+	the problem is fixed */
 	/*while(i == 0){
 	i=gpio_get_value(DLP_4430_GPIO_44);
 	printk("wait for ready bit %d\n",i);
 	}*/
-	printk("%d ready bit ", i);
+	printk(KERN_INFO "%d ready bit ", i);
 	mdelay(2000);
 	return 0;
 }
@@ -1120,8 +1122,8 @@ static void omap_sfh7741prox_init(void)
 
 	error = gpio_direction_output(OMAP4_SFH7741_ENABLE_GPIO , 1);
 	if (error < 0) {
-		pr_err("%s: GPIO configuration failed: GPIO %d,\
-			error %d\n",__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
+		pr_err("%s: GPIO configuration failed: GPIO %d, error %d\n",
+			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
 		goto fail3;
 	}
 	return;
@@ -1187,8 +1189,8 @@ static void __init omap4_display_init(void)
 	gpio_request(dsi_panel.reset_gpio, "dsi1_en_gpio");
 	gpio_direction_output(dsi_panel.reset_gpio, 0);
 
-        gpio_request(dsi2_panel.reset_gpio, "dsi2_en_gpio");
-        gpio_direction_output(dsi2_panel.reset_gpio, 0);
+	gpio_request(dsi2_panel.reset_gpio, "dsi2_en_gpio");
+	gpio_direction_output(dsi2_panel.reset_gpio, 0);
 }
 
 static void enable_board_wakeup_source(void)
@@ -1248,7 +1250,7 @@ static void __init omap_4430sdp_init(void)
 	usb_musb_init(&musb_board_data);
 
 	status = omap4_keypad_initialization(&sdp4430_keypad_data);
-	if(status)
+	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
 
 	status = omap_ethernet_init();
