@@ -317,10 +317,13 @@ static int omap4_pm_suspend(void)
 		 * state in the omap4_pm_suspend function
 		 */
 		if (strcmp(pwrst->pwrdm->name, "cpu1_pwrdm")) {
+
+#ifdef CONFIG_OMAP_ALLOW_OSWR
 			if ((pwrst->pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET)
 			 && (omap_rev() >= OMAP4430_REV_ES2_1))
 				pwrdm_set_logic_retst(pwrst->pwrdm,
 							PWRDM_POWER_OFF);
+#endif
 			if (omap4_set_pwrdm_state(pwrst->pwrdm,
 							PWRDM_POWER_RET))
 				goto restore;

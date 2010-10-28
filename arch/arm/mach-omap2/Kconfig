@@ -267,3 +267,12 @@ config ENABLE_L3_ERRORS
 	default y
 	help
 	  Select this option to enable L3 error detection on OMAP4
+
+config OMAP_ALLOW_OSWR
+	bool  "Enable Open Switch Retention"
+	depends on ARCH_OMAP4
+	default n
+	help
+	  Select this option to enable OSWR support.
+	  Which means the Logic of power domains can be lost now
+	  unlike the CSWR wherein the logic is retained
