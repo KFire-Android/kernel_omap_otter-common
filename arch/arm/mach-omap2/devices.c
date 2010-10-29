@@ -796,7 +796,9 @@ void __init omap2_init_mmc(struct omap_mmc_platform_data *mmc_data, int ctrl_nr)
 	}
 
 	mmc_data->dev_attr = oh->dev_attr;
-
+#ifdef CONFIG_OMAP_PM
+	mmc_data->set_min_bus_tput = omap_pm_set_min_bus_tput;
+#endif
 	omap2_mmc_mux(mmc_data, ctrl_nr - 1);
 	od = omap_device_build(name, ctrl_nr - 1, oh, mmc_data,
 			       sizeof(struct omap_mmc_platform_data),

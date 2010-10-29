@@ -33,6 +33,10 @@
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
+#ifdef CONFIG_PM
+#include <plat/omap-pm.h>
+#endif
+
 
 #include <plat/dma.h>
 #include <mach/hardware.h>
@@ -128,6 +132,7 @@
 
 #define MMC_TIMEOUT_MS		20
 #define OMAP_MMC_MASTER_CLOCK	96000000
+#define OMAP_MMC_CLOCK_24MHZ	24000000
 #define DRIVER_NAME		"mmci-omap-hs"
 
 /* Timeouts for entering power saving states on inactivity, msec */
@@ -204,6 +209,7 @@ struct omap_hsmmc_host {
 	int			reqs_blocked;
 	int			use_reg;
 	int			req_in_progress;
+	int			tput_constraint;
 
 	struct	omap_mmc_platform_data	*pdata;
 };
@@ -688,6 +694,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 
 		if (dsor > 250)
 			dsor = 250;
+
 	}
 
 	OMAP_HSMMC_WRITE(host, SYSCTL, OMAP_HSMMC_READ(host, SYSCTL) & ~CEN);
@@ -1747,7 +1754,25 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 		if (dsor > 250)
 			dsor = 250;
+
+		ios->clock = OMAP_MMC_MASTER_CLOCK / dsor;
 	}
+
+	/*
+	 * On OMAP4 at VDD_CORE - 0.93V the func clock could drop
+	 * to 12MHz if it was operating at 24Mhz originally. Hold
+	 * a constraint to prevent that.
+	 */
+	if ((mmc_slot(host).features & HSMMC_DVFS_24MHZ_CONST) &&
+			(ios->clock == OMAP_MMC_CLOCK_24MHZ) &&
+					host->pdata->set_min_bus_tput) {
+		if (host->tput_constraint == 0) {
+			host->pdata->set_min_bus_tput(host->dev,
+				OCP_INITIATOR_AGENT, 200*1000*4);
+			host->tput_constraint = 1;
+		}
+	}
+
 	omap_hsmmc_stop_clock(host);
 	regval = OMAP_HSMMC_READ(host, SYSCTL);
 	regval = regval & ~(CLKD_MASK);
@@ -1877,7 +1902,6 @@ enum {ENABLED = 0, DISABLED, CARDSLEEP, REGSLEEP, OFF};
 /* Handler for [ENABLED -> DISABLED] transition */
 static int omap_hsmmc_enabled_to_disabled(struct omap_hsmmc_host *host)
 {
-
 	pm_runtime_put_sync(host->dev);
 
 	host->dpm_state = DISABLED;
@@ -2024,19 +2048,34 @@ static int omap_hsmmc_off_to_enabled(struct omap_hsmmc_host *host)
 static int omap_hsmmc_enable(struct mmc_host *mmc)
 {
 	struct omap_hsmmc_host *host = mmc_priv(mmc);
+	int ret;
 
 	switch (host->dpm_state) {
 	case DISABLED:
-		return omap_hsmmc_disabled_to_enabled(host);
+		ret = omap_hsmmc_disabled_to_enabled(host);
+		break;
 	case CARDSLEEP:
 	case REGSLEEP:
-		return omap_hsmmc_sleep_to_enabled(host);
+		ret = omap_hsmmc_sleep_to_enabled(host);
+		break;
 	case OFF:
-		return omap_hsmmc_off_to_enabled(host);
+		ret = omap_hsmmc_off_to_enabled(host);
+		break;
 	default:
 		dev_dbg(mmc_dev(host->mmc), "UNKNOWN state\n");
 		return -EINVAL;
 	}
+
+	if ((mmc_slot(host).features & HSMMC_DVFS_24MHZ_CONST) &&
+			(host->mmc->ios.clock == OMAP_MMC_CLOCK_24MHZ) &&
+						host->pdata->set_min_bus_tput) {
+		if (host->tput_constraint == 0) {
+			host->pdata->set_min_bus_tput(host->dev,
+					OCP_INITIATOR_AGENT, 200*1000*4);
+			host->tput_constraint = 1;
+		}
+	}
+	return ret;
 }
 
 /*
@@ -2051,6 +2090,15 @@ static int omap_hsmmc_disable(struct mmc_host *mmc, int lazy)
 		int delay;
 
 		delay = omap_hsmmc_enabled_to_disabled(host);
+		if ((mmc_slot(host).features & HSMMC_DVFS_24MHZ_CONST) &&
+						host->pdata->set_min_bus_tput) {
+			if (host->tput_constraint == 1) {
+				host->pdata->set_min_bus_tput(host->dev,
+						OCP_INITIATOR_AGENT, -1);
+				host->tput_constraint = 0;
+			}
+		}
+
 		if (lazy || delay < 0)
 			return delay;
 		return 0;
@@ -2070,6 +2118,15 @@ static int omap_hsmmc_enable_simple(struct mmc_host *mmc)
 {
 	struct omap_hsmmc_host *host = mmc_priv(mmc);
 
+	if ((mmc_slot(host).features & HSMMC_DVFS_24MHZ_CONST) &&
+			(host->mmc->ios.clock == OMAP_MMC_CLOCK_24MHZ) &&
+						host->pdata->set_min_bus_tput) {
+		if (host->tput_constraint == 0) {
+			host->pdata->set_min_bus_tput(host->dev,
+					OCP_INITIATOR_AGENT, 200*1000*4);
+			host->tput_constraint = 1;
+		}
+	}
 	pm_runtime_get_sync(host->dev);
 
 	dev_dbg(mmc_dev(host->mmc), "enabled\n");
@@ -2081,6 +2138,15 @@ static int omap_hsmmc_disable_simple(struct mmc_host *mmc, int lazy)
 	struct omap_hsmmc_host *host = mmc_priv(mmc);
 
 	pm_runtime_put_sync(host->dev);
+	if ((mmc_slot(host).features & HSMMC_DVFS_24MHZ_CONST) &&
+					host->pdata->set_min_bus_tput) {
+		if (host->tput_constraint == 1) {
+			host->pdata->set_min_bus_tput(host->dev,
+					OCP_INITIATOR_AGENT, -1);
+			host->tput_constraint = 0;
+		}
+	}
+
 	dev_dbg(mmc_dev(host->mmc), "idle\n");
 	return 0;
 }
@@ -2235,6 +2301,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	host->base	= ioremap(host->mapbase, SZ_4K);
 	host->regs	= (u16 *) pdata->regs_map;
 	host->power_mode = MMC_POWER_OFF;
+	host->tput_constraint = 0;
 
 #ifdef CONFIG_TIWLAN_SDIO
 	if (pdev->id == CONFIG_TIWLAN_MMC_CONTROLLER-1) {

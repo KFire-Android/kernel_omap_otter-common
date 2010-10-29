@@ -161,6 +161,9 @@ struct omap_mmc_platform_data {
 	int (*suspend)(struct device *dev, int slot);
 	int (*resume)(struct device *dev, int slot);
 
+	/* add min bus tput constraint */
+	int(*set_min_bus_tput)(struct device *dev, u8 agent_id, long r);
+
 	/* Return context loss count due to PM states changing */
 	int (*get_context_loss_count)(struct device *dev);
 
@@ -203,6 +206,7 @@ struct omap_mmc_platform_data {
 		/* we can put the features above into this variable */
 #define HSMMC_HAS_PBIAS		(1 << 0)
 #define HSMMC_HAS_UPDATED_RESET	(1 << 1)
+#define HSMMC_DVFS_24MHZ_CONST	(1 << 2)
 		unsigned features;
 
 		int switch_pin;			/* gpio (card detect) */
