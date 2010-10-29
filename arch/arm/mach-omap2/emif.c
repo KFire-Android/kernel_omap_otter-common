@@ -38,13 +38,16 @@
 struct emif_instance {
 	void __iomem *base;
 	u16 irq;
+	struct platform_device *pdev;
 };
 static struct emif_instance emif[EMIF_NUM_INSTANCES];
 static struct emif_regs *emif_curr_regs[EMIF_NUM_INSTANCES];
 static struct emif_regs *emif1_regs_cache[EMIF_MAX_NUM_FREQUENCIES];
 static struct emif_regs *emif2_regs_cache[EMIF_MAX_NUM_FREQUENCIES];
 static struct emif_device_details *emif_devices[2];
-static u32 emif_temperature_level[EMIF_NUM_INSTANCES];
+static u32 emif_temperature_level[EMIF_NUM_INSTANCES] = {SDRAM_TEMP_NOMINAL,
+							 SDRAM_TEMP_NOMINAL};
+static u32 emif_thermal_handling_pending;
 static u32 T_den, T_num;
 
 struct omap_device_pm_latency omap_emif_latency[] = {
@@ -133,7 +136,8 @@ static u32 ns_x2_2_cycles(u32 ns)
 s8 addressing_table_index(u8 type, u8 density, u8 width)
 {
 	u8 index;
-	if ((density > LPDDR2_DENSITY_8Gb) || (width == LPDDR2_IO_WIDTH_8))
+	if (unlikely((density > LPDDR2_DENSITY_8Gb) ||
+		     (width == LPDDR2_IO_WIDTH_8)))
 		return -1;
 
 	/*
@@ -448,12 +452,15 @@ static u32 get_zq_config_reg(const struct lpddr2_device_info *cs1_device,
 }
 
 static u32 get_temp_alert_config(const struct lpddr2_device_info *cs1_device,
-				 const struct lpddr2_addressing *addressing)
+				 const struct lpddr2_addressing *addressing,
+				 bool is_derated)
 {
-	u32 alert = 0;
+	u32 alert = 0, interval;
+	interval = TEMP_ALERT_POLL_INTERVAL_MS*10000/addressing->t_REFI_us_x10;
+	if (is_derated)
+		interval *= 4;
 	mask_n_set(alert, OMAP44XX_REG_TA_REFINTERVAL_SHIFT,
-		   OMAP44XX_REG_TA_REFINTERVAL_MASK,
-		   TEMP_ALERT_POLL_INTERVAL_MS*10000/addressing->t_REFI_us_x10);
+		   OMAP44XX_REG_TA_REFINTERVAL_MASK, interval);
 
 	mask_n_set(alert, OMAP44XX_REG_TA_DEVCNT_SHIFT,
 		   OMAP44XX_REG_TA_DEVCNT_MASK,
@@ -559,6 +566,14 @@ static u32 get_temperature_level(u32 emif_nr)
 		tmp_temperature_level = max(temp, tmp_temperature_level);
 	}
 
+	/* treat everything less than nominal(3) in MR4 as nominal */
+	if (unlikely(tmp_temperature_level < SDRAM_TEMP_NOMINAL))
+		tmp_temperature_level = SDRAM_TEMP_NOMINAL;
+
+	/* if we get reserved value in MR4 persist with the existing value */
+	if (unlikely(tmp_temperature_level == SDRAM_TEMP_RESERVED_4))
+		tmp_temperature_level = emif_temperature_level[emif_nr];
+
 	return tmp_temperature_level;
 }
 
@@ -626,16 +641,19 @@ static void setup_registers(u32 emif_nr, struct emif_regs *regs,
 static void setup_temperature_sensitive_regs(u32 emif_nr,
 				      struct emif_regs *regs)
 {
-	u32 tim1, ref_ctrl;
+	u32 tim1, ref_ctrl, temp_alert_cfg;
 	void __iomem *base = emif[emif_nr].base;
 	u32 temperature = emif_temperature_level[emif_nr];
 
-	if (temperature == SDRAM_TEMP_HIGH_DERATE_REFRESH) {
+	if (unlikely(temperature == SDRAM_TEMP_HIGH_DERATE_REFRESH)) {
 		tim1 = regs->sdram_tim1;
 		ref_ctrl = regs->ref_ctrl_derated;
-	} else if (temperature == SDRAM_TEMP_HIGH_DERATE_REFRESH_AND_TIMINGS) {
+		temp_alert_cfg = regs->temp_alert_config_derated;
+	} else if (unlikely(temperature ==
+			    SDRAM_TEMP_HIGH_DERATE_REFRESH_AND_TIMINGS)) {
 		tim1 = regs->sdram_tim1_derated;
 		ref_ctrl = regs->ref_ctrl_derated;
+		temp_alert_cfg = regs->temp_alert_config_derated;
 	} else {
 		/*
 		 * Nominal timings - you may switch back to the
@@ -643,52 +661,34 @@ static void setup_temperature_sensitive_regs(u32 emif_nr,
 		 */
 		tim1 = regs->sdram_tim1;
 		ref_ctrl = regs->ref_ctrl;
+		temp_alert_cfg = regs->temp_alert_config;
 	}
 
 	__raw_writel(tim1, base + OMAP44XX_EMIF_SDRAM_TIM_1_SHDW);
+	__raw_writel(temp_alert_cfg,
+		     base + OMAP44XX_EMIF_TEMP_ALERT_CONFIG);
 	__raw_writel(ref_ctrl, base + OMAP44XX_EMIF_SDRAM_REF_CTRL_SHDW);
 
 	/* read back last written register to ensure write is complete */
 	__raw_readl(base + OMAP44XX_EMIF_SDRAM_REF_CTRL_SHDW);
 }
 
-static void print_temp_alert(u32 emif_nr,
-			     u32 old_temperature_level,
-			     u32 curr_temperature_level)
+static irqreturn_t handle_temp_alert(void __iomem *base, u32 emif_nr)
 {
-	if (curr_temperature_level == SDRAM_TEMP_RESERVED_4 ||
-	    curr_temperature_level > SDRAM_TEMP_VERY_HIGH_SHUTDOWN)
-		pr_err("EMIF %d: SDRAM temperature changes!\n"
-		       "\tUnexpected temperature value - %d. Ignoring..\n",
-		       emif_nr + 1, curr_temperature_level);
-	else if (curr_temperature_level == SDRAM_TEMP_VERY_HIGH_SHUTDOWN)
-		pr_emerg("EMIF %d: SDRAM temperature exceeds operating"
-			 " limit!!\n\tNeeds shut down!!!\n", emif_nr + 1);
-	else if (curr_temperature_level > old_temperature_level)
-		pr_err("EMIF %d: Temperature level increases!\n"
-		       "\tNew temperature level: %x\n", emif_nr + 1,
-		       curr_temperature_level);
-	else if (curr_temperature_level < old_temperature_level)
-		pr_info("EMIF %d: Temperature level decreases!\n"
-			"\tNew temperature level: %x\n", emif_nr + 1,
-			curr_temperature_level);
-}
-
-static void handle_temp_alert(void __iomem *base, u32 emif_nr)
-{
-	u32 old_temperature_level;
-	u32 tmp_temperature_level = get_temperature_level(emif_nr);
-	if (tmp_temperature_level == emif_temperature_level[emif_nr])
-		return;
-
+	u32 ret, old_temperature_level;
 	old_temperature_level = emif_temperature_level[emif_nr];
-	emif_temperature_level[emif_nr] = tmp_temperature_level;
+	emif_temperature_level[emif_nr] = get_temperature_level(emif_nr);
 
-	if (!emif_curr_regs[emif_nr]) {
-		pr_err("EMIF: Not initalized yet! Can not do "
-		       "temperature derating..");
-	} else if (tmp_temperature_level < SDRAM_TEMP_VERY_HIGH_SHUTDOWN ||
-		   tmp_temperature_level != SDRAM_TEMP_RESERVED_4) {
+	if (unlikely(emif_temperature_level[emif_nr] == old_temperature_level))
+		ret = IRQ_HANDLED;
+	else if (likely(emif_temperature_level[emif_nr] <
+			old_temperature_level)) {
+		/* Temperature coming down - defer handling to thread */
+		emif_thermal_handling_pending |= (1 << emif_nr);
+		ret = IRQ_WAKE_THREAD;
+	} else if (likely(emif_temperature_level[emif_nr] !=
+			SDRAM_TEMP_VERY_HIGH_SHUTDOWN)) {
+		/* Temperature is going up - handle immediately */
 		setup_temperature_sensitive_regs(emif_nr,
 						 emif_curr_regs[emif_nr]);
 		/*
@@ -696,10 +696,9 @@ static void handle_temp_alert(void __iomem *base, u32 emif_nr)
 		 * freq update method only
 		 */
 		omap4_set_freq_update();
+		ret = IRQ_HANDLED;
 	}
-	/* Do the printing after handling the temperature change */
-	print_temp_alert(emif_nr, old_temperature_level,
-			 emif_temperature_level[emif_nr]);
+	return ret;
 }
 
 static void setup_volt_sensitive_registers(u32 emif_nr, struct emif_regs *regs,
@@ -727,10 +726,69 @@ static void setup_volt_sensitive_registers(u32 emif_nr, struct emif_regs *regs,
 	return;
 }
 
+/*
+ * Interrupt Handler for EMIF1 and EMIF2
+ */
+static irqreturn_t emif_interrupt_handler(int irq, void *dev_id)
+{
+	void __iomem *base;
+	irqreturn_t ret = IRQ_HANDLED;
+	u32 sys, ll;
+	u8 emif_nr = EMIF1;
 
-static void __init setup_emif_interrupts(void __iomem *base)
+	if (emif[EMIF2].irq == irq)
+		emif_nr = EMIF2;
+
+	base = emif[emif_nr].base;
+
+	/* Save the status and clear it */
+	sys = __raw_readl(base + OMAP44XX_EMIF_IRQSTATUS_SYS);
+	ll = __raw_readl(base + OMAP44XX_EMIF_IRQSTATUS_LL);
+	__raw_writel(sys, base + OMAP44XX_EMIF_IRQSTATUS_SYS);
+	__raw_writel(ll, base + OMAP44XX_EMIF_IRQSTATUS_LL);
+	/*
+	 * Handle temperature alert
+	 * Temperature alert should be same for both ports
+	 * So, it's enough to process it for only one of the ports
+	 */
+	if (sys & OMAP44XX_REG_TA_SYS_MASK)
+		ret = handle_temp_alert(base, emif_nr);
+
+	if (sys & OMAP44XX_REG_ERR_SYS_MASK)
+		pr_err("EMIF: Access error from EMIF%d SYS port - %x",
+			emif_nr, sys);
+
+	if (ll & OMAP44XX_REG_ERR_LL_MASK)
+		pr_err("EMIF Error: Access error from EMIF%d LL port - %x",
+			emif_nr, ll);
+
+	return ret;
+}
+
+static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
+{
+	u8 emif_nr = EMIF1;
+	if (emif[EMIF2].irq == irq)
+		emif_nr = EMIF2;
+
+	if (emif_thermal_handling_pending & (1 << emif_nr)) {
+		setup_temperature_sensitive_regs(emif_nr,
+					emif_curr_regs[emif_nr]);
+		/*
+		 * EMIF de-rated timings register needs to be setup using
+		 * freq update method only
+		 */
+		omap4_set_freq_update();
+		/* clear the bit */
+		emif_thermal_handling_pending &= ~(1 << emif_nr);
+	}
+	return IRQ_HANDLED;
+}
+
+int  __init setup_emif_interrupts(u32 emif_nr)
 {
 	u32 temp;
+	void __iomem *base = emif[emif_nr].base;
 	/* Clear any pendining interrupts */
 	__raw_writel(0xFFFFFFFF, base + OMAP44XX_EMIF_IRQSTATUS_SYS);
 	__raw_writel(0xFFFFFFFF, base + OMAP44XX_EMIF_IRQSTATUS_LL);
@@ -742,58 +800,25 @@ static void __init setup_emif_interrupts(void __iomem *base)
 
 	/* Dummy read to make sure writes are complete */
 	__raw_readl(base + OMAP44XX_EMIF_IRQENABLE_SET_LL);
-}
-/*
- * Interrupt Handler for EMIF1 and EMIF2
- */
-static irqreturn_t emif_interrupt_handler(int irq, void *dev_id)
-{
-	void __iomem *base;
-	u32 sys, ll;
-	u8 emif_nr = EMIF1;
 
-	if (emif[EMIF2].irq == irq)
-		emif_nr = EMIF2;
-
-	base = emif[emif_nr].base;
-
-	sys = __raw_readl(base + OMAP44XX_EMIF_IRQSTATUS_SYS);
-
-	/*
-	 * Handle temperature alert
-	 * Temperature alert should be same for both ports
-	 * So, it's enough to process it for only one of the ports
-	 */
-	if (sys & OMAP44XX_REG_TA_SYS_MASK)
-		handle_temp_alert(base, emif_nr);
-
-	if (sys & OMAP44XX_REG_ERR_SYS_MASK)
-		pr_err("EMIF: Access error from EMIF%d SYS port - %x",
-			emif_nr, sys);
-
-	ll = __raw_readl(base + OMAP44XX_EMIF_IRQSTATUS_LL);
-
-	if (ll & OMAP44XX_REG_ERR_LL_MASK)
-		pr_err("EMIF Error: Access error from EMIF%d LL port - %x",
-			emif_nr, ll);
-
-	/* Clear the status */
-	__raw_writel(sys, base + OMAP44XX_EMIF_IRQSTATUS_SYS);
-	__raw_writel(ll, base + OMAP44XX_EMIF_IRQSTATUS_LL);
-
-	return IRQ_HANDLED;
+	/* setup IRQ handlers */
+	return request_threaded_irq(emif[emif_nr].irq,
+			emif_interrupt_handler,
+			emif_threaded_isr,
+			IRQF_SHARED, emif[emif_nr].pdev->name,
+			emif[emif_nr].pdev);
 }
 
 static int __devinit omap_emif_probe(struct platform_device *pdev)
 {
 	int id;
-	int ret;
 	struct resource *res;
 
 	if (!pdev)
 		return -EINVAL;
 
 	id = pdev->id;
+	emif[id].pdev = pdev;
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (!res) {
 		pr_err("EMIF %i Invalid IRQ resource\n", id);
@@ -801,14 +826,6 @@ static int __devinit omap_emif_probe(struct platform_device *pdev)
 	}
 
 	emif[id].irq = res->start;
-	ret = request_irq(emif[id].irq,
-			(irq_handler_t)emif_interrupt_handler,
-			IRQF_SHARED, pdev->name, pdev);
-	if (ret) {
-		pr_err("request_irq failed to register for 0x%x\n",
-					 emif[id].irq);
-		return ret;
-	}
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
@@ -821,12 +838,6 @@ static int __devinit omap_emif_probe(struct platform_device *pdev)
 		pr_err("Could not ioremap EMIF%i\n", id);
 		return -ENOMEM;
 	}
-
-	/*
-	 * EMIF devices are enabled by the hwmod
-	 * framework. Setup the IRQs
-	 */
-	setup_emif_interrupts(emif[id].base);
 
 	pr_info("EMIF%d is enabled with IRQ%d\n", id, emif[id].irq);
 
@@ -938,7 +949,10 @@ static void emif_calculate_regs(const struct emif_device_details *devices,
 	    get_zq_config_reg(cs1_device, addressing, LPDDR2_VOLTAGE_RAMPING);
 
 	regs->temp_alert_config =
-	    get_temp_alert_config(cs1_device, addressing);
+	    get_temp_alert_config(cs1_device, addressing, false);
+
+	regs->temp_alert_config_derated =
+	    get_temp_alert_config(cs1_device, addressing, true);
 
 	regs->emif_ddr_phy_ctlr_1_init =
 	    get_ddr_phy_ctrl_1(EMIF_FREQ_19_2_MHZ, RL_19_2_MHZ);
@@ -1057,6 +1071,25 @@ static int do_emif_setup_registers(u32 emif_nr,
 	return 0;
 }
 
+int do_setup_device_details(u32 emif_nr,
+			    const struct emif_device_details *devices)
+{
+	if (!emif_devices[emif_nr]) {
+		emif_devices[emif_nr] =
+			kmalloc(sizeof(struct emif_device_details), GFP_KERNEL);
+		if (!emif_devices[emif_nr])
+			return -ENOMEM;
+		*emif_devices[emif_nr] = *devices;
+	}
+
+	emif_temperature_level[emif_nr] = get_temperature_level(emif_nr);
+
+	if (emif_temperature_level[emif_nr] == SDRAM_TEMP_VERY_HIGH_SHUTDOWN)
+		pr_emerg("EMIF %d: SDRAM temperature exceeds operating"
+			 "limit.. Needs shut down!!!", emif_nr + 1);
+	return 0;
+}
+
 /*
  * omap_emif_device_init needs to be done before
  * ddr reconfigure function call.
@@ -1100,23 +1133,21 @@ postcore_initcall(omap_emif_register);
 int omap_emif_notify_voltage(struct notifier_block *nb,
 		unsigned long val, void *data)
 {
-	int ret;
 	u32 volt_state;
 
 	if (val == VOLTAGE_PRECHANGE)
 		volt_state =  LPDDR2_VOLTAGE_RAMPING;
 	 else
 		volt_state =  LPDDR2_VOLTAGE_STABLE;
-
-	if (emif_curr_regs[EMIF1])
+	if (likely(emif_curr_regs[EMIF1]))
 		setup_volt_sensitive_registers(EMIF1, emif_curr_regs[EMIF1],
 					       volt_state);
 
-	if (emif_curr_regs[EMIF2])
+	if (likely(emif_curr_regs[EMIF2]))
 		setup_volt_sensitive_registers(EMIF2, emif_curr_regs[EMIF2],
 					       volt_state);
 
-	if (!emif_curr_regs[EMIF1] && !emif_curr_regs[EMIF2]) {
+	if (unlikely(!emif_curr_regs[EMIF1] && !emif_curr_regs[EMIF2])) {
 		pr_err("emif: voltage state notification came before the"
 		       " initial setup - ignoring the notification");
 		return -EINVAL;
@@ -1126,11 +1157,7 @@ int omap_emif_notify_voltage(struct notifier_block *nb,
 	 * EMIF read-idle control needs to be setup using
 	 * freq update method only
 	 */
-	ret = omap4_set_freq_update();
-	if (ret)
-		return ret;
-
-	return 0;
+	return omap4_set_freq_update();
 }
 
 static struct notifier_block emif_volt_notifier_block = {
@@ -1156,10 +1183,10 @@ int omap_emif_setup_registers(u32 freq,
 			      u32 volt_state)
 {
 	int err = 0;
-	if (emif_devices[EMIF1])
+	if (likely(emif_devices[EMIF1]))
 		err = do_emif_setup_registers(EMIF1, freq, volt_state);
-	if (!err && emif_devices[EMIF2])
-		err |= do_emif_setup_registers(EMIF2, freq, volt_state);
+	if (likely(!err && emif_devices[EMIF2]))
+		err = do_emif_setup_registers(EMIF2, freq, volt_state);
 	return err;
 }
 
@@ -1171,38 +1198,20 @@ int omap_emif_setup_device_details(
 			const struct emif_device_details *emif1_devices,
 			const struct emif_device_details *emif2_devices)
 {
-	if (emif1_devices) {
-		emif_devices[EMIF1] =
-			kmalloc(sizeof(struct emif_device_details), GFP_KERNEL);
-		if (!emif_devices[EMIF1])
-			return -ENOMEM;
-		*emif_devices[EMIF1] = *emif1_devices;
-	}
+	if (emif1_devices)
+		BUG_ON(do_setup_device_details(EMIF1, emif1_devices));
 
 	/*
 	 * If memory devices connected to both the EMIFs are identical
 	 * (which is normally the case), then no need to calculate the
 	 * registers again for EMIF1 and allocate the structure for registers
 	 */
-	if (emif2_devices && (emif1_devices != emif2_devices)) {
-		emif_devices[EMIF2] =
-			kmalloc(sizeof(struct emif_device_details), GFP_KERNEL);
-		if (!emif_devices[EMIF2])
-			return -ENOMEM;
-		*emif_devices[EMIF2] = *emif2_devices;
-	} else if (emif2_devices)
+	if (emif2_devices && (emif1_devices != emif2_devices))
+		BUG_ON(do_setup_device_details(EMIF2, emif2_devices));
+	else if (emif2_devices) {
 		emif_devices[EMIF2] = emif_devices[EMIF1];
-
-	/* Initialize temperature level for each EMIF */
-	if (emif1_devices)
-		emif_temperature_level[EMIF1] = get_temperature_level(EMIF1);
-	if (emif2_devices)
-		emif_temperature_level[EMIF2] = get_temperature_level(EMIF2);
-
-	if ((emif_temperature_level[EMIF1] == SDRAM_TEMP_VERY_HIGH_SHUTDOWN) ||
-	    (emif_temperature_level[EMIF2] == SDRAM_TEMP_VERY_HIGH_SHUTDOWN)) {
-		pr_emerg("EMIF: SDRAM temperature exceeds operating"
-			 "limit.. Needs shut down!!!");
+		/* call for temperature related setup */
+		BUG_ON(do_setup_device_details(EMIF2, emif2_devices));
 	}
 
 	return 0;
@@ -1235,6 +1244,14 @@ void __init omap_init_emif_timings(void)
 	ret = clk_set_rate(dpll_core_m2_clk, rate);
 	if (ret)
 		pr_err("Unable to set LPDDR2 rate to %ld:\n", rate);
+
+	/* registers are setup correctly - now enable interrupts */
+	if (emif_devices[EMIF1])
+		ret = setup_emif_interrupts(EMIF1);
+	if (!ret && emif_devices[EMIF2])
+		ret = setup_emif_interrupts(EMIF2);
+	if (ret)
+		pr_err("EMIF: IRQ setup failed\n");
 
 	clk_put(dpll_core_m2_clk);
 }

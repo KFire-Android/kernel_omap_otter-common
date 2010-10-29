@@ -220,7 +220,7 @@
 #define MR10_ZQ_ZQRESET		0xC3
 
 /* TEMP_ALERT_CONFIG */
-#define TEMP_ALERT_POLL_INTERVAL_MS	1400 /* 1.4s (temp gradient - 5 C/s) */
+#define TEMP_ALERT_POLL_INTERVAL_MS	360 /* for temp gradient - 5 C/s */
 #define TEMP_ALERT_CONFIG_DEVCT_1	0
 #define TEMP_ALERT_CONFIG_DEVWDT_32	2
 
@@ -277,6 +277,7 @@ struct emif_regs{
 	u32 zq_config_normal;
 	u32 zq_config_volt_ramp;
 	u32 temp_alert_config;
+	u32 temp_alert_config_derated;
 	u32 emif_ddr_phy_ctlr_1_init;
 	u32 emif_ddr_phy_ctlr_1_final;
 };
