@@ -200,6 +200,40 @@ void omap_mcbsp_register_board_cfg(struct omap_mcbsp_platform_data *config,
 
 /*-------------------------------------------------------------------------*/
 
+#if defined(CONFIG_SND_OMAP_SOC_DMIC) || \
+    defined(CONFIG_SND_OMAP_SOC_DMIC_MODULE)
+
+static struct omap_device_pm_latency omap_dmic_latency[] = {
+	{
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static void omap_init_dmic(void)
+{
+	struct omap_hwmod *oh;
+	struct omap_device *od;
+
+	oh = omap_hwmod_lookup("dmic");
+	if (!oh) {
+		printk(KERN_ERR "Could not look up dmic hw_mod\n");
+		return;
+	}
+
+	od = omap_device_build("omap-dmic-dai", -1, oh, NULL, 0,
+				omap_dmic_latency,
+				ARRAY_SIZE(omap_dmic_latency), 0);
+	if (IS_ERR(od))
+		printk(KERN_ERR "Could not build omap_device for omap-dmic-dai\n");
+}
+#else
+static inline void omap_init_dmic(void) {}
+#endif
+
+/*-------------------------------------------------------------------------*/
+
 #if defined(CONFIG_SND_OMAP_SOC_MCPDM) || defined(CONFIG_SND_OMAP_SOC_MCPDM_MODULE)
 
 static struct omap_device_pm_latency omap_mcpdm_latency[] = {
@@ -534,6 +568,7 @@ static int __init omap_init_devices(void)
 	 * in alphabetical order so they're easier to sort through.
 	 */
 	omap_init_aess();
+	omap_init_dmic();
 	omap_init_dsp();
 	omap_init_kp();
 	omap_init_rng();

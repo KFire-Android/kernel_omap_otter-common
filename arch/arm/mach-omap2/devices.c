@@ -350,30 +350,12 @@ static struct platform_device omap_abe_dai = {
 	.id	= -1,
 };
 
-static struct platform_device omap_dmic_dai0 = {
-	.name	= "omap-dmic-dai",
-	.id	= 0,
-};
-
-static struct platform_device omap_dmic_dai1 = {
-	.name	= "omap-dmic-dai",
-	.id	= 1,
-};
-
-static struct platform_device omap_dmic_dai2 = {
-	.name	= "omap-dmic-dai",
-	.id	= 2,
-};
-
 static inline void omap_init_abe(void)
 {
 	platform_device_register(&codec_dmic0);
 	platform_device_register(&codec_dmic1);
 	platform_device_register(&codec_dmic2);
 	platform_device_register(&omap_abe_dai);
-	platform_device_register(&omap_dmic_dai0);
-	platform_device_register(&omap_dmic_dai1);
-	platform_device_register(&omap_dmic_dai2);
 }
 #else
 static inline void omap_init_abe(void) {}
