@@ -884,42 +884,42 @@ static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
 
 static const char *dl1_equ_texts[] = {
 	"Flat response",
-	"High-pass 1dB",
-	"High-pass 0.25dB",
-	"High-pass 0.1dB",
+	"High-pass 0dB",
+	"High-pass -12dB",
+	"High-pass -20dB",
 };
 
 static const char *dl20_equ_texts[] = {
 	"Flat response",
-	"High-pass 1dB",
-	"High-pass 0.25dB",
-	"High-pass 0.1dB",
+	"High-pass 0dB",
+	"High-pass -12dB",
+	"High-pass -20dB",
 };
 
 static const char *dl21_equ_texts[] = {
 	"Flat response",
-	"High-pass 1dB",
-	"High-pass 0.25dB",
-	"High-pass 0.1dB",
+	"High-pass 0dB",
+	"High-pass -12dB",
+	"High-pass -20dB",
 };
 
 static const char *amic_equ_texts[] = {
-	"High-pass 1dB",
-	"High-pass 0.25dB",
-	"High-pass 0.125dB",
+	"High-pass 0dB",
+	"High-pass -12dB",
+	"High-pass -18dB",
 };
 
 static const char *dmic_equ_texts[] = {
-	"High-pass 1dB",
-	"High-pass 0.25dB",
-	"High-pass 0.125dB",
+	"High-pass 0dB",
+	"High-pass -12dB",
+	"High-pass -18dB",
 };
 
 static const char *sdt_equ_texts[] = {
 	"Flat response",
-	"High-pass 1dB",
-	"High-pass 0.25dB",
-	"High-pass 0.1dB",
+	"High-pass 0dB",
+	"High-pass -12dB",
+	"High-pass -20dB",
 };
 
 static const struct soc_enum dl1_equalizer_enum =

@@ -47,24 +47,24 @@
  * Coefficients for DL1EQ
  */
 const s32 dl1_equ_coeffs[NBDL1EQ_PROFILES][NBDL1COEFFS] = {
-/* Flat response with Gain =1 */
+/* Flat response with Gain = 0dB */
 				{0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0,
 				0, 0, 0x040002, 0, 0,
 				0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0},
 
-/* 800Hz cut-off frequency and Gain = 1  */
+/* 800Hz cut-off frequency and Gain = 0dB  */
 				{0, 0, 0, 0, 0, 0, 0, 0, 0, -7554223,
 				708210, -708206, 7554225, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 6802833, -682266, 731554},
 
-/* 800Hz cut-off frequency and Gain = 0.25 */
+/* 800Hz cut-off frequency and Gain = -12dB */
 				{0, 0, 0, 0, 0, 0, 0, 0, 0, -3777112,
 				5665669, -5665667, 3777112, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 6802833, -682266, 731554},
 
-/* 800Hz cut-off frequency and Gain = 0.1 */
+/* 800Hz cut-off frequency and Gain = -20dB */
 				{0, 0, 0, 0, 0, 0, 0, 0, 0, -1510844,
 				4532536, -4532536, 1510844, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 6802833, -682266, 731554},
@@ -74,24 +74,24 @@ const s32 dl1_equ_coeffs[NBDL1EQ_PROFILES][NBDL1COEFFS] = {
  * Coefficients for DL2EQ_L
  */
 const s32 dl20_equ_coeffs[NBDL20EQ_PROFILES][NBDL2COEFFS] = {
-/* Flat response with Gain =1 */
+/* Flat response with Gain = 0dB */
 				{0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0,
 				0, 0, 0x040002, 0, 0,
 				0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0},
 
-/* 800Hz cut-off frequency and Gain = 1 */
+/* 800Hz cut-off frequency and Gain = 0dB */
 				{0, 0, 0, 0, 0, 0, 0, 0, 0, -7554223,
 				708210, -708206, 7554225, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 6802833, -682266, 731554},
 
-/* 800Hz cut-off frequency and Gain = 0.25 */
+/* 800Hz cut-off frequency and Gain = -12dB */
 				{0, 0, 0, 0, 0, 0, 0, 0, 0, -3777112,
 				5665669, -5665667, 3777112, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 6802833, -682266, 731554},
 
-/* 800Hz cut-off frequency and Gain = 0.1 */
+/* 800Hz cut-off frequency and Gain = -20dB */
 				{0, 0, 0, 0, 0, 0, 0, 0, 0, -1510844,
 				4532536, -4532536, 1510844, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 6802833, -682266, 731554},
@@ -101,24 +101,24 @@ const s32 dl20_equ_coeffs[NBDL20EQ_PROFILES][NBDL2COEFFS] = {
  * Coefficients for DL2_EQ_R
  */
 const s32 dl21_equ_coeffs[NBDL20EQ_PROFILES][NBDL2COEFFS] = {
-/* Flat response with Gain =1 */
+/* Flat response with Gain = 0dB */
 				{0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0,
 				0, 0, 0x040002, 0, 0,
 				0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0},
 
-/* 800Hz cut-off frequency and Gain = 1 */
+/* 800Hz cut-off frequency and Gain = 0dB */
 				{0, 0, 0, 0, 0, 0, 0, 0, 0, -7554223,
 				708210, -708206, 7554225, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 6802833, -682266, 731554},
 
-/*800Hz cut-off frequency and Gain = 0.25 */
+/*800Hz cut-off frequency and Gain = -12dB */
 				{0, 0, 0, 0, 0, 0, 0, 0, 0, -3777112,
 				5665669, -5665667, 3777112, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 6802833, -682266, 731554},
 
-/* 800Hz cut-off frequency and Gain = 0.1 */
+/* 800Hz cut-off frequency and Gain = -20dB */
 				{0, 0, 0, 0, 0, 0, 0, 0, 0, -1510844,
 				4532536, -4532536, 1510844, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 6802833, -682266, 731554},
@@ -128,21 +128,21 @@ const s32 dl21_equ_coeffs[NBDL20EQ_PROFILES][NBDL2COEFFS] = {
  * Coefficients for DMICEQ
  */
 const u32 dmic_equ_coeffs[NBDMICEQ_PROFILES][NBDMICCOEFFS] = {
-/* 20kHz cut-off frequency and Gain = 1 */
+/* 20kHz cut-off frequency and Gain = 0dB */
 				{-4119413, -192384, -341428, -348088,
 				-151380, 151380, 348088, 341428, 192384,
 				4119419, 1938156, -6935719, 775202,
 				-1801934, 2997698, -3692214, 3406822,
 				-2280190, 1042982},
 
-/* 20kHz cut-off frequency and Gain = 0.25 */
+/* 20kHz cut-off frequency and Gain = -12dB */
 				{-1029873, -3078121, -5462817, -5569389,
 				-2422069, 2422071, 5569391, 5462819,
 				3078123, 1029875, 1938188, -6935811,
 				775210, -1801950, 2997722, -3692238,
 				3406838, -2280198, 1042982},
 
-/* 20kHz cut-off frequency and Gain = 0.125 */
+/* 20kHz cut-off frequency and Gain = -18dB */
 				{-514937, -1539061, -2731409, -2784693,
 				-1211033, 1211035, 2784695, 2731411,
 				1539063, 514939, 1938188, -6935811,
@@ -154,21 +154,21 @@ const u32 dmic_equ_coeffs[NBDMICEQ_PROFILES][NBDMICCOEFFS] = {
  * Coefficients for AMICEQ
  */
 const u32 amic_equ_coeffs[NBAMICEQ_PROFILES][NBAMICCOEFFS] = {
-/* 20kHz cut-off frequency and Gain = 1 */
+/* 20kHz cut-off frequency and Gain = 0dB */
 				{-4119413, -192384, -341428, -348088,
 				-151380, 151380, 348088, 341428, 192384,
 				4119419, 1938156, -6935719, 775202,
 				-1801934, 2997698, -3692214, 3406822,
 				-2280190, 1042982},
 
-/* 20kHz cut-off frequency and Gain = 0.25 */
+/* 20kHz cut-off frequency and Gain = -12dB */
 				{-1029873, -3078121, -5462817, -5569389,
 				-2422069, 2422071, 5569391, 5462819,
 				3078123, 1029875, 1938188, -6935811,
 				775210, -1801950, 2997722, -3692238,
 				3406838, -2280198, 1042982},
 
-/* 20kHz cut-off frequency and Gain = 0.125 */
+/* 20kHz cut-off frequency and Gain = -18dB */
 				{-514937, -1539061, -2731409, -2784693,
 				-1211033, 1211035, 2784695, 2731411,
 				1539063, 514939, 1938188, -6935811,
@@ -181,18 +181,18 @@ const u32 amic_equ_coeffs[NBAMICEQ_PROFILES][NBAMICCOEFFS] = {
  * Coefficients for SDTEQ
  */
 const u32 sdt_equ_coeffs[NBSDTEQ_PROFILES][NBSDTCOEFFS] = {
-/* Flat response with Gain =1 */
+/* Flat response with Gain = 0dB */
 				{0, 0, 0, 0, 0x040002, 0, 0, 0, 0},
 
-/* 800Hz cut-off frequency and Gain = 1  */
+/* 800Hz cut-off frequency and Gain = 0dB  */
 				{0, -7554223, 708210, -708206, 7554225,
 				0, 6802833, -682266, 731554},
 
-/* 800Hz cut-off frequency and Gain = 0.25 */
+/* 800Hz cut-off frequency and Gain = -12dB */
 				{0, -3777112, 5665669, -5665667, 3777112,
 				0, 6802833, -682266, 731554},
 
-/* 800Hz cut-off frequency and Gain = 0.1 */
+/* 800Hz cut-off frequency and Gain = -20dB */
 				{0, -1510844, 4532536, -4532536, 1510844,
 				0, 6802833, -682266, 731554}
 };
