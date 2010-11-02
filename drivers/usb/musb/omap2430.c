@@ -122,7 +122,7 @@ int musb_notifier_call(struct notifier_block *nb,
 		/* Release L3 constraint */
 		if (pdata->set_min_bus_tput)
 			pdata->set_min_bus_tput(musb->controller,
-						OCP_INITIATOR_AGENT, 0);
+						OCP_INITIATOR_AGENT, -1);
 		break;
 	default:
 		DBG(1, "ID float\n");
