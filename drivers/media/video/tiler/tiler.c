@@ -572,6 +572,12 @@ static void _m_unregister_buf(struct __buf_info *_b)
 	kfree(_b);
 }
 
+static int tiler_notify_event(int event, void *data)
+{
+	return blocking_notifier_call_chain(&tiler_device->notifier,
+								event, data);
+}
+
 /**
  * Free all info kept by a process:
  *
@@ -589,6 +595,9 @@ static void _m_free_process_info(struct process_info *pi)
 	struct gid_info *gi, *gi_;
 	struct __buf_info *_b = NULL, *_b_ = NULL;
 	bool ai_autofreed, need2free;
+
+	if (!list_empty(&pi->bufs))
+		tiler_notify_event(TILER_DEVICE_CLOSE, NULL);
 
 	/* unregister all buffers */
 	list_for_each_entry_safe(_b, _b_, &pi->bufs, by_pid)
@@ -1401,12 +1410,6 @@ s32 tiler_reserve(u32 n, struct tiler_buf_info *b)
 }
 EXPORT_SYMBOL(tiler_reserve);
 
-static int tiler_notify_event(int event, void *data)
-{
-	return blocking_notifier_call_chain(&tiler_device->notifier,
-								event, data);
-}
-
 int tiler_reg_notifier(struct notifier_block *nb)
 {
 	if (!nb)
@@ -1483,10 +1486,8 @@ static s32 tiler_release(struct inode *ip, struct file *filp)
 
 	mutex_lock(&mtx);
 	/* free resources if last device in this process */
-	if (0 == --pi->refs) {
-		tiler_notify_event(TILER_DEVICE_CLOSE, NULL);
+	if (0 == --pi->refs)
 		_m_free_process_info(pi);
-	}
 
 	mutex_unlock(&mtx);
 
