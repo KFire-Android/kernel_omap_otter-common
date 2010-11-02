@@ -1191,7 +1191,7 @@ static void hdmi_w1_audio_enable(void)
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 1, 31, 31);
 }
 
-static __attribute__ ((unused))__attribute__ ((unused)) void hdmi_w1_audio_disable(void)
+static void hdmi_w1_audio_disable(void)
 {
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 0, 31, 31);
 }
@@ -1564,7 +1564,7 @@ int hdmi_w1_wrapper_enable(u32 instanceName)
 
 int hdmi_w1_wrapper_disable(u32 instanceName)
 {
-	hdmi_w1_audio_enable();
+	hdmi_w1_audio_disable();
 	printk(KERN_INFO "Wrapper disabled...\n");
 	return 0;
 }
