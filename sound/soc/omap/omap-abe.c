@@ -317,10 +317,16 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 
 	switch (params_channels(params)) {
 	case 1:
-		format.samp_format = MONO_MSB;
+		if (params_format(params) == SNDRV_PCM_FORMAT_S16_LE)
+			format.samp_format = MONO_RSHIFTED_16;
+		else
+			format.samp_format = MONO_MSB;
 		break;
 	case 2:
-		format.samp_format = STEREO_MSB;
+		if (params_format(params) == SNDRV_PCM_FORMAT_S16_LE)
+			format.samp_format = STEREO_16_16;
+		else
+			format.samp_format = STEREO_MSB;
 		break;
 	case 3:
 		format.samp_format = THREE_MSB;
