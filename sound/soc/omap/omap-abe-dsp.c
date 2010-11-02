@@ -1109,7 +1109,7 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			ABE_WIDGET(2), ABE_OPP_50, 0),
 	/* the MM_UL mapping is intentional */
 	SND_SOC_DAPM_AIF_OUT("MM_UL1", "MultiMedia1 Capture", 0,
-			ABE_WIDGET(3), ABE_OPP_50, 0),
+			ABE_WIDGET(3), ABE_OPP_100, 0),
 	SND_SOC_DAPM_AIF_OUT("MM_UL2", "MultiMedia2 Capture", 0,
 			ABE_WIDGET(4), ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_IN("MM_DL", " MultiMedia1 Playback", 0,
