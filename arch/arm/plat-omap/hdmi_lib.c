@@ -1572,11 +1572,18 @@ int hdmi_w1_wrapper_disable(u32 instanceName)
 int hdmi_w1_stop_audio_transfer(u32 instanceName)
 {
 	hdmi_w1_audio_stop();
+	/* if audio is not used, switch to smart-idle */
+	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x2, 3, 2);
 	return 0;
 }
 
 int hdmi_w1_start_audio_transfer(u32 instanceName)
 {
+	/*
+	 * during audio use-case, switch to no-idle to avoid
+	 * DSS_L3_ICLK clock to be shutdown (as per TRM)
+	 */
+	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 3, 2);
 	hdmi_w1_audio_start();
 	printk(KERN_INFO "Start audio transfer...\n");
 	return 0;
