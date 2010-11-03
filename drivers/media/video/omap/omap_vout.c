@@ -1678,6 +1678,18 @@ static int omap_vout_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
+static unsigned int omap_vout_poll(struct file *file, struct poll_table_struct *poll)
+{
+	struct omap_vout_device *vout = file->private_data;
+	struct videobuf_queue *q = &vout->vbq;
+
+	/* we handle this here as videobuf_poll_stream would start reading */
+	if (!vout->streaming)
+		return POLLERR;
+
+	return videobuf_poll_stream(file, q, poll);
+}
+
 static int omap_vout_release(struct file *file)
 {
 	unsigned int ret, i;
@@ -2799,6 +2811,7 @@ static const struct v4l2_file_operations omap_vout_fops = {
 	.owner 		= THIS_MODULE,
 	.unlocked_ioctl	= video_ioctl2,
 	.mmap 		= omap_vout_mmap,
+	.poll		= omap_vout_poll,
 	.open 		= omap_vout_open,
 	.release 	= omap_vout_release,
 };
