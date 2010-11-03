@@ -180,7 +180,7 @@ void notify_ducatidrv_get_config(struct notify_ducatidrv_config *cfg)
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_get_config failed! "
+		pr_err("notify_ducatidrv_get_config failed! "
 			"status = 0x%x", status);
 	}
 	return;
@@ -231,7 +231,7 @@ int notify_ducatidrv_setup(struct notify_ducatidrv_config *cfg)
 	if (ducati_mbox == NULL) {
 		ducati_mbox = omap_mbox_get("mailbox-2", &ducati_notify_nb);
 		if (ducati_mbox == NULL) {
-			printk(KERN_ERR "Failed in omap_mbox_get(ducati)\n");
+			pr_err("Failed in omap_mbox_get(ducati)\n");
 			status = NOTIFY_E_INVALIDSTATE;
 			goto error_mailbox_get_failed;
 		}
@@ -241,7 +241,7 @@ int notify_ducatidrv_setup(struct notify_ducatidrv_config *cfg)
 	if (!tesla_mbox) {
 		tesla_mbox = omap_mbox_get("mailbox-1", &ducati_notify_nb);
 		if (!tesla_mbox) {
-			printk(KERN_ERR "Failed in omap_mbox_get(tesla)\n");
+			pr_err("Failed in omap_mbox_get(tesla)\n");
 			status = NOTIFY_E_INVALIDSTATE;
 			goto error_mailbox_get_failed;
 		}
@@ -253,7 +253,7 @@ error_mailbox_get_failed:
 error_exit:
 	atomic_set(&(notify_ducatidriver_state.ref_count),
 			NOTIFYDUCATIDRIVER_MAKE_MAGICSTAMP(0));
-	printk(KERN_ERR "notify_ducatidrv_setup failed! status = 0x%x", status);
+	pr_err("notify_ducatidrv_setup failed! status = 0x%x", status);
 	return status;
 }
 EXPORT_SYMBOL(notify_ducatidrv_setup);
@@ -307,7 +307,7 @@ int notify_ducatidrv_destroy(void)
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_destroy failed! "
+		pr_err("notify_ducatidrv_destroy failed! "
 			"status = 0x%x", status);
 	}
 	return status;
@@ -337,7 +337,7 @@ void notify_ducatidrv_params_init(struct notify_ducatidrv_params *params)
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_params_init failed! "
+		pr_err("notify_ducatidrv_params_init failed! "
 			"status = 0x%x", status);
 	}
 	return;
@@ -567,8 +567,7 @@ error_unlock_and_return:
 	/* Leave critical section protection. */
 	mutex_unlock(notify_ducatidriver_state.gate_handle);
 exit:
-	printk(KERN_ERR "notify_ducatidrv_create failed! status = 0x%x",
-		status);
+	pr_err("notify_ducatidrv_create failed! status = 0x%x", status);
 	return NULL;
 }
 EXPORT_SYMBOL(notify_ducatidrv_create);
@@ -640,10 +639,8 @@ int notify_ducatidrv_delete(struct notify_ducatidrv_object **handle_ptr)
 	}
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_delete failed! "
-			"status = 0x%x", status);
-	}
+	if (status < 0)
+		pr_err("notify_ducatidrv_delete failed! status = 0x%x", status);
 	return status;
 }
 EXPORT_SYMBOL(notify_ducatidrv_delete);
@@ -734,7 +731,7 @@ int notify_ducatidrv_register_event(struct notify_driver_object *handle,
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_register_event failed! "
+		pr_err("notify_ducatidrv_register_event failed! "
 			"status = 0x%x", status);
 	}
 	return status;
@@ -827,7 +824,7 @@ int notify_ducatidrv_unregister_event(struct notify_driver_object *handle,
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_unregister_event failed! "
+		pr_err("notify_ducatidrv_unregister_event failed! "
 			"status = 0x%x", status);
 	}
 	return status;
@@ -977,7 +974,7 @@ int notify_ducatidrv_send_event(struct notify_driver_object *handle,
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_sendevent failed! "
+		pr_err("notify_ducatidrv_sendevent failed! "
 			"status = 0x%x", status);
 	}
 	return status;
@@ -1024,7 +1021,7 @@ int notify_ducatidrv_disable(struct notify_driver_object *handle)
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_disable failed! "
+		pr_err("notify_ducatidrv_disable failed! "
 			"status = 0x%x", status);
 	}
 	/*No flags to be returned. */
@@ -1073,7 +1070,7 @@ void notify_ducatidrv_enable(struct notify_driver_object *handle)
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_enable failed! "
+		pr_err("notify_ducatidrv_enable failed! "
 			"status = 0x%x", status);
 	}
 	return;
@@ -1180,7 +1177,7 @@ void notify_ducatidrv_disable_event(struct notify_driver_object *handle,
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_disable_event failed! "
+		pr_err("notify_ducatidrv_disable_event failed! "
 			"status = 0x%x", status);
 	}
 	return;
@@ -1238,7 +1235,7 @@ void notify_ducatidrv_enable_event(struct notify_driver_object *handle,
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_enable_event failed! "
+		pr_err("notify_ducatidrv_enable_event failed! "
 			"status = 0x%x", status);
 	}
 	return;
@@ -1288,7 +1285,7 @@ uint notify_ducatidrv_shared_mem_req(
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_ducatidrv_shared_mem_req failed!"
+		pr_err("notify_ducatidrv_shared_mem_req failed!"
 			" status = 0x%x", status);
 	}
 	return mem_req;
