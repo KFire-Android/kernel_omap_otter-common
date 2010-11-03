@@ -223,7 +223,7 @@ int ipc_attach(u16 remote_proc_id)
 	struct ipc_proc_entry *ipc;
 
 	if (remote_proc_id >= MULTIPROC_MAXPROCESSORS) {
-		printk(KERN_ERR "Invalid remote_proc_id passed\n");
+		pr_err("Invalid remote_proc_id passed\n");
 		return IPC_E_FAIL;
 	}
 
@@ -247,11 +247,10 @@ int ipc_attach(u16 remote_proc_id)
 							ipc_shared_addr);
 
 	if (status < 0)
-		printk(KERN_ERR "ipc_attach : ipc_proc_sync_start "
+		pr_err("ipc_attach : ipc_proc_sync_start "
 			"failed [0x%x]\n", status);
 	else
-		printk(KERN_ERR "ipc_proc_sync_start : status [0x%x]\n",
-			status);
+		pr_err("ipc_proc_sync_start : status [0x%x]\n", status);
 
 
 	if (status >= 0) {
@@ -259,11 +258,10 @@ int ipc_attach(u16 remote_proc_id)
 		status = gatemp_attach(remote_proc_id, ipc_module->
 							gatemp_shared_addr);
 		if (status < 0)
-			printk(KERN_ERR "ipc_attach : gatemp_attach "
+			pr_err("ipc_attach : gatemp_attach "
 				"failed [0x%x]\n", status);
 		else
-			printk(KERN_ERR "gatemp_attach : status [0x%x]\n",
-				status);
+			pr_err("gatemp_attach : status [0x%x]\n", status);
 
 	}
 
@@ -271,10 +269,10 @@ int ipc_attach(u16 remote_proc_id)
 	if (status >= 0) {
 		status = sharedregion_attach(remote_proc_id);
 		if (status < 0)
-			printk(KERN_ERR "ipc_attach : sharedregion_attach "
+			pr_err("ipc_attach : sharedregion_attach "
 				"failed [0x%x]\n", status);
 		else
-			printk(KERN_ERR "sharedregion_attach : status "
+			pr_err("sharedregion_attach : status "
 				"[0x%x]\n", status);
 	}
 
@@ -296,11 +294,11 @@ int ipc_attach(u16 remote_proc_id)
 			if (slave->notify_sr_ptr ==
 						SHAREDREGION_INVALIDSRPTR) {
 				status = IPC_E_FAIL;
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"sharedregion_get_srptr "
 					"failed [0x%x]\n", status);
 			} else {
-				printk(KERN_ERR
+				pr_err(
 					"sharedregion_get_srptr : "
 					"status [0x%x]\n", status);
 			}
@@ -309,11 +307,11 @@ int ipc_attach(u16 remote_proc_id)
 							notify_sr_ptr);
 			if (notify_shared_addr == NULL) {
 				status = IPC_E_FAIL;
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"sharedregion_get_ptr "
 					"failed [0x%x]\n", status);
 			} else {
-				printk(KERN_ERR
+				pr_err(
 					"sharedregion_get_ptr : "
 					"status [0x%x]\n", status);
 			}
@@ -323,11 +321,11 @@ int ipc_attach(u16 remote_proc_id)
 			status = notify_attach(remote_proc_id,
 							notify_shared_addr);
 			if (status < 0)
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"notify_attach "
 					"failed [0x%x]\n", status);
 			else
-					printk(KERN_ERR
+					pr_err(
 						"notify_attach : "
 						"status [0x%x]\n", status);
 		}
@@ -339,11 +337,11 @@ int ipc_attach(u16 remote_proc_id)
 			status = ipu_pm_attach(remote_proc_id, ipc_module->
 							ipu_pm_shared_addr);
 			if (status < 0)
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"ipu_pm_attach "
 					"failed [0x%x]\n", status);
 			else
-				printk(KERN_ERR
+				pr_err(
 					"ipu_pm_attach : "
 					"status [0x%x]\n", status);
 		}
@@ -362,11 +360,11 @@ int ipc_attach(u16 remote_proc_id)
 				sharedregion_get_srptr(nsrn_shared_addr, 0);
 			if (slave->nsrn_sr_ptr == SHAREDREGION_INVALIDSRPTR) {
 				status = IPC_E_FAIL;
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"sharedregion_get_srptr "
 					"failed [0x%x]\n", status);
 			} else {
-				printk(KERN_ERR
+				pr_err(
 					"sharedregion_get_srptr : "
 					"status [0x%x]\n", status);
 			}
@@ -375,11 +373,11 @@ int ipc_attach(u16 remote_proc_id)
 				sharedregion_get_ptr(slave->nsrn_sr_ptr);
 			if (nsrn_shared_addr == NULL) {
 				status = IPC_E_FAIL;
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"sharedregion_get_ptr "
 					"failed [0x%x]\n", status);
 			} else {
-				printk(KERN_ERR
+				pr_err(
 					"sharedregion_get_ptr : "
 					"status [0x%x]\n", status);
 			}
@@ -391,11 +389,11 @@ int ipc_attach(u16 remote_proc_id)
 							nsrn_shared_addr);
 
 			if (status < 0)
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"nameserver_remotenotify_attach "
 					"failed [0x%x]\n", status);
 			else
-				printk(KERN_ERR
+				pr_err(
 					"nameserver_remotenotify_attach : "
 					"status [0x%x]\n", status);
 		}
@@ -415,11 +413,11 @@ int ipc_attach(u16 remote_proc_id)
 			if (slave->transport_sr_ptr ==
 					SHAREDREGION_INVALIDSRPTR) {
 				status = IPC_E_FAIL;
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"sharedregion_get_srptr "
 					"failed [0x%x]\n", status);
 			} else {
-				printk(KERN_ERR
+				pr_err(
 					"sharedregion_get_srptr : "
 					"status [0x%x]\n", status);
 			}
@@ -428,11 +426,11 @@ int ipc_attach(u16 remote_proc_id)
 							transport_sr_ptr);
 			if (msgq_shared_addr == NULL) {
 				status = IPC_E_FAIL;
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"sharedregion_get_ptr "
 					"failed [0x%x]\n", status);
 			} else {
-				printk(KERN_ERR
+				pr_err(
 					"sharedregion_get_ptr : "
 					"status [0x%x]\n", status);
 			}
@@ -443,11 +441,11 @@ int ipc_attach(u16 remote_proc_id)
 			status = messageq_attach(remote_proc_id,
 							msgq_shared_addr);
 			if (status < 0)
-				printk(KERN_ERR "ipc_attach : "
+				pr_err("ipc_attach : "
 					"messageq_attach "
 					"failed [0x%x]\n", status);
 			else
-				printk(KERN_ERR
+				pr_err(
 					"messageq_attach : "
 					"status [0x%x]\n", status);
 		}
@@ -465,11 +463,11 @@ int ipc_attach(u16 remote_proc_id)
 		status = ipc_proc_sync_finish(remote_proc_id,
 						ipc_module->ipc_shared_addr);
 		if (status < 0)
-			printk(KERN_ERR "ipc_attach : "
+			pr_err("ipc_attach : "
 				"ipc_proc_sync_finish "
 				"failed [0x%x]\n", status);
 		else
-			printk(KERN_ERR
+			pr_err(
 				"ipc_proc_sync_finish : "
 				"status [0x%x]\n", status);
 	}
@@ -477,7 +475,7 @@ int ipc_attach(u16 remote_proc_id)
 	if (status >= 0)
 		ipc->is_attached = true;
 	else
-		printk(KERN_ERR "ipc_attach failed! status = 0x%x\n", status);
+		pr_err("ipc_attach failed! status = 0x%x\n", status);
 
 	return status;
 }
@@ -526,11 +524,11 @@ int ipc_detach(u16 remote_proc_id)
 			/* call messageq_detach for remote processor */
 			status = messageq_detach(remote_proc_id);
 			if (status < 0)
-				printk(KERN_ERR "ipc_detach : "
+				pr_err("ipc_detach : "
 					"messageq_detach "
 					"failed [0x%x]\n", status);
 			else
-				printk(KERN_ERR
+				pr_err(
 					"messageq_detach : "
 					"status [0x%x]\n", status);
 
@@ -563,11 +561,11 @@ int ipc_detach(u16 remote_proc_id)
 			status = nameserver_remotenotify_detach(
 							remote_proc_id);
 			if (status < 0)
-				printk(KERN_ERR "ipc_detach : "
+				pr_err("ipc_detach : "
 					"nameserver_remotenotify_detach "
 					"failed [0x%x]\n", status);
 			else
-				printk(KERN_ERR
+				pr_err(
 					"nameserver_remotenotify_detach : "
 					"status [0x%x]\n", status);
 
@@ -595,11 +593,11 @@ int ipc_detach(u16 remote_proc_id)
 			/* call ipu_pm_detach for remote processor */
 			status = ipu_pm_detach(remote_proc_id);
 			if (status < 0)
-				printk(KERN_ERR "ipc_detach : "
+				pr_err("ipc_detach : "
 					"ipu_pm_detach "
 					"failed [0x%x]\n", status);
 			else
-				printk(KERN_ERR
+				pr_err(
 					"ipu_pm_detach : "
 					"status [0x%x]\n", status);
 		}
@@ -608,11 +606,11 @@ int ipc_detach(u16 remote_proc_id)
 			/* call notify_detach for remote processor */
 			status = notify_detach(remote_proc_id);
 			if (status < 0)
-				printk(KERN_ERR "ipc_detach : "
+				pr_err("ipc_detach : "
 					"notify_detach "
 					"failed [0x%x]\n", status);
 			else
-				printk(KERN_ERR
+				pr_err(
 					"notify_detach : "
 					"status [0x%x]\n", status);
 
@@ -680,8 +678,7 @@ int ipc_detach(u16 remote_proc_id)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "ipc_detach failed with status [0x%x]\n",
-								status);
+		pr_err("ipc_detach failed with status [0x%x]\n", status);
 	return status;
 }
 
@@ -701,7 +698,7 @@ ipc_control(u16 proc_id, u32 cmd_id, void *arg)
 #if defined CONFIG_SYSLINK_USE_SYSMGR
 		status = platform_load_callback(proc_id, arg);
 		if (status < 0)
-			printk(KERN_ERR "ipc_control : platform_load_callback "
+			pr_err("ipc_control : platform_load_callback "
 				"failed [0x%x]\n", status);
 #endif
 	}
@@ -712,7 +709,7 @@ ipc_control(u16 proc_id, u32 cmd_id, void *arg)
 #if defined CONFIG_SYSLINK_USE_SYSMGR
 		status = platform_start_callback(proc_id, arg);
 		if (status < 0)
-			printk(KERN_ERR "ipc_control : platform_start_callback"
+			pr_err("ipc_control : platform_start_callback"
 				" failed [0x%x]\n", status);
 #endif
 	}
@@ -723,7 +720,7 @@ ipc_control(u16 proc_id, u32 cmd_id, void *arg)
 #if defined CONFIG_SYSLINK_USE_SYSMGR
 		status = platform_stop_callback(proc_id, arg);
 		if (status < 0)
-			printk(KERN_ERR "ipc_control : platform_stop_callback"
+			pr_err("ipc_control : platform_stop_callback"
 				" failed [0x%x]\n", status);
 #endif
 	}
@@ -732,7 +729,7 @@ ipc_control(u16 proc_id, u32 cmd_id, void *arg)
 	default:
 	{
 		status = -EINVAL;
-		printk(KERN_ERR "ipc_control : invalid "
+		pr_err("ipc_control : invalid "
 				" command code [0x%x]\n", cmd_id);
 	}
 	break;
@@ -911,10 +908,9 @@ static int ipc_proc_sync_start(u16 remote_proc_id, void *shared_addr)
 	}
 exit:
 	if (status < 0)
-		printk(KERN_ERR "ipc_proc_sync_start failed: status [0x%x]\n",
-								status);
+		pr_err("ipc_proc_sync_start failed: status [0x%x]\n", status);
 	else
-		printk(KERN_ERR "ipc_proc_sync_start done\n");
+		pr_err("ipc_proc_sync_start done\n");
 
 	return status;
 }
@@ -1043,8 +1039,7 @@ int ipc_read_config(u16 remote_proc_id, u32 tag, void *cfg, u32 size)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "ipc_read_config failed: status [0x%x]\n",
-								status);
+		pr_err("ipc_read_config failed: status [0x%x]\n", status);
 
 	return status;
 }
@@ -1151,8 +1146,7 @@ int ipc_write_config(u16 remote_proc_id, u32 tag, void *cfg, u32 size)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "ipc_write_config failed: status [0x%x]\n",
-								status);
+		pr_err("ipc_write_config failed: status [0x%x]\n", status);
 
 	return status;
 }
@@ -1270,8 +1264,7 @@ int ipc_start(void)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "ipc_start failed: status [0x%x]\n",
-								status);
+		pr_err("ipc_start failed: status [0x%x]\n", status);
 
 	return status;
 }
@@ -1360,7 +1353,7 @@ int ipc_stop(void)
 	}
 exit:
 	if (status < 0)
-		printk(KERN_ERR "ipc_stop failed: status [0x%x]\n", status);
+		pr_err("ipc_stop failed: status [0x%x]\n", status);
 
 	return status;
 }
@@ -1393,9 +1386,7 @@ void ipc_get_config(struct ipc_config *cfg_params)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "ipc_get_config failed: status [0x%x]\n",
-								status);
-
+		pr_err("ipc_get_config failed: status [0x%x]\n", status);
 }
 
 
@@ -1445,7 +1436,7 @@ int ipc_setup(const struct ipc_config *cfg)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "ipc_setup failed: status [0x%x]\n", status);
+		pr_err("ipc_setup failed: status [0x%x]\n", status);
 
 	return status;
 }
@@ -1494,7 +1485,7 @@ int ipc_destroy(void)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "ipc_destroy failed: status [0x%x]\n", status);
+		pr_err("ipc_destroy failed: status [0x%x]\n", status);
 
 	return status;
 }

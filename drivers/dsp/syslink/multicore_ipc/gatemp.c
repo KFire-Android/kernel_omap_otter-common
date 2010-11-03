@@ -238,8 +238,7 @@ void gatemp_get_config(struct gatemp_config *cfg)
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "gatemp_get_config failed! status = 0x%x",
-			retval);
+		pr_err("gatemp_get_config failed! status = 0x%x", retval);
 	return;
 }
 
@@ -418,7 +417,7 @@ error_nameserver:
 	kfree(gatemp_module->gate_mutex);
 	gatemp_module->gate_mutex = NULL;
 exit:
-	printk(KERN_ERR "gatemp_setup failed! status = 0x%x", retval);
+	pr_err("gatemp_setup failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -476,7 +475,7 @@ s32 gatemp_destroy(void)
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "gatemp_destroy failed! status = 0x%x", retval);
+		pr_err("gatemp_destroy failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -851,8 +850,7 @@ proxy_work:
 	}
 
 	if (retval != 0) {
-		printk(KERN_ERR "gatemp_instance_init failed! status = 0x%x",
-			retval);
+		pr_err("gatemp_instance_init failed! status = 0x%x", retval);
 	}
 	return retval;
 }
@@ -971,7 +969,7 @@ static void gatemp_instance_finalize(struct gatemp_object *obj, int status)
 
 exit:
 	if (retval < 0) {
-		printk(KERN_ERR "gatemp_instance_finalize failed! "
+		pr_err("gatemp_instance_finalize failed! "
 			"status = 0x%x", retval);
 	}
 	return;
@@ -1049,7 +1047,7 @@ int gatemp_open(char *name, void **handle)
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "gatemp_open failed! status = 0x%x", retval);
+		pr_err("gatemp_open failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -1155,10 +1153,8 @@ int gatemp_open_by_addr(void *shared_addr, void **handle)
 	}
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "gatemp_open_by_addr failed! status = 0x%x",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("gatemp_open_by_addr failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -1206,7 +1202,7 @@ int gatemp_close(void **handle)
 	return 0;
 
 exit:
-	printk(KERN_ERR "gatemp_close failed! status = 0x%x", retval);
+	pr_err("gatemp_close failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -1449,7 +1445,7 @@ static void gatemp_set_region0_reserved(void *shared_addr)
 
 static void gatemp_clear_region0_reserved(void)
 {
-	printk(KERN_INFO "gatemp_clear_region0_reserved: either nothing to do "
+	pr_info("gatemp_clear_region0_reserved: either nothing to do "
 		"or not implemented");
 }
 
@@ -1516,7 +1512,7 @@ static void gatemp_open_region0_reserved(void *shared_addr)
 
 static void gatemp_close_region0_reserved(void *shared_addr)
 {
-	printk(KERN_INFO "gatemp_close_region0_reserved: either nothing to do "
+	pr_info("gatemp_close_region0_reserved: either nothing to do "
 		"or not implemented");
 }
 
@@ -1577,7 +1573,7 @@ int gatemp_start(void *shared_addr)
 	}
 
 	if (retval < 0)
-		printk(KERN_ERR "gatemp_start failed! status = 0x%x", retval);
+		pr_err("gatemp_start failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -1683,7 +1679,7 @@ void *gatemp_create(const struct gatemp_params *params)
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "gatemp_create failed! status = 0x%x", retval);
+		pr_err("gatemp_create failed! status = 0x%x", retval);
 	return (void *)handle;
 }
 
@@ -1722,7 +1718,7 @@ gatemp_init_fail:
 	kfree(obj);
 	obj = NULL;
 exit:
-	printk(KERN_ERR "_gatemp_create failed! status = 0x%x", retval);
+	pr_err("_gatemp_create failed! status = 0x%x", retval);
 	return (void *)NULL;
 }
 
@@ -1776,7 +1772,7 @@ int gatemp_delete(void **handle)
 	return 0;
 
 exit:
-	printk(KERN_ERR "gatemp_delete failed! status = 0x%x", retval);
+	pr_err("gatemp_delete failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -1823,7 +1819,7 @@ int gatemp_attach(u16 remote_proc_id, void *shared_addr)
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "gatemp_attach failed! status = 0x%x", retval);
+		pr_err("gatemp_attach failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -1857,6 +1853,6 @@ int gatemp_detach(u16 remote_proc_id, void *shared_addr)
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "gatemp_detach failed! status = 0x%x", retval);
+		pr_err("gatemp_detach failed! status = 0x%x", retval);
 	return retval;
 }

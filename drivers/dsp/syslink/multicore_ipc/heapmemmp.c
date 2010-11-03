@@ -155,7 +155,7 @@ int heapmemmp_get_config(struct heapmemmp_config *cfgparams)
 					sizeof(struct heapmemmp_config));
 	return 0;
 error:
-	printk(KERN_ERR "heapmemmp_get_config failed status: %x\n", retval);
+	pr_err("heapmemmp_get_config failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapmemmp_get_config);
@@ -233,7 +233,7 @@ int heapmemmp_setup(const struct heapmemmp_config *cfg)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapmemmp_setup failed status: %x\n", retval);
+	pr_err("heapmemmp_setup failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapmemmp_setup);
@@ -304,7 +304,7 @@ int heapmemmp_destroy(void)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapmemmp_destroy failed status: %x\n", retval);
+	pr_err("heapmemmp_destroy failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapmemmp_destroy);
@@ -331,7 +331,7 @@ void heapmemmp_params_init(struct heapmemmp_params *params)
 
 	return;
 error:
-	printk(KERN_ERR "heapmemmp_params_init failed status: %x\n", retval);
+	pr_err("heapmemmp_params_init failed status: %x\n", retval);
 }
 EXPORT_SYMBOL(heapmemmp_params_init);
 
@@ -543,7 +543,7 @@ error:
 		heapmemmp_delete(handle_ptr);
 	else
 		heapmemmp_close(handle_ptr);
-	printk(KERN_ERR "_heapmemmp_create failed status: %x\n", retval);
+	pr_err("_heapmemmp_create failed status: %x\n", retval);
 	return retval;
 }
 
@@ -583,7 +583,7 @@ void *heapmemmp_create(const struct heapmemmp_params *params)
 	return (void *)handle;
 
 error:
-	printk(KERN_ERR "heapmemmp_create failed status: %x\n", retval);
+	pr_err("heapmemmp_create failed status: %x\n", retval);
 	return (void *)handle;
 }
 EXPORT_SYMBOL(heapmemmp_create);
@@ -696,7 +696,7 @@ device_busy_error:
 	gatemp_leave(obj->gate, key);
 
 error:
-	printk(KERN_ERR "heapmemmp_delete failed status: %x\n", retval);
+	pr_err("heapmemmp_delete failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapmemmp_delete);
@@ -785,7 +785,7 @@ int heapmemmp_open(char *name, void **handle_ptr)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapmemmp_open failed status: %x\n", retval);
+	pr_err("heapmemmp_open failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapmemmp_open);
@@ -857,7 +857,7 @@ int heapmemmp_close(void **handle_ptr)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapmemmp_close failed status: %x\n", retval);
+	pr_err("heapmemmp_close failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapmemmp_close);
@@ -1102,11 +1102,11 @@ void *heapmemmp_alloc(void *hphandle, u32 size, u32 align)
 	gatemp_leave(obj->gate, key);
 
 	if (alloc_addr == NULL)
-		printk(KERN_ERR "heapmemmp_alloc returned NULL\n");
+		pr_err("heapmemmp_alloc returned NULL\n");
 	return alloc_addr;
 
 error:
-	printk(KERN_ERR "heapmemmp_alloc failed status: %x\n", retval);
+	pr_err("heapmemmp_alloc failed status: %x\n", retval);
 	return NULL;
 }
 EXPORT_SYMBOL(heapmemmp_alloc);
@@ -1269,7 +1269,7 @@ int heapmemmp_free(void *hphandle, void *addr, u32 size)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapmemmp_free failed status: %x\n", retval);
+	pr_err("heapmemmp_free failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapmemmp_free);
@@ -1342,7 +1342,7 @@ void heapmemmp_get_stats(void *hphandle, struct memory_stats *stats)
 	gatemp_leave(obj->gate, key);
 error:
 	if (status < 0)
-		printk(KERN_ERR "heapmemmp_get_stats status: %x\n", status);
+		pr_err("heapmemmp_get_stats status: %x\n", status);
 }
 EXPORT_SYMBOL(heapmemmp_get_stats);
 
@@ -1367,7 +1367,7 @@ bool heapmemmp_isblocking(void *handle)
 	return isblocking;
 
 error:
-	printk(KERN_ERR "heapmemmp_isblocking status: %x\n", retval);
+	pr_err("heapmemmp_isblocking status: %x\n", retval);
 	return isblocking;
 }
 EXPORT_SYMBOL(heapmemmp_isblocking);
@@ -1414,8 +1414,7 @@ void heapmemmp_get_extended_stats(void *hphandle,
 	return;
 
 error:
-	printk(KERN_ERR "heapmemmp_get_extended_stats status: %x\n",
-			status);
+	pr_err("heapmemmp_get_extended_stats status: %x\n", status);
 }
 EXPORT_SYMBOL(heapmemmp_get_extended_stats);
 
@@ -1461,8 +1460,7 @@ int heapmemmp_shared_mem_req(const struct heapmemmp_params *params)
 	return mem_req;
 
 error:
-	printk(KERN_ERR "heapmemmp_shared_mem_req retval: %x\n",
-		retval);
+	pr_err("heapmemmp_shared_mem_req retval: %x\n", retval);
 	return mem_req;
 }
 EXPORT_SYMBOL(heapmemmp_shared_mem_req);
@@ -1544,8 +1542,7 @@ heapmemmp_open_by_addr(void *shared_addr, void **handle_ptr)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapmemmp_open_by_addr status: %x\n",
-		retval);
+	pr_err("heapmemmp_open_by_addr status: %x\n", retval);
 	return retval;
 }
 
@@ -1625,8 +1622,7 @@ static int heapmemmp_post_init(struct heapmemmp_object *handle)
 
 	return 0;
 error:
-	printk(KERN_ERR "heapmemmp_post_init status: %x\n",
-		retval);
+	pr_err("heapmemmp_post_init status: %x\n", retval);
 	return retval;
 }
 

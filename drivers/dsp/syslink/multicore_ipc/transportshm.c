@@ -202,7 +202,7 @@ void transportshm_get_config(struct transportshm_config *cfg)
 	return;
 
 exit:
-	printk(KERN_ERR "transportshm_get_config: Argument of type"
+	pr_err("transportshm_get_config: Argument of type"
 		"(struct transportshm_config *) passed is null!\n");
 }
 
@@ -253,8 +253,7 @@ int transportshm_setup(const struct transportshm_config *cfg)
 		/* @retval TRANSPORTSHM_E_FAIL Failed to create
 		GateMutex! */
 		status = TRANSPORTSHM_E_FAIL;
-		printk(KERN_ERR "transportshm_setup: Failed to create "
-			"mutex!\n");
+		pr_err("transportshm_setup: Failed to create mutex!\n");
 		atomic_set(&transportshm_module->ref_count,
 				TRANSPORTSHM_MAKE_MAGICSTAMP(0));
 		goto exit;
@@ -269,8 +268,7 @@ int transportshm_setup(const struct transportshm_config *cfg)
 	return status;
 
 exit:
-	printk(KERN_ERR "transportshm_setup failed: status = 0x%x",
-		status);
+	pr_err("transportshm_setup failed: status = 0x%x", status);
 	return status;
 }
 
@@ -343,8 +341,7 @@ int transportshm_destroy(void)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "transportshm_destroy failed: "
-			"status = 0x%x\n", status);
+		pr_err("transportshm_destroy failed: status = 0x%x\n", status);
 	return status;
 }
 
@@ -360,13 +357,13 @@ void transportshm_params_init(struct transportshm_params *params)
 			&(transportshm_module->ref_count),
 			TRANSPORTSHM_MAKE_MAGICSTAMP(0),
 			TRANSPORTSHM_MAKE_MAGICSTAMP(1)) == true)) {
-		printk(KERN_ERR "transportshm_params_init: Module was "
+		pr_err("transportshm_params_init: Module was "
 				" not initialized\n");
 		goto exit;
 	}
 
 	if (WARN_ON(params == NULL)) {
-		printk(KERN_ERR "transportshm_params_init: Argument of"
+		pr_err("transportshm_params_init: Argument of"
 				" type (struct transportshm_params *) "
 				"is NULL!");
 		goto exit;
@@ -423,8 +420,7 @@ void *transportshm_create(u16 proc_id,
 	return handle;
 
 exit:
-	printk(KERN_ERR "transportshm_create failed: status = 0x%x\n",
-		status);
+	pr_err("transportshm_create failed: status = 0x%x\n", status);
 	return handle;
 }
 
@@ -455,7 +451,7 @@ int transportshm_delete(void **handle_ptr)
 	}
 	if (WARN_ON(*handle_ptr == NULL)) {
 		status = -EINVAL;
-		printk(KERN_WARNING "transportshm_delete: Invalid NULL"
+		pr_warn("transportshm_delete: Invalid NULL"
 			" mqtshm_handle specified! status = 0x%x\n", status);
 		goto exit;
 	}
@@ -487,7 +483,7 @@ int transportshm_delete(void **handle_ptr)
 		if (handle->local_list != NULL) {
 			status = listmp_delete(&handle->local_list);
 			if (status < 0)
-				printk(KERN_WARNING "transportshm_delete: "
+				pr_warn("transportshm_delete: "
 						"Failed to delete local listmp "
 						"instance!\n");
 		}
@@ -496,7 +492,7 @@ int transportshm_delete(void **handle_ptr)
 			tmp_status = listmp_close(&handle->remote_list);
 			if ((tmp_status < 0) && (status >= 0)) {
 				status = tmp_status;
-				printk(KERN_WARNING "transportshm_delete: "
+				pr_warn("transportshm_delete: "
 						"Failed to close remote listmp "
 						"instance!\n");
 			}
@@ -511,7 +507,7 @@ int transportshm_delete(void **handle_ptr)
 						handle->notify_event_id);
 		if (tmp_status < 0) {
 			status = tmp_status;
-			printk(KERN_WARNING "transportshm_delete: Failed to "
+			pr_warn("transportshm_delete: Failed to "
 					"unregister notify event!\n");
 		}
 
@@ -523,7 +519,7 @@ int transportshm_delete(void **handle_ptr)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "transportshm_delete failed: "
+		pr_err("transportshm_delete failed: "
 			"status = 0x%x\n", status);
 	return status;
 }
@@ -605,8 +601,7 @@ transportshm_open_by_addr(void *shared_addr, void **handle_ptr)
 	return status;
 
 exit:
-	printk(KERN_ERR "transportshm_open_by_addr failed: status = 0x%x\n",
-		status);
+	pr_err("transportshm_open_by_addr failed: status = 0x%x\n", status);
 	return status;
 }
 
@@ -659,7 +654,7 @@ transportshm_close(void **handle_ptr)
 		status = gatemp_close(&obj->gate);
 		if (status < 0) {
 			status = TRANSPORTSHM_E_FAIL;
-			printk(KERN_ERR "transportshm_close: "
+			pr_err("transportshm_close: "
 				"gatemp_close failed, status [0x%x]\n",
 				status);
 		}
@@ -669,7 +664,7 @@ transportshm_close(void **handle_ptr)
 		tmp_status = listmp_close(&obj->local_list);
 		if ((tmp_status < 0) && (status >= 0)) {
 			status = TRANSPORTSHM_E_FAIL;
-			printk(KERN_ERR "transportshm_close: "
+			pr_err("transportshm_close: "
 				"listmp_close(local_list) failed, "
 				"status [0x%x]\n", status);
 		}
@@ -679,7 +674,7 @@ transportshm_close(void **handle_ptr)
 		tmp_status = listmp_close(&obj->remote_list);
 		if ((tmp_status < 0) && (status >= 0)) {
 			status = TRANSPORTSHM_E_FAIL;
-			printk(KERN_ERR "transportshm_close: "
+			pr_err("transportshm_close: "
 				"listmp_close(remote_list) failed, "
 				"status [0x%x]\n", status);
 		}
@@ -697,8 +692,7 @@ transportshm_close(void **handle_ptr)
 	*handle_ptr = NULL;
 exit:
 	if (status < 0)
-		printk(KERN_ERR "transportshm_close failed: status = 0x%x\n",
-								status);
+		pr_err("transportshm_close failed: status = 0x%x\n", status);
 	return status;
 }
 
@@ -744,7 +738,7 @@ int transportshm_put(void *handle, void *msg)
 	/*key = gatemp_enter(obj->gate);*/
 	status = listmp_put_tail(obj->remote_list, (struct listmp_elem *) msg);
 	if (status < 0) {
-		printk(KERN_ERR "transportshm_put: Failed to put "
+		pr_err("transportshm_put: Failed to put "
 			"message in the shared list! status = 0x%x\n", status);
 		goto exit_with_gate;
 	}
@@ -758,7 +752,7 @@ int transportshm_put(void *handle, void *msg)
 
 
 notify_send_fail:
-	printk(KERN_ERR "transportshm_put: Notification to remote "
+	pr_err("transportshm_put: Notification to remote "
 		"processor failed, status = 0x%x\n", status);
 	/* If sending the event failed, then remove the element from the */
 	/* list.  Ignore the status of remove. */
@@ -768,8 +762,7 @@ exit_with_gate:
 	/*gatemp_leave(obj->gate, key);*/
 exit:
 	if (status < 0)
-		printk(KERN_ERR "transportshm_put failed: "
-			"status = 0x%x\n", status);
+		pr_err("transportshm_put failed: status = 0x%x\n", status);
 	return status;
 }
 
@@ -782,7 +775,7 @@ int transportshm_control(void *handle, u32 cmd, u32 *cmd_arg)
 {
 	BUG_ON(handle == NULL);
 
-	printk(KERN_ALERT "transportshm_control not supported!\n");
+	pr_err("transportshm_control not supported!\n");
 	return TRANSPORTSHM_E_NOTSUPPORTED;
 }
 
@@ -845,7 +838,7 @@ u32 transportshm_shared_mem_req(const struct transportshm_params *params)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "transportshm_shared_mem_req failed: "
+		pr_err("transportshm_shared_mem_req failed: "
 			"status = 0x%x\n", status);
 
 	return mem_req;
@@ -902,8 +895,7 @@ static void _transportshm_notify_fxn(u16 proc_id, u16 line_id, u32 event_no,
 exit:
 	mutex_unlock(transportshm_state.gate_handle);
 mutex_fail:
-	printk(KERN_ERR "transportshm_notify_fxn: argument passed is "
-		"NULL!\n");
+	pr_err("transportshm_notify_fxn: argument passed is NULL!\n");
 	return;
 }
 

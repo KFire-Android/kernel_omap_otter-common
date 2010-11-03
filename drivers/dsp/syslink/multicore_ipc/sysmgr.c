@@ -197,7 +197,7 @@ void sysmgr_get_config(struct sysmgr_config *config)
 
 	if (WARN_ON(config == NULL)) {
 		status = -EINVAL;
-		printk(KERN_ALERT "sysmgr_get_config [0x%x] : Argument of type"
+		pr_err("sysmgr_get_config [0x%x] : Argument of type"
 				" (sysmgr_get_config *) passed is null!",
 				status);
 		return;
@@ -384,10 +384,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 	/* Initialize PlatformMem */
 	status = platform_mem_setup();
 	if (status < 0) {
-		printk(KERN_ERR "sysmgr_setup : platform_mem_setup "
+		pr_err("sysmgr_setup : platform_mem_setup "
 			"failed [0x%x]\n", status);
 	} else {
-		printk(KERN_ERR "platform_mem_setup : status [0x%x]\n" ,
+		pr_err("platform_mem_setup : status [0x%x]\n" ,
 			status);
 		sysmgr_state.platform_mem_init_flag = true;
 	}
@@ -397,10 +397,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 
 	status = multiproc_setup(&(config->multiproc_cfg));
 	if (status < 0) {
-		printk(KERN_ERR "sysmgr_setup : multiproc_setup "
+		pr_err("sysmgr_setup : multiproc_setup "
 			"failed [0x%x]\n", status);
 	} else {
-		printk(KERN_ERR "sysmgr_setup : status [0x%x]\n" , status);
+		pr_err("sysmgr_setup : status [0x%x]\n" , status);
 		sysmgr_state.multiproc_init_flag = true;
 	}
 
@@ -408,10 +408,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 	if (status >= 0) {
 		status = proc_mgr_setup(&(config->proc_mgr_cfg));
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : proc_mgr_setup "
+			pr_err("sysmgr_setup : proc_mgr_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "proc_mgr_setup : status [0x%x]\n" ,
+			pr_err("proc_mgr_setup : status [0x%x]\n" ,
 				status);
 			sysmgr_state.proc_mgr_init_flag = true;
 		}
@@ -421,10 +421,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 	if (status >= 0) {
 		status = sharedregion_setup(&config->sharedregion_cfg);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : sharedregion_setup "
+			pr_err("sysmgr_setup : sharedregion_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "sharedregion_setup : status [0x%x]\n" ,
+			pr_err("sharedregion_setup : status [0x%x]\n" ,
 				status);
 			sysmgr_state.sharedregion_init_flag = true;
 		}
@@ -434,10 +434,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 	if (status >= 0) {
 		status = notify_setup(&config->notify_cfg);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : notify_setup "
+			pr_err("sysmgr_setup : notify_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "notify_setup : status [0x%x]\n" ,
+			pr_err("notify_setup : status [0x%x]\n" ,
 				status);
 			sysmgr_state.notify_init_flag = true;
 		}
@@ -447,10 +447,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 	if (status >= 0) {
 		status = nameserver_setup();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : nameserver_setup "
+			pr_err("sysmgr_setup : nameserver_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "nameserver_setup : status [0x%x]\n" ,
+			pr_err("nameserver_setup : status [0x%x]\n" ,
 				status);
 			sysmgr_state.nameserver_init_flag = true;
 		}
@@ -460,10 +460,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 	if (status >= 0) {
 		status = gatepeterson_setup(&config->gatepeterson_cfg);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : gatepeterson_setup "
+			pr_err("sysmgr_setup : gatepeterson_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "gatepeterson_setup : status [0x%x]\n" ,
+			pr_err("gatepeterson_setup : status [0x%x]\n" ,
 				status);
 			sysmgr_state.gatepeterson_init_flag = true;
 		}
@@ -473,10 +473,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 	if (status >= 0) {
 		status = messageq_setup(&config->messageq_cfg);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : messageq_setup "
+			pr_err("sysmgr_setup : messageq_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "messageq_setup : status [0x%x]\n" ,
+			pr_err("messageq_setup : status [0x%x]\n" ,
 				status);
 			sysmgr_state.messageq_init_flag = true;
 		}
@@ -486,10 +486,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 	if (status >= 0) {
 		status = heapbuf_setup(&config->heapbuf_cfg);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : heapbuf_setup "
+			pr_err("sysmgr_setup : heapbuf_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "heapbuf_setup : status [0x%x]\n" ,
+			pr_err("heapbuf_setup : status [0x%x]\n" ,
 				status);
 			sysmgr_state.heapbuf_init_flag = true;
 		}
@@ -500,11 +500,11 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 		status = listmp_sharedmemory_setup(
 				&config->listmp_sharedmemory_cfg);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : "
+			pr_err("sysmgr_setup : "
 				"listmp_sharedmemory_setup failed [0x%x]\n",
 				status);
 		} else {
-			printk(KERN_ERR "listmp_sharedmemory_setup : "
+			pr_err("listmp_sharedmemory_setup : "
 				"status [0x%x]\n" , status);
 			sysmgr_state.listmp_sharedmemory_init_flag = true;
 		}
@@ -515,11 +515,11 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 		status = messageq_transportshm_setup(
 				 &config->messageq_transportshm_cfg);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : "
+			pr_err("sysmgr_setup : "
 				"messageq_transportshm_setup failed [0x%x]\n",
 				status);
 		} else {
-			printk(KERN_ERR "messageq_transportshm_setup : "
+			pr_err("messageq_transportshm_setup : "
 				"status [0x%x]\n", status);
 			sysmgr_state.messageq_transportshm_init_flag = true;
 		}
@@ -529,11 +529,11 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 	if (status >= 0) {
 		status = notify_ducatidrv_setup(&config->notify_ducatidrv_cfg);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : "
+			pr_err("sysmgr_setup : "
 				"notify_ducatidrv_setup failed [0x%x]\n",
 				status);
 		} else {
-			printk(KERN_ERR "notify_ducatidrv_setup : "
+			pr_err("notify_ducatidrv_setup : "
 				"status [0x%x]\n" , status);
 			sysmgr_state.notify_ducatidrv_init_flag = true;
 		}
@@ -544,11 +544,11 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 		status = nameserver_remotenotify_setup(
 				 &config->nameserver_remotenotify_cfg);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : "
+			pr_err("sysmgr_setup : "
 				"nameserver_remotenotify_setup failed [0x%x]\n",
 				status);
 		} else {
-			printk(KERN_ERR "nameserver_remotenotify_setup : "
+			pr_err("nameserver_remotenotify_setup : "
 				"status [0x%x]\n" , status);
 			sysmgr_state.nameserver_remotenotify_init_flag = true;
 		}
@@ -558,10 +558,10 @@ s32 sysmgr_setup(const struct sysmgr_config *cfg)
 		/* Call platform setup function */
 		status = platform_setup(config);
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_setup : platform_setup "
+			pr_err("sysmgr_setup : platform_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "platform_setup : status [0x%x]\n" ,
+			pr_err("platform_setup : status [0x%x]\n" ,
 				status);
 			sysmgr_state.platform_init_flag = true;
 		}
@@ -602,7 +602,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.platform_init_flag == true) {
 		status = platform_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : platform_destroy "
+			pr_err("sysmgr_destroy : platform_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.platform_init_flag = false;
@@ -613,7 +613,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.nameserver_remotenotify_init_flag == true) {
 		status = nameserver_remotenotify_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : "
+			pr_err("sysmgr_destroy : "
 				"nameserver_remotenotify_destroy "
 				"failed [0x%x]\n", status);
 		} else {
@@ -626,7 +626,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.notify_ducatidrv_init_flag == true) {
 		status = notify_ducatidrv_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : "
+			pr_err("sysmgr_destroy : "
 				"notify_ducatidrv_destroy failed [0x%x]\n",
 				status);
 		} else {
@@ -638,7 +638,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.messageq_transportshm_init_flag == true) {
 		status = messageq_transportshm_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : "
+			pr_err("sysmgr_destroy : "
 				"messageq_transportshm_destroy failed [0x%x]\n",
 				status);
 		} else {
@@ -651,7 +651,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.listmp_sharedmemory_init_flag == true) {
 		status = listmp_sharedmemory_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : "
+			pr_err("sysmgr_destroy : "
 				"listmp_sharedmemory_destroy failed [0x%x]\n",
 				status);
 		} else {
@@ -664,7 +664,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.heapbuf_init_flag == true) {
 		status = heapbuf_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : heapbuf_destroy "
+			pr_err("sysmgr_destroy : heapbuf_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.heapbuf_init_flag = false;
@@ -675,7 +675,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.messageq_init_flag == true) {
 		status = messageq_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : messageq_destroy "
+			pr_err("sysmgr_destroy : messageq_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.messageq_init_flag = false;
@@ -686,7 +686,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.gatepeterson_init_flag == true) {
 		status = gatepeterson_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : "
+			pr_err("sysmgr_destroy : "
 				"gatepeterson_destroy failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.gatepeterson_init_flag = false;
@@ -697,7 +697,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.nameserver_init_flag == true) {
 		status = nameserver_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : nameserver_destroy "
+			pr_err("sysmgr_destroy : nameserver_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.nameserver_init_flag = false;
@@ -708,7 +708,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.notify_init_flag == true) {
 		status = notify_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : sysmgr_destroy "
+			pr_err("sysmgr_destroy : sysmgr_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.notify_init_flag = false;
@@ -719,7 +719,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.sharedregion_init_flag == true) {
 		status = sharedregion_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : "
+			pr_err("sysmgr_destroy : "
 				"sharedregion_destroy failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.sharedregion_init_flag = false;
@@ -730,7 +730,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.proc_mgr_init_flag == true) {
 		status = proc_mgr_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : proc_mgr_destroy "
+			pr_err("sysmgr_destroy : proc_mgr_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.proc_mgr_init_flag = false;
@@ -741,7 +741,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.multiproc_init_flag == true) {
 		status = multiproc_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : multiproc_destroy "
+			pr_err("sysmgr_destroy : multiproc_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.proc_mgr_init_flag = false;
@@ -752,7 +752,7 @@ s32 sysmgr_destroy(void)
 	if (sysmgr_state.platform_mem_init_flag == true) {
 		status = platform_mem_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "sysmgr_destroy : platform_mem_destroy "
+			pr_err("sysmgr_destroy : platform_mem_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			sysmgr_state.platform_mem_init_flag = false;
@@ -763,7 +763,7 @@ s32 sysmgr_destroy(void)
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "sysmgr_destroy : failed with "
+		pr_err("sysmgr_destroy : failed with "
 			"status = [0x%x]\n", status);
 	}
 	return status;
@@ -781,7 +781,7 @@ void sysmgr_set_boot_load_page(u16 proc_id, u32 boot_load_page)
 		(struct sysmgr_boot_load_page *) boot_load_page;
 
 	if ((proc_id < 0) || (proc_id >= MULTIPROC_MAXPROCESSORS)) {
-		printk(KERN_ERR
+		pr_err(
 		"sysmgr_set_boot_load_page failed: Invalid proc_id passed\n");
 		return;
 	}
@@ -804,17 +804,17 @@ void sysmgr_wait_for_scalability_info(u16 proc_id)
 	VOLATILE struct sysmgr_boot_load_page *temp = NULL;
 
 	if ((proc_id < 0) || (proc_id >= MULTIPROC_MAXPROCESSORS)) {
-		printk(KERN_ERR "sysmgr_wait_for_scalability_info failed: "
+		pr_err("sysmgr_wait_for_scalability_info failed: "
 			"Invalid proc_id passed\n");
 		return;
 	}
 	temp = sysmgr_state.boot_load_page[proc_id];
 
-	printk(KERN_ERR "sysmgr_wait_for_scalability_info: BF while temp->handshake:%x\n",
+	pr_err("sysmgr_wait_for_scalability_info: BF while temp->handshake:%x\n",
 		temp->handshake);
 	while (temp->handshake != SYSMGR_SCALABILITYHANDSHAKESTAMP)
 		;
-	printk(KERN_ERR "sysmgr_wait_for_scalability_info:AF while temp->handshake:%x\n",
+	pr_err("sysmgr_wait_for_scalability_info:AF while temp->handshake:%x\n",
 		temp->handshake);
 
 	/* Reset the handshake value for reverse synchronization */
@@ -832,7 +832,7 @@ void sysmgr_wait_for_slave_setup(u16 proc_id)
 	VOLATILE struct sysmgr_boot_load_page *temp = NULL;
 
 	if ((proc_id < 0) || (proc_id >= MULTIPROC_MAXPROCESSORS)) {
-		printk(KERN_ERR "sysmgr_wait_for_slave_setup failed: "
+		pr_err("sysmgr_wait_for_slave_setup failed: "
 			"Invalid proc_id passed\n");
 		return;
 	}

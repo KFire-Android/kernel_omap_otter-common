@@ -369,14 +369,13 @@ static int __init ipc_init(void)
 	ipc_major = MAJOR(dev);
 
 	if (retval < 0) {
-		printk(KERN_ERR "ipc_init: can't get major %x\n", ipc_major);
+		pr_err("ipc_init: can't get major %x\n", ipc_major);
 		goto exit;
 	}
 
 	ipc_device = kmalloc(sizeof(struct ipc_device), GFP_KERNEL);
 	if (!ipc_device) {
-		printk(KERN_ERR "ipc_init: memory allocation failed for "
-			"ipc_device\n");
+		pr_err("ipc_init: memory allocation failed for ipc_device\n");
 		retval = -ENOMEM;
 		goto unreg_exit;
 	}
@@ -387,13 +386,13 @@ static int __init ipc_init(void)
 
 	retval = ipc_modules_init();
 	if (retval) {
-		printk(KERN_ERR "ipc_init: ipc initialization failed\n");
+		pr_err("ipc_init: ipc initialization failed\n");
 		goto unreg_exit;
 
 	}
 	ipc_class = class_create(THIS_MODULE, "syslink_ipc");
 	if (IS_ERR(ipc_class)) {
-		printk(KERN_ERR "ipc_init: error creating ipc class\n");
+		pr_err("ipc_init: error creating ipc class\n");
 		retval = PTR_ERR(ipc_class);
 		goto unreg_exit;
 	}
@@ -404,7 +403,7 @@ static int __init ipc_init(void)
 	ipc_device->cdev.owner = THIS_MODULE;
 	retval = cdev_add(&ipc_device->cdev, dev, IPC_DEVICES);
 	if (retval) {
-		printk(KERN_ERR "ipc_init: failed to add the ipc device\n");
+		pr_err("ipc_init: failed to add the ipc device\n");
 		goto class_exit;
 	}
 	return retval;

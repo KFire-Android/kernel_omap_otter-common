@@ -183,7 +183,7 @@ int gatehwspinlock_setup(const struct gatehwspinlock_config *config)
 			lock_handle = hwspinlock_request_specific(i);
 			if (lock_handle == NULL) {
 				retval = -EBUSY;
-				printk(KERN_ERR "hwspinlock_request failed for"
+				pr_err("hwspinlock_request failed for"
 					"id = %d", i);
 				goto spinlock_request_fail;
 			}
@@ -200,8 +200,7 @@ exit:
 	kfree(gatehwspinlock_module->hw_lock_handles);
 	atomic_dec_return(&gatehwspinlock_module->ref_count);
 	if (retval < 0)
-		printk(KERN_ERR "gatehwspinlock_setup failed! status = 0x%x",
-			retval);
+		pr_err("gatehwspinlock_setup failed! status = 0x%x", retval);
 	return retval;
 }
 EXPORT_SYMBOL(gatehwspinlock_setup);
@@ -240,8 +239,7 @@ int gatehwspinlock_destroy(void)
 			lock_handle = gatehwspinlock_module->hw_lock_handles[i];
 			retval = hwspinlock_free(lock_handle);
 			if (retval < 0)
-				printk(KERN_ERR "hwspinlock_free failed for"
-					"id = %d", i);
+				pr_err("hwspinlock_free failed for id = %d", i);
 			gatehwspinlock_module->hw_lock_handles[i] = NULL;
 	}
 	memset(&gatehwspinlock_module->cfg, 0,
@@ -251,12 +249,9 @@ int gatehwspinlock_destroy(void)
 	return 0;
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "gatehwspinlock_destroy failed status:%x\n",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("gatehwspinlock_destroy failed status:%x\n", retval);
 	return retval;
-
 }
 EXPORT_SYMBOL(gatehwspinlock_destroy);
 
@@ -375,7 +370,7 @@ void *gatehwspinlock_create(enum igatempsupport_local_protect local_protect,
 		gatehwspinlock_module->hw_lock_handles[params->resource_id];
 	if (obj->hwhandle == NULL) {
 		retval = -EBUSY;
-		printk(KERN_ERR "hwspinlock_request failed for id = %d",
+		pr_err("hwspinlock_request failed for id = %d",
 			params->resource_id);
 		goto free_obj;
 	}
@@ -385,7 +380,7 @@ void *gatehwspinlock_create(enum igatempsupport_local_protect local_protect,
 free_obj:
 	kfree(obj);
 exit:
-	printk(KERN_ERR "gatehwspinlock_create failed status: %x\n", retval);
+	pr_err("gatehwspinlock_create failed status: %x\n", retval);
 	return NULL;
 }
 EXPORT_SYMBOL(gatehwspinlock_create);
@@ -427,7 +422,7 @@ int gatehwspinlock_delete(void **gphandle)
 	return 0;
 
 exit:
-	printk(KERN_ERR "gatehwspinlock_delete failed status: %x\n", retval);
+	pr_err("gatehwspinlock_delete failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(gatehwspinlock_delete);
@@ -480,8 +475,7 @@ int *gatehwspinlock_enter(void *gphandle)
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "gatehwspinlock_enter failed! status = 0x%x",
-			retval);
+		pr_err("gatehwspinlock_enter failed! status = 0x%x", retval);
 	return key;
 }
 EXPORT_SYMBOL(gatehwspinlock_enter);
@@ -522,8 +516,7 @@ void gatehwspinlock_leave(void *gphandle, int *key)
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "gatehwspinlock_leave failed! status = 0x%x",
-			retval);
+		pr_err("gatehwspinlock_leave failed! status = 0x%x", retval);
 	return;
 }
 EXPORT_SYMBOL(gatehwspinlock_leave);
@@ -552,8 +545,7 @@ static u32 gatehwspinlock_get_resource_id(void *handle)
 	return obj->lock_num;
 
 exit:
-	printk(KERN_ERR "gatehwspinlock_get_resource_id failed status: %x\n",
-		retval);
+	pr_err("gatehwspinlock_get_resource_id failed status: %x\n", retval);
 	return (u32)-1;
 }
 EXPORT_SYMBOL(gatehwspinlock_get_resource_id);

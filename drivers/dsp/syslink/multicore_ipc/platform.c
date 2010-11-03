@@ -640,8 +640,7 @@ platform_get_config(struct platform_config *config)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "platform_get_config failed! status = 0x%x\n",
-								status);
+		pr_err("platform_get_config failed! status = 0x%x\n", status);
 	return;
 }
 
@@ -704,7 +703,7 @@ platform_override_config(struct platform_config *config)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "platform_override_config failed! status "
+		pr_err("platform_override_config failed! status "
 				"= 0x%x\n", status);
 	return status;
 }
@@ -728,10 +727,10 @@ platform_setup(void)
 	/* Initialize PlatformMem */
 	status = platform_mem_setup();
 	if (status < 0) {
-		printk(KERN_ERR "platform_setup : platform_mem_setup "
+		pr_err("platform_setup : platform_mem_setup "
 			"failed [0x%x]\n", status);
 	} else {
-		printk(KERN_ERR "platform_mem_setup : status [0x%x]\n" ,
+		pr_err("platform_mem_setup : status [0x%x]\n" ,
 			status);
 		platform_module->platform_mem_init_flag = true;
 	}
@@ -740,10 +739,10 @@ platform_setup(void)
 
 	status = multiproc_setup(&(config->multiproc_config));
 	if (status < 0) {
-		printk(KERN_ERR "platform_setup : multiproc_setup "
+		pr_err("platform_setup : multiproc_setup "
 			"failed [0x%x]\n", status);
 	} else {
-		printk(KERN_ERR "platform_setup : status [0x%x]\n", status);
+		pr_err("platform_setup : status [0x%x]\n", status);
 		platform_module->multiproc_init_flag = true;
 	}
 
@@ -751,11 +750,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = proc_mgr_setup(&(config->proc_mgr_config));
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : proc_mgr_setup "
+			pr_err("platform_setup : proc_mgr_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "proc_mgr_setup : status [0x%x]\n",
-				status);
+			pr_err("proc_mgr_setup : status [0x%x]\n", status);
 			platform_module->proc_mgr_init_flag = true;
 		}
 	}
@@ -764,11 +762,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = sharedregion_setup(&config->sharedregion_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : sharedregion_setup "
+			pr_err("platform_setup : sharedregion_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "sharedregion_setup : status [0x%x]\n",
-				status);
+			pr_err("sharedregion_setup : status [0x%x]\n", status);
 			platform_module->sharedregion_init_flag = true;
 		}
 	}
@@ -778,11 +775,11 @@ platform_setup(void)
 		status = notify_ducatidrv_setup(&config->
 						notify_ducatidrv_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : "
+			pr_err("platform_setup : "
 				"notify_ducatidrv_setup failed [0x%x]\n",
 				status);
 		} else {
-			printk(KERN_ERR "notify_ducatidrv_setup : "
+			pr_err("notify_ducatidrv_setup : "
 				"status [0x%x]\n", status);
 			platform_module->notify_ducatidrv_init_flag = true;
 		}
@@ -792,11 +789,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = notify_setup(&config->notify_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : notify_setup "
+			pr_err("platform_setup : notify_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "notify_setup : status [0x%x]\n",
-				status);
+			pr_err("notify_setup : status [0x%x]\n", status);
 			platform_module->notify_init_flag = true;
 		}
 	}
@@ -805,11 +801,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = ipu_pm_setup(&config->ipu_pm_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : ipu_pm_setup "
+			pr_err("platform_setup : ipu_pm_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "ipu_pm_setup : status [0x%x]\n",
-				status);
+			pr_err("ipu_pm_setup : status [0x%x]\n", status);
 			platform_module->ipu_pm_init_flag = true;
 		}
 	}
@@ -817,11 +812,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = nameserver_setup();
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : nameserver_setup "
+			pr_err("platform_setup : nameserver_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "nameserver_setup : status [0x%x]\n",
-				status);
+			pr_err("nameserver_setup : status [0x%x]\n", status);
 			platform_module->nameserver_init_flag = true;
 		}
 	}
@@ -830,11 +824,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = gatemp_setup(&config->gatemp_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : gatemp_setup "
+			pr_err("platform_setup : gatemp_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "gatemp_setup : status [0x%x]\n",
-				status);
+			pr_err("gatemp_setup : status [0x%x]\n", status);
 			platform_module->gatemp_init_flag = true;
 		}
 	}
@@ -843,11 +836,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = gatepeterson_setup(&config->gatepeterson_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : gatepeterson_setup "
+			pr_err("platform_setup : gatepeterson_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "gatepeterson_setup : status [0x%x]\n",
-				status);
+			pr_err("gatepeterson_setup : status [0x%x]\n", status);
 			platform_module->gatepeterson_init_flag = true;
 		}
 	}
@@ -859,7 +851,7 @@ platform_setup(void)
 		m_info.is_cached = false;
 		status = platform_mem_map(&m_info);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : platform_mem_map "
+			pr_err("platform_setup : platform_mem_map "
 				"failed [0x%x]\n", status);
 		} else {
 			config->gatehwspinlock_config.num_locks = 32;
@@ -868,7 +860,7 @@ platform_setup(void)
 			status = gatehwspinlock_setup(&config->
 							gatehwspinlock_config);
 			if (status < 0) {
-				printk(KERN_ERR "platform_setup : "
+				pr_err("platform_setup : "
 					"gatehwspinlock_setup failed [0x%x]\n",
 					status);
 			} else
@@ -881,11 +873,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = messageq_setup(&config->messageq_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : messageq_setup "
+			pr_err("platform_setup : messageq_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "messageq_setup : status [0x%x]\n",
-				status);
+			pr_err("messageq_setup : status [0x%x]\n", status);
 			platform_module->messageq_init_flag = true;
 		}
 	}
@@ -894,10 +885,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = ringio_setup(&config->ringio_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : ringio_setup "
+			pr_err("platform_setup : ringio_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "ringio_setup : status [0x%x]\n",
+			pr_err("ringio_setup : status [0x%x]\n",
 				status);
 			platform_module->ringio_init_flag = true;
 		}
@@ -908,11 +899,11 @@ platform_setup(void)
 		status = ringiotransportshm_setup(&config->
 						ringiotransportshm_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : "
+			pr_err("platform_setup : "
 				"ringiotransportshm_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "ringiotransportshm_setup : status "
+			pr_err("ringiotransportshm_setup : status "
 				"[0x%x]\n", status);
 			platform_module->ringiotransportshm_init_flag = true;
 		}
@@ -922,11 +913,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = heapbufmp_setup(&config->heapbufmp_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : heapbufmp_setup "
+			pr_err("platform_setup : heapbufmp_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "heapbufmp_setup : status [0x%x]\n",
-				status);
+			pr_err("heapbufmp_setup : status [0x%x]\n", status);
 			platform_module->heapbufmp_init_flag = true;
 		}
 	}
@@ -935,11 +925,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = heapmemmp_setup(&config->heapmemmp_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : heapmemmp_setup "
+			pr_err("platform_setup : heapmemmp_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "heapmemmp_setup : status [0x%x]\n",
-				status);
+			pr_err("heapmemmp_setup : status [0x%x]\n", status);
 			platform_module->heapmemmp_init_flag = true;
 		}
 	}
@@ -948,10 +937,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = heapmultibuf_setup(&config->heapmultibuf_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : heapmultibuf_setup "
+			pr_err("platform_setup : heapmultibuf_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "heapmultibuf_setup : status [0x%x]\n",
+			pr_err("heapmultibuf_setup : status [0x%x]\n",
 				status);
 			platform_module->heapmultibuf_init_flag = true;
 		}
@@ -962,11 +951,11 @@ platform_setup(void)
 		status = listmp_setup(
 				&config->listmp_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : "
+			pr_err("platform_setup : "
 				"listmp_setup failed [0x%x]\n",
 				status);
 		} else {
-			printk(KERN_ERR "listmp_setup : "
+			pr_err("listmp_setup : "
 				"status [0x%x]\n", status);
 			platform_module->listmp_init_flag = true;
 		}
@@ -977,12 +966,11 @@ platform_setup(void)
 		status = transportshm_setup(
 				 &config->transportshm_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : "
+			pr_err("platform_setup : "
 				"transportshm_setup failed [0x%x]\n",
 				status);
 		} else {
-			printk(KERN_ERR "transportshm_setup : "
-				"status [0x%x]\n", status);
+			pr_err("transportshm_setup : status [0x%x]\n", status);
 			platform_module->transportshm_init_flag = true;
 		}
 	}
@@ -992,11 +980,11 @@ platform_setup(void)
 		status = nameserver_remotenotify_setup(
 				 &config->nameserver_remotenotify_config);
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : "
+			pr_err("platform_setup : "
 				"nameserver_remotenotify_setup failed "
 				"[0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "nameserver_remotenotify_setup : "
+			pr_err("nameserver_remotenotify_setup : "
 				"status [0x%x]\n", status);
 			platform_module->nameserver_remotenotify_init_flag =
 									true;
@@ -1053,11 +1041,10 @@ platform_setup(void)
 	if (status >= 0) {
 		status = _platform_setup();
 		if (status < 0) {
-			printk(KERN_ERR "platform_setup : _platform_setup "
+			pr_err("platform_setup : _platform_setup "
 				"failed [0x%x]\n", status);
 		} else {
-			printk(KERN_ERR "_platform_setup : status [0x%x]\n",
-				status);
+			pr_err("_platform_setup : status [0x%x]\n", status);
 			platform_module->platform_init_flag = true;
 		}
 
@@ -1081,7 +1068,7 @@ platform_destroy(void)
 	if (platform_module->platform_init_flag == true) {
 		status = _platform_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : _platform_destroy "
+			pr_err("platform_destroy : _platform_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->platform_init_flag = false;
@@ -1131,7 +1118,7 @@ platform_destroy(void)
 	if (platform_module->nameserver_remotenotify_init_flag == true) {
 		status = nameserver_remotenotify_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"nameserver_remotenotify_destroy "
 				"failed [0x%x]\n", status);
 		} else {
@@ -1144,7 +1131,7 @@ platform_destroy(void)
 	if (platform_module->transportshm_init_flag == true) {
 		status = transportshm_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"transportshm_destroy failed "
 				"[0x%x]\n", status);
 		} else {
@@ -1157,7 +1144,7 @@ platform_destroy(void)
 	if (platform_module->listmp_init_flag == true) {
 		status = listmp_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"listmp_destroy failed [0x%x]\n",
 				status);
 		} else {
@@ -1170,7 +1157,7 @@ platform_destroy(void)
 	if (platform_module->heapmultibuf_init_flag == true) {
 		status = heapmultibuf_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"heapmultibuf_destroy "
 				"failed [0x%x]\n", status);
 		} else {
@@ -1182,7 +1169,7 @@ platform_destroy(void)
 	if (platform_module->heapbufmp_init_flag == true) {
 		status = heapbufmp_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : heapbufmp_destroy "
+			pr_err("platform_destroy : heapbufmp_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->heapbufmp_init_flag = false;
@@ -1193,7 +1180,7 @@ platform_destroy(void)
 	if (platform_module->heapmemmp_init_flag == true) {
 		status = heapmemmp_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : heapmemmp_destroy "
+			pr_err("platform_destroy : heapmemmp_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->heapmemmp_init_flag = false;
@@ -1204,7 +1191,7 @@ platform_destroy(void)
 	if (platform_module->messageq_init_flag == true) {
 		status = messageq_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : messageq_destroy "
+			pr_err("platform_destroy : messageq_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->messageq_init_flag = false;
@@ -1215,7 +1202,7 @@ platform_destroy(void)
 	if (platform_module->ringio_init_flag == true) {
 		status = ringio_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : ringio_destroy "
+			pr_err("platform_destroy : ringio_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->ringio_init_flag = false;
@@ -1227,7 +1214,7 @@ platform_destroy(void)
 	if (platform_module->ringiotransportshm_init_flag == true) {
 		status = ringiotransportshm_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 					"ringiotransportshm_destroy "
 					"failed [0x%x]\n", status);
 		} else {
@@ -1239,7 +1226,7 @@ platform_destroy(void)
 	if (platform_module->gatepeterson_init_flag == true) {
 		status = gatepeterson_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"gatepeterson_destroy failed [0x%x]\n", status);
 		} else {
 			platform_module->gatepeterson_init_flag = false;
@@ -1250,7 +1237,7 @@ platform_destroy(void)
 	if (platform_module->gatehwspinlock_init_flag == true) {
 		status = gatehwspinlock_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"gatehwspinlock_destroy failed "
 				"[0x%x]\n", status);
 		} else {
@@ -1262,7 +1249,7 @@ platform_destroy(void)
 		u_info.is_cached = false;
 		status = platform_mem_unmap(&u_info);
 		if (status < 0)
-			printk(KERN_ERR "platform_destroy : platform_mem_unmap"
+			pr_err("platform_destroy : platform_mem_unmap"
 						" failed [0x%x]\n", status);
 	}
 
@@ -1270,7 +1257,7 @@ platform_destroy(void)
 	if (platform_module->gatemp_init_flag == true) {
 		status = gatemp_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"gatemp_destroy failed [0x%x]\n", status);
 		} else {
 			platform_module->gatemp_init_flag = false;
@@ -1281,7 +1268,7 @@ platform_destroy(void)
 	if (platform_module->nameserver_init_flag == true) {
 		status = nameserver_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : nameserver_destroy "
+			pr_err("platform_destroy : nameserver_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->nameserver_init_flag = false;
@@ -1291,7 +1278,7 @@ platform_destroy(void)
 	if (platform_module->ipu_pm_init_flag == true) {
 		status = ipu_pm_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : ipu_pm_destroy "
+			pr_err("platform_destroy : ipu_pm_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->ipu_pm_init_flag = false;
@@ -1302,7 +1289,7 @@ platform_destroy(void)
 	if (platform_module->notify_ducatidrv_init_flag == true) {
 		status = notify_ducatidrv_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"notify_ducatidrv_destroy failed [0x%x]\n",
 				status);
 		} else {
@@ -1314,7 +1301,7 @@ platform_destroy(void)
 	if (platform_module->notify_init_flag == true) {
 		status = notify_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : notify_destroy "
+			pr_err("platform_destroy : notify_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->notify_init_flag = false;
@@ -1325,7 +1312,7 @@ platform_destroy(void)
 	if (platform_module->sharedregion_init_flag == true) {
 		status = sharedregion_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"sharedregion_destroy failed [0x%x]\n", status);
 		} else {
 			platform_module->sharedregion_init_flag = false;
@@ -1336,7 +1323,7 @@ platform_destroy(void)
 	if (platform_module->proc_mgr_init_flag == true) {
 		status = proc_mgr_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : proc_mgr_destroy "
+			pr_err("platform_destroy : proc_mgr_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->proc_mgr_init_flag = false;
@@ -1347,7 +1334,7 @@ platform_destroy(void)
 	if (platform_module->multiproc_init_flag == true) {
 		status = multiproc_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : multiproc_destroy "
+			pr_err("platform_destroy : multiproc_destroy "
 				"failed [0x%x]\n", status);
 		} else {
 			platform_module->multiproc_init_flag = false;
@@ -1358,7 +1345,7 @@ platform_destroy(void)
 	if (platform_module->platform_mem_init_flag == true) {
 		status = platform_mem_destroy();
 		if (status < 0) {
-			printk(KERN_ERR "platform_destroy : "
+			pr_err("platform_destroy : "
 				"platform_mem_destroy failed [0x%x]\n", status);
 		} else {
 			platform_module->platform_mem_init_flag = false;
@@ -1400,7 +1387,7 @@ static s32 _platform_setup(void)
 	/* Get MultiProc ID by name. */
 	proc_id = multiproc_get_id("SysM3");
 	if (proc_id >= MULTIPROC_MAXPROCESSORS) {
-		printk(KERN_ERR "multi proc returned invalid proc id\n");
+		pr_err("multi proc returned invalid proc id\n");
 		goto multiproc_id_fail;
 	}
 	handle = &platform_objects[proc_id];
@@ -1438,7 +1425,7 @@ static s32 _platform_setup(void)
 	/* Get MultiProc ID by name. */
 	proc_id = multiproc_get_id("AppM3");
 	if (proc_id >= MULTIPROC_MAXPROCESSORS) {
-		printk(KERN_ERR "multi proc returned invalid proc id\n");
+		pr_err("multi proc returned invalid proc id\n");
 		goto proc_mgr_create_fail;
 	}
 	handle = &platform_objects[proc_id];
@@ -1470,7 +1457,7 @@ static s32 _platform_setup(void)
 	/* Get MultiProc ID by name. */
 	proc_id = multiproc_get_id("Tesla");
 	if (proc_id >= MULTIPROC_MAXPROCESSORS) {
-		printk(KERN_ERR "multi proc returned invalid proc id\n");
+		pr_err("multi proc returned invalid proc id\n");
 		goto multiproc_id_fail;
 	}
 	handle = &platform_objects[proc_id];
@@ -1717,7 +1704,7 @@ alloced_host_sr_config_exit:
 	kfree(platform_host_sr_config);
 exit:
 	if (status < 0)
-		printk(KERN_ERR "platform_load_callback failed, status [0x%x]\n",
+		pr_err("platform_load_callback failed, status [0x%x]\n",
 			status);
 
 	return status;
@@ -1741,7 +1728,7 @@ int platform_start_callback(u16 proc_id, void *arg)
 	} while (status < 0);
 
 	if (status < 0)
-		printk(KERN_ERR "platform_load_callback failed, status [0x%x]\n",
+		pr_err("platform_load_callback failed, status [0x%x]\n",
 			status);
 
 	return status;
@@ -1849,12 +1836,12 @@ _platform_read_slave_memory(u16 proc_id,
 	if (status >= 0) {
 		memcpy(value, (void *) m_addr, *num_bytes);
 		done = true;
-		printk(KERN_ERR "_platform_read_slave_memory successful! "
+		pr_err("_platform_read_slave_memory successful! "
 			"status = 0x%x, proc_id = %d, addr = 0x%x, "
 			"m_addr = 0x%x, size = 0x%x", status, proc_id, addr,
 			m_addr, *num_bytes);
 	} else {
-		printk(KERN_ERR "_platform_read_slave_memory failed! "
+		pr_err("_platform_read_slave_memory failed! "
 			"status = 0x%x, proc_id = %d, addr = 0x%x, "
 			"m_addr = 0x%x, size = 0x%x", status, proc_id, addr,
 			m_addr, *num_bytes);
@@ -1912,12 +1899,12 @@ static int _platform_write_slave_memory(u16 proc_id, u32 addr, void *value,
 	if (status >= 0) {
 		memcpy((void *) m_addr, value, *num_bytes);
 		done = true;
-		printk(KERN_ERR "_platform_write_slave_memory successful! "
+		pr_err("_platform_write_slave_memory successful! "
 			"status = 0x%x, proc_id = %d, addr = 0x%x, "
 			"m_addr = 0x%x, size = 0x%x", status, proc_id, addr,
 			m_addr, *num_bytes);
 	} else {
-		printk(KERN_ERR "_platform_write_slave_memory failed! "
+		pr_err("_platform_write_slave_memory failed! "
 			"status = 0x%x, proc_id = %d, addr = 0x%x, "
 			"m_addr = 0x%x, size = 0x%x", status, proc_id, addr,
 			m_addr, *num_bytes);

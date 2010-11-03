@@ -122,7 +122,7 @@ static int sharedregion_ioctl_setup(struct sharedregion_cmd_args *cargs)
 					region.entry.base,
 					PLATFORM_MEM_XLT_FLAGS_VIRT2PHYS);
 			if (region.entry.base == NULL) {
-				printk(KERN_ERR "sharedregion_ioctl_setup: "
+				pr_err("sharedregion_ioctl_setup: "
 					"failed to translate region virtual "
 					"address.\n");
 				status = -ENOMEM;
@@ -192,7 +192,7 @@ static int sharedregion_ioctl_get_heap(struct sharedregion_cmd_args *cargs)
 	if (heap_handle != NULL)
 		cargs->api_status = 0;
 	else {
-		printk(KERN_ERR "sharedregion_ioctl_get_heap failed: "
+		pr_err("sharedregion_ioctl_get_heap failed: "
 			"heap_handle is NULL!");
 		cargs->api_status = -1;
 	}
@@ -223,7 +223,7 @@ static int sharedregion_ioctl_set_entry(struct sharedregion_cmd_args *cargs)
 			(void *)cargs->args.set_entry.entry.base,
 			PLATFORM_MEM_XLT_FLAGS_PHYS2VIRT);
 	if (entry.base == NULL) {
-		printk(KERN_ERR "sharedregion_ioctl_set_entry: failed to"
+		pr_err("sharedregion_ioctl_set_entry: failed to"
 			"translate region virtual address.\n");
 		status = -ENOMEM;
 		goto exit;
@@ -280,7 +280,7 @@ static int sharedregion_ioctl_get_region_info(
 					region.entry.base,
 					PLATFORM_MEM_XLT_FLAGS_VIRT2PHYS);
 			if (region.entry.base == NULL) {
-				printk(KERN_ERR
+				pr_err(
 					"sharedregion_ioctl_get_region_info: "
 					"failed to translate region virtual "
 					"address.\n");
@@ -555,9 +555,7 @@ int sharedregion_ioctl(struct inode *inode, struct file *filp,
 	}
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "sharedregion_ioctl failed! status = 0x%x",
-			status);
-	}
+	if (status < 0)
+		pr_err("sharedregion_ioctl failed! status = 0x%x", status);
 	return status;
 }

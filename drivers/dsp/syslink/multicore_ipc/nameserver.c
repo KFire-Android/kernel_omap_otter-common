@@ -257,10 +257,8 @@ void nameserver_get_config(struct nameserver_config *cfg)
 	}
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "nameserver_get_config failed! retval = 0x%x",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("nameserver_get_config failed! retval = 0x%x", retval);
 	return;
 }
 EXPORT_SYMBOL(nameserver_get_config);
@@ -310,7 +308,7 @@ int nameserver_setup(void)
 remote_alloc_fail:
 	kfree(nameserver_module->mod_gate_handle);
 exit:
-	printk(KERN_ERR "nameserver_setup failed, retval: %x\n", retval);
+	pr_err("nameserver_setup failed, retval: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(nameserver_setup);
@@ -359,10 +357,8 @@ int nameserver_destroy(void)
 	return 0;
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "nameserver_destroy failed, retval: %x\n",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("nameserver_destroy failed, retval: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(nameserver_destroy);
@@ -389,10 +385,8 @@ void nameserver_params_init(struct nameserver_params *params)
 		sizeof(struct nameserver_params));
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "nameserver_params_init failed! status = 0x%x",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("nameserver_params_init failed! status = 0x%x", retval);
 	return;
 }
 EXPORT_SYMBOL(nameserver_params_init);
@@ -479,7 +473,7 @@ error:
 error_handle:
 	mutex_unlock(nameserver_module->mod_gate_handle);
 exit:
-	printk(KERN_ERR "nameserver_create failed retval:%x\n", retval);
+	pr_err("nameserver_create failed retval:%x\n", retval);
 	return NULL;
 }
 EXPORT_SYMBOL(nameserver_create);
@@ -567,10 +561,8 @@ void nameserver_construct(void *handle, const char *name,
 	mutex_unlock(nameserver_module->mod_gate_handle);
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "nameserver_construct failed! retval = 0x%x",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("nameserver_construct failed! retval = 0x%x", retval);
 	return;
 }
 
@@ -636,7 +628,7 @@ int nameserver_delete(void **handle)
 error:
 	mutex_unlock(gate_handle);
 exit:
-	printk(KERN_ERR "nameserver_delete failed retval:%x\n", retval);
+	pr_err("nameserver_delete failed retval:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(nameserver_delete);
@@ -703,7 +695,7 @@ error:
 	mutex_unlock(obj->gate_handle);
 
 exit:
-	printk(KERN_ERR "nameserver_destruct failed! status = 0x%x", retval);
+	pr_err("nameserver_destruct failed! status = 0x%x", retval);
 	return;
 }
 
@@ -814,7 +806,7 @@ error_name:
 error:
 	mutex_unlock(temp_obj->gate_handle);
 exit:
-	printk(KERN_ERR "nameserver_add failed status: %x\n", retval);
+	pr_err("nameserver_add failed status: %x\n", retval);
 	return NULL;
 }
 EXPORT_SYMBOL(nameserver_add);
@@ -846,7 +838,7 @@ void *nameserver_add_uint32(void *handle, const char *name,
 
 exit:
 	if (retval < 0 || new_node == NULL) {
-		printk(KERN_ERR "nameserver_add_uint32 failed! status = 0x%x "
+		pr_err("nameserver_add_uint32 failed! status = 0x%x "
 			"new_node = 0x%x", retval, (u32)new_node);
 	}
 	return new_node;
@@ -947,7 +939,7 @@ int nameserver_remove(void *handle, const char *name)
 error:
 	mutex_unlock(temp_obj->gate_handle);
 exit:
-	printk(KERN_ERR "nameserver_remove failed status:%x\n", retval);
+	pr_err("nameserver_remove failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(nameserver_remove);
@@ -990,7 +982,7 @@ int nameserver_remove_entry(void *nshandle, void *nsentry)
 	return 0;
 
 exit:
-	printk(KERN_ERR "nameserver_remove_entry failed status:%x\n", retval);
+	pr_err("nameserver_remove_entry failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(nameserver_remove_entry);
@@ -1071,7 +1063,7 @@ error:
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "nameserver_get_local entry not found!\n");
+		pr_err("nameserver_get_local entry not found!\n");
 	return retval;
 }
 EXPORT_SYMBOL(nameserver_get_local);
@@ -1163,7 +1155,7 @@ int nameserver_get(void *handle, const char *name,
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "nameserver_get failed: status=%x\n", retval);
+		pr_err("nameserver_get failed: status=%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(nameserver_get);
@@ -1200,10 +1192,8 @@ int nameserver_get_uint32(void *handle, const char *name, void *value,
 
 exit:
 	/* -ENOENT is a valid run-time failure. */
-	if ((retval < 0) && (retval != -ENOENT)) {
-		printk(KERN_ERR "nameserver_get_uint32 failed! status = 0x%x",
-			retval);
-	}
+	if ((retval < 0) && (retval != -ENOENT))
+		pr_err("nameserver_get_uint32 failed! status = 0x%x", retval);
 	return retval;
 }
 EXPORT_SYMBOL(nameserver_get_uint32);
@@ -1248,7 +1238,7 @@ int nameserver_get_local_uint32(void *handle, const char *name, void *value)
 exit:
 	/* -ENOENT is a valid run-time failure. */
 	if ((retval < 0) && (retval != -ENOENT)) {
-		printk(KERN_ERR "nameserver_get_local_uint32 failed! "
+		pr_err("nameserver_get_local_uint32 failed! "
 			"status = 0x%x", retval);
 	}
 	return retval;
@@ -1310,7 +1300,7 @@ int nameserver_match(void *handle, const char *name, u32 *value)
 
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "nameserver_match failed status:%x\n", retval);
+		pr_err("nameserver_match failed status:%x\n", retval);
 	return found_len;
 }
 EXPORT_SYMBOL(nameserver_match);
@@ -1347,7 +1337,7 @@ void *nameserver_get_handle(const char *name)
 	return (void *)obj;
 
 exit:
-	printk(KERN_ERR "nameserver_get_handle failed! status = 0x%x", retval);
+	pr_err("nameserver_get_handle failed! status = 0x%x", retval);
 	return (void *)NULL;
 }
 EXPORT_SYMBOL(nameserver_get_handle);
@@ -1385,7 +1375,7 @@ int nameserver_register_remote_driver(void *handle, u16 proc_id)
 	return 0;
 
 exit:
-	printk(KERN_ERR "nameserver_register_remote_driver failed! "
+	pr_err("nameserver_register_remote_driver failed! "
 		"status:%x\n", retval);
 	return retval;
 }
@@ -1415,7 +1405,7 @@ int nameserver_unregister_remote_driver(u16 proc_id)
 	return 0;
 
 exit:
-	printk(KERN_ERR "nameserver_unregister_remote_driver failed! "
+	pr_err("nameserver_unregister_remote_driver failed! "
 		"status:%x\n", retval);
 	return retval;
 }
@@ -1443,7 +1433,7 @@ bool nameserver_is_registered(u16 proc_id)
 
 exit:
 	if (retval < 0) {
-		printk(KERN_ERR "nameserver_is_registered failed! "
+		pr_err("nameserver_is_registered failed! "
 			"status = 0x%x", retval);
 	}
 	return registered;

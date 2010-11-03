@@ -161,7 +161,7 @@ int heapbufmp_get_config(struct heapbufmp_config *cfgparams)
 					sizeof(struct heapbufmp_config));
 	return 0;
 error:
-	printk(KERN_ERR "heapbufmp_get_config failed status: %x\n", retval);
+	pr_err("heapbufmp_get_config failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapbufmp_get_config);
@@ -242,7 +242,7 @@ int heapbufmp_setup(const struct heapbufmp_config *cfg)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapbufmp_setup failed status: %x\n", retval);
+	pr_err("heapbufmp_setup failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapbufmp_setup);
@@ -315,7 +315,7 @@ int heapbufmp_destroy(void)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapbufmp_destroy failed status: %x\n", retval);
+	pr_err("heapbufmp_destroy failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapbufmp_destroy);
@@ -344,7 +344,7 @@ void heapbufmp_params_init(struct heapbufmp_params *params)
 
 	return;
 error:
-	printk(KERN_ERR "heapbufmp_params_init failed status: %x\n", retval);
+	pr_err("heapbufmp_params_init failed status: %x\n", retval);
 }
 EXPORT_SYMBOL(heapbufmp_params_init);
 
@@ -573,7 +573,7 @@ error:
 	else
 		heapbufmp_close(handle_ptr);
 
-	printk(KERN_ERR "_heapbufmp_create failed status: %x\n", retval);
+	pr_err("_heapbufmp_create failed status: %x\n", retval);
 	return retval;
 }
 
@@ -620,7 +620,7 @@ void *heapbufmp_create(const struct heapbufmp_params *params)
 	return (void *)handle;
 
 error:
-	printk(KERN_ERR "heapbufmp_create failed status: %x\n", retval);
+	pr_err("heapbufmp_create failed status: %x\n", retval);
 	return (void *)handle;
 }
 EXPORT_SYMBOL(heapbufmp_create);
@@ -740,7 +740,7 @@ device_busy_error:
 	gatemp_leave(obj->gate, key);
 
 error:
-	printk(KERN_ERR "heapbufmp_delete failed status: %x\n", retval);
+	pr_err("heapbufmp_delete failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapbufmp_delete);
@@ -831,7 +831,7 @@ int heapbufmp_open(char *name, void **handle_ptr)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapbufmp_open failed status: %x\n", retval);
+	pr_err("heapbufmp_open failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapbufmp_open);
@@ -908,7 +908,7 @@ int heapbufmp_close(void **handle_ptr)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapbufmp_close failed status: %x\n", retval);
+	pr_err("heapbufmp_close failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapbufmp_close);
@@ -1001,11 +1001,11 @@ void *heapbufmp_alloc(void *hphandle, u32 size, u32 align)
 	gatemp_leave(obj->gate, key);
 
 	if (block == NULL)
-		printk(KERN_ERR "heapbufmp_alloc returned NULL\n");
+		pr_err("heapbufmp_alloc returned NULL\n");
 
 	return block;
 error:
-	printk(KERN_ERR "heapbufmp_alloc failed status: %x\n", retval);
+	pr_err("heapbufmp_alloc failed status: %x\n", retval);
 	return NULL;
 }
 EXPORT_SYMBOL(heapbufmp_alloc);
@@ -1079,7 +1079,7 @@ int heapbufmp_free(void *hphandle, void *block, u32 size)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapbufmp_free failed status: %x\n", retval);
+	pr_err("heapbufmp_free failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(heapbufmp_free);
@@ -1149,8 +1149,7 @@ void heapbufmp_get_stats(void *hphandle, struct memory_stats *stats)
 
 error:
 	if (retval < 0)
-		printk(KERN_ERR "heapbufmp_get_stats status: [0x%x]\n",
-								retval);
+		pr_err("heapbufmp_get_stats status: [0x%x]\n", retval);
 }
 EXPORT_SYMBOL(heapbufmp_get_stats);
 
@@ -1177,7 +1176,7 @@ bool heapbufmp_isblocking(void *handle)
 	return isblocking;
 
 error:
-	printk(KERN_ERR "heapbufmp_isblocking status: %x\n", retval);
+	pr_err("heapbufmp_isblocking status: %x\n", retval);
 	return isblocking;
 }
 EXPORT_SYMBOL(heapbufmp_isblocking);
@@ -1255,8 +1254,7 @@ void heapbufmp_get_extended_stats(void *hphandle,
 	return;
 
 error:
-	printk(KERN_ERR "heapbufmp_get_extended_stats status: %x\n",
-			retval);
+	pr_err("heapbufmp_get_extended_stats status: %x\n", retval);
 }
 EXPORT_SYMBOL(heapbufmp_get_extended_stats);
 
@@ -1335,8 +1333,7 @@ int heapbufmp_shared_mem_req(const struct heapbufmp_params *params)
 
 	return mem_req;
 error:
-	printk(KERN_ERR "heapbufmp_shared_mem_req status: %x\n",
-		status);
+	pr_err("heapbufmp_shared_mem_req status: %x\n", status);
 	return mem_req;
 }
 EXPORT_SYMBOL(heapbufmp_shared_mem_req);
@@ -1415,8 +1412,7 @@ heapbufmp_open_by_addr(void *shared_addr, void **handle_ptr)
 	return 0;
 
 error:
-	printk(KERN_ERR "heapbufmp_open_by_addr status: %x\n",
-		retval);
+	pr_err("heapbufmp_open_by_addr status: %x\n", retval);
 
 	return retval;
 }
@@ -1554,6 +1550,6 @@ created_free_list_error:
 	listmp_delete(&obj->free_list);
 
 error:
-	printk(KERN_ERR "heapmem_post_init status: %x\n", retval);
+	pr_err("heapmem_post_init status: %x\n", retval);
 	return retval;
 }

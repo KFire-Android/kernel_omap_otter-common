@@ -730,6 +730,6 @@ int messageq_ioctl(struct inode *inode, struct file *filp,
 	return status;
 
 exit:
-	printk(KERN_ERR "messageq_ioctl failed: status = 0x%x\n", status);
+	pr_err("messageq_ioctl failed: status = 0x%x\n", status);
 	return status;
 }

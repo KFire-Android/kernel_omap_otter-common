@@ -645,6 +645,6 @@ int listmp_ioctl(struct inode *inode, struct file *filp,
 	return status;
 
 exit:
-	printk(KERN_ERR "listmp_ioctl failed: status = 0x%x\n", status);
+	pr_err("listmp_ioctl failed: status = 0x%x\n", status);
 	return status;
 }

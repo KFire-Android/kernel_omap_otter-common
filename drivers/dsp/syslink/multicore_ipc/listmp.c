@@ -150,10 +150,8 @@ void listmp_get_config(struct listmp_config *cfg_params)
 	}
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_get_config failed: status = 0x%x\n",
-			status);
-	}
+	if (status < 0)
+		pr_err("listmp_get_config failed: status = 0x%x\n", status);
 	return;
 }
 
@@ -218,7 +216,7 @@ clean_nameserver:
 	WARN_ON(status1 < 0);
 	atomic_set(&listmp_module->ref_count, LISTMP_MAKE_MAGICSTAMP(0));
 exit:
-	printk(KERN_ERR "listmp_setup failed! status = 0x%x\n", status);
+	pr_err("listmp_setup failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -281,10 +279,8 @@ int listmp_destroy(void)
 	atomic_set(&listmp_module->ref_count, LISTMP_MAKE_MAGICSTAMP(0));
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_destroy failed! status = 0x%x\n",
-			status);
-	}
+	if (status < 0)
+		pr_err("listmp_destroy failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -309,10 +305,8 @@ void listmp_params_init(struct listmp_params *params)
 		sizeof(struct listmp_params));
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_params_init failed! status = 0x%x\n",
-			status);
-	}
+	if (status < 0)
+		pr_err("listmp_params_init failed! status = 0x%x\n", status);
 	return;
 }
 
@@ -344,10 +338,8 @@ void *listmp_create(const struct listmp_params *params)
 	mutex_unlock(listmp_module->local_lock);
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_create failed! status = 0x%x\n",
-			status);
-	}
+	if (status < 0)
+		pr_err("listmp_create failed! status = 0x%x\n", status);
 	return (void *)obj;
 }
 
@@ -412,10 +404,8 @@ int listmp_delete(void **listmp_handleptr)
 	*listmp_handleptr = NULL;
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_delete failed! status = 0x%x\n",
-			status);
-	}
+	if (status < 0)
+		pr_err("listmp_delete failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -497,7 +487,7 @@ int listmp_open(char *name, void **listmp_handleptr)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "listmp_open failed! status = 0x%x\n", status);
+		pr_err("listmp_open failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -570,10 +560,8 @@ int listmp_open_by_addr(void *shared_addr, void **listmp_handleptr)
 	}
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_open failed! "
-			"status = 0x%x\n", status);
-	}
+	if (status < 0)
+		pr_err("listmp_open failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -625,7 +613,7 @@ int listmp_close(void **listmp_handleptr)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "listmp_close failed! status = 0x%x\n", status);
+		pr_err("listmp_close failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -693,10 +681,8 @@ void *listmp_get_gate(void *listmp_handle)
 	gatemp_handle = obj->gatemp_handle;
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "listmp_get_gate failed! status = 0x%x",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("listmp_get_gate failed! status = 0x%x", retval);
 	return gatemp_handle;
 }
 
@@ -776,10 +762,9 @@ gate_leave_and_exit:
 	gatemp_leave(obj->gatemp_handle, key);
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "listmp_get_head failed! status = 0x%x",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("listmp_get_head failed! status = 0x%x", retval);
+
 	return elem;
 }
 
@@ -862,10 +847,9 @@ gate_leave_and_exit:
 	gatemp_leave(obj->gatemp_handle, key);
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "listmp_get_tail failed! status = 0x%x",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("listmp_get_tail failed! status = 0x%x", retval);
+
 	return elem;
 }
 
@@ -943,10 +927,8 @@ gate_leave_and_exit:
 	gatemp_leave(obj->gatemp_handle, key);
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_put_head failed! status = 0x%x\n",
-			status);
-	}
+	if (status < 0)
+		pr_err("listmp_put_head failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -1031,10 +1013,8 @@ gate_leave_and_exit:
 	gatemp_leave(obj->gatemp_handle, key);
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_put_tail failed! "
-			"status = 0x%x\n", status);
-	}
+	if (status < 0)
+		pr_err("listmp_put_tail failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -1121,10 +1101,8 @@ gate_leave_and_exit:
 	gatemp_leave(obj->gatemp_handle, key);
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_insert failed! status = 0x%x\n",
-			status);
-	}
+	if (status < 0)
+		pr_err("listmp_insert failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -1189,10 +1167,8 @@ gate_leave_and_exit:
 	gatemp_leave(obj->gatemp_handle, key);
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "listmp_remove failed! status = 0x%x\n",
-			status);
-	}
+	if (status < 0)
+		pr_err("listmp_remove failed! status = 0x%x\n", status);
 	return status;
 }
 
@@ -1232,7 +1208,7 @@ void *listmp_next(void *listmp_handle, struct listmp_elem *elem)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "listmp_next failed! status = 0x%x\n", status);
+		pr_err("listmp_next failed! status = 0x%x\n", status);
 	return ret_elem;
 }
 
@@ -1272,7 +1248,7 @@ void *listmp_prev(void *listmp_handle, struct listmp_elem *elem)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "listmp_prev failed! status = 0x%x\n", status);
+		pr_err("listmp_prev failed! status = 0x%x\n", status);
 	return ret_elem;
 }
 
@@ -1304,7 +1280,7 @@ uint listmp_shared_mem_req(const struct listmp_params *params)
 
 exit:
 	if (retval < 0) {
-		printk(KERN_ERR "listmp_shared_mem_req failed! status = 0x%x\n",
+		pr_err("listmp_shared_mem_req failed! status = 0x%x\n",
 			retval);
 	}
 	return mem_req;
@@ -1507,9 +1483,7 @@ error:
 	}
 
 exit:
-	if (status < 0) {
-		printk(KERN_ERR "_listmp_create failed! status = 0x%x\n",
-			status);
-	}
+	if (status < 0)
+		pr_err("_listmp_create failed! status = 0x%x\n", status);
 	return status;
 }

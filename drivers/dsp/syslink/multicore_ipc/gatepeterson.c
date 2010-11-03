@@ -209,8 +209,7 @@ exit:
 	atomic_set(&gatepeterson_module->ref_count,
 				GATEPETERSON_MAKE_MAGICSTAMP(0));
 
-	printk(KERN_ERR	"gatepeterson_setup failed status: %x\n",
-			retval);
+	pr_err("gatepeterson_setup failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(gatepeterson_setup);
@@ -272,12 +271,9 @@ int gatepeterson_destroy(void)
 	return 0;
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "gatepeterson_destroy failed status:%x\n",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("gatepeterson_destroy failed status:%x\n", retval);
 	return retval;
-
 }
 EXPORT_SYMBOL(gatepeterson_destroy);
 
@@ -418,10 +414,8 @@ static int gatepeterson_instance_init(struct gatepeterson_object *obj,
 	}
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "gatemp_instance_init failed! status = 0x%x",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("gatemp_instance_init failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -545,8 +539,7 @@ int gatepeterson_delete(void **gphandle)
 	return 0;
 
 exit:
-	printk(KERN_ERR "gatepeterson_delete failed status: %x\n",
-			retval);
+	pr_err("gatepeterson_delete failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(gatepeterson_delete);
@@ -604,7 +597,7 @@ int gatepeterson_open_by_addr(enum igatempsupport_local_protect local_protect,
 	return 0;
 
 exit:
-	printk(KERN_ERR "gatepeterson_open failed status: %x\n", retval);
+	pr_err("gatepeterson_open failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(gatepeterson_open_by_addr);
@@ -668,7 +661,7 @@ error_handle:
 	gatemp_leave(obj->local_gate, key);
 
 exit:
-	printk(KERN_ERR "gatepeterson_close failed status: %x\n", retval);
+	pr_err("gatepeterson_close failed status: %x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(gatepeterson_close);
@@ -939,10 +932,10 @@ obj_alloc_fail:
 
 exit:
 	if (create_flag == true)
-		printk(KERN_ERR "_gatepeterson_create (create) failed "
+		pr_err("_gatepeterson_create (create) failed "
 			"status: %x\n", status);
 	else
-		printk(KERN_ERR "_gatepeterson_create (open) failed "
+		pr_err("_gatepeterson_create (open) failed "
 			"status: %x\n", status);
 
 	return NULL;

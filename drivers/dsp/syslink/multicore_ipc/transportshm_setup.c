@@ -111,7 +111,7 @@ int transportshm_setup_attach(u16 remote_proc_id, u32 *shared_addr)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "transportshm_setup_attach failed! status "
+		pr_err("transportshm_setup_attach failed! status "
 			"= 0x%x", status);
 	return status;
 }
@@ -156,7 +156,7 @@ int transportshm_setup_detach(u16 remote_proc_id)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "transportshm_setup_detach failed! status "
+		pr_err("transportshm_setup_detach failed! status "
 			"= 0x%x", status);
 	return status;
 }
@@ -189,7 +189,7 @@ u32 transportshm_setup_shared_mem_req(u32 *shared_addr)
 
 exit:
 	if (status < 0)
-		printk(KERN_ERR "transportshm_setup_shared_mem_req failed! "
+		pr_err("transportshm_setup_shared_mem_req failed! "
 			"status = 0x%x", status);
 	return mem_req;
 }

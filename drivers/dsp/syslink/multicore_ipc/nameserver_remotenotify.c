@@ -151,7 +151,7 @@ void nameserver_remotenotify_get_config(
 
 exit:
 	if (retval < 0) {
-		printk(KERN_ERR "nameserver_remotenotify_get_config failed!"
+		pr_err("nameserver_remotenotify_get_config failed!"
 			" retval = 0x%x", retval);
 	}
 	return;
@@ -212,7 +212,7 @@ int nameserver_remotenotify_setup(struct nameserver_remotenotify_config *cfg)
 	return 0;
 
 exit:
-	printk(KERN_ERR "nameserver_remotenotify_setup failed! retval = 0x%x",
+	pr_err("nameserver_remotenotify_setup failed! retval = 0x%x",
 		retval);
 	return retval;
 }
@@ -248,7 +248,7 @@ int nameserver_remotenotify_destroy(void)
 	return 0;
 
 exit:
-	printk(KERN_ERR "nameserver_remotenotify_destroy failed! retval = 0x%x",
+	pr_err("nameserver_remotenotify_destroy failed! retval = 0x%x",
 		retval);
 	return retval;
 }
@@ -262,13 +262,13 @@ void nameserver_remotenotify_params_init(
 			&(nameserver_remotenotify_state.ref_count),
 			NAMESERVERREMOTENOTIFY_MAKE_MAGICSTAMP(0),
 			NAMESERVERREMOTENOTIFY_MAKE_MAGICSTAMP(1)) == true))) {
-		printk(KERN_ERR "nameserver_remotenotify_params_init failed: "
+		pr_err("nameserver_remotenotify_params_init failed: "
 			"Module is not initialized!\n");
 		return;
 	}
 
 	if (WARN_ON(unlikely(params == NULL))) {
-		printk(KERN_ERR "nameserver_remotenotify_params_init failed: "
+		pr_err("nameserver_remotenotify_params_init failed: "
 			"Argument of type(nameserver_remotenotify_params *) "
 			"is NULL!\n");
 		return;
@@ -377,7 +377,7 @@ signal_response:
 
 exit:
 	if (retval < 0) {
-		printk(KERN_ERR "nameserver_remotenotify_callback failed! "
+		pr_err("nameserver_remotenotify_callback failed! "
 			"status = 0x%x\n", retval);
 	}
 	return;
@@ -520,7 +520,7 @@ down_error:
 	mutex_unlock(obj->local_gate);
 exit:
 	if (retval < 0)
-		printk(KERN_ERR "nameserver_remotenotify_get failed! "
+		pr_err("nameserver_remotenotify_get failed! "
 			"status = 0x%x", retval);
 	return retval;
 }
@@ -646,7 +646,7 @@ mem_error:
 	kfree(handle);
 
 exit:
-	printk(KERN_ERR "nameserver_remotenotify_create failed! "
+	pr_err("nameserver_remotenotify_create failed! "
 		"status = 0x%x\n", retval);
 	return NULL;
 }
@@ -708,7 +708,7 @@ free_handle:
 
 exit:
 	if (retval < 0) {
-		printk(KERN_ERR "nameserver_remotenotify_delete failed! "
+		pr_err("nameserver_remotenotify_delete failed! "
 			"status = 0x%x\n", retval);
 	}
 	return retval;
@@ -776,7 +776,7 @@ int nameserver_remotenotify_attach(u16 remote_proc_id, void *shared_addr)
 	return 0;
 
 exit:
-	printk(KERN_ERR "nameserver_remotenotify_attach failed! status = 0x%x",
+	pr_err("nameserver_remotenotify_attach failed! status = 0x%x",
 		retval);
 	return retval;
 }
@@ -818,7 +818,7 @@ int nameserver_remotenotify_detach(u16 remote_proc_id)
 	return 0;
 
 exit:
-	printk(KERN_ERR "nameserver_remotenotify_detach failed! status = 0x%x",
+	pr_err("nameserver_remotenotify_detach failed! status = 0x%x",
 		retval);
 	return retval;
 }

@@ -40,9 +40,7 @@ int nameserver_remote_get(const struct nameserver_remote_object *handle,
 						name, value, value_len, NULL);
 
 exit:
-	if (retval < 0) {
-		printk(KERN_ERR "nameserver_remote_get failed! status = 0x%x",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("nameserver_remote_get failed! status = 0x%x", retval);
 	return retval;
 }

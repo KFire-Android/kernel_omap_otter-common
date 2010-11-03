@@ -163,7 +163,7 @@ gate_create_fail:
 	kfree(sharedregion_module->regions);
 
 error:
-	printk(KERN_ERR "sharedregion_setup failed status:%x\n", retval);
+	pr_err("sharedregion_setup failed status:%x\n", retval);
 	sharedregion_destroy();
 	return retval;
 }
@@ -203,7 +203,7 @@ int sharedregion_destroy(void)
 
 error:
 	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_destroy failed status:%x\n",
+		pr_err("sharedregion_destroy failed status:%x\n",
 			retval);
 	}
 	return retval;
@@ -271,10 +271,8 @@ int sharedregion_start(void)
 	}
 
 error:
-	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_start failed status:%x\n",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("sharedregion_start failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(sharedregion_start);
@@ -325,7 +323,7 @@ int sharedregion_stop(void)
 
 error:
 	if (retval < 0)
-		printk(KERN_ERR "sharedregion_stop failed status:%x\n", retval);
+		pr_err("sharedregion_stop failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(sharedregion_stop);
@@ -375,10 +373,8 @@ int sharedregion_attach(u16 remote_proc_id)
 	}
 
 error:
-	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_attach failed status:%x\n",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("sharedregion_attach failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(sharedregion_attach);
@@ -417,17 +413,15 @@ int sharedregion_detach(u16 remote_proc_id)
 			tmp_status = heapmemmp_close((void **) &(region->heap));
 			if ((tmp_status < 0) && (retval >= 0)) {
 				retval = -1;
-				printk(KERN_ERR "sharedregion_detach: "
+				pr_err("sharedregion_detach: "
 					"heapmemmp_close failed!");
 			}
 		}
 	}
 
 error:
-	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_detach failed status:%x\n",
-			retval);
-	}
+	if (retval < 0)
+		pr_err("sharedregion_detach failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(sharedregion_detach);
@@ -469,7 +463,7 @@ void *sharedregion_get_ptr(u32 *srptr)
 	return return_ptr;
 
 error:
-	printk(KERN_ERR "sharedregion_get_ptr failed 0x%x\n", retval);
+	pr_err("sharedregion_get_ptr failed 0x%x\n", retval);
 	return (void *)NULL;
 
 }
@@ -522,7 +516,7 @@ u32 *sharedregion_get_srptr(void *addr, u16 id)
 	return ret_ptr;
 
 error:
-	printk(KERN_ERR	"sharedregion_get_srptr failed 0x%x\n", retval);
+	pr_err("sharedregion_get_srptr failed 0x%x\n", retval);
 	return (u32 *)NULL;
 }
 EXPORT_SYMBOL(sharedregion_get_srptr);
@@ -625,13 +619,13 @@ success:
 
 dup_entry_error: /* Fall through */
 mem_overlap_error:
-	printk(KERN_WARNING "sharedregion_add entry exists status: %x\n",
+	pr_warn("sharedregion_add entry exists status: %x\n",
 		retval);
 	mutex_unlock(sharedregion_module->local_lock);
 
 error:
 	if (retval < 0)
-		printk(KERN_ERR "sharedregion_add failed status:%x\n", retval);
+		pr_err("sharedregion_add failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(sharedregion_add);
@@ -686,7 +680,7 @@ int sharedregion_remove(u32 index)
 	return 0;
 
 error:
-	printk(KERN_ERR "sharedregion_remove failed status:%x\n", retval);
+	pr_err("sharedregion_remove failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(sharedregion_remove);
@@ -733,8 +727,7 @@ int sharedregion_get_table_info(u32 index, u16 proc_id,
 	return 0;
 
 error:
-	printk(KERN_ERR "sharedregion_get_table_info failed status:%x\n",
-		retval);
+	pr_err("sharedregion_get_table_info failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(sharedregion_get_table_info);
@@ -781,8 +774,7 @@ int sharedregion_set_table_info(u32 index, u16 proc_id,
 	return 0;
 
 error:
-	printk(KERN_ERR "sharedregion_set_table_info failed status:%x\n",
-		retval);
+	pr_err("sharedregion_set_table_info failed status:%x\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL(sharedregion_set_table_info);
@@ -817,7 +809,7 @@ void sharedregion_get_region_info(u16 id, struct sharedregion_region *region)
 
 error:
 	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_get_region_info failed: "
+		pr_err("sharedregion_get_region_info failed: "
 			"status = 0x%x", retval);
 	}
 	return;
@@ -868,20 +860,20 @@ int sharedregion_set_entry(u16 id, struct sharedregion_entry *entry)
 	retval = _sharedregion_check_overlap(region->entry.base,
 						region->entry.len);
 	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_set_entry: Entry is overlapping "
+		pr_err("sharedregion_set_entry: Entry is overlapping "
 			"existing entry!");
 		goto error;
 	}
 	if (region->entry.is_valid) {
 		/*region entry should be invalid at this point */
 		retval = -EEXIST;
-		printk(KERN_ERR "_sharedregion_setEntry: Entry already exists");
+		pr_err("_sharedregion_setEntry: Entry already exists");
 		goto error;
 	}
 	if ((entry->cache_enable) && (entry->cache_line_size == 0)) {
 		/* if cache enabled, cache line size must != 0 */
 		retval = -1;
-		printk(KERN_ERR "_sharedregion_setEntry: If cache enabled, "
+		pr_err("_sharedregion_setEntry: If cache enabled, "
 			"cache line size must != 0");
 		goto error;
 	}
@@ -945,7 +937,7 @@ int sharedregion_set_entry(u16 id, struct sharedregion_entry *entry)
 	return 0;
 
 error:
-	printk(KERN_ERR "sharedregion_set_entry failed! status = 0x%x", retval);
+	pr_err("sharedregion_set_entry failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -1021,8 +1013,7 @@ int sharedregion_clear_entry(u16 id)
 	return 0;
 
 error:
-	printk(KERN_ERR "sharedregion_clear_entry failed! status = 0x%x",
-		retval);
+	pr_err("sharedregion_clear_entry failed! status = 0x%x", retval);
 	return retval;
 }
 
@@ -1083,10 +1074,8 @@ void sharedregion_entry_init(struct sharedregion_entry *entry)
 	entry->is_valid = false;
 
 error:
-	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_entry_init failed: "
-			"status = 0x%x", retval);
-	}
+	if (retval < 0)
+		pr_err("sharedregion_entry_init failed: status = 0x%x", retval);
 	return;
 }
 
@@ -1124,7 +1113,7 @@ void *sharedregion_get_heap(u16 id)
 	return (void *)heap;
 
 error:
-	printk(KERN_ERR "sharedregion_get_heap failed: status = 0x%x", retval);
+	pr_err("sharedregion_get_heap failed: status = 0x%x", retval);
 	return (void *)NULL;
 }
 
@@ -1166,10 +1155,8 @@ u16 sharedregion_get_id(void *addr)
 	mutex_unlock(sharedregion_module->local_lock);
 
 error:
-	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_get_id failed: "
-			"status = 0x%x", retval);
-	}
+	if (retval < 0)
+		pr_err("sharedregion_get_id failed: status = 0x%x", retval);
 	return region_id;
 }
 EXPORT_SYMBOL(sharedregion_get_id);
@@ -1213,7 +1200,7 @@ u16 sharedregion_get_id_by_name(char *name)
 
 error:
 	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_get_id_by_name failed: "
+		pr_err("sharedregion_get_id_by_name failed: "
 			"status = 0x%x", retval);
 	}
 	return region_id;
@@ -1248,7 +1235,7 @@ int sharedregion_get_entry(u16 id, struct sharedregion_entry *entry)
 	return 0;
 
 error:
-	printk(KERN_ERR "sharedregion_get_entry failed: status = 0x%x", retval);
+	pr_err("sharedregion_get_entry failed: status = 0x%x", retval);
 	return retval;
 }
 
@@ -1287,7 +1274,7 @@ uint sharedregion_get_cache_line_size(u16 id)
 	return cache_line_size;
 
 error:
-	printk(KERN_ERR "sharedregion_get_cache_line_size failed: "
+	pr_err("sharedregion_get_cache_line_size failed: "
 		"status = 0x%x", retval);
 	return cache_line_size;
 }
@@ -1327,7 +1314,7 @@ bool sharedregion_is_cache_enabled(u16 id)
 	return cache_enable;
 
 error:
-	printk(KERN_ERR "sharedregion_is_cache_enabled failed: "
+	pr_err("sharedregion_is_cache_enabled failed: "
 		"status = 0x%x", retval);
 	return false;
 }
@@ -1379,7 +1366,7 @@ void *sharedregion_reserve_memory(u16 id, uint size)
 	/* Need to make sure (cur_size + new_size) is smaller than region len */
 	if (region->entry.len < (cur_size + new_size)) {
 		retval = -EINVAL;
-		printk(KERN_ERR "sharedregion_reserve_memory: Too large size "
+		pr_err("sharedregion_reserve_memory: Too large size "
 					"is requested to be reserved!");
 		goto error;
 	}
@@ -1389,8 +1376,7 @@ void *sharedregion_reserve_memory(u16 id, uint size)
 	return ret_ptr;
 
 error:
-	printk(KERN_ERR "sharedregion_reserve_memory failed: "
-		"status = 0x%x", retval);
+	pr_err("sharedregion_reserve_memory failed: status = 0x%x", retval);
 	return (void *)NULL;
 }
 
@@ -1439,7 +1425,7 @@ void sharedregion_unreserve_memory(u16 id, uint size)
 
 error:
 	if (retval < 0) {
-		printk(KERN_ERR "sharedregion_unreserve_memory failed: "
+		pr_err("sharedregion_unreserve_memory failed: "
 			"status = 0x%x", retval);
 	}
 	return;
@@ -1475,7 +1461,7 @@ static int _sharedregion_check_overlap(void *base, u32 len)
 				if (base < (void *)((u32) region->entry.base
 							+ region->entry.len)) {
 					retval = -1;
-					printk(KERN_ERR "_sharedregion_check_"
+					pr_err("_sharedregion_check_"
 						"_overlap failed: Specified "
 						"region falls within another "
 						"region!");
@@ -1485,7 +1471,7 @@ static int _sharedregion_check_overlap(void *base, u32 len)
 				if ((void *)((u32) base + len) > \
 					region->entry.base) {
 					retval = -1;
-					printk(KERN_ERR "_sharedregion_check_"
+					pr_err("_sharedregion_check_"
 						"_overlap failed: Specified "
 						"region spans across multiple "
 						"regions!");
@@ -1499,8 +1485,7 @@ static int _sharedregion_check_overlap(void *base, u32 len)
 	return 0;
 
 error:
-	printk(KERN_ERR "_sharedregion_check_overlap failed: "
-		"status = 0x%x", retval);
+	pr_err("_sharedregion_check_overlap failed: status = 0x%x", retval);
 	return retval;
 }
 
@@ -1534,7 +1519,7 @@ static u32 _sharedregion_get_num_offset_bits(void)
 
 error:
 	if (retval < 0) {
-		printk(KERN_ERR "_sharedregion_get_num_offset_bits failed: "
+		pr_err("_sharedregion_get_num_offset_bits failed: "
 			"status = 0x%x", retval);
 	}
 	return num_offset_bits;
@@ -1569,21 +1554,21 @@ int _sharedregion_set_entry(u16 id, struct sharedregion_entry *entry)
 	retval = _sharedregion_check_overlap(region->entry.base,
 						region->entry.len);
 	if (retval < 0) {
-		printk(KERN_ERR "_sharedregion_set_entry: Entry is overlapping "
+		pr_err("_sharedregion_set_entry: Entry is overlapping "
 			"existing entry!");
 		goto error;
 	}
 	if (region->entry.is_valid) {
 		/*region entry should be invalid at this point */
 		retval = -EEXIST;
-		printk(KERN_ERR "_sharedregion_set_entry: ntry already exists");
+		pr_err("_sharedregion_set_entry: ntry already exists");
 		goto error;
 	}
 	/* Fail if cacheEnabled and cache_line_size equal 0 */
 	if ((entry->cache_enable) && (entry->cache_line_size == 0)) {
 		/* if cache enabled, cache line size must != 0 */
 		retval = -1;
-		printk(KERN_ERR "_sharedregion_set_entry: If cache enabled, "
+		pr_err("_sharedregion_set_entry: If cache enabled, "
 			"cache line size must != 0");
 		goto error;
 	}
@@ -1599,7 +1584,6 @@ int _sharedregion_set_entry(u16 id, struct sharedregion_entry *entry)
 	return 0;
 
 error:
-	printk(KERN_ERR "_sharedregion_set_entry failed! status = 0x%x",
-		retval);
+	pr_err("_sharedregion_set_entry failed! status = 0x%x", retval);
 	return retval;
 }

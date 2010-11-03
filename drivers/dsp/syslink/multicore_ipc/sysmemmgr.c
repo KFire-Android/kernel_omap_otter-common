@@ -123,7 +123,7 @@ void sysmemmgr_get_config(struct sysmemmgr_config *config)
 	return;
 
 err_exit:
-	printk(KERN_ERR "sysmemmgr_get_config: Argument of type "
+	pr_err("sysmemmgr_get_config: Argument of type "
 		"(struct sysmemmgr_config *) passed is NULL\n");
 	return;
 }
@@ -195,21 +195,21 @@ int sysmemmgr_setup(struct sysmemmgr_config *config)
 	return 0;
 
 err_mem_gate:
-	printk(KERN_ERR "sysmemmgr_setup: Failed to create gate handle\n");
+	pr_err("sysmemmgr_setup: Failed to create gate handle\n");
 	goto exit;
 
 err_phys_addr:
-	printk(KERN_ERR "sysmemmgr_setup: Physical Base address of static "
+	pr_err("sysmemmgr_setup: Physical Base address of static "
 		"memory region is NULL\n");
 	goto exit;
 
 err_virt_addr:
-	printk(KERN_ERR "sysmemmgr_setup: Virtual Base address of static "
+	pr_err("sysmemmgr_setup: Virtual Base address of static "
 		"memory region is NULL\n");
 	goto exit;
 
 err_config:
-	printk(KERN_ERR "sysmemmgr_setup: Argument of type "
+	pr_err("sysmemmgr_setup: Argument of type "
 		"(struct sysmemmgr_config *) passed is NULL\n");
 	goto exit;
 
@@ -248,7 +248,7 @@ int sysmemmgr_destroy(void)
 	return 0;
 
 err_exit:
-	printk(KERN_ERR "sysmemgr_destroy: Module was not initialized\n");
+	pr_err("sysmemgr_destroy: Module was not initialized\n");
 	return status;
 }
 
@@ -337,10 +337,10 @@ void *sysmemmgr_alloc(u32 size, enum sysmemmgr_allocflag flag)
 	}
 
 err_exit:
-	printk(KERN_ERR "sysmemgr_alloc: Module was not initialized\n");
+	pr_err("sysmemgr_alloc: Module was not initialized\n");
 exit:
 	if (WARN_ON(ret_ptr == NULL))
-		printk(KERN_ERR "sysmemmgr_alloc: Allocation failed\n");
+		pr_err("sysmemmgr_alloc: Allocation failed\n");
 	return ret_ptr;
 }
 
@@ -398,7 +398,7 @@ int sysmemmgr_free(void *blk, u32 size, enum sysmemmgr_allocflag flag)
 	return 0;
 
 err_exit:
-	printk(KERN_ERR "sysmemgr_free: Module was not initialized\n");
+	pr_err("sysmemgr_free: Module was not initialized\n");
 	return status;
 }
 
@@ -449,8 +449,7 @@ void *sysmemmgr_translate(void *src_addr, enum sysmemmgr_xltflag flags)
 
 	default:
 	{
-		printk(KERN_ALERT "sysmemmgr_translate: Unhandled translation "
-			"flag\n");
+		pr_err("sysmemmgr_translate: Unhandled translation flag\n");
 	}
 	break;
 	}
