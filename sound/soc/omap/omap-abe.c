@@ -1189,17 +1189,21 @@ static void disable_be_ports(struct snd_pcm_substream *substream, int stream)
 			}
 			break;
 		case OMAP_ABE_DAI_BT_VX:
-			if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-				abe_dai_disable_data_transfer(BT_VX_DL_PORT);
-			else
-				abe_dai_disable_data_transfer(BT_VX_UL_PORT);
+			if (be_is_pending(be_rtd, stream)) {
+				if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+					abe_dai_disable_data_transfer(BT_VX_DL_PORT);
+				else
+					abe_dai_disable_data_transfer(BT_VX_UL_PORT);
+			}
 			break;
 		case OMAP_ABE_DAI_MM_FM:
 		case OMAP_ABE_DAI_MODEM:
-			if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-				abe_dai_disable_data_transfer(MM_EXT_OUT_PORT);
-			else
-				abe_dai_disable_data_transfer(MM_EXT_IN_PORT);
+			if (be_is_pending(be_rtd, stream)) {
+				if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+					abe_dai_disable_data_transfer(MM_EXT_OUT_PORT);
+				else
+					abe_dai_disable_data_transfer(MM_EXT_IN_PORT);
+			}
 		case OMAP_ABE_DAI_DMIC0:
 			abe_data.dmic_status[0] = DAI_STOPPED;
 			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
