@@ -34,6 +34,7 @@
 #include <plat/usb.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
+#include <plat/omap-pm.h>
 
 #ifdef CONFIG_USB_MUSB_SOC
 
@@ -367,6 +368,9 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 		musb_plat.device_idle = omap_device_idle;
 		musb_plat.enable_wakeup = omap_device_enable_wakeup;
 		musb_plat.disable_wakeup = omap_device_disable_wakeup;
+#ifdef CONFIG_PM
+		musb_plat.set_min_bus_tput = omap_pm_set_min_bus_tput;
+#endif
 		/*
 		 * Errata 1.166 idle_req/ack is broken in omap3430
 		 * workaround is to disable the autodile bit for omap3430.

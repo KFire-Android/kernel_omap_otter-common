@@ -147,6 +147,9 @@ struct musb_hdrc_platform_data {
 
 	/* Clear the enable wakeup bit  of sysconfig register */
 	int		(*disable_wakeup)(struct omap_device *od);
+	/* This is used for L3 constrint */
+	int		(*set_min_bus_tput)(struct device *dev,
+						u8 agent_id, long r);
  };
 
 

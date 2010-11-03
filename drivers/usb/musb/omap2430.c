@@ -34,6 +34,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/wakelock.h>
 
+#include <plat/omap-pm.h>
+
 #include "musb_core.h"
 #include "omap2430.h"
 
@@ -68,6 +70,8 @@ int musb_notifier_call(struct notifier_block *nb,
 		unsigned long event, void *unused)
 {
 	struct musb	*musb = container_of(nb, struct musb, nb);
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	static int hostmode;
 
 	switch (event) {
@@ -90,6 +94,13 @@ int musb_notifier_call(struct notifier_block *nb,
 			omap_writel(0x0, 0x4A002300);
 			mdelay(400);
 		}
+		/* hold the L3 constraint as there was performance drop with
+		 * ondemand governor
+		 */
+		if (pdata->set_min_bus_tput)
+			pdata->set_min_bus_tput(musb->controller,
+					OCP_INITIATOR_AGENT, (200*1000*4));
+
 		if (!hostmode) {
 			/* Enable VBUS Valid, BValid, AValid. Clear SESSEND.*/
 			omap_writel(0x00000015, 0x4A00233C);
@@ -108,6 +119,10 @@ int musb_notifier_call(struct notifier_block *nb,
 		hostmode = 0;
 		wake_unlock(&usb_lock);
 
+		/* Release L3 constraint */
+		if (pdata->set_min_bus_tput)
+			pdata->set_min_bus_tput(musb->controller,
+						OCP_INITIATOR_AGENT, 0);
 		break;
 	default:
 		DBG(1, "ID float\n");
