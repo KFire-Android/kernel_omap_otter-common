@@ -918,7 +918,7 @@ int omap_device_set_rate(struct device *req_dev, struct device *dev,
 		return -ENODEV;
 	}
 	if (unlikely(freq != rate))
-		dev_warn(dev, "%s: Available freq %ld != dpll freq %ld.\n",
+		dev_dbg(dev, "%s: Available freq %ld != dpll freq %ld.\n",
 			__func__, freq, rate);
 
 	/* Get the voltage corresponding to the requested frequency */
