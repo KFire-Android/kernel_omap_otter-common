@@ -172,7 +172,7 @@ int proc_mgr_destroy(void)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_destroy: Error - module not initialized\n");
+		pr_err("proc_mgr_destroy: Error - module not initialized\n");
 		return -EFAULT;
 	}
 	if (atomic_dec_return(&proc_mgr_obj_state.ref_count)
@@ -213,7 +213,7 @@ void proc_mgr_params_init(void *handle, struct proc_mgr_params *params)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_params_init: Error - module not initialized\n");
+		pr_err("proc_mgr_params_init: Error - module not initialized\n");
 	}
 	if (handle == NULL) {
 		memcpy(params, &(proc_mgr_obj_state.def_inst_params),
@@ -256,12 +256,12 @@ void *proc_mgr_create(u16 proc_id, const struct proc_mgr_params *params)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_create: Error - module not initialized\n");
+		pr_err("proc_mgr_create: Error - module not initialized\n");
 		return NULL;
 	}
 	if (proc_mgr_obj_state.proc_handles[proc_id] != NULL) {
 		handle = proc_mgr_obj_state.proc_handles[proc_id];
-		printk(KERN_WARNING "proc_mgr_create:"
+		pr_warn("proc_mgr_create:"
 			"Processor already exists for specified"
 			"%d  proc_id, handle = 0x%x\n", proc_id, (u32)handle);
 		return handle;
@@ -300,7 +300,7 @@ proc_mgr_delete(void **handle_ptr)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_delete: Error - module not initialized\n");
+		pr_err("proc_mgr_delete: Error - module not initialized\n");
 		return -EFAULT;
 	}
 
@@ -331,7 +331,7 @@ int proc_mgr_open(void **handle_ptr, u16 proc_id)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_open: Error - module not initialized\n");
+		pr_err("proc_mgr_open: Error - module not initialized\n");
 		return -EFAULT;
 	}
 
@@ -356,7 +356,7 @@ int proc_mgr_close(void *handle)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_close: Error - module not initialized\n");
+		pr_err("proc_mgr_close: Error - module not initialized\n");
 		return -EFAULT;
 	}
 	/* Nothing to be done for closing the handle. */
@@ -383,7 +383,7 @@ void proc_mgr_get_attach_params(void *handle,
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_get_attach_params:"
+		pr_err("proc_mgr_get_attach_params:"
 			"Error - module not initialized\n");
 	}
 	if (handle == NULL) {
@@ -435,8 +435,7 @@ int proc_mgr_attach(void *handle, struct proc_mgr_attach_params *params)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_attach:"
-			"Error - module not initialized\n");
+		pr_err("proc_mgr_attach: Error - module not initialized\n");
 		return -EFAULT;
 	}
 	if (WARN_ON(handle == NULL)) {
@@ -457,7 +456,7 @@ int proc_mgr_attach(void *handle, struct proc_mgr_attach_params *params)
 	retval = processor_attach(proc_mgr_handle->proc_handle,
 					&proc_attach_params);
 	proc_mgr_handle->num_mem_entries = proc_attach_params.num_mem_entries;
-	printk(KERN_INFO "proc_mgr_attach:proc_mgr_handle->num_mem_entries = %d\n",
+	pr_info("proc_mgr_attach:proc_mgr_handle->num_mem_entries = %d\n",
 			proc_mgr_handle->num_mem_entries);
 	/* Store memory information in local object.*/
 	memcpy(&(proc_mgr_handle->mem_entries),
@@ -490,8 +489,7 @@ int proc_mgr_detach(void *handle)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_detach:"
-			"Error - module not initialized\n");
+		pr_err("proc_mgr_detach: Error - module not initialized\n");
 		return -EFAULT;
 	}
 	BUG_ON(handle == NULL);
@@ -520,8 +518,7 @@ enum proc_mgr_state proc_mgr_get_state(void *handle)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_get_state:"
-			"Error - module not initialized\n");
+		pr_err("proc_mgr_get_state: Error - module not initialized\n");
 		return -EFAULT;
 	}
 	BUG_ON(handle == NULL);
@@ -552,8 +549,7 @@ int proc_mgr_read(void *handle, u32 proc_addr, u32 *num_bytes, void *buffer)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_read:"
-			"Error - module not initialized\n");
+		pr_err("proc_mgr_read: Error - module not initialized\n");
 		return -EFAULT;
 	}
 	BUG_ON(handle == NULL);
@@ -603,8 +599,7 @@ int proc_mgr_write(void *handle, u32 proc_addr, u32 *num_bytes, void *buffer)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_write:"
-			"Error - module not initialized\n");
+		pr_err("proc_mgr_write: Error - module not initialized\n");
 		return -EFAULT;
 	}
 	BUG_ON(proc_addr == 0);
@@ -637,8 +632,7 @@ int proc_mgr_control(void *handle, int cmd, void *arg)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_control:"
-			"Error - module not initialized\n");
+		pr_err("proc_mgr_control: Error - module not initialized\n");
 		return -EFAULT;
 	}
 	BUG_ON(handle == NULL);
@@ -669,7 +663,7 @@ int proc_mgr_translate_addr(void *handle, void **dst_addr,
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_translate_addr:"
+		pr_err("proc_mgr_translate_addr:"
 			"Error - module not initialized\n");
 		return -EFAULT;
 	}
@@ -706,7 +700,7 @@ int proc_mgr_register_notify(void *handle, proc_mgr_callback_fxn fxn,
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_register_notify:"
+		pr_err("proc_mgr_register_notify:"
 			"Error - module not initialized\n");
 		return -EFAULT;
 	}
@@ -736,7 +730,7 @@ int proc_mgr_get_proc_info(void *handle, struct proc_mgr_proc_info *proc_info)
 	if (atomic_cmpmask_and_lt(&(proc_mgr_obj_state.ref_count),
 		PROCMGR_MAKE_MAGICSTAMP(0), PROCMGR_MAKE_MAGICSTAMP(1))
 		 == true) {
-		printk(KERN_ERR "proc_mgr_get_proc_info:"
+		pr_err("proc_mgr_get_proc_info:"
 			"Error - module not initialized\n");
 		return -EFAULT;
 	}

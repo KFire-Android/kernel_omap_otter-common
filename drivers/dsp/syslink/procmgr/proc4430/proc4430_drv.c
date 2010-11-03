@@ -311,7 +311,7 @@ static int proc4430_drv_ioctl(struct inode *inode, struct file *filp,
 
 	default:
 	{
-		printk(KERN_ERR "unsupported ioctl\n");
+		pr_err("unsupported ioctl\n");
 	}
 	break;
 	}
@@ -358,7 +358,7 @@ static int __init proc4430_drv_initializeModule(void)
 	int retval;
 
 	/* Display the version info and created date/time */
-	printk(KERN_INFO "proc4430_drv_initializeModule\n");
+	pr_info("proc4430_drv_initializeModule\n");
 
 	if (driver_major) {
 		dev = MKDEV(driver_major, driver_minor);
@@ -383,7 +383,7 @@ static int __init proc4430_drv_initializeModule(void)
 	retval = cdev_add(&proc_4430_device->cdev, dev, 1);
 
 	if (retval) {
-		printk(KERN_ERR "Failed to add the syslink proc_4430 device\n");
+		pr_err("Failed to add the syslink proc_4430 device\n");
 		goto exit;
 	}
 
@@ -391,7 +391,7 @@ static int __init proc4430_drv_initializeModule(void)
 	proc_4430_class = class_create(THIS_MODULE, "syslink-proc4430");
 
 	if (IS_ERR(proc_4430_class)) {
-		printk(KERN_ERR "Error creating bridge class\n");
+		pr_err("Error creating bridge class\n");
 		goto exit;
 	}
 	device_create(proc_4430_class, NULL, MKDEV(driver_major, driver_minor),

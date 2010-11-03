@@ -231,13 +231,12 @@ void proc4430_params_init(void *handle, struct proc4430_params *params)
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_params_init failed "
-			"Module not initialized");
+		pr_err("proc4430_params_init failed - Module not initialized");
 		return;
 	}
 
 	if (WARN_ON(params == NULL)) {
-		printk(KERN_ERR "proc4430_params_init failed "
+		pr_err("proc4430_params_init failed "
 			"Argument of type proc4430_params * "
 			"is NULL");
 		return;
@@ -268,8 +267,7 @@ void *proc4430_create(u16 proc_id, const struct proc4430_params *params)
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_create failed "
-			"Module not initialized");
+		pr_err("proc4430_create failed - Module not initialized");
 		goto error;
 	}
 
@@ -345,8 +343,7 @@ int proc4430_delete(void **handle_ptr)
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_delete failed "
-			"Module not initialized");
+		pr_err("proc4430_delete failed Module not initialized");
 		return -ENODEV;
 	}
 
@@ -391,8 +388,7 @@ int proc4430_open(void **handle_ptr, u16 proc_id)
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_open failed "
-			"Module not initialized");
+		pr_err("proc4430_open failed Module not initialized");
 		return -ENODEV;
 	}
 
@@ -424,8 +420,7 @@ int proc4430_close(void *handle)
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_close failed "
-			"Module not initialized");
+		pr_err("proc4430_close failed Module not initialized");
 		return -ENODEV;
 	}
 
@@ -456,19 +451,17 @@ int proc4430_attach(void *handle, struct processor_attach_params *params)
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_attach failed"
-			"Module not initialized");
+		pr_err("proc4430_attach failed Module not initialized");
 		return -ENODEV;
 	}
 
 	if (WARN_ON(handle == NULL)) {
-		printk(KERN_ERR "proc4430_attach failed"
-			"Driver handle is NULL");
+		pr_err("proc4430_attach failed Driver handle is NULL");
 		return -EINVAL;
 	}
 
 	if (WARN_ON(params == NULL)) {
-		printk(KERN_ERR "proc4430_attach failed"
+		pr_err("proc4430_attach failed"
 			"Argument processor_attach_params * is NULL");
 		return -EINVAL;
 	}
@@ -482,7 +475,7 @@ int proc4430_attach(void *handle, struct processor_attach_params *params)
 				OMAP4430PROC_MAKE_MAGICSTAMP(0));
 	atomic_inc_return(&object->attach_count);
 
-	printk(KERN_ERR "proc4430_attach num_mem_entries = %d",
+	pr_err("proc4430_attach num_mem_entries = %d",
 				object->params.num_mem_entries);
 	/* Return memory information in params. */
 	for (i = 0; (i < object->params.num_mem_entries); i++) {
@@ -497,7 +490,7 @@ int proc4430_attach(void *handle, struct processor_attach_params *params)
 			map_info.is_cached = false;
 			retval = platform_mem_map(&map_info);
 			if (retval != 0) {
-				printk(KERN_ERR "proc4430_attach failed\n");
+				pr_err("proc4430_attach failed\n");
 				return -EFAULT;
 			}
 			map_count++;
@@ -540,12 +533,11 @@ int proc4430_detach(void *handle)
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
 
-		printk(KERN_ERR "proc4430_detach failed "
-			"Module not initialized");
+		pr_err("proc4430_detach failed Module not initialized");
 		return -ENODEV;
 	}
 	if (WARN_ON(handle == NULL)) {
-		printk(KERN_ERR "proc4430_detach failed "
+		pr_err("proc4430_detach failed "
 			"Argument Driverhandle is NULL");
 		return -EINVAL;
 	}
@@ -586,8 +578,7 @@ int proc4430_read(void *handle, u32 proc_addr, u32 *num_bytes,
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_read failed "
-			"Module not initialized");
+		pr_err("proc4430_read failed Module not initialized");
 		return -ENODEV;
 	}
 
@@ -613,8 +604,7 @@ int proc4430_write(void *handle, u32 proc_addr, u32 *num_bytes,
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_write failed "
-			"Module not initialized");
+		pr_err("proc4430_write failed Module not initialized");
 		return -ENODEV;
 	}
 
@@ -644,18 +634,17 @@ int proc4430_control(void *handle, int cmd, void *arg)
 		retval = ipu_pm_notifications(cmd, NULL);
 		break;
 	default:
-		printk(KERN_ERR "Invalid notification\n");
+		pr_err("Invalid notification\n");
 	}
 	if (retval != PM_SUCCESS)
-		printk(KERN_ERR "Error in notifications\n");
+		pr_err("Error in notifications\n");
 #endif
 
 	if (atomic_cmpmask_and_lt(&proc4430_state.ref_count,
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_control failed "
-			"Module not initialized");
+		pr_err("proc4430_control failed Module not initialized");
 		return -ENODEV;
 	}
 
@@ -685,8 +674,7 @@ int proc4430_translate_addr(void *handle,
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_translate_addr failed "
-			"Module not initialized");
+		pr_err("proc4430_translate_addr failed Module not initialized");
 		retval = -ENODEV;
 		goto error_exit;
 	}
@@ -764,8 +752,7 @@ int proc4430_virt_to_phys(void *handle, u32 da, u32 *mapped_entries,
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_virt_to_phys failed "
-			"Module not initialized");
+		pr_err("proc4430_virt_to_phys failed Module not initialized");
 		ret_val = -EFAULT;
 		goto error_exit;
 	}
@@ -782,7 +769,7 @@ int proc4430_virt_to_phys(void *handle, u32 da, u32 *mapped_entries,
 	return 0;
 
 error_exit:
-	printk(KERN_WARNING "proc4430_virtToPhys failed !!!!\n");
+	pr_warn("proc4430_virtToPhys failed !!!!\n");
 	return ret_val;
 }
 
@@ -802,8 +789,7 @@ int proc4430_proc_info(void *handle, struct proc_mgr_proc_info *procinfo)
 					OMAP4430PROC_MAKE_MAGICSTAMP(0),
 					OMAP4430PROC_MAKE_MAGICSTAMP(1))
 					== true) {
-		printk(KERN_ERR "proc4430_proc_info failed "
-			"Module not initialized");
+		pr_err("proc4430_proc_info failed Module not initialized");
 		goto error_exit;
 	}
 
@@ -829,6 +815,6 @@ int proc4430_proc_info(void *handle, struct proc_mgr_proc_info *procinfo)
 	return 0;
 
 error_exit:
-	printk(KERN_WARNING "proc4430_proc_info failed !!!!\n");
+	pr_warn("proc4430_proc_info failed !!!!\n");
 	return -EFAULT;
 }

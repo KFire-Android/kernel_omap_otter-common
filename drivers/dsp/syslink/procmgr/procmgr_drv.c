@@ -145,7 +145,7 @@ static int proc_mgr_drv_release(struct inode *inode, struct file *filp)
 	pr_ctxt = filp->private_data;
 	while (pr_ctxt->setup_count-- > 0) {
 		/* Destroy has not been called.  Call destroy now. */
-		printk(KERN_ERR "proc_mgr_drv_release: "
+		pr_err("proc_mgr_drv_release: "
 			"proc_mgr_destroy %d\n", pr_ctxt->setup_count);
 		proc_mgr_destroy();
 	}
@@ -577,7 +577,7 @@ static int proc_mgr_drv_ioctl(struct inode *inode, struct file *filp,
 	}
 	break;
 	default:
-		printk(KERN_ERR"PROC_MGR_DRV: WRONG IOCTL !!!!\n");
+		pr_err("PROC_MGR_DRV: WRONG IOCTL !!!!\n");
 		BUG_ON(1);
 	break;
 	}
@@ -641,7 +641,7 @@ static int __devinit proc_mgr_probe(struct platform_device *pdev)
 	retval = cdev_add(&procmgr_device->cdev, dev, 1);
 
 	if (retval) {
-		printk(KERN_ERR "Failed to add the syslink procmgr device\n");
+		pr_err("Failed to add the syslink procmgr device\n");
 		goto exit;
 	}
 
@@ -649,7 +649,7 @@ static int __devinit proc_mgr_probe(struct platform_device *pdev)
 	proc_mgr_class = class_create(THIS_MODULE, "syslink-procmgr");
 
 	if (IS_ERR(proc_mgr_class)) {
-		printk(KERN_ERR "Error creating bridge class\n");
+		pr_err("Error creating bridge class\n");
 		goto exit;
 	}
 	device_create(proc_mgr_class, NULL, MKDEV(driver_major, driver_minor),
@@ -691,7 +691,7 @@ static int __init proc_mgr_drv_initialize_module(void)
 
 	procmgr_pdev = platform_device_alloc(PROCMGR_NAME, -1);
 	if (!procmgr_pdev) {
-		printk(KERN_ERR "%s:device allocation failed\n", __func__);
+		pr_err("%s:device allocation failed\n", __func__);
 		return -ENOMEM;
 	}
 	retval = platform_device_add(procmgr_pdev);
