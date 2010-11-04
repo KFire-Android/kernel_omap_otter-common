@@ -179,6 +179,8 @@ struct messageq_object {
 	/* NameServer key */
 	struct semaphore *synchronizer;
 	/* Semaphore used for synchronizing message events */
+	bool unblocked;
+	/* Whether MessageQ is unblocked */
 };
 
 
@@ -573,6 +575,9 @@ void *messageq_create(char *name, const struct messageq_params *params)
 		}
 	}
 
+	/* Whether messageq is blocked */
+	obj->unblocked = false;
+
 exit:
 	if (unlikely(status < 0)) {
 		messageq_delete((void **)&obj);
@@ -812,6 +817,12 @@ int messageq_get(void *messageq_handle, messageq_msg *msg,
 				}
 				if (status < 0) {
 					*msg = NULL;
+					break;
+				}
+				if (obj->unblocked) {
+					*msg = NULL;
+					status = MESSAGEQ_E_UNBLOCKED;
+					obj->unblocked = false;
 					break;
 				}
 			}
@@ -1195,6 +1206,36 @@ exit:
 	return status;
 }
 EXPORT_SYMBOL(messageq_unregister_heap);
+
+/* Unblock messageq to prevent waiting forever */
+int messageq_unblock(void *messageq_handle)
+{
+	int status = 0;
+	struct messageq_object *obj = (struct messageq_object *)messageq_handle;
+
+	if (WARN_ON(unlikely(atomic_cmpmask_and_lt(
+				&(messageq_module->ref_count),
+				MESSAGEQ_MAKE_MAGICSTAMP(0),
+				MESSAGEQ_MAKE_MAGICSTAMP(1)) == true))) {
+		status = -ENODEV;
+		goto exit;
+	}
+	if (WARN_ON(unlikely(obj == NULL)) || (WARN_ON(unlikely(
+				obj->synchronizer == NULL)))) {
+		status = -EINVAL;
+		goto exit;
+	}
+	/* Set instance to 'unblocked' state */
+	obj->unblocked = true;
+	up(obj->synchronizer);
+
+exit:
+	if (status < 0) {
+		pr_err("messageq_unblock failed! status = 0x%x\n",
+			status);
+	}
+	return status;
+}
 
 /* Register a transport */
 int messageq_register_transport(void *messageq_transportshm_handle,

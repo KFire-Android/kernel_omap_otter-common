@@ -166,6 +166,11 @@
  *  @brief  Operation is successful.
  */
 #define MESSAGEQ_E_CANNOTFREESTATICMSG		-18
+/*!
+ *  @def    MESSAGEQ_E_UNBLOCKED
+ *  @brief  The resource is now unblocked
+ */
+#define MESSAGEQ_E_UNBLOCKED			-20
 
 
 /* =============================================================================
@@ -436,5 +441,7 @@ int messageq_register_transport(void *imessageq_transport_handle,
 /* Unregister a transport with MessageQ */
 void messageq_unregister_transport(u16 proc_id, u32 priority);
 
+/* Unblock messageq to prevent waiting forever */
+int messageq_unblock(void *messageq_handle);
 
 #endif /* _MESSAGEQ_H_ */
