@@ -1295,8 +1295,7 @@ static struct omap_hwmod omap44xx_dsp_hwmod = {
  static struct omap_hwmod_class_sysconfig omap44xx_dss_sysc = {
 	.rev_offs	= 0x0000,
 	.syss_offs	= 0x0014,
-	.sysc_flags	= SYSS_HAS_RESET_STATUS,
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.sysc_flags	= SYSS_HAS_RESET_STATUS | SYSC_READONLY,
 };
 
 static struct omap_hwmod_class omap44xx_dss_hwmod_class = {
@@ -1455,7 +1454,7 @@ static struct omap_hwmod omap44xx_elm_hwmod = {
 
 static struct omap_hwmod_class_sysconfig omap44xx_emif_sysc = {
 	.rev_offs	= 0x0000,
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.sysc_flags	= SYSC_READONLY,
 };
 
 static struct omap_hwmod_class omap44xx_emif_hwmod_class = {
@@ -5728,13 +5727,8 @@ static struct omap_hwmod omap44xx_usbhs_ohci_hwmod = {
  * video encoder
  */
 
-static struct omap_hwmod_class_sysconfig omap44xx_venc_sysc = {
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-};
-
 static struct omap_hwmod_class omap44xx_venc_hwmod_class = {
 	.name = "venc",
-	.sysc = &omap44xx_venc_sysc,
 };
 
 /* dss_venc */

@@ -89,6 +89,10 @@ static int _update_sysc_cache(struct omap_hwmod *oh)
 		return -EINVAL;
 	}
 
+	/* Check for a readonly sysconfig register */
+	if (oh->class->sysc->sysc_flags & SYSC_READONLY)
+		return -EINVAL;
+
 	/* XXX ensure module interface clock is up */
 
 	oh->_sysc_cache = omap_hwmod_readl(oh, oh->class->sysc->sysc_offs);
@@ -113,6 +117,10 @@ static void _write_sysconfig(u32 v, struct omap_hwmod *oh)
 		WARN(1, "omap_hwmod: %s: cannot write OCP_SYSCONFIG: not defined on hwmod's class\n", oh->name);
 		return;
 	}
+
+	/* Check for a readonly sysconfig register */
+	if (oh->class->sysc->sysc_flags & SYSC_READONLY)
+		return;
 
 	/* XXX ensure module interface clock is up */
 

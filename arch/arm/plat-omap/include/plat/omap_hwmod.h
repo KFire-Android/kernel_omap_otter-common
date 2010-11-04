@@ -255,6 +255,7 @@ struct omap_hwmod_ocp_if {
 #define SYSC_NO_CACHE		(1 << 8)  /* XXX SW flag, belongs elsewhere */
 #define SYSC_HAS_RESET_STATUS	(1 << 9)
 #define SYSS_MISSING            (1 << 10)
+#define SYSC_READONLY		(1 << 11)
 
 /* omap_hwmod_sysconfig.clockact flags */
 #define CLOCKACT_TEST_BOTH	0x0
