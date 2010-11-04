@@ -32,12 +32,14 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/pm_runtime.h>
+#include <linux/wakelock.h>
 
 #include "musb_core.h"
 #include "omap2430.h"
 
 
 static struct timer_list musb_idle_timer;
+static struct wake_lock usb_lock;
 
  void musb_enable_vbus(struct musb *musb)
  {
@@ -82,6 +84,7 @@ int musb_notifier_call(struct notifier_block *nb,
 
 	case USB_EVENT_VBUS:
 		DBG(1, "VBUS Connect\n");
+		wake_lock(&usb_lock);
 		musb->is_active = 1;
 		if (omap_readl(0x4A002300)&0x1) {
 			omap_writel(0x0, 0x4A002300);
@@ -103,6 +106,7 @@ int musb_notifier_call(struct notifier_block *nb,
 		/* put the phy in powerdown mode*/
 		omap_writel(0x1, 0x4A002300);
 		hostmode = 0;
+		wake_unlock(&usb_lock);
 
 		break;
 	default:
@@ -335,11 +339,15 @@ int __init musb_platform_init(struct musb *musb)
 	plat->is_usb_active = is_musb_active;
 
 	if (cpu_is_omap44xx()) {
+		wake_lock_init(&usb_lock, WAKE_LOCK_SUSPEND, "musb_wake_lock");
+
 		/* register for transciever notification*/
 		status = otg_register_notifier(musb->xceiv, &musb->nb);
 
-	if (status)
-		DBG(1, "notification register failed\n");
+		if (status) {
+			DBG(1, "notification register failed\n");
+			wake_lock_destroy(&usb_lock);
+		}
 	}
 	return 0;
 }
@@ -422,6 +430,7 @@ int musb_platform_exit(struct musb *musb)
 	if (cpu_is_omap44xx()) {
 		/* register for transciever notification*/
 		otg_unregister_notifier(musb->xceiv, &musb->nb);
+		wake_lock_destroy(&usb_lock);
 	}
 	musb_platform_suspend(musb);
 
