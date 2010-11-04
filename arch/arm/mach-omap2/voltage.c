@@ -45,6 +45,7 @@
 #define VP_TRANXDONE_TIMEOUT	300
 
 #ifdef CONFIG_PM_DEBUG
+#include <linux/seq_file.h>
 static struct dentry *voltage_dir;
 #endif
 
@@ -471,10 +472,41 @@ static int nom_volt_debug_get(void *data, u64 *val)
 	return 0;
 }
 
+static int volt_dbg_show_users(struct seq_file *s, void *unused)
+{
+	struct omap_vdd_info *vdd = 0;
+	struct plist_node *node;
+	struct omap_vdd_user_list *user;
+	int count = 0;
+
+	vdd = (struct omap_vdd_info *)s->private ;
+	plist_for_each_entry(user, &vdd->user_list, node) {
+		count++;
+		pr_info("VDD=%s: User=%d: Name=%s: Volt=%d\n",
+			vdd->voltdm.name, count, dev_name(user->dev),
+			user->volt);
+	}
+
+	return 0;
+}
+
+static int volt_users_dbg_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, volt_dbg_show_users,
+		inode->i_private);
+}
+
 DEFINE_SIMPLE_ATTRIBUTE(vp_debug_fops, vp_debug_get, vp_debug_set, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(vp_volt_debug_fops, vp_volt_debug_get, NULL, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(nom_volt_debug_fops, nom_volt_debug_get, NULL,
 								"%llu\n");
+static const struct file_operations volt_users_dbg_fops = {
+	.open           = volt_users_dbg_open,
+	.read		= seq_read,
+	.llseek 	= seq_lseek,
+	.release        = single_release,
+};
+
 #endif
 
 static void vp_latch_vsel(struct omap_vdd_info *vdd)
@@ -1010,6 +1042,8 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 				(void *) vdd, &vp_volt_debug_fops);
 	(void) debugfs_create_file("curr_nominal_volt", S_IRUGO, vdd_debug,
 				(void *) vdd, &nom_volt_debug_fops);
+	(void) debugfs_create_file("volt_users", S_IRUGO, vdd_debug,
+				(void *) vdd, &volt_users_dbg_fops);
 #endif
 }
 static void __init init_voltagecontroller(void)
