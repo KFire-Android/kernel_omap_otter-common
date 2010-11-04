@@ -47,6 +47,7 @@ static struct emif_regs *emif2_regs_cache[EMIF_MAX_NUM_FREQUENCIES];
 static struct emif_device_details *emif_devices[2];
 static u32 emif_temperature_level[EMIF_NUM_INSTANCES] = {SDRAM_TEMP_NOMINAL,
 							 SDRAM_TEMP_NOMINAL};
+static u32 emif_notify_pending;
 static u32 emif_thermal_handling_pending;
 static u32 T_den, T_num;
 
@@ -680,12 +681,13 @@ static irqreturn_t handle_temp_alert(void __iomem *base, u32 emif_nr)
 	emif_temperature_level[emif_nr] = get_temperature_level(emif_nr);
 
 	if (unlikely(emif_temperature_level[emif_nr] == old_temperature_level))
-		ret = IRQ_HANDLED;
-	else if (likely(emif_temperature_level[emif_nr] <
+		return IRQ_HANDLED;
+
+	emif_notify_pending |= (1 << emif_nr);
+	if (likely(emif_temperature_level[emif_nr] <
 			old_temperature_level)) {
 		/* Temperature coming down - defer handling to thread */
 		emif_thermal_handling_pending |= (1 << emif_nr);
-		ret = IRQ_WAKE_THREAD;
 	} else if (likely(emif_temperature_level[emif_nr] !=
 			SDRAM_TEMP_VERY_HIGH_SHUTDOWN)) {
 		/* Temperature is going up - handle immediately */
@@ -696,9 +698,8 @@ static irqreturn_t handle_temp_alert(void __iomem *base, u32 emif_nr)
 		 * freq update method only
 		 */
 		omap4_set_freq_update();
-		ret = IRQ_HANDLED;
 	}
-	return ret;
+	return IRQ_WAKE_THREAD;
 }
 
 static void setup_volt_sensitive_registers(u32 emif_nr, struct emif_regs *regs,
@@ -782,6 +783,15 @@ static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
 		/* clear the bit */
 		emif_thermal_handling_pending &= ~(1 << emif_nr);
 	}
+	if (emif_notify_pending & (1 << emif_nr)) {
+		sysfs_notify(&(emif[emif_nr].pdev->dev.kobj), NULL,
+			       "temperature");
+		kobject_uevent(&(emif[emif_nr].pdev->dev.kobj),
+			       KOBJ_CHANGE);
+		/* clear the bit */
+		emif_notify_pending &= ~(1 << emif_nr);
+	}
+
 	return IRQ_HANDLED;
 }
 
@@ -808,6 +818,22 @@ int  __init setup_emif_interrupts(u32 emif_nr)
 			IRQF_SHARED, emif[emif_nr].pdev->name,
 			emif[emif_nr].pdev);
 }
+
+static ssize_t emif_temperature_show(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	u32 temperature;
+	if (dev == &(emif[EMIF1].pdev->dev))
+		temperature = emif_temperature_level[EMIF1];
+	else if (dev == &(emif[EMIF2].pdev->dev))
+		temperature = emif_temperature_level[EMIF2];
+	else
+		return 0;
+
+	return snprintf(buf, 20, "%u\n", temperature);
+}
+static DEVICE_ATTR(temperature, S_IRUGO, emif_temperature_show, NULL);
 
 static int __devinit omap_emif_probe(struct platform_device *pdev)
 {
@@ -1083,6 +1109,9 @@ int do_setup_device_details(u32 emif_nr,
 	}
 
 	emif_temperature_level[emif_nr] = get_temperature_level(emif_nr);
+	WARN_ON(device_create_file(&(emif[emif_nr].pdev->dev),
+				   &dev_attr_temperature));
+	WARN_ON(kobject_uevent(&(emif[emif_nr].pdev->dev.kobj), KOBJ_ADD));
 
 	if (emif_temperature_level[emif_nr] == SDRAM_TEMP_VERY_HIGH_SHUTDOWN)
 		pr_emerg("EMIF %d: SDRAM temperature exceeds operating"
