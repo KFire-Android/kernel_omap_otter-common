@@ -2360,36 +2360,19 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 			color_mode == OMAP_DSS_COLOR_UYVY) {
 		int vidrot = 0;
 
-		if (mirroring) {
-			switch (rotation) {
-			case OMAP_DSS_ROT_0:
-				vidrot = 2;
-				break;
-			case OMAP_DSS_ROT_90:
-				vidrot = 1;
-				break;
-			case OMAP_DSS_ROT_180:
-				vidrot = 0;
-				break;
-			case OMAP_DSS_ROT_270:
-				vidrot = 3;
-				break;
-			}
-		} else {
-			switch (rotation) {
-			case OMAP_DSS_ROT_0:
-				vidrot = 0;
-				break;
-			case OMAP_DSS_ROT_90:
-				vidrot = 1;
-				break;
-			case OMAP_DSS_ROT_180:
-				vidrot = 2;
-				break;
-			case OMAP_DSS_ROT_270:
-				vidrot = 3;
-				break;
-			}
+		switch (rotation) {
+		case OMAP_DSS_ROT_0:
+			vidrot = 0;
+			break;
+		case OMAP_DSS_ROT_180:
+			vidrot = 2;
+			break;
+		case OMAP_DSS_ROT_90:
+			vidrot = mirroring ? 3 : 1;
+			break;
+		case OMAP_DSS_ROT_270:
+			vidrot = mirroring ? 1 : 3;
+			break;
 		}
 
 		REG_FLD_MOD(dispc_reg_att[plane], vidrot, 13, 12);
