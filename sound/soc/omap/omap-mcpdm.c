@@ -688,6 +688,7 @@ static void playback_abe_work(struct work_struct *work)
 		abe_dsp_disable_data_transfer(PDM_DL_PORT);
 		omap_mcpdm_stop(mcpdm, SNDRV_PCM_STREAM_PLAYBACK);
 		omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
+		abe_dsp_shutdown();
 	}
 	spin_unlock(&mcpdm->lock);
 
