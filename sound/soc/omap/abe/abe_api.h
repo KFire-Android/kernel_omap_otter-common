@@ -466,4 +466,14 @@ abehal_status abe_remote_debugger_interface(u32 n, u8 *p);
  *
  */
 abehal_status abe_enable_test_pattern(u32 smem_id, u32 on_off);
+/**
+ * abe_check_activity - Check if some ABE activity.
+ *
+ * Check if any ABE ports are running.
+ * return 1: still activity on ABE
+ * return 0: no more activity on ABE. Event generator can be stopped
+ *
+ */
+u32 abe_check_activity(void);
+
 #endif/* _ABE_API_H_ */

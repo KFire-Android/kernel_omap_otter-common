@@ -522,3 +522,27 @@ void abe_decide_main_port(u32 id)
 		abe_select_main_port(id);
 	}
 }
+/**
+ * abe_check_activity - Check if some ABE activity.
+ *
+ * Check if any ABE ports are running.
+ * return 1: still activity on ABE
+ * return 0: no more activity on ABE. Event generator can be stopped
+ *
+ */
+u32 abe_check_activity(void)
+{
+	u32 i;
+	u32 ret;
+
+	ret = 0;
+	for (i = 0; i < (LAST_PORT_ID - 1); i++) {
+		if (abe_port[abe_port_priority[i]].status ==
+				OMAP_ABE_PORT_ACTIVITY_RUNNING)
+			break;
+	}
+	if (i < (LAST_PORT_ID - 1))
+		ret = 1;
+
+	return ret;
+}
