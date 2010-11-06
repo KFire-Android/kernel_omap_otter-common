@@ -61,43 +61,13 @@
 #define NUM_ABE_FRONTENDS		7
 #define NUM_ABE_BACKENDS		11
 
-/*
- * Playback volumes for FE PCMs the need to be muted to stop pops.
- */
-struct abe_playback_controls {
-	int dl1_vol;
-	int dl2_vol;
-	int tones1_vol;
-	int tones2_vol;
-};
-
-/*
- * Capture volumes for FE PCMs the need to be muted to stop pops.
- */
-struct abe_capture_controls {
-	int dmic1_vol;
-	int dmic2_vol;
-	int dmic3_vol;
-	int amic_vol;
-};
-
 /* logical -> physical DAI status */
 enum dai_status {
 	DAI_STOPPED = 0,
 	DAI_STARTED,
 };
 
-struct abe_frontend_dai {
-
-	struct snd_pcm_substream *substream;
-	union {
-		struct abe_playback_controls playback;
-		struct abe_capture_controls capture;
-	};
-};
-
 struct omap_abe_data {
-	struct abe_frontend_dai frontend[NUM_ABE_FRONTENDS][2];
 	int be_active[NUM_ABE_BACKENDS][2];
 
 	struct clk *clk;
@@ -294,6 +264,8 @@ static int abe_fe_startup(struct snd_pcm_substream *substream,
 			dev_err(dai->dev, "failed to get MODEM DAI\n");
 			return ret;
 		}
+		dev_dbg(abe_data.modem_dai->dev, "%s: MODEM stream %d\n",
+				__func__, substream->stream);
 
 		ret = snd_soc_dai_startup(abe_data.modem_substream[substream->stream],
 				abe_data.modem_dai);
@@ -436,6 +408,9 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 		snd_soc_dai_set_dma_data(abe_data.modem_dai, substream,
 				&omap_abe_dai_dma_params[dai->id][substream->stream]);
 
+		dev_dbg(abe_data.modem_dai->dev, "%s: MODEM stream %d\n",
+				__func__, substream->stream);
+
 		ret = snd_soc_dai_hw_params(abe_data.modem_substream[substream->stream],
 				params, abe_data.modem_dai);
 		if (ret < 0)
@@ -457,6 +432,10 @@ static int abe_fe_prepare(struct snd_pcm_substream *substream,
 	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
 		ret = snd_soc_dai_prepare(abe_data.modem_substream[substream->stream],
 				abe_data.modem_dai);
+
+		dev_dbg(abe_data.modem_dai->dev, "%s: MODEM stream %d\n",
+				__func__, substream->stream);
+
 		if (ret < 0) {
 			dev_err(abe_data.modem_dai->dev, "MODEM prepare failed\n");
 			return ret;
@@ -469,8 +448,12 @@ static int abe_fe_trigger(struct snd_pcm_substream *substream,
 				  int cmd, struct snd_soc_dai *dai)
 {
 	int ret = 0;
-	//TODO: how do we sequence this with ABE ???
+
 	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
+
+		dev_dbg(abe_data.modem_dai->dev, "%s: MODEM stream %d cmd %d\n",
+				__func__, substream->stream, cmd);
+
 		ret = snd_soc_dai_trigger(abe_data.modem_substream[substream->stream],
 				cmd, abe_data.modem_dai);
 		if (ret < 0) {
@@ -487,6 +470,10 @@ static int abe_fe_hw_free(struct snd_pcm_substream *substream,
 	int ret = 0;
 
 	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
+
+		dev_dbg(abe_data.modem_dai->dev, "%s: MODEM stream %d\n",
+				__func__, substream->stream);
+
 		ret = snd_soc_dai_hw_free(abe_data.modem_substream[substream->stream],
 				abe_data.modem_dai);
 		if (ret < 0) {
@@ -501,10 +488,13 @@ static void abe_fe_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
 
-	if (dai->id == ABE_FRONTEND_DAI_MODEM)
+	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
+		dev_dbg(abe_data.modem_dai->dev, "%s: MODEM stream %d\n",
+				__func__, substream->stream);
+
 		snd_soc_dai_shutdown(abe_data.modem_substream[substream->stream],
 				abe_data.modem_dai);
-
+	}
 	//TODO: Do we need to do reset this stuff i.e. :-
 	//abe_connect_cbpr_dmareq_port(VIB_DL_PORT, &format, ABE_CBPR6_IDX,
 	//				&dma_sink);
@@ -672,15 +662,12 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	int stream = substream->stream, i, ret;
+	int stream = substream->stream, i, ret = 0;
 
 	dev_dbg(dai->dev,"%s: frontend %s \n", __func__, rtd->dai_link->name);
 
 	mutex_lock(&fe_mutex);
 
-	// TODO: generate our own hw params for backend DAI
-	/* only hw_params backends that are either sinks or
-	 * sources to this frontend DAI */
 	for (i = 0; i < rtd->num_be[stream]; i++) {
 		struct snd_soc_pcm_runtime *be_rtd = rtd->be_rtd[i][stream];
 		struct snd_pcm_substream *be_substream =
