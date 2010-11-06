@@ -383,13 +383,11 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 		 */
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			/* Vx_DL connection to McBSP 2 ports */
-			format.f = 8000;
 			format.samp_format = STEREO_RSHIFTED_16;
 			abe_connect_serial_port(VX_DL_PORT, &format, MCBSP2_RX);
 			abe_read_port_address(VX_DL_PORT, &dma_params);
 		} else {
 			/* Vx_UL connection to McBSP 2 ports */
-			format.f = 8000;
 			format.samp_format = STEREO_RSHIFTED_16;
 			abe_connect_serial_port(VX_UL_PORT, &format, MCBSP2_TX);
 			abe_read_port_address(VX_UL_PORT, &dma_params);
