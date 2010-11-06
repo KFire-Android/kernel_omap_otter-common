@@ -661,8 +661,12 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	int stream = substream->stream, i, ret = 0;
+	struct snd_pcm_hw_params *params_fe;
 
+	params_fe = kzalloc(sizeof(struct snd_pcm_hw_params), GFP_KERNEL);
 	dev_dbg(dai->dev,"%s: frontend %s \n", __func__, rtd->dai_link->name);
+
+	memcpy(params_fe, params, sizeof(struct snd_pcm_hw_params));
 
 	mutex_lock(&fe_mutex);
 
@@ -694,12 +698,14 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	/* call hw_params on the frontend */
+	memcpy(params, params_fe, sizeof(struct snd_pcm_hw_params));
 	ret = abe_fe_hw_params(substream, params, dai);
 	if (ret < 0)
 		dev_err(dai->dev,"%s: frontend hw_params failed\n", __func__);
 
 out:
 	mutex_unlock(&fe_mutex);
+	kfree(params_fe);
 	return ret;
 }
 
