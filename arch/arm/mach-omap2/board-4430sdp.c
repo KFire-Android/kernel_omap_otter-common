@@ -53,6 +53,7 @@
 #include <plat/omap4-keypad.h>
 #include <plat/hwspinlock.h>
 #include <plat/nokia-dsi-panel.h>
+#include "mux.h"
 #include "hsmmc.h"
 #include "smartreflex-class3.h"
 
@@ -61,6 +62,8 @@
 #define ETH_KS8851_QUART		138
 #define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
 #define OMAP4_SFH7741_ENABLE_GPIO		188
+
+#define OMAP4_TOUCH_IRQ_1		35
 
 #define OMAP4_CMA3000ACCL_GPIO		186
 #define OMAP4SDP_MDM_PWR_EN_GPIO	157
@@ -1202,12 +1205,14 @@ static void enable_board_wakeup_source(void)
 {
 	/* Android does not have touchscreen as wakeup source */
 #if !defined(CONFIG_ANDROID)
-	u16 padconf;
-	/* NOTE: Use mx framework when available */
-	/* Enable IO wakeup for the gpio used for primary touchscreen */
-	padconf = omap_readw(CONTROL_CORE_PAD1_GPMC_AD11);
-	padconf |= OMAP44XX_PADCONF_WAKEUPENABLE0;
-	omap_writew(padconf, CONTROL_CORE_PAD1_GPMC_AD11);
+	int gpio_val;
+
+	gpio_val = omap_mux_get_gpio(OMAP4_TOUCH_IRQ_1);
+	if ((gpio_val & OMAP44XX_PADCONF_WAKEUPENABLE0) == 0) {
+		gpio_val |= OMAP44XX_PADCONF_WAKEUPENABLE0;
+		omap_mux_set_gpio(gpio_val, OMAP4_TOUCH_IRQ_1);
+	}
+
 #endif
 }
 
@@ -1226,9 +1231,22 @@ static struct omap_volt_vc_data vc_config = {
 	.vdd2_off = 600000,       /* 0.6v */
 };
 
+#ifdef CONFIG_OMAP_MUX
+static struct omap_board_mux board_mux[] __initdata = {
+	{ .reg_offset = OMAP_MUX_TERMINATOR },
+};
+#else
+#define board_mux	NULL
+#endif
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
+	int package = OMAP_PACKAGE_CBS;
+
+	if (omap_rev() == OMAP4430_REV_ES1_0)
+		package = OMAP_PACKAGE_CBL;
+	omap4_mux_init(board_mux, package);
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
 	omap_init_emif_timings();
