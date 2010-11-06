@@ -676,6 +676,14 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 
 		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
 			be_rtd->current_fe = dai->id;
+			if (be_rtd->dai_link->be_hw_params_fixup)
+				ret = be_rtd->dai_link->be_hw_params_fixup(be_rtd, params);
+			if (ret < 0) {
+				dev_err(&rtd->dev, "%s: backend hw_params fixup failed %d\n",
+										__func__, ret);
+				goto out;
+			}
+
 			ret = snd_soc_pcm_hw_params(be_substream, params);
 			if (ret < 0) {
 				dev_err(&rtd->dev, "%s: backend hw_params failed %d\n",
