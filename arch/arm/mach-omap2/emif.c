@@ -1057,7 +1057,7 @@ static struct emif_regs *get_regs(u32 emif_nr, u32 freq)
 	 * and calculate the values
 	 */
 	if (!regs) {
-		regs = kmalloc(sizeof(struct emif_regs), GFP_KERNEL);
+		regs = kmalloc(sizeof(struct emif_regs), GFP_ATOMIC);
 		if (!regs)
 			return NULL;
 		emif_calculate_regs(emif_devices[emif_nr], freq, regs);
