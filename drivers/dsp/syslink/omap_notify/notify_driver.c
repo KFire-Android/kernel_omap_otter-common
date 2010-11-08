@@ -178,7 +178,7 @@ struct notify_driver_object *notify_get_driver_handle(u16 remote_proc_id,
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_get_driver_handle failed! "
+		pr_err("notify_get_driver_handle failed! "
 			"status = 0x%x\n", status);
 	}
 	return handle;

@@ -570,7 +570,7 @@ int notify_drv_ioctl(struct inode *inode, struct file *filp, u32 cmd,
 		u32 pid = *((u32 *)args);
 		status = notify_drv_attach(pid);
 		if (status < 0)
-			printk(KERN_ERR "NOTIFY_ATTACH FAILED\n");
+			pr_err("NOTIFY_ATTACH FAILED\n");
 		else {
 			u32 *data = kmalloc(sizeof(u32), GFP_KERNEL);
 			if (WARN_ON(!data)) {
@@ -597,7 +597,7 @@ int notify_drv_ioctl(struct inode *inode, struct file *filp, u32 cmd,
 		else
 			status = notify_drv_detach(pid, true);
 		if (status < 0)
-			printk(KERN_ERR "NOTIFY_DETACH FAILED\n");
+			pr_err("NOTIFY_DETACH FAILED\n");
 		else
 			remove_pr_res(pr_ctxt, info);
 	}
@@ -693,7 +693,7 @@ int notify_drv_ioctl(struct inode *inode, struct file *filp, u32 cmd,
 		/* This does not impact return status of this function,so retval
 		 * comment is not used. */
 		status = NOTIFY_E_INVALIDARG;
-		printk(KERN_ERR "not valid command\n");
+		pr_err("not valid command\n");
 	}
 	break;
 	}
@@ -735,10 +735,8 @@ static void _notify_drv_callback(u16 proc_id, u16 line_id, u32 event_id,
 				event_id, payload, cbck->func, cbck->param);
 
 func_end:
-	if (status < 0) {
-		printk(KERN_ERR "_notify_drv_callback failed! status = 0x%x",
-			status);
-	}
+	if (status < 0)
+		pr_err("_notify_drv_callback failed! status = 0x%x", status);
 	return;
 }
 
@@ -801,7 +799,7 @@ static int _notify_drv_add_buf_by_pid(u16 proc_id, u16 line_id, u32 pid,
 
 func_end:
 	if (status < 0) {
-		printk(KERN_ERR "_notify_drv_add_buf_by_pid failed! "
+		pr_err("_notify_drv_add_buf_by_pid failed! "
 			"status = 0x%x", status);
 	}
 	return status;

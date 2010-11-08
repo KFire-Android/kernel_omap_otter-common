@@ -73,7 +73,7 @@ int notify_setup_omap4_attach(u16 proc_id, void *shared_addr)
 							&notify_shm_params);
 	if (notify_setup_driver_handles[proc_id] == NULL) {
 		status = NOTIFY_E_FAIL;
-		printk(KERN_ERR "notify_setup_omap4_attach: "
+		pr_err("notify_setup_omap4_attach: "
 			"notify_ducatidrv_create failed! status = 0x%x",
 			status);
 		goto exit;
@@ -84,14 +84,14 @@ int notify_setup_omap4_attach(u16 proc_id, void *shared_addr)
 					proc_id, 0u, NULL);
 	if (notify_setup_notify_handles[proc_id] == NULL) {
 		status = NOTIFY_E_FAIL;
-		printk(KERN_ERR "notify_setup_omap4_attach: notify_create "
+		pr_err("notify_setup_omap4_attach: notify_create "
 			"failed!");
 		goto exit;
 	}
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_setup_omap4_attach failed! "
+		pr_err("notify_setup_omap4_attach failed! "
 			"status = 0x%x", status);
 	}
 	return status;
@@ -113,7 +113,7 @@ int notify_setup_omap4_detach(u16 proc_id)
 	/* Delete the notify driver to the M3 (Line 0) */
 	status = notify_delete(&(notify_setup_notify_handles[proc_id]));
 	if (status < 0) {
-		printk(KERN_ERR "notify_setup_omap4_detach: notify_delete "
+		pr_err("notify_setup_omap4_detach: notify_delete "
 			"failed for line 0!");
 	}
 
@@ -121,13 +121,13 @@ int notify_setup_omap4_detach(u16 proc_id)
 				&(notify_setup_driver_handles[proc_id]));
 	if ((tmp_status < 0) && (status >= 0)) {
 		status = tmp_status;
-		printk(KERN_ERR "notify_setup_omap4_detach: "
+		pr_err("notify_setup_omap4_detach: "
 			"notify_ducatidrv_delete failed for line 0!");
 	}
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_setup_omap4_detach failed! "
+		pr_err("notify_setup_omap4_detach failed! "
 			"status = 0x%x", status);
 	}
 	return status;
@@ -153,7 +153,7 @@ uint notify_setup_omap4_shared_mem_req(u16 remote_proc_id, void *shared_addr)
 
 exit:
 	if (status < 0) {
-		printk(KERN_ERR "notify_setup_omap4_shared_mem_req failed!"
+		pr_err("notify_setup_omap4_shared_mem_req failed!"
 			" status = 0x%x", status);
 	}
 	return mem_req;
