@@ -70,6 +70,8 @@ static int omap_devh_ioctl(struct inode *inode, struct file *filp,
 {
 	int rc = 0;
 	struct omap_devh *devh = filp->private_data;
+	struct omap_devh_platform_data *pdata =
+		(struct omap_devh_platform_data *)devh->dev->platform_data;
 
 	if (!devh)
 		return -EINVAL;
@@ -96,6 +98,12 @@ static int omap_devh_ioctl(struct inode *inode, struct file *filp,
 	*/
 	case DEVH_IOCWAITONEVENTS:
 		/*rc = omap_devh_wait_on_events(devh);*/
+		break;
+	case DEVH_IOCEVENTREG:
+		rc = pdata->ops->register_event_notification(devh,
+			(const void __user *)arg);
+		break;
+	case DEVH_IOCEVENTUNREG:
 		break;
 	default:
 		return -ENOTTY;
@@ -164,6 +172,8 @@ static int omap_devh_probe(struct platform_device *pdev)
 			MAJOR(omap_devh_dev),
 			minor);
 
+	INIT_LIST_HEAD(&(devh->event_list));
+	spin_lock_init(&(devh->event_lock));
 	if (pdata->ops->register_notifiers)
 		pdata->ops->register_notifiers(devh);
 

@@ -26,10 +26,13 @@
 #include <linux/io.h>
 #include <linux/pm_runtime.h>
 #include <linux/sched.h>
+#include <linux/eventfd.h>
 #include <mach/irqs.h>
 #include <plat/omap_device.h>
 #include <plat/iommu.h>
 #include <plat/remoteproc.h>
+#include <linux/slab.h>
+#include <linux/pagemap.h>
 #if defined(CONFIG_TILER_OMAP)
 #include <mach/tiler.h>
 #endif
@@ -54,6 +57,14 @@ enum {
 	DEVH_BRDST_ERROR,
 };
 
+struct deh_event_ntfy {
+	u32     fd;
+	struct eventfd_ctx *evt_ctx;
+	struct list_head list;
+};
+
+struct omap_devh *devh_get_obj(int dev_index);
+
 static struct omap_devh_platform_data *devh_get_plat_data_by_name(char *name)
 {
 	int i, j = devh_get_plat_data_size();
@@ -66,6 +77,22 @@ static struct omap_devh_platform_data *devh_get_plat_data_by_name(char *name)
 		}
 	}
 	return NULL;
+}
+
+static void devh_notification_handler(u16 proc_id, u16 line_id, u32 event_id,
+					uint *arg, u32 payload)
+{
+	struct omap_devh *devh = (struct omap_devh *)arg;
+	struct deh_event_ntfy *fd_reg;
+	struct deh_event_ntfy *tmp_fd_reg;
+
+	pr_warning("Unrecoverable Error occured in Ducati for proc_id = %d\n",
+		proc_id);
+
+	spin_lock_irq(&(devh->event_lock));
+	list_for_each_entry_safe(fd_reg, tmp_fd_reg, &(devh->event_list), list)
+		eventfd_signal(fd_reg->evt_ctx, 1);
+	spin_unlock_irq(&(devh->event_lock));
 }
 
 static int devh44xx_notifier_call(struct notifier_block *nb,
@@ -200,10 +227,55 @@ static int devh44xx_sysm3_ipc_notifier_call(struct notifier_block *nb,
 {
 	struct omap_devh_platform_data *pdata =
 				devh_get_plat_data_by_name("SysM3");
+	u16 *proc_id = (u16 *)v;
+	struct omap_devh *obj;
+	int status;
 
 	switch ((int)val) {
 	case IPC_CLOSE:
 		return devh44xx_notifier_call(nb, val, v, pdata);
+	case IPC_START:
+		/*
+		 * TODO - hack hack - clean this up to use a define proc id
+		 * and use this to get the devh object
+		 */
+		if (*proc_id == multiproc_get_id("SysM3")) {
+			obj = devh_get_obj(1);
+			if (WARN_ON(obj == NULL)) {
+				status = -1;
+				pr_err("devh_44xx_notifier_call: cannot grab "
+					"device devh1 instance\n");
+			} else {
+				status = notify_register_event(pdata->proc_id,
+					pdata->line_id,
+					pdata->err_event_id,
+					(notify_fn_notify_cbck) \
+					devh_notification_handler,
+					(void *)obj);
+			}
+		} else {
+			status = 0;
+		}
+		return status;
+	case IPC_STOP:
+		if (*proc_id == multiproc_get_id("SysM3")) {
+			obj = devh_get_obj(1);
+			if (WARN_ON(obj == NULL)) {
+				status = -1;
+				pr_err("devh_44xx_notifier_call: cannot grab "
+					"device devh1 instance\n");
+			} else {
+				status = notify_unregister_event(pdata->proc_id,
+					pdata->line_id,
+					pdata->err_event_id,
+					(notify_fn_notify_cbck) \
+					devh_notification_handler,
+					(void *)obj);
+			}
+		} else {
+			status = 0;
+		}
+		return status;
 	default:
 		return 0;
 	}
@@ -214,10 +286,55 @@ static int devh44xx_appm3_ipc_notifier_call(struct notifier_block *nb,
 {
 	struct omap_devh_platform_data *pdata =
 				devh_get_plat_data_by_name("AppM3");
+	struct omap_devh *obj;
 
+	u16* proc_id = (u16 *)v;
+	int status;
 	switch ((int)val) {
 	case IPC_CLOSE:
 		return devh44xx_notifier_call(nb, val, v, pdata);
+	case IPC_START:
+		/*
+		 * TODO - hack hack - clean this up to use a define proc id
+		 * and use this to get the devh object
+		 */
+		if (*proc_id == multiproc_get_id("AppM3")) {
+			obj = devh_get_obj(2);
+			if (WARN_ON(obj == NULL)) {
+				status = -1;
+				pr_err("devh_44xx_notifier_call: cannot grab "
+					"device devh2 instance\n");
+			} else {
+				status = notify_register_event(pdata->proc_id,
+					pdata->line_id,
+					pdata->err_event_id,
+					(notify_fn_notify_cbck) \
+					devh_notification_handler,
+					(void *)obj);
+			}
+		} else {
+			status = 0;
+		}
+		return status;
+	case IPC_STOP:
+		if (*proc_id == multiproc_get_id("AppM3")) {
+			obj = devh_get_obj(2);
+			if (WARN_ON(obj == NULL)) {
+				status = -1;
+				pr_err("devh_44xx_notifier_call: cannot grab "
+					"device devh2 instance\n");
+			} else {
+				status = notify_unregister_event(pdata->proc_id,
+					pdata->line_id,
+					pdata->err_event_id,
+					(notify_fn_notify_cbck) \
+					devh_notification_handler,
+					(void *)obj);
+			}
+		} else {
+			status = 0;
+		}
+		return status;
 	default:
 		return 0;
 	}
@@ -637,14 +754,38 @@ static struct omap_devh_runtime_info omap4_tesla_runtime_info = {
 	.rproc = NULL,
 };
 
+static inline int devh44xx_register_proc_error
+	(struct omap_devh *devh, const void __user *args)
+{
+	int fd;
+	struct deh_event_ntfy *fd_reg;
+	if (copy_from_user(&fd, args, sizeof(int)))
+		return -EFAULT;
+	fd_reg = kzalloc(sizeof(struct deh_event_ntfy), GFP_KERNEL);
+	if (!fd_reg) {
+		dev_err(devh->dev, "%s: kzalloc failed\n", __func__);
+		return -ENOMEM;
+	}
+	fd_reg->fd = fd;
+	fd_reg->evt_ctx = eventfd_ctx_fdget(fd);
+	INIT_LIST_HEAD(&fd_reg->list);
+	spin_lock_irq(&(devh->event_lock));
+	list_add_tail(&fd_reg->list, &(devh->event_list));
+	spin_unlock_irq(&(devh->event_lock));
+	pr_info("Registered user-space process for deh error notification\n");
+	return 0;
+}
+
 static struct omap_devh_ops omap4_sysm3_ops = {
 	.register_notifiers = devh44xx_sysm3_register,
 	.unregister_notifiers = devh44xx_sysm3_unregister,
+	.register_event_notification = devh44xx_register_proc_error,
 };
 
 static struct omap_devh_ops omap4_appm3_ops = {
 	.register_notifiers = devh44xx_appm3_register,
 	.unregister_notifiers = devh44xx_appm3_unregister,
+	.register_event_notification = devh44xx_register_proc_error,
 };
 
 static struct omap_devh_ops omap4_tesla_ops = {
@@ -657,18 +798,24 @@ static struct omap_devh_platform_data omap4_devh_data[] = {
 		.name = "Tesla",
 		.ops = &omap4_tesla_ops,
 		.proc_id = 0,
+		.err_event_id = -1,
+		.line_id = -1,
 		.private_data = &omap4_tesla_runtime_info,
 	},
 	{
 		.name = "SysM3",
 		.ops = &omap4_sysm3_ops,
 		.proc_id = 2,
+		.err_event_id = (4 | (NOTIFY_SYSTEMKEY << 16)),
+		.line_id = 0,
 		.private_data = &omap4_sysm3_runtime_info,
 	},
 	{
 		.name = "AppM3",
 		.ops = &omap4_appm3_ops,
 		.proc_id = 1,
+		.err_event_id = (4 | (NOTIFY_SYSTEMKEY << 16)),
+		.line_id = 0,
 		.private_data = &omap4_appm3_runtime_info,
 	},
 };
@@ -687,6 +834,26 @@ static struct platform_device *omap4_devh_pdev[NR_DEVH_DEVICES];
 struct omap_devh_platform_data *devh_get_plat_data(void)
 {
 	return omap4_devh_data;
+}
+
+/* returns devh object based on the device index */
+struct omap_devh *devh_get_obj(int dev_index)
+{
+	struct platform_device *pdev;
+	struct omap_devh *obj = NULL;
+	int max_num_devices;
+
+	max_num_devices = devh_get_plat_data_size();
+
+	if (WARN_ON((dev_index > (max_num_devices - 1))))
+		return NULL;
+
+	pdev = omap4_devh_pdev[dev_index];
+
+	if (pdev)
+		obj = (struct omap_devh *)platform_get_drvdata(pdev);
+
+	return obj;
 }
 
 static int __init omap4_devh_init(void)

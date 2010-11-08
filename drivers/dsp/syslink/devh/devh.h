@@ -28,23 +28,29 @@
 #include <linux/cdev.h>
 #include <linux/semaphore.h>
 
-#define DEVH_IOC_MAGIC		'P'
+#define DEVH_IOC_MAGIC                 'E'
 
-#define DEVH_IOCWAITONEVENTS	_IOR(DEVH_IOC_MAGIC, 0, int)
+#define DEVH_IOCWAITONEVENTS		_IO(DEVH_IOC_MAGIC, 0)
+#define DEVH_IOCEVENTREG		_IOW(DEVH_IOC_MAGIC, 1, int)
+#define DEVH_IOCEVENTUNREG		_IOW(DEVH_IOC_MAGIC, 2, int)
 
-#define DEVH_IOC_MAXNR		(1)
+#define DEVH_IOC_MAXNR		(2)
 
 struct omap_devh;
 
 struct omap_devh_ops {
 	int (*register_notifiers)(struct omap_devh *devh);
 	int (*unregister_notifiers)(struct omap_devh *devh);
+	int (*register_event_notification)(struct omap_devh *devh,
+		const void __user *args);
 };
 
 struct omap_devh_platform_data {
 	struct omap_devh_ops *ops;
 	char *name;
 	int  proc_id;
+	int  err_event_id;
+	int  line_id;
 	struct semaphore sem_handle;
 	void *private_data;
 };
@@ -56,6 +62,8 @@ struct omap_devh {
 	int state;
 	int minor;
 	char *name;
+	struct list_head event_list;
+	spinlock_t event_lock;
 };
 
 extern struct omap_devh_platform_data *devh_get_plat_data(void);
