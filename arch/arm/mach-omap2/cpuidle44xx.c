@@ -65,11 +65,11 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	/* C0 - CPU0 WFI + CPU1 WFI + MPU ON  + CORE INA  */
 	{1,	2,	2,	5},
 	/* C1 - CPU0 WFI + CPU1 OFF + MPU INA  + CORE INA  */
-	{0,	93,	60,	150},
+	{1,	93,	60,	400},
 	/* C2 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE INA  */
-	{0,	1284,	1304,	50000},
+	{1,	1284,	1304,	3500},
 	/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR  + CORE CSWR */
-	{0,	1434,	6454,	92000},
+	{1,	1434,	6454,	4000},
 	/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR  + CORE OSWR */
 	/* FIXME: disabled until CORE OSWR supported */
 	{0,	1534,	6554,	117000},
