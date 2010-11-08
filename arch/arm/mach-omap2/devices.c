@@ -574,7 +574,8 @@ static void omap_init_pmu(void)
 }
 
 
-#if defined(CONFIG_CRYPTO_DEV_OMAP_SHAM) || defined(CONFIG_CRYPTO_DEV_OMAP_SHAM_MODULE)
+#if defined(CONFIG_CRYPTO_DEV_OMAP_SHAM) || \
+defined(CONFIG_CRYPTO_DEV_OMAP_SHAM_MODULE)
 
 #ifdef CONFIG_ARCH_OMAP2
 static struct resource omap2_sham_resources[] = {
@@ -734,8 +735,8 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 				OMAP_PIN_INPUT_PULLUP);
 
 			/*
-			 * For 8 wire configurations, Lines DAT4, 5, 6 and 7 need to be muxed
-			 * in the board-*.c files
+			 * For 8 wire configurations, lines DAT4, 5, 6 and 7
+			 * need to be muxed in the board-*.c files
 			 */
 			if (mmc_controller->slots[0].caps &
 				(MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA)) {
@@ -893,18 +894,16 @@ void __init omap_display_init(struct omap_dss_board_info *board_data)
 	struct omap_display_platform_data pdata;
 	idx = 1;
 
-        if(cpu_is_omap44xx())
-	{
+	if (cpu_is_omap44xx()) {
 		oh_name =  &oh_name_omap4[0];
 		count = 7;
-        }
-	else
-	{
+	} else {
 		oh_name =  &oh_name_omap3[0];
 		count = 5;
 	}
 	for (i = 0; i < count; i++)	{
-		l = snprintf(oh_name[i], MAX_OMAP_DSS_HWMOD_NAME_LEN, oh_name[i]);
+		l = snprintf(oh_name[i],
+			MAX_OMAP_DSS_HWMOD_NAME_LEN, oh_name[i]);
 		WARN(l >= MAX_OMAP_DSS_HWMOD_NAME_LEN,
 		"String buffer overflow in DSS device setup\n");
 
@@ -971,7 +970,7 @@ struct vout_platform_data omap_vout_data = {
 static struct platform_device omap_vout_device = {
 	.name		= "omap_vout",
 	.num_resources	= ARRAY_SIZE(omap_vout_resource),
-	.resource 	= &omap_vout_resource[0],
+	.resource	= &omap_vout_resource[0],
 	.id		= -1,
 #ifdef CONFIG_PM
 	.dev	= {
@@ -1051,8 +1050,9 @@ static void omap_init_gpu(void)
 		pr_err("omap_init_gpu: Platform data memory allocation failed\n");
 		return;
 	}
-        pdata->set_max_mpu_wakeup_lat =omap_pm_set_max_mpu_wakeup_lat;
-        pdata->set_min_bus_tput = omap_pm_set_min_bus_tput;
+
+	pdata->set_max_mpu_wakeup_lat = omap_pm_set_max_mpu_wakeup_lat;
+	pdata->set_min_bus_tput = omap_pm_set_min_bus_tput;
 	pdata->device_enable = omap_device_enable;
 	pdata->device_idle = omap_device_idle;
 	pdata->device_shutdown = omap_device_shutdown;
