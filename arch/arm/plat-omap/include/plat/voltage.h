@@ -6,6 +6,9 @@
  * Copyright (C) 2009 Texas Instruments, Inc.
  * Thara Gopinath <thara@ti.com>
  *
+ * Copyright (C) 2010 Motorola
+ * Lun Chang <l.chang@motorola.com>
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -27,59 +30,25 @@ extern struct dentry *pm_dbg_main_dir;
 #define VOLTAGE_PRECHANGE	0
 #define VOLTAGE_POSTCHANGE	1
 
-/* Voltage SR Parameters for OMAP3*/
-#define OMAP3_SRI2C_SLAVE_ADDR			0x12
-#define OMAP3_VDD1_SR_CONTROL_REG		0x00
-#define OMAP3_VDD2_SR_CONTROL_REG		0x01
-
-/* Voltage SR parameters for OMAP4 */
-#define OMAP4_SRI2C_SLAVE_ADDR			0x12
-#define OMAP4_VDD_MPU_SR_VOLT_REG		0x55
-#define OMAP4_VDD_IVA_SR_VOLT_REG		0x5B
-#define OMAP4_VDD_CORE_SR_VOLT_REG		0x61
-
-/*
- * Omap3 VP register specific values. Maybe these need to come from
- * board file or PMIC data structure
- */
-#define OMAP3_VP_CONFIG_ERROROFFSET		0x00
-#define	OMAP3_VP_VSTEPMIN_SMPSWAITTIMEMIN	0x3C
-#define OMAP3_VP_VSTEPMIN_VSTEPMIN		0x1
-#define OMAP3_VP_VSTEPMAX_SMPSWAITTIMEMAX	0x3C
-#define OMAP3_VP_VSTEPMAX_VSTEPMAX		0x04
-#define OMAP3_VP_VLIMITTO_TIMEOUT_US		0x200
-
-/*
- * Omap3430 specific VP register values. Maybe these need to come from
- * board file or PMIC data structure
- */
-#define OMAP3430_VP1_VLIMITTO_VDDMIN		0x14
-#define OMAP3430_VP1_VLIMITTO_VDDMAX		0x42
-#define OMAP3430_VP2_VLIMITTO_VDDMAX		0x2C
-#define OMAP3430_VP2_VLIMITTO_VDDMIN		0x18
-
-/*
- * Omap3630 specific VP register values. Maybe these need to come from
- * board file or PMIC data structure
- */
-#define OMAP3630_VP1_VLIMITTO_VDDMIN		0x18
-#define OMAP3630_VP1_VLIMITTO_VDDMAX		0x3C
-#define OMAP3630_VP2_VLIMITTO_VDDMIN		0x18
-#define OMAP3630_VP2_VLIMITTO_VDDMAX		0x30
-
-/* OMAP4 VP register values */
-#define OMAP4_VP_CONFIG_ERROROFFSET		0x00
-#define	OMAP4_VP_VSTEPMIN_SMPSWAITTIMEMIN	0x3C
-#define OMAP4_VP_VSTEPMIN_VSTEPMIN		0x1
-#define OMAP4_VP_VSTEPMAX_SMPSWAITTIMEMAX	0x3C
-#define OMAP4_VP_VSTEPMAX_VSTEPMAX		0x04
-#define OMAP4_VP_VLIMITTO_TIMEOUT_US		0x200
-#define OMAP4_VP_MPU_VLIMITTO_VDDMIN		0x18
-#define OMAP4_VP_MPU_VLIMITTO_VDDMAX		0x3C
-#define OMAP4_VP_IVA_VLIMITTO_VDDMIN		0x18
-#define OMAP4_VP_IVA_VLIMITTO_VDDMAX		0x3C
-#define OMAP4_VP_CORE_VLIMITTO_VDDMIN		0x18
-#define OMAP4_VP_CORE_VLIMITTO_VDDMAX		0x30
+struct omap_volt_pmic_info {
+	char *name;
+	int slew_rate;
+	int step_size;
+	unsigned char i2c_addr;
+	unsigned char i2c_vreg;
+	unsigned long (*vsel_to_uv)(unsigned char vsel);
+	unsigned char (*uv_to_vsel)(unsigned long uv);
+	unsigned char (*onforce_cmd)(unsigned char vsel);
+	unsigned char (*on_cmd)(unsigned char vsel);
+	unsigned char (*sleepforce_cmd)(unsigned char vsel);
+	unsigned char (*sleep_cmd)(unsigned char vsel);
+	unsigned char vp_config_erroroffset;
+	unsigned char vp_vstepmin_vstepmin;
+	unsigned char vp_vstepmax_vstepmax;
+	unsigned short vp_vlimitto_timeout_us;
+	unsigned char vp_vlimitto_vddmin;
+	unsigned char vp_vlimitto_vddmax;
+};
 
 /**
  * voltagedomain - omap voltage domain global structure
@@ -107,15 +76,6 @@ struct omap_volt_data {
 	u8	vp_errgain;
 };
 
-/**
- * omap_volt_pmic_info - PMIC specific data required by the voltage driver.
- * @slew_rate	: PMIC slew rate (in uv/us)
- * @step_size	: PMIC voltage step size (in uv)
- */
-struct omap_volt_pmic_info {
-      int slew_rate;
-      int step_size;
-};
 
 /* Various voltage controller related info */
 struct omap_volt_vc_data {
@@ -158,7 +118,8 @@ int omap_voltage_get_volttable(struct voltagedomain *voltdm,
 		struct omap_volt_data **volt_data);
 struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
 		unsigned long volt);
-void omap_voltage_register_pmic(struct omap_volt_pmic_info *pmic_info);
+void omap_voltage_register_pmic(struct omap_volt_pmic_info *pmic_info,
+		char *vdmname);
 unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm);
 int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 		unsigned long *volt);

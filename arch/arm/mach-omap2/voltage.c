@@ -13,6 +13,10 @@
  * Copyright (C) 2010 Texas Instruments, Inc.
  * Thara Gopinath <thara@ti.com>
  *
+ * Copyright (C) 2010 Motorola
+ * Lun Chang <l.chang@motorola.com>
+ *
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
@@ -31,7 +35,6 @@
 #include <plat/omap-pm.h>
 #include <plat/omap34xx.h>
 #include <plat/opp.h>
-#include <plat/opp_twl_tps.h>
 #include <plat/clock.h>
 #include <plat/common.h>
 #include <plat/voltage.h>
@@ -182,6 +185,7 @@ struct omap_vdd_info{
 	unsigned long curr_volt;
 	u8 cmdval_reg;
 	u8 vdd_sr_reg;
+	struct omap_volt_pmic_info *pmic;
 };
 static struct omap_vdd_info *vdd_info;
 /*
@@ -282,14 +286,6 @@ static struct omap_volt_vc_data vc_config = {
 	.vdd1_onlp = 1000000,      /* 1.0v */
 	.vdd1_ret = 975000,       /* .975v */
 	.vdd1_off = 600000,       /* 0.6v */
-};
-
-/*
- * Default PMIC Data
- */
-static struct omap_volt_pmic_info volt_pmic_info = {
-	.slew_rate = 4000,
-	.step_size = 12500,
 };
 
 /*
@@ -454,7 +450,7 @@ static int vp_volt_debug_get(void *data, u64 *val)
 
 	vsel = voltage_read_reg(vdd->vp_offs.voltage);
 	pr_notice("curr_vsel = %x\n", vsel);
-	*val = omap_twl_vsel_to_uv(vsel);
+	*val = vdd->pmic->vsel_to_uv(vsel);
 
 	return 0;
 }
@@ -509,6 +505,17 @@ static const struct file_operations volt_users_dbg_fops = {
 
 #endif
 
+static unsigned char omap_vdd_id(char *vdm)
+{
+	int i;
+	for (i = 0; i < no_scalable_vdd; i++) {
+		if (!strcmp(vdd_info[i].voltdm.name, vdm))
+			return i;
+	}
+	pr_warning("%s: Error in getting vdd id for vdd_%s\n", __func__, vdm);
+	return -EINVAL;
+}
+
 static void vp_latch_vsel(struct omap_vdd_info *vdd)
 {
 	u32 vpconfig;
@@ -521,7 +528,7 @@ static void vp_latch_vsel(struct omap_vdd_info *vdd)
 			__func__, vdd->voltdm.name);
 		return;
 	}
-	vsel = omap_twl_uv_to_vsel(uvdc);
+	vsel = vdd->pmic->uv_to_vsel(uvdc);
 	vpconfig = voltage_read_reg(vdd->vp_offs.vpconfig);
 	vpconfig &= ~(vdd->vp_reg.vpconfig_initvoltage_mask |
 			vdd->vp_reg.vpconfig_initvdd);
@@ -547,30 +554,33 @@ static void vp_latch_vsel(struct omap_vdd_info *vdd)
 static void __init omap3_init_voltagecontroller(void)
 {
 	u8 vsel_on, vsel_onlp, vsel_ret, vsel_off;
+	u8 impu, icore;
+	impu = omap_vdd_id("mpu");
+	icore = omap_vdd_id("core");
 
 	voltage_write_reg(OMAP3_PRM_VC_SMPS_SA_OFFSET,
-			(OMAP3_SRI2C_SLAVE_ADDR <<
+			(vdd_info[impu].pmic->i2c_addr <<
 			 OMAP3430_PRM_VC_SMPS_SA_SA1_SHIFT) |
-			(OMAP3_SRI2C_SLAVE_ADDR <<
+			(vdd_info[icore].pmic->i2c_addr <<
 			 OMAP3430_PRM_VC_SMPS_SA_SA0_SHIFT));
 	voltage_write_reg(OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET,
-			(OMAP3_VDD2_SR_CONTROL_REG << OMAP3430_VOLRA1_SHIFT) |
-			(OMAP3_VDD1_SR_CONTROL_REG << OMAP3430_VOLRA0_SHIFT));
+		(vdd_info[impu].pmic->i2c_vreg << OMAP3430_VOLRA1_SHIFT) |
+		(vdd_info[icore].pmic->i2c_vreg << OMAP3430_VOLRA0_SHIFT));
 
-	vsel_on = omap_twl_uv_to_vsel(vc_config.vdd0_on);
-	vsel_onlp = omap_twl_uv_to_vsel(vc_config.vdd0_onlp);
-	vsel_ret = omap_twl_uv_to_vsel(vc_config.vdd0_ret);
-	vsel_off = omap_twl_uv_to_vsel(vc_config.vdd0_off);
+	vsel_on = vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_on);
+	vsel_onlp = vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_onlp);
+	vsel_ret = vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_ret);
+	vsel_off = vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_off);
 	voltage_write_reg(OMAP3_PRM_VC_CMD_VAL_0_OFFSET,
 			(vsel_on << OMAP3430_VC_CMD_ON_SHIFT) |
 			(vsel_onlp << OMAP3430_VC_CMD_ONLP_SHIFT) |
 			(vsel_ret << OMAP3430_VC_CMD_RET_SHIFT) |
 			(vsel_off << OMAP3430_VC_CMD_OFF_SHIFT));
 
-	vsel_on = omap_twl_uv_to_vsel(vc_config.vdd1_on);
-	vsel_onlp = omap_twl_uv_to_vsel(vc_config.vdd1_onlp);
-	vsel_ret = omap_twl_uv_to_vsel(vc_config.vdd1_ret);
-	vsel_off = omap_twl_uv_to_vsel(vc_config.vdd1_off);
+	vsel_on = vdd_info[icore].pmic->uv_to_vsel(vc_config.vdd1_on);
+	vsel_onlp = vdd_info[icore].pmic->uv_to_vsel(vc_config.vdd1_onlp);
+	vsel_ret = vdd_info[icore].pmic->uv_to_vsel(vc_config.vdd1_ret);
+	vsel_off = vdd_info[icore].pmic->uv_to_vsel(vc_config.vdd1_off);
 	voltage_write_reg(OMAP3_PRM_VC_CMD_VAL_1_OFFSET,
 			(vsel_on << OMAP3430_VC_CMD_ON_SHIFT) |
 			(vsel_onlp << OMAP3430_VC_CMD_ONLP_SHIFT) |
@@ -602,17 +612,17 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 	if (!strcmp(vdd->voltdm.name, "mpu")) {
 		if (cpu_is_omap3630()) {
 			vdd->vp_reg.vlimitto_vddmin =
-					OMAP3630_VP1_VLIMITTO_VDDMIN;
+					vdd->pmic->vp_vlimitto_vddmin;
 			vdd->vp_reg.vlimitto_vddmax =
-					OMAP3630_VP1_VLIMITTO_VDDMAX;
+					vdd->pmic->vp_vlimitto_vddmax;
 			vdd->volt_data = omap36xx_vdd1_volt_data;
 			vdd->volt_data_count =
 					ARRAY_SIZE(omap36xx_vdd1_volt_data);
 		} else {
 			vdd->vp_reg.vlimitto_vddmin =
-					OMAP3430_VP1_VLIMITTO_VDDMIN;
+					vdd->pmic->vp_vlimitto_vddmin;
 			vdd->vp_reg.vlimitto_vddmax =
-					OMAP3430_VP1_VLIMITTO_VDDMAX;
+					vdd->pmic->vp_vlimitto_vddmax;
 			vdd->volt_data = omap34xx_vdd1_volt_data;
 			vdd->volt_data_count =
 					ARRAY_SIZE(omap34xx_vdd1_volt_data);
@@ -625,21 +635,21 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 		vdd->opp_dev = omap2_get_mpuss_device();
 		vdd->vp_reg.tranxdone_status = OMAP3430_VP1_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP3_PRM_VC_CMD_VAL_0_OFFSET;
-		vdd->vdd_sr_reg = OMAP3_VDD1_SR_CONTROL_REG;
+		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
 	} else if (!strcmp(vdd->voltdm.name, "core")) {
 		if (cpu_is_omap3630()) {
 			vdd->vp_reg.vlimitto_vddmin =
-					OMAP3630_VP2_VLIMITTO_VDDMIN;
+					vdd->pmic->vp_vlimitto_vddmin;
 			vdd->vp_reg.vlimitto_vddmax =
-					OMAP3630_VP2_VLIMITTO_VDDMAX;
+					vdd->pmic->vp_vlimitto_vddmax;
 			vdd->volt_data = omap36xx_vdd2_volt_data;
 			vdd->volt_data_count =
 					ARRAY_SIZE(omap36xx_vdd2_volt_data);
 		} else {
 			vdd->vp_reg.vlimitto_vddmin =
-					OMAP3430_VP2_VLIMITTO_VDDMIN;
+					vdd->pmic->vp_vlimitto_vddmin;
 			vdd->vp_reg.vlimitto_vddmax =
-					OMAP3430_VP2_VLIMITTO_VDDMAX;
+					vdd->pmic->vp_vlimitto_vddmax;
 			vdd->volt_data = omap34xx_vdd2_volt_data;
 			vdd->volt_data_count =
 					ARRAY_SIZE(omap34xx_vdd2_volt_data);
@@ -650,7 +660,7 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 		vdd->opp_dev = omap2_get_l3_device();
 		vdd->vp_reg.tranxdone_status = OMAP3430_VP2_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP3_PRM_VC_CMD_VAL_1_OFFSET;
-		vdd->vdd_sr_reg = OMAP3_VDD2_SR_CONTROL_REG;
+		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
 	} else {
 		pr_warning("%s: vdd_%s does not exisit in OMAP3\n",
 			__func__, vdd->voltdm.name);
@@ -689,7 +699,7 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 	vdd->nominal_volt = 1200000;
 
 	/* VPCONFIG bit fields */
-	vdd->vp_reg.vpconfig_erroroffset = (OMAP3_VP_CONFIG_ERROROFFSET <<
+	vdd->vp_reg.vpconfig_erroroffset = (vdd->pmic->vp_config_erroroffset <<
 				 OMAP3430_ERROROFFSET_SHIFT);
 	vdd->vp_reg.vpconfig_errorgain = volt_data->vp_errgain;
 	vdd->vp_reg.vpconfig_errorgain_mask = OMAP3430_ERRORGAIN_MASK;
@@ -702,12 +712,12 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 	vdd->vp_reg.vpconfig_vpenable = OMAP3430_VPENABLE_MASK;
 
 	/* VSTEPMIN VSTEPMAX bit fields */
-	waittime = ((volt_pmic_info.step_size / volt_pmic_info.slew_rate) *
+	waittime = ((vdd->pmic->step_size / vdd->pmic->slew_rate) *
 				sys_clk_speed) / 1000;
 	vdd->vp_reg.vstepmin_smpswaittimemin = waittime;
 	vdd->vp_reg.vstepmax_smpswaittimemax = waittime;
-	vdd->vp_reg.vstepmin_stepmin = OMAP3_VP_VSTEPMIN_VSTEPMIN;
-	vdd->vp_reg.vstepmax_stepmax = OMAP3_VP_VSTEPMAX_VSTEPMAX;
+	vdd->vp_reg.vstepmin_stepmin = vdd->pmic->vp_vstepmin_vstepmin;
+	vdd->vp_reg.vstepmax_stepmax = vdd->pmic->vp_vstepmax_vstepmax;
 	vdd->vp_reg.vstepmin_smpswaittimemin_shift =
 				OMAP3430_SMPSWAITTIMEMIN_SHIFT;
 	vdd->vp_reg.vstepmax_smpswaittimemax_shift =
@@ -716,7 +726,8 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 	vdd->vp_reg.vstepmax_stepmax_shift = OMAP3430_VSTEPMAX_SHIFT;
 
 	/* VLIMITTO bit fields */
-	timeout_val = (sys_clk_speed * OMAP3_VP_VLIMITTO_TIMEOUT_US) / 1000;
+	timeout_val = (sys_clk_speed * vdd->pmic->vp_vlimitto_timeout_us)
+		/ 1000;
 	vdd->vp_reg.vlimitto_timeout = timeout_val;
 	vdd->vp_reg.vlimitto_vddmin_shift = OMAP3430_VDDMIN_SHIFT;
 	vdd->vp_reg.vlimitto_vddmax_shift = OMAP3430_VDDMAX_SHIFT;
@@ -727,28 +738,39 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 static void __init omap4_init_voltagecontroller(void)
 {
 	u8 on_cmd, onlp_cmd, ret_cmd, off_cmd;
+	u8 impu, icore, iiva;
+	impu = omap_vdd_id("mpu");
+	icore = omap_vdd_id("core");
+	iiva = omap_vdd_id("iva");
 
 	voltage_write_reg(OMAP4_PRM_VC_SMPS_SA_OFFSET,
-			(OMAP4_SRI2C_SLAVE_ADDR <<
+			(vdd_info[icore].pmic->i2c_addr <<
 			 OMAP4430_SA_VDD_CORE_L_0_6_SHIFT) |
-			(OMAP4_SRI2C_SLAVE_ADDR <<
+			(vdd_info[iiva].pmic->i2c_addr <<
 			 OMAP4430_SA_VDD_IVA_L_PRM_VC_SMPS_SA_SHIFT) |
-			(OMAP4_SRI2C_SLAVE_ADDR <<
+			(vdd_info[impu].pmic->i2c_addr <<
 			 OMAP4430_SA_VDD_MPU_L_PRM_VC_SMPS_SA_SHIFT));
 	voltage_write_reg(OMAP4_PRM_VC_VAL_SMPS_RA_VOL_OFFSET,
-			(OMAP4_VDD_MPU_SR_VOLT_REG <<
+			(vdd_info[impu].pmic->i2c_vreg <<
 			 OMAP4430_VOLRA_VDD_MPU_L_SHIFT) |
-			(OMAP4_VDD_IVA_SR_VOLT_REG <<
+			(vdd_info[iiva].pmic->i2c_vreg <<
 			 OMAP4430_VOLRA_VDD_IVA_L_SHIFT) |
-			(OMAP4_VDD_CORE_SR_VOLT_REG <<
+			(vdd_info[icore].pmic->i2c_vreg <<
 			 OMAP4430_VOLRA_VDD_CORE_L_SHIFT));
 	voltage_write_reg(OMAP4_PRM_VC_CFG_CHANNEL_OFFSET,
 			OMAP4430_RAV_VDD_MPU_L_MASK |
 			OMAP4430_CMD_VDD_MPU_L_MASK |
+			((vdd_info[impu].pmic->i2c_addr ==
+				vdd_info[icore].pmic->i2c_addr) ?
+					0 : OMAP4430_SA_VDD_MPU_L_MASK) |
 			OMAP4430_RAV_VDD_IVA_L_MASK |
 			OMAP4430_CMD_VDD_IVA_L_MASK |
+			((vdd_info[iiva].pmic->i2c_addr ==
+				vdd_info[icore].pmic->i2c_addr) ?
+					0 : OMAP4430_SA_VDD_IVA_L_MASK) |
 			OMAP4430_RAV_VDD_CORE_L_MASK |
-			OMAP4430_CMD_VDD_CORE_L_MASK);
+			OMAP4430_CMD_VDD_CORE_L_MASK |
+			OMAP4430_SA_VDD_CORE_L_MASK);
 	/*
 	 * Configure SR I2C in HS Mode. Is there really a need to configure
 	 * i2c in the normal mode??
@@ -785,30 +807,42 @@ static void __init omap4_init_voltagecontroller(void)
 		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
 		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
 
-	on_cmd = omap_twl_onforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd0_on));
-	onlp_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd0_onlp));
-	ret_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd0_ret));
-	off_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd0_off));
+	on_cmd = vdd_info[impu].pmic->onforce_cmd(
+		vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_on));
+	onlp_cmd = vdd_info[impu].pmic->sleepforce_cmd(
+		vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_onlp));
+	ret_cmd = vdd_info[impu].pmic->sleepforce_cmd(
+		vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_ret));
+	off_cmd = vdd_info[impu].pmic->sleepforce_cmd(
+		vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_off));
 	voltage_write_reg(OMAP4_PRM_VC_VAL_CMD_VDD_MPU_L_OFFSET,
 			(on_cmd << OMAP4430_ON_SHIFT) |
 			(onlp_cmd << OMAP4430_ONLP_SHIFT) |
 			(ret_cmd << OMAP4430_RET_SHIFT) |
 			(off_cmd << OMAP4430_OFF_SHIFT));
 
-	on_cmd = omap_twl_onforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd1_on));
-	onlp_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd1_onlp));
-	ret_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd1_ret));
-	off_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd1_off));
+	on_cmd = vdd_info[icore].pmic->onforce_cmd(
+		vdd_info[icore].pmic->uv_to_vsel(vc_config.vdd1_on));
+	onlp_cmd = vdd_info[icore].pmic->sleepforce_cmd(
+		vdd_info[icore].pmic->uv_to_vsel(vc_config.vdd1_onlp));
+	ret_cmd = vdd_info[icore].pmic->sleepforce_cmd(
+		vdd_info[icore].pmic->uv_to_vsel(vc_config.vdd1_ret));
+	off_cmd = vdd_info[icore].pmic->sleepforce_cmd(
+		vdd_info[icore].pmic->uv_to_vsel(vc_config.vdd1_off));
 	voltage_write_reg(OMAP4_PRM_VC_VAL_CMD_VDD_CORE_L_OFFSET,
 			(on_cmd << OMAP4430_ON_SHIFT) |
 			(onlp_cmd << OMAP4430_ONLP_SHIFT) |
 			(ret_cmd << OMAP4430_RET_SHIFT) |
 			(off_cmd << OMAP4430_OFF_SHIFT));
 
-	on_cmd = omap_twl_onforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd2_on));
-	onlp_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd2_onlp));
-	ret_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd2_ret));
-	off_cmd = omap_twl_sleepforce_cmd(omap_twl_uv_to_vsel(vc_config.vdd2_off));
+	on_cmd = vdd_info[iiva].pmic->onforce_cmd(
+		vdd_info[iiva].pmic->uv_to_vsel(vc_config.vdd2_on));
+	onlp_cmd = vdd_info[iiva].pmic->sleepforce_cmd(
+		vdd_info[iiva].pmic->uv_to_vsel(vc_config.vdd2_onlp));
+	ret_cmd = vdd_info[iiva].pmic->sleepforce_cmd(
+		vdd_info[iiva].pmic->uv_to_vsel(vc_config.vdd2_ret));
+	off_cmd = vdd_info[iiva].pmic->sleepforce_cmd(
+		vdd_info[iiva].pmic->uv_to_vsel(vc_config.vdd2_off));
 	voltage_write_reg(OMAP4_PRM_VC_VAL_CMD_VDD_IVA_L_OFFSET,
 			(on_cmd << OMAP4430_ON_SHIFT) |
 			(onlp_cmd << OMAP4430_ONLP_SHIFT) |
@@ -825,8 +859,8 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 	u32 sys_clk_speed, timeout_val, waittime;
 
 	if (!strcmp(vdd->voltdm.name, "mpu")) {
-		vdd->vp_reg.vlimitto_vddmin = OMAP4_VP_MPU_VLIMITTO_VDDMIN;
-		vdd->vp_reg.vlimitto_vddmax = OMAP4_VP_MPU_VLIMITTO_VDDMAX;
+		vdd->vp_reg.vlimitto_vddmin = vdd->pmic->vp_vlimitto_vddmin;
+		vdd->vp_reg.vlimitto_vddmax = vdd->pmic->vp_vlimitto_vddmax;
 		vdd->volt_data = omap44xx_vdd_mpu_volt_data;
 		vdd->volt_data_count = ARRAY_SIZE(omap44xx_vdd_mpu_volt_data);
 		vdd->dep_vdd_info = omap44xx_vddmpu_dep_info;
@@ -838,10 +872,10 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 		vdd->vp_reg.tranxdone_status =
 				OMAP4430_VP_MPU_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_MPU_L_OFFSET;
-		vdd->vdd_sr_reg = OMAP4_VDD_MPU_SR_VOLT_REG;
+		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
 	} else if (!strcmp(vdd->voltdm.name, "core")) {
-		vdd->vp_reg.vlimitto_vddmin = OMAP4_VP_CORE_VLIMITTO_VDDMIN;
-		vdd->vp_reg.vlimitto_vddmax = OMAP4_VP_CORE_VLIMITTO_VDDMAX;
+		vdd->vp_reg.vlimitto_vddmin = vdd->pmic->vp_vlimitto_vddmin;
+		vdd->vp_reg.vlimitto_vddmax = vdd->pmic->vp_vlimitto_vddmax;
 		vdd->volt_data = omap44xx_vdd_core_volt_data;
 		vdd->volt_data_count = ARRAY_SIZE(omap44xx_vdd_core_volt_data);
 		vdd->volt_clk = clk_get(NULL, "l3_div_ck");
@@ -851,10 +885,10 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 		vdd->vp_reg.tranxdone_status =
 				OMAP4430_VP_CORE_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_CORE_L_OFFSET;
-		vdd->vdd_sr_reg = OMAP4_VDD_CORE_SR_VOLT_REG;
+		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
 	} else if (!strcmp(vdd->voltdm.name, "iva")) {
-		vdd->vp_reg.vlimitto_vddmin = OMAP4_VP_IVA_VLIMITTO_VDDMIN;
-		vdd->vp_reg.vlimitto_vddmax = OMAP4_VP_IVA_VLIMITTO_VDDMAX;
+		vdd->vp_reg.vlimitto_vddmin = vdd->pmic->vp_vlimitto_vddmin;
+		vdd->vp_reg.vlimitto_vddmax = vdd->pmic->vp_vlimitto_vddmax;
 		vdd->volt_data = omap44xx_vdd_iva_volt_data;
 		vdd->volt_data_count = ARRAY_SIZE(omap44xx_vdd_iva_volt_data);
 		vdd->dep_vdd_info = omap44xx_vddiva_dep_info;
@@ -866,7 +900,7 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 		vdd->vp_reg.tranxdone_status =
 			OMAP4430_VP_IVA_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_IVA_L_OFFSET;
-		vdd->vdd_sr_reg = OMAP4_VDD_IVA_SR_VOLT_REG;
+		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
 	} else {
 		pr_warning("%s: vdd_%s does not exisit in OMAP4\n",
 			__func__, vdd->voltdm.name);
@@ -906,7 +940,7 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 
 	/* VPCONFIG bit fields */
 	vdd->vp_reg.vpconfig_erroroffset =
-				(OMAP4_VP_CONFIG_ERROROFFSET <<
+				(vdd->pmic->vp_config_erroroffset <<
 				 OMAP4430_ERROROFFSET_SHIFT);
 	vdd->vp_reg.vpconfig_errorgain = volt_data->vp_errgain;
 	vdd->vp_reg.vpconfig_errorgain_mask = OMAP4430_ERRORGAIN_MASK;
@@ -919,12 +953,12 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 	vdd->vp_reg.vpconfig_vpenable = OMAP4430_VPENABLE_MASK;
 
 	/* VSTEPMIN VSTEPMAX bit fields */
-	waittime = ((volt_pmic_info.step_size / volt_pmic_info.slew_rate) *
+	waittime = ((vdd->pmic->step_size / vdd->pmic->slew_rate) *
 				sys_clk_speed) / 1000;
 	vdd->vp_reg.vstepmin_smpswaittimemin = waittime;
 	vdd->vp_reg.vstepmax_smpswaittimemax = waittime;
-	vdd->vp_reg.vstepmin_stepmin = OMAP4_VP_VSTEPMIN_VSTEPMIN;
-	vdd->vp_reg.vstepmax_stepmax = OMAP4_VP_VSTEPMAX_VSTEPMAX;
+	vdd->vp_reg.vstepmin_stepmin = vdd->pmic->vp_vstepmin_vstepmin;
+	vdd->vp_reg.vstepmax_stepmax = vdd->pmic->vp_vstepmax_vstepmax;
 	vdd->vp_reg.vstepmin_smpswaittimemin_shift =
 		OMAP4430_SMPSWAITTIMEMIN_SHIFT;
 	vdd->vp_reg.vstepmax_smpswaittimemax_shift =
@@ -933,7 +967,8 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 	vdd->vp_reg.vstepmax_stepmax_shift = OMAP4430_VSTEPMAX_SHIFT;
 
 	/* VLIMITTO bit fields */
-	timeout_val = (sys_clk_speed * OMAP4_VP_VLIMITTO_TIMEOUT_US) / 1000;
+	timeout_val = (sys_clk_speed * vdd->pmic->vp_vlimitto_timeout_us)
+			/ 1000;
 	vdd->vp_reg.vlimitto_timeout = timeout_val;
 	vdd->vp_reg.vlimitto_vddmin_shift = OMAP4430_VDDMIN_SHIFT;
 	vdd->vp_reg.vlimitto_vddmax_shift = OMAP4430_VDDMAX_SHIFT;
@@ -1077,7 +1112,7 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 		vc_regaddr_shift = OMAP3430_REGADDR_SHIFT;
 		vc_valid = OMAP3430_VALID_MASK;
 		vc_bypass_val_reg_offs = OMAP3_PRM_VC_BYPASS_VAL_OFFSET;
-		sr_i2c_slave_addr = OMAP3_SRI2C_SLAVE_ADDR;
+		sr_i2c_slave_addr = vdd->pmic->i2c_addr;
 	} else {
 		pr_warning("%s: vc bypass method of voltage scaling"
 			"not supported\n", __func__);
@@ -1100,7 +1135,7 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 		volt_data = NULL;
 	}
 
-	target_vsel = omap_twl_uv_to_vsel(target_volt);
+	target_vsel = vdd->pmic->uv_to_vsel(target_volt);
 	current_vsel = voltage_read_reg(vdd->vp_offs.voltage);
 	smps_steps = abs(target_vsel - current_vsel);
 
@@ -1148,8 +1183,8 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 	}
 
 	/* SMPS slew rate / step size. 2us added as buffer. */
-	smps_delay = ((smps_steps * volt_pmic_info.step_size) /
-			volt_pmic_info.slew_rate) + 2;
+	smps_delay = ((smps_steps * vdd->pmic->step_size) /
+			vdd->pmic->slew_rate) + 2;
 	udelay(smps_delay);
 
 	vdd->curr_volt = target_volt;
@@ -1200,7 +1235,7 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 		volt_data = NULL;
 	}
 
-	target_vsel = omap_twl_uv_to_vsel(target_volt);
+	target_vsel = vdd->pmic->uv_to_vsel(target_volt);
 	current_vsel = voltage_read_reg(vdd->vp_offs.voltage);
 	smps_steps = abs(target_vsel - current_vsel);
 
@@ -1272,8 +1307,8 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	 * Wait for voltage to settle with SW wait-loop.
 	 * SMPS slew rate / step size. 2us added as buffer.
 	 */
-	smps_delay = ((smps_steps * volt_pmic_info.step_size) /
-			volt_pmic_info.slew_rate) + 2;
+	smps_delay = ((smps_steps * vdd->pmic->step_size) /
+			vdd->pmic->slew_rate) + 2;
 	udelay(smps_delay);
 
 	/*
@@ -1439,7 +1474,7 @@ unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
 	curr_vsel = voltage_read_reg(vdd->vp_offs.voltage);
-	return omap_twl_vsel_to_uv(curr_vsel);
+	return vdd->pmic->vsel_to_uv(curr_vsel);
 }
 
 /**
@@ -1826,10 +1861,26 @@ struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
  * not override the default table using this API, the default values wiil
  * be used in the driver.
  */
-void omap_voltage_register_pmic(struct omap_volt_pmic_info *pmic_info)
+void omap_voltage_register_pmic(struct omap_volt_pmic_info *pmic_info,
+				char *vdm_name)
 {
-	volt_pmic_info.slew_rate = pmic_info->slew_rate;
-	volt_pmic_info.step_size = pmic_info->step_size;
+	int i;
+	struct omap_vdd_info *vdds = NULL;
+	int nvdds = 0;
+
+	if (cpu_is_omap34xx()) {
+		vdds = omap3_vdd_info;
+		nvdds = OMAP3_NO_SCALABLE_VDD;
+	} else if (cpu_is_omap44xx()) {
+		vdds = omap4_vdd_info;
+		nvdds = OMAP4_NO_SCALABLE_VDD;
+	}
+	for (i = 0; i < nvdds; i++) {
+		if (!strcmp(vdds[i].voltdm.name, vdm_name)) {
+			vdds[i].pmic = pmic_info;
+			break;
+		}
+	}
 }
 
 /**
