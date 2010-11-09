@@ -647,6 +647,9 @@ int dss_suspend_all_devices(void)
 
 	return 0;
 }
+#ifdef CONFIG_OMAP4_DSS_SUSPEND_HACK
+EXPORT_SYMBOL(dss_suspend_all_devices);
+#endif
 
 static int dss_resume_device(struct device *dev, void *data)
 {

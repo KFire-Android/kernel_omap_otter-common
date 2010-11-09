@@ -30,6 +30,10 @@
 
 #include "../base.h"
 #include "power.h"
+#ifdef CONFIG_OMAP4_DSS_SUSPEND_HACK
+#warning "Dirty Hack to fix DSS suspend in system suspend!!!"
+extern dss_suspend_all_devices(void);
+#endif
 
 /*
  * The entries in the dpm_list list are in a depth first order, simply
@@ -1110,6 +1114,10 @@ int dpm_suspend_start(pm_message_t state)
 	int error;
 
 	might_sleep();
+#ifdef CONFIG_OMAP4_DSS_SUSPEND_HACK
+	if (cpu_is_omap44xx())
+		dss_suspend_all_devices();
+#endif
 	error = dpm_prepare(state);
 	if (!error)
 		error = dpm_suspend(state);

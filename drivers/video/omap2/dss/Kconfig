@@ -125,4 +125,10 @@ config OMAP2_DSS_MIN_FCK_PER_PCK
 	  Max FCK is 173MHz, so this doesn't work if your PCK
 	  is very high.
 
+config OMAP4_DSS_SUSPEND_HACK
+	bool "DSS Suspend Hack"
+	depends on ARCH_OMAP4
+        default n
+	help
+	   Temporary Hack to fix DSS suspend in system suspend.
 endif
