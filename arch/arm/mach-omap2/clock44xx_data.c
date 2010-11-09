@@ -31,6 +31,7 @@
 #include "cm-regbits-44xx.h"
 #include "prm.h"
 #include "prm-regbits-44xx.h"
+#include "scrm_44xx.h"
 
 /* Root clocks */
 
@@ -2760,6 +2761,168 @@ static struct clk trace_clk_div_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+/* SCRM aux clk nodes */
+
+static const struct clksel auxclk_sel[] = {
+	{ .parent = &sys_clkin_ck, .rates = div_1_0_rates },
+	{ .parent = &dpll_per_m3_ck, .rates = div_1_1_rates },
+	{ .parent = &dpll_core_m3_ck, .rates = div_1_2_rates },
+	{ .parent = NULL },
+};
+
+static struct clk auxclk0_ck = {
+	.name		= "auxclk0_ck",
+	.parent		= &sys_clkin_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_omap4_dflt_wait,
+	.clksel		= auxclk_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLK0,
+	.clksel_mask	= OMAP4_SRCSELECT_MASK,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP4_SCRM_AUXCLK0,
+	.enable_bit	= OMAP4_ENABLE_SHIFT,
+};
+
+static struct clk auxclk1_ck = {
+	.name		= "auxclk1_ck",
+	.parent		= &sys_clkin_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_omap4_dflt_wait,
+	.clksel		= auxclk_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLK1,
+	.clksel_mask	= OMAP4_SRCSELECT_MASK,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP4_SCRM_AUXCLK1,
+	.enable_bit	= OMAP4_ENABLE_SHIFT,
+};
+
+static struct clk auxclk2_ck = {
+	.name		= "auxclk2_ck",
+	.parent		= &sys_clkin_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_omap4_dflt_wait,
+	.clksel		= auxclk_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLK2,
+	.clksel_mask	= OMAP4_SRCSELECT_MASK,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP4_SCRM_AUXCLK2,
+	.enable_bit	= OMAP4_ENABLE_SHIFT,
+};
+static struct clk auxclk3_ck = {
+	.name		= "auxclk3_ck",
+	.parent		= &sys_clkin_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_omap4_dflt_wait,
+	.clksel		= auxclk_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLK3,
+	.clksel_mask	= OMAP4_SRCSELECT_MASK,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP4_SCRM_AUXCLK3,
+	.enable_bit	= OMAP4_ENABLE_SHIFT,
+};
+
+static struct clk auxclk4_ck = {
+	.name		= "auxclk4_ck",
+	.parent		= &sys_clkin_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_omap4_dflt_wait,
+	.clksel		= auxclk_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLK4,
+	.clksel_mask	= OMAP4_SRCSELECT_MASK,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP4_SCRM_AUXCLK4,
+	.enable_bit	= OMAP4_ENABLE_SHIFT,
+};
+
+static struct clk auxclk5_ck = {
+	.name		= "auxclk5_ck",
+	.parent		= &sys_clkin_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_omap4_dflt_wait,
+	.clksel		= auxclk_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLK5,
+	.clksel_mask	= OMAP4_SRCSELECT_MASK,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP4_SCRM_AUXCLK5,
+	.enable_bit	= OMAP4_ENABLE_SHIFT,
+};
+
+static const struct clksel auxclkreq_sel[] = {
+	{ .parent = &auxclk0_ck, .rates = div_1_0_rates },
+	{ .parent = &auxclk1_ck, .rates = div_1_1_rates },
+	{ .parent = &auxclk2_ck, .rates = div_1_2_rates },
+	{ .parent = &auxclk3_ck, .rates = div_1_3_rates },
+	{ .parent = &auxclk4_ck, .rates = div_1_4_rates },
+	{ .parent = &auxclk5_ck, .rates = div_1_5_rates },
+	{ .parent = NULL },
+};
+
+static struct clk auxclkreq0_ck = {
+	.name		= "auxclkreq0_ck",
+	.parent		= &auxclk0_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_null,
+	.clksel         = auxclkreq_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLKREQ0,
+	.clksel_mask	= OMAP4_MAPPING_MASK,
+	.recalc		= &omap2_clksel_recalc,
+};
+
+static struct clk auxclkreq1_ck = {
+	.name		= "auxclkreq1_ck",
+	.parent		= &auxclk1_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_null,
+	.clksel         = auxclkreq_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLKREQ1,
+	.clksel_mask	= OMAP4_MAPPING_MASK,
+	.recalc		= &omap2_clksel_recalc,
+};
+
+static struct clk auxclkreq2_ck = {
+	.name		= "auxclkreq2_ck",
+	.parent		= &auxclk2_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_null,
+	.clksel         = auxclkreq_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLKREQ2,
+	.clksel_mask	= OMAP4_MAPPING_MASK,
+	.recalc		= &omap2_clksel_recalc,
+};
+
+static struct clk auxclkreq3_ck = {
+	.name		= "auxclkreq3_ck",
+	.parent		= &auxclk3_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_null,
+	.clksel         = auxclkreq_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLKREQ3,
+	.clksel_mask	= OMAP4_MAPPING_MASK,
+	.recalc		= &omap2_clksel_recalc,
+};
+
+static struct clk auxclkreq4_ck = {
+	.name		= "auxclkreq4_ck",
+	.parent		= &auxclk4_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_null,
+	.clksel         = auxclkreq_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLKREQ4,
+	.clksel_mask	= OMAP4_MAPPING_MASK,
+	.recalc		= &omap2_clksel_recalc,
+};
+
+static struct clk auxclkreq5_ck = {
+	.name		= "auxclkreq5_ck",
+	.parent		= &auxclk5_ck,
+	.init		= &omap2_init_clksel_parent,
+	.ops		= &clkops_null,
+	.clksel         = auxclkreq_sel,
+	.clksel_reg	= OMAP4_SCRM_AUXCLKREQ5,
+	.clksel_mask	= OMAP4_MAPPING_MASK,
+	.recalc		= &omap2_clksel_recalc,
+};
+
 /*
  * clkdev
  */
@@ -3013,6 +3176,18 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"uart3_ick",				&dummy_ck,	CK_443X),
 	CLK(NULL,	"uart4_ick",				&dummy_ck,	CK_443X),
 	CLK("omap_wdt",	"ick",					&dummy_ck,	CK_443X),
+	CLK(NULL,	"auxclk0_ck",				&auxclk0_ck,	CK_443X),
+	CLK(NULL,	"auxclk1_ck",				&auxclk1_ck,	CK_443X),
+	CLK(NULL,	"auxclk2_ck",				&auxclk2_ck,	CK_443X),
+	CLK(NULL,	"auxclk3_ck",				&auxclk3_ck,	CK_443X),
+	CLK(NULL,	"auxclk4_ck",				&auxclk4_ck,	CK_443X),
+	CLK(NULL,	"auxclk5_ck",				&auxclk5_ck,	CK_443X),
+	CLK(NULL,	"auxclkreq0_ck",			&auxclkreq0_ck,	CK_443X),
+	CLK(NULL,	"auxclkreq1_ck",			&auxclkreq1_ck,	CK_443X),
+	CLK(NULL,	"auxclkreq2_ck",			&auxclkreq2_ck,	CK_443X),
+	CLK(NULL,	"auxclkreq3_ck",			&auxclkreq3_ck,	CK_443X),
+	CLK(NULL,	"auxclkreq4_ck",			&auxclkreq4_ck,	CK_443X),
+	CLK(NULL,	"auxclkreq5_ck",			&auxclkreq5_ck,	CK_443X),
 };
 
 int __init omap4xxx_clk_init(void)
