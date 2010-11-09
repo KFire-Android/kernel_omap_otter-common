@@ -655,9 +655,6 @@ struct omap_dss_device {
 				u16 lck_div;
 				u16 pck_div;
 			} div;
-
-			bool ext_te;
-			u8 ext_te_gpio;
 		} dsi;
 
 		struct {
@@ -681,8 +678,6 @@ struct omap_dss_device {
 		u8 pixel_size;
 		struct rfbi_timings rfbi_timings;
 	} ctrl;
-
-	int reset_gpio;
 
 	int max_backlight_level;
 
