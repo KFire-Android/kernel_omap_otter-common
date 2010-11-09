@@ -48,6 +48,7 @@
 #include <plat/usb.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
+#include <plat/opp_twl_tps.h>
 #include <plat/mmc.h>
 #include <plat/syntm12xx.h>
 #include <plat/omap4-keypad.h>
@@ -1216,6 +1217,66 @@ static void enable_board_wakeup_source(void)
 #endif
 }
 
+static struct omap_volt_pmic_info omap_pmic_core = {
+	.name = "twl",
+	.slew_rate = 4000,
+	.step_size = 12500,
+	.i2c_addr = 0x12,
+	.i2c_vreg = 0x61,
+	.vsel_to_uv = omap_twl_vsel_to_uv,
+	.uv_to_vsel = omap_twl_uv_to_vsel,
+	.onforce_cmd = omap_twl_onforce_cmd,
+	.on_cmd = omap_twl_on_cmd,
+	.sleepforce_cmd = omap_twl_sleepforce_cmd,
+	.sleep_cmd = omap_twl_sleep_cmd,
+	.vp_config_erroroffset = 0,
+	.vp_vstepmin_vstepmin = 0x01,
+	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vlimitto_timeout_us = 0x200,
+	.vp_vlimitto_vddmin = 0x18,
+	.vp_vlimitto_vddmax = 0x30,
+};
+
+static struct omap_volt_pmic_info omap_pmic_mpu = {
+	.name = "twl",
+	.slew_rate = 4000,
+	.step_size = 12500,
+	.i2c_addr = 0x12,
+	.i2c_vreg = 0x55,
+	.vsel_to_uv = omap_twl_vsel_to_uv,
+	.uv_to_vsel = omap_twl_uv_to_vsel,
+	.onforce_cmd = omap_twl_onforce_cmd,
+	.on_cmd = omap_twl_on_cmd,
+	.sleepforce_cmd = omap_twl_sleepforce_cmd,
+	.sleep_cmd = omap_twl_sleep_cmd,
+	.vp_config_erroroffset = 0,
+	.vp_vstepmin_vstepmin = 0x01,
+	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vlimitto_timeout_us = 0x200,
+	.vp_vlimitto_vddmin = 0x18,
+	.vp_vlimitto_vddmax = 0x3c,
+};
+
+static struct omap_volt_pmic_info omap_pmic_iva = {
+	.name = "twl",
+	.slew_rate = 4000,
+	.step_size = 12500,
+	.i2c_addr = 0x12,
+	.i2c_vreg = 0x5b,
+	.vsel_to_uv = omap_twl_vsel_to_uv,
+	.uv_to_vsel = omap_twl_uv_to_vsel,
+	.onforce_cmd = omap_twl_onforce_cmd,
+	.on_cmd = omap_twl_on_cmd,
+	.sleepforce_cmd = omap_twl_sleepforce_cmd,
+	.sleep_cmd = omap_twl_sleep_cmd,
+	.vp_config_erroroffset = 0,
+	.vp_vstepmin_vstepmin = 0x01,
+	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vlimitto_timeout_us = 0x200,
+	.vp_vlimitto_vddmin = 0x18,
+	.vp_vlimitto_vddmax = 0x3c,
+};
+
 static struct omap_volt_vc_data vc_config = {
 	.vdd0_on = 1350000,        /* 1.35v */
 	.vdd0_onlp = 1350000,      /* 1.35v */
@@ -1288,6 +1349,9 @@ static void __init omap_4430sdp_init(void)
 	omap_cma3000accl_init();
 	omap_display_init(&sdp4430_dss_data);
 	enable_board_wakeup_source();
+	omap_voltage_register_pmic(&omap_pmic_core, "core");
+	omap_voltage_register_pmic(&omap_pmic_mpu, "mpu");
+	omap_voltage_register_pmic(&omap_pmic_iva, "iva");
 	omap_voltage_init_vc(&vc_config);
 }
 
