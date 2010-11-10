@@ -68,12 +68,14 @@ struct voltagedomain {
  *			  with voltage.
  * @vp_errorgain	: Error gain value for the voltage processor. This
  *			  field also differs according to the voltage/opp.
+ * @abb_type		: Bitfield OPP_SEL.PRM_LDO_ABB_CTRL.
  */
 struct omap_volt_data {
 	u32	volt_nominal;
 	u32	sr_nvalue;
 	u8	sr_errminlimit;
 	u8	vp_errgain;
+	u8	abb_type;
 };
 
 

@@ -47,6 +47,13 @@
 #define VP_IDLE_TIMEOUT		200
 #define VP_TRANXDONE_TIMEOUT	300
 
+/* Settling Time for ABB Transition in us */
+#define ABB_TRANXDONE_TIMEOUT  30
+
+/* Bitfield OPP_SEL.PRM_LDO_ABB_CTRL */
+#define FAST_OPP		0x1
+#define NOMINAL_OPP		0x0
+
 #ifdef CONFIG_PM_DEBUG
 #include <linux/seq_file.h>
 static struct dentry *voltage_dir;
@@ -116,6 +123,24 @@ struct omap_vdd_dep_volt {
 };
 
 /**
+ *  ABB Register offsets and masks
+ *
+ * @prm_abb_ldo_setup_idx : PRM_LDO_ABB_SETUP Register specific to MPU/IVA
+ * @prm_abb_ldo_ctrl_idx  : PRM_LDO_ABB_CTRL Register specific to MPU/IVA
+ * @prm_irqstatus_mpu	  : PRM_IRQSTATUS_MPU_A9/PRM_IRQSTATUS_MPU_A9_2
+ * @abb_done_st_shift	  : ABB_DONE_ST shift
+ * @abb_done_st_mask	  : ABB_DONE_ST_MASK bit mask
+ *
+ */
+struct abb_reg_val {
+	u16 prm_abb_ldo_setup_idx;
+	u16 prm_abb_ldo_ctrl_idx;
+	u16 prm_irqstatus_mpu;
+	u16 abb_done_st_shift;
+	u16 abb_done_st_mask;
+};
+
+/**
  * omap_vdd_dep_info - Dependent vdd info
  *
  * @name		: Dependent vdd name
@@ -172,6 +197,7 @@ struct omap_vdd_info{
 	struct clk *volt_clk;
 	struct device *opp_dev;
 	struct voltagedomain voltdm;
+	struct abb_reg_val omap_abb_reg_val;
 	struct omap_vdd_dep_info *dep_vdd_info;
 	spinlock_t user_lock;
 	struct plist_head user_list;
@@ -239,6 +265,15 @@ static struct omap_vdd_info omap4_vdd_info[] = {
 		.voltdm = {
 			.name = "mpu",
 		},
+		.omap_abb_reg_val = {
+			.prm_abb_ldo_setup_idx =
+				OMAP4_PRM_LDO_ABB_MPU_SETUP_OFFSET,
+			.prm_abb_ldo_ctrl_idx =
+				OMAP4_PRM_LDO_ABB_MPU_CTRL_OFFSET,
+			.prm_irqstatus_mpu = OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET,
+			.abb_done_st_shift = OMAP4430_ABB_MPU_DONE_ST_SHIFT,
+			.abb_done_st_mask = OMAP4430_ABB_MPU_DONE_ST_MASK,
+		},
 	},
 	{
 		.vp_offs = {
@@ -251,6 +286,15 @@ static struct omap_vdd_info omap4_vdd_info[] = {
 		},
 		.voltdm = {
 			.name = "iva",
+		},
+		.omap_abb_reg_val = {
+			.prm_abb_ldo_setup_idx =
+				OMAP4_PRM_LDO_ABB_IVA_SETUP_OFFSET,
+			.prm_abb_ldo_ctrl_idx =
+				OMAP4_PRM_LDO_ABB_IVA_CTRL_OFFSET,
+			.prm_irqstatus_mpu = OMAP4_PRM_IRQSTATUS_MPU_OFFSET,
+			.abb_done_st_shift = OMAP4430_ABB_IVA_DONE_ST_SHIFT,
+			.abb_done_st_mask = OMAP4430_ABB_IVA_DONE_ST_MASK,
 		},
 	},
 	{
@@ -305,10 +349,10 @@ static struct omap_volt_data omap34xx_vdd1_volt_data[] = {
 };
 
 static struct omap_volt_data omap36xx_vdd1_volt_data[] = {
-	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C},
-	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
-	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23},
-	{.volt_nominal = 1350000, .sr_errminlimit = 0xFA, .vp_errgain = 0x27},
+	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1350000, .sr_errminlimit = 0xFA, .vp_errgain = 0x27, .abb_type = FAST_OPP},
 };
 
 /* VDD2 */
@@ -330,16 +374,16 @@ static struct omap_volt_data omap36xx_vdd2_volt_data[] = {
  * driver after reading the efuse.
  */
 static struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
-	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C},
-	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
-	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23},
-	{.volt_nominal = 1350000, .sr_errminlimit = 0xFA, .vp_errgain = 0x27},
+	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1350000, .sr_errminlimit = 0xFA, .vp_errgain = 0x27, .abb_type = FAST_OPP},
 };
 
 static struct omap_volt_data omap44xx_vdd_iva_volt_data[] = {
-	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C},
-	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
-	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23},
+	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16, .abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP},
 };
 
 static struct omap_volt_data omap44xx_vdd_core_volt_data[] = {
@@ -1016,6 +1060,28 @@ static void __init init_voltageprocessor(struct omap_vdd_info *vdd)
 			(vpconfig | vdd->vp_reg.vpconfig_forceupdate));
 	/* Clear force bit */
 	voltage_write_reg(vdd->vp_offs.vpconfig, vpconfig);
+}
+
+/**
+  * omap4_abb_enable - Sets ABB_LDO_SETUP.SR2EN bit
+  * Enables ABB.
+  */
+static void omap4_abb_enable(struct omap_vdd_info *vdd_info)
+{
+	prm_set_mod_reg_bits(OMAP4430_SR2EN_MASK,
+			OMAP4430_PRM_DEVICE_MOD,
+			vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
+}
+
+/**
+  * omap4_abb_disable - Clears ABB_LDO_SETUP.SR2EN bit
+  * Disables ABB.
+  */
+static void omap4_abb_disable(struct omap_vdd_info *vdd_info)
+{
+	prm_clear_mod_reg_bits(OMAP4430_SR2EN_MASK,
+			OMAP4430_PRM_DEVICE_MOD,
+			vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
 }
 
 static void __init vdd_data_configure(struct omap_vdd_info *vdd)
