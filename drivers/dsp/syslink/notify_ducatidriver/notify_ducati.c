@@ -811,13 +811,11 @@ int notify_ducatidrv_unregister_event(struct notify_driver_object *handle,
 		/* Find the correct slot in the registration array. */
 		if (event_id == obj->reg_chart[i]) {
 			obj->reg_chart[i] = (u32) -1;
-			for (j = (i + 1); (obj->reg_chart[j] != (u32)-1) && \
-				(j != obj->num_events); j++)
+			for (j = (i + 1); (j != obj->num_events) && \
+				(obj->reg_chart[j] != (u32)-1); j++) {
 				obj->reg_chart[j - 1] = obj->reg_chart[j];
-
-			if (j == obj->num_events)
-				obj->reg_chart[j - 1] = (u32)-1;
-
+				obj->reg_chart[j] = (u32)-1;
+			}
 			break;
 		}
 	}
