@@ -5044,6 +5044,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	int cconv = 0;
 	s32 row_inc = 0;
 	s32 pix_inc;
+	int truncate = 0;
 
 	DSSDBG("dispc_setup_wb\n");
 	DSSDBG("Maxds = %d\n", maxdownscale);
@@ -5054,53 +5055,52 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 		printk(KERN_ERR "dispc_setup_wb paddr NULL\n");
 		return -EINVAL;
 		}
-	{
-		/* validate color format and 5taps*/
 
-		if (out_width < width / maxdownscale ||
-				out_width > width * 8) {
-			printk(KERN_ERR "dispc_setup_wb out_width not in range\n");
-			return -EINVAL;
-		}
-		if (out_height < height / maxdownscale ||
-				out_height > height * 8){
-			printk(KERN_ERR "dispc_setup_wb out_height not in range\n");
-			return -EINVAL;
-		}
-		/* validate color format and 5taps */
-		DSSDBG(KERN_ERR"%d color mode %d input color mode",
-			color_mode, wb->input_color_mode);
+	/* validate color format and 5taps*/
+	if (out_width < width / maxdownscale ||
+			out_width > width * 8) {
+		printk(KERN_ERR "dispc_setup_wb out_width not in range\n");
+		return -EINVAL;
+	}
+	if (out_height < height / maxdownscale ||
+			out_height > height * 8){
+		printk(KERN_ERR "dispc_setup_wb out_height not in range\n");
+		return -EINVAL;
+	}
+	/* validate color format and 5taps */
+	DSSDBG(KERN_ERR "%d color mode %d input color mode",
+		color_mode, wb->input_color_mode);
 
-		switch (color_mode) {
-		case OMAP_DSS_COLOR_RGB16:
-		case OMAP_DSS_COLOR_RGB24P:
-		case OMAP_DSS_COLOR_ARGB16:
-		case OMAP_DSS_COLOR_RGBA12:
-		case OMAP_DSS_COLOR_XRGB12:
-		case OMAP_DSS_COLOR_ARGB16_1555:
-		case OMAP_DSS_COLOR_RGBX24_32_ALGN:
-		case OMAP_DSS_COLOR_XRGB15:
-			REG_FLD_MOD(dispc_reg_att[plane], 0x1, 10, 10);
-			break;
-		case OMAP_DSS_COLOR_ARGB32:
-		case OMAP_DSS_COLOR_RGBA32:
-		case OMAP_DSS_COLOR_RGB24U:
-			REG_FLD_MOD(dispc_reg_att[plane], 0x0, 10, 10);
-			break;
-		case OMAP_DSS_COLOR_NV12:
-		case OMAP_DSS_COLOR_YUV2:
-		case OMAP_DSS_COLOR_UYVY:
-			REG_FLD_MOD(dispc_reg_att[plane], 0x0, 10, 10);
-			cconv = 1;
-			break;
-
-		default:
-			return -EINVAL;
-		}
+	switch (color_mode) {
+	case OMAP_DSS_COLOR_RGB16:
+	case OMAP_DSS_COLOR_RGB24P:
+	case OMAP_DSS_COLOR_ARGB16:
+	case OMAP_DSS_COLOR_RGBA12:
+	case OMAP_DSS_COLOR_XRGB12:
+	case OMAP_DSS_COLOR_ARGB16_1555:
+	case OMAP_DSS_COLOR_RGBX24_32_ALGN:
+	case OMAP_DSS_COLOR_XRGB15:
+		truncate = 1;
+		break;
+	case OMAP_DSS_COLOR_ARGB32:
+	case OMAP_DSS_COLOR_RGBA32:
+	case OMAP_DSS_COLOR_RGB24U:
+		break;
+	case OMAP_DSS_COLOR_NV12:
+	case OMAP_DSS_COLOR_YUV2:
+	case OMAP_DSS_COLOR_UYVY:
+		cconv = 1;
+		break;
+	default:
+		return -EINVAL;
 	}
 
 	if (width > 1280)
 		three_taps = 1;
+
+	enable_clocks(1);
+
+	REG_FLD_MOD(dispc_reg_att[plane], truncate, 10, 10);
 
 	/* We handle ONLY overlays as source yet, NOT Managers */
 	/* TODO: remove this check once managers are accepted as source */
@@ -5170,16 +5170,9 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	} else {
 		row_inc = 1;
 		if (lines_to_skip) {
-			u8 ps;
+			u8 ps = 2;
+
 			switch (color_mode) {
-			case OMAP_DSS_COLOR_RGB16:
-			case OMAP_DSS_COLOR_ARGB16:
-
-			case OMAP_DSS_COLOR_YUV2:
-			case OMAP_DSS_COLOR_UYVY:
-				ps = 2;
-				break;
-
 			case OMAP_DSS_COLOR_RGB24P:
 			case OMAP_DSS_COLOR_RGB24U:
 			case OMAP_DSS_COLOR_ARGB32:
@@ -5191,8 +5184,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 				ps = 1;
 				break;
 			default:
-				BUG();
-				return -EINVAL;
+				;
 			}
 			row_inc += width * ps * lines_to_skip;
 		}
@@ -5268,8 +5260,9 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	pix_inc = dispc_read_reg(dispc_reg_att[plane]);
 	DSSDBG("vid[%d] attributes = %x\n", plane, pix_inc);
 
-	return 0;
+	enable_clocks(0);
 
+	return 0;
 }
 
 void dispc_flush_wb(struct writeback_cache_data *wb)
