@@ -2502,6 +2502,33 @@ static int vidioc_qbuf(struct file *file, void *fh,
 	return ret;
 }
 
+/* Locking: Caller holds q->vb_lock */
+static int wait_for_1buf(struct videobuf_queue *q)
+{
+	int retval;
+
+checks:
+	if (!q->streaming)
+		return -EINVAL;
+
+	if (!list_is_singular(&q->stream) && !list_empty(&q->stream))
+		return 0;
+
+	/* Drop lock to avoid deadlock with qbuf */
+	mutex_unlock(&q->vb_lock);
+
+	/* Checking list_empty/singular and streaming is safe without
+	 * locks because we goto checks to validate while
+	 * holding locks before proceeding */
+	retval = wait_event_interruptible(q->wait, !q->streaming ||
+		(!list_empty(&q->stream) && !list_is_singular(&q->stream)));
+	mutex_lock(&q->vb_lock);
+
+	if (!retval)
+		goto checks;
+	return retval;
+}
+
 static int vidioc_dqbuf(struct file *file, void *fh, struct v4l2_buffer *b)
 {
 	struct omap_vout_device *vout = fh;
@@ -2510,12 +2537,23 @@ static int vidioc_dqbuf(struct file *file, void *fh, struct v4l2_buffer *b)
 	if (!vout->streaming)
 		return -EINVAL;
 
+	/*
+	 * omap_vout is an output device and as such, it holds onto one frame
+	 * so that DSS can refresh the screen.  However, videobuf_dqbuf does
+	 * not understand it, and only unlocks the q->vb_lock if there are
+	 * 0 buffers in the queue.  So we have to handle the 1-buffer-in-the
+	 * queue case here, but only for the blocking case.
+	 */
 	if (file->f_flags & O_NONBLOCK)
 		/* Call videobuf_dqbuf for non blocking mode */
 		return videobuf_dqbuf(q, (struct v4l2_buffer *)b, 1);
-	else
-		/* Call videobuf_dqbuf for  blocking mode */
-		return videobuf_dqbuf(q, (struct v4l2_buffer *)b, 0);
+
+	mutex_lock(&q->vb_lock);
+	wait_for_1buf(q);
+	mutex_unlock(&q->vb_lock);
+
+	/* Call videobuf_dqbuf for  blocking mode */
+	return videobuf_dqbuf(q, (struct v4l2_buffer *)b, 0);
 }
 
 static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
