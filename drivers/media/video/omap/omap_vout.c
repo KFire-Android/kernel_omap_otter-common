@@ -2619,7 +2619,7 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 streamon_err1:
 	if (ret)
-		ret = videobuf_streamoff(q);
+		videobuf_streamoff(q);
 streamon_err:
 	mutex_unlock(&vout->lock);
 	return ret;
