@@ -1676,6 +1676,7 @@ int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
+	v_info.vdd_info = vdd;
 	v_info.curr_volt = vdd->curr_volt;
 	v_info.target_volt = target_volt;
 

@@ -103,6 +103,7 @@ struct omap_volt_vc_data {
 
 /* Voltage change notifier structure */
 struct omap_volt_change_info {
+	struct omap_vdd_info *vdd_info;
 	unsigned long curr_volt;
 	unsigned long target_volt;
 };
