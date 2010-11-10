@@ -2635,7 +2635,7 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 		(((vout->vid_dev)->v4l2_dev).dev)->platform_data;
 
 	if (!vout->streaming)
-		return -EINVAL;
+		goto finish;
 
 	vout->streaming = 0;
 	mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN |
@@ -2668,15 +2668,16 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 		v4l2_err(&vout->vid_dev->v4l2_dev, "failed to change mode in"
 				" streamoff\n");
 
-	INIT_LIST_HEAD(&vout->dma_queue);
-	ret = videobuf_streamoff(&vout->vbq);
-
 #ifdef CONFIG_PM
 	if (pdata->set_min_bus_tput)
 		pdata->set_min_bus_tput(
 			((vout->vid_dev)->v4l2_dev).dev,
 				OCP_INITIATOR_AGENT, 0);
 #endif
+
+finish:
+	INIT_LIST_HEAD(&vout->dma_queue);
+	ret = videobuf_streamoff(&vout->vbq);
 	return ret;
 }
 
