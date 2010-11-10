@@ -819,21 +819,6 @@ static int taal_probe(struct omap_dss_device *dssdev)
 
 	if (panel_data->use_ext_te || td->force_update) {
 		int gpio = panel_data->ext_te_gpio;
-		int val, regoffset = 0x90;
-		void __iomem *phymux_base = NULL;
-
-
-		if (cpu_is_omap44xx()) {
-			phymux_base = ioremap(0x4A100000, 0x1000);
-
-			if (dssdev->channel == OMAP_DSS_CHANNEL_LCD2)
-				regoffset = 0x94;
-
-			val = __raw_readl(phymux_base + regoffset);
-			val = val & 0xFFFFFFE0;
-			val = val | 0x11B;
-			__raw_writel(val, phymux_base + regoffset);
-		}
 
 		r = gpio_request(gpio, "taal irq");
 		if (r) {
@@ -875,7 +860,6 @@ static int taal_probe(struct omap_dss_device *dssdev)
 		}
 
 		dev_dbg(&dssdev->dev, "Using GPIO TE\n");
-		iounmap(phymux_base);
 	}
 
 	r = sysfs_create_group(&dssdev->dev.kobj, &taal_attr_group);

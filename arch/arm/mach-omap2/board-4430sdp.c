@@ -1195,11 +1195,24 @@ static void omap_cma3000accl_init(void)
 static void __init omap4_display_init(void)
 {
 	void __iomem *phymux_base = NULL;
-	unsigned int dsimux = 0xFFFFFFFF;
+	u32 val = 0xFFFFC000;
+
 	phymux_base = ioremap(0x4A100000, 0x1000);
+
 	/* Turning on DSI PHY Mux*/
-	__raw_writel(dsimux, phymux_base+0x618);
-	dsimux = __raw_readl(phymux_base+0x618);
+	__raw_writel(val, phymux_base + 0x618);
+
+	/* Set mux to choose GPIO 101 for Taal 1 ext te line*/
+	val = __raw_readl(phymux_base + 0x90);
+	val = (val & 0xFFFFFFE0) | 0x11B;
+	__raw_writel(val, phymux_base + 0x90);
+
+	/* Set mux to choose GPIO 103 for Taal 2 ext te line*/
+	val = __raw_readl(phymux_base + 0x94);
+	val = (val & 0xFFFFFFE0) | 0x11B;
+	__raw_writel(val, phymux_base + 0x94);
+
+	iounmap(phymux_base);
 
 	/* Panel Taal reset and backlight GPIO init */
 	gpio_request(dsi_panel.reset_gpio, "dsi1_en_gpio");
