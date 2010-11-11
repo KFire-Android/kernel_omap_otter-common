@@ -48,14 +48,15 @@ static struct wake_lock usb_lock;
 	 int val;
 
 	/* enable VBUS valid, id groung*/
-	omap_writel(0x00000005, 0x4A00233C);
+	omap_writel(AVALID | VBUSVALID, CONTROL_BASE +
+					USBOTGHS_CONTROL);
 
 	/* start the session */
 	val = omap_readb(0x4A0AB060);
 	val |= 0x1;
 	omap_writel(val, 0x4A0AB060);
 
-	while (musb_readb(musb->mregs, MUSB_DEVCTL)&0x80) {
+	while (musb_readb(musb->mregs, MUSB_DEVCTL) & 0x80) {
 		mdelay(20);
 		DBG(1, "devcontrol before vbus=%x\n", musb_readb(musb->mregs,
 						 MUSB_DEVCTL));
@@ -72,28 +73,31 @@ int musb_notifier_call(struct notifier_block *nb,
 	struct musb	*musb = container_of(nb, struct musb, nb);
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
+	struct omap_musb_board_data *data = pdata->board_data;
 	static int hostmode;
+	u32 val;
 
 	switch (event) {
 	case USB_EVENT_ID:
 		DBG(1, "ID GND\n");
 		musb->is_active = 1;
-		if (omap_readl(0x4A002300)&0x1) {
-			omap_writel(0x0, 0x4A002300);
-			mdelay(500);
+		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			val = omap_readl(CONTROL_BASE + ONTROL_DEV_CONF);
+			if (val & 0x1) {
+				val &= ~PHY_PD;
+				omap_writel(val, CONTROL_BASE +
+							ONTROL_DEV_CONF);
+				mdelay(500);
+			}
+			hostmode = 1;
+			musb_enable_vbus(musb);
 		}
-		hostmode = 1;
-		musb_enable_vbus(musb);
 		break;
 
 	case USB_EVENT_VBUS:
 		DBG(1, "VBUS Connect\n");
 		wake_lock(&usb_lock);
 		musb->is_active = 1;
-		if (omap_readl(0x4A002300)&0x1) {
-			omap_writel(0x0, 0x4A002300);
-			mdelay(400);
-		}
 		/* hold the L3 constraint as there was performance drop with
 		 * ondemand governor
 		 */
@@ -101,24 +105,36 @@ int musb_notifier_call(struct notifier_block *nb,
 			pdata->set_min_bus_tput(musb->controller,
 					OCP_INITIATOR_AGENT, (200*1000*4));
 
-		if (!hostmode) {
-			/* Enable VBUS Valid, BValid, AValid. Clear SESSEND.*/
-			omap_writel(0x00000015, 0x4A00233C);
+		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			val = omap_readl(CONTROL_BASE + ONTROL_DEV_CONF);
+			if (val & 0x1) {
+				val &= ~PHY_PD;
+				omap_writel(val, CONTROL_BASE +
+							ONTROL_DEV_CONF);
+				mdelay(400);
+			}
+			if (!hostmode) {
+				/* Enable VBUS Valid, AValid. Clear SESSEND.*/
+				omap_writel(IDDIG | AVALID | VBUSVALID,
+					CONTROL_BASE + USBOTGHS_CONTROL);
+			}
 		}
 		break;
 
 	case USB_EVENT_NONE:
 		DBG(1, "VBUS Disconnect\n");
-		omap_writel(0x00000018, 0x4A00233C);
+		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			omap_writel(SESSEND | IDDIG, CONTROL_BASE +
+							USBOTGHS_CONTROL);
+			if (musb->xceiv->set_vbus)
+				otg_set_vbus(musb->xceiv, 0);
 
-		if (musb->xceiv->set_vbus)
-			otg_set_vbus(musb->xceiv, 0);
-
-		/* put the phy in powerdown mode*/
-		omap_writel(0x1, 0x4A002300);
+			/* put the phy in powerdown mode*/
+			omap_writel(PHY_PD, CONTROL_BASE + ONTROL_DEV_CONF);
+		}
 		hostmode = 0;
-		wake_unlock(&usb_lock);
 
+		wake_unlock(&usb_lock);
 		/* Release L3 constraint */
 		if (pdata->set_min_bus_tput)
 			pdata->set_min_bus_tput(musb->controller,
@@ -196,6 +212,9 @@ void musb_platform_try_idle(struct musb *musb, unsigned long timeout)
 {
 	unsigned long		default_timeout = jiffies + msecs_to_jiffies(3);
 	static unsigned long	last_timer;
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *pdata = dev->platform_data;
+	struct omap_musb_board_data *data = pdata->board_data;
 
 	if (timeout == 0)
 		timeout = default_timeout;
@@ -208,7 +227,15 @@ void musb_platform_try_idle(struct musb *musb, unsigned long timeout)
 		last_timer = jiffies;
 		return;
 	}
-
+	if ((musb->xceiv->state == OTG_STATE_UNDEFINED) &&
+		(data->interface_type == MUSB_INTERFACE_UTMI)) {
+			/*
+			 * powerdown the when the gadget driver is unloaded.
+			 * Powerdown the phy.
+			 * this will allow the core to hit retention and offmode
+			 */
+			omap_writel(PHY_PD, CONTROL_BASE + ONTROL_DEV_CONF);
+	}
 	if (time_after(last_timer, timeout)) {
 		if (!timer_pending(&musb_idle_timer))
 			last_timer = timeout;
@@ -312,13 +339,9 @@ int __init musb_platform_init(struct musb *musb)
 		return -ENODEV;
 	}
 
-	if (cpu_is_omap44xx()) {
-		/* disable the optional 60M clock if enabled by romcode*/
-		l = omap_readl(0x4A009360);
-		l &= ~0x00000100;
-		omap_writel(l, 0x4A009360);
-		omap_writel(0x1, 0x4A002300);
-	}
+
+	if (data->interface_type == MUSB_INTERFACE_UTMI)
+		omap_writel(PHY_PD, CONTROL_BASE + ONTROL_DEV_CONF);
 
 	/* Fixme this can be enabled when load the gadget driver also*/
 	musb_platform_resume(musb);
@@ -412,6 +435,7 @@ static int musb_platform_resume(struct musb *musb)
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_hwmod *oh = pdata->oh;
+	struct omap_musb_board_data *data = pdata->board_data;
 	struct clk *phyclk;
 	struct clk *clk48m;
 
@@ -422,7 +446,7 @@ static int musb_platform_resume(struct musb *musb)
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
 
-	if (cpu_is_omap44xx()) {
+	if (data->interface_type == MUSB_INTERFACE_UTMI) {
 		/* Enable the phy clocks*/
 		phyclk = clk_get(NULL, "ocp2scp_usb_phy_ick");
 		clk_enable(phyclk);

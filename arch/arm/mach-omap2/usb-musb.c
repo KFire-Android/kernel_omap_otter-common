@@ -55,6 +55,8 @@ static struct musb_hdrc_config musb_config = {
 #ifdef CONFIG_ARCH_OMAP4
 #define DIE_ID_REG_BASE		(L4_44XX_PHYS + 0x2000)
 #define DIE_ID_REG_OFFSET		0x200
+#define ONTROL_DEV_CONF		0x300
+#	define PHY_PD			(1 << 0)
 #else
 #define DIE_ID_REG_BASE		(L4_WK_34XX_PHYS + 0xA000)
 #define DIE_ID_REG_OFFSET		0x218
@@ -271,17 +273,6 @@ static void usb_gadget_init(void)
 
 static void usb_gadget_init(void)
 {
-	int l;
-
-	if (cpu_is_omap44xx()) {
-		/* disable the optional 60M clock if enabled by romcode*/
-		l = omap_readl(0x4A009360);
-		l &= ~0x00000100;
-		omap_writel(l, 0x4A009360);
-		/*powerdown the phy*/
-		omap_writel(0x1, 0x4A002300);
-	}
-
 }
 
 #endif /* CONFIG_ANDROID */
@@ -346,6 +337,10 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 	int l, bus_id = -1;
 	struct musb_hdrc_platform_data *pdata;
 
+	if (!board_data) {
+		pr_err("Board data is required for hdrc device register\n");
+		return;
+	}
 	l = snprintf(oh_name, MAX_OMAP_MUSB_HWMOD_NAME_LEN,
 						"usb_otg_hs");
 	WARN(l >= MAX_OMAP_MUSB_HWMOD_NAME_LEN,
@@ -398,9 +393,10 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 			dev->coherent_dma_mask = musb_dmamask;
 			put_device(dev);
 		}
+
 		/*powerdown the phy*/
-		if (cpu_is_omap44xx())
-			omap_writel(0x1, 0x4A002300);
+		if (board_data->interface_type == MUSB_INTERFACE_UTMI)
+			omap_writel(PHY_PD, DIE_ID_REG_BASE + ONTROL_DEV_CONF);
 
 		usb_gadget_init();
 	}
@@ -414,6 +410,7 @@ void musb_context_save_restore(enum musb_state state)
 	struct device *dev = &pdev->dev;
 	struct device_driver *drv = dev->driver;
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
+	struct omap_musb_board_data *data = plat->board_data;
 
 	if (drv) {
 #ifdef CONFIG_PM_RUNTIME
@@ -439,13 +436,14 @@ void musb_context_save_restore(enum musb_state state)
 				 * force idle during idle and disable
 				 * the clock.
 				 */
-				if (cpu_is_omap44xx()) {
-					/* Disable the phy clock*/
+				/* Disable the 48Mhz phy clock and
+				  * module mode
+				  */
+				if (data->interface_type ==
+						MUSB_INTERFACE_UTMI)
 					omap_writel(0x0, 0x4A0093E0);
-					/* Enable ENABLEFORCE bit*/
-					omap_writel(0x1, 0x4A0AB414);
-				}
-
+				/* Enable ENABLEFORCE bit*/
+				omap_writel(0x1, 0x4A0AB414);
 				pdata->device_idle(pdev);
 				break;
 
@@ -465,11 +463,15 @@ void musb_context_save_restore(enum musb_state state)
 				 */
 				pdata->device_enable(pdev);
 
-				if (cpu_is_omap44xx()) {
+				/* Enable phy 48Mhz clock and module
+				 * mode bit
+				 */
+				if (data->interface_type ==
+						MUSB_INTERFACE_UTMI)
 					omap_writel(0x101, 0x4A0093E0);
-					/* Disable ENABLEFORCE bit*/
-					omap_writel(0x0, 0x4A0AB414);
-				}
+				/* Disable ENABLEFORCE bit*/
+				omap_writel(0x0, 0x4A0AB414);
+
 				break;
 
 				default:
@@ -486,15 +488,9 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 {
 	int l;
 
-	if (cpu_is_omap44xx()) {
-		/* disable the optional 60M clock if enabled by romcode*/
-		l = omap_readl(0x4A009360);
-		l &= ~0x00000100;
-		omap_writel(l, 0x4A009360);
+	if (board_data->interface_type == MUSB_INTERFACE_UTMI)
 		/*powerdown the phy*/
-		omap_writel(0x1, 0x4A002300);
-	}
-
+		omap_writel(PHY_PD, DIE_ID_REG_BASE + ONTROL_DEV_CONF);
 }
 void musb_context_save_restore(enum musb_state state)
 {

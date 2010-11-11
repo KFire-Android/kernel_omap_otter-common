@@ -40,6 +40,7 @@
 #include <linux/time.h>
 #include <linux/timer.h>
 
+#include <plat/usb.h>
 #include <asm/unaligned.h>
 
 #include "musb_core.h"
@@ -49,6 +50,9 @@ static void musb_port_suspend(struct musb *musb, bool do_suspend)
 {
 	u8		power;
 	void __iomem	*mbase = musb->mregs;
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *plat = dev->platform_data;
+	struct omap_musb_board_data *data = plat->board_data;
 
 	if (!is_host_active(musb))
 		return;
@@ -63,7 +67,9 @@ static void musb_port_suspend(struct musb *musb, bool do_suspend)
 		int retries = 10000;
 
 		power &= ~MUSB_POWER_RESUME;
-		power |= MUSB_POWER_SUSPENDM | MUSB_POWER_ENSUSPEND;
+		power |= MUSB_POWER_SUSPENDM;
+		if (data->interface_type == MUSB_INTERFACE_UTMI)
+			power |= MUSB_POWER_ENSUSPEND;
 		musb_writeb(mbase, MUSB_POWER, power);
 
 		/* Needed for OPT A tests */
@@ -101,7 +107,9 @@ static void musb_port_suspend(struct musb *musb, bool do_suspend)
 				otg_state_string(musb));
 		}
 	} else if (power & MUSB_POWER_SUSPENDM) {
-		power &= ~MUSB_POWER_SUSPENDM | ~MUSB_POWER_ENSUSPEND;
+		power &= ~MUSB_POWER_SUSPENDM;
+		if (data->interface_type == MUSB_INTERFACE_UTMI)
+			power &= ~MUSB_POWER_ENSUSPEND;
 		power |= MUSB_POWER_RESUME;
 		musb_writeb(mbase, MUSB_POWER, power);
 

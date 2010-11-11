@@ -49,4 +49,16 @@
 #define OTG_FORCESTDBY		0x414
 #	define	ENABLEFORCE		(1 << 0)
 
+#define CONTROL_BASE		0x4A002000
+#define USBOTGHS_CONTROL	0x33c
+#	define	AVALID			(1 << 0)
+#	define	BVALID			(1 << 1)
+#	define	VBUSVALID		(1 << 2)
+#	define	SESSEND			(1 << 3)
+#	define	IDDIG			(1 << 4)
+
+#define ONTROL_DEV_CONF	0x300
+#	define PHY_PD			(1 << 0)
+
+
 #endif	/* __MUSB_OMAP243X_H__ */

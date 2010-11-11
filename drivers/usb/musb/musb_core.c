@@ -106,6 +106,7 @@
 #include <mach/memory.h>
 #include <asm/mach-types.h>
 #endif
+#include <plat/usb.h>
 
 #include "musb_core.h"
 
@@ -458,6 +459,9 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 {
 	irqreturn_t handled = IRQ_NONE;
 	int state;
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *plat = dev->platform_data;
+	struct omap_musb_board_data *data = plat->board_data;
 
 	DBG(3, "<== Power=%02x, DevCtl=%02x, int_usb=0x%x\n", power, devctl,
 		int_usb);
@@ -646,12 +650,13 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 		DBG(1, "SUSPEND (%s) devctl %02x power %02x\n",
 				otg_state_string(musb), devctl, power);
 
-		/* Enable suspend */
-		state = musb_readb(musb->mregs, MUSB_POWER);
-		state |= MUSB_POWER_ENSUSPEND;
-		musb_writeb(musb->mregs, MUSB_POWER, state);
-		handled = IRQ_HANDLED;
-
+		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			/* Enable suspend */
+			state = musb_readb(musb->mregs, MUSB_POWER);
+			state |= MUSB_POWER_ENSUSPEND;
+			musb_writeb(musb->mregs, MUSB_POWER, state);
+			handled = IRQ_HANDLED;
+		}
 		switch (musb->xceiv->state) {
 #ifdef	CONFIG_USB_MUSB_OTG
 		case OTG_STATE_A_PERIPHERAL:
