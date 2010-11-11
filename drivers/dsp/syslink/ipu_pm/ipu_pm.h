@@ -123,6 +123,7 @@
 
 #define AUX_CLK_MIN 1
 #define AUX_CLK_MAX 3
+#define NUM_AUX_CLK 6
 
 #define GP_TIMER_3 3
 #define GP_TIMER_4 4
@@ -187,6 +188,12 @@
 						tmp |=	\
 						((val << SCRM_##bitfield)\
 						& SCRM_##bitfield##_MASK);\
+						}
+
+/* Macro to clear a bitfield*/
+#define MASK_CLEAR_FIELD(tmp, bitfield)	{	\
+						tmp &=	\
+						(~SCRM_##bitfield##_MASK);\
 						}
 
 /* Macro to return the address of the aux clk */

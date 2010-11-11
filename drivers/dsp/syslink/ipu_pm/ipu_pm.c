@@ -270,6 +270,26 @@ static int i2c_spinlock_list[I2C_BUS_MAX + 1] = {
 static char *ipu_regulator_name[REGULATOR_MAX] = {
 	"cam2pwr"};
 
+static struct clk *aux_clk_ptr[NUM_AUX_CLK];
+
+static char *aux_clk_name[NUM_AUX_CLK] = {
+	"auxclk0_ck",
+	"auxclk1_ck",
+	"auxclk2_ck",
+	"auxclk3_ck",
+	"auxclk4_ck",
+	"auxclk5_ck",
+} ;
+
+static char *aux_clk_source_name[] = {
+	"sys_clkin_ck",
+	"dpll_core_m3_ck",
+	"dpll_per_m3_ck",
+	NULL
+} ;
+
+/* static struct clk *aux_clk_source_clocks[3]; */
+
 static struct ipu_pm_module_object ipu_pm_state = {
 	.def_cfg.reserved = 1,
 	.gate_handle = NULL
@@ -1057,7 +1077,7 @@ static inline int ipu_pm_get_aux_clk(int proc_id, u32 rcb_num)
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
 	u32 a_clk = 0;
-	u32 a_clk_req = 0;
+	int ret;
 	int pm_aux_clk_num;
 
 	/* get the handle to proper ipu pm object */
@@ -1076,26 +1096,61 @@ static inline int ipu_pm_get_aux_clk(int proc_id, u32 rcb_num)
 
 	pm_aux_clk_num = rcb_p->fill9;
 
+	pr_info("Request AUX CLK %d\n", pm_aux_clk_num);
+
 	if (WARN_ON((pm_aux_clk_num < AUX_CLK_MIN) ||
 			(pm_aux_clk_num > AUX_CLK_MAX)))
 		return PM_INVAL_AUX_CLK;
 
 	if (AUX_CLK_USE_MASK & (1 << pm_aux_clk_num)) {
-		/* Build the value to write */
-		MASK_SET_FIELD(a_clk, AUX_CLK_ENABLE, AUX_CLK_ENA);
-		MASK_SET_FIELD(a_clk, AUX_CLK_SRCSELECT, PER_DPLL_CLK);
+		struct clk *aux_clk;
+		struct clk *aux_clk_src_ptr;
+
+		aux_clk = clk_get(NULL, aux_clk_name[pm_aux_clk_num]);
+		if (!aux_clk) {
+			pr_err("UNABLE TO GET AUX CLOCK: %s\n",
+				aux_clk_name[pm_aux_clk_num]);
+			return PM_NO_AUX_CLK;
+		}
+		clk_disable(aux_clk);
+
+		aux_clk_src_ptr = clk_get(NULL,
+			aux_clk_source_name[PER_DPLL_CLK]);
+		if (!aux_clk_src_ptr) {
+			pr_err("UNABLE TO GET AUX CLOCK SOURCE CLOCK: %s\n",
+				aux_clk_source_name[PER_DPLL_CLK]);
+			return PM_NO_AUX_CLK;
+		}
+		ret = clk_set_parent(aux_clk, aux_clk_src_ptr);
+		if (ret) {
+			pr_err("UNABLE TO SET CLOCK: %s"
+				"  AS PARENT OF AUX CLOCK: %s\n",
+				aux_clk_source_name[PER_DPLL_CLK],
+				aux_clk_name[pm_aux_clk_num]);
+			return PM_NO_AUX_CLK;
+		}
+
+		/* update divisor manually until API available */
+		a_clk = __raw_readl(AUX_CLK_REG(pm_aux_clk_num));
+		MASK_CLEAR_FIELD(a_clk, AUX_CLK_CLKDIV);
 		MASK_SET_FIELD(a_clk, AUX_CLK_CLKDIV, 0xA);
-		MASK_SET_FIELD(a_clk_req, AUX_CLK_REQ_MAPPING, pm_aux_clk_num);
-		MASK_SET_FIELD(a_clk_req, AUX_CLK_REQ_POLARITY, POL_GAT_HIGH);
+
+		/* Enable and configure aux clock */
+		__raw_writel(a_clk, AUX_CLK_REG(pm_aux_clk_num));
+
+		ret = clk_enable(aux_clk);
+		if (ret) {
+			pr_err("UNABLE TO ENABLE AUX CLOCK: %s\n",
+				aux_clk_name[pm_aux_clk_num]);
+			return PM_NO_AUX_CLK;
+		}
+
+		aux_clk_ptr[pm_aux_clk_num] = aux_clk;
 
 		/* Clear the bit in the usage mask */
 		AUX_CLK_USE_MASK &= ~(1 << pm_aux_clk_num);
 
-		/* Enable and configure aux clock */
-		__raw_writel(a_clk, AUX_CLK_REG(pm_aux_clk_num));
-		/* Configure aux clock req */
-		__raw_writel(a_clk_req, AUX_CLK_REG_REQ(pm_aux_clk_num));
-		pr_info("AUX_CLK_REG_%d | [0x%x] | [0x%x]\\n", pm_aux_clk_num,
+		pr_err("AUX_CLK_REG_%d | [0x%x] | [0x%x]\\n", pm_aux_clk_num,
 				__raw_readl(AUX_CLK_REG(pm_aux_clk_num)),
 				__raw_readl(AUX_CLK_REG_REQ(pm_aux_clk_num)));
 
@@ -1711,8 +1766,7 @@ static inline int ipu_pm_rel_aux_clk(int proc_id, u32 rcb_num)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
-	u32 a_clk = 0;
-	u32 a_clk_req = 0;
+	struct clk *aux_clk;
 	int pm_aux_clk_num;
 
 	/* get the handle to proper ipu pm object */
@@ -1731,21 +1785,22 @@ static inline int ipu_pm_rel_aux_clk(int proc_id, u32 rcb_num)
 
 	pm_aux_clk_num = rcb_p->fill9;
 
+	pr_info("Release AUX CLK %d\n", pm_aux_clk_num);
+
 	/* Check the usage mask */
 	if (AUX_CLK_USE_MASK & (1 << pm_aux_clk_num))
 		return PM_NO_AUX_CLK;
 
-	/* Build the value to write */
-	MASK_SET_FIELD(a_clk, AUX_CLK_ENABLE, 0x0);
-	MASK_SET_FIELD(a_clk, AUX_CLK_SRCSELECT, 0x0);
-	MASK_SET_FIELD(a_clk, AUX_CLK_CLKDIV, 0x0);
-	MASK_SET_FIELD(a_clk_req, AUX_CLK_REQ_MAPPING, 0x0);
-	MASK_SET_FIELD(a_clk_req, AUX_CLK_REQ_POLARITY, 0x0);
+	aux_clk = aux_clk_ptr[pm_aux_clk_num];
+	if (!aux_clk) {
+		pr_err("UNABLE TO DISABLE AUX CLOCK,"
+			" STRUCT CLK * IS NULL: %s\n",
+			aux_clk_name[pm_aux_clk_num]);
+		return PM_INVAL_AUX_CLK;
+	}
+	clk_disable(aux_clk);
 
-	/* Disable and reset to defualt configuration aux clock */
-	__raw_writel(a_clk, AUX_CLK_REG(pm_aux_clk_num));
-	/* Reset to default configuration aux clock req */
-	__raw_writel(a_clk_req, AUX_CLK_REG_REQ(pm_aux_clk_num));
+	aux_clk_ptr[pm_aux_clk_num] = 0;
 
 	/* Set the usage mask for reuse */
 	AUX_CLK_USE_MASK |= (1 << pm_aux_clk_num);
