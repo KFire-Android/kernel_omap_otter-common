@@ -214,6 +214,10 @@ struct omap_vdd_info{
 	struct omap_volt_pmic_info *pmic;
 };
 static struct omap_vdd_info *vdd_info;
+#ifdef CONFIG_OMAP_ABB
+static int omap4_abb_change_opp(struct omap_vdd_info *vdd_info);
+#endif
+
 /*
  * Number of scalable voltage domains.
  */
@@ -383,7 +387,11 @@ static struct omap_volt_data omap44xx_vdd_mpu_volt_data[] = {
 static struct omap_volt_data omap44xx_vdd_iva_volt_data[] = {
 	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C, .abb_type = NOMINAL_OPP},
 	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16, .abb_type = NOMINAL_OPP},
+#ifdef CONFIG_OMAP_ABB_DEFAULT_IVA_FBB
+	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = FAST_OPP},
+#else
 	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP},
+#endif
 };
 
 static struct omap_volt_data omap44xx_vdd_core_volt_data[] = {
@@ -587,6 +595,145 @@ static void vp_latch_vsel(struct omap_vdd_info *vdd)
 	/* Clear initVDD copy trigger bit */
 	voltage_write_reg(vdd->vp_offs.vpconfig, vpconfig);
 }
+
+#ifdef CONFIG_OMAP_ABB
+/**
+ * omap_abb_notify_voltage - voltage change notifier handler for ABB
+ * @nb	 : notifier block
+ * @val	 : VOLTAGE_PRECHANGE or VOLTAGE_POSTCHANGE
+ * @data : struct omap_volt_change_info for a given voltage domain
+ *
+ * Sets ABB ldo to either bypass or Forward Body-Bias whenever a voltage
+ * change notification is generated.  Voltages marked as FAST will result in
+ * FBB operation of ABB ldo and voltages marked as NOMINAL will bypass the
+ * ldo.  Returns 0 upon success, negative error code otherwise.
+ */
+static int omap_abb_notify_voltage(struct notifier_block *nb,
+		unsigned long val, void *data)
+{
+	struct omap_volt_data *curr_volt_data, *target_volt_data;
+	struct omap_volt_change_info *v_info;
+	int ret = 0;
+
+	if (!cpu_is_omap44xx())
+		return -EINVAL;
+
+	v_info = (struct omap_volt_change_info *)data;
+	target_volt_data = omap_voltage_get_voltdata(&v_info->vdd_info->voltdm,
+			v_info->target_volt);
+	curr_volt_data = omap_voltage_get_voltdata(&v_info->vdd_info->voltdm,
+			v_info->curr_volt);
+
+	/* nothing to do here */
+	if (target_volt_data->abb_type == curr_volt_data->abb_type)
+		goto out;
+
+	if (val == VOLTAGE_PRECHANGE &&
+			target_volt_data->abb_type == NOMINAL_OPP) {
+		/* bypass ABB before lowering voltage */
+		prm_rmw_mod_reg_bits(OMAP4430_OPP_SEL_MASK,
+			(NOMINAL_OPP << OMAP4430_OPP_SEL_SHIFT),
+			OMAP4430_PRM_DEVICE_MOD,
+			v_info->vdd_info->omap_abb_reg_val.prm_abb_ldo_ctrl_idx);
+		ret = omap4_abb_change_opp(v_info->vdd_info);
+	} else if (val == VOLTAGE_POSTCHANGE &&
+			target_volt_data->abb_type == FAST_OPP) {
+		/* enable Forward Body-Bias before raising voltage */
+		prm_rmw_mod_reg_bits(OMAP4430_OPP_SEL_MASK,
+			(FAST_OPP << OMAP4430_OPP_SEL_SHIFT),
+			OMAP4430_PRM_DEVICE_MOD,
+			v_info->vdd_info->omap_abb_reg_val.prm_abb_ldo_ctrl_idx);
+		ret = omap4_abb_change_opp(v_info->vdd_info);
+	} else
+		ret = -EINVAL;
+
+out:
+	return ret;
+}
+
+static struct notifier_block abb_mpu_volt_notifier_block = {
+	.notifier_call = omap_abb_notify_voltage,
+};
+
+static struct notifier_block abb_iva_volt_notifier_block = {
+	.notifier_call = omap_abb_notify_voltage,
+};
+
+/*
+ * omap_abb_init - initialize Adaptive Body-Bias LDO
+ * @vdd_info : pointer to the voltage domain we are initializing
+ *
+ * Currently only supports OMAP4.  Enables active Forward Body-Bias by default
+ * on VDD_MPU only, not on VDD_IVA.  Disables sleep Reverse Body-Bias and
+ * active Reverse Body-Bias for both voltage domains.  Registers voltage
+ * notifiers for affected voltage domains.  Returns 0 on success, negative
+ * integers otherwise.
+ */
+static int omap_abb_init(struct omap_vdd_info *vdd_info)
+{
+	int ret = 0;
+	struct clk *sys_ck;
+	u32 sr2_wt_cnt_val;
+
+	/* FIXME OMAP3630 not yet supported */
+	if(!cpu_is_omap44xx()) {
+		pr_info("%s: OMAP 3630 ABB support is missing\n", __func__);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* VDD_CORE does not support ABB */
+	if(!strcmp("core", vdd_info->voltdm.name)) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	sys_ck = clk_get(NULL, "sys_clkin_ck");
+	if (IS_ERR(sys_ck)) {
+		pr_warning("%s: Could not get the sys clk to calculate"
+			"various params\n", __func__);
+		ret = -ENODEV;
+		goto out;
+	}
+
+	sr2_wt_cnt_val = clk_get_rate(sys_ck);
+	sr2_wt_cnt_val = sr2_wt_cnt_val / 1000000 / 16;
+
+	prm_rmw_mod_reg_bits(OMAP4430_SR2_WTCNT_VALUE_MASK,
+			(sr2_wt_cnt_val << OMAP4430_SR2_WTCNT_VALUE_SHIFT),
+			OMAP4430_PRM_DEVICE_MOD,
+			vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
+
+	/* enable fbb by default */
+	prm_set_mod_reg_bits(OMAP4430_ACTIVE_FBB_SEL_MASK,
+			OMAP4430_PRM_DEVICE_MOD,
+			vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
+
+	/* do not enable active rbb by default */
+	prm_clear_mod_reg_bits(OMAP4430_ACTIVE_RBB_SEL_MASK,
+			OMAP4430_PRM_DEVICE_MOD,
+			vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
+
+	/* do not enable sleep rbb by default */
+	prm_clear_mod_reg_bits(OMAP4430_SLEEP_RBB_SEL_MASK,
+			OMAP4430_PRM_DEVICE_MOD,
+			vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
+
+	if(!strcmp("mpu", vdd_info->voltdm.name)) {
+		omap_voltage_register_notifier(&vdd_info->voltdm,
+				&abb_mpu_volt_notifier_block);
+	} else if(!strcmp("iva", vdd_info->voltdm.name)) {
+		omap_voltage_register_notifier(&(vdd_info->voltdm),
+				&abb_iva_volt_notifier_block);
+	} else {
+		pr_warning("%s: Invalid VDD specified\n", __func__);
+		ret = -EINVAL;
+	}
+
+out:
+	return ret;
+}
+#endif
 
 /* OMAP3 specific voltage init functions */
 /*
@@ -1062,6 +1209,7 @@ static void __init init_voltageprocessor(struct omap_vdd_info *vdd)
 	voltage_write_reg(vdd->vp_offs.vpconfig, vpconfig);
 }
 
+#ifdef CONFIG_OMAP_ABB
 /**
   * omap4_abb_enable - Sets ABB_LDO_SETUP.SR2EN bit
   * Enables ABB.
@@ -1083,6 +1231,76 @@ static void omap4_abb_disable(struct omap_vdd_info *vdd_info)
 			OMAP4430_PRM_DEVICE_MOD,
 			vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx);
 }
+
+/**
+ * omap4_abb_change_opp - set LDO mode & poll status until transition completes
+ * @vdd_info : voltage domain info for the VDD that is transitioning
+ *
+ * Enables ABB LDO if not done already, changes the operating mode (mode
+ * programming should already be done by notification handler), polls on
+ * status until change completes and clears status bits.  Returns 0 on
+ * success, -EBUSY if timeout occurs.
+ */
+static int omap4_abb_change_opp(struct omap_vdd_info *vdd_info)
+{
+	int ret = 0;
+	int timeout;
+
+	/* enable ABB ldo if not done already */
+	if (prm_read_mod_reg(OMAP4430_PRM_DEVICE_MOD,
+			vdd_info->omap_abb_reg_val.prm_abb_ldo_setup_idx) &
+			OMAP4430_SR2_WTCNT_VALUE_MASK)
+		omap4_abb_enable(vdd_info);
+
+	/* clear ABB ldo interrupt status */
+	prm_clear_mod_reg_bits(vdd_info->omap_abb_reg_val.abb_done_st_mask,
+			OMAP4430_PRM_OCP_SOCKET_MOD,
+			vdd_info->omap_abb_reg_val.prm_irqstatus_mpu);
+
+	/* enable ABB LDO OPP change */
+	prm_set_mod_reg_bits(OMAP4430_OPP_CHANGE_MASK,
+		OMAP4430_PRM_DEVICE_MOD,
+		vdd_info->omap_abb_reg_val.prm_abb_ldo_ctrl_idx);
+
+	timeout = 0;
+
+	/* wait until OPP change completes */
+	while ((timeout < ABB_TRANXDONE_TIMEOUT) &&
+		(!(prm_read_mod_reg(OMAP4430_PRM_OCP_SOCKET_MOD,
+			vdd_info->omap_abb_reg_val.prm_irqstatus_mpu) &
+			vdd_info->omap_abb_reg_val.abb_done_st_mask))) {
+		udelay(1);
+		timeout++;
+	}
+
+	if (timeout == ABB_TRANXDONE_TIMEOUT)
+		pr_warn("ABB: TRANXDONE timed out waiting for OPP change\n");
+
+	timeout = 0;
+
+	/* Clear all pending TRANXDONE interrupts/status */
+	while (timeout < ABB_TRANXDONE_TIMEOUT) {
+		prm_write_mod_reg((1 << vdd_info->omap_abb_reg_val.abb_done_st_shift),
+				OMAP4430_PRM_OCP_SOCKET_MOD,
+				vdd_info->omap_abb_reg_val.prm_irqstatus_mpu);
+
+		if (!(prm_read_mod_reg(OMAP4430_PRM_OCP_SOCKET_MOD,
+				vdd_info->omap_abb_reg_val.prm_irqstatus_mpu)
+				& vdd_info->omap_abb_reg_val.abb_done_st_mask))
+			break;
+
+		udelay(1);
+		timeout++;
+	}
+
+	if (timeout == ABB_TRANXDONE_TIMEOUT) {
+		pr_warn("ABB: TRANXDONE timed out trying to clear status\n");
+		ret = -EBUSY;
+	}
+
+	return ret;
+}
+#endif
 
 static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 {
@@ -1145,6 +1363,16 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 				(void *) vdd, &nom_volt_debug_fops);
 	(void) debugfs_create_file("volt_users", S_IRUGO, vdd_debug,
 				(void *) vdd, &volt_users_dbg_fops);
+#ifdef CONFIG_OMAP_ABB
+	/* ABB support for OMAP4 */
+	if (cpu_is_omap44xx() && !strcmp("vdd_iva", name))
+		(void) debugfs_create_u8("fbb_enable", S_IRUGO | S_IWUGO,
+				vdd_debug, &(vdd->volt_data[2].abb_type));
+
+	if (cpu_is_omap44xx() && !strcmp("vdd_mpu", name))
+		(void) debugfs_create_u8("fbb_enable", S_IRUGO | S_IWUGO,
+				vdd_debug, &(vdd->volt_data[3].abb_type));
+#endif
 #endif
 }
 static void __init init_voltagecontroller(void)
@@ -2125,7 +2353,11 @@ static int __init omap_voltage_init(void)
 	for (i = 0; i < no_scalable_vdd; i++) {
 		vdd_data_configure(&vdd_info[i]);
 		init_voltageprocessor(&vdd_info[i]);
+#ifdef CONFIG_OMAP_ABB
+		omap_abb_init(&vdd_info[i]);
+#endif
 	}
+
 	return 0;
 }
 device_initcall(omap_voltage_init);

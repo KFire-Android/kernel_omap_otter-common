@@ -99,6 +99,30 @@ config OMAP_SMARTREFLEX_CLASS3
 	  Class 3 implementation of Smartreflex employs continuous hardware
 	  voltage caliberation.
 
+config OMAP_ABB
+	bool "Enable Adaptive Body-Bias"
+	depends on (ARCH_OMAP3 || ARCH_OMAP4)
+	default y
+	help
+	  Say Y to enable Adaptive Body-Bias in the OMAP voltage layer.
+	  ABB is a technique to boost voltage at high OPPs for weak
+	  silicon, and to reduce voltage at low OPPs for strong silicon.
+	  When bypassed the ABB ldo follows VDD_x voltage.
+
+	  Say Y here if unsure.
+
+config OMAP_ABB_DEFAULT_IVA_FBB
+	bool "Enable Forward Body-Bias on VDD_IVA by default"
+	depends on ARCH_OMAP4 && OMAP_ABB
+	default n
+	help
+	  Say Y if you want enable FBB for VDD_IVA by default at
+	  boot-time.  This value can still be modified dynamically
+	  through the voltage directory exported through debugfs
+	  (debugfs_mount/pm_debug/voltage/vdd_iva/fbb_enable).
+
+	  Say N if you are unsure.
+
 config OMAP_RESET_CLOCKS
 	bool "Reset unused clocks during boot"
 	depends on ARCH_OMAP
