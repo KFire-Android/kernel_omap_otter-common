@@ -347,6 +347,9 @@ static DECLARE_TLV_DB_SCALE(vxrec_vx_dl_tlv, -12000, 100, 3000);
 /* VXREC volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(vxrec_vx_ul_tlv, -12000, 100, 3000);
 
+/* DMIC volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(dmic_tlv, -12000, 100, 3000);
+
 //TODO: we have to use the shift value atm to represent register id due to current HAL
 static int dl1_put_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -650,6 +653,26 @@ static int volume_put_dl2_mixer(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
+static int volume_put_dmic(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	pm_runtime_get_sync(&pdev->dev);
+	abe_write_gain(mc->reg,
+		       -12000 + (ucontrol->value.integer.value[0] * 100),
+		       RAMP_20MS, mc->shift);
+	abe_write_gain(mc->reg,
+		       -12000 + (ucontrol->value.integer.value[1] * 100),
+		       RAMP_20MS, mc->rshift);
+	pm_runtime_put_sync(&pdev->dev);
+
+	return 1;
+}
+
 static int volume_get_dl1_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
@@ -730,6 +753,25 @@ static int volume_get_sdt_mixer(struct snd_kcontrol *kcontrol,
 	pm_runtime_get_sync(&pdev->dev);
 	abe_read_mixer(MIXSDT, &val, mc->reg);
 	ucontrol->value.integer.value[0] = (val + 12000) / 100;
+	pm_runtime_put_sync(&pdev->dev);
+
+	return 0;
+}
+
+static int volume_get_dmic(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+	u32 val;
+
+	pm_runtime_get_sync(&pdev->dev);
+	abe_read_gain(mc->reg, &val, mc->shift);
+	ucontrol->value.integer.value[0] = (val + 12000) / 100;
+	abe_read_gain(mc->reg, &val, mc->rshift);
+	ucontrol->value.integer.value[1] = (val + 12000) / 100;
 	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
@@ -1093,6 +1135,19 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	SOC_SINGLE_EXT_TLV("SDT DL Volume",
 		MIX_SDT_INPUT_DL1_MIXER, 0, 149, 0,
 		volume_get_sdt_mixer, volume_put_sdt_mixer, sdt_dl_tlv),
+
+	/* DMIC gains */
+	SOC_DOUBLE_EXT_TLV("DMIC1 UL Volume",
+		GAINS_DMIC1, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
+		volume_get_dmic, volume_put_dmic, dmic_tlv),
+
+	SOC_DOUBLE_EXT_TLV("DMIC2 UL Volume",
+		GAINS_DMIC2, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
+		volume_get_dmic, volume_put_dmic, dmic_tlv),
+
+	SOC_DOUBLE_EXT_TLV("DMIC3 UL Volume",
+		GAINS_DMIC3, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
+		volume_get_dmic, volume_put_dmic, dmic_tlv),
 
 	SOC_ENUM_EXT("DL1 Equalizer Profile",
 			dl1_equalizer_enum ,
