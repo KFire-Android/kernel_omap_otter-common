@@ -536,7 +536,7 @@ int snd_soc_pcm_open(struct snd_pcm_substream *substream)
 		}
 
 		if (rtd->be_active++)
-			goto out;
+			goto no_pcm;
 	}
 
 	if (rtd->dai_link->no_host_mode == SND_SOC_DAI_LINK_NO_HOST)
