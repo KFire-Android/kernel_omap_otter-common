@@ -1,3 +1,4 @@
+#define TMP_AUX_CLK_HACK 1 /* should be removed by Nov 13, 2010 */
 /*
  * ipu_pm.c
  *
@@ -1529,6 +1530,10 @@ static inline int ipu_pm_get_iss(int proc_id, u32 rcb_num)
 
 	pr_info("Request ISS\n");
 
+#if TMP_AUX_CLK_HACK
+	rcb_p->fill9 = AUX_CLK_MIN;
+	ipu_pm_get_aux_clk(proc_id, rcb_num);
+#endif
 #ifdef CONFIG_OMAP_PM
 	retval = omap_pm_set_max_mpu_wakeup_lat(&pm_qos_handle,
 						IPU_PM_MM_MPU_LAT_CONSTRAINT);
@@ -2195,6 +2200,10 @@ static inline int ipu_pm_rel_iss(int proc_id, u32 rcb_num)
 
 	pr_info("Release ISS\n");
 
+#if TMP_AUX_CLK_HACK
+	rcb_p->fill9 = AUX_CLK_MIN;
+	ipu_pm_rel_aux_clk(proc_id, rcb_num);
+#endif
 	if (!params->pm_iss_counter)
 		goto error;
 
