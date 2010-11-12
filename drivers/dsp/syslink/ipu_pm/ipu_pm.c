@@ -1151,7 +1151,7 @@ static inline int ipu_pm_get_aux_clk(int proc_id, u32 rcb_num)
 		/* Clear the bit in the usage mask */
 		AUX_CLK_USE_MASK &= ~(1 << pm_aux_clk_num);
 
-		pr_err("AUX_CLK_REG_%d | [0x%x] | [0x%x]\\n", pm_aux_clk_num,
+		pr_err("AUX_CLK_REG_%d | [0x%x] | [0x%x]\n", pm_aux_clk_num,
 				__raw_readl(AUX_CLK_REG(pm_aux_clk_num)),
 				__raw_readl(AUX_CLK_REG_REQ(pm_aux_clk_num)));
 

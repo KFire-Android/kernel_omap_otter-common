@@ -121,8 +121,8 @@
 #define REGULATOR_MIN 1
 #define REGULATOR_MAX 1
 
-#define AUX_CLK_MIN 1
-#define AUX_CLK_MAX 3
+#define AUX_CLK_MIN 0
+#define AUX_CLK_MAX 5
 #define NUM_AUX_CLK 6
 
 #define GP_TIMER_3 3
@@ -148,8 +148,8 @@
 
 /* Auxiliar Clocks Registers */
 #define SCRM_BASE			OMAP2_L4_IO_ADDRESS(0x4a30A000)
-#define SCRM_BASE_AUX_CLK		0x00000314
-#define SCRM_BASE_AUX_CLK_REQ		0x00000214
+#define SCRM_BASE_AUX_CLK		0x00000310
+#define SCRM_BASE_AUX_CLK_REQ		0x00000210
 #define SCRM_AUX_CLK_OFFSET		0x4
 /* Auxiliar Clocks bit fields */
 #define SCRM_AUX_CLK_POLARITY		0x0
