@@ -20,7 +20,7 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-#define DEBUG
+#undef DEBUG
 
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -34,9 +34,9 @@
 #include <plat/omap_device.h>
 #include <linux/pm_runtime.h>
 
-static int early_timer_count __initdata;
+static int early_timer_count __initdata = 1;
 
-/*
+/**
  * omap2_dm_timer_set_src - change the timer input clock source
  * @pdev:	timer platform device pointer
  * @timer_clk:	current clock source
@@ -45,7 +45,7 @@ static int early_timer_count __initdata;
 static int omap2_dm_timer_set_src(struct platform_device *pdev, int source)
 {
 	int ret;
-	struct omap_dmtimer_platform_data *pdata = pdev->dev.platform_data;
+	struct dmtimer_platform_data *pdata = pdev->dev.platform_data;
 	struct clk *fclk = clk_get(&pdev->dev, "fck");
 	struct clk *new_fclk;
 	char *fclk_name = "32k_ck"; /* default name */
@@ -104,22 +104,30 @@ struct omap_device_pm_latency omap2_dmtimer_latency[] = {
 	},
 };
 
+/**
+ * omap2_timer_early_init - build and register early timer device
+ * with an associated timer hwmod
+ * @oh: timer hwmod pointer to be used to build timer device
+ * @user: parameter that can be passed from calling hwmod API
+ *
+ * early init is called in the last part of omap2_init_common_hw
+ * for each early timer class using omap_hwmod_for_each_by_class.
+ * it registers each of the timer devices present in the system.
+ * at the end of function call memory is allocated for omap_device
+ * and hwmod for early timer and the device is registered to the
+ * framework ready to be probed by the driver.
+ */
 static int __init omap2_timer_early_init(struct omap_hwmod *oh, void *user)
 {
 	int id;
+	int ret = 0;
 	char *name = "omap-timer";
-	struct omap_dmtimer_platform_data *pdata;
+	struct dmtimer_platform_data *pdata;
 	struct omap_device *od;
-
-	if (!oh) {
-		pr_err("%s: Could not find [%s]\n", __func__, oh->name);
-		return -EINVAL;
-	}
 
 	pr_debug("%s:%s\n", __func__, oh->name);
 
-	pdata = kzalloc(sizeof(struct omap_dmtimer_platform_data),
-			GFP_KERNEL);
+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
 		pr_err("%s: No memory for [%s]\n", __func__, oh->name);
 		return -ENOMEM;
@@ -140,45 +148,60 @@ static int __init omap2_timer_early_init(struct omap_hwmod *oh, void *user)
 	pdata->is_early_init = 1;
 
 	/*
-	 * extract the id from name
-	 * this is not the best implementation, but the cleanest with
-	 * the existing constraints: (1) early timers are not sequential,
-	 * 1/2/10 (2) export APIs use id's to identify corresponding
-	 * timers (3) non-early timers initialization have to track the
-	 * id's already used by early timers.
-	 *
-	 * well, the ideal solution would have been to have an 'id' field
-	 * in struct omap_hwmod {}. otherwise, we have to have devattr
-	 * for all timers.
+	 * extract the id from name filed in hwmod database
+	 * and use the same for constructing ids' for the
+	 * timer devices. in a way, we are avoiding usage of
+	 * static variable witin the function to do the same.
+	 * CAUTION: we have to be careful and make sure the
+	 * name in hwmod database does not change in which case
+	 * we might either make corresponding change here or
+	 * switch back static variable mechanism.
 	 */
 	sscanf(oh->name, "timer%2d", &id);
 
 	od = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
 			omap2_dmtimer_latency,
 			ARRAY_SIZE(omap2_dmtimer_latency), 1);
+
 	if (IS_ERR(od)) {
 		pr_err("%s: Cant build omap_device for %s:%s.\n",
 			__func__, name, oh->name);
-		kfree(pdata);
-	}
-	early_timer_count++;
-	return 0;
+		ret = -EINVAL;
+	} else
+		early_timer_count++;
+	/*
+	 * pdata can be freed because omap_device_build
+	 * creates its own memory pool
+	 */
+	kfree(pdata);
+
+	return ret;
 }
 
+/**
+ * omap2_timer_init - build and register timer device with an
+ * associated timer hwmod
+ * @oh:	timer hwmod pointer to be used to build timer device
+ * @user:	parameter that can be passed from calling hwmod API
+ *
+ * called by omap_hwmod_for_each_by_class to register each of the timer
+ * devices present in the system. the number of timer devices is known
+ * by parsing through the hwmod database for a given class name. at the
+ * end of function call memory is allocated for omap_device and hwmod
+ * for timer and the device is registered to the framework ready to be
+ * proved by the driver.
+ */
 static int __init omap2_timer_init(struct omap_hwmod *oh, void *user)
 {
 	int id;
+	int ret = 0;
 	char *name = "omap-timer";
 	struct omap_device *od;
-	struct omap_dmtimer_platform_data *pdata;
+	struct dmtimer_platform_data *pdata;
 
-	if (!oh) {
-		pr_err("%s:NULL hwmod pointer (oh)\n", __func__);
-		return -EINVAL;
-	}
 	pr_debug("%s:%s\n", __func__, oh->name);
 
-	pdata = kzalloc(sizeof(struct omap_dmtimer_platform_data), GFP_KERNEL);
+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
 		pr_err("%s:No memory for [%s]\n",  __func__, oh->name);
 		return -ENOMEM;
@@ -198,29 +221,43 @@ static int __init omap2_timer_init(struct omap_hwmod *oh, void *user)
 	pdata->is_early_init = 0;
 
 	/*
-	* extract the id from name
-	* this is not the best implementation, but the cleanest with
-	* the existing constraints: (1) early timers are not sequential,
-	* 1/2/10 (2) export APIs use id's to identify corresponding
-	* timers (3) non-early timers initialization have to track the
-	* id's already used by early timers.
-	*
-	* well, the ideal solution would have been to have an 'id' field
-	* in struct omap_hwmod {}. otherwise we have to have devattr for
-	* all timers.
-	*/
+	 * extract the id from name filed in hwmod database
+	 * and use the same for constructing ids' for the
+	 * timer devices. in a way, we are avoiding usage of
+	 * static variable witin the function to do the same.
+	 * CAUTION: we have to be careful and make sure the
+	 * name in hwmod database does not change in which case
+	 * we might either make corresponding change here or
+	 * switch back static variable mechanism.
+	 */
 	sscanf(oh->name, "timer%2d", &id);
 
 	od = omap_device_build(name, id, oh,
 			pdata, sizeof(*pdata),
 			omap2_dmtimer_latency,
 			ARRAY_SIZE(omap2_dmtimer_latency), 0);
-	WARN(IS_ERR(od), "Cant build omap_device for %s:%s.\n",
-			name, oh->name);
 
-	return 0;
+	if (IS_ERR(od)) {
+		pr_err("%s: Cant build omap_device for %s:%s.\n",
+			__func__, name, oh->name);
+		ret =  -EINVAL;
+	}
+	/*
+	 * pdata can be freed because omap_device_build
+	 * creates its own memory pool
+	 */
+	kfree(pdata);
+	return ret;
 }
 
+/**
+ * omap2_dm_timer_early_init - top level early timer initialization
+ * called in the last part of omap2_init_common_hw
+ *
+ * uses dedicated hwmod api to parse through hwmod database for
+ * given class name and then build and register the timer device.
+ * at the end driver is registered and early probe initiated.
+ */
 void __init omap2_dm_timer_early_init(void)
 {
 	if (omap_hwmod_for_each_by_class("timer",
@@ -229,12 +266,17 @@ void __init omap2_dm_timer_early_init(void)
 		return;
 	}
 	early_platform_driver_register_all("earlytimer");
-	early_platform_driver_probe("earlytimer", early_timer_count + 1, 0);
+	early_platform_driver_probe("earlytimer", early_timer_count, 0);
 }
 
-static int __init omap_timer_init(void)
+/**
+ * omap2_dmtimer_device_init - top level timer device initialization
+ *
+ * uses dedicated hwmod api to parse through hwmod database for
+ * given class names and then build and register the timer device.
+ */
+static int __init omap2_dmtimer_device_init(void)
 {
-	/* register all timers again */
 	int ret = omap_hwmod_for_each_by_class("timer", omap2_timer_init, NULL);
 
 	if (unlikely(ret))
@@ -242,4 +284,4 @@ static int __init omap_timer_init(void)
 
 	return ret;
 }
-arch_initcall(omap_timer_init);
+arch_initcall(omap2_dmtimer_device_init);

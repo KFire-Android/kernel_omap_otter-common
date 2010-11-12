@@ -34,7 +34,7 @@
  * with this program; if not, write  to the Free Software Foundation, Inc.,
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#define DEBUG
+#undef DEBUG
 
 #include <linux/init.h>
 #include <linux/spinlock.h>
@@ -208,8 +208,7 @@ struct omap_timer_regs {
 static struct omap_timer_regs timer_context[NR_DMTIMERS_MAX];
 
 static LIST_HEAD(omap_timer_list);
-static spinlock_t dm_timer_lock;
-static int spinlock_initialized __initdata;
+static DEFINE_SPINLOCK(dm_timer_lock);
 
 /*
  * Reads timer registers in posted and non-posted mode. The posted mode bit
@@ -218,15 +217,15 @@ static int spinlock_initialized __initdata;
  */
 static inline u32 omap_dm_timer_read_reg(struct omap_dm_timer *timer, u32 reg)
 {
-	struct omap_dmtimer_platform_data *pdata = \
-					timer->pdev->dev.platform_data;
+	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
 
-	if (reg >= OMAP_TIMER_STAT_REG && reg <= OMAP_TIMER_INT_EN_REG)
-		reg += pdata->offset1;
-	else if (reg >= OMAP_TIMER_WAKEUP_EN_REG)
+	if (reg >= OMAP_TIMER_WAKEUP_EN_REG)
 		reg += pdata->offset2;
+	else if (reg >= OMAP_TIMER_STAT_REG)
+		reg += pdata->offset1;
+
 	if (timer->posted)
-		while (readl(timer->io_base + \
+		while (readl(timer->io_base +
 			((OMAP_TIMER_WRITE_PEND_REG + pdata->offset2) & 0xff))
 				& (reg >> WPSHIFT))
 			cpu_relax();
@@ -242,15 +241,15 @@ static inline u32 omap_dm_timer_read_reg(struct omap_dm_timer *timer, u32 reg)
 static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
 						u32 value)
 {
-	struct omap_dmtimer_platform_data *pdata = \
-					timer->pdev->dev.platform_data;
+	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
 
-	if (reg >= OMAP_TIMER_STAT_REG && reg <= OMAP_TIMER_INT_EN_REG)
-		reg += pdata->offset1;
-	else if (reg >= OMAP_TIMER_WAKEUP_EN_REG)
+	if (reg >= OMAP_TIMER_WAKEUP_EN_REG)
 		reg += pdata->offset2;
+	else if (reg >= OMAP_TIMER_STAT_REG)
+		reg += pdata->offset1;
+
 	if (timer->posted)
-		while (readl(timer->io_base + \
+		while (readl(timer->io_base +
 			((OMAP_TIMER_WRITE_PEND_REG + pdata->offset2) & 0xff))
 				& (reg >> WPSHIFT))
 			cpu_relax();
@@ -310,8 +309,7 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
 	int c;
 	u32 reg_address;
 	int reset_active;
-	struct omap_dmtimer_platform_data *pdata = \
-					timer->pdev->dev.platform_data;
+	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
 
 	if (pdata->timer_ip_type == OMAP_TIMER_IP_VERSION_2) {
 		reg_address = OMAP_TIMER_OCP_CFG_REG;
@@ -413,8 +411,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_free);
 
 void omap_dm_timer_enable(struct omap_dm_timer *timer)
 {
-	struct omap_dmtimer_platform_data *pdata = \
-				timer->pdev->dev.platform_data;
+	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
 
 	if (timer->enabled)
 		return;
@@ -437,8 +434,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
 
 void omap_dm_timer_disable(struct omap_dm_timer *timer)
 {
-	struct omap_dmtimer_platform_data *pdata = \
-		timer->pdev->dev.platform_data;
+	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
 
 	if (!timer->enabled)
 		return;
@@ -565,8 +561,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
 int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
 {
 	int ret;
-	struct omap_dmtimer_platform_data *pdata = \
-				timer->pdev->dev.platform_data;
+	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
 
 	if (source < 0 || source >= 3)
 		return -EINVAL;
@@ -691,8 +686,7 @@ void omap_dm_timer_set_int_disable(struct omap_dm_timer *timer,
 					unsigned int value)
 {
 	u32 l;
-	struct omap_dmtimer_platform_data *pdata = \
-					timer->pdev->dev.platform_data;
+	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
 
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_WAKEUP_EN_REG);
 	if (pdata->timer_ip_type == OMAP_TIMER_IP_VERSION_2) {
@@ -757,81 +751,82 @@ int omap_dm_timers_active(void)
 }
 EXPORT_SYMBOL_GPL(omap_dm_timers_active);
 
+/**
+ * omap_dm_timer_probe - probe function called for every registered device
+ * @pdev:	pointer to current timer platform device
+ *
+ * called by driver framework at the end of device registration for all
+ * timer devices
+ */
 static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
 {
-	int ret = 0;
+	int ret;
+	unsigned long flags;
 	struct omap_dm_timer *timer;
-	struct resource *res;
-	struct omap_dmtimer_platform_data *pdata = pdev->dev.platform_data;
-	bool enabled =  false;
+	struct resource *mem, *irq, *ioarea;
+	struct dmtimer_platform_data *pdata = pdev->dev.platform_data;
 
-	if (!pdev || !pdev->dev.platform_data) {
-		pr_err("%s:Timer device initialized without platform data\n",
-		__func__);
-		return -EINVAL;
+	dev_dbg(&pdev->dev, "%s: in\n", __func__);
+
+	if (!pdata) {
+		dev_err(&pdev->dev, "%s: no platform data\n", __func__);
+		return -ENODEV;
 	}
-	dev_info(&pdev->dev, "%s:[id=%d]\n", __func__, pdev->id);
 	/*
 	 * early timers are already registered and in list.
 	 * what we need to do during second phase of probe
-	 * is to free the prevoious platform data and then
-	 * assign the newly allocated / configured platform
-	 * data which contains different (i) timer enable/disable
-	 * functions (ii) timer set/get clock functions
+	 * is to assign the newly allocated/configured pdev
+	 * to already registered timer->pdev. we also call
+	 * pm_runtime_enable() for each device because it
+	 * could not be called during early boot because
+	 * pm_runtime framework was not yet up and running.
 	 */
+	spin_lock_irqsave(&dm_timer_lock, flags);
 	list_for_each_entry(timer, &omap_timer_list, node)
 		if (timer->id == pdev->id) {
-			/*
-			 * Before switching to pm_runtime, disable
-			 * timer clock using old timer->pdev handle.
-			 */
-			if (timer->enabled) {
-				omap_dm_timer_disable(timer);
-				enabled = true;
-			}
-
-			/* replace early platform device with new allocation */
 			timer->pdev = pdev;
-
+			spin_unlock_irqrestore(&dm_timer_lock, flags);
 			pm_runtime_enable(&pdev->dev);
-
-			/*
-			 * Enable timer clock using new timer->pdev
-			 * handle which now uses pm_runtime api. this is needed
-			 * to ensure device clock in  mandated state before
-			 * making clock state transitions.
-			 */
-			if (enabled)
-				omap_dm_timer_enable(timer);
+			dev_dbg(&pdev->dev, "pm_runtime ENABLED\n");
 			return 0;
 		}
+	spin_unlock_irqrestore(&dm_timer_lock, flags);
+
+	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	if (unlikely(!irq)) {
+		dev_err(&pdev->dev, "%s: no IRQ resource\n", __func__);
+		ret = -ENODEV;
+		goto err_free_pdev;
+	}
+
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (unlikely(!mem)) {
+		dev_err(&pdev->dev, "%s: no memory resource\n", __func__);
+		ret = -ENODEV;
+		goto err_free_pdev;
+	}
+
+	ioarea = request_mem_region(mem->start, resource_size(mem),
+			pdev->name);
+	if (!ioarea) {
+		dev_err(&pdev->dev, "%s: region already claimed\n", __func__);
+		ret = -EBUSY;
+		goto err_free_pdev;
+	}
+
 	timer = kzalloc(sizeof(struct omap_dm_timer), GFP_KERNEL);
 	if (!timer) {
-		pr_err("%s: No memory for omap_dm_timer\n", __func__);
-		return -ENOMEM;
-	}
-
-	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-	if (unlikely(!res)) {
-		pr_err("%s:timer%d has invalid IRQ resource\n",
-			__func__, pdev->id + 1);
-		ret = -ENODEV;
-		goto exit_1;
-	}
-	timer->irq = res->start;
-
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (unlikely(!res)) {
-		pr_err("%s:timer%d has invalid memory resource\n",
-			__func__, pdev->id + 1);
+		dev_err(&pdev->dev, "%s: no memory for omap_dm_timer\n",
+			__func__);
 		ret = -ENOMEM;
-		goto exit_1;
+		goto err_release_ioregion;
 	}
-	timer->io_base = ioremap(res->start, resource_size(res));
+
+	timer->io_base = ioremap(mem->start, resource_size(mem));
 	if (!timer->io_base) {
 		dev_err(&pdev->dev, "%s: ioremap failed\n", __func__);
 		ret = -ENOMEM;
-		goto exit_2;
+		goto err_free_mem;
 	}
 
 	timer->fclk = clk_get(&pdev->dev, "fck");
@@ -839,54 +834,63 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "%s:%d: clk_get() FAILED\n",
 			__func__, __LINE__);
 		ret = -EINVAL;
-		goto exit_2;
+		goto err_free_mem;
 	}
+	timer->irq = irq->start;
 	timer->pdev = pdev;
 	timer->id = pdev->id;
 	timer->reserved = 0;
 	timer->is_initialized = 1;
 	timer->context = 0;
+	/* add the timer element to the list */
+	spin_lock_irqsave(&dm_timer_lock, flags);
 	list_add_tail(&timer->node, &omap_timer_list);
+	spin_unlock_irqrestore(&dm_timer_lock, flags);
 
-	if (pdata->timer_ip_type != OMAP_TIMER_IP_VERSION_1)
-		pm_runtime_enable(&pdev->dev);
-	/*
-	 * initializing spinlock here so that it is available
-	 * during early timers access. please note that probe
-	 * is initialized during early init through separate
-	 * path early_platform_init()
-	 */
-	if (!spinlock_initialized) {
-		spin_lock_init(&dm_timer_lock);
-		spinlock_initialized = 1;
-	}
+	dev_dbg(&pdev->dev, " bound to its driver\n");
 
-	dev_info(&pdev->dev, " registered\n");
+	return 0;
 
-	return ret;
-exit_2:
-	release_mem_region(res->start, resource_size(res));
-exit_1:
+err_free_mem:
 	kfree(timer);
-	return ret;
-	}
 
+err_release_ioregion:
+	release_mem_region(mem->start, resource_size(mem));
+
+err_free_pdev:
+	platform_device_del(pdev);
+
+	return ret;
+}
+
+/**
+ * omap_dm_timer_remove - cleanup a registered timer device
+ * @pdev:	pointer to current timer platform device
+ *
+ * called by driver framework whenever a timer device is unregistered.
+ * it addition to freeing platform resources it also deletes the timer
+ * entry from the local list.
+ */
 static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
 {
-	struct resource *res;
-	struct omap_dm_timer *timer;
+	struct omap_dm_timer *timer, *tmp;
+	unsigned long flags;
+	int ret = -EINVAL;
 
-	list_for_each_entry(timer, &omap_timer_list, node) {
-		if (timer->id == pdev->id && timer->is_initialized) {
-			iounmap(timer->io_base);
-			res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-			release_mem_region(res->start, resource_size(res));
-			kfree(timer);
+	spin_lock_irqsave(&dm_timer_lock, flags);
+	list_for_each_entry_safe(timer, tmp, &omap_timer_list, node) {
+		if (timer->id == pdev->id) {
+			clk_put(timer->fclk);
+			platform_device_del(timer->pdev);
 			list_del(&timer->node);
-			return 0;
+			kfree(timer);
+			ret = 0;
+			break;
 		}
 	}
-	return -EINVAL;
+	spin_unlock_irqrestore(&dm_timer_lock, flags);
+
+	return ret;
 }
 
 static struct platform_driver omap_dmtimer_driver = {
