@@ -3,17 +3,18 @@
  *
  * OMAP Dual-Mode Timers
  *
+ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
+ * Tarun Kanti DebBarma <tarun.kanti@ti.com>
+ *
+ * Copyright (C) 2010 Texas Instruments Incorporated
+ * Thara Gopinath <thara@ti.com>
+ *
  * Copyright (C) 2005 Nokia Corporation
  * OMAP2 support by Juha Yrjola
  * API improvements and OMAP2 clock framework support by Timo Teras
  *
  * Copyright (C) 2009 Texas Instruments
  * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
- *
- * Copyright (C) 2010 Texas Instruments, Inc.
- * Add hwmod support
- * Thara Gopinath <thara@ti.com>
- * Tarun Kanti DebBarma <tarun.kanti@ti.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -33,6 +34,8 @@
  * with this program; if not, write  to the Free Software Foundation, Inc.,
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+#undef DEBUG
+
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/errno.h>
@@ -47,6 +50,7 @@
 #include <plat/dmtimer.h>
 #include <plat/omap_device.h>
 #include <mach/irqs.h>
+#include <linux/err.h>
 
 /* register offsets */
 #define _OMAP_TIMER_ID_OFFSET		0x00
@@ -166,6 +170,7 @@ struct omap_dm_timer {
 	unsigned long phys_base;
 	unsigned long fclk_rate;
 	int irq;
+	struct clk *fclk;
 	void __iomem *io_base;
 	unsigned reserved:1;
 	unsigned enabled:1;
@@ -414,8 +419,17 @@ void omap_dm_timer_enable(struct omap_dm_timer *timer)
 	if (timer->enabled)
 		return;
 
-	if (pdata->omap_dm_clk_enable)
-		pdata->omap_dm_clk_enable(timer->pdev);
+	if (unlikely(pdata->is_early_init)) {
+		clk_enable(timer->fclk);
+		timer->enabled = 1;
+		return;
+	}
+
+	if (pm_runtime_get_sync(&timer->pdev->dev)) {
+		dev_dbg(&timer->pdev->dev, "%s:pm_runtime_get_sync() FAILED\n",
+			__func__);
+		return;
+	}
 
 	timer->enabled = 1;
 }
@@ -429,8 +443,17 @@ void omap_dm_timer_disable(struct omap_dm_timer *timer)
 	if (!timer->enabled)
 		return;
 
-	if (pdata->omap_dm_clk_disable)
-		pdata->omap_dm_clk_disable(timer->pdev);
+	if (unlikely(pdata->is_early_init)) {
+		clk_disable(timer->fclk);
+		timer->enabled = 0;
+		return;
+	}
+
+	if (pm_runtime_put_sync(&timer->pdev->dev)) {
+		dev_dbg(&timer->pdev->dev, "%s:pm_runtime_put_sync() FAILED\n",
+			__func__);
+		return;
+	}
 
 	timer->enabled = 0;
 }
@@ -803,10 +826,18 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
 		goto exit_2;
 	}
 
+	timer->fclk = clk_get(&pdev->dev, "fck");
+	if (IS_ERR_OR_NULL(timer->fclk)) {
+		dev_dbg(&pdev->dev, "%s:%d: clk_get() FAILED\n",
+			__func__, __LINE__);
+		ret = -EINVAL;
+		goto exit_2;
+	}
 	timer->pdev = pdev;
 	timer->id = pdev->id;
 	timer->reserved = 0;
 	timer->is_initialized = 1;
+	timer->context = 0;
 	list_add_tail(&timer->node, &omap_timer_list);
 
 	if (pdata->timer_ip_type != OMAP_TIMER_IP_LEGACY)
