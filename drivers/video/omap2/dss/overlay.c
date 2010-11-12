@@ -131,6 +131,35 @@ static ssize_t overlay_input_size_show(struct omap_overlay *ovl, char *buf)
 			ovl->info.width, ovl->info.height);
 }
 
+static ssize_t overlay_input_size_store(struct omap_overlay *ovl,
+		const char *buf, size_t size)
+{
+	int r;
+	char *last;
+	struct omap_overlay_info info;
+
+	ovl->get_overlay_info(ovl, &info);
+
+	info.width = simple_strtoul(buf, &last, 10);
+	++last;
+	if (last - buf >= size)
+		return -EINVAL;
+
+	info.height = simple_strtoul(last, &last, 10);
+
+	r = ovl->set_overlay_info(ovl, &info);
+	if (r)
+		return r;
+
+	if (ovl->manager) {
+		r = ovl->manager->apply(ovl->manager);
+		if (r)
+			return r;
+	}
+
+	return size;
+}
+
 static ssize_t overlay_screen_width_show(struct omap_overlay *ovl, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%d\n", ovl->info.screen_width);
@@ -402,7 +431,8 @@ struct overlay_attribute {
 static OVERLAY_ATTR(name, S_IRUGO, overlay_name_show, NULL);
 static OVERLAY_ATTR(manager, S_IRUGO|S_IWUSR,
 		overlay_manager_show, overlay_manager_store);
-static OVERLAY_ATTR(input_size, S_IRUGO, overlay_input_size_show, NULL);
+static OVERLAY_ATTR(input_size, S_IRUGO|S_IWUSR,
+		    overlay_input_size_show, overlay_input_size_store);
 static OVERLAY_ATTR(screen_width, S_IRUGO, overlay_screen_width_show, NULL);
 static OVERLAY_ATTR(position, S_IRUGO|S_IWUSR,
 		overlay_position_show, overlay_position_store);
