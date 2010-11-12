@@ -35,134 +35,65 @@
 #include <linux/pm_runtime.h>
 
 static int early_timer_count __initdata;
-static int is_early_init __initdata = 1;
 
-static char *omap2_dm_source_names[] __initdata = {
-	"sys_ck",
-	"func_32k_ck",
-	"alt_ck",
-	NULL
-};
-static struct clk *omap2_dm_source_clocks[3];
-
-static char *omap3_dm_source_names[] __initdata = {
-	"sys_ck",
-	"omap_32k_fck",
-	NULL
-};
-static struct clk *omap3_dm_source_clocks[2];
-
-static char *omap4_dm_source_names[] __initdata = {
-	"sys_clkin_ck",
-	"sys_32k_ck",
-	"syc_clk_div_ck",
-	NULL
-};
-static struct clk *omap4_dm_source_clocks[3];
-
-static struct clk **omap_dm_source_clocks;
-
-static int omap2_dm_timer_set_src(struct platform_device *pdev,
-			struct clk *timer_clk, int source)
+/*
+ * omap2_dm_timer_set_src - change the timer input clock source
+ * @pdev:	timer platform device pointer
+ * @timer_clk:	current clock source
+ * @source:	array index of parent clock source
+ */
+static int omap2_dm_timer_set_src(struct platform_device *pdev, int source)
 {
 	int ret;
+	struct omap_dmtimer_platform_data *pdata = pdev->dev.platform_data;
+	struct clk *fclk = clk_get(&pdev->dev, "fck");
+	struct clk *new_fclk;
+	char *fclk_name = "32k_ck"; /* default name */
 
-	if (IS_ERR(timer_clk)) {
-		dev_warn(&pdev->dev, "%s: Not able get the clock pointer\n",
-			__func__);
+	switch (source) {
+	case OMAP_TIMER_SRC_SYS_CLK:
+		fclk_name = "sys_ck";
+		break;
+
+	case OMAP_TIMER_SRC_32_KHZ:
+		fclk_name = "32k_ck";
+		break;
+
+	case OMAP_TIMER_SRC_EXT_CLK:
+		if (pdata->timer_ip_type == OMAP_TIMER_IP_VERSION_1) {
+			fclk_name = "alt_ck";
+			break;
+		}
+		dev_dbg(&pdev->dev, "%s:%d: invalid clk src.\n",
+			__func__, __LINE__);
 		return -EINVAL;
 	}
 
-#ifndef CONFIG_PM_RUNTIME
-	clk_disable(timer_clk); /* enabled in hwmod */
-#else
-	if (unlikely(is_early_init))
-		omap_device_idle(pdev);
-	else {
-		ret = pm_runtime_put_sync(&pdev->dev);
-		if (unlikely(ret))
-			dev_warn(&pdev->dev,
-			"%s: pm_runtime_put_sync FAILED(%d)\n",
-			__func__, ret);
-	}
-#endif
 
-	ret = clk_set_parent(timer_clk, omap_dm_source_clocks[source]);
-	if (ret)
-		dev_warn(&pdev->dev, "%s: Not able to change "
-			"fclk source\n", __func__);
-
-#ifndef CONFIG_PM_RUNTIME
-	clk_enable(timer_clk);
-#else
-	if (unlikely(is_early_init))
-		omap_device_enable(pdev);
-	else {
-		ret = pm_runtime_get_sync(&pdev->dev);
-		if (unlikely(ret))
-			dev_warn(&pdev->dev,
-			"%s: pm_runtime_get_sync FAILED(%d)\n",
-			__func__, ret);
-	}
-#endif
-
-	return ret;
-}
-
-static int omap2_dm_timer_set_clk(struct platform_device *pdev, int source)
-{
-	struct clk *timer_clk = clk_get(&pdev->dev, "fck");
-
-	return omap2_dm_timer_set_src(pdev, timer_clk, source);
-}
-
-struct clk *omap2_dm_timer_get_fclk(struct platform_device *pdev)
-{
-	return clk_get(&pdev->dev, "fck");
-}
-
-static int omap2_dm_early_timer_set_clk
-			(struct platform_device *pdev, int source)
-{
-	struct omap_device *odev = to_omap_device(pdev);
-
-	return omap2_dm_timer_set_src(pdev,
-			omap_hwmod_get_clk(odev->hwmods[0]),
-			source);
-}
-
-static struct clk *omap2_dm_early_timer_get_fclk
-				(struct platform_device *pdev)
-{
-	struct omap_device *odev = to_omap_device(pdev);
-
-	return omap_hwmod_get_clk(odev->hwmods[0]);
-}
-
-/* One time initializations */
-static void __init omap2_dm_timer_setup(void)
-{
-	int i;
-	char **clock_source_names;
-
-	if (cpu_is_omap24xx()) {
-		clock_source_names = omap2_dm_source_names;
-		omap_dm_source_clocks = omap2_dm_source_clocks;
-	} else if (cpu_is_omap34xx()) {
-		clock_source_names = omap3_dm_source_names;
-		omap_dm_source_clocks = omap3_dm_source_clocks;
-	} else if (cpu_is_omap44xx()) {
-		clock_source_names = omap4_dm_source_names;
-		omap_dm_source_clocks = omap4_dm_source_clocks;
-	} else {
-		pr_err("%s: Chip support not yet added\n", __func__);
-		return;
+	if (IS_ERR_OR_NULL(fclk)) {
+		dev_dbg(&pdev->dev, "%s:%d: clk_get() FAILED\n",
+			__func__, __LINE__);
+		return -EINVAL;
 	}
 
-	/* Initialize the dmtimer src clocks */
-	for (i = 0; clock_source_names[i] != NULL; i++)
-			omap_dm_source_clocks[i] =
-				clk_get(NULL, clock_source_names[i]);
+	new_fclk = clk_get(&pdev->dev, fclk_name);
+	if (IS_ERR_OR_NULL(new_fclk)) {
+		dev_dbg(&pdev->dev, "%s:%d: clk_get() %s FAILED\n",
+			__func__, __LINE__, fclk_name);
+		clk_put(fclk);
+		return -EINVAL;
+	}
+
+	ret = clk_set_parent(fclk, new_fclk);
+	clk_put(new_fclk);
+	clk_put(fclk);
+	if (IS_ERR_VALUE(ret)) {
+		dev_dbg(&pdev->dev, "%s:clk_set_parent() to %s FAILED\n",
+			__func__, fclk_name);
+		return -EINVAL;
+	}
+
+	return 0;
 }
 
 struct omap_device_pm_latency omap2_dmtimer_latency[] = {
@@ -176,7 +107,7 @@ struct omap_device_pm_latency omap2_dmtimer_latency[] = {
 static int __init omap2_timer_early_init(struct omap_hwmod *oh, void *user)
 {
 	int id;
-	char *name = "dmtimer";
+	char *name = "omap-timer";
 	struct omap_dmtimer_platform_data *pdata;
 	struct omap_device *od;
 
@@ -193,8 +124,8 @@ static int __init omap2_timer_early_init(struct omap_hwmod *oh, void *user)
 		pr_err("%s: No memory for [%s]\n", __func__, oh->name);
 		return -ENOMEM;
 	}
-	pdata->omap_dm_set_source_clk = omap2_dm_early_timer_set_clk;
-	pdata->omap_dm_get_timer_clk = omap2_dm_early_timer_get_fclk;
+
+	pdata->set_timer_src = omap2_dm_timer_set_src;
 
 	pdata->timer_ip_type = oh->class->rev;
 
@@ -222,7 +153,7 @@ static int __init omap2_timer_early_init(struct omap_hwmod *oh, void *user)
 	 */
 	sscanf(oh->name, "timer%2d", &id);
 
-	od = omap_device_build(name, id - 1, oh, pdata, sizeof(*pdata),
+	od = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
 			omap2_dmtimer_latency,
 			ARRAY_SIZE(omap2_dmtimer_latency), 1);
 	if (IS_ERR(od)) {
@@ -237,7 +168,7 @@ static int __init omap2_timer_early_init(struct omap_hwmod *oh, void *user)
 static int __init omap2_timer_init(struct omap_hwmod *oh, void *user)
 {
 	int id;
-	char *name = "dmtimer";
+	char *name = "omap-timer";
 	struct omap_device *od;
 	struct omap_dmtimer_platform_data *pdata;
 
@@ -252,15 +183,9 @@ static int __init omap2_timer_init(struct omap_hwmod *oh, void *user)
 		pr_err("%s:No memory for [%s]\n",  __func__, oh->name);
 		return -ENOMEM;
 	}
-	/* hook clock set/get functions */
-	pdata->omap_dm_set_source_clk = omap2_dm_timer_set_clk;
-	pdata->omap_dm_get_timer_clk = omap2_dm_timer_get_fclk;
 
+	pdata->set_timer_src = omap2_dm_timer_set_src;
 
-	/* Update Highlander offsets for GPTimer [3-9, 11-12].
-	 * The offset1 & offset2 will be zero on OMAP3 and
-	 * OMAP4 millisecond timers (GPT1, GPT2, GPT10).
-	 */
 	pdata->timer_ip_type = oh->class->rev;
 	if (unlikely(pdata->timer_ip_type == OMAP_TIMER_IP_VERSION_1)) {
 		pdata->offset1 = 0x0;
@@ -286,7 +211,7 @@ static int __init omap2_timer_init(struct omap_hwmod *oh, void *user)
 	*/
 	sscanf(oh->name, "timer%2d", &id);
 
-	od = omap_device_build(name, id - 1, oh,
+	od = omap_device_build(name, id, oh,
 			pdata, sizeof(*pdata),
 			omap2_dmtimer_latency,
 			ARRAY_SIZE(omap2_dmtimer_latency), 0);
@@ -303,7 +228,6 @@ void __init omap2_dm_timer_early_init(void)
 		pr_debug("%s: device registration FAILED\n", __func__);
 		return;
 	}
-	omap2_dm_timer_setup();
 	early_platform_driver_register_all("earlytimer");
 	early_platform_driver_probe("earlytimer", early_timer_count + 1, 0);
 }

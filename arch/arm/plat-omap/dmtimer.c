@@ -333,7 +333,7 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
 
 static void omap_dm_timer_reset(struct omap_dm_timer *timer)
 {
-	if (!cpu_class_is_omap2() || timer->id != 0) {
+	if (!cpu_class_is_omap2() || timer->id != 1) {
 		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
 		omap_dm_timer_wait_for_reset(timer);
 	}
@@ -384,7 +384,7 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
 
 	spin_lock_irqsave(&dm_timer_lock, flags);
 	list_for_each_entry(timer, &omap_timer_list, node) {
-		if (timer->id == id-1 && !timer->reserved) {
+		if (timer->id == id && !timer->reserved) {
 			found = 1;
 			timer->reserved = 1;
 			break;
@@ -501,13 +501,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
 
 struct clk *omap_dm_timer_get_fclk(struct omap_dm_timer *timer)
 {
-	struct omap_dmtimer_platform_data *pdata = \
-				timer->pdev->dev.platform_data;
-
-	if (pdata->omap_dm_get_timer_clk)
-		return pdata->omap_dm_get_timer_clk(timer->pdev);
-
-	return NULL;
+	return timer->fclk;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_get_fclk);
 
@@ -570,13 +564,27 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
 
 int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
 {
+	int ret;
 	struct omap_dmtimer_platform_data *pdata = \
 				timer->pdev->dev.platform_data;
 
-	if (pdata->omap_dm_set_source_clk)
-		timer->fclk_rate = pdata->omap_dm_set_source_clk
-				(timer->pdev, source);
-	return 0;
+	if (source < 0 || source >= 3)
+		return -EINVAL;
+
+	omap_dm_timer_disable(timer);
+
+	/* change the timer clock source */
+	ret = pdata->set_timer_src(timer->pdev, source);
+
+	omap_dm_timer_enable(timer);
+
+	/*
+	 * When the functional clock disappears, too quick writes seem
+	 * to cause an abort. XXX Is this still necessary?
+	 */
+	__delay(300000);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_set_source);
 
@@ -885,7 +893,7 @@ static struct platform_driver omap_dmtimer_driver = {
 	.probe          = omap_dm_timer_probe,
 	.remove			= omap_dm_timer_remove,
 	.driver         = {
-		.name   = "dmtimer",
+		.name   = "omap-timer",
 	},
 };
 

@@ -56,9 +56,7 @@ extern struct sys_timer omap_timer;
 struct clk;
 
 struct omap_dmtimer_platform_data {
-	int (*omap_dm_set_source_clk)
-			(struct platform_device *pdev, int source);
-	struct clk* (*omap_dm_get_timer_clk) (struct platform_device *pdev);
+	int (*set_timer_src) (struct platform_device *pdev, int source);
 	int timer_ip_type;
 	int offset1;
 	int offset2;
