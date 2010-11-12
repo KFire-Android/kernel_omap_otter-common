@@ -20,6 +20,8 @@
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+#define DEBUG
+
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/io.h>
@@ -171,7 +173,7 @@ struct omap_device_pm_latency omap2_dmtimer_latency[] = {
 	},
 };
 
-static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
+static int __init omap2_timer_early_init(struct omap_hwmod *oh, void *user)
 {
 	int id;
 	char *name = "dmtimer";
@@ -196,7 +198,7 @@ static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
 
 	pdata->timer_ip_type = oh->class->rev;
 
-	if (pdata->timer_ip_type == OMAP_TIMER_IP_LEGACY) {
+	if (pdata->timer_ip_type == OMAP_TIMER_IP_VERSION_1) {
 		pdata->offset1 = 0;
 		pdata->offset2 = 0;
 	} else {
@@ -232,7 +234,7 @@ static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
 	return 0;
 }
 
-static int __init omap2_dm_timer_init(struct omap_hwmod *oh, void *user)
+static int __init omap2_timer_init(struct omap_hwmod *oh, void *user)
 {
 	int id;
 	char *name = "dmtimer";
@@ -260,7 +262,7 @@ static int __init omap2_dm_timer_init(struct omap_hwmod *oh, void *user)
 	 * OMAP4 millisecond timers (GPT1, GPT2, GPT10).
 	 */
 	pdata->timer_ip_type = oh->class->rev;
-	if (unlikely(pdata->timer_ip_type == OMAP_TIMER_IP_LEGACY)) {
+	if (unlikely(pdata->timer_ip_type == OMAP_TIMER_IP_VERSION_1)) {
 		pdata->offset1 = 0x0;
 		pdata->offset2 = 0x0;
 	} else {
@@ -296,8 +298,11 @@ static int __init omap2_dm_timer_init(struct omap_hwmod *oh, void *user)
 
 void __init omap2_dm_timer_early_init(void)
 {
-	omap_hwmod_for_each_by_class("timer_1ms",
-				omap_dm_timer_early_init, NULL);
+	if (omap_hwmod_for_each_by_class("timer",
+		omap2_timer_early_init, NULL)) {
+		pr_debug("%s: device registration FAILED\n", __func__);
+		return;
+	}
 	omap2_dm_timer_setup();
 	early_platform_driver_register_all("earlytimer");
 	early_platform_driver_probe("earlytimer", early_timer_count + 1, 0);
@@ -306,8 +311,11 @@ void __init omap2_dm_timer_early_init(void)
 static int __init omap_timer_init(void)
 {
 	/* register all timers again */
-	omap_hwmod_for_each_by_class("timer_1ms", omap2_dm_timer_init, NULL);
-	omap_hwmod_for_each_by_class("timer", omap2_dm_timer_init, NULL);
-	return 0;
+	int ret = omap_hwmod_for_each_by_class("timer", omap2_timer_init, NULL);
+
+	if (unlikely(ret))
+		pr_debug("%s: device registration FAILED\n", __func__);
+
+	return ret;
 }
 arch_initcall(omap_timer_init);

@@ -34,7 +34,7 @@
  * with this program; if not, write  to the Free Software Foundation, Inc.,
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#undef DEBUG
+#define DEBUG
 
 #include <linux/init.h>
 #include <linux/spinlock.h>
@@ -840,7 +840,7 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
 	timer->context = 0;
 	list_add_tail(&timer->node, &omap_timer_list);
 
-	if (pdata->timer_ip_type != OMAP_TIMER_IP_LEGACY)
+	if (pdata->timer_ip_type != OMAP_TIMER_IP_VERSION_1)
 		pm_runtime_enable(&pdev->dev);
 	/*
 	 * initializing spinlock here so that it is available

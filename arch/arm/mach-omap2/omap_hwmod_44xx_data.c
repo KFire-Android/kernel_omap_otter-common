@@ -4462,13 +4462,21 @@ static struct omap_hwmod_class_sysconfig omap44xx_timer_1ms_sysc = {
 			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
 			   SYSS_HAS_RESET_STATUS),
 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.clockact	= 0x2, /* preserve fclk on idle */
 	.sysc_fields	= &omap_hwmod_sysc_type1,
 };
 
+/*
+ * during early boot when device model is not fully up and running
+ * any one of the dmtimers could be used by gmtimer implementation
+ * to provide system ticks. in order to enable hwmod api to search
+ * all the dmtimers irrespective of the class (ms and non-ms) it
+ * belongs the .name field is assigned a uniform name 'timer'.
+ */
 static struct omap_hwmod_class omap44xx_timer_1ms_hwmod_class = {
-	.name = "timer_1ms",
+	.name = "timer",
 	.sysc = &omap44xx_timer_1ms_sysc,
-	.rev = OMAP_TIMER_IP_LEGACY,
+	.rev = OMAP_TIMER_IP_VERSION_1,
 };
 
 static struct omap_hwmod_class_sysconfig omap44xx_timer_sysc = {

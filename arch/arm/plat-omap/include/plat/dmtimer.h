@@ -47,7 +47,7 @@
 #define OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE	0x02
 
 /* timer ip constants */
-#define OMAP_TIMER_IP_LEGACY			0x1
+#define OMAP_TIMER_IP_VERSION_1			0x1
 #define OMAP_TIMER_IP_VERSION_2			0x2
 
 struct omap_dm_timer;
