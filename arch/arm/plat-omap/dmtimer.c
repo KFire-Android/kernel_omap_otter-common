@@ -171,9 +171,36 @@ struct omap_dm_timer {
 	unsigned enabled:1;
 	unsigned posted:1;
 	unsigned is_initialized:1;
+	unsigned context:1;
 	struct platform_device *pdev;
 	struct list_head node;
 };
+
+struct omap_timer_regs {
+	u32 tidr;
+	u32 tiocp_cfg;
+	u32 tistat;
+	u32 tisr;
+	u32 tier;
+	u32 twer;
+	u32 tclr;
+	u32 tcrr;
+	u32 tldr;
+	u32 ttrg;
+	u32 twps;
+	u32 tmar;
+	u32 tcar1;
+	u32 tsicr;
+	u32 tcar2;
+	u32 tpir; /* timers: 1, 2, 10 */
+	u32 tnir; /* timers: 1, 2, 10 */
+	u32 tcvr; /* timers: 1, 2, 10 */
+	u32 tocr; /* timers: 1, 2, 10 */
+	u32 towr; /* timers: 1, 2, 10 */
+};
+
+#define NR_DMTIMERS_MAX			12
+static struct omap_timer_regs timer_context[NR_DMTIMERS_MAX];
 
 static LIST_HEAD(omap_timer_list);
 static spinlock_t dm_timer_lock;
@@ -223,6 +250,54 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
 				& (reg >> WPSHIFT))
 			cpu_relax();
 	writel(value, timer->io_base + (reg & 0xff));
+}
+
+static void omap_timer_save_context(struct omap_dm_timer *timer)
+{
+	timer_context[timer->id].tiocp_cfg =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_OCP_CFG_REG);
+	timer_context[timer->id].tistat =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_SYS_STAT_REG);
+	timer_context[timer->id].tisr =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_STAT_REG);
+	timer_context[timer->id].tier =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_INT_EN_REG);
+	timer_context[timer->id].twer =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_WAKEUP_EN_REG);
+	timer_context[timer->id].tclr =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+	timer_context[timer->id].tcrr =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_COUNTER_REG);
+	timer_context[timer->id].tldr =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_LOAD_REG);
+	timer_context[timer->id].tmar =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_MATCH_REG);
+	timer_context[timer->id].tsicr =
+		omap_dm_timer_read_reg(timer, OMAP_TIMER_IF_CTRL_REG);
+}
+
+static void omap_timer_restore_context(struct omap_dm_timer *timer)
+{
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_REG,
+				timer_context[timer->id].tiocp_cfg);
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_SYS_STAT_REG,
+				timer_context[timer->id].tistat);
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_STAT_REG,
+				timer_context[timer->id].tisr);
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_INT_EN_REG,
+				timer_context[timer->id].tier);
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_WAKEUP_EN_REG,
+				timer_context[timer->id].twer);
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG,
+				timer_context[timer->id].tclr);
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_COUNTER_REG,
+				timer_context[timer->id].tcrr);
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_LOAD_REG,
+				timer_context[timer->id].tldr);
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_MATCH_REG,
+				timer_context[timer->id].tmar);
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG,
+				timer_context[timer->id].tsicr);
 }
 
 static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
@@ -423,6 +498,12 @@ void omap_dm_timer_start(struct omap_dm_timer *timer)
 {
 	u32 l;
 
+	if (timer->context) {
+		omap_dm_timer_enable(timer);
+		omap_timer_restore_context(timer);
+		timer->context = 0;
+	}
+
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
 	if (!(l & OMAP_TIMER_CTRL_ST)) {
 		l |= OMAP_TIMER_CTRL_ST;
@@ -434,6 +515,10 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_start);
 void omap_dm_timer_stop(struct omap_dm_timer *timer)
 {
 	u32 l;
+
+	/* if timer is already stopped, return */
+	if (timer->context)
+		return;
 
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
 	if (l & OMAP_TIMER_CTRL_ST) {
@@ -454,6 +539,9 @@ void omap_dm_timer_stop(struct omap_dm_timer *timer)
 			OMAP_TIMER_INT_OVERFLOW);
 #endif
 	}
+	omap_timer_save_context(timer);
+	omap_dm_timer_disable(timer);
+	timer->context = 1;
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
 
@@ -492,6 +580,12 @@ void omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
                             unsigned int load)
 {
 	u32 l;
+
+	if (timer->context) {
+		omap_dm_timer_enable(timer);
+		omap_timer_restore_context(timer);
+		timer->context = 0;
+	}
 
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
 	if (autoreload) {
@@ -556,6 +650,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_set_prescaler);
 void omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
 				  unsigned int value)
 {
+	omap_dm_timer_enable(timer);
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_INT_EN_REG, value);
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_WAKEUP_EN_REG, value);
 }
@@ -592,6 +687,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_read_status);
 
 void omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
 {
+	omap_dm_timer_enable(timer);
 	omap_dm_timer_write_reg(timer, OMAP_TIMER_STAT_REG, value);
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_write_status);
@@ -600,6 +696,7 @@ unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
 {
 	unsigned int l;
 
+	omap_dm_timer_enable(timer);
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_COUNTER_REG);
 
 	return l;
