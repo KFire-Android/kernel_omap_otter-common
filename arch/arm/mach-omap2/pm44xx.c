@@ -186,6 +186,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK,
 			0x2 << OMAP4430_AUTO_CTRL_VDD_CORE_L_SHIFT,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
+
 	}
 
 	if (core_next_state < PWRDM_POWER_ON)
@@ -507,6 +508,8 @@ static void __init prcm_setup_regs(void)
 	prm_rmw_mod_reg_bits(OMAP4430_GLOBAL_WUEN_MASK, OMAP4430_GLOBAL_WUEN_MASK,
 		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET);
 
+	/* Toggle CLKREQ in RET and OFF states */
+	prm_write_mod_reg(0x2, OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_CLKREQCTRL_OFFSET);
 }
 
 /**
