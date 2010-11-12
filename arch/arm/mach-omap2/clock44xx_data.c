@@ -813,9 +813,9 @@ static struct clk dpll_per_m2_ck = {
 
 static struct clk dpll_per_m2x2_ck = {
 	.name		= "dpll_per_m2x2_ck",
-	.parent		= &dpll_per_m2_ck,
+	.parent		= &dpll_per_ck,
 	.ops		= &clkops_null,
-	.recalc		= &omap3_clkoutx2_recalc,
+	.recalc		= &followparent_recalc,
 };
 
 static struct clk dpll_per_m3_ck = {
