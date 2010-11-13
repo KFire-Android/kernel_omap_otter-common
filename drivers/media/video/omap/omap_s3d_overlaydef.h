@@ -205,6 +205,9 @@ struct s3d_formatter_config {
 	bool wb_skip_lines;
 	bool a_view_per_ovl;
 
+	unsigned int in_rotation;
+	unsigned int out_rotation;
+
 	unsigned int wb_passes;
 	unsigned int wb_ovls;
 	unsigned int disp_ovls;

@@ -894,11 +894,6 @@ static int fill_src(struct s3d_ovl_device *dev,
 		return -EINVAL;
 	}
 
-	if (dev->rotation == 90 || dev->rotation == 270) {
-		unsigned int tmp = info->src_w;
-		info->src_w = info->src_h;
-		info->src_h = tmp;
-	}
 	return 0;
 }
 static int fill_dst(struct s3d_ovl_device *dev,
@@ -918,28 +913,18 @@ static int fill_dst(struct s3d_ovl_device *dev,
 		info->alt_view = (disp_info->type == S3D_DISP_FRAME_SEQ);
 		break;
 	case S3D_DISP_ROW_IL:
+	case S3D_DISP_COL_IL:
 		info->dst_w = dst_width;
 		info->dst_h = dst_height/2;
 		info->wb_dst_w = info->dst_w;
 		info->wb_dst_h = info->dst_h;
 		info->use_wb = true;
 		info->wb_skip_lines = true;
-		info->wb_passes = 2;
-		info->alt_view = true;
-		info->disp_ovls = 1;
-		info->wb_ovls = 1;
-		break;
-	case S3D_DISP_COL_IL:
-		info->dst_w = dst_width/2;
-		info->dst_h = dst_height;
-		info->wb_dst_w = info->dst_w;
-		info->wb_dst_h = info->dst_h;
-		info->use_wb = true;
 		info->wb_needs_tiler = true;
+		info->wb_passes = 2;
+		info->alt_view = true;
 		info->disp_ovls = 1;
 		info->wb_ovls = 1;
-		info->alt_view = true;
-		info->wb_passes = 2;
 		break;
 	case S3D_DISP_OVERUNDER:
 		info->dst_w = dst_width;
@@ -1006,6 +991,8 @@ static int fill_formatter_config(struct s3d_ovl_device *dev,
 
 	info->disp_w = dst_width;
 	info->disp_h = dst_height;
+	info->in_rotation = dev->rotation;
+	info->out_rotation = 0;
 
 	/*If the input matches what the display expects just feed it, no
 	 * special processing is needed */
@@ -1043,7 +1030,33 @@ static int fill_formatter_config(struct s3d_ovl_device *dev,
 
 	}
 
+	if (disp_info->type == S3D_DISP_COL_IL && !anaglyph) {
+		switch (dev->rotation) {
+		case 0:
+			info->in_rotation = 90;
+			info->out_rotation = 270;
+			break;
+		case 90:
+			info->in_rotation = 0;
+			info->out_rotation = 90;
+			break;
+		case 270:
+			info->in_rotation = 0;
+			info->out_rotation = 270;
+			break;
+		case 180:
+			info->in_rotation = 90;
+			info->out_rotation = 90;
+			break;
+		}
+	}
+
 	r = fill_src(dev, info, fpack, dev->crop.width, dev->crop.height);
+	if (info->in_rotation == 90 || info->in_rotation == 270) {
+		unsigned int tmp = info->src_w;
+		info->src_w = info->src_h;
+		info->src_h = tmp;
+	}
 
 	if (anaglyph) {
 		info->disp_ovls = 2;
@@ -1053,9 +1066,19 @@ static int fill_formatter_config(struct s3d_ovl_device *dev,
 		return 0;
 	}
 
+	if (info->out_rotation == 90 || info->out_rotation == 270) {
+		dst_width = dev->win.w.height;
+		dst_height = dev->win.w.width;
+	}
+
 	r = fill_dst(dev, info, disp_info, dst_width, dst_height);
 
 	disp_fpack_to_v4l2_fpack(disp_info, &dev->out_q.frame_packing);
+
+	/*Special case, for column interleaving we technically row interleave
+	  and use input/output rotation to appear as column interleaving*/
+	if (disp_info->type == S3D_DISP_COL_IL)
+		dev->out_q.frame_packing.type = V4L2_FPACK_ROW_IL;
 	return r;
 
 }
@@ -1066,11 +1089,11 @@ static int init_overlay(struct s3d_ovl_device *dev, struct s3d_overlay *ovl)
 
 	dispc_get_default_color_conv_coef(&color_conv_tbl);
 	ovl->alpha = dev->win.global_alpha;
-
+	ovl->vflip = dev->vflip;
 	if (ovl->role == OVL_ROLE_WB ||
 		((ovl->role & OVL_ROLE_DISP) && !dev->fter_config.use_wb)) {
 		/*TODO: account for custom s3d offsets (gap between l r) */
-		v4l2_rot_to_dss_rot(dev->rotation, &ovl->rotation);
+		v4l2_rot_to_dss_rot(dev->fter_config.in_rotation, &ovl->rotation);
 		ovl->queue = &dev->in_q;
 		ovl->wb_queue = &dev->out_q;
 
@@ -1151,12 +1174,12 @@ static int init_overlay(struct s3d_ovl_device *dev, struct s3d_overlay *ovl)
 		}
 
 	} else if ((ovl->role & OVL_ROLE_DISP) && dev->fter_config.use_wb) {
-		ovl->rotation = OMAP_DSS_ROT_0;
+		v4l2_rot_to_dss_rot(dev->fter_config.out_rotation, &ovl->rotation);
 		ovl->queue = &dev->out_q;
 		ovl->src.w = dev->fter_config.disp_w;
 		ovl->src.h = dev->fter_config.disp_h;
-		ovl->dst.w = dev->fter_config.disp_w;
-		ovl->dst.h = dev->fter_config.disp_h;
+		ovl->dst.w = ovl->src.w;
+		ovl->dst.h = ovl->src.h;
 		ovl->state = OVL_ST_FETCH_ALL;
 	}
 
@@ -1442,10 +1465,20 @@ static int allocate_resources(struct s3d_ovl_device *dev)
 	}
 
 	if (dev->fter_config.use_wb) {
+		unsigned int disp_w;
+		unsigned int disp_h;
+		if (dev->fter_config.out_rotation == 90 ||
+			dev->fter_config.out_rotation == 270) {
+			disp_w = dev->fter_config.disp_h;
+			disp_h = dev->fter_config.disp_w;
+		} else {
+			disp_w = dev->fter_config.disp_w;
+			disp_h = dev->fter_config.disp_h;
+		}
 		dev->out_q.bpp = RGB32_BPP;
 		dev->out_q.color_mode = OMAP_DSS_COLOR_RGBA32;
-		dev->out_q.width = dev->fter_config.disp_w;
-		dev->out_q.height = dev->fter_config.disp_h;
+		dev->out_q.width = disp_w;
+		dev->out_q.height = disp_h;
 		dev->out_q.crop_w = dev->out_q.width;
 		dev->out_q.crop_h = dev->out_q.height;
 		dev->out_q.uses_tiler = dev->fter_config.wb_needs_tiler;
