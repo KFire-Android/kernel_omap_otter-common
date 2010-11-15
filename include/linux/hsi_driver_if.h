@@ -21,6 +21,7 @@
 #ifndef __HSI_DRIVER_IF_H__
 #define __HSI_DRIVER_IF_H__
 
+#include <linux/platform_device.h>
 #include <linux/device.h>
 #include <linux/clk.h>
 #include <linux/notifier.h>
@@ -34,8 +35,8 @@
 #define ANY_HSI_CONTROLLER	-1
 
 /* HSR special divisor values set to control the auto-divisor Rx mode */
-#define HSI_HSR_DIVISOR_AUTO		0x1000 /* Activate auto Rx */
-#define HSI_SSR_DIVISOR_USE_TIMEOUT	0x1001 /* De-activate auto-Rx for SSI */
+#define HSI_HSR_DIVISOR_AUTO		0x1000	/* Activate auto Rx */
+#define HSI_SSR_DIVISOR_USE_TIMEOUT	0x1001	/* De-activate auto-Rx for SSI */
 
 enum {
 	HSI_EVENT_BREAK_DETECTED = 0,
@@ -106,22 +107,20 @@ struct ctrl_ctx {
 /* END DPS */
 
 struct hsi_platform_data {
-	void (*set_min_bus_tput)(struct device *dev, u8 agent_id,
-							unsigned long r);
-	int (*clk_notifier_register)(struct clk *clk,
-						struct notifier_block *nb);
-	int (*clk_notifier_unregister)(struct clk *clk,
-						struct notifier_block *nb);
+	void (*set_min_bus_tput) (struct device *dev, u8 agent_id,
+				  unsigned long r);
+	int (*device_enable) (struct platform_device *pdev);
+	int (*device_shutdown) (struct platform_device *pdev);
+	int (*device_idle) (struct platform_device *pdev);
 	u8 num_ports;
 	struct ctrl_ctx ctx;
 };
 
 /**
- * struct hsi_device - HSI device object
+ * struct hsi_device - HSI device object (Virtual)
  * @n_ctrl: associated HSI controller platform id number
  * @n_p: port number
  * @n_ch: channel number
- * @modalias: [to be removed]
  * @ch: channel descriptor
  * @device: associated device
 */
@@ -146,14 +145,13 @@ struct hsi_device {
  * @driver: associated device_driver object
 */
 struct hsi_device_driver {
-	unsigned long		ctrl_mask;
-	unsigned long		ch_mask[HSI_MAX_PORTS];
-	int			(*probe)(struct hsi_device *dev);
-	int			(*remove)(struct hsi_device *dev);
-	int			(*suspend)(struct hsi_device *dev,
-						pm_message_t mesg);
-	int			(*resume)(struct hsi_device *dev);
-	struct device_driver	driver;
+	unsigned long ctrl_mask;
+	unsigned long ch_mask[HSI_MAX_PORTS];
+	int (*probe) (struct hsi_device *dev);
+	int (*remove) (struct hsi_device *dev);
+	int (*suspend) (struct hsi_device *dev, pm_message_t mesg);
+	int (*resume) (struct hsi_device *dev);
+	struct device_driver driver;
 };
 
 #define to_hsi_device_driver(drv) container_of(drv, \
@@ -163,18 +161,21 @@ struct hsi_device_driver {
 int hsi_register_driver(struct hsi_device_driver *driver);
 void hsi_unregister_driver(struct hsi_device_driver *driver);
 int hsi_open(struct hsi_device *dev);
-int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size);
+int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size);
 void hsi_write_cancel(struct hsi_device *dev);
-int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size);
+int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size);
 void hsi_read_cancel(struct hsi_device *dev);
 int hsi_poll(struct hsi_device *dev);
 int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 void hsi_close(struct hsi_device *dev);
 void hsi_set_read_cb(struct hsi_device *dev,
-		void (*read_cb)(struct hsi_device *dev, unsigned int size));
+		     void (*read_cb) (struct hsi_device *dev,
+				      unsigned int size));
 void hsi_set_write_cb(struct hsi_device *dev,
-		void (*write_cb)(struct hsi_device *dev, unsigned int size));
+		      void (*write_cb) (struct hsi_device *dev,
+					unsigned int size));
 void hsi_set_port_event_cb(struct hsi_device *dev,
-				void (*port_event_cb)(struct hsi_device *dev,
-					unsigned int event, void *arg));
+			   void (*port_event_cb) (struct hsi_device *dev,
+						  unsigned int event,
+						  void *arg));
 #endif /* __HSI_DRIVER_IF_H__ */

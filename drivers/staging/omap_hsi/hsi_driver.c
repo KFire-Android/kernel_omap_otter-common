@@ -18,6 +18,11 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/device.h>
+#include <linux/platform_device.h>
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
@@ -26,7 +31,8 @@
 #include <linux/slab.h>
 #include "hsi_driver.h"
 
-#define	HSI_DRIVER_VERSION	"0.1"
+#define HSI_MODULENAME "omap_hsi"
+#define	HSI_DRIVER_VERSION	"0.2"
 #define HSI_RESETDONE_TIMEOUT	10	/* 10 ms */
 #define HSI_RESETDONE_RETRIES	20	/* => max 200 ms waiting for reset */
 
@@ -51,34 +57,11 @@ int hsi_port_event_handler(struct hsi_port *p, unsigned int event, void *arg)
 			read_lock(&hsi_channel->rw_lock);
 			if ((hsi_channel->dev) && (hsi_channel->port_event))
 				hsi_channel->port_event(hsi_channel->dev,
-								event, arg);
+							event, arg);
 			read_unlock(&hsi_channel->rw_lock);
 		}
 	}
 	return 0;
-}
-
-static int hsi_clk_event(struct notifier_block *nb, unsigned long event,
-			 void *data)
-{
-/* TODO - implement support for clocks changes
-	switch (event) {
-	case CLK_PRE_RATE_CHANGE:
-		break;
-	case CLK_ABORT_RATE_CHANGE:
-		break;
-	case CLK_POST_RATE_CHANGE:
-		break;
-	default:
-		break;
-	}
-*/
-
-	/*
-	 * TODO: At this point we may emit a port event warning about the
-	 * clk frequency change to the upper layers.
-	 */
-	return NOTIFY_DONE;
 }
 
 static void hsi_dev_release(struct device *dev)
@@ -89,6 +72,7 @@ static void hsi_dev_release(struct device *dev)
 	 */
 }
 
+/* Register a hsi_device, linked to a port and channel id */
 static int __init reg_hsi_dev_ch(struct hsi_dev *hsi_ctrl, unsigned int p,
 				 unsigned int ch)
 {
@@ -140,6 +124,24 @@ static int __init register_hsi_devices(struct hsi_dev *hsi_ctrl)
 	return 0;
 }
 
+static void __exit unregister_hsi_devices(struct hsi_dev *hsi_ctrl)
+{
+	struct hsi_port *hsi_p;
+	struct hsi_device *device;
+	unsigned int port;
+	unsigned int ch;
+
+	for (port = 0; port < hsi_ctrl->max_p; port++) {
+		hsi_p = &hsi_ctrl->hsi_port[port];
+		for (ch = 0; ch < hsi_p->max_ch; ch++) {
+			device = hsi_p->hsi_channel[ch].dev;
+			hsi_close(device);
+			device_unregister(&device->device);
+			kfree(device);
+		}
+	}
+}
+
 static int __init hsi_softreset(struct hsi_dev *hsi_ctrl)
 {
 	int ind = 0;
@@ -165,7 +167,7 @@ static int __init hsi_softreset(struct hsi_dev *hsi_ctrl)
 }
 
 static void __init set_hsi_ports_default(struct hsi_dev *hsi_ctrl,
-					 struct platform_device *pd)
+					    struct platform_device *pd)
 {
 	struct port_ctx *cfg;
 	struct hsi_platform_data *pdata = pd->dev.platform_data;
@@ -175,11 +177,12 @@ static void __init set_hsi_ports_default(struct hsi_dev *hsi_ctrl,
 
 	for (port = 1; port <= pdata->num_ports; port++) {
 		cfg = &pdata->ctx.pctx[port - 1];
-		hsi_outl(cfg->hst.mode | cfg->hst.flow | HSI_MODE_WAKE_CTRL_SW,
-			 base, HSI_HST_MODE_REG(port));
+		hsi_outl(cfg->hst.mode | cfg->hst.flow |
+			HSI_HST_MODE_WAKE_CTRL_SW, base,
+			HSI_HST_MODE_REG(port));
 		if (!hsi_driver_device_is_hsi(pdev))
 			hsi_outl(cfg->hst.frame_size, base,
-						 HSI_HST_FRAMESIZE_REG(port));
+				 HSI_HST_FRAMESIZE_REG(port));
 		hsi_outl(cfg->hst.divisor, base, HSI_HST_DIVISOR_REG(port));
 		hsi_outl(cfg->hst.channels, base, HSI_HST_CHANNELS_REG(port));
 		hsi_outl(cfg->hst.arb_mode, base, HSI_HST_ARBMODE_REG(port));
@@ -191,7 +194,7 @@ static void __init set_hsi_ports_default(struct hsi_dev *hsi_ctrl,
 		hsi_outl(cfg->hsr.channels, base, HSI_HSR_CHANNELS_REG(port));
 		if (hsi_driver_device_is_hsi(pdev))
 			hsi_outl(cfg->hsr.divisor, base,
-						HSI_HSR_DIVISOR_REG(port));
+				 HSI_HSR_DIVISOR_REG(port));
 		hsi_outl(cfg->hsr.timeout, base, HSI_HSR_COUNTERS_REG(port));
 	}
 
@@ -227,18 +230,6 @@ static int __init hsi_port_channels_init(struct hsi_port *port)
 	return 0;
 }
 
-static void hsi_ports_exit(struct hsi_dev *hsi_ctrl, unsigned int max_ports)
-{
-	struct hsi_port *hsi_p;
-	unsigned int port;
-
-	for (port = 0; port < max_ports; port++) {
-		hsi_p = &hsi_ctrl->hsi_port[port];
-		hsi_mpu_exit(hsi_p);
-		hsi_cawake_exit(hsi_p);
-	}
-}
-
 static int __init hsi_request_mpu_irq(struct hsi_port *hsi_p)
 {
 	struct hsi_dev *hsi_ctrl = hsi_p->hsi_controller;
@@ -247,10 +238,10 @@ static int __init hsi_request_mpu_irq(struct hsi_port *hsi_p)
 
 	if (hsi_driver_device_is_hsi(pd))
 		mpu_irq = platform_get_resource(pd, IORESOURCE_IRQ,
-					hsi_p->port_number - 1);
-	else /* SSI support 2 IRQs per port */
+						hsi_p->port_number - 1);
+	else			/* SSI support 2 IRQs per port */
 		mpu_irq = platform_get_resource(pd, IORESOURCE_IRQ,
-					(hsi_p->port_number - 1) * 2);
+						(hsi_p->port_number - 1) * 2);
 
 	if (!mpu_irq) {
 		dev_err(hsi_ctrl->dev, "HSI misses info for MPU IRQ on"
@@ -273,7 +264,7 @@ static int __init hsi_request_cawake_irq(struct hsi_port *hsi_p)
 		return 0;
 	} else {
 		cawake_irq = platform_get_resource(pd, IORESOURCE_IRQ,
-					   4 + hsi_p->port_number);
+						   4 + hsi_p->port_number);
 	}
 
 	if (!cawake_irq) {
@@ -293,6 +284,18 @@ static int __init hsi_request_cawake_irq(struct hsi_port *hsi_p)
 	return hsi_cawake_init(hsi_p, cawake_irq->name);
 }
 
+static void hsi_ports_exit(struct hsi_dev *hsi_ctrl, unsigned int max_ports)
+{
+	struct hsi_port *hsi_p;
+	unsigned int port;
+
+	for (port = 0; port < max_ports; port++) {
+		hsi_p = &hsi_ctrl->hsi_port[port];
+		hsi_mpu_exit(hsi_p);
+		hsi_cawake_exit(hsi_p);
+	}
+}
+
 static int __init hsi_ports_init(struct hsi_dev *hsi_ctrl)
 {
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
@@ -306,8 +309,7 @@ static int __init hsi_ports_init(struct hsi_dev *hsi_ctrl)
 		hsi_p->port_number = port + 1;
 		hsi_p->hsi_controller = hsi_ctrl;
 		hsi_p->max_ch = hsi_driver_device_is_hsi(pd) ?
-				HSI_CHANNELS_MAX : HSI_SSI_CHANNELS_MAX;
-		hsi_p->max_ch = min(hsi_p->max_ch, (u8) HSI_PORT_MAX_CH);
+		    HSI_CHANNELS_MAX : HSI_SSI_CHANNELS_MAX;
 		hsi_p->irq = 0;
 		hsi_p->counters_on = 1;
 		hsi_p->reg_counters = pdata->ctx.pctx[port].hsr.timeout;
@@ -360,7 +362,7 @@ static void __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 
 	if (!gdd_chan_count) {
 		dev_warn(hsi_ctrl->dev, "HSI device has no GDD channel count "
-					"resource (use 8 as default)\n");
+			 "resource (use 8 as default)\n");
 		hsi_ctrl->gdd_chan_count = 8;
 	} else {
 		hsi_ctrl->gdd_chan_count = gdd_chan_count->start;
@@ -371,13 +373,13 @@ static void __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 		}
 		if (i >= 16)
 			dev_err(hsi_ctrl->dev, "The Number of DMA channels "
-					"shall be a power of 2! (=%d)\n",
-					hsi_ctrl->gdd_chan_count);
+				"shall be a power of 2! (=%d)\n",
+				hsi_ctrl->gdd_chan_count);
 	}
 }
 
 static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
-				      struct platform_device *pd)
+					 struct platform_device *pd)
 {
 	struct hsi_platform_data *pdata = pd->dev.platform_data;
 	struct resource *mem, *ioarea;
@@ -409,28 +411,13 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 	hsi_ctrl->id = pd->id;
 	if (pdata->num_ports > HSI_MAX_PORTS) {
 		dev_err(&pd->dev, "The HSI driver does not support enough "
-		"ports!\n");
+			"ports!\n");
 		return -ENXIO;
 	}
 	hsi_ctrl->max_p = pdata->num_ports;
 	hsi_ctrl->dev = &pd->dev;
 	spin_lock_init(&hsi_ctrl->lock);
-	hsi_ctrl->hsi_clk = clk_get(&pd->dev, "hsi_fck");
 	hsi_init_gdd_chan_count(hsi_ctrl);
-
-	if (IS_ERR(hsi_ctrl->hsi_clk)) {
-		dev_err(hsi_ctrl->dev, "Unable to get HSI clocks\n");
-		return PTR_ERR(hsi_ctrl->hsi_clk);
-	}
-
-	if (pdata->clk_notifier_register) {
-		hsi_ctrl->hsi_nb.notifier_call = hsi_clk_event;
-		hsi_ctrl->hsi_nb.priority = INT_MAX; /* Let's try to be first */
-		err = pdata->clk_notifier_register(hsi_ctrl->hsi_clk,
-						   &hsi_ctrl->hsi_nb);
-		if (err < 0)
-			goto rback1;
-	}
 
 	err = hsi_ports_init(hsi_ctrl);
 	if (err < 0)
@@ -440,32 +427,23 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 	if (err < 0)
 		goto rback3;
 
+	/* Everything is fine */
 	return 0;
 rback3:
 	hsi_ports_exit(hsi_ctrl, hsi_ctrl->max_p);
 rback2:
-	if (pdata->clk_notifier_unregister)
-		pdata->clk_notifier_unregister(hsi_ctrl->hsi_clk,
-					       &hsi_ctrl->hsi_nb);
-rback1:
-	clk_put(hsi_ctrl->hsi_clk);
 	dev_err(&pd->dev, "Error on hsi_controller initialization\n");
 	return err;
 }
 
 static void hsi_controller_exit(struct hsi_dev *hsi_ctrl)
 {
-	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
-
 	hsi_gdd_exit(hsi_ctrl);
 	hsi_ports_exit(hsi_ctrl, hsi_ctrl->max_p);
-	if (pdata->clk_notifier_unregister)
-		pdata->clk_notifier_unregister(hsi_ctrl->hsi_clk,
-					       &hsi_ctrl->hsi_nb);
-	clk_put(hsi_ctrl->hsi_clk);
 }
 
-static int __init hsi_probe(struct platform_device *pd)
+/* HSI Platform Device probing & hsi_device registration */
+static int __init hsi_platform_device_probe(struct platform_device *pd)
 {
 	struct hsi_platform_data *pdata = pd->dev.platform_data;
 	struct hsi_dev *hsi_ctrl;
@@ -473,7 +451,7 @@ static int __init hsi_probe(struct platform_device *pd)
 	int err;
 
 	dev_dbg(&pd->dev, "The platform device probed is an %s\n",
-			hsi_driver_device_is_hsi(pd) ? "HSI" : "SSI");
+		hsi_driver_device_is_hsi(pd) ? "HSI" : "SSI");
 
 	if (!pdata) {
 		pr_err(LOG_NAME "No platform_data found on hsi device\n");
@@ -495,8 +473,6 @@ static int __init hsi_probe(struct platform_device *pd)
 		goto rollback1;
 	}
 
-	clk_enable(hsi_ctrl->hsi_clk);
-
 	err = hsi_softreset(hsi_ctrl);
 	if (err < 0)
 		goto rollback2;
@@ -513,21 +489,24 @@ static int __init hsi_probe(struct platform_device *pd)
 	revision = hsi_inl(hsi_ctrl->base, HSI_SYS_REVISION_REG);
 	if (hsi_driver_device_is_hsi(pd))
 		dev_info(hsi_ctrl->dev, "HSI Hardware REVISION 0x%x\n",
-								revision);
+			 revision);
 	else
 		dev_info(hsi_ctrl->dev, "SSI Hardware REVISION %d.%d\n",
-					(revision & HSI_SSI_REV_MAJOR) >> 4,
-					(revision & HSI_SSI_REV_MINOR));
-
+			 (revision & HSI_SSI_REV_MAJOR) >> 4,
+			 (revision & HSI_SSI_REV_MINOR));
 
 	err = hsi_debug_add_ctrl(hsi_ctrl);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&pd->dev,
+			"Could not add hsi controller to debugfs: %d\n", err);
 		goto rollback2;
+	}
 
 	err = register_hsi_devices(hsi_ctrl);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&pd->dev, "Could not register hsi_devices: %d\n", err);
 		goto rollback3;
-
+	}
 	return err;
 
 rollback3:
@@ -539,25 +518,7 @@ rollback1:
 	return err;
 }
 
-static void __exit unregister_hsi_devices(struct hsi_dev *hsi_ctrl)
-{
-	struct hsi_port *hsi_p;
-	struct hsi_device *device;
-	unsigned int port;
-	unsigned int ch;
-
-	for (port = 0; port < hsi_ctrl->max_p; port++) {
-		hsi_p = &hsi_ctrl->hsi_port[port];
-		for (ch = 0; ch < hsi_p->max_ch; ch++) {
-			device = hsi_p->hsi_channel[ch].dev;
-			hsi_close(device);
-			device_unregister(&device->device);
-			kfree(device);
-		}
-	}
-}
-
-static int __exit hsi_remove(struct platform_device *pd)
+static int __exit hsi_platform_device_remove(struct platform_device *pd)
 {
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
 
@@ -574,50 +535,54 @@ static int __exit hsi_remove(struct platform_device *pd)
 
 int hsi_driver_device_is_hsi(struct platform_device *dev)
 {
-	const struct platform_device_id *id = platform_get_device_id(dev);
+	struct platform_device_id *id =
+	    (struct platform_device_id *)platform_get_device_id(dev);
 	return (id->driver_data == HSI_DRV_DEVICE_HSI);
 }
 
 /* List of devices supported by this driver */
 static struct platform_device_id hsi_id_table[] = {
-	{ "omap_hsi",	HSI_DRV_DEVICE_HSI },
-	{ "omap_ssi",	HSI_DRV_DEVICE_SSI },
-	{ },
+	{"omap_hsi", HSI_DRV_DEVICE_HSI},
+	{"omap_ssi", HSI_DRV_DEVICE_SSI},
+	{},
 };
+
 MODULE_DEVICE_TABLE(platform, hsi_id_table);
 
 static struct platform_driver hsi_pdriver = {
-	.probe = hsi_probe,
-	.remove = __exit_p(hsi_remove),
 	.driver = {
-		   .name = "omap_hsi",
+		   .name = HSI_MODULENAME,
 		   .owner = THIS_MODULE,
 		   },
-	.id_table = hsi_id_table
+	.id_table = hsi_id_table,
+	/* HSI_TODO : is it really needed,
+	 * as we already use platform_driver_probe() ?
+	 */
+	.probe = hsi_platform_device_probe,
+	.remove = __exit_p(hsi_platform_device_remove),
 };
 
+/* HSI bus and platform driver registration */
 static int __init hsi_driver_init(void)
 {
 	int err = 0;
 
 	pr_info("HSI DRIVER Version " HSI_DRIVER_VERSION "\n");
 
+	/* Register the (virtual) HSI bus */
 	hsi_bus_init();
 	err = hsi_debug_init();
 	if (err < 0) {
 		pr_err(LOG_NAME "HSI Debugfs failed %d\n", err);
 		goto rback1;
 	}
-	err = platform_driver_probe(&hsi_pdriver, hsi_probe);
+
+	/* Register the HSI platform driver */
+	err = platform_driver_probe(&hsi_pdriver, hsi_platform_device_probe);
 	if (err < 0) {
 		pr_err(LOG_NAME "Platform DRIVER register FAILED: %d\n", err);
 		goto rback2;
 	}
-
-	/* Set the CM_L3INIT_HSI_CLKCTRL to divide HSI_FCLK @192MHz by 2
-	 *  to make the HSI works even if the OPP50 is set
-	 * TODO : omap2_clk_set_parent() should be used */
-	omap_writel(0x01000001, 0X4A009338);
 
 	return 0;
 rback2:
@@ -639,8 +604,9 @@ static void __exit hsi_driver_exit(void)
 module_init(hsi_driver_init);
 module_exit(hsi_driver_exit);
 
-MODULE_ALIAS("platform:omap_hsi");
+MODULE_ALIAS("platform:" HSI_MODULENAME);
 MODULE_AUTHOR("Carlos Chinea / Nokia");
 MODULE_AUTHOR("Sebastien JAN / Texas Instruments");
+MODULE_AUTHOR("Djamil ELAIDI / Texas Instruments");
 MODULE_DESCRIPTION("MIPI High-speed Synchronous Serial Interface (HSI) Driver");
 MODULE_LICENSE("GPL");
