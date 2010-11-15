@@ -2257,9 +2257,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	struct omap_hsmmc_host *host = NULL;
 	struct resource *res;
 	int ret, irq;
-#ifdef ADMA
 	int ctrlr_caps;
-#endif
 
 	if (pdata == NULL) {
 		dev_err(&pdev->dev, "Platform Data is missing\n");
@@ -2295,7 +2293,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	host->mmc	= mmc;
 	host->pdata	= pdata;
 	host->dev	= &pdev->dev;
-	host->dma_type	= 0;
+	host->dma_type	= SDMA_XFER;
 	host->dev->dma_mask = &pdata->dma_mask;
 	host->dma_ch	= -1;
 	host->irq	= irq;
@@ -2382,7 +2380,6 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 							" clk failed\n");
 	}
 
-#ifdef ADMA
 	ctrlr_caps = OMAP_HSMMC_READ(host, CAPA);
 	if (ctrlr_caps & CAPA_ADMA_SUPPORT) {
 		/* FIXME: passing the device structure fails
@@ -2392,11 +2389,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 			ADMA_TABLE_SZ, &host->phy_adma_table, 0);
 		if (host->adma_table != NULL)
 			host->dma_type = ADMA_XFER;
-	} else {
-			host->dma_type = SDMA_XFER;
 	}
-#endif
-	host->dma_type = SDMA_XFER;
 
 	dev_dbg(mmc_dev(host->mmc), "DMA Mode=%d\n", host->dma_type);
 
