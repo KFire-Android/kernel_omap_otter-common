@@ -26,10 +26,10 @@
 struct bus_type hsi_bus_type;
 
 static ssize_t modalias_show(struct device *dev, struct device_attribute *a,
-								char *buf)
+			     char *buf)
 {
 	return snprintf(buf, PAGE_SIZE + 1, "%s%s\n", HSI_PREFIX,
-								dev_name(dev));
+			dev_name(dev));
 }
 
 static struct device_attribute hsi_dev_attrs[] = {
@@ -76,17 +76,25 @@ void hsi_bus_exit(void)
 	bus_unregister(&hsi_bus_type);
 }
 
-static int hsi_driver_probe(struct device *dev)
+static int hsi_bus_probe(struct device *dev)
 {
-	struct hsi_device_driver *drv = to_hsi_device_driver(dev->driver);
+	struct hsi_device_driver *drv;
+	int rc;
+
+	if (!dev->driver)
+		return 0;
+
+	drv = to_hsi_device_driver(dev->driver);
 
 	if (!drv->probe)
 		return -ENODEV;
 
-	return drv->probe(to_hsi_device(dev));
+	rc = drv->probe(to_hsi_device(dev));
+
+	return rc;
 }
 
-static int hsi_driver_remove(struct device *dev)
+static int hsi_bus_remove(struct device *dev)
 {
 	struct hsi_device_driver *drv;
 	int ret;
@@ -105,9 +113,9 @@ static int hsi_driver_remove(struct device *dev)
 	return ret;
 }
 
-static int hsi_driver_suspend(struct device *dev, pm_message_t mesg)
+static int hsi_bus_suspend(struct device *dev, pm_message_t mesg)
 {
-	struct hsi_device_driver *drv = to_hsi_device_driver(dev->driver);
+	struct hsi_device_driver *drv;
 
 	if (!dev->driver)
 		return 0;
@@ -119,7 +127,7 @@ static int hsi_driver_suspend(struct device *dev, pm_message_t mesg)
 	return drv->suspend(to_hsi_device(dev), mesg);
 }
 
-static int hsi_driver_resume(struct device *dev)
+static int hsi_bus_resume(struct device *dev)
 {
 	struct hsi_device_driver *drv;
 
@@ -138,10 +146,10 @@ struct bus_type hsi_bus_type = {
 	.dev_attrs	= hsi_dev_attrs,
 	.match		= hsi_bus_match,
 	.uevent		= hsi_bus_uevent,
-	.probe		= hsi_driver_probe,
-	.remove		= hsi_driver_remove,
-	.suspend	= hsi_driver_suspend,
-	.resume		= hsi_driver_resume,
+	.probe		= hsi_bus_probe,
+	.remove		= hsi_bus_remove,
+	.suspend	= hsi_bus_suspend,
+	.resume		= hsi_bus_resume,
 };
 
 /**
@@ -164,6 +172,7 @@ int hsi_register_driver(struct hsi_device_driver *driver)
 
 	return ret;
 }
+
 EXPORT_SYMBOL(hsi_register_driver);
 
 /**
@@ -179,4 +188,5 @@ void hsi_unregister_driver(struct hsi_device_driver *driver)
 
 	pr_debug("hsi: driver %s unregistered\n", driver->driver.name);
 }
+
 EXPORT_SYMBOL(hsi_unregister_driver);

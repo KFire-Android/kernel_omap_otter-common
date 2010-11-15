@@ -29,6 +29,8 @@
 #include <linux/list.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
+
 #include "hsi_driver.h"
 
 #define HSI_MODULENAME "omap_hsi"
@@ -378,6 +380,71 @@ static void __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 	}
 }
 
+void hsi_clocks_disable(struct device *dev)
+{
+	struct platform_device *pd = to_platform_device(dev);
+	int ret;
+
+	pr_info("HSI DRIVER CLK : hsi_clocks_disable for %s, device:0x%x",
+		pd->name, (unsigned int)dev);
+	/* HSI_TODO : this can probably be changed
+	 * to return pm_runtime_put(dev);
+	 */
+	ret = pm_runtime_put_sync(dev);
+	/*pr_info(", returns %d\n", ret);*/
+}
+
+int hsi_clocks_enable(struct device *dev)
+{
+	struct platform_device *pd = to_platform_device(dev);
+
+	pr_info("HSI DRIVER CLK : hsi_clocks_enable for %s, device:0x%x",
+		pd->name, (unsigned int)dev);
+	/* Calls platform_bus_type.pm->runtime_resume(dev)
+	 * which in turn calls :
+	 *  - omap_device_enable()
+	 *  - dev->driver->pm->runtime_resume(dev)
+	 */
+	return pm_runtime_get_sync(dev);
+}
+
+/**
+* hsi_clocks_disable_channel - virtual wrapper for disabling HSI clocks for
+* a given channel
+* @dev - reference to the hsi device.
+* @channel_number - channel number which requests clock to be disabled
+*
+* Note : there is no real HW clock management per HSI channel, this is only
+* virtual to keep track of active channels and ease debug
+*/
+void hsi_clocks_disable_channel(struct device *dev, u8 channel_number)
+{
+	int ret;
+
+	pr_info
+	    ("HSI DRIVER CLK : hsi_clocks_disable for channel %d, device:0x%x",
+	     channel_number, (unsigned int)dev);
+	ret = pm_runtime_put_sync(dev);
+	/*pr_info(", returns %d\n", ret);*/
+}
+
+/**
+* hsi_clocks_enable_channel - virtual wrapper for enabling HSI clocks for
+* a given channel
+* @dev - reference to the hsi device.
+* @channel_number - channel number which requests clock to be enabled
+*
+* Note : there is no real HW clock management per HSI channel, this is only
+* virtual to keep track of active channels and ease debug
+*/
+int hsi_clocks_enable_channel(struct device *dev, u8 channel_number)
+{
+	pr_info
+	    ("HSI DRIVER CLK : hsi_clocks_enable for channel %d, device:0x%x",
+	     channel_number, (unsigned int)dev);
+	return pm_runtime_get_sync(dev);
+}
+
 static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 					 struct platform_device *pd)
 {
@@ -473,6 +540,10 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 		goto rollback1;
 	}
 
+	pm_runtime_enable(hsi_ctrl->dev);
+	hsi_clocks_enable(hsi_ctrl->dev);
+	/* HSI_TODO : test the return values */
+
 	err = hsi_softreset(hsi_ctrl);
 	if (err < 0)
 		goto rollback2;
@@ -507,12 +578,20 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 		dev_err(&pd->dev, "Could not register hsi_devices: %d\n", err);
 		goto rollback3;
 	}
+
+	/* From here no need for HSI HW access */
+	hsi_clocks_disable(hsi_ctrl->dev);
+
 	return err;
 
 rollback3:
 	hsi_debug_remove_ctrl(hsi_ctrl);
 rollback2:
 	hsi_controller_exit(hsi_ctrl);
+
+	/* From here no need for HSI HW access */
+	hsi_clocks_disable(hsi_ctrl->dev);
+
 rollback1:
 	kfree(hsi_ctrl);
 	return err;
@@ -526,12 +605,109 @@ static int __exit hsi_platform_device_remove(struct platform_device *pd)
 		return 0;
 
 	unregister_hsi_devices(hsi_ctrl);
+
+	/* From here no need for HSI HW access */
+	pm_runtime_disable(hsi_ctrl->dev);
+
 	hsi_debug_remove_ctrl(hsi_ctrl);
 	hsi_controller_exit(hsi_ctrl);
+
 	kfree(hsi_ctrl);
 
 	return 0;
 }
+
+#ifdef CONFIG_SUSPEND
+static int hsi_suspend(struct device *dev)
+{
+	pr_info("HSI DRIVER : hsi_suspend\n");
+
+	/* HSI_TODO : missing the SUSPEND feature */
+
+	return 0;
+}
+
+static int hsi_resume(struct device *dev)
+{
+	pr_info("HSI DRIVER : hsi_resume\n");
+
+	/* HSI_TODO : missing the SUSPEND feature */
+
+	return 0;
+}
+#endif /* CONFIG_PM_SUSPEND */
+
+#ifdef CONFIG_PM_RUNTIME
+/**
+* hsi_runtime_resume - executed by the PM core for the bus type of the device being woken up
+* @dev - reference to the hsi device.
+*
+*
+*/
+static int hsi_runtime_resume(struct device *dev)
+{
+	pr_info("HSI DRIVER : hsi_runtime_resume\n");
+	dev_dbg(dev, "%s\n", __func__);
+	/* Restore context */
+
+	/* HSI device is now fully operational and _must_ be able to */
+	/* complete I/O operations */
+
+	/* HSI_TODO : missing the runtime resume feature */
+
+	return 0;
+}
+
+/**
+* hsi_runtime_suspend - Prepare HSI for low power : device will not process data and will
+    not communicate with the CPU
+* @dev - reference to the hsi device.
+*
+* Return value : -EBUSY or -EAGAIN if device is busy and still operational
+*
+*/
+static int hsi_runtime_suspend(struct device *dev)
+{
+	pr_info("HSI DRIVER : hsi_runtime_suspend\n");
+	dev_dbg(dev, "%s\n", __func__);
+	/* Save context */
+
+	/* HSI is now ready to be put in low power state */
+
+	/* HSI_TODO : missing the runtime suspend feature */
+
+	return 0;
+}
+
+/* Based on counters, device appears to be idle.
+ * Check if the device can be suspended & queue up
+ * a suspend request for the device in that case.
+ */
+static int hsi_runtime_idle(struct device *dev)
+{
+	struct platform_device *pd = to_platform_device(dev);
+	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+	int port, ch, ret;
+
+	pr_info("HSI DRIVER : hsi_runtime_idle\n");
+
+	for (port = 0; port < hsi_ctrl->max_p; port++)
+		for (ch = 0; ch < hsi_ctrl->hsi_port[port].max_ch; ch++)
+			if (hsi_is_channel_busy
+			    (&hsi_ctrl->hsi_port[port].hsi_channel[ch])) {
+				pr_info("HSI DRIVER : hsi_runtime_idle, channel %d busy\n", ch);
+				dev_dbg(dev, "%s [-EBUSY]\n", __func__);
+				return -EBUSY;
+			}
+	/* HSI_TODO : check also the interrupt status registers.*/
+
+	ret = pm_runtime_suspend(dev);
+	dev_dbg(dev, "%s [%d]\n", __func__, ret);
+
+	return 0;
+}
+
+#endif /* CONFIG_PM_RUNTIME */
 
 int hsi_driver_device_is_hsi(struct platform_device *dev)
 {
@@ -549,10 +725,34 @@ static struct platform_device_id hsi_id_table[] = {
 
 MODULE_DEVICE_TABLE(platform, hsi_id_table);
 
+#ifdef CONFIG_PM
+static const struct dev_pm_ops hsi_driver_pm_ops = {
+#ifdef CONFIG_SUSPEND
+	.suspend = hsi_suspend,
+	.resume = hsi_resume,
+#endif
+#ifdef CONFIG_PM_RUNTIME
+	.runtime_suspend = hsi_runtime_suspend,
+	.runtime_resume = hsi_runtime_resume,
+	.runtime_idle = hsi_runtime_idle,
+#endif
+};
+
+#define HSI_DRIVER_PM_OPS_PTR (&hsi_driver_pm_ops)
+
+#else /* !CONFIG_PM */
+
+#define HSI_DRIVER_PM_OPS_PTR NULL
+
+#endif
+
 static struct platform_driver hsi_pdriver = {
 	.driver = {
 		   .name = HSI_MODULENAME,
 		   .owner = THIS_MODULE,
+#ifdef CONFIG_PM
+		   .pm = HSI_DRIVER_PM_OPS_PTR,
+#endif
 		   },
 	.id_table = hsi_id_table,
 	/* HSI_TODO : is it really needed,

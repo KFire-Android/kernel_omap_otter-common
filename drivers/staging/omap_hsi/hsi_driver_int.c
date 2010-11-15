@@ -34,26 +34,37 @@ void hsi_reset_ch_write(struct hsi_channel *ch)
 	ch->write_data.lch = -1;
 }
 
-int hsi_driver_write_interrupt(struct hsi_channel *ch, u32 *data)
+/* Check if a data transfer (Read or Write) is
+ * ongoing for a given HSI channel
+ */
+bool hsi_is_channel_busy(struct hsi_channel *ch)
+{
+	if ((ch->write_data.addr == NULL) && (ch->read_data.addr == NULL))
+		return false;
+
+	return true;
+}
+
+int hsi_driver_write_interrupt(struct hsi_channel *ch, u32 * data)
 {
 	struct hsi_port *p = ch->hsi_port;
 	unsigned int port = p->port_number;
 	unsigned int channel = ch->channel_number;
 
 	hsi_outl_or(HSI_HST_DATAACCEPT(channel), p->hsi_controller->base,
-			HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
+		    HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 
 	return 0;
 }
 
-int hsi_driver_read_interrupt(struct hsi_channel *ch, u32 *data)
+int hsi_driver_read_interrupt(struct hsi_channel *ch, u32 * data)
 {
 	struct hsi_port *p = ch->hsi_port;
 	unsigned int port = p->port_number;
 	unsigned int channel = ch->channel_number;
 
 	hsi_outl_or(HSI_HSR_DATAAVAILABLE(channel), p->hsi_controller->base,
-			HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
+		    HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 
 	return 0;
 }
@@ -68,21 +79,21 @@ void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
 	long buff_offset;
 
 	enable = hsi_inl(base,
-			HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
+			 HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 
 	if (!(enable & HSI_HST_DATAACCEPT(channel))) {
 		dev_dbg(&ch->dev->device, LOG_NAME "Write cancel on not "
-		"enabled channel %d ENABLE REG 0x%08X", channel, enable);
+			"enabled channel %d ENABLE REG 0x%08X", channel,
+			enable);
 		return;
 	}
 
 	hsi_outl_and(~HSI_HST_DATAACCEPT(channel), base,
-			HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
+		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 
 	buff_offset = hsi_hst_bufstate_f_reg(p->hsi_controller, port, channel);
 	if (buff_offset >= 0)
-		hsi_outl_and(~HSI_BUFSTATE_CHANNEL(channel), base,
-								buff_offset);
+		hsi_outl_and(~HSI_BUFSTATE_CHANNEL(channel), base, buff_offset);
 
 	hsi_reset_ch_write(ch);
 }
@@ -95,7 +106,7 @@ void hsi_driver_disable_read_interrupt(struct hsi_channel *ch)
 	void __iomem *base = p->hsi_controller->base;
 
 	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
-			HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
+		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 }
 
 void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
@@ -106,7 +117,7 @@ void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
 	void __iomem *base = p->hsi_controller->base;
 
 	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
-			HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
+		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 
 	hsi_reset_ch_read(ch);
 }
@@ -128,10 +139,10 @@ static void do_channel_tx(struct hsi_channel *ch)
 
 	if (ch->write_data.addr == NULL) {
 		hsi_outl_and(~HSI_HST_DATAACCEPT(n_ch), base,
-				HSI_SYS_MPU_ENABLE_CH_REG(n_p, irq, n_ch));
+			     HSI_SYS_MPU_ENABLE_CH_REG(n_p, irq, n_ch));
 		hsi_reset_ch_write(ch);
 		spin_unlock(&hsi_ctrl->lock);
-		(*ch->write_done)(ch->dev, 1);
+		(*ch->write_done) (ch->dev, 1);
 	} else {
 		buff_offset = hsi_hst_buffer_reg(hsi_ctrl, n_p, n_ch);
 		if (buff_offset >= 0) {
@@ -171,17 +182,18 @@ static void do_channel_rx(struct hsi_channel *ch)
 	}
 
 	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(n_ch), base,
-				HSI_SYS_MPU_ENABLE_CH_REG(n_p, irq, n_ch));
+		     HSI_SYS_MPU_ENABLE_CH_REG(n_p, irq, n_ch));
 	hsi_reset_ch_read(ch);
 
 	spin_unlock(&hsi_ctrl->lock);
 
 	if (rx_poll)
 		hsi_port_event_handler(ch->hsi_port,
-				HSI_EVENT_HSR_DATAAVAILABLE, (void *)n_ch);
+				       HSI_EVENT_HSR_DATAAVAILABLE,
+				       (void *)n_ch);
 
 	if (data_read)
-		(*ch->read_done)(ch->dev, 1);
+		(*ch->read_done) (ch->dev, 1);
 }
 
 /**
@@ -195,8 +207,9 @@ static void do_channel_rx(struct hsi_channel *ch)
  * This function calls the related processing functions and triggered events
 */
 static void hsi_driver_int_proc(struct hsi_port *pport,
-		unsigned long status_offset, unsigned long enable_offset,
-		unsigned int start, unsigned int stop)
+				unsigned long status_offset,
+				unsigned long enable_offset, unsigned int start,
+				unsigned int stop)
 {
 	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
 	void __iomem *base = hsi_ctrl->base;
@@ -232,9 +245,9 @@ static void hsi_driver_int_proc(struct hsi_port *pport,
 	if (status_reg & HSI_ERROROCCURED) {
 		hsr_err_reg = hsi_inl(base, HSI_HSR_ERROR_REG(port));
 		dev_err(hsi_ctrl->dev, "HSI ERROR Port %d: 0x%x\n",
-							port, hsr_err_reg);
+			port, hsr_err_reg);
 		hsi_outl(hsr_err_reg, base, HSI_HSR_ERRORACK_REG(port));
-		if (hsr_err_reg) /* ignore spurious errors */
+		if (hsr_err_reg)	/* ignore spurious errors */
 			hsi_port_event_handler(pport, HSI_EVENT_ERROR, NULL);
 		else
 			dev_dbg(hsi_ctrl->dev, "Spurious HSI error!\n");
@@ -256,23 +269,23 @@ static void do_hsi_tasklet(unsigned long hsi_port)
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
 
 	hsi_driver_int_proc(pport,
-			HSI_SYS_MPU_STATUS_REG(port, irq),
-			HSI_SYS_MPU_ENABLE_REG(port, irq),
-			0, min(pport->max_ch, (u8) HSI_SSI_CHANNELS_MAX));
+			    HSI_SYS_MPU_STATUS_REG(port, irq),
+			    HSI_SYS_MPU_ENABLE_REG(port, irq),
+			    0, min(pport->max_ch, (u8) HSI_SSI_CHANNELS_MAX));
 
 	if (pport->max_ch > HSI_SSI_CHANNELS_MAX)
 		hsi_driver_int_proc(pport,
-				HSI_SYS_MPU_U_STATUS_REG(port, irq),
-				HSI_SYS_MPU_U_ENABLE_REG(port, irq),
-				HSI_SSI_CHANNELS_MAX, pport->max_ch);
+				    HSI_SYS_MPU_U_STATUS_REG(port, irq),
+				    HSI_SYS_MPU_U_ENABLE_REG(port, irq),
+				    HSI_SSI_CHANNELS_MAX, pport->max_ch);
 
 	status_reg = hsi_inl(base, HSI_SYS_MPU_STATUS_REG(port, irq)) &
-			hsi_inl(base, HSI_SYS_MPU_ENABLE_REG(port, irq));
+	    hsi_inl(base, HSI_SYS_MPU_ENABLE_REG(port, irq));
 
 	if (hsi_driver_device_is_hsi(pd))
 		status_reg |=
-			(hsi_inl(base, HSI_SYS_MPU_U_STATUS_REG(port, irq)) &
-			hsi_inl(base, HSI_SYS_MPU_U_ENABLE_REG(port, irq)));
+		    (hsi_inl(base, HSI_SYS_MPU_U_STATUS_REG(port, irq)) &
+		     hsi_inl(base, HSI_SYS_MPU_U_ENABLE_REG(port, irq)));
 
 	if (status_reg)
 		tasklet_hi_schedule(&pport->hsi_tasklet);
@@ -294,10 +307,9 @@ int __init hsi_mpu_init(struct hsi_port *hsi_p, const char *irq_name)
 {
 	int err;
 
-	tasklet_init(&hsi_p->hsi_tasklet, do_hsi_tasklet,
-							(unsigned long)hsi_p);
+	tasklet_init(&hsi_p->hsi_tasklet, do_hsi_tasklet, (unsigned long)hsi_p);
 	err = request_irq(hsi_p->irq, hsi_mpu_handler, IRQF_DISABLED,
-							irq_name, hsi_p);
+			  irq_name, hsi_p);
 	if (err < 0) {
 		dev_err(hsi_p->hsi_controller->dev, "FAILED to MPU request"
 			" IRQ (%d) on port %d", hsi_p->irq, hsi_p->port_number);

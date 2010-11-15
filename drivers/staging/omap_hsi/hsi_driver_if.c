@@ -41,7 +41,8 @@ int hsi_set_rx_divisor(struct hsi_port *sport, u32 divisor)
 		if (divisor == HSI_HSR_DIVISOR_AUTO && sport->counters_on) {
 			/* auto mode: deactivate counters + set divisor = 0 */
 			sport->reg_counters = hsi_inl(base,
-						HSI_HSR_COUNTERS_REG(port));
+						      HSI_HSR_COUNTERS_REG
+						      (port));
 			sport->counters_on = 0;
 			hsi_outl(0, base, HSI_HSR_COUNTERS_REG(port));
 			hsi_outl(0, base, HSI_HSR_DIVISOR_REG(port));
@@ -51,10 +52,11 @@ int hsi_set_rx_divisor(struct hsi_port *sport, u32 divisor)
 			if (!sport->counters_on) {
 				/* Leave auto mode: restore counters */
 				hsi_outl(sport->reg_counters, base,
-						HSI_HSR_COUNTERS_REG(port));
+					 HSI_HSR_COUNTERS_REG(port));
 				sport->counters_on = 1;
 				dev_dbg(hsi_ctrl->dev, "Left HSR auto mode. "
-				"Counters=0x%lx\n", sport->reg_counters);
+					"Counters=0x%lx\n",
+					sport->reg_counters);
 			}
 			hsi_outl(divisor, base, HSI_HSR_DIVISOR_REG(port));
 		}
@@ -62,18 +64,19 @@ int hsi_set_rx_divisor(struct hsi_port *sport, u32 divisor)
 		if (divisor == HSI_HSR_DIVISOR_AUTO && sport->counters_on) {
 			/* auto mode: deactivate timeout */
 			sport->reg_counters = hsi_inl(base,
-						HSI_HSR_COUNTERS_REG(port));
+						      HSI_HSR_COUNTERS_REG
+						      (port));
 			sport->counters_on = 0;
 			hsi_outl(0, base, HSI_HSR_COUNTERS_REG(port));
 			dev_dbg(hsi_ctrl->dev, "Deactivated SSR timeout\n");
 		} else if (divisor == HSI_SSR_DIVISOR_USE_TIMEOUT &&
-							!sport->counters_on){
+			   !sport->counters_on) {
 			/* Leave auto mode: restore timeout */
 			hsi_outl(sport->reg_counters, base,
-					HSI_HSR_COUNTERS_REG(port));
+				 HSI_HSR_COUNTERS_REG(port));
 			sport->counters_on = 1;
 			dev_dbg(hsi_ctrl->dev, "Re-activated SSR timeout; "
-					"timeout=0x%lx\n", sport->reg_counters);
+				"timeout=0x%lx\n", sport->reg_counters);
 		}
 	}
 
@@ -88,45 +91,41 @@ int hsi_set_rx(struct hsi_port *sport, struct hsr_ctx *cfg)
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 
 	if (((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_STREAM) &&
-		((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_FRAME) &&
-		((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_SLEEP) &&
-		(cfg->mode != NOT_SET))
+	    ((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_FRAME) &&
+	    ((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_SLEEP) &&
+	    (cfg->mode != NOT_SET))
 		return -EINVAL;
 
 	if (hsi_driver_device_is_hsi(pdev)) {
-		if (
-		((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_SYNCHRONIZED) &&
-		((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_PIPELINED) &&
-			(cfg->flow != NOT_SET))
+		if (((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_SYNCHRONIZED)
+		    && ((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_PIPELINED)
+		    && (cfg->flow != NOT_SET))
 			return -EINVAL;
 	} else {
-		if (
-		((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_SYNCHRONIZED) &&
-			(cfg->flow != NOT_SET))
+		if (((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_SYNCHRONIZED)
+		    && (cfg->flow != NOT_SET))
 			return -EINVAL;
 	}
 
 	if ((cfg->frame_size > HSI_FRAMESIZE_MAX) &&
-		(cfg->frame_size != NOT_SET))
+	    (cfg->frame_size != NOT_SET))
 		return -EINVAL;
 
 	if ((cfg->channels == 0) ||
-		((cfg->channels > sport->max_ch) &&
-			(cfg->channels != NOT_SET)))
+	    ((cfg->channels > sport->max_ch) && (cfg->channels != NOT_SET)))
 		return -EINVAL;
 
 	if (hsi_driver_device_is_hsi(pdev)) {
 		if ((cfg->divisor > HSI_MAX_RX_DIVISOR) &&
-			(cfg->divisor != HSI_HSR_DIVISOR_AUTO) &&
-			(cfg->divisor != NOT_SET))
+		    (cfg->divisor != HSI_HSR_DIVISOR_AUTO) &&
+		    (cfg->divisor != NOT_SET))
 			return -EINVAL;
 	}
 
-	if ((cfg->mode != NOT_SET) &&
-		(cfg->flow != NOT_SET))
+	if ((cfg->mode != NOT_SET) && (cfg->flow != NOT_SET))
 		hsi_outl(cfg->mode | ((cfg->flow & HSI_FLOW_VAL_MASK)
-						<< HSI_FLOW_OFFSET), base,
-						HSI_HSR_MODE_REG(port));
+				      << HSI_FLOW_OFFSET), base,
+			 HSI_HSR_MODE_REG(port));
 
 	if (cfg->frame_size != NOT_SET)
 		hsi_outl(cfg->frame_size, base, HSI_HSR_FRAMESIZE_REG(port));
@@ -136,7 +135,7 @@ int hsi_set_rx(struct hsi_port *sport, struct hsr_ctx *cfg)
 			return -EINVAL;
 		else
 			hsi_outl(cfg->channels, base,
-						HSI_HSR_CHANNELS_REG(port));
+				 HSI_HSR_CHANNELS_REG(port));
 	}
 
 	return hsi_set_rx_divisor(sport, cfg->divisor);
@@ -151,7 +150,7 @@ void hsi_get_rx(struct hsi_port *sport, struct hsr_ctx *cfg)
 
 	cfg->mode = hsi_inl(base, HSI_HSR_MODE_REG(port)) & HSI_MODE_VAL_MASK;
 	cfg->flow = (hsi_inl(base, HSI_HSR_MODE_REG(port)) & HSI_FLOW_VAL_MASK)
-							>> HSI_FLOW_OFFSET;
+	    >> HSI_FLOW_OFFSET;
 	cfg->frame_size = hsi_inl(base, HSI_HSR_FRAMESIZE_REG(port));
 	cfg->channels = hsi_inl(base, HSI_HSR_CHANNELS_REG(port));
 	if (hsi_driver_device_is_hsi(pdev))
@@ -165,48 +164,43 @@ int hsi_set_tx(struct hsi_port *sport, struct hst_ctx *cfg)
 	int port = sport->port_number;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 	unsigned int max_divisor = hsi_driver_device_is_hsi(pdev) ?
-				HSI_MAX_TX_DIVISOR : HSI_SSI_MAX_TX_DIVISOR;
+	    HSI_MAX_TX_DIVISOR : HSI_SSI_MAX_TX_DIVISOR;
 
 	if (((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_STREAM) &&
-		((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_FRAME) &&
-		(cfg->mode != NOT_SET))
+	    ((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_FRAME) &&
+	    (cfg->mode != NOT_SET))
 		return -EINVAL;
 
 	if (hsi_driver_device_is_hsi(pdev)) {
-		if (
-		((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_SYNCHRONIZED) &&
-		((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_PIPELINED) &&
-			(cfg->flow != NOT_SET))
+		if (((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_SYNCHRONIZED)
+		    && ((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_PIPELINED)
+		    && (cfg->flow != NOT_SET))
 			return -EINVAL;
 	} else {
-		if (
-		((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_SYNCHRONIZED) &&
-			(cfg->flow != NOT_SET))
+		if (((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_SYNCHRONIZED)
+		    && (cfg->flow != NOT_SET))
 			return -EINVAL;
 	}
 
 	if ((cfg->frame_size > HSI_FRAMESIZE_MAX) &&
-		(cfg->frame_size != NOT_SET))
+	    (cfg->frame_size != NOT_SET))
 		return -EINVAL;
 
 	if ((cfg->channels == 0) ||
-		((cfg->channels > sport->max_ch) &&
-			(cfg->channels != NOT_SET)))
+	    ((cfg->channels > sport->max_ch) && (cfg->channels != NOT_SET)))
 		return -EINVAL;
 
 	if ((cfg->divisor > max_divisor) && (cfg->divisor != NOT_SET))
 		return -EINVAL;
 
 	if ((cfg->arb_mode != HSI_ARBMODE_ROUNDROBIN) &&
-		(cfg->arb_mode != HSI_ARBMODE_PRIORITY) &&
-		(cfg->mode != NOT_SET))
+	    (cfg->arb_mode != HSI_ARBMODE_PRIORITY) && (cfg->mode != NOT_SET))
 		return -EINVAL;
 
-	if ((cfg->mode != NOT_SET) &&
-		(cfg->flow != NOT_SET))
+	if ((cfg->mode != NOT_SET) && (cfg->flow != NOT_SET))
 		hsi_outl(cfg->mode | ((cfg->flow & HSI_FLOW_VAL_MASK) <<
-				HSI_FLOW_OFFSET) | HSI_MODE_WAKE_CTRL_SW,
-				base, HSI_HST_MODE_REG(port));
+				      HSI_FLOW_OFFSET) | HSI_MODE_WAKE_CTRL_SW,
+			 base, HSI_HST_MODE_REG(port));
 
 	if (cfg->frame_size != NOT_SET)
 		hsi_outl(cfg->frame_size, base, HSI_HST_FRAMESIZE_REG(port));
@@ -216,7 +210,7 @@ int hsi_set_tx(struct hsi_port *sport, struct hst_ctx *cfg)
 			return -EINVAL;
 		else
 			hsi_outl(cfg->channels, base,
-						HSI_HST_CHANNELS_REG(port));
+				 HSI_HST_CHANNELS_REG(port));
 	}
 
 	if (cfg->divisor != NOT_SET)
@@ -230,17 +224,17 @@ int hsi_set_tx(struct hsi_port *sport, struct hst_ctx *cfg)
 
 void hsi_get_tx(struct hsi_port *sport, struct hst_ctx *cfg)
 {
-    struct hsi_dev *hsi_ctrl = sport->hsi_controller;
-    void __iomem *base = hsi_ctrl->base;
-    int port = sport->port_number;
+	struct hsi_dev *hsi_ctrl = sport->hsi_controller;
+	void __iomem *base = hsi_ctrl->base;
+	int port = sport->port_number;
 
-    cfg->mode = hsi_inl(base, HSI_HST_MODE_REG(port)) & HSI_MODE_VAL_MASK;
-    cfg->flow = (hsi_inl(base, HSI_HST_MODE_REG(port)) & HSI_FLOW_VAL_MASK)
-							>> HSI_FLOW_OFFSET;
-    cfg->frame_size = hsi_inl(base, HSI_HST_FRAMESIZE_REG(port));
-    cfg->channels = hsi_inl(base, HSI_HST_CHANNELS_REG(port));
-    cfg->divisor = hsi_inl(base, HSI_HST_DIVISOR_REG(port));
-    cfg->arb_mode = hsi_inl(base, HSI_HST_ARBMODE_REG(port));
+	cfg->mode = hsi_inl(base, HSI_HST_MODE_REG(port)) & HSI_MODE_VAL_MASK;
+	cfg->flow = (hsi_inl(base, HSI_HST_MODE_REG(port)) & HSI_FLOW_VAL_MASK)
+	    >> HSI_FLOW_OFFSET;
+	cfg->frame_size = hsi_inl(base, HSI_HST_FRAMESIZE_REG(port));
+	cfg->channels = hsi_inl(base, HSI_HST_CHANNELS_REG(port));
+	cfg->divisor = hsi_inl(base, HSI_HST_DIVISOR_REG(port));
+	cfg->arb_mode = hsi_inl(base, HSI_HST_ARBMODE_REG(port));
 }
 
 /**
@@ -263,27 +257,34 @@ int hsi_open(struct hsi_device *dev)
 	ch = dev->ch;
 	if (!ch->read_done || !ch->write_done) {
 		dev_err(&dev->device, "Trying to open with no (read/write) "
-						"callbacks registered\n");
+			"callbacks registered\n");
 		return -EINVAL;
 	}
 	port = ch->hsi_port;
 	hsi_ctrl = port->hsi_controller;
+
+	hsi_clocks_enable_channel(dev->device.parent, ch->channel_number);
+
 	spin_lock_bh(&hsi_ctrl->lock);
 	if (ch->flags & HSI_CH_OPEN) {
 		dev_err(&dev->device, "Port %d Channel %d already OPENED\n",
-							dev->n_p, dev->n_ch);
+			dev->n_p, dev->n_ch);
 		spin_unlock_bh(&hsi_ctrl->lock);
 		return -EBUSY;
 	}
-	clk_enable(hsi_ctrl->hsi_clk);
+
 	ch->flags |= HSI_CH_OPEN;
 
-	hsi_outl_or(HSI_ERROROCCURED | HSI_BREAKDETECTED, hsi_ctrl->base,
-		HSI_SYS_MPU_ENABLE_REG(port->port_number, port->n_irq));
+	hsi_outl_or(HSI_CAWAKEDETECTED | HSI_ERROROCCURED | HSI_BREAKDETECTED,
+		    hsi_ctrl->base, HSI_SYS_MPU_ENABLE_REG(port->port_number,
+							   port->n_irq));
 	/* NOTE: error and break are port events and do not need to be
 	 * enabled for HSI extended enable register */
 
 	spin_unlock_bh(&hsi_ctrl->lock);
+
+	/* Cut the clocks and wait for ACWAKE change */
+	hsi_clocks_disable_channel(dev->device.parent, ch->channel_number);
 
 	return 0;
 }
@@ -300,7 +301,7 @@ EXPORT_SYMBOL(hsi_open);
  * Transfer is only completed when the write_done callback is called.
  *
  */
-int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size)
+int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 {
 	struct hsi_channel *ch;
 	int err;
@@ -347,7 +348,7 @@ EXPORT_SYMBOL(hsi_write);
  * Data is only available in the buffer when the read_done callback is called.
  *
  */
-int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
+int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 {
 	struct hsi_channel *ch;
 	int err;
@@ -388,8 +389,8 @@ void __hsi_write_cancel(struct hsi_channel *ch)
 		hsi_driver_cancel_write_interrupt(ch);
 	else if (ch->write_data.size > 1)
 		hsi_driver_cancel_write_dma(ch);
-
 }
+
 /**
  * hsi_write_cancel - Cancel pending write request.
  * @dev - hsi device channel where to cancel the pending write.
@@ -407,9 +408,13 @@ void hsi_write_cancel(struct hsi_device *dev)
 		return;
 	}
 
+	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
+
 	spin_lock_bh(&dev->ch->hsi_port->hsi_controller->lock);
 	__hsi_write_cancel(dev->ch);
 	spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
+
+	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number);
 }
 EXPORT_SYMBOL(hsi_write_cancel);
 
@@ -439,17 +444,20 @@ void hsi_read_cancel(struct hsi_device *dev)
 		return;
 	}
 
+	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
+
 	spin_lock_bh(&dev->ch->hsi_port->hsi_controller->lock);
 	__hsi_read_cancel(dev->ch);
 	spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
 
+	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number);
 }
 EXPORT_SYMBOL(hsi_read_cancel);
 
 /**
  * hsi_poll - HSI poll
  * @dev - hsi device channel reference to apply the I/O control
- * 						(or port associated to it)
+ *						(or port associated to it)
  *
  * Return 0 on sucess, a negative value on failure.
  *
@@ -457,6 +465,7 @@ EXPORT_SYMBOL(hsi_read_cancel);
 int hsi_poll(struct hsi_device *dev)
 {
 	struct hsi_channel *ch;
+	struct hsi_dev *hsi_ctrl = dev->ch->hsi_port->hsi_controller;
 	int err;
 
 	if (unlikely(!dev || !dev->ch))
@@ -468,20 +477,28 @@ int hsi_poll(struct hsi_device *dev)
 	}
 
 	ch = dev->ch;
-	spin_lock_bh(&ch->hsi_port->hsi_controller->lock);
+
+	/* Safety : enable the clocks */
+	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
+
+	spin_lock_bh(&hsi_ctrl->lock);
 	ch->flags |= HSI_CH_RX_POLL;
+
 	err = hsi_driver_read_interrupt(ch, NULL);
-	spin_unlock_bh(&ch->hsi_port->hsi_controller->lock);
+
+	spin_unlock_bh(&hsi_ctrl->lock);
+
+	/* Cut the clocks */
+	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number);
 
 	return err;
 }
 EXPORT_SYMBOL(hsi_poll);
 
-
 /**
  * hsi_ioctl - HSI I/O control
  * @dev - hsi device channel reference to apply the I/O control
- * 						(or port associated to it)
+ *						(or port associated to it)
  * @command - HSI I/O control command
  * @arg - parameter associated to the control command. NULL, if no parameter.
  *
@@ -498,10 +515,10 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	int err = 0;
 
 	if (unlikely((!dev) ||
-		(!dev->ch) ||
-		(!dev->ch->hsi_port) ||
-		(!dev->ch->hsi_port->hsi_controller)) ||
-		(!(dev->ch->flags & HSI_CH_OPEN))) {
+		     (!dev->ch) ||
+		     (!dev->ch->hsi_port) ||
+		     (!dev->ch->hsi_port->hsi_controller)) ||
+	    (!(dev->ch->flags & HSI_CH_OPEN))) {
 		pr_err(LOG_NAME "HSI IOCTL Invalid parameter\n");
 		return -EINVAL;
 	}
@@ -511,7 +528,6 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	port = ch->hsi_port->port_number;
 	channel = ch->channel_number;
 	base = hsi_ctrl->base;
-	clk_enable(hsi_ctrl->hsi_clk);
 
 	switch (command) {
 	case HSI_IOCTL_WAKE_UP:
@@ -519,14 +535,14 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		wake = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		if (!(wake & HSI_WAKE(channel))) {
 			hsi_outl(HSI_WAKE(channel), base,
-					HSI_SYS_SET_WAKE_REG(port));
+				 HSI_SYS_SET_WAKE_REG(port));
 		}
 		break;
 	case HSI_IOCTL_WAKE_DOWN:
 		wake = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		if ((wake & HSI_WAKE(channel))) {
 			hsi_outl(HSI_WAKE(channel), base,
-						HSI_SYS_CLEAR_WAKE_REG(port));
+				 HSI_SYS_CLEAR_WAKE_REG(port));
 		}
 		break;
 	case HSI_IOCTL_SEND_BREAK:
@@ -536,13 +552,21 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		if (arg == NULL)
 			err = -EINVAL;
 		else
-			*(u32 *)arg = hsi_inl(base, HSI_SYS_WAKE_REG(port));
+			*(u32 *) arg = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		break;
 	case HSI_IOCTL_FLUSH_RX:
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
 		hsi_outl(0, base, HSI_HSR_RXSTATE_REG(port));
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
 		break;
 	case HSI_IOCTL_FLUSH_TX:
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
 		hsi_outl(0, base, HSI_HST_TXSTATE_REG(port));
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
 		break;
 	case HSI_IOCTL_CAWAKE:
 		if (!arg) {
@@ -553,35 +577,63 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			err = -ENODEV;
 			goto out;
 		}
-		*(unsigned int *)arg = hsi_cawake(dev->ch->hsi_port);
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
+		*(unsigned int *)arg = hsi_get_cawake(dev->ch->hsi_port);
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
 		break;
 	case HSI_IOCTL_SET_RX:
 		if (!arg) {
 			err = -EINVAL;
 			goto out;
 		}
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
+		spin_lock_bh(&hsi_ctrl->lock);
 		err = hsi_set_rx(dev->ch->hsi_port, (struct hsr_ctx *)arg);
+		spin_unlock_bh(&hsi_ctrl->lock);
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
 		break;
 	case HSI_IOCTL_GET_RX:
 		if (!arg) {
 			err = -EINVAL;
 			goto out;
 		}
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
+		spin_lock_bh(&hsi_ctrl->lock);
 		hsi_get_rx(dev->ch->hsi_port, (struct hsr_ctx *)arg);
+		spin_unlock_bh(&hsi_ctrl->lock);
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
 		break;
 	case HSI_IOCTL_SET_TX:
 		if (!arg) {
 			err = -EINVAL;
 			goto out;
 		}
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
+		spin_lock_bh(&hsi_ctrl->lock);
 		err = hsi_set_tx(dev->ch->hsi_port, (struct hst_ctx *)arg);
+		spin_unlock_bh(&hsi_ctrl->lock);
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
 		break;
 	case HSI_IOCTL_GET_TX:
 		if (!arg) {
 			err = -EINVAL;
 			goto out;
 		}
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
+		spin_lock_bh(&hsi_ctrl->lock);
 		hsi_get_tx(dev->ch->hsi_port, (struct hst_ctx *)arg);
+		spin_unlock_bh(&hsi_ctrl->lock);
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
 		break;
 	default:
 		err = -ENOIOCTLCMD;
@@ -591,6 +643,7 @@ out:
 
 	return err;
 }
+
 EXPORT_SYMBOL(hsi_ioctl);
 
 /**
@@ -604,13 +657,17 @@ void hsi_close(struct hsi_device *dev)
 		return;
 	}
 
-	spin_lock_bh(&dev->ch->hsi_port->hsi_controller->lock);
+	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
+
+	spin_lock_bh(&hsi_ctrl->lock);
 	if (dev->ch->flags & HSI_CH_OPEN) {
 		dev->ch->flags &= ~HSI_CH_OPEN;
 		__hsi_write_cancel(dev->ch);
 		__hsi_read_cancel(dev->ch);
 	}
-	spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
+	spin_unlock_bh(&hsi_ctrl->lock);
+
+	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number);
 }
 EXPORT_SYMBOL(hsi_close);
 
@@ -622,7 +679,8 @@ EXPORT_SYMBOL(hsi_close);
  * NOTE: Write callback must be only set when channel is not open !
  */
 void hsi_set_read_cb(struct hsi_device *dev,
-		void (*read_cb)(struct hsi_device *dev, unsigned int size))
+		     void (*read_cb) (struct hsi_device *dev,
+				      unsigned int size))
 {
 	dev->ch->read_done = read_cb;
 }
@@ -636,7 +694,8 @@ EXPORT_SYMBOL(hsi_set_read_cb);
  * NOTE: Read callback must be only set when channel is not open !
  */
 void hsi_set_write_cb(struct hsi_device *dev,
-		void (*write_cb)(struct hsi_device *dev, unsigned int size))
+		      void (*write_cb) (struct hsi_device *dev,
+					unsigned int size))
 {
 	dev->ch->write_done = write_cb;
 }
@@ -648,8 +707,9 @@ EXPORT_SYMBOL(hsi_set_write_cb);
  * @port_event_cb - callback to signal events from the channel port.
  */
 void hsi_set_port_event_cb(struct hsi_device *dev,
-				void (*port_event_cb)(struct hsi_device *dev,
-						unsigned int event, void *arg))
+			   void (*port_event_cb) (struct hsi_device *dev,
+						  unsigned int event,
+						  void *arg))
 {
 	write_lock_bh(&dev->ch->rw_lock);
 	dev->ch->port_event = port_event_cb;

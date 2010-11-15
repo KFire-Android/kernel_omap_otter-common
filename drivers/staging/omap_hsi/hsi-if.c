@@ -1,4 +1,4 @@
-/*
+	/*
  * hsi-if.c
  *
  * Part of the HSI character driver, implements the HSI interface.
@@ -82,7 +82,7 @@ struct if_hsi_iface {
 };
 
 static void if_hsi_port_event(struct hsi_device *dev, unsigned int event,
-				void *arg);
+			      void *arg);
 static int __devinit if_hsi_probe(struct hsi_device *dev);
 static int __devexit if_hsi_remove(struct hsi_device *dev);
 
@@ -91,8 +91,7 @@ static struct hsi_device_driver if_hsi_char_driver = {
 	.probe = if_hsi_probe,
 	.remove = __devexit_p(if_hsi_remove),
 	.driver = {
-		.name = "hsi_char"
-	},
+		   .name = "hsi_char"},
 };
 
 static struct if_hsi_iface hsi_iface;
@@ -116,9 +115,9 @@ static int if_hsi_read_on(int ch, u32 *data, unsigned int count)
 	channel->rx_count = count;
 	spin_unlock(&channel->lock);
 
-	ret = hsi_read(channel->dev, data, count/4);
+	ret = hsi_read(channel->dev, data, count / 4);
 	dev_dbg(&channel->dev->device, "%s, ch = %d, ret = %d\n", __func__, ch,
-									ret);
+		ret);
 
 	return ret;
 }
@@ -182,7 +181,7 @@ static int if_hsi_write_on(int ch, u32 *address, unsigned int count)
 	channel->state |= HSI_CHANNEL_STATE_WRITING;
 	spin_unlock(&channel->lock);
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-	ret = hsi_write(channel->dev, address, count/4);
+	ret = hsi_write(channel->dev, address, count / 4);
 	return ret;
 }
 
@@ -361,16 +360,14 @@ static int if_hsi_openchannel(struct if_hsi_channel *channel)
 	}
 
 	if (!channel->dev) {
-		pr_err("Channel %d is not ready??\n",
-				channel->channel_id);
+		pr_err("Channel %d is not ready??\n", channel->channel_id);
 		ret = -ENODEV;
 		goto leave;
 	}
 
 	ret = hsi_open(channel->dev);
 	if (ret < 0) {
-		pr_err("Could not open channel %d\n",
-				channel->channel_id);
+		pr_err("Could not open channel %d\n", channel->channel_id);
 		goto leave;
 	}
 
@@ -380,7 +377,6 @@ leave:
 	spin_unlock(&channel->lock);
 	return ret;
 }
-
 
 static int if_hsi_closechannel(struct if_hsi_channel *channel)
 {
@@ -392,8 +388,7 @@ static int if_hsi_closechannel(struct if_hsi_channel *channel)
 		goto leave;
 
 	if (!channel->dev) {
-		pr_err("Channel %d is not ready??\n",
-				channel->channel_id);
+		pr_err("Channel %d is not ready??\n", channel->channel_id);
 		ret = -ENODEV;
 		goto leave;
 	}
@@ -416,7 +411,6 @@ leave:
 	return ret;
 }
 
-
 int if_hsi_start(int ch)
 {
 	struct if_hsi_channel *channel;
@@ -424,6 +418,7 @@ int if_hsi_start(int ch)
 
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
+
 	spin_lock_bh(&hsi_iface.lock);
 	channel->state = 0;
 	ret = if_hsi_openchannel(channel);
@@ -433,6 +428,7 @@ int if_hsi_start(int ch)
 		goto error;
 	}
 	spin_unlock_bh(&hsi_iface.lock);
+
 	if_hsi_poll(ch);
 
 error:
@@ -517,19 +513,19 @@ static int __devexit if_hsi_remove(struct hsi_device *dev)
 }
 
 static void if_hsi_port_event(struct hsi_device *dev, unsigned int event,
-				void *arg)
+			      void *arg)
 {
 	struct hsi_event ev;
 	int i;
 
 	ev.event = HSI_EV_EXCEP;
-	ev.data = (u32 *)0;
+	ev.data = (u32 *) 0;
 	ev.count = 0;
 
 	switch (event) {
 	case HSI_EVENT_BREAK_DETECTED:
 		pr_debug("%s, HWBREAK detected\n", __func__);
-		ev.data = (u32 *)HSI_HWBREAK;
+		ev.data = (u32 *) HSI_HWBREAK;
 		spin_lock_bh(&hsi_iface.lock);
 		for (i = 0; i < HSI_MAX_CHAR_DEVS; i++) {
 			if (hsi_iface.channels[i].opened)
@@ -540,7 +536,7 @@ static void if_hsi_port_event(struct hsi_device *dev, unsigned int event,
 	case HSI_EVENT_HSR_DATAAVAILABLE:
 		i = (int)arg;
 		pr_debug("%s, HSI_EVENT_HSR_DATAAVAILABLE channel = %d\n",
-								__func__, i);
+			 __func__, i);
 		ev.event = HSI_EV_AVAIL;
 		spin_lock_bh(&hsi_iface.lock);
 		if (hsi_iface.channels[i].opened)
@@ -565,7 +561,7 @@ static void if_hsi_port_event(struct hsi_device *dev, unsigned int event,
 int __init if_hsi_init(unsigned int port, unsigned int *channels_map)
 {
 	struct if_hsi_channel *channel;
-	int	i, ret = 0;
+	int i, ret = 0;
 
 	port -= 1;
 	if (port >= HSI_MAX_PORTS)
@@ -589,13 +585,13 @@ int __init if_hsi_init(unsigned int port, unsigned int *channels_map)
 
 	for (i = 0; (i < HSI_MAX_CHAR_DEVS) && channels_map[i]; i++) {
 		pr_debug("%s, port = %d, channels_map[i] = %d\n", __func__,
-							port, channels_map[i]);
+			 port, channels_map[i]);
 		if ((channels_map[i] - 1) < HSI_MAX_CHAR_DEVS)
 			if_hsi_char_driver.ch_mask[port] |=
-						(1 << ((channels_map[i] - 1)));
+			    (1 << ((channels_map[i] - 1)));
 		else {
 			pr_err("Channel %d cannot be handled by the HSI "
-						"driver.\n", channels_map[i]);
+			       "driver.\n", channels_map[i]);
 			return -EINVAL;
 		}
 
@@ -609,12 +605,12 @@ int __init if_hsi_init(unsigned int port, unsigned int *channels_map)
 	if (hsi_iface.init_chan_map) {
 		ret = -ENXIO;
 		pr_err("HSI: Some channels could not be registered (out of "
-					"range or already registered?)\n");
+		       "range or already registered?)\n");
 	}
 	return ret;
 }
 
-int __exit if_hsi_exit(void)
+int __devexit if_hsi_exit(void)
 {
 	struct if_hsi_channel *channel;
 	unsigned long *address;

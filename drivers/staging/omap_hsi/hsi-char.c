@@ -43,13 +43,15 @@
 
 #include "hsi-char.h"
 
-#define DRIVER_VERSION  "0.1.0"
+#define DRIVER_VERSION  "0.2.0"
+#define HSI_CHAR_DEVICE_NAME  "hsi_char"
 
 static unsigned int port = 1;
 module_param(port, uint, 1);
 MODULE_PARM_DESC(port, "HSI port to be probed");
 
-static unsigned int channels_map[HSI_MAX_CHAR_DEVS] = {1};
+static unsigned int channels_map[HSI_MAX_CHAR_DEVS] = { 1 };
+
 module_param_array(channels_map, uint, NULL, 0);
 MODULE_PARM_DESC(channels_map, "HSI channels to be probed");
 
@@ -66,7 +68,7 @@ struct hsi_char {
 	int poll_event;
 	struct list_head rx_queue;
 	struct list_head tx_queue;
-	spinlock_t lock; /* Serialize access to driver data and API */
+	spinlock_t lock;	/* Serialize access to driver data and API */
 	struct fasync_struct *async_queue;
 	wait_queue_head_t rx_wait;
 	wait_queue_head_t tx_wait;
@@ -80,7 +82,7 @@ void if_notify(int ch, struct hsi_event *ev)
 	struct char_queue *entry;
 
 	pr_debug("%s, ev = {0x%x, 0x%p, %u}\n", __func__, ev->event, ev->data,
-								ev->count);
+		 ev->count);
 
 	spin_lock(&hsi_char_data[ch].lock);
 
@@ -138,7 +140,6 @@ void if_notify(int ch, struct hsi_event *ev)
 	}
 }
 
-
 static int hsi_char_fasync(int fd, struct file *file, int on)
 {
 	int ch = (int)file->private_data;
@@ -148,13 +149,12 @@ static int hsi_char_fasync(int fd, struct file *file, int on)
 		return -EIO;
 }
 
-
-static unsigned int hsi_char_poll(struct file *file, poll_table *wait)
+static unsigned int hsi_char_poll(struct file *file, poll_table * wait)
 {
 	int ch = (int)file->private_data;
 	unsigned int ret = 0;
 
-	/*printk(KERN_DEBUG "%s\n", __func__);*/
+	/*printk(KERN_DEBUG "%s\n", __func__); */
 
 	poll_wait(file, &hsi_char_data[ch].poll_wait, wait);
 	poll_wait(file, &hsi_char_data[ch].tx_wait, wait);
@@ -166,18 +166,17 @@ static unsigned int hsi_char_poll(struct file *file, poll_table *wait)
 	return ret;
 }
 
-
 static ssize_t hsi_char_read(struct file *file, char __user *buf,
-			size_t count, loff_t *ppos)
+			     size_t count, loff_t *ppos)
 {
 	int ch = (int)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
-	u32	*data;
+	u32 *data;
 	unsigned int data_len;
 	struct char_queue *entry;
 	ssize_t ret;
 
-	/*printk(KERN_DEBUG "%s, count = %d\n", __func__, count);*/
+	/*printk(KERN_DEBUG "%s, count = %d\n", __func__, count); */
 
 	/* only 32bit data is supported for now */
 	if ((count < 4) || (count & 3))
@@ -193,7 +192,7 @@ static ssize_t hsi_char_read(struct file *file, char __user *buf,
 
 	add_wait_queue(&hsi_char_data[ch].rx_wait, &wait);
 
-	for ( ; ; ) {
+	for (;;) {
 		data = NULL;
 		data_len = 0;
 
@@ -202,7 +201,7 @@ static ssize_t hsi_char_read(struct file *file, char __user *buf,
 		spin_lock_bh(&hsi_char_data[ch].lock);
 		if (!list_empty(&hsi_char_data[ch].rx_queue)) {
 			entry = list_entry(hsi_char_data[ch].rx_queue.next,
-						struct char_queue, list);
+					   struct char_queue, list);
 			data = entry->data;
 			data_len = entry->count;
 			list_del(&entry->list);
@@ -211,7 +210,7 @@ static ssize_t hsi_char_read(struct file *file, char __user *buf,
 		spin_unlock_bh(&hsi_char_data[ch].lock);
 
 		pr_debug("%s, data = 0x%p, data_len = %d\n",
-						__func__, data, data_len);
+			 __func__, data, data_len);
 
 		if (data_len) {
 			pr_debug("%s, RX finished\n", __func__);
@@ -229,12 +228,12 @@ static ssize_t hsi_char_read(struct file *file, char __user *buf,
 			ret = -EAGAIN;
 			if_hsi_cancel_read(ch);
 			/* goto out; */
-		break;
-	}
+			break;
+		}
 
-	/*printk(KERN_DEBUG "%s, going to sleep...\n", __func__);*/
+		/*printk(KERN_DEBUG "%s, going to sleep...\n", __func__); */
 		schedule();
-	/*printk(KERN_DEBUG "%s, woke up\n", __func__);*/
+		/*printk(KERN_DEBUG "%s, woke up\n", __func__); */
 	}
 
 	if (data_len) {
@@ -250,21 +249,21 @@ out:
 	remove_wait_queue(&hsi_char_data[ch].rx_wait, &wait);
 
 out2:
-	/*printk(KERN_DEBUG "%s, ret = %d\n", __func__, ret);*/
+	/*printk(KERN_DEBUG "%s, ret = %d\n", __func__, ret); */
 	return ret;
 }
 
 static ssize_t hsi_char_write(struct file *file, const char __user *buf,
-			 size_t count, loff_t *ppos)
+			      size_t count, loff_t *ppos)
 {
 	int ch = (int)file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
-	u32	*data;
+	u32 *data;
 	unsigned int data_len = 0;
 	struct char_queue *entry;
-	ssize_t	ret;
+	ssize_t ret;
 
-	/*printk(KERN_DEBUG "%s, count = %d\n", __func__, count);*/
+	/*printk(KERN_DEBUG "%s, count = %d\n", __func__, count); */
 
 	/* only 32bit data is supported for now */
 	if ((count < 4) || (count & 3))
@@ -291,7 +290,7 @@ static ssize_t hsi_char_write(struct file *file, const char __user *buf,
 
 	add_wait_queue(&hsi_char_data[ch].tx_wait, &wait);
 
-	for ( ; ; ) {
+	for (;;) {
 		data = NULL;
 		data_len = 0;
 
@@ -300,7 +299,7 @@ static ssize_t hsi_char_write(struct file *file, const char __user *buf,
 		spin_lock_bh(&hsi_char_data[ch].lock);
 		if (!list_empty(&hsi_char_data[ch].tx_queue)) {
 			entry = list_entry(hsi_char_data[ch].tx_queue.next,
-					struct char_queue, list);
+					   struct char_queue, list);
 			data = entry->data;
 			data_len = entry->count;
 			list_del(&entry->list);
@@ -322,24 +321,24 @@ static ssize_t hsi_char_write(struct file *file, const char __user *buf,
 			goto out;
 		}
 
-		/*printk(KERN_DEBUG "%s, going to sleep...\n", __func__);*/
+		/*printk(KERN_DEBUG "%s, going to sleep...\n", __func__); */
 		schedule();
-		/*printk(KERN_DEBUG "%s, woke up\n", __func__);*/
+		/*printk(KERN_DEBUG "%s, woke up\n", __func__); */
 	}
 
-    kfree(data);
+	kfree(data);
 
 out:
 	__set_current_state(TASK_RUNNING);
 	remove_wait_queue(&hsi_char_data[ch].tx_wait, &wait);
 
 out2:
-	/*printk(KERN_DEBUG "%s, ret = %d\n", __func__, ret);*/
+	/*printk(KERN_DEBUG "%s, ret = %d\n", __func__, ret); */
 	return ret;
 }
 
 static int hsi_char_ioctl(struct inode *inode, struct file *file,
-				unsigned int cmd, unsigned long arg)
+			  unsigned int cmd, unsigned long arg)
 {
 	int ch = (int)file->private_data;
 	unsigned int state;
@@ -360,8 +359,7 @@ static int hsi_char_ioctl(struct inode *inode, struct file *file,
 		if_hsi_flush_tx(ch);
 		break;
 	case CS_SET_WAKELINE:
-		if (copy_from_user(&state, (void __user *)arg,
-				sizeof(state)))
+		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
 			ret = -EFAULT;
 		else
 			if_hsi_set_wakeline(ch, state);
@@ -372,8 +370,7 @@ static int hsi_char_ioctl(struct inode *inode, struct file *file,
 			ret = -EFAULT;
 		break;
 	case CS_SET_RX:
-		if (copy_from_user(&rx_cfg, (void __user *)arg,
-				sizeof(rx_cfg)))
+		if (copy_from_user(&rx_cfg, (void __user *)arg, sizeof(rx_cfg)))
 			ret = -EFAULT;
 		else
 			ret = if_hsi_set_rx(ch, &rx_cfg);
@@ -384,8 +381,7 @@ static int hsi_char_ioctl(struct inode *inode, struct file *file,
 			ret = -EFAULT;
 		break;
 	case CS_SET_TX:
-		if (copy_from_user(&tx_cfg, (void __user *)arg,
-				sizeof(tx_cfg)))
+		if (copy_from_user(&tx_cfg, (void __user *)arg, sizeof(tx_cfg)))
 			ret = -EFAULT;
 		else
 			ret = if_hsi_set_tx(ch, &tx_cfg);
@@ -408,7 +404,7 @@ static int hsi_char_open(struct inode *inode, struct file *file)
 	int ret = 0, ch = iminor(inode);
 
 	pr_debug("%s, ch = %d, channels_map[%d] = %d\n", __func__, ch, ch,
-							channels_map[ch]);
+		 channels_map[ch]);
 
 	if (!channels_map[ch])
 		return -ENODEV;
@@ -433,8 +429,8 @@ static int hsi_char_open(struct inode *inode, struct file *file)
 static int hsi_char_release(struct inode *inode, struct file *file)
 {
 	int ch = (int)file->private_data;
-	struct char_queue	*entry;
-	struct list_head	*cursor, *next;
+	struct char_queue *entry;
+	struct list_head *cursor, *next;
 
 	pr_debug("%s, ch = %d\n", __func__, ch);
 
@@ -478,7 +474,6 @@ static struct cdev hsi_char_cdev;
 
 static int __init hsi_char_init(void)
 {
-	char devname[] = "hsi_char";
 	int ret, i;
 
 	pr_info("HSI character device version " DRIVER_VERSION "\n");
@@ -493,13 +488,15 @@ static int __init hsi_char_init(void)
 		INIT_LIST_HEAD(&hsi_char_data[i].tx_queue);
 	}
 
-	/*printk(KERN_DEBUG "%s, devname = %s\n", __func__, devname);*/
+	/*printk(KERN_DEBUG "%s, devname = %s\n", __func__, devname); */
 
 	ret = if_hsi_init(port, channels_map);
 	if (ret)
 		return ret;
 
-	ret = alloc_chrdev_region(&hsi_char_dev, 0, HSI_MAX_CHAR_DEVS, devname);
+	ret =
+	    alloc_chrdev_region(&hsi_char_dev, 0, HSI_MAX_CHAR_DEVS,
+				HSI_CHAR_DEVICE_NAME);
 	if (ret < 0) {
 		pr_err("HSI character driver: Failed to register\n");
 		return ret;

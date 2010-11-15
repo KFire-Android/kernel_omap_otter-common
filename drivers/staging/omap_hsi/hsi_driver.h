@@ -54,8 +54,8 @@
 /* SW strategies for FIFO mapping */
 enum {
 	HSI_FIFO_MAPPING_UNDEF = 0,
-	HSI_FIFO_MAPPING_SSI, /* 8 FIFOs per port (SSI compatible mode) */
-	HSI_FIFO_MAPPING_ALL_PORT1, /* ALL FIFOs mapped on 1st port */
+	HSI_FIFO_MAPPING_SSI,	/* 8 FIFOs per port (SSI compatible mode) */
+	HSI_FIFO_MAPPING_ALL_PORT1,	/* ALL FIFOs mapped on 1st port */
 };
 #define HSI_FIFO_MAPPING_DEFAULT	HSI_FIFO_MAPPING_SSI
 
@@ -98,10 +98,10 @@ struct hsi_channel {
 	u8 channel_number;
 	rwlock_t rw_lock;
 	struct hsi_device *dev;
-	void (*write_done)(struct hsi_device *dev, unsigned int size);
-	void (*read_done)(struct hsi_device *dev, unsigned int size);
-	void (*port_event)(struct hsi_device *dev, unsigned int event,
-								void *arg);
+	void (*write_done) (struct hsi_device *dev, unsigned int size);
+	void (*read_done) (struct hsi_device *dev, unsigned int size);
+	void (*port_event) (struct hsi_device *dev, unsigned int event,
+			    void *arg);
 };
 
 /**
@@ -139,6 +139,8 @@ struct hsi_port {
 
 /**
  * struct hsi_dev - hsi controller driver data
+ * This structure is saved into platform_device->dev->p->driver_data
+ *
  * @hsi_port: Array of hsi ports enabled in the controller
  * @id: HSI controller platform id number
  * @max_p: Number of ports enabled in the controller
@@ -164,7 +166,6 @@ struct hsi_dev {
 	struct hsi_port hsi_port[HSI_MAX_PORTS];
 	int id;
 	u8 max_p;
-	struct clk *hsi_clk;
 	void __iomem *base;
 	unsigned long phy_base;
 	spinlock_t lock; /* Serializes access to internal data and regs */
@@ -174,12 +175,8 @@ struct hsi_dev {
 	unsigned int gdd_usecount;
 	unsigned int last_gdd_lch;
 	unsigned int gdd_chan_count;
-	void (*set_min_bus_tput)(struct device *dev, u8 agent_id,
-						unsigned long r);
-	int (*clk_notifier_register)(struct clk *clk,
-					struct notifier_block *nb);
-	int (*clk_notifier_unregister)(struct clk *clk,
-					struct notifier_block *nb);
+	void (*set_min_bus_tput) (struct device *dev, u8 agent_id,
+				  unsigned long r);
 	struct notifier_block hsi_nb;
 	struct tasklet_struct hsi_gdd_tasklet;
 #ifdef CONFIG_DEBUG_FS
@@ -198,13 +195,14 @@ void hsi_bus_exit(void);
 
 void hsi_reset_ch_read(struct hsi_channel *ch);
 void hsi_reset_ch_write(struct hsi_channel *ch);
+bool hsi_is_channel_busy(struct hsi_channel *ch);
 
-int hsi_driver_read_interrupt(struct hsi_channel *hsi_channel, u32 *data);
-int hsi_driver_write_interrupt(struct hsi_channel *hsi_channel, u32 *data);
-int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 *data,
+int hsi_driver_read_interrupt(struct hsi_channel *hsi_channel, u32 * data);
+int hsi_driver_write_interrupt(struct hsi_channel *hsi_channel, u32 * data);
+int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 			unsigned int count);
-int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 *data,
-			unsigned int count);
+int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
+			 unsigned int count);
 
 void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch);
 void hsi_driver_disable_read_interrupt(struct hsi_channel *ch);
@@ -224,18 +222,23 @@ int hsi_cawake_init(struct hsi_port *port, const char *irq_name);
 void hsi_cawake_exit(struct hsi_port *port);
 
 int hsi_fifo_get_id(struct hsi_dev *hsi_ctrl, unsigned int channel,
-							unsigned int port);
+		    unsigned int port);
 int hsi_fifo_get_chan(struct hsi_dev *hsi_ctrl, unsigned int fifo,
-				unsigned int *channel, unsigned int *port);
+		      unsigned int *channel, unsigned int *port);
 int __init hsi_fifo_mapping(struct hsi_dev *hsi_ctrl, unsigned int mtype);
 long hsi_hst_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
-				unsigned int port, unsigned int channel);
+			    unsigned int port, unsigned int channel);
 long hsi_hsr_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
-				unsigned int port, unsigned int channel);
+			    unsigned int port, unsigned int channel);
 long hsi_hst_buffer_reg(struct hsi_dev *hsi_ctrl,
-				unsigned int port, unsigned int channel);
+			unsigned int port, unsigned int channel);
 long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
-				unsigned int port, unsigned int channel);
+			unsigned int port, unsigned int channel);
+
+void hsi_clocks_disable(struct device *dev);
+int hsi_clocks_enable(struct device *dev);
+void hsi_clocks_disable_channel(struct device *dev, u8 channel_number);
+int hsi_clocks_enable_channel(struct device *dev, u8 channel_number);
 
 #ifdef CONFIG_DEBUG_FS
 int hsi_debug_init(void);
@@ -255,7 +258,8 @@ static inline unsigned int hsi_cawake(struct hsi_port *port)
 }
 
 static inline struct hsi_channel *ctrl_get_ch(struct hsi_dev *hsi_ctrl,
-					unsigned int port, unsigned int channel)
+					      unsigned int port,
+					      unsigned int channel)
 {
 	return &hsi_ctrl->hsi_port[port - 1].hsi_channel[channel];
 }
@@ -263,12 +267,12 @@ static inline struct hsi_channel *ctrl_get_ch(struct hsi_dev *hsi_ctrl,
 /* HSI IO access */
 static inline u32 hsi_inl(void __iomem *base, u32 offset)
 {
-	return inl((unsigned int) base + offset);
+	return inl((unsigned int)base + offset);
 }
 
 static inline void hsi_outl(u32 data, void __iomem *base, u32 offset)
 {
-	outl(data, (unsigned int) base + offset);
+	outl(data, (unsigned int)base + offset);
 }
 
 static inline void hsi_outl_or(u32 data, void __iomem *base, u32 offset)
@@ -285,12 +289,12 @@ static inline void hsi_outl_and(u32 data, void __iomem *base, u32 offset)
 
 static inline u16 hsi_inw(void __iomem *base, u32 offset)
 {
-	return inw((unsigned int) base + offset);
+	return inw((unsigned int)base + offset);
 }
 
 static inline void hsi_outw(u16 data, void __iomem *base, u32 offset)
 {
-	outw(data, (unsigned int) base + offset);
+	outw(data, (unsigned int)base + offset);
 }
 
 static inline void hsi_outw_or(u16 data, void __iomem *base, u32 offset)
