@@ -118,7 +118,7 @@
  * using a 16bit integer in 1 ADMA table row.
  * Hence rounding it to a lesser value.
  */
-#define ADMA_MAX_XFER_PER_ROW (60 * 1024)
+#define ADMA_MAX_XFER_PER_ROW (63 * 1024)
 /*
  * FIXME: Most likely all the data using these _DEVID defines should come
  * from the platform_data, or implemented in controller and slot specific
