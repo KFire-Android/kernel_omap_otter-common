@@ -924,6 +924,10 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 
 	host->data = NULL;
 
+	if (host->dma_type == ADMA_XFER)
+		dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
+					omap_hsmmc_get_dma_dir(host, data));
+
 	if (!data->error)
 		data->bytes_xfered += data->blocks * (data->blksz);
 	else
