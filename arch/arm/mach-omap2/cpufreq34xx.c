@@ -21,6 +21,7 @@
 
 #include <linux/module.h>
 #include <linux/err.h>
+#include <linux/delay.h>
 
 #include <plat/opp.h>
 #include <plat/cpu.h>
@@ -104,6 +105,28 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 	OMAP_OPP_DEF("iva", false, 800000000, 1350000),
 };
 static u32 omap36xx_opp_def_size = ARRAY_SIZE(omap36xx_opp_def_list);
+
+#ifndef CONFIG_CPU_FREQ
+static unsigned long compute_lpj(unsigned long ref, u_int div, u_int mult)
+{
+	unsigned long new_jiffy_l, new_jiffy_h;
+
+	/*
+	 * Recalculate loops_per_jiffy.  We do it this way to
+	 * avoid math overflow on 32-bit machines.  Maybe we
+	 * should make this architecture dependent?  If you have
+	 * a better way of doing this, please replace!
+	 *
+	 *    new = old * mult / div
+	 */
+	new_jiffy_h = ref / div;
+	new_jiffy_l = (ref % div) / 100;
+	new_jiffy_h *= mult;
+	new_jiffy_l = new_jiffy_l * mult / div;
+
+	return new_jiffy_h + new_jiffy_l * 100;
+}
+#endif
 
 
 static int omap3_mpu_set_rate(struct device *dev, unsigned long rate)
