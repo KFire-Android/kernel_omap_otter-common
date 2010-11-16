@@ -1512,6 +1512,46 @@ static int abe_add_widgets(struct snd_soc_platform *platform)
 	return 0;
 }
 
+static int aess_set_opp_mode(void)
+{
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+	int i, opp = 0;
+
+	pm_runtime_get_sync(&pdev->dev);
+
+	/* now calculate OPP level based upon DAPM widget status */
+	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++) {
+		opp |= abe->dapm[i];
+	}
+
+	opp = (1 << (fls(opp) - 1)) * 25;
+
+	switch (opp) {
+	case 25:
+		/* OPP25 is not ready to be used */
+		abe_set_opp_processing(ABE_OPP25);
+		udelay(250);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+		break;
+	case 50:
+		abe_set_opp_processing(ABE_OPP50);
+		udelay(250);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+		break;
+	case 100:
+	default:
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
+		abe_set_opp_processing(ABE_OPP100);
+		udelay(250);
+		break;
+	}
+
+	pm_runtime_put_sync(&pdev->dev);
+
+	return 0;
+}
+
 static int abe_probe(struct snd_soc_platform *platform)
 {
 	abe_init_engine(platform);
@@ -1585,42 +1625,13 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 static int aess_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime  *rtd = substream->private_data;
-	/* TODO: do not use abe global structure to assign pdev */
-	struct platform_device *pdev = abe->pdev;
-	int i, opp = 0;
+
 
 	mutex_lock(&abe->mutex);
 
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, rtd->cpu_dai->id);
 
-	/* now calculate OPP level based upon DAPM widget status */
-	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++) {
-	//	dev_dbg(&rtd->dev, "opp w %d val 0x%x\n", i, abe->dapm[i]);
-		opp |= abe->dapm[i];
-	}
-
-	opp = (1 << (fls(opp) - 1)) * 25;
-	dev_dbg(&rtd->dev, "OPP level at prepare is %d\n", opp);
-
-	switch (opp) {
-	case 25:
-		/* OPP25 is not ready to be used */
-		abe_set_opp_processing(ABE_OPP50);
-		udelay(250);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
-		break;
-	case 50:
-		abe_set_opp_processing(ABE_OPP50);
-		udelay(250);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
-		break;
-	case 100:
-	default:
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 196600000);
-		abe_set_opp_processing(ABE_OPP100);
-		udelay(250);
-		break;
-	}
+	aess_set_opp_mode();
 
 	mutex_unlock(&abe->mutex);
 	return 0;
@@ -1633,44 +1644,20 @@ static int aess_close(struct snd_pcm_substream *substream)
 	/* TODO: do not use abe global structure to assign pdev */
 	struct platform_device *pdev = abe->pdev;
 
-	int i, opp = 0;
-
 	mutex_lock(&abe->mutex);
 
 	abe->fe_id = dai->id;
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
-	/* now calculate OPP level based upon DAPM widget status */
-	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++) {
-	//	dev_dbg(&rtd->dev, "opp w %d val 0x%x\n", i, abe->dapm[i]);
-		opp |= abe->dapm[i];
-	}
-	opp = (1 << (fls(opp) - 1)) * 25;
-	dev_dbg(&rtd->dev, "OPP level at close is %d\n", opp);
+	aess_set_opp_mode();
 
-	switch (opp) {
-	case 25:
-		/* OPP25 is not ready to be used */
-		abe_set_opp_processing(ABE_OPP50);
+	if (!--abe->active) {
+		abe_set_opp_processing(ABE_OPP25);
 		udelay(250);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
-		break;
-	case 50:
-		abe_set_opp_processing(ABE_OPP50);
-		udelay(250);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98300000);
-		break;
-	case 100:
-	default:
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 196600000);
-		abe_set_opp_processing(ABE_OPP100);
-		udelay(250);
-		break;
-	}
-	pm_runtime_put_sync(&pdev->dev);
-
-	if (!--abe->active)
 		omap_device_set_rate(&pdev->dev, &pdev->dev, 0);
+	}
+
+	pm_runtime_put_sync(&pdev->dev);
 
 	mutex_unlock(&abe->mutex);
 	return 0;
