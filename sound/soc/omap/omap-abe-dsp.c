@@ -1531,19 +1531,19 @@ static int aess_set_opp_mode(void)
 	case 25:
 		/* OPP25 is not ready to be used */
 		abe_set_opp_processing(ABE_OPP25);
-		udelay(250);
+		udelay(11);
 		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 50:
 		abe_set_opp_processing(ABE_OPP50);
-		udelay(250);
+		udelay(11);
 		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 		break;
 	case 100:
 	default:
 		omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
 		abe_set_opp_processing(ABE_OPP100);
-		udelay(250);
+		udelay(11);
 		break;
 	}
 
@@ -1653,7 +1653,7 @@ static int aess_close(struct snd_pcm_substream *substream)
 
 	if (!--abe->active) {
 		abe_set_opp_processing(ABE_OPP25);
-		udelay(250);
+		udelay(11);
 		omap_device_set_rate(&pdev->dev, &pdev->dev, 0);
 	}
 
