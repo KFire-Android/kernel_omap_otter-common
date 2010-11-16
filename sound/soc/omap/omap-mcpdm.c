@@ -66,7 +66,6 @@ struct omap_mcpdm {
 	void __iomem *io_base;
 	u8 free;
 	int irq;
-	struct workqueue_struct *workqueue;
 	struct delayed_work delayed_work;
 #ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
 	struct delayed_work delayed_abe_work;
@@ -528,7 +527,7 @@ static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-				queue_delayed_work(mcpdm->workqueue, &mcpdm->delayed_work,
+				schedule_delayed_work(&mcpdm->delayed_work,
 						msecs_to_jiffies(1000)); /* TODO: pdata ? */
 	}
 
@@ -671,7 +670,7 @@ static void omap_mcpdm_abe_dai_shutdown(struct snd_pcm_substream *substream,
 				omap_mcpdm_free(mcpdm);
 		}
 		if (mcpdm->dl_active == 0 && substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-				queue_delayed_work(mcpdm->workqueue, &mcpdm->delayed_abe_work,
+				schedule_delayed_work(&mcpdm->delayed_abe_work,
 						msecs_to_jiffies(1000)); /* TODO: pdata ? */
 	}
 
@@ -869,9 +868,6 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 	mcpdm->dl1_offset = 0x1F;
 	mcpdm->dl2_offset = 0x1F;
 
-	mcpdm->workqueue = create_singlethread_workqueue("mcpdm");
-	if (mcpdm->workqueue == NULL)
-		goto err_work;
 	INIT_DELAYED_WORK(&mcpdm->delayed_work, playback_work);
 #ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
 	INIT_DELAYED_WORK(&mcpdm->delayed_abe_work, playback_abe_work);
@@ -880,8 +876,6 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 			ARRAY_SIZE(omap_mcpdm_dai));
 	if (ret == 0)
 		return 0;
-err_work:
-	free_irq(mcpdm->irq, mcpdm);
 err:
 	kfree(mcpdm);
 	return ret;
@@ -896,7 +890,6 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 
 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_mcpdm_dai));
 	pm_runtime_put_sync(&pdev->dev);
-	destroy_workqueue(mcpdm->workqueue);
 	free_irq(mcpdm->irq, (void *)mcpdm);
 	kfree(mcpdm);
 	return 0;
