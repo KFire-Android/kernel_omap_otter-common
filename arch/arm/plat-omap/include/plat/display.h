@@ -672,6 +672,8 @@ struct omap_dss_device {
 
 		enum omap_panel_config config;
 		struct s3d_disp_info s3d_info;
+		u32 width_in_mm;
+		u32 height_in_mm;
 	} panel;
 
 	struct {
@@ -751,6 +753,8 @@ struct omap_dss_driver {
 
 	void (*get_resolution)(struct omap_dss_device *dssdev,
 			u16 *xres, u16 *yres);
+	void (*get_dimension)(struct omap_dss_device *dssdev,
+			u32 *width, u32 *height);
 	int (*get_recommended_bpp)(struct omap_dss_device *dssdev);
 
 	int (*check_timings)(struct omap_dss_device *dssdev,

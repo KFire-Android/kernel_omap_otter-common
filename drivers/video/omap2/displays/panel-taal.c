@@ -167,6 +167,8 @@ struct panel_config {
 
 	struct panel_regulator *regulators;
 	int num_regulators;
+	u32 width_in_mm;
+	u32 height_in_mm;
 };
 
 enum {
@@ -191,6 +193,8 @@ static struct panel_config panel_configs[] = {
 			.high		= 10,
 			.low		= 10,
 		},
+		.width_in_mm = 84,
+		.height_in_mm = 47,
 	},
        {
                 .name           = "taal2",
@@ -209,6 +213,8 @@ static struct panel_config panel_configs[] = {
                         .high           = 10,
                         .low            = 10,
                 },
+		.width_in_mm = 84,
+		.height_in_mm = 47,
         },
 };
 
@@ -538,6 +544,13 @@ static void taal_get_resolution(struct omap_dss_device *dssdev,
 	}
 }
 
+static void taal_get_dimension(struct omap_dss_device *dssdev,
+		u32 *width, u32 *height)
+{
+	*width = dssdev->panel.width_in_mm;
+	*height = dssdev->panel.height_in_mm;
+}
+
 static ssize_t taal_num_errors_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -746,6 +759,8 @@ static int taal_probe(struct omap_dss_device *dssdev)
 	dssdev->panel.config = OMAP_DSS_LCD_TFT;
 	dssdev->panel.timings = panel_config->timings;
 	dssdev->ctrl.pixel_size = 24;
+	dssdev->panel.width_in_mm = panel_config->width_in_mm;
+	dssdev->panel.height_in_mm = panel_config->height_in_mm;
 
 	td = kzalloc(sizeof(*td), GFP_KERNEL);
 	if (!td) {
@@ -1727,6 +1742,7 @@ static struct omap_dss_driver taal_driver = {
 	.sync		= taal_sync,
 
 	.get_resolution	= taal_get_resolution,
+	.get_dimension = taal_get_dimension,
 	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
 
 	.enable_te	= taal_enable_te,
@@ -1766,6 +1782,7 @@ static struct omap_dss_driver taal2_driver = {
 	.sync		= taal_sync,
 
 	.get_resolution	= taal_get_resolution,
+	.get_dimension = taal_get_dimension,
 	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
 
 	.enable_te	= taal_enable_te,
