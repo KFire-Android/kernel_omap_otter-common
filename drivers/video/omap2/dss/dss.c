@@ -149,13 +149,15 @@ int dss_mainclk_enable()
 	int ret = 0;
 
 	if (!dss.mainclk_state) {
-		if (cpu_is_omap44xx())
+		if (cpu_is_omap44xx() || cpu_is_omap34xx())
 			ret = dss_opt_clock_enable();
 
-		if (!ret)
-			ret = pm_runtime_get_sync(&dss.pdev->dev);
-		else
+		if (ret)
 			dss_opt_clock_disable();
+#ifdef CONFIG_PM_RUNTIME
+		else
+			ret = pm_runtime_get_sync(&dss.pdev->dev);
+#endif
 
 		if (!ret)
 			dss.mainclk_state = true;

@@ -81,18 +81,18 @@ err0:
 static int zoom_panel_power_enable(int enable)
 {
 	int ret;
-	struct regulator *vpll2_reg;
+	struct regulator *vdds_dsi_reg;
 
-	vpll2_reg = regulator_get(NULL, "vpll2");
-	if (IS_ERR(vpll2_reg)) {
-		pr_err("Unable to get vpll2 regulator\n");
-		return PTR_ERR(vpll2_reg);
+	vdds_dsi_reg = regulator_get(NULL, "vdds_dsi");
+	if (IS_ERR(vdds_dsi_reg)) {
+		pr_err("Unable to get vdds_dsi regulator\n");
+		return PTR_ERR(vdds_dsi_reg);
 	}
 
 	if (enable)
-		ret = regulator_enable(vpll2_reg);
+		ret = regulator_enable(vdds_dsi_reg);
 	else
-		ret = regulator_disable(vpll2_reg);
+		ret = regulator_disable(vdds_dsi_reg);
 
 	return ret;
 }

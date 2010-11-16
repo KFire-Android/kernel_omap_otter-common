@@ -175,7 +175,7 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
 };
 
 static struct regulator_consumer_supply zoom_vpll2_supply = {
-	.supply         = "vpll2",
+	.supply         = "vdds_dsi",
 };
 
 static struct regulator_consumer_supply zoom_vdda_dac_supply = {
