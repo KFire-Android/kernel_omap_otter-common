@@ -26,5 +26,6 @@
 
 void abe_dsp_enable_data_transfer(int port);
 void abe_dsp_disable_data_transfer(int port);
+void abe_dsp_shutdown(void);
 
 #endif	/* End of __OMAP_ABE_DSP_H__ */

@@ -255,11 +255,20 @@ void abe_dsp_disable_data_transfer(int port)
 
 	abe_disable_data_transfer(port);
 	udelay(250);
-/*
-	abe_stop_event_generator();
-	udelay(500);
-*/
 	pm_runtime_put_sync(&pdev->dev);
+}
+
+void abe_dsp_shutdown(void)
+{
+        /* TODO: do not use abe global structure to assign pdev */
+        struct platform_device *pdev = abe->pdev;
+
+	if (!abe_check_activity()) {
+		abe_set_opp_processing(ABE_OPP25);
+		abe_stop_event_generator();
+		udelay(11);
+		omap_device_set_rate(&pdev->dev, &pdev->dev, 0);
+	}
 }
 
 /*
@@ -1651,11 +1660,8 @@ static int aess_close(struct snd_pcm_substream *substream)
 
 	aess_set_opp_mode();
 
-	if (!--abe->active) {
-		abe_set_opp_processing(ABE_OPP25);
-		udelay(11);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 0);
-	}
+	if (!--abe->active)
+		abe_dsp_shutdown();
 
 	pm_runtime_put_sync(&pdev->dev);
 
