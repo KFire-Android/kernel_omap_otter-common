@@ -3555,12 +3555,14 @@ static struct i2c_driver syn_i2c_driver = {
 	.remove         = __exit_p(syn_remove),
 	.id_table       = syn_id,
 
+#ifdef CONFIG_PM
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	.suspend        = NULL,
 	.resume         = NULL,
 #else
 	.suspend        = syn_suspend,
 	.resume         = syn_resume,
+#endif
 #endif
 };
 
