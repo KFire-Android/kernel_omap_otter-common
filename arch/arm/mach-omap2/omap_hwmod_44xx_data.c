@@ -1208,14 +1208,14 @@ static struct omap_hwmod_rst_info omap44xx_dsp_c0_resets[] = {
 static struct omap_hwmod_ocp_if omap44xx_dsp__iva = {
 	.master		= &omap44xx_dsp_hwmod,
 	.slave		= &omap44xx_iva_hwmod,
-	.clk		= "dpll_iva_m5_ck",
+	.clk		= "dpll_iva_m5x2_ck",
 };
 
 /* dsp -> sl2if */
 static struct omap_hwmod_ocp_if omap44xx_dsp__sl2if = {
 	.master		= &omap44xx_dsp_hwmod,
 	.slave		= &omap44xx_sl2if_hwmod,
-	.clk		= "dpll_iva_m5_ck",
+	.clk		= "dpll_iva_m5x2_ck",
 };
 
 /* dsp master ports */
@@ -2713,7 +2713,7 @@ static struct omap_hwmod_rst_info omap44xx_iva_seq1_resets[] = {
 static struct omap_hwmod_ocp_if omap44xx_iva__sl2if = {
 	.master		= &omap44xx_iva_hwmod,
 	.slave		= &omap44xx_sl2if_hwmod,
-	.clk		= "dpll_iva_m5_ck",
+	.clk		= "dpll_iva_m5x2_ck",
 };
 
 /* iva master ports */

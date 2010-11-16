@@ -132,14 +132,14 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 };
 
 #define	L3_OPP50_RATE			100000000
-#define DPLL_CORE_M3_OPP50_RATE		100000000
-#define DPLL_CORE_M3_OPP100_RATE	160000000
-#define DPLL_CORE_M6_OPP50_RATE		100000000
-#define DPLL_CORE_M6_OPP100_RATE	133300000
-#define DPLL_PER_M3_OPP50_RATE		96000000
-#define DPLL_PER_M3_OPP100_RATE		128000000
-#define DPLL_PER_M6_OPP50_RATE		96000000
-#define DPLL_PER_M6_OPP100_RATE		192000000
+#define DPLL_CORE_M3_OPP50_RATE		200000000
+#define DPLL_CORE_M3_OPP100_RATE	320000000
+#define DPLL_CORE_M6_OPP50_RATE		200000000
+#define DPLL_CORE_M6_OPP100_RATE	266600000
+#define DPLL_PER_M3_OPP50_RATE		192000000
+#define DPLL_PER_M3_OPP100_RATE		256000000
+#define DPLL_PER_M6_OPP50_RATE		192000000
+#define DPLL_PER_M6_OPP100_RATE		384000000
 
 static u32 omap44xx_opp_def_size = ARRAY_SIZE(omap44xx_opp_def_list);
 
@@ -214,10 +214,10 @@ static int omap4_iva_set_rate(struct device *dev, unsigned long rate)
 		 * Round rate is required as the actual iva clock rate is
 		 * weird for OMAP4
 		 */
-		round_rate = clk_round_rate(iva_clk, rate / 2);
+		round_rate = clk_round_rate(iva_clk, rate);
 		return clk_set_rate(iva_clk, round_rate);
 	} else if (dev == omap4_get_dsp_device()) {
-		return clk_set_rate(dsp_clk, rate / 2);
+		return clk_set_rate(dsp_clk, rate);
 	} else {
 		dev_warn(dev, "%s: Wrong device pointer\n", __func__);
 		return -EINVAL;
@@ -228,9 +228,9 @@ static int omap4_iva_set_rate(struct device *dev, unsigned long rate)
 static unsigned long omap4_iva_get_rate(struct device *dev)
 {
 	if (dev == omap2_get_iva_device()) {
-		return iva_clk->rate * 2;
+		return iva_clk->rate ;
 	} else if (dev == omap4_get_dsp_device()) {
-		return dsp_clk->rate * 2;
+		return dsp_clk->rate ;
 	} else {
 		dev_warn(dev, "%s: Wrong device pointer\n", __func__);
 		return -EINVAL;
@@ -258,12 +258,12 @@ static int omap4_l3_set_rate(struct device *dev, unsigned long rate)
 	clk_set_rate(core_m6_clk, d_core_m6_rate);
 	clk_set_rate(per_m3_clk, d_per_m3_rate);
 	clk_set_rate(per_m6_clk, d_per_m6_rate);
-	return clk_set_rate(l3_clk, rate);
+	return clk_set_rate(l3_clk, rate * 2);
 }
 
 static unsigned long omap4_l3_get_rate(struct device *dev)
 {
-	return l3_clk->rate;
+	return l3_clk->rate / 2;
 }
 
 static int omap4_emif_set_rate(struct device *dev, unsigned long rate)
@@ -280,34 +280,34 @@ static int omap4_abe_set_rate(struct device *dev, unsigned long rate)
 {
 	unsigned long round_rate;
 
-	round_rate = clk_round_rate(abe_clk, rate / 2);
+	round_rate = clk_round_rate(abe_clk, rate);
 
 	return clk_set_rate(abe_clk, round_rate);
 }
 
 static unsigned long omap4_abe_get_rate(struct device *dev)
 {
-	return abe_clk->rate * 2;
+	return abe_clk->rate ;
 }
 
 static int omap4_sgx_set_rate(struct device *dev, unsigned long rate)
 {
-	return clk_set_rate(sgx_clk, rate / 2);
+	return clk_set_rate(sgx_clk, rate);
 }
 
 static unsigned long omap4_sgx_get_rate(struct device *dev)
 {
-	return sgx_clk->rate * 2;
+	return sgx_clk->rate ;
 }
 
 static int omap4_fdif_set_rate(struct device *dev, unsigned long rate)
 {
-	return clk_set_rate(fdif_clk, rate / 2);
+	return clk_set_rate(fdif_clk, rate);
 }
 
 static unsigned long omap4_fdif_get_rate(struct device *dev)
 {
-	return fdif_clk->rate * 2;
+	return fdif_clk->rate ;
 }
 
 struct device *find_dev_ptr(char *name)
@@ -355,15 +355,15 @@ int __init omap4_pm_init_opp_table(void)
 	}
 
 	dpll_mpu_clk = clk_get(NULL, "dpll_mpu_ck");
-	iva_clk = clk_get(NULL, "dpll_iva_m5_ck");
-	dsp_clk = clk_get(NULL, "dpll_iva_m4_ck");
-	l3_clk = clk_get(NULL, "dpll_core_m5_ck");
+	iva_clk = clk_get(NULL, "dpll_iva_m5x2_ck");
+	dsp_clk = clk_get(NULL, "dpll_iva_m4x2_ck");
+	l3_clk = clk_get(NULL, "dpll_core_m5x2_ck");
 	core_m2_clk = clk_get(NULL, "dpll_core_m2_ck");
-	core_m3_clk = clk_get(NULL, "dpll_core_m3_ck");
-	core_m6_clk = clk_get(NULL, "dpll_core_m6_ck");
-	sgx_clk = clk_get(NULL, "dpll_per_m7_ck");
-	per_m3_clk = clk_get(NULL, "dpll_per_m3_ck");
-	per_m6_clk = clk_get(NULL, "dpll_per_m6_ck");
+	core_m3_clk = clk_get(NULL, "dpll_core_m3x2_ck");
+	core_m6_clk = clk_get(NULL, "dpll_core_m6x2_ck");
+	sgx_clk = clk_get(NULL, "dpll_per_m7x2_ck");
+	per_m3_clk = clk_get(NULL, "dpll_per_m3x2_ck");
+	per_m6_clk = clk_get(NULL, "dpll_per_m6x2_ck");
 	abe_clk = clk_get(NULL, "abe_clk");
 	fdif_clk = clk_get(NULL, "fdif_fck");
 

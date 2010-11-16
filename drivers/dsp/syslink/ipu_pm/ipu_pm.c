@@ -284,8 +284,8 @@ static char *aux_clk_name[NUM_AUX_CLK] = {
 
 static char *aux_clk_source_name[] = {
 	"sys_clkin_ck",
-	"dpll_core_m3_ck",
-	"dpll_per_m3_ck",
+	"dpll_core_m3x2_ck",
+	"dpll_per_m3x2_ck",
 	NULL
 } ;
 
