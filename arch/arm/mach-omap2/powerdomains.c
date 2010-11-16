@@ -45,7 +45,7 @@
 #define OMAP_MEM3_STATEST_MASK OMAP3430_L2FLATMEMSTATEST_MASK
 #define OMAP_MEM4_STATEST_MASK OMAP4430_OCP_NRET_BANK_STATEST_MASK
 
-#if !defined(CONFIG_ARCH_OMAP2) || !defined(CONFIG_ARCH_OMAP3)
+#if !defined(CONFIG_ARCH_OMAP2) && !defined(CONFIG_ARCH_OMAP3)
 struct pwrdm_functions omap2_pwrdm_functions;
 #elif !defined(CONFIG_ARCH_OMAP4)
 struct pwrdm_functions omap4_pwrdm_functions;

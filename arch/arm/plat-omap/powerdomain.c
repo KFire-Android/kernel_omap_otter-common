@@ -1054,12 +1054,14 @@ void pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm)
 		break;
 	}
 
+#ifdef CONFIG_PM
 	if (pwrdm_read_pwrst(pwrdm) != new_state) {
 		if (cpu_is_omap44xx())
 			omap4_set_pwrdm_state(pwrdm, new_state);
 		else if (cpu_is_omap34xx())
 			set_pwrdm_state(pwrdm, new_state);
 	}
+#endif
 
 	pr_debug("OMAP PM: %s pwrst: curr= %d, prev= %d next= %d "
 			"wkuplat_min= %lu, set_state= %d\n", pwrdm->name,
