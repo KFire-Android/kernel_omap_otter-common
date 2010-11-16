@@ -848,9 +848,6 @@ static int __init sdp4430_soc_init(void)
 	if (machine_is_omap_4430sdp())
 		sdp4430_tps6130x_configure();
 
-	/* Codec starts in HP mode */
-	twl6040_power_mode = 1;
-
 	return 0;
 
 err:
