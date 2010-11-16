@@ -49,20 +49,20 @@
 #define WAKE_DOWN		1
 
 struct hsi_tx_config {
-	u32 mode;
-	u32 flow;
-	u32 frame_size;
-	u32 channels;
-	u32 divisor;
-	u32 arb_mode;
+	__u32 mode;
+	__u32 flow;
+	__u32 frame_size;
+	__u32 channels;
+	__u32 divisor;
+	__u32 arb_mode;
 };
 
 struct hsi_rx_config {
-	u32 mode;
-	u32 flow;
-	u32 frame_size;
-	u32 channels;
-	u32 divisor;	/* not used for SSI */
+	__u32 mode;
+	__u32 flow;
+	__u32 frame_size;
+	__u32 channels;
+	__u32 divisor;	/* not used for SSI */
 };
 
 #endif /* HSI_CHAR_H */
