@@ -132,6 +132,144 @@ static dma_addr_t dmac_pa;
 #define TMM_SS(ssptr)   TMM(TILER_GET_ACC_MODE(ssptr))
 #define TMM_SET(fmt, i) tmm[(fmt) - TILFMT_8BIT] = i
 
+static void fill_map(char **map, int div, struct tcm_area *a, char c, bool ovw)
+{
+	int x, y;
+	for (y = a->p0.y; y <= a->p1.y; y++)
+		for (x = a->p0.x / div; x <= a->p1.x / div; x++)
+			if (map[y][x] == ' ' || ovw)
+				map[y][x] = c;
+}
+
+static void fill_map_pt(char **map, int div, struct tcm_pt *p, char c)
+{
+	map[p->y][p->x / div] = c;
+}
+
+static char read_map_pt(char **map, int div, struct tcm_pt *p)
+{
+	return map[p->y][p->x / div];
+}
+
+static int map_width(int div, int x0, int x1)
+{
+	return (x1 / div) - (x0 / div) + 1;
+}
+
+static void text_map(char **map, int div, char *nice, int y, int x0, int x1)
+{
+	char *p = map[y] + (x0 / div);
+	int w = (map_width(div, x0, x1) - strlen(nice)) / 2;
+	if (w >= 0) {
+		p += w;
+		while (*nice)
+			*p++ = *nice++;
+	}
+}
+
+static void map_1d_info(char **map, int div, char *nice, struct tcm_area *a)
+{
+	sprintf(nice, "%dK", tcm_sizeof(*a) * 4);
+	if (a->p0.y + 1 < a->p1.y) {
+		text_map(map, div, nice, (a->p0.y + a->p1.y) / 2, 0,
+							TILER_WIDTH - 1);
+	} else if (a->p0.y < a->p1.y) {
+		if (strlen(nice) < map_width(div, a->p0.x, TILER_WIDTH - 1))
+			text_map(map, div, nice, a->p0.y, a->p0.x + div,
+							TILER_WIDTH - 1);
+		else if (strlen(nice) < map_width(div, 0, a->p1.x))
+			text_map(map, div, nice, a->p1.y, 0, a->p1.y - div);
+	} else if (strlen(nice) + 1 < map_width(div, a->p0.x, a->p1.x)) {
+		text_map(map, div, nice, a->p0.y, a->p0.x, a->p1.x);
+	}
+}
+
+static void map_2d_info(char **map, int div, char *nice, struct tcm_area *a)
+{
+	sprintf(nice, "(%d*%d)", tcm_awidth(*a), tcm_aheight(*a));
+	if (strlen(nice) + 1 < map_width(div, a->p0.x, a->p1.x))
+		text_map(map, div, nice, (a->p0.y + a->p1.y) / 2, a->p0.x,
+			 a->p1.x);
+}
+
+static void print_allocation_map(void)
+{
+	int div = 2;
+	int i;
+	char **map, *global_map;
+	struct area_info *ai;
+	struct mem_info *mi;
+	struct tcm_area a, p;
+	static char *m2d = "abcdefghijklmnopqrstuvwxyz"
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+	static char *a2d = ".,:;'\"`~!^-+";
+	char *m2dp = m2d, *a2dp = a2d;
+	char nice[128];
+
+	/* allocate map */
+	map = kzalloc(TILER_HEIGHT * sizeof(*map), GFP_KERNEL);
+	global_map = kzalloc((TILER_WIDTH / div + 1) * TILER_HEIGHT,
+								GFP_KERNEL);
+	if (!map || !global_map) {
+		printk(KERN_ERR "could not allocate map for debug print\n");
+		goto error;
+	}
+	memset(global_map, ' ', (TILER_WIDTH / div + 1) * TILER_HEIGHT);
+	for (i = 0; i < TILER_HEIGHT; i++) {
+		map[i] = global_map + i * (TILER_WIDTH / div + 1);
+		map[i][TILER_WIDTH / div] = 0;
+	}
+
+	/* get all allocations */
+	mutex_lock(&mtx);
+
+	list_for_each_entry(mi, &blocks, global) {
+		if (mi->area.is2d) {
+			ai = mi->parent;
+			fill_map(map, div, &ai->area, *a2dp, false);
+			fill_map(map, div, &mi->area, *m2dp, true);
+			if (!*++a2dp)
+				a2dp = a2d;
+			if (!*++m2dp)
+				m2dp = m2d;
+			map_2d_info(map, div, nice, &mi->area);
+		} else {
+			bool start = read_map_pt(map, div, &mi->area.p0) == ' ';
+			bool end = read_map_pt(map, div, &mi->area.p1) == ' ';
+			tcm_for_each_slice(a, mi->area, p)
+				fill_map(map, div, &a, '=', true);
+			fill_map_pt(map, div, &mi->area.p0, start ? '<' : 'X');
+			fill_map_pt(map, div, &mi->area.p1, end ? '>' : 'X');
+			map_1d_info(map, div, nice, &mi->area);
+		}
+	}
+
+	printk(KERN_ERR "BEGIN TILER MAP\n");
+	for (i = 0; i < TILER_HEIGHT; i++)
+		printk(KERN_ERR "%03d:%s\n", i, map[i]);
+	printk(KERN_ERR "END TILER MAP\n");
+
+	mutex_unlock(&mtx);
+
+error:
+	kfree(map);
+	kfree(global_map);
+}
+
+static uint tiler_alloc_debug;
+static int tiler_alloc_debug_set(const char *val, struct kernel_param *kp)
+{
+	int r = param_set_uint(val, kp);
+	if (tiler_alloc_debug & 2) {
+		print_allocation_map();
+		tiler_alloc_debug &= ~2;
+	}
+	return r;
+}
+
+module_param_call(alloc_debug, tiler_alloc_debug_set, param_get_uint,
+					&tiler_alloc_debug, 0644);
+
 /* get process info, and increment refs for device tracking */
 static struct process_info *__get_pi(pid_t pid, bool kernel)
 {
@@ -343,6 +481,14 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 
 			/* remove from reserved list */
 			list_del(&mi->global);
+			if (tiler_alloc_debug & 1)
+				printk(KERN_ERR "(=2d (%d-%d,%d-%d) in (%d-%d,%d-%d) prereserved)\n",
+					mi->area.p0.x, mi->area.p1.x,
+					mi->area.p0.y, mi->area.p1.y,
+			((struct area_info *) mi->parent)->area.p0.x,
+			((struct area_info *) mi->parent)->area.p1.x,
+			((struct area_info *) mi->parent)->area.p0.y,
+			((struct area_info *) mi->parent)->area.p1.y);
 			goto done;
 		}
 	}
@@ -363,6 +509,14 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 			x = _m_blk_find_fit(w, align, offs, ai, &before);
 			if (x) {
 				_m_add2area(mi, ai, x - w, x - 1, before);
+				if (tiler_alloc_debug & 1)
+					printk(KERN_ERR "(+2d (%d-%d,%d-%d) in (%d-%d,%d-%d) existing)\n",
+						mi->area.p0.x, mi->area.p1.x,
+						mi->area.p0.y, mi->area.p1.y,
+				((struct area_info *) mi->parent)->area.p0.x,
+				((struct area_info *) mi->parent)->area.p1.x,
+				((struct area_info *) mi->parent)->area.p0.y,
+				((struct area_info *) mi->parent)->area.p1.y);
 				goto done;
 			}
 		}
@@ -377,6 +531,12 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 		_m_add2area(mi, ai, ai->area.p0.x + offs,
 			     ai->area.p0.x + offs + w - 1,
 			     &ai->blocks);
+		if (tiler_alloc_debug & 1)
+			printk(KERN_ERR "(+2d (%d-%d,%d-%d) in (%d-%d,%d-%d) new)\n",
+				mi->area.p0.x, mi->area.p1.x,
+				mi->area.p0.y, mi->area.p1.y,
+				ai->area.p0.x, ai->area.p1.x,
+				ai->area.p0.y, ai->area.p1.y);
 	} else {
 		/* clean up */
 		kfree(mi);
@@ -456,6 +616,12 @@ static s32 _m_free(struct mem_info *mi)
 
 		/* check to see if area needs removing also */
 		if (ai && !--ai->nblocks) {
+			if (tiler_alloc_debug & 1)
+				printk(KERN_ERR "(-2d (%d-%d,%d-%d) in (%d-%d,%d-%d) last)\n",
+					mi->area.p0.x, mi->area.p1.x,
+					mi->area.p0.y, mi->area.p1.y,
+					ai->area.p0.x, ai->area.p1.x,
+					ai->area.p0.y, ai->area.p1.y);
 			clear_pat(TMM_SS(mi->sys_addr), &ai->area);
 			res = tcm_free(&ai->area);
 			list_del(&ai->by_gid);
@@ -463,8 +629,18 @@ static s32 _m_free(struct mem_info *mi)
 			_m_try_free_group(ai->gi);
 			kfree(ai);
 			ai = NULL;
-		}
+		} else if (tiler_alloc_debug & 1)
+			printk(KERN_ERR "(-2d (%d-%d,%d-%d) in (%d-%d,%d-%d) remaining)\n",
+				mi->area.p0.x, mi->area.p1.x,
+				mi->area.p0.y, mi->area.p1.y,
+				ai->area.p0.x, ai->area.p1.x,
+				ai->area.p0.y, ai->area.p1.y);
+
 	} else {
+		if (tiler_alloc_debug & 1)
+			printk(KERN_ERR "(-1d: %d,%d..%d,%d)\n",
+				mi->area.p0.x, mi->area.p0.y,
+				mi->area.p1.x, mi->area.p1.y);
 		/* remove 1D area */
 		clear_pat(TMM_SS(mi->sys_addr), &mi->area);
 		res = tcm_free(&mi->area);
@@ -757,7 +933,10 @@ static struct mem_info *__get_area(enum tiler_fmt fmt, u32 width, u32 height,
 			kfree(mi);
 			return NULL;
 		}
-
+		if (tiler_alloc_debug & 1)
+			printk(KERN_ERR "(+1d: %d,%d..%d,%d)\n",
+				mi->area.p0.x, mi->area.p0.y,
+				mi->area.p1.x, mi->area.p1.y);
 		mutex_lock(&mtx);
 		mi->parent = gi;
 		list_add(&mi->by_area, &gi->onedim);
