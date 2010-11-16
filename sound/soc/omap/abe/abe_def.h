@@ -238,7 +238,7 @@
 /* number of ATC access upon AMIC DMArequests, all the FIFOs are enabled */
 #define MCPDM_UL_ITER 4
 /* All the McPDM FIFOs are enabled simultaneously */
-#define MCPDM_DL_ITER 12
+#define MCPDM_DL_ITER 24
 /* All the DMIC FIFOs are enabled simultaneously */
 #define DMIC_ITER 12
 /* port / flow management */
