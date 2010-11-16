@@ -1762,6 +1762,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		ios->clock = OMAP_MMC_MASTER_CLOCK / dsor;
 	}
 
+#ifdef CONFIG_OMAP_PM
 	/*
 	 * On OMAP4 at VDD_CORE - 0.93V the func clock could drop
 	 * to 12MHz if it was operating at 24Mhz originally. Hold
@@ -1776,6 +1777,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			host->tput_constraint = 1;
 		}
 	}
+#endif
 
 	omap_hsmmc_stop_clock(host);
 	regval = OMAP_HSMMC_READ(host, SYSCTL);
@@ -2070,6 +2072,7 @@ static int omap_hsmmc_enable(struct mmc_host *mmc)
 		return -EINVAL;
 	}
 
+#ifdef CONFIG_OMAP_PM
 	if ((mmc_slot(host).features & HSMMC_DVFS_24MHZ_CONST) &&
 			(host->mmc->ios.clock == OMAP_MMC_CLOCK_24MHZ) &&
 						host->pdata->set_min_bus_tput) {
@@ -2079,6 +2082,7 @@ static int omap_hsmmc_enable(struct mmc_host *mmc)
 			host->tput_constraint = 1;
 		}
 	}
+#endif
 	return ret;
 }
 
@@ -2094,6 +2098,7 @@ static int omap_hsmmc_disable(struct mmc_host *mmc, int lazy)
 		int delay;
 
 		delay = omap_hsmmc_enabled_to_disabled(host);
+#ifdef CONFIG_OMAP_PM
 		if ((mmc_slot(host).features & HSMMC_DVFS_24MHZ_CONST) &&
 						host->pdata->set_min_bus_tput) {
 			if (host->tput_constraint == 1) {
@@ -2102,6 +2107,7 @@ static int omap_hsmmc_disable(struct mmc_host *mmc, int lazy)
 				host->tput_constraint = 0;
 			}
 		}
+#endif
 
 		if (lazy || delay < 0)
 			return delay;
@@ -2122,6 +2128,7 @@ static int omap_hsmmc_enable_simple(struct mmc_host *mmc)
 {
 	struct omap_hsmmc_host *host = mmc_priv(mmc);
 
+#ifdef CONFIG_OMAP_PM
 	if ((mmc_slot(host).features & HSMMC_DVFS_24MHZ_CONST) &&
 			(host->mmc->ios.clock == OMAP_MMC_CLOCK_24MHZ) &&
 						host->pdata->set_min_bus_tput) {
@@ -2131,6 +2138,7 @@ static int omap_hsmmc_enable_simple(struct mmc_host *mmc)
 			host->tput_constraint = 1;
 		}
 	}
+#endif
 	pm_runtime_get_sync(host->dev);
 
 	dev_dbg(mmc_dev(host->mmc), "enabled\n");
@@ -2142,6 +2150,7 @@ static int omap_hsmmc_disable_simple(struct mmc_host *mmc, int lazy)
 	struct omap_hsmmc_host *host = mmc_priv(mmc);
 
 	pm_runtime_put_sync(host->dev);
+#ifdef CONFIG_OMAP_PM
 	if ((mmc_slot(host).features & HSMMC_DVFS_24MHZ_CONST) &&
 					host->pdata->set_min_bus_tput) {
 		if (host->tput_constraint == 1) {
@@ -2150,6 +2159,7 @@ static int omap_hsmmc_disable_simple(struct mmc_host *mmc, int lazy)
 			host->tput_constraint = 0;
 		}
 	}
+#endif
 
 	dev_dbg(mmc_dev(host->mmc), "idle\n");
 	return 0;
