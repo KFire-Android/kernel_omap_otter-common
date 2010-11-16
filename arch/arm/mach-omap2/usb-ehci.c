@@ -35,6 +35,7 @@
 #include <plat/omap_hwmod.h>
 #include <linux/pm_runtime.h>
 
+#include <plat/omap-pm.h>
 #include "mux.h"
 
 /*
@@ -239,6 +240,39 @@ static inline u8 uhhtll_omap_readb(void __iomem *base, u8 reg)
 /*-------------------------------------------------------------------------*/
 
 
+#ifdef	CONFIG_PM
+
+/* get the throughput */
+static int uhhtll_get_tput(struct device	*dev)
+{
+
+	return omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT,
+					(200*1000*4));
+}
+
+
+/* release throughput */
+static int uhhtll_put_tput(struct device	*dev)
+{
+
+	return omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, -1);
+}
+
+#else
+static int uhhtll_get_tput(struct device	*dev)
+{
+	return 0;
+}
+
+static int uhhtll_put_tput(struct device	*dev)
+{
+	return 0;
+}
+
+#endif
+
+
+
 /**
  * uhh_hcd_omap_probe - initialize TI-based HCDs
  *
@@ -380,6 +414,8 @@ static int uhhtll_enable(struct uhhtll_hcd_omap *omap)
 	if (omap->count > 0)
 		goto ok_end;
 
+	uhhtll_get_tput(&omap->pdev->dev);
+
 	pm_runtime_get_sync(&omap->pdev->dev);
 
 	if (cpu_is_omap44xx()) {
@@ -498,6 +534,7 @@ err_host_fs_fck:
 	}
 
 err_end:
+	uhhtll_put_tput(&omap->pdev->dev);
 	pm_runtime_put_sync(&omap->pdev->dev);
 	return ret;
 
@@ -583,6 +620,7 @@ static void uhhtll_disable(struct uhhtll_hcd_omap *omap)
 			omap->usbtll_fck = NULL;
 		}
 
+		uhhtll_put_tput(&omap->pdev->dev);
 		pm_runtime_put_sync(&omap->pdev->dev);
 	}
 
