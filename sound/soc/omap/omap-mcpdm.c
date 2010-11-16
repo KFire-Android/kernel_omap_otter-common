@@ -672,12 +672,12 @@ static void omap_mcpdm_abe_dai_shutdown(struct snd_pcm_substream *substream,
 		mcpdm->ul_active--;
 
 	if (!dai->active) {
-		if (mcpdm->ul_active == 0 && substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		if (!mcpdm->ul_active && substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
-			if (!mcpdm->free && !mcpdm->ul_active && !mcpdm->dn_channels)
+			if (!mcpdm->free && !mcpdm->dn_channels)
 				omap_mcpdm_free(mcpdm);
 		}
-		if (mcpdm->dl_active == 0 && substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		if (!mcpdm->dl_active && substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 				schedule_delayed_work(&mcpdm->delayed_abe_work,
 						msecs_to_jiffies(1000)); /* TODO: pdata ? */
 	}
@@ -699,7 +699,7 @@ static void playback_abe_work(struct work_struct *work)
 	}
 	spin_unlock(&mcpdm->lock);
 
-	if (!mcpdm->free && !mcpdm->dl_active && !mcpdm->ul_active)
+	if (!mcpdm->free && !mcpdm->ul_active)
 		omap_mcpdm_free(mcpdm);
 }
 
