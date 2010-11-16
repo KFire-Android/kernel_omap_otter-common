@@ -350,6 +350,8 @@ static int if_hsi_openchannel(struct if_hsi_channel *channel)
 {
 	int ret = 0;
 
+	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__,
+		channel->channel_id);
 	spin_lock(&channel->lock);
 
 	if (channel->state == HSI_CHANNEL_STATE_UNAVAIL)
@@ -383,6 +385,8 @@ static int if_hsi_closechannel(struct if_hsi_channel *channel)
 {
 	int ret = 0;
 
+	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__,
+		channel->channel_id);
 	spin_lock(&channel->lock);
 
 	if (!channel->opened)
@@ -442,7 +446,10 @@ void if_hsi_stop(int ch)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
+	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
+
 	if_hsi_set_wakeline(ch, HSI_IOCTL_ACWAKE_DOWN);
+
 	spin_lock_bh(&hsi_iface.lock);
 	if_hsi_closechannel(channel);
 	spin_unlock_bh(&hsi_iface.lock);
@@ -453,6 +460,9 @@ static int __devinit if_hsi_probe(struct hsi_device *dev)
 	struct if_hsi_channel *channel;
 	unsigned long *address;
 	int ret = -ENXIO, port;
+
+	dev_dbg(&dev->device, "%s, port = %d, ch = %d\n", __func__, dev->n_p,
+		dev->n_ch);
 
 	for (port = 0; port < HSI_MAX_PORTS; port++) {
 		if (if_hsi_char_driver.ch_mask[port])
@@ -490,6 +500,9 @@ static int __devexit if_hsi_remove(struct hsi_device *dev)
 	struct if_hsi_channel *channel;
 	unsigned long *address;
 	int ret = -ENXIO, port;
+
+	dev_dbg(&dev->device, "%s, port = %d, ch = %d\n", __func__, dev->n_p,
+		dev->n_ch);
 
 	for (port = 0; port < HSI_MAX_PORTS; port++) {
 		if (if_hsi_char_driver.ch_mask[port])
@@ -566,6 +579,8 @@ int __init if_hsi_init(unsigned int port, unsigned int *channels_map)
 	struct if_hsi_channel *channel;
 	int i, ret = 0;
 
+	pr_debug("%s, port = %d\n", __func__, port);
+
 	port -= 1;
 	if (port >= HSI_MAX_PORTS)
 		return -EINVAL;
@@ -618,6 +633,8 @@ int __devexit if_hsi_exit(void)
 	struct if_hsi_channel *channel;
 	unsigned long *address;
 	int i, port;
+
+	pr_debug("%s\n", __func__);
 
 	for (port = 0; port < HSI_MAX_PORTS; port++) {
 		if (if_hsi_char_driver.ch_mask[port])

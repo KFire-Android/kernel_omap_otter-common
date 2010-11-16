@@ -99,6 +99,11 @@ static int __init reg_hsi_dev_ch(struct hsi_dev *hsi_ctrl, unsigned int p,
 		dev_set_name(&dev->device, "omap_hsi%d-p%u.c%u", dev->n_ctrl, p,
 			     ch);
 
+	pr_debug
+	    ("HSI DRIVER : reg_hsi_dev_ch, port %d, ch %d, hsi_ctrl->dev:0x%x,"
+		"&dev->device:0x%x\n",
+	     p, ch, (unsigned int)hsi_ctrl->dev, (unsigned int)&dev->device);
+
 	err = device_register(&dev->device);
 	if (err >= 0) {
 		write_lock_bh(&port->hsi_channel[ch].rw_lock);
@@ -458,6 +463,8 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 			"HSI IO memory region information\n");
 		return -ENXIO;
 	}
+	dev_dbg(&pd->dev, "hsi_controller_init : IORESOURCE_MEM %s [%x, %x]\n",
+		 mem->name, mem->start, mem->end);
 
 	ioarea = devm_request_mem_region(&pd->dev, mem->start,
 					 (mem->end - mem->start) + 1,
@@ -466,6 +473,8 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 		dev_err(&pd->dev, "Unable to request HSI IO mem region\n");
 		return -EBUSY;
 	}
+	dev_dbg(&pd->dev, "hsi_controller_init : ioarea %s [%x, %x]\n", ioarea->name,
+		 ioarea->start, ioarea->end);
 
 	hsi_ctrl->phy_base = mem->start;
 	hsi_ctrl->base = devm_ioremap(&pd->dev, mem->start,
@@ -474,6 +483,8 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 		dev_err(&pd->dev, "Unable to ioremap HSI base IO address\n");
 		return -ENXIO;
 	}
+	dev_dbg(&pd->dev, "hsi_controller_init : hsi_ctrl->base=%x\n",
+		 (unsigned int)hsi_ctrl->base);
 
 	hsi_ctrl->id = pd->id;
 	if (pdata->num_ports > HSI_MAX_PORTS) {
@@ -516,6 +527,8 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 	struct hsi_dev *hsi_ctrl;
 	u32 revision;
 	int err;
+
+	dev_dbg(&pd->dev, "HSI DRIVER : hsi_platform_device_probe\n");
 
 	dev_dbg(&pd->dev, "The platform device probed is an %s\n",
 		hsi_driver_device_is_hsi(pd) ? "HSI" : "SSI");
@@ -600,6 +613,8 @@ rollback1:
 static int __exit hsi_platform_device_remove(struct platform_device *pd)
 {
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+
+	dev_dbg(&pd->dev, "HSI DRIVER : hsi_platform_device_remove\n");
 
 	if (!hsi_ctrl)
 		return 0;

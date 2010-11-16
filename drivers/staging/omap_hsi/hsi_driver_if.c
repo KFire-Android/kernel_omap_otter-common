@@ -250,6 +250,8 @@ int hsi_open(struct hsi_device *dev)
 	struct hsi_port *port;
 	struct hsi_dev *hsi_ctrl;
 
+	dev_dbg(&dev->device, "%s\n", __func__);
+
 	if (!dev || !dev->ch) {
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
 		return -EINVAL;
@@ -307,6 +309,9 @@ int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 	struct hsi_channel *ch;
 	int err;
 
+	dev_dbg(&dev->device, "%s @%x, size %d u32\n", __func__, (u32) addr,
+		size);
+
 	if (unlikely(!dev || !dev->ch || !addr || (size <= 0))) {
 		dev_err(&dev->device, "Wrong paramenters "
 			"hsi_device %p data %p count %d", dev, addr, size);
@@ -354,6 +359,9 @@ int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 	struct hsi_channel *ch;
 	int err;
 
+	dev_dbg(&dev->device, "%s @%x, size %d u32\n", __func__, (u32) addr,
+		size);
+
 	if (unlikely(!dev || !dev->ch || !addr || (size <= 0))) {
 		dev_err(&dev->device, "Wrong paramenters "
 			"hsi_device %p data %p count %d", dev, addr, size);
@@ -400,6 +408,8 @@ void __hsi_write_cancel(struct hsi_channel *ch)
  */
 void hsi_write_cancel(struct hsi_device *dev)
 {
+	dev_dbg(&dev->device, "%s\n", __func__);
+
 	if (unlikely(!dev || !dev->ch)) {
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
 		return;
@@ -435,6 +445,8 @@ void __hsi_read_cancel(struct hsi_channel *ch)
  */
 void hsi_read_cancel(struct hsi_device *dev)
 {
+	dev_dbg(&dev->device, "%s\n", __func__);
+
 	if (unlikely(!dev || !dev->ch)) {
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
 		return;
@@ -468,6 +480,8 @@ int hsi_poll(struct hsi_device *dev)
 	struct hsi_channel *ch;
 	struct hsi_dev *hsi_ctrl = dev->ch->hsi_port->hsi_controller;
 	int err;
+
+	dev_dbg(&dev->device, "%s\n", __func__);
 
 	if (unlikely(!dev || !dev->ch))
 		return -EINVAL;
@@ -514,6 +528,8 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	unsigned int port, channel;
 	u32 wake;
 	int err = 0;
+
+	dev_dbg(&dev->device, "IOCTL: command %d\n", command);
 
 	if (unlikely((!dev) ||
 		     (!dev->ch) ||
@@ -711,6 +727,8 @@ void hsi_close(struct hsi_device *dev)
 {
 	struct hsi_dev *hsi_ctrl = dev->ch->hsi_port->hsi_controller;
 
+	dev_dbg(&dev->device, "%s\n", __func__);
+
 	if (!dev || !dev->ch) {
 		pr_err(LOG_NAME "Trying to close wrong HSI device %p\n", dev);
 		return;
@@ -741,6 +759,8 @@ void hsi_set_read_cb(struct hsi_device *dev,
 		     void (*read_cb) (struct hsi_device *dev,
 				      unsigned int size))
 {
+	dev_dbg(&dev->device, "%s\n", __func__);
+
 	dev->ch->read_done = read_cb;
 }
 EXPORT_SYMBOL(hsi_set_read_cb);
@@ -756,6 +776,8 @@ void hsi_set_write_cb(struct hsi_device *dev,
 		      void (*write_cb) (struct hsi_device *dev,
 					unsigned int size))
 {
+	dev_dbg(&dev->device, "%s\n", __func__);
+
 	dev->ch->write_done = write_cb;
 }
 EXPORT_SYMBOL(hsi_set_write_cb);
@@ -770,6 +792,8 @@ void hsi_set_port_event_cb(struct hsi_device *dev,
 						  unsigned int event,
 						  void *arg))
 {
+	dev_dbg(&dev->device, "%s\n", __func__);
+
 	write_lock_bh(&dev->ch->rw_lock);
 	dev->ch->port_event = port_event_cb;
 	write_unlock_bh(&dev->ch->rw_lock);

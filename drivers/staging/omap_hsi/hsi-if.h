@@ -33,9 +33,9 @@
 #define HSI_ERROR		2
 
 struct hsi_event {
-    unsigned int event;
-    u32 *data;
-    unsigned int count;
+	unsigned int event;
+	u32 *data;
+	unsigned int count;
 };
 
 int if_hsi_init(unsigned int port, unsigned int *channels_map);

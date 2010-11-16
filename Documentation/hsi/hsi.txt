@@ -160,16 +160,16 @@ I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 	- arg: parameter for the control command
 
   Commands:
-	- HSI_IOCTL_WAKE_UP:
-		Description: Set HSI wakeup line for the channel
+	- HSI_IOCTL_ACWAKE_UP:
+		Description: Set HSI wakeup line (acwake) for the channel
 		Parameters: None
-	- HSI_IOCTL_WAKE_DOWN:
-		Description: Unset HSI wakeup line for the channel
+	- HSI_IOCTL_ACWAKE_DOWN:
+		Description: Unset HSI wakeup line (acwake) for the channel
 		Parameters: None
 	- HSI_IOCTL_SEND_BREAK:
 		Description: Send a HW BREAK frame in FRAME mode
 		Parameters: None
-	- HSI_IOCTL_WAKE:
+	- HSI_IOCTL_GET_ACWAKE:
 		Description: Get HST WAKE line status
 		Parameters: Pointer to a u32 variable to return result
 		(Result: 0 means wakeline DOWN, other result means wakeline UP)
@@ -179,7 +179,7 @@ I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 	- HSI_IOCTL_FLUSH_TX:
 		Description: Force the HST to idle state
 		Parameters: None
-	- HSI_IOCTL_CAWAKE:
+	- HSI_IOCTL_GET_CAWAKE:
 		Description: Get CAWAKE (HSR) line status
 		Parameters: Pointer to a u32 variable to return result
 		(Result: 0 means wakeline DOWN, other result means wakeline UP)

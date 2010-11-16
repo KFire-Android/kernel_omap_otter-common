@@ -35,7 +35,7 @@
  * This exclusively applies to HSI devices.
  */
 int hsi_fifo_get_id(struct hsi_dev *hsi_ctrl, unsigned int channel,
-					unsigned int port)
+		    unsigned int port)
 {
 	int fifo_index = 0;
 	int err = 0;
@@ -61,14 +61,14 @@ int hsi_fifo_get_id(struct hsi_dev *hsi_ctrl, unsigned int channel,
 		}
 	} else {
 		err = -EPERM;
-		goto  fifo_id_bk;
+		goto fifo_id_bk;
 	}
 
 fifo_id_bk:
 	if (unlikely(err < 0)) {
 		dev_err(hsi_ctrl->dev, "Cannot map a fifo to the requested "
 			"params: channel:%d, port:%d; ERR=%d\n", channel, port,
-								fifo_index);
+			fifo_index);
 		fifo_index = err;
 	}
 
@@ -89,7 +89,7 @@ fifo_id_bk:
  * This exclusively applies to HSI devices.
  */
 int hsi_fifo_get_chan(struct hsi_dev *hsi_ctrl, unsigned int fifo,
-				unsigned int *channel, unsigned int *port)
+		      unsigned int *channel, unsigned int *port)
 {
 	int err = 0;
 
@@ -133,8 +133,7 @@ fifo_id_bk:
  * Note: The mapping is identical for Read and Write path.
  * This exclusively applies to HSI devices.
  */
-int __init hsi_fifo_mapping(struct hsi_dev *hsi_ctrl,
-							unsigned int mtype)
+int __init hsi_fifo_mapping(struct hsi_dev *hsi_ctrl, unsigned int mtype)
 {
 	int err = 0;
 	void __iomem *base = hsi_ctrl->base;
@@ -145,14 +144,14 @@ int __init hsi_fifo_mapping(struct hsi_dev *hsi_ctrl,
 		channel = 0;
 		for (i = 0; i < HSI_HST_FIFO_COUNT; i++) {
 			hsi_outl(HSI_MAPPING_ENABLE |
-				(channel << HSI_MAPPING_CH_NUMBER_OFFSET) |
-				(0 << HSI_MAPPING_PORT_NUMBER_OFFSET) |
-				HSI_HST_MAPPING_THRESH_VALUE,
-				base, HSI_HST_MAPPING_FIFO_REG(i));
+				 (channel << HSI_MAPPING_CH_NUMBER_OFFSET) |
+				 (0 << HSI_MAPPING_PORT_NUMBER_OFFSET) |
+				 HSI_HST_MAPPING_THRESH_VALUE,
+				 base, HSI_HST_MAPPING_FIFO_REG(i));
 			hsi_outl(HSI_MAPPING_ENABLE |
-				(channel << HSI_MAPPING_CH_NUMBER_OFFSET) |
-				(0 << HSI_MAPPING_PORT_NUMBER_OFFSET),
-				base, HSI_HSR_MAPPING_FIFO_REG(i));
+				 (channel << HSI_MAPPING_CH_NUMBER_OFFSET) |
+				 (0 << HSI_MAPPING_PORT_NUMBER_OFFSET),
+				 base, HSI_HSR_MAPPING_FIFO_REG(i));
 			channel++;
 		}
 		hsi_ctrl->fifo_mapping_strategy = HSI_FIFO_MAPPING_ALL_PORT1;
@@ -161,14 +160,14 @@ int __init hsi_fifo_mapping(struct hsi_dev *hsi_ctrl,
 		port = 0;
 		for (i = 0; i < HSI_HST_FIFO_COUNT; i++) {
 			hsi_outl(HSI_MAPPING_ENABLE |
-				(channel << HSI_MAPPING_CH_NUMBER_OFFSET) |
-				(port << HSI_MAPPING_PORT_NUMBER_OFFSET) |
-				HSI_HST_MAPPING_THRESH_VALUE,
-				base, HSI_HST_MAPPING_FIFO_REG(i));
+				 (channel << HSI_MAPPING_CH_NUMBER_OFFSET) |
+				 (port << HSI_MAPPING_PORT_NUMBER_OFFSET) |
+				 HSI_HST_MAPPING_THRESH_VALUE,
+				 base, HSI_HST_MAPPING_FIFO_REG(i));
 			hsi_outl(HSI_MAPPING_ENABLE |
-				(channel << HSI_MAPPING_CH_NUMBER_OFFSET) |
-				(port << HSI_MAPPING_PORT_NUMBER_OFFSET),
-				base, HSI_HSR_MAPPING_FIFO_REG(i));
+				 (channel << HSI_MAPPING_CH_NUMBER_OFFSET) |
+				 (port << HSI_MAPPING_PORT_NUMBER_OFFSET),
+				 base, HSI_HSR_MAPPING_FIFO_REG(i));
 			channel++;
 			if (channel == 8) {
 				channel = 0;
@@ -198,7 +197,8 @@ int __init hsi_fifo_mapping(struct hsi_dev *hsi_ctrl,
  * On HSI: it is linked to the FIFOs (and depend on the SW strategy)
  */
 long hsi_hst_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
-				unsigned int port, unsigned int channel) {
+			    unsigned int port, unsigned int channel)
+{
 	int fifo;
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
@@ -223,7 +223,8 @@ long hsi_hst_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
  * On HSI: it is linked to the FIFOs (and depend on the SW strategy)
  */
 long hsi_hsr_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
-				unsigned int port, unsigned int channel) {
+			    unsigned int port, unsigned int channel)
+{
 	int fifo;
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
@@ -248,7 +249,8 @@ long hsi_hsr_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
  * On HSI: it is linked to the FIFOs (and depend on the SW strategy)
  */
 long hsi_hst_buffer_reg(struct hsi_dev *hsi_ctrl,
-				unsigned int port, unsigned int channel) {
+			unsigned int port, unsigned int channel)
+{
 	int fifo;
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
@@ -273,7 +275,8 @@ long hsi_hst_buffer_reg(struct hsi_dev *hsi_ctrl,
  * On HSI: it is linked to the FIFOs (and depend on the SW strategy)
  */
 long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
-				unsigned int port, unsigned int channel) {
+			unsigned int port, unsigned int channel)
+{
 	int fifo;
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
@@ -285,4 +288,3 @@ long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
 		return HSI_HSR_BUFFER_CH_REG(port, channel);
 	}
 }
-
