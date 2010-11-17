@@ -722,7 +722,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_counter_sysc = {
 	.rev_offs	= 0x0000,
 	.sysc_offs	= 0x0004,
 	.sysc_flags	= SYSC_HAS_SIDLEMODE,
-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO),
 	.sysc_fields	= &omap_hwmod_sysc_type1,
 };
 
@@ -766,6 +766,7 @@ static struct omap_hwmod omap44xx_counter_32k_hwmod = {
 		},
 	},
 	.slaves		= omap44xx_counter_32k_slaves,
+	.flags          = HWMOD_SWSUP_SIDLE,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_counter_32k_slaves),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 };
