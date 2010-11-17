@@ -144,12 +144,23 @@
 
 #define	OMAP_UHH_DEBUG_CSR				(0x44)
 
+
+/* OHCI Register Set */
+#define OHCI_HCCONTROL			0x04
+#define OHCI_HCCONTROL_RESET		(~(3<<6))
+#define OHCI_HCCONTROL_SUSPEND		(3 << 6)
+#define OHCI_HCCONTROL_RESUME		(1 << 6)
+#define OHCI_HCCONTROL_OPERATIONAL	(2 << 6)
+
+
 #if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE) || \
 	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
 
 static const char uhhtllname[] = "uhhtll-omap";
 #define USB_UHH_HS_HWMODNAME				"usb_uhh_hs"
 #define USB_TLL_HS_HWMODNAME				"usb_tll_hs"
+#define USBHS_OHCI_HWMODNAME				"usbhs_ohci"
+#define USBHS_EHCI_HWMODNAME				"usbhs_ehci"
 
 struct uhhtll_hcd_omap {
 	struct platform_device	*pdev;
@@ -167,10 +178,17 @@ struct uhhtll_hcd_omap {
 	void __iomem		*uhh_base;
 	void __iomem		*tll_base;
 
+
 	struct semaphore	mutex;
 	int			count;
 
 	struct usbhs_omap_platform_data platdata;
+
+	u32				ohci_addr_start;
+	u32				ohci_addr_size;
+	void __iomem			*ohci_base;
+	struct omap_hwmod		*uhh_hwmod;
+	u16				hwmod_flags;
 };
 
 static struct uhhtll_hcd_omap uhhtll = {
@@ -312,6 +330,18 @@ static int uhhtll_hcd_omap_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	omap->ohci_base = ioremap(omap->ohci_addr_start,
+					omap->ohci_addr_size);
+	if (!omap->ohci_base) {
+		dev_err(&pdev->dev, "UHH OHCI ioremap failed\n");
+		iounmap(omap->tll_base);
+		iounmap(omap->uhh_base);
+		kfree(omap);
+		return -ENOMEM;
+	}
+
+
+
 	pm_runtime_enable(&pdev->dev);
 
 	omap->pdev = pdev;
@@ -339,6 +369,7 @@ static int uhhtll_hcd_omap_remove(struct platform_device *pdev)
 	}
 
 	pm_runtime_disable(&omap->pdev->dev);
+	iounmap(omap->ohci_base);
 	iounmap(omap->tll_base);
 	iounmap(omap->uhh_base);
 	omap->pdev = NULL;
@@ -403,10 +434,9 @@ static void omap_usb_utmi_init(struct uhhtll_hcd_omap *omap,
 	}
 }
 
-
-static int uhhtll_enable(struct uhhtll_hcd_omap *omap, int do_reset)
+static int uhhtll_enable(struct uhhtll_hcd_omap *omap, int flag)
 {
-	unsigned long timeout = jiffies + msecs_to_jiffies(100);
+	unsigned long timeout;
 	unsigned reg = 0;
 	int ret;
 
@@ -419,33 +449,59 @@ static int uhhtll_enable(struct uhhtll_hcd_omap *omap, int do_reset)
 
 	pm_runtime_get_sync(&omap->pdev->dev);
 
+	omap->hwmod_flags = omap->uhh_hwmod->flags;
+
+	if (omap->uhh_hwmod->flags & HWMOD_SWSUP_SIDLE)
+			omap->uhh_hwmod->flags &= ~(HWMOD_SWSUP_SIDLE);
+
+	if (omap->uhh_hwmod->flags & HWMOD_SWSUP_MSTANDBY)
+			omap->uhh_hwmod->flags &= ~(HWMOD_SWSUP_MSTANDBY);
+
 	if (cpu_is_omap44xx()) {
 
-		/* Put UHH in NoIdle/NoStandby mode */
+		/* Put UHH in smart idle and smart standby mode */
 		reg = uhhtll_omap_read(omap->uhh_base, OMAP_UHH_SYSCONFIG);
 		reg &= OMAP_UHH_SYSCONFIG_IDLEMODE_RESET;
-		reg |= OMAP_UHH_SYSCONFIG_NIDLEMODE_SET;
+		reg |= OMAP_UHH_SYSCONFIG_SIDLEMODE_SET;
 
 		reg &= OMAP_UHH_SYSCONFIG_STDYMODE_RESET;
-		reg |= OMAP_UHH_SYSCONFIG_NSTDYMODE_SET;
+		reg |= OMAP_UHH_SYSCONFIG_SSTDYMODE_SET;
 
 		uhhtll_omap_write(omap->uhh_base, OMAP_UHH_SYSCONFIG, reg);
-		reg = uhhtll_omap_read(omap->uhh_base, OMAP_UHH_HOSTCONFIG);
 
-		/* setup ULPI bypass and burst configurations */
-		reg |= (OMAP_UHH_HOSTCONFIG_INCR4_BURST_EN |
-			OMAP_UHH_HOSTCONFIG_INCR8_BURST_EN |
-			OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN);
-		reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
+		if (flag) {
 
-		/*
-		 * FIXME: This bit is currently undocumented.
-		 * Update this commennt after the documentation
-		 * is properly updated
-		 */
-		reg |= OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
+			reg = uhhtll_omap_read(omap->uhh_base,
+					OMAP_UHH_HOSTCONFIG);
 
-		uhhtll_omap_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
+			/* setup ULPI bypass and burst configurations */
+			reg |= (OMAP_UHH_HOSTCONFIG_INCR4_BURST_EN |
+				OMAP_UHH_HOSTCONFIG_INCR8_BURST_EN |
+				OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN);
+			reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
+
+			/*
+			 * FIXME: This bit is currently undocumented.
+			 * Update this commennt after the documentation
+			 * is properly updated
+			 */
+			reg |= OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
+
+			uhhtll_omap_write(omap->uhh_base,
+					OMAP_UHH_HOSTCONFIG, reg);
+
+			/* configure OHCI to suspend; this will
+			 * help if OHCI is not loaded
+			 */
+			reg = uhhtll_omap_read(omap->ohci_base, OHCI_HCCONTROL);
+
+			reg &= OHCI_HCCONTROL_RESET;
+			reg |= OHCI_HCCONTROL_SUSPEND;
+
+			uhhtll_omap_write(omap->ohci_base,
+					OHCI_HCCONTROL, reg);
+
+		}
 
 		goto ok_end;
 
@@ -475,13 +531,15 @@ static int uhhtll_enable(struct uhhtll_hcd_omap *omap, int do_reset)
 		}
 		clk_enable(omap->usbtll_fck);
 
-		if (do_reset) {
+		if (flag) {
 
 			/* perform TLL soft reset, and wait
 				until reset is complete */
 			uhhtll_omap_write(omap->tll_base,
 				OMAP_USBTLL_SYSCONFIG,
 				OMAP_USBTLL_SYSCONFIG_SOFTRESET);
+
+			timeout = jiffies + msecs_to_jiffies(1000);
 
 			/* Wait for TLL reset to complete */
 			while (!(uhhtll_omap_read(omap->tll_base,
@@ -564,57 +622,55 @@ static void uhhtll_disable(struct uhhtll_hcd_omap *omap, int do_reset)
 
 	if (omap->count == 0) {
 
-		if (do_reset) {
-
-			if (cpu_is_omap44xx())
-				uhhtll_omap_write(omap->uhh_base,
-						OMAP_UHH_SYSCONFIG,
-					OMAP4_UHH_SYSCONFIG_SOFTRESET);
-			else
-				uhhtll_omap_write(omap->uhh_base,
-						OMAP_UHH_SYSCONFIG,
-					OMAP_UHH_SYSCONFIG_SOFTRESET);
-			while (!(uhhtll_omap_read(omap->uhh_base,
-				OMAP_UHH_SYSSTATUS) & (1 << 0))) {
-				cpu_relax();
-
-				if (time_after(jiffies, timeout))
-					dev_dbg(&omap->pdev->dev,
-						"operation timed out\n");
-			}
-
-			while (!(uhhtll_omap_read(omap->uhh_base,
-				OMAP_UHH_SYSSTATUS) & (1 << 1))) {
-				cpu_relax();
-
-				if (time_after(jiffies, timeout))
-					dev_dbg(&omap->pdev->dev,
-					"operation timed out\n");
-			}
-
-			while (!(uhhtll_omap_read(omap->uhh_base,
-				OMAP_UHH_SYSSTATUS) & (1 << 2))) {
-				cpu_relax();
-
-				if (time_after(jiffies, timeout))
-					dev_dbg(&omap->pdev->dev,
-						"operation timed out\n");
-			}
-
-			uhhtll_omap_write(omap->tll_base, OMAP_USBTLL_SYSCONFIG,
-								(1 << 1));
-
-			while (!(uhhtll_omap_read(omap->tll_base,
-				OMAP_USBTLL_SYSSTATUS) & (1 << 0))) {
-				cpu_relax();
-
-				if (time_after(jiffies, timeout))
-					dev_dbg(&omap->pdev->dev,
-						"operation timed out\n");
-			}
-		}
+		omap->uhh_hwmod->flags = omap->hwmod_flags;
 
 		if (cpu_is_omap34xx()) {
+
+			if (do_reset) {
+
+				uhhtll_omap_write(omap->uhh_base,
+						OMAP_UHH_SYSCONFIG,
+						OMAP_UHH_SYSCONFIG_SOFTRESET);
+				while (!(uhhtll_omap_read(omap->uhh_base,
+					OMAP_UHH_SYSSTATUS) & (1 << 0))) {
+					cpu_relax();
+
+					if (time_after(jiffies, timeout))
+						dev_dbg(&omap->pdev->dev,
+						"operation timed out\n");
+				}
+
+				while (!(uhhtll_omap_read(omap->uhh_base,
+					OMAP_UHH_SYSSTATUS) & (1 << 1))) {
+					cpu_relax();
+
+					if (time_after(jiffies, timeout))
+						dev_dbg(&omap->pdev->dev,
+						"operation timed out\n");
+				}
+
+				while (!(uhhtll_omap_read(omap->uhh_base,
+					OMAP_UHH_SYSSTATUS) & (1 << 2))) {
+					cpu_relax();
+
+					if (time_after(jiffies, timeout))
+						dev_dbg(&omap->pdev->dev,
+						"operation timed out\n");
+				}
+
+				uhhtll_omap_write(omap->tll_base,
+							OMAP_USBTLL_SYSCONFIG,
+							(1 << 1));
+
+				while (!(uhhtll_omap_read(omap->tll_base,
+					OMAP_USBTLL_SYSSTATUS) & (1 << 0))) {
+					cpu_relax();
+
+					if (time_after(jiffies, timeout))
+						dev_dbg(&omap->pdev->dev,
+						"operation timed out\n");
+				}
+			}
 
 			if (omap->usbhost_fs_fck != NULL) {
 				clk_disable(omap->usbhost_fs_fck);
@@ -672,6 +728,8 @@ static int uhhtll_ehci_resume(struct uhhtll_hcd_omap *omap,
 		if (omap->utmi_p2_fck != NULL)
 			clk_enable(omap->utmi_p2_fck);
 	}
+
+	return 0;
 }
 
 static void uhhtll_ehci_suspend(struct uhhtll_hcd_omap *omap,
@@ -1987,8 +2045,9 @@ static void setup_4430ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 
 void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 {
-	struct omap_hwmod *oh[2];
+	struct omap_hwmod *oh[2], *ohci_oh;
 	struct omap_device *od;
+	struct omap_hwmod_addr_space *taddr;
 	int  bus_id = -1;
 
 	if (cpu_is_omap34xx()) {
@@ -2012,6 +2071,13 @@ void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 		return;
 	}
 
+	ohci_oh = omap_hwmod_lookup(USBHS_OHCI_HWMODNAME);
+
+	if (!ohci_oh) {
+		pr_err("Could not look up %s\n", USBHS_OHCI_HWMODNAME);
+		return;
+	}
+
 	od = omap_device_build_ss(uhhtllname, bus_id, oh, 2,
 				(void *)pdata, sizeof(*pdata),
 				omap_uhhtll_latency,
@@ -2024,6 +2090,13 @@ void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 	}
 
 	sema_init(&uhhtll.mutex, 1);
+
+	/*we know that first address is OHCI base address */
+	taddr = &(ohci_oh->slaves[0]->addr[0]);
+	uhhtll.ohci_addr_start = taddr->pa_start;
+	uhhtll.ohci_addr_size = taddr->pa_end - taddr->pa_start + 1;
+
+	uhhtll.uhh_hwmod = oh[0];
 
 	if (platform_driver_register(&uhhtll_hcd_omap_driver) < 0) {
 		pr_err("Unable to register HSUSB UHH TLL driver\n");
@@ -2045,7 +2118,6 @@ void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 
 
 static const char ehciname[] = "ehci-omap";
-#define USBHS_EHCI_HWMODNAME				"usbhs_ehci"
 static u64 ehci_dmamask = ~(u32)0;
 
 
@@ -2100,8 +2172,6 @@ void __init usb_ehci_init(void)
 
 
 static const char ohciname[] = "ohci-omap3";
-#define USBHS_OHCI_HWMODNAME				"usbhs_ohci"
-
 static u64 ohci_dmamask = DMA_BIT_MASK(32);
 
 
