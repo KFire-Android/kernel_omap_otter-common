@@ -117,7 +117,7 @@ static int layout_packed_nv12(char *offsets, int y_width, int uv_width,
 			/* this formula only works for even ys */
 			uv_sysptr[i] = base + (0x3FFF & (unsigned long) base)
 				+ 0x8000000;
-			uv_allocptr[i] = page_offset ? NULL : uv_sysptr[i];
+			uv_allocptr[i] = page_offset ? NULL : base;
 			i++;
 		} else {
 			y_sysptr[i] = base;
