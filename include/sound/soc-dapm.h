@@ -497,6 +497,7 @@ struct snd_soc_dapm_context {
 	struct device *dev; /* from parent - for debug */
 	struct snd_soc_codec *codec; /* parent codec */
 	struct snd_soc_platform *platform; /*parent platform */
+	int (*stream_event)(struct snd_soc_dapm_context *dapm);
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_dapm;
 #endif

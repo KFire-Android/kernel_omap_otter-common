@@ -3436,6 +3436,7 @@ int snd_soc_register_platform(struct device *dev,
 		return -ENOMEM;
 	}
 	platform->dapm->platform = platform;
+	platform->dapm->stream_event = platform_drv->stream_event;
 
 	platform->dev = dev;
 	platform->driver = platform_drv;
@@ -3545,6 +3546,7 @@ int snd_soc_register_codec(struct device *dev,
 		return -ENOMEM;
 	}
 	codec->dapm->codec = codec;
+	codec->dapm->stream_event = codec_drv->stream_event;
 
 	/* allocate CODEC register cache */
 	if (codec_drv->reg_cache_size && codec_drv->reg_word_size) {
