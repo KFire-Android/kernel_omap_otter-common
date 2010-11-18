@@ -1884,3 +1884,20 @@ abehal_status abe_enable_test_pattern(u32 smem_id, u32 on_off)
 	return 0;
 }
 EXPORT_SYMBOL(abe_enable_test_pattern);
+/**
+ * abe_wakeup - Wakeup ABE
+ *
+ * Wakeup ABE in case of retention
+ */
+abehal_status abe_wakeup(void)
+{
+	/* Restart event generator */
+	abe_write_event_generator(EVENT_TIMER);
+
+	/* reconfigure DMA Req and MCU Irq visibility */
+	abe_hw_configuration();
+
+	return 0;
+}
+EXPORT_SYMBOL(abe_wakeup);
+
