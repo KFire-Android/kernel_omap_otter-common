@@ -183,9 +183,15 @@ static void abe_irq_pingpong_subroutine(void)
 
 static irqreturn_t abe_irq_handler(int irq, void *dev_id)
 {
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
 	/* TODO: handle underruns/overruns/errors */
+	pm_runtime_get_sync(&pdev->dev);
 	abe_irq_clear();
 	abe_irq_processing();
+	pm_runtime_put_sync(&pdev->dev);
+
 	return IRQ_HANDLED;
 }
 
