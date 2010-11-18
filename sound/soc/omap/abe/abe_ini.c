@@ -46,6 +46,25 @@ void abe_hw_configuration()
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_ATC, 0x3C, &atc_reg, 4);
 }
 /**
+ * abe_disable_clear - disable MCU/DSP ABE interrupt
+ *
+ * This subroutine is disabling ABE MCU/DSP Irq
+ */
+abehal_status abe_disable_irq(void)
+{
+	u32 atc_reg;
+
+	/* disables the DMAreq from AESS AESS_DMAENABLE_CLR = 127
+	 * DMA_Req7 will still be enabled as it is used for ABE trace */
+	atc_reg = 0x7F;
+	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_ATC, 0x64, &atc_reg, 4);
+	/* disables the MCU IRQ from AESS to Cortex A9 */
+	atc_reg = 0x01;
+	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_ATC, 0x40, &atc_reg, 4);
+
+	return 0;
+}
+/**
  * abe_build_scheduler_table
  *
  */

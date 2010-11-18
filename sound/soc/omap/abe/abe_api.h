@@ -98,6 +98,12 @@ abehal_status abe_irq_processing(void);
  */
 abehal_status abe_irq_clear(void);
 /**
+ * abe_disable_clear - disable MCU/DSP ABE interrupt
+ *
+ * This subroutine is disabling ABE MCU/DSP Irq
+ */
+abehal_status abe_disable_irq(void);
+/**
  * abe_select_main_port - Select stynchronization port for Event generator.
  * @id: audio port name
  *
