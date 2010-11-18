@@ -1804,11 +1804,10 @@ static int aess_close(struct snd_pcm_substream *substream)
 	abe->fe_id = dai->id;
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
 
-	aess_set_opp_mode();
-
-	if (!--abe->active)
+	if (!--abe->active) {
+		abe_disable_irq();
 		abe_dsp_shutdown();
-
+	}
 	pm_runtime_put_sync(&pdev->dev);
 
 	mutex_unlock(&abe->mutex);
