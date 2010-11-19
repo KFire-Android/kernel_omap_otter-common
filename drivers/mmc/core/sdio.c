@@ -446,9 +446,11 @@ static void mmc_sdio_detect(struct mmc_host *host)
 	BUG_ON(!host->card);
 
 	/* Make sure card is powered before detecting it */
-	err = pm_runtime_get_sync(&host->card->dev);
-	if (err < 0)
-		goto out;
+	if (host->caps & MMC_CAP_POWER_OFF_CARD) {
+		err = pm_runtime_get_sync(&host->card->dev);
+		if (err < 0)
+			goto out;
+	}
 
 	mmc_claim_host(host);
 
@@ -470,7 +472,8 @@ static void mmc_sdio_detect(struct mmc_host *host)
 	 * is about to show up at this point, the _sync variant is
 	 * desirable anyway.
 	 */
-	pm_runtime_put_sync(&host->card->dev);
+	if (host->caps & MMC_CAP_POWER_OFF_CARD)
+		pm_runtime_put_sync(&host->card->dev);
 
 out:
 	if (err) {
@@ -630,16 +633,21 @@ int mmc_attach_sdio(struct mmc_host *host, u32 ocr)
 	card = host->card;
 
 	/*
-	 * Let runtime PM core know our card is active
+	 * Enable runtime PM only if supported by host+card+board
 	 */
-	err = pm_runtime_set_active(&card->dev);
-	if (err)
-		goto remove;
+	if (host->caps & MMC_CAP_POWER_OFF_CARD) {
+		/*
+		 * Let runtime PM core know our card is active
+		 */
+		err = pm_runtime_set_active(&card->dev);
+		if (err)
+			goto remove;
 
-	/*
-	 * Enable runtime PM for this card
-	 */
-	pm_runtime_enable(&card->dev);
+		/*
+		 * Enable runtime PM for this card
+		 */
+		pm_runtime_enable(&card->dev);
+	}
 
 	/*
 	 * The number of functions on the card is encoded inside
@@ -680,9 +688,10 @@ int mmc_attach_sdio(struct mmc_host *host, u32 ocr)
 			goto remove;
 
 		/*
-		 * Enable Runtime PM for this func
+		 * Enable Runtime PM for this func (if supported)
 		 */
-		pm_runtime_enable(&card->sdio_func[i]->dev);
+		if (host->caps & MMC_CAP_POWER_OFF_CARD)
+			pm_runtime_enable(&card->sdio_func[i]->dev);
 #ifdef CONFIG_TIWLAN_SDIO
 	}
 #endif
