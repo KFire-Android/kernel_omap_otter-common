@@ -645,17 +645,22 @@ static int omap_mcpdm_abe_dai_startup(struct snd_pcm_substream *substream,
 	int ret;
 
 	/* make sure we stop any pre-existing shutdown */
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		cancel_delayed_work(&mcpdm->delayed_abe_work);
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		ret = cancel_delayed_work(&mcpdm->delayed_abe_work);
+		if (ret)
+			abe_dsp_pm_put();
+	}
 
 	ret = omap_mcpdm_dai_startup(substream, dai);
 	if (ret < 0)
 		return ret;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mcpdm->dl_active++;
-	else
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		if (!mcpdm->dl_active++)
+			abe_dsp_pm_get();
+	} else
 		mcpdm->ul_active++;
+
 	return ret;
 }
 
@@ -692,12 +697,14 @@ static void playback_abe_work(struct work_struct *work)
 
 	spin_lock(&mcpdm->lock);
 	if (!mcpdm->dl_active && mcpdm->dn_channels) {
-		abe_dsp_disable_data_transfer(PDM_DL_PORT);
+		abe_disable_data_transfer(PDM_DL_PORT);
+		udelay(250);
 		omap_mcpdm_stop(mcpdm, SNDRV_PCM_STREAM_PLAYBACK);
 		omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
 		abe_dsp_shutdown();
 	}
 	spin_unlock(&mcpdm->lock);
+	abe_dsp_pm_put();
 
 	if (!mcpdm->free && !mcpdm->ul_active)
 		omap_mcpdm_free(mcpdm);
@@ -714,31 +721,31 @@ static int omap_mcpdm_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	snd_soc_dai_set_dma_data(dai, substream,
 				 &omap_mcpdm_dai_dma_params[stream]);
 
-	spin_lock(&mcpdm->lock);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		u32 ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
-
+		spin_lock(&mcpdm->lock);
 		/* Check if McPDM is already started */
-		if ((ctrl & (PDM_DN_MASK | PDM_CMD_MASK)) == 0 ) {
+		if (!mcpdm->dn_channels) {
 			/* start ATC before McPDM IP */
-			abe_dsp_enable_data_transfer(PDM_DL_PORT);
+			abe_enable_data_transfer(PDM_DL_PORT);
 			udelay(250);
 			mcpdm->downlink->channels = (PDM_DN_MASK | PDM_CMD_MASK);
 
 			ret = omap_mcpdm_playback_open(mcpdm, &omap_mcpdm_links[0]);
-			if (ret < 0)
+			if (ret < 0) {
+				spin_unlock(&mcpdm->lock);
 				goto out;
+			}
 
 			omap_mcpdm_start(mcpdm, stream);
 		}
+		spin_unlock(&mcpdm->lock);
 	} else {
 		mcpdm->uplink->channels = 0x0003;
 		ret = omap_mcpdm_capture_open(mcpdm, &omap_mcpdm_links[1]);
 	}
 
 out:
-	spin_unlock(&mcpdm->lock);
 	return ret;
 }
 

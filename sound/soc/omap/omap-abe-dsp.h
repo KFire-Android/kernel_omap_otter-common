@@ -24,8 +24,8 @@
 #ifndef __OMAP_ABE_DSP_H__
 #define __OMAP_ABE_DSP_H__
 
-void abe_dsp_enable_data_transfer(int port);
-void abe_dsp_disable_data_transfer(int port);
 void abe_dsp_shutdown(void);
+void abe_dsp_pm_get(void);
+void abe_dsp_pm_put(void);
 
 #endif	/* End of __OMAP_ABE_DSP_H__ */
