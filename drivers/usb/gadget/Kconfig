@@ -190,7 +190,7 @@ config USB_LH7A40X
 
 config USB_GADGET_OMAP
 	boolean "OMAP USB Device Controller"
-	depends on ARCH_OMAP
+	depends on ARCH_OMAP && !USB_MUSB_HDRC
 	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3 || MACH_OMAP_H4_OTG
 	select USB_OTG_UTILS if ARCH_OMAP
 	help
@@ -255,6 +255,7 @@ config USB_PXA25X_SMALL
 
 config USB_GADGET_R8A66597
 	boolean "Renesas R8A66597 USB Peripheral Controller"
+	depends on !USB_MUSB_HDRC
 	select USB_GADGET_DUALSPEED
 	help
 	   R8A66597 is a discrete USB host and peripheral controller chip that
@@ -365,6 +366,7 @@ config USB_GADGET_MUSB_HDRC
 
 config USB_GADGET_M66592
 	boolean "Renesas M66592 USB Peripheral Controller"
+	depends on !USB_MUSB_HDRC
 	select USB_GADGET_DUALSPEED
 	help
 	   M66592 is a discrete USB peripheral controller chip that
@@ -513,7 +515,7 @@ config USB_LANGWELL
 
 config USB_GADGET_DUMMY_HCD
 	boolean "Dummy HCD (DEVELOPMENT)"
-	depends on USB=y || (USB=m && USB_GADGET=m)
+	depends on !USB_MUSB_HDRC && (USB=y || (USB=m && USB_GADGET=m))
 	select USB_GADGET_DUALSPEED
 	help
 	  This host controller driver emulates USB, looping all data transfer

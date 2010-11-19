@@ -82,6 +82,7 @@ choice
 config USB_MUSB_HOST
 	depends on USB
 	bool "USB Host"
+	select USB_MUSB_HDRC_HCD
 	help
 	  Say Y here if your system supports the USB host role.
 	  If it has a USB "A" (rectangular), "Mini-A" (uncommon),
@@ -103,6 +104,7 @@ config USB_MUSB_PERIPHERAL
 config USB_MUSB_OTG
 	depends on USB && USB_GADGET && PM && EXPERIMENTAL
 	bool "Both host and peripheral:  USB OTG (On The Go) Device"
+	select USB_MUSB_HDRC_HCD
 	select USB_GADGET_MUSB_HDRC
 	select USB_OTG
 	help
