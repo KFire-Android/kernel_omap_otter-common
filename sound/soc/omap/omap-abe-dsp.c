@@ -1658,7 +1658,8 @@ static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 				PING_PONG_WITH_MCU_IRQ);
 
 	/* Memory mapping for hw params */
-	runtime->dma_area  = abe->io_base + ABE_DMEM_BASE_OFFSET_MPU + dst;
+	runtime->dma_area  = abe->io_base + ABE_DMEM_BASE_OFFSET_MPU +
+				ABE_VM_AESS_OFFSET + dst;
 	runtime->dma_addr  = 0;
 	runtime->dma_bytes = N_SAMPLES_BYTES * 2;
 
