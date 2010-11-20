@@ -24,6 +24,10 @@
 #ifndef __OMAP_ABE_DSP_H__
 #define __OMAP_ABE_DSP_H__
 
+#define N_SAMPLES_BYTES			(6144 * 4)	/* Samples * bytes */
+#define ABE_DMEM_BASE_OFFSET_MPU	0x4000		/* Ping start offset of DMEM */
+#define ABE_DMEM_BASE_ADDRESS_MPU	0x49080000L	/* Pong start offset of DMEM */
+
 void abe_dsp_shutdown(void);
 void abe_dsp_pm_get(void);
 void abe_dsp_pm_put(void);

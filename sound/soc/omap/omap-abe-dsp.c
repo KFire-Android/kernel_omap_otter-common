@@ -93,6 +93,7 @@ static const struct snd_pcm_hardware omap_abe_hardware = {
 	.info			= SNDRV_PCM_INFO_MMAP |
 				  SNDRV_PCM_INFO_MMAP_VALID |
 				  SNDRV_PCM_INFO_INTERLEAVED |
+				  SNDRV_PCM_INFO_BLOCK_TRANSFER |
 				  SNDRV_PCM_INFO_PAUSE |
 				  SNDRV_PCM_INFO_RESUME,
 	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
@@ -145,6 +146,10 @@ struct abe_data {
 	u32 dapm[ABE_NUM_DAPM_REG];
 
 	u16 router[16];
+
+	u32 *psubs;
+
+	int mmap_trigger;
 };
 
 static struct abe_data *abe;
@@ -171,6 +176,16 @@ static int abe_dsp_write(struct snd_soc_platform *platform, unsigned int reg,
 static irqreturn_t abe_irq_handler(int irq, void *dev_id)
 {
 	/* TODO: handle underruns/overruns/errors */
+	struct snd_pcm_substream *subs =
+			(struct snd_pcm_substream *)abe->psubs;
+	u32 dst, n_bytes;
+
+	abe_irq_processing();
+	abe_read_next_ping_pong_buffer(MM_DL_PORT, &dst, &n_bytes);
+	abe_set_ping_pong_buffer(MM_DL_PORT, n_bytes);
+	if (abe->mmap_trigger)
+		snd_pcm_period_elapsed(subs);
+
 	return IRQ_HANDLED;
 }
 
@@ -191,8 +206,8 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 	 */
 	pm_runtime_get_sync(&pdev->dev);
 
-	ret = request_irq(abe->irq, abe_irq_handler,
-				0, "ABE", (void *)abe);
+	ret = request_threaded_irq(abe->irq, NULL, abe_irq_handler,
+				IRQF_ONESHOT, "ABE", (void *)abe);
 	if (ret) {
 		dev_err(platform->dev, "request for ABE IRQ %d failed %d\n",
 				abe->irq, ret);
@@ -1616,23 +1631,51 @@ static int aess_open(struct snd_pcm_substream *substream)
 	mutex_unlock(&abe->mutex);
 	return 0;
 }
+static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
+	struct snd_pcm_substream *substream)
+{
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	abe_data_format_t format;
+	u32 dst;
+
+	/*Storing substream pointer for irq*/
+	abe->psubs = (u32 *)substream;
+	/* Triggers elapsed period on ABE irq handler*/
+	abe->mmap_trigger = 1;
+
+	format.f = params_rate(params);
+	format.samp_format = STEREO_16_16;
+
+	/* Connect a Ping-Pong cache-flush protocol to MM_DL port */
+	abe_connect_irq_ping_pong_port(MM_DL_PORT, &format,
+				       abe_irq_pingpong_player_id,
+				       N_SAMPLES_BYTES, &dst,
+				       PING_PONG_WITH_MCU_IRQ);
+
+	/* Memory mapping for hw params */
+	runtime->dma_area  = abe->io_base + ABE_DMEM_BASE_OFFSET_MPU + dst;
+	runtime->dma_addr  = 0;
+	runtime->dma_bytes = N_SAMPLES_BYTES;
+
+	return 0;
+}
 
 static int aess_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
-	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *dai = rtd->cpu_dai;
+	int ret = 0;
 
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
-
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MODEM:
 		break;
 	case ABE_FRONTEND_DAI_LP_MEDIA:
-		snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
-		runtime->dma_bytes = params_buffer_bytes(params);
+		ret = abe_ping_pong_init(params, substream);
+		if (ret < 0)
+			return ret;
 		break;
 	default:
 		break;
