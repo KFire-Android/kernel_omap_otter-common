@@ -98,11 +98,11 @@ static const struct snd_pcm_hardware omap_abe_hardware = {
 				  SNDRV_PCM_INFO_RESUME,
 	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
 				  SNDRV_PCM_FMTBIT_S32_LE,
-	.period_bytes_min	= 12 * 1024,
-	.period_bytes_max	= 12 * 1024,
+	.period_bytes_min	= 24 * 1024,
+	.period_bytes_max	= 24 * 1024,
 	.periods_min		= 2,
 	.periods_max		= 2,
-	.buffer_bytes_max	= 12 * 1024 * 2,
+	.buffer_bytes_max	= 24 * 1024 * 2,
 };
 
 /*
@@ -1725,21 +1725,23 @@ static int aess_close(struct snd_pcm_substream *substream)
 static int aess_mmap(struct snd_pcm_substream *substream,
 	struct vm_area_struct *vma)
 {
-	struct snd_pcm_runtime *runtime = substream->runtime;
-	int ret;
+	int offset, size, err;
 
 	/* TODO: we may need to check for underrun. */
+	vma->vm_flags |= VM_IO | VM_RESERVED;
+	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+	size = vma->vm_end - vma->vm_start;
+	offset = vma->vm_pgoff << PAGE_SHIFT;
 
-	ret = dma_mmap_writecombine(substream->pcm->card->dev, vma,
-				     runtime->dma_area,
-				     runtime->dma_addr,
-				     runtime->dma_bytes);
-	if (ret < 0)
-		return ret;
+	err = io_remap_pfn_range(vma, vma->vm_start,
+			(ABE_DMEM_BASE_ADDRESS_MPU + ABE_DMEM_BASE_OFFSET_MPU + offset) >> PAGE_SHIFT,
+			 size, vma->vm_page_prot);
 
-	/* TODO: tell ABE we have new period. */
-	/* abe_blah(); */
+	if (err)
+		return -EAGAIN;
+
 	return 0;
+
 }
 
 static struct snd_pcm_ops omap_aess_pcm_ops = {
@@ -1764,90 +1766,10 @@ static int aess_stream_event(struct snd_soc_dapm_context *dapm)
 	return 0;
 }
 
-/* TODO: MODEM doesn't need this although low power mmap() does */
-/* TODO: We need the buffer less IOCTL() to support MODEM */
-static u64 omap_pcm_dmamask = DMA_BIT_MASK(64);
-
-static int aess_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
-	int stream)
-{
-	struct snd_pcm_substream *substream = pcm->streams[stream].substream;
-	struct snd_dma_buffer *buf = &substream->dma_buffer;
-	size_t size = omap_abe_hardware.buffer_bytes_max;
-
-	buf->dev.type = SNDRV_DMA_TYPE_DEV;
-	buf->dev.dev = pcm->card->dev;
-	buf->private_data = NULL;
-	buf->area = dma_alloc_writecombine(pcm->card->dev, size,
-					   &buf->addr, GFP_KERNEL);
-
-	if (!buf->area)
-		return -ENOMEM;
-
-	buf->bytes = size;
-
-	return 0;
-}
-
-static void aess_pcm_free_dma_buffers(struct snd_pcm *pcm)
-{
-	struct snd_pcm_substream *substream;
-	struct snd_dma_buffer *buf;
-	int stream;
-
-	for (stream = 0; stream < 2; stream++) {
-		substream = pcm->streams[stream].substream;
-		if (!substream)
-			continue;
-
-		buf = &substream->dma_buffer;
-		if (!buf->area)
-			continue;
-
-		dma_free_writecombine(pcm->card->dev, buf->bytes,
-				      buf->area, buf->addr);
-		buf->area = NULL;
-	}
-}
-
-static int aess_pcm_new(struct snd_soc_pcm_runtime *rtd)
-{
-	struct snd_card *card = rtd->card->snd_card;
-	struct snd_pcm *pcm = rtd->pcm;
-	int ret = 0;
-
-	if (rtd->dai_link->no_host_mode)
-		return 0;
-
-	if (!card->dev->dma_mask)
-		card->dev->dma_mask = &omap_pcm_dmamask;
-	if (!card->dev->coherent_dma_mask)
-		card->dev->coherent_dma_mask = DMA_BIT_MASK(64);
-
-	if (pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream) {
-		ret = aess_pcm_preallocate_dma_buffer(pcm,
-			SNDRV_PCM_STREAM_PLAYBACK);
-		if (ret)
-			goto out;
-	}
-
-	if (pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream) {
-		ret = aess_pcm_preallocate_dma_buffer(pcm,
-			SNDRV_PCM_STREAM_CAPTURE);
-		if (ret)
-			goto out;
-	}
-
-out:
-	return ret;
-}
-
 static struct snd_soc_platform_driver omap_aess_platform = {
 	.ops	= &omap_aess_pcm_ops,
 	.probe = abe_probe,
 	.remove = abe_remove,
-	.pcm_new	= aess_pcm_new,
-	.pcm_free	= aess_pcm_free_dma_buffers,
 	.read = abe_dsp_read,
 	.write = abe_dsp_write,
 	.stream_event = aess_stream_event,
