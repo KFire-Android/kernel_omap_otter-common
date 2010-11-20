@@ -1093,11 +1093,13 @@ static void enable_fe_ports(struct snd_pcm_substream *substream, int stream)
 
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
-	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			abe_enable_data_transfer(MM_DL_PORT);
 		else
 			abe_enable_data_transfer(MM_UL_PORT);
+		break;
+	case ABE_FRONTEND_DAI_LP_MEDIA:
+		abe_enable_irq_transfer(MM_DL_PORT);
 		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 		if (stream == SNDRV_PCM_STREAM_CAPTURE)
@@ -1207,11 +1209,13 @@ static void disable_fe_ports(struct snd_pcm_substream *substream, int stream)
 
 	switch(rtd->cpu_dai->id) {
 	case ABE_FRONTEND_DAI_MEDIA:
-	case ABE_FRONTEND_DAI_LP_MEDIA:
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 			abe_disable_data_transfer(MM_DL_PORT);
 		else
 			abe_disable_data_transfer(MM_UL_PORT);
+		break;
+	case ABE_FRONTEND_DAI_LP_MEDIA:
+		abe_disable_irq_transfer(MM_DL_PORT);
 		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 		if (stream == SNDRV_PCM_STREAM_CAPTURE)

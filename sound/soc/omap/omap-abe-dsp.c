@@ -99,7 +99,7 @@ static const struct snd_pcm_hardware omap_abe_hardware = {
 	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
 				  SNDRV_PCM_FMTBIT_S32_LE,
 	.period_bytes_min	= 24 * 1024,
-	.period_bytes_max	= 24 * 1024,
+	.period_bytes_max	= 48 * 1024,
 	.periods_min		= 2,
 	.periods_max		= 2,
 	.buffer_bytes_max	= 24 * 1024 * 2,
@@ -147,9 +147,8 @@ struct abe_data {
 
 	u16 router[16];
 
-	u32 *psubs;
+	struct snd_pcm_substream *psubs;
 
-	int mmap_trigger;
 };
 
 static struct abe_data *abe;
@@ -173,19 +172,20 @@ static int abe_dsp_write(struct snd_soc_platform *platform, unsigned int reg,
 	return 0;
 }
 
+static void abe_irq_pingpong_subroutine(void)
+{
+	u32 dst, n_bytes;
+
+	abe_read_next_ping_pong_buffer(MM_DL_PORT, &dst, &n_bytes);
+	abe_set_ping_pong_buffer(MM_DL_PORT, n_bytes);
+	snd_pcm_period_elapsed(abe->psubs);
+}
+
 static irqreturn_t abe_irq_handler(int irq, void *dev_id)
 {
 	/* TODO: handle underruns/overruns/errors */
-	struct snd_pcm_substream *subs =
-			(struct snd_pcm_substream *)abe->psubs;
-	u32 dst, n_bytes;
-
+	abe_irq_clear();
 	abe_irq_processing();
-	abe_read_next_ping_pong_buffer(MM_DL_PORT, &dst, &n_bytes);
-	abe_set_ping_pong_buffer(MM_DL_PORT, n_bytes);
-	if (abe->mmap_trigger)
-		snd_pcm_period_elapsed(subs);
-
 	return IRQ_HANDLED;
 }
 
@@ -1639,23 +1639,28 @@ static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 	u32 dst;
 
 	/*Storing substream pointer for irq*/
-	abe->psubs = (u32 *)substream;
-	/* Triggers elapsed period on ABE irq handler*/
-	abe->mmap_trigger = 1;
+	abe->psubs = substream;
 
 	format.f = params_rate(params);
 	format.samp_format = STEREO_16_16;
 
+	abe_write_event_generator(EVENT_44100);
+
+	/*Adding ping pong buffer subroutine*/
+	abe_add_subroutine(&abe_irq_pingpong_player_id,
+				(abe_subroutine2) abe_irq_pingpong_subroutine,
+				SUB_0_PARAM, (u32 *)0);
+
 	/* Connect a Ping-Pong cache-flush protocol to MM_DL port */
 	abe_connect_irq_ping_pong_port(MM_DL_PORT, &format,
-				       abe_irq_pingpong_player_id,
-				       N_SAMPLES_BYTES, &dst,
-				       PING_PONG_WITH_MCU_IRQ);
+				abe_irq_pingpong_player_id,
+				N_SAMPLES_BYTES, &dst,
+				PING_PONG_WITH_MCU_IRQ);
 
 	/* Memory mapping for hw params */
 	runtime->dma_area  = abe->io_base + ABE_DMEM_BASE_OFFSET_MPU + dst;
 	runtime->dma_addr  = 0;
-	runtime->dma_bytes = N_SAMPLES_BYTES;
+	runtime->dma_bytes = N_SAMPLES_BYTES * 2;
 
 	return 0;
 }
@@ -1734,21 +1739,37 @@ static int aess_mmap(struct snd_pcm_substream *substream,
 	offset = vma->vm_pgoff << PAGE_SHIFT;
 
 	err = io_remap_pfn_range(vma, vma->vm_start,
-			(ABE_DMEM_BASE_ADDRESS_MPU + ABE_DMEM_BASE_OFFSET_MPU + offset) >> PAGE_SHIFT,
-			 size, vma->vm_page_prot);
+			(ABE_DMEM_BASE_ADDRESS_MPU +
+			ABE_DMEM_BASE_OFFSET_PING_PONG + offset) >> PAGE_SHIFT,
+			size, vma->vm_page_prot);
 
 	if (err)
 		return -EAGAIN;
 
 	return 0;
-
 }
 
+static snd_pcm_uframes_t aess_pointer(struct snd_pcm_substream *substream)
+{
+	snd_pcm_uframes_t offset;
+	u32 pingpong;
+
+	abe_read_offset_ping_pong_buffer(MM_DL_PORT, &pingpong);
+	offset = (snd_pcm_uframes_t)pingpong;
+/*
+	if (offset >= runtime->buffer_size)
+		offset = 0;
+*/
+	return offset;
+}
+
+
 static struct snd_pcm_ops omap_aess_pcm_ops = {
-	.open = aess_open,
+	.open           = aess_open,
 	.hw_params	= aess_hw_params,
 	.prepare	= aess_prepare,
-	.close	= aess_close,
+	.close	        = aess_close,
+	.pointer	= aess_pointer,
 	.mmap		= aess_mmap,
 };
 
