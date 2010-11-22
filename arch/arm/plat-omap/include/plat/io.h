@@ -158,6 +158,10 @@
  * VPOM3430 was not working for Int controller
  */
 
+#define L4_WK_34XX_PHYS		L4_WK_34XX_BASE /* 0x48300000 --> 0xfa300000 */
+#define L4_WK_34XX_VIRT		(L4_WK_34XX_PHYS + OMAP2_L4_IO_OFFSET)
+#define L4_WK_34XX_SIZE		SZ_1M
+
 #define L4_PER_34XX_PHYS	L4_PER_34XX_BASE
 						/* 0x49000000 --> 0xfb000000 */
 #define L4_PER_34XX_VIRT	(L4_PER_34XX_PHYS + OMAP2_L4_IO_OFFSET)
