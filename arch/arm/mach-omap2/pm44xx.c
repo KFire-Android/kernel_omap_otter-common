@@ -584,6 +584,7 @@ static int __init omap4_pm_init(void)
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
 	per_pwrdm = pwrdm_lookup("l4per_pwrdm");
 	omap4_idle_init();
+	omap4_trigger_ioctrl();
 
 err2:
 	return ret;
