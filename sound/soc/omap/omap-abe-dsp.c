@@ -281,7 +281,7 @@ void abe_dsp_shutdown(void)
         /* TODO: do not use abe global structure to assign pdev */
         struct platform_device *pdev = abe->pdev;
 
-	if (!abe_check_activity()) {
+	if (!abe->active && !abe_check_activity()) {
 		abe_set_opp_processing(ABE_OPP25);
 		abe_stop_event_generator();
 		udelay(11);
