@@ -1696,8 +1696,8 @@ static int aess_open(struct snd_pcm_substream *substream)
 
 	pm_runtime_get_sync(&pdev->dev);
 
-	abe_reset_hal();
-	abe_write_event_generator(EVENT_TIMER);
+	if (!abe->active++)
+		abe_wakeup();
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MODEM:
@@ -1708,8 +1708,6 @@ static int aess_open(struct snd_pcm_substream *substream)
 	default:
 		break;
 	}
-
-	abe->active++;
 
 	mutex_unlock(&abe->mutex);
 	return 0;
