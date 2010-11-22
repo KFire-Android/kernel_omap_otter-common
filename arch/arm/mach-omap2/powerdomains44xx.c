@@ -96,11 +96,16 @@ int omap4_pwrdm_read_logic_pwrst(struct powerdomain *pwrdm)
 					OMAP3430_LOGICSTATEST_MASK);
 }
 
-
 int omap4_pwrdm_read_prev_logic_pwrst(struct powerdomain *pwrdm)
 {
-	return prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP3430_PM_PREPWSTST,
-					OMAP3430_LASTLOGICSTATEENTERED_MASK);
+	int dff_ctxt;
+
+	dff_ctxt = prm_read_mod_bits_shift(pwrdm->prcm_offs, OMAP4_PM_CONTEXT,
+					OMAP4430_LOSTCONTEXT_DFF_MASK);
+	if (dff_ctxt)
+		return PWRDM_POWER_OFF;
+	else
+		return PWRDM_POWER_RET;
 }
 
 int omap4_pwrdm_read_logic_retst(struct powerdomain *pwrdm)

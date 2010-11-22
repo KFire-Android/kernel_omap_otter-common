@@ -226,6 +226,7 @@
 #define OMAP4_RM_RSTST					0x0008
 #define OMAP4_PM_PWSTCTRL				0x0000
 #define OMAP4_PM_PWSTST					0x0004
+#define OMAP4_PM_CONTEXT				0x0024
 
 
 #ifndef __ASSEMBLER__
