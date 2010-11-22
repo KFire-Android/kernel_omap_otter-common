@@ -105,7 +105,7 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
 	u8 prev_logic_pwrst, prev_mem_pwrst;
 
 	prev_logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
-	if ((pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET) &&
+	if ((pwrdm->pwrsts_logic_ret & PWRSTS_OFF) &&
 	    (prev_logic_pwrst == PWRDM_POWER_OFF))
 		pwrdm->ret_logic_off_counter++;
 
@@ -132,13 +132,16 @@ static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
 	switch (flag) {
 	case PWRDM_STATE_NOW:
 		prev = pwrdm->state;
+		if (state == PWRDM_POWER_RET && state != prev)
+			_update_logic_membank_counters(pwrdm);
 		break;
 	case PWRDM_STATE_PREV:
 		prev = pwrdm_read_prev_pwrst(pwrdm);
-		if (pwrdm->state != prev)
+		if (pwrdm->state != prev) {
 			pwrdm->state_counter[prev]++;
-		if (prev == PWRDM_POWER_RET)
-			_update_logic_membank_counters(pwrdm);
+			if (prev == PWRDM_POWER_RET)
+				_update_logic_membank_counters(pwrdm);
+		}
 		break;
 	default:
 		return -EINVAL;
