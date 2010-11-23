@@ -636,19 +636,16 @@ static int omap_mcpdm_abe_dai_startup(struct snd_pcm_substream *substream,
 
 	/* make sure we stop any pre-existing shutdown */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		ret = cancel_delayed_work(&mcpdm->delayed_abe_work);
-		if (ret)
-			abe_dsp_pm_put();
+		cancel_delayed_work(&mcpdm->delayed_abe_work);
 	}
 
 	ret = omap_mcpdm_dai_startup(substream, dai);
 	if (ret < 0)
 		return ret;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		if (!mcpdm->dl_active++)
-			abe_dsp_pm_get();
-	} else
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		mcpdm->dl_active++;
+	else
 		mcpdm->ul_active++;
 
 	return ret;
@@ -698,6 +695,7 @@ static void playback_abe_work(struct work_struct *work)
 
 	if (!mcpdm->free && !mcpdm->ul_active)
 		omap_mcpdm_free(mcpdm);
+
 }
 
 static int omap_mcpdm_abe_dai_hw_params(struct snd_pcm_substream *substream,
@@ -713,9 +711,10 @@ static int omap_mcpdm_abe_dai_hw_params(struct snd_pcm_substream *substream,
 
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		spin_lock(&mcpdm->lock);
 		/* Check if McPDM is already started */
 		if (!mcpdm->dn_channels) {
+			abe_dsp_pm_get();
+			spin_lock(&mcpdm->lock);
 			/* start ATC before McPDM IP */
 			abe_enable_data_transfer(PDM_DL_PORT);
 			udelay(250);
@@ -728,8 +727,8 @@ static int omap_mcpdm_abe_dai_hw_params(struct snd_pcm_substream *substream,
 			}
 
 			omap_mcpdm_start(mcpdm, stream);
+			spin_unlock(&mcpdm->lock);
 		}
-		spin_unlock(&mcpdm->lock);
 	} else {
 		mcpdm->uplink->channels = PDM_UP1_EN | PDM_UP2_EN;
 		ret = omap_mcpdm_capture_open(mcpdm, &omap_mcpdm_links[1]);
