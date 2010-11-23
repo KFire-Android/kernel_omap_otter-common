@@ -1111,7 +1111,7 @@ int do_setup_device_details(u32 emif_nr,
 	emif_temperature_level[emif_nr] = get_temperature_level(emif_nr);
 	WARN_ON(device_create_file(&(emif[emif_nr].pdev->dev),
 				   &dev_attr_temperature));
-	WARN_ON(kobject_uevent(&(emif[emif_nr].pdev->dev.kobj), KOBJ_ADD));
+	kobject_uevent(&(emif[emif_nr].pdev->dev.kobj), KOBJ_ADD);
 
 	if (emif_temperature_level[emif_nr] == SDRAM_TEMP_VERY_HIGH_SHUTDOWN)
 		pr_emerg("EMIF %d: SDRAM temperature exceeds operating"
