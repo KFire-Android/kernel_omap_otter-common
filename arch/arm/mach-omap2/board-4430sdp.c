@@ -637,16 +637,16 @@ static struct omap_dss_device sdp4430_lcd2_device = {
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
 };
 
+#ifdef CONFIG_OMAP2_DSS_HDMI
 static int sdp4430_panel_enable_hdmi(struct omap_dss_device *dssdev)
 {
 	gpio_request(HDMI_GPIO_60 , "hdmi_gpio_60");
 	gpio_request(HDMI_GPIO_41 , "hdmi_gpio_41");
-	gpio_direction_output(HDMI_GPIO_60, 0);
-	gpio_direction_output(HDMI_GPIO_41, 0);
-	gpio_set_value(HDMI_GPIO_60, 1);
-	gpio_set_value(HDMI_GPIO_41, 1);
+	gpio_direction_output(HDMI_GPIO_60, 1);
+	gpio_direction_output(HDMI_GPIO_41, 1);
 	gpio_set_value(HDMI_GPIO_60, 0);
 	gpio_set_value(HDMI_GPIO_41, 0);
+	mdelay(5);
 	gpio_set_value(HDMI_GPIO_60, 1);
 	gpio_set_value(HDMI_GPIO_41, 1);
 	return 0;
@@ -654,13 +654,10 @@ static int sdp4430_panel_enable_hdmi(struct omap_dss_device *dssdev)
 
 static void sdp4430_panel_disable_hdmi(struct omap_dss_device *dssdev)
 {
-	gpio_set_value(HDMI_GPIO_60, 1);
-	gpio_set_value(HDMI_GPIO_41, 1);
 }
 
 static __attribute__ ((unused)) void __init sdp4430_hdmi_init(void)
 {
-	return;
 }
 
 static struct omap_dss_device sdp4430_hdmi_device = {
@@ -672,18 +669,21 @@ static struct omap_dss_device sdp4430_hdmi_device = {
 	.platform_disable = sdp4430_panel_disable_hdmi,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
 };
+#endif /* CONFIG_OMAP2_DSS_HDMI */
 
+#ifdef CONFIG_PANEL_PICO_DLP
 static int sdp4430_panel_enable_pico_DLP(struct omap_dss_device *dssdev)
 {
-	int i = 0;
+	/* int i = 0; */
+
 	gpio_request(DLP_4430_GPIO_59, "DLP DISPLAY SEL");
 	gpio_direction_output(DLP_4430_GPIO_59, 0);
 	gpio_request(DLP_4430_GPIO_45, "DLP PARK");
 	gpio_direction_output(DLP_4430_GPIO_45, 0);
 	gpio_request(DLP_4430_GPIO_40, "DLP PHY RESET");
 	gpio_direction_output(DLP_4430_GPIO_40, 0);
-	gpio_request(DLP_4430_GPIO_44, "DLP READY RESET");
-	gpio_direction_input(DLP_4430_GPIO_44);
+	/* gpio_request(DLP_4430_GPIO_44, "DLP READY RESET");
+	gpio_direction_input(DLP_4430_GPIO_44); */
 	mdelay(500);
 
 	gpio_set_value(DLP_4430_GPIO_59, 1);
@@ -693,15 +693,13 @@ static int sdp4430_panel_enable_pico_DLP(struct omap_dss_device *dssdev)
 	gpio_set_value(DLP_4430_GPIO_40, 1);
 	mdelay(1000);
 
-	/*FIXME with the MLO gpio changes ,
-	gpio read is not retuning correct value even though
-	it is  set in hardware so the check is comment till
-	the problem is fixed */
-	/*while(i == 0){
-	i=gpio_get_value(DLP_4430_GPIO_44);
-	printk("wait for ready bit %d\n",i);
-	}*/
-	printk(KERN_INFO "%d ready bit ", i);
+	/* FIXME with the MLO gpio changes,
+		gpio read is not retuning correct value even though
+		it is  set in hardware so the check is comment
+		till the problem is fixed */
+	/* while (i == 0)
+		i = gpio_get_value(DLP_4430_GPIO_44); */
+
 	mdelay(2000);
 	return 0;
 }
@@ -710,23 +708,29 @@ static void sdp4430_panel_disable_pico_DLP(struct omap_dss_device *dssdev)
 {
 	gpio_set_value(DLP_4430_GPIO_40, 0);
 	gpio_set_value(DLP_4430_GPIO_45, 0);
+	gpio_set_value(DLP_4430_GPIO_59, 0);
 }
 
 static struct omap_dss_device sdp4430_picoDLP_device = {
-	.name			        = "pico_DLP",
-	.driver_name		        = "picoDLP_panel",
-	.type			        = OMAP_DISPLAY_TYPE_DPI,
-	.phy.dpi.data_lines	        = 24,
-	.platform_enable	        = sdp4430_panel_enable_pico_DLP,
-	.platform_disable	        = sdp4430_panel_disable_pico_DLP,
-	.channel			= OMAP_DSS_CHANNEL_LCD2,
+	.name			= "pico_DLP",
+	.driver_name		= "picoDLP_panel",
+	.type			= OMAP_DISPLAY_TYPE_DPI,
+	.phy.dpi.data_lines	= 24,
+	.platform_enable	= sdp4430_panel_enable_pico_DLP,
+	.platform_disable	= sdp4430_panel_disable_pico_DLP,
+	.channel		= OMAP_DSS_CHANNEL_LCD2,
 };
+#endif /* CONFIG_PANEL_PICO_DLP */
 
 static struct omap_dss_device *sdp4430_dss_devices[] = {
 	&sdp4430_lcd_device,
 	&sdp4430_lcd2_device,
+#ifdef CONFIG_OMAP2_DSS_HDMI
 	&sdp4430_hdmi_device,
+#endif /* CONFIG_OMAP2_DSS_HDMI */
+#ifdef CONFIG_PANEL_PICO_DLP
 	&sdp4430_picoDLP_device,
+#endif /* CONFIG_PANEL_PICO_DLP */
 };
 
 static struct omap_dss_board_info sdp4430_dss_data = {

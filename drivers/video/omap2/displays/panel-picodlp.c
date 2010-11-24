@@ -23,7 +23,6 @@
 #include <linux/i2c.h>
 #include <linux/gpio.h>
 #include <plat/display.h>
-#include<../drivers/video/omap2/dss/dss.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/firmware.h>
@@ -36,31 +35,24 @@
 #define MAX_I2C_WRITE_BLOCK_SIZE 32
 #define PICO_MAJOR     1 /* 2 bits */
 #define PICO_MINOR     1 /* 2 bits */
-#define DSI_DIV2            (0x40C)
-#define DSI_DIV_LCD          (16)
-#define DSI_DIV_PCD          (0)
-#define DSI_CONTROL2         (0x238)
 
-static  int display_control_reg   = (0x58000000 + 0x1000);
-extern void __iomem  *dispc_base;
 
 static struct omap_video_timings pico_ls_timings = {
-	.x_res	        = 864,
-	.y_res	        = 480,
+	.x_res		= 864,
+	.y_res		= 480,
+	.pixel_clock	= 26600,
 	.hsw		= 7,
 	.hfp		= 11,
 	.hbp		= 7,
-
 	.vsw		= 2,
 	.vfp		= 3,
 	.vbp		= 14,
 };
 
 struct pico {
-	struct i2c_client    *client;
+	struct i2c_client *client;
 	struct mutex xfer_lock;
-	} *sd;
-
+} *sd;
 
 static int dlp_read_block(int reg, u8 *data, int len);
 static int pico_i2c_write(int reg, u32 value);
@@ -94,14 +86,6 @@ static int dlp_write_block(int reg, const u8 *data, int len)
 	r = i2c_transfer(sd->client->adapter, &msg, 1);
 	mutex_unlock(&sd->xfer_lock);
 
-		if (r == 1) {
-			for (i = 0; i < len; i++)
-				dev_info(&sd->client->dev,
-					 "addr %x bw 0x%02x[%d]: 0x%02x\n",
-					 sd->client->addr, reg + i, i, data[i]);
-		}
-
-
 	if (r == 1)
 		return 0;
 
@@ -120,7 +104,7 @@ static int pico_i2c_write(int reg, u32 value)
 	return dlp_write_block(reg, data, 4);
 }
 
-static int dlp_read_block(int reg, u8 *data, int len)
+static __attribute__ ((unused)) int dlp_read_block(int reg, u8 *data, int len)
 {
 	unsigned char wb[2];
 	struct i2c_msg msg[2];
@@ -140,19 +124,15 @@ static int dlp_read_block(int reg, u8 *data, int len)
 	r = i2c_transfer(sd->client->adapter, msg, 2);
 	mutex_unlock(&sd->xfer_lock);
 
+	if (r == 2) {
+		int i;
 
-		if (r == 2) {
-			int i;
-
-			for (i = 0; i < len; i++)
-				dev_info(&sd->client->dev,
-					 "addr %x br 0x%02x[%d]: 0x%02x\n",
-					sd->client->addr, reg + i, i, data[i]);
-		}
-
-
-	if (r == 2)
+		for (i = 0; i < len; i++)
+			dev_info(&sd->client->dev,
+				 "addr %x br 0x%02x[%d]: 0x%02x\n",
+				sd->client->addr, reg + i, i, data[i]);
 		return len;
+	}
 
 	return r;
 }
@@ -241,7 +221,7 @@ static void dpp2600_config_rgb(void)
 int dpp2600_config_splash(int image_number)
 {
 	int address, size, resolution;
-	printk("dpp2600 config splash");
+	printk(KERN_INFO "pico DLP dpp2600 config splash\n");
 	resolution = QWVGA_LANDSCAPE;
 	switch (image_number) {
 	case 0:
@@ -278,22 +258,6 @@ int dpp2600_config_splash(int image_number)
 	/* turn image back on */
 	pico_i2c_write(SEQ_CONTROL, 1);
 	return 0;
-}
-
-/*
- *  Modify contents of a 32-bit register
- *  @param anAddr      Register address
- *  @param aClearMask  Any bits set in this mask will be cleared
- *  @param aSetMask    Bits to be set after the clear
- */
-void modify_pico_register(unsigned int Addr, unsigned int ClearMask,
-			unsigned int SetMask)
-{
-	u32 val;
-	val = __raw_readl(Addr);
-	val &= ~(ClearMask);
-	val |= (SetMask);
-	__raw_writel(val, Addr);
 }
 
 /*
@@ -375,7 +339,7 @@ static int pico_i2c_initialize(void)
 	pico_i2c_write(G_DRIVE_CURRENT, 0x298);
 	pico_i2c_write(B_DRIVE_CURRENT, 0x298);
 	pico_i2c_write(RGB_DRIVER_ENABLE, 7);
-	mdelay(10000);
+	mdelay(3000);
 	dpp2600_config_rgb();
 	return 0;
 
@@ -384,7 +348,7 @@ static int pico_i2c_initialize(void)
 
 static int pico_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-	printk("pico probe called");
+	printk(KERN_INFO "pico DLP probe called\n");
 	sd = kzalloc(sizeof(struct pico), GFP_KERNEL);
 	if (sd == NULL)
 		return -ENOMEM;
@@ -420,20 +384,13 @@ static int picoDLP_panel_start(struct omap_dss_device *dssdev)
 		dev_err(&dssdev->dev, "failed to enable DPI\n");
 		return r;
 	}
-	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
-	display_control_reg	= (int)dispc_base;
-	/* Specify the Display Controller Logic Clock Divisor*/
-	modify_pico_register(display_control_reg + DSI_DIV2, 0xFF |
-			(0XFF << DSI_DIV_LCD), (1 << DSI_DIV_LCD) | (4 << DSI_DIV_PCD));
-	/* LCD output Enabled */
-	modify_pico_register(display_control_reg + DSI_CONTROL2, (1<<11), 0x00000000);
 	pico_i2c_initialize();
 	return 0;
 }
 
 static int picoDLP_panel_enable(struct omap_dss_device *dssdev)
 {
-	printk(KERN_INFO "pico DLP init is called ");
+	printk(KERN_INFO "pico DLP init is called\n");
 	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
 		return -EINVAL;
 
@@ -460,7 +417,6 @@ static int picoDLP_panel_probe(struct omap_dss_device *dssdev)
 
 static void picoDLP_panel_remove(struct omap_dss_device *dssdev)
 {
-	return;
 }
 
 static void picoDLP_panel_stop(struct omap_dss_device *dssdev)
@@ -476,8 +432,6 @@ static void picoDLP_panel_disable(struct omap_dss_device *dssdev)
 	/* Turn of DLP Power */
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
 		picoDLP_panel_stop(dssdev);
-
-	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 }
 
 static int picoDLP_panel_suspend(struct omap_dss_device *dssdev)
@@ -495,7 +449,7 @@ static int picoDLP_panel_suspend(struct omap_dss_device *dssdev)
 
 static int picoDLP_panel_resume(struct omap_dss_device *dssdev)
 {
-	printk(KERN_INFO "pico DLP resume is called ");
+	printk(KERN_INFO "pico DLP resume is called\n");
 	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
 		return -EINVAL;
 
@@ -532,7 +486,7 @@ static int __init pico_i2c_init(void)
 	r = i2c_add_driver(&pico_i2c_driver);
 	if (r < 0) {
 		printk(KERN_WARNING DRIVER_NAME
-		" driver registration failed\n");
+			" driver registration failed\n");
 		return r;
 	}
 	omap_dss_register_driver(&picoDLP_driver);
@@ -551,9 +505,5 @@ module_init(pico_i2c_init);
 module_exit(pico_i2c_exit);
 
 
-
 MODULE_DESCRIPTION("pico DLP driver");
 MODULE_LICENSE("GPL");
-
-
-
