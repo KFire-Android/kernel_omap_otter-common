@@ -618,10 +618,11 @@ static int omap_dss_probe(struct platform_device *pdev)
 	if (cpu_is_omap44xx())
 		dss_init_writeback(pdev); /*Write back init*/
 #ifdef HWMOD
-	if (!cpu_is_omap44xx())
+	if (!cpu_is_omap44xx()) {
 		r = dss_get_clocks();
-	if (r)
-		goto err_clocks;
+		if (r)
+			goto err_clocks;
+	}
 
 	core.ctx_id = dss_get_ctx_id();
 	DSSDBG("initial ctx id %u\n", core.ctx_id);

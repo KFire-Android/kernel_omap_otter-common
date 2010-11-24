@@ -81,13 +81,12 @@ int omapdss_sdi_display_enable(struct omap_dss_device *dssdev)
 	if (!sdi.skip_init) {
 		r = dss_calc_clock_div(1, t->pixel_clock * 1000,
 				&dss_cinfo, &dispc_cinfo);
+		if (r)
+			goto err2;
 	} else {
-		r = dss_get_clock_div(&dss_cinfo);
-		r = dispc_get_clock_div(dssdev->channel, &dispc_cinfo);
+		dss_get_clock_div(&dss_cinfo);
+		dispc_get_clock_div(dssdev->channel, &dispc_cinfo);
 	}
-
-	if (r)
-		goto err2;
 
 	fck = dss_cinfo.fck;
 	lck_div = dispc_cinfo.lck_div;
@@ -110,9 +109,7 @@ int omapdss_sdi_display_enable(struct omap_dss_device *dssdev)
 	if (r)
 		goto err2;
 
-	r = dispc_set_clock_div(dssdev->channel, &dispc_cinfo);
-	if (r)
-		goto err2;
+	dispc_set_clock_div(dssdev->channel, &dispc_cinfo);
 
 	if (!sdi.skip_init) {
 		dss_sdi_init(dssdev->phy.sdi.datapairs);

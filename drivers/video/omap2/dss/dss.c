@@ -400,7 +400,7 @@ void dss_select_lcd_clk_source(enum omap_dsi_index ix,
 		dss.lcd1_clk_source = clk_src;
 	} else {
 		REG_FLD_MOD(DSS_CONTROL, b, 12, 12);	/* LCD2_CLK_SWITCH */
-		dss.lcd1_clk_source = clk_src;
+		dss.lcd2_clk_source = clk_src;
 	}
 }
 
@@ -434,9 +434,8 @@ int dss_calc_clock_rates(struct dss_clock_info *cinfo)
 						cinfo->fck_div == 0)
 		return -EINVAL;
 
-	if (cpu_is_omap34xx()) {
+	if (cpu_is_omap34xx())
 		prate = clk_get_rate(clk_get_parent(dss.dpll4_m4_ck));
-	}
 
 	cinfo->fck = prate / cinfo->fck_div;
 
@@ -462,7 +461,7 @@ int dss_set_clock_div(struct dss_clock_info *cinfo)
 	return 0;
 }
 
-int dss_get_clock_div(struct dss_clock_info *cinfo)
+void dss_get_clock_div(struct dss_clock_info *cinfo)
 {
 	cinfo->fck = dss_clk_get_rate(DSS_CLK_FCK1);
 
@@ -476,8 +475,6 @@ int dss_get_clock_div(struct dss_clock_info *cinfo)
 	} else {
 		cinfo->fck_div = 0;
 	}
-
-	return 0;
 }
 
 unsigned long dss_get_dpll4_rate(void)
@@ -694,7 +691,7 @@ int dss_init(struct platform_device *pdev)
 
 	dss.pdata = pdev->dev.platform_data;
 	dss.pdev = pdev;
-	if(cpu_is_omap44xx())
+	if (cpu_is_omap44xx())
 		dss_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	else
 		dss_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);

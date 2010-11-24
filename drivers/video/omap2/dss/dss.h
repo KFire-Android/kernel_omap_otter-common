@@ -301,7 +301,7 @@ void dss_set_dac_pwrdn_bgz(bool enable);
 unsigned long dss_get_dpll4_rate(void);
 int dss_calc_clock_rates(struct dss_clock_info *cinfo);
 int dss_set_clock_div(struct dss_clock_info *cinfo);
-int dss_get_clock_div(struct dss_clock_info *cinfo);
+void dss_get_clock_div(struct dss_clock_info *cinfo);
 int dss_calc_clock_div(bool is_tft, unsigned long req_pck,
 		struct dss_clock_info *dss_cinfo,
 		struct dispc_clock_info *dispc_cinfo);
@@ -470,7 +470,7 @@ void dispc_go(enum omap_channel channel);
 void dispc_enable_digit_out(bool enable);
 void dispc_enable_channel(enum omap_channel channel, bool enable);
 bool dispc_is_channel_enabled(enum omap_channel channel);
-int dispc_enable_plane(enum omap_plane plane, bool enable);
+void dispc_enable_plane(enum omap_plane plane, bool enable);
 void dispc_enable_replication(enum omap_plane plane, bool enable);
 
 void dispc_set_parallel_interface_mode(enum omap_channel channel,
@@ -506,9 +506,9 @@ void dispc_find_clk_divs(bool is_tft, unsigned long req_pck, unsigned long fck,
 		struct dispc_clock_info *cinfo);
 int dispc_calc_clock_rates(unsigned long dispc_fclk_rate,
 		struct dispc_clock_info *cinfo);
-int dispc_set_clock_div(enum omap_channel channel,
+void dispc_set_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
-int dispc_get_clock_div(enum omap_channel channel,
+void dispc_get_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
 void dispc_go_wb(void);
 void dispc_cancel_go_wb(void);

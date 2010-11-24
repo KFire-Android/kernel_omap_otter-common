@@ -4280,7 +4280,7 @@ void dispc_set_pol_freq(enum omap_channel channel,
 void dispc_find_clk_divs(bool is_tft, unsigned long req_pck, unsigned long fck,
 		struct dispc_clock_info *cinfo)
 {
-	u16 pcd_min = is_tft ? 2 : 3;
+	u16 pcd_min = cpu_is_omap44xx() ? 1 : (is_tft ? 2 : 3);
 	unsigned long best_pck;
 	u16 best_ld, cur_ld;
 	u16 best_pd, cur_pd;
@@ -4336,7 +4336,7 @@ int dispc_calc_clock_rates(unsigned long dispc_fclk_rate,
 	return 0;
 }
 
-int dispc_set_clock_div(enum omap_channel channel,
+void dispc_set_clock_div(enum omap_channel channel,
 	struct dispc_clock_info *cinfo)
 {
 	DSSDBG("lck = %lu (%u)\n", cinfo->lck, cinfo->lck_div);
@@ -4344,11 +4344,9 @@ int dispc_set_clock_div(enum omap_channel channel,
 
 	dispc_set_lcd_divisor(channel, cinfo->lck_div,
 		cinfo->pck_div);
-
-	return 0;
 }
 
-int dispc_get_clock_div(enum omap_channel channel,
+void dispc_get_clock_div(enum omap_channel channel,
 	struct dispc_clock_info *cinfo)
 {
 	unsigned long fck;
@@ -4363,8 +4361,6 @@ int dispc_get_clock_div(enum omap_channel channel,
 	}
 	cinfo->lck = fck / cinfo->lck_div;
 	cinfo->pck = cinfo->lck / cinfo->pck_div;
-
-	return 0;
 }
 
 /* dispc.irq_lock has to be locked by the caller */
@@ -4956,15 +4952,13 @@ void dispc_exit(void)
 	iounmap(dispc.base);
 }
 
-int dispc_enable_plane(enum omap_plane plane, bool enable)
+void dispc_enable_plane(enum omap_plane plane, bool enable)
 {
 	DSSDBG("dispc_enable_plane %d, %d\n", plane, enable);
 
 	enable_clocks(1);
 	_dispc_enable_plane(plane, enable);
 	enable_clocks(0);
-
-	return 0;
 }
 
 int dispc_setup_plane(enum omap_plane plane,

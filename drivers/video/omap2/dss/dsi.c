@@ -3586,11 +3586,7 @@ static int dsi_configure_dispc_clocks(struct omap_dss_device *dssdev)
 		return r;
 	}
 
-	r = dispc_set_clock_div(dssdev->channel, &dispc_cinfo);
-	if (r) {
-		DSSERR("Failed to set dispc clocks\n");
-		return r;
-	}
+	dispc_set_clock_div(dssdev->channel, &dispc_cinfo);
 
 	return 0;
 }

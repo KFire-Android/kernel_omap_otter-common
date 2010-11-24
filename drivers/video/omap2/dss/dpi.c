@@ -41,34 +41,36 @@ static struct {
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
-		unsigned long pck_req, unsigned long *fck, int *lck_div,
-		int *pck_div)
+		unsigned long pck_req, unsigned long *pck)
 {
 	struct dsi_clock_info dsi_cinfo;
 	struct dispc_clock_info dispc_cinfo;
 	int r;
 	enum omap_dsi_index ix;
 
+	DSSDBG("DPI clk source is DSI PLL\n");
+
 	ix = (channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
 	if (!cpu_is_omap44xx()) {
-		r = dsi_pll_calc_clock_div_pck(channel, is_tft,
+		r = dsi_pll_calc_clock_div_pck(ix, is_tft,
 			pck_req, &dsi_cinfo, &dispc_cinfo);
 		if (r)
 			return r;
 	} else {
-		dispc_cinfo.lck_div = 1;
-		dispc_cinfo.pck_div = 4;
-		dsi_cinfo.regn = 19;
+		dsi_cinfo.regn = 17;
 		dsi_cinfo.regm = 150;
 		dsi_cinfo.regm_dispc = 4;
 		dsi_cinfo.regm_dsi = 4;
 		dsi_cinfo.use_dss2_fck = true;
-		dsi_cinfo.highfreq = 0;
-		dsi_calc_clock_rates(&dsi_cinfo);
+		r = dsi_calc_clock_rates(&dsi_cinfo);
+		if (r)
+			return r;
+		dispc_find_clk_divs(is_tft, pck_req,
+			dsi_cinfo.dsi_pll_dispc_fclk, &dispc_cinfo);
 	}
 
-	r = dsi_pll_set_clock_div(channel, &dsi_cinfo);
+	r = dsi_pll_set_clock_div(ix, &dsi_cinfo);
 	if (r)
 		return r;
 
@@ -78,62 +80,57 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 	else
 		dss_select_dispc_clk_source(ix, DSS_SRC_DSI1_PLL_FCLK);
 
-	r = dispc_set_clock_div(channel, &dispc_cinfo);
-	if (r)
-		return r;
+	dispc_set_clock_div(channel, &dispc_cinfo);
 
-	*fck = dsi_cinfo.dsi_pll_dispc_fclk;
-	*lck_div = dispc_cinfo.lck_div;
-	*pck_div = dispc_cinfo.pck_div;
+	*pck = dispc_cinfo.pck;
 
 	return 0;
 }
-#else
-static int dpi_set_dispc_clk(enum omap_channel channel, bool is_tft,
-		unsigned long pck_req, unsigned long *fck, int *lck_div,
-		int *pck_div)
+#else /* #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL */
+static int dpi_set_dispc_clk(enum omap_channel channel,
+		bool is_tft, unsigned long pck_req, unsigned long *pck)
 {
-	struct dss_clock_info dss_cinfo;
 	struct dispc_clock_info dispc_cinfo;
-	int r;
+	enum omap_dsi_index ix;
 
-	if (cpu_is_omap44xx()) /*TODO Check this */
-		return 0;
+	DSSDBG("DPI clk source is DISPC\n");
 
-	r = dss_calc_clock_div(is_tft, pck_req, &dss_cinfo, &dispc_cinfo);
-	if (r)
-		return r;
+	ix = (channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
-	r = dss_set_clock_div(&dss_cinfo);
-	if (r)
-		return r;
+	if (cpu_is_omap44xx())
+		dispc_find_clk_divs(is_tft, pck_req,
+			dss_clk_get_rate(DSS_CLK_FCK1), &dispc_cinfo);
+	else {
+		struct dss_clock_info dss_cinfo;
+		int r;
 
-	r = dispc_set_clock_div(channel, &dispc_cinfo);
-	if (r)
-		return r;
+		r = dss_calc_clock_div(is_tft, pck_req,
+				&dss_cinfo, &dispc_cinfo);
+		if (r)
+			return r;
 
-	*fck = dss_cinfo.fck;
-	*lck_div = dispc_cinfo.lck_div;
-	*pck_div = dispc_cinfo.pck_div;
+		r = dss_set_clock_div(&dss_cinfo);
+		if (r)
+			return r;
+	}
+
+	dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
+	dss_select_lcd_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
+
+	dispc_set_clock_div(channel, &dispc_cinfo);
+
+	*pck = dispc_cinfo.pck;
 
 	return 0;
 }
-#endif
+#endif /* CONFIG_OMAP2_DSS_USE_DSI_PLL */
 
 static int dpi_set_mode(struct omap_dss_device *dssdev)
 {
 	struct omap_video_timings *t = &dssdev->panel.timings;
-	int lck_div = 0, pck_div = 0;
-	unsigned long fck = 0;
-	unsigned long pck;
+	unsigned long pck = 0;
 	bool is_tft;
 	int r = 0;
-	enum omap_dsi_index ix;
-
-	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
-
-	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
-
 
 	dispc_set_pol_freq(dssdev->channel, dssdev->panel.config,
 				dssdev->panel.acbi, dssdev->panel.acb);
@@ -142,15 +139,15 @@ static int dpi_set_mode(struct omap_dss_device *dssdev)
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 	r = dpi_set_dsi_clk(dssdev->channel, is_tft,
-			t->pixel_clock * 1000, &fck, &lck_div, &pck_div);
-#else
+			t->pixel_clock * 1000, &pck);
+#else /* #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL */
 	r = dpi_set_dispc_clk(dssdev->channel, is_tft,
-			t->pixel_clock * 1000, &fck, &lck_div, &pck_div);
-#endif
+			t->pixel_clock * 1000, &pck);
+#endif /* CONFIG_OMAP2_DSS_USE_DSI_PLL */
 	if (r)
-		goto err0;
+		return r;
 
-	pck = fck / lck_div / pck_div / 1000;
+	pck /= 1000;
 
 	if (pck != t->pixel_clock) {
 		DSSWARN("Could not find exact pixel clock. "
@@ -162,17 +159,10 @@ static int dpi_set_mode(struct omap_dss_device *dssdev)
 
 	dispc_set_lcd_timings(dssdev->channel, t);
 
-
-#ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-err1:
-	dsi_pll_uninit(ix);
-#endif
-err0:
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
-	return r;
+	return 0;
 }
 
-static int dpi_basic_init(struct omap_dss_device *dssdev)
+static void dpi_basic_init(struct omap_dss_device *dssdev)
 {
 	bool is_tft;
 
@@ -180,20 +170,16 @@ static int dpi_basic_init(struct omap_dss_device *dssdev)
 
 	dispc_set_parallel_interface_mode(dssdev->channel,
 				OMAP_DSS_PARALLELMODE_BYPASS);
-	dispc_set_lcd_display_type(dssdev->channel, is_tft ?
-			OMAP_DSS_LCD_DISPLAY_TFT : OMAP_DSS_LCD_DISPLAY_STN);
-	dispc_set_tft_data_lines(dssdev->channel,
-				dssdev->phy.dpi.data_lines);
-
-	return 0;
+	dispc_set_lcd_display_type(dssdev->channel,
+		is_tft ? OMAP_DSS_LCD_DISPLAY_TFT : OMAP_DSS_LCD_DISPLAY_STN);
+	dispc_set_tft_data_lines(dssdev->channel, dssdev->phy.dpi.data_lines);
 }
 
 /*This one needs to be to set the ovl info to dirty*/
 static void dpi_start_auto_update(struct omap_dss_device *dssdev)
-
 {
 	int i;
-	DSSDBG("starting auto update\n");
+
 	for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
 		struct omap_overlay *ovl;
 
@@ -201,8 +187,6 @@ static void dpi_start_auto_update(struct omap_dss_device *dssdev)
 
 		if (ovl->manager == dssdev->manager)
 			ovl->info_dirty = true;
-
-		DSSDBG("ovl[%d]->manager = %s", i, ovl->manager->name);
 	}
 	dssdev->manager->apply(dssdev->manager);
 }
@@ -210,47 +194,41 @@ static void dpi_start_auto_update(struct omap_dss_device *dssdev)
 int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 {
 	int r;
-	enum omap_dsi_index ix;
-
-	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
 	if (cpu_is_omap44xx() && dssdev->channel != OMAP_DSS_CHANNEL_LCD2) {
 		/* Only LCD2 channel is connected to DPI on OMAP4 */
-		r = -EINVAL;
-		goto err0;
+		return -EINVAL;
 	}
 
 	r = omap_dss_start_device(dssdev);
 	if (r) {
 		DSSERR("failed to start device\n");
-		goto err0;
+		return r;
 	}
 
 	if (cpu_is_omap34xx() && !cpu_is_omap3630()) {
 		r = regulator_enable(dpi.vdds_dsi_reg);
 		if (r)
-			goto err1;
+			goto err0;
 	}
-
-	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	/* turn on clock(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
+	if (!cpu_is_omap44xx())
+		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	dss_mainclk_state_enable();
 
-	r = dpi_basic_init(dssdev);
-	if (r)
-		goto err2;
+	dpi_basic_init(dssdev);
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	dss_clk_enable(DSS_CLK_FCK2);
 	r = dsi_pll_init(dssdev, 0, 1);
 	if (r)
-		goto err3;
-#endif
+		goto err1;
+#endif /* CONFIG_OMAP2_DSS_USE_DSI_PLL */
+
 	r = dpi_set_mode(dssdev);
 	if (r)
-		goto err4;
+		goto err2;
 
 	mdelay(2);
 
@@ -263,45 +241,45 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 
 	return 0;
 
-err4:
-#ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	dsi_pll_uninit(ix);
-err3:
-	dss_clk_disable(DSS_CLK_FCK2);
-#endif
 err2:
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+#ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
+	dsi_pll_uninit(dssdev->channel == OMAP_DSS_CHANNEL_LCD ? DSI1 : DSI2);
+err1:
+#endif
+	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+	if (!cpu_is_omap44xx())
+		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
+	dss_mainclk_state_disable(true);
 	if (cpu_is_omap34xx() && !cpu_is_omap3630())
 		regulator_disable(dpi.vdds_dsi_reg);
-err1:
-	omap_dss_stop_device(dssdev);
 err0:
+	omap_dss_stop_device(dssdev);
 	return r;
 }
 EXPORT_SYMBOL(omapdss_dpi_display_enable);
 
 void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 {
-	enum omap_dsi_index ix;
-
-	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
-
 	if (dssdev->manager)
 		dssdev->manager->disable(dssdev->manager);
 
 #ifdef HWMOD
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
-	dsi_pll_uninit(ix);
-	dss_clk_disable(DSS_CLK_FCK2);
+	{
+		enum omap_dsi_index ix;
+
+		ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
+		dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
+		dsi_pll_uninit(ix);
+	}
 #endif
 #endif
 
 	/* cut clock(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+	if (!cpu_is_omap44xx())
+		dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 	dss_mainclk_state_disable(true);
-
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	if (cpu_is_omap34xx() && !cpu_is_omap3630())
 		regulator_disable(dpi.vdds_dsi_reg);
@@ -313,8 +291,8 @@ EXPORT_SYMBOL(omapdss_dpi_display_disable);
 void dpi_set_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings)
 {
-	DSSDBG("dpi_set_timings\n");
 	dssdev->panel.timings = *timings;
+
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
 		dpi_set_mode(dssdev);
 		dispc_go(dssdev->channel);
@@ -325,14 +303,8 @@ EXPORT_SYMBOL(dpi_set_timings);
 int dpi_check_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings)
 {
+	struct dispc_clock_info dispc_cinfo;
 	bool is_tft;
-	int r = 0;
-	int lck_div, pck_div;
-	unsigned long fck;
-	unsigned long pck;
-	enum omap_dsi_index ix;
-
-	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
 	if (!dispc_lcd_timings_ok(timings))
 		return -EINVAL;
@@ -345,37 +317,44 @@ int dpi_check_timings(struct omap_dss_device *dssdev,
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 	{
 		struct dsi_clock_info dsi_cinfo;
-		struct dispc_clock_info dispc_cinfo;
-		r = dsi_pll_calc_clock_div_pck(ix, is_tft,
-				timings->pixel_clock * 1000,
-				&dsi_cinfo, &dispc_cinfo);
+		int r = 0;
 
-		if (r)
-			return r;
-
-		fck = dsi_cinfo.dsi_pll_dispc_fclk;
-		lck_div = dispc_cinfo.lck_div;
-		pck_div = dispc_cinfo.pck_div;
+		if (cpu_is_omap44xx()) {
+			dsi_cinfo.regn = 17;
+			dsi_cinfo.regm = 150;
+			dsi_cinfo.regm_dispc = 4;
+			dsi_cinfo.regm_dsi = 4;
+			dsi_cinfo.use_dss2_fck = true;
+			r = dsi_calc_clock_rates(&dsi_cinfo);
+			if (r)
+				return r;
+			dispc_find_clk_divs(is_tft, timings->pixel_clock * 1000,
+				dsi_cinfo.dsi_pll_dispc_fclk, &dispc_cinfo);
+		} else {
+			r = dsi_pll_calc_clock_div_pck(dssdev->channel ==
+					OMAP_DSS_CHANNEL_LCD ? DSI1 : DSI2,
+					is_tft, timings->pixel_clock * 1000,
+					&dsi_cinfo, &dispc_cinfo);
+			if (r)
+				return r;
+		}
 	}
-#else
-	{
+#else /* #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL */
+	if (cpu_is_omap44xx())
+		dispc_find_clk_divs(is_tft, timings->pixel_clock * 1000,
+			dss_clk_get_rate(DSS_CLK_FCK1), &dispc_cinfo);
+	else {
 		struct dss_clock_info dss_cinfo;
-		struct dispc_clock_info dispc_cinfo;
+		int r = 0;
+
 		r = dss_calc_clock_div(is_tft, timings->pixel_clock * 1000,
 				&dss_cinfo, &dispc_cinfo);
-
 		if (r)
 			return r;
-
-		fck = dss_cinfo.fck;
-		lck_div = dispc_cinfo.lck_div;
-		pck_div = dispc_cinfo.pck_div;
 	}
-#endif
+#endif /* CONFIG_OMAP2_DSS_USE_DSI_PLL */
 
-	pck = fck / lck_div / pck_div / 1000;
-
-	timings->pixel_clock = pck;
+	timings->pixel_clock = dispc_cinfo.pck / 1000;
 
 	return 0;
 }
@@ -404,4 +383,3 @@ int dpi_init(struct platform_device *pdev)
 void dpi_exit(void)
 {
 }
-
