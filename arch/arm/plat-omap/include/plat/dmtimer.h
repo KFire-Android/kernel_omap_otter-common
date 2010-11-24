@@ -47,7 +47,7 @@
 #define OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE	0x02
 
 /* timer ip constants */
-#define OMAP_TIMER_IP_VERSION_1			0x1
+#define OMAP_TIMER_IP_LEGACY			0x1
 #define OMAP_TIMER_IP_VERSION_2			0x2
 
 struct omap_dm_timer;
@@ -55,12 +55,15 @@ extern struct omap_dm_timer *gptimer_wakeup;
 extern struct sys_timer omap_timer;
 struct clk;
 
-struct dmtimer_platform_data {
-	int (*set_timer_src) (struct platform_device *pdev, int source);
+struct omap_dmtimer_platform_data {
+	void (*omap_dm_clk_enable) (struct platform_device *pdev);
+	void (*omap_dm_clk_disable) (struct platform_device *pdev);
+	int (*omap_dm_set_source_clk)
+			(struct platform_device *pdev, int source);
+	struct clk* (*omap_dm_get_timer_clk) (struct platform_device *pdev);
 	int timer_ip_type;
 	int offset1;
 	int offset2;
-	u32 is_early_init:1;
 };
 
 struct omap_dm_timer *omap_dm_timer_request(void);
