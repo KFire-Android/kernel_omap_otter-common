@@ -38,6 +38,7 @@
 #include "omap-abe.h"
 #include "omap-pcm.h"
 #include "omap-mcbsp.h"
+#include "omap-dmic.h"
 #include "../codecs/twl6040.h"
 
 #ifdef CONFIG_SND_OMAP_SOC_HDMI
@@ -179,28 +180,21 @@ static int sdp4430_dmic_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	int ret;
+	int ret = 0;
 
-	/* Set DMIC DAI configuration */
-	ret = snd_soc_dai_set_fmt(cpu_dai,
-				  SND_SOC_DAIFMT_DSP_A |
-				  SND_SOC_DAIFMT_NB_NF |
-				  SND_SOC_DAIFMT_CBS_CFS);
-	if (ret < 0) {
-		printk(KERN_ERR "can't set DMIC DAI configuration\n");
-		return ret;
-	}
-
-	/* TODO: where does the DMIC clock come from (external source??) -
-	 * do we need to enable it. Set McBSP clock to external */
-	/* ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLKS_FCLK,
-					64 * params_rate(params),
-				     SND_SOC_CLOCK_IN);
-	 */
+	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_SYSCLK_PAD_CLKS,
+				     19200000, SND_SOC_CLOCK_IN);
 	if (ret < 0) {
 		printk(KERN_ERR "can't set DMIC cpu system clock\n");
 		return ret;
 	}
+
+	ret = snd_soc_dai_set_clkdiv(cpu_dai, OMAP_DMIC_CLKDIV, 8);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set DMIC cpu clock divider\n");
+		return ret;
+	}
+
 	return 0;
 }
 
@@ -532,7 +526,6 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.name = "SDP4430 Vibra Playback",
 		.stream_name = "VIB-DL",
 
-		/* ABE components - DMIC UL 2 */
 		.cpu_dai_name = "Vibra",
 		.platform_name = "omap-pcm-audio",
 
@@ -616,7 +609,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "DMIC Capture",
 
 		/* ABE components - DMIC0 */
-		.cpu_dai_name = "omap-dmic-dai.0",
+		.cpu_dai_name = "omap-dmic-dai-0",
 		.platform_name = "omap-pcm-audio",
 
 		/* DMIC codec */
@@ -752,12 +745,13 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "DMIC0",
 
 		/* ABE components - DMIC UL 1 */
-		.cpu_dai_name = "omap-dmic-dai.0",
+		.cpu_dai_name = "omap-dmic-abe-dai-0",
 		.platform_name = "omap-aess-audio",
 
-		/* DMIC 1 */
+		/* DMIC 0 */
 		.codec_dai_name = "dmic-hifi",
 		.codec_name = "dmic-codec.0",
+		.ops = &sdp4430_dmic_ops,
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.be_hw_params_fixup = dmic_be_hw_params_fixup,
@@ -768,12 +762,13 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "DMIC1",
 
 		/* ABE components - DMIC UL 1 */
-		.cpu_dai_name = "omap-dmic-dai.1",
+		.cpu_dai_name = "omap-dmic-abe-dai-1",
 		.platform_name = "omap-aess-audio",
 
 		/* DMIC 1 */
 		.codec_dai_name = "dmic-hifi",
 		.codec_name = "dmic-codec.1",
+		.ops = &sdp4430_dmic_ops,
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.be_hw_params_fixup = dmic_be_hw_params_fixup,
@@ -784,12 +779,13 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.stream_name = "DMIC2",
 
 		/* ABE components - DMIC UL 2 */
-		.cpu_dai_name = "omap-dmic-dai.2",
+		.cpu_dai_name = "omap-dmic-abe-dai-2",
 		.platform_name = "omap-aess-audio",
 
 		/* DMIC 2 */
 		.codec_dai_name = "dmic-hifi",
 		.codec_name = "dmic-codec.2",
+		.ops = &sdp4430_dmic_ops,
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.be_hw_params_fixup = dmic_be_hw_params_fixup,
