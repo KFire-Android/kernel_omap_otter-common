@@ -1785,11 +1785,11 @@ static int aess_stream_event(struct snd_soc_dapm_context *dapm)
 	/* TODO: do not use abe global structure to assign pdev */
 	struct platform_device *pdev = abe->pdev;
 
-	pm_runtime_get_sync(&pdev->dev);
-
-	aess_set_opp_mode();
-
-	pm_runtime_put_sync(&pdev->dev);
+	if (abe->active) {
+		pm_runtime_get_sync(&pdev->dev);
+		aess_set_opp_mode();
+		pm_runtime_put_sync(&pdev->dev);
+	}
 
 	return 0;
 }
