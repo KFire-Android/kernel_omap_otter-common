@@ -233,11 +233,11 @@ void omap_init_power_states(void)
 			cpuidle_params_table[OMAP4_STATE_C1].wake_latency;
 	omap4_power_states[OMAP4_STATE_C1].threshold =
 			cpuidle_params_table[OMAP4_STATE_C1].threshold;
-	omap4_power_states[OMAP4_STATE_C1].cpu0_state = PWRDM_POWER_ON;
+	omap4_power_states[OMAP4_STATE_C1].cpu0_state = PWRDM_POWER_OFF;
 	omap4_power_states[OMAP4_STATE_C1].cpu1_state = PWRDM_POWER_OFF;
-	omap4_power_states[OMAP4_STATE_C1].mpu_state = PWRDM_POWER_ON;
+	omap4_power_states[OMAP4_STATE_C1].mpu_state = PWRDM_POWER_INACTIVE;
 	omap4_power_states[OMAP4_STATE_C1].mpu_logic_state = PWRDM_POWER_RET;
-	omap4_power_states[OMAP4_STATE_C1].core_state = PWRDM_POWER_ON;
+	omap4_power_states[OMAP4_STATE_C1].core_state = PWRDM_POWER_INACTIVE;
 	omap4_power_states[OMAP4_STATE_C1].core_logic_state = PWRDM_POWER_ON;
 	omap4_power_states[OMAP4_STATE_C1].flags = CPUIDLE_FLAG_TIME_VALID;
 
@@ -257,7 +257,7 @@ void omap_init_power_states(void)
 	omap4_power_states[OMAP4_STATE_C2].cpu1_state = PWRDM_POWER_OFF;
 	omap4_power_states[OMAP4_STATE_C2].mpu_state = PWRDM_POWER_RET;
 	omap4_power_states[OMAP4_STATE_C2].mpu_logic_state = PWRDM_POWER_OFF;
-	omap4_power_states[OMAP4_STATE_C2].core_state = PWRDM_POWER_ON;
+	omap4_power_states[OMAP4_STATE_C2].core_state = PWRDM_POWER_INACTIVE;
 	omap4_power_states[OMAP4_STATE_C2].core_logic_state = PWRDM_POWER_ON;
 	omap4_power_states[OMAP4_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID;
 
