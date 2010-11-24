@@ -835,9 +835,15 @@ static void mute_be_capture(struct snd_pcm_substream *substream)
 		case OMAP_ABE_DAI_BT_VX:
 		case OMAP_ABE_DAI_MM_FM:
 		case OMAP_ABE_DAI_MODEM:
+			break;
 		case OMAP_ABE_DAI_DMIC0:
+			abe_mute_gain(GAINS_DMIC1, 0);
+			break;
 		case OMAP_ABE_DAI_DMIC1:
+			abe_mute_gain(GAINS_DMIC2, 0);
+			break;
 		case OMAP_ABE_DAI_DMIC2:
+			abe_mute_gain(GAINS_DMIC3, 0);
 			break;
 		}
 	}
@@ -863,9 +869,15 @@ static void unmute_be_capture(struct snd_pcm_substream *substream)
 		case OMAP_ABE_DAI_BT_VX:
 		case OMAP_ABE_DAI_MM_FM:
 		case OMAP_ABE_DAI_MODEM:
+			break;
 		case OMAP_ABE_DAI_DMIC0:
+			abe_unmute_gain(GAINS_DMIC1, 0);
+			break;
 		case OMAP_ABE_DAI_DMIC1:
+			abe_unmute_gain(GAINS_DMIC2, 0);
+			break;
 		case OMAP_ABE_DAI_DMIC2:
+			abe_unmute_gain(GAINS_DMIC3, 0);
 			break;
 		}
 	}
