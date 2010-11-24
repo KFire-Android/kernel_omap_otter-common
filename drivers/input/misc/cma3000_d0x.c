@@ -232,9 +232,9 @@ static ssize_t cma3000_store_attr_delay(struct device *dev,
 		/* Set to the fastest speed */
 		i = CMAMODE_MEAS400;
 	} else {
-		if (interval < cma3000_measure_interval[CMAMODE_MEAS100])
+		if (interval < cma3000_measure_interval[CMAMODE_MEAS40])
 			i = CMAMODE_MEAS400;
-		else if (interval < cma3000_measure_interval[CMAMODE_MEAS40])
+		else if (interval >= cma3000_measure_interval[CMAMODE_MEAS100])
 			i = CMAMODE_MEAS100;
 		else
 			i = CMAMODE_MEAS40;
@@ -243,7 +243,7 @@ static ssize_t cma3000_store_attr_delay(struct device *dev,
 	data->req_rate = cma3000_measure_interval[i];
 	cma3000_set_mode(data, i);
 
-	return 1;
+	return count;
 
 }
 
