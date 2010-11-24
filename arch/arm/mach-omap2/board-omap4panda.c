@@ -44,6 +44,10 @@
 #include <plat/display.h>
 #include <linux/delay.h>
 #include <plat/usb.h>
+#ifdef CONFIG_SERIAL_OMAP
+#include <plat/omap-serial.h>
+#include <plat/serial.h>
+#endif
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/mmc.h>
@@ -422,6 +426,65 @@ static struct i2c_board_info __initdata panda_i2c_boardinfo[] = {
 	},
 };
 
+static struct omap_uart_port_info omap_serial_platform_data[] = {
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART1_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART1_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART1_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART1_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART1_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART2_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART2_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART2_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART2_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART2_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART3_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART3_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART3_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART3_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART3_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART4_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART4_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART4_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART4_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART4_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+		.flags		= 0
+	}
+};
+
+
 /*
  * LPDDR2 Configeration Data
  * The memory organisation is as below :
@@ -592,7 +655,7 @@ static void __init omap_panda_init(void)
 	omap4_i2c_init();
 	omap4_display_init();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
-	omap_serial_init();
+	omap_serial_init(omap_serial_platform_data);
 	omap4_twl6030_hsmmc_init(mmc);
 
 #ifdef CONFIG_TIWLAN_SDIO

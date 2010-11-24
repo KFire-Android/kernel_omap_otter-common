@@ -29,6 +29,7 @@
 
 #ifdef CONFIG_SERIAL_OMAP
 #include <plat/omap-serial.h>
+#include <plat/serial.h>
 #endif
 
 #include <plat/common.h>
@@ -676,7 +677,8 @@ void __init omap_serial_early_init(void)
  * Don't mix calls to omap_serial_init_port() and omap_serial_init(),
  * use only one of the two.
  */
-void __init omap_serial_init_port(int port)
+void __init omap_serial_init_port(int port,
+			struct omap_uart_port_info *platform_data)
 {
 	struct omap_uart_state *uart;
 	struct omap_hwmod *oh = NULL;
@@ -755,13 +757,17 @@ void __init omap_serial_init_port(int port)
 	pdata_size = 2 * sizeof(struct plat_serial8250_port);
 #else
 	name = DRIVER_NAME;
-	omap_up.dma_enabled = uart->dma_enabled;
+	uart->dma_enabled = platform_data->use_dma;
+	omap_up.use_dma = platform_data->use_dma;
+	omap_up.dma_rx_buf_size = platform_data->dma_rx_buf_size;
+	omap_up.dma_rx_timeout = platform_data->dma_rx_timeout;
 
 	omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
 	omap_up.mapbase = uart->mapbase;
 	omap_up.membase = uart->membase;
 	omap_up.irqflags = IRQF_SHARED;
 	omap_up.flags = UPF_BOOT_AUTOCONF | UPF_SHARE_IRQ;
+	omap_up.idle_timeout = platform_data->idle_timeout;
 
 	pdata = &omap_up;
 	pdata_size = sizeof(struct omap_uart_port_info);
@@ -797,7 +803,7 @@ void __init omap_serial_init_port(int port)
 	 */
 	uart->timeout = (30 * HZ);
 	omap_uart_block_sleep(uart);
-	uart->timeout = DEFAULT_TIMEOUT;
+	uart->timeout = platform_data->idle_timeout;
 
 	if (((cpu_is_omap34xx() || cpu_is_omap44xx())
 		 && uart->padconf) ||
@@ -814,10 +820,13 @@ void __init omap_serial_init_port(int port)
  * can call this function when they want to have default behaviour
  * for serial ports (e.g initialize them all as serial ports).
  */
-void __init omap_serial_init(void)
+void __init omap_serial_init(struct omap_uart_port_info *platform_data)
 {
 	struct omap_uart_state *uart;
+	unsigned int count = 0;
 
-	list_for_each_entry(uart, &uart_list, node)
-		omap_serial_init_port(uart->num);
+	list_for_each_entry(uart, &uart_list, node) {
+		omap_serial_init_port(uart->num, &platform_data[count]);
+		count++;
+	}
 }
