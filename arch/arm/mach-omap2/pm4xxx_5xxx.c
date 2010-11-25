@@ -366,6 +366,17 @@ static int __init omap_pm_init(void)
 
 	(void) clkdm_for_each(omap_pm_clkdms_setup, NULL);
 
+	/*
+	 * ROM code initializes IVAHD and TESLA clock registers during
+	 * secure RAM restore phase on omap4430 EMU/HS devices, thus
+	 * IVAHD / TESLA clock registers must be saved / restored
+	 * during MPU OSWR / device off.
+	 */
+	if (omap_rev() >= OMAP4430_REV_ES1_0 &&
+	    omap_rev() < OMAP4430_REV_ES2_3 &&
+	    omap_type() != OMAP2_DEVICE_TYPE_GP)
+		pm44xx_errata |= PM_OMAP4_ROM_IVAHD_TESLA_ERRATUM_xxx;
+
 #ifdef CONFIG_SUSPEND
 	omap_pm_suspend = omap4_5_pm_suspend;
 #endif
