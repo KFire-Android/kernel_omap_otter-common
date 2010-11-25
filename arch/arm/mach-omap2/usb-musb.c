@@ -50,18 +50,18 @@ static struct musb_hdrc_config musb_config = {
 	.ram_bits	= 12,
 };
 
-#ifdef CONFIG_ANDROID
+#define ONTROL_DEV_CONF		0x300
+#	define PHY_PD			(1 << 0)
 
 #ifdef CONFIG_ARCH_OMAP4
 #define DIE_ID_REG_BASE		(L4_44XX_PHYS + 0x2000)
 #define DIE_ID_REG_OFFSET		0x200
-#define ONTROL_DEV_CONF		0x300
-#	define PHY_PD			(1 << 0)
 #else
 #define DIE_ID_REG_BASE		(L4_WK_34XX_PHYS + 0xA000)
 #define DIE_ID_REG_OFFSET		0x218
 #endif /* CONFIG_ARCH_OMAP4 */
 
+#ifdef CONFIG_ANDROID
 #define MAX_USB_SERIAL_NUM		17
 #define OMAP_VENDOR_ID			0x0451
 #define OMAP_UMS_PRODUCT_ID		0xD100
