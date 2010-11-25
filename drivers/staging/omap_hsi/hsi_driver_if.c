@@ -313,7 +313,7 @@ int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 		size);
 
 	if (unlikely(!dev || !dev->ch || !addr || (size <= 0))) {
-		dev_err(&dev->device, "Wrong paramenters "
+		dev_err(&dev->device, "Wrong parameters "
 			"hsi_device %p data %p count %d", dev, addr, size);
 		return -EINVAL;
 	}
@@ -363,7 +363,7 @@ int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 		size);
 
 	if (unlikely(!dev || !dev->ch || !addr || (size <= 0))) {
-		dev_err(&dev->device, "Wrong paramenters "
+		dev_err(&dev->device, "Wrong parameters "
 			"hsi_device %p data %p count %d", dev, addr, size);
 		return -EINVAL;
 	}
@@ -752,6 +752,7 @@ EXPORT_SYMBOL(hsi_close);
  * hsi_set_read_cb - register read_done() callback.
  * @dev - reference to hsi device channel where the callback is associated to.
  * @read_cb - callback to signal read transfer completed.
+ *		size is expressed in number of 32-bit words.
  *
  * NOTE: Write callback must be only set when channel is not open !
  */
@@ -769,6 +770,7 @@ EXPORT_SYMBOL(hsi_set_read_cb);
  * hsi_set_read_cb - register write_done() callback.
  * @dev - reference to hsi device channel where the callback is associated to.
  * @write_cb - callback to signal read transfer completed.
+ *		size is expressed in number of 32-bit words.
  *
  * NOTE: Read callback must be only set when channel is not open !
  */

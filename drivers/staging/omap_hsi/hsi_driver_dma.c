@@ -82,8 +82,10 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 	unsigned int channel = hsi_channel->channel_number;
 	unsigned int sync;
 	int lch;
-	dma_addr_t dma_data;
+	dma_addr_t src_addr;
+	dma_addr_t dest_addr;
 	u16 tmp;
+	int fifo;
 
 	if ((size < 1) || (data == NULL))
 		return -EINVAL;
@@ -101,7 +103,7 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 	/* Sync is required for SSI but not for HSI */
 	sync = hsi_sync_table[HSI_SYNC_WRITE][port - 1][channel];
 
-	dma_data = dma_map_single(hsi_ctrl->dev, data, size * 4, DMA_TO_DEVICE);
+	src_addr = dma_map_single(hsi_ctrl->dev, data, size * 4, DMA_TO_DEVICE);
 
 	tmp = HSI_SRC_SINGLE_ACCESS0 |
 	    HSI_SRC_MEMORY_PORT |
@@ -114,9 +116,25 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 
 	hsi_outw((HSI_BLOCK_IE | HSI_TOUT_IE), base, HSI_GDD_CCIR_REG(lch));
 
-	hsi_outl(channel, base, HSI_GDD_CDSA_REG(lch));
+	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
+		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
+		if (fifo < 0) {
+			dev_err(hsi_ctrl->dev, "No valid FIFO id for DMA "
+				"transfer to FIFO.\n");
+			return -EFAULT;
+		}
+		/* HSI CDSA register takes a FIFO ID when copying to FIFO */
+		hsi_outl(fifo, base, HSI_GDD_CDSA_REG(lch));
+	} else {
+		dest_addr = hsi_ctrl->phy_base + HSI_HST_BUFFER_CH_REG(port,
+								channel);
+		/* SSI CDSA register always takes a 32-bit address */
+		hsi_outl(dest_addr, base, HSI_GDD_CDSA_REG(lch));
+	}
 
-	hsi_outl(dma_data, base, HSI_GDD_CSSA_REG(lch));
+	/* HSI CSSA register takes a 32-bit address when copying from memory */
+	/* SSI CSSA register always takes a 32-bit address */
+	hsi_outl(src_addr, base, HSI_GDD_CSSA_REG(lch));
 	hsi_outw(size, base, HSI_GDD_CEN_REG(lch));
 
 	hsi_outl_or(HSI_GDD_LCH(lch), base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
@@ -145,8 +163,10 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 	unsigned int channel = hsi_channel->channel_number;
 	unsigned int sync;
 	unsigned int lch;
-	dma_addr_t dma_data;
+	dma_addr_t src_addr;
+	dma_addr_t dest_addr;
 	u16 tmp;
+	int fifo;
 
 	lch = hsi_get_free_lch(hsi_ctrl);
 	if (lch >= hsi_ctrl->gdd_chan_count) {
@@ -170,7 +190,7 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 	/* Sync is required for SSI but not for HSI */
 	sync = hsi_sync_table[HSI_SYNC_READ][port - 1][channel];
 
-	dma_data = dma_map_single(hsi_ctrl->dev, data, count * 4,
+	dest_addr = dma_map_single(hsi_ctrl->dev, data, count * 4,
 				  DMA_FROM_DEVICE);
 
 	tmp = HSI_DST_SINGLE_ACCESS0 |
@@ -184,9 +204,25 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 
 	hsi_outw((HSI_BLOCK_IE | HSI_TOUT_IE), base, HSI_GDD_CCIR_REG(lch));
 
-	hsi_outl(channel, base, HSI_GDD_CSSA_REG(lch));
+	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
+		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
+		if (fifo < 0) {
+			dev_err(hsi_ctrl->dev, "No valid FIFO id for DMA "
+				"transfer from FIFO.\n");
+			return -EFAULT;
+		}
+		/* HSI CSSA register takes a FIFO ID when copying from FIFO */
+		hsi_outl(fifo, base, HSI_GDD_CSSA_REG(lch));
+	} else{
+		src_addr = hsi_ctrl->phy_base + HSI_HSR_BUFFER_CH_REG(port,
+								channel);
+		/* SSI CSSA register always takes a 32-bit address */
+		hsi_outl(src_addr, base, HSI_GDD_CSSA_REG(lch));
+	}
 
-	hsi_outl(dma_data, base, HSI_GDD_CDSA_REG(lch));
+	/* HSI CDSA register takes a 32-bit address when copying to memory */
+	/* SSI CDSA register always takes a 32-bit address */
+	hsi_outl(dest_addr, base, HSI_GDD_CDSA_REG(lch));
 	hsi_outw(count, base, HSI_GDD_CEN_REG(lch));
 
 	hsi_outl_or(HSI_GDD_LCH(lch), base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
@@ -347,7 +383,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 						DMA_FROM_DEVICE);
 			dma_unmap_single(hsi_ctrl->dev, dma_h, size,
 					 DMA_FROM_DEVICE);
-			ch = ctrl_get_ch(hsi_ctrl, port, channel);
+			ch = hsi_ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_read(ch);
 			/* DMA transfer is over, re-enable default mode
 			 * (interrupts for polling feature)
@@ -360,14 +396,14 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			size = hsi_inw(base, HSI_GDD_CEN_REG(gdd_lch)) * 4;
 			dma_unmap_single(hsi_ctrl->dev, dma_h, size,
 					 DMA_TO_DEVICE);
-			ch = ctrl_get_ch(hsi_ctrl, port, channel);
+			ch = hsi_ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_write(ch);
 			spin_unlock(&hsi_ctrl->lock);
 			ch->write_done(ch->dev, size / 4);
 		}
 	} else {
-		dev_err(hsi_ctrl->dev, "Error  on GDD transfer "
-			"on gdd channel %d\n", gdd_lch);
+		dev_err(hsi_ctrl->dev, "Time-out overflow Error on GDD transfer"
+			" on gdd channel %d\n", gdd_lch);
 		spin_unlock(&hsi_ctrl->lock);
 		hsi_port_event_handler(&hsi_ctrl->hsi_port[port - 1],
 				       HSI_EVENT_ERROR, NULL);

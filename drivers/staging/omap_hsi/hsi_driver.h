@@ -256,7 +256,7 @@ void hsi_debug_remove_ctrl(struct hsi_dev *hsi_ctrl);
 #define	hsi_debug_exit()
 #endif /* CONFIG_DEBUG_FS */
 
-static inline struct hsi_channel *ctrl_get_ch(struct hsi_dev *hsi_ctrl,
+static inline struct hsi_channel *hsi_ctrl_get_ch(struct hsi_dev *hsi_ctrl,
 					      unsigned int port,
 					      unsigned int channel)
 {

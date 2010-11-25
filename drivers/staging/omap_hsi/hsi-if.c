@@ -66,9 +66,9 @@ struct if_hsi_channel {
 	struct hsi_device *dev;
 	unsigned int channel_id;
 	u32 *tx_data;
-	unsigned int tx_count;
+	unsigned int tx_count;	/* Number of bytes to be written */
 	u32 *rx_data;
-	unsigned int rx_count;
+	unsigned int rx_count;	/* Number of bytes to be read */
 	unsigned int opened;
 	unsigned int state;
 	spinlock_t lock; /* Serializes access to channel data */
@@ -133,7 +133,7 @@ static void if_hsi_read_done(struct hsi_device *dev, unsigned int size)
 	channel->state &= ~HSI_CHANNEL_STATE_READING;
 	ev.event = HSI_EV_IN;
 	ev.data = channel->rx_data;
-	ev.count = 4 * size;
+	ev.count = 4 * size;	/* Convert size to number of u8, not u32 */
 	spin_unlock(&channel->lock);
 	if_notify(dev->n_ch, &ev);
 }
@@ -197,7 +197,7 @@ static void if_hsi_write_done(struct hsi_device *dev, unsigned int size)
 	channel->state &= ~HSI_CHANNEL_STATE_WRITING;
 	ev.event = HSI_EV_OUT;
 	ev.data = channel->tx_data;
-	ev.count = 4 * size;
+	ev.count = 4 * size;	/* Convert size to number of u8, not u32 */
 	spin_unlock(&channel->lock);
 	if_notify(dev->n_ch, &ev);
 }
