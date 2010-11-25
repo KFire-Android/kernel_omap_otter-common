@@ -24,19 +24,8 @@
 static void do_hsi_cawake_tasklet(unsigned long hsi_p)
 {
 	struct hsi_port *port = (struct hsi_port *)hsi_p;
-	struct hsi_dev *hsi_ctrl = port->hsi_controller;
 
-	if (hsi_cawake(port)) {
-		if (!hsi_ctrl->cawake_clk_enable) {
-			hsi_ctrl->cawake_clk_enable = 1;
-		}
-		hsi_port_event_handler(port, HSI_EVENT_CAWAKE_UP, NULL);
-	} else {
-		hsi_port_event_handler(port, HSI_EVENT_CAWAKE_DOWN, NULL);
-		if (hsi_ctrl->cawake_clk_enable) {
-			hsi_ctrl->cawake_clk_enable = 0;
-		}
-	}
+	hsi_do_cawake_process(port);
 }
 
 static irqreturn_t hsi_cawake_isr(int irq, void *hsi_p)
@@ -51,11 +40,11 @@ static irqreturn_t hsi_cawake_isr(int irq, void *hsi_p)
 int __init hsi_cawake_init(struct hsi_port *port, const char *irq_name)
 {
 	tasklet_init(&port->cawake_tasklet, do_hsi_cawake_tasklet,
-							(unsigned long)port);
+		     (unsigned long)port);
 
 	if (request_irq(port->cawake_gpio_irq, hsi_cawake_isr,
-		IRQF_DISABLED | IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-							irq_name, port) < 0) {
+			IRQF_DISABLED | IRQF_TRIGGER_RISING |
+			IRQF_TRIGGER_FALLING, irq_name, port) < 0) {
 		dev_err(port->hsi_controller->dev,
 			"FAILED to request %s GPIO IRQ %d on port %d\n",
 			irq_name, port->cawake_gpio_irq, port->port_number);
@@ -69,7 +58,7 @@ int __init hsi_cawake_init(struct hsi_port *port, const char *irq_name)
 void hsi_cawake_exit(struct hsi_port *port)
 {
 	if (port->cawake_gpio < 0)
-		return;	/* Nothing to do */
+		return;		/* Nothing to do (SSI with GPIO or HSI with IO ring wakeup */
 
 	disable_irq_wake(port->cawake_gpio_irq);
 	tasklet_kill(&port->cawake_tasklet);

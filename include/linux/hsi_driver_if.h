@@ -49,17 +49,17 @@ enum {
 };
 
 enum {
-	HSI_IOCTL_WAKE_UP,
-	HSI_IOCTL_WAKE_DOWN,
-	HSI_IOCTL_SEND_BREAK,
-	HSI_IOCTL_WAKE,
-	HSI_IOCTL_FLUSH_RX,
-	HSI_IOCTL_FLUSH_TX,
-	HSI_IOCTL_CAWAKE,
-	HSI_IOCTL_SET_RX,
-	HSI_IOCTL_GET_RX,
-	HSI_IOCTL_SET_TX,
-	HSI_IOCTL_GET_TX,
+	HSI_IOCTL_ACWAKE_DOWN = 0,	/* Unset HSI wakeup line (acwake) for the channel */
+	HSI_IOCTL_ACWAKE_UP,	/* Set HSI wakeup line (acwake) for the channel */
+	HSI_IOCTL_SEND_BREAK,	/* Send a HW BREAK frame in FRAME mode */
+	HSI_IOCTL_GET_ACWAKE,	/* Get HST WAKE line status */
+	HSI_IOCTL_FLUSH_RX,	/* Force the HSR to idle state */
+	HSI_IOCTL_FLUSH_TX,	/* Force the HST to idle state */
+	HSI_IOCTL_GET_CAWAKE,	/* Get CAWAKE (HSR) line status */
+	HSI_IOCTL_SET_RX,	/* Set HSR configuration */
+	HSI_IOCTL_GET_RX,	/* Get HSR configuration */
+	HSI_IOCTL_SET_TX,	/* Set HST configuration */
+	HSI_IOCTL_GET_TX,	/* Get HST configuration */
 };
 
 /* Forward references */

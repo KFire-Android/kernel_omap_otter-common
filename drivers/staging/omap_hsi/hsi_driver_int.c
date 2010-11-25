@@ -45,6 +45,7 @@ bool hsi_is_channel_busy(struct hsi_channel *ch)
 	return true;
 }
 
+/* Enables the Data Accepted Interrupt of HST for the given channel */
 int hsi_driver_write_interrupt(struct hsi_channel *ch, u32 * data)
 {
 	struct hsi_port *p = ch->hsi_port;
@@ -57,6 +58,7 @@ int hsi_driver_write_interrupt(struct hsi_channel *ch, u32 * data)
 	return 0;
 }
 
+/* Enables the Data Available Interrupt of HSR for the given channel */
 int hsi_driver_read_interrupt(struct hsi_channel *ch, u32 * data)
 {
 	struct hsi_port *p = ch->hsi_port;
@@ -122,7 +124,7 @@ void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
 	hsi_reset_ch_read(ch);
 }
 
-static void do_channel_tx(struct hsi_channel *ch)
+static void hsi_do_channel_tx(struct hsi_channel *ch)
 {
 	struct hsi_dev *hsi_ctrl = ch->hsi_port->hsi_controller;
 	void __iomem *base = hsi_ctrl->base;
@@ -153,7 +155,7 @@ static void do_channel_tx(struct hsi_channel *ch)
 	}
 }
 
-static void do_channel_rx(struct hsi_channel *ch)
+static void hsi_do_channel_rx(struct hsi_channel *ch)
 {
 	struct hsi_dev *hsi_ctrl = ch->hsi_port->hsi_controller;
 	void __iomem *base = ch->hsi_port->hsi_controller->base;
@@ -196,6 +198,64 @@ static void do_channel_rx(struct hsi_channel *ch)
 		(*ch->read_done) (ch->dev, 1);
 }
 
+void hsi_do_cawake_process(struct hsi_port *pport)
+{
+	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
+
+	/* Check CAWAKE line status */
+	if (hsi_get_cawake(pport)) {
+		/* CAWAKE went high. This can be for 2 reasons: */
+		/*  - Ack from modem following an ACWAKE high from OMAP */
+		/*	(ACPU wakeup) */
+		/*  - Initial request from modem to wake up */
+		/*	(OMAP is in low power) */
+		dev_dbg(hsi_ctrl->dev, "CAWAKE rising edge detected\n");
+		hsi_ctrl->cawake_status = 1;
+
+		if (hsi_ctrl->acwake_status) {
+			/* Case 1 : Ack from modem following an ACWAKE high */
+			/*	(ACPU requests a Modem wakeup) */
+			dev_dbg(hsi_ctrl->dev,
+				"ACWAKE already high, CAWAKE Ack received from modem\n");
+
+			/* OMAP is ready, Modem is ready, Transmission can start */
+		} else {
+			/* Case 2 : Initial request from modem to wake up the OMAP */
+			/*	(OMAP is currently in idle) */
+			/* Note : if we enter here, OMAP is NOT in OFF mode, */
+			/*	otherwise the wakeup path would have gone */
+			/*	through the IOPAD daisy chain wakeup */
+			dev_dbg(hsi_ctrl->dev,
+				"ACWAKE low, OMAP awaken from non-OFF mode\n");
+
+			hsi_clocks_enable(hsi_ctrl->dev);
+		}
+
+		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_UP, NULL);
+	} else {
+		/* CAWAKE went low. Only 1 reason for this : */
+		/*  - Ack from modem following an ACWAKE low */
+		/*	(ACPU low power mode request) */
+		dev_dbg(hsi_ctrl->dev, "CAWAKE falling edge detected\n");
+		hsi_ctrl->cawake_status = 0;
+
+		if (unlikely(hsi_ctrl->acwake_status)) {
+			dev_err(hsi_ctrl->dev,
+				"Unauthorized modem transition to Low Power "
+				"Mode : ACWAKE is still high whereas it should be low\n");
+			return;
+		}
+
+		/* Enter low power mode */
+		/*hsi_clocks_disable(hsi_ctrl->dev);*/
+		/* This will be done later in tasklet, as soon as we do not */
+		/* need any register access */
+
+		/* Inform upper layers */
+		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_DOWN, NULL);
+	}
+}
+
 /**
  * hsi_driver_int_proc - check all channels / ports for interrupts events
  * @hsi_ctrl - HSI controler data
@@ -204,7 +264,8 @@ static void do_channel_rx(struct hsi_channel *ch)
  * @start: interrupt index to start on
  * @stop: interrupt index to stop on
  *
- * This function calls the related processing functions and triggered events
+ * This function calls the related processing functions and triggered events.
+ * Events are cleared after corresponding function has been called.
 */
 static void hsi_driver_int_proc(struct hsi_port *pport,
 				unsigned long status_offset,
@@ -219,26 +280,15 @@ static void hsi_driver_int_proc(struct hsi_port *pport,
 	u32 hsr_err_reg;
 	u32 channels_served = 0;
 
+	/* Get events status */
 	status_reg = hsi_inl(base, status_offset);
 	status_reg &= hsi_inl(base, enable_offset);
-
-	for (channel = start; channel < stop; channel++) {
-		if (status_reg & HSI_HST_DATAACCEPT(channel)) {
-
-			do_channel_tx(&pport->hsi_channel[channel]);
-			channels_served |= HSI_HST_DATAACCEPT(channel);
-		}
-
-		if (status_reg & HSI_HSR_DATAAVAILABLE(channel)) {
-			do_channel_rx(&pport->hsi_channel[channel]);
-			channels_served |= HSI_HSR_DATAAVAILABLE(channel);
-		}
-	}
 
 	if (status_reg & HSI_BREAKDETECTED) {
 		dev_info(hsi_ctrl->dev, "Hardware BREAK on port %d\n", port);
 		hsi_outl(0, base, HSI_HSR_BREAK_REG(port));
 		hsi_port_event_handler(pport, HSI_EVENT_BREAK_DETECTED, NULL);
+
 		channels_served |= HSI_BREAKDETECTED;
 	}
 
@@ -255,6 +305,32 @@ static void hsi_driver_int_proc(struct hsi_port *pport,
 		channels_served |= HSI_ERROROCCURED;
 	}
 
+	/* CAWAKE falling or rising edge detected */
+	if (status_reg & HSI_CAWAKEDETECTED) {
+		hsi_do_cawake_process(pport);
+
+		channels_served |= HSI_CAWAKEDETECTED;
+	}
+
+	for (channel = start; channel < stop; channel++) {
+		if (status_reg & HSI_HST_DATAACCEPT(channel)) {
+			hsi_do_channel_tx(&pport->hsi_channel[channel]);
+			channels_served |= HSI_HST_DATAACCEPT(channel);
+		}
+
+		if (status_reg & HSI_HSR_DATAAVAILABLE(channel)) {
+			hsi_do_channel_rx(&pport->hsi_channel[channel]);
+			channels_served |= HSI_HSR_DATAAVAILABLE(channel);
+		}
+
+		if (status_reg & HSI_HSR_DATAOVERRUN(channel)) {
+			/*HSI_TODO : Data overrun handling*/
+			dev_dbg(hsi_ctrl->dev,
+				"Data overrun in real time mode !\n");
+		}
+	}
+
+	/* Reset status bits */
 	hsi_outl(channels_served, base, status_offset);
 }
 
@@ -268,25 +344,37 @@ static void do_hsi_tasklet(unsigned long hsi_port)
 	u32 status_reg;
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
 
+	/* Process events for channels 0..7 */
 	hsi_driver_int_proc(pport,
 			    HSI_SYS_MPU_STATUS_REG(port, irq),
 			    HSI_SYS_MPU_ENABLE_REG(port, irq),
 			    0, min(pport->max_ch, (u8) HSI_SSI_CHANNELS_MAX));
 
+	/* Process events for channels 8..15 */
 	if (pport->max_ch > HSI_SSI_CHANNELS_MAX)
 		hsi_driver_int_proc(pport,
 				    HSI_SYS_MPU_U_STATUS_REG(port, irq),
 				    HSI_SYS_MPU_U_ENABLE_REG(port, irq),
 				    HSI_SSI_CHANNELS_MAX, pport->max_ch);
 
+	/* Get unprocessed events for channels 0..7 */
 	status_reg = hsi_inl(base, HSI_SYS_MPU_STATUS_REG(port, irq)) &
 	    hsi_inl(base, HSI_SYS_MPU_ENABLE_REG(port, irq));
 
+	/* Get unprocessed events for channels 8..15 */
 	if (hsi_driver_device_is_hsi(pd))
 		status_reg |=
 		    (hsi_inl(base, HSI_SYS_MPU_U_STATUS_REG(port, irq)) &
 		     hsi_inl(base, HSI_SYS_MPU_U_ENABLE_REG(port, irq)));
 
+	/* Check if clocks can be disabled */
+	if (!hsi_ctrl->acwake_status && !hsi_ctrl->cawake_status) {
+		dev_dbg(hsi_ctrl->dev,
+			"ACWAKE & CAWAKE are low, all events processed, disabling clocks\n");
+		hsi_clocks_disable(hsi_ctrl->dev);
+	}
+
+	/* Re-queue unprocessed events */
 	if (status_reg)
 		tasklet_hi_schedule(&pport->hsi_tasklet);
 	else

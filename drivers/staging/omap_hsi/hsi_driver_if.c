@@ -199,8 +199,9 @@ int hsi_set_tx(struct hsi_port *sport, struct hst_ctx *cfg)
 
 	if ((cfg->mode != NOT_SET) && (cfg->flow != NOT_SET))
 		hsi_outl(cfg->mode | ((cfg->flow & HSI_FLOW_VAL_MASK) <<
-				      HSI_FLOW_OFFSET) | HSI_MODE_WAKE_CTRL_SW,
-			 base, HSI_HST_MODE_REG(port));
+				      HSI_FLOW_OFFSET) |
+			 HSI_HST_MODE_WAKE_CTRL_SW, base,
+			 HSI_HST_MODE_REG(port));
 
 	if (cfg->frame_size != NOT_SET)
 		hsi_outl(cfg->frame_size, base, HSI_HST_FRAMESIZE_REG(port));
@@ -530,29 +531,86 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	base = hsi_ctrl->base;
 
 	switch (command) {
-	case HSI_IOCTL_WAKE_UP:
+	case HSI_IOCTL_ACWAKE_UP:
+		/* Wake up request to Modem (OMAP initiated or ACK from Modem following CAWAKE high) */
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
+
+		spin_lock_bh(&hsi_ctrl->lock);
+		ch->flags |= HSI_CH_ACWAKE;
+		hsi_ctrl->acwake_status |= BIT(channel);
+
 		/* We only claim once the wake line per channel */
 		wake = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		if (!(wake & HSI_WAKE(channel))) {
-			hsi_outl(HSI_WAKE(channel), base,
+			hsi_outl(HSI_SET_WAKE(channel), base,
 				 HSI_SYS_SET_WAKE_REG(port));
 		}
+		spin_unlock_bh(&hsi_ctrl->lock);
+
+		goto out;
 		break;
-	case HSI_IOCTL_WAKE_DOWN:
+	case HSI_IOCTL_ACWAKE_DOWN:
+		/* Low power request initiation (OMAP initiated, typically following inactivity timeout) */
+		/* ACPU HSI block shall still be capable of receiving */
+
+		/* Clocks should be on, but to be sure we enable them here. */
+		/* Clocks will be disabled immediatly after register access */
+		/* (or at least clock counter will be decremented) */
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
+
+		spin_lock_bh(&hsi_ctrl->lock);
+
 		wake = hsi_inl(base, HSI_SYS_WAKE_REG(port));
+		/* Release the wake line per channel */
 		if ((wake & HSI_WAKE(channel))) {
-			hsi_outl(HSI_WAKE(channel), base,
+			hsi_outl(HSI_CLEAR_WAKE(channel), base,
 				 HSI_SYS_CLEAR_WAKE_REG(port));
 		}
+
+		ch->flags &= ~HSI_CH_ACWAKE;
+		hsi_ctrl->acwake_status &= ~BIT(channel);
+
+		spin_unlock_bh(&hsi_ctrl->lock);
+
+		/* Check if CAWAKE is already low */
+		if (hsi_get_cawake(ch->hsi_port)) {
+			dev_err(hsi_ctrl->dev,
+				"CAWAKE is already high at the time of ACWAKE down,"
+				" disabling clock\n");
+
+			hsi_clocks_disable_channel(dev->device.parent,
+						   ch->channel_number);
+		}
+
+		/* Decrement the power.usage_count. This may _not_ lead to a real HW clock cut down */
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
+
+		/* If all channels have their ACWAKE line down, do not cut the clocks, wait for CAWAKE to go low */
+
+		goto out;
 		break;
 	case HSI_IOCTL_SEND_BREAK:
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
 		hsi_outl(1, base, HSI_HST_BREAK_REG(port));
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
+		/*HSI_TODO : need to deactivate clock after BREAK frames sent*/
+		/*Use interrupt ? (if TX BREAK INT exists)*/
 		break;
-	case HSI_IOCTL_WAKE:
-		if (arg == NULL)
+	case HSI_IOCTL_GET_ACWAKE:
+		if (arg == NULL) {
 			err = -EINVAL;
-		else
-			*(u32 *) arg = hsi_inl(base, HSI_SYS_WAKE_REG(port));
+			goto out;
+		} else
+			hsi_clocks_enable_channel(dev->device.parent,
+						  ch->channel_number);
+		*(u32 *) arg = hsi_inl(base, HSI_SYS_WAKE_REG(port));
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
 		break;
 	case HSI_IOCTL_FLUSH_RX:
 		hsi_clocks_enable_channel(dev->device.parent,
@@ -568,7 +626,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		hsi_clocks_disable_channel(dev->device.parent,
 					   ch->channel_number);
 		break;
-	case HSI_IOCTL_CAWAKE:
+	case HSI_IOCTL_GET_CAWAKE:
 		if (!arg) {
 			err = -EINVAL;
 			goto out;
@@ -643,7 +701,6 @@ out:
 
 	return err;
 }
-
 EXPORT_SYMBOL(hsi_ioctl);
 
 /**
@@ -652,6 +709,8 @@ EXPORT_SYMBOL(hsi_ioctl);
  */
 void hsi_close(struct hsi_device *dev)
 {
+	struct hsi_dev *hsi_ctrl = dev->ch->hsi_port->hsi_controller;
+
 	if (!dev || !dev->ch) {
 		pr_err(LOG_NAME "Trying to close wrong HSI device %p\n", dev);
 		return;

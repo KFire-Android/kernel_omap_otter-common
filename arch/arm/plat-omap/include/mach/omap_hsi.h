@@ -95,13 +95,18 @@
 			(((port - 1) * HSI_SYS_MPU_ENABLE_PORT_OFFSET) +\
 			(irq * HSI_SYS_MPU_ENABLE_IRQ_OFFSET)))
 #define HSI_HST_DATAACCEPT(channel)	((channel < 8) ?		\
-					(1 << channel) : (1 << (channel - 8)))
+					(1 << channel) :		\
+					(1 << (channel - 8)))
 #define HSI_HSR_DATAAVAILABLE(channel)	(channel < 8 ?			\
-				(1 << (channel + 8)) : (1 << (channel - 8 + 8)))
+					(1 << (channel + 8)) :		\
+					(1 << (channel - 8 + 8)))
 #define HSI_HSR_DATAOVERRUN(channel)	(channel < 8 ?			\
-			(1 << (channel + 16)) : (1 << (channel - 8 + 16)))
+					(1 << (channel + 16)) :		\
+					(1 << (channel - 8 + 16)))
+
 #define HSI_ERROROCCURED		(1 << 24)
 #define HSI_BREAKDETECTED		(1 << 25)
+#define HSI_CAWAKEDETECTED		(1 << 26)
 
 #define HSI_SYS_GDD_MPU_IRQ_STATUS_REG	0x0800
 #define HSI_SYS_GDD_MPU_IRQ_ENABLE_REG	0x0804
@@ -117,12 +122,14 @@
 #define HSI_SYS_SET_WAKE_BASE		0x0c08
 #define HSI_SYS_SET_WAKE_REG(port)	(HSI_SYS_SET_WAKE_BASE +\
 					((port - 1) * HSI_SYS_WAKE_OFFSET))
-#	define HSI_SSI_WAKE_MASK	0xff	/* for SSI */
-#	define HSI_WAKE_MASK		0xffff	/* for HSI */
-#	define HSI_WAKE_4_WIRES		(0 << 16)
-#	define HSI_WAKE_READY_LVL_0	(0 << 17)
-#	define HSI_WAKE(channel)	(1 << channel | HSI_WAKE_4_WIRES |\
-							HSI_WAKE_READY_LVL_0)
+#define HSI_SSI_WAKE_MASK		0xff	/* for SSI */
+#define HSI_WAKE_MASK			0xffff	/* for HSI */
+#define HSI_SET_WAKE_4_WIRES		(0 << 16)
+#define HSI_SET_WAKE_READY_LVL_0	(0 << 17)
+#define HSI_SET_WAKE(channel)		(1 << channel | HSI_SET_WAKE_4_WIRES |\
+							HSI_SET_WAKE_READY_LVL_0)
+#define HSI_CLEAR_WAKE(channel)		(1 << channel)
+#define HSI_WAKE(channel)		(1 << channel)
 
 #define HSI_SYS_HWINFO_REG		0x0004	/* only for HSI */
 
@@ -151,12 +158,12 @@
 #define HSI_MODE_FRAME			2
 #define HSI_SSI_MODE_MULTIPOINTS	3		/* SSI only */
 #define HSI_FLOW_OFFSET			2		/* HSI only */
-#define HSI_FLOW_VAL_MASK		3 		/* HSI only */
+#define HSI_FLOW_VAL_MASK		3		/* HSI only */
 #define HSI_FLOW_SYNCHRONIZED		0		/* HSI only */
-#define HSI_FLOW_PIPELINED		1 		/* HSI only */
-#define HSI_FLOW_REAL_TIME		2 		/* HSI only */
-#define HSI_MODE_WAKE_CTRL_AUTO		(1 << 4)	/* HSI only */
-#define HSI_MODE_WAKE_CTRL_SW		(0 << 4)	/* HSI only */
+#define HSI_FLOW_PIPELINED		1		/* HSI only */
+#define HSI_FLOW_REAL_TIME		2		/* HSI only */
+#define HSI_HST_MODE_WAKE_CTRL_AUTO	(1 << 4)	/* HSI only */
+#define HSI_HST_MODE_WAKE_CTRL_SW	(0 << 4)	/* HSI only */
 
 #define HSI_HST_FRAMESIZE_REG(port)	(HSI_HST_BASE(port) + 0x0008)
 #define HSI_FRAMESIZE_DEFAULT		31
@@ -166,8 +173,8 @@
 #define	TXSTATE_IDLE			0
 
 #define HSI_HST_BUFSTATE_REG(port)	(HSI_HST_BASE(port) + 0x0010)
-#define HSI_HST_BUFSTATE_FIFO_REG(fifo)	((fifo < 8) ? 			\
-					HSI_HST_BUFSTATE_REG(1) : 	\
+#define HSI_HST_BUFSTATE_FIFO_REG(fifo)	((fifo < 8) ?			\
+					HSI_HST_BUFSTATE_REG(1) :	\
 					HSI_HST_BUFSTATE_REG(2))
 #define	HSI_BUFSTATE_CHANNEL(channel)	(channel < 8 ?			\
 					(1 << channel) : (1 << (channel - 8)))
@@ -214,14 +221,15 @@
 #define HSI_HSR_ID_REG(port)		(HSI_HSR_BASE(port) + 0x0000)
 
 #define HSI_HSR_MODE_REG(port)		(HSI_HSR_BASE(port) + 0x0004)
+#define HSI_HSR_MODE_WAKE_STATUS		(1 << 4)	/* HSI only */
 
 #define HSI_HSR_FRAMESIZE_REG(port)	(HSI_HSR_BASE(port) + 0x0008)
 
 #define HSI_HSR_RXSTATE_REG(port)	(HSI_HSR_BASE(port) + 0x000c)
 
 #define HSI_HSR_BUFSTATE_REG(port)	(HSI_HSR_BASE(port) + 0x0010)
-#define HSI_HSR_BUFSTATE_FIFO_REG(fifo)	((fifo < 8) ? 			\
-					HSI_HSR_BUFSTATE_REG(1) : 	\
+#define HSI_HSR_BUFSTATE_FIFO_REG(fifo)	((fifo < 8) ?			\
+					HSI_HSR_BUFSTATE_REG(1) :	\
 					HSI_HSR_BUFSTATE_REG(2))
 
 #define HSI_HSR_BREAK_REG(port)		(HSI_HSR_BASE(port) + 0x001c)
@@ -242,14 +250,14 @@
 #define HSI_HSR_OVERRUNACK_REG(port)	(HSI_HSR_BASE(port) + 0x0030)
 
 #define HSI_HSR_COUNTERS_REG(port)	(HSI_HSR_BASE(port) + 0x0034)
-#define HSI_TIMEOUT_DEFAULT		0		/* SSI only */
-#define HSI_SSI_RX_TIMEOUT_MAX		0x1ff		/* SSI only */
+#define HSI_TIMEOUT_DEFAULT		0	/* SSI only */
+#define HSI_SSI_RX_TIMEOUT_MAX		0x1ff	/* SSI only */
 #define HSI_COUNTERS_FT_MASK		0x000fffff	/* HSI only */
 #define HSI_COUNTERS_TB_MASK		0x00f00000	/* HSI only */
 #define HSI_COUNTERS_FB_MASK		0xff000000	/* HSI only */
-#define HSI_COUNTERS_FT_OFFSET		0		/* HSI only */
-#define HSI_COUNTERS_TB_OFFSET		20		/* HSI only */
-#define HSI_COUNTERS_FB_OFFSET		24		/* HSI only */
+#define HSI_COUNTERS_FT_OFFSET		0	/* HSI only */
+#define HSI_COUNTERS_TB_OFFSET		20	/* HSI only */
+#define HSI_COUNTERS_FB_OFFSET		24	/* HSI only */
 /* Default FT value: 2 x max_bits_per_frame + 20% margin */
 #define HSI_COUNTERS_FT_DEFAULT		(90 << HSI_COUNTERS_FT_OFFSET)
 #define HSI_COUNTERS_TB_DEFAULT		(6 << HSI_COUNTERS_TB_OFFSET)
@@ -281,7 +289,6 @@
 #define HSI_HSR_DIVISOR_REG(port)	(HSI_HSR_BASE(port) + 0x014C)
 #define HSI_HSR_DIVISOR_MASK		0xff
 #define HSI_MAX_RX_DIVISOR		0xff
-
 
 /*
  * HSI GDD registers
@@ -349,12 +356,12 @@
 
 #define HSI_CCR_ENABLE			(1 << 7)
 
-#define HSI_CCR_SYNC_MASK		0x001f		/* only for SSI */
+#define HSI_CCR_SYNC_MASK		0x001f	/* only for SSI */
 
-#define HSI_GDD_CICR_BASE		(HSI_GDD_BASE + 0x0804)
-#define HSI_GDD_CICR_OFFSET		0x40
-#define HSI_GDD_CICR_REG(channel)	(HSI_GDD_CICR_BASE +\
-					(channel * HSI_GDD_CICR_OFFSET))
+#define HSI_GDD_CCIR_BASE		(HSI_GDD_BASE + 0x0804)
+#define HSI_GDD_CCIR_OFFSET		0x40
+#define HSI_GDD_CCIR_REG(channel)	(HSI_GDD_CCIR_BASE +\
+					(channel * HSI_GDD_CCIR_OFFSET))
 #define HSI_BLOCK_IE			(1 << 5)
 #define HSI_HALF_IE			(1 << 2)
 #define HSI_TOUT_IE			(1 << 0)
@@ -364,9 +371,9 @@
 #define HSI_GDD_CSR_REG(channel)	(HSI_GDD_CSR_BASE +\
 					(channel * HSI_GDD_CSR_OFFSET))
 #define HSI_CSR_SYNC			(1 << 6)
-#define HSI_CSR_BLOCK			(1 << 5)
-#define HSI_CSR_HALF			(1 << 2)
-#define HSI_CSR_TOUT			(1 << 0)
+#define HSI_CSR_BLOCK			(1 << 5)	/* Full block is transferred */
+#define HSI_CSR_HALF			(1 << 2)	/* Half block is transferred */
+#define HSI_CSR_TOUT			(1 << 0)	/* Time-out overflow occurs */
 
 #define HSI_GDD_CSSA_BASE		(HSI_GDD_BASE + 0x0808)
 #define HSI_GDD_CSSA_OFFSET		0x40

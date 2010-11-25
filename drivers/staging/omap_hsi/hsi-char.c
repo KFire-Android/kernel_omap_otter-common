@@ -358,13 +358,13 @@ static int hsi_char_ioctl(struct inode *inode, struct file *file,
 	case CS_FLUSH_TX:
 		if_hsi_flush_tx(ch);
 		break;
-	case CS_SET_WAKELINE:
+	case CS_SET_ACWAKELINE:
 		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
 			ret = -EFAULT;
 		else
 			if_hsi_set_wakeline(ch, state);
 		break;
-	case CS_GET_WAKELINE:
+	case CS_GET_ACWAKELINE:
 		if_hsi_get_wakeline(ch, &state);
 		if (copy_to_user((void __user *)arg, &state, sizeof(state)))
 			ret = -EFAULT;

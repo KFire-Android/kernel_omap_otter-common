@@ -31,8 +31,8 @@
 #define CS_FLUSH_RX		CS_IO(2)
 #define CS_FLUSH_TX		CS_IO(3)
 #define CS_BOOTSTRAP		CS_IO(4)
-#define CS_SET_WAKELINE		CS_IOW(5, unsigned int)
-#define CS_GET_WAKELINE		CS_IOR(6, unsigned int)
+#define CS_SET_ACWAKELINE		CS_IOW(5, unsigned int)
+#define CS_GET_ACWAKELINE		CS_IOR(6, unsigned int)
 #define CS_SET_RX		CS_IOW(7, struct hsi_rx_config)
 #define CS_GET_RX		CS_IOW(8, struct hsi_rx_config)
 #define CS_SET_TX		CS_IOW(9, struct hsi_tx_config)
@@ -62,7 +62,7 @@ struct hsi_rx_config {
 	__u32 flow;
 	__u32 frame_size;
 	__u32 channels;
-	__u32 divisor;	/* not used for SSI */
+	__u32 divisor;		/* not used for SSI */
 };
 
 #endif /* HSI_CHAR_H */

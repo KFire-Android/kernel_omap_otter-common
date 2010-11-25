@@ -23,16 +23,16 @@
 
 #define HSI_SYNC_WRITE	0
 #define HSI_SYNC_READ	1
-#define HSI_L3_TPUT	13428 /* 13428 KiB/s => ~110 Mbit/s*/
+#define HSI_L3_TPUT	13428	/* 13428 KiB/s => ~110 Mbit/s */
 
 static unsigned char hsi_sync_table[2][2][8] = {
 	{
-		{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
-		{0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00}
-	}, {
-		{0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17},
-		{0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f}
-	}
+	 {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08},
+	 {0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x00}
+	 }, {
+	     {0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17},
+	     {0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f}
+	     }
 };
 
 /**
@@ -73,7 +73,7 @@ static unsigned int hsi_get_free_lch(struct hsi_dev *hsi_ctrl)
  *
  * Return 0 on success and < 0 on error.
  */
-int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 *data,
+int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 			 unsigned int size)
 {
 	struct hsi_dev *hsi_ctrl = hsi_channel->hsi_port->hsi_controller;
@@ -101,20 +101,18 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 *data,
 	/* Sync is required for SSI but not for HSI */
 	sync = hsi_sync_table[HSI_SYNC_WRITE][port - 1][channel];
 
-	dma_data = dma_map_single(hsi_ctrl->dev, data, size * 4,
-					DMA_TO_DEVICE);
+	dma_data = dma_map_single(hsi_ctrl->dev, data, size * 4, DMA_TO_DEVICE);
 
 	tmp = HSI_SRC_SINGLE_ACCESS0 |
-		HSI_SRC_MEMORY_PORT |
-		HSI_DST_SINGLE_ACCESS0 |
-		HSI_DST_PERIPHERAL_PORT |
-		HSI_DATA_TYPE_S32;
+	    HSI_SRC_MEMORY_PORT |
+	    HSI_DST_SINGLE_ACCESS0 |
+	    HSI_DST_PERIPHERAL_PORT | HSI_DATA_TYPE_S32;
 	hsi_outw(tmp, base, HSI_GDD_CSDP_REG(lch));
 
 	tmp = HSI_SRC_AMODE_POSTINC | HSI_DST_AMODE_CONST | sync;
 	hsi_outw(tmp, base, HSI_GDD_CCR_REG(lch));
 
-	hsi_outw((HSI_BLOCK_IE | HSI_TOUT_IE), base, HSI_GDD_CICR_REG(lch));
+	hsi_outw((HSI_BLOCK_IE | HSI_TOUT_IE), base, HSI_GDD_CCIR_REG(lch));
 
 	hsi_outl(channel, base, HSI_GDD_CDSA_REG(lch));
 
@@ -138,7 +136,7 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 *data,
  *
  * Return 0 on success and < 0 on error.
  */
-int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 *data,
+int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 			unsigned int count)
 {
 	struct hsi_dev *hsi_ctrl = hsi_channel->hsi_port->hsi_controller;
@@ -173,19 +171,18 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 *data,
 	sync = hsi_sync_table[HSI_SYNC_READ][port - 1][channel];
 
 	dma_data = dma_map_single(hsi_ctrl->dev, data, count * 4,
-					DMA_FROM_DEVICE);
+				  DMA_FROM_DEVICE);
 
 	tmp = HSI_DST_SINGLE_ACCESS0 |
-		HSI_DST_MEMORY_PORT |
-		HSI_SRC_SINGLE_ACCESS0 |
-		HSI_SRC_PERIPHERAL_PORT |
-		HSI_DATA_TYPE_S32;
+	    HSI_DST_MEMORY_PORT |
+	    HSI_SRC_SINGLE_ACCESS0 |
+	    HSI_SRC_PERIPHERAL_PORT | HSI_DATA_TYPE_S32;
 	hsi_outw(tmp, base, HSI_GDD_CSDP_REG(lch));
 
 	tmp = HSI_DST_AMODE_POSTINC | HSI_SRC_AMODE_CONST | sync;
 	hsi_outw(tmp, base, HSI_GDD_CCR_REG(lch));
 
-	hsi_outw((HSI_BLOCK_IE | HSI_TOUT_IE), base, HSI_GDD_CICR_REG(lch));
+	hsi_outw((HSI_BLOCK_IE | HSI_TOUT_IE), base, HSI_GDD_CCIR_REG(lch));
 
 	hsi_outl(channel, base, HSI_GDD_CSSA_REG(lch));
 
@@ -213,20 +210,21 @@ void hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 	ccr = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	if (!(ccr & HSI_CCR_ENABLE)) {
 		dev_dbg(&hsi_ch->dev->device, LOG_NAME "Write cancel on not "
-		"enabled logical channel %d CCR REG 0x%08X\n", lch, ccr);
+			"enabled logical channel %d CCR REG 0x%08X\n", lch,
+			ccr);
 		return;
 	}
 
 	hsi_outw_and(~HSI_CCR_ENABLE, hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	hsi_outl_and(~HSI_GDD_LCH(lch), hsi_ctrl->base,
-						HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
+		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	hsi_outl(HSI_GDD_LCH(lch), hsi_ctrl->base,
-						HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
+		 HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
 
 	buff_offset = hsi_hst_bufstate_f_reg(hsi_ctrl, port, channel);
 	if (buff_offset >= 0)
 		hsi_outl_and(~HSI_BUFSTATE_CHANNEL(channel), hsi_ctrl->base,
-								buff_offset);
+			     buff_offset);
 
 	hsi_reset_ch_write(hsi_ch);
 }
@@ -251,20 +249,20 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 	reg = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	if (!(reg & HSI_CCR_ENABLE)) {
 		dev_dbg(&hsi_ch->dev->device, LOG_NAME "Read cancel on not "
-		"enable logical channel %d CCR REG 0x%08X\n", lch, reg);
+			"enable logical channel %d CCR REG 0x%08X\n", lch, reg);
 		return;
 	}
 
 	hsi_outw_and(~HSI_CCR_ENABLE, hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	hsi_outl_and(~HSI_GDD_LCH(lch), hsi_ctrl->base,
-						HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
+		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	hsi_outl(HSI_GDD_LCH(lch), hsi_ctrl->base,
-						HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
+		 HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
 
 	buff_offset = hsi_hsr_bufstate_f_reg(hsi_ctrl, port, channel);
 	if (buff_offset >= 0)
 		hsi_outl_and(~HSI_BUFSTATE_CHANNEL(channel), hsi_ctrl->base,
-								buff_offset);
+			     buff_offset);
 
 	hsi_reset_ch_read(hsi_ch);
 }
@@ -283,7 +281,8 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
  * Return 0 on success and < 0 on error.
  */
 int hsi_get_info_from_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int lch,
-	unsigned int *port, unsigned int *channel, unsigned int *is_read_path)
+			      unsigned int *port, unsigned int *channel,
+			      unsigned int *is_read_path)
 {
 	int i_ports;
 	int i_chans;
@@ -292,14 +291,14 @@ int hsi_get_info_from_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int lch,
 	for (i_ports = 0; i_ports < HSI_MAX_PORTS; i_ports++)
 		for (i_chans = 0; i_chans < HSI_PORT_MAX_CH; i_chans++)
 			if (hsi_ctrl->hsi_port[i_ports].
-				hsi_channel[i_chans].read_data.lch == lch) {
+			    hsi_channel[i_chans].read_data.lch == lch) {
 				*is_read_path = 1;
 				*port = i_ports + 1;
 				*channel = i_chans;
 				err = 0;
 				goto get_info_bk;
 			} else if (hsi_ctrl->hsi_port[i_ports].
-				hsi_channel[i_chans].write_data.lch == lch) {
+				   hsi_channel[i_chans].write_data.lch == lch) {
 				*is_read_path = 0;
 				*port = i_ports + 1;
 				*channel = i_chans;
@@ -322,32 +321,32 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 	size_t size;
 
 	if (hsi_get_info_from_gdd_lch(hsi_ctrl, gdd_lch, &port, &channel,
-							&is_read_path) < 0) {
+				      &is_read_path) < 0) {
 		dev_err(hsi_ctrl->dev, "Unable to match the DMA channel %d with"
-						" an HSI channel\n", gdd_lch);
+			" an HSI channel\n", gdd_lch);
 		return;
 	}
 /* FIXME: to remove when validated: */
 	else {
 		dev_dbg(hsi_ctrl->dev, "DMA event on gdd_lch=%d => port=%d, "
 			"channel=%d, read=%d\n", gdd_lch, port, channel,
-								is_read_path);
+			is_read_path);
 	}
 
 	spin_lock(&hsi_ctrl->lock);
 
 	hsi_outl_and(~HSI_GDD_LCH(gdd_lch), base,
-						HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
+		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	gdd_csr = hsi_inw(base, HSI_GDD_CSR_REG(gdd_lch));
 
 	if (!(gdd_csr & HSI_CSR_TOUT)) {
-		if (is_read_path) { /* Read path */
+		if (is_read_path) {	/* Read path */
 			dma_h = hsi_inl(base, HSI_GDD_CDSA_REG(gdd_lch));
 			size = hsi_inw(base, HSI_GDD_CEN_REG(gdd_lch)) * 4;
 			dma_sync_single_for_cpu(hsi_ctrl->dev, dma_h, size,
-							DMA_FROM_DEVICE);
-			dma_unmap_single(hsi_ctrl->dev, dma_h, size,
 						DMA_FROM_DEVICE);
+			dma_unmap_single(hsi_ctrl->dev, dma_h, size,
+					 DMA_FROM_DEVICE);
 			ch = ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_read(ch);
 			/* DMA transfer is over, re-enable default mode
@@ -356,11 +355,11 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			hsi_driver_read_interrupt(ch, NULL);
 			spin_unlock(&hsi_ctrl->lock);
 			ch->read_done(ch->dev, size / 4);
-		} else {
+		} else {	/* Write path */
 			dma_h = hsi_inl(base, HSI_GDD_CSSA_REG(gdd_lch));
 			size = hsi_inw(base, HSI_GDD_CEN_REG(gdd_lch)) * 4;
 			dma_unmap_single(hsi_ctrl->dev, dma_h, size,
-						DMA_TO_DEVICE);
+					 DMA_TO_DEVICE);
 			ch = ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_write(ch);
 			spin_unlock(&hsi_ctrl->lock);
@@ -368,10 +367,10 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 		}
 	} else {
 		dev_err(hsi_ctrl->dev, "Error  on GDD transfer "
-				"on gdd channel %d\n", gdd_lch);
+			"on gdd channel %d\n", gdd_lch);
 		spin_unlock(&hsi_ctrl->lock);
 		hsi_port_event_handler(&hsi_ctrl->hsi_port[port - 1],
-							HSI_EVENT_ERROR, NULL);
+				       HSI_EVENT_ERROR, NULL);
 	}
 }
 
@@ -417,11 +416,11 @@ static irqreturn_t hsi_gdd_mpu_handler(int irq, void *hsi_controller)
 int __init hsi_gdd_init(struct hsi_dev *hsi_ctrl, const char *irq_name)
 {
 	tasklet_init(&hsi_ctrl->hsi_gdd_tasklet, do_hsi_gdd_tasklet,
-						(unsigned long)hsi_ctrl);
+		     (unsigned long)hsi_ctrl);
 	if (request_irq(hsi_ctrl->gdd_irq, hsi_gdd_mpu_handler, IRQF_DISABLED,
-						irq_name, hsi_ctrl) < 0) {
+			irq_name, hsi_ctrl) < 0) {
 		dev_err(hsi_ctrl->dev, "FAILED to request GDD IRQ %d\n",
-							hsi_ctrl->gdd_irq);
+			hsi_ctrl->gdd_irq);
 		return -EBUSY;
 	}
 

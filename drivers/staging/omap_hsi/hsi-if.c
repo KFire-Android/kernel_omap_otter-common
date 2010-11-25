@@ -256,7 +256,7 @@ void if_hsi_get_wakeline(int ch, unsigned int *state)
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	spin_lock_bh(&hsi_iface.lock);
-	hsi_ioctl(channel->dev, HSI_IOCTL_WAKE, state);
+	hsi_ioctl(channel->dev, HSI_IOCTL_GET_ACWAKE, state);
 	spin_unlock_bh(&hsi_iface.lock);
 }
 
@@ -265,7 +265,8 @@ void if_hsi_set_wakeline(int ch, unsigned int state)
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	spin_lock_bh(&hsi_iface.lock);
-	hsi_ioctl(channel->dev, state, NULL);
+	hsi_ioctl(channel->dev,
+		  state ? HSI_IOCTL_ACWAKE_UP : HSI_IOCTL_ACWAKE_DOWN, NULL);
 	spin_unlock_bh(&hsi_iface.lock);
 }
 
@@ -431,6 +432,8 @@ int if_hsi_start(int ch)
 
 	if_hsi_poll(ch);
 
+	if_hsi_set_wakeline(ch, HSI_IOCTL_ACWAKE_UP);
+
 error:
 	return ret;
 }
@@ -439,7 +442,7 @@ void if_hsi_stop(int ch)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
-	if_hsi_set_wakeline(ch, 1);
+	if_hsi_set_wakeline(ch, HSI_IOCTL_ACWAKE_DOWN);
 	spin_lock_bh(&hsi_iface.lock);
 	if_hsi_closechannel(channel);
 	spin_unlock_bh(&hsi_iface.lock);
@@ -629,7 +632,7 @@ int __devexit if_hsi_exit(void)
 	for (i = 0; i < HSI_MAX_CHAR_DEVS; i++) {
 		channel = &hsi_iface.channels[i];
 		if (channel->opened) {
-			if_hsi_set_wakeline(i, 1);
+			if_hsi_set_wakeline(i, HSI_IOCTL_ACWAKE_DOWN);
 			if_hsi_closechannel(channel);
 		}
 	}

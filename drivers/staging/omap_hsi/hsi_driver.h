@@ -39,15 +39,16 @@
 #include <linux/hsi_driver_if.h>
 
 /* Channel states */
-#define	HSI_CH_OPEN		0x01
-#define HSI_CH_RX_POLL		0x10
+#define	HSI_CH_OPEN		  0x01
+#define HSI_CH_RX_POLL	0x10
+#define HSI_CH_ACWAKE		0x02	/* ACWAKE line status */
 
 /*
  * The number of channels handled by the driver in the ports, or the highest
  * port channel number (+1) used. (MAX:8 for SSI; 16 for HSI)
  * Reducing this value optimizes the driver memory footprint.
  */
-#define HSI_PORT_MAX_CH		4
+#define HSI_PORT_MAX_CH		HSI_CHANNELS_MAX
 
 #define LOG_NAME		"OMAP HSI: "
 
@@ -148,7 +149,8 @@ struct hsi_port {
  * @base: HSI registers base virtual address
  * @phy_base: HSI registers base physical address
  * @lock: Serializes access to internal data and regs
- * @cawake_clk_enable: Tracks if a cawake event has enable the clocks
+ * @cawake_status: Tracks CAWAKE line status
+ * @acwake_status: Bitmap to track ACWAKE line status per channel
  * @gdd_irq: GDD (DMA) irq number
  * @fifo_mapping_strategy: Selected strategy for fifo to ports/channels mapping
  * @gdd_usecount: Holds the number of ongoning DMA transfers
@@ -209,6 +211,7 @@ void hsi_driver_disable_read_interrupt(struct hsi_channel *ch);
 void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch);
 void hsi_driver_cancel_write_dma(struct hsi_channel *ch);
 void hsi_driver_cancel_read_dma(struct hsi_channel *ch);
+void hsi_do_cawake_process(struct hsi_port *pport);
 
 int hsi_driver_device_is_hsi(struct platform_device *dev);
 
@@ -251,11 +254,6 @@ void hsi_debug_remove_ctrl(struct hsi_dev *hsi_ctrl);
 #define	hsi_debug_init()		0
 #define	hsi_debug_exit()
 #endif /* CONFIG_DEBUG_FS */
-
-static inline unsigned int hsi_cawake(struct hsi_port *port)
-{
-	return gpio_get_value(port->cawake_gpio);
-}
 
 static inline struct hsi_channel *ctrl_get_ch(struct hsi_dev *hsi_ctrl,
 					      unsigned int port,
@@ -307,6 +305,16 @@ static inline void hsi_outw_and(u16 data, void __iomem *base, u32 offset)
 {
 	u16 tmp = hsi_inw(base, offset);
 	hsi_outw((tmp & data), base, offset);
+}
+
+static inline u32 hsi_get_cawake(struct hsi_port *port)
+{
+	if (port->cawake_gpio >= 0)
+		return gpio_get_value(port->cawake_gpio);
+	else
+		return hsi_inl(port->hsi_controller->base,
+				HSI_HSR_MODE_REG(port->port_number)) &
+				HSI_HSR_MODE_WAKE_STATUS;
 }
 
 #endif /* __HSI_DRIVER_H__ */
