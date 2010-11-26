@@ -162,6 +162,7 @@ obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom2.o \
 					   hsmmc.o \
 					   board-zoom-debugboard.o
 obj-$(CONFIG_MACH_OMAP_ZOOM3)		+= board-zoom3.o \
+					   board-zoom-flash.o \
 					   board-zoom-peripherals.o \
 					   board-zoom-display.o \
 					   hsmmc.o \

@@ -146,6 +146,42 @@ struct omap_nand_info {
 	int				dma_ch;
 };
 
+static struct nand_ecclayout nand_x8_hw_romcode_oob_64 = {
+	.eccbytes = 12,
+	.eccpos = {
+		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+	},
+	.oobfree = {
+		{.offset = 13,
+		.length = 51}
+	}
+};
+
+/*
+ * Define some generic bad / good block scan pattern which are used
+ * while scanning a device for factory marked good / bad blocks
+ */
+static uint8_t scan_ff_pattern[] = { 0xff };
+
+static struct
+nand_bbt_descr bb_descrip_flashbased = {
+	.options = NAND_BBT_SCANEMPTY | NAND_BBT_SCANALLPAGES,
+	.offs = 0,
+	.len = 1,
+	.pattern = scan_ff_pattern,
+};
+
+static struct nand_ecclayout nand_x16_hw_romcode_oob_64 = {
+	.eccbytes = 12,
+	.eccpos = {
+		2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
+	},
+	.oobfree = {
+		{.offset = 14,
+		.length = 50}
+	}
+};
+
 /**
  * omap_nand_wp - This function enable or disable the Write Protect feature
  * @mtd: MTD device structure
@@ -529,7 +565,6 @@ static int omap_verify_buf(struct mtd_info *mtd, const u_char * buf, int len)
 	return 0;
 }
 
-#ifdef CONFIG_MTD_NAND_OMAP_HWECC
 /**
  * omap_hwecc_init - Initialize the HW ECC for NAND flash in GPMC controller
  * @mtd: MTD device structure
@@ -807,7 +842,6 @@ static void omap_enable_hwecc(struct mtd_info *mtd, int mode)
 
 	__raw_writel(val, info->gpmc_baseaddr + GPMC_ECC_CONFIG);
 }
-#endif
 
 /**
  * omap_wait - wait until the command is done
@@ -981,19 +1015,25 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
 	}
 	info->nand.verify_buf = omap_verify_buf;
 
-#ifdef CONFIG_MTD_NAND_OMAP_HWECC
-	info->nand.ecc.bytes		= 3;
-	info->nand.ecc.size		= 512;
-	info->nand.ecc.calculate	= omap_calculate_ecc;
-	info->nand.ecc.hwctl		= omap_enable_hwecc;
-	info->nand.ecc.correct		= omap_correct_data;
-	info->nand.ecc.mode		= NAND_ECC_HW;
+	if (pdata->ecc_opt & 0x3) {
+		info->nand.ecc.bytes            = 3;
+		info->nand.ecc.size             = 512;
+		if (info->nand.options & NAND_BUSWIDTH_16) {
+			info->nand.ecc.layout   = &nand_x16_hw_romcode_oob_64;
+		} else {
+			info->nand.ecc.layout   = &nand_x8_hw_romcode_oob_64;
+			info->nand.badblock_pattern = &bb_descrip_flashbased;
+		}
+		info->nand.ecc.calculate        = omap_calculate_ecc;
+		info->nand.ecc.hwctl            = omap_enable_hwecc;
+		info->nand.ecc.correct          = omap_correct_data;
+		info->nand.ecc.mode             = NAND_ECC_HW;
+		/* init HW ECC */
+		omap_hwecc_init(&info->mtd);
+	} else {
+		info->nand.ecc.mode = NAND_ECC_SOFT;
+	}
 
-	/* init HW ECC */
-	omap_hwecc_init(&info->mtd);
-#else
-	info->nand.ecc.mode = NAND_ECC_SOFT;
-#endif
 
 	/* DIP switches on some boards change between 8 and 16 bit
 	 * bus widths for flash.  Try the other width if the first try fails.

@@ -24,6 +24,10 @@ struct omap_nand_platform_data {
 	void __iomem		*gpmc_cs_baseaddr;
 	void __iomem		*gpmc_baseaddr;
 	int			devsize;
+	int                     ecc_opt;/* 0x0 - sw ecc
+					 * 0x1 - hw ecc default ecc layout
+					 * 0x2 - hw ecc in romcode layout
+					 */
 };
 
 /* size (4 KiB) for IO mapping */
