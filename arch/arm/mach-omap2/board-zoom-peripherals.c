@@ -24,6 +24,10 @@
 
 #include <plat/common.h>
 #include <plat/usb.h>
+#ifdef CONFIG_SERIAL_OMAP
+#include <plat/omap-serial.h>
+#include <plat/serial.h>
+#endif
 
 #include <mach/board-zoom.h>
 
@@ -309,6 +313,64 @@ static struct omap_musb_board_data musb_board_data = {
 	.power			= 100,
 };
 
+static struct omap_uart_port_info omap_serial_platform_data[] = {
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART1_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART1_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART1_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART1_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART1_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART2_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART2_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART2_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART2_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART2_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART3_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART3_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART3_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART3_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART3_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART4_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART4_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART4_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART4_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART3_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+		.flags		= 0
+	}
+};
+
 static void enable_board_wakeup_source(void)
 {
 	/* T2 interrupt line (keypad) */
@@ -319,7 +381,7 @@ static void enable_board_wakeup_source(void)
 void __init zoom_peripherals_init(void)
 {
 	omap_i2c_init();
-	omap_serial_init();
+	omap_serial_init(omap_serial_platform_data);
 	usb_musb_init(&musb_board_data);
 	enable_board_wakeup_source();
 }
