@@ -164,14 +164,15 @@ struct hsi_port {
  * @dir: debugfs base directory
  * @dev: Reference to the HSI platform device
  */
-struct hsi_dev {
+struct hsi_dev { /* HSI_TODO : this should be later renamed into hsi_controller*/
 	struct hsi_port hsi_port[HSI_MAX_PORTS];
 	int id;
 	u8 max_p;
 	void __iomem *base;
 	unsigned long phy_base;
 	spinlock_t lock; /* Serializes access to internal data and regs */
-	unsigned int cawake_clk_enable:1;
+	bool cawake_status;	/* HSI_TODO : fine tune the init values */
+	unsigned int acwake_status;	/* HSI_TODO : fine tune the init values */
 	int gdd_irq;
 	unsigned int fifo_mapping_strategy;
 	unsigned int gdd_usecount;
