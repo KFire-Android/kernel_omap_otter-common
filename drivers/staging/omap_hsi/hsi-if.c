@@ -436,8 +436,6 @@ int if_hsi_start(int ch)
 
 	if_hsi_poll(ch);
 
-	if_hsi_set_wakeline(ch, HSI_IOCTL_ACWAKE_UP);
-
 error:
 	return ret;
 }
@@ -447,8 +445,6 @@ void if_hsi_stop(int ch)
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-
-	if_hsi_set_wakeline(ch, HSI_IOCTL_ACWAKE_DOWN);
 
 	spin_lock_bh(&hsi_iface.lock);
 	if_hsi_closechannel(channel);
