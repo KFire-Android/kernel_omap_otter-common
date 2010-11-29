@@ -1042,6 +1042,9 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 		I2C_BOARD_INFO("bq24156", 0x6a),
 		.platform_data = &sdp4430_bqdata,
 	},
+	{
+		I2C_BOARD_INFO("cdc_tcxo_driver", 0x6c),
+	},
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
