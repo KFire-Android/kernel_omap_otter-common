@@ -84,15 +84,17 @@ struct omap_uart_state {
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
 
-#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
+#if defined(CONFIG_PM)
 	int context_valid;
 
 	/* Registers to be saved/restored for OFF-mode */
 	u16 dll;
 	u16 dlh;
 	u16 ier;
+	u16 sysc;
 	u16 scr;
 	u16 wer;
+	u16 mcr;
 #endif
 };
 
@@ -178,7 +180,7 @@ static inline void __init omap_uart_reset(struct omap_uart_state *p)
 	serial_write_reg(p, UART_OMAP_MDR1, 0x00);
 }
 
-#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
+#if defined(CONFIG_PM)
 
 static void omap_uart_save_context(struct omap_uart_state *uart)
 {
@@ -188,13 +190,19 @@ static void omap_uart_save_context(struct omap_uart_state *uart)
 		return;
 
 	lcr = serial_read_reg(uart, UART_LCR);
-	serial_write_reg(uart, UART_LCR, 0xBF);
+	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDB);
 	uart->dll = serial_read_reg(uart, UART_DLL);
 	uart->dlh = serial_read_reg(uart, UART_DLM);
 	serial_write_reg(uart, UART_LCR, lcr);
 	uart->ier = serial_read_reg(uart, UART_IER);
+	uart->sysc = serial_read_reg(uart, UART_OMAP_SYSC);
 	uart->scr = serial_read_reg(uart, UART_OMAP_SCR);
 	uart->wer = serial_read_reg(uart, UART_OMAP_WER);
+	lcr = serial_read_reg(uart, UART_LCR);
+	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDA);
+	uart->mcr = serial_read_reg(uart, UART_MCR);
+	serial_write_reg(uart, UART_LCR, lcr);
+
 
 	uart->context_valid = 1;
 }
@@ -212,22 +220,31 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 	uart->context_valid = 0;
 
 	serial_write_reg(uart, UART_OMAP_MDR1, 0x7);
-	serial_write_reg(uart, UART_LCR, 0xBF); /* Config B mode */
+	/* Config B mode */
+	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDB);
 	efr = serial_read_reg(uart, UART_EFR);
 	serial_write_reg(uart, UART_EFR, UART_EFR_ECB);
-	serial_write_reg(uart, UART_LCR, 0x0); /* Operational mode */
+	/* Operational mode */
+	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MOPER);
 	serial_write_reg(uart, UART_IER, 0x0);
-	serial_write_reg(uart, UART_LCR, 0xBF); /* Config B mode */
+	/* Config B mode */
+	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDB);
 	serial_write_reg(uart, UART_DLL, uart->dll);
 	serial_write_reg(uart, UART_DLM, uart->dlh);
-	serial_write_reg(uart, UART_LCR, 0x0); /* Operational mode */
+	/* Operational mode */
+	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MOPER);
 	serial_write_reg(uart, UART_IER, uart->ier);
-	serial_write_reg(uart, UART_FCR, 0xA1);
-	serial_write_reg(uart, UART_LCR, 0xBF); /* Config B mode */
+	/* Enable FiFo and Trig Threshold */
+	serial_write_reg(uart, UART_FCR, 0x51);
+	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDA);
+	serial_write_reg(uart, UART_MCR, uart->mcr);
+	/* Config B mode */
+	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDB);
 	serial_write_reg(uart, UART_EFR, efr);
 	serial_write_reg(uart, UART_LCR, UART_LCR_WLEN8);
 	serial_write_reg(uart, UART_OMAP_SCR, uart->scr);
 	serial_write_reg(uart, UART_OMAP_WER, uart->wer);
+	serial_write_reg(uart, UART_OMAP_SYSC, uart->sysc);
 	serial_write_reg(uart, UART_OMAP_MDR1, 0x00); /* UART 16x mode */
 }
 #else

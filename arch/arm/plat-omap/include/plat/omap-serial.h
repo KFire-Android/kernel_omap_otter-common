@@ -44,7 +44,9 @@
  * Reference OMAP TRM Chapter 17
  * Section: 1.4.3 Mode Selection
  */
-#define OMAP_UART_LCR_CONF_MDB	0XBF
+#define OMAP_UART_LCR_CONF_MDB	0xBF
+#define OMAP_UART_LCR_CONF_MOPER 0x00
+#define OMAP_UART_LCR_CONF_MDA  0x80
 
 /* WER = 0x7F
  * Enable module level wakeup in WER reg
