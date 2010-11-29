@@ -1565,11 +1565,12 @@ void omap_vp_enable(struct voltagedomain *voltdm)
 				vdd->vp_reg.vpconfig_vpenable)
 		return;
 	/*
-	 * This latching is required only if VC bypass method is used for
-	 * voltage scaling during dvfs.
+	 * This latching is required in VC bypass method as well VP force
+	 * update method to ensure that VP registers are programmed always to
+	 * current Nominal vsel before enabling VP ensuring no mismatch
+	 * happens b/w VP and VC regs.
 	 */
-	if (!voltscale_vpforceupdate)
-		vp_latch_vsel(vdd);
+	vp_latch_vsel(vdd);
 
 	/*
 	 * If debug is enabled, it is likely that the following parameters
