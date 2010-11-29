@@ -208,6 +208,13 @@ receive_chars(struct uart_omap_port *up, unsigned int *status)
 ignore_char:
 		lsr = serial_in(up, UART_LSR);
 	} while ((lsr & (UART_LSR_DR | UART_LSR_BI)) && (max_count-- > 0));
+
+	/* Wait for some time, to assure if the TX or RX starts.
+	 * This has to be relooked when the actual use case sec
+	 * narios would handle these wake-locks.
+	 */
+	if (up->pdev->id == UART2)
+		wake_lock_timeout(&uart_lock, 1*HZ);
 	spin_unlock(&up->port.lock);
 	tty_flip_buffer_push(tty);
 	spin_lock(&up->port.lock);
@@ -233,8 +240,14 @@ static void transmit_chars(struct uart_omap_port *up)
 		serial_out(up, UART_TX, xmit->buf[xmit->tail]);
 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
 		up->port.icount.tx++;
-		if (uart_circ_empty(xmit))
+		if (uart_circ_empty(xmit)) {
+			/* This wake lock has to moved out to use case drivers
+			 * which require these.
+			 */
+			if (up->pdev->id == UART2)
+				wake_lock_timeout(&uart_lock, 1*HZ);
 			break;
+		}
 	} while (--count > 0);
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
@@ -357,6 +370,14 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 
 	if (omap_is_console_port(&up->port))
 		wake_lock_timeout(&uart_lock, 5 * HZ);
+
+	/*
+	 * This will enable the clock for some reason if the
+	 * clocks get disabled. This would enable the ICK also
+	 * in case if the Idle state is set and the PRCM modul
+	 * just shutdown the ICK because of inactivity.
+	 */
+	omap_uart_enable_clock_from_irq(up->pdev->id);
 
 	iir = serial_in(up, UART_IIR);
 	if (iir & UART_IIR_NO_INT)
@@ -1148,6 +1169,10 @@ static int serial_omap_start_rxdma(struct uart_omap_port *up)
 	mod_timer(&up->uart_dma.rx_timer, jiffies +
 				usecs_to_jiffies(up->uart_dma.rx_timeout));
 	up->uart_dma.rx_dma_used = true;
+
+	if (up->pdev->id == UART2)
+		wake_lock_timeout(&uart_lock, 1*HZ);
+
 	return ret;
 }
 
@@ -1201,7 +1226,18 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
 		serial_omap_stop_tx(&up->port);
 		up->uart_dma.tx_dma_used = false;
 		spin_unlock(&(up->uart_dma.tx_lock));
+		if (up->pdev->id == UART2)
+			wake_lock_timeout(&uart_lock, 1*HZ);
 	} else {
+
+		/*
+		 * This will enable the clock for some reason if the
+		 * clocks get disabled. This would enable the ICK also
+		 * in case if the Idle state is set and the PRCM modul
+		 * just shutdown the ICK because of inactivity.
+		 */
+		omap_uart_enable_clock_from_irq(up->pdev->id);
+
 		omap_stop_dma(up->uart_dma.tx_dma_channel);
 		serial_omap_continue_tx(up);
 	}

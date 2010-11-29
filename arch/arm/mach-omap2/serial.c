@@ -470,6 +470,27 @@ static irqreturn_t omap_uart_interrupt(int irq, void *dev_id)
 	return IRQ_NONE;
 }
 
+/*
+ * This function enabled clock. This is exported function
+ * hence call be called by other module to enable the UART
+ * clocks.
+ */
+void omap_uart_enable_clock_from_irq(int uart_num)
+{
+	struct omap_uart_state *uart;
+
+	list_for_each_entry(uart, &uart_list, node) {
+		if (uart_num == uart->num) {
+			if (uart->clocked)
+				break;
+			omap_uart_block_sleep(uart);
+			break;
+		}
+	}
+	return;
+}
+EXPORT_SYMBOL(omap_uart_enable_clock_from_irq);
+
 static void omap_uart_idle_init(struct omap_uart_state *uart)
 {
 	int ret;

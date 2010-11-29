@@ -68,6 +68,10 @@
 
 #define RX_TIMEOUT		(3 * HZ)
 #define OMAP_MAX_HSUART_PORTS	4
+#define UART1                  (0x0)
+#define UART2                  (0x1)
+#define UART3                  (0x2)
+#define UART4                  (0x3)
 
 #define MSR_SAVE_FLAGS		UART_MSR_ANY_DELTA
 
@@ -144,4 +148,5 @@ struct uart_omap_port {
 };
 
 int omap_uart_active(int num);
+void omap_uart_enable_clock_from_irq(int uart_num);
 #endif /* __OMAP_SERIAL_H__ */
