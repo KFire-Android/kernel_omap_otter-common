@@ -478,7 +478,7 @@ EXPORT_SYMBOL(hsi_read_cancel);
 int hsi_poll(struct hsi_device *dev)
 {
 	struct hsi_channel *ch;
-	struct hsi_dev *hsi_ctrl = dev->ch->hsi_port->hsi_controller;
+	struct hsi_dev *hsi_ctrl;
 	int err;
 
 	dev_dbg(&dev->device, "%s\n", __func__);
@@ -492,6 +492,7 @@ int hsi_poll(struct hsi_device *dev)
 	}
 
 	ch = dev->ch;
+	hsi_ctrl = ch->hsi_port->hsi_controller;
 
 	/* Safety : enable the clocks */
 	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
@@ -725,7 +726,7 @@ EXPORT_SYMBOL(hsi_ioctl);
  */
 void hsi_close(struct hsi_device *dev)
 {
-	struct hsi_dev *hsi_ctrl = dev->ch->hsi_port->hsi_controller;
+	struct hsi_dev *hsi_ctrl;
 
 	dev_dbg(&dev->device, "%s\n", __func__);
 
@@ -733,6 +734,8 @@ void hsi_close(struct hsi_device *dev)
 		pr_err(LOG_NAME "Trying to close wrong HSI device %p\n", dev);
 		return;
 	}
+
+	hsi_ctrl = dev->ch->hsi_port->hsi_controller;
 
 	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
 
