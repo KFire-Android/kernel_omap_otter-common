@@ -132,7 +132,7 @@ static int hmc5843_write_register(struct hmc5843 *hmc5843, int index)
 static int hmc5843_read_xyz(struct hmc5843 *hmc5843, int *x, int *y, int *z)
 {
 	struct i2c_msg msgs[2];
-	u8 buf[6];
+	u8 buf[7];
 	int n = 0;
 	int result;
 
@@ -150,7 +150,7 @@ static int hmc5843_read_xyz(struct hmc5843 *hmc5843, int *x, int *y, int *z)
 	msgs[n].addr	= hmc5843->client->addr;
 	msgs[n].flags	= I2C_M_RD;
 	msgs[n].buf	= buf;
-	msgs[n].len	= 6;
+	msgs[n].len	= 7;
 	++n;
 
 	result = i2c_transfer(hmc5843->client->adapter, msgs, n);
