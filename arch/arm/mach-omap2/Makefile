@@ -119,6 +119,10 @@ mailbox_mach-objs			:= mailbox.o
 
 ifeq ($(CONFIG_OMAP_REMOTE_PROC),y)
 obj-$(CONFIG_ARCH_OMAP4)		+= remoteproc44xx.o
+ifeq ($(CONFIG_SYSLINK_IPU_PM_TRACES),y)
+CFLAGS_ipu_drv.o				+= -DDEBUG
+CFLAGS_ipu_dev.o				+= -DDEBUG
+endif
 obj-$(CONFIG_MPU_SYSLINK_IPC)		+= ipu_drv.o
 obj-$(CONFIG_MPU_SYSLINK_IPC)		+= ipu_dev.o
 obj-$(CONFIG_MPU_SYSLINK_IPC)		+= ipu_utility.o
