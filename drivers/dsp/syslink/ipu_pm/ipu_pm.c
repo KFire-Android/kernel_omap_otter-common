@@ -1059,7 +1059,12 @@ static inline int ipu_pm_get_aux_clk(struct ipu_pm_object *handle,
 						, aux_clk_name[pm_aux_clk_num]);
 			return PM_NO_AUX_CLK;
 		}
-		clk_disable(aux_clk);
+		if (unlikely(aux_clk->usecount != 0)) {
+			pr_err("%s %d aux_clk%d->usecount = %d, expected to "
+				"be zero as there should be no other users\n",
+				__func__, __LINE__, pm_aux_clk_num,
+				aux_clk->usecount);
+		}
 
 		aux_clk_src_ptr = clk_get(NULL,
 			aux_clk_source_name[PER_DPLL_CLK]);
