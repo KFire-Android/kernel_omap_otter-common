@@ -734,7 +734,7 @@ EXPORT_SYMBOL_GPL(videobuf_streamon);
 /* Locking: Caller holds q->vb_lock */
 static int __videobuf_streamoff(struct videobuf_queue *q)
 {
-	if (!q->streaming)
+	if (list_empty(&q->stream))
 		return -EINVAL;
 
 	videobuf_queue_cancel(q);
