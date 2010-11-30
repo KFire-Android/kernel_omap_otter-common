@@ -297,7 +297,8 @@ static void omap_32k_sync_shutdown(struct platform_device *pdev)
 {
 	struct omap_32k_sync_device     *omap = platform_get_drvdata(pdev);
 
-	clk_disable(omap->ick);
+	if (!cpu_is_omap3630())
+		clk_disable(omap->ick);
 }
 
 static struct platform_driver omap_32k_sync_driver = {
