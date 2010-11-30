@@ -170,7 +170,7 @@ static struct omap_rproc_platform_data omap4_rproc_data[] = {
 		.name = "ducati-proc0",
 		.ops = &omap4_ducati0_ops,
 		.oh_name = "ipu_c0",
-#ifdef CONFIG_SYSLINK_DUCATI_PM
+#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
 		.timer_id = 3,
 #else
 		.timer_id = -1,
@@ -180,7 +180,7 @@ static struct omap_rproc_platform_data omap4_rproc_data[] = {
 		.name = "ducati-proc1",
 		.ops = &omap4_ducati1_ops,
 		.oh_name = "ipu_c1",
-#ifdef CONFIG_SYSLINK_DUCATI_PM
+#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
 		.timer_id = 4,
 #else
 		.timer_id = -1,
