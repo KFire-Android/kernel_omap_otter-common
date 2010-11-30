@@ -148,5 +148,7 @@ struct uart_omap_port {
 };
 
 int omap_uart_active(int num);
+#ifdef CONFIG_PM
 void omap_uart_enable_clock_from_irq(int uart_num);
+#endif
 #endif /* __OMAP_SERIAL_H__ */

@@ -371,6 +371,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	if (omap_is_console_port(&up->port))
 		wake_lock_timeout(&uart_lock, 5 * HZ);
 
+#ifdef CONFIG_PM
 	/*
 	 * This will enable the clock for some reason if the
 	 * clocks get disabled. This would enable the ICK also
@@ -378,6 +379,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	 * just shutdown the ICK because of inactivity.
 	 */
 	omap_uart_enable_clock_from_irq(up->pdev->id);
+#endif
 
 	iir = serial_in(up, UART_IIR);
 	if (iir & UART_IIR_NO_INT)
@@ -1230,6 +1232,7 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
 			wake_lock_timeout(&uart_lock, 1*HZ);
 	} else {
 
+#ifdef CONFIG_PM
 		/*
 		 * This will enable the clock for some reason if the
 		 * clocks get disabled. This would enable the ICK also
@@ -1237,6 +1240,7 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
 		 * just shutdown the ICK because of inactivity.
 		 */
 		omap_uart_enable_clock_from_irq(up->pdev->id);
+#endif
 
 		omap_stop_dma(up->uart_dma.tx_dma_channel);
 		serial_omap_continue_tx(up);
