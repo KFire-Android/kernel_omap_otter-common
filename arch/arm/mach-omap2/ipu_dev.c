@@ -41,14 +41,14 @@ static char *hwmod_state_strings[] = {
 	"_HWMOD_STATE_IDLE",
 	"_HWMOD_STATE_DISABLED",
 };
-static void print_hwmod_state(struct omap_hwmod *oh)
+static void print_hwmod_state(struct omap_hwmod *oh, char *desc)
 {
 	u32 _state = (u32) oh->_state;
-	pr_info("HWMOD name = %s\n", oh->name);
+	pr_debug("HWMOD name = %s\n", oh->name);
 	if (_state > _HWMOD_STATE_LAST)
 		WARN(1, "Illegal hwmod _state = %d\n", _state);
 	else
-		pr_info("state = %s\n", hwmod_state_strings[_state]);
+		pr_debug("%s state = %s\n", desc, hwmod_state_strings[_state]);
 }
 
 inline int ipu_pm_module_start(unsigned rsrc)
@@ -58,11 +58,11 @@ inline int ipu_pm_module_start(unsigned rsrc)
 
 	pd = ipupm_get_plat_data();
 
-	print_hwmod_state(pd[rsrc].oh);
+	print_hwmod_state(pd[rsrc].oh, "Previous");
 	ret = omap_device_enable(pd[rsrc].pdev);
 	if (ret)
 		pr_err("device enable failed %s", pd[rsrc].oh_name);
-
+	print_hwmod_state(pd[rsrc].oh, "New");
 	return ret;
 }
 EXPORT_SYMBOL(ipu_pm_module_start);
@@ -74,8 +74,10 @@ inline int ipu_pm_module_stop(unsigned rsrc)
 
 	pd = ipupm_get_plat_data();
 
-	print_hwmod_state(pd[rsrc].oh);
+	print_hwmod_state(pd[rsrc].oh, "Previous");
 	ret = omap_device_shutdown(pd[rsrc].pdev);
+	print_hwmod_state(pd[rsrc].oh, "New");
+
 	if (ret)
 		pr_err("device disable failed %s", pd[rsrc].oh_name);
 

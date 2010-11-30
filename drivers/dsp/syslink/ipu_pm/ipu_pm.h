@@ -92,6 +92,11 @@
 #include <linux/kfifo.h>
 
 /* Pm notify ducati driver */
+#define A9 3
+#define SYS_M3 2
+#define APP_M3 1
+#define TESLA 0
+
 /* Suspend/resume/other... */
 #define NUMBER_PM_EVENTS 4
 
@@ -129,7 +134,7 @@
 #define GP_TIMER_4 4
 #define GP_TIMER_9 9
 #define GP_TIMER_11 11
-#define NUM_IPU_TIMERS 4
+#define NUM_IPU_TIMERS 2
 
 #define I2C_SL_INVAL -1
 #define I2C_1_SL 0
@@ -138,7 +143,14 @@
 #define I2C_4_SL 3
 
 #define RCB_MIN 1
-#define RCB_MAX 33
+#define RCB_MAX 32
+/* In some cases remote proc may need rcb's for internal
+ * use without requesting any resource, those need to be
+ * set as 0 in this mask in order to not release it.
+ * i.e. Ducati is using 0 to 4 (b00000011) rcb's for internal purpose
+ * without requestig any resource.
+ */
+#define RESERVED_RCBS 0xFFFFFFFC
 
 #define PM_RESOURCE 2
 #define PM_NOTIFICATION 3
@@ -182,7 +194,6 @@
 #define CAM_ENABLED			0x2
 #define CAM_DISABLED			0x0
 
-
 /* Macro to set a val in a bitfield*/
 #define MASK_SET_FIELD(tmp, bitfield, val)	{	\
 						tmp |=	\
@@ -203,7 +214,6 @@
 /* Macro to return the address of the aux clk req */
 #define AUX_CLK_REG_REQ(clk)	(SCRM_BASE + (SCRM_BASE_AUX_CLK_REQ + \
 					(SCRM_AUX_CLK_OFFSET * clk)))
-
 
 /*
  *  IPU_PM_MODULEID
@@ -281,8 +291,19 @@ enum pm_regulator_action{PM_SET_VOLTAGE,
 	PM_GET_VOLTAGE
 };
 
+/* Resources id should start at zero,
+ * should be always consecutive and should match
+ * IPU side.
+ */
+#define PM_FIRST_RES	0
+
+/* Resources that can handle cstrs should be
+ * consecutive and first in the res_type enum
+ */
+#define PM_NUM_RES_W_CSTRS 10
+
 enum res_type{
-	FDIF,
+	FDIF = PM_FIRST_RES,
 	IPU,
 	SYSM3,
 	APPM3,
@@ -292,28 +313,29 @@ enum res_type{
 	IVASEQ1,
 	L3_BUS,
 	MPU,
+	/* SL2IF, */
+	/* DSP, */
 	SDMA,
 	GP_TIMER,
 	GP_IO,
 	I2C,
 	REGULATOR,
 	AUX_CLK,
+	PM_NUM_RES
 };
 
-/* Events can start at any number but
+/* Events should start at zero and
  * should be always consecutive
  */
 #define PM_FIRST_EVENT	0
 
-enum pm_event_type{PM_SUSPEND = PM_FIRST_EVENT,
+enum pm_event_type{
+	PM_SUSPEND = PM_FIRST_EVENT,
 	PM_RESUME,
 	PM_PID_DEATH,
-	PM_HIBERNATE
+	PM_HIBERNATE,
+	PM_LAST_EVENT
 };
-
-#define PM_LAST_EVENT	((sizeof(enum pm_event_type) / sizeof(void))	\
-							+ PM_FIRST_EVENT\
-								- 1)
 
 struct rcb_message {
 	unsigned rcb_flag:1;
@@ -454,7 +476,7 @@ void ipu_pm_notify_callback(u16 proc_id, u16 line_id, u32 event_id,
 					uint *arg, u32 payload);
 
 /* Function for send PM Notifications */
-int ipu_pm_notifications(enum pm_event_type event_type, void *data);
+int ipu_pm_notifications(int proc_id, enum pm_event_type event, void *data);
 
 /* Function to set init parameters */
 void ipu_pm_params_init(struct ipu_pm_params *params);

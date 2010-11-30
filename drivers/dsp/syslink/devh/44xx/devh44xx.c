@@ -86,7 +86,8 @@ static int devh44xx_notifier_call(struct notifier_block *nb,
 		err = mutex_lock_interruptible(&local_gate);
 		if (err)
 			goto exit;
-		err = ipu_pm_notifications(PM_PID_DEATH, (void *)my_pid);
+		err = ipu_pm_notifications(APP_M3, PM_PID_DEATH,
+								(void *)my_pid);
 		if (err) {
 			pinfo->brd_state = DEVH_BRDST_ERROR;
 			if (!strcmp(pdata->name, "SysM3")) {

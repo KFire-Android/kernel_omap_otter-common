@@ -202,7 +202,8 @@ static int ipu_pm_drv_suspend(struct device *dev)
 		 */
 
 		/* call our notification function */
-		retval = ipu_pm_notifications(PM_SUSPEND, NULL);
+		retval = ipu_pm_notifications(APP_M3, PM_SUSPEND, NULL);
+		retval = ipu_pm_notifications(SYS_M3, PM_SUSPEND, NULL);
 
 		/* FIXME: Currently sending SUSPEND is enough to send
 		 * Ducati to hibernate, save ctx can be called at this
@@ -234,7 +235,8 @@ static int ipu_pm_drv_resume(struct device *dev)
 		 */
 
 		/* call our notification function */
-		retval = ipu_pm_notifications(PM_RESUME, NULL);
+		retval = ipu_pm_notifications(APP_M3, PM_RESUME, NULL);
+		retval = ipu_pm_notifications(SYS_M3, PM_RESUME, NULL);
 
 		/* return result, should be zero if all Ducati clients
 		 * returned zero else fail code
