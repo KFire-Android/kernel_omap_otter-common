@@ -627,11 +627,16 @@ int proc4430_control(void *handle, int cmd, void *arg)
 	/*FIXME: Remove handle,etc if not used */
 
 #ifdef CONFIG_SYSLINK_DUCATI_PM
-	/* For purpose testing */
+	/* Just for testing purpose */
 	switch (cmd) {
 	case PM_SUSPEND:
+		retval = ipu_pm_notifications(APP_M3, cmd, NULL);
+		retval = ipu_pm_notifications(SYS_M3, cmd, NULL);
+		ipu_pm_save_ctx(SYS_M3);
+		break;
 	case PM_RESUME:
-		retval = ipu_pm_notifications(cmd, NULL);
+		retval = ipu_pm_notifications(APP_M3, cmd, NULL);
+		retval = ipu_pm_notifications(SYS_M3, cmd, NULL);
 		break;
 	default:
 		pr_err("Invalid notification\n");
