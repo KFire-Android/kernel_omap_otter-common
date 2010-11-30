@@ -29,11 +29,25 @@ config  DUCATI_BASEIMAGE_PHYS_ADDR
 	  loaded.
 
 config  SYSLINK_DUCATI_PM
-        tristate "DUCATI POWER MANAGEMENT"
-        depends on SYSLINK_PROC && SYSLINK_PROC4430
-        default n
+	bool "IPU Power Management"
+	depends on SYSLINK_PROC
+        default y
         help
-           Ducati Power Management Implementation
+	  Enables the options available for ipu_pm implementation
+
+config  SYSLINK_IPU_SELF_HIBERNATION
+	bool "Enable IPU Self hibernation"
+	depends on SYSLINK_DUCATI_PM
+	default y
+	help
+	  IPU will hibernate by it self after a configurable time, this
+	  controls the self hibernation, IPU will hibernate when a system
+	  suspend is executed and wake up when system resumes.
+
+config  SYSLINK_IPU_PM_TRACES
+	bool "IPU PM Debug Traces"
+	depends on SYSLINK_DUCATI_PM
+	default n
 
 config  OMAP_DEVICE_HANDLER
         tristate "Device Handler"

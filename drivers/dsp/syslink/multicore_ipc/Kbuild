@@ -19,6 +19,11 @@ syslink_platform-objs = $(libservices) $(libsyslink_platform)
 
 ccflags-y += -Wno-strict-prototypes
 
+#Enable ipu_pm debug traces
+ifeq ($(CONFIG_SYSLINK_IPU_PM_TRACES),y)
+CFLAGS_ipu_pm.o := -DDEBUG
+endif
+
 #Machine dependent
 ccflags-y += -D_TI_ -D_DB_TIOMAP -DTMS32060 \
                 -DTICFG_PROC_VER -DTICFG_EVM_TYPE -DCHNL_SMCLASS \
