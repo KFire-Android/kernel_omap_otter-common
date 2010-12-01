@@ -714,6 +714,20 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		hsi_clocks_disable_channel(dev->device.parent,
 					   ch->channel_number);
 		break;
+	case HSI_IOCTL_SW_RESET:
+		hsi_clocks_enable_channel(dev->device.parent,
+					  ch->channel_number);
+		dev_info(dev->device.parent, "SW Reset\n");
+		spin_lock_bh(&hsi_ctrl->lock);
+		err = hsi_softreset(hsi_ctrl);
+
+		/* Reset HSI config to default */
+		hsi_softreset_driver(hsi_ctrl);
+		spin_unlock_bh(&hsi_ctrl->lock);
+
+		hsi_clocks_disable_channel(dev->device.parent,
+					   ch->channel_number);
+		break;
 	default:
 		err = -ENOIOCTLCMD;
 		break;

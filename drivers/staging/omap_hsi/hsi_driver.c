@@ -35,8 +35,11 @@
 
 #define HSI_MODULENAME "omap_hsi"
 #define	HSI_DRIVER_VERSION	"0.2"
-#define HSI_RESETDONE_TIMEOUT	10	/* 10 ms */
-#define HSI_RESETDONE_RETRIES	20	/* => max 200 ms waiting for reset */
+#define HSI_RESETDONE_MAX_RETRIES	5 /* Max 5*L4 Read cycles waiting for */
+					  /* reset to complete */
+#define HSI_RESETDONE_NORMAL_RETRIES	1 /* Reset should complete in 1 R/W */
+					  /* cycle */
+
 
 /* NOTE: Function called in soft interrupt context (tasklet) */
 int hsi_port_event_handler(struct hsi_port *p, unsigned int event, void *arg)
@@ -149,31 +152,63 @@ static void __exit unregister_hsi_devices(struct hsi_dev *hsi_ctrl)
 	}
 }
 
-static int __init hsi_softreset(struct hsi_dev *hsi_ctrl)
+static void hsi_set_pm_default(struct hsi_dev *hsi_ctrl)
 {
-	int ind = 0;
+	/* Set default PM settings */
+	hsi_outl((HSI_AUTOIDLE | HSI_SIDLEMODE_SMART | HSI_MIDLEMODE_SMART),
+		 hsi_ctrl->base, HSI_SYS_SYSCONFIG_REG);
+	hsi_outl(HSI_CLK_AUTOGATING_ON, hsi_ctrl->base, HSI_GDD_GCR_REG);
+}
+
+int hsi_softreset(struct hsi_dev *hsi_ctrl)
+{
+	unsigned int ind = 0;
 	void __iomem *base = hsi_ctrl->base;
 	u32 status;
 
+	/* Reseting HSI Block */
 	hsi_outl_or(HSI_SOFTRESET, base, HSI_SYS_SYSCONFIG_REG);
-
 	do {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(msecs_to_jiffies(HSI_RESETDONE_TIMEOUT));
 		status = hsi_inl(base, HSI_SYS_SYSSTATUS_REG);
 		ind++;
-	} while ((!(status & HSI_RESETDONE)) && (ind < HSI_RESETDONE_RETRIES));
+	} while ((!(status & HSI_RESETDONE)) &&
+		   (ind < HSI_RESETDONE_MAX_RETRIES));
 
-	if (ind >= HSI_RESETDONE_RETRIES)
+	if (ind >= HSI_RESETDONE_MAX_RETRIES) {
+		dev_err(hsi_ctrl->dev, "HSI SW_RESET failed to complete within"
+			" %d retries.\n", HSI_RESETDONE_MAX_RETRIES);
 		return -EIO;
+	}
 
-	/* Reseting GDD */
-	hsi_outl_or(HSI_SWRESET, base, HSI_GDD_GRST_REG);
+	if (ind > HSI_RESETDONE_NORMAL_RETRIES) {
+		dev_warn(hsi_ctrl->dev, "HSI SW_RESET abnormally long:"
+			" %d retries to complete.\n", ind);
+	}
+
+	ind = 0;
+	/* Reseting DMA Engine */
+	hsi_outl_or(HSI_GDD_GRST_SWRESET, base, HSI_GDD_GRST_REG);
+	do {
+		status = hsi_inl(base, HSI_GDD_GRST_REG);
+		ind++;
+	} while ((status & HSI_GDD_GRST_SWRESET) &&
+		 (ind < HSI_RESETDONE_MAX_RETRIES));
+
+	if (ind >= HSI_RESETDONE_MAX_RETRIES) {
+		dev_err(hsi_ctrl->dev, "HSI DMA SW_RESET failed to complete"
+			" within %d retries.\n", HSI_RESETDONE_MAX_RETRIES);
+		return -EIO;
+	}
+
+	if (ind > HSI_RESETDONE_NORMAL_RETRIES) {
+		dev_warn(hsi_ctrl->dev, "HSI DMA SW_RESET abnormally long:"
+			" %d retries to complete.\n", ind);
+	}
 
 	return 0;
 }
 
-static void __init set_hsi_ports_default(struct hsi_dev *hsi_ctrl,
+static void hsi_set_ports_default(struct hsi_dev *hsi_ctrl,
 					    struct platform_device *pd)
 {
 	struct port_ctx *cfg;
@@ -235,6 +270,58 @@ static int __init hsi_port_channels_init(struct hsi_port *port)
 	}
 
 	return 0;
+}
+
+static int hsi_port_channels_reset(struct hsi_port *port)
+{
+	struct hsi_channel *ch;
+	unsigned int ch_i;
+
+	for (ch_i = 0; ch_i < port->max_ch; ch_i++) {
+		ch = &port->hsi_channel[ch_i];
+		ch->flags = 0;
+		ch->read_data.addr = NULL;
+		ch->read_data.size = 0;
+		ch->read_data.lch = -1;
+		ch->write_data.addr = NULL;
+		ch->write_data.size = 0;
+		ch->write_data.lch = -1;
+	}
+
+	return 0;
+}
+
+void hsi_softreset_driver(struct hsi_dev *hsi_ctrl)
+{
+	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
+	struct hsi_platform_data *pdata = pd->dev.platform_data;
+	struct hsi_port *hsi_p;
+	unsigned int port;
+	int err;
+	u32 revision;
+
+	/* HSI port reset */
+	for (port = 0; port < hsi_ctrl->max_p; port++) {
+		hsi_p = &hsi_ctrl->hsi_port[port];
+		hsi_p->counters_on = 1;
+		hsi_p->reg_counters = pdata->ctx.pctx[port].hsr.timeout;
+		err = hsi_port_channels_reset(&hsi_ctrl->hsi_port[port]);
+	}
+
+	hsi_set_pm_default(hsi_ctrl);
+
+	/* Re-Configure HSI ports */
+	hsi_set_ports_default(hsi_ctrl, pd);
+
+	/* Gather info from registers for the driver.(REVISION) */
+	revision = hsi_inl(hsi_ctrl->base, HSI_SYS_REVISION_REG);
+	if (hsi_driver_device_is_hsi(pd))
+		dev_info(hsi_ctrl->dev, "HSI Hardware REVISION 0x%x\n",
+			 revision);
+	else
+		dev_info(hsi_ctrl->dev, "SSI Hardware REVISION %d.%d\n",
+			 (revision & HSI_SSI_REV_MAJOR) >> 4,
+			 (revision & HSI_SSI_REV_MINOR));
 }
 
 static int __init hsi_request_mpu_irq(struct hsi_port *hsi_p)
@@ -557,17 +644,15 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 	hsi_clocks_enable(hsi_ctrl->dev);
 	/* HSI_TODO : test the return values */
 
+	/* Non critical SW Reset */
 	err = hsi_softreset(hsi_ctrl);
 	if (err < 0)
 		goto rollback2;
 
-	/* Set default PM settings */
-	hsi_outl((HSI_AUTOIDLE | HSI_SIDLEMODE_SMART | HSI_MIDLEMODE_SMART),
-		 hsi_ctrl->base, HSI_SYS_SYSCONFIG_REG);
-	hsi_outl(HSI_CLK_AUTOGATING_ON, hsi_ctrl->base, HSI_GDD_GCR_REG);
+	hsi_set_pm_default(hsi_ctrl);
 
 	/* Configure HSI ports */
-	set_hsi_ports_default(hsi_ctrl, pd);
+	hsi_set_ports_default(hsi_ctrl, pd);
 
 	/* Gather info from registers for the driver.(REVISION) */
 	revision = hsi_inl(hsi_ctrl->base, HSI_SYS_REVISION_REG);

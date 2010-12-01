@@ -314,7 +314,7 @@
 #define	HSI_SWITCH_OFF			(1 << 0)
 
 #define HSI_GDD_GRST_REG		(HSI_GDD_BASE + 0x0200)
-#define HSI_SWRESET			1
+#define HSI_GDD_GRST_SWRESET		1
 
 #define HSI_GDD_CSDP_BASE		(HSI_GDD_BASE + 0x0800)
 #define HSI_GDD_CSDP_OFFSET		0x40

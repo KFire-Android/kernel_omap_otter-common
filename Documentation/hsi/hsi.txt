@@ -201,7 +201,7 @@ I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 		any other SSR bit-rate divisor values.
 	- HSI_IOCTL_GET_RX:
 		Description: Get HSR configuration
-		Parameters: Pointer to a Hsr_ctx structure describing
+		Parameters: Pointer to a hsr_ctx structure describing
 		configurable HSR parameters (mode, frame size, channels,
 		data flow type, bit-rate divisor)
 	- HSI_IOCTL_SET_TX:
@@ -220,6 +220,9 @@ I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 	accordingly. Depending on the required speed and HSI device, some
 	constraints on OPP may have to be handled. This shall be managed by the
 	HSI driver user.
+	- HSI_IOCTL_SW_RESET:
+		Description: Force a Reset of HSI block and HSI DMA engine
+		Parameters: None
 
 J) void hsi_close(struct hsi_device *dev);
 
@@ -305,4 +308,4 @@ Carlos Chinea <carlos.chinea@nokia.com>.
 Contact: Sebastien Jan <s-jan@ti.com>
 
 Copyright (C) 2008 Nokia Corporation.
-Copyright (C) 2009 Texas Instruments, Inc.
+Copyright (C) 2010 Texas Instruments, Inc.

@@ -31,12 +31,13 @@
 #define CS_FLUSH_RX		CS_IO(2)
 #define CS_FLUSH_TX		CS_IO(3)
 #define CS_BOOTSTRAP		CS_IO(4)
-#define CS_SET_ACWAKELINE		CS_IOW(5, unsigned int)
-#define CS_GET_ACWAKELINE		CS_IOR(6, unsigned int)
+#define CS_SET_ACWAKELINE	CS_IOW(5, unsigned int)
+#define CS_GET_ACWAKELINE	CS_IOR(6, unsigned int)
 #define CS_SET_RX		CS_IOW(7, struct hsi_rx_config)
 #define CS_GET_RX		CS_IOW(8, struct hsi_rx_config)
 #define CS_SET_TX		CS_IOW(9, struct hsi_tx_config)
 #define CS_GET_TX		CS_IOW(10, struct hsi_tx_config)
+#define CS_SW_RESET		CS_IO(11)
 
 #define HSI_MODE_SLEEP		0
 #define HSI_MODE_STREAM		1

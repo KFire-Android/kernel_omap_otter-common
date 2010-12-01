@@ -229,7 +229,7 @@ int hsi_fifo_get_id(struct hsi_dev *hsi_ctrl, unsigned int channel,
 		    unsigned int port);
 int hsi_fifo_get_chan(struct hsi_dev *hsi_ctrl, unsigned int fifo,
 		      unsigned int *channel, unsigned int *port);
-int __init hsi_fifo_mapping(struct hsi_dev *hsi_ctrl, unsigned int mtype);
+int hsi_fifo_mapping(struct hsi_dev *hsi_ctrl, unsigned int mtype);
 long hsi_hst_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
 			    unsigned int port, unsigned int channel);
 long hsi_hsr_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
@@ -238,6 +238,9 @@ long hsi_hst_buffer_reg(struct hsi_dev *hsi_ctrl,
 			unsigned int port, unsigned int channel);
 long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
 			unsigned int port, unsigned int channel);
+
+int hsi_softreset(struct hsi_dev *hsi_ctrl);
+void hsi_softreset_driver(struct hsi_dev *hsi_ctrl);
 
 void hsi_clocks_disable(struct device *dev);
 int hsi_clocks_enable(struct device *dev);

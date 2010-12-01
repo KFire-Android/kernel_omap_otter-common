@@ -54,6 +54,7 @@ int if_hsi_set_rx(int ch, struct hsi_rx_config *cfg);
 void if_hsi_get_rx(int ch, struct hsi_rx_config *cfg);
 int if_hsi_set_tx(int ch, struct hsi_tx_config *cfg);
 void if_hsi_get_tx(int ch, struct hsi_tx_config *cfg);
+void if_hsi_sw_reset(int ch);
 
 int if_hsi_read(int ch, u32 *data, unsigned int count);
 int if_hsi_poll(int ch);

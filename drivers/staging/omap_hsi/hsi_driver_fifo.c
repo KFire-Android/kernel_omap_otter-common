@@ -133,7 +133,7 @@ fifo_id_bk:
  * Note: The mapping is identical for Read and Write path.
  * This exclusively applies to HSI devices.
  */
-int __init hsi_fifo_mapping(struct hsi_dev *hsi_ctrl, unsigned int mtype)
+int hsi_fifo_mapping(struct hsi_dev *hsi_ctrl, unsigned int mtype)
 {
 	int err = 0;
 	void __iomem *base = hsi_ctrl->base;

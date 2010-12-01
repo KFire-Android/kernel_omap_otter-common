@@ -391,6 +391,9 @@ static int hsi_char_ioctl(struct inode *inode, struct file *file,
 		if (copy_to_user((void __user *)arg, &tx_cfg, sizeof(tx_cfg)))
 			ret = -EFAULT;
 		break;
+	case CS_SW_RESET:
+		if_hsi_sw_reset(ch);
+		break;
 	default:
 		ret = -ENOIOCTLCMD;
 		break;

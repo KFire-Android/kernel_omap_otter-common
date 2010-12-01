@@ -322,6 +322,27 @@ void if_hsi_get_tx(int ch, struct hsi_tx_config *cfg)
 	spin_unlock_bh(&hsi_iface.lock);
 }
 
+void if_hsi_sw_reset(int ch)
+{
+	struct if_hsi_channel *channel;
+	int i;
+
+	channel = &hsi_iface.channels[ch];
+	spin_lock_bh(&hsi_iface.lock);
+	hsi_ioctl(channel->dev, HSI_IOCTL_SW_RESET, NULL);
+
+	/* Reset HSI channel states */
+	for (i = 0; i < HSI_MAX_PORTS; i++)
+		if_hsi_char_driver.ch_mask[i] = 0;
+
+	for (i = 0; i < HSI_MAX_CHAR_DEVS; i++) {
+		channel = &hsi_iface.channels[i];
+		channel->opened = 0;
+		channel->state = HSI_CHANNEL_STATE_UNAVAIL;
+	}
+	spin_unlock_bh(&hsi_iface.lock);
+}
+
 void if_hsi_cancel_read(int ch)
 {
 	struct if_hsi_channel *channel;
@@ -591,10 +612,9 @@ int __init if_hsi_init(unsigned int port, unsigned int *channels_map)
 		channel = &hsi_iface.channels[i];
 		channel->dev = NULL;
 		channel->opened = 0;
-		channel->state = 0;
+		channel->state = HSI_CHANNEL_STATE_UNAVAIL;
 		channel->channel_id = i;
 		spin_lock_init(&channel->lock);
-		channel->state = HSI_CHANNEL_STATE_UNAVAIL;
 	}
 
 	for (i = 0; (i < HSI_MAX_CHAR_DEVS) && channels_map[i]; i++) {

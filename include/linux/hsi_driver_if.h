@@ -60,6 +60,7 @@ enum {
 	HSI_IOCTL_GET_RX,	/* Get HSR configuration */
 	HSI_IOCTL_SET_TX,	/* Set HST configuration */
 	HSI_IOCTL_GET_TX,	/* Get HST configuration */
+	HSI_IOCTL_SW_RESET,	/* Force a HSI SW RESET */
 };
 
 /* Forward references */
