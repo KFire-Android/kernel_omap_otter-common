@@ -560,12 +560,12 @@ static void __init omap3_init_voltagecontroller(void)
 
 	voltage_write_reg(OMAP3_PRM_VC_SMPS_SA_OFFSET,
 			(vdd_info[impu].pmic->i2c_addr <<
-			 OMAP3430_PRM_VC_SMPS_SA_SA1_SHIFT) |
+			 OMAP3430_PRM_VC_SMPS_SA_SA0_SHIFT) |
 			(vdd_info[icore].pmic->i2c_addr <<
-			 OMAP3430_PRM_VC_SMPS_SA_SA0_SHIFT));
+			 OMAP3430_PRM_VC_SMPS_SA_SA1_SHIFT));
 	voltage_write_reg(OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET,
-		(vdd_info[impu].pmic->i2c_vreg << OMAP3430_VOLRA1_SHIFT) |
-		(vdd_info[icore].pmic->i2c_vreg << OMAP3430_VOLRA0_SHIFT));
+		(vdd_info[impu].pmic->i2c_vreg << OMAP3430_VOLRA0_SHIFT) |
+		(vdd_info[icore].pmic->i2c_vreg << OMAP3430_VOLRA1_SHIFT));
 
 	vsel_on = vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_on);
 	vsel_onlp = vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_onlp);

@@ -20,9 +20,10 @@
 
 int omap2_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 {
-	return prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
+	prm_rmw_mod_reg_bits(OMAP_POWERSTATE_MASK,
 				(pwrst << OMAP_POWERSTATE_SHIFT),
 				pwrdm->prcm_offs, OMAP2_PM_PWSTCTRL);
+	return 0;
 }
 
 int omap2_pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
