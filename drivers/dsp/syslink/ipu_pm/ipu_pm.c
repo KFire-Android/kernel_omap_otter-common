@@ -246,6 +246,7 @@ static struct ipu_pm_object *pm_handle_sysm3;
 static struct workqueue_struct *ipu_wq;
 #ifdef CONFIG_OMAP_PM
 static struct pm_qos_request_list *pm_qos_handle;
+static struct pm_qos_request_list *pm_qos_handle_2;
 #endif
 static struct omap_rproc *sys_rproc;
 static struct omap_rproc *app_rproc;
@@ -3294,6 +3295,13 @@ int ipu_pm_save_ctx(int proc_id)
 	if (ipu_pm_get_state(proc_id) & SYS_PROC_DOWN)
 		goto exit;
 
+#ifdef CONFIG_OMAP_PM
+	retval = omap_pm_set_max_sdma_lat(&pm_qos_handle_2,
+						IPU_PM_NO_MPU_LAT_CONSTRAINT);
+	if (retval)
+		pr_info("Unable to remove cstr on IPU\n");
+#endif
+
 	/* Because of the current scheme, we need to check
 	 * if APPM3 is enable and we need to shut it down too
 	 * Sysm3 is the only want sending the hibernate message
@@ -3391,6 +3399,12 @@ int ipu_pm_restore_ctx(int proc_id)
 		cm_write_mod_reg(HW_AUTO,
 				 OMAP4430_CM2_CORE_MOD,
 				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
+#ifdef CONFIG_OMAP_PM
+		retval = omap_pm_set_max_sdma_lat(&pm_qos_handle_2,
+						IPU_PM_MM_MPU_LAT_CONSTRAINT);
+		if (retval)
+			pr_info("Unable to set cstr on IPU\n");
+#endif
 	}
 
 	/* Check if the M3 was loaded */
@@ -3429,6 +3443,12 @@ int ipu_pm_restore_ctx(int proc_id)
 				goto error;
 			handle->rcb_table->state_flag &= ~APP_PROC_DOWN;
 		}
+#ifdef CONFIG_OMAP_PM
+		retval = omap_pm_set_max_sdma_lat(&pm_qos_handle_2,
+						IPU_PM_MM_MPU_LAT_CONSTRAINT);
+		if (retval)
+			pr_info("Unable to set cstr on IPU\n");
+#endif
 	} else
 		goto error;
 exit:
