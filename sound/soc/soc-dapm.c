@@ -29,7 +29,7 @@
  *    o Support for reduced codec bias currents.
  */
 
-#define DEBUG
+#undef DEBUG
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
