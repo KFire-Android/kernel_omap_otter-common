@@ -162,9 +162,6 @@ struct omap_vout_device {
 	/* writeback variables*/
 	bool wb_enabled;
 	bool buf_empty;
-
-	/* early suspend support */
-	bool ignore;
 };
 
 struct vout_platform_data {
