@@ -2444,53 +2444,12 @@ static int vidioc_querybuf(struct file *file, void *fh,
 	return videobuf_querybuf(&vout->vbq, b);
 }
 
-static bool has_suspended_display(struct omap_vout_device *vout)
-{
-	struct omapvideo_info *ovid = &vout->vid_info;
-	int i;
-
-	/*
-	 * QUESTION: should we return true if one of the displays is suspended,
-	 * or only if ALL of the displays are suspended.  For now we do the
-	 * former.
-	 */
-	for (i = 0; i < ovid->num_overlays; i++) {
-		struct omap_overlay_manager *mgr = ovid->overlays[i]->manager;
-		if (mgr && mgr->device &&
-		    mgr->device->state == OMAP_DSS_DISPLAY_SUSPENDED)
-			return true;
-	}
-	return false;
-}
-
-static void fake_display_buffer(struct omap_vout_device *vout)
-{
-	if (!vout->first_int && (vout->cur_frm != vout->next_frm)) {
-		do_gettimeofday(&vout->cur_frm->ts);
-		vout->cur_frm->state = VIDEOBUF_DONE;
-		wake_up_interruptible(&vout->cur_frm->done);
-		vout->cur_frm = vout->next_frm;
-	}
-
-	vout->first_int = 0;
-	if (list_empty(&vout->dma_queue)) {
-		vout->buf_empty = true;
-	} else {
-		vout->next_frm = list_entry(vout->dma_queue.next,
-				struct videobuf_buffer, queue);
-		list_del(&vout->next_frm->queue);
-
-		vout->next_frm->state = VIDEOBUF_ACTIVE;
-	}
-}
-
 static int vidioc_qbuf(struct file *file, void *fh,
 			struct v4l2_buffer *buffer)
 {
 	struct omap_vout_device *vout = fh;
 	struct videobuf_queue *q = &vout->vbq;
 	int ret = 0;
-	unsigned long flags;
 	u32 addr = 0, uv_addr = 0;
 	q->field = vout->pix.field;
 
@@ -2514,24 +2473,12 @@ static int vidioc_qbuf(struct file *file, void *fh,
 		return -EINVAL;
 	}
 #endif
-
 	ret = videobuf_qbuf(q, buffer);
-
 	/* record buffer offset from crop window */
 	if (omap_vout_calculate_offset(vout, buffer->index)) {
 		printk(KERN_ERR "Could not calculate buffer offset\n");
 		return -EINVAL;
 	}
-
-	if (vout->streaming && has_suspended_display(vout)) {
-		/* we could return an error, but we want to simulate normal
-		   processing of this buffer */
-		spin_lock_irqsave(&vout->vbq_lock, flags);
-		fake_display_buffer(vout);
-		spin_unlock_irqrestore(&vout->vbq_lock, flags);
-		return ret;
-	}
-
 	if (vout->wb_enabled && vout->streaming && vout->buf_empty) {
 		addr = (unsigned long) vout->queued_buf_addr[vout->cur_frm->i]
 			+ vout->cropped_offset[vout->cur_frm->i];
@@ -2572,7 +2519,7 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 	mutex_lock(&vout->lock);
 
-	if (vout->streaming || has_suspended_display(vout)) {
+	if (vout->streaming) {
 		ret = -EBUSY;
 		goto streamon_err;
 	}
