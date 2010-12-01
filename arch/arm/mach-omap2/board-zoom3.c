@@ -21,10 +21,74 @@
 #include <plat/common.h>
 #include <plat/board.h>
 #include <plat/usb.h>
+#include <plat/opp_twl_tps.h>
 
 #include "mux.h"
 #include "sdram-hynix-h8mbx00u0mer-0em.h"
 #include "smartreflex-class3.h"
+
+#ifdef CONFIG_PM
+static struct omap_volt_vc_data vc_config = {
+	/* MPU */
+	.vdd0_on	= 1200000, /* 1.2v */
+	.vdd0_onlp	= 1000000, /* 1.0v */
+	.vdd0_ret	=  975000, /* 0.975v */
+	.vdd0_off	=  600000, /* 0.6v */
+	/* CORE */
+	.vdd1_on	= 1150000, /* 1.15v */
+	.vdd1_onlp	= 1000000, /* 1.0v */
+	.vdd1_ret	=  975000, /* 0.975v */
+	.vdd1_off	=  600000, /* 0.6v */
+
+	.clksetup	= 0xff,
+	.voltoffset	= 0xff,
+	.voltsetup2	= 0xff,
+	.voltsetup_time1 = 0xfff,
+	.voltsetup_time2 = 0xfff,
+};
+
+#ifdef CONFIG_TWL4030_CORE
+static struct omap_volt_pmic_info omap_pmic_mpu = { /* and iva */
+	.name = "twl",
+	.slew_rate = 4000,
+	.step_size = 12500,
+	.i2c_addr = 0x12,
+	.i2c_vreg = 0x0, /* (vdd0) VDD1 -> VDD1_CORE -> VDD_MPU */
+	.vsel_to_uv = omap_twl_vsel_to_uv,
+	.uv_to_vsel = omap_twl_uv_to_vsel,
+	.onforce_cmd = omap_twl_onforce_cmd,
+	.on_cmd = omap_twl_on_cmd,
+	.sleepforce_cmd = omap_twl_sleepforce_cmd,
+	.sleep_cmd = omap_twl_sleep_cmd,
+	.vp_config_erroroffset = 0,
+	.vp_vstepmin_vstepmin = 0x01,
+	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vlimitto_timeout_us = 0x200,
+	.vp_vlimitto_vddmin = 0x14,
+	.vp_vlimitto_vddmax = 0x44,
+};
+
+static struct omap_volt_pmic_info omap_pmic_core = {
+	.name = "twl",
+	.slew_rate = 4000,
+	.step_size = 12500,
+	.i2c_addr = 0x12,
+	.i2c_vreg = 0x1, /* (vdd1) VDD2 -> VDD2_CORE -> VDD_CORE */
+	.vsel_to_uv = omap_twl_vsel_to_uv,
+	.uv_to_vsel = omap_twl_uv_to_vsel,
+	.onforce_cmd = omap_twl_onforce_cmd,
+	.on_cmd = omap_twl_on_cmd,
+	.sleepforce_cmd = omap_twl_sleepforce_cmd,
+	.sleep_cmd = omap_twl_sleep_cmd,
+	.vp_config_erroroffset = 0,
+	.vp_vstepmin_vstepmin = 0x01,
+	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vlimitto_timeout_us = 0x200,
+	.vp_vlimitto_vddmin = 0x18,
+	.vp_vlimitto_vddmax = 0x42,
+};
+#endif /* CONFIG_TWL4030_CORE */
+#endif /* CONFIG_PM */
 
 static void __init omap_zoom_map_io(void)
 {
@@ -128,6 +192,14 @@ static void __init omap_zoom_init(void)
 	usb_uhhtll_init(&usbhs_pdata);
 	usb_ehci_init();
 	sr_class3_init();
+
+#ifdef CONFIG_PM
+#ifdef CONFIG_TWL4030_CORE
+	omap_voltage_register_pmic(&omap_pmic_core, "core");
+	omap_voltage_register_pmic(&omap_pmic_mpu, "mpu");
+#endif
+	omap_voltage_init_vc(&vc_config);
+#endif
 }
 
 MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
