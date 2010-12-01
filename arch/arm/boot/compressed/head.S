@@ -241,6 +241,11 @@ not_relocated:	mov	r0, #0
 		 */
 		bl	cache_on
 
+		/* If don't clean up the cache, decompressing
+		 * kernel may fail, especially OMAP HS/EMU.
+		 */
+		bl	cache_clean_flush
+
 		mov	r1, sp			@ malloc space above stack
 		add	r2, sp, #0x10000	@ 64k max
 
