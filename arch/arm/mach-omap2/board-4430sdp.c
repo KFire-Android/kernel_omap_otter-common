@@ -1240,8 +1240,8 @@ static struct omap_volt_pmic_info omap_pmic_core = {
 	.vp_vstepmin_vstepmin = 0x01,
 	.vp_vstepmax_vstepmax = 0x04,
 	.vp_vlimitto_timeout_us = 0x200,
-	.vp_vlimitto_vddmin = 0x18,
-	.vp_vlimitto_vddmax = 0x30,
+	.vp_vlimitto_vddmin = 0xA,
+	.vp_vlimitto_vddmax = 0x28,
 };
 
 static struct omap_volt_pmic_info omap_pmic_mpu = {
@@ -1260,8 +1260,8 @@ static struct omap_volt_pmic_info omap_pmic_mpu = {
 	.vp_vstepmin_vstepmin = 0x01,
 	.vp_vstepmax_vstepmax = 0x04,
 	.vp_vlimitto_timeout_us = 0x200,
-	.vp_vlimitto_vddmin = 0x18,
-	.vp_vlimitto_vddmax = 0x3c,
+	.vp_vlimitto_vddmin = 0xA,
+	.vp_vlimitto_vddmax = 0x39,
 };
 
 static struct omap_volt_pmic_info omap_pmic_iva = {
@@ -1280,8 +1280,8 @@ static struct omap_volt_pmic_info omap_pmic_iva = {
 	.vp_vstepmin_vstepmin = 0x01,
 	.vp_vstepmax_vstepmax = 0x04,
 	.vp_vlimitto_timeout_us = 0x200,
-	.vp_vlimitto_vddmin = 0x18,
-	.vp_vlimitto_vddmax = 0x3c,
+	.vp_vlimitto_vddmin = 0xA,
+	.vp_vlimitto_vddmax = 0x2D,
 };
 
 static struct omap_volt_vc_data vc_config = {
