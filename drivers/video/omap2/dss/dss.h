@@ -204,14 +204,12 @@ struct writeback_cache_data {
 
 	enum omap_color_mode			color_mode;
 	enum omap_color_mode			input_color_mode;
-	enum omap_writeback_capturemode	capturemode;
-	enum omap_writeback_source_type	source_type;
+	enum omap_writeback_capturemode		capturemode;
+	enum omap_writeback_source_type		source_type;
 	enum omap_writeback_source		source;
-
-	enum omap_burst_size	burst_size;
-	u32						fifo_low;
-	u32						fifo_high;
-
+	enum omap_burst_size			burst_size;
+	u32					fifo_low;
+	u32					fifo_high;
 };
 
 struct seq_file;
@@ -439,6 +437,7 @@ void dispc_set_plane_ba0(enum omap_plane plane, u32 paddr);
 void dispc_set_plane_ba1(enum omap_plane plane, u32 paddr);
 void dispc_enable_gamma_table(bool enable);
 void dispc_set_idle_mode(void);
+void dispc_setup_color_fr_lr(int range);
 
 void dispc_set_plane_pos(enum omap_plane plane, u16 x, u16 y);
 void dispc_set_plane_size(enum omap_plane plane, u16 width, u16 height);

@@ -19,12 +19,12 @@
 
 #include <linux/string.h>
 
-#define HDMI_WP				0x58006000
+#define HDMI_WP			0x58006000
 #define HDMI_CORE_SYS		0x58006400
 #define HDMI_CORE_AV		0x58006900
-#define HDMI_HDCP			0x58007000
+#define HDMI_HDCP		0x58007000
 
-#define HDMI_WP_AUDIO_DATA		0x8Cul
+#define HDMI_WP_AUDIO_DATA	0x8Cul
 
 #define DBG(format, ...) \
 		printk(KERN_DEBUG "hdmi: " format, ## __VA_ARGS__)
@@ -108,10 +108,10 @@ enum hdmi_core_tclkselclkmult {
 
 struct hdmi_core_video_config_t {
 	enum hdmi_core_inputbus_width	CoreInputBusWide;
-	enum hdmi_core_dither_trunc 	CoreOutputDitherTruncation;
-	enum hdmi_core_deepcolor_ed		CoreDeepColorPacketED;
-	enum hdmi_core_packet_mode		CorePacketMode;
-	enum hdmi_core_hdmi_dvi			CoreHdmiDvi;
+	enum hdmi_core_dither_trunc	CoreOutputDitherTruncation;
+	enum hdmi_core_deepcolor_ed	CoreDeepColorPacketED;
+	enum hdmi_core_packet_mode	CorePacketMode;
+	enum hdmi_core_hdmi_dvi		CoreHdmiDvi;
 	enum hdmi_core_tclkselclkmult	CoreTclkSelClkMult;
 };
 
@@ -206,8 +206,12 @@ struct hdmi_core_infoframe_avi {
 };
 
 struct hdmi_core_packet_enable_repeat {
+	u32		MPEGInfoFrameED;
+	u32		MPEGInfoFrameRepeat;
 	u32		AudioPacketED;
 	u32		AudioPacketRepeat;
+	u32		SPDInfoFrameED;
+	u32		SPDInfoFrameRepeat;
 	u32		AVIInfoFrameED;
 	u32		AVIInfoFrameRepeat;
 	u32		GeneralcontrolPacketED;
@@ -322,8 +326,24 @@ struct hdmi_audio_dma {
 enum hdmi_packing_mode {
 	HDMI_PACK_10b_RGB_YUV444 = 0,
 	HDMI_PACK_24b_RGB_YUV444_YUV422 = 1,
-	HDMI_PACK_20b_YUV422 = 2,
 	HDMI_PACK_ALREADYPACKED = 7
+};
+
+enum hdmi_timing_mode {
+	HDMI_TIMING_MASTER_24BIT = 0x1,
+	HDMI_TIMING_MASTER_30BIT = 0x2,
+	HDMI_TIMING_MASTER_36BIT = 0x3
+};
+
+enum hdmi_deep_mode {
+	HDMI_DEEP_COLOR_24BIT = 0,
+	HDMI_DEEP_COLOR_30BIT = 1,
+	HDMI_DEEP_COLOR_36BIT = 2
+};
+
+enum hdmi_range {
+	HDMI_LIMITED_RANGE = 0,
+	HDMI_FULL_RANGE = 1,
 };
 
 struct hdmi_video_format {
@@ -380,6 +400,7 @@ struct hdmi_config {
 	u16 v_pol;
 	u16 hdmi_dvi;
 	u16 video_format;
+	u16 deep_color;
 	u16 s3d_structure;/*Frame Structure for the S3D Frame*/
 	u16 subsamp_pos; /*Subsampling used in Vendor Specific Infoframe */
 	int vsi_enabled; /* Vender Specific InfoFrame enabled/disabled*/
@@ -429,13 +450,32 @@ struct hdmi_notifier {
 	struct list_head list;
 };
 
-#define HDMI_CONNECT      0x01
-#define HDMI_DISCONNECT   0x02
-#define HDMI_HPD          0x04
-#define HDMI_FIRST_HPD    0x08
+/* HDMI power states */
+enum hdmi_power_state {
+	HDMI_POWER_OFF  = 0,
+	HDMI_POWER_MIN  = 1,	/* minimum power for HPD detect */
+	HDMI_POWER_FULL = 3,	/* full power */
+};
 
-#define HDMI_POWERPHYOFF  0x00
-#define HDMI_POWERPHYON   0x01
+/* HDMI device states */
+#include <plat/display.h>
+enum hdmi_dev_state {
+	HDMI_DISABLED  = OMAP_DSS_DISPLAY_DISABLED,
+	HDMI_ACTIVE    = OMAP_DSS_DISPLAY_ACTIVE,
+	HDMI_SUSPENDED = OMAP_DSS_DISPLAY_SUSPENDED,
+};
+
+#define HDMI_CONNECT		0x01
+#define HDMI_DISCONNECT		0x02
+#define HDMI_HPD_MODIFY		0x04
+#define HDMI_FIRST_HPD		0x08
+#define HDMI_HPD_LOW		0x10
+#define HDMI_HPD_HIGH		0x20
+
+#define HDMI_EVENT_POWEROFF	0x00
+#define HDMI_EVENT_POWERPHYOFF	0x01
+#define HDMI_EVENT_POWERPHYON	0x02
+#define HDMI_EVENT_POWERON	0x03
 
 /* Function prototype */
 int HDMI_W1_StopVideoFrame(u32);
@@ -447,13 +487,16 @@ int hdmi_w1_wrapper_disable(u32);
 int hdmi_w1_wrapper_enable(u32);
 int hdmi_w1_stop_audio_transfer(u32);
 int hdmi_w1_start_audio_transfer(u32);
-int HDMI_CORE_DDC_READEDID(u32 Core, u8 *data);
+int HDMI_CORE_DDC_READEDID(u32 Core, u8 *data, u16 max_length);
 int hdmi_lib_enable(struct hdmi_config *cfg);
 void HDMI_W1_HPD_handler(int *r);
 int hdmi_lib_init(void);
 void hdmi_lib_exit(void);
 int hdmi_configure_csc(enum hdmi_core_av_csc csc);
+int hdmi_configure_lrfr(enum hdmi_range, int force_set);
+int hdmi_set_irqs(int i);
 
+int hdmi_set_audio_power(bool on);
 void hdmi_add_notifier(struct hdmi_notifier *notifier);
 void hdmi_remove_notifier(struct hdmi_notifier *notifier);
 void hdmi_notify_hpd(int state);

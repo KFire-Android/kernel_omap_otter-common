@@ -17,12 +17,13 @@
 
 /* Rev history:
  * Yong Zhi <y-zhi@ti.com>	changed SiVal macros
- * 				added PLL/PHY code
+ *				added PLL/PHY code
  *				added EDID code
- * 				moved PLL/PHY code to hdmi panel driver
- * 				cleanup 2/08/10
- * MythriPk <mythripk@ti.com>	Apr 2010 Modified to read extended EDID partition
- *				and handle checksum with and without extension
+ *				moved PLL/PHY code to hdmi panel driver
+ *				cleanup 2/08/10
+ * MythriPk <mythripk@ti.com>	Apr 2010 Modified to read extended EDID
+ *				partition and handle checksum with and without
+ *				extension
  *				May 2010 Added support for Hot Plug Detect.
  * Munish <munish@ti.com>	Sep 2010 Added VS Infoframe for S3D support
  *
@@ -40,165 +41,163 @@
 #include <linux/module.h>
 #include <linux/module.h>
 #include <linux/seq_file.h>
+#include <linux/hrtimer.h>
 
 /* HDMI PHY */
-#define HDMI_TXPHY_TX_CTRL						0x0ul
-#define HDMI_TXPHY_DIGITAL_CTRL					0x4ul
-#define HDMI_TXPHY_POWER_CTRL					0x8ul
+#define HDMI_TXPHY_TX_CTRL			0x0ul
+#define HDMI_TXPHY_DIGITAL_CTRL			0x4ul
+#define HDMI_TXPHY_POWER_CTRL			0x8ul
 
 /* HDMI Wrapper */
-#define HDMI_WP_REVISION						0x0ul
-#define HDMI_WP_SYSCONFIG						0x10ul
-#define HDMI_WP_IRQSTATUS_RAW					0x24ul
-#define HDMI_WP_IRQSTATUS						0x28ul
-#define HDMI_WP_PWR_CTRL						0x40ul
-#define HDMI_WP_IRQENABLE_SET					0x2Cul
-#define HDMI_WP_VIDEO_CFG						0x50ul
-#define HDMI_WP_VIDEO_SIZE						0x60ul
-#define HDMI_WP_VIDEO_TIMING_H					0x68ul
-#define HDMI_WP_VIDEO_TIMING_V					0x6Cul
-#define HDMI_WP_WP_CLK								0x70ul
+#define HDMI_WP_REVISION			0x0ul
+#define HDMI_WP_SYSCONFIG			0x10ul
+#define HDMI_WP_IRQSTATUS_RAW			0x24ul
+#define HDMI_WP_IRQSTATUS			0x28ul
+#define HDMI_WP_PWR_CTRL			0x40ul
+#define HDMI_WP_IRQENABLE_SET			0x2Cul
+#define HDMI_WP_VIDEO_CFG			0x50ul
+#define HDMI_WP_VIDEO_SIZE			0x60ul
+#define HDMI_WP_VIDEO_TIMING_H			0x68ul
+#define HDMI_WP_VIDEO_TIMING_V			0x6Cul
+#define HDMI_WP_WP_CLK				0x70ul
 
 /* HDMI IP Core System */
-#define HDMI_CORE_SYS__VND_IDL					0x0ul
-#define HDMI_CORE_SYS__DEV_IDL					0x8ul
-#define HDMI_CORE_SYS__DEV_IDH					0xCul
-#define HDMI_CORE_SYS__DEV_REV					0x10ul
-#define HDMI_CORE_SYS__SRST						0x14ul
-#define HDMI_CORE_CTRL1							0x20ul
-#define HDMI_CORE_SYS__SYS_STAT					0x24ul
-#define HDMI_CORE_SYS__VID_ACEN					0x124ul
-#define HDMI_CORE_SYS__VID_MODE					0x128ul
-#define HDMI_CORE_SYS__VID_CTRL					0x120ul
-#define HDMI_CORE_SYS__INTR_STATE				0x1C0ul
-#define HDMI_CORE_SYS__INTR1					0x1C4ul
-#define HDMI_CORE_SYS__INTR2					0x1C8ul
-#define HDMI_CORE_SYS__INTR3					0x1CCul
-#define HDMI_CORE_SYS__INTR4					0x1D0ul
-#define HDMI_CORE_SYS__UMASK1					0x1D4ul
-#define HDMI_CORE_SYS__TMDS_CTRL				0x208ul
-#define HDMI_CORE_CTRL1_VEN__FOLLOWVSYNC		0x1ul
-#define HDMI_CORE_CTRL1_HEN__FOLLOWHSYNC		0x1ul
-#define HDMI_CORE_CTRL1_BSEL__24BITBUS			0x1ul
-#define HDMI_CORE_CTRL1_EDGE__RISINGEDGE		0x1ul
+#define HDMI_CORE_SYS__VND_IDL			0x0ul
+#define HDMI_CORE_SYS__DEV_IDL			0x8ul
+#define HDMI_CORE_SYS__DEV_IDH			0xCul
+#define HDMI_CORE_SYS__DEV_REV			0x10ul
+#define HDMI_CORE_SYS__SRST			0x14ul
+#define HDMI_CORE_CTRL1				0x20ul
+#define HDMI_CORE_SYS__SYS_STAT			0x24ul
+#define HDMI_CORE_SYS__VID_ACEN			0x124ul
+#define HDMI_CORE_SYS__VID_MODE			0x128ul
+#define HDMI_CORE_SYS__VID_CTRL			0x120ul
+#define HDMI_CORE_SYS__INTR_STATE		0x1C0ul
+#define HDMI_CORE_SYS__INTR1			0x1C4ul
+#define HDMI_CORE_SYS__INTR2			0x1C8ul
+#define HDMI_CORE_SYS__INTR3			0x1CCul
+#define HDMI_CORE_SYS__INTR4			0x1D0ul
+#define HDMI_CORE_SYS__UMASK1			0x1D4ul
+#define HDMI_CORE_SYS__TMDS_CTRL		0x208ul
+#define HDMI_CORE_CTRL1_VEN__FOLLOWVSYNC	0x1ul
+#define HDMI_CORE_CTRL1_HEN__FOLLOWHSYNC	0x1ul
+#define HDMI_CORE_CTRL1_BSEL__24BITBUS		0x1ul
+#define HDMI_CORE_CTRL1_EDGE__RISINGEDGE	0x1ul
 
-#define HDMI_CORE_SYS__DE_DLY				0xC8ul
-#define HDMI_CORE_SYS__DE_CTRL				0xCCul
-#define HDMI_CORE_SYS__DE_TOP				0xD0ul
-#define HDMI_CORE_SYS__DE_CNTL				0xD8ul
-#define HDMI_CORE_SYS__DE_CNTH				0xDCul
-#define HDMI_CORE_SYS__DE_LINL				0xE0ul
-#define HDMI_CORE_SYS__DE_LINH__1			0xE4ul
+#define HDMI_CORE_SYS__DE_DLY			0xC8ul
+#define HDMI_CORE_SYS__DE_CTRL			0xCCul
+#define HDMI_CORE_SYS__DE_TOP			0xD0ul
+#define HDMI_CORE_SYS__DE_CNTL			0xD8ul
+#define HDMI_CORE_SYS__DE_CNTH			0xDCul
+#define HDMI_CORE_SYS__DE_LINL			0xE0ul
+#define HDMI_CORE_SYS__DE_LINH__1		0xE4ul
 
 /* HDMI IP Core Audio Video */
-#define HDMI_CORE_AV_HDMI_CTRL				0xBCul
-#define HDMI_CORE_AV_DPD					0xF4ul
-#define HDMI_CORE_AV_PB_CTRL1				0xF8ul
-#define HDMI_CORE_AV_PB_CTRL2				0xFCul
-#define HDMI_CORE_AV_AVI_TYPE				0x100ul
-#define HDMI_CORE_AV_AVI_VERS				0x104ul
-#define HDMI_CORE_AV_AVI_LEN				0x108ul
-#define HDMI_CORE_AV_AVI_CHSUM				0x10Cul
-#define HDMI_CORE_AV_AVI_DBYTE				0x110ul
+#define HDMI_CORE_AV_HDMI_CTRL			0xBCul
+#define HDMI_CORE_AV_DPD			0xF4ul
+#define HDMI_CORE_AV_PB_CTRL1			0xF8ul
+#define HDMI_CORE_AV_PB_CTRL2			0xFCul
+#define HDMI_CORE_AV_AVI_TYPE			0x100ul
+#define HDMI_CORE_AV_AVI_VERS			0x104ul
+#define HDMI_CORE_AV_AVI_LEN			0x108ul
+#define HDMI_CORE_AV_AVI_CHSUM			0x10Cul
+#define HDMI_CORE_AV_AVI_DBYTE			0x110ul
 #define HDMI_CORE_AV_AVI_DBYTE__ELSIZE		0x4ul
 
 /* HDMI DDC E-DID */
-#define HDMI_CORE_DDC_CMD				0x3CCul
+#define HDMI_CORE_DDC_CMD			0x3CCul
 #define HDMI_CORE_DDC_STATUS			0x3C8ul
-#define HDMI_CORE_DDC_ADDR				0x3B4ul
+#define HDMI_CORE_DDC_ADDR			0x3B4ul
 #define HDMI_CORE_DDC_OFFSET			0x3BCul
 #define HDMI_CORE_DDC_COUNT1			0x3C0ul
 #define HDMI_CORE_DDC_COUNT2			0x3C4ul
-#define HDMI_CORE_DDC_DATA				0x3D0ul
-#define HDMI_CORE_DDC_SEGM				0x3B8ul
+#define HDMI_CORE_DDC_DATA			0x3D0ul
+#define HDMI_CORE_DDC_SEGM			0x3B8ul
 
-#define HDMI_WP_AUDIO_CFG                         0x80ul
-#define HDMI_WP_AUDIO_CFG2                        0x84ul
-#define HDMI_WP_AUDIO_CTRL                        0x88ul
-#define HDMI_WP_AUDIO_DATA                        0x8Cul
+#define HDMI_WP_AUDIO_CFG			0x80ul
+#define HDMI_WP_AUDIO_CFG2			0x84ul
+#define HDMI_WP_AUDIO_CTRL			0x88ul
+#define HDMI_WP_AUDIO_DATA			0x8Cul
 
-#define HDMI_CORE_AV__AVI_DBYTE                0x110ul
-#define HDMI_CORE_AV__AVI_DBYTE__ELSIZE        0x4ul
-#define HDMI_IP_CORE_AV__AVI_DBYTE__NELEMS        15
-#define HDMI_CORE_AV__SPD_DBYTE                0x190ul
-#define HDMI_CORE_AV__SPD_DBYTE__ELSIZE        0x4ul
-#define HDMI_CORE_AV__SPD_DBYTE__NELEMS        27
-#define HDMI_CORE_AV__AUDIO_DBYTE              0x210ul
-#define HDMI_CORE_AV__AUDIO_DBYTE__ELSIZE      0x4ul
-#define HDMI_CORE_AV__AUDIO_DBYTE__NELEMS      10
-#define HDMI_CORE_AV__MPEG_DBYTE               0x290ul
-#define HDMI_CORE_AV__MPEG_DBYTE__ELSIZE       0x4ul
-#define HDMI_CORE_AV__MPEG_DBYTE__NELEMS       27
-#define HDMI_CORE_AV__GEN_DBYTE                0x300ul
-#define HDMI_CORE_AV__GEN_DBYTE__ELSIZE        0x4ul
-#define HDMI_CORE_AV__GEN_DBYTE__NELEMS        31
-#define HDMI_CORE_AV__GEN2_DBYTE               0x380ul
-#define HDMI_CORE_AV__GEN2_DBYTE__ELSIZE       0x4ul
-#define HDMI_CORE_AV__GEN2_DBYTE__NELEMS       31
-#define HDMI_CORE_AV__ACR_CTRL                 0x4ul
-#define HDMI_CORE_AV__FREQ_SVAL                0x8ul
-#define HDMI_CORE_AV__N_SVAL1                  0xCul
-#define HDMI_CORE_AV__N_SVAL2                  0x10ul
-#define HDMI_CORE_AV__N_SVAL3                  0x14ul
-#define HDMI_CORE_AV__CTS_SVAL1                0x18ul
-#define HDMI_CORE_AV__CTS_SVAL2                0x1Cul
-#define HDMI_CORE_AV__CTS_SVAL3                0x20ul
-#define HDMI_CORE_AV__CTS_HVAL1                0x24ul
-#define HDMI_CORE_AV__CTS_HVAL2                0x28ul
-#define HDMI_CORE_AV__CTS_HVAL3                0x2Cul
-#define HDMI_CORE_AV__AUD_MODE                 0x50ul
-#define HDMI_CORE_AV__SPDIF_CTRL               0x54ul
-#define HDMI_CORE_AV__HW_SPDIF_FS              0x60ul
-#define HDMI_CORE_AV__SWAP_I2S                 0x64ul
-#define HDMI_CORE_AV__SPDIF_ERTH               0x6Cul
-#define HDMI_CORE_AV__I2S_IN_MAP               0x70ul
-#define HDMI_CORE_AV__I2S_IN_CTRL              0x74ul
-#define HDMI_CORE_AV__I2S_CHST0                0x78ul
-#define HDMI_CORE_AV__I2S_CHST1                0x7Cul
-#define HDMI_CORE_AV__I2S_CHST2                0x80ul
-#define HDMI_CORE_AV__I2S_CHST4                0x84ul
-#define HDMI_CORE_AV__I2S_CHST5                0x88ul
-#define HDMI_CORE_AV__ASRC                     0x8Cul
-#define HDMI_CORE_AV__I2S_IN_LEN               0x90ul
-#define HDMI_CORE_AV__HDMI_CTRL                0xBCul
-#define HDMI_CORE_AV__AUDO_TXSTAT              0xC0ul
-#define HDMI_CORE_AV__AUD_PAR_BUSCLK_1         0xCCul
-#define HDMI_CORE_AV__AUD_PAR_BUSCLK_2         0xD0ul
-#define HDMI_CORE_AV__AUD_PAR_BUSCLK_3         0xD4ul
-#define HDMI_CORE_AV__TEST_TXCTRL              0xF0ul
-#define HDMI_CORE_AV__DPD                      0xF4ul
-#define HDMI_CORE_AV__PB_CTRL1                 0xF8ul
-#define HDMI_CORE_AV__PB_CTRL2                 0xFCul
-#define HDMI_CORE_AV__AVI_TYPE                 0x100ul
-#define HDMI_CORE_AV__AVI_VERS                 0x104ul
-#define HDMI_CORE_AV__AVI_LEN                  0x108ul
-#define HDMI_CORE_AV__AVI_CHSUM                0x10Cul
-#define HDMI_CORE_AV__SPD_TYPE                 0x180ul
-#define HDMI_CORE_AV__SPD_VERS                 0x184ul
-#define HDMI_CORE_AV__SPD_LEN                  0x188ul
-#define HDMI_CORE_AV__SPD_CHSUM                0x18Cul
-#define HDMI_CORE_AV__AUDIO_TYPE               0x200ul
-#define HDMI_CORE_AV__AUDIO_VERS               0x204ul
-#define HDMI_CORE_AV__AUDIO_LEN                0x208ul
-#define HDMI_CORE_AV__AUDIO_CHSUM              0x20Cul
-#define HDMI_CORE_AV__MPEG_TYPE                0x280ul
-#define HDMI_CORE_AV__MPEG_VERS                0x284ul
-#define HDMI_CORE_AV__MPEG_LEN                 0x288ul
-#define HDMI_CORE_AV__MPEG_CHSUM               0x28Cul
-#define HDMI_CORE_AV__CP_BYTE1                 0x37Cul
-#define HDMI_CORE_AV__CEC_ADDR_ID              0x3FCul
-
+#define HDMI_CORE_AV__AVI_DBYTE			0x110ul
+#define HDMI_CORE_AV__AVI_DBYTE__ELSIZE		0x4ul
+#define HDMI_IP_CORE_AV__AVI_DBYTE__NELEMS	15
+#define HDMI_CORE_AV__SPD_DBYTE			0x190ul
+#define HDMI_CORE_AV__SPD_DBYTE__ELSIZE		0x4ul
+#define HDMI_CORE_AV__SPD_DBYTE__NELEMS		27
+#define HDMI_CORE_AV__AUDIO_DBYTE		0x210ul
+#define HDMI_CORE_AV__AUDIO_DBYTE__ELSIZE	0x4ul
+#define HDMI_CORE_AV__AUDIO_DBYTE__NELEMS	10
+#define HDMI_CORE_AV__MPEG_DBYTE		0x290ul
+#define HDMI_CORE_AV__MPEG_DBYTE__ELSIZE	0x4ul
+#define HDMI_CORE_AV__MPEG_DBYTE__NELEMS	27
+#define HDMI_CORE_AV__GEN_DBYTE			0x300ul
+#define HDMI_CORE_AV__GEN_DBYTE__ELSIZE		0x4ul
+#define HDMI_CORE_AV__GEN_DBYTE__NELEMS		31
+#define HDMI_CORE_AV__GEN2_DBYTE		0x380ul
+#define HDMI_CORE_AV__GEN2_DBYTE__ELSIZE	0x4ul
+#define HDMI_CORE_AV__GEN2_DBYTE__NELEMS	31
+#define HDMI_CORE_AV__ACR_CTRL			0x4ul
+#define HDMI_CORE_AV__FREQ_SVAL			0x8ul
+#define HDMI_CORE_AV__N_SVAL1			0xCul
+#define HDMI_CORE_AV__N_SVAL2			0x10ul
+#define HDMI_CORE_AV__N_SVAL3			0x14ul
+#define HDMI_CORE_AV__CTS_SVAL1			0x18ul
+#define HDMI_CORE_AV__CTS_SVAL2			0x1Cul
+#define HDMI_CORE_AV__CTS_SVAL3			0x20ul
+#define HDMI_CORE_AV__CTS_HVAL1			0x24ul
+#define HDMI_CORE_AV__CTS_HVAL2			0x28ul
+#define HDMI_CORE_AV__CTS_HVAL3			0x2Cul
+#define HDMI_CORE_AV__AUD_MODE			0x50ul
+#define HDMI_CORE_AV__SPDIF_CTRL		0x54ul
+#define HDMI_CORE_AV__HW_SPDIF_FS		0x60ul
+#define HDMI_CORE_AV__SWAP_I2S			0x64ul
+#define HDMI_CORE_AV__SPDIF_ERTH		0x6Cul
+#define HDMI_CORE_AV__I2S_IN_MAP		0x70ul
+#define HDMI_CORE_AV__I2S_IN_CTRL		0x74ul
+#define HDMI_CORE_AV__I2S_CHST0			0x78ul
+#define HDMI_CORE_AV__I2S_CHST1			0x7Cul
+#define HDMI_CORE_AV__I2S_CHST2			0x80ul
+#define HDMI_CORE_AV__I2S_CHST4			0x84ul
+#define HDMI_CORE_AV__I2S_CHST5			0x88ul
+#define HDMI_CORE_AV__ASRC			0x8Cul
+#define HDMI_CORE_AV__I2S_IN_LEN		0x90ul
+#define HDMI_CORE_AV__HDMI_CTRL			0xBCul
+#define HDMI_CORE_AV__AUDO_TXSTAT		0xC0ul
+#define HDMI_CORE_AV__AUD_PAR_BUSCLK_1		0xCCul
+#define HDMI_CORE_AV__AUD_PAR_BUSCLK_2		0xD0ul
+#define HDMI_CORE_AV__AUD_PAR_BUSCLK_3		0xD4ul
+#define HDMI_CORE_AV__TEST_TXCTRL		0xF0ul
+#define HDMI_CORE_AV__DPD			0xF4ul
+#define HDMI_CORE_AV__PB_CTRL1			0xF8ul
+#define HDMI_CORE_AV__PB_CTRL2			0xFCul
+#define HDMI_CORE_AV__AVI_TYPE			0x100ul
+#define HDMI_CORE_AV__AVI_VERS			0x104ul
+#define HDMI_CORE_AV__AVI_LEN			0x108ul
+#define HDMI_CORE_AV__AVI_CHSUM			0x10Cul
+#define HDMI_CORE_AV__SPD_TYPE			0x180ul
+#define HDMI_CORE_AV__SPD_VERS			0x184ul
+#define HDMI_CORE_AV__SPD_LEN			0x188ul
+#define HDMI_CORE_AV__SPD_CHSUM			0x18Cul
+#define HDMI_CORE_AV__AUDIO_TYPE		0x200ul
+#define HDMI_CORE_AV__AUDIO_VERS		0x204ul
+#define HDMI_CORE_AV__AUDIO_LEN			0x208ul
+#define HDMI_CORE_AV__AUDIO_CHSUM		0x20Cul
+#define HDMI_CORE_AV__MPEG_TYPE			0x280ul
+#define HDMI_CORE_AV__MPEG_VERS			0x284ul
+#define HDMI_CORE_AV__MPEG_LEN			0x288ul
+#define HDMI_CORE_AV__MPEG_CHSUM		0x28Cul
+#define HDMI_CORE_AV__CP_BYTE1			0x37Cul
+#define HDMI_CORE_AV__CEC_ADDR_ID		0x3FCul
 
 static struct {
-	void __iomem *base_core;     /*0*/
-	void __iomem *base_core_av;  /*1*/
-	void __iomem *base_wp;       /*2*/
+	void __iomem *base_core;	/* 0 */
+	void __iomem *base_core_av;	/* 1 */
+	void __iomem *base_wp;		/* 2 */
 	struct hdmi_core_infoframe_avi avi_param;
 	struct mutex mutex;
 	struct list_head notifier_head;
 } hdmi;
-
-int count = 0, count_hpd = 0;
 
 static inline void hdmi_write_reg(u32 base, u16 idx, u32 val)
 {
@@ -206,16 +205,16 @@ static inline void hdmi_write_reg(u32 base, u16 idx, u32 val)
 
 	switch (base) {
 	case HDMI_CORE_SYS:
-	  b = hdmi.base_core;
-	  break;
+		b = hdmi.base_core;
+		break;
 	case HDMI_CORE_AV:
-	  b = hdmi.base_core_av;
-	  break;
+		b = hdmi.base_core_av;
+		break;
 	case HDMI_WP:
-	  b = hdmi.base_wp;
-	  break;
+		b = hdmi.base_wp;
+		break;
 	default:
-	  BUG();
+		BUG();
 	}
 	__raw_writel(val, b + idx);
 	/* DBG("write = 0x%x idx =0x%x\r\n", val, idx); */
@@ -228,16 +227,16 @@ static inline u32 hdmi_read_reg(u32 base, u16 idx)
 
 	switch (base) {
 	case HDMI_CORE_SYS:
-	 b = hdmi.base_core;
-	 break;
+		b = hdmi.base_core;
+		break;
 	case HDMI_CORE_AV:
-	 b = hdmi.base_core_av;
-	 break;
+		b = hdmi.base_core_av;
+		break;
 	case HDMI_WP:
-	 b = hdmi.base_wp;
-	 break;
+		b = hdmi.base_wp;
+		break;
 	default:
-	 BUG();
+		BUG();
 	}
 	l = __raw_readl(b + idx);
 
@@ -247,9 +246,9 @@ static inline u32 hdmi_read_reg(u32 base, u16 idx)
 
 void hdmi_dump_regs(struct seq_file *s)
 {
-	#define DUMPREG(g, r) seq_printf(s, "%-35s %08x\n", #r, hdmi_read_reg(g, r))
+#define DUMPREG(g, r) seq_printf(s, "%-35s %08x\n", #r, hdmi_read_reg(g, r))
 
-	/*wrapper registers*/
+	/* wrapper registers */
 	DUMPREG(HDMI_WP, HDMI_WP_REVISION);
 	DUMPREG(HDMI_WP, HDMI_WP_SYSCONFIG);
 	DUMPREG(HDMI_WP, HDMI_WP_IRQSTATUS_RAW);
@@ -306,36 +305,35 @@ void hdmi_dump_regs(struct seq_file *s)
 	DUMPREG(HDMI_CORE_AV, HDMI_CORE_AV__AVI_DBYTE);
 	DUMPREG(HDMI_CORE_AV, HDMI_CORE_AV__AVI_DBYTE);
 	DUMPREG(HDMI_CORE_AV, HDMI_CORE_AV__AVI_DBYTE);
-
 }
 
-#define FLD_MASK(start, end)	(((1 << (start - end + 1)) - 1) << (end))
-#define FLD_VAL(val, start, end) (((val) << end) & FLD_MASK(start, end))
+#define FLD_MASK(start, end)	(((1 << ((start) - (end) + 1)) - 1) << (end))
+#define FLD_VAL(val, start, end) (((val) << (end)) & FLD_MASK(start, end))
 #define FLD_GET(val, start, end) (((val) & FLD_MASK(start, end)) >> (end))
 #define FLD_MOD(orig, val, start, end) \
 	(((orig) & ~FLD_MASK(start, end)) | FLD_VAL(val, start, end))
 
 #define REG_FLD_MOD(base, idx, val, start, end) \
-	hdmi_write_reg(base, idx, FLD_MOD(hdmi_read_reg(base, idx), val, start, end))
+	hdmi_write_reg(base, idx, \
+		FLD_MOD(hdmi_read_reg(base, idx), val, start, end))
 
 #define RD_REG_32(COMP, REG)            hdmi_read_reg(COMP, REG)
 #define WR_REG_32(COMP, REG, VAL)       hdmi_write_reg(COMP, REG, (u32)(VAL))
 
-u8 edid_backup[256];
-
 int hdmi_get_pixel_append_position(void)
 {
-	printk("This is yet to be implemented");
+	printk(KERN_WARNING "This is yet to be implemented");
 	return 0;
 }
 EXPORT_SYMBOL(hdmi_get_pixel_append_position);
 
-int hdmi_core_ddc_edid(u8 *pEDID)
+int hdmi_core_ddc_edid(u8 *pEDID, int ext)
 {
 	u32 i, j, l;
 	char checksum = 0;
 	u32 sts = HDMI_CORE_DDC_STATUS;
 	u32 ins = HDMI_CORE_SYS;
+	u32 offset = 0;
 
 	/* Turn on CLK for DDC */
 	REG_FLD_MOD(HDMI_CORE_AV, HDMI_CORE_AV_DPD, 0x7, 2, 0);
@@ -343,32 +341,47 @@ int hdmi_core_ddc_edid(u8 *pEDID)
 	/* Wait */
 	mdelay(10);
 
-	/* Clk SCL Devices */
-	REG_FLD_MOD(ins, HDMI_CORE_DDC_CMD, 0xA, 3, 0);
+	if (!ext) {
+		/* Clk SCL Devices */
+		REG_FLD_MOD(ins, HDMI_CORE_DDC_CMD, 0xA, 3, 0);
 
-	/* HDMI_CORE_DDC_STATUS__IN_PROG */
-	while (FLD_GET(hdmi_read_reg(ins, sts), 4, 4) == 1)
+		/* HDMI_CORE_DDC_STATUS__IN_PROG */
+		while (FLD_GET(hdmi_read_reg(ins, sts), 4, 4) == 1)
+			;
 
-	/* Clear FIFO */
-	REG_FLD_MOD(ins, HDMI_CORE_DDC_CMD, 0x9, 3, 0);
+		/* Clear FIFO */
+		REG_FLD_MOD(ins, HDMI_CORE_DDC_CMD, 0x9, 3, 0);
 
-	/* HDMI_CORE_DDC_STATUS__IN_PROG */
-	while (FLD_GET(hdmi_read_reg(ins, sts), 4, 4) == 1)
+		/* HDMI_CORE_DDC_STATUS__IN_PROG */
+		while (FLD_GET(hdmi_read_reg(ins, sts), 4, 4) == 1)
+			;
+	} else {
+		if (ext%2 != 0)
+			offset = 0x80;
+	}
+
+	/* Load Segment Address Register */
+	REG_FLD_MOD(ins, HDMI_CORE_DDC_SEGM, ext/2, 7, 0);
 
 	/* Load Slave Address Register */
 	REG_FLD_MOD(ins, HDMI_CORE_DDC_ADDR, 0xA0 >> 1, 7, 1);
 
 	/* Load Offset Address Register */
-	REG_FLD_MOD(ins, HDMI_CORE_DDC_OFFSET, 0x0, 7, 0);
+	REG_FLD_MOD(ins, HDMI_CORE_DDC_OFFSET, offset, 7, 0);
 	/* Load Byte Count */
-	REG_FLD_MOD(ins, HDMI_CORE_DDC_COUNT1, 0x100, 7, 0);
-	REG_FLD_MOD(ins, HDMI_CORE_DDC_COUNT2, 0x100>>8, 1, 0);
+	REG_FLD_MOD(ins, HDMI_CORE_DDC_COUNT1, 0x80, 7, 0);
+	REG_FLD_MOD(ins, HDMI_CORE_DDC_COUNT2, 0x0, 1, 0);
 	/* Set DDC_CMD */
+
+	if (ext)
+		REG_FLD_MOD(ins, HDMI_CORE_DDC_CMD, 0x4, 3, 0);
+	else
 	REG_FLD_MOD(ins, HDMI_CORE_DDC_CMD, 0x2, 3, 0);
 
-	/* Yong: do not optimize this part of the code, seems
-	DDC bus needs some time to get stabilized
-	*/
+	/*
+	 * Yong: do not optimize this part of the code, seems
+	 * DDC bus needs some time to get stabilized
+	 */
 	l = hdmi_read_reg(ins, sts);
 
 	/* HDMI_CORE_DDC_STATUS__BUS_LOW */
@@ -382,83 +395,21 @@ int hdmi_core_ddc_edid(u8 *pEDID)
 		return -1;
 	}
 
-	j = 100;
-	while (j--) {
-		l = hdmi_read_reg(ins, sts);
-		/* progress */
-		if (FLD_GET(l, 4, 4) == 1) {
-			/* HACK: Load Slave Address Register again */
-			REG_FLD_MOD(ins, HDMI_CORE_DDC_ADDR, 0xA0 >> 1, 7, 1);
-			REG_FLD_MOD(ins, HDMI_CORE_DDC_CMD, 0x2, 3, 0);
-			break;
-		}
-		mdelay(20);
-	}
-
-	i = 0;
-	while (((FLD_GET(hdmi_read_reg(ins, sts), 4, 4) == 1)
-			| (FLD_GET(hdmi_read_reg(ins, sts), 2, 2) == 0)) && i < 256) {		
-		if (FLD_GET(hdmi_read_reg(ins,
-			sts), 2, 2) == 0) {
+	i = ext * 128;
+	j = 0;
+	while (((FLD_GET(hdmi_read_reg(ins, sts), 4, 4) == 1) ||
+		(FLD_GET(hdmi_read_reg(ins, sts), 2, 2) == 0)) && j < 128) {
+		if (FLD_GET(hdmi_read_reg(ins, sts), 2, 2) == 0) {
 			/* FIFO not empty */
-			pEDID[i++] = FLD_GET(hdmi_read_reg(ins, HDMI_CORE_DDC_DATA), 7, 0);
+			pEDID[i++] = FLD_GET(
+				hdmi_read_reg(ins, HDMI_CORE_DDC_DATA), 7, 0);
+			j++;
 		}
 	}
 
-	if (pEDID[0x14] == 0x80) {/* Digital Display */
-		if (pEDID[0x7e] == 0x00) {/* No Extention Block */
-			for (j = 0; j < 128; j++)
-			checksum += pEDID[j];
-			DBG("No extension 128 bit checksum\n");
-		} else {
-			for (j = 0; j < 256; j++)
-			checksum += pEDID[j];
-			DBG("Extension present 256 bit checksum\n");
-			/* HDMI_CORE_DDC_READ_EXTBLOCK(); */
-		}
-	} else {
-		DBG("Analog Display\n");
-	}
+	for (j = 0; j < 128; j++)
+		checksum += pEDID[j];
 
-	DBG("EDID Content %d\n", i);
-	for (i = 0 ; i < 256 ; i++)
-		edid_backup[i] = pEDID[i];
-
-#ifdef DEBUG_EDID
-	DBG("\nHeader:");
-	for (i = 0x00; i < 0x08; i++)
-		DBG(" %02x", pEDID[i]);
-	DBG("\nVendor & Product:");
-	for (i = 0x08; i < 0x12; i++)
-		DBG(" %02x", pEDID[i]);
-	DBG("\nEDID Structure:");
-	for (i = 0x12; i < 0x14; i++)
-		DBG(" %02x", pEDID[i]);
-	DBG("\nBasic Display Parameter:");
-	for (i = 0x14; i < 0x19; i++)
-		DBG(" %02x", pEDID[i]);
-	DBG("\nColor Characteristics:");
-	for (i = 0x19; i < 0x23; i++)
-		DBG(" %02x", pEDID[i]);
-	DBG("\nEstablished timings:");
-	for (i = 0x23; i < 0x26; i++)
-		DBG(" %02x", pEDID[i]);
-	DBG("Standard timings:\n");
-	for (i = 0x26; i < 0x36; i++)
-		DBG("\n%02x", pEDID[i]);
-	DBG("\nDetailed timing1:");
-	for (i = 0x36; i < 0x48; i++)
-		DBG("\n%02x", pEDID[i]);
-	DBG("\nDetailed timing2:");
-	for (i = 0x48; i < 0x5a; i++)
-		DBG("\n%02x", pEDID[i]);
-	DBG("\nDetailed timing3:");
-	for (i = 0x5a; i < 0x6c; i++)
-		DBG(" %02x", pEDID[i]);
-	DBG("\nDetailed timing4:");
-	for (i = 0x6c; i < 0x7e; i++)
-		DBG(" %02x", pEDID[i]);
-#endif
 	if (checksum != 0) {
 		printk("E-EDID checksum failed!!");
 		return -1;
@@ -466,30 +417,78 @@ int hdmi_core_ddc_edid(u8 *pEDID)
 	return 0;
 }
 
-static void hdmi_core_init(struct hdmi_core_video_config_t *v_cfg,
+int read_edid(u8 *pEDID, u16 max_length)
+{
+	int r = 0, n = 0, i = 0;
+	int max_ext_blocks = (max_length / 128) - 1;
+
+	r = hdmi_core_ddc_edid(pEDID, 0);
+	if (r) {
+		return -1;
+	} else {
+		n = pEDID[0x7e];
+
+		/*
+		 * README: need to comply with max_length set by the caller.
+		 * Better implementation should be to allocate necessary
+		 * memory to store EDID according to nb_block field found
+		 * in first block
+		 */
+
+		if (n > max_ext_blocks)
+			n = max_ext_blocks;
+
+		for (i = 1; i <= n; i++) {
+			r = hdmi_core_ddc_edid(pEDID, i);
+			if (r)
+				return -1;
+		}
+	}
+	return 0;
+}
+
+static void hdmi_core_init(enum hdmi_deep_mode deep_color,
+	struct hdmi_core_video_config_t *v_cfg,
 	struct hdmi_core_audio_config *audio_cfg,
 	struct hdmi_core_infoframe_avi *avi,
 	struct hdmi_core_packet_enable_repeat *r_p)
 {
 	DBG("Enter HDMI_Core_GlobalInitVars()\n");
 
-	/*video core*/
-	v_cfg->CoreInputBusWide = HDMI_INPUT_8BIT;
-	v_cfg->CoreOutputDitherTruncation = HDMI_OUTPUTTRUNCATION_8BIT;
-	v_cfg->CoreDeepColorPacketED = HDMI_DEEPCOLORPACKECTDISABLE;
-	v_cfg->CorePacketMode = HDMI_PACKETMODERESERVEDVALUE;
+	/* video core */
+	switch (deep_color) {
+	case HDMI_DEEP_COLOR_30BIT:
+		v_cfg->CoreInputBusWide = HDMI_INPUT_10BIT;
+		v_cfg->CoreOutputDitherTruncation = HDMI_OUTPUTTRUNCATION_10BIT;
+		v_cfg->CoreDeepColorPacketED = HDMI_DEEPCOLORPACKECTENABLE;
+		v_cfg->CorePacketMode = HDMI_PACKETMODE30BITPERPIXEL;
+		break;
+	case HDMI_DEEP_COLOR_36BIT:
+		v_cfg->CoreInputBusWide = HDMI_INPUT_12BIT;
+		v_cfg->CoreOutputDitherTruncation = HDMI_OUTPUTTRUNCATION_12BIT;
+		v_cfg->CoreDeepColorPacketED = HDMI_DEEPCOLORPACKECTENABLE;
+		v_cfg->CorePacketMode = HDMI_PACKETMODE36BITPERPIXEL;
+		break;
+	case HDMI_DEEP_COLOR_24BIT:
+	default:
+		v_cfg->CoreInputBusWide = HDMI_INPUT_8BIT;
+		v_cfg->CoreOutputDitherTruncation = HDMI_OUTPUTTRUNCATION_8BIT;
+		v_cfg->CoreDeepColorPacketED = HDMI_DEEPCOLORPACKECTDISABLE;
+		v_cfg->CorePacketMode = HDMI_PACKETMODERESERVEDVALUE;
+		break;
+	}
+
 	v_cfg->CoreHdmiDvi = HDMI_DVI;
 	v_cfg->CoreTclkSelClkMult = FPLL10IDCK;
-
-	/*audio core*/
+	/* audio core */
 	audio_cfg->fs = FS_44100;
 	audio_cfg->n = 0;
 	audio_cfg->cts = 0;
-	audio_cfg->layout = LAYOUT_2CH; /*2channel audio*/
+	audio_cfg->layout = LAYOUT_2CH; /* 2channel audio */
 	audio_cfg->aud_par_busclk = 0;
 	audio_cfg->cts_mode = CTS_MODE_HW;
 
-	/*info frame*/
+	/* info frame */
 	avi->db1y_rgb_yuv422_yuv444 = 0;
 	avi->db1a_active_format_off_on = 0;
 	avi->db1b_no_vert_hori_verthori = 0;
@@ -508,7 +507,7 @@ static void hdmi_core_init(struct hdmi_core_video_config_t *v_cfg,
 	avi->db10_11_pixelendofleft = 0;
 	avi->db12_13_pixelstartofright = 0;
 
-	/*packet enable and repeat*/
+	/* packet enable and repeat */
 	r_p->AudioPacketED = 0;
 	r_p->AudioPacketRepeat = 0;
 	r_p->AVIInfoFrameED = 0;
@@ -517,6 +516,10 @@ static void hdmi_core_init(struct hdmi_core_video_config_t *v_cfg,
 	r_p->GeneralcontrolPacketRepeat = 0;
 	r_p->GenericPacketED = 0;
 	r_p->GenericPacketRepeat = 0;
+	r_p->MPEGInfoFrameED = 0;
+	r_p->MPEGInfoFrameRepeat = 0;
+	r_p->SPDInfoFrameED = 0;
+	r_p->SPDInfoFrameRepeat = 0;
 }
 
 static void hdmi_core_powerdown_disable(void)
@@ -544,40 +547,40 @@ static void hdmi_core_swreset_assert(void)
 }
 
 /* DSS_HDMI_CORE_VIDEO_CONFIG */
-static int hdmi_core_video_config(
-	struct hdmi_core_video_config_t *cfg)
+static int hdmi_core_video_config(struct hdmi_core_video_config_t *cfg)
 {
 	u32 name = HDMI_CORE_SYS;
 	u32 av_name = HDMI_CORE_AV;
 	u32 r = 0;
 
-	/*sys_ctrl1 default configuration not tunable*/
+	/* sys_ctrl1 default configuration not tunable */
 	u32 ven;
 	u32 hen;
 	u32 bsel;
 	u32 edge;
 
-	/*sys_ctrl1 default configuration not tunable*/
+	/* sys_ctrl1 default configuration not tunable */
 	ven = HDMI_CORE_CTRL1_VEN__FOLLOWVSYNC;
 	hen = HDMI_CORE_CTRL1_HEN__FOLLOWHSYNC;
 	bsel = HDMI_CORE_CTRL1_BSEL__24BITBUS;
 	edge = HDMI_CORE_CTRL1_EDGE__RISINGEDGE;
 
-	/*sys_ctrl1 default configuration not tunable*/
+	/* sys_ctrl1 default configuration not tunable */
 	r = hdmi_read_reg(name, HDMI_CORE_CTRL1);
 	r = FLD_MOD(r, ven, 5, 5);
 	r = FLD_MOD(r, hen, 4, 4);
 	r = FLD_MOD(r, bsel, 2, 2);
 	r = FLD_MOD(r, edge, 1, 1);
+	/* PD bit has to be written to recieve the interrupts */
+	r = FLD_MOD(r, 1, 0, 0);
 	hdmi_write_reg(name, HDMI_CORE_CTRL1, r);
 
 	REG_FLD_MOD(name, HDMI_CORE_SYS__VID_ACEN, cfg->CoreInputBusWide, 7, 6);
 
-	/*Vid_Mode */
+	/* Vid_Mode */
 	r = hdmi_read_reg(name, HDMI_CORE_SYS__VID_MODE);
-	/*dither truncation configuration*/
-	if (cfg->CoreOutputDitherTruncation >
-				HDMI_OUTPUTTRUNCATION_12BIT) {
+	/* dither truncation configuration */
+	if (cfg->CoreOutputDitherTruncation > HDMI_OUTPUTTRUNCATION_12BIT) {
 		r = FLD_MOD(r, cfg->CoreOutputDitherTruncation - 3, 7, 6);
 		r = FLD_MOD(r, 1, 5, 5);
 	} else {
@@ -586,14 +589,14 @@ static int hdmi_core_video_config(
 	}
 	hdmi_write_reg(name, HDMI_CORE_SYS__VID_MODE, r);
 
-	/*HDMI_Ctrl*/
+	/* HDMI_CTRL */
 	r = hdmi_read_reg(av_name, HDMI_CORE_AV_HDMI_CTRL);
 	r = FLD_MOD(r, cfg->CoreDeepColorPacketED, 6, 6);
 	r = FLD_MOD(r, cfg->CorePacketMode, 5, 3);
 	r = FLD_MOD(r, cfg->CoreHdmiDvi, 0, 0);
 	hdmi_write_reg(av_name, HDMI_CORE_AV_HDMI_CTRL, r);
 
-	/*TMDS_CTRL*/
+	/* TMDS_CTRL */
 	REG_FLD_MOD(name, HDMI_CORE_SYS__TMDS_CTRL,
 		cfg->CoreTclkSelClkMult, 6, 5);
 
@@ -615,21 +618,24 @@ static int hdmi_core_audio_config(u32 name,
 	u8 size1;
 	u16 size0;
 
-	/*CTS_MODE*/
+	/* CTS_MODE */
 	WR_REG_32(name, HDMI_CORE_AV__ACR_CTRL,
-		((0x0 << 2) | /* MCLK_EN (0: Mclk is not used)*/
-		(0x1 << 1) | /* CTS Request Enable (1:Packet Enable, 0:Disable) */
-		(audio_cfg->cts_mode << 0))); /* CTS Source Select  (1:SW, 0:HW)*/
+		/* MCLK_EN (0: Mclk is not used) */
+		(0x0 << 2) |
+		/* CTS Request Enable (1:Packet Enable, 0:Disable) */
+		(0x1 << 1) |
+		/* CTS Source Select (1:SW, 0:HW) */
+		(audio_cfg->cts_mode << 0));
 
 	REG_FLD_MOD(name, HDMI_CORE_AV__FREQ_SVAL, 0, 2, 0);
 	REG_FLD_MOD(name, HDMI_CORE_AV__N_SVAL1, audio_cfg->n, 7, 0);
-	REG_FLD_MOD(name, HDMI_CORE_AV__N_SVAL2, (audio_cfg->n >> 8), 7, 0);
-	REG_FLD_MOD(name, HDMI_CORE_AV__N_SVAL3, (audio_cfg->n >> 16), 7, 0);
-	REG_FLD_MOD(name, HDMI_CORE_AV__CTS_SVAL1, (audio_cfg->cts), 7, 0);
-	REG_FLD_MOD(name, HDMI_CORE_AV__CTS_SVAL2, (audio_cfg->cts >> 8), 7, 0);
-	REG_FLD_MOD(name, HDMI_CORE_AV__CTS_SVAL3, (audio_cfg->cts >> 16), 7, 0);
+	REG_FLD_MOD(name, HDMI_CORE_AV__N_SVAL2, audio_cfg->n >> 8, 7, 0);
+	REG_FLD_MOD(name, HDMI_CORE_AV__N_SVAL3, audio_cfg->n >> 16, 7, 0);
+	REG_FLD_MOD(name, HDMI_CORE_AV__CTS_SVAL1, audio_cfg->cts, 7, 0);
+	REG_FLD_MOD(name, HDMI_CORE_AV__CTS_SVAL2, audio_cfg->cts >> 8, 7, 0);
+	REG_FLD_MOD(name, HDMI_CORE_AV__CTS_SVAL3, audio_cfg->cts >> 16, 7, 0);
 
-	/*number of channel*/
+	/* number of channel */
 	REG_FLD_MOD(name, HDMI_CORE_AV__HDMI_CTRL, audio_cfg->layout, 2, 1);
 	REG_FLD_MOD(name, HDMI_CORE_AV__AUD_PAR_BUSCLK_1,
 				audio_cfg->aud_par_busclk, 7, 0);
@@ -637,45 +643,45 @@ static int hdmi_core_audio_config(u32 name,
 				(audio_cfg->aud_par_busclk >> 8), 7, 0);
 	REG_FLD_MOD(name, HDMI_CORE_AV__AUD_PAR_BUSCLK_3,
 				(audio_cfg->aud_par_busclk >> 16), 7, 0);
-	/* FS_OVERRIDE = 1 because // input is used*/
+	/* FS_OVERRIDE = 1 because // input is used */
 	WR_REG_32(name, HDMI_CORE_AV__SPDIF_CTRL, 0x1);
-	 /* refer to table209 p192 in func core spec*/
+	 /* refer to table209 p192 in func core spec */
 	WR_REG_32(name, HDMI_CORE_AV__I2S_CHST4, audio_cfg->fs);
 
-	/* audio config is mainly due to wrapper hardware connection
-	   and so are fixe (hardware) I2S deserializer is by-pass
-	   so I2S configuration is not needed (I2S don't care).
-	   Wrapper are directly connected at the I2S deserialiser
-	   output level so some register call I2S... need to be
-	   programm to configure this parallel bus, there configuration
-	   is also fixe and due to the hardware connection (I2S hardware)
-	*/
+	/*
+	 * audio config is mainly due to wrapper hardware connection
+	 * and so are fixe (hardware) I2S deserializer is by-pass
+	 * so I2S configuration is not needed (I2S don't care).
+	 * Wrapper are directly connected at the I2S deserialiser
+	 * output level so some register call I2S... need to be
+	 * programm to configure this parallel bus, there configuration
+	 * is also fixe and due to the hardware connection (I2S hardware)
+	 */
 	WR_REG_32(name, HDMI_CORE_AV__I2S_IN_CTRL,
-		(0 << 7) | /* HBRA_ON */
-		(1 << 6) | /* SCK_EDGE Sample clock is rising */
-		(0 << 5) | /* CBIT_ORDER */
-		(0 << 4) | /* VBit, 0x0=PCM, 0x1=compressed */
-		(0 << 3) | /* I2S_WS, 0xdon't care */
-		(0 << 2) | /* I2S_JUST, 0=left-justified 1=right-justified */
-		(0 << 1) | /* I2S_DIR, 0xdon't care */
-		(0)); /* I2S_SHIFT, 0x0 don't care*/
+		(0 << 7) |	/* HBRA_ON */
+		(1 << 6) |	/* SCK_EDGE Sample clock is rising */
+		(0 << 5) |	/* CBIT_ORDER */
+		(0 << 4) |	/* VBit, 0x0=PCM, 0x1=compressed */
+		(0 << 3) |	/* I2S_WS, 0xdon't care */
+		(0 << 2) |	/* I2S_JUST, 0=left- 1=right-justified */
+		(0 << 1) |	/* I2S_DIR, 0xdon't care */
+		(0));		/* I2S_SHIFT, 0x0 don't care */
 
 	WR_REG_32(name, HDMI_CORE_AV__I2S_CHST5, /* mode only */
-		(0 << 4) | /* FS_ORIG */
-		(1 << 1) | /* I2S lenght 16bits (refer doc) */
-		(0));/* Audio sample lenght */
+		(0 << 4) |	/* FS_ORIG */
+		(1 << 1) |	/* I2S lenght 16bits (refer doc) */
+		(0));		/* Audio sample lenght */
 
 	WR_REG_32(name, HDMI_CORE_AV__I2S_IN_LEN, /* mode only */
-		(0xb)); /* In lenght b=>24bits     i2s hardware */
+		(0xb));		/* In length b=>24bits i2s hardware */
 
-	/*channel enable depend of the layout*/
+	/* channel enable depend of the layout */
 	if (audio_cfg->layout == LAYOUT_2CH) {
 		SD3_EN = 0x0;
 		SD2_EN = 0x0;
 		SD1_EN = 0x0;
 		SD0_EN = 0x1;
-	}
-	if (audio_cfg->layout == LAYOUT_8CH) {
+	} else if (audio_cfg->layout == LAYOUT_8CH) {
 		SD3_EN = 0x1;
 		SD2_EN = 0x1;
 		SD1_EN = 0x1;
@@ -683,20 +689,20 @@ static int hdmi_core_audio_config(u32 name,
 	}
 
 	WR_REG_32(name, HDMI_CORE_AV__AUD_MODE,
-		(SD3_EN << 7) | /* SD3_EN */
-		(SD2_EN << 6) | /* SD2_EN */
-		(SD1_EN << 5) | /* SD1_EN */
-		(SD0_EN << 4) | /* SD0_EN */
-		(0 << 3) | /* DSD_EN */
-		(1 << 2) | /* AUD_PAR_EN*/
-		(0 << 1) | /* SPDIF_EN*/
-		(0)); /* AUD_EN*/
+		(SD3_EN << 7) |	/* SD3_EN */
+		(SD2_EN << 6) |	/* SD2_EN */
+		(SD1_EN << 5) |	/* SD1_EN */
+		(SD0_EN << 4) |	/* SD0_EN */
+		(0 << 3) |	/* DSD_EN */
+		(1 << 2) |	/* AUD_PAR_EN */
+		(0 << 1) |	/* SPDIF_EN */
+		(0));		/* AUD_EN */
 
 	/* Audio info frame setting refer to CEA-861-d spec p75 */
-	/*0x10 because only PCM is supported / -1 because 1 is for 2 channel*/
-	DBYTE1 = 0x10 + (audio_cfg->if_channel_number - 1);
+	/* 0x0 because on HDMI CT must be = 0 / -1 because 1 is for 2 channel */
+	DBYTE1 = 0x0 + (audio_cfg->if_channel_number - 1);
 	DBYTE2 = (audio_cfg->if_fs << 2) + audio_cfg->if_sample_size;
-	/*channel location according to CEA spec*/
+	/* channel location according to CEA spec */
 	DBYTE4 = audio_cfg->if_audio_channel_location;
 
 	CHSUM = 0x100-0x84-0x01-0x0A-DBYTE1-DBYTE2-DBYTE4;
@@ -704,7 +710,8 @@ static int hdmi_core_audio_config(u32 name,
 	WR_REG_32(name, HDMI_CORE_AV__AUDIO_TYPE, 0x084);
 	WR_REG_32(name, HDMI_CORE_AV__AUDIO_VERS, 0x001);
 	WR_REG_32(name, HDMI_CORE_AV__AUDIO_LEN, 0x00A);
-	WR_REG_32(name, HDMI_CORE_AV__AUDIO_CHSUM, CHSUM); /*don't care on VMP*/
+	/* don't care on VMP */
+	WR_REG_32(name, HDMI_CORE_AV__AUDIO_CHSUM, CHSUM);
 
 	size0 = HDMI_CORE_AV__AUDIO_DBYTE;
 	size1 = HDMI_CORE_AV__AUDIO_DBYTE__ELSIZE;
@@ -719,32 +726,55 @@ static int hdmi_core_audio_config(u32 name,
 	hdmi_write_reg(name, (size0 + 8 * size1), 0x000);
 	hdmi_write_reg(name, (size0 + 9 * size1), 0x000);
 
+	/* ISCR1 and ACP setting */
+	WR_REG_32(name, HDMI_CORE_AV__SPD_TYPE, 0x04);
+	WR_REG_32(name, HDMI_CORE_AV__SPD_VERS, 0x0);
+	WR_REG_32(name, HDMI_CORE_AV__SPD_LEN, 0x0);
+	WR_REG_32(name, HDMI_CORE_AV__SPD_CHSUM, 0x0);
+
+	WR_REG_32(name, HDMI_CORE_AV__MPEG_TYPE, 0x05);
+	WR_REG_32(name, HDMI_CORE_AV__MPEG_VERS, 0x0);
+	WR_REG_32(name, HDMI_CORE_AV__MPEG_LEN, 0x0);
+	WR_REG_32(name, HDMI_CORE_AV__MPEG_CHSUM, 0x0);
+
 	return ret;
 }
 
 int hdmi_core_read_avi_infoframe(struct hdmi_core_infoframe_avi *info_avi)
 {
-	info_avi->db1y_rgb_yuv422_yuv444 = hdmi.avi_param.db1y_rgb_yuv422_yuv444;
-	info_avi->db1a_active_format_off_on = hdmi.avi_param.db1a_active_format_off_on;
-	info_avi->db1b_no_vert_hori_verthori = hdmi.avi_param.db1b_no_vert_hori_verthori;
+	info_avi->db1y_rgb_yuv422_yuv444 =
+		hdmi.avi_param.db1y_rgb_yuv422_yuv444;
+	info_avi->db1a_active_format_off_on =
+		hdmi.avi_param.db1a_active_format_off_on;
+	info_avi->db1b_no_vert_hori_verthori =
+		hdmi.avi_param.db1b_no_vert_hori_verthori;
 	info_avi->db1s_0_1_2 = hdmi.avi_param.db1s_0_1_2;
-	info_avi->db2c_no_itu601_itu709_extented = 							hdmi.avi_param.db2c_no_itu601_itu709_extented;
+	info_avi->db2c_no_itu601_itu709_extented =
+		hdmi.avi_param.db2c_no_itu601_itu709_extented;
 	info_avi->db2m_no_43_169 = hdmi.avi_param.db2m_no_43_169;
 	info_avi->db2r_same_43_169_149 = hdmi.avi_param.db2r_same_43_169_149;
 	info_avi->db3itc_no_yes = hdmi.avi_param.db3itc_no_yes;
-	info_avi->db3ec_xvyuv601_xvyuv709 = hdmi.avi_param.db3ec_xvyuv601_xvyuv709;
+	info_avi->db3ec_xvyuv601_xvyuv709 =
+		hdmi.avi_param.db3ec_xvyuv601_xvyuv709;
 	info_avi->db3q_default_lr_fr = hdmi.avi_param.db3q_default_lr_fr;
-	info_avi->db3sc_no_hori_vert_horivert = hdmi.avi_param.db3sc_no_hori_vert_horivert;
+	info_avi->db3sc_no_hori_vert_horivert =
+		hdmi.avi_param.db3sc_no_hori_vert_horivert;
 	info_avi->db4vic_videocode = hdmi.avi_param.db4vic_videocode;
-	info_avi->db5pr_no_2_3_4_5_6_7_8_9_10 = hdmi.avi_param.db5pr_no_2_3_4_5_6_7_8_9_10;
+	info_avi->db5pr_no_2_3_4_5_6_7_8_9_10 =
+		hdmi.avi_param.db5pr_no_2_3_4_5_6_7_8_9_10;
 	info_avi->db6_7_lineendoftop = hdmi.avi_param.db6_7_lineendoftop;
-	info_avi->db8_9_linestartofbottom = hdmi.avi_param.db8_9_linestartofbottom;
-	info_avi->db10_11_pixelendofleft = hdmi.avi_param.db10_11_pixelendofleft;
-	info_avi->db12_13_pixelstartofright = hdmi.avi_param.db12_13_pixelstartofright;
+	info_avi->db8_9_linestartofbottom =
+		hdmi.avi_param.db8_9_linestartofbottom;
+	info_avi->db10_11_pixelendofleft =
+		hdmi.avi_param.db10_11_pixelendofleft;
+	info_avi->db12_13_pixelstartofright =
+		hdmi.avi_param.db12_13_pixelstartofright;
+
 	return 0;
 }
 
-static int hdmi_core_audio_infoframe_avi(struct hdmi_core_infoframe_avi info_avi)
+static int hdmi_core_audio_infoframe_avi(
+				struct hdmi_core_infoframe_avi info_avi)
 {
 	u16 offset;
 	int dbyte, dbyte_size;
@@ -753,7 +783,7 @@ static int hdmi_core_audio_infoframe_avi(struct hdmi_core_infoframe_avi info_avi
 
 	dbyte = HDMI_CORE_AV_AVI_DBYTE;
 	dbyte_size = HDMI_CORE_AV_AVI_DBYTE__ELSIZE;
-	/*info frame video*/
+	/* info frame video */
 	sum += 0x82 + 0x002 + 0x00D;
 	hdmi_write_reg(HDMI_CORE_AV, HDMI_CORE_AV_AVI_TYPE, 0x082);
 	hdmi_write_reg(HDMI_CORE_AV, HDMI_CORE_AV_AVI_VERS, 0x002);
@@ -841,36 +871,79 @@ int hdmi_configure_csc(enum hdmi_core_av_csc csc)
 {
 	int var;
 	switch (csc) {
-	/*Setting the AVI infroframe to respective color mode
-	* As the quantization is in default mode ie it selects
-	* full range for RGB (except for VGA ) and limited range
-	* for YUV we dont have to make any changes for this */
+	/*
+	 * Setting the AVI infroframe to respective color mode
+	 * As the quantization is in default mode ie it selects
+	 * full range for RGB (except for VGA ) and limited range
+	 * for YUV we dont have to make any changes for this
+	 */
 	case RGB:
-			hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_RGB;
-			hdmi_core_audio_infoframe_avi(hdmi.avi_param);
-			var = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN);
-			var = FLD_MOD(var, 0, 2, 2);
-			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN, var);
-			break;
+		hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_RGB;
+		hdmi_core_audio_infoframe_avi(hdmi.avi_param);
+		var = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN);
+		var = FLD_MOD(var, 0, 2, 2);
+		hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN, var);
+		break;
 	case RGB_TO_YUV:
-			hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_YUV422;
-			hdmi_core_audio_infoframe_avi(hdmi.avi_param);
-			var = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN);
-			var = FLD_MOD(var, 1, 2, 2);
-			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN, var);
-			break;
+		hdmi.avi_param.db1y_rgb_yuv422_yuv444 =
+						INFOFRAME_AVI_DB1Y_YUV422;
+		hdmi_core_audio_infoframe_avi(hdmi.avi_param);
+		var = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN);
+		var = FLD_MOD(var, 1, 2, 2);
+		hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_ACEN, var);
+		break;
 	case YUV_TO_RGB:
-			hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_RGB;
-			hdmi_core_audio_infoframe_avi(hdmi.avi_param);
-			var = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_MODE);
-			var = FLD_MOD(var, 1, 3, 3);
-			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_MODE, var);
-			break;
+		hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_RGB;
+		hdmi_core_audio_infoframe_avi(hdmi.avi_param);
+		var = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_MODE);
+		var = FLD_MOD(var, 1, 3, 3);
+		hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__VID_MODE, var);
+		break;
 	default:
-			break;
+		break;
 	}
 	return 0;
+}
 
+int hdmi_configure_lrfr(enum hdmi_range lr_fr, int force_set)
+{
+	int var;
+	switch (lr_fr) {
+	/*
+	 * Setting the AVI infroframe to respective limited range
+	 * 0 if for limited range 1 for full range
+	 */
+	case HDMI_LIMITED_RANGE:
+		hdmi.avi_param.db3q_default_lr_fr = INFOFRAME_AVI_DB3Q_LR;
+		hdmi_core_audio_infoframe_avi(hdmi.avi_param);
+		if (force_set) {
+			var = hdmi_read_reg(HDMI_CORE_SYS,
+						HDMI_CORE_SYS__VID_ACEN);
+			var = FLD_MOD(var, 1, 1, 1);
+			hdmi_write_reg(HDMI_CORE_SYS,
+						HDMI_CORE_SYS__VID_ACEN, var);
+		}
+		break;
+	case HDMI_FULL_RANGE:
+		if (hdmi.avi_param.db1y_rgb_yuv422_yuv444 ==
+						INFOFRAME_AVI_DB1Y_YUV422) {
+			printk(KERN_ERR"It is only limited range for YUV");
+			return -1;
+		}
+		hdmi.avi_param.db3q_default_lr_fr = INFOFRAME_AVI_DB3Q_FR;
+		hdmi_core_audio_infoframe_avi(hdmi.avi_param);
+		if (force_set) {
+			var = hdmi_read_reg(HDMI_CORE_SYS,
+						HDMI_CORE_SYS__VID_MODE);
+			var = FLD_MOD(var, 1, 4, 4);
+			hdmi_write_reg(HDMI_CORE_SYS,
+						HDMI_CORE_SYS__VID_MODE, var);
+		}
+		break;
+	default:
+		break;
+	}
+	return 0;
 }
 
 static int hdmi_core_vsi_infoframe(u32 name,
@@ -911,18 +984,23 @@ static int hdmi_core_vsi_infoframe(u32 name,
 static int hdmi_core_av_packet_config(u32 name,
 	struct hdmi_core_packet_enable_repeat r_p)
 {
-	/*enable/repeat the infoframe*/
+
+	/* enable/repeat the infoframe */
 	hdmi_write_reg(name, HDMI_CORE_AV_PB_CTRL1,
-		(r_p.AudioPacketED << 5)|
-		(r_p.AudioPacketRepeat << 4)|
-		(r_p.AVIInfoFrameED << 1)|
+		(r_p.MPEGInfoFrameED << 7) |
+		(r_p.MPEGInfoFrameRepeat << 6) |
+		(r_p.AudioPacketED << 5) |
+		(r_p.AudioPacketRepeat << 4) |
+		(r_p.SPDInfoFrameED << 3) |
+		(r_p.SPDInfoFrameRepeat << 2) |
+		(r_p.AVIInfoFrameED << 1) |
 		(r_p.AVIInfoFrameRepeat));
 
-	/*enable/repeat the packet*/
+	/* enable/repeat the packet */
 	hdmi_write_reg(name, HDMI_CORE_AV_PB_CTRL2,
-		(r_p.GeneralcontrolPacketED << 3)|
-		(r_p.GeneralcontrolPacketRepeat << 2)|
-		(r_p.GenericPacketED << 1)|
+		(r_p.GeneralcontrolPacketED << 3) |
+		(r_p.GeneralcontrolPacketRepeat << 2) |
+		(r_p.GenericPacketED << 1) |
 		(r_p.GenericPacketRepeat));
 	return 0;
 }
@@ -980,7 +1058,6 @@ static void hdmi_w1_init(struct hdmi_video_timing *t_p,
 	audio_dma->dma_or_irq = HDMI_THRESHOLD_DMA;
 	audio_dma->threshold_value = 0x10;
 	audio_dma->block_start_end = HDMI_BLOCK_STARTEND_ON;
-
 }
 
 
@@ -1035,8 +1112,8 @@ int hdmi_w1_set_wait_phy_pwr(HDMI_PhyPwr_t val)
 	DBG("*** Set PHY power mode to %d\n", val);
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_PWR_CTRL, val, 7, 6);
 
-	if (hdmi_w1_wait_for_bit_change(HDMI_WP,
-		HDMI_WP_PWR_CTRL, 5, 4, val) != val) {
+	if (hdmi_w1_wait_for_bit_change(HDMI_WP, HDMI_WP_PWR_CTRL, 5, 4, val)
+	    != val) {
 		ERR("Failed to set PHY power mode to %d\n", val);
 		return -ENODEV;
 	}
@@ -1049,8 +1126,8 @@ int hdmi_w1_set_wait_pll_pwr(HDMI_PllPwr_t val)
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_PWR_CTRL, val, 3, 2);
 
 	/* wait till PHY_PWR_STATUS=ON */
-	if (hdmi_w1_wait_for_bit_change(HDMI_WP,
-		HDMI_WP_PWR_CTRL, 1, 0, val) != val) {
+	if (hdmi_w1_wait_for_bit_change(HDMI_WP, HDMI_WP_PWR_CTRL, 1, 0, val)
+	    != val) {
 		ERR("Failed to set PHY_PWR_STATUS to ON\n");
 		return -ENODEV;
 	}
@@ -1153,36 +1230,35 @@ static int hdmi_w1_audio_config_format(u32 name,
 	/* Wakeup */
 	value = 0x1030022;
 	hdmi_write_reg(name, HDMI_WP_AUDIO_CFG, value);
-	DBG("HDMI_WP_AUDIO_CFG = 0x%x \n", value);
+	DBG("HDMI_WP_AUDIO_CFG = 0x%x\n", value);
 
 	return ret;
 }
 
 static int hdmi_w1_audio_config_dma(u32 name, struct hdmi_audio_dma *audio_dma)
-
 {
 	int ret = 0;
 	u32 value = 0;
 
 	value = hdmi_read_reg(name, HDMI_WP_AUDIO_CFG2);
 	value &= 0xffffff00;
-	value |= (audio_dma->block_size);
+	value |= audio_dma->block_size;
 	value &= 0xffff00ff;
-	value |= ((audio_dma->dma_transfer) << 8);
+	value |= audio_dma->dma_transfer << 8;
 	/*  Wakeup */
 	value = 0x20C0;
 	hdmi_write_reg(name, HDMI_WP_AUDIO_CFG2, value);
-	DBG("HDMI_WP_AUDIO_CFG2 = 0x%x \n", value);
+	DBG("HDMI_WP_AUDIO_CFG2 = 0x%x\n", value);
 
 	value = hdmi_read_reg(name, HDMI_WP_AUDIO_CTRL);
 	value &= 0xfffffdff;
-	value |= ((audio_dma->dma_or_irq)<<9);
+	value |= audio_dma->dma_or_irq << 9;
 	value &= 0xfffffe00;
-	value |= (audio_dma->threshold_value);
+	value |= audio_dma->threshold_value;
 	/*  Wakeup */
 	value = 0x020;
 	hdmi_write_reg(name, HDMI_WP_AUDIO_CTRL, value);
-	DBG("HDMI_WP_AUDIO_CTRL = 0x%x \n", value);
+	DBG("HDMI_WP_AUDIO_CTRL = 0x%x\n", value);
 
 	return ret;
 }
@@ -1237,7 +1313,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	u32 av_name = HDMI_CORE_AV;
 
-	/*HDMI*/
+	/* HDMI */
 	struct hdmi_video_timing VideoTimingParam;
 	struct hdmi_video_format VideoFormatParam;
 	struct hdmi_video_interface VideoInterfaceParam;
@@ -1246,7 +1322,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	struct hdmi_audio_dma audio_dma;
 	struct hdmi_s3d_config s3d_param;
 
-	/*HDMI core*/
+	/* HDMI core */
 	struct hdmi_core_video_config_t v_core_cfg;
 	struct hdmi_core_audio_config audio_cfg;
 	struct hdmi_core_packet_enable_repeat repeat_param;
@@ -1255,7 +1331,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 		&VideoInterfaceParam, &IrqHdmiVectorEnable,
 		&audio_fmt, &audio_dma);
 
-	hdmi_core_init(&v_core_cfg,
+	hdmi_core_init(cfg->deep_color, &v_core_cfg,
 		&audio_cfg,
 		&hdmi.avi_param,
 		&repeat_param);
@@ -1263,6 +1339,7 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	/* Enable PLL Lock and UnLock intrerrupts */
 	IrqHdmiVectorEnable.pllUnlock = 1;
 	IrqHdmiVectorEnable.pllLock = 1;
+	IrqHdmiVectorEnable.core = 1;
 
 	/***************** init DSS register **********************/
 	hdmi_w1_irq_enable(&IrqHdmiVectorEnable);
@@ -1272,8 +1349,21 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	hdmi_w1_video_config_timing(&VideoTimingParam);
 
-	/*video config*/
-	VideoFormatParam.packingMode = HDMI_PACK_24b_RGB_YUV444_YUV422;
+	/* video config */
+	switch (cfg->deep_color) {
+	case 0:
+		VideoFormatParam.packingMode = HDMI_PACK_24b_RGB_YUV444_YUV422;
+		VideoInterfaceParam.timingMode = HDMI_TIMING_MASTER_24BIT;
+		break;
+	case 1:
+		VideoFormatParam.packingMode = HDMI_PACK_10b_RGB_YUV444;
+		VideoInterfaceParam.timingMode = HDMI_TIMING_MASTER_30BIT;
+		break;
+	case 2:
+		VideoFormatParam.packingMode = HDMI_PACK_ALREADYPACKED;
+		VideoInterfaceParam.timingMode = HDMI_TIMING_MASTER_36BIT;
+		break;
+	}
 
 	hdmi_w1_video_config_format(&VideoFormatParam);
 
@@ -1281,7 +1371,6 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	VideoInterfaceParam.vSyncPolarity = cfg->v_pol;
 	VideoInterfaceParam.hSyncPolarity = cfg->h_pol;
 	VideoInterfaceParam.interlacing = cfg->interlace;
-	VideoInterfaceParam.timingMode = 1 ; /* HDMI_TIMING_MASTER_24BIT */
 
 	hdmi_w1_video_config_interface(&VideoInterfaceParam);
 
@@ -1297,14 +1386,13 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	/****************************** CORE *******************************/
 	/************* configure core video part ********************************/
-	/*set software reset in the core*/
+	/* set software reset in the core */
 	hdmi_core_swreset_assert();
 
-	/*power down off*/
+	/* power down off */
 	hdmi_core_powerdown_disable();
 
-	v_core_cfg.CorePacketMode = HDMI_PACKETMODE24BITPERPIXEL;
-	v_core_cfg.CoreHdmiDvi = HDMI_HDMI;
+	v_core_cfg.CoreHdmiDvi = cfg->hdmi_dvi;
 
 	/* hnagalla */
 	audio_cfg.fs = 0x02;
@@ -1353,11 +1441,11 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	hdmi_core_audio_config(av_name, &audio_cfg);
 	hdmi_core_audio_mode_enable(av_name);
 
-	/*release software reset in the core*/
+	/* release software reset in the core */
 	hdmi_core_swreset_release();
 
-	/*configure packet*/
-	/*info frame video see doc CEA861-D page 65*/
+	/* configure packet */
+	/* info frame video see doc CEA861-D page 65 */
 	hdmi.avi_param.db1y_rgb_yuv422_yuv444 = INFOFRAME_AVI_DB1Y_RGB;
 	hdmi.avi_param.db1a_active_format_off_on =
 		INFOFRAME_AVI_DB1A_ACTIVE_FORMAT_OFF;
@@ -1389,12 +1477,19 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 		repeat_param.GenericPacketRepeat = PACKETREPEATON;
 	}
 
-	/*enable/repeat the infoframe*/
+	/* enable/repeat the infoframe */
 	repeat_param.AVIInfoFrameED = PACKETENABLE;
 	repeat_param.AVIInfoFrameRepeat = PACKETREPEATON;
 	/* wakeup */
 	repeat_param.AudioPacketED = PACKETENABLE;
 	repeat_param.AudioPacketRepeat = PACKETREPEATON;
+	/* ISCR1 transmission */
+	repeat_param.MPEGInfoFrameED = PACKETENABLE;
+	repeat_param.MPEGInfoFrameRepeat = PACKETREPEATON;
+	/* ACP transmission */
+	repeat_param.SPDInfoFrameED = PACKETENABLE;
+	repeat_param.SPDInfoFrameRepeat = PACKETREPEATON;
+
 	r = hdmi_core_av_packet_config(av_name, repeat_param);
 
 	REG_FLD_MOD(av_name, HDMI_CORE_AV__HDMI_CTRL, cfg->hdmi_dvi, 0, 0);
@@ -1428,40 +1523,50 @@ void hdmi_lib_exit(void){
 	iounmap(hdmi.base_wp);
 }
 
-int hdmi_set_irqs(void)
+int hdmi_set_irqs(int i)
 {
 	u32 r = 0 , hpd = 0;
 	struct hdmi_irq_vector pIrqVectorEnable;
 
-	pIrqVectorEnable.pllRecal = 0;
-	pIrqVectorEnable.phyShort5v = 0;
-	pIrqVectorEnable.videoEndFrame = 0;
-	pIrqVectorEnable.videoVsync = 0;
-	pIrqVectorEnable.fifoSampleRequest = 0;
-	pIrqVectorEnable.fifoOverflow = 0;
-	pIrqVectorEnable.fifoUnderflow = 0;
-	pIrqVectorEnable.ocpTimeOut = 0;
-	pIrqVectorEnable.pllUnlock = 1;
-	pIrqVectorEnable.pllLock = 1;
-	pIrqVectorEnable.phyDisconnect = 1;
-	pIrqVectorEnable.phyConnect = 1;
-	pIrqVectorEnable.core = 1;
+	if (!i) {
+		pIrqVectorEnable.pllRecal = 0;
+		pIrqVectorEnable.phyShort5v = 0;
+		pIrqVectorEnable.videoEndFrame = 0;
+		pIrqVectorEnable.videoVsync = 0;
+		pIrqVectorEnable.fifoSampleRequest = 0;
+		pIrqVectorEnable.fifoOverflow = 0;
+		pIrqVectorEnable.fifoUnderflow = 0;
+		pIrqVectorEnable.ocpTimeOut = 0;
+		pIrqVectorEnable.pllUnlock = 1;
+		pIrqVectorEnable.pllLock = 1;
+		pIrqVectorEnable.phyDisconnect = 1;
+		pIrqVectorEnable.phyConnect = 1;
+		pIrqVectorEnable.core = 1;
 
-	hdmi_w1_irq_enable(&pIrqVectorEnable);
+		hdmi_w1_irq_enable(&pIrqVectorEnable);
 
-	r = hdmi_read_reg(HDMI_WP, HDMI_WP_IRQENABLE_SET);
-	DBG("Irqenable %x \n", r);
+		r = hdmi_read_reg(HDMI_WP, HDMI_WP_IRQENABLE_SET);
+		DBG("Irqenable %x\n", r);
+	}
+	r = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_CTRL1);
+	/* PD bit has to be written to recieve the interrupts */
+	r = FLD_MOD(r, !i, 0, 0);
+	hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_CTRL1, r);
+
+	hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__UMASK1, i ? 0x00 : 0x40);
 	hpd = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__UMASK1);
 	DBG("%x hpd\n", hpd);
+
 	return 0;
 }
 
-/* Interrupt handler*/
+/* Interrupt handler */
 void HDMI_W1_HPD_handler(int *r)
 {
-	u32 val, set = 0, hpd_intr;
+	u32 val, set = 0, hpd_intr, core_state, time_in_ms;
+	static bool first_hpd, dirty;
+	static ktime_t ts_hpd_lo, ts_hpd_hi;
 
-	mdelay(30);
 	DBG("-------------DEBUG-------------------");
 	DBG("%x hdmi_wp_irqstatus\n", \
 		hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS));
@@ -1474,46 +1579,64 @@ void HDMI_W1_HPD_handler(int *r)
 	DBG("-------------DEBUG-------------------");
 
 	val = hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
-	mdelay(30);
-
 	set = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__SYS_STAT);
-	mdelay(30);
-
 	hpd_intr = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
-	mdelay(30);
+	core_state = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR_STATE);
 
-	hdmi_write_reg(HDMI_WP, HDMI_WP_IRQSTATUS, val);
-	/* flush posted write */
-	hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
 	mdelay(30);
 
 	if (val & 0x02000000) {
 		DBG("connect, ");
 		*r = HDMI_CONNECT;
 	}
-	if (hpd_intr & 0x00000040) {
-		if  (set & 0x00000002)
-			*r = HDMI_HPD;
-		else
-			*r = HDMI_DISCONNECT;
+	if ((val & 0x1) && (core_state & 0x1) && (hpd_intr & 0x40)) {
+		if (set & 0x2) {
+			if ((first_hpd == 0) && (dirty == 0)) {
+				*r = HDMI_FIRST_HPD;
+				first_hpd++;
+				DBG("first hpd");
+			} else if (dirty) {
+				ts_hpd_hi = ktime_get();
+				DBG("Temp: HPD high received @%u",
+						(int) ktime_to_ms(ts_hpd_lo));
+				time_in_ms = (int) ktime_to_ms(
+					ktime_sub(ts_hpd_hi, ts_hpd_lo));
+				DBG("HPD lo->high in %u", time_in_ms);
+				if (time_in_ms >= 100)
+					*r = HDMI_HPD_MODIFY;
+				else
+					*r = HDMI_HPD_HIGH;
+				dirty = 0;
+			}
+		} else {
+			ts_hpd_lo = ktime_get();
+			dirty = 1;
+			*r = HDMI_HPD_LOW;
+			DBG("Temp: HPD low received @%u",
+						(int) ktime_to_ms(ts_hpd_lo));
+		}
 	}
 	if ((val & 0x04000000) && (!(val & 0x02000000))) {
 		DBG("Disconnect");
+		dirty = 0;
+		first_hpd = 0;
 		*r = HDMI_DISCONNECT;
 	}
+
+	hdmi_write_reg(HDMI_WP, HDMI_WP_IRQSTATUS, val);
+	/* flush posted write */
+	hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
+
 	/* flush posted write */
 	hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1, hpd_intr);
-	mdelay(30);
-	hdmi_set_irqs();
-	/*Read to flush*/
+	/* Read to flush */
 	hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
 }
 
-
-/* wrapper functions to be used until L24.5 release*/
-int HDMI_CORE_DDC_READEDID(u32 name, u8 *p)
+/* wrapper functions to be used until L24.5 release */
+int HDMI_CORE_DDC_READEDID(u32 name, u8 *p, u16 max_length)
 {
-	int r = hdmi_core_ddc_edid(p);
+	int r = read_edid(p, max_length);
 	return r;
 }
 

@@ -1339,7 +1339,7 @@ void dispc_get_default_color_conv_coef(struct omap_color_conv_coef *ct)
 }
 
 void dispc_set_color_conv_coef(enum omap_plane plane,
-		struct omap_color_conv_coef *ct)
+		const struct omap_color_conv_coef *ct)
 {
 #define CVAL(x, y) (FLD_VAL(x, 26, 16) | FLD_VAL(y, 10, 0))
 
@@ -1381,6 +1381,34 @@ void dispc_set_color_conv_coef(enum omap_plane plane,
 	}
 
 	enable_clocks(0);
+#undef CVAL
+}
+
+void dispc_setup_color_fr_lr(int range)
+{
+	const struct omap_color_conv_coef  ctbl_bt601_5_lr = {
+		298, 409, 0, 298, -208, -100, 298, 0, 517, 0,
+	};
+	const struct omap_color_conv_coef ctbl_bt601_5_fr = {
+		256, 351, 0, 256, -179, -86, 256, 0, 443, 1,
+	};
+
+	const struct omap_color_conv_coef *ct;
+
+#define CVAL(x, y) (FLD_VAL(x, 26, 16) | FLD_VAL(y, 10, 0))
+
+	if (range)
+		ct = &ctbl_bt601_5_fr;
+		/*Full range selected if range = 1 else default limited range*/
+	else
+		ct = &ctbl_bt601_5_lr;
+
+	dispc_set_color_conv_coef(OMAP_DSS_VIDEO1, ct);
+	dispc_set_color_conv_coef(OMAP_DSS_VIDEO2, ct);
+	if (cpu_is_omap44xx()) {
+		dispc_set_color_conv_coef(OMAP_DSS_VIDEO3, ct);
+	}
+
 #undef CVAL
 }
 
@@ -2342,9 +2370,12 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 				REG_FLD_MOD(dispc_reg_att[plane], 0x0, 18, 18);
 		}
 	} else {
-		REG_FLD_MOD(dispc_reg_att[plane], 0, 13, 12);
-		if (!cpu_is_omap44xx())
+		if (!cpu_is_omap44xx()) {
+			REG_FLD_MOD(dispc_reg_att[plane], 0, 13, 12);
 			REG_FLD_MOD(dispc_reg_att[plane], 0, 18, 18);
+		} else {
+			REG_FLD_MOD(dispc_reg_att[plane], rotation, 13, 12);
+		}
 	}
 
 	if (plane != OMAP_DSS_GFX) {
@@ -4541,6 +4572,60 @@ void dispc_irq_handler(void)
 	spin_unlock(&dispc.irq_lock);
 }
 
+int omapdss_manager_reset(struct omap_overlay_manager *mgr)
+{
+	bool enable;
+	int i, ret = 0;
+
+	if (!mgr || !mgr->device)
+		return -EINVAL;
+
+	enable = mgr->device->state == OMAP_DSS_DISPLAY_ACTIVE;
+	if (mgr->device->driver->reset)
+		mgr->device->driver->reset(mgr->device,
+						OMAP_DSS_RESET_OFF);
+	else
+		omapdss_display_disable(mgr->device);
+
+	for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
+		struct omap_overlay *ovl;
+		ovl = omap_dss_get_overlay(i);
+
+		if (!(ovl->caps & OMAP_DSS_OVL_CAP_DISPC))
+			continue;
+
+		if (ovl->id != 0 && ovl->manager == mgr)
+			dispc_enable_plane(ovl->id, 0);
+	}
+
+	dispc_go(mgr->id);
+	mdelay(50);
+	if (enable) {
+		if (mgr->device->driver->reset) {
+			ret = mgr->device->driver->reset(mgr->device,
+						OMAP_DSS_RESET_ON);
+			if (ret)
+				omapdss_display_disable(mgr->device);
+		} else
+			ret = omapdss_display_enable(mgr->device);
+	}
+
+	return ret;
+}
+
+int omapdss_channel_reset(enum omap_channel channel)
+{
+	int i;
+	for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
+		struct omap_overlay_manager *mgr;
+		mgr = omap_dss_get_overlay_manager(i);
+
+		if (mgr->id == channel)
+			return omapdss_manager_reset(mgr);
+	}
+	return -EINVAL;
+}
+
 static void dispc_error_worker(struct work_struct *work)
 {
 	int i;
@@ -4624,123 +4709,21 @@ static void dispc_error_worker(struct work_struct *work)
 	}
 
 	if (errors & DISPC_IRQ_SYNC_LOST) {
-		struct omap_overlay_manager *manager = NULL;
-		bool enable = false;
-
 		DSSERR("SYNC_LOST, disabling LCD\n");
 
-		for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
-			struct omap_overlay_manager *mgr;
-			mgr = omap_dss_get_overlay_manager(i);
-
-			if (mgr->id == OMAP_DSS_CHANNEL_LCD) {
-				manager = mgr;
-				enable = mgr->device->state ==
-						OMAP_DSS_DISPLAY_ACTIVE;
-				omapdss_display_disable(mgr->device);
-				break;
-			}
-		}
-
-		if (manager) {
-			struct omap_dss_device *dssdev = manager->device;
-			for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
-				struct omap_overlay *ovl;
-				ovl = omap_dss_get_overlay(i);
-
-				if (!(ovl->caps & OMAP_DSS_OVL_CAP_DISPC))
-					continue;
-
-				if (ovl->id != 0 && ovl->manager == manager)
-					dispc_enable_plane(ovl->id, 0);
-			}
-
-			dispc_go(manager->id);
-			mdelay(50);
-			if (enable)
-				omapdss_display_enable(dssdev);
-		}
+		omapdss_channel_reset(OMAP_DSS_CHANNEL_LCD);
 	}
-
 	if (errors & DISPC_IRQ_SYNC_LOST_2) {
-		struct omap_overlay_manager *manager = NULL;
-		bool enable = false;
-
 		DSSERR("SYNC_LOST for LCD2, disabling LCD2\n");
 
-		for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
-			struct omap_overlay_manager *mgr;
-			mgr = omap_dss_get_overlay_manager(i);
-
-			if (mgr->id == OMAP_DSS_CHANNEL_LCD2) {
-				manager = mgr;
-				enable = mgr->device->state ==
-						OMAP_DSS_DISPLAY_ACTIVE;
-				omapdss_display_disable(mgr->device);
-				break;
-			}
-		}
-
-		if (manager) {
-			for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
-				struct omap_overlay *ovl;
-				ovl = omap_dss_get_overlay(i);
-
-				if (!(ovl->caps & OMAP_DSS_OVL_CAP_DISPC))
-					continue;
-
-				if (ovl->id != 0 && ovl->manager == manager)
-					dispc_enable_plane(ovl->id, 0);
-			}
-
-			dispc_go(manager->id);
-			mdelay(50);
-			if (enable)
-				omapdss_display_enable(manager->device);
-		}
+		omapdss_channel_reset(OMAP_DSS_CHANNEL_LCD2);
 	}
 
 	if (errors & DISPC_IRQ_SYNC_LOST_DIGIT) {
-
-		struct omap_overlay_manager *manager = NULL;
-		bool enable = false;
-
 		DSSERR("SYNC_LOST_DIGIT\n");
 		DSSERR("SYNC_LOST_DIGIT, disabling TV\n");
 
-		for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
-			struct omap_overlay_manager *mgr;
-			mgr = omap_dss_get_overlay_manager(i);
-
-			if (mgr->id == OMAP_DSS_CHANNEL_DIGIT) {
-				manager = mgr;
-				enable = mgr->device->state ==
-						OMAP_DSS_DISPLAY_ACTIVE;
-				omapdss_display_disable(mgr->device);
-				break;
-			}
-
-		}
-
-		if (manager) {
-			struct omap_dss_device *dssdev = manager->device;
-			for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
-				struct omap_overlay *ovl;
-				ovl = omap_dss_get_overlay(i);
-
-				if (!(ovl->caps & OMAP_DSS_OVL_CAP_DISPC))
-					continue;
-
-				if (ovl->id != 0 && ovl->manager == manager)
-					dispc_enable_plane(ovl->id, 0);
-			}
-
-			dispc_go(manager->id);
-			mdelay(50);
-			if (enable)
-				omapdss_display_enable(dssdev);
-		}
-
+		omapdss_channel_reset(OMAP_DSS_CHANNEL_DIGIT);
 	}
 
 	if (errors & DISPC_IRQ_OCP_ERR) {

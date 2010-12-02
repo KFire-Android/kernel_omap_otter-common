@@ -71,10 +71,10 @@ static void hdmi_hpd_notifier(int state, void *data)
 
 static void hdmi_pwrchange_notifier(int state, void *data)
 {
-	if (state) {
+	if (state == HDMI_EVENT_POWERPHYON) {
 		hdmi_w1_wrapper_enable(HDMI_WP);
 		hdmi_w1_start_audio_transfer(HDMI_WP);
-	} else {
+	} else if (state == HDMI_EVENT_POWERPHYOFF) {
 		hdmi_w1_stop_audio_transfer(HDMI_WP);
 		hdmi_w1_wrapper_disable(HDMI_WP);
 	}
