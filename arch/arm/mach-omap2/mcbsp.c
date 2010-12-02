@@ -920,6 +920,9 @@ static int omap_init_mcbsp(struct omap_hwmod *oh, void *user)
 			pdata->buffer_size = 0x500;
 		else
 			pdata->buffer_size = 0x80;
+	} else if (cpu_is_omap44xx()) {
+		pdata->dma_op_mode = MCBSP_DMA_MODE_ELEMENT;
+		pdata->buffer_size = 0x80;
 	} else {
 		pdata->dma_op_mode = -EINVAL;
 		pdata->buffer_size = 0;
