@@ -511,10 +511,71 @@ static ssize_t show_virt(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%p\n", ofbi->region->vaddr);
 }
 
+static ssize_t show_fit_to_screen(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", ofbi->fit_to_screen);
+}
+
+static ssize_t store_fit_to_screen(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	bool fit_to_screen;
+	int r;
+	struct fb_var_screeninfo new_var;
+
+	fit_to_screen = simple_strtoul(buf, NULL, 0);
+
+
+	/* this parameter is meaningful only for vid pipleines*/
+	if ((fit_to_screen == 1) && (ofbi->num_overlays == 1) &&
+			!strcmp(ofbi->overlays[0]->name, "gfx")) {
+		dev_err(dev, "fit to screen has no impact on graphics pipeline\n");
+		return -EINVAL;
+	}
+
+	if (fit_to_screen != 0 && fit_to_screen != 1)
+		return -EINVAL;
+
+	if (!lock_fb_info(fbi))
+		return -ENODEV;
+
+	ofbi->fit_to_screen = fit_to_screen;
+
+	omapfb_get_mem_region(ofbi->region);
+
+	memcpy(&new_var, &fbi->var, sizeof(new_var));
+	r = check_fb_var(fbi, &new_var);
+	if (r)
+		goto out;
+	memcpy(&fbi->var, &new_var, sizeof(fbi->var));
+
+	set_fb_fix(fbi);
+
+	r = omapfb_apply_changes(fbi, 0);
+	if (r)
+		goto out;
+
+	r = count;
+out:
+	omapfb_put_mem_region(ofbi->region);
+
+	unlock_fb_info(fbi);
+
+	return r;
+}
+
 static struct device_attribute omapfb_attrs[] = {
 	__ATTR(rotate_type, S_IRUGO | S_IWUSR, show_rotate_type,
 			store_rotate_type),
 	__ATTR(mirror, S_IRUGO | S_IWUSR, show_mirror, store_mirror),
+	__ATTR(fit_to_screen, S_IRUGO | S_IWUSR, show_fit_to_screen, store_fit_to_screen),
 	__ATTR(size, S_IRUGO | S_IWUSR, show_size, store_size),
 	__ATTR(overlays, S_IRUGO | S_IWUSR, show_overlays, store_overlays),
 	__ATTR(overlays_rotate, S_IRUGO | S_IWUSR, show_overlays_rotate,

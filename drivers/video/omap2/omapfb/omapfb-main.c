@@ -984,10 +984,14 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 	int r = 0, rotation = 0;
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct fb_var_screeninfo *var = &fbi->var;
+	struct omap_dss_device *display;
 	struct omap_overlay *ovl;
+	u16 outw, outh, w, h;
 	u16 posx, posy;
-	u16 outw, outh;
 	int i;
+	/* Assigning default values */
+	outw = var->xres;
+	outh = var->yres;
 
 #ifdef DEBUG
 	if (omapfb_test_pattern)
@@ -1025,24 +1029,23 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 			}
 			}
 		} else {
-			/*sv it comes here for vid1 on fb */
-			DBG("its vid pipeline so sclaing is enabled, still\
-				we will not scale for output size,\
-				just maintain the input size");
+			/*It comes here for vid1 on fb */
+			DBG("Its video pipeline.scaling is enabled");
 			rotation = (var->rotate + ofbi->rotation[i]) % 4;
+
+			/* get the device resolution */
+			display = ovl->manager->device;
+			display->driver->get_resolution(display, &w, &h);
+
 			if (rotation == FB_ROTATE_CW ||
 					rotation == FB_ROTATE_CCW) {
-				outw = var->yres;
-				outh = var->xres;
+				outw = ofbi->fit_to_screen ? h : var->yres;
+				outh = ofbi->fit_to_screen ? w : var->xres;
 			} else {
 				DBG("info.out_width = %d, info.out_height = %d\
-					take care of this for vid pipeline",
-					ovl->info.out_width,
-					ovl->info.out_height);
-				/*svoutw = ovl->info.out_width;
-				outh = ovl->info.out_height;*/
-				outw = var->xres;
-				outh = var->yres;
+				take care of this for vid pipeline", outw, outh);
+				outw = ofbi->fit_to_screen ? w : var->xres;
+				outh = ofbi->fit_to_screen ? h : var->yres;
 			}
 		}
 

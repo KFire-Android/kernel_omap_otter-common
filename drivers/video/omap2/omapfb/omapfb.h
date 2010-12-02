@@ -69,6 +69,7 @@ struct omapfb_info {
 	enum omap_dss_rotation_type rotation_type;
 	u8 rotation[OMAPFB_MAX_OVL_PER_FB];
 	bool mirror;
+	bool fit_to_screen;
 };
 
 struct omapfb2_device {
