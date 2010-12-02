@@ -1137,7 +1137,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 	},
 };
 
-static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
+static struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
 	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
@@ -1441,6 +1441,78 @@ static struct omap_board_mux board_mux[] __initdata = {
 #define board_mux	NULL
 #endif
 
+/*
+ * As OMAP4430 mux HSI and USB signals, when HSI is used (for instance HSI
+ * modem is plugged) we should configure HSI pad conf and disable some USB
+ * configurations.
+ * HSI usage is declared using bootargs variable:
+ * board-4430sdp.modem_ipc=hsi
+ * Any other or missing value will not setup HSI pad conf, and port_mode[0]
+ * will be used by USB.
+ * Variable modem_ipc is used to catch bootargs parameter value.
+ */
+static char *modem_ipc = "n/a";
+
+module_param(modem_ipc, charp, 0);
+MODULE_PARM_DESC(modem_ipc, "Modem IPC setting");
+
+static void omap_4430hsi_pad_conf(void)
+{
+	/*
+	 * HSI pad conf: hsi1_ca/ac_wake/flag/data/ready
+	 * Also configure gpio_92/95/157/187 used by modem
+	 */
+
+	/* hsi1_cawake */
+	omap_mux_init_signal("usbb1_ulpitll_clk.hsi1_cawake", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE | \
+		OMAP_PIN_OFF_WAKEUPENABLE);
+	/* hsi1_caflag */
+	omap_mux_init_signal("usbb1_ulpitll_dir.hsi1_caflag", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_cadata */
+	omap_mux_init_signal("usbb1_ulpitll_stp.hsi1_cadata", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acready */
+	omap_mux_init_signal("usbb1_ulpitll_nxt.hsi1_acready", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acwake */
+	omap_mux_init_signal("usbb1_ulpitll_dat0.hsi1_acwake", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acdata */
+	omap_mux_init_signal("usbb1_ulpitll_dat1.hsi1_acdata", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acflag */
+	omap_mux_init_signal("usbb1_ulpitll_dat2.hsi1_acflag", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_caready */
+	omap_mux_init_signal("usbb1_ulpitll_dat3.hsi1_caready", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_92 */
+	omap_mux_init_signal("usbb1_ulpitll_dat4.gpio_92", \
+		OMAP_PULL_ENA);
+	/* gpio_95 */
+	omap_mux_init_signal("usbb1_ulpitll_dat7.gpio_95", \
+		OMAP_PIN_INPUT_PULLDOWN | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_157 */
+	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_187 */
+	omap_mux_init_signal("sys_boot3.gpio_187", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+}
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1469,6 +1541,21 @@ static void __init omap_4430sdp_init(void)
 		gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
 		gpio_direction_output(OMAP4SDP_MDM_PWR_EN_GPIO, 1);
 	}
+
+	/*
+	 * Test board-4430sdp.modem_ipc bootargs value to detect if HSI pad
+	 * conf is required
+	 */
+	pr_info("Configured modem_ipc: %s", modem_ipc);
+	if (!strcmp(modem_ipc, "hsi")) {
+		pr_info("Modem HSI detected, set USB port_mode[0] as UNUSED");
+		/* USBB1 I/O pads conflict with HSI1 port */
+		usbhs_pdata.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED;
+		/* Setup HSI pad conf for OMAP4430 platform */
+		omap_4430hsi_pad_conf();
+	} else
+		pr_info("Modem HSI not detected");
+
 	usb_uhhtll_init(&usbhs_pdata);
 	usb_musb_init(&musb_board_data);
 
