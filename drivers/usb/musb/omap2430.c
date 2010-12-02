@@ -42,19 +42,19 @@
 
 static struct timer_list musb_idle_timer;
 static struct wake_lock usb_lock;
+static void __iomem *ctrl_base;
 
- void musb_enable_vbus(struct musb *musb)
- {
-	 int val;
+void musb_enable_vbus(struct musb *musb)
+{
+	 int devctl;
 
 	/* enable VBUS valid, id groung*/
-	omap_writel(AVALID | VBUSVALID, CONTROL_BASE +
+	__raw_writel(AVALID | VBUSVALID, ctrl_base +
 					USBOTGHS_CONTROL);
-
 	/* start the session */
-	val = omap_readb(0x4A0AB060);
-	val |= 0x1;
-	omap_writel(val, 0x4A0AB060);
+	devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+	devctl |= MUSB_DEVCTL_SESSION;
+	musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
 
 	while (musb_readb(musb->mregs, MUSB_DEVCTL) & 0x80) {
 		mdelay(20);
@@ -64,8 +64,38 @@ static struct wake_lock usb_lock;
 	if (musb->xceiv->set_vbus)
 		otg_set_vbus(musb->xceiv, 1);
 
- }
+}
 
+void phy_clk_set(struct musb *musb, u8 on)
+{
+	static int state;
+	struct clk *phyclk;
+	struct clk *clk48m;
+
+	phyclk = clk_get(NULL, "ocp2scp_usb_phy_ick");
+	clk48m = clk_get(NULL, "ocp2scp_usb_phy_phy_48m");
+
+	if (!phyclk) {
+		pr_warning("cannot clk_get ocp2scp_usb_phy_ick\n");
+		return;
+	}
+	clk48m = clk_get(NULL, "ocp2scp_usb_phy_phy_48m");
+	if (!clk48m) {
+		pr_warning("cannot clk_get ocp2scp_usb_phy_phy_48m\n");
+		return;
+	}
+	if (on && (!state)) {
+		/* Enable the phy clocks*/
+		clk_enable(phyclk);
+		clk_enable(clk48m);
+		state = 1;
+	} else if (state) {
+		/* Disable the phy clocks*/
+		clk_disable(phyclk);
+		clk_disable(clk48m);
+		state = 0;
+	}
+}
  /* blocking notifier support */
 int musb_notifier_call(struct notifier_block *nb,
 		unsigned long event, void *unused)
@@ -82,10 +112,10 @@ int musb_notifier_call(struct notifier_block *nb,
 		DBG(1, "ID GND\n");
 		musb->is_active = 1;
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
-			val = omap_readl(CONTROL_BASE + ONTROL_DEV_CONF);
+			val = __raw_readl(ctrl_base + ONTROL_DEV_CONF);
 			if (val & 0x1) {
 				val &= ~PHY_PD;
-				omap_writel(val, CONTROL_BASE +
+				__raw_writel(val, ctrl_base +
 							ONTROL_DEV_CONF);
 				mdelay(500);
 			}
@@ -106,17 +136,17 @@ int musb_notifier_call(struct notifier_block *nb,
 					OCP_INITIATOR_AGENT, (200*1000*4));
 
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
-			val = omap_readl(CONTROL_BASE + ONTROL_DEV_CONF);
+			val = __raw_readl(ctrl_base + ONTROL_DEV_CONF);
 			if (val & 0x1) {
 				val &= ~PHY_PD;
-				omap_writel(val, CONTROL_BASE +
+				__raw_writel(val, ctrl_base +
 							ONTROL_DEV_CONF);
 				mdelay(400);
 			}
 			if (!hostmode) {
 				/* Enable VBUS Valid, AValid. Clear SESSEND.*/
-				omap_writel(IDDIG | AVALID | VBUSVALID,
-					CONTROL_BASE + USBOTGHS_CONTROL);
+				__raw_writel(IDDIG | AVALID | VBUSVALID,
+					ctrl_base + USBOTGHS_CONTROL);
 			}
 		}
 		break;
@@ -124,13 +154,13 @@ int musb_notifier_call(struct notifier_block *nb,
 	case USB_EVENT_NONE:
 		DBG(1, "VBUS Disconnect\n");
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
-			omap_writel(SESSEND | IDDIG, CONTROL_BASE +
+			__raw_writel(SESSEND | IDDIG, ctrl_base +
 							USBOTGHS_CONTROL);
 			if (musb->xceiv->set_vbus)
 				otg_set_vbus(musb->xceiv, 0);
 
 			/* put the phy in powerdown mode*/
-			omap_writel(PHY_PD, CONTROL_BASE + ONTROL_DEV_CONF);
+			__raw_writel(PHY_PD, ctrl_base + ONTROL_DEV_CONF);
 		}
 		hostmode = 0;
 
@@ -234,7 +264,7 @@ void musb_platform_try_idle(struct musb *musb, unsigned long timeout)
 			 * Powerdown the phy.
 			 * this will allow the core to hit retention and offmode
 			 */
-			omap_writel(PHY_PD, CONTROL_BASE + ONTROL_DEV_CONF);
+			__raw_writel(PHY_PD, ctrl_base + ONTROL_DEV_CONF);
 	}
 	if (time_after(last_timer, timeout)) {
 		if (!timer_pending(&musb_idle_timer))
@@ -339,10 +369,6 @@ int __init musb_platform_init(struct musb *musb)
 		return -ENODEV;
 	}
 
-
-	if (data->interface_type == MUSB_INTERFACE_UTMI)
-		omap_writel(PHY_PD, CONTROL_BASE + ONTROL_DEV_CONF);
-
 	/* Fixme this can be enabled when load the gadget driver also*/
 	musb_platform_resume(musb);
 
@@ -356,6 +382,12 @@ int __init musb_platform_init(struct musb *musb)
 		/* OMAP4 uses Internal PHY GS70 which uses UTMI interface */
 		l &= ~ULPI_12PIN;       /* Disable ULPI */
 		l |= UTMI_8BIT;         /* Enable UTMI  */
+		ctrl_base = ioremap(0x4A002000, SZ_1K);
+		if (!ctrl_base) {
+			dev_err(dev, "ioremap failed\n");
+			return -ENOMEM;
+		}
+		__raw_writel(PHY_PD, ctrl_base + ONTROL_DEV_CONF);
 	} else {
 		l |= ULPI_12PIN;
 	}
@@ -414,6 +446,7 @@ static int musb_platform_suspend(struct musb *musb)
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_hwmod *oh = pdata->oh;
+	struct omap_musb_board_data *data = pdata->board_data;
 
 	if (!musb->clock)
 		return 0;
@@ -426,6 +459,10 @@ static int musb_platform_suspend(struct musb *musb)
 	pdata->enable_wakeup(oh->od);
 	otg_set_suspend(musb->xceiv, 1);
 
+	/* Disable the phy clocks*/
+	if (data->interface_type == MUSB_INTERFACE_UTMI)
+		phy_clk_set(musb, 0);
+
 	return 0;
 }
 
@@ -436,8 +473,6 @@ static int musb_platform_resume(struct musb *musb)
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_hwmod *oh = pdata->oh;
 	struct omap_musb_board_data *data = pdata->board_data;
-	struct clk *phyclk;
-	struct clk *clk48m;
 
 	if (!musb->clock)
 		return 0;
@@ -446,13 +481,9 @@ static int musb_platform_resume(struct musb *musb)
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
 
-	if (data->interface_type == MUSB_INTERFACE_UTMI) {
-		/* Enable the phy clocks*/
-		phyclk = clk_get(NULL, "ocp2scp_usb_phy_ick");
-		clk_enable(phyclk);
-		clk48m = clk_get(NULL, "ocp2scp_usb_phy_phy_48m");
-		clk_enable(clk48m);
-	}
+	/* Enable the phy clocks*/
+	if (data->interface_type == MUSB_INTERFACE_UTMI)
+		phy_clk_set(musb, 1);
 
 	pdata->disable_wakeup(oh->od);
 	l = musb_readl(musb->mregs, OTG_FORCESTDBY);
@@ -462,9 +493,11 @@ static int musb_platform_resume(struct musb *musb)
 	return 0;
 }
 
-
 int musb_platform_exit(struct musb *musb)
 {
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *plat = dev->platform_data;
+	struct omap_musb_board_data *data = plat->board_data;
 
 	if (cpu_is_omap44xx()) {
 		/* register for transciever notification*/
@@ -472,6 +505,8 @@ int musb_platform_exit(struct musb *musb)
 		wake_lock_destroy(&usb_lock);
 	}
 	musb_platform_suspend(musb);
+	if (data->interface_type == MUSB_INTERFACE_UTMI)
+		iounmap(ctrl_base);
 
 	return 0;
 }

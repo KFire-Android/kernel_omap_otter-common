@@ -411,6 +411,31 @@ void musb_context_save_restore(enum musb_state state)
 	struct device_driver *drv = dev->driver;
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
 	struct omap_musb_board_data *data = plat->board_data;
+	struct clk *phyclk;
+	struct clk *clk48m;
+	struct resource	*iomem;
+	void __iomem	*base;
+
+	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!iomem)
+		return;
+
+	phyclk = clk_get(NULL, "ocp2scp_usb_phy_ick");
+	if (!phyclk) {
+		pr_warning("cannot clk_get ocp2scp_usb_phy_ick\n");
+		return;
+	}
+	clk48m = clk_get(NULL, "ocp2scp_usb_phy_phy_48m");
+	if (!clk48m) {
+		pr_warning("cannot clk_get ocp2scp_usb_phy_phy_48m\n");
+		return;
+	}
+
+	base = ioremap(iomem->start, resource_size(iomem));
+	if (!base) {
+		dev_err(dev, "ioremap failed\n");
+		return;
+	}
 
 	if (drv) {
 #ifdef CONFIG_PM_RUNTIME
@@ -436,14 +461,16 @@ void musb_context_save_restore(enum musb_state state)
 				 * force idle during idle and disable
 				 * the clock.
 				 */
-				/* Disable the 48Mhz phy clock and
-				  * module mode
-				  */
 				if (data->interface_type ==
-						MUSB_INTERFACE_UTMI)
-					omap_writel(0x0, 0x4A0093E0);
+						MUSB_INTERFACE_UTMI) {
+					/* Disable the 48Mhz phy clock and
+					 * module mode
+					 */
+					clk_disable(phyclk);
+					clk_disable(clk48m);
+				}
 				/* Enable ENABLEFORCE bit*/
-				omap_writel(0x1, 0x4A0AB414);
+				__raw_writel(0x1, base + 0x414);
 				pdata->device_idle(pdev);
 				break;
 
@@ -463,14 +490,16 @@ void musb_context_save_restore(enum musb_state state)
 				 */
 				pdata->device_enable(pdev);
 
-				/* Enable phy 48Mhz clock and module
-				 * mode bit
-				 */
 				if (data->interface_type ==
-						MUSB_INTERFACE_UTMI)
-					omap_writel(0x101, 0x4A0093E0);
+						MUSB_INTERFACE_UTMI) {
+					/* Enable phy 48Mhz clock and module
+					 * mode bit
+					 */
+					clk_enable(phyclk);
+					clk_enable(clk48m);
+				}
 				/* Disable ENABLEFORCE bit*/
-				omap_writel(0x0, 0x4A0AB414);
+				__raw_writel(0x1, base + 0x414);
 
 				break;
 
@@ -481,6 +510,7 @@ void musb_context_save_restore(enum musb_state state)
 #endif
 
 	}
+	iounmap(base);
 }
 
 #else
@@ -488,7 +518,7 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 {
 	int l;
 
-	if (board_data->interface_type == MUSB_INTERFACE_UTMI)
+	if (board_data && board_data->interface_type == MUSB_INTERFACE_UTMI)
 		/*powerdown the phy*/
 		omap_writel(PHY_PD, DIE_ID_REG_BASE + ONTROL_DEV_CONF);
 }
