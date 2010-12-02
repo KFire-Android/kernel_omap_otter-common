@@ -43,6 +43,7 @@
 static struct timer_list musb_idle_timer;
 static struct wake_lock usb_lock;
 static void __iomem *ctrl_base;
+void __iomem *phymux_base;
 
 void musb_enable_vbus(struct musb *musb)
 {
@@ -101,6 +102,13 @@ int musb_notifier_call(struct notifier_block *nb,
 		if (pdata->set_min_bus_tput)
 			pdata->set_min_bus_tput(musb->controller,
 				OCP_INITIATOR_AGENT, (200*1000*4));
+
+		val = __raw_readl(phymux_base +
+				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
+
+		val |= DP_WAKEUPENABLE;
+		__raw_writel(val, phymux_base +
+					USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
 
 		break;
 
@@ -164,6 +172,12 @@ int musb_notifier_call(struct notifier_block *nb,
 		if (pdata->set_min_bus_tput)
 			pdata->set_min_bus_tput(musb->controller,
 						OCP_INITIATOR_AGENT, -1);
+		val = __raw_readl(phymux_base +
+				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
+
+		val &= ~DP_WAKEUPENABLE;
+		__raw_writel(val, phymux_base +
+					USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
 		break;
 	default:
 		DBG(1, "ID float\n");
@@ -199,6 +213,7 @@ static void musb_do_idle(unsigned long _musb)
 			musb->xceiv->state = OTG_STATE_A_IDLE;
 			MUSB_HST_MODE(musb);
 		}
+
 		break;
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
 	case OTG_STATE_A_SUSPEND:
@@ -402,6 +417,8 @@ int __init musb_platform_init(struct musb *musb)
 	plat->is_usb_active = is_musb_active;
 
 	if (cpu_is_omap44xx()) {
+		phymux_base = ioremap(0x4A100000, SZ_1K);
+		ctrl_base = ioremap(0x4A002000, SZ_1K);
 		wake_lock_init(&usb_lock, WAKE_LOCK_SUSPEND, "musb_wake_lock");
 
 		/* register for transciever notification*/
@@ -499,8 +516,9 @@ int musb_platform_exit(struct musb *musb)
 		wake_lock_destroy(&usb_lock);
 	}
 	musb_platform_suspend(musb);
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap44xx()) {
 		iounmap(ctrl_base);
-
+		iounmap(phymux_base);
+	}
 	return 0;
 }

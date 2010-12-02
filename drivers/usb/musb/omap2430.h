@@ -60,4 +60,7 @@
 #define CONTROL_DEV_CONF	0x300
 #	define PHY_PD			(1 << 0)
 
+#define USBA0_OTG_CE_PAD1_USBA0_OTG_DP	0x194
+#	define	DP_WAKEUPENABLE		(1 << 30)
+
 #endif	/* __MUSB_OMAP243X_H__ */
