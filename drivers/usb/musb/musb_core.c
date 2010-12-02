@@ -483,10 +483,8 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 				/* remote wakeup?  later, GetPortStatus
 				 * will stop RESUME signaling
 				 */
+				otg_set_clk(musb->xceiv, 1);
 
-				if (data && data->interface_type ==
-						MUSB_INTERFACE_UTMI)
-					phy_clk_set(musb, 1);
 				if (power & MUSB_POWER_SUSPENDM) {
 					/* spurious */
 					musb->int_usb &= ~MUSB_INTR_SUSPEND;
@@ -521,9 +519,8 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 			}
 #endif
 		} else {
-			if (data && data->interface_type ==
-						MUSB_INTERFACE_UTMI)
-				phy_clk_set(musb, 1);
+			otg_set_clk(musb->xceiv, 1);
+
 			switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
 			case OTG_STATE_A_SUSPEND:
@@ -699,9 +696,7 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 							OTG_TIME_B_ASE0_BRST));
 #endif
 			}
-			if (data && data->interface_type ==
-						MUSB_INTERFACE_UTMI)
-				phy_clk_set(musb, 0);
+			otg_set_clk(musb->xceiv, 0);
 			break;
 		case OTG_STATE_A_WAIT_BCON:
 			if (musb->a_wait_bcon != 0)
@@ -2148,7 +2143,7 @@ bad_config:
 					& MUSB_DEVCTL_BDEVICE
 				? 'B' : 'A'));
 
-		otg_init(musb->xceiv);
+		otg_set_irq(musb->xceiv);
 	} else /* peripheral is enabled */ {
 		MUSB_DEV_MODE(musb);
 		musb->xceiv->default_a = 0;

@@ -84,6 +84,11 @@ struct otg_transceiver {
 	int	(*init)(struct otg_transceiver *otg);
 	void	(*shutdown)(struct otg_transceiver *otg);
 
+	int	(*enable_irq)(struct otg_transceiver *otg);
+
+	/* for enabling and disabling the transciever clocks*/
+	int	(*set_clk)(struct otg_transceiver *otg,
+					int on);
 	/* bind/unbind the host controller */
 	int	(*set_host)(struct otg_transceiver *otg,
 				struct usb_bus *host);
@@ -217,6 +222,24 @@ static inline int
 otg_start_srp(struct otg_transceiver *otg)
 {
 	return otg->start_srp(otg);
+}
+
+static inline int
+otg_set_clk(struct otg_transceiver *otg, int on)
+{
+	if (otg->set_clk != NULL)
+		return otg->set_clk(otg, on);
+	else
+		return 0;
+}
+
+static inline int
+otg_set_irq(struct otg_transceiver *otg)
+{
+	if (otg->enable_irq != NULL)
+		return otg->enable_irq(otg);
+	else
+		return 0;
 }
 
 /* notifiers */

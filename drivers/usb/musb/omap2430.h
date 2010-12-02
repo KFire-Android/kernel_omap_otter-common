@@ -57,8 +57,7 @@
 #	define	SESSEND			(1 << 3)
 #	define	IDDIG			(1 << 4)
 
-#define ONTROL_DEV_CONF	0x300
+#define CONTROL_DEV_CONF	0x300
 #	define PHY_PD			(1 << 0)
-
 
 #endif	/* __MUSB_OMAP243X_H__ */

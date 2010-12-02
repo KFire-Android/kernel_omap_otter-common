@@ -1856,7 +1856,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 			} else {
 				hcd->self.uses_pio_for_control = 1;
 			}
-			otg_init(musb->xceiv);
+			otg_set_irq(musb->xceiv);
 		}
 	}
 

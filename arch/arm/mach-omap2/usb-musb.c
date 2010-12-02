@@ -50,7 +50,7 @@ static struct musb_hdrc_config musb_config = {
 	.ram_bits	= 12,
 };
 
-#define ONTROL_DEV_CONF		0x300
+#define CONTROL_DEV_CONF		0x300
 #	define PHY_PD			(1 << 0)
 
 #ifdef CONFIG_ARCH_OMAP4
@@ -396,7 +396,7 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 
 		/*powerdown the phy*/
 		if (board_data->interface_type == MUSB_INTERFACE_UTMI)
-			omap_writel(PHY_PD, DIE_ID_REG_BASE + ONTROL_DEV_CONF);
+			omap_writel(PHY_PD, DIE_ID_REG_BASE + CONTROL_DEV_CONF);
 
 		usb_gadget_init();
 	}
@@ -520,7 +520,7 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
 
 	if (board_data && board_data->interface_type == MUSB_INTERFACE_UTMI)
 		/*powerdown the phy*/
-		omap_writel(PHY_PD, DIE_ID_REG_BASE + ONTROL_DEV_CONF);
+		omap_writel(PHY_PD, DIE_ID_REG_BASE + CONTROL_DEV_CONF);
 }
 void musb_context_save_restore(enum musb_state state)
 {

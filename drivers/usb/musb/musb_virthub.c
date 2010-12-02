@@ -93,6 +93,11 @@ static void musb_port_suspend(struct musb *musb, bool do_suspend)
 					+ msecs_to_jiffies(
 						OTG_TIME_A_AIDL_BDIS));
 			musb_platform_try_idle(musb, 0);
+			/*
+			 * disable the phy clock when the device is supended.
+			 * this will allow the core retention
+			 */
+			otg_set_clk(musb->xceiv, 0);
 			break;
 #ifdef	CONFIG_USB_MUSB_OTG
 		case OTG_STATE_B_HOST:
@@ -113,9 +118,7 @@ static void musb_port_suspend(struct musb *musb, bool do_suspend)
 		power |= MUSB_POWER_RESUME;
 		musb_writeb(mbase, MUSB_POWER, power);
 
-		if (data->interface_type == MUSB_INTERFACE_UTMI)
-			phy_clk_set(musb, 1);
-
+		otg_set_clk(musb->xceiv, 1);
 		DBG(3, "Root port resuming, power %02x\n", power);
 
 		/* later, GetPortStatus will stop RESUME signaling */
