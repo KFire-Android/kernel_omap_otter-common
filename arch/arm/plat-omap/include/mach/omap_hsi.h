@@ -294,6 +294,9 @@
 /*
  * HSI GDD registers
  */
+#define HSI_SSI_DMA_CHANNEL_MAX		8
+#define HSI_HSI_DMA_CHANNEL_MAX		16
+
 #define HSI_SSI_GDD_HW_ID_REG		(HSI_GDD_BASE + 0x0000)
 
 #define HSI_SSI_GDD_PPORT_ID_REG	(HSI_GDD_BASE + 0x0010)

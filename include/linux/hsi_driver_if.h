@@ -107,6 +107,10 @@ struct ctrl_ctx {
 };
 /* END DPS */
 
+/**
+ * struct hsi_device - HSI device object (Virtual)
+ * @hsi_gdd_chan_count: DMA channels available
+*/
 struct hsi_platform_data {
 	void (*set_min_bus_tput) (struct device *dev, u8 agent_id,
 				  unsigned long r);
@@ -115,6 +119,7 @@ struct hsi_platform_data {
 	int (*device_idle) (struct platform_device *pdev);
 	u8 num_ports;
 	struct ctrl_ctx ctx;
+	u8 hsi_gdd_chan_count;
 };
 
 /**

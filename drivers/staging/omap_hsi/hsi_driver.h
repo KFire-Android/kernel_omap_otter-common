@@ -50,6 +50,10 @@
  */
 #define HSI_PORT_MAX_CH		HSI_CHANNELS_MAX
 
+/* Number of DMA channels when nothing is defined for the device */
+#define HSI_DMA_CHANNEL_DEFAULT		8
+
+
 #define LOG_NAME		"OMAP HSI: "
 
 /* SW strategies for FIFO mapping */

@@ -168,6 +168,7 @@ static struct port_ctx hsi_port_ctx[] = {
 
 static struct hsi_platform_data omap_hsi_platform_data = {
 	.num_ports = ARRAY_SIZE(hsi_port_ctx),
+	.hsi_gdd_chan_count = HSI_HSI_DMA_CHANNEL_MAX,
 	.ctx.pctx = hsi_port_ctx,
 	.device_enable = omap_device_enable,
 	.device_idle = omap_device_idle,

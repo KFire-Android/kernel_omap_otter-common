@@ -446,20 +446,28 @@ static int __init hsi_request_gdd_irq(struct hsi_dev *hsi_ctrl)
 	return hsi_gdd_init(hsi_ctrl, gdd_irq->name);
 }
 
-static void __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
+static int __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 {
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
-	struct resource *gdd_chan_count;
+	u8 gdd_chan_count;
+	struct hsi_platform_data *pdata =
+			(struct hsi_platform_data *)pd->dev.platform_data;
 	int i;
 
-	gdd_chan_count = platform_get_resource(pd, IORESOURCE_DMA, 0);
+	if (!pdata) {
+		dev_err(hsi_ctrl->dev, "HSI has no platform data\n");
+		return -ENXIO;
+	}
+
+	gdd_chan_count = pdata->hsi_gdd_chan_count;
 
 	if (!gdd_chan_count) {
 		dev_warn(hsi_ctrl->dev, "HSI device has no GDD channel count "
-			 "resource (use 8 as default)\n");
-		hsi_ctrl->gdd_chan_count = 8;
+			 "(use %d as default)\n",
+			 HSI_DMA_CHANNEL_DEFAULT);
+		hsi_ctrl->gdd_chan_count = HSI_DMA_CHANNEL_DEFAULT;
 	} else {
-		hsi_ctrl->gdd_chan_count = gdd_chan_count->start;
+		hsi_ctrl->gdd_chan_count = gdd_chan_count;
 		/* Check that the number of channels is power of 2 */
 		for (i = 0; i < 16; i++) {
 			if (hsi_ctrl->gdd_chan_count == (1 << i))
@@ -470,6 +478,7 @@ static void __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 				"shall be a power of 2! (=%d)\n",
 				hsi_ctrl->gdd_chan_count);
 	}
+	return 0;
 }
 
 void hsi_clocks_disable(struct device *dev)
@@ -582,7 +591,9 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 	hsi_ctrl->max_p = pdata->num_ports;
 	hsi_ctrl->dev = &pd->dev;
 	spin_lock_init(&hsi_ctrl->lock);
-	hsi_init_gdd_chan_count(hsi_ctrl);
+	err = hsi_init_gdd_chan_count(hsi_ctrl);
+	if (err < 0)
+		goto rback1;
 
 	err = hsi_ports_init(hsi_ctrl);
 	if (err < 0)
