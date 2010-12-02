@@ -181,6 +181,12 @@ int musb_notifier_call(struct notifier_block *nb,
 	case USB_EVENT_NONE:
 		DBG(1, "VBUS Disconnect\n");
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			/* enable this clock because in suspend interrupt
+			 * handler phy clocks are disabled. If phy clocks are
+			 * not enabled then DISCONNECT interrupt will not be
+			 * reached to mentor
+			 */
+			phy_clk_set(musb, 1);
 			__raw_writel(SESSEND | IDDIG, ctrl_base +
 							USBOTGHS_CONTROL);
 			if (musb->xceiv->set_vbus)
@@ -278,6 +284,7 @@ void musb_platform_try_idle(struct musb *musb, unsigned long timeout)
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_musb_board_data *data = pdata->board_data;
+	u32 val;
 
 	if (timeout == 0)
 		timeout = default_timeout;
@@ -290,14 +297,38 @@ void musb_platform_try_idle(struct musb *musb, unsigned long timeout)
 		last_timer = jiffies;
 		return;
 	}
-	if ((musb->xceiv->state == OTG_STATE_UNDEFINED) &&
-		(data->interface_type == MUSB_INTERFACE_UTMI)) {
-			/*
-			 * powerdown the when the gadget driver is unloaded.
-			 * Powerdown the phy.
-			 * this will allow the core to hit retention and offmode
-			 */
+
+	switch (musb->xceiv->state) {
+	/*
+	  * disable the phy clock when the device is supended.
+	  * this will allow the core to hit retention
+	  */
+	case OTG_STATE_A_SUSPEND:
+		if (data->interface_type == MUSB_INTERFACE_UTMI)
+			phy_clk_set(musb, 0);
+		break;
+	case OTG_STATE_UNDEFINED:
+		/*
+		* disable the phy clock when the gadget driver is unloaded.
+		* Powerdown the phy and configure the musb sysconfig to
+		* force standby/idle.
+		* this will allow the core to hit retention and offmode
+		*/
+		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			phy_clk_set(musb, 0);
+			/* put the phy into powerdown mode*/
 			__raw_writel(PHY_PD, ctrl_base + ONTROL_DEV_CONF);
+		}
+		/* configure in force idle/ standby */
+		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+		val &= ~(SMARTIDLEWKUP | SMARTSTDBY | NOSTDBY | ENABLEWAKEUP);
+		val |= FORCEIDLE | FORCESTDBY;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+		musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
+
+		break;
+	default:
+		break;
 	}
 	if (time_after(last_timer, timeout)) {
 		if (!timer_pending(&musb_idle_timer))
@@ -512,6 +543,8 @@ static int musb_platform_resume(struct musb *musb)
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_hwmod *oh = pdata->oh;
+	struct omap_musb_board_data *data = pdata->board_data;
+	struct clk *clk32k;
 
 	if (!musb->clock)
 		return 0;
@@ -519,6 +552,11 @@ static int musb_platform_resume(struct musb *musb)
 	otg_set_suspend(musb->xceiv, 0);
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
+
+	if (data->interface_type == MUSB_INTERFACE_UTMI) {
+		clk32k = clk_get(NULL, "usb_phy_cm_clk32k");
+		clk_enable(clk32k);
+	}
 	pdata->disable_wakeup(oh->od);
 	l = musb_readl(musb->mregs, OTG_FORCESTDBY);
 	l &= ~ENABLEFORCE;	/* disable MSTANDBY */

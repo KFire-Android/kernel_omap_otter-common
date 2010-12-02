@@ -505,9 +505,11 @@ extern void musb_platform_restore_context(struct musb *musb,
 
 extern int musb_notifier_call(struct notifier_block *nb,
 		unsigned long event, void *unused);
+extern void phy_clk_set(struct musb *musb, u8 on);
 
 #else
 #define musb_notifier_call(m,x,y)		do {} while (0)
+#define phy_clk_set(m, x)			do {} while (0)
 #endif
 
 static inline void musb_set_vbus(struct musb *musb, int is_on)

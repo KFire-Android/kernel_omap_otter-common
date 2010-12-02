@@ -113,6 +113,9 @@ static void musb_port_suspend(struct musb *musb, bool do_suspend)
 		power |= MUSB_POWER_RESUME;
 		musb_writeb(mbase, MUSB_POWER, power);
 
+		if (data->interface_type == MUSB_INTERFACE_UTMI)
+			phy_clk_set(musb, 1);
+
 		DBG(3, "Root port resuming, power %02x\n", power);
 
 		/* later, GetPortStatus will stop RESUME signaling */

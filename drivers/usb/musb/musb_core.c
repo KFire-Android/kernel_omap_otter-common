@@ -484,6 +484,9 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 				 * will stop RESUME signaling
 				 */
 
+				if (data && data->interface_type ==
+						MUSB_INTERFACE_UTMI)
+					phy_clk_set(musb, 1);
 				if (power & MUSB_POWER_SUSPENDM) {
 					/* spurious */
 					musb->int_usb &= ~MUSB_INTR_SUSPEND;
@@ -491,7 +494,8 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 					break;
 				}
 
-				power &= ~MUSB_POWER_SUSPENDM;
+				power &= ~(MUSB_POWER_SUSPENDM
+							| MUSB_POWER_ENSUSPEND);
 				musb_writeb(mbase, MUSB_POWER,
 						power | MUSB_POWER_RESUME);
 
@@ -517,6 +521,9 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 			}
 #endif
 		} else {
+			if (data && data->interface_type ==
+						MUSB_INTERFACE_UTMI)
+				phy_clk_set(musb, 1);
 			switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
 			case OTG_STATE_A_SUSPEND:
@@ -650,7 +657,7 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 		DBG(1, "SUSPEND (%s) devctl %02x power %02x\n",
 				otg_state_string(musb), devctl, power);
 
-		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+		if (data && data->interface_type == MUSB_INTERFACE_UTMI) {
 			/* Enable suspend */
 			state = musb_readb(musb->mregs, MUSB_POWER);
 			state |= MUSB_POWER_ENSUSPEND;
@@ -692,6 +699,9 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 							OTG_TIME_B_ASE0_BRST));
 #endif
 			}
+			if (data && data->interface_type ==
+						MUSB_INTERFACE_UTMI)
+				phy_clk_set(musb, 0);
 			break;
 		case OTG_STATE_A_WAIT_BCON:
 			if (musb->a_wait_bcon != 0)
