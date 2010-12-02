@@ -473,7 +473,9 @@ struct musb_context_registers {
 
 #if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
     defined(CONFIG_ARCH_OMAP4)
-	u32 otg_sysconfig, otg_forcestandby;
+	u32 otg_sysconfig, otg_forcestandby, otg_interfacesel;
+	u32 ctl_dev_conf;
+	u32 usbotg_control;
 #endif
 	u8 power;
 	u16 intrtxe, intrrxe;

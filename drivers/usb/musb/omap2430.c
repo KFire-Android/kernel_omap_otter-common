@@ -33,6 +33,7 @@
 #include <linux/io.h>
 #include <linux/pm_runtime.h>
 #include <linux/wakelock.h>
+#include <linux/pm_qos_params.h>
 
 #include <plat/omap-pm.h>
 
@@ -75,6 +76,7 @@ int musb_notifier_call(struct notifier_block *nb,
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_musb_board_data *data = pdata->board_data;
+	static struct pm_qos_request_list *usb_qos_request;
 	static int hostmode;
 	u32 val;
 
@@ -85,6 +87,9 @@ int musb_notifier_call(struct notifier_block *nb,
 		/* configure musb into smartidle with wakeup enabled
 		 * smart standby mode.
 		 */
+		wake_lock(&usb_lock);
+		omap_pm_set_max_mpu_wakeup_lat(&usb_qos_request, 4000);
+
 		musb_writel(musb->mregs, OTG_FORCESTDBY, 0);
 		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
 		if (cpu_is_omap44xx())
@@ -172,6 +177,7 @@ int musb_notifier_call(struct notifier_block *nb,
 		if (pdata->set_min_bus_tput)
 			pdata->set_min_bus_tput(musb->controller,
 						OCP_INITIATOR_AGENT, -1);
+
 		val = __raw_readl(phymux_base +
 				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
 
@@ -449,6 +455,11 @@ void musb_platform_save_context(struct musb *musb,
 {
 	void __iomem *musb_base = musb->mregs;
 	musb_context->otg_sysconfig = musb_readl(musb->mregs, OTG_SYSCONFIG);
+	musb_context->otg_interfacesel = musb_readl(musb->mregs,
+							OTG_INTERFSEL);
+	musb_context->ctl_dev_conf = __raw_readl(ctrl_base + CONTROL_DEV_CONF);
+	musb_context->usbotg_control = __raw_readl(ctrl_base +
+							USBOTGHS_CONTROL);
 	musb_writel(musb_base, OTG_FORCESTDBY, 1);
 }
 
@@ -457,6 +468,11 @@ void musb_platform_restore_context(struct musb *musb,
 {
 	void __iomem *musb_base = musb->mregs;
 	musb_writel(musb->mregs, OTG_SYSCONFIG, musb_context->otg_sysconfig);
+	__raw_writel(musb_context->ctl_dev_conf, ctrl_base + CONTROL_DEV_CONF);
+	__raw_writel(musb_context->usbotg_control, ctrl_base +
+							USBOTGHS_CONTROL);
+	musb_writel(musb->mregs, OTG_INTERFSEL,
+					musb_context->otg_interfacesel);
 	musb_writel(musb_base, OTG_FORCESTDBY, 0);
 }
 #endif
