@@ -52,8 +52,11 @@
 #define OMAP_TIMER_TRIGGER_OVERFLOW		0x01
 #define OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE	0x02
 
-/* timer ip constants */
-#define OMAP_TIMER_IP_LEGACY			0x1
+/*
+ * IP revision identifier so that Highlander IP
+ * in OMAP 4 can be distinguished.
+ */
+#define OMAP_TIMER_IP_VERSION_1			0x1
 #define OMAP_TIMER_IP_VERSION_2			0x2
 
 struct omap_dm_timer;
@@ -62,9 +65,7 @@ extern struct sys_timer omap_timer;
 struct clk;
 
 struct omap_dmtimer_platform_data {
-	int (*omap_dm_set_source_clk)
-			(struct platform_device *pdev, int source);
-	struct clk* (*omap_dm_get_timer_clk) (struct platform_device *pdev);
+	int (*set_timer_src) (struct platform_device *pdev, int source);
 	int timer_ip_type;
 	int offset1;
 	int offset2;
