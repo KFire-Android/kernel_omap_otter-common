@@ -1448,6 +1448,56 @@ abehal_status abe_use_compensated_gain(u32 on_off)
 }
 EXPORT_SYMBOL(abe_use_compensated_gain);
 /**
+ * abe_disable_gain
+ * Parameters:
+ *	mixer id
+ *	sub-port id
+ *
+ */
+abehal_status abe_disable_gain(u32 id, u32 p)
+{
+	u32 mixer_offset, f_g, ramp;
+
+	abe_gain_offset(id, &mixer_offset);
+
+	/* save the input parameters for mute/unmute */
+	ramp = abe_desired_ramp_delay_ms[mixer_offset + p];
+	f_g = GAIN_MUTE;
+	if (!(abe_muted_gains_indicator[mixer_offset + p] & 0x02)) {
+		abe_muted_gains_decibel[mixer_offset + p] =
+			abe_desired_gains_decibel[mixer_offset + p];
+		/* mute the gain */
+		abe_write_gain(id, f_g, ramp, p);
+		abe_muted_gains_indicator[mixer_offset + p] |= 0x02;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(abe_disable_gain);
+/**
+ * abe_enable_gain
+ * Parameters:
+ *	mixer id
+ *	sub-port id
+ *
+ */
+abehal_status abe_enable_gain(u32 id, u32 p)
+{
+	u32 mixer_offset, f_g, ramp;
+
+	abe_gain_offset(id, &mixer_offset);
+
+	if ((abe_muted_gains_indicator[mixer_offset + p] & 0x02)) {
+		/* restore the input parameters for mute/unmute */
+		f_g = abe_muted_gains_decibel[mixer_offset + p];
+		ramp = abe_desired_ramp_delay_ms[mixer_offset + p];
+		abe_muted_gains_indicator[mixer_offset + p] &= ~0x02;
+		/* unmute the gain */
+		abe_write_gain(id, f_g, ramp, p);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(abe_enable_gain);
+/**
  * abe_mute_gain
  * Parameters:
  *	mixer id
@@ -1457,14 +1507,19 @@ EXPORT_SYMBOL(abe_use_compensated_gain);
 abehal_status abe_mute_gain(u32 id, u32 p)
 {
 	u32 mixer_offset, f_g, ramp;
-	/* save the input parameters for mute/unmute */
+
 	abe_gain_offset(id, &mixer_offset);
+
+	/* save the input parameters for mute/unmute */
 	ramp = abe_desired_ramp_delay_ms[mixer_offset + p];
 	f_g = GAIN_MUTE;
-	abe_muted_gains_decibel[mixer_offset + p] =
-		abe_desired_gains_decibel[mixer_offset + p];
-	/* unmute the gain */
-	abe_write_gain(id, f_g, ramp, p);
+	if (!abe_muted_gains_indicator[mixer_offset + p]) {
+		abe_muted_gains_decibel[mixer_offset + p] =
+			abe_desired_gains_decibel[mixer_offset + p];
+		/* mute the gain */
+		abe_write_gain(id, f_g, ramp, p);
+	}
+	abe_muted_gains_indicator[mixer_offset + p] |= 0x01;
 	return 0;
 }
 EXPORT_SYMBOL(abe_mute_gain);
@@ -1478,12 +1533,17 @@ EXPORT_SYMBOL(abe_mute_gain);
 abehal_status abe_unmute_gain(u32 id, u32 p)
 {
 	u32 mixer_offset, f_g, ramp;
-	/* restore the input parameters for mute/unmute */
+
 	abe_gain_offset(id, &mixer_offset);
-	f_g = abe_muted_gains_decibel[mixer_offset + p];
-	ramp = abe_desired_ramp_delay_ms[mixer_offset + p];
-	/* unmute the gain */
-	abe_write_gain(id, f_g, ramp, p);
+
+	if ((abe_muted_gains_indicator[mixer_offset + p] & 0x01)) {
+		/* restore the input parameters for mute/unmute */
+		f_g = abe_muted_gains_decibel[mixer_offset + p];
+		ramp = abe_desired_ramp_delay_ms[mixer_offset + p];
+		abe_muted_gains_indicator[mixer_offset + p] &= ~0x01;
+		/* unmute the gain */
+		abe_write_gain(id, f_g, ramp, p);
+	}
 	return 0;
 }
 EXPORT_SYMBOL(abe_unmute_gain);
@@ -1568,9 +1628,13 @@ abehal_status abe_write_gain(u32 id, s32 f_g, u32 ramp, u32 p)
 			break;
 		}
 	} else {
-		/* load the S_G_Target SMEM table */
-		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM,
-			       mixer_target, (u32 *) &lin_g, sizeof(lin_g));
+		if (!abe_muted_gains_indicator[mixer_offset + p])
+			/* load the S_G_Target SMEM table */
+			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM,
+				       mixer_target, (u32 *) &lin_g, sizeof(lin_g));
+		else
+			/* update muted gain with new value */
+			abe_muted_gains_decibel[mixer_offset + p] = f_g;
 	}
 	ramp = maximum(minimum(RAMP_MAXLENGTH, ramp), RAMP_MINLENGTH);
 	/* ramp data should be interpolated in the table instead */

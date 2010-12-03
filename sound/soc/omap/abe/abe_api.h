@@ -397,6 +397,8 @@ abehal_status abe_write_aps(u32 id, abe_aps_t *param);
  */
 abehal_status abe_write_gain(u32 id, s32 f_g, u32 ramp, u32 p);
 abehal_status abe_use_compensated_gain(u32 on_off);
+abehal_status abe_enable_gain(u32 id, u32 p);
+abehal_status abe_disable_gain(u32 id, u32 p);
 abehal_status abe_mute_gain(u32 id, u32 p);
 abehal_status abe_unmute_gain(u32 id, u32 p);
 /**
