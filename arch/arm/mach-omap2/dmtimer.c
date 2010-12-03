@@ -1,16 +1,22 @@
 /**
- * linux/arch/arm/mach-omap2/dmtimers.c
+ * OMAP2PLUS Dual-Mode Timers - platform device registration
  *
- * Copyright (C) 2010 Texas Instruments, Inc.
- * Thara Gopinath <thara@ti.com>
+ * Contains first level initialization routines which extracts timers
+ * information from hwmod database and registers with linux device model.
+ * It also has low level function to change the timer input clock source.
+ *
+ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
  * Tarun Kanti DebBarma <tarun.kanti@ti.com>
- * 	- Highlander ip support on omap4
- *	- hwmod support
+ * Thara Gopinath <thara@ti.com>
  *
- * OMAP2 Dual-Mode Timers
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+ *
+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+ * kind, whether express or implied; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  */
 #include <linux/clk.h>
 #include <linux/delay.h>
@@ -25,7 +31,6 @@
 #include <linux/pm_runtime.h>
 
 static int early_timer_count __initdata;
-static int is_early_init __initdata = 1;
 
 static char *omap2_dm_source_names[] __initdata = {
 	"sys_ck",
@@ -52,58 +57,12 @@ static struct clk *omap4_dm_source_clocks[3];
 
 static struct clk **omap_dm_source_clocks;
 
-static void omap2_dm_timer_enable(struct platform_device *pdev)
-{
-	if (!pdev) {
-		dev_err(&pdev->dev, "%s: invalid pdev\n", __func__);
-		return;
-	}
-
-	if (pm_runtime_get_sync(&pdev->dev))
-		dev_warn(&pdev->dev, "%s: pm_runtime_get_sync FAILED\n",
-			__func__);
-}
-
-static void omap2_dm_timer_disable(struct platform_device *pdev)
-{
-	if (!pdev) {
-		dev_err(&pdev->dev, "%s: invalid pdev\n", __func__);
-		return;
-	}
-
-	if (pm_runtime_put_sync(&pdev->dev))
-		dev_warn(&pdev->dev, "%s: pm_runtime_put_sync FAILED\n",
-			__func__);
-}
-
-static void omap2_dm_early_timer_enable(struct platform_device *pdev)
-{
-#ifdef CONFIG_PM_RUNTIME
-	/* when pm_runtime is enabled, it is still inactive at this point
-	 * that is why this call is needed as it is not enabled by default
-	 */
-	if (omap_device_enable(pdev))
-		dev_warn(&pdev->dev, "%s: Unable to enable the timer%d\n",
-			__func__, pdev->id);
-#endif
-}
-
-static void omap2_dm_early_timer_disable(struct platform_device *pdev)
-{
-#ifdef CONFIG_PM_RUNTIME
-	/* when pm_runtime is enabled, it is still inactive at this point
-	 * that is why this call is needed as it is not enabled by default
-	 */
-	if (omap_device_idle(pdev))
-		dev_warn(&pdev->dev, "%s: Unable to disable the timer%d\n",
-			__func__, pdev->id);
-#endif
-}
 
 static int omap2_dm_timer_set_src(struct platform_device *pdev,
 			struct clk *timer_clk, int source)
 {
 	int ret;
+	struct omap_dmtimer_platform_data *pdata = pdev->dev.platform_data;
 
 	if (IS_ERR(timer_clk)) {
 		dev_warn(&pdev->dev, "%s: Not able get the clock pointer\n",
@@ -114,7 +73,7 @@ static int omap2_dm_timer_set_src(struct platform_device *pdev,
 #ifndef CONFIG_PM_RUNTIME
 	clk_disable(timer_clk); /* enabled in hwmod */
 #else
-	if (unlikely(is_early_init))
+	if (unlikely(pdata->is_early_init))
 		omap_device_idle(pdev);
 	else {
 		ret = pm_runtime_put_sync(&pdev->dev);
@@ -133,7 +92,7 @@ static int omap2_dm_timer_set_src(struct platform_device *pdev,
 #ifndef CONFIG_PM_RUNTIME
 	clk_enable(timer_clk);
 #else
-	if (unlikely(is_early_init))
+	if (unlikely(pdata->is_early_init))
 		omap_device_enable(pdev);
 	else {
 		ret = pm_runtime_get_sync(&pdev->dev);
@@ -231,8 +190,6 @@ static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
 		pr_err("%s: No memory for [%s]\n", __func__, oh->name);
 		return -ENOMEM;
 	}
-	pdata->omap_dm_clk_enable = omap2_dm_early_timer_enable;
-	pdata->omap_dm_clk_disable = omap2_dm_early_timer_disable;
 	pdata->omap_dm_set_source_clk = omap2_dm_early_timer_set_clk;
 	pdata->omap_dm_get_timer_clk = omap2_dm_early_timer_get_fclk;
 
@@ -245,6 +202,9 @@ static int __init omap_dm_timer_early_init(struct omap_hwmod *oh, void *user)
 		pdata->offset1 = 0x10;
 		pdata->offset2 = 0x14;
 	}
+
+	pdata->is_early_init = 1;
+
 	/*
 	 * extract the id from name
 	 * this is not the best implementation, but the cleanest with
@@ -293,10 +253,6 @@ static int __init omap2_dm_timer_init(struct omap_hwmod *oh, void *user)
 	pdata->omap_dm_set_source_clk = omap2_dm_timer_set_clk;
 	pdata->omap_dm_get_timer_clk = omap2_dm_timer_get_fclk;
 
-	/* hook timer enable/disable functions */
-	pdata->omap_dm_clk_enable = omap2_dm_timer_enable;
-	pdata->omap_dm_clk_disable = omap2_dm_timer_disable;
-
 	/* Update Highlander offsets for GPTimer [3-9, 11-12].
 	 * The offset1 & offset2 will be zero on OMAP3 and
 	 * OMAP4 millisecond timers (GPT1, GPT2, GPT10).
@@ -309,6 +265,9 @@ static int __init omap2_dm_timer_init(struct omap_hwmod *oh, void *user)
 		pdata->offset1 = 0x10;
 		pdata->offset2 = 0x14;
 	}
+
+	pdata->is_early_init = 0;
+
 	/*
 	* extract the id from name
 	* this is not the best implementation, but the cleanest with
@@ -344,9 +303,6 @@ void __init omap2_dm_timer_early_init(void)
 
 static int __init omap_timer_init(void)
 {
-	/* disable early init flag */
-	is_early_init = 0;
-
 	/* register all timers again */
 	omap_hwmod_for_each_by_class("timer_1ms", omap2_dm_timer_init, NULL);
 	omap_hwmod_for_each_by_class("timer", omap2_dm_timer_init, NULL);
