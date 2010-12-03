@@ -398,9 +398,11 @@ static int dl2_put_mixer(struct snd_kcontrol *kcontrol,
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
+		abe_enable_gain(MIXDL2, mc->reg);
 	} else {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
+		abe_disable_gain(MIXDL2, mc->reg);
 	}
 
 	pm_runtime_put_sync(&pdev->dev);
@@ -422,9 +424,11 @@ static int audio_ul_put_mixer(struct snd_kcontrol *kcontrol,
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
+		abe_enable_gain(MIXDL1, mc->reg);
 	} else {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
+		abe_disable_gain(MIXDL1, mc->reg);
 	}
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -446,9 +450,11 @@ static int vxrec_put_mixer(struct snd_kcontrol *kcontrol,
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
+		abe_enable_gain(MIXVXREC, mc->reg);
 	} else {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
+		abe_disable_gain(MIXVXREC, mc->reg);
 	}
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -470,9 +476,11 @@ static int sdt_put_mixer(struct snd_kcontrol *kcontrol,
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
+		abe_enable_gain(MIXAUDUL, mc->reg);
 	} else {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
+		abe_disable_gain(MIXAUDUL, mc->reg);
 	}
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -568,9 +576,11 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	if (ucontrol->value.integer.value[0]) {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
+		abe_enable_gain(MIXSDT, mc->reg);
 	} else {
 		abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
+		abe_disable_gain(MIXSDT, mc->reg);
 	}
 	pm_runtime_put_sync(&pdev->dev);
 
