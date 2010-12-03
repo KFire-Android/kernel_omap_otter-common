@@ -39,7 +39,7 @@ static int early_timer_count __initdata = 1;
 static int omap2_dm_timer_set_src(struct platform_device *pdev, int source)
 {
 	int ret;
-	struct omap_dmtimer_platform_data *pdata = pdev->dev.platform_data;
+	struct dmtimer_platform_data *pdata = pdev->dev.platform_data;
 	struct clk *fclk = clk_get(&pdev->dev, "fck");
 	struct clk *new_fclk;
 	char *fclk_name = "32k_ck"; /* default name */
@@ -115,7 +115,7 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *user)
 	int id;
 	int ret = 0;
 	char *name = "omap_timer";
-	struct omap_dmtimer_platform_data *pdata;
+	struct dmtimer_platform_data *pdata;
 	struct omap_device *od;
 
 	pr_debug("%s:%s\n", __func__, oh->name);
