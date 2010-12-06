@@ -602,9 +602,9 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		spin_unlock_bh(&hsi_ctrl->lock);
 
 		/* Check if CAWAKE is already low */
-		if (hsi_get_cawake(ch->hsi_port)) {
-			dev_err(hsi_ctrl->dev,
-				"CAWAKE is already high at the time of ACWAKE "
+		if (!hsi_get_cawake(ch->hsi_port)) {
+			dev_info(hsi_ctrl->dev,
+				"CAWAKE is already low at the time of ACWAKE "
 				"down, disabling clock\n");
 
 			hsi_clocks_disable_channel(dev->device.parent,
