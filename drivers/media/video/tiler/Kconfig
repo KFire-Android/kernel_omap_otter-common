@@ -1,6 +1,7 @@
 config TILER_OMAP
 	tristate "OMAP TILER support"
 	default y
+	depends on ARCH_OMAP4
 	help
            TILER driver for OMAP based boards.
 

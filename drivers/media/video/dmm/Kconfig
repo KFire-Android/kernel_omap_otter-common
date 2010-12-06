@@ -1,6 +1,7 @@
 config DMM_OMAP
 	tristate "OMAP DMM support"
 	default y
+	depends on TILER_OMAP
 	help
            DMM driver for OMAP based boards.
 
