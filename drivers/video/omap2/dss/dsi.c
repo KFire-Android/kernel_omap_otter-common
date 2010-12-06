@@ -241,6 +241,11 @@ struct error_recovery {
 	bool recovering;
 };
 
+struct error_receive_data {
+	struct work_struct receive_data_work;
+	struct omap_dss_device *dssdev;
+};
+
 static struct dsi_struct
 {
 	void __iomem	*base;
@@ -295,6 +300,7 @@ static struct dsi_struct
 	int debug_write;
 
 	struct error_recovery recover;
+	struct error_receive_data receive_data;
 
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
 	spinlock_t irq_stats_lock;
@@ -2227,6 +2233,19 @@ static u16 dsi_vc_flush_receive_data(enum omap_dsi_index ix,
 	return 0;
 }
 
+static void dsi_receive_data(struct work_struct *work)
+{
+	enum omap_dsi_index ix;
+	struct error_receive_data *receive_data;
+
+	receive_data = container_of(work, struct error_receive_data,
+					receive_data_work);
+	ix = (receive_data->dssdev->channel == OMAP_DSS_CHANNEL_LCD) ?
+		DSI1 : DSI2;
+
+	dsi_vc_flush_receive_data(ix, receive_data->dssdev->channel);
+}
+
 static int dsi_vc_send_bta(enum omap_dsi_index ix, int channel)
 {
 	struct dsi_struct *p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
@@ -3212,7 +3231,7 @@ static void dsi_handle_framedone(enum omap_dsi_index ix, int error)
 	/* RX_FIFO_NOT_EMPTY */
 	if (REG_GET(ix, DSI_VC_CTRL(channel), 20, 20)) {
 		DSSERR("Received error during frame transfer:\n");
-		dsi_vc_flush_receive_data(ix, channel);
+		schedule_work(&p_dsi->receive_data.receive_data_work);
 		if (!error)
 			error = -EIO;
 	}
@@ -3881,6 +3900,7 @@ int dsi_init_display(struct omap_dss_device *dssdev)
 	p_dsi->vc[1].dssdev = dssdev;
 
 	p_dsi->recover.dssdev = dssdev;
+	p_dsi->receive_data.dssdev = dssdev;
 
 	return 0;
 }
@@ -4023,6 +4043,10 @@ int dsi_init(struct platform_device *pdev)
 	dsi1.te_timer.data = 0;
 #endif
 
+	dsi1.receive_data.dssdev = 0;
+	INIT_WORK(&dsi1.receive_data.receive_data_work,
+		  dsi_receive_data);
+
 	dsi1_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	dsi1.base = ioremap(dsi1_mem->start, resource_size(dsi1_mem));
 	if (!dsi1.base) {
@@ -4112,6 +4136,10 @@ int dsi2_init(struct platform_device *pdev)
 	dsi2.te_timer.data = 0;
 #endif
 	dsi2.te_enabled = true;
+
+	dsi2.receive_data.dssdev = 0;
+	INIT_WORK(&dsi2.receive_data.receive_data_work,
+		  dsi_receive_data);
 
 	dsi2_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	dsi2.base = ioremap(dsi2_mem->start, resource_size(dsi2_mem));
