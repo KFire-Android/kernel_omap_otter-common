@@ -33,7 +33,8 @@
 #include "opp44xx.h"
 
 static struct clk *dpll_mpu_clk, *iva_clk, *dsp_clk, *l3_clk, *core_m2_clk;
-static struct clk *core_m3_clk, *core_m6_clk, *per_m3_clk, *per_m6_clk;
+static struct clk *core_m3_clk, *core_m6_clk, *core_m7_clk;
+static struct clk *per_m3_clk, *per_m6_clk;
 static struct clk *abe_clk, *sgx_clk, *fdif_clk;
 
 /*
@@ -148,6 +149,8 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 #define DPLL_CORE_M3_OPP100_RATE	320000000
 #define DPLL_CORE_M6_OPP50_RATE		200000000
 #define DPLL_CORE_M6_OPP100_RATE	266600000
+#define DPLL_CORE_M7_OPP50_RATE		133333333
+#define DPLL_CORE_M7_OPP100_RATE	266666666
 #define DPLL_PER_M3_OPP50_RATE		192000000
 #define DPLL_PER_M3_OPP100_RATE		256000000
 #define DPLL_PER_M6_OPP50_RATE		192000000
@@ -231,16 +234,19 @@ static unsigned long omap4_iva_get_rate(struct device *dev)
 
 static int omap4_l3_set_rate(struct device *dev, unsigned long rate)
 {
-	u32 d_core_m3_rate, d_core_m6_rate, d_per_m3_rate, d_per_m6_rate;
+	u32 d_core_m3_rate, d_core_m6_rate, d_core_m7_rate;
+	u32 d_per_m3_rate, d_per_m6_rate;
 
 	if (rate <= L3_OPP50_RATE) {
 		d_core_m3_rate = DPLL_CORE_M3_OPP50_RATE;
 		d_core_m6_rate = DPLL_CORE_M6_OPP50_RATE;
+		d_core_m7_rate = DPLL_CORE_M7_OPP50_RATE;
 		d_per_m3_rate = DPLL_PER_M3_OPP50_RATE;
 		d_per_m6_rate = DPLL_PER_M6_OPP50_RATE;
 	} else {
 		d_core_m3_rate = DPLL_CORE_M3_OPP100_RATE;
 		d_core_m6_rate = DPLL_CORE_M6_OPP100_RATE;
+		d_core_m7_rate = DPLL_CORE_M7_OPP100_RATE;
 		d_per_m3_rate = DPLL_PER_M3_OPP100_RATE;
 		d_per_m6_rate = DPLL_PER_M6_OPP100_RATE;
 	}
@@ -248,6 +254,7 @@ static int omap4_l3_set_rate(struct device *dev, unsigned long rate)
 	clk_set_rate(core_m3_clk, d_core_m3_rate);
 	d_core_m6_rate = clk_round_rate(core_m6_clk, d_core_m6_rate);
 	clk_set_rate(core_m6_clk, d_core_m6_rate);
+	clk_set_rate(core_m7_clk, d_core_m7_rate);
 	clk_set_rate(per_m3_clk, d_per_m3_rate);
 	clk_set_rate(per_m6_clk, d_per_m6_rate);
 	return clk_set_rate(l3_clk, rate * 2);
@@ -353,6 +360,7 @@ int __init omap4_pm_init_opp_table(void)
 	core_m2_clk = clk_get(NULL, "dpll_core_m2_ck");
 	core_m3_clk = clk_get(NULL, "dpll_core_m3x2_ck");
 	core_m6_clk = clk_get(NULL, "dpll_core_m6x2_ck");
+	core_m7_clk = clk_get(NULL, "dpll_core_m7x2_ck");
 	sgx_clk = clk_get(NULL, "dpll_per_m7x2_ck");
 	per_m3_clk = clk_get(NULL, "dpll_per_m3x2_ck");
 	per_m6_clk = clk_get(NULL, "dpll_per_m6x2_ck");
