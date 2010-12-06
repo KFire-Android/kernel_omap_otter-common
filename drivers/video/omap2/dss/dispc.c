@@ -39,7 +39,9 @@
 #include <plat/display.h>
 
 #include "dss.h"
+#ifdef CONFIG_TILER_OMAP
 #include <mach/tiler.h>
+#endif
 
 #ifdef CONFIG_ARCH_OMAP4
 #define DISPC_BASE		0x58001000
@@ -2431,6 +2433,7 @@ static s32 pixinc(int pixels, u8 ps)
 		BUG();
 }
 
+#ifdef CONFIG_TILER_OMAP
 static void calc_tiler_row_rotation(u8 rotation,
 		u16 width,
 		enum omap_color_mode color_mode,
@@ -2508,6 +2511,7 @@ static void calc_tiler_row_rotation(u8 rotation,
 
 	return;
  }
+#endif
 
 static void calc_vrfb_rotation_offset(u8 rotation, bool mirror,
 		u16 screen_width,
@@ -2983,7 +2987,6 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	s32 pix_inc;
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
-	int bpp = color_mode_to_bpp(color_mode) / 8;
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -3097,6 +3100,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	offset0 = offset1 = 0x0;
 
 	if (rotation_type == OMAP_DSS_ROT_TILER) {
+#ifdef CONFIG_TILER_OMAP
+		int bpp = color_mode_to_bpp(color_mode) / 8;
 		struct tiler_view_orient orient = {0};
 		unsigned long tiler_width = width, tiler_height = height;
 		u8 mir_x = 0, mir_y = 0;
@@ -3163,6 +3168,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 							paddr, puv_addr);
 		/* set BURSTTYPE if rotation is non-zero */
 		REG_FLD_MOD(dispc_reg_att[plane], 0x1, 29, 29);
+#endif
 	} else if (rotation_type == OMAP_DSS_ROT_DMA) {
 		calc_dma_rotation_offset(rotation, mirror,
 				screen_width, width, frame_height, color_mode,
@@ -5012,10 +5018,8 @@ void change_base_address(int plane, u32 p_uv_addr)
 /* Writeback*/
 int dispc_setup_wb(struct writeback_cache_data *wb)
 {
-	unsigned long tiler_width, tiler_height;
-	u8 rotation = 0, mirror = 0 ;
+	u8 rotation = 0;
 	int ch_width, ch_height, out_ch_width, out_ch_height, scale_x, scale_y;
-	struct tiler_view_orient orient = {0};
 	u32 paddr = wb->paddr;
 	u32 puv_addr = wb->puv_addr; /* relevant for NV12 format only */
 	u16 out_width = wb->width;
@@ -5023,11 +5027,6 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	u16 width = wb->input_width;
 	u16 height = wb->input_height;
 	u32 lines_to_skip = wb->line_skip;
-
-	unsigned offset1 = 0;
-	enum device_n_buffer_type ilace = PBUF_PDEV;
-	u16 pic_height = 0;/* not required in case
-		of progressive cases */
 
 	enum omap_color_mode color_mode = wb->color_mode;  /* output color */
 
@@ -5040,7 +5039,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	const int maxdownscale = 2;
 	bool three_taps = 0;
 	int cconv = 0;
-	s32 row_inc;
+	s32 row_inc = 0;
 	s32 pix_inc;
 
 	DSSDBG("dispc_setup_wb\n");
@@ -5112,6 +5111,13 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 	pix_inc = 0x1;
 	if ((paddr >= 0x60000000) && (paddr <= 0x7fffffff)) {
+#ifdef CONFIG_TILER_OMAP
+		unsigned long tiler_width, tiler_height;
+		struct tiler_view_orient orient = {0};
+		u8 mirror = 0;
+		unsigned offset1 = 0;
+		enum device_n_buffer_type ilace = PBUF_PDEV;
+		u16 pic_height = 0; /* not required in case of progressive cases */
 		u8 mir_x = 0, mir_y = 0;
 		tiler_width = out_width, tiler_height = out_height;
 
@@ -5157,6 +5163,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 						paddr, puv_addr);
 		/* set BURSTTYPE if rotation is non-zero */
 		REG_FLD_MOD(dispc_reg_att[plane], 0x1, 8, 8);
+#endif
 	} else {
 		row_inc = 1;
 		if (lines_to_skip) {

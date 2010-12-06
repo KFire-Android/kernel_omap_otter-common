@@ -34,7 +34,9 @@
 #include <plat/display.h>
 #include <plat/vram.h>
 #include <plat/vrfb.h>
+#ifdef CONFIG_TILER_OMAP
 #include <mach/tiler.h>
+#endif
 
 #include "omapfb.h"
 
@@ -46,7 +48,9 @@
 static char *def_mode;
 static char *def_vram;
 static int def_vrfb;
+#ifdef CONFIG_TILER_OMAP
 static int def_tiler;
+#endif
 static int def_rotate;
 static int def_mirror;
 
@@ -1198,6 +1202,7 @@ static int omapfb_mmap(struct fb_info *fbi, struct vm_area_struct *vma)
 
 	vma->vm_private_data = rg;
 	if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
+#ifdef CONFIG_TILER_OMAP
 		int k = 0, p = fix->line_length;
 
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
@@ -1212,6 +1217,7 @@ static int omapfb_mmap(struct fb_info *fbi, struct vm_area_struct *vma)
 				return -EAGAIN;
 			off += 2*64*TILER_WIDTH;
 		}
+#endif
 	} else {
 		vma->vm_pgoff = off >> PAGE_SHIFT;
 	vma->vm_flags |= VM_IO | VM_RESERVED;
@@ -1427,7 +1433,9 @@ static void omapfb_free_fbmem(struct fb_info *fbi)
 	WARN_ON(atomic_read(&rg->map_count));
 
 	if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
+#ifdef CONFIG_TILER_OMAP
 		tiler_free(rg->paddr);
+#endif
 	} else {
 	if (rg->paddr)
 		if (omap_vram_free(rg->paddr, rg->size))
@@ -1481,10 +1489,10 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omapfb2_mem_region *rg;
 	void __iomem *vaddr = NULL;
-	int r;
+	int r = 0;
+#ifdef CONFIG_TILER_OMAP
 	u16 h = 0, w = 0;
-	unsigned long pstride;
-	size_t psize;
+#endif
 
 	rg = ofbi->region;
 
@@ -1501,6 +1509,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 	if (!paddr) {
 		DBG("allocating %lu bytes for fb %d\n", size, ofbi->id);
 		if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
+#ifdef CONFIG_TILER_OMAP
 			int err = 0xFFFFFFFF;
 			/* get width & height from line length & size */
 			w = fbi->fix.line_length /
@@ -1515,6 +1524,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 			if (err != 0x0)
 				return -ENOMEM;
 			r = 0;
+#endif
 		} else {
 		r = omap_vram_alloc(OMAP_VRAM_MEMTYPE_SDRAM, size, &paddr);
 		}
@@ -1538,6 +1548,9 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 			return -ENOMEM;
 		}
 	} else if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
+#ifdef CONFIG_TILER_OMAP
+		unsigned long pstride;
+		size_t psize;
 		pstride = tiler_stride(tiler_get_natural_addr((void *)&paddr));
 		psize = h * pstride;
 		vaddr = __arm_multi_strided_ioremap(1, &paddr, &psize,
@@ -1547,6 +1560,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 			return -ENOMEM;
 
 		DBG("allocated VRAM paddr %lx, vaddr %p\n", paddr, vaddr);
+#endif
 	} else if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
 		r = omap_vrfb_request_ctx(&rg->vrfb);
 		if (r) {
@@ -2158,8 +2172,10 @@ static int omapfb_create_framebuffers(struct omapfb2_device *fbdev)
 		/* assign these early, so that fb alloc can use them */
 		if (def_vrfb == 1)
 			ofbi->rotation_type = OMAP_DSS_ROT_VRFB;
+#ifdef CONFIG_TILER_OMAP
 		else if (def_tiler == 1)
 			ofbi->rotation_type = OMAP_DSS_ROT_TILER;
+#endif
 		else
 			ofbi->rotation_type = OMAP_DSS_ROT_DMA;
 
@@ -2581,7 +2597,9 @@ module_param_named(mode, def_mode, charp, 0);
 module_param_named(vram, def_vram, charp, 0);
 module_param_named(rotate, def_rotate, int, 0);
 module_param_named(vrfb, def_vrfb, bool, 0);
+#ifdef CONFIG_TILER_OMAP
 module_param_named(tiler, def_tiler, bool, 0);
+#endif
 module_param_named(mirror, def_mirror, bool, 0);
 
 /* late_initcall to let panel/ctrl drivers loaded first.
