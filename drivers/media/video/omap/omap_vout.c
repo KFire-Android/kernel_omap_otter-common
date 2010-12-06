@@ -342,7 +342,6 @@ int omap_vout_try_format(struct v4l2_pix_format *pix)
 	return bpp;
 }
 
-
 #ifndef CONFIG_ARCH_OMAP4
 /*
  * omap_vout_uservirt_to_phys: This inline function is used to convert user
@@ -1420,6 +1419,10 @@ static int omap_vout_buffer_setup(struct videobuf_queue *q, unsigned int *count,
 	*count = vout->buffer_allocated = i;
 
 #else
+
+	if (V4L2_MEMORY_MMAP != vout->memory)
+		return 0;
+
 	/* tiler_alloc_buf to be called here
 	pre-requisites: rotation, format?
 	based on that buffers will be allocated.
@@ -1441,8 +1444,6 @@ static int omap_vout_buffer_setup(struct videobuf_queue *q, unsigned int *count,
 	if (omap_vout_tiler_buffer_setup(vout, count, 0, &vout->pix))
 			return -ENOMEM;
 #endif
-	if (V4L2_MEMORY_MMAP != vout->memory)
-		return 0;
 	return 0;
 }
 
@@ -1483,6 +1484,30 @@ static void omap_vout_free_allbuffers(struct omap_vout_device *vout)
 	vout->buffer_allocated = num_buffers;
 }
 #endif
+
+static u32 omap_tiler_virt_to_phys(void *ptr)
+{
+	pgd_t *pgd = NULL;
+	pmd_t *pmd = NULL;
+	pte_t *ptep = NULL, pte = 0x0;
+	s32 r = -1;
+	u32 til_addr = 0x0;
+	u32 arg = (u32)ptr;
+
+	pgd = pgd_offset(current->mm, arg);
+	if (!(pgd_none(*pgd) || pgd_bad(*pgd))) {
+		pmd = pmd_offset(pgd, arg);
+		if (!(pmd_none(*pmd) || pmd_bad(*pmd))) {
+			ptep = pte_offset_map(pmd, arg);
+			if (ptep) {
+				pte = *ptep;
+				if (pte_present(pte))
+					return (pte & PAGE_MASK) |
+						(~PAGE_MASK & arg);
+			}
+		}
+	}
+}
 
 /*
  * This function will be called when VIDIOC_QBUF ioctl is called.
@@ -1605,8 +1630,23 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 	/* Here, we need to use the physical addresses given by Tiler:
 	  */
 	dmabuf = vout->buf_phy_addr[vb->i];
-	vout->queued_buf_addr[vb->i] = (u8 *) vout->buf_phy_addr[vb->i];
-	vout->queued_buf_uv_addr[vb->i] = (u8 *) vout->buf_phy_uv_addr[vb->i];
+	if (V4L2_MEMORY_MMAP == vb->memory) {
+		vout->queued_buf_addr[vb->i] = (u8 *) vout->buf_phy_addr[vb->i];
+		vout->queued_buf_uv_addr[vb->i] = (u8 *) vout->buf_phy_uv_addr[vb->i];
+	}
+	if (V4L2_MEMORY_USERPTR == vb->memory) {
+		int offset;
+		if (0 == vb->baddr)
+			return -EINVAL;
+		/* Physical address */
+		vout->queued_buf_addr[vb->i] =
+			(u8 *)omap_tiler_virt_to_phys((void *) vb->baddr);
+
+		if (V4L2_PIX_FMT_NV12 == vout->pix.pixelformat) {
+			offset = vout->pix.height * vout->pix.bytesperline;
+			vout->queued_buf_uv_addr[vb->i] = (u8 *)omap_tiler_virt_to_phys((u8*)vb->baddr + offset);
+		}
+	}
 
 #endif
 	return 0;
