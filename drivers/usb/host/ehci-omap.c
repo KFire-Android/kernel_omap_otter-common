@@ -190,7 +190,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	omap->ehci->caps = hcd->regs;
 	omap->ehci_base = hcd->regs;
 
-	ret = uhhtllp->enable(OMAP_EHCI, pdev);
+	ret = uhhtllp->enable(OMAP_EHCI);
 	if (ret) {
 		dev_dbg(&pdev->dev, "failed to start ehci\n");
 		goto err_uhh_ioremap;
@@ -238,7 +238,7 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_hcd:
-	uhhtllp->disable(OMAP_EHCI, pdev);
+	uhhtllp->disable(OMAP_EHCI);
 
 err_uhh_ioremap:
 	iounmap(hcd->regs);
@@ -271,7 +271,7 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
 	struct usb_hcd *hcd = ehci_to_hcd(omap->ehci);
 
 	usb_remove_hcd(hcd);
-	uhhtllp->disable(OMAP_EHCI, pdev);
+	uhhtllp->disable(OMAP_EHCI);
 	iounmap(hcd->regs);
 	usb_put_hcd(hcd);
 	kfree(omap);
@@ -297,7 +297,7 @@ static int ehci_hcd_omap_suspend(struct device *dev)
 	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
 
 	dev_dbg(dev, "ehci_hcd_omap_suspend\n");
-	return uhhtllp->suspend(OMAP_EHCI, pdev);
+	return uhhtllp->suspend(OMAP_EHCI);
 }
 
 static int ehci_hcd_omap_resume(struct device *dev)
@@ -308,7 +308,7 @@ static int ehci_hcd_omap_resume(struct device *dev)
 	int ret;
 
 	dev_dbg(dev, "ehci_hcd_omap_resume\n");
-	ret = uhhtllp->resume(OMAP_EHCI, pdev);
+	ret = uhhtllp->resume(OMAP_EHCI);
 
 	/* Route All ports to this controller again */
 	ehci_writel(omap->ehci, FLAG_CF, &omap->ehci->regs->configured_flag);

@@ -82,6 +82,22 @@ static int ohci_omap3_start(struct usb_hcd *hcd)
 	return ret;
 }
 
+
+static int ohci_omap3_bus_suspend(struct usb_hcd *hcd)
+{
+	int ret;
+
+	ret = ohci_bus_suspend(hcd);
+
+	/* Delay required so that after ohci suspend
+	 * smart stand by can be set in the driver.
+	 * required for power mangament
+	 */
+
+	msleep(10);
+	return ret;
+}
+
 /*-------------------------------------------------------------------------*/
 
 static const struct hc_driver ohci_omap3_hc_driver = {
@@ -121,7 +137,7 @@ static const struct hc_driver ohci_omap3_hc_driver = {
 	.hub_status_data =	ohci_hub_status_data,
 	.hub_control =		ohci_hub_control,
 #ifdef	CONFIG_PM
-	.bus_suspend =		ohci_bus_suspend,
+	.bus_suspend =		ohci_omap3_bus_suspend,
 	.bus_resume =		ohci_bus_resume,
 #endif
 	.start_port_reset =	ohci_start_port_reset,
@@ -201,7 +217,7 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 	/* we know this is the memory we want, no need to ioremap again */
 	omap->ohci_base = hcd->regs;
 
-	ret = uhhtllp->enable(OMAP_OHCI, pdev);
+	ret = uhhtllp->enable(OMAP_OHCI);
 	if (ret) {
 		dev_dbg(&pdev->dev, "failed to start ohci\n");
 		goto err_uhh_ioremap;
@@ -218,7 +234,7 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_hcd:
-	uhhtllp->disable(OMAP_OHCI, pdev);
+	uhhtllp->disable(OMAP_OHCI);
 
 err_uhh_ioremap:
 	iounmap(hcd->regs);
@@ -253,7 +269,7 @@ static int __devexit ohci_hcd_omap3_remove(struct platform_device *pdev)
 	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
 
 	usb_remove_hcd(hcd);
-	uhhtllp->disable(OMAP_OHCI, pdev);
+	uhhtllp->disable(OMAP_OHCI);
 	iounmap(hcd->regs);
 	usb_put_hcd(hcd);
 	kfree(omap);
@@ -279,7 +295,7 @@ static int ohci_hcd_omap_suspend(struct device *dev)
 	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
 
 	dev_err(dev, "ohci_hcd_omap_suspend\n");
-	return uhhtllp->suspend(OMAP_OHCI, pdev);
+	return uhhtllp->suspend(OMAP_OHCI);
 }
 
 static int ohci_hcd_omap_resume(struct device *dev)
@@ -288,7 +304,7 @@ static int ohci_hcd_omap_resume(struct device *dev)
 	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
 
 	dev_err(dev, "ohci_hcd_omap_resume\n");
-	return uhhtllp->resume(OMAP_OHCI, pdev);
+	return uhhtllp->resume(OMAP_OHCI);
 
 }
 

@@ -913,7 +913,7 @@ int omap_device_set_rate(struct device *req_dev, struct device *dev,
 	/* Get the possible rate from the opp layer */
 	opp = opp_find_freq_ceil(dev, &freq);
 	if (IS_ERR(opp)) {
-		dev_err(dev, "%s: Unable to find OPP for freq%ld\n",
+		dev_dbg(dev, "%s: Unable to find OPP for freq%ld\n",
 			__func__, rate);
 		return -ENODEV;
 	}

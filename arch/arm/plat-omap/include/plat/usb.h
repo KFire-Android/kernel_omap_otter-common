@@ -50,10 +50,10 @@ struct usbhs_omap_platform_data {
 
 struct uhhtll_apis {
 	int	(*get_platform_data) (struct usbhs_omap_platform_data *);
-	int	(*enable) (enum driver_type, struct platform_device *);
-	int	(*disable) (enum driver_type, struct platform_device *);
-	int	(*suspend) (enum driver_type, struct platform_device *);
-	int	(*resume) (enum driver_type, struct platform_device *);
+	int	(*enable) (enum driver_type);
+	int	(*disable) (enum driver_type);
+	int	(*suspend) (enum driver_type);
+	int	(*resume) (enum driver_type);
 };
 
 /*-------------------------------------------------------------------------*/
