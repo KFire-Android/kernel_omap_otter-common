@@ -186,6 +186,9 @@ struct uhhtll_hcd_omap {
 	struct semaphore	mutex;
 	int			count;
 
+	int			p1_fck_count;
+	int			p2_fck_count;
+
 	struct usbhs_omap_platform_data platdata;
 
 	u32				ohci_addr_start;
@@ -919,6 +922,115 @@ static void usbhs_omap_tll_init(struct uhhtll_hcd_omap *omap,
 
 
 
+static void usbhs_p1_enable(struct uhhtll_hcd_omap *omap)
+{
+
+	if (!omap->utmi_p1_fck)
+		return;
+
+	if (omap->p1_fck_count > 0)
+		goto end_count;
+
+	clk_enable(omap->utmi_p1_fck);
+
+end_count:
+	omap->p1_fck_count++;
+
+}
+
+
+static void usbhs_p1_disble(struct uhhtll_hcd_omap *omap)
+{
+
+	if (!omap->utmi_p1_fck)
+		return;
+
+	if (omap->p1_fck_count == 0)
+		return;
+
+	omap->p1_fck_count--;
+	if (omap->p1_fck_count == 0)
+		clk_disable(omap->utmi_p1_fck);
+
+}
+
+static void usbhs_p2_enable(struct uhhtll_hcd_omap *omap)
+{
+
+	if (!omap->utmi_p2_fck)
+		return;
+
+	if (omap->p2_fck_count > 0)
+		goto end_count;
+
+	clk_enable(omap->utmi_p2_fck);
+
+end_count:
+	omap->p2_fck_count++;
+
+}
+
+
+static void usbhs_p2_disble(struct uhhtll_hcd_omap *omap)
+{
+
+	if (!omap->utmi_p2_fck)
+		return;
+
+	if (omap->p2_fck_count == 0)
+		return;
+
+	omap->p2_fck_count--;
+	if (omap->p2_fck_count == 0)
+		clk_disable(omap->utmi_p2_fck);
+
+}
+
+
+static void usbhs_ehci_clk(struct uhhtll_hcd_omap *omap, int on)
+{
+	struct usbhs_omap_platform_data *pdata = &omap->platdata;
+
+	if ((pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_PHY) ||
+		(pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_TLL)) {
+			if (on)
+				usbhs_p1_enable(omap);
+			else
+				usbhs_p1_disble(omap);
+	}
+
+	if ((pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_PHY) ||
+		(pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_TLL)) {
+			if (on)
+				usbhs_p2_enable(omap);
+			else
+				usbhs_p2_disble(omap);
+	}
+}
+
+
+
+static void usbhs_ohci_clk(struct uhhtll_hcd_omap *omap, int on)
+{
+	struct usbhs_omap_platform_data *pdata = &omap->platdata;
+
+	if (is_ohci_port(pdata->port_mode[0])) {
+		if (on)
+			usbhs_p1_enable(omap);
+		else
+			usbhs_p1_disble(omap);
+	}
+
+	if (is_ohci_port(pdata->port_mode[1])) {
+		if (on)
+			usbhs_p2_enable(omap);
+		else
+			usbhs_p2_disble(omap);
+	}
+}
+
+
+
 static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 {
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
@@ -936,7 +1048,7 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 	pm_runtime_get_sync(&omap->pdev->dev);
 
 	if (!do_init)
-		goto  end_clk;
+		goto  end_init;
 
 	/* get ehci regulator and enable */
 	for (i = 0 ; i < OMAP3_HS_USB_PORTS ; i++) {
@@ -1378,13 +1490,7 @@ ok_end:
 			gpio_set_value(pdata->reset_gpio_port[1], 1);
 	}
 
-end_clk:
-	if (omap->utmi_p1_fck != NULL)
-		clk_enable(omap->utmi_p1_fck);
-
-	if (omap->utmi_p2_fck != NULL)
-		clk_enable(omap->utmi_p2_fck);
-
+end_init:
 	uhhtll_get_tput(&omap->pdev->dev);
 
 end_count:
@@ -1408,12 +1514,6 @@ static void usbhs_disable(struct uhhtll_hcd_omap *omap, int do_stop)
 	omap->count--;
 
 	if (omap->count == 0) {
-
-		if (omap->utmi_p1_fck != NULL)
-			clk_disable(omap->utmi_p1_fck);
-
-		if (omap->utmi_p2_fck != NULL)
-			clk_disable(omap->utmi_p2_fck);
 
 		if (!do_stop)
 			goto ok_end;
@@ -1552,6 +1652,7 @@ static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata)
 static int uhhtll_drv_enable(enum driver_type drvtype)
 {
 	struct uhhtll_hcd_omap *omap = &uhhtll;
+	struct usbhs_omap_platform_data *pdata = &omap->platdata;
 	int ret = -EBUSY;
 
 	if (!omap->pdev) {
@@ -1562,6 +1663,14 @@ static int uhhtll_drv_enable(enum driver_type drvtype)
 	down_interruptible(&omap->mutex);
 
 	ret = usbhs_enable(omap, 1);
+
+	if (drvtype == OMAP_EHCI) {
+		usbhs_ehci_io_wakeup(pdata->port_mode, 0);
+		usbhs_ehci_clk(omap, 1);
+	} else if (drvtype == OMAP_OHCI) {
+		usbhs_ohci_io_wakeup(pdata->port_mode, 0);
+		usbhs_ohci_clk(omap, 1);
+	}
 
 	up(&omap->mutex);
 
@@ -1582,13 +1691,15 @@ static int uhhtll_drv_disable(enum driver_type drvtype)
 
 	down_interruptible(&omap->mutex);
 
-	usbhs_disable(omap, 1);
-
-	if (drvtype == OMAP_EHCI)
+	if (drvtype == OMAP_EHCI) {
 		usbhs_ehci_io_wakeup(pdata->port_mode, 0);
-	else if (drvtype == OMAP_OHCI)
+		usbhs_ehci_clk(omap, 0);
+	} else if (drvtype == OMAP_OHCI) {
 		usbhs_ohci_io_wakeup(pdata->port_mode, 0);
+		usbhs_ohci_clk(omap, 0);
+	}
 
+	usbhs_disable(omap, 1);
 
 	up(&omap->mutex);
 
@@ -1609,12 +1720,16 @@ static int uhhtll_drv_suspend(enum driver_type drvtype)
 
 	down_interruptible(&omap->mutex);
 
-	usbhs_disable(omap, 0);
 
-	if (drvtype == OMAP_EHCI)
+	if (drvtype == OMAP_EHCI) {
 		usbhs_ehci_io_wakeup(pdata->port_mode, 1);
-	else if (drvtype == OMAP_OHCI)
+		usbhs_ehci_clk(omap, 0);
+	} else if (drvtype == OMAP_OHCI) {
 		usbhs_ohci_io_wakeup(pdata->port_mode, 1);
+		usbhs_ohci_clk(omap, 0);
+	}
+
+	usbhs_disable(omap, 0);
 
 	up(&omap->mutex);
 
@@ -1637,10 +1752,13 @@ static int uhhtll_drv_resume(enum driver_type drvtype)
 
 	ret = usbhs_enable(omap, 0);
 
-	if (drvtype == OMAP_EHCI)
+	if (drvtype == OMAP_EHCI) {
 		usbhs_ehci_io_wakeup(pdata->port_mode, 0);
-	else if (drvtype == OMAP_OHCI)
+		usbhs_ehci_clk(omap, 1);
+	} else if (drvtype == OMAP_OHCI) {
 		usbhs_ohci_io_wakeup(pdata->port_mode, 0);
+		usbhs_ohci_clk(omap, 1);
+	}
 
 	up(&omap->mutex);
 
