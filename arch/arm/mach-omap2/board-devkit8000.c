@@ -807,7 +807,6 @@ static void __init devkit8000_init(void)
 
 	usb_musb_init(&musb_board_data);
 	usb_uhhtll_init(&usbhs_pdata);
-	usb_ehci_init();
 	devkit8000_flash_init();
 
 	/* Ensure SDRC pins are mux'd for self-refresh */

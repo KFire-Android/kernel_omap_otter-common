@@ -640,7 +640,6 @@ static void __init omap3_stalker_init(void)
 	omap_serial_init();
 	usb_musb_init(&musb_board_data);
 	usb_uhhtll_init(&usbhs_pdata);
-	usb_ehci_init();
 	ads7846_dev_init();
 
 	omap_mux_init_gpio(21, OMAP_PIN_OUTPUT);

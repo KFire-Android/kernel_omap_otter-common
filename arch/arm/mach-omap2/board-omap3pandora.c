@@ -582,7 +582,6 @@ static void __init omap3pandora_init(void)
 			ARRAY_SIZE(omap3pandora_spi_board_info));
 	omap3pandora_ads7846_init();
 	usb_uhhtll_init(&usbhs_pdata);
-	usb_ehci_init();
 	pandora_keys_gpio_init();
 	usb_musb_init(&musb_board_data);
 

@@ -48,8 +48,17 @@ struct usbhs_omap_platform_data {
 	struct regulator        *regulator[OMAP3_HS_USB_PORTS];
 };
 
+
+struct usbhs_omap_resource {
+	int			irq;		/* irq allocated */
+	void __iomem		*regs;		/* device memory/io */
+	u64			start;	/* memory/io resource start */
+	u64			len;	/* memory/io resource length */
+};
+
 struct uhhtll_apis {
 	int	(*get_platform_data) (struct usbhs_omap_platform_data *);
+	int	(*get_resource)(enum driver_type, struct usbhs_omap_resource *);
 	int	(*enable) (enum driver_type);
 	int	(*disable) (enum driver_type);
 	int	(*suspend) (enum driver_type);
@@ -96,11 +105,9 @@ enum musb_interface    {MUSB_INTERFACE_ULPI, MUSB_INTERFACE_UTMI};
 
 extern void usb_musb_init(struct omap_musb_board_data *board_data);
 
-extern void usb_ehci_init(void);
-
-extern void usb_ohci_init(void);
-
 extern void usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata);
+
+extern void usbhs_wakeup(void);
 
 /* For saving and restoring the musb context during off/wakeup*/
 extern void musb_context_save_restore(enum musb_state state);

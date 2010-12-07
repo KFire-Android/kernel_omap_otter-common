@@ -101,7 +101,6 @@ static void __init omap_sdp_init(void)
 	board_smc91x_init();
 	enable_board_wakeup_source();
 	usb_uhhtll_init(&usbhs_pdata);
-	usb_ehci_init();
 	sr_class3_init();
 }
 

@@ -44,8 +44,7 @@
 struct ohci_hcd_omap3 {
 	struct ohci_hcd		*ohci;
 	struct device		*dev;
-	void __iomem		*ohci_base;
-
+	struct usbhs_omap_resource res;
 	struct usbhs_omap_platform_data platdata;
 };
 
@@ -85,6 +84,9 @@ static int ohci_omap3_start(struct usb_hcd *hcd)
 
 static int ohci_omap3_bus_suspend(struct usb_hcd *hcd)
 {
+	struct device *dev = hcd->self.controller;
+	struct uhhtll_apis *uhhtllp = dev->platform_data;
+
 	int ret;
 
 	ret = ohci_bus_suspend(hcd);
@@ -93,10 +95,34 @@ static int ohci_omap3_bus_suspend(struct usb_hcd *hcd)
 	 * smart stand by can be set in the driver.
 	 * required for power mangament
 	 */
+	msleep(5);
 
-	msleep(10);
+	if (ret != 0)
+		dev_dbg(dev, "ohci_omap3_bus_suspend failed %d\n", ret);
+
+
+	if (!ret && uhhtllp && uhhtllp->suspend)
+		uhhtllp->suspend(OMAP_OHCI);
+
 	return ret;
 }
+
+
+static int ohci_omap3_bus_resume(struct usb_hcd *hcd)
+{
+	struct device *dev = hcd->self.controller;
+	struct uhhtll_apis *uhhtllp = dev->platform_data;
+	int ret = 0;
+
+	if (uhhtllp && uhhtllp->resume)
+		ret = uhhtllp->resume(OMAP_OHCI);
+
+	if (!ret)
+		ohci_bus_resume(hcd);
+
+	return ret;
+}
+
 
 /*-------------------------------------------------------------------------*/
 
@@ -138,7 +164,7 @@ static const struct hc_driver ohci_omap3_hc_driver = {
 	.hub_control =		ohci_hub_control,
 #ifdef	CONFIG_PM
 	.bus_suspend =		ohci_omap3_bus_suspend,
-	.bus_resume =		ohci_bus_resume,
+	.bus_resume =		ohci_omap3_bus_resume,
 #endif
 	.start_port_reset =	ohci_start_port_reset,
 };
@@ -162,10 +188,9 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
 	struct ohci_hcd_omap3 *omap;
 	struct usbhs_omap_platform_data *pdata;
-	struct resource *res;
+	struct usbhs_omap_resource *omapresp;
 	struct usb_hcd *hcd;
 	int ret = -ENODEV;
-	int irq;
 
 	if (!uhhtllp) {
 		dev_dbg(&pdev->dev, "missing platform_data\n");
@@ -174,8 +199,6 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 
 	if (usb_disabled())
 		goto err_end;
-
-	irq = platform_get_irq(pdev, 0);
 
 	omap = kzalloc(sizeof(*omap), GFP_KERNEL);
 	if (!omap) {
@@ -187,6 +210,17 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 
 	if (uhhtllp->get_platform_data(pdata) != 0) {
 		ret = -EINVAL;
+		goto err_mem;
+	}
+
+	omapresp = &omap->res;
+	if (uhhtllp->get_resource(OMAP_OHCI, omapresp) != 0) {
+		ret = -EINVAL;
+		goto err_mem;
+	}
+
+	if (!omapresp->regs) {
+		dev_dbg(&pdev->dev, "failed to OHCI regs\n");
 		goto err_mem;
 	}
 
@@ -202,30 +236,19 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 	omap->dev		= &pdev->dev;
 	omap->ohci		= hcd_to_ohci(hcd);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-
-	hcd->rsrc_start = res->start;
-	hcd->rsrc_len = resource_size(res);
-
-	hcd->regs = ioremap(hcd->rsrc_start, hcd->rsrc_len);
-	if (!hcd->regs) {
-		dev_err(&pdev->dev, "OHCI ioremap failed\n");
-		ret = -ENOMEM;
-		goto err_ioremap;
-	}
-
-	/* we know this is the memory we want, no need to ioremap again */
-	omap->ohci_base = hcd->regs;
+	hcd->rsrc_start = omapresp->start;
+	hcd->rsrc_len = omapresp->len;
+	hcd->regs =  omapresp->regs;
 
 	ret = uhhtllp->enable(OMAP_OHCI);
 	if (ret) {
 		dev_dbg(&pdev->dev, "failed to start ohci\n");
-		goto err_uhh_ioremap;
+		goto err_regs;
 	}
 
 	ohci_hcd_init(omap->ohci);
 
-	ret = usb_add_hcd(hcd, irq, IRQF_DISABLED);
+	ret = usb_add_hcd(hcd, omapresp->irq, IRQF_DISABLED);
 	if (ret) {
 		dev_dbg(&pdev->dev, "failed to add hcd with err %d\n", ret);
 		goto err_add_hcd;
@@ -236,10 +259,7 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 err_add_hcd:
 	uhhtllp->disable(OMAP_OHCI);
 
-err_uhh_ioremap:
-	iounmap(hcd->regs);
-
-err_ioremap:
+err_regs:
 	usb_put_hcd(hcd);
 
 err_mem:
@@ -268,9 +288,10 @@ static int __devexit ohci_hcd_omap3_remove(struct platform_device *pdev)
 	struct usb_hcd *hcd = ohci_to_hcd(omap->ohci);
 	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
 
+	if (hcd->state == HC_STATE_SUSPENDED)
+		uhhtllp->resume(OMAP_OHCI);
 	usb_remove_hcd(hcd);
 	uhhtllp->disable(OMAP_OHCI);
-	iounmap(hcd->regs);
 	usb_put_hcd(hcd);
 	kfree(omap);
 
@@ -286,48 +307,12 @@ static void ohci_hcd_omap3_shutdown(struct platform_device *pdev)
 		hcd->driver->shutdown(hcd);
 }
 
-
-#ifdef	CONFIG_PM
-
-static int ohci_hcd_omap_suspend(struct device *dev)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
-
-	dev_err(dev, "ohci_hcd_omap_suspend\n");
-	return uhhtllp->suspend(OMAP_OHCI);
-}
-
-static int ohci_hcd_omap_resume(struct device *dev)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
-
-	dev_err(dev, "ohci_hcd_omap_resume\n");
-	return uhhtllp->resume(OMAP_OHCI);
-
-}
-
-static const struct dev_pm_ops ohci_hcd_omap_dev_pm_ops = {
-	.suspend	= ohci_hcd_omap_suspend,
-	.resume		= ohci_hcd_omap_resume,
-};
-
-#define OHCI_HCD_OMAP_DEV_PM_OPS (&ohci_hcd_omap_dev_pm_ops)
-#else
-#define	OHCI_HCD_OMAP_DEV_PM_OPS	NULL
-#endif
-
-
-
-
 static struct platform_driver ohci_hcd_omap3_driver = {
 	.probe		= ohci_hcd_omap3_probe,
 	.remove		= __devexit_p(ohci_hcd_omap3_remove),
 	.shutdown	= ohci_hcd_omap3_shutdown,
 	.driver		= {
 		.name	= "ohci-omap3",
-		.pm		= OHCI_HCD_OMAP_DEV_PM_OPS,
 	},
 };
 

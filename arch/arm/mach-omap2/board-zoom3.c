@@ -192,7 +192,6 @@ static void __init omap_zoom_init(void)
 
 	omap_mux_init_gpio(64, OMAP_PIN_OUTPUT);
 	usb_uhhtll_init(&usbhs_pdata);
-	usb_ehci_init();
 	sr_class3_init();
 
 #ifdef CONFIG_PM

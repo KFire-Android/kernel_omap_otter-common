@@ -121,6 +121,7 @@ void omap4_trigger_ioctrl(void)
 	/* Trigger WUCLKIN enable */
 	prm_rmw_mod_reg_bits(OMAP4430_WUCLK_CTRL_MASK, OMAP4430_WUCLK_CTRL_MASK,
 		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET);
+
 	omap_test_timeout(
 		(prm_read_mod_reg(OMAP4430_PRM_DEVICE_MOD,
 				OMAP4_PRM_IO_PMCTRL_OFFSET)
@@ -337,6 +338,9 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 		/* Re-enable UART3 */
 		omap_writel(0x2, 0x4A009550);
 		omap_writel(0xD, 0x48020054);
+
+		/* usbhs remote wakeup */
+		usbhs_wakeup();
 		omap4_trigger_ioctrl();
 	}
 

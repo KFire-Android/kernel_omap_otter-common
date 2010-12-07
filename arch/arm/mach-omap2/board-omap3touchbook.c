@@ -552,7 +552,6 @@ static void __init omap3_touchbook_init(void)
 	omap3_ads7846_init();
 	usb_musb_init(&musb_board_data);
 	usb_uhhtll_init(&usbhs_pdata);
-	usb_ehci_init();
 	omap3touchbook_flash_init();
 
 	/* Ensure SDRC pins are mux'd for self-refresh */

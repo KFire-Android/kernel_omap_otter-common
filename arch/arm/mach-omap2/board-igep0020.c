@@ -484,7 +484,6 @@ static void __init igep2_init(void)
 	omap_serial_init();
 	usb_musb_init(&musb_board_data);
 	usb_uhhtll_init(&usbhs_pdata);
-	usb_ehci_init();
 
 	igep2_flash_init();
 	igep2_init_led();

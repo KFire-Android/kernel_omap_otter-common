@@ -153,18 +153,39 @@
 #define OHCI_HCCONTROL_RESUME		(1 << 6)
 #define OHCI_HCCONTROL_OPERATIONAL	(2 << 6)
 
-
+/* EHCI register set */
+#define EHCI_CONFIGFLAG			0x50
+#define EHCI_CONFIG_ENABLE		1
 
 #define USBHS_IO_WAKEUPENABLE		(1 << 14)
+#define USBHS_IO_WKUPEVNT		(1 << 15)
 
 #if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE) || \
 	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
 
-static const char uhhtllname[] = "uhhtll-omap";
+
 #define USB_UHH_HS_HWMODNAME				"usb_uhh_hs"
 #define USB_TLL_HS_HWMODNAME				"usb_tll_hs"
 #define USBHS_OHCI_HWMODNAME				"usbhs_ohci"
 #define USBHS_EHCI_HWMODNAME				"usbhs_ehci"
+
+/* EHCI/OHCI state events */
+#define USBHS_OHCI_LOADED	0
+#define	USBHS_OHCI_SUSPENED	1
+#define USBHS_OHCI_RMWKP	2
+
+#define USBHS_EHCI_LOADED	8
+#define USBHS_EHCI_SUSPENED	9
+#define USBHS_EHCI_RMWKP	10
+
+
+static const char uhhtllname[] = "uhhtll-omap";
+
+static const char ehciname[] = "ehci-omap";
+static u64 ehci_dmamask = ~(u32)0;
+static const char ohciname[] = "ohci-omap3";
+static u64 ohci_dmamask = DMA_BIT_MASK(32);
+
 
 struct uhhtll_hcd_omap {
 	struct platform_device	*pdev;
@@ -189,11 +210,18 @@ struct uhhtll_hcd_omap {
 	int			p1_fck_count;
 	int			p2_fck_count;
 
+
+	unsigned long		event_state;
+
+	struct work_struct	wakeup_work;	/* for remote wakeup */
+
 	struct usbhs_omap_platform_data platdata;
 
-	u32				ohci_addr_start;
-	u32				ohci_addr_size;
-	void __iomem			*ohci_base;
+	struct usbhs_omap_resource	ohci_res;
+	struct usbhs_omap_resource	ehci_res;
+
+	struct platform_device		*ohci_pdev;
+	struct platform_device		*ehci_pdev;
 	struct omap_hwmod		*uhh_hwmod;
 };
 
@@ -203,6 +231,8 @@ static struct uhhtll_hcd_omap uhhtll = {
 
 static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata);
 
+static int uhhtll_get_resource(enum driver_type, struct usbhs_omap_resource *);
+
 static int uhhtll_drv_enable(enum driver_type drvtype);
 
 static int uhhtll_drv_disable(enum driver_type drvtype);
@@ -210,7 +240,6 @@ static int uhhtll_drv_disable(enum driver_type drvtype);
 static int uhhtll_drv_suspend(enum driver_type drvtype);
 
 static int uhhtll_drv_resume(enum driver_type drvtype);
-
 
 static struct omap_device_pm_latency omap_uhhtll_latency[] = {
 	  {
@@ -223,6 +252,7 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
 
 static struct uhhtll_apis uhhtll_export = {
 	.get_platform_data	= uhhtll_get_platform_data,
+	.get_resource		= uhhtll_get_resource,
 	.enable			= uhhtll_drv_enable,
 	.disable		= uhhtll_drv_disable,
 	.suspend		= uhhtll_drv_suspend,
@@ -644,6 +674,50 @@ static void usbhs_ohci_io_wakeup(const enum usbhs_omap3_port_mode
 	/* TODO for OMAP3 */
 }
 
+void usbhs_wakeup()
+{
+	struct uhhtll_hcd_omap *omap = &uhhtll;
+	u32 reg;
+	char workq = 0;
+
+	if (!omap->pdev)
+		return;
+
+	if (test_bit(USBHS_OHCI_LOADED, &omap->event_state) &&
+		test_bit(USBHS_OHCI_SUSPENED, &omap->event_state) &&
+		!test_bit(USBHS_OHCI_RMWKP, &omap->event_state)) {
+
+		/* check for the ohci wakeup
+		 * TODO, replace with I/O frame work
+		 */
+		reg = omap_readw(0x4A1000F8);
+
+		if (reg&USBHS_IO_WKUPEVNT) {
+			set_bit(USBHS_OHCI_RMWKP, &omap->event_state);
+			workq = 1;
+		}
+	}
+
+	if (test_bit(USBHS_EHCI_LOADED, &omap->event_state) &&
+		test_bit(USBHS_EHCI_SUSPENED, &omap->event_state) &&
+		!test_bit(USBHS_EHCI_RMWKP, &omap->event_state)) {
+
+		/* check for the ehci wakeup
+		 * TODO, replace with I/O frame work
+		 */
+		reg = omap_readw(0x4A1000CA);
+
+		if (reg&USBHS_IO_WKUPEVNT) {
+			set_bit(USBHS_EHCI_RMWKP, &omap->event_state);
+			workq = 1;
+		}
+	}
+
+
+	if (workq)
+		queue_work(pm_wq, &omap->wakeup_work);
+}
+
 
 #else
 static int uhhtll_get_tput(struct device	*dev)
@@ -670,8 +744,35 @@ static void usbhs_ohci_io_wakeup(const enum usbhs_omap3_port_mode
 	return;
 }
 
+
+void usbhs_wakeup()
+{
+	return;
+}
+
 #endif
 
+static void usbhs_resume_work(struct work_struct *work)
+{
+	struct uhhtll_hcd_omap *omap = &uhhtll;
+
+	if (!omap->pdev)
+		return;
+
+	dev_dbg(&omap->pdev->dev, "usbhs_resume_work reamote wakeup\n");
+
+	if (test_bit(USBHS_EHCI_RMWKP, &omap->event_state)) {
+		uhhtll_drv_resume(OMAP_EHCI);
+		clear_bit(USBHS_EHCI_RMWKP, &omap->event_state);
+	}
+
+	if (test_bit(USBHS_OHCI_RMWKP, &omap->event_state)) {
+		uhhtll_drv_resume(OMAP_OHCI);
+		clear_bit(USBHS_OHCI_RMWKP, &omap->event_state);
+	}
+
+	flush_scheduled_work();
+}
 
 
 /**
@@ -683,6 +784,7 @@ static int uhhtll_hcd_omap_probe(struct platform_device *pdev)
 {
 	struct uhhtll_hcd_omap *omap = &uhhtll;
 	struct resource *res;
+	struct usbhs_omap_resource *omap_res;
 
 
 	if (!pdev) {
@@ -692,8 +794,6 @@ static int uhhtll_hcd_omap_probe(struct platform_device *pdev)
 
 	memcpy(&omap->platdata, pdev->dev.platform_data,
 				sizeof(omap->platdata));
-
-
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	omap->uhh_base = ioremap(res->start, resource_size(res));
@@ -708,21 +808,69 @@ static int uhhtll_hcd_omap_probe(struct platform_device *pdev)
 	if (!omap->tll_base) {
 		dev_err(&pdev->dev, "TLL ioremap failed\n");
 		iounmap(omap->uhh_base);
-		kfree(omap);
 		return -ENOMEM;
 	}
 
-	omap->ohci_base = ioremap(omap->ohci_addr_start,
-					omap->ohci_addr_size);
-	if (!omap->ohci_base) {
+
+	omap_res = &omap->ohci_res;
+	omap_res->irq = platform_get_irq(omap->ohci_pdev, 0);
+	if (omap_res->irq < 0) {
+		dev_err(&pdev->dev, "OHCI irq failed\n");
+		iounmap(omap->tll_base);
+		iounmap(omap->uhh_base);
+		return -ENOMEM;
+	}
+
+	res = platform_get_resource(omap->ohci_pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "UHH OHCI get resource failed\n");
+		iounmap(omap->tll_base);
+		iounmap(omap->uhh_base);
+		return -ENOMEM;
+	}
+
+	omap_res->start = res->start;
+	omap_res->len = resource_size(res);
+	omap_res->regs = ioremap(omap_res->start, omap_res->len);
+	if (!omap_res->regs) {
 		dev_err(&pdev->dev, "UHH OHCI ioremap failed\n");
 		iounmap(omap->tll_base);
 		iounmap(omap->uhh_base);
-		kfree(omap);
 		return -ENOMEM;
 	}
 
 
+	omap_res = &omap->ehci_res;
+	omap_res->irq = platform_get_irq(omap->ehci_pdev, 0);
+	if (omap_res->irq < 0) {
+		dev_err(&pdev->dev, "OHCI irq failed\n");
+		iounmap(omap->uhh_base);
+		return -ENOMEM;
+	}
+
+	res = platform_get_resource(omap->ehci_pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "UHH EHCI get resource failed\n");
+		iounmap(omap->ohci_res.regs);
+		iounmap(omap->tll_base);
+		iounmap(omap->uhh_base);
+		return -ENOMEM;
+	}
+
+	omap_res->start = res->start;
+	omap_res->len = resource_size(res);
+	omap_res->regs = ioremap(omap_res->start, omap_res->len);
+	if (!omap_res->regs) {
+		dev_err(&pdev->dev, "UHH EHCI ioremap failed\n");
+		iounmap(omap->ohci_res.regs);
+		iounmap(omap->tll_base);
+		iounmap(omap->uhh_base);
+		return -ENOMEM;
+	}
+
+#ifdef CONFIG_PM
+	INIT_WORK(&omap->wakeup_work, usbhs_resume_work);
+#endif
 
 	pm_runtime_enable(&pdev->dev);
 
@@ -750,8 +898,12 @@ static int uhhtll_hcd_omap_remove(struct platform_device *pdev)
 		return -EBUSY;
 	}
 
+#ifdef CONFIG_PM
+	flush_scheduled_work();
+#endif
 	pm_runtime_disable(&omap->pdev->dev);
-	iounmap(omap->ohci_base);
+	iounmap(omap->ehci_res.regs);
+	iounmap(omap->ohci_res.regs);
 	iounmap(omap->tll_base);
 	iounmap(omap->uhh_base);
 	omap->pdev = NULL;
@@ -759,44 +911,11 @@ static int uhhtll_hcd_omap_remove(struct platform_device *pdev)
 }
 
 
-#ifdef	CONFIG_PM
-
-
-static int uhhtll_omap_suspend(struct device *dev)
-{
-
-	dev_err(dev, "uhhtll_omap_suspend\n");
-	return 0;
-}
-
-static int uhhtll_omap_resume(struct device *dev)
-{
-	dev_err(dev, "uhhtll_omap_resume\n");
-	return 0;
-}
-
-
-static const struct dev_pm_ops usbhs_omap_dev_pm_ops = {
-	.runtime_suspend	= uhhtll_omap_suspend,
-	.runtime_resume		= uhhtll_omap_resume,
-};
-
-
-
-
-#define USBHS_OMAP_DEV_PM_OPS (&usbhs_omap_dev_pm_ops)
-#else
-#define	USBHS_OMAP_DEV_PM_OPS	NULL
-#endif
-
-
-
 static struct platform_driver uhhtll_hcd_omap_driver = {
 	.probe			= uhhtll_hcd_omap_probe,
 	.remove			= uhhtll_hcd_omap_remove,
 	.driver = {
 		.name		= "uhhtll-omap",
-		.pm		= USBHS_OMAP_DEV_PM_OPS,
 	}
 };
 
@@ -906,7 +1025,8 @@ static void usbhs_omap_tll_init(struct uhhtll_hcd_omap *omap,
 				| OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE);
 
 			reg |= (1 << (i+1));
-		}
+		} else
+			continue;
 
 		reg |= OMAP_TLL_CHANNEL_CONF_CHANEN;
 		uhhtll_omap_write(omap->tll_base,
@@ -1098,6 +1218,25 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 
 		uhhtll_omap_write(omap->uhh_base, OMAP_UHH_SYSCONFIG, reg);
 
+		/* configure OHCI to suspend; this will
+		 * help if OHCI is not loaded
+		 */
+		reg = uhhtll_omap_read(omap->ohci_res.regs, OHCI_HCCONTROL);
+
+		reg &= OHCI_HCCONTROL_RESET;
+		reg |= OHCI_HCCONTROL_SUSPEND;
+
+		uhhtll_omap_write(omap->ohci_res.regs, OHCI_HCCONTROL, reg);
+
+		/* Enable the EHCI config flag	 */
+		reg  = uhhtll_omap_read(omap->ehci_res.regs, EHCI_CONFIGFLAG);
+		reg |= EHCI_CONFIG_ENABLE;
+
+		uhhtll_omap_write(omap->ehci_res.regs, EHCI_CONFIGFLAG, reg);
+
+		reg = uhhtll_omap_read(omap->uhh_base,
+				OMAP_UHH_HOSTCONFIG);
+
 		reg = uhhtll_omap_read(omap->uhh_base,
 				OMAP_UHH_HOSTCONFIG);
 
@@ -1107,33 +1246,7 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 			OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN);
 		reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
 
-		/*
-		 * FIXME: This bit is currently undocumented.
-		 * Update this commennt after the documentation
-		 * is properly updated
-		 */
-		reg |= OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
-
-		uhhtll_omap_write(omap->uhh_base,
-				OMAP_UHH_HOSTCONFIG, reg);
-
-
-		/* configure OHCI to suspend; this will
-		 * help if OHCI is not loaded
-		 */
-		reg = uhhtll_omap_read(omap->ohci_base, OHCI_HCCONTROL);
-
-		reg &= OHCI_HCCONTROL_RESET;
-		reg |= OHCI_HCCONTROL_SUSPEND;
-
-		uhhtll_omap_write(omap->ohci_base,
-				OHCI_HCCONTROL, reg);
-
-		reg = uhhtll_omap_read(omap->uhh_base,
-				OMAP_UHH_HOSTCONFIG);
 		reg &= OMAP_UHH_HOST_PORT1_RESET;
-
-
 		omap->utmi_p1_fck = clk_get(&omap->pdev->dev,
 				"utmi_p1_gfclk");
 		if (IS_ERR(omap->utmi_p1_fck)) {
@@ -1249,7 +1362,7 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 			uhhtll_omap_write(omap->tll_base, OMAP_USBTLL_SYSCONFIG,
 					OMAP_USBTLL_SYSCONFIG_ENAWAKEUP |
 					OMAP_USBTLL_SYSCONFIG_SIDLEMODE |
-					OMAP_USBTLL_SYSCONFIG_CACTIVITY);
+					OMAP_USBTLL_SYSCONFIG_AUTOIDLE);
 
 
 			/* Enable UTMI mode for required TLL channels */
@@ -1491,7 +1604,21 @@ ok_end:
 	}
 
 end_init:
-	uhhtll_get_tput(&omap->pdev->dev);
+
+	if (cpu_is_omap44xx()) {
+
+		reg = uhhtll_omap_read(omap->uhh_base, OMAP_UHH_HOSTCONFIG);
+		/*
+		 * FIXME: This bit is currently undocumented.
+		 * Update this commennt after the documentation
+		 * is properly updated
+		 */
+		reg |= OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
+
+		uhhtll_omap_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
+
+		uhhtll_get_tput(&omap->pdev->dev);
+	}
 
 end_count:
 	omap->count++;
@@ -1505,11 +1632,20 @@ static void usbhs_disable(struct uhhtll_hcd_omap *omap, int do_stop)
 {
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
 	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
+	u32 reg;
 
 	dev_dbg(&omap->pdev->dev, "Disable USBHS\n");
 
 	if (omap->count == 0)
 		return;
+
+	if (do_stop) {
+		/* Re-enable the EHCI config flag	 */
+		reg  = uhhtll_omap_read(omap->ehci_res.regs, EHCI_CONFIGFLAG);
+		reg |= EHCI_CONFIG_ENABLE;
+
+		uhhtll_omap_write(omap->ehci_res.regs, EHCI_CONFIGFLAG, reg);
+	}
 
 	omap->count--;
 
@@ -1612,7 +1748,21 @@ static void usbhs_disable(struct uhhtll_hcd_omap *omap, int do_stop)
 		}
 
 ok_end:
-		uhhtll_put_tput(&omap->pdev->dev);
+		if (cpu_is_omap44xx()) {
+
+			reg = uhhtll_omap_read(omap->uhh_base,
+					OMAP_UHH_HOSTCONFIG);
+			/*
+			 * FIXME: This bit is currently undocumented.
+			 * Update this commennt after the documentation
+			 * is properly updated
+			 */
+			reg &= ~OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
+
+			uhhtll_omap_write(omap->uhh_base,
+					OMAP_UHH_HOSTCONFIG, reg);
+			uhhtll_put_tput(&omap->pdev->dev);
+		}
 		pm_runtime_put_sync(&omap->pdev->dev);
 	}
 
@@ -1649,6 +1799,38 @@ static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata)
 }
 
 
+static int uhhtll_get_resource(enum driver_type drvtype,
+				struct usbhs_omap_resource *omap_res)
+{
+	struct uhhtll_hcd_omap *omap = &uhhtll;
+	int ret = 0;
+
+	if (!omap_res) {
+		pr_err("uhhtll_get_resource NULL input\n");
+		return -EINVAL;
+	}
+
+	if (!omap->pdev) {
+		pr_err("UHH not yet intialized\n");
+		return -EBUSY;
+	}
+
+	down_interruptible(&omap->mutex);
+
+	if (drvtype == OMAP_EHCI)
+		memcpy(omap_res, &omap->ehci_res, sizeof(omap->ehci_res));
+	else if (drvtype == OMAP_OHCI)
+		memcpy(omap_res, &omap->ohci_res, sizeof(omap->ohci_res));
+	else
+		ret = -EINVAL;
+
+	up(&omap->mutex);
+
+	return ret;
+}
+
+
+
 static int uhhtll_drv_enable(enum driver_type drvtype)
 {
 	struct uhhtll_hcd_omap *omap = &uhhtll;
@@ -1664,12 +1846,14 @@ static int uhhtll_drv_enable(enum driver_type drvtype)
 
 	ret = usbhs_enable(omap, 1);
 
-	if (drvtype == OMAP_EHCI) {
+	if ((!ret) && (drvtype == OMAP_EHCI)) {
 		usbhs_ehci_io_wakeup(pdata->port_mode, 0);
 		usbhs_ehci_clk(omap, 1);
-	} else if (drvtype == OMAP_OHCI) {
+		set_bit(USBHS_EHCI_LOADED, &omap->event_state);
+	} else if ((!ret) && (drvtype == OMAP_OHCI)) {
 		usbhs_ohci_io_wakeup(pdata->port_mode, 0);
 		usbhs_ohci_clk(omap, 1);
+		set_bit(USBHS_OHCI_LOADED, &omap->event_state);
 	}
 
 	up(&omap->mutex);
@@ -1683,21 +1867,35 @@ static int uhhtll_drv_disable(enum driver_type drvtype)
 {
 	struct uhhtll_hcd_omap *omap = &uhhtll;
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
+	int ret = 0;
 
 	if (!omap->pdev) {
 		pr_err("UHH not yet intialized\n");
 		return -EBUSY;
 	}
 
+	dev_dbg(&omap->pdev->dev, "uhhtll_drv_disable");
+
 	down_interruptible(&omap->mutex);
 
-	if (drvtype == OMAP_EHCI) {
+	if ((drvtype == OMAP_EHCI) &&
+		test_bit(USBHS_EHCI_LOADED, &omap->event_state)) {
 		usbhs_ehci_io_wakeup(pdata->port_mode, 0);
-		usbhs_ehci_clk(omap, 0);
-	} else if (drvtype == OMAP_OHCI) {
+		if (test_and_clear_bit(USBHS_EHCI_SUSPENED, &omap->event_state))
+			usbhs_enable(omap, 0);
+		else
+			usbhs_ehci_clk(omap, 0);
+		clear_bit(USBHS_EHCI_LOADED, &omap->event_state);
+	} else if ((drvtype == OMAP_OHCI) &&
+		test_bit(USBHS_OHCI_LOADED , &omap->event_state)) {
 		usbhs_ohci_io_wakeup(pdata->port_mode, 0);
-		usbhs_ohci_clk(omap, 0);
-	}
+		if (test_and_clear_bit(USBHS_OHCI_SUSPENED, &omap->event_state))
+			usbhs_enable(omap, 0);
+		else
+			usbhs_ohci_clk(omap, 0);
+		clear_bit(USBHS_OHCI_LOADED, &omap->event_state);
+	} else
+		ret = -EINVAL;
 
 	usbhs_disable(omap, 1);
 
@@ -1712,6 +1910,46 @@ static int uhhtll_drv_suspend(enum driver_type drvtype)
 {
 	struct uhhtll_hcd_omap *omap = &uhhtll;
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
+	int ret = 0;
+
+	if (!omap->pdev) {
+		pr_err("UHH not yet intialized\n");
+		return -EBUSY;
+	}
+
+	dev_dbg(&omap->pdev->dev, "uhhtll_drv_suspend\n");
+	down_interruptible(&omap->mutex);
+
+
+	if ((drvtype == OMAP_EHCI) &&
+		test_bit(USBHS_EHCI_LOADED, &omap->event_state)) {
+		if (!test_bit(USBHS_EHCI_SUSPENED, &omap->event_state)) {
+			usbhs_ehci_io_wakeup(pdata->port_mode, 1);
+			usbhs_ehci_clk(omap, 0);
+			set_bit(USBHS_EHCI_SUSPENED, &omap->event_state);
+			usbhs_disable(omap, 0);
+		}
+	} else if ((drvtype == OMAP_OHCI) &&
+		test_bit(USBHS_OHCI_LOADED , &omap->event_state)) {
+		if (!test_bit(USBHS_OHCI_SUSPENED, &omap->event_state)) {
+			usbhs_ohci_io_wakeup(pdata->port_mode, 1);
+			usbhs_ohci_clk(omap, 0);
+			set_bit(USBHS_OHCI_SUSPENED, &omap->event_state);
+			usbhs_disable(omap, 0);
+		}
+	} else
+		ret = -EINVAL;
+
+	up(&omap->mutex);
+
+	return ret;
+}
+
+static int uhhtll_drv_resume(enum driver_type drvtype)
+{
+	struct uhhtll_hcd_omap *omap = &uhhtll;
+	struct usbhs_omap_platform_data *pdata = &omap->platdata;
+	int ret = 0;
 
 	if (!omap->pdev) {
 		pr_err("UHH not yet intialized\n");
@@ -1720,45 +1958,24 @@ static int uhhtll_drv_suspend(enum driver_type drvtype)
 
 	down_interruptible(&omap->mutex);
 
-
-	if (drvtype == OMAP_EHCI) {
-		usbhs_ehci_io_wakeup(pdata->port_mode, 1);
-		usbhs_ehci_clk(omap, 0);
-	} else if (drvtype == OMAP_OHCI) {
-		usbhs_ohci_io_wakeup(pdata->port_mode, 1);
-		usbhs_ohci_clk(omap, 0);
-	}
-
-	usbhs_disable(omap, 0);
-
-	up(&omap->mutex);
-
-	return 0;
-}
-
-static int uhhtll_drv_resume(enum driver_type drvtype)
-{
-	struct uhhtll_hcd_omap *omap = &uhhtll;
-	struct usbhs_omap_platform_data *pdata = &omap->platdata;
-	int ret = -EBUSY;
-
-	if (!omap->pdev) {
-		pr_err("UHH not yet intialized\n");
-		return ret;
-	}
-
-	down_interruptible(&omap->mutex);
-
-
-	ret = usbhs_enable(omap, 0);
-
-	if (drvtype == OMAP_EHCI) {
-		usbhs_ehci_io_wakeup(pdata->port_mode, 0);
-		usbhs_ehci_clk(omap, 1);
-	} else if (drvtype == OMAP_OHCI) {
-		usbhs_ohci_io_wakeup(pdata->port_mode, 0);
-		usbhs_ohci_clk(omap, 1);
-	}
+	if ((drvtype == OMAP_EHCI) &&
+		test_bit(USBHS_EHCI_LOADED, &omap->event_state)) {
+		if (test_and_clear_bit(USBHS_EHCI_SUSPENED,
+			&omap->event_state)) {
+			ret = usbhs_enable(omap, 0);
+			usbhs_ehci_io_wakeup(pdata->port_mode, 0);
+			usbhs_ehci_clk(omap, 1);
+		}
+	} else if ((drvtype == OMAP_OHCI) &&
+		test_bit(USBHS_OHCI_LOADED , &omap->event_state)) {
+		if (test_and_clear_bit(USBHS_OHCI_SUSPENED,
+			&omap->event_state)) {
+			ret = usbhs_enable(omap, 0);
+			usbhs_ohci_io_wakeup(pdata->port_mode, 0);
+			usbhs_ohci_clk(omap, 1);
+		}
+	} else
+		ret = -EINVAL;
 
 	up(&omap->mutex);
 
@@ -2212,14 +2429,13 @@ static void setup_4430ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 
 
 
-
-
-
 void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 {
-	struct omap_hwmod *oh[2], *ohci_oh;
-	struct omap_device *od;
-	struct omap_hwmod_addr_space *taddr;
+	struct uhhtll_hcd_omap *omap = &uhhtll;
+	struct omap_hwmod *oh[2], *ohci_oh, *ehci_oh;
+	struct platform_device	*pdev;
+	struct device	*dev;
+	struct omap_device *od, *ohci_od, *ehci_od;
 	int  bus_id = -1;
 
 	if (cpu_is_omap34xx()) {
@@ -2250,6 +2466,13 @@ void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 		return;
 	}
 
+	ehci_oh = omap_hwmod_lookup(USBHS_EHCI_HWMODNAME);
+
+	if (!ehci_oh) {
+		pr_err("Could not look up %s\n", USBHS_EHCI_HWMODNAME);
+		return;
+	}
+
 	od = omap_device_build_ss(uhhtllname, bus_id, oh, 2,
 				(void *)pdata, sizeof(*pdata),
 				omap_uhhtll_latency,
@@ -2261,14 +2484,50 @@ void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 		return;
 	}
 
-	sema_init(&uhhtll.mutex, 1);
 
-	/*we know that first address is OHCI base address */
-	taddr = &(ohci_oh->slaves[0]->addr[0]);
-	uhhtll.ohci_addr_start = taddr->pa_start;
-	uhhtll.ohci_addr_size = taddr->pa_end - taddr->pa_start + 1;
+	ohci_od = omap_device_build(ohciname, bus_id, ohci_oh,
+				(void *)&uhhtll_export, sizeof(uhhtll_export),
+				omap_uhhtll_latency,
+				ARRAY_SIZE(omap_uhhtll_latency), false);
 
-	uhhtll.uhh_hwmod = oh[0];
+	if (IS_ERR(ohci_od)) {
+		pr_err("Could not build hwmod device %s\n",
+			USBHS_OHCI_HWMODNAME);
+		return;
+	} else {
+		pdev = &ohci_od->pdev;
+		dev = &pdev->dev;
+		get_device(dev);
+		dev->dma_mask = &ohci_dmamask;
+		dev->coherent_dma_mask = 0xffffffff;
+		put_device(dev);
+
+	}
+
+	ehci_od = omap_device_build(ehciname, bus_id, ehci_oh,
+				(void *)&uhhtll_export, sizeof(uhhtll_export),
+				omap_uhhtll_latency,
+				ARRAY_SIZE(omap_uhhtll_latency), false);
+
+	if (IS_ERR(ehci_od)) {
+		pr_err("Could not build hwmod device %s\n",
+			USBHS_EHCI_HWMODNAME);
+		return;
+	} else {
+		pdev = &ehci_od->pdev;
+		dev = &pdev->dev;
+		get_device(dev);
+		dev->dma_mask = &ehci_dmamask;
+		dev->coherent_dma_mask = 0xffffffff;
+		put_device(dev);
+
+	}
+
+	sema_init(&omap->mutex, 1);
+
+	omap->ohci_pdev = &ohci_od->pdev;
+	omap->ehci_pdev = &ehci_od->pdev;
+	omap->uhh_hwmod = oh[0];
 
 	if (platform_driver_register(&uhhtll_hcd_omap_driver) < 0) {
 		pr_err("Unable to register HSUSB UHH TLL driver\n");
@@ -2284,107 +2543,3 @@ void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 }
 
 #endif
-
-
-#if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
-
-
-static const char ehciname[] = "ehci-omap";
-static u64 ehci_dmamask = ~(u32)0;
-
-
-void __init usb_ehci_init(void)
-{
-	struct omap_hwmod *oh;
-	struct omap_device *od;
-	int  bus_id = -1;
-	struct platform_device	*pdev;
-	struct device	*dev;
-
-	oh = omap_hwmod_lookup(USBHS_EHCI_HWMODNAME);
-
-	if (!oh) {
-		pr_err("Could not look up %s\n", USBHS_EHCI_HWMODNAME);
-		return;
-	}
-
-	od = omap_device_build(ehciname, bus_id, oh,
-				(void *)&uhhtll_export, sizeof(uhhtll_export),
-				omap_uhhtll_latency,
-				ARRAY_SIZE(omap_uhhtll_latency), false);
-
-	if (IS_ERR(od)) {
-		pr_err("Could not build hwmod device %s\n",
-			USBHS_EHCI_HWMODNAME);
-		return;
-	} else {
-		pdev = &od->pdev;
-		dev = &pdev->dev;
-		get_device(dev);
-		dev->dma_mask = &ehci_dmamask;
-		dev->coherent_dma_mask = 0xffffffff;
-		put_device(dev);
-
-	}
-}
-
-#else
-
-void __init usb_ehci_init(void)
-{
-}
-
-#endif /* CONFIG_USB_EHCI_HCD */
-
-#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
-
-#ifndef USB_UHHTLL_HCD_MODULE
-#define USB_UHHTLL_HCD_MODULE
-#endif
-
-
-static const char ohciname[] = "ohci-omap3";
-static u64 ohci_dmamask = DMA_BIT_MASK(32);
-
-
-void __init usb_ohci_init(void)
-{
-	struct omap_hwmod *oh;
-	struct omap_device *od;
-	int  bus_id = -1;
-	struct platform_device	*pdev;
-	struct device	*dev;
-
-	oh = omap_hwmod_lookup(USBHS_OHCI_HWMODNAME);
-
-	if (!oh) {
-		pr_err("Could not look up %s\n", USBHS_OHCI_HWMODNAME);
-		return;
-	}
-
-	od = omap_device_build(ohciname, bus_id, oh,
-				(void *)&uhhtll_export, sizeof(uhhtll_export),
-				omap_uhhtll_latency,
-				ARRAY_SIZE(omap_uhhtll_latency), false);
-
-	if (IS_ERR(od)) {
-		pr_err("Could not build hwmod device %s\n",
-			USBHS_OHCI_HWMODNAME);
-		return;
-	} else {
-		pdev = &od->pdev;
-		dev = &pdev->dev;
-		get_device(dev);
-		dev->dma_mask = &ohci_dmamask;
-		dev->coherent_dma_mask = 0xffffffff;
-		put_device(dev);
-
-	}
-}
-
-#else
-
-void __init usb_ohci_init(void)
-{
-}
-#endif /* CONFIG_USB_OHCI_HCD */

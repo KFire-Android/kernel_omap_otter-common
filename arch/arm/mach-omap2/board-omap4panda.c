@@ -556,7 +556,6 @@ static void __init omap4_ehci_init(void)
 	gpio_set_value(hub_nreset, 1);
 
 	usb_uhhtll_init(&usbhs_pdata);
-	usb_ehci_init();
 
 	/* enable power to hub */
 	gpio_set_value(GPIO_HUB_POWER, 1);
