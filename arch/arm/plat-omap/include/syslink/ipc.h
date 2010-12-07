@@ -120,7 +120,11 @@ struct ipc_params {
 };
 
 /* IPC events. */
-#define IPC_CLOSE      0
+enum {
+	IPC_CLOSE = 0,
+	IPC_START = 1,
+	IPC_STOP = 2,
+};
 
 /* =============================================================================
  * APIs
@@ -178,5 +182,8 @@ int ipc_unregister_notifier(struct notifier_block *nb);
 #ifdef CONFIG_SYSLINK_RECOVERY
 bool ipc_recovering();
 #endif
+
+/* Indicate to schedule the recovery mechanism */
+void ipc_recover_schedule(void);
 
 #endif /* ifndef _IPC_H_ */

@@ -1731,6 +1731,8 @@ int platform_start_callback(u16 proc_id, void *arg)
 		pr_err("platform_load_callback failed, status [0x%x]\n",
 			status);
 
+	ipc_notify_event(IPC_START, &proc_id);
+
 	return status;
 }
 EXPORT_SYMBOL(platform_start_callback);
@@ -1787,6 +1789,8 @@ int platform_stop_callback(u16 proc_id, void *arg)
 			platform_num_srs_unmapped = 0;
 		}
 	}
+
+	ipc_notify_event(IPC_STOP, &proc_id);
 
 	ipc_detach(proc_id);
 

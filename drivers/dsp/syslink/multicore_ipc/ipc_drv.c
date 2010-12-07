@@ -106,12 +106,13 @@ static void ipc_recover(struct work_struct *work)
 	complete_all(&ipc_open_comp);
 }
 
-static void ipc_recover_schedule(void)
+void ipc_recover_schedule(void)
 {
 	INIT_COMPLETION(ipc_open_comp);
 	recover = true;
 	queue_work(ipc_rec_queue, &ipc_recovery_work);
 }
+EXPORT_SYMBOL_GPL(ipc_recover_schedule);
 
 static int ipc_ducati_iommu_notifier_call(struct notifier_block *nb,
 						unsigned long val, void *v)
