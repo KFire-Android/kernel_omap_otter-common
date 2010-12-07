@@ -36,7 +36,7 @@
 
 /* HSR special divisor values set to control the auto-divisor Rx mode */
 #define HSI_HSR_DIVISOR_AUTO		0x1000	/* Activate auto Rx */
-#define HSI_SSR_DIVISOR_USE_TIMEOUT	0x1001	/* De-activate auto-Rx for SSI */
+#define HSI_SSR_DIVISOR_USE_TIMEOUT	0x1001	/* De-activate auto-Rx (SSI) */
 
 enum {
 	HSI_EVENT_BREAK_DETECTED = 0,
@@ -49,10 +49,10 @@ enum {
 };
 
 enum {
-	HSI_IOCTL_ACWAKE_DOWN = 0,	/* Unset HSI wakeup line (acwake) for the channel */
-	HSI_IOCTL_ACWAKE_UP,	/* Set HSI wakeup line (acwake) for the channel */
+	HSI_IOCTL_ACWAKE_DOWN = 0,	/* Unset HST ACWAKE line for channel */
+	HSI_IOCTL_ACWAKE_UP,	/* Set HSI wakeup line (acwake) for channel */
 	HSI_IOCTL_SEND_BREAK,	/* Send a HW BREAK frame in FRAME mode */
-	HSI_IOCTL_GET_ACWAKE,	/* Get HST WAKE line status */
+	HSI_IOCTL_GET_ACWAKE,	/* Get HST CAWAKE line status */
 	HSI_IOCTL_FLUSH_RX,	/* Force the HSR to idle state */
 	HSI_IOCTL_FLUSH_TX,	/* Force the HST to idle state */
 	HSI_IOCTL_GET_CAWAKE,	/* Get CAWAKE (HSR) line status */

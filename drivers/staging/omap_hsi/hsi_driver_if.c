@@ -549,7 +549,8 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 
 	switch (command) {
 	case HSI_IOCTL_ACWAKE_UP:
-		/* Wake up request to Modem (OMAP initiated or ACK from Modem following CAWAKE high) */
+		/* Wake up request to Modem (typically OMAP initiated or */
+		/* ACK from Modem following CAWAKE high) */
 		hsi_clocks_enable_channel(dev->device.parent,
 					  ch->channel_number);
 
@@ -568,7 +569,8 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		goto out;
 		break;
 	case HSI_IOCTL_ACWAKE_DOWN:
-		/* Low power request initiation (OMAP initiated, typically following inactivity timeout) */
+		/* Low power request initiation (OMAP initiated, typically */
+		/* following inactivity timeout) */
 		/* ACPU HSI block shall still be capable of receiving */
 
 		/* Clocks should be on, but to be sure we enable them here. */
@@ -594,18 +596,20 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		/* Check if CAWAKE is already low */
 		if (hsi_get_cawake(ch->hsi_port)) {
 			dev_err(hsi_ctrl->dev,
-				"CAWAKE is already high at the time of ACWAKE down,"
-				" disabling clock\n");
+				"CAWAKE is already high at the time of ACWAKE "
+				"down, disabling clock\n");
 
 			hsi_clocks_disable_channel(dev->device.parent,
 						   ch->channel_number);
 		}
 
-		/* Decrement the power.usage_count. This may _not_ lead to a real HW clock cut down */
+		/* Decrement the power.usage_count. */
+		/* This may _not_ lead to a real HW clock cut down */
 		hsi_clocks_disable_channel(dev->device.parent,
 					   ch->channel_number);
 
-		/* If all channels have their ACWAKE line down, do not cut the clocks, wait for CAWAKE to go low */
+		/* If all channels have their ACWAKE line down, do not cut */
+		/* the clocks, wait for CAWAKE to go low */
 
 		goto out;
 		break;

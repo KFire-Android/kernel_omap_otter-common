@@ -213,14 +213,15 @@ void hsi_do_cawake_process(struct hsi_port *pport)
 		hsi_ctrl->cawake_status = 1;
 
 		if (hsi_ctrl->acwake_status) {
-			/* Case 1 : Ack from modem following an ACWAKE high */
+			/* Case 1: Ack from modem following an ACWAKE high */
 			/*	(ACPU requests a Modem wakeup) */
-			dev_dbg(hsi_ctrl->dev,
-				"ACWAKE already high, CAWAKE Ack received from modem\n");
+			dev_dbg(hsi_ctrl->dev, "ACWAKE already high, "
+				" CAWAKE Ack received from modem\n");
 
-			/* OMAP is ready, Modem is ready, Transmission can start */
+			/* OMAP is ready, Modem is ready */
+			/* Transmission can start */
 		} else {
-			/* Case 2 : Initial request from modem to wake up the OMAP */
+			/* Case 2: Initial request from modem to wake up OMAP */
 			/*	(OMAP is currently in idle) */
 			/* Note : if we enter here, OMAP is NOT in OFF mode, */
 			/*	otherwise the wakeup path would have gone */
@@ -242,7 +243,8 @@ void hsi_do_cawake_process(struct hsi_port *pport)
 		if (unlikely(hsi_ctrl->acwake_status)) {
 			dev_err(hsi_ctrl->dev,
 				"Unauthorized modem transition to Low Power "
-				"Mode : ACWAKE is still high whereas it should be low\n");
+				"Mode : ACWAKE is still high whereas it should"
+				" be low\n");
 			return;
 		}
 
@@ -370,7 +372,8 @@ static void do_hsi_tasklet(unsigned long hsi_port)
 	/* Check if clocks can be disabled */
 	if (!hsi_ctrl->acwake_status && !hsi_ctrl->cawake_status) {
 		dev_dbg(hsi_ctrl->dev,
-			"ACWAKE & CAWAKE are low, all events processed, disabling clocks\n");
+			"ACWAKE & CAWAKE are low, all events processed, "
+			"disabling clocks\n");
 		hsi_clocks_disable(hsi_ctrl->dev);
 	}
 

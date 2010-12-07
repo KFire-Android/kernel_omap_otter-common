@@ -58,7 +58,8 @@ int __init hsi_cawake_init(struct hsi_port *port, const char *irq_name)
 void hsi_cawake_exit(struct hsi_port *port)
 {
 	if (port->cawake_gpio < 0)
-		return;		/* Nothing to do (SSI with GPIO or HSI with IO ring wakeup */
+		return;	/* Nothing to do (case SSI with GPIO or */
+			/* HSI with IO ring wakeup */
 
 	disable_irq_wake(port->cawake_gpio_irq);
 	tasklet_kill(&port->cawake_tasklet);

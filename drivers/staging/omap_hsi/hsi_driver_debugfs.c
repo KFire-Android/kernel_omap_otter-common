@@ -71,7 +71,7 @@ static int hsi_debug_port_show(struct seq_file *m, void *p)
 		seq_printf(m, "MPU_U_ENABLE_IRQ%d\t: 0x%08x\n",
 			   hsi_port->n_irq,
 			   hsi_inl(base, HSI_SYS_MPU_U_ENABLE_REG(port,
-								  hsi_port->n_irq)));
+							hsi_port->n_irq)));
 		seq_printf(m, "MPU_U_STATUS_IRQ%d\t: 0x%08x\n", hsi_port->n_irq,
 			   hsi_inl(base,
 				   HSI_SYS_MPU_U_STATUS_REG(port,
@@ -335,7 +335,7 @@ static ssize_t hsi_port_counters_write(struct file *filep,
 	nwords = hsi_debug_tokenize(tmpbuf, words, MAXWORDS);
 	if (nwords < 0) {
 		dev_warn(hsi_ctrl->dev,
-			 "HSI counters write usage: echo <values> > counters\n");
+			"HSI counters write usage: echo <values> > counters\n");
 		return -EINVAL;
 	}
 

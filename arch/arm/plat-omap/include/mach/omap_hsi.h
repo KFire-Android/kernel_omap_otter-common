@@ -126,8 +126,9 @@
 #define HSI_WAKE_MASK			0xffff	/* for HSI */
 #define HSI_SET_WAKE_4_WIRES		(0 << 16)
 #define HSI_SET_WAKE_READY_LVL_0	(0 << 17)
-#define HSI_SET_WAKE(channel)		(1 << channel | HSI_SET_WAKE_4_WIRES |\
-							HSI_SET_WAKE_READY_LVL_0)
+#define HSI_SET_WAKE(channel)		(1 << channel |\
+						HSI_SET_WAKE_4_WIRES |\
+						HSI_SET_WAKE_READY_LVL_0)
 #define HSI_CLEAR_WAKE(channel)		(1 << channel)
 #define HSI_WAKE(channel)		(1 << channel)
 
@@ -371,9 +372,9 @@
 #define HSI_GDD_CSR_REG(channel)	(HSI_GDD_CSR_BASE +\
 					(channel * HSI_GDD_CSR_OFFSET))
 #define HSI_CSR_SYNC			(1 << 6)
-#define HSI_CSR_BLOCK			(1 << 5)	/* Full block is transferred */
-#define HSI_CSR_HALF			(1 << 2)	/* Half block is transferred */
-#define HSI_CSR_TOUT			(1 << 0)	/* Time-out overflow occurs */
+#define HSI_CSR_BLOCK			(1 << 5) /* Full block is transferred */
+#define HSI_CSR_HALF			(1 << 2) /* Half block is transferred */
+#define HSI_CSR_TOUT			(1 << 0) /* Time-out overflow occurs */
 
 #define HSI_GDD_CSSA_BASE		(HSI_GDD_BASE + 0x0808)
 #define HSI_GDD_CSSA_OFFSET		0x40
