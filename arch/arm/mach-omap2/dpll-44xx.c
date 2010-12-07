@@ -22,10 +22,12 @@
 #include <mach/omap4-common.h>
 
 #include "clock.h"
+#include "clock44xx.h"
 #include "cm.h"
 #include "cm-regbits-44xx.h"
 
 #define MAX_FREQ_UPDATE_TIMEOUT  100000
+#define DPLL_REGM4XEN_ENABLE	0x1
 
 static struct clockdomain *l3_emif_clkdm;
 
@@ -148,4 +150,45 @@ int omap4_set_freq_update(void)
 	}
 
 	return 0;
+}
+
+long omap4_dpll_regm4xen_round_rate(struct clk *clk, unsigned long target_rate)
+{
+	u32 reg;
+	struct dpll_data *dd;
+
+	dd = clk->dpll_data;
+
+	/* REGM4XEN add 4x multiplier to MN dividers; check if it is set */
+	reg = __raw_readl(dd->control_reg);
+	reg &= OMAP4430_DPLL_REGM4XEN_MASK;
+	if (reg)
+		dd->max_multiplier = OMAP4430_MAX_DPLL_MULT * OMAP4430_REGM4XEN_MULT;
+	else
+		dd->max_multiplier = OMAP4430_MAX_DPLL_MULT;
+
+	omap2_dpll_round_rate(clk, target_rate);
+
+	if (reg) {
+		/*
+		 * FIXME this is lazy; we only support values of M that are
+		 * divisible by 4 (a safe bet) and for which M/4 is >= 2
+		 */
+		if (dd->last_rounded_m % OMAP4430_REGM4XEN_MULT)
+			pr_warn("%s: %s's M (%u) is not divisible by 4\n",
+					__func__, clk->name, dd->last_rounded_m);
+
+		if ((dd->last_rounded_m / OMAP4430_REGM4XEN_MULT) < 2)
+			pr_warn("%s: %s's M (%u) is too low.  Try disabling REGM4XEN for this frequency\n",
+					__func__, clk->name, dd->last_rounded_m);
+
+		dd->last_rounded_m /= OMAP4430_REGM4XEN_MULT;
+	}
+
+	pr_debug("%s: last_rounded_m is %d, last_rounded_n is %d, last_rounded_rate is %lu\n",
+			__func__, clk->dpll_data->last_rounded_m,
+			clk->dpll_data->last_rounded_n,
+			clk->dpll_data->last_rounded_rate);
+
+	return clk->dpll_data->last_rounded_rate;
 }
