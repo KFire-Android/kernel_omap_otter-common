@@ -133,6 +133,7 @@ struct twl6030_usb {
 	u8			linkstat;
 	u8			asleep;
 	bool			irq_enabled;
+	int			prev_vbus;
 };
 
 /* internal define on top of container_of */
@@ -237,19 +238,25 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 
 	vbus_state = twl6030_readb(twl, TWL6030_MODULE_CHARGER,
 						CONTROLLER_STAT1);
-	if (!(hw_state & STS_USB_ID)) {
-		if (vbus_state & VBUS_DET)
-			status = USB_EVENT_VBUS;
-		else
-			status = USB_EVENT_NONE;
+	/* AC unplugg can also generate this IRQ
+	 * we only call the notifier in case of VBUS change
+	 */
+	if (twl->prev_vbus != (vbus_state & VBUS_DET)) {
+		if (!(hw_state & STS_USB_ID)) {
+			if (vbus_state & VBUS_DET)
+				status = USB_EVENT_VBUS;
+			else
+				status = USB_EVENT_NONE;
 
-		if (status >= 0) {
-			blocking_notifier_call_chain(&twl->otg.notifier,
-					status, twl->otg.gadget);
+			if (status >= 0) {
+				blocking_notifier_call_chain(&twl->otg.notifier,
+						status, twl->otg.gadget);
+			}
 		}
+		twl->linkstat = status;
+		sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 	}
-	twl->linkstat = status;
-	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
+	twl->prev_vbus = vbus_state & VBUS_DET;
 
 	return IRQ_HANDLED;
 }
@@ -452,6 +459,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->otg.enable_irq	= twl6030_enable_irq;
 	twl->otg.set_clk	= set_phy_clk;
 	twl->otg.shutdown	= phy_shutdown;
+	twl->prev_vbus		= 0;
 
 	/* init spinlock for workqueue */
 	spin_lock_init(&twl->lock);
