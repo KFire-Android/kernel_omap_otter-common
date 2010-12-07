@@ -764,8 +764,11 @@ int snd_soc_pcm_close(struct snd_pcm_substream *substream)
 	codec_dai->active--;
 	codec->active--;
 
-	if (rtd->dai_link->no_pcm)
-		rtd->be_active--;
+	/* Are we the backend and already enabled */
+	if (rtd->dai_link->no_pcm) {
+		if (--rtd->be_active)
+			goto no_pcm;
+	}
 
 	/* Muting the DAC suppresses artifacts caused during digital
 	 * shutdown, for example from stopping clocks.
@@ -806,6 +809,7 @@ int snd_soc_pcm_close(struct snd_pcm_substream *substream)
 	if (rtd->dai_link->dynamic)
 		snd_soc_put_backend_dais(substream);
 
+no_pcm:
 	mutex_unlock(&rtd->pcm_mutex);
 	return 0;
 }
