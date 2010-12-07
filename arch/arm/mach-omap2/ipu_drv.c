@@ -201,10 +201,6 @@ static int ipu_pm_drv_suspend(struct device *dev)
 		 * BIOS timers could be saved locally or on Ducati
 		 */
 
-		/* call our notification function */
-		retval = ipu_pm_notifications(APP_M3, PM_SUSPEND, NULL);
-		retval = ipu_pm_notifications(SYS_M3, PM_SUSPEND, NULL);
-
 		/* FIXME: Currently sending SUSPEND is enough to send
 		 * Ducati to hibernate, save ctx can be called at this
 		 * point to save ctx and reset remote procs
@@ -212,14 +208,25 @@ static int ipu_pm_drv_suspend(struct device *dev)
 		 * which ever proc_id, maybe this will change when
 		 * Tesla support is added.
 		 */
-		/* sysm3 is handling hibernation of ducati currently */
-		ipu_pm_save_ctx(SYS_M3);
+		/* call notification function */
+		if (ipu_pm_get_handle(APP_M3)) {
+			retval = ipu_pm_notifications(APP_M3, PM_SUSPEND, NULL);
+			if (retval)
+				goto error;
+		}
+		if (ipu_pm_get_handle(SYS_M3)) {
+			retval = ipu_pm_notifications(SYS_M3, PM_SUSPEND, NULL);
+			if (retval)
+				goto error;
+			/* sysm3 is handling hibernation of ducati currently */
+			ipu_pm_save_ctx(SYS_M3);
+		}
 
 		/* return result, should be zero if all Ducati clients
 		 * returned zero else fail code
 		 */
 	}
-
+error:
 	return retval;
 }
 
@@ -235,14 +242,22 @@ static int ipu_pm_drv_resume(struct device *dev)
 		 */
 
 		/* call our notification function */
-		retval = ipu_pm_notifications(APP_M3, PM_RESUME, NULL);
-		retval = ipu_pm_notifications(SYS_M3, PM_RESUME, NULL);
+		if (ipu_pm_get_handle(APP_M3)) {
+			retval = ipu_pm_notifications(APP_M3, PM_RESUME, NULL);
+			if (retval)
+				goto error;
+		}
+		if (ipu_pm_get_handle(SYS_M3)) {
+			retval = ipu_pm_notifications(SYS_M3, PM_RESUME, NULL);
+			if (retval)
+				goto error;
+		}
 
 		/* return result, should be zero if all Ducati clients
 		 * returned zero else fail code
 		 */
 	}
-
+error:
 	return retval;
 }
 
