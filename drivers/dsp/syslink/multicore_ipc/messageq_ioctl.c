@@ -541,7 +541,10 @@ int messageq_ioctl(struct inode *inode, struct file *filp,
 
 	if (user == true) {
 #ifdef CONFIG_SYSLINK_RECOVERY
-		if (ipc_recovering()) {
+		if (ipc_recovering() && cmd != CMD_MESSAGEQ_UNBLOCK
+			    && cmd != CMD_MESSAGEQ_DELETE
+			    && cmd != CMD_MESSAGEQ_CLOSE
+			    && cmd != CMD_MESSAGEQ_DESTROY) {
 			status = -EIO;
 			goto exit;
 		}
