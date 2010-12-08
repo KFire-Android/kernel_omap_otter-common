@@ -4291,8 +4291,8 @@ static struct omap_hwmod_ocp_if *omap44xx_smartreflex_iva_slaves[] = {
 };
 
 static u32 omap44xx_sr_iva_efuse_offs[] = {
-	OMAP44XX_CONTROL_FUSE_IVA_OPP50, OMAP44XX_CONTROL_FUSE_IVA_OPP100,
-	OMAP44XX_CONTROL_FUSE_IVA_OPPTURBO,
+	OMAP44XX_CONTROL_FUSE_IVA_OPP50, OMAP44XX_CONTROL_FUSE_IVA_OPP50,
+	OMAP44XX_CONTROL_FUSE_IVA_OPP100, OMAP44XX_CONTROL_FUSE_IVA_OPPTURBO,
 };
 
 static u32 omap44xx_sr_iva_test_nvalues[] = {

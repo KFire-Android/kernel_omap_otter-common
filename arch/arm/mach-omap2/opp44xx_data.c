@@ -50,18 +50,24 @@ static struct omap_opp_def __initdata omap44xx_pre_es2_1_opp_def_list[] = {
 	OMAP_OPP_DEF("mpu", true, 800000000, 1260000),
 	/* MPU OPP4 - OPP-SB */
 	OMAP_OPP_DEF("mpu", true, 1008000000, 1350000),
+	/* IVA OPP1 - OPP50_98 */
+	OMAP_OPP_DEF("iva", true,  133000000, 928000),
 	/* IVA OPP1 - OPP50 */
 	OMAP_OPP_DEF("iva", true,  133000000, 930000),
 	/* IVA OPP2 - OPP100 */
 	OMAP_OPP_DEF("iva", true,  266000000, 1100000),
 	/* IVA OPP3 - OPP-Turbo */
 	OMAP_OPP_DEF("iva", false, 332000000, 1260000),
+	/* DSP OPP1 - OPP50_98 */
+	OMAP_OPP_DEF("dsp", true, 232800000, 928000),
 	/* DSP OPP1 - OPP50 */
 	OMAP_OPP_DEF("dsp", true, 232800000, 930000),
 	/* DSP OPP2 - OPP100 */
 	OMAP_OPP_DEF("dsp", true, 465600000, 1100000),
 	/* DSP OPP3 - OPPTB */
 	OMAP_OPP_DEF("dsp", false, 498000000, 1260000),
+	/* ABE OPP - OPP50_98 */
+	OMAP_OPP_DEF("omap-aess-audio", true, 49000000, 928000),
 	/* ABE OPP1 - OPP50 */
 	OMAP_OPP_DEF("omap-aess-audio", true, 98300000, 930000),
 	/* ABE OPP2 - OPP100 */
@@ -91,18 +97,24 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	OMAP_OPP_DEF("mpu", true, 800000000, 1260000),
 	/* MPU OPP4 - OPP-SB */
 	OMAP_OPP_DEF("mpu", true, 1008000000, 1350000),
+	/* IVA OPP1 - OPP50_98 */
+	OMAP_OPP_DEF("iva", true,  133000000, 928000),
 	/* IVA OPP1 - OPP50 */
 	OMAP_OPP_DEF("iva", true,  133000000, 930000),
 	/* IVA OPP2 - OPP100 */
 	OMAP_OPP_DEF("iva", true,  266000000, 1100000),
 	/* IVA OPP3 - OPP-Turbo */
 	OMAP_OPP_DEF("iva", false, 332000000, 1260000),
+	/* DSP OPP1 - OPP50_98 */
+	OMAP_OPP_DEF("dsp", true, 232800000, 928000),
 	/* DSP OPP1 - OPP50 */
 	OMAP_OPP_DEF("dsp", true, 232800000, 930000),
 	/* DSP OPP2 - OPP100 */
 	OMAP_OPP_DEF("dsp", true, 465600000, 1100000),
 	/* DSP OPP3 - OPPTB */
 	OMAP_OPP_DEF("dsp", false, 498000000, 1260000),
+	/* ABE OPP - OPP50_98 */
+	OMAP_OPP_DEF("omap-aess-audio", true, 49000000, 928000),
 	/* ABE OPP1 - OPP50 */
 	OMAP_OPP_DEF("omap-aess-audio", true, 98300000, 930000),
 	/* ABE OPP2 - OPP100 */
