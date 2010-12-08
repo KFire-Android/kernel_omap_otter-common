@@ -339,6 +339,14 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_disable_pin(codec->dapm, "Headset Mic");
 	snd_soc_dapm_disable_pin(codec->dapm, "Headset Stereophone");
 
+	/* allow audio paths from the audio modem to run during suspend */
+	snd_soc_dapm_ignore_suspend(codec, "Ext Mic");
+	snd_soc_dapm_ignore_suspend(codec, "Ext Spk");
+	snd_soc_dapm_ignore_suspend(codec, "AFML");
+	snd_soc_dapm_ignore_suspend(codec, "AFMR");
+	snd_soc_dapm_ignore_suspend(codec, "Headset Mic");
+	snd_soc_dapm_ignore_suspend(codec, "Headset Stereophone");
+
 	ret = snd_soc_dapm_sync(codec->dapm);
 	if (ret)
 		return ret;
@@ -548,6 +556,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.fe_playback_channels = 2,
 		.fe_capture_channels = 2,
 		.no_host_mode = SND_SOC_DAI_LINK_NO_HOST,
+		.ignore_suspend = 1,
 	},
 	{
 		.name = "SDP4430 Media LP",
@@ -739,6 +748,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
 		.ops = &sdp4430_mcbsp_ops,
 		.be_id = OMAP_ABE_DAI_MODEM,
+		.ignore_suspend = 1,
 	},
 	{
 		.name = OMAP_ABE_BE_DMIC0,
