@@ -23,6 +23,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 
+#include <ipc.h>
 #include <heap.h>
 #include <heapmemmp_ioctl.h>
 #include <sharedregion.h>
@@ -428,6 +429,12 @@ int heapmemmp_ioctl(struct inode *pinode, struct file *filp,
 			(struct ipc_process_context *)filp->private_data;
 
 	if (user == true) {
+#ifdef CONFIG_SYSLINK_RECOVERY
+		if (ipc_recovering()) {
+			status = -EIO;
+			goto exit;
+		}
+#endif
 		if (_IOC_DIR(cmd) & _IOC_READ)
 			status = !access_ok(VERIFY_WRITE, uarg, _IOC_SIZE(cmd));
 		else if (_IOC_DIR(cmd) & _IOC_WRITE)

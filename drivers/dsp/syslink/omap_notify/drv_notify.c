@@ -28,9 +28,9 @@
 #include <linux/types.h>
 #include <linux/cdev.h>
 
-
 #include <syslink/platform_mem.h>
 #include <syslink/ipc_ioctl.h>
+#include <syslink/ipc.h>
 #include <syslink/drv_notify.h>
 #include <syslink/notify_driver.h>
 #include <syslink/notify.h>
@@ -238,6 +238,11 @@ int notify_drv_ioctl(struct inode *inode, struct file *filp, u32 cmd,
 	struct notify_cmd_args common_args;
 	struct ipc_process_context *pr_ctxt =
 		(struct ipc_process_context *)filp->private_data;
+
+#ifdef CONFIG_SYSLINK_RECOVERY
+	if (ipc_recovering() && user && cmd != CMD_NOTIFY_THREADDETACH)
+		return -EIO;
+#endif
 
 	switch (cmd) {
 	case CMD_NOTIFY_GETCONFIG:

@@ -19,6 +19,7 @@
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <ipc.h>
 #include <multiproc.h>
 #include <multiproc_ioctl.h>
 
@@ -142,6 +143,12 @@ int multiproc_ioctl(struct inode *inode, struct file *filp,
 
 
 	if (user == true) {
+#ifdef CONFIG_SYSLINK_RECOVERY
+		if (ipc_recovering()) {
+			status = -EIO;
+			goto exit;
+		}
+#endif
 		if (_IOC_DIR(cmd) & _IOC_READ)
 			status = !access_ok(VERIFY_WRITE, uarg, _IOC_SIZE(cmd));
 		else if (_IOC_DIR(cmd) & _IOC_WRITE)

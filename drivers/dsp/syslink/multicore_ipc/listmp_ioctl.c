@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 
 /* Module Headers */
+#include <ipc.h>
 #include <listmp.h>
 #include <_listmp.h>
 #include <listmp_ioctl.h>
@@ -500,6 +501,12 @@ int listmp_ioctl(struct inode *inode, struct file *filp,
 			(struct ipc_process_context *)filp->private_data;
 
 	if (user == true) {
+#ifdef CONFIG_SYSLINK_RECOVERY
+		if (ipc_recovering()) {
+			status = -EIO;
+			goto exit;
+		}
+#endif
 		if (_IOC_DIR(cmd) & _IOC_READ)
 			status = !access_ok(VERIFY_WRITE, uarg, _IOC_SIZE(cmd));
 		else if (_IOC_DIR(cmd) & _IOC_WRITE)

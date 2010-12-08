@@ -174,4 +174,9 @@ int ipc_register_notifier(struct notifier_block *nb);
 /* Un-register for IPC events. */
 int ipc_unregister_notifier(struct notifier_block *nb);
 
+/* check if ipc is in recovery state */
+#ifdef CONFIG_SYSLINK_RECOVERY
+bool ipc_recovering();
+#endif
+
 #endif /* ifndef _IPC_H_ */

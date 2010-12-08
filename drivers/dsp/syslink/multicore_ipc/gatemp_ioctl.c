@@ -23,6 +23,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 
+#include <ipc.h>
 #include <gatemp.h>
 #include <gatemp_ioctl.h>
 #include <sharedregion.h>
@@ -315,6 +316,12 @@ int gatemp_ioctl(struct inode *inode, struct file *filp,
 
 
 	if (user == true) {
+#ifdef CONFIG_SYSLINK_RECOVERY
+		if (ipc_recovering()) {
+			status = -EIO;
+			goto exit;
+		}
+#endif
 		if (_IOC_DIR(cmd) & _IOC_READ)
 			status = !access_ok(VERIFY_WRITE, uarg, _IOC_SIZE(cmd));
 		else if (_IOC_DIR(cmd) & _IOC_WRITE)

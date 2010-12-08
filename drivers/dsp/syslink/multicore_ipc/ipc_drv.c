@@ -150,6 +150,11 @@ static int ipc_sysm3_rproc_notifier_call(struct notifier_block *nb,
 		return 0;
 	}
 }
+
+bool ipc_recovering()
+{
+	return recover;
+}
 #endif
 
 /*
@@ -238,14 +243,6 @@ static int ipc_ioctl(struct inode *ip, struct file *filp, u32 cmd, ulong arg)
 	s32 retval = 0;
 	void __user *argp = (void __user *)arg;
 
-#ifdef CONFIG_SYSLINK_RECOVERY
-	if (recover) {
-		if (cmd != CMD_NOTIFY_THREADDETACH) {
-			retval = -EIO;
-			goto exit;
-		}
-	}
-#endif
 	/* Verify the memory and ensure that it is not is kernel
 	     address space
 	*/
