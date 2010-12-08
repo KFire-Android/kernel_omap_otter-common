@@ -184,7 +184,7 @@
  */
 #define min_mdb (-12000)
 #define max_mdb ( 3000)
-#define sizeof_db2lin_table (1+ ((max_mdb - min_mdb)/100))
+#define sizeof_db2lin_table (1 + ((max_mdb - min_mdb)/100))
 #define sizeof_alpha_iir_table 61
 #define sizeof_beta_iir_table 61
 #define GAIN_MAXIMUM 3000L
@@ -237,7 +237,7 @@
 #define NOPARAMETER 0
 /* number of ATC access upon AMIC DMArequests, all the FIFOs are enabled */
 #define MCPDM_UL_ITER 4
-/* All the McPDM FIFOs are enabled simultaneously */
+/* All the McPDM FIFOs are enabled simultaneously MCPDMDL_IP THR = 4 */
 #define MCPDM_DL_ITER 24
 /* All the DMIC FIFOs are enabled simultaneously */
 #define DMIC_ITER 12
@@ -263,7 +263,7 @@
 #define c_feat_read_eq3 6
 #define c_write_eq3 7
 /* ATC FIFOs pointer margin before the scheduler is resynchronized */
-#define JITTER_MARGIN 3
+#define JITTER_MARGIN 4
 /* max number of gain to be controlled by HAL */
 #define MAX_NBGAIN_CMEM 34
 /*

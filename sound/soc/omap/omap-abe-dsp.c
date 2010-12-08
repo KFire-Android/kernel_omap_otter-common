@@ -1706,7 +1706,8 @@ static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 	format.f = params_rate(params);
 	format.samp_format = STEREO_16_16;
 
-	abe_write_event_generator(EVENT_44100);
+	if (format.f == 44100)
+		abe_write_event_generator(EVENT_44100);
 
 	/*Adding ping pong buffer subroutine*/
 	abe_add_subroutine(&abe_irq_pingpong_player_id,
@@ -1724,6 +1725,9 @@ static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 				ABE_VM_AESS_OFFSET + dst;
 	runtime->dma_addr  = 0;
 	runtime->dma_bytes = N_SAMPLES_BYTES * 2;
+
+	/* Need to set the first buffer in order to get interrupt */
+	abe_set_ping_pong_buffer(MM_DL_PORT, N_SAMPLES_BYTES);
 
 	return 0;
 }
@@ -1817,7 +1821,7 @@ static snd_pcm_uframes_t aess_pointer(struct snd_pcm_substream *substream)
 	snd_pcm_uframes_t offset;
 	u32 pingpong;
 
-	abe_read_offset_ping_pong_buffer(MM_DL_PORT, &pingpong);
+	abe_read_offset_from_ping_buffer(MM_DL_PORT, &pingpong);
 	offset = (snd_pcm_uframes_t)pingpong;
 /*
 	if (offset >= runtime->buffer_size)

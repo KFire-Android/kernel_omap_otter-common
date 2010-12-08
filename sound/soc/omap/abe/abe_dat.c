@@ -30,8 +30,10 @@ u32 abe_firmware_version_number;
  */
 u32 abe_compensated_mixer_gain;
 u8 abe_muted_gains_indicator[MAX_NBGAIN_CMEM];
-u32 abe_unmuted_desired_gains[MAX_NBGAIN_CMEM];
-u32 abe_unmuted_compensated_gains[MAX_NBGAIN_CMEM];
+u32 abe_desired_gains_decibel[MAX_NBGAIN_CMEM];
+u32 abe_muted_gains_decibel[MAX_NBGAIN_CMEM];
+u32 abe_desired_gains_linear[MAX_NBGAIN_CMEM];
+u32 abe_desired_ramp_delay_ms[MAX_NBGAIN_CMEM];
 /*
  * HAL/FW ports status / format / sampling / protocol(call_back) / features
  *	/ gain / name
@@ -528,7 +530,7 @@ const abe_subroutine2 abe_sub_array [MAXNBSUBROUTINE] =
  typedef double (*PtrFun) (double);
 PtrFun pFun;
 pFun = sin;
-       y = (* pFun) (x);
+   y = (* pFun) (x);
 *//* mask, { time id param tag1} */
 const abe_sequence_t seq_null = {
 	NOMASK, {CL_M1, 0, {0, 0, 0, 0}, 0}, {CL_M1, 0, {0, 0, 0, 0}, 0}

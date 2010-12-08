@@ -220,7 +220,7 @@ typedef struct {
 #define smem_vx_dl	IO_VX_DL_ASRC_labelID	/* Voice_16k_DL_labelID */
 #define dmem_vx_ul D_VX_UL_FIFO_ADDR
 #define dmem_vx_ul_size (D_VX_UL_FIFO_sizeof/4)
-#define smem_vx_ul Voice_16k_UL_labelID
+#define smem_vx_ul Voice_8k_UL_labelID
 #define dmem_tones_dl D_TONES_DL_FIFO_ADDR
 #define dmem_tones_dl_size (D_TONES_DL_FIFO_sizeof/4)
 #define smem_tones_dl Tones_labelID

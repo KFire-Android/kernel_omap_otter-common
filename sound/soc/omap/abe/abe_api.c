@@ -49,7 +49,6 @@ u32 warm_boot = 0;
  */
 abehal_status abe_reset_hal(void)
 {
-#if 0
 	u32 i;
 	_log(id_reset_hal, 0, 0, 0);
 	abe_dbg_output = TERMINAL_OUTPUT;
@@ -63,13 +62,14 @@ abehal_status abe_reset_hal(void)
 	/* default = disable the mixer's adaptive gain control */
 	abe_use_compensated_gain(0);
 	/* reset the default gain values */
-	for (i = 0; i < MAXNBFEATURE; i++)
-		abe_unmuted_desired_gains[i] =
-			abe_unmuted_compensated_gains[i] =
-			abe_muted_gains_indicator[i] = 0;
+	for (i = 0; i < MAXNBFEATURE; i++) {
+		abe_muted_gains_indicator[i] = 0;
+		abe_desired_gains_decibel[i] = (u32) GAIN_MUTE;
+		abe_desired_gains_linear[i] = 0;
+		abe_desired_ramp_delay_ms[i] = 0;
+	}
 	/* set debug mask to "enable all traces" */
 	abe_dbg_mask = (abe_dbg_t) (0);
-#endif
 	abe_hw_configuration();
 	return 0;
 }
@@ -192,9 +192,9 @@ EXPORT_SYMBOL(abe_reload_fw);
 abehal_status abe_read_hardware_configuration(u32 *u, u32 *o,
 					      abe_hw_config_init_t *hw)
 {
-	_log(id_read_hardware_configuration, (u32);
-	     u, (u32) u >> 8, (u32) u >> 16)
-		abe_read_use_case_opp(u, o);
+	_log(id_read_hardware_configuration, (u32) u,
+		(u32) u >> 8, (u32) u >> 16);
+	abe_read_use_case_opp(u, o);
 	/* 0: 96kHz 1:192kHz */
 	hw->MCPDM_CTRL__DIV_SEL = 0;
 	/* 0: no command in the FIFO, 1: 6 data on each lines (with commands) */
@@ -262,7 +262,7 @@ EXPORT_SYMBOL(abe_read_hardware_configuration);
  * for the delivery of "end of time sequenced tasks" notifications, some are
  * originated from the Ping-Pong protocols, some are generated from
  * the embedded debugger when the firmware stops on programmable break-points,
- * etc
+ * etc ...
  */
 abehal_status abe_irq_processing(void)
 {
@@ -325,7 +325,6 @@ abehal_status abe_irq_clear(void)
 	return 0;
 }
 EXPORT_SYMBOL(abe_irq_clear);
-
 /**
  * abe_select_main_port - Select stynchronization port for Event generator.
  * @id: audio port name
@@ -426,8 +425,8 @@ abehal_status abe_read_use_case_opp(u32 *u, u32 *o)
 #define OPP_25 1
 #define OPP_50 2
 #define OPP_100 4
-	_log(id_read_use_case_opp, (u32); u, (u32) u >> 8, (u32) u >> 16)
-		opp = i = 0;
+	_log(id_read_use_case_opp, (u32) u, (u32) u >> 8, (u32) u >> 16);
+	opp = i = 0;
 	do {
 		/* check for pointer errors */
 		if (i > MAX_READ_USE_CASE_OPP) {
@@ -499,7 +498,9 @@ EXPORT_SYMBOL(abe_read_use_case_opp);
  */
 abehal_status abe_set_opp_processing(u32 opp)
 {
-	u32 dOppMode32;
+	u32 dOppMode32, sio_desc_address;
+	ABE_SIODescriptor desc;
+
 	_lock_enter;
 	_log(id_set_opp_processing, opp, 0, 0);
 	switch (opp) {
@@ -522,7 +523,27 @@ abehal_status abe_set_opp_processing(u32 opp)
 	/* Write Multiframe inside DMEM */
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 		       D_maxTaskBytesInSlot_ADDR, &dOppMode32, sizeof(u32));
+
+	sio_desc_address = dmem_port_descriptors + (MM_EXT_IN_PORT *
+			   sizeof(ABE_SIODescriptor));
+	abe_block_copy (COPY_FROM_ABE_TO_HOST, ABE_DMEM, sio_desc_address,
+			(u32 *)&desc, sizeof(desc));
+
+	if (dOppMode32 == DOPPMODE32_OPP100) {
+		/* ASRC input buffer, size 40 */
+		desc.smem_addr1 = smem_mm_ext_in_opp100;
+		/* Init MM_EXT_IN ASRC and enable its adaptation */
+		abe_init_asrc_mm_ext_in(250);
+	} else {
+		/* at OPP 50 or without ASRC */
+		desc.smem_addr1 = smem_mm_ext_in_opp50;
+	}
+
+	abe_block_copy (COPY_FROM_HOST_TO_ABE, ABE_DMEM, sio_desc_address,
+			(u32 *)&desc, sizeof(desc));
+
 	return 0;
+
 }
 EXPORT_SYMBOL(abe_set_opp_processing);
 /**
@@ -608,28 +629,6 @@ abehal_status abe_read_next_ping_pong_buffer(u32 port, u32 *p, u32 *n)
 	return 0;
 }
 EXPORT_SYMBOL(abe_read_next_ping_pong_buffer);
-abehal_status abe_read_offset_ping_pong_buffer(u32 port, u32 *n)
-{
-	u32 sio_pp_desc_address;
-	ABE_SPingPongDescriptor desc_pp;
-	/* ping_pong is only supported on MM_DL */
-	if (port != MM_DL_PORT) {
-		abe_dbg_param |= ERR_API;
-		abe_dbg_error_log(ABE_PARAMETER_ERROR);
-	}
-	/* read the port SIO descriptor and extract the current pointer
-	   address after reading the counter */
-	sio_pp_desc_address = D_PingPongDesc_ADDR;
-	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM, sio_pp_desc_address,
-		       (u32 *) &desc_pp, sizeof(ABE_SPingPongDescriptor));
-	if ((desc_pp.counter & 0x1) == 0) {
-		*n = 24*1024/4 - desc_pp.workbuff_Samples;
-	} else {
-		*n = 2*24*1024/4 - desc_pp.workbuff_Samples;
-	}
-	return 0;
-}
-EXPORT_SYMBOL(abe_read_offset_ping_pong_buffer);
 /**
  * abe_init_ping_pong_buffer
  * @id: ABE port ID
@@ -663,6 +662,55 @@ abehal_status abe_init_ping_pong_buffer(u32 id, u32 size_bytes, u32 n_buffers,
 }
 EXPORT_SYMBOL(abe_init_ping_pong_buffer);
 /**
+ * abe_read_offset_from_ping_buffer
+ * @id: ABE port ID
+ * @n:  returned address of the offset from the ping buffer start address expressed in samples
+ *
+ * Computes the current firmware ping pong read pointer location, expressed in samples,
+ * as the offset from the start address of ping buffer.
+ */
+abehal_status abe_read_offset_from_ping_buffer(u32 id, u32 *n)
+{
+	u32 sio_pp_desc_address;
+	ABE_SPingPongDescriptor desc_pp;
+	/* ping_pong is only supported on MM_DL */
+	if (MM_DL_PORT != id) {
+		abe_dbg_param |= ERR_API;
+		abe_dbg_error_log(ABE_PARAMETER_ERROR);
+	} else {
+		/* read the port SIO ping pong descriptor */
+		sio_pp_desc_address = D_PingPongDesc_ADDR;
+		abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
+			       sio_pp_desc_address, (u32 *) &desc_pp,
+			       sizeof(ABE_SPingPongDescriptor));
+		/* extract the current ping pong buffer read pointer based on
+		   the value of the counter */
+		if ((desc_pp.counter & 0x1) == 0) {
+			/* the next is buffer0, hence the current is buffer1 */
+			if (abe_port[MM_DL_PORT].format.samp_format &
+			    (MONO_MSB | MONO_RSHIFTED_16 | STEREO_16_16)) {
+				*n = abe_size_pingpong / 4 +
+					desc_pp.nextbuff1_Samples -
+					desc_pp.workbuff_Samples;
+			} else if (abe_port[MM_DL_PORT].format.samp_format &
+				    (STEREO_MSB | STEREO_RSHIFTED_16)) {
+				*n = abe_size_pingpong / 8 +
+					desc_pp.nextbuff1_Samples -
+					desc_pp.workbuff_Samples;
+			} else {
+				abe_dbg_param |= ERR_API;
+				abe_dbg_error_log(ABE_PARAMETER_ERROR);
+			}
+		} else {
+			/* the next is buffer1, hence the current is buffer0 */
+			*n = desc_pp.nextbuff0_Samples -
+				desc_pp.workbuff_Samples;
+		}
+	}
+	return 0;
+}
+EXPORT_SYMBOL(abe_read_offset_from_ping_buffer);
+/**
  * abe_plug_subroutine
  * @id: returned sequence index after plugging a new subroutine
  * @f: subroutine address to be inserted
@@ -674,8 +722,8 @@ EXPORT_SYMBOL(abe_init_ping_pong_buffer);
 abehal_status abe_plug_subroutine(u32 *id, abe_subroutine2 f, u32 n,
 				  u32 *params)
 {
-	_log(id_plug_subroutine, (u32); (*id), (u32) f, n)
-		abe_add_subroutine(id, (abe_subroutine2) f, n, (u32 *) params);
+	_log(id_plug_subroutine, (u32) (*id), (u32) f, n);
+	abe_add_subroutine(id, (abe_subroutine2) f, n, (u32 *) params);
 	return 0;
 }
 EXPORT_SYMBOL(abe_plug_subroutine);
@@ -746,11 +794,11 @@ EXPORT_SYMBOL(abe_read_remaining_data);
  */
 abehal_status abe_disable_data_transfer(u32 id)
 {
+	abe_port_protocol_t *protocol;
 	_log(id_disable_data_transfer, id, 0, 0);
 	/* there is only one PDM_DL physical port shared
 	   with DL1/DL2/VIB. Here is a check for the need to stop
 	   PDM_DL if some activity is already on */
-/*
 	if (id == PDM_DL1_PORT) {
 		pdm_dl1_status = 0;
 		if (pdm_dl2_status || pdm_vib_status)
@@ -772,7 +820,12 @@ abehal_status abe_disable_data_transfer(u32 id)
 		else
 			id = PDM_DL_PORT;
 	}
-*/
+	/* MM_DL managed in ping-pong */
+	if (id == MM_DL_PORT) {
+		protocol = &(abe_port[MM_DL_PORT].protocol);
+		if (protocol->protocol_switch == PINGPONG_PORT_PROT)
+			abe_disable_pp_io_task(MM_DL_PORT);
+	}
 	/* local host variable status= "port is running" */
 	abe_port[id].status = OMAP_ABE_PORT_ACTIVITY_IDLE;
 	/* disable DMA requests */
@@ -781,7 +834,7 @@ abehal_status abe_disable_data_transfer(u32 id)
 	abe_init_atc(id);
 	abe_clean_temporary_buffers(id);
 	/* select the main port based on the desactivation of this port */
-	abe_decide_main_port(id);
+	abe_decide_main_port();
 	return 0;
 }
 EXPORT_SYMBOL(abe_disable_data_transfer);
@@ -797,12 +850,11 @@ abehal_status abe_enable_data_transfer(u32 id)
 {
 	abe_port_protocol_t *protocol;
 	abe_data_format_t format;
-	u32 dOppMode32;
+
 	_log(id_enable_data_transfer, id, 0, 0);
 	/* there is only one PDM_DL physical port shared
 	   with DL1/DL2/VIB. Here is a check for the need to enable
 	   PDM_DL when some activity is already on */
-/*
 	if (id == PDM_DL1_PORT) {
 		id = PDM_DL_PORT;
 		if (pdm_dl1_status == 1)
@@ -824,7 +876,6 @@ abehal_status abe_enable_data_transfer(u32 id)
 		else
 			pdm_vib_status = 1;
 	}
-*/
 	abe_clean_temporary_buffers(id);
 	if (id == PDM_UL_PORT) {
 		/* initializes the ABE ATC descriptors in DMEM - MCPDM_UL */
@@ -839,6 +890,13 @@ abehal_status abe_enable_data_transfer(u32 id)
 		format = abe_port[PDM_DL_PORT].format;
 		abe_init_atc(PDM_DL_PORT);
 		abe_init_io_tasks(PDM_DL_PORT, &format, protocol);
+	}
+	/* MM_DL managed in ping-pong */
+	if (id == MM_DL_PORT) {
+		protocol = &(abe_port[MM_DL_PORT].protocol);
+		if (protocol->protocol_switch == PINGPONG_PORT_PROT) {
+			abe_enable_pp_io_task(MM_DL_PORT);
+		}
 	}
 	if (id == DMIC_PORT) {
 		/* one DMIC port enabled = all DMICs enabled,
@@ -856,20 +914,13 @@ abehal_status abe_enable_data_transfer(u32 id)
 		/* Init VX_DL ASRC and enable its adaptation */
 		abe_init_asrc_vx_dl(250);
 	}
-	if (id == MM_EXT_IN_PORT) {
-		abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
-			       D_maxTaskBytesInSlot_ADDR, &dOppMode32,
-			       sizeof(u32));
-		if (dOppMode32 == DOPPMODE32_OPP100)
-			/* Init MM_EXT_IN ASRC and enable its adaptation */
-			abe_init_asrc_mm_ext_in(250);
-	}
+
 	/* local host variable status= "port is running" */
 	abe_port[id].status = OMAP_ABE_PORT_ACTIVITY_RUNNING;
 	/* enable DMA requests */
 	abe_enable_dma_request(id);
 	/* select the main port based on the activation of this new port */
-	abe_decide_main_port(id);
+	abe_decide_main_port();
 	return 0;
 }
 EXPORT_SYMBOL(abe_enable_data_transfer);
@@ -1350,11 +1401,12 @@ abehal_status abe_write_asrc(u32 port, s32 dppm)
 		drift_sign_addr = D_AsrcVars_UL_VX_ADDR + (1 * sizeof(s32));
 		alpha_params_addr = D_AsrcVars_UL_VX_ADDR + (3 * sizeof(s32));
 		break;
-		/* asynchronous sample-rate-converter for the multimedia player */
 	default:
+		/* asynchronous sample-rate-converter for the multimedia player */
 	case MM_EXT_IN_PORT:
 		drift_sign_addr = D_AsrcVars_MM_EXT_IN_ADDR + (1 * sizeof(s32));
-		alpha_params_addr = D_AsrcVars_MM_EXT_IN_ADDR + (3 * sizeof(s32));
+		alpha_params_addr =
+			D_AsrcVars_MM_EXT_IN_ADDR + (3 * sizeof(s32));
 		break;
 	}
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, drift_sign_addr,
@@ -1404,20 +1456,15 @@ EXPORT_SYMBOL(abe_use_compensated_gain);
  */
 abehal_status abe_mute_gain(u32 id, u32 p)
 {
-	u32 lin_g, mixer_offset, mixer_target;
+	u32 mixer_offset, f_g, ramp;
+	/* save the input parameters for mute/unmute */
 	abe_gain_offset(id, &mixer_offset);
-	abe_muted_gains_indicator[mixer_offset + p] = 1;
-	/* SMEM word32 address */
-	mixer_target = (S_GTarget1_ADDR << 1);
-	mixer_target += mixer_offset;
-	mixer_target += p;
-	/* translate coef address in Bytes */
-	mixer_target <<= 2;
-	/* new muted gain */
-	lin_g = 0;
-	/* load the S_G_Target SMEM table */
-	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM, mixer_target,
-		       (u32 *) &lin_g, sizeof(lin_g));
+	ramp = abe_desired_ramp_delay_ms[mixer_offset + p];
+	f_g = GAIN_MUTE;
+	abe_muted_gains_decibel[mixer_offset + p] =
+		abe_desired_gains_decibel[mixer_offset + p];
+	/* unmute the gain */
+	abe_write_gain(id, f_g, ramp, p);
 	return 0;
 }
 EXPORT_SYMBOL(abe_mute_gain);
@@ -1430,23 +1477,13 @@ EXPORT_SYMBOL(abe_mute_gain);
  */
 abehal_status abe_unmute_gain(u32 id, u32 p)
 {
-	u32 mixer_offset, mixer_target, lin_g;
+	u32 mixer_offset, f_g, ramp;
+	/* restore the input parameters for mute/unmute */
 	abe_gain_offset(id, &mixer_offset);
-	/* SMEM word32 address */
-	mixer_target = (S_GTarget1_ADDR << 1);
-	mixer_target += mixer_offset;
-	mixer_target += p;
-	/* translate coef address in Bytes */
-	mixer_target <<= 2;
-	/* unmute gain */
-	if (abe_compensated_mixer_gain)
-		lin_g = abe_unmuted_compensated_gains[mixer_offset + p];
-	else
-		lin_g = abe_unmuted_desired_gains[mixer_offset + p];
-	abe_muted_gains_indicator[mixer_offset + p] = 0;
-	/* load the S_G_Target SMEM table */
-	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM, mixer_target,
-		       (u32 *) &lin_g, sizeof(lin_g));
+	f_g = abe_muted_gains_decibel[mixer_offset + p];
+	ramp = abe_desired_ramp_delay_ms[mixer_offset + p];
+	/* unmute the gain */
+	abe_write_gain(id, f_g, ramp, p);
 	return 0;
 }
 EXPORT_SYMBOL(abe_unmute_gain);
@@ -1464,7 +1501,8 @@ EXPORT_SYMBOL(abe_unmute_gain);
  */
 abehal_status abe_write_gain(u32 id, s32 f_g, u32 ramp, u32 p)
 {
-	u32 lin_g, mixer_target, mixer_offset, i, mean_gain, mean_exp;
+	u32 lin_g, sum_g, mixer_target, mixer_offset, i, mean_gain, mean_exp;
+	u32 new_gain_linear[4];
 	s32 gain_index;
 	u32 alpha, beta;
 	u32 ramp_index;
@@ -1474,14 +1512,16 @@ abehal_status abe_write_gain(u32 id, s32 f_g, u32 ramp, u32 p)
 	gain_index = minimum(gain_index, sizeof_db2lin_table);
 	lin_g = abe_db2lin_table[gain_index];
 	abe_gain_offset(id, &mixer_offset);
+	/* save the input parameters for mute/unmute */
+	abe_desired_gains_linear[mixer_offset + p] = lin_g;
+	abe_desired_gains_decibel[mixer_offset + p] = f_g;
+	abe_desired_ramp_delay_ms[mixer_offset + p] = ramp;
 	/* SMEM word32 address */
 	mixer_target = (S_GTarget1_ADDR << 1);
 	mixer_target += mixer_offset;
 	mixer_target += p;
 	/* translate coef address in Bytes */
 	mixer_target <<= 2;
-	abe_muted_gains_indicator[mixer_offset + p] = 0;
-	abe_unmuted_desired_gains[mixer_offset + p] = lin_g;
 	if (abe_compensated_mixer_gain) {
 		switch (id) {
 		case MIXDL1:
@@ -1489,48 +1529,42 @@ abehal_status abe_write_gain(u32 id, s32 f_g, u32 ramp, u32 p)
 		case MIXVXREC:
 		case MIXAUDUL:
 			/* compute the sum of the gain of the mixer */
-			for (lin_g = i = 0; i < 4; i++)
-				lin_g += abe_unmuted_desired_gains[mixer_offset
-								   + i];
+			for (sum_g = i = 0; i < 4; i++)
+				sum_g += abe_desired_gains_linear[mixer_offset +
+								  i];
 			/* lets avoid a division by 0 */
-			if (lin_g == 0)
+			if (sum_g == 0)
 				break;
+			/* if the sum is OK with less than 1, then
+			   do not weight the gains */
+			if (sum_g < 0x00040000) {	/* REMOVE HARD CONST */
+				/* recompute all gains from original
+				   desired values */
+				sum_g = 0x00040000;
+			}
 			/* translate it in Q16 format for the later division */
-			abe_int_2_float16(lin_g, &mean_gain, &mean_exp);
+			abe_int_2_float16(sum_g, &mean_gain, &mean_exp);
 			mean_exp = 10 - mean_exp;
 			for (i = 0; i < 4; i++) {
 				/* new gain = desired gain divided by sum of gains */
-				abe_unmuted_compensated_gains[mixer_offset +
-							      i] =
-					(abe_unmuted_desired_gains
+				new_gain_linear[i] =
+					(abe_desired_gains_linear
 					 [mixer_offset + i]
 					 << 8) / mean_gain;
-				abe_unmuted_compensated_gains[mixer_offset +
-							      i] =
-					(mean_exp >
-					 0) ?
-					abe_unmuted_compensated_gains
-					[mixer_offset + i]
-					<< mean_exp :
-					abe_unmuted_compensated_gains
-					[mixer_offset + i]
-					>> mean_exp;
+				new_gain_linear[i] = (mean_exp > 0) ?
+					new_gain_linear[i] << mean_exp :
+					new_gain_linear[i] >> mean_exp;
 			}
 			/* load the whole adpated S_G_Target SMEM MIXER table */
 			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM,
 				       mixer_target - (p << 2),
-				       abe_unmuted_compensated_gains,
-				       (4 * sizeof(lin_g)));
+				       new_gain_linear, (4 * sizeof(lin_g)));
 			break;
 		default:
-		case GAINS_DMIC1:
-		case GAINS_DMIC2:
-		case GAINS_DMIC3:
-		case GAINS_AMIC:
-		case GAINS_DL1:
-		case GAINS_DL2:
-		case MIXECHO:
-		case MIXSDT:
+			/* load the S_G_Target SMEM table */
+			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_SMEM,
+				       mixer_target,
+				       (u32 *) &lin_g, sizeof(lin_g));
 			break;
 		}
 	} else {
@@ -1597,9 +1631,8 @@ EXPORT_SYMBOL(abe_write_mixer);
  */
 abehal_status abe_read_gain(u32 id, u32 *f_g, u32 p)
 {
-	u32 mixer_target, mixer_offset;
-	u32 i;
-	_log(id_read_gain, id, (u32); f_g, p)
+	u32 mixer_target, mixer_offset, i;
+	_log(id_read_gain, id, (u32) f_g, p);
 		abe_gain_offset(id, &mixer_offset);
 	/* SMEM word32 address */
 	mixer_target = (S_GTarget1_ADDR << 1);
@@ -1665,8 +1698,8 @@ EXPORT_SYMBOL(abe_read_mixer);
  */
 abehal_status abe_set_router_configuration(u32 id, u32 k, u32 *param)
 {
-	_log(id_set_router_configuration, id, (u32); param, (u32) param >> 8)
-		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
+	_log(id_set_router_configuration, id, (u32) param, (u32) param >> 8);
+	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       D_aUplinkRouting_ADDR,
 			       param, D_aUplinkRouting_sizeof);
 	return 0;

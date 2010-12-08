@@ -1127,7 +1127,7 @@ static void enable_fe_ports(struct snd_pcm_substream *substream, int stream)
 			abe_enable_data_transfer(MM_UL_PORT);
 		break;
 	case ABE_FRONTEND_DAI_LP_MEDIA:
-		abe_enable_irq_transfer(MM_DL_PORT);
+		abe_enable_data_transfer(MM_DL_PORT);
 		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 		if (stream == SNDRV_PCM_STREAM_CAPTURE)
@@ -1247,7 +1247,7 @@ static void disable_fe_ports(struct snd_pcm_substream *substream, int stream)
 			abe_disable_data_transfer(MM_UL_PORT);
 		break;
 	case ABE_FRONTEND_DAI_LP_MEDIA:
-		abe_disable_irq_transfer(MM_DL_PORT);
+		abe_disable_data_transfer(MM_DL_PORT);
 		break;
 	case ABE_FRONTEND_DAI_MEDIA_CAPTURE:
 		if (stream == SNDRV_PCM_STREAM_CAPTURE)
@@ -1610,7 +1610,7 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "MultiMedia1 LP Playback",
 			.channels_min = 2,
 			.channels_max = 2,
-			.rates = SNDRV_PCM_RATE_44100,
+			.rates = SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000,
 			.formats = OMAP_ABE_FORMATS | SNDRV_PCM_FMTBIT_S16_LE,
 		},
 		.ops = &omap_abe_dai_ops,

@@ -29,7 +29,7 @@
 /*
  * HAL INTERNAL AP
  */
-void abe_decide_main_port(u32 id);
+void abe_decide_main_port(void);
 void abe_gain_offset(u32 id, u32 *mixer_offset);
 void abe_int_2_float16(u32 data, u32 *mantissa, u32 *exp);
 void abe_reset_gain_mixer(u32 id, u32 p);
@@ -49,6 +49,8 @@ void abe_disable_atc(u32 id);
 void abe_init_atc(u32 id);
 void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 		       abe_port_protocol_t *prot);
+void abe_enable_pp_io_task(u32 id);
+void abe_disable_pp_io_task(u32 id);
 void abe_init_dma_t(u32 id, abe_port_protocol_t *prot);
 u32 abe_dma_port_iter_factor(abe_data_format_t *f);
 u32 abe_dma_port_copy_subroutine_id(u32 i);
@@ -63,6 +65,8 @@ void abe_irq_ping_pong(void);
 void abe_irq_check_for_sequences(u32 seq_info);
 void abe_default_irq_pingpong_player(void);
 void abe_default_irq_pingpong_player_32bits(void);
+void abe_rshifted16_irq_pingpong_player_32bits(void);
+void abe_1616_irq_pingpong_player_1616bits(void);
 void abe_default_irq_aps_adaptation(void);
 void abe_irq_aps(u32 aps_info);
 void abe_clean_temporary_buffers(u32 id);
@@ -80,8 +84,10 @@ void abe_init_asrc_mm_ext_in(s32 dppm);
 extern const u32 abe_port_priority[LAST_PORT_ID - 1];
 extern u32 abe_compensated_mixer_gain;
 extern u8 abe_muted_gains_indicator[MAX_NBGAIN_CMEM];
-extern u32 abe_unmuted_desired_gains[MAX_NBGAIN_CMEM];
-extern u32 abe_unmuted_compensated_gains[MAX_NBGAIN_CMEM];
+extern u32 abe_desired_gains_decibel[MAX_NBGAIN_CMEM];
+extern u32 abe_muted_gains_decibel[MAX_NBGAIN_CMEM];
+extern u32 abe_desired_gains_linear[MAX_NBGAIN_CMEM];
+extern u32 abe_desired_ramp_delay_ms[MAX_NBGAIN_CMEM];
 extern u32 pdm_dl1_status;
 extern u32 pdm_dl2_status;
 extern u32 pdm_vib_status;

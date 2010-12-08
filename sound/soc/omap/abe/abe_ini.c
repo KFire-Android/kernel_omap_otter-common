@@ -20,6 +20,9 @@
  */
 #include "abe_main.h"
 #include "abe_dm_addr.h"
+
+short MultiFrame[PROCESSING_SLOTS][TASKS_IN_SLOT];
+
 /*
  * initialize the default values for call-backs to subroutines
  * - FIFO IRQ call-backs for sequenced tasks
@@ -28,7 +31,6 @@
  * - Error monitoring
  * - Activity Tracing
  */
-static short MultiFrame[PROCESSING_SLOTS][TASKS_IN_SLOT];
 /**
  * abe_hw_configuration
  *
@@ -71,10 +73,10 @@ void abe_build_scheduler_table()
 	/* MultiFrame[1][1] = 0; */
 #define TASK_ASRC_VX_DL_SLT 1
 #define TASK_ASRC_VX_DL_IDX 2
-	MultiFrame[1][2] = ABE_TASK_ID(C_ABE_FW_TASK_ASRC_VX_DL_16);
+	MultiFrame[1][2] = ABE_TASK_ID(C_ABE_FW_TASK_ASRC_VX_DL_8);
 #define TASK_VX_DL_SLT 1
 #define TASK_VX_DL_IDX 3
-	MultiFrame[1][3] = ABE_TASK_ID(C_ABE_FW_TASK_VX_DL_16_48);
+	MultiFrame[1][3] = ABE_TASK_ID(C_ABE_FW_TASK_VX_DL_8_48);
 	/* MultiFrame[1][4] = 0; */
 	/* MultiFrame[1][5] = 0; */
 	MultiFrame[1][6] = ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer);
@@ -166,7 +168,7 @@ void abe_build_scheduler_table()
 	MultiFrame[12][4] = ABE_TASK_ID(C_ABE_FW_TASK_ULMixer);
 #define TASK_VX_UL_SLT 12
 #define TASK_VX_UL_IDX 5
-	MultiFrame[12][5] = ABE_TASK_ID(C_ABE_FW_TASK_VX_UL_48_16);
+	MultiFrame[12][5] = ABE_TASK_ID(C_ABE_FW_TASK_VX_UL_48_8);
 	/* MultiFrame[12][6] = 0; */
 	/* MultiFrame[12][7] = 0; */
 	/* MultiFrame[13][0] = 0; */
@@ -199,7 +201,7 @@ void abe_build_scheduler_table()
 	/* MultiFrame[16][1] = 0; */
 #define TASK_ASRC_VX_UL_SLT 16
 #define TASK_ASRC_VX_UL_IDX 2
-	MultiFrame[16][2] = ABE_TASK_ID(C_ABE_FW_TASK_ASRC_VX_UL_16);
+	MultiFrame[16][2] = ABE_TASK_ID(C_ABE_FW_TASK_ASRC_VX_UL_8);
 	MultiFrame[16][3] = ABE_TASK_ID(C_ABE_FW_TASK_IO_VX_UL);
 	/* MultiFrame[16][4] = 0; */
 	/* MultiFrame[16][5] = 0; */
@@ -317,11 +319,11 @@ void abe_init_atc(u32 id)
 	/* IN from AESS point of view */
 	if (abe_port[id].protocol.direction == ABE_ATC_DIRECTION_IN)
 		if (iter + 2 * datasize > 126)
-			desc.wrpt = (iter >> 1) + (JITTER_MARGIN * datasize);
+			desc.wrpt = (iter >> 1) + ((JITTER_MARGIN - 1) * datasize);
 		else
-			desc.wrpt = iter + (JITTER_MARGIN * datasize);
+			desc.wrpt = iter + ((JITTER_MARGIN - 1) * datasize);
 	else
-		desc.wrpt = 0 + (JITTER_MARGIN * datasize);
+		desc.wrpt = 0 + ((JITTER_MARGIN + 1) * datasize);
 	switch ((abe_port[id]).protocol.protocol_switch) {
 	case SLIMBUS_PORT_PROT:
 		desc.cbdir = (abe_port[id]).protocol.direction;
@@ -580,20 +582,10 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 	u32 sio_desc_address, datasize, iter, nsamp, datasize2, dOppMode32;
 	u32 atc_ptr_saved, atc_ptr_saved2, copy_func_index1;
 	u32 copy_func_index2, atc_desc_address1, atc_desc_address2;
+
 	if (prot->protocol_switch == PINGPONG_PORT_PROT) {
-		/* MM_DL managed in ping-pong */
-		if (MM_DL_PORT == id) {
-#if 0
-			abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
-				       D_multiFrame_ADDR,
-				       (u32 *) MultiFrame, sizeof(MultiFrame));
-			MultiFrame[TASK_IO_MM_DL_SLT][TASK_IO_MM_DL_IDX] =
-				ABE_TASK_ID(C_ABE_FW_TASK_IO_PING_PONG);
-			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
-				       D_multiFrame_ADDR, (u32 *) MultiFrame,
-				       sizeof(MultiFrame));
-#endif
-		} else {
+		/* ping_pong is only supported on MM_DL */
+		if (MM_DL_PORT != id) {
 			abe_dbg_param |= ERR_API;
 			abe_dbg_error_log(ABE_PARAMETER_ERROR);
 		}
@@ -622,17 +614,22 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 		desc_pp.workbuff_BaseAddr =
 			(u16) (abe_base_address_pingpong[1]);
 		/* size comunicated in XIO sample */
-		desc_pp.workbuff_Samples = (u16) iter_samples;
+		desc_pp.workbuff_Samples = 0;
 		desc_pp.nextbuff0_BaseAddr =
 			(u16) (abe_base_address_pingpong[0]);
-		desc_pp.nextbuff0_Samples =
-			(u16) ((abe_size_pingpong >> 2) / datasize);
 		desc_pp.nextbuff1_BaseAddr =
 			(u16) (abe_base_address_pingpong[1]);
-		desc_pp.nextbuff1_Samples =
-			(u16) ((abe_size_pingpong >> 2) / datasize);
+		if (dmareq_addr == ABE_DMASTATUS_RAW) {
+			desc_pp.nextbuff0_Samples =
+				(u16) ((abe_size_pingpong >> 2) / datasize);
+			desc_pp.nextbuff1_Samples =
+				(u16) ((abe_size_pingpong >> 2) / datasize);
+		} else {
+			desc_pp.nextbuff0_Samples = 0;
+			desc_pp.nextbuff1_Samples = 0;
+		}
 		/* next buffer to send is B1, first IRQ fills B0 */
-		desc_pp.counter = 1;
+		desc_pp.counter = 0;
 		/* send a DMA req to fill B0 with N samples
 		   abe_block_copy (COPY_FROM_HOST_TO_ABE, ABE_ATC, ABE_DMASTATUS_RAW,
 		   &(abe_port[id].protocol.p.prot_pingpong.irq_data), 4); */
@@ -879,32 +876,54 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 			       sio_desc_address, (u32 *) &desc, sizeof(desc));
 	}
 }
-void abe_enable_irq_transfer(u32 id)
+/**
+ * abe_enable_pp_io_task
+ * @id: port_id
+ *
+ *
+ */
+void abe_enable_pp_io_task(u32 id)
 {
+
 	/* MM_DL managed in ping-pong */
 	if (MM_DL_PORT == id) {
 		abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
-			       D_multiFrame_ADDR,
-			       (u32 *) MultiFrame, sizeof(MultiFrame));
+			       D_multiFrame_ADDR, (u32 *) MultiFrame,
+			       sizeof(MultiFrame));
 		MultiFrame[TASK_IO_MM_DL_SLT][TASK_IO_MM_DL_IDX] =
 			ABE_TASK_ID(C_ABE_FW_TASK_IO_PING_PONG);
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       D_multiFrame_ADDR, (u32 *) MultiFrame,
-				       sizeof(MultiFrame));
+			       sizeof(MultiFrame));
+	}
+	/* ping_pong is only supported on MM_DL */
+	else {
+		abe_dbg_param |= ERR_API;
+		abe_dbg_error_log(ABE_PARAMETER_ERROR);
 	}
 }
-
-void abe_disable_irq_transfer(u32 id)
+/**
+ * abe_disable_pp_io_task
+ * @id: port_id
+ *
+ *
+ */
+void abe_disable_pp_io_task(u32 id)
 {
 	/* MM_DL managed in ping-pong */
 	if (MM_DL_PORT == id) {
 		abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
-			       D_multiFrame_ADDR,
-			       (u32 *) MultiFrame, sizeof(MultiFrame));
+			       D_multiFrame_ADDR, (u32 *) MultiFrame,
+			       sizeof(MultiFrame));
 		MultiFrame[TASK_IO_MM_DL_SLT][TASK_IO_MM_DL_IDX] = 0;
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       D_multiFrame_ADDR, (u32 *) MultiFrame,
 			       sizeof(MultiFrame));
+	}
+	/* ping_pong is only supported on MM_DL */
+	else {
+		abe_dbg_param |= ERR_API;
+		abe_dbg_error_log(ABE_PARAMETER_ERROR);
 	}
 }
 /**
