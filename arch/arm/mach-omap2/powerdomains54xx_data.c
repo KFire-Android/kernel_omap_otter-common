@@ -240,7 +240,7 @@ static struct powerdomain l3init_54xx_pwrdm = {
 		[0] = PWRSTS_OFF_RET,	/* l3init_bank1 */
 		[1] = PWRSTS_OFF_RET,	/* l3init_bank2 */
 	},
-	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE | PWRDM_HAS_HDWR_SAR,
 };
 
 /* l4per_54xx_pwrdm: Target peripherals power domain */
