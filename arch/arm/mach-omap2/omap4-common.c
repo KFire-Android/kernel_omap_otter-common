@@ -24,6 +24,7 @@
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
 #include <plat/control.h>
+#include <plat/clockdomain.h>
 
 #ifdef CONFIG_ENABLE_L3_ERRORS
 /*
@@ -184,6 +185,7 @@ void __iomem *l2cache_base;
 void __iomem *gic_cpu_base_addr;
 void __iomem *gic_dist_base_addr;
 void __iomem *sar_ram_base;
+static struct clockdomain *l4_secure_clkdm;
 
 void __init gic_init_irq(void)
 {
@@ -248,6 +250,9 @@ static int __init omap4_sar_ram_init(void)
 	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_8K);
 	BUG_ON(!sar_ram_base);
 
+	/* FIXME: HWSUP isn't working for l4_secure_clkdm */
+	l4_secure_clkdm = clkdm_lookup("l4_secure_clkdm");
+
 	return 0;
 }
 early_initcall(omap4_sar_ram_init);
@@ -275,13 +280,20 @@ u32 omap4_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
 	param[3] = arg3;
 	param[4] = arg4;
 
+	/* Put l4 secure to SW_WKUP so that moduels are accessible */
+	omap2_clkdm_wakeup(l4_secure_clkdm);
+
 	/*
 	 * Secure API needs physical address
 	 * pointer for the parameters
 	 */
 	flush_cache_all();
 	outer_clean_range(__pa(param), __pa(param + 5));
+
 	ret = omap_smc2(idx, flag, __pa(param));
+
+	/* Restore the HW_SUP so that module can idle */
+	omap2_clkdm_allow_idle(l4_secure_clkdm);
 
 	return ret;
 }

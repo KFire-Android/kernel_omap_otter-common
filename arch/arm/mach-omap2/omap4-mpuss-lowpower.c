@@ -80,7 +80,6 @@ dma_addr_t omap4_secure_ram_phys;
 
 static void *secure_ram;
 static struct powerdomain *cpu0_pwrdm, *cpu1_pwrdm, *mpuss_pd;
-static struct clockdomain *l4_secure_clkdm;
 
 /*
  * GIC save restore offset from SAR_BANK3
@@ -385,17 +384,11 @@ static void save_secure_ram(void)
 {
 	u32 ret;
 
-	/* Put l4 secure to SW_WKUP so that moduels are accessible */
-	omap2_clkdm_wakeup(l4_secure_clkdm);
-
 	ret = omap4_secure_dispatcher(HAL_SAVESECURERAM_INDEX,
 					FLAG_START_CRITICAL,
 					1, omap4_secure_ram_phys, 0, 0, 0);
 	if (ret)
 		pr_debug("Secure ram context save failed\n");
-
-	/* Restore the HW_SUP so that module can idle */
-	omap2_clkdm_allow_idle(l4_secure_clkdm);
 }
 
 #ifdef CONFIG_LOCAL_TIMERS
@@ -640,9 +633,6 @@ void __init omap4_mpuss_init(void)
 		if (!secure_ram)
 			pr_err("Unable to allocate secure ram storage\n");
 		writel(0x1, sar_ram_base + OMAP_TYPE_OFFSET);
-
-		/* FIXME: HWSUP isn't working for l4_secure_clkdm */
-		l4_secure_clkdm = clkdm_lookup("l4_secure_clkdm");
 	} else {
 		writel(0x0, sar_ram_base + OMAP_TYPE_OFFSET);
 	}
