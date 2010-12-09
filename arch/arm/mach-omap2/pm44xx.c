@@ -284,7 +284,6 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 #ifdef CONFIG_SUSPEND
 static int omap4_pm_prepare(void)
 {
-	disable_hlt();
 	return 0;
 }
 
@@ -402,17 +401,18 @@ static int omap4_pm_enter(suspend_state_t suspend_state)
 
 static void omap4_pm_finish(void)
 {
-	enable_hlt();
 	return;
 }
 
 static int omap4_pm_begin(suspend_state_t state)
 {
+	disable_hlt();
 	return 0;
 }
 
 static void omap4_pm_end(void)
 {
+	enable_hlt();
 	return;
 }
 
