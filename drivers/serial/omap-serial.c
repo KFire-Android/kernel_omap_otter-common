@@ -510,7 +510,11 @@ static int serial_omap_startup(struct uart_port *port)
 	if (serial_in(up, UART_LSR) & UART_LSR_DR)
 		(void) serial_in(up, UART_RX);
 	(void) serial_in(up, UART_IIR);
-	(void) serial_in(up, UART_MSR);
+	/*
+	 * We _do_ need to save this value as we pass here after suspend
+	 */
+	up->msr_saved_flags = serial_in(up, UART_MSR);
+
 
 	/*
 	 * Now, initialize the UART
@@ -524,7 +528,6 @@ static int serial_omap_startup(struct uart_port *port)
 	serial_omap_set_mctrl(&up->port, up->port.mctrl);
 	spin_unlock_irqrestore(&up->port.lock, flags);
 
-	up->msr_saved_flags = 0;
 	if (up->use_dma) {
 		free_page((unsigned long)up->port.state->xmit.buf);
 		up->port.state->xmit.buf = dma_alloc_coherent(NULL,
