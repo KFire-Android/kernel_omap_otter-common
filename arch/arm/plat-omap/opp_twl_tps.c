@@ -32,6 +32,13 @@ static u8 smps_offset;
 unsigned long omap_twl_vsel_to_uv(const u8 vsel)
 {
 	if (twl_class_is_6030()) {
+		if (vsel == 0)
+			return 0;
+		else if (vsel == 0x1)
+			return 600000;
+		else if (vsel == 0x3A)
+			return 1350000;
+
 		if (!is_offset_valid) {
 			twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset, 0xE0);
 			is_offset_valid = true;
@@ -60,6 +67,13 @@ u8 omap_twl_uv_to_vsel(unsigned long uv)
 {
 	/* Round up to higher voltage */
 	if (twl_class_is_6030()) {
+		if (uv == 0)
+			return 0x00;
+		else if (uv == 600000)
+			return 0x01;
+		else if (uv == 1350000)
+			return 0x3A;
+
 		if (!is_offset_valid) {
 			twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset, 0xE0);
 			is_offset_valid = true;
@@ -68,8 +82,6 @@ u8 omap_twl_uv_to_vsel(unsigned long uv)
 		if (smps_offset & 0x8) {
 			return DIV_ROUND_UP(uv - 700000, 12500) + 1;
 		} else {
-			if (uv == 1350000)
-				return 0x3A;
 			return DIV_ROUND_UP(uv - 600000, 12500) + 1;
 		}
 	}
