@@ -270,7 +270,7 @@ config OMAP3_SDRC_AC_TIMING
 config ENABLE_L3_ERRORS
 	bool  "Enable L3 error logging"
 	depends on ARCH_OMAP4
-	default y
+	default n
 	help
 	  Select this option to enable L3 error detection on OMAP4
 
