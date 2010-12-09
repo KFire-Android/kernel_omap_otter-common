@@ -29,6 +29,7 @@
 #include <plat/display.h>
 #include <plat/smartreflex.h>
 #include <plat/voltage.h>
+#include <plat/prcm.h>
 
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
@@ -60,6 +61,52 @@ static struct voltagedomain *vdd_mpu, *vdd_iva, *vdd_core;
 
 #define MAX_IOPAD_LATCH_TIME 1000
 
+/**
+ * omap4_device_off_set_state -
+ * When Device OFF is enabled, Device is allowed to perform
+ * transition to off mode as soon as all power domains in MPU, IVA
+ * and CORE voltage are in OFF or OSWR state (open switch retention)
+ */
+void omap4_device_off_set_state(u8 enable)
+{
+	if (enable)
+		prm_write_mod_reg(0x1 << OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
+		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET);
+	else
+		prm_write_mod_reg(0x0 << OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
+		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET);
+}
+
+/**
+ * omap4_device_off_read_prev_state:
+ * returns 1 if the device hit OFF mode
+ * This is API to check whether OMAP is waking up from device OFF mode.
+ * There is no other status bit available for SW to read whether last state
+ * entered was device OFF. To work around this, CORE PD, RFF context state
+ * is used which is lost only when we hit device OFF state
+ */
+u32 omap4_device_off_read_prev_state(void)
+{
+	u32 reg = 0;
+
+	reg = prm_read_mod_reg(core_pwrdm->prcm_offs,
+					core_pwrdm->context_offset);
+	reg = (reg >> 0x1) & 0x1;
+	return reg;
+}
+
+/**
+ * omap4_device_off_read_prev_state:
+ * returns 1 if the device next state is OFF
+ * This is API to check whether OMAP is programmed for device OFF
+ */
+u32 omap4_device_off_read_next_state(void)
+{
+	return prm_read_mod_reg(OMAP4430_PRM_DEVICE_MOD,
+			OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET)
+			& OMAP4430_DEVICE_OFF_ENABLE_MASK;
+}
+
 int omap4_can_sleep(void)
 {
 	if (!omap_uart_can_sleep())
@@ -84,24 +131,6 @@ void omap4_trigger_ioctrl(void)
 		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET);
 	return;
 }
-/**
- * omap4_is_device_off_wakeup :
- * This is API to check whether OMAP is waking up from device OFF mode.
- * There is no other status bit available for SW to read whether last state
- * entered was device OFF. To work around this, CORE PD, RFF context state
- * is used which is lost only when we hit device OFF state
- */
-u32 omap4_is_device_off_wakeup(void)
-{
-	u32 reg = 0;
-
-	reg = prm_read_mod_reg(core_pwrdm->prcm_offs,
-					core_pwrdm->context_offset);
-	reg = (reg >> 0x1) & 0x1;
-	return reg;
-}
-
-
 
 /* This sets pwrdm state (other than mpu & core. Currently only ON &
  * RET are supported. Function is assuming that clkdm doesn't have
@@ -182,7 +211,8 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		/* Disable SR for MPU VDD */
 		omap_smartreflex_disable(vdd_mpu);
 		/* Enable AUTO RET for mpu */
-		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_MPU_L_MASK,
+		if (!omap4_device_off_read_next_state())
+			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_MPU_L_MASK,
 			0x2 << OMAP4430_AUTO_CTRL_VDD_MPU_L_SHIFT,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
 	}
@@ -207,14 +237,15 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap2_gpio_prepare_for_idle(0);
 		omap4_trigger_ioctrl();
 
-		/* Enable AUTO RET for IVA and CORE */
-		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK,
+		if (!omap4_device_off_read_next_state()) {
+			/* Enable AUTO RET for IVA and CORE */
+			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK,
 			0x2 << OMAP4430_AUTO_CTRL_VDD_IVA_L_SHIFT,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
-		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK,
+			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK,
 			0x2 << OMAP4430_AUTO_CTRL_VDD_CORE_L_SHIFT,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
-
+		}
 	}
 
 	/* FIXME  This call is not needed now for retention support and global
@@ -227,8 +258,18 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	if (core_next_state < PWRDM_POWER_ON)
 		musb_context_save_restore(disable_clk);
 #endif
+	if (omap4_device_off_read_next_state()) {
+		omap4_prcm_prepare_off();
+		/* Save the device context to SAR RAM */
+		omap4_sar_save();
+		omap4_sar_overwrite();
+	}
 
 	omap4_enter_lowpower(cpu, power_state);
+
+	if (omap4_device_off_read_prev_state())
+		omap4_prcm_resume_off();
+
 
 	/* FIXME  This call is not needed now for retention support and global
 	 * suspend resume support. All the required actions are taken based
@@ -243,11 +284,15 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 #endif
 
 	if (core_next_state < PWRDM_POWER_ON) {
-		/* Disable AUTO RET for IVA and CORE */
-		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK, 0x0,
+		if (!omap4_device_off_read_next_state()) {
+			/* Disable AUTO RET for IVA and CORE */
+			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK,
+			0x0,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
-		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK, 0x0,
+			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK,
+			0x0,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
+		}
 
 		omap2_gpio_resume_after_idle(0);
 		omap_uart_resume_idle(0);
@@ -261,8 +306,10 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	}
 
 	if (mpu_next_state < PWRDM_POWER_ON) {
-		/* Disable AUTO RET for mpu */
-		prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_MPU_L_MASK, 0x0,
+		if (!omap4_device_off_read_next_state())
+			/* Disable AUTO RET for mpu */
+			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_MPU_L_MASK,
+			0x0,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
 		/* Enable SR for MPU VDD */
 		omap_smartreflex_enable(vdd_mpu);
@@ -356,13 +403,22 @@ static int omap4_pm_suspend(void)
 							PWRDM_POWER_OFF);
 #endif
 			if (omap4_set_pwrdm_state(pwrst->pwrdm,
-							PWRDM_POWER_RET))
+							pwrst->next_state))
 				goto restore;
 		}
 	}
 
 	omap_uart_prepare_suspend();
+
+	/* Enable Device OFF */
+	if (enable_off_mode)
+		omap4_device_off_set_state(1);
+
 	omap4_enter_sleep(0, PWRDM_POWER_OFF);
+
+	/* Disable Device OFF state*/
+	if (enable_off_mode)
+		omap4_device_off_set_state(0);
 
 restore:
 	/* Print the previous power domain states */
@@ -475,6 +531,35 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	list_add(&pwrst->node, &pwrst_list);
 
 	return omap4_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+}
+
+/**
+ * omap4_pm_off_mode_enable :
+ *	Program all powerdomain to OFF
+ */
+void omap4_pm_off_mode_enable(int enable)
+{
+	struct power_state *pwrst;
+	u32 state;
+	u32 logic_state;
+
+	if (enable) {
+		state = PWRDM_POWER_OFF;
+		logic_state = PWRDM_POWER_OFF;
+	} else {
+		state = PWRDM_POWER_RET;
+		logic_state = PWRDM_POWER_RET;
+	}
+
+	list_for_each_entry(pwrst, &pwrst_list, node) {
+		pwrdm_set_logic_retst(pwrst->pwrdm, logic_state);
+		if ((state == PWRDM_POWER_OFF) &&
+			!(pwrst->pwrdm->pwrsts & (1 << state)))
+			pwrst->next_state = PWRDM_POWER_RET;
+		else
+			pwrst->next_state = state;
+		omap4_set_pwrdm_state(pwrst->pwrdm, state);
+	}
 }
 
 static void __init prcm_setup_regs(void)
@@ -634,7 +719,6 @@ static int __init omap4_pm_init(void)
 	suspend_set_ops(&omap_pm_ops);
 #endif /* CONFIG_SUSPEND */
 
-	mpu_pwrdm = pwrdm_lookup("mpu_pwrdm");
 	cpu0_pwrdm = pwrdm_lookup("cpu0_pwrdm");
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
 	per_pwrdm = pwrdm_lookup("l4per_pwrdm");

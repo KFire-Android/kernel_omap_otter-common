@@ -628,11 +628,16 @@ static int option_set(void *data, u64 val)
 	if (option == &wakeup_timer_milliseconds && val >= 1000)
 		return -EINVAL;
 
-	*option = val;
+	if (cpu_is_omap44xx() && (omap_type() == OMAP2_DEVICE_TYPE_GP))
+		*option = 0;
+	else
+		*option = val;
 
 	if (option == &enable_off_mode) {
 		if (cpu_is_omap34xx())
 			omap3_pm_off_mode_enable(val);
+		else if (cpu_is_omap44xx())
+			omap4_pm_off_mode_enable(val);
 	}
 	if (option == &enable_sr_vp_debug && val)
 		pr_notice("Beware that enabling this option will allow user "

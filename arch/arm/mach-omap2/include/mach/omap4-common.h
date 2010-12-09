@@ -59,6 +59,9 @@
 #define OMAP4_USBHOST_CLKSEL_UTMI_P2_EXT_P1_INT		0x2
 #define OMAP4_USBHOST_CLKSEL_UTMI_P2_EXT_P1_EXT		0x3
 
+/* L2 controller AUXCTRL value */
+#define OMAP4_L2X0_AUXCTL_VALUE				0x1e470000
+
 #ifndef __ASSEMBLER__
 /*
  * wfi used in low power code. Directly opcode is used instead

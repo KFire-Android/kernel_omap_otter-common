@@ -42,5 +42,5 @@ extern void omap4_wakeupgen_clear_interrupt(unsigned int cpu, unsigned int irq);
 extern void omap4_wakeupgen_set_all(unsigned int cpu);
 extern void omap4_wakeupgen_clear_all(unsigned int cpu);
 extern void omap4_wakeupgen_save(void);
-
+extern void omap4_wakeupgen_restore(void);
 #endif

@@ -54,11 +54,16 @@ restore_context:
 	 * Check  the wakeup CPU
 	 */
 #ifdef CONFIG_CACHE_L2X0
+	/* FIXME : Add POR register restore as well */
 	ldr	r2, =OMAP44XX_L2CACHE_BASE
 	ldr	r0, [r2, #L2X0_CTRL]
 	and	r0, #0x0f
 	cmp	r0, #1
 	beq	skip_l2en
+	ldr	r0, =OMAP4_L2X0_AUXCTL_VALUE
+	ldr     r12, =0x109		@ Setup L2 AUXCTL value
+	dsb
+	smc     #0
 	mov     r0, #0x1
 	ldr     r12, =0x102		@ Enable L2 Cache controller
 	dsb

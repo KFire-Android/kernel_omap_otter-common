@@ -106,7 +106,8 @@ static struct powerdomain *cpu0_pwrdm, *cpu1_pwrdm, *mpuss_pd;
 /*
  * GIC Save restore bank base
  */
-void __iomem *sar_bank3_base;
+static void __iomem *sar_bank3_base;
+static u32 max_spi_irq, max_spi_reg;
 
 /*
  * Program the wakeup routine address for the CPU's
@@ -218,12 +219,7 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
  */
 static void save_gic(void)
 {
-	u32 max_spi_irq, max_spi_reg, reg_index, reg_value;
-
-	/*
-	 * GIC needs to be saved in SAR_BANK3
-	 */
-	sar_bank3_base = sar_ram_base + SAR_BANK3_OFFSET;
+	u32 reg_index, reg_value;
 
 	/*
 	 * Find out how many interrupts are supported.
@@ -276,7 +272,7 @@ static void save_gic(void)
 	 *
 	 * SGI - backup SGI
 	 */
-	for (reg_index = 0; reg_index < 4; reg_index++) {
+	for (reg_index = 0; reg_index < 3; reg_index++) {
 		reg_value = readl(gic_dist_base_addr +
 					GIC_DIST_PRI + 4 * reg_index);
 		/*
@@ -340,6 +336,81 @@ static void save_gic(void)
 	reg_value = readl(sar_bank3_base + SAR_BACKUP_STATUS_OFFSET);
 	reg_value |= (SAR_BACKUP_STATUS_GIC_CPU0 | SAR_BACKUP_STATUS_GIC_CPU1);
 	writel(reg_value, sar_bank3_base + SAR_BACKUP_STATUS_OFFSET);
+}
+/*
+ * Save GIC context in SAR RAM. Restore is done by ROM code
+ * GIC is lost only when MPU hits OSWR or OFF. It consist
+ * of a distributor and a per-cpu interface module
+ */
+static void restore_gic(void)
+{
+	u32 reg_index, reg_value;
+
+	reg_value = readl(sar_bank3_base + ICDISER_CPU0_OFFSET);
+	writel(reg_value, gic_dist_base_addr + GIC_DIST_ENABLE_SET);
+
+	for (reg_index = 0; reg_index < max_spi_reg; reg_index++) {
+		reg_value = readl(sar_bank3_base + ICDISER_SPI_OFFSET
+							+ 4 * reg_index);
+		writel(reg_value, gic_dist_base_addr + 0x104 + 4 * reg_index);
+	}
+
+	/*
+	 * Interrupt Priority Registers
+	 * Secure sw accesses, last 5 bits of the 8 bits (bit[7:3] are used)
+	 * Non-Secure sw accesses, last 4 bits (i.e. bits[7:4] are used)
+	 * But the Secure Bits[7:3] are shifted by 1 in Non-Secure access.
+	 * Secure (bits[7:3] << 1)== Non Secure bits[7:4]
+	 *
+	 * SGI - backup SGI
+	 */
+	for (reg_index = 0; reg_index < 3; reg_index++) {
+		/*
+		 * Save the priority bits of the Interrupts
+		 */
+		reg_value = readl(sar_bank3_base + ICDIPR_SFI_CPU0_OFFSET
+							+ 4 * reg_index);
+		writel(reg_value, gic_dist_base_addr + GIC_DIST_PRI
+							+ 4 * reg_index);
+	}
+	/*
+	 * PPI -  backup PPIs
+	 */
+	reg_value = readl(sar_bank3_base + ICDIPR_PPI_CPU0_OFFSET);
+	writel(reg_value, gic_dist_base_addr + GIC_DIST_PRI + 0x1c);
+
+	/*
+	 * SPI - backup SPI
+	 * Interrupt priority regs - 4 interrupts/register
+	 */
+	for (reg_index = 0; reg_index < (max_spi_irq / 4); reg_index++) {
+		reg_value = readl(sar_bank3_base + ICDIPR_SPI_OFFSET +
+							4 * reg_index);
+		writel(reg_value, gic_dist_base_addr +
+				(GIC_DIST_PRI + 0x20) + 4 * reg_index);
+	}
+
+	/*
+	 * Interrupt SPI TARGET - 4 interrupts/register
+	 */
+	for (reg_index = 0; reg_index < (max_spi_irq / 4); reg_index++) {
+		reg_value = readl(sar_bank3_base + ICDIPTR_SPI_OFFSET +
+							4 * reg_index);
+		writel(reg_value, gic_dist_base_addr +
+				(GIC_DIST_TARGET + 0x20) + 4 * reg_index);
+	}
+
+	/*
+	 * Interrupt SPI Congigeration - 16 interrupts/register
+	 */
+	for (reg_index = 0; reg_index < (max_spi_irq / 16); reg_index++) {
+		reg_value = readl(sar_bank3_base + ICDICFR_OFFSET +
+							4 * reg_index);
+		writel(reg_value, gic_dist_base_addr +
+				(GIC_DIST_CONFIG + 0x08) + 4 * reg_index);
+
+	}
+
 }
 
 /*
@@ -510,6 +581,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 * Check MPUSS next state and save GIC if needed
 	 * GIC lost during MPU OFF and OSWR
 	 */
+	pwrdm_clear_all_prev_pwrst(mpuss_pd);
 	switch (pwrdm_read_next_pwrst(mpuss_pd)) {
 	case PWRDM_POWER_ON:
 		/* No need to save MPUSS context */
@@ -547,7 +619,6 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 */
 cpu_prepare:
 	clear_cpu_prev_pwrst(cpu);
-	pwrdm_clear_all_prev_pwrst(mpuss_pd);
 	if (cpu)
 		pwrdm_set_next_pwrst(cpu1_pwrdm, power_state);
 	else
@@ -603,8 +674,14 @@ cpu_prepare:
 		/*
 		 * Enable GIC distributor
 		 */
-		if (!wakeup_cpu)
+		if (!wakeup_cpu) {
+			if ((omap_type() == OMAP2_DEVICE_TYPE_GP)
+					&& omap4_device_off_read_prev_state()) {
+				restore_gic();
+				omap4_wakeupgen_restore();
+			}
 			enable_gic_distributor();
+		}
 		/*
 		 * Enable GIC cpu inrterface
 		 */
@@ -613,10 +690,27 @@ cpu_prepare:
 	default:
 		;
 	}
+
 }
 
 void __init omap4_mpuss_init(void)
 {
+	/*
+	 * Find out how many interrupts are supported.
+	 * The GIC only supports up to 1020 interrupt sources.
+	 */
+	max_spi_irq = readl(gic_dist_base_addr + GIC_DIST_CTR) & 0x1f;
+	max_spi_irq = (max_spi_irq + 1) * 32;
+	if (max_spi_irq > max(1020, NR_IRQS))
+		max_spi_irq = max(1020, NR_IRQS);
+	max_spi_irq = (max_spi_irq - 32);
+	max_spi_reg = max_spi_irq / 32;
+
+	/*
+	 * GIC needs to be saved in SAR_BANK3
+	 */
+	sar_bank3_base = sar_ram_base + SAR_BANK3_OFFSET;
+
 	cpu0_pwrdm = pwrdm_lookup("cpu0_pwrdm");
 	cpu1_pwrdm = pwrdm_lookup("cpu1_pwrdm");
 	mpuss_pd = pwrdm_lookup("mpu_pwrdm");

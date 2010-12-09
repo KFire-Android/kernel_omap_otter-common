@@ -218,7 +218,7 @@ static int __init omap_l2_cache_init(void)
 	BUG_ON(!l2cache_base);
 
 	if (omap_rev() != OMAP4430_REV_ES1_0)
-		omap_smc1(0x109, 0x1e470000);
+		omap_smc1(0x109, OMAP4_L2X0_AUXCTL_VALUE);
 
 	/* Enable PL310 L2 Cache controller */
 	omap_smc1(0x102, 0x1);
@@ -230,7 +230,7 @@ static int __init omap_l2_cache_init(void)
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		l2x0_init(l2cache_base, 0x0e050000, 0xc0000fff);
 	else
-		l2x0_init(l2cache_base, 0x1e470000, 0xd0000fff);
+		l2x0_init(l2cache_base, OMAP4_L2X0_AUXCTL_VALUE, 0xd0000fff);
 
 	return 0;
 }
