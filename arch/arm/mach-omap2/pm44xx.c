@@ -109,6 +109,14 @@ int omap4_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
 		return ret;
 
 	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
+		if ((pwrdm_read_pwrst(pwrdm) > state) &&
+			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
+				ret = pwrdm_set_next_pwrst(pwrdm, state);
+				pwrdm_set_lowpwrstchange(pwrdm);
+				pwrdm_wait_transition(pwrdm);
+				pwrdm_state_switch(pwrdm);
+				return ret;
+		}
 		omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
 		sleep_switch = 1;
 		pwrdm_wait_transition(pwrdm);
