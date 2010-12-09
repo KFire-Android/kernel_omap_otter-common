@@ -527,6 +527,16 @@ static void __init prcm_setup_regs(void)
 
 	/* Toggle CLKREQ in RET and OFF states */
 	prm_write_mod_reg(0x2, OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_CLKREQCTRL_OFFSET);
+
+	/*
+	 * De-assert PWRREQ signal in Device OFF state
+	 *	0x3: PWRREQ is de-asserted if all voltage domain are in
+	 *	OFF state. Conversely, PWRREQ is asserted upon any
+	 *	voltage domain entering or staying in ON or SLEEP or
+	 *	RET state.
+	 */
+	prm_write_mod_reg(0x3, OMAP4430_PRM_DEVICE_MOD,
+				OMAP4_PRM_PWRREQCTRL_OFFSET);
 }
 
 /**
