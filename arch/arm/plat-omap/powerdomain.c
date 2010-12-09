@@ -1033,6 +1033,10 @@ void pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm)
 
 	/* Find power state with wakeup latency < minimum constraint. */
 	for (new_state = 0x0; new_state < PWRDM_MAX_PWRSTS; new_state++) {
+#ifdef CONFIG_PM
+		if ((new_state == PWRDM_POWER_OFF) & !enable_off_mode)
+			continue;
+#endif
 		if (min_latency == -1 ||
 			pwrdm->wakeup_lat[new_state] < min_latency)
 			break;

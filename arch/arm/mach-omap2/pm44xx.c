@@ -556,6 +556,11 @@ void omap4_pm_off_mode_enable(int enable)
 	}
 
 	list_for_each_entry(pwrst, &pwrst_list, node) {
+		if (!plist_head_empty(&pwrst->pwrdm->wakeuplat_dev_list)) {
+			pr_crit("Device is holding contsraint on %s\n",
+				 pwrst->pwrdm->name);
+			continue;
+		}
 		pwrdm_set_logic_retst(pwrst->pwrdm, logic_state);
 		if ((state == PWRDM_POWER_OFF) &&
 			!(pwrst->pwrdm->pwrsts & (1 << state)))
