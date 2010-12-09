@@ -50,6 +50,15 @@
 #define FLAG_FIQ_ENABLE			0x1
 #define NO_FLAG				0x0
 
+/*
+ * SAR restore phase USB HOST static port
+ * configuration
+ */
+#define OMAP4_USBHOST_CLKSEL_UTMI_P2_INT_P1_INT		0x0
+#define OMAP4_USBHOST_CLKSEL_UTMI_P2_INT_P1_EXT		0x1
+#define OMAP4_USBHOST_CLKSEL_UTMI_P2_EXT_P1_INT		0x2
+#define OMAP4_USBHOST_CLKSEL_UTMI_P2_EXT_P1_EXT		0x3
+
 #ifndef __ASSEMBLER__
 /*
  * wfi used in low power code. Directly opcode is used instead
@@ -82,6 +91,21 @@ extern void __omap4_cpu_suspend(unsigned int cpu, unsigned int save_state);
 extern unsigned long *omap4_cpu_wakeup_addr(void);
 extern int omap4_set_freq_update(void);
 
+#ifdef CONFIG_PM
+extern void omap4_sar_save(void);
+extern void omap4_sar_overwrite(void);
+extern void omap4_sar_usbhost_init(u32 fck_source);
+#else
+void omap4_sar_save(void)
+{
+}
+void omap4_sar_overwrite(void)
+{
+}
+void omap4_sar_usbhost_init(u32 fck_source)
+{
+}
+#endif
 #endif
 
 #endif

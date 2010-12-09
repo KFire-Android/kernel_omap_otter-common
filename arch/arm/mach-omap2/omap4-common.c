@@ -23,8 +23,11 @@
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
+
 #include <plat/control.h>
 #include <plat/clockdomain.h>
+#include <plat/clockdomain.h>
+
 
 #ifdef CONFIG_ENABLE_L3_ERRORS
 /*
@@ -184,7 +187,7 @@ void __iomem *l2cache_base;
 
 void __iomem *gic_cpu_base_addr;
 void __iomem *gic_dist_base_addr;
-void __iomem *sar_ram_base;
+
 static struct clockdomain *l4_secure_clkdm;
 
 void __init gic_init_irq(void)
@@ -233,29 +236,7 @@ static int __init omap_l2_cache_init(void)
 }
 early_initcall(omap_l2_cache_init);
 #endif
-/*
- * SAR RAM used to save and restore the HW
- * context in low power modes
- */
-static int __init omap4_sar_ram_init(void)
-{
-	/*
-	 * To avoid code running on other OMAPs in
-	 * multi-omap builds
-	 */
-	if (!cpu_is_omap44xx())
-		return -ENODEV;
 
-	/* Static mapping, never released */
-	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_8K);
-	BUG_ON(!sar_ram_base);
-
-	/* FIXME: HWSUP isn't working for l4_secure_clkdm */
-	l4_secure_clkdm = clkdm_lookup("l4_secure_clkdm");
-
-	return 0;
-}
-early_initcall(omap4_sar_ram_init);
 
 /*
  * omap4_sec_dispatcher: Routine to dispatch low power secure
@@ -279,6 +260,10 @@ u32 omap4_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
 	param[2] = arg2;
 	param[3] = arg3;
 	param[4] = arg4;
+
+	/* Look-up Only once */
+	if (!l4_secure_clkdm)
+		l4_secure_clkdm = clkdm_lookup("l4_secure_clkdm");
 
 	/* Put l4 secure to SW_WKUP so that moduels are accessible */
 	omap2_clkdm_wakeup(l4_secure_clkdm);
