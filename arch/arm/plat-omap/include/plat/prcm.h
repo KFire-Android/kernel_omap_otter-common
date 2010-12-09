@@ -33,6 +33,8 @@ int omap2_cm_wait_idlest(void __iomem *reg, u32 mask, u8 idlest,
 
 void omap3_prcm_save_context(void);
 void omap3_prcm_restore_context(void);
+void omap4_prcm_prepare_off(void);
+void omap4_prcm_resume_off(void);
 
 u32 prm_read_mod_reg(s16 module, u16 idx);
 void prm_write_mod_reg(u32 val, s16 module, u16 idx);
