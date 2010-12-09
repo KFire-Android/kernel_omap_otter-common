@@ -267,8 +267,12 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 
 	omap4_enter_lowpower(cpu, power_state);
 
-	if (omap4_device_off_read_prev_state())
+	if (omap4_device_off_read_prev_state()) {
 		omap4_prcm_resume_off();
+#ifdef CONFIG_PM_DEBUG
+		omap4_device_off_counter++;
+#endif
+	}
 
 
 	/* FIXME  This call is not needed now for retention support and global
