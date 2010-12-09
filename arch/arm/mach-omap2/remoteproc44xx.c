@@ -97,7 +97,7 @@ static inline int proc44x_sleep(struct device *dev)
 			dev_err(dev, "%s err 0x%x\n", __func__, ret);
 
 		if (obj->dmtimer)
-			omap_dm_timer_disable(obj->dmtimer);
+			omap_dm_timer_stop(obj->dmtimer);
 	}
 
 	obj->state = OMAP_RPROC_HIBERNATING;
@@ -112,7 +112,7 @@ static inline int proc44x_wakeup(struct device *dev)
 	int ret = 0;
 
 	if (obj->dmtimer)
-		omap_dm_timer_enable(obj->dmtimer);
+		omap_dm_timer_start(obj->dmtimer);
 
 	ret = omap_device_enable(pdev);
 	if (ret)
