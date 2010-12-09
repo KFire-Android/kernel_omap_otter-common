@@ -23,8 +23,13 @@ extern int omap3_can_sleep(void);
 extern int set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 #ifdef CONFIG_PM
 extern int omap4_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+extern u32 omap4_is_device_off_wakeup(void);
 #else
 static inline int omap4_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+{
+	return 0;
+}
+static inline u32 omap4_is_device_off_wakeup(void)
 {
 	return 0;
 }

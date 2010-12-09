@@ -84,6 +84,23 @@ void omap4_trigger_ioctrl(void)
 		OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_IO_PMCTRL_OFFSET);
 	return;
 }
+/**
+ * omap4_is_device_off_wakeup :
+ * This is API to check whether OMAP is waking up from device OFF mode.
+ * There is no other status bit available for SW to read whether last state
+ * entered was device OFF. To work around this, CORE PD, RFF context state
+ * is used which is lost only when we hit device OFF state
+ */
+u32 omap4_is_device_off_wakeup(void)
+{
+	u32 reg = 0;
+
+	reg = prm_read_mod_reg(core_pwrdm->prcm_offs,
+					core_pwrdm->context_offset);
+	reg = (reg >> 0x1) & 0x1;
+	return reg;
+}
+
 
 
 /* This sets pwrdm state (other than mpu & core. Currently only ON &
