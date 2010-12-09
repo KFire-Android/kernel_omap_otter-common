@@ -98,6 +98,7 @@ static int twl6030_irq_thread(void *data)
 
 	while (!kthread_should_stop()) {
 		int i;
+		int start_time = 0;
 		union {
 		u8 bytes[4];
 		u32 int_sts;
@@ -146,12 +147,25 @@ static int twl6030_irq_thread(void *data)
 					return -EINVAL;
 				}
 
+				/* this may be a wakeup event
+				 * d->status flag's are masked while we are
+				 * waking up, give some time for the
+				 * IRQ to be enabled.
+				 */
+				start_time = jiffies;
+				while ((d->status & IRQ_DISABLED) &&
+				       (jiffies_to_msecs(jiffies-start_time) < 100)) {
+					yield();
+				}
+
 				/* These can't be masked ... always warn
 				 * if we get any surprises.
 				 */
-				if (d->status & IRQ_DISABLED)
+				if (d->status & IRQ_DISABLED) {
+					pr_warning("twl handler not called, irq is disabled!\n");
 					note_interrupt(module_irq, d,
 							IRQ_NONE);
+				}
 				else
 					d->handle_irq(module_irq, d);
 
