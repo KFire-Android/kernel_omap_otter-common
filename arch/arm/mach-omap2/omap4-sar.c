@@ -17,9 +17,17 @@
 
 #include <mach/omap4-common.h>
 #include <plat/clockdomain.h>
+#include <plat/control.h>
 
 #include "omap4-sar-layout.h"
 #include "cm-regbits-44xx.h"
+
+/*
+ * These SECUTE control registers are used to work-around
+ * DDR corruption on the second chip select.
+ */
+#define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG	0x0114
+#define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG	0x011c
 
 void __iomem *sar_ram_base;
 static void __iomem *omap4_sar_modules[MAX_SAR_MODULES];
@@ -176,6 +184,8 @@ void omap4_sar_overwrite(void)
  */
 static int __init omap4_sar_ram_init(void)
 {
+	void __iomem *secure_ctrl_mod;
+
 	/*
 	 * To avoid code running on other OMAPs in
 	 * multi-omap builds
@@ -230,6 +240,19 @@ static int __init omap4_sar_ram_init(void)
 	 */
 	if (omap_type() == OMAP2_DEVICE_TYPE_GP)
 		save_sar_bank3();
+	/*
+	 * Overwrite EMIF1/EMIF2
+	 * SECURE_EMIF1_SDRAM_CONFIG2_REG
+	 * SECURE_EMIF2_SDRAM_CONFIG2_REG
+	 */
+	secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
+	BUG_ON(!secure_ctrl_mod);
+	__raw_writel(0x10,
+		secure_ctrl_mod + OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG);
+	__raw_writel(0x10,
+	secure_ctrl_mod + OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
+	wmb();
+	iounmap(secure_ctrl_mod);
 
 	/*
 	 * L3INIT PD and clocks are needed for SAR save phase
