@@ -54,6 +54,8 @@
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
 
+#include "pm.h"
+
 #ifdef CONFIG_SMP
 /*
  * CPUx Wakeup Non-Secure Physical Address offsets
@@ -462,6 +464,20 @@ static void save_secure_ram(void)
 		pr_debug("Secure ram context save failed\n");
 }
 
+/*
+ * API to save Secure RAM, GIC, WakeupGen Registers using secure API
+ * for HS/EMU device
+ */
+static void save_secure_all(void)
+{
+	u32 ret;
+	ret = omap4_secure_dispatcher(HAL_SAVEALL_INDEX,
+					FLAG_START_CRITICAL,
+					1, omap4_secure_ram_phys, 0, 0, 0);
+	if (ret)
+		pr_debug("Secure all context save failed\n");
+}
+
 #ifdef CONFIG_LOCAL_TIMERS
 
 /*
@@ -582,6 +598,14 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 * GIC lost during MPU OFF and OSWR
 	 */
 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
+	if (omap4_device_off_read_next_state() &&
+			 (omap_type() != OMAP2_DEVICE_TYPE_GP)) {
+		/* FIXME: Check if this can be optimised */
+		save_secure_all();
+		save_state = 3;
+		goto cpu_prepare;
+	}
+
 	switch (pwrdm_read_next_pwrst(mpuss_pd)) {
 	case PWRDM_POWER_ON:
 		/* No need to save MPUSS context */
