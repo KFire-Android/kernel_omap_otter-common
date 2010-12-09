@@ -67,8 +67,8 @@ struct clk;
 struct dmtimer_platform_data {
 	int (*set_timer_src) (struct platform_device *pdev, int source);
 	int timer_ip_type;
-	int offset1;
-	int offset2;
+	int func_offset;
+	int intr_offset;
 	u32 is_early_init:1;
 };
 

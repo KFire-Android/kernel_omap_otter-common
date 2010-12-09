@@ -138,11 +138,11 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *user)
 	pdata->timer_ip_type = oh->class->rev;
 
 	if (pdata->timer_ip_type == OMAP_TIMER_IP_VERSION_1) {
-		pdata->offset1 = 0;
-		pdata->offset2 = 0;
+		pdata->intr_offset = 0;
+		pdata->func_offset = 0;
 	} else {
-		pdata->offset1 = 0x10;
-		pdata->offset2 = 0x14;
+		pdata->intr_offset = 0x10;
+		pdata->func_offset = 0x14;
 	}
 
 	/*

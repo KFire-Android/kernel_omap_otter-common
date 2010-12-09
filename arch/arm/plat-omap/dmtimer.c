@@ -165,7 +165,7 @@
 #define OMAP_TIMER_TICK_INT_MASK_COUNT_REG				\
 		(_OMAP_TIMER_TICK_INT_MASK_COUNT_OFFSET | (WP_TOWR << WPSHIFT))
 
-#define MAX_WRITE_PEND_WAIT		10000 /* 10ms timeout delay */
+#define MAX_WRITE_PEND_WAIT		15000 /* 15ms timeout delay */
 
 struct omap_dm_timer {
 	int irq;
@@ -174,6 +174,7 @@ struct omap_dm_timer {
 	unsigned reserved:1;
 	unsigned enabled:1;
 	unsigned posted:1;
+	unsigned context:1;
 	struct platform_device *pdev;
 	struct list_head node;
 };
@@ -222,13 +223,14 @@ static inline u32 omap_dm_timer_read_reg(struct omap_dm_timer *timer, u32 reg)
 	int i = 0;
 
 	if (reg >= OMAP_TIMER_WAKEUP_EN_REG)
-		reg += pdata->offset1;
+		reg += pdata->func_offset;
 	else if (reg >= OMAP_TIMER_STAT_REG)
-		reg += pdata->offset2;
+		reg += pdata->intr_offset;
+
 	if (timer->posted) {
 		omap_test_timeout(!(readl(timer->io_base +
 			((OMAP_TIMER_WRITE_PEND_REG +
-			pdata->offset1) & 0xff)) & (reg >> WPSHIFT)),
+			pdata->func_offset) & 0xff)) & (reg >> WPSHIFT)),
 			MAX_WRITE_PEND_WAIT, i);
 		WARN_ON(i == MAX_WRITE_PEND_WAIT);
 	}
@@ -253,14 +255,14 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
 	int i = 0;
 
 	if (reg >= OMAP_TIMER_WAKEUP_EN_REG)
-		reg += pdata->offset1;
+		reg += pdata->func_offset;
 	else if (reg >= OMAP_TIMER_STAT_REG)
-		reg += pdata->offset2;
+		reg += pdata->intr_offset;
 
 	if (timer->posted) {
 		omap_test_timeout(!(readl(timer->io_base +
 			((OMAP_TIMER_WRITE_PEND_REG +
-			pdata->offset1) & 0xff)) & (reg >> WPSHIFT)),
+			pdata->func_offset) & 0xff)) & (reg >> WPSHIFT)),
 			MAX_WRITE_PEND_WAIT, i);
 		WARN_ON(i == MAX_WRITE_PEND_WAIT);
 	}
@@ -511,9 +513,10 @@ void omap_dm_timer_start(struct omap_dm_timer *timer)
 {
 	u32 l;
 
-	if (timer->pdev->id != 1) {
+	if (timer->pdev->id != 1 && timer->context) {
 		omap_dm_timer_enable(timer);
 		omap_timer_restore_context(timer);
+		timer->context = 0;
 	}
 
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
@@ -549,6 +552,7 @@ void omap_dm_timer_stop(struct omap_dm_timer *timer)
 	if (timer->pdev->id != 1) {
 		omap_timer_save_context(timer);
 		omap_dm_timer_disable(timer);
+		timer->context = 1;
 	}
 }
 EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
@@ -601,9 +605,10 @@ void omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
 {
 	u32 l;
 
-	if (timer->pdev->id != 1) {
+	if (timer->pdev->id != 1 && timer->context) {
 		omap_dm_timer_enable(timer);
 		omap_timer_restore_context(timer);
+		timer->context = 0;
 	}
 
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
