@@ -16,7 +16,9 @@
 #include <linux/delay.h>
 #include <plat/powerdomain.h>
 #include <plat/prcm.h>
+
 #include "powerdomains.h"
+#include "cm44xx.h"
 
 int omap4_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 {
@@ -159,15 +161,33 @@ int omap4_pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
 
 int omap4_pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
 {
-	prm_rmw_mod_reg_bits(0, 1 << OMAP3430ES2_SAVEANDRESTORE_SHIFT,
-					pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
+	/*
+	 * FIXME; This should be fixed right way by moving it into HWMOD
+	 * or clock framework since sar control is moved to module level
+	 */
+	cm_rmw_mod_reg_bits(OMAP4430_SAR_MODE_MASK,
+		1 << OMAP4430_SAR_MODE_SHIFT, OMAP4430_CM2_L3INIT_MOD,
+		OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
+	cm_rmw_mod_reg_bits(OMAP4430_SAR_MODE_MASK,
+		1 << OMAP4430_SAR_MODE_SHIFT, OMAP4430_CM2_L3INIT_MOD,
+		OMAP4_CM_L3INIT_USB_TLL_CLKCTRL_OFFSET);
+
 	return 0;
 }
 
 int omap4_pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
 {
-	prm_rmw_mod_reg_bits(1 << OMAP3430ES2_SAVEANDRESTORE_SHIFT, 0,
-					pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
+	/*
+	 * FIXME; This should be fixed right way by moving it into HWMOD
+	 * or clock framework since sar control is moved to module level
+	 */
+	cm_rmw_mod_reg_bits(OMAP4430_SAR_MODE_MASK,
+		0 << OMAP4430_SAR_MODE_SHIFT, OMAP4430_CM2_L3INIT_MOD,
+		OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
+	cm_rmw_mod_reg_bits(OMAP4430_SAR_MODE_MASK,
+		0 << OMAP4430_SAR_MODE_SHIFT, OMAP4430_CM2_L3INIT_MOD,
+		OMAP4_CM_L3INIT_USB_TLL_CLKCTRL_OFFSET);
+
 	return 0;
 }
 
