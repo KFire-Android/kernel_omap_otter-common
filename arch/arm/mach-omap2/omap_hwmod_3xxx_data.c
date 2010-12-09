@@ -559,7 +559,7 @@ static struct omap_hwmod_class_sysconfig omap3xxx_timer_1ms_sysc = {
 };
 
 static struct omap_hwmod_class omap3xxx_timer_1ms_hwmod_class = {
-	.name = "timer_1ms",
+	.name = "timer",
 	.sysc = &omap3xxx_timer_1ms_sysc,
 	.rev = OMAP_TIMER_IP_VERSION_1,
 };

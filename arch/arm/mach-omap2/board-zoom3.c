@@ -22,6 +22,7 @@
 #include <plat/board.h>
 #include <plat/usb.h>
 #include <plat/opp_twl_tps.h>
+#include <plat/timer-gp.h>
 
 #include "mux.h"
 #include "sdram-hynix-h8mbx00u0mer-0em.h"
@@ -159,6 +160,7 @@ static void __init omap_zoom_init_irq(void)
 	omap_board_config_size = ARRAY_SIZE(zoom_config);
 	omap2_init_common_hw(h8mbx00u0mer0em_sdrc_params,
 			h8mbx00u0mer0em_sdrc_params);
+	omap2_gp_clockevent_set_gptimer(1);
 	omap_init_irq();
 }
 
