@@ -948,6 +948,13 @@ static void __init omap4_init_voltagecontroller(void)
 			 OMAP4430_VOLRA_VDD_IVA_L_SHIFT) |
 			(vdd_info[icore].pmic->i2c_vreg <<
 			 OMAP4430_VOLRA_VDD_CORE_L_SHIFT));
+	voltage_write_reg(OMAP4_PRM_VC_VAL_SMPS_RA_CMD_OFFSET,
+			(vdd_info[impu].pmic->i2c_cmdreg <<
+			 OMAP4430_VOLRA_VDD_MPU_L_SHIFT) |
+			(vdd_info[iiva].pmic->i2c_cmdreg <<
+			 OMAP4430_VOLRA_VDD_IVA_L_SHIFT) |
+			(vdd_info[icore].pmic->i2c_cmdreg <<
+			 OMAP4430_VOLRA_VDD_CORE_L_SHIFT));
 	voltage_write_reg(OMAP4_PRM_VC_CFG_CHANNEL_OFFSET,
 			OMAP4430_RAV_VDD_MPU_L_MASK |
 			OMAP4430_CMD_VDD_MPU_L_MASK |
@@ -961,7 +968,9 @@ static void __init omap4_init_voltagecontroller(void)
 					0 : OMAP4430_SA_VDD_IVA_L_MASK) |
 			OMAP4430_RAV_VDD_CORE_L_MASK |
 			OMAP4430_CMD_VDD_CORE_L_MASK |
-			OMAP4430_SA_VDD_CORE_L_MASK);
+			((vdd_info[iiva].pmic->i2c_addr ==
+			vdd_info[icore].pmic->i2c_addr) ?
+					0 : OMAP4430_SA_VDD_CORE_L_MASK));
 	/*
 	 * Configure SR I2C in HS Mode. Is there really a need to configure
 	 * i2c in the normal mode??
@@ -993,6 +1002,23 @@ static void __init omap4_init_voltagecontroller(void)
 		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
 		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
 	voltage_write_reg(OMAP4_PRM_VOLTSETUP_MPU_RET_SLEEP_OFFSET,
+		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+
+	/* setup the VOLTSETUP* registers for OFF */
+	voltage_write_reg(OMAP4_PRM_VOLTSETUP_CORE_OFF_OFFSET,
+		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+	voltage_write_reg(OMAP4_PRM_VOLTSETUP_IVA_OFF_OFFSET,
+		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+	voltage_write_reg(OMAP4_PRM_VOLTSETUP_MPU_OFF_OFFSET,
 		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
 		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
 		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |

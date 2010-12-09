@@ -36,6 +36,7 @@ struct omap_volt_pmic_info {
 	int step_size;
 	unsigned char i2c_addr;
 	unsigned char i2c_vreg;
+	unsigned char i2c_cmdreg;
 	unsigned long (*vsel_to_uv)(unsigned char vsel);
 	unsigned char (*uv_to_vsel)(unsigned long uv);
 	unsigned char (*onforce_cmd)(unsigned char vsel);
