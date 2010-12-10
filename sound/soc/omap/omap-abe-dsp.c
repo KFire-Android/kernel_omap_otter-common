@@ -125,11 +125,13 @@ struct abe_data {
 
 	struct delayed_work delayed_work;
 	struct mutex mutex;
+	struct mutex opp_mutex;
 
 	struct clk *clk;
 
 	void __iomem *io_base;
 	int irq;
+	int opp;
 
 	int fe_id;
 
@@ -227,7 +229,10 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 	abe_load_fw();	// TODO: use fw API here
 
 	/* Config OPP 100 for now */
+	mutex_lock(&abe->opp_mutex);
 	abe_set_opp_processing(ABE_OPP100);
+	abe->opp = 100;
+	mutex_unlock(&abe->opp_mutex);
 
 	/* "tick" of the audio engine */
 	abe_write_event_generator(EVENT_TIMER);
@@ -285,8 +290,9 @@ void abe_dsp_shutdown(void)
 
 	if (!abe->active && !abe_check_activity()) {
 		abe_set_opp_processing(ABE_OPP25);
+		abe->opp = 25;
 		abe_stop_event_generator();
-		udelay(11);
+		udelay(250);
 		omap_device_set_rate(&pdev->dev, &pdev->dev, 0);
 	}
 }
@@ -1617,31 +1623,46 @@ static int aess_set_opp_mode(void)
 
 	pm_runtime_get_sync(&pdev->dev);
 
+	mutex_lock(&abe->opp_mutex);
+
 	/* now calculate OPP level based upon DAPM widget status */
-	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++) {
+	for (i = ABE_WIDGET_START; i < ABE_WIDGET_END; i++)
 		opp |= abe->dapm[i];
-	}
 
 	opp = (1 << (fls(opp) - 1)) * 25;
 
-	switch (opp) {
-	case 25:
-		abe_set_opp_processing(ABE_OPP25);
-		udelay(11);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 49000000);
-		break;
-	case 50:
-		abe_set_opp_processing(ABE_OPP50);
-		udelay(11);
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
-		break;
-	case 100:
-	default:
-		omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
-		abe_set_opp_processing(ABE_OPP100);
-		udelay(11);
-		break;
+	if (abe->opp > opp) {
+		/* Decrease OPP mode - no need of OPP100% */
+		switch (opp) {
+		case 25:
+			abe_set_opp_processing(ABE_OPP25);
+			udelay(250);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 49000000);
+			break;
+		case 50:
+		default:
+			abe_set_opp_processing(ABE_OPP50);
+			udelay(250);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+			break;
+		}
+	} else if (abe->opp < opp) {
+		/* Increase OPP mode - no need of OPP25% */
+		switch (opp) {
+		case 50:
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+			abe_set_opp_processing(ABE_OPP50);
+			break;
+		case 100:
+		default:
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
+			abe_set_opp_processing(ABE_OPP100);
+			break;
+		}
 	}
+	abe->opp = opp;
+
+	mutex_unlock(&abe->opp_mutex);
 
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -1982,6 +2003,7 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 	abe->pdev = pdev;
 
 	mutex_init(&abe->mutex);
+	mutex_init(&abe->opp_mutex);
 
 	ret = snd_soc_register_platform(&pdev->dev,
 			&omap_aess_platform);
