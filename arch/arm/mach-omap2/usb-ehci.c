@@ -2359,32 +2359,33 @@ static void setup_4430ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
 
-		/* usbb1_mm_rxdp */
-		omap_writew(0x001D, 0x4A1000C4);
-
-		/* usbb1_mm_rxdm */
-		omap_writew(0x001D, 0x4A1000C8);
+		omap_mux_init_signal("usbb1_mm_rxdp",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_mm_rxdm",
+			OMAP_PIN_INPUT_PULLDOWN);
 
 	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
 	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
 
-		/* usbb1_mm_rxrcv */
-		omap_writew(0x001D, 0x4A1000CA);
+		omap_mux_init_signal("usbb1_mm_rxrcv",
+			OMAP_PIN_INPUT_PULLDOWN);
 
 	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
 
-		/* usbb1_mm_txen */
-		omap_writew(0x001D, 0x4A1000D0);
+		omap_mux_init_signal("usbb1_mm_txen",
+			OMAP_PIN_INPUT_PULLDOWN);
+
 
 	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
 
-		/* usbb1_mm_txdat */
-		omap_writew(0x001D, 0x4A1000CE);
+		omap_mux_init_signal("usbb1_mm_txdat",
+			OMAP_PIN_INPUT_PULLDOWN);
 
-		/* usbb1_mm_txse0 */
-		omap_writew(0x001D, 0x4A1000CC);
+		omap_mux_init_signal("usbb1_mm_txse0",
+			OMAP_PIN_INPUT_PULLDOWN);
+
 		break;
 
 	case OMAP_USBHS_PORT_MODE_UNUSED:
@@ -2398,32 +2399,33 @@ static void setup_4430ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
 
-		/* usbb2_mm_rxdp */
-		omap_writew(0x010C, 0x4A1000F8);
-
-		/* usbb2_mm_rxdm */
-		omap_writew(0x010C, 0x4A1000F6);
+		omap_mux_init_signal("usbb2_mm_rxdp",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_mm_rxdm",
+			OMAP_PIN_INPUT_PULLDOWN);
 
 	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
 	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
 
-		/* usbb2_mm_rxrcv */
-		omap_writew(0x010C, 0x4A1000FA);
+		omap_mux_init_signal("usbb2_mm_rxrcv",
+			OMAP_PIN_INPUT_PULLDOWN);
 
 	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
 
-		/* usbb2_mm_txen */
-		omap_writew(0x080C, 0x4A1000FC);
+		omap_mux_init_signal("usbb2_mm_txen",
+			OMAP_PIN_INPUT_PULLDOWN);
+
 
 	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
 
-		/* usbb2_mm_txdat */
-		omap_writew(0x000C, 0x4A100112);
+		omap_mux_init_signal("usbb2_mm_txdat",
+			OMAP_PIN_INPUT_PULLDOWN);
 
-		/* usbb2_mm_txse0 */
-		omap_writew(0x000C, 0x4A100110);
+		omap_mux_init_signal("usbb2_mm_txse0",
+			OMAP_PIN_INPUT_PULLDOWN);
+
 		break;
 
 	case OMAP_USBHS_PORT_MODE_UNUSED:
