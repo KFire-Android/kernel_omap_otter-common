@@ -377,6 +377,14 @@ static int __init omap_pm_init(void)
 	    omap_type() != OMAP2_DEVICE_TYPE_GP)
 		pm44xx_errata |= PM_OMAP4_ROM_IVAHD_TESLA_ERRATUM_xxx;
 
+	/*
+	 * Similar to above errata, ROM code modifies L3INSTR clock
+	 * registers also and these must be saved / restored during
+	 * MPU OSWR / device off.
+	 */
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+		pm44xx_errata |= PM_OMAP4_ROM_L3INSTR_ERRATUM_xxx;
+
 #ifdef CONFIG_SUSPEND
 	omap_pm_suspend = omap4_5_pm_suspend;
 #endif

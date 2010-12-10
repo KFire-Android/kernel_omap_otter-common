@@ -132,6 +132,12 @@ static struct reg_tuple ivahd_reg[] = {
 	{.addr = OMAP4430_PM_IVAHD_PWRSTCTRL}
 };
 
+static struct reg_tuple l3instr_reg[] = {
+	{.addr = OMAP4430_CM_L3INSTR_L3_3_CLKCTRL},
+	{.addr = OMAP4430_CM_L3INSTR_L3_INSTR_CLKCTRL},
+	{.addr = OMAP4430_CM_L3INSTR_OCP_WP1_CLKCTRL},
+};
+
 /*
  * Program the wakeup routine address for the CPU0 and CPU1
  * used for OFF or DORMANT wakeup.
@@ -327,6 +333,28 @@ static inline void restore_ivahd_tesla_regs(void)
 		__raw_writel(ivahd_reg[i].val, ivahd_reg[i].addr);
 }
 
+static inline void save_l3instr_regs(void)
+{
+	int i;
+
+	if (!IS_PM44XX_ERRATUM(PM_OMAP4_ROM_L3INSTR_ERRATUM_xxx))
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(l3instr_reg); i++)
+		l3instr_reg[i].val = __raw_readl(l3instr_reg[i].addr);
+}
+
+static inline void restore_l3instr_regs(void)
+{
+	int i;
+
+	if (!IS_PM44XX_ERRATUM(PM_OMAP4_ROM_L3INSTR_ERRATUM_xxx))
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(l3instr_reg); i++)
+		__raw_writel(l3instr_reg[i].val, l3instr_reg[i].addr);
+}
+
 /**
  * omap_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
  * The purpose of this function is to manage low power programming
@@ -396,10 +424,12 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		omap4_cm_prepare_off();
 		omap4_dpll_prepare_off();
 		save_ivahd_tesla_regs();
+		save_l3instr_regs();
 		save_state = 3;
 	} else if (pwrdm_read_next_pwrst(mpuss_pd) ==
 		   PWRDM_POWER_OSWR) {
 		save_ivahd_tesla_regs();
+		save_l3instr_regs();
 		save_state = 2;
 	}
 
@@ -427,8 +457,10 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	cpu_pwrdm_pre_post_transition(wakeup_cpu, 0);
 	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
 
-	if (omap_mpuss_read_prev_context_state())
+	if (omap_mpuss_read_prev_context_state()) {
 		restore_ivahd_tesla_regs();
+		restore_l3instr_regs();
+	}
 
 	if (save_state == 3 &&
 	    pwrdm_read_prev_pwrst(core_pd) == PWRDM_POWER_OFF) {
