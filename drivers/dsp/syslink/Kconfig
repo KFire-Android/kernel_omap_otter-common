@@ -44,6 +44,17 @@ config  SYSLINK_IPU_SELF_HIBERNATION
 	  controls the self hibernation, IPU will hibernate when a system
 	  suspend is executed and wake up when system resumes.
 
+config  DUCATI_WATCH_DOG
+	bool "Enable Ducati watch dog timer"
+	depends on SYSLINK_IPU_SELF_HIBERNATION
+	default n
+	help
+	  Ducati cores will trigger reset if any of the two M3 cores stop
+	  responding after 7 seconds. Requires Hibernation enabled. If
+	  hibernation is enabled, M3 cores go to hibernation after 5
+	  seconds. Ducati cannot go to hibernation if fault occurs on one
+	  of the M3 cores
+
 config  SYSLINK_IPU_PM_TRACES
 	bool "IPU PM Debug Traces"
 	depends on SYSLINK_DUCATI_PM

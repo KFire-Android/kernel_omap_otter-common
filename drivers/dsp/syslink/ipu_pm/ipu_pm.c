@@ -27,7 +27,12 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/interrupt.h>
+#include <linux/notifier.h>
+#include <linux/clk.h>
 #include <linux/uaccess.h>
+#include <linux/irq.h>
+
 #include <linux/platform_device.h>
 #include <syslink/notify.h>
 #include <syslink/notify_driver.h>
@@ -261,6 +266,18 @@ static inline int ipu_pm_rel_cstr(struct ipu_pm_object *handle,
 				  struct rcb_block *rcb_p,
 				  struct ipu_pm_params *params);
 
+/* Hibernate and watch dog timer interrupt */
+static irqreturn_t ipu_pm_timer_interrupt(int irq,
+					void *dev_id);
+
+/* Hibernate and watch dog timer function */
+static int ipu_pm_timer_state(int event);
+
+#ifdef CONFIG_DUCATI_WATCH_DOG
+/* Functions for reporing watch dog reset */
+static int ipu_pm_notify_event(int event, void *data);
+#endif
+
 /** ============================================================================
  *  Globals
  *  ============================================================================
@@ -371,7 +388,9 @@ static struct ipu_pm_params pm_params = {
 	.pm_notification_event = PM_NOTIFICATION,
 	.proc_id = A9,
 	.remote_proc_id = -1,
-	.line_id = 0
+	.line_id = 0,
+	.hib_timer_state = PM_HIB_TIMER_RESET,
+	.wdt_time = 0
 } ;
 
 /* Functions to request resources */
@@ -422,6 +441,8 @@ static int (*release_fxn[PM_NUM_RES]) (struct ipu_pm_object *handle,
 	ipu_pm_rel_aux_clk,
 
 };
+
+static struct blocking_notifier_head ipu_pm_notifier;
 
 /*
   Function to schedule the recover process
@@ -2386,6 +2407,11 @@ int ipu_pm_save_ctx(int proc_id)
 
 		num_loaded_cores = app_loaded + sys_loaded;
 
+#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
+		/* Turn off timer before hibernation */
+		ipu_pm_timer_state(PM_HIB_TIMER_OFF);
+#endif
+
 		flag = 1;
 		timeout = jiffies + msecs_to_jiffies(WAIT_FOR_IDLE_TIMEOUT);
 		/* Wait fot Ducati to hibernate */
@@ -2428,10 +2454,15 @@ int ipu_pm_save_ctx(int proc_id)
 			pr_err("Not able to save iommu");
 	} else
 		goto error;
+
+
 exit:
 	mutex_unlock(ipu_pm_state.gate_handle);
 	return 0;
 error:
+#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
+	ipu_pm_timer_state(PM_HIB_TIMER_ON);
+#endif
 	mutex_unlock(ipu_pm_state.gate_handle);
 	pr_debug("Aborting hibernation process\n");
 	return -EINVAL;
@@ -2467,6 +2498,8 @@ int ipu_pm_restore_ctx(int proc_id)
 		/* Enable/disable ipu hibernation*/
 #ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
 		handle->rcb_table->pm_flags.hibernateAllowed = 1;
+		/* turn on ducati hibernation timer */
+		ipu_pm_timer_state(PM_HIB_TIMER_ON);
 #else
 		handle->rcb_table->pm_flags.hibernateAllowed = 0;
 #endif
@@ -2527,6 +2560,10 @@ int ipu_pm_restore_ctx(int proc_id)
 				goto error;
 			handle->rcb_table->state_flag &= ~APP_PROC_DOWN;
 		}
+#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
+		/* turn on ducati hibernation timer */
+		ipu_pm_timer_state(PM_HIB_TIMER_ON);
+#endif
 #ifdef CONFIG_OMAP_PM
 		retval = omap_pm_set_max_sdma_lat(&pm_qos_handle_2,
 						IPU_PM_MM_MPU_LAT_CONSTRAINT);
@@ -2643,6 +2680,8 @@ int ipu_pm_setup(struct ipu_pm_config *cfg)
 		goto exit;
 	}
 
+	BLOCKING_INIT_NOTIFIER_HEAD(&ipu_pm_notifier);
+
 	return retval;
 exit:
 	pr_err("ipu_pm_setup failed! retval = 0x%x", retval);
@@ -2699,6 +2738,7 @@ int ipu_pm_attach(u16 remote_proc_id, void *shared_addr)
 						__func__, __LINE__);
 			goto exit;
 		}
+		handle->dmtimer = NULL;
 	} else if (remote_proc_id == APP_M3 && IS_ERR_OR_NULL(app_rproc)) {
 		pr_debug("requesting app_rproc\n");
 		app_rproc = omap_rproc_get("ducati-proc1");
@@ -2709,6 +2749,7 @@ int ipu_pm_attach(u16 remote_proc_id, void *shared_addr)
 						__func__, __LINE__);
 			goto exit;
 		}
+		handle->dmtimer = NULL;
 	}
 
 	if (IS_ERR_OR_NULL(ducati_iommu)) {
@@ -2768,6 +2809,12 @@ int ipu_pm_detach(u16 remote_proc_id)
 		retval = -EINVAL;
 		goto exit;
 	}
+
+#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
+	/* reset the ducati hibernation timer */
+	if (remote_proc_id == SYS_M3)
+		ipu_pm_timer_state(PM_HIB_TIMER_RESET);
+#endif
 
 	/* When recovering clean_up was called, so wait for completion.
 	 * If not make sure there is no resource pending.
@@ -2835,6 +2882,7 @@ int ipu_pm_detach(u16 remote_proc_id)
 		if (recover)
 			recover = false;
 		global_rcb = NULL;
+		first_time = 1;
 	}
 
 	/* Deleting the handle based on remote_proc_id */
@@ -2900,3 +2948,151 @@ exit:
 	return retval;
 }
 EXPORT_SYMBOL(ipu_pm_destroy);
+
+static irqreturn_t ipu_pm_timer_interrupt(int irq, void *dev_id)
+{
+	struct omap_dm_timer *gpt = (struct omap_dm_timer *)dev_id;
+
+	ipu_pm_timer_state(PM_HIB_TIMER_EXPIRE);
+	omap_dm_timer_write_status(gpt, OMAP_TIMER_INT_OVERFLOW);
+	return IRQ_HANDLED;
+}
+
+/* Function implements hibernation and watch dog timer
+ * The functionality is based on following states
+ * RESET:		Timer is disabed
+ * OFF:			Timer is OFF
+ * ON:			Timer running
+ * HIBERNATE:	Waking up for ducati cores to hibernate
+ * WD_RESET:	Waiting for Ducati cores to complete hibernation
+ */
+static int ipu_pm_timer_state(int event)
+{
+	int retval = 0;
+	int tick_rate;
+	struct ipu_pm_object *handle;
+	struct ipu_pm_params *params;
+
+	handle = ipu_pm_get_handle(SYS_M3);
+	if (handle == NULL) {
+		pr_err("ipu_pm_timer_state handle ptr NULL\n");
+		retval = PTR_ERR(handle);
+		goto exit;
+	}
+	params = handle->params;
+	if (params == NULL) {
+		pr_err("ipu_pm_timer_state params ptr NULL\n");
+		retval = PTR_ERR(params);
+		goto exit;
+	}
+	if (sys_rproc == NULL)
+		goto exit;
+
+	switch (event) {
+	case PM_HIB_TIMER_EXPIRE:
+		if (params->hib_timer_state == PM_HIB_TIMER_ON) {
+			/* If any resource in use, no hibernation */
+			if (handle->rcb_table->state_flag & HIB_REF_MASK)
+				goto exit;
+
+			pr_debug("Starting hibernation, waking up M3 cores");
+			handle->rcb_table->state_flag |= (SYS_PROC_HIB |
+					APP_PROC_HIB | ENABLE_IPU_HIB);
+#ifdef CONFIG_DUCATI_WATCH_DOG
+			if (sys_rproc->dmtimer != NULL)
+				omap_dm_timer_set_load(sys_rproc->dmtimer, 1,
+						params->wdt_time);
+			params->hib_timer_state = PM_HIB_TIMER_WDRESET;
+		} else if (params->hib_timer_state ==
+			PM_HIB_TIMER_WDRESET) {
+			/* notify devh to begin error recovery here */
+			pr_debug("Timer ISR: Trigger WD reset + recovery\n");
+			ipu_pm_notify_event(0, NULL);
+			if (sys_rproc->dmtimer != NULL)
+				omap_dm_timer_stop(sys_rproc->dmtimer);
+			params->hib_timer_state = PM_HIB_TIMER_OFF;
+#endif
+		}
+		break;
+	case PM_HIB_TIMER_RESET:
+		/* disable timer and remove irq handler */
+		if (handle->dmtimer) {
+			free_irq(OMAP44XX_IRQ_GPT3, (void *)handle->dmtimer);
+			handle->dmtimer = NULL;
+			params->hib_timer_state = PM_HIB_TIMER_RESET;
+		}
+		break;
+	case PM_HIB_TIMER_OFF: /* disable timer */
+		/* no need to disable timer since it
+		 * is done in rproc context */
+		params->hib_timer_state = PM_HIB_TIMER_OFF;
+		break;
+	case PM_HIB_TIMER_ON: /* enable timer */
+		if (params->hib_timer_state == PM_HIB_TIMER_RESET) {
+			tick_rate = clk_get_rate(omap_dm_timer_get_fclk(
+					sys_rproc->dmtimer));
+			handle->rcb_table->hib_time = 0xFFFFFFFF - (
+					(tick_rate/1000) * PM_HIB_DEFAULT_TIME);
+			params->wdt_time = 0xFFFFFFFF - (
+					(tick_rate/1000) * PM_HIB_WDT_TIME);
+			retval = request_irq(OMAP44XX_IRQ_GPT3,
+					ipu_pm_timer_interrupt,
+					IRQF_DISABLED,
+					"HIB_TIMER",
+					(void *)sys_rproc->dmtimer);
+			if (retval < 0)
+				pr_warn("request_irq status: %x\n", retval);
+			/*
+			 * store the dmtimer handle locally to use during
+			 * free_irq as dev_id token in cases where the remote
+			 * proc frees the dmtimer handle first
+			 */
+			handle->dmtimer = sys_rproc->dmtimer;
+		}
+		if (sys_rproc->dmtimer != NULL)
+			omap_dm_timer_set_load_start(sys_rproc->dmtimer, 1,
+					handle->rcb_table->hib_time);
+		params->hib_timer_state = PM_HIB_TIMER_ON;
+		break;
+	}
+	return retval;
+exit:
+	if (retval < 0)
+		pr_err("ipu_pm_timer_state failed, retval: %x\n", retval);
+	return retval;
+}
+
+/*
+ * ======== ipu_pm_notify_event ========
+ *  IPU event notifications.
+ */
+#ifdef CONFIG_DUCATI_WATCH_DOG
+static int ipu_pm_notify_event(int event, void *data)
+{
+	return blocking_notifier_call_chain(&ipu_pm_notifier, event, data);
+}
+#endif
+
+/*
+ * ======== ipu_pm_register_notifier ========
+ *  Register for IPC events.
+ */
+int ipu_pm_register_notifier(struct notifier_block *nb)
+{
+	if (!nb)
+		return -EINVAL;
+	return blocking_notifier_chain_register(&ipu_pm_notifier, nb);
+}
+EXPORT_SYMBOL_GPL(ipu_pm_register_notifier);
+
+/*
+ * ======== ipu_pm_unregister_notifier ========
+ *  Un-register for events.
+ */
+int ipu_pm_unregister_notifier(struct notifier_block *nb)
+{
+	if (!nb)
+		return -EINVAL;
+	return blocking_notifier_chain_unregister(&ipu_pm_notifier, nb);
+}
+EXPORT_SYMBOL_GPL(ipu_pm_unregister_notifier);

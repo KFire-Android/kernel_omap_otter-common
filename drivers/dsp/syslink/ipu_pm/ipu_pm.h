@@ -225,6 +225,9 @@
 #define SYS_PROC_DOWN		0x00010000
 #define APP_PROC_DOWN		0x00020000
 #define ENABLE_IPU_HIB		0x00000040
+#define SYS_PROC_HIB		0x00000001
+#define APP_PROC_HIB		0x00000002
+#define HIB_REF_MASK		0x00000F80
 
 #define SYS_PROC_IDLING		0x00000001
 #define APP_PROC_IDLING		0x00000002
@@ -337,6 +340,18 @@ enum pm_event_type{
 	PM_LAST_EVENT
 };
 
+
+enum pm_hib_timer_event{
+	PM_HIB_TIMER_RESET,
+	PM_HIB_TIMER_OFF,
+	PM_HIB_TIMER_ON,
+	PM_HIB_TIMER_WDRESET,
+	PM_HIB_TIMER_EXPIRE
+};
+
+#define PM_HIB_DEFAULT_TIME		5000	/* 5 SEC    */
+#define PM_HIB_WDT_TIME			3000	/* 3 SEC    */
+
 struct rcb_message {
 	unsigned rcb_flag:1;
 	unsigned rcb_num:6;
@@ -429,6 +444,8 @@ struct ipu_pm_params {
 	int remote_proc_id;
 	int line_id;
 	void *gate_mp;
+	int hib_timer_state;
+	int wdt_time;
 };
 
 /* This structure defines attributes for initialization of the ipu_pm module. */
@@ -465,6 +482,7 @@ struct ipu_pm_object {
 	struct work_struct work;
 	struct kfifo fifo;
 	spinlock_t lock;
+	struct omap_dm_timer *dmtimer;
 };
 
 /* Function for PM resources Callback */
@@ -536,5 +554,11 @@ int ipu_pm_module_set_bandwidth(unsigned rsrc,
 
 /* Function to get ducati state flag from share memory */
 u32 ipu_pm_get_state(int proc_id);
+
+/* Function to register notifier from devh module */
+int ipu_pm_register_notifier(struct notifier_block *nb);
+
+/* Function to unregister notifier from devh module */
+int ipu_pm_unregister_notifier(struct notifier_block *nb);
 
 #endif
