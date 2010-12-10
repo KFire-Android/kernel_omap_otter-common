@@ -2134,115 +2134,120 @@ static void setup_ehci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 
 static void setup_4430ehci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
 {
-	/*
-	 * FIXME: This funtion should use mux framework functions;
-	 * For now, we are hardcoding this.
-	 */
-
 	switch (port_mode[0]) {
 	case OMAP_EHCI_PORT_MODE_PHY:
-
-		/* HUSB1_PHY CLK , INPUT ENABLED, PULLDOWN  */
-		omap_writew(0x010C, 0x4A1000C2);
-
-		/* HUSB1 STP */
-		omap_writew(0x0004, 0x4A1000C4);
-
-		/* HUSB1_DIR */
-		omap_writew(0x010C, 0x4A1000C6);
-
-		/* HUSB1_NXT */
-		omap_writew(0x010C, 0x4A1000C8);
-
-		/* HUSB1_DATA0 */
-		omap_writew(0x010C, 0x4A1000CA);
-
-		/* HUSB1_DATA1 */
-		omap_writew(0x010C, 0x4A1000CC);
-
-		/* HUSB1_DATA2 */
-		omap_writew(0x010C, 0x4A1000CE);
-
-		/* HUSB1_DATA3 */
-		omap_writew(0x010C, 0x4A1000D0);
-
-		/* HUSB1_DATA4 */
-		omap_writew(0x010C, 0x4A1000D2);
-
-		/* HUSB1_DATA5 */
-		omap_writew(0x010C, 0x4A1000D4);
-
-		/* HUSB1_DATA6 */
-		omap_writew(0x010C, 0x4A1000D6);
-
-		/* HUSB1_DATA7 */
-		omap_writew(0x010C, 0x4A1000D8);
-
-		break;
-
-
+		omap_mux_init_signal("usbb1_ulpiphy_stp",
+			OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("usbb1_ulpiphy_clk",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_dir",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_nxt",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_dat0",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_dat1",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_dat2",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_dat3",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_dat4",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_dat5",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_dat6",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpiphy_dat7",
+			OMAP_PIN_INPUT_PULLDOWN);
+			break;
 	case OMAP_EHCI_PORT_MODE_TLL:
-		/* TODO */
-
-
-		break;
+		omap_mux_init_signal("usbb1_ulpitll_stp",
+			OMAP_PIN_INPUT_PULLUP);
+		omap_mux_init_signal("usbb1_ulpitll_clk",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_dir",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_nxt",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_dat0",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_dat1",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_dat2",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_dat3",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_dat4",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_dat5",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_dat6",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb1_ulpitll_dat7",
+			OMAP_PIN_INPUT_PULLDOWN);
+			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
-		/* FALLTHROUGH */
 	default:
-		break;
+			break;
 	}
-
 	switch (port_mode[1]) {
 	case OMAP_EHCI_PORT_MODE_PHY:
-		/* HUSB2_PHY CLK , INPUT PULLDOWN ENABLED  */
-		omap_writew(0x010C, 0x4A100160);
-
-		/* HUSB2 STP */
-		omap_writew(0x0002, 0x4A100162);
-
-		/* HUSB2_DIR */
-		omap_writew(0x010A, 0x4A100164);
-
-		/* HUSB2_NXT */
-		omap_writew(0x010A, 0x4A100166);
-
-		/* HUSB2_DATA0 */
-		omap_writew(0x010A, 0x4A100168);
-
-		/* HUSB2_DATA1 */
-		omap_writew(0x010A, 0x4A10016A);
-
-		/* HUSB2_DATA2 */
-		omap_writew(0x010A, 0x4A10016C);
-
-		/* HUSB2_DATA3 */
-		omap_writew(0x010A, 0x4A10016E);
-
-		/* HUSB2_DATA4 */
-		omap_writew(0x010A, 0x4A100170);
-
-		/* HUSB2_DATA5 */
-		omap_writew(0x010A, 0x4A100172);
-
-		/* HUSB2_DATA6 */
-		omap_writew(0x010A, 0x4A100174);
-
-		/* HUSB2_DATA7 */
-		omap_writew(0x010A, 0x4A100176);
-
-		break;
-
+		omap_mux_init_signal("usbb2_ulpiphy_stp",
+			OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("usbb2_ulpiphy_clk",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_dir",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_nxt",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_dat0",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_dat1",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_dat2",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_dat3",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_dat4",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_dat5",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_dat6",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpiphy_dat7",
+			OMAP_PIN_INPUT_PULLDOWN);
+			break;
 	case OMAP_EHCI_PORT_MODE_TLL:
-		/* TODO */
-
-		break;
+		omap_mux_init_signal("usbb2_ulpitll_stp",
+			OMAP_PIN_INPUT_PULLUP);
+		omap_mux_init_signal("usbb2_ulpitll_clk",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_dir",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_nxt",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_dat0",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_dat1",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_dat2",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_dat3",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_dat4",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_dat5",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_dat6",
+			OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("usbb2_ulpitll_dat7",
+			OMAP_PIN_INPUT_PULLDOWN);
+			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
-		/* FALLTHROUGH */
 	default:
-		break;
+			break;
 	}
-
-	return;
 }
 
 static void setup_ohci_io_mux(const enum usbhs_omap3_port_mode *port_mode)
