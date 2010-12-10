@@ -1,11 +1,10 @@
 # =====================================================================
-# L27.9.0 Froyo Hand-Off
+# L27.9.1 Froyo Hand-off
 # =====================================================================
 
 Author: Leed Aguilar
-Date: Nov 30th 2010
-Target Release: L27.9.0
-Destination: rel_l27x_handoff@list.ti.com
+Date: Dec 10th 2010
+Target Release: L27.9.1
 
 # =====================================================================
 # Config Spec
@@ -20,21 +19,21 @@ N/A
 [KERNEL]
 Repo   : git://git.omapzoom.org/kernel/omap.git
 Branch : p-android-omap-2.6.35
-Tag    : android-2.6.35-2.2-omap4.9v0
+Tag    : android-2.6.35-2.2-omap4.9v1
 Config : android_4430_defconfig
 
 [U-BOOT]
 Repo   : git://git.omapzoom.org/repo/u-boot.git
 Branch : omap4_dev
-Tag:   : L27.9.0
+Tag:   : L27.9.1
 Commit : 025fefdbfb6234fe986ac59e7cde5e838981d00a
 Config : omap4430sdp_config
 
 [X-LOADER]
 Repo   : git://git.omapzoom.org/repo/x-loader.git
 Branch : omap4_dev
-Tag:   : L27.9.0
-Commit : c07208b045182c61c204ce445f936799b57bd174
+Tag:   : L27.9.1
+Commit : aadc04ed16b8e1ed11044b2f71144032fd404537
 Config : omap4430sdp_config
 
 OS: Linux 2.6.35
@@ -48,7 +47,7 @@ Toolchain: arm-none-linux-gnueabi-gcc (Sourcery G++ Lite 2010q1-202) 4.4.1
 Kernel:
 -------
 1. git clone git://git.omapzoom.org/kernel/omap.git; cd omap/
-2. git checkout -b L27.9.0 android-2.6.35-2.2-omap4.9v0
+2. git checkout -b L27.9.1 android-2.6.35-2.2-omap4.9v1
 3. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- android_4430_defconfig
 4. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- uImage
 ** Output: uImage
@@ -56,7 +55,7 @@ Kernel:
 u-boot:
 -------
 1. git clone  git://git.omapzoom.org/repo/u-boot.git; cd u-boot/
-2. git checkout -b L27.9.0 025fefdbfb6234fe986ac59e7cde5e838981d00a
+2. git checkout -b L27.9.1 025fefdbfb6234fe986ac59e7cde5e838981d00a
 3. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
 4. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi-
 ** Output: u-boot.bin
@@ -65,7 +64,7 @@ u-boot:
 x-loader:
 ---------
 1. git clone git://git.omapzoom.org/repo/x-loader.git; cd x-loader/
-2. git checkout -b L27.9.0 c07208b045182c61c204ce445f936799b57bd174
+2. git checkout -b L27.9.1 aadc04ed16b8e1ed11044b2f71144032fd404537
 3. make ARCH=arm CCROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
 4. make ARCH=arm CCROSS_COMPILE=arm-none-linux-gnueabi- ift
 ** Output:
@@ -84,7 +83,7 @@ http://www.codesourcery.com/sgpp/lite/arm/portal/release1293
 * Sample bootargs for MMC boot:
 
 # The following command line is for 1GB support
-setenv bootargs console=ttyO2,115200n8 mem=458M@0x80000000 mem=512M@0xA0000000 \
+setenv bootargs console=ttyO2,115200n8 mem=456M@0x80000000 mem=512M@0xA0000000 \
 root=/dev/mmcblk1p2 rw rootdelay=2 init=/init  vram="10M" omapfb.vram="0:4M"
 setenv bootcmd 'mmcinit 0; fatload mmc 0 0x80000000 uImage;bootm 80000000'
 saveenv
@@ -98,6 +97,7 @@ init=/init androidboot.console=ttyO2 mem=460M ip=dhcp'
 
 How obtain the Android source code:
 $ repo init -u git://git.omapzoom.org/platform/omapmanifest.git -b froyo
+$ repo sync
 $ cp device/ti/blaze/buildspec.mk.default buildspec.mk
 $ make -j2
 Output:
@@ -111,15 +111,13 @@ http://omappedia.org/wiki/Android_Getting_Started#Building_Android
 
 [HIGHLIGHTS]
 
-- HDMI S3D - Enable S3D hotplug support
-- EHCI/OHCI smart idle, suspend/resume and L3 constraint
-- SGX:KM DVFS Implementation
-- Audio modem integration
-- CDC programming to follow external clock logic
-- OMAP UART Constraints for BT
-- HSI driver support of PM Runtime APIs
-- HSMMC: Enable ADMA for MMC1 & MMC2
-- OMAP4: Extend clock database (include various x2 clock nodes)
+- Adding the OMAP DMIC Audio driver
+- Syslink IPU self hibernation support
+- Dmtimer: context save and restore support
+- Enable c4 and C5 states for cpu Idle path
+- Support for OSWR in idle path
+- Support for OWSR is suspend path
+- Support for ABB voltage data
 
 [ADB over USB SUPPORT]
 
@@ -133,75 +131,80 @@ More info about ADB can be found here:
 http://omappedia.org/wiki/Support_Tools
 
 # =====================================================================
-# Known Issues
-# =====================================================================
-
-No UTR Validation
-
-# =====================================================================
 # GERRIT IDs and Kernel Changelist
 # =====================================================================
 
-Kernel stats from previous L27.8.1 HO:
+Kernel stats from previous L27.9.0 HO:
 
-61 files changed, 3023 insertions(+), 1833 deletions(-)
+588 files changed, 20306 insertions(+), 12829 deletions(-)
 
-8498 omap4: keep data-prefetch enabled always
-8294 OMAP4: S3D V4L2 - Add column interleving support
-7748 OMAP4: HDMI S3D - Enable S3D hotplug support
-8348 omap4: pm: enable io daisy chain during pm init
-7894 omap4: usb: EHCI and OHCI smart idle
-7893 omap4: usb: EHCI and OHCI global suspend/resume
-7820 omap4: usb: Aquire l3 contraint for EHCI and OHCI drivers
-8454 OMAP4 PM: Fix for Crash in CpuIdle Path with SR enabled.
-8446 OMAP4: PM: Program the CDC TCXO to output CLK1 based on REQ1
-8463 OMAP4 : UART : Fixing the timing response issues with BT chipset
-8462 OMAP4 : Fixes Serial Save and Restore regsiter while idle and suspend
-8435 OMAP4: HSI: add (ACWAKE, CAWAKE) parameters to hsi_dev struct
-8215 OMAP4: HSI debug traces
-8214 OMAP4: HSI Wake line management(ACWAKE, CAWAKE)
-8213 OMAP4: HSI: Fix user space exports in hsi_char.h
-8212 OMAP4: PM: Add HSI driver support of PM Runtime APIs
-8211 OMAP4: HSI Driver porting to OMAP HWMOD & omap_device
-8043 OMAP4: SGX: Rebase virtual display code for DDK 1.6.16.3924
-7892 SGX:KM DVFS Implementation
-8345 OMAP4 : Fixes the platform related configuration in UART
-8093 ASoC: core: Balance dai_active flag for no_pcm backends
-8040 ASoC: ABE DAI: Do not modify the fe hw_params
-8039 ASoC: SDP4430: Fixup the channels param for mcbsp be ports
-8038 ASoC: ABE DAI: Use fixup hw_params
-8037 ASoC: ABE DAI: Pass sample rate to modem
-8036 ASoC: ABE DAI: Dai clean up
-8035 ASoC: SDP 4430 - Add BE hw_params fixups
-8034 ASoC: core - add fixup function for BE hw_params
-7870 ASoC: ABE DAI: Add verification before close BT_VX and MM_EXT
-7869 ASoC: SDP4430: Add PCM format for BT dai
-7868 ASoC: SDP4430: FM only support 48KHz
-7867 ASoC: ABE DAI: Fix McBSP configuration for abe ports
-7866 ASoC: ABE DAI: Set ABE format acording to sample rate requested
-7865 ASoC: ABE DAI: Add support for 16 bits for Modem dai
-7864 ASoC: SDP4430: Set mcbsp format for modem dai
-7863 ASoC: McPDM - cleanup
-7862 ASoC: ABE DAI - Make sure we pass FE ID to all BEs
-7861 ASoC: core - Add FE ID to BE calls
-7874 usb: musb: Internal phy changes under UTMI interface mode check
-8404 omap: revert dmtimer s/r patch series
-8368 OMAP4: Remove Warnings on system boot up.
-8116 OMAP: dmtimer: incorporate lo comments
-8115 OMAP: dmtimer: optimize omap2_dm_timer_set_src
-8114 OMAP: dmtimer: remove early timer restriction.
-8113 OMAP: dmtimer: move enable/disable functions to platform
-8112 OMAP4: dmtimer: context save and restore
-8230 USB: MUSB: Change defconfig to support Mouse/Keyboard in HOST mode
-8242 USB: MUSB: Kconfig fixes to make all MUSB mode slections work
-8221 omap4: 32-kHz counter: Remove unsupported smart-idle flag
-8220 OMAP4: PM: De-assert CLK-REQ in Device RET and OFF states
-8154 OMAP4: hsmmc: Enable ADMA for MMC1 & MMC2
-8153 OMAP4: hsmmc: Round off the size for ADMA descriptor table entry
-8152 OMAP4: hsmmc: unmapped dma-sg list coming from block layer
-7880 OMAP: PM: Bootup Fixes, Corrections in OPP definitions
-7879 OMAP4: Extend clock database.
-8117 Revert "OMAP4:To make Dpll_per_m2 parent of Dpll_per_m2x2 clock"
+8798 OMAP4: disable L3 error handling by default
+8853 OMAP4 SDP Board file: Prox enable should be low at boot
+8138 hwmon: (lm75) Trivial changes to pacify the checkpatch
+8137 hwmon: (lm75) Make the writing to sysfs more robust
+8390 CMA3000 accelerometer: Fix delay sysfs to set correct delay
+8571 ASoC: ABE DSP: Add DMIC gain controls
+8426 ASoC: ABE: Implement mute/unmute for DMIC
+8047 ASoC: sdp4430: Update DMIC DAI configuration
+8046 ASoC: DMIC: Set correct DAI capabilities for DMIC
+8045 ASoC: DMIC: Adding the OMAP DMIC driver
+8044 OMAP4: DMIC: Add digital mic PM registration
+8627 ASoC: DAPM: Disable debug in SoC DAPM
+8425 ASoC: McPDM: Balance pm resource after cancelling close workqueue
+8424 ASoC: ABE DSP: Add additional check before disabling the event generator
+8423 ASoC: ABE DSP: Avoid OPP transitions when ABE is inactive
+8802 OMAP4: Vibrator: Use LP PLL for vibrator
+8801 ASoC: SDP4430: Use twl6040 Standard Multimedia mode
+8794 SGX: UDD: Support for flipping with multiple display types
+8790 serial: do not throw away MSR deltas when resuming
+8169 input/touchscreen: Update syntm12xx for no CONFIG_PM compile
+8763 omap: mach-omap2: adapt remoteproc to dmtimer context save / restore
+8755 OMAP: dmtimer: fix off-mode logic and incorrect offsets
+8453 fix read of hmc5843 X, Y, Z data
+8007 omap4: cpufreq: Fix cpufreq notifiers
+8710 syslink: ipu_pm: fix suspend/resume when no IPU image loaded
+8698 OMAP4: Enable syslink IPU self hibernate flag
+8547 OMAP: DSS2: Panel-Taal: Allow update of row and column addresses
+8695 OMAP: dmtimer: incorporate lo comments
+8694 OMAP: dmtimer: optimize omap2_dm_timer_set_src
+8693 OMAP: dmtimer: merge two init functions in mach-omap2
+8692 OMAP: dmtimer: move enable/disable functions to platform
+8691 OMAP: dmtimer: context save and restore
+8477 SYSLINK: IPU-PM: clean up warning in AUXCLK request function
+8471 syslink: procmgr: simulate suspend/resume path
+8468 syslink: ipu_pm: refactor and cleanup functions
+8613 OMAP4: Enable c4 and C5 states for cpu Idle path.
+8476 omap: mach-omap2: support selectable debug traces for ipu_pm
+8472 syslink: ipc: add CONFIG_ flags and traces
+8469 omap: remoteproc: CONFIG flag for self hibernation
+7585 omap:iodmm-send notification on close only when resources not free
+7583 omap: remoteproc - fix sparse warnings in remote proc about static
+7582 syslink: notifier - add a mutext per notify_object
+8056 SYSLINK: notify - reset notify registration chart correctly
+7959 SYSLINK: notify-replace printks with pr_xxx
+7958 SYSLINK: notify-ducati-replace printks with pr_xxx
+7957 SYSLINK: PROCMGR-replace printks with pr_xxx
+7956 SYSLINK: IPC-replace printks with pr_xxx
+8027 OMAP4: voltage: voltage notifier handlers for ABB
+8191 OMAP4: voltage: introduce ABB voltage data
+8190 OMAP: voltage: include struct vdd_info in notifier
+8527 OMAP4: Enable OSWR for Suspend path in defconfig
+8316 OMAP4: Fxing updation retention_logic_off counter for IVA
+8315 OMAP4: Fixing the updation of logic off counter
+8388 OMAP4:PM: Fix the power state of CORE and MPU in C1 and C2
+8514 OMAP4: PM: Update SR settings
+8196 OMAP4/TILER: Color support for allocation-map debug.
+8164 OMAP4/TILER: Add allocation debug interface.
+8559 syslink: ipu_pm: add a core latency constraint when the ipu is running.
+8029 OMAP/V4L2: Allow QBUF while trying to deque the last buffer.
+8031 OMAP/V4L2: Fix STREAMOFF handling if not streaming.
+8485 V4L2/videobuf: Fix issue with calling STREAMOFF while not streaming
+8030 OMAP/V4L2: Correctly return errors from vidioc_streamon
+8028 OMAP:V4L2: Add poll support
+8516 Revert "OMAP/V4L2: Add support for queueing buffers to suspended displays"
+8515 Revert "OMAP/V4L2: Add early suspend handler and ignore state"
+8484 Revert "Remove Early suspend from DSS"
+8483 Revert "OMAP4: Hack to make DSS suspend to work"
 
 # =====================================================================
 # Documentation
@@ -222,4 +225,5 @@ N/A
 N/A
 
 # ======================================================================
+
 
