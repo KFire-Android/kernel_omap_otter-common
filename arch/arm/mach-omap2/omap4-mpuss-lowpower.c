@@ -82,6 +82,7 @@
 
 #define NR_TESLA_REGS				3
 #define NR_IVAHD_REGS				4
+#define NR_L3INSTR_REGS				3
 
 /*
  * Physical address of secure memory storage
@@ -106,6 +107,12 @@ struct tuple ivahd_reg[NR_IVAHD_REGS] = {
 	{OMAP4430_CM_IVAHD_IVAHD_CLKCTRL, 0x0},
 	{OMAP4430_CM_IVAHD_SL2_CLKCTRL, 0x0},
 	{OMAP4430_PM_IVAHD_PWRSTCTRL, 0x0}
+};
+
+struct tuple l3instr_reg[NR_L3INSTR_REGS] = {
+	{OMAP4430_CM_L3INSTR_L3_3_CLKCTRL, 0x0},
+	{OMAP4430_CM_L3INSTR_L3_INSTR_CLKCTRL, 0x0},
+	{OMAP4430_CM_L3INSTR_OCP_WP1_CLKCTRL, 0x0},
 };
 
 /*
@@ -574,6 +581,21 @@ static inline void restore_ivahd_tesla_regs(void)
 		__raw_writel(ivahd_reg[i].val, ivahd_reg[i].addr);
 }
 
+static inline void save_l3instr_regs(void)
+{
+	int i;
+
+	for (i = 0; i < NR_L3INSTR_REGS; i++)
+		l3instr_reg[i].val = __raw_readl(l3instr_reg[i].addr);
+}
+
+static inline void restore_l3instr_regs(void)
+{
+	int i;
+
+	for (i = 0; i < NR_L3INSTR_REGS; i++)
+		__raw_writel(l3instr_reg[i].val, l3instr_reg[i].addr);
+}
 
 /*
  * OMAP4 MPUSS Low Power Entry Function
@@ -651,6 +673,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		/* FIXME: Check if this can be optimised */
 		save_secure_all();
 		save_ivahd_tesla_regs();
+		save_l3instr_regs();
 		save_state = 3;
 		goto cpu_prepare;
 	}
@@ -664,6 +687,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		if (pwrdm_read_logic_retst(mpuss_pd) == PWRDM_POWER_OFF) {
 			if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
 				save_gic_wakeupgen_secure();
+				save_l3instr_regs();
 			} else {
 				save_gic();
 				omap4_wakeupgen_save();
@@ -677,6 +701,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 			save_secure_ram();
 			save_gic_wakeupgen_secure();
 			save_ivahd_tesla_regs();
+			save_l3instr_regs();
 		} else {
 			save_gic();
 			omap4_wakeupgen_save();
@@ -755,8 +780,10 @@ cpu_prepare:
 				omap4_wakeupgen_restore();
 			}
 			enable_gic_distributor();
-			if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+			if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
 				restore_ivahd_tesla_regs();
+				restore_l3instr_regs();
+			}
 		}
 		/*
 		 * Enable GIC cpu inrterface
