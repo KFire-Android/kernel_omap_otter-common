@@ -58,7 +58,8 @@ enum {
 };
 
 struct deh_event_ntfy {
-	u32     fd;
+	u32 fd;
+	u32 event;
 	struct eventfd_ctx *evt_ctx;
 	struct list_head list;
 };
@@ -79,20 +80,29 @@ static struct omap_devh_platform_data *devh_get_plat_data_by_name(char *name)
 	return NULL;
 }
 
+static int devh_notify_event(struct omap_devh *devh , u32 event)
+{
+	struct deh_event_ntfy *fd_reg;
+
+	spin_lock_irq(&(devh->event_lock));
+	list_for_each_entry(fd_reg, &(devh->event_list), list)
+		if (fd_reg->event == event)
+			eventfd_signal(fd_reg->evt_ctx, 1);
+	spin_unlock_irq(&(devh->event_lock));
+
+	return 0;
+}
+
 static void devh_notification_handler(u16 proc_id, u16 line_id, u32 event_id,
 					uint *arg, u32 payload)
 {
-	struct omap_devh *devh = (struct omap_devh *)arg;
-	struct deh_event_ntfy *fd_reg;
-	struct deh_event_ntfy *tmp_fd_reg;
-
 	pr_warning("Unrecoverable Error occured in Ducati for proc_id = %d\n",
 		proc_id);
 
-	spin_lock_irq(&(devh->event_lock));
-	list_for_each_entry_safe(fd_reg, tmp_fd_reg, &(devh->event_list), list)
-		eventfd_signal(fd_reg->evt_ctx, 1);
-	spin_unlock_irq(&(devh->event_lock));
+	/* schedule the recovery */
+	ipc_recover_schedule();
+
+	devh_notify_event((struct omap_devh *)arg, DEV_SYS_ERROR);
 }
 
 static int devh44xx_notifier_call(struct notifier_block *nb,
@@ -222,6 +232,27 @@ static struct notifier_block devh_notify_nb_iommu_ducati1 = {
 	.notifier_call = devh44xx_appm3_iommu_notifier_call,
 };
 
+static int devh44xx_wdt_ipc_notifier_call(struct notifier_block *nb,
+						unsigned long val, void *v)
+{
+	struct omap_devh *obj;
+	int i = devh_get_plat_data_size();
+
+	/* schedule the recovery */
+	ipc_recover_schedule();
+
+	while (i--) {
+		obj = devh_get_obj(i);
+		devh_notify_event(obj, DEV_WATCHDOG_ERROR);
+	}
+
+	return 0;
+}
+
+static struct notifier_block devh_notify_nb_ipc_wdt = {
+	.notifier_call = devh44xx_wdt_ipc_notifier_call,
+};
+
 static int devh44xx_sysm3_ipc_notifier_call(struct notifier_block *nb,
 						unsigned long val, void *v)
 {
@@ -253,12 +284,16 @@ static int devh44xx_sysm3_ipc_notifier_call(struct notifier_block *nb,
 					devh_notification_handler,
 					(void *)obj);
 			}
+			if (status == 0)
+				status = ipu_pm_register_notifier(
+						&devh_notify_nb_ipc_wdt);
 		} else {
 			status = 0;
 		}
 		return status;
 	case IPC_STOP:
 		if (*proc_id == multiproc_get_id("SysM3")) {
+			ipu_pm_unregister_notifier(&devh_notify_nb_ipc_wdt);
 			obj = devh_get_obj(1);
 			if (WARN_ON(obj == NULL)) {
 				status = -1;
@@ -757,21 +792,28 @@ static struct omap_devh_runtime_info omap4_tesla_runtime_info = {
 static inline int devh44xx_register_proc_error
 	(struct omap_devh *devh, const void __user *args)
 {
-	int fd;
 	struct deh_event_ntfy *fd_reg;
-	if (copy_from_user(&fd, args, sizeof(int)))
+	struct deh_reg_event_args re_args;
+
+	if (copy_from_user(&re_args, args, sizeof(re_args)))
 		return -EFAULT;
+
 	fd_reg = kzalloc(sizeof(struct deh_event_ntfy), GFP_KERNEL);
 	if (!fd_reg) {
 		dev_err(devh->dev, "%s: kzalloc failed\n", __func__);
 		return -ENOMEM;
 	}
-	fd_reg->fd = fd;
-	fd_reg->evt_ctx = eventfd_ctx_fdget(fd);
+
+	fd_reg->fd = re_args.fd;
+	fd_reg->event = re_args.event;
+	fd_reg->evt_ctx = eventfd_ctx_fdget(re_args.fd);
+
 	INIT_LIST_HEAD(&fd_reg->list);
+
 	spin_lock_irq(&(devh->event_lock));
 	list_add_tail(&fd_reg->list, &(devh->event_list));
 	spin_unlock_irq(&(devh->event_lock));
+
 	pr_info("Registered user-space process for deh error notification\n");
 	return 0;
 }

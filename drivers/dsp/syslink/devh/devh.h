@@ -31,10 +31,18 @@
 #define DEVH_IOC_MAGIC                 'E'
 
 #define DEVH_IOCWAITONEVENTS		_IO(DEVH_IOC_MAGIC, 0)
-#define DEVH_IOCEVENTREG		_IOW(DEVH_IOC_MAGIC, 1, int)
-#define DEVH_IOCEVENTUNREG		_IOW(DEVH_IOC_MAGIC, 2, int)
+#define DEVH_IOCEVENTREG		_IOW(DEVH_IOC_MAGIC, 1, \
+					struct deh_reg_event_args)
+#define DEVH_IOCEVENTUNREG		_IOW(DEVH_IOC_MAGIC, 2, \
+					struct deh_reg_event_args)
 
 #define DEVH_IOC_MAXNR		(2)
+
+/* Device error types */
+enum {
+	DEV_SYS_ERROR = 1,
+	DEV_WATCHDOG_ERROR,
+};
 
 struct omap_devh;
 
@@ -64,6 +72,11 @@ struct omap_devh {
 	char *name;
 	struct list_head event_list;
 	spinlock_t event_lock;
+};
+
+struct deh_reg_event_args {
+	int fd;
+	u32 event;
 };
 
 extern struct omap_devh_platform_data *devh_get_plat_data(void);
