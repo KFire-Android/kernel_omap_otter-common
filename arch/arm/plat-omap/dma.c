@@ -33,6 +33,7 @@
 #include <linux/irq.h>
 #include <linux/io.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 
 #include <asm/system.h>
 
@@ -53,6 +54,7 @@ static void __iomem *omap_dma_base;
 static struct omap_dma_lch *dma_chan;
 static struct omap_system_dma_plat_info *p;
 static struct omap_dma_dev_attr *d;
+static struct platform_device           *pd;
 
 #define dma_read(reg)							\
 ({									\
@@ -441,6 +443,8 @@ int omap_request_dma(int dev_id, const char *dev_name,
 	unsigned long flags;
 	struct omap_dma_lch *chan;
 
+	pm_runtime_get_sync(&pd->dev);
+
 	spin_lock_irqsave(&dma_chan_lock, flags);
 	for (ch = 0; ch < dma_chan_count; ch++) {
 		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
@@ -451,6 +455,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
 	}
 	if (free_ch == -1) {
 		spin_unlock_irqrestore(&dma_chan_lock, flags);
+		pm_runtime_put(&pd->dev);
 		return -EBUSY;
 	}
 	chan = dma_chan + free_ch;
@@ -545,6 +550,7 @@ void omap_free_dma(int lch)
 		omap_clear_dma(lch);
 		omap_clear_dma_sglist_mode(lch);
 	}
+	pm_runtime_put(&pd->dev);
 
 	spin_lock_irqsave(&dma_chan_lock, flags);
 	dma_chan[lch].dev_id = -1;
@@ -891,6 +897,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	pd = pdev;
 	p = pdata;
 	d = p->dma_attr;
 
@@ -916,6 +923,8 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 	dma_chan_count		= d->dma_chan_count;
 	dma_chan		= d->dma_chan;
 
+	pm_runtime_enable(&pd->dev);
+	pm_runtime_get_sync(&pd->dev);
 
 	enable_1510_mode = d->dma_dev_attr & ENABLE_1510_MODE;
 
@@ -970,6 +979,13 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 		dma_chan[0].dev_id = 0;
 		dma_chan[1].dev_id = 1;
 	}
+
+	/*
+	 * Note: If dma channels are reserved through boot paramters,
+	 * then dma device is always enabled.
+	 */
+	if (!omap_dma_reserve_channels)
+		pm_runtime_put(&pd->dev);
 
 	dev_info(&pdev->dev, "System DMA registered\n");
 	return 0;
