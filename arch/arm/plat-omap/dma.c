@@ -991,6 +991,39 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 	return 0;
 }
 
+static int omap_dma_suspend(struct device *dev)
+{
+	pm_runtime_put(&pd->dev);
+
+	if (p->dma_context_save)
+		p->dma_context_save();
+
+	return 0;
+
+}
+
+static int omap_dma_resume(struct device *dev)
+{
+	/*
+	 * This may not restore sysconfig register if multiple DMA channels
+	 * are in use during suspend.
+	 * Work around: restroing sysconfig manually in machine specific dma
+	 * driver.
+	 */
+	pm_runtime_get_sync(&pd->dev);
+
+	if (p->dma_context_restore)
+		p->dma_context_restore();
+
+	return 0;
+
+}
+
+static const struct dev_pm_ops dma_pm_ops = {
+	.suspend	 = omap_dma_suspend,
+	.resume		 = omap_dma_resume,
+};
+
 static int __devexit omap_system_dma_remove(struct platform_device *pdev)
 {
 	struct resource *mem;
@@ -1004,7 +1037,8 @@ static struct platform_driver omap_system_dma_driver = {
 	.probe		= omap_system_dma_probe,
 	.remove		= omap_system_dma_remove,
 	.driver		= {
-		.name	= "dma"
+		.name	= "dma",
+		.pm	= &dma_pm_ops,
 	},
 };
 

@@ -367,6 +367,8 @@ struct omap_system_dma_plat_info {
 	void (*enable_channel_irq)(int lch);
 	void (*disable_channel_irq)(int lch);
 	void (*set_dma_chain_ch)(int free_ch);
+	void (*dma_context_save)(void);
+	void (*dma_context_restore)(void);
 };
 
 extern void omap_set_dma_priority(int lch, int dst_port, int priority);

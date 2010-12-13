@@ -384,6 +384,8 @@ static int __init omap1_system_dma_init(void)
 	pdata->enable_irq_lch		= NULL;
 	pdata->disable_irq_lch		= NULL;
 	pdata->set_dma_chain_ch		= NULL;
+	p->dma_context_save		= NULL;
+	p->dma_context_restore		= NULL;
 
 	if (cpu_is_omap15xx())
 		d->dma_chan_count = 9;

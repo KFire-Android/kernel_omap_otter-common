@@ -38,6 +38,8 @@
 #include <plat/omap_device.h>
 #include <plat/dma.h>
 
+#include "pm.h"
+
 #define dma_read(reg)							\
 ({									\
 	u32 __val;							\
@@ -50,11 +52,11 @@
 	__raw_writel((val), dma_base + OMAP_DMA4_##reg);		\
 })
 
-static struct omap_dma_global_context_registers {
-	u32 dma_irqenable_l0;
-	u32 dma_ocp_sysconfig;
-	u32 dma_gcr;
-} omap_dma_global_context;
+static struct global_context_registers {
+	u32 sysconfig;
+	u32 irqenable_l0;
+	u32 gcr;
+} global_ctx_regs;
 
 struct dma_link_info {
 	int *linked_dmach_q;
@@ -69,6 +71,8 @@ struct dma_link_info {
 
 };
 
+static u32 *ch_ctx_regs;
+static u8 ch_spec_regs;
 static struct dma_link_info *dma_linked_lch;
 static struct omap_dma_lch *dma_chan;
 
@@ -274,25 +278,56 @@ static int dma_sglist_set_phy_params(struct omap_dma_sglist_node *sghead,
 	return 0;
 }
 
-
-void omap_dma_global_context_save(void)
+void omap2_dma_context_save(void)
 {
-	omap_dma_global_context.dma_irqenable_l0 =
-		dma_read(IRQENABLE_L0);
-	omap_dma_global_context.dma_ocp_sysconfig =
-		dma_read(OCP_SYSCONFIG);
-	omap_dma_global_context.dma_gcr = dma_read(GCR);
+	int ch, i, ch_count = 0;
+
+#ifdef CONFIG_PM
+	if (!enable_off_mode)
+		return;
+#endif
+	/*
+	 * TODO: sysconfig setting should be part of run time pm.
+	 * Current pm runtime frame work will not restore this register
+	 * if multiple DMA channels are in use.
+	 */
+	global_ctx_regs.sysconfig        = dma_read(OCP_SYSCONFIG);
+	global_ctx_regs.irqenable_l0 = dma_read(IRQENABLE_L0);
+	global_ctx_regs.gcr          = dma_read(GCR);
+
+	for (ch = 0; ch < dma_chan_count; ch++) {
+		void __iomem *lch_base = dma_base + OMAP_DMA4_CH_BASE(ch);
+		if (dma_chan[ch].dev_id == -1)
+			continue;
+		for (i = 0; i <= ch_spec_regs; i++)
+			ch_ctx_regs[ch_count++] = __raw_readl(lch_base + i);
+	}
 }
 
-void omap_dma_global_context_restore(void)
+void omap2_dma_context_restore(void)
 {
-	int ch;
+	int ch, i, ch_count = 0;
 
-	dma_write(omap_dma_global_context.dma_gcr, GCR);
-	dma_write(omap_dma_global_context.dma_ocp_sysconfig,
-		OCP_SYSCONFIG);
-	dma_write(omap_dma_global_context.dma_irqenable_l0,
-		IRQENABLE_L0);
+#ifdef CONFIG_PM
+	if (!enable_off_mode)
+		return;
+#endif
+	/*
+	 * TODO: sysconfig setting should be part of run time pm.
+	 * Current pm runtime frame work will not restore this register
+	 * if multiple DMA channels are in use.
+	 */
+	dma_write(global_ctx_regs.sysconfig, OCP_SYSCONFIG);
+	dma_write(global_ctx_regs.gcr, GCR);
+	dma_write(global_ctx_regs.irqenable_l0, IRQENABLE_L0);
+
+	for (ch = 0; ch < dma_chan_count; ch++) {
+		void __iomem *lch_base = dma_base + OMAP_DMA4_CH_BASE(ch);
+		if (dma_chan[ch].dev_id == -1)
+			continue;
+		for (i = 0; i <= ch_spec_regs; i++)
+			__raw_writel(ch_ctx_regs[ch_count++], lch_base + i);
+	}
 
 	/*
 	 * A bug in ROM code leaves IRQ status for channels 0 and 1 uncleared
@@ -303,9 +338,6 @@ void omap_dma_global_context_restore(void)
 	if (cpu_is_omap34xx() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
 		dma_write(0x3 , IRQSTATUS_L0);
 
-	for (ch = 0; ch < dma_chan_count; ch++)
-		if (dma_chan[ch].dev_id != -1)
-			omap_clear_dma(ch);
 }
 
 /* Create chain of DMA channesls */
@@ -1309,6 +1341,8 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *user)
 	p->enable_lnk		= omap2_enable_lnk;
 	p->disable_lnk		= omap2_disable_lnk;
 	p->set_dma_chain_ch	= set_dma_chain_ch;
+	p->dma_context_save	= omap2_dma_context_save;
+	p->dma_context_restore	= omap2_dma_context_restore;
 	p->clear_lch_regs	= NULL;
 	p->get_gdma_dev		= NULL;
 	p->set_gdma_dev		= NULL;
@@ -1361,6 +1395,20 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *user)
 						dma_chan_count, GFP_KERNEL);
 	if (!dma_linked_lch) {
 		kfree(d->dma_chan);
+		return -ENOMEM;
+	}
+
+	/* OMAP4 and OMAP3630 has descrіptor loading registers */
+	if (cpu_is_omap3630() || cpu_is_omap4430())
+		ch_spec_regs = 22;
+	else
+		ch_spec_regs = 19;
+
+	ch_ctx_regs = kzalloc(dma_chan_count * (4 * ch_spec_regs), GFP_KERNEL);
+
+	if (!ch_ctx_regs) {
+		kfree(d->dma_chan);
+		kfree(dma_linked_lch);
 		return -ENOMEM;
 	}
 
