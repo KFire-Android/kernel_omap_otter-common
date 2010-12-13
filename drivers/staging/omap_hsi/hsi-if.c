@@ -144,9 +144,7 @@ int if_hsi_read(int ch, u32 *data, unsigned int count)
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-	spin_lock_bh(&hsi_iface.lock);
 	ret = if_hsi_read_on(ch, data, count);
-	spin_unlock_bh(&hsi_iface.lock);
 	return ret;
 }
 
@@ -156,9 +154,7 @@ int if_hsi_poll(int ch)
 	int ret = 0;
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-	spin_lock_bh(&hsi_iface.lock);
 	ret = hsi_poll(channel->dev);
-	spin_unlock_bh(&hsi_iface.lock);
 	return ret;
 }
 
@@ -208,9 +204,7 @@ int if_hsi_write(int ch, u32 *data, unsigned int count)
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-	spin_lock_bh(&hsi_iface.lock);
 	ret = if_hsi_write_on(ch, data, count);
-	spin_unlock_bh(&hsi_iface.lock);
 	return ret;
 }
 
@@ -219,18 +213,14 @@ void if_hsi_send_break(int ch)
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-	spin_lock_bh(&hsi_iface.lock);
 	hsi_ioctl(channel->dev, HSI_IOCTL_SEND_BREAK, NULL);
-	spin_unlock_bh(&hsi_iface.lock);
 }
 
 void if_hsi_flush_rx(int ch)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
-	spin_lock_bh(&hsi_iface.lock);
 	hsi_ioctl(channel->dev, HSI_IOCTL_FLUSH_RX, NULL);
-	spin_unlock_bh(&hsi_iface.lock);
 }
 
 void if_hsi_flush_ch(int ch)
@@ -238,36 +228,28 @@ void if_hsi_flush_ch(int ch)
 	/* FIXME - Check the purpose of this function */
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
-	spin_lock(&channel->lock);
-	spin_unlock(&channel->lock);
 }
 
 void if_hsi_flush_tx(int ch)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
-	spin_lock_bh(&hsi_iface.lock);
 	hsi_ioctl(channel->dev, HSI_IOCTL_FLUSH_TX, NULL);
-	spin_unlock_bh(&hsi_iface.lock);
 }
 
 void if_hsi_get_wakeline(int ch, unsigned int *state)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
-	spin_lock_bh(&hsi_iface.lock);
 	hsi_ioctl(channel->dev, HSI_IOCTL_GET_ACWAKE, state);
-	spin_unlock_bh(&hsi_iface.lock);
 }
 
 void if_hsi_set_wakeline(int ch, unsigned int state)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
-	spin_lock_bh(&hsi_iface.lock);
 	hsi_ioctl(channel->dev,
 		  state ? HSI_IOCTL_ACWAKE_UP : HSI_IOCTL_ACWAKE_DOWN, NULL);
-	spin_unlock_bh(&hsi_iface.lock);
 }
 
 int if_hsi_set_rx(int ch, struct hsi_rx_config *cfg)
@@ -278,9 +260,7 @@ int if_hsi_set_rx(int ch, struct hsi_rx_config *cfg)
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
 	RXCONV(&ctx, cfg);
-	spin_lock_bh(&hsi_iface.lock);
 	ret = hsi_ioctl(channel->dev, HSI_IOCTL_SET_RX, &ctx);
-	spin_unlock_bh(&hsi_iface.lock);
 	return ret;
 }
 
@@ -290,10 +270,8 @@ void if_hsi_get_rx(int ch, struct hsi_rx_config *cfg)
 	struct hsr_ctx ctx;
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-	spin_lock_bh(&hsi_iface.lock);
 	hsi_ioctl(channel->dev, HSI_IOCTL_GET_RX, &ctx);
 	RXCONV(cfg, &ctx);
-	spin_unlock_bh(&hsi_iface.lock);
 }
 
 int if_hsi_set_tx(int ch, struct hsi_tx_config *cfg)
@@ -304,9 +282,7 @@ int if_hsi_set_tx(int ch, struct hsi_tx_config *cfg)
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
 	TXCONV(&ctx, cfg);
-	spin_lock_bh(&hsi_iface.lock);
 	ret = hsi_ioctl(channel->dev, HSI_IOCTL_SET_TX, &ctx);
-	spin_unlock_bh(&hsi_iface.lock);
 	return ret;
 }
 
@@ -316,21 +292,18 @@ void if_hsi_get_tx(int ch, struct hsi_tx_config *cfg)
 	struct hst_ctx ctx;
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-	spin_lock_bh(&hsi_iface.lock);
 	hsi_ioctl(channel->dev, HSI_IOCTL_GET_TX, &ctx);
 	TXCONV(cfg, &ctx);
-	spin_unlock_bh(&hsi_iface.lock);
 }
 
 void if_hsi_sw_reset(int ch)
 {
 	struct if_hsi_channel *channel;
 	int i;
-
 	channel = &hsi_iface.channels[ch];
-	spin_lock_bh(&hsi_iface.lock);
 	hsi_ioctl(channel->dev, HSI_IOCTL_SW_RESET, NULL);
 
+	spin_lock_bh(&hsi_iface.lock);
 	/* Reset HSI channel states */
 	for (i = 0; i < HSI_MAX_PORTS; i++)
 		if_hsi_char_driver.ch_mask[i] = 0;
@@ -348,9 +321,9 @@ void if_hsi_cancel_read(int ch)
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-	spin_lock(&channel->lock);
 	if (channel->state & HSI_CHANNEL_STATE_READING)
 		hsi_read_cancel(channel->dev);
+	spin_lock(&channel->lock);
 	channel->state &= ~HSI_CHANNEL_STATE_READING;
 	spin_unlock(&channel->lock);
 }
@@ -360,9 +333,9 @@ void if_hsi_cancel_write(int ch)
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
-	spin_lock(&channel->lock);
 	if (channel->state & HSI_CHANNEL_STATE_WRITING)
 		hsi_write_cancel(channel->dev);
+	spin_lock(&channel->lock);
 	channel->state &= ~HSI_CHANNEL_STATE_WRITING;
 	spin_unlock(&channel->lock);
 }
@@ -388,8 +361,11 @@ static int if_hsi_openchannel(struct if_hsi_channel *channel)
 		ret = -ENODEV;
 		goto leave;
 	}
+	spin_unlock(&channel->lock);
 
 	ret = hsi_open(channel->dev);
+
+	spin_lock(&channel->lock);
 	if (ret < 0) {
 		pr_err("Could not open channel %d\n", channel->channel_id);
 		goto leave;
@@ -421,16 +397,22 @@ static int if_hsi_closechannel(struct if_hsi_channel *channel)
 
 	/* Stop any pending read/write */
 	if (channel->state & HSI_CHANNEL_STATE_READING) {
-		hsi_read_cancel(channel->dev);
 		channel->state &= ~HSI_CHANNEL_STATE_READING;
+		spin_unlock(&channel->lock);
+		hsi_read_cancel(channel->dev);
+		spin_lock(&channel->lock);
 	}
+
 	if (channel->state & HSI_CHANNEL_STATE_WRITING) {
-		hsi_write_cancel(channel->dev);
 		channel->state &= ~HSI_CHANNEL_STATE_WRITING;
-	}
+		spin_unlock(&channel->lock);
+		hsi_write_cancel(channel->dev);
+	} else
+		spin_unlock(&channel->lock);
 
 	hsi_close(channel->dev);
 
+	spin_lock(&channel->lock);
 	channel->opened = 0;
 leave:
 	spin_unlock(&channel->lock);
@@ -445,18 +427,17 @@ int if_hsi_start(int ch)
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
 
-	spin_lock_bh(&hsi_iface.lock);
+	spin_lock_bh(&channel->lock);
 	channel->state = 0;
+	spin_unlock_bh(&channel->lock);
+
 	ret = if_hsi_openchannel(channel);
 	if (ret < 0) {
 		pr_err("Could not open channel %d\n", ch);
-		spin_unlock_bh(&hsi_iface.lock);
 		goto error;
 	}
-	spin_unlock_bh(&hsi_iface.lock);
 
 	if_hsi_poll(ch);
-
 error:
 	return ret;
 }
@@ -467,9 +448,7 @@ void if_hsi_stop(int ch)
 	channel = &hsi_iface.channels[ch];
 	dev_dbg(&channel->dev->device, "%s, ch = %d\n", __func__, ch);
 
-	spin_lock_bh(&hsi_iface.lock);
 	if_hsi_closechannel(channel);
-	spin_unlock_bh(&hsi_iface.lock);
 }
 
 static int __devinit if_hsi_probe(struct hsi_device *dev)
@@ -559,22 +538,18 @@ static void if_hsi_port_event(struct hsi_device *dev, unsigned int event,
 	case HSI_EVENT_BREAK_DETECTED:
 		pr_debug("%s, HWBREAK detected\n", __func__);
 		ev.data = (u32 *) HSI_HWBREAK;
-		spin_lock_bh(&hsi_iface.lock);
 		for (i = 0; i < HSI_MAX_CHAR_DEVS; i++) {
 			if (hsi_iface.channels[i].opened)
 				if_notify(i, &ev);
 		}
-		spin_unlock_bh(&hsi_iface.lock);
 		break;
 	case HSI_EVENT_HSR_DATAAVAILABLE:
 		i = (int)arg;
 		pr_debug("%s, HSI_EVENT_HSR_DATAAVAILABLE channel = %d\n",
 			 __func__, i);
 		ev.event = HSI_EV_AVAIL;
-		spin_lock_bh(&hsi_iface.lock);
 		if (hsi_iface.channels[i].opened)
 			if_notify(i, &ev);
-		spin_unlock_bh(&hsi_iface.lock);
 		break;
 	case HSI_EVENT_CAWAKE_UP:
 		pr_debug("%s, CAWAKE up\n", __func__);

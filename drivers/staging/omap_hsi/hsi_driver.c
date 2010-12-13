@@ -483,7 +483,6 @@ static int __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 
 void hsi_clocks_disable(struct device *dev)
 {
-	struct platform_device *pd = to_platform_device(dev);
 	int ret;
 
 	dev_info(dev, "HSI DRIVER CLK : hsi_clocks_disable for %s, device:0x%x",

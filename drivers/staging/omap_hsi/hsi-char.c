@@ -190,7 +190,9 @@ static ssize_t hsi_char_read(struct file *file, char __user *buf,
 		goto out2;
 	}
 
+	spin_lock_bh(&hsi_char_data[ch].lock);
 	add_wait_queue(&hsi_char_data[ch].rx_wait, &wait);
+	spin_unlock_bh(&hsi_char_data[ch].lock);
 
 	for (;;) {
 		data = NULL;
@@ -216,8 +218,8 @@ static ssize_t hsi_char_read(struct file *file, char __user *buf,
 			pr_debug("%s, RX finished\n", __func__);
 			spin_lock_bh(&hsi_char_data[ch].lock);
 			hsi_char_data[ch].poll_event &= ~(POLLIN | POLLRDNORM);
-			if_hsi_poll(ch);
 			spin_unlock_bh(&hsi_char_data[ch].lock);
+			if_hsi_poll(ch);
 			break;
 		} else if (file->f_flags & O_NONBLOCK) {
 			pr_debug("%s, O_NONBLOCK\n", __func__);
@@ -278,17 +280,15 @@ static ssize_t hsi_char_write(struct file *file, const char __user *buf,
 		ret = count;
 	}
 
-	spin_lock_bh(&hsi_char_data[ch].lock);
 	ret = if_hsi_write(ch, data, count);
 	if (ret < 0) {
-		spin_unlock_bh(&hsi_char_data[ch].lock);
 		kfree(data);
 		goto out2;
 	}
+	spin_lock_bh(&hsi_char_data[ch].lock);
 	hsi_char_data[ch].poll_event &= ~(POLLOUT | POLLWRNORM);
-	spin_unlock_bh(&hsi_char_data[ch].lock);
-
 	add_wait_queue(&hsi_char_data[ch].tx_wait, &wait);
+	spin_unlock_bh(&hsi_char_data[ch].lock);
 
 	for (;;) {
 		data = NULL;
