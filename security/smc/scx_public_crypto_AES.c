@@ -74,49 +74,49 @@
  *This structure contains the registers of the AES HW accelerator.
  */
 struct AESReg_t {
-	VU32 AES_KEY2_6;	/* 0x00 */
-	VU32 AES_KEY2_7;	/* 0xO4 */
-	VU32 AES_KEY2_4;	/* 0x08 */
-	VU32 AES_KEY2_5;	/* 0x0C */
-	VU32 AES_KEY2_2;	/* 0x10 */
-	VU32 AES_KEY2_3;	/* 0x14 */
-	VU32 AES_KEY2_0;	/* 0x18 */
-	VU32 AES_KEY2_1;	/* 0x1C */
+	u32 AES_KEY2_6;	/* 0x00 */
+	u32 AES_KEY2_7;	/* 0xO4 */
+	u32 AES_KEY2_4;	/* 0x08 */
+	u32 AES_KEY2_5;	/* 0x0C */
+	u32 AES_KEY2_2;	/* 0x10 */
+	u32 AES_KEY2_3;	/* 0x14 */
+	u32 AES_KEY2_0;	/* 0x18 */
+	u32 AES_KEY2_1;	/* 0x1C */
 
-	VU32 AES_KEY1_6;	/* 0x20 */
-	VU32 AES_KEY1_7;	/* 0x24 */
-	VU32 AES_KEY1_4;	/* 0x28 */
-	VU32 AES_KEY1_5;	/* 0x2C */
-	VU32 AES_KEY1_2;	/* 0x30 */
-	VU32 AES_KEY1_3;	/* 0x34 */
-	VU32 AES_KEY1_0;	/* 0x38 */
-	VU32 AES_KEY1_1;	/* 0x3C */
+	u32 AES_KEY1_6;	/* 0x20 */
+	u32 AES_KEY1_7;	/* 0x24 */
+	u32 AES_KEY1_4;	/* 0x28 */
+	u32 AES_KEY1_5;	/* 0x2C */
+	u32 AES_KEY1_2;	/* 0x30 */
+	u32 AES_KEY1_3;	/* 0x34 */
+	u32 AES_KEY1_0;	/* 0x38 */
+	u32 AES_KEY1_1;	/* 0x3C */
 
-	VU32 AES_IV_IN_0;	/* 0x40 */
-	VU32 AES_IV_IN_1;	/* 0x44 */
-	VU32 AES_IV_IN_2;	/* 0x48 */
-	VU32 AES_IV_IN_3;	/* 0x4C */
+	u32 AES_IV_IN_0;	/* 0x40 */
+	u32 AES_IV_IN_1;	/* 0x44 */
+	u32 AES_IV_IN_2;	/* 0x48 */
+	u32 AES_IV_IN_3;	/* 0x4C */
 
-	VU32 AES_CTRL;		/* 0x50 */
+	u32 AES_CTRL;		/* 0x50 */
 
-	VU32 AES_C_LENGTH_0;	/* 0x54 */
-	VU32 AES_C_LENGTH_1;	/* 0x58 */
-	VU32 AES_AUTH_LENGTH;	/* 0x5C */
+	u32 AES_C_LENGTH_0;	/* 0x54 */
+	u32 AES_C_LENGTH_1;	/* 0x58 */
+	u32 AES_AUTH_LENGTH;	/* 0x5C */
 
-	VU32 AES_DATA_IN_0;	/* 0x60 */
-	VU32 AES_DATA_IN_1;	/* 0x64 */
-	VU32 AES_DATA_IN_2;	/* 0x68 */
-	VU32 AES_DATA_IN_3;	/* 0x6C */
+	u32 AES_DATA_IN_0;	/* 0x60 */
+	u32 AES_DATA_IN_1;	/* 0x64 */
+	u32 AES_DATA_IN_2;	/* 0x68 */
+	u32 AES_DATA_IN_3;	/* 0x6C */
 
-	VU32 AES_TAG_OUT_0;	/* 0x70 */
-	VU32 AES_TAG_OUT_1;	/* 0x74 */
-	VU32 AES_TAG_OUT_2;	/* 0x78 */
-	VU32 AES_TAG_OUT_3;	/* 0x7C */
+	u32 AES_TAG_OUT_0;	/* 0x70 */
+	u32 AES_TAG_OUT_1;	/* 0x74 */
+	u32 AES_TAG_OUT_2;	/* 0x78 */
+	u32 AES_TAG_OUT_3;	/* 0x7C */
 
-	VU32 AES_REVISION;	/* 0x80 */
-	VU32 AES_SYSCONFIG;	/* 0x84 */
+	u32 AES_REVISION;	/* 0x80 */
+	u32 AES_SYSCONFIG;	/* 0x84 */
 
-	VU32 AES_SYSSTATUS;	/* 0x88 */
+	u32 AES_SYSSTATUS;	/* 0x88 */
 
 };
 
@@ -132,9 +132,8 @@ static void PDrvCryptoUpdateAESWithDMA(u8 *pSrc, u8 *pDest,
 /*----------------------------------------------------------------------------
  *Save HWA registers into the specified operation state structure
  *--------------------------------------------------------------------------*/
-static void PDrvCryptoSaveAESRegisters(
-			u32 AES_CTRL,
-			PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState)
+static void PDrvCryptoSaveAESRegisters(u32 AES_CTRL,
+	struct PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState)
 {
 	dprintk(KERN_INFO "PDrvCryptoSaveAESRegisters: \
 		pAESState(%p) <- pAESReg_t(%p): CTRL=0x%08x\n",
@@ -152,9 +151,8 @@ static void PDrvCryptoSaveAESRegisters(
 /*----------------------------------------------------------------------------
  *Restore the HWA registers from the operation state structure
  *---------------------------------------------------------------------------*/
-void PDrvCryptoRestoreAESRegisters(
-				u32 AES_CTRL,
-				PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState)
+void PDrvCryptoRestoreAESRegisters(u32 AES_CTRL,
+	struct PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState)
 {
 	u32 ctrl = 0;
 
@@ -206,8 +204,8 @@ void PDrvCryptoAESExit(void)
 }
 
 void PDrvCryptoUpdateAES(u32 AES_CTRL,
-			PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState,
-			u8 *pSrc, u8 *pDest, u32 nbBlocks)
+	struct PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState,
+	u8 *pSrc, u8 *pDest, u32 nbBlocks)
 {
 	u32 nbr_of_blocks;
 	u32 vTemp;
@@ -249,8 +247,8 @@ void PDrvCryptoUpdateAES(u32 AES_CTRL,
 			/*We wait for the input ready */
 
 			/*Crash the system as this should never occur */
-			if (scxPublicCryptoWaitForReadyBit(
-				(VU32 *)&pAESReg_t->AES_CTRL,
+			if (SCXPublicCryptoWaitForReadyBit(
+				(u32 *)&pAESReg_t->AES_CTRL,
 				AES_CTRL_INPUT_READY_BIT) !=
 					PUBLIC_CRYPTO_OPERATION_SUCCESS)
 					panic("Wait too long for AES hardware \
@@ -271,8 +269,8 @@ void PDrvCryptoUpdateAES(u32 AES_CTRL,
 			pProcessSrc += 4;
 
 			/* We wait for the output ready */
-			scxPublicCryptoWaitForReadyBitInfinitely(
-					(VU32 *)&pAESReg_t->AES_CTRL,
+			SCXPublicCryptoWaitForReadyBitInfinitely(
+					(u32 *)&pAESReg_t->AES_CTRL,
 					AES_CTRL_OUTPUT_READY_BIT);
 
 			/* We copy the 16 bytes of data reg->dest */
@@ -321,6 +319,7 @@ static void PDrvCryptoUpdateAESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 	u32 nLength = nbBlocks * AES_BLOCK_SIZE;
 	u32 nLengthLoop = 0;
 	u32 nbBlocksLoop = 0;
+	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
 
 	dprintk(KERN_INFO
 		"PDrvCryptoUpdateAESWithDMA: In=0x%08x, Out=0x%08x, Len=%u\n",
@@ -329,15 +328,15 @@ static void PDrvCryptoUpdateAESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 		(unsigned int)nLength);
 
 	/*lock the DMA */
-	down(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+	mutex_lock(&pDevice->sm.sDMALock);
 
 	if (scxPublicDMARequest(&dma_ch0) != PUBLIC_CRYPTO_OPERATION_SUCCESS) {
-		up(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+		mutex_unlock(&pDevice->sm.sDMALock);
 		return;
 	}
 	if (scxPublicDMARequest(&dma_ch1) != PUBLIC_CRYPTO_OPERATION_SUCCESS) {
 		scxPublicDMARelease(dma_ch0);
-		up(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+		mutex_unlock(&pDevice->sm.sDMALock);
 		return;
 	}
 
@@ -355,10 +354,10 @@ static void PDrvCryptoUpdateAESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 			| AES_SYSCONFIG_DMA_REQ_IN_EN_BIT);
 
 		/*check length */
-		if (nLength <= g_SCXLNXDeviceMonitor.nDMABufferLength)
+		if (nLength <= pDevice->nDMABufferLength)
 			nLengthLoop = nLength;
 		else
-			nLengthLoop = g_SCXLNXDeviceMonitor.nDMABufferLength;
+			nLengthLoop = pDevice->nDMABufferLength;
 
 		/*The length is always a multiple of the block size */
 		nbBlocksLoop = nLengthLoop / AES_BLOCK_SIZE;
@@ -369,14 +368,14 @@ static void PDrvCryptoUpdateAESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 		 *This may prevent potential issues when flushing/invalidating
 		 *the buffer as the cache lines are 64 bytes long.
 		 */
-		memcpy(g_SCXLNXDeviceMonitor.pDMABuffer, pSrc, nLengthLoop);
+		memcpy(pDevice->pDMABuffer, pSrc, nLengthLoop);
 
 		/*DMA1: Mem -> AES */
 		scxPublicSetDMAChannelCommonParams(&ch0_parameters,
 			nbBlocksLoop,
 			DMA_CEN_Elts_per_Frame_AES,
 			AES1_REGS_HW_ADDR + 0x60,
-			(u32)g_SCXLNXDeviceMonitor.pDMABufferPhys,
+			(u32)pDevice->pDMABufferPhys,
 			OMAP44XX_DMA_AES1_P_DATA_IN_REQ);
 
 		ch0_parameters.src_amode = OMAP_DMA_AMODE_POST_INC;
@@ -394,7 +393,7 @@ static void PDrvCryptoUpdateAESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 		scxPublicSetDMAChannelCommonParams(&ch1_parameters,
 			nbBlocksLoop,
 			DMA_CEN_Elts_per_Frame_AES,
-			(u32)g_SCXLNXDeviceMonitor.pDMABufferPhys,
+			(u32)pDevice->pDMABufferPhys,
 			AES1_REGS_HW_ADDR + 0x60,
 			OMAP44XX_DMA_AES1_P_DATA_OUT_REQ);
 
@@ -439,7 +438,7 @@ static void PDrvCryptoUpdateAESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 
 		/*The DMA output is in the preallocated aligned buffer
 		 *and needs to be copied to the output buffer.*/
-		memcpy(pDest, g_SCXLNXDeviceMonitor.pDMABuffer, nLengthLoop);
+		memcpy(pDest, pDevice->pDMABuffer, nLengthLoop);
 
 		pSrc += nLengthLoop;
 		pDest += nLengthLoop;
@@ -447,13 +446,13 @@ static void PDrvCryptoUpdateAESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 	}
 
 	/*For safety reasons, let's clean the working buffer */
-	memset(g_SCXLNXDeviceMonitor.pDMABuffer, 0, nLengthLoop);
+	memset(pDevice->pDMABuffer, 0, nLengthLoop);
 
 	/*release the DMA */
 	scxPublicDMARelease(dma_ch0);
 	scxPublicDMARelease(dma_ch1);
 
-	up(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+	mutex_unlock(&pDevice->sm.sDMALock);
 
 	dprintk(KERN_INFO "PDrvCryptoUpdateAESWithDMA: Success\n");
 }

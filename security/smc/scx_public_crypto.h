@@ -20,18 +20,15 @@
 #define __SCX_PUBLIC_CRYPTO_H
 
 #include "scxlnx_defs.h"
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
+#include <linux/io.h>
 #include <mach/io.h>
-#else
-#include <asm-arm/arch-omap/io.h>
-#endif
 
-typedef volatile unsigned int	VU32;
-typedef volatile unsigned short	VU16;
-typedef volatile unsigned char	VU8;
+#include <plat/clockdomain.h>
 
-#define OUTREG32(a, b)	(*(volatile unsigned int *)(a) = (unsigned int)b)
-#define INREG32(a)	(*(volatile unsigned int *)(a))
+/*-------------------------------------------------------------------------- */
+
+#define OUTREG32(a, b)	__raw_writel(b, a)
+#define INREG32(a)	__raw_readl(a)
 #define SETREG32(x, y)	OUTREG32(x, INREG32(x) | (y))
 #define CLRREG32(x, y)	OUTREG32(x, INREG32(x) & ~(y))
 
@@ -49,13 +46,13 @@ typedef volatile unsigned char	VU8;
 
 #define IS_4_BYTES_ALIGNED(x)((!((x) & 0x3)) ? true : false)
 
-#define SMODULE_SMC_OMAP4_PUBLIC_DMA
+#define TF_SMC_OMAP4_PUBLIC_DMA
 
 /*
  *The size limit to trigger DMA for AES, DES and Digest.
  *0xFFFFFFFF means "never"
  */
-#ifdef SMODULE_SMC_OMAP4_PUBLIC_DMA
+#ifdef TF_SMC_OMAP4_PUBLIC_DMA
 #define DMA_TRIGGER_IRQ_AES				128
 #define DMA_TRIGGER_IRQ_DES				128
 #define DMA_TRIGGER_IRQ_DIGEST				1024
@@ -106,105 +103,129 @@ typedef volatile unsigned char	VU8;
 
 /*-------------------------------------------------------------------------- */
 /*
+ *The magic word.
+ */
+#define CRYPTOKI_UPDATE_SHORTCUT_CONTEXT_MAGIC		0x45EF683C
+
+/*-------------------------------------------------------------------------- */
+/* CUS context structure                                                     */
+/*-------------------------------------------------------------------------- */
+
+/* State of an AES operation */
+struct PUBLIC_CRYPTO_AES_OPERATION_STATE {
+	u32 AES_IV_0;
+	u32 AES_IV_1;
+	u32 AES_IV_2;
+	u32 AES_IV_3;
+};
+
+struct PUBLIC_CRYPTO_DES_OPERATION_STATE {
+	u32 DES_IV_L;
+	u32 DES_IV_H;
+};
+
+#define HASH_BLOCK_BYTES_LENGTH		64
+
+struct PUBLIC_CRYPTO_SHA_OPERATION_STATE {
+	/*Current digest */
+	u32 SHA_DIGEST_A;
+	u32 SHA_DIGEST_B;
+	u32 SHA_DIGEST_C;
+	u32 SHA_DIGEST_D;
+	u32 SHA_DIGEST_E;
+	u32 SHA_DIGEST_F;
+	u32 SHA_DIGEST_G;
+	u32 SHA_DIGEST_H;
+
+	/*This buffer contains a partial chunk */
+	u8 pChunkBuffer[HASH_BLOCK_BYTES_LENGTH];
+
+	/*Number of bytes stored in pChunkBuffer (0..64) */
+	u32 nChunkLength;
+
+	/*
+	 * Total number of bytes processed so far
+	 * (not including the partial chunk)
+	 */
+	u32 nBytesProcessed;
+};
+
+union PUBLIC_CRYPTO_OPERATION_STATE {
+	struct PUBLIC_CRYPTO_AES_OPERATION_STATE aes;
+	struct PUBLIC_CRYPTO_DES_OPERATION_STATE des;
+	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE sha;
+};
+
+/*
+ *Fully describes a public crypto operation
+ *(i.e., an operation that has a shortcut attached).
+ */
+struct CRYPTOKI_UPDATE_SHORTCUT_CONTEXT {
+	/*
+	 *Identifies the public crypto operation in the list of all public
+	 *operations.
+	 */
+	struct list_head list;
+
+	u32 nMagicNumber;	/*Must be set to
+				 *{CRYPTOKI_UPDATE_SHORTCUT_CONTEXT_MAGIC} */
+
+	/*basic fields */
+	u32 hClientSession;
+	u32 nCommandID;
+	u32 nHWAID;
+	u32 nHWA_CTRL;
+	u32 hKeyContext;
+	union PUBLIC_CRYPTO_OPERATION_STATE sOperationState;
+	u32 nUseCount;
+	bool bSuspended;
+};
+
+struct CRYPTOKI_UPDATE_PARAMS {
+	/*fields for data processing of an update command */
+	u32 nInputDataLength;
+	u8 *pInputData;
+
+	u32 nResultDataLength;
+	u8 *pResultData;
+
+	u8 *pS2CDataBuffer;
+	u32 nS2CDataBufferMaxLength;
+};
+
+/*-------------------------------------------------------------------------- */
+/*
  *Public crypto API (Top level)
  */
 
 /*
 *Initialize the public crypto DMA chanels and global HWA semaphores
  */
-u32 scxPublicCryptoInit(void);
+u32 SCXPublicCryptoInit(void);
 
 /*
  *Initialize the device context CUS fields
  *(shortcut semaphore and public CUS list)
  */
-void scxPublicCryptoInitDeviceContext(SCXLNX_CONN_MONITOR *pDeviceContext);
+void SCXPublicCryptoInitDeviceContext(struct SCXLNX_CONNECTION *pDeviceContext);
 
 /**
  *Terminate the public crypto (including DMA)
  */
-void scxPublicCryptoTerminate(void);
+void SCXPublicCryptoTerminate(void);
 
-bool scxPublicCryptoParseCommandMessage(
-				SCXLNX_CONN_MONITOR *pConn,
-				SCXLNX_SHMEM_DESC *pDeviceContextDesc,
-				CRYPTOKI_UPDATE_SHORTCUT_CONTEXT *pCUSContext,
-				SCX_COMMAND_INVOKE_CLIENT_COMMAND *pCommand,
-				CRYPTOKI_UPDATE_PARAMS *pParams);
+int SCXPublicCryptoTryShortcutedUpdate(struct SCXLNX_CONNECTION *pConn,
+	struct SCX_COMMAND_INVOKE_CLIENT_COMMAND *pMessage,
+	struct SCX_ANSWER_INVOKE_CLIENT_COMMAND *pAnswer);
 
-/*
- *Perform a crypto update operation.
- *THIS FUNCTION IS CALLED FROM THE IOCTL
- */
-void scxPublicCryptoUpdate(
-	CRYPTOKI_UPDATE_SHORTCUT_CONTEXT *pCUSContext,
-	CRYPTOKI_UPDATE_PARAMS *pCUSParams);
-
-/*
- *i.e. copy the result into the user output buffer and release the resources.
- *THIS FUNCTION IS CALLED FROM THE USER THREAD (ioctl).
- */
-void scxPublicCryptoWriteAnswerMessage(
-				CRYPTOKI_UPDATE_SHORTCUT_CONTEXT *pCUSContext,
-				CRYPTOKI_UPDATE_PARAMS *pCUSParams,
-				SCX_ANSWER_INVOKE_CLIENT_COMMAND *pAnswer);
-
-/*----------------------------------------------------------------------*/
-/*				CUS RPCs				*/
-/*----------------------------------------------------------------------*/
-
-u32 scxPublicCryptoInstallShortcutLockAccelerator(
-					u32 nRPCCommand,
-					void *pL0SharedBuffer);
-
-u32 scxPublicCryptoLockAcceleratorsSuspendShortcut(
-					u32 nRPCCommand,
-					void *pL0SharedBuffer);
-
-u32 scxPublicCryptoResumeShortcutUnlockAccelerators(
-					u32 nRPCCommand,
-					void *pL0SharedBuffer);
-
-u32 scxPublicCryptoClearGlobalKeyContext(
-					u32 nRPCCommand,
-					void *pL0SharedBuffer);
-
-/*----------------------------------------------------------------------*/
-/*			generic HWA utilities for CUS			*/
-/*--------------------------------------------------------------------- */
-
-/*HWA public lock or unlock one HWA according algo specified by nHWAID */
-void PDrvCryptoLockUnlockHWA(u32 nHWAID, bool bDoLock);
-
-/*HWAs public lock or unlock HWA's specified in the HWA H/A/D fields of RPC
-	command nRPCCommand */
-void PDrvCryptoLockUnlockHWAs(u32 nRPCCommand, bool bDoLock);
-
-/*Check if the command must be intercepted by a CUS or not. */
-bool scxPublicCryptoIsShortcutedCommand(
-			SCXLNX_CONN_MONITOR *pDeviceContext,
-			SCX_COMMAND_INVOKE_CLIENT_COMMAND *pCommand,
-			CRYPTOKI_UPDATE_SHORTCUT_CONTEXT **ppCUSContext,
-			bool incrementnUseCount);
-
-/*get the device context conn monitor from memory hDeviceContext handle
-	comming from secure; return NULL if it does not exit.*/
-SCXLNX_CONN_MONITOR *PDrvCryptoGetDeviceContextFromHandle(u32 hDeviceContext);
-
-/*get the shared memory from memory block handle comming from secure
-	return NULL if it does not exit.*/
-SCXLNX_SHMEM_DESC *PDrvCryptoGetSharedMemoryFromBlockHandle(
-					SCXLNX_CONN_MONITOR *pConn,
-					u32 hBlock);
+int SCXPublicCryptoExecuteRPCCommand(u32 nRPCCommand, void *pL0SharedBuffer);
 
 /*-------------------------------------------------------------------------- */
 /*
  *Helper methods
  */
-u32 scxPublicCryptoWaitForReadyBit(VU32 *pRegister, u32 vBit);
-void scxPublicCryptoWaitForReadyBitInfinitely(VU32 *pRegister, u32 vBit);
-void scxPublicCryptoEnableClock(uint32_t vClockPhysAddr);
-void scxPublicCryptoDisableClock(uint32_t vClockPhysAddr);
+u32 SCXPublicCryptoWaitForReadyBit(u32 *pRegister, u32 vBit);
+void SCXPublicCryptoWaitForReadyBitInfinitely(u32 *pRegister, u32 vBit);
 
 /*---------------------------------------------------------------------------*/
 /*                               AES operations                              */
@@ -225,12 +246,9 @@ void PDrvCryptoAESExit(void);
  *
  *nbBlocks number of block(s)to process.
  */
-void PDrvCryptoUpdateAES(
-			u32 AES_CTRL,
-			PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState,
-			u8 *pSrc,
-			u8 *pDest,
-			u32 nbBlocks);
+void PDrvCryptoUpdateAES(u32 AES_CTRL,
+	struct PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState,
+	u8 *pSrc, u8 *pDest, u32 nbBlocks);
 
 /*---------------------------------------------------------------------------*/
 /*                              DES/DES3 operations                          */
@@ -250,12 +268,9 @@ void PDrvCryptoDESExit(void);
  *pDest:			Output buffer containing the processed data.
  *nbBlocks:		Number of block(s)to process.
  */
-void PDrvCryptoUpdateDES(
-			u32 DES_CTRL,
-			PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState,
-			u8 *pSrc,
-			u8 *pDest,
-			u32 nbBlocks);
+void PDrvCryptoUpdateDES(u32 DES_CTRL,
+	struct PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState,
+	u8 *pSrc, u8 *pDest, u32 nbBlocks);
 
 /*---------------------------------------------------------------------------*/
 /*                               Digest operations                           */
@@ -272,14 +287,12 @@ void PDrvCryptoDigestExit(void);
  *pData:			Input buffer to process
  *dataLength:	Length in bytes of the input buffer.
  */
-void PDrvCryptoUpdateHash(
-			u32 SHA_CTRL,
-			PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
-			u8 *pData,
-			u32 dataLength);
+void PDrvCryptoUpdateHash(u32 SHA_CTRL,
+	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
+	u8 *pData, u32 dataLength);
 
 
-#ifdef SMC_OMAP4_POWER_MANAGEMENT
+#ifdef POWER_MANAGEMENT
 
 /**
  *Activates an inactivity timer for power management.
@@ -289,6 +302,6 @@ void PDrvCryptoUpdateHash(
  */
 void scxPublicCryptoStartInactivityTimer(void);
 
-#endif	/*SMC_OMAP4_POWER_MANAGEMENT */
+#endif	/*POWER_MANAGEMENT */
 
 #endif /*__SCX_PUBLIC_CRYPTO_H */

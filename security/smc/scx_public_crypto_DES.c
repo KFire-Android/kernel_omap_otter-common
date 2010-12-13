@@ -60,21 +60,21 @@
  * This structure contains the registers of the DES HW accelerator.
  */
 struct Des3DesReg_t {
-	VU32 DES_KEY3_L;	/* DES Key 3 Low Register		*/
-	VU32 DES_KEY3_H;	/* DES Key 3 High Register		*/
-	VU32 DES_KEY2_L;	/* DES Key 2 Low Register		*/
-	VU32 DES_KEY2_H;	/* DES Key 2 High Register		*/
-	VU32 DES_KEY1_L;	/* DES Key 1 Low Register		*/
-	VU32 DES_KEY1_H;	/* DES Key 1 High Register 		*/
-	VU32 DES_IV_L;		/* DES Initialization Vector Low Reg	*/
-	VU32 DES_IV_H;		/* DES Initialization Vector High Reg	*/
-	VU32 DES_CTRL;		/* DES Control Register			*/
-	VU32 DES_LENGTH;	/* DES Length Register			*/
-	VU32 DES_DATA_L;	/* DES Data Input/Output Low Register	*/
-	VU32 DES_DATA_H;	/* DES Data Input/Output High Register	*/
-	VU32 DES_REV;		/* DES Revision Register		*/
-	VU32 DES_SYSCONFIG;	/* DES Mask and Reset Register		*/
-	VU32 DES_SYSSTATUS;	/* DES System Status Register		*/
+	u32 DES_KEY3_L;	/* DES Key 3 Low Register		*/
+	u32 DES_KEY3_H;	/* DES Key 3 High Register		*/
+	u32 DES_KEY2_L;	/* DES Key 2 Low Register		*/
+	u32 DES_KEY2_H;	/* DES Key 2 High Register		*/
+	u32 DES_KEY1_L;	/* DES Key 1 Low Register		*/
+	u32 DES_KEY1_H;	/* DES Key 1 High Register		*/
+	u32 DES_IV_L;		/* DES Initialization Vector Low Reg	*/
+	u32 DES_IV_H;		/* DES Initialization Vector High Reg	*/
+	u32 DES_CTRL;		/* DES Control Register			*/
+	u32 DES_LENGTH;	/* DES Length Register			*/
+	u32 DES_DATA_L;	/* DES Data Input/Output Low Register	*/
+	u32 DES_DATA_H;	/* DES Data Input/Output High Register	*/
+	u32 DES_REV;		/* DES Revision Register		*/
+	u32 DES_SYSCONFIG;	/* DES Mask and Reset Register		*/
+	u32 DES_SYSSTATUS;	/* DES System Status Register		*/
 };
 
 static struct Des3DesReg_t *pDESReg_t;
@@ -88,9 +88,8 @@ static void PDrvCryptoUpdateDESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks);
 /*-------------------------------------------------------------------------
  *Save HWA registers into the specified operation state structure
  *-------------------------------------------------------------------------*/
-static void PDrvCryptoSaveDESRegisters(
-			u32 DES_CTRL,
-			PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState)
+static void PDrvCryptoSaveDESRegisters(u32 DES_CTRL,
+	struct PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState)
 {
 	dprintk(KERN_INFO
 		"PDrvCryptoSaveDESRegisters in pDESState=%p CTRL=0x%08x\n",
@@ -106,9 +105,8 @@ static void PDrvCryptoSaveDESRegisters(
 /*-------------------------------------------------------------------------
  *Restore the HWA registers from the operation state structure
  *-------------------------------------------------------------------------*/
-static void PDrvCryptoRestoreDESRegisters(
-				u32 DES_CTRL,
-				PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState)
+static void PDrvCryptoRestoreDESRegisters(u32 DES_CTRL,
+	struct PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState)
 {
 	dprintk(KERN_INFO "PDrvCryptoRestoreDESRegisters from \
 		pDESState=%p CTRL=0x%08x\n",
@@ -144,10 +142,9 @@ void PDrvCryptoDESExit(void)
 	omap_iounmap(pDESReg_t);
 }
 
-void PDrvCryptoUpdateDES(
-			u32 DES_CTRL,
-			PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState,
-			u8 *pSrc, u8 *pDest, u32 nbBlocks)
+void PDrvCryptoUpdateDES(u32 DES_CTRL,
+	struct PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState,
+	u8 *pSrc, u8 *pDest, u32 nbBlocks)
 {
 	u32 nbr_of_blocks;
 	u32 vTemp;
@@ -189,8 +186,8 @@ void PDrvCryptoUpdateDES(
 
 			/*We wait for the input ready */
 			/*Crash the system as this should never occur */
-			if (scxPublicCryptoWaitForReadyBit(
-				(VU32 *)&pDESReg_t->DES_CTRL,
+			if (SCXPublicCryptoWaitForReadyBit(
+				(u32 *)&pDESReg_t->DES_CTRL,
 				DES_CTRL_INPUT_READY_BIT) !=
 					PUBLIC_CRYPTO_OPERATION_SUCCESS) {
 				panic("Wait too long for DES HW \
@@ -206,8 +203,8 @@ void PDrvCryptoUpdateDES(
 			pProcessSrc += 4;
 
 			/*We wait for the output ready */
-			scxPublicCryptoWaitForReadyBitInfinitely(
-						(VU32 *)&pDESReg_t->DES_CTRL,
+			SCXPublicCryptoWaitForReadyBitInfinitely(
+						(u32 *)&pDESReg_t->DES_CTRL,
 						DES_CTRL_OUTPUT_READY_BIT);
 
 			/*We copy the 8 bytes of data reg->dest */
@@ -249,6 +246,7 @@ static void PDrvCryptoUpdateDESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 	u32 nLength = nbBlocks * DES_BLOCK_SIZE;
 	u32 nLengthLoop = 0;
 	u32 nbBlocksLoop = 0;
+	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
 
 	dprintk(KERN_INFO
 		"PDrvCryptoUpdateDESWithDMA: In=0x%08x, Out=0x%08x, Len=%u\n",
@@ -256,15 +254,15 @@ static void PDrvCryptoUpdateDESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 		(unsigned int)nLength);
 
 	/*lock the DMA */
-	down(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+	mutex_lock(&pDevice->sm.sDMALock);
 
 	if (scxPublicDMARequest(&dma_ch0) != PUBLIC_CRYPTO_OPERATION_SUCCESS) {
-		up(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+		mutex_unlock(&pDevice->sm.sDMALock);
 		return;
 	}
 	if (scxPublicDMARequest(&dma_ch1) != PUBLIC_CRYPTO_OPERATION_SUCCESS) {
 		scxPublicDMARelease(dma_ch0);
-		up(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+		mutex_unlock(&pDevice->sm.sDMALock);
 		return;
 	}
 
@@ -282,10 +280,10 @@ static void PDrvCryptoUpdateDESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 			| DES_SYSCONFIG_DMA_REQ_IN_EN_BIT);
 
 		/* Check length */
-		if (nLength <= g_SCXLNXDeviceMonitor.nDMABufferLength)
+		if (nLength <= pDevice->nDMABufferLength)
 			nLengthLoop = nLength;
 		else
-			nLengthLoop = g_SCXLNXDeviceMonitor.nDMABufferLength;
+			nLengthLoop = pDevice->nDMABufferLength;
 
 		/* The length is always a multiple of the block size */
 		nbBlocksLoop = nLengthLoop / DES_BLOCK_SIZE;
@@ -296,14 +294,14 @@ static void PDrvCryptoUpdateDESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 		 * may prevent potential issues when flushing/invalidating the
 		 * buffer as the cache lines are 64 bytes long.
 		 */
-		memcpy(g_SCXLNXDeviceMonitor.pDMABuffer, pSrc, nLengthLoop);
+		memcpy(pDevice->pDMABuffer, pSrc, nLengthLoop);
 
 		/* DMA1: Mem -> DES */
 		scxPublicSetDMAChannelCommonParams(&ch0_parameters,
 			nbBlocksLoop,
 			DMA_CEN_Elts_per_Frame_DES,
 			DES_REGS_HW_ADDR + 0x28,
-			g_SCXLNXDeviceMonitor.pDMABufferPhys,
+			pDevice->pDMABufferPhys,
 			OMAP44XX_DMA_DES_P_DATA_IN_REQ);
 
 		ch0_parameters.src_amode = OMAP_DMA_AMODE_POST_INC;
@@ -319,7 +317,7 @@ static void PDrvCryptoUpdateDESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 		scxPublicSetDMAChannelCommonParams(&ch1_parameters,
 			nbBlocksLoop,
 			DMA_CEN_Elts_per_Frame_DES,
-			g_SCXLNXDeviceMonitor.pDMABufferPhys,
+			pDevice->pDMABufferPhys,
 			DES_REGS_HW_ADDR + 0x28,
 			OMAP44XX_DMA_DES_P_DATA_OUT_REQ);
 
@@ -359,7 +357,7 @@ static void PDrvCryptoUpdateDESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 
 		/* The DMA output is in the preallocated aligned buffer
 		 * and needs to be copied to the output buffer.*/
-		memcpy(pDest, g_SCXLNXDeviceMonitor.pDMABuffer, nLengthLoop);
+		memcpy(pDest, pDevice->pDMABuffer, nLengthLoop);
 
 		pSrc += nLengthLoop;
 		pDest += nLengthLoop;
@@ -367,13 +365,13 @@ static void PDrvCryptoUpdateDESWithDMA(u8 *pSrc, u8 *pDest, u32 nbBlocks)
 	}
 
 	/* For safety reasons, let's clean the working buffer */
-	memset(g_SCXLNXDeviceMonitor.pDMABuffer, 0, nLengthLoop);
+	memset(pDevice->pDMABuffer, 0, nLengthLoop);
 
 	/* Release the DMA */
 	scxPublicDMARelease(dma_ch0);
 	scxPublicDMARelease(dma_ch1);
 
-	up(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+	mutex_unlock(&pDevice->sm.sDMALock);
 
 	dprintk(KERN_INFO "PDrvCryptoUpdateDESWithDMA: Success\n");
 }

@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2006-2010 Trusted Logic S.A.
  * All Rights Reserved.
  *
@@ -26,123 +26,105 @@
 #define PUB2SEC_NOCST        0xFF
 #define SMICODEPUB_NEWTASK   0x00
 
+/*
+ * RPC status:
+ *  - 0: the secure world yielded due to an interrupt
+ *  - 1: the secure world yielded on an RPC (no public thread is handling it)
+ *  - 2: the secure world yielded on an RPC and the response is ready
+ */
+#define RPC_ADVANCEMENT_NONE		0
+#define RPC_ADVANCEMENT_PENDING		1
+#define RPC_ADVANCEMENT_FINISHED	2
+
 #ifdef CONFIG_ARM_ERRATA_430973
 #define INVALIDATE_BTB       MCR p15, 0, R0, c7, c5, 6
 #else
 #define INVALIDATE_BTB
 #endif
 
-pub2sec_bridge_entry:
-   .global pub2sec_bridge_entry
+schedule_secure_world:
+	.global schedule_secure_world
 
-      PUSH     {R4-R12, LR}
-      // Copy the Secure Service ID in R12
-      MOV      R6, #PUB2SEC_NOCST
-      MOV      R12, #SMICODEPUB_NEWTASK
+	/* Save registers and disable interrupts */
+	push	{r4-r12, lr}
+	cpsid	i
 
-      DSB                              // Data Write Barrier
-      ISB                              // Prefetch Buffer flush
-      DMB                              // Data Synchro Barrier
-      INVALIDATE_BTB                   // Invalidate entire branch predictor
-                                       //  array
-      SMC      1
-      B        service_end
-      NOP
-      INVALIDATE_BTB                   // Invalidate entire branch predictor
-                                       //  array
-      BL       SCXLNXSMCommReturnFromIRQ
-      MOV      R12, #SMICODEPUB_IRQ_END
-      DSB                              // Data Write Barrier
-      ISB                              // Prefetch Buffer flush
-      DMB                              // Data Synchro Barrier
-      INVALIDATE_BTB                   // Invalidate entire branch predictor
-                                       //  array
-      SMC      1
+	/* Copy the Secure Service ID in r12 */
+	mov     r12, r0
+
+	cmp	r0, #SMICODEPUB_IRQ_END
+	beq	check_rpc
+
+	mov	r6, #PUB2SEC_NOCST
+	mov	r12, #SMICODEPUB_NEWTASK
+
+	b	label_smc
+
+check_rpc:
+	ldr	r8, =g_RPC_advancement
+	ldr	r9, [r8]
+	cmp	r9, #RPC_ADVANCEMENT_PENDING
+	beq	schedule_secure_world_exit
+
+	ldr	r10, =g_secure_task_id
+	ldr	r6, [r10]
+
+	cmp	r9, #RPC_ADVANCEMENT_NONE
+	beq	label_smc
+
+	ldr	r9, =g_RPC_parameters
+	ldm	r9, {r0-r3}
+	mov	r10, #RPC_ADVANCEMENT_NONE
+	str	r10, [r8]
+	mov 	r12, #SMICODEPUB_RPC_END
+
+	b	label_smc
+
+label_smc:
+	INVALIDATE_BTB
+	smc	1
+	b	service_end
+	nop
+
+	INVALIDATE_BTB
+	mov	r0, #0x00
+	ldr	r8, =g_secure_task_id
+	str	r6, [r8]
+	b	schedule_secure_world_exit
 
 service_end:
-      INVALIDATE_BTB                // Invalidate entire branch predictor array
-      POP      {R4-R12, LR}
-      BX       LR
+   ldr	r8, =g_service_end
+   mov	r6, #0x1
+   str	r6, [r8]
+
+schedule_secure_world_exit:
+	INVALIDATE_BTB
+
+	/* Enable interrupts and restore registers */
+	cpsie	i
+	pop	{r4-r12, lr}
+
+	bx	lr
 
 rpc_handler:
-    .global rpc_handler
-      INVALIDATE_BTB                   // Invalidate entire branch predictor
-                                       //  array
-      CPSIE i                          // Enable IRQs
-      BL       SCXLNXSMCommRPCHandler
-      MOV      R12, #SMICODEPUB_RPC_END
-      INVALIDATE_BTB                   // Invalidate entire branch predictor
-                                       //  array
-      DSB                              // Data Write Barrier
-      ISB                              // Prefetch Buffer flush
-      DMB                              // Data Synchro Barrier
-      SMC      1
+	.global rpc_handler
 
-#ifdef COMPILE_AS_LINUX_MODULE
+	INVALIDATE_BTB
 
-//----------------------------------------------------------------------------
-// The following functions have been extracted from the kernel in:
-//    > arch\arm\mm\cache-v7.S
-//----------------------------------------------------------------------------
+	/* g_RPC_advancement = RPC_ADVANCEMENT_PENDING */
+	ldr	r8, =g_RPC_advancement
+	mov	r9, #RPC_ADVANCEMENT_PENDING
+	str	r9, [r8]
 
-/*
- * dcache_line_size - get the cache line size from the CSIDR register
- * (available on ARMv7+). It assumes that the CSSR register was configured
- * to access the L1 data cache CSIDR.
- */
-   .macro   dcache_line_size, reg, tmp
-   mrc   p15, 1, \tmp, c0, c0, 0    @ read CSIDR
-   and   \tmp, \tmp, #7       @ cache line size encoding
-   mov   \reg, #16         @ size offset
-   mov   \reg, \reg, lsl \tmp    @ actual cache line size
-   .endm
+	ldr	r8, =g_RPC_parameters
+	stm	r8, {r0-r3}
 
-/*
- * v7_dma_flush_range(start,end)
- * - start   - virtual start address of region
- * - end     - virtual end address of region
- */
-v7_dma_flush_range:
-   .global v7_dma_flush_range
-   dcache_line_size r2, r3
-   sub   r3, r2, #1
-   bic   r0, r0, r3
-1:
-   mcr   p15, 0, r0, c7, c14, 1     @ clean & invalidate D / U line
-   add   r0, r0, r2
-   cmp   r0, r1
-   blo   1b
-   dsb
-   mov   pc, lr
+	ldr	r8, =g_secure_task_id
+	str	r6, [r8]
 
+	/* Enable interrupts and restore registers */
+	cpsie	i
+	pop	{r4-r12, lr}
+	mov r0, #0x00
 
-/*
- * v7_dma_inv_range(start,end)
- *
- * Invalidate the data cache within the specified region; we will
- * be performing a DMA operation in this region and we want to
- * purge old data in the cache.
- *
- * - start   - virtual start address of region
- * - end     - virtual end address of region
- */
-v7_dma_inv_range:
-   .global v7_dma_inv_range
-   dcache_line_size r2, r3
-   sub   r3, r2, #1
-   tst   r0, r3
-   bic   r0, r0, r3
-   mcrne p15, 0, r0, c7, c14, 1     @ clean & invalidate D / U line
-
-   tst   r1, r3
-   bic   r1, r1, r3
-   mcrne p15, 0, r1, c7, c14, 1     @ clean & invalidate D / U line
-1:
-   mcr   p15, 0, r0, c7, c6, 1      @ invalidate D / U line
-   add   r0, r0, r2
-   cmp   r0, r1
-   blo   1b
-   dsb
-   mov   pc, lr
-
-#endif /* COMPILE_AS_LINUX_MODULE */
+	bx	lr

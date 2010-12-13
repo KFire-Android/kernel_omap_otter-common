@@ -63,55 +63,55 @@
  * This structure contains the registers of the SHA1/MD5 HW accelerator.
  */
 struct Sha1Md5Reg_t {
-	VU32 ODIGEST_A;		/* 0x00 Outer Digest A      */
-	VU32 ODIGEST_B;		/* 0x04 Outer Digest B      */
-	VU32 ODIGEST_C;		/* 0x08 Outer Digest C      */
-	VU32 ODIGEST_D;		/* 0x0C Outer Digest D      */
-	VU32 ODIGEST_E;		/* 0x10 Outer Digest E      */
-	VU32 ODIGEST_F;		/* 0x14 Outer Digest F      */
-	VU32 ODIGEST_G;		/* 0x18 Outer Digest G      */
-	VU32 ODIGEST_H;		/* 0x1C Outer Digest H      */
-	VU32 IDIGEST_A;		/* 0x20 Inner Digest A      */
-	VU32 IDIGEST_B;		/* 0x24 Inner Digest B      */
-	VU32 IDIGEST_C;		/* 0x28 Inner Digest C      */
-	VU32 IDIGEST_D;		/* 0x2C Inner Digest D      */
-	VU32 IDIGEST_E;		/* 0x30 Inner Digest E      */
-	VU32 IDIGEST_F;		/* 0x34 Inner Digest F      */
-	VU32 IDIGEST_G;		/* 0x38 Inner Digest G      */
-	VU32 IDIGEST_H;		/* 0x3C Inner Digest H      */
-	VU32 DIGEST_COUNT;	/* 0x40 Digest count        */
-	VU32 MODE;		/* 0x44 Digest mode         */
-	VU32 LENGTH;		/* 0x48 Data length         */
+	u32 ODIGEST_A;		/* 0x00 Outer Digest A      */
+	u32 ODIGEST_B;		/* 0x04 Outer Digest B      */
+	u32 ODIGEST_C;		/* 0x08 Outer Digest C      */
+	u32 ODIGEST_D;		/* 0x0C Outer Digest D      */
+	u32 ODIGEST_E;		/* 0x10 Outer Digest E      */
+	u32 ODIGEST_F;		/* 0x14 Outer Digest F      */
+	u32 ODIGEST_G;		/* 0x18 Outer Digest G      */
+	u32 ODIGEST_H;		/* 0x1C Outer Digest H      */
+	u32 IDIGEST_A;		/* 0x20 Inner Digest A      */
+	u32 IDIGEST_B;		/* 0x24 Inner Digest B      */
+	u32 IDIGEST_C;		/* 0x28 Inner Digest C      */
+	u32 IDIGEST_D;		/* 0x2C Inner Digest D      */
+	u32 IDIGEST_E;		/* 0x30 Inner Digest E      */
+	u32 IDIGEST_F;		/* 0x34 Inner Digest F      */
+	u32 IDIGEST_G;		/* 0x38 Inner Digest G      */
+	u32 IDIGEST_H;		/* 0x3C Inner Digest H      */
+	u32 DIGEST_COUNT;	/* 0x40 Digest count        */
+	u32 MODE;		/* 0x44 Digest mode         */
+	u32 LENGTH;		/* 0x48 Data length         */
 
-	VU32 reserved0[13];
+	u32 reserved0[13];
 
-	VU32 DIN_0;		/* 0x80 Data 0              */
-	VU32 DIN_1;		/* 0x84 Data 1              */
-	VU32 DIN_2;		/* 0x88 Data 2              */
-	VU32 DIN_3;		/* 0x8C Data 3              */
-	VU32 DIN_4;		/* 0x90 Data 4              */
-	VU32 DIN_5;		/* 0x94 Data 5              */
-	VU32 DIN_6;		/* 0x98 Data 6              */
-	VU32 DIN_7;		/* 0x9C Data 7              */
-	VU32 DIN_8;		/* 0xA0 Data 8              */
-	VU32 DIN_9;		/* 0xA4 Data 9              */
-	VU32 DIN_10;		/* 0xA8 Data 10             */
-	VU32 DIN_11;		/* 0xAC Data 11             */
-	VU32 DIN_12;		/* 0xB0 Data 12             */
-	VU32 DIN_13;		/* 0xB4 Data 13             */
-	VU32 DIN_14;		/* 0xB8 Data 14             */
-	VU32 DIN_15;		/* 0xBC Data 15             */
+	u32 DIN_0;		/* 0x80 Data 0              */
+	u32 DIN_1;		/* 0x84 Data 1              */
+	u32 DIN_2;		/* 0x88 Data 2              */
+	u32 DIN_3;		/* 0x8C Data 3              */
+	u32 DIN_4;		/* 0x90 Data 4              */
+	u32 DIN_5;		/* 0x94 Data 5              */
+	u32 DIN_6;		/* 0x98 Data 6              */
+	u32 DIN_7;		/* 0x9C Data 7              */
+	u32 DIN_8;		/* 0xA0 Data 8              */
+	u32 DIN_9;		/* 0xA4 Data 9              */
+	u32 DIN_10;		/* 0xA8 Data 10             */
+	u32 DIN_11;		/* 0xAC Data 11             */
+	u32 DIN_12;		/* 0xB0 Data 12             */
+	u32 DIN_13;		/* 0xB4 Data 13             */
+	u32 DIN_14;		/* 0xB8 Data 14             */
+	u32 DIN_15;		/* 0xBC Data 15             */
 
-	VU32 reserved1[16];
+	u32 reserved1[16];
 
-	VU32 REVISION;		/* 0x100 Revision           */
+	u32 REVISION;		/* 0x100 Revision           */
 
-	VU32 reserved2[3];
+	u32 reserved2[3];
 
-	VU32 SYSCONFIG;		/* 0x110 Config             */
-	VU32 SYSSTATUS;		/* 0x114 Status             */
-	VU32 IRQSTATUS;		/* 0x118 IRQ Status         */
-	VU32 IRQENABLE;		/* 0x11C IRQ Enable         */
+	u32 SYSCONFIG;		/* 0x110 Config             */
+	u32 SYSSTATUS;		/* 0x114 Status             */
+	u32 IRQSTATUS;		/* 0x118 IRQ Status         */
+	u32 IRQENABLE;		/* 0x11C IRQ Enable         */
 };
 
 static struct Sha1Md5Reg_t *pSha1Md5Reg_t;
@@ -126,15 +126,15 @@ static void static_Hash_HwPerformDmaDigest(u8 *pData, u32 nDataLength,
 				u32 nAlgo, u32 nBytesProcessed);
 
 static void PDrvCryptoUpdateHashWithDMA(u32 SHA_CTRL,
-				PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
-				u8 *pData, u32 dataLength);
+	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
+	u8 *pData, u32 dataLength);
 
 
 /*-------------------------------------------------------------------------
  *Save HWA registers into the specified operation state structure
  *------------------------------------------------------------------------*/
 static void PDrvCryptoSaveHashRegisters(
-			PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState)
+	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState)
 {
 	dprintk(KERN_INFO "PDrvCryptoSaveHashRegisters: State=%p\n",
 		pSHAState);
@@ -153,7 +153,7 @@ static void PDrvCryptoSaveHashRegisters(
  *Restore the HWA registers from the operation state structure
  *-------------------------------------------------------------------------*/
 static void PDrvCryptoRestoreHashRegisters(
-			PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState)
+	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState)
 {
 	dprintk(KERN_INFO "PDrvCryptoRestoreHashRegisters: State=%p\n",
 		pSHAState);
@@ -190,10 +190,9 @@ void PDrvCryptoDigestExit(void)
 	omap_iounmap(pSha1Md5Reg_t);
 }
 
-void PDrvCryptoUpdateHash(
-			u32 SHA_CTRL,
-			PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
-			u8 *pData, u32 dataLength)
+void PDrvCryptoUpdateHash(u32 SHA_CTRL,
+	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
+	u8 *pData, u32 dataLength)
 {
 	u32 dmaUse = PUBLIC_CRYPTO_DMA_USE_NONE;
 
@@ -215,15 +214,19 @@ void PDrvCryptoUpdateHash(
 		return;
 	}
 
-	/* Restore the registers of the accelerator from the operation state */
-	PDrvCryptoRestoreHashRegisters(pSHAState);
-
 	if (dmaUse != PUBLIC_CRYPTO_DMA_USE_NONE) {
+		/*
+		 * Restore the registers of the accelerator from the operation
+		 * state
+		 */
+		PDrvCryptoRestoreHashRegisters(pSHAState);
 
 		/*perform the updates with DMA */
 		PDrvCryptoUpdateHashWithDMA(SHA_CTRL,
 				pSHAState, pData, dataLength);
 
+		/* Save the accelerator registers into the operation state */
+		PDrvCryptoSaveHashRegisters(pSHAState);
 	} else {
 		/*Non-DMA transfer */
 
@@ -259,10 +262,22 @@ void PDrvCryptoUpdateHash(
 				return;
 			}
 
+			/*
+			 * Restore the registers of the accelerator from the
+			 * operation state
+			 */
+			PDrvCryptoRestoreHashRegisters(pSHAState);
+
 			/*Then we send this buffer to the HWA */
 			static_Hash_HwPerform64bDigest(
 				(u32 *)pSHAState->pChunkBuffer, SHA_CTRL,
 				pSHAState->nBytesProcessed);
+
+			/*
+			 * Save the accelerator registers into the operation
+			 * state
+			 */
+			PDrvCryptoSaveHashRegisters(pSHAState);
 
 			pSHAState->nBytesProcessed =
 				INREG32(&pSha1Md5Reg_t->DIGEST_COUNT);
@@ -292,9 +307,11 @@ void PDrvCryptoUpdateHash(
 
 				/*Then we send this buffer to the hash
 				 *hardware */
+				PDrvCryptoRestoreHashRegisters(pSHAState);
 				static_Hash_HwPerform64bDigest(
 					(u32 *)pTempAlignedBuffer, SHA_CTRL,
 						pSHAState->nBytesProcessed);
+				PDrvCryptoSaveHashRegisters(pSHAState);
 
 				pSHAState->nBytesProcessed =
 					INREG32(&pSha1Md5Reg_t->DIGEST_COUNT);
@@ -323,9 +340,6 @@ void PDrvCryptoUpdateHash(
 		}
 	}
 
-	/*Save the accelerator registers into the operation state */
-	PDrvCryptoSaveHashRegisters(pSHAState);
-
 	dprintk(KERN_INFO "PDrvCryptoUpdateHash: Done: \
 		Chunck=%u; Processed=%u\n",
 		pSHAState->nChunkLength, pSHAState->nBytesProcessed);
@@ -350,8 +364,8 @@ static void static_Hash_HwPerform64bDigest(u32 *pData,
 		nAlgoConstant | (nAlgo & 0x6));
 	OUTREG32(&pSha1Md5Reg_t->LENGTH, HASH_BLOCK_BYTES_LENGTH);
 
-	if (scxPublicCryptoWaitForReadyBit(
-		(VU32 *)&pSha1Md5Reg_t->IRQSTATUS,
+	if (SCXPublicCryptoWaitForReadyBit(
+		(u32 *)&pSha1Md5Reg_t->IRQSTATUS,
 		DIGEST_IRQSTATUS_INPUT_READY_BIT)
 			!= PUBLIC_CRYPTO_OPERATION_SUCCESS) {
 		/* Crash the system as this should never occur */
@@ -382,8 +396,8 @@ static void static_Hash_HwPerform64bDigest(u32 *pData,
 	/*
 	 *Wait until the hash operation is finished.
 	 */
-	scxPublicCryptoWaitForReadyBitInfinitely(
-		(VU32 *)&pSha1Md5Reg_t->IRQSTATUS,
+	SCXPublicCryptoWaitForReadyBitInfinitely(
+		(u32 *)&pSha1Md5Reg_t->IRQSTATUS,
 		DIGEST_IRQSTATUS_OUTPUT_READY_BIT);
 }
 
@@ -400,15 +414,16 @@ static void static_Hash_HwPerformDmaDigest(u8 *pData, u32 nDataLength,
 	struct omap_dma_channel_params ch0_parameters;
 	u32 nLengthLoop = 0;
 	u32 nAlgoConstant;
+	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
 
 	dprintk(KERN_INFO
 		"static_Hash_HwPerformDmaDigest: Buffer=0x%08x/%u\n",
 		(u32)pData, (u32)nDataLength);
 
 	/*lock the DMA */
-	down(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+	mutex_lock(&pDevice->sm.sDMALock);
 	if (scxPublicDMARequest(&dma_ch0) != PUBLIC_CRYPTO_OPERATION_SUCCESS) {
-		up(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+		mutex_unlock(&pDevice->sm.sDMALock);
 		return;
 	}
 
@@ -422,10 +437,10 @@ static void static_Hash_HwPerformDmaDigest(u8 *pData, u32 nDataLength,
 		}
 
 		/*check length */
-		if (nDataLength <= g_SCXLNXDeviceMonitor.nDMABufferLength)
+		if (nDataLength <= pDevice->nDMABufferLength)
 			nLengthLoop = nDataLength;
 		else
-			nLengthLoop = g_SCXLNXDeviceMonitor.nDMABufferLength;
+			nLengthLoop = pDevice->nDMABufferLength;
 
 		/*
 		 *Copy the data from the input buffer into a preallocated
@@ -433,14 +448,14 @@ static void static_Hash_HwPerformDmaDigest(u8 *pData, u32 nDataLength,
 		 *This may prevent potential issues when flushing/invalidating
 		 *the buffer as the cache lines are 64 bytes long.
 		 */
-		memcpy(g_SCXLNXDeviceMonitor.pDMABuffer, pData, nLengthLoop);
+		memcpy(pDevice->pDMABuffer, pData, nLengthLoop);
 
 		/*DMA1: Mem -> HASH */
 		scxPublicSetDMAChannelCommonParams(&ch0_parameters,
 			nLengthLoop / HASH_BLOCK_BYTES_LENGTH,
 			DMA_CEN_Elts_per_Frame_SHA,
 			DIGEST1_REGS_HW_ADDR + 0x80,
-			g_SCXLNXDeviceMonitor.pDMABufferPhys,
+			pDevice->pDMABufferPhys,
 			OMAP44XX_DMA_SHA2_DIN_P);
 
 		/*specific for Mem -> HWA */
@@ -483,19 +498,19 @@ static void static_Hash_HwPerformDmaDigest(u8 *pData, u32 nDataLength,
 	}
 
 	/*For safety reasons, let's clean the working buffer */
-	memset(g_SCXLNXDeviceMonitor.pDMABuffer, 0, nLengthLoop);
+	memset(pDevice->pDMABuffer, 0, nLengthLoop);
 
 	/*release the DMA */
 	scxPublicDMARelease(dma_ch0);
 
-	up(&g_SCXLNXDeviceMonitor.sm.sDMALock);
+	mutex_unlock(&pDevice->sm.sDMALock);
 
 	/*
 	 * The dma transfert is finished, now wait until the hash
 	 * operation is finished.
 	 */
-	scxPublicCryptoWaitForReadyBitInfinitely(
-		(VU32 *)&pSha1Md5Reg_t->IRQSTATUS,
+	SCXPublicCryptoWaitForReadyBitInfinitely(
+		(u32 *)&pSha1Md5Reg_t->IRQSTATUS,
 		DIGEST_IRQSTATUS_CONTEXT_READY_BIT);
 }
 
@@ -508,8 +523,8 @@ static void static_Hash_HwPerformDmaDigest(u8 *pData, u32 nDataLength,
  *        dataLength : number of byte to process
  */
 static void PDrvCryptoUpdateHashWithDMA(u32 nSHA_CTRL,
-				PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
-				u8 *pData, u32 dataLength)
+	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
+	u8 *pData, u32 dataLength)
 {
 	dprintk(KERN_INFO "PDrvCryptoUpdateHashWithDMA\n");
 

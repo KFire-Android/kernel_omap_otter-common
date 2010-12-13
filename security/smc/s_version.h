@@ -1,20 +1,22 @@
 /*
- * Copyright (c) 2007-2010 Trusted Logic S.A.
+ * Copyright (c) 2010 Trusted Logic S.A.
  * All Rights Reserved.
  *
- * This software is the confidential and proprietary information of
- * Trusted Logic S.A. ("Confidential Information"). You shall not
- * disclose such Confidential Information and shall use it only in
- * accordance with the terms of the license agreement you entered
- * into with Trusted Logic S.A.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * version 2 as published by the Free Software Foundation.
  *
- * TRUSTED LOGIC S.A. MAKES NO REPRESENTATIONS OR WARRANTIES ABOUT THE
- * SUITABILITY OF THE SOFTWARE, EITHER EXPRESS OR IMPLIED, INCLUDING
- * BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. TRUSTED LOGIC S.A. SHALL
- * NOT BE LIABLE FOR ANY DAMAGES SUFFERED BY LICENSEE AS A RESULT OF USING,
- * MODIFYING OR DISTRIBUTING THIS SOFTWARE OR ITS DERIVATIVES.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
+ * MA 02111-1307 USA
  */
+
 #ifndef __S_VERSION_H__
 #define __S_VERSION_H__
 
@@ -24,8 +26,7 @@
  * Then set:
  * - S_VERSION_OS
  * - S_VERSION_PLATFORM
- * - S_VERSION_MAJOR
- * - S_VERSION_MINOR
+ * - S_VERSION_MAIN
  * - S_VERSION_ENG is optional
  * - S_VERSION_PATCH is optional
  * - S_VERSION_BUILD = 0 if S_VERSION_BUILD not defined or empty
@@ -37,14 +38,14 @@
 /*
  * This version number must be updated for each new release
  */
-#define S_VERSION_MAJOR 1
-#define S_VERSION_MINOR 1
+#define S_VERSION_MAIN  "01.02"
+
 /*
 * If this is a patch or engineering version use the following
 * defines to set the version number. Else set these values to 0.
 */
 #define S_VERSION_ENG 0
-#define S_VERSION_PATCH 0
+#define S_VERSION_PATCH 2
 
 #ifdef S_VERSION_BUILD
 /* TRICK: detect if S_VERSION is defined but empty */
@@ -56,6 +57,9 @@
 /* S_VERSION_BUILD is not defined */
 #define S_VERSION_BUILD 0
 #endif
+
+#define __STRINGIFY(X) #X
+#define __STRINGIFY2(X) __STRINGIFY(X)
 
 #if S_VERSION_ENG != 0
 #define _S_VERSION_ENG "e" __STRINGIFY2(S_VERSION_ENG)
@@ -69,9 +73,6 @@
 #define _S_VERSION_PATCH ""
 #endif
 
-#define __STRINGIFY(X) #X
-#define __STRINGIFY2(X) __STRINGIFY(X)
-
 #if !defined(NDEBUG) || defined(_DEBUG)
 #define S_VERSION_VARIANT "D   "
 #else
@@ -79,11 +80,10 @@
 #endif
 
 #define S_VERSION_STRING \
-	"SMC " \
+	"SMC" \
 	S_VERSION_OS \
 	S_VERSION_PLATFORM \
-	__STRINGIFY2(S_VERSION_MAJOR) "." \
-	__STRINGIFY2(S_VERSION_MINOR) \
+	S_VERSION_MAIN \
 	_S_VERSION_ENG \
 	_S_VERSION_PATCH \
 	"."  __STRINGIFY2(S_VERSION_BUILD) " " \
