@@ -77,7 +77,7 @@ struct hsi_char {
 
 static struct hsi_char hsi_char_data[HSI_MAX_CHAR_DEVS];
 
-void if_notify(int ch, struct hsi_event *ev)
+void if_hsi_notify(int ch, struct hsi_event *ev)
 {
 	struct char_queue *entry;
 

@@ -26,6 +26,6 @@
 /* how many char devices would be created at most */
 #define HSI_MAX_CHAR_DEVS	8
 
-void if_notify(int ch, struct hsi_event *ev);
+void if_hsi_notify(int ch, struct hsi_event *ev);
 
 #endif /* _HSI_CHAR_H */

@@ -204,8 +204,10 @@ void hsi_reset_ch_read(struct hsi_channel *ch);
 void hsi_reset_ch_write(struct hsi_channel *ch);
 bool hsi_is_channel_busy(struct hsi_channel *ch);
 
-int hsi_driver_read_interrupt(struct hsi_channel *hsi_channel, u32 * data);
-int hsi_driver_write_interrupt(struct hsi_channel *hsi_channel, u32 * data);
+int hsi_driver_enable_read_interrupt(struct hsi_channel *hsi_channel,
+					u32 *data);
+int hsi_driver_enable_write_interrupt(struct hsi_channel *hsi_channel,
+					u32 *data);
 int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 			unsigned int count);
 int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
@@ -246,10 +248,12 @@ long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
 int hsi_softreset(struct hsi_dev *hsi_ctrl);
 void hsi_softreset_driver(struct hsi_dev *hsi_ctrl);
 
-void hsi_clocks_disable(struct device *dev);
-int hsi_clocks_enable(struct device *dev);
-void hsi_clocks_disable_channel(struct device *dev, u8 channel_number);
-int hsi_clocks_enable_channel(struct device *dev, u8 channel_number);
+void hsi_clocks_disable(struct device *dev, const char *s);
+int hsi_clocks_enable(struct device *dev, const char *s);
+void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
+				const char *s);
+int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
+				const char *s);
 
 #ifdef CONFIG_DEBUG_FS
 int hsi_debug_init(void);

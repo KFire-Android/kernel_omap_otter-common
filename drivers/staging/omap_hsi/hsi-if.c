@@ -122,6 +122,7 @@ static int if_hsi_read_on(int ch, u32 *data, unsigned int count)
 	return ret;
 }
 
+/* HSI char driver read done callback */
 static void if_hsi_read_done(struct hsi_device *dev, unsigned int size)
 {
 	struct if_hsi_channel *channel;
@@ -135,7 +136,7 @@ static void if_hsi_read_done(struct hsi_device *dev, unsigned int size)
 	ev.data = channel->rx_data;
 	ev.count = 4 * size;	/* Convert size to number of u8, not u32 */
 	spin_unlock(&channel->lock);
-	if_notify(dev->n_ch, &ev);
+	if_hsi_notify(dev->n_ch, &ev);
 }
 
 int if_hsi_read(int ch, u32 *data, unsigned int count)
@@ -181,6 +182,7 @@ static int if_hsi_write_on(int ch, u32 *address, unsigned int count)
 	return ret;
 }
 
+/* HSI char driver write done callback */
 static void if_hsi_write_done(struct hsi_device *dev, unsigned int size)
 {
 	struct if_hsi_channel *channel;
@@ -195,7 +197,7 @@ static void if_hsi_write_done(struct hsi_device *dev, unsigned int size)
 	ev.data = channel->tx_data;
 	ev.count = 4 * size;	/* Convert size to number of u8, not u32 */
 	spin_unlock(&channel->lock);
-	if_notify(dev->n_ch, &ev);
+	if_hsi_notify(dev->n_ch, &ev);
 }
 
 int if_hsi_write(int ch, u32 *data, unsigned int count)
@@ -348,10 +350,14 @@ static int if_hsi_openchannel(struct if_hsi_channel *channel)
 		channel->channel_id);
 	spin_lock(&channel->lock);
 
-	if (channel->state == HSI_CHANNEL_STATE_UNAVAIL)
-		return -ENODEV;
+	if (channel->state == HSI_CHANNEL_STATE_UNAVAIL) {
+		pr_err("Channel %d is not available\n", channel->channel_id);
+		ret = -ENODEV;
+		goto leave;
+	}
 
 	if (channel->opened) {
+		pr_err("Channel %d is busy\n", channel->channel_id);
 		ret = -EBUSY;
 		goto leave;
 	}
@@ -540,7 +546,7 @@ static void if_hsi_port_event(struct hsi_device *dev, unsigned int event,
 		ev.data = (u32 *) HSI_HWBREAK;
 		for (i = 0; i < HSI_MAX_CHAR_DEVS; i++) {
 			if (hsi_iface.channels[i].opened)
-				if_notify(i, &ev);
+				if_hsi_notify(i, &ev);
 		}
 		break;
 	case HSI_EVENT_HSR_DATAAVAILABLE:
@@ -549,7 +555,7 @@ static void if_hsi_port_event(struct hsi_device *dev, unsigned int event,
 			 __func__, i);
 		ev.event = HSI_EV_AVAIL;
 		if (hsi_iface.channels[i].opened)
-			if_notify(i, &ev);
+			if_hsi_notify(i, &ev);
 		break;
 	case HSI_EVENT_CAWAKE_UP:
 		pr_debug("%s, CAWAKE up\n", __func__);

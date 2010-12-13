@@ -274,7 +274,8 @@ int hsi_open(struct hsi_device *dev)
 	port = ch->hsi_port;
 	hsi_ctrl = port->hsi_controller;
 
-	hsi_clocks_enable_channel(dev->device.parent, ch->channel_number);
+	hsi_clocks_enable_channel(dev->device.parent, ch->channel_number,
+				__func__);
 
 	spin_lock_bh(&hsi_ctrl->lock);
 	if (ch->flags & HSI_CH_OPEN) {
@@ -295,7 +296,8 @@ int hsi_open(struct hsi_device *dev)
 	spin_unlock_bh(&hsi_ctrl->lock);
 
 	/* Cut the clocks and wait for ACWAKE change */
-	hsi_clocks_disable_channel(dev->device.parent, ch->channel_number);
+	hsi_clocks_disable_channel(dev->device.parent, ch->channel_number,
+				__func__);
 
 	return 0;
 }
@@ -336,7 +338,7 @@ int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 	ch->write_data.size = size;
 
 	if (size == 1)
-		err = hsi_driver_write_interrupt(ch, addr);
+		err = hsi_driver_enable_write_interrupt(ch, addr);
 	else
 		err = hsi_driver_write_dma(ch, addr, size);
 
@@ -386,7 +388,7 @@ int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 	ch->read_data.size = size;
 
 	if (size == 1)
-		err = hsi_driver_read_interrupt(ch, addr);
+		err = hsi_driver_enable_read_interrupt(ch, addr);
 	else
 		err = hsi_driver_read_dma(ch, addr, size);
 
@@ -427,13 +429,15 @@ void hsi_write_cancel(struct hsi_device *dev)
 		return;
 	}
 
-	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
+	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
 
 	spin_lock_bh(&dev->ch->hsi_port->hsi_controller->lock);
 	__hsi_write_cancel(dev->ch);
 	spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
 
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number);
+	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
 }
 EXPORT_SYMBOL(hsi_write_cancel);
 
@@ -465,18 +469,20 @@ void hsi_read_cancel(struct hsi_device *dev)
 		return;
 	}
 
-	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
+	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
 
 	spin_lock_bh(&dev->ch->hsi_port->hsi_controller->lock);
 	__hsi_read_cancel(dev->ch);
 	spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
 
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number);
+	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
 }
 EXPORT_SYMBOL(hsi_read_cancel);
 
 /**
- * hsi_poll - HSI poll
+ * hsi_poll - HSI poll, enables data reception
  * @dev - hsi device channel reference to apply the I/O control
  *						(or port associated to it)
  *
@@ -503,17 +509,19 @@ int hsi_poll(struct hsi_device *dev)
 	hsi_ctrl = ch->hsi_port->hsi_controller;
 
 	/* Safety : enable the clocks */
-	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
+	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
 
 	spin_lock_bh(&hsi_ctrl->lock);
 	ch->flags |= HSI_CH_RX_POLL;
 
-	err = hsi_driver_read_interrupt(ch, NULL);
+	err = hsi_driver_enable_read_interrupt(ch, NULL);
 
 	spin_unlock_bh(&hsi_ctrl->lock);
 
 	/* Cut the clocks */
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number);
+	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
 
 	return err;
 }
@@ -560,7 +568,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		/* Wake up request to Modem (typically OMAP initiated or */
 		/* ACK from Modem following CAWAKE high) */
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 
 		spin_lock_bh(&hsi_ctrl->lock);
 		ch->flags |= HSI_CH_ACWAKE;
@@ -585,7 +593,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		/* Clocks will be disabled immediatly after register access */
 		/* (or at least clock counter will be decremented) */
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 
 		spin_lock_bh(&hsi_ctrl->lock);
 
@@ -605,16 +613,16 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		if (!hsi_get_cawake(ch->hsi_port)) {
 			dev_info(hsi_ctrl->dev,
 				"CAWAKE is already low at the time of ACWAKE "
-				"down, disabling clock\n");
+				"down, disabling clocks\n");
 
 			hsi_clocks_disable_channel(dev->device.parent,
-						   ch->channel_number);
+						ch->channel_number, __func__);
 		}
 
 		/* Decrement the power.usage_count. */
 		/* This may _not_ lead to a real HW clock cut down */
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 
 		/* If all channels have their ACWAKE line down, do not cut */
 		/* the clocks, wait for CAWAKE to go low */
@@ -623,10 +631,10 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		break;
 	case HSI_IOCTL_SEND_BREAK:
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 		hsi_outl(1, base, HSI_HST_BREAK_REG(port));
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		/*HSI_TODO : need to deactivate clock after BREAK frames sent*/
 		/*Use interrupt ? (if TX BREAK INT exists)*/
 		break;
@@ -636,24 +644,24 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			goto out;
 		} else
 			hsi_clocks_enable_channel(dev->device.parent,
-						  ch->channel_number);
+						  ch->channel_number, __func__);
 		*(u32 *) arg = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		break;
 	case HSI_IOCTL_FLUSH_RX:
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 		hsi_outl(0, base, HSI_HSR_RXSTATE_REG(port));
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		break;
 	case HSI_IOCTL_FLUSH_TX:
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 		hsi_outl(0, base, HSI_HST_TXSTATE_REG(port));
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		break;
 	case HSI_IOCTL_GET_CAWAKE:
 		if (!arg) {
@@ -665,10 +673,10 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			goto out;
 		}
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 		*(unsigned int *)arg = hsi_get_cawake(dev->ch->hsi_port);
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		break;
 	case HSI_IOCTL_SET_RX:
 		if (!arg) {
@@ -676,12 +684,12 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			goto out;
 		}
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 		spin_lock_bh(&hsi_ctrl->lock);
 		err = hsi_set_rx(dev->ch->hsi_port, (struct hsr_ctx *)arg);
 		spin_unlock_bh(&hsi_ctrl->lock);
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		break;
 	case HSI_IOCTL_GET_RX:
 		if (!arg) {
@@ -689,12 +697,12 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			goto out;
 		}
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 		spin_lock_bh(&hsi_ctrl->lock);
 		hsi_get_rx(dev->ch->hsi_port, (struct hsr_ctx *)arg);
 		spin_unlock_bh(&hsi_ctrl->lock);
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		break;
 	case HSI_IOCTL_SET_TX:
 		if (!arg) {
@@ -702,12 +710,12 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			goto out;
 		}
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 		spin_lock_bh(&hsi_ctrl->lock);
 		err = hsi_set_tx(dev->ch->hsi_port, (struct hst_ctx *)arg);
 		spin_unlock_bh(&hsi_ctrl->lock);
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		break;
 	case HSI_IOCTL_GET_TX:
 		if (!arg) {
@@ -715,16 +723,16 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			goto out;
 		}
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 		spin_lock_bh(&hsi_ctrl->lock);
 		hsi_get_tx(dev->ch->hsi_port, (struct hst_ctx *)arg);
 		spin_unlock_bh(&hsi_ctrl->lock);
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		break;
 	case HSI_IOCTL_SW_RESET:
 		hsi_clocks_enable_channel(dev->device.parent,
-					  ch->channel_number);
+					  ch->channel_number, __func__);
 		dev_info(dev->device.parent, "SW Reset\n");
 		spin_lock_bh(&hsi_ctrl->lock);
 		err = hsi_softreset(hsi_ctrl);
@@ -734,7 +742,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		spin_unlock_bh(&hsi_ctrl->lock);
 
 		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number);
+					   ch->channel_number, __func__);
 		break;
 	default:
 		err = -ENOIOCTLCMD;
@@ -763,7 +771,8 @@ void hsi_close(struct hsi_device *dev)
 
 	hsi_ctrl = dev->ch->hsi_port->hsi_controller;
 
-	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number);
+	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
 
 	spin_lock_bh(&hsi_ctrl->lock);
 	if (dev->ch->flags & HSI_CH_OPEN) {
@@ -773,7 +782,8 @@ void hsi_close(struct hsi_device *dev)
 	}
 	spin_unlock_bh(&hsi_ctrl->lock);
 
-	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number);
+	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
 }
 EXPORT_SYMBOL(hsi_close);
 

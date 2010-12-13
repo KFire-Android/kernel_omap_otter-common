@@ -94,6 +94,10 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 	if (lch >= hsi_ctrl->gdd_chan_count) {
 		dev_err(hsi_ctrl->dev, "No free GDD logical channels.\n");
 		return -EBUSY;	/* No free GDD logical channels. */
+	} else {
+		dev_dbg(hsi_ctrl->dev, "Allocated DMA channel %d for write on"
+					" HSI channel %d.\n", lch,
+					hsi_channel->channel_number);
 	}
 
 	/* NOTE: Getting a free gdd logical channel and
@@ -172,6 +176,10 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 	if (lch >= hsi_ctrl->gdd_chan_count) {
 		dev_err(hsi_ctrl->dev, "No free GDD logical channels.\n");
 		return -EBUSY;	/* No free GDD logical channels. */
+	} else {
+		dev_dbg(hsi_ctrl->dev, "Allocated DMA channel %d for read on"
+					" HSI channel %d.\n", lch,
+					hsi_channel->channel_number);
 	}
 
 	/* When DMA is used for Rx, disable the Rx Interrupt.
@@ -280,7 +288,7 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 	/* DMA transfer is over, re-enable default mode
 	 * (Interrupts for polling feature)
 	 */
-	hsi_driver_read_interrupt(hsi_ch, NULL);
+	hsi_driver_enable_read_interrupt(hsi_ch, NULL);
 
 	reg = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	if (!(reg & HSI_CCR_ENABLE)) {
@@ -388,7 +396,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			/* DMA transfer is over, re-enable default mode
 			 * (interrupts for polling feature)
 			 */
-			hsi_driver_read_interrupt(ch, NULL);
+			hsi_driver_enable_read_interrupt(ch, NULL);
 			spin_unlock(&hsi_ctrl->lock);
 			ch->read_done(ch->dev, size / 4);
 		} else {	/* Write path */

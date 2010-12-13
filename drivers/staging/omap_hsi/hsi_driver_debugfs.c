@@ -33,7 +33,7 @@ static int hsi_debug_show(struct seq_file *m, void *p)
 	struct hsi_dev *hsi_ctrl = m->private;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 
-	hsi_clocks_enable(hsi_ctrl->dev);
+	hsi_clocks_enable(hsi_ctrl->dev, __func__);
 
 	seq_printf(m, "REVISION\t: 0x%08x\n",
 		   hsi_inl(hsi_ctrl->base, HSI_SYS_REVISION_REG));
@@ -45,7 +45,7 @@ static int hsi_debug_show(struct seq_file *m, void *p)
 	seq_printf(m, "SYSSTATUS\t: 0x%08x\n",
 		   hsi_inl(hsi_ctrl->base, HSI_SYS_SYSSTATUS_REG));
 
-	hsi_clocks_disable(hsi_ctrl->dev);
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 	return 0;
 }
@@ -60,7 +60,7 @@ static int hsi_debug_port_show(struct seq_file *m, void *p)
 	long buff_offset;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 
-	hsi_clocks_enable(hsi_ctrl->dev);
+	hsi_clocks_enable(hsi_ctrl->dev, __func__);
 
 	if (hsi_port->cawake_gpio >= 0)
 		seq_printf(m, "CAWAKE\t\t: %d\n", hsi_get_cawake(hsi_port));
@@ -166,7 +166,7 @@ static int hsi_debug_port_show(struct seq_file *m, void *p)
 			   hsi_inl(base, HSI_HSR_DIVISOR_REG(port)));
 	}
 
-	hsi_clocks_disable(hsi_ctrl->dev);
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 	return 0;
 }
@@ -178,7 +178,7 @@ static int hsi_debug_gdd_show(struct seq_file *m, void *p)
 	int lch;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 
-	hsi_clocks_enable(hsi_ctrl->dev);
+	hsi_clocks_enable(hsi_ctrl->dev, __func__);
 
 	seq_printf(m, "GDD_MPU_STATUS\t: 0x%08x\n",
 		   hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG));
@@ -224,7 +224,7 @@ static int hsi_debug_gdd_show(struct seq_file *m, void *p)
 					   HSI_SSI_GDD_CLNK_CTRL_REG(lch)));
 	}
 
-	hsi_clocks_disable(hsi_ctrl->dev);
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 	return 0;
 }
@@ -262,11 +262,11 @@ static ssize_t hsi_port_counters_read(struct file *filep, char __user * buff,
 		goto hsi_cnt_rd_bk;
 	}
 
-	hsi_clocks_enable(hsi_ctrl->dev);
+	hsi_clocks_enable(hsi_ctrl->dev, __func__);
 
 	reg = hsi_inl(base, HSI_HSR_COUNTERS_REG(port));
 
-	hsi_clocks_disable(hsi_ctrl->dev);
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 	if (hsi_driver_device_is_hsi(pdev)) {
 		sprintf(str, "FT:%d, TB:%d, FB:%d\n",
@@ -357,7 +357,7 @@ static ssize_t hsi_port_counters_write(struct file *filep,
 		return -EINVAL;
 	}
 
-	hsi_clocks_enable(hsi_ctrl->dev);
+	hsi_clocks_enable(hsi_ctrl->dev, __func__);
 
 	if (hsi_driver_device_is_hsi(pdev)) {
 		if (nwords != 3) {
@@ -387,7 +387,7 @@ static ssize_t hsi_port_counters_write(struct file *filep,
 
 hsi_cnt_w_bk1:
 
-	hsi_clocks_disable(hsi_ctrl->dev);
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 	return ret;
 }

@@ -178,9 +178,7 @@ int hsi_softreset(struct hsi_dev *hsi_ctrl)
 		dev_err(hsi_ctrl->dev, "HSI SW_RESET failed to complete within"
 			" %d retries.\n", HSI_RESETDONE_MAX_RETRIES);
 		return -EIO;
-	}
-
-	if (ind > HSI_RESETDONE_NORMAL_RETRIES) {
+	} else if (ind > HSI_RESETDONE_NORMAL_RETRIES) {
 		dev_warn(hsi_ctrl->dev, "HSI SW_RESET abnormally long:"
 			" %d retries to complete.\n", ind);
 	}
@@ -297,7 +295,6 @@ void hsi_softreset_driver(struct hsi_dev *hsi_ctrl)
 	struct hsi_platform_data *pdata = pd->dev.platform_data;
 	struct hsi_port *hsi_p;
 	unsigned int port;
-	int err;
 	u32 revision;
 
 	/* HSI port reset */
@@ -305,7 +302,7 @@ void hsi_softreset_driver(struct hsi_dev *hsi_ctrl)
 		hsi_p = &hsi_ctrl->hsi_port[port];
 		hsi_p->counters_on = 1;
 		hsi_p->reg_counters = pdata->ctx.pctx[port].hsr.timeout;
-		err = hsi_port_channels_reset(&hsi_ctrl->hsi_port[port]);
+		hsi_port_channels_reset(&hsi_ctrl->hsi_port[port]);
 	}
 
 	hsi_set_pm_default(hsi_ctrl);
@@ -481,12 +478,11 @@ static int __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 	return 0;
 }
 
-void hsi_clocks_disable(struct device *dev)
+void hsi_clocks_disable(struct device *dev, const char *s)
 {
 	int ret;
 
-	dev_info(dev, "HSI DRIVER CLK : hsi_clocks_disable for %s, device:0x%x",
-		pd->name, (unsigned int)dev);
+	dev_dbg(dev, "HSI DRIVER CLK: hsi_clocks_disable: %s\n", s);
 	/* HSI_TODO : this can probably be changed
 	 * to return pm_runtime_put(dev);
 	 */
@@ -494,12 +490,9 @@ void hsi_clocks_disable(struct device *dev)
 	/*pr_info(", returns %d\n", ret);*/
 }
 
-int hsi_clocks_enable(struct device *dev)
+int hsi_clocks_enable(struct device *dev, const char *s)
 {
-	struct platform_device *pd = to_platform_device(dev);
-
-	dev_info(dev, "HSI DRIVER CLK : hsi_clocks_enable for %s, device:0x%x",
-		pd->name, (unsigned int)dev);
+	dev_dbg(dev, "HSI DRIVER CLK: hsi_clocks_enable: %s\n", s);
 	/* Calls platform_bus_type.pm->runtime_resume(dev)
 	 * which in turn calls :
 	 *  - omap_device_enable()
@@ -517,13 +510,13 @@ int hsi_clocks_enable(struct device *dev)
 * Note : there is no real HW clock management per HSI channel, this is only
 * virtual to keep track of active channels and ease debug
 */
-void hsi_clocks_disable_channel(struct device *dev, u8 channel_number)
+void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
+				const char *s)
 {
 	int ret;
 
-	dev_info(dev,
-	    "HSI DRIVER CLK: hsi_clocks_disable for channel %d, device:0x%x",
-	    channel_number, (unsigned int)dev);
+	dev_dbg(dev, "HSI DRIVER CLK: hsi_clocks_disable for channel %d: %s\n",
+		channel_number, s);
 	ret = pm_runtime_put_sync(dev);
 	/*pr_info(", returns %d\n", ret);*/
 }
@@ -537,11 +530,11 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number)
 * Note : there is no real HW clock management per HSI channel, this is only
 * virtual to keep track of active channels and ease debug
 */
-int hsi_clocks_enable_channel(struct device *dev, u8 channel_number)
+int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
+				const char *s)
 {
-	dev_info(dev,
-	     "HSI DRIVER CLK : hsi_clocks_enable for channel %d, device:0x%x",
-	     channel_number, (unsigned int)dev);
+	dev_dbg(dev, "HSI DRIVER CLK: hsi_clocks_enable for channel %d: %s\n",
+		channel_number, s);
 	return pm_runtime_get_sync(dev);
 }
 
@@ -651,7 +644,7 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 	}
 
 	pm_runtime_enable(hsi_ctrl->dev);
-	hsi_clocks_enable(hsi_ctrl->dev);
+	hsi_clocks_enable(hsi_ctrl->dev, __func__);
 	/* HSI_TODO : test the return values */
 
 	/* Non critical SW Reset */
@@ -688,7 +681,7 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 	}
 
 	/* From here no need for HSI HW access */
-	hsi_clocks_disable(hsi_ctrl->dev);
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 	return err;
 
@@ -698,7 +691,7 @@ rollback2:
 	hsi_controller_exit(hsi_ctrl);
 
 	/* From here no need for HSI HW access */
-	hsi_clocks_disable(hsi_ctrl->dev);
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 rollback1:
 	kfree(hsi_ctrl);
@@ -730,7 +723,7 @@ static int __exit hsi_platform_device_remove(struct platform_device *pd)
 #ifdef CONFIG_SUSPEND
 static int hsi_suspend(struct device *dev)
 {
-	dev_info(dev, "HSI DRIVER : hsi_suspend\n");
+	dev_dbg(dev, "%s\n", __func__);
 
 	/* HSI_TODO : missing the SUSPEND feature */
 
@@ -739,7 +732,7 @@ static int hsi_suspend(struct device *dev)
 
 static int hsi_resume(struct device *dev)
 {
-	dev_info(dev, "HSI DRIVER : hsi_resume\n");
+	dev_dbg(dev, "%s\n", __func__);
 
 	/* HSI_TODO : missing the SUSPEND feature */
 
@@ -756,7 +749,6 @@ static int hsi_resume(struct device *dev)
 */
 static int hsi_runtime_resume(struct device *dev)
 {
-	dev_info(dev, "HSI DRIVER : hsi_runtime_resume\n");
 	dev_dbg(dev, "%s\n", __func__);
 	/* Restore context */
 
@@ -778,7 +770,6 @@ static int hsi_runtime_resume(struct device *dev)
 */
 static int hsi_runtime_suspend(struct device *dev)
 {
-	dev_info(dev, "HSI DRIVER : hsi_runtime_suspend\n");
 	dev_dbg(dev, "%s\n", __func__);
 	/* Save context */
 
@@ -799,7 +790,7 @@ static int hsi_runtime_idle(struct device *dev)
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
 	int port, ch, ret;
 
-	dev_info(dev, "HSI DRIVER : hsi_runtime_idle\n");
+	dev_dbg(dev, "%s\n", __func__);
 
 	for (port = 0; port < hsi_ctrl->max_p; port++)
 		for (ch = 0; ch < hsi_ctrl->hsi_port[port].max_ch; ch++)

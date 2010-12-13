@@ -46,7 +46,7 @@ bool hsi_is_channel_busy(struct hsi_channel *ch)
 }
 
 /* Enables the Data Accepted Interrupt of HST for the given channel */
-int hsi_driver_write_interrupt(struct hsi_channel *ch, u32 * data)
+int hsi_driver_enable_write_interrupt(struct hsi_channel *ch, u32 * data)
 {
 	struct hsi_port *p = ch->hsi_port;
 	unsigned int port = p->port_number;
@@ -59,7 +59,7 @@ int hsi_driver_write_interrupt(struct hsi_channel *ch, u32 * data)
 }
 
 /* Enables the Data Available Interrupt of HSR for the given channel */
-int hsi_driver_read_interrupt(struct hsi_channel *ch, u32 * data)
+int hsi_driver_enable_read_interrupt(struct hsi_channel *ch, u32 * data)
 {
 	struct hsi_port *p = ch->hsi_port;
 	unsigned int port = p->port_number;
@@ -137,6 +137,9 @@ static void hsi_do_channel_tx(struct hsi_channel *ch)
 	n_p = ch->hsi_port->port_number;
 	irq = ch->hsi_port->n_irq;
 
+	dev_dbg(hsi_ctrl->dev,
+		"Data Accepted interrupt for channel %d.\n", n_ch);
+
 	spin_lock(&hsi_ctrl->lock);
 
 	if (ch->write_data.addr == NULL) {
@@ -169,6 +172,9 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 	n_ch = ch->channel_number;
 	n_p = ch->hsi_port->port_number;
 	irq = ch->hsi_port->n_irq;
+
+	dev_dbg(hsi_ctrl->dev,
+		"Data Available interrupt for channel %d.\n", n_ch);
 
 	spin_lock(&hsi_ctrl->lock);
 
@@ -215,7 +221,7 @@ void hsi_do_cawake_process(struct hsi_port *pport)
 		if (hsi_ctrl->acwake_status) {
 			/* Case 1: Ack from modem following an ACWAKE high */
 			/*	(ACPU requests a Modem wakeup) */
-			dev_dbg(hsi_ctrl->dev, "ACWAKE already high, "
+			dev_dbg(hsi_ctrl->dev, "ACWAKE already high,"
 				" CAWAKE Ack received from modem\n");
 
 			/* OMAP is ready, Modem is ready */
@@ -229,7 +235,8 @@ void hsi_do_cawake_process(struct hsi_port *pport)
 			dev_dbg(hsi_ctrl->dev,
 				"ACWAKE low, OMAP awaken from non-OFF mode\n");
 
-			hsi_clocks_enable(hsi_ctrl->dev);
+			/*Not needed as clocks should already be ON*/
+			/*hsi_clocks_enable(hsi_ctrl->dev);*/
 		}
 
 		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_UP, NULL);
@@ -296,8 +303,22 @@ static void hsi_driver_int_proc(struct hsi_port *pport,
 
 	if (status_reg & HSI_ERROROCCURED) {
 		hsr_err_reg = hsi_inl(base, HSI_HSR_ERROR_REG(port));
-		dev_err(hsi_ctrl->dev, "HSI ERROR Port %d: 0x%x\n",
-			port, hsr_err_reg);
+		if (hsr_err_reg & HSI_HSR_ERROR_SIG)
+			dev_err(hsi_ctrl->dev, "HSI ERROR Port %d: 0x%x: %s\n",
+				port, hsr_err_reg, "Signal Error");
+		if (hsr_err_reg & HSI_HSR_ERROR_FTE)
+			dev_err(hsi_ctrl->dev, "HSI ERROR Port %d: 0x%x: %s\n",
+				port, hsr_err_reg, "Frame Timeout Error");
+		if (hsr_err_reg & HSI_HSR_ERROR_TBE)
+			dev_err(hsi_ctrl->dev, "HSI ERROR Port %d: 0x%x: %s\n",
+				port, hsr_err_reg, "Tailing Bit Error");
+		if (hsr_err_reg & HSI_HSR_ERROR_RME)
+			dev_err(hsi_ctrl->dev, "HSI ERROR Port %d: 0x%x: %s\n",
+				port, hsr_err_reg, "RX Mapping Error");
+		if (hsr_err_reg & HSI_HSR_ERROR_TME)
+			dev_err(hsi_ctrl->dev, "HSI ERROR Port %d: 0x%x: %s\n",
+				port, hsr_err_reg, "TX Mapping Error");
+		/* Clear error event bit */
 		hsi_outl(hsr_err_reg, base, HSI_HSR_ERRORACK_REG(port));
 		if (hsr_err_reg)	/* ignore spurious errors */
 			hsi_port_event_handler(pport, HSI_EVENT_ERROR, NULL);
@@ -327,7 +348,7 @@ static void hsi_driver_int_proc(struct hsi_port *pport,
 
 		if (status_reg & HSI_HSR_DATAOVERRUN(channel)) {
 			/*HSI_TODO : Data overrun handling*/
-			dev_dbg(hsi_ctrl->dev,
+			dev_err(hsi_ctrl->dev,
 				"Data overrun in real time mode !\n");
 		}
 	}
@@ -374,7 +395,7 @@ static void do_hsi_tasklet(unsigned long hsi_port)
 		dev_dbg(hsi_ctrl->dev,
 			"ACWAKE & CAWAKE are low, all events processed, "
 			"disabling clocks\n");
-		hsi_clocks_disable(hsi_ctrl->dev);
+		/*hsi_clocks_disable(hsi_ctrl->dev);*/
 	}
 
 	/* Re-queue unprocessed events */
@@ -397,7 +418,7 @@ static irqreturn_t hsi_mpu_handler(int irq, void *hsi_port)
 int __init hsi_mpu_init(struct hsi_port *hsi_p, const char *irq_name)
 {
 	int err;
-
+	/* HSI_TODO : use DECLARE_TASKLET */
 	tasklet_init(&hsi_p->hsi_tasklet, do_hsi_tasklet, (unsigned long)hsi_p);
 	err = request_irq(hsi_p->irq, hsi_mpu_handler, IRQF_DISABLED,
 			  irq_name, hsi_p);
