@@ -520,6 +520,7 @@ static int __devexit if_hsi_remove(struct hsi_device *dev)
 	if (test_bit(dev->n_ch, address) && (dev->n_p == port)) {
 		hsi_set_read_cb(dev, NULL);
 		hsi_set_write_cb(dev, NULL);
+		hsi_set_port_event_cb(dev, NULL);
 		channel = &hsi_iface.channels[dev->n_ch];
 		channel->dev = NULL;
 		channel->state = HSI_CHANNEL_STATE_UNAVAIL;
