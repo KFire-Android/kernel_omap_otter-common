@@ -36,6 +36,8 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 
+u32 warm_boot = 0;
+
 /**
  * abe_reset_hal - reset the ABE/HAL
  * @rdev: regulator source
@@ -89,7 +91,6 @@ EXPORT_SYMBOL(abe_reset_hal);
  */
 abehal_status abe_load_fw_param(u32 *ABE_FW)
 {
-	static u32 warm_boot;
 	u32 event_gen;
 	u32 pmem_size, dmem_size, smem_size, cmem_size;
 	u32 *pmem_ptr, *dmem_ptr, *smem_ptr, *cmem_ptr, *fw_ptr;
@@ -158,6 +159,21 @@ abehal_status abe_load_fw(void)
 	return 0;
 }
 EXPORT_SYMBOL(abe_load_fw);
+/**
+ * abe_reload_fw - Reload ABE Firmware after OFF mode
+ *
+ * loads the Audio Engine firmware, generate a single pulse on the Event
+ * generator to let execution start, read the version number returned from
+ * this execution.
+ */
+abehal_status abe_reload_fw(void)
+{
+	warm_boot = 0;
+	abe_load_fw_param((u32 *) abe_firmware_array);
+	abe_build_scheduler_table();
+	return 0;
+}
+EXPORT_SYMBOL(abe_reload_fw);
 /**
  * abe_read_hardware_configuration - Return default HW periferals configuration
  * @u: use-case description list (pointer)

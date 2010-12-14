@@ -55,6 +55,14 @@ abehal_status abe_load_fw_param(u32 *FW);
  */
 abehal_status abe_load_fw(void);
 /**
+ * abe_reload_fw - Reload ABE Firmware after OFF mode
+ *
+ * loads the Audio Engine firmware, generate a single pulse on the Event
+ * generator to let execution start, read the version number returned from
+ * this execution.
+ */
+abehal_status abe_reload_fw(void);
+/**
  * abe_read_hardware_configuration - Return default HW periferals configuration
  * @u: use-case description list (pointer)
  * @o: opp mode (pointer)
