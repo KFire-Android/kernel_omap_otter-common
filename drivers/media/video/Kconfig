@@ -336,6 +336,22 @@ config VIDEO_TCM825X
 	  This is a driver for the Toshiba TCM825x VGA camera sensor.
 	  It is used for example in Nokia N800.
 
+config VIDEO_IMX046
+	tristate "Sony IMX046 sensor driver (8MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Sony
+	  IMX046 camera.  It is currently working with the TI OMAP3
+	  camera controller.
+
+config VIDEO_LV8093
+	tristate "Piezo Actuator Lens driver for LV8093"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 lens driver for the Sanyo LV8093.
+	  It is currently working with the TI OMAP3 camera controller
+	  and Sony IMX046 sensor.
+
 config VIDEO_SAA7110
 	tristate "Philips SAA7110 video decoder"
 	depends on VIDEO_V4L2 && I2C
