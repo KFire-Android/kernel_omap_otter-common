@@ -46,6 +46,8 @@
 
 struct omap_hdmi_data {
 	struct hdmi_notifier notifier;
+	struct snd_pcm_substream *substream;
+	int active;
 };
 
 struct omap_hdmi_data hdmi_data;
@@ -63,23 +65,40 @@ static struct omap_pcm_dma_data omap_hdmi_dai_dma_params = {
 #ifdef CONFIG_HDMI_NO_IP_MODULE
 static void hdmi_hpd_notifier(int state, void *data)
 {
-	struct snd_pcm_substream *substream = data;
+	struct omap_hdmi_data *hdmi_data = data;
+	struct snd_pcm_substream *substream = hdmi_data->substream;
 
-	if (!state && substream)
-		snd_pcm_stop(substream, SNDRV_PCM_STATE_DISCONNECTED);
+	if (state) {
+		hdmi_data->active = 1;
+	} else {
+		if (substream)
+			snd_pcm_stop(substream, SNDRV_PCM_STATE_DISCONNECTED);
+		hdmi_data->active = 0;
+	}
 }
 
 static void hdmi_pwrchange_notifier(int state, void *data)
 {
-	if (state == HDMI_EVENT_POWERPHYON) {
-		hdmi_w1_wrapper_enable(HDMI_WP);
-		hdmi_w1_start_audio_transfer(HDMI_WP);
-	} else if (state == HDMI_EVENT_POWERPHYOFF) {
-		hdmi_w1_stop_audio_transfer(HDMI_WP);
-		hdmi_w1_wrapper_disable(HDMI_WP);
+	struct omap_hdmi_data *hdmi_data = data;
+	struct snd_pcm_substream *substream = hdmi_data->substream;
+
+	switch (state) {
+	case HDMI_EVENT_POWERPHYON:
+		if (substream) {
+			hdmi_w1_wrapper_enable(HDMI_WP);
+			hdmi_w1_start_audio_transfer(HDMI_WP);
+		}
+		break;
+	case HDMI_EVENT_POWERPHYOFF:
+		if (substream) {
+			hdmi_w1_stop_audio_transfer(HDMI_WP);
+			hdmi_w1_wrapper_disable(HDMI_WP);
+		}
+		break;
+	default:
+		break;
 	}
 }
-
 #endif
 
 static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
@@ -87,13 +106,13 @@ static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
 {
 	int err = 0;
 #ifdef CONFIG_HDMI_NO_IP_MODULE
-	struct hdmi_notifier *notifier = &hdmi_data.notifier;
+	if (!hdmi_data.active) {
+		printk(KERN_ERR "hdmi device not available\n");
+		return -ENODEV;
+	}
 
-	notifier->hpd_notifier = hdmi_hpd_notifier;
-	notifier->pwrchange_notifier = hdmi_pwrchange_notifier;
-	notifier->private_data = substream;
-	hdmi_add_notifier(notifier);
-
+	hdmi_set_audio_power(1);
+	hdmi_data.substream = substream;
 	err = hdmi_w1_wrapper_enable(HDMI_WP);
 #else
 	if (hdmi_audio_core.module_loaded)
@@ -108,12 +127,9 @@ static void omap_hdmi_dai_shutdown(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
 #ifdef CONFIG_HDMI_NO_IP_MODULE
-	struct hdmi_notifier *notifier = &hdmi_data.notifier;
-
 	hdmi_w1_wrapper_disable(HDMI_WP);
-
-	hdmi_remove_notifier(notifier);
-	notifier->private_data = NULL;
+	hdmi_data.substream = NULL;
+	hdmi_set_audio_power(0);
 #else
 	if (hdmi_audio_core.module_loaded)
 		hdmi_audio_core.wrapper_disable(HDMI_WP);
@@ -133,6 +149,8 @@ static int omap_hdmi_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 #ifdef CONFIG_HDMI_NO_IP_MODULE
+		if (cmd == SNDRV_PCM_TRIGGER_RESUME)
+			hdmi_set_audio_power(1);
 		err = hdmi_w1_start_audio_transfer(HDMI_WP);
 #else
 		if (hdmi_audio_core.module_loaded)
@@ -148,6 +166,10 @@ static int omap_hdmi_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 #ifdef CONFIG_HDMI_NO_IP_MODULE
 		err = hdmi_w1_stop_audio_transfer(HDMI_WP);
+		if (err)
+			return err;
+		if (cmd == SNDRV_PCM_TRIGGER_SUSPEND)
+			hdmi_set_audio_power(0);
 #else
 		if (hdmi_audio_core.module_loaded)
 			err = hdmi_audio_core.stop_audio(HDMI_WP);
@@ -206,12 +228,24 @@ static struct snd_soc_dai_driver omap_hdmi_dai = {
 
 static __devinit int omap_hdmi_probe(struct platform_device *pdev)
 {
+	struct hdmi_notifier *notifier = &hdmi_data.notifier;
+
+	notifier->hpd_notifier = hdmi_hpd_notifier;
+	notifier->pwrchange_notifier = hdmi_pwrchange_notifier;
+	notifier->private_data = &hdmi_data;
+	hdmi_add_notifier(notifier);
+
 	return snd_soc_register_dai(&pdev->dev, &omap_hdmi_dai);
 }
 
 static int __devexit omap_hdmi_remove(struct platform_device *pdev)
 {
+	struct hdmi_notifier *notifier = &hdmi_data.notifier;
+
+	notifier->private_data = NULL;
+	hdmi_remove_notifier(notifier);
 	snd_soc_unregister_dai(&pdev->dev);
+
 	return 0;
 }
 
