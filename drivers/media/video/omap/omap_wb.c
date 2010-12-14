@@ -191,6 +191,27 @@ int omap_wb_try_format(enum omap_color_mode *color_mode,
 	return bpp;
 }
 
+static int omap_wb_process_frame(struct omap_wb_device *wb)
+{
+	int ret = 0;
+	u32 addr, uv_addr;
+	wb->next_frm = list_entry(wb->dma_queue.next,
+				struct videobuf_buffer, queue);
+
+	list_del(&wb->next_frm->queue);
+
+	wb->next_frm->state = VIDEOBUF_ACTIVE;
+
+	addr = (unsigned long)wb->queued_buf_addr[wb->next_frm->i];
+
+	uv_addr = (unsigned long)wb->queued_buf_uv_addr[
+		wb->next_frm->i];
+
+	ret = omap_setup_wb(wb, addr, uv_addr);
+	if (ret)
+		printk(KERN_ERR WB_NAME "error in setup_wb %d\n", ret);
+	return ret;
+}
 /*
  *
  * IOCTL interface.
@@ -346,7 +367,8 @@ static int vidioc_qbuf(struct file *file, void *fh,
 	struct omap_wb_device *wb = fh;
 	struct videobuf_queue *q = &wb->vbq;
 	int ret = 0;
-	u32 addr = 0, uv_addr = 0;
+	int qempty = list_empty(&wb->dma_queue);
+
 	v4l2_dbg(1, debug_wb, &wb->wb_dev->v4l2_dev,
 		"entered qbuf: buffer address: %x\n", (unsigned int) buffer);
 
@@ -365,12 +387,14 @@ static int vidioc_qbuf(struct file *file, void *fh,
 
 	ret = videobuf_qbuf(q, buffer);
 
-	if (wb->streaming && wb->buf_empty) {
-		addr = (unsigned long)wb->queued_buf_addr[wb->next_frm->i];
-		uv_addr = (unsigned long) wb->queued_buf_uv_addr[wb->cur_frm->i];
-		wb->buf_empty = 0;
-		omap_setup_wb(wb, addr, uv_addr);
-	}
+	if (wb->cur_frm &&
+			wb->next_frm &&
+			wb->cur_frm->i == wb->next_frm->i &&
+			wb->cur_frm->state == VIDEOBUF_ACTIVE &&
+			wb->next_frm->state == VIDEOBUF_ACTIVE &&
+			qempty)
+		ret = omap_wb_process_frame(wb);
+
 	return ret;
 }
 
@@ -1176,10 +1200,7 @@ static struct platform_driver omap_wb_driver = {
 void omap_wb_isr(void *arg, unsigned int irqstatus)
 {
 	struct timeval timevalue = {0};
-	int r = 0;
-	struct omap_wb_device *wb =
-	    (struct omap_wb_device *) arg;
-	u32 addr, uv_addr;
+	struct omap_wb_device *wb = (struct omap_wb_device *) arg;
 	unsigned long flags;
 
 	spin_lock_irqsave(&wb->vbq_lock, flags);
@@ -1189,29 +1210,16 @@ void omap_wb_isr(void *arg, unsigned int irqstatus)
 		wb->cur_frm->state = VIDEOBUF_DONE;
 		wake_up_interruptible(&wb->cur_frm->done);
 		wb->cur_frm = wb->next_frm;
-		}
+	}
 
 	wb->first_int = 0;
+
 	if (list_empty(&wb->dma_queue)) {
-		wb->buf_empty = true;
 		spin_unlock_irqrestore(&wb->vbq_lock, flags);
 		return;
 	}
 
-	wb->next_frm = list_entry(wb->dma_queue.next,
-		struct videobuf_buffer, queue);
-	list_del(&wb->next_frm->queue);
-
-	wb->next_frm->state = VIDEOBUF_ACTIVE;
-	addr = (unsigned long)wb->queued_buf_addr[wb->next_frm->i];
-
-#ifdef CONFIG_ARCH_OMAP4
-	uv_addr = (unsigned long)wb->queued_buf_uv_addr[
-		wb->next_frm->i];
-#endif
-	r = omap_setup_wb(wb, addr, uv_addr);
-	if (r)
-		printk(KERN_ERR WB_NAME "error in setup_wb %d\n", r);
+	omap_wb_process_frame(wb);
 
 	spin_unlock_irqrestore(&wb->vbq_lock, flags);
 }

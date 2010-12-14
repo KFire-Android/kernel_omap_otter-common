@@ -162,6 +162,10 @@ struct omap_vout_device {
 	/* writeback variables*/
 	bool wb_enabled;
 	bool buf_empty;
+
+	/* workqueue for manual update */
+	struct work_struct	 work;
+	struct workqueue_struct *workqueue;
 };
 
 struct vout_platform_data {

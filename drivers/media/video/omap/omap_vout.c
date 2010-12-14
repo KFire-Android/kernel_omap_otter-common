@@ -1040,12 +1040,20 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 	int i;
 	struct omap_overlay *ovl;
 	struct omapvideo_info *ovid = &vout->vid_info;
+	struct omap_dss_device *dev = NULL;
 
 	for (i = 0; i < ovid->num_overlays; i++) {
 		ovl = ovid->overlays[i];
 		if (!ovl->manager || !ovl->manager->device)
 			return -EINVAL;
+		dev = ovl->manager->device;
 		ovl->manager->apply(ovl->manager);
+#ifndef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
+		if (dev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
+		    dev->driver->get_update_mode(dev) != OMAP_DSS_UPDATE_AUTO)
+			/* we only keep the last frame on manual-upd panels */
+			queue_work(vout->workqueue, &vout->work);
+#endif
 	}
 
 	return 0;
@@ -1107,12 +1115,52 @@ static int i_to_p_base_address_change(struct omap_vout_device *vout)
 	return vout->field_id;
 }
 
+static int omapvid_process_frame(struct omap_vout_device *vout)
+{
+	u32 addr, uv_addr;
+	int ret = 0;
+	struct omapvideo_info *ovid;
+	struct omap_overlay *ovl;
+	struct omap_dss_device *cur_display;
 
+	ovid = &vout->vid_info;
+	ovl = ovid->overlays[0];
+	cur_display = ovl->manager->device;
+
+	vout->next_frm = list_entry(vout->dma_queue.next,
+			struct videobuf_buffer, queue);
+	list_del(&vout->next_frm->queue);
+
+	vout->next_frm->state = VIDEOBUF_ACTIVE;
+
+	addr = (unsigned long)
+			vout->queued_buf_addr[vout->next_frm->i] +
+			vout->cropped_offset[vout->next_frm->i];
+	uv_addr = (unsigned long)vout->queued_buf_uv_addr[
+			vout->next_frm->i]
+			+ vout->cropped_uv_offset[vout->next_frm->i];
+
+	/* First save the configuration in ovelray structure */
+	ret = omapvid_init(vout, addr, uv_addr);
+	if (ret)
+		printk(KERN_ERR VOUT_NAME
+				"failed to set overlay info\n");
+	if (!vout->wb_enabled) {
+		/* Enable the pipeline and set the Go bit */
+		ret = omapvid_apply_changes(vout);
+		if (ret)
+			printk(KERN_ERR VOUT_NAME
+				"failed to change mode\n");
+	}
+#ifdef CONFIG_PANEL_PICO_DLP
+	if (sysfs_streq(cur_display->name, "pico_DLP"))
+		dispc_go(OMAP_DSS_CHANNEL_LCD2);
+#endif
+	return ret;
+}
 
 void omap_vout_isr(void *arg, unsigned int irqstatus)
 {
-	int ret;
-	u32 addr, uv_addr;
 	struct omap_overlay *ovl;
 	struct timeval timevalue;
 	struct omapvideo_info *ovid;
@@ -1214,34 +1262,7 @@ wb:
 	}
 
 intlace:
-	vout->next_frm = list_entry(vout->dma_queue.next,
-			struct videobuf_buffer, queue);
-	list_del(&vout->next_frm->queue);
-
-	vout->next_frm->state = VIDEOBUF_ACTIVE;
-	addr = (unsigned long)
-		vout->queued_buf_addr[vout->next_frm->i] +
-		vout->cropped_offset[vout->next_frm->i];
-	uv_addr = (unsigned long)vout->queued_buf_uv_addr[
-		vout->next_frm->i]
-		+ vout->cropped_uv_offset[vout->next_frm->i];
-
-	/* First save the configuration in ovelray structure */
-	ret = omapvid_init(vout, addr, uv_addr);
-	if (ret)
-		printk(KERN_ERR VOUT_NAME
-			"failed to set overlay info\n");
-	if (!vout->wb_enabled) {
-		/* Enable the pipeline and set the Go bit */
-		ret = omapvid_apply_changes(vout);
-		if (ret)
-			printk(KERN_ERR VOUT_NAME
-					"failed to change mode\n");
-	}
-#ifdef CONFIG_PANEL_PICO_DLP
-	if (sysfs_streq(cur_display->name, "pico_DLP"))
-		dispc_go(OMAP_DSS_CHANNEL_LCD2);
-#endif
+	omapvid_process_frame(vout);
 vout_isr_err:
 	spin_unlock_irqrestore(&vout->vbq_lock, flags);
 }
@@ -2448,6 +2469,34 @@ reqbuf_err:
 	return ret;
 }
 
+static void omapvid_perform_work(struct work_struct *work)
+{
+#ifndef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
+	struct omap_vout_device *vout;
+	struct omapvideo_info *ovid;
+	struct omap_overlay *ovl;
+	struct omap_dss_device *dev;
+	int i;
+
+	vout = container_of(work, struct omap_vout_device, work);
+
+	ovid = &vout->vid_info;
+
+	for (i = 0; i < ovid->num_overlays; i++) {
+		ovl = ovid->overlays[i];
+		if (!ovl->manager || !ovl->manager->device)
+			continue;
+
+		dev = ovl->manager->device;
+		/* no need to call sync as work is scheduled on sync */
+		if (dev->driver->update)
+			dev->driver->update(dev, 0, 0,
+				dev->panel.timings.x_res,
+				dev->panel.timings.y_res);
+	}
+#endif
+}
+
 static int vidioc_querybuf(struct file *file, void *fh,
 			struct v4l2_buffer *b)
 {
@@ -2460,9 +2509,13 @@ static int vidioc_qbuf(struct file *file, void *fh,
 			struct v4l2_buffer *buffer)
 {
 	struct omap_vout_device *vout = fh;
+	struct omap_overlay *ovl;
+	struct omap_dss_device *dev;
+	bool process = vout->wb_enabled;
 	struct videobuf_queue *q = &vout->vbq;
-	int ret = 0;
-	u32 addr = 0, uv_addr = 0;
+	int ret = 0, i;
+	int qempty = list_empty(&vout->dma_queue);
+
 	q->field = vout->pix.field;
 
 	if ((V4L2_BUF_TYPE_VIDEO_OUTPUT != buffer->type) ||
@@ -2491,14 +2544,29 @@ static int vidioc_qbuf(struct file *file, void *fh,
 		printk(KERN_ERR "Could not calculate buffer offset\n");
 		return -EINVAL;
 	}
-	if (vout->wb_enabled && vout->streaming && vout->buf_empty) {
-		addr = (unsigned long) vout->queued_buf_addr[vout->cur_frm->i]
-			+ vout->cropped_offset[vout->cur_frm->i];
-		uv_addr = (unsigned long) vout->queued_buf_uv_addr[vout->cur_frm->i]
-			+ vout->cropped_uv_offset[vout->cur_frm->i];
-		vout->buf_empty = false;
-		omapvid_init(vout, addr, uv_addr);
+
+
+	/* also process frame if displayed on a manual update screen */
+	for (i = 0; !process && i < vout->vid_info.num_overlays; i++) {
+		ovl = vout->vid_info.overlays[i];
+		if (!ovl->manager || !ovl->manager->device)
+			continue;
+		dev = ovl->manager->device;
+		process =
+			dev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
+			dev->driver->get_update_mode(dev) !=
+							OMAP_DSS_UPDATE_AUTO;
 	}
+
+	if (process &&
+			vout->cur_frm &&
+			vout->next_frm &&
+			vout->cur_frm->i == vout->next_frm->i &&
+			vout->cur_frm->state == VIDEOBUF_ACTIVE &&
+			vout->next_frm->state == VIDEOBUF_ACTIVE &&
+			qempty)
+		ret = omapvid_process_frame(vout);
+
 	return ret;
 }
 
@@ -3078,11 +3146,20 @@ static int __init omap_vout_create_video_devices(struct platform_device *pdev)
 		vout->vid_info.num_overlays = 1;
 		vout->vid_info.id = k + 1;
 
+#ifndef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
+		vout->workqueue = create_singlethread_workqueue("OMAPVOUT");
+		if (vout->workqueue == NULL) {
+			ret = -ENOMEM;
+			goto error;
+		}
+
+		INIT_WORK(&vout->work, omapvid_perform_work);
+#endif
 		/* Setup the default configuration for the video devices
 		 */
 		if (omap_vout_setup_video_data(vout) != 0) {
 			ret = -ENOMEM;
-			goto error;
+			goto error_q;
 		}
 
 		/* Allocate default number of buffers for the video streaming
@@ -3117,6 +3194,10 @@ error2:
 		omap_vout_free_buffers(vout);
 error1:
 		video_device_release(vfd);
+error_q:
+#ifndef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
+		destroy_workqueue(vout->workqueue);
+#endif
 error:
 		kfree(vout);
 		return ret;
@@ -3167,6 +3248,11 @@ static void omap_vout_cleanup_device(struct omap_vout_device *vout)
 		omap_vout_free_vrfb_buffers(vout);
 #else
 	omap_vout_free_tiler_buffers(vout);
+#endif
+
+#ifndef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
+	flush_workqueue(vout->workqueue);
+	destroy_workqueue(vout->workqueue);
 #endif
 	kfree(vout);
 }

@@ -775,7 +775,7 @@ static int configure_overlay(enum omap_plane plane)
 			source_of_wb = true;
 		}
 	}
-	
+
 	x = c->pos_x;
 	y = c->pos_y;
 	w = c->width;
@@ -940,7 +940,7 @@ static int configure_dispc(void)
 {
 	struct overlay_cache_data *oc;
 	struct manager_cache_data *mc;
-	struct writeback_cache_data *wb;
+	struct writeback_cache_data *wb = NULL;
 	const int num_ovls = ARRAY_SIZE(dss_cache.overlay_cache);
 	const int num_mgrs = MAX_DSS_MANAGERS;
 	int i;
@@ -948,7 +948,6 @@ static int configure_dispc(void)
 	bool mgr_busy[MAX_DSS_MANAGERS];
 	bool mgr_go[MAX_DSS_MANAGERS];
 	bool busy;
-	bool ignore_mgr_busy = false;
 	r = 0;
 	busy = false;
 
@@ -968,16 +967,15 @@ static int configure_dispc(void)
 		if (!oc->dirty)
 			continue;
 
-		if (oc->manual_update && !mc->do_manual_update)
-			continue;
+		/* check if ovl has a manager - for now WB sources do not */
+		if (!wb || !wb->enabled || !omap_dss_check_wb(wb, i, -1)) {
+			if (oc->manual_update && !mc->do_manual_update)
+				continue;
 
-		ignore_mgr_busy =  cpu_is_omap44xx() &&
-					wb->enabled &&
-					omap_dss_check_wb(wb, i, -1);
-
-		if (mgr_busy[oc->channel] && !ignore_mgr_busy) {
-			busy = true;
-			continue;
+			if (mgr_busy[oc->channel]) {
+				busy = true;
+				continue;
+			}
 		}
 
 		r = configure_overlay(i);
