@@ -1235,6 +1235,14 @@ static void enable_board_wakeup_source(void)
 	}
 
 #endif
+
+	/*
+	 * Enable IO daisy for sys_nirq1/2, to be able to
+	 * wakeup from interrupts from PMIC/Audio IC.
+	 * Needed only in Device OFF mode.
+	 */
+	omap_mux_enable_wakeup("sys_nirq1");
+	omap_mux_enable_wakeup("sys_nirq2");
 }
 
 static struct omap_volt_pmic_info omap_pmic_core = {
