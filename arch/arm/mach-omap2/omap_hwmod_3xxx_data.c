@@ -2161,7 +2161,7 @@ static struct omap_hwmod omap3xxx_usbhsotg_hwmod = {
 static struct omap_hwmod_ocp_if omap3xxx_dma_system__l3 = {
 	.master		= &omap3xxx_dma_system_hwmod,
 	.slave		= &omap3xxx_l3_main_hwmod,
-	.clk		= "l3_div_ck",
+	.clk		= "core_l3_ick",
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
@@ -2215,7 +2215,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_dma_system_masters[] = {
 static struct omap_hwmod_ocp_if omap3xxx_l4_core__dma_system = {
 	.master		= &omap3xxx_l4_core_hwmod,
 	.slave		= &omap3xxx_dma_system_hwmod,
-	.clk		= "l4_div_ck",
+	.clk		= "core_l4_ick",
 	.addr		= omap3xxx_dma_system_addrs,
 	.addr_cnt	= ARRAY_SIZE(omap3xxx_dma_system_addrs),
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
@@ -2231,12 +2231,8 @@ static struct omap_hwmod omap3xxx_dma_system_hwmod = {
 	.class		= &omap3xxx_dma_hwmod_class,
 	.mpu_irqs	= omap3xxx_dma_system_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_dma_system_irqs),
-	.main_clk	= "l3_div_ck",
-	.prcm = {
-		.omap2 = {
-			/* .clkctrl_reg = NULL, */
-		},
-	},
+	.main_clk	= "core_l3_ick",
+	.flags		= HWMOD_NO_IDLEST,
 	.slaves		= omap3xxx_dma_system_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_dma_system_slaves),
 	.masters	= omap3xxx_dma_system_masters,
