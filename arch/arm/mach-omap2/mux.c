@@ -35,7 +35,7 @@
 
 #include <asm/system.h>
 
-#include "control.h"
+#include <plat/control.h>
 #include "mux.h"
 
 #define OMAP_MUX_BASE_OFFSET		0x30	/* Offset from CTRL_BASE */
@@ -204,6 +204,66 @@ static int __init _omap_mux_init_signal(struct omap_mux_partition *partition,
 	return -ENODEV;
 }
 
+static u16 omap_mux_read_signal(const char *muxname)
+{
+	struct omap_mux_partition *partition;
+	struct omap_mux_entry *e;
+	const char *mode_name;
+	int mode0_len = 0;
+	struct list_head *muxmodes;
+
+	mode_name = strchr(muxname, '.');
+	if (mode_name) {
+		mode0_len = strlen(muxname) - strlen(mode_name);
+		mode_name++;
+	} else {
+		mode_name = muxname;
+	}
+
+	list_for_each_entry(partition, &mux_partitions, node) {
+		muxmodes = &partition->muxmodes;
+		list_for_each_entry(e, muxmodes, node) {
+			struct omap_mux *m = &e->mux;
+			char *m0_entry = m->muxnames[0];
+			int i;
+
+			/* First check for full name in mode0.muxmode format */
+			if (mode0_len && strncmp(muxname, m0_entry, mode0_len))
+				continue;
+
+			/* Then check for muxmode only */
+			for (i = 0; i < OMAP_MUX_NR_MODES; i++) {
+				char *mode_cur = m->muxnames[i];
+
+				if (!mode_cur)
+					continue;
+
+				if (!strcmp(mode_name, mode_cur)) {
+
+					return omap_mux_read(partition,
+							 m->reg_offset);
+				}
+			}
+		}
+	}
+
+	pr_err("%s: Could not set signal %s\n", __func__, muxname);
+
+	return -ENODEV;
+}
+
+int omap_mux_enable_wakeup(const char *muxname)
+{
+	u16 val;
+
+	val = omap_mux_read_signal(muxname);
+	if (val == -ENODEV)
+		return val;
+	val |= OMAP44XX_PADCONF_WAKEUPENABLE0;
+	omap_mux_init_signal(muxname, val);
+	return 0;
+}
+
 int __init omap_mux_init_signal(const char *muxname, int val)
 {
 	struct omap_mux_partition *partition;
@@ -216,7 +276,6 @@ int __init omap_mux_init_signal(const char *muxname, int val)
 	}
 
 	return -ENODEV;
-
 }
 
 #ifdef CONFIG_DEBUG_FS

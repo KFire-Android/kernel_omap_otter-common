@@ -170,6 +170,7 @@ int omap_mux_init_gpio(int gpio, int val);
  * @val:		Options for the mux register value
  */
 int omap_mux_init_signal(const char *muxname, int val);
+int omap_mux_enable_wakeup(const char *muxname);
 
 #else
 
@@ -178,6 +179,10 @@ static inline int omap_mux_init_gpio(int gpio, int val)
 	return 0;
 }
 static inline int omap_mux_init_signal(char *muxname, int val)
+{
+	return 0;
+}
+static inline int omap_mux_enable_wakeup(char *muxname)
 {
 	return 0;
 }
