@@ -48,6 +48,7 @@ static struct class *omap_ipu_pm_class;
 static dev_t omap_ipu_pm_dev;
 
 int ipu_pm_first_dev;
+int need_resume_notifications;
 
 static struct proc_dir_entry *ipu_pm_proc_entry;
 /* we could iterate over something much more
@@ -180,6 +181,8 @@ static int __devinit ipu_pm_probe(struct platform_device *pdev)
 	/* int id = pdev->id; */
 	/* ivahd.pdev = pdev; */
 
+	need_resume_notifications = 0;
+
 	if (!is_driver_init) {
 		is_driver_init = 1;
 		/* FIXME: maybe needed for multiple dev */
@@ -210,18 +213,26 @@ static int ipu_pm_drv_suspend(struct device *dev)
 		 */
 		/* call notification function */
 		if (ipu_pm_get_handle(APP_M3)) {
-			retval = ipu_pm_notifications(APP_M3, PM_SUSPEND, NULL);
-			if (retval)
-				goto error;
+			if (!(ipu_pm_get_state(APP_M3) & APP_PROC_DOWN)) {
+				retval = ipu_pm_notifications(APP_M3,
+							      PM_SUSPEND, NULL);
+				if (retval)
+					goto error;
+			}
 		}
 		if (ipu_pm_get_handle(SYS_M3)) {
-			retval = ipu_pm_notifications(SYS_M3, PM_SUSPEND, NULL);
-			if (retval)
-				goto error;
-			/* sysm3 is handling hibernation of ducati currently */
-			ipu_pm_save_ctx(SYS_M3);
+			if (!(ipu_pm_get_state(SYS_M3) & SYS_PROC_DOWN)) {
+				retval = ipu_pm_notifications(SYS_M3,
+							      PM_SUSPEND, NULL);
+				if (retval)
+					goto error;
+				/* sysm3 is handling hibernation of ducati
+				 * currently
+				 */
+				ipu_pm_save_ctx(SYS_M3);
+				need_resume_notifications = 1;
+			}
 		}
-
 		/* return result, should be zero if all Ducati clients
 		 * returned zero else fail code
 		 */
@@ -242,15 +253,20 @@ static int ipu_pm_drv_resume(struct device *dev)
 		 */
 
 		/* call our notification function */
-		if (ipu_pm_get_handle(APP_M3)) {
-			retval = ipu_pm_notifications(APP_M3, PM_RESUME, NULL);
-			if (retval)
-				goto error;
-		}
-		if (ipu_pm_get_handle(SYS_M3)) {
-			retval = ipu_pm_notifications(SYS_M3, PM_RESUME, NULL);
-			if (retval)
-				goto error;
+		if (need_resume_notifications) {
+			if (ipu_pm_get_handle(APP_M3)) {
+				retval = ipu_pm_notifications(APP_M3,
+							       PM_RESUME, NULL);
+				if (retval)
+					goto error;
+			}
+			if (ipu_pm_get_handle(SYS_M3)) {
+				retval = ipu_pm_notifications(SYS_M3,
+							       PM_RESUME, NULL);
+				if (retval)
+					goto error;
+			}
+			need_resume_notifications = 0;
 		}
 
 		/* return result, should be zero if all Ducati clients
