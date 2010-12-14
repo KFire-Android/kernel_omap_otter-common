@@ -20,6 +20,7 @@
 
 #include <linux/dma-mapping.h>
 #include <linux/uaccess.h>
+#include <linux/slab.h>
 
 #include "isp.h"
 

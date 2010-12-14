@@ -16,6 +16,7 @@
  */
 
 #include <linux/debugfs.h>
+#include <linux/slab.h>
 
 #include "isp.h"
 #include "ispreg.h"

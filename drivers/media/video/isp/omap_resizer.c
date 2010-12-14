@@ -31,6 +31,7 @@
 #include <linux/platform_device.h>
 #include <linux/uaccess.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
 #include <media/v4l2-dev.h>
 #include <asm/cacheflush.h>
 #include <plat/omap-pm.h>

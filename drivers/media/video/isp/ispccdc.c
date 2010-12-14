@@ -24,6 +24,7 @@
 #include <linux/uaccess.h>
 #include <linux/delay.h>
 #include <linux/device.h>
+#include <linux/slab.h>
 
 #include "isp.h"
 #include "ispreg.h"

@@ -11,6 +11,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/slab.h>
 
 #include <media/v4l2-int-device.h>
 #include <media/v4l2-ioctl.h>

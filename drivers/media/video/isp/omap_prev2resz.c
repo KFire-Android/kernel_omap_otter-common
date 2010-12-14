@@ -21,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
 #include <plat/omap-pm.h>
 #include "isp.h"
 #include <linux/omap_prev2resz.h>

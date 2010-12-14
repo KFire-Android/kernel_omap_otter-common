@@ -34,6 +34,7 @@
 #include <linux/vmalloc.h>
 #include <linux/platform_device.h>
 #include <linux/device.h>
+#include <linux/slab.h>
 
 #include "isp.h"
 #include "ispreg.h"

@@ -17,6 +17,7 @@
 
 #include <media/v4l2-common.h>
 #include <linux/debugfs.h>
+#include <linux/slab.h>
 
 #include "isp.h"
 #include "ispreg.h"
