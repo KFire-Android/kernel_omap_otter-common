@@ -829,8 +829,7 @@ static void mute_be_capture(struct snd_pcm_substream *substream)
 
 		switch (be_rtd->dai_link->be_id) {
 		case OMAP_ABE_DAI_PDM_UL:
-//			abe_write_mixer(MIXAUDUL, MUTE_GAIN, RAMP_0MS,
-//				MIX_AUDUL_INPUT_UPLINK);
+			abe_mute_gain(GAINS_AMIC, 0);
 			break;
 		case OMAP_ABE_DAI_BT_VX:
 		case OMAP_ABE_DAI_MM_FM:
@@ -863,8 +862,7 @@ static void unmute_be_capture(struct snd_pcm_substream *substream)
 
 		switch (be_rtd->dai_link->be_id) {
 		case OMAP_ABE_DAI_PDM_UL:
-//			abe_write_mixer(MIXAUDUL, GAIN_M6dB, RAMP_0MS,
-//				MIX_AUDUL_INPUT_UPLINK);
+			abe_unmute_gain(GAINS_AMIC, 0);
 			break;
 		case OMAP_ABE_DAI_BT_VX:
 		case OMAP_ABE_DAI_MM_FM:
