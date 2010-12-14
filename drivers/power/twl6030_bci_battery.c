@@ -239,6 +239,8 @@ struct twl6030_bci_device_info {
 	unsigned int		regulation_voltagemV;
 	unsigned int		low_bat_voltagemV;
 	unsigned int		termination_currentmA;
+	unsigned int		capacity;
+	unsigned int		capacity_debounce_count;
 
 	struct power_supply	bat;
 	struct power_supply	usb;
@@ -365,6 +367,7 @@ static void twl6030_stop_usb_charger(struct twl6030_bci_device_info *di)
 	di->charger_source = 0;
 	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 0, CONTROLLER_CTRL1);
+	di->capacity = -1;
 }
 
 static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
@@ -387,6 +390,7 @@ static void twl6030_stop_ac_charger(struct twl6030_bci_device_info *di)
 	di->charger_source = 0;
 	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
 	events = BQ2415x_STOP_CHARGING;
+	di->capacity = -1;
 	blocking_notifier_call_chain(&notifier_list, events, NULL);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 0, CONTROLLER_CTRL1);
 }
@@ -514,7 +518,13 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 		di->charge_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
 		dev_err(di->dev, "Charger Fault stop charging\n");
 	}
-	power_supply_changed(&di->bat);
+
+	if (di->capacity != -1)
+		power_supply_changed(&di->bat);
+	else {
+		cancel_delayed_work(&di->twl6030_bci_monitor_work);
+		schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -775,6 +785,52 @@ static void twl6030_current_avg(struct work_struct *work)
 		msecs_to_jiffies(1000 * di->current_avg_interval));
 }
 
+static int capacity_changed(struct twl6030_bci_device_info *di)
+{
+		int curr_capacity = 0;
+		/* Because system load is always grater than
+		 * termination current, we will never get a CHARGE DONE
+		 * int from BQ. And charging will alwys be in progress.
+		 * We consider Vbat>3900 to be a full battery.
+		 * Since Voltage meassured during charging is Voreg ~4.2v,
+		 * we dont update capacity if we are charging.
+		 */
+		if (di->voltage_uV < 3500)
+			curr_capacity = 5;
+		else if (di->voltage_uV < 3600 && di->voltage_uV >= 3500)
+			curr_capacity = 20;
+		else if (di->voltage_uV < 3700 && di->voltage_uV >= 3600)
+			curr_capacity = 50;
+		else if (di->voltage_uV < 3800 && di->voltage_uV >= 3700)
+			curr_capacity = 75;
+		else if (di->voltage_uV < 3900 && di->voltage_uV >= 3800)
+			curr_capacity = 90;
+		else if (di->voltage_uV >= 3900) {
+			if (di->charge_status == POWER_SUPPLY_STATUS_CHARGING) {
+				curr_capacity = 90;
+				/* fake the debounce count. */
+				di->capacity_debounce_count = 4;
+			} else {
+				curr_capacity = 100;
+			}
+		}
+
+		/* Debouncing of voltage change. */
+		if (curr_capacity != di->capacity)
+			di->capacity_debounce_count++;
+		else
+			di->capacity_debounce_count = 0;
+
+		if ((di->capacity_debounce_count >= 4)
+			|| (di->capacity == -1)) {
+			di->capacity = curr_capacity;
+			return 1;
+		}
+	return 0;
+
+}
+
+
 static void twl6030_bci_battery_work(struct work_struct *work)
 {
 	struct twl6030_bci_device_info *di = container_of(work,
@@ -815,6 +871,9 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 		/* first 2 values are for negative temperature */
 		di->temp_C = (temp - 2) * 10; /* in tenths of degree Celsius */
 	}
+
+	if (capacity_changed(di))
+		power_supply_changed(&di->bat);
 }
 
 static void twl6030_current_mode_changed(struct twl6030_bci_device_info *di)
@@ -952,20 +1011,7 @@ static int twl6030_bci_battery_get_property(struct power_supply *psy,
 		val->intval = di->bat_health;
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
-		/* FIXME correct the threshold
-		 * need to get the correct percentage value per the
-		 * battery characteristics. Approx values for now.
-		 */
-		if (di->voltage_uV < 3594)
-			val->intval = 5;
-		else if (di->voltage_uV < 3651 && di->voltage_uV > 3594)
-			val->intval = 20;
-		else if (di->voltage_uV < 3702 && di->voltage_uV > 3651)
-			val->intval = 50;
-		else if (di->voltage_uV < 3900 && di->voltage_uV > 3702)
-			val->intval = 75;
-		else if (di->voltage_uV > 3900)
-			val->intval = 90;
+		val->intval = di->capacity;
 		break;
 	default:
 		return -EINVAL;
@@ -1506,6 +1552,8 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->bk_bat.get_property = twl6030_bk_bci_battery_get_property;
 
 	di->vac_priority = 2;
+	di->capacity = -1;
+	di->capacity_debounce_count = 0;
 	platform_set_drvdata(pdev, di);
 
 	/* settings for temperature sensing */
