@@ -177,6 +177,7 @@ static int imx046_sensor_power_set(struct v4l2_int_device *s, enum v4l2_power po
 	struct isp_csi2_lanes_cfg lanecfg;
 	struct isp_csi2_phy_cfg phyconfig;
 	static enum v4l2_power previous_power = V4L2_POWER_OFF;
+	static struct pm_qos_request_list *qos_request;
 	int err = 0;
 
 	switch (power) {
@@ -193,7 +194,7 @@ static int imx046_sensor_power_set(struct v4l2_int_device *s, enum v4l2_power po
 					 OCP_INITIATOR_AGENT, 800000);
 
 		/* Hold a constraint to keep MPU in C1 */
-		omap_pm_set_max_mpu_wakeup_lat(vdev->cam->isp, 12);
+		omap_pm_set_max_mpu_wakeup_lat(&qos_request, 12);
 
 		isp_csi2_reset(&isp->isp_csi2);
 
@@ -267,7 +268,7 @@ static int imx046_sensor_power_set(struct v4l2_int_device *s, enum v4l2_power po
 
 		/* Remove pm constraints */
 		omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 0);
-		omap_pm_set_max_mpu_wakeup_lat(vdev->cam->isp, -1);
+		omap_pm_set_max_mpu_wakeup_lat(&qos_request, -1);
 
 		/* Make sure not to disable the MCLK twice in a row */
 		if (previous_power == V4L2_POWER_ON)
