@@ -28,6 +28,7 @@
 #	define	FORCEIDLE		(0 << SIDLEMODE)
 #	define	NOIDLE			(1 << SIDLEMODE)
 #	define	SMARTIDLE		(2 << SIDLEMODE)
+#	define	SMARTIDLEWKUP		(3 << SIDLEMODE)
 
 #	define	ENABLEWAKEUP		(1 << 2)
 #	define	SOFTRST			(1 << 1)

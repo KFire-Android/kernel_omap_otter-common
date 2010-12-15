@@ -84,11 +84,14 @@ void phy_clk_set(struct musb *musb, u8 on)
 		pr_warning("cannot clk_get ocp2scp_usb_phy_phy_48m\n");
 		return;
 	}
-	if (on && (!state)) {
-		/* Enable the phy clocks*/
-		clk_enable(phyclk);
-		clk_enable(clk48m);
-		state = 1;
+
+	if (on) {
+		if (!state) {
+			/* Enable the phy clocks*/
+			clk_enable(phyclk);
+			clk_enable(clk48m);
+			state = 1;
+		}
 	} else if (state) {
 		/* Disable the phy clocks*/
 		clk_disable(phyclk);
@@ -110,8 +113,20 @@ int musb_notifier_call(struct notifier_block *nb,
 	switch (event) {
 	case USB_EVENT_ID:
 		DBG(1, "ID GND\n");
-		musb->is_active = 1;
+
+		/* configure musb into smartidle with wakeup enabled
+		 * smart standby mode.
+		 */
+		musb_writel(musb->mregs, OTG_FORCESTDBY, 0);
+		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+		if (cpu_is_omap44xx())
+			val |= SMARTIDLEWKUP | SMARTSTDBY | ENABLEWAKEUP;
+		else
+			val |= SMARTIDLE | SMARTSTDBY | ENABLEWAKEUP;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			phy_clk_set(musb, 1);
 			val = __raw_readl(ctrl_base + ONTROL_DEV_CONF);
 			if (val & 0x1) {
 				val &= ~PHY_PD;
@@ -127,15 +142,20 @@ int musb_notifier_call(struct notifier_block *nb,
 	case USB_EVENT_VBUS:
 		DBG(1, "VBUS Connect\n");
 		wake_lock(&usb_lock);
-		musb->is_active = 1;
-		/* hold the L3 constraint as there was performance drop with
-		 * ondemand governor
+
+		/* configure musb into smartidle with wakeup enabled
+		 * smart standby mode.
 		 */
-		if (pdata->set_min_bus_tput)
-			pdata->set_min_bus_tput(musb->controller,
-					OCP_INITIATOR_AGENT, (200*1000*4));
+		musb_writel(musb->mregs, OTG_FORCESTDBY, 0);
+		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+		if (cpu_is_omap44xx())
+			val |= SMARTIDLEWKUP | SMARTSTDBY | ENABLEWAKEUP;
+		else
+			val |= SMARTIDLE | SMARTSTDBY | ENABLEWAKEUP;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
 
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			phy_clk_set(musb, 1);
 			val = __raw_readl(ctrl_base + ONTROL_DEV_CONF);
 			if (val & 0x1) {
 				val &= ~PHY_PD;
@@ -149,6 +169,13 @@ int musb_notifier_call(struct notifier_block *nb,
 					ctrl_base + USBOTGHS_CONTROL);
 			}
 		}
+
+		/* hold the L3 constraint as there was performance drop with
+		 * ondemand governor
+		 */
+		if (pdata->set_min_bus_tput)
+			pdata->set_min_bus_tput(musb->controller,
+					OCP_INITIATOR_AGENT, (200*1000*4));
 		break;
 
 	case USB_EVENT_NONE:
@@ -158,11 +185,18 @@ int musb_notifier_call(struct notifier_block *nb,
 							USBOTGHS_CONTROL);
 			if (musb->xceiv->set_vbus)
 				otg_set_vbus(musb->xceiv, 0);
-
+			/* Disable the phy clocks */
+			phy_clk_set(musb, 0);
 			/* put the phy in powerdown mode*/
 			__raw_writel(PHY_PD, ctrl_base + ONTROL_DEV_CONF);
 		}
 		hostmode = 0;
+		/* configure in force idle/ standby */
+		musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
+		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+		val &= ~(SMARTIDLEWKUP | SMARTSTDBY | ENABLEWAKEUP);
+		val |= FORCEIDLE | FORCESTDBY;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
 
 		wake_unlock(&usb_lock);
 		/* Release L3 constraint */
@@ -236,7 +270,6 @@ static void musb_do_idle(unsigned long _musb)
 	}
 	spin_unlock_irqrestore(&musb->lock, flags);
 }
-
 
 void musb_platform_try_idle(struct musb *musb, unsigned long timeout)
 {
@@ -358,6 +391,7 @@ int __init musb_platform_init(struct musb *musb)
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
 	struct omap_musb_board_data *data = plat->board_data;
 	int status;
+	u32 val;
 
 	/* We require some kind of external transceiver, hooked
 	 * up through ULPI.  TWL4030-family PMICs include one,
@@ -419,6 +453,12 @@ int __init musb_platform_init(struct musb *musb)
 			wake_lock_destroy(&usb_lock);
 		}
 	}
+	/* configure in force idle/ standby */
+	musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
+	val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+	val &= ~(SMARTIDLEWKUP | NOSTDBY | ENABLEWAKEUP);
+	val |= FORCEIDLE | FORCESTDBY;
+	musb_writel(musb->mregs, OTG_SYSCONFIG,	val);
 	return 0;
 }
 
@@ -427,7 +467,7 @@ void musb_platform_save_context(struct musb *musb,
 		struct musb_context_registers *musb_context)
 {
 	void __iomem *musb_base = musb->mregs;
-
+	musb_context->otg_sysconfig = musb_readl(musb->mregs, OTG_SYSCONFIG);
 	musb_writel(musb_base, OTG_FORCESTDBY, 1);
 }
 
@@ -435,7 +475,7 @@ void musb_platform_restore_context(struct musb *musb,
 		struct musb_context_registers *musb_context)
 {
 	void __iomem *musb_base = musb->mregs;
-
+	musb_writel(musb->mregs, OTG_SYSCONFIG, musb_context->otg_sysconfig);
 	musb_writel(musb_base, OTG_FORCESTDBY, 0);
 }
 #endif
@@ -472,7 +512,6 @@ static int musb_platform_resume(struct musb *musb)
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_hwmod *oh = pdata->oh;
-	struct omap_musb_board_data *data = pdata->board_data;
 
 	if (!musb->clock)
 		return 0;
@@ -480,11 +519,6 @@ static int musb_platform_resume(struct musb *musb)
 	otg_set_suspend(musb->xceiv, 0);
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
-
-	/* Enable the phy clocks*/
-	if (data->interface_type == MUSB_INTERFACE_UTMI)
-		phy_clk_set(musb, 1);
-
 	pdata->disable_wakeup(oh->od);
 	l = musb_readl(musb->mregs, OTG_FORCESTDBY);
 	l &= ~ENABLEFORCE;	/* disable MSTANDBY */

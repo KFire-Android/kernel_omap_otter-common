@@ -189,13 +189,30 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 
 	}
 
+	/* FIXME  This call is not needed now for retention support and global
+	 * suspend resume support. All the required actions are taken based
+	 * the connect disconnect events.
+	 * This call will be required for offmode support to save and restore
+	 * context in the idle path oddmode support only.
+	*/
+#if 0
 	if (core_next_state < PWRDM_POWER_ON)
 		musb_context_save_restore(disable_clk);
+#endif
 
 	omap4_enter_lowpower(cpu, power_state);
 
+	/* FIXME  This call is not needed now for retention support and global
+	 * suspend resume support. All the required actions are taken based
+	 * the connect disconnect events.
+	 * This call will be required for offmode support to save and restore
+	 * context in the idle path oddmode support only.
+	*/
+#if 0
 	if (core_next_state < PWRDM_POWER_ON)
 		musb_context_save_restore(enable_clk);
+
+#endif
 
 	if (core_next_state < PWRDM_POWER_ON) {
 		/* Disable AUTO RET for IVA and CORE */
