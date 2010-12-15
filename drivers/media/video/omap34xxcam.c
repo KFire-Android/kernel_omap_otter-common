@@ -39,6 +39,7 @@
 
 #include <media/v4l2-common.h>
 #include <media/v4l2-ioctl.h>
+#include <media/v4l2-event.h>
 
 #include "omap34xxcam.h"
 #include "isp/isp.h"
@@ -585,7 +586,7 @@ static int try_pix_parm(struct omap34xxcam_videodev *vdev,
 				if (FPS_ABS_DIFF(fps, frmi.discrete)
 				    < FPS_ABS_DIFF(fps, *best_ival)) {
 					dev_dbg(&vdev->vfd->dev, "closer fps: "
-						"fps %d\t fps %d\n",
+						"fps %ld\t fps %ld\n",
 						FPS_ABS_DIFF(fps,
 							     frmi.discrete),
 						FPS_ABS_DIFF(fps, *best_ival));
@@ -1544,7 +1545,7 @@ done:
 
 int vidioc_dqevent(struct v4l2_fh *vfh, struct v4l2_event *ev)
 {
-	return v4l2_event_dequeue(&vfh->events, ev);
+	return v4l2_event_dequeue(vfh, ev, 0);
 }
 
 int vidioc_subscribe_event(struct v4l2_fh *vfh,
@@ -1562,7 +1563,7 @@ int vidioc_subscribe_event(struct v4l2_fh *vfh,
 		return -EINVAL;
 	}
 
-	return v4l2_event_subscribe(&fh->vfh.events, sub);
+	return v4l2_event_subscribe(&fh->vfh, sub);
 }
 
 int vidioc_unsubscribe_event(struct v4l2_fh *vfh,
@@ -1570,7 +1571,7 @@ int vidioc_unsubscribe_event(struct v4l2_fh *vfh,
 {
 	struct omap34xxcam_fh *fh = to_omap34xxcam_fh(vfh);
 
-	v4l2_event_unsubscribe(&fh->vfh.events, sub);
+	v4l2_event_unsubscribe(&fh->vfh, sub);
 
 	return 0;
 }
@@ -1729,7 +1730,7 @@ static unsigned int omap34xxcam_poll(struct file *file,
 
 	poll_wait(file, &ofh->vdev->poll_event, wait);
 
-	if (v4l2_event_pending(&vfh->events))
+	if (v4l2_event_pending(vfh))
 		ret |= POLLPRI;
 
 	poll_wait(file, &ofh->poll_vb, wait);
@@ -1804,12 +1805,17 @@ static int omap34xxcam_open(struct file *file)
 	if (ofh == NULL)
 		return -ENOMEM;
 
-	if (v4l2_fh_add(vdev->vfd, &ofh->vfh)) {
-		rval = -ENOMEM;
-		goto out_v4l2_fh_add;
-	}
-
 	ofh->vdev = vdev;
+
+	if (v4l2_fh_init(&ofh->vfh, vdev->vfd) < 0)
+		goto out_fh_get;
+
+	if (ofh->vfh.events != NULL) {
+		if (v4l2_event_alloc(&ofh->vfh, 16) < 0)
+			goto out_fh_get;
+	}
+	v4l2_fh_add(&ofh->vfh);
+
 
 	mutex_lock(&vdev->mutex);
 	for (i = 0; i <= OMAP34XXCAM_SLAVE_FLASH; i++) {
@@ -1884,10 +1890,10 @@ out_try_module_get:
 	for (i--; i >= 0; i--)
 		if (vdev->slave[i] != v4l2_int_device_dummy())
 			module_put(vdev->slave[i]->module);
+	v4l2_fh_del(&ofh->vfh);
 
-out_v4l2_fh_add:
-	v4l2_fh_del(vdev->vfd, &ofh->vfh);
-
+out_fh_get:
+	v4l2_fh_exit(&ofh->vfh);
 	kfree(ofh);
 
 	return rval;
@@ -1937,7 +1943,8 @@ static int omap34xxcam_release(struct file *file)
 		if (vdev->slave[i] != v4l2_int_device_dummy())
 			module_put(vdev->slave[i]->module);
 
-	v4l2_fh_del(vdev->vfd, vfh);
+	v4l2_fh_del(vfh);
+	v4l2_fh_exit(vfh);
 
 	kfree(ofh);
 
