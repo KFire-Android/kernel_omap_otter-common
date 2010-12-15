@@ -174,6 +174,11 @@ static struct resource omap3isp_resources[] = {
 		.flags		= IORESOURCE_MEM,
 	},
 	{
+		.start		= OMAP3430_ISP_CSI2PHY2_BASE,
+		.end		= OMAP3430_ISP_CSI2PHY2_END,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
 		.start		= INT_34XX_CAM_IRQ,
 		.flags		= IORESOURCE_IRQ,
 	}
