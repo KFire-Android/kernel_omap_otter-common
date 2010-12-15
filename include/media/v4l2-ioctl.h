@@ -256,6 +256,8 @@ struct v4l2_ioctl_ops {
 	int (*vidioc_g_dv_timings) (struct file *file, void *fh,
 				    struct v4l2_dv_timings *timings);
 
+	int (*vidioc_dqevent)          (struct v4l2_fh *fh,
+					struct v4l2_event *ev);
 	int (*vidioc_subscribe_event)  (struct v4l2_fh *fh,
 					struct v4l2_event_subscription *sub);
 	int (*vidioc_unsubscribe_event)(struct v4l2_fh *fh,
