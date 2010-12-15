@@ -1869,6 +1869,25 @@ static int aess_suspend(struct device *dev)
 	pdev = to_platform_device(dev);
 	pdata = pdev->dev.platform_data;
 
+	pm_runtime_get_sync(&pdev->dev);
+
+	if (!abe->active && !abe_check_activity())
+		dev_err(&pdev->dev, "Suspend in a middle of ABE activity!\n");
+
+	/* TODO: Find a better way to save/retore gains after dor OFF mode */
+	abe_mute_gain(MIXSDT, MIX_SDT_INPUT_UP_MIXER);
+	abe_mute_gain(MIXSDT, MIX_SDT_INPUT_DL1_MIXER);
+	abe_mute_gain(MIXAUDUL, MIX_AUDUL_INPUT_MM_DL);
+	abe_mute_gain(MIXAUDUL, MIX_AUDUL_INPUT_TONES);
+	abe_mute_gain(MIXAUDUL, MIX_AUDUL_INPUT_UPLINK);
+	abe_mute_gain(MIXAUDUL, MIX_AUDUL_INPUT_VX_DL);
+	abe_mute_gain(MIXVXREC, MIX_VXREC_INPUT_TONES);
+	abe_mute_gain(MIXVXREC, MIX_VXREC_INPUT_VX_DL);
+	abe_mute_gain(MIXVXREC, MIX_VXREC_INPUT_MM_DL);
+	abe_mute_gain(MIXVXREC, MIX_VXREC_INPUT_VX_UL);
+
+	pm_runtime_put_sync(&pdev->dev);
+
 	if (pdata->get_context_loss_count)
 		abe->loss_count = pdata->get_context_loss_count(dev);
 
@@ -1892,6 +1911,18 @@ static int aess_resume(struct device *dev)
 
 	if (loss_count != abe->loss_count)
 		abe_reload_fw();
+
+	/* TODO: Find a better way to save/retore gains after dor OFF mode */
+	abe_unmute_gain(MIXSDT, MIX_SDT_INPUT_UP_MIXER);
+	abe_unmute_gain(MIXSDT, MIX_SDT_INPUT_DL1_MIXER);
+	abe_unmute_gain(MIXAUDUL, MIX_AUDUL_INPUT_MM_DL);
+	abe_unmute_gain(MIXAUDUL, MIX_AUDUL_INPUT_TONES);
+	abe_unmute_gain(MIXAUDUL, MIX_AUDUL_INPUT_UPLINK);
+	abe_unmute_gain(MIXAUDUL, MIX_AUDUL_INPUT_VX_DL);
+	abe_unmute_gain(MIXVXREC, MIX_VXREC_INPUT_TONES);
+	abe_unmute_gain(MIXVXREC, MIX_VXREC_INPUT_VX_DL);
+	abe_unmute_gain(MIXVXREC, MIX_VXREC_INPUT_MM_DL);
+	abe_unmute_gain(MIXVXREC, MIX_VXREC_INPUT_VX_UL);
 
 	pm_runtime_put_sync(&pdev->dev);
 
