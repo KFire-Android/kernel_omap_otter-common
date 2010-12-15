@@ -682,6 +682,7 @@ static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
 
 		if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
+			MCBSP_WRITE(mcbsp, WAKEUPEN, XRDYEN | RRDYEN);
 			omap_hwmod_enable_wakeup(mcbsp->oh[0]);
 			omap_hwmod_set_slave_idlemode(mcbsp->oh[0],
 						HWMOD_IDLEMODE_SMART);
