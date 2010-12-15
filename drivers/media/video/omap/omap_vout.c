@@ -1064,10 +1064,16 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 
 			/* no need to call sync as work is scheduled on sync */
 
-			if (dev->driver->update)
-				dev->driver->update(dev, 0, 0,
+			/* schedule update if supported to avoid delay */
+			if (dev->driver->sched_update)
+				dev->driver->sched_update(dev, 0, 0,
 					dev->panel.timings.x_res,
 					dev->panel.timings.y_res);
+			else if (dev->driver->update)
+				if (dev->driver->update)
+					dev->driver->update(dev, 0, 0,
+						dev->panel.timings.x_res,
+						dev->panel.timings.y_res);
 		}
 #endif
 	}
