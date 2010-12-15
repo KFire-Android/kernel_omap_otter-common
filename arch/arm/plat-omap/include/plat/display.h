@@ -359,6 +359,7 @@ enum omap_dsi_index {
 };
 void dsi_bus_lock(enum omap_dsi_index ix);
 void dsi_bus_unlock(enum omap_dsi_index ix);
+bool dsi_bus_is_locked(enum omap_dsi_index ix);
 int dsi_vc_dcs_write(enum omap_dsi_index ix, int channel,
 		u8 *data, int len);
 int dsi_vc_dcs_write_0(enum omap_dsi_index ix, int channel,
@@ -602,6 +603,14 @@ struct s3d_disp_info {
 	unsigned int gap;
 };
 
+/* info for delayed update */
+struct omap_dss_sched_update {
+	u16 x, y, w, h;		/* update window */
+	struct work_struct work;
+	bool scheduled;		/* scheduled */
+	bool waiting;		/* waiting to update */
+};
+
 struct omap_dss_device {
 	struct device dev;
 
@@ -693,6 +702,9 @@ struct omap_dss_device {
 
 	struct blocking_notifier_head notifier;
 
+	/* support for scheduling subsequent update */
+	struct omap_dss_sched_update sched_update;
+
 	/* platform specific  */
 	int (*platform_enable)(struct omap_dss_device *dssdev);
 	void (*platform_disable)(struct omap_dss_device *dssdev);
@@ -718,6 +730,8 @@ struct omap_dss_driver {
 			struct omap_dss_device *dssdev);
 
 	int (*update)(struct omap_dss_device *dssdev,
+			       u16 x, u16 y, u16 w, u16 h);
+	int (*sched_update)(struct omap_dss_device *dssdev,
 			       u16 x, u16 y, u16 w, u16 h);
 	int (*sync)(struct omap_dss_device *dssdev);
 
@@ -846,6 +860,8 @@ void omapdss_dsi_vc_enable_hs(enum omap_dsi_index ix, int channel,
 	bool enable);
 int omapdss_dsi_enable_te(struct omap_dss_device *dssdev, bool enable);
 
+int omap_dsi_sched_update_lock(struct omap_dss_device *dssdev,
+					u16 x, u16 y, u16 w, u16 h);
 int omap_dsi_prepare_update(struct omap_dss_device *dssdev,
 				    u16 *x, u16 *y, u16 *w, u16 *h,
 				    bool enlarge_update_area);

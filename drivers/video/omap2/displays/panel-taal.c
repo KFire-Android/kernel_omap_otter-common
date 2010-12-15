@@ -1153,7 +1153,7 @@ static irqreturn_t taal_te_isr2(int irq, void *data)
         struct taal_data *td = dev_get_drvdata(&dssdev->dev);
         int old;
         int r;
-        
+
         old = atomic_cmpxchg(&td->do_update, 1, 0);
 
         if (old) {
@@ -1191,7 +1191,7 @@ static void taal_te_timeout_work_callback(struct work_struct *work)
 	dsi_bus_unlock(ix);
 }
 
-static int taal_update(struct omap_dss_device *dssdev,
+static int taal_update_locked(struct omap_dss_device *dssdev,
 				    u16 x, u16 y, u16 w, u16 h)
 {
 	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
@@ -1201,11 +1201,6 @@ static int taal_update(struct omap_dss_device *dssdev,
 
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
-	dev_dbg(&dssdev->dev, "update %d, %d, %d x %d\n", x, y, w, h);
-
-	mutex_lock(&td->lock);
-	dsi_bus_lock(ix);
-
 	if (!td->enabled) {
 		r = 0;
 		goto err;
@@ -1213,6 +1208,7 @@ static int taal_update(struct omap_dss_device *dssdev,
 
 	r = omap_dsi_prepare_update(dssdev, &x, &y, &w, &h, true);
 	if (r)
+
 		goto err;
 
 	r = taal_set_update_window(ix, x, y, w, h);
@@ -1245,6 +1241,45 @@ static int taal_update(struct omap_dss_device *dssdev,
 	return 0;
 err:
 	dsi_bus_unlock(ix);
+	mutex_unlock(&td->lock);
+	return r;
+}
+
+static int taal_update(struct omap_dss_device *dssdev,
+				    u16 x, u16 y, u16 w, u16 h)
+{
+	enum omap_dsi_index ix;
+	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+
+	dev_dbg(&dssdev->dev, "update %d, %d, %d x %d\n", x, y, w, h);
+	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
+
+	mutex_lock(&td->lock);
+
+	/* mark while waiting on bus so delayed update will not call update */
+	dssdev->sched_update.waiting = true;
+	dsi_bus_lock(ix);
+	dssdev->sched_update.waiting = false;
+
+	return taal_update_locked(dssdev, x, y, w, h);
+}
+
+static int taal_sched_update(struct omap_dss_device *dssdev,
+					u16 x, u16 y, u16 w, u16 h)
+{
+	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
+	int r;
+
+	mutex_lock(&td->lock);
+	/* this locks dsi bus if it can and returns 0 */
+	r = omap_dsi_sched_update_lock(dssdev, x, y, w, h);
+
+	if (!r)
+		/* start the update now */
+		return taal_update_locked(dssdev, x, y, w, h);
+
+	if (r == -EBUSY)
+		r = 0;
 	mutex_unlock(&td->lock);
 	return r;
 }
@@ -1651,6 +1686,7 @@ static struct omap_dss_driver taal_driver = {
 	.get_update_mode = taal_get_update_mode,
 
 	.update		= taal_update,
+	.sched_update	= taal_sched_update,
 	.sync		= taal_sync,
 
 	.get_resolution	= taal_get_resolution,

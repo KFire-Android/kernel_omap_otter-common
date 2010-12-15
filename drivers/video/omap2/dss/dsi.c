@@ -270,6 +270,7 @@ static struct dsi_struct
 	bool te_enabled;
 
 	struct workqueue_struct *workqueue;
+	struct workqueue_struct *update_queue;
 
 	void (*framedone_callback)(int, void *);
 	void *framedone_data;
@@ -355,13 +356,14 @@ void dsi_bus_unlock(enum omap_dsi_index ix)
 }
 EXPORT_SYMBOL(dsi_bus_unlock);
 
-static bool dsi_bus_is_locked(enum omap_dsi_index ix)
+bool dsi_bus_is_locked(enum omap_dsi_index ix)
 {
 	if (ix == DSI1)
 		return dsi1.bus_lock.count == 0;
 	else
 		return dsi2.bus_lock.count == 0;
 }
+EXPORT_SYMBOL(dsi_bus_is_locked);
 
 static inline int wait_for_bit_change(enum omap_dsi_index ix,
 	const struct dsi_reg idx, int bitnum,
@@ -3352,6 +3354,55 @@ static void dsi2_framedone_irq_callback(void *data, u32 mask)
 	}
 }
 
+static void omap_dsi_delayed_update(struct work_struct *work)
+{
+	struct omap_dss_device *dssdev;
+	struct omap_dss_sched_update *nu;
+
+	dssdev = container_of(work, typeof(*dssdev), sched_update.work);
+	nu = &dssdev->sched_update;
+
+	/* only update if no update is pending */
+
+	/* waiting is updated only from update, so no need for locking */
+	if (!dssdev->sched_update.waiting)
+		dssdev->driver->update(dssdev, nu->x, nu->y, nu->w, nu->h);
+}
+
+int omap_dsi_sched_update_lock(struct omap_dss_device *dssdev,
+						u16 x, u16 y, u16 w, u16 h)
+{
+	/* this method must be called within a locked section */
+	enum omap_dsi_index ix;
+	struct dsi_struct *p_dsi;
+
+	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
+	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
+
+	/* if update is in progress schedule another update */
+	if (dsi_bus_is_locked(ix)) {
+		struct omap_dss_sched_update *nu = &dssdev->sched_update;
+		/* using nu->scheduled as it gets updated within same locks */
+		if (nu->scheduled) {
+			/* update next update region */
+			nu->w = max(x + w, nu->x + nu->w) - min(x, nu->x);
+			nu->x = min(x, nu->x);
+			nu->h = max(y + h, nu->y + nu->h) - min(x, nu->x);
+			nu->y = min(y, nu->y);
+		} else {
+			INIT_WORK(&nu->work, omap_dsi_delayed_update);
+			queue_work(p_dsi->update_queue, &nu->work);
+			nu->scheduled = true;
+			nu->x = x;
+			nu->y = y;
+			nu->w = w;
+			nu->h = h;
+		}
+		return -EBUSY;
+	}
+	dsi_bus_lock(ix);
+	return 0;
+}
 
 int omap_dsi_prepare_update(struct omap_dss_device *dssdev,
 					u16 *x, u16 *y, u16 *w, u16 *h,
@@ -3404,6 +3455,7 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
 	p_dsi->update_channel = channel;
+	dssdev->sched_update.scheduled = false;
 
 	/* OMAP DSS cannot send updates of odd widths.
 	 * omap_dsi_prepare_update() makes the widths even, but add a BUG_ON
@@ -3928,6 +3980,12 @@ int dsi_init(struct platform_device *pdev)
 	if (dsi1.workqueue == NULL)
 		return -ENOMEM;
 
+	dsi1.update_queue = create_singlethread_workqueue("dsi_upd");
+	if (dsi1.update_queue == NULL) {
+		r = -ENOMEM;
+		goto err1;
+	}
+
 	INIT_DELAYED_WORK_DEFERRABLE(&dsi1.framedone_timeout_work,
 			dsi_framedone_timeout_work_callback);
 
@@ -3980,6 +4038,7 @@ err2:
 	iounmap(dsi1.base);
 	if (cpu_is_omap44xx())
 		free_irq(OMAP44XX_IRQ_DSS_DSI1, (void *)0);
+	destroy_workqueue(dsi1.update_queue);
 err1:
 	destroy_workqueue(dsi1.workqueue);
 	return r;
@@ -4010,6 +4069,12 @@ int dsi2_init(struct platform_device *pdev)
 	dsi2.workqueue = create_singlethread_workqueue("dsi2");
 	if (dsi2.workqueue == NULL)
 		return -ENOMEM;
+
+	dsi2.update_queue = create_singlethread_workqueue("dsi2_upd");
+	if (dsi2.update_queue == NULL) {
+		r = -ENOMEM;
+		goto err1;
+	}
 
 	INIT_DELAYED_WORK_DEFERRABLE(&dsi2.framedone_timeout_work,
 			dsi2_framedone_timeout_work_callback);
@@ -4052,6 +4117,7 @@ int dsi2_init(struct platform_device *pdev)
 err2:
 	iounmap(dsi2.base);
 	free_irq(OMAP44XX_IRQ_DSS_DSI2, (void *)0);
+	destroy_workqueue(dsi2.update_queue);
 err1:
 	destroy_workqueue(dsi2.workqueue);
 	return r;
