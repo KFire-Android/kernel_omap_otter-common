@@ -80,9 +80,18 @@ module_param_named(debug, dss_debug, bool, 0644);
 /* CONTEXT */
 static int dss_get_ctx_id(void)
 {
-	struct omap_dss_board_info *pdata = core.pdata;
+	struct omap_dss_board_info *pdata = core.pdev->dev.platform_data;
 	int r;
 
+#ifdef CONFIG_ARCH_OMAP3
+	/*
+	 * FixMe
+	 * pdata->get_last_off_on_transaction_id should be NULL, but is
+	 * being corrupted and is 0x00737364 (string "dss") at this point.
+	 * Until that is fixed, we just get out of here.
+	 */
+	return 0;
+#endif
 	if (!pdata->get_last_off_on_transaction_id)
 		return 0;
 	r = pdata->get_last_off_on_transaction_id(&core.pdev->dev);
@@ -334,8 +343,14 @@ void dss_clk_enable(enum dss_clock clks)
 
 	dss_clk_enable_no_ctx(clks);
 
+#if 0
+	/*
+	 * FixMe
+	 * See the note in dss_clk_disable().
+	 */
 	if (check_ctx && cpu_is_omap34xx() && dss_need_ctx_restore())
 		restore_all_ctx();
+#endif
 }
 
 int dss_opt_clock_enable()
@@ -389,8 +404,20 @@ void dss_clk_disable(enum dss_clock clks)
 
 		BUG_ON(core.num_clks_enabled < num_clks);
 
+#if 0
+		/*
+		 * FixMe
+		 * There is a yet unresolved catch-22 here.  During
+		 * initialization, this routine is called dss_init().  At that
+		 * time, the context can not be saved as the dispc memory used
+		 * to store the context is not not yet allocated.  That is
+		 * allocated later by dispc_init().  But we can't call
+		 * dispc_init() first as it needs to use core.pdev and that is
+		 * initialized by dss_init.  This'll need to be fixed for PM.
+		 */
 		if (core.num_clks_enabled == num_clks)
 			save_all_ctx();
+#endif
 	}
 
 	dss_clk_disable_no_ctx(clks);
@@ -857,16 +884,6 @@ static int omap_dsshw_remove(struct platform_device *pdev)
 static int omap_dispchw_probe(struct platform_device *pdev)
 {
 	int r;
-	struct omap_display_platform_data *dispdata;
-
-	core.pdev = pdev;
-	/*
-	 * Rather than receiving struct omap_dss_board_info directly in
-	 * platform_data, this function receives it within
-	 * struct omap_display_platform_data.  See omap_display_init().
-	 */
-	dispdata = pdev->dev.platform_data;
-	core.pdata = dispdata->board_data;
 
 	r = dispc_init(pdev);
 	if (r) {
@@ -1309,8 +1326,8 @@ static int __init omap_dss_init(void)
 
 static int __init omap_dss_init2(void)
 {
-	platform_driver_register(&omap_dispchw_driver);
 	platform_driver_register(&omap_dsshw_driver);
+	platform_driver_register(&omap_dispchw_driver);
 	platform_driver_register(&omap_dsihw_driver);
 	platform_driver_register(&omap_dsi2hw_driver);
 #ifdef CONFIG_OMAP2_DSS_HDMI
