@@ -1702,13 +1702,6 @@ EXPORT_SYMBOL(abe_write_mixer);
  * @p: list of port corresponding to the above gains
  *
  */
-/**
- * abe_read_gain
- * @id: name of the mixer
- * @param: list of input gains of the mixer
- * @p: list of port corresponding to the above gains
- *
- */
 abehal_status abe_read_gain(u32 id, u32 *f_g, u32 p)
 {
 	u32 mixer_target, mixer_offset, i;
@@ -1720,17 +1713,24 @@ abehal_status abe_read_gain(u32 id, u32 *f_g, u32 p)
 	mixer_target += p;
 	/* translate coef address in Bytes */
 	mixer_target <<= 2;
-	/* load the S_G_Target SMEM table */
-	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_SMEM, mixer_target,
-		       (u32 *) f_g, sizeof(*f_g));
-	for (i = 0; i < sizeof_db2lin_table; i++) {
-		if (abe_db2lin_table[i] == *f_g)
-			goto found;
+
+	if (!abe_muted_gains_indicator[mixer_offset + p]) {
+		/* load the S_G_Target SMEM table */
+		abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_SMEM, mixer_target,
+			       (u32 *) f_g, sizeof(*f_g));
+		for (i = 0; i < sizeof_db2lin_table; i++) {
+				if (abe_db2lin_table[i] == *f_g)
+				goto found;
+		}
+		*f_g = 0;
+		return -1;
+	      found:
+		*f_g = (i * 100) + min_mdb;
+	} else {
+		/* update muted gain with new value */
+		*f_g = abe_muted_gains_decibel[mixer_offset + p];
 	}
-	*f_g = 0;
-	return -1;
-      found:
-	*f_g = (i * 100) + min_mdb;
+
 	return 0;
 }
 EXPORT_SYMBOL(abe_read_gain);
