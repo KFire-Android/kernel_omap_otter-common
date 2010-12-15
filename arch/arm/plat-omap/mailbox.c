@@ -328,6 +328,10 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
 	mutex_lock(&mboxes_lock);
 
 	if (!--mbox->use_count) {
+		omap_mbox_disable_irq(mbox, IRQ_RX);
+		omap_mbox_disable_irq(mbox, IRQ_TX);
+		flush_work(&mbox->rxq->work);
+		flush_work(&mbox->txq->work);
 		mbox_queue_free(mbox->txq);
 		mbox_queue_free(mbox->rxq);
 	}
