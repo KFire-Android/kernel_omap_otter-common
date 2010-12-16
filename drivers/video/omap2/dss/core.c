@@ -339,8 +339,9 @@ static void dss_clk_enable_no_ctx(enum dss_clock clks)
 
 void dss_clk_enable(enum dss_clock clks)
 {
+#if 0
 	bool check_ctx = core.num_clks_enabled == 0;
-
+#endif
 	dss_clk_enable_no_ctx(clks);
 
 #if 0
