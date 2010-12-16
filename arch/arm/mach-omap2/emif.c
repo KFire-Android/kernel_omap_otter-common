@@ -676,7 +676,7 @@ static void setup_temperature_sensitive_regs(u32 emif_nr,
 
 static irqreturn_t handle_temp_alert(void __iomem *base, u32 emif_nr)
 {
-	u32 ret, old_temperature_level;
+	u32 old_temperature_level;
 	old_temperature_level = emif_temperature_level[emif_nr];
 	emif_temperature_level[emif_nr] = get_temperature_level(emif_nr);
 
