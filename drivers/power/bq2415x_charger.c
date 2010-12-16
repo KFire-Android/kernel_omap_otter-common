@@ -174,6 +174,14 @@ static int bq2415x_read_byte(struct bq2415x_device_info *di, u8 *value, u8 reg)
 	return bq2415x_read_block(di, value, reg, 1);
 }
 
+
+static void bq2415x_config_status_reg(struct bq2415x_device_info *di)
+{
+	di->status_reg = (TIMER_RST | ENABLE_STAT_PIN);
+	bq2415x_write_byte(di, di->status_reg, REG_STATUS_CONTROL);
+	return;
+}
+
 static int bq2415x_charger_event(struct notifier_block *nb, unsigned long event,
 				void *_data)
 {
@@ -210,14 +218,14 @@ static int bq2415x_charger_event(struct notifier_block *nb, unsigned long event,
 		di->active = 0;
 	}
 
+	if (event & BQ2415x_RESET_TIMER) {
+		/* reset 32 second timer */
+		bq2415x_config_status_reg(di);
+	}
+
 	return ret;
 }
-static void bq2415x_config_status_reg(struct bq2415x_device_info *di)
-{
-	di->status_reg = (TIMER_RST | ENABLE_STAT_PIN);
-	bq2415x_write_byte(di, di->status_reg, REG_STATUS_CONTROL);
-	return;
-}
+
 
 static void bq2415x_config_control_reg(struct bq2415x_device_info *di)
 {
@@ -340,6 +348,7 @@ bq2415x_charger_update_status(struct bq2415x_device_info *di)
 
 	timer_fault = 0;
 	bq2415x_read_block(di, &read_reg[0], 0, 7);
+
 
 	if ((read_reg[0] & 0x30) == 0x20)
 		dev_dbg(di->dev, "CHARGE DONE\n");

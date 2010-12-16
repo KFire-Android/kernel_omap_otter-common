@@ -31,6 +31,11 @@
 #define BQ2415x_FAULT_TIMER		0x36
 #define BQ2415x_FAULT_NO_BATTERY	0x37
 
+/* not a bq generated event,we use this to reset the
+ * the timer from the twl driver.
+ */
+#define BQ2415x_RESET_TIMER		0x38
+
 struct bq2415x_platform_data {
 	int max_charger_currentmA;
 	int max_charger_voltagemV;

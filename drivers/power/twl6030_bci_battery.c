@@ -26,6 +26,7 @@
 #include <linux/power_supply.h>
 #include <linux/i2c/twl6030-gpadc.h>
 #include <linux/i2c/bq2415x.h>
+#include <linux/wakelock.h>
 
 #define CONTROLLER_INT_MASK	0x00
 #define CONTROLLER_CTRL1	0x01
@@ -200,6 +201,8 @@
 
 /* Ptr to thermistor table */
 static const unsigned int fuelgauge_rate[4] = {4, 16, 64, 256};
+static struct wake_lock chrg_lock;
+
 
 struct twl6030_bci_device_info {
 	struct device		*dev;
@@ -241,6 +244,8 @@ struct twl6030_bci_device_info {
 	unsigned int		termination_currentmA;
 	unsigned int		capacity;
 	unsigned int		capacity_debounce_count;
+	unsigned int		ac_last_refresh;
+	unsigned int		wakelock_enabled;
 
 	struct power_supply	bat;
 	struct power_supply	usb;
@@ -250,6 +255,7 @@ struct twl6030_bci_device_info {
 	struct delayed_work	twl6030_current_avg_work;
 };
 static struct blocking_notifier_head notifier_list;
+extern u32 wakeup_timer_seconds;
 
 static void twl6030_config_min_vbus_reg(struct twl6030_bci_device_info *di,
 						unsigned int value)
@@ -362,12 +368,48 @@ static void twl6030_config_limit2_reg(struct twl6030_bci_device_info *di,
 	return;
 }
 
+/*
+ * Return channel value
+ * Or < 0 on failure.
+ */
+static int twl6030_get_gpadc_conversion(int channel_no)
+{
+	struct twl6030_gpadc_request req;
+	int temp = 0;
+	int ret;
+
+	req.channels = (1 << channel_no);
+	req.method = TWL6030_GPADC_SW2;
+	req.active = 0;
+	req.func_cb = NULL;
+	ret = twl6030_gpadc_conversion(&req);
+	if (ret < 0)
+		return ret;
+
+	if (req.rbuf[channel_no] > 0)
+		temp = req.rbuf[channel_no];
+
+	return temp;
+}
+
+static int is_battery_present(void)
+{
+	int val;
+	/*
+	 * Prevent charging on batteries were id resistor is
+	 * less than 5K.
+	 */
+	val = twl6030_get_gpadc_conversion(0);
+	if (val < 5000)
+		return 0;
+	return 1;
+}
+
 static void twl6030_stop_usb_charger(struct twl6030_bci_device_info *di)
 {
 	di->charger_source = 0;
 	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 0, CONTROLLER_CTRL1);
-	di->capacity = -1;
 }
 
 static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
@@ -387,18 +429,28 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 static void twl6030_stop_ac_charger(struct twl6030_bci_device_info *di)
 {
 	long int events;
+
+	if (!is_battery_present()) {
+		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
+		return;
+	}
 	di->charger_source = 0;
 	di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
 	events = BQ2415x_STOP_CHARGING;
-	di->capacity = -1;
 	blocking_notifier_call_chain(&notifier_list, events, NULL);
 	twl_i2c_write_u8(TWL6030_MODULE_CHARGER, 0, CONTROLLER_CTRL1);
+	if (di->wakelock_enabled)
+		wake_unlock(&chrg_lock);
 }
 
 static void twl6030_start_ac_charger(struct twl6030_bci_device_info *di)
 {
 	long int events;
 
+	if (!is_battery_present()) {
+		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
+		return;
+	}
 	dev_dbg(di->dev, "AC charger detected\n");
 	di->charger_source = POWER_SUPPLY_TYPE_MAINS;
 	di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
@@ -408,6 +460,9 @@ static void twl6030_start_ac_charger(struct twl6030_bci_device_info *di)
 			CONTROLLER_CTRL1_EN_CHARGER |
 			CONTROLLER_CTRL1_SEL_CHARGER,
 			CONTROLLER_CTRL1);
+
+	if (di->wakelock_enabled)
+		wake_lock(&chrg_lock);
 }
 
 static void twl6030_stop_charger(struct twl6030_bci_device_info *di)
@@ -626,30 +681,6 @@ static void twl6030battery_current(struct twl6030_bci_device_info *di)
 }
 
 /*
- * Return channel value
- * Or < 0 on failure.
- */
-static int twl6030_get_gpadc_conversion(int channel_no)
-{
-	struct twl6030_gpadc_request req;
-	int temp = 0;
-	int ret;
-
-	req.channels = (1 << channel_no);
-	req.method = TWL6030_GPADC_SW2;
-	req.active = 0;
-	req.func_cb = NULL;
-	ret = twl6030_gpadc_conversion(&req);
-	if (ret < 0)
-		return ret;
-
-	if (req.rbuf[channel_no] > 0)
-		temp = req.rbuf[channel_no];
-
-	return temp;
-}
-
-/*
  * Setup the twl6030 BCI module to enable backup
  * battery charging.
  */
@@ -787,14 +818,42 @@ static void twl6030_current_avg(struct work_struct *work)
 
 static int capacity_changed(struct twl6030_bci_device_info *di)
 {
-		int curr_capacity = 0;
-		/* Because system load is always grater than
-		 * termination current, we will never get a CHARGE DONE
-		 * int from BQ. And charging will alwys be in progress.
-		 * We consider Vbat>3900 to be a full battery.
-		 * Since Voltage meassured during charging is Voreg ~4.2v,
-		 * we dont update capacity if we are charging.
-		 */
+	int curr_capacity = di->capacity;
+	int charger_source = di->charger_source;
+	int charging_disabled = 0;
+	unsigned int time_delta = 0;
+
+	/* Because system load is always greater than
+	 * termination current, we will never get a CHARGE DONE
+	 * int from BQ. And charging will alwys be in progress.
+	 * We consider Vbat>3900 to be a full battery.
+	 * Since Voltage measured during charging is Voreg ~4.2v,
+	 * we dont update capacity if we are charging.
+	 */
+
+	/* if it has been more than 10 minutes since our last update
+	 * and we are charging we force a update.
+	 */
+	time_delta = jiffies_to_msecs(jiffies - di->ac_last_refresh);
+
+	if ((time_delta > (1000 * 60 * 10))
+		&& (di->charger_source != POWER_SUPPLY_TYPE_BATTERY)) {
+
+		charging_disabled = 1;
+		di->ac_last_refresh = jiffies;
+		di->capacity = -1;
+		/* We have to disable charging to read correct voltages.*/
+		twl6030_stop_charger(di);
+		/*voltage setteling time*/
+		msleep(200);
+		di->voltage_uV = twl6030_get_gpadc_conversion(7);
+
+	}
+
+	/* Setting the capacity level only makes sense when on
+	 * the battery is powering the board.
+	 */
+	if (di->charge_status == POWER_SUPPLY_STATUS_DISCHARGING) {
 		if (di->voltage_uV < 3500)
 			curr_capacity = 5;
 		else if (di->voltage_uV < 3600 && di->voltage_uV >= 3500)
@@ -806,26 +865,36 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 		else if (di->voltage_uV < 3900 && di->voltage_uV >= 3800)
 			curr_capacity = 90;
 		else if (di->voltage_uV >= 3900) {
-			if (di->charge_status == POWER_SUPPLY_STATUS_CHARGING) {
-				curr_capacity = 90;
-				/* fake the debounce count. */
-				di->capacity_debounce_count = 4;
-			} else {
 				curr_capacity = 100;
-			}
 		}
+	}
 
-		/* Debouncing of voltage change. */
-		if (curr_capacity != di->capacity)
-			di->capacity_debounce_count++;
-		else
-			di->capacity_debounce_count = 0;
+	/* if we disabled charging to check capacity,
+	 * enable it again after we read the
+	 * correct voltage.
+	 */
+	if (charging_disabled) {
+		if (charger_source == POWER_SUPPLY_TYPE_MAINS)
+			twl6030_start_ac_charger(di);
+		else if (charger_source == POWER_SUPPLY_TYPE_USB)
+			twl6030_start_usb_charger(di);
+	}
 
-		if ((di->capacity_debounce_count >= 4)
-			|| (di->capacity == -1)) {
-			di->capacity = curr_capacity;
-			return 1;
-		}
+
+	/* Debouncing of voltage change. */
+	if (curr_capacity != di->capacity)
+		di->capacity_debounce_count++;
+	else
+		di->capacity_debounce_count = 0;
+
+	if ((di->capacity_debounce_count >= 4)
+		|| (di->capacity == -1)) {
+		di->capacity = curr_capacity;
+		di->capacity_debounce_count = 0;
+		return 1;
+	}
+
+
 	return 0;
 
 }
@@ -1358,6 +1427,35 @@ static ssize_t show_current_avg_interval(struct device *dev,
 	return sprintf(buf, "%u\n", val);
 }
 
+static ssize_t set_wakelock_enable(struct device *dev,
+	  struct device_attribute *attr, const char *buf, size_t count)
+{
+	long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	if ((strict_strtol(buf, 10, &val) < 0) || (val < 0) || (val > 1))
+		return -EINVAL;
+
+	if ((val) && (di->charger_source == POWER_SUPPLY_TYPE_MAINS))
+		wake_lock(&chrg_lock);
+	else
+		wake_unlock(&chrg_lock);
+
+	di->wakelock_enabled = val;
+	return status;
+}
+
+static ssize_t show_wakelock_enable(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	unsigned int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->wakelock_enabled;
+	return sprintf(buf, "%u\n", val);
+}
+
 static ssize_t set_monitoring_interval(struct device *dev,
 	  struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -1447,6 +1545,8 @@ static DEVICE_ATTR(monitoring_interval, S_IWUSR | S_IRUGO,
 		show_monitoring_interval, set_monitoring_interval);
 static DEVICE_ATTR(current_avg_interval, S_IWUSR | S_IRUGO,
 		show_current_avg_interval, set_current_avg_interval);
+static DEVICE_ATTR(wakelock_enable, S_IWUSR | S_IRUGO,
+		show_wakelock_enable, set_wakelock_enable);
 static DEVICE_ATTR(bsi, S_IRUGO, show_bsi, NULL);
 static DEVICE_ATTR(stat1, S_IRUGO, show_stat1, NULL);
 static DEVICE_ATTR(status_int1, S_IRUGO, show_status_int1, NULL);
@@ -1475,6 +1575,7 @@ static struct attribute *twl6030_bci_attributes[] = {
 	&dev_attr_stat1.attr,
 	&dev_attr_status_int1.attr,
 	&dev_attr_status_int2.attr,
+	&dev_attr_wakelock_enable.attr,
 	NULL,
 };
 
@@ -1552,10 +1653,12 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->bk_bat.get_property = twl6030_bk_bci_battery_get_property;
 
 	di->vac_priority = 2;
-	di->capacity = -1;
+	di->capacity = 100;
 	di->capacity_debounce_count = 0;
+	di->ac_last_refresh = jiffies;
 	platform_set_drvdata(pdev, di);
 
+	wake_lock_init(&chrg_lock, WAKE_LOCK_SUSPEND, "ac_chrg_wake_lock");
 	/* settings for temperature sensing */
 	ret = twl6030battery_temp_setup();
 	if (ret)
@@ -1685,6 +1788,7 @@ chg_irq_fail:
 	irq = platform_get_irq(pdev, 1);
 	free_irq(irq, di);
 temp_setup_fail:
+	wake_lock_destroy(&chrg_lock);
 	platform_set_drvdata(pdev, NULL);
 err_pdata:
 	kfree(di);
@@ -1720,6 +1824,7 @@ static int __devexit twl6030_bci_battery_remove(struct platform_device *pdev)
 	power_supply_unregister(&di->usb);
 	power_supply_unregister(&di->ac);
 	power_supply_unregister(&di->bk_bat);
+	wake_lock_destroy(&chrg_lock);
 	platform_set_drvdata(pdev, NULL);
 	kfree(di);
 
@@ -1731,6 +1836,7 @@ static int twl6030_bci_battery_suspend(struct platform_device *pdev,
 	pm_message_t state)
 {
 	struct twl6030_bci_device_info *di = platform_get_drvdata(pdev);
+	long int events;
 	u8 rd_reg;
 
 	/* mask to prevent wakeup due to 32s timeout from External charger */
@@ -1741,12 +1847,26 @@ static int twl6030_bci_battery_suspend(struct platform_device *pdev,
 
 	cancel_delayed_work(&di->twl6030_bci_monitor_work);
 	cancel_delayed_work(&di->twl6030_current_avg_work);
+
+	/* We cannot tolarate a sleep longer than 30 seconds
+	 * while on ac charging we have to reset the BQ watchdog timer.
+	 */
+	if ((di->charger_source == POWER_SUPPLY_TYPE_MAINS) &&
+		((wakeup_timer_seconds > 25) || !wakeup_timer_seconds)) {
+		wakeup_timer_seconds = 25;
+	}
+
+	/*reset the BQ watch dog*/
+	events = BQ2415x_RESET_TIMER;
+	blocking_notifier_call_chain(&notifier_list, events, NULL);
+
 	return 0;
 }
 
 static int twl6030_bci_battery_resume(struct platform_device *pdev)
 {
 	struct twl6030_bci_device_info *di = platform_get_drvdata(pdev);
+	long int events;
 	u8 rd_reg;
 
 	twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg, CONTROLLER_INT_MASK);
@@ -1756,6 +1876,10 @@ static int twl6030_bci_battery_resume(struct platform_device *pdev)
 
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
 	schedule_delayed_work(&di->twl6030_current_avg_work, 50);
+
+	events = BQ2415x_RESET_TIMER;
+	blocking_notifier_call_chain(&notifier_list, events, NULL);
+
 	return 0;
 }
 #else
