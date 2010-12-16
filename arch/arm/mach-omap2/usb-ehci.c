@@ -2549,4 +2549,8 @@ void __init usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata)
 {
 }
 
+void usbhs_wakeup()
+{
+}
+
 #endif
