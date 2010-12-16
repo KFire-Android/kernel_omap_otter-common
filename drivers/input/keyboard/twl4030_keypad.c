@@ -367,8 +367,8 @@ static int __devinit twl4030_kp_probe(struct platform_device *pdev)
 
 	input_set_capability(input, EV_MSC, MSC_SCAN);
 
-	input->name		= "TWL4030 Keypad";
-	input->phys		= "twl4030_keypad/input0";
+	input->name		= "twl4030-keypad";
+	input->phys		= "twl4030-keypad/input0";
 	input->dev.parent	= &pdev->dev;
 
 	input->id.bustype	= BUS_HOST;
