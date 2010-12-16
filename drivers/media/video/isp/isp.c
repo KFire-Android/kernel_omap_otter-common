@@ -1609,7 +1609,7 @@ static int isp_try_pipeline(struct device *dev,
 			pipe->modules = OMAP_ISP_PREVIEW |
 					OMAP_ISP_RESIZER |
 					OMAP_ISP_CCDC;
-			if (isp->revision <= ISP_REVISION_2_0) {
+			if (isp->revision <= ISP_REVISION_RAPXXX) {
 				pipe->prv.out.path = PREVIEW_MEM;
 				pipe->rsz.in.path = RSZ_MEM_YUV;
 			} else {
@@ -2100,7 +2100,7 @@ int isp_vbq_setup(struct device *dev, struct videobuf_queue *vbq,
 	struct isp_device *isp = dev_get_drvdata(dev);
 
 	if (CCDC_PREV_RESZ_CAPTURE(isp) &&
-		isp->revision <= ISP_REVISION_2_0)
+		isp->revision <= ISP_REVISION_RAPXXX)
 		return isp_tmp_buf_alloc(dev, &isp->pipeline);
 
 	return 0;
@@ -2864,7 +2864,7 @@ int isp_put(void)
 	if (isp->ref_count) {
 		if (--isp->ref_count == 0) {
 			isp_save_ctx(&pdev->dev);
-			if (isp->revision <= ISP_REVISION_2_0)
+			if (isp->revision <= ISP_REVISION_RAPXXX)
 				isp_tmp_buf_free(&pdev->dev);
 			isp_release_resources(&pdev->dev);
 			isp_disable_clocks(&pdev->dev);
