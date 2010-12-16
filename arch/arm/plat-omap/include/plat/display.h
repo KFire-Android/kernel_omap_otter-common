@@ -809,6 +809,12 @@ void omap_dss_remove_notify(struct omap_dss_device *dssdev, struct notifier_bloc
 
 int omap_dss_get_num_overlay_managers(void);
 struct omap_overlay_manager *omap_dss_get_overlay_manager(int num);
+bool dss_ovl_manually_updated(struct omap_overlay *ovl);
+static inline bool dssdev_manually_updated(struct omap_dss_device *dev)
+{
+	return dev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
+		dev->driver->get_update_mode(dev) != OMAP_DSS_UPDATE_AUTO;
+}
 
 int omap_dss_get_num_overlays(void);
 struct omap_overlay *omap_dss_get_overlay(int num);

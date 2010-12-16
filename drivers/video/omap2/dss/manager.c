@@ -1401,10 +1401,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 
 		oc->enabled = true;
 
-		oc->manual_update =
-			dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
-			dssdev->driver->get_update_mode(dssdev) !=
-				OMAP_DSS_UPDATE_AUTO;
+		oc->manual_update = dssdev_manually_updated(dssdev);
 
 		++num_planes_enabled;
 	}
@@ -1443,10 +1440,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		mc->manual_upd_display =
 			dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE;
 
-		mc->manual_update =
-			dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
-			dssdev->driver->get_update_mode(dssdev) !=
-				OMAP_DSS_UPDATE_AUTO;
+		mc->manual_update = dssdev_manually_updated(dssdev);
 	}
 
 	/* XXX TODO: Try to get fifomerge working. The problem is that it
@@ -1625,9 +1619,7 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 
 		oc->channel = ovl->manager->id;
 
-		oc->manual_update =
-			dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
-			dssdev->driver->get_update_mode(dssdev) != OMAP_DSS_UPDATE_AUTO;
+		oc->manual_update = dssdev_manually_updated(dssdev);
 
 		wbc->enabled = true;
 		wbc->color_mode = wb->info.dss_mode;

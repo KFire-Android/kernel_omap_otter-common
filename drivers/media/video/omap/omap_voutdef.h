@@ -80,6 +80,13 @@ struct omap2video_device {
 	struct omap_overlay_manager *managers[MAX_MANAGERS];
 };
 
+/* manual update work */
+struct omap_vout_work {
+	struct omap_vout_device *vout;
+	struct work_struct work;
+	bool process;
+};
+
 /* per-device data structure */
 struct omap_vout_device {
 
@@ -164,7 +171,6 @@ struct omap_vout_device {
 	bool buf_empty;
 
 	/* workqueue for manual update */
-	struct work_struct	 work;
 	struct workqueue_struct *workqueue;
 };
 

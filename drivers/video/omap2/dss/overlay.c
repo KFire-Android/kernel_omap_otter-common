@@ -642,6 +642,17 @@ static int omap_dss_unset_manager(struct omap_overlay *ovl)
 	return 0;
 }
 
+bool dss_ovl_manually_updated(struct omap_overlay *ovl)
+{
+	struct omap_dss_device *dev;
+	if (!ovl->manager)
+		return false;
+	dev = ovl->manager->device;
+	if (!dev || !dev->driver)
+		return false;
+	return dssdev_manually_updated(dev);
+}
+
 int omap_dss_get_num_overlays(void)
 {
 	return num_overlays;
