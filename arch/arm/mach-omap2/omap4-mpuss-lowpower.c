@@ -638,6 +638,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 
 	switch (power_state) {
 	case PWRDM_POWER_ON:
+	case PWRDM_POWER_INACTIVE:
 		save_state = 0;
 		break;
 	case PWRDM_POWER_OFF:
@@ -680,6 +681,7 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 
 	switch (pwrdm_read_next_pwrst(mpuss_pd)) {
 	case PWRDM_POWER_ON:
+	case PWRDM_POWER_INACTIVE:
 		/* No need to save MPUSS context */
 		break;
 	case PWRDM_POWER_RET:
