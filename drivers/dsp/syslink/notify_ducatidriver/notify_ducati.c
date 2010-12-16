@@ -103,6 +103,8 @@ struct notify_ducatidrv_module {
 	struct notify_ducatidrv_object *driver_handles
 				[MULTIPROC_MAXPROCESSORS][NOTIFY_MAX_INTLINES];
 	/* Loader handle array. */
+	struct mutex dh_lock;
+	/* mutext for adding/removing driver handles safety */
 	atomic_t mbox2_ref_count;
 	/* Reference count for enabling/disabling ducati mailbox interrupt */
 	atomic_t mbox1_ref_count;
@@ -219,6 +221,7 @@ int notify_ducatidrv_setup(struct notify_ducatidrv_config *cfg)
 		goto error_exit;
 	}
 	mutex_init(notify_ducatidriver_state.gate_handle);
+	mutex_init(&notify_ducatidriver_state.dh_lock);
 
 	for (i = 0 ; i < MULTIPROC_MAXPROCESSORS; i++)
 		for (j = 0 ; j < NOTIFY_MAX_INTLINES; j++)
@@ -435,9 +438,6 @@ struct notify_ducatidrv_object *notify_ducatidrv_create(
 	memcpy(&(obj->params), (void *) params,
 				sizeof(struct notify_ducatidrv_params));
 	obj->num_events = notify_state.cfg.num_events;
-	/* Set the handle in the driverHandles array. */
-	notify_ducatidriver_state.driver_handles
-		[params->remote_proc_id][params->line_id] = obj;
 	/* Point to the generic drvHandle object from this specific
 	 * NotifyDriverShm object. */
 	obj->drv_handle = drv_handle;
@@ -534,6 +534,12 @@ struct notify_ducatidrv_object *notify_ducatidrv_create(
 #endif
 
 	drv_handle->is_init = NOTIFY_DRIVERINITSTATUS_DONE;
+
+	mutex_lock_killable(&notify_ducatidriver_state.dh_lock);
+	/* Set the handle in the driverHandles array. */
+	notify_ducatidriver_state.driver_handles
+		[params->remote_proc_id][params->line_id] = obj;
+	mutex_unlock(&notify_ducatidriver_state.dh_lock);
 	mutex_unlock(notify_ducatidriver_state.gate_handle);
 	return obj;
 
@@ -559,8 +565,6 @@ error_clean_and_exit:
 	if (drv_handle != NULL) {
 		/* Unregister driver from the Notify module*/
 		notify_unregister_driver(drv_handle);
-		notify_ducatidriver_state.driver_handles
-			[params->remote_proc_id][params->line_id] = NULL;
 		drv_handle = NULL;
 	}
 error_unlock_and_return:
@@ -600,6 +604,7 @@ int notify_ducatidrv_delete(struct notify_ducatidrv_object **handle_ptr)
 
 	obj = (struct notify_ducatidrv_object *)(*handle_ptr);
 	if (obj != NULL) {
+		mutex_lock_killable(&notify_ducatidriver_state.dh_lock);
 		if (obj->remote_proc_id) {
 			mbox = ducati_mbox;
 			mbx_cnt = &notify_ducatidriver_state.mbox2_ref_count;
@@ -633,9 +638,9 @@ int notify_ducatidrv_delete(struct notify_ducatidrv_object **handle_ptr)
 		notify_ducatidriver_state.driver_handles
 			[obj->params.remote_proc_id][obj->params.line_id] = \
 									NULL;
-
 		kfree(obj);
 		obj = NULL;
+		mutex_unlock(&notify_ducatidriver_state.dh_lock);
 	}
 
 exit:
@@ -1296,10 +1301,14 @@ static int notify_shmdrv_isr(struct notifier_block *nb, unsigned long val,
 {
 	/* Decode the msg to identify the processor that has sent the message */
 	u32 proc_id = (u32)ntfy_msg;
+	struct notify_ducatidrv_object *obj;
 
+	mutex_lock_killable(&notify_ducatidriver_state.dh_lock);
 	/* Call the corresponding prpc_id callback */
-	notify_shmdrv_isr_callback(notify_ducatidriver_state.driver_handles
-		[proc_id][0], ntfy_msg);
+	obj = notify_ducatidriver_state.driver_handles[proc_id][0];
+	if (obj)
+		notify_shmdrv_isr_callback(obj, ntfy_msg);
+	mutex_unlock(&notify_ducatidriver_state.dh_lock);
 
 	return 0;
 }
