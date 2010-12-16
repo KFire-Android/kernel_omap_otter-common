@@ -84,8 +84,8 @@
 #define OMAP4_ENABLE_EXT_MASK			(1 << 3)
 #define OMAP4_ENABLE_INT_SHIFT			2
 #define OMAP4_ENABLE_INT_MASK			(1 << 2)
-#define OMAP4_MODE_SHIFT			0
-#define OMAP4_MODE_MASK				(0x3 << 0)
+#define OMAP4_ALT_CLK__MODE_SHIFT		0
+#define OMAP4_ALT_CLK_MODE_MASK			(0x3 << 0)
 
 /* MODEMCLKM */
 #define OMAP4_CLK_32KHZ_SHIFT			0

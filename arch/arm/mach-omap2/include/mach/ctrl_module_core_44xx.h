@@ -385,7 +385,7 @@
 #define OMAP4_MULT_CONF_DPLL_PHASELOCK_SEL_MASK		(0x7 << 0)
 
 /* CONF_DEBUG_SEL_TST_0 */
-#define OMAP4_MODE_SHIFT				0
-#define OMAP4_MODE_MASK					(0xf << 0)
+#define OMAP4_MODE_CONF_SHIFT				0
+#define OMAP4_MODE_CONF_MASK				(0xf << 0)
 
 #endif
