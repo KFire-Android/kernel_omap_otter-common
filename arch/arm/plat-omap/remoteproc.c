@@ -320,10 +320,10 @@ static int omap_rproc_ioctl(struct inode *inode, struct file *filp,
 	int rc = 0;
 	struct omap_rproc *rproc = filp->private_data;
 
-	dev_info(rproc->dev, "%s\n", __func__);
-
 	if (!rproc)
 		return -EINVAL;
+
+	dev_info(rproc->dev, "%s\n", __func__);
 
 	if (_IOC_TYPE(cmd) != RPROC_IOC_MAGIC)
 		return -ENOTTY;
