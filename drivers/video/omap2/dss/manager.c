@@ -629,11 +629,11 @@ int dss_mgr_wait_for_go_ovl(struct omap_overlay *ovl)
 		return 0;
 
 	dssdev = ovl->manager->device;
-	channel = dssdev->channel;
 
 	if (!dssdev || dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return 0;
 
+	channel = dssdev->channel;
 	if (dssdev->type == OMAP_DISPLAY_TYPE_VENC
 		|| dssdev->type == OMAP_DISPLAY_TYPE_HDMI) {
 		irq = DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_EVSYNC_EVEN;
