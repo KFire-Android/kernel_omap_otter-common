@@ -459,7 +459,7 @@ static int syn_read_block(struct syn *sd, int reg, u8 *data, int len)
 
 static int syn_read_u8(struct syn *sd, int reg)
 {
-	unsigned char b[1];
+	unsigned char b[1] = {0};
 	int r;
 
 	r = syn_read_block(sd, reg, b, 1);
@@ -477,7 +477,7 @@ static int syn_write_u8(struct syn *sd, u8 reg, u8 value)
 static int syn_read_u16(struct syn *sd, int reg)
 {
 	int r;
-	u8 data[2];
+	u8 data[2] = {0};
 
 	r = syn_read_block(sd, reg, data, 2);
 	if (r < 0)
@@ -695,9 +695,9 @@ static void syn_isr_bist(struct syn *sd, u8 bits)
 
 static void syn_isr_proximity(struct syn *sd, u8 bits)
 {
-	unsigned char data[6];
+	unsigned char data[6] = {0};
 	struct input_dev *idev;
-	int r;
+	int r = 0;
 
 	idev = sd->tp[0].idev;
 
@@ -2942,9 +2942,9 @@ static void syn_remove_sysfs(struct syn *sd)
 
 static int syn_read_func_descs(struct syn *sd)
 {
-	int properties;
-	int fun;
-	int r;
+	int properties = 0;
+	int fun = 0;
+	int r = 0;
 	int addr = REG_PDT_PROPERTIES;
 
 	sd->func_descs_valid = 0;
@@ -3097,7 +3097,7 @@ static int syn_button_query_caps(struct syn *sd)
 static int syn_touch_query_caps(struct syn *sd)
 {
 	int r;
-	u8 data[TOUCH_QUERY_LEN];
+	u8 data[TOUCH_QUERY_LEN] = {0};
 
 	if (sd->touch == NULL)
 		return -ENODEV;
