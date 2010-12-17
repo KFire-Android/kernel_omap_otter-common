@@ -2558,7 +2558,8 @@ err1:
 err_alloc:
 	omap_hsmmc_gpio_free(pdata);
 err:
-	release_mem_region(res->start, res->end - res->start + 1);
+	if (res)
+		release_mem_region(res->start, res->end - res->start + 1);
 	return ret;
 }
 
