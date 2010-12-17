@@ -66,7 +66,12 @@ static void __init sr_read_efuse(struct omap_sr_dev_data *dev_data,
 	int i;
 	void __iomem *ctrl_base;
 
-	if (!dev_data || !dev_data->volts_supported || !dev_data->volt_data ||
+	if (!dev_data) {
+		pr_warning(" Bad parameters! dev_data NULL!\n");
+		return;
+	}
+
+	if (!dev_data->volts_supported || !dev_data->volt_data ||
 			!dev_data->efuse_nvalues_offs) {
 		pr_warning("%s: Bad parameters! dev_data = %x,"
 			"dev_data->volts_supported = %x,"
