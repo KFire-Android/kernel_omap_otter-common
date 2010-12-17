@@ -22,7 +22,7 @@
 
 #define OMAP_MUX_TERMINATOR	0xffff
 
-/* 34xx mux mode options for each pin. See TRM for options */
+/* 34xx/44xx mux mode options for each pin. See TRM for options */
 #define OMAP_MUX_MODE0      0
 #define OMAP_MUX_MODE1      1
 #define OMAP_MUX_MODE2      2
@@ -37,7 +37,7 @@
 #define OMAP_PULL_UP			(1 << 4)
 #define OMAP_ALTELECTRICALSEL		(1 << 5)
 
-/* 34xx specific mux bit defines */
+/* 34xx/44xx mux bit defines */
 #define OMAP_INPUT_EN			(1 << 8)
 #define OMAP_OFF_EN			(1 << 9)
 #define OMAP_OFFOUT_EN			(1 << 10)

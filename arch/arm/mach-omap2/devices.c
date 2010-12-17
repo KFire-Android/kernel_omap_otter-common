@@ -217,7 +217,7 @@ static int omap4_init_keypad(struct omap_hwmod *oh, void *user)
 	struct omap4_keypad_platform_data *sdp4430_keypad_data;
 	unsigned int id = -1;
 	char *name = "omap-keypad";
-
+	keyboard_mux_init();
 	sdp4430_keypad_data = user;
 
 	od = omap_device_build(name, id, oh, sdp4430_keypad_data,

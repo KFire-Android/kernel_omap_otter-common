@@ -170,6 +170,58 @@ static struct omap4_keypad_platform_data sdp4430_keypad_data = {
 	.cols			= 8,
 };
 
+void keyboard_mux_init(void)
+{
+	omap_mux_init_signal("kpd_col0.kpd_col0",
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
+	omap_mux_init_signal("kpd_col1.kpd_col1",
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
+	omap_mux_init_signal("kpd_col2.kpd_col2",
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
+	omap_mux_init_signal("kpd_col3.kpd_col3",
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
+	omap_mux_init_signal("kpd_col4.kpd_col4",
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
+	omap_mux_init_signal("kpd_col5.kpd_col5",
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
+	omap_mux_init_signal("gpmc_a23.kpd_col7",
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
+	omap_mux_init_signal("gpmc_a22.kpd_col6",
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1);
+	omap_mux_init_signal("kpd_row0.kpd_row0",
+				OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
+				OMAP_INPUT_EN);
+	omap_mux_init_signal("kpd_row1.kpd_row1",
+				OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
+				OMAP_INPUT_EN);
+	omap_mux_init_signal("kpd_row2.kpd_row2",
+				OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
+				OMAP_INPUT_EN);
+	omap_mux_init_signal("kpd_row3.kpd_row3",
+				OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
+				OMAP_INPUT_EN);
+	omap_mux_init_signal("kpd_row4.kpd_row4",
+				OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
+				OMAP_INPUT_EN);
+	omap_mux_init_signal("kpd_row5.kpd_row5",
+				OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
+				OMAP_INPUT_EN);
+	omap_mux_init_signal("gpmc_a18.kpd_row6",
+				OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
+				OMAP_INPUT_EN);
+	omap_mux_init_signal("gpmc_a19.kpd_row7",
+				OMAP_PULL_ENA | OMAP_PULL_UP |
+				OMAP_WAKEUP_EN | OMAP_MUX_MODE1 |
+				OMAP_INPUT_EN);
+}
+
 /* Proximity Sensor */
 static void omap_prox_activate(int state)
 {
