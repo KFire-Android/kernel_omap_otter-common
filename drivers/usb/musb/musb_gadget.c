@@ -163,7 +163,10 @@ __acquires(ep->musb->lock)
 	int			busy = ep->busy;
 
 	req = to_musb_request(request);
-
+	if (!req) {
+		WARN_ON(1);
+		return;
+	}
 	list_del(&request->list);
 	if (req->request.status == -EINPROGRESS)
 		req->request.status = status;
