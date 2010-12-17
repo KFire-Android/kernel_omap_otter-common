@@ -50,7 +50,7 @@ struct twl6040_codec {
 static int twl6040_codec_set_resource(enum twl6040_codec_res id, int enable)
 {
 	struct twl6040_codec *codec = platform_get_drvdata(twl6040_codec_dev);
-	u8 val;
+	u8 val = 0;
 
 	twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE, &val,
 			codec->resource[id].reg);
@@ -69,7 +69,7 @@ static int twl6040_codec_set_resource(enum twl6040_codec_res id, int enable)
 static inline int twl6040_codec_get_resource(enum twl6040_codec_res id)
 {
 	struct twl6040_codec *codec = platform_get_drvdata(twl6040_codec_dev);
-	u8 val;
+	u8 val = 0;
 
 	twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE, &val,
 			codec->resource[id].reg);
