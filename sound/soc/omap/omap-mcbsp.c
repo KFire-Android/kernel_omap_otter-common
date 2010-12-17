@@ -836,7 +836,7 @@ static int								\
 omap_mcbsp##id##_get_st_ch##channel##_volume(struct snd_kcontrol *kc,	\
 					struct snd_ctl_elem_value *uc)	\
 {									\
-	s16 chgain;							\
+	s16 chgain = 0;							\
 									\
 	if (omap_st_get_chgain((id)-1, channel, &chgain))		\
 		return -EAGAIN;						\
