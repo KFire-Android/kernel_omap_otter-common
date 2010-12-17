@@ -585,7 +585,12 @@ unsigned long omap3_clkoutx2_recalc(struct clk *clk)
 	/* clk does not have a DPLL as a parent? */
 	WARN_ON(!pclk);
 
-	dd = pclk->dpll_data;
+	if (pclk)
+		dd = pclk->dpll_data;
+	else {
+		pr_err("%s: pclk is NULL\n", __func__);
+		return -EINVAL;
+	}
 
 	WARN_ON(!dd->enable_mask);
 
