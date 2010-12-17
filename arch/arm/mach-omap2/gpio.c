@@ -61,8 +61,10 @@ static int omap2_init_gpio(struct omap_hwmod *oh, void *user)
 	static int id;
 	struct omap_gpio_dev_attr *gpio_dev_data;
 
-	if (!oh)
+	if (!oh) {
 		pr_err("Could not look up omap gpio %d\n", id + 1);
+		return -EFAULT;
+	}
 
 	pdata = kzalloc(sizeof(struct omap_gpio_platform_data),
 					GFP_KERNEL);
