@@ -85,7 +85,7 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 	if (mgr == ovl->manager)
 		return size;
 
-	if (sysfs_streq(mgr->name, "tv")) {
+	if (mgr && sysfs_streq(mgr->name, "tv")) {
 		ovl->get_overlay_info(ovl, &info);
 		if (mgr->device->panel.timings.x_res < info.width ||
 			mgr->device->panel.timings.y_res < info.height) {
