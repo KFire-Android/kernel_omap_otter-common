@@ -45,8 +45,8 @@ struct vib_data *misc_data;
 
 static void vib_set(int on)
 {
-	u8 lppllctl, hppllctl;
-	u8 reg;
+	u8 lppllctl = 0, hppllctl = 0;
+	u8 reg = 0;
 
 	if (on) {
 		/* Sequence to enable HPPLL for Vibra
