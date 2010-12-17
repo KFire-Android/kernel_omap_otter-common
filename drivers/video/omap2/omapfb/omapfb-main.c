@@ -232,6 +232,13 @@ static struct omapfb_colormode omapfb_colormodes[] = {
 		.blue	= { .length = 4, .offset = 0, .msb_right = 0 },
 		.transp	= { .length = 4, .offset = 12, .msb_right = 0 },
 	}, {
+		.dssmode = OMAP_DSS_COLOR_CLUT8,
+		.bits_per_pixel = 8,
+		.red    = { .length = 8, .offset = 0, .msb_right = 0 },
+		.green  = { .length = 8, .offset = 0, .msb_right = 0 },
+		.blue   = { .length = 8, .offset = 0, .msb_right = 0 },
+		.transp = { .length = 0, .offset = 0, .msb_right = 0 },
+	}, {
 		.dssmode = OMAP_DSS_COLOR_RGB16,
 		.bits_per_pixel = 16,
 		.red	= { .length = 5, .offset = 11, .msb_right = 0 },
@@ -557,7 +564,7 @@ static int setup_vrfb_rotation(struct fb_info *fbi)
 	omap_vrfb_setup(&rg->vrfb, rg->paddr,
 			var->xres_virtual,
 			var->yres_virtual,
-			bytespp, yuv_mode);
+			bytespp, yuv_mode, 0);
 
 	/* Now one can ioremap the 0 angle view */
 	r = omap_vrfb_map_angle(vrfb, var->yres_virtual, 0);

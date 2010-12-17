@@ -2617,7 +2617,6 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 	case OMAP_DSS_COLOR_CLUT1:
 	case OMAP_DSS_COLOR_CLUT2:
 	case OMAP_DSS_COLOR_CLUT4:
-	case OMAP_DSS_COLOR_CLUT8:
 		BUG();
 		return;
 	default:
@@ -3021,6 +3020,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	/* check if color format is supported */
 	if (plane == OMAP_DSS_GFX) {
 		switch (color_mode) {
+		case OMAP_DSS_COLOR_CLUT8:
 		case OMAP_DSS_COLOR_ARGB16:
 		case OMAP_DSS_COLOR_ARGB32:
 		case OMAP_DSS_COLOR_RGBA32:

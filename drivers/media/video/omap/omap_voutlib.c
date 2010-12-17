@@ -225,7 +225,6 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 		hresize = 2048;
 	else if (cpu_is_omap34xx() && (hresize > 4096))
 		hresize = 4096;
-
 	win->w.width = ((1024 * try_crop.width) / hresize) & ~1;
 	if (win->w.width == 0)
 		win->w.width = 2;

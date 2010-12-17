@@ -581,6 +581,7 @@ static const struct v4l2_ioctl_ops wb_ioctl_fops = {
 	.vidioc_default		= vidioc_default,
 };
 
+#ifdef CONFIG_TILER_OMAP
 static void omap_wb_tiler_buffer_free(struct omap_wb_device *wb,
 					unsigned int count,
 					unsigned int startindex)
@@ -690,6 +691,7 @@ static void omap_wb_free_tiler_buffers(struct omap_wb_device *wb)
 	omap_wb_tiler_buffer_free(wb, wb->buffer_allocated, 0);
 	wb->buffer_allocated = 0;
 }
+#endif	/* ifdef CONFIG_TILER_OMAP */
 
 
 /* Video buffer call backs */
@@ -725,8 +727,10 @@ static int omap_wb_buffer_setup(struct videobuf_queue *q, unsigned int *count,
 	v4l2_dbg(1, debug_wb, &wb->wb_dev->v4l2_dev,
 			"\nheight=%d, size = %d, wb->buffer_sz=%d\n",
 			wb->pix.height, *size, wb->buffer_size);
+#ifdef CONFIG_TILER_OMAP
 	if (omap_wb_tiler_buffer_setup(wb, count, 0, &wb->pix))
 			return -ENOMEM;
+#endif
 
 	if (V4L2_MEMORY_MMAP != wb->memory)
 		return 0;
@@ -925,7 +929,9 @@ static int omap_wb_release(struct file *file)
 
 	q = &wb->vbq;
 
+#ifdef CONFIG_TILER_OMAP
 	omap_wb_free_tiler_buffers(wb);
+#endif
 
 	videobuf_mmap_free(q);
 
@@ -1138,7 +1144,9 @@ static void omap_wb_cleanup_device(struct omap_wb_device *wb)
 		}
 	}
 
+#ifdef CONFIG_TILER_OMAP
 	omap_wb_free_tiler_buffers(wb);
+#endif
 
 	kfree(wb);
 }
