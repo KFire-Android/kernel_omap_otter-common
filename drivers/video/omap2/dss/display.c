@@ -40,7 +40,7 @@ int omapdss_display_enable(struct omap_dss_device *dssdev)
 	int r = 0;
 
 	/* use smart_enable if present */
-	if (dssdev->driver->smart_enable)
+	if ((dssdev->driver) && (dssdev->driver->smart_enable))
 		return dssdev->driver->smart_enable(dssdev);
 
 	/* store resume info for suspended displays */
