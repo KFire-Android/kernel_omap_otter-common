@@ -75,8 +75,8 @@ EXPORT_SYMBOL(pwm_config);
 
 int pwm_enable(struct pwm_device *pwm)
 {
-	u8 val;
-	int ret;
+	u8 val = 0;
+	int ret = 0;
 
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID1, &val, LED_PWM_CTRL2);
 	if (ret < 0) {
@@ -101,8 +101,8 @@ EXPORT_SYMBOL(pwm_enable);
 
 void pwm_disable(struct pwm_device *pwm)
 {
-	u8 val;
-	int ret;
+	u8 val = 0;
+	int ret = 0;
 
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID1, &val, LED_PWM_CTRL2);
 	if (ret < 0) {
