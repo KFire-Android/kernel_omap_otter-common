@@ -438,7 +438,7 @@ static inline void sgtable_drain_kmalloc(struct sg_table *sgt)
 static int map_iovm_area(struct iommu *obj, struct iovm_struct *new,
 			 const struct sg_table *sgt, u32 flags)
 {
-	int err;
+	int err = 0;
 	unsigned int i, j;
 	struct scatterlist *sg;
 	u32 da = new->da_start;
