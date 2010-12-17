@@ -673,7 +673,7 @@ static int user_to_device_map(struct iommu *mmu, u32 uva, u32 da, u32 size,
 
 {
 	int res = 0;
-	int w;
+	int w = 0;
 	struct vm_area_struct *vma;
 	struct mm_struct *mm = current->mm;
 	u32 pg_num;
@@ -690,6 +690,10 @@ static int user_to_device_map(struct iommu *mmu, u32 uva, u32 da, u32 size,
 	pages = size / PAGE_SIZE;
 
 	vma = find_vma(mm, uva);
+	if (!vma) {
+		WARN_ON(1);
+		return -EFAULT;
+	}
 
 	if (vma->vm_flags & (VM_WRITE | VM_MAYWRITE))
 		w = 1;
@@ -811,7 +815,8 @@ static int phys_to_device_map(struct iodmm_struct *obj,
 	return 0;
 
 err_add_map:
-	gen_pool_free(gen_pool, da, bytes);
+	if (gen_pool)
+		gen_pool_free(gen_pool, da, bytes);
 exit:
 	return err;
 }
@@ -1026,7 +1031,11 @@ int omap_create_dmm_pool(struct iodmm_struct *obj, const void __user *args)
 	pool->da_end = pool_info.da_begin + pool_info.size;
 
 	pool->genpool = gen_pool_create(12, -1);
-	gen_pool_add(pool->genpool, pool->da_begin,  pool_info.size, -1);
+	if (pool->genpool)
+		gen_pool_add(pool->genpool, pool->da_begin,
+			pool_info.size, -1);
+	else
+		pr_err("%s:gen_pool_create retuned null\n", __func__);
 
 	INIT_LIST_HEAD(&pool->list);
 	list_add_tail(&pool->list, &iovmm->mmap_pool);
