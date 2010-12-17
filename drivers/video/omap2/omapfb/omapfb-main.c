@@ -2381,6 +2381,10 @@ static int omapfb_parse_def_modes(struct omapfb2_device *fbdev)
 	int r = 0;
 
 	str = kmalloc(strlen(def_mode) + 1, GFP_KERNEL);
+	if (!str) {
+		WARN_ON(1);
+		return -ENOMEM;
+	}
 	strcpy(str, def_mode);
 	options = str;
 
@@ -2466,6 +2470,10 @@ static int omapfb_probe(struct platform_device *pdev)
 		fbdev->displays[fbdev->num_displays++] = dssdev;
 
 		notifier = kzalloc(sizeof(struct omapfb_notifier_block), GFP_KERNEL);
+		if (!notifier) {
+			WARN_ON(1);
+			continue;
+		}
 		notifier->notifier.notifier_call = omapfb_notifier;
 		notifier->fbdev = fbdev;
 		omap_dss_add_notify(dssdev, &notifier->notifier);
