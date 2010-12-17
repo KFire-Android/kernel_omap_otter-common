@@ -1213,7 +1213,7 @@ static int enable_overlays(const struct s3d_ovl_device *dev,
 				const struct list_head *overlays,
 				enum s3d_overlay_role role, bool enable)
 {
-	int r;
+	int r = 0;
 	struct list_head *pos;
 	struct s3d_overlay *ovl;
 
