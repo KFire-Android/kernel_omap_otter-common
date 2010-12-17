@@ -1418,13 +1418,14 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 		unsigned long target_volt)
 {
 	struct omap_volt_data *volt_data;
-	u32 vc_bypass_value, vc_cmdval, vc_valid, vc_bypass_val_reg_offs;
-	u32 vp_errgain_val, vc_cmd_on_mask;
+	u32 vc_bypass_value = 0, vc_cmdval = 0;
+	u32  vc_valid = 0, vc_bypass_val_reg_offs = 0;
+	u32 vp_errgain_val = 0, vc_cmd_on_mask = 0;
 	u32 loop_cnt = 0, retries_cnt = 0;
 	u32 smps_steps = 0, smps_delay = 0;
-	u8 vc_data_shift, vc_slaveaddr_shift, vc_regaddr_shift;
-	u8 vc_cmd_on_shift;
-	u8 target_vsel, current_vsel, sr_i2c_slave_addr;
+	u8 vc_data_shift = 0, vc_slaveaddr_shift = 0, vc_regaddr_shift = 0;
+	u8 vc_cmd_on_shift = 0;
+	u8 target_vsel = 0, current_vsel = 0, sr_i2c_slave_addr = 0;
 
 	if (cpu_is_omap34xx()) {
 		vc_cmd_on_shift = OMAP3430_VC_CMD_ON_SHIFT;
