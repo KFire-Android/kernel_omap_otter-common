@@ -439,6 +439,7 @@ int notify_register_event_single(u16 proc_id, u16 line_id, u32 event_id,
 		goto exit;
 	}
 
+	mutex_lock_killable(&obj->lock);
 	obj->callbacks[stripped_event_id].fn_notify_cbck = notify_callback_fxn;
 	obj->callbacks[stripped_event_id].cbck_arg = cbck_arg;
 
@@ -446,6 +447,7 @@ int notify_register_event_single(u16 proc_id, u16 line_id, u32 event_id,
 		status = driver_handle->fxn_table.register_event(driver_handle,
 							stripped_event_id);
 	}
+	mutex_unlock(&obj->lock);
 exit:
 	if (status < 0) {
 		pr_err("notify_register_event_single failed! "
@@ -535,12 +537,11 @@ int notify_unregister_event(u16 proc_id, u16 line_id, u32 event_id,
 		mutex_unlock(&obj->lock);
 		goto exit;
 	}
-
+	mutex_unlock(&obj->lock);
 	if (list_empty(event_list)) {
 		status = notify_unregister_event_single(proc_id, line_id,
 								event_id);
 	}
-	mutex_unlock(&obj->lock);
 	kfree(listener);
 exit:
 	if (status < 0) {
@@ -606,12 +607,14 @@ int notify_unregister_event_single(u16 proc_id, u16 line_id, u32 event_id)
 		goto exit;
 	}
 
+	mutex_lock_killable(&obj->lock);
 	obj->callbacks[stripped_event_id].fn_notify_cbck = NULL;
 	obj->callbacks[stripped_event_id].cbck_arg = NULL;
 	if (proc_id != multiproc_self()) {
 		status = driver_handle->fxn_table.unregister_event(
 					driver_handle, stripped_event_id);
 	}
+	mutex_unlock(&obj->lock);
 exit:
 	if (status < 0) {
 		pr_err("notify_unregister_event_single failed! "
@@ -1054,6 +1057,7 @@ void notify_exec(struct notify_object *obj, u32 event_id, u32 payload)
 		(event_id >= NOTIFY_MAXEVENTS))) {
 		pr_err("Invalid event_id %d\n", event_id);
 	} else {
+		mutex_lock_killable(&obj->lock);
 		callback = &(obj->callbacks[event_id]);
 		WARN_ON(callback->fn_notify_cbck == NULL);
 
@@ -1061,6 +1065,7 @@ void notify_exec(struct notify_object *obj, u32 event_id, u32 payload)
 		   and the payload */
 		callback->fn_notify_cbck(obj->remote_proc_id, obj->line_id,
 				event_id, callback->cbck_arg, payload);
+		mutex_unlock(&obj->lock);
 	}
 }
 
@@ -1082,13 +1087,9 @@ static void _notify_exec_many(u16 proc_id, u16 line_id, u32 event_id, uint *arg,
 	/* Both loopback and the the event itself are enabled */
 	event_list = &(obj->event_list[event_id]);
 
-	/* Enter critical section protection. */
-	mutex_lock_killable(&obj->lock);
 	/* Use "NULL" to get the first EventListener on the list */
 	list_for_each_entry(listener, event_list, element) {
 		listener->callback.fn_notify_cbck(proc_id, line_id, event_id,
 				listener->callback.cbck_arg, payload);
 	}
-	/* Leave critical section protection. */
-	mutex_unlock(&obj->lock);
 }
