@@ -414,7 +414,7 @@ ssize_t gpsdrv_read(struct file *file, char __user *data, size_t size,
 	int len = 0;
 	struct sk_buff *skb = NULL;
 	unsigned long timeout = GPSDRV_READ_TIMEOUT;
-	struct gpsdrv_data *hgps = file->private_data;
+	struct gpsdrv_data *hgps;
 
 	GPSDRV_DBG(" Inside %s", __func__);
 
@@ -424,6 +424,7 @@ ssize_t gpsdrv_read(struct file *file, char __user *data, size_t size,
 		return -EINVAL;
 	}
 
+	hgps = file->private_data;
 	/* Check if GPS is registered to perform read operation */
 	if (!test_bit(GPS_ST_RUNNING, &hgps->state)) {
 		GPSDRV_ERR("GPS Device is not running");
@@ -509,17 +510,19 @@ ssize_t gpsdrv_write(struct file *file, const char __user *data,
 	/* Initialize gpsdrv_event_hdr with write opcode */
 	struct gpsdrv_event_hdr gpsdrv_hdr = { GPS_CH9_OP_WRITE, 0x0000 };
 	struct sk_buff *skb = NULL;
-	struct gpsdrv_data *hgps = file->private_data;
-
-	spin_lock(&hgps->lock);
-	GPSDRV_DBG(" Inside %s", __func__);
-	spin_unlock(&hgps->lock);
+	struct gpsdrv_data *hgps;
 
 	/* Validate input parameters */
 	if ((NULL == file) || (((NULL == data) || (0 == size)))) {
 		GPSDRV_ERR("Invalid input params passed to %s", __func__);
 		return -EINVAL;
 	}
+
+	hgps = file->private_data;
+
+	spin_lock(&hgps->lock);
+	GPSDRV_DBG(" Inside %s", __func__);
+	spin_unlock(&hgps->lock);
 
 	/* Check if GPS is registered to perform write operation */
 	if (!test_bit(GPS_ST_RUNNING, &hgps->state)) {
@@ -615,7 +618,7 @@ static int gpsdrv_ioctl(struct inode *inode, struct file *file,
 {
 	struct sk_buff *skb = NULL;
 	int		retCode = GPS_SUCCESS;
-	struct gpsdrv_data *hgps = file->private_data;
+	struct gpsdrv_data *hgps;
 
 	GPSDRV_DBG(" Inside %s", __func__);
 
@@ -624,6 +627,9 @@ static int gpsdrv_ioctl(struct inode *inode, struct file *file,
 		GPSDRV_ERR("Invalid input parameters passed to %s", __func__);
 		return -EINVAL;
 	}
+
+	hgps = file->private_data;
+
 	/* Check if GPS is registered to perform IOCTL operation */
 	if (!test_bit(GPS_ST_RUNNING, &hgps->state)) {
 		GPSDRV_ERR("GPS Device is not running");
