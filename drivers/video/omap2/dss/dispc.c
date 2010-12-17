@@ -1463,6 +1463,10 @@ static void _dispc_set_plane_ba_uv1(enum omap_plane plane, u32 paddr)
 	};
 
 	BUG_ON(plane == OMAP_DSS_GFX);
+	if (plane >= 3) {
+		WARN_ON(1);
+		return;
+	}
 
 	dispc_write_reg(ba_uv1_reg[plane - 1], paddr);
 	/* plane - 1 => no UV_BA for GFX*/
