@@ -189,7 +189,7 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
 			resource_size(res), pdev->name);
 	if (!mem) {
 		dev_err(&pdev->dev, "no mem region available\n");
-		return -ENOMEM;
+		error = -ENOMEM;
 		goto err_free_keypad;
 	}
 
