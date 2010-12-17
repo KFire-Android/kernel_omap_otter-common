@@ -133,7 +133,10 @@ int omap_setup_wb(struct omap_wb_device *wb_device, u32 addr, u32 uv_addr)
 		printk(KERN_ERR WB_NAME "wb_info not set\n");
 		goto err;
 	}
-	r = omap_dss_wb_apply(mgr, wb);
+	if (mgr)
+		r = omap_dss_wb_apply(mgr, wb);
+	else
+		printk(KERN_ERR WB_NAME "mgr is NULL!\n");
 err:
 	return r;
 }
