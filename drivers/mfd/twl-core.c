@@ -999,7 +999,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	int				status;
 	unsigned			i;
 	struct twl4030_platform_data	*pdata = client->dev.platform_data;
-	u8 temp;
+	u8 temp = 0;
 
 	if (!pdata) {
 		dev_dbg(&client->dev, "no platform data?\n");
