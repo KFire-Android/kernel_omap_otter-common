@@ -305,6 +305,10 @@ static int pm_dbg_show_regs(struct seq_file *s, void *unused)
 
 	if (reg_set == 0) {
 		store = kmalloc(pm_dbg_get_regset_size(), GFP_KERNEL);
+		if (!store) {
+			WARN_ON(1);
+			return -ENOMEM;
+		}
 		ptr = store;
 		pm_dbg_regset_store(ptr);
 	} else {
