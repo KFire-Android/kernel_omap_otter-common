@@ -266,13 +266,19 @@ static int sr_late_init(struct omap_sr *sr_info)
 			iounmap(sr_info->base);
 			mem = platform_get_resource(sr_info->pdev,
 				IORESOURCE_MEM, 0);
-			release_mem_region(mem->start, resource_size(mem));
+
+			if (mem)
+				release_mem_region(mem->start,
+					resource_size(mem));
+			else
+				WARN_ON(1);
+
 			list_del(&sr_info->node);
-			kfree(sr_info);
 
 			dev_err(&sr_info->pdev->dev, "%s: ERROR in registering"
 				"interrupt handler. Smartreflex will"
 				"not function as desired\n", __func__);
+			kfree(sr_info);
 			return ret;
 		}
 	}
@@ -789,8 +795,8 @@ static int omap_sr_autocomp_show(void *data, u64 *val)
 	struct omap_sr *sr_info = (struct omap_sr *) data;
 
 	if (!sr_info) {
-		pr_warning("%s: omap_sr struct for sr_%s not found\n",
-			__func__, sr_info->voltdm->name);
+		pr_warning("%s: omap_sr struct for sr_info not found\n",
+			__func__);
 		return -EINVAL;
 	}
 	*val = sr_info->is_autocomp_active;
@@ -802,8 +808,8 @@ static int omap_sr_autocomp_store(void *data, u64 val)
 	struct omap_sr *sr_info = (struct omap_sr *) data;
 
 	if (!sr_info) {
-		pr_warning("%s: omap_sr struct for sr_%s not found\n",
-			__func__, sr_info->voltdm->name);
+		pr_warning("%s: omap_sr struct for sr_info not found\n",
+			__func__);
 		return -EINVAL;
 	}
 
@@ -868,7 +874,8 @@ static int __init omap_smartreflex_probe(struct platform_device *pdev)
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_free_devinfo;
 	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -962,7 +969,10 @@ static int __devexit omap_smartreflex_remove(struct platform_device *pdev)
 	iounmap(sr_info->base);
 	kfree(sr_info);
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	release_mem_region(mem->start, resource_size(mem));
+	if (mem)
+		release_mem_region(mem->start, resource_size(mem));
+	else
+		WARN_ON(1);
 	return 0;
 }
 
