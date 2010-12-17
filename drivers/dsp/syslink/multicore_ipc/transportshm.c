@@ -462,6 +462,13 @@ int transportshm_delete(void **handle_ptr)
 
 	handle = (struct transportshm_object *) (*handle_ptr);
 	if (handle != NULL) {
+		messageq_unregister_transport(handle->
+				remote_proc_id, handle->params.priority);
+
+		status = notify_unregister_event_single(handle->
+						remote_proc_id,
+						0,
+						handle->notify_event_id);
 		if (handle->self != NULL) {
 			proc_id = handle->self->creator_proc_id;
 			/* Clear handle in the local array */
@@ -481,8 +488,8 @@ int transportshm_delete(void **handle_ptr)
 		}
 
 		if (handle->local_list != NULL) {
-			status = listmp_delete(&handle->local_list);
-			if (status < 0)
+			tmp_status = listmp_delete(&handle->local_list);
+			if (tmp_status < 0 && status >= 0)
 				pr_warn("transportshm_delete: "
 						"Failed to delete local listmp "
 						"instance!\n");
@@ -498,13 +505,6 @@ int transportshm_delete(void **handle_ptr)
 			}
 		}
 
-		messageq_unregister_transport(handle->
-				remote_proc_id, handle->params.priority);
-
-		tmp_status = notify_unregister_event_single(handle->
-						remote_proc_id,
-						0,
-						handle->notify_event_id);
 		if (tmp_status < 0) {
 			status = tmp_status;
 			pr_warn("transportshm_delete: Failed to "
@@ -633,8 +633,12 @@ transportshm_close(void **handle_ptr)
 	}
 
 	obj = (struct transportshm_object *)(*handle_ptr);
-	transportshm_module->transports[obj->remote_proc_id]
-					[obj->params.priority] = NULL;
+
+	messageq_unregister_transport(obj->remote_proc_id,
+					obj->params.priority);
+
+	status = notify_unregister_event_single(obj->remote_proc_id, 0,
+			(obj->notify_event_id | (NOTIFY_SYSTEMKEY << 16)));
 
 	if (obj->other != NULL) {
 		/* other flag was set by remote proc */
@@ -651,8 +655,8 @@ transportshm_close(void **handle_ptr)
 	}
 
 	if (obj->gate != NULL) {
-		status = gatemp_close(&obj->gate);
-		if (status < 0) {
+		tmp_status = gatemp_close(&obj->gate);
+		if (tmp_status < 0 && status >= 0) {
 			status = TRANSPORTSHM_E_FAIL;
 			pr_err("transportshm_close: "
 				"gatemp_close failed, status [0x%x]\n",
@@ -680,13 +684,8 @@ transportshm_close(void **handle_ptr)
 		}
 	}
 
-	messageq_unregister_transport(obj->remote_proc_id,
-					obj->params.priority);
-
-	tmp_status = notify_unregister_event_single(obj->remote_proc_id, 0,
-			(obj->notify_event_id | (NOTIFY_SYSTEMKEY << 16)));
-	if ((tmp_status < 0) && (status >= 0))
-		status = TRANSPORTSHM_E_FAIL;
+	transportshm_module->transports[obj->remote_proc_id]
+					[obj->params.priority] = NULL;
 
 	kfree(obj);
 	*handle_ptr = NULL;
