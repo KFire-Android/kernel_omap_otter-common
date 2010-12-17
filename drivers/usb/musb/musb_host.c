@@ -1788,13 +1788,13 @@ static int musb_schedule(
 	struct musb_qh		*qh,
 	int			is_in)
 {
-	int			idle;
-	int			best_diff;
-	int			best_end, epnum;
+	int			idle = 0;
+	int			best_diff = 0;
+	int			best_end = 0, epnum = 0;
 	struct musb_hw_ep	*hw_ep = NULL;
 	struct list_head	*head = NULL;
-	u8			toggle;
-	u8			txtype;
+	u8			toggle = 0;
+	u8			txtype = 0;
 	struct urb		*urb = next_urb(qh);
 
 	/* use fixed hardware for control and bulk */
