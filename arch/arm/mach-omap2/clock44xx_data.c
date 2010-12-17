@@ -3267,7 +3267,7 @@ static struct omap_clk omap44xx_clks[] = {
 int __init omap4xxx_clk_init(void)
 {
 	struct omap_clk *c;
-	u32 cpu_clkflg;
+	u32 cpu_clkflg = 0;
 
 	if (cpu_is_omap44xx()) {
 		cpu_mask = RATE_IN_4430;
