@@ -1915,9 +1915,25 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 	struct omap_video_timings timings;
 
 	img_format = kzalloc(sizeof(*img_format), GFP_KERNEL);
+	if (!img_format) {
+		WARN_ON(1);
+		return -ENOMEM;
+	}
 	aud_format = kzalloc(sizeof(*aud_format), GFP_KERNEL);
+	if (!aud_format) {
+		WARN_ON(1);
+		goto hdmi_get_err1;
+	}
 	vsdb_format = kzalloc(sizeof(*vsdb_format), GFP_KERNEL);
+	if (!vsdb_format) {
+		WARN_ON(1);
+		goto hdmi_get_err2;
+	}
 	lat = kzalloc(sizeof(*lat), GFP_KERNEL);
+	if (!lat) {
+		WARN_ON(1);
+		goto hdmi_get_err3;
+	}
 
 	if (!edid_set) {
 		printk(KERN_WARNING "Display doesn't seem to be enabled invalid read\n");
@@ -2010,10 +2026,13 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 
 	printk(KERN_INFO "YUV supported %d", hdmi_tv_yuv_supported(edid));
 
-	kfree(img_format);
-	kfree(aud_format);
-	kfree(vsdb_format);
 	kfree(lat);
+hdmi_get_err3:
+	kfree(vsdb_format);
+hdmi_get_err2:
+	kfree(aud_format);
+hdmi_get_err1:
+	kfree(img_format);
 }
 
 static int hdmi_check_timings(struct omap_dss_device *dssdev,
@@ -2151,7 +2170,7 @@ int hdmi_init_display(struct omap_dss_device *dssdev)
 
 static int hdmi_read_edid(struct omap_video_timings *dp)
 {
-	int r = 0, ret, code;
+	int r = 0, ret = 0, code = 0;
 
 	memset(edid, 0, HDMI_EDID_MAX_LENGTH);
 	if (!edid_set)
