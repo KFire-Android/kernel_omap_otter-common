@@ -177,7 +177,7 @@ void abe_call_subroutine(u32 idx, u32 p1, u32 p2, u32 p3, u32 p4)
 	abe_subroutine3 f3;
 	abe_subroutine4 f4;
 	u32 *params;
-	if (idx > MAXNBSUBROUTINE)
+	if (idx >= MAXNBSUBROUTINE)
 		return;
 	switch (idx) {
 		/* call the subroutines defined at compilation time
