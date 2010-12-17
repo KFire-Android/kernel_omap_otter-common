@@ -157,7 +157,7 @@ static inline int twl6030_writeb(struct twl6030_usb *twl, u8 module,
 
 static inline int twl6030_readb(struct twl6030_usb *twl, u8 module, u8 address)
 {
-	u8 data;
+	u8 data = 0;
 	int ret = 0;
 
 	ret = twl_i2c_read_u8(module, &data, address);
