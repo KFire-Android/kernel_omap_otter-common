@@ -188,7 +188,7 @@ static int bq2415x_charger_event(struct notifier_block *nb, unsigned long event,
 
 	struct bq2415x_device_info *di;
 	struct charge_params *data;
-	u8 read_reg[7];
+	u8 read_reg[7] = {0};
 	int ret = 0;
 
 	di = container_of(nb, struct bq2415x_device_info, nb);
@@ -265,11 +265,11 @@ static void bq2415x_config_voltage_reg(struct bq2415x_device_info *di)
 
 static void bq2415x_config_current_reg(struct bq2415x_device_info *di)
 {
-	unsigned int currentmA;
-	unsigned int term_currentmA;
-	u8 Vichrg;
-	u8 shift;
-	u8 Viterm;
+	unsigned int currentmA = 0;
+	unsigned int term_currentmA = 0;
+	u8 Vichrg = 0;
+	u8 shift = 0;
+	u8 Viterm = 0;
 
 	currentmA = di->currentmA;
 	term_currentmA = di->term_currentmA;
@@ -344,7 +344,7 @@ static void bq2415x_config_safety_reg(struct bq2415x_device_info *di,
 static void
 bq2415x_charger_update_status(struct bq2415x_device_info *di)
 {
-	u8 read_reg[7];
+	u8 read_reg[7] = {0};
 
 	timer_fault = 0;
 	bq2415x_read_block(di, &read_reg[0], 0, 7);
