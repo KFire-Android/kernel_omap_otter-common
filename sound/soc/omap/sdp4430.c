@@ -465,6 +465,9 @@ static const char *modem_be[] = {
 
 static const char *mm_lp_be[] = {
 		OMAP_ABE_BE_PDM_DL1,
+		OMAP_ABE_BE_PDM_DL2,
+		OMAP_ABE_BE_BT_VX,
+		OMAP_ABE_BE_MM_EXT0,
 };
 
 /* Digital audio interface glue - connects codec <--> CPU */
