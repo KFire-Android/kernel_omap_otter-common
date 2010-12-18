@@ -10,9 +10,12 @@
  */
 #include <linux/module.h>
 #include <linux/types.h>
+#include <linux/cpu.h>
 #include <linux/kernel.h>
+#include <linux/notifier.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
+#include <linux/smp.h>
 #include <linux/init.h>
 
 #include <asm/thread_notify.h>
@@ -483,7 +486,19 @@ void vfp_flush_hwstate(struct thread_info *thread)
 	put_cpu();
 }
 
-#include <linux/smp.h>
+#ifdef CONFIG_HOTPLUG_CPU
+static int vfp_hotplug_notifier(struct notifier_block *b, unsigned long action,
+				void *data)
+{
+	if (action == CPU_STARTING)
+		vfp_enable(NULL);
+	return NOTIFY_OK;
+}
+
+static struct notifier_block vfp_hotplug_nb = {
+	.notifier_call = vfp_hotplug_notifier,
+};
+#endif
 
 /*
  * VFP support code initialisation.
@@ -513,6 +528,10 @@ static int __init vfp_init(void)
 	else if (vfpsid & FPSID_NODOUBLE) {
 		printk("no double precision support\n");
 	} else {
+#ifdef CONFIG_HOTPLUG_CPU
+		register_cpu_notifier(&vfp_hotplug_nb);
+#endif
+
 		smp_call_function(vfp_enable, NULL, 1);
 
 		VFP_arch = (vfpsid & FPSID_ARCH_MASK) >> FPSID_ARCH_BIT;  /* Extract the architecture version */
