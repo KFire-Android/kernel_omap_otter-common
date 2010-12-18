@@ -410,8 +410,8 @@ void omap_dm_timer_enable(struct omap_dm_timer *timer)
 		return;
 	}
 
-	if (pm_runtime_get_sync(&timer->pdev->dev)) {
-		dev_dbg(&timer->pdev->dev, "%s:pm_runtime_get_sync() FAILED\n",
+	if (pm_runtime_get_sync(&timer->pdev->dev) < 0) {
+		dev_err(&timer->pdev->dev, "%s:pm_runtime_get_sync() FAILED\n",
 			__func__);
 		return;
 	}
@@ -433,8 +433,8 @@ void omap_dm_timer_disable(struct omap_dm_timer *timer)
 		return;
 	}
 
-	if (pm_runtime_put_sync(&timer->pdev->dev)) {
-		dev_dbg(&timer->pdev->dev, "%s:pm_runtime_put_sync() FAILED\n",
+	if (pm_runtime_put_sync(&timer->pdev->dev) < 0) {
+		dev_err(&timer->pdev->dev, "%s:pm_runtime_put_sync() FAILED\n",
 			__func__);
 		return;
 	}
