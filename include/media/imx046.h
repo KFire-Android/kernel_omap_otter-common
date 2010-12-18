@@ -16,6 +16,7 @@
 #define IMX046_H
 
 #define IMX046_I2C_ADDR		0x1A
+#define IMX046_NAME		"imx046"
 
 /* Average black level */
 #define IMX046_BLACK_LEVEL_AVG	64
