@@ -98,8 +98,8 @@ static const struct snd_pcm_hardware omap_abe_hardware = {
 				  SNDRV_PCM_INFO_RESUME,
 	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
 				  SNDRV_PCM_FMTBIT_S32_LE,
-	.period_bytes_min	= 24 * 1024,
-	.period_bytes_max	= 48 * 1024,
+	.period_bytes_min	= 4 * 1024,
+	.period_bytes_max	= 24 * 1024,
 	.periods_min		= 2,
 	.periods_max		= 2,
 	.buffer_bytes_max	= 24 * 1024 * 2,
@@ -1698,6 +1698,7 @@ static int aess_open(struct snd_pcm_substream *substream)
 	struct snd_soc_dai *dai = rtd->cpu_dai;
 	/* TODO: do not use abe global structure to assign pdev */
 	struct platform_device *pdev = abe->pdev;
+	int ret = 0;
 
 	mutex_lock(&abe->mutex);
 
@@ -1714,19 +1715,22 @@ static int aess_open(struct snd_pcm_substream *substream)
 		break;
 	case ABE_FRONTEND_DAI_LP_MEDIA:
 		snd_soc_set_runtime_hwparams(substream, &omap_abe_hardware);
+		ret = snd_pcm_hw_constraint_step(substream->runtime, 0,
+					 SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 1024);
 		break;
 	default:
 		break;
 	}
 
 	mutex_unlock(&abe->mutex);
-	return 0;
+	return ret;
 }
 static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 	struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	abe_data_format_t format;
+	size_t period_size;
 	u32 dst;
 
 	/*Storing substream pointer for irq*/
@@ -1738,6 +1742,8 @@ static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 	if (format.f == 44100)
 		abe_write_event_generator(EVENT_44100);
 
+	period_size = params_period_bytes(params);
+
 	/*Adding ping pong buffer subroutine*/
 	abe_add_subroutine(&abe_irq_pingpong_player_id,
 				(abe_subroutine2) abe_irq_pingpong_subroutine,
@@ -1746,17 +1752,17 @@ static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 	/* Connect a Ping-Pong cache-flush protocol to MM_DL port */
 	abe_connect_irq_ping_pong_port(MM_DL_PORT, &format,
 				abe_irq_pingpong_player_id,
-				N_SAMPLES_BYTES, &dst,
+				period_size, &dst,
 				PING_PONG_WITH_MCU_IRQ);
 
 	/* Memory mapping for hw params */
 	runtime->dma_area  = abe->io_base + ABE_DMEM_BASE_OFFSET_MPU +
 				ABE_VM_AESS_OFFSET + dst;
 	runtime->dma_addr  = 0;
-	runtime->dma_bytes = N_SAMPLES_BYTES * 2;
+	runtime->dma_bytes = period_size * 2;
 
 	/* Need to set the first buffer in order to get interrupt */
-	abe_set_ping_pong_buffer(MM_DL_PORT, N_SAMPLES_BYTES);
+	abe_set_ping_pong_buffer(MM_DL_PORT, period_size);
 
 	return 0;
 }
