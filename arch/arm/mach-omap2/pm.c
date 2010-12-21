@@ -84,11 +84,9 @@ static void omap2_init_processor_devices(void)
 	struct omap_hwmod *oh;
 
 	_init_omap_device("mpu", &mpu_dev);
-#if 0
-	_init_omap_device("iva", &iva_dev);
-	if (cpu_is_omap44xx())
-		_init_omap_device("dsp", &dsp_dev);
-#endif
+
+	if (cpu_is_omap34xx())
+		_init_omap_device("iva", &iva_dev);
 	oh = omap_hwmod_lookup("iva");
 	if (oh && oh->od)
 		iva_dev = &oh->od->pdev.dev;
