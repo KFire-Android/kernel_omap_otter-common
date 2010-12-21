@@ -303,6 +303,7 @@ void omap2_dma_context_save(void)
 			ch_ctx_regs[ch_count++] = __raw_readl(lch_base + i);
 	}
 }
+EXPORT_SYMBOL(omap2_dma_context_save);
 
 void omap2_dma_context_restore(void)
 {
@@ -339,6 +340,7 @@ void omap2_dma_context_restore(void)
 		dma_write(0x3 , IRQSTATUS_L0);
 
 }
+EXPORT_SYMBOL(omap2_dma_context_restore);
 
 /* Create chain of DMA channesls */
 static void create_dma_lch_chain(int lch_head, int lch_queue)

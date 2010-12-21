@@ -375,4 +375,7 @@ extern int omap_modify_dma_chain_params(int chain_id,
 					struct omap_dma_channel_params params);
 extern int omap_dma_chain_status(int chain_id);
 
+extern void omap2_dma_context_save(void);
+extern void omap2_dma_context_restore(void);
+
 #endif /* __ASM_ARCH_OMAP2_DMA_H */
