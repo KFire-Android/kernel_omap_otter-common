@@ -2370,6 +2370,13 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(host->dev);
 
+	/*
+	 * FIX ME:
+	 * HACK to prevent WLAN failure when L4 PER hits OSWR.
+	 */
+	if (cpu_is_omap44xx() && host->id == OMAP_MMC5_DEVID)
+		omap_pm_set_max_dev_wakeup_lat(host->dev, host->dev, 1);
+
 	if (mmc_host_enable(host->mmc) != 0)
 		goto err1;
 
@@ -2537,6 +2544,10 @@ err1:
 	if (host->adma_table != NULL)
 		dma_free_coherent(NULL, ADMA_TABLE_SZ,
 			host->adma_table, host->phy_adma_table);
+
+	if (cpu_is_omap44xx() && host->id == OMAP_MMC5_DEVID)
+		omap_pm_set_max_dev_wakeup_lat(host->dev, host->dev, -1);
+
 	iounmap(host->base);
 	platform_set_drvdata(pdev, NULL);
 	mmc_free_host(mmc);
@@ -2554,6 +2565,10 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
 
 	if (host) {
 		mmc_host_enable(host->mmc);
+
+		if (cpu_is_omap44xx() && host->id == OMAP_MMC5_DEVID)
+			omap_pm_set_max_dev_wakeup_lat(host->dev, host->dev, -1);
+
 		mmc_remove_host(host->mmc);
 		if (host->use_reg)
 			omap_hsmmc_reg_put(host);
