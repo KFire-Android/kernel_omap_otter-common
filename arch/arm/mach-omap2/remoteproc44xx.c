@@ -73,11 +73,11 @@ static inline int proc44x_stop(struct device *dev)
 		ret = omap_device_shutdown(pdev);
 		if (ret)
 			dev_err(dev, "%s err 0x%x\n", __func__, ret);
+	}
 
-		if (obj->dmtimer) {
-			omap_dm_timer_free(obj->dmtimer);
-			obj->dmtimer = NULL;
-		}
+	if (obj->dmtimer) {
+		omap_dm_timer_free(obj->dmtimer);
+		obj->dmtimer = NULL;
 	}
 
 	obj->state = OMAP_RPROC_STOPPED;
