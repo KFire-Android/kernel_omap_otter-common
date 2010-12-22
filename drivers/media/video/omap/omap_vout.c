@@ -1259,8 +1259,9 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 		    !(ovl->info.field & OMAP_FLAG_IDEV) &&
 		    (irq == DISPC_IRQ_FRAMEDONE ||
 		     irq == DISPC_IRQ_FRAMEDONE2)) {
-			if (i_to_p_base_address_change(vout))
-				goto vout_isr_err;
+			 /* in this case, the upper halg of the frame would be
+			  * rendered and the lower one would be ignored.
+			  */
 		}
 		break;
 	case OMAP_DISPLAY_TYPE_DPI:
