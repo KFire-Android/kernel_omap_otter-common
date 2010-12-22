@@ -29,10 +29,32 @@
 #include <plat/smartreflex.h>
 #include <plat/voltage.h>
 
+static int sr_idle_hwmod(struct omap_device *od)
+{
+	struct omap_hwmod *oh = *od->hwmods;
+
+	if (irqs_disabled())
+		_omap_hwmod_idle(oh);
+	else
+		omap_device_idle_hwmods(od);
+	return 0;
+}
+
+static int sr_enable_hwmod(struct omap_device *od)
+{
+	struct omap_hwmod *oh = *od->hwmods;
+
+	if (irqs_disabled())
+		_omap_hwmod_enable(oh);
+	else
+		omap_device_enable_hwmods(od);
+	return 0;
+}
+
 static struct omap_device_pm_latency omap_sr_latency[] = {
 	{
-		.deactivate_func = omap_device_idle_hwmods,
-		.activate_func	 = omap_device_enable_hwmods,
+		.deactivate_func = sr_idle_hwmod,
+		.activate_func	 = sr_enable_hwmod,
 		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST
 	},
 };
