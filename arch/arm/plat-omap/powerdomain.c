@@ -33,6 +33,7 @@ enum {
 static LIST_HEAD(pwrdm_list);
 
 static struct pwrdm_functions *arch_pwrdm;
+static struct mutex global_wakeuplat_mutex;
 
 /* Private functions */
 
@@ -90,9 +91,6 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	/* Initialize priority ordered list for wakeup latency constraint */
 	spin_lock_init(&pwrdm->wakeuplat_lock);
 	plist_head_init(&pwrdm->wakeuplat_dev_list, &pwrdm->wakeuplat_lock);
-
-	/* res_mutex protects res_list add and del ops */
-	mutex_init(&pwrdm->wakeuplat_mutex);
 
 	pr_debug("powerdomain: registered %s\n", pwrdm->name);
 
@@ -185,6 +183,9 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
 void pwrdm_init(struct powerdomain **pwrdm_list, struct pwrdm_functions * custom_funcs)
 {
 	struct powerdomain **p = NULL;
+
+	/*Initialise the global latency constraint mutex */
+	mutex_init(&global_wakeuplat_mutex);
 
 	if (!custom_funcs) {
 		printk(KERN_ERR "No custom pwrdm functions registered\n");
@@ -929,7 +930,7 @@ int pwrdm_wakeuplat_set_constraint (struct powerdomain *pwrdm,
 		return -EINVAL;
 	}
 
-	mutex_lock(&pwrdm->wakeuplat_mutex);
+	mutex_lock(&global_wakeuplat_mutex);
 
 	plist_for_each_entry(user, &pwrdm->wakeuplat_dev_list, node) {
 		if (user->dev == dev) {
@@ -960,7 +961,7 @@ int pwrdm_wakeuplat_set_constraint (struct powerdomain *pwrdm,
 	pwrdm_wakeuplat_update_pwrst(pwrdm);
 
 exit_set:
-	mutex_unlock(&pwrdm->wakeuplat_mutex);
+	mutex_unlock(&global_wakeuplat_mutex);
 
 	return ret;
 }
@@ -986,7 +987,7 @@ int pwrdm_wakeuplat_release_constraint (struct powerdomain *pwrdm,
 		return -EINVAL;
 	}
 
-	mutex_lock(&pwrdm->wakeuplat_mutex);
+	mutex_lock(&global_wakeuplat_mutex);
 
 	plist_for_each_entry(user, &pwrdm->wakeuplat_dev_list, node) {
 		if (user->dev == dev) {
@@ -1007,7 +1008,7 @@ int pwrdm_wakeuplat_release_constraint (struct powerdomain *pwrdm,
 	pwrdm_wakeuplat_update_pwrst(pwrdm);
 
 exit_rls:
-	mutex_unlock(&pwrdm->wakeuplat_mutex);
+	mutex_unlock(&global_wakeuplat_mutex);
 
 	return ret;
 }
