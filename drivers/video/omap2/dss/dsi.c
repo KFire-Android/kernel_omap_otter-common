@@ -2339,6 +2339,8 @@ static int dsi_vc_send_long(enum omap_dsi_index ix, int channel,
 
 	dsi_vc_write_long_header(ix, channel, data_type, len, ecc);
 
+	udelay(1);
+
 	p = data;
 	for (i = 0; i < len >> 2; i++) {
 		if (p_dsi->debug_write)
@@ -3722,6 +3724,7 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 	int r = 0;
 	struct dsi_struct *p_dsi;
 	enum omap_dsi_index ix;
+	u32 val;
 
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 
@@ -3732,6 +3735,14 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 	/* turn on clock(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_TRANSITION;
 	dss_mainclk_state_enable();
+
+	/* Force Enable: set CM_DSS_DSS_CLKCTRL.MODULEMODE = ENABLE
+	  * pm_runtime_get_sync() doesn't set the MODULEMODE bits everytime
+	  * force a MODULE ON for now
+	  */
+	val = omap_readl(0x4a009120);
+	val = val | 0x02;
+	omap_writel(val, 0x4a009120);
 
 	WARN_ON(!dsi_bus_is_locked(ix));
 

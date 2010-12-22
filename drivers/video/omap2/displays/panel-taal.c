@@ -425,8 +425,6 @@ static int taal_set_update_window(enum omap_dsi_index ix,
 	if (r)
 		return r;
 
-	dsi_vc_send_bta_sync(ix, TCH);
-
 	buf[0] = DCS_PAGE_ADDR;
 	buf[1] = (y1 >> 8) & 0xff;
 	buf[2] = (y1 >> 0) & 0xff;
