@@ -1598,6 +1598,7 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 	struct omapfb2_device *fbdev = ofbi->fbdev;
 	struct omap_dss_device *display;
 	int bytespp;
+	u16 w, h;
 
 	display =  fb2display(fbi);
 
@@ -1626,28 +1627,24 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 			bytespp = fbi->var.bits_per_pixel >> 3;
 		}
 	}
-	if (!size) {
-		u16 w, h;
 
-		display->driver->get_resolution(display, &w, &h);
+	display->driver->get_resolution(display, &w, &h);
 
-		if (ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
-			size = max(omap_vrfb_min_phys_size(w, h, bytespp),
-					omap_vrfb_min_phys_size(h, w, bytespp));
+	if (!size && ofbi->rotation_type == OMAP_DSS_ROT_VRFB) {
+		size = max(omap_vrfb_min_phys_size(w, h, bytespp),
+				omap_vrfb_min_phys_size(h, w, bytespp));
 
-			DBG("adjusting fb mem size for VRFB, %u -> %lu\n",
-					w * h * bytespp, size);
-		} else if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
-			/* round up width to tiler size */
-			w = ALIGN(w, PAGE_SIZE / bytespp);
-			fbi->fix.line_length = w * bytespp;
-		}
-			size = w * h * bytespp;
-
+		DBG("adjusting fb mem size for VRFB, %u -> %lu\n",
+				w * h * bytespp, size);
+	} else if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
+		/* round up width to tiler size */
+		w = ALIGN(w, PAGE_SIZE / bytespp);
+		fbi->fix.line_length = w * bytespp;
+		size = w * h * bytespp;
 	}
 
 	if (!size)
-		return 0;
+		size = w * h * bytespp;
 
 	return omapfb_alloc_fbmem(fbi, size, paddr);
 }
