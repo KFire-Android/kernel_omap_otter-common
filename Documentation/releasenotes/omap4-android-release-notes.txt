@@ -1,16 +1,10 @@
 # =====================================================================
-# L27.9.1 Froyo Hand-off
+# L27.10.1 Froyo Hand-off
 # =====================================================================
 
 Author: Leed Aguilar
-Date: Dec 10th 2010
-Target Release: L27.9.1
-
-# =====================================================================
-# Config Spec
-# ======================================================================
-
-N/A
+Date: Dec 23rd 2010
+Target Release: L27.10.1
 
 # =====================================================================
 # Configuration Settings
@@ -19,21 +13,21 @@ N/A
 [KERNEL]
 Repo   : git://git.omapzoom.org/kernel/omap.git
 Branch : p-android-omap-2.6.35
-Tag    : android-2.6.35-2.2-omap4.9v1
+Tag    : android-2.6.35-2.2-omap4.10v1
 Config : android_4430_defconfig
 
 [U-BOOT]
 Repo   : git://git.omapzoom.org/repo/u-boot.git
 Branch : omap4_dev
-Tag:   : L27.9.1
-Commit : 025fefdbfb6234fe986ac59e7cde5e838981d00a
+Tag:   : L27.10.1
+Commit : 7f57cccdcb93e54f40785d1c1efdfb773439be22
 Config : omap4430sdp_config
 
 [X-LOADER]
 Repo   : git://git.omapzoom.org/repo/x-loader.git
 Branch : omap4_dev
-Tag:   : L27.9.1
-Commit : aadc04ed16b8e1ed11044b2f71144032fd404537
+Tag:   : L27.10.1
+Commit : ce5988b900b7462dfd79e8813be95bd86ee52fd4
 Config : omap4430sdp_config
 
 OS: Linux 2.6.35
@@ -47,7 +41,7 @@ Toolchain: arm-none-linux-gnueabi-gcc (Sourcery G++ Lite 2010q1-202) 4.4.1
 Kernel:
 -------
 1. git clone git://git.omapzoom.org/kernel/omap.git; cd omap/
-2. git checkout -b L27.9.1 android-2.6.35-2.2-omap4.9v1
+2. git checkout -b L27.10.1 android-2.6.35-2.2-omap4.10v1
 3. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- android_4430_defconfig
 4. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- uImage
 ** Output: uImage
@@ -55,7 +49,7 @@ Kernel:
 u-boot:
 -------
 1. git clone  git://git.omapzoom.org/repo/u-boot.git; cd u-boot/
-2. git checkout -b L27.9.1 025fefdbfb6234fe986ac59e7cde5e838981d00a
+2. git checkout -b L27.10.1 7f57cccdcb93e54f40785d1c1efdfb773439be22
 3. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
 4. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi-
 ** Output: u-boot.bin
@@ -64,9 +58,9 @@ u-boot:
 x-loader:
 ---------
 1. git clone git://git.omapzoom.org/repo/x-loader.git; cd x-loader/
-2. git checkout -b L27.9.1 aadc04ed16b8e1ed11044b2f71144032fd404537
-3. make ARCH=arm CCROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
-4. make ARCH=arm CCROSS_COMPILE=arm-none-linux-gnueabi- ift
+2. git checkout -b L27.10.1 ce5988b900b7462dfd79e8813be95bd86ee52fd4
+3. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- omap4430sdp_config
+4. make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- ift
 ** Output:
  - For SDP4430 ES1.0/ES2.0 GP boards: MLO
  - For SDP4430 ES2.0 EMU boards you need to sign the x-load.bin
@@ -111,13 +105,15 @@ http://omappedia.org/wiki/Android_Getting_Started#Building_Android
 
 [HIGHLIGHTS]
 
-- Adding the OMAP DMIC Audio driver
-- Syslink IPU self hibernation support
-- Dmtimer: context save and restore support
-- Enable c4 and C5 states for cpu Idle path
-- Support for OSWR in idle path
-- Support for OWSR is suspend path
-- Support for ABB voltage data
+- DMA: OFF mode support
+- Device OFF support for HS/GP devices
+- C-states transitions support (C1-C5)
+- Low power MP3 support (OPP25)
+- manual update mode support for FB and V4L2
+- EHCI/OHCI suspend/resume support
+- usb: musb: USB remote wakeup support using
+- musb: supporting core retention when host suspends the device
+
 
 [ADB over USB SUPPORT]
 
@@ -131,98 +127,140 @@ More info about ADB can be found here:
 http://omappedia.org/wiki/Support_Tools
 
 # =====================================================================
-# GERRIT IDs and Kernel Changelist
+# Known Issues
 # =====================================================================
 
-Kernel stats from previous L27.9.0 HO:
-
-588 files changed, 20306 insertions(+), 12829 deletions(-)
-
-8798 OMAP4: disable L3 error handling by default
-8853 OMAP4 SDP Board file: Prox enable should be low at boot
-8138 hwmon: (lm75) Trivial changes to pacify the checkpatch
-8137 hwmon: (lm75) Make the writing to sysfs more robust
-8390 CMA3000 accelerometer: Fix delay sysfs to set correct delay
-8571 ASoC: ABE DSP: Add DMIC gain controls
-8426 ASoC: ABE: Implement mute/unmute for DMIC
-8047 ASoC: sdp4430: Update DMIC DAI configuration
-8046 ASoC: DMIC: Set correct DAI capabilities for DMIC
-8045 ASoC: DMIC: Adding the OMAP DMIC driver
-8044 OMAP4: DMIC: Add digital mic PM registration
-8627 ASoC: DAPM: Disable debug in SoC DAPM
-8425 ASoC: McPDM: Balance pm resource after cancelling close workqueue
-8424 ASoC: ABE DSP: Add additional check before disabling the event generator
-8423 ASoC: ABE DSP: Avoid OPP transitions when ABE is inactive
-8802 OMAP4: Vibrator: Use LP PLL for vibrator
-8801 ASoC: SDP4430: Use twl6040 Standard Multimedia mode
-8794 SGX: UDD: Support for flipping with multiple display types
-8790 serial: do not throw away MSR deltas when resuming
-8169 input/touchscreen: Update syntm12xx for no CONFIG_PM compile
-8763 omap: mach-omap2: adapt remoteproc to dmtimer context save / restore
-8755 OMAP: dmtimer: fix off-mode logic and incorrect offsets
-8453 fix read of hmc5843 X, Y, Z data
-8007 omap4: cpufreq: Fix cpufreq notifiers
-8710 syslink: ipu_pm: fix suspend/resume when no IPU image loaded
-8698 OMAP4: Enable syslink IPU self hibernate flag
-8547 OMAP: DSS2: Panel-Taal: Allow update of row and column addresses
-8695 OMAP: dmtimer: incorporate lo comments
-8694 OMAP: dmtimer: optimize omap2_dm_timer_set_src
-8693 OMAP: dmtimer: merge two init functions in mach-omap2
-8692 OMAP: dmtimer: move enable/disable functions to platform
-8691 OMAP: dmtimer: context save and restore
-8477 SYSLINK: IPU-PM: clean up warning in AUXCLK request function
-8471 syslink: procmgr: simulate suspend/resume path
-8468 syslink: ipu_pm: refactor and cleanup functions
-8613 OMAP4: Enable c4 and C5 states for cpu Idle path.
-8476 omap: mach-omap2: support selectable debug traces for ipu_pm
-8472 syslink: ipc: add CONFIG_ flags and traces
-8469 omap: remoteproc: CONFIG flag for self hibernation
-7585 omap:iodmm-send notification on close only when resources not free
-7583 omap: remoteproc - fix sparse warnings in remote proc about static
-7582 syslink: notifier - add a mutext per notify_object
-8056 SYSLINK: notify - reset notify registration chart correctly
-7959 SYSLINK: notify-replace printks with pr_xxx
-7958 SYSLINK: notify-ducati-replace printks with pr_xxx
-7957 SYSLINK: PROCMGR-replace printks with pr_xxx
-7956 SYSLINK: IPC-replace printks with pr_xxx
-8027 OMAP4: voltage: voltage notifier handlers for ABB
-8191 OMAP4: voltage: introduce ABB voltage data
-8190 OMAP: voltage: include struct vdd_info in notifier
-8527 OMAP4: Enable OSWR for Suspend path in defconfig
-8316 OMAP4: Fxing updation retention_logic_off counter for IVA
-8315 OMAP4: Fixing the updation of logic off counter
-8388 OMAP4:PM: Fix the power state of CORE and MPU in C1 and C2
-8514 OMAP4: PM: Update SR settings
-8196 OMAP4/TILER: Color support for allocation-map debug.
-8164 OMAP4/TILER: Add allocation debug interface.
-8559 syslink: ipu_pm: add a core latency constraint when the ipu is running.
-8029 OMAP/V4L2: Allow QBUF while trying to deque the last buffer.
-8031 OMAP/V4L2: Fix STREAMOFF handling if not streaming.
-8485 V4L2/videobuf: Fix issue with calling STREAMOFF while not streaming
-8030 OMAP/V4L2: Correctly return errors from vidioc_streamon
-8028 OMAP:V4L2: Add poll support
-8516 Revert "OMAP/V4L2: Add support for queueing buffers to suspended displays"
-8515 Revert "OMAP/V4L2: Add early suspend handler and ignore state"
-8484 Revert "Remove Early suspend from DSS"
-8483 Revert "OMAP4: Hack to make DSS suspend to work"
+OMAPS00228147: Zero value is reported for temperature.
+OMAPS00226184: Fail to change the FB mode to 8 bpp
+OMAPS00229931: uart console has sluggish behavior when system hit OWSR in idle path
+OMAPS00228153: USB Chapter 9: MSC tests reports a failure in the mass storage feature.
+OMAPS00228155: Video: Setting mirroring after setting rotation to 90 or270 is not working
+OMAPS00229932: FATAL ERROR: SECURITY VIOLATION message is seen while testing writeback support
+OMAPS00229934: S/R when the HDMI output device is used generate a kernel panic and division by zero.
+OMAPS00229933: Video: HDMI: The hotplug funtionality just work once.
 
 # =====================================================================
-# Documentation
+# Kernel Changelist
 # =====================================================================
 
-N/A
+Kernel stats from previous L27.9.1 HO:
 
-# ======================================================================
-# Klocwork Results
-# ======================================================================
+ 237 files changed, 49383 insertions(+), 12722 deletions(-)
 
-N/A
-
-# ======================================================================
-# Benchmarking measurements:
-# ======================================================================
-
-N/A
+a84f36d HACK: use omap_pm_set_max_dev_wakeup_lat under PM flag
+90036c2 OMAP4: PM Using global Mutex instaed of per power domain.
+e84dd4a OMAP4: Avoiding Mutex lock panic in SR
+7d6df7b OMAP4: DSS2: Modification in interlaced buffer to progressive screen mechanism
+b3af940 OMAP4: Suspend resume failure in case of DSI
+ba99f79 OMAP: dmtimer: remove clockact for off-mode
+a48ef2c OMAP4: HACK: Prevent WLAN failure
+c83c766 OMAP4: powerdomain: add INACTIVE support for CPU0
+4f72f31 OMAP4: suspend: Enable IO Daisy for KEYPAD
+2d8b995 OMAP4: SGX: UDD: Fixed checking of manual update support for DSS2
+545b4f1 USB: EHCI/OHCI: Fix compilation error
+54d48fa omap4: usbhs: Use Mux framework APIs for OHCI I/O settings
+bc5d9d7 omap4: usbhs: Use Mux framework APIs for EHCI I/O settings
+3f99206 omap4: usbhs: Enable remote wakeup using I/O pads
+9a59e3d omap4: usbhs: Enable the EHCI and OHCI port clocks
+64310a2 omap4: usbhs: Enable I/O wakeup during global/suspend
+bbd3e25 ZOOM3: isp: REVERT drop temp buffer for ISP rev 2.1
+9defc30 omap3isp: Add secondary csi2 phy
+f4e57cc ZOOM2: fix compilation issue of omap_pm_set_max_mpu_wakeup_lat
+390db46 ZOOM2: Add support for IMX046 and LV8093
+cb4bd97 OMAP4: CPUidle: final C-state recommendations
+3a32398 OMAP: DSS: fix compile error without TILER feature
+aa435fa OMAP: tiler: add dependency for TILER on OMAP4
+c75a7e1 OMAP4: DSS: Making the deault color format of framebuffer ARGB32
+180e171 ZOOM3:I2C: Add I2C defines and disable pullups
+96a1672 twl4030: Define more registers for setting voltages.
+30ca114 OMAP3: camera: fix compilation issue of omap34xxcam
+0e2b256 OMAP3: camera: fix compilation issue of isp
+ef249e8 V4L2: add priv ioctl for omap3 camera
+2a2f965 OMAP3: camera: import isp and omap34xxcam
+00ac941 V4L2: add V4L2_CID_TEST_PATTERN
+54f1d6f OMAP3: camera: import imx046 and lv8093 driver
+844a9df OMAP4: DSS: Framebuffer: UI cloning to HDMI
+40edbc6 OMAP: dmtimer: pm_runtime_get_put_sync() return code change
+8ae1404 TWL6030: Battery: Wakeup from suspend to refresh watchdog
+72e2abd ASoC: HDMI: Add hdmi power constraints
+1badfe5 OMAP4/DSS2/HDMI: Sync-patch from dev.omapzoom.org/kernel-display tree
+7f2a03e OMAP4: DSS2: Added input_size store sysfs entry to dss2 overlay
+6549868 OMAP/SGX: UDD: Make use of new sched_update() call for DSS2 displays
+ecc287a OMAP/V4L2: Optimize V4L2 performance on manual update displays
+8096c18 OMAP/DSS2/DSI/TAAL: Added performance optimization for manual update
+ea1523e OMAP/DSS2/V4L2: Fix concurrency issues with V4L2 in manual update mode
+0e81688 V4L2: manual update mode patch
+5acb64d omap: emif: Remove unused variable compilation warning
+46d4865 DSS Core: Remove unused variable compilation warning
+8e2fc38 OMAP3: Include ES1.1 and ES1.2 in CHIP_GE_OMAP3xxx macros
+d80d9fb OMAP4: SMC alpha prime update
+a27395e Revert "SYSLINK : Disable devh notification for tiler events."
+a3641a6 SYSLINK: ipc - allow some ioctl go through in recovery state
+07a69c7 SYSLINK: ipc - move check for in recovery state per ipc submodule
+e666e3a OMAP4: suspend: Enable IO Daisy for SYS_NIRQ1/2
+f5e7c6f OMAP: mux: Add an api to enable IO daisy wakeup
+30f471b ASoC: ABE DSP: Update control of gain for OFF mode support
+61cf570 ASoc: ABE DSP: Add mute/unmute for AMIC gain
+c89e399 ASoC: abe-dsp: Prepare aess for OFF
+d560773 ASoC: ABE HAL: Add new interface for OFF mode
+7a439cb SGX: UDD: Give support to calculate DPI from framebuffer info
+78b36ae SGX: UDD: Correct update and sync sequence for DPI and HDMI panels
+20867c2 DSS2: Taal: Remove forced auto update scheme
+4616450 DSS2: Taal: Remove mux settings for taal to board file
+bc7c17c TWL6030 Battery: Update the capacity properly.
+f5d1ae3e Revert "OMAP3: DSS: resolve earlier work-arounds"
+ad83393 OMAP3: Add Silicon rev detection for ES1.1 and ES1.2
+9fb2600 OMAP3: DSS: resolve earlier work-arounds
+f8bee7a OMAP3: camera: add ispmmu hwmod
+13650da OMAP3: touchscreen: Add initialization of Synaptics driver
+6c5513d ASoC: ABE DSP: Use 49MHz clock for ABE OPP 25
+aa09e06 ASoC: ABE DSP: Fix OPP level for Sidetone Mixer
+52098af OMAP4: Add support for OPP25 for ABE
+e2bb1ec omap: mach-omap2: don't wake ipu from hibernation for suspend
+64125e1 OMAP2+: DMA: OFF mode support
+cef761a OMAP: PM: DMA: Enable runtime pm
+860af97 ASoc: OMAP4: Modem: Avoid audio voice call suspended during suspend mode
+35a85be ASoC: core: Balance PCM no_pcm backend substream open/close
+dec4197 OMAP: HSI: ensure CAWAKE is low before disabling HSI clocks
+422275a OMAP: HSI: Fixed wrong security check of framesize value
+fc819c8 OMAP4: HSI: Fixed invalid resource for max DMA channels available
+8e04251 OMAP: HSI: Add IOCTL for SW Reset
+636cf97 HSI: Enable clocks before debugfs usage
+604b861 OMAP:HSI: Editorial changes (non functional)
+8ef3be4 OMAP: HSI: Removed ACWAKE line control by hsi_char driver
+3a7d0e1 OMAP: HSI: Fixed possible null-pointer dereference
+0dbe002 OMAP4: HSI: Restored HSI driver broken compatibility with OMAP3 SSI
+a94f174 omap4: pm: Consider the device constraints while enabling off mode
+6246d0a omap4: pm: Restore L3INSTR registers from MPU OSWR/OFF mode
+9a48da5 omap4: pm-debug: Add device OFF counter
+b241fd2 omap4: pm: Work-around for ROM code BUG of IVAHD/TESLA
+5cba1e5 omap4: pm: Add device-off support for HS device
+acfbe94 omap4: pm: Add GP device-off support
+31855d5 omap4: pm: Workaround for DDR corruption on second CS
+d3cca68 omap4: pm: Add device off wakeup status API
+c828b42 omap4: pm: re-organise and fix asm low power code
+1fe5bce omap4: pm: Add SAR sar backup support towards device off
+767a101 OMAP4: PM: Disable cpuidle very early in system suspend
+81b2c3b Revert "OMAP4: dont target OFF for IVA"
+757605b OMAP4: PM: Use the lowpwrstatechange feature on OMAP4
+a7be19a OMAP4: PM: Do not assume clkdm supports hw transitions
+f24b706 omap4: pm: De-assert PWRREQ signal in Device OFF state
+075af19 omap4: powerdomain: Add HWSAR flag to L3INIT and fix the sar APIs
+a84d377 OMAP4: PM: save/restore all CM1/2 settings in OFF mode
+5aa59fb OMAP4: PM: save/restore all DPLL settings in OFF mode
+699076f omap4: voltage: Update OFF mode settings
+305aede omap4: voltage: Add special vsel conditions
+2100c68 omap4: clocks: Keep L3INSTR clock domain modulemode under HW control
+f552a05 omap4: powerdomain: Remove L3INIT_PD OFF state
+b81da1d omap4: clockdomain: l4_secure_clkdm HWSUP doesn't work
+b5dfdf3 usb: musb: Fix for musb when core transitions to off and wakeup
+c083de0 twl6030-usb: call notifier only on vbus state change.
+d6cb2b9 TWL6030-IRQ: wait for irq to be enabled.
+af6ab38 usb: musb: USB remote wakeup support using
+adc9843 usb: musb: phoenix tranciever + internal phy changes as one driver
+e052719 usb: musb: supporting core retention when host suspends the device
+2e13034 usb: musb: Remove idle path phy clock and device enable/disable usage
+f090580 usb: musb: Removed the omap_write/readl usage in the musb driver
 
 # ======================================================================
 
