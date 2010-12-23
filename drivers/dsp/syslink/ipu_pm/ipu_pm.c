@@ -567,6 +567,12 @@ static int ipu_pm_iommu_notifier_call(struct notifier_block *nb,
 {
 	switch ((int)val) {
 	case IOMMU_CLOSE:
+		/*
+		 * restore IOMMU since it is required the IOMMU
+		 * is up and running for reclaiming MMU entries
+		 */
+		if (ipu_pm_get_state(SYS_M3) & SYS_PROC_DOWN)
+			iommu_restore_ctx(ducati_iommu);
 		return 0;
 	case IOMMU_FAULT:
 		ipu_pm_recover_schedule();
@@ -2865,6 +2871,12 @@ int ipu_pm_detach(u16 remote_proc_id)
 
 	if (IS_ERR_OR_NULL(sys_rproc) && IS_ERR_OR_NULL(app_rproc)) {
 		if (!IS_ERR_OR_NULL(ducati_iommu)) {
+			/*
+			 * Restore iommu to allow process's iommu cleanup
+			 * after ipu_pm is shutdown
+			 */
+			if (ipu_pm_get_state(SYS_M3) & SYS_PROC_DOWN)
+				iommu_restore_ctx(ducati_iommu);
 			iommu_unregister_notifier(ducati_iommu,
 					&ipu_pm_notify_nb_iommu_ducati);
 			pr_debug("releasing ducati_iommu\n");
