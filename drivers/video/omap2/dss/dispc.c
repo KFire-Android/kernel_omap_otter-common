@@ -4729,7 +4729,12 @@ static void dispc_error_worker(struct work_struct *work)
 		DSSERR("SYNC_LOST_DIGIT\n");
 		DSSERR("SYNC_LOST_DIGIT, disabling TV\n");
 
-		omapdss_channel_reset(OMAP_DSS_CHANNEL_DIGIT);
+		/* WORKAROUND: Currently on OMAP4 if we get digital underflow we are
+		putting the panel size to be zero. This is causing V4L2 overlay to
+		fail. Temporarily disabling underflow handing till actual fix is found.
+		No side effects found on the functionality of HDMI module */
+		if (!cpu_is_omap44xx())
+			omapdss_channel_reset(OMAP_DSS_CHANNEL_DIGIT);
 	}
 
 	if (errors & DISPC_IRQ_OCP_ERR) {
