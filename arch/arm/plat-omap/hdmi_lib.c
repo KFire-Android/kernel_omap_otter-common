@@ -1124,6 +1124,21 @@ int hdmi_w1_set_wait_phy_pwr(HDMI_PhyPwr_t val)
 		ERR("Failed to set PHY power mode to %d\n", val);
 		return -ENODEV;
 	}
+
+	if(val){
+		/* WORKAROUND: If HDMI is used, switch to no-idle
+		Note: It was experimentally found that smart idle is not
+		working as expected for HDMI wrapper. The 3 interrupts in
+		HDMI wrapper (Cable connect / cable disconnect / Core IRQ)
+		are not getting detected immediately on cable insertion.
+		On switching to NO-IDLE mode doesnt seen to have any impact on
+		DSS going to retention/off via cupu idle path. */
+		REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 3, 2);
+	}else{
+		/* if HDMI is not use, switch to smart-idle */
+		REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x2, 3, 2);
+	}
+
 	return 0;
 }
 
@@ -1720,6 +1735,8 @@ int HDMI_W1_SetWaitSoftReset(void)
 	/* wait till SOFTRESET == 0 */
 	while (FLD_GET(hdmi_read_reg(HDMI_WP, HDMI_WP_SYSCONFIG), 0, 0))
 		;
+	/* WORKAROUND for Cable attach dettach */
+	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 3, 2);
 	return 0;
 }
 
@@ -1741,7 +1758,9 @@ int hdmi_w1_stop_audio_transfer(u32 instanceName)
 {
 	hdmi_w1_audio_stop();
 	/* if audio is not used, switch to smart-idle */
-	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x2, 3, 2);
+	/* WORKAROUND for Cable attach takes care of this condition
+	now */
+	/* REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x2, 3, 2); */
 	return 0;
 }
 
@@ -1751,7 +1770,9 @@ int hdmi_w1_start_audio_transfer(u32 instanceName)
 	 * during audio use-case, switch to no-idle to avoid
 	 * DSS_L3_ICLK clock to be shutdown (as per TRM)
 	 */
-	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 3, 2);
+	/* WORKAROUND for Cable attach takes care of this condition
+	now */
+	/* REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 3, 2); */
 	hdmi_w1_audio_start();
 	printk(KERN_INFO "Start audio transfer...\n");
 	return 0;
