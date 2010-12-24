@@ -60,6 +60,8 @@
 #define HDMI_WP_VIDEO_TIMING_H			0x68ul
 #define HDMI_WP_VIDEO_TIMING_V			0x6Cul
 #define HDMI_WP_WP_CLK				0x70ul
+#define HDMI_WP_WP_DEBUG_CFG			0x90ul
+#define HDMI_WP_WP_DEBUG_DATA			0x94ul
 
 /* HDMI IP Core System */
 #define HDMI_CORE_SYS__VND_IDL			0x0ul
@@ -189,6 +191,11 @@
 #define HDMI_CORE_AV__MPEG_CHSUM		0x28Cul
 #define HDMI_CORE_AV__CP_BYTE1			0x37Cul
 #define HDMI_CORE_AV__CEC_ADDR_ID		0x3FCul
+
+#define HDMI_WP_IRQSTATUS_CORE 0x00000001
+#define HDMI_WP_IRQSTATUS_PHYCONNECT 0x02000000
+#define HDMI_WP_IRQSTATUS_PHYDISCONNECT 0x04000000
+#define HDMI_CORE_SYS__SYS_STAT_HPD 0x02
 
 static struct {
 	void __iomem *base_core;	/* 0 */
@@ -1563,10 +1570,10 @@ int hdmi_set_irqs(int i)
 /* Interrupt handler */
 void HDMI_W1_HPD_handler(int *r)
 {
-	u32 val, set = 0, hpd_intr, core_state, time_in_ms;
+	u32 val, set = 0, hpd_intr = 0, core_state = 0, time_in_ms;
 	static bool first_hpd, dirty;
-	static ktime_t ts_hpd_lo, ts_hpd_hi;
-
+	static ktime_t ts_hpd_low, ts_hpd_high;
+	mdelay(30);
 	DBG("-------------DEBUG-------------------");
 	DBG("%x hdmi_wp_irqstatus\n", \
 		hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS));
@@ -1579,58 +1586,93 @@ void HDMI_W1_HPD_handler(int *r)
 	DBG("-------------DEBUG-------------------");
 
 	val = hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
+	if (val & HDMI_WP_IRQSTATUS_CORE) {
+		core_state = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR_STATE);
+		if (core_state & 0x1) {
 	set = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__SYS_STAT);
 	hpd_intr = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
-	core_state = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR_STATE);
 
-	mdelay(30);
-
-	if (val & 0x02000000) {
-		DBG("connect, ");
-		*r = HDMI_CONNECT;
-	}
-	if ((val & 0x1) && (core_state & 0x1) && (hpd_intr & 0x40)) {
-		if (set & 0x2) {
-			if ((first_hpd == 0) && (dirty == 0)) {
-				*r = HDMI_FIRST_HPD;
-				first_hpd++;
-				DBG("first hpd");
-			} else if (dirty) {
-				ts_hpd_hi = ktime_get();
-				DBG("Temp: HPD high received @%u",
-						(int) ktime_to_ms(ts_hpd_lo));
-				time_in_ms = (int) ktime_to_ms(
-					ktime_sub(ts_hpd_hi, ts_hpd_lo));
-				DBG("HPD lo->high in %u", time_in_ms);
-				if (time_in_ms >= 100)
-					*r = HDMI_HPD_MODIFY;
-				else
-					*r = HDMI_HPD_HIGH;
-				dirty = 0;
-			}
-		} else {
-			ts_hpd_lo = ktime_get();
-			dirty = 1;
-			*r = HDMI_HPD_LOW;
-			DBG("Temp: HPD low received @%u",
-						(int) ktime_to_ms(ts_hpd_lo));
+			hdmi_write_reg(HDMI_WP, HDMI_WP_IRQSTATUS, val);
+			/* flush posted write */
+			hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
 		}
 	}
-	if ((val & 0x04000000) && (!(val & 0x02000000))) {
+
+	if (val & HDMI_WP_IRQSTATUS_PHYCONNECT) {
+		DBG("connect, ");
+		*r |= HDMI_CONNECT;
+	}
+
+	if ((val & HDMI_WP_IRQSTATUS_CORE) && (core_state & 0x1)) {
+		if (hpd_intr & 0x40) {
+			if  (set & HDMI_CORE_SYS__SYS_STAT_HPD) {
+			if ((first_hpd == 0) && (dirty == 0)) {
+					*r |= HDMI_FIRST_HPD;
+				first_hpd++;
+				DBG("first hpd");
+				} else {
+					ts_hpd_high = ktime_get();
+					if (dirty) {
+						time_in_ms =
+						(int)ktime_to_us(ktime_sub\
+						(ts_hpd_high, ts_hpd_low)) / 1000;
+				if (time_in_ms >= 100)
+							*r |= HDMI_HPD_MODIFY;
+				else
+							*r |= HDMI_HPD_HIGH;
+				dirty = 0;
+			}
+				}
+		} else {
+				ts_hpd_low = ktime_get();
+			dirty = 1;
+				*r |= HDMI_HPD_LOW;
+			}
+		}
+	}
+
+	if ((val & HDMI_WP_IRQSTATUS_PHYDISCONNECT)
+		&& (!(val & HDMI_WP_IRQSTATUS_PHYCONNECT))) {
 		DBG("Disconnect");
 		dirty = 0;
 		first_hpd = 0;
-		*r = HDMI_DISCONNECT;
+		*r |= HDMI_DISCONNECT;
 	}
 
+	val = hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
+    if(val){
 	hdmi_write_reg(HDMI_WP, HDMI_WP_IRQSTATUS, val);
 	/* flush posted write */
 	hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
+	}
+}
 
-	/* flush posted write */
-	hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1, hpd_intr);
-	/* Read to flush */
-	hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
+int hdmi_rxdet(void)
+{
+	int state = 0;
+	int loop = 0, val1, val2, val3, val4;
+
+	hdmi_write_reg(HDMI_WP, HDMI_WP_WP_DEBUG_CFG, 4);
+
+	do {
+		val1 = hdmi_read_reg(HDMI_WP, HDMI_WP_WP_DEBUG_DATA);
+		udelay(5);
+		val2 = hdmi_read_reg(HDMI_WP, HDMI_WP_WP_DEBUG_DATA);
+		udelay(5);
+		val3 = hdmi_read_reg(HDMI_WP, HDMI_WP_WP_DEBUG_DATA);
+		udelay(5);
+		val4 = hdmi_read_reg(HDMI_WP, HDMI_WP_WP_DEBUG_DATA);
+	} while ((val1 != val2 || val2 != val3 || val3 != val4)
+		&& (loop < 100));
+
+	hdmi_write_reg(HDMI_WP, HDMI_WP_WP_DEBUG_CFG, 0);
+
+	if (loop == 100)
+		state = -1;
+	else
+		state = (val1 & 1);
+
+	return state;
 }
 
 /* wrapper functions to be used until L24.5 release */

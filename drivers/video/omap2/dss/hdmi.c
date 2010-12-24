@@ -1304,6 +1304,11 @@ static void cancel_hot_plug_notify_work(void)
 	hot_plug_notify_canceled = false;
 }
 
+static int hdmi_is_connected(void)
+{
+	return hdmi_rxdet();
+}
+
 static void hdmi_work_queue(struct work_struct *ws)
 {
 	struct hdmi_work_struct *work =
@@ -1313,6 +1318,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 	unsigned long time;
 	static ktime_t last_connect, last_disconnect;
 	bool notify;
+	int action = 0;
 
 	mutex_lock(&hdmi.lock);
 	mutex_lock(&hdmi.lock_aux);
@@ -1323,7 +1329,12 @@ static void hdmi_work_queue(struct work_struct *ws)
 	DSSDBG("irqstatus=%08x\n hdmi/vid_power=%d/%d",
 		r, hdmi_power, video_power);
 
-	if (r & HDMI_DISCONNECT) {
+	DSSDBG("irqstatus=%08x\n dssdev->state = %d, "
+		"hdmi_power = %d", r, dssdev->state, hdmi_power);
+	if (r & (HDMI_CONNECT | HDMI_DISCONNECT))
+		action = (hdmi_is_connected()) ? HDMI_CONNECT : HDMI_DISCONNECT;
+
+	if (action & HDMI_DISCONNECT) {
 		/* cancel auto-notify */
 		mutex_unlock(&hdmi.lock_aux);
 		mutex_unlock(&hdmi.lock);
@@ -1332,7 +1343,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 		mutex_lock(&hdmi.lock_aux);
 	}
 
-	if ((r & HDMI_DISCONNECT) && !(r & HDMI_IN_RESET) &&
+	if ((action & HDMI_DISCONNECT) && !(r & HDMI_IN_RESET) &&
 	    (hdmi_power == HDMI_POWER_FULL)) {
 		/*
 		 * Wait at least 100ms after HDMI_CONNECT to decide if
@@ -1386,10 +1397,10 @@ static void hdmi_work_queue(struct work_struct *ws)
 	}
 
 	/* read connect timestamp */
-	if (r & HDMI_CONNECT)
+	if (action & HDMI_CONNECT)
 		last_connect = ktime_get();
 
-	if (r & HDMI_CONNECT) {
+	if (action & HDMI_CONNECT) {
 		if (!edid_set && !custom_set) {
 			/*
 			 * Schedule hot-plug-notify in 1 sec in case no HPD
@@ -1408,14 +1419,13 @@ static void hdmi_work_queue(struct work_struct *ws)
 		}
 	}
 
-	if ((r & HDMI_CONNECT) && (video_power == HDMI_POWER_MIN) &&
+	if ((action & HDMI_CONNECT) && (video_power == HDMI_POWER_MIN) &&
 		(hdmi_power != HDMI_POWER_FULL)) {
 
 		DSSINFO("Physical Connect\n");
 
 		/* turn on clocks on connect */
 		hdmi_reconfigure(dssdev);
-		hdmi_set_irqs(0);
 		mutex_unlock(&hdmi.lock_aux);
 		hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
 		mutex_unlock(&hdmi.lock);
@@ -1458,7 +1468,6 @@ static void hdmi_work_queue(struct work_struct *ws)
 		/* force a new power-up to read EDID */
 		edid_set = false;
 		hdmi_reconfigure(dssdev);
-		hdmi_set_irqs(0);
 		set_hdmi_hot_plug_status(dssdev, true);
 		/* ignore return value for now */
 	}
@@ -1473,7 +1482,7 @@ static inline void hdmi_handle_irq_work(int r)
 {
 	struct hdmi_work_struct *work;
 	if (r) {
-		work = kmalloc(sizeof(*work), GFP_KERNEL);
+		work = kmalloc(sizeof(*work), GFP_ATOMIC);
 
 		if (work) {
 			INIT_WORK(&work->work, hdmi_work_queue);
@@ -1520,7 +1529,6 @@ static void hdmi_power_off_phy(struct omap_dss_device *dssdev)
 
 	HDMI_W1_StopVideoFrame(HDMI_WP);
 
-	hdmi_set_irqs(1);
 	dispc_enable_digit_out(0);
 
 	hdmi_phy_off(HDMI_WP);
