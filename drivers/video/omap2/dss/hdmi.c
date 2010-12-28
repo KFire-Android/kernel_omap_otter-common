@@ -794,8 +794,6 @@ static int hdmi_phy_init(u32 w1,
 	/* write to phy address 1 to start HDMI line (TXVALID and TMDSCLKEN) */
 	hdmi_write_reg(phy, HDMI_TXPHY_DIGITAL_CTRL, 0xF0000000);
 
-	/* setup max LDO voltage */
-	REG_FLD_MOD(phy, HDMI_TXPHY_POWER_CTRL, 0xB, 3, 0);
 	/*  write to phy address 3 to change the polarity control  */
 	REG_FLD_MOD(phy, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
 
