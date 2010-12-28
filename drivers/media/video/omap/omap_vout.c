@@ -40,7 +40,11 @@
 #include <linux/videodev2.h>
 #include <linux/slab.h>
 
+#ifndef CONFIG_ARCH_OMAP4
+#include <media/videobuf-dma-sg.h>
+#else
 #include <media/videobuf-dma-contig.h>
+#endif
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
 
@@ -209,12 +213,11 @@ const static struct v4l2_fmtdesc omap_formats[] = {
  */
 static unsigned long omap_vout_alloc_buffer(u32 buf_size, u32 *phys_addr)
 {
-	u32 order, size;
+	u32 size;
 	unsigned long virt_addr, addr;
 
 	size = PAGE_ALIGN(buf_size);
-	order = get_order(size);
-	virt_addr = __get_free_pages(GFP_KERNEL | GFP_DMA, order);
+	virt_addr = (u32) alloc_pages_exact(size, GFP_KERNEL | GFP_DMA);
 	addr = virt_addr;
 
 	if (virt_addr) {
@@ -244,7 +247,11 @@ static void omap_vout_free_buffer(unsigned long virtaddr, u32 buf_size)
 		addr += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
+#ifndef CONFIG_ARCH_OMAP4
+	free_pages_exact((void *) virtaddr, size);
+#else
 	free_pages((unsigned long) virtaddr, order);
+#endif
 }
 
 #ifndef CONFIG_ARCH_OMAP4
@@ -1520,13 +1527,15 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 			    struct videobuf_buffer *vb,
 			    enum v4l2_field field)
 {
-	dma_addr_t dmabuf;
 #ifndef CONFIG_ARCH_OMAP4
 	struct vid_vrfb_dma *tx;
 	enum dss_rotation rotation;
 	u32 dest_frame_index = 0, src_element_index = 0;
 	u32 dest_element_index = 0, src_frame_index = 0;
 	u32 elem_count = 0, frame_count = 0, pixsize = 2;
+	struct videobuf_dmabuf *dmabuf = NULL;
+#else
+	dma_addr_t dmabuf;
 #endif
 	struct omap_vout_device *vout = q->priv_data;
 #ifdef CONFIG_PM
@@ -1548,17 +1557,24 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 	if (V4L2_MEMORY_USERPTR == vb->memory) {
 		if (0 == vb->baddr)
 			return -EINVAL;
+		/* Virtual address */
+		/* priv points to struct videobuf_pci_sg_memory. But we went
+		 * pointer to videobuf_dmabuf, which is member of
+		 * videobuf_pci_sg_memory */
+		dmabuf = videobuf_to_dma(q->bufs[vb->i]);
+		dmabuf->vmalloc = (void *) vb->baddr;
+
 		/* Physical address */
-		vout->queued_buf_addr[vb->i] = (u8 *)
-			omap_vout_uservirt_to_phys(vb->baddr);
-	} else {
-		vout->queued_buf_addr[vb->i] = (u8 *)vout->buf_phy_addr[vb->i];
+		dmabuf->bus_addr = (dma_addr_t) omap_vout_uservirt_to_phys(vb->baddr);
 	}
 
-	if (!rotation_enabled(vout))
+	if (!rotation_enabled(vout)) {
+		dmabuf = videobuf_to_dma(q->bufs[vb->i]);
+		vout->queued_buf_addr[vb->i] = (u8 *) dmabuf->bus_addr;
 		return 0;
+	}
 
-	dmabuf = vout->buf_phy_addr[vb->i];
+	dmabuf = videobuf_to_dma(q->bufs[vb->i]);
 	/* If rotation is enabled, copy input buffer into VRFB
 	 * memory space using DMA. We are copying input buffer
 	 * into VRFB memory space of desired angle and DSS will
@@ -1587,7 +1603,7 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 			tx->dev_id, 0x0);
 	/* src_port required only for OMAP1 */
 	omap_set_dma_src_params(tx->dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
-			dmabuf, src_element_index, src_frame_index);
+			dmabuf->bus_addr, src_element_index, src_frame_index);
 	/*set dma source burst mode for VRFB */
 	omap_set_dma_src_burst_mode(tx->dma_ch, OMAP_DMA_DATA_BURST_16);
 	rotation = calc_rotation(vout);
@@ -1717,6 +1733,8 @@ static int omap_vout_mmap(struct file *file, struct vm_area_struct *vma)
 #ifndef CONFIG_ARCH_OMAP4
 	unsigned long start = vma->vm_start;
 	unsigned long size = (vma->vm_end - vma->vm_start);
+	struct page *cpage;
+	struct videobuf_dmabuf *dmabuf = NULL;
 #else
 	int j = 0, k = 0, m = 0, p = 0, m_increment = 0;
 #endif
@@ -1749,14 +1767,17 @@ static int omap_vout_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 	vma->vm_ops = &omap_vout_vm_ops;
 	vma->vm_private_data = (void *) vout;
-	pos = (void *)vout->buf_virt_addr[i];
 #ifndef CONFIG_ARCH_OMAP4
-	vma->vm_pgoff = virt_to_phys((void *)pos) >> PAGE_SHIFT;
+	dmabuf = videobuf_to_dma(q->bufs[i]);
+	pos = (void *)(dmabuf->bus_addr);
+
 	while (size > 0) {
-		unsigned long pfn;
-		pfn = virt_to_phys((void *) pos) >> PAGE_SHIFT;
-		if (remap_pfn_range(vma, start, pfn, PAGE_SIZE, PAGE_SHARED))
+		cpage = pfn_to_page(((unsigned int) pos) >> PAGE_SHIFT);
+		if (vm_insert_page(vma, start, cpage)) {
+			printk(KERN_ERR "vout_mmap: Failed to insert bus_addr"
+					"page to VMA \n");
 			return -EAGAIN;
+		}
 		start += PAGE_SIZE;
 		pos += PAGE_SIZE;
 		size -= PAGE_SIZE;
@@ -1958,9 +1979,15 @@ static int omap_vout_open(struct file *file)
 	video_vbq_ops.buf_queue = omap_vout_buffer_queue;
 	spin_lock_init(&vout->vbq_lock);
 
+#ifndef CONFIG_ARCH_OMAP4
+	videobuf_queue_sg_init(q, &video_vbq_ops, q->dev,
+			&vout->vbq_lock, vout->type, V4L2_FIELD_NONE,
+			sizeof(struct videobuf_buffer), vout);
+#else
 	videobuf_queue_dma_contig_init(q, &video_vbq_ops, q->dev,
 			&vout->vbq_lock, vout->type, V4L2_FIELD_NONE,
 			sizeof(struct videobuf_buffer), vout);
+#endif
 
 	v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev, "Exiting %s\n", __func__);
 	return 0;
@@ -2561,6 +2588,7 @@ static int vidioc_reqbufs(struct file *file, void *fh,
 	unsigned int i;
 #ifndef CONFIG_ARCH_OMAP4
 	unsigned int num_buffers = 0;
+	struct videobuf_dmabuf *dmabuf = NULL;
 #endif
 	struct omap_vout_device *vout = fh;
 	struct videobuf_queue *q = &vout->vbq;
@@ -2590,7 +2618,8 @@ static int vidioc_reqbufs(struct file *file, void *fh,
 		num_buffers = (vout->vid == OMAP_VIDEO1) ?
 			video1_numbuffers : video2_numbuffers;
 		for (i = num_buffers; i < vout->buffer_allocated; i++) {
-			omap_vout_free_buffer(vout->buf_virt_addr[i],
+			dmabuf = videobuf_to_dma(q->bufs[i]);
+			omap_vout_free_buffer((u32)dmabuf->vmalloc,
 						vout->buffer_size);
 			vout->buf_virt_addr[i] = 0;
 			vout->buf_phy_addr[i] = 0;
@@ -2623,7 +2652,14 @@ static int vidioc_reqbufs(struct file *file, void *fh,
 		goto reqbuf_err;
 
 	vout->buffer_allocated = req->count;
-
+#ifndef CONFIG_ARCH_OMAP4
+	for (i = 0; i < req->count; i++) {
+		dmabuf = videobuf_to_dma(q->bufs[i]);
+		dmabuf->vmalloc = (void *) vout->buf_virt_addr[i];
+		dmabuf->bus_addr = (dma_addr_t) vout->buf_phy_addr[i];
+		dmabuf->sglen = 1;
+	}
+#endif
 reqbuf_err:
 	mutex_unlock(&vout->lock);
 	return ret;
