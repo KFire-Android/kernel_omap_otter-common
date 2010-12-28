@@ -225,6 +225,27 @@ static struct omapfb_colormode omapfb_colormodes[] = {
 		.bits_per_pixel = 16,
 		.nonstd = OMAPFB_COLOR_YUY422,
 	}, {
+		.dssmode = OMAP_DSS_COLOR_CLUT2,
+		.bits_per_pixel = 2,
+		.red    = { .length = 8, .offset = 0, .msb_right = 0 },
+		.green  = { .length = 8, .offset = 1, .msb_right = 0 },
+		.blue   = { .length = 8, .offset = 0, .msb_right = 0 },
+		.transp = { .length = 0, .offset = 0, .msb_right = 0 },
+	}, {
+		.dssmode = OMAP_DSS_COLOR_CLUT4,
+		.bits_per_pixel = 4,
+		.red    = { .length = 8, .offset = 2, .msb_right = 0 },
+		.green  = { .length = 8, .offset = 1, .msb_right = 0 },
+		.blue   = { .length = 0, .offset = 0, .msb_right = 0 },
+		.transp = { .length = 0, .offset = 0, .msb_right = 0 },
+	}, {
+		.dssmode = OMAP_DSS_COLOR_CLUT8,
+		.bits_per_pixel = 8,
+		.red    = { .length = 8, .offset = 4, .msb_right = 0 },
+		.green  = { .length = 8, .offset = 2, .msb_right = 0 },
+		.blue   = { .length = 8, .offset = 0, .msb_right = 0 },
+		.transp = { .length = 0, .offset = 6, .msb_right = 0 },
+	}, {
 		.dssmode = OMAP_DSS_COLOR_ARGB16,
 		.bits_per_pixel = 16,
 		.red	= { .length = 4, .offset = 8, .msb_right = 0 },
@@ -944,7 +965,11 @@ int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 			break;
 		}
 	default:
-		screen_width = fix->line_length / (var->bits_per_pixel >> 3);
+		if (var->bits_per_pixel >> 3)
+			screen_width = fix->line_length
+					/ (var->bits_per_pixel >> 3);
+		else
+			screen_width = fix->line_length;
 		break;
 	}
 
@@ -1834,7 +1859,11 @@ int omapfb_realloc_fbmem(struct fb_info *fbi, unsigned long size, int type)
 	unsigned int w, h, bytespp;
 	w = var->xres;
 	h = var->yres;
-	bytespp = var->bits_per_pixel >> 0x3;
+
+	if (var->bits_per_pixel >> 0x3)
+		bytespp = var->bits_per_pixel >> 0x3;
+	else
+		bytespp = 1;
 
 	if (type > OMAPFB_MEMTYPE_MAX)
 		return -EINVAL;

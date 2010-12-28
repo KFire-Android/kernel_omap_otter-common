@@ -2626,7 +2626,7 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 	case OMAP_DSS_COLOR_CLUT1:
 	case OMAP_DSS_COLOR_CLUT2:
 	case OMAP_DSS_COLOR_CLUT4:
-		BUG();
+	case OMAP_DSS_COLOR_CLUT8:
 		return;
 	default:
 		ps = color_mode_to_bpp(color_mode) / 8;
@@ -2849,6 +2849,13 @@ int dispc_scaling_decision(u16 width, u16 height,
 	int x, y;			/* decimation search variables */
 	unsigned long fclk_max = dispc_fclk_rate();
 
+        if (bpp < 16) {
+                *x_decim = 1;
+                *y_decim = 1;
+                *three_tap = 0;
+                return 0;
+        }
+
 	/* restrict search region based on whether we can decimate */
 	if (!can_decimate_x) {
 		if (min_x_decim > 1)
@@ -3032,7 +3039,6 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	/* check if color format is supported */
 	if (plane == OMAP_DSS_GFX) {
 		switch (color_mode) {
-		case OMAP_DSS_COLOR_CLUT8:
 		case OMAP_DSS_COLOR_ARGB16:
 		case OMAP_DSS_COLOR_ARGB32:
 		case OMAP_DSS_COLOR_RGBA32:
@@ -3045,6 +3051,9 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		case OMAP_DSS_COLOR_RGB16:
 		case OMAP_DSS_COLOR_RGB24P:
 		case OMAP_DSS_COLOR_RGB24U:
+		case OMAP_DSS_COLOR_CLUT8:
+		case OMAP_DSS_COLOR_CLUT4:
+		case OMAP_DSS_COLOR_CLUT2:
 			break;
 
 		default:
