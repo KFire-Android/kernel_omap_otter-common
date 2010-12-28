@@ -26,10 +26,13 @@
 
 #define LCD_XRES		800
 #define LCD_YRES		480
-/* NEC MIN PIX Clock is 21.8MHz */
-/* Typical PIX clock is 23.8MHz */
-/* Maximum is 25.7MHz */
-#define LCD_PIXEL_CLOCK		23800
+
+#define LCD_PIXCLOCK_MIN	21800 /* NEC MIN PIX Clock is 21.8MHz */
+#define LCD_PIXCLOCK_TYP	23800 /* Typical PIX clock is 23.8MHz */
+#define LCD_PIXCLOCK_MAX	25700 /* Maximum is 25.7MHz */
+
+/* Current Pixel clock */
+#define LCD_PIXEL_CLOCK		LCD_PIXCLOCK_MIN
 
 /* NEC NL8048HL11-01B  Manual
  * defines HFB, HSW, HBP, VFP, VSW, VBP as shown below
