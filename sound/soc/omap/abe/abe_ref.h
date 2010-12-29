@@ -75,12 +75,19 @@ void abe_dbg_error_log(u32 x);
 void abe_init_asrc_vx_dl(s32 dppm);
 void abe_init_asrc_vx_ul(s32 dppm);
 void abe_init_asrc_mm_ext_in(s32 dppm);
+void abe_init_asrc_bt_ul(s32 dppm);
+void abe_init_asrc_bt_dl(s32 dppm);
 //u8 *memmove(u8 *dst, u8 *src, u32 n);
 //u32 __get_unaligned_memmove32(void *p);
 //void __put_unaligned_memmove32(u32 val, void *p);
 /*
  * HAL INTERNAL DATA
  */
+extern void __iomem *io_base;
+extern u16 MultiFrame[PROCESSING_SLOTS][TASKS_IN_SLOT];
+extern ABE_SIODescriptor sio_desc;
+extern ABE_SPingPongDescriptor desc_pp;
+extern abe_satcdescriptor_aess atc_desc;
 extern const u32 abe_port_priority[LAST_PORT_ID - 1];
 extern u32 abe_compensated_mixer_gain;
 extern u8 abe_muted_gains_indicator[MAX_NBGAIN_CMEM];

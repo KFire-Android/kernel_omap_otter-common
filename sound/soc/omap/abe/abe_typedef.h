@@ -36,23 +36,6 @@ typedef ABE_uint16 *pABE_uint16;
 typedef ABE_int16 *pABE_int16;
 typedef ABE_int32 *pABE_int32;
 typedef ABE_uint32 *pABE_uint32;
-#ifdef __chess__
-typedef struct abeatcdescTag {
-	unsigned long a;
-	unsigned long b;
-} ABE_SAtcDescriptor;
-typedef void (*pABE_voidFunction) () clobbers(R0, R1, R2, R3, R4,
-					      R5, R6, R7, R13);
-typedef void (*pABE_voidFunctionsList[]) () clobbers(R0, R1, R2, R3, R4,
-						     R5, R6, R7, R13);
-typedef void (*pABE_cmdFunction) () clobbers(R0, R1, R2, R3, R4,
-					     R5, R6, R7, R13);
-typedef void (*pABE_cmdFunctionsList[]) () clobbers(R0, R1, R2, R3, R4,
-						    R5, R6, R7, R13);
-typedef void (*pABE_copyFunction) (ABE_uint16 chess_storage(R13)) clobbers(R13);
-typedef void (*pABE_copyFunctionsList[]) (ABE_uint16 chess_storage(R13))
-clobbers(R13);
-#endif
 /*
  * Commonly used structures
  */
@@ -213,51 +196,4 @@ typedef struct {
 	/* 22: samples available in the ping/pong buffer 1 */
 	ABE_uint16 nextbuff1_Samples;
 } ABE_SPingPongDescriptor;
-#ifdef __chess__
-/* [W] asrc output used for the next ASRC call (+/- 1 / 0)*/
-#define drift_ASRC 0
-/* [W] asrc output used for controlling the number of samples to be
-	exchanged (+/- 1 / 0) */
-#define drift_io 2
-/* DMAReq address or HOST IRQ buffer address (ATC ADDRESS) */
-#define hw_ctrl_addr 4
-/* index of the copy subroutine */
-#define copy_func_index 6
-/* X number of SMEM samples to move */
-#define x_io 7
-/* 0 for mono data, 1 for stereo data */
-#define data_size 8
-/* internal SMEM buffer INITPTR pointer index */
-#define smem_addr 9
-/* data content to be loaded to "hw_ctrl_addr" */
-#define atc_irq_data 10
-/* ATC descriptor address */
-#define atc_address 11
-/* THR1; For stereo data, THR1 is provided by HAL as THR1<<1 */
-#define threshold_1 12
-/* THR2; For stereo data, THR2 is provided by HAL as THR2<<1 */
-#define threshold_2 13
-/* UP_1; For stereo data, UP_1 is provided by HAL as UP_1<<1 */
-#define update_1 14
-/* UP_2; For stereo data, UP_2 is provided by HAL as UP_2<<1 */
-#define update_2 15
-/* Flow error counter */
-#define flow_counter 16
-/* Read DMEM =0, Write DMEM =3 (ATC offset of the access pointer) */
-#define direction_rw 17
-/* ping/pong buffer flag */
-#define counter 11
-/* current Base address of the working buffer */
-#define workbuff_BaseAddr 12
-/* samples left in the working buffer */
-#define workbuff_Samples 14
-/* Base address of the ping/pong buffer 0 */
-#define nextbuff0_BaseAddr 16
-/* samples available in the ping/pong buffer 0 */
-#define nextbuff0_Samples 18
-/* samples available in the ping/pong buffer 0 */
-#define nextbuff1_BaseAddr 20
-/* samples available in the ping/pong buffer 1 */
-#define nextbuff1_Samples 22
-#endif
 #endif/* _ABE_TYPEDEF_H_ */

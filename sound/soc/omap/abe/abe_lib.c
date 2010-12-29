@@ -19,9 +19,6 @@
  * 02110-1301 USA
  */
 #include "abe_main.h"
-#if PC_SIMULATION
-#include <stdlib.h>
-#endif
 /**
 * abe_fprintf
 * @line: character line to be printed

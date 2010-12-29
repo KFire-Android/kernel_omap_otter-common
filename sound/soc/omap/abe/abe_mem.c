@@ -20,22 +20,6 @@
  */
 #include "abe_main.h"
 
-#define ABE_PMEM_BASE_OFFSET_MPU	0xe0000
-#define ABE_CMEM_BASE_OFFSET_MPU	0xa0000
-#define ABE_SMEM_BASE_OFFSET_MPU	0xc0000
-#define ABE_DMEM_BASE_OFFSET_MPU	0x80000
-#define ABE_ATC_BASE_OFFSET_MPU		0xf1000
-
-void __iomem *io_base;
-/**
- * abe_init_mem - Allocate Kernel space memory map for ABE
- *
- * Memory map of ABE memory space for PMEM/DMEM/SMEM/DMEM
- */
-void abe_init_mem(void __iomem *_io_base)
-{
-	io_base = _io_base;
-}
 /**
  * abe_block_copy
  * @direction: direction of the data move (Read/Write)
@@ -93,7 +77,7 @@ void abe_block_copy(u32 direction, u32 memory_bank, u32 address,
  *
  * Reset ABE memory
  */
-     void abe_reset_mem(u32 memory_bank, u32 address, u32 nb_bytes)
+void abe_reset_mem(u32 memory_bank, u32 address, u32 nb_bytes)
 {
 	u32 i;
 	u32 *dst_ptr, n;
@@ -113,28 +97,4 @@ void abe_block_copy(u32 direction, u32 memory_bank, u32 address,
 	n = (nb_bytes / 4);
 	for (i = 0; i < n; i++)
 		*dst_ptr++ = 0;
-}
-/**
- * abe_check_activity - Check if some ABE activity.
- *
- * Check if any ABE ports are running.
- * return 1: still activity on ABE
- * return 0: no more activity on ABE. Event generator can be stopped
- *
- */
-u32 abe_check_activity(void)
-{
-	u32 i;
-	u32 ret;
-
-	ret = 0;
-	for (i = 0; i < (LAST_PORT_ID - 1); i++) {
-		if (abe_port[abe_port_priority[i]].status ==
-				OMAP_ABE_PORT_ACTIVITY_RUNNING)
-			break;
-	}
-	if (i < (LAST_PORT_ID - 1))
-		ret = 1;
-
-	return ret;
 }

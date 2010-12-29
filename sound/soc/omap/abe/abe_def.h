@@ -120,12 +120,14 @@
 #define MIX_VXREC_INPUT_TONES 1
 #define MIX_VXREC_INPUT_VX_UL 2
 #define MIX_VXREC_INPUT_VX_DL 3
+#define MIX_ECHO_DL1	0
+#define MIX_ECHO_DL2	1
 /* nb of samples to route */
 #define NBROUTE_UL 16
 /* 10 routing tables max */
 #define NBROUTE_CONFIG_MAX 10
 /* 5 pre-computed routing tables */
-#define NBROUTE_CONFIG 5
+#define NBROUTE_CONFIG 6
 /* AMIC on VX_UL */
 #define UPROUTE_CONFIG_AMIC 0
 /* DMIC first pair on VX_UL */
@@ -136,6 +138,8 @@
 #define UPROUTE_CONFIG_DMIC3 3
 /* BT_UL on VX_UL */
 #define UPROUTE_CONFIG_BT 4
+/* ECHO_REF on MM_UL2 */
+#define UPROUTE_ECHO_MMUL2 5
 /* call-back indexes */
 #define MAXCALLBACK 100
 /* subroutines */
@@ -176,9 +180,10 @@
 #define FORCED_DRIFT_CONTROL 1
 /* for abe_set_asrc_drift_control */
 #define ADPATIVE_DRIFT_CONTROL 2
-#define DOPPMODE32_OPP100 (0x00000010 | (0x00000000<<16))
-#define DOPPMODE32_OPP50 (0x0000000C | (0x0000004<<16))
-#define DOPPMODE32_OPP25 (0x0000004 | (0x0000000C<<16))
+/* number of task/slot depending on the OPP value */
+#define DOPPMODE32_OPP100 (0x00000010)
+#define DOPPMODE32_OPP50 (0x0000000C)
+#define DOPPMODE32_OPP25 (0x0000004)
 /*
  * ABE CONST AREA FOR PARAMETERS TRANSLATION
  */
@@ -203,6 +208,7 @@
 #define GAIN_M50dB -5000L
 /* muted gain = -120 decibels */
 #define MUTE_GAIN -12000L
+#define GAIN_TOOLOW -13000L
 #define GAIN_MUTE MUTE_GAIN
 #define RAMP_MINLENGTH 3L
 /* ramp_t is in milli- seconds */
@@ -237,16 +243,10 @@
 #define NOPARAMETER 0
 /* number of ATC access upon AMIC DMArequests, all the FIFOs are enabled */
 #define MCPDM_UL_ITER 4
-/* All the McPDM FIFOs are enabled simultaneously MCPDMDL_IP THR = 4 */
+/* All the McPDM FIFOs are enabled simultaneously */
 #define MCPDM_DL_ITER 24
 /* All the DMIC FIFOs are enabled simultaneously */
 #define DMIC_ITER 12
-/* port / flow management */
-#define DEFAULT_THR_READ 1
-/* port / flow management */
-#define DEFAULT_THR_WRITE 1
-/* allows control on the PDM line */
-#define DEFAULT_CONTROL_MCPDMDL 1
 /* TBD later if needed */
 #define MAX_PINGPONG_BUFFERS 2
 /*
@@ -262,8 +262,6 @@
 #define c_write_eq2 5
 #define c_feat_read_eq3 6
 #define c_write_eq3 7
-/* ATC FIFOs pointer margin before the scheduler is resynchronized */
-#define JITTER_MARGIN 4
 /* max number of gain to be controlled by HAL */
 #define MAX_NBGAIN_CMEM 34
 /*
@@ -272,4 +270,5 @@
 #define maximum(a,b) (((a)<(b))?(b):(a))
 #define minimum(a,b) (((a)>(b))?(b):(a))
 #define absolute(a) (((a)>0)?(a):((-1)*(a)))
+#define HAL_VERSIONS 9
 #endif/* _ABE_DEF_H_ */

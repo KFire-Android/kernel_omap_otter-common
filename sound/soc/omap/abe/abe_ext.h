@@ -22,39 +22,18 @@
 #define _ABE_EXT_H_
 /* Tuning is done on PC ? */
 #define PC_SIMULATION 0
-#if PC_SIMULATION
-extern void target_server_read_pmem(u32 address, u32 *data,
-				    u32 nb_words_32bits);
-extern void target_server_write_pmem(u32 address, u32 *data,
-				     u32 nb_words_32bits);
-extern void target_server_read_cmem(u32 address, u32 *data,
-				    u32 nb_words_32bits);
-extern void target_server_write_cmem(u32 address, u32 *data,
-				     u32 nb_words_32bits);
-extern void target_server_read_atc(u32 address, u32 *data,
-				   u32 nb_words_32bits);
-extern void target_server_write_atc(u32 address, u32 *data,
-				    u32 nb_words_32bits);
-extern void target_server_read_smem(u32 address_48bits, u32 *data,
-				    u32 nb_words_48bits);
-extern void target_server_write_smem(u32 address_48bits, u32 *data,
-				     u32 nb_words_48bits);
-extern void target_server_read_dmem(u32 address_byte, u32 *data, u32 nb_byte);
-extern void target_server_write_dmem(u32 address_byte, u32 *data, u32 nb_byte);
-extern void target_server_activate_mcpdm_ul(void);
-extern void target_server_activate_mcpdm_dl(void);
-extern void target_server_activate_dmic(void);
-extern void target_server_set_voice_sampling(int dVirtAudioVoiceMode,
-					     int
-					     dVirtAudioVoiceSampleFrequency);
-extern void target_server_set_dVirtAudioMultimediaMode(int
-						       dVirtAudioMultimediaMode);
-#endif
 /*
  * OS DEPENDENT MMU CONFIGURATION
  */
 #define _lock_enter
 #define _lock_exit
+#define ABE_PMEM_BASE_OFFSET_MPU	0xe0000
+#define ABE_CMEM_BASE_OFFSET_MPU	0xa0000
+#define ABE_SMEM_BASE_OFFSET_MPU	0xc0000
+#define ABE_DMEM_BASE_OFFSET_MPU	0x80000
+#define ABE_ATC_BASE_OFFSET_MPU		0xf1000
+/* default base address for io_base */
+#define ABE_DEFAULT_BASE_ADDRESS_L3 0x49000000L
 /* base address used for L3/DMA access */
 #define ABE_ATC_BASE_ADDRESS_L3 0x490F1000L
 /* base address used for L4/MCU access */

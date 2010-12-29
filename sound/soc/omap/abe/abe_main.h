@@ -24,6 +24,8 @@
 #include "abe_dm_addr.h"
 #include "abe_sm_addr.h"
 #include "abe_cm_addr.h"
+#include "abe_define.h"
+#include "abe_fw.h"
 #include "abe_def.h"
 #include "abe_typ.h"
 #include "abe_ext.h"
@@ -43,5 +45,5 @@
 /* low-level log files */
 #define ABE_DEBUG_LL_LOG                0
 #define ABE_DEBUG (ABE_DEBUG_CHECKERS | ABE_DEBUG_HWFILE | ABE_DEBUG_LL_LOG)
-extern void abe_init_mem(void __iomem *_io_base);
 #endif /* _ABE_MAIN_H_ */
+

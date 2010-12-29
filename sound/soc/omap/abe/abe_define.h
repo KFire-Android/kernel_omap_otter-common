@@ -38,8 +38,6 @@
 #define GAINS_WITH_RAMP1                                    14
 #define GAINS_WITH_RAMP2                                    22
 #define GAINS_WITH_RAMP_TOTAL                               36
-#define EANC_FIR_TAPS                                       21
-#define EANC_IIR_ORDER                                      8
 #define ASRC_MEMLENGTH                                      40
 #define ASRC_UL_VX_FIR_L                                    19
 #define ASRC_DL_VX_FIR_L                                    19
@@ -54,12 +52,14 @@
 #define SAMP_LOOP_48K                                       12
 #define SAMP_LOOP_16K                                       4
 #define SAMP_LOOP_8K                                        2
-#define INPUT_SCALE_SHIFTM2                                 5348
-#define OUTPUT_SCALE_SHIFTM2                                5352
-#define MUTE_SCALING                                        5356
+#define INPUT_SCALE_SHIFTM2                                 5052
+#define OUTPUT_SCALE_SHIFTM2                                5056
+#define MUTE_SCALING                                        5060
 #define ABE_PMEM                                            1
 #define ABE_CMEM                                            2
 #define ABE_SMEM                                            3
 #define ABE_DMEM                                            4
 #define ABE_ATC                                             5
+#define ASRC_BT_UL_FIR_L                                    19
+#define ASRC_BT_DL_FIR_L                                    19
 #endif/* _ABE_DEFINE_H_ */

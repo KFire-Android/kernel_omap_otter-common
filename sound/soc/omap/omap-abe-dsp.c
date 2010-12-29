@@ -192,7 +192,7 @@ static irqreturn_t abe_irq_handler(int irq, void *dev_id)
 
 	/* TODO: handle underruns/overruns/errors */
 	pm_runtime_get_sync(&pdev->dev);
-	abe_irq_clear();
+	abe_clear_irq();
 	abe_irq_processing();
 	pm_runtime_put_sync(&pdev->dev);
 

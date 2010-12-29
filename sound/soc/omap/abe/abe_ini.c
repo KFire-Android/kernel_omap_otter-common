@@ -20,9 +20,6 @@
  */
 #include "abe_main.h"
 #include "abe_dm_addr.h"
-
-short MultiFrame[PROCESSING_SLOTS][TASKS_IN_SLOT];
-
 /*
  * initialize the default values for call-backs to subroutines
  * - FIFO IRQ call-backs for sequenced tasks
@@ -44,25 +41,6 @@ void abe_hw_configuration()
 	/* enables the MCU IRQ from AESS to Cortex A9 */
 	atc_reg = 0x01;
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_ATC, 0x3C, &atc_reg, 4);
-}
-/**
- * abe_disable_clear - disable MCU/DSP ABE interrupt
- *
- * This subroutine is disabling ABE MCU/DSP Irq
- */
-abehal_status abe_disable_irq(void)
-{
-	u32 atc_reg;
-
-	/* disables the DMAreq from AESS AESS_DMAENABLE_CLR = 127
-	 * DMA_Req7 will still be enabled as it is used for ABE trace */
-	atc_reg = 0x7F;
-	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_ATC, 0x64, &atc_reg, 4);
-	/* disables the MCU IRQ from AESS to Cortex A9 */
-	atc_reg = 0x01;
-	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_ATC, 0x40, &atc_reg, 4);
-
-	return 0;
 }
 /**
  * abe_build_scheduler_table
@@ -108,14 +86,14 @@ void abe_build_scheduler_table()
 	MultiFrame[2][5] = ABE_TASK_ID(C_ABE_FW_TASK_IO_DMIC);
 	/* MultiFrame[2][6] = 0; */
 	/* MultiFrame[2][7] = 0; */
-	MultiFrame[3][1] = ABE_TASK_ID(C_ABE_FW_TASK_DL1_GAIN);
-	MultiFrame[3][0] = ABE_TASK_ID(C_ABE_FW_TASK_DL1_APS_EQ);
-	MultiFrame[3][2] = ABE_TASK_ID(C_ABE_FW_TASK_EchoMixer);
+	MultiFrame[3][0] = ABE_TASK_ID(C_ABE_FW_TASK_DL1_GAIN);
+	/* MultiFrame[3][1] = 0; */
+	/* MultiFrame[3][2] = 0; */
 	/* MultiFrame[3][3] = 0; */
 	/* MultiFrame[3][4] = 0; */
 	/* MultiFrame[3][5] = 0; */
 	MultiFrame[3][6] = ABE_TASK_ID(C_ABE_FW_TASK_DL2_GAIN);
-	MultiFrame[3][7] = ABE_TASK_ID(C_ABE_FW_TASK_DL2_APS_EQ);
+	MultiFrame[3][7] = ABE_TASK_ID(C_ABE_FW_TASK_DL2_EQ);
 	MultiFrame[4][0] = ABE_TASK_ID(C_ABE_FW_TASK_DL1_EQ);
 	/* MultiFrame[4][1] = 0; */
 	MultiFrame[4][2] = ABE_TASK_ID(C_ABE_FW_TASK_VXRECMixer);
@@ -130,24 +108,24 @@ void abe_build_scheduler_table()
 	/* MultiFrame[5][3] = 0; */
 	/* MultiFrame[5][4] = 0; */
 	/* MultiFrame[5][5] = 0; */
-	MultiFrame[5][6] = ABE_TASK_ID(C_ABE_FW_TASK_DL2_EQ);
+	/* MultiFrame[5][6] = 0; */
 	MultiFrame[5][7] = ABE_TASK_ID(C_ABE_FW_TASK_VIBRA_SPLIT);
 	MultiFrame[6][0] = ABE_TASK_ID(C_ABE_FW_TASK_EARP_48_96_LP);
 	/* MultiFrame[6][1] = 0; */
 	/* MultiFrame[6][2] = 0; */
 	/* MultiFrame[6][3] = 0; */
 	/* MultiFrame[6][4] = 0; */
-	/* MultiFrame[6][5] = 0; */
-	MultiFrame[6][6] = ABE_TASK_ID(C_ABE_FW_TASK_DL2_APS_SPLIT);
+	MultiFrame[6][5] = ABE_TASK_ID(C_ABE_FW_TASK_EchoMixer);
+	/* MultiFrame[6][6] = 0; */
 	/* MultiFrame[6][7] = 0; */
 	MultiFrame[7][0] = ABE_TASK_ID(C_ABE_FW_TASK_IO_PDM_DL);
 	/* MultiFrame[7][1] = 0; */
 	MultiFrame[7][2] = ABE_TASK_ID(C_ABE_FW_TASK_BT_UL_SPLIT);
 	MultiFrame[7][3] = ABE_TASK_ID(C_ABE_FW_TASK_DBG_SYNC);
 	/* MultiFrame[7][4] = 0; */
-	/* MultiFrame[7][5] = 0; */
-	MultiFrame[7][6] = ABE_TASK_ID(C_ABE_FW_TASK_DL2_R_APS_CORE);
-	MultiFrame[7][7] = ABE_TASK_ID(C_ABE_FW_TASK_DL2_L_APS_CORE);
+	MultiFrame[7][5] = ABE_TASK_ID(C_ABE_FW_TASK_ECHO_REF_SPLIT);
+	/* MultiFrame[7][6] = 0; */
+	/* MultiFrame[7][7] = 0; */
 	/* MultiFrame[8][0] = 0; */
 	/* MultiFrame[8][1] = 0; */
 	MultiFrame[8][2] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC1_96_48_LP);
@@ -208,13 +186,15 @@ void abe_build_scheduler_table()
 	/* MultiFrame[14][5] = 0; */
 	/* MultiFrame[14][6] = 0; */
 	/* MultiFrame[14][7] = 0; */
-	MultiFrame[15][0] = ABE_TASK_ID(C_ABE_FW_TASK_DL1_APS_IIR);
-	MultiFrame[15][1] = ABE_TASK_ID(C_ABE_FW_TASK_DL1_APS_CORE);
+#define TASK_ASRC_BT_UL_SLT 15
+#define TASK_ASRC_BT_UL_IDX 6
+	MultiFrame[15][0] = ABE_TASK_ID(C_ABE_FW_TASK_IO_MM_EXT_OUT);
+	/* MultiFrame[15][1] = 0; */
 	/* MultiFrame[15][2] = 0; */
 	MultiFrame[15][3] = ABE_TASK_ID(C_ABE_FW_TASK_IO_BT_VX_UL);
 	/* MultiFrame[15][4] = 0; */
 	/* MultiFrame[15][5] = 0; */
-	/* MultiFrame[15][6] = 0; */
+	MultiFrame[15][6] = ABE_TASK_ID(C_ABE_FW_TASK_ASRC_BT_UL_8);
 	/* MultiFrame[15][7] = 0; */
 	/* MultiFrame[16][0] = 0; */
 	/* MultiFrame[16][1] = 0; */
@@ -244,7 +224,9 @@ void abe_build_scheduler_table()
 	/* MultiFrame[18][3] = 0; */
 	/* MultiFrame[18][4] = 0; */
 	/* MultiFrame[18][5] = 0; */
-	/* MultiFrame[18][6] = 0; */
+#define TASK_ASRC_BT_DL_SLT 18
+#define TASK_ASRC_BT_DL_IDX 6
+	MultiFrame[18][6] = ABE_TASK_ID(C_ABE_FW_TASK_ASRC_BT_DL_8);
 	/* MultiFrame[18][7] = 0; */
 	MultiFrame[19][0] = ABE_TASK_ID(C_ABE_FW_TASK_IO_PDM_DL);
 	/* MultiFrame[19][1] = 0 */
@@ -265,7 +247,7 @@ void abe_build_scheduler_table()
 	/* MultiFrame[20][7] = 0; */
 	/* MultiFrame[21][0] = 0; */
 	MultiFrame[21][1] = ABE_TASK_ID(C_ABE_FW_TASK_DEBUGTRACE_VX_ASRCs);
-	MultiFrame[21][2] = ABE_TASK_ID(C_ABE_FW_TASK_IO_MM_EXT_OUT);
+	/* MultiFrame[21][2] = 0; */
 	MultiFrame[21][3] = ABE_TASK_ID(C_ABE_FW_TASK_IO_MM_EXT_IN);
 	/* MultiFrame[21][4] = 0; */
 	/* MultiFrame[21][5] = 0; */
@@ -315,14 +297,15 @@ void abe_build_scheduler_table()
  */
 void abe_init_atc(u32 id)
 {
-	abe_satcdescriptor_aess desc;
 	u8 iter;
 	s32 datasize;
+#define JITTER_MARGIN 4
 	/* load default values of the descriptor */
-	desc.rdpt = desc.wrpt = desc.irqdest = desc.cberr = 0;
-	desc.desen = desc.nw = 0;
-	desc.reserved0 = desc.reserved1 = desc.reserved2 = 0;
-	desc.srcid = desc.destid = desc.badd = desc.iter = desc.cbsize = 0;
+	atc_desc.rdpt = atc_desc.wrpt = atc_desc.irqdest = atc_desc.cberr = 0;
+	atc_desc.desen = atc_desc.nw = 0;
+	atc_desc.reserved0 = atc_desc.reserved1 = atc_desc.reserved2 = 0;
+	atc_desc.srcid = atc_desc.destid = atc_desc.badd = atc_desc.iter =
+		atc_desc.cbsize = 0;
 	datasize = abe_dma_port_iter_factor(&((abe_port[id]).format));
 	iter = (u8) abe_dma_port_iteration(&((abe_port[id]).format));
 	/* if the ATC FIFO is too small there will be two ABE firmware
@@ -338,107 +321,117 @@ void abe_init_atc(u32 id)
 	/* IN from AESS point of view */
 	if (abe_port[id].protocol.direction == ABE_ATC_DIRECTION_IN)
 		if (iter + 2 * datasize > 126)
-			desc.wrpt = (iter >> 1) + ((JITTER_MARGIN - 1) * datasize);
+			atc_desc.wrpt =
+				(iter >> 1) + ((JITTER_MARGIN - 1) * datasize);
 		else
-			desc.wrpt = iter + ((JITTER_MARGIN - 1) * datasize);
+			atc_desc.wrpt = iter + ((JITTER_MARGIN - 1) * datasize);
 	else
-		desc.wrpt = 0 + ((JITTER_MARGIN + 1) * datasize);
+		atc_desc.wrpt = 0 + ((JITTER_MARGIN + 1) * datasize);
 	switch ((abe_port[id]).protocol.protocol_switch) {
 	case SLIMBUS_PORT_PROT:
-		desc.cbdir = (abe_port[id]).protocol.direction;
-		desc.cbsize = (abe_port[id]).protocol.p.prot_slimbus.buf_size;
-		desc.badd =
+		atc_desc.cbdir = (abe_port[id]).protocol.direction;
+		atc_desc.cbsize =
+			(abe_port[id]).protocol.p.prot_slimbus.buf_size;
+		atc_desc.badd =
 			((abe_port[id]).protocol.p.prot_slimbus.buf_addr1) >> 4;
-		desc.iter = (abe_port[id]).protocol.p.prot_slimbus.iter;
-		desc.srcid =
+		atc_desc.iter = (abe_port[id]).protocol.p.prot_slimbus.iter;
+		atc_desc.srcid =
 			abe_atc_srcid[(abe_port[id]).protocol.p.prot_slimbus.
 				      desc_addr1 >> 3];
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       (abe_port[id]).protocol.p.prot_slimbus.
-			       desc_addr1, (u32 *) &desc, sizeof(desc));
-		desc.badd = (abe_port[id]).protocol.p.prot_slimbus.buf_addr2;
-		desc.srcid =
+			       desc_addr1, (u32 *) &atc_desc,
+			       sizeof(atc_desc));
+		atc_desc.badd =
+			(abe_port[id]).protocol.p.prot_slimbus.buf_addr2;
+		atc_desc.srcid =
 			abe_atc_srcid[(abe_port[id]).protocol.p.prot_slimbus.
 				      desc_addr2 >> 3];
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       (abe_port[id]).protocol.p.prot_slimbus.
-			       desc_addr2, (u32 *) &desc, sizeof(desc));
+			       desc_addr2, (u32 *) &atc_desc,
+			       sizeof(atc_desc));
 		break;
 	case SERIAL_PORT_PROT:
-		desc.cbdir = (abe_port[id]).protocol.direction;
-		desc.cbsize = (abe_port[id]).protocol.p.prot_serial.buf_size;
-		desc.badd =
+		atc_desc.cbdir = (abe_port[id]).protocol.direction;
+		atc_desc.cbsize =
+			(abe_port[id]).protocol.p.prot_serial.buf_size;
+		atc_desc.badd =
 			((abe_port[id]).protocol.p.prot_serial.buf_addr) >> 4;
-		desc.iter = (abe_port[id]).protocol.p.prot_serial.iter;
-		desc.srcid =
+		atc_desc.iter = (abe_port[id]).protocol.p.prot_serial.iter;
+		atc_desc.srcid =
 			abe_atc_srcid[(abe_port[id]).protocol.p.prot_serial.
 				      desc_addr >> 3];
-		desc.destid =
+		atc_desc.destid =
 			abe_atc_dstid[(abe_port[id]).protocol.p.prot_serial.
 				      desc_addr >> 3];
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       (abe_port[id]).protocol.p.prot_serial.desc_addr,
-			       (u32 *) &desc, sizeof(desc));
+			       (u32 *) &atc_desc, sizeof(atc_desc));
 		break;
 	case DMIC_PORT_PROT:
-		desc.cbdir = ABE_ATC_DIRECTION_IN;
-		desc.cbsize = (abe_port[id]).protocol.p.prot_dmic.buf_size;
-		desc.badd = ((abe_port[id]).protocol.p.prot_dmic.buf_addr) >> 4;
-		desc.iter = DMIC_ITER;
-		desc.srcid = abe_atc_srcid[ABE_ATC_DMIC_DMA_REQ];
+		atc_desc.cbdir = ABE_ATC_DIRECTION_IN;
+		atc_desc.cbsize = (abe_port[id]).protocol.p.prot_dmic.buf_size;
+		atc_desc.badd =
+			((abe_port[id]).protocol.p.prot_dmic.buf_addr) >> 4;
+		atc_desc.iter = DMIC_ITER;
+		atc_desc.srcid = abe_atc_srcid[ABE_ATC_DMIC_DMA_REQ];
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       (ABE_ATC_DMIC_DMA_REQ*ATC_SIZE),
-			       (u32 *) &desc, sizeof(desc));
+			       (u32 *) &atc_desc, sizeof(atc_desc));
 		break;
 	case MCPDMDL_PORT_PROT:
-		desc.cbdir = ABE_ATC_DIRECTION_OUT;
-		desc.cbsize = (abe_port[id]).protocol.p.prot_mcpdmdl.buf_size;
-		desc.badd =
+		atc_desc.cbdir = ABE_ATC_DIRECTION_OUT;
+		atc_desc.cbsize =
+			(abe_port[id]).protocol.p.prot_mcpdmdl.buf_size;
+		atc_desc.badd =
 			((abe_port[id]).protocol.p.prot_mcpdmdl.buf_addr) >> 4;
-		desc.iter = MCPDM_DL_ITER;
-		desc.destid = abe_atc_dstid[ABE_ATC_MCPDMDL_DMA_REQ];
+		atc_desc.iter = MCPDM_DL_ITER;
+		atc_desc.destid = abe_atc_dstid[ABE_ATC_MCPDMDL_DMA_REQ];
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       (ABE_ATC_MCPDMDL_DMA_REQ*ATC_SIZE),
-			       (u32 *) &desc, sizeof(desc));
+			       (u32 *) &atc_desc, sizeof(atc_desc));
 		break;
 	case MCPDMUL_PORT_PROT:
-		desc.cbdir = ABE_ATC_DIRECTION_IN;
-		desc.cbsize = (abe_port[id]).protocol.p.prot_mcpdmul.buf_size;
-		desc.badd =
+		atc_desc.cbdir = ABE_ATC_DIRECTION_IN;
+		atc_desc.cbsize =
+			(abe_port[id]).protocol.p.prot_mcpdmul.buf_size;
+		atc_desc.badd =
 			((abe_port[id]).protocol.p.prot_mcpdmul.buf_addr) >> 4;
-		desc.iter = MCPDM_UL_ITER;
-		desc.srcid = abe_atc_srcid[ABE_ATC_MCPDMUL_DMA_REQ];
+		atc_desc.iter = MCPDM_UL_ITER;
+		atc_desc.srcid = abe_atc_srcid[ABE_ATC_MCPDMUL_DMA_REQ];
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       (ABE_ATC_MCPDMUL_DMA_REQ*ATC_SIZE),
-			       (u32 *) &desc, sizeof(desc));
+			       (u32 *) &atc_desc, sizeof(atc_desc));
 		break;
 	case PINGPONG_PORT_PROT:
 		/* software protocol, nothing to do on ATC */
 		break;
 	case DMAREQ_PORT_PROT:
-		desc.cbdir = (abe_port[id]).protocol.direction;
-		desc.cbsize = (abe_port[id]).protocol.p.prot_dmareq.buf_size;
-		desc.badd =
+		atc_desc.cbdir = (abe_port[id]).protocol.direction;
+		atc_desc.cbsize =
+			(abe_port[id]).protocol.p.prot_dmareq.buf_size;
+		atc_desc.badd =
 			((abe_port[id]).protocol.p.prot_dmareq.buf_addr) >> 4;
 		/* CBPr needs ITER=1. this is the eDMA job to do the iterations */
-		desc.iter = 1;
+		atc_desc.iter = 1;
 		/* input from ABE point of view */
 		if (abe_port[id].protocol.direction == ABE_ATC_DIRECTION_IN) {
-			/* desc.rdpt = 127; */
-			/* desc.wrpt = 0; */
-			desc.srcid = abe_atc_srcid
+			/* atc_atc_desc.rdpt = 127; */
+			/* atc_atc_desc.wrpt = 0; */
+			atc_desc.srcid = abe_atc_srcid
 				[(abe_port[id]).protocol.p.prot_dmareq.
 				 desc_addr >> 3];
 		} else {
-			/* desc.rdpt = 0; */
-			/* desc.wrpt = 127; */
-			desc.destid = abe_atc_dstid
+			/* atc_atc_desc.rdpt = 0; */
+			/* atc_atc_desc.wrpt = 127; */
+			atc_desc.destid = abe_atc_dstid
 				[(abe_port[id]).protocol.p.prot_dmareq.
 				 desc_addr >> 3];
 		}
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 			       (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
-			       (u32 *) &desc, sizeof(desc));
+			       (u32 *) &atc_desc, sizeof(atc_desc));
 		break;
 	}
 }
@@ -499,8 +492,6 @@ void abe_init_dma_t(u32 id, abe_port_protocol_t *prot)
  */
 void abe_disable_enable_dma_request(u32 id, u32 on_off)
 {
-	ABE_SIODescriptor desc;
-	ABE_SPingPongDescriptor desc_pp;
 	u8 desc_third_word[4], irq_dmareq_field;
 	u32 sio_desc_address;
 	u32 struct_offset;
@@ -518,22 +509,25 @@ void abe_disable_enable_dma_request(u32 id, u32 on_off)
 			       sio_desc_address + struct_offset,
 			       (u32 *) desc_third_word, 4);
 	} else {
+		/* serial interface: sync ATC with Firmware activity */
 		sio_desc_address =
 			dmem_port_descriptors +
 			(id * sizeof(ABE_SIODescriptor));
 		abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
-			       sio_desc_address, (u32 *) &desc, sizeof(desc));
+			       sio_desc_address, (u32 *) &sio_desc,
+			       sizeof(sio_desc));
 		if (on_off) {
-			desc.atc_irq_data =
+			sio_desc.atc_irq_data =
 				(u8) abe_port[id].protocol.p.prot_dmareq.
 				dma_data;
-			desc.on_off = 0x80;
+			sio_desc.on_off = 0x80;
 		} else {
-			desc.atc_irq_data = 0;
-			desc.on_off = 0;
+			sio_desc.atc_irq_data = 0;
+			sio_desc.on_off = 0;
 		}
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
-			       sio_desc_address, (u32 *) &desc, sizeof(desc));
+			       sio_desc_address, (u32 *) &sio_desc,
+			       sizeof(sio_desc));
 	}
 }
 void abe_enable_dma_request(u32 id)
@@ -560,6 +554,13 @@ void abe_disable_dma_request(u32 id)
  */
 void abe_enable_atc(u32 id)
 {
+	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
+		       (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
+		       (u32 *) &atc_desc, sizeof(atc_desc));
+	atc_desc.desen = 1;
+	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
+		       (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
+		       (u32 *) &atc_desc, sizeof(atc_desc));
 }
 /**
  * abe_disable_atc
@@ -569,14 +570,13 @@ void abe_enable_atc(u32 id)
  */
 void abe_disable_atc(u32 id)
 {
-	abe_satcdescriptor_aess desc;
 	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
 		       (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
-		       (u32 *) &desc, sizeof(desc));
-	desc.desen = 0;
+		       (u32 *) &atc_desc, sizeof(atc_desc));
+	atc_desc.desen = 0;
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 		       (abe_port[id]).protocol.p.prot_dmareq.desc_addr,
-		       (u32 *) &desc, sizeof(desc));
+		       (u32 *) &atc_desc, sizeof(atc_desc));
 }
 /**
  * abe_init_io_tasks
@@ -592,8 +592,6 @@ void abe_disable_atc(u32 id)
 void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 		       abe_port_protocol_t *prot)
 {
-	ABE_SIODescriptor desc;
-	ABE_SPingPongDescriptor desc_pp;
 	u32 x_io, direction, iter_samples, smem1, smem2, smem3, io_sub_id,
 		io_flag;
 	u32 copy_func_index, before_func_index, after_func_index;
@@ -601,7 +599,6 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 	u32 sio_desc_address, datasize, iter, nsamp, datasize2, dOppMode32;
 	u32 atc_ptr_saved, atc_ptr_saved2, copy_func_index1;
 	u32 copy_func_index2, atc_desc_address1, atc_desc_address2;
-
 	if (prot->protocol_switch == PINGPONG_PORT_PROT) {
 		/* ping_pong is only supported on MM_DL */
 		if (MM_DL_PORT != id) {
@@ -794,18 +791,46 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 		/* check for 8kHz/16kHz */
 		if (BT_VX_DL_PORT == id) {
 			abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
-				       D_multiFrame_ADDR,
-				       (u32 *) MultiFrame, sizeof(MultiFrame));
+				       D_multiFrame_ADDR, (u32 *) MultiFrame,
+				       sizeof(MultiFrame));
+			abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
+				       D_maxTaskBytesInSlot_ADDR, &dOppMode32,
+				       sizeof(u32));
 			if (abe_port[id].format.f == 8000) {
-				MultiFrame[TASK_BT_DL_48_8_SLT]
-					[TASK_BT_DL_48_8_IDX] =
-					ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_8);
-				smem1 = BT_DL_8k_labelID;
+				MultiFrame[TASK_ASRC_BT_DL_SLT]
+					[TASK_ASRC_BT_DL_IDX] =
+					ABE_TASK_ID(C_ABE_FW_TASK_ASRC_BT_DL_8);
+				if (dOppMode32 == DOPPMODE32_OPP100) {
+					MultiFrame[TASK_BT_DL_48_8_SLT]
+						[TASK_BT_DL_48_8_IDX] =
+						ABE_TASK_ID
+						(C_ABE_FW_TASK_BT_DL_48_8_OPP100);
+					smem1 = BT_DL_8k_opp100_labelID;
+				} else {
+					MultiFrame[TASK_BT_DL_48_8_SLT]
+						[TASK_BT_DL_48_8_IDX] =
+						ABE_TASK_ID
+						(C_ABE_FW_TASK_BT_DL_48_8);
+					smem1 = BT_DL_8k_labelID;
+				}
 			} else {
-				MultiFrame[TASK_BT_DL_48_8_SLT]
-					[TASK_BT_DL_48_8_IDX] =
-					ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_16);
-				smem1 = BT_DL_16k_labelID;
+				MultiFrame[TASK_ASRC_BT_DL_SLT]
+					[TASK_ASRC_BT_DL_IDX] =
+					ABE_TASK_ID
+					(C_ABE_FW_TASK_ASRC_BT_DL_16);
+				if (dOppMode32 == DOPPMODE32_OPP100) {
+					MultiFrame[TASK_BT_DL_48_8_SLT]
+						[TASK_BT_DL_48_8_IDX] =
+						ABE_TASK_ID
+						(C_ABE_FW_TASK_BT_DL_48_16_OPP100);
+					smem1 = BT_DL_16k_opp100_labelID;
+				} else {
+					MultiFrame[TASK_BT_DL_48_8_SLT]
+						[TASK_BT_DL_48_8_IDX] =
+						ABE_TASK_ID
+						(C_ABE_FW_TASK_BT_DL_48_16);
+					smem1 = BT_DL_16k_labelID;
+				}
 			}
 			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 				       D_multiFrame_ADDR, (u32 *) MultiFrame,
@@ -814,18 +839,39 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 		/* check for 8kHz/16kHz */
 		if (BT_VX_UL_PORT == id) {
 			abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
-				       D_multiFrame_ADDR,
-				       (u32 *) MultiFrame, sizeof(MultiFrame));
+				       D_multiFrame_ADDR, (u32 *) MultiFrame,
+				       sizeof(MultiFrame));
+			/* set the SMEM buffer -- programming sequence */
+			abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
+				       D_maxTaskBytesInSlot_ADDR, &dOppMode32,
+				       sizeof(u32));
 			if (abe_port[id].format.f == 8000) {
+				MultiFrame[TASK_ASRC_BT_UL_SLT]
+					[TASK_ASRC_BT_UL_IDX] =
+					ABE_TASK_ID(C_ABE_FW_TASK_ASRC_BT_UL_8);
 				MultiFrame[TASK_BT_UL_8_48_SLT]
 					[TASK_BT_UL_8_48_IDX] =
 					ABE_TASK_ID(C_ABE_FW_TASK_BT_UL_8_48);
-				smem1 = BT_UL_8k_labelID;
+				if (dOppMode32 == DOPPMODE32_OPP100)
+					/* ASRC input buffer, size 40 */
+					smem1 = smem_bt_vx_ul_opp100;
+				else
+					/* at OPP 50 without ASRC */
+					smem1 = BT_UL_8k_labelID;
 			} else {
+				MultiFrame[TASK_ASRC_BT_UL_SLT]
+					[TASK_ASRC_BT_UL_IDX] =
+					ABE_TASK_ID
+					(C_ABE_FW_TASK_ASRC_BT_UL_16);
 				MultiFrame[TASK_BT_UL_8_48_SLT]
 					[TASK_BT_UL_8_48_IDX] =
 					ABE_TASK_ID(C_ABE_FW_TASK_BT_UL_16_48);
-				smem1 = BT_UL_16k_labelID;
+				if (dOppMode32 == DOPPMODE32_OPP100)
+					/* ASRC input buffer, size 40 */
+					smem1 = smem_bt_vx_ul_opp100;
+				else
+					/* at OPP 50 without ASRC */
+					smem1 = BT_UL_16k_labelID;
 			}
 			abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 				       D_multiFrame_ADDR, (u32 *) MultiFrame,
@@ -860,39 +906,40 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 		else
 			/* offset of the write pointer in the ATC descriptor */
 			direction = 3;
-		desc.drift_ASRC = 0;
-		desc.drift_io = 0;
-		desc.io_type_idx = (u8) io_sub_id;
-		desc.samp_size = (u8) datasize;
-		desc.hw_ctrl_addr = (u16) (dmareq_addr << 2);
-		desc.atc_irq_data = (u8) dmareq_field;
-		desc.flow_counter = (u16) 0;
-		desc.direction_rw = (u8) direction;
-		desc.repeat_last_samp = (u8) io_flag;
-		desc.nsamp = (u8) nsamp;
-		desc.x_io = (u8) x_io;
+		sio_desc.drift_ASRC = 0;
+		sio_desc.drift_io = 0;
+		sio_desc.io_type_idx = (u8) io_sub_id;
+		sio_desc.samp_size = (u8) datasize;
+		sio_desc.hw_ctrl_addr = (u16) (dmareq_addr << 2);
+		sio_desc.atc_irq_data = (u8) dmareq_field;
+		sio_desc.flow_counter = (u16) 0;
+		sio_desc.direction_rw = (u8) direction;
+		sio_desc.repeat_last_samp = (u8) io_flag;
+		sio_desc.nsamp = (u8) nsamp;
+		sio_desc.x_io = (u8) x_io;
 		/* set ATC ON */
-		desc.on_off = 0x80;
-		desc.split_addr1 = (u16) smem1;
-		desc.split_addr2 = (u16) smem2;
-		desc.split_addr3 = (u16) smem3;
-		desc.before_f_index = (u8) before_func_index;
-		desc.after_f_index = (u8) after_func_index;
-		desc.smem_addr1 = (u16) smem1;
-		desc.atc_address1 = (u16) atc_desc_address1;
-		desc.atc_pointer_saved1 = (u16) atc_ptr_saved;
-		desc.data_size1 = (u8) datasize;
-		desc.copy_f_index1 = (u8) copy_func_index1;
-		desc.smem_addr2 = (u16) smem2;
-		desc.atc_address2 = (u16) atc_desc_address2;
-		desc.atc_pointer_saved2 = (u16) atc_ptr_saved2;
-		desc.data_size2 = (u8) datasize2;
-		desc.copy_f_index2 = (u8) copy_func_index2;
+		sio_desc.on_off = 0x80;
+		sio_desc.split_addr1 = (u16) smem1;
+		sio_desc.split_addr2 = (u16) smem2;
+		sio_desc.split_addr3 = (u16) smem3;
+		sio_desc.before_f_index = (u8) before_func_index;
+		sio_desc.after_f_index = (u8) after_func_index;
+		sio_desc.smem_addr1 = (u16) smem1;
+		sio_desc.atc_address1 = (u16) atc_desc_address1;
+		sio_desc.atc_pointer_saved1 = (u16) atc_ptr_saved;
+		sio_desc.data_size1 = (u8) datasize;
+		sio_desc.copy_f_index1 = (u8) copy_func_index1;
+		sio_desc.smem_addr2 = (u16) smem2;
+		sio_desc.atc_address2 = (u16) atc_desc_address2;
+		sio_desc.atc_pointer_saved2 = (u16) atc_ptr_saved2;
+		sio_desc.data_size2 = (u8) datasize2;
+		sio_desc.copy_f_index2 = (u8) copy_func_index2;
 		sio_desc_address = dmem_port_descriptors + (id *
 							    sizeof
 							    (ABE_SIODescriptor));
 		abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
-			       sio_desc_address, (u32 *) &desc, sizeof(desc));
+			       sio_desc_address, (u32 *) &sio_desc,
+			       sizeof(sio_desc));
 	}
 }
 /**
@@ -903,7 +950,6 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
  */
 void abe_enable_pp_io_task(u32 id)
 {
-
 	/* MM_DL managed in ping-pong */
 	if (MM_DL_PORT == id) {
 		abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM,
@@ -1018,8 +1064,8 @@ void abe_reset_all_ports(void)
 	abe_write_mixer(MIXDL2, MUTE_GAIN, RAMP_100MS, MIX_DL2_INPUT_MM_UL2);
 	abe_write_mixer(MIXSDT, MUTE_GAIN, RAMP_100MS, MIX_SDT_INPUT_UP_MIXER);
 	abe_write_mixer(MIXSDT, GAIN_0dB, RAMP_100MS, MIX_SDT_INPUT_DL1_MIXER);
-	abe_write_mixer(MIXECHO, GAIN_0dB, RAMP_100MS, GAIN_LEFT_OFFSET);
-	abe_write_mixer(MIXECHO, GAIN_0dB, RAMP_100MS, GAIN_RIGHT_OFFSET);
+	abe_write_mixer(MIXECHO, MUTE_GAIN, RAMP_100MS, MIX_ECHO_DL1);
+	abe_write_mixer(MIXECHO, MUTE_GAIN, RAMP_100MS, MIX_ECHO_DL2);
 	abe_write_mixer(MIXAUDUL, MUTE_GAIN, RAMP_100MS, MIX_AUDUL_INPUT_MM_DL);
 	abe_write_mixer(MIXAUDUL, MUTE_GAIN, RAMP_100MS, MIX_AUDUL_INPUT_TONES);
 	abe_write_mixer(MIXAUDUL, GAIN_0dB, RAMP_100MS, MIX_AUDUL_INPUT_UPLINK);
@@ -1826,4 +1872,408 @@ void abe_init_asrc_mm_ext_in(s32 dppm)
 	/* dummy field */
 	el[i + 2] = temp0;
 	abe_write_fifo(ABE_DMEM, D_FwMemInitDescr_ADDR, (u32 *) &el[0], 42);
+}
+/**
+ * abe_init_asrc_bt_ul
+ *
+ * Initialize the following ASRC BT_UL parameters :
+ * 1. DriftSign = D_AsrcVars[1] = 1 or -1
+ * 2. Subblock = D_AsrcVars[2] = 0
+ * 3. DeltaAlpha = D_AsrcVars[3] = (round(nb_phases * drift[ppm] * 10^-6 * 2^20)) << 2
+ * 4. MinusDeltaAlpha = D_AsrcVars[4] = (-round(nb_phases * drift[ppm] * 10^-6 * 2^20)) << 2
+ * 5. OneMinusEpsilon = D_AsrcVars[5] = 1 - DeltaAlpha/2
+ * 6. AlphaCurrent = 0x000020 (CMEM), initial value of Alpha parameter
+ * 7. BetaCurrent = 0x3fffe0 (CMEM), initial value of Beta parameter
+ * AlphaCurrent + BetaCurrent = 1 (=0x400000 in CMEM = 2^20 << 2)
+ * 8. drift_ASRC = 0 & drift_io = 0
+ * 9. SMEM for ASRC_BT_UL_Coefs pointer
+ * 10. CMEM for ASRC_BT_UL_Coefs pointer
+ * ASRC_BT_UL_Coefs = C_CoefASRC16_VX_ADDR/C_CoefASRC16_VX_sizeof/0/1/
+ * C_CoefASRC15_VX_ADDR/C_CoefASRC15_VX_sizeof/0/1
+ * 11. SMEM for XinASRC_BT_UL pointer
+ * 12. CMEM for XinASRC_BT_UL pointer
+ * XinASRC_BT_UL = S_XinASRC_BT_UL_ADDR/S_XinASRC_BT_UL_sizeof/0/1/0/0/0/0
+ * 13. SMEM for IO_BT_UL_ASRC pointer
+ * 14. CMEM for IO_BT_UL_ASRC pointer
+ * IO_BT_UL_ASRC = S_XinASRC_BT_UL_ADDR/S_XinASRC_BT_UL_sizeof/ASRC_BT_UL_FIR_L+ASRC_margin/1/0/0/0/0
+ */
+void abe_init_asrc_bt_ul(s32 dppm)
+{
+	s32 el[45];
+	s32 temp0, temp1, adppm, dtemp, mem_tag, mem_addr;
+	u32 i = 0;
+	temp0 = 0;
+	temp1 = 1;
+
+	/* 1. DriftSign = D_AsrcVars[1] = 1 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_UL_ADDR + (1 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	if (dppm >= 0) {
+		el[i + 1] = 1;
+		adppm = dppm;
+	} else {
+		el[i + 1] = -1;
+		adppm = (-1 * dppm);
+	}
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+	dtemp = (adppm << 4) + adppm - ((adppm * 3481L) / 15625L);
+
+	/* 2. Subblock = D_AsrcVars[2] = 0 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_UL_ADDR + (2 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	el[i + 1] = temp0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 3. DeltaAlpha = D_AsrcVars[3] = 0 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_UL_ADDR + (3 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	if (dppm == 0)
+		el[i + 1] = 0;
+	else
+		el[i + 1] = dtemp << 2;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 4. MinusDeltaAlpha = D_AsrcVars[4] = 0 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_UL_ADDR + (4 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	if (dppm == 0)
+		el[i + 1] = 0;
+	else
+		el[i + 1] = (-dtemp) << 2;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/*5. OneMinusEpsilon = D_AsrcVars[5] = 0x00400000 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_UL_ADDR + (5 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	if (dppm == 0)
+		el[i + 1] = 0x00400000;
+	else
+		el[i + 1] = (0x00100000 - (dtemp / 2)) << 2;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 6. AlphaCurrent = 0x000020 (CMEM) */
+	mem_tag = ABE_CMEM;
+	mem_addr = C_AlphaCurrent_BT_UL_ADDR;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = 0x00000020;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 7. BetaCurrent = 0x3fffe0 (CMEM) */
+	mem_tag = ABE_CMEM;
+	mem_addr = C_BetaCurrent_BT_UL_ADDR;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = 0x003fffe0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 8. drift_ASRC = 0 & drift_io = 0 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_IOdescr_ADDR + (BT_VX_UL_PORT * sizeof(ABE_SIODescriptor))
+		+ drift_asrc_;
+	el[i] = (mem_tag << 16) + mem_addr;
+	el[i + 1] = temp0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 9. SMEM for ASRC_BT_UL_Coefs pointer */
+	/* ASRC_BT_UL_Coefs = C_CoefASRC16_VX_ADDR/C_CoefASRC16_VX_sizeof/0
+	   /1/C_CoefASRC15_VX_ADDR/C_CoefASRC15_VX_sizeof/0/1 */
+	mem_tag = ABE_SMEM;
+	mem_addr = ASRC_BT_UL_Coefs_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = C_CoefASRC16_VX_ADDR;
+	el[i + 1] = (el[i + 1] << 8) + C_CoefASRC16_VX_sizeof;
+	el[i + 2] = C_CoefASRC15_VX_ADDR;
+	el[i + 2] = (el[i + 2] << 8) + C_CoefASRC15_VX_sizeof;
+	i = i + 3;
+
+	/* 10. CMEM for ASRC_BT_UL_Coefs pointer */
+	/* ASRC_BT_UL_Coefs = C_CoefASRC16_VX_ADDR/C_CoefASRC16_VX_sizeof/0/
+	   1/C_CoefASRC15_VX_ADDR/C_CoefASRC15_VX_sizeof/0/1 */
+	mem_tag = ABE_CMEM;
+	mem_addr = ASRC_BT_UL_Coefs_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	/* el[i+1] = iam1<<16 + inc1<<12 + iam2<<4 + inc2 */
+	el[i + 1] = (temp0 << 16) + (temp1 << 12) + (temp0 << 4) + temp1;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 11. SMEM for XinASRC_BT_UL pointer */
+	/* XinASRC_BT_UL = S_XinASRC_BT_UL_ADDR/S_XinASRC_BT_UL_sizeof/0/1/0/0/0/0 */
+	mem_tag = ABE_SMEM;
+	mem_addr = XinASRC_BT_UL_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = S_XinASRC_BT_UL_ADDR;
+	el[i + 1] = (el[i + 1] << 8) + S_XinASRC_BT_UL_sizeof;
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 12. CMEM for XinASRC_BT_UL pointer */
+	/* XinASRC_BT_UL = S_XinASRC_BT_UL_ADDR/S_XinASRC_BT_UL_sizeof/0/1/0/0/0/0 */
+	mem_tag = ABE_CMEM;
+	mem_addr = XinASRC_BT_UL_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	/* el[i+1] = iam1<<16 + inc1<<12 + iam2<<4 + inc2 */
+	el[i + 1] = (temp0 << 16) + (temp1 << 12) + (temp0 << 4) + temp0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 13. SMEM for IO_BT_UL_ASRC pointer */
+	/* IO_BT_UL_ASRC = S_XinASRC_BT_UL_ADDR/S_XinASRC_BT_UL_sizeof/
+	   ASRC_BT_UL_FIR_L+ASRC_margin/1/0/0/0/0 */
+	mem_tag = ABE_SMEM;
+	mem_addr = IO_BT_UL_ASRC_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = S_XinASRC_BT_UL_ADDR;
+	el[i + 1] = (el[i + 1] << 8) + S_XinASRC_BT_UL_sizeof;
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 14. CMEM for IO_BT_UL_ASRC pointer */
+	/* IO_BT_UL_ASRC = S_XinASRC_BT_UL_ADDR/S_XinASRC_BT_UL_sizeof/
+	   ASRC_BT_UL_FIR_L+ASRC_margin/1/0/0/0/0 */
+	mem_tag = ABE_CMEM;
+	mem_addr = IO_BT_UL_ASRC_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	/* el[i+1] = iam1<<16 + inc1<<12 + iam2<<4 + inc2 */
+	el[i + 1] = ((ASRC_BT_UL_FIR_L + ASRC_margin) << 16) + (temp1 << 12)
+		+ (temp0 << 4) + temp0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	abe_write_fifo(ABE_DMEM, D_FwMemInitDescr_ADDR, (u32 *) &el[0], 42);
+}
+/**
+ * abe_init_asrc_bt_dl
+ *
+ * Initialize the following ASRC BT_DL parameters :
+ * 1. DriftSign = D_AsrcVars[1] = 1 or -1
+ * 2. Subblock = D_AsrcVars[2] = 0
+ * 3. DeltaAlpha = D_AsrcVars[3] = (round(nb_phases * drift[ppm] * 10^-6 * 2^20)) << 2
+ * 4. MinusDeltaAlpha = D_AsrcVars[4] = (-round(nb_phases * drift[ppm] * 10^-6 * 2^20)) << 2
+ * 5. OneMinusEpsilon = D_AsrcVars[5] = 1 - DeltaAlpha/2
+ * 6. AlphaCurrent = 0x000020 (CMEM), initial value of Alpha parameter
+ * 7. BetaCurrent = 0x3fffe0 (CMEM), initial value of Beta parameter
+ * AlphaCurrent + BetaCurrent = 1 (=0x400000 in CMEM = 2^20 << 2)
+ * 8. drift_ASRC = 0 & drift_io = 0
+ * 9. SMEM for ASRC_BT_DL_Coefs pointer
+ * 10. CMEM for ASRC_BT_DL_Coefs pointer
+ *		ASRC_BT_DL_Coefs = C_CoefASRC16_VX_ADDR/C_CoefASRC16_VX_sizeof
+ *	/0/1/C_CoefASRC15_VX_ADDR/C_CoefASRC15_VX_sizeof/0/1
+ * 11. SMEM for XinASRC_BT_DL pointer
+ * 12. CMEM for XinASRC_BT_DL pointer
+ *		XinASRC_BT_DL = S_XinASRC_BT_DL_ADDR/S_XinASRC_BT_DL_sizeof/0/1/0/0/0/0
+ * 13. SMEM for DL_48_8_DEC pointer
+ * 14. CMEM for DL_48_8_DEC pointer
+ *		DL_48_8_DEC = S_XinASRC_BT_DL_ADDR/S_XinASRC_BT_DL_sizeof/
+ *	ASRC_BT_DL_FIR_L+ASRC_margin/1/0/0/0/0
+ * 15. SMEM for DL_48_16_DEC pointer
+ * 16. CMEM for DL_48_16_DEC pointer
+ *		DL_48_16_DEC = S_XinASRC_BT_DL_ADDR/S_XinASRC_BT_DL_sizeof/
+ *	ASRC_BT_DL_FIR_L+ASRC_margin/1/0/0/0/0
+ */
+void abe_init_asrc_bt_dl(s32 dppm)
+{
+	s32 el[51];
+	s32 temp0, temp1, adppm, dtemp, mem_tag, mem_addr;
+	u32 i = 0;
+	temp0 = 0;
+	temp1 = 1;
+
+	/* 1. DriftSign = D_AsrcVars[1] = 1 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_DL_ADDR + (1 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	if (dppm >= 0) {
+		el[i + 1] = 1;
+		adppm = dppm;
+	} else {
+		el[i + 1] = -1;
+		adppm = (-1 * dppm);
+	}
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+	dtemp = (adppm << 4) + adppm - ((adppm * 3481L) / 15625L);
+
+	/* 2. Subblock = D_AsrcVars[2] = 0 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_DL_ADDR + (2 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	el[i + 1] = temp0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 3. DeltaAlpha = D_AsrcVars[3] = 0 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_DL_ADDR + (3 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	if (dppm == 0)
+		el[i + 1] = 0;
+	else
+		el[i + 1] = dtemp << 2;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 4. MinusDeltaAlpha = D_AsrcVars[4] = 0 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_DL_ADDR + (4 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	if (dppm == 0)
+		el[i + 1] = 0;
+	else
+		el[i + 1] = (-dtemp) << 2;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 5. OneMinusEpsilon = D_AsrcVars[5] = 0x00400000 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_AsrcVars_BT_DL_ADDR + (5 * sizeof(s32));
+	el[i] = (mem_tag << 16) + mem_addr;
+	if (dppm == 0)
+		el[i + 1] = 0x00400000;
+	else
+		el[i + 1] = (0x00100000 - (dtemp / 2)) << 2;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 6. AlphaCurrent = 0x000020 (CMEM) */
+	mem_tag = ABE_CMEM;
+	mem_addr = C_AlphaCurrent_BT_DL_ADDR;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = 0x00000020;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 7. BetaCurrent = 0x3fffe0 (CMEM) */
+	mem_tag = ABE_CMEM;
+	mem_addr = C_BetaCurrent_BT_DL_ADDR;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = 0x003fffe0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 8. drift_ASRC = 0 & drift_io = 0 */
+	mem_tag = ABE_DMEM;
+	mem_addr = D_IOdescr_ADDR + (BT_VX_DL_PORT * sizeof(ABE_SIODescriptor))
+		+ drift_asrc_;
+	el[i] = (mem_tag << 16) + mem_addr;
+	el[i + 1] = temp0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 9. SMEM for ASRC_BT_DL_Coefs pointer */
+	/* ASRC_BT_DL_Coefs = C_CoefASRC16_VX_ADDR/C_CoefASRC16_VX_sizeof/0/1/
+	   C_CoefASRC15_VX_ADDR/C_CoefASRC15_VX_sizeof/0/1 */
+	mem_tag = ABE_SMEM;
+	mem_addr = ASRC_BT_DL_Coefs_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = (C_CoefASRC16_VX_ADDR << 8) + C_CoefASRC16_VX_sizeof;
+	el[i + 2] = (C_CoefASRC15_VX_ADDR << 8) + C_CoefASRC15_VX_sizeof;
+	i = i + 3;
+
+	/* 10. CMEM for ASRC_BT_DL_Coefs pointer */
+	/* ASRC_BT_DL_Coefs = C_CoefASRC16_VX_ADDR/C_CoefASRC16_VX_sizeof/0/1/
+	   C_CoefASRC15_VX_ADDR/C_CoefASRC15_VX_sizeof/0/1 */
+	mem_tag = ABE_CMEM;
+	mem_addr = ASRC_BT_DL_Coefs_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	/* el[i+1] = iam1<<16 + inc1<<12 + iam2<<4 + inc2 */
+	el[i + 1] = (temp0 << 16) + (temp1 << 12) + (temp0 << 4) + temp1;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 11. SMEM for XinASRC_BT_DL pointer */
+	/* XinASRC_BT_DL = S_XinASRC_BT_DL_ADDR/S_XinASRC_BT_DL_sizeof/0/1/0/0/0/0 */
+	mem_tag = ABE_SMEM;
+	mem_addr = XinASRC_BT_DL_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = (S_XinASRC_BT_DL_ADDR << 8) + S_XinASRC_BT_DL_sizeof;
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 12. CMEM for XinASRC_BT_DL pointer */
+	/* XinASRC_BT_DL = S_XinASRC_BT_DL_ADDR/S_XinASRC_BT_DL_sizeof/0/1/0/0/0/0 */
+	mem_tag = ABE_CMEM;
+	mem_addr = XinASRC_BT_DL_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	/* el[i+1] = iam1<<16 + inc1<<12 + iam2<<4 + inc2 */
+	el[i + 1] = (temp0 << 16) + (temp1 << 12) + (temp0 << 4) + temp0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 13. SMEM for DL_48_8_DEC pointer */
+	/* DL_48_8_DEC = S_XinASRC_BT_DL_ADDR/S_XinASRC_BT_DL_sizeof/
+	   ASRC_BT_DL_FIR_L+ASRC_margin/1/0/0/0/0 */
+	mem_tag = ABE_SMEM;
+	mem_addr = DL_48_8_DEC_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = (S_XinASRC_BT_DL_ADDR << 8) + S_XinASRC_BT_DL_sizeof;
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 14. CMEM for DL_48_8_DEC pointer */
+	/* DL_48_8_DEC = S_XinASRC_BT_DL_ADDR/S_XinASRC_BT_DL_sizeof/
+	   ASRC_BT_DL_FIR_L+ASRC_margin/1/0/0/0/0 */
+	mem_tag = ABE_CMEM;
+	mem_addr = DL_48_8_DEC_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	/* el[i+1] = iam1<<16 + inc1<<12 + iam2<<4 + inc2 */
+	el[i + 1] = ((ASRC_BT_DL_FIR_L + ASRC_margin) << 16) + (temp1 << 12)
+		+ (temp0 << 4) + temp0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 15. SMEM for DL_48_16_DEC pointer */
+	/* DL_48_16_DEC = S_XinASRC_BT_DL_ADDR/S_XinASRC_BT_DL_sizeof/
+	   ASRC_BT_DL_FIR_L+ASRC_margin/1/0/0/0/0 */
+	mem_tag = ABE_SMEM;
+	mem_addr = DL_48_16_DEC_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	el[i + 1] = (S_XinASRC_BT_DL_ADDR << 8) + S_XinASRC_BT_DL_sizeof;
+	el[i + 2] = temp0;
+	i = i + 3;
+
+	/* 16. CMEM for DL_48_16_DEC pointer */
+	/* DL_48_16_DEC = S_XinASRC_BT_DL_ADDR/S_XinASRC_BT_DL_sizeof/
+	   ASRC_BT_DL_FIR_L+ASRC_margin/1/0/0/0/0 */
+	mem_tag = ABE_CMEM;
+	mem_addr = DL_48_16_DEC_labelID;
+	el[i] = (mem_tag << 16) + (mem_addr << 2);
+	/* el[i+1] = iam1<<16 + inc1<<12 + iam2<<4 + inc2 */
+	el[i + 1] = ((ASRC_BT_DL_FIR_L + ASRC_margin) << 16) + (temp1 << 12)
+		+ (temp0 << 4) + temp0;
+	/* dummy field */
+	el[i + 2] = temp0;
+	abe_write_fifo(ABE_DMEM, D_FwMemInitDescr_ADDR, (u32 *) &el[0], 48);
 }

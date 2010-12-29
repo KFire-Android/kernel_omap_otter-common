@@ -482,7 +482,7 @@ typedef struct {
 			u32 iter;
 		} prot_serial;
 		/* DMIC peripheral connected to ATC */
-		struct	{
+		struct {
 			/* DMEM address in bytes */
 			u32 buf_addr;
 			/* DMEM buffer size in bytes */

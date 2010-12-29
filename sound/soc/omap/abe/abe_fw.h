@@ -17,6 +17,8 @@
  * along with this program; if not, write to the Free Software`
  * 02110-1301 USA
  */
+#ifndef _ABE_FW_H_
+#define _ABE_FW_H_
 #include "abe_cm_addr.h"
 #include "abe_sm_addr.h"
 #include "abe_dm_addr.h"
@@ -238,10 +240,14 @@ typedef struct {
 #define smem_mm_ext_in_opp50 MM_EXT_IN_labelID
 #define dmem_bt_vx_dl D_BT_DL_FIFO_ADDR
 #define dmem_bt_vx_dl_size (D_BT_DL_FIFO_sizeof/4)
-#define smem_bt_vx_dl BT_DL_8k_labelID
+#define smem_bt_vx_dl_opp50 BT_DL_8k_labelID
+/*BT_DL_8k_opp100_labelID  ASRC output buffer, size 40 */
+#define smem_bt_vx_dl_opp100 BT_DL_8k_opp100_labelID
 #define dmem_bt_vx_ul D_BT_UL_FIFO_ADDR
 #define dmem_bt_vx_ul_size (D_BT_UL_FIFO_sizeof/4)
-#define smem_bt_vx_ul BT_UL_8k_labelID
+#define smem_bt_vx_ul_opp50 BT_UL_8k_labelID
+/*IO_BT_UL_ASRC_labelID	 ASRC input buffer, size 40 */
+#define smem_bt_vx_ul_opp100 IO_BT_UL_ASRC_labelID
 /*
  * INITPTR / INITREG AREA
  */
@@ -370,3 +376,4 @@ typedef struct {
  * int24 cmem_dither(x) [4]
  */
 #define cmem_dither
+#endif /* _ABE_FW_H_ */
