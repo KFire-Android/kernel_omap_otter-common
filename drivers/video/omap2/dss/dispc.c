@@ -1912,6 +1912,8 @@ void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high)
 					   DISPC_VID_FIFO_THRESHOLD(0),
 					   DISPC_VID_FIFO_THRESHOLD(1) };
 	if (cpu_is_omap44xx()) {
+		/* Enabling the Buffer Preload */
+		REG_FLD_MOD(dispc_reg_att[plane], 1, 19, 19);
 		ftrs_reg[3] = DISPC_VID_V3_WB_BUF_THRESHOLD(0);
 		ftrs_reg[4] = DISPC_VID_V3_WB_BUF_THRESHOLD(1);
 	}
