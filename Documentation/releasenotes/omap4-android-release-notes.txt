@@ -2,8 +2,8 @@
 # L27.10.1 Froyo Hand-off
 # =====================================================================
 
-Author: Leed Aguilar
-Date: Dec 23rd 2010
+Author: Dan Murphy
+Date: Dec 29rd 2010
 Target Release: L27.10.1
 
 # =====================================================================
@@ -113,6 +113,7 @@ http://omappedia.org/wiki/Android_Getting_Started#Building_Android
 - EHCI/OHCI suspend/resume support
 - usb: musb: USB remote wakeup support using
 - musb: supporting core retention when host suspends the device
+- HDMI work arounds for cable detection
 
 
 [ADB over USB SUPPORT]
@@ -145,8 +146,10 @@ OMAPS00229933: Video: HDMI: The hotplug funtionality just work once.
 
 Kernel stats from previous L27.9.1 HO:
 
- 237 files changed, 49383 insertions(+), 12722 deletions(-)
-
+ffa36a5 OMAP4: Workaround Video Playback on HDMI attach on the fly not working
+6bf0896 OMAP4: Workaround improve HDMI attach responsiveness
+dffc0a4 OMAP4: Improve consistency of HDMI Attach / Dettach Interrupt
+f3161da Enabled HSI pad conf in board-4430sdp.c using new bootarg
 a84f36d HACK: use omap_pm_set_max_dev_wakeup_lat under PM flag
 90036c2 OMAP4: PM Using global Mutex instaed of per power domain.
 e84dd4a OMAP4: Avoiding Mutex lock panic in SR
