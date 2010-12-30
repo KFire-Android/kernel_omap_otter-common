@@ -1917,7 +1917,7 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 	img_format = kzalloc(sizeof(*img_format), GFP_KERNEL);
 	if (!img_format) {
 		WARN_ON(1);
-		return -ENOMEM;
+		return;
 	}
 	aud_format = kzalloc(sizeof(*aud_format), GFP_KERNEL);
 	if (!aud_format) {
