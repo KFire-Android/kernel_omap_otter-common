@@ -825,59 +825,65 @@ static int abe_get_equalizer(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
-			struct snd_ctl_elem_value *ucontrol)
+static void abe_dsp_set_equalizer(unsigned int id, unsigned int profile)
 {
 	/* TODO: do not use abe global structure to assign pdev */
 	struct platform_device *pdev = abe->pdev;
-	struct soc_enum *eqc = (struct soc_enum *)kcontrol->private_value;
-	u16 val = ucontrol->value.enumerated.item[0];
 	abe_equ_t equ_params;
 
-	switch (eqc->reg) {
+	switch (id) {
 	case EQ1:
 		equ_params.equ_length = NBDL1COEFFS;
-		memcpy(equ_params.coef.type1, dl1_equ_coeffs[val],
-				sizeof(dl1_equ_coeffs[val]));
-		abe->dl1_equ_profile = val;
+		memcpy(equ_params.coef.type1, dl1_equ_coeffs[profile],
+				sizeof(dl1_equ_coeffs[profile]));
+		abe->dl1_equ_profile = profile;
 		break;
 	case EQ2L:
 		equ_params.equ_length = NBDL2COEFFS;
-		memcpy(equ_params.coef.type1, dl20_equ_coeffs[val],
-				sizeof(dl20_equ_coeffs[val]));
-		abe->dl20_equ_profile = val;
+		memcpy(equ_params.coef.type1, dl20_equ_coeffs[profile],
+				sizeof(dl20_equ_coeffs[profile]));
+		abe->dl20_equ_profile = profile;
 		break;
 	case EQ2R:
 		equ_params.equ_length = NBDL2COEFFS;
-		memcpy(equ_params.coef.type1, dl21_equ_coeffs[val],
-				sizeof(dl21_equ_coeffs[val]));
-		abe->dl21_equ_profile = val;
+		memcpy(equ_params.coef.type1, dl21_equ_coeffs[profile],
+				sizeof(dl21_equ_coeffs[profile]));
+		abe->dl21_equ_profile = profile;
 		break;
 	case EQAMIC:
 		equ_params.equ_length = NBAMICCOEFFS;
-		memcpy(equ_params.coef.type1, amic_equ_coeffs[val],
-				sizeof(amic_equ_coeffs[val]));
-		abe->amic_equ_profile = val;
+		memcpy(equ_params.coef.type1, amic_equ_coeffs[profile],
+				sizeof(amic_equ_coeffs[profile]));
+		abe->amic_equ_profile = profile;
 		break;
 	case EQDMIC:
 		equ_params.equ_length = NBDMICCOEFFS;
-		memcpy(equ_params.coef.type1, dmic_equ_coeffs[val],
-				sizeof(dmic_equ_coeffs[val]));
-		abe->dmic_equ_profile = val;
+		memcpy(equ_params.coef.type1, dmic_equ_coeffs[profile],
+				sizeof(dmic_equ_coeffs[profile]));
+		abe->dmic_equ_profile = profile;
 		break;
 	case EQSDT:
 		equ_params.equ_length = NBSDTCOEFFS;
-		memcpy(equ_params.coef.type1, sdt_equ_coeffs[val],
-				sizeof(sdt_equ_coeffs[val]));
-		abe->sdt_equ_profile = val;
+		memcpy(equ_params.coef.type1, sdt_equ_coeffs[profile],
+				sizeof(sdt_equ_coeffs[profile]));
+		abe->sdt_equ_profile = profile;
 		break;
 	default:
-		break;
+		return;
 	}
 
 	pm_runtime_get_sync(&pdev->dev);
-	abe_write_equalizer(eqc->reg, &equ_params);
+	abe_write_equalizer(id, &equ_params);
 	pm_runtime_put_sync(&pdev->dev);
+}
+
+static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_enum *eqc = (struct soc_enum *)kcontrol->private_value;
+	u16 val = ucontrol->value.enumerated.item[0];
+
+	abe_dsp_set_equalizer(eqc->reg, val);
 
 	return 1;
 }
@@ -1969,6 +1975,12 @@ static int aess_resume(struct device *dev)
 	abe_unmute_gain(MIXVXREC, MIX_VXREC_INPUT_VX_DL);
 	abe_unmute_gain(MIXVXREC, MIX_VXREC_INPUT_MM_DL);
 	abe_unmute_gain(MIXVXREC, MIX_VXREC_INPUT_VX_UL);
+	abe_dsp_set_equalizer(EQ1, abe->dl1_equ_profile);
+	abe_dsp_set_equalizer(EQ2L, abe->dl20_equ_profile);
+	abe_dsp_set_equalizer(EQ2R, abe->dl21_equ_profile);
+	abe_dsp_set_equalizer(EQAMIC, abe->amic_equ_profile);
+	abe_dsp_set_equalizer(EQDMIC, abe->dmic_equ_profile);
+	abe_dsp_set_equalizer(EQSDT, abe->sdt_equ_profile);
 
 	pm_runtime_put_sync(&pdev->dev);
 
