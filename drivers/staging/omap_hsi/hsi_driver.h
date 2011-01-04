@@ -177,7 +177,7 @@ struct hsi_dev { /* HSI_TODO:  should be later renamed into hsi_controller*/
 	void __iomem *base;
 	unsigned long phy_base;
 	spinlock_t lock; /* Serializes access to internal data and regs */
-	bool cawake_status;	/* HSI_TODO : fine tune the init values */
+	int cawake_status;
 	unsigned int acwake_status;	/* HSI_TODO : fine tune init values */
 	int gdd_irq;
 	unsigned int fifo_mapping_strategy;

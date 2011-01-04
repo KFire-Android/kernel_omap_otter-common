@@ -243,9 +243,14 @@ done:
 void hsi_do_cawake_process(struct hsi_port *pport)
 {
 	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
+	bool cawake_status = hsi_get_cawake(pport);
+
+	/* Deal with init condition */
+	if (unlikely(hsi_ctrl->cawake_status < 0))
+		hsi_ctrl->cawake_status = !cawake_status;
 
 	/* Check CAWAKE line status */
-	if (hsi_ctrl->cawake_status) {
+	if (cawake_status) {
 		/* CAWAKE went high. This can be for 2 reasons: */
 		/*  - Ack from modem following an ACWAKE high from OMAP */
 		/*	(ACPU wakeup) */
@@ -269,10 +274,17 @@ void hsi_do_cawake_process(struct hsi_port *pport)
 			/*	through the IOPAD daisy chain wakeup */
 			dev_dbg(hsi_ctrl->dev,
 				"ACWAKE low, OMAP awaken from non-OFF mode\n");
-
-			/*Not needed as clocks should already be ON*/
-			/*hsi_clocks_enable(hsi_ctrl->dev);*/
 		}
+
+		/* Check for possible mismatch (race condition) */
+		if (unlikely(hsi_ctrl->cawake_status)) {
+			dev_err(hsi_ctrl->dev,
+				"CAWAKE race is detected: %s.\n",
+				"HI -> LOW -> HI");
+			hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_DOWN,
+						NULL);
+		}
+		hsi_ctrl->cawake_status = 1;
 
 		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_UP, NULL);
 	} else {
@@ -288,10 +300,14 @@ void hsi_do_cawake_process(struct hsi_port *pport)
 				" be low\n");
 		}
 
-		/* Enter low power mode */
-		/*hsi_clocks_disable(hsi_ctrl->dev);*/
-		/* This will be done later in tasklet, as soon as we do not */
-		/* need any register access */
+		if (unlikely(!hsi_ctrl->cawake_status)) {
+			dev_err(hsi_ctrl->dev,
+				"CAWAKE race is detected: %s.\n",
+				"LOW -> HI -> LOW");
+			hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_UP,
+						NULL);
+		}
+		hsi_ctrl->cawake_status = 0;
 
 		/* Inform upper layers */
 		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_DOWN, NULL);
@@ -414,9 +430,6 @@ static void do_hsi_workqueue(struct work_struct *work)
 
 	hsi_clocks_enable(hsi_ctrl->dev, __func__);
 
-	/* Early read */
-	hsi_ctrl->cawake_status = hsi_get_cawake(pport);
-
 	/* Process events for channels 0..7 */
 	status_reg = hsi_driver_int_proc(pport,
 			    HSI_SYS_MPU_STATUS_REG(port, irq),
@@ -430,6 +443,8 @@ static void do_hsi_workqueue(struct work_struct *work)
 				    HSI_SYS_MPU_U_ENABLE_REG(port, irq),
 				    HSI_SSI_CHANNELS_MAX, pport->max_ch);
 
+	hsi_ctrl->cawake_status = hsi_get_cawake(pport);
+
 	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
 	/* if no event was processed in this work, this means all events have */
@@ -440,7 +455,7 @@ static void do_hsi_workqueue(struct work_struct *work)
 		goto work_done;
 	}
 
-	/* Check if clocks can be disabled */
+	/* Check if clocks can be disabled definitely */
 	if (!hsi_ctrl->acwake_status && !hsi_ctrl->cawake_status) {
 		dev_dbg(hsi_ctrl->dev,
 			"ACWAKE & CAWAKE are low, all events processed, "

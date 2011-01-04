@@ -689,6 +689,8 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 	if (err < 0)
 		goto rback2;
 
+	hsi_ctrl->cawake_status = -1; /* Unknown */
+
 	/* Everything is fine */
 	return 0;
 rback2:
