@@ -1104,7 +1104,7 @@ int unregister_mmufault(struct iodmm_struct *obj, const void __user *args)
 	if (copy_from_user(&fd, (void __user *)args, sizeof(int)))
 		return -EFAULT;
 
-	/* Free DMM mapped memory resources */
+	/* remove the mmu fault event notification */
 	spin_lock_irq(&obj->iovmm->iommu->event_lock);
 	list_for_each_entry_safe(fd_reg, temp_reg,
 			&obj->iovmm->iommu->event_list, list) {

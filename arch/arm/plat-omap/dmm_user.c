@@ -80,7 +80,7 @@ static int omap_dmm_ioctl(struct inode *inode, struct file *filp,
 		ret = register_mmufault(obj, (const void __user *)args);
 		break;
 	case IOMMU_IOCEVENTUNREG:
-		ret = register_mmufault(obj, (const void __user *)args);
+		ret = unregister_mmufault(obj, (const void __user *)args);
 		break;
 	case DMM_IOCMEMFLUSH:
 		ret = proc_begin_dma(obj, (void __user *)args);
