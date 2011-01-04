@@ -883,46 +883,44 @@ static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
 }
 
 static const char *dl1_equ_texts[] = {
-	"Flat response. Gain = 1",
-	"High-pass with 800Hz cut-off frequency. Gain = 1",
-	"High-pass with 800Hz cut-off frequency. Gain = 0.25",
-	"High-pass with 800Hz cut-off frequency. Gain = 0.1",
+	"Flat response",
+	"High-pass 1dB",
+	"High-pass 0.25dB",
+	"High-pass 0.1dB",
 };
 
 static const char *dl20_equ_texts[] = {
-	"Flat response. Gain = 1",
-	"High-pass with 800Hz cut-off frequency. Gain = 1",
-	"High-pass with 800Hz cut-off frequency. Gain = 0.25",
-	"High-pass with 800Hz cut-off frequency. Gain = 0.1",
-
+	"Flat response",
+	"High-pass 1dB",
+	"High-pass 0.25dB",
+	"High-pass 0.1dB",
 };
 
 static const char *dl21_equ_texts[] = {
-	"Flat response. Gain = 1",
-	"High-pass with 800Hz cut-off frequency. Gain = 1",
-	"High-pass with 800Hz cut-off frequency. Gain = 0.25",
-	"High-pass with 800Hz cut-off frequency. Gain = 0.1",
+	"Flat response",
+	"High-pass 1dB",
+	"High-pass 0.25dB",
+	"High-pass 0.1dB",
 };
 
 static const char *amic_equ_texts[] = {
-	"High-pass with 20kHz cut-off frequency. Gain = 1",
-	"High-pass with 20kHz cut-off frequency. Gain = 0.25",
-	"High-pass with 20kHz cut-off frequency. Gain = 0.125",
+	"High-pass 1dB",
+	"High-pass 0.25dB",
+	"High-pass 0.125dB",
 };
 
 static const char *dmic_equ_texts[] = {
-	"High-pass with 20kHz cut-off frequency. Gain = 1",
-	"High-pass with 20kHz cut-off frequency. Gain = 0.25",
-	"High-pass with 20kHz cut-off frequency. Gain = 0.125",
+	"High-pass 1dB",
+	"High-pass 0.25dB",
+	"High-pass 0.125dB",
 };
 
 static const char *sdt_equ_texts[] = {
-	"Flat response. Gain = 1",
-	"High-pass with 800Hz cut-off frequency. Gain = 1",
-	"High-pass with 800Hz cut-off frequency. Gain = 0.25",
-	"High-pass with 800Hz cut-off frequency. Gain = 0.1",
+	"Flat response",
+	"High-pass 1dB",
+	"High-pass 0.25dB",
+	"High-pass 0.1dB",
 };
-
 
 static const struct soc_enum dl1_equalizer_enum =
 	SOC_ENUM_SINGLE(EQ1, 0, NBDL1EQ_PROFILES, dl1_equ_texts);
@@ -1167,27 +1165,27 @@ static const struct snd_kcontrol_new abe_controls[] = {
 		GAINS_DMIC3, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
 		volume_get_dmic, volume_put_dmic, dmic_tlv),
 
-	SOC_ENUM_EXT("DL1 Equalizer Profile",
+	SOC_ENUM_EXT("DL1 Equalizer",
 			dl1_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
-	SOC_ENUM_EXT("DL2 Left Equalizer Profile",
+	SOC_ENUM_EXT("DL2 Left Equalizer",
 			dl20_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
-	SOC_ENUM_EXT("DL2 Right Equalizer Profile",
+	SOC_ENUM_EXT("DL2 Right Equalizer",
 			dl21_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
-	SOC_ENUM_EXT("AMIC Equalizer Profile",
+	SOC_ENUM_EXT("AMIC Equalizer",
 			amic_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
-	SOC_ENUM_EXT("DMIC Equalizer Profile",
+	SOC_ENUM_EXT("DMIC Equalizer",
 			dmic_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 
-	SOC_ENUM_EXT("Sidetone Equalizer Profile",
+	SOC_ENUM_EXT("Sidetone Equalizer",
 			sdt_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
 };
