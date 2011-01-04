@@ -1915,10 +1915,12 @@ static int aess_suspend(struct device *dev)
 	pdev = to_platform_device(dev);
 	pdata = pdev->dev.platform_data;
 
-	pm_runtime_get_sync(&pdev->dev);
+	if (abe->active && abe_check_activity()) {
+		dev_dbg(&pdev->dev, "Suspend in a middle of ABE activity!\n");
+		goto no_suspend;
+	}
 
-	if (!abe->active && !abe_check_activity())
-		dev_err(&pdev->dev, "Suspend in a middle of ABE activity!\n");
+	pm_runtime_get_sync(&pdev->dev);
 
 	/* TODO: Find a better way to save/retore gains after dor OFF mode */
 	abe_mute_gain(MIXSDT, MIX_SDT_INPUT_UP_MIXER);
@@ -1943,6 +1945,7 @@ static int aess_suspend(struct device *dev)
 	if (pdata->get_context_loss_count)
 		abe->loss_count = pdata->get_context_loss_count(dev);
 
+no_suspend:
 	return 0;
 }
 
@@ -1955,6 +1958,11 @@ static int aess_resume(struct device *dev)
 
 	pdev = to_platform_device(dev);
 	pdata = pdev->dev.platform_data;
+
+	if (abe->active && abe_check_activity()) {
+		dev_dbg(&pdev->dev, "Resume in a middle of ABE activity!\n");
+		goto no_resume;
+	}
 
 	if (pdata->get_context_loss_count)
 		loss_count = pdata->get_context_loss_count(dev);
@@ -1984,12 +1992,13 @@ static int aess_resume(struct device *dev)
 
 	pm_runtime_put_sync(&pdev->dev);
 
+no_resume:
 	return 0;
 }
 
 #else
-#define aess_runtime_suspend	NULL
-#define aess_runtime_resume	NULL
+#define aess_suspend	NULL
+#define aess_resume	NULL
 #endif
 
 static const struct dev_pm_ops aess_pm_ops = {
