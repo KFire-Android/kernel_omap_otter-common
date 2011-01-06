@@ -412,6 +412,13 @@ void omap_uart_resume_idle(int num)
 					omap_uart_block_sleep(uart);
 			}
 
+			/* Check for IO pad wakeup */
+			if (cpu_is_omap44xx() && uart->padconf) {
+				u32 p = omap_readl(uart->padconf);
+				if (p & OMAP44XX_PADCONF_WAKEUPEVENT0)
+					omap_uart_block_sleep(uart);
+			}
+
 			/* Check for normal UART wakeup */
 			if (uart->wk_st && uart->wk_mask)
 				if (__raw_readl(uart->wk_st) & uart->wk_mask)
@@ -805,7 +812,7 @@ void __init omap_serial_init_port(int port,
 	omap_up.membase = uart->membase;
 	omap_up.irqflags = IRQF_SHARED;
 	omap_up.flags = UPF_BOOT_AUTOCONF | UPF_SHARE_IRQ;
-	omap_up.idle_timeout = platform_data->idle_timeout;
+	omap_up.idle_timeout = (platform_data->idle_timeout * HZ);
 
 	pdata = &omap_up;
 	pdata_size = sizeof(struct omap_uart_port_info);
@@ -841,7 +848,7 @@ void __init omap_serial_init_port(int port,
 	 */
 	uart->timeout = (30 * HZ);
 	omap_uart_block_sleep(uart);
-	uart->timeout = platform_data->idle_timeout;
+	uart->timeout = (platform_data->idle_timeout * HZ);
 
 	if (((cpu_is_omap34xx() || cpu_is_omap44xx())
 		 && uart->padconf) ||
