@@ -291,6 +291,7 @@ void __init omap4_check_revision(void)
 	u8 *type;
 	u32 id[4] = { 0 };
 	u32 reg;
+	u32 omap_rev_reg;
 	u8 id_string[MAX_ID_STRING];
 
 #if 0
@@ -346,11 +347,17 @@ void __init omap4_check_revision(void)
 			dot = 0;
 			break;
 		case 2:
-			if (0x3b95c02f == read_tap_reg(OMAP_TAP_IDCODE)) {
+			omap_rev_reg = (read_tap_reg(OMAP_TAP_IDCODE) >> 28);
+			if (omap_rev_reg == 0x3) {
 				omap_revision = OMAP4430_REV_ES2_1;
 				omap_chip.oc |= CHIP_IS_OMAP4430ES2_1;
 				rev = 2;
 				dot = 1;
+			} else if (omap_rev_reg >= 0x4) {
+				omap_revision = OMAP4430_REV_ES2_2;
+				omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
+				rev = 2;
+				dot = 2;
 			} else {
 				omap_revision = OMAP4430_REV_ES2_0;
 				omap_chip.oc |= CHIP_IS_OMAP4430ES2;
@@ -359,17 +366,17 @@ void __init omap4_check_revision(void)
 			}
 			break;
 		default:
-			omap_revision = OMAP4430_REV_ES2_1;
-			omap_chip.oc |= CHIP_IS_OMAP4430ES2_1;
+			omap_revision = OMAP4430_REV_ES2_2;
+			omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
 			rev = 2;
-			dot = 1;
+			dot = 2;
 		}
 	} else {
 		/* Assume the latest version */
-		omap_revision = OMAP4430_REV_ES2_1;
-		omap_chip.oc |= CHIP_IS_OMAP4430ES2_1;
+		omap_revision = OMAP4430_REV_ES2_2;
+		omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
 		rev = 2;
-		dot = 1;
+		dot = 2;
 	}
 
 	switch (omap_type()) {
