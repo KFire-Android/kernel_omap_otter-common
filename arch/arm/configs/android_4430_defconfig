@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.7
-# Wed Jan  5 15:29:30 2011
+# Wed Jan  5 16:44:56 2011
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -2026,9 +2026,13 @@ CONFIG_EXT2_FS=y
 CONFIG_EXT3_FS=y
 # CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
 # CONFIG_EXT3_FS_XATTR is not set
-# CONFIG_EXT4_FS is not set
+CONFIG_EXT4_FS=y
+# CONFIG_EXT4_FS_XATTR is not set
+# CONFIG_EXT4_DEBUG is not set
 CONFIG_JBD=y
 # CONFIG_JBD_DEBUG is not set
+CONFIG_JBD2=y
+# CONFIG_JBD2_DEBUG is not set
 # CONFIG_REISERFS_FS is not set
 # CONFIG_JFS_FS is not set
 CONFIG_FS_POSIX_ACL=y
@@ -2147,7 +2151,7 @@ CONFIG_MSDOS_PARTITION=y
 # CONFIG_ULTRIX_PARTITION is not set
 # CONFIG_SUN_PARTITION is not set
 # CONFIG_KARMA_PARTITION is not set
-# CONFIG_EFI_PARTITION is not set
+CONFIG_EFI_PARTITION=y
 # CONFIG_SYSV68_PARTITION is not set
 CONFIG_NLS=y
 CONFIG_NLS_DEFAULT="iso8859-1"
