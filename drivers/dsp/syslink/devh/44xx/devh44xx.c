@@ -96,7 +96,7 @@ static int devh_notify_event(struct omap_devh *devh , u32 event)
 static void devh_notification_handler(u16 proc_id, u16 line_id, u32 event_id,
 					uint *arg, u32 payload)
 {
-	pr_warning("Unrecoverable Error occured in Ducati for proc_id = %d\n",
+	pr_warning("Sys Error occured in Ducati for proc_id = %d\n",
 		proc_id);
 
 	/* schedule the recovery */
@@ -237,6 +237,8 @@ static int devh44xx_wdt_ipc_notifier_call(struct notifier_block *nb,
 {
 	struct omap_devh *obj;
 	int i = devh_get_plat_data_size();
+
+	pr_warning("Ducati Watch Dog fired\n");
 
 	/* schedule the recovery */
 	ipc_recover_schedule();
@@ -789,7 +791,7 @@ static struct omap_devh_runtime_info omap4_tesla_runtime_info = {
 	.rproc = NULL,
 };
 
-static inline int devh44xx_register_proc_error
+static inline int devh44xx_register_event
 	(struct omap_devh *devh, const void __user *args)
 {
 	struct deh_event_ntfy *fd_reg;
@@ -814,20 +816,45 @@ static inline int devh44xx_register_proc_error
 	list_add_tail(&fd_reg->list, &(devh->event_list));
 	spin_unlock_irq(&(devh->event_lock));
 
-	pr_info("Registered user-space process for deh error notification\n");
+	pr_info("Registered user-space process for %s event in %s\n",
+		(re_args.event == 1 ? "DEV_SYS_ERROR" :
+		(re_args.event == 2 ? "DEV_WATCHDOG_ERROR" : "UNKNOWN EVENT")),
+		devh->name);
+	return 0;
+}
+
+static inline int devh44xx_unregister_event(struct omap_devh *devh,
+						const void __user *args)
+{
+	struct deh_event_ntfy *fd_reg, *tmp_reg;
+	struct deh_reg_event_args re_args;
+	if (copy_from_user(&re_args, args, sizeof(re_args)))
+		return -EFAULT;
+
+	spin_lock_irq(&(devh->event_lock));
+	list_for_each_entry_safe(fd_reg, tmp_reg, &(devh->event_list), list)
+	{
+		if (fd_reg->fd == re_args.fd) {
+			list_del(&fd_reg->list);
+			kfree(fd_reg);
+		}
+	}
+	spin_unlock_irq(&(devh->event_lock));
 	return 0;
 }
 
 static struct omap_devh_ops omap4_sysm3_ops = {
 	.register_notifiers = devh44xx_sysm3_register,
 	.unregister_notifiers = devh44xx_sysm3_unregister,
-	.register_event_notification = devh44xx_register_proc_error,
+	.register_event_notification = devh44xx_register_event,
+	.unregister_event_notification = devh44xx_unregister_event,
 };
 
 static struct omap_devh_ops omap4_appm3_ops = {
 	.register_notifiers = devh44xx_appm3_register,
 	.unregister_notifiers = devh44xx_appm3_unregister,
-	.register_event_notification = devh44xx_register_proc_error,
+	.register_event_notification = devh44xx_register_event,
+	.unregister_event_notification = devh44xx_unregister_event,
 };
 
 static struct omap_devh_ops omap4_tesla_ops = {

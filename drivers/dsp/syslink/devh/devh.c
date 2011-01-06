@@ -101,9 +101,11 @@ static int omap_devh_ioctl(struct inode *inode, struct file *filp,
 		break;
 	case DEVH_IOCEVENTREG:
 		rc = pdata->ops->register_event_notification(devh,
-			(const void __user *)arg);
+						(const void __user *)arg);
 		break;
 	case DEVH_IOCEVENTUNREG:
+		rc = pdata->ops->unregister_event_notification(devh,
+						(const void __user *)arg);
 		break;
 	default:
 		return -ENOTTY;

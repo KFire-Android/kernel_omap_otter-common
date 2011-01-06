@@ -50,7 +50,9 @@ struct omap_devh_ops {
 	int (*register_notifiers)(struct omap_devh *devh);
 	int (*unregister_notifiers)(struct omap_devh *devh);
 	int (*register_event_notification)(struct omap_devh *devh,
-		const void __user *args);
+						const void __user *args);
+	int (*unregister_event_notification)(struct omap_devh *devh,
+						const void __user *args);
 };
 
 struct omap_devh_platform_data {
