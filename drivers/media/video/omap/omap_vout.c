@@ -2156,6 +2156,7 @@ static int vidioc_s_fmt_vid_overlay(struct file *file, void *fh,
 			struct v4l2_format *f)
 {
 	int ret = 0;
+	__s32	temp;
 	struct omap_overlay *ovl;
 	struct omapvideo_info *ovid;
 	struct omap_vout_device *vout = fh;
@@ -2165,8 +2166,24 @@ static int vidioc_s_fmt_vid_overlay(struct file *file, void *fh,
 	ovid = &vout->vid_info;
 	ovl = ovid->overlays[0];
 
+	/* flip the x,y coordinates to properly validate the video size against
+	rotated FB coordinates nad to properly center the video when <x,y)
+	is anything orher than (0,0)*/
+	if (rotate_90_or_270(vout)) {
+		temp = win->w.left;
+		win->w.left = win->w.top;
+		win->w.top = temp;
+	}
+
 	ret = omap_vout_new_window(&vout->crop, &vout->win, &vout->fbuf, win);
 	if (!ret) {
+		/*Flip the x, y coordinates to back to dss coordinates*/
+		if (rotate_90_or_270(vout)) {
+			temp = vout->win.w.left;
+			vout->win.w.left = vout->win.w.top;
+			vout->win.w.top = temp;
+		}
+
 		/* Video1 plane does not support global alpha for OMAP 2/3 */
 		if ((cpu_is_omap24xx() || cpu_is_omap34xx()) &&
 			    ovl->id == OMAP_DSS_VIDEO1)
