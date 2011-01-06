@@ -364,8 +364,11 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 	dma_addr_t dma_h;
 	size_t size;
 
+	spin_lock(&hsi_ctrl->lock);
+
 	if (hsi_get_info_from_gdd_lch(hsi_ctrl, gdd_lch, &port, &channel,
 				      &is_read_path) < 0) {
+		spin_unlock(&hsi_ctrl->lock);
 		dev_err(hsi_ctrl->dev, "Unable to match the DMA channel %d with"
 			" an HSI channel\n", gdd_lch);
 		return;
@@ -376,8 +379,6 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			"channel=%d, read=%d\n", gdd_lch, port, channel,
 			is_read_path);
 	}
-
-	spin_lock(&hsi_ctrl->lock);
 
 	hsi_outl_and(~HSI_GDD_LCH(gdd_lch), base,
 		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
