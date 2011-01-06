@@ -1657,8 +1657,12 @@ static int aess_set_opp_mode(void)
 			break;
 		}
 	} else if (abe->opp < opp) {
-		/* Increase OPP mode - no need of OPP25% */
+		/* Increase OPP mode */
 		switch (opp) {
+		case 25:
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 49000000);
+			abe_set_opp_processing(ABE_OPP25);
+			break;
 		case 50:
 			omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 			abe_set_opp_processing(ABE_OPP50);
@@ -1925,6 +1929,12 @@ static int aess_suspend(struct device *dev)
 	abe_mute_gain(MIXVXREC, MIX_VXREC_INPUT_VX_UL);
 
 	pm_runtime_put_sync(&pdev->dev);
+
+	/*
+	 * force setting OPP after suspend/resume to ensure
+	 * ABE freq/volt are set to proper values
+	 */
+	abe->opp = 0;
 
 	if (pdata->get_context_loss_count)
 		abe->loss_count = pdata->get_context_loss_count(dev);
