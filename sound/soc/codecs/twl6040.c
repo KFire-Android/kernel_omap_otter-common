@@ -75,6 +75,7 @@ struct twl6040_data {
 	int codec_powered;
 	int pll;
 	int non_lp;
+	int earpiece_used;
 	unsigned int sysclk;
 	struct snd_pcm_hw_constraint_list *sysclk_constraints;
 	struct completion ready;
@@ -367,6 +368,10 @@ static int headset_power_mode(struct snd_soc_codec *codec, int high_perf)
 {
 	int hslctl, hsrctl;
 	int mask = TWL6040_HSDRVMODEL | TWL6040_HSDACMODEL;
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+
+	/* Earphone doesn't support low power mode */
+	high_perf |= priv->earpiece_used;
 
 	hslctl = twl6040_read_reg_cache(codec, TWL6040_REG_HSLCTL);
 	hsrctl = twl6040_read_reg_cache(codec, TWL6040_REG_HSRCTL);
@@ -398,10 +403,19 @@ static int twl6040_power_mode_event(struct snd_soc_dapm_widget *w,
 	struct snd_soc_codec *codec = w->codec;
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 
-	if (SND_SOC_DAPM_EVENT_ON(event))
+	if (SND_SOC_DAPM_EVENT_ON(event)) {
 		priv->non_lp++;
-	else
+		if (!strcmp(w->name,"Earphone Driver")) {
+			/* Earphone doesn't support low power mode */
+			priv->earpiece_used = 1;
+			headset_power_mode(w->codec, 1);
+		}
+	} else {
 		priv->non_lp--;
+		if (!strcmp(w->name,"Earphone Driver")) {
+			priv->earpiece_used = 0;
+		}
+	}
 
 	msleep(1);
 
