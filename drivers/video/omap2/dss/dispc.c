@@ -1770,6 +1770,7 @@ void dispc_set_idle_mode(void)
 {
 	u32 l;
 
+	enable_clocks(1);
 	l = dispc_read_reg(DISPC_SYSCONFIG);
 	l = FLD_MOD(l, 2, 13, 12);	/* MIDLEMODE: smart standby */
 	l = FLD_MOD(l, 2, 4, 3);	/* SIDLEMODE: smart idle */
@@ -1783,12 +1784,14 @@ void dispc_set_idle_mode(void)
 	l = FLD_MOD(l, 0, 0, 0);	/* AUTOIDLE */
 #endif
 	dispc_write_reg(DISPC_SYSCONFIG, l);
-
+	enable_clocks(0);
 }
 
 void dispc_enable_gamma_table(bool enable)
 {
+	enable_clocks(1);
 	REG_FLD_MOD(DISPC_CONFIG, enable, 9, 9);
+	enable_clocks(0);
 }
 
 static void _dispc_set_vid_color_conv(enum omap_plane plane, bool enable)
@@ -1833,7 +1836,9 @@ void dispc_set_lcd_size(enum omap_channel channel, u16 width, u16 height)
 #ifndef CONFIG_OMAP4_ES1
 void dispc_set_tv_divisor(void)
 {
+	enable_clocks(1);
 	dispc_write_reg(DISPC_DIVISOR1, FLD_VAL(1, 23, 16) | FLD_VAL(1, 7, 0));
+	enable_clocks(0);
 }
 #endif
 
@@ -2915,11 +2920,13 @@ int dispc_scaling_decision(u16 width, u16 height,
 		 * Predecimation on OMAP4 still fetches the whole lines
 		 * :TODO: How does it affect the required clock speed?
 		 */
+		enable_clocks(1);
 		fclk = calc_fclk(channel, in_width, in_height,
 					out_width, out_height);
 		fclk5 = *three_tap ? 0 :
 			calc_fclk_five_taps(channel, in_width, in_height,
 					out_width, out_height, color_mode);
+		enable_clocks(0);
 
 		DSSDBG("%d*%d,%d*%d->%d,%d requires %lu(3T), %lu(5T) Hz\n",
 			in_width, x, in_height, y, out_width, out_height,
@@ -3416,14 +3423,20 @@ void dispc_enable_digit_out(bool enable)
 
 bool dispc_is_channel_enabled(enum omap_channel channel)
 {
+	bool ret = false;
+
+	enable_clocks(1);
 	if (channel == OMAP_DSS_CHANNEL_LCD2)
-		return !!REG_GET(DISPC_CONTROL2, 0, 0);
+		ret = !!REG_GET(DISPC_CONTROL2, 0, 0);
 	else if (channel == OMAP_DSS_CHANNEL_LCD)
-		return !!REG_GET(DISPC_CONTROL, 0, 0);
+		ret = !!REG_GET(DISPC_CONTROL, 0, 0);
 	else if (channel == OMAP_DSS_CHANNEL_DIGIT)
-		return !!REG_GET(DISPC_CONTROL, 1, 1);
+		ret = !!REG_GET(DISPC_CONTROL, 1, 1);
 	else
 		BUG();
+	enable_clocks(0);
+
+	return ret;
 }
 
 void dispc_enable_channel(enum omap_channel channel, bool enable)
@@ -3835,7 +3848,7 @@ static void dispc_set_lcd_divisor(enum omap_channel channel, u16 lck_div,
 	enable_clocks(0);
 }
 
-static void dispc_get_lcd_divisor(enum omap_channel channel,
+static void _dispc_get_lcd_divisor(enum omap_channel channel,
 						int *lck_div, int *pck_div)
 {
 	u32 l;
@@ -3913,7 +3926,7 @@ void dispc_dump_clocks(struct seq_file *s)
 
 	enable_clocks(1);
 
-	dispc_get_lcd_divisor(OMAP_DSS_CHANNEL_LCD, &lcd, &pcd);
+	_dispc_get_lcd_divisor(OMAP_DSS_CHANNEL_LCD, &lcd, &pcd);
 
 	seq_printf(s, "- DISPC -\n");
 
@@ -3948,7 +3961,7 @@ void dispc_dump_clocks(struct seq_file *s)
 			dispc_pclk_rate(OMAP_DSS_CHANNEL_LCD), pcd);
 
 	if (cpu_is_omap44xx()) {
-		dispc_get_lcd_divisor(OMAP_DSS_CHANNEL_LCD2, &lcd, &pcd);
+		_dispc_get_lcd_divisor(OMAP_DSS_CHANNEL_LCD2, &lcd, &pcd);
 
 		seq_printf(s, "- DISPC - LCD 2\n");
 
@@ -5273,11 +5286,13 @@ void dispc_flush_wb(struct writeback_cache_data *wb)
 
 	if (source > OMAP_WB_TV_MANAGER) {
 		input_plane = (source - 3);
+		enable_clocks(1);
 		REG_FLD_MOD(dispc_reg_att[input_plane], 0x0, 31, 30);
 #ifndef CONFIG_OMAP4_ES1
 		/* Memory to memory mode bit is set on ES 2.0 */
 		REG_FLD_MOD(dispc_reg_att[plane], 0, 19, 19);
 #endif
+		enable_clocks(0);
 	}
 }
 
