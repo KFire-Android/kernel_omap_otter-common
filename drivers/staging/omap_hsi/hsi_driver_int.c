@@ -96,7 +96,6 @@ void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
 	buff_offset = hsi_hst_bufstate_f_reg(p->hsi_controller, port, channel);
 	if (buff_offset >= 0)
 		hsi_outl_and(~HSI_BUFSTATE_CHANNEL(channel), base, buff_offset);
-
 	hsi_reset_ch_write(ch);
 }
 
@@ -120,7 +119,6 @@ void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
 
 	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
 		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
-
 	hsi_reset_ch_read(ch);
 }
 
@@ -178,6 +176,19 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 
 	spin_lock_bh(&hsi_ctrl->lock);
 
+	/*
+	 * Check race condition: DMA RX initiated as RX transmission just
+	 * started in interrupt mode (default) -
+	 * acknowledge then ignore interrupt occurence
+	 */
+	if (ch->read_data.lch != -1) {
+		dev_err(hsi_ctrl->dev, "DMA RX initiated but RX already"
+					" started in interrupt mode\n");
+
+		hsi_driver_disable_read_interrupt(ch);
+		goto done;
+	}
+
 	if (ch->flags & HSI_CH_RX_POLL)
 		rx_poll = 1;
 
@@ -193,6 +204,7 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		     HSI_SYS_MPU_ENABLE_CH_REG(n_p, irq, n_ch));
 	hsi_reset_ch_read(ch);
 
+done:
 	spin_unlock_bh(&hsi_ctrl->lock);
 
 	if (rx_poll)

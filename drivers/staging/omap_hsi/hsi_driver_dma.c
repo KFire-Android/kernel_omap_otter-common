@@ -59,6 +59,7 @@ static unsigned int hsi_get_free_lch(struct hsi_dev *hsi_ctrl)
 		}
 	}
 
+	lch = hsi_ctrl->gdd_chan_count;
 	return lch;
 }
 

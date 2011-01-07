@@ -334,6 +334,16 @@ int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 
 	ch = dev->ch;
 	spin_lock_bh(&ch->hsi_port->hsi_controller->lock);
+
+	if (ch->write_data.addr != NULL) {
+		dev_err(&dev->device, "# Invalid request - Write "
+				"operation pending port %d channel %d\n",
+					ch->hsi_port->port_number,
+							ch->channel_number);
+		err = -EINVAL;
+		goto abort;
+	}
+
 	ch->write_data.addr = addr;
 	ch->write_data.size = size;
 
@@ -346,10 +356,9 @@ int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 		ch->write_data.addr = NULL;
 		ch->write_data.size = 0;
 	}
+abort:
 	spin_unlock_bh(&ch->hsi_port->hsi_controller->lock);
-
 	return err;
-
 }
 EXPORT_SYMBOL(hsi_write);
 
@@ -384,6 +393,16 @@ int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 
 	ch = dev->ch;
 	spin_lock_bh(&ch->hsi_port->hsi_controller->lock);
+
+	if (ch->read_data.addr != NULL) {
+		dev_err(&dev->device, "# Invalid request - Read "
+				"operation pending port %d channel %d\n",
+					ch->hsi_port->port_number,
+							ch->channel_number);
+		err = -EINVAL;
+		goto abort;
+	}
+
 	ch->read_data.addr = addr;
 	ch->read_data.size = size;
 
@@ -396,6 +415,7 @@ int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 		ch->read_data.addr = NULL;
 		ch->read_data.size = 0;
 	}
+abort:
 	spin_unlock_bh(&ch->hsi_port->hsi_controller->lock);
 
 	return err;
