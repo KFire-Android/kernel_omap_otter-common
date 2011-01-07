@@ -1085,9 +1085,29 @@ static int fill_formatter_config(struct s3d_ovl_device *dev,
 
 static int init_overlay(struct s3d_ovl_device *dev, struct s3d_overlay *ovl)
 {
-	struct omap_color_conv_coef color_conv_tbl;
+	struct omap_overlay_info *info;
 
-	dispc_get_default_color_conv_coef(&color_conv_tbl);
+	info = &ovl->dssovl->info;
+
+	if (anaglyph_enabled(dev)) {
+		if (!info->yuv2rgb_conv.weight_coef) {
+			info->yuv2rgb_conv.weight_coef =
+				kzalloc(sizeof(struct \
+					omap_dss_color_weight_coef),
+					GFP_KERNEL);
+			if (!info->yuv2rgb_conv.weight_coef) {
+				S3DERR("could not allocate memory for color "
+					"weight coef\n");
+				return -ENOMEM;
+			}
+		}
+		memset(info->yuv2rgb_conv.weight_coef, 0,
+			sizeof(*info->yuv2rgb_conv.weight_coef));
+	} else if (info->yuv2rgb_conv.weight_coef) {
+		kfree(info->yuv2rgb_conv.weight_coef);
+		info->yuv2rgb_conv.weight_coef = NULL;
+	}
+
 	ovl->alpha = dev->win.global_alpha;
 	ovl->vflip = dev->vflip;
 	if (ovl->role == OVL_ROLE_WB ||
@@ -1108,27 +1128,24 @@ static int init_overlay(struct s3d_ovl_device *dev, struct s3d_overlay *ovl)
 			ovl->state = OVL_ST_FETCH_R;
 
 			if (anaglyph_enabled(dev)) {
-				ovl->dssovl->info.zorder = OMAP_DSS_OVL_ZORDER_2;
+				info->zorder = OMAP_DSS_OVL_ZORDER_2;
 				ovl->alpha = dev->win.global_alpha / 2;
 				switch (dev->anaglyph_type) {
-					/* remove green */
 				case V4L2_ANAGLYPH_GR_MAG:
-					color_conv_tbl.gy  = 0;
-					color_conv_tbl.gcr = 0;
-					color_conv_tbl.gcb = 0;
+					info->yuv2rgb_conv.weight_coef->rr =
+						1000;
+					info->yuv2rgb_conv.weight_coef->bb =
+						1000;
 					break;
-					/* remove green */
 				case V4L2_ANAGLYPH_RED_BLUE:
-					color_conv_tbl.gy  = 0;
-					color_conv_tbl.gcr = 0;
-					color_conv_tbl.gcb = 0;
-				/* INTENTIONAL FALLTHROUGH:
-				 *for all RED-something the right view does not
-				 *contain any red */
+					info->yuv2rgb_conv.weight_coef->bb =
+						1000;
+					break;
 				default:
-					color_conv_tbl.ry  = 0;
-					color_conv_tbl.rcr = 0;
-					color_conv_tbl.rcb = 0;
+					info->yuv2rgb_conv.weight_coef->gg =
+						1000;
+					info->yuv2rgb_conv.weight_coef->bb =
+						1000;
 				}
 			}
 		} else {/*Left or LR*/
@@ -1140,27 +1157,17 @@ static int init_overlay(struct s3d_ovl_device *dev, struct s3d_overlay *ovl)
 			ovl->state = OVL_ST_FETCH_L;
 
 			if (anaglyph_enabled(dev)) {
-				ovl->dssovl->info.zorder = OMAP_DSS_OVL_ZORDER_1;
+				info->zorder = OMAP_DSS_OVL_ZORDER_1;
 				switch (dev->anaglyph_type) {
-				/* leave only green */
 				case V4L2_ANAGLYPH_GR_MAG:
-					color_conv_tbl.ry  = 0;
-					color_conv_tbl.rcr = 0;
-					color_conv_tbl.rcb = 0;
-					color_conv_tbl.by  = 0;
-					color_conv_tbl.bcr = 0;
-					color_conv_tbl.bcb = 0;
+					info->yuv2rgb_conv.weight_coef->gg =
+						1000;
 					break;
-				/* leave only red */
 				case V4L2_ANAGLYPH_RED_CYAN:
 				case V4L2_ANAGLYPH_RED_BLUE:
 				default:
-					color_conv_tbl.by  = 0;
-					color_conv_tbl.bcr = 0;
-					color_conv_tbl.bcb = 0;
-					color_conv_tbl.gy  = 0;
-					color_conv_tbl.gcr = 0;
-					color_conv_tbl.gcb = 0;
+					info->yuv2rgb_conv.weight_coef->rr =
+						1000;
 				}
 			}
 		} else if (ovl->role == OVL_ROLE_DISP) {
@@ -1183,7 +1190,7 @@ static int init_overlay(struct s3d_ovl_device *dev, struct s3d_overlay *ovl)
 		ovl->state = OVL_ST_FETCH_ALL;
 	}
 
-	dispc_set_color_conv_coef(ovl->dssovl->id, &color_conv_tbl);
+	info->yuv2rgb_conv.dirty = true;
 
 	S3DINFO("init_ovl - role:0x%x, src.w:%d, src.h:%d, dst.w:%d, dst.h:%d "
 		"dst.x:%d, dst.y:%d\n", ovl->role, ovl->src.w, ovl->src.h,
@@ -1272,7 +1279,7 @@ static int conf_overlay_info(const struct s3d_ovl_device *dev,
 	info.p_uv_addr = uv_addr;
 
 	info.rotation = ovl->rotation;
-	info.rotation_type = ovl->queue->uses_tiler ? 
+	info.rotation_type = ovl->queue->uses_tiler ?
 				OMAP_DSS_ROT_TILER : OMAP_DSS_ROT_DMA;
 
 	info.vaddr = NULL;
@@ -1397,15 +1404,23 @@ static int free_overlays(const struct s3d_ovl_device *dev,
 {
 	struct list_head *pos, *n;
 	struct s3d_overlay *ovl;
-	struct omap_color_conv_coef ct;
-	dispc_get_default_color_conv_coef(&ct);
+	struct omap_overlay *dssovl;
+	struct omap_overlay_info info;
 
 	list_for_each_safe(pos, n, overlays) {
 		ovl = list_entry(pos, struct s3d_overlay, list);
 		list_del(pos);
-		dispc_set_color_conv_coef(ovl->dssovl->id,&ct);
 		mutex_lock(&ovl->dssovl->lock);
-		ovl->dssovl->in_use = false;
+		dssovl = ovl->dssovl;
+		dssovl->get_overlay_info(dssovl, &info);
+		if (info.yuv2rgb_conv.weight_coef) {
+			kfree(info.yuv2rgb_conv.weight_coef);
+			info.yuv2rgb_conv.weight_coef = NULL;
+		}
+		info.yuv2rgb_conv.dirty = true;
+		info.global_alpha = 255;
+		dssovl->in_use = false;
+		dssovl->set_overlay_info(dssovl, &info);
 		mutex_unlock(&ovl->dssovl->lock);
 		kfree(ovl);
 	}
@@ -2877,8 +2892,6 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 			DISPC_IRQ_FRAMEDONE_WB);
 		omap_dispc_unregister_isr(s3d_overlay_isr, dev, mask);
 		free_resources(dev);
-		mutex_unlock(&dev->lock);
-		return r;
 	}
 
 	mutex_unlock(&dev->lock);

@@ -188,6 +188,12 @@ enum omap_display_caps {
 	OMAP_DSS_DISPLAY_CAP_TEAR_ELIM		= 1 << 1,
 };
 
+enum omap_dss_color_conv_type {
+	OMAP_DSS_COLOR_CONV_BT601_5_LR = 0,
+	OMAP_DSS_COLOR_CONV_BT601_5_FR = 0,
+	OMAP_DSS_COLOR_CONV_BT709,
+};
+
 enum omap_dss_update_mode {
 	OMAP_DSS_UPDATE_DISABLED = 0,
 	OMAP_DSS_UPDATE_AUTO,
@@ -435,11 +441,17 @@ struct omap_video_timings {
 	u16 vbp;	/* Vertical back porch */
 };
 
-struct omap_color_conv_coef {
-	int  ry,  rcr,  rcb;
-	int  gy,  gcr,  gcb;
-	int  by,  bcr,  bcb;
-	int  full_range;
+/* Weight coef are set as value * 1000 (if coef = 1 it is set to 1000) */
+struct omap_dss_color_weight_coef {
+	int rr, rg, rb;
+	int gr, gg, gb;
+	int br, bg, bb;
+};
+
+struct omap_dss_yuv2rgb_conv {
+	enum omap_dss_color_conv_type type;
+	struct omap_dss_color_weight_coef *weight_coef;
+	bool dirty;
 };
 
 #ifdef CONFIG_OMAP2_DSS_VENC
@@ -460,6 +472,7 @@ struct omap_overlay_info {
 	u16 width;
 	u16 height;
 	enum omap_color_mode color_mode;
+	struct omap_dss_yuv2rgb_conv yuv2rgb_conv;
 	u8 rotation;
 	enum omap_dss_rotation_type rotation_type;
 	bool mirror;
@@ -857,9 +870,6 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask);
 int omap_dispc_wait_for_irq_timeout(u32 irqmask, unsigned long timeout);
 int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 			unsigned long timeout);
-void dispc_get_default_color_conv_coef(struct omap_color_conv_coef *ct);
-void dispc_set_color_conv_coef(enum omap_plane plane,
-		const struct omap_color_conv_coef *ct);
 
 #define to_dss_driver(x) container_of((x), struct omap_dss_driver, driver)
 #define to_dss_device(x) container_of((x), struct omap_dss_device, dev)
