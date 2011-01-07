@@ -1089,10 +1089,9 @@ int omapvid_apply_changes(struct omap_vout_device *vout)
 					dev->panel.timings.x_res,
 					dev->panel.timings.y_res);
 			else if (dev->driver->update)
-				if (dev->driver->update)
-					dev->driver->update(dev, 0, 0,
-						dev->panel.timings.x_res,
-						dev->panel.timings.y_res);
+				dev->driver->update(dev, 0, 0,
+					dev->panel.timings.x_res,
+					dev->panel.timings.y_res);
 		}
 #endif
 	}
