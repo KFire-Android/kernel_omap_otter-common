@@ -975,7 +975,8 @@ static int dsi_pll_power(enum omap_dsi_index ix,
 }
 
 /* calculate clock rates using dividers in cinfo */
-int dsi_calc_clock_rates(struct dsi_clock_info *cinfo)
+int dsi_calc_clock_rates(enum omap_channel channel,
+		struct dsi_clock_info *cinfo)
 {
 	if (cinfo->regn == 0 || cinfo->regn > REGN_MAX)
 		return -EINVAL;
@@ -997,7 +998,7 @@ int dsi_calc_clock_rates(struct dsi_clock_info *cinfo)
 		 * with DSS2_FCK source also */
 		cinfo->highfreq = 0;
 	} else {
-		cinfo->clkin = dispc_pclk_rate(OMAP_DSS_CHANNEL_LCD);
+		cinfo->clkin = dispc_pclk_rate(channel);
 
 		if (cinfo->clkin < 32000000)
 			cinfo->highfreq = 0;
@@ -3579,7 +3580,7 @@ static int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev)
 	cinfo.regm  = dssdev->phy.dsi.div.regm;
 	cinfo.regm_dispc = dssdev->phy.dsi.div.regm_dispc;
 	cinfo.regm_dsi = dssdev->phy.dsi.div.regm_dsi;
-	r = dsi_calc_clock_rates(&cinfo);
+	r = dsi_calc_clock_rates(dssdev->channel, &cinfo);
 	if (r) {
 		DSSERR("Failed to calc dsi clocks\n");
 		return r;
@@ -3647,7 +3648,7 @@ static int dsi_display_init_dsi(struct omap_dss_device *dssdev)
 		dss_select_dispc_clk_source(ix, (ix == DSI1) ?
 			DSS_SRC_PLL1_CLK1 : DSS_SRC_PLL2_CLK1);
 		dss_select_dsi_clk_source(ix, (ix == DSI1) ?
-			DSS_SRC_PLL1_CLK2 : DSS_SRC_PLL1_CLK2);
+			DSS_SRC_PLL1_CLK2 : DSS_SRC_PLL2_CLK2);
 		dss_select_lcd_clk_source(ix, (ix == DSI1) ?
 			DSS_SRC_PLL1_CLK1 : DSS_SRC_PLL2_CLK1);
 	} else {

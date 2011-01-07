@@ -358,7 +358,8 @@ void dsi_pll_uninit(enum omap_dsi_index ix);
 void dsi_get_overlay_fifo_thresholds(enum omap_plane plane,
 		u32 fifo_size, enum omap_burst_size *burst_size,
 		u32 *fifo_low, u32 *fifo_high);
-int dsi_calc_clock_rates(struct dsi_clock_info *cinfo);
+int dsi_calc_clock_rates(enum omap_channel channel,
+		struct dsi_clock_info *cinfo);
 void dsi_wait_pll_dispc_active(enum omap_dsi_index ix);
 void dsi_wait_pll_dsi_active(enum omap_dsi_index ix);
 #else
