@@ -1722,22 +1722,17 @@ static void s3d_overlay_isr(void *arg, u32 irqstatus)
 	struct timeval timevalue = { 0 };
 	struct s3d_ovl_device *dev = (struct s3d_ovl_device *)arg;
 	unsigned long flags;
-	u32 irq = 0;
 
 	if (!dev->streaming)
 		return;
 
-	irq = DISPC_IRQ_FRAMEDONE | DISPC_IRQ_FRAMEDONE2 |
-	    DISPC_IRQ_VSYNC | DISPC_IRQ_VSYNC2 |
-	    DISPC_IRQ_EVSYNC_EVEN | DISPC_IRQ_EVSYNC_ODD;
-
 	spin_lock_irqsave(&dev->vbq_lock, flags);
-	do_gettimeofday(&timevalue);
-
-	if (!(irqstatus & irq) || dev->cur_buf == NULL) {
+	if (dev->cur_buf == NULL) {
 		spin_unlock_irqrestore(&dev->vbq_lock, flags);
 		return;
 	}
+
+	do_gettimeofday(&timevalue);
 
 	if (dev->cur_buf != dev->next_buf) {
 		S3DINFO("vsync ISR: buffer done - idx:%d\n", dev->cur_buf->i);
@@ -2730,6 +2725,8 @@ static int vidioc_s_ctrl(struct file *file, void *fh, struct v4l2_control *a)
 	case V4L2_CID_PRIVATE_DISPLAY_ID:
 		{
 			int r;
+			if (dev->streaming)
+				return -EBUSY;
 			mutex_lock(&dev->lock);
 			r = change_display(dev, get_display(a->value));
 			if (!r)
@@ -2865,9 +2862,13 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 		return r;
 	}
 
-	mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN |
-		DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_FRAMEDONE |
-		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2;
+	if (dev->cur_disp->channel == OMAP_DSS_CHANNEL_LCD)
+		mask = DISPC_IRQ_FRAMEDONE | DISPC_IRQ_VSYNC;
+	else if (dev->cur_disp->channel == OMAP_DSS_CHANNEL_LCD2)
+		mask = DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2;
+	else
+		mask = DISPC_IRQ_FRAMEDONE_DIG |
+			DISPC_IRQ_EVSYNC_EVEN | DISPC_IRQ_EVSYNC_ODD;
 
 	r = omap_dispc_register_isr(s3d_wb_isr, dev, DISPC_IRQ_FRAMEDONE_WB);
 	if (r) {
@@ -2914,9 +2915,13 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 
 	dev->streaming = false;
 
-	mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN |
-		DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_FRAMEDONE |
-		DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2;
+	if (dev->cur_disp->channel == OMAP_DSS_CHANNEL_LCD)
+		mask = DISPC_IRQ_FRAMEDONE | DISPC_IRQ_VSYNC;
+	else if (dev->cur_disp->channel == OMAP_DSS_CHANNEL_LCD2)
+		mask = DISPC_IRQ_FRAMEDONE2 | DISPC_IRQ_VSYNC2;
+	else
+		mask = DISPC_IRQ_FRAMEDONE_DIG |
+			DISPC_IRQ_EVSYNC_EVEN | DISPC_IRQ_EVSYNC_ODD;
 
 	r = omap_dispc_unregister_isr(s3d_overlay_isr, dev, mask);
 	if (r)
