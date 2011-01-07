@@ -734,8 +734,15 @@ EXPORT_SYMBOL_GPL(videobuf_streamon);
 /* Locking: Caller holds q->vb_lock */
 static int __videobuf_streamoff(struct videobuf_queue *q)
 {
-	if (list_empty(&q->stream))
-		return -EINVAL;
+	if (q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT
+			|| q->type == V4L2_BUF_TYPE_VBI_OUTPUT
+			|| q->type == V4L2_BUF_TYPE_SLICED_VBI_OUTPUT) {
+		if (list_empty(&q->stream))
+			return -EINVAL;
+	} else {
+		if (!q->streaming)
+			return 0;
+	}
 
 	videobuf_queue_cancel(q);
 
