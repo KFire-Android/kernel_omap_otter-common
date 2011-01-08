@@ -51,8 +51,11 @@
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/mmc.h>
+#include <plat/opp_twl_tps.h>
 #include <plat/hwspinlock.h>
+#include "mux.h"
 #include "hsmmc.h"
+#include "smartreflex-class3.h"
 
 #define GPIO_HUB_POWER 1
 #define GPIO_HUB_NRESET_39 39
@@ -113,6 +116,7 @@ static int panda_panel_enable_hdmi(struct omap_dss_device *dssdev)
 	gpio_set_value(HDMI_GPIO_41, 1);
 	gpio_set_value(HDMI_GPIO_60, 0);
 	gpio_set_value(HDMI_GPIO_41, 0);
+	mdelay(5);
 	gpio_set_value(HDMI_GPIO_60, 1);
 	gpio_set_value(HDMI_GPIO_41, 1);
 
@@ -183,6 +187,7 @@ static void __init omap_panda_init_irq(void)
 	omap2_gp_clockevent_set_gptimer(1);
 #endif
 	gic_init_irq();
+	sr_class3_init();
 }
 
 static struct omap_musb_board_data musb_board_data = {
@@ -196,17 +201,6 @@ static struct omap_musb_board_data musb_board_data = {
 #endif
 	.power			= 100,
 };
-
-static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
-	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
-	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
-	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
-	.phy_reset  = false,
-	.reset_gpio_port[0]  = -EINVAL,
-	.reset_gpio_port[1]  = -EINVAL,
-	.reset_gpio_port[2]  = -EINVAL
-};
-
 
 static struct omap2_hsmmc_info mmc[] = {
 	{
@@ -425,65 +419,15 @@ static struct i2c_board_info __initdata panda_i2c_boardinfo[] = {
 		.platform_data = &panda_twldata,
 	},
 };
-
-static struct omap_uart_port_info omap_serial_platform_data[] = {
-	{
-#if defined(CONFIG_SERIAL_OMAP_UART1_DMA)
-		.use_dma	= CONFIG_SERIAL_OMAP_UART1_DMA,
-		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART1_RXDMA_BUFSIZE,
-		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART1_RXDMA_TIMEOUT,
-#else
-		.use_dma	= 0,
-		.dma_rx_buf_size = 0,
-		.dma_rx_timeout	= 0,
-#endif /* CONFIG_SERIAL_OMAP_UART1_DMA */
-		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
-		.flags		= 1,
-	},
-	{
-#if defined(CONFIG_SERIAL_OMAP_UART2_DMA)
-		.use_dma	= CONFIG_SERIAL_OMAP_UART2_DMA,
-		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART2_RXDMA_BUFSIZE,
-		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART2_RXDMA_TIMEOUT,
-#else
-		.use_dma	= 0,
-		.dma_rx_buf_size = 0,
-		.dma_rx_timeout	= 0,
-#endif /* CONFIG_SERIAL_OMAP_UART2_DMA */
-		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
-		.flags		= 1,
-	},
-	{
-#if defined(CONFIG_SERIAL_OMAP_UART3_DMA)
-		.use_dma	= CONFIG_SERIAL_OMAP_UART3_DMA,
-		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART3_RXDMA_BUFSIZE,
-		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART3_RXDMA_TIMEOUT,
-#else
-		.use_dma	= 0,
-		.dma_rx_buf_size = 0,
-		.dma_rx_timeout	= 0,
-#endif /* CONFIG_SERIAL_OMAP_UART3_DMA */
-		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
-		.flags		= 1,
-	},
-	{
-#if defined(CONFIG_SERIAL_OMAP_UART4_DMA)
-		.use_dma	= CONFIG_SERIAL_OMAP_UART4_DMA,
-		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART4_RXDMA_BUFSIZE,
-		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART4_RXDMA_TIMEOUT,
-#else
-		.use_dma	= 0,
-		.dma_rx_buf_size = 0,
-		.dma_rx_timeout	= 0,
-#endif /* CONFIG_SERIAL_OMAP_UART4_DMA */
-		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
-		.flags		= 1,
-	},
-	{
-		.flags		= 0
-	}
+static struct usbhs_omap_platform_data usbhs_pdata __initconst = {
+	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
+	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.phy_reset  = false,
+	.reset_gpio_port[0]  = -EINVAL,
+	.reset_gpio_port[1]  = -EINVAL,
+	.reset_gpio_port[2]  = -EINVAL
 };
-
 
 /*
  * LPDDR2 Configeration Data
@@ -503,8 +447,8 @@ static __initdata struct emif_device_details emif_devices = {
 };
 
 static struct omap_i2c_bus_board_data __initdata panda_i2c_bus_pdata;
-static void __init omap_i2c_hwspinlock_init(int bus_id,
-		unsigned int spinlock_id, struct omap_i2c_bus_board_data *pdata)
+static void __init omap_i2c_hwspinlock_init(int bus_id, unsigned int
+			spinlock_id, struct omap_i2c_bus_board_data *pdata)
 {
 	pdata->handle = hwspinlock_request_specific(spinlock_id);
 	if (pdata->handle != NULL) {
@@ -601,6 +545,247 @@ void wlan_1273_config(void)
 }
 #endif
 
+
+
+static void enable_board_wakeup_source(void)
+{
+	/* Android does not have touchscreen as wakeup source */
+#if !defined(CONFIG_ANDROID)
+	int gpio_val;
+
+	gpio_val = omap_mux_get_gpio(OMAP4_TOUCH_IRQ_1);
+	if ((gpio_val & OMAP44XX_PADCONF_WAKEUPENABLE0) == 0) {
+		gpio_val |= OMAP44XX_PADCONF_WAKEUPENABLE0;
+		omap_mux_set_gpio(gpio_val, OMAP4_TOUCH_IRQ_1);
+	}
+
+#endif
+
+	/*
+	 * Enable IO daisy for sys_nirq1/2, to be able to
+	 * wakeup from interrupts from PMIC/Audio IC.
+	 * Needed only in Device OFF mode.
+	 */
+	omap_mux_enable_wakeup("sys_nirq1");
+	omap_mux_enable_wakeup("sys_nirq2");
+}
+
+static struct omap_volt_pmic_info omap_pmic_core = {
+	.name = "twl",
+	.slew_rate = 4000,
+	.step_size = 12500,
+	.i2c_addr = 0x12,
+	.i2c_vreg = 0x61,
+	.i2c_cmdreg = 0x62,
+	.vsel_to_uv = omap_twl_vsel_to_uv,
+	.uv_to_vsel = omap_twl_uv_to_vsel,
+	.onforce_cmd = omap_twl_onforce_cmd,
+	.on_cmd = omap_twl_on_cmd,
+	.sleepforce_cmd = omap_twl_sleepforce_cmd,
+	.sleep_cmd = omap_twl_sleep_cmd,
+	.vp_config_erroroffset = 0,
+	.vp_vstepmin_vstepmin = 0x01,
+	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vlimitto_timeout_us = 0x200,
+	.vp_vlimitto_vddmin = 0xA,
+	.vp_vlimitto_vddmax = 0x28,
+};
+
+static struct omap_volt_pmic_info omap_pmic_mpu = {
+	.name = "twl",
+	.slew_rate = 4000,
+	.step_size = 12500,
+	.i2c_addr = 0x12,
+	.i2c_vreg = 0x55,
+	.i2c_cmdreg = 0x56,
+	.vsel_to_uv = omap_twl_vsel_to_uv,
+	.uv_to_vsel = omap_twl_uv_to_vsel,
+	.onforce_cmd = omap_twl_onforce_cmd,
+	.on_cmd = omap_twl_on_cmd,
+	.sleepforce_cmd = omap_twl_sleepforce_cmd,
+	.sleep_cmd = omap_twl_sleep_cmd,
+	.vp_config_erroroffset = 0,
+	.vp_vstepmin_vstepmin = 0x01,
+	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vlimitto_timeout_us = 0x200,
+	.vp_vlimitto_vddmin = 0xA,
+	.vp_vlimitto_vddmax = 0x39,
+};
+
+static struct omap_volt_pmic_info omap_pmic_iva = {
+	.name = "twl",
+	.slew_rate = 4000,
+	.step_size = 12500,
+	.i2c_addr = 0x12,
+	.i2c_vreg = 0x5b,
+	.i2c_cmdreg = 0x5c,
+	.vsel_to_uv = omap_twl_vsel_to_uv,
+	.uv_to_vsel = omap_twl_uv_to_vsel,
+	.onforce_cmd = omap_twl_onforce_cmd,
+	.on_cmd = omap_twl_on_cmd,
+	.sleepforce_cmd = omap_twl_sleepforce_cmd,
+	.sleep_cmd = omap_twl_sleep_cmd,
+	.vp_config_erroroffset = 0,
+	.vp_vstepmin_vstepmin = 0x01,
+	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vlimitto_timeout_us = 0x200,
+	.vp_vlimitto_vddmin = 0xA,
+	.vp_vlimitto_vddmax = 0x2D,
+};
+
+static struct omap_volt_vc_data vc_config = {
+	.vdd0_on = 1350000,        /* 1.35v */
+	.vdd0_onlp = 1350000,      /* 1.35v */
+	.vdd0_ret = 837500,       /* 0.8375v */
+	.vdd0_off = 0,		/* 0 v */
+	.vdd1_on = 1100000,        /* 1.1v */
+	.vdd1_onlp = 1100000,      /* 1.1v */
+	.vdd1_ret = 837500,       /* 0.8375v */
+	.vdd1_off = 0,		/* 0 v */
+	.vdd2_on = 1100000,        /* 1.1v */
+	.vdd2_onlp = 1100000,      /* 1.1v */
+	.vdd2_ret = 837500,       /* .8375v */
+	.vdd2_off = 0,		/* 0 v */
+};
+
+static struct omap_uart_port_info omap_serial_platform_data[] = {
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART1_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART1_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART1_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART1_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART1_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART2_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART2_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART2_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART2_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART2_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART3_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART3_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART3_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART3_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART3_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+#if defined(CONFIG_SERIAL_OMAP_UART4_DMA)
+		.use_dma	= CONFIG_SERIAL_OMAP_UART4_DMA,
+		.dma_rx_buf_size = CONFIG_SERIAL_OMAP_UART4_RXDMA_BUFSIZE,
+		.dma_rx_timeout	= CONFIG_SERIAL_OMAP_UART4_RXDMA_TIMEOUT,
+#else
+		.use_dma	= 0,
+		.dma_rx_buf_size = 0,
+		.dma_rx_timeout	= 0,
+#endif /* CONFIG_SERIAL_OMAP_UART3_DMA */
+		.idle_timeout	= CONFIG_SERIAL_OMAP_IDLE_TIMEOUT,
+		.flags		= 1,
+	},
+	{
+		.flags		= 0
+	}
+};
+
+#ifdef CONFIG_OMAP_MUX
+static struct omap_board_mux board_mux[] __initdata = {
+	{ .reg_offset = OMAP_MUX_TERMINATOR },
+};
+#else
+#define board_mux	NULL
+#endif
+
+/*
+ * As OMAP4430 mux HSI and USB signals, when HSI is used (for instance HSI
+ * modem is plugged) we should configure HSI pad conf and disable some USB
+ * configurations.
+ * HSI usage is declared using bootargs variable:
+ * board-4430sdp.modem_ipc=hsi
+ * Any other or missing value will not setup HSI pad conf, and port_mode[0]
+ * will be used by USB.
+ * Variable modem_ipc is used to catch bootargs parameter value.
+ */
+static char *modem_ipc = "n/a";
+
+module_param(modem_ipc, charp, 0);
+MODULE_PARM_DESC(modem_ipc, "Modem IPC setting");
+
+static void omap_4430hsi_pad_conf(void)
+{
+	/*
+	 * HSI pad conf: hsi1_ca/ac_wake/flag/data/ready
+	 * Also configure gpio_92/95/157/187 used by modem
+	 */
+
+	/* hsi1_cawake */
+	omap_mux_init_signal("usbb1_ulpitll_clk.hsi1_cawake", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE | \
+		OMAP_PIN_OFF_WAKEUPENABLE);
+	/* hsi1_caflag */
+	omap_mux_init_signal("usbb1_ulpitll_dir.hsi1_caflag", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_cadata */
+	omap_mux_init_signal("usbb1_ulpitll_stp.hsi1_cadata", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acready */
+	omap_mux_init_signal("usbb1_ulpitll_nxt.hsi1_acready", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acwake */
+	omap_mux_init_signal("usbb1_ulpitll_dat0.hsi1_acwake", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acdata */
+	omap_mux_init_signal("usbb1_ulpitll_dat1.hsi1_acdata", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acflag */
+	omap_mux_init_signal("usbb1_ulpitll_dat2.hsi1_acflag", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_caready */
+	omap_mux_init_signal("usbb1_ulpitll_dat3.hsi1_caready", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_92 */
+	omap_mux_init_signal("usbb1_ulpitll_dat4.gpio_92", \
+		OMAP_PULL_ENA);
+	/* gpio_95 */
+	omap_mux_init_signal("usbb1_ulpitll_dat7.gpio_95", \
+		OMAP_PIN_INPUT_PULLDOWN | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_157 */
+	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_187 */
+	omap_mux_init_signal("sys_boot3.gpio_187", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+}
+
 static void __init panda_boardrev_init(void)
 {
 	int ret;
@@ -644,9 +829,16 @@ error1:
 
 }
 
+/* dummy */
+void keyboard_mux_init(void) {}
+
 static void __init omap_panda_init(void)
 {
+	int package = OMAP_PACKAGE_CBS;
 
+	if (omap_rev() == OMAP4430_REV_ES1_0)
+		package = OMAP_PACKAGE_CBL;
+	omap4_mux_init(board_mux, package);
 	panda_boardrev_init();
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
@@ -661,11 +853,31 @@ static void __init omap_panda_init(void)
 	wlan_1273_config();
 #endif
 
+
+	/*
+	 * Test board-4430sdp.modem_ipc bootargs value to detect if HSI pad
+	 * conf is required
+	 */
+	pr_info("Configured modem_ipc: %s", modem_ipc);
+	if (!strcmp(modem_ipc, "hsi")) {
+		pr_info("Modem HSI detected, set USB port_mode[0] as UNUSED");
+		/* USBB1 I/O pads conflict with HSI1 port */
+		usbhs_pdata.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED;
+		/* Setup HSI pad conf for OMAP4430 platform */
+		omap_4430hsi_pad_conf();
+	} else
+		pr_info("Modem HSI not detected");
+
 	usb_musb_init(&musb_board_data);
 	omap4_ehci_init();
 #ifdef CONFIG_OMAP2_DSS_HDMI
 	omap_display_init(&panda_dss_data);
 #endif
+	enable_board_wakeup_source();
+	omap_voltage_register_pmic(&omap_pmic_core, "core");
+	omap_voltage_register_pmic(&omap_pmic_mpu, "mpu");
+	omap_voltage_register_pmic(&omap_pmic_iva, "iva");
+	omap_voltage_init_vc(&vc_config);
 }
 
 static void __init omap_panda_map_io(void)
