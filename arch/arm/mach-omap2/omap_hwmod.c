@@ -1173,7 +1173,8 @@ static int _setup(struct omap_hwmod *oh, void *data)
 	 * reset asserted. Exit without warning because that behavior is
 	 * expected.
 	 */
-	if ((oh->flags & HWMOD_INIT_NO_RESET) && oh->rst_lines_cnt == 1)
+	if ((oh->flags & HWMOD_INIT_NO_RESET) &&
+	    (oh->rst_lines_cnt == 1 || cpu_is_omap34xx()))
 		return 0;
 
 	r = _omap_hwmod_enable(oh);
