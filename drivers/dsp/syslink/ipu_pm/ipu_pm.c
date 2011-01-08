@@ -737,14 +737,26 @@ void ipu_pm_notify_callback(u16 proc_id, u16 line_id, u32 event_id,
 	if (!_is_event(event))
 		goto error;
 	if (event == PM_HIBERNATE) {
-		/* Remote Proc is ready to hibernate
-		 * PM_HIBERNATE is a one way notification
-		 * Remote proc to Host proc
+		/* If any resource in use, no hibernation */
+		if (!(handle->rcb_table->state_flag & HIB_REF_MASK)) {
+			/* Remote Proc is ready to hibernate
+			 * PM_HIBERNATE is a one way notification
+			 * Remote proc to Host proc
+			 */
+			pr_debug("Remote Proc is ready to hibernate\n");
+
+			retval = ipu_pm_save_ctx(proc_id);
+			if (retval)
+				pr_err("Unable to stop proc %d\n", proc_id);
+		} else
+			pr_err("Hibernation is not allowed if resource in use");
+	} else if (event == PM_ALIVE) {
+		/* If resources are in use ipu will send an event to make
+		 * sure it is in a good state but hibernation won't happen
+		 * and the timer will be reloaded to hib_time again.
 		 */
-		pr_debug("Remote Proc is ready to hibernate\n");
-		retval = ipu_pm_save_ctx(proc_id);
-		if (retval)
-			pr_err("Unable to stop proc %d\n", proc_id);
+		pr_debug("Unable to stop proc, Resources in use\n");
+		ipu_pm_timer_state(PM_HIB_TIMER_ON);
 	} else {
 		pr_debug("Remote Proc received %d event\n", event);
 		handle->pm_event[event].pm_msg = payload;
@@ -2392,8 +2404,10 @@ int ipu_pm_save_ctx(int proc_id)
 								PROC_LD_SHIFT;
 
 	/* If already down don't kill it twice */
-	if (ipu_pm_get_state(proc_id) & SYS_PROC_DOWN)
-		goto exit;
+	if (ipu_pm_get_state(proc_id) & SYS_PROC_DOWN) {
+		pr_warn("ipu already hibernated, no need to save again");
+		return 0;
+	}
 
 #ifdef CONFIG_OMAP_PM
 	retval = omap_pm_set_max_sdma_lat(&pm_qos_handle_2,
@@ -3003,10 +3017,6 @@ static int ipu_pm_timer_state(int event)
 	switch (event) {
 	case PM_HIB_TIMER_EXPIRE:
 		if (params->hib_timer_state == PM_HIB_TIMER_ON) {
-			/* If any resource in use, no hibernation */
-			if (handle->rcb_table->state_flag & HIB_REF_MASK)
-				goto exit;
-
 			pr_debug("Starting hibernation, waking up M3 cores");
 			handle->rcb_table->state_flag |= (SYS_PROC_HIB |
 					APP_PROC_HIB | ENABLE_IPU_HIB);
@@ -3019,6 +3029,7 @@ static int ipu_pm_timer_state(int event)
 			PM_HIB_TIMER_WDRESET) {
 			/* notify devh to begin error recovery here */
 			pr_debug("Timer ISR: Trigger WD reset + recovery\n");
+			ipu_pm_recover_schedule();
 			ipu_pm_notify_event(0, NULL);
 			if (sys_rproc->dmtimer != NULL)
 				omap_dm_timer_stop(sys_rproc->dmtimer);

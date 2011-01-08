@@ -337,6 +337,7 @@ enum pm_event_type{
 	PM_RESUME,
 	PM_PID_DEATH,
 	PM_HIBERNATE,
+	PM_ALIVE,
 	PM_LAST_EVENT
 };
 
