@@ -109,6 +109,12 @@ static int nec_8048_panel_resume(struct omap_dss_device *dssdev)
 	return nec_8048_panel_enable(dssdev);
 }
 
+static void nec_8048_panel_get_timings(struct omap_dss_device *dssdev,
+				struct omap_video_timings *timings)
+{
+	*timings = dssdev->panel.timings;
+}
+
 static struct omap_dss_driver nec_8048_driver = {
 	.probe          = nec_8048_panel_probe,
 	.remove         = nec_8048_panel_remove,
@@ -117,6 +123,7 @@ static struct omap_dss_driver nec_8048_driver = {
 	.suspend        = nec_8048_panel_suspend,
 	.resume         = nec_8048_panel_resume,
 	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
+	.get_timings    = nec_8048_panel_get_timings,
 
 	.driver		= {
 		.name	= "NEC_8048_panel",
