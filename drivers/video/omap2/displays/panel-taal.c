@@ -1268,17 +1268,29 @@ static int taal_sched_update(struct omap_dss_device *dssdev,
 	struct taal_data *td = dev_get_drvdata(&dssdev->dev);
 	int r;
 
-	mutex_lock(&td->lock);
-	/* this locks dsi bus if it can and returns 0 */
-	r = omap_dsi_sched_update_lock(dssdev, x, y, w, h);
+	if (mutex_trylock(&td->lock)) {
+		r = omap_dsi_sched_update_lock(dssdev, x, y, w, h, false);
 
-	if (!r)
-		/* start the update now */
-		return taal_update_locked(dssdev, x, y, w, h);
+		if (!r) {
+			/* start the update now */
+			r = taal_update_locked(dssdev, x, y, w, h);
 
-	if (r == -EBUSY)
-		r = 0;
-	mutex_unlock(&td->lock);
+			return r;
+		}
+
+		if (r == -EBUSY)
+			r = 0;
+
+		mutex_unlock(&td->lock);
+
+	} else {
+		/* this locks dsi bus if it can and returns 0 */
+		r = omap_dsi_sched_update_lock(dssdev, x, y, w, h, true);
+
+		if (r == -EBUSY)
+			r = 0;
+	}
+
 	return r;
 }
 
@@ -1723,6 +1735,7 @@ static struct omap_dss_driver taal2_driver = {
 	.get_update_mode = taal_get_update_mode,
 
 	.update		= taal_update,
+	.sched_update	= taal_sched_update,
 	.sync		= taal_sync,
 
 	.get_resolution	= taal_get_resolution,

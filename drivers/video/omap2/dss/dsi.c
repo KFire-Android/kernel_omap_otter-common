@@ -3369,21 +3369,27 @@ static void omap_dsi_delayed_update(struct work_struct *work)
 	/* waiting is updated only from update, so no need for locking */
 	if (!dssdev->sched_update.waiting)
 		dssdev->driver->update(dssdev, nu->x, nu->y, nu->w, nu->h);
+	dssdev->sched_update.scheduled = false;
 }
 
+static DEFINE_MUTEX(sched_lock);
+
 int omap_dsi_sched_update_lock(struct omap_dss_device *dssdev,
-						u16 x, u16 y, u16 w, u16 h)
+				u16 x, u16 y, u16 w, u16 h, bool sched_only)
 {
 	/* this method must be called within a locked section */
 	enum omap_dsi_index ix;
 	struct dsi_struct *p_dsi;
+	struct omap_dss_sched_update *nu = &dssdev->sched_update;
 
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
+	if (sched_only)
+		mutex_lock(&sched_lock);
+
 	/* if update is in progress schedule another update */
-	if (dsi_bus_is_locked(ix)) {
-		struct omap_dss_sched_update *nu = &dssdev->sched_update;
+	if (sched_only || nu->scheduled || dsi_bus_is_locked(ix)) {
 		/* using nu->scheduled as it gets updated within same locks */
 		if (nu->scheduled) {
 			/* update next update region */
@@ -3400,6 +3406,10 @@ int omap_dsi_sched_update_lock(struct omap_dss_device *dssdev,
 			nu->w = w;
 			nu->h = h;
 		}
+
+		if (sched_only)
+			mutex_unlock(&sched_lock);
+
 		return -EBUSY;
 	}
 	dsi_bus_lock(ix);
@@ -3457,7 +3467,6 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
 	p_dsi->update_channel = channel;
-	dssdev->sched_update.scheduled = false;
 
 	/* OMAP DSS cannot send updates of odd widths.
 	 * omap_dsi_prepare_update() makes the widths even, but add a BUG_ON
