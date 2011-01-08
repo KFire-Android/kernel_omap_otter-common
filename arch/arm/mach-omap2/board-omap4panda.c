@@ -829,9 +829,6 @@ error1:
 
 }
 
-/* dummy */
-void keyboard_mux_init(void) {}
-
 static void __init omap_panda_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
