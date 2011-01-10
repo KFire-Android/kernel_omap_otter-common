@@ -225,6 +225,15 @@ static int _prcm_int_handle_wakeup(void)
 {
 	int c;
 
+	/* By OMAP3630ES1.x and OMAP3430ES3.1 TRM, S/W must clear
+	 * the EN_IO and EN_IO_CHAIN bits of WKEN_WKUP. Those bits
+	 * would be set again by S/W in sleep sequences.
+	 */
+	if (omap_rev() >= OMAP3430_REV_ES3_1)
+		prm_clear_mod_reg_bits(OMAP3430_EN_IO_MASK |
+				       OMAP3430_EN_IO_CHAIN_MASK,
+				       WKUP_MOD, PM_WKEN);
+
 	c = prcm_clear_mod_irqs(WKUP_MOD, 1);
 	c += prcm_clear_mod_irqs(CORE_MOD, 1);
 	c += prcm_clear_mod_irqs(OMAP3430_PER_MOD, 1);
@@ -875,10 +884,14 @@ static void __init prcm_setup_regs(void)
 			     OMAP3430_GR_MOD,
 			     OMAP3_PRM_CLKSRC_CTRL_OFFSET);
 
-	/* setup wakup source */
-	prm_write_mod_reg(OMAP3430_EN_IO_MASK | OMAP3430_EN_GPIO1_MASK |
-			  OMAP3430_EN_GPT1_MASK | OMAP3430_EN_GPT12_MASK,
-			  WKUP_MOD, PM_WKEN);
+	/* setup wakup source:
+	 *  By OMAP3630ES1.x and OMAP3430ES3.1 TRM, S/W must take care
+	 *  the EN_IO and EN_IO_CHAIN bits in sleep-wakeup sequences.
+	 */
+	prm_write_mod_reg(OMAP3430_EN_GPIO1_MASK | OMAP3430_EN_GPT1_MASK |
+			  OMAP3430_EN_GPT12_MASK, WKUP_MOD, PM_WKEN);
+	if (omap_rev() < OMAP3430_REV_ES3_1)
+		prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
 	/* No need to write EN_IO, that is always enabled */
 	prm_write_mod_reg(OMAP3430_GRPSEL_GPIO1_MASK |
 			  OMAP3430_GRPSEL_GPT1_MASK |
