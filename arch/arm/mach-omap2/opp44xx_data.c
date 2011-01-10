@@ -330,6 +330,7 @@ int __init omap4_pm_init_opp_table(void)
 {
 	struct omap_opp_def *opp_def;
 	struct device *dev;
+	struct clk *gpu_fclk;
 	int i, r;
 
 	/*
@@ -362,10 +363,15 @@ int __init omap4_pm_init_opp_table(void)
 	core_m6_clk = clk_get(NULL, "dpll_core_m6x2_ck");
 	core_m7_clk = clk_get(NULL, "dpll_core_m7x2_ck");
 	sgx_clk = clk_get(NULL, "dpll_per_m7x2_ck");
+	gpu_fclk = clk_get(NULL, "gpu_fck");
 	per_m3_clk = clk_get(NULL, "dpll_per_m3x2_ck");
 	per_m6_clk = clk_get(NULL, "dpll_per_m6x2_ck");
 	abe_clk = clk_get(NULL, "abe_clk");
 	fdif_clk = clk_get(NULL, "fdif_fck");
+
+	/* Set SGX parent to PER DPLL */
+	clk_set_parent(gpu_fclk, sgx_clk);
+	clk_put(gpu_fclk);
 
 	/* Populate the set rate and get rate for mpu, iva, dsp and l3 device */
 	dev = omap2_get_mpuss_device();
