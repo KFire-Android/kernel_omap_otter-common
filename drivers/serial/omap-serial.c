@@ -789,6 +789,13 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	serial_out(up, UART_LCR, OMAP_UART_LCR_CONF_MDB);
 
 	if (up->use_dma) {
+		if (up->uart_dma.tx_threshold) {
+			serial_out(up, UART_MDR3,
+					SET_DMA_TX_THRESHOLD);
+			serial_out(up, UART_TX_DMA_THRESHOLD,
+					TX_FIFO_THR_LVL);
+		}
+
 		serial_out(up, UART_TI752_TLR, 0);
 		serial_out(up, UART_OMAP_SCR,
 			(UART_FCR_TRIGGER_4 | UART_FCR_TRIGGER_8));
@@ -1108,7 +1115,6 @@ static void serial_omap_rx_timeout(unsigned long uart_no)
 {
 	struct uart_omap_port *up = ui[uart_no];
 	unsigned int curr_dma_pos, curr_transmitted_size;
-	int ret = 0;
 
 	curr_dma_pos = omap_get_dma_dst_pos(up->uart_dma.rx_dma_channel);
 	if ((curr_dma_pos == up->uart_dma.prev_rx_dma_pos) ||
@@ -1134,19 +1140,16 @@ static void serial_omap_rx_timeout(unsigned long uart_no)
 			up->uart_dma.rx_buf_dma_phys),
 			curr_transmitted_size);
 	tty_flip_buffer_push(up->port.state->port.tty);
-	up->uart_dma.prev_rx_dma_pos = curr_dma_pos;
 	if (up->uart_dma.rx_buf_size +
 			up->uart_dma.rx_buf_dma_phys == curr_dma_pos) {
-		ret = serial_omap_start_rxdma(up);
-		if (ret < 0) {
-			serial_omap_stop_rxdma(up);
-			up->ier |= UART_IER_RDI;
-			serial_out(up, UART_IER, up->ier);
-		}
+		omap_start_dma(up->uart_dma.rx_dma_channel);
+		up->uart_dma.prev_rx_dma_pos = up->uart_dma.rx_buf_dma_phys;
 	} else  {
-		mod_timer(&up->uart_dma.rx_timer, jiffies +
-			usecs_to_jiffies(up->uart_dma.rx_timeout));
+		up->uart_dma.prev_rx_dma_pos = curr_dma_pos;
 	}
+
+	mod_timer(&up->uart_dma.rx_timer, jiffies +
+		usecs_to_jiffies(up->uart_dma.rx_timeout));
 	up->port_activity = jiffies;
 }
 
@@ -1327,6 +1330,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 		up->uart_dma.uart_dma_tx = dma_tx->start;
 		up->uart_dma.uart_dma_rx = dma_rx->start;
 		up->use_dma = omap_up_info->use_dma;
+		up->uart_dma.tx_threshold = omap_up_info->omap4_tx_threshold;
 		up->uart_dma.rx_buf_size = omap_up_info->dma_rx_buf_size;
 		up->uart_dma.rx_timeout = omap_up_info->dma_rx_timeout;
 		spin_lock_init(&(up->uart_dma.tx_lock));
@@ -1467,6 +1471,11 @@ int omap_uart_active(int num)
 
 	/* Any rx activity? */
 	if (status & UART_LSR_DR)
+		return 1;
+
+	/* Check if DMA channels are active */
+	if (up->use_dma && (up->uart_dma.rx_dma_channel != OMAP_UART_DMA_CH_FREE ||
+		up->uart_dma.tx_dma_channel != OMAP_UART_DMA_CH_FREE))
 		return 1;
 
 	return 0;

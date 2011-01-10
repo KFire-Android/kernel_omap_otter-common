@@ -38,6 +38,17 @@
 #define OMAP_MODE13X_SPEED	230400
 
 /*
+ * From OMAP4430 ES 2.0 onwards set
+ * tx_threshold while using UART in DMA Mode
+ * and ensure tx_threshold + tx_trigger <= 63
+ */
+#define UART_MDR3		0x20
+#define SET_DMA_TX_THRESHOLD	0x04
+#define UART_TX_DMA_THRESHOLD	0x21
+/* Setting TX Threshold Level to 62 */
+#define TX_FIFO_THR_LVL	0x3E
+
+/*
  * LCR = 0XBF: Switch to Configuration Mode B.
  * In configuration mode b allow access
  * to EFR,DLL,DLH.
@@ -97,6 +108,7 @@ struct omap_uart_port_info {
 	int                     dma_rx_buf_size;/* DMA Rx Buffer Size */
 	int                     dma_rx_timeout; /* DMA RX timeout */
 	unsigned int            idle_timeout;   /* Omap Uart Idle Time out */
+	u8			omap4_tx_threshold;
 };
 
 struct uart_omap_dma {
@@ -122,6 +134,7 @@ struct uart_omap_dma {
 	struct timer_list	rx_timer;
 	int			rx_buf_size;
 	int			rx_timeout;
+	u8			tx_threshold;
 };
 
 struct uart_omap_port {

@@ -271,7 +271,11 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MOPER);
 	serial_write_reg(uart, UART_IER, uart->ier);
 	/* Enable FiFo and Trig Threshold */
-	serial_write_reg(uart, UART_FCR, 0x51);
+	if (uart->dma_enabled)
+		serial_write_reg(uart, UART_FCR, 0x59);
+	else
+		serial_write_reg(uart, UART_FCR, 0x51);
+
 	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDA);
 	serial_write_reg(uart, UART_MCR, uart->mcr);
 	/* Config B mode */
@@ -844,6 +848,11 @@ void __init omap_serial_init_port(int port,
 	omap_up.use_dma = platform_data->use_dma;
 	omap_up.dma_rx_buf_size = platform_data->dma_rx_buf_size;
 	omap_up.dma_rx_timeout = platform_data->dma_rx_timeout;
+
+	if (omap_up.use_dma) {
+		if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
+			omap_up.omap4_tx_threshold = true;
+	}
 
 	omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
 	omap_up.mapbase = uart->mapbase;
