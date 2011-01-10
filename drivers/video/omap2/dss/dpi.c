@@ -115,7 +115,8 @@ static int dpi_set_dispc_clk(enum omap_channel channel,
 	}
 
 	dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
-	dss_select_lcd_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
+	if (cpu_is_omap44xx())
+		dss_select_lcd_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 
 	dispc_set_clock_div(channel, &dispc_cinfo);
 
