@@ -2314,10 +2314,10 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	if (!is_volt_scaled)
 		omap_voltage_scale_vdd(voltdm, volt);
 
-	mutex_unlock(&vdd->scaling_mutex);
-
 	/* Enable Smartreflex module */
 	omap_smartreflex_enable(voltdm);
+
+	mutex_unlock(&vdd->scaling_mutex);
 
 	/* Scale dependent vdds */
 	scale_dep_vdd(vdd);
