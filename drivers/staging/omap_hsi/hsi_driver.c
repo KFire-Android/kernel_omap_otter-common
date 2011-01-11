@@ -31,6 +31,8 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 
+#include <plat/omap_device.h>
+
 #include "hsi_driver.h"
 
 #define HSI_MODULENAME "omap_hsi"
@@ -774,6 +776,13 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 
 	/* From here no need for HSI HW access */
 	hsi_clocks_disable(hsi_ctrl->dev, __func__);
+
+	/* Set the HSI FCLK to default. */
+	err = omap_device_set_rate(hsi_ctrl->dev, hsi_ctrl->dev,
+					pdata->default_hsi_fclk);
+	if (err)
+		dev_err(&pd->dev, "Cannot set HSI FClk to default value: %ld\n",
+			pdata->default_hsi_fclk);
 
 	return err;
 

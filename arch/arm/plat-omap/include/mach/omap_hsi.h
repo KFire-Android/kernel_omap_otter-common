@@ -28,6 +28,11 @@
 #ifndef __OMAP_HSI_H__
 #define __OMAP_HSI_H__
 
+/* Set the HSI Functional Clock to 96MHz.
+ * This is to ensure HSI will function even at OPP50. */
+#define HSI_DEFAULT_FCLK		96000000	/* 96 MHz */
+
+
 #define HSI_PORT_OFFSET			0x1000
 
 /*
