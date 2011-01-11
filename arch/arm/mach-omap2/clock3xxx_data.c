@@ -211,7 +211,6 @@ static struct clk sys_clkout1 = {
 /* DPLLS */
 
 /* CM CLOCKS */
-
 static const struct clksel_rate div16_dpll_rates[] = {
 	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
 	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
@@ -232,7 +231,42 @@ static const struct clksel_rate div16_dpll_rates[] = {
 	{ .div = 0 }
 };
 
-static const struct clksel_rate dpll4_rates[] = {
+static const struct clksel_rate div31_dpll_rates[] = {
+	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
+	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
+	{ .div = 3, .val = 3, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 4, .val = 4, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 5, .val = 5, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 6, .val = 6, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 7, .val = 7, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 8, .val = 8, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 9, .val = 9, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 10, .val = 10, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 11, .val = 11, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 12, .val = 12, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 13, .val = 13, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 14, .val = 14, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 15, .val = 15, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 16, .val = 16, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 17, .val = 17, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 18, .val = 18, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 19, .val = 19, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 20, .val = 20, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 21, .val = 21, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 22, .val = 22, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 23, .val = 23, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 24, .val = 24, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 25, .val = 25, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 26, .val = 26, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 27, .val = 27, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 28, .val = 28, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 29, .val = 29, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 30, .val = 30, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 31, .val = 31, .flags = RATE_IN_3430ES2PLUS },
+	{ .div = 0 }
+};
+
+static const struct clksel_rate div32_dpll_rates[] = {
 	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
 	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
 	{ .div = 3, .val = 3, .flags = RATE_IN_3XXX },
@@ -449,43 +483,8 @@ static struct clk dpll3_x2_ck = {
 	.recalc		= &omap3_clkoutx2_recalc,
 };
 
-static const struct clksel_rate div31_dpll3_rates[] = {
-	{ .div = 1, .val = 1, .flags = RATE_IN_3XXX },
-	{ .div = 2, .val = 2, .flags = RATE_IN_3XXX },
-	{ .div = 3, .val = 3, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 4, .val = 4, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 5, .val = 5, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 6, .val = 6, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 7, .val = 7, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 8, .val = 8, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 9, .val = 9, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 10, .val = 10, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 11, .val = 11, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 12, .val = 12, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 13, .val = 13, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 14, .val = 14, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 15, .val = 15, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 16, .val = 16, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 17, .val = 17, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 18, .val = 18, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 19, .val = 19, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 20, .val = 20, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 21, .val = 21, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 22, .val = 22, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 23, .val = 23, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 24, .val = 24, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 25, .val = 25, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 26, .val = 26, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 27, .val = 27, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 28, .val = 28, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 29, .val = 29, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 30, .val = 30, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 31, .val = 31, .flags = RATE_IN_3430ES2PLUS },
-	{ .div = 0 },
-};
-
-static const struct clksel div31_dpll3m2_clksel[] = {
-	{ .parent = &dpll3_ck, .rates = div31_dpll3_rates },
+static const struct clksel div31_dpll3_clksel[] = {
+	{ .parent = &dpll3_ck, .rates = div31_dpll_rates },
 	{ .parent = NULL }
 };
 
@@ -497,7 +496,7 @@ static struct clk dpll3_m2_ck = {
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
 	.clksel_mask	= OMAP3430_CORE_DPLL_CLKOUT_DIV_MASK,
-	.clksel		= div31_dpll3m2_clksel,
+	.clksel		= div31_dpll3_clksel,
 	.clkdm_name	= "dpll3_clkdm",
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap3_core_dpll_m2_set_rate,
@@ -520,8 +519,8 @@ static struct clk dpll3_m2x2_ck = {
 };
 
 /* The PWRDN bit is apparently only available on 3430ES2 and above */
-static const struct clksel div16_dpll3_clksel[] = {
-	{ .parent = &dpll3_ck, .rates = div16_dpll_rates },
+static const struct clksel dpll3_clksel[] = {
+	{ .parent = &dpll3_ck, .rates = div32_dpll_rates },
 	{ .parent = NULL }
 };
 
@@ -532,8 +531,8 @@ static struct clk dpll3_m3_ck = {
 	.parent		= &dpll3_ck,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
-	.clksel_mask	= OMAP3430_DIV_DPLL3_MASK,
-	.clksel		= div16_dpll3_clksel,
+	.clksel_mask	= OMAP3630_DIV_DPLL3_MASK,
+	.clksel		= dpll3_clksel,
 	.clkdm_name	= "dpll3_clkdm",
 	.recalc		= &omap2_clksel_recalc,
 };
@@ -634,7 +633,12 @@ static struct clk dpll4_x2_ck = {
 };
 
 static const struct clksel dpll4_clksel[] = {
-	{ .parent = &dpll4_ck, .rates = dpll4_rates },
+	{ .parent = &dpll4_ck, .rates = div32_dpll_rates },
+	{ .parent = NULL }
+};
+
+static const struct clksel div31_dpll4_clksel[] = {
+	{ .parent = &dpll4_ck, .rates = div31_dpll_rates },
 	{ .parent = NULL }
 };
 
@@ -645,8 +649,8 @@ static struct clk dpll4_m2_ck = {
 	.parent		= &dpll4_ck,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP_CM_REGADDR(PLL_MOD, OMAP3430_CM_CLKSEL3),
-	.clksel_mask	= OMAP3630_DIV_96M_MASK,
-	.clksel		= dpll4_clksel,
+	.clksel_mask	= OMAP3430_DIV_96M_MASK,
+	.clksel		= div31_dpll4_clksel,
 	.clkdm_name	= "dpll4_clkdm",
 	.recalc		= &omap2_clksel_recalc,
 };
@@ -748,7 +752,7 @@ static struct clk dpll4_m3_ck = {
 	.parent		= &dpll4_ck,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_CLKSEL),
-	.clksel_mask	= OMAP3430_CLKSEL_TV_MASK,
+	.clksel_mask	= OMAP3630_CLKSEL_TV_MASK,
 	.clksel		= dpll4_clksel,
 	.clkdm_name	= "dpll4_clkdm",
 	.recalc		= &omap2_clksel_recalc,
@@ -833,7 +837,7 @@ static struct clk dpll4_m4_ck = {
 	.parent		= &dpll4_ck,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_DSS_MOD, CM_CLKSEL),
-	.clksel_mask	= OMAP3430_CLKSEL_DSS1_MASK,
+	.clksel_mask	= OMAP3630_CLKSEL_DSS1_MASK,
 	.clksel		= dpll4_clksel,
 	.clkdm_name	= "dpll4_clkdm",
 	.recalc		= &omap2_clksel_recalc,
@@ -860,7 +864,7 @@ static struct clk dpll4_m5_ck = {
 	.parent		= &dpll4_ck,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_CLKSEL),
-	.clksel_mask	= OMAP3430_CLKSEL_CAM_MASK,
+	.clksel_mask	= OMAP3630_CLKSEL_CAM_MASK,
 	.clksel		= dpll4_clksel,
 	.clkdm_name	= "dpll4_clkdm",
 	.set_rate	= &omap2_clksel_set_rate,
@@ -887,7 +891,7 @@ static struct clk dpll4_m6_ck = {
 	.parent		= &dpll4_ck,
 	.init		= &omap2_init_clksel_parent,
 	.clksel_reg	= OMAP_CM_REGADDR(OMAP3430_EMU_MOD, CM_CLKSEL1),
-	.clksel_mask	= OMAP3430_DIV_DPLL4_MASK,
+	.clksel_mask	= OMAP3630_DIV_DPLL4_MASK,
 	.clksel		= dpll4_clksel,
 	.clkdm_name	= "dpll4_clkdm",
 	.recalc		= &omap2_clksel_recalc,
