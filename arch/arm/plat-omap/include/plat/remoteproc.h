@@ -90,7 +90,8 @@ struct omap_rproc_platform_data {
 	struct omap_rproc_ops *ops;
 	char *name;
 	char *oh_name;
-	int timer_id;
+	int timer_hib_id;
+	int timer_clk_id;
 };
 
 struct omap_rproc {
@@ -102,8 +103,10 @@ struct omap_rproc {
 	int minor;
 	struct blocking_notifier_head	notifier;
 	struct mutex lock;
-	int timer_id;
+	int timer_hib_id;
+	int timer_clk_id;
 	struct omap_dm_timer *dmtimer;
+	struct omap_dm_timer *dmtimer_clk;
 	struct list_head event_list;
 	spinlock_t event_lock;
 };

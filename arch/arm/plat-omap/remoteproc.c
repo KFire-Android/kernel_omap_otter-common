@@ -418,7 +418,8 @@ static int omap_rproc_probe(struct platform_device *pdev)
 	atomic_set(&rproc->count, 0);
 	rproc->name = pdata->name;
 
-	rproc->timer_id = pdata->timer_id;
+	rproc->timer_clk_id = pdata->timer_clk_id;
+	rproc->timer_hib_id = pdata->timer_hib_id;
 
 	mutex_init(&rproc->lock);
 	BLOCKING_INIT_NOTIFIER_HEAD(&rproc->notifier);

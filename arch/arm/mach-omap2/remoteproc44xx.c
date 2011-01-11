@@ -37,10 +37,10 @@ static inline int proc44x_start(struct device *dev, u32 start_addr)
 						to_platform_device(dev));
 	int ret = 0;
 
-	/* Enable the Timer that would be used by co-processor */
-	if (obj->timer_id >= 0) {
+	/* Enable the Timer that would be used by co-processor for HIB/WD*/
+	if (obj->timer_hib_id >= 0) {
 		obj->dmtimer =
-			omap_dm_timer_request_specific(obj->timer_id);
+			omap_dm_timer_request_specific(obj->timer_hib_id);
 		if (!obj->dmtimer) {
 			ret = -EBUSY;
 			goto err_start;
@@ -48,6 +48,19 @@ static inline int proc44x_start(struct device *dev, u32 start_addr)
 		omap_dm_timer_set_int_enable(obj->dmtimer,
 						OMAP_TIMER_INT_OVERFLOW);
 		omap_dm_timer_set_source(obj->dmtimer, OMAP_TIMER_SRC_SYS_CLK);
+	}
+
+	/* Enable the Timer that would be used by co-processor as Clock*/
+	if (obj->timer_clk_id >= 0) {
+		obj->dmtimer_clk =
+			omap_dm_timer_request_specific(obj->timer_clk_id);
+		if (!obj->dmtimer_clk) {
+			ret = -EBUSY;
+			goto err_start;
+		}
+
+		omap_dm_timer_set_source(obj->dmtimer_clk,
+							OMAP_TIMER_SRC_SYS_CLK);
 	}
 
 	ret = omap_device_enable(pdev);
@@ -80,6 +93,11 @@ static inline int proc44x_stop(struct device *dev)
 		obj->dmtimer = NULL;
 	}
 
+	if (obj->dmtimer_clk) {
+			omap_dm_timer_free(obj->dmtimer_clk);
+			obj->dmtimer_clk = NULL;
+	}
+
 	obj->state = OMAP_RPROC_STOPPED;
 	return ret;
 }
@@ -98,6 +116,8 @@ static inline int proc44x_sleep(struct device *dev)
 
 		if (obj->dmtimer)
 			omap_dm_timer_stop(obj->dmtimer);
+		if (obj->dmtimer_clk)
+			omap_dm_timer_stop(obj->dmtimer_clk);
 	}
 
 	obj->state = OMAP_RPROC_HIBERNATING;
@@ -113,6 +133,8 @@ static inline int proc44x_wakeup(struct device *dev)
 
 	if (obj->dmtimer)
 		omap_dm_timer_start(obj->dmtimer);
+	if (obj->dmtimer_clk)
+		omap_dm_timer_start(obj->dmtimer_clk);
 
 	ret = omap_device_enable(pdev);
 	if (ret)
@@ -164,27 +186,26 @@ static struct omap_rproc_platform_data omap4_rproc_data[] = {
 		.name = "tesla",
 		.ops = &omap4_tesla_ops,
 		.oh_name = "dsp_c0",
-		.timer_id = 5,
+		.timer_clk_id = 5,
+		.timer_hib_id = -1,
 	},
 	{
 		.name = "ducati-proc0",
 		.ops = &omap4_ducati0_ops,
 		.oh_name = "ipu_c0",
+		.timer_clk_id = 4,
 #ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
-		.timer_id = 3,
+		.timer_hib_id = 3,
 #else
-		.timer_id = -1,
+		.timer_hib_id = -1,
 #endif
 	},
 	{
 		.name = "ducati-proc1",
 		.ops = &omap4_ducati1_ops,
 		.oh_name = "ipu_c1",
-#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
-		.timer_id = 4,
-#else
-		.timer_id = -1,
-#endif
+		.timer_clk_id = 9,
+		.timer_hib_id = -1,
 
 	},
 };
