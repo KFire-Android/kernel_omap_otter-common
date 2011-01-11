@@ -302,8 +302,13 @@ static void ohci_hcd_omap3_shutdown(struct platform_device *pdev)
 {
 	struct ohci_hcd_omap3 *omap = platform_get_drvdata(pdev);
 	struct usb_hcd *hcd = ohci_to_hcd(omap->ohci);
+	struct uhhtll_apis *uhhtllp = pdev->dev.platform_data;
+	int ret = 0;
 
-	if (hcd->driver->shutdown)
+	if (uhhtllp && uhhtllp->resume)
+		ret = uhhtllp->resume(OMAP_OHCI);
+
+	if (!ret && hcd->driver->shutdown)
 		hcd->driver->shutdown(hcd);
 }
 
