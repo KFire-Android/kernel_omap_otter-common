@@ -51,6 +51,9 @@ void local_timer_stop(void);
  * Setup a local timer interrupt for a CPU.
  */
 void local_timer_setup(struct clock_event_device *);
+void twd_timer_setup_with_clock(struct clock_event_device *,
+	unsigned long target_rate, unsigned long twd_clock_rate,
+	unsigned int arch_clock_divider);
 
 #else
 
