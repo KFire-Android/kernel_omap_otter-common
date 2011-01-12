@@ -1176,6 +1176,7 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 	/* Check which widgets we need to power and store them in
 	 * lists indicating if they should be powered up or down.
 	 */
+	mutex_lock(&card->dapm_mutex);
 	list_for_each_entry(w, &dapm->widgets, list) {
 		switch (w->id) {
 		case snd_soc_dapm_pre:
@@ -1208,6 +1209,7 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 			break;
 		}
 	}
+	mutex_unlock(&card->dapm_mutex);
 
 	/* If there are no DAPM widgets then try to figure out power from the
 	 * event type.
