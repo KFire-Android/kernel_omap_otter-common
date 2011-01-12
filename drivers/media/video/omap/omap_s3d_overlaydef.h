@@ -276,6 +276,14 @@ struct s3d_ovl_device {
 	bool override_s3d_disp;
 	struct s3d_disp_info s3d_disp_info;
 
+	/* workqueue for manual update */
+	struct workqueue_struct *workqueue;
+};
+
+/* manual display update work */
+struct s3d_disp_upd_work {
+	struct omap_dss_device *disp;
+	struct work_struct work;
 };
 
 /*External function prototypes*/

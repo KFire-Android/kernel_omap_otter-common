@@ -497,6 +497,36 @@ static int get_view_address(const struct s3d_buffer_queue *q,
 
 }
 
+static void s3d_update_disp_work(struct work_struct *work)
+{
+	struct s3d_disp_upd_work *w = container_of(work, typeof(*w), work);
+	struct omap_dss_device *disp = w->disp;
+
+	if (disp->driver->sched_update)
+		disp->driver->sched_update(disp, 0, 0,
+			disp->panel.timings.x_res,
+			disp->panel.timings.y_res);
+	else if (disp->driver->update)
+		disp->driver->update(disp, 0, 0,
+			disp->panel.timings.x_res,
+			disp->panel.timings.y_res);
+	kfree(w);
+}
+
+static void s3d_sched_disp_update(struct s3d_ovl_device *dev)
+{
+	struct s3d_disp_upd_work *w;
+
+	/* queue process frame */
+	w = kzalloc(sizeof(*w), GFP_ATOMIC);
+	if (w) {
+		w->disp = dev->cur_disp;
+		INIT_WORK(&w->work, s3d_update_disp_work);
+		queue_work(dev->workqueue, &w->work);
+	} else
+		S3DWARN("Failed to queue display update work\n");
+}
+
 static int apply(const struct s3d_ovl_device *dev,
 			const struct s3d_overlay *ovl)
 {
@@ -518,11 +548,12 @@ static int apply(const struct s3d_ovl_device *dev,
 	return r;
 }
 
-static int apply_changes(const struct s3d_ovl_device *dev,
+static int apply_changes(struct s3d_ovl_device *dev,
 				const struct list_head *overlays)
 {
 	struct list_head *pos;
 	struct s3d_overlay *ovl;
+	bool update_disp = false;
 	int r;
 
 	list_for_each(pos, overlays) {
@@ -534,8 +565,15 @@ static int apply_changes(const struct s3d_ovl_device *dev,
 				return r;
 			}
 			ovl->update_dss = false;
+			if (ovl->role & OVL_ROLE_DISP)
+				update_disp = true;
 		}
 	}
+
+	/* if manual update mode display -> schedule update */
+	if (update_disp && dssdev_manually_updated(dev->cur_disp))
+		s3d_sched_disp_update(dev);
+
 	return 0;
 }
 
@@ -2776,26 +2814,46 @@ static int vidioc_qbuf(struct file *file, void *fh, struct v4l2_buffer *buffer)
 {
 	struct s3d_ovl_device *dev = fh;
 	struct videobuf_queue *q = &dev->vbq;
-	int ret = 0;
+	int r = 0;
+	bool push_buf = false;
 
 	mutex_lock(&dev->lock);
 	if ((V4L2_BUF_TYPE_VIDEO_OUTPUT != buffer->type) ||
 		(buffer->index >= dev->in_q.n_alloc) ||
 		(q->bufs[buffer->index]->memory != buffer->memory)) {
-		return -EINVAL;
+		r = -EINVAL;
+		goto exit;
 	}
-	mutex_unlock(&dev->lock);
 
-	ret = videobuf_qbuf(q, buffer);
+	if (dev->streaming && dssdev_manually_updated(dev->cur_disp) &&
+		list_empty(&dev->videobuf_q) &&
+		(dev->cur_buf == dev->next_buf))
+		push_buf = true;
 
-	mutex_lock(&dev->lock);
+	r = videobuf_qbuf(q, buffer);
+	if (r)
+		goto exit;
+
 	if (calculate_offset(&dev->crop, &dev->in_q, buffer->index)) {
-		S3DERR("failed calculating offsets\n");
-		mutex_unlock(&dev->lock);
-		return -EINVAL;
+		r = -EINVAL;
+		goto exit;
 	}
+
+	if (push_buf) {
+		dev->next_buf = list_entry(dev->videobuf_q.next,
+					struct videobuf_buffer, queue);
+		list_del(&dev->next_buf->queue);
+		dev->next_buf->state = VIDEOBUF_ACTIVE;
+
+		r = conf_overlays(dev, &dev->overlays,
+					dev->next_buf->i, OVL_ROLE_DISP);
+		if (!r)
+			r = apply_changes(dev, &dev->overlays);
+	}
+
+exit:
 	mutex_unlock(&dev->lock);
-	return ret;
+	return r;
 }
 
 static int vidioc_dqbuf(struct file *file, void *fh, struct v4l2_buffer *b)
@@ -2959,6 +3017,11 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 	free_resources(dev);
 
 	change_s3d_mode(dev, V4L2_S3D_MODE_OFF);
+
+	/* if current display is manually updated schedule update to refresh
+		view when streaming is stopped */
+	if (dssdev_manually_updated(dev->cur_disp))
+		s3d_sched_disp_update(dev);
 
 	INIT_LIST_HEAD(&dev->videobuf_q);
 	INIT_LIST_HEAD(&dev->fter_info.wb_videobuf_q);
@@ -3341,6 +3404,8 @@ static int __init s3d_ovl_dev_init(struct s3d_ovl_device *dev)
 
 static void s3d_ovl_dev_release(struct s3d_ovl_device *dev)
 {
+	flush_workqueue(dev->workqueue);
+	destroy_workqueue(dev->workqueue);
 
 	video_unregister_device(dev->vfd);
 	v4l2_device_unregister(&dev->v4l2_dev);
@@ -3374,10 +3439,17 @@ static int __init s3d_ovl_driver_init(void)
 		r = -ENODEV;
 		goto error1;
 	}
+
+	dev->workqueue = create_singlethread_workqueue("s3d_workqueue");
+	if (!dev->workqueue) {
+		r = -ENOMEM;
+		goto error2;
+	}
+
 	vfd = dev->vfd;
 	if (video_register_device(vfd, VFL_TYPE_GRABBER, -1) < 0) {
 		r = -ENODEV;
-		goto error2;
+		goto error3;
 	}
 	video_set_drvdata(vfd, dev);
 
@@ -3385,6 +3457,8 @@ static int __init s3d_ovl_driver_init(void)
 
 	return 0;
 
+error3:
+	destroy_workqueue(dev->workqueue);
 error2:
 	video_device_release(vfd);
 error1:
