@@ -1544,7 +1544,7 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	 * audio/video enough time to stop operations.  However, if
 	 * user reconnects HDMI, response will be delayed.
 	 */
-	mdelay(1000);
+	mdelay(100); /* Tunning the delay*/
 
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	hdmi_power_off_phy(dssdev);
@@ -1941,7 +1941,7 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 		edid_set = !memcmp(edid, header, sizeof(header));
 	}
 
-	mdelay(100);
+	mdelay(100); /* We should investigate why the delay is required ??*/
 
 	e = edid;
 	printk(KERN_INFO "\nHeader:\n%02x\t%02x\t%02x\t%02x\t%02x\t%02x\t"

@@ -53,7 +53,9 @@
 #define HDMI_WP_SYSCONFIG			0x10ul
 #define HDMI_WP_IRQSTATUS_RAW			0x24ul
 #define HDMI_WP_IRQSTATUS			0x28ul
+#define HDMI_WP_IRQWAKEEN			0x34ul
 #define HDMI_WP_PWR_CTRL			0x40ul
+#define HDMI_WP_DEBOUNCE			0x44ul
 #define HDMI_WP_IRQENABLE_SET			0x2Cul
 #define HDMI_WP_VIDEO_CFG			0x50ul
 #define HDMI_WP_VIDEO_SIZE			0x60ul
@@ -62,6 +64,7 @@
 #define HDMI_WP_WP_CLK				0x70ul
 #define HDMI_WP_WP_DEBUG_CFG			0x90ul
 #define HDMI_WP_WP_DEBUG_DATA			0x94ul
+
 
 /* HDMI IP Core System */
 #define HDMI_CORE_SYS__VND_IDL			0x0ul
@@ -195,6 +198,8 @@
 #define HDMI_WP_IRQSTATUS_CORE 0x00000001
 #define HDMI_WP_IRQSTATUS_PHYCONNECT 0x02000000
 #define HDMI_WP_IRQSTATUS_PHYDISCONNECT 0x04000000
+#define HDMI_WP_IRQSTATUS_OCPTIMEOUT 0x00000010
+
 #define HDMI_CORE_SYS__SYS_STAT_HPD 0x02
 
 static struct {
@@ -1049,7 +1054,7 @@ static void hdmi_w1_init(struct hdmi_video_timing *t_p,
 	pIrqVectorEnable->fifoSampleRequest = 0;
 	pIrqVectorEnable->fifoOverflow = 0;
 	pIrqVectorEnable->fifoUnderflow = 0;
-	pIrqVectorEnable->ocpTimeOut = 0;
+	pIrqVectorEnable->ocpTimeOut = 1;
 	pIrqVectorEnable->core = 1;
 
 	audio_fmt->stereo_channel_enable = HDMI_STEREO_ONECHANNELS;
@@ -1089,6 +1094,16 @@ static void hdmi_w1_irq_enable(struct hdmi_irq_vector *pIrqVectorEnable)
 	hdmi_write_reg(HDMI_WP, HDMI_WP_IRQENABLE_SET, r);
 }
 
+static void hdmi_w1_irq_wakeup_enable(struct hdmi_irq_vector *pIrqVectorEnable)
+{
+	u32 r = 0;
+	/* make the irq wakeup enable */
+	r = ((pIrqVectorEnable->phyDisconnect << 26) |
+		(pIrqVectorEnable->phyConnect << 25) |
+		(pIrqVectorEnable->core << 0));
+	hdmi_write_reg(HDMI_WP, HDMI_WP_IRQWAKEEN, r);
+}
+
 static inline int hdmi_w1_wait_for_bit_change(const u32 ins,
 	u32 idx, int b2, int b1, int val)
 {
@@ -1123,20 +1138,6 @@ int hdmi_w1_set_wait_phy_pwr(HDMI_PhyPwr_t val)
 	    != val) {
 		ERR("Failed to set PHY power mode to %d\n", val);
 		return -ENODEV;
-	}
-
-	if(val){
-		/* WORKAROUND: If HDMI is used, switch to no-idle
-		Note: It was experimentally found that smart idle is not
-		working as expected for HDMI wrapper. The 3 interrupts in
-		HDMI wrapper (Cable connect / cable disconnect / Core IRQ)
-		are not getting detected immediately on cable insertion.
-		On switching to NO-IDLE mode doesnt seen to have any impact on
-		DSS going to retention/off via cupu idle path. */
-		REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 3, 2);
-	}else{
-		/* if HDMI is not use, switch to smart-idle */
-		REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x2, 3, 2);
 	}
 
 	return 0;
@@ -1358,6 +1359,14 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 		&hdmi.avi_param,
 		&repeat_param);
 
+	/*
+	   Currently we are seeing OCP timeout interrupt.
+	   It happens if l3 is idle. we need to set the SCP
+	   clock to proper value to make sure good performance
+	   is met.
+	*/
+	hdmi_write_reg(HDMI_WP, HDMI_WP_WP_CLK, 0x100);
+
 	/* Enable PLL Lock and UnLock intrerrupts */
 	IrqHdmiVectorEnable.pllUnlock = 1;
 	IrqHdmiVectorEnable.pllLock = 1;
@@ -1365,6 +1374,10 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	/***************** init DSS register **********************/
 	hdmi_w1_irq_enable(&IrqHdmiVectorEnable);
+
+	/* Enable wakeup for connect & core at start but on disconnect */
+	IrqHdmiVectorEnable.phyDisconnect = 0;
+	hdmi_w1_irq_wakeup_enable(&IrqHdmiVectorEnable);
 
 	hdmi_w1_video_init_format(&VideoFormatParam,
 			&VideoTimingParam, cfg);
@@ -1588,7 +1601,7 @@ void HDMI_W1_HPD_handler(int *r)
 	u32 val, set = 0, hpd_intr = 0, core_state = 0, time_in_ms;
 	static bool first_hpd, dirty;
 	static ktime_t ts_hpd_low, ts_hpd_high;
-	mdelay(30);
+	//mdelay(30);
 	DBG("-------------DEBUG-------------------");
 	DBG("%x hdmi_wp_irqstatus\n", \
 		hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS));
@@ -1604,8 +1617,8 @@ void HDMI_W1_HPD_handler(int *r)
 	if (val & HDMI_WP_IRQSTATUS_CORE) {
 		core_state = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR_STATE);
 		if (core_state & 0x1) {
-	set = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__SYS_STAT);
-	hpd_intr = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
+			set = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__SYS_STAT);
+			hpd_intr = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
 
 			hdmi_write_reg(HDMI_WP, HDMI_WP_IRQSTATUS, val);
 			/* flush posted write */
@@ -1646,26 +1659,36 @@ void HDMI_W1_HPD_handler(int *r)
 		}
 	}
 
-	if ((val & HDMI_WP_IRQSTATUS_PHYDISCONNECT)
-		&& (!(val & HDMI_WP_IRQSTATUS_PHYCONNECT))) {
+	/* We can get connect / disconnect simultaneously due to glitch	*/
+	if (val & HDMI_WP_IRQSTATUS_PHYDISCONNECT) {
 		DBG("Disconnect");
 		dirty = 0;
 		first_hpd = 0;
 		*r |= HDMI_DISCONNECT;
 	}
 
-	val = hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
-    if(val){
+	/*
+	   Handle ocp timeout in correct way. SCP clock will reset the divder
+	   to 7 automatically. We need to speed up the clock to avoid performance
+	   degradation.
+	*/
+	if(val & HDMI_WP_IRQSTATUS_OCPTIMEOUT) {
+		hdmi_write_reg(HDMI_WP, HDMI_WP_WP_CLK, 0x100);
+		DBG("OCP timeout");
+	}
+
+	/* Ack other interrupts if any */
 	hdmi_write_reg(HDMI_WP, HDMI_WP_IRQSTATUS, val);
 	/* flush posted write */
 	hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
-	}
+
 }
 
 int hdmi_rxdet(void)
 {
 	int state = 0;
 	int loop = 0, val1, val2, val3, val4;
+	struct hdmi_irq_vector IrqHdmiVectorEnable;
 
 	hdmi_write_reg(HDMI_WP, HDMI_WP_WP_DEBUG_CFG, 4);
 
@@ -1686,6 +1709,25 @@ int hdmi_rxdet(void)
 		state = -1;
 	else
 		state = (val1 & 1);
+
+	/* Turn on the wakeup capability of the interrupts
+	It is recommended to turn on opposite interrupt wake
+	up capability in connected and disconnected state.
+	This is to avoid race condition in interrupts.
+	*/
+	IrqHdmiVectorEnable.core = 1;
+	if(state){
+		//printk("Connected ...");
+		IrqHdmiVectorEnable.phyDisconnect = 1;
+		IrqHdmiVectorEnable.phyConnect = 0;
+		hdmi_w1_irq_wakeup_enable(&IrqHdmiVectorEnable);
+	}
+	else {
+		//printk("DisConnected ...");
+		IrqHdmiVectorEnable.phyDisconnect = 0;
+		IrqHdmiVectorEnable.phyConnect = 1;
+		hdmi_w1_irq_wakeup_enable(&IrqHdmiVectorEnable);
+	}
 
 	return state;
 }
@@ -1733,10 +1775,14 @@ int HDMI_W1_SetWaitSoftReset(void)
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 0, 0);
 
 	/* wait till SOFTRESET == 0 */
-	while (FLD_GET(hdmi_read_reg(HDMI_WP, HDMI_WP_SYSCONFIG), 0, 0))
-		;
-	/* WORKAROUND for Cable attach dettach */
-	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 3, 2);
+	while (FLD_GET(hdmi_read_reg(HDMI_WP, HDMI_WP_SYSCONFIG), 0, 0));
+
+	/* Make madule smart and wakeup capable*/
+	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x3, 3, 2);
+
+	/* Add debounce as less as possible */
+	hdmi_write_reg(HDMI_WP, HDMI_WP_DEBOUNCE, 0x0101);
+
 	return 0;
 }
 
@@ -1757,10 +1803,8 @@ int hdmi_w1_wrapper_disable(u32 instanceName)
 int hdmi_w1_stop_audio_transfer(u32 instanceName)
 {
 	hdmi_w1_audio_stop();
-	/* if audio is not used, switch to smart-idle */
-	/* WORKAROUND for Cable attach takes care of this condition
-	now */
-	/* REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x2, 3, 2); */
+	/* if audio is not used, switch to smart-idle & wakeup capable*/
+	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x3, 3, 2);
 	return 0;
 }
 
@@ -1770,9 +1814,7 @@ int hdmi_w1_start_audio_transfer(u32 instanceName)
 	 * during audio use-case, switch to no-idle to avoid
 	 * DSS_L3_ICLK clock to be shutdown (as per TRM)
 	 */
-	/* WORKAROUND for Cable attach takes care of this condition
-	now */
-	/* REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 3, 2); */
+	REG_FLD_MOD(HDMI_WP, HDMI_WP_SYSCONFIG, 0x1, 3, 2);
 	hdmi_w1_audio_start();
 	printk(KERN_INFO "Start audio transfer...\n");
 	return 0;
