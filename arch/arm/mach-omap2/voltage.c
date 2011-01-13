@@ -212,6 +212,7 @@ struct omap_vdd_info{
 	u8 cmdval_reg;
 	u8 vdd_sr_reg;
 	struct omap_volt_pmic_info *pmic;
+	struct device vdd_device;
 };
 static struct omap_vdd_info *vdd_info;
 #ifdef CONFIG_OMAP_ABB
@@ -2258,7 +2259,6 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	int is_volt_scaled = 0, i;
 	struct omap_vdd_info *vdd;
 	struct plist_node *node;
-	struct omap_vdd_user_list *user;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -2271,16 +2271,9 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 
 	curr_volt = omap_voltage_get_nom_volt(voltdm);
 
-	/* Find the device requesting the voltage scaling */
-	node = plist_first(&vdd->user_list);
-	user = container_of(node, struct omap_vdd_user_list, node);
-
-	/* calculate the voltages for dependent vdd's */
-	if (calc_dep_vdd_volt(user->dev, vdd, volt)) {
-		pr_warning("%s: Error in calculating dependent vdd voltages"
-			"for vdd_%s\n", __func__, voltdm->name);
-		return -EINVAL;
-	}
+	/* Find the highest voltage for this vdd */
+	node = plist_last(&vdd->user_list);
+	volt = node->prio;
 
 	/* Disable smartreflex module across voltage and frequency scaling */
 	omap_smartreflex_disable(voltdm);
@@ -2318,6 +2311,13 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	omap_smartreflex_enable(voltdm);
 
 	mutex_unlock(&vdd->scaling_mutex);
+
+    /* calculate the voltages for dependent vdd's */
+	if (calc_dep_vdd_volt(&vdd->vdd_device, vdd, volt)) {
+		pr_warning("%s: Error in calculating dependent vdd voltages"
+			"for vdd_%s\n", __func__, voltdm->name);
+		return -EINVAL;
+	}
 
 	/* Scale dependent vdds */
 	scale_dep_vdd(vdd);
