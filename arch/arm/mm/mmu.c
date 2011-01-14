@@ -260,6 +260,18 @@ static struct mem_type mem_types[] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
 		.domain    = DOMAIN_KERNEL,
 	},
+
+	[MT_MEMORY_SO] = {
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+				PMD_SECT_UNCACHED | PMD_SECT_XN,
+		.domain    = DOMAIN_KERNEL,
+	},
+
+	[MT_MEMORY_SO_EXE] = {
+		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
+				PMD_SECT_UNCACHED,
+		.domain    = DOMAIN_KERNEL,
+	},
 };
 
 const struct mem_type *get_mem_type(unsigned int type)

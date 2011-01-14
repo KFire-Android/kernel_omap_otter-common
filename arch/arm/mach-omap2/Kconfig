@@ -267,6 +267,17 @@ config OMAP3_SDRC_AC_TIMING
 	  wish to say no.  Selecting yes without understanding what is
 	  going on could result in system crashes;
 
+config INTERCONNECT_IO_POSTING
+	bool "Enable bus posting for PIO accesses"
+	depends on ARCH_OMAP34XX || ARCH_OMAP4
+	default n
+	---help---
+	This option sets PIO access for internal OMAP3 registers to follow the
+	ARMv7 DEVICE attribute. For 3430 this will allow posted writes in the
+	interconnect. Software will need to synchronize writes to ensure
+	completion. When not set the attribute is Strongly Ordered which is
+	non-posted on the OMAP3 interconnect.
+
 config ENABLE_L3_ERRORS
 	bool  "Enable L3 error logging"
 	depends on ARCH_OMAP4

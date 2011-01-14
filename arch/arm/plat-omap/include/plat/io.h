@@ -60,6 +60,19 @@
 #define IOMEM(x)		((void __force __iomem *)(x))
 #endif
 
+#ifdef CONFIG_INTERCONNECT_IO_POSTING
+ /*
+  * ARM writes to devices are postable.  Further software
+  * sychronization neeed ex: DSB or register read back
+  */
+#define IO_MAP_TYPE    MT_DEVICE
+#else
+/* ARM writes to devices are sychronized */
+#define IO_MAP_TYPE    MT_MEMORY_SO
+#endif
+
+
+
 #define OMAP1_IO_OFFSET		0x01000000	/* Virtual IO = 0xfefb0000 */
 #define OMAP1_IO_ADDRESS(pa)	IOMEM((pa) - OMAP1_IO_OFFSET)
 
@@ -143,6 +156,18 @@
  * Omap3 specific IO mapping
  * ----------------------------------------------------------------------------
  */
+
+/* Select ARM view IO behavior */
+#ifdef CONFIG_INTERCONNECT_IO_POSTING
+/*
+ * ARM writes to devices are postable.  Further software
+ * sychronization neeed ex: DSB or register read back
+ */
+#define IO_MAP_TYPE    MT_DEVICE
+#else
+/* ARM writes to devices are sychronized */
+#define IO_MAP_TYPE    MT_MEMORY_SO
+#endif
 
 /* We map both L3 and L4 on OMAP3 */
 #define L3_34XX_PHYS		L3_34XX_BASE	/* 0x68000000 --> 0xf8000000 */
