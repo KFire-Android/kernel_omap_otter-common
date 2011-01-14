@@ -237,6 +237,7 @@ clean_inv_l1_hs:
 	ldr     r1, [r4, #0x04]		@ $L1 clean
 	stmfd   r13!, {r4-r12, r14}
 	ldr	r12, =0x108		@ SCU power state secure API
+	dsb
 	smc	#0
 	ldmfd   r13!, {r4-r12, r14}
 l2x_clean_inv:				@ Only for MPU OFF and last CPU
@@ -283,6 +284,7 @@ do_WFI:
 	mov     r1, #0xff
 	stmfd   r13!, {r4-r12, r14}
 	ldr	r12, =0x108		@ SCU power state secure API
+	dsb
 	smc	#0
 	ldmfd   r13!, {r4-r12, r14}
 	dsb				@ Issue a write memory barrier
