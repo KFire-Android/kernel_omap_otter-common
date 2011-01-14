@@ -35,7 +35,7 @@
 #define PTMSYNCREQ_EN_OFFSET			0x6D0
 #define SAR_BACKUP_STATUS_OFFSET		0x500
 #define SAR_BACKUP_STATUS_WAKEUPGEN		0x10
-#define SECURE_L3FW_IRQ_MASK			0xfffff8ff
+#define SECURE_L3FW_IRQ_MASK			0xfffffeff
 
 /* Wakeupgen Base addres */
 void __iomem *wakeupgen_base;
