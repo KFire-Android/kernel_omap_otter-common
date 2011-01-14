@@ -1126,7 +1126,7 @@ void dispc_restore_context(void)
 	 * enable last so IRQs won't trigger before
 	 * the context is fully restored
 	 */
-	RR(IRQENABLE);
+	_omap_dispc_set_irqs();
 }
 
 #undef SR
@@ -4492,10 +4492,6 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 	int ret = -EINVAL;
 	struct omap_dispc_isr_data *isr_data;
 
-	if (!dss_get_mainclk_state()) {
-		DSSERR("trying to unregister DSS isr with mainclk disabled\n");
-		return -EINVAL;
-	}
 	spin_lock_irqsave(&dispc.irq_lock, flags);
 
 	for (i = 0; i < DISPC_MAX_NR_ISRS; i++) {
@@ -4514,8 +4510,12 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 		break;
 	}
 
-	if (ret == 0)
-		_omap_dispc_set_irqs();
+	if (ret == 0) {
+		if (dss_get_mainclk_state())
+			_omap_dispc_set_irqs();
+		else
+			DSSINFO("unregistering DSS isr with mainclk off\n");
+	}
 
 	spin_unlock_irqrestore(&dispc.irq_lock, flags);
 
