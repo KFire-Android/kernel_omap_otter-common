@@ -56,13 +56,13 @@
 
 #define LOG_NAME		"OMAP HSI: "
 
-/* SW strategies for FIFO mapping */
+/* SW strategies for HSI FIFO mapping */
 enum {
 	HSI_FIFO_MAPPING_UNDEF = 0,
 	HSI_FIFO_MAPPING_SSI,	/* 8 FIFOs per port (SSI compatible mode) */
 	HSI_FIFO_MAPPING_ALL_PORT1,	/* ALL FIFOs mapped on 1st port */
 };
-#define HSI_FIFO_MAPPING_DEFAULT	HSI_FIFO_MAPPING_SSI
+#define HSI_FIFO_MAPPING_DEFAULT	HSI_FIFO_MAPPING_ALL_PORT1
 
 /* Device identifying constants */
 enum {

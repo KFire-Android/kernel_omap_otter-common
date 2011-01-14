@@ -175,7 +175,7 @@ int hsi_fifo_mapping(struct hsi_dev *hsi_ctrl, unsigned int mtype)
 			}
 		}
 
-		hsi_ctrl->fifo_mapping_strategy = HSI_FIFO_MAPPING_DEFAULT;
+		hsi_ctrl->fifo_mapping_strategy = HSI_FIFO_MAPPING_SSI;
 	} else {
 		hsi_ctrl->fifo_mapping_strategy = HSI_FIFO_MAPPING_UNDEF;
 		dev_err(hsi_ctrl->dev, "Bad Fifo strategy request\n");
