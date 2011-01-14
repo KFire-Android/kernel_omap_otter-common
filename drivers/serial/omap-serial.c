@@ -38,6 +38,9 @@
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
 #include <plat/omap-serial.h>
+#include <plat/control.h>
+
+#include "../../arch/arm/mach-omap2/mux.h"
 
 static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
 static struct wake_lock uart_lock;
@@ -46,6 +49,7 @@ static struct wake_lock uart_lock;
 static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
 static void serial_omap_rx_timeout(unsigned long uart_no);
 static int serial_omap_start_rxdma(struct uart_omap_port *up);
+static int omap4_uart_cts_wakeup(int uart_no, int state);
 
 static inline unsigned int serial_in(struct uart_omap_port *up, int offset)
 {
@@ -144,6 +148,11 @@ static void serial_omap_stop_rx(struct uart_port *port)
 	up->ier &= ~UART_IER_RLSI;
 	up->port.read_status_mask &= ~UART_LSR_DR;
 	serial_out(up, UART_IER, up->ier);
+
+	/*Disable the UART CTS wakeup for UART1,UART2*/
+	if ((!port->suspended && ((up->pdev->id  - 1) == UART2)))
+		omap4_uart_cts_wakeup((up->pdev->id - 1), 0);
+
 }
 
 static inline void
@@ -485,6 +494,8 @@ static int serial_omap_startup(struct uart_port *port)
 	unsigned long flags = 0;
 	int retval;
 
+	if ((up->pdev->id  - 1) == UART2)
+		omap4_uart_cts_wakeup((up->pdev->id - 1), 1);
 	/*
 	 * Allocate the IRQ
 	 */
@@ -1363,6 +1374,69 @@ static struct platform_driver serial_omap_driver = {
 		.name	= DRIVER_NAME,
 	},
 };
+
+int omap4_uart_cts_wakeup(int uart_no, int state)
+{
+	struct uart_omap_port *up = ui[uart_no];
+	u32 padconf_cts;
+	u32 v;
+
+	if (unlikely(uart_no < 0 || uart_no > OMAP_MAX_HSUART_PORTS)) {
+		dev_dbg(up->port.dev, "Bad uart id %d\n", uart_no);
+		return -EPERM;
+	}
+
+	if (state) {
+		/*
+		 * Enable the CTS for io pad wakeup
+		 */
+		switch (uart_no) {
+		case UART2:
+			dev_dbg(up->port.dev, "Enabling CTS wakeup for UART2");
+			padconf_cts = 0x4A100118;
+			v = omap_readl(padconf_cts);
+			break;
+		default:
+			dev_dbg(up->port.dev, "Wakeup on Uart%d is not \
+						supported\n", uart_no);
+			return -EPERM;
+		}
+
+		v |= ((OMAP_WAKEUP_EN | OMAP_OFF_PULL_EN |
+			OMAP_OFFOUT_VAL | OMAP_OFFOUT_EN |
+			OMAP_OFF_EN | OMAP_PULL_UP |
+			OMAP_MUX_MODE0));
+
+		omap_writel(v, padconf_cts);
+
+		/*
+		 * Enable the CTS for module level wakeup
+		 */
+		serial_out(up, UART_OMAP_WER,
+				serial_in(up, UART_OMAP_WER) | 0x1);
+	} else {
+		/*
+		 * Disable the CTS capability for io pad wakeup
+		 */
+		switch (uart_no) {
+		case UART2:
+			padconf_cts = 0x4A100118;
+			v = omap_readl(padconf_cts);
+		break;
+		default:
+			dev_dbg(up->port.dev, "Wakeup on Uart%d is not \
+						supported\n", uart_no);
+			return -EPERM;
+		}
+
+		v &= (u32)(~(OMAP_WAKEUP_EN | OMAP_OFF_PULL_EN |
+				OMAP_OFF_EN | OMAP_OFFOUT_EN));
+
+		omap_writel(v, padconf_cts);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(omap4_uart_cts_wakeup);
 
 /**
  * omap_uart_active() - Check if any ports managed by this
