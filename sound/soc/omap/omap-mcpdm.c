@@ -664,7 +664,8 @@ static void omap_mcpdm_abe_dai_shutdown(struct snd_pcm_substream *substream,
 	if (!dai->active) {
 		if (!mcpdm->ul_active && substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
-			if (!mcpdm->free && !mcpdm->dn_channels)
+			if (!mcpdm->free && !mcpdm->dn_channels &&
+			    !mcpdm->dl_active)
 				omap_mcpdm_free(mcpdm);
 		}
 		if (!mcpdm->dl_active && substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
