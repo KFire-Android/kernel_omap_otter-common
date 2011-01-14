@@ -91,7 +91,7 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 	OMAP_OPP_DEF("mpu", false, 1000000000, 1350000),
 
 	/* L3 OPP1 - OPP50 */
-	OMAP_OPP_DEF("l3_main", true, 100000000, 930000),
+	OMAP_OPP_DEF("l3_main", true, 110000000, 930000),
 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
 	OMAP_OPP_DEF("l3_main", true, 200000000, 1137500),
 

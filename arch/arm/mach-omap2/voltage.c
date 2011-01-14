@@ -45,7 +45,7 @@
 #include "prm-regbits-44xx.h"
 
 #define VP_IDLE_TIMEOUT		200
-#define VP_TRANXDONE_TIMEOUT	300
+#define VP_TRANXDONE_TIMEOUT	400
 
 /* Settling Time for ABB Transition in us */
 #define ABB_TRANXDONE_TIMEOUT  30
