@@ -23,6 +23,7 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <linux/delay.h>
 
 #include <plat/omap_device.h>
 #include <plat/powerdomain.h>
@@ -184,6 +185,9 @@ static int bank_width;
 
 /* TODO: Analyze removing gpio_bank_count usage from driver code */
 int gpio_bank_count;
+/* Revert the defines after the GPIO glitch errata is applied */
+int saved_core_gpmc_pad;
+#define CONTROL_CORE_GPMC_PAD0 0x4A10007C
 
 static void omap_gpio_mod_init(struct gpio_bank *bank);
 
@@ -1753,8 +1757,55 @@ static int omap_gpio_suspend(struct device *dev)
 	void __iomem *wake_set;
 	unsigned long flags;
 	struct gpio_bank *bank = &gpio_bank[pdev->id];
+	int nwp_padconf, nwp_high_padconf;
 
 	omap_gpio_save_context(dev);
+
+	/*
+	 * HACK: The GPIO lines seem to glitch after OFF mode.
+	 * Workaround the issue for GPIO54 and 55.
+	 * Revert this patch after the whole errata patch is applied.
+	 */
+	if (pdev->id == 1 && cpu_is_omap44xx()) {
+		saved_core_gpmc_pad = omap_readl(CONTROL_CORE_GPMC_PAD0);
+		nwp_padconf = omap_readl(CONTROL_CORE_GPMC_PAD0);
+		nwp_padconf |= 1 << 3;
+		/* Enable pullupdown */
+		omap_writel(nwp_padconf, CONTROL_CORE_GPMC_PAD0);
+		/* Enable INPUT */
+		nwp_padconf = nwp_padconf | 1 << 8;
+		omap_writel(nwp_padconf, CONTROL_CORE_GPMC_PAD0);
+		if (__raw_readl(bank->base + OMAP4_GPIO_DATAOUT) & (1 << 22)) {
+			/* Enable PU */
+			nwp_padconf = nwp_padconf | 1 << 4;
+			omap_writel(nwp_padconf, CONTROL_CORE_GPMC_PAD0);
+		}
+		/* Disable output on GPIO 54 */
+		__raw_writel(__raw_readl(bank->base + OMAP4_GPIO_OE) | 1 << 22,
+			bank->base + OMAP4_GPIO_OE);
+		/* Put the pad in safe mode */
+		omap_writel(nwp_padconf | 0x7, CONTROL_CORE_GPMC_PAD0);
+
+		/* Handle the high bits for GPIO 55 */
+		nwp_high_padconf = omap_readl(CONTROL_CORE_GPMC_PAD0);
+		nwp_high_padconf |= 1 << 19;
+		omap_writel(nwp_high_padconf, CONTROL_CORE_GPMC_PAD0);
+		nwp_high_padconf = nwp_high_padconf | 1 << 24;
+		omap_writel(nwp_high_padconf, CONTROL_CORE_GPMC_PAD0);
+		if (__raw_readl(bank->base + OMAP4_GPIO_DATAOUT) & (1 << 23)) {
+			nwp_high_padconf = nwp_high_padconf | 1 << 20;
+			omap_writel(nwp_high_padconf, CONTROL_CORE_GPMC_PAD0);
+		}
+		/* Disable output on GPIO 55 */
+		__raw_writel(__raw_readl(bank->base + OMAP4_GPIO_OE) | 1 << 23,
+			bank->base + OMAP4_GPIO_OE);
+		omap_writel(nwp_high_padconf | 0x70000, CONTROL_CORE_GPMC_PAD0);
+		/*
+		 * Strangely the delay seems to be needed even after programming
+		 * the bits.
+		 */
+		mdelay(50);
+	}
 
 	switch (bank->method) {
 	case METHOD_GPIO_1610:
@@ -1816,6 +1867,10 @@ static int omap_gpio_resume(struct device *dev)
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	omap_gpio_restore_context(dev);
+
+	/* Restore the original padconf */
+	if (pdev->id == 1 && cpu_is_omap44xx())
+		omap_writel(saved_core_gpmc_pad, CONTROL_CORE_GPMC_PAD0);
 
 	return 0;
 }
