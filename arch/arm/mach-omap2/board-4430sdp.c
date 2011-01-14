@@ -61,6 +61,7 @@
 #include "mux.h"
 #include "hsmmc.h"
 #include "smartreflex-class3.h"
+#include "board-4430sdp-wifi.h"
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
@@ -1206,39 +1207,6 @@ static int __init omap4_i2c_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_TIWLAN_SDIO
-static void pad_config(unsigned long pad_addr, u32 andmask, u32 ormask)
-{
-	int val;
-	 u32 *addr;
-
-	addr = (u32 *) ioremap(pad_addr, 4);
-	if (!addr) {
-		printk(KERN_ERR"OMAP_pad_config: ioremap failed with addr %lx\n",
-		pad_addr);
-	return;
-	}
-
-	val =  __raw_readl(addr);
-	val &= andmask;
-	val |= ormask;
-	__raw_writel(val, addr);
-
-	iounmap(addr);
-}
-
-void wlan_1283_config(void)
-{
-	pad_config(0x4A100078, 0x0000FFFF, 0x41030000);
-	pad_config(0x4A10007C, 0xFFFFFFEF, 0x0000000B);
-	if (gpio_request(54, NULL) != 0)
-		printk(KERN_ERR "GPIO 54 request failed\n");
-	gpio_direction_output(54, 0);
-	return ;
-}
-#endif
-
-
 static void omap_cma3000accl_init(void)
 {
 	if (gpio_request(OMAP4_CMA3000ACCL_GPIO, "Accelerometer") < 0) {
@@ -1536,7 +1504,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_twl6030_hsmmc_init(mmc);
 
 #ifdef CONFIG_TIWLAN_SDIO
-	wlan_1283_config();
+	config_wlan_mux();
 #endif
 
 	/* Power on the ULPI PHY */
