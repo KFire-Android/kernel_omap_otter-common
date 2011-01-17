@@ -202,6 +202,20 @@ static inline void omap_uart_enable_rtspullup(struct omap_uart_state *uart)
 	uart->rts_override = 1;
 }
 
+static void omap_uart_rtspad_init(struct omap_uart_state *uart)
+{
+	if (!cpu_is_omap34xx())
+		return;
+	switch (uart->num) {
+	case UART2:
+		uart->rts_padconf = 0x4A10011A;
+		break;
+	default:
+		uart->rts_padconf = 0;
+		break;
+	}
+}
+
 #if defined(CONFIG_PM)
 
 static void omap_uart_save_context(struct omap_uart_state *uart)
@@ -521,20 +535,6 @@ void omap_uart_enable_clock_from_irq(int uart_num)
 	return;
 }
 EXPORT_SYMBOL(omap_uart_enable_clock_from_irq);
-
-static void omap_uart_rtspad_init(struct omap_uart_state *uart)
-{
-	if (!cpu_is_omap34xx())
-		return;
-	switch (uart->num) {
-	case UART2:
-		uart->rts_padconf = 0x4A10011A;
-		break;
-	default:
-		uart->rts_padconf = 0;
-		break;
-	}
-}
 
 static void omap_uart_idle_init(struct omap_uart_state *uart)
 {
