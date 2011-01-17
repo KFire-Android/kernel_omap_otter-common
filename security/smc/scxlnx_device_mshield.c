@@ -63,8 +63,6 @@ struct SCX_SMC_PA_CTRL {
 	u32 nSDPBackingStoreAddr;
 	u32 nSDPBkExtStoreAddr;
 	u32 nDataAddr;
-
-	u32 nClockTimerExpireMs;
 };
 
 static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
@@ -73,7 +71,6 @@ static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
 	int nResult = S_SUCCESS;
 	struct SCX_SMC_PA_CTRL paCtrl;
 	u8 *pPABuffer = NULL;
-	u8 *pPABufferRaw = NULL;
 	u8 *pConfBuffer = NULL;
 	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
 
@@ -106,23 +103,11 @@ static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
 			"Start the SMC PA (%d bytes) with conf (%d bytes)\n",
 			file, paCtrl.nPASize, paCtrl.nConfSize);
 
-		pPABufferRaw = (u8 *) internal_kmalloc(paCtrl.nPASize,
+		pPABuffer = (u8 *) internal_kmalloc(paCtrl.nPASize,
 						GFP_KERNEL);
-		if (pPABufferRaw == NULL) {
-			dprintk(KERN_ERR "SCXLNXCtrlDeviceIoctl(%p): "
-				"Out of memory for PA buffer\n", file);
-
-			nResult = -ENOMEM;
-			goto exit;
-		}
-
-		pPABuffer = (u8 *) internal_vmap_uncached(pPABufferRaw,
-				paCtrl.nPASize);
 		if (pPABuffer == NULL) {
 			dprintk(KERN_ERR "SCXLNXCtrlDeviceIoctl(%p): "
 				"Out of memory for PA buffer\n", file);
-
-			internal_kfree(pPABufferRaw);
 
 			nResult = -ENOMEM;
 			goto exit;
@@ -134,8 +119,7 @@ static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
 				"Cannot access PA buffer (%p)\n",
 				file, (void *) paCtrl.pPABuffer);
 
-			internal_vunmap(pPABuffer);
-			internal_kfree(pPABufferRaw);
+			internal_kfree(pPABuffer);
 
 			nResult = -EFAULT;
 			goto exit;
@@ -145,8 +129,7 @@ static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
 			pConfBuffer = (u8 *) internal_kmalloc(
 				paCtrl.nConfSize, GFP_KERNEL);
 			if (pConfBuffer == NULL) {
-				internal_vunmap(pPABuffer);
-				internal_kfree(pPABufferRaw);
+				internal_kfree(pPABuffer);
 
 				nResult = -ENOMEM;
 				goto exit;
@@ -154,8 +137,7 @@ static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
 
 			if (copy_from_user(pConfBuffer,
 					paCtrl.pConfBuffer, paCtrl.nConfSize)) {
-				internal_vunmap(pPABuffer);
-				internal_kfree(pPABufferRaw);
+				internal_kfree(pPABuffer);
 				internal_kfree(pConfBuffer);
 
 				nResult = -EFAULT;
@@ -190,7 +172,7 @@ static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
 			paCtrl.nSDPBackingStoreAddr,
 			paCtrl.nSDPBkExtStoreAddr,
 			paCtrl.nDataAddr,
-			pPABuffer, pPABufferRaw,
+			pPABuffer,
 			paCtrl.nPASize,
 			pConfBuffer, paCtrl.nConfSize);
 		if (nResult)
@@ -198,6 +180,7 @@ static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
 		else
 			dprintk(KERN_INFO "SMC: started\n");
 
+		internal_kfree(pPABuffer);
 		internal_kfree(pConfBuffer);
 		break;
 
@@ -314,8 +297,10 @@ int __init SCXLNXCtrlDeviceEarlyInit(void)
 	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
 
 	/* Reserve memory areas for SDP operations */
-	pDevice->nSDPBackingStoreAddr = (u32) __pa(alloc_bootmem(SZ_1M));
-	pDevice->nSDPBkExtStoreAddr = (u32) __pa(alloc_bootmem(SZ_1M));
+	pDevice->nSDPBackingStoreAddr = (u32) __pa(
+		__alloc_bootmem(SZ_1M, SZ_1M, __pa(MAX_DMA_ADDRESS)));
+	pDevice->nSDPBkExtStoreAddr = (u32) __pa(
+		__alloc_bootmem(SZ_1M, SZ_1M, __pa(MAX_DMA_ADDRESS)));
 
 	printk(KERN_INFO "SMC: Allocated SDP Backing Storage (0x%x) and "
 		"External Storage (0x%x) memory areas\n",

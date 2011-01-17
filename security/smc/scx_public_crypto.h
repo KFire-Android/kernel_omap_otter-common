@@ -185,9 +185,11 @@ struct CRYPTOKI_UPDATE_PARAMS {
 	/*fields for data processing of an update command */
 	u32 nInputDataLength;
 	u8 *pInputData;
+	struct SCXLNX_SHMEM_DESC *pInputShmem;
 
 	u32 nResultDataLength;
 	u8 *pResultData;
+	struct SCXLNX_SHMEM_DESC *pOutputShmem;
 
 	u8 *pS2CDataBuffer;
 	u32 nS2CDataBufferMaxLength;
@@ -218,7 +220,7 @@ int SCXPublicCryptoTryShortcutedUpdate(struct SCXLNX_CONNECTION *pConn,
 	struct SCX_COMMAND_INVOKE_CLIENT_COMMAND *pMessage,
 	struct SCX_ANSWER_INVOKE_CLIENT_COMMAND *pAnswer);
 
-int SCXPublicCryptoExecuteRPCCommand(u32 nRPCCommand, void *pL0SharedBuffer);
+int SCXPublicCryptoExecuteRPCCommand(u32 nRPCCommand, void *pRPCSharedBuffer);
 
 /*-------------------------------------------------------------------------- */
 /*

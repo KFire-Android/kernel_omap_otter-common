@@ -38,14 +38,14 @@
 /*
  * This version number must be updated for each new release
  */
-#define S_VERSION_MAIN  "01.02"
+#define S_VERSION_MAIN  "01.03"
 
 /*
 * If this is a patch or engineering version use the following
 * defines to set the version number. Else set these values to 0.
 */
 #define S_VERSION_ENG 0
-#define S_VERSION_PATCH 2
+#define S_VERSION_PATCH 3
 
 #ifdef S_VERSION_BUILD
 /* TRICK: detect if S_VERSION is defined but empty */

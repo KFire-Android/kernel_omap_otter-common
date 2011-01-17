@@ -189,7 +189,7 @@ static struct SCXLNX_CONNECTION *SCXGetCUSDeviceContext(
  * Get the shared memory from the memory block handle coming from secure.
  * Return NULL if it does not exist.
  */
-static u8 *PDrvCryptoGetSharedMemoryFromBlockHandle(
+static struct SCXLNX_SHMEM_DESC *PDrvCryptoGetSharedMemoryFromBlockHandle(
 	struct SCXLNX_CONNECTION *pConn, u32 hBlock)
 {
 	struct SCXLNX_SHMEM_DESC *pSharedMemoryDescriptor = NULL;
@@ -201,7 +201,7 @@ static u8 *PDrvCryptoGetSharedMemoryFromBlockHandle(
 		if ((u32) pSharedMemoryDescriptor->hIdentifier ==
 				(u32) hBlock) {
 			mutex_unlock(&(pConn->sharedMemoriesMutex));
-			return pSharedMemoryDescriptor->pBuffer;
+			return pSharedMemoryDescriptor;
 		}
 	}
 
@@ -240,15 +240,15 @@ static void PDrvCryptoLockUnlockHWA(u32 nHWAID, bool bDoLock)
 	}
 
 	if (bDoLock == LOCK_HWA) {
-		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: \
-			Wait for HWAID=0x%04X\n", nHWAID);
+		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "\
+			"Wait for HWAID=0x%04X\n", nHWAID);
 		mutex_lock(pHWAToLockUnlock);
-		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: \
-			Locked on HWAID=0x%04X\n", nHWAID);
+		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "\
+			"Locked on HWAID=0x%04X\n", nHWAID);
 	} else {
 		mutex_unlock(pHWAToLockUnlock);
-		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: \
-			Released for HWAID=0x%04X\n", nHWAID);
+		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "\
+			"Released for HWAID=0x%04X\n", nHWAID);
 	}
 }
 
@@ -366,8 +366,8 @@ void SCXPublicCryptoUpdate(
 	struct CRYPTOKI_UPDATE_PARAMS *pCUSParams)
 {
 	dprintk(KERN_INFO
-		"scxPublicCryptoUpdate(%x) : \
-		HWAID=0x%x, In=%p, Out=%p, Len=%u\n",
+		"scxPublicCryptoUpdate(%x): "\
+		"HWAID=0x%x, In=%p, Out=%p, Len=%u\n",
 		(uint32_t) pCUSContext, pCUSContext->nHWAID,
 		pCUSParams->pInputData,
 		pCUSParams->pResultData, pCUSParams->nInputDataLength);
@@ -459,9 +459,9 @@ static bool SCXPublicCryptoIsShortcutedCommand(
 	struct CRYPTOKI_UPDATE_SHORTCUT_CONTEXT *pCUSContext = NULL;
 	*ppCUSContext = NULL;
 
-	dprintk(KERN_INFO "scxPublicCryptoIsShortcutedCommand: \
-		pDeviceContext=0x%08x, pCommand=0x%08x, \
-		CltSession=0x%08x, CmdID=0x%08x\n",
+	dprintk(KERN_INFO "scxPublicCryptoIsShortcutedCommand: "\
+		"pDeviceContext=0x%08x, pCommand=0x%08x, "\
+		"CltSession=0x%08x, CmdID=0x%08x\n",
 		(uint32_t) pDeviceContext, (uint32_t) pCommand,
 		(uint32_t) pCommand->hClientSession,
 		pCommand->nClientCommandIdentifier);
@@ -479,8 +479,8 @@ static bool SCXPublicCryptoIsShortcutedCommand(
 	list_for_each_entry(
 	   pCUSContext, &(pDeviceContext->ShortcutList), list) {
 		dprintk(KERN_INFO
-			"scxPublicCryptoIsShortcutedCommand: \
-			nCommandID = 0x%08x hClientSession = 0x%08x \n",
+			"scxPublicCryptoIsShortcutedCommand: "\
+			"nCommandID = 0x%08x hClientSession = 0x%08x\n",
 			pCUSContext->nCommandID, pCUSContext->hClientSession);
 
 		if ((pCUSContext->hClientSession == pCommand->hClientSession)
@@ -488,8 +488,8 @@ static bool SCXPublicCryptoIsShortcutedCommand(
 			(pCUSContext->nCommandID == (pCommand->
 				nClientCommandIdentifier & 0x7FFF))) {
 			dprintk(KERN_INFO
-				"scxPublicCryptoIsShortcutedCommand: \
-				shortcut is identified \n");
+				"scxPublicCryptoIsShortcutedCommand: "\
+				"shortcut is identified\n");
 			/*find a CUS : check if is suspended or not */
 			if (pCUSContext->bSuspended) {
 				/*
@@ -501,8 +501,8 @@ static bool SCXPublicCryptoIsShortcutedCommand(
 				 * the client and the service should generally
 				 * communicate to avoid such a collision
 				 */
-				dprintk(KERN_INFO "shortcut exists but \
-					suspended\n");
+				dprintk(KERN_INFO "shortcut exists but "\
+					"suspended\n");
 				goto command_not_shortcutable;
 
 			} else {
@@ -533,9 +533,9 @@ static bool SCXPublicCryptoIsShortcutedCommand(
 					 *take the standard path  <=> do not
 					 *shortcut */
 					dprintk(KERN_INFO
-						"shortcut exists but AES key \
-						not correct\nhKeyContext=\
-						0x%08x vs 0x%08x\n",
+						"shortcut exists but AES key "\
+						"not correct\nhKeyContext="\
+						"0x%08x vs 0x%08x\n",
 						pCUSContext->hKeyContext,
 						pDevice->
 						hAES1SecureKeyContext);
@@ -630,6 +630,8 @@ static bool SCXPublicCryptoParseCommandMessage(struct SCXLNX_CONNECTION *pConn,
 	u8 *pSharedMem;
 	u8 *pInputData;
 	u8 *pResultData;
+	struct SCXLNX_SHMEM_DESC *pInputShmem = NULL;
+	struct SCXLNX_SHMEM_DESC *pOutputShmem = NULL;
 
 	dprintk(KERN_INFO
 		"scxPublicCryptoParseCommandMessage(%p) : Session=0x%x\n",
@@ -668,13 +670,14 @@ static bool SCXPublicCryptoParseCommandMessage(struct SCXLNX_CONNECTION *pConn,
 		if (pInputData == NULL)
 			return false;
 
-		pSharedMem = PDrvCryptoGetSharedMemoryFromBlockHandle(pConn,
+		pInputShmem = PDrvCryptoGetSharedMemoryFromBlockHandle(pConn,
 			pCommand->sParams[0].sMemref.hBlock);
 
-		if (pSharedMem == NULL)
+		if (pInputShmem == NULL)
 			goto err0;
+		atomic_inc(&pInputShmem->nRefCnt);
 
-		if (copy_from_user(pInputData, pSharedMem +
+		if (copy_from_user(pInputData, pInputShmem->pBuffer +
 				pCommand->sParams[0].sMemref.nOffset,
 				pCommand->sParams[0].sMemref.nSize))
 			goto err0;
@@ -722,12 +725,14 @@ static bool SCXPublicCryptoParseCommandMessage(struct SCXLNX_CONNECTION *pConn,
 			if (pResultData == NULL)
 				goto err0;
 
-			pSharedMem = PDrvCryptoGetSharedMemoryFromBlockHandle(
+			pOutputShmem = PDrvCryptoGetSharedMemoryFromBlockHandle(
 				pConn, pCommand->sParams[1].sMemref.hBlock);
-			if (pSharedMem == NULL)
+			if (pOutputShmem == NULL)
 				goto err1;
+			atomic_inc(&pOutputShmem->nRefCnt);
 
-			pSharedMem += pCommand->sParams[1].sMemref.nOffset;
+			pSharedMem = pOutputShmem->pBuffer +
+				pCommand->sParams[1].sMemref.nOffset;
 
 			nResultDataLength = pCommand->sParams[1].sMemref.nSize;
 
@@ -764,8 +769,8 @@ static bool SCXPublicCryptoParseCommandMessage(struct SCXLNX_CONNECTION *pConn,
 		/* Must be multiple of the AES block size */
 		if ((nInputDataLength % AES_BLOCK_SIZE) != 0) {
 			dprintk(KERN_ERR
-				"scxPublicCryptoParseCommandMessage(%p): \
-				Input Data Length invalid [%d] for AES\n",
+				"scxPublicCryptoParseCommandMessage(%p): "\
+				"Input Data Length invalid [%d] for AES\n",
 				pCUSContext, nInputDataLength);
 			goto err1;
 		}
@@ -774,8 +779,8 @@ static bool SCXPublicCryptoParseCommandMessage(struct SCXLNX_CONNECTION *pConn,
 		/* Must be multiple of the DES block size */
 		if ((nInputDataLength % DES_BLOCK_SIZE) != 0) {
 			dprintk(KERN_ERR
-				"scxPublicCryptoParseCommandMessage(%p): \
-				Input Data Length invalid [%d] for DES\n",
+				"scxPublicCryptoParseCommandMessage(%p): "\
+				"Input Data Length invalid [%d] for DES\n",
 				pCUSContext, nInputDataLength);
 			goto err1;
 		}
@@ -787,8 +792,10 @@ static bool SCXPublicCryptoParseCommandMessage(struct SCXLNX_CONNECTION *pConn,
 
 	pCUSParams->pInputData = pInputData;
 	pCUSParams->nInputDataLength = nInputDataLength;
+	pCUSParams->pInputShmem = pInputShmem;
 	pCUSParams->pResultData = pResultData;
 	pCUSParams->nResultDataLength = nResultDataLength;
+	pCUSParams->pOutputShmem = pOutputShmem;
 
 	/*
 	 * Save userspace buffer vaddr so we can copy back result data later on
@@ -799,8 +806,15 @@ static bool SCXPublicCryptoParseCommandMessage(struct SCXLNX_CONNECTION *pConn,
 
 err1:
 	internal_kfree(pResultData);
+
+	if (pOutputShmem)
+		atomic_dec(&pOutputShmem->nRefCnt);
 err0:
 	internal_kfree(pInputData);
+
+	if (pInputShmem)
+		atomic_dec(&pInputShmem->nRefCnt);
+
 	return false;
 }
 
@@ -856,8 +870,10 @@ int SCXPublicCryptoTryShortcutedUpdate(struct SCXLNX_CONNECTION *pConn,
 	if (SCXPublicCryptoIsShortcutedCommand(pConn,
 			(struct SCX_COMMAND_INVOKE_CLIENT_COMMAND *) pMessage,
 			&pCUSContext, false)) {
+		u32 nHWAID = pCUSContext->nHWAID;
+
 		/* Lock HWA */
-		PDrvCryptoLockUnlockHWA(pCUSContext->nHWAID, LOCK_HWA);
+		PDrvCryptoLockUnlockHWA(nHWAID, LOCK_HWA);
 
 		if (SCXPublicCryptoIsShortcutedCommand(pConn,
 				pMessage,
@@ -888,11 +904,21 @@ int SCXPublicCryptoTryShortcutedUpdate(struct SCXLNX_CONNECTION *pConn,
 			SCXPublicCryptoWriteAnswerMessage(pCUSContext,
 				&sCUSParams, pAnswer);
 
+			/* Decrement registered shmems use count if needed */
+			if (sCUSParams.pInputShmem)
+				atomic_dec(&sCUSParams.pInputShmem->nRefCnt);
+			if (sCUSParams.pOutputShmem)
+				atomic_dec(&sCUSParams.pOutputShmem->nRefCnt);
+
 			/* Decrement CUS context use count */
 			pCUSContext->nUseCount--;
-		}
 
-		PDrvCryptoLockUnlockHWA(pCUSContext->nHWAID, UNLOCK_HWA);
+			PDrvCryptoLockUnlockHWA(pCUSContext->nHWAID,
+				UNLOCK_HWA);
+		} else {
+			PDrvCryptoLockUnlockHWA(nHWAID, UNLOCK_HWA);
+			return -1;
+		}
 	} else {
 		return -1;
 	}
@@ -992,16 +1018,16 @@ static void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr)
  * secure world can install a new key in it.
  */
 static int SCXPublicCryptoInstallShortcutLockAccelerator(
-	u32 nRPCCommand, void *pL0SharedBuffer)
+	u32 nRPCCommand, void *pRPCSharedBuffer)
 {
 	struct CRYPTOKI_UPDATE_SHORTCUT_CONTEXT *pCUSContext = NULL;
 	struct SCXLNX_CONNECTION *pDeviceContext = NULL;
 
 	/* Reference the input/ouput data */
 	struct RPC_INSTALL_SHORTCUT_LOCK_ACCELERATOR_OUT *pInstallShortcutOut =
-		pL0SharedBuffer;
+		pRPCSharedBuffer;
 	struct RPC_INSTALL_SHORTCUT_LOCK_ACCELERATOR_IN *pInstallShortcutIn =
-		pL0SharedBuffer;
+		pRPCSharedBuffer;
 
 	dprintk(KERN_INFO "SCXPublicCryptoInstallShortcutLockAccelerator: "
 		"nRPCCommand=0x%08x; nHWAID=0x%08x\n",
@@ -1028,8 +1054,8 @@ static int SCXPublicCryptoInstallShortcutLockAccelerator(
 		internal_kmalloc(sizeof(*pCUSContext), GFP_KERNEL);
 	if (pCUSContext == NULL) {
 		dprintk(KERN_ERR
-			"scxPublicCryptoInstallShortcutLockAccelerator: \
-			Out of memory for public session\n");
+			"scxPublicCryptoInstallShortcutLockAccelerator: "\
+			"Out of memory for public session\n");
 		pInstallShortcutOut->nError = S_ERROR_OUT_OF_MEMORY;
 		return 0;
 	}
@@ -1096,7 +1122,7 @@ static int SCXPublicCryptoInstallShortcutLockAccelerator(
  * - Uninstall the shortcut
  */
 static int SCXPublicCryptoLockAcceleratorsSuspendShortcut(
-	u32 nRPCCommand, void *pL0SharedBuffer)
+	u32 nRPCCommand, void *pRPCSharedBuffer)
 {
 	u32 nTargetShortcut;
 	struct CRYPTOKI_UPDATE_SHORTCUT_CONTEXT *pCUSContext = NULL;
@@ -1104,13 +1130,13 @@ static int SCXPublicCryptoLockAcceleratorsSuspendShortcut(
 
 	/*reference the input/ouput data */
 	struct RPC_LOCK_HWA_SUSPEND_SHORTCUT_OUT *pSuspendShortcutOut =
-		pL0SharedBuffer;
+		pRPCSharedBuffer;
 	struct RPC_LOCK_HWA_SUSPEND_SHORTCUT_IN *pSuspendShortcutIn =
-		pL0SharedBuffer;
+		pRPCSharedBuffer;
 
 	dprintk(KERN_INFO
-		"scxPublicCryptoLockAcceleratorsSuspendShortcut: \
-		pSuspendShortcutIn=0x%08x; nShortcutID=0x%08x\n",
+		"scxPublicCryptoLockAcceleratorsSuspendShortcut: "\
+		"pSuspendShortcutIn=0x%08x; nShortcutID=0x%08x\n",
 		pSuspendShortcutIn->nShortcutID, (u32)pSuspendShortcutIn);
 
 	nTargetShortcut = pSuspendShortcutIn->nShortcutID;
@@ -1130,9 +1156,9 @@ static int SCXPublicCryptoLockAcceleratorsSuspendShortcut(
 		pDeviceContext = SCXGetCUSDeviceContext(pCUSContext);
 		if (pDeviceContext == NULL) {
 			dprintk(KERN_INFO
-			"scxPublicCryptoLockAcceleratorsSuspendShortcut: \
-			nShortcutID=0x%08x does not exist, cannot suspend \
-			Shortcut\n",
+			"scxPublicCryptoLockAcceleratorsSuspendShortcut: "\
+			"nShortcutID=0x%08x does not exist, cannot suspend "\
+			"Shortcut\n",
 				pSuspendShortcutIn->nShortcutID);
 			return -1;
 		}
@@ -1164,8 +1190,8 @@ loop_on_suspend:
 		if ((nRPCCommand &
 		RPC_LOCK_ACCELERATORS_SUSPEND_SHORTCUT_UNINSTALL) != 0) {
 			dprintk(KERN_INFO
-			"scxPublicCryptoLockAcceleratorsSuspendShortcut: \
-			Uninstall 0x%08x\n",
+			"scxPublicCryptoLockAcceleratorsSuspendShortcut:"\
+			"Uninstall 0x%08x\n",
 				nTargetShortcut);
 			list_del(&(pCUSContext->list));
 			/*list_del only remove the item in the list, the
@@ -1195,7 +1221,7 @@ loop_on_suspend:
  * -	Unlock some of the accelerators
  */
 static int SCXPublicCryptoResumeShortcutUnlockAccelerators(
-	u32 nRPCCommand, void *pL0SharedBuffer)
+	u32 nRPCCommand, void *pRPCSharedBuffer)
 {
 	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
 	struct SCXLNX_CONNECTION *pDeviceContext = NULL;
@@ -1203,7 +1229,7 @@ static int SCXPublicCryptoResumeShortcutUnlockAccelerators(
 
 	/*reference the input data */
 	struct RPC_RESUME_SHORTCUT_UNLOCK_HWA_IN *pResumeShortcutIn =
-		pL0SharedBuffer;
+		pRPCSharedBuffer;
 
 	dprintk(KERN_INFO
 		"scxPublicCryptoResumeShortcutUnlockAccelerators\n"
@@ -1223,9 +1249,9 @@ static int SCXPublicCryptoResumeShortcutUnlockAccelerators(
 		pDeviceContext = SCXGetCUSDeviceContext(pCUSContext);
 		if (pDeviceContext == NULL) {
 			dprintk(KERN_INFO
-			"scxPublicCryptoResumeShortcutUnlockAccelerators(...):\
-			nShortcutID 0x%08x does not exist, cannot suspend \
-			Shortcut \n",
+			"scxPublicCryptoResumeShortcutUnlockAccelerators(...):"\
+			"nShortcutID 0x%08x does not exist, cannot suspend "\
+			"Shortcut\n",
 				pResumeShortcutIn->nShortcutID);
 			return -1;
 		}
@@ -1292,7 +1318,7 @@ static int SCXPublicCryptoResumeShortcutUnlockAccelerators(
  * this RPC.
  */
 static int SCXPublicCryptoClearGlobalKeyContext(
-	u32 nRPCCommand, void *pL0SharedBuffer)
+	u32 nRPCCommand, void *pRPCSharedBuffer)
 {
 	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
 
@@ -1325,28 +1351,28 @@ static int SCXPublicCryptoClearGlobalKeyContext(
  * Execute a public crypto related RPC
  */
 
-int SCXPublicCryptoExecuteRPCCommand(u32 nRPCCommand, void *pL0SharedBuffer)
+int SCXPublicCryptoExecuteRPCCommand(u32 nRPCCommand, void *pRPCSharedBuffer)
 {
 	switch (nRPCCommand & RPC_CRYPTO_COMMAND_MASK) {
 	case RPC_INSTALL_SHORTCUT_LOCK_ACCELERATOR:
 		dprintk(KERN_INFO "RPC_INSTALL_SHORTCUT_LOCK_ACCELERATOR\n");
 		return SCXPublicCryptoInstallShortcutLockAccelerator(
-			nRPCCommand, pL0SharedBuffer);
+			nRPCCommand, pRPCSharedBuffer);
 
 	case RPC_LOCK_ACCELERATORS_SUSPEND_SHORTCUT:
 		dprintk(KERN_INFO "RPC_LOCK_ACCELERATORS_SUSPEND_SHORTCUT\n");
 		return SCXPublicCryptoLockAcceleratorsSuspendShortcut(
-			nRPCCommand, pL0SharedBuffer);
+			nRPCCommand, pRPCSharedBuffer);
 
 	case RPC_RESUME_SHORTCUT_UNLOCK_ACCELERATORS:
 		dprintk(KERN_INFO "RPC_RESUME_SHORTCUT_UNLOCK_ACCELERATORS\n");
 		return SCXPublicCryptoResumeShortcutUnlockAccelerators(
-			nRPCCommand, pL0SharedBuffer);
+			nRPCCommand, pRPCSharedBuffer);
 
 	case RPC_CLEAR_GLOBAL_KEY_CONTEXT:
 		dprintk(KERN_INFO "RPC_CLEAR_GLOBAL_KEY_CONTEXT\n");
 		return SCXPublicCryptoClearGlobalKeyContext(
-			nRPCCommand, pL0SharedBuffer);
+			nRPCCommand, pRPCSharedBuffer);
 	}
 
 	return -1;

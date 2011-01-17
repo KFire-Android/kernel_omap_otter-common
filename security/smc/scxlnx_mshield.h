@@ -26,7 +26,7 @@ int SCXLNXCtrlDeviceRegister(void);
 
 int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 	u32 nSDPBkExtStoreAddr, u32 nDataAddr, u8 *pPABufferVAddr,
-	u8 *pPABufferVAddrRaw, u32 nPABufferSize, u8 *pPropertiesBuffer,
+	u32 nPABufferSize, u8 *pPropertiesBuffer,
 	u32 nPropertiesBufferLen);
 
 /* Assembler entry points to/from secure */

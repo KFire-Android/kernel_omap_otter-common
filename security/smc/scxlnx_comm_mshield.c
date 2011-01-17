@@ -28,6 +28,7 @@
 #include <linux/vmalloc.h>
 #include <linux/version.h>
 #include <linux/jiffies.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/cacheflush.h>
 
@@ -48,9 +49,6 @@
 #define RPC_CMD_YIELD	0x00
 #define RPC_CMD_INIT	0x01
 #define RPC_CMD_TRACE	0x02
-
-/* Trace offset */
-#define RPC_TRACE_OFFSET	0xC00
 
 /* RPC return values to secure world */
 #define RPC_SUCCESS			0x00000000
@@ -77,13 +75,12 @@ u32 g_service_end;
 /*
  * Secure ROMCode HAL API Identifiers
  */
+#define API_HAL_SDP_RUNTIMEINIT_INDEX           0x04
 #define API_HAL_LM_PALOAD_INDEX                 0x05
 #define API_HAL_LM_PAUNLOADALL_INDEX            0x07
-#define API_HAL_SDP_RUNTIMEINIT_INDEX           0x04
 #define API_HAL_TASK_MGR_RPCINIT_INDEX          0x08
-#define API_HAL_SEC_L3_RAM_RESIZE_INDEX         0x17
-#define API_HAL_CONTEXT_SAVESECURERAM_INDEX     0x1A
 #define API_HAL_KM_GETSECUREROMCODECRC_INDEX    0x0B
+#define API_HAL_SEC_L3_RAM_RESIZE_INDEX         0x17
 
 #define API_HAL_RET_VALUE_OK	0x0
 
@@ -115,16 +112,10 @@ struct NS_PA_INFO {
  *    I think these easily fit in 256 bytes and you can use the area at
  *    offset 0x2C0-0x3BF in the L1 shared buffer
  */
-struct SCHANNEL_L0_BUFFER_INPUT {
-	u32 nL1Command;
-	u8  sReserved[4092];
-};
-
-struct SCHANNEL_L0_BUFFER_SMC_INIT_INPUT {
-	u32 nL1Command;
-	u32 nL1SharedBufferLength;
+struct SCHANNEL_INIT_BUFFER {
+	u32 nInitStatus;
+	u32 nProtocolVersion;
 	u32 nL1SharedBufferPhysAddr;
-	u32 nL0SharedBufferPhysAddr;
 	u32 nBackingStoreAddr;
 	u32 nBackExtStorageAddr;
 	u32 nDataAddr;
@@ -136,6 +127,28 @@ struct SCHANNEL_L0_BUFFER_SMC_INIT_INPUT {
 struct wake_lock g_smc_wake_lock;
 #endif
 
+static struct clockdomain *smc_l4_sec_clkdm;
+static atomic_t smc_l4_sec_clkdm_use_count = ATOMIC_INIT(0);
+
+static int __init omap4_smc_init(void)
+{
+	g_secure_task_id = 0;
+
+	dprintk(KERN_INFO "SMC early init\n");
+
+	smc_l4_sec_clkdm = clkdm_lookup("l4_secure_clkdm");
+	if (smc_l4_sec_clkdm == NULL)
+		return -EFAULT;
+
+#ifdef CONFIG_HAS_WAKELOCK
+	wake_lock_init(&g_smc_wake_lock, WAKE_LOCK_SUSPEND,
+		SCXLNX_DEVICE_BASE_NAME);
+#endif
+
+	return 0;
+}
+early_initcall(omap4_smc_init);
+
 /*
  * Function responsible for formatting parameters to pass from NS world to
  * S world
@@ -144,32 +157,40 @@ struct wake_lock g_smc_wake_lock;
  * SChannel commands use schedule_secure_world, a function that does not
  * allocate nor flush the caches, etc.
  */
-static u32 pub2sec_dispatcher(u32 app_id, u32 flags, u32 nargs,
+u32 omap4_secure_dispatcher(u32 app_id, u32 flags, u32 nargs,
 	u32 arg1, u32 arg2, u32 arg3, u32 arg4)
 {
 	u32 nRet;
 	u32 pub2sec_args[5] = {0, 0, 0, 0, 0};
+	unsigned long nITFlags;
+	bool smc_kind = false;
 #ifdef CONFIG_SMP
+	long ret;
 	cpumask_t saved_cpu_mask;
 	cpumask_t local_cpu_mask = CPU_MASK_NONE;
 #endif
 
-	dprintk(KERN_INFO "pub2sec_dispatcher: "
+	dprintk(KERN_INFO "omap4_secure_dispatcher: "
 		"app_id=0x%08x, flags=0x%08x, nargs=%u\n",
 		app_id, flags, nargs);
 
-	dprintk(KERN_INFO "pub2sec_dispatcher: "
-		"args=%08x, %08x, %08x, %08x\n",
+	if ((app_id == API_HAL_SDP_RUNTIMEINIT_INDEX) ||
+		(app_id == API_HAL_LM_PALOAD_INDEX) ||
+		(app_id == API_HAL_LM_PAUNLOADALL_INDEX) ||
+		(app_id == API_HAL_TASK_MGR_RPCINIT_INDEX) ||
+		(app_id == API_HAL_KM_GETSECUREROMCODECRC_INDEX) ||
+		(app_id == API_HAL_SEC_L3_RAM_RESIZE_INDEX) ||
+		(app_id == SMICODEPUB_IRQ_END))
+		smc_kind = true;
+
+	if (nargs != 0)
+		dprintk(KERN_INFO
+		"omap4_secure_dispatcher: args=%08x, %08x, %08x, %08x\n",
 		arg1, arg2, arg3, arg4);
 
 #ifdef CONFIG_HAS_WAKELOCK
-	wake_lock(&g_smc_wake_lock);
-#endif
-
-#ifdef CONFIG_SMP
-	cpu_set(0, local_cpu_mask);
-	sched_getaffinity(0, &saved_cpu_mask);
-	sched_setaffinity(0, &local_cpu_mask);
+	if (smc_kind)
+		wake_lock(&g_smc_wake_lock);
 #endif
 
 	/*
@@ -184,23 +205,41 @@ static u32 pub2sec_dispatcher(u32 app_id, u32 flags, u32 nargs,
 	pub2sec_args[4] = arg4;
 
 	/* Make sure parameters are visible to the secure world */
-	flush_cache_all();
-	outer_flush_range(__pa(pub2sec_args),
+	dmac_clean_range((void *)pub2sec_args,
+		(void *)(((u32)(pub2sec_args)) + 5*sizeof(u32)));
+	outer_clean_range(__pa(pub2sec_args),
 		__pa(pub2sec_args) + 5*sizeof(u32));
 	wmb();
 
+#ifdef CONFIG_SMP
+	if (smc_kind) {
+		cpu_set(0, local_cpu_mask);
+		sched_getaffinity(0, &saved_cpu_mask);
+		ret = sched_setaffinity(0, &local_cpu_mask);
+		if (ret != 0)
+			dprintk(KERN_ERR "sched_setaffinity #1 -> 0x%lX", ret);
+	}
+#endif
+
+	local_irq_save(nITFlags);
 	/* proc_id is always 0 */
 	nRet = schedule_secure_world(app_id, 0, flags, __pa(pub2sec_args));
+	local_irq_restore(nITFlags);
+
+#ifdef CONFIG_SMP
+	if (smc_kind) {
+		ret = sched_setaffinity(0, &saved_cpu_mask);
+		if (ret != 0)
+			dprintk(KERN_ERR "sched_setaffinity #2 -> 0x%lX", ret);
+	}
+#endif
 
 	/* Restore the HW_SUP on L4 Sec clock domain so hardware can idle */
 	SCXL4SECClockDomainDisable();
 
-#ifdef CONFIG_SMP
-	sched_setaffinity(0, &saved_cpu_mask);
-#endif
-
 #ifdef CONFIG_HAS_WAKELOCK
-	wake_unlock(&g_smc_wake_lock);
+	if (smc_kind)
+		wake_unlock(&g_smc_wake_lock);
 #endif
 
 	return nRet;
@@ -216,14 +255,31 @@ int SCXLNXCommYield(struct SCXLNX_COMM *pComm)
 
 	g_service_end = 0;
 	/* yield to the Secure World */
-	ret = pub2sec_dispatcher(SMICODEPUB_IRQ_END, /* app_id */
+	ret = omap4_secure_dispatcher(SMICODEPUB_IRQ_END, /* app_id */
 	   0, 0,        /* flags, nargs */
 	   0, 0, 0, 0); /* arg1, arg2, arg3, arg4 */
 	if (g_service_end != 0) {
 		dprintk(KERN_ERR "Service End ret=%X\n", ret);
+
+		if (ret == 0) {
+			dmac_inv_range((void *)pComm->pInitSharedBuffer,
+				(void *)(((u32)(pComm->pInitSharedBuffer)) +
+					PAGE_SIZE));
+			outer_inv_range(__pa(pComm->pInitSharedBuffer),
+				__pa(pComm->pInitSharedBuffer) +
+				PAGE_SIZE);
+
+			ret = ((struct SCHANNEL_INIT_BUFFER *)
+				(pComm->pInitSharedBuffer))->nInitStatus;
+
+			dprintk(KERN_ERR "SMC PA failure ret=%X\n", ret);
+			if (ret == 0)
+				ret = -EFAULT;
+		}
 		test_and_clear_bit(SCXLNX_COMM_FLAG_PA_AVAILABLE,
 			&pComm->nFlags);
-		return -EFAULT;
+	} else {
+		ret = 0;
 	}
 
 	return ret;
@@ -245,8 +301,8 @@ static int SCXLNXCommSEInit(struct SCXLNX_COMM *pComm,
 	/* Secure CRC read */
 	dprintk(KERN_INFO "SCXLNXCommSEInit: Secure CRC Read...\n");
 
-	nCRC = pub2sec_dispatcher(API_HAL_KM_GETSECUREROMCODECRC_INDEX, 0, 0,
-		0, 0, 0, 0);
+	nCRC = omap4_secure_dispatcher(API_HAL_KM_GETSECUREROMCODECRC_INDEX,
+		0, 0, 0, 0, 0, 0);
 	printk(KERN_INFO "SMC: SecureCRC=0x%08X\n", nCRC);
 
 	/*
@@ -264,7 +320,7 @@ static int SCXLNXCommSEInit(struct SCXLNX_COMM *pComm,
 
 	/* SRAM resize */
 	dprintk(KERN_INFO "SCXLNXCommSEInit: SRAM resize (52KB)...\n");
-	nError = pub2sec_dispatcher(API_HAL_SEC_L3_RAM_RESIZE_INDEX,
+	nError = omap4_secure_dispatcher(API_HAL_SEC_L3_RAM_RESIZE_INDEX,
 		FLAG_FIQ_ENABLE | FLAG_START_HAL_CRITICAL, 1,
 		SEC_RAM_SIZE_52KB, 0, 0, 0);
 
@@ -280,7 +336,7 @@ static int SCXLNXCommSEInit(struct SCXLNX_COMM *pComm,
 	dprintk(KERN_INFO "SCXLNXCommSEInit: SDP runtime init..."
 		"(nSDPBackingStoreAddr=%x, nSDPBkExtStoreAddr=%x)\n",
 		nSDPBackingStoreAddr, nSDPBkExtStoreAddr);
-	nError = pub2sec_dispatcher(API_HAL_SDP_RUNTIMEINIT_INDEX,
+	nError = omap4_secure_dispatcher(API_HAL_SDP_RUNTIMEINIT_INDEX,
 		FLAG_FIQ_ENABLE | FLAG_START_HAL_CRITICAL, 2,
 		nSDPBackingStoreAddr, nSDPBkExtStoreAddr, 0, 0);
 
@@ -294,7 +350,7 @@ static int SCXLNXCommSEInit(struct SCXLNX_COMM *pComm,
 
 	/* RPC init */
 	dprintk(KERN_INFO "SCXLNXCommSEInit: RPC init...\n");
-	nError = pub2sec_dispatcher(API_HAL_TASK_MGR_RPCINIT_INDEX,
+	nError = omap4_secure_dispatcher(API_HAL_TASK_MGR_RPCINIT_INDEX,
 		FLAG_START_HAL_CRITICAL, 1,
 		(u32) (u32(*const) (u32, u32, u32, u32)) &rpc_handler, 0, 0, 0);
 
@@ -314,36 +370,23 @@ error:
 	return -EFAULT;
 }
 
-/* Free the PA buffers and check protocol version returned by the PA */
+/* Check protocol version returned by the PA */
 static u32 SCXLNXCommRPCInit(struct SCXLNX_COMM *pComm)
 {
 	u32 nProtocolVersion;
 	u32 nRPCError = RPC_SUCCESS;
-	void *pPABuffer;
-	void *pPABufferRaw;
-	void *pPAInfo;
-	void *pPAInfoRaw;
 
 	dprintk(KERN_INFO "SCXLNXSMCommRPCInit(%p)\n", pComm);
 
 	spin_lock(&(pComm->lock));
 
-	pPABuffer = pComm->pPABuffer;
-	pPABufferRaw = pComm->pPABufferRaw;
-	pPAInfo = pComm->pPAInfo;
-	pPAInfoRaw = pComm->pPAInfoRaw;
+	dmac_inv_range((void *)pComm->pInitSharedBuffer,
+		(void *)(((u32)(pComm->pInitSharedBuffer)) + PAGE_SIZE));
+	outer_inv_range(__pa(pComm->pInitSharedBuffer),
+		__pa(pComm->pInitSharedBuffer) +  PAGE_SIZE);
 
-	if (pComm->pPABuffer != NULL) {
-		pComm->pPABuffer = NULL;
-		pComm->pPABufferRaw = NULL;
-	}
-
-	if (pComm->pPAInfo != NULL) {
-		pComm->pPAInfo = NULL;
-		pComm->pPAInfoRaw = NULL;
-	}
-
-	nProtocolVersion = *((u32 *) (pComm->pL0SharedBuffer));
+	nProtocolVersion = ((struct SCHANNEL_INIT_BUFFER *)
+				(pComm->pInitSharedBuffer))->nProtocolVersion;
 
 	if ((GET_PROTOCOL_MAJOR_VERSION(nProtocolVersion))
 			!= SCX_S_PROTOCOL_MAJOR_VERSION) {
@@ -357,16 +400,6 @@ static u32 SCXLNXCommRPCInit(struct SCXLNX_COMM *pComm)
 	}
 
 	spin_unlock(&(pComm->lock));
-
-	if (pPABuffer != NULL) {
-		internal_vunmap(pPABuffer);
-		internal_kfree(pPABufferRaw);
-	}
-
-	if (pPAInfo != NULL) {
-		internal_vunmap(pPAInfo);
-		internal_kfree(pPAInfoRaw);
-	}
 
 	return nRPCError;
 }
@@ -424,9 +457,7 @@ int SCXLNXCommExecuteRPCCommand(struct SCXLNX_COMM *pComm)
 #ifdef CONFIG_SECURE_TRACE
 			spin_lock(&(pComm->lock));
 			printk(KERN_INFO "SMC PA: %s",
-				&(((struct SCHANNEL_L0_BUFFER_INPUT *)
-					pComm->pL0SharedBuffer)->
-						sReserved[RPC_TRACE_OFFSET]));
+				pComm->pBuffer->sRPCTraceBuffer);
 			spin_unlock(&(pComm->lock));
 #endif
 			nRPCReturn = RPC_NON_YIELD;
@@ -435,7 +466,7 @@ int SCXLNXCommExecuteRPCCommand(struct SCXLNX_COMM *pComm)
 
 		default:
 			if (SCXPublicCryptoExecuteRPCCommand(nRPCCommand,
-					pComm->pL0SharedBuffer) != 0)
+				pComm->pBuffer->sRPCShortcutBuffer) != 0)
 				g_RPC_parameters[0] = RPC_ERROR_BAD_PARAMETERS;
 			else
 				g_RPC_parameters[0] = RPC_SUCCESS;
@@ -457,9 +488,6 @@ int SCXLNXCommExecuteRPCCommand(struct SCXLNX_COMM *pComm)
  * L4 SEC Clock domain handling
  *-------------------------------------------------------------------------- */
 
-static struct clockdomain *smc_l4_sec_clkdm;
-static atomic_t smc_l4_sec_clkdm_use_count = ATOMIC_INIT(0);
-
 void SCXL4SECClockDomainEnable(void)
 {
 	atomic_inc(&smc_l4_sec_clkdm_use_count);
@@ -480,6 +508,8 @@ int SCXLNXCommHibernate(struct SCXLNX_COMM *pComm)
 {
 	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
 
+	dprintk(KERN_INFO "SCXLNXCommHibernate()\n");
+
 	/*
 	 * As we enter in CORE OFF, the keys are going to be cleared.
 	 * Reset the global key context.
@@ -491,7 +521,6 @@ int SCXLNXCommHibernate(struct SCXLNX_COMM *pComm)
 	pDevice->hAES2SecureKeyContext = 0;
 	pDevice->hDESSecureKeyContext = 0;
 	pDevice->bSHAM1IsPublic = false;
-
 	return 0;
 }
 
@@ -510,25 +539,12 @@ int SCXLNXCommInit(struct SCXLNX_COMM *pComm)
 	spin_lock_init(&(pComm->lock));
 	pComm->nFlags = 0;
 	pComm->pBuffer = NULL;
-	pComm->pL0SharedBuffer = NULL;
-	pComm->pPAInfo = NULL;
-	pComm->pPABuffer = NULL;
-
-	pComm->pBufferRaw = NULL;
-	pComm->pL0SharedBufferRaw = NULL;
-	pComm->pPAInfoRaw = NULL;
-	pComm->pPABufferRaw = NULL;
+	pComm->pInitSharedBuffer = NULL;
 
 	pComm->bSEInitialized = false;
 
 	init_waitqueue_head(&(pComm->waitQueue));
 	mutex_init(&(pComm->sRPCLock));
-
-	g_secure_task_id = 0;
-
-	smc_l4_sec_clkdm = clkdm_lookup("l4_secure_clkdm");
-	if (smc_l4_sec_clkdm == NULL)
-		return -EFAULT;
 
 	if (SCXPublicCryptoInit() != PUBLIC_CRYPTO_OPERATION_SUCCESS)
 		return -EFAULT;
@@ -536,30 +552,18 @@ int SCXLNXCommInit(struct SCXLNX_COMM *pComm)
 	return 0;
 }
 
-static void SCXLNXCommStop(struct SCXLNX_COMM *pComm);
-
 /* Start the SMC PA */
 int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 	u32 nSDPBkExtStoreAddr, u32 nDataAddr, u8 *pPABufferVAddr,
-	u8 *pPABufferVAddrRaw, u32 nPABufferSize, u8 *pPropertiesBuffer,
+	u32 nPABufferSize, u8 *pPropertiesBuffer,
 	u32 nPropertiesBufferLength)
 {
-	struct SCHANNEL_L0_BUFFER_INPUT *pL0SharedBufferRaw = NULL;
-	struct SCHANNEL_L0_BUFFER_INPUT *pL0SharedBuffer = NULL;
-	struct SCHANNEL_L0_BUFFER_INPUT *pL0SharedBufferRawDescr = NULL;
+	struct SCHANNEL_INIT_BUFFER *pInitSharedBuffer = NULL;
 	struct SCHANNEL_C1S_BUFFER *pL1SharedBuffer = NULL;
-	struct SCHANNEL_C1S_BUFFER *pL1SharedBufferRaw = NULL;
-	struct SCHANNEL_C1S_BUFFER *pL1SharedBufferRawDescr = NULL;
-	struct SCHANNEL_L0_BUFFER_SMC_INIT_INPUT *pSMCInitInput;
-	struct NS_PA_INFO *paInfo = NULL;
-	struct NS_PA_INFO *paInfoRaw = NULL;
+	struct SCHANNEL_C1S_BUFFER *pL1SharedBufferDescr = NULL;
+	struct NS_PA_INFO sPAInfo;
 	int nError;
 	u32 descr;
-
-#ifdef CONFIG_HAS_WAKELOCK
-	wake_lock_init(&g_smc_wake_lock, WAKE_LOCK_SUSPEND,
-		SCXLNX_DEVICE_BASE_NAME);
-#endif
 
 	/*
 	 * Implementation notes:
@@ -579,10 +583,9 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 		goto error1;
 	}
 
-	if ((sizeof(struct SCHANNEL_L0_BUFFER_INPUT) != PAGE_SIZE)
-			|| (sizeof(struct SCHANNEL_C1S_BUFFER) != PAGE_SIZE)) {
+	if (sizeof(struct SCHANNEL_C1S_BUFFER) != PAGE_SIZE) {
 		dprintk(KERN_ERR "SCXLNXCommStart(%p): "
-			"The L0 or L1 structure size is incorrect!\n", pComm);
+			"The L1 structure size is incorrect!\n", pComm);
 		nError = -EFAULT;
 		goto error1;
 	}
@@ -592,94 +595,70 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 	if (nError != 0) {
 		dprintk(KERN_ERR "SCXLNXCommStart(%p): "
 			"SE initialization failed\n", pComm);
-
 		goto error1;
 	}
 
-	paInfo = internal_kmalloc_vmap((void **) &paInfoRaw,
-		sizeof(struct NS_PA_INFO), GFP_KERNEL);
-	pL0SharedBuffer =
-		(struct SCHANNEL_L0_BUFFER_INPUT *)
-			internal_get_zeroed_page_vmap(
-				(void **) &pL0SharedBufferRaw, GFP_KERNEL);
-	pL1SharedBuffer =
-		(struct SCHANNEL_C1S_BUFFER *) internal_get_zeroed_page_vmap(
-			(void **) &pL1SharedBufferRaw, GFP_KERNEL);
-
-	if ((paInfo == NULL) || (paInfoRaw == NULL) ||
-	   (pL0SharedBuffer == NULL) || (pL0SharedBufferRaw == NULL) ||
-	   (pL1SharedBuffer == NULL) || (pL1SharedBufferRaw == NULL)) {
+	pInitSharedBuffer =
+		(struct SCHANNEL_INIT_BUFFER *)
+			internal_get_zeroed_page(GFP_KERNEL);
+	if (pInitSharedBuffer == NULL) {
 		dprintk(KERN_ERR "SCXLNXCommStart(%p): "
 			"Ouf of memory!\n", pComm);
 
 		nError = -ENOMEM;
 		goto error1;
 	}
+	/* Ensure the page is mapped */
+	__set_page_locked(virt_to_page(pInitSharedBuffer));
 
-	/*
-	 * Ensure the pages storing SM communication buffers are mapped
-	 */
-	__set_page_locked(virt_to_page(pL0SharedBufferRaw));
-	__set_page_locked(virt_to_page(pL1SharedBufferRaw));
+	pL1SharedBuffer =
+		(struct SCHANNEL_C1S_BUFFER *)
+			internal_get_zeroed_page(GFP_KERNEL);
+
+	if (pL1SharedBuffer == NULL) {
+		dprintk(KERN_ERR "SCXLNXCommStart(%p): "
+			"Ouf of memory!\n", pComm);
+
+		nError = -ENOMEM;
+		goto error1;
+	}
+	/* Ensure the page is mapped */
+	__set_page_locked(virt_to_page(pL1SharedBuffer));
 
 	dprintk(KERN_INFO "SCXLNXCommStart(%p): "
 		"L0SharedBuffer={0x%08x, 0x%08x}\n", pComm,
-		(u32) pL0SharedBuffer, (u32) __pa(pL0SharedBufferRaw));
+		(u32) pInitSharedBuffer, (u32) __pa(pInitSharedBuffer));
 	dprintk(KERN_INFO "SCXLNXCommStart(%p): "
 		"L1SharedBuffer={0x%08x, 0x%08x}\n", pComm,
-		(u32) pL1SharedBuffer, (u32) __pa(pL1SharedBufferRaw));
-
-	descr = SCXLNXCommGetL2DescriptorCommon((u32) pL0SharedBuffer,
-			current->mm);
-	pL0SharedBufferRawDescr = (struct SCHANNEL_L0_BUFFER_INPUT *) (
-		((u32) __pa(pL0SharedBufferRaw) & 0xFFFFF000) |
-		(descr & 0xFFF));
+		(u32) pL1SharedBuffer, (u32) __pa(pL1SharedBuffer));
 
 	descr = SCXLNXCommGetL2DescriptorCommon((u32) pL1SharedBuffer,
 			current->mm);
-	pL1SharedBufferRawDescr = (struct SCHANNEL_C1S_BUFFER *) (
-		((u32) __pa(pL1SharedBufferRaw) & 0xFFFFF000) |
+	pL1SharedBufferDescr = (struct SCHANNEL_C1S_BUFFER *) (
+		((u32) __pa(pL1SharedBuffer) & 0xFFFFF000) |
 		(descr & 0xFFF));
 
-	pComm->pPAInfo = paInfo;
-	pComm->pPAInfoRaw = paInfoRaw;
-	pComm->pPABuffer = pPABufferVAddr;
-	pComm->pPABufferRaw = pPABufferVAddrRaw;
-	pComm->pL0SharedBuffer = pL0SharedBuffer;
-	pComm->pL0SharedBufferRaw = pL0SharedBufferRaw;
-	pComm->pBuffer = pL1SharedBuffer;
-	pComm->pBufferRaw = pL1SharedBufferRaw;
+	sPAInfo.pCertificate = (void *) __pa(pPABufferVAddr);
+	sPAInfo.pParameters = (void *) __pa(pInitSharedBuffer);
+	sPAInfo.pResults = (void *) __pa(pInitSharedBuffer);
 
-	paInfo->pCertificate = (void *) __pa(pPABufferVAddrRaw);
-	paInfo->pParameters = (void *) __pa(pL0SharedBufferRaw);
-	paInfo->pResults = (void *) __pa(pL0SharedBufferRaw);
+	pInitSharedBuffer->nL1SharedBufferPhysAddr = (u32) pL1SharedBufferDescr;
 
-	memset(pL0SharedBuffer, 0, sizeof(struct SCHANNEL_L0_BUFFER_INPUT));
-	memset(pL1SharedBuffer, 0, sizeof(struct SCHANNEL_C1S_BUFFER));
+	pInitSharedBuffer->nBackingStoreAddr = nSDPBackingStoreAddr;
+	pInitSharedBuffer->nBackExtStorageAddr = nSDPBkExtStoreAddr;
+	pInitSharedBuffer->nDataAddr = nDataAddr;
 
-	pSMCInitInput =
-		(struct SCHANNEL_L0_BUFFER_SMC_INIT_INPUT *) pL0SharedBuffer;
-
-	pSMCInitInput->nL1Command = SCX_SMC_INIT;
-	pSMCInitInput->nL0SharedBufferPhysAddr = (u32) pL0SharedBufferRawDescr;
-	pSMCInitInput->nL1SharedBufferLength =
-		sizeof(struct SCHANNEL_C1S_BUFFER);
-	pSMCInitInput->nL1SharedBufferPhysAddr = (u32) pL1SharedBufferRawDescr;
-
-	pSMCInitInput->nBackingStoreAddr = nSDPBackingStoreAddr;
-	pSMCInitInput->nBackExtStorageAddr = nSDPBkExtStoreAddr;
-	pSMCInitInput->nDataAddr = nDataAddr;
-
-	pSMCInitInput->nPropertiesBufferLength = nPropertiesBufferLength;
+	pInitSharedBuffer->nPropertiesBufferLength = nPropertiesBufferLength;
 	if (nPropertiesBufferLength == 0) {
-		pSMCInitInput->pPropertiesBuffer[0] = 0;
+		pInitSharedBuffer->pPropertiesBuffer[0] = 0;
 	} else {
 		/* Test for overflow */
-		if ((pSMCInitInput->pPropertiesBuffer + nPropertiesBufferLength
-				> pSMCInitInput->pPropertiesBuffer) &&
+		if ((pInitSharedBuffer->pPropertiesBuffer +
+			nPropertiesBufferLength
+				> pInitSharedBuffer->pPropertiesBuffer) &&
 			(nPropertiesBufferLength <=
-				pSMCInitInput->nPropertiesBufferLength)) {
-				memcpy(pSMCInitInput->pPropertiesBuffer,
+				pInitSharedBuffer->nPropertiesBufferLength)) {
+				memcpy(pInitSharedBuffer->pPropertiesBuffer,
 					pPropertiesBuffer,
 					 nPropertiesBufferLength);
 		} else {
@@ -687,7 +666,7 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 				"Configuration buffer size from userland is "
 				"incorrect(%d, %d)\n",
 				pComm, (u32) nPropertiesBufferLength,
-				pSMCInitInput->nPropertiesBufferLength);
+				pInitSharedBuffer->nPropertiesBufferLength);
 			nError = -EFAULT;
 			goto error1;
 		}
@@ -695,9 +674,35 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 
 	dprintk(KERN_INFO "SCXLNXSMCommStart(%p): "
 		"System Configuration (%d bytes)\n", pComm,
-		pSMCInitInput->nPropertiesBufferLength);
+		pInitSharedBuffer->nPropertiesBufferLength);
 	dprintk(KERN_INFO "SCXLNXSMCommStart(%p): "
 		"Starting PA (%d bytes)...\n", pComm, nPABufferSize);
+
+	/*
+	 * Make sure all data is visible to the secure world
+	 */
+	dmac_clean_range((void *)pInitSharedBuffer,
+		(void *)(((u32)pInitSharedBuffer) + PAGE_SIZE));
+	outer_clean_range(__pa(pInitSharedBuffer),
+		__pa(pInitSharedBuffer) + PAGE_SIZE);
+
+	dmac_clean_range((void *)pPABufferVAddr,
+		(void *)(pPABufferVAddr + nPABufferSize));
+	outer_clean_range(__pa(pPABufferVAddr),
+		__pa(pPABufferVAddr) + nPABufferSize);
+
+	dmac_clean_range((void *)&sPAInfo,
+		(void *)(((u32)&sPAInfo) + sizeof(struct NS_PA_INFO)));
+	outer_clean_range(__pa(&sPAInfo),
+		__pa(&sPAInfo) + sizeof(struct NS_PA_INFO));
+	wmb();
+
+	spin_lock(&(pComm->lock));
+	pComm->pInitSharedBuffer = pInitSharedBuffer;
+	pComm->pBuffer = pL1SharedBuffer;
+	spin_unlock(&(pComm->lock));
+	pInitSharedBuffer = NULL;
+	pL1SharedBuffer = NULL;
 
 	/*
 	 * Set the OS current time in the L1 shared buffer first. The secure
@@ -706,29 +711,13 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 	SCXLNXCommSetCurrentTime(pComm);
 
 	/*
-	 * Make sure all data is visible to the secure world
-	 */
-	flush_cache_all();
-	outer_flush_range(__pa(pL0SharedBufferRaw),
-		__pa(pL0SharedBufferRaw) + PAGE_SIZE);
-	outer_flush_range(__pa(pL1SharedBufferRaw),
-		__pa(pL1SharedBufferRaw) + PAGE_SIZE);
-	outer_flush_range(__pa(pPABufferVAddrRaw),
-		__pa(pPABufferVAddrRaw) + nPABufferSize);
-	outer_flush_range(__pa(paInfoRaw),
-		__pa(paInfoRaw) + sizeof(struct NS_PA_INFO));
-	wmb();
-
-	/*
 	 * Start the SMC PA
 	 */
-	nError = pub2sec_dispatcher(API_HAL_LM_PALOAD_INDEX,
+	nError = omap4_secure_dispatcher(API_HAL_LM_PALOAD_INDEX,
 		FLAG_IRQ_ENABLE | FLAG_FIQ_ENABLE | FLAG_START_HAL_CRITICAL, 1,
-		__pa(pComm->pPAInfoRaw), 0, 0, 0);
+		__pa(&sPAInfo), 0, 0, 0);
 	if (nError != API_HAL_RET_VALUE_OK) {
 		printk(KERN_ERR "SMC: PA load failed [0x%x]\n", nError);
-		test_and_clear_bit(SCXLNX_COMM_FLAG_PA_AVAILABLE,
-			&pComm->nFlags);
 		goto error2;
 	}
 
@@ -745,111 +734,25 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 
 	return 0;
 
-error1:
-	internal_vunmap(pPABufferVAddr);
-	internal_vunmap(paInfo);
-	internal_kfree(pPABufferVAddrRaw);
-	internal_kfree(paInfoRaw);
-	if (pL0SharedBuffer != NULL) {
-		__clear_page_locked(virt_to_page(pL0SharedBufferRaw));
-		internal_free_page_vunmap((unsigned long) pL0SharedBuffer);
-		internal_free_page((unsigned long) pL0SharedBufferRaw);
-	}
-	if (pL1SharedBuffer != NULL) {
-		__clear_page_locked(virt_to_page(pL1SharedBufferRaw));
-		internal_free_page_vunmap((unsigned long) pL1SharedBuffer);
-		internal_free_page((unsigned long) pL1SharedBufferRaw);
-	}
-
-	return nError;
-
 error2:
-	dprintk(KERN_ERR "SCXLNXCommStart(%p): Failure [%d]\n",
-		pComm, nError);
-
-	SCXLNXCommStop(pComm);
-
-	return nError;
-}
-
-static void SCXLNXCommStop(struct SCXLNX_COMM *pComm)
-{
-	int nError;
-	void *pBufferRaw;
-	void *pBuffer;
-	void *pL0SharedBufferRaw;
-	void *pL0SharedBuffer;
-	void *pPABuffer;
-	void *pPABufferRaw;
-	void *pPAInfo;
-	void *pPAInfoRaw;
-
-	dprintk(KERN_INFO "SCXLNXCommStop(%p)\n", pComm);
-
-	nError = pub2sec_dispatcher(API_HAL_LM_PAUNLOADALL_INDEX,
-		FLAG_START_HAL_CRITICAL, 0, 0, 0, 0, 0);
-
-	if (nError != API_HAL_RET_VALUE_OK)
-		dprintk(KERN_ERR "SCXLNXCommStop(%p): "
-			"PA unload failed [0x%x]\n", pComm, nError);
-
 	spin_lock(&(pComm->lock));
-
-	pBufferRaw = pComm->pBufferRaw;
-	pBuffer = pComm->pBuffer;
-	pL0SharedBufferRaw = pComm->pL0SharedBufferRaw;
-	pL0SharedBuffer = pComm->pL0SharedBuffer;
-	pPABuffer = pComm->pPABuffer;
-	pPABufferRaw = pComm->pPABufferRaw;
-	pPAInfo = pComm->pPAInfo;
-	pPAInfoRaw = pComm->pPAInfoRaw;
-
-	if (pComm->pBuffer != NULL) {
-		pComm->pBuffer = NULL;
-		pComm->pBufferRaw = NULL;
-	}
-
-	if (pComm->pL0SharedBuffer != NULL) {
-		pComm->pL0SharedBuffer = NULL;
-		pComm->pL0SharedBufferRaw = NULL;
-	}
-
-	if (pComm->pPABuffer != NULL) {
-		pComm->pPABuffer = NULL;
-		pComm->pPABufferRaw = NULL;
-	}
-
-	if (pComm->pPAInfo != NULL) {
-		pComm->pPAInfo = NULL;
-		pComm->pPAInfoRaw = NULL;
-	}
-
+	pL1SharedBuffer = pComm->pBuffer;
+	pInitSharedBuffer = pComm->pInitSharedBuffer;
+	pComm->pBuffer = NULL;
+	pComm->pInitSharedBuffer = NULL;
 	spin_unlock(&(pComm->lock));
 
-	if (pBuffer != NULL) {
-		__clear_page_locked(virt_to_page(pBufferRaw));
-		internal_free_page_vunmap((unsigned long) pBuffer);
+error1:
+	if (pInitSharedBuffer != NULL) {
+		__clear_page_locked(virt_to_page(pInitSharedBuffer));
+		internal_free_page((unsigned long) pInitSharedBuffer);
+	}
+	if (pL1SharedBuffer != NULL) {
+		__clear_page_locked(virt_to_page(pL1SharedBuffer));
+		internal_free_page((unsigned long) pL1SharedBuffer);
 	}
 
-	if (pL0SharedBuffer != NULL) {
-		__clear_page_locked(virt_to_page(pL0SharedBufferRaw));
-		internal_free_page_vunmap((unsigned long) pL0SharedBuffer);
-		internal_free_page((unsigned long) pL0SharedBufferRaw);
-	}
-
-	if (pPABuffer != NULL) {
-		internal_vunmap(pPABuffer);
-		internal_kfree(pPABufferRaw);
-	}
-
-	if (pPAInfo != NULL) {
-		internal_vunmap(pPAInfo);
-		internal_kfree(pPAInfoRaw);
-	}
-
-#ifdef CONFIG_HAS_WAKELOCK
-	wake_lock_destroy(&g_smc_wake_lock);
-#endif
+	return nError;
 }
 
 void SCXLNXCommTerminate(struct SCXLNX_COMM *pComm)

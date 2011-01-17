@@ -11,6 +11,16 @@ config SECURITY_MIDDLEWARE_COMPONENT
 
 	  If you are unsure how to answer this question, answer N.
 
+config DYNAMIC_SDP_STORAGE_ALLOC
+	bool "Enable SDRAM memory zones dynamic allocation"
+	default n
+	depends on SECURITY_MIDDLEWARE_COMPONENT
+	help
+	  The SMC requires memory to be reserved in SDRAM.  This option enables
+	  dynamic allocation at boot time.
+
+	  If you are unsure how to answer this question, answer N.
+
 config SECURE_TRACE
 	bool "Enable SMC secure traces"
 	depends on SECURITY_MIDDLEWARE_COMPONENT
@@ -18,3 +28,17 @@ config SECURE_TRACE
 	help
 	  This option enables traces from the SMC Protected Application to be
 	  displayed in kernel logs.
+
+config TF_DRIVER_DEBUG_SUPPORT
+	bool "Debug support"
+	depends on SECURITY_MIDDLEWARE_COMPONENT
+	default n
+	help
+	  This options enables debug traces in the driver.
+
+config SMC_BENCH_SECURE_CYCLE
+	bool "Enable secure cycles benchmarks"
+	depends on TF_DRIVER_DEBUG_SUPPORT
+	default n
+	help
+	  This options enables benchmarks.

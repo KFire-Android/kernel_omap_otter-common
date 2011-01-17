@@ -78,18 +78,9 @@
 #define TIME_IMMEDIATE ((u64) 0x0000000000000000ULL)
 #define TIME_INFINITE  ((u64) 0xFFFFFFFFFFFFFFFFULL)
 
-#define sigkill_pending() \
-	(signal_pending(current) && \
-	 sigismember(&current->pending.signal, SIGKILL))
-
-
 /*---------------------------------------------------------------------------
  * atomic operation definitions
  *---------------------------------------------------------------------------*/
-
-/*----------------------------------------------------------------------------
- * SMC related operations
- *----------------------------------------------------------------------------*/
 
 /*
  * Atomically updates the nSyncSerial_N and sTime_N register
@@ -153,6 +144,25 @@ static inline void SCXLNXCommReadTimeout(struct SCXLNX_COMM *pComm, u64 *pTime)
 	*pTime = sTime;
 }
 
+/*----------------------------------------------------------------------------
+ * SIGKILL signal handling
+ *----------------------------------------------------------------------------*/
+
+static bool sigkill_pending(void)
+{
+	if (signal_pending(current)) {
+		dprintk(KERN_INFO "A signal is pending\n");
+		if (sigismember(&current->pending.signal, SIGKILL)) {
+			dprintk(KERN_INFO "A SIGKILL is pending\n");
+			return true;
+		} else if (sigismember(
+			&current->signal->shared_pending.signal, SIGKILL)) {
+			dprintk(KERN_INFO "A SIGKILL is pending (shared)\n");
+			return true;
+		}
+	}
+	return false;
+}
 
 /*----------------------------------------------------------------------------
  * Shared memory related operations
@@ -183,13 +193,15 @@ struct SCXLNX_COARSE_PAGE_TABLE *SCXLNXAllocateCoarsePageTable(
 		void *pPage;
 		int i;
 
+		spin_unlock(&(pAllocationContext->lock));
+
 		/* first allocate a new page descriptor */
 		pArray = internal_kmalloc(sizeof(*pArray), GFP_KERNEL);
 		if (pArray == NULL) {
 			printk(KERN_ERR "SCXLNXAllocateCoarsePageTable(%p):"
 					" failed to allocate a table array\n",
 					pAllocationContext);
-			goto exit;
+			return NULL;
 		}
 
 		pArray->nType = nType;
@@ -202,8 +214,10 @@ struct SCXLNX_COARSE_PAGE_TABLE *SCXLNXAllocateCoarsePageTable(
 					" failed allocate a page\n",
 					pAllocationContext);
 			internal_kfree(pArray);
-			goto exit;
+			return NULL;
 		}
+
+		spin_lock(&(pAllocationContext->lock));
 
 		/* initialize the coarse page table descriptors */
 		for (i = 0; i < 4; i++) {
@@ -233,8 +247,6 @@ struct SCXLNX_COARSE_PAGE_TABLE *SCXLNXAllocateCoarsePageTable(
 		list_add(&(pArray->list),
 			&(pAllocationContext->sCoarsePageTableArrays));
 	}
-
-exit:
 	spin_unlock(&(pAllocationContext->lock));
 
 	return pCoarsePageTable;
@@ -274,6 +286,7 @@ void SCXLNXFreeCoarsePageTable(
 			 * are in use, free the whole page
 			 */
 			int i;
+			u32 *pDescriptors;
 
 			/*
 			 * remove the page's associated coarse page table
@@ -285,20 +298,24 @@ void SCXLNXFreeCoarsePageTable(
 					list_del(&(pArray->
 						sCoarsePageTables[i].list));
 
-			/*
-			 * Free the page.
-			 * The address of the page is contained in the first
-			 * element
-			 */
-			internal_free_page((unsigned long) pArray->
-				sCoarsePageTables[0].pDescriptors);
+			pDescriptors =
+				pArray->sCoarsePageTables[0].pDescriptors;
 			pArray->sCoarsePageTables[0].pDescriptors = NULL;
 
 			/* remove the coarse page table from the array  */
 			list_del(&(pArray->list));
 
+			spin_unlock(&(pAllocationContext->lock));
+			/*
+			 * Free the page.
+			 * The address of the page is contained in the first
+			 * element
+			 */
+			internal_free_page((unsigned long) pDescriptors);
 			/* finaly free the array */
 			internal_kfree(pArray);
+
+			spin_lock(&(pAllocationContext->lock));
 		}
 	} else {
 		/*
@@ -329,17 +346,23 @@ void SCXLNXReleaseCoarsePageTableAllocator(
 	/* now clean up the list of page descriptors */
 	while (!list_empty(&(pAllocationContext->sCoarsePageTableArrays))) {
 		struct SCXLNX_COARSE_PAGE_TABLE_ARRAY *pPageDesc;
+		u32 *pDescriptors;
 
 		pPageDesc = list_entry(
 			pAllocationContext->sCoarsePageTableArrays.next,
 			struct SCXLNX_COARSE_PAGE_TABLE_ARRAY, list);
 
-		if (pPageDesc->sCoarsePageTables[0].pDescriptors != NULL)
-			internal_free_page((unsigned long) pPageDesc->
-				sCoarsePageTables[0].pDescriptors);
-
+		pDescriptors = pPageDesc->sCoarsePageTables[0].pDescriptors;
 		list_del(&(pPageDesc->list));
+
+		spin_unlock(&(pAllocationContext->lock));
+
+		if (pDescriptors != NULL)
+			internal_free_page((unsigned long)pDescriptors);
+
 		internal_kfree(pPageDesc);
+
+		spin_lock(&(pAllocationContext->lock));
 	}
 
 	spin_unlock(&(pAllocationContext->lock));
@@ -466,22 +489,46 @@ inline struct page *SCXLNXCommL2PageDescriptorToPage(u32 nL2PageDescriptor)
  * Returns the L1 descriptor for the 1KB-aligned coarse page table. The address
  * must be in the kernel address space.
  */
-void SCXLNXCommGetL2PageDescriptor(u32 *pL2PageDescriptor,
+void SCXLNXCommGetL2PageDescriptor(
+	u32 *pL2PageDescriptor,
 	u32 nFlags, struct mm_struct *mm)
 {
 	unsigned long nPageVirtAddr;
 	u32 nDescriptor;
+	struct page *pPage;
+	bool bUnmapPage = false;
+
+	dprintk(KERN_INFO
+		"SCXLNXCommGetL2PageDescriptor():"
+		"*pL2PageDescriptor=%x\n",
+		*pL2PageDescriptor);
 
 	if (*pL2PageDescriptor == L2_DESCRIPTOR_FAULT)
 		return;
 
-	nPageVirtAddr = (unsigned long) page_address(
-		(struct page *) (*pL2PageDescriptor));
+	pPage = (struct page *) (*pL2PageDescriptor);
 
-	nDescriptor = L2_PAGE_DESCRIPTOR_BASE;
+	nPageVirtAddr = (unsigned long) page_address(pPage);
+	if (nPageVirtAddr == 0) {
+		dprintk(KERN_INFO "page_address returned 0\n");
+		/* Should we use kmap_atomic(pPage, KM_USER0) instead ? */
+		nPageVirtAddr = (unsigned long) kmap(pPage);
+		if (nPageVirtAddr == 0) {
+			*pL2PageDescriptor = L2_DESCRIPTOR_FAULT;
+			dprintk(KERN_ERR "kmap returned 0\n");
+			return;
+		}
+		bUnmapPage = true;
+	}
 
-	nDescriptor |= (page_to_phys((struct page *) (*pL2PageDescriptor)) &
-		L2_DESCRIPTOR_ADDR_MASK);
+	nDescriptor = SCXLNXCommGetL2DescriptorCommon(nPageVirtAddr, mm);
+	if (nDescriptor == 0) {
+		*pL2PageDescriptor = L2_DESCRIPTOR_FAULT;
+		return;
+	}
+	nDescriptor |= L2_PAGE_DESCRIPTOR_BASE;
+
+	nDescriptor |= (page_to_phys(pPage) & L2_DESCRIPTOR_ADDR_MASK);
 
 	if (!(nFlags & SCX_SHMEM_TYPE_WRITE))
 		/* only read access */
@@ -490,7 +537,8 @@ void SCXLNXCommGetL2PageDescriptor(u32 *pL2PageDescriptor,
 		/* read and write access */
 		nDescriptor |= L2_PAGE_DESCRIPTOR_AP_APX_READ_WRITE;
 
-	nDescriptor |= SCXLNXCommGetL2DescriptorCommon(nPageVirtAddr, mm);
+	if (bUnmapPage)
+		kunmap(pPage);
 
 	*pL2PageDescriptor = nDescriptor;
 }
@@ -588,7 +636,6 @@ void SCXLNXCommReleaseSharedMemory(
 			pShmemDesc);
 }
 
-
 /*
  * Make sure the coarse pages are allocated. If not allocated, do it Locks down
  * the physical memory pages
@@ -671,7 +718,7 @@ int SCXLNXCommFillDescriptorTable(
 	     nCoarsePageIndex++) {
 		struct SCXLNX_COARSE_PAGE_TABLE *pCoarsePageTable;
 
-		/* compute a virual address with appropriate offset */
+		/* compute a virtual address with appropriate offset */
 		u32 nBufferOffsetVAddr = nBufferVAddr +
 			(nCoarsePageIndex * SCX_MAX_COARSE_PAGE_MAPPED_SIZE);
 		u32 nPagesToGet;
@@ -756,8 +803,8 @@ int SCXLNXCommFillDescriptorTable(
 			}
 
 			for (nIndex = nPageShift;
-			     nIndex < nPageShift + nPages;
-			     nIndex++) {
+				  nIndex < nPageShift + nPages;
+				  nIndex++) {
 				/* Get the actual L2 descriptors */
 				SCXLNXCommGetL2PageDescriptor(
 					&pCoarsePageTable->pDescriptors[nIndex],
@@ -788,8 +835,8 @@ int SCXLNXCommFillDescriptorTable(
 		} else {
 			/* Kernel-space memory */
 			for (nIndex = nPageShift;
-			     nIndex < nPagesToGet;
-			     nIndex++) {
+				  nIndex < nPagesToGet;
+				  nIndex++) {
 				unsigned long addr =
 					(unsigned long) (nBufferOffsetVAddr +
 						((nIndex - nPageShift) *
@@ -807,18 +854,15 @@ int SCXLNXCommFillDescriptorTable(
 			}
 		}
 
-#ifdef CONFIG_TF_MSHIELD
-		/*
-		 * Flush the coarse page table to synchronise with
-		 * secure side
-		 */
-		flush_cache_all();
-		outer_flush_range(
+		dmac_clean_range((void *)pCoarsePageTable->pDescriptors,
+		   (void *)(((u32)(pCoarsePageTable->pDescriptors)) +
+		   SCX_DESCRIPTOR_TABLE_CAPACITY * sizeof(u32)));
+
+		outer_clean_range(
 			__pa(pCoarsePageTable->pDescriptors),
 			__pa(pCoarsePageTable->pDescriptors) +
 			SCX_DESCRIPTOR_TABLE_CAPACITY * sizeof(u32));
 		wmb();
-#endif
 
 		/* Update the coarse page table address */
 		pDescriptors[nCoarsePageIndex] =
@@ -946,14 +990,6 @@ static int SCXLNXCommTestSTimeout(
 	return 0;
 }
 
-/* Forward declaration */
-static int SCXLNXCommSendMessage(
-	struct SCXLNX_COMM *pComm,
-	union SCX_COMMAND_MESSAGE *pMessage,
-	struct SCXLNX_CONNECTION *pConn,
-	int bKillable);
-
-
 /*
  * Sends the specified message through the specified communication channel.
  *
@@ -967,6 +1003,7 @@ static int SCXLNXCommSendMessage(struct SCXLNX_COMM *pComm,
 	struct SCXLNX_CONNECTION *pConn,
 	int bKillable)
 {
+	int result;
 	bool bMessageCopied = false;
 	u64 sTimeout;
 	signed long nRelativeTimeoutJiffies;
@@ -974,12 +1011,19 @@ static int SCXLNXCommSendMessage(struct SCXLNX_COMM *pComm,
 	u32 nFirstCommand;
 	u32 nFirstAnswer;
 	u32 nFirstFreeAnswer;
+	unsigned long saved_flags;
+	bool wait_prepared = false;
 
 	struct SCXLNX_ANSWER_STRUCT *pAnswerStructure;
 
 	DEFINE_WAIT(wait);
 
 	dprintk(KERN_INFO "SCXLNXCommSendMessage(%p)\n", pMessage);
+
+#ifdef CONFIG_FREEZER
+	saved_flags = current->flags;
+	current->flags |= PF_FREEZER_NOSIG;
+#endif
 
 	/*
 	 * Read all answers from the answer queue
@@ -1096,12 +1140,8 @@ copy_answers:
 	 */
 	wake_up(&(pComm->waitQueue));
 
-#ifdef CONFIG_TF_MSHIELD
-	if (unlikely(freezing(current))) {
-		printk(KERN_INFO "SMC: Entering refrigerator\n");
-		refrigerator();
-		printk(KERN_INFO "SMC: Left refrigerator\n");
-	}
+#ifdef CONFIG_FREEZER
+	try_to_freeze();
 #endif
 
 #ifndef CONFIG_PREEMPT
@@ -1122,6 +1162,7 @@ copy_answers:
 		"Prepare to wait\n", pMessage);
 	prepare_to_wait(&pComm->waitQueue, &wait,
 			bKillable ? TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE);
+	wait_prepared = true;
 
 	/*
 	 * Check if our answer is available
@@ -1132,8 +1173,8 @@ copy_answers:
 		 (test_bit(SCXLNX_COMM_FLAG_L1_SHARED_ALLOCATED,
 			&(pComm->nFlags)))) {
 		/* Secure world finished booting */
-		finish_wait(&pComm->waitQueue, &wait);
-		return 0;
+		result = 0;
+		goto exit;
 	}
 #endif
 	if (pMessage != NULL) {
@@ -1143,8 +1184,8 @@ copy_answers:
 		if (pAnswerStructure->bAnswerCopied) {
 			dprintk(KERN_INFO "SCXLNXCommSendMessage(thread=%u): "
 				"Received answer\n", current->pid);
-			finish_wait(&pComm->waitQueue, &wait);
-			return 0;
+			result = 0;
+			goto exit;
 		}
 	}
 
@@ -1154,8 +1195,8 @@ copy_answers:
 	if (bKillable && (sigkill_pending())) {
 		dprintk(KERN_ERR "SCXLNXCommSendMessage(thread=%u): "
 			"Failure (error %d)\n", current->pid, -EINTR);
-		finish_wait(&pComm->waitQueue, &wait);
-		return -EINTR;
+		result = -EINTR;
+		goto exit;
 	}
 
 	/*
@@ -1185,24 +1226,23 @@ copy_answers:
 	}
 
 	finish_wait(&pComm->waitQueue, &wait);
+	wait_prepared = false;
 
 	/*
 	 * Yield to the Secure World
 	 */
 schedule_secure_world:
-	{
-		int ret = SCXLNXCommYield(pComm);
-		if (ret != 0)
-			return ret;
-	}
+	result = SCXLNXCommYield(pComm);
+	if (result != 0)
+		goto exit;
 	goto copy_answers;
 
 wait:
 	if (bKillable && (sigkill_pending())) {
 		dprintk(KERN_ERR "SCXLNXCommSendMessage(thread=%u): "
 			"Failure (error %d)\n", current->pid, -EINTR);
-		finish_wait(&pComm->waitQueue, &wait);
-		return -EINTR;
+		result = -EINTR;
+		goto exit;
 	}
 
 	if (nRelativeTimeoutJiffies == MAX_SCHEDULE_TIMEOUT)
@@ -1214,13 +1254,26 @@ wait:
 			nRelativeTimeoutJiffies);
 
 	/* go to sleep */
-	schedule_timeout(nRelativeTimeoutJiffies);
+	if (schedule_timeout(nRelativeTimeoutJiffies) == 0)
+		dprintk(KERN_INFO
+			"SCXLNXCommSendMessage: timeout expired\n");
+	else
+		dprintk(KERN_INFO
+			"SCXLNXCommSendMessage: signal delivered\n");
 
-	dprintk(KERN_INFO "SCXLNXCommSendMessage: "
-		"N_SM_EVENT signaled or timeout expired\n");
 	finish_wait(&pComm->waitQueue, &wait);
-
+	wait_prepared = false;
 	goto copy_answers;
+
+exit:
+#ifdef CONFIG_FREEZER
+	current->flags &= ~(PF_FREEZER_NOSIG);
+	current->flags |= (saved_flags & PF_FREEZER_NOSIG);
+#endif
+	if (wait_prepared)
+		finish_wait(&pComm->waitQueue, &wait);
+
+	return result;
 }
 
 /*
@@ -1362,7 +1415,6 @@ destroy_context:
  * the routine returns an appropriate error code if
  * the operation fails.
  */
-#if 0
 static int SCXLNXCommShutdown(struct SCXLNX_COMM *pComm)
 {
 	int nError;
@@ -1371,12 +1423,14 @@ static int SCXLNXCommShutdown(struct SCXLNX_COMM *pComm)
 
 	dprintk(KERN_INFO "SCXLNXCommShutdown()\n");
 
-	sMessage.sHeader.nMessageType = SCX_MESSAGE_TYPE_POWER_MANAGEMENT;
-	sMessage.sPowerManagementMessage.nPowerCommand = SCPM_PREPARE_SHUTDOWN;
-	sMessage.sPowerManagementMessage.nSharedMemDescriptors[0] = 0;
-	sMessage.sPowerManagementMessage.nSharedMemDescriptors[1] = 0;
-	sMessage.sPowerManagementMessage.nSharedMemSize = 0;
-	sMessage.sPowerManagementMessage.nSharedMemStartOffset = 0;
+	memset(&sMessage, 0, sizeof(sMessage));
+
+	sMessage.sHeader.nMessageType = SCX_MESSAGE_TYPE_MANAGEMENT;
+	sMessage.sHeader.nMessageSize =
+			(sizeof(struct SCX_COMMAND_MANAGEMENT) -
+				sizeof(struct SCX_COMMAND_HEADER))/sizeof(u32);
+
+	sMessage.sManagementMessage.nCommand = SCX_MANAGEMENT_SHUTDOWN;
 
 	nError = SCXLNXCommSendReceive(
 		pComm,
@@ -1392,11 +1446,13 @@ static int SCXLNXCommShutdown(struct SCXLNX_COMM *pComm)
 		return nError;
 	}
 
-	printk(KERN_INFO "smodule: shut down.\n");
+	if (sAnswer.sHeader.nErrorCode != 0)
+		printk(KERN_INFO "tf_driver: shutdown failed.\n");
+	else
+		printk(KERN_INFO "tf_driver: shutdown succeeded.\n");
 
-	return 0;
+	return sAnswer.sHeader.nErrorCode;
 }
-#endif
 
 /*
  * Handles all the power management calls.
@@ -1433,12 +1489,7 @@ int SCXLNXCommPowerManagement(struct SCXLNX_COMM *pComm,
 	case SCXLNX_POWER_OPERATION_SHUTDOWN:
 		switch (nStatus) {
 		case SCX_POWER_MODE_ACTIVE:
-			#if 0
 			nError = SCXLNXCommShutdown(pComm);
-			#endif
-			/* The SMC PA does not support this command
-			   in this version */
-			nError = 0;
 
 			if (nError) {
 				printk(KERN_ERR "SCXLNXCommPowerManagement(): "

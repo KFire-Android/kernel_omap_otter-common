@@ -138,7 +138,7 @@ static struct class *tf_class;
  *----------------------------------------------------------------------------*/
 
 /*
- * smodule character device definitions.
+ * tf_driver character device definitions.
  * read and write methods are not defined
  * and will return an error if used by user space
  */
@@ -339,6 +339,10 @@ static int __init SCXLNXDeviceRegister(void)
 		goto init_failed;
 #endif
 
+#ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
+	runBogoMIPS();
+	addressCacheProperty((unsigned long) &SCXLNXDeviceRegister);
+#endif
 	/*
 	 * Successful completion.
 	 */
@@ -651,7 +655,7 @@ static long SCXLNXDeviceIoctl(struct file *file, unsigned int ioctl_num,
 			dprintk(KERN_WARNING "SCXLNXDeviceIoctl(%p): "
 				"Failed to copy back the secure world "
 				"description to %p\n",
-				pConn, pInfoBuffer->sSecureWorldDescription);
+				file, pInfoBuffer->sSecureWorldDescription);
 			nResult = -EFAULT;
 			goto exit;
 		}

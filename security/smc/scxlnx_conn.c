@@ -79,8 +79,8 @@ int SCXLNXConnCheckMessageValidity(
 		}
 		break;
 
-	case SCX_MESSAGE_TYPE_POWER_MANAGEMENT:
-		/* POWER_MANAGEMENT always valid */
+	case SCX_MESSAGE_TYPE_MANAGEMENT:
+		/* MANAGEMENT always valid */
 		nValid = 1;
 		break;
 
@@ -124,7 +124,18 @@ static void SCXLNXConnUnmapShmem(
 
 	dprintk(KERN_DEBUG "SCXLNXConnUnmapShmem(%p)\n", pShmemDesc);
 
+retry:
 	mutex_lock(&(pConn->sharedMemoriesMutex));
+	if (atomic_read(&pShmemDesc->nRefCnt) > 1) {
+		/*
+		 * Shared mem still in use, wait for other operations completion
+		 * before actually unmapping it.
+		 */
+		dprintk(KERN_INFO "Descriptor in use\n");
+		mutex_unlock(&(pConn->sharedMemoriesMutex));
+		schedule();
+		goto retry;
+	}
 
 	SCXLNXCommReleaseSharedMemory(
 			&(pConn->sAllocationContext),
@@ -212,6 +223,7 @@ static int SCXLNXConnMapShmem(
 
 		/* Initialize the structure */
 		pShmemDesc->nType = SCXLNX_SHMEM_TYPE_REGISTERED_SHMEM;
+		atomic_set(&pShmemDesc->nRefCnt, 1);
 		INIT_LIST_HEAD(&(pShmemDesc->list));
 	} else {
 		/* take the first free shared memory descriptor */
@@ -271,6 +283,120 @@ error:
 }
 
 
+
+/* This function is a copy of the find_vma() function
+in linux kernel 2.6.15 version with some fixes :
+	- memory block may end on vm_end
+	- check the full memory block is in the memory area
+	- guarantee NULL is returned if no memory area is found */
+struct vm_area_struct *SCXLNXConnFindVma(struct mm_struct *mm,
+	unsigned long addr, unsigned long size)
+{
+	struct vm_area_struct *vma = NULL;
+
+	dprintk(KERN_INFO
+		"SCXLNXConnFindVma addr=0x%lX size=0x%lX\n", addr, size);
+
+	if (mm) {
+		/* Check the cache first. */
+		/* (Cache hit rate is typically around 35%.) */
+		vma = mm->mmap_cache;
+		if (!(vma && vma->vm_end >= (addr+size) &&
+				vma->vm_start <= addr))	{
+			struct rb_node *rb_node;
+
+			rb_node = mm->mm_rb.rb_node;
+			vma = NULL;
+
+			while (rb_node) {
+				struct vm_area_struct *vma_tmp;
+
+				vma_tmp = rb_entry(rb_node,
+					struct vm_area_struct, vm_rb);
+
+				dprintk(KERN_INFO
+					"vma_tmp->vm_start=0x%lX"
+					"vma_tmp->vm_end=0x%lX\n",
+					vma_tmp->vm_start,
+					vma_tmp->vm_end);
+
+				if (vma_tmp->vm_end >= (addr+size)) {
+					vma = vma_tmp;
+					if (vma_tmp->vm_start <= addr)
+						break;
+
+					rb_node = rb_node->rb_left;
+				} else {
+					rb_node = rb_node->rb_right;
+				}
+			}
+
+			if (vma)
+				mm->mmap_cache = vma;
+			if (rb_node == NULL)
+				vma = NULL;
+		}
+	}
+	return vma;
+}
+
+static int SCXLNXConnValidateSharedMemoryBlockAndFlags(
+	void *pSharedMemory,
+	u32 nSharedMemorySize,
+	u32 nFlags)
+{
+	struct vm_area_struct *vma;
+	unsigned long nSharedMemory = (unsigned long) pSharedMemory;
+	u32 nChunk;
+
+	if (nSharedMemorySize == 0)
+		/* This is always valid */
+		return 0;
+
+	if ((nSharedMemory + nSharedMemorySize) < nSharedMemory)
+		/* Overflow */
+		return -EINVAL;
+
+	down_read(&current->mm->mmap_sem);
+
+	/*
+	 *  When looking for a memory address, split buffer into chunks of
+	 *  size=PAGE_SIZE.
+	 */
+	nChunk = PAGE_SIZE - (nSharedMemory & (PAGE_SIZE-1));
+	if (nChunk > nSharedMemorySize)
+		nChunk = nSharedMemorySize;
+
+	do {
+		vma = SCXLNXConnFindVma(current->mm, nSharedMemory, nChunk);
+
+		if (vma == NULL)
+			goto error;
+
+		if (nFlags & SCX_SHMEM_TYPE_READ)
+			if (!(vma->vm_flags & VM_READ))
+				goto error;
+		if (nFlags & SCX_SHMEM_TYPE_WRITE)
+			if (!(vma->vm_flags & VM_WRITE))
+				goto error;
+
+		nSharedMemorySize -= nChunk;
+		nSharedMemory += nChunk;
+		nChunk = (nSharedMemorySize <= PAGE_SIZE ?
+				nSharedMemorySize : PAGE_SIZE);
+	} while (nSharedMemorySize != 0);
+
+	up_read(&current->mm->mmap_sem);
+	return 0;
+
+error:
+	up_read(&current->mm->mmap_sem);
+	dprintk(KERN_ERR "SCXLNXConnValidateSharedMemoryBlockAndFlags: "
+		"return error\n");
+	return -EFAULT;
+}
+
+
 static int SCXLNXConnMapTempShMem(struct SCXLNX_CONNECTION *pConn,
 	 struct SCX_COMMAND_PARAM_TEMP_MEMREF *pTempMemRef,
 	 u32 nParamType,
@@ -317,6 +443,13 @@ static int SCXLNXConnMapTempShMem(struct SCXLNX_CONNECTION *pConn,
 
 		u32 nSharedMemDescriptors[SCX_MAX_COARSE_PAGES];
 		u32 nDescriptorCount;
+
+		nError = SCXLNXConnValidateSharedMemoryBlockAndFlags(
+				(void *) pTempMemRef->nDescriptor,
+				pTempMemRef->nSize,
+				nFlags);
+		if (nError != 0)
+			goto error;
 
 		nError = SCXLNXConnMapShmem(
 				pConn,
@@ -455,6 +588,7 @@ int SCXLNXConnInitSharedMemory(struct SCXLNX_CONNECTION *pConn)
 		pShmemDesc->nNumberOfCoarsePageTables = 0;
 
 		pShmemDesc->nType = SCXLNX_SHMEM_TYPE_PREALLOC_REGISTERED_SHMEM;
+		atomic_set(&pShmemDesc->nRefCnt, 1);
 
 		/*
 		 * add this preallocated descriptor to the list of free
@@ -482,94 +616,6 @@ int SCXLNXConnInitSharedMemory(struct SCXLNX_CONNECTION *pConn)
 error:
 	SCXLNXConnCleanupSharedMemory(pConn);
 	return nError;
-}
-
-
-/* This function is a copy of the find_vma() function
-in linux kernel 2.6.15 version with some fixes :
-	- memory block may end on vm_end
-	- check the full memory block is in the memory area
-	- guarantee NULL is returned if no memory area is found */
-struct vm_area_struct *SCXLNXConnFindVma(struct mm_struct *mm,
-	unsigned long addr, unsigned long size)
-{
-	struct vm_area_struct *vma = NULL;
-
-	if (mm) {
-		/* Check the cache first. */
-		/* (Cache hit rate is typically around 35%.) */
-		vma = mm->mmap_cache;
-		if (!(vma && vma->vm_end >= (addr+size) &&
-				vma->vm_start <= addr))	{
-			struct rb_node *rb_node;
-
-			rb_node = mm->mm_rb.rb_node;
-			vma = NULL;
-
-			while (rb_node) {
-				struct vm_area_struct *vma_tmp;
-
-				vma_tmp = rb_entry(rb_node,
-					struct vm_area_struct, vm_rb);
-
-				if (vma_tmp->vm_end >= (addr+size)) {
-					vma = vma_tmp;
-					if (vma_tmp->vm_start <= addr)
-						break;
-
-					rb_node = rb_node->rb_left;
-				} else {
-					rb_node = rb_node->rb_right;
-				}
-			}
-
-			if (vma)
-				mm->mmap_cache = vma;
-			if (rb_node == NULL)
-				vma = NULL;
-		}
-	}
-	return vma;
-}
-
-static int SCXLNXConnValidateSharedMemoryBlockAndFlags(
-	void *pSharedMemory,
-	u32 nSharedMemorySize,
-	u32 nFlags)
-{
-	struct vm_area_struct *vma;
-	unsigned long nSharedMemory = (unsigned long) pSharedMemory;
-
-	if (nSharedMemorySize == 0)
-		/* This is always valid */
-		return 0;
-
-	if (((u32)pSharedMemory + nSharedMemorySize) < (u32) pSharedMemory)
-		/* Overflow */
-		return -EINVAL;
-
-	down_read(&current->mm->mmap_sem);
-
-	vma = SCXLNXConnFindVma(current->mm, nSharedMemory, nSharedMemorySize);
-
-	if (vma == NULL)
-		goto error;
-
-	if (nFlags & SCX_SHMEM_TYPE_READ)
-		if (!(vma->vm_flags & VM_READ))
-			goto error;
-	if (nFlags & SCX_SHMEM_TYPE_WRITE)
-		if (!(vma->vm_flags & VM_WRITE))
-			goto error;
-
-	up_read(&current->mm->mmap_sem);
-	return 0;
-
-error:
-	up_read(&current->mm->mmap_sem);
-	dprintk(KERN_ERR "SCXLNXConnValidateSharedMemoryBlockAndFlags: "
-		"return error\n");
-	return -EFAULT;
 }
 
 /*----------------------------------------------------------------------------
@@ -605,17 +651,15 @@ int SCXLNXConnCreateDeviceContext(
 		(sAnswer.sCreateDeviceContextAnswer.nErrorCode != S_SUCCESS))
 		goto error;
 
-	if (sAnswer.sCreateDeviceContextAnswer.nErrorCode == S_SUCCESS) {
-		/*
-		 * CREATE_DEVICE_CONTEXT succeeded,
-		 * store device context handler and update connection status
-		 */
-		pConn->hDeviceContext =
-			sAnswer.sCreateDeviceContextAnswer.hDeviceContext;
-		spin_lock(&(pConn->stateLock));
-		pConn->nState = SCXLNX_CONN_STATE_VALID_DEVICE_CONTEXT;
-		spin_unlock(&(pConn->stateLock));
-	}
+	/*
+	 * CREATE_DEVICE_CONTEXT succeeded,
+	 * store device context handler and update connection status
+	 */
+	pConn->hDeviceContext =
+		sAnswer.sCreateDeviceContextAnswer.hDeviceContext;
+	spin_lock(&(pConn->stateLock));
+	pConn->nState = SCXLNX_CONN_STATE_VALID_DEVICE_CONTEXT;
+	spin_unlock(&(pConn->stateLock));
 
 	/* successful completion */
 	dprintk(KERN_INFO "SCXLNXConnCreateDeviceContext(%p):"
@@ -626,7 +670,7 @@ int SCXLNXConnCreateDeviceContext(
 
 error:
 	if (nError != 0) {
-		dprintk(KERN_ERR "SCXLNXCreateDeviceContext failed with "
+		dprintk(KERN_ERR "SCXLNXConnCreateDeviceContext failed with "
 			"error %d\n", nError);
 	} else {
 		/*
@@ -637,11 +681,17 @@ error:
 		spin_lock(&(pConn->stateLock));
 		pConn->nState = SCXLNX_CONN_STATE_NO_DEVICE_CONTEXT;
 		spin_unlock(&(pConn->stateLock));
-		dprintk(KERN_ERR "SCXLNXCreateDeviceContext failed with "
+		dprintk(KERN_ERR "SCXLNXConnCreateDeviceContext failed with "
 			"nErrorCode 0x%08X\n",
 			sAnswer.sCreateDeviceContextAnswer.nErrorCode);
+		if (sAnswer.sCreateDeviceContextAnswer.nErrorCode ==
+			S_ERROR_OUT_OF_MEMORY)
+			nError = -ENOMEM;
+		else
+			nError = -EFAULT;
 	}
-	return nError;
+
+   return nError;
 }
 
 /* Check that the current application belongs to the
@@ -1391,11 +1441,21 @@ int SCXLNXConnDestroyDeviceContext(
 	return 0;
 
 error:
-	dprintk(KERN_ERR "SCXLNXConnDestroyDeviceContext failed with error "
-		"%d and nSChannelStatus 0x%x\n", nError,
-		sAnswer.sDestroyDeviceContextAnswer.nErrorCode);
+	if (nError != 0) {
+		dprintk(KERN_ERR "SCXLNXConnDestroyDeviceContext failed with "
+			"error %d\n", nError);
+	} else {
+		dprintk(KERN_ERR "SCXLNXConnDestroyDeviceContext failed with "
+			"nErrorCode 0x%08X\n",
+			sAnswer.sDestroyDeviceContextAnswer.nErrorCode);
+		if (sAnswer.sDestroyDeviceContextAnswer.nErrorCode ==
+			S_ERROR_OUT_OF_MEMORY)
+			nError = -ENOMEM;
+		else
+			nError = -EFAULT;
+	}
 
-	return nError;
+   return nError;
 }
 
 

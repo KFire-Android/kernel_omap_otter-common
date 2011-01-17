@@ -37,7 +37,9 @@
  * Debug printing routines
  *----------------------------------------------------------------------------*/
 
-#ifdef DEBUG
+#ifdef CONFIG_TF_DRIVER_DEBUG_SUPPORT
+
+void addressCacheProperty(unsigned long va);
 
 #define dprintk  printk
 
@@ -47,14 +49,21 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage);
 
 void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer);
 
-#else /* defined(DEBUG) */
+#ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
+void setupCounters(void);
+void runBogoMIPS(void);
+int runCodeSpeed(unsigned int nLoop);
+int runDataSpeed(unsigned int nLoop, unsigned long nVA);
+#endif /* CONFIG_SMC_BENCH_SECURE_CYCLE */
+
+#else /* defined(CONFIG_TF_DRIVER_DEBUG_SUPPORT) */
 
 #define dprintk(args...)  do { ; } while (0)
 #define SCXLNXDumpL1SharedBuffer(pBuf)  ((void) 0)
 #define SCXLNXDumpMessage(pMessage)  ((void) 0)
 #define SCXLNXDumpAnswer(pAnswer)  ((void) 0)
 
-#endif /* defined(DEBUG) */
+#endif /* defined(CONFIG_TF_DRIVER_DEBUG_SUPPORT) */
 
 #define SHA1_DIGEST_SIZE	20
 
@@ -72,18 +81,12 @@ int SCXLNXConnHashApplicationPathAndData(char *pBuffer, void *pData,
  *----------------------------------------------------------------------------*/
 
 void *internal_kmalloc(size_t nSize, int nPriority);
-void *internal_kmalloc_vmap(void **pBufferRaw, size_t nSize, int nPriority);
-void *internal_vmap_uncached(void *pBufferRaw, size_t nSize);
 void internal_kfree(void *pMemory);
 void internal_vunmap(void *pMemory);
 void *internal_vmalloc(size_t nSize);
 void internal_vfree(void *pMemory);
-unsigned long internal_get_zeroed_page_vmap(void **pBufferRaw, int nPriority);
 unsigned long internal_get_zeroed_page(int nPriority);
-unsigned long internal_get_free_pages_vmap(void **pBufferRaw, int nPriority,
-	unsigned int order);
 void internal_free_page(unsigned long pPage);
-void internal_free_page_vunmap(unsigned long pPage);
 int internal_get_user_pages(
 		struct task_struct *tsk,
 		struct mm_struct *mm,

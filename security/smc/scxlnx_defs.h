@@ -162,8 +162,8 @@ struct SCXLNX_SHMEM_DESC {
 
 	/*
 	 * The identifier of the block of shared memory, as returned by the
-	 * smodule. This identifier is hBlock field of a REGISTER_SHARED_MEMORY
-	 * answer
+	 * Secure World.
+	 * This identifier is hBlock field of a REGISTER_SHARED_MEMORY answer
 	 */
 	u32 hIdentifier;
 
@@ -174,6 +174,9 @@ struct SCXLNX_SHMEM_DESC {
 	struct SCXLNX_COARSE_PAGE_TABLE *pCoarsePageTable[SCX_MAX_COARSE_PAGES];
 
 	u32 nNumberOfCoarsePageTables;
+
+	/* Reference counter */
+	atomic_t nRefCnt;
 };
 
 
@@ -243,17 +246,7 @@ struct SCXLNX_COMM {
 	int bSEInitialized;
 
 	/* Virtual address of the L0 communication buffer */
-	void *pL0SharedBuffer;
-
-	/* Temporary buffers used to load and start the PA */
-	void *pPAInfo;
-	void *pPABuffer;
-
-	/* Raw buffers */
-	struct SCHANNEL_C1S_BUFFER *pBufferRaw;
-	void *pL0SharedBufferRaw;
-	void *pPAInfoRaw;
-	void *pPABufferRaw;
+	void *pInitSharedBuffer;
 
 	/*
 	 * Lock to be held by a client when executing an RPC
@@ -507,7 +500,7 @@ struct SCXLNX_ANSWER_STRUCT {
 
 /**
  * The major and minor numbers of the registered character device driver.
- * Only 1 SModule exists, hence only 1 instance of the driver is supported.
+ * Only 1 instance of the driver is supported.
  */
 #define SCXLNX_DEVICE_MINOR_NUMBER	(0)
 

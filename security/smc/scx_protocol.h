@@ -73,10 +73,11 @@
 #define SCX_POWER_MODE_PANIC              (15)
 
 /*
- * Possible nPowerCommand values for POWER_MANAGEMENT commands
+ * Possible nCommand values for MANAGEMENT commands
  */
-#define SCPM_PREPARE_HIBERNATE          (1)
-#define SCPM_PREPARE_SHUTDOWN           (2)
+#define SCX_MANAGEMENT_HIBERNATE            (1)
+#define SCX_MANAGEMENT_SHUTDOWN             (2)
+#define SCX_MANAGEMENT_PREPARE_FOR_CORE_OFF (3)
 
 /*
  * The capacity of the Normal Word message queue, in number of slots.
@@ -327,16 +328,16 @@ union SCX_ANSWER_PARAM {
 #define SCX_MESSAGE_TYPE_CLOSE_CLIENT_SESSION    0xF2
 #define SCX_MESSAGE_TYPE_INVOKE_CLIENT_COMMAND   0xF5
 #define SCX_MESSAGE_TYPE_CANCEL_CLIENT_COMMAND   0xF4
-#define SCX_MESSAGE_TYPE_POWER_MANAGEMENT        0xFE
+#define SCX_MESSAGE_TYPE_MANAGEMENT              0xFE
 
 
 /*
  * The error codes
  */
-#define S_SUCCESS				0x00000000
-#define S_PENDING				0xFFFF2000
-#define S_ERROR_BUSY				0xFFFF000D
+#define S_SUCCESS						0x00000000
 #define S_ERROR_NO_DATA				0xFFFF000B
+#define S_ERROR_OUT_OF_MEMORY		0xFFFF000C
+
 
 struct SCX_COMMAND_HEADER {
 	u8                       nMessageSize;
@@ -570,18 +571,16 @@ struct SCX_ANSWER_CANCEL_CLIENT_OPERATION {
 };
 
 /*
- * POWER_MANAGEMENT command message.
+ * MANAGEMENT command message.
  */
-struct SCX_COMMAND_POWER_MANAGEMENT {
+struct SCX_COMMAND_MANAGEMENT {
 	u8                   nMessageSize;
 	u8                   nMessageType;
-	u16                  nMessageInfo_RFU;
+	u16                  nCommand;
 	u32                  nOperationID;
-	u32                  nPowerCommand;
-	u32                  nSharedMemDescriptors[2];
-	u8                   sReserved[24];
-	u32                  nSharedMemStartOffset;
-	u32                  nSharedMemSize;
+	u32                  nW3BSize;
+	u32                  nW3BStartOffset;
+	u32                  nSharedMemDescriptors[1];
 };
 
 /*
@@ -604,7 +603,7 @@ union SCX_COMMAND_MESSAGE {
 	struct SCX_COMMAND_INVOKE_CLIENT_COMMAND sInvokeClientCommandMessage;
 	struct SCX_COMMAND_CANCEL_CLIENT_OPERATION
 		sCancelClientOperationMessage;
-	struct SCX_COMMAND_POWER_MANAGEMENT sPowerManagementMessage;
+	struct SCX_COMMAND_MANAGEMENT sManagementMessage;
 };
 
 /*
@@ -642,7 +641,12 @@ struct SCHANNEL_C1S_BUFFER {
 	u32 nFirstAnswer;
 	u32 nFirstFreeAnswer;
 	u32 nW3BDescriptors[128];
+	#ifdef CONFIG_TF_MSHIELD
+	u8  sRPCTraceBuffer[140];
+	u8  sRPCShortcutBuffer[180];
+	#else
 	u8  sReserved3[320];
+	#endif
 	u32 sCommandQueue[SCX_N_MESSAGE_QUEUE_CAPACITY];
 	u32 sAnswerQueue[SCX_S_ANSWER_QUEUE_CAPACITY];
 };

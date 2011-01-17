@@ -22,7 +22,99 @@
 /*----------------------------------------------------------------------------
  * Debug printing routines
  *----------------------------------------------------------------------------*/
-#ifdef DEBUG
+#ifdef CONFIG_TF_DRIVER_DEBUG_SUPPORT
+
+void addressCacheProperty(unsigned long va)
+{
+	unsigned long pa;
+	unsigned long inner;
+	unsigned long outer;
+
+	asm volatile ("mcr p15, 0, %0, c7, c8, 0" : : "r" (va));
+	asm volatile ("mrc p15, 0, %0, c7, c4, 0" : "=r" (pa));
+
+	dprintk(KERN_INFO "VA:%x, PA:%x\n",
+		(unsigned int) va,
+		(unsigned int) pa);
+
+	if (pa & 1) {
+		dprintk(KERN_INFO "Prop Error\n");
+		return;
+	}
+
+	outer = (pa >> 2) & 3;
+	dprintk(KERN_INFO "\touter : %x", (unsigned int) outer);
+
+	switch (outer) {
+	case 3:
+		dprintk(KERN_INFO "Write-Back, no Write-Allocate\n");
+		break;
+	case 2:
+		dprintk(KERN_INFO "Write-Through, no Write-Allocate.\n");
+		break;
+	case 1:
+		dprintk(KERN_INFO "Write-Back, Write-Allocate.\n");
+		break;
+	case 0:
+		dprintk(KERN_INFO "Non-cacheable.\n");
+		break;
+	}
+
+	inner = (pa >> 4) & 7;
+	dprintk(KERN_INFO "\tinner : %x", (unsigned int)inner);
+
+	switch (inner) {
+	case 7:
+		dprintk(KERN_INFO "Write-Back, no Write-Allocate\n");
+		break;
+	case 6:
+		dprintk(KERN_INFO "Write-Through.\n");
+		break;
+	case 5:
+		dprintk(KERN_INFO "Write-Back, Write-Allocate.\n");
+		break;
+	case 3:
+		dprintk(KERN_INFO "Device.\n");
+		break;
+	case 1:
+		dprintk(KERN_INFO "Strongly-ordered.\n");
+		break;
+	case 0:
+		dprintk(KERN_INFO "Non-cacheable.\n");
+		break;
+	}
+
+	if (pa & 0x00000002)
+		dprintk(KERN_INFO "SuperSection.\n");
+	if (pa & 0x00000080)
+		dprintk(KERN_INFO "Memory is shareable.\n");
+	else
+		dprintk(KERN_INFO "Memory is non-shareable.\n");
+
+	if (pa & 0x00000200)
+		dprintk(KERN_INFO "Non-secure.\n");
+}
+
+#ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
+
+#define LOOP_SIZE (100000)
+
+void runBogoMIPS(void)
+{
+	uint32_t nCycles;
+	void *pAddress = &runBogoMIPS;
+
+	dprintk(KERN_INFO "BogoMIPS:\n");
+
+	setupCounters();
+	nCycles = runCodeSpeed(LOOP_SIZE);
+	dprintk(KERN_INFO "%u cycles with code access\n", nCycles);
+	nCycles = runDataSpeed(LOOP_SIZE, (unsigned long)pAddress);
+	dprintk(KERN_INFO "%u cycles to access %x\n", nCycles,
+		(unsigned int) pAddress);
+}
+
+#endif /* CONFIG_SMC_BENCH_SECURE_CYCLE */
 
 /*
  * Dump the L1 shared buffer.
@@ -335,27 +427,21 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 			pMessage->sCancelClientOperationMessage.hClientSession);
 		break;
 
-	case SCX_MESSAGE_TYPE_POWER_MANAGEMENT:
+	case SCX_MESSAGE_TYPE_MANAGEMENT:
 		dprintk(
 			KERN_INFO "   nMessageSize             = 0x%02X\n"
 			KERN_INFO "   nMessageType             = 0x%02X "
-				"SCX_MESSAGE_TYPE_POWER_MANAGEMENT\n"
+				"SCX_MESSAGE_TYPE_MANAGEMENT\n"
 			KERN_INFO "   nOperationID             = 0x%08X\n"
-			KERN_INFO "   nPowerCommand            = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[0] = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[1] = 0x%08X\n"
-			KERN_INFO "   nSharedMemStartOffset    = 0x%08X\n"
-			KERN_INFO "   nSharedMemSize           = 0x%08X\n",
+			KERN_INFO "   nCommand                 = 0x%08X\n"
+			KERN_INFO "   nW3BSize                 = 0x%08X\n"
+			KERN_INFO "   nW3BStartOffset          = 0x%08X\n",
 			pMessage->sHeader.nMessageSize,
 			pMessage->sHeader.nMessageType,
 			pMessage->sHeader.nOperationID,
-			pMessage->sPowerManagementMessage.nPowerCommand,
-			pMessage->sPowerManagementMessage.
-				nSharedMemDescriptors[0],
-			pMessage->sPowerManagementMessage.
-				nSharedMemDescriptors[1],
-			pMessage->sPowerManagementMessage.nSharedMemStartOffset,
-			pMessage->sPowerManagementMessage.nSharedMemSize);
+			pMessage->sManagementMessage.nCommand,
+			pMessage->sManagementMessage.nW3BSize,
+			pMessage->sManagementMessage.nW3BStartOffset);
 		break;
 
 	default:
@@ -514,11 +600,11 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 			pAnswer->sCancelClientOperationAnswer.nErrorCode);
 		break;
 
-	case SCX_MESSAGE_TYPE_POWER_MANAGEMENT:
+	case SCX_MESSAGE_TYPE_MANAGEMENT:
 		dprintk(
 			KERN_INFO "   nMessageSize      = 0x%02X\n"
 			KERN_INFO "   nMessageType      = 0x%02X "
-				"SCX_ANSWER_POWER_MANAGEMENT\n"
+				"SCX_MESSAGE_TYPE_MANAGEMENT\n"
 			KERN_INFO "   nOperationID      = 0x%08X\n"
 			KERN_INFO "   nErrorCode        = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
@@ -537,7 +623,7 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 	}
 }
 
-#endif  /* defined(DEBUG) */
+#endif  /* defined(TF_DRIVER_DEBUG_SUPPORT) */
 
 /*----------------------------------------------------------------------------
  * SHA-1 implementation
@@ -881,7 +967,7 @@ int SCXLNXConnHashApplicationPathAndData(char *pBuffer, void *pData,
 			}
 			pathlen = (buffer + PAGE_SIZE) - endpath;
 
-#ifndef NDEBUG
+#ifdef CONFIG_TF_DRIVER_DEBUG_SUPPORT
 			{
 				char *pChar;
 				dprintk(KERN_DEBUG "current process path = ");
@@ -893,7 +979,7 @@ int SCXLNXConnHashApplicationPathAndData(char *pBuffer, void *pData,
 				dprintk(", uid=%d, euid=%d\n", current_uid(),
 					current_euid());
 			}
-#endif				/*defined(NDEBUG) */
+#endif				/*defined(CONFIG_TF_DRIVER_DEBUG_SUPPORT) */
 
 			sha1_init(&sha1Context);
 			sha1_update(&sha1Context, endpath, pathlen);
@@ -931,108 +1017,6 @@ void *internal_kmalloc(size_t nSize, int nPriority)
 		atomic_inc(
 			&pDevice->sDeviceStats.stat_memories_allocated);
 
-	return pResult;
-}
-
-void *internal_kmalloc_vmap(void **pBufferRaw, size_t nSize, int nPriority)
-{
-	void *pResult;
-	struct page **page_map;
-	pgprot_t prot;
-	int nbPages, i;
-	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
-
-	dprintk(KERN_INFO "internal_kmalloc_vmap priority=%x size=%x\n",
-		nPriority, nSize);
-	*pBufferRaw = kmalloc(nSize, nPriority);
-
-	if (*pBufferRaw == NULL) {
-		dprintk(KERN_ERR "Cannot allocate %d bytes in \
-			internal_get_zeroed_page_vmap\n",
-			nSize);
-		return NULL;
-	}
-	atomic_inc(&pDevice->sDeviceStats.
-			stat_memories_allocated);
-
-	nbPages = 1 + (((unsigned int)(*pBufferRaw) & 0xFFF) + nSize) / 0x1000;
-
-	dprintk(KERN_INFO "internal_kmalloc_vmap: size %d, pages %d\n", nSize,
-		nbPages);
-	page_map = vmalloc(nbPages * sizeof(struct page *));
-	for (i = 0; i < nbPages; i++) {
-		unsigned int temp;
-		/*point to each page on which we map */
-		temp = ((unsigned int)(*pBufferRaw)) + i * 0x1000;
-		page_map[i] =
-			pfn_to_page(virt_to_phys((void *)temp) >> PAGE_SHIFT);
-	}
-	/*
-	 * pgprot_kernel is a global variable of pgprot_t type.
-	 * It should be declared in pgtable.h
-	 */
-	prot = pgprot_kernel;
-
-	prot &= CLEAN_CACHE_CFG_MASK;
-	prot |= L_PTE_MT_WRITEBACK | L_PTE_SHARED;
-
-	pResult = vmap(page_map, nbPages, VM_READ | VM_WRITE, prot);
-
-	pResult =
-		(void *)(((unsigned int)pResult & 0xFFFFF000) |
-			(((unsigned int)(*pBufferRaw)) & 0xFFF));
-
-	/*Note: pBufferRaw needs to be freed together with pResult !! */
-	vfree(page_map);
-	if (pResult == NULL) {
-		kfree(pBufferRaw);
-		atomic_dec(&pDevice->sDeviceStats.
-				stat_memories_allocated);
-		*pBufferRaw = NULL;
-	}
-	return pResult;
-}
-
-void *internal_vmap_uncached(void *pBufferRaw, size_t nSize)
-{
-	void *pResult;
-	struct page **page_map;
-	pgprot_t prot;
-	int nbPages, i;
-
-	dprintk(KERN_INFO "internal_vmap_uncached pBufferRaw=%p size=%x\n",
-	   pBufferRaw, nSize);
-
-	nbPages = 1 + (((unsigned int)(pBufferRaw) & 0xFFF) + nSize) / 0x1000;
-
-	dprintk(KERN_INFO "internal_vmap_uncached: size %d, pages %d\n", nSize,
-		nbPages);
-	page_map = vmalloc(nbPages * sizeof(struct page *));
-	for (i = 0; i < nbPages; i++) {
-		unsigned int temp;
-		/*point to each page on which we map */
-		temp = ((unsigned int)(pBufferRaw)) + i * 0x1000;
-		page_map[i] =
-			pfn_to_page(virt_to_phys((void *)temp) >> PAGE_SHIFT);
-	}
-	/*
-	 * pgprot_kernel is a global variable of pgprot_t type.
-	 * It should be declared in pgtable.h
-	 */
-	prot = pgprot_noncached(pgprot_kernel);
-
-	pResult = vmap(page_map, nbPages, VM_READ | VM_WRITE, prot);
-
-	if (pResult != NULL) {
-		struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
-		atomic_inc(&pDevice->sDeviceStats.
-			stat_memories_allocated);
-		pResult =
-		(void *)(((unsigned int)pResult & 0xFFFFF000) |
-			(((unsigned int)(pBufferRaw)) & 0xFFF));
-	}
-
-	vfree(page_map);
 	return pResult;
 }
 
@@ -1081,47 +1065,6 @@ void internal_vfree(void *pMemory)
 	return vfree(pMemory);
 }
 
-unsigned long internal_get_zeroed_page_vmap(void **pBufferRaw, int nPriority)
-{
-	void *ptr;
-	struct page **page_map;
-	pgprot_t prot;
-	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
-
-	*pBufferRaw = (void *) get_zeroed_page(nPriority);
-
-	if ((unsigned long) *pBufferRaw == 0) {
-		dprintk(KERN_ERR "Cannot allocate %lu bytes in \
-			internal_get_zeroed_page_vmap\n",
-			1 * PAGE_SIZE);
-		return 0;
-	}
-	atomic_inc(&pDevice->sDeviceStats.stat_pages_allocated);
-
-	page_map = vmalloc(1 * sizeof(struct page *));
-	page_map[0] = pfn_to_page(virt_to_phys(*pBufferRaw) >> PAGE_SHIFT);
-
-	/*
-	 * pgprot_kernel is a global variable of pgprot_t type.
-	 * It should be declared in pgtable.h
-	 */
-	prot = pgprot_kernel;
-
-	prot &= CLEAN_CACHE_CFG_MASK;
-	prot |= L_PTE_MT_WRITEBACK | L_PTE_SHARED;
-
-	ptr = vmap(page_map, 1, VM_READ | VM_WRITE, prot);
-
-	vfree(page_map);
-	if (ptr == NULL) {
-		free_page((unsigned long)*pBufferRaw);
-		atomic_dec(&pDevice->sDeviceStats.
-				stat_pages_allocated);
-		*pBufferRaw = NULL;
-	}
-	return (unsigned long) ptr;
-}
-
 unsigned long internal_get_zeroed_page(int nPriority)
 {
 	unsigned long nResult;
@@ -1136,63 +1079,6 @@ unsigned long internal_get_zeroed_page(int nPriority)
 	return nResult;
 }
 
-unsigned long internal_get_free_pages_vmap(void **pBufferRaw, int nPriority,
-	unsigned int order)
-{
-	void *ptr;
-	struct page **page_map;
-	int i, nbPages;
-	pgprot_t prot;
-	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
-
-	dprintk(KERN_INFO
-		"internal_get_free_pages_vmap priority=%x order=%x\n",
-		nPriority, order);
-	*pBufferRaw = (void *)__get_free_pages(nPriority, order);
-
-	if (*pBufferRaw == 0) {
-		dprintk(KERN_ERR "Cannot allocate %lu bytes in \
-			internal_get_free_pages_vmap\n",
-			PAGE_SIZE * (2 << order));
-		return 0;
-	}
-	atomic_add((0x1 << order),
-		&pDevice->sDeviceStats.stat_pages_allocated);
-
-	nbPages = 2 << order;
-	page_map = vmalloc(nbPages * sizeof(struct page *));
-
-	for (i = 0; i < nbPages; i++) {
-		unsigned int temp;
-		/*point to each page on which we map */
-		temp = ((unsigned int)(*pBufferRaw)) + i * 0x1000;
-		page_map[i] =
-			 pfn_to_page(virt_to_phys((void *)temp) >> PAGE_SHIFT);
-	}
-
-	/*
-	 * pgprot_kernel is a global variable of pgprot_t type.
-	 * It should be declared in pgtable.h
-	 */
-	prot = pgprot_kernel;
-
-	prot &= CLEAN_CACHE_CFG_MASK;
-	prot |= L_PTE_MT_WRITEBACK | L_PTE_SHARED;
-
-	ptr = vmap(page_map, nbPages, VM_READ | VM_WRITE, prot);
-
-	vfree(page_map);
-	if (ptr == NULL) {
-		free_page((unsigned long)*pBufferRaw);
-		atomic_sub((0x1 << order),
-				&pDevice->sDeviceStats.
-				stat_pages_allocated);
-		*pBufferRaw = NULL;
-	}
-	return (unsigned long)ptr;
-}
-
-
 void internal_free_page(unsigned long pPage)
 {
 	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
@@ -1201,16 +1087,6 @@ void internal_free_page(unsigned long pPage)
 		atomic_dec(
 			&pDevice->sDeviceStats.stat_pages_allocated);
 	return free_page(pPage);
-}
-
-void internal_free_page_vunmap(unsigned long pPage)
-{
-	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
-
-	if (pPage != 0)
-		atomic_dec(&pDevice->sDeviceStats.
-				stat_pages_allocated);
-	return vunmap((void *) pPage);
 }
 
 int internal_get_user_pages(
