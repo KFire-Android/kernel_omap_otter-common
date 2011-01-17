@@ -188,7 +188,9 @@ void __iomem *l2cache_base;
 void __iomem *gic_cpu_base_addr;
 void __iomem *gic_dist_base_addr;
 
+#ifndef CONFIG_TF_MSHIELD
 static struct clockdomain *l4_secure_clkdm;
+#endif
 
 void __init gic_init_irq(void)
 {
@@ -238,6 +240,7 @@ early_initcall(omap_l2_cache_init);
 #endif
 
 
+#ifndef CONFIG_TF_MSHIELD
 /*
  * omap4_sec_dispatcher: Routine to dispatch low power secure
  * service routines
@@ -282,6 +285,7 @@ u32 omap4_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
 
 	return ret;
 }
+#endif
 
 #ifdef CONFIG_ENABLE_L3_ERRORS
 static void omap_fw_error_handler(u32 ctrl_sec_err_status,
