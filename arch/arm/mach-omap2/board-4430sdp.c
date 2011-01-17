@@ -809,9 +809,6 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_cd	= -EINVAL,
 		.gpio_wp        = 4,
 		.ocr_mask	= MMC_VDD_165_195,
-#ifdef CONFIG_PM_RUNTIME
-		.power_saving	= true,
-#endif
 	},
 	{}	/* Terminator */
 };
