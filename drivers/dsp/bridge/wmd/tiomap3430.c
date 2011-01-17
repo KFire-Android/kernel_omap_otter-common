@@ -218,6 +218,10 @@ static struct bridge_drv_interface drv_interface_fxns = {
 	bridge_msg_set_queue_id,
 };
 
+static struct notifier_block dsp_mbox_notifier = {
+	.notifier_call = io_mbox_msg,
+};
+
 static inline void tlb_flush_all(const void __iomem *base)
 {
 	__raw_writeb(__raw_readb(base + MMU_GFLUSH) | 1, base + MMU_GFLUSH);
@@ -619,7 +623,7 @@ static int bridge_brd_start(struct wmd_dev_context *hDevContext,
 		 *Enable Mailbox events and also drain any pending
 		 * stale messages.
 		 */
-		hDevContext->mbox = omap_mbox_get("dsp", NULL);
+		dev_context->mbox = omap_mbox_get("dsp", &dsp_mbox_notifier);
 		if (IS_ERR(hDevContext->mbox)) {
 			hDevContext->mbox = NULL;
 			pr_err("%s: Failed to get dsp mailbox handle\n",
@@ -630,9 +634,6 @@ static int bridge_brd_start(struct wmd_dev_context *hDevContext,
 	}
 
 	if (DSP_SUCCEEDED(status)) {
-
-		hDevContext->mbox->rxq->callback = (int (*)(void *))io_mbox_msg;
-
 /*PM_IVA2GRPSEL_PER = 0xC0; */
 		temp = (u32) *((reg_uword32 *)
 				((u32) (resources->dw_per_pm_base) + 0xA8));
@@ -768,7 +769,7 @@ static int bridge_brd_stop(struct wmd_dev_context *hDevContext)
 	/* Disable the mail box interrupts */
 	if (hDevContext->mbox) {
 		omap_mbox_disable_irq(hDevContext->mbox, IRQ_RX);
-		omap_mbox_put(hDevContext->mbox, NULL);
+		omap_mbox_put(dev_context->mbox, &dsp_mbox_notifier);
 		hDevContext->mbox = NULL;
 	}
 	/* Reset IVA2 clocks*/
