@@ -52,13 +52,13 @@ struct services_clk_t {
  * enumerations needs to be fixed in the array as well */
 static struct services_clk_t services_clks[] = {
 	{NULL, "iva2_ck", NULL},
-	{NULL, "gpt5_fck", NULL},
+	{NULL, "fck", "omap_timer.5"},
 	{NULL, "gpt5_ick", NULL},
-	{NULL, "gpt6_fck", NULL},
+	{NULL, "fck", "omap_timer.6"},
 	{NULL, "gpt6_ick", NULL},
-	{NULL, "gpt7_fck", NULL},
+	{NULL, "fck", "omap_timer.7"},
 	{NULL, "gpt7_ick", NULL},
-	{NULL, "gpt8_fck", NULL},
+	{NULL, "fck", "omap_timer.8"},
 	{NULL, "gpt8_ick", NULL},
 	{NULL, "wdt3_fck", NULL},
 	{NULL, "wdt3_ick", NULL},
