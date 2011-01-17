@@ -632,8 +632,6 @@ static int bridge_brd_start(struct wmd_dev_context *hDevContext,
 	if (DSP_SUCCEEDED(status)) {
 
 		hDevContext->mbox->rxq->callback = (int (*)(void *))io_mbox_msg;
-		hDevContext->mbox->txq->callback =
-					(int (*)(void *))send_mbox_callback;
 
 /*PM_IVA2GRPSEL_PER = 0xC0; */
 		temp = (u32) *((reg_uword32 *)
