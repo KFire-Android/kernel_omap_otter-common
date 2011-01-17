@@ -54,7 +54,6 @@
  * disabled via sysfs. This also causes that any deeper omap sleep states are
  * blocked. 
  */
-#define DEFAULT_TIMEOUT 5
 
 #define MAX_UART_HWMOD_NAME_LEN		16
 
@@ -565,7 +564,7 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 	int ret;
 
 	uart->can_sleep = 0;
-	uart->timeout = DEFAULT_TIMEOUT;
+	uart->timeout = msecs_to_jiffies(DEFAULT_IDLE_TIMEOUT);
 	setup_timer(&uart->timer, omap_uart_idle_timer,
 		    (unsigned long) uart);
 	if (uart->timeout)
@@ -669,7 +668,7 @@ static ssize_t sleep_timeout_show(struct device *dev,
 	struct omap_device *odev = to_omap_device(pdev);
 	struct omap_uart_state *uart = odev->hwmods[0]->dev_attr;
 
-	return sprintf(buf, "%u\n", uart->timeout / HZ);
+	return sprintf(buf, "%u\n", jiffies_to_msecs(uart->timeout));
 }
 
 static ssize_t sleep_timeout_store(struct device *dev,
@@ -686,7 +685,7 @@ static ssize_t sleep_timeout_store(struct device *dev,
 		return -EINVAL;
 	}
 
-	uart->timeout = value * HZ;
+	uart->timeout = msecs_to_jiffies(value);
 	if (uart->timeout)
 		mod_timer(&uart->timer, jiffies + uart->timeout);
 	else
@@ -880,7 +879,7 @@ void __init omap_serial_init_port(int port,
 	omap_up.membase = uart->membase;
 	omap_up.irqflags = IRQF_SHARED;
 	omap_up.flags = UPF_BOOT_AUTOCONF | UPF_SHARE_IRQ;
-	omap_up.idle_timeout = (platform_data->idle_timeout * HZ);
+	omap_up.idle_timeout = platform_data->idle_timeout;
 
 	pdata = &omap_up;
 	pdata_size = sizeof(struct omap_uart_port_info);
@@ -917,7 +916,7 @@ void __init omap_serial_init_port(int port,
 	 */
 	uart->timeout = (30 * HZ);
 	omap_uart_block_sleep(uart);
-	uart->timeout = (platform_data->idle_timeout * HZ);
+	uart->timeout = msecs_to_jiffies(platform_data->idle_timeout);
 
 	if (((cpu_is_omap34xx() || cpu_is_omap44xx())
 		 && uart->padconf) ||
