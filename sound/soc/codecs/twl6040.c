@@ -80,6 +80,9 @@ struct twl6040_data {
 	struct snd_pcm_hw_constraint_list *sysclk_constraints;
 	struct completion ready;
 	struct snd_soc_codec *codec;
+	struct workqueue_struct *workqueue;
+	struct delayed_work delayed_work;
+	struct mutex mutex;
 };
 
 /*
@@ -422,13 +425,55 @@ static int twl6040_power_mode_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+static void twl6040_hs_jack_report(struct snd_soc_codec *codec,
+				struct snd_soc_jack *jack, int report)
+{
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+	int status, state;
+
+	mutex_lock(&priv->mutex);
+
+	/* Sync status */
+	status = twl6040_read_reg_volatile(codec, TWL6040_REG_STATUS);
+	if (status & TWL6040_PLUGCOMP)
+		state = report;
+	else
+		state = 0;
+
+	mutex_unlock(&priv->mutex);
+
+	snd_soc_jack_report(jack, state, report);
+	switch_set_state(&priv->hs_jack.sdev, !!state);
+}
+
+void twl6040_hs_jack_detect(struct snd_soc_codec *codec,
+				struct snd_soc_jack *jack, int report)
+{
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+	struct twl6040_jack_data *hs_jack = &priv->hs_jack;
+
+	hs_jack->jack = jack;
+	hs_jack->report = report;
+
+	twl6040_hs_jack_report(codec, hs_jack->jack, hs_jack->report);
+}
+EXPORT_SYMBOL_GPL(twl6040_hs_jack_detect);
+
+static void twl6040_accessory_work(struct work_struct *work)
+{
+	struct twl6040_data *priv = container_of(work,
+					struct twl6040_data, delayed_work.work);
+	struct snd_soc_codec *codec = priv->codec;
+	struct twl6040_jack_data *hs_jack = &priv->hs_jack;
+
+	twl6040_hs_jack_report(codec, hs_jack->jack, hs_jack->report);
+}
+
 /* audio interrupt handler */
 static irqreturn_t twl6040_naudint_handler(int irq, void *data)
 {
 	struct snd_soc_codec *codec = data;
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
-	struct twl6040_jack_data *jack = &priv->hs_jack;
-	int report = 0;
 	u8 intid = 0;
 
 	twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &intid, TWL6040_REG_INTID);
@@ -436,30 +481,9 @@ static irqreturn_t twl6040_naudint_handler(int irq, void *data)
 	if (intid & TWL6040_THINT)
 		dev_alert(codec->dev, "die temp over-limit detection\n");
 
-	if (intid & TWL6040_PLUGINT) {
-		/* Debounce */
-		msleep(200);
-		report = jack->report;
-
-		/*
-		 * Early interrupt, CODEC driver cannot report jack status
-		 * since jack is not registered yet. MACHINE driver will
-		 * register jack and report status thru twl6040_hs_jack_detect
-		 */
-		if (jack->jack)
-			snd_soc_jack_report(jack->jack, report, jack->report);
-
-		switch_set_state(&jack->sdev, !!report);
-	}
-
-	if (intid & TWL6040_UNPLUGINT) {
-		/* Debounce */
-		msleep(200);
-		if (jack->jack)
-			snd_soc_jack_report(jack->jack, report, jack->report);
-
-		switch_set_state(&jack->sdev, !!report);
-	}
+	if ((intid & TWL6040_PLUGINT) || (intid & TWL6040_UNPLUGINT))
+		queue_delayed_work(priv->workqueue, &priv->delayed_work,
+				   msecs_to_jiffies(200));
 
 	if (intid & TWL6040_HFINT)
 		dev_alert(codec->dev, "hf drivers over current detection\n");
@@ -1158,27 +1182,6 @@ static int twl6040_resume(struct snd_soc_codec *codec)
 #define twl6040_resume NULL
 #endif
 
-void twl6040_hs_jack_detect(struct snd_soc_codec *codec,
-			    struct snd_soc_jack *jack, int report)
-{
-	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
-	int status, state;
-
-	priv->hs_jack.jack = jack;
-	priv->hs_jack.report = report;
-
-	/* Sync status */
-	status = twl6040_read_reg_volatile(codec, TWL6040_REG_STATUS);
-	if(status & TWL6040_PLUGCOMP)
-		state = report;
-	else
-		state = 0;
-
-	snd_soc_jack_report(jack, state, report);
-	switch_set_state(&priv->hs_jack.sdev, !!state);
-}
-EXPORT_SYMBOL_GPL(twl6040_hs_jack_detect);
-
 static int twl6040_probe(struct snd_soc_codec *codec)
 {
 	struct twl4030_codec_audio_data *twl_codec = codec->dev->platform_data;
@@ -1209,6 +1212,13 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 
 	priv->audpwron = audpwron;
 	priv->naudint = naudint;
+	priv->workqueue = create_singlethread_workqueue("twl6040-codec");
+	if (!priv->workqueue)
+		goto work_err;
+
+	INIT_DELAYED_WORK(&priv->delayed_work, twl6040_accessory_work);
+
+	mutex_init(&priv->mutex);
 
 	init_completion(&priv->ready);
 
@@ -1275,6 +1285,8 @@ gpio2_err:
 gpio1_err:
 	switch_dev_unregister(&jack->sdev);
 switch_err:
+	destroy_workqueue(priv->workqueue);
+work_err:
 	kfree(priv);
 	return ret;
 }
@@ -1295,6 +1307,7 @@ static int twl6040_remove(struct snd_soc_codec *codec)
 		free_irq(naudint, codec);
 
 	switch_dev_unregister(&jack->sdev);
+	destroy_workqueue(priv->workqueue);
 	kfree(priv);
 
 	return 0;
