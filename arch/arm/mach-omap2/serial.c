@@ -99,6 +99,10 @@ struct omap_uart_state {
 	u16 scr;
 	u16 wer;
 	u16 mcr;
+	u16 mdr3;
+	u16 dma_thresh;
+
+
 #endif
 };
 
@@ -235,11 +239,20 @@ static void omap_uart_save_context(struct omap_uart_state *uart)
 	uart->scr = serial_read_reg(uart, UART_OMAP_SCR);
 	uart->wer = serial_read_reg(uart, UART_OMAP_WER);
 	lcr = serial_read_reg(uart, UART_LCR);
+
 	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDA);
 	uart->mcr = serial_read_reg(uart, UART_MCR);
 	serial_write_reg(uart, UART_LCR, lcr);
 
-
+	/* HACK to reset UART module if DMA is enabled
+	 * For some reason if DMA is enabled the module is
+	 * stuck in transition state.
+	 */
+	if (uart->dma_enabled && cpu_is_omap44xx()) {
+		uart->mdr3 = serial_read_reg(uart, UART_MDR3);
+		uart->dma_thresh = serial_read_reg(uart, UART_TX_DMA_THRESHOLD);
+		serial_write_reg(uart, UART_OMAP_SYSC, 0x2);
+	}
 	uart->context_valid = 1;
 }
 
@@ -285,6 +298,12 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 	serial_write_reg(uart, UART_OMAP_SCR, uart->scr);
 	serial_write_reg(uart, UART_OMAP_WER, uart->wer);
 	serial_write_reg(uart, UART_OMAP_SYSC, uart->sysc);
+
+	if (uart->dma_enabled && cpu_is_omap44xx()) {
+		serial_write_reg(uart, UART_TX_DMA_THRESHOLD, uart->dma_thresh);
+		serial_write_reg(uart, UART_MDR3, uart->mdr3);
+	}
+
 	serial_write_reg(uart, UART_OMAP_MDR1, 0x00); /* UART 16x mode */
 }
 #else
