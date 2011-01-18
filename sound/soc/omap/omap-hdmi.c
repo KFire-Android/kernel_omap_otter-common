@@ -83,6 +83,13 @@ static void hdmi_pwrchange_notifier(int state, void *data)
 	struct snd_pcm_substream *substream = hdmi_data->substream;
 
 	switch (state) {
+	case HDMI_EVENT_POWEROFF:
+		if (substream)
+			snd_pcm_stop(substream, SNDRV_PCM_STATE_DISCONNECTED);
+		hdmi_data->active = 0;
+		break;
+	case HDMI_EVENT_POWERON:
+		break;
 	case HDMI_EVENT_POWERPHYON:
 		if (substream) {
 			hdmi_w1_wrapper_enable(HDMI_WP);
