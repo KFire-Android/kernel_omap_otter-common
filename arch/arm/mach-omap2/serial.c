@@ -202,17 +202,18 @@ static inline void omap_uart_enable_rtspullup(struct omap_uart_state *uart)
 		return;
 
 	uart->rts_padvalue = omap_readl(uart->rts_padconf);
-	omap_writel(0x118 | 0x7, uart->rts_padconf);
+	omap_writel(((0x011FFFFF) & uart->rts_padvalue), uart->rts_padconf);
 	uart->rts_override = 1;
 }
 
 static void omap_uart_rtspad_init(struct omap_uart_state *uart)
 {
-	if (!cpu_is_omap34xx())
+	if (!cpu_is_omap44xx())
 		return;
 	switch (uart->num) {
 	case UART2:
-		uart->rts_padconf = 0x4A10011A;
+		uart->rts_override = 0;
+		uart->rts_padconf = 0x4A100118;
 		break;
 	default:
 		uart->rts_padconf = 0;
