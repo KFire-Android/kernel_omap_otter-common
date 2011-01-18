@@ -1381,7 +1381,11 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 
 		if (ovl->info.yuv2rgb_conv.dirty) {
 			oc->yuv2rgb_conv = &ovl->info.yuv2rgb_conv;
-			ovl->info.yuv2rgb_conv.dirty = false;
+			/* DSS OFF may be losing the color conv register
+			content So configure color conv when ever overlay is
+			set up*/
+			if (!cpu_is_omap44xx())
+				ovl->info.yuv2rgb_conv.dirty = false;
 		} else
 			oc->yuv2rgb_conv = NULL;
 
