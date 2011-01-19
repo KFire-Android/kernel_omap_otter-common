@@ -81,6 +81,8 @@
 #define LED_PWM2OFF		0x04
 #define LED_TOGGLE3		0x92
 
+#define TWL6030_RTC_GPIO 6
+
 static struct platform_device sdp4430_hdmi_audio_device = {
 	.name		= "hdmi-dai",
 	.id		= -1,
@@ -1483,6 +1485,18 @@ static void omap_4430hsi_pad_conf(void)
 		OMAP_PIN_OFF_NONE);
 }
 
+static void enable_rtc_gpio(void){
+	/* To access twl registers we enable gpio6
+	 * we need this so the RTC driver can work.
+	 */
+	gpio_request(TWL6030_RTC_GPIO, "h_SYS_DRM_MSEC");
+	gpio_direction_output(TWL6030_RTC_GPIO, 1);
+
+	omap_mux_init_signal("fref_clk0_out.gpio_wk6", \
+		OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+	return;
+}
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1494,6 +1508,8 @@ static void __init omap_4430sdp_init(void)
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
 	omap_init_emif_timings();
+
+	enable_rtc_gpio();
 	omap4_i2c_init();
 	omap4_display_init();
 	omap_disp_led_init();
