@@ -687,7 +687,7 @@ static void playback_abe_work(struct work_struct *work)
 		udelay(250);
 		omap_mcpdm_stop(mcpdm, SNDRV_PCM_STREAM_PLAYBACK);
 		omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
-		abe_dsp_shutdown();
+		abe_dsp_mcpdm_shutdown();
 	}
 	abe_dsp_pm_put();
 	mutex_unlock(&mcpdm->mutex);

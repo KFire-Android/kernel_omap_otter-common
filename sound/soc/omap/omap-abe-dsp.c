@@ -303,6 +303,17 @@ void abe_dsp_shutdown(void)
 	}
 }
 
+void abe_dsp_mcpdm_shutdown(void)
+{
+	mutex_lock(&abe->mutex);
+
+	abe_dsp_shutdown();
+
+	mutex_unlock(&abe->mutex);
+
+	return;
+}
+
 /*
  * These TLV settings will need fine tuned for each individual control
  */
