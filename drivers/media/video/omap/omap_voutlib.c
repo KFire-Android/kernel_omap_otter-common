@@ -191,6 +191,9 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 	if (try_crop.width <= 0 || try_crop.height <= 0)
 		return -EINVAL;
 
+	if (win->w.width <= 0 || win->w.height <= 0)
+		return -EINVAL;
+
 	if (cpu_is_omap24xx()) {
 		if (crop->height != win->w.height) {
 			/* If we're resizing vertically, we can't support a
