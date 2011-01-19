@@ -203,7 +203,7 @@ static void __init omap_zoom_init(void)
 #endif
 }
 
-MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
+MACHINE_START(OMAP_ZOOM3, "OMAP3630 Zoom3 board")
 	.phys_io	= ZOOM_UART_BASE,
 	.io_pg_offst	= (ZOOM_UART_VIRT >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
