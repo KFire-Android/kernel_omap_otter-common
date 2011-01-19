@@ -1562,20 +1562,19 @@ static struct omap_hwmod omap44xx_emif2_hwmod = {
  * face detection hw accelerator module
  */
 
-/* static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
- *	.rev_offs	= 0x0000,
- *	.sysc_offs	= 0x0010,
- *	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
- *			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
- *	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
- *			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
- *	.sysc_fields	= &omap_hwmod_sysc_type2,
- *};
- */
+static struct omap_hwmod_class_sysconfig omap44xx_fdif_sysc = {
+	.rev_offs	= 0x0000,
+	.sysc_offs	= 0x0010,
+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
+	.sysc_fields	= &omap_hwmod_sysc_type2,
+};
 
 static struct omap_hwmod_class omap44xx_fdif_hwmod_class = {
 	.name = "fdif",
-	/* .sysc = &omap44xx_fdif_sysc, */
+	.sysc = &omap44xx_fdif_sysc,
 };
 
 /* fdif */
@@ -2613,20 +2612,19 @@ static struct omap_hwmod omap44xx_ipu_hwmod = {
  * external images sensor pixel data processor
  */
 
-/* static struct omap_hwmod_class_sysconfig omap44xx_iss_sysc = {
- *	.rev_offs	= 0x0000,
- *	.sysc_offs	= 0x0010,
- *	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
- *			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
- *	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
- *			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
- *	.sysc_fields	= &omap_hwmod_sysc_type2,
- *};
- */
+static struct omap_hwmod_class_sysconfig omap44xx_iss_sysc = {
+	.rev_offs	= 0x0000,
+	.sysc_offs	= 0x0010,
+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_RESET_STATUS |
+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
+	.sysc_fields	= &omap_hwmod_sysc_type2,
+};
 
 static struct omap_hwmod_class omap44xx_iss_hwmod_class = {
 	.name = "iss",
-	/* .sysc = &omap44xx_iss_sysc, */
+	.sysc = &omap44xx_iss_sysc,
 };
 
 /* iss */
@@ -2676,6 +2674,7 @@ static struct omap_hwmod_opt_clk iss_opt_clks[] = {
 static struct omap_hwmod omap44xx_iss_hwmod = {
 	.name		= "iss",
 	.class		= &omap44xx_iss_hwmod_class,
+	.flags		= HWMOD_INIT_NO_RESET,
 	.mpu_irqs	= omap44xx_iss_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_iss_irqs),
 	.sdma_reqs	= omap44xx_iss_sdma_reqs,
