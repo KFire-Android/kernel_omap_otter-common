@@ -54,21 +54,18 @@ static void vib_set(int on)
 		 *	 ensure syncronization between audio and vibra
 		 *	 components.
 		 */
-		lppllctl = TWL6040_LPLLENA;
+		hppllctl = TWL6040_MCLK_38400KHZ | TWL6040_HPLLSQRENA |
+			   TWL6040_HPLLBP | TWL6040_HPLLENA;
+		hppllctl &= ~TWL6040_HPLLSQRBP & ~TWL6040_HPLLRST;
 		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				 lppllctl, TWL6040_REG_LPPLLCTL);
-		mdelay(5);
-		lppllctl &= ~TWL6040_HPLLSEL;
+				hppllctl, TWL6040_REG_HPPLLCTL);
+		lppllctl = TWL6040_HPLLSEL | TWL6040_LPLLENA;
 		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				 lppllctl, TWL6040_REG_LPPLLCTL);
-		twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-				&hppllctl, TWL6040_REG_HPPLLCTL);
-		hppllctl &= ~TWL6040_HPLLENA;
+				lppllctl, TWL6040_REG_LPPLLCTL);
+		udelay(100);
+		lppllctl &= ~TWL6040_LPLLENA;
 		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				 hppllctl, TWL6040_REG_HPPLLCTL);
-		lppllctl &= ~TWL6040_LPLLFIN;
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				 lppllctl, TWL6040_REG_LPPLLCTL);
+				lppllctl, TWL6040_REG_LPPLLCTL);
 
 		twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
 				&reg, TWL6040_REG_VIBCTLL);
