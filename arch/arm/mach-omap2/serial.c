@@ -868,6 +868,7 @@ void __init omap_serial_init_port(int port,
 	omap_up.use_dma = platform_data->use_dma;
 	omap_up.dma_rx_buf_size = platform_data->dma_rx_buf_size;
 	omap_up.dma_rx_poll_rate = platform_data->dma_rx_poll_rate;
+	omap_up.dma_rx_timeout = platform_data->dma_rx_timeout;
 
 	if (omap_up.use_dma) {
 		if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))

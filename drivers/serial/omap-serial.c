@@ -1120,7 +1120,7 @@ static void serial_omap_rxdma_poll(unsigned long uart_no)
 	if ((curr_dma_pos == up->uart_dma.prev_rx_dma_pos) ||
 			     (curr_dma_pos == 0)) {
 		if (jiffies_to_msecs(jiffies - up->port_activity) <
-							RX_TIMEOUT) {
+						up->uart_dma.rx_timeout) {
 			mod_timer(&up->uart_dma.rx_timer, jiffies +
 				usecs_to_jiffies(up->uart_dma.rx_poll_rate));
 		} else {
