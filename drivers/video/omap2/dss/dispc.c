@@ -3272,7 +3272,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 				   scale_x, scale_y);
 		_dispc_set_vid_size(plane, out_width, out_height);
 
-		if (yuv2rgb_conv) {
+		if (yuv2rgb_conv->dirty) {
 			struct omap_dss_color_conv cc;
 			int i;
 
@@ -3288,6 +3288,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 				multiply_color_conv_matrix(&cc.coef,
 					yuv2rgb_conv->weight_coef);
 			_dispc_set_vid_color_conv_coef(plane, &cc);
+			yuv2rgb_conv->dirty = false;
 		}
 
 		_dispc_enable_vid_color_conv(plane, cconv);

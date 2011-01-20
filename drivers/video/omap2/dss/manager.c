@@ -1379,15 +1379,8 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		oc->pic_height = ovl->info.pic_height;
 		oc->color_mode = ovl->info.color_mode;
 
-		if (ovl->info.yuv2rgb_conv.dirty) {
+		if (ovl->info.yuv2rgb_conv.dirty)
 			oc->yuv2rgb_conv = &ovl->info.yuv2rgb_conv;
-			/* DSS OFF may be losing the color conv register
-			content So configure color conv when ever overlay is
-			set up*/
-			if (!cpu_is_omap44xx())
-				ovl->info.yuv2rgb_conv.dirty = false;
-		} else
-			oc->yuv2rgb_conv = NULL;
 
 		oc->rotation = ovl->info.rotation;
 		oc->rotation_type = ovl->info.rotation_type;
@@ -1622,11 +1615,8 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr, struct omap_writeback *w
 		oc->min_y_decim = ovl->info.min_y_decim;
 		oc->max_y_decim = ovl->info.max_y_decim;
 
-		if (ovl->info.yuv2rgb_conv.dirty) {
+		if (ovl->info.yuv2rgb_conv.dirty)
 			oc->yuv2rgb_conv = &ovl->info.yuv2rgb_conv;
-			ovl->info.yuv2rgb_conv.dirty = false;
-		} else
-			oc->yuv2rgb_conv = NULL;
 
 		oc->replication =
 			dss_use_replication(dssdev, ovl->info.color_mode);
