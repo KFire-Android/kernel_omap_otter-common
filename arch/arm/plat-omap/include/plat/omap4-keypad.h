@@ -8,6 +8,7 @@ struct omap4_keypad_platform_data {
 
 	u8 rows;
 	u8 cols;
+	bool rep;
 };
 void keyboard_mux_init(void);
 extern int omap4_keypad_initialization(struct omap4_keypad_platform_data *);

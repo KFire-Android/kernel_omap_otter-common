@@ -223,8 +223,12 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
 	input_dev->keycodesize	= sizeof(keypad_data->keymap[0]);
 	input_dev->keycodemax	= max_keys;
 
-	__set_bit(EV_KEY, input_dev->evbit);
-	__set_bit(EV_REP, input_dev->evbit);
+       /* setup input device */
+        __set_bit(EV_KEY, input_dev->evbit);
+
+        /* Enable auto repeat feature of Linux input subsystem */
+        if (pdata->rep)
+            __set_bit(EV_REP, input_dev->evbit);
 
 	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
 

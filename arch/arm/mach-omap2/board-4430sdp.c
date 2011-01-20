@@ -169,6 +169,7 @@ static struct omap4_keypad_platform_data sdp4430_keypad_data = {
 	.keymap_data		= &sdp4430_keymap_data,
 	.rows			= 8,
 	.cols			= 8,
+	.rep		        = 0,
 };
 
 void keyboard_mux_init(void)
