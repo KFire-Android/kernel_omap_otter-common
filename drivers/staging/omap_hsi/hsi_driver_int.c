@@ -99,17 +99,6 @@ void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
 	hsi_reset_ch_write(ch);
 }
 
-void hsi_driver_disable_read_interrupt(struct hsi_channel *ch)
-{
-	struct hsi_port *p = ch->hsi_port;
-	unsigned int port = p->port_number;
-	unsigned int channel = ch->channel_number;
-	void __iomem *base = p->hsi_controller->base;
-
-	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
-		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
-}
-
 void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
 {
 	struct hsi_port *p = ch->hsi_port;
@@ -120,6 +109,28 @@ void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
 	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
 		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 	hsi_reset_ch_read(ch);
+}
+
+void hsi_driver_disable_write_interrupt(struct hsi_channel *ch)
+{
+	struct hsi_port *p = ch->hsi_port;
+	unsigned int port = p->port_number;
+	unsigned int channel = ch->channel_number;
+	void __iomem *base = p->hsi_controller->base;
+
+	hsi_outl_and(~HSI_HST_DATAACCEPT(channel), base,
+		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
+}
+
+void hsi_driver_disable_read_interrupt(struct hsi_channel *ch)
+{
+	struct hsi_port *p = ch->hsi_port;
+	unsigned int port = p->port_number;
+	unsigned int channel = ch->channel_number;
+	void __iomem *base = p->hsi_controller->base;
+
+	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
+		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 }
 
 static void hsi_do_channel_tx(struct hsi_channel *ch)
@@ -140,13 +151,15 @@ static void hsi_do_channel_tx(struct hsi_channel *ch)
 
 	spin_lock_bh(&hsi_ctrl->lock);
 
+	hsi_driver_disable_write_interrupt(ch);
+
 	if (ch->write_data.addr == NULL) {
-		hsi_outl_and(~HSI_HST_DATAACCEPT(n_ch), base,
-			     HSI_SYS_MPU_ENABLE_CH_REG(n_p, irq, n_ch));
+		/* Write using a DMA transfer */
 		hsi_reset_ch_write(ch);
 		spin_unlock_bh(&hsi_ctrl->lock);
 		(*ch->write_done) (ch->dev, 1);
 	} else {
+		/* Write using CPU copy */
 		buff_offset = hsi_hst_buffer_reg(hsi_ctrl, n_p, n_ch);
 		if (buff_offset >= 0) {
 			hsi_outl(*(ch->write_data.addr), base, buff_offset);
@@ -200,8 +213,7 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		}
 	}
 
-	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(n_ch), base,
-		     HSI_SYS_MPU_ENABLE_CH_REG(n_p, irq, n_ch));
+	hsi_driver_disable_read_interrupt(ch);
 	hsi_reset_ch_read(ch);
 
 done:
