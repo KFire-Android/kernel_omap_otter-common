@@ -215,6 +215,11 @@ context_save:
 	mrc	p15, 0, r4, c1, c0, 0	@ save control register
 	stmia	r8!, {r4}
 
+	mrc	p15, 0, r0, c1, c0, 0
+	bic	r0, r0, #(1 << 2)	/* Disable the C bit */
+	mcr	p15, 0, r0, c1, c0, 0
+	isb
+
 	ldr	r4, =sar_ram_base	@ Check DEVICE type
 	ldr	r4, [r4]
 	ldr     r9, [r4, #OMAP_TYPE_OFFSET]
@@ -230,16 +235,24 @@ clean_inv_l1:				@ cache-v7.S routine used here
 	str	r3, [r2, #0x08]
 	b	l2x_clean_inv
 clean_inv_l1_hs:
-	ldr r4, =sar_ram_base
-	ldr r4, [r4]
-	orr	r4, r4, #SCU_OFFSET
-	ldr     r0, [r4]		@ SCU Power state value
-	ldr     r1, [r4, #0x04]		@ $L1 clean
 	stmfd   r13!, {r4-r12, r14}
+	mov     r0, #0x00		@ Keep CPU in ON state
+	mov     r1, #0xFF		@ Clean Secure L1
 	ldr	r12, =0x108		@ SCU power state secure API
 	dsb
 	smc	#0
 	ldmfd   r13!, {r4-r12, r14}
+
+	bl	v7_flush_dcache_all	@ Clean and Invalidate L1
+
+	stmfd   r13!, {r4-r12, r14}
+	mov     r0, #0x03		@ CPU to OFF state
+	mov     r1, #0x00		@ Secure L1 is already clean
+	ldr	r12, =0x108		@ SCU power state secure API
+	dsb
+	smc	#0
+	ldmfd   r13!, {r4-r12, r14}
+
 l2x_clean_inv:				@ Only for MPU OFF and last CPU
 #ifdef CONFIG_CACHE_L2X0
 	ldr	r8, =sar_ram_base
@@ -275,19 +288,26 @@ do_WFI:
 	 * to be cleared o.w CPUs may deadlock because
 	 * of coherency
 	 */
+	mrc	p15, 0, r0, c1, c0, 0
+	tst	r0, #(1 << 2)        @ Check C bit enabled?
+	orreq	r0, r0, #(1 << 2)    @ Enable the C bit if cleared
+	mcreq	p15, 0, r0, c1, c0, 0
+	isb
+
 	ldr	r4, =sar_ram_base
 	ldr	r4, [r4]
 	ldr     r9, [r4, #OMAP_TYPE_OFFSET]
 	cmp	r9, #0x1
 	bne	scu_gp_clear
+
 	mov     r0, #0x00
-	mov     r1, #0xff
+	mov     r1, #0x00
 	stmfd   r13!, {r4-r12, r14}
 	ldr	r12, =0x108		@ SCU power state secure API
 	dsb
 	smc	#0
 	ldmfd   r13!, {r4-r12, r14}
-	dsb				@ Issue a write memory barrier
+	isb
 	b	skip_gp_clear
 scu_gp_clear:
 	ldr	r2, =scu_base		@ Take CPUx out of coherency
