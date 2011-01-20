@@ -47,7 +47,7 @@ static struct wake_lock uart_lock;
 
 /* Forward declaration of functions */
 static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
-static void serial_omap_rx_timeout(unsigned long uart_no);
+static void serial_omap_rxdma_poll(unsigned long uart_no);
 static int serial_omap_start_rxdma(struct uart_omap_port *up);
 static int omap4_uart_cts_wakeup(int uart_no, int state);
 
@@ -546,7 +546,7 @@ static int serial_omap_startup(struct uart_port *port)
 			(dma_addr_t *)&(up->uart_dma.tx_buf_dma_phys),
 			0);
 		init_timer(&(up->uart_dma.rx_timer));
-		up->uart_dma.rx_timer.function = serial_omap_rx_timeout;
+		up->uart_dma.rx_timer.function = serial_omap_rxdma_poll;
 		up->uart_dma.rx_timer.data = up->pdev->id;
 		/* Currently the buffer size is 4KB. Can increase it */
 		up->uart_dma.rx_buf = dma_alloc_coherent(NULL,
@@ -1111,7 +1111,7 @@ static int serial_omap_resume(struct platform_device *dev)
 	return 0;
 }
 
-static void serial_omap_rx_timeout(unsigned long uart_no)
+static void serial_omap_rxdma_poll(unsigned long uart_no)
 {
 	struct uart_omap_port *up = ui[uart_no];
 	unsigned int curr_dma_pos, curr_transmitted_size;
@@ -1122,7 +1122,7 @@ static void serial_omap_rx_timeout(unsigned long uart_no)
 		if (jiffies_to_msecs(jiffies - up->port_activity) <
 							RX_TIMEOUT) {
 			mod_timer(&up->uart_dma.rx_timer, jiffies +
-				usecs_to_jiffies(up->uart_dma.rx_timeout));
+				usecs_to_jiffies(up->uart_dma.rx_poll_rate));
 		} else {
 			serial_omap_stop_rxdma(up);
 			up->ier |= UART_IER_RDI;
@@ -1144,12 +1144,11 @@ static void serial_omap_rx_timeout(unsigned long uart_no)
 			up->uart_dma.rx_buf_dma_phys == curr_dma_pos) {
 		omap_start_dma(up->uart_dma.rx_dma_channel);
 		up->uart_dma.prev_rx_dma_pos = up->uart_dma.rx_buf_dma_phys;
-	} else  {
+	} else
 		up->uart_dma.prev_rx_dma_pos = curr_dma_pos;
-	}
 
 	mod_timer(&up->uart_dma.rx_timer, jiffies +
-		usecs_to_jiffies(up->uart_dma.rx_timeout));
+		usecs_to_jiffies(up->uart_dma.rx_poll_rate));
 	up->port_activity = jiffies;
 }
 
@@ -1186,7 +1185,7 @@ static int serial_omap_start_rxdma(struct uart_omap_port *up)
 	/* FIXME: Cache maintenance needed here? */
 	omap_start_dma(up->uart_dma.rx_dma_channel);
 	mod_timer(&up->uart_dma.rx_timer, jiffies +
-				usecs_to_jiffies(up->uart_dma.rx_timeout));
+				usecs_to_jiffies(up->uart_dma.rx_poll_rate));
 	up->uart_dma.rx_dma_used = true;
 
 	if (up->pdev->id == UART2)
@@ -1332,7 +1331,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 		up->use_dma = omap_up_info->use_dma;
 		up->uart_dma.tx_threshold = omap_up_info->omap4_tx_threshold;
 		up->uart_dma.rx_buf_size = omap_up_info->dma_rx_buf_size;
-		up->uart_dma.rx_timeout = omap_up_info->dma_rx_timeout;
+		up->uart_dma.rx_poll_rate = omap_up_info->dma_rx_poll_rate;
 		spin_lock_init(&(up->uart_dma.tx_lock));
 		spin_lock_init(&(up->uart_dma.rx_lock));
 		up->uart_dma.tx_dma_channel = OMAP_UART_DMA_CH_FREE;

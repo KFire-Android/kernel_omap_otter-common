@@ -78,7 +78,7 @@
 #define OMAP_UART_DMA_CH_FREE	-1
 
 #define RX_TIMEOUT		(3 * HZ)	/* RX DMA timeout (jiffies) */
-#define DEFAULT_RXDMA_TIMEOUT	1		/* RX DMA polling rate (us) */
+#define DEFAULT_RXDMA_POLLRATE	1		/* RX DMA polling rate (us) */
 #define DEFAULT_RXDMA_BUFSIZE	4096		/* RX DMA buffer size */
 #define DEFAULT_IDLE_TIMEOUT	5		/* UART idle timeout (secs) */
 
@@ -110,7 +110,7 @@ struct omap_uart_port_info {
 	/* beyond this is the platform specific fields */
 	int                     use_dma;        /* DMA Enable / Disable */
 	int                     dma_rx_buf_size;/* DMA Rx Buffer Size */
-	int                     dma_rx_timeout; /* DMA RX timeout */
+	int                     dma_rx_poll_rate;/* DMA RX poll rate */
 	unsigned int            idle_timeout;   /* Omap Uart Idle Time out */
 	u8			omap4_tx_threshold;
 };
@@ -137,7 +137,7 @@ struct uart_omap_dma {
 	/* timer to poll activity on rx dma */
 	struct timer_list	rx_timer;
 	int			rx_buf_size;
-	int			rx_timeout;
+	int			rx_poll_rate;
 	u8			tx_threshold;
 };
 
