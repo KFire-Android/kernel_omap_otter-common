@@ -77,7 +77,11 @@
 
 #define OMAP_UART_DMA_CH_FREE	-1
 
-#define RX_TIMEOUT		(3 * HZ)
+#define RX_TIMEOUT		(3 * HZ)	/* RX DMA timeout (jiffies) */
+#define DEFAULT_RXDMA_TIMEOUT	1		/* RX DMA polling rate (us) */
+#define DEFAULT_RXDMA_BUFSIZE	4096		/* RX DMA buffer size */
+#define DEFAULT_IDLE_TIMEOUT	5		/* UART idle timeout (secs) */
+
 #define OMAP_MAX_HSUART_PORTS	4
 #define UART1                  (0x0)
 #define UART2                  (0x1)
