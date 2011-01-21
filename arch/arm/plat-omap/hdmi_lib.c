@@ -219,7 +219,6 @@ static struct {
 	void __iomem *base_core_av;	/* 1 */
 	void __iomem *base_wp;		/* 2 */
 	struct hdmi_core_infoframe_avi avi_param;
-	struct mutex mutex;
 	struct list_head notifier_head;
 #ifdef CONFIG_OMAP_HDMI_AUDIO_WA
 	u32 notify_event_reg;
@@ -227,6 +226,8 @@ static struct {
 	struct omap_chip_id audio_wa_chip_ids;
 #endif
 } hdmi;
+
+static DEFINE_MUTEX(hdmi_mutex);
 
 static inline void hdmi_write_reg(u32 base, u16 idx, u32 val)
 {
@@ -1664,6 +1665,16 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 int hdmi_lib_init(void){
 	u32 rev;
+	static u8 initialized;
+
+	mutex_lock(&hdmi_mutex);
+	if (initialized) {
+		printk(KERN_INFO "hdmi_lib already initialized\n");
+		mutex_unlock(&hdmi_mutex);
+		return 0;
+	}
+	initialized = 1;
+	mutex_unlock(&hdmi_mutex);
 
 	hdmi.base_wp = ioremap(HDMI_WP, (HDMI_HDCP - HDMI_WP));
 
@@ -1680,7 +1691,6 @@ int hdmi_lib_init(void){
 			CHIP_IS_OMAP4430ES2_1 | CHIP_IS_OMAP4430ES2_2;
 #endif
 
-	mutex_init(&hdmi.mutex);
 	INIT_LIST_HEAD(&hdmi.notifier_head);
 
 	rev = hdmi_read_reg(HDMI_WP, HDMI_WP_REVISION);
@@ -1964,9 +1974,9 @@ int hdmi_w1_start_audio_transfer(u32 instanceName)
 
 void hdmi_add_notifier(struct hdmi_notifier *notifier)
 {
-	mutex_lock(&hdmi.mutex);
+	mutex_lock(&hdmi_mutex);
 	list_add_tail(&notifier->list, &hdmi.notifier_head);
-	mutex_unlock(&hdmi.mutex);
+	mutex_unlock(&hdmi_mutex);
 }
 
 void hdmi_remove_notifier(struct hdmi_notifier *notifier)
@@ -1975,9 +1985,9 @@ void hdmi_remove_notifier(struct hdmi_notifier *notifier)
 
 	list_for_each_entry_safe(cur, next, &hdmi.notifier_head, list) {
 		if (cur == notifier) {
-			mutex_lock(&hdmi.mutex);
+			mutex_lock(&hdmi_mutex);
 			list_del(&cur->list);
-			mutex_unlock(&hdmi.mutex);
+			mutex_unlock(&hdmi_mutex);
 		}
 	}
 }
