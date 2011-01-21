@@ -1668,7 +1668,7 @@ static int aess_set_opp_mode(void)
 		case 25:
 			abe_set_opp_processing(ABE_OPP25);
 			udelay(250);
-			omap_device_set_rate(&pdev->dev, &pdev->dev, 49000000);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 			break;
 		case 50:
 		default:
@@ -1681,7 +1681,7 @@ static int aess_set_opp_mode(void)
 		/* Increase OPP mode */
 		switch (opp) {
 		case 25:
-			omap_device_set_rate(&pdev->dev, &pdev->dev, 49000000);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
 			abe_set_opp_processing(ABE_OPP25);
 			break;
 		case 50:
