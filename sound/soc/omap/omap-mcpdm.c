@@ -410,15 +410,12 @@ static int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 
 	pm_runtime_get_sync(&pdev->dev);
 
-	mutex_lock(&mcpdm->mutex);
 	if (!mcpdm->free) {
 		dev_err(mcpdm->dev, "McPDM interface is in use\n");
-		mutex_unlock(&mcpdm->mutex);
 		ret = -EBUSY;
 		goto err;
 	}
 	mcpdm->free = 0;
-	mutex_unlock(&mcpdm->mutex);
 
 	/* Disable lines while request is ongoing */
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, 0x00);
@@ -452,15 +449,11 @@ static void omap_mcpdm_free(struct omap_mcpdm *mcpdm)
 	pdev = to_platform_device(mcpdm->dev);
 	pdata = pdev->dev.platform_data;
 
-	mutex_lock(&mcpdm->mutex);
 	if (mcpdm->free) {
 		dev_err(mcpdm->dev, "McPDM interface is already free\n");
-		mutex_unlock(&mcpdm->mutex);
 		return;
 	}
-
 	mcpdm->free = 1;
-	mutex_unlock(&mcpdm->mutex);
 
 	pm_runtime_put_sync(&pdev->dev);
 
@@ -506,14 +499,22 @@ static int omap_mcpdm_dai_startup(struct snd_pcm_substream *substream,
 
 	dev_dbg(dai->dev, "%s: active %d\n", __func__, dai->active);
 
+	mutex_lock(&mcpdm->mutex);
+
 	/* make sure we stop any pre-existing shutdown */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		cancel_delayed_work(&mcpdm->delayed_work);
 
 	if (!dai->active && mcpdm->free) {
 		err = omap_mcpdm_request(mcpdm);
+		if (err) {
+			mutex_unlock(&mcpdm->mutex);
+			return err;
+		}
 		omap_mcpdm_set_offset(mcpdm);
 	}
+
+	mutex_unlock(&mcpdm->mutex);
 
 	return err;
 }
@@ -525,6 +526,8 @@ static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 
 	dev_dbg(dai->dev, "%s: active %d\n", __func__, dai->active);
 
+	mutex_lock(&mcpdm->mutex);
+
 	if (!dai->active) {
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
@@ -533,6 +536,7 @@ static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 						msecs_to_jiffies(1000)); /* TODO: pdata ? */
 	}
 
+	mutex_unlock(&mcpdm->mutex);
 }
 
 /* work to delay McPDM shutdown */
@@ -541,11 +545,15 @@ static void playback_work(struct work_struct *work)
 	struct omap_mcpdm *mcpdm =
 			container_of(work, struct omap_mcpdm, delayed_work.work);
 
+	mutex_lock(&mcpdm->mutex);
+
 	if (!mcpdm->dl_active)
 		omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
 
 	if (!mcpdm->free && !mcpdm->dl_active && !mcpdm->ul_active)
 		omap_mcpdm_free(mcpdm);
+
+	mutex_unlock(&mcpdm->mutex);
 }
 
 static int omap_mcpdm_dai_hw_params(struct snd_pcm_substream *substream,
@@ -630,21 +638,30 @@ static int omap_mcpdm_abe_dai_startup(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
-	int ret;
+	int ret = 0;
+
+	mutex_lock(&mcpdm->mutex);
 
 	/* make sure we stop any pre-existing shutdown */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		cancel_delayed_work(&mcpdm->delayed_abe_work);
 	}
 
-	ret = omap_mcpdm_dai_startup(substream, dai);
-	if (ret < 0)
-		return ret;
+	if (!dai->active && mcpdm->free) {
+		ret = omap_mcpdm_request(mcpdm);
+		if (ret) {
+			mutex_unlock(&mcpdm->mutex);
+			return ret;
+		}
+		omap_mcpdm_set_offset(mcpdm);
+	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		mcpdm->dl_active++;
 	else
 		mcpdm->ul_active++;
+
+	mutex_unlock(&mcpdm->mutex);
 
 	return ret;
 }
@@ -655,6 +672,8 @@ static void omap_mcpdm_abe_dai_shutdown(struct snd_pcm_substream *substream,
 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
 
 	dev_dbg(dai->dev, "%s: active %d\n", __func__, dai->active);
+
+	mutex_lock(&mcpdm->mutex);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		mcpdm->dl_active--;
@@ -672,6 +691,8 @@ static void omap_mcpdm_abe_dai_shutdown(struct snd_pcm_substream *substream,
 				schedule_delayed_work(&mcpdm->delayed_abe_work,
 						msecs_to_jiffies(1000)); /* TODO: pdata ? */
 	}
+
+	mutex_unlock(&mcpdm->mutex);
 
 }
 
@@ -708,32 +729,31 @@ static int omap_mcpdm_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	snd_soc_dai_set_dma_data(dai, substream,
 				 &omap_mcpdm_dai_dma_params[stream]);
 
+	mutex_lock(&mcpdm->mutex);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		/* Check if McPDM is already started */
 		if (!mcpdm->dn_channels) {
-			mutex_lock(&mcpdm->mutex);
 			abe_dsp_pm_get();
 			/* start ATC before McPDM IP */
 			abe_enable_data_transfer(PDM_DL_PORT);
 			udelay(250);
 			mcpdm->downlink->channels = (PDM_DN_MASK | PDM_CMD_MASK);
-
 			ret = omap_mcpdm_playback_open(mcpdm, &omap_mcpdm_links[0]);
 			if (ret < 0) {
 				mutex_unlock(&mcpdm->mutex);
-				goto out;
+				return ret;
 			}
 
 			omap_mcpdm_start(mcpdm, stream);
-			mutex_unlock(&mcpdm->mutex);
 		}
 	} else {
 		mcpdm->uplink->channels = PDM_UP1_EN | PDM_UP2_EN;
 		ret = omap_mcpdm_capture_open(mcpdm, &omap_mcpdm_links[1]);
 	}
 
-out:
+	mutex_unlock(&mcpdm->mutex);
+
 	return ret;
 }
 
