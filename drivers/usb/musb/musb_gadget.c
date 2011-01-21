@@ -144,6 +144,8 @@ static inline void unmap_dma_buffer(struct musb_request *request,
 	}
 }
 
+static void stop_activity(struct musb *musb, struct usb_gadget_driver *driver);
+
 /*
  * Immediately complete a request.
  *
@@ -1614,10 +1616,15 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	 * not pullup unless the B-session is active.
 	 */
 	spin_lock_irqsave(&musb->lock, flags);
-	if (is_on != musb->softconnect) {
-		musb->softconnect = is_on;
-		musb_pullup(musb, is_on);
-	}
+	if (is_on) {
+		if (!musb->softconnect) {
+			musb_start(musb);
+			musb->softconnect = 1;
+			musb_pullup(musb, is_on);
+		}
+	} else
+		stop_activity(musb, musb->gadget_driver);
+
 	spin_unlock_irqrestore(&musb->lock, flags);
 	return 0;
 }
