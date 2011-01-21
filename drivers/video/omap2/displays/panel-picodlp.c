@@ -396,6 +396,13 @@ static int picoDLP_panel_enable(struct omap_dss_device *dssdev)
 
 	return picoDLP_panel_start(dssdev);
 }
+
+static void picoDLP_panel_get_timings(struct omap_dss_device *dssdev,
+					struct omap_video_timings *timings)
+{
+	*timings = dssdev->panel.timings;
+}
+
 static void pico_get_resolution(struct omap_dss_device *dssdev,
 		u16 *xres, u16 *yres)
 {
@@ -461,6 +468,7 @@ static struct omap_dss_driver picoDLP_driver = {
 	.remove		= picoDLP_panel_remove,
 	.enable		= picoDLP_panel_enable,
 	.disable	= picoDLP_panel_disable,
+	.get_timings	= picoDLP_panel_get_timings,
 	.get_resolution	= pico_get_resolution,
 	.suspend	= picoDLP_panel_suspend,
 	.resume		= picoDLP_panel_resume,
