@@ -312,9 +312,19 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 	u32 hsr_err_reg;
 	u32 channels_served = 0;
 
+
 	/* Get events status */
 	status_reg = hsi_inl(base, status_offset);
 	status_reg &= hsi_inl(base, enable_offset);
+
+	if (!status_reg) {
+		dev_dbg(hsi_ctrl->dev, "Channel [%d,%d] : no event, exit.\n",
+			start, stop);
+		return 0;
+	} else {
+		dev_dbg(hsi_ctrl->dev, "Channel [%d,%d] : Events 0x%08x\n",
+			start, stop, status_reg);
+	}
 
 	if (status_reg & HSI_BREAKDETECTED) {
 		dev_info(hsi_ctrl->dev, "Hardware BREAK on port %d\n", port);
