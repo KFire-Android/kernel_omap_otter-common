@@ -857,7 +857,7 @@ static void omap_mux_init_signals(struct omap_mux_partition *partition,
 				  struct omap_board_mux *board_mux)
 {
 	omap_mux_set_cmdline_signals();
-	omap_mux_write_array(partition->base, board_mux);
+	omap_mux_write_array(partition, board_mux);
 }
 
 #else
