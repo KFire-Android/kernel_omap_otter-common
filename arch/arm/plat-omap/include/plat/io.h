@@ -95,6 +95,7 @@
 #define OMAP2_EMU_IO_OFFSET		0xaa800000	/* Emulation */
 #define OMAP2_EMU_IO_ADDRESS(pa)	IOMEM((pa) + OMAP2_EMU_IO_OFFSET)
 
+
 /*
  * ----------------------------------------------------------------------------
  * Omap1 specific IO mapping
@@ -224,6 +225,13 @@
 #define L3_44XX_PHYS		L3_44XX_BASE	/* 0x44000000 --> 0xf8000000 */
 #define L3_44XX_VIRT		(L3_44XX_PHYS + OMAP4_L3_IO_OFFSET)
 #define L3_44XX_SIZE		SZ_1M
+
+#define L3_DSS_44XX_BASE	0x58000000
+#define L3_DSS_44XX_IO_OFFSET	0xA0100000
+
+#define L3_DSS_44XX_PHYS	L3_DSS_44XX_BASE /* 0x58000000 --> 0xf8100000 */
+#define L3_DSS_44XX_VIRT	(L3_DSS_44XX_PHYS + L3_DSS_44XX_IO_OFFSET)
+#define L3_DSS_44XX_SIZE	SZ_1M
 
 #define L4_44XX_PHYS		L4_44XX_BASE	/* 0x4a000000 --> 0xfc000000 */
 #define L4_44XX_VIRT		(L4_44XX_PHYS + OMAP2_L4_IO_OFFSET)

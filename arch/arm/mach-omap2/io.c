@@ -193,6 +193,12 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
 		.type		= IO_MAP_TYPE,
 	},
 	{
+		.virtual	= L3_DSS_44XX_VIRT,
+		.pfn		= __phys_to_pfn(L3_DSS_44XX_PHYS),
+		.length		= L3_DSS_44XX_SIZE,
+		.type		= IO_MAP_TYPE
+	},
+	{
 		.virtual	= L4_44XX_VIRT,
 		.pfn		= __phys_to_pfn(L4_44XX_PHYS),
 		.length		= L4_44XX_SIZE,

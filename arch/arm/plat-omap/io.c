@@ -108,6 +108,8 @@ void __iomem *omap_ioremap(unsigned long p, size_t size, unsigned int type)
 	if (cpu_is_omap44xx()) {
 		if (BETWEEN(p, L3_44XX_PHYS, L3_44XX_SIZE))
 			return XLATE(p, L3_44XX_PHYS, L3_44XX_VIRT);
+		if (BETWEEN(p, L3_DSS_44XX_PHYS, L3_DSS_44XX_SIZE))
+			return XLATE(p, L3_DSS_44XX_PHYS, L3_DSS_44XX_VIRT);
 		if (BETWEEN(p, L4_44XX_PHYS, L4_44XX_SIZE))
 			return XLATE(p, L4_44XX_PHYS, L4_44XX_VIRT);
 		if (BETWEEN(p, OMAP44XX_GPMC_PHYS, OMAP44XX_GPMC_SIZE))
