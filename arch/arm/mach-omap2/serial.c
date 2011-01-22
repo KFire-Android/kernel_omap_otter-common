@@ -436,7 +436,7 @@ static void omap_uart_idle_timer(unsigned long data)
 	 * if port is active then dont allow
 	 * sleep.
 	 */
-	if (omap_uart_active(uart->num)) {
+	if (omap_uart_active(uart->num, uart->timeout)) {
 		omap_uart_block_sleep(uart);
 		return;
 	}

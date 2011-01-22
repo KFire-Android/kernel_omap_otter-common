@@ -166,7 +166,7 @@ struct uart_omap_port {
 	unsigned long		port_activity;
 };
 
-int omap_uart_active(int num);
+int omap_uart_active(int num, u32 timeout);
 #ifdef CONFIG_PM
 void omap_uart_enable_clock_from_irq(int uart_num);
 #endif

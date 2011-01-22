@@ -1448,15 +1448,16 @@ EXPORT_SYMBOL(omap4_uart_cts_wakeup);
  * force idle mode for errata 2.15 implementation.
  */
 
-int omap_uart_active(int num)
+int omap_uart_active(int num, u32 timeout)
 {
 	struct uart_omap_port *up = ui[num];
 	struct circ_buf *xmit;
 	unsigned int status;
 
-	/* check for recent driver activity */
-	/* if from now to last activty < 5 second keep clocks on */
-	if ((jiffies_to_msecs(jiffies - up->port_activity) < 5000))
+	/* Check for recent driver activity. If time delta from now
+	 * to last activty < "uart idle timeout" second keep clocks on.
+	 */
+	if (((jiffies - up->port_activity) < timeout))
 		return 1;
 
 	xmit = &up->port.state->xmit;
