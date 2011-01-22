@@ -69,6 +69,11 @@
 #define DMA_UP_ENABLE		0x2
 
 /*
+ * MCPDM_SYSCONFIG bit fields
+ */
+#define MCPDM_SOFTRESET		0x1
+
+/*
  * MCPDM_CTRL bit fields
  */
 

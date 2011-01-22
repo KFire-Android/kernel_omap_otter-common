@@ -211,12 +211,21 @@ static void omap_mcpdm_start(struct omap_mcpdm *mcpdm, int stream)
 {
 	int ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
 
-	if (stream)
+	if (stream) {
+		ctrl |= SW_UP_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 		ctrl |= mcpdm->up_channels;
-	else
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		ctrl &= ~SW_UP_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	} else {
+		ctrl |= SW_DN_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 		ctrl |= mcpdm->dn_channels;
-
-	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		ctrl &= ~SW_DN_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	}
 }
 
 /*
@@ -227,12 +236,21 @@ static void omap_mcpdm_stop(struct omap_mcpdm *mcpdm, int stream)
 {
 	int ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
 
-	if (stream)
+	if (stream) {
+		ctrl |= SW_UP_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 		ctrl &= ~mcpdm->up_channels;
-	else
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		ctrl &= ~SW_UP_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	} else {
+		ctrl |= SW_DN_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
 		ctrl &= ~mcpdm->dn_channels;
-
-	omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+		ctrl &= ~SW_DN_RST;
+		omap_mcpdm_write(mcpdm, MCPDM_CTRL, ctrl);
+	}
 }
 
 /*
@@ -404,6 +422,7 @@ static int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 	struct omap_mcpdm_platform_data *pdata;
 	int ret;
 	int ctrl;
+	int attemps = 0;
 
 	pdev = to_platform_device(mcpdm->dev);
 	pdata = pdev->dev.platform_data;
@@ -416,6 +435,18 @@ static int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 		goto err;
 	}
 	mcpdm->free = 0;
+
+	/* Perform SW RESET of McPDM IP */
+	ctrl = omap_mcpdm_read(mcpdm, MCPDM_SYSCONFIG);
+	ctrl |= MCPDM_SOFTRESET;
+	omap_mcpdm_write(mcpdm, MCPDM_SYSCONFIG, ctrl);
+	/* Wait completion of SW RESET */
+	while ((omap_mcpdm_read(mcpdm, MCPDM_SYSCONFIG) & MCPDM_SOFTRESET)) {
+		if (attemps++ > 10000) {
+			udelay(10);
+			dev_err(mcpdm->dev, "Could not RESET McPDM\n");
+		}
+	}
 
 	/* Disable lines while request is ongoing */
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, 0x00);
