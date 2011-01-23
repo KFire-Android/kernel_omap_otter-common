@@ -198,6 +198,8 @@
 #define BBSPOR_CFG			0xE6
 #define		BB_CHG_EN		(1 << 3)
 
+#define STS_HW_CONDITIONS	0x21
+#define STS_USB_ID		(1 << 2)	/* Level status of USB ID */
 
 /* Ptr to thermistor table */
 static const unsigned int fuelgauge_rate[4] = {4, 16, 64, 256};
@@ -490,12 +492,16 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	u8 charge_state = 0;
 	u8 present_charge_state = 0;
 	u8 ac_or_vbus, no_ac_and_vbus = 0;
+	u8 hw_state = 0, temp = 0;
 
 	/* read charger controller_stat1 */
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &present_charge_state,
 		CONTROLLER_STAT1);
 	if (ret)
 		return IRQ_NONE;
+
+	twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
+
 	charge_state = di->stat1;
 
 	stat_toggle = charge_state ^ present_charge_state;
@@ -519,6 +525,13 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	}
 
 	if (stat_reset & VBUS_DET) {
+		/* On a USB detach, UNMASK VBUS OVP if masked*/
+		twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &temp,
+			CHARGERUSB_INT_MASK);
+		if (temp & MASK_MCHARGERUSB_FAULT)
+			twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
+				(temp & ~MASK_MCHARGERUSB_FAULT),
+					CHARGERUSB_INT_MASK);
 		di->usb_online = 0;
 		dev_dbg(di->dev, "usb removed\n");
 		twl6030_stop_usb_charger(di);
@@ -526,13 +539,27 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 			twl6030_start_ac_charger(di);
 
 	}
+
 	if (stat_set & VBUS_DET) {
-		di->usb_online = POWER_SUPPLY_TYPE_USB;
-		if ((present_charge_state & VAC_DET) && (di->vac_priority == 2))
-			dev_dbg(di->dev,
-				"USB charger detected, continue with VAC\n");
-		else
-			twl6030_start_usb_charger(di);
+		/* In HOST mode (ID GROUND) when a device is connected, Mask
+		 * VBUS OVP interrupt and do no enable usb charging
+		 */
+		if (hw_state & STS_USB_ID) {
+			twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &temp,
+				CHARGERUSB_INT_MASK);
+			if (!(temp & MASK_MCHARGERUSB_FAULT))
+				twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
+					(temp | MASK_MCHARGERUSB_FAULT),
+						CHARGERUSB_INT_MASK);
+		} else {
+			di->usb_online = POWER_SUPPLY_TYPE_USB;
+			if ((present_charge_state & VAC_DET) &&
+			    (di->vac_priority == 2))
+				dev_dbg(di->dev, "USB charger detected,\
+						continue with VAC\n");
+			else
+				twl6030_start_usb_charger(di);
+		}
 	}
 
 	if (stat_reset & VAC_DET) {
