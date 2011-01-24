@@ -281,7 +281,7 @@ config INTERCONNECT_IO_POSTING
 config ENABLE_L3_ERRORS
 	bool  "Enable L3 error logging"
 	depends on ARCH_OMAP4
-	default n
+	default y
 	help
 	  Select this option to enable L3 error detection on OMAP4
 
