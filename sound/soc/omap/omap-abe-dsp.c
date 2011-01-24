@@ -1764,6 +1764,8 @@ static int aess_restore_context(struct abe_data *abe)
 	struct omap4_abe_dsp_pdata *pdata = pdev->dev.platform_data;
 	int loss_count = 0;
 
+	omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+
 	if (pdata->get_context_loss_count)
 		loss_count = pdata->get_context_loss_count(&pdev->dev);
 
