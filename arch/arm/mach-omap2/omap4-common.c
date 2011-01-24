@@ -411,13 +411,11 @@ static irqreturn_t l3_interrupt_handler(int irq, void *dev_id)
 						source_name, readl(slave_addr));
 					dump_stack();
 				} else {
-
-/* FIXME:On secure devices, PPA manages this already */
-#if 0					/* Then this is a Fire Wall Error */
-					omap_fw_error_handler(
-							ctrl_sec_err_status,
-						ctrl_sec_err_status_regval);
-#endif
+					/* Then this is a Fire Wall Error */
+					if (omap_type() == OMAP2_DEVICE_TYPE_GP)
+						omap_fw_error_handler(
+								ctrl_sec_err_status,
+								ctrl_sec_err_status_regval);
 				}
 				/* clear the stderr log */
 				writel((stderrlog_main_reg_val |
