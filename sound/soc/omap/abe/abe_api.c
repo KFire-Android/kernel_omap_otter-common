@@ -164,6 +164,11 @@ abehal_status abe_reload_fw(void)
 	warm_boot = 0;
 	abe_load_fw_param((u32 *) abe_firmware_array);
 	abe_build_scheduler_table();
+
+	/* IRQ & DBG circular read pointer in DMEM */
+	abe_dbg_activity_log_write_pointer = 0;
+	abe_irq_dbg_read_ptr = 0;
+
 	return 0;
 }
 EXPORT_SYMBOL(abe_reload_fw);
