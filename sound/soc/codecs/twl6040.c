@@ -280,6 +280,16 @@ static void twl6040_init_vdd_regs(struct snd_soc_codec *codec)
 
 	for (i = 0; i < TWL6040_VDDREGNUM; i++) {
 		reg = twl6040_vdd_reg[i];
+		/* skip vibra registers */
+		switch (reg) {
+		case TWL6040_REG_VIBCTLL:
+		case TWL6040_REG_VIBDATL:
+		case TWL6040_REG_VIBCTLR:
+		case TWL6040_REG_VIBDATR:
+			continue;
+		default:
+			break;
+		}
 		twl6040_write(codec, reg, cache[reg]);
 	}
 }

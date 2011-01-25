@@ -622,6 +622,12 @@ struct twl4030_codec_audio_data {
 struct twl4030_codec_vibra_data {
 	unsigned int	audio_mclk;
 	unsigned int	coexist;
+
+	/* timed-output based implementations */
+	int max_timeout;
+	int initial_vibrate;
+	int (*init)(void);
+	void (*exit)(void);
 };
 
 struct twl4030_codec_data {

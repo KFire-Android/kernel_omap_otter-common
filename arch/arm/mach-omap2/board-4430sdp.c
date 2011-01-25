@@ -440,20 +440,6 @@ static struct platform_device sdp4430_leds_pwm = {
 	},
 };
 
-static struct twl6040_vib_platform_data sdp4430_vib_data = {
-	.max_timeout = 15000,
-	.active_low = 0,
-	.initial_vibrate = 0,
-};
-
-static struct platform_device sdp4430_vib = {
-	.name           = VIB_NAME,
-	.id             = -1,
-	.dev            = {
-		.platform_data  = &sdp4430_vib_data,
-	},
-};
-
 /* Begin Synaptic Touchscreen TM-01217 */
 
 static char *tm12xx_idev_names[] = {
@@ -761,7 +747,6 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_leds_gpio,
 	&wl128x_device,
 	&sdp4430_hdmi_audio_device,
-	&sdp4430_vib,
 	&sdp4430_keypad_led,
 };
 
@@ -1045,12 +1030,14 @@ static struct twl4030_codec_audio_data twl6040_audio = {
 
 static struct twl4030_codec_vibra_data twl6040_vibra = {
 	.audio_mclk	= 38400000,
+	.max_timeout	= 15000,
+	.initial_vibrate = 0,
 };
 
 static struct twl4030_codec_data twl6040_codec = {
 	.audio_mclk	= 38400000,
-	.audio = &twl6040_audio,
-	.vibra = &twl6040_vibra,
+	.audio		= &twl6040_audio,
+	.vibra		= &twl6040_vibra,
 };
 
 static struct twl4030_platform_data sdp4430_twldata = {

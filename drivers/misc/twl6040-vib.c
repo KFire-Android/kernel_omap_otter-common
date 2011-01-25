@@ -35,7 +35,7 @@ struct vib_data {
 	struct hrtimer timer;
 	spinlock_t lock;
 
-	struct twl6040_vib_platform_data *pdata;
+	struct twl4030_codec_vibra_data *pdata;
 
 	int vib_power_state;
 	int vib_state;
@@ -128,8 +128,7 @@ static int vib_get_time(struct timed_output_dev *dev)
 
 static void vib_enable(struct timed_output_dev *dev, int value)
 {
-	struct vib_data *data =
-	    container_of(dev, struct vib_data, dev);
+	struct vib_data *data = container_of(dev, struct vib_data, dev);
 	unsigned long flags;
 
 	if (value < 0) {
@@ -167,7 +166,7 @@ void vibrator_haptic_fire(int value)
 
 static int vib_probe(struct platform_device *pdev)
 {
-	struct twl6040_vib_platform_data *pdata = pdev->dev.platform_data;
+	struct twl4030_codec_vibra_data *pdata = pdev->dev.platform_data;
 	struct vib_data *data;
 	int ret = 0;
 

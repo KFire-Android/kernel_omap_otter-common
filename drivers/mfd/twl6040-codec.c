@@ -166,7 +166,7 @@ static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 
 	if (pdata->vibra) {
 		cell = &codec->cells[childs];
-		cell->name = "twl6040-vibra";
+		cell->name = "vib-twl6040";
 		cell->platform_data = pdata->vibra;
 		cell->data_size = sizeof(*pdata->vibra);
 		childs++;
