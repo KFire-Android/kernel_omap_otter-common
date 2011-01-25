@@ -17,6 +17,7 @@
 
 #include <plat/common.h>
 #include <plat/clockdomain.h>
+#include <plat/prcm.h>
 
 #include <mach/emif.h>
 #include <mach/omap4-common.h>
@@ -150,6 +151,57 @@ int omap4_set_freq_update(void)
 	}
 
 	return 0;
+}
+
+int omap4_noncore_dpll_mn_bypass(struct clk *clk)
+{
+	int i, ret = 0;
+	u32 reg;
+	struct dpll_data *dd;
+
+	if (!clk || !clk->dpll_data)
+		return -EINVAL;
+
+	dd = clk->dpll_data;
+
+	if (!(clk->dpll_data->modes & (1 << DPLL_MN_BYPASS)))
+		return -EINVAL;
+
+	pr_debug("%s: configuring DPLL %s for MN bypass\n",
+			__func__, clk->name);
+
+	/* protect the DPLL during programming; usecount++ */
+	clk_enable(dd->clk_bypass);
+
+	omap4_prm_rmw_reg_bits(dd->enable_mask,
+			(DPLL_MN_BYPASS << __ffs(dd->enable_mask)),
+			dd->control_reg);
+
+	/* wait for DPLL to enter bypass */
+	for (i = 0; i < 1000000; i++) {
+		reg = __raw_readl(dd->idlest_reg) & dd->mn_bypass_st_mask;
+		if (reg)
+			break;
+	}
+
+	if (reg) {
+		if (clk->usecount) {
+			/* DPLL is actually needed right now; usecount++ */
+			clk_enable(dd->clk_bypass);
+			clk_disable(clk->parent);
+		}
+		pr_err("%s: reparenting %s to %s, and setting old rate %lu to new rate %lu\n",
+				__func__, clk->name, dd->clk_bypass->name,
+				clk->rate, dd->clk_bypass->rate);
+		clk_reparent(clk, dd->clk_bypass);
+		clk->rate = dd->clk_bypass->rate;
+	} else
+		ret = -ENODEV;
+
+	/* done programming, no need to protect DPLL; usecount-- */
+	clk_disable(dd->clk_bypass);
+
+	return ret;
 }
 
 unsigned long omap4_dpll_regm4xen_recalc(struct clk *clk)
