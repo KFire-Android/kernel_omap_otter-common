@@ -47,7 +47,7 @@ config  SYSLINK_IPU_SELF_HIBERNATION
 config  DUCATI_WATCH_DOG
 	bool "Enable Ducati watch dog timer"
 	depends on SYSLINK_IPU_SELF_HIBERNATION
-	default n
+	default y
 	help
 	  Ducati cores will trigger reset if any of the two M3 cores stop
 	  responding after 7 seconds. Requires Hibernation enabled. If
