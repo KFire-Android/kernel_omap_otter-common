@@ -1332,15 +1332,25 @@ static const struct clksel pmd_stm_clock_mux_sel[] = {
 static struct clk pmd_stm_clock_mux_ck = {
 	.name		= "pmd_stm_clock_mux_ck",
 	.parent		= &sys_clkin_ck,
+	.clksel		= &pmd_stm_clock_mux_sel,
+	.clksel_reg	= OMAP4430_CM_EMU_DEBUGSS_CLKCTRL,
+	.clksel_mask	= OMAP4430_PMD_STM_MUX_CTRL_MASK,
 	.ops		= &clkops_null,
-	.recalc		= &followparent_recalc,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 static struct clk pmd_trace_clk_mux_ck = {
 	.name		= "pmd_trace_clk_mux_ck",
 	.parent		= &sys_clkin_ck,
+	.clksel		= &pmd_stm_clock_mux_sel,
+	.clksel_reg	= OMAP4430_CM_EMU_DEBUGSS_CLKCTRL,
+	.clksel_mask	= OMAP4430_PMD_TRACE_MUX_CTRL_MASK,
 	.ops		= &clkops_null,
-	.recalc		= &followparent_recalc,
+	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 static const struct clksel syc_clk_div_div[] = {
