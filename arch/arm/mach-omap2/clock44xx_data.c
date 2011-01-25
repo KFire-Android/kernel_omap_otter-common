@@ -442,6 +442,8 @@ static struct clk dpll_core_ck = {
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_null,
 	.recalc		= &omap3_dpll_recalc,
+	.round_rate     = &omap2_dpll_round_rate,
+	.set_rate       = &omap4_core_dpll_set_rate,
 };
 
 static struct clk dpll_core_x2_ck = {
