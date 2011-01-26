@@ -642,6 +642,7 @@ static int fsg_setup(struct usb_function *f,
 		/* Raise an exception to stop the current operation
 		 * and reinitialize our state. */
 		DBG(fsg, "bulk reset request\n");
+		fsg->common->ep0req->length = 0;
 		raise_exception(fsg->common, FSG_STATE_RESET);
 		return DELAYED_STATUS;
 
