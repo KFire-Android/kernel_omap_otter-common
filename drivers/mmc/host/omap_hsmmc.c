@@ -1822,14 +1822,10 @@ static void omap_hsmmc_status_notify_cb(int card_present, void *dev_id)
        carddetect = slot->card_detect(host->dev, host->slot_id);
 
        sysfs_notify(&host->mmc->class_dev.kobj, NULL, "cover_switch");
-	if (carddetect) {
+	if (carddetect)
 		mmc_detect_change(host->mmc, (HZ * 200) / 1000);
-	} else {
-		mmc_host_enable(host->mmc);
-		omap_hsmmc_reset_controller_fsm(host, SRD);
-		mmc_host_lazy_disable(host->mmc);
+	else
 		mmc_detect_change(host->mmc, (HZ * 50) / 1000);
-	}
 }
 #endif
 
