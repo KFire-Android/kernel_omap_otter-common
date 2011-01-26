@@ -157,8 +157,16 @@
 #define EHCI_CONFIGFLAG			0x50
 #define EHCI_CONFIG_ENABLE		1
 
+#define EHCI_PORTSC_0			0x54
+#define EHCI_PORTSC_CCS			0x1
+
+
 #define USBHS_IO_WAKEUPENABLE		(1 << 14)
 #define USBHS_IO_WKUPEVNT		(1 << 15)
+
+#define USBHS_IO_MODERESET		(~(0x7))
+#define USBHS_IO_CLKMODE		(0x4)
+#define USBHS_IO_SAFEMODE		(0x7)
 
 #if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE) || \
 	defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
@@ -185,6 +193,9 @@ static const char ehciname[] = "ehci-omap";
 static u64 ehci_dmamask = ~(u32)0;
 static const char ohciname[] = "ohci-omap3";
 static u64 ohci_dmamask = DMA_BIT_MASK(32);
+
+/* Workaround for ehci resume failure in phy mode of port 0*/
+static int usbhs_phy_safe;
 
 
 struct uhhtll_hcd_omap {
@@ -306,6 +317,71 @@ static int uhhtll_put_tput(struct device	*dev)
 {
 
 	return omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, -1);
+}
+
+
+
+
+static void usbhs_4430ehci_phy_mux(const enum usbhs_omap3_port_mode
+					*port_mode, int mode)
+{
+	u16 reg;
+
+	/*
+	 * FIXME: This funtion should use mux framework functions;
+	 * For now, we are hardcoding this.
+	 */
+
+	switch (port_mode[0]) {
+	case OMAP_EHCI_PORT_MODE_PHY:
+
+		/* HUSB1_CLK */
+		reg = omap_readw(0x4A1000C2);
+		reg &= USBHS_IO_MODERESET;
+		if (mode)
+			reg |= USBHS_IO_SAFEMODE;
+		else
+			reg |= USBHS_IO_CLKMODE;
+		omap_writew(reg, 0x4A1000C2);
+
+		break;
+
+	case OMAP_EHCI_PORT_MODE_TLL:
+		/* TODO */
+
+
+		break;
+	case OMAP_USBHS_PORT_MODE_UNUSED:
+		/* FALLTHROUGH */
+	default:
+		break;
+	}
+
+	switch (port_mode[1]) {
+	case OMAP_EHCI_PORT_MODE_PHY:
+
+		/* HUSB2_CLK */
+		reg = omap_readw(0x4A100160);
+		reg &= USBHS_IO_MODERESET;
+		if (mode)
+			reg |= USBHS_IO_SAFEMODE;
+		else
+			reg |= USBHS_IO_CLKMODE;
+		omap_writew(reg, 0x4A100160);
+
+		break;
+
+	case OMAP_EHCI_PORT_MODE_TLL:
+		/* TODO */
+
+		break;
+	case OMAP_USBHS_PORT_MODE_UNUSED:
+		/* FALLTHROUGH */
+	default:
+		break;
+	}
+
+	return;
 }
 
 
@@ -1779,6 +1855,46 @@ ok_end:
 }
 
 
+static int usbhs_is_ehciport0_connected(struct uhhtll_hcd_omap *omap)
+{
+	enum usbhs_omap3_port_mode *portmode = &(omap->platdata.port_mode[0]);
+	u32 reg;
+
+	if (portmode[0] == OMAP_EHCI_PORT_MODE_PHY) {
+
+		/* usbhs clocks are expected to be already enabled */
+		reg  = uhhtll_omap_read(omap->ehci_res.regs, EHCI_PORTSC_0);
+
+		return reg&EHCI_PORTSC_CCS;
+	}
+
+	return 0;
+}
+
+
+static void usbhs_ehci_devoff_suspend(struct uhhtll_hcd_omap *omap)
+{
+	enum usbhs_omap3_port_mode *portmode = &(omap->platdata.port_mode[0]);
+
+	usbhs_phy_safe = 1;
+	usbhs_4430ehci_phy_mux(portmode, usbhs_phy_safe);
+
+}
+
+
+static void usbhs_ehci_devoff_resume(struct uhhtll_hcd_omap *omap)
+{
+	enum usbhs_omap3_port_mode *portmode = &(omap->platdata.port_mode[0]);
+
+	if (usbhs_phy_safe) {
+		usbhs_phy_safe = 0;
+		usbhs_4430ehci_phy_mux(portmode, usbhs_phy_safe);
+	}
+}
+
+
+
+
 static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata)
 {
 	struct uhhtll_hcd_omap *omap = &uhhtll;
@@ -1911,6 +2027,7 @@ static int uhhtll_drv_suspend(enum driver_type drvtype)
 	struct uhhtll_hcd_omap *omap = &uhhtll;
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
 	int ret = 0;
+	int is_ehciport0;
 
 	if (!omap->pdev) {
 		pr_err("UHH not yet intialized\n");
@@ -1924,10 +2041,13 @@ static int uhhtll_drv_suspend(enum driver_type drvtype)
 	if ((drvtype == OMAP_EHCI) &&
 		test_bit(USBHS_EHCI_LOADED, &omap->event_state)) {
 		if (!test_bit(USBHS_EHCI_SUSPENED, &omap->event_state)) {
+			is_ehciport0 = usbhs_is_ehciport0_connected(omap);
 			usbhs_ehci_io_wakeup(pdata->port_mode, 1);
 			usbhs_ehci_clk(omap, 0);
 			set_bit(USBHS_EHCI_SUSPENED, &omap->event_state);
 			usbhs_disable(omap, 0);
+			if (!is_ehciport0)
+				usbhs_ehci_devoff_suspend(omap);
 		}
 	} else if ((drvtype == OMAP_OHCI) &&
 		test_bit(USBHS_OHCI_LOADED , &omap->event_state)) {
@@ -1962,6 +2082,7 @@ static int uhhtll_drv_resume(enum driver_type drvtype)
 		test_bit(USBHS_EHCI_LOADED, &omap->event_state)) {
 		if (test_and_clear_bit(USBHS_EHCI_SUSPENED,
 			&omap->event_state)) {
+			usbhs_ehci_devoff_resume(omap);
 			ret = usbhs_enable(omap, 0);
 			usbhs_ehci_io_wakeup(pdata->port_mode, 0);
 			usbhs_ehci_clk(omap, 1);
