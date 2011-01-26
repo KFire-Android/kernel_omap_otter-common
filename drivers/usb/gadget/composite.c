@@ -1011,7 +1011,8 @@ unknown:
 		case USB_RECIP_INTERFACE:
 			if (cdev->config == NULL)
 				return value;
-
+			if (!cdev->config || w_index >= MAX_CONFIG_INTERFACES)
+				break;
 			f = cdev->config->interface[intf];
 			break;
 
