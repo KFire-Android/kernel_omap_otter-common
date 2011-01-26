@@ -293,3 +293,13 @@ config OMAP_ALLOW_OSWR
 	  Select this option to enable OSWR support.
 	  Which means the Logic of power domains can be lost now
 	  unlike the CSWR wherein the logic is retained
+
+config OMAP4_PMD_CLKS_ENABLE
+	bool "Enable debug clocks (trace & STM)"
+	depends on ARCH_OMAP4
+	default n
+	help
+	  Select this option to enable l3_instr_ick, l3_main_3_ick and
+	  ocp_wp_noc_ick at boot-time, which are needed for debugging on OMAP4.
+	  Even without this option set it is possible to enable these clocks
+	  at run-time via debugfs.
