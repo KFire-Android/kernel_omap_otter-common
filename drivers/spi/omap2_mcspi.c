@@ -566,14 +566,14 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 		}
 	}
 
-	if (tx != NULL) {
-		omap_start_dma(mcspi_dma->dma_tx_channel);
-		omap2_mcspi_set_dma_req(spi, 0, 1);
-	}
-
 	if (rx != NULL) {
 		omap_start_dma(mcspi_dma->dma_rx_channel);
 		omap2_mcspi_set_dma_req(spi, 1, 1);
+	}
+
+	if (tx != NULL) {
+		omap_start_dma(mcspi_dma->dma_tx_channel);
+		omap2_mcspi_set_dma_req(spi, 0, 1);
 	}
 
 	if (tx != NULL) {
