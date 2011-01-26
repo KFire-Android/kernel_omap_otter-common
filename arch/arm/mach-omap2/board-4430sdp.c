@@ -1477,6 +1477,21 @@ static void enable_rtc_gpio(void){
 	return;
 }
 
+/* Disable default configuration of VREF_EN to minimize DDR leakage */
+static void omap4_lpddr2_config() {
+	int control_io1_3;
+	int control_io2_3;
+
+	control_io1_3 =
+		omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_3);
+	control_io2_3 =
+		omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_3);
+	omap4_ctrl_pad_writel(control_io1_3 & 0xFFFFFFF0,
+		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_3);
+	omap4_ctrl_pad_writel(control_io2_3 & 0xFFFFFFF0,
+		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_3);
+}
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1487,6 +1502,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_mux_init(board_mux, package);
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
+	omap4_lpddr2_config();
 	omap_init_emif_timings();
 
 	enable_rtc_gpio();
