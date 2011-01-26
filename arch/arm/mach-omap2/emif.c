@@ -608,6 +608,11 @@ static void setup_registers(u32 emif_nr, struct emif_regs *regs,
 	__raw_writel(EMIF_PWR_MGMT_CTRL_SHDW,
 		     base + OMAP44XX_EMIF_PWR_MGMT_CTRL_SHDW);
 
+	/* Enable self refresh mode */
+	__raw_writel(EMIF_PWR_MGMT_CTRL | 0x200,
+		base + OMAP44XX_EMIF_PWR_MGMT_CTRL);
+
+
 	__raw_writel(regs->temp_alert_config,
 		     base + OMAP44XX_EMIF_TEMP_ALERT_CONFIG);
 
