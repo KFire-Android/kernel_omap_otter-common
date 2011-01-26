@@ -226,12 +226,13 @@ static inline void twl6040_write_reg_cache(struct snd_soc_codec *codec,
 static int twl6040_read_reg_volatile(struct snd_soc_codec *codec,
 			unsigned int reg)
 {
+	struct twl6040_codec *twl6040 = codec->control_data;
 	u8 value = 0;
 
 	if (reg >= TWL6040_CACHEREGNUM)
 		return -EIO;
 
-	twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &value, reg);
+	value = twl6040_reg_read(twl6040, reg);
 	twl6040_write_reg_cache(codec, reg, value);
 
 	return value;
@@ -243,11 +244,13 @@ static int twl6040_read_reg_volatile(struct snd_soc_codec *codec,
 static int twl6040_write(struct snd_soc_codec *codec,
 			unsigned int reg, unsigned int value)
 {
+	struct twl6040_codec *twl6040 = codec->control_data;
+
 	if (reg >= TWL6040_CACHEREGNUM)
 		return -EIO;
 
 	twl6040_write_reg_cache(codec, reg, value);
-	return twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, value, reg);
+	return twl6040_reg_write(twl6040, reg, value);
 }
 
 static void twl6040_init_vio_regs(struct snd_soc_codec *codec)
@@ -483,10 +486,11 @@ static void twl6040_accessory_work(struct work_struct *work)
 static irqreturn_t twl6040_naudint_handler(int irq, void *data)
 {
 	struct snd_soc_codec *codec = data;
+	struct twl6040_codec *twl6040 = codec->control_data;
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 	u8 intid = 0;
 
-	twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &intid, TWL6040_REG_INTID);
+	intid = twl6040_reg_read(twl6040, TWL6040_REG_INTID);
 
 	if (intid & TWL6040_THINT)
 		dev_alert(codec->dev, "die temp over-limit detection\n");
@@ -780,6 +784,7 @@ static int twl6040_add_widgets(struct snd_soc_codec *codec)
 static int twl6040_power_up_completion(struct snd_soc_codec *codec,
 					int naudint)
 {
+	struct twl6040_codec *twl6040 = codec->control_data;
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 	int time_left;
 	u8 intid = 0;
@@ -788,8 +793,7 @@ static int twl6040_power_up_completion(struct snd_soc_codec *codec,
 				msecs_to_jiffies(144));
 
 	if (!time_left) {
-		twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &intid,
-							TWL6040_REG_INTID);
+		intid = twl6040_reg_read(twl6040, TWL6040_REG_INTID);
 		if (!(intid & TWL6040_READYINT)) {
 			dev_err(codec->dev, "timeout waiting for READYINT\n");
 			return -ETIMEDOUT;
@@ -953,6 +957,7 @@ static int twl6040_hw_params(struct snd_pcm_substream *substream,
 static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
 {
 	struct snd_soc_codec *codec = codec_dai->codec;
+	struct twl6040_codec *twl6040 = codec->control_data;
 	int hs_gain, hfl_gain, hfr_gain;
 
 	hfl_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HFLGAIN);
@@ -960,12 +965,9 @@ static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
 	hs_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HSGAIN);
 
 	if (mute) {
-		twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0x1D,
-				 TWL6040_REG_HFLGAIN);
-		twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0x1D,
-				 TWL6040_REG_HFRGAIN);
-		twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, 0xFF,
-				 TWL6040_REG_HSGAIN);
+		twl6040_reg_write(twl6040, TWL6040_REG_HFLGAIN, 0x1D);
+		twl6040_reg_write(twl6040, TWL6040_REG_HFRGAIN, 0x1D);
+		twl6040_reg_write(twl6040, TWL6040_REG_HSGAIN, 0xFF);
 	} else {
 		twl6040_write(codec, TWL6040_REG_HFLGAIN, hfl_gain);
 		twl6040_write(codec, TWL6040_REG_HFRGAIN, hfr_gain);
@@ -1201,6 +1203,8 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	int ret = 0;
 	u8 icrev = 0, intmr = TWL6040_ALLINT_MSK;
 
+	codec->control_data = dev_get_drvdata(codec->dev->parent);
+
 	priv = kzalloc(sizeof(struct twl6040_data), GFP_KERNEL);
 	if (priv == NULL)
 		return -ENOMEM;
@@ -1208,7 +1212,7 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 
 	priv->codec = codec;
 
-	twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &icrev, TWL6040_REG_ASICREV);
+	icrev = twl6040_reg_read(codec->control_data, TWL6040_REG_ASICREV);
 
 	if (twl_codec && (icrev > 0))
 		audpwron = twl_codec->audpwron_gpio;

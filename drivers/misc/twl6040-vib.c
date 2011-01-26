@@ -36,6 +36,7 @@ struct vib_data {
 	spinlock_t lock;
 
 	struct twl4030_codec_vibra_data *pdata;
+	struct twl6040_codec *twl6040;
 
 	int vib_power_state;
 	int vib_state;
@@ -45,6 +46,7 @@ struct vib_data *misc_data;
 
 static void vib_set(int on)
 {
+	struct twl6040_codec *twl6040 = misc_data->twl6040;
 	u8 lppllctl = 0, hppllctl = 0;
 	u8 reg = 0;
 
@@ -55,47 +57,34 @@ static void vib_set(int on)
 		 *	 components.
 		 */
 		lppllctl = TWL6040_LPLLENA;
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				 lppllctl, TWL6040_REG_LPPLLCTL);
+		twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
 		mdelay(5);
 		lppllctl &= ~TWL6040_HPLLSEL;
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				 lppllctl, TWL6040_REG_LPPLLCTL);
-		twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-				&hppllctl, TWL6040_REG_HPPLLCTL);
+		twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
+		hppllctl = twl6040_reg_read(twl6040, TWL6040_REG_HPPLLCTL);
 		hppllctl &= ~TWL6040_HPLLENA;
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				 hppllctl, TWL6040_REG_HPPLLCTL);
+		twl6040_reg_write(twl6040, TWL6040_REG_HPPLLCTL, hppllctl);
 		lppllctl &= ~TWL6040_LPLLFIN;
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				 lppllctl, TWL6040_REG_LPPLLCTL);
+		twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
 
-		twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-				&reg, TWL6040_REG_VIBCTLL);
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				(reg | TWL6040_VIBENAL | TWL6040_VIBCTRLLP),
-				TWL6040_REG_VIBCTLL);
+		reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLL);
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLL,
+				  reg | TWL6040_VIBENAL | TWL6040_VIBCTRLLP);
 
-		twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-				&reg, TWL6040_REG_VIBCTLR);
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				(reg | TWL6040_VIBENAR | TWL6040_VIBCTRLRN),
-				TWL6040_REG_VIBCTLR);
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			0x32, TWL6040_REG_VIBDATL);
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			0x32, TWL6040_REG_VIBDATR);
+		reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLR);
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLR,
+				  reg | TWL6040_VIBENAR | TWL6040_VIBCTRLRN);
 
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATL, 0x32);
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATR, 0x32);
 	} else {
-		twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-			&reg, TWL6040_REG_VIBCTLL);
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			(reg & ~TWL6040_VIBENAL), TWL6040_REG_VIBCTLL);
+		reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLL)
+			& ~TWL6040_VIBENAL;
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLL, reg);
 
-		twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-			&reg, TWL6040_REG_VIBCTLR);
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			(reg & ~TWL6040_VIBENAR), TWL6040_REG_VIBCTLR);
+		reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLR)
+			& ~TWL6040_VIBENAR;
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLR, reg);
 	}
 }
 
@@ -182,6 +171,7 @@ static int vib_probe(struct platform_device *pdev)
 	}
 
 	data->pdata = pdata;
+	data->twl6040 = dev_get_drvdata(pdev->dev.parent);
 
 	INIT_WORK(&data->vib_work, vib_update);
 

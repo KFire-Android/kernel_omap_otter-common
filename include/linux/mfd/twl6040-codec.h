@@ -24,6 +24,8 @@
 #ifndef __TWL6040_CODEC_H__
 #define __TWL6040_CODEC_H__
 
+#include <linux/mfd/core.h>
+
 #define TWL6040_REG_ASICID		0x01
 #define TWL6040_REG_ASICREV		0x02
 #define TWL6040_REG_INTID		0x03
@@ -152,11 +154,31 @@
 
 #define TWL6040_PLUGCOMP		0x02
 
+#define TWL6040_CODEC_CELLS		2
+
 enum twl6040_codec_res {
 	TWL6040_CODEC_RES_POWER = 0,
 	TWL6040_CODEC_RES_APLL,
 	TWL6040_CODEC_RES_MAX,
 };
+
+struct twl6040_codec_resource {
+	int request_count;
+	u8 reg;
+	u8 mask;
+};
+
+struct twl6040_codec {
+	unsigned int audio_mclk;
+	struct mutex mutex;
+	struct mutex io_mutex;
+	struct twl6040_codec_resource resource[TWL6040_CODEC_RES_MAX];
+	struct mfd_cell cells[TWL6040_CODEC_CELLS];
+};
+
+int twl6040_reg_read(struct twl6040_codec *twl6040, unsigned int reg);
+int twl6040_reg_write(struct twl6040_codec *twl6040, unsigned int reg,
+		      u8 val);
 
 int twl6040_codec_disable_resource(enum twl6040_codec_res id);
 int twl6040_codec_enable_resource(enum twl6040_codec_res id);

@@ -39,11 +39,14 @@ struct vibra_info {
 	struct work_struct	play_work;
 
 	bool			enabled;
-	bool 			coexist;
+	bool			coexist;
+
+	struct twl6040_codec	*twl6040;
 };
 
 static void vibra_enable(struct vibra_info *info)
 {
+	struct twl6040_codec *twl6040 = info->twl6040;
 	u8 lppllctl, hppllctl;
 	u8 reg;
 
@@ -55,44 +58,36 @@ static void vibra_enable(struct vibra_info *info)
 	hppllctl = TWL6040_MCLK_38400KHZ | TWL6040_HPLLSQRENA |
 		   TWL6040_HPLLBP | TWL6040_HPLLENA;
 	hppllctl &= ~TWL6040_HPLLSQRBP & ~TWL6040_HPLLRST;
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			hppllctl, TWL6040_REG_HPPLLCTL);
+	twl6040_reg_write(twl6040, TWL6040_REG_HPPLLCTL, hppllctl);
 	lppllctl = TWL6040_HPLLSEL | TWL6040_LPLLENA;
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			lppllctl, TWL6040_REG_LPPLLCTL);
+	twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
 	udelay(100);
 	lppllctl &= ~TWL6040_LPLLENA;
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			lppllctl, TWL6040_REG_LPPLLCTL);
+	twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
 
-	twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-			&reg, TWL6040_REG_VIBCTLL);
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			(reg | TWL6040_VIBENAL | TWL6040_VIBCTRLLP),
-			TWL6040_REG_VIBCTLL);
+	reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLL);
+	twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLL,
+			  reg | TWL6040_VIBENAL | TWL6040_VIBCTRLLP);
 
-	twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-			&reg, TWL6040_REG_VIBCTLR);
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			(reg | TWL6040_VIBENAR | TWL6040_VIBCTRLRN),
-			TWL6040_REG_VIBCTLR);
+	reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLR);
+	twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLR,
+			  reg | TWL6040_VIBENAR | TWL6040_VIBCTRLRN);
 
 	info->enabled = true;
 }
 
 static void vibra_disable(struct vibra_info *info)
 {
+	struct twl6040_codec *twl6040 = info->twl6040;
 	u8 reg;
 
-	twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-			&reg, TWL6040_REG_VIBCTLL);
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			(reg & ~TWL6040_VIBENAL), TWL6040_REG_VIBCTLL);
+	reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLL)
+		& ~TWL6040_VIBENAL;
+	twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLL, reg);
 
-	twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE,
-			&reg, TWL6040_REG_VIBCTLR);
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			(reg & ~TWL6040_VIBENAR), TWL6040_REG_VIBCTLR);
+	reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLR)
+		& ~TWL6040_VIBENAR;
+	twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLR, reg);
 
 	info->enabled = false;
 }
@@ -101,16 +96,14 @@ static void vibra_play_work(struct work_struct *work)
 {
 	struct vibra_info *info = container_of(work,
 				struct vibra_info, play_work);
+	struct twl6040_codec *twl6040 = info->twl6040;
 
 	if (!info->enabled)
 		vibra_enable(info);
 
 	/* TODO: Set direction and speed to vibra */
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			0x32, TWL6040_REG_VIBDATL);
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-			0x32, TWL6040_REG_VIBDATR);
-
+	twl6040_reg_write(twl6040, TWL6040_REG_VIBDATL, 0x32);
+	twl6040_reg_write(twl6040, TWL6040_REG_VIBDATR, 0x32);
 }
 
 static int vibra_play(struct input_dev *input, void *data,
@@ -174,6 +167,7 @@ static int __devinit twl6040_vibra_probe(struct platform_device *pdev)
 
 	info->dev = &pdev->dev;
 	info->coexist = pdata->coexist;
+	info->twl6040 = dev_get_drvdata(pdev->dev.parent);
 	INIT_WORK(&info->play_work, vibra_play_work);
 
 	info->input_dev = input_allocate_device();

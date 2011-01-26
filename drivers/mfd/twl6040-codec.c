@@ -30,51 +30,59 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/twl6040-codec.h>
 
-#define TWL6040_CODEC_CELLS	2
-
 static struct platform_device *twl6040_codec_dev;
 
-struct twl6040_codec_resource {
-	int request_count;
-	u8 reg;
-	u8 mask;
-};
+int twl6040_reg_read(struct twl6040_codec *twl6040, unsigned int reg)
+{
+	int ret;
+	u8 val;
 
-struct twl6040_codec {
-	unsigned int audio_mclk;
-	struct mutex mutex;
-	struct twl6040_codec_resource resource[TWL6040_CODEC_RES_MAX];
-	struct mfd_cell cells[TWL6040_CODEC_CELLS];
-};
+	mutex_lock(&twl6040->io_mutex);
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, reg);
+	if (ret < 0) {
+		mutex_unlock(&twl6040->io_mutex);
+		return ret;
+	}
+	mutex_unlock(&twl6040->io_mutex);
+
+	return val;
+}
+EXPORT_SYMBOL(twl6040_reg_read);
+
+int twl6040_reg_write(struct twl6040_codec *twl6040, unsigned int reg, u8 val)
+{
+	int ret;
+
+	mutex_lock(&twl6040->io_mutex);
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, reg);
+	mutex_unlock(&twl6040->io_mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL(twl6040_reg_write);
 
 static int twl6040_codec_set_resource(enum twl6040_codec_res id, int enable)
 {
-	struct twl6040_codec *codec = platform_get_drvdata(twl6040_codec_dev);
+	struct twl6040_codec *twl6040 = platform_get_drvdata(twl6040_codec_dev);
 	u8 val = 0;
 
-	twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE, &val,
-			codec->resource[id].reg);
+	val = twl6040_reg_read(twl6040, twl6040->resource[id].reg);
 
 	if (enable)
-		val |= codec->resource[id].mask;
+		val |= twl6040->resource[id].mask;
 	else
-		val &= ~codec->resource[id].mask;
+		val &= ~twl6040->resource[id].mask;
 
-	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE,
-				val, codec->resource[id].reg);
+	twl6040_reg_write(twl6040, twl6040->resource[id].reg, val);
 
 	return val;
 }
 
 static inline int twl6040_codec_get_resource(enum twl6040_codec_res id)
 {
-	struct twl6040_codec *codec = platform_get_drvdata(twl6040_codec_dev);
-	u8 val = 0;
+	struct twl6040_codec *twl6040 = platform_get_drvdata(twl6040_codec_dev);
 
-	twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE, &val,
-			codec->resource[id].reg);
-
-	return val;
+	return twl6040_reg_read(twl6040, twl6040->resource[id].reg);
 }
 
 int twl6040_codec_enable_resource(enum twl6040_codec_res id)
@@ -136,47 +144,48 @@ EXPORT_SYMBOL_GPL(twl6040_codec_disable_resource);
 
 static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 {
-	struct twl6040_codec *codec;
+	struct twl6040_codec *twl6040;
 	struct twl4030_codec_data *pdata = pdev->dev.platform_data;
 	struct mfd_cell *cell = NULL;
-	int ret, childs = 0;
+	int ret, children = 0;
 
 	if(!pdata) {
 		dev_err(&pdev->dev, "Platform data is missing\n");
 		return -EINVAL;
 	}
 
-	codec = kzalloc(sizeof(struct twl6040_codec), GFP_KERNEL);
-	if (!codec)
+	twl6040 = kzalloc(sizeof(struct twl6040_codec), GFP_KERNEL);
+	if (!twl6040)
 		return -ENOMEM;
 
-	platform_set_drvdata(pdev, codec);
+	platform_set_drvdata(pdev, twl6040);
 
 	twl6040_codec_dev = pdev;
-	mutex_init(&codec->mutex);
-	codec->audio_mclk = pdata->audio_mclk;
+	mutex_init(&twl6040->mutex);
+	mutex_init(&twl6040->io_mutex);
+	twl6040->audio_mclk = pdata->audio_mclk;
 
 	if (pdata->audio) {
-		cell = &codec->cells[childs];
+		cell = &twl6040->cells[children];
 		cell->name = "twl6040-codec";
 		cell->platform_data = pdata->audio;
 		cell->data_size = sizeof(*pdata->audio);
-		childs++;
+		children++;
 	}
 
 	if (pdata->vibra) {
-		cell = &codec->cells[childs];
+		cell = &twl6040->cells[children];
 		cell->name = "vib-twl6040";
 		cell->platform_data = pdata->vibra;
 		cell->data_size = sizeof(*pdata->vibra);
-		childs++;
+		children++;
 	}
 
-	if (childs) {
-		ret = mfd_add_devices(&pdev->dev, pdev->id, codec->cells,
-				      childs, NULL, 0);
+	if (children) {
+		ret = mfd_add_devices(&pdev->dev, pdev->id, twl6040->cells,
+				      children, NULL, 0);
 	} else {
-		dev_err(&pdev->dev, "No platform data found for childs\n");
+		dev_err(&pdev->dev, "No platform data found for children\n");
 		ret = -ENODEV;
 	}
 
@@ -184,18 +193,18 @@ static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 		return 0;
 
 	platform_set_drvdata(pdev, NULL);
-	kfree(codec);
+	kfree(twl6040);
 	twl6040_codec_dev = NULL;
 	return ret;
 }
 
 static int __devexit twl6040_codec_remove(struct platform_device *pdev)
 {
-	struct twl6040_codec *codec = platform_get_drvdata(pdev);
+	struct twl6040_codec *twl6040 = platform_get_drvdata(pdev);
 
 	mfd_remove_devices(&pdev->dev);
 	platform_set_drvdata(pdev, NULL);
-	kfree(codec);
+	kfree(twl6040);
 	twl6040_codec_dev = NULL;
 
 	return 0;
