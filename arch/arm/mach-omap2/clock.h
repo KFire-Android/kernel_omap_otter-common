@@ -138,6 +138,8 @@ extern const struct clksel_rate gpt_32k_rates[];
 extern const struct clksel_rate gpt_sys_rates[];
 extern const struct clksel_rate gfx_l3_rates[];
 
+extern unsigned long mpu_timer_rate;
+
 #ifdef CONFIG_CPU_FREQ
 
 #ifdef CONFIG_ARCH_OMAP2

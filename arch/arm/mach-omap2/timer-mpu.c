@@ -25,22 +25,17 @@
 #include <asm/smp_twd.h>
 #include <asm/localtimer.h>
 
+#include "clock.h"
+
 /*
  * Setup the local clock events for a CPU.
  */
 void __cpuinit local_timer_setup(struct clock_event_device *evt)
 {
 #ifdef CONFIG_CPU_FREQ
-	struct clk *mpu_clk;
 	unsigned long timer_rate;
 
-	mpu_clk = clk_get(NULL, "dpll_mpu_ck");
-	if (!mpu_clk) {
-		pr_err("timer-mpu: Could not get mpu_clk\n");
-		BUG();
-	}
-	/* Timet clock = mpu clk/2 */
-	timer_rate = (clk_get_rate(mpu_clk)) >> 1;
+	timer_rate = (mpu_timer_rate >> 1);
 
 	/*
 	 * Select the lowest timer target clock freq so that

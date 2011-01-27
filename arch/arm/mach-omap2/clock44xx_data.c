@@ -33,6 +33,8 @@
 #include "prm-regbits-44xx.h"
 #include "scrm_44xx.h"
 
+unsigned long mpu_timer_rate;
+
 /* Root clocks */
 
 static struct clk extalt_clkin_ck = {
@@ -3282,6 +3284,7 @@ int __init omap4xxx_clk_init(void)
 {
 	struct omap_clk *c;
 	u32 cpu_clkflg = 0;
+	struct clk *mpu_clk;
 
 	if (cpu_is_omap44xx()) {
 		cpu_mask = RATE_IN_4430;
@@ -3309,6 +3312,15 @@ int __init omap4xxx_clk_init(void)
 	 * enable other clocks as necessary
 	 */
 	clk_enable_init_clocks();
+
+	mpu_clk = clk_get(NULL, "dpll_mpu_ck");
+	if (!mpu_clk) {
+		pr_err("timer-mpu: Could not get mpu_clk\n");
+		BUG();
+	}
+
+	/* Timet clock = mpu clk/2 */
+	mpu_timer_rate = clk_get_rate(mpu_clk);
 
 	return 0;
 }
