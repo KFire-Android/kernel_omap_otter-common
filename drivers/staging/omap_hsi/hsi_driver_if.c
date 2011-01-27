@@ -348,6 +348,7 @@ int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 
 	ch->write_data.addr = addr;
 	ch->write_data.size = size;
+	ch->write_data.lch = -1;
 
 	if (size == 1)
 		err = hsi_driver_enable_write_interrupt(ch, addr);
@@ -407,6 +408,7 @@ int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 
 	ch->read_data.addr = addr;
 	ch->read_data.size = size;
+	ch->read_data.lch = -1;
 
 	if (size == 1)
 		err = hsi_driver_enable_read_interrupt(ch, addr);
