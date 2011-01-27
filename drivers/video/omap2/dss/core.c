@@ -832,15 +832,18 @@ static void omap_dss_shutdown(struct platform_device *pdev)
 static int omap_dss_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	DSSDBG("suspend %d\n", state.event);
-
+	request_dss_suspend();
 	return dss_suspend_all_devices();
 }
 
 static int omap_dss_resume(struct platform_device *pdev)
 {
-	DSSDBG("resume\n");
+	int val;
 
-	return dss_resume_all_devices();
+	DSSDBG("resume\n");
+	request_dss_resume();
+	val = dss_resume_all_devices();
+	return val;
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND

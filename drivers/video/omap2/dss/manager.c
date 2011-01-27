@@ -1320,6 +1320,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	struct writeback_cache_data *wbc;
 	DSSDBG("omap_dss_mgr_apply(%s)\n", mgr->name);
 
+	request_dss();
 	if (!dss_get_mainclk_state()) {
 		DSSERR("mainclk disabled while trying"
 			"mgr_apply, returning\n");
