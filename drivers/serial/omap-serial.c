@@ -32,7 +32,6 @@
 #include <linux/dma-mapping.h>
 #include <linux/clk.h>
 #include <linux/serial_core.h>
-#include <linux/wakelock.h>
 
 #include <asm/irq.h>
 #include <plat/dma.h>
@@ -43,7 +42,6 @@
 #include "../../arch/arm/mach-omap2/mux.h"
 
 static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
-static struct wake_lock uart_lock;
 
 /* Forward declaration of functions */
 static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
@@ -222,8 +220,8 @@ ignore_char:
 	 * This has to be relooked when the actual use case sec
 	 * narios would handle these wake-locks.
 	 */
-	if (up->pdev->id == UART2)
-		wake_lock_timeout(&uart_lock, 1*HZ);
+	if (up->plat_hold_wakelock)
+		(up->plat_hold_wakelock());
 	spin_unlock(&up->port.lock);
 	tty_flip_buffer_push(tty);
 	spin_lock(&up->port.lock);
@@ -253,8 +251,8 @@ static void transmit_chars(struct uart_omap_port *up)
 			/* This wake lock has to moved out to use case drivers
 			 * which require these.
 			 */
-			if (up->pdev->id == UART2)
-				wake_lock_timeout(&uart_lock, 1*HZ);
+			if (up->plat_hold_wakelock)
+				(up->plat_hold_wakelock());
 			break;
 		}
 	} while (--count > 0);
@@ -377,9 +375,9 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	unsigned int iir, lsr;
 	unsigned long flags;
 
-	if (omap_is_console_port(&up->port))
-		wake_lock_timeout(&uart_lock, 5 * HZ);
-
+	if (omap_is_console_port(&up->port) &&
+			 (up->plat_hold_wakelock))
+				(up->plat_hold_wakelock());
 #ifdef CONFIG_PM
 	/*
 	 * This will enable the clock for some reason if the
@@ -1103,8 +1101,8 @@ static int serial_omap_resume(struct platform_device *dev)
 	struct uart_omap_port *up = platform_get_drvdata(dev);
 
 	if (omap_is_console_port(&up->port))
-		wake_lock_timeout(&uart_lock, 5 * HZ);
-
+			if (up->plat_hold_wakelock)
+				(up->plat_hold_wakelock());
 	if (up)
 		uart_resume_port(&serial_omap_reg, &up->port);
 
@@ -1188,8 +1186,8 @@ static int serial_omap_start_rxdma(struct uart_omap_port *up)
 				usecs_to_jiffies(up->uart_dma.rx_poll_rate));
 	up->uart_dma.rx_dma_used = true;
 
-	if (up->pdev->id == UART2)
-		wake_lock_timeout(&uart_lock, 1*HZ);
+	if (up->plat_hold_wakelock)
+		(up->plat_hold_wakelock());
 
 	return ret;
 }
@@ -1244,8 +1242,8 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
 		serial_omap_stop_tx(&up->port);
 		up->uart_dma.tx_dma_used = false;
 		spin_unlock(&(up->uart_dma.tx_lock));
-		if (up->pdev->id == UART2)
-			wake_lock_timeout(&uart_lock, 1*HZ);
+			if (up->plat_hold_wakelock)
+				(up->plat_hold_wakelock());
 	} else {
 
 #ifdef CONFIG_PM
@@ -1324,6 +1322,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 	up->port.irqflags = omap_up_info->irqflags;
 	up->port.uartclk = omap_up_info->uartclk;
 	up->uart_dma.uart_base = mem->start;
+	up->plat_hold_wakelock = omap_up_info->plat_hold_wakelock;
 
 	if (omap_up_info->use_dma) {
 		up->uart_dma.uart_dma_tx = dma_tx->start;
@@ -1486,7 +1485,6 @@ static int __init serial_omap_init(void)
 {
 	int ret;
 
-	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
 	ret = uart_register_driver(&serial_omap_reg);
 	if (ret != 0)
 		return ret;

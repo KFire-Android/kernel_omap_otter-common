@@ -880,6 +880,7 @@ void __init omap_serial_init_port(int port,
 	omap_up.irqflags = IRQF_SHARED;
 	omap_up.flags = UPF_BOOT_AUTOCONF | UPF_SHARE_IRQ;
 	omap_up.idle_timeout = platform_data->idle_timeout;
+	omap_up.plat_hold_wakelock = platform_data->plat_hold_wakelock;
 
 	pdata = &omap_up;
 	pdata_size = sizeof(struct omap_uart_port_info);

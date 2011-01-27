@@ -52,6 +52,7 @@
 #include <plat/omap-serial.h>
 #include <plat/serial.h>
 #endif
+#include <linux/wakelock.h>
 #include <plat/opp_twl_tps.h>
 #include <plat/mmc.h>
 #include <plat/syntm12xx.h>
@@ -83,6 +84,7 @@
 
 #define TWL6030_RTC_GPIO 6
 
+static struct wake_lock uart_lock;
 static struct platform_device sdp4430_hdmi_audio_device = {
 	.name		= "hdmi-dai",
 	.id		= -1,
@@ -1347,6 +1349,12 @@ static struct omap_volt_vc_data vc_config = {
 	.vdd2_off = 0,		/* 0 v */
 };
 
+void plat_hold_wakelock(void)
+{
+	wake_lock_timeout(&uart_lock, 2*HZ);
+	return;
+}
+
 static struct omap_uart_port_info omap_serial_platform_data[] = {
 	{
 		.use_dma	= 0,
@@ -1355,6 +1363,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
 		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
 		.flags		= 1,
+		.plat_hold_wakelock = NULL,
 	},
 	{
 		.use_dma	= 0,
@@ -1363,6 +1372,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
 		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
 		.flags		= 1,
+		.plat_hold_wakelock = plat_hold_wakelock,
 	},
 	{
 		.use_dma	= 0,
@@ -1371,6 +1381,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
 		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
 		.flags		= 1,
+		.plat_hold_wakelock = plat_hold_wakelock,
 	},
 	{
 		.use_dma	= 0,
@@ -1379,6 +1390,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
 		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
 		.flags		= 1,
+		.plat_hold_wakelock = NULL,
 	},
 	{
 		.flags		= 0
@@ -1510,6 +1522,8 @@ static void __init omap_4430sdp_init(void)
 	omap4_display_init();
 	omap_disp_led_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+
+	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
 	omap_serial_init(omap_serial_platform_data);
 	omap4_twl6030_hsmmc_init(mmc);
 
