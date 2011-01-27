@@ -50,21 +50,6 @@ static void vibra_enable(struct vibra_info *info)
 	u8 lppllctl, hppllctl;
 	u8 reg;
 
-	/* Sequence to enable HPPLL for Vibra
-	 * TODO: This should be in TWL6040 MFD driver to
-	 *	 ensure syncronization between audio and vibra
-	 *	 components.
-	*/
-	hppllctl = TWL6040_MCLK_38400KHZ | TWL6040_HPLLSQRENA |
-		   TWL6040_HPLLBP | TWL6040_HPLLENA;
-	hppllctl &= ~TWL6040_HPLLSQRBP & ~TWL6040_HPLLRST;
-	twl6040_reg_write(twl6040, TWL6040_REG_HPPLLCTL, hppllctl);
-	lppllctl = TWL6040_HPLLSEL | TWL6040_LPLLENA;
-	twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
-	udelay(100);
-	lppllctl &= ~TWL6040_LPLLENA;
-	twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
-
 	reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLL);
 	twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLL,
 			  reg | TWL6040_VIBENAL | TWL6040_VIBCTRLLP);
