@@ -117,7 +117,6 @@ struct workqueue_struct *irq_wq;
 static DECLARE_WAIT_QUEUE_HEAD(audio_wq);
 static bool hot_plug_notify_canceled;
 static DECLARE_DELAYED_WORK(hot_plug_notify_work, hdmi_notify_queue);
-static DEFINE_SPINLOCK(irqstatus_lock);
 
 struct hdmi_work_struct {
 	struct work_struct work;
@@ -1060,7 +1059,8 @@ int hdmi_init(struct platform_device *pdev)
 	irq_wq = create_singlethread_workqueue("HDMI WQ");
 
 	hdmi_irq = platform_get_irq(pdev, 0);
-	r = request_irq(hdmi_irq, hdmi_irq_handler, 0, "OMAP HDMI", (void *)0);
+	r = request_threaded_irq(hdmi_irq, NULL, hdmi_irq_handler, IRQF_ONESHOT,
+				 "OMAP HDMI", (void *)0);
 
 	return omap_dss_register_driver(&hdmi_driver);
 }
@@ -1638,11 +1638,19 @@ static inline void hdmi_handle_irq_work(int r)
 
 static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 {
-	unsigned long flags;
 	int r = 0;
+	u32 val = 0;
 
 	/* process interrupt in critical section to handle conflicts */
-	spin_lock_irqsave(&irqstatus_lock, flags);
+
+	request_dss();
+	/* Force Enable: set CM_DSS_DSS_CLKCTRL.MODULEMODE = ENABLE
+	  * pm_runtime_get_sync() doesn't set the MODULEMODE bits everytime
+	  * force a MODULE ON for now
+	  */
+	val = omap_readl(0x4a009120);
+	val = val | 0x02;
+	omap_writel(val, 0x4a009120);
 
 	HDMI_W1_HPD_handler(&r);
 	DSSDBG("Received IRQ r=%08x\n", r);
@@ -1655,7 +1663,6 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 	if (r & HDMI_DISCONNECT)
 		hdmi_connected = false;
 
-	spin_unlock_irqrestore(&irqstatus_lock, flags);
 
 	hdmi_handle_irq_work(r | in_reset);
 
