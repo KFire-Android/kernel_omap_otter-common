@@ -137,6 +137,34 @@ void vibrator_haptic_fire(int value)
 	vib_enable(&misc_data->dev, value);
 }
 
+#if CONFIG_PM
+static int vib_suspend(struct device *dev)
+{
+	struct vib_data *data = dev_get_drvdata(dev);
+
+	twl6040_disable(data->twl6040);
+
+	return 0;
+}
+
+static int vib_resume(struct device *dev)
+{
+	struct vib_data *data = dev_get_drvdata(dev);
+
+	twl6040_enable(data->twl6040);
+
+	return 0;
+}
+#else
+#define vib_suspend NULL
+#define vib_resume  NULL
+#endif
+
+static const struct dev_pm_ops vib_pm_ops = {
+	.suspend = vib_suspend,
+	.resume = vib_resume,
+};
+
 static int vib_probe(struct platform_device *pdev)
 {
 	struct twl4030_codec_vibra_data *pdata = pdev->dev.platform_data;
@@ -216,6 +244,7 @@ static struct platform_driver twl6040_vib_driver = {
 	.driver = {
 		   .name = VIB_NAME,
 		   .owner = THIS_MODULE,
+		   .pm = &vib_pm_ops,
 	},
 };
 
