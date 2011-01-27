@@ -133,6 +133,30 @@ static void twl6040_vibra_close(struct input_dev *input)
 		vibra_disable(info);
 }
 
+#if CONFIG_PM
+static int vib_suspend(struct device *dev)
+{
+	struct vib_data *data = dev_get_drvdata(dev);
+
+	twl6040_disable(data->twl6040);
+
+	return 0;
+}
+
+static int vib_resume(struct device *dev)
+{
+	struct vib_data *data = dev_get_drvdata(dev);
+
+	twl6040_enable(data->twl6040);
+
+	return 0;
+}
+#else
+#define vib_suspend NULL
+#define vib_resume  NULL
+#endif
+
+
 static int __devinit twl6040_vibra_probe(struct platform_device *pdev)
 {
 	struct twl4030_codec_vibra_data *pdata = pdev->dev.platform_data;
@@ -216,6 +240,7 @@ static struct platform_driver twl6040_vibra_driver = {
 	.driver		= {
 		.name	= "twl6040-vibra",
 		.owner 	= THIS_MODULE,
+		.pm	= &vib_pm_ops,
 	},
 };
 
