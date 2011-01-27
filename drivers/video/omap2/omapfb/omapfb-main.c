@@ -1562,7 +1562,7 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 #ifdef CONFIG_TILER_OMAP
 		unsigned long pstride;
 		size_t psize;
-		pstride = tiler_stride(tiler_get_natural_addr((void *)&paddr));
+		pstride = tiler_stride(tiler_get_natural_addr((void *)paddr));
 		psize = h * pstride;
 		vaddr = __arm_multi_strided_ioremap(1, &paddr, &psize,
 			&pstride, (unsigned long *) &fbi->fix.line_length,
