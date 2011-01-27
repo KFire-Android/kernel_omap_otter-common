@@ -1483,10 +1483,13 @@ abehal_status abe_disable_gain(u32 id, u32 p)
 	ramp = abe_desired_ramp_delay_ms[mixer_offset + p];
 	f_g = GAIN_MUTE;
 	if (!(abe_muted_gains_indicator[mixer_offset + p] & 0x02)) {
-		abe_muted_gains_decibel[mixer_offset + p] =
-			abe_desired_gains_decibel[mixer_offset + p];
-		/* mute the gain */
-		abe_write_gain(id, f_g, ramp, p);
+		/* Check if we are in mute */
+		if (!(abe_muted_gains_indicator[mixer_offset + p] & 0x01)) {
+			abe_muted_gains_decibel[mixer_offset + p] =
+				abe_desired_gains_decibel[mixer_offset + p];
+			/* mute the gain */
+			abe_write_gain(id, f_g, ramp, p);
+		}
 		abe_muted_gains_indicator[mixer_offset + p] |= 0x02;
 	}
 	return 0;
