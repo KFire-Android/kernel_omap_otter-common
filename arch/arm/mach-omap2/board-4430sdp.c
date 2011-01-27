@@ -1478,7 +1478,7 @@ static void enable_rtc_gpio(void){
 }
 
 /* Disable default configuration of VREF_EN to minimize DDR leakage */
-static void omap4_lpddr2_config() {
+static void omap4_lpddr2_config(void) {
 	int control_io1_3;
 	int control_io2_3;
 
