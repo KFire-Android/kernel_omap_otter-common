@@ -169,6 +169,14 @@ abehal_status abe_reload_fw(void)
 	abe_dbg_activity_log_write_pointer = 0;
 	abe_irq_dbg_read_ptr = 0;
 
+	/* Restore Gains not managed by the drivers */
+	abe_write_gain(GAINS_SPLIT, GAIN_0dB, RAMP_100MS, GAIN_LEFT_OFFSET);
+	abe_write_gain(GAINS_SPLIT, GAIN_0dB, RAMP_100MS, GAIN_RIGHT_OFFSET);
+	abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_100MS, GAIN_LEFT_OFFSET);
+	abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_100MS, GAIN_RIGHT_OFFSET);
+	abe_write_gain(GAINS_DL2, GAIN_0dB, RAMP_100MS, GAIN_LEFT_OFFSET);
+	abe_write_gain(GAINS_DL2, GAIN_0dB, RAMP_100MS, GAIN_RIGHT_OFFSET);
+
 	return 0;
 }
 EXPORT_SYMBOL(abe_reload_fw);
