@@ -265,13 +265,13 @@ static int v4l2_rot_to_dss_rot(const unsigned int v4l2_rotation,
 {
 	switch (v4l2_rotation) {
 	case 90:
-		*rotation = OMAP_DSS_ROT_270;
+		*rotation = OMAP_DSS_ROT_90;
 		break;
 	case 180:
 		*rotation = OMAP_DSS_ROT_180;
 		break;
 	case 270:
-		*rotation = OMAP_DSS_ROT_90;
+		*rotation = OMAP_DSS_ROT_270;
 		break;
 	case 0:
 		*rotation = OMAP_DSS_ROT_0;
