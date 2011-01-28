@@ -1232,7 +1232,6 @@ static void omapvid_process_frame_work(struct work_struct *work)
 	if (!w->process || !next_frame(vout))
 		omapvid_process_frame(w->vout);
 	mutex_unlock(&vout->lock);
-	kfree(w);
 }
 
 void omap_vout_isr(void *arg, unsigned int irqstatus)
@@ -1242,7 +1241,7 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 	struct omapvideo_info *ovid;
 	struct omap_dss_device *cur_display;
 	struct omap_vout_device *vout = (struct omap_vout_device *)arg;
-	struct omap_vout_work *w;
+	struct omap_vout_work *w = vout->work;
 	int process = false;
 	unsigned long flags;
 	int irq = 0;
@@ -1336,15 +1335,14 @@ intlace:
 	/* if any manager is in manual update mode, we must schedule work */
 	if (manually_updated(vout)) {
 		/* queue process frame */
-		w = kzalloc(sizeof(*w), GFP_ATOMIC);
+
 		if (w) {
 			w->vout = vout;
 			w->process = process;
 			INIT_WORK(&w->work, omapvid_process_frame_work);
 			queue_work(vout->workqueue, &w->work);
-		} else {
-			printk(KERN_WARNING "Failed to create process_frame_work\n");
-		}
+		} else
+			printk(KERN_ERR "Failed to get allocate work struct\n");
 	} else {
 		/* process frame here for auto update screens */
 		if (process && next_frame(vout))
@@ -2664,6 +2662,7 @@ static int vidioc_reqbufs(struct file *file, void *fh,
 		dmabuf->sglen = 1;
 	}
 #endif
+
 reqbuf_err:
 	mutex_unlock(&vout->lock);
 	return ret;
@@ -3163,6 +3162,7 @@ static int __init omap_vout_setup_video_data(struct omap_vout_device *vout)
 	mutex_init(&vout->lock);
 
 	vfd->minor = -1;
+
 	return 0;
 
 }
@@ -3330,7 +3330,12 @@ static int __init omap_vout_create_video_devices(struct platform_device *pdev)
 		vout->workqueue = create_singlethread_workqueue("OMAPVOUT");
 		if (vout->workqueue == NULL) {
 			ret = -ENOMEM;
-			goto error;
+			goto error_q;
+		}
+		vout->work = kzalloc(sizeof(struct omap_vout_work), GFP_KERNEL);
+		if (vout->work == NULL) {
+			ret = -ENOMEM;
+			goto error_q;
 		}
 
 #endif
@@ -3338,7 +3343,7 @@ static int __init omap_vout_create_video_devices(struct platform_device *pdev)
 		 */
 		if (omap_vout_setup_video_data(vout) != 0) {
 			ret = -ENOMEM;
-			goto error_q;
+			goto error;
 		}
 
 		/* Allocate default number of buffers for the video streaming
@@ -3373,6 +3378,7 @@ error2:
 		omap_vout_free_buffers(vout);
 error1:
 		video_device_release(vfd);
+		kfree(vout->work);
 error_q:
 #ifndef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
 		destroy_workqueue(vout->workqueue);
@@ -3432,6 +3438,7 @@ static void omap_vout_cleanup_device(struct omap_vout_device *vout)
 #ifndef CONFIG_FB_OMAP2_FORCE_AUTO_UPDATE
 	flush_workqueue(vout->workqueue);
 	destroy_workqueue(vout->workqueue);
+	kfree(vout->work);
 #endif
 	kfree(vout);
 }
