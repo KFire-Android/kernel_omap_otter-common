@@ -643,7 +643,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
 			    OMAP_I2C_STAT_XUDF)) {
 		omap_i2c_init(dev);
-		return -EIO;
+		return -EAGAIN;
 	}
 
 	if (dev->cmd_err & OMAP_I2C_STAT_NACK) {
@@ -1126,6 +1126,7 @@ omap_i2c_probe(struct platform_device *pdev)
 	strlcpy(adap->name, "OMAP I2C adapter", sizeof(adap->name));
 	adap->algo = &omap_i2c_algo;
 	adap->dev.parent = &pdev->dev;
+	adap->retries = 2;
 
 	/* i2c device drivers may be active on return from add_adapter() */
 	adap->nr = pdev->id;
