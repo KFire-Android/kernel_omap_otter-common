@@ -635,19 +635,12 @@ static int omap_dss_set_manager(struct omap_overlay *ovl,
 	ovl->manager = mgr;
 
 	/* do not set channel out if DSS is off */
-	if (!dss_get_mainclk_state())
-		return 0;
+	if (!dss_get_mainclk_state()) {
+		DSSERR("DSS clock not active, setting ovl manager failed\n");
+		return -EIO;
+	}
 
-	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
-	/* XXX: on manual update display, in auto update mode, a bug happens
-	 * here. When an overlay is first enabled on LCD, then it's disabled,
-	 * and the manager is changed to TV, we sometimes get SYNC_LOST_DIGIT
-	 * errors. Waiting before changing the channel_out fixes it. I'm
-	 * guessing that the overlay is still somehow being used for the LCD,
-	 * but I don't understand how or why. */
-	msleep(40);
 	dispc_set_channel_out(ovl->id, mgr->id);
-	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1);
 
 	return 0;
 }
