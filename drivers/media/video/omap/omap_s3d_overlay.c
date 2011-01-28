@@ -668,10 +668,8 @@ static int change_display(struct s3d_ovl_device *dev,
 		return -EINVAL;
 	}
 
-	if (dev->streaming) {
-		S3DERR("cannot change display while streaming!\n");
-		return -EBUSY;
-	}
+	if (dev->cur_disp == display)
+		return 0;
 
 	mgr = display->manager;
 	if (!mgr) {
@@ -692,7 +690,9 @@ static int change_display(struct s3d_ovl_device *dev,
 	}
 
 	if (mgr->device != display) {
+		omapdss_display_disable(display);
 		if (mgr->device) {
+			omapdss_display_disable(mgr->device);
 			r = mgr->unset_device(mgr);
 			if (r || mgr->device) {
 				S3DERR("failed to unbind display from manager\n");
@@ -744,13 +744,14 @@ static inline int bind_ovl2display(struct s3d_ovl_device *dev,
 		return r;
 	}
 
-	r = ovl->dssovl->unset_manager(ovl->dssovl);
-	if (r && mgr != NULL) {
-		S3DERR("couldn't unbind manager from ovl\n");
-		return r;
+	if (mgr) {
+		r = ovl->dssovl->unset_manager(ovl->dssovl);
+		if (r) {
+			S3DERR("couldn't unbind manager from ovl\n");
+			return r;
+		}
 	}
-	if (mgr)
-		mgr->apply(mgr);
+
 	r = ovl->dssovl->set_manager(ovl->dssovl, display->manager);
 	if (r) {
 		S3DERR("couldn't bind to manager\n");
@@ -2769,6 +2770,8 @@ static int vidioc_s_ctrl(struct file *file, void *fh, struct v4l2_control *a)
 			int r;
 			if (dev->streaming)
 				return -EBUSY;
+			if (dev->cur_disp_idx == a->value)
+				return 0;
 			mutex_lock(&dev->lock);
 			r = change_display(dev, get_display(a->value));
 			if (!r)
