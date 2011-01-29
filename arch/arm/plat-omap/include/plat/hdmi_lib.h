@@ -25,6 +25,7 @@
 #define HDMI_HDCP		0x58007000
 
 #define HDMI_WP_AUDIO_DATA	0x8Cul
+#define USE_HDMI_AUDIO_WORKAROUND
 
 #define DBG(format, ...) \
 		printk(KERN_DEBUG "hdmi: " format, ## __VA_ARGS__)
@@ -429,6 +430,16 @@ enum hdmi_core_av_csc{
 	RGB_TO_YUV = 0x1,
 	YUV_TO_RGB = 0x2
 };
+
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+/* HDMI audio workaround states */
+enum hdmi_audio_notify_state {
+	HDMI_NOTIFY_EVENT_NOTREG,
+	HDMI_NOTIFY_WAIT_FOR_IPC,
+	HDMI_NOTIFY_EVENT_REG,
+};
+#endif
+
 
 struct hdmi_core_audio_config {
 	enum hdmi_core_fs		fs; /* 0=32KHz - 1=44.1KHz */

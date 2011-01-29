@@ -43,6 +43,18 @@
 #include <linux/seq_file.h>
 #include <linux/hrtimer.h>
 
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+#include <syslink/ipc.h>
+#include <syslink/notify.h>
+#include <syslink/notify_driver.h>
+#include <syslink/notifydefs.h>
+#include <syslink/notify_driverdefs.h>
+
+#define SYS_M3 2
+#define HDMI_AUDIO_WA_EVENT 5
+#define HDMI_AUDIO_WA_EVENT_ACK 5
+#endif
+
 /* HDMI PHY */
 #define HDMI_TXPHY_TX_CTRL			0x0ul
 #define HDMI_TXPHY_DIGITAL_CTRL			0x4ul
@@ -209,6 +221,10 @@ static struct {
 	struct hdmi_core_infoframe_avi avi_param;
 	struct mutex mutex;
 	struct list_head notifier_head;
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+	u32 notify_event_reg;
+	u32 cts_interval;
+#endif
 } hdmi;
 
 static inline void hdmi_write_reg(u32 base, u16 idx, u32 val)
@@ -634,8 +650,13 @@ static int hdmi_core_audio_config(u32 name,
 	WR_REG_32(name, HDMI_CORE_AV__ACR_CTRL,
 		/* MCLK_EN (0: Mclk is not used) */
 		(0x0 << 2) |
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+		/* Disable ACR packets while audio is not present */
+		(0x1 << 0) |
+#else
 		/* CTS Request Enable (1:Packet Enable, 0:Disable) */
 		(0x1 << 1) |
+#endif
 		/* CTS Source Select (1:SW, 0:HW) */
 		(audio_cfg->cts_mode << 0));
 
@@ -1290,13 +1311,69 @@ static int hdmi_w1_audio_config_dma(u32 name, struct hdmi_audio_dma *audio_dma)
 	return ret;
 }
 
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+void hdmi_notify_event_ack_func(u16 proc_id, u16 line_id, u32 event_id,
+							u32 *arg, u32 payload)
+{
+	if (payload && (event_id == HDMI_AUDIO_WA_EVENT_ACK))
+		REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 1, 31, 31);
+}
+
+static int hdmi_syslink_notifier_call(struct notifier_block *nb,
+						unsigned long val, void *v)
+{
+	int status = 0;
+	u16 *proc_id = (u16 *)v;
+
+	switch ((int)val) {
+	case IPC_START:
+		if (*proc_id == multiproc_get_id("SysM3")) {
+			status = notify_register_event(SYS_M3, 0,
+				HDMI_AUDIO_WA_EVENT_ACK, (notify_fn_notify_cbck)
+				hdmi_notify_event_ack_func,	(void *)NULL);
+			if (status == NOTIFY_S_SUCCESS)
+				hdmi.notify_event_reg = HDMI_NOTIFY_EVENT_REG;
+		}
+		return status;
+	case IPC_STOP:
+		if (*proc_id == multiproc_get_id("SysM3")) {
+			status = notify_unregister_event(SYS_M3, 0,
+				HDMI_AUDIO_WA_EVENT_ACK, (notify_fn_notify_cbck)
+				hdmi_notify_event_ack_func,	(void *)NULL);
+			if (status == NOTIFY_S_SUCCESS)
+				hdmi.notify_event_reg =
+					HDMI_NOTIFY_EVENT_NOTREG;
+		}
+		return status;
+	case IPC_CLOSE:
+	default:
+		return status;
+	}
+}
+
+static struct notifier_block hdmi_syslink_notify_block = {
+	.notifier_call = hdmi_syslink_notifier_call,
+};
+#endif
+
 static void hdmi_w1_audio_enable(void)
 {
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+	if (hdmi.notify_event_reg == HDMI_NOTIFY_EVENT_REG)
+		notify_send_event(SYS_M3, 0, HDMI_AUDIO_WA_EVENT,
+					hdmi.cts_interval, 0);
+#else
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 1, 31, 31);
+#endif
 }
 
 static void hdmi_w1_audio_disable(void)
 {
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+	/* Payload=0 disables workaround */
+	if (hdmi.notify_event_reg == HDMI_NOTIFY_EVENT_REG)
+		notify_send_event(SYS_M3, 0, HDMI_AUDIO_WA_EVENT, 0, 0);
+#endif
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 0, 31, 31);
 }
 
@@ -1339,6 +1416,10 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	u32 r, deep_color = 0;
 
 	u32 av_name = HDMI_CORE_AV;
+
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+	u32 cts_interval_qtt, cts_interval_res;
+#endif
 
 	/* HDMI */
 	struct hdmi_video_timing VideoTimingParam;
@@ -1477,6 +1558,19 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	r = hdmi_core_video_config(&v_core_cfg);
 
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+	if (cfg->pixel_clock && deep_color) {
+		cts_interval_qtt = 1000000 /
+			((cfg->pixel_clock * deep_color) / 100);
+		cts_interval_res = 1000000 %
+			((cfg->pixel_clock * deep_color) / 100);
+		hdmi.cts_interval = cts_interval_res*audio_cfg.n/
+					((cfg->pixel_clock * deep_color) / 100);
+		hdmi.cts_interval += cts_interval_qtt*audio_cfg.n;
+	} else
+		hdmi.cts_interval = 0;
+#endif
+
 	hdmi_core_audio_config(av_name, &audio_cfg);
 	hdmi_core_audio_mode_enable(av_name);
 
@@ -1532,6 +1626,13 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	r = hdmi_core_av_packet_config(av_name, repeat_param);
 
 	REG_FLD_MOD(av_name, HDMI_CORE_AV__HDMI_CTRL, cfg->hdmi_dvi, 0, 0);
+
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+	if (hdmi.notify_event_reg == HDMI_NOTIFY_EVENT_NOTREG) {
+		r = ipc_register_notifier(&hdmi_syslink_notify_block);
+		hdmi.notify_event_reg = HDMI_NOTIFY_WAIT_FOR_IPC;
+	}
+#endif
 	return r;
 }
 
@@ -1547,6 +1648,9 @@ int hdmi_lib_init(void){
 
 	hdmi.base_core = hdmi.base_wp + 0x400;
 	hdmi.base_core_av = hdmi.base_wp + 0x900;
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+	hdmi.notify_event_reg = HDMI_NOTIFY_EVENT_NOTREG;
+#endif
 
 	mutex_init(&hdmi.mutex);
 	INIT_LIST_HEAD(&hdmi.notifier_head);
@@ -1560,6 +1664,9 @@ int hdmi_lib_init(void){
 
 void hdmi_lib_exit(void){
 	iounmap(hdmi.base_wp);
+#ifdef USE_HDMI_AUDIO_WORKAROUND
+	ipc_unregister_notifier(&hdmi_syslink_notify_block);
+#endif
 }
 
 int hdmi_set_irqs(int i)
