@@ -628,6 +628,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.supported_be = mm_lp_be,
 		.num_be = ARRAY_SIZE(mm_lp_be),
 		.fe_playback_channels = 2,
+		.no_host_mode = SND_SOC_DAI_LINK_OPT_HOST,
 	},
 #ifdef CONFIG_SND_OMAP_SOC_HDMI
 	{
