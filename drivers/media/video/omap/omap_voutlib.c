@@ -117,6 +117,8 @@ int omap_vout_new_window(struct v4l2_rect *crop,
 	win->w = new_win->w;
 	win->field = new_win->field;
 	win->chromakey = new_win->chromakey;
+        if (cpu_is_omap44xx())
+            win->zorder = new_win->zorder;
 
 	/* Adjust the cropping window to allow for resizing limitation */
 	if (cpu_is_omap24xx()) {
