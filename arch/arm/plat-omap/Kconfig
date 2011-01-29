@@ -279,6 +279,15 @@ config OMAP_PM
 	bool "OMAP PM layer implementation"
 endchoice
 
+config OMAP_HDMI_AUDIO_WA
+	bool "Enable HDMI audio workaround"
+	depends on SYSLINK_PROC
+	default y
+	help
+	  Enable HDMI audio workaround for OMAP ES2.0, ES2.1 and
+	  ES2.2 revisions. This allows to send ACR packets at
+	  the rate described in HDMI 1.3a.
+
 endmenu
 
 endif
