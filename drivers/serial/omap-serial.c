@@ -221,7 +221,7 @@ ignore_char:
 	 * narios would handle these wake-locks.
 	 */
 	if (up->plat_hold_wakelock)
-		(up->plat_hold_wakelock());
+		(up->plat_hold_wakelock(up, WAKELK_RX));
 	spin_unlock(&up->port.lock);
 	tty_flip_buffer_push(tty);
 	spin_lock(&up->port.lock);
@@ -252,7 +252,7 @@ static void transmit_chars(struct uart_omap_port *up)
 			 * which require these.
 			 */
 			if (up->plat_hold_wakelock)
-				(up->plat_hold_wakelock());
+				(up->plat_hold_wakelock(up, WAKELK_TX));
 			break;
 		}
 	} while (--count > 0);
@@ -377,7 +377,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 
 	if (omap_is_console_port(&up->port) &&
 			 (up->plat_hold_wakelock))
-				(up->plat_hold_wakelock());
+				(up->plat_hold_wakelock(up, WAKELK_IRQ));
 #ifdef CONFIG_PM
 	/*
 	 * This will enable the clock for some reason if the
@@ -1102,7 +1102,7 @@ static int serial_omap_resume(struct platform_device *dev)
 
 	if (omap_is_console_port(&up->port))
 			if (up->plat_hold_wakelock)
-				(up->plat_hold_wakelock());
+				(up->plat_hold_wakelock(up, WAKELK_RESUME));
 	if (up)
 		uart_resume_port(&serial_omap_reg, &up->port);
 
@@ -1187,7 +1187,7 @@ static int serial_omap_start_rxdma(struct uart_omap_port *up)
 	up->uart_dma.rx_dma_used = true;
 
 	if (up->plat_hold_wakelock)
-		(up->plat_hold_wakelock());
+		(up->plat_hold_wakelock(up, WAKELK_RX));
 
 	return ret;
 }
@@ -1243,7 +1243,7 @@ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data)
 		up->uart_dma.tx_dma_used = false;
 		spin_unlock(&(up->uart_dma.tx_lock));
 			if (up->plat_hold_wakelock)
-				(up->plat_hold_wakelock());
+				(up->plat_hold_wakelock(up, WAKELK_TX));
 	} else {
 
 #ifdef CONFIG_PM

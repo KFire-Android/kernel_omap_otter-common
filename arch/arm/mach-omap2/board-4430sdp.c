@@ -83,6 +83,7 @@
 #define LED_TOGGLE3		0x92
 
 #define TWL6030_RTC_GPIO 6
+#define BLUETOOTH_UART UART2
 
 static struct wake_lock uart_lock;
 static struct platform_device sdp4430_hdmi_audio_device = {
@@ -1349,9 +1350,18 @@ static struct omap_volt_vc_data vc_config = {
 	.vdd2_off = 0,		/* 0 v */
 };
 
-void plat_hold_wakelock(void)
+void plat_hold_wakelock(void *up, int flag)
 {
-	wake_lock_timeout(&uart_lock, 2*HZ);
+	struct uart_omap_port *up2 = (struct uart_omap_port *)up;
+	/*Specific wakelock for bluetooth usecases*/
+	if ((up2->pdev->id == BLUETOOTH_UART)
+		&& ((flag == WAKELK_TX) || (flag == WAKELK_RX)))
+		wake_lock_timeout(&uart_lock, 2*HZ);
+
+	/*Specific wakelock for console usecases*/
+	if ((up2->pdev->id != BLUETOOTH_UART)
+		&& ((flag == WAKELK_IRQ) || (flag == WAKELK_RESUME)))
+		wake_lock_timeout(&uart_lock, 5*HZ);
 	return;
 }
 
