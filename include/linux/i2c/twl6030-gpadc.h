@@ -50,7 +50,7 @@ struct twl6030_value {
 };
 
 struct twl6030_gpadc_request {
-	u16 channels;
+	u32 channels;
 	u16 do_avg;
 	u16 method;
 	u16 type;

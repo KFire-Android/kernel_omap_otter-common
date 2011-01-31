@@ -272,7 +272,7 @@ static int twl6030_gpadc_channel_raw_read(struct twl6030_gpadc_data *gpadc,
 }
 
 static int twl6030_gpadc_read_channels(struct twl6030_gpadc_data *gpadc,
-		u8 reg_base, u16 channels, struct twl6030_gpadc_request *req)
+		u8 reg_base, u32 channels, struct twl6030_gpadc_request *req)
 {
 	int count = 0;
 	u8 reg, i;
