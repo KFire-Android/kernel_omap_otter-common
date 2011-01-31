@@ -1692,29 +1692,29 @@ static int aess_set_opp_mode(void)
 		case 25:
 			abe_set_opp_processing(ABE_OPP25);
 			udelay(250);
-			omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 98304000);
 			break;
 		case 50:
 		default:
 			abe_set_opp_processing(ABE_OPP50);
 			udelay(250);
-			omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 98304000);
 			break;
 		}
 	} else if (abe->opp < opp) {
 		/* Increase OPP mode */
 		switch (opp) {
 		case 25:
-			omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 98304000);
 			abe_set_opp_processing(ABE_OPP25);
 			break;
 		case 50:
-			omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 98304000);
 			abe_set_opp_processing(ABE_OPP50);
 			break;
 		case 100:
 		default:
-			omap_device_set_rate(&pdev->dev, &pdev->dev, 196000000);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 196608000);
 			abe_set_opp_processing(ABE_OPP100);
 			break;
 		}
@@ -1790,7 +1790,7 @@ static int aess_restore_context(struct abe_data *abe)
 	struct omap4_abe_dsp_pdata *pdata = pdev->dev.platform_data;
 	int loss_count = 0;
 
-	omap_device_set_rate(&pdev->dev, &pdev->dev, 98000000);
+	omap_device_set_rate(&pdev->dev, &pdev->dev, 98304000);
 
 	if (pdata->get_context_loss_count)
 		loss_count = pdata->get_context_loss_count(&pdev->dev);
