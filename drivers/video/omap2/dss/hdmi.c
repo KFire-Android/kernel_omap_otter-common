@@ -1777,7 +1777,7 @@ static int hdmi_reset(struct omap_dss_device *dssdev,
 		hdmi_power = HDMI_POWER_MIN;
 	}
 	if (phase & OMAP_DSS_RESET_ON) {
-		if (hdmi_power == HDMI_POWER_FULL) {
+		if (hdmi_power == HDMI_POWER_MIN) {
 			r = hdmi_reconfigure(dssdev);
 			hdmi_notify_pwrchange(HDMI_EVENT_POWERPHYON);
 			in_reset = 0;
