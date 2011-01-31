@@ -96,6 +96,8 @@ static int dapm_down_seq[] = {
 	[snd_soc_dapm_post] = 12,
 };
 
+int soc_dpcm_runtime_update(struct snd_soc_dapm_widget *);
+
 static void pop_wait(u32 pop_time)
 {
 	if (pop_time)
@@ -1849,6 +1851,7 @@ static int soc_dapm_mux_update_power(struct snd_soc_dapm_widget *widget,
 	if (found) {
 		dapm_mark_dirty(widget, "mux change");
 		dapm_power_widgets(widget->dapm, SND_SOC_DAPM_STREAM_NOP);
+		soc_dpcm_runtime_update(widget);
 	}
 
 	return 0;
@@ -1893,6 +1896,7 @@ static int soc_dapm_mixer_update_power(struct snd_soc_dapm_widget *widget,
 	if (found) {
 		dapm_mark_dirty(widget, "mixer update");
 		dapm_power_widgets(widget->dapm, SND_SOC_DAPM_STREAM_NOP);
+		soc_dpcm_runtime_update(widget);
 	}
 
 	return 0;
