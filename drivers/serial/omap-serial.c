@@ -1447,6 +1447,14 @@ EXPORT_SYMBOL(omap4_uart_cts_wakeup);
  * force idle mode for errata 2.15 implementation.
  */
 
+void omap_uart_update_jiffies(int num)
+{
+	struct uart_omap_port *up = ui[num];
+
+	up->port_activity = jiffies;
+}
+EXPORT_SYMBOL(omap_uart_update_jiffies);
+
 int omap_uart_active(int num, u32 timeout)
 {
 	struct uart_omap_port *up = ui[num];

@@ -65,6 +65,7 @@ struct omap_uart_state {
 
 	void __iomem *wk_st;
 	void __iomem *wk_en;
+	u32 padconf_wake_ev;
 	u32 wk_mask;
 	u32 padconf;
 	u32 dma_enabled;
@@ -476,8 +477,14 @@ void omap_uart_resume_idle(int num)
 			/* Check for IO pad wakeup */
 			if (cpu_is_omap44xx() && uart->padconf) {
 				u32 p = omap_readl(uart->padconf);
-				if (p & OMAP44XX_PADCONF_WAKEUPEVENT0)
-					omap_uart_block_sleep(uart);
+				if ((p & OMAP44XX_PADCONF_WAKEUPEVENT0) &&
+						(uart->padconf_wake_ev != 0)) {
+					if ((omap_readl(uart->padconf_wake_ev) &
+						(uart->wk_mask))) {
+						omap_uart_block_sleep(uart);
+						omap_uart_update_jiffies(1);
+					}
+				}
 			}
 
 			/* Check for normal UART wakeup */
@@ -508,6 +515,11 @@ int omap_uart_can_sleep(void)
 			continue;
 
 		if (!uart->can_sleep) {
+			can_sleep = 0;
+			continue;
+		}
+
+		if (omap_uart_active(uart->num, uart->timeout)) {
 			can_sleep = 0;
 			continue;
 		}
@@ -620,19 +632,33 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 	} else {
 		uart->wk_en = 0;
 		uart->wk_st = 0;
+		uart->padconf_wake_ev = 0;
 		uart->wk_mask = 0;
 		switch (uart->num) {
 		case 0:
+			/* FIXME : Reference platform does not have a device
+			 * connected to UART Port 0. Since UART1 is muxable
+			 * need to add code to find corresponding wake event
+			 * pad.
+			 */
 			uart->padconf = 0x4A1000E4;
+			uart->padconf_wake_ev = 0;
+			uart->wk_mask = 0;
 			break;
 		case 1:
 			uart->padconf = 0x4A10011C;
+			uart->padconf_wake_ev = 0x4A1001E4;
+			uart->wk_mask = 0x0000F000;
 			break;
 		case 2:
 			uart->padconf = 0x4A100144;
+			uart->padconf_wake_ev = 0x4A1001E8;
+			uart->wk_mask = 0x0000000F;
 			break;
 		case 3:
 			uart->padconf = 0x4A10015C;
+			uart->padconf_wake_ev = 0x4A1001E8;
+			uart->wk_mask = 0x000C0000;
 			break;
 		}
 	}
