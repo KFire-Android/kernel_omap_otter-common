@@ -2287,8 +2287,6 @@ static int vidioc_s_fmt_vid_overlay(struct file *file, void *fh,
 			info.pos_y = vout->win.w.top;
 			info.out_width = vout->win.w.width;
 			info.out_height = vout->win.w.height;
-                        if (cpu_is_omap44xx())
-                            info.zorder = vout->win.zorder;
 
 			if (ovl->set_overlay_info(ovl, &info))
 				return -EINVAL;
@@ -2334,8 +2332,6 @@ static int vidioc_g_fmt_vid_overlay(struct file *file, void *fh,
 	win->w = vout->win.w;
 	win->field = vout->win.field;
 	win->global_alpha = vout->win.global_alpha;
-        if (cpu_is_omap44xx())
-            win->zorder = vout->win.zorder;
 
 	if (ovl->manager && ovl->manager->get_manager_info) {
 		ovl->manager->get_manager_info(ovl->manager, &info);
