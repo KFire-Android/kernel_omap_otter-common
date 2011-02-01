@@ -1030,6 +1030,13 @@ static struct twl4030_bci_platform_data sdp4430_bci_data = {
 	.tblsize			= ARRAY_SIZE(sdp4430_batt_table),
 };
 
+static void omap4_audio_conf(void)
+{
+	/* twl6040 naudint */
+	omap_mux_init_signal("sys_nirq2.sys_nirq2", \
+		OMAP_PIN_INPUT_PULLUP);
+}
+
 static struct twl4030_codec_audio_data twl6040_audio = {
 	.audio_mclk	= 38400000,
 	.audpwron_gpio  = 127,
@@ -1528,6 +1535,7 @@ static void __init omap_4430sdp_init(void)
 	omap_init_emif_timings();
 
 	enable_rtc_gpio();
+	omap4_audio_conf();
 	omap4_i2c_init();
 	omap4_display_init();
 	omap_disp_led_init();
