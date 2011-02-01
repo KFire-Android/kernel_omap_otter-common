@@ -89,6 +89,8 @@
 #include <plat/opp.h>
 #include <plat/voltage.h>
 
+#include <mach/omap4-common.h>
+
 /* These parameters are passed to _omap_device_{de,}activate() */
 #define USE_WAKEUP_LAT			0
 #define IGNORE_WAKEUP_LAT		1
@@ -886,6 +888,10 @@ int omap_device_set_rate(struct device *req_dev, struct device *dev,
 
 	pdev = container_of(dev, struct platform_device, dev);
 	od = _find_by_pdev(pdev);
+
+	/* if in low power DPLL cascading mode, bail out early */
+	if (omap4_lpmode)
+		return -EINVAL;
 
 	/*
 	 * Figure out if the desired frquency lies between the
