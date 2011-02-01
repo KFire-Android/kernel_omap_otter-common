@@ -303,3 +303,10 @@ config OMAP4_PMD_CLKS_ENABLE
 	  ocp_wp_noc_ick at boot-time, which are needed for debugging on OMAP4.
 	  Even without this option set it is possible to enable these clocks
 	  at run-time via debugfs.
+
+config OMAP4_KEEP_STATIC_DEPENDENCIES
+	bool "Keep OMAP4 Static dependencies"
+	depends on ARCH_OMAP4
+	default n
+	help
+	  Select this option to keep the static dependency mapping for OMAP4.

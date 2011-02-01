@@ -678,8 +678,13 @@ static void __init prcm_setup_regs(void)
  */
 static void __init prcm_clear_statdep_regs(void)
 {
+#ifdef CONFIG_OMAP4_KEEP_STATIC_DEPENDENCIES
+	pr_info("%s: Keep static depndencies\n", __func__);
+	return;
+#else
 	u32 reg;
 
+	pr_info("%s: Clearing static depndencies\n", __func__);
 	/* MPU towards EMIF, L3_2 and L4CFG clockdomains */
 	reg = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_2_STATDEP_MASK
 			| OMAP4430_L4CFG_STATDEP_MASK;
@@ -718,6 +723,7 @@ static void __init prcm_clear_statdep_regs(void)
 		| OMAP4430_L4CFG_STATDEP_MASK | OMAP4430_L4WKUP_STATDEP_MASK;
 	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM2_RESTORE_MOD,
 		OMAP4_CM_SDMA_STATICDEP_RESTORE_OFFSET);
+#endif
 };
 
 /**
