@@ -225,6 +225,7 @@
 #define snd_soc_get_enum_text(soc_enum, idx) \
 	(soc_enum->texts ? soc_enum->texts[idx] : soc_enum->dtexts[idx])
 
+
 /*
  * Component probe and remove ordering levels for components with runtime
  * dependencies.
@@ -814,7 +815,6 @@ struct snd_soc_dai_link {
 	unsigned int be_id;
 	/* This DAI can support no host IO (no pcm data is copied to from host) */
 	unsigned int no_host_mode:2;
-
 
 	/* pmdown_time is ignored at stop */
 	unsigned int ignore_pmdown_time:1;
