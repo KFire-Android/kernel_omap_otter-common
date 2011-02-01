@@ -47,26 +47,9 @@ struct vib_data *misc_data;
 static void vib_set(int on)
 {
 	struct twl6040_codec *twl6040 = misc_data->twl6040;
-	u8 lppllctl = 0, hppllctl = 0;
 	u8 reg = 0;
 
 	if (on) {
-		/* Sequence to enable HPPLL for Vibra
-		 * TODO: This should be in TWL6040 MFD driver to
-		 *	 ensure syncronization between audio and vibra
-		 *	 components.
-		 */
-		lppllctl = TWL6040_LPLLENA;
-		twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
-		mdelay(5);
-		lppllctl &= ~TWL6040_HPLLSEL;
-		twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
-		hppllctl = twl6040_reg_read(twl6040, TWL6040_REG_HPPLLCTL);
-		hppllctl &= ~TWL6040_HPLLENA;
-		twl6040_reg_write(twl6040, TWL6040_REG_HPPLLCTL, hppllctl);
-		lppllctl &= ~TWL6040_LPLLFIN;
-		twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
-
 		reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLL);
 		twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLL,
 				  reg | TWL6040_VIBENAL | TWL6040_VIBCTRLLP);
@@ -75,8 +58,6 @@ static void vib_set(int on)
 		twl6040_reg_write(twl6040, TWL6040_REG_VIBCTLR,
 				  reg | TWL6040_VIBENAR | TWL6040_VIBCTRLRN);
 
-		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATL, 0x32);
-		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATR, 0x32);
 	} else {
 		reg = twl6040_reg_read(twl6040, TWL6040_REG_VIBCTLL)
 			& ~TWL6040_VIBENAL;
@@ -124,6 +105,9 @@ static void vib_enable(struct timed_output_dev *dev, int value)
 		pr_err("%s: Invalid vibrator timer value\n", __func__);
 		return;
 	}
+
+	twl6040_reg_write(data->twl6040, TWL6040_REG_VIBDATL, 0x32);
+	twl6040_reg_write(data->twl6040, TWL6040_REG_VIBDATR, 0x32);
 
 	spin_lock_irqsave(&data->lock, flags);
 	hrtimer_cancel(&data->timer);
