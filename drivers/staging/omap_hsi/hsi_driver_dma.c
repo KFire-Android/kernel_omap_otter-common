@@ -357,6 +357,7 @@ get_info_bk:
 static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 {
 	void __iomem *base = hsi_ctrl->base;
+	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 	struct hsi_channel *ch;
 	unsigned int port;
 	unsigned int channel;
@@ -364,6 +365,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 	u32 gdd_csr;
 	dma_addr_t dma_h;
 	size_t size;
+	u8 fifo, fifo_words_avail;
 
 	spin_lock(&hsi_ctrl->lock);
 
@@ -373,9 +375,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 		dev_err(hsi_ctrl->dev, "Unable to match the DMA channel %d with"
 			" an HSI channel\n", gdd_lch);
 		return;
-	}
-/* FIXME: to remove when validated: */
-	else {
+	} else {
 		dev_dbg(hsi_ctrl->dev, "DMA event on gdd_lch=%d => port=%d, "
 			"channel=%d, read=%d\n", gdd_lch, port, channel,
 			is_read_path);
@@ -401,6 +401,21 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			hsi_driver_enable_read_interrupt(ch, NULL);
 			spin_unlock(&hsi_ctrl->lock);
 			ch->read_done(ch->dev, size / 4);
+
+			/* Check if FIFO is correctly emptied */
+			if (hsi_driver_device_is_hsi(pdev)) {
+				fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
+				fifo_words_avail =
+					hsi_get_rx_fifo_occupancy(hsi_ctrl,
+								fifo);
+				if (fifo_words_avail)
+					dev_warn(hsi_ctrl->dev,
+						"WARNING: FIFO %d not empty "
+						"after DMA copy, remaining "
+						"%d/%d frames\n",
+						fifo, fifo_words_avail,
+						HSI_HSR_FIFO_SIZE);
+			}
 		} else {	/* Write path */
 			dma_h = hsi_inl(base, HSI_GDD_CSSA_REG(gdd_lch));
 			size = hsi_inw(base, HSI_GDD_CEN_REG(gdd_lch)) * 4;

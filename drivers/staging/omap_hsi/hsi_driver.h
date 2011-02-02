@@ -246,6 +246,7 @@ long hsi_hst_buffer_reg(struct hsi_dev *hsi_ctrl,
 			unsigned int port, unsigned int channel);
 long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
 			unsigned int port, unsigned int channel);
+u8 hsi_get_rx_fifo_occupancy(struct hsi_dev *hsi_ctrl, u8 fifo);
 
 int hsi_softreset(struct hsi_dev *hsi_ctrl);
 void hsi_softreset_driver(struct hsi_dev *hsi_ctrl);

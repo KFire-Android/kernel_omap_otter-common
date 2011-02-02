@@ -66,7 +66,7 @@ int hsi_fifo_get_id(struct hsi_dev *hsi_ctrl, unsigned int channel,
 
 fifo_id_bk:
 	if (unlikely(err < 0)) {
-		dev_err(hsi_ctrl->dev, "Cannot map a fifo to the requested "
+		dev_err(hsi_ctrl->dev, "Cannot map a FIFO to the requested "
 			"params: channel:%d, port:%d; ERR=%d\n", channel, port,
 			fifo_index);
 		fifo_index = err;
@@ -288,3 +288,24 @@ long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
 		return HSI_HSR_BUFFER_CH_REG(port, channel);
 	}
 }
+
+
+/**
+ * hsi_get_rx_fifo_occupancy - Return the size of data remaining
+ *				in the given FIFO
+ * @hsi_ctrl - HSI controler data
+ * @fifo - FIFO to look at
+ *
+ * Returns the number of frames (32bits) remaining in the FIFO
+ */
+u8 hsi_get_rx_fifo_occupancy(struct hsi_dev *hsi_ctrl, u8 fifo)
+{
+	void __iomem *base = hsi_ctrl->base;
+	int hsr_mapping, mapping_words;
+
+	hsr_mapping = hsi_inl(base, HSI_HSR_MAPPING_FIFO_REG(fifo));
+	mapping_words = (hsr_mapping >> HSI_HST_MAPPING_THRESH_OFFSET) & 0xF;
+
+	return mapping_words;
+}
+

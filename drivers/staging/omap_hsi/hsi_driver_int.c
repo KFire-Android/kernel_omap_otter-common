@@ -179,6 +179,7 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 	long buff_offset;
 	int rx_poll = 0;
 	int data_read = 0;
+	int fifo, fifo_words_avail;
 
 	n_ch = ch->channel_number;
 	n_p = ch->hsi_port->port_number;
@@ -215,6 +216,17 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 
 	hsi_driver_disable_read_interrupt(ch);
 	hsi_reset_ch_read(ch);
+
+	/* Check if FIFO is correctly emptied */
+	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
+		fifo = hsi_fifo_get_id(hsi_ctrl, n_ch, n_p);
+		fifo_words_avail = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
+		if (fifo_words_avail)
+			dev_warn(hsi_ctrl->dev,
+				"WARNING: RX FIFO %d not empty after CPU copy, "
+				"remaining %d/%d frames\n",
+				fifo, fifo_words_avail, HSI_HSR_FIFO_SIZE);
+	}
 
 done:
 	spin_unlock_bh(&hsi_ctrl->lock);

@@ -213,6 +213,7 @@
 
 /* Additional registers for HSI */
 #define	HSI_HST_FIFO_COUNT			16
+#define	HSI_HST_FIFO_SIZE			8
 #define HSI_HST_MAPPING_FIFO_REG(fifo)		(HSI_HST_BASE(1) + 0x0100 +\
 						(fifo * 4))
 #define HSI_MAPPING_ENABLE		1
@@ -282,6 +283,7 @@
 
 /* Additional registers for HSI */
 #define	HSI_HSR_FIFO_COUNT		16
+#define	HSI_HSR_FIFO_SIZE		8
 #define HSI_HSR_MAPPING_FIFO_REG(fifo)	(HSI_HSR_BASE(1) + 0x0100 +\
 					(fifo * 4))
 #define HSI_HSR_MAPPING_WORDS_MASK	(0xf << 10)
