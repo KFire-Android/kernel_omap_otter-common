@@ -171,7 +171,6 @@ struct omap_vout_device {
 	bool buf_empty;
 
 	/* workqueue for manual update */
-	struct omap_vout_work *work;
 	struct workqueue_struct *workqueue;
 };
 
