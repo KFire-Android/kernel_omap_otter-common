@@ -210,6 +210,10 @@ struct uhhtll_hcd_omap {
 	struct clk		*xclk60mhsp2_ck;
 	struct clk		*utmi_p1_fck;
 	struct clk		*utmi_p2_fck;
+	struct clk		*usbhost_p1_fck;
+	struct clk		*usbtll_p1_fck;
+	struct clk		*usbhost_p2_fck;
+	struct clk		*usbtll_p2_fck;
 	struct clk		*usbtll_fck;
 	struct clk		*usbtll_ick;
 
@@ -1507,11 +1511,57 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 
 			reg |= OMAP_UHH_HOST_P1_SET_ULPIPHY;
 
-		} else {
-				omap->xclk60mhsp1_ck = NULL;
-				reg |= OMAP_UHH_HOST_P1_SET_ULPITLL;
+		} else if (pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_TLL) {
+			omap->xclk60mhsp1_ck = clk_get(&omap->pdev->dev,
+							"init_60m_fclk");
+			if (IS_ERR(omap->xclk60mhsp1_ck)) {
+				ret = PTR_ERR(omap->xclk60mhsp1_ck);
+				dev_err(&omap->pdev->dev,
+					"Unable to get Port1 ULPI clock\n");
 			}
 
+			omap->utmi_p1_fck = clk_get(&omap->pdev->dev,
+							"utmi_p1_gfclk");
+			if (IS_ERR(omap->utmi_p1_fck)) {
+				ret = PTR_ERR(omap->utmi_p1_fck);
+				dev_err(&omap->pdev->dev,
+					"Unable to get utmi_p1_fck\n");
+			}
+
+			ret = clk_set_parent(omap->utmi_p1_fck,
+						omap->xclk60mhsp1_ck);
+			if (ret != 0) {
+				dev_err(&omap->pdev->dev,
+					"Unable to set P1 f-clock\n");
+			}
+
+			omap->usbhost_p1_fck = clk_get(&omap->pdev->dev,
+						"usb_host_hs_utmi_p1_clk");
+			if (IS_ERR(omap->usbhost_p1_fck)) {
+				ret = PTR_ERR(omap->usbhost_p1_fck);
+				dev_err(&omap->pdev->dev,
+					"Unable to get HOST PORT 1 clk\n");
+			} else {
+				ret = clk_enable(omap->usbhost_p1_fck);
+			}
+
+			omap->usbtll_p1_fck = clk_get(&omap->pdev->dev,
+						"usb_tll_hs_usb_ch0_clk");
+
+			if (IS_ERR(omap->usbtll_p1_fck)) {
+				ret = PTR_ERR(omap->usbtll_p1_fck);
+				dev_err(&omap->pdev->dev,
+					"Unable to get TLL CH0 clk\n");
+			} else {
+				ret = clk_enable(omap->usbtll_p1_fck);
+			}
+
+			reg |= OMAP_UHH_HOST_P1_SET_ULPITLL;
+		} else {
+			/* OHCI serial modes. HSIC is not yet supported */
+			omap->xclk60mhsp1_ck = NULL;
+			reg |= OMAP_UHH_HOST_P1_SET_ULPITLL;
+		}
 
 		reg &= OMAP_UHH_HOST_PORT2_RESET;
 
@@ -1549,7 +1599,54 @@ static int usbhs_enable(struct uhhtll_hcd_omap *omap, int do_init)
 
 			reg |= OMAP_UHH_HOST_P2_SET_ULPIPHY;
 
+		} else if (pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_TLL) {
+			omap->xclk60mhsp2_ck = clk_get(&omap->pdev->dev,
+							"init_60m_fclk");
+			if (IS_ERR(omap->xclk60mhsp2_ck)) {
+				ret = PTR_ERR(omap->xclk60mhsp2_ck);
+				dev_err(&omap->pdev->dev,
+					"Unable to get Port2 ULPI clock\n");
+			}
+
+			omap->utmi_p2_fck = clk_get(&omap->pdev->dev,
+							"utmi_p2_gfclk");
+			if (IS_ERR(omap->utmi_p2_fck)) {
+				ret = PTR_ERR(omap->utmi_p2_fck);
+				dev_err(&omap->pdev->dev,
+					"Unable to get utmi_p2_fck\n");
+			}
+
+			ret = clk_set_parent(omap->utmi_p2_fck,
+						omap->xclk60mhsp2_ck);
+			if (ret != 0) {
+				dev_err(&omap->pdev->dev,
+					"Unable to set P2 f-clock\n");
+			}
+
+			omap->usbhost_p2_fck = clk_get(&omap->pdev->dev,
+						"usb_host_hs_utmi_p2_clk");
+			if (IS_ERR(omap->usbhost_p2_fck)) {
+				ret = PTR_ERR(omap->usbhost_p2_fck);
+				dev_err(&omap->pdev->dev,
+					"Unable to get HOST PORT 2 clk\n");
+			} else {
+				ret = clk_enable(omap->usbhost_p2_fck);
+			}
+
+			omap->usbtll_p2_fck = clk_get(&omap->pdev->dev,
+						"usb_tll_hs_usb_ch1_clk");
+
+			if (IS_ERR(omap->usbtll_p2_fck)) {
+				ret = PTR_ERR(omap->usbtll_p2_fck);
+				dev_err(&omap->pdev->dev,
+					"Unable to get TLL CH1 clk\n");
+			} else {
+				ret = clk_enable(omap->usbtll_p2_fck);
+			}
+
+			reg |= OMAP_UHH_HOST_P2_SET_ULPITLL;
 		} else {
+			/* OHCI serial modes. HSIC is not yet supported */
 			omap->xclk60mhsp2_ck = NULL;
 			reg |= OMAP_UHH_HOST_P2_SET_ULPITLL;
 		}
