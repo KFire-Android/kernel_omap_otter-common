@@ -36,6 +36,17 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap-pm.h>
 
+#define CONTROL_DEV_CONF                0x300
+#define PHY_PD				(1 << 0)
+
+#ifdef CONFIG_ARCH_OMAP4
+#define DIE_ID_REG_BASE         (L4_44XX_PHYS + 0x2000)
+#define DIE_ID_REG_OFFSET               0x200
+#else
+#define DIE_ID_REG_BASE         (L4_WK_34XX_PHYS + 0xA000)
+#define DIE_ID_REG_OFFSET               0x218
+#endif /* CONFIG_ARCH_OMAP4 */
+
 #ifdef CONFIG_USB_MUSB_SOC
 
 static const char name[] = "musb_hdrc";
@@ -49,17 +60,6 @@ static struct musb_hdrc_config musb_config = {
 	.num_eps	= 16,
 	.ram_bits	= 12,
 };
-
-#define CONTROL_DEV_CONF		0x300
-#	define PHY_PD			(1 << 0)
-
-#ifdef CONFIG_ARCH_OMAP4
-#define DIE_ID_REG_BASE		(L4_44XX_PHYS + 0x2000)
-#define DIE_ID_REG_OFFSET		0x200
-#else
-#define DIE_ID_REG_BASE		(L4_WK_34XX_PHYS + 0xA000)
-#define DIE_ID_REG_OFFSET		0x218
-#endif /* CONFIG_ARCH_OMAP4 */
 
 #ifdef CONFIG_ANDROID
 #define MAX_USB_SERIAL_NUM		17
