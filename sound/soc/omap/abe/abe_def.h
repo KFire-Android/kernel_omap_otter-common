@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -81,7 +81,7 @@
 #define CS_M1 0xFFFF
 #define CL_M1 0xFFFFFFFFL
 /*
-	Mixer ID 	 Input port ID	 Comments
+	Mixer ID	 Input port ID		Comments
 	DL1_MIXER	 0 MMDL path
 	 1 MMUL2 path
 	 2 VXDL path
@@ -188,7 +188,7 @@
  * ABE CONST AREA FOR PARAMETERS TRANSLATION
  */
 #define min_mdb (-12000)
-#define max_mdb ( 3000)
+#define max_mdb (3000)
 #define sizeof_db2lin_table (1 + ((max_mdb - min_mdb)/100))
 #define sizeof_alpha_iir_table 61
 #define sizeof_beta_iir_table 61
@@ -263,12 +263,12 @@
 #define c_feat_read_eq3 6
 #define c_write_eq3 7
 /* max number of gain to be controlled by HAL */
-#define MAX_NBGAIN_CMEM 34
+#define MAX_NBGAIN_CMEM 36
 /*
  * MACROS
  */
-#define maximum(a,b) (((a)<(b))?(b):(a))
-#define minimum(a,b) (((a)>(b))?(b):(a))
-#define absolute(a) (((a)>0)?(a):((-1)*(a)))
+#define maximum(a, b) (((a) < (b)) ? (b) : (a))
+#define minimum(a, b) (((a) > (b)) ? (b) : (a))
+#define absolute(a) (((a) > 0) ? (a) : ((-1)*(a)))
 #define HAL_VERSIONS 9
 #endif/* _ABE_DEF_H_ */

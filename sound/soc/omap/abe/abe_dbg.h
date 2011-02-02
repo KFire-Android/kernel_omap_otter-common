@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -146,4 +146,5 @@
 /*
  * MACROS
  */
-#define _log(x, y, z, t) {if (x & abe_dbg_mask) abe_dbg_log(x, y, z, t); }
+#define _log(x, y, z, t) { if (x & abe->dbg_mask) abe_dbg_log(x, y, z, t); }
+

@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,22 +20,20 @@
  */
 #include "abe_def.h"
 #include "abe_initxxx_labels.h"
-#ifndef ABETYP
-#define ABETYP
+#ifndef _ABE_TYP_H_
+#define _ABE_TYP_H_
 /*
- * BASIC TYPES
+ *	BASIC TYPES
  */
-#define MAX_UINT8	((((1L <<  7) -1)<<1) +1)
-#define MAX_UINT16	((((1L << 15) -1)<<1) +1)
-#define MAX_UINT32	((((1L << 31) -1)<<1) +1)
+#define MAX_UINT8	((((1L <<  7) - 1) << 1) + 1)
+#define MAX_UINT16	((((1L << 15) - 1) << 1) + 1)
+#define MAX_UINT32	((((1L << 31) - 1) << 1) + 1)
 #define s8 char
 #define u8 unsigned char
 #define s16 short
 #define u16 unsigned short
 #define s32 int
 #define u32 unsigned int
-/* returned status from HAL APIs */
-#define abehal_status u32
 /* 4 bytes    Bit field indicating the type of informations to be traced */
 typedef u32 abe_dbg_mask_t;
 /* scheduling task loops (250us / 272us with respectively 48kHz /
@@ -53,23 +51,23 @@ typedef void (*abe_subroutine2) (u32, u32);
 typedef void (*abe_subroutine3) (u32, u32, u32);
 typedef void (*abe_subroutine4) (u32, u32, u32, u32);
 /*
- *      CODE PORTABILITY - FUTURE PATCHES
+ *	CODE PORTABILITY - FUTURE PATCHES
  *
- *      32bits field for having the code compatible with future revisions of
- * 	the hardware (audio integration) or evolution of the software
- * 	partitionning. Used for the highest level APIs (launch_sequences)
+ *	32bits field for having the code compatible with future revisions of
+ *	the hardware (audio integration) or evolution of the software
+ *	partitionning. Used for the highest level APIs (launch_sequences)
  */
 typedef u32 abe_patch_rev;
 /*
- * ENUMS
+ *	ENUMS
  */
 /*
- *      MEMORY CONFIG TYPE
+ *	MEMORY CONFIG TYPE
  *
- *         0: Ultra Lowest power consumption audio player
- *         1: OPP 25% (simple multimedia features)
- *         2: OPP 50% (multimedia and voice calls)
- *         3: OPP100% (multimedia complex use-cases)
+ *		0: Ultra Lowest power consumption audio player
+ *		1: OPP 25% (simple multimedia features)
+ *		2: OPP 50% (multimedia and voice calls)
+ *		3: OPP100% (multimedia complex use-cases)
  */
 #define ABE_AUDIO_PLAYER_ON_HEADSET_OR_EARPHONE 1
 #define ABE_DRIFT_MANAGEMENT_FOR_AUDIO_PLAYER 2
@@ -82,19 +80,19 @@ typedef u32 abe_patch_rev;
 #define ABE_VOICE_CALL_WITH_EARPHONE_ACTIVE_NOISE_CANCELLER 9
 #define ABE_LAST_USE_CASE 10
 /*
- *      OPP TYPE
+ *	OPP TYPE
  *
- *         0: Ultra Lowest power consumption audio player
- *         1: OPP 25% (simple multimedia features)
- *         2: OPP 50% (multimedia and voice calls)
- *         3: OPP100% (multimedia complex use-cases)
+ *		0: Ultra Lowest power consumption audio player
+ *		1: OPP 25% (simple multimedia features)
+ *		2: OPP 50% (multimedia and voice calls)
+ *		3: OPP100% (multimedia complex use-cases)
  */
 #define ABE_OPP0 0
 #define ABE_OPP25 1
 #define ABE_OPP50 2
 #define ABE_OPP100 3
 /*
- *      DMIC DECIMATION RATIO
+ *	DMIC DECIMATION RATIO
  *
  */
 #define ABE_DEC16 16
@@ -102,19 +100,19 @@ typedef u32 abe_patch_rev;
 #define ABE_DEC32 32
 #define ABE_DEC40 40
 /*
- *      SAMPLES TYPE
+ *	SAMPLES TYPE
  *
- *    mono 16bits sample LSB aligned, 16 MSB bits are unused
- *    mono right shifted to 16bits LSBs on a 32bits DMEM FIFO for McBSP
- *	TX purpose.
- *    mono sample MSB aligned (16/24/32bits)
- *      two successive mono samples in one 32bits container
- *    Two L/R 16bits samples in a 32bits container,
- *    Two channels defined with two MSB aligned samples
- *    Three channels defined with three MSB aligned samples (MIC)
- *    Four channels defined with four MSB aligned samples (MIC)
-    . . .
- *    Eight channels defined with eight MSB aligned samples (MIC)
+ *	mono 16 bit sample LSB aligned, 16 MSB bits are unused;
+ *	mono right shifted to 16bits LSBs on a 32bits DMEM FIFO for McBSP
+ *	TX purpose;
+ *	mono sample MSB aligned (16/24/32bits);
+ *	two successive mono samples in one 32bits container;
+ *	Two L/R 16bits samples in a 32bits container;
+ *	Two channels defined with two MSB aligned samples;
+ *	Three channels defined with three MSB aligned samples (MIC);
+ *	Four channels defined with four MSB aligned samples (MIC);
+ *	. . .
+ *	Eight channels defined with eight MSB aligned samples (MIC);
  */
 #define MONO_MSB 1
 #define MONO_RSHIFTED_16 2
@@ -130,7 +128,7 @@ typedef u32 abe_patch_rev;
 #define NINE_MSB 12
 #define TEN_MSB 13
 /*
- *      PORT PROTOCOL TYPE - abe_port_protocol_switch_id
+ *	PORT PROTOCOL TYPE - abe_port_protocol_switch_id
  */
 #define SLIMBUS_PORT_PROT 1
 #define SERIAL_PORT_PROT 2
@@ -141,7 +139,7 @@ typedef u32 abe_patch_rev;
 #define PINGPONG_PORT_PROT 7
 #define DMAREQ_PORT_PROT 8
 /*
- *      PORT IDs, this list is aligned with the FW data mapping
+ *	PORT IDs, this list is aligned with the FW data mapping
  */
 #define DMIC_PORT 0
 #define PDM_UL_PORT 1
@@ -166,12 +164,12 @@ typedef u32 abe_patch_rev;
 #define PDM_DL2_PORT 19
 #define PDM_VIB_PORT 20
 /* There is only one DMIC port, always used with 6 samples
-   per 96kHz periods */
+	per 96kHz periods   */
 #define DMIC_PORT1 DMIC_PORT
 #define DMIC_PORT2 DMIC_PORT
 #define DMIC_PORT3 DMIC_PORT
 /*
- *      ABE_DL_SRC_ID     source of samples
+ *	ABE_DL_SRC_ID     source of samples
  */
 #define SRC_DL1_MIXER_OUTPUT DL1_M_labelID
 #define SRC_SDT_MIXER_OUTPUT SDT_M_labelID
@@ -186,8 +184,9 @@ typedef u32 abe_patch_rev;
 #define SRC_MM_UL2 MM_UL2_labelID
 #define SRC_MM_UL MM_UL_labelID
 /*
- *      abe_patched_pattern_id     selection of the audio engine signal to
- *	replace by a precomputed pattern
+ *	abe_patched_pattern_id
+ *		selection of the audio engine signal to
+ *		replace by a precomputed pattern
  */
 #define DBG_PATCH_AMIC 1
 #define DBG_PATCH_DMIC1 2
@@ -204,7 +203,7 @@ typedef u32 abe_patch_rev;
 #define DBG_PATCH_MM_DL_MIXDL1 13
 #define DBG_PATCH_MM_DL_MIXDL2 14
 /*
- *      Signal processing module names - EQ APS MIX ROUT
+ *	Signal processing module names - EQ APS MIX ROUT
  */
 /* equalizer downlink path headset + earphone */
 #define FEAT_EQ1            1
@@ -255,9 +254,9 @@ typedef u32 abe_patch_rev;
 #define FEAT_GAINS_SPLIT    (FEAT_GAINS_AMIC+1)
 #define FEAT_GAINS_DL1      (FEAT_GAINS_SPLIT+1)
 #define FEAT_GAINS_DL2      (FEAT_GAINS_DL1+1)
-#define FEAT_GAIN_EANC      (FEAT_GAINS_DL2+1)
+#define FEAT_GAIN_BTUL      (FEAT_GAINS_DL2+1)
 /* sequencing queue of micro tasks */
-#define FEAT_SEQ            (FEAT_GAIN_EANC+1)
+#define FEAT_SEQ            (FEAT_GAIN_BTUL+1)
 /* Phoenix control queue through McPDM */
 #define FEAT_CTL            (FEAT_SEQ+1)
 /* list of features of the firmware -------------------------------*/
@@ -291,14 +290,13 @@ typedef u32 abe_patch_rev;
 #define MIXDL2 FEAT_MIXDL2
 #define MIXSDT FEAT_MIXSDT
 #define MIXECHO FEAT_MIXECHO
-#define MIXEANC FEAT_GAIN_EANC
 #define MIXAUDUL FEAT_MIXAUDUL
 #define MIXVXREC FEAT_MIXVXREC
 /* abe_router_id */
 /* there is only one router up to now */
 #define UPROUTE  FEAT_UPROUTE
 /*
- *      GAIN IDs
+ *	GAIN IDs
  */
 #define GAINS_DMIC1     FEAT_GAINS_DMIC1
 #define GAINS_DMIC2     FEAT_GAINS_DMIC2
@@ -307,14 +305,14 @@ typedef u32 abe_patch_rev;
 #define GAINS_SPLIT     FEAT_GAINS_SPLIT
 #define GAINS_DL1       FEAT_GAINS_DL1
 #define GAINS_DL2       FEAT_GAINS_DL2
-#define GAINS_EANC      FEAT_GAIN_EANC
+#define GAINS_BTUL      FEAT_GAIN_BTUL
 /*
- *      EVENT GENERATORS - abe_event_id
+ *	EVENT GENERATORS - abe_event_id
  */
 #define EVENT_TIMER 0
 #define EVENT_44100 1
 /*
- *      SERIAL PORTS IDs - abe_mcbsp_id
+ *	SERIAL PORTS IDs - abe_mcbsp_id
  */
 #define MCBSP1_TX MCBSP1_DMA_TX
 #define MCBSP1_RX MCBSP1_DMA_RX
@@ -323,7 +321,7 @@ typedef u32 abe_patch_rev;
 #define MCBSP3_TX MCBSP3_DMA_TX
 #define MCBSP3_RX MCBSP3_DMA_RX
 /*
- *      SERIAL PORTS IDs - abe_slimbus_id;
+ *	SERIAL PORTS IDs - abe_slimbus_id;
  */
 #define SLIMBUS1_TX0  SLIMBUS1_DMA_TX0
 #define SLIMBUS1_TX1  SLIMBUS1_DMA_TX1
@@ -343,10 +341,10 @@ typedef u32 abe_patch_rev;
 #define SLIMBUS1_RX7  SLIMBUS1_DMA_RX7
 #define SLIMBUS_UNUSED  _DUMMY_FIFO_
 /*
- *      ---------------------------------   TYPES USED FOR APIS  ---------------
+ *	-----------------   TYPES USED FOR APIS  ---------------
  */
 /*
- *      HARDWARE CONFIG TYPE
+ *	HARDWARE CONFIG TYPE
  */
 typedef struct {
 	/* EVENT_GENERATOR_COUNTER_DEFAULT gives about 96kHz */
@@ -358,7 +356,8 @@ typedef struct {
 	u32 HAL_EVENT_SELECTION;
 	/* 0: 96kHz   1:192kHz */
 	u32 MCPDM_CTRL__DIV_SEL;
-	/* 0: no command in the FIFO,  1: 6 data on each lines (with commands) */
+	/* 0: no command in the FIFO,
+	1: 6 data on each line (with commands) */
 	u32 MCPDM_CTRL__CMD_INT;
 	/* 0:MSB aligned  1:LSB aligned */
 	u32 MCPDM_CTRL__PDMOUTFORMAT;
@@ -390,9 +389,9 @@ typedef struct {
 	u32 SLIMBUS_DCT_FIFO_SETUP_REG__SB_THRESHOLD;
 } abe_hw_config_init_t;
 /*
- *      EQU_T
+ *	EQU_T
  *
- *      coefficients of the equalizer
+ *	coefficients of the equalizer
  */
 typedef struct {
 	/* type of filter */
@@ -414,30 +413,32 @@ typedef struct {
 	} coef;
 	s32 equ_param3;
 } abe_equ_t;
+
 /*
- *      APS_T
+ *	APS_T
  *
- *      coefficients of the Acoustics Protection and Safety
+ *	coefficients of the Acoustics Protection and Safety
  */
 typedef struct {
 	s32 coef1[NBAPS1];
 	s32 coef2[NBAPS2];
 } abe_aps_t;
+
 typedef struct {
 	/* structure of two energy_t estimation for coil and membrane */
 	u32 e1;
 	u32 e2;
 } abe_aps_energy_t;
 /*
- *      ROUTER_T
+ *	ROUTER_T
  *
- *      table of indexes in unsigned bytes
+ *	table of indexes in unsigned bytes
  */
 typedef u16 abe_router_t;
 /*
- *      DATA_FORMAT_T
+ *	DATA_FORMAT_T
  *
- *      used in port declaration
+ *	used in port declaration
  */
 typedef struct {
 	/* Sampling frequency of the stream */
@@ -446,9 +447,9 @@ typedef struct {
 	u32 samp_format;
 } abe_data_format_t;
 /*
- *      PORT_PROTOCOL_T
+ *	PORT_PROTOCOL_T
  *
- *      port declaration
+ *	port declaration
  */
 typedef struct {
 	/* Direction=0 means input from AESS point of view */
@@ -550,9 +551,9 @@ typedef struct {
 	} p;
 } abe_port_protocol_t;
 /*
- *      DMA_T
+ *	DMA_T
  *
- *      dma structure for easing programming
+ *	dma structure for easing programming
  */
 typedef struct {
 	/* OCP L3 pointer to the first address of the */
@@ -565,6 +566,7 @@ typedef struct {
 	/* number of iterations for the DMA data moves. */
 	u32 iter;
 } abe_dma_t;
+
 typedef struct {
 	/* Offset to the first address of the */
 	u32 data;
@@ -572,15 +574,15 @@ typedef struct {
 	u32 iter;
 } abe_dma_t_offset;
 /*
- *  SEQ_T
+ *	SEQ_T
  *
- *      struct {
- *      micros_t time;          Waiting time before executing next line
- *      seq_code_t code         Subroutine index interpreted in the HAL and
- *				translated to
- *                                FW subroutine codes in case of ABE tasks
- *      int32 param[2]          Two parameters
- *      } seq_t
+ *	struct {
+ *		micros_t time;          Waiting time before executing next line
+ *		seq_code_t code         Subroutine index interpreted in the HAL
+ *					and translated to FW subroutine codes
+ *					in case of ABE tasks
+ *		int32 param[2]		Two parameters
+ *		} seq_t
  *
  */
 typedef struct {
@@ -589,29 +591,30 @@ typedef struct {
 	u32 param[4];
 	u8 tag;
 } abe_seq_t;
+
 typedef struct {
 	u32 mask;
 	abe_seq_t seq1;
 	abe_seq_t seq2;
 } abe_sequence_t;
 /*
- *      DRIFT_T abe_drift_t = s32
+ *	DRIFT_T abe_drift_t = s32
  *
- *      ASRC drift parameter in [ppm] value
+ *	ASRC drift parameter in [ppm] value
  */
 /*
- *      ---------------------------------   INTERNAL DATA TYPES  ---------------------
+ *  --------------------   INTERNAL DATA TYPES  ---------------------
  */
 /*
- *      ABE_IRQ_DATA_T
+ *	ABE_IRQ_DATA_T
  *
- *      IRQ FIFO content declaration
- *      APS interrupts : IRQtag_APS to [31:28], APS_IRQs to [27:16],
- *		loopCounter to [15:0]
- *      SEQ interrupts : IRQtag_COUNT to [31:28], Count_IRQs to [27:16],
- *		loopCounter to [15:0]
- *      Ping-Pong Interrupts : IRQtag_PP to [31:28], PP_MCU_IRQ to [27:16],
- *		loopCounter to [15:0]
+ *	IRQ FIFO content declaration
+ *	APS interrupts : IRQ_FIFO[31:28] = IRQtag_APS,
+ *		IRQ_FIFO[27:16] = APS_IRQs, IRQ_FIFO[15:0] = loopCounter
+ *	SEQ interrupts : IRQ_FIFO[31:28] IRQtag_COUNT,
+ *		IRQ_FIFO[27:16] = Count_IRQs, IRQ_FIFO[15:0] = loopCounter
+ *	Ping-Pong Interrupts : IRQ_FIFO[31:28] = IRQtag_PP,
+ *		IRQ_FIFO[27:16] = PP_MCU_IRQ, IRQ_FIFO[15:0] = loopCounter
  */
 typedef struct {
 	unsigned int counter:16;
@@ -619,8 +622,8 @@ typedef struct {
 	unsigned int tag:4;
 } abe_irq_data_t;
 /*
- *      ABE_PORT_T status / format / sampling / protocol(call_back) / features /
- *	gain / name ..
+ *	ABE_PORT_T status / format / sampling / protocol(call_back) /
+ *	features / gain / name ..
  *
  */
 typedef struct {
@@ -643,7 +646,7 @@ typedef struct {
 	char name[NBCHARPORTNAME];
 } abe_port_t;
 /*
- *      ABE_SUBROUTINE_T
+ *	ABE_SUBROUTINE_T
  *
  */
 typedef struct {
@@ -651,7 +654,7 @@ typedef struct {
 	s32 param[4];
 } abe_subroutine_t;
 /*
- *      ABE_PORT_INFO_T    OPP, subroutines to call on reset
+ *	ABE_PORT_INFO_T    OPP, subroutines to call on reset
  *
  */
 typedef struct {
@@ -660,7 +663,7 @@ typedef struct {
 	abe_subroutine_t sub2;
 } abe_port_info_t;
 /*
- *      ABE_FEATURE_T
+ *	ABE_FEATURE_T
  *
  */
 typedef struct {
@@ -676,4 +679,5 @@ typedef struct {
 	u32 min_opp;
 	char name[NBCHARFEATURENAME];
 } abe_feature_t;
-#endif/* ifndef ABETYP */
+
+#endif/* ifndef _ABE_TYP_H_ */

@@ -52,9 +52,9 @@
 #define SAMP_LOOP_48K                                       12
 #define SAMP_LOOP_16K                                       4
 #define SAMP_LOOP_8K                                        2
-#define INPUT_SCALE_SHIFTM2                                 5052
-#define OUTPUT_SCALE_SHIFTM2                                5056
-#define MUTE_SCALING                                        5060
+#define INPUT_SCALE_SHIFTM2                                 5056
+#define OUTPUT_SCALE_SHIFTM2                                5060
+#define MUTE_SCALING                                        5064
 #define ABE_PMEM                                            1
 #define ABE_CMEM                                            2
 #define ABE_SMEM                                            3
@@ -62,4 +62,4 @@
 #define ABE_ATC                                             5
 #define ASRC_BT_UL_FIR_L                                    19
 #define ASRC_BT_DL_FIR_L                                    19
-#endif/* _ABE_DEFINE_H_ */
+#endif /* _ABE_DEFINE_H_ */

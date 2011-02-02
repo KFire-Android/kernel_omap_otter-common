@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -32,7 +32,7 @@
 #define FW_SCHED_LOOP_FREQ_DIV1000	(FW_SCHED_LOOP_FREQ/1000)
 #define EVENT_FREQUENCY 96000
 #define SLOTS_IN_SCHED_LOOP (96000/FW_SCHED_LOOP_FREQ)
-#define SCHED_LOOP_8kHz ( 8000/FW_SCHED_LOOP_FREQ)
+#define SCHED_LOOP_8kHz (8000/FW_SCHED_LOOP_FREQ)
 #define SCHED_LOOP_16kHz (16000/FW_SCHED_LOOP_FREQ)
 #define SCHED_LOOP_24kHz (24000/FW_SCHED_LOOP_FREQ)
 #define SCHED_LOOP_48kHz (48000/FW_SCHED_LOOP_FREQ)
@@ -40,7 +40,7 @@
 /*
  * DMEM AREA - SCHEDULER
  */
-#define dmem_mm_trace D_DEBUG_FIFO_ADDR
+#define dmem_mm_trace	D_DEBUG_FIFO_ADDR
 #define dmem_mm_trace_size ((D_DEBUG_FIFO_ADDR_END-D_DEBUG_FIFO_ADDR+1)/4)
 #define ATC_SIZE 8		/* 8 bytes per descriptors */
 typedef struct {
@@ -55,7 +55,7 @@ typedef struct {
 	unsigned wrpt:7;
 	unsigned reserved2:1;
 	unsigned badd:12;	/* second 32bits word of the descriptor */
-	unsigned iter:7;	/* iteration field overlaps the 16 bits boundary */
+	unsigned iter:7;	/* iteration field overlaps 16-bit boundary */
 	unsigned srcid:6;
 	unsigned destid:6;
 	unsigned desen:1;
@@ -64,8 +64,8 @@ typedef struct {
  * table of scheduler tasks :
  * char scheduler_table[24 x 4] : four bytes used at OPP100%
  */
-#define dmem_scheduler_table	 D_multiFrame_ADDR
-#define dmem_eanc_task_pointer 	D_pFastLoopBack_ADDR
+#define dmem_scheduler_table	D_multiFrame_ADDR
+#define dmem_eanc_task_pointer	D_pFastLoopBack_ADDR
 /*
  * OPP value :
  * pointer increment steps in the scheduler table
@@ -150,8 +150,8 @@ typedef struct {
  * DMEM indexes of the router uplink paths
  * uint8 dmem_router_index [8]
  */
-// OC: TBD ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//#define dmem_router_index
+
+/* #define dmem_router_index */
 /*
  * analog control circular buffer commands to Phoenix
  * structure {
@@ -160,8 +160,8 @@ typedef struct {
  * uint32 FIFO_CONTENT [6];
  * } dmem_commands_to_phoenix; 32 bytes
  */
-#define dmem_commands_to_phoenix 	D_Cmd2PhenixFifo_ADDR
-#define dmem_commands_to_phoenix_descriptor 	D_Cmd2PhenixFifoDesc_ADDR
+#define dmem_commands_to_phoenix		D_Cmd2PhenixFifo_ADDR
+#define dmem_commands_to_phoenix_descriptor	D_Cmd2PhenixFifoDesc_ADDR
 /*
  * analog control circular buffer commands from Phoenix (status line)
  * structure {
@@ -170,15 +170,15 @@ typedef struct {
  * uint32 FIFO_CONTENT [6];
  * } dmem_commands_to_phoenix; 32 bytes
  */
-#define dmem_commands_from_phoenix	D_StatusFromPhenixFifo_ADDR
-#define dmem_commands_from_phoenix_descriptor 	D_StatusFromPhenixFifoDesc_ADDR
+#define dmem_commands_from_phoenix		D_StatusFromPhenixFifo_ADDR
+#define dmem_commands_from_phoenix_descriptor	D_StatusFromPhenixFifoDesc_ADDR
 /*
  * DEBUG mask
  * uint16 dmem_debug_trace_mask
  * each bit of this word enables a type a trace in the debug circular buffer
  */
-// OC: TBD ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-//#define dmem_debug_trace_mask
+
+/* #define dmem_debug_trace_mask */
 /*
  * DEBUG circular buffer
  * structure {
@@ -268,7 +268,8 @@ typedef struct {
  */
 /*
  * PHOENIX OFFSET in SMEM
- * used to subtract a DC offset on the headset path (power consumption optimization)
+ * used to subtract a DC offset on the headset path
+ * (power consumption optimization)
  */
 /* OC: exact usage to be detailled */
 #define smem_phoenix_offset	S_PhoenixOffset_ADDR
@@ -299,8 +300,8 @@ typedef struct {
  * 18 = TOTAL
  */
 #if 0
-#define smem_g0	S_GTarget_ADDR	// [9] 2 gains in 1 SM address
-#define smem_g1	S_GCurrent_ADDR	// [9] 2 gains in 1 SM address
+#define smem_g0	S_GTarget_ADDR		/* [9] 2 gains in 1 SM address */
+#define smem_g1	S_GCurrent_ADDR		/* [9] 2 gains in 1 SM address */
 #endif
 /*
  * COEFFICIENTS AREA
@@ -337,7 +338,7 @@ typedef struct {
 #define mixer_sdt_offset 24
 #define mixer_vxrec_offset 26
 #define mixer_audul_offset 30
-#define gain_unused_offset 34
+#define btul_gains_offset 34
 /*
  * DMIC SRC 96->48
  * the filter is changed depending on the decimatio ratio used (16/25/32/40)
@@ -376,4 +377,4 @@ typedef struct {
  * int24 cmem_dither(x) [4]
  */
 #define cmem_dither
-#endif /* _ABE_FW_H_ */
+#endif/* _ABE_FW_H_ */

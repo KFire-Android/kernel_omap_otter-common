@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,18 +18,20 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA
  */
+
 /**
  * abe_fprintf
-	 *
-	 *  Parameter  :
-	 *      character line to be printed
-	 *
-	 *  Operations :
-	 *
-	 *  Return value :
-	 *      None.
-	 */
+ *
+ *  Parameter  :
+ *      character line to be printed
+ *
+ *  Operations :
+ *
+ *  Return value :
+ *	none
+ */
 void abe_fprintf(char *line);
+
 /*
  *  ABE_READ_FEATURE_FROM_PORT
  *
@@ -40,9 +42,10 @@ void abe_fprintf(char *line);
  *
  *
  *  Return value :
- *
+ *	none
  */
 void abe_read_feature_from_port(u32 x);
+
 /*
  *  ABE_WRITE_FEATURE_TO_PORT
  *
@@ -51,9 +54,8 @@ void abe_read_feature_from_port(u32 x);
  *
  *  Operations :
  *
- *
  *  Return value :
- *
+ *	none
  */
 void abe_write_feature_to_port(u32 x);
 /*
@@ -64,29 +66,30 @@ void abe_write_feature_to_port(u32 x);
  *
  *  Operations :
  *
- *
  *  Return value :
- *
+ *	none
  */
 void abe_read_fifo(u32 x);
+
 /*
  *  ABE_WRITE_FIFO
  *
  *  Parameter  :
  *      mem_bank : currently only ABE_DMEM supported
  *	addr : FIFO descriptor address ( descriptor fields : READ ptr,
- * 	WRITE ptr, FIFO START_ADDR, FIFO END_ADDR)
+ *	WRITE ptr, FIFO START_ADDR, FIFO END_ADDR)
  *	data to write to FIFO
  *	number of 32-bit words to write to DMEM FIFO
  *
  *  Operations :
- *     write DMEM FIFO and update FIFO descriptor, it is assumed that FIFO
- * 	descriptor is located in DMEM
+ *	write DMEM FIFO and update FIFO descriptor, it is assumed that FIFO
+ *	descriptor is located in DMEM
  *
  *  Return value :
- *      none
+ *	none
  */
 void abe_write_fifo(u32 mem_bank, u32 addr, u32 *data, u32 nb_data32);
+
 /*
  *  ABE_BLOCK_COPY
  *
@@ -101,10 +104,11 @@ void abe_write_fifo(u32 mem_bank, u32 addr, u32 *data, u32 nb_data32);
  *      block data move
  *
  *  Return value :
- *      none
+ *	none
  */
 void abe_block_copy(u32 direction, u32 memory_bank, u32 address, u32 *data,
 		    u32 nb);
+
 /*
  *  ABE_RESET_MEM
  *

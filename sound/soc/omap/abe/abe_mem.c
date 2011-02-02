@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 	Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,6 +19,7 @@
  * 02110-1301 USA
  */
 #include "abe_main.h"
+#include "abe_ref.h"
 
 /**
  * abe_block_copy
@@ -35,25 +36,26 @@ void abe_block_copy(u32 direction, u32 memory_bank, u32 address,
 {
 	u32 i;
 	u32 base_address = 0, *src_ptr, *dst_ptr, n;
+
 	switch (memory_bank) {
 	case ABE_PMEM:
-		base_address = (u32) io_base + ABE_PMEM_BASE_OFFSET_MPU;
+		base_address = (u32) abe->io_base + ABE_PMEM_BASE_OFFSET_MPU;
 		break;
 	case ABE_CMEM:
-		base_address = (u32) io_base + ABE_CMEM_BASE_OFFSET_MPU;
+		base_address = (u32) abe->io_base + ABE_CMEM_BASE_OFFSET_MPU;
 		break;
 	case ABE_SMEM:
-		base_address = (u32) io_base + ABE_SMEM_BASE_OFFSET_MPU;
+		base_address = (u32) abe->io_base + ABE_SMEM_BASE_OFFSET_MPU;
 		break;
 	case ABE_DMEM:
-		base_address = (u32) io_base + ABE_DMEM_BASE_OFFSET_MPU;
+		base_address = (u32) abe->io_base + ABE_DMEM_BASE_OFFSET_MPU;
 		break;
 	case ABE_ATC:
-		base_address = (u32) io_base + ABE_ATC_BASE_OFFSET_MPU;
+		base_address = (u32) abe->io_base + ABE_ATC_BASE_OFFSET_MPU;
 		break;
 	default:
-		base_address = (u32) io_base + ABE_SMEM_BASE_OFFSET_MPU;
-		abe_dbg_param |= ERR_LIB;
+		base_address = (u32) abe->io_base + ABE_SMEM_BASE_OFFSET_MPU;
+		abe->dbg_param |= ERR_LIB;
 		abe_dbg_error_log(ABE_BLOCK_COPY_ERR);
 		break;
 	}
@@ -68,6 +70,7 @@ void abe_block_copy(u32 direction, u32 memory_bank, u32 address,
 	for (i = 0; i < n; i++)
 		*dst_ptr++ = *src_ptr++;
 }
+
 /**
  * abe_reset_mem
  *
@@ -82,15 +85,16 @@ void abe_reset_mem(u32 memory_bank, u32 address, u32 nb_bytes)
 	u32 i;
 	u32 *dst_ptr, n;
 	u32 base_address = 0;
+
 	switch (memory_bank) {
 	case ABE_SMEM:
-		base_address = (u32) io_base + ABE_SMEM_BASE_OFFSET_MPU;
+		base_address = (u32) abe->io_base + ABE_SMEM_BASE_OFFSET_MPU;
 		break;
 	case ABE_DMEM:
-		base_address = (u32) io_base + ABE_DMEM_BASE_OFFSET_MPU;
+		base_address = (u32) abe->io_base + ABE_DMEM_BASE_OFFSET_MPU;
 		break;
 	case ABE_CMEM:
-		base_address = (u32) io_base + ABE_CMEM_BASE_OFFSET_MPU;
+		base_address = (u32) abe->io_base + ABE_CMEM_BASE_OFFSET_MPU;
 		break;
 	}
 	dst_ptr = (u32 *) (base_address + address);

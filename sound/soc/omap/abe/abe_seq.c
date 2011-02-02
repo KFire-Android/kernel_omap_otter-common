@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,6 +19,8 @@
  * 02110-1301 USA
  */
 #include "abe_main.h"
+#include "abe_ref.h"
+
 /**
  * abe_null_subroutine
  *
@@ -26,12 +28,15 @@
 void abe_null_subroutine_0(void)
 {
 }
+
 void abe_null_subroutine_2(u32 a, u32 b)
 {
 }
+
 void abe_null_subroutine_4(u32 a, u32 b, u32 c, u32 d)
 {
 }
+
 /**
  * abe_init_subroutine_table - initializes the default table of pointers
  * to subroutines
@@ -42,6 +47,7 @@ void abe_null_subroutine_4(u32 a, u32 b, u32 c, u32 d)
 void abe_init_subroutine_table(void)
 {
 	u32 id;
+
 	/* reset the table's pointers */
 	abe_subroutine_write_pointer = 0;
 	/* the first index is the NULL task */
@@ -59,6 +65,7 @@ void abe_init_subroutine_table(void)
 			   (abe_subroutine2) abe_default_irq_aps_adaptation,
 			   SUB_0_PARAM, (u32 *) 0);
 }
+
 /**
  * abe_add_subroutine
  * @id: ABE port id
@@ -71,8 +78,10 @@ void abe_init_subroutine_table(void)
 void abe_add_subroutine(u32 *id, abe_subroutine2 f, u32 nparam, u32 *params)
 {
 	u32 i, i_found;
-	if ((abe_subroutine_write_pointer >= MAXNBSUBROUTINE) || ((u32) f == 0)) {
-		abe_dbg_param |= ERR_SEQ;
+
+	if ((abe_subroutine_write_pointer >= MAXNBSUBROUTINE) ||
+			((u32) f == 0)) {
+		abe->dbg_param |= ERR_SEQ;
 		abe_dbg_error_log(ABE_PARAMETER_OVERFLOW);
 	} else {
 		/* search if this subroutine address was not already
@@ -98,9 +107,11 @@ void abe_add_subroutine(u32 *id, abe_subroutine2 f, u32 nparam, u32 *params)
 		}
 	}
 }
+
 /**
  * abe_add_sequence
- * @id: returned sequence index after pluging a new sequence (index in the tables)
+ * @id: returned sequence index after pluging a new sequence
+ * (index in the tables)
  * @s: sequence to be inserted
  *
  * Load a time-sequenced operations.
@@ -109,10 +120,11 @@ void abe_add_sequence(u32 *id, abe_sequence_t *s)
 {
 	abe_seq_t *seq_src, *seq_dst;
 	u32 i, no_end_of_sequence_found;
+
 	seq_src = &(s->seq1);
 	seq_dst = &((abe_all_sequence[abe_sequence_write_pointer]).seq1);
 	if ((abe_sequence_write_pointer >= MAXNBSEQUENCE) || ((u32) s == 0)) {
-		abe_dbg_param |= ERR_SEQ;
+		abe->dbg_param |= ERR_SEQ;
 		abe_dbg_error_log(ABE_PARAMETER_OVERFLOW);
 	} else {
 		*id = abe_subroutine_write_pointer;
@@ -153,6 +165,7 @@ void abe_reset_one_sequence(u32 id)
 void abe_reset_all_sequence(void)
 {
 	u32 i;
+
 	abe_init_subroutine_table();
 	/* arrange to have the first sequence index=0 to the NULL operation
 	   sequence */
@@ -177,7 +190,8 @@ void abe_call_subroutine(u32 idx, u32 p1, u32 p2, u32 p3, u32 p4)
 	abe_subroutine3 f3;
 	abe_subroutine4 f4;
 	u32 *params;
-	if (idx >= MAXNBSUBROUTINE)
+
+	if (idx > MAXNBSUBROUTINE)
 		return;
 	switch (idx) {
 		/* call the subroutines defined at compilation time

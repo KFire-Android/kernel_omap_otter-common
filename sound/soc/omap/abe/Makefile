@@ -1,4 +1,5 @@
 snd-soc-abe-hal-objs += abe_api.o \
+			abe_aess.o \
 			abe_dbg.o \
 			abe_dat.o \
 			abe_ext.o \

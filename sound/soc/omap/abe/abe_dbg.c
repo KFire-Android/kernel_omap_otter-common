@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,6 +19,8 @@
  * 02110-1301 USA
  */
 #include "abe_main.h"
+#include "abe_ref.h"
+
 /**
  * abe_dbg_log - Log ABE trace inside circular buffer
  * @x: data to be logged
@@ -35,39 +37,41 @@
 void abe_dbg_log(u32 x, u32 y, u32 z, u32 t)
 {
 	u32 time_stamp, data;
-	if (abe_dbg_activity_log_write_pointer >= (D_DEBUG_HAL_TASK_sizeof - 2))
-		abe_dbg_activity_log_write_pointer = 0;
+	if (abe->dbg_activity_log_write_pointer >=
+			(D_DEBUG_HAL_TASK_sizeof - 2))
+		abe->dbg_activity_log_write_pointer = 0;
 	/* copy in DMEM trace buffer and CortexA9 local buffer and a small 7
 	   words circular buffer of the DMA trace ending with 0x55555555
 	   (tag for last word) */
 	abe_block_copy(COPY_FROM_ABE_TO_HOST, ABE_DMEM, D_loopCounter_ADDR,
 		       (u32 *) &time_stamp, sizeof(time_stamp));
-	abe_dbg_activity_log[abe_dbg_activity_log_write_pointer] = time_stamp;
+	abe->dbg_activity_log[abe->dbg_activity_log_write_pointer] = time_stamp;
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, D_DEBUG_HAL_TASK_ADDR +
-		       (abe_dbg_activity_log_write_pointer << 2),
+		       (abe->dbg_activity_log_write_pointer << 2),
 		       (u32 *) &time_stamp, sizeof(time_stamp));
-	abe_dbg_activity_log_write_pointer++;
+	abe->dbg_activity_log_write_pointer++;
 	data = ((x & MAX_UINT8) << 24) | ((y & MAX_UINT8) << 16) |
 		((z & MAX_UINT8) << 8)
 		| (t & MAX_UINT8);
-	abe_dbg_activity_log[abe_dbg_activity_log_write_pointer] = data;
+	abe->dbg_activity_log[abe->dbg_activity_log_write_pointer] = data;
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, D_DEBUG_HAL_TASK_ADDR +
-		       (abe_dbg_activity_log_write_pointer << 2),
+		       (abe->dbg_activity_log_write_pointer << 2),
 		       (u32 *) &data, sizeof(data));
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM,
 		       D_DEBUG_FIFO_HAL_ADDR +
-		       ((abe_dbg_activity_log_write_pointer << 2) &
+		       ((abe->dbg_activity_log_write_pointer << 2) &
 			(D_DEBUG_FIFO_HAL_sizeof - 1)), (u32 *) &data,
 		       sizeof(data));
 	data = ABE_DBG_MAGIC_NUMBER;
 	abe_block_copy(COPY_FROM_HOST_TO_ABE, ABE_DMEM, D_DEBUG_FIFO_HAL_ADDR +
-		       (((abe_dbg_activity_log_write_pointer +
-			  1) << 2) &(D_DEBUG_FIFO_HAL_sizeof - 1)),
+		       (((abe->dbg_activity_log_write_pointer +
+			  1) << 2) & (D_DEBUG_FIFO_HAL_sizeof - 1)),
 		       (u32 *) &data, sizeof(data));
-	abe_dbg_activity_log_write_pointer++;
-	if (abe_dbg_activity_log_write_pointer >= D_DEBUG_HAL_TASK_sizeof)
-		abe_dbg_activity_log_write_pointer = 0;
+	abe->dbg_activity_log_write_pointer++;
+	if (abe->dbg_activity_log_write_pointer >= D_DEBUG_HAL_TASK_sizeof)
+		abe->dbg_activity_log_write_pointer = 0;
 }
+
 /**
  * abe_debug_output_pins
  * @x: d
@@ -77,6 +81,7 @@ void abe_dbg_log(u32 x, u32 y, u32 z, u32 t)
 void abe_debug_output_pins(u32 x)
 {
 }
+
 /**
  * abe_dbg_error_log -  Log ABE error
  * @x: error to log
@@ -87,6 +92,7 @@ void abe_dbg_error_log(u32 x)
 {
 	abe_dbg_log(x, MAX_UINT8, MAX_UINT8, MAX_UINT8);
 }
+
 /**
  * abe_debugger
  * @x: error to log
@@ -96,17 +102,23 @@ void abe_dbg_error_log(u32 x)
 void abe_debugger(u32 x)
 {
 }
+
 /**
  * abe_load_embeddded_patterns
  *
  * load test patterns
  *
  *  S = power (2, 31) * 0.25;
- *  N =  4; B = 2; F=[1/N 1/N]; gen_and_save('dbg_8k_2.txt',  B, F, N, S);
- *  N =  8; B = 2; F=[1/N 2/N]; gen_and_save('dbg_16k_2.txt', B, F, N, S);
- *  N = 12; B = 2; F=[1/N 2/N]; gen_and_save('dbg_48k_2.txt', B, F, N, S);
- *  N = 60; B = 2; F=[4/N 8/N]; gen_and_save('dbg_amic.txt', B, F, N, S);
- *  N = 10; B = 6; F=[1/N 2/N 3/N 1/N 2/N 3/N]; gen_and_save('dbg_dmic.txt', B, F, N, S);
+ *  N =  4; B = 2; F=[1/N 1/N];
+ *	gen_and_save('dbg_8k_2.txt',  B, F, N, S);
+ *  N =  8; B = 2; F=[1/N 2/N];
+ *	gen_and_save('dbg_16k_2.txt', B, F, N, S);
+ *  N = 12; B = 2; F=[1/N 2/N];
+ *	gen_and_save('dbg_48k_2.txt', B, F, N, S);
+ *  N = 60; B = 2; F=[4/N 8/N];
+ *	gen_and_save('dbg_amic.txt', B, F, N, S);
+ *  N = 10; B = 6; F=[1/N 2/N 3/N 1/N 2/N 3/N];
+ *	gen_and_save('dbg_dmic.txt', B, F, N, S);
 */
 void abe_load_embeddded_patterns(void)
 {

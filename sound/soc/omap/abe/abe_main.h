@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,7 +20,9 @@
  */
 #ifndef _ABE_MAIN_H_
 #define _ABE_MAIN_H_
+
 #include <linux/io.h>
+
 #include "abe_dm_addr.h"
 #include "abe_sm_addr.h"
 #include "abe_cm_addr.h"
@@ -31,19 +33,18 @@
 #include "abe_ext.h"
 #include "abe_dbg.h"
 #include "abe_lib.h"
-#include "abe_ref.h"
 #include "abe_api.h"
 #include "abe_typedef.h"
 #include "abe_functionsid.h"
 #include "abe_taskid.h"
 #include "abe_initxxx_labels.h"
 #include "abe_fw.h"
+
 /* pipe connection to the TARGET simulator */
 #define ABE_DEBUG_CHECKERS              0
 /* simulator data extracted from a text-file */
 #define ABE_DEBUG_HWFILE                0
 /* low-level log files */
 #define ABE_DEBUG_LL_LOG                0
-#define ABE_DEBUG (ABE_DEBUG_CHECKERS | ABE_DEBUG_HWFILE | ABE_DEBUG_LL_LOG)
-#endif /* _ABE_MAIN_H_ */
 
+#endif				/* _ABE_MAIN_H_ */

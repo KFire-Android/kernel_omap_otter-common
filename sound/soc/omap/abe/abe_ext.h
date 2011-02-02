@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 	Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,8 +20,6 @@
  */
 #ifndef _ABE_EXT_H_
 #define _ABE_EXT_H_
-/* Tuning is done on PC ? */
-#define PC_SIMULATION 0
 /*
  * OS DEPENDENT MMU CONFIGURATION
  */
@@ -34,23 +32,8 @@
 #define ABE_ATC_BASE_OFFSET_MPU		0xf1000
 /* default base address for io_base */
 #define ABE_DEFAULT_BASE_ADDRESS_L3 0x49000000L
-/* base address used for L3/DMA access */
-#define ABE_ATC_BASE_ADDRESS_L3 0x490F1000L
-/* base address used for L4/MCU access */
-#define ABE_ATC_BASE_ADDRESS_L4 0x401F1000L
-/* 64kB as seen from DMA access */
-#define ABE_DMEM_BASE_ADDRESS_L3 0x49080000L
-/* 64kB as seen from MCU access */
-#define ABE_DMEM_BASE_ADDRESS_L4 0x40180000L
-/* 8kB as seen from MPU access */
-#define ABE_PMEM_BASE_ADDRESS_MPU 0x490E0000L
-/* 8kB */
-#define ABE_CMEM_BASE_ADDRESS_MPU 0x490A0000L
-/* 24kB */
-#define ABE_SMEM_BASE_ADDRESS_MPU 0x490C0000L
-/* 64kB */
-#define ABE_DMEM_BASE_ADDRESS_MPU 0x49080000L
-#define ABE_ATC_BASE_ADDRESS_MPU 0x490F1000L
+#define ABE_DEFAULT_BASE_ADDRESS_L4 0x40100000L
+#define ABE_DEFAULT_BASE_ADDRESS_DEFAULT ABE_DEFAULT_BASE_ADDRESS_L3
 /*
  * HARDWARE AND PERIPHERAL DEFINITIONS
  */
@@ -74,9 +57,9 @@
 #define ABE_DMASTATUS_RAW 0x84
 #define EVENT_GENERATOR_COUNTER 0x68
 /* PLL output/desired sampling rate = (32768 * 6000)/96000 */
-#define EVENT_GENERATOR_COUNTER_DEFAULT 2048
+#define EVENT_GENERATOR_COUNTER_DEFAULT (2048-1)
 /* PLL output/desired sampling rate = (32768 * 6000)/88200 */
-#define EVENT_GENERATOR_COUNTER_44100 2228
+#define EVENT_GENERATOR_COUNTER_44100 (2228-1)
 /* start / stop the EVENT generator */
 #define EVENT_GENERATOR_START 0x6C
 #define EVENT_GENERATOR_ON 1

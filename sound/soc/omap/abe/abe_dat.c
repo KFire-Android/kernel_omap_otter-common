@@ -2,7 +2,7 @@
  * ALSA SoC OMAP ABE driver
  *
  * Author:	Laurent Le Faucheur <l-le-faucheur@ti.com>
- * 		Liam Girdwood <lrg@slimlogic.co.uk>
+ *		Liam Girdwood <lrg@slimlogic.co.uk>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,40 +18,15 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA
  */
+
 #include "abe_main.h"
-#ifndef abe_dat_c
-#define abe_dat_c
+
 const u32 abe_firmware_array[ABE_FIRMWARE_MAX_SIZE] = {
 #include "abe_firmware.c"
 };
-u32 abe_firmware_version_number;
-/*
- * Kernel base
- */
-void __iomem *io_base;
-/*
- * global variable : saves stack area
- */
-u16 MultiFrame[PROCESSING_SLOTS][TASKS_IN_SLOT];
-ABE_SIODescriptor sio_desc;
-ABE_SPingPongDescriptor desc_pp;
-abe_satcdescriptor_aess atc_desc;
-/*
- * automatic gain control of input mixer's gains
- */
-u32 abe_compensated_mixer_gain;
-u8 abe_muted_gains_indicator[MAX_NBGAIN_CMEM];
-u32 abe_desired_gains_decibel[MAX_NBGAIN_CMEM];
-u32 abe_muted_gains_decibel[MAX_NBGAIN_CMEM];
-u32 abe_desired_gains_linear[MAX_NBGAIN_CMEM];
-u32 abe_desired_ramp_delay_ms[MAX_NBGAIN_CMEM];
-/*
- * HAL/FW ports status / format / sampling / protocol(call_back) / features
- *	/ gain / name
- */
-u32 pdm_dl1_status;
-u32 pdm_dl2_status;
-u32 pdm_vib_status;
+
+struct omap_abe *abe;
+
 /*
  * HAL/FW ports status / format / sampling / protocol(call_back) / features
  *	/ gain / name
@@ -63,7 +38,7 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 	   reseted at start Port Name for the debug trace */
 	/* DMIC */ {
 		    OMAP_ABE_PORT_ACTIVITY_IDLE, {96000, SIX_MSB},
-		    NODRIFT, NOCALLBACK, 0, (DMIC_ITER / 6),
+		    NODRIFT, NOCALLBACK, 0, (DMIC_ITER/6),
 		    {
 		     SNK_P, DMIC_PORT_PROT,
 		     {{dmem_dmic, dmem_dmic_size, DMIC_ITER} }
@@ -72,7 +47,7 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		    {EQDMIC, 0}, "DMIC"},
 	/* PDM_UL */ {
 		      OMAP_ABE_PORT_ACTIVITY_IDLE, {96000, STEREO_MSB},
-		      NODRIFT, NOCALLBACK, smem_amic, (MCPDM_UL_ITER / 2),
+		      NODRIFT, NOCALLBACK, smem_amic, (MCPDM_UL_ITER/2),
 		      {
 		       SNK_P, MCPDMUL_PORT_PROT,
 		       {{dmem_amic, dmem_amic_size, MCPDM_UL_ITER} }
@@ -84,11 +59,11 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 			NODRIFT, NOCALLBACK, smem_bt_vx_ul_opp50, 1,
 			{
 			 SNK_P, SERIAL_PORT_PROT, {{
-						    (MCBSP1_DMA_TX*ATC_SIZE),
-						    dmem_bt_vx_ul,
-						    dmem_bt_vx_ul_size,
-						    (1*SCHED_LOOP_8kHz)
-						    } }
+						   (MCBSP1_DMA_TX*ATC_SIZE),
+						   dmem_bt_vx_ul,
+						   dmem_bt_vx_ul_size,
+						   (1*SCHED_LOOP_8kHz)
+						   } }
 			 },
 			{0, 0}, {0}, "BT_VX_UL"},
 	/* MM_UL */ {
@@ -96,11 +71,11 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		     NODRIFT, NOCALLBACK, smem_mm_ul, 1,
 		     {
 		      SRC_P, DMAREQ_PORT_PROT, {{
-						 (CBPr_DMA_RTX3*ATC_SIZE),
-						 dmem_mm_ul, dmem_mm_ul_size,
-						 (10*SCHED_LOOP_48kHz),
-						 ABE_DMASTATUS_RAW, (1 << 3)
-						 } }
+						(CBPr_DMA_RTX3*ATC_SIZE),
+						dmem_mm_ul, dmem_mm_ul_size,
+						(10*SCHED_LOOP_48kHz),
+						ABE_DMASTATUS_RAW, (1 << 3)
+						} }
 		      },
 		     {CIRCULAR_BUFFER_PERIPHERAL_R__3, 120},
 		     {UPROUTE, 0}, "MM_UL"},
@@ -109,11 +84,11 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		      NODRIFT, NOCALLBACK, smem_mm_ul2, 1,
 		      {
 		       SRC_P, DMAREQ_PORT_PROT, {{
-						  (CBPr_DMA_RTX4*ATC_SIZE),
-						  dmem_mm_ul2, dmem_mm_ul2_size,
-						  (2*SCHED_LOOP_48kHz),
-						  ABE_DMASTATUS_RAW, (1 << 4)
-						  } }
+						 (CBPr_DMA_RTX4*ATC_SIZE),
+						 dmem_mm_ul2, dmem_mm_ul2_size,
+						 (2*SCHED_LOOP_48kHz),
+						 ABE_DMASTATUS_RAW, (1 << 4)
+						 } }
 		       },
 		      {CIRCULAR_BUFFER_PERIPHERAL_R__4, 24},
 		      {UPROUTE, 0}, "MM_UL2"},
@@ -122,11 +97,11 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		     NODRIFT, NOCALLBACK, smem_vx_ul, 1,
 		     {
 		      SRC_P, DMAREQ_PORT_PROT, {{
-						 (CBPr_DMA_RTX2*ATC_SIZE),
-						 dmem_vx_ul, dmem_vx_ul_size,
-						 (1*SCHED_LOOP_8kHz),
-						 ABE_DMASTATUS_RAW, (1 << 2)
-						 } }
+						(CBPr_DMA_RTX2*ATC_SIZE),
+						dmem_vx_ul, dmem_vx_ul_size,
+						(1*SCHED_LOOP_8kHz),
+						ABE_DMASTATUS_RAW, (1 << 2)
+						} }
 		      }, {
 			  CIRCULAR_BUFFER_PERIPHERAL_R__2, 2},
 		     {ASRC2, 0}, "VX_UL"},
@@ -135,11 +110,11 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		     NODRIFT, NOCALLBACK, smem_mm_dl, 1,
 		     {
 		      SNK_P, PINGPONG_PORT_PROT, {{
-						   (CBPr_DMA_RTX0*ATC_SIZE),
-						   dmem_mm_dl, dmem_mm_dl_size,
-						   (2*SCHED_LOOP_48kHz),
-						   ABE_DMASTATUS_RAW, (1 << 0)
-						   } }
+						  (CBPr_DMA_RTX0*ATC_SIZE),
+						  dmem_mm_dl, dmem_mm_dl_size,
+						  (2*SCHED_LOOP_48kHz),
+						  ABE_DMASTATUS_RAW, (1 << 0)
+						  } }
 		      },
 		     {CIRCULAR_BUFFER_PERIPHERAL_R__0, 24},
 		     {ASRC3, 0}, "MM_DL"},
@@ -148,11 +123,11 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		     NODRIFT, NOCALLBACK, smem_vx_dl, 1,
 		     {
 		      SNK_P, DMAREQ_PORT_PROT, {{
-						 (CBPr_DMA_RTX1*ATC_SIZE),
-						 dmem_vx_dl, dmem_vx_dl_size,
-						 (1*SCHED_LOOP_8kHz),
-						 ABE_DMASTATUS_RAW, (1 << 1)
-						 } }
+						(CBPr_DMA_RTX1*ATC_SIZE),
+						dmem_vx_dl, dmem_vx_dl_size,
+						(1*SCHED_LOOP_8kHz),
+						ABE_DMASTATUS_RAW, (1 << 1)
+						} }
 		      },
 		     {CIRCULAR_BUFFER_PERIPHERAL_R__1, 2},
 		     {ASRC1, 0}, "VX_DL"},
@@ -161,12 +136,12 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 			NODRIFT, NOCALLBACK, smem_tones_dl, 1,
 			{
 			 SNK_P, DMAREQ_PORT_PROT, {{
-						    (CBPr_DMA_RTX5*ATC_SIZE),
-						    dmem_tones_dl,
-						    dmem_tones_dl_size,
-						    (2*SCHED_LOOP_48kHz),
-						    ABE_DMASTATUS_RAW, (1 << 5)
-						    } }
+						   (CBPr_DMA_RTX5*ATC_SIZE),
+						   dmem_tones_dl,
+						   dmem_tones_dl_size,
+						   (2*SCHED_LOOP_48kHz),
+						   ABE_DMASTATUS_RAW, (1 << 5)
+						   } }
 			 },
 			{CIRCULAR_BUFFER_PERIPHERAL_R__5, 24},
 			{0}, "TONES_DL"},
@@ -175,11 +150,11 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		      NODRIFT, NOCALLBACK, smem_vib, 1,
 		      {
 		       SNK_P, DMAREQ_PORT_PROT, {{
-						  (CBPr_DMA_RTX6*ATC_SIZE),
-						  dmem_vib_dl, dmem_vib_dl_size,
-						  (2*SCHED_LOOP_24kHz),
-						  ABE_DMASTATUS_RAW, (1 << 6)
-						  } }
+						 (CBPr_DMA_RTX6*ATC_SIZE),
+						 dmem_vib_dl, dmem_vib_dl_size,
+						 (2*SCHED_LOOP_24kHz),
+						 ABE_DMASTATUS_RAW, (1 << 6)
+						 } }
 		       },
 		      {CIRCULAR_BUFFER_PERIPHERAL_R__6, 12},
 		      {0}, "VIB_DL"},
@@ -188,18 +163,18 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 			NODRIFT, NOCALLBACK, smem_bt_vx_dl_opp50, 1,
 			{
 			 SRC_P, SERIAL_PORT_PROT, {{
-						    (MCBSP1_DMA_RX*ATC_SIZE),
-						    dmem_bt_vx_dl,
-						    dmem_bt_vx_dl_size,
-						    (1*SCHED_LOOP_8kHz),
-						    } }
+						   (MCBSP1_DMA_RX*ATC_SIZE),
+						   dmem_bt_vx_dl,
+						   dmem_bt_vx_dl_size,
+						   (1*SCHED_LOOP_8kHz),
+						   } }
 			 },
 			{0, 0}, {0}, "BT_VX_DL"},
 	/* PDM_DL */ {
 		      OMAP_ABE_PORT_ACTIVITY_IDLE, {96000, SIX_MSB},
-		      NODRIFT, NOCALLBACK, 0, (MCPDM_DL_ITER / 6),
-		      {SRC_P, MCPDMDL_PORT_PROT,
-		       {{dmem_mcpdm, dmem_mcpdm_size} } },
+		      NODRIFT, NOCALLBACK, 0, (MCPDM_DL_ITER/6),
+		      {SRC_P, MCPDMDL_PORT_PROT, {{dmem_mcpdm,
+						dmem_mcpdm_size} } },
 		      {0, 0},
 		      {MIXDL1, EQ1, APS1, MIXDL2, EQ2L, EQ2R, APS2L, APS2R, 0},
 		      "PDM_DL"},
@@ -209,10 +184,10 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 	 NODRIFT, NOCALLBACK, smem_mm_ext_out, 1,
 	 {
 	  SRC_P, SERIAL_PORT_PROT, {{
-				     (MCBSP1_DMA_TX*ATC_SIZE),
-				     dmem_mm_ext_out, dmem_mm_ext_out_size,
-				     (2*SCHED_LOOP_48kHz)
-				     } }
+				    (MCBSP1_DMA_TX*ATC_SIZE),
+				    dmem_mm_ext_out, dmem_mm_ext_out_size,
+				    (2*SCHED_LOOP_48kHz)
+				    } }
 	  }, {0, 0}, {0}, "MM_EXT_OUT"},
 	/* MM_EXT_IN */
 	{
@@ -220,10 +195,10 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 	 NODRIFT, NOCALLBACK, smem_mm_ext_in_opp100, 1,
 	 {
 	  SNK_P, SERIAL_PORT_PROT, {{
-				     (MCBSP1_DMA_RX*ATC_SIZE),
-				     dmem_mm_ext_in, dmem_mm_ext_in_size,
-				     (2*SCHED_LOOP_48kHz)
-				     } }
+				    (MCBSP1_DMA_RX*ATC_SIZE),
+				    dmem_mm_ext_in, dmem_mm_ext_in_size,
+				    (2*SCHED_LOOP_48kHz)
+				    } }
 	  },
 	 {0, 0}, {0}, "MM_EXT_IN"},
 	/* PCM3_TX */ {
@@ -231,12 +206,12 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		       NODRIFT, NOCALLBACK, 0, 1,
 		       {
 			SRC_P, TDM_SERIAL_PORT_PROT, {{
-						       (MCBSP3_DMA_TX *
-							ATC_SIZE),
-						       dmem_mm_ext_out,
-						       dmem_mm_ext_out_size,
-						       (2*SCHED_LOOP_48kHz)
-						       } }
+						      (MCBSP3_DMA_TX *
+						       ATC_SIZE),
+						      dmem_mm_ext_out,
+						      dmem_mm_ext_out_size,
+						      (2*SCHED_LOOP_48kHz)
+						      } }
 			},
 		       {0, 0}, {0}, "TDM_OUT"},
 	/* PCM3_RX */ {
@@ -244,12 +219,12 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 		       NODRIFT, NOCALLBACK, 0, 1,
 		       {
 			SRC_P, TDM_SERIAL_PORT_PROT, {{
-						       (MCBSP3_DMA_RX *
-							ATC_SIZE),
-						       dmem_mm_ext_in,
-						       dmem_mm_ext_in_size,
-						       (2*SCHED_LOOP_48kHz)
-						       } }
+						      (MCBSP3_DMA_RX *
+						       ATC_SIZE),
+						      dmem_mm_ext_in,
+						      dmem_mm_ext_in_size,
+						      (2*SCHED_LOOP_48kHz)
+						      } }
 			},
 		       {0, 0}, {0}, "TDM_IN"},
 	/* SCHD_DBG_PORT */ {
@@ -257,14 +232,14 @@ const abe_port_t abe_port_init[LAST_PORT_ID] = {
 			     NODRIFT, NOCALLBACK, 0, 1,
 			     {
 			      SRC_P, DMAREQ_PORT_PROT, {{
-							 (CBPr_DMA_RTX7 *
-							  ATC_SIZE),
-							 dmem_mm_trace,
-							 dmem_mm_trace_size,
-							 (2*SCHED_LOOP_48kHz),
-							 ABE_DMASTATUS_RAW,
-							 (1 << 4)
-							 } }
+							(CBPr_DMA_RTX7 *
+							 ATC_SIZE),
+							dmem_mm_trace,
+							dmem_mm_trace_size,
+							(2*SCHED_LOOP_48kHz),
+							ABE_DMASTATUS_RAW,
+							(1 << 4)
+							} }
 			      }, {CIRCULAR_BUFFER_PERIPHERAL_R__7, 24},
 			     {FEAT_SEQ, FEAT_CTL, FEAT_GAINS, 0}, "SCHD_DBG"},
 };
@@ -555,7 +530,7 @@ const abe_subroutine2 abe_sub_array [MAXNBSUBROUTINE] =
  typedef double (*PtrFun) (double);
 PtrFun pFun;
 pFun = sin;
-       y = (* pFun) (x);
+   y = (* pFun) (x);
 *//* mask, { time id param tag1} */
 const abe_sequence_t seq_null = {
 	NOMASK, {CL_M1, 0, {0, 0, 0, 0}, 0}, {CL_M1, 0, {0, 0, 0, 0}, 0}
@@ -788,25 +763,6 @@ const u32 abe_alpha_iir[64] = {
  * ABE_DEBUG DATA
  */
 /*
- * IRQ and trace pointer in DMEM:
- * FW updates a write pointer at "MCU_IRQ_FIFO_ptr_labelID", the read pointer is in HAL
- */
-u32 abe_irq_dbg_read_ptr;
-/*
- * General circular buffer used to trace APIs calls and AE activity.
- */
-u32 abe_dbg_activity_log[D_DEBUG_HAL_TASK_sizeof];
-u32 abe_dbg_activity_log_write_pointer;
-u32 abe_dbg_mask;
-/*
- * Global variable holding parameter errors
- */
-u32 abe_dbg_param;
-/*
- * Output of messages selector
- */
-u32 abe_dbg_output;
-/*
  * last parameters
  */
 #define SIZE_PARAM 10
@@ -836,24 +792,4 @@ const u32 abe_port_priority[LAST_PORT_ID - 1] = {
 	BT_VX_UL_PORT,
 	VIB_DL_PORT,
 };
-/*
- * ABE CONST AREA FOR DMIC DECIMATION FILTERS
- */
-/* const s32 abe_dmic_40 [C_98_48_LP_Coefs_sizeof] = {
-	-4119413, -192384, -341428, -348088, -151380, 151380, 348088,
-	341428, 192384, 4119415, 1938156, -6935719, 775202, -1801934,
-	2997698, -3692214, 3406822, -2280190, 1042982 };
-const s32 abe_dmic_32 [C_98_48_LP_Coefs_sizeof] = {
-	-4119413, -192384, -341428, -348088, -151380, 151380, 348088,
-	341428, 192384, 4119415, 1938156, -6935719, 775202, -1801934,
-	2997698, -3692214, 3406822, -2280190, 1042982 };
-const s32 abe_dmic_25 [C_98_48_LP_Coefs_sizeof] = {
-	-4119413, -192384, -341428, -348088, -151380, 151380, 348088,
-	341428, 192384, 4119415, 1938156, -6935719, 775202, -1801934,
-	2997698, -3692214, 3406822, -2280190, 1042982 };
-const s32 abe_dmic_16 [C_98_48_LP_Coefs_sizeof] = {
-	-4119413, -192384, -341428, -348088, -151380, 151380, 348088,
-	341428, 192384, 4119415, 1938156, -6935719, 775202, -1801934,
-	2997698, -3692214, 3406822, -2280190, 1042982 };
-*/
-#endif/* abe_dat_c */
+

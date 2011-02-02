@@ -323,4 +323,4 @@
 #define D_PONG_ADDR                                         40960
 #define D_PONG_ADDR_END                                     65535
 #define D_PONG_sizeof                                       24576
-#endif/* _ABEDM_ADDR_H_ */
+#endif /* _ABEDM_ADDR_H_ */
