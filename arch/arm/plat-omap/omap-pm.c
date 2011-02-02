@@ -32,6 +32,7 @@ struct omap_opp *mpu_opps;
 struct omap_opp *l3_opps;
 
 static DEFINE_MUTEX(bus_tput_mutex);
+static DEFINE_MUTEX(mpu_tput_mutex);
 
 /* Used to model a Interconnect Throughput */
 static struct interconnect_tput {
@@ -44,7 +45,9 @@ static struct interconnect_tput {
 	struct mutex throughput_mutex;
 	/* Target level for interconnect throughput */
 	unsigned long target_level;
-} *bus_tput;
+	unsigned long max_level;
+
+} *bus_tput, *mpu_tput;
 
 /* Used to represent a user of a interconnect throughput */
 struct users {
@@ -57,6 +60,24 @@ struct users {
 
 /* Private/Internal Functions */
 
+static struct users *max_lookup(struct interconnect_tput *list_ptr)
+{
+	struct users *usr, *tmp_usr;
+
+	usr = NULL;
+	list_ptr->max_level = 0;
+	list_for_each_entry(tmp_usr, &list_ptr->users_list, node) {
+		if (tmp_usr->level > list_ptr->max_level) {
+			usr = tmp_usr;
+			list_ptr->max_level = tmp_usr->level;
+		}
+	}
+
+	return usr;
+}
+
+
+
 /**
  * user_lookup - look up a user by its device pointer, return a pointer
  * @dev: The device to be looked up
@@ -66,12 +87,13 @@ struct users {
  * the struct users if found, else returns NULL.
  **/
 
-static struct users *user_lookup(struct device *dev)
+static struct users *user_lookup(struct device *dev,
+		struct interconnect_tput *list_ptr)
 {
 	struct users *usr, *tmp_usr;
 
 	usr = NULL;
-	list_for_each_entry(tmp_usr, &bus_tput->users_list, node) {
+	list_for_each_entry(tmp_usr, &list_ptr->users_list, node) {
 		if (tmp_usr->dev == dev) {
 			usr = tmp_usr;
 			break;
@@ -112,20 +134,24 @@ static struct users *get_user(void)
  * Returns 0 on sucess, else returns EINVAL if memory
  * allocation fails.
  */
-int omap_bus_tput_init(void)
+int omap_tput_list_init(struct interconnect_tput **list_ptr)
 {
-	bus_tput = kmalloc(sizeof(struct interconnect_tput), GFP_KERNEL);
-	if (!bus_tput) {
+	struct interconnect_tput *tmp_ptr = NULL;
+	tmp_ptr = kmalloc(sizeof(struct interconnect_tput), GFP_KERNEL);
+	if (!tmp_ptr) {
 		pr_err("%s FATAL ERROR: kmalloc failed\n", __func__);
 		return -EINVAL;
        }
-	INIT_LIST_HEAD(&bus_tput->users_list);
-	mutex_init(&bus_tput->throughput_mutex);
-	bus_tput->no_of_users = 0;
-	bus_tput->target_level = 0;
+	INIT_LIST_HEAD(&tmp_ptr->users_list);
+	mutex_init(&tmp_ptr->throughput_mutex);
+	tmp_ptr->no_of_users = 0;
+	tmp_ptr->target_level = 0;
+	tmp_ptr->max_level = 0;
+
+	*list_ptr = tmp_ptr;
+
 	return 0;
 }
-
 
 /**
  * add_req_tput  - Request for a required level by a device
@@ -140,7 +166,9 @@ int omap_bus_tput_init(void)
  * Returns the updated level of interconnect throughput.
  * In case of Invalid dev or user pointer, it returns 0.
  */
-static unsigned long add_req_tput(struct device *dev, unsigned long level)
+static unsigned long add_req_tput(struct device *dev,
+		unsigned long level,
+		struct interconnect_tput *list_ptr)
 {
 	int ret;
 	struct  users *user;
@@ -149,8 +177,8 @@ static unsigned long add_req_tput(struct device *dev, unsigned long level)
 		pr_err("Invalid dev pointer\n");
 		ret = 0;
 	}
-	mutex_lock(&bus_tput->throughput_mutex);
-	user = user_lookup(dev);
+	mutex_lock(&list_ptr->throughput_mutex);
+	user = user_lookup(dev, list_ptr);
 	if (user == NULL) {
 		user = get_user();
 		if (IS_ERR(user)) {
@@ -159,19 +187,20 @@ static unsigned long add_req_tput(struct device *dev, unsigned long level)
 			ret = 0;
 			goto unlock;
 		}
-		bus_tput->target_level += level;
-		bus_tput->no_of_users++;
+		list_ptr->target_level += level;
+		list_ptr->no_of_users++;
 		user->dev = dev;
-		list_add(&user->node, &bus_tput->users_list);
+		list_add(&user->node, &list_ptr->users_list);
 		user->level = level;
 	} else {
-		bus_tput->target_level -= user->level;
-		bus_tput->target_level += level;
+		list_ptr->target_level -= user->level;
+		list_ptr->target_level += level;
 		user->level = level;
 	}
-		ret = bus_tput->target_level;
+
+	ret = list_ptr->target_level;
 unlock:
-	mutex_unlock(&bus_tput->throughput_mutex);
+	mutex_unlock(&list_ptr->throughput_mutex);
 	return ret;
 }
 
@@ -187,14 +216,15 @@ unlock:
  * Returns 0, if the dev structure is invalid
  * else returns modified interconnect throughput rate.
  */
-static unsigned long remove_req_tput(struct device *dev)
+static unsigned long remove_req_tput(struct device *dev,
+		struct interconnect_tput *list_ptr)
 {
 	struct users *user;
 	int found = 0;
 	int ret;
 
-	mutex_lock(&bus_tput->throughput_mutex);
-	list_for_each_entry(user, &bus_tput->users_list, node) {
+	mutex_lock(&list_ptr->throughput_mutex);
+	list_for_each_entry(user, &list_ptr->users_list, node) {
 		if (user->dev == dev) {
 			found = 1;
 			break;
@@ -206,13 +236,16 @@ static unsigned long remove_req_tput(struct device *dev)
 		ret = 0;
 		goto unlock;
 	}
-	bus_tput->target_level -= user->level;
-	bus_tput->no_of_users--;
+
+	list_ptr->target_level -= user->level;
+	list_ptr->no_of_users--;
 	list_del(&user->node);
+
 	kfree(user);
-	ret = bus_tput->target_level;
+	ret = list_ptr->target_level;
+
 unlock:
-	mutex_unlock(&bus_tput->throughput_mutex);
+	mutex_unlock(&list_ptr->throughput_mutex);
 	return ret;
 }
 
@@ -266,12 +299,12 @@ int omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, long r)
 		pr_debug("OMAP PM: remove min bus tput constraint for: "
 			"interconnect dev %s for agent_id %d\n", dev_name(dev),
 				agent_id);
-		target_level = remove_req_tput(dev);
+		target_level = remove_req_tput(dev, bus_tput);
 	} else {
 		pr_debug("OMAP PM: add min bus tput constraint for: "
 			"interconnect dev %s for agent_id %d: rate %ld KiB\n",
 				dev_name(dev), agent_id, r);
-		target_level = add_req_tput(dev, r);
+		target_level = add_req_tput(dev, r, bus_tput);
 	}
 
 	/* Convert the throughput(in KiB/s) into Hz. */
@@ -542,10 +575,16 @@ int __init omap_pm_if_early_init()
 int __init omap_pm_if_init(void)
 {
 	int ret;
-	ret = omap_bus_tput_init();
+	ret = omap_tput_list_init(&bus_tput);
 	if (ret)
 		pr_err("Failed to initialize interconnect"
 			" bandwidth users list\n");
+
+	ret = omap_tput_list_init(&mpu_tput);
+	if (ret)
+		pr_err("Failed to initialize mpu"
+			" frequency users list\n");
+
 	return ret;
 }
 
@@ -554,4 +593,53 @@ void omap_pm_if_exit(void)
 	/* Deallocate CPUFreq frequency table here */
 }
 
+int omap_pm_set_min_mpu_freq(struct device *dev, unsigned long f)
+{
 
+	int ret = 0;
+	struct device *mpu_dev;
+	static struct device dummy_mpu_dev;
+	unsigned long old_max_level;
+
+	if (!dev) {
+		WARN(1, "OMAP PM: %s: invalid parameter(s)", __func__);
+		return -EINVAL;
+	}
+
+	mutex_lock(&mpu_tput_mutex);
+
+	mpu_dev = omap2_get_mpuss_device();
+	if (!mpu_dev) {
+		pr_err("Unable to get MPU device pointer");
+		ret = -EINVAL;
+		goto unlock;
+	}
+
+	/* Save the current constraint */
+	old_max_level = mpu_tput->max_level;
+
+	if (f == -1)
+		remove_req_tput(dev, mpu_tput);
+	else
+		add_req_tput(dev, f, mpu_tput);
+
+	/* Find max constraint after the operation */
+	max_lookup(mpu_tput);
+
+	/* Rescale the frequency if a change is detected with
+	 * the new constraint.
+	 */
+	if (mpu_tput->max_level != old_max_level) {
+		ret = omap_device_set_rate(&dummy_mpu_dev,
+					mpu_dev, mpu_tput->max_level);
+		if (ret)
+			pr_err("Unable to set MPU frequency to %ld\n",
+				mpu_tput->max_level);
+	}
+
+
+unlock:
+	mutex_unlock(&mpu_tput_mutex);
+	return ret;
+}
+EXPORT_SYMBOL(omap_pm_set_min_mpu_freq);
