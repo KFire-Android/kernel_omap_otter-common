@@ -231,11 +231,30 @@ static int sdp4430_dmic_hw_params(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
-	return 0;
+	if (rtd->current_fe == ABE_FRONTEND_DAI_MODEM) {
+		/* set Modem McBSP configuration  */
+		ret = sdp4430_modem_mcbsp_configure(substream, 1);
+	}
+
+	return ret;
+}
+
+static int sdp4430_dmic_hw_free(struct snd_pcm_substream *substream)
+{
+	int ret = 0;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+
+	if (rtd->current_fe == ABE_FRONTEND_DAI_MODEM) {
+		/* freed Modem McBSP configuration */
+		ret = sdp4430_modem_mcbsp_configure(substream, 0);
+	}
+
+	return ret;
 }
 
 static struct snd_soc_ops sdp4430_dmic_ops = {
 	.hw_params = sdp4430_dmic_hw_params,
+	.hw_free = sdp4430_dmic_hw_free,
 };
 
 static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
