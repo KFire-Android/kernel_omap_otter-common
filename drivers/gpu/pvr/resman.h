@@ -41,6 +41,9 @@ enum {
 	RESMAN_TYPE_TRANSFER_CONTEXT,					
 
 	
+	RESMAN_TYPE_DMA_CLIENT_FIFO_DATA,				
+
+	
 	
 	
 	

@@ -27,10 +27,10 @@
 #include "perproc.h"
 #include "sgxinfokm.h"
 
-
+ 
 #define CCB_OFFSET_IS_VALID(type, psCCBMemInfo, psCCBKick, offset) \
-	((sizeof(type) <= (psCCBMemInfo)->ui32AllocSize) && \
-	((psCCBKick)->offset <= (psCCBMemInfo)->ui32AllocSize - sizeof(type)))
+	((sizeof(type) <= (psCCBMemInfo)->uAllocSize) && \
+	((psCCBKick)->offset <= (psCCBMemInfo)->uAllocSize - sizeof(type)))
 
 #define	CCB_DATA_FROM_OFFSET(type, psCCBMemInfo, psCCBKick, offset) \
 	((type *)(((IMG_CHAR *)(psCCBMemInfo)->pvLinAddrKM) + \
@@ -42,18 +42,20 @@ IMG_VOID SGXTestActivePowerEvent(PVRSRV_DEVICE_NODE	*psDeviceNode,
 								 IMG_UINT32			ui32CallerID);
 
 IMG_IMPORT
-PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_SGXDEV_INFO	*psDevInfo,
+PVRSRV_ERROR SGXScheduleCCBCommand(PVRSRV_DEVICE_NODE	*psDeviceNode,
 								   SGXMKIF_CMD_TYPE		eCommandType,
 								   SGXMKIF_COMMAND		*psCommandData,
 								   IMG_UINT32			ui32CallerID,
 								   IMG_UINT32			ui32PDumpFlags,
-								   IMG_BOOL			bLastInScene);
+								   IMG_HANDLE			hDevMemContext,
+								   IMG_BOOL				bLastInScene);
 IMG_IMPORT
 PVRSRV_ERROR SGXScheduleCCBCommandKM(PVRSRV_DEVICE_NODE		*psDeviceNode,
 									 SGXMKIF_CMD_TYPE		eCommandType,
 									 SGXMKIF_COMMAND		*psCommandData,
 									 IMG_UINT32				ui32CallerID,
 									 IMG_UINT32				ui32PDumpFlags,
+									 IMG_HANDLE				hDevMemContext,
 									 IMG_BOOL				bLastInScene);
 
 IMG_IMPORT
@@ -99,4 +101,11 @@ IMG_VOID SGXCleanupRequest(PVRSRV_DEVICE_NODE	*psDeviceNode,
 							IMG_DEV_VIRTADDR	*psHWDataDevVAddr,
 							IMG_UINT32			ui32CleanupType);
 
+IMG_IMPORT
+PVRSRV_ERROR PVRSRVGetSGXRevDataKM(PVRSRV_DEVICE_NODE* psDeviceNode, IMG_UINT32 *pui32SGXCoreRev,
+				IMG_UINT32 *pui32SGXCoreID);
+
+PVRSRV_ERROR SGXContextSuspend(PVRSRV_DEVICE_NODE	*psDeviceNode,
+							   IMG_DEV_VIRTADDR		*psHWContextDevVAddr,
+							   IMG_BOOL				bResume);
 

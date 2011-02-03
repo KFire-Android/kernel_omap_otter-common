@@ -63,97 +63,6 @@ IMG_UINT32 PVRSRV_BridgeDispatchKM(IMG_UINT32	Ioctl,
 								   IMG_UINT32	OutBufLen,
 								   IMG_UINT32	*pdwBytesTransferred);
 
-#if defined(DEBUG) && defined(DUMP_OMAP34xx_CLOCKS) && defined(__linux__)
-
-#pragma GCC diagnostic ignored "-Wstrict-prototypes"
-#include <mach/clock.h>
-
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
-#include <../mach-omap2/clock_34xx.h>
-#define ONCHIP_CLKS onchip_clks
-#else
-#include <../mach-omap2/clock34xx.h>
-#define ONCHIP_CLKS onchip_34xx_clks
-#endif
-
-static void omap3_clk_recalc(struct clk *clk) {}
-static void omap3_followparent_recalc(struct clk *clk) {}
-static void omap3_propagate_rate(struct clk *clk) {}
-static void omap3_table_recalc(struct clk *clk) {}
-static long omap3_round_to_table_rate(struct clk *clk, unsigned long rate) { return 0; }
-static int omap3_select_table_rate(struct clk *clk, unsigned long rate) { return 0; }
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29))
-static void omap3_dpll_recalc(struct clk *clk, unsigned long parent_rate,
-							  u8 rate_storage) {}
-static void omap3_clkoutx2_recalc(struct clk *clk, unsigned long parent_rate,
-								  u8 rate_storage) {}
-static void omap3_dpll_allow_idle(struct clk *clk) {}
-static void omap3_dpll_deny_idle(struct clk *clk) {}
-static u32 omap3_dpll_autoidle_read(struct clk *clk) { return 0; }
-static int omap3_noncore_dpll_enable(struct clk *clk) { return 0; }
-static void omap3_noncore_dpll_disable(struct clk *clk) {}
-static int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate) { return 0; }
-static int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate) { return 0; }
-void followparent_recalc(struct clk *clk, unsigned long new_parent_rate,
-								u8 rate_storage) {}
-long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate) { return 0; }
-void omap2_clksel_recalc(struct clk *clk, unsigned long new_parent_rate,
-								u8 rate_storage) {}
-long omap2_clksel_round_rate(struct clk *clk, unsigned long target_rate) { return 0; }
-int omap2_clksel_set_rate(struct clk *clk, unsigned long rate) { return 0; }
-void omap2_fixed_divisor_recalc(struct clk *clk, unsigned long new_parent_rate,
-									   u8 rate_storage) {}
-void omap2_init_clksel_parent(struct clk *clk) {}
-#endif
-
-static void dump_omap34xx_clocks(void)
-{
-	struct clk **c;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,29))
-	struct vdd_prcm_config *t1 = vdd1_rate_table;
-	struct vdd_prcm_config *t2 = vdd2_rate_table;
-
-	t1 = t1;
-	t2 = t2;
-#else
-
-	omap3_dpll_allow_idle(0);
-	omap3_dpll_deny_idle(0);
-	omap3_dpll_autoidle_read(0);
-	omap3_clk_recalc(0);
-	omap3_followparent_recalc(0);
-	omap3_propagate_rate(0);
-	omap3_table_recalc(0);
-	omap3_round_to_table_rate(0, 0);
-	omap3_select_table_rate(0, 0);
-#endif
-
-	for(c = ONCHIP_CLKS; c < ONCHIP_CLKS + ARRAY_SIZE(ONCHIP_CLKS); c++)
-	{
-		struct clk *cp = *c, *copy;
-		unsigned long rate;
-		copy = clk_get(NULL, cp->name);
-		if(!copy)
-			continue;
-		rate = clk_get_rate(copy);
-		if (rate < 1000000)
-		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: clock %s is %lu KHz (%lu Hz)", __func__, cp->name, rate/1000, rate));
-		}
-		else
-		{
-			PVR_DPF((PVR_DBG_ERROR, "%s: clock %s is %lu MHz (%lu Hz)", __func__, cp->name, rate/1000000, rate));
-		}
-	}
-}
-
-#else
-
-static INLINE void dump_omap34xx_clocks(void) {}
-
-#endif
-
 #if defined(SGX_OCP_REGS_ENABLED)
 
 #define SYS_OMAP4430_OCP_REGS_SYS_PHYS_BASE		(SYS_OMAP4430_SGX_REGS_SYS_PHYS_BASE + EUR_CR_OCP_REVISION)
@@ -168,6 +77,9 @@ static PVRSRV_ERROR EnableSGXClocksWrap(SYS_DATA *psSysData)
 	if(eError == PVRSRV_OK)
 	{
 		OSWriteHWReg(gpvOCPRegsLinAddr,
+					 EUR_CR_OCP_SYSCONFIG - EUR_CR_OCP_REVISION,
+					 0x14); 
+		OSWriteHWReg(gpvOCPRegsLinAddr,
 					 EUR_CR_OCP_DEBUG_CONFIG - EUR_CR_OCP_REVISION,
 					 EUR_CR_OCP_DEBUG_CONFIG_THALIA_INT_BYPASS_MASK);
 	}
@@ -175,14 +87,14 @@ static PVRSRV_ERROR EnableSGXClocksWrap(SYS_DATA *psSysData)
 	return eError;
 }
 
-#else
+#else 
 
 static INLINE PVRSRV_ERROR EnableSGXClocksWrap(SYS_DATA *psSysData)
 {
 	return EnableSGXClocks(psSysData);
 }
 
-#endif
+#endif 
 
 static INLINE PVRSRV_ERROR EnableSystemClocksWrap(SYS_DATA *psSysData)
 {
@@ -191,7 +103,7 @@ static INLINE PVRSRV_ERROR EnableSystemClocksWrap(SYS_DATA *psSysData)
 #if !defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 	if(eError == PVRSRV_OK)
 	{
-
+		
 		EnableSGXClocksWrap(psSysData);
 	}
 #endif
@@ -208,13 +120,13 @@ static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 
 	PVR_UNREFERENCED_PARAMETER(psSysData);
 
-
+	
 	gsSGXDeviceMap.ui32Flags = 0x0;
-
+	
 #if defined(NO_HARDWARE)
-
-
-	eError = OSBaseAllocContigMemory(SYS_OMAP4430_SGX_REGS_SIZE,
+	
+	
+	eError = OSBaseAllocContigMemory(SYS_OMAP4430_SGX_REGS_SIZE, 
 									 &gsSGXRegsCPUVAddr,
 									 &sCpuPAddr);
 	if(eError != PVRSRV_OK)
@@ -225,21 +137,21 @@ static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 	gsSGXDeviceMap.sRegsSysPBase = SysCpuPAddrToSysPAddr(gsSGXDeviceMap.sRegsCpuPBase);
 	gsSGXDeviceMap.ui32RegsSize = SYS_OMAP4430_SGX_REGS_SIZE;
 #if defined(__linux__)
-
+	
 	gsSGXDeviceMap.pvRegsCpuVBase = gsSGXRegsCPUVAddr;
 #else
-
+	
 	gsSGXDeviceMap.pvRegsCpuVBase = IMG_NULL;
 #endif
 
 	OSMemSet(gsSGXRegsCPUVAddr, 0, SYS_OMAP4430_SGX_REGS_SIZE);
 
-
+	
 
 
 	gsSGXDeviceMap.ui32IRQ = 0;
 
-#else
+#else 
 
 	gsSGXDeviceMap.sRegsSysPBase.uiAddr = SYS_OMAP4430_SGX_REGS_SYS_PHYS_BASE;
 	gsSGXDeviceMap.sRegsCpuPBase = SysSysPAddrToCpuPAddr(gsSGXDeviceMap.sRegsSysPBase);
@@ -251,10 +163,13 @@ static PVRSRV_ERROR SysLocateDevices(SYS_DATA *psSysData)
 
 #if defined(PDUMP)
 	{
+		
 		static IMG_CHAR pszPDumpDevName[] = "SGXMEM";
 		gsSGXDeviceMap.pszPDumpDevName = pszPDumpDevName;
 	}
 #endif
+
+	
 
 
 	return PVRSRV_OK;
@@ -318,7 +233,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	IMG_UINT32			i;
 	PVRSRV_ERROR 		eError;
 	PVRSRV_DEVICE_NODE	*psDeviceNode;
-#if !defined(NO_OMAP_TIMER)
+#if !defined(PVR_NO_OMAP_TIMER)
 	IMG_CPU_PHYADDR		TimerRegPhysBase;
 #endif
 #if !defined(SGX_DYNAMIC_TIMING_INFO)
@@ -344,7 +259,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 
 	gpsSysData->ui32NumDevices = SYS_DEVICE_COUNT;
 
-
+	
 	for(i=0; i<SYS_DEVICE_COUNT; i++)
 	{
 		gpsSysData->sDeviceID[i].uiID = i;
@@ -363,8 +278,8 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 		return eError;
 	}
 
-#if !defined(NO_OMAP_TIMER)
-	TimerRegPhysBase.uiAddr = SYS_OMAP3430_GP11TIMER_REGS_SYS_PHYS_BASE;
+#if !defined(PVR_NO_OMAP_TIMER)
+	TimerRegPhysBase.uiAddr = SYS_OMAP4430_GP11TIMER_REGS_SYS_PHYS_BASE;
 	gpsSysData->pvSOCTimerRegisterKM = IMG_NULL;
 	gpsSysData->hSOCTimerRegisterOSMemHandle = 0;
 	OSReservePhys(TimerRegPhysBase,
@@ -372,27 +287,27 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 				  PVRSRV_HAP_MULTI_PROCESS|PVRSRV_HAP_UNCACHED,
 				  (IMG_VOID **)&gpsSysData->pvSOCTimerRegisterKM,
 				  &gpsSysData->hSOCTimerRegisterOSMemHandle);
-#endif
+#endif 
 
 #if !defined(SGX_DYNAMIC_TIMING_INFO)
-
+	
 	psTimingInfo = &gsSGXDeviceMap.sTimingInfo;
 	psTimingInfo->ui32CoreClockSpeed = SYS_SGX_CLOCK_SPEED;
-	psTimingInfo->ui32HWRecoveryFreq = SYS_SGX_HWRECOVERY_TIMEOUT_FREQ;
+	psTimingInfo->ui32HWRecoveryFreq = SYS_SGX_HWRECOVERY_TIMEOUT_FREQ; 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 	psTimingInfo->bEnableActivePM = IMG_TRUE;
-#else
+#else	
 	psTimingInfo->bEnableActivePM = IMG_FALSE;
-#endif
-	psTimingInfo->ui32ActivePowManLatencyms = SYS_SGX_ACTIVE_POWER_LATENCY_MS;
-	psTimingInfo->ui32uKernelFreq = SYS_SGX_PDS_TIMER_FREQ;
+#endif 
+	psTimingInfo->ui32ActivePowManLatencyms = SYS_SGX_ACTIVE_POWER_LATENCY_MS; 
+	psTimingInfo->ui32uKernelFreq = SYS_SGX_PDS_TIMER_FREQ; 
 #endif
 
-
+	
 
 	gpsSysSpecificData->ui32SrcClockDiv = 3;
 
-
+	
 
 
 
@@ -428,6 +343,18 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	}
 #endif
 
+	eError = SysPMRuntimeRegister();
+	if (eError != PVRSRV_OK)
+	{
+		PVR_DPF((PVR_DBG_ERROR,"SysInitialise: Failed to register with OSPM!"));
+		(IMG_VOID)SysDeinitialise(gpsSysData);
+		gpsSysData = IMG_NULL;
+		return eError;
+	}
+	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_PM_RUNTIME);
+
+	
+
 
 	eError = PVRSRVRegisterDevice(gpsSysData, SGXRegisterDevice,
 								  DEVICE_SGX_INTERRUPT, &gui32SGXDeviceID);
@@ -440,13 +367,14 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	}
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_REGDEV);
 
+	
 
 
-
+	
 	psDeviceNode = gpsSysData->psDeviceNodeList;
 	while(psDeviceNode)
 	{
-
+		
 		switch(psDeviceNode->sDevId.eDeviceType)
 		{
 			case PVRSRV_DEVICE_TYPE_SGX:
@@ -454,16 +382,16 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 				DEVICE_MEMORY_INFO *psDevMemoryInfo;
 				DEVICE_MEMORY_HEAP_INFO *psDeviceMemoryHeap;
 
-
+				
 
 
 				psDeviceNode->psLocalDevMemArena = IMG_NULL;
 
-
+				
 				psDevMemoryInfo = &psDeviceNode->sDevMemoryInfo;
 				psDeviceMemoryHeap = psDevMemoryInfo->psDeviceMemoryHeap;
 
-
+				
 				for(i=0; i<psDevMemoryInfo->ui32HeapCount; i++)
 				{
 					psDeviceMemoryHeap[i].ui32Attribs |= PVRSRV_BACKINGSTORE_SYSMEM_NONCONTIG;
@@ -479,7 +407,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 				return PVRSRV_ERROR_INIT_FAILURE;
 		}
 
-
+		
 		psDeviceNode = psDeviceNode->psNext;
 	}
 
@@ -501,9 +429,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 		gpsSysData = IMG_NULL;
 		return eError;
 	}
-#endif
-
-	dump_omap34xx_clocks();
+#endif	
 
 	eError = PVRSRVInitialiseDevice(gui32SGXDeviceID);
 	if (eError != PVRSRV_OK)
@@ -516,9 +442,9 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_INITDEV);
 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
-
+	
 	DisableSGXClocks(gpsSysData);
-#endif
+#endif	
 
 	return PVRSRV_OK;
 }
@@ -535,7 +461,7 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 		PVR_DPF((PVR_DBG_ERROR,"SysInitialise: Failed to Enable SGX clocks (%d)", eError));
 		return eError;
 	}
-#endif
+#endif	
 
 	eError = OSInstallMISR(gpsSysData);
 	if (eError != PVRSRV_OK)
@@ -546,7 +472,7 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_MISR);
 
 #if defined(SYS_USING_INTERRUPTS)
-
+	
 	eError = OSInstallDeviceLISR(gpsSysData, gsSGXDeviceMap.ui32IRQ, "SGX ISR", gpsSGXDevNode);
 	if (eError != PVRSRV_OK)
 	{
@@ -554,9 +480,10 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 		return eError;
 	}
 	SYS_SPECIFIC_DATA_SET(&gsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_LISR);
-#endif
+#endif 
 
-
+#if defined(__linux__)
+	
 	gpsSysData->pszVersionString = SysCreateVersionString(gsSGXDeviceMap.sRegsCpuPBase);
 	if (!gpsSysData->pszVersionString)
 	{
@@ -566,11 +493,12 @@ PVRSRV_ERROR SysFinalise(IMG_VOID)
 	{
 		PVR_DPF((PVR_DBG_WARNING, "SysFinalise: Version string: %s", gpsSysData->pszVersionString));
 	}
+#endif
 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
-
+	
 	DisableSGXClocks(gpsSysData);
-#endif
+#endif	
 
 	gpsSysSpecificData->bSGXInitComplete = IMG_TRUE;
 
@@ -592,7 +520,7 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 			return eError;
 		}
 	}
-#endif 
+#endif
 
 	if (SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_MISR))
 	{
@@ -625,14 +553,26 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 			return eError;
 		}
 	}
-	
+
+	if (SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_PM_RUNTIME))
+	{
+		eError = SysPMRuntimeUnregister();
+		if (eError != PVRSRV_OK)
+		{
+			PVR_DPF((PVR_DBG_ERROR,"SysDeinitialise: Failed to unregister with OSPM!"));
+			(IMG_VOID)SysDeinitialise(gpsSysData);
+			gpsSysData = IMG_NULL;
+			return eError;
+		}
+	}
+
 #if defined(SGX_OCP_REGS_ENABLED)
 	if (SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_OCPREGS))
 	{
-	OSUnMapPhysToLin(gpvOCPRegsLinAddr,
-					 SYS_OMAP4430_OCP_REGS_SIZE,
-					 PVRSRV_HAP_UNCACHED|PVRSRV_HAP_KERNEL_ONLY,
-					 IMG_NULL);
+		OSUnMapPhysToLin(gpvOCPRegsLinAddr,
+						 SYS_OMAP4430_OCP_REGS_SIZE,
+						 PVRSRV_HAP_UNCACHED|PVRSRV_HAP_KERNEL_ONLY,
+						 IMG_NULL);
 	}
 #endif
 
@@ -644,7 +584,7 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 	}
 
 	if (SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_ENVDATA))
-	{
+	{	
 		eError = OSDeInitEnvData(gpsSysData->pvEnvSpecificData);
 		if (eError != PVRSRV_OK)
 		{
@@ -653,7 +593,6 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 		}
 	}
 
-#if !defined(NO_OMAP_TIMER)
 	if(gpsSysData->pvSOCTimerRegisterKM)
 	{
 		OSUnReservePhys(gpsSysData->pvSOCTimerRegisterKM,
@@ -661,18 +600,18 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 						PVRSRV_HAP_MULTI_PROCESS|PVRSRV_HAP_UNCACHED,
 						gpsSysData->hSOCTimerRegisterOSMemHandle);
 	}
-#endif
 
 	SysDeinitialiseCommon(gpsSysData);
 
 #if defined(NO_HARDWARE)
 	if(SYS_SPECIFIC_DATA_TEST(gpsSysSpecificData, SYS_SPECIFIC_DATA_ENABLE_LOCATEDEV))
 	{
-
+		
 		OSBaseFreeContigMemory(SYS_OMAP4430_SGX_REGS_SIZE, gsSGXRegsCPUVAddr, gsSGXDeviceMap.sRegsCpuPBase);
 	}
 #endif
 
+	
 	gpsSysSpecificData->ui32SysSpecificData = 0;
 	gpsSysSpecificData->bSGXInitComplete = IMG_FALSE;
 
@@ -690,7 +629,7 @@ PVRSRV_ERROR SysGetDeviceMemoryMap(PVRSRV_DEVICE_TYPE	eDeviceType,
 	{
 		case PVRSRV_DEVICE_TYPE_SGX:
 		{
-
+			
 			*ppvDeviceMap = (IMG_VOID*)&gsSGXDeviceMap;
 
 			break;
@@ -711,9 +650,9 @@ IMG_DEV_PHYADDR SysCpuPAddrToDevPAddr(PVRSRV_DEVICE_TYPE	eDeviceType,
 
 	PVR_UNREFERENCED_PARAMETER(eDeviceType);
 
-
+	
 	DevPAddr.uiAddr = CpuPAddr.uiAddr;
-
+	
 	return DevPAddr;
 }
 
@@ -721,7 +660,7 @@ IMG_CPU_PHYADDR SysSysPAddrToCpuPAddr (IMG_SYS_PHYADDR sys_paddr)
 {
 	IMG_CPU_PHYADDR cpu_paddr;
 
-
+	
 	cpu_paddr.uiAddr = sys_paddr.uiAddr;
 	return cpu_paddr;
 }
@@ -730,7 +669,7 @@ IMG_SYS_PHYADDR SysCpuPAddrToSysPAddr (IMG_CPU_PHYADDR cpu_paddr)
 {
 	IMG_SYS_PHYADDR sys_paddr;
 
-
+	
 	sys_paddr.uiAddr = cpu_paddr.uiAddr;
 	return sys_paddr;
 }
@@ -742,7 +681,7 @@ IMG_DEV_PHYADDR SysSysPAddrToDevPAddr(PVRSRV_DEVICE_TYPE eDeviceType, IMG_SYS_PH
 
 	PVR_UNREFERENCED_PARAMETER(eDeviceType);
 
-
+	
 	DevPAddr.uiAddr = SysPAddr.uiAddr;
 
 	return DevPAddr;
@@ -755,7 +694,7 @@ IMG_SYS_PHYADDR SysDevPAddrToSysPAddr(PVRSRV_DEVICE_TYPE eDeviceType, IMG_DEV_PH
 
 	PVR_UNREFERENCED_PARAMETER(eDeviceType);
 
-
+	
 	SysPAddr.uiAddr = DevPAddr.uiAddr;
 
 	return SysPAddr;
@@ -779,10 +718,10 @@ IMG_UINT32 SysGetInterruptSource(SYS_DATA			*psSysData,
 {
 	PVR_UNREFERENCED_PARAMETER(psSysData);
 #if defined(NO_HARDWARE)
-
+	
 	return 0xFFFFFFFF;
 #else
-
+	
 	return psDeviceNode->ui32SOCInterruptBit;
 #endif
 }
@@ -793,7 +732,7 @@ IMG_VOID SysClearInterrupts(SYS_DATA* psSysData, IMG_UINT32 ui32ClearBits)
 	PVR_UNREFERENCED_PARAMETER(psSysData);
 	PVR_UNREFERENCED_PARAMETER(ui32ClearBits);
 
-
+	
 	OSReadHWReg(((PVRSRV_SGXDEV_INFO *)gpsSGXDevNode->pvDevice)->pvRegsBaseKM,
 										EUR_CR_EVENT_HOST_CLEAR);
 }
@@ -908,9 +847,9 @@ PVRSRV_ERROR SysDevicePrePowerState(IMG_UINT32				ui32DeviceIndex,
 		PVR_DPF((PVR_DBG_MESSAGE, "SysDevicePrePowerState: SGX Entering state D3"));
 		DisableSGXClocks(gpsSysData);
 	}
-#else
+#else	
 	PVR_UNREFERENCED_PARAMETER(eNewPowerState );
-#endif
+#endif 
 	return PVRSRV_OK;
 }
 
@@ -934,9 +873,9 @@ PVRSRV_ERROR SysDevicePostPowerState(IMG_UINT32				ui32DeviceIndex,
 		PVR_DPF((PVR_DBG_MESSAGE, "SysDevicePostPowerState: SGX Leaving state D3"));
 		eError = EnableSGXClocksWrap(gpsSysData);
 	}
-#else
+#else	
 	PVR_UNREFERENCED_PARAMETER(eCurrentPowerState);
-#endif
+#endif	
 
 	return eError;
 }
@@ -957,7 +896,7 @@ PVRSRV_ERROR SysOEMFunction (	IMG_UINT32	ui32ID,
 	if ((ui32ID == OEM_GET_EXT_FUNCS) &&
 		(ulOutSize == sizeof(PVRSRV_DC_OEM_JTABLE)))
 	{
-
+		
 		PVRSRV_DC_OEM_JTABLE *psOEMJTable = (PVRSRV_DC_OEM_JTABLE*) pvOut;
 		psOEMJTable->pfnOEMBridgeDispatch = &PVRSRV_BridgeDispatchKM;
 		return PVRSRV_OK;

@@ -142,7 +142,7 @@ struct _RA_ARENA_
 #endif
 
 #if defined(CONFIG_PROC_FS) && defined(DEBUG)
-#define PROC_NAME_SIZE		32
+#define PROC_NAME_SIZE		64
 
 	struct proc_dir_entry* pProcInfo;
 	struct proc_dir_entry* pProcSegs;

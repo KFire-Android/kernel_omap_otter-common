@@ -47,8 +47,6 @@
 #include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/proc_fs.h>
-#include <linux/pm_runtime.h>
-#include <plat/gpu.h>
 
 #if defined(SUPPORT_DRI_DRM)
 #include <drm/drmP.h>
@@ -127,11 +125,11 @@ static int PVRSRVRelease(struct inode* pInode, struct file* pFile);
 
 static struct file_operations pvrsrv_fops =
 {
-	.owner = THIS_MODULE,
+	.owner=THIS_MODULE,
 	.unlocked_ioctl = PVRSRV_BridgeDispatchKM,
-	.open = PVRSRVOpen,
-	.release = PVRSRVRelease,
-	.mmap = PVRMMap,
+	.open=PVRSRVOpen,
+	.release=PVRSRVRelease,
+	.mmap=PVRMMap,
 };
 #endif
 
@@ -201,8 +199,23 @@ static LDM_DRV powervr_driver = {
 	.shutdown	= PVRSRVDriverShutdown,
 };
 
-struct gpu_platform_data *gpsSgxPlatformData;
 LDM_DEV *gpsPVRLDMDev;
+
+#if defined(MODULE) && defined(PVR_LDM_PLATFORM_MODULE)
+
+static IMG_VOID PVRSRVDeviceRelease(struct device unref__ *pDevice)
+{
+}
+
+static struct platform_device powervr_device = {
+	.name			= DEVNAME,
+	.id				= -1,
+	.dev 			= {
+		.release	= PVRSRVDeviceRelease
+	}
+};
+
+#endif 
 
 #if defined(PVR_LDM_PLATFORM_MODULE)
 static int PVRSRVDriverProbe(LDM_DEV *pDevice)
@@ -221,16 +234,8 @@ static int __devinit PVRSRVDriverProbe(LDM_DEV *pDevice, const struct pci_device
 	{
 		return -EINVAL;
 	}
-#endif	
-
-	gpsSgxPlatformData = pDevice->dev.platform_data;
-	if(!gpsSgxPlatformData)
-	{
-		PVR_TRACE(("No SGX platform device data."));
-	}
+#endif
 	
-	pm_runtime_enable(&pDevice->dev);
-
 	psSysData = SysAcquireDataNoCheck();
 	if ( psSysData == IMG_NULL)
 	{
@@ -269,8 +274,6 @@ static void __devexit PVRSRVDriverRemove(LDM_DEV *pDevice)
 	}
 #endif
 	(IMG_VOID)SysDeinitialise(psSysData);
-	
-	pm_runtime_disable(&pDevice->dev);
 
 	gpsPVRLDMDev = IMG_NULL;
 
@@ -425,7 +428,9 @@ static int PVRSRVOpen(struct inode unref__ * pInode, struct file *pFile)
 	if(eError != PVRSRV_OK)
 		goto err_unlock;
 
-#if defined(PVR_SECURE_FD_EXPORT)
+#if defined (SUPPORT_SID_INTERFACE)
+	psPrivateData->hKernelMemInfo = 0;
+#else
 	psPrivateData->hKernelMemInfo = NULL;
 #endif
 #if defined(SUPPORT_DRI_DRM) && defined(PVR_SECURE_DRM_AUTH_EXPORT)
@@ -464,7 +469,7 @@ static int PVRSRVRelease(struct inode unref__ * pInode, struct file *pFile)
 		list_del(&psPrivateData->sDRMAuthListItem);
 #endif
 
-
+		
 		gui32ReleasePID = psPrivateData->ui32OpenPID;
 		PVRSRVProcessDisconnect(psPrivateData->ui32OpenPID);
 		gui32ReleasePID = 0;
@@ -474,7 +479,7 @@ static int PVRSRVRelease(struct inode unref__ * pInode, struct file *pFile)
 				  psPrivateData, psPrivateData->hBlockAlloc);
 
 #if !defined(SUPPORT_DRI_DRM)
-		PRIVATE_DATA(pFile) = IMG_NULL;
+		PRIVATE_DATA(pFile) = IMG_NULL; 
 #endif
 	}
 
@@ -541,6 +546,16 @@ static int __init PVRCore_Init(IMG_VOID)
 		goto init_failed;
 	}
 
+#if defined(MODULE)
+	if ((error = platform_device_register(&powervr_device)) != 0)
+	{
+		platform_driver_unregister(&powervr_driver);
+
+		PVR_DPF((PVR_DBG_ERROR, "PVRCore_Init: unable to register platform device (%d)", error));
+
+		goto init_failed;
+	}
+#endif
 #endif 
 
 #if defined(PVR_LDM_PCI_MODULE)
@@ -623,6 +638,9 @@ sys_deinit:
 #endif
 
 #if defined (PVR_LDM_PLATFORM_MODULE)
+#if defined (MODULE)
+	platform_device_unregister(&powervr_device);
+#endif
 	platform_driver_unregister(&powervr_driver);
 #endif
 
@@ -689,6 +707,9 @@ static void __exit PVRCore_Cleanup(void)
 #endif
 
 #if defined (PVR_LDM_PLATFORM_MODULE)
+#if defined (MODULE)
+	platform_device_unregister(&powervr_device);
+#endif
 	platform_driver_unregister(&powervr_driver);
 #endif
 

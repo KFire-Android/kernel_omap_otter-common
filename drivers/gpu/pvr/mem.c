@@ -37,7 +37,7 @@ FreeSharedSysMemCallBack(IMG_PVOID	pvParam,
 	PVR_UNREFERENCED_PARAMETER(ui32Param);
 
 	OSFreePages(psKernelMemInfo->ui32Flags,
-				psKernelMemInfo->ui32AllocSize,
+				psKernelMemInfo->uAllocSize,
 				psKernelMemInfo->pvLinAddrKM,
 				psKernelMemInfo->sMemBlk.hOSMemHandle);
 
@@ -54,7 +54,7 @@ FreeSharedSysMemCallBack(IMG_PVOID	pvParam,
 IMG_EXPORT PVRSRV_ERROR
 PVRSRVAllocSharedSysMemoryKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 							 IMG_UINT32					ui32Flags,
-							 IMG_SIZE_T 				ui32Size,
+							 IMG_SIZE_T 				uSize,
 							 PVRSRV_KERNEL_MEM_INFO 	**ppsKernelMemInfo)
 {
 	PVRSRV_KERNEL_MEM_INFO *psKernelMemInfo;
@@ -73,11 +73,11 @@ PVRSRVAllocSharedSysMemoryKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 	ui32Flags &= ~PVRSRV_HAP_MAPTYPE_MASK;
 	ui32Flags |= PVRSRV_HAP_MULTI_PROCESS;
 	psKernelMemInfo->ui32Flags = ui32Flags;
-	psKernelMemInfo->ui32AllocSize = ui32Size;
+	psKernelMemInfo->uAllocSize = uSize;
 
 	if(OSAllocPages(psKernelMemInfo->ui32Flags,
-					psKernelMemInfo->ui32AllocSize,
-					HOST_PAGESIZE(),
+					psKernelMemInfo->uAllocSize,
+					(IMG_UINT32)HOST_PAGESIZE(),
 					&psKernelMemInfo->pvLinAddrKM,
 					&psKernelMemInfo->sMemBlk.hOSMemHandle)
 		!= PVRSRV_OK)

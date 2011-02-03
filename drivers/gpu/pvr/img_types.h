@@ -56,16 +56,19 @@ typedef signed long		IMG_INT32,	*IMG_PINT32;
 	#define IMG_UINT32_MAX 0xFFFFFFFFUL
 #endif
 
+#if defined(USE_CODE)
+
+typedef unsigned __int64	IMG_UINT64, *IMG_PUINT64;
+typedef __int64				IMG_INT64,  *IMG_PINT64;
+
+#else
 	#if (defined(LINUX) || defined(__METAG))
-#if !defined(USE_CODE)
 		typedef unsigned long long		IMG_UINT64,	*IMG_PUINT64;
 		typedef long long 				IMG_INT64,	*IMG_PINT64;
-#endif
 	#else
-
 		#error("define an OS")
-
 	#endif
+#endif
 
 #if !(defined(LINUX) && defined (__KERNEL__))
 typedef float			IMG_FLOAT,	*IMG_PFLOAT;
@@ -84,22 +87,23 @@ typedef void            IMG_VOID, *IMG_PVOID;
 typedef IMG_INT32       IMG_RESULT;
 
 #if defined(_WIN64)
-typedef unsigned __int64 IMG_UINTPTR_T;
+	typedef unsigned __int64	IMG_UINTPTR_T;
+	typedef signed __int64		IMG_PTRDIFF_T;
+	typedef IMG_UINT64			IMG_SIZE_T;
 #else
-typedef unsigned int     IMG_UINTPTR_T;
+	typedef unsigned int	IMG_UINTPTR_T;
+	typedef IMG_UINT32		IMG_SIZE_T;
 #endif
 
 typedef IMG_PVOID       IMG_HANDLE;
 
 typedef void**          IMG_HVOID,	* IMG_PHVOID;
 
-typedef IMG_UINT32		IMG_SIZE_T;
-
 #define IMG_NULL        0 
 
 typedef IMG_UINT32      IMG_SID;
 
-
+typedef IMG_UINT32      IMG_EVENTSID;
 typedef IMG_PVOID IMG_CPU_VIRTADDR;
 
 typedef struct _IMG_DEV_VIRTADDR
@@ -109,6 +113,8 @@ typedef struct _IMG_DEV_VIRTADDR
 #define IMG_CAST_TO_DEVVADDR_UINT(var)		(IMG_UINT32)(var)
 	
 } IMG_DEV_VIRTADDR;
+
+typedef IMG_UINT32 IMG_DEVMEM_SIZE_T;
 
 typedef struct _IMG_CPU_PHYADDR
 {

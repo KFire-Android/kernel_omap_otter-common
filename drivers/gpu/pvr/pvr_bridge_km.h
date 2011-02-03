@@ -57,14 +57,22 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVDestroyCommandQueueKM(PVRSRV_QUEUE_INFO *psQueue
 
 IMG_IMPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVGetDeviceMemHeapsKM(IMG_HANDLE hDevCookie,
+#if defined (SUPPORT_SID_INTERFACE)
+													PVRSRV_HEAP_INFO_KM *psHeapInfo);
+#else
 													PVRSRV_HEAP_INFO *psHeapInfo);
+#endif
 
 IMG_IMPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVCreateDeviceMemContextKM(IMG_HANDLE					hDevCookie,
 														 PVRSRV_PER_PROCESS_DATA	*psPerProc,
 														 IMG_HANDLE					*phDevMemContext,
 														 IMG_UINT32					*pui32ClientHeapCount,
+#if defined (SUPPORT_SID_INTERFACE)
+														 PVRSRV_HEAP_INFO_KM		*psHeapInfo,
+#else
 														 PVRSRV_HEAP_INFO			*psHeapInfo,
+#endif
 														 IMG_BOOL					*pbCreated,
 														 IMG_BOOL					*pbShared);
 
@@ -79,7 +87,11 @@ IMG_IMPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVGetDeviceMemHeapInfoKM(IMG_HANDLE				hDevCookie,
 															IMG_HANDLE			hDevMemContext,
 															IMG_UINT32			*pui32ClientHeapCount,
+#if defined (SUPPORT_SID_INTERFACE)
+															PVRSRV_HEAP_INFO_KM	*psHeapInfo,
+#else
 															PVRSRV_HEAP_INFO	*psHeapInfo,
+#endif
 															IMG_BOOL 			*pbShared
 					);
 
@@ -247,6 +259,10 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVMapDeviceClassMemoryKM(PVRSRV_PER_PROCESS_DATA	*
 													   PVRSRV_KERNEL_MEM_INFO	**ppsMemInfo,
 													   IMG_HANDLE				*phOSMapInfo);
 
+IMG_EXPORT
+PVRSRV_ERROR IMG_CALLCONV PVRSRVChangeDeviceMemoryAttributesKM(IMG_HANDLE hKernelMemInfo,
+															   IMG_UINT32 ui32Attribs);
+
 IMG_IMPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVUnmapDeviceClassMemoryKM(PVRSRV_KERNEL_MEM_INFO *psMemInfo);
 
@@ -263,7 +279,11 @@ IMG_IMPORT
 PVRSRV_ERROR IMG_CALLCONV PVRSRVFreeSyncInfoKM(PVRSRV_KERNEL_SYNC_INFO	*psKernelSyncInfo);
 
 IMG_IMPORT
+#if defined (SUPPORT_SID_INTERFACE)
+PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO_KM *psMiscInfo);
+#else
 PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo);
+#endif
 
 IMG_IMPORT PVRSRV_ERROR
 PVRSRVAllocSharedSysMemoryKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,

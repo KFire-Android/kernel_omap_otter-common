@@ -185,6 +185,7 @@ SGXCleanupSharedPBDescKM(PVRSRV_STUB_PBDESC *psStubPBDescIn)
 	psStubPBDescIn->ui32RefCount--;
 	if (psStubPBDescIn->ui32RefCount == 0)
 	{
+		IMG_DEV_VIRTADDR sHWPBDescDevVAddr = psStubPBDescIn->sHWPBDescDevVAddr;
 		List_PVRSRV_STUB_PBDESC_Remove(psStubPBDescIn);
 		for(i=0 ; i<psStubPBDescIn->ui32SubKernelMemInfosCount; i++)
 		{
@@ -215,7 +216,7 @@ SGXCleanupSharedPBDescKM(PVRSRV_STUB_PBDESC *psStubPBDescIn)
 
 		
 		SGXCleanupRequest(psDeviceNode,
-						  IMG_NULL,
+						  &sHWPBDescDevVAddr,
 						  PVRSRV_CLEANUPCMD_PB);
 	}
 	return PVRSRV_OK;
@@ -268,7 +269,8 @@ SGXAddSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 					 IMG_UINT32					ui32TotalPBSize,
 					 IMG_HANDLE					*phSharedPBDesc,
 					 PVRSRV_KERNEL_MEM_INFO		**ppsSharedPBDescSubKernelMemInfos,
-					 IMG_UINT32					ui32SharedPBDescSubKernelMemInfosCount)
+					 IMG_UINT32					ui32SharedPBDescSubKernelMemInfosCount,
+					 IMG_DEV_VIRTADDR			sHWPBDescDevVAddr)
 {
 	PVRSRV_STUB_PBDESC *psStubPBDesc=IMG_NULL;
 	PVRSRV_ERROR eRet = PVRSRV_ERROR_INVALID_PERPROC;
@@ -401,6 +403,8 @@ SGXAddSharedPBDescKM(PVRSRV_PER_PROCESS_DATA	*psPerProc,
 			goto NoAdd;
 		}
 	}
+
+	psStubPBDesc->sHWPBDescDevVAddr = sHWPBDescDevVAddr;
 
 	psResItem = ResManRegisterRes(psPerProc->hResManContext,
 								  RESMAN_TYPE_SHARED_PB_DESC,
