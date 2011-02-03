@@ -42,6 +42,11 @@ config PANEL_NEC_NL8048HL11_01B
         help
           LCD Panel used in the Zoom boards
 
+config PANEL_SIL9022
+       tristate "HDMI interface"
+       help
+               HDMI interface used in the Zoom board
+
 config PANEL_TOPPOLY_TDO35S
         tristate "Toppoly TDO35S LCD Panel support"
         depends on OMAP2_DSS
