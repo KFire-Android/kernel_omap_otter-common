@@ -31,6 +31,10 @@
 #include <plat/serial.h>
 #endif
 
+#ifdef CONFIG_PANEL_SIL9022
+#include <mach/sil9022.h>
+#endif
+
 #include <mach/board-zoom.h>
 
 #include "mux.h"
@@ -376,6 +380,14 @@ static struct i2c_board_info __initdata zoom2_i2c_bus2_info[] = {
 #endif
 };
 
+static struct i2c_board_info __initdata zoom2_i2c_bus3_info[] = {
+#ifdef CONFIG_PANEL_SIL9022
+	{
+		I2C_BOARD_INFO(SIL9022_DRV_NAME, SI9022_I2CSLAVEADDRESS),
+	},
+#endif
+};
+
 static int __init omap_i2c_init(void)
 {
 	/* Disable OMAP 3630 internal pull-ups for I2Ci */
@@ -405,6 +417,8 @@ static int __init omap_i2c_init(void)
 			ARRAY_SIZE(zoom_i2c_boardinfo));
 	omap_register_i2c_bus(2, 100, NULL, zoom2_i2c_bus2_info,
 			ARRAY_SIZE(zoom2_i2c_bus2_info));
+	omap_register_i2c_bus(3, 400, NULL, zoom2_i2c_bus3_info,
+			ARRAY_SIZE(zoom2_i2c_bus3_info));
 	return 0;
 }
 
@@ -467,4 +481,8 @@ void __init zoom_peripherals_init(void)
 	usb_musb_init(&musb_board_data);
 	enable_board_wakeup_source();
 	zoom2_cam_init();
+#ifdef CONFIG_PANEL_SIL9022
+	config_hdmi_gpio();
+	zoom_hdmi_reset_enable(1);
+#endif
 }
