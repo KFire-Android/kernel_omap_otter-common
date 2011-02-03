@@ -81,6 +81,9 @@ struct twl6040_data {
 	struct workqueue_struct *workqueue;
 	struct delayed_work delayed_work;
 	struct mutex mutex;
+	int hfl_gain;
+	int hfr_gain;
+	int hs_gain;
 };
 
 /*
@@ -422,6 +425,103 @@ static irqreturn_t twl6040_audio_handler(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
+/*
+ * HSGAIN and HFGAIN values when playback is in process are stored with
+ * driver data, in order to update these elements when gain controls are
+ * used a custom volsw and volsw_2r put are added to handle these changes.
+ */
+#define SOC_DOUBLE_TLV_TWL6040_HS(xname, xreg, shift_left, shift_right, xmax,\
+	xinvert, tlv_array) \
+{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname),\
+	.access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |\
+		SNDRV_CTL_ELEM_ACCESS_READWRITE,\
+	.tlv.p = (tlv_array), \
+	.info = snd_soc_info_volsw, .get = snd_soc_get_volsw, \
+	.put = snd_soc_put_volsw_twl6040_hs, \
+	.private_value = (unsigned long)&(struct soc_mixer_control) \
+		{.reg = xreg, .shift = shift_left, .rshift = shift_right,\
+		.max = xmax, .platform_max = xmax, .invert = xinvert} }
+#define SOC_DOUBLE_R_TLV_TWL6040_HF(xname, reg_left, reg_right, xshift, xmax, \
+	xinvert, tlv_array) \
+{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = (xname),\
+	.access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |\
+		SNDRV_CTL_ELEM_ACCESS_READWRITE,\
+	.tlv.p = (tlv_array), \
+	.info = snd_soc_info_volsw_2r, \
+	.get = snd_soc_get_volsw_2r, .put = snd_soc_put_volsw_2r_twl6040_hf, \
+	.private_value = (unsigned long)&(struct soc_mixer_control) \
+		{.reg = reg_left, .rreg = reg_right, .shift = xshift, \
+		.max = xmax, .platform_max = xmax, .invert = xinvert} }
+
+static int snd_soc_put_volsw_twl6040_hs(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	unsigned int reg = mc->reg;
+	unsigned int shift = mc->shift;
+	unsigned int rshift = mc->rshift;
+	int max = mc->max;
+	unsigned int mask = (1 << fls(max)) - 1;
+	unsigned int invert = mc->invert;
+	unsigned int val, val2, val_mask;
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+
+	val = (ucontrol->value.integer.value[0] & mask);
+	if (invert)
+		val = max - val;
+	val_mask = mask << shift;
+	val = val << shift;
+	if (shift != rshift) {
+		val2 = (ucontrol->value.integer.value[1] & mask);
+		if (invert)
+			val2 = max - val2;
+		val_mask |= mask << rshift;
+		val |= val2 << rshift;
+	}
+	priv->hs_gain = val;
+	return snd_soc_update_bits_locked(codec, reg, val_mask, val);
+}
+
+static int snd_soc_put_volsw_2r_twl6040_hf(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+	unsigned int reg = mc->reg;
+	unsigned int reg2 = mc->rreg;
+	unsigned int shift = mc->shift;
+	int max = mc->max;
+	unsigned int mask = (1 << fls(max)) - 1;
+	unsigned int invert = mc->invert;
+	int err;
+	unsigned int val, val2, val_mask;
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+
+	val_mask = mask << shift;
+	val = (ucontrol->value.integer.value[0] & mask);
+	val2 = (ucontrol->value.integer.value[1] & mask);
+
+	if (invert) {
+		val = max - val;
+		val2 = max - val2;
+	}
+
+	val = val << shift;
+	val2 = val2 << shift;
+
+	priv->hfl_gain = val;
+	priv->hfr_gain = val2;
+
+	err = snd_soc_update_bits_locked(codec, reg, val_mask, val);
+	if (err < 0)
+		return err;
+
+	err = snd_soc_update_bits_locked(codec, reg2, val_mask, val2);
+	return err;
+}
 
 /*
  * MICATT volume control:
@@ -518,9 +618,9 @@ static const struct snd_kcontrol_new twl6040_snd_controls[] = {
 		TWL6040_REG_LINEGAIN, 0, 4, 0xF, 0, afm_amp_tlv),
 
 	/* Playback gains */
-	SOC_DOUBLE_TLV("Headset Playback Volume",
+	SOC_DOUBLE_TLV_TWL6040_HS("Headset Playback Volume",
 		TWL6040_REG_HSGAIN, 0, 4, 0xF, 1, hs_tlv),
-	SOC_DOUBLE_R_TLV("Handsfree Playback Volume",
+	SOC_DOUBLE_R_TLV_TWL6040_HF("Handsfree Playback Volume",
 		TWL6040_REG_HFLGAIN, TWL6040_REG_HFRGAIN, 0, 0x1D, 1, hf_tlv),
 	SOC_SINGLE_TLV("Earphone Playback Volume",
 		TWL6040_REG_EARCTL, 1, 0xF, 1, ep_tlv),
@@ -810,21 +910,23 @@ static int twl6040_hw_params(struct snd_pcm_substream *substream,
 static int twl6040_mute(struct snd_soc_dai *codec_dai, int mute)
 {
 	struct snd_soc_codec *codec = codec_dai->codec;
-	struct twl6040_codec *twl6040 = codec->control_data;
-	int hs_gain, hfl_gain, hfr_gain;
-
-	hfl_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HFLGAIN);
-	hfr_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HFRGAIN);
-	hs_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HSGAIN);
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 
 	if (mute) {
-		twl6040_reg_write(twl6040, TWL6040_REG_HFLGAIN, 0x1D);
-		twl6040_reg_write(twl6040, TWL6040_REG_HFRGAIN, 0x1D);
-		twl6040_reg_write(twl6040, TWL6040_REG_HSGAIN, 0xFF);
+		priv->hfl_gain = twl6040_read_reg_cache(codec,
+						TWL6040_REG_HFLGAIN);
+		priv->hfr_gain = twl6040_read_reg_cache(codec,
+						TWL6040_REG_HFRGAIN);
+		priv->hs_gain = twl6040_read_reg_cache(codec,
+						TWL6040_REG_HSGAIN);
+
+		twl6040_write(codec, TWL6040_REG_HFLGAIN, 0x1D);
+		twl6040_write(codec, TWL6040_REG_HFRGAIN, 0x1D);
+		twl6040_write(codec, TWL6040_REG_HSGAIN, 0xFF);
 	} else {
-		twl6040_write(codec, TWL6040_REG_HFLGAIN, hfl_gain);
-		twl6040_write(codec, TWL6040_REG_HFRGAIN, hfr_gain);
-		twl6040_write(codec, TWL6040_REG_HSGAIN, hs_gain);
+		twl6040_write(codec, TWL6040_REG_HFLGAIN, priv->hfl_gain);
+		twl6040_write(codec, TWL6040_REG_HFRGAIN, priv->hfr_gain);
+		twl6040_write(codec, TWL6040_REG_HSGAIN, priv->hs_gain);
 	}
 
 	return 0;
@@ -1000,6 +1102,10 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	priv->workqueue = create_singlethread_workqueue("twl6040-codec");
 	if (!priv->workqueue)
 		goto work_err;
+
+	priv->hfl_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HFLGAIN);
+	priv->hfr_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HFRGAIN);
+	priv->hs_gain = twl6040_read_reg_cache(codec, TWL6040_REG_HSGAIN);
 
 	INIT_DELAYED_WORK(&priv->delayed_work, twl6040_accessory_work);
 	mutex_init(&priv->mutex);
