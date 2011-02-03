@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -281,9 +281,9 @@
  		#if defined(SGX_FEATURE_MP)
 			#define FIX_HW_BRN_31425
 		#endif
-		#define FIX_HW_BRN_31620
 		#define FIX_HW_BRN_31542
-		#define FIX_HW_BRN_32044 
+		#define FIX_HW_BRN_31671		
+		#define FIX_HW_BRN_32044
 			
 	#else
 	#if SGX_CORE_REV == 140
@@ -320,6 +320,13 @@
 		#define FIX_HW_BRN_32044 
 			
 	#else
+	#if SGX_CORE_REV == 142
+ 		#if defined(SGX_FEATURE_MP)
+			#define FIX_HW_BRN_31425
+		#endif
+		#define FIX_HW_BRN_32044 
+			
+	#else
 	#if SGX_CORE_REV == 211
 		#define FIX_HW_BRN_31093
 		#define FIX_HW_BRN_31195
@@ -333,6 +340,8 @@
 			
 	#else
 	#if SGX_CORE_REV == 2111
+		#define FIX_HW_BRN_30970 
+		#define FIX_HW_BRN_30982 
 		#define FIX_HW_BRN_31093
 		#define FIX_HW_BRN_31195
 		#define FIX_HW_BRN_31278
@@ -341,23 +350,25 @@
 		#endif
 		#define FIX_HW_BRN_31620
 		#define FIX_HW_BRN_31542
-		#define FIX_HW_BRN_30970 
 		#define FIX_HW_BRN_32044 
-		#define FIX_HW_BRN_30982 
 			
 	#else
 	#if SGX_CORE_REV == 213
 		#if defined(SGX_FEATURE_MP)
 			#define FIX_HW_BRN_31425
 		#endif
-		#define FIX_HW_BRN_31542
 		#define FIX_HW_BRN_32044 
 			
+	#else
+	#if SGX_CORE_REV == 216
+		#define FIX_HW_BRN_32044 
 	#else
 	#if SGX_CORE_REV == SGX_CORE_REV_HEAD
 		
 	#else
 		#error "sgxerrata.h: SGX543 Core Revision unspecified"
+	#endif
+	#endif
 	#endif
 	#endif
 	#endif

@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -822,7 +822,6 @@ PVRSRVMapDeviceMemoryBW(IMG_UINT32 ui32BridgeID,
 
     NEW_HANDLE_BATCH_OR_ERROR(psMapDevMemOUT->eError, psPerProc, 2)
 
-    
     psMapDevMemOUT->eError = PVRSRVLookupHandle(KERNEL_HANDLE_BASE,
                                                 (IMG_VOID**)&psSrcKernelMemInfo,
                                                 psMapDevMemIN->hKernelMemInfo,
@@ -832,7 +831,6 @@ PVRSRVMapDeviceMemoryBW(IMG_UINT32 ui32BridgeID,
         return 0;
     }
 
-    
     psMapDevMemOUT->eError = PVRSRVLookupHandle(psPerProc->psHandleBase,
                                                 &hDstDevMemHeap,
                                                 psMapDevMemIN->hDstDevMemHeap,
@@ -841,19 +839,10 @@ PVRSRVMapDeviceMemoryBW(IMG_UINT32 ui32BridgeID,
     {
         return 0;
     }
-
     
     if (psSrcKernelMemInfo->sShareMemWorkaround.bInUse)
     {
         PVR_DPF((PVR_DBG_MESSAGE, "using the mem wrap workaround."));
-
-        
-
-
-
-
-
-
 
         psMapDevMemOUT->eError = BM_XProcWorkaroundSetShareIndex(psSrcKernelMemInfo->sShareMemWorkaround.ui32ShareIndex);
         if(psMapDevMemOUT->eError != PVRSRV_OK)

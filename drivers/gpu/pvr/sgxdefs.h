@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -46,7 +46,7 @@
 #include "sgx540defs.h"
 #else
 #if defined(SGX543)
-#if SGX_CORE_REV == 113 || SGX_CORE_REV == 122 || SGX_CORE_REV == 1221 || SGX_CORE_REV == 140
+#if defined(FIX_HW_BRN_29954)
 #include "sgx543_v1.164defs.h"
 #else
 #include "sgx543defs.h"

@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -54,7 +54,7 @@ extern IMG_UINT32 g_ui32EveryLineCounter;
 
 #ifdef PDUMP
 
-#define MAKEUNIQUETAG(hMemInfo)	((PDumpOSIsSuspended()) ? 0 : ((BM_BUF *)(((PVRSRV_KERNEL_MEM_INFO *)(hMemInfo))->sMemBlk.hBuffer))->pMapping)
+#define MAKEUNIQUETAG(hMemInfo)	(((BM_BUF *)(((PVRSRV_KERNEL_MEM_INFO *)(hMemInfo))->sMemBlk.hBuffer))->pMapping)
 
 	IMG_IMPORT PVRSRV_ERROR PDumpMemPolKM(PVRSRV_KERNEL_MEM_INFO *psMemInfo,
 										  IMG_UINT32			ui32Offset,
