@@ -589,6 +589,7 @@ struct v4l2_window {
 	__u32			clipcount;
 	void			__user *bitmap;
 	__u8                    global_alpha;
+        __u8                    zorder;
 };
 
 /*
