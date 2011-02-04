@@ -449,7 +449,7 @@ static int twl6030_gpadc_wait_conversion_ready(
 int twl6030_gpadc_conversion(struct twl6030_gpadc_request *req)
 {
 	const struct twl6030_gpadc_conversion_method *method;
-	u8 ch_msb, ch_lsb;
+	u8 ch_msb, ch_lsb, ch_isb;
 	int ret = 0;
 
 	if (unlikely(!req))
@@ -472,9 +472,11 @@ int twl6030_gpadc_conversion(struct twl6030_gpadc_request *req)
 	method = &twl6030_conversion_methods[req->method];
 
 	if (req->method == TWL6030_GPADC_RT) {
-		ch_msb = (req->channels >> 8) & 0xff;
+		ch_msb = (req->channels >> 16) & 0x01;
+		ch_isb = (req->channels >> 8) & 0xff;
 		ch_lsb = req->channels & 0xff;
-		twl6030_gpadc_write(the_gpadc, method->sel + 1, ch_msb);
+		twl6030_gpadc_write(the_gpadc, method->sel + 2, ch_msb);
+		twl6030_gpadc_write(the_gpadc, method->sel + 1, ch_isb);
 		twl6030_gpadc_write(the_gpadc, method->sel, ch_lsb);
 	}
 
