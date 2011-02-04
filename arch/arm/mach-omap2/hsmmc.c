@@ -357,12 +357,15 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 		else
 			mmc->slots[0].features |= HSMMC_HAS_PBIAS;
 
-		if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
-			mmc->slots[0].features |= HSMMC_HAS_UPDATED_RESET;
+		if (cpu_is_omap44xx()) {
+			if (omap_rev() > OMAP4430_REV_ES1_0)
+				mmc->slots[0].features |= HSMMC_HAS_UPDATED_RESET;
 
-		if (cpu_is_omap44xx())
 			mmc->slots[0].features |= HSMMC_DVFS_24MHZ_CONST;
 
+			if (c->mmc >= 3 && c->mmc <= 5)
+				mmc->slots[0].features |= HSMMC_HAS_48MHZ_MASTER_CLK;
+		}
 		switch (c->mmc) {
 		case 1:
 			if (mmc->slots[0].features & HSMMC_HAS_PBIAS) {
