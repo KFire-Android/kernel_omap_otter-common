@@ -1603,8 +1603,12 @@ static int change_s3d_mode(struct s3d_ovl_device *dev,
 
 	disp = dev->cur_disp;
 	enable_s3d = (mode == V4L2_S3D_MODE_ON) && !dev->override_s3d_disp;
-
-	if (disp && disp->driver && disp->driver->enable_s3d) {
+	if (!disp) {
+		WARN_ON(1);
+		S3DERR("NULL display pointer!\n");
+		return -EFAULT;
+	}
+	if (disp->driver && disp->driver->enable_s3d) {
 		r = disp->driver->enable_s3d(dev->cur_disp, enable_s3d);
 		if (enable_s3d && r) {
 			S3DWARN("failed to enable S3D display\n");
@@ -1613,7 +1617,7 @@ static int change_s3d_mode(struct s3d_ovl_device *dev,
 		}
 	}
 
-	if(disp->panel.s3d_info.type == S3D_DISP_NONE &&
+	if (disp->panel.s3d_info.type == S3D_DISP_NONE &&
 		mode == V4L2_S3D_MODE_ON &&
 		!dev->override_s3d_disp)
 		mode = dev->s3d_mode = V4L2_S3D_MODE_ANAGLYPH;
