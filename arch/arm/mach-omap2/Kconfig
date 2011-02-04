@@ -82,7 +82,7 @@ config MACH_OMAP3EVM
 
 config WIFI_CONTROL_FUNC
         bool "Enable WiFi control function abstraction"
-        depends on MACH_OMAP_4430SDP
+	depends on MACH_OMAP_4430SDP || MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3
         select WIRELESS_EXT
         select WEXT_CORE
         select WEXT_PROC

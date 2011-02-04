@@ -12,9 +12,11 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/gpio.h>
+#include <linux/delay.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include <asm/delay.h>
 
 #include <mach/board-zoom.h>
 
@@ -27,6 +29,9 @@
 #include "mux.h"
 #include "sdram-hynix-h8mbx00u0mer-0em.h"
 #include "smartreflex-class3.h"
+#include "board-zoom2-wifi.h"
+
+#define McBSP3_BT_GPIO 164
 
 #ifdef CONFIG_PM
 static struct omap_volt_vc_data vc_config = {
@@ -181,16 +186,60 @@ static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 	.reset_gpio_port[1]	= 64,
 	.reset_gpio_port[2]	= -EINVAL,
 };
+/* wl127x BT, FM, GPS connectivity chip */
+static int gpios[] = {109, 161, -1};
+
+static struct platform_device wl127x_device = {
+
+       .name           = "kim",
+       .id             = -1,
+       .dev.platform_data = &gpios,
+
+};
+static struct platform_device *zoom_devices[] __initdata = {
+
+	&wl127x_device,
+};
+/* Fix to prevent VIO leakage on wl127x */
+static int wl127x_vio_leakage_fix(void)
+{
+	int ret = 0;
+
+	pr_info(" wl127x_vio_leakage_fix\n");
+
+	ret = gpio_request(gpios[0], "wl127x_bten");
+	if (ret < 0) {
+		pr_err("wl127x_bten gpio_%d request fail",
+			gpios[0]);
+		goto fail;
+	}
+
+	gpio_direction_output(gpios[0], 1);
+	mdelay(10);
+	gpio_direction_output(gpios[0], 0);
+	udelay(64);
+
+	gpio_free(gpios[0]);
+fail:
+	return ret;
+}
+
+
 
 static void __init omap_zoom_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
+	config_wlan_mux();
+
 	zoom_peripherals_init();
 	zoom_flash_init(zoom_flash_partitions, ZOOM_NAND_CS);
 	zoom_debugboard_init();
 	zoom_display_init(OMAP_DSS_VENC_TYPE_COMPOSITE);
 
 	omap_mux_init_gpio(64, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(109, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(161, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(McBSP3_BT_GPIO, OMAP_PIN_OUTPUT);
 	usb_uhhtll_init(&usbhs_pdata);
 	sr_class3_init();
 
@@ -201,6 +250,8 @@ static void __init omap_zoom_init(void)
 #endif
 	omap_voltage_init_vc(&vc_config);
 #endif
+	platform_add_devices(zoom_devices, ARRAY_SIZE(zoom_devices));
+	wl127x_vio_leakage_fix();
 }
 
 MACHINE_START(OMAP_ZOOM3, "OMAP3630 Zoom3 board")

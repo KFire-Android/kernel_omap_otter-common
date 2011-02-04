@@ -409,6 +409,9 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 						hsmmc23_before_set_reg;
 				mmc->slots[0].after_set_reg = NULL;
 			}
+#ifdef CONFIG_TIWLAN_SDIO
+			mmc->slots[0].ocr_mask  = MMC_VDD_165_195;
+#endif
 			break;
 		case 4:
 		case 5:

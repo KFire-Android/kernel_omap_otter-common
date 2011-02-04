@@ -190,7 +190,14 @@ obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 
 obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
 					   hsmmc.o
-obj-$(CONFIG_TIWLAN_SDIO)               += board-4430sdp-wifi.o
+
+ifeq ($(CONFIG_ARCH_OMAP4),y)
+obj-$(CONFIG_TIWLAN_SDIO)		+= board-4430sdp-wifi.o
+endif
+ifeq ($(CONFIG_ARCH_OMAP3),y)
+obj-$(CONFIG_TIWLAN_SDIO)		+= board-zoom2-wifi.o
+endif
+
 obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
 
 obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o \
