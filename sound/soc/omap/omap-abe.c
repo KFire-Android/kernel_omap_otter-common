@@ -698,7 +698,12 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params_fe;
 
 	params_fe = kzalloc(sizeof(struct snd_pcm_hw_params), GFP_KERNEL);
-	dev_dbg(dai->dev,"%s: frontend %s \n", __func__, rtd->dai_link->name);
+	if (!params_fe) {
+		WARN_ON(1);
+		return -ENOMEM;
+	}
+
+	dev_dbg(dai->dev, "%s: frontend %s\n", __func__, rtd->dai_link->name);
 
 	memcpy(params_fe, params, sizeof(struct snd_pcm_hw_params));
 
