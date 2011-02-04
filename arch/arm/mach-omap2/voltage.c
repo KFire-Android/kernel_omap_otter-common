@@ -1633,9 +1633,9 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	u32 vc_cmd_on_mask, vc_cmdval, vpconfig;
 	u32 smps_steps = 0, smps_delay = 0;
 	int timeout = 0;
-	u8 target_vsel, current_vsel;
-	u8 vc_cmd_on_shift;
-	u8 prm_irqst_reg_offs, ocp_mod;
+	u8 target_vsel = 0, current_vsel = 0;
+	u8 vc_cmd_on_shift = 0;
+	u8 prm_irqst_reg_offs = 0, ocp_mod = 0;
 
 	if (cpu_is_omap34xx()) {
 		vc_cmd_on_shift = OMAP3430_VC_CMD_ON_SHIFT;
