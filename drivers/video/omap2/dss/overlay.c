@@ -68,7 +68,10 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 	if (len > 0) {
 		for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
 			mgr = omap_dss_get_overlay_manager(i);
-
+			if (!mgr) {
+				WARN_ON(1);
+				continue;
+			}
 			if (strncmp(buf, mgr->name, len) == 0)
 				break;
 
