@@ -4672,7 +4672,10 @@ int omapdss_channel_reset(enum omap_channel channel)
 	for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
 		struct omap_overlay_manager *mgr;
 		mgr = omap_dss_get_overlay_manager(i);
-
+		if (!mgr) {
+			WARN_ON(1);
+			continue;
+		}
 		if (mgr->id == channel)
 			return omapdss_manager_reset(mgr);
 	}
