@@ -237,7 +237,7 @@ static ssize_t set_offset(struct device *dev,
 static int twl6030_gpadc_read(struct twl6030_gpadc_data *gpadc, u8 reg)
 {
 	int ret;
-	u8 val;
+	u8 val = 0;
 
 	ret = twl_i2c_read_u8(TWL_MODULE_MADC, &val, reg);
 	if (ret) {
