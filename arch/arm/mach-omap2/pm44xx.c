@@ -54,7 +54,7 @@ struct power_state {
 static LIST_HEAD(pwrst_list);
 static struct powerdomain *mpu_pwrdm;
 
-static struct powerdomain *mpu_pwrdm, *cpu0_pwrdm;
+static struct powerdomain *mpu_pwrdm, *cpu0_pwrdm, *cpu1_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
 
 static struct voltagedomain *vdd_mpu, *vdd_iva, *vdd_core;
@@ -541,7 +541,13 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	if (!pwrst)
 		return -ENOMEM;
 	pwrst->pwrdm = pwrdm;
-	pwrst->next_state = PWRDM_POWER_RET;
+	if ((!strcmp(pwrdm->name, mpu_pwrdm->name)) ||
+			(!strcmp(pwrdm->name, core_pwrdm->name)) ||
+			(!strcmp(pwrdm->name, cpu0_pwrdm->name)) ||
+			(!strcmp(pwrdm->name, cpu1_pwrdm->name)))
+		pwrst->next_state = PWRDM_POWER_ON;
+	else
+		pwrst->next_state = PWRDM_POWER_RET;
 	list_add(&pwrst->node, &pwrst_list);
 
 	return omap4_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
@@ -740,6 +746,12 @@ static int __init omap4_pm_init(void)
 		return -ENODEV;
 
 	pr_err("Power Management for TI OMAP4.\n");
+	mpu_pwrdm = pwrdm_lookup("mpu_pwrdm");
+	cpu0_pwrdm = pwrdm_lookup("cpu0_pwrdm");
+	cpu1_pwrdm = pwrdm_lookup("cpu1_pwrdm");
+	core_pwrdm = pwrdm_lookup("core_pwrdm");
+	per_pwrdm = pwrdm_lookup("l4per_pwrdm");
+
 
 #ifdef CONFIG_PM
 	prcm_setup_regs();
@@ -794,9 +806,6 @@ static int __init omap4_pm_init(void)
 	suspend_set_ops(&omap_pm_ops);
 #endif /* CONFIG_SUSPEND */
 
-	cpu0_pwrdm = pwrdm_lookup("cpu0_pwrdm");
-	core_pwrdm = pwrdm_lookup("core_pwrdm");
-	per_pwrdm = pwrdm_lookup("l4per_pwrdm");
 	omap4_idle_init();
 	omap4_trigger_ioctrl();
 
