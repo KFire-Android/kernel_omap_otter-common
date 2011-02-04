@@ -114,6 +114,11 @@ int omap_setup_wb(struct omap_wb_device *wb_device, u32 addr, u32 uv_addr)
 	for (i = 0; i < omap_dss_get_num_overlay_managers(); ++i) {
 			/* Fix : checking for mgr will shift to DSS2 */
 			mgr = omap_dss_get_overlay_manager(i);
+			if (!mgr) {
+				WARN_ON(1);
+				r = -EINVAL;
+				goto err;
+			}
 			if (strcmp(mgr->name, "lcd") == 0)
 				break;
 	}
