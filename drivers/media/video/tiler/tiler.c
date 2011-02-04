@@ -689,9 +689,14 @@ static s32 _m_free(struct mem_info *mi)
 	/* remove block from area first if 2D */
 	if (mi->area.is2d) {
 		ai = mi->parent;
-
+		if (!ai) {
+			printk(KERN_ERR "Null parent pointer!\n");
+			WARN_ON(1);
+			kfree(mi);
+			return -EFAULT;
+		}
 		/* check to see if area needs removing also */
-		if (ai && !--ai->nblocks) {
+		if (!--ai->nblocks) {
 			if (tiler_alloc_debug & 1)
 				printk(KERN_ERR "(-2d (%d-%d,%d-%d) in (%d-%d,%d-%d) last)\n",
 					mi->area.p0.x, mi->area.p1.x,
