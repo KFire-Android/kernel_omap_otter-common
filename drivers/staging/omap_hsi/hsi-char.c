@@ -272,10 +272,14 @@ static ssize_t hsi_char_write(struct file *file, const char __user *buf,
 		return -EINVAL;
 
 	data = kmalloc(count, GFP_ATOMIC);
-
+	if (!data) {
+		WARN_ON(1);
+		return -ENOMEM;
+	}
 	if (copy_from_user(data, (void __user *)buf, count)) {
 		ret = -EFAULT;
 		kfree(data);
+		goto out2;
 	} else {
 		ret = count;
 	}
