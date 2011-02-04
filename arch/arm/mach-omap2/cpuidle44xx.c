@@ -138,6 +138,11 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 
 	omap4_enter_sleep(dev->cpu, cx->cpu0_state);
 
+
+	/* restore the MPU and CORE states to ON */
+	omap4_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
+	omap4_set_pwrdm_state(core_pd, PWRDM_POWER_ON);
+
 #ifdef CONFIG_PM_DEBUG
 	pwrdm_post_transition();
 #endif
