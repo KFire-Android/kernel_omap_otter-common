@@ -1,4 +1,5 @@
 #define TMP_AUX_CLK_HACK 1 /* should be removed by Nov 13, 2010 */
+#define SR_WA
 /*
  * ipu_pm.c
  *
@@ -319,6 +320,10 @@ static bool first_time = 1;
 /* BIOS flags states for each core in IPU */
 static void __iomem *sysm3Idle;
 static void __iomem *appm3Idle;
+#ifdef SR_WA
+static void __iomem *issHandle;
+static void __iomem *fdifHandle;
+#endif
 
 /* Ducati Interrupt Capable Gptimers */
 static int ipu_timer_list[NUM_IPU_TIMERS] = {
@@ -1712,6 +1717,16 @@ static inline int ipu_pm_rel_fdif(struct ipu_pm_object *handle,
 	retval = ipu_pm_module_stop(rcb_p->sub_type);
 	if (retval)
 		return PM_UNSUPPORTED;
+
+#ifdef SR_WA
+	/* Make sure the clock domain is in idle if not softreset */
+	if ((cm_read_mod_reg(OMAP4430_CM2_CAM_MOD,
+			OMAP4_CM_CAM_CLKSTCTRL_OFFSET)) & 0x400) {
+		__raw_writel(__raw_readl(fdifHandle + 0x10) | 0x1,
+							fdifHandle + 0x10);
+	}
+#endif
+
 	params->pm_fdif_counter--;
 	pr_debug("Release FDIF\n");
 
@@ -1893,9 +1908,18 @@ static inline int ipu_pm_rel_iss(struct ipu_pm_object *handle,
 
 	retval = ipu_pm_module_stop(rcb_p->sub_type);
 	if (retval) {
-		pr_err("%s %d Error releasing ISSs\n", __func__, __LINE__);
+		pr_err("%s %d Error releasing ISS\n", __func__, __LINE__);
 		return PM_UNSUPPORTED;
 	}
+
+#ifdef SR_WA
+	/* Make sure the clock domain is in idle if not softreset */
+	if ((cm_read_mod_reg(OMAP4430_CM2_CAM_MOD,
+			OMAP4_CM_CAM_CLKSTCTRL_OFFSET)) & 0x100) {
+		__raw_writel(__raw_readl(issHandle + 0x10) | 0x1,
+							issHandle + 0x10);
+	}
+#endif
 
 	/* FIXME:
 	 * disable OPTFCLKEN_CTRLCLK for camera sensors
@@ -2699,7 +2723,10 @@ int ipu_pm_setup(struct ipu_pm_config *cfg)
 		iounmap(sysm3Idle);
 		goto exit;
 	}
-
+#ifdef SR_WA
+	issHandle = ioremap(0x52000000, (sizeof(void) * 1));
+	fdifHandle = ioremap(0x4A10A000, (sizeof(void) * 1));
+#endif
 	BLOCKING_INIT_NOTIFIER_HEAD(&ipu_pm_notifier);
 
 	return retval;
@@ -2963,6 +2990,12 @@ int ipu_pm_destroy(void)
 
 	first_time = 1;
 	iounmap(sysm3Idle);
+#ifdef SR_WA
+	iounmap(issHandle);
+	iounmap(fdifHandle);
+	issHandle = NULL;
+	fdifHandle = NULL;
+#endif
 	sysm3Idle = NULL;
 	appm3Idle = NULL;
 	global_rcb = NULL;
