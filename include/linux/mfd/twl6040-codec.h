@@ -161,9 +161,6 @@
 #define TWL6040_SYSCLK_SEL_LPPLL	1
 #define TWL6040_SYSCLK_SEL_HPPLL	2
 
-#define TWL6040_HPPLL_ID		1
-#define TWL6040_LPPLL_ID		2
-
 /* STATUS (0x2E) fields */
 
 #define TWL6040_PLUGCOMP		0x02
@@ -177,6 +174,12 @@
 #define TWL6040_IRQ_VIB			4
 #define TWL6040_IRQ_READY		5
 
+enum twl6040_pll_id {
+	TWL6040_NOPLL_ID,
+	TWL6040_LPPLL_ID,
+	TWL6040_HPPLL_ID,
+};
+
 struct twl6040_codec {
 	struct device *dev;
 	struct mutex mutex;
@@ -188,6 +191,9 @@ struct twl6040_codec {
 	int audpwron;
 	int powered;
 	int power_count;
+
+	enum twl6040_pll_id pll;
+	unsigned int sysclk;
 
 	unsigned int irq;
 	unsigned int irq_base;
@@ -221,6 +227,10 @@ int twl6040_reg_write(struct twl6040_codec *twl6040, unsigned int reg,
 int twl6040_enable(struct twl6040_codec *twl6040);
 int twl6040_disable(struct twl6040_codec *twl6040);
 int twl6040_is_enabled(struct twl6040_codec *twl6040);
+int twl6040_set_pll(struct twl6040_codec *twl6040, enum twl6040_pll_id id,
+		    unsigned int freq_in, unsigned int freq_out);
+enum twl6040_pll_id twl6040_get_pll(struct twl6040_codec *twl6040);
+unsigned int twl6040_get_sysclk(struct twl6040_codec *twl6040);
 int twl6040_irq_init(struct twl6040_codec *twl6040);
 void twl6040_irq_exit(struct twl6040_codec *twl6040);
 

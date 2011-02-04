@@ -313,6 +313,8 @@ static int twl6040_power(struct twl6040_codec *twl6040, int enable)
 				return ret;
 			}
 		}
+		twl6040->pll = TWL6040_LPPLL_ID;
+		twl6040->sysclk = 19200000;
 	} else {
 		if (gpio_is_valid(audpwron)) {
 			/* use AUDPWRON line */
@@ -329,6 +331,8 @@ static int twl6040_power(struct twl6040_codec *twl6040, int enable)
 				return ret;
 			}
 		}
+		twl6040->pll = TWL6040_NOPLL_ID;
+		twl6040->sysclk = 0;
 	}
 
 	twl6040->powered = enable;
@@ -367,6 +371,135 @@ int twl6040_is_enabled(struct twl6040_codec *twl6040)
 	return twl6040->power_count;
 }
 EXPORT_SYMBOL(twl6040_is_enabled);
+
+int twl6040_set_pll(struct twl6040_codec *twl6040, enum twl6040_pll_id id,
+		    unsigned int freq_in, unsigned int freq_out)
+{
+	u8 hppllctl, lppllctl;
+	int ret = 0;
+
+	mutex_lock(&twl6040->mutex);
+
+	hppllctl = twl6040_reg_read(twl6040, TWL6040_REG_HPPLLCTL);
+	lppllctl = twl6040_reg_read(twl6040, TWL6040_REG_LPPLLCTL);
+
+	switch (id) {
+	case TWL6040_LPPLL_ID:
+		/* lppll divider */
+		switch (freq_out) {
+		case 17640000:
+			lppllctl |= TWL6040_LPLLFIN;
+			break;
+		case 19200000:
+			lppllctl &= ~TWL6040_LPLLFIN;
+			break;
+		default:
+			dev_err(&twl6040_codec_dev->dev,
+				"freq_out %d not supported\n", freq_out);
+			ret = -EINVAL;
+			goto pll_out;
+		}
+		twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
+
+		switch (freq_in) {
+		case 32768:
+			lppllctl |= TWL6040_LPLLENA;
+			twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL,
+					  lppllctl);
+			mdelay(5);
+			lppllctl &= ~TWL6040_HPLLSEL;
+			twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL,
+					  lppllctl);
+			hppllctl &= ~TWL6040_HPLLENA;
+			twl6040_reg_write(twl6040, TWL6040_REG_HPPLLCTL,
+					  hppllctl);
+			break;
+		default:
+			dev_err(&twl6040_codec_dev->dev,
+				"freq_in %d not supported\n", freq_in);
+			ret = -EINVAL;
+			goto pll_out;
+		}
+
+		twl6040->pll = TWL6040_LPPLL_ID;
+		break;
+	case TWL6040_HPPLL_ID:
+		/* high-performance pll can provide only 19.2 MHz */
+		if (freq_out != 19200000) {
+			dev_err(&twl6040_codec_dev->dev,
+				"freq_out %d not supported\n", freq_out);
+			ret = -EINVAL;
+			goto pll_out;
+		}
+
+		hppllctl &= ~TWL6040_MCLK_MSK;
+
+		switch (freq_in) {
+		case 12000000:
+			/* mclk input, pll enabled */
+			hppllctl |= TWL6040_MCLK_12000KHZ |
+				    TWL6040_HPLLSQRBP |
+				    TWL6040_HPLLENA;
+			break;
+		case 19200000:
+			/* mclk input, pll disabled */
+			hppllctl |= TWL6040_MCLK_19200KHZ |
+				    TWL6040_HPLLSQRENA |
+				    TWL6040_HPLLBP;
+			break;
+		case 26000000:
+			/* mclk input, pll enabled */
+			hppllctl |= TWL6040_MCLK_26000KHZ |
+				    TWL6040_HPLLSQRBP |
+				    TWL6040_HPLLENA;
+			break;
+		case 38400000:
+			/* clk slicer, pll disabled */
+			hppllctl |= TWL6040_MCLK_38400KHZ |
+				    TWL6040_HPLLSQRENA |
+				    TWL6040_HPLLBP;
+			break;
+		default:
+			dev_err(&twl6040_codec_dev->dev,
+				"freq_in %d not supported\n", freq_in);
+			ret = -EINVAL;
+			goto pll_out;
+		}
+
+		twl6040_reg_write(twl6040, TWL6040_REG_HPPLLCTL, hppllctl);
+		udelay(500);
+		lppllctl |= TWL6040_HPLLSEL;
+		twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
+		lppllctl &= ~TWL6040_LPLLENA;
+		twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
+
+		twl6040->pll = TWL6040_HPPLL_ID;
+		break;
+	default:
+		dev_err(&twl6040_codec_dev->dev, "unknown pll id %d\n", id);
+		ret = -EINVAL;
+		goto pll_out;
+	}
+
+	twl6040->sysclk = freq_out;
+
+pll_out:
+	mutex_unlock(&twl6040->mutex);
+	return ret;
+}
+EXPORT_SYMBOL(twl6040_set_pll);
+
+enum twl6040_pll_id twl6040_get_pll(struct twl6040_codec *twl6040)
+{
+	return twl6040->pll;
+}
+EXPORT_SYMBOL(twl6040_get_pll);
+
+unsigned int twl6040_get_sysclk(struct twl6040_codec *twl6040)
+{
+	return twl6040->sysclk;
+}
+EXPORT_SYMBOL(twl6040_get_sysclk);
 
 static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 {
