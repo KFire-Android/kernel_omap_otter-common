@@ -594,6 +594,10 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			dbs_tuners_ins.hotplug_load_history = kmalloc(
 					(sizeof(unsigned int) * max_periods),
 					GFP_KERNEL);
+			if (!dbs_tuners_ins.hotplug_load_history) {
+				WARN_ON(1);
+				return -ENOMEM;
+			}
 			for (i = 0; i < max_periods; i++)
 				dbs_tuners_ins.hotplug_load_history[i] = 50;
 		}
