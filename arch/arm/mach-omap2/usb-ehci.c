@@ -405,6 +405,11 @@ static void usbhs_4430ehci_io_enable(const enum usbhs_omap3_port_mode
 		reg |= USBHS_IO_WAKEUPENABLE;
 		omap_writew(reg, 0x4A1000CA);
 
+		/* HUSB1_DIR */
+		reg = omap_readw(0x4A1000C6);
+		reg |= USBHS_IO_WAKEUPENABLE;
+		omap_writew(reg, 0x4A1000C6);
+
 		break;
 
 	case OMAP_EHCI_PORT_MODE_TLL:
@@ -460,6 +465,11 @@ static void usbhs_4430ehci_io_disable(const enum usbhs_omap3_port_mode
 		reg = omap_readw(0x4A1000CA);
 		reg &= ~USBHS_IO_WAKEUPENABLE;
 		omap_writew(reg, 0x4A1000CA);
+
+		/* HUSB1_DIR */
+		reg = omap_readw(0x4A1000C6);
+		reg &= ~USBHS_IO_WAKEUPENABLE;
+		omap_writew(reg, 0x4A1000C6);
 
 		break;
 
@@ -2036,6 +2046,71 @@ static void usbhs_ehci_devoff_resume(struct uhhtll_hcd_omap *omap)
 }
 
 
+/*
+ *	This function reset the ULPY phy and thus reinitate the connection
+ *	status of phy
+ */
+static void usbhs_ehci_phyactive(struct uhhtll_hcd_omap *omap)
+{
+	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
+	u32 reg;
+
+	reg  = uhhtll_omap_read(omap->ehci_res.regs, 0xA4);
+	dev_dbg(&omap->pdev->dev, "EHCI_INSREG05 0x%X\n", reg);
+	reg = 0x81C40000;
+	uhhtll_omap_write(omap->ehci_res.regs, 0xA4, reg);
+	udelay(100);
+
+	while (uhhtll_omap_read(omap->ehci_res.regs,
+			0xA4) & (1 << 31)) {
+		cpu_relax();
+
+		if (time_after(jiffies, timeout)) {
+			dev_dbg(&omap->pdev->dev,
+			"operation timed out .. 1\n");
+			break;
+		}
+	}
+
+
+	reg  = uhhtll_omap_read(omap->ehci_res.regs, 0xA4);
+	dev_dbg(&omap->pdev->dev, "EHCI_INSREG05 0x%X\n", reg);
+	reg = 0x81840050;
+	uhhtll_omap_write(omap->ehci_res.regs, 0xA4, reg);
+	udelay(100);
+
+	while (uhhtll_omap_read(omap->ehci_res.regs,
+			0xA4) & (1 << 31)) {
+		cpu_relax();
+
+		if (time_after(jiffies, timeout)) {
+			dev_dbg(&omap->pdev->dev,
+			"operation timed out .. 2\n");
+			break;
+		}
+	}
+
+
+	reg  = uhhtll_omap_read(omap->ehci_res.regs, 0xA4);
+	dev_dbg(&omap->pdev->dev, "EHCI_INSREG05 0x%X\n", reg);
+	reg = 0x81840045;
+	uhhtll_omap_write(omap->ehci_res.regs, 0xA4, reg);
+	udelay(100);
+
+	while (uhhtll_omap_read(omap->ehci_res.regs,
+			0xA4) & (1 << 31)) {
+		cpu_relax();
+
+		if (time_after(jiffies, timeout)) {
+			dev_dbg(&omap->pdev->dev,
+			"operation timed out.. 3\n");
+			break;
+		}
+	}
+
+}
+
+
 
 
 static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata)
@@ -2212,6 +2287,7 @@ static int uhhtll_drv_resume(enum driver_type drvtype)
 {
 	struct uhhtll_hcd_omap *omap = &uhhtll;
 	struct usbhs_omap_platform_data *pdata = &omap->platdata;
+	static int usbhs_phy_safe_local;
 	int ret = 0;
 
 	if (!omap->pdev) {
@@ -2225,10 +2301,13 @@ static int uhhtll_drv_resume(enum driver_type drvtype)
 		test_bit(USBHS_EHCI_LOADED, &omap->event_state)) {
 		if (test_and_clear_bit(USBHS_EHCI_SUSPENED,
 			&omap->event_state)) {
+			usbhs_phy_safe_local = usbhs_phy_safe;
 			usbhs_ehci_devoff_resume(omap);
 			ret = usbhs_enable(omap, 0);
 			usbhs_ehci_io_wakeup(pdata->port_mode, 0);
 			usbhs_ehci_clk(omap, 1);
+			if (usbhs_phy_safe_local)
+				usbhs_ehci_phyactive(omap);
 		}
 	} else if ((drvtype == OMAP_OHCI) &&
 		test_bit(USBHS_OHCI_LOADED , &omap->event_state)) {
