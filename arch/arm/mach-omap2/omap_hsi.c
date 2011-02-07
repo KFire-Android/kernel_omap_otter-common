@@ -34,142 +34,43 @@
 #define OMAP_HSI_HWMOD_NAME  "hsi"
 #define OMAP_HSI_HWMOD_CLASSNAME  "hsi"
 
-#define	hsi_inl(p)	inl((unsigned long) p)
-#define	hsi_outl(v, p)	outl(v, (unsigned long) p)
-
-#ifdef HSI_CONTEXT_SAVE_RESTORE
-static void hsi_set_mode(struct platform_device *pdev, u32 mode)
-{
-	struct hsi_platform_data *pdata = pdev->dev.platform_data;
-	void __iomem *base = OMAP2_IO_ADDRESS(pdev->resource[0].start);
-	int port;
-
-	for (port = 1; port <= pdata->num_ports; port++) {
-		/* FIXME - to update: need read/modify/write or something else:
-		 * this register now also contains flow and wake ctrl
-		 */
-		hsi_outl(mode, base + HSI_HST_MODE_REG(port));
-		hsi_outl(mode, base + HSI_HSR_MODE_REG(port));
-	}
-}
-
-static void hsi_save_mode(struct platform_device *pdev)
-{
-	struct hsi_platform_data *pdata = pdev->dev.platform_data;
-	void __iomem *base = OMAP2_IO_ADDRESS(pdev->resource[0].start);
-	struct port_ctx *p;
-	int port;
-
-	for (port = 1; port <= pdata->num_ports; port++) {
-		p = &pdata->ctx.pctx[port - 1];
-		p->hst.mode = hsi_inl(base + HSI_HST_MODE_REG(port));
-		p->hsr.mode = hsi_inl(base + HSI_HSR_MODE_REG(port));
-	}
-}
-
-static void hsi_restore_mode(struct platform_device *pdev)
-{
-	struct hsi_platform_data *pdata = pdev->dev.platform_data;
-	void __iomem *base = OMAP2_IO_ADDRESS(pdev->resource[0].start);
-	struct port_ctx *p;
-	int port;
-
-	for (port = 1; port <= pdata->num_ports; port++) {
-		p = &pdata->ctx.pctx[port - 1];
-		hsi_outl(p->hst.mode, base + HSI_HST_MODE_REG(port));
-		hsi_outl(p->hsr.mode, base + HSI_HSR_MODE_REG(port));
-	}
-}
-#endif /* HSI_CONTEXT_SAVE_RESTORE */
-
-#ifdef HSI_CONTEXT_SAVE_RESTORE
-static void hsi_save_ctx(struct platform_device *pdev)
-{
-	struct hsi_platform_data *pdata = pdev->dev.platform_data;
-	void __iomem *base = OMAP2_IO_ADDRESS(pdev->resource[0].start);
-	struct port_ctx *p;
-	int port;
-
-	pdata->ctx.loss_count = omap_pm_get_dev_context_loss_count(&pdev->dev);
-	pdata->ctx.sysconfig = hsi_inl(base + HSI_SYS_SYSCONFIG_REG);
-	pdata->ctx.gdd_gcr = hsi_inl(base + HSI_GDD_GCR_REG);
-	for (port = 1; port <= pdata->num_ports; port++) {
-		p = &pdata->ctx.pctx[port - 1];
-		p->sys_mpu_enable[0] = hsi_inl(base +
-					       HSI_SYS_MPU_ENABLE_REG(port, 0));
-		p->sys_mpu_enable[1] = hsi_inl(base +
-					       HSI_SYS_MPU_U_ENABLE_REG(port,
-									0));
-		p->hst.frame_size = hsi_inl(base + HSI_HST_FRAMESIZE_REG(port));
-		p->hst.divisor = hsi_inl(base + HSI_HST_DIVISOR_REG(port));
-		p->hst.channels = hsi_inl(base + HSI_HST_CHANNELS_REG(port));
-		p->hst.arb_mode = hsi_inl(base + HSI_HST_ARBMODE_REG(port));
-		p->hsr.frame_size = hsi_inl(base + HSI_HSR_FRAMESIZE_REG(port));
-/*FIXME - check this register*/
-		p->hsr.timeout = hsi_inl(base + HSI_HSR_COUNTERS_REG(port));
-		p->hsr.channels = hsi_inl(base + HSI_HSR_CHANNELS_REG(port));
-	}
-}
-
-static void hsi_restore_ctx(struct platform_device *pdev)
-{
-	struct hsi_platform_data *pdata = pdev->dev.platform_data;
-	void __iomem *base = OMAP2_IO_ADDRESS(pdev->resource[0].start);
-	struct port_ctx *p;
-	int port;
-	int loss_count;
-
-	loss_count = omap_pm_get_dev_context_loss_count(&pdev->dev);
-
-	if (loss_count == pdata->ctx.loss_count)
-		return;
-
-	hsi_outl(pdata->ctx.sysconfig, base + HSI_SYS_SYSCONFIG_REG);
-	hsi_outl(pdata->ctx.gdd_gcr, base + HSI_GDD_GCR_REG);
-	for (port = 1; port <= pdata->num_ports; port++) {
-		p = &pdata->ctx.pctx[port - 1];
-		hsi_outl(p->sys_mpu_enable[0], base +
-			 HSI_SYS_MPU_ENABLE_REG(port, 0));
-		hsi_outl(p->sys_mpu_enable[1], base +
-			 HSI_SYS_MPU_U_ENABLE_REG(port, 0));
-		hsi_outl(p->hst.frame_size, base + HSI_HST_FRAMESIZE_REG(port));
-		hsi_outl(p->hst.divisor, base + HSI_HST_DIVISOR_REG(port));
-		hsi_outl(p->hst.channels, base + HSI_HST_CHANNELS_REG(port));
-		hsi_outl(p->hst.arb_mode, base + HSI_HST_ARBMODE_REG(port));
-		hsi_outl(p->hsr.frame_size, base + HSI_HSR_FRAMESIZE_REG(port));
-/* FIXME - check this register */
-		hsi_outl(p->hsr.timeout, base + HSI_HSR_COUNTERS_REG(port));
-		hsi_outl(p->hsr.channels, base + HSI_HSR_CHANNELS_REG(port));
-	}
-}
-#endif /* HSI_CONTEXT_SAVE_RESTORE */
 
 /*
  * NOTE: We abuse a little bit the struct port_ctx to use it also for
  * initialization.
  */
+
+
 static struct port_ctx hsi_port_ctx[] = {
 	[0] = {
 	       .hst.mode = HSI_MODE_FRAME,
 	       .hst.flow = HSI_FLOW_SYNCHRONIZED,
 	       .hst.frame_size = HSI_FRAMESIZE_DEFAULT,
-	       .hst.divisor = 1,
+	       .hst.divisor = HSI_DIVISOR_DEFAULT,
 	       .hst.channels = HSI_CHANNELS_DEFAULT,
 	       .hst.arb_mode = HSI_ARBMODE_ROUNDROBIN,
 	       .hsr.mode = HSI_MODE_FRAME,
 	       .hsr.flow = HSI_FLOW_SYNCHRONIZED,
 	       .hsr.frame_size = HSI_FRAMESIZE_DEFAULT,
 	       .hsr.channels = HSI_CHANNELS_DEFAULT,
-	       .hsr.divisor = 1,
-	       .hsr.timeout = HSI_COUNTERS_FT_DEFAULT |
-	       HSI_COUNTERS_TB_DEFAULT | HSI_COUNTERS_FB_DEFAULT,
+	       .hsr.divisor = HSI_DIVISOR_DEFAULT,
+	       .hsr.counters = HSI_COUNTERS_FT_DEFAULT |
+			       HSI_COUNTERS_TB_DEFAULT |
+			       HSI_COUNTERS_FB_DEFAULT,
 	       },
+};
+
+static struct ctrl_ctx hsi_ctx = {
+		.sysconfig = 0,
+		.gdd_gcr = 0,
+		.dll = 0,
+		.pctx = hsi_port_ctx,
 };
 
 static struct hsi_platform_data omap_hsi_platform_data = {
 	.num_ports = ARRAY_SIZE(hsi_port_ctx),
 	.hsi_gdd_chan_count = HSI_HSI_DMA_CHANNEL_MAX,
-	.ctx.pctx = hsi_port_ctx,
+	.ctx = &hsi_ctx,
 	.device_enable = omap_device_enable,
 	.device_idle = omap_device_idle,
 	.device_shutdown = omap_device_shutdown,
@@ -201,7 +102,7 @@ static int __init omap_hsi_init(struct omap_hwmod *oh, void *user)
 	od = omap_device_build(OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, 0, oh,
 			       pdata, sizeof(*pdata), omap_hsi_latency,
 			       ARRAY_SIZE(omap_hsi_latency), false);
-	WARN(IS_ERR(od), "Cant build omap_device for %s:%s.\n",
+	WARN(IS_ERR(od), "Can't build omap_device for %s:%s.\n",
 	     OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, oh->name);
 
 	pr_info("HSI: device registered\n");

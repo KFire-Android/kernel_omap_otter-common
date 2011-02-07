@@ -82,7 +82,7 @@ struct hsr_ctx {
 	u32 flow;
 	u32 frame_size;
 	u32 divisor;
-	u32 timeout;
+	u32 counters;
 	u32 channels;
 };
 
@@ -94,15 +94,15 @@ struct port_ctx {
 
 /**
  * struct ctrl_ctx - hsi controller regs context
- * @loss_count: hsi last loss count
- * @sysconfig: keeps sysconfig reg state
- * @gdd_gcr: keeps gcr reg state
+ * @sysconfig: keeps HSI_SYSCONFIG reg state
+ * @gdd_gcr: keeps DMA_GCR reg state
+ * @dll: keeps HSR_DLL state
  * @pctx: array of port context
  */
 struct ctrl_ctx {
-	int loss_count;
 	u32 sysconfig;
 	u32 gdd_gcr;
+	u32 dll;
 	struct port_ctx *pctx;
 };
 /* END DPS */
@@ -118,7 +118,7 @@ struct hsi_platform_data {
 	int (*device_shutdown) (struct platform_device *pdev);
 	int (*device_idle) (struct platform_device *pdev);
 	u8 num_ports;
-	struct ctrl_ctx ctx;
+	struct ctrl_ctx *ctx;
 	u8 hsi_gdd_chan_count;
 	unsigned long default_hsi_fclk;
 };

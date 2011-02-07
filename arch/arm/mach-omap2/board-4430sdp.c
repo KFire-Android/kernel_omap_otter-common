@@ -1263,6 +1263,13 @@ static void enable_board_wakeup_source(void)
 	 */
 	omap_mux_enable_wakeup("sys_nirq1");
 	omap_mux_enable_wakeup("sys_nirq2");
+
+	/*
+	 * Enable IO daisy for HSI CAWAKE line, to be able to
+	 * wakeup from interrupts from Modem.
+	 * Needed only in Device OFF mode.
+	 */
+	omap_mux_enable_wakeup("usbb1_ulpitll_clk.hsi1_cawake");
 }
 
 static struct omap_volt_pmic_info omap_pmic_core = {

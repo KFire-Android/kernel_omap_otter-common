@@ -41,6 +41,94 @@
 					  /* cycle */
 
 
+static void hsi_save_ctx(struct hsi_dev *hsi_ctrl)
+{
+	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
+	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
+	void __iomem *base = hsi_ctrl->base;
+	struct port_ctx *p;
+	int port;
+
+	pdata->ctx->sysconfig = hsi_inl(base, HSI_SYS_SYSCONFIG_REG);
+	pdata->ctx->gdd_gcr = hsi_inl(base, HSI_GDD_GCR_REG);
+	if (hsi_driver_device_is_hsi(pdev))
+		pdata->ctx->dll = hsi_inl(base, HSI_HSR_DLL_REG);
+
+	for (port = 1; port <= pdata->num_ports; port++) {
+		p = &pdata->ctx->pctx[port - 1];
+		/* HSI TOP */
+		p->sys_mpu_enable[0] = hsi_inl(base,
+					       HSI_SYS_MPU_ENABLE_REG(port, 0));
+		p->sys_mpu_enable[1] = hsi_inl(base,
+				       HSI_SYS_MPU_U_ENABLE_REG(port, 0));
+
+		/* HST */
+		p->hst.mode = hsi_inl(base, HSI_HST_MODE_REG(port));
+		if (!hsi_driver_device_is_hsi(pdev))
+			p->hst.frame_size = hsi_inl(base,
+						HSI_HST_FRAMESIZE_REG(port));
+		p->hst.divisor = hsi_inl(base, HSI_HST_DIVISOR_REG(port));
+		p->hst.channels = hsi_inl(base, HSI_HST_CHANNELS_REG(port));
+		p->hst.arb_mode = hsi_inl(base, HSI_HST_ARBMODE_REG(port));
+
+		/* HSR */
+		p->hsr.mode = hsi_inl(base, HSI_HSR_MODE_REG(port));
+		if (!hsi_driver_device_is_hsi(pdev))
+			p->hsr.frame_size = hsi_inl(base,
+						HSI_HSR_FRAMESIZE_REG(port));
+		p->hsr.divisor = hsi_inl(base, HSI_HSR_DIVISOR_REG(port));
+		p->hsr.channels = hsi_inl(base, HSI_HSR_CHANNELS_REG(port));
+		p->hsr.counters = hsi_inl(base, HSI_HSR_COUNTERS_REG(port));
+	}
+}
+
+static void hsi_restore_ctx(struct hsi_dev *hsi_ctrl)
+{
+	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
+	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
+	void __iomem *base = hsi_ctrl->base;
+	struct port_ctx *p;
+	int port;
+
+	hsi_outl(pdata->ctx->sysconfig, base, HSI_SYS_SYSCONFIG_REG);
+	hsi_outl(pdata->ctx->gdd_gcr, base, HSI_GDD_GCR_REG);
+	if (hsi_driver_device_is_hsi(pdev))
+		hsi_outl(pdata->ctx->dll, base, HSI_HSR_DLL_REG);
+
+	for (port = 1; port <= pdata->num_ports; port++) {
+		p = &pdata->ctx->pctx[port - 1];
+		/* HSI TOP */
+		hsi_outl(p->sys_mpu_enable[0], base,
+			 HSI_SYS_MPU_ENABLE_REG(port, 0));
+		hsi_outl(p->sys_mpu_enable[1], base,
+			 HSI_SYS_MPU_U_ENABLE_REG(port, 0));
+
+		/* HST */
+		hsi_outl(p->hst.mode, base, HSI_HST_MODE_REG(port));
+		if (!hsi_driver_device_is_hsi(pdev))
+			hsi_outl(p->hst.frame_size, base,
+				HSI_HST_FRAMESIZE_REG(port));
+		hsi_outl(p->hst.divisor, base, HSI_HST_DIVISOR_REG(port));
+		hsi_outl(p->hst.channels, base, HSI_HST_CHANNELS_REG(port));
+		hsi_outl(p->hst.arb_mode, base, HSI_HST_ARBMODE_REG(port));
+
+		/* HSR */
+		hsi_outl(p->hsr.mode, base, HSI_HSR_MODE_REG(port));
+		if (!hsi_driver_device_is_hsi(pdev))
+			hsi_outl(p->hsr.frame_size, base,
+				HSI_HSR_FRAMESIZE_REG(port));
+		hsi_outl(p->hsr.divisor, base, HSI_HSR_DIVISOR_REG(port));
+		hsi_outl(p->hsr.channels, base, HSI_HSR_CHANNELS_REG(port));
+		hsi_outl(p->hsr.counters, base, HSI_HSR_COUNTERS_REG(port));
+	}
+
+	if (hsi_driver_device_is_hsi(pdev)) {
+		/* SW strategy for HSI fifo management can be changed here */
+		hsi_fifo_mapping(hsi_ctrl, HSI_FIFO_MAPPING_DEFAULT);
+	}
+}
+
+
 /* NOTE: Function called in soft interrupt context (tasklet) */
 int hsi_port_event_handler(struct hsi_port *p, unsigned int event, void *arg)
 {
@@ -216,7 +304,8 @@ static void hsi_set_ports_default(struct hsi_dev *hsi_ctrl,
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 
 	for (port = 1; port <= pdata->num_ports; port++) {
-		cfg = &pdata->ctx.pctx[port - 1];
+		cfg = &pdata->ctx->pctx[port - 1];
+		/* HST */
 		hsi_outl(cfg->hst.mode | cfg->hst.flow |
 			HSI_HST_MODE_WAKE_CTRL_SW, base,
 			HSI_HST_MODE_REG(port));
@@ -227,20 +316,23 @@ static void hsi_set_ports_default(struct hsi_dev *hsi_ctrl,
 		hsi_outl(cfg->hst.channels, base, HSI_HST_CHANNELS_REG(port));
 		hsi_outl(cfg->hst.arb_mode, base, HSI_HST_ARBMODE_REG(port));
 
+		/* HSR */
 		hsi_outl(cfg->hsr.mode | cfg->hsr.flow, base,
 			 HSI_HSR_MODE_REG(port));
-		hsi_outl(cfg->hsr.frame_size, base,
-			 HSI_HSR_FRAMESIZE_REG(port));
+		if (!hsi_driver_device_is_hsi(pdev))
+			hsi_outl(cfg->hsr.frame_size, base,
+				 HSI_HSR_FRAMESIZE_REG(port));
 		hsi_outl(cfg->hsr.channels, base, HSI_HSR_CHANNELS_REG(port));
 		if (hsi_driver_device_is_hsi(pdev))
 			hsi_outl(cfg->hsr.divisor, base,
 				 HSI_HSR_DIVISOR_REG(port));
-		hsi_outl(cfg->hsr.timeout, base, HSI_HSR_COUNTERS_REG(port));
+		hsi_outl(cfg->hsr.counters, base, HSI_HSR_COUNTERS_REG(port));
 	}
 
 	if (hsi_driver_device_is_hsi(pdev)) {
 		/* SW strategy for HSI fifo management can be changed here */
 		hsi_fifo_mapping(hsi_ctrl, HSI_FIFO_MAPPING_DEFAULT);
+		hsi_outl(pdata->ctx->dll, base, HSI_HSR_DLL_REG);
 	}
 }
 
@@ -301,7 +393,7 @@ void hsi_softreset_driver(struct hsi_dev *hsi_ctrl)
 	for (port = 0; port < hsi_ctrl->max_p; port++) {
 		hsi_p = &hsi_ctrl->hsi_port[port];
 		hsi_p->counters_on = 1;
-		hsi_p->reg_counters = pdata->ctx.pctx[port].hsr.timeout;
+		hsi_p->reg_counters = pdata->ctx->pctx[port].hsr.counters;
 		hsi_port_channels_reset(&hsi_ctrl->hsi_port[port]);
 	}
 
@@ -403,7 +495,7 @@ static int __init hsi_ports_init(struct hsi_dev *hsi_ctrl)
 		    HSI_CHANNELS_MAX : HSI_SSI_CHANNELS_MAX;
 		hsi_p->irq = 0;
 		hsi_p->counters_on = 1;
-		hsi_p->reg_counters = pdata->ctx.pctx[port].hsr.timeout;
+		hsi_p->reg_counters = pdata->ctx->pctx[port].hsr.counters;
 		spin_lock_init(&hsi_p->lock);
 		err = hsi_port_channels_init(&hsi_ctrl->hsi_port[port]);
 		if (err < 0)
@@ -721,7 +813,7 @@ static int __exit hsi_platform_device_remove(struct platform_device *pd)
 }
 
 #ifdef CONFIG_SUSPEND
-static int hsi_suspend(struct device *dev)
+static int hsi_suspend_noirq(struct device *dev)
 {
 	dev_dbg(dev, "%s\n", __func__);
 
@@ -730,7 +822,7 @@ static int hsi_suspend(struct device *dev)
 	return 0;
 }
 
-static int hsi_resume(struct device *dev)
+static int hsi_resume_noirq(struct device *dev)
 {
 	dev_dbg(dev, "%s\n", __func__);
 
@@ -749,13 +841,16 @@ static int hsi_resume(struct device *dev)
 */
 static int hsi_runtime_resume(struct device *dev)
 {
+	struct platform_device *pd = to_platform_device(dev);
+	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+
 	dev_dbg(dev, "%s\n", __func__);
+
 	/* Restore context */
+	hsi_restore_ctx(hsi_ctrl);
 
 	/* HSI device is now fully operational and _must_ be able to */
 	/* complete I/O operations */
-
-	/* HSI_TODO : missing the runtime resume feature */
 
 	return 0;
 }
@@ -770,12 +865,15 @@ static int hsi_runtime_resume(struct device *dev)
 */
 static int hsi_runtime_suspend(struct device *dev)
 {
+	struct platform_device *pd = to_platform_device(dev);
+	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+
 	dev_dbg(dev, "%s\n", __func__);
+
 	/* Save context */
+	hsi_save_ctx(hsi_ctrl);
 
 	/* HSI is now ready to be put in low power state */
-
-	/* HSI_TODO : missing the runtime suspend feature */
 
 	return 0;
 }
@@ -832,8 +930,8 @@ MODULE_DEVICE_TABLE(platform, hsi_id_table);
 #ifdef CONFIG_PM
 static const struct dev_pm_ops hsi_driver_pm_ops = {
 #ifdef CONFIG_SUSPEND
-	.suspend = hsi_suspend,
-	.resume = hsi_resume,
+	.suspend_noirq = hsi_suspend_noirq,
+	.resume_noirq = hsi_resume_noirq,
 #endif
 #ifdef CONFIG_PM_RUNTIME
 	.runtime_suspend = hsi_runtime_suspend,
