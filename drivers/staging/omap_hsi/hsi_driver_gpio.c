@@ -25,6 +25,9 @@ static void do_hsi_cawake_tasklet(unsigned long hsi_p)
 {
 	struct hsi_port *port = (struct hsi_port *)hsi_p;
 
+	/* SSI_TODO : clocks needs to be enabled here */
+	port->hsi_controller->cawake_status = hsi_get_cawake(port);
+
 	hsi_do_cawake_process(port);
 }
 

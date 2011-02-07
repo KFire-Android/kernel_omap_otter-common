@@ -138,8 +138,10 @@ struct hsi_port {
 	int counters_on;
 	unsigned long reg_counters;
 	spinlock_t lock; /* access to the port registers and internal data */
-	struct tasklet_struct hsi_tasklet;
-	struct tasklet_struct cawake_tasklet;
+	struct workqueue_struct *hsi_workqueue;
+	struct work_struct hsi_work;
+	struct tasklet_struct cawake_tasklet;	/* SSI_TODO : need to replace */
+						/* by a workqueue */
 };
 
 /**
@@ -176,7 +178,7 @@ struct hsi_dev { /* HSI_TODO:  should be later renamed into hsi_controller*/
 	unsigned long phy_base;
 	spinlock_t lock; /* Serializes access to internal data and regs */
 	bool cawake_status;	/* HSI_TODO : fine tune the init values */
-	unsigned int acwake_status;	/* HSI_TODO : fine tune  init values */
+	unsigned int acwake_status;	/* HSI_TODO : fine tune init values */
 	int gdd_irq;
 	unsigned int fifo_mapping_strategy;
 	unsigned int gdd_usecount;

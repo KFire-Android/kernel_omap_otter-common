@@ -599,33 +599,82 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 
 		spin_lock_bh(&hsi_ctrl->lock);
 
+		/* Read the CAWAKE status before changing the ACWAKE. */
+		/* This is to prevent a race condition with CAWAKE interrupt */
+		hsi_ctrl->cawake_status = hsi_get_cawake(ch->hsi_port);
 		wake = hsi_inl(base, HSI_SYS_WAKE_REG(port));
+		if (unlikely(hsi_ctrl->acwake_status !=
+				(wake & HSI_WAKE_MASK))) {
+			dev_warn(&dev->device, "ACWAKE shadow register mismatch"
+				" acwake_status: 0x%x, HSI_SYS_WAKE_REG: 0x%x",
+				hsi_ctrl->acwake_status, wake);
+			hsi_ctrl->acwake_status = wake & HSI_WAKE_MASK;
+		}
+		/* SSI_TODO: add safety check for SSI also */
+
+		ch->flags &= ~HSI_CH_ACWAKE;
+		hsi_ctrl->acwake_status &= ~BIT(channel);
+
+		/* Check if we expect some ACWAKE line transition ? */
+		/* Note that we test the acwake_status value after this IOCTL */
+		if (!hsi_ctrl->acwake_status) {
+			/* Check if CAWAKE is already low */
+			if (!hsi_ctrl->cawake_status) {
+				spin_unlock_bh(&hsi_ctrl->lock);
+				dev_dbg(hsi_ctrl->dev,
+					"CAWAKE is already low at the time of "
+					"ACWAKE down, cancelling hsi_work...");
+
+				if (cancel_work_sync(&ch->hsi_port->hsi_work)) {
+					dev_dbg(hsi_ctrl->dev,
+					"cancel_work_sync with success, "
+					"disabling clocks...\n");
+
+					/* Disable clocks (symetrical to */
+					/* enable clocks of ACWAKE UP) */
+					/* Here clocks are not yet disabled */
+					/* due to previous safety clock */
+					/* enable mechanism */
+					hsi_clocks_disable_channel(
+							dev->device.parent,
+							ch->channel_number,
+							__func__);
+				} else {
+					dev_dbg(hsi_ctrl->dev,
+					"cancel_work_sync failed: hsi_work was "
+					"already running\n");
+
+				}
+				spin_lock_bh(&hsi_ctrl->lock);
+			} else {
+				dev_dbg(hsi_ctrl->dev,
+					"CAWAKE is high at the time of ACWAKE "
+					"down, waiting CAWAKE falling edge.\n");
+			}
+		} else {
+			/* ACWAKE line should not be deasserted yet */
+			spin_unlock_bh(&hsi_ctrl->lock);
+			/* Disable clocks (symetrical to enable clocks of */
+			/* ACWAKE UP) */
+			/* Here clocks are not yet disabled due to Safety */
+			/* clock enable mechanism */
+			hsi_clocks_disable_channel(dev->device.parent,
+						   ch->channel_number,
+						   __func__);
+			spin_lock_bh(&hsi_ctrl->lock);
+		}
+
 		/* Release the wake line per channel */
 		if ((wake & HSI_WAKE(channel))) {
 			hsi_outl(HSI_CLEAR_WAKE(channel), base,
 				 HSI_SYS_CLEAR_WAKE_REG(port));
 		}
 
-		ch->flags &= ~HSI_CH_ACWAKE;
-		hsi_ctrl->acwake_status &= ~BIT(channel);
-
 		spin_unlock_bh(&hsi_ctrl->lock);
 
-		/* Check if CAWAKE is already low */
-		if (!hsi_get_cawake(ch->hsi_port)) {
-			dev_info(hsi_ctrl->dev,
-				"CAWAKE is already low at the time of ACWAKE "
-				"down, clocks should be disabled soon...\n");
-		}
-
-		/* 1st call : End of safety clock enable. */
-		/* This may should not lead yet to a real HW clock cut down */
-		hsi_clocks_disable_channel(dev->device.parent,
-					   ch->channel_number, __func__);
-
-		/* 2nd call :*/
-		/* Disable clocks (symetrical to enable clocks of ACWAKE UP)*/
-		/* Here clocks are very likely disabled */
+		/* End of safety clock enable. */
+		/* This may lead  to a real HW clock cut down based on CAWAKE */
+		/* status */
 		hsi_clocks_disable_channel(dev->device.parent,
 					   ch->channel_number, __func__);
 
