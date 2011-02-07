@@ -2262,6 +2262,7 @@ static struct omap_hwmod omap44xx_hsi_hwmod = {
 	.mpu_irqs	= omap44xx_hsi_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_hsi_irqs),
 	.main_clk	= "hsi_fck",
+	.vdd_name	= "core",
 	.prcm = {
 		.omap4 = {
 			.clkctrl_reg = OMAP4430_CM_L3INIT_HSI_CLKCTRL,

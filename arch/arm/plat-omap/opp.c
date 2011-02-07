@@ -408,7 +408,7 @@ unsigned long opp_get_rate(struct device *dev)
 	}
 
 	if (!dev_opp->get_rate) {
-		dev_err(dev, "%s: No set_rate API for scaling opp\n",
+		dev_err(dev, "%s: No get_rate API for scaling opp\n",
 			__func__);
 		return 0;
 	}

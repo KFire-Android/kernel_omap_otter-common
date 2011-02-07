@@ -120,6 +120,7 @@ struct hsi_platform_data {
 	u8 num_ports;
 	struct ctrl_ctx ctx;
 	u8 hsi_gdd_chan_count;
+	unsigned long default_hsi_fclk;
 };
 
 /**

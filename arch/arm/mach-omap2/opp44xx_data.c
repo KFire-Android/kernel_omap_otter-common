@@ -35,7 +35,7 @@
 static struct clk *dpll_mpu_clk, *iva_clk, *dsp_clk, *l3_clk, *core_m2_clk;
 static struct clk *core_m3_clk, *core_m6_clk, *core_m7_clk;
 static struct clk *per_m3_clk, *per_m6_clk;
-static struct clk *abe_clk, *sgx_clk, *fdif_clk;
+static struct clk *abe_clk, *sgx_clk, *fdif_clk, *hsi_clk;
 
 /*
  * Separate OPP table is needed for pre ES2.1 chips as emif cannot be scaled.
@@ -87,6 +87,10 @@ static struct omap_opp_def __initdata omap44xx_pre_es2_1_opp_def_list[] = {
 	OMAP_OPP_DEF("gpu", true, 153600000, 930000),
 	/* SGX OPP2 - OPP100 */
 	OMAP_OPP_DEF("gpu", true, 307200000, 1100000),
+	/* HSI OPP1 - OPP50 */
+	OMAP_OPP_DEF("hsi", true, 96000000, 930000),
+	/* HSI OPP2 - OPP100 */
+	OMAP_OPP_DEF("hsi", true, 192000000, 1100000),
 };
 
 static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
@@ -142,6 +146,10 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	OMAP_OPP_DEF("gpu", true, 153600000, 930000),
 	/* SGX OPP2 - OPP100 */
 	OMAP_OPP_DEF("gpu", true, 307200000, 1100000),
+	/* HSI OPP1 - OPP50 */
+	OMAP_OPP_DEF("hsi", true, 96000000, 930000),
+	/* HSI OPP2 - OPP100 */
+	OMAP_OPP_DEF("hsi", true, 192000000, 1100000),
 };
 
 #define	L3_OPP50_RATE			100000000
@@ -309,6 +317,16 @@ static unsigned long omap4_fdif_get_rate(struct device *dev)
 	return fdif_clk->rate ;
 }
 
+static int omap4_hsi_set_rate(struct device *dev, unsigned long rate)
+{
+	return clk_set_rate(hsi_clk, rate);
+}
+
+static unsigned long omap4_hsi_get_rate(struct device *dev)
+{
+	return hsi_clk->rate ;
+}
+
 struct device *find_dev_ptr(char *name)
 {
 
@@ -368,6 +386,7 @@ int __init omap4_pm_init_opp_table(void)
 	per_m6_clk = clk_get(NULL, "dpll_per_m6x2_ck");
 	abe_clk = clk_get(NULL, "abe_clk");
 	fdif_clk = clk_get(NULL, "fdif_fck");
+	hsi_clk = clk_get(NULL, "hsi_fck");
 
 	/* Set SGX parent to PER DPLL */
 	clk_set_parent(gpu_fclk, sgx_clk);
@@ -425,6 +444,11 @@ int __init omap4_pm_init_opp_table(void)
 	if (dev)
 		opp_populate_rate_fns(dev, omap4_fdif_set_rate,
 				omap4_fdif_get_rate);
+
+	dev = find_dev_ptr("hsi");
+	if (dev)
+		opp_populate_rate_fns(dev, omap4_hsi_set_rate,
+				omap4_hsi_get_rate);
 
 	return 0;
 }
