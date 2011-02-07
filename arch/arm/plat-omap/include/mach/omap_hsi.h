@@ -288,7 +288,7 @@
 					(fifo * 4))
 #define HSI_HSR_MAPPING_WORDS_MASK	(0xf << 10)
 
-#define HSI_HSR_DLL_REG(port)		(HSI_HSR_BASE(port) + 0x0144)
+#define HSI_HSR_DLL_REG			(HSI_HSR_BASE(1) + 0x0144)
 #define HSI_HSR_DLL_COCHRE		1
 #define HSI_HSR_DLL_COCHGR		(1 << 4)
 #define HSI_HSR_DLL_INCO_MASK		0x0003ff00
