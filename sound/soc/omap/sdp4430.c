@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
 #include <linux/mfd/twl6040-codec.h>
+#include <linux/i2c/twl.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -44,6 +45,8 @@
 #ifdef CONFIG_SND_OMAP_SOC_HDMI
 #include "omap-hdmi.h"
 #endif
+
+#define TPS6130X_I2C_ADAPTER	1
 
 static int twl6040_power_mode;
 static int mcbsp_cfg;
@@ -829,6 +832,7 @@ static struct platform_device *sdp4430_snd_device;
 static int __init sdp4430_soc_init(void)
 {
 	struct i2c_adapter *adapter;
+	u8 gpoctl;
 	int ret;
 
 	if (!machine_is_omap_4430sdp() && !machine_is_omap4_panda()) {
@@ -851,24 +855,41 @@ static int __init sdp4430_soc_init(void)
 	if (ret)
 		goto err;
 
-        adapter = i2c_get_adapter(1);
-        if (!adapter) {
-                printk(KERN_ERR "can't get i2c adapter\n");
-                return -ENODEV;
-        }
+	/* enable tps6130x */
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &gpoctl,
+			      TWL6040_REG_GPOCTL);
+	if (ret)
+		goto err;
+
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl | TWL6040_GPO2,
+			       TWL6040_REG_GPOCTL);
+	if (ret)
+		goto err;
+
+	adapter = i2c_get_adapter(TPS6130X_I2C_ADAPTER);
+	if (!adapter) {
+		printk(KERN_ERR "can't get i2c adapter\n");
+		ret = -ENODEV;
+		goto adp_err;
+	}
 
 	tps6130x_client = i2c_new_device(adapter, &tps6130x_hwmon_info);
 	if (!tps6130x_client) {
-                printk(KERN_ERR "can't add i2c device\n");
-                return -ENODEV;
-        }
+		printk(KERN_ERR "can't add i2c device\n");
+		ret = -ENODEV;
+		goto tps_err;
+	}
 
 	/* Only configure the TPS6130x on SDP4430 */
 	if (machine_is_omap_4430sdp())
 		sdp4430_tps6130x_configure();
 
-	return 0;
+	return ret;
 
+tps_err:
+	i2c_put_adapter(adapter);
+adp_err:
+	twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl, TWL6040_REG_GPOCTL);
 err:
 	printk(KERN_ERR "Unable to add platform device\n");
 	platform_device_put(sdp4430_snd_device);
