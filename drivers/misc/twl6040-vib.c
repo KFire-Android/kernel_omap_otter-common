@@ -195,6 +195,7 @@ static int vib_probe(struct platform_device *pdev)
 	misc_data = data;
 	platform_set_drvdata(pdev, data);
 
+	twl6040_enable(data->twl6040);
 	vib_enable(&data->dev, data->pdata->initial_vibrate);
 
 	return 0;
@@ -215,8 +216,9 @@ static int vib_remove(struct platform_device *pdev)
 	if (data->pdata->exit)
 		data->pdata->exit();
 
-	timed_output_dev_unregister(&data->dev);
+	twl6040_disable(data->twl6040);
 
+	timed_output_dev_unregister(&data->dev);
 	kfree(data->pdata);
 	kfree(data);
 

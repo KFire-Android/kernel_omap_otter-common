@@ -26,6 +26,8 @@
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
+#include <linux/gpio.h>
+#include <linux/delay.h>
 #include <linux/i2c/twl.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/twl6040-codec.h>
@@ -61,93 +63,320 @@ int twl6040_reg_write(struct twl6040_codec *twl6040, unsigned int reg, u8 val)
 }
 EXPORT_SYMBOL(twl6040_reg_write);
 
-static int twl6040_codec_set_resource(enum twl6040_codec_res id, int enable)
+/* twl6040 codec manual power-up sequence */
+static int twl6040_power_up(struct twl6040_codec *twl6040)
 {
-	struct twl6040_codec *twl6040 = platform_get_drvdata(twl6040_codec_dev);
-	u8 val = 0;
+	u8 ncpctl, ldoctl, lppllctl, accctl;
+	int ret;
 
-	val = twl6040_reg_read(twl6040, twl6040->resource[id].reg);
+	ncpctl = twl6040_reg_read(twl6040, TWL6040_REG_NCPCTL);
+	ldoctl = twl6040_reg_read(twl6040, TWL6040_REG_LDOCTL);
+	lppllctl = twl6040_reg_read(twl6040, TWL6040_REG_LPPLLCTL);
+	accctl = twl6040_reg_read(twl6040, TWL6040_REG_ACCCTL);
 
-	if (enable)
-		val |= twl6040->resource[id].mask;
-	else
-		val &= ~twl6040->resource[id].mask;
+	/* enable reference system */
+	ldoctl |= TWL6040_REFENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		return ret;
+	msleep(10);
 
-	twl6040_reg_write(twl6040, twl6040->resource[id].reg, val);
+	/* enable internal oscillator */
+	ldoctl |= TWL6040_OSCENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		goto osc_err;
+	udelay(10);
 
-	return val;
+	/* enable high-side ldo */
+	ldoctl |= TWL6040_HSLDOENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		goto hsldo_err;
+	udelay(244);
+
+	/* enable negative charge pump */
+	ncpctl |= TWL6040_NCPENA | TWL6040_NCPOPEN;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_NCPCTL, ncpctl);
+	if (ret)
+		goto ncp_err;
+	udelay(488);
+
+	/* enable low-side ldo */
+	ldoctl |= TWL6040_LSLDOENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		goto lsldo_err;
+	udelay(244);
+
+	/* enable low-power pll */
+	lppllctl |= TWL6040_LPLLENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
+	if (ret)
+		goto lppll_err;
+
+	/* reset state machine */
+	accctl |= TWL6040_RESETSPLIT;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_ACCCTL, accctl);
+	if (ret)
+		goto rst_err;
+	mdelay(5);
+	accctl &= ~TWL6040_RESETSPLIT;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_ACCCTL, accctl);
+	if (ret)
+		goto rst_err;
+
+	/* disable internal oscillator */
+	ldoctl &= ~TWL6040_OSCENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		goto rst_err;
+
+	return 0;
+
+rst_err:
+	lppllctl &= ~TWL6040_LPLLENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
+lppll_err:
+	ldoctl &= ~TWL6040_LSLDOENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	udelay(244);
+lsldo_err:
+	ncpctl &= ~(TWL6040_NCPENA | TWL6040_NCPOPEN);
+	twl6040_reg_write(twl6040, TWL6040_REG_NCPCTL, ncpctl);
+	udelay(488);
+ncp_err:
+	ldoctl &= ~TWL6040_HSLDOENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	udelay(244);
+hsldo_err:
+	ldoctl &= ~TWL6040_OSCENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+osc_err:
+	ldoctl &= ~TWL6040_REFENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	msleep(10);
+
+	return ret;
 }
 
-static inline int twl6040_codec_get_resource(enum twl6040_codec_res id)
+/* twl6040 codec manual power-down sequence */
+static int twl6040_power_down(struct twl6040_codec *twl6040)
 {
-	struct twl6040_codec *twl6040 = platform_get_drvdata(twl6040_codec_dev);
+	u8 ncpctl, ldoctl, lppllctl, accctl;
+	int ret;
 
-	return twl6040_reg_read(twl6040, twl6040->resource[id].reg);
+	ncpctl = twl6040_reg_read(twl6040, TWL6040_REG_NCPCTL);
+	ldoctl = twl6040_reg_read(twl6040, TWL6040_REG_LDOCTL);
+	lppllctl = twl6040_reg_read(twl6040, TWL6040_REG_LPPLLCTL);
+	accctl = twl6040_reg_read(twl6040, TWL6040_REG_ACCCTL);
+
+	/* enable internal oscillator */
+	ldoctl |= TWL6040_OSCENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		return ret;
+	udelay(10);
+
+	/* disable low-power pll */
+	lppllctl &= ~TWL6040_LPLLENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
+	if (ret)
+		goto lppll_err;
+
+	/* disable low-side ldo */
+	ldoctl &= ~TWL6040_LSLDOENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		goto lsldo_err;
+	udelay(244);
+
+	/* disable negative charge pump */
+	ncpctl &= ~(TWL6040_NCPENA | TWL6040_NCPOPEN);
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_NCPCTL, ncpctl);
+	if (ret)
+		goto ncp_err;
+	udelay(488);
+
+	/* disable high-side ldo */
+	ldoctl &= ~TWL6040_HSLDOENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		goto hsldo_err;
+	udelay(244);
+
+	/* disable internal oscillator */
+	ldoctl &= ~TWL6040_OSCENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		goto osc_err;
+
+	/* disable reference system */
+	ldoctl &= ~TWL6040_REFENA;
+	ret = twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	if (ret)
+		goto ref_err;
+	msleep(10);
+
+	return 0;
+
+ref_err:
+	ldoctl |= TWL6040_OSCENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	udelay(10);
+osc_err:
+	ldoctl |= TWL6040_HSLDOENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	udelay(244);
+hsldo_err:
+	ncpctl |= TWL6040_NCPENA | TWL6040_NCPOPEN;
+	twl6040_reg_write(twl6040, TWL6040_REG_NCPCTL, ncpctl);
+	udelay(488);
+ncp_err:
+	ldoctl |= TWL6040_LSLDOENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	udelay(244);
+lsldo_err:
+	lppllctl |= TWL6040_LPLLENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
+lppll_err:
+	lppllctl |= TWL6040_LPLLENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LPPLLCTL, lppllctl);
+	accctl |= TWL6040_RESETSPLIT;
+	twl6040_reg_write(twl6040, TWL6040_REG_ACCCTL, accctl);
+	mdelay(5);
+	accctl &= ~TWL6040_RESETSPLIT;
+	twl6040_reg_write(twl6040, TWL6040_REG_ACCCTL, accctl);
+	ldoctl &= ~TWL6040_OSCENA;
+	twl6040_reg_write(twl6040, TWL6040_REG_LDOCTL, ldoctl);
+	msleep(10);
+
+	return ret;
 }
 
-int twl6040_codec_enable_resource(enum twl6040_codec_res id)
+static irqreturn_t twl6040_naudint_handler(int irq, void *data)
 {
-	struct twl6040_codec *codec = platform_get_drvdata(twl6040_codec_dev);
-	int val;
+	struct twl6040_codec *twl6040 = data;
+	u8 intid;
 
-	if (id >= TWL6040_CODEC_RES_MAX) {
-		dev_err(&twl6040_codec_dev->dev,
-				"Invalid resource ID (%u)\n", id);
-		return -EINVAL;
+	intid = twl6040_reg_read(twl6040, TWL6040_REG_INTID);
+
+	if (intid & TWL6040_READYINT)
+		complete(&twl6040->ready);
+
+	return IRQ_HANDLED;
+}
+
+static int twl6040_power_up_completion(struct twl6040_codec *twl6040,
+				       int naudint)
+{
+	int time_left;
+	u8 intid;
+
+	time_left = wait_for_completion_timeout(&twl6040->ready,
+						msecs_to_jiffies(144));
+	if (!time_left) {
+		intid = twl6040_reg_read(twl6040, TWL6040_REG_INTID);
+		if (!(intid & TWL6040_READYINT)) {
+			dev_err(&twl6040_codec_dev->dev,
+				"timeout waiting for READYINT\n");
+			return -ETIMEDOUT;
+		}
 	}
 
-	mutex_lock(&codec->mutex);
-	if (!codec->resource[id].request_count)
-		/* Resource was disabled, enable it */
-		val = twl6040_codec_set_resource(id, 1);
-	else
-		val = twl6040_codec_get_resource(id);
-
-	codec->resource[id].request_count++;
-	mutex_unlock(&codec->mutex);
-
-	return val;
+	return 0;
 }
-EXPORT_SYMBOL_GPL(twl6040_codec_enable_resource);
 
-int twl6040_codec_disable_resource(unsigned id)
+static int twl6040_power(struct twl6040_codec *twl6040, int enable)
 {
-	struct twl6040_codec *codec = platform_get_drvdata(twl6040_codec_dev);
-	int val;
+	int audpwron = twl6040->audpwron;
+	int naudint = twl6040->irq;
+	int ret = 0;
 
-	if (id >= TWL6040_CODEC_RES_MAX) {
-		dev_err(&twl6040_codec_dev->dev,
-				"Invalid resource ID (%u)\n", id);
-		return -EINVAL;
+	if (enable) {
+		if (gpio_is_valid(audpwron)) {
+			/* use AUDPWRON line */
+			gpio_set_value(audpwron, 1);
+			/* wait for power-up completion */
+			ret = twl6040_power_up_completion(twl6040, naudint);
+			if (ret) {
+				dev_err(&twl6040_codec_dev->dev,
+					"automatic power-down failed\n");
+				return ret;
+			}
+		} else {
+			/* use manual power-up sequence */
+			ret = twl6040_power_up(twl6040);
+			if (ret) {
+				dev_err(&twl6040_codec_dev->dev,
+					"manual power-up failed\n");
+				return ret;
+			}
+		}
+	} else {
+		if (gpio_is_valid(audpwron)) {
+			/* use AUDPWRON line */
+			gpio_set_value(audpwron, 0);
+
+			/* power-down sequence latency */
+			udelay(500);
+		} else {
+			/* use manual power-down sequence */
+			ret = twl6040_power_down(twl6040);
+			if (ret) {
+				dev_err(&twl6040_codec_dev->dev,
+					"manual power-down failed\n");
+				return ret;
+			}
+		}
 	}
 
-	mutex_lock(&codec->mutex);
-	if (!codec->resource[id].request_count) {
-		dev_err(&twl6040_codec_dev->dev,
-			"Resource has been disabled already (%u)\n", id);
-		mutex_unlock(&codec->mutex);
-		return -EPERM;
-	}
-	codec->resource[id].request_count--;
+	twl6040->powered = enable;
 
-	if (!codec->resource[id].request_count)
-		/* Resource can be disabled now */
-		val = twl6040_codec_set_resource(id, 0);
-	else
-		val = twl6040_codec_get_resource(id);
-
-	mutex_unlock(&codec->mutex);
-
-	return val;
+	return ret;
 }
-EXPORT_SYMBOL_GPL(twl6040_codec_disable_resource);
+
+int twl6040_enable(struct twl6040_codec *twl6040)
+{
+	int ret = 0;
+
+	mutex_lock(&twl6040->mutex);
+	if (!twl6040->power_count++)
+		ret = twl6040_power(twl6040, 1);
+	mutex_unlock(&twl6040->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL(twl6040_enable);
+
+int twl6040_disable(struct twl6040_codec *twl6040)
+{
+	int ret = 0;
+
+	mutex_lock(&twl6040->mutex);
+	if (!--twl6040->power_count)
+		ret = twl6040_power(twl6040, 0);
+	mutex_unlock(&twl6040->mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL(twl6040_disable);
+
+int twl6040_is_enabled(struct twl6040_codec *twl6040)
+{
+	return twl6040->power_count;
+}
+EXPORT_SYMBOL(twl6040_is_enabled);
 
 static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 {
-	struct twl6040_codec *twl6040;
 	struct twl4030_codec_data *pdata = pdev->dev.platform_data;
+	struct twl6040_codec *twl6040;
 	struct mfd_cell *cell = NULL;
+	unsigned int naudint;
+	int audpwron;
 	int ret, children = 0;
+	u8 icrev = 0, accctl;
 
 	if(!pdata) {
 		dev_err(&pdev->dev, "Platform data is missing\n");
@@ -161,9 +390,57 @@ static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, twl6040);
 
 	twl6040_codec_dev = pdev;
+	twl6040->dev = &pdev->dev;
 	mutex_init(&twl6040->mutex);
 	mutex_init(&twl6040->io_mutex);
-	twl6040->audio_mclk = pdata->audio_mclk;
+
+	icrev = twl6040_reg_read(twl6040, TWL6040_REG_ASICREV);
+
+	if (pdata && (icrev > 0))
+		audpwron = pdata->audpwron_gpio;
+	else
+		audpwron = -EINVAL;
+
+	if (pdata)
+		naudint = pdata->naudint_irq;
+	else
+		naudint = 0;
+
+	twl6040->audpwron = audpwron;
+	twl6040->powered = 0;
+	twl6040->irq = naudint;
+	twl6040->irq_base = pdata->irq_base;
+	init_completion(&twl6040->ready);
+
+	if (gpio_is_valid(audpwron)) {
+		ret = gpio_request(audpwron, "audpwron");
+		if (ret)
+			goto gpio1_err;
+
+		ret = gpio_direction_output(audpwron, 0);
+		if (ret)
+			goto gpio2_err;
+	}
+
+	if (naudint) {
+		/* codec interrupt */
+		ret = twl6040_irq_init(twl6040);
+		if (ret)
+			goto gpio2_err;
+
+		ret = twl6040_request_irq(twl6040, TWL6040_IRQ_READY,
+				  twl6040_naudint_handler, "twl6040_irq_ready",
+				  twl6040);
+		if (ret) {
+			dev_err(twl6040->dev, "READY IRQ request failed: %d\n",
+				ret);
+			goto irq_err;
+		}
+	}
+
+	/* dual-access registers controlled by I2C only */
+	accctl = twl6040_reg_read(twl6040, TWL6040_REG_ACCCTL);
+	twl6040_reg_write(twl6040, TWL6040_REG_ACCCTL, accctl | TWL6040_I2CSEL);
 
 	if (pdata->audio) {
 		cell = &twl6040->cells[children];
@@ -184,14 +461,26 @@ static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 	if (children) {
 		ret = mfd_add_devices(&pdev->dev, pdev->id, twl6040->cells,
 				      children, NULL, 0);
+		if (ret)
+			goto mfd_err;
 	} else {
 		dev_err(&pdev->dev, "No platform data found for children\n");
 		ret = -ENODEV;
+		goto mfd_err;
 	}
 
-	if (!ret)
-		return 0;
+	return 0;
 
+mfd_err:
+	if (naudint)
+		twl6040_free_irq(twl6040, TWL6040_IRQ_READY, twl6040);
+irq_err:
+	if (naudint)
+		twl6040_irq_exit(twl6040);
+gpio2_err:
+	if (gpio_is_valid(audpwron))
+		gpio_free(audpwron);
+gpio1_err:
 	platform_set_drvdata(pdev, NULL);
 	kfree(twl6040);
 	twl6040_codec_dev = NULL;
@@ -201,6 +490,18 @@ static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 static int __devexit twl6040_codec_remove(struct platform_device *pdev)
 {
 	struct twl6040_codec *twl6040 = platform_get_drvdata(pdev);
+	int audpwron = twl6040->audpwron;
+	int naudint = twl6040->irq;
+
+	twl6040_disable(twl6040);
+
+	twl6040_free_irq(twl6040, TWL6040_IRQ_READY, twl6040);
+
+	if (gpio_is_valid(audpwron))
+		gpio_free(audpwron);
+
+	if (naudint)
+		twl6040_irq_exit(twl6040);
 
 	mfd_remove_devices(&pdev->dev);
 	platform_set_drvdata(pdev, NULL);

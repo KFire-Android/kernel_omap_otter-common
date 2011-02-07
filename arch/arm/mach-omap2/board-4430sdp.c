@@ -1023,21 +1023,20 @@ static void omap4_audio_conf(void)
 }
 
 static struct twl4030_codec_audio_data twl6040_audio = {
-	.audio_mclk	= 38400000,
-	.audpwron_gpio  = 127,
-	.naudint_irq    = OMAP44XX_IRQ_SYS_2N,
+	/* Add audio only data */
 };
 
 static struct twl4030_codec_vibra_data twl6040_vibra = {
-	.audio_mclk	= 38400000,
 	.max_timeout	= 15000,
 	.initial_vibrate = 0,
 };
 
 static struct twl4030_codec_data twl6040_codec = {
-	.audio_mclk	= 38400000,
 	.audio		= &twl6040_audio,
 	.vibra		= &twl6040_vibra,
+	.audpwron_gpio	= 127,
+	.naudint_irq	= OMAP44XX_IRQ_SYS_2N,
+	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
 static struct twl4030_platform_data sdp4430_twldata = {

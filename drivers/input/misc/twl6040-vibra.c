@@ -199,6 +199,9 @@ static int __devinit twl6040_vibra_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, info);
+
+	twl6040_enable(info->twl6040);
+
 	return 0;
 
 err_iff:
@@ -214,6 +217,7 @@ static int __devexit twl6040_vibra_remove(struct platform_device *pdev)
 {
 	struct vibra_info *info = platform_get_drvdata(pdev);
 
+	twl6040_disable(info->twl6040);
 	input_unregister_device(info->input_dev);
 	kfree(info);
 	platform_set_drvdata(pdev, NULL);

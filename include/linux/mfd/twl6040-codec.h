@@ -24,6 +24,7 @@
 #ifndef __TWL6040_CODEC_H__
 #define __TWL6040_CODEC_H__
 
+#include <linux/interrupt.h>
 #include <linux/mfd/core.h>
 
 #define TWL6040_REG_ASICID		0x01
@@ -83,7 +84,11 @@
 
 /* INTMR (0x04) fields */
 
+#define TWL6040_THMSK			0x01
 #define TWL6040_PLUGMSK			0x02
+#define TWL6040_HOOKMSK			0x08
+#define TWL6040_HFMSK			0x10
+#define TWL6040_VIBMSK			0x20
 #define TWL6040_READYMSK		0x40
 #define TWL6040_ALLINT_MSK		0x7B
 
@@ -131,18 +136,27 @@
 #define TWL6040_HSDRVMODER		0x08
 
 /* VIBCTLL (0x18) fields */
+
 #define TWL6040_VIBCTRLLN		0x10
 #define TWL6040_VIBCTRLLP		0x04
 #define TWL6040_VIBENAL			0x01
 
 /* VIBCTLL (0x19) fields */
+
 #define TWL6040_VIBCTRLRN		0x10
 #define TWL6040_VIBCTRLRP		0x04
 #define TWL6040_VIBENAR			0x01
 
+/* GPOCTL (0x1E) fields */
+#define TWL6040_GPO1			0x01
+#define TWL6040_GPO2			0x02
+#define TWL6040_GPO3			0x03
+
 /* ACCCTL (0x2D) fields */
 
+#define TWL6040_I2CSEL			0x01
 #define TWL6040_RESETSPLIT		0x04
+#define TWL6040_INTCLRMODE		0x08
 
 #define TWL6040_SYSCLK_SEL_LPPLL	1
 #define TWL6040_SYSCLK_SEL_HPPLL	2
@@ -156,31 +170,58 @@
 
 #define TWL6040_CODEC_CELLS		2
 
-enum twl6040_codec_res {
-	TWL6040_CODEC_RES_POWER = 0,
-	TWL6040_CODEC_RES_APLL,
-	TWL6040_CODEC_RES_MAX,
-};
-
-struct twl6040_codec_resource {
-	int request_count;
-	u8 reg;
-	u8 mask;
-};
+#define TWL6040_IRQ_TH			0
+#define TWL6040_IRQ_PLUG		1
+#define TWL6040_IRQ_HOOK		2
+#define TWL6040_IRQ_HF			3
+#define TWL6040_IRQ_VIB			4
+#define TWL6040_IRQ_READY		5
 
 struct twl6040_codec {
-	unsigned int audio_mclk;
+	struct device *dev;
 	struct mutex mutex;
 	struct mutex io_mutex;
-	struct twl6040_codec_resource resource[TWL6040_CODEC_RES_MAX];
+	struct mutex irq_mutex;
 	struct mfd_cell cells[TWL6040_CODEC_CELLS];
+	struct completion ready;
+
+	int audpwron;
+	int powered;
+	int power_count;
+
+	unsigned int irq;
+	unsigned int irq_base;
+	u8 irq_masks_cur;
+	u8 irq_masks_cache;
 };
+
+static inline int twl6040_request_irq(struct twl6040_codec *twl6040, int irq,
+				      irq_handler_t handler, const char *name,
+				      void *data)
+{
+	if (!twl6040->irq_base)
+		return -EINVAL;
+
+	return request_threaded_irq(twl6040->irq_base + irq, NULL, handler,
+				    0, name, data);
+}
+
+static inline void twl6040_free_irq(struct twl6040_codec *twl6040, int irq,
+				    void *data)
+{
+	if (!twl6040->irq_base)
+		return;
+
+	free_irq(twl6040->irq_base + irq, data);
+}
 
 int twl6040_reg_read(struct twl6040_codec *twl6040, unsigned int reg);
 int twl6040_reg_write(struct twl6040_codec *twl6040, unsigned int reg,
 		      u8 val);
-
-int twl6040_codec_disable_resource(enum twl6040_codec_res id);
-int twl6040_codec_enable_resource(enum twl6040_codec_res id);
+int twl6040_enable(struct twl6040_codec *twl6040);
+int twl6040_disable(struct twl6040_codec *twl6040);
+int twl6040_is_enabled(struct twl6040_codec *twl6040);
+int twl6040_irq_init(struct twl6040_codec *twl6040);
+void twl6040_irq_exit(struct twl6040_codec *twl6040);
 
 #endif  /* End of __TWL6040_CODEC_H__ */
