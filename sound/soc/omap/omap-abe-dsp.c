@@ -384,6 +384,9 @@ static DECLARE_TLV_DB_SCALE(vxrec_vx_ul_tlv, -12000, 100, 3000);
 /* DMIC volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(dmic_tlv, -12000, 100, 3000);
 
+/* BT UL volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(btul_tlv, -12000, 100, 3000);
+
 //TODO: we have to use the shift value atm to represent register id due to current HAL
 static int dl1_put_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -697,7 +700,7 @@ static int volume_put_dl2_mixer(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
-static int volume_put_dmic(struct snd_kcontrol *kcontrol,
+static int volume_put_gain(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct soc_mixer_control *mc =
@@ -802,7 +805,7 @@ static int volume_get_sdt_mixer(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int volume_get_dmic(struct snd_kcontrol *kcontrol,
+static int volume_get_gain(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct soc_mixer_control *mc =
@@ -820,6 +823,7 @@ static int volume_get_dmic(struct snd_kcontrol *kcontrol,
 
 	return 0;
 }
+
 
 static int abe_get_equalizer(struct snd_kcontrol *kcontrol,
 			struct snd_ctl_elem_value *ucontrol)
@@ -1187,15 +1191,19 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	/* DMIC gains */
 	SOC_DOUBLE_EXT_TLV("DMIC1 UL Volume",
 		GAINS_DMIC1, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
-		volume_get_dmic, volume_put_dmic, dmic_tlv),
+		volume_get_gain, volume_put_gain, dmic_tlv),
 
 	SOC_DOUBLE_EXT_TLV("DMIC2 UL Volume",
 		GAINS_DMIC2, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
-		volume_get_dmic, volume_put_dmic, dmic_tlv),
+		volume_get_gain, volume_put_gain, dmic_tlv),
 
 	SOC_DOUBLE_EXT_TLV("DMIC3 UL Volume",
 		GAINS_DMIC3, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
-		volume_get_dmic, volume_put_dmic, dmic_tlv),
+		volume_get_gain, volume_put_gain, dmic_tlv),
+
+	SOC_DOUBLE_EXT_TLV("BT UL Volume",
+		GAINS_BTUL, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
+		volume_get_gain, volume_put_gain, btul_tlv),
 
 	SOC_ENUM_EXT("DL1 Equalizer",
 			dl1_equalizer_enum ,
@@ -1760,6 +1768,8 @@ static int aess_save_context(struct abe_data *abe)
 	abe_mute_gain(GAINS_DMIC3, GAIN_RIGHT_OFFSET);
 	abe_mute_gain(GAINS_AMIC, GAIN_LEFT_OFFSET);
 	abe_mute_gain(GAINS_AMIC, GAIN_RIGHT_OFFSET);
+	abe_mute_gain(GAINS_BTUL, GAIN_LEFT_OFFSET);
+	abe_mute_gain(GAINS_BTUL, GAIN_RIGHT_OFFSET);
 
 	if (pdata->get_context_loss_count)
 		abe->loss_count = pdata->get_context_loss_count(&pdev->dev);
@@ -1810,6 +1820,8 @@ static int aess_restore_context(struct abe_data *abe)
 	abe_unmute_gain(GAINS_DMIC3, GAIN_RIGHT_OFFSET);
 	abe_unmute_gain(GAINS_AMIC, GAIN_LEFT_OFFSET);
 	abe_unmute_gain(GAINS_AMIC, GAIN_RIGHT_OFFSET);
+	abe_unmute_gain(GAINS_BTUL, GAIN_LEFT_OFFSET);
+	abe_unmute_gain(GAINS_BTUL, GAIN_RIGHT_OFFSET);
 
 	abe_dsp_set_equalizer(EQ1, abe->dl1_equ_profile);
 	abe_dsp_set_equalizer(EQ2L, abe->dl20_equ_profile);
