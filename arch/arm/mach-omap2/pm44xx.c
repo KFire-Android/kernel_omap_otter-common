@@ -235,7 +235,12 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_uart_prepare_idle(1);
 		omap_uart_prepare_idle(2);
 		omap_uart_prepare_idle(3);
-		omap2_gpio_prepare_for_idle(0);
+
+		if (omap4_device_off_read_next_state())
+			omap2_gpio_prepare_for_idle(1);
+		else
+			omap2_gpio_prepare_for_idle(0);
+
 		omap4_trigger_ioctrl();
 
 		if (!omap4_device_off_read_next_state()) {
@@ -299,7 +304,11 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
 		}
 
-		omap2_gpio_resume_after_idle(0);
+		if (omap4_device_off_read_prev_state())
+			omap2_gpio_resume_after_idle(1);
+		else
+			omap2_gpio_resume_after_idle(0);
+
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);
 		omap_uart_resume_idle(2);
