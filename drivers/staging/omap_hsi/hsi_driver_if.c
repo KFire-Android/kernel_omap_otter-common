@@ -109,8 +109,8 @@ int hsi_set_rx(struct hsi_port *sport, struct hsr_ctx *cfg)
 		if (((cfg->flow & HSI_FLOW_VAL_MASK) != HSI_FLOW_SYNCHRONIZED)
 		    && (cfg->flow != NOT_SET))
 			return -EINVAL;
-
-		if ((cfg->frame_size > HSI_FRAMESIZE_MAX) &&
+		/* HSI only supports payload size of 32bits */
+		if ((cfg->frame_size != HSI_FRAMESIZE_MAX) &&
 		    (cfg->frame_size != NOT_SET))
 			return -EINVAL;
 	}
