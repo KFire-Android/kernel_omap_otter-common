@@ -268,6 +268,7 @@ static int omap_dmic_dai_hw_params(struct snd_pcm_substream *substream,
 
 	channels = params_channels(params);
 	switch (channels) {
+	case 1:
 	case 2:
 		link->channels = 2;
 		break;
