@@ -84,8 +84,10 @@ static void hdmi_pwrchange_notifier(int state, void *data)
 
 	switch (state) {
 	case HDMI_EVENT_POWEROFF:
-		if (substream)
+		if (substream) {
 			snd_pcm_stop(substream, SNDRV_PCM_STATE_DISCONNECTED);
+			hdmi_set_audio_power(0);
+		}
 		hdmi_data->active = 0;
 		break;
 	case HDMI_EVENT_POWERON:
