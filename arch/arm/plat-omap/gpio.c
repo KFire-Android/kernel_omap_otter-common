@@ -1868,7 +1868,6 @@ static int omap_gpio_resume(struct device *dev)
 
 	omap_gpio_restore_context(dev);
 
-	udelay(10);
 	/* Restore the original padconf */
 	if (pdev->id == 1 && cpu_is_omap44xx())
 		omap_writel(saved_core_gpmc_pad, CONTROL_CORE_GPMC_PAD0);
