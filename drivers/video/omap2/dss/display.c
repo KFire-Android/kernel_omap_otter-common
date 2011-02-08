@@ -654,7 +654,8 @@ static int dss_resume_device(struct device *dev, void *data)
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 
 	/* don't work on non-suspended displays */
-	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
+	if ((dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) &&
+	    (dssdev->state != OMAP_DSS_DISPLAY_DISABLED))
 		return 0;
 
 	if (dssdev->activate_after_resume && dssdev->driver->resume) {

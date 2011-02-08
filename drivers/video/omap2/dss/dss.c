@@ -174,7 +174,7 @@ void dss_mainclk_disable()
 		dss.mainclk_state = false;
 		pm_runtime_put_sync(&dss.pdev->dev);
 
-		if (cpu_is_omap44xx())
+		if (cpu_is_omap44xx() || cpu_is_omap34xx())
 			dss_opt_clock_disable();
 	}
 }
