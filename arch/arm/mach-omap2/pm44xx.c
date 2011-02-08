@@ -712,19 +712,29 @@ static void __init prcm_clear_statdep_regs(void)
 	u32 reg;
 
 	pr_info("%s: Clearing static depndencies\n", __func__);
+
+	/*
+	 * REVISIT: Seen issue with MPU/DSP -> L3_2 and L4CFG. Keeping
+	 * it enabled.
+	 */
 	/* MPU towards EMIF, L3_2 and L4CFG clockdomains */
-	reg = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_2_STATDEP_MASK
-			| OMAP4430_L4CFG_STATDEP_MASK;
+	reg = OMAP4430_MEMIF_STATDEP_MASK;
 	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
 		OMAP4_CM_MPU_STATICDEP_OFFSET);
 
-
+	 /*
+	  * REVISIT: Issue seen with Ducati towards EMIF, L3_2, L3_1,
+	  * L4CFG and L4WKUP static
+	  * dependency. Keep it enabled as of now.
+	  */
+#if 0
 	/* Ducati towards EMIF, L3_2, L3_1, L4CFG and L4WKUP clockdomains */
 	reg = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_1_STATDEP_MASK
 		| OMAP4430_L3_2_STATDEP_MASK | OMAP4430_L4CFG_STATDEP_MASK
 		| OMAP4430_L4WKUP_STATDEP_MASK;
 	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM2_CORE_MOD,
 		OMAP4_CM_DUCATI_STATICDEP_OFFSET);
+#endif
 
 	/* SDMA towards EMIF, L3_2, L3_1, L4CFG, L4WKUP, L3INIT
 	 * and L4PER clockdomains
