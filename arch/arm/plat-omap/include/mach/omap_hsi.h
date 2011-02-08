@@ -176,7 +176,8 @@
 #define HSI_FRAMESIZE_MAX		0x1f
 
 #define HSI_HST_TXSTATE_REG(port)	(HSI_HST_BASE(port) + 0x000c)
-#define	TXSTATE_IDLE			0
+#define	HSI_HST_TXSTATE_VAL_MASK	0x07
+#define	HSI_HST_TXSTATE_IDLE		0
 
 #define HSI_HST_BUFSTATE_REG(port)	(HSI_HST_BASE(port) + 0x0010)
 #define HSI_HST_BUFSTATE_FIFO_REG(fifo)	((fifo < 8) ?			\

@@ -216,6 +216,8 @@ void hsi_reset_ch_write(struct hsi_channel *ch);
 bool hsi_is_channel_busy(struct hsi_channel *ch);
 bool hsi_is_hsi_port_busy(struct hsi_port *pport);
 bool hsi_is_hsi_controller_busy(struct hsi_dev *hsi_ctrl);
+bool hsi_is_hst_port_busy(struct hsi_port *pport);
+bool hsi_is_hst_controller_busy(struct hsi_dev *hsi_ctrl);
 
 int hsi_driver_enable_read_interrupt(struct hsi_channel *hsi_channel,
 					u32 *data);

@@ -610,6 +610,9 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 		return;
 	}
 
+	if (hsi_is_hst_controller_busy(hsi_ctrl))
+		dev_warn(dev, "Disabling clocks with HST FSM not IDLE !\n");
+
 	/* HSI_TODO : this can probably be changed
 	 * to return pm_runtime_put(dev);
 	 */

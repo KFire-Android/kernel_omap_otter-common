@@ -113,6 +113,35 @@ bool hsi_is_hsi_controller_busy(struct hsi_dev *hsi_ctrl)
 	return false;
 }
 
+bool hsi_is_hst_port_busy(struct hsi_port *pport)
+{
+	unsigned int port = pport->port_number;
+	void __iomem *base = pport->hsi_controller->base;
+	u32 txstateval;
+
+	txstateval = hsi_inl(base, HSI_HST_TXSTATE_REG(port)) &
+			HSI_HST_TXSTATE_VAL_MASK;
+
+	if (txstateval != HSI_HST_TXSTATE_IDLE) {
+		dev_dbg(pport->hsi_controller->dev, "HST port %d busy, "
+			"TXSTATE=%d\n", port, txstateval);
+		return true;
+	}
+
+	return false;
+}
+
+bool hsi_is_hst_controller_busy(struct hsi_dev *hsi_ctrl)
+{
+	int port;
+
+	for (port = 0; port < hsi_ctrl->max_p; port++)
+		if (hsi_is_hst_port_busy(&hsi_ctrl->hsi_port[port]))
+			return true;
+
+	return false;
+}
+
 /* Enables the Data Accepted Interrupt of HST for the given channel */
 int hsi_driver_enable_write_interrupt(struct hsi_channel *ch, u32 * data)
 {
