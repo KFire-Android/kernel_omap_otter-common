@@ -512,5 +512,7 @@ void hdmi_remove_notifier(struct hdmi_notifier *notifier);
 void hdmi_notify_hpd(int state);
 void hdmi_notify_pwrchange(int state);
 int hdmi_rxdet(void);
+int hdmi_w1_get_video_state(void);
+
 #endif
 

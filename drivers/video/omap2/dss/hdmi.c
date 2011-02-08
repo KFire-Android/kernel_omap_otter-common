@@ -297,6 +297,8 @@ struct hdmi {
 	struct hdmi_config cfg;
 	struct omap_display_platform_data *pdata;
 	struct platform_device *pdev;
+	void (*hdmi_start_frame_cb)(void);
+	void (*hdmi_stop_frame_cb)(void);
 } hdmi;
 
 struct hdmi_cm {
@@ -969,6 +971,9 @@ int hdmi_init(struct platform_device *pdev)
 
 	hdmi_lib_init();
 
+	hdmi.hdmi_start_frame_cb = 0;
+	hdmi.hdmi_stop_frame_cb = 0;
+
 	hdmi_enable_clocks(0);
 	/* Get the major number for this module */
 	r = alloc_chrdev_region(&hdmi_dev_id, 0, 1, "hdmi_panel");
@@ -1194,6 +1199,9 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	dispc_enable_digit_out(1);
 
+	if (hdmi.hdmi_start_frame_cb)
+		(*hdmi.hdmi_start_frame_cb)();
+
 	kfree(vsdb_format);
 
 	return 0;
@@ -1389,6 +1397,10 @@ static void hdmi_work_queue(struct work_struct *ws)
 		if (dssdev->platform_disable)
 			dssdev->platform_disable(dssdev);
 			dispc_enable_digit_out(0);
+
+		if (hdmi.hdmi_stop_frame_cb)
+			(*hdmi.hdmi_stop_frame_cb)();
+
 		HDMI_W1_SetWaitPllPwrState(HDMI_WP, HDMI_PLLPWRCMD_ALLOFF);
 		edid_set = custom_set = false;
 		set_video_power(dssdev, HDMI_POWER_MIN);
@@ -1528,6 +1540,9 @@ static void hdmi_power_off_phy(struct omap_dss_device *dssdev)
 	HDMI_W1_StopVideoFrame(HDMI_WP);
 
 	dispc_enable_digit_out(0);
+
+	if (hdmi.hdmi_stop_frame_cb)
+		(*hdmi.hdmi_stop_frame_cb)();
 
 	hdmi_phy_off(HDMI_WP);
 
@@ -2290,3 +2305,22 @@ const struct omap_video_timings *hdmi_get_omap_timing(int ix)
 		return NULL;
 	return all_timings_direct + ix;
 }
+
+int hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
+				 void (*hdmi_stop_frame_cb)(void))
+{
+	hdmi.hdmi_start_frame_cb = hdmi_start_frame_cb;
+	hdmi.hdmi_stop_frame_cb  = hdmi_stop_frame_cb;
+
+	return hdmi_w1_get_video_state();
+}
+EXPORT_SYMBOL(hdmi_register_hdcp_callbacks);
+
+void hdmi_restart(void)
+{
+	struct omap_dss_device *dssdev = get_hdmi_device();
+
+	hdmi_disable_video(dssdev);
+	hdmi_enable_video(dssdev);
+}
+EXPORT_SYMBOL(hdmi_restart);

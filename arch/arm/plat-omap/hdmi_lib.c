@@ -1199,6 +1199,13 @@ void hdmi_w1_video_start(void)
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_VIDEO_CFG, (u32)0x1, 31, 31);
 }
 
+int hdmi_w1_get_video_state(void)
+{
+	uint32_t status = hdmi_read_reg(HDMI_WP, HDMI_WP_VIDEO_CFG);
+
+	return (status & 0x80000000) ? 1 : 0;
+}
+
 static void hdmi_w1_video_init_format(struct hdmi_video_format *f_p,
 	struct hdmi_video_timing *t_p, struct hdmi_config *param)
 {
