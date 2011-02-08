@@ -487,7 +487,7 @@ static void ipu_pm_clean_res(void)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	struct rcb_block *rcb_p;
-	int cur_rcb = 1;
+	int cur_rcb = 0;
 	u32 mask;
 	int res;
 	int retval = 0;
@@ -530,11 +530,19 @@ static void ipu_pm_clean_res(void)
 				pr_err("Error releasing res:%d cstrs\n", res);
 		}
 
-		if (_is_res(res)) {
-			pr_debug("Releasing res:%d\n", res);
-			retval = release_fxn[res](handle, rcb_p, params);
-			if (retval)
-				pr_err("Can't release resource: %d\n", res);
+		/* The first resource is internally created to manage the
+		 * the constrainst of the IPU via SYS and APP and it shouldn't
+		 * be released as a resource
+		 */
+		if (cur_rcb > 1) {
+			if (_is_res(res)) {
+				pr_debug("Releasing res:%d\n", res);
+				retval = release_fxn[res](handle, rcb_p,
+									params);
+				if (retval)
+					pr_err("Can't release resource: %d\n",
+									   res);
+			}
 		}
 
 		/* Clear the RCB from the RAT if success */
