@@ -363,8 +363,11 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 
 			mmc->slots[0].features |= HSMMC_DVFS_24MHZ_CONST;
 
-			if (c->mmc >= 3 && c->mmc <= 5)
+			if (c->mmc >= 3 && c->mmc <= 5) {
 				mmc->slots[0].features |= HSMMC_HAS_48MHZ_MASTER_CLK;
+				mmc->get_context_loss_count =
+						hsmmc_get_context_loss;
+			}
 		}
 		switch (c->mmc) {
 		case 1:
@@ -409,7 +412,6 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
 			break;
 		case 4:
 		case 5:
-			mmc->get_context_loss_count = hsmmc_get_context_loss;
 			/* TODO Update required */
 			mmc->slots[0].before_set_reg = NULL;
 			mmc->slots[0].after_set_reg = NULL;
