@@ -1367,6 +1367,11 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
 		.flags		= 1,
 		.plat_hold_wakelock = NULL,
+		.rts_padconf	= 0,
+		.rts_override	= 0,
+		.padconf	= OMAP4_CTRL_MODULE_PAD_SDMMC1_CMD_OFFSET,
+		.padconf_wake_ev = 0,
+		.wk_mask	= 0,
 	},
 	{
 		.use_dma	= 0,
@@ -1376,6 +1381,16 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
 		.flags		= 1,
 		.plat_hold_wakelock = plat_hold_wakelock,
+		.rts_padconf	= OMAP4_CTRL_MODULE_PAD_UART2_RTS_OFFSET,
+		.rts_override	= 0,
+		.padconf	= OMAP4_CTRL_MODULE_PAD_UART2_RX_OFFSET,
+		.padconf_wake_ev =
+			OMAP4_CTRL_MODULE_PAD_CORE_PADCONF_WAKEUPEVENT_3,
+		.wk_mask	=
+			OMAP4_UART2_TX_DUPLICATEWAKEUPEVENT_MASK |
+			OMAP4_UART2_RX_DUPLICATEWAKEUPEVENT_MASK |
+			OMAP4_UART2_RTS_DUPLICATEWAKEUPEVENT_MASK |
+			OMAP4_UART2_CTS_DUPLICATEWAKEUPEVENT_MASK,
 	},
 	{
 		.use_dma	= 0,
@@ -1385,6 +1400,16 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
 		.flags		= 1,
 		.plat_hold_wakelock = plat_hold_wakelock,
+		.rts_padconf	= 0,
+		.rts_override	= 0,
+		.padconf	= OMAP4_CTRL_MODULE_PAD_UART3_RX_IRRX_OFFSET,
+		.padconf_wake_ev =
+			OMAP4_CTRL_MODULE_PAD_CORE_PADCONF_WAKEUPEVENT_4,
+		.wk_mask	=
+			OMAP4_UART3_TX_IRTX_DUPLICATEWAKEUPEVENT_MASK |
+			OMAP4_UART3_RX_IRRX_DUPLICATEWAKEUPEVENT_MASK |
+			OMAP4_UART3_RTS_SD_DUPLICATEWAKEUPEVENT_MASK |
+			OMAP4_UART3_CTS_RCTX_DUPLICATEWAKEUPEVENT_MASK,
 	},
 	{
 		.use_dma	= 0,
@@ -1394,6 +1419,14 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
 		.flags		= 1,
 		.plat_hold_wakelock = NULL,
+		.rts_padconf	= 0,
+		.rts_override	= 0,
+		.padconf	= OMAP4_CTRL_MODULE_PAD_UART4_RX_OFFSET,
+		.padconf_wake_ev =
+			OMAP4_CTRL_MODULE_PAD_CORE_PADCONF_WAKEUPEVENT_4,
+		.wk_mask	=
+			OMAP4_UART4_TX_DUPLICATEWAKEUPEVENT_MASK |
+			OMAP4_UART4_RX_DUPLICATEWAKEUPEVENT_MASK,
 	},
 	{
 		.flags		= 0

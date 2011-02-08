@@ -65,14 +65,14 @@ struct omap_uart_state {
 
 	void __iomem *wk_st;
 	void __iomem *wk_en;
-	u32 padconf_wake_ev;
+	u16 padconf_wake_ev;
 	u32 wk_mask;
-	u32 padconf;
+	u16 padconf;
 	u32 dma_enabled;
 
-	u32 rts_padconf;
+	u16 rts_padconf;
 	int rts_override;
-	u16 rts_padvalue;
+	u32 rts_padvalue;
 
 	struct clk *ick;
 	struct clk *fck;
@@ -192,8 +192,16 @@ static inline void omap_uart_disable_rtspullup(struct omap_uart_state *uart)
 {
 	if (!uart->rts_padconf || !uart->rts_override)
 		return;
-	omap_writel(uart->rts_padvalue, uart->rts_padconf);
-	uart->rts_override = 0;
+
+	if (cpu_is_omap44xx()) {
+		/* FIXME: should this be done atomically? */
+		u16 offset = uart->rts_padconf & ~0x3; /* 32-bit align */
+		u32 value = omap4_ctrl_pad_readl(offset);
+		value = ((uart->rts_padconf & 0x2 ? 0x0000FFFF : 0xFFFF0000)
+			& value) | uart->rts_padvalue;
+		omap4_ctrl_pad_writel(value, offset);
+		uart->rts_override = 0;
+	}
 }
 
 static inline void omap_uart_enable_rtspullup(struct omap_uart_state *uart)
@@ -201,23 +209,21 @@ static inline void omap_uart_enable_rtspullup(struct omap_uart_state *uart)
 	if (!uart->rts_padconf || uart->rts_override)
 		return;
 
-	uart->rts_padvalue = omap_readl(uart->rts_padconf);
-	omap_writel(((0x011FFFFF) & uart->rts_padvalue), uart->rts_padconf);
-	uart->rts_override = 1;
-}
-
-static void omap_uart_rtspad_init(struct omap_uart_state *uart)
-{
-	if (!cpu_is_omap44xx())
-		return;
-	switch (uart->num) {
-	case UART2:
-		uart->rts_override = 0;
-		uart->rts_padconf = 0x4A100118;
-		break;
-	default:
-		uart->rts_padconf = 0;
-		break;
+	if (cpu_is_omap44xx()) {
+		/* FIXME: should this be done atomically? */
+		u16 offset = uart->rts_padconf & ~0x3; /* 32-bit align */
+		u32 value = omap4_ctrl_pad_readl(offset);
+		if (uart->rts_padconf & 0x2) {
+			uart->rts_padvalue = value & 0xFFFF0000;
+			value &= 0x011FFFFF;
+			value |= 0x011F0000; /* Set the PU Enable */
+		} else {
+			uart->rts_padvalue = value & 0x0000FFFF;
+			value &= 0xFFFF011F;
+			value |= 0x0000011F; /* Set the PU Enable */
+		}
+		omap4_ctrl_pad_writel(value, offset);
+		uart->rts_override = 1;
 	}
 }
 
@@ -355,9 +361,13 @@ static void omap_uart_enable_wakeup(struct omap_uart_state *uart)
 	}
 
 	if (cpu_is_omap44xx() && uart->padconf) {
-		u32 v = omap_readl(uart->padconf);
-		v |= OMAP44XX_PADCONF_WAKEUPENABLE0;
-		omap_writel(v, uart->padconf);
+		u16 offset = uart->padconf & ~0x3; /* 32-bit align */
+		u32 mask = uart->padconf & 0x2 ? OMAP44XX_PADCONF_WAKEUPENABLE1
+			: OMAP44XX_PADCONF_WAKEUPENABLE0;
+
+		u32 v = omap4_ctrl_pad_readl(offset);
+		v |= mask;
+		omap4_ctrl_pad_writel(v, offset);
 	}
 }
 
@@ -375,6 +385,17 @@ static void omap_uart_disable_wakeup(struct omap_uart_state *uart)
 		u16 v = omap_ctrl_readw(uart->padconf);
 		v &= ~OMAP3_PADCONF_WAKEUPENABLE0;
 		omap_ctrl_writew(v, uart->padconf);
+	}
+
+	/* Ensure IOPAD wake-enables are cleared */
+	if (cpu_is_omap44xx() && uart->padconf) {
+		u16 offset = uart->padconf & ~0x3; /* 32-bit align */
+		u32 mask = uart->padconf & 0x2 ? OMAP44XX_PADCONF_WAKEUPENABLE1
+			: OMAP44XX_PADCONF_WAKEUPENABLE0;
+
+		u32 v = omap4_ctrl_pad_readl(offset);
+		v &= ~mask;
+		omap4_ctrl_pad_writel(v, offset);
 	}
 }
 
@@ -457,6 +478,30 @@ void omap_uart_prepare_idle(int num)
 	}
 }
 
+static bool omap_uart_is_wakeup_src(struct omap_uart_state *uart)
+{
+	if (cpu_is_omap34xx() && uart->padconf) {
+		u16 p = omap_ctrl_readw(uart->padconf);
+
+		if (p & OMAP3_PADCONF_WAKEUPEVENT0)
+			return true;
+	}
+
+	if (cpu_is_omap44xx() && uart->padconf) {
+		u16 offset = uart->padconf & ~0x3; /* 32-bit align */
+		u32 event_mask = uart->padconf & 0x2
+			? OMAP44XX_PADCONF_WAKEUPEVENT1
+			: OMAP44XX_PADCONF_WAKEUPEVENT0;
+		u32 p = omap4_ctrl_pad_readl(offset);
+		if ((p & event_mask) && (uart->padconf_wake_ev != 0))
+			if ((omap4_ctrl_pad_readl(uart->padconf_wake_ev)
+						& (uart->wk_mask)))
+				return true;
+	}
+
+	return false;
+}
+
 void omap_uart_resume_idle(int num)
 {
 	struct omap_uart_state *uart;
@@ -467,24 +512,11 @@ void omap_uart_resume_idle(int num)
 			omap_uart_disable_rtspullup(uart);
 
 			/* Check for IO pad wakeup */
-			if (cpu_is_omap34xx() && uart->padconf) {
-				u16 p = omap_ctrl_readw(uart->padconf);
+			if (omap_uart_is_wakeup_src(uart)) {
+				omap_uart_block_sleep(uart);
 
-				if (p & OMAP3_PADCONF_WAKEUPEVENT0)
-					omap_uart_block_sleep(uart);
-			}
-
-			/* Check for IO pad wakeup */
-			if (cpu_is_omap44xx() && uart->padconf) {
-				u32 p = omap_readl(uart->padconf);
-				if ((p & OMAP44XX_PADCONF_WAKEUPEVENT0) &&
-						(uart->padconf_wake_ev != 0)) {
-					if ((omap_readl(uart->padconf_wake_ev) &
-						(uart->wk_mask))) {
-						omap_uart_block_sleep(uart);
-						omap_uart_update_jiffies(1);
-					}
-				}
+				if (cpu_is_omap44xx())
+					omap_uart_update_jiffies(1);
 			}
 
 			/* Check for normal UART wakeup */
@@ -632,35 +664,6 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 	} else {
 		uart->wk_en = 0;
 		uart->wk_st = 0;
-		uart->padconf_wake_ev = 0;
-		uart->wk_mask = 0;
-		switch (uart->num) {
-		case 0:
-			/* FIXME : Reference platform does not have a device
-			 * connected to UART Port 0. Since UART1 is muxable
-			 * need to add code to find corresponding wake event
-			 * pad.
-			 */
-			uart->padconf = 0x4A1000E4;
-			uart->padconf_wake_ev = 0;
-			uart->wk_mask = 0;
-			break;
-		case 1:
-			uart->padconf = 0x4A10011C;
-			uart->padconf_wake_ev = 0x4A1001E4;
-			uart->wk_mask = 0x0000F000;
-			break;
-		case 2:
-			uart->padconf = 0x4A100144;
-			uart->padconf_wake_ev = 0x4A1001E8;
-			uart->wk_mask = 0x0000000F;
-			break;
-		case 3:
-			uart->padconf = 0x4A10015C;
-			uart->padconf_wake_ev = 0x4A1001E8;
-			uart->wk_mask = 0x000C0000;
-			break;
-		}
 	}
 
 	uart->irqflags |= IRQF_SHARED;
@@ -908,6 +911,15 @@ void __init omap_serial_init_port(int port,
 	omap_up.idle_timeout = platform_data->idle_timeout;
 	omap_up.plat_hold_wakelock = platform_data->plat_hold_wakelock;
 
+	if (cpu_is_omap44xx()) {
+		uart->rts_padconf = platform_data->rts_padconf;
+		uart->rts_override = platform_data->rts_override;
+
+		uart->padconf = platform_data->padconf;
+		uart->padconf_wake_ev = platform_data->padconf_wake_ev;
+		uart->wk_mask = platform_data->wk_mask;
+	}
+
 	pdata = &omap_up;
 	pdata_size = sizeof(struct omap_uart_port_info);
 #endif
@@ -930,7 +942,6 @@ void __init omap_serial_init_port(int port,
 #endif
 
 	omap_uart_enable_clocks(uart);
-	omap_uart_rtspad_init(uart);
 	omap_uart_idle_init(uart);
 	omap_uart_reset(uart);
 	omap_uart_disable_clocks(uart);

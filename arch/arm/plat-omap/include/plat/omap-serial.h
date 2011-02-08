@@ -115,6 +115,12 @@ struct omap_uart_port_info {
 	unsigned int            idle_timeout;   /* Omap Uart Idle Time out */
 	u8			omap4_tx_threshold;
 	void			(*plat_hold_wakelock)(void *p, int flag);
+
+	u16			rts_padconf;
+	int			rts_override;
+	u16			padconf_wake_ev;
+	u32			wk_mask;
+	u16			padconf;
 };
 
 struct uart_omap_dma {
