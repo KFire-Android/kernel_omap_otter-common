@@ -453,9 +453,12 @@ void musb_platform_save_context(struct musb *musb,
 	musb_context->otg_sysconfig = musb_readl(musb->mregs, OTG_SYSCONFIG);
 	musb_context->otg_interfacesel = musb_readl(musb->mregs,
 							OTG_INTERFSEL);
-	musb_context->ctl_dev_conf = __raw_readl(ctrl_base + CONTROL_DEV_CONF);
-	musb_context->usbotg_control = __raw_readl(ctrl_base +
+	if (cpu_is_omap44xx()) {
+		musb_context->ctl_dev_conf = __raw_readl(ctrl_base +
+							CONTROL_DEV_CONF);
+		musb_context->usbotg_control = __raw_readl(ctrl_base +
 							USBOTGHS_CONTROL);
+	}
 	musb_writel(musb_base, OTG_FORCESTDBY, 1);
 }
 
@@ -464,9 +467,12 @@ void musb_platform_restore_context(struct musb *musb,
 {
 	void __iomem *musb_base = musb->mregs;
 	musb_writel(musb->mregs, OTG_SYSCONFIG, musb_context->otg_sysconfig);
-	__raw_writel(musb_context->ctl_dev_conf, ctrl_base + CONTROL_DEV_CONF);
-	__raw_writel(musb_context->usbotg_control, ctrl_base +
+	if (cpu_is_omap44xx()) {
+		__raw_writel(musb_context->ctl_dev_conf, ctrl_base +
+							CONTROL_DEV_CONF);
+		__raw_writel(musb_context->usbotg_control, ctrl_base +
 							USBOTGHS_CONTROL);
+	}
 	musb_writel(musb->mregs, OTG_INTERFSEL,
 					musb_context->otg_interfacesel);
 	musb_writel(musb_base, OTG_FORCESTDBY, 0);
