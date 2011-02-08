@@ -23,6 +23,7 @@
 #include <linux/i2c/cma3000.h>
 #include <linux/i2c/bq2415x.h>
 #include <linux/regulator/machine.h>
+#include <linux/regulator/tps6130x.h>
 #include <linux/input/sfh7741.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
@@ -32,6 +33,7 @@
 #include <linux/twl6040-vib.h>
 #include <linux/wl12xx.h>
 #include <linux/cdc_tcxo.h>
+#include <linux/mfd/twl6040-codec.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -1192,8 +1194,56 @@ static void omap4_audio_conf(void)
 		OMAP_PIN_INPUT_PULLUP);
 }
 
+static int tps6130x_enable(int on)
+{
+        u8 val = 0;
+        int ret;
+
+        ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, TWL6040_REG_GPOCTL);
+        if (ret < 0) {
+		pr_err("%s: failed to read GPOCTL %d\n", __func__, ret);
+                return ret;
+	}
+
+	/* TWL6040 GPO2 connected to TPS6130X NRESET */
+	if (on)
+		val |= TWL6040_GPO2;
+	else
+		val &= ~TWL6040_GPO2;
+
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, TWL6040_REG_GPOCTL);
+	if (ret < 0)
+		pr_err("%s: failed to write GPOCTL %d\n", __func__, ret);
+
+	return ret;
+}
+
+struct tps6130x_platform_data tps6130x_pdata = {
+	.chip_enable	= tps6130x_enable,
+};
+
+static struct regulator_consumer_supply twl6040_vddhf_supply[] = {
+	REGULATOR_SUPPLY("vddhf", "twl6040-codec"),
+};
+
+static struct regulator_init_data twl6040_vddhf = {
+	.constraints = {
+		.min_uV			= 4075000,
+		.max_uV			= 4950000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(twl6040_vddhf_supply),
+	.consumer_supplies	= twl6040_vddhf_supply,
+	.driver_data		= &tps6130x_pdata,
+};
+
 static struct twl4030_codec_audio_data twl6040_audio = {
-	/* Add audio only data */
+	.vddhf_uV	= 4075000,
 };
 
 static struct twl4030_codec_vibra_data twl6040_vibra = {
@@ -1299,6 +1349,10 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("cdc_tcxo_driver", 0x6c),
 		.platform_data = &sdp4430_cdc_data,
+	},
+	{
+		I2C_BOARD_INFO("tps6130x", 0x33),
+		.platform_data = &twl6040_vddhf,
 	},
 };
 
