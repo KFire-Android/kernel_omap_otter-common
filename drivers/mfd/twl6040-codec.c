@@ -63,6 +63,42 @@ int twl6040_reg_write(struct twl6040_codec *twl6040, unsigned int reg, u8 val)
 }
 EXPORT_SYMBOL(twl6040_reg_write);
 
+int twl6040_set_bits(struct twl6040_codec *twl6040, unsigned int reg, u8 mask)
+{
+	int ret;
+	u8 val;
+
+	mutex_lock(&twl6040->io_mutex);
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, reg);
+	if (ret)
+		goto out;
+
+	val |= mask;
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, reg);
+out:
+	mutex_unlock(&twl6040->io_mutex);
+	return ret;
+}
+EXPORT_SYMBOL(twl6040_set_bits);
+
+int twl6040_clear_bits(struct twl6040_codec *twl6040, unsigned int reg, u8 mask)
+{
+	int ret;
+	u8 val;
+
+	mutex_lock(&twl6040->io_mutex);
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, reg);
+	if (ret)
+		goto out;
+
+	val &= ~mask;
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, reg);
+out:
+	mutex_unlock(&twl6040->io_mutex);
+	return ret;
+}
+EXPORT_SYMBOL(twl6040_clear_bits);
+
 /* twl6040 codec manual power-up sequence */
 static int twl6040_power_up(struct twl6040_codec *twl6040)
 {

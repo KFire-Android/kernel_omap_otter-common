@@ -224,6 +224,10 @@ static inline void twl6040_free_irq(struct twl6040_codec *twl6040, int irq,
 int twl6040_reg_read(struct twl6040_codec *twl6040, unsigned int reg);
 int twl6040_reg_write(struct twl6040_codec *twl6040, unsigned int reg,
 		      u8 val);
+int twl6040_set_bits(struct twl6040_codec *twl6040, unsigned int reg,
+		     u8 mask);
+int twl6040_clear_bits(struct twl6040_codec *twl6040, unsigned int reg,
+		       u8 mask);
 int twl6040_enable(struct twl6040_codec *twl6040);
 int twl6040_disable(struct twl6040_codec *twl6040);
 int twl6040_is_enabled(struct twl6040_codec *twl6040);
