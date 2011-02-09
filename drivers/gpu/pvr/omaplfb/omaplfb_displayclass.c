@@ -1386,10 +1386,33 @@ static OMAP_ERROR InitDev(OMAPLFB_DEVINFO *psDevInfo, int fb_idx)
 				DESIRED_BPP);
 	}
 	acquire_console_sem();
+
+	FBSize = (psLINFBInfo->screen_size) != 0 ?
+		psLINFBInfo->screen_size : psLINFBInfo->fix.smem_len;
+	psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
+	psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
+	psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
+	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
+	psPVRFBInfo->ulByteStride = psLINFBInfo->fix.line_length;
+	psPVRFBInfo->ulFBSize = FBSize;
+	psPVRFBInfo->ulBufferSize =
+		psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
+
+	/* Calculate the buffers according to the flipping technique */
+#if defined(FLIP_TECHNIQUE_FRAMEBUFFER)
 	psLINFBInfo->var.activate = FB_ACTIVATE_FORCE;
 	fb_set_var(psLINFBInfo, &psLINFBInfo->var);
 	buffers_available =
 		psLINFBInfo->var.yres_virtual / psLINFBInfo->var.yres;
+
+#elif defined(FLIP_TECHNIQUE_OVERLAY)
+	buffers_available =
+		psPVRFBInfo->ulFBSize / psPVRFBInfo->ulBufferSize;
+
+#else
+#error No flipping technique selected, please define \
+	FLIP_TECHNIQUE_FRAMEBUFFER or FLIP_TECHNIQUE_OVERLAY
+#endif
 
 	if(buffers_available <= 1)
 	{
@@ -1442,13 +1465,6 @@ static OMAP_ERROR InitDev(OMAPLFB_DEVINFO *psDevInfo, int fb_idx)
 	DEBUG_PRINTK("*Stride (bytes): %u",
 		(unsigned int)psLINFBInfo->fix.line_length);
 
-	psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
-	psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
-	psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
-	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
-	psPVRFBInfo->ulByteStride = psLINFBInfo->fix.line_length;
-	psPVRFBInfo->ulFBSize = FBSize;
-
 #ifdef CONFIG_TILER_OMAP
 	/* If TILER is being used, use correct physical stride and FB size */
 	if ((psPVRFBInfo->sSysAddr.uiAddr >= TILER_MIN_PADDR) &&
@@ -1463,10 +1479,12 @@ static OMAP_ERROR InitDev(OMAPLFB_DEVINFO *psDevInfo, int fb_idx)
 		psPVRFBInfo->ulByteStride = tiler_stride(tiler_naddr);
 		/* Calculate the whole TILER region to map in bytes */
 		psPVRFBInfo->ulFBSize = max_rows * psPVRFBInfo->ulByteStride;
+		/* Re-calculate buffer size with previous stride */
+		psPVRFBInfo->ulBufferSize =
+			psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
 	}
 #endif
-	psPVRFBInfo->ulBufferSize =
-		psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
+
 	/* Get physical display size for DPI calculation */
 	if (psLINFBInfo->var.width < 0 || psLINFBInfo->var.height < 0) {
 		psDevInfo->sDisplayInfo.ui32PhysicalWidthmm = 0;
