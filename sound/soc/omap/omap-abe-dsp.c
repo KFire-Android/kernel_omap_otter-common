@@ -384,6 +384,9 @@ static DECLARE_TLV_DB_SCALE(vxrec_vx_ul_tlv, -12000, 100, 3000);
 /* DMIC volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(dmic_tlv, -12000, 100, 3000);
 
+/* AMIC volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(amic_tlv, -12000, 100, 3000);
+
 /* BT UL volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(btul_tlv, -12000, 100, 3000);
 
@@ -1200,6 +1203,10 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	SOC_DOUBLE_EXT_TLV("DMIC3 UL Volume",
 		GAINS_DMIC3, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
 		volume_get_gain, volume_put_gain, dmic_tlv),
+
+	SOC_DOUBLE_EXT_TLV("AMIC UL Volume",
+		GAINS_AMIC, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
+		volume_get_gain, volume_put_gain, amic_tlv),
 
 	SOC_DOUBLE_EXT_TLV("BT UL Volume",
 		GAINS_BTUL, GAIN_LEFT_OFFSET, GAIN_RIGHT_OFFSET, 149, 0,
