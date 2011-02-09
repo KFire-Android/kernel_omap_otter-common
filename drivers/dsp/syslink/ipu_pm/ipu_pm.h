@@ -100,12 +100,6 @@
 #define APP_M3 1
 #define TESLA 0
 
-/* If sysm3 or appm3 is requested ipu will be automatically requested
- * this is beacause the cstrs can only be set to ipu and not individually.
- * SYSM3 + APPM3 + IPU
- */
-#define MAX_IPU_COUNT 3
-
 #define PM_CSTR_PERF_MASK	0x00000001
 #define PM_CSTR_LAT_MASK	0x00000002
 #define PM_CSTR_BW_MASK		0x00000004
