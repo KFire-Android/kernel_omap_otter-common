@@ -309,8 +309,7 @@ int dss_calc_clock_div(bool is_tft, unsigned long req_pck,
 bool dss_get_mainclk_state(void);
 int dss_mainclk_enable(void);
 void dss_mainclk_disable(void);
-void request_dss_suspend(void);
-void request_dss_resume(void);
+
 /* SDI */
 #ifdef CONFIG_OMAP2_DSS_SDI
 int sdi_init(bool skip_init);

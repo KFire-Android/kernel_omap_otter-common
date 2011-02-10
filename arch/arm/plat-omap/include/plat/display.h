@@ -915,6 +915,5 @@ int omap_rfbi_update(struct omap_dss_device *dssdev,
 
 void change_base_address(int id, u32 p_uv_addr);
 bool is_hdmi_interlaced(void);
-void request_dss(void);
-void release_dss(void);
+
 #endif

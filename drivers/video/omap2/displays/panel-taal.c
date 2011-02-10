@@ -465,8 +465,6 @@ static int taal_bl_update_status(struct backlight_device *dev)
 
 	dev_dbg(&dssdev->dev, "update brightness to %d\n", level);
 
-	request_dss();
-
 	mutex_lock(&td->lock);
 
 	if (td->use_dsi_bl) {

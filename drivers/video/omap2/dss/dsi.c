@@ -559,8 +559,6 @@ irqreturn_t dsi_irq_handler(int irq, void *arg)
 	int i;
 	enum omap_dsi_index ix = DSI1;
 
-	request_dss();
-
 	irqstatus = dsi_read_reg(ix, DSI_IRQSTATUS);
 
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
@@ -3277,7 +3275,6 @@ static void dsi_framedone_bta_callback(enum omap_dsi_index ix)
 {
 	dsi_handle_framedone(ix, 0);
 
-	release_dss();
 #ifdef CONFIG_OMAP2_DSS_FAKE_VSYNC
 	dispc_fake_vsync_irq(ix);
 #endif

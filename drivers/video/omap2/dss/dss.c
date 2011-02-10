@@ -30,12 +30,8 @@
 #include <linux/seq_file.h>
 #include <linux/clk.h>
 #include <linux/pm_runtime.h>
-#include <linux/workqueue.h>
-#include <linux/jiffies.h>
-#include <linux/sched.h>
 
 #include <plat/display.h>
-#include <plat/powerdomain.h>
 #include "dss.h"
 
 #ifndef CONFIG_ARCH_OMAP4
@@ -91,7 +87,6 @@ static struct {
 } dss;
 
 static int _omap_dss_wait_reset(void);
-void release_dss_work(struct work_struct *work);
 
 static inline void dss_write_reg(const struct dss_reg idx, u32 val)
 {
@@ -107,11 +102,6 @@ static inline u32 dss_read_reg(const struct dss_reg idx)
 	dss.ctx[(DSS_##reg).idx / sizeof(u32)] = dss_read_reg(DSS_##reg)
 #define RR(reg) \
 	dss_write_reg(DSS_##reg, dss.ctx[(DSS_##reg).idx / sizeof(u32)])
-
-struct delayed_work	rel_work;
-struct workqueue_struct *workqueue;
-int	in_suspend;
-struct mutex dss_lock;
 
 void dss_save_context(void)
 {
@@ -187,82 +177,6 @@ void dss_mainclk_disable()
 		if (cpu_is_omap44xx())
 			dss_opt_clock_disable();
 	}
-}
-
-void release_dss()
-{
-	unsigned long delay;
-
-	delay = msecs_to_jiffies(1000);
-	cancel_delayed_work(&rel_work);
-	flush_workqueue(workqueue);
-	queue_delayed_work(workqueue, &rel_work, delay);
-}
-EXPORT_SYMBOL(release_dss);
-
-void release_dss_work(struct work_struct *work)
-{
-	mutex_lock(&dss_lock);
-	if (in_suspend) {
-		mutex_unlock(&dss_lock);
-		return;
-	}
-
-	if (dispc_is_channel_enabled(OMAP_DSS_CHANNEL_DIGIT)) {
-		mutex_unlock(&dss_lock);
-		return;
-	}
-
-	dss_mainclk_disable();
-
-	mutex_unlock(&dss_lock);
-}
-
-void request_dss()
-{
-	unsigned long delay;
-
-
-	cancel_delayed_work(&rel_work);
-	flush_workqueue(workqueue);
-
-	if (!in_suspend) {
-		struct powerdomain *dss_pwrdm;
-
-		dss_pwrdm = pwrdm_lookup("dss_pwrdm");
-		pwrdm_set_next_pwrst(dss_pwrdm, PWRDM_POWER_INACTIVE);
-		dss_mainclk_enable();
-		/* start the delayed work to release DSS after 10 sec */
-		delay = msecs_to_jiffies(10000);
-		queue_delayed_work(workqueue, &rel_work, delay);
-	}
-}
-EXPORT_SYMBOL(request_dss);
-
-void request_dss_suspend(void)
-{
-	mutex_lock(&dss_lock);
-
-	request_dss();
-
-	in_suspend = 1;
-
-	{
-		struct powerdomain *dss_pwrdm;
-
-		dss_pwrdm = pwrdm_lookup("dss_pwrdm");
-		pwrdm_set_next_pwrst(dss_pwrdm, PWRDM_POWER_OFF);
-	}
-
-	mutex_unlock(&dss_lock);
-}
-
-void request_dss_resume(void)
-{
-	mutex_lock(&dss_lock);
-
-	in_suspend = 0;
-	mutex_unlock(&dss_lock);
 }
 
 void dss_sdi_init(u8 datapairs)
@@ -867,18 +781,6 @@ int dss_init(struct platform_device *pdev)
 	printk(KERN_INFO "OMAP DSS rev %d.%d\n",
 			FLD_GET(rev, 7, 4), FLD_GET(rev, 3, 0));
 	dss_clk_disable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_FCK2 | DSS_CLK_54M | DSS_CLK_96M);
-
-	workqueue = create_singlethread_workqueue("rel_timeout");
-	if (workqueue == NULL)
-		DSSERR("omap2 dss: Failed to create rel_timeout workqueue\n");
-	INIT_DELAYED_WORK(&rel_work, release_dss_work);
-	{
-		struct powerdomain *dss_pwrdm;
-
-		dss_pwrdm = pwrdm_lookup("dss_pwrdm");
-		pwrdm_set_next_pwrst(dss_pwrdm, PWRDM_POWER_INACTIVE);
-	}
-	mutex_init(&dss_lock);
 
 	return 0;
 
