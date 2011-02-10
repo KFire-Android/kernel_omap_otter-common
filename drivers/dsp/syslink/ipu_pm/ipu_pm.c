@@ -2584,22 +2584,28 @@ int ipu_pm_restore_ctx(int proc_id)
 	int sys_loaded;
 	int app_loaded;
 	struct ipu_pm_object *handle;
+	struct ipu_pm_params *params;
 
 	/*If feature not supported by proc, return*/
 	if (!proc_supported(proc_id))
 		return 0;
 
-	/* get the handle to proper ipu pm object */
-	handle = ipu_pm_get_handle(proc_id);
-
+	/* get the handle to proper ipu pm object
+	 * currently sys_m3 is the one handling hib
+	 */
+	handle = ipu_pm_get_handle(SYS_M3);
 	if (WARN_ON(unlikely(handle == NULL)))
 		return -EINVAL;
 
-	/* FIXME: This needs mor analysis.
+	params = handle->params;
+	if (WARN_ON(unlikely(params == NULL)))
+		return -EINVAL;
+
+	/* FIXME: This needs more analysis.
 	 * Since the sync of IPU and MPU is done this is a safe place
 	 * to switch to HW_AUTO to allow transition of clocks to gated
 	 * supervised by HW.
-	*/
+	 */
 	if (first_time) {
 		/* Enable/disable ipu hibernation*/
 #ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
@@ -2668,10 +2674,6 @@ int ipu_pm_restore_ctx(int proc_id)
 				goto error;
 			handle->rcb_table->state_flag &= ~APP_PROC_DOWN;
 		}
-#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
-		/* turn on ducati hibernation timer */
-		ipu_pm_timer_state(PM_HIB_TIMER_ON);
-#endif
 #ifdef CONFIG_OMAP_PM
 		retval = omap_pm_set_max_sdma_lat(&pm_qos_handle_2,
 						IPU_PM_MM_MPU_LAT_CONSTRAINT);
@@ -2681,6 +2683,12 @@ int ipu_pm_restore_ctx(int proc_id)
 	} else
 		goto error;
 exit:
+#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
+	/* turn on ducati hibernation timer */
+	if ((params->hib_timer_state == PM_HIB_TIMER_OFF) &&
+		global_rcb->pm_flags.hibernateAllowed)
+		ipu_pm_timer_state(PM_HIB_TIMER_ON);
+#endif
 	mutex_unlock(ipu_pm_state.gate_handle);
 	return retval;
 error:
@@ -3164,6 +3172,14 @@ static int ipu_pm_timer_state(int event)
 		params->hib_timer_state = PM_HIB_TIMER_OFF;
 		break;
 	case PM_HIB_TIMER_ON: /* enable timer */
+		/* If hibernation flag is disabled never start the HIB/WDT timer
+		 * this can be used to turn off in runtime this feature without
+		 * having to rebuild the kernel.
+		 * Very useful when debugging IPU.
+		 */
+		if (!global_rcb->pm_flags.hibernateAllowed)
+			break;
+
 		if (params->hib_timer_state == PM_HIB_TIMER_RESET) {
 			tick_rate = clk_get_rate(omap_dm_timer_get_fclk(
 					sys_rproc->dmtimer));
