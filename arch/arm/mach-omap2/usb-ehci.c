@@ -186,6 +186,8 @@
 #define USBHS_EHCI_SUSPENED	9
 #define USBHS_EHCI_RMWKP	10
 
+/* EHCI/OHCI Debug flag */
+#define EHCI_OHCI_DEBUG		0
 
 static const char uhhtllname[] = "uhhtll-omap";
 
@@ -826,6 +828,147 @@ void usbhs_wakeup()
 	return;
 }
 
+#endif
+
+#if EHCI_OHCI_DEBUG
+static void usbhs_regdump(struct uhhtll_hcd_omap *omap)
+{
+	struct device	*dev = &omap->pdev->dev;
+	void __iomem	*ptr = omap->tll_base;
+
+	dev_info(dev, "USBHS registers dump\n");
+
+	dev_info(dev, "%-27s 0X%08X\n", "USBTLL_REVISION",
+		uhhtll_omap_read(ptr, 0));
+	dev_info(dev, "%-27s 0X%08X\n", "USBTLL_HWINFO",
+		uhhtll_omap_read(ptr, 0x4));
+	dev_info(dev, "%-27s 0X%08X\n", "USBTLL_SYSCONFIG",
+		uhhtll_omap_read(ptr, 0x10));
+	dev_info(dev, "%-27s 0X%08X\n", "USBTLL_SYSSTATUS",
+		uhhtll_omap_read(ptr, 0x14));
+	dev_info(dev, "%-27s 0X%08X\n", "USBTLL_IRQSTATUS",
+		uhhtll_omap_read(ptr, 0x18));
+	dev_info(dev, "%-27s 0X%08X\n", "USBTLL_IRQENABLE",
+		uhhtll_omap_read(ptr, 0x1C));
+	dev_info(dev, "%-27s 0X%08X\n", "TLL_SHARED_CONF",
+		uhhtll_omap_read(ptr, 0x30));
+	dev_info(dev, "%-27s 0X%08X\n", "TLL_SHARED_CONF_0",
+		uhhtll_omap_read(ptr, 0x40));
+	dev_info(dev, "%-27s 0X%08X\n", "TLL_SHARED_CONF_1",
+		uhhtll_omap_read(ptr, 0x44));
+
+	ptr = omap->uhh_base;
+	dev_info(dev, "%-27s 0X%08X\n", "UHH_REVISION",
+		uhhtll_omap_read(ptr, 0));
+	dev_info(dev, "%-27s 0X%08X\n", "UHH_HWINFO",
+		uhhtll_omap_read(ptr, 4));
+	dev_info(dev, "%-27s 0X%08X\n", "UHH_SYSCONFIG",
+		uhhtll_omap_read(ptr, 0x10));
+	dev_info(dev, "%-27s 0X%08X\n", "UHH_SYSSTATUS",
+		uhhtll_omap_read(ptr, 0x14));
+	dev_info(dev, "%-27s 0X%08X\n", "UHH_HOSTCONFIG",
+		uhhtll_omap_read(ptr, 0x40));
+	dev_info(dev, "%-27s 0X%08X\n", "UHH_DEBUG_CSR",
+		uhhtll_omap_read(ptr, 0x44));
+
+	ptr = omap->ohci_res.regs;
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCREVISION",
+		uhhtll_omap_read(ptr, 0));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCCONTROL",
+		uhhtll_omap_read(ptr, 0x4));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCCOMMANDSTATUS",
+		uhhtll_omap_read(ptr, 0x8));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCINTERRUPTSTATUS",
+		uhhtll_omap_read(ptr, 0xC));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCINTERRUPTENABLE",
+		uhhtll_omap_read(ptr, 0x10));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCINTERRUPTDISABLE",
+		uhhtll_omap_read(ptr, 0x14));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCHCCA",
+		uhhtll_omap_read(ptr, 0x18));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCPERIODCURRENTED",
+		uhhtll_omap_read(ptr, 0x1C));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCCONTROLHEADED",
+		uhhtll_omap_read(ptr, 0x20));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCCONTROLCURRENTED",
+		uhhtll_omap_read(ptr, 0x24));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCBULKHEADED",
+		uhhtll_omap_read(ptr, 0x28));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCBULKCURRENTED",
+		uhhtll_omap_read(ptr, 0x2C));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCDONEHEAD",
+		uhhtll_omap_read(ptr, 0x30));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCFMINTERVAL",
+		uhhtll_omap_read(ptr, 0x34));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCFMREMAINING",
+		uhhtll_omap_read(ptr, 0x38));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCFMNUMBER",
+		uhhtll_omap_read(ptr, 0x3C));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCPERIODICSTART",
+		uhhtll_omap_read(ptr, 0x40));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCLSTHRESHOLD",
+		uhhtll_omap_read(ptr, 0x44));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCRHDESCRIPTORA",
+		uhhtll_omap_read(ptr, 0x48));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCRHDESCRIPTORB",
+		uhhtll_omap_read(ptr, 0x4C));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCRHSTATUS",
+		uhhtll_omap_read(ptr, 0x50));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCRHPORTSTATUS_1",
+		uhhtll_omap_read(ptr, 0x54));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . HCRHPORTSTATUS_2",
+		uhhtll_omap_read(ptr, 0x58));
+	dev_info(dev, "%-27s 0X%08X\n", "OHCI . RESERVED",
+		uhhtll_omap_read(ptr, 0x5C));
+
+	ptr = omap->ehci_res.regs;
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . HCCAPBASE",
+		uhhtll_omap_read(ptr, 0));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . HCSPARAMS",
+		uhhtll_omap_read(ptr, 0x4));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . HCCPARAMS",
+		uhhtll_omap_read(ptr, 0x8));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . USBCMD",
+		uhhtll_omap_read(ptr, 0x10));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . USBSTS",
+		uhhtll_omap_read(ptr, 0x14));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . USBINTR",
+		uhhtll_omap_read(ptr, 0x18));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . FRINDEX",
+		uhhtll_omap_read(ptr, 0x1C));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . CTRLDSSEGMENT",
+		uhhtll_omap_read(ptr, 0x20));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . PERIODICLISTBASE",
+		uhhtll_omap_read(ptr, 0x24));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . ASYNCLISTADDR",
+		uhhtll_omap_read(ptr, 0x28));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . CONFIGFLAG",
+		uhhtll_omap_read(ptr, 0x50));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . PORTSC_0",
+		uhhtll_omap_read(ptr, 0x54));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . PORTSC_1",
+		uhhtll_omap_read(ptr, 0x58));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . PORTSC_2",
+		uhhtll_omap_read(ptr, 0x5C));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . INSNREG00",
+		uhhtll_omap_read(ptr, 0x90));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . INSNREG01",
+		uhhtll_omap_read(ptr, 0x94));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . INSNREG02",
+		uhhtll_omap_read(ptr, 0x98));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . INSNREG03",
+		uhhtll_omap_read(ptr, 0x9C));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . INSNREG04",
+		uhhtll_omap_read(ptr, 0xA0));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . INSNREG05_UTMI_RW",
+		uhhtll_omap_read(ptr, 0xA4));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . INSNREG06",
+		uhhtll_omap_read(ptr, 0xA8));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . INSNREG07",
+		uhhtll_omap_read(ptr, 0xAC));
+	dev_info(dev, "%-27s 0X%08X\n", "EHCI . INSNREG08",
+		uhhtll_omap_read(ptr, 0xB0));
+}
 #endif
 
 static void usbhs_resume_work(struct work_struct *work)
