@@ -210,12 +210,16 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	if (strcmp(pwrdm->name, "mpu_pwrdm"))
 		return 0;
 
-	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
+	pwrst = kzalloc(sizeof(struct power_state), GFP_ATOMIC);
 	if (!pwrst)
 		return -ENOMEM;
 
 	pwrst->pwrdm = pwrdm;
-	pwrst->next_state = PWRDM_POWER_CSWR;
+	pwrst->next_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_CSWR);
+
+	pr_debug("Default setup powerdomain %s: next_state =%d\n", pwrdm->name,
+		 pwrst->next_state);
+
 	list_add(&pwrst->node, &pwrst_list);
 
 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
