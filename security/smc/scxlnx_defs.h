@@ -36,10 +36,6 @@
 
 #include "scx_protocol.h"
 
-#ifdef CONFIG_HAS_WAKELOCK
-extern struct wake_lock g_smc_wake_lock;
-#endif
-
 /*----------------------------------------------------------------------------*/
 
 #define SIZE_1KB 0x400

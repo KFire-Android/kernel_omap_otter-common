@@ -293,17 +293,4 @@ void PDrvCryptoUpdateHash(u32 SHA_CTRL,
 	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
 	u8 *pData, u32 dataLength);
 
-
-#ifdef POWER_MANAGEMENT
-
-/**
- *Activates an inactivity timer for power management.
- *If an update command has not been received in a time period
- *(the delay of the timer)then the clocks will be disabled by
- *the timer callabck.
- */
-void scxPublicCryptoStartInactivityTimer(void);
-
-#endif	/*POWER_MANAGEMENT */
-
 #endif /*__SCX_PUBLIC_CRYPTO_H */

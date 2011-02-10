@@ -372,9 +372,7 @@ void SCXPublicCryptoUpdate(
 		pCUSParams->pInputData,
 		pCUSParams->pResultData, pCUSParams->nInputDataLength);
 
-#ifdef CONFIG_HAS_WAKELOCK
-	wake_lock(&g_smc_wake_lock);
-#endif
+	tf_wake_lock();
 
 	/* Enable the clock and Process Data */
 	switch (pCUSContext->nHWAID) {
@@ -427,9 +425,7 @@ void SCXPublicCryptoUpdate(
 		break;
 	}
 
-#ifdef CONFIG_HAS_WAKELOCK
-	wake_unlock(&g_smc_wake_lock);
-#endif
+	tf_wake_unlock();
 
 	dprintk(KERN_INFO "scxPublicCryptoUpdate: Done\n");
 }
@@ -955,14 +951,13 @@ static void SCXPublicCryptoDisableClock(uint32_t vClockPhysAddr)
 {
 	u32 *pClockReg;
 	u32 val;
-	unsigned long nITFlags;
 
 	dprintk(KERN_INFO "SCXPublicCryptoDisableClock: " \
 		"vClockPhysAddr=0x%08X\n",
 		vClockPhysAddr);
 
 	/* Ensure none concurrent access when changing clock registers */
-	local_irq_save(nITFlags);
+	spin_lock(&SCXLNXGetDevice()->sm.lock);
 
 	pClockReg = (u32 *)IO_ADDRESS(vClockPhysAddr);
 
@@ -974,9 +969,9 @@ static void SCXPublicCryptoDisableClock(uint32_t vClockPhysAddr)
 	while ((__raw_readl(pClockReg) & 0x30000) == 0)
 		;
 
-	SCXL4SECClockDomainDisable();
+	SCXL4SECClockDomainDisable(false);
 
-	local_irq_restore(nITFlags);
+	spin_unlock(&SCXLNXGetDevice()->sm.lock);
 }
 
 /*------------------------------------------------------------------------- */
@@ -985,16 +980,15 @@ static void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr)
 {
 	u32 *pClockReg;
 	u32 val;
-	unsigned long nITFlags;
 
 	dprintk(KERN_INFO "SCXPublicCryptoEnableClock: " \
 		"vClockPhysAddr=0x%08X\n",
 		vClockPhysAddr);
 
 	/* Ensure none concurrent access when changing clock registers */
-	local_irq_save(nITFlags);
+	spin_lock(&SCXLNXGetDevice()->sm.lock);
 
-	SCXL4SECClockDomainEnable();
+	SCXL4SECClockDomainEnable(false);
 
 	pClockReg = (u32 *)IO_ADDRESS(vClockPhysAddr);
 
@@ -1006,7 +1000,7 @@ static void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr)
 	while ((__raw_readl(pClockReg) & 0x30000) != 0)
 		;
 
-	local_irq_restore(nITFlags);
+	spin_unlock(&SCXLNXGetDevice()->sm.lock);
 }
 
 /*------------------------------------------------------------------------- */

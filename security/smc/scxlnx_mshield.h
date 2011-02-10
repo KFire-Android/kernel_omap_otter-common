@@ -34,7 +34,10 @@ u32 schedule_secure_world(u32 app_id, u32 proc_id, u32 flags, u32 args);
 u32 rpc_handler(u32 p1, u32 p2, u32 p3, u32 p4);
 
 /* L4 SEC clockdomain enabling/disabling */
-void SCXL4SECClockDomainEnable(void);
-void SCXL4SECClockDomainDisable(void);
+void SCXL4SECClockDomainEnable(bool use_spin_lock);
+void SCXL4SECClockDomainDisable(bool use_spin_lock);
+
+void tf_wake_lock(void);
+void tf_wake_unlock(void);
 
 #endif

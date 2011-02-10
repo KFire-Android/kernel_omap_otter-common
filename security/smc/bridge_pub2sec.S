@@ -45,37 +45,31 @@
 schedule_secure_world:
 	.global schedule_secure_world
 
-	/* Save registers and disable interrupts */
+	/* Save registers */
 	push	{r4-r12, lr}
 
 	/* Copy the Secure Service ID in r12 */
 	mov     r12, r0
 
 	cmp	r0, #SMICODEPUB_IRQ_END
-	beq	check_rpc
+	beq	return_from_irq
+
+	cmp	r0, #SMICODEPUB_RPC_END
+	beq	return_from_rpc
 
 	mov	r6, #PUB2SEC_NOCST
 	mov	r12, #SMICODEPUB_NEWTASK
 
 	b	label_smc
 
-check_rpc:
-	ldr	r8, =g_RPC_advancement
-	ldr	r9, [r8]
-	cmp	r9, #RPC_ADVANCEMENT_PENDING
-	beq	schedule_secure_world_exit
-
-	ldr	r10, =g_secure_task_id
-	ldr	r6, [r10]
-
-	cmp	r9, #RPC_ADVANCEMENT_NONE
-	beq	label_smc
-
+return_from_rpc:
 	ldr	r9, =g_RPC_parameters
 	ldm	r9, {r0-r3}
-	mov	r10, #RPC_ADVANCEMENT_NONE
-	str	r10, [r8]
-	mov 	r12, #SMICODEPUB_RPC_END
+	/* fall through */
+
+return_from_irq:
+	ldr	r10, =g_secure_task_id
+	ldr	r6, [r10]
 
 	b	label_smc
 
@@ -123,9 +117,9 @@ label_smc:
 	b	schedule_secure_world_exit
 
 service_end:
-   ldr	r8, =g_service_end
-   mov	r6, #0x1
-   str	r6, [r8]
+	ldr	r8, =g_service_end
+	mov	r6, #0x1
+	str	r6, [r8]
 
 schedule_secure_world_exit:
 #ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
@@ -144,10 +138,8 @@ schedule_secure_world_exit:
 
 	INVALIDATE_BTB
 
-	/* Enable interrupts and restore registers */
-	pop	{r4-r12, lr}
-
-	bx	lr
+	/* Restore registers */
+	pop	{r4-r12, pc}
 
 rpc_handler:
 	.global rpc_handler
@@ -178,11 +170,9 @@ rpc_handler:
 	ldr	r8, =g_secure_task_id
 	str	r6, [r8]
 
-	/* Enable interrupts and restore registers */
-	pop	{r4-r12, lr}
-	mov r0, #0x00
-
-	bx	lr
+	/* Restore registers */
+	mov	r0, #0x00
+	pop	{r4-r12, pc}
 
 #ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
 

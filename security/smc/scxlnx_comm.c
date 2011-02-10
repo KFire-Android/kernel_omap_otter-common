@@ -34,6 +34,9 @@
 #include "scxlnx_util.h"
 #include "scxlnx_conn.h"
 
+#ifdef CONFIG_TF_MSHIELD
+#include "scxlnx_mshield.h"
+#endif
 
 /*---------------------------------------------------------------------------
  * Internal Constants
@@ -993,7 +996,7 @@ static int SCXLNXCommTestSTimeout(
 /*
  * Sends the specified message through the specified communication channel.
  *
- * This function sends the message and returns immediately
+ * This function sends the command and waits for the answer
  *
  * Returns zero upon successful completion, or an appropriate error code upon
  * failure.
@@ -1018,6 +1021,18 @@ static int SCXLNXCommSendMessage(struct SCXLNX_COMM *pComm,
 
 	DEFINE_WAIT(wait);
 
+#ifdef CONFIG_SMP
+	long ret_affinity;
+	cpumask_t saved_cpu_mask;
+	cpumask_t local_cpu_mask = CPU_MASK_NONE;
+
+	cpu_set(0, local_cpu_mask);
+	sched_getaffinity(0, &saved_cpu_mask);
+	ret_affinity = sched_setaffinity(0, &local_cpu_mask);
+	if (ret_affinity != 0)
+		dprintk(KERN_ERR "sched_setaffinity #1 -> 0x%lX", ret_affinity);
+#endif
+
 	dprintk(KERN_INFO "SCXLNXCommSendMessage(%p)\n", pMessage);
 
 #ifdef CONFIG_FREEZER
@@ -1025,6 +1040,11 @@ static int SCXLNXCommSendMessage(struct SCXLNX_COMM *pComm,
 	current->flags |= PF_FREEZER_NOSIG;
 #endif
 
+lock_secure:
+#ifdef CONFIG_TF_MSHIELD
+	tf_wake_lock();
+	SCXL4SECClockDomainEnable(true);
+#endif
 	/*
 	 * Read all answers from the answer queue
 	 */
@@ -1141,7 +1161,23 @@ copy_answers:
 	wake_up(&(pComm->waitQueue));
 
 #ifdef CONFIG_FREEZER
-	try_to_freeze();
+	if (unlikely(freezing(current))) {
+
+#ifdef CONFIG_TF_MSHIELD
+		if (tf_schedule_secure_world(pComm, true) == STATUS_PENDING)
+			goto copy_answers;
+
+		SCXL4SECClockDomainDisable(true);
+		tf_wake_unlock();
+#endif
+
+		dprintk(KERN_INFO
+			"Entering refrigerator.\n");
+		refrigerator();
+		dprintk(KERN_INFO
+			"Left refrigerator.\n");
+		goto lock_secure;
+	}
 #endif
 
 #ifndef CONFIG_PREEMPT
@@ -1149,11 +1185,13 @@ copy_answers:
 		schedule();
 #endif
 
+#ifdef CONFIG_TF_MSHIELD
 	/*
 	 * Handle RPC (if any)
 	 */
 	if (SCXLNXCommExecuteRPCCommand(pComm) == RPC_NON_YIELD)
 		goto schedule_secure_world;
+#endif
 
 	/*
 	 * Join wait queue
@@ -1232,8 +1270,8 @@ copy_answers:
 	 * Yield to the Secure World
 	 */
 schedule_secure_world:
-	result = SCXLNXCommYield(pComm);
-	if (result != 0)
+	result = tf_schedule_secure_world(pComm, false);
+	if (result < 0)
 		goto exit;
 	goto copy_answers;
 
@@ -1253,6 +1291,16 @@ wait:
 			"prepare to sleep 0x%lx jiffies\n",
 			nRelativeTimeoutJiffies);
 
+#ifdef CONFIG_TF_MSHIELD
+	if (tf_schedule_secure_world(pComm, true) == STATUS_PENDING) {
+		finish_wait(&pComm->waitQueue, &wait);
+		wait_prepared = false;
+		goto copy_answers;
+	}
+	SCXL4SECClockDomainDisable(true);
+	tf_wake_unlock();
+#endif
+
 	/* go to sleep */
 	if (schedule_timeout(nRelativeTimeoutJiffies) == 0)
 		dprintk(KERN_INFO
@@ -1263,15 +1311,32 @@ wait:
 
 	finish_wait(&pComm->waitQueue, &wait);
 	wait_prepared = false;
-	goto copy_answers;
+	goto lock_secure;
 
 exit:
+	if (wait_prepared) {
+		finish_wait(&pComm->waitQueue, &wait);
+		wait_prepared = false;
+	}
+
+#ifdef CONFIG_TF_MSHIELD
+	if (tf_schedule_secure_world(pComm, true) == STATUS_PENDING)
+		goto copy_answers;
+
+	SCXL4SECClockDomainDisable(true);
+	tf_wake_unlock();
+#endif
+
 #ifdef CONFIG_FREEZER
 	current->flags &= ~(PF_FREEZER_NOSIG);
 	current->flags |= (saved_flags & PF_FREEZER_NOSIG);
 #endif
-	if (wait_prepared)
-		finish_wait(&pComm->waitQueue, &wait);
+
+#ifdef CONFIG_SMP
+	ret_affinity = sched_setaffinity(0, &saved_cpu_mask);
+	if (ret_affinity != 0)
+		dprintk(KERN_ERR "sched_setaffinity #2 -> 0x%lX", ret_affinity);
+#endif
 
 	return result;
 }

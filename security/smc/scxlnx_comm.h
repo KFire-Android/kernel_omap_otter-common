@@ -154,7 +154,9 @@ int SCXLNXCommFillDescriptorTable(
  * Standard communication operations
  *----------------------------------------------------------------------------*/
 
-int SCXLNXCommYield(struct SCXLNX_COMM *pComm);
+#define STATUS_PENDING 0x00000001
+
+int tf_schedule_secure_world(struct SCXLNX_COMM *pComm, bool prepare_exit);
 
 int SCXLNXCommSendReceive(
 	struct SCXLNX_COMM *pComm,
