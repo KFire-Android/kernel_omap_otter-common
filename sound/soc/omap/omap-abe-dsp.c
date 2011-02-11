@@ -1911,8 +1911,7 @@ static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 				PING_PONG_WITH_MCU_IRQ);
 
 	/* Memory mapping for hw params */
-	runtime->dma_area  = abe->io_base + ABE_DMEM_BASE_OFFSET_MPU +
-				ABE_VM_AESS_OFFSET + dst;
+	runtime->dma_area  = abe->io_base + ABE_DMEM_BASE_OFFSET_MPU + dst;
 	runtime->dma_addr  = 0;
 	runtime->dma_bytes = period_size * 2;
 
@@ -1988,18 +1987,28 @@ static int aess_close(struct snd_pcm_substream *substream)
 static int aess_mmap(struct snd_pcm_substream *substream,
 	struct vm_area_struct *vma)
 {
-	int offset, size, err;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *dai = rtd->cpu_dai;
+	int offset, size, err = 0;
 
-	/* TODO: we may need to check for underrun. */
-	vma->vm_flags |= VM_IO | VM_RESERVED;
-	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-	size = vma->vm_end - vma->vm_start;
-	offset = vma->vm_pgoff << PAGE_SHIFT;
+	switch (dai->id) {
+	case ABE_FRONTEND_DAI_LP_MEDIA:
+		/* TODO: we may need to check for underrun. */
+		vma->vm_flags |= VM_IO | VM_RESERVED;
+		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+		size = vma->vm_end - vma->vm_start;
+		offset = vma->vm_pgoff << PAGE_SHIFT;
 
-	err = io_remap_pfn_range(vma, vma->vm_start,
-			(ABE_DMEM_BASE_ADDRESS_MPU +
-			ABE_DMEM_BASE_OFFSET_PING_PONG + offset) >> PAGE_SHIFT,
-			size, vma->vm_page_prot);
+		err = io_remap_pfn_range(vma, vma->vm_start,
+				(ABE_DMEM_BASE_ADDRESS_MPU +
+				ABE_DMEM_BASE_OFFSET_PING_PONG +
+				offset) >> PAGE_SHIFT,
+				size, vma->vm_page_prot);
+		break;
+
+	default:
+		break;
+	}
 
 	if (err)
 		return -EAGAIN;

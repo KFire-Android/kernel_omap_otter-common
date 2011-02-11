@@ -24,10 +24,10 @@
 #ifndef __OMAP_ABE_DSP_H__
 #define __OMAP_ABE_DSP_H__
 
-#define ABE_DMEM_BASE_OFFSET_MPU	0x80000		/* Ping start offset of DMEM */
-#define ABE_DMEM_BASE_ADDRESS_MPU	0x49080000L	/* Pong start offset of DMEM */
-#define ABE_DMEM_BASE_OFFSET_PING_PONG	0x4000		/* Ping pong buffer DMEM offset */
-#define ABE_VM_AESS_OFFSET		0x400000	/* AESS VM offset for DMEM */
+/* Pong start offset of DMEM */
+#define ABE_DMEM_BASE_ADDRESS_MPU	0x40180000L
+/* Ping pong buffer DMEM offset */
+#define ABE_DMEM_BASE_OFFSET_PING_PONG	0x4000
 
 void abe_dsp_mcpdm_shutdown(void);
 void abe_dsp_pm_get(void);

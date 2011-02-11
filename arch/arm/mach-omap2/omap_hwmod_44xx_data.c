@@ -652,8 +652,8 @@ static struct omap_hwmod_ocp_if *omap44xx_aess_masters[] = {
 
 static struct omap_hwmod_addr_space omap44xx_aess_addrs[] = {
 	{
-		.pa_start	= 0x49000000,
-		.pa_end		= 0x491f11ff,
+		.pa_start	= 0x40100000,
+		.pa_end		= 0x401f13ff,
 		.flags		= ADDR_TYPE_RT
 	},
 };
