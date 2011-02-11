@@ -889,9 +889,11 @@ int omap_device_set_rate(struct device *req_dev, struct device *dev,
 	pdev = container_of(dev, struct platform_device, dev);
 	od = _find_by_pdev(pdev);
 
+#ifdef CONFIG_ARCH_OMAP4
 	/* if in low power DPLL cascading mode, bail out early */
 	if (omap4_lpmode)
 		return -EINVAL;
+#endif
 
 	/*
 	 * Figure out if the desired frquency lies between the
