@@ -48,6 +48,8 @@
 #include <plat/omap_hwmod.h>
 #include "dmtimer.h"
 
+#include <mach/tf_mshield.h>
+
 /*
  * The machine specific code may provide the extra mapping besides the
  * default mapping provided here.
@@ -256,6 +258,10 @@ static void __init _omap2_map_common_io(void)
 	omap_sram_init();
 	omapfb_reserve_sdram();
 	omap_vram_reserve_sdram();
+
+#ifdef CONFIG_DYNAMIC_SDP_STORAGE_ALLOC
+	SCXLNXCtrlDeviceEarlyInit();
+#endif
 }
 
 #ifdef CONFIG_ARCH_OMAP2420
