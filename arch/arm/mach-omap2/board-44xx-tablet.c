@@ -377,6 +377,33 @@ static struct regulator_init_data tablet_clk32kg = {
 	},
 };
 
+static void omap4_audio_conf(void)
+{
+	/* twl6040 naudint */
+	omap_mux_init_signal("sys_nirq2.sys_nirq2", \
+		OMAP_PIN_INPUT_PULLUP);
+}
+
+static struct twl4030_codec_audio_data twl6040_audio = {
+	/* single-step ramp for headset and handsfree */
+	.hs_left_step   = 0x0f,
+	.hs_right_step  = 0x0f,
+	.hf_left_step   = 0x1d,
+	.hf_right_step  = 0x1d,
+};
+
+static struct twl4030_codec_vibra_data twl6040_vibra = {
+	/* Add vibra only data */
+};
+
+static struct twl4030_codec_data twl6040_codec = {
+	.audio          = &twl6040_audio,
+	.vibra          = &twl6040_vibra,
+	.audpwron_gpio  = 127,
+	.naudint_irq    = OMAP44XX_IRQ_SYS_2N,
+	.irq_base       = TWL6040_CODEC_IRQ_BASE,
+};
+
 static struct twl4030_platform_data tablet_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
@@ -393,7 +420,10 @@ static struct twl4030_platform_data tablet_twldata = {
 	.vaux2		= &tablet_vaux2,
 	.vaux3		= &tablet_vaux3,
 	.clk32kg	= &tablet_clk32kg,
-	.usb		= &omap4_usbphy_data
+	.usb		= &omap4_usbphy_data,
+
+	/* children */
+	.codec		= &twl6040_codec,
 };
 
 static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
@@ -547,6 +577,7 @@ static void __init omap_tablet_init(void)
 	tablet_rev = omap_init_board_version();
 	register_reboot_notifier(&tablet_reboot_notifier);
 	omap4_create_board_props();
+	omap4_audio_conf();
 	omap4_i2c_init();
 	tablet_touch_init();
 	tablet_panel_init();
