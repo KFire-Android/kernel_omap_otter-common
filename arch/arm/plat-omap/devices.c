@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/i2c/twl.h>
+#include <linux/bootmem.h>
 
 #include <mach/hardware.h>
 #include <asm/mach-types.h>
@@ -99,6 +100,33 @@ EXPORT_SYMBOL(dsp_kfunc_device_register);
 static inline void omap_init_dsp(void) { }
 #endif	/* CONFIG_OMAP_DSP */
 
+#if defined(CONFIG_MPU_BRIDGE) ||  defined(CONFIG_MPU_BRIDGE_MODULE)
+
+static unsigned long dspbridge_phys_mempool_base;
+
+void dspbridge_reserve_sdram(void)
+{
+	void *va;
+	unsigned long size = CONFIG_BRIDGE_MEMPOOL_SIZE;
+
+	if (!size)
+		return;
+
+	va = __alloc_bootmem_nopanic(size, SZ_1M, 0);
+	if (!va) {
+		pr_err("%s: Failed to bootmem allocation(%lu bytes)\n",
+		       __func__, size);
+		return;
+	}
+	dspbridge_phys_mempool_base = virt_to_phys(va);
+}
+
+unsigned long dspbridge_get_mempool_base(void)
+{
+	return dspbridge_phys_mempool_base;
+}
+EXPORT_SYMBOL(dspbridge_get_mempool_base);
+#endif
 /*-------------------------------------------------------------------------*/
 #if	defined(CONFIG_KEYBOARD_OMAP) || defined(CONFIG_KEYBOARD_OMAP_MODULE)
 
