@@ -1621,6 +1621,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	int irq;
 	int ret;
 	u8 controller_stat = 0;
+	u8 hw_state = 0;
 
 	di = kzalloc(sizeof(*di), GFP_KERNEL);
 	if (!di)
@@ -1774,8 +1775,15 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 							di->voltage_uV);
 
 	if (controller_stat & VBUS_DET) {
-		di->usb_online = POWER_SUPPLY_TYPE_USB;
-		twl6030_start_usb_charger(di);
+		/*
+		 * In HOST mode (ID GROUND) with a device connected,
+		 * do no enable usb charging
+		 */
+		twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
+		if (!(hw_state & STS_USB_ID)) {
+			di->usb_online = POWER_SUPPLY_TYPE_USB;
+			twl6030_start_usb_charger(di);
+		}
 	}
 
 	if (controller_stat & VAC_DET) {
