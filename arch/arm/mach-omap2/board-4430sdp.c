@@ -370,12 +370,10 @@ static struct regulator_consumer_supply sdp4430_vcxio_supply[] = {
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi1"),
 };
-
 static struct regulator_consumer_supply omap4_sdp4430_vmmc5_supply = {
 	.supply = "vmmc",
 	.dev_name = "omap_hsmmc.4",
 };
-
 static struct regulator_init_data sdp4430_vmmc5 = {
 	.constraints = {
 		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
@@ -383,7 +381,6 @@ static struct regulator_init_data sdp4430_vmmc5 = {
 	.num_consumer_supplies = 1,
 	.consumer_supplies = &omap4_sdp4430_vmmc5_supply,
 };
-
 static struct fixed_voltage_config sdp4430_vwlan = {
 	.supply_name = "vwl1271",
 	.microvolts = 1800000, /* 1.8V */
@@ -393,12 +390,16 @@ static struct fixed_voltage_config sdp4430_vwlan = {
 	.enabled_at_boot = 0,
 	.init_data = &sdp4430_vmmc5,
 };
-
 static struct platform_device omap_vwlan_device = {
 	.name		= "reg-fixed-voltage",
 	.id		= 1,
 	.dev = {
 		.platform_data = &sdp4430_vwlan,
+               }
+};
+static struct regulator_consumer_supply sdp4430_cam2_supply[] = {
+	{
+		.supply = "cam2pwr",
 	},
 };
 
@@ -484,6 +485,8 @@ static struct regulator_init_data sdp4430_vaux3 = {
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+	.num_consumer_supplies = 1,
+	.consumer_supplies = sdp4430_cam2_supply,
 };
 
 /* VMMC1 for MMC1 card */
