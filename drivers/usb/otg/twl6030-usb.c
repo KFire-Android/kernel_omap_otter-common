@@ -427,7 +427,7 @@ static int phy_init(struct otg_transceiver *x)
 
 	if (__raw_readl(ctrl_base + CONTROL_DEV_CONF) & PHY_PD) {
 		__raw_writel(~PHY_PD, ctrl_base + CONTROL_DEV_CONF);
-		mdelay(500);
+		msleep(200);
 	}
 	return 0;
 }
