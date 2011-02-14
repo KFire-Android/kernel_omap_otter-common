@@ -1760,9 +1760,11 @@ void HDMI_W1_HPD_handler(int *r)
 			set = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__SYS_STAT);
 			hpd_intr = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
 
-			hdmi_write_reg(HDMI_WP, HDMI_WP_IRQSTATUS, val);
-			/* flush posted write */
-			hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
+			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1,
+				hpd_intr);
+
+			/* Read to flush */
+			hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
 		}
 	}
 
@@ -1999,3 +2001,4 @@ void hdmi_notify_pwrchange(int state)
 			cur->pwrchange_notifier(state, cur->private_data);
 	}
 }
+
