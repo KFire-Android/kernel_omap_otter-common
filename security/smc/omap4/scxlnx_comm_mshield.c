@@ -178,6 +178,7 @@ u32 omap4_secure_dispatcher(u32 app_id, u32 flags, u32 nargs,
 	u32 arg1, u32 arg2, u32 arg3, u32 arg4)
 {
 	u32 ret;
+	unsigned long nITFlags;
 	u32 pub2sec_args[5] = {0, 0, 0, 0, 0};
 
 	dprintk(KERN_INFO "omap4_secure_dispatcher: "
@@ -207,8 +208,10 @@ u32 omap4_secure_dispatcher(u32 app_id, u32 flags, u32 nargs,
 	 */
 	SCXL4SECClockDomainEnable(true);
 
+	local_irq_save(nITFlags);
 	/* proc_id is always 0 */
 	ret = schedule_secure_world(app_id, 0, flags, __pa(pub2sec_args));
+	local_irq_restore(nITFlags);
 
 	/* Restore the HW_SUP on L4 Sec clock domain so hardware can idle */
 	SCXL4SECClockDomainDisable(true);
