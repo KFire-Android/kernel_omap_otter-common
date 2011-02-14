@@ -358,6 +358,11 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 	unsigned long timeout;
 	unsigned long internal_clk = 0;
 	struct clk *fclk;
+	struct platform_device *pdev;
+	struct omap_i2c_bus_platform_data *pdata;
+
+	pdev = container_of(dev->dev, struct platform_device, dev);
+	pdata = pdev->dev.platform_data;
 
 	if (dev->rev >= OMAP_I2C_REV_2) {
 		/* Disable I2C controller before soft reset */
@@ -435,12 +440,16 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 	if (!(cpu_class_is_omap1() || cpu_is_omap2420())) {
 
 		/*
-		 * HSI2C controller internal clk rate should be 19.2 Mhz for
-		 * HS and for all modes on 2430. On 34xx we can use lower rate
-		 * to get longer filter period for better noise suppression.
+		 * HSI2C controller internal clk rate should be 96 Mhz for
+		 * HS mode on 4430 ES2.x and 19.2 Mhz for HS mode on 2430 and
+		 * For all modes on 34xx we can use lower rate to get longer
+		 * filter period for better noise suppression.
 		 * The filter is iclk (fclk for HS) period.
 		 */
-		if (dev->speed > 400 || cpu_is_omap2430())
+		if ((pdata->features & I2C_HAS_FASTMODE_PLUS)
+					&& dev->speed > 1000)
+			internal_clk = 96000;
+		else if (dev->speed > 400 || cpu_is_omap2430())
 			internal_clk = 19200;
 		else if (dev->speed > 100)
 			internal_clk = 9600;
