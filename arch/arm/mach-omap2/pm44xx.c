@@ -385,7 +385,7 @@ static int omap4_pm_suspend(void)
 	struct power_state *pwrst;
 	int state;
 	u32 cpu_id = 0;
-
+	u32 cpu1_state;
 	/*
 	 * Wakeup timer from suspend
 	 */
@@ -443,6 +443,13 @@ static int omap4_pm_suspend(void)
 		}
 	}
 
+	/*
+	 * To Ensure that we don't attempt suspend when CPU1 is
+	 * not in OFF state to avoid un-supported H/W mode
+	 */
+	cpu1_state = pwrdm_read_pwrst(cpu1_pwrdm);
+	if (cpu1_state != PWRDM_POWER_OFF)
+		goto restore;
 	omap_uart_prepare_suspend();
 
 	/* Enable Device OFF */
