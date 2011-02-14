@@ -626,11 +626,11 @@ void dsp_clk_wakeup_event_ctrl(u32 ClkId, bool enable)
 				      ((u32) (resources->dw_per_pm_base) +
 				       0xA4));
 		if (enable) {
-			iva2_grpsel |= OMAP3430_GRPSEL_GPT5;
-			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT5;
+			iva2_grpsel |= OMAP3430_GRPSEL_GPT5_MASK;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT5_MASK;
 		} else {
-			mpu_grpsel |= OMAP3430_GRPSEL_GPT5;
-			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT5;
+			mpu_grpsel |= OMAP3430_GRPSEL_GPT5_MASK;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT5_MASK;
 		}
 		*((reg_uword32 *) ((u32) (resources->dw_per_pm_base) + 0xA8))
 		    = iva2_grpsel;
@@ -645,11 +645,11 @@ void dsp_clk_wakeup_event_ctrl(u32 ClkId, bool enable)
 				      ((u32) (resources->dw_per_pm_base) +
 				       0xA4));
 		if (enable) {
-			iva2_grpsel |= OMAP3430_GRPSEL_GPT6;
-			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT6;
+			iva2_grpsel |= OMAP3430_GRPSEL_GPT6_MASK;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT6_MASK;
 		} else {
-			mpu_grpsel |= OMAP3430_GRPSEL_GPT6;
-			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT6;
+			mpu_grpsel |= OMAP3430_GRPSEL_GPT6_MASK;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT6_MASK;
 		}
 		*((reg_uword32 *) ((u32) (resources->dw_per_pm_base) + 0xA8))
 		    = iva2_grpsel;
@@ -664,11 +664,11 @@ void dsp_clk_wakeup_event_ctrl(u32 ClkId, bool enable)
 				      ((u32) (resources->dw_per_pm_base) +
 				       0xA4));
 		if (enable) {
-			iva2_grpsel |= OMAP3430_GRPSEL_GPT7;
-			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT7;
+			iva2_grpsel |= OMAP3430_GRPSEL_GPT7_MASK;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT7_MASK;
 		} else {
-			mpu_grpsel |= OMAP3430_GRPSEL_GPT7;
-			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT7;
+			mpu_grpsel |= OMAP3430_GRPSEL_GPT7_MASK;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT7_MASK;
 		}
 		*((reg_uword32 *) ((u32) (resources->dw_per_pm_base) + 0xA8))
 		    = iva2_grpsel;
@@ -683,11 +683,11 @@ void dsp_clk_wakeup_event_ctrl(u32 ClkId, bool enable)
 				      ((u32) (resources->dw_per_pm_base) +
 				       0xA4));
 		if (enable) {
-			iva2_grpsel |= OMAP3430_GRPSEL_GPT8;
-			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT8;
+			iva2_grpsel |= OMAP3430_GRPSEL_GPT8_MASK;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_GPT8_MASK;
 		} else {
-			mpu_grpsel |= OMAP3430_GRPSEL_GPT8;
-			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT8;
+			mpu_grpsel |= OMAP3430_GRPSEL_GPT8_MASK;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_GPT8_MASK;
 		}
 		*((reg_uword32 *) ((u32) (resources->dw_per_pm_base) + 0xA8))
 		    = iva2_grpsel;
@@ -702,11 +702,11 @@ void dsp_clk_wakeup_event_ctrl(u32 ClkId, bool enable)
 				      ((u32) (resources->dw_core_pm_base) +
 				       0xA4));
 		if (enable) {
-			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP1;
-			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP1;
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP1_MASK;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP1_MASK;
 		} else {
-			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP1;
-			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP1;
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP1_MASK;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP1_MASK;
 		}
 		*((reg_uword32 *) ((u32) (resources->dw_core_pm_base) + 0xA8))
 		    = iva2_grpsel;
@@ -721,11 +721,11 @@ void dsp_clk_wakeup_event_ctrl(u32 ClkId, bool enable)
 				      ((u32) (resources->dw_per_pm_base) +
 				       0xA4));
 		if (enable) {
-			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP2;
-			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP2;
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP2_MASK;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP2_MASK;
 		} else {
-			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP2;
-			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP2;
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP2_MASK;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP2_MASK;
 		}
 		*((reg_uword32 *) ((u32) (resources->dw_per_pm_base) + 0xA8))
 		    = iva2_grpsel;
@@ -740,11 +740,11 @@ void dsp_clk_wakeup_event_ctrl(u32 ClkId, bool enable)
 				      ((u32) (resources->dw_per_pm_base) +
 				       0xA4));
 		if (enable) {
-			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP3;
-			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP3;
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP3_MASK;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP3_MASK;
 		} else {
-			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP3;
-			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP3;
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP3_MASK;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP3_MASK;
 		}
 		*((reg_uword32 *) ((u32) (resources->dw_per_pm_base) + 0xA8))
 		    = iva2_grpsel;
@@ -759,11 +759,11 @@ void dsp_clk_wakeup_event_ctrl(u32 ClkId, bool enable)
 				      ((u32) (resources->dw_per_pm_base) +
 				       0xA4));
 		if (enable) {
-			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP4;
-			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP4;
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP4_MASK;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP4_MASK;
 		} else {
-			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP4;
-			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP4;
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP4_MASK;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP4_MASK;
 		}
 		*((reg_uword32 *) ((u32) (resources->dw_per_pm_base) + 0xA8))
 		    = iva2_grpsel;
@@ -778,11 +778,11 @@ void dsp_clk_wakeup_event_ctrl(u32 ClkId, bool enable)
 				      ((u32) (resources->dw_core_pm_base) +
 				       0xA4));
 		if (enable) {
-			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP5;
-			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP5;
+			iva2_grpsel |= OMAP3430_GRPSEL_MCBSP5_MASK;
+			mpu_grpsel &= ~OMAP3430_GRPSEL_MCBSP5_MASK;
 		} else {
-			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP5;
-			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP5;
+			mpu_grpsel |= OMAP3430_GRPSEL_MCBSP5_MASK;
+			iva2_grpsel &= ~OMAP3430_GRPSEL_MCBSP5_MASK;
 		}
 		*((reg_uword32 *) ((u32) (resources->dw_core_pm_base) + 0xA8))
 		    = iva2_grpsel;

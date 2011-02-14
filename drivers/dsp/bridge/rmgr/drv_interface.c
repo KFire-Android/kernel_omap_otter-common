@@ -103,6 +103,9 @@ static DECLARE_COMPLETION(bridge_open_comp);
 static bool recover;
 #endif
 
+static void bridge_create_sysfs(void);
+static void bridge_destroy_sysfs(void);
+
 #ifdef CONFIG_PM
 struct omap34_xx_bridge_suspend_data {
 	int suspended;
@@ -110,9 +113,6 @@ struct omap34_xx_bridge_suspend_data {
 };
 
 static struct omap34_xx_bridge_suspend_data bridge_suspend_data;
-
-static void bridge_create_sysfs(void);
-static void bridge_destroy_sysfs(void);
 
 static int omap34_xxbridge_suspend_lockout(struct omap34_xx_bridge_suspend_data
 					   *s, struct file *f)

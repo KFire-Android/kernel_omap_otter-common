@@ -295,13 +295,13 @@ static int bridge_brd_monitor(struct wmd_dev_context *hDevContext)
 		/* Wait until the state has moved to ON */
 		while ((*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD,
 					      OMAP2_PM_PWSTST) &
-					      OMAP_INTRANSITION)
+					      OMAP_INTRANSITION_MASK)
 			;
 		/* Disable Automatic transition */
 		(*pdata->dsp_cm_write)(OMAP34XX_CLKSTCTRL_DISABLE_AUTO,
 					OMAP3430_IVA2_MOD, OMAP2_CM_CLKSTCTRL);
 	}
-	(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST2_IVA2, 0,
+	(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST2_IVA2_MASK, 0,
 					OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
 	services_clk_enable(SERVICESCLK_IVA2_CK);
 
@@ -430,8 +430,8 @@ static int bridge_brd_start(struct wmd_dev_context *hDevContext,
 
 		/* Assert RST1 i.e only the RST only for DSP megacell */
 		if (DSP_SUCCEEDED(status)) {
-			(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST1_IVA2,
-					OMAP3430_RST1_IVA2, OMAP3430_IVA2_MOD,
+			(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST1_IVA2_MASK,
+					OMAP3430_RST1_IVA2_MASK, OMAP3430_IVA2_MOD,
 					OMAP2_RM_RSTCTRL);
 			/* Mask address with 1K for compatibility */
 			__raw_writel(dwDSPAddr & OMAP3_IVA2_BOOTADDR_MASK,
@@ -448,12 +448,12 @@ static int bridge_brd_start(struct wmd_dev_context *hDevContext,
 	if (DSP_SUCCEEDED(status)) {
 		/* Reset and Unreset the RST2, so that BOOTADDR is copied to
 		 * IVA2 SYSC register */
-		(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST2_IVA2,
-					   OMAP3430_RST1_IVA2,
+		(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST2_IVA2_MASK,
+					   OMAP3430_RST1_IVA2_MASK,
 					   OMAP3430_IVA2_MOD,
 					   OMAP2_RM_RSTCTRL);
 		udelay(100);
-		(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST2_IVA2, 0,
+		(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST2_IVA2_MASK, 0,
 					OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
 		udelay(100);
 
@@ -619,7 +619,7 @@ static int bridge_brd_start(struct wmd_dev_context *hDevContext,
 		 *Enable Mailbox events and also drain any pending
 		 * stale messages.
 		 */
-		hDevContext->mbox = omap_mbox_get("dsp");
+		hDevContext->mbox = omap_mbox_get("dsp", NULL);
 		if (IS_ERR(hDevContext->mbox)) {
 			hDevContext->mbox = NULL;
 			pr_err("%s: Failed to get dsp mailbox handle\n",
@@ -665,7 +665,7 @@ static int bridge_brd_start(struct wmd_dev_context *hDevContext,
 		hw_mmu_event_enable(resources->dw_dmmu_base,
 				    HW_MMU_ALL_INTERRUPTS);
 		/* release the RST1, DSP starts executing now .. */
-		(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST1_IVA2, 0,
+		(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST1_IVA2_MASK, 0,
 					OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
 
 		dev_dbg(bridge, "Waiting for Sync @ 0x%x\n", dw_sync_addr);
@@ -770,12 +770,13 @@ static int bridge_brd_stop(struct wmd_dev_context *hDevContext)
 	/* Disable the mail box interrupts */
 	if (hDevContext->mbox) {
 		omap_mbox_disable_irq(hDevContext->mbox, IRQ_RX);
-		omap_mbox_put(hDevContext->mbox);
+		omap_mbox_put(hDevContext->mbox, NULL);
 		hDevContext->mbox = NULL;
 	}
 	/* Reset IVA2 clocks*/
-	(*pdata->dsp_prm_write)(OMAP3430_RST1_IVA2 | OMAP3430_RST2_IVA2 |
-				OMAP3430_RST3_IVA2,
+	(*pdata->dsp_prm_write)(OMAP3430_RST1_IVA2_MASK |
+				OMAP3430_RST2_IVA2_MASK |
+				OMAP3430_RST3_IVA2_MASK,
 				OMAP3430_IVA2_MOD,
 				OMAP2_RM_RSTCTRL);
 
@@ -828,12 +829,13 @@ static int wmd_brd_delete(struct wmd_dev_context *hDevContext)
 	/* Disable the mail box interrupts */
 	if (hDevContext->mbox) {
 		omap_mbox_disable_irq(hDevContext->mbox, IRQ_RX);
-		omap_mbox_put(hDevContext->mbox);
+		omap_mbox_put(hDevContext->mbox, NULL);
 		hDevContext->mbox = NULL;
 	}
 	/* Reset IVA2 clocks*/
-	(*pdata->dsp_prm_write)(OMAP3430_RST1_IVA2 | OMAP3430_RST2_IVA2 |
-				OMAP3430_RST3_IVA2,
+	(*pdata->dsp_prm_write)(OMAP3430_RST1_IVA2_MASK |
+				OMAP3430_RST2_IVA2_MASK |
+				OMAP3430_RST3_IVA2_MASK,
 				OMAP3430_IVA2_MOD,
 				OMAP2_RM_RSTCTRL);
 
