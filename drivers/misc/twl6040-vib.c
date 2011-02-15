@@ -215,7 +215,6 @@ static int vib_probe(struct platform_device *pdev)
 err2:
 	timed_output_dev_unregister(&data->dev);
 err1:
-	kfree(data->pdata);
 	kfree(data);
 err0:
 	return ret;
@@ -231,7 +230,6 @@ static int vib_remove(struct platform_device *pdev)
 	twl6040_disable(data->twl6040);
 
 	timed_output_dev_unregister(&data->dev);
-	kfree(data->pdata);
 	kfree(data);
 
 	return 0;
