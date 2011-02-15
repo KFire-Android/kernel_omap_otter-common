@@ -204,7 +204,7 @@ static int __init _omap_mux_init_signal(struct omap_mux_partition *partition,
 	return -ENODEV;
 }
 
-static u16 omap_mux_read_signal(const char *muxname)
+u16 omap_mux_read_signal(const char *muxname)
 {
 	struct omap_mux_partition *partition;
 	struct omap_mux_entry *e;
