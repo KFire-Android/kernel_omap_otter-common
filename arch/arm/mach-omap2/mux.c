@@ -264,6 +264,18 @@ int omap_mux_enable_wakeup(const char *muxname)
 	return 0;
 }
 
+int omap_mux_disable_wakeup(const char *muxname)
+{
+	u16 val;
+
+	val = omap_mux_read_signal(muxname);
+	if (val == -ENODEV)
+		return val;
+	val &= ~OMAP44XX_PADCONF_WAKEUPENABLE0;
+	omap_mux_init_signal(muxname, val);
+	return 0;
+}
+
 int __init omap_mux_init_signal(const char *muxname, int val)
 {
 	struct omap_mux_partition *partition;
