@@ -61,6 +61,13 @@ int platform_pm_runtime_idle(struct device *dev)
 {
 	int ret;
 
+	if (dev->driver->pm && dev->driver->pm->runtime_idle) {
+		ret = dev->driver->pm->runtime_idle(dev);
+
+		if (ret)
+			return ret;
+	}
+
 	ret = pm_runtime_suspend(dev);
 	dev_dbg(dev, "%s [%d]\n", __func__, ret);
 
