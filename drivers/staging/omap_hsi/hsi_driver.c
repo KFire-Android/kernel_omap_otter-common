@@ -244,10 +244,13 @@ static void __exit unregister_hsi_devices(struct hsi_dev *hsi_ctrl)
 
 static void hsi_set_pm_default(struct hsi_dev *hsi_ctrl)
 {
-	/* Set default PM settings */
-	hsi_outl((HSI_AUTOIDLE | HSI_SIDLEMODE_SMART | HSI_MIDLEMODE_SMART),
+	/* Set default SYSCONFIG PM settings */
+	hsi_outl((HSI_AUTOIDLE | HSI_SIDLEMODE_SMART_WAKEUP |
+				 HSI_MIDLEMODE_SMART_WAKEUP),
 		 hsi_ctrl->base, HSI_SYS_SYSCONFIG_REG);
 	hsi_outl(HSI_CLK_AUTOGATING_ON, hsi_ctrl->base, HSI_GDD_GCR_REG);
+
+	/* HSI_TODO : use the HWMOD API : omap_hwmod_set_slave_idlemode() */
 }
 
 int hsi_softreset(struct hsi_dev *hsi_ctrl)
