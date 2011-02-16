@@ -1268,6 +1268,80 @@ static void __init omap4_display_init(void)
 	gpio_direction_output(dsi2_panel.reset_gpio, 0);
 }
 
+
+/*
+ * As OMAP4430 mux HSI and USB signals, when HSI is used (for instance HSI
+ * modem is plugged) we should configure HSI pad conf and disable some USB
+ * configurations.
+ * HSI usage is declared using bootargs variable:
+ * board-4430sdp.modem_ipc=hsi
+ * Any other or missing value will not setup HSI pad conf, and port_mode[0]
+ * will be used by USB.
+ * Variable modem_ipc is used to catch bootargs parameter value.
+ */
+
+static char *modem_ipc = "n/a";
+
+module_param(modem_ipc, charp, 0);
+MODULE_PARM_DESC(modem_ipc, "Modem IPC setting");
+
+static void omap_4430hsi_pad_conf(void)
+{
+	/*
+	 * HSI pad conf: hsi1_ca/ac_wake/flag/data/ready
+	 * Also configure gpio_92/95/157/187 used by modem
+	 */
+
+	/* hsi1_cawake */
+	omap_mux_init_signal("usbb1_ulpitll_clk.hsi1_cawake", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE | \
+		OMAP_PIN_OFF_WAKEUPENABLE);
+	/* hsi1_caflag */
+	omap_mux_init_signal("usbb1_ulpitll_dir.hsi1_caflag", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_cadata */
+	omap_mux_init_signal("usbb1_ulpitll_stp.hsi1_cadata", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acready */
+	omap_mux_init_signal("usbb1_ulpitll_nxt.hsi1_acready", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acwake */
+	omap_mux_init_signal("usbb1_ulpitll_dat0.hsi1_acwake", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acdata */
+	omap_mux_init_signal("usbb1_ulpitll_dat1.hsi1_acdata", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_acflag */
+	omap_mux_init_signal("usbb1_ulpitll_dat2.hsi1_acflag", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* hsi1_caready */
+	omap_mux_init_signal("usbb1_ulpitll_dat3.hsi1_caready", \
+		OMAP_PIN_INPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_92 */
+	omap_mux_init_signal("usbb1_ulpitll_dat4.gpio_92", \
+		OMAP_PULL_ENA);
+	/* gpio_95 */
+	omap_mux_init_signal("usbb1_ulpitll_dat7.gpio_95", \
+		OMAP_PIN_INPUT_PULLDOWN | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_157 */
+	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+	/* gpio_187 */
+	omap_mux_init_signal("sys_boot3.gpio_187", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE);
+}
+
 static void enable_board_wakeup_source(void)
 {
 	int gpio_val;
@@ -1293,14 +1367,15 @@ static void enable_board_wakeup_source(void)
 	omap_mux_enable_wakeup("sys_nirq1");
 	omap_mux_enable_wakeup("sys_nirq2");
 
-#if 0
-	/*
-	 * Enable IO daisy for HSI CAWAKE line, to be able to
-	 * wakeup from interrupts from Modem.
-	 * Needed only in Device OFF mode.
-	 */
-	omap_mux_enable_wakeup("usbb1_ulpitll_clk.hsi1_cawake");
-#endif
+	if (!strcmp(modem_ipc, "hsi")) {
+		/*
+		 * Enable IO daisy for HSI CAWAKE line, to be able to
+		 * wakeup from interrupts from Modem.
+		 * Needed only in Device OFF mode.
+		 */
+		omap_mux_enable_wakeup("usbb1_ulpitll_clk.hsi1_cawake");
+	}
+
 }
 
 static struct omap_volt_pmic_info omap_pmic_core = {
@@ -1478,78 +1553,6 @@ static struct omap_board_mux board_mux[] __initdata = {
 #else
 #define board_mux	NULL
 #endif
-
-/*
- * As OMAP4430 mux HSI and USB signals, when HSI is used (for instance HSI
- * modem is plugged) we should configure HSI pad conf and disable some USB
- * configurations.
- * HSI usage is declared using bootargs variable:
- * board-4430sdp.modem_ipc=hsi
- * Any other or missing value will not setup HSI pad conf, and port_mode[0]
- * will be used by USB.
- * Variable modem_ipc is used to catch bootargs parameter value.
- */
-static char *modem_ipc = "n/a";
-
-module_param(modem_ipc, charp, 0);
-MODULE_PARM_DESC(modem_ipc, "Modem IPC setting");
-
-static void omap_4430hsi_pad_conf(void)
-{
-	/*
-	 * HSI pad conf: hsi1_ca/ac_wake/flag/data/ready
-	 * Also configure gpio_92/95/157/187 used by modem
-	 */
-
-	/* hsi1_cawake */
-	omap_mux_init_signal("usbb1_ulpitll_clk.hsi1_cawake", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE | \
-		OMAP_PIN_OFF_WAKEUPENABLE);
-	/* hsi1_caflag */
-	omap_mux_init_signal("usbb1_ulpitll_dir.hsi1_caflag", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE);
-	/* hsi1_cadata */
-	omap_mux_init_signal("usbb1_ulpitll_stp.hsi1_cadata", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE);
-	/* hsi1_acready */
-	omap_mux_init_signal("usbb1_ulpitll_nxt.hsi1_acready", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
-	/* hsi1_acwake */
-	omap_mux_init_signal("usbb1_ulpitll_dat0.hsi1_acwake", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
-	/* hsi1_acdata */
-	omap_mux_init_signal("usbb1_ulpitll_dat1.hsi1_acdata", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
-	/* hsi1_acflag */
-	omap_mux_init_signal("usbb1_ulpitll_dat2.hsi1_acflag", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
-	/* hsi1_caready */
-	omap_mux_init_signal("usbb1_ulpitll_dat3.hsi1_caready", \
-		OMAP_PIN_INPUT | \
-		OMAP_PIN_OFF_NONE);
-	/* gpio_92 */
-	omap_mux_init_signal("usbb1_ulpitll_dat4.gpio_92", \
-		OMAP_PULL_ENA);
-	/* gpio_95 */
-	omap_mux_init_signal("usbb1_ulpitll_dat7.gpio_95", \
-		OMAP_PIN_INPUT_PULLDOWN | \
-		OMAP_PIN_OFF_NONE);
-	/* gpio_157 */
-	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
-	/* gpio_187 */
-	omap_mux_init_signal("sys_boot3.gpio_187", \
-		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
-}
 
 static void enable_rtc_gpio(void){
 	/* To access twl registers we enable gpio6

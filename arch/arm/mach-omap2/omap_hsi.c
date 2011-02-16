@@ -15,6 +15,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+#include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/err.h>
 #include <linux/clk.h>
@@ -26,13 +27,19 @@
 #include <mach/omap_hsi.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
+#include <plat/control.h>
 #include <linux/hsi_driver_if.h>
 #include "clock.h"
+#include "mux.h"
 #include <asm/clkdev.h>
+#include <../drivers/staging/omap_hsi/hsi_driver.h>
 
-#define OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME  "omap_hsi"
-#define OMAP_HSI_HWMOD_NAME  "hsi"
-#define OMAP_HSI_HWMOD_CLASSNAME  "hsi"
+#define OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME	"omap_hsi"
+#define OMAP_HSI_PLATFORM_DEVICE_NAME		"omap_hsi.0"
+#define OMAP_HSI_HWMOD_NAME			"hsi"
+#define OMAP_HSI_HWMOD_CLASSNAME		"hsi"
+#define OMAP_HSI_PADCONF_CAWAKE_PIN		"usbb1_ulpitll_clk.hsi1_cawake"
+
 
 
 /*
@@ -77,13 +84,201 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 	.device_shutdown = omap_device_shutdown,
 };
 
+
+static struct platform_device *hsi_get_hsi_platform_device(void)
+{
+	struct device *dev;
+	struct platform_device *pdev;
+
+	/* HSI_TODO: handle platform device id (or port) (0/1) */
+	dev = bus_find_device_by_name(&platform_bus_type, NULL,
+					OMAP_HSI_PLATFORM_DEVICE_NAME);
+	if (!dev) {
+		pr_debug("Could not find platform device %s\n",
+		       OMAP_HSI_PLATFORM_DEVICE_NAME);
+		return 0;
+	}
+
+	if (!dev->driver) {
+		/* Could not find driver for platform device. */
+		return 0;
+	}
+
+	pdev = to_platform_device(dev);
+
+	return pdev;
+}
+
+static struct hsi_dev *hsi_get_hsi_controller_data(struct platform_device *pd)
+{
+	struct hsi_dev *hsi_ctrl;
+
+	if (!pd)
+		return 0;
+
+	hsi_ctrl = (struct hsi_dev *) platform_get_drvdata(pd);
+	if (!hsi_ctrl) {
+		pr_err("Could not find HSI controller data\n");
+		return 0;
+	}
+
+	return hsi_ctrl;
+}
+
+/**
+* hsi_idle_hwmod - This function is a used to workaround the omap_hwmod layer
+*			which might sleep when omap_hwmod_idle() is called,
+*			and thus cannot be called from atomic context.
+*
+* @od - reference to the hsi omap_device.
+*
+* Note : a "normal" .deactivate_func shall be omap_device_idle_hwmods()
+*/
+static int hsi_idle_hwmod(struct omap_device *od)
+{
+	/* HSI omap_device only contain one od->hwmods[0], so no need to */
+	/* loop for all hwmods */
+	if (irqs_disabled())
+		_omap_hwmod_idle(od->hwmods[0]);
+	else
+		omap_hwmod_idle(od->hwmods[0]);
+	return 0;
+}
+
+/**
+* hsi_enable_hwmod - This function is a used to workaround the omap_hwmod layer
+*			which might sleep when omap_hwmod_enable() is called,
+*			and thus cannot be called from atomic context.
+*
+* @od - reference to the hsi omap_device.
+*
+* Note : a "normal" .activate_func shall be omap_device_enable_hwmods()
+*/
+static int hsi_enable_hwmod(struct omap_device *od)
+{
+	/* HSI omap_device only contain one od->hwmods[0], so no need to */
+	/* loop for all hwmods */
+	if (irqs_disabled())
+		_omap_hwmod_enable(od->hwmods[0]);
+	else
+		omap_hwmod_enable(od->hwmods[0]);
+	return 0;
+}
+
+/**
+* omap_hsi_prepare_suspend - Prepare HSI for suspend mode (OFF)
+*
+* Return value : -ENODEV if HSI controller has not been found, else 0.
+*
+*/
+int omap_hsi_prepare_suspend(void)
+{
+	struct platform_device *pdev;
+	struct hsi_dev *hsi_ctrl;
+
+	pdev = hsi_get_hsi_platform_device();
+	hsi_ctrl = hsi_get_hsi_controller_data(pdev);
+
+	if (!hsi_ctrl)
+		return -ENODEV;
+
+	if (!hsi_ctrl->clock_enabled)
+		return 0;
+
+	if (device_may_wakeup(&pdev->dev))
+		omap_mux_enable_wakeup(OMAP_HSI_PADCONF_CAWAKE_PIN);
+	else
+		omap_mux_disable_wakeup(OMAP_HSI_PADCONF_CAWAKE_PIN);
+
+	return 0;
+}
+
+/**
+* omap_hsi_prepare_idle - Prepare HSI for idle to low power
+*
+* Return value : -ENODEV if HSI controller has not been found, else 0.
+*
+*/
+int omap_hsi_prepare_idle(void)
+{
+	struct platform_device *pdev;
+	struct hsi_dev *hsi_ctrl;
+
+	pdev = hsi_get_hsi_platform_device();
+	hsi_ctrl = hsi_get_hsi_controller_data(pdev);
+
+	if (!hsi_ctrl)
+		return -ENODEV;
+
+	if (!hsi_ctrl->clock_enabled)
+		return 0;
+
+	/* If hsi_clocks_disable_channel() is used, it prevents board to */
+	/* enter sleep, due to the checks of HSI controller status. */
+	/* This is why we call directly the omap_device_xxx() function here */
+	hsi_runtime_suspend(hsi_ctrl->dev);
+	omap_device_idle(pdev);
+
+	return 0;
+}
+
+
+/**
+* omap_hsi_resume_idle - Prepare HSI for wakeup from low power
+*
+* Return value :* -ENODEV if HSI platform device or HSI controller or CAWAKE
+*		  Padconf has not been found
+*		* -EPERM if HSI is not allowed to wakeup the platform.
+*		* else 0.
+*
+*/
+int omap_hsi_resume_idle(void)
+{
+	struct platform_device *pdev;
+	struct hsi_dev *hsi_ctrl;
+	u16 val;
+
+	pdev = hsi_get_hsi_platform_device();
+	if (!pdev)
+		return -ENODEV;
+	if (!device_may_wakeup(&pdev->dev))
+		return -EPERM;
+
+	hsi_ctrl = hsi_get_hsi_controller_data(pdev);
+	if (!hsi_ctrl)
+		return -ENODEV;
+
+	/* Check for IO pad wakeup */
+	val = omap_mux_read_signal(OMAP_HSI_PADCONF_CAWAKE_PIN);
+
+	if (val == -ENODEV)
+		return val;
+
+	if (val & OMAP44XX_PADCONF_WAKEUPEVENT0) {
+		dev_dbg(hsi_ctrl->dev, "HSI WAKEUP DETECTED from PADCONF : "
+				       "0x%04x\n", val);
+
+		if (!hsi_ctrl->clock_enabled) {
+			/* CAWAKE falling or rising edge detected */
+			hsi_ctrl->hsi_port->cawake_off_event = true;
+			tasklet_hi_schedule(&hsi_ctrl->hsi_port->hsi_tasklet);
+
+			/* Disable interrupt until Bottom Half has cleared */
+			/* the IRQ status register */
+			disable_irq_nosync(hsi_ctrl->hsi_port->irq);
+		}
+	}
+
+	return 0;
+}
+
 /* HSI_TODO : This requires some fine tuning & completion of
  * activate/deactivate latency values
  */
 static struct omap_device_pm_latency omap_hsi_latency[] = {
 	[0] = {
-	       .deactivate_func = omap_device_idle_hwmods,
-	       .activate_func = omap_device_enable_hwmods,
+	       .deactivate_func = hsi_idle_hwmod,
+	       .activate_func = hsi_enable_hwmod,
 	       .flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
 	       },
 };
@@ -106,7 +301,7 @@ static int __init omap_hsi_init(struct omap_hwmod *oh, void *user)
 	WARN(IS_ERR(od), "Can't build omap_device for %s:%s.\n",
 	     OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, oh->name);
 
-	pr_info("HSI: device registered\n");
+	pr_info("HSI: device registered as omap_hwmod: %s\n", oh->name);
 	return 0;
 }
 

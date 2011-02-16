@@ -141,6 +141,16 @@ bool hsi_is_hst_controller_busy(struct hsi_dev *hsi_ctrl)
 	return false;
 }
 
+
+/* Enables the CAWAKE, BREAK, or ERROR interrupt for he given port */
+int hsi_driver_enable_interrupt(struct hsi_port *pport, u32 flag)
+{
+	hsi_outl_or(flag, pport->hsi_controller->base,
+		    HSI_SYS_MPU_ENABLE_REG(pport->port_number, pport->n_irq));
+
+	return 0;
+}
+
 /* Enables the Data Accepted Interrupt of HST for the given channel */
 int hsi_driver_enable_write_interrupt(struct hsi_channel *ch, u32 * data)
 {
@@ -416,7 +426,9 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 	status_reg = hsi_inl(base, status_offset);
 	status_reg &= hsi_inl(base, enable_offset);
 
-	if (!status_reg) {
+	if (pport->cawake_off_event) {
+		dev_dbg(hsi_ctrl->dev, "CAWAKE detected from OFF mode.\n");
+	} else if (!status_reg) {
 		dev_dbg(hsi_ctrl->dev, "Channels [%d,%d] : no event, exit.\n",
 			start, stop);
 		return 0;
@@ -461,10 +473,11 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 	}
 
 	/* CAWAKE falling or rising edge detected */
-	if (status_reg & HSI_CAWAKEDETECTED) {
+	if ((status_reg & HSI_CAWAKEDETECTED) || pport->cawake_off_event) {
 		hsi_do_cawake_process(pport);
 
 		channels_served |= HSI_CAWAKEDETECTED;
+		pport->cawake_off_event = false;
 	}
 
 	for (channel = start; channel < stop; channel++) {
@@ -556,13 +569,14 @@ int __init hsi_mpu_init(struct hsi_port *hsi_p, const char *irq_name)
 
 	dev_info(hsi_p->hsi_controller->dev, "Registering IRQ %s (%d)\n",
 						irq_name, hsi_p->irq);
-	err = request_irq(hsi_p->irq, hsi_mpu_handler, IRQF_DISABLED,
+	err = request_irq(hsi_p->irq, hsi_mpu_handler, IRQF_NO_SUSPEND,
 			  irq_name, hsi_p);
 	if (err < 0) {
 		dev_err(hsi_p->hsi_controller->dev, "FAILED to MPU request"
 			" IRQ (%d) on port %d", hsi_p->irq, hsi_p->port_number);
 		return -EBUSY;
 	}
+
 	return 0;
 }
 

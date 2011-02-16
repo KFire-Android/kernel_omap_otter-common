@@ -290,9 +290,9 @@ int hsi_open(struct hsi_device *dev)
 
 	ch->flags |= HSI_CH_OPEN;
 
-	hsi_outl_or(HSI_CAWAKEDETECTED | HSI_ERROROCCURED | HSI_BREAKDETECTED,
-		    hsi_ctrl->base, HSI_SYS_MPU_ENABLE_REG(port->port_number,
-							   port->n_irq));
+	hsi_driver_enable_interrupt(port, HSI_CAWAKEDETECTED | HSI_ERROROCCURED
+					| HSI_BREAKDETECTED);
+
 	/* NOTE: error and break are port events and do not need to be
 	 * enabled for HSI extended enable register */
 
@@ -829,10 +829,24 @@ void hsi_set_port_event_cb(struct hsi_device *dev,
 						  unsigned int event,
 						  void *arg))
 {
+	struct hsi_port *port = dev->ch->hsi_port;
+	struct hsi_dev *hsi_ctrl = port->hsi_controller;
+
 	dev_dbg(dev->device.parent, "%s\n", __func__);
 
 	write_lock_bh(&dev->ch->rw_lock);
 	dev->ch->port_event = port_event_cb;
 	write_unlock_bh(&dev->ch->rw_lock);
+
+	/* Since we now have a callback registered for events, we can now */
+	/* enable the CAWAKE, ERROR and BREAK interrupts */
+	spin_lock_bh(&hsi_ctrl->lock);
+	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
+	hsi_driver_enable_interrupt(port, HSI_CAWAKEDETECTED | HSI_ERROROCCURED
+					| HSI_BREAKDETECTED);
+	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
+				__func__);
+	spin_unlock_bh(&hsi_ctrl->lock);
 }
 EXPORT_SYMBOL(hsi_set_port_event_cb);

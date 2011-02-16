@@ -451,4 +451,8 @@ struct omap_hsi_board_config {
 };
 extern int omap_hsi_config(struct omap_hsi_board_config *hsi_config);
 
+extern int omap_hsi_prepare_suspend(void);
+extern int omap_hsi_prepare_idle(void);
+extern int omap_hsi_resume_idle(void);
+
 #endif /* __OMAP_HSI_H__ */

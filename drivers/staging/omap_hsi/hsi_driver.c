@@ -42,8 +42,7 @@
 #define HSI_RESETDONE_NORMAL_RETRIES	1 /* Reset should complete in 1 R/W */
 					  /* cycle */
 
-
-static void hsi_save_ctx(struct hsi_dev *hsi_ctrl)
+void hsi_save_ctx(struct hsi_dev *hsi_ctrl)
 {
 	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
@@ -84,7 +83,7 @@ static void hsi_save_ctx(struct hsi_dev *hsi_ctrl)
 	}
 }
 
-static void hsi_restore_ctx(struct hsi_dev *hsi_ctrl)
+void hsi_restore_ctx(struct hsi_dev *hsi_ctrl)
 {
 	struct hsi_platform_data *pdata = hsi_ctrl->dev->platform_data;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
@@ -500,6 +499,7 @@ static int __init hsi_ports_init(struct hsi_dev *hsi_ctrl)
 		    HSI_CHANNELS_MAX : HSI_SSI_CHANNELS_MAX;
 		hsi_p->irq = 0;
 		hsi_p->cawake_status = -1; /* Unknown */
+		hsi_p->cawake_off_event = false;
 		hsi_p->acwake_status = 0;
 		hsi_p->in_int_tasklet = false;
 		hsi_p->in_cawake_tasklet = false;
@@ -808,6 +808,9 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 
 	/* From here no need for HSI HW access */
 	hsi_clocks_disable(hsi_ctrl->dev, __func__);
+
+	/* Allow HSI to wake up the platform */
+	device_init_wakeup(hsi_ctrl->dev, 1);
 
 	/* Set the HSI FCLK to default. */
 	err = omap_device_set_rate(hsi_ctrl->dev, hsi_ctrl->dev,

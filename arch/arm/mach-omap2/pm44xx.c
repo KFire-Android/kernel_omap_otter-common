@@ -33,6 +33,7 @@
 
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
+#include "mach/omap_hsi.h"
 
 #include "prm.h"
 #include "pm.h"
@@ -231,6 +232,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_smartreflex_disable(vdd_iva);
 		omap_smartreflex_disable(vdd_core);
 
+		omap_hsi_prepare_idle();
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
 		omap_uart_prepare_idle(2);
@@ -325,6 +327,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_uart_resume_idle(1);
 		omap_uart_resume_idle(2);
 		omap_uart_resume_idle(3);
+		omap_hsi_resume_idle();
 
 		/* Enable SR for IVA and CORE */
 		omap_smartreflex_enable(vdd_iva);
@@ -398,7 +401,7 @@ static int omap4_pm_suspend(void)
 
 	/*
 	 * Clear all wakeup sources and keep
-	 * only Debug UART, Keypad and GPT1 interrupt
+	 * only Debug UART, Keypad, HSI and GPT1 interrupt
 	 * as a wakeup event from MPU/Device OFF
 	 */
 	omap4_wakeupgen_clear_all(cpu_id);
@@ -407,6 +410,7 @@ static int omap4_pm_suspend(void)
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_GPT1);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_PRCM);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_SYS_1N);
+	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_HSI_P1);
 
 #ifdef CONFIG_ENABLE_L3_ERRORS
 	/* Allow the L3 errors to be logged */
@@ -451,6 +455,7 @@ static int omap4_pm_suspend(void)
 	if (cpu1_state != PWRDM_POWER_OFF)
 		goto restore;
 	omap_uart_prepare_suspend();
+	omap_hsi_prepare_suspend();
 
 	/* Enable Device OFF */
 	if (enable_off_mode)
