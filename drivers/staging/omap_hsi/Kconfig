@@ -3,7 +3,7 @@
 #
 
 config OMAP_HSI
-	tristate "OMAP HSI hardware driver"
+	bool "OMAP HSI hardware driver"
 	depends on (ARCH_OMAP34XX || ARCH_OMAP4)
 	default n
 	---help---
