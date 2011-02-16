@@ -1503,8 +1503,6 @@ static u32 omap_tiler_virt_to_phys(void *ptr)
 	pgd_t *pgd = NULL;
 	pmd_t *pmd = NULL;
 	pte_t *ptep = NULL, pte = 0x0;
-	s32 r = -1;
-	u32 til_addr = 0x0;
 	u32 arg = (u32)ptr;
 
 	pgd = pgd_offset(current->mm, arg);
@@ -1520,6 +1518,8 @@ static u32 omap_tiler_virt_to_phys(void *ptr)
 			}
 		}
 	}
+
+	return 0;
 }
 
 /*
@@ -1544,7 +1544,7 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 	dma_addr_t dmabuf;
 #endif
 	struct omap_vout_device *vout = q->priv_data;
-#ifdef CONFIG_PM
+#if defined(CONFIG_PM) && !defined(CONFIG_ARCH_OMAP4)
 	struct vout_platform_data *pdata =
 			(((vout->vid_dev)->v4l2_dev).dev)->platform_data;
 #endif
