@@ -596,7 +596,6 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 {
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
-	int ret;
 
 	if (channel_number != HSI_CH_NUMBER_NONE)
 		dev_dbg(dev, "CLK: hsi_clocks_disable for "
@@ -616,11 +615,15 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 	if (hsi_is_hst_controller_busy(hsi_ctrl))
 		dev_warn(dev, "Disabling clocks with HST FSM not IDLE !\n");
 
+#ifndef USE_PM_RUNTIME_FOR_HSI
+	hsi_runtime_suspend(dev);
+	omap_device_idle(pd);
+#else
 	/* HSI_TODO : this can probably be changed
 	 * to return pm_runtime_put(dev);
 	 */
-	ret = pm_runtime_put_sync(dev);
-	/*pr_info(", returns %d\n", ret);*/
+	pm_runtime_put_sync(dev);
+#endif
 }
 
 /**
@@ -651,8 +654,13 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 		dev_dbg(dev, "Clocks already enabled, skipping...\n");
 		return -EEXIST;
 	}
-
+#ifndef USE_PM_RUNTIME_FOR_HSI
+	omap_device_enable(pd);
+	hsi_runtime_resume(dev);
+	return 0;
+#else
 	return pm_runtime_get_sync(dev);
+#endif
 }
 
 static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
@@ -764,7 +772,6 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 
 	pm_runtime_enable(hsi_ctrl->dev);
 	hsi_clocks_enable(hsi_ctrl->dev, __func__);
-	/* HSI_TODO : test the return values */
 
 	/* Non critical SW Reset */
 	err = hsi_softreset(hsi_ctrl);
@@ -873,7 +880,7 @@ static int hsi_resume_noirq(struct device *dev)
 *
 *
 */
-static int hsi_runtime_resume(struct device *dev)
+int hsi_runtime_resume(struct device *dev)
 {
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
@@ -902,7 +909,7 @@ static int hsi_runtime_resume(struct device *dev)
 * Return value : -EBUSY or -EAGAIN if device is busy and still operational
 *
 */
-static int hsi_runtime_suspend(struct device *dev)
+int hsi_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);

@@ -268,6 +268,9 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 				const char *s);
 int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 				const char *s);
+int hsi_runtime_resume(struct device *dev);
+int hsi_runtime_suspend(struct device *dev);
+
 
 #ifdef CONFIG_DEBUG_FS
 int hsi_debug_init(void);
