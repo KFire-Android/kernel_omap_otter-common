@@ -341,7 +341,6 @@ static void __iomem *fdifHandle;
 static struct clk *clk_opt_iss;
 /* Ducati Interrupt Capable Gptimers */
 static int ipu_timer_list[NUM_IPU_TIMERS] = {
-	GP_TIMER_9,
 	GP_TIMER_11};
 
 /* I2C spinlock assignment mapping table */

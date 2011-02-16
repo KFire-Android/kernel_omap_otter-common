@@ -128,7 +128,7 @@
 #define GP_TIMER_4 4
 #define GP_TIMER_9 9
 #define GP_TIMER_11 11
-#define NUM_IPU_TIMERS 2
+#define NUM_IPU_TIMERS 1
 
 #define I2C_SL_INVAL -1
 #define I2C_1_SL 0
