@@ -930,32 +930,26 @@ int hsi_runtime_suspend(struct device *dev)
 }
 
 /* Based on counters, device appears to be idle.
- * Check if the device can be suspended & queue up
- * a suspend request for the device in that case.
+ * Check if the device can be suspended.
  */
 static int hsi_runtime_idle(struct device *dev)
 {
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
-	int port, ch, ret;
 
 	dev_dbg(dev, "%s\n", __func__);
 
-	for (port = 0; port < hsi_ctrl->max_p; port++)
-		for (ch = 0; ch < hsi_ctrl->hsi_port[port].max_ch; ch++)
-			if (hsi_is_channel_busy
-			    (&hsi_ctrl->hsi_port[port].hsi_channel[ch])) {
-				dev_info(dev,
-				    "HSI DRIVER : hsi_runtime_idle, "
-				    "channel %d busy\n",
-				    ch);
-				dev_dbg(dev, "%s [-EBUSY]\n", __func__);
-				return -EBUSY;
-			}
-	/* HSI_TODO : check also the interrupt status registers.*/
+	if (hsi_is_hsi_controller_busy(hsi_ctrl)) {
+		dev_dbg(dev, "hsi_runtime_idle: HSI port busy\n");
+		return -EBUSY;
+	}
 
-	ret = pm_runtime_suspend(dev);
-	dev_dbg(dev, "%s [%d]\n", __func__, ret);
+	if (hsi_is_hst_controller_busy(hsi_ctrl)) {
+		dev_dbg(dev, "hsi_runtime_idle: HST FSM not IDLE !\n");
+		return -EBUSY;
+	}
+
+	/* HSI_TODO : check also the interrupt status registers.*/
 
 	return 0;
 }

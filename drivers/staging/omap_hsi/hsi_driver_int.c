@@ -58,7 +58,6 @@ bool hsi_is_channel_busy(struct hsi_channel *ch)
 bool hsi_is_hsi_port_busy(struct hsi_port *pport)
 {
 	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
-	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 	int ch;
 
 	if (pport->in_int_tasklet) {
