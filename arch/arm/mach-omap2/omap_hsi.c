@@ -125,6 +125,15 @@ static struct hsi_dev *hsi_get_hsi_controller_data(struct platform_device *pd)
 	return hsi_ctrl;
 }
 
+/* Note : for hsi_idle_hwmod() and hsi_enable_hwmod() :*/
+/* we should normally use omap_hwmod_enable(), but this */
+/* function contains a mutex lock of the OMAP HWMOD mutex and there */
+/* is only one HWMOD mutex shared for the whole HWMOD table. */
+/* This is not compatible with the way HSI driver has to enable the */
+/* clocks (from atomic context), as the mutex can very likely be */
+/* locked by another HWMOD user. Thus we bypass the mutex usage. */
+/* The global mutex has been replaced by a separate mutex per HWMOD */
+/* entry, then on 2.6.38 by a separate spinlock. */
 /**
 * hsi_idle_hwmod - This function is a used to workaround the omap_hwmod layer
 *			which might sleep when omap_hwmod_idle() is called,
@@ -138,10 +147,7 @@ static int hsi_idle_hwmod(struct omap_device *od)
 {
 	/* HSI omap_device only contain one od->hwmods[0], so no need to */
 	/* loop for all hwmods */
-	if (irqs_disabled())
-		_omap_hwmod_idle(od->hwmods[0]);
-	else
-		omap_hwmod_idle(od->hwmods[0]);
+	_omap_hwmod_idle(od->hwmods[0]);
 	return 0;
 }
 
@@ -158,10 +164,7 @@ static int hsi_enable_hwmod(struct omap_device *od)
 {
 	/* HSI omap_device only contain one od->hwmods[0], so no need to */
 	/* loop for all hwmods */
-	if (irqs_disabled())
-		_omap_hwmod_enable(od->hwmods[0]);
-	else
-		omap_hwmod_enable(od->hwmods[0]);
+	_omap_hwmod_enable(od->hwmods[0]);
 	return 0;
 }
 
