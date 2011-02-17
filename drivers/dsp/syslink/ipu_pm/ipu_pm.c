@@ -802,11 +802,11 @@ int ipu_pm_notifications(int proc_id, enum pm_event_type event, void *data)
 	int pm_ack = 0;
 
 	handle = ipu_pm_get_handle(proc_id);
-	if (handle == NULL)
-		goto error;
+	if (WARN_ON(handle == NULL))
+		return -EINVAL;
 	params = handle->params;
-	if (params == NULL)
-		goto error;
+	if (WARN_ON(params == NULL))
+		return -EINVAL;
 
 	/* Prepare the message for remote proc */
 	pm_msg.fields.msg_type = PM_NOTIFICATIONS;
@@ -834,15 +834,26 @@ int ipu_pm_notifications(int proc_id, enum pm_event_type event, void *data)
 	retval = down_timeout(&handle->pm_event[event].sem_handle,
 			      msecs_to_jiffies(params->timeout));
 
-	pm_msg.whole = handle->pm_event[event].pm_msg;
-	if (WARN_ON((retval < 0) || (pm_msg.fields.parm != PM_SUCCESS)))
+	if (retval < 0)
 		goto error;
+
+	pm_msg.whole = handle->pm_event[event].pm_msg;
+	if (pm_msg.fields.parm != PM_SUCCESS) {
+		pr_err("Error in Proc:%d for Event_type:%d\n", proc_id, event);
+		return -EINVAL;
+	}
+
 	return pm_ack;
 
 error_send:
-	pr_err("Error notify_send event %d to proc %d\n", event, proc_id);
+	pr_err("Error sending Notify Event:%d to Proc:%d\n",
+						params->pm_notification_event,
+						proc_id);
+	return -EINVAL;
 error:
-	pr_err("Error sending Notification event %d\n", event);
+	pr_err("Time out when sending Notify Event:%d to Proc:%d\n",
+						params->pm_notification_event,
+						proc_id);
 	return -EBUSY;
 }
 EXPORT_SYMBOL(ipu_pm_notifications);
