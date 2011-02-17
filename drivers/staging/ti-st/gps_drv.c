@@ -30,7 +30,8 @@
 #include <linux/poll.h>
 #include <linux/skbuff.h>
 #include <linux/interrupt.h>
-#include "st.h"
+
+#include <linux/ti_wilink_st.h>
 
 #undef VERBOSE
 #undef DEBUG
@@ -210,7 +211,12 @@ void gpsdrv_st_cb(void *arg, char data)
 }
 
 static struct st_proto_s gpsdrv_proto = {
-	.type = ST_GPS,
+	.chnl_id = 0x09,
+	.max_frame_size = 300,
+	.hdr_len = 3,
+	.offset_len_in_hdr = 1,
+	.len_size = 2,
+	.reserve = 1,
 	.recv = gpsdrv_st_recv,
 	.reg_complete_cb = gpsdrv_st_cb,
 };
@@ -373,7 +379,7 @@ int gpsdrv_release(struct inode *inod, struct file *file)
 	tasklet_kill(&hgps->gpsdrv_tx_tsklet);
 	/* Cleat registered bit if already registered */
 	if (test_and_clear_bit(GPS_ST_REGISTERED, &hgps->state)) {
-		if (st_unregister(gpsdrv_proto.type) < 0) {
+		if (st_unregister(&gpsdrv_proto) < 0) {
 			GPSDRV_ERR(" st_unregister failed");
 			/* Re-Enable the task-let if un-register fails */
 			tasklet_enable(&hgps->gpsdrv_tx_tsklet);

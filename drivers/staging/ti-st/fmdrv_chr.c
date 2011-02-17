@@ -34,7 +34,7 @@
 #include <linux/platform_device.h>
 #include <linux/uaccess.h>
 
-#include "st.h"
+#include <linux/ti_wilink_st.h>
 
 /*#define VERBOSE*/
 
@@ -587,9 +587,9 @@ static long fm_st_receive(void *arg, struct sk_buff *skb)
 /* This function will be called from open function.
  * Register with ST driver and initialize driver data.
  */
+static struct st_proto_s fm_st_proto;
 int fmc_prepare(struct fmdrv_chr_ops *fmdev)
 {
-	static struct st_proto_s fm_st_proto;
 	unsigned long timeleft;
 	int ret = 0;
 
@@ -598,8 +598,14 @@ int fmc_prepare(struct fmdrv_chr_ops *fmdev)
 		goto exit;
 	}
 
+	/* register channel ID & relevant details */
 	memset(&fm_st_proto, 0, sizeof(fm_st_proto));
-	fm_st_proto.type = ST_FM;
+	fm_st_proto.chnl_id = 0x08;
+	fm_st_proto.max_frame_size = 0xff;
+	fm_st_proto.hdr_len = 1;
+	fm_st_proto.offset_len_in_hdr = 0;
+	fm_st_proto.len_size = 1;
+	fm_st_proto.reserve = 1;
 	fm_st_proto.recv = fm_st_receive;
 	fm_st_proto.match_packet = NULL;
 	fm_st_proto.reg_complete_cb = fm_st_reg_comp_cb;
@@ -640,7 +646,7 @@ int fmc_prepare(struct fmdrv_chr_ops *fmdev)
 		fmdev->st_write = fm_st_proto.write;
 	} else {
 		pr_err("(fmdrv): Failed to get ST write func pointer");
-		ret = st_unregister(ST_FM);
+		ret = st_unregister(&fm_st_proto);
 		if (ret < 0)
 			pr_err("(fmdrv): st_unregister failed %d", ret);
 		ret = -EAGAIN;
@@ -709,7 +715,7 @@ static int fm_chr_release(struct inode *inod, struct file *fil)
 	fm_chr_fasync(-1, fil, 0);
 
 	/* Unregister FM with ST driver */
-	err = st_unregister(ST_FM);
+	err = st_unregister(&fm_st_proto);
 	if (err < FM_CHR_DRV_SUCCESS) {
 		FM_CHR_DRV_ERR(" Unable to unregister from ST ");
 
