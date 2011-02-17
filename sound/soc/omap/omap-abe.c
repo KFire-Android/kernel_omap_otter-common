@@ -69,6 +69,7 @@ enum dai_status {
 
 struct omap_abe_data {
 	int be_active[NUM_ABE_BACKENDS][2];
+	int trigger_active[NUM_ABE_BACKENDS][2];
 
 	struct clk *clk;
 	struct workqueue_struct *workqueue;
@@ -196,6 +197,39 @@ static inline void be_dec_active(struct snd_soc_pcm_runtime *be_rtd, int stream)
 static inline int be_is_pending(struct snd_soc_pcm_runtime *be_rtd, int stream)
 {
 	return abe_data.be_active[be_rtd->dai_link->be_id][stream] == 1 ? 1 : 0;
+}
+
+static inline int be_is_running(struct snd_soc_pcm_runtime *be_rtd, int stream)
+{
+	return abe_data.be_active[be_rtd->dai_link->be_id][stream] >= 1 ? 1 : 0;
+}
+
+/*
+ * Caller holds lock for trigger_active calls.
+ */
+static inline int trigger_get_active(struct snd_soc_pcm_runtime *be_rtd,
+					int stream)
+{
+	return abe_data.trigger_active[be_rtd->dai_link->be_id][stream];
+}
+
+static inline void trigger_inc_active(struct snd_soc_pcm_runtime *be_rtd,
+					int stream)
+{
+	abe_data.trigger_active[be_rtd->dai_link->be_id][stream]++;
+}
+
+static inline void trigger_dec_active(struct snd_soc_pcm_runtime *be_rtd,
+					int stream)
+{
+	abe_data.trigger_active[be_rtd->dai_link->be_id][stream]--;
+}
+
+/* iff the BE has one user can we start and stop the port */
+static inline int trigger_is_pending(struct snd_soc_pcm_runtime *be_rtd,
+					int stream)
+{
+	return abe_data.trigger_active[be_rtd->dai_link->be_id][stream] == 1 ? 1 : 0;
 }
 
 /*
@@ -678,7 +712,7 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 		if (be_substream == NULL)
 			continue;
 
-		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
+		if (be_is_running(rtd->be_rtd[i][stream], stream)) {
 			be_rtd->current_fe = dai->id;
 			if (be_rtd->dai_link->be_hw_params_fixup)
 				ret = be_rtd->dai_link->be_hw_params_fixup(be_rtd, params);
@@ -753,7 +787,7 @@ static int omap_abe_dai_prepare(struct snd_pcm_substream *substream,
 			continue;
 
 		/* prepare backend stream */
-		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
+		if (be_is_running(rtd->be_rtd[i][stream], stream)) {
 			be_rtd->current_fe = dai->id;
 			snd_soc_pcm_prepare(be_substream);
 		}
@@ -795,7 +829,7 @@ static int omap_abe_dai_hw_free(struct snd_pcm_substream *substream,
 		if (be_substream == NULL)
 			continue;
 
-		if (be_is_pending(rtd->be_rtd[i][stream], stream)) {
+		if (be_is_running(rtd->be_rtd[i][stream], stream)) {
 			be_rtd->current_fe = dai->id;
 			snd_soc_pcm_hw_free(be_substream);
 		}
@@ -962,6 +996,38 @@ static inline void abe_dai_enable_data_transfer(int port)
 		abe_enable_data_transfer(port);
 }
 
+static void inc_be_ports(struct snd_pcm_substream *substream, int stream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_pcm_runtime *be_rtd;
+	int i;
+
+	for (i = 0; i < rtd->num_be[stream]; i++) {
+		be_rtd = rtd->be_rtd[i][stream];
+
+		if (be_is_running(be_rtd, stream))
+			/* update TRIGGER ref counts */
+			trigger_inc_active(be_rtd, stream);
+
+	}
+}
+
+static void dec_be_ports(struct snd_pcm_substream *substream, int stream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_pcm_runtime *be_rtd;
+	int i;
+
+	for (i = 0; i < rtd->num_be[stream]; i++) {
+		be_rtd = rtd->be_rtd[i][stream];
+
+		if (be_is_running(be_rtd, stream))
+			/* update TRIGGER ref counts */
+			trigger_dec_active(be_rtd, stream);
+
+	}
+}
+
 static void enable_be_ports(struct snd_pcm_substream *substream, int stream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -978,28 +1044,30 @@ static void enable_be_ports(struct snd_pcm_substream *substream, int stream)
 
 		switch (be_rtd->dai_link->be_id) {
 		case OMAP_ABE_DAI_PDM_DL1:
-			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    pdm_ready(&abe_data))
 				abe_dai_enable_data_transfer(PDM_DL_PORT);
 			abe_data.pdm_dl_status[0] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
-			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    pdm_ready(&abe_data))
 				abe_dai_enable_data_transfer(PDM_DL_PORT);
 			abe_data.pdm_dl_status[1] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
-			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    pdm_ready(&abe_data))
 				abe_dai_enable_data_transfer(PDM_DL_PORT);
 			abe_data.pdm_dl_status[2] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_PDM_UL:
-			if (be_is_pending(be_rtd, stream)) {
+			if (trigger_is_pending(be_rtd, stream))
 				abe_dai_enable_data_transfer(PDM_UL_PORT);
-			}
 			abe_data.pdm_ul_status = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_BT_VX:
-			if (be_is_pending(be_rtd, stream)) {
+			if (trigger_is_pending(be_rtd, stream)) {
 				if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 					/* BT_DL connection to McBSP 1 ports */
 					format.f = 8000;
@@ -1018,7 +1086,7 @@ static void enable_be_ports(struct snd_pcm_substream *substream, int stream)
 			}
 			break;
 		case OMAP_ABE_DAI_MM_FM:
-			if (be_is_pending(be_rtd, stream)) {
+			if (trigger_is_pending(be_rtd, stream)) {
 				if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 					/* MM_EXT connection to McBSP 2 ports */
 					format.f = 48000;
@@ -1037,17 +1105,20 @@ static void enable_be_ports(struct snd_pcm_substream *substream, int stream)
 			}
 			break;
 		case OMAP_ABE_DAI_DMIC0:
-			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    dmic_ready(&abe_data))
 				abe_dai_enable_data_transfer(DMIC_PORT);
 			abe_data.dmic_status[0] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_DMIC1:
-			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    dmic_ready(&abe_data))
 				abe_dai_enable_data_transfer(DMIC_PORT1);
 			abe_data.dmic_status[1] = DAI_STARTED;
 			break;
 		case OMAP_ABE_DAI_DMIC2:
-			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    dmic_ready(&abe_data))
 				abe_dai_enable_data_transfer(DMIC_PORT2);
 			abe_data.dmic_status[2] = DAI_STARTED;
 			break;
@@ -1119,29 +1190,29 @@ static void disable_be_ports(struct snd_pcm_substream *substream, int stream)
 		switch (be_rtd->dai_link->be_id) {
 		case OMAP_ABE_DAI_PDM_DL1:
 			abe_data.pdm_dl_status[0] = DAI_STOPPED;
-			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data)) {
+			if (trigger_is_pending(be_rtd, stream) &&
+			    pdm_ready(&abe_data))
 				abe_dai_disable_data_transfer(PDM_DL_PORT);
-			}
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
 			abe_data.pdm_dl_status[1] = DAI_STOPPED;
-			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data)) {
+			if (trigger_is_pending(be_rtd, stream) &&
+			    pdm_ready(&abe_data))
 				abe_dai_disable_data_transfer(PDM_DL_PORT);
-			}
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
 			abe_data.pdm_dl_status[2] = DAI_STOPPED;
-			if (be_is_pending(be_rtd, stream) && pdm_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    pdm_ready(&abe_data))
 				abe_dai_disable_data_transfer(PDM_VIB_PORT);
 			break;
 		case OMAP_ABE_DAI_PDM_UL:
 			abe_data.pdm_ul_status = DAI_STOPPED;
-			if (be_is_pending(be_rtd, stream)) {
+			if (trigger_is_pending(be_rtd, stream))
 				abe_dai_disable_data_transfer(PDM_UL_PORT);
-			}
 			break;
 		case OMAP_ABE_DAI_BT_VX:
-			if (be_is_pending(be_rtd, stream)) {
+			if (trigger_is_pending(be_rtd, stream)) {
 				if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 					abe_dai_disable_data_transfer(BT_VX_DL_PORT);
 				else
@@ -1150,7 +1221,7 @@ static void disable_be_ports(struct snd_pcm_substream *substream, int stream)
 			break;
 		case OMAP_ABE_DAI_MM_FM:
 		case OMAP_ABE_DAI_MODEM:
-			if (be_is_pending(be_rtd, stream)) {
+			if (trigger_is_pending(be_rtd, stream)) {
 				if (stream == SNDRV_PCM_STREAM_PLAYBACK)
 					abe_dai_disable_data_transfer(MM_EXT_OUT_PORT);
 				else
@@ -1158,20 +1229,24 @@ static void disable_be_ports(struct snd_pcm_substream *substream, int stream)
 			}
 		case OMAP_ABE_DAI_DMIC0:
 			abe_data.dmic_status[0] = DAI_STOPPED;
-			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    dmic_ready(&abe_data))
 				abe_dai_disable_data_transfer(DMIC_PORT);
 			break;
 		case OMAP_ABE_DAI_DMIC1:
 			abe_data.dmic_status[1] = DAI_STOPPED;
-			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    dmic_ready(&abe_data))
 				abe_dai_disable_data_transfer(DMIC_PORT1);
 			break;
 		case OMAP_ABE_DAI_DMIC2:
 			abe_data.dmic_status[2] = DAI_STOPPED;
-			if (be_is_pending(be_rtd, stream) && dmic_ready(&abe_data))
+			if (trigger_is_pending(be_rtd, stream) &&
+			    dmic_ready(&abe_data))
 				abe_dai_disable_data_transfer(DMIC_PORT2);
 			break;
 		}
+
 	}
 }
 
@@ -1311,8 +1386,20 @@ static void trigger_be_ports(struct snd_pcm_substream *substream, int cmd)
 				__func__, be_rtd->dai_link->be_id, cmd,
 				abe_data.be_active[be_rtd->dai_link->be_id][stream]);
 
-		if (be_is_pending(be_rtd, stream))
-			snd_soc_dai_trigger(substream, cmd, be_rtd->cpu_dai);
+		switch (cmd) {
+		case SNDRV_PCM_TRIGGER_START:
+		case SNDRV_PCM_TRIGGER_STOP:
+			if (be_is_running(be_rtd, stream) &&
+			    trigger_is_pending(be_rtd, stream))
+					snd_soc_dai_trigger(substream, cmd,
+							be_rtd->cpu_dai);
+			break;
+		default:
+			if (be_is_running(be_rtd, stream))
+				snd_soc_dai_trigger(substream, cmd,
+							be_rtd->cpu_dai);
+			break;
+		}
 	}
 }
 
@@ -1329,6 +1416,7 @@ static void capture_trigger(struct snd_pcm_substream *substream, int cmd)
 		mute_be_capture(substream);
 
 		/* Enable ALL ABE BE ports */
+		inc_be_ports(substream, SNDRV_PCM_STREAM_CAPTURE);
 		enable_be_ports(substream, SNDRV_PCM_STREAM_CAPTURE);
 
 		/* DAI work must be started/stopped at least 250us after ABE */
@@ -1362,6 +1450,7 @@ static void capture_trigger(struct snd_pcm_substream *substream, int cmd)
 
 		/*  trigger ALL BE ports */
 		trigger_be_ports(substream, cmd);
+		dec_be_ports(substream, SNDRV_PCM_STREAM_CAPTURE);
 		break;
 	default:
 		break;
@@ -1384,6 +1473,7 @@ static void playback_trigger(struct snd_pcm_substream *substream, int cmd)
 		mute_be_playback(substream);
 
 		/* enabled BE ports */
+		inc_be_ports(substream, SNDRV_PCM_STREAM_PLAYBACK);
 		enable_be_ports(substream, SNDRV_PCM_STREAM_PLAYBACK);
 
 		/* DAI work must be started/stopped at least 250us after ABE */
@@ -1432,6 +1522,7 @@ static void playback_trigger(struct snd_pcm_substream *substream, int cmd)
 
 		/*  trigger ALL BE ports */
 		trigger_be_ports(substream, cmd);
+		dec_be_ports(substream, SNDRV_PCM_STREAM_PLAYBACK);
 		break;
 	default:
 		break;
