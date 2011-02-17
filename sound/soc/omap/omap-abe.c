@@ -888,72 +888,7 @@ static void unmute_be_capture(struct snd_pcm_substream *substream)
 		}
 	}
 }
-#if 0
-static void mute_fe_playback(struct abe_frontend_dai *fe,
-		struct snd_soc_pcm_runtime *be_rtd, int mixer, int *volume)
-{
-	struct snd_soc_pcm_runtime *rtd = fe->substream->private_data;
 
-	switch (rtd->cpu_dai->id) {
-	case ABE_FRONTEND_DAI_MEDIA:
-	case ABE_FRONTEND_DAI_LP_MEDIA:
-		if (be_is_pending(be_rtd, SNDRV_PCM_STREAM_PLAYBACK)) {
-			abe_read_mixer(mixer, volume, MIX_DL1_INPUT_MM_DL);
-			abe_write_mixer(mixer, MUTE_GAIN, RAMP_0MS,
-				MIX_DL1_INPUT_MM_DL);
-		}
-		break;
-	case ABE_FRONTEND_DAI_MODEM:
-	case ABE_FRONTEND_DAI_VOICE:
-		if (be_is_pending(be_rtd, SNDRV_PCM_STREAM_PLAYBACK)) {
-			abe_read_mixer(mixer, volume, MIX_DL1_INPUT_VX_DL);
-			abe_write_mixer(mixer, MUTE_GAIN, RAMP_0MS,
-				MIX_DL1_INPUT_VX_DL);
-		}
-		break;
-	case ABE_FRONTEND_DAI_TONES:
-		if (be_is_pending(be_rtd, SNDRV_PCM_STREAM_PLAYBACK)) {
-			abe_read_mixer(mixer, volume, MIX_DL1_INPUT_TONES);
-			abe_write_mixer(mixer, MUTE_GAIN, RAMP_0MS,
-				MIX_DL1_INPUT_TONES);
-		}
-		break;
-	default:
-		break;
-	}
-}
-
-static void unmute_fe_playback(struct abe_frontend_dai *fe,
-		struct snd_soc_pcm_runtime *be_rtd, int mixer, int volume)
-{
-	struct snd_soc_pcm_runtime *rtd = fe->substream->private_data;
-
-	switch (rtd->cpu_dai->id) {
-	case ABE_FRONTEND_DAI_MEDIA:
-	case ABE_FRONTEND_DAI_LP_MEDIA:
-		if (be_is_pending(be_rtd, SNDRV_PCM_STREAM_PLAYBACK)) {
-			abe_write_mixer(mixer, volume, RAMP_5MS,
-				MIX_DL1_INPUT_MM_DL);
-		}
-		break;
-	case ABE_FRONTEND_DAI_MODEM:
-	case ABE_FRONTEND_DAI_VOICE:
-		if (be_is_pending(be_rtd, SNDRV_PCM_STREAM_PLAYBACK)) {
-			abe_write_mixer(mixer, volume, RAMP_5MS,
-				MIX_DL1_INPUT_VX_DL);
-		}
-		break;
-	case ABE_FRONTEND_DAI_TONES:
-		if (be_is_pending(be_rtd, SNDRV_PCM_STREAM_PLAYBACK)) {
-			abe_write_mixer(mixer, volume, RAMP_5MS,
-				MIX_DL1_INPUT_TONES);
-		}
-		break;
-	default:
-		break;
-	}
-}
-#endif
 static void mute_be_playback(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
