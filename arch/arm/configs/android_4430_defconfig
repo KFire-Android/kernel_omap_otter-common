@@ -736,6 +736,7 @@ CONFIG_BT_HIDP=y
 # CONFIG_BT_HCIBFUSB is not set
 # CONFIG_BT_HCIVHCI is not set
 # CONFIG_BT_MRVL is not set
+CONFIG_BT_WILINK=m
 # CONFIG_AF_RXRPC is not set
 CONFIG_FIB_RULES=y
 # CONFIG_WIRELESS is not set
@@ -817,6 +818,11 @@ CONFIG_UID_STAT=y
 # CONFIG_EEPROM_MAX6875 is not set
 # CONFIG_EEPROM_93CX6 is not set
 # CONFIG_IWMC3200TOP is not set
+
+#
+# Texas Instruments shared transport line discipline
+#
+CONFIG_TI_ST=m
 CONFIG_HAVE_IDE=y
 # CONFIG_IDE is not set
 
@@ -1992,8 +1998,6 @@ CONFIG_IIO=y
 #
 # Texas Instruments shared transport line discipline
 #
-CONFIG_TI_ST=m
-CONFIG_ST_BT=m
 CONFIG_ST_FM=m
 CONFIG_ST_GPS=m
 # CONFIG_ADIS16255 is not set
