@@ -64,6 +64,9 @@
 #include "smartreflex-class3.h"
 #include "board-4430sdp-wifi.h"
 
+#include <linux/skbuff.h>
+#include <linux/ti_wilink_st.h>
+
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
 #define ETH_KS8851_QUART		138
@@ -733,12 +736,33 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.default_device	=	&sdp4430_lcd_device,
 };
 
+
+int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	/* TODO: wait for HCI-LL sleep */
+	return 0;
+}
+int plat_kim_resume(struct platform_device *pdev)
+{
+	return 0;
+}
 /* wl128x BT, FM, GPS connectivity chip */
-static int gpios[] = {55, -1, -1};
+struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = 55,
+	.dev_name = "/dev/ttyO1",
+	.flow_cntrl = 1,
+	.baud_rate = 3000000,
+	.suspend = plat_kim_suspend,
+	.resume = plat_kim_resume,
+};
 static struct platform_device wl128x_device = {
 	.name		= "kim",
 	.id		= -1,
-	.dev.platform_data = &gpios,
+	.dev.platform_data = &wilink_pdata,
+};
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
 };
 
 static struct platform_device *sdp4430_devices[] __initdata = {
@@ -747,6 +771,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_leds_pwm,
 	&sdp4430_leds_gpio,
 	&wl128x_device,
+	&btwilink_device,
 	&sdp4430_hdmi_audio_device,
 	&sdp4430_keypad_led,
 };
