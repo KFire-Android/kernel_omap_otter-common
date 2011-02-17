@@ -39,6 +39,7 @@ obj-$(CONFIG_TWL4030_POWER)    += twl4030-power.o
 obj-$(CONFIG_TWL4030_CODEC)	+= twl4030-codec.o
 obj-$(CONFIG_TWL6030_GPADC)	+= twl6030-gpadc.o
 obj-$(CONFIG_TWL6040_CODEC)	+= twl6040-codec.o twl6040-irq.o
+obj-$(CONFIG_TWL6030_POWEROFF)	+= twl6030-poweroff.o
 
 obj-$(CONFIG_MFD_MC13783)	+= mc13783-core.o
 
