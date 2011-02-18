@@ -50,6 +50,7 @@
 		(dst)->frame_size = (src)->frame_size; \
 		(dst)->channels = (src)->channels; \
 		(dst)->divisor = (src)->divisor; \
+		(dst)->counters = (src)->counters; \
 	} while (0)
 
 #define TXCONV(dst, src) \

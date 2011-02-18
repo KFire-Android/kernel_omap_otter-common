@@ -259,7 +259,9 @@
 
 #define HSI_HSR_OVERRUNACK_REG(port)	(HSI_HSR_BASE(port) + 0x0030)
 
+/* HSR_COUNTERS_Pp is former SSI_TIMEOUT_REG */
 #define HSI_HSR_COUNTERS_REG(port)	(HSI_HSR_BASE(port) + 0x0034)
+#define SSI_TIMEOUT_REG(port)		(HSI_HSR_COUNTERS_REG(port))
 #define HSI_TIMEOUT_DEFAULT		0	/* SSI only */
 #define HSI_SSI_RX_TIMEOUT_MAX		0x1ff	/* SSI only */
 #define HSI_COUNTERS_FT_MASK		0x000fffff	/* HSI only */

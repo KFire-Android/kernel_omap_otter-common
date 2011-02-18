@@ -66,6 +66,7 @@ struct hsi_rx_config {
 	__u32 frame_size;
 	__u32 channels;
 	__u32 divisor;		/* not used for SSI */
+	__u32 counters;
 };
 
 #endif /* HSI_CHAR_H */

@@ -27,56 +27,54 @@
  * (but with error counters deactivated). This function implements the
  * the transitions to/from this mode.
  */
-int hsi_set_rx_divisor(struct hsi_port *sport, u32 divisor)
+int hsi_set_rx_divisor(struct hsi_port *sport, struct hsr_ctx *cfg)
 {
 	struct hsi_dev *hsi_ctrl = sport->hsi_controller;
 	void __iomem *base = hsi_ctrl->base;
 	int port = sport->port_number;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 
-	if (divisor == NOT_SET)
+	if (cfg->divisor == NOT_SET)
 		return 0;
 
 	if (hsi_driver_device_is_hsi(pdev)) {
-		if (divisor == HSI_HSR_DIVISOR_AUTO && sport->counters_on) {
+		if (cfg->divisor == HSI_HSR_DIVISOR_AUTO &&
+		    sport->counters_on) {
 			/* auto mode: deactivate counters + set divisor = 0 */
-			sport->reg_counters = hsi_inl(base,
-						      HSI_HSR_COUNTERS_REG
-						      (port));
+			sport->reg_counters = hsi_inl(base, HSI_HSR_COUNTERS_REG
+							    (port));
 			sport->counters_on = 0;
 			hsi_outl(0, base, HSI_HSR_COUNTERS_REG(port));
 			hsi_outl(0, base, HSI_HSR_DIVISOR_REG(port));
 			dev_dbg(hsi_ctrl->dev, "Switched to HSR auto mode\n");
-		} else if (divisor != HSI_HSR_DIVISOR_AUTO) {
+		} else if (cfg->divisor != HSI_HSR_DIVISOR_AUTO) {
 			/* Divisor set mode: use counters */
-			if (!sport->counters_on) {
-				/* Leave auto mode: restore counters */
-				hsi_outl(sport->reg_counters, base,
-					 HSI_HSR_COUNTERS_REG(port));
-				sport->counters_on = 1;
-				dev_dbg(hsi_ctrl->dev, "Left HSR auto mode. "
-					"Counters=0x%lx\n",
-					sport->reg_counters);
-			}
-			hsi_outl(divisor, base, HSI_HSR_DIVISOR_REG(port));
+			/* Leave auto mode: use new counters values */
+			sport->reg_counters = cfg->counters;
+			sport->counters_on = 1;
+			hsi_outl(cfg->counters, base,
+				 HSI_HSR_COUNTERS_REG(port));
+			hsi_outl(cfg->divisor, base, HSI_HSR_DIVISOR_REG(port));
+			dev_dbg(hsi_ctrl->dev, "Left HSR auto mode. "
+				"Counters=0x%08x, Divisor=0x%08x\n",
+				cfg->counters, cfg->divisor);
 		}
 	} else {
-		if (divisor == HSI_HSR_DIVISOR_AUTO && sport->counters_on) {
+		if (cfg->divisor == HSI_HSR_DIVISOR_AUTO &&
+		    sport->counters_on) {
 			/* auto mode: deactivate timeout */
 			sport->reg_counters = hsi_inl(base,
-						      HSI_HSR_COUNTERS_REG
-						      (port));
+						      SSI_TIMEOUT_REG(port));
 			sport->counters_on = 0;
-			hsi_outl(0, base, HSI_HSR_COUNTERS_REG(port));
+			hsi_outl(0, base, SSI_TIMEOUT_REG(port));
 			dev_dbg(hsi_ctrl->dev, "Deactivated SSR timeout\n");
-		} else if (divisor == HSI_SSR_DIVISOR_USE_TIMEOUT &&
-			   !sport->counters_on) {
-			/* Leave auto mode: restore timeout */
-			hsi_outl(sport->reg_counters, base,
-				 HSI_HSR_COUNTERS_REG(port));
+		} else if (cfg->divisor == HSI_SSR_DIVISOR_USE_TIMEOUT) {
+			/* Leave auto mode: use new counters values */
+			sport->reg_counters = cfg->counters;
 			sport->counters_on = 1;
-			dev_dbg(hsi_ctrl->dev, "Re-activated SSR timeout; "
-				"timeout=0x%lx\n", sport->reg_counters);
+			hsi_outl(cfg->counters, base, SSI_TIMEOUT_REG(port));
+			dev_dbg(hsi_ctrl->dev, "Left SSR auto mode. "
+				"Timeout=0x%08x\n", cfg->counters);
 		}
 	}
 
@@ -142,9 +140,7 @@ int hsi_set_rx(struct hsi_port *sport, struct hsr_ctx *cfg)
 				 HSI_HSR_CHANNELS_REG(port));
 	}
 
-	/* HSI_TODO: HSR counters need to be configurable */
-
-	return hsi_set_rx_divisor(sport, cfg->divisor);
+	return hsi_set_rx_divisor(sport, cfg);
 }
 
 void hsi_get_rx(struct hsi_port *sport, struct hsr_ctx *cfg)
@@ -159,8 +155,12 @@ void hsi_get_rx(struct hsi_port *sport, struct hsr_ctx *cfg)
 	    >> HSI_FLOW_OFFSET;
 	cfg->frame_size = hsi_inl(base, HSI_HSR_FRAMESIZE_REG(port));
 	cfg->channels = hsi_inl(base, HSI_HSR_CHANNELS_REG(port));
-	if (hsi_driver_device_is_hsi(pdev))
+	if (hsi_driver_device_is_hsi(pdev)) {
 		cfg->divisor = hsi_inl(base, HSI_HSR_DIVISOR_REG(port));
+		cfg->counters = hsi_inl(base, HSI_HSR_COUNTERS_REG(port));
+	} else {
+		cfg->counters = hsi_inl(base, SSI_TIMEOUT_REG(port));
+	}
 }
 
 int hsi_set_tx(struct hsi_port *sport, struct hst_ctx *cfg)
