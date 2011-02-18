@@ -21,6 +21,7 @@
 
 #include <linux/clk.h>
 #include <linux/platform_device.h>
+#include <linux/cdc_tcxo.h>
 #include <linux/i2c.h>
 #include <linux/mfd/twl6040-codec.h>
 #include <linux/i2c/twl.h>
@@ -125,6 +126,16 @@ static int sdp4430_mcpdm_hw_params(struct snd_pcm_substream *substream,
 	if (twl6040_power_mode) {
 		clk_id = TWL6040_SYSCLK_SEL_HPPLL;
 		freq = 38400000;
+		/*
+		 * TWL6040 requires MCLK to be active as long as
+		 * high-performance mode is in use. Glitch-free mux
+		 * cannot tolerate MCLK gating
+		 */
+		ret = cdc_tcxo_set_req_int(CDC_TCXO_CLK2, 1);
+		if (ret) {
+			printk(KERN_ERR "failed to enable twl6040 MCLK\n");
+			return ret;
+		}
 	} else {
 		clk_id = TWL6040_SYSCLK_SEL_LPPLL;
 		freq = 32768;
@@ -136,6 +147,15 @@ static int sdp4430_mcpdm_hw_params(struct snd_pcm_substream *substream,
 	if (ret) {
 		printk(KERN_ERR "can't set codec system clock\n");
 		return ret;
+	}
+
+	/* low-power mode uses 32k clock, MCLK is not required */
+	if (!twl6040_power_mode) {
+		ret = cdc_tcxo_set_req_int(CDC_TCXO_CLK2, 0);
+		if (ret) {
+			printk(KERN_ERR "failed to disable twl6040 MCLK\n");
+			return ret;
+		}
 	}
 
 	if (rtd->current_fe == ABE_FRONTEND_DAI_MODEM) {
@@ -954,6 +974,16 @@ static int __init sdp4430_soc_init(void)
 	/* Only configure the TPS6130x on SDP4430 */
 	if (machine_is_omap_4430sdp())
 		sdp4430_tps6130x_configure();
+
+	/* Default mode is low-power, MCLK not required */
+	twl6040_power_mode = 0;
+	cdc_tcxo_set_req_int(CDC_TCXO_CLK2, 0);
+
+	/*
+	 * CDC CLK2 supplies TWL6040 MCLK, drive it from REQ2INT to
+	 * have full control of MCLK gating
+	 */
+	cdc_tcxo_set_req_prio(CDC_TCXO_CLK2, CDC_TCXO_PRIO_REQINT);
 
 	return ret;
 
