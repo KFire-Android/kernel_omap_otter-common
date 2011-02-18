@@ -31,6 +31,7 @@
 #include <linux/delay.h>
 #include <linux/twl6040-vib.h>
 #include <linux/wl12xx.h>
+#include <linux/cdc_tcxo.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -1187,6 +1188,24 @@ static struct bq2415x_platform_data sdp4430_bqdata = {
 	.max_charger_currentmA = 1550,
 };
 
+/*
+ * The Clock Driver Chip (TCXO) on OMAP4 based SDP needs to
+ * be programmed to output CLK1 based on REQ1 from OMAP.
+ * By default CLK1 is driven based on an internal REQ1INT signal
+ * which is always set to 1.
+ * Doing this helps gate sysclk (from CLK1) to OMAP while OMAP
+ * is in sleep states.
+ */
+static struct cdc_tcxo_platform_data sdp4430_cdc_data = {
+	.buf = {
+		CDC_TCXO_REQ4INT | CDC_TCXO_REQ1INT |
+		CDC_TCXO_REQ4POL | CDC_TCXO_REQ3POL |
+		CDC_TCXO_REQ2POL | CDC_TCXO_REQ1POL,
+		CDC_TCXO_MREQ4 | CDC_TCXO_MREQ3 |
+		CDC_TCXO_MREQ2 | CDC_TCXO_MREQ1,
+		0, 0 },
+};
+
 static struct cma3000_platform_data cma3000_platform_data = {
 	.def_poll_rate = 200,
 	.fuzz_x = 25,
@@ -1219,6 +1238,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	},
 	{
 		I2C_BOARD_INFO("cdc_tcxo_driver", 0x6c),
+		.platform_data = &sdp4430_cdc_data,
 	},
 };
 
