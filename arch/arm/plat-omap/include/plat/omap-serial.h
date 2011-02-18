@@ -114,6 +114,7 @@ struct omap_uart_port_info {
 	int                     dma_rx_timeout; /* DMA RX timeout */
 	unsigned int            idle_timeout;   /* Omap Uart Idle Time out */
 	u8			omap4_tx_threshold;
+	int			uart_wakeup_event;
 	void			(*plat_hold_wakelock)(void *p, int flag);
 
 	u16			rts_padconf;

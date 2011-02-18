@@ -84,6 +84,7 @@
 
 #define TWL6030_RTC_GPIO 6
 #define BLUETOOTH_UART UART2
+#define CONSOLE_UART UART3
 
 static struct wake_lock uart_lock;
 static struct platform_device sdp4430_hdmi_audio_device = {
@@ -1361,7 +1362,7 @@ void plat_hold_wakelock(void *up, int flag)
 		wake_lock_timeout(&uart_lock, 2*HZ);
 
 	/*Specific wakelock for console usecases*/
-	if ((up2->pdev->id != BLUETOOTH_UART)
+	if ((up2->pdev->id == CONSOLE_UART)
 		&& ((flag == WAKELK_IRQ) || (flag == WAKELK_RESUME)))
 		wake_lock_timeout(&uart_lock, 5*HZ);
 	return;

@@ -505,9 +505,11 @@ static bool omap_uart_is_wakeup_src(struct omap_uart_state *uart)
 void omap_uart_resume_idle(int num)
 {
 	struct omap_uart_state *uart;
+	struct omap_uart_port_info *pdata;
 
 	list_for_each_entry(uart, &uart_list, node) {
 		if (num == uart->num) {
+			pdata = uart->pdev->dev.platform_data;
 			omap_uart_enable_clocks(uart);
 			omap_uart_disable_rtspullup(uart);
 
@@ -515,8 +517,11 @@ void omap_uart_resume_idle(int num)
 			if (omap_uart_is_wakeup_src(uart)) {
 				omap_uart_block_sleep(uart);
 
+				if (pdata && pdata->plat_hold_wakelock)
+					pdata->uart_wakeup_event = 1;
+
 				if (cpu_is_omap44xx())
-					omap_uart_update_jiffies(1);
+					omap_uart_update_jiffies(uart->num);
 			}
 
 			/* Check for normal UART wakeup */

@@ -379,9 +379,6 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	unsigned int iir, lsr;
 	unsigned long flags;
 
-	if (omap_is_console_port(&up->port) &&
-			 (up->plat_hold_wakelock))
-				(up->plat_hold_wakelock(up, WAKELK_IRQ));
 #ifdef CONFIG_PM
 	/*
 	 * This will enable the clock for some reason if the
@@ -400,8 +397,12 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	lsr = serial_in(up, UART_LSR);
 	if (iir & UART_IIR_RLSI) {
 		if (!up->use_dma) {
-			if (lsr & UART_LSR_DR)
+			if (lsr & UART_LSR_DR) {
 				receive_chars(up, &lsr);
+				if (omap_is_console_port(&up->port) &&
+						(up->plat_hold_wakelock))
+					up->plat_hold_wakelock(up, WAKELK_IRQ);
+			}
 		} else {
 			up->ier &= ~UART_IER_RDI;
 			serial_out(up, UART_IER, up->ier);
@@ -1093,6 +1094,11 @@ static int
 serial_omap_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct uart_omap_port *up = platform_get_drvdata(pdev);
+	struct omap_uart_port_info *omap_up_info = pdev->dev.platform_data;
+
+	/* Reset the uart wakeup event */
+	omap_up_info->uart_wakeup_event = 0;
+
 	if (up)
 		uart_suspend_port(&serial_omap_reg, &up->port);
 
@@ -1103,10 +1109,12 @@ serial_omap_suspend(struct platform_device *pdev, pm_message_t state)
 static int serial_omap_resume(struct platform_device *dev)
 {
 	struct uart_omap_port *up = platform_get_drvdata(dev);
+	struct omap_uart_port_info *omap_up_info = dev->dev.platform_data;
 
-	if (omap_is_console_port(&up->port))
-			if (up->plat_hold_wakelock)
-				(up->plat_hold_wakelock(up, WAKELK_RESUME));
+	if (omap_is_console_port(&up->port) && up->plat_hold_wakelock &&
+			omap_up_info->uart_wakeup_event)
+		up->plat_hold_wakelock(up, WAKELK_RESUME);
+
 	if (up)
 		uart_resume_port(&serial_omap_reg, &up->port);
 
