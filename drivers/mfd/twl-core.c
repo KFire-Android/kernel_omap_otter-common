@@ -614,6 +614,17 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
+		if (twl_has_bci() && pdata->bci &&
+			!(features & (TPS_SUBSET | TWL5031))) {
+			child = add_child(3, "twl4030_bci",
+			pdata->bci, sizeof(*pdata->bci),
+			false,
+			/* irq0 = CHG_PRES, irq1 = BCI */
+			pdata->irq_base + BCI_PRES_INTR_OFFSET,
+			pdata->irq_base + BCI_INTR_OFFSET);
+			if (IS_ERR(child))
+				return PTR_ERR(child);
+		}
 	if (twl_has_bci() && pdata->bci &&
 	    (features & TWL6030_CLASS)) {
 		child = add_child(1, "twl6030_bci",

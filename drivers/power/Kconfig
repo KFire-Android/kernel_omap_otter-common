@@ -89,6 +89,13 @@ config BATTERY_OLPC
 	help
 	  Say Y to enable support for the battery on the OLPC laptop.
 
+config TWL4030_BCI_BATTERY
+	tristate "OMAP TWL4030 BCI Battery driver"
+	depends on TWL4030_CORE && TWL4030_MADC
+	help
+          Support for the OMAP TWL4030 BCI Battery driver.
+	  This driver gives support for the TWL4030 Battery Charge Interface.
+
 config TWL6030_BCI_BATTERY
 	tristate "OMAP TWL6030 BCI Battery driver"
 	depends on TWL4030_CORE && TWL6030_GPADC
