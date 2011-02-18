@@ -243,17 +243,20 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 	 */
 	if (twl->prev_vbus != (vbus_state & VBUS_DET)) {
 		if (!(hw_state & STS_USB_ID)) {
-			if (vbus_state & VBUS_DET)
+			if (vbus_state & VBUS_DET) {
 				status = USB_EVENT_VBUS;
+				twl->otg.default_a = false;
+				twl->otg.state = OTG_STATE_B_IDLE;
+			}
 			else
 				status = USB_EVENT_NONE;
 
 			if (status >= 0) {
+				twl->linkstat = status;
 				blocking_notifier_call_chain(&twl->otg.notifier,
 						status, twl->otg.gadget);
 			}
 		}
-		twl->linkstat = status;
 		sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 	}
 	twl->prev_vbus = vbus_state & VBUS_DET;
@@ -264,41 +267,30 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 {
 	struct twl6030_usb *twl = _twl;
-	int status ;
+	int status = USB_EVENT_NONE;
+	u8 hw_state;
 
-	status = twl6030_readb(twl, TWL_MODULE_USB, USB_ID_INT_SRC);
+	hw_state = twl6030_readb(twl, TWL6030_MODULE_ID0, STS_HW_CONDITIONS);
 
-	if (status & ID_GND) {
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_LATCH_CLR,
-								status);
+	if (hw_state & STS_USB_ID) {
 
 		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_CLR, 0x1);
 		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_SET,
-								0x10);
+									0x10);
 		status = USB_EVENT_ID;
-
-		blocking_notifier_call_chain(&twl->otg.notifier, status,
-							twl->otg.gadget);
-
 		twl->otg.default_a = true;
 		twl->otg.state = OTG_STATE_A_IDLE;
-
-	} else if (status & ID_FLOAT) {
-
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_LATCH_CLR,
-								status);
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_CLR,
-								0x10);
-		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_SET,
-								0x1);
-
-		twl->otg.default_a = false;
-		twl->otg.state = OTG_STATE_B_IDLE;
 		blocking_notifier_call_chain(&twl->otg.notifier, status,
-					twl->otg.gadget);
+							twl->otg.gadget);
+	} else {
+		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_CLR,
+									0x10);
+		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_SET,
+									0x1);
 	}
 	twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_LATCH_CLR, status);
-	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
+	twl->linkstat = status;
+
 	return IRQ_HANDLED;
 }
 
