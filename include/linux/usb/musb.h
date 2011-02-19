@@ -11,7 +11,10 @@
 #define __LINUX_USB_MUSB_H
 
 #include <linux/platform_device.h>
+#include <linux/wakelock.h>
+#include <linux/pm_qos_params.h>
 #include <plat/omap_hwmod.h>
+#include <plat/omap-pm.h>
 
 /* The USB role is defined by the connector used on the board, so long as
  * standards are being followed.  (Developer boards sometimes won't.)
@@ -147,9 +150,16 @@ struct musb_hdrc_platform_data {
 
 	/* Clear the enable wakeup bit  of sysconfig register */
 	int		(*disable_wakeup)(struct omap_device *od);
+
 	/* This is used for L3 constrint */
 	int		(*set_min_bus_tput)(struct device *dev,
 						u8 agent_id, long r);
+
+	/* This is used for C state constraint */
+	struct pm_qos_request_list *musb_qos_request;
+
+	/* This is used for holding a wakelock */
+	struct wake_lock musb_lock;
  };
 
 

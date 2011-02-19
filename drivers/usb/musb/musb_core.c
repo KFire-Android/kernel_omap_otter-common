@@ -729,6 +729,14 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 
 		musb->ep0_stage = MUSB_EP0_START;
 
+		/* Hold a wakelock */
+		wake_lock(&plat->musb_lock);
+
+		/* Hold a L3 constarint */
+		if (plat->set_min_bus_tput)
+			plat->set_min_bus_tput(musb->controller,
+					OCP_INITIATOR_AGENT, (200*1000*4));
+
 #ifdef CONFIG_USB_MUSB_OTG
 		/* flush endpoints when transitioning from Device Mode */
 		if (is_peripheral_active(musb)) {
@@ -793,6 +801,14 @@ b_host:
 				otg_state_string(musb),
 				MUSB_MODE(musb), devctl);
 		handled = IRQ_HANDLED;
+
+		/* Release the wakelock */
+		wake_unlock(&plat->musb_lock);
+
+		/* Release L3 constraint */
+		if (plat->set_min_bus_tput)
+			plat->set_min_bus_tput(musb->controller,
+						OCP_INITIATOR_AGENT, -1);
 
 		switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
@@ -859,6 +875,17 @@ b_host:
 			}
 		} else if (is_peripheral_capable()) {
 			DBG(1, "BUS RESET as %s\n", otg_state_string(musb));
+
+			/* Hold a wakelock */
+			wake_lock(&plat->musb_lock);
+
+			/* hold the L3 constraint as there was performance drop
+			 * with ondemand governor
+			 */
+			if (plat->set_min_bus_tput)
+				plat->set_min_bus_tput(musb->controller,
+					OCP_INITIATOR_AGENT, (200*1000*4));
+
 			switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_OTG
 			case OTG_STATE_A_SUSPEND:

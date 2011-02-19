@@ -32,17 +32,12 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/pm_runtime.h>
-#include <linux/wakelock.h>
-#include <linux/pm_qos_params.h>
-
-#include <plat/omap-pm.h>
 
 #include "musb_core.h"
 #include "omap2430.h"
 
 
 static struct timer_list musb_idle_timer;
-static struct wake_lock usb_lock;
 static void __iomem *ctrl_base;
 void __iomem *phymux_base;
 
@@ -76,7 +71,6 @@ int musb_notifier_call(struct notifier_block *nb,
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_musb_board_data *data = pdata->board_data;
-	static struct pm_qos_request_list *usb_qos_request;
 	static int hostmode;
 	u32 val;
 
@@ -87,8 +81,8 @@ int musb_notifier_call(struct notifier_block *nb,
 		/* configure musb into smartidle with wakeup enabled
 		 * smart standby mode.
 		 */
-		wake_lock(&usb_lock);
-		omap_pm_set_max_mpu_wakeup_lat(&usb_qos_request, 4000);
+
+		omap_pm_set_max_mpu_wakeup_lat(&pdata->musb_qos_request, 4000);
 
 		musb_writel(musb->mregs, OTG_FORCESTDBY, 0);
 		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
@@ -104,10 +98,6 @@ int musb_notifier_call(struct notifier_block *nb,
 			musb_enable_vbus(musb);
 		}
 
-		if (pdata->set_min_bus_tput)
-			pdata->set_min_bus_tput(musb->controller,
-				OCP_INITIATOR_AGENT, (200*1000*4));
-
 		val = __raw_readl(phymux_base +
 				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
 
@@ -119,7 +109,6 @@ int musb_notifier_call(struct notifier_block *nb,
 
 	case USB_EVENT_VBUS:
 		DBG(1, "VBUS Connect\n");
-		wake_lock(&usb_lock);
 
 		/* configure musb into smartidle with wakeup enabled
 		 * smart standby mode.
@@ -141,16 +130,11 @@ int musb_notifier_call(struct notifier_block *nb,
 			}
 		}
 
-		/* hold the L3 constraint as there was performance drop with
-		 * ondemand governor
-		 */
-		if (pdata->set_min_bus_tput)
-			pdata->set_min_bus_tput(musb->controller,
-					OCP_INITIATOR_AGENT, (200*1000*4));
 		break;
 
 	case USB_EVENT_NONE:
 		DBG(1, "VBUS Disconnect\n");
+
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
 			/* enable this clock because in suspend interrupt
 			 * handler phy clocks are disabled. If phy clocks are
@@ -172,11 +156,7 @@ int musb_notifier_call(struct notifier_block *nb,
 		val |= FORCEIDLE | FORCESTDBY;
 		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
 
-		wake_unlock(&usb_lock);
-		/* Release L3 constraint */
-		if (pdata->set_min_bus_tput)
-			pdata->set_min_bus_tput(musb->controller,
-						OCP_INITIATOR_AGENT, -1);
+		omap_pm_set_max_mpu_wakeup_lat(&pdata->musb_qos_request, -1);
 
 		val = __raw_readl(phymux_base +
 				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
@@ -421,14 +401,14 @@ int __init musb_platform_init(struct musb *musb)
 	if (cpu_is_omap44xx()) {
 		phymux_base = ioremap(0x4A100000, SZ_1K);
 		ctrl_base = ioremap(0x4A002000, SZ_1K);
-		wake_lock_init(&usb_lock, WAKE_LOCK_SUSPEND, "musb_wake_lock");
+		wake_lock_init(&plat->musb_lock, WAKE_LOCK_SUSPEND, "musb_wake_lock");
 
 		/* register for transciever notification*/
 		status = otg_register_notifier(musb->xceiv, &musb->nb);
 
 		if (status) {
 			DBG(1, "notification register failed\n");
-			wake_lock_destroy(&usb_lock);
+			wake_lock_destroy(&plat->musb_lock);
 		}
 		ctrl_base = ioremap(0x4A002000, SZ_1K);
 		if (!ctrl_base) {
@@ -528,10 +508,13 @@ static int musb_platform_resume(struct musb *musb)
 
 int musb_platform_exit(struct musb *musb)
 {
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *plat = dev->platform_data;
+
 	if (cpu_is_omap44xx()) {
 		/* register for transciever notification*/
 		otg_unregister_notifier(musb->xceiv, &musb->nb);
-		wake_lock_destroy(&usb_lock);
+		wake_lock_destroy(&plat->musb_lock);
 	}
 	musb_platform_suspend(musb);
 	if (cpu_is_omap44xx()) {
