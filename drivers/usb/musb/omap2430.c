@@ -398,10 +398,10 @@ int __init musb_platform_init(struct musb *musb)
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 	plat->is_usb_active = is_musb_active;
 
+	wake_lock_init(&plat->musb_lock, WAKE_LOCK_SUSPEND, "musb_wake_lock");
 	if (cpu_is_omap44xx()) {
 		phymux_base = ioremap(0x4A100000, SZ_1K);
 		ctrl_base = ioremap(0x4A002000, SZ_1K);
-		wake_lock_init(&plat->musb_lock, WAKE_LOCK_SUSPEND, "musb_wake_lock");
 
 		/* register for transciever notification*/
 		status = otg_register_notifier(musb->xceiv, &musb->nb);
@@ -514,8 +514,8 @@ int musb_platform_exit(struct musb *musb)
 	if (cpu_is_omap44xx()) {
 		/* register for transciever notification*/
 		otg_unregister_notifier(musb->xceiv, &musb->nb);
-		wake_lock_destroy(&plat->musb_lock);
 	}
+	wake_lock_destroy(&plat->musb_lock);
 	musb_platform_suspend(musb);
 	if (cpu_is_omap44xx()) {
 		iounmap(ctrl_base);
