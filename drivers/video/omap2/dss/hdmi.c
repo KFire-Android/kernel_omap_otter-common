@@ -1952,7 +1952,7 @@ static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
 static void hdmi_get_edid(struct omap_dss_device *dssdev)
 {
 	u8 i = 0, mark = 0, *e;
-	int offset, addr;
+	int offset, addr, length;
 	struct HDMI_EDID *edid_st = (struct HDMI_EDID *)edid;
 	struct image_format *img_format;
 	struct audio_format *aud_format;
@@ -2056,10 +2056,21 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 				dss_debug = mark;
 			}
 		}
+		hdmi_get_video_svds(edid, &offset, &length);
+		printk(KERN_INFO "No of SVDs: %d", length);
+		for (i = 0; i < length; i++) {
+			printk(KERN_INFO "SVD[%d]: CEA code[%d], native[%s]",
+				i, edid[offset+i] & HDMI_EDID_EX_VIDEO_MASK,
+				edid[offset+i] & HDMI_EDID_EX_VIDEO_NATIVE ?
+				"YES" : "NO");
+		}
+		printk(KERN_INFO "No. of native DTD: %d",
+				(edid[EDID_DESCRIPTOR_BLOCK1_ADDRESS + 3]
+			& HDMI_VIDEO_NATIVE_DTDS_MASK));
+
 		printk(KERN_INFO "Supports basic audio: %s",
 				(edid[EDID_DESCRIPTOR_BLOCK1_ADDRESS + 3]
 			& HDMI_AUDIO_BASIC_MASK) ? "YES" : "NO");
-
 	}
 
 	printk(KERN_INFO "Has IEEE HDMI ID: %s",
