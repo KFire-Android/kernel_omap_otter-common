@@ -287,6 +287,21 @@ bool hdmi_has_ieee_id(u8 *edid)
 	return 0;
 }
 
+int hdmi_get_video_svds(u8 *edid, int *offset, int *length)
+{
+	enum extension_edid_db vdb =  DATABLOCK_VIDEO;
+	if ((offset == NULL) || (length == NULL))
+		return 0;
+	if (!hdmi_get_datablock_offset(edid, vdb, offset)) {
+		*length = edid[*offset] & HDMI_EDID_EX_DATABLOCK_LEN_MASK;
+		(*offset)++;
+		return 1;
+	}
+	*length = 0;
+	*offset = 0;
+	return 0;
+}
+
 void hdmi_get_av_delay(u8 *edid, struct latency *lat)
 {
 	int offset, current_byte, length = 0;

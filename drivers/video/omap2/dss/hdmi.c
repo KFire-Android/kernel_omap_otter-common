@@ -2234,9 +2234,10 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
  */
 static int get_edid_timing_data(struct HDMI_EDID *edid)
 {
-	u8 i, code, offset = 0, addr = 0;
+	u8 i, j, code, offset = 0, addr = 0;
 	struct hdmi_cm cm;
 	bool audio_support = false;
+	int svd_base, svd_length, svd_code, svd_native;
 
 	/*
 	 *  Verify if the sink supports audio
@@ -2271,6 +2272,34 @@ static int get_edid_timing_data(struct HDMI_EDID *edid)
 		DSSDBG("code = %d , mode = %d", hdmi.code, hdmi.mode);
 		return 1;
 	}
+	/* Search SVDs in block 1 twice: first natives and then all */
+	if (edid->extension_edid != 0x00) {
+		hdmi_get_video_svds((u8 *)edid, &svd_base, &svd_length);
+		for (j = 1; j >= 0; j--) {
+			for (i = 0; i < svd_length; i++) {
+				svd_native = ((u8 *)edid)[svd_base+i]
+					& HDMI_EDID_EX_VIDEO_NATIVE;
+				svd_code = ((u8 *)edid)[svd_base+i]
+					& HDMI_EDID_EX_VIDEO_MASK;
+				if (svd_code >= ARRAY_SIZE(code_cea))
+					continue;
+				/* Check if this SVD is native*/
+				if (!svd_native && j)
+					continue;
+				/* Check if this 3D CEA timing is supported*/
+				if (hdmi.s3d_enabled &&
+					s3d_code_cea[svd_code] == -1)
+					continue;
+				/* Check if this CEA timing is supported*/
+				if (code_cea[svd_code] == -1)
+					continue;
+				hdmi.code = svd_code;
+				hdmi.mode = 1;
+				return 1;
+			}
+		}
+	}
+	/* Search DTDs in block1 */
 	if (edid->extension_edid != 0x00) {
 		offset = edid->offset_dtd;
 		if (offset != 0)
