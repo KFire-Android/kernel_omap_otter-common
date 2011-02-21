@@ -2122,7 +2122,8 @@ static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata)
 		return -EBUSY;
 	}
 
-	down_interruptible(&omap->mutex);
+	if (down_interruptible(&omap->mutex))
+		return -ERESTARTSYS;
 
 	memcpy(pdata, &omap->platdata, sizeof(omap->platdata));
 
@@ -2149,7 +2150,8 @@ static int uhhtll_get_resource(enum driver_type drvtype,
 		return -EBUSY;
 	}
 
-	down_interruptible(&omap->mutex);
+	if (down_interruptible(&omap->mutex))
+		return -ERESTARTSYS;
 
 	if (drvtype == OMAP_EHCI)
 		memcpy(omap_res, &omap->ehci_res, sizeof(omap->ehci_res));
@@ -2176,7 +2178,8 @@ static int uhhtll_drv_enable(enum driver_type drvtype)
 		return ret;
 	}
 
-	down_interruptible(&omap->mutex);
+	if (down_interruptible(&omap->mutex))
+		return -ERESTARTSYS;
 
 	ret = usbhs_enable(omap, 1);
 
@@ -2210,7 +2213,8 @@ static int uhhtll_drv_disable(enum driver_type drvtype)
 
 	dev_dbg(&omap->pdev->dev, "uhhtll_drv_disable");
 
-	down_interruptible(&omap->mutex);
+	if (down_interruptible(&omap->mutex))
+		return -ERESTARTSYS;
 
 	if ((drvtype == OMAP_EHCI) &&
 		test_bit(USBHS_EHCI_LOADED, &omap->event_state)) {
@@ -2253,7 +2257,8 @@ static int uhhtll_drv_suspend(enum driver_type drvtype)
 	}
 
 	dev_dbg(&omap->pdev->dev, "uhhtll_drv_suspend\n");
-	down_interruptible(&omap->mutex);
+	if (down_interruptible(&omap->mutex))
+		return -ERESTARTSYS;
 
 
 	if ((drvtype == OMAP_EHCI) &&
@@ -2295,7 +2300,8 @@ static int uhhtll_drv_resume(enum driver_type drvtype)
 		return -EBUSY;
 	}
 
-	down_interruptible(&omap->mutex);
+	if (down_interruptible(&omap->mutex))
+		return -ERESTARTSYS;
 
 	if ((drvtype == OMAP_EHCI) &&
 		test_bit(USBHS_EHCI_LOADED, &omap->event_state)) {
