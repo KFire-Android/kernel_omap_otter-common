@@ -814,6 +814,9 @@ exit:
 	SCXL4SECClockDomainDisable(true);
 	tf_wake_unlock();
 
+	if (ret > 0)
+		ret = -EFAULT;
+
 	return ret;
 }
 
