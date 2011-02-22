@@ -630,6 +630,11 @@ void opp_init_cpufreq_table(struct device *dev,
 	*table = &freq_table[0];
 }
 
+void opp_exit_cpufreq_table(struct cpufreq_frequency_table **table)
+{
+	kfree(*table);
+}
+
 struct device **opp_init_voltage_params(struct voltagedomain *voltdm,
 					int *dev_count)
 {
