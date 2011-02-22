@@ -519,7 +519,6 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 			}
 #endif
 		} else {
-			otg_set_clk(musb->xceiv, 1);
 
 			switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
@@ -696,7 +695,6 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 							OTG_TIME_B_ASE0_BRST));
 #endif
 			}
-			otg_set_clk(musb->xceiv, 0);
 			break;
 		case OTG_STATE_A_WAIT_BCON:
 			if (musb->a_wait_bcon != 0)
