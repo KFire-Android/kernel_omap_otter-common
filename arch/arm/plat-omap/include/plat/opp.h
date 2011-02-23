@@ -77,7 +77,8 @@ struct omap_opp *opp_find_freq_floor(struct device *dev, unsigned long *freq);
 
 struct omap_opp *opp_find_freq_ceil(struct device *dev, unsigned long *freq);
 
-struct omap_opp *opp_find_voltage(struct device *dev, unsigned long volt);
+struct omap_opp *opp_find_voltage(struct device *dev, unsigned long volt,
+		bool enabled);
 
 int opp_set_rate(struct device *dev, unsigned long freq);
 
@@ -139,7 +140,8 @@ static inline struct omap_opp *opp_find_freq_ceil(struct device *dev,
 }
 
 static inline struct omap_opp *opp_find_voltage(struct device *dev,
-						unsigned long volt)
+						unsigned long volt,
+						bool enabled)
 {
 	return ERR_PTR(-EINVAL);
 }

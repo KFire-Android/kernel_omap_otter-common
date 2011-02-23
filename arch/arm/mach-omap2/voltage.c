@@ -2402,7 +2402,7 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 		struct omap_opp *opp;
 		unsigned long freq;
 
-		opp = opp_find_voltage(vdd->dev_list[i], volt);
+		opp = opp_find_voltage(vdd->dev_list[i], volt, true);
 		if (IS_ERR(opp)) {
 			dev_err(vdd->dev_list[i], "%s: Unable to find OPP for"
 				"volt%ld\n", __func__, volt);
