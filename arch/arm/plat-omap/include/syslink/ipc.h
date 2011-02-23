@@ -181,9 +181,8 @@ int ipc_unregister_notifier(struct notifier_block *nb);
 /* check if ipc is in recovery state */
 #ifdef CONFIG_SYSLINK_RECOVERY
 bool ipc_recovering(void);
-#endif
 
 /* Indicate to schedule the recovery mechanism */
 void ipc_recover_schedule(void);
-
+#endif /* ifdef CONFIG_SYSLINK_RECOVERY */
 #endif /* ifndef _IPC_H_ */
