@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/clk.h>
+#include <linux/regulator/machine.h>
 
 #include <mach/irqs.h>
 #include <plat/mux.h>
@@ -272,6 +273,7 @@ int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
 
 	BUG_ON(bus_id < 1 || bus_id > omap_i2c_nr_ports());
 
+	regulator_has_full_constraints();
 	if (info) {
 		err = i2c_register_board_info(bus_id, info, len);
 		if (err)
