@@ -288,14 +288,10 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		"Data Available interrupt for channel %d.\n", n_ch);
 
 	/*
-	 * Check race condition: DMA RX initiated as RX transmission just
-	 * started in interrupt mode (default) -
-	 * acknowledge then ignore interrupt occurence
+	 * Check race condition: RX transmission initiated but DMA transmission
+	 * already started - acknowledge then ignore interrupt occurence
 	 */
 	if (ch->read_data.lch != -1) {
-		dev_err(hsi_ctrl->dev, "DMA RX initiated but RX already"
-					" started in interrupt mode\n");
-
 		hsi_driver_disable_read_interrupt(ch);
 		goto done;
 	}
@@ -319,7 +315,7 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		fifo = hsi_fifo_get_id(hsi_ctrl, n_ch, n_p);
 		fifo_words_avail = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
 		if (fifo_words_avail)
-			dev_warn(hsi_ctrl->dev,
+			dev_dbg(hsi_ctrl->dev,
 				"WARNING: RX FIFO %d not empty after CPU copy, "
 				"remaining %d/%d frames\n",
 				fifo, fifo_words_avail, HSI_HSR_FIFO_SIZE);

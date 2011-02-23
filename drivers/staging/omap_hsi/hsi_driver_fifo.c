@@ -154,8 +154,10 @@ int hsi_fifo_mapping(struct hsi_dev *hsi_ctrl, unsigned int mtype)
 				 base, HSI_HSR_MAPPING_FIFO_REG(i));
 			channel++;
 		}
+		if (hsi_ctrl->fifo_mapping_strategy == HSI_FIFO_MAPPING_UNDEF)
+			dev_dbg(hsi_ctrl->dev, "Fifo mapping : All FIFOs for "
+						"Port1\n");
 		hsi_ctrl->fifo_mapping_strategy = HSI_FIFO_MAPPING_ALL_PORT1;
-		dev_dbg(hsi_ctrl->dev, "Fifo mapping : All FIFOs for Port1\n");
 	} else if (mtype == HSI_FIFO_MAPPING_SSI) {
 		channel = 0;
 		port = 0;
@@ -176,12 +178,14 @@ int hsi_fifo_mapping(struct hsi_dev *hsi_ctrl, unsigned int mtype)
 			}
 		}
 
+		if (hsi_ctrl->fifo_mapping_strategy == HSI_FIFO_MAPPING_UNDEF)
+			dev_dbg(hsi_ctrl->dev, "Fifo mapping : 8 FIFOs per Port"
+						" (SSI compatible mode)\n");
 		hsi_ctrl->fifo_mapping_strategy = HSI_FIFO_MAPPING_SSI;
-		dev_dbg(hsi_ctrl->dev, "Fifo mapping : 8 FIFOs per Port "
-					"(SSI compatible mode)\n");
 	} else {
 		hsi_ctrl->fifo_mapping_strategy = HSI_FIFO_MAPPING_UNDEF;
-		dev_err(hsi_ctrl->dev, "Bad Fifo strategy request\n");
+		dev_err(hsi_ctrl->dev, "Bad Fifo strategy request : %d\n",
+			mtype);
 		err = -EINVAL;
 	}
 

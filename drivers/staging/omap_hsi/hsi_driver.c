@@ -696,6 +696,7 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 	}
 	hsi_ctrl->max_p = pdata->num_ports;
 	hsi_ctrl->in_dma_tasklet = false;
+	hsi_ctrl->fifo_mapping_strategy = HSI_FIFO_MAPPING_UNDEF;
 	hsi_ctrl->dev = &pd->dev;
 	spin_lock_init(&hsi_ctrl->lock);
 	err = hsi_init_gdd_chan_count(hsi_ctrl);
