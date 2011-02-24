@@ -29,7 +29,7 @@
 #define SFH7741_PROX_ON	1
 #define SFH7741_PROX_OFF	0
 
-#undef SFH7741_SUSPEND_RESUME
+#define SFH7741_SUSPEND_RESUME
 
 struct sfh7741_drvdata {
 	struct input_dev *input;
@@ -78,7 +78,7 @@ static ssize_t set_prox_state(struct device *dev,
 				enable_irq_wake(ddata->irq);
 
 			proximity = ddata->read_prox();
-			input_report_abs(ddata->input, ABS_DISTANCE, !proximity);
+			input_report_abs(ddata->input, ABS_DISTANCE, proximity);
 			input_sync(ddata->input);
 		} else {
 			disable_irq_nosync(ddata->irq);
@@ -227,8 +227,7 @@ static int sfh7741_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct sfh7741_drvdata *ddata = platform_get_drvdata(pdev);
 	/* Save the prox state for the resume */
-	ddata->on_before_suspend = ddata->prox_enable
-	ddata->pdata->activate_func(SFH7741_PROX_OFF);
+	ddata->on_before_suspend = ddata->prox_enable;
 
 	return 0;
 }
@@ -237,10 +236,13 @@ static int sfh7741_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct sfh7741_drvdata *ddata = platform_get_drvdata(pdev);
+	int proximity = 0;
 
-	if (ddata->on_before_suspend)
-		ddata->pdata->activate_func(SFH7741_PROX_ON);
-
+	if (ddata->on_before_suspend) {
+		proximity = ddata->read_prox();
+		input_report_abs(ddata->input, ABS_DISTANCE, proximity);
+		input_sync(ddata->input);
+	}
 	return 0;
 }
 
