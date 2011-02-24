@@ -1245,10 +1245,9 @@ static void __init omap4_display_init(void)
 
 static void enable_board_wakeup_source(void)
 {
+	int gpio_val;
 	/* Android does not have touchscreen as wakeup source */
 #if !defined(CONFIG_ANDROID)
-	int gpio_val;
-
 	gpio_val = omap_mux_get_gpio(OMAP4_TOUCH_IRQ_1);
 	if ((gpio_val & OMAP44XX_PADCONF_WAKEUPENABLE0) == 0) {
 		gpio_val |= OMAP44XX_PADCONF_WAKEUPENABLE0;
@@ -1256,7 +1255,11 @@ static void enable_board_wakeup_source(void)
 	}
 
 #endif
-
+	gpio_val = omap_mux_get_gpio(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+	if ((gpio_val & OMAP44XX_PADCONF_WAKEUPENABLE0) == 0) {
+		gpio_val |= OMAP44XX_PADCONF_WAKEUPENABLE0;
+		omap_mux_set_gpio(gpio_val, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+	}
 	/*
 	 * Enable IO daisy for sys_nirq1/2, to be able to
 	 * wakeup from interrupts from PMIC/Audio IC.
