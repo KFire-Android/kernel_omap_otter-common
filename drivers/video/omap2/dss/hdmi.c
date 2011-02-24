@@ -1212,6 +1212,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	HDMI_W1_StartVideoFrame(HDMI_WP);
 
 	dispc_enable_digit_out(1);
+	hdmi_set_irqs(0);
 
 	if (hdmi.hdmi_start_frame_cb)
 		(*hdmi.hdmi_start_frame_cb)();
@@ -1229,6 +1230,7 @@ static int hdmi_min_enable(void)
 	int r;
 	DSSDBG("hdmi_min_enable");
 
+	hdmi_set_irqs(1);
 	hdmi_enable_clocks(0);
 	hdmi_power = HDMI_POWER_MIN;
 	r = hdmi_phy_init(HDMI_WP, HDMI_PHY, 0);
@@ -1402,6 +1404,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 		if (notify)
 			hdmi_notify_pwrchange(HDMI_EVENT_POWEROFF);
 		mutex_lock(&hdmi.lock_aux);
+
 		if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 			/* HDMI is disabled, no need to process */
 			goto done;
@@ -1461,6 +1464,8 @@ static void hdmi_work_queue(struct work_struct *ws)
 			goto done;
 	}
 
+done:
+
 	if ((r & HDMI_FIRST_HPD) && (!edid_set) && (!custom_set)) {
 		mutex_unlock(&hdmi.lock_aux);
 		mutex_unlock(&hdmi.lock);
@@ -1502,7 +1507,6 @@ static void hdmi_work_queue(struct work_struct *ws)
 		/* ignore return value for now */
 	}
 
-done:
 	mutex_unlock(&hdmi.lock_aux);
 	mutex_unlock(&hdmi.lock);
 	kfree(work);
@@ -1558,6 +1562,7 @@ static void hdmi_power_off_phy(struct omap_dss_device *dssdev)
 	memset(&dssdev->panel.timings, 0, sizeof(dssdev->panel.timings));
 
 	HDMI_W1_StopVideoFrame(HDMI_WP);
+	hdmi_set_irqs(1);
 
 	dispc_enable_digit_out(0);
 
