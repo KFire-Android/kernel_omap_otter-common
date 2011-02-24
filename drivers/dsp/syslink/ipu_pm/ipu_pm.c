@@ -316,6 +316,7 @@ static struct omap_rproc *app_rproc;
 static struct omap_mbox *ducati_mbox;
 static struct iommu *ducati_iommu;
 static bool first_time = 1;
+static bool _is_iommu_up;
 
 /* BIOS flags states for each core in IPU */
 static void __iomem *sysm3Idle;
@@ -581,11 +582,14 @@ static int ipu_pm_iommu_notifier_call(struct notifier_block *nb,
 	switch ((int)val) {
 	case IOMMU_CLOSE:
 		/*
+		 * FIXME: this need to be checked by the iommu driver
 		 * restore IOMMU since it is required the IOMMU
 		 * is up and running for reclaiming MMU entries
 		 */
-		if (ipu_pm_get_state(SYS_M3) & SYS_PROC_DOWN)
+		if (!_is_iommu_up) {
 			iommu_restore_ctx(ducati_iommu);
+			_is_iommu_up = 1;
+		}
 		return 0;
 	case IOMMU_FAULT:
 		ipu_pm_recover_schedule();
@@ -2500,8 +2504,10 @@ int ipu_pm_save_ctx(int proc_id)
 			omap_mbox_save_ctx(ducati_mbox);
 		else
 			pr_err("Not able to save mbox");
-		if (ducati_iommu)
+		if (ducati_iommu) {
 			iommu_save_ctx(ducati_iommu);
+			_is_iommu_up = 0;
+		}
 		else
 			pr_err("Not able to save iommu");
 	} else
@@ -2589,8 +2595,10 @@ int ipu_pm_restore_ctx(int proc_id)
 			omap_mbox_restore_ctx(ducati_mbox);
 		else
 			pr_err("Not able to restore mbox");
-		if (ducati_iommu)
+		if (ducati_iommu) {
 			iommu_restore_ctx(ducati_iommu);
+			_is_iommu_up = 1;
+		}
 		else
 			pr_err("Not able to restore iommu");
 
@@ -2817,6 +2825,7 @@ int ipu_pm_attach(u16 remote_proc_id, void *shared_addr)
 						__func__, __LINE__);
 			goto exit;
 		}
+		_is_iommu_up = 1;
 		iommu_register_notifier(ducati_iommu,
 				&ipu_pm_notify_nb_iommu_ducati);
 	}
@@ -2929,6 +2938,15 @@ int ipu_pm_detach(u16 remote_proc_id)
 			iommu_unregister_notifier(ducati_iommu,
 					&ipu_pm_notify_nb_iommu_ducati);
 			pr_debug("releasing ducati_iommu\n");
+			/*
+			 * FIXME: this need to be checked by the iommu driver
+			 * restore IOMMU since it is required the IOMMU
+			 * is up and running for reclaiming MMU entries
+			 */
+			if (!_is_iommu_up) {
+				iommu_restore_ctx(ducati_iommu);
+				_is_iommu_up = 1;
+			}
 			iommu_put(ducati_iommu);
 			ducati_iommu = NULL;
 		}
