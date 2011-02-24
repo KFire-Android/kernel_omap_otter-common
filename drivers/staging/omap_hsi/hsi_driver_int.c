@@ -445,7 +445,9 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 	if (status_reg & HSI_BREAKDETECTED) {
 		dev_info(hsi_ctrl->dev, "Hardware BREAK on port %d\n", port);
 		hsi_outl(0, base, HSI_HSR_BREAK_REG(port));
+		spin_unlock(&hsi_ctrl->lock);
 		hsi_port_event_handler(pport, HSI_EVENT_BREAK_DETECTED, NULL);
+		spin_lock(&hsi_ctrl->lock);
 
 		channels_served |= HSI_BREAKDETECTED;
 	}
@@ -469,9 +471,11 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 				port, hsr_err_reg, "TX Mapping Error");
 		/* Clear error event bit */
 		hsi_outl(hsr_err_reg, base, HSI_HSR_ERRORACK_REG(port));
-		if (hsr_err_reg)	/* ignore spurious errors */
+		if (hsr_err_reg) {	/* ignore spurious errors */
+			spin_unlock(&hsi_ctrl->lock);
 			hsi_port_event_handler(pport, HSI_EVENT_ERROR, NULL);
-		else
+			spin_lock(&hsi_ctrl->lock);
+		} else
 			dev_dbg(hsi_ctrl->dev, "Spurious HSI error!\n");
 
 		channels_served |= HSI_ERROROCCURED;
