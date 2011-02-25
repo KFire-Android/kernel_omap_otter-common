@@ -63,7 +63,7 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 		dsi_cinfo.regm_dispc = 4;
 		dsi_cinfo.regm_dsi = 4;
 		dsi_cinfo.use_dss2_fck = true;
-		r = dsi_calc_clock_rates(&dsi_cinfo);
+		r = dsi_calc_clock_rates(channel, &dsi_cinfo);
 		if (r)
 			return r;
 		dispc_find_clk_divs(is_tft, pck_req,
@@ -332,7 +332,7 @@ int dpi_check_timings(struct omap_dss_device *dssdev,
 			dsi_cinfo.regm_dispc = 4;
 			dsi_cinfo.regm_dsi = 4;
 			dsi_cinfo.use_dss2_fck = true;
-			r = dsi_calc_clock_rates(&dsi_cinfo);
+			r = dsi_calc_clock_rates(dssdev->channel, &dsi_cinfo);
 			if (r)
 				return r;
 			dispc_find_clk_divs(is_tft, timings->pixel_clock * 1000,
