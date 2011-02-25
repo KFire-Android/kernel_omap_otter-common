@@ -740,11 +740,11 @@ static void playback_abe_work(struct work_struct *work)
 		omap_mcpdm_stop(mcpdm, SNDRV_PCM_STREAM_PLAYBACK);
 		omap_mcpdm_playback_close(mcpdm, mcpdm->downlink);
 		abe_dsp_mcpdm_shutdown();
+		abe_dsp_pm_put();
 	}
-	abe_dsp_pm_put();
 	mutex_unlock(&mcpdm->mutex);
 
-	if (!mcpdm->free && !mcpdm->ul_active)
+	if (!mcpdm->free && !mcpdm->ul_active && !mcpdm->dl_active)
 		omap_mcpdm_free(mcpdm);
 
 }
