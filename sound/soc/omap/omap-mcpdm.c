@@ -420,21 +420,19 @@ static int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 {
 	struct platform_device *pdev;
 	struct omap_mcpdm_platform_data *pdata;
-	int ret;
 	int ctrl;
 	int attemps = 0;
 
 	pdev = to_platform_device(mcpdm->dev);
 	pdata = pdev->dev.platform_data;
 
-	pm_runtime_get_sync(&pdev->dev);
-
 	if (!mcpdm->free) {
 		dev_err(mcpdm->dev, "McPDM interface is in use\n");
-		ret = -EBUSY;
-		goto err;
+		return -EBUSY;
 	}
 	mcpdm->free = 0;
+
+	pm_runtime_get_sync(&pdev->dev);
 
 	/* Perform SW RESET of McPDM IP */
 	ctrl = omap_mcpdm_read(mcpdm, MCPDM_SYSCONFIG);
@@ -451,13 +449,6 @@ static int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 	/* Disable lines while request is ongoing */
 	omap_mcpdm_write(mcpdm, MCPDM_CTRL, 0x00);
 
-	ret = request_irq(mcpdm->irq, omap_mcpdm_irq_handler,
-				0, "McPDM", (void *)mcpdm);
-	if (ret) {
-		dev_err(mcpdm->dev, "Request for McPDM IRQ failed\n");
-		goto err;
-	}
-
 	if (omap_rev() != OMAP4430_REV_ES1_0) {
 		/* Enable McPDM watch dog for ES above ES 1.0 to avoid saturation */
 		ctrl = omap_mcpdm_read(mcpdm, MCPDM_CTRL);
@@ -466,10 +457,6 @@ static int omap_mcpdm_request(struct omap_mcpdm *mcpdm)
 	}
 
 	return 0;
-
-err:
-	pm_runtime_put_sync(&pdev->dev);
-	return ret;
 }
 
 static void omap_mcpdm_free(struct omap_mcpdm *mcpdm)
@@ -487,8 +474,6 @@ static void omap_mcpdm_free(struct omap_mcpdm *mcpdm)
 	mcpdm->free = 1;
 
 	pm_runtime_put_sync(&pdev->dev);
-
-	free_irq(mcpdm->irq, (void *)mcpdm);
 }
 
 /* Enable/disable DC offset cancelation for the analog
@@ -908,6 +893,13 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+	ret = request_irq(mcpdm->irq, omap_mcpdm_irq_handler,
+				0, "McPDM", mcpdm);
+	if (ret) {
+		dev_err(mcpdm->dev, "Request for McPDM IRQ failed: %d\n", ret);
+		goto err;
+	}
+
 	pm_runtime_enable(&pdev->dev);
 
 	mcpdm->dev = &pdev->dev;
@@ -922,8 +914,13 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 #endif
 	ret = snd_soc_register_dais(&pdev->dev, omap_mcpdm_dai,
 			ARRAY_SIZE(omap_mcpdm_dai));
-	if (ret == 0)
-		return 0;
+	if (ret < 0)
+		goto dai_err;
+
+	return 0;
+
+dai_err:
+	free_irq(mcpdm->irq, mcpdm);
 err:
 	kfree(mcpdm);
 	return ret;
@@ -937,8 +934,7 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 	pdata = pdev->dev.platform_data;
 
 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_mcpdm_dai));
-	pm_runtime_put_sync(&pdev->dev);
-	free_irq(mcpdm->irq, (void *)mcpdm);
+	free_irq(mcpdm->irq, mcpdm);
 	kfree(mcpdm);
 	return 0;
 }
