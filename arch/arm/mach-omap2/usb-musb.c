@@ -72,6 +72,9 @@ static struct musb_hdrc_config musb_config = {
 #define OMAP_ACM_PRODUCT_ID		0xD105
 #define OMAP_ACM_ADB_PRODUCT_ID		0xD106
 #define OMAP_ACM_UMS_ADB_PRODUCT_ID	0xD107
+#define OMAP_MTP_PRODUCT_ID		0xD108
+#define OMAP_MTP_ADB_PRODUCT_ID 	0xD109
+#define OMAP_MTP_UMS_ADB_PRODUCT_ID	0xD10A
 
 static char device_serial[MAX_USB_SERIAL_NUM];
 
@@ -112,6 +115,20 @@ static char *usb_functions_acm_ums_adb[] = {
 	"adb",
 };
 
+static char *usb_functions_mtp[] = {
+	"mtp",
+};
+
+static char *usb_functions_mtp_adb[] = {
+	"mtp",
+	"adb",
+};
+static char *usb_functions_mtp_ums_adb[] = {
+	"mtp",
+	"usb_mass_storage",
+	"adb",
+};
+
 static char *usb_functions_all[] = {
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	"rndis",
@@ -124,6 +141,9 @@ static char *usb_functions_all[] = {
 #endif
 #ifdef CONFIG_USB_ANDROID_ADB
 	"adb",
+#endif
+#ifdef CONFIG_USB_ANDROID_MTP
+	"mtp",
 #endif
 };
 
@@ -168,6 +188,21 @@ static struct android_usb_product usb_products[] = {
 		.num_functions  = ARRAY_SIZE(usb_functions_acm_ums_adb),
 		.functions      = usb_functions_acm_ums_adb,
 	},
+	{
+		.product_id     = OMAP_MTP_PRODUCT_ID,
+		.num_functions  = ARRAY_SIZE(usb_functions_mtp),
+		.functions      = usb_functions_mtp,
+	},
+	{
+		.product_id     = OMAP_MTP_ADB_PRODUCT_ID,
+		.num_functions  = ARRAY_SIZE(usb_functions_mtp_adb),
+		.functions      = usb_functions_mtp_adb,
+	},
+	{
+		.product_id     = OMAP_MTP_UMS_ADB_PRODUCT_ID,
+		.num_functions  = ARRAY_SIZE(usb_functions_mtp_ums_adb),
+		.functions      = usb_functions_mtp_ums_adb,
+        },
 };
 
 /* standard android USB platform data */
