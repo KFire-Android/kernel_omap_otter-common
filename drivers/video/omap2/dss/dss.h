@@ -227,6 +227,8 @@ struct regulator *dss_get_vdds_sdi(void);
 struct regulator *dss_get_vdda_dac(void);
 int dss_opt_clock_enable(void);
 void dss_opt_clock_disable(void);
+int hdmi_opt_clock_enable(void);
+void hdmi_opt_clock_disable(void);
 void save_all_ctx(void);
 void restore_all_ctx(void);
 

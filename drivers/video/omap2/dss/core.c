@@ -344,13 +344,10 @@ int dss_opt_clock_enable()
 	int r = clk_enable(core.dss_ick);
 	if (!r) {
 		r = clk_enable(core.dss1_fck);
-		if (!r) {
-			r = clk_enable(core.dss_96m_fck);
-			if (!r)
-				return 0;
+		if (r) {
 			clk_disable(core.dss1_fck);
+			clk_disable(core.dss_ick);
 		}
-		clk_disable(core.dss_ick);
 	}
 	return r;
 }
@@ -359,6 +356,15 @@ void dss_opt_clock_disable()
 {
 	clk_disable(core.dss_ick);
 	clk_disable(core.dss1_fck);
+}
+
+int hdmi_opt_clock_enable()
+{
+	return clk_enable(core.dss_96m_fck);
+}
+
+void hdmi_opt_clock_disable()
+{
 	clk_disable(core.dss_96m_fck);
 }
 

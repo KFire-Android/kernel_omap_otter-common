@@ -115,7 +115,7 @@ struct hdmi_work_struct {
 	struct work_struct work;
 	int r;
 };
-
+static bool hdmi_opt_clk_state;
 static int in_reset;
 #define HDMI_IN_RESET		0x1000
 static bool hdmi_connected;
@@ -1598,7 +1598,11 @@ static int hdmi_start_display(struct omap_dss_device *dssdev)
 	/* enable clock(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 	dss_mainclk_state_enable();
-
+	if (!hdmi_opt_clk_state) {
+		r = hdmi_opt_clock_enable();
+		if (!r)
+			hdmi_opt_clk_state = true;
+	}
 err:
 	return r;
 }
@@ -1666,6 +1670,20 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 	DSSINFO("pwrchanged => (%d,%c) = %d\n",
 		power_need, (state_need == HDMI_ACTIVE ? 'A' :
 			     state_need == HDMI_SUSPENDED ? 'S' : 'D'), r);
+
+	if (power_need == HDMI_POWER_FULL) {
+		if (!hdmi_opt_clk_state) {
+			r = hdmi_opt_clock_enable();
+			if (!r)
+				hdmi_opt_clk_state = true;
+		}
+	} else {
+		if (hdmi_opt_clk_state) {
+			hdmi_opt_clock_disable();
+			hdmi_opt_clk_state = false;
+		}
+	}
+
 	return r;
 }
 
