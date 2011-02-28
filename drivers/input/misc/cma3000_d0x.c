@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2010 Texas Instruments
  * Author: Hemanth V <hemanthv@ti.com>
+ * Contributor: Dan Murphy <dmurphy@ti.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
@@ -80,10 +81,8 @@ static int mode_to_mg[8][2] = {
 	{0, 0},
 };
 
-/* interval between samples for the different rates, in msecs */
-static const unsigned int cma3000_measure_interval[] = {
-	0, 1000 / 10, 1000 / 400, 1000 / 40,
-};
+static uint32_t accl_debug;
+module_param_named(cma3000_debug, accl_debug, uint, 0664);
 
 static int cma3000_set_mode(struct cma3000_accl_data *data, int val)
 {
@@ -146,10 +145,44 @@ static ssize_t cma3000_store_attr_mode(struct device *dev,
 	if (val < CMAMODE_DEFAULT || val > CMAMODE_POFF)
 		return -EINVAL;
 
-	data->enabled = val;
-	cma3000_set_mode(data, val);
+	return cma3000_set_mode(data, val);
 
-	return count;
+}
+
+static ssize_t cma3000_show_attr_delay(struct device *dev,
+				     struct device_attribute *attr,
+				     char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
+
+	return sprintf(buf, "%d\n", data->req_poll_rate);
+}
+
+static ssize_t cma3000_store_attr_delay(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
+	unsigned long interval;
+	int error;
+
+	error = strict_strtoul(buf, 0, &interval);
+	if (error)
+		return error;
+
+	if (interval <= 0 || interval > 200)
+		return -EINVAL;
+
+	cancel_delayed_work_sync(&data->input_work);
+	data->req_poll_rate = interval;
+
+	/*TO DO: Figure out if we need to modify the rate*/
+	/*cma3000_set_mode(data, data->pdata.mode);*/
+	schedule_delayed_work(&data->input_work, 0);
+
+	return 1;
 
 }
 
@@ -175,7 +208,7 @@ static ssize_t cma3000_store_attr_enable(struct device *dev,
 	struct platform_device *pdev = to_platform_device(dev);
 	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
 	unsigned long val;
-	int error;
+	int error, enable;
 
 	error = strict_strtoul(buf, 0, &val);
 	if (error)
@@ -185,66 +218,18 @@ static ssize_t cma3000_store_attr_enable(struct device *dev,
 		return -EINVAL;
 
 	if (val == CMAMODE_DEFAULT || val == CMAMODE_POFF)
-		data->enabled = val;
+		enable = val;
 	else
-		data->enabled = data->pdata.mode;
+		enable = data->pdata.mode;
 
-	cma3000_set_mode(data, data->enabled);
+	cma3000_set_mode(data, enable);
 
-	return count;
-}
+	if (val == CMAMODE_DEFAULT || val == CMAMODE_POFF)
+		cancel_delayed_work_sync(&data->input_work);
+	else
+		schedule_delayed_work(&data->input_work, 0);
 
-static ssize_t cma3000_show_attr_delay(struct device *dev,
-				     struct device_attribute *attr,
-				     char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
-
-	return sprintf(buf, "%d\n", data->req_rate);
-}
-
-static ssize_t cma3000_store_attr_delay(struct device *dev,
-				     struct device_attribute *attr,
-				     const char *buf, size_t count)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
-	unsigned long interval;
-	int error;
-	int i;
-
-	if (data->enabled == CMAMODE_DEFAULT ||
-		data->enabled == CMAMODE_POFF) {
-		dev_info(&data->client->dev, "%s:Accel was not enabled\n",
-			__func__);
-		return 1;
-	}
-
-	error = strict_strtoul(buf, 0, &interval);
-	if (error)
-		return error;
-
-	if (interval < 0)
-		return -EINVAL;
-
-	if (interval == 0) {
-		/* Set to the fastest speed */
-		i = CMAMODE_MEAS400;
-	} else {
-		if (interval < cma3000_measure_interval[CMAMODE_MEAS40])
-			i = CMAMODE_MEAS400;
-		else if (interval >= cma3000_measure_interval[CMAMODE_MEAS100])
-			i = CMAMODE_MEAS100;
-		else
-			i = CMAMODE_MEAS40;
-	}
-
-	data->req_rate = cma3000_measure_interval[i];
-	cma3000_set_mode(data, i);
-
-	return count;
-
+	return 1;
 }
 
 static ssize_t cma3000_show_attr_grange(struct device *dev,
@@ -502,18 +487,22 @@ static void decode_mg(struct cma3000_accl_data *data, int *datax,
 	*dataz = (((s8)(*dataz)) * (data->bit_to_mg));
 }
 
-static irqreturn_t cma3000_thread_irq(int irq, void *dev_id)
+static void cma3000_read_report_data(struct cma3000_accl_data *data)
 {
-	struct cma3000_accl_data *data = dev_id;
 	int  datax, datay, dataz;
 	u8 ctrl, mode, range, intr_status;
 
+	mutex_lock(&data->mutex);
 	intr_status = cma3000_read(data, CMA3000_INTSTATUS, "interrupt status");
-	if (intr_status < 0)
-		return IRQ_NONE;
+	if (intr_status < 0) {
+		pr_info("%s:No interrupt from the device\n", __func__);
+		goto not_from_device;
+	}
 
 	/* Check if free fall is detected, report immediately */
 	if (intr_status & CMA3000_INTSTATUS_FFDET) {
+		if (accl_debug)
+			pr_info("%s:Free fall\n", __func__);
 		input_report_abs(data->input_dev, ABS_MISC, 1);
 		input_sync(data->input_dev);
 	} else {
@@ -524,6 +513,10 @@ static irqreturn_t cma3000_thread_irq(int irq, void *dev_id)
 	datay = cma3000_read(data, CMA3000_DOUTY, "Y");
 	dataz = cma3000_read(data, CMA3000_DOUTZ, "Z");
 
+	if (accl_debug)
+		pr_info("%s:Raw x= %d, y= %d, z= %d\n",
+			__func__, datax, datay, dataz);
+
 	ctrl = cma3000_read(data, CMA3000_CTRL, "ctrl");
 	mode = (ctrl & CMA3000_MODEMASK) >> 1;
 	range = (ctrl & CMA3000_GRANGEMASK) >> 7;
@@ -532,15 +525,42 @@ static irqreturn_t cma3000_thread_irq(int irq, void *dev_id)
 
 	/* Interrupt not for this device */
 	if (data->bit_to_mg == 0)
-		return IRQ_NONE;
+		goto not_from_device;
 
 	/* Decode register values to milli g */
 	decode_mg(data, &datax, &datay, &dataz);
-
+	if (accl_debug)
+		pr_info("%s:Reporting x= %d, y= %d, z= %d\n",
+			__func__, datax, datay, dataz);
 	input_report_abs(data->input_dev, ABS_X, datax);
 	input_report_abs(data->input_dev, ABS_Y, datay);
 	input_report_abs(data->input_dev, ABS_Z, dataz);
 	input_sync(data->input_dev);
+
+not_from_device:
+	mutex_unlock(&data->mutex);
+	if (data->client->irq)
+		enable_irq(data->client->irq);
+}
+
+static void cma3000_input_work_func(struct work_struct *work)
+{
+	struct cma3000_accl_data *cma = container_of((struct delayed_work *)work,
+						  struct cma3000_accl_data,
+						  input_work);
+
+	cma3000_read_report_data(cma);
+	if (!cma->client->irq)
+		schedule_delayed_work(&cma->input_work,
+				msecs_to_jiffies(cma->req_poll_rate));
+}
+
+static irqreturn_t cma3000_isr(int irq, void *dev_id)
+{
+	struct cma3000_accl_data *cma = dev_id;
+
+	disable_irq_nosync(irq);
+	schedule_delayed_work(&cma->input_work, 0);
 
 	return IRQ_HANDLED;
 }
@@ -580,10 +600,6 @@ int cma3000_poweron(struct cma3000_accl_data *data)
 	mdfftmr = data->pdata.mdfftmr;
 	ffthr = data->pdata.ffthr;
 
-	if (data->enabled == CMAMODE_DEFAULT ||
-	    data->enabled == CMAMODE_POFF)
-		return 0;
-
 	if (mode < CMAMODE_DEFAULT || mode > CMAMODE_POFF) {
 		data->pdata.mode = CMAMODE_MOTDET;
 		mode = data->pdata.mode;
@@ -614,20 +630,12 @@ int cma3000_poweron(struct cma3000_accl_data *data)
 
 	mdelay(CMA3000_SETDELAY);
 
-	enable_irq(data->client->irq);
-
 	return 0;
 }
 
 int cma3000_poweroff(struct cma3000_accl_data *data)
 {
 	int ret;
-
-	if (data->enabled == CMAMODE_DEFAULT ||
-	    data->enabled == CMAMODE_POFF)
-		return 0;
-	else
-		disable_irq_nosync(data->client->irq);
 
 	ret = cma3000_set(data, CMA3000_CTRL, CMAMODE_POFF, "Mode setting");
 	mdelay(CMA3000_SETDELAY);
@@ -639,6 +647,8 @@ int cma3000_init(struct cma3000_accl_data *data)
 {
 	int ret = 0, fuzz_x, fuzz_y, fuzz_z, g_range;
 	uint32_t irqflags;
+
+	INIT_DELAYED_WORK(&data->input_work, cma3000_input_work_func);
 
 	if (data->client->dev.platform_data == NULL) {
 		dev_err(&data->client->dev, "platform data not found\n");
@@ -663,12 +673,12 @@ int cma3000_init(struct cma3000_accl_data *data)
 	if (ret < 0)
 		goto err_op2_failed;
 
+	data->req_poll_rate = data->pdata.def_poll_rate;
 	fuzz_x = data->pdata.fuzz_x;
 	fuzz_y = data->pdata.fuzz_y;
 	fuzz_z = data->pdata.fuzz_z;
 	g_range = data->pdata.g_range;
 	irqflags = data->pdata.irqflags;
-	data->enabled = 0;
 
 	data->input_dev = input_allocate_device();
 	if (data->input_dev == NULL) {
@@ -706,8 +716,7 @@ int cma3000_init(struct cma3000_accl_data *data)
 	mutex_init(&data->mutex);
 
 	if (data->client->irq) {
-		ret = request_threaded_irq(data->client->irq, NULL,
-					cma3000_thread_irq,
+		ret = request_irq(data->client->irq, cma3000_isr,
 					irqflags | IRQF_ONESHOT,
 					data->client->name, data);
 
@@ -724,8 +733,6 @@ int cma3000_init(struct cma3000_accl_data *data)
 			"failed to create sysfs entries\n");
 		goto err_op1_failed;
 	}
-
-	cma3000_set_mode(data, data->enabled);
 
 	return 0;
 

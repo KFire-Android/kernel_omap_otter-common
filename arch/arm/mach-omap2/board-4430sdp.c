@@ -1068,6 +1068,7 @@ static struct bq2415x_platform_data sdp4430_bqdata = {
 };
 
 static struct cma3000_platform_data cma3000_platform_data = {
+	.def_poll_rate = 200,
 	.fuzz_x = 25,
 	.fuzz_y = 25,
 	.fuzz_z = 25,
@@ -1135,7 +1136,6 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("cma3000_accl", 0x1c),
 		.platform_data = &cma3000_platform_data,
-		.irq = OMAP_GPIO_IRQ(OMAP4_CMA3000ACCL_GPIO),
 	},
 };
 

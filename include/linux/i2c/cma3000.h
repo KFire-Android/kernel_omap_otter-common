@@ -4,6 +4,7 @@
  *
  * Copyright (C) 2010 Texas Instruments
  * Author: Hemanth V <hemanthv@ti.com>
+ * Contributor: Dan Murphy <dmurphy@ti.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
@@ -46,6 +47,7 @@
  */
 
 struct cma3000_platform_data {
+	int def_poll_rate;
 	int fuzz_x;
 	int fuzz_y;
 	int fuzz_z;

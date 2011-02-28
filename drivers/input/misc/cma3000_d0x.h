@@ -4,6 +4,7 @@
  *
  * Copyright (C) 2010 Texas Instruments
  * Author: Hemanth V <hemanthv@ti.com>
+ * Contributor: Dan Murphy <dmurphy@ti.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
@@ -23,6 +24,9 @@
 
 #include <linux/i2c.h>
 #include <linux/input.h>
+#include <linux/workqueue.h>
+
+#include <linux/i2c/cma3000.h>
 
 struct cma3000_accl_data {
 #ifdef CONFIG_INPUT_CMA3000_I2C
@@ -31,11 +35,12 @@ struct cma3000_accl_data {
 	struct input_dev *input_dev;
 	struct cma3000_platform_data pdata;
 
+	struct delayed_work input_work;
+
 	/* mutex for sysfs operations */
 	struct mutex mutex;
 	int bit_to_mg;
-	int enabled;
-	int req_rate;
+	int req_poll_rate;
 };
 
 int cma3000_set(struct cma3000_accl_data *, u8, u8, char *);
