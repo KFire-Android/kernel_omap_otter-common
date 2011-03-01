@@ -365,13 +365,10 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 	u32 gdd_csr;
 	dma_addr_t dma_h;
 	size_t size;
-	u8 fifo, fifo_words_avail;
-
-	spin_lock(&hsi_ctrl->lock);
+	int fifo, fifo_words_avail;
 
 	if (hsi_get_info_from_gdd_lch(hsi_ctrl, gdd_lch, &port, &channel,
 				      &is_read_path) < 0) {
-		spin_unlock(&hsi_ctrl->lock);
 		dev_err(hsi_ctrl->dev, "Unable to match the DMA channel %d with"
 			" an HSI channel\n", gdd_lch);
 		return;
@@ -399,8 +396,12 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			 * (interrupts for polling feature)
 			 */
 			hsi_driver_enable_read_interrupt(ch, NULL);
+
+			dev_dbg(hsi_ctrl->dev, "Calling read callback "
+						"(size %d).\n", size/4);
 			spin_unlock(&hsi_ctrl->lock);
 			ch->read_done(ch->dev, size / 4);
+			spin_lock(&hsi_ctrl->lock);
 
 			/* Check if FIFO is correctly emptied */
 			if (hsi_driver_device_is_hsi(pdev)) {
@@ -423,8 +424,12 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 					 DMA_TO_DEVICE);
 			ch = hsi_ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_write(ch);
+
+			dev_dbg(hsi_ctrl->dev, "Calling write callback "
+						"(size %d).\n", size/4);
 			spin_unlock(&hsi_ctrl->lock);
 			ch->write_done(ch->dev, size / 4);
+			spin_lock(&hsi_ctrl->lock);
 		}
 	} else {
 		dev_err(hsi_ctrl->dev, "Time-out overflow Error on GDD transfer"
@@ -432,12 +437,12 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 		spin_unlock(&hsi_ctrl->lock);
 		hsi_port_event_handler(&hsi_ctrl->hsi_port[port - 1],
 				       HSI_EVENT_ERROR, NULL);
+		spin_lock(&hsi_ctrl->lock);
 	}
 }
 
-static void do_hsi_gdd_tasklet(unsigned long device)
+static u32 hsi_process_dma_event(struct hsi_dev *hsi_ctrl)
 {
-	struct hsi_dev *hsi_ctrl = (struct hsi_dev *)device;
 	void __iomem *base = hsi_ctrl->base;
 	unsigned int gdd_lch = 0;
 	u32 status_reg = 0;
@@ -445,6 +450,11 @@ static void do_hsi_gdd_tasklet(unsigned long device)
 	unsigned int gdd_max_count = hsi_ctrl->gdd_chan_count;
 
 	status_reg = hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
+
+	if (!status_reg) {
+		dev_dbg(hsi_ctrl->dev, "DMA : no event, exit.\n");
+		return 0;
+	}
 
 	for (gdd_lch = 0; gdd_lch < gdd_max_count; gdd_lch++) {
 		if (status_reg & HSI_GDD_LCH(gdd_lch)) {
@@ -458,17 +468,37 @@ static void do_hsi_gdd_tasklet(unsigned long device)
 	status_reg = hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
 	status_reg &= hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 
-	if (status_reg)
-		tasklet_hi_schedule(&hsi_ctrl->hsi_gdd_tasklet);
-	else
-		enable_irq(hsi_ctrl->gdd_irq);
+	return status_reg;
 }
 
-static irqreturn_t hsi_gdd_mpu_handler(int irq, void *hsi_controller)
+static void do_hsi_gdd_tasklet(unsigned long device)
 {
-	struct hsi_dev *hsi_ctrl = hsi_controller;
+	struct hsi_dev *hsi_ctrl = (struct hsi_dev *)device;
+
+	dev_dbg(hsi_ctrl->dev, "DMA Tasklet : clock_enabled=%d\n",
+		hsi_ctrl->clock_enabled);
+
+	spin_lock(&hsi_ctrl->lock);
+	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	hsi_ctrl->in_dma_tasklet = true;
+
+	hsi_process_dma_event(hsi_ctrl);
+
+	hsi_ctrl->in_dma_tasklet = false;
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
+	spin_unlock(&hsi_ctrl->lock);
+
+	enable_irq(hsi_ctrl->gdd_irq);
+}
+
+static irqreturn_t hsi_gdd_mpu_handler(int irq, void *p)
+{
+	struct hsi_dev *hsi_ctrl = p;
 
 	tasklet_hi_schedule(&hsi_ctrl->hsi_gdd_tasklet);
+
+	/* Disable interrupt until Bottom Half has cleared the IRQ status */
+	/* register */
 	disable_irq_nosync(hsi_ctrl->gdd_irq);
 
 	return IRQ_HANDLED;
@@ -478,6 +508,10 @@ int __init hsi_gdd_init(struct hsi_dev *hsi_ctrl, const char *irq_name)
 {
 	tasklet_init(&hsi_ctrl->hsi_gdd_tasklet, do_hsi_gdd_tasklet,
 		     (unsigned long)hsi_ctrl);
+
+	dev_info(hsi_ctrl->dev, "Registering IRQ %s (%d)\n",
+					irq_name, hsi_ctrl->gdd_irq);
+
 	if (request_irq(hsi_ctrl->gdd_irq, hsi_gdd_mpu_handler, IRQF_DISABLED,
 			irq_name, hsi_ctrl) < 0) {
 		dev_err(hsi_ctrl->dev, "FAILED to request GDD IRQ %d\n",

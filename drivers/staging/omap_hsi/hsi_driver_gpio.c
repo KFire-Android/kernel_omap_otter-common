@@ -24,11 +24,18 @@
 static void do_hsi_cawake_tasklet(unsigned long hsi_p)
 {
 	struct hsi_port *port = (struct hsi_port *)hsi_p;
+	struct hsi_dev *hsi_ctrl = port->hsi_controller;
 
-	/* SSI_TODO : clocks needs to be enabled here */
-	port->hsi_controller->cawake_status = hsi_get_cawake(port);
+	spin_lock(&hsi_ctrl->lock);
+	hsi_clocks_enable(hsi_ctrl->dev, __func__);
+	port->in_cawake_tasklet = true;
 
+	port->cawake_status = hsi_get_cawake(port);
 	hsi_do_cawake_process(port);
+
+	port->in_cawake_tasklet = false;
+	hsi_clocks_disable(hsi_ctrl->dev, __func__);
+	spin_unlock(&hsi_ctrl->lock);
 }
 
 static irqreturn_t hsi_cawake_isr(int irq, void *hsi_p)

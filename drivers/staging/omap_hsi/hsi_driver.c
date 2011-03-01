@@ -36,7 +36,7 @@
 #include "hsi_driver.h"
 
 #define HSI_MODULENAME "omap_hsi"
-#define	HSI_DRIVER_VERSION	"0.3.0"
+#define	HSI_DRIVER_VERSION	"0.4.0"
 #define HSI_RESETDONE_MAX_RETRIES	5 /* Max 5*L4 Read cycles waiting for */
 					  /* reset to complete */
 #define HSI_RESETDONE_NORMAL_RETRIES	1 /* Reset should complete in 1 R/W */
@@ -496,6 +496,10 @@ static int __init hsi_ports_init(struct hsi_dev *hsi_ctrl)
 		hsi_p->max_ch = hsi_driver_device_is_hsi(pd) ?
 		    HSI_CHANNELS_MAX : HSI_SSI_CHANNELS_MAX;
 		hsi_p->irq = 0;
+		hsi_p->cawake_status = -1; /* Unknown */
+		hsi_p->acwake_status = 0;
+		hsi_p->in_int_tasklet = false;
+		hsi_p->in_cawake_tasklet = false;
 		hsi_p->counters_on = 1;
 		hsi_p->reg_counters = pdata->ctx->pctx[port].hsr.counters;
 		spin_lock_init(&hsi_p->lock);
@@ -572,45 +576,43 @@ static int __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 	return 0;
 }
 
-void hsi_clocks_disable(struct device *dev, const char *s)
-{
-	int ret;
-
-	dev_dbg(dev, "HSI DRIVER CLK: hsi_clocks_disable: %s\n", s);
-	/* HSI_TODO : this can probably be changed
-	 * to return pm_runtime_put(dev);
-	 */
-	ret = pm_runtime_put_sync(dev);
-	/*pr_info(", returns %d\n", ret);*/
-}
-
-int hsi_clocks_enable(struct device *dev, const char *s)
-{
-	dev_dbg(dev, "HSI DRIVER CLK: hsi_clocks_enable: %s\n", s);
-	/* Calls platform_bus_type.pm->runtime_resume(dev)
-	 * which in turn calls :
-	 *  - omap_device_enable()
-	 *  - dev->driver->pm->runtime_resume(dev)
-	 */
-	return pm_runtime_get_sync(dev);
-}
-
 /**
 * hsi_clocks_disable_channel - virtual wrapper for disabling HSI clocks for
 * a given channel
 * @dev - reference to the hsi device.
 * @channel_number - channel number which requests clock to be disabled
+*		    0xFF means no particular channel
 *
 * Note : there is no real HW clock management per HSI channel, this is only
 * virtual to keep track of active channels and ease debug
+*
+* Function to be called with lock
 */
 void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 				const char *s)
 {
+	struct platform_device *pd = to_platform_device(dev);
+	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
 	int ret;
 
-	dev_dbg(dev, "HSI DRIVER CLK: hsi_clocks_disable for channel %d: %s\n",
-		channel_number, s);
+	if (channel_number != HSI_CH_NUMBER_NONE)
+		dev_dbg(dev, "CLK: hsi_clocks_disable for "
+			"channel %d: %s\n", channel_number, s);
+	else
+		dev_dbg(dev, "CLK: hsi_clocks_disable: %s\n", s);
+
+	if (!hsi_ctrl->clock_enabled) {
+		dev_dbg(dev, "Clocks already disabled, skipping...\n");
+		return;
+	}
+	if (hsi_is_hsi_controller_busy(hsi_ctrl)) {
+		dev_dbg(dev, "Cannot disable clocks, HSI port busy\n");
+		return;
+	}
+
+	/* HSI_TODO : this can probably be changed
+	 * to return pm_runtime_put(dev);
+	 */
 	ret = pm_runtime_put_sync(dev);
 	/*pr_info(", returns %d\n", ret);*/
 }
@@ -620,15 +622,30 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 * a given channel
 * @dev - reference to the hsi device.
 * @channel_number - channel number which requests clock to be enabled
+*		    0xFF means no particular channel
 *
 * Note : there is no real HW clock management per HSI channel, this is only
 * virtual to keep track of active channels and ease debug
+*
+* Function to be called with lock
 */
 int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 				const char *s)
 {
-	dev_dbg(dev, "HSI DRIVER CLK: hsi_clocks_enable for channel %d: %s\n",
-		channel_number, s);
+	struct platform_device *pd = to_platform_device(dev);
+	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
+
+	if (channel_number != HSI_CH_NUMBER_NONE)
+		dev_dbg(dev, "CLK: hsi_clocks_enable for "
+			"channel %d: %s\n", channel_number, s);
+	else
+		dev_dbg(dev, "CLK: hsi_clocks_enable: %s\n", s);
+
+	if (hsi_ctrl->clock_enabled) {
+		dev_dbg(dev, "Clocks already enabled, skipping...\n");
+		return -EEXIST;
+	}
+
 	return pm_runtime_get_sync(dev);
 }
 
@@ -675,6 +692,7 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 		return -ENXIO;
 	}
 	hsi_ctrl->max_p = pdata->num_ports;
+	hsi_ctrl->in_dma_tasklet = false;
 	hsi_ctrl->dev = &pd->dev;
 	spin_lock_init(&hsi_ctrl->lock);
 	err = hsi_init_gdd_chan_count(hsi_ctrl);
@@ -688,8 +706,6 @@ static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
 	err = hsi_request_gdd_irq(hsi_ctrl);
 	if (err < 0)
 		goto rback2;
-
-	hsi_ctrl->cawake_status = -1; /* Unknown */
 
 	/* Everything is fine */
 	return 0;
@@ -857,6 +873,11 @@ static int hsi_runtime_resume(struct device *dev)
 
 	dev_dbg(dev, "%s\n", __func__);
 
+	if (hsi_ctrl->clock_enabled)
+		dev_warn(dev, "Warning: clock status mismatch vs runtime PM\n");
+
+	hsi_ctrl->clock_enabled = true;
+
 	/* Restore context */
 	hsi_restore_ctx(hsi_ctrl);
 
@@ -881,8 +902,13 @@ static int hsi_runtime_suspend(struct device *dev)
 
 	dev_dbg(dev, "%s\n", __func__);
 
+	if (!hsi_ctrl->clock_enabled)
+		dev_warn(dev, "Warning: clock status mismatch vs runtime PM\n");
+
 	/* Save context */
 	hsi_save_ctx(hsi_ctrl);
+
+	hsi_ctrl->clock_enabled = false;
 
 	/* HSI is now ready to be put in low power state */
 
