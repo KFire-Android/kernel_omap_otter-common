@@ -346,6 +346,7 @@ static int hsi_char_ioctl(struct inode *inode, struct file *file,
 {
 	int ch = (int)file->private_data;
 	unsigned int state;
+	unsigned char occ;
 	struct hsi_rx_config rx_cfg;
 	struct hsi_tx_config tx_cfg;
 	int ret = 0;
@@ -397,6 +398,11 @@ static int hsi_char_ioctl(struct inode *inode, struct file *file,
 		break;
 	case CS_SW_RESET:
 		if_hsi_sw_reset(ch);
+		break;
+	case CS_GET_FIFO_OCCUPANCY:
+		if_hsi_get_fifo_occupancy(ch, &occ);
+		if (copy_to_user((void __user *)arg, &occ, sizeof(occ)))
+			ret = -EFAULT;
 		break;
 	default:
 		ret = -ENOIOCTLCMD;

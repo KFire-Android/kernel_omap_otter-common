@@ -38,6 +38,8 @@
 #define CS_SET_TX		CS_IOW(9, struct hsi_tx_config)
 #define CS_GET_TX		CS_IOW(10, struct hsi_tx_config)
 #define CS_SW_RESET		CS_IO(11)
+#define CS_GET_FIFO_OCCUPANCY	CS_IOR(12, unsigned char)
+
 
 #define HSI_MODE_SLEEP		0
 #define HSI_MODE_STREAM		1

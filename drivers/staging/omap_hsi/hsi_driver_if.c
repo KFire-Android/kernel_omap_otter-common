@@ -592,6 +592,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	unsigned int port, channel;
 	u32 acwake;
 	int err = 0;
+	int fifo = 0;
 
 	if (unlikely((!dev) ||
 		     (!dev->ch) ||

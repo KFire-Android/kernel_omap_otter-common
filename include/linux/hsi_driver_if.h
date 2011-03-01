@@ -61,6 +61,7 @@ enum {
 	HSI_IOCTL_SET_TX,	/* Set HST configuration */
 	HSI_IOCTL_GET_TX,	/* Get HST configuration */
 	HSI_IOCTL_SW_RESET,	/* Force a HSI SW RESET */
+	HSI_IOCTL_GET_FIFO_OCCUPANCY, /* Get amount of words in RX FIFO */
 };
 
 /* Forward references */

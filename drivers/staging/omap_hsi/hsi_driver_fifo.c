@@ -296,7 +296,6 @@ long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
 	}
 }
 
-
 /**
  * hsi_get_rx_fifo_occupancy - Return the size of data remaining
  *				in the given FIFO
