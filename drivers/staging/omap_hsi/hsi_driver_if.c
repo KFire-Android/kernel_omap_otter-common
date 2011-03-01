@@ -613,8 +613,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		channel, command);
 
 	spin_lock_bh(&hsi_ctrl->lock);
-	hsi_clocks_enable_channel(dev->device.parent,
-				  ch->channel_number, __func__);
+	hsi_clocks_enable_channel(dev->device.parent, channel, __func__);
 
 	switch (command) {
 	case HSI_IOCTL_ACWAKE_UP:
@@ -677,11 +676,11 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		/*Use interrupt ? (if TX BREAK INT exists)*/
 		break;
 	case HSI_IOCTL_GET_ACWAKE:
-		if (arg == NULL) {
+		if (!arg) {
 			err = -EINVAL;
 			goto out;
 		}
-		*(u32 *) arg = hsi_inl(base, HSI_SYS_WAKE_REG(port));
+		*(u32 *)arg = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		break;
 	case HSI_IOCTL_FLUSH_RX:
 		hsi_outl(0, base, HSI_HSR_RXSTATE_REG(port));
@@ -698,7 +697,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			err = -ENODEV;
 			goto out;
 		}
-		*(unsigned int *)arg = hsi_get_cawake(dev->ch->hsi_port);
+		*(u32 *)arg = hsi_get_cawake(dev->ch->hsi_port);
 		break;
 	case HSI_IOCTL_SET_RX:
 		if (!arg) {
@@ -729,12 +728,25 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		hsi_get_tx(dev->ch->hsi_port, (struct hst_ctx *)arg);
 		break;
 	case HSI_IOCTL_SW_RESET:
-
 		dev_info(dev->device.parent, "SW Reset\n");
 		err = hsi_softreset(hsi_ctrl);
 
 		/* Reset HSI config to default */
 		hsi_softreset_driver(hsi_ctrl);
+		break;
+	case HSI_IOCTL_GET_FIFO_OCCUPANCY:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
+		if (unlikely(fifo < 0)) {
+			dev_err(hsi_ctrl->dev, "No valid FIFO id found for "
+					       "channel %d.\n", channel);
+			err = -EFAULT;
+			goto out;
+		}
+		*(u8 *)arg = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
 		break;
 	default:
 		err = -ENOIOCTLCMD;
@@ -742,8 +754,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	}
 out:
 	/* All IOCTL end by disabling the clocks, except ACWAKE high. */
-	hsi_clocks_disable_channel(dev->device.parent,
-				   ch->channel_number, __func__);
+	hsi_clocks_disable_channel(dev->device.parent, channel, __func__);
 
 	spin_unlock_bh(&hsi_ctrl->lock);
 
