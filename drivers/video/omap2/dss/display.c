@@ -105,7 +105,7 @@ static ssize_t display_enabled_store(struct device *dev,
 		const char *buf, size_t size)
 {
 	struct omap_dss_device *dssdev = to_dss_device(dev);
-	bool enabled = simple_strtoul(buf, NULL, 10);
+	unsigned int enabled = simple_strtoul(buf, NULL, 10);
 	int r = 0;
 
 	if (enabled)
@@ -113,7 +113,33 @@ static ssize_t display_enabled_store(struct device *dev,
 	else
 		omapdss_display_disable(dssdev);
 
-	return r ? : size;
+	return r ? r : size;
+}
+
+static ssize_t display_3d_enabled_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	bool enabled = false;
+
+	if (dssdev->driver->get_s3d_enabled)
+		enabled = dssdev->driver->get_s3d_enabled(dssdev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", enabled ? 1 : 0);
+}
+
+static ssize_t display_3d_enabled_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	unsigned int enable = simple_strtoul(buf, NULL, 10);
+	int r = 0;
+
+	if (dssdev->driver->enable_s3d)
+		r = dssdev->driver->enable_s3d(dssdev, enable);
+
+	return r ? r : size;
 }
 
 static ssize_t display_upd_mode_show(struct device *dev,
@@ -384,6 +410,8 @@ static ssize_t display_hpd_enabled_store(struct device *dev,
 
 static DEVICE_ATTR(enabled, S_IRUGO|S_IWUSR,
 		display_enabled_show, display_enabled_store);
+static DEVICE_ATTR(s3d_enabled, S_IRUGO|S_IWUSR,
+		display_3d_enabled_show, display_3d_enabled_store);
 static DEVICE_ATTR(update_mode, S_IRUGO|S_IWUSR,
 		display_upd_mode_show, display_upd_mode_store);
 static DEVICE_ATTR(tear_elim, S_IRUGO|S_IWUSR,
@@ -403,6 +431,7 @@ static DEVICE_ATTR(hpd_enabled, S_IRUGO|S_IWUSR,
 
 static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_enabled,
+	&dev_attr_s3d_enabled,
 	&dev_attr_update_mode,
 	&dev_attr_tear_elim,
 	&dev_attr_timings,
