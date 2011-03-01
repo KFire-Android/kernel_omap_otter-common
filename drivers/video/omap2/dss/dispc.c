@@ -3021,7 +3021,21 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if (ilace != PBUF_PDEV) {
 #ifdef CONFIG_OMAP2_DSS_HDMI
 		/* HDMI output */
-		height /= 2;
+		switch (rotation) {
+		case OMAP_DSS_ROT_0:
+		case OMAP_DSS_ROT_180:
+			height /= 2;
+			break;
+		case OMAP_DSS_ROT_90:
+		case OMAP_DSS_ROT_270:
+			/* rotation not considered for interlace devices */
+			if (ilace == PBUF_IDEV || ilace == IBUF_IDEV)
+				return -EINVAL;
+			width = width/2;
+			break;
+		default:
+			return -EINVAL;
+		}
 #else
 		/* VENC output */
 		if (fieldmode)

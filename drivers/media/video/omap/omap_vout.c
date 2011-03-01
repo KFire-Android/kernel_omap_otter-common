@@ -1176,25 +1176,6 @@ static int interlace_display(struct omap_vout_device *vout, u32 irqstatus,
 	return vout->field_id;
 }
 
-#ifdef CONFIG_OMAP2_DSS_HDMI
-/* This returns the the infromation of level of completion of display of
-	the complete frame */
-static int i_to_p_base_address_change(struct omap_vout_device *vout)
-{
-	struct omap_overlay *ovl;
-	struct omapvideo_info *ovid;
-	ovid = &(vout->vid_info);
-	ovl = ovid->overlays[0];
-
-	if (vout->field_id == 0) {
-		change_base_address(ovl->id, ovl->info.p_uv_addr);
-		dispc_go(ovl->manager->device->channel);
-	}
-	vout->field_id ^= 1;
-	return vout->field_id;
-}
-#endif
-
 static int omapvid_process_frame(struct omap_vout_device *vout)
 {
 	u32 addr, uv_addr;
@@ -1314,7 +1295,7 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 		    !(ovl->info.field & OMAP_FLAG_IDEV) &&
 		    (irq == DISPC_IRQ_FRAMEDONE ||
 		     irq == DISPC_IRQ_FRAMEDONE2)) {
-			 /* in this case, the upper halg of the frame would be
+			 /* In this case, the upper half of the frame would be
 			  * rendered and the lower one would be ignored.
 			  */
 		}
@@ -1333,8 +1314,11 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 				goto vout_isr_err;
 		} else if (ovl->info.field & OMAP_FLAG_IBUF) {
 			if (irqstatus & DISPC_IRQ_EVSYNC_EVEN) {
-				if (i_to_p_base_address_change(vout))
-					goto vout_isr_err;
+				/* In this case, the upper half of the frame
+				 * would be rendered and the lower one would
+				 * be ignored.
+				 */
+				break;
 			}
 		} else {
 			if (!(irqstatus & DISPC_IRQ_EVSYNC_EVEN))
