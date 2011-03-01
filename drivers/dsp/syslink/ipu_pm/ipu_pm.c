@@ -2646,7 +2646,7 @@ int ipu_pm_restore_ctx(int proc_id)
 			iommu_restore_ctx(ducati_iommu);
 			_is_iommu_up = 1;
 		} else
-			pr_err("Not able to restore iommu");
+			pr_err("Not restoring iommu");
 
 		pr_info("Wakeup SYSM3\n");
 		retval = rproc_wakeup(sys_rproc);
@@ -2987,13 +2987,6 @@ int ipu_pm_detach(u16 remote_proc_id)
 			/*
 			 * Restore iommu to allow process's iommu cleanup
 			 * after ipu_pm is shutdown
-			 */
-			if (ipu_pm_get_state(SYS_M3) & SYS_PROC_DOWN)
-				iommu_restore_ctx(ducati_iommu);
-			iommu_unregister_notifier(ducati_iommu,
-					&ipu_pm_notify_nb_iommu_ducati);
-			pr_debug("releasing ducati_iommu\n");
-			/*
 			 * FIXME: this need to be checked by the iommu driver
 			 * restore IOMMU since it is required the IOMMU
 			 * is up and running for reclaiming MMU entries
@@ -3002,6 +2995,9 @@ int ipu_pm_detach(u16 remote_proc_id)
 				iommu_restore_ctx(ducati_iommu);
 				_is_iommu_up = 1;
 			}
+			iommu_unregister_notifier(ducati_iommu,
+					&ipu_pm_notify_nb_iommu_ducati);
+			pr_debug("%s ducati_iommu put\n", __func__);
 			iommu_put(ducati_iommu);
 			ducati_iommu = NULL;
 		}
