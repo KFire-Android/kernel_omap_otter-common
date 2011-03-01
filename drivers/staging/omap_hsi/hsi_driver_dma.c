@@ -123,7 +123,7 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
-		if (fifo < 0) {
+		if (unlikely(fifo < 0)) {
 			dev_err(hsi_ctrl->dev, "No valid FIFO id for DMA "
 				"transfer to FIFO.\n");
 			return -EFAULT;
@@ -215,7 +215,7 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
-		if (fifo < 0) {
+		if (unlikely(fifo < 0)) {
 			dev_err(hsi_ctrl->dev, "No valid FIFO id for DMA "
 				"transfer from FIFO.\n");
 			return -EFAULT;
@@ -406,6 +406,12 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			/* Check if FIFO is correctly emptied */
 			if (hsi_driver_device_is_hsi(pdev)) {
 				fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
+				if (unlikely(fifo < 0)) {
+					dev_err(hsi_ctrl->dev, "No valid FIFO "
+						"id found for channel %d.\n",
+						channel);
+					return;
+				}
 				fifo_words_avail =
 					hsi_get_rx_fifo_occupancy(hsi_ctrl,
 								fifo);

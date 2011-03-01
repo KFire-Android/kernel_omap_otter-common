@@ -322,6 +322,11 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 	/* Check if FIFO is correctly emptied */
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, n_ch, n_p);
+		if (unlikely(fifo < 0)) {
+			dev_err(hsi_ctrl->dev, "No valid FIFO id found for "
+					       "channel %d.\n", n_ch);
+			goto done;
+		}
 		fifo_words_avail = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
 		if (fifo_words_avail)
 			dev_dbg(hsi_ctrl->dev,

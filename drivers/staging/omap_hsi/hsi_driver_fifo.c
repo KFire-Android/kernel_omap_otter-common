@@ -209,7 +209,7 @@ long hsi_hst_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
 	int fifo;
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
-		if (fifo < 0)
+		if (unlikely(fifo < 0))
 			return fifo;
 		else
 			return HSI_HST_BUFSTATE_FIFO_REG(fifo);
@@ -235,7 +235,7 @@ long hsi_hsr_bufstate_f_reg(struct hsi_dev *hsi_ctrl,
 	int fifo;
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
-		if (fifo < 0)
+		if (unlikely(fifo < 0))
 			return fifo;
 		else
 			return HSI_HSR_BUFSTATE_FIFO_REG(fifo);
@@ -287,7 +287,7 @@ long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
 	int fifo;
 	if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
 		fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
-		if (fifo < 0)
+		if (unlikely(fifo < 0))
 			return fifo;
 		else
 			return HSI_HSR_BUFFER_FIFO_REG(fifo);
