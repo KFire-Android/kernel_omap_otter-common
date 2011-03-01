@@ -545,6 +545,7 @@ static const char *mm1_be[] = {
 		OMAP_ABE_BE_DMIC0,
 		OMAP_ABE_BE_DMIC1,
 		OMAP_ABE_BE_DMIC2,
+		OMAP_ABE_BE_VXREC,
 };
 
 static const char *mm2_be[] = {
@@ -554,6 +555,7 @@ static const char *mm2_be[] = {
 		OMAP_ABE_BE_DMIC0,
 		OMAP_ABE_BE_DMIC1,
 		OMAP_ABE_BE_DMIC2,
+		OMAP_ABE_BE_VXREC,
 };
 
 static const char *tones_be[] = {
@@ -928,6 +930,22 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.be_hw_params_fixup = dmic_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_DMIC2,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = OMAP_ABE_BE_VXREC,
+		.stream_name = "VXREC",
+
+		/* ABE components - VxREC */
+		.cpu_dai_name = "omap-abe-vxrec-dai",
+		.platform_name = "omap-aess-audio",
+
+		/* no codec needed */
+		.codec_dai_name = "null-codec-dai",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.no_codec = 1, /* TODO: have a dummy CODEC */
+		.be_id = OMAP_ABE_DAI_VXREC,
 		.ignore_suspend = 1,
 	},
 };

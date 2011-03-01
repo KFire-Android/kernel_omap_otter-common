@@ -43,6 +43,7 @@
 #define OMAP_ABE_DAI_DMIC0			7
 #define OMAP_ABE_DAI_DMIC1			8
 #define OMAP_ABE_DAI_DMIC2			9
+#define OMAP_ABE_DAI_VXREC			10
 
 #define OMAP_ABE_BE_PDM_DL1		"(Backend) PDM-DL1"
 #define OMAP_ABE_BE_PDM_UL1		"(Backend) PDM-UL1"
@@ -54,6 +55,6 @@
 #define OMAP_ABE_BE_DMIC0		"(Backend) DMIC0"
 #define OMAP_ABE_BE_DMIC1		"(Backend) DMIC1"
 #define OMAP_ABE_BE_DMIC2		"(Backend) DMIC2"
-
+#define OMAP_ABE_BE_VXREC		"(Backend) VXREC"
 
 #endif	/* End of __OMAP_MCPDM_H__ */
