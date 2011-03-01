@@ -410,12 +410,18 @@ static struct platform_device omap_abe_dai = {
 	.id	= -1,
 };
 
+static struct platform_device omap_abe_vxrec = {
+	.name	= "omap-abe-vxrec-dai",
+	.id	= -1,
+};
+
 static inline void omap_init_abe(void)
 {
 	platform_device_register(&codec_dmic0);
 	platform_device_register(&codec_dmic1);
 	platform_device_register(&codec_dmic2);
 	platform_device_register(&omap_abe_dai);
+	platform_device_register(&omap_abe_vxrec);
 }
 #else
 static inline void omap_init_abe(void) {}
