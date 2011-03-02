@@ -464,6 +464,45 @@ u32 omap_prcm_get_reset_sources(void)
 }
 EXPORT_SYMBOL(omap_prcm_get_reset_sources);
 
+void omap4_prm_global_sw_reset(const char *cmd)
+{
+	u32 v;
+
+	v = prm_read_mod_reg(OMAP4430_PRM_DEVICE_MOD,
+			OMAP4_RM_RSTCTRL);
+
+	switch (cmd[0]) {
+	case 0:
+		/* cmd = NULL; case: cold boot */
+		v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+		break;
+	default:
+		/* cmd != null; case: warm boot */
+		if (!strcmp(cmd, "bootloader")) {
+			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+		} else if (!strcmp(cmd, "recovery")) {
+			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+		} else {
+			printk(KERN_EMERG "reboot: non-supported mode [%s]\n",
+									cmd);
+			/* otherwise cold boot */
+			v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+		}
+		break;
+	}
+	/* clear previous reboot status */
+	prm_write_mod_reg(0xfff,
+			OMAP4430_PRM_DEVICE_MOD,
+			OMAP4_RM_RSTST);
+
+	prm_write_mod_reg(v,
+			OMAP4430_PRM_DEVICE_MOD,
+			OMAP4_RM_RSTCTRL);
+
+	/* OCP barrier */
+	v = prm_read_mod_reg(WKUP_MOD, OMAP4_RM_RSTCTRL);
+}
+
 /* Resets clock rates and reboots the system. Only called from system.h */
 void omap_prcm_arch_reset(char mode, const char *cmd)
 {
@@ -485,16 +524,13 @@ void omap_prcm_arch_reset(char mode, const char *cmd)
 		 * Configuration. */
 		omap_writel(l, OMAP343X_SCRATCHPAD + 4);
 	} else if (cpu_is_omap44xx())
-		prcm_offs = OMAP4430_PRM_DEVICE_MOD;
+		omap4_prm_global_sw_reset(cmd); /* never returns */
 	else
 		WARN_ON(1);
 
 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
 		prm_set_mod_reg_bits(OMAP_RST_DPLL3_MASK, prcm_offs,
 						 OMAP2_RM_RSTCTRL);
-	if (cpu_is_omap44xx())
-		prm_set_mod_reg_bits(OMAP4430_RST_GLOBAL_WARM_SW_MASK,
-				     prcm_offs, OMAP4_RM_RSTCTRL);
 }
 
 static inline u32 __omap_prcm_read(void __iomem *base, s16 module, u16 reg)
