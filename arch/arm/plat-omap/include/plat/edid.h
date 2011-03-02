@@ -55,6 +55,8 @@
 #define HDMI_EDID_V_BORDER_OFFSET		16
 #define HDMI_EDID_FLAGS_OFFSET			17
 
+#define HDMI_IEEE_REGISTRATION_ID		0x000c03
+
 /* HDMI Connected States */
 #define HDMI_STATE_NOMONITOR	0 /* No HDMI monitor connected*/
 #define HDMI_STATE_CONNECTED	1 /* HDMI monitor connected but powered off */
@@ -76,6 +78,7 @@
 
 #define HDMI_IMG_FORMAT_MAX_LENGTH		20
 #define HDMI_AUDIO_FORMAT_MAX_LENGTH		10
+#define HDMI_AUDIO_BASIC_MASK			0x40
 
 /* HDMI EDID Extenion Data Block Values: Video */
 #define HDMI_EDID_EX_VIDEO_NATIVE		0x80
@@ -269,6 +272,7 @@ int hdmi_get_datablock_offset(u8 *edid, enum extension_edid_db datablock,
 								int *offset);
 int hdmi_get_image_format(u8 *edid, struct image_format *format);
 int hdmi_get_audio_format(u8 *edid, struct audio_format *format);
+bool hdmi_has_ieee_id(u8 *edid);
 void hdmi_get_av_delay(u8 *edid, struct latency *lat);
 void hdmi_deep_color_support_info(u8 *edid, struct deep_color *format);
 int hdmi_tv_yuv_supported(u8 *edid);

@@ -265,6 +265,28 @@ int hdmi_get_audio_format(u8 *edid, struct audio_format *format)
 	return 0;
 }
 
+bool hdmi_has_ieee_id(u8 *edid)
+{
+	int offset, current_byte, length = 0;
+	enum extension_edid_db vsdb =  DATABLOCK_VENDOR;
+	u32 hdmi_identifier = 0;
+
+	if (!hdmi_get_datablock_offset(edid, vsdb, &offset)) {
+		current_byte = edid[offset];
+		length = current_byte & HDMI_EDID_EX_DATABLOCK_LEN_MASK;
+
+		if (length < 3)
+			return 0;
+		offset++;
+		hdmi_identifier = edid[offset] | edid[offset+1]<<8
+						| edid[offset+2]<<16;
+		if (hdmi_identifier == HDMI_IEEE_REGISTRATION_ID)
+			return 1;
+
+	}
+	return 0;
+}
+
 void hdmi_get_av_delay(u8 *edid, struct latency *lat)
 {
 	int offset, current_byte, length = 0;

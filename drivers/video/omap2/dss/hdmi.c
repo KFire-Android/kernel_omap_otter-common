@@ -2236,6 +2236,21 @@ static int get_edid_timing_data(struct HDMI_EDID *edid)
 {
 	u8 i, code, offset = 0, addr = 0;
 	struct hdmi_cm cm;
+	bool audio_support = false;
+
+	/*
+	 *  Verify if the sink supports audio
+	 */
+	/* check if EDID has CEA extension block */
+	if ((edid->extension_edid != 0x00))
+		/* check if CEA extension block is version 3 */
+		if (edid->extention_rev == 3)
+			/* check if extension block has the IEEE HDMI ID*/
+			if (hdmi_has_ieee_id((u8 *)edid))
+				/* check if sink supports basic audio */
+				if (edid->num_dtd & HDMI_AUDIO_BASIC_MASK)
+					audio_support = true;
+
 	/* Seach block 0, there are 4 DTDs arranged in priority order */
 	for (i = 0; i < EDID_SIZE_BLOCK0_TIMING_DESCRIPTOR; i++) {
 		get_edid_timing_info(&edid->DTD[i], &edid_timings);
@@ -2247,6 +2262,9 @@ static int get_edid_timing_data(struct HDMI_EDID *edid)
 		if (cm.code == -1)
 			continue;
 		if (hdmi.s3d_enabled && s3d_code_cea[cm.code] == -1)
+			continue;
+		/* if sink supports audio, use CEA video timing */
+		if (audio_support && !cm.mode)
 			continue;
 		hdmi.code = cm.code;
 		hdmi.mode = cm.mode;
@@ -2266,6 +2284,9 @@ static int get_edid_timing_data(struct HDMI_EDID *edid)
 			if (cm.code == -1)
 				continue;
 			if (hdmi.s3d_enabled && s3d_code_cea[cm.code] == -1)
+				continue;
+			/* if sink supports audio, use CEA video timing */
+			if (audio_support && !cm.mode)
 				continue;
 			hdmi.code = cm.code;
 			hdmi.mode = cm.mode;
