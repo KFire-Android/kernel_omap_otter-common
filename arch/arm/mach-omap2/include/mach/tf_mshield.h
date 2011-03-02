@@ -6,6 +6,6 @@
  * published by the Free Software Foundation.
  */
 
-#ifdef CONFIG_DYNAMIC_SDP_STORAGE_ALLOC
-void SCXLNXCtrlDeviceEarlyInit(void);
+#ifdef CONFIG_TF_MSHIELD
+void tf_allocate_workspace(void);
 #endif

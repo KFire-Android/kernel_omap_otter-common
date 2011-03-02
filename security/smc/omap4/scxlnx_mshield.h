@@ -24,20 +24,18 @@
 
 int SCXLNXCtrlDeviceRegister(void);
 
-int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
-	u32 nSDPBkExtStoreAddr, u32 nDataAddr, u8 *pPABufferVAddr,
-	u32 nPABufferSize, u8 *pPropertiesBuffer,
-	u32 nPropertiesBufferLen);
+int SCXLNXCommStart(struct SCXLNX_COMM *pComm,
+	u32 nWorkspaceAddr, u32 nWorkspaceSize,
+	u8 *pPABufferVAddr, u32 nPABufferSize,
+	u8 *pPropertiesBuffer, u32 nPropertiesBufferLength);
 
 /* Assembler entry points to/from secure */
 u32 schedule_secure_world(u32 app_id, u32 proc_id, u32 flags, u32 args);
 u32 rpc_handler(u32 p1, u32 p2, u32 p3, u32 p4);
+u32 read_mpidr(void);
 
 /* L4 SEC clockdomain enabling/disabling */
-void SCXL4SECClockDomainEnable(bool use_spin_lock);
-void SCXL4SECClockDomainDisable(bool use_spin_lock);
-
-void tf_wake_lock(void);
-void tf_wake_unlock(void);
+void tf_l4sec_clkdm_wakeup(bool use_spin_lock, bool wakelock);
+void tf_l4sec_clkdm_allow_idle(bool use_spin_lock, bool wakeunlock);
 
 #endif

@@ -59,10 +59,6 @@ struct SCX_SMC_PA_CTRL {
 
 	u32 nConfSize;
 	u8 *pConfBuffer;
-
-	u32 nSDPBackingStoreAddr;
-	u32 nSDPBkExtStoreAddr;
-	u32 nDataAddr;
 };
 
 static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
@@ -145,36 +141,18 @@ static int SCXLNXCtrlDeviceIoctl(struct inode *inode, struct file *file,
 			}
 		}
 
-#ifdef CONFIG_DYNAMIC_SDP_STORAGE_ALLOC
-#define DATA_ADDRESS_OFFSET	0x20000
-		if (pDevice->nSDPBackingStoreAddr != 0) {
-			/*
-			 * Override configuration to use dynamically allocated
-			 * areas if SCXLNXCtrlDeviceEarlyInit was called.
-			 */
-			paCtrl.nSDPBackingStoreAddr =
-				pDevice->nSDPBackingStoreAddr;
-			paCtrl.nSDPBkExtStoreAddr =
-				pDevice->nSDPBkExtStoreAddr;
-			paCtrl.nDataAddr =
-				paCtrl.nSDPBkExtStoreAddr + DATA_ADDRESS_OFFSET;
-
-			dprintk(KERN_INFO "Overriding configuration: "
-				"SDP addresses = (0x%08x, 0x%08x), "
-				"SMC heap = 0x%08x\n",
-				paCtrl.nSDPBackingStoreAddr,
-				paCtrl.nSDPBkExtStoreAddr,
-				paCtrl.nDataAddr);
+		if (pDevice->nWorkspaceAddr == 0) {
+			nResult = -ENOMEM;
+			goto exit;
 		}
-#endif
 
 		nResult = SCXLNXCommStart(&pDevice->sm,
-			paCtrl.nSDPBackingStoreAddr,
-			paCtrl.nSDPBkExtStoreAddr,
-			paCtrl.nDataAddr,
+			pDevice->nWorkspaceAddr,
+			pDevice->nWorkspaceSize,
 			pPABuffer,
 			paCtrl.nPASize,
-			pConfBuffer, paCtrl.nConfSize);
+			pConfBuffer,
+			paCtrl.nConfSize);
 		if (nResult)
 			dprintk(KERN_ERR "SMC: start failed\n");
 		else
@@ -291,22 +269,34 @@ int __init SCXLNXCtrlDeviceRegister(void)
 	return nError;
 }
 
-#ifdef CONFIG_DYNAMIC_SDP_STORAGE_ALLOC
-int __init SCXLNXCtrlDeviceEarlyInit(void)
+static int __initdata smc_mem;
+
+void __init tf_allocate_workspace(void)
 {
 	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
 
-	/* Reserve memory areas for SDP operations */
-	pDevice->nSDPBackingStoreAddr = (u32) __pa(
-		__alloc_bootmem(SZ_1M, SZ_1M, __pa(MAX_DMA_ADDRESS)));
-	pDevice->nSDPBkExtStoreAddr = (u32) __pa(
-		__alloc_bootmem(SZ_1M, SZ_1M, __pa(MAX_DMA_ADDRESS)));
+#if 0
+	if (smc_mem < 3)
+		smc_mem = 3;
 
-	printk(KERN_INFO "SMC: Allocated SDP Backing Storage (0x%x) and "
-		"External Storage (0x%x) memory areas\n",
-		pDevice->nSDPBackingStoreAddr,
-		pDevice->nSDPBkExtStoreAddr);
+	pDevice->nWorkspaceSize = SZ_1M * smc_mem;
+	pDevice->nWorkspaceAddr = (u32) __pa(__alloc_bootmem(
+		pDevice->nWorkspaceSize, SZ_1M, __pa(MAX_DMA_ADDRESS)));
+#else
+	smc_mem = 3;
+	pDevice->nWorkspaceSize = SZ_1M * smc_mem;
+	pDevice->nWorkspaceAddr = (u32) 0x9C900000;
+#endif
+	printk(KERN_INFO "SMC: Allocated workspace of %dM at (0x%x)\n",
+		smc_mem,
+		pDevice->nWorkspaceAddr);
+}
 
+static int __init tf_mem_setup(char *str)
+{
+	get_option(&str, &smc_mem);
 	return 0;
 }
-#endif
+
+early_param("smc_mem", tf_mem_setup);
+

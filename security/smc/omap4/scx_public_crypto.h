@@ -27,6 +27,11 @@
 
 /*-------------------------------------------------------------------------- */
 
+#define PUBLIC_CRYPTO_HWA_AES1		0x1
+#define PUBLIC_CRYPTO_HWA_AES2		0x2
+#define PUBLIC_CRYPTO_HWA_DES		0x4
+#define PUBLIC_CRYPTO_HWA_SHA		0x8
+
 #define OUTREG32(a, b)	__raw_writel(b, a)
 #define INREG32(a)	__raw_readl(a)
 #define SETREG32(x, y)	OUTREG32(x, INREG32(x) | (y))
@@ -117,6 +122,20 @@ struct PUBLIC_CRYPTO_AES_OPERATION_STATE {
 	u32 AES_IV_1;
 	u32 AES_IV_2;
 	u32 AES_IV_3;
+
+	u32 CTRL;
+
+	/* Only used by Linux crypto API interface */
+	u32 KEY1_0;
+	u32 KEY1_1;
+	u32 KEY1_2;
+	u32 KEY1_3;
+	u32 KEY1_4;
+	u32 KEY1_5;
+	u32 KEY1_6;
+	u32 KEY1_7;
+
+	u32 key_is_public;
 };
 
 struct PUBLIC_CRYPTO_DES_OPERATION_STATE {
@@ -127,7 +146,7 @@ struct PUBLIC_CRYPTO_DES_OPERATION_STATE {
 #define HASH_BLOCK_BYTES_LENGTH		64
 
 struct PUBLIC_CRYPTO_SHA_OPERATION_STATE {
-	/*Current digest */
+	/* Current digest */
 	u32 SHA_DIGEST_A;
 	u32 SHA_DIGEST_B;
 	u32 SHA_DIGEST_C;
@@ -137,10 +156,10 @@ struct PUBLIC_CRYPTO_SHA_OPERATION_STATE {
 	u32 SHA_DIGEST_G;
 	u32 SHA_DIGEST_H;
 
-	/*This buffer contains a partial chunk */
+	/* This buffer contains a partial chunk */
 	u8 pChunkBuffer[HASH_BLOCK_BYTES_LENGTH];
 
-	/*Number of bytes stored in pChunkBuffer (0..64) */
+	/* Number of bytes stored in pChunkBuffer (0..64) */
 	u32 nChunkLength;
 
 	/*
@@ -148,6 +167,8 @@ struct PUBLIC_CRYPTO_SHA_OPERATION_STATE {
 	 * (not including the partial chunk)
 	 */
 	u32 nBytesProcessed;
+
+	u32 CTRL;
 };
 
 union PUBLIC_CRYPTO_OPERATION_STATE {
@@ -229,12 +250,32 @@ int SCXPublicCryptoExecuteRPCCommand(u32 nRPCCommand, void *pRPCSharedBuffer);
 u32 SCXPublicCryptoWaitForReadyBit(u32 *pRegister, u32 vBit);
 void SCXPublicCryptoWaitForReadyBitInfinitely(u32 *pRegister, u32 vBit);
 
+void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr);
+void SCXPublicCryptoDisableClock(uint32_t vClockPhysAddr);
+
+#define LOCK_HWA	true
+#define UNLOCK_HWA	false
+
+void PDrvCryptoLockUnlockHWA(u32 nHWAID, bool bDoLock);
+
 /*---------------------------------------------------------------------------*/
 /*                               AES operations                              */
 /*---------------------------------------------------------------------------*/
 
 void PDrvCryptoAESInit(void);
 void PDrvCryptoAESExit(void);
+
+#ifdef CONFIG_SMC_KERNEL_CRYPTO
+int register_smc_public_crypto_aes(void);
+void unregister_smc_public_crypto_aes(void);
+#else
+static inline int register_smc_public_crypto_aes(void)
+{
+	return 0;
+}
+
+static inline void unregister_smc_public_crypto_aes(void) {}
+#endif
 
 /**
  *This function performs an AES update operation.
@@ -248,8 +289,7 @@ void PDrvCryptoAESExit(void);
  *
  *nbBlocks number of block(s)to process.
  */
-void PDrvCryptoUpdateAES(u32 AES_CTRL,
-	struct PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState,
+bool PDrvCryptoUpdateAES(struct PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState,
 	u8 *pSrc, u8 *pDest, u32 nbBlocks);
 
 /*---------------------------------------------------------------------------*/
@@ -270,7 +310,7 @@ void PDrvCryptoDESExit(void);
  *pDest:			Output buffer containing the processed data.
  *nbBlocks:		Number of block(s)to process.
  */
-void PDrvCryptoUpdateDES(u32 DES_CTRL,
+bool PDrvCryptoUpdateDES(u32 DES_CTRL,
 	struct PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState,
 	u8 *pSrc, u8 *pDest, u32 nbBlocks);
 
@@ -281,6 +321,18 @@ void PDrvCryptoUpdateDES(u32 DES_CTRL,
 void PDrvCryptoDigestInit(void);
 void PDrvCryptoDigestExit(void);
 
+#ifdef CONFIG_SMC_KERNEL_CRYPTO
+int register_smc_public_crypto_digest(void);
+void unregister_smc_public_crypto_digest(void);
+#else
+static inline int register_smc_public_crypto_digest(void)
+{
+	return 0;
+}
+
+static inline void unregister_smc_public_crypto_digest(void) {}
+#endif
+
 /**
  *This function performs a HASH update Operation.
  *
@@ -289,7 +341,7 @@ void PDrvCryptoDigestExit(void);
  *pData:			Input buffer to process
  *dataLength:	Length in bytes of the input buffer.
  */
-void PDrvCryptoUpdateHash(u32 SHA_CTRL,
+void PDrvCryptoUpdateHash(
 	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
 	u8 *pData, u32 dataLength);
 

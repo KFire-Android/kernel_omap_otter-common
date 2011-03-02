@@ -121,22 +121,22 @@ void runBogoMIPS(void)
  */
 void SCXLNXDumpL1SharedBuffer(struct SCHANNEL_C1S_BUFFER *pBuf)
 {
-	dprintk(KERN_INFO "buffer@%p:\n", pBuf);
-
-	dprintk(
-		KERN_INFO "  nConfigFlags_S=%08X\n"
-		KERN_INFO "  sVersionDescription=%64s\n"
-		KERN_INFO "  nStatus_S=%08X\n"
-		KERN_INFO "  nSyncSerial_N=%08X\n"
-		KERN_INFO "  nSyncSerial_S=%08X\n"
-		KERN_INFO "  sTime_N[0]=%016llX\n"
-		KERN_INFO "  sTime_N[1]=%016llX\n"
-		KERN_INFO "  sTimeout_S[0]=%016llX\n"
-		KERN_INFO "  sTimeout_S[1]=%016llX\n"
-		KERN_INFO "  nFirstCommand=%08X\n"
-		KERN_INFO "  nFirstFreeCommand=%08X\n"
-		KERN_INFO "  nFirstAnswer=%08X\n"
-		KERN_INFO "  nFirstFreeAnswer=%08X\n\n",
+	dprintk(KERN_INFO
+		"buffer@%p:\n"
+		"  nConfigFlags_S=%08X\n"
+		"  sVersionDescription=%64s\n"
+		"  nStatus_S=%08X\n"
+		"  nSyncSerial_N=%08X\n"
+		"  nSyncSerial_S=%08X\n"
+		"  sTime_N[0]=%016llX\n"
+		"  sTime_N[1]=%016llX\n"
+		"  sTimeout_S[0]=%016llX\n"
+		"  sTimeout_S[1]=%016llX\n"
+		"  nFirstCommand=%08X\n"
+		"  nFirstFreeCommand=%08X\n"
+		"  nFirstAnswer=%08X\n"
+		"  nFirstFreeAnswer=%08X\n\n",
+		pBuf,
 		pBuf->nConfigFlags_S,
 		pBuf->sVersionDescription,
 		pBuf->nStatus_S,
@@ -164,12 +164,12 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 
 	switch (pMessage->sHeader.nMessageType) {
 	case SCX_MESSAGE_TYPE_CREATE_DEVICE_CONTEXT:
-		dprintk(
-			KERN_INFO "   nMessageSize             = 0x%02X\n"
-			KERN_INFO "   nMessageType             = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize             = 0x%02X\n"
+			"   nMessageType             = 0x%02X "
 				"SCX_MESSAGE_TYPE_CREATE_DEVICE_CONTEXT\n"
-			KERN_INFO "   nOperationID             = 0x%08X\n"
-			KERN_INFO "   nDeviceContextID         = 0x%08X\n",
+			"   nOperationID             = 0x%08X\n"
+			"   nDeviceContextID         = 0x%08X\n",
 			pMessage->sHeader.nMessageSize,
 			pMessage->sHeader.nMessageType,
 			pMessage->sHeader.nOperationID,
@@ -178,12 +178,12 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 		break;
 
 	case SCX_MESSAGE_TYPE_DESTROY_DEVICE_CONTEXT:
-		dprintk(
-			KERN_INFO "   nMessageSize    = 0x%02X\n"
-			KERN_INFO "   nMessageType    = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize    = 0x%02X\n"
+			"   nMessageType    = 0x%02X "
 				"SCX_MESSAGE_TYPE_DESTROY_DEVICE_CONTEXT\n"
-			KERN_INFO "   nOperationID    = 0x%08X\n"
-			KERN_INFO "   hDeviceContext  = 0x%08X\n",
+			"   nOperationID    = 0x%08X\n"
+			"   hDeviceContext  = 0x%08X\n",
 			pMessage->sHeader.nMessageSize,
 			pMessage->sHeader.nMessageType,
 			pMessage->sHeader.nOperationID,
@@ -191,16 +191,16 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 		break;
 
 	case SCX_MESSAGE_TYPE_OPEN_CLIENT_SESSION:
-		dprintk(
-			KERN_INFO "   nMessageSize                = 0x%02X\n"
-			KERN_INFO "   nMessageType                = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize                = 0x%02X\n"
+			"   nMessageType                = 0x%02X "
 				"SCX_MESSAGE_TYPE_OPEN_CLIENT_SESSION\n"
-			KERN_INFO "   nParamTypes                 = 0x%04X\n"
-			KERN_INFO "   nOperationID                = 0x%08X\n"
-			KERN_INFO "   hDeviceContext              = 0x%08X\n"
-			KERN_INFO "   nCancellationID             = 0x%08X\n"
-			KERN_INFO "   sTimeout                    = 0x%016llX\n"
-			KERN_INFO "   sDestinationUUID            = "
+			"   nParamTypes                 = 0x%04X\n"
+			"   nOperationID                = 0x%08X\n"
+			"   hDeviceContext              = 0x%08X\n"
+			"   nCancellationID             = 0x%08X\n"
+			"   sTimeout                    = 0x%016llX\n"
+			"   sDestinationUUID            = "
 				"%08X-%04X-%04X-%02X%02X-"
 				"%02X%02X%02X%02X%02X%02X\n",
 			pMessage->sHeader.nMessageSize,
@@ -303,13 +303,13 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 		break;
 
 	case SCX_MESSAGE_TYPE_CLOSE_CLIENT_SESSION:
-		dprintk(
-			KERN_INFO "   nMessageSize                = 0x%02X\n"
-			KERN_INFO "   nMessageType                = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize                = 0x%02X\n"
+			"   nMessageType                = 0x%02X "
 				"SCX_MESSAGE_TYPE_CLOSE_CLIENT_SESSION\n"
-			KERN_INFO "   nOperationID                = 0x%08X\n"
-			KERN_INFO "   hDeviceContext              = 0x%08X\n"
-			KERN_INFO "   hClientSession              = 0x%08X\n",
+			"   nOperationID                = 0x%08X\n"
+			"   hDeviceContext              = 0x%08X\n"
+			"   hClientSession              = 0x%08X\n",
 			pMessage->sHeader.nMessageSize,
 			pMessage->sHeader.nMessageType,
 			pMessage->sHeader.nOperationID,
@@ -319,24 +319,24 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 		break;
 
 	case SCX_MESSAGE_TYPE_REGISTER_SHARED_MEMORY:
-		dprintk(
-			KERN_INFO "   nMessageSize             = 0x%02X\n"
-			KERN_INFO "   nMessageType             = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize             = 0x%02X\n"
+			"   nMessageType             = 0x%02X "
 				"SCX_MESSAGE_TYPE_REGISTER_SHARED_MEMORY\n"
-			KERN_INFO "   nMemoryFlags             = 0x%04X\n"
-			KERN_INFO "   nOperationID             = 0x%08X\n"
-			KERN_INFO "   hDeviceContext           = 0x%08X\n"
-			KERN_INFO "   nBlockID                 = 0x%08X\n"
-			KERN_INFO "   nSharedMemSize           = 0x%08X\n"
-			KERN_INFO "   nSharedMemStartOffset    = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[0] = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[1] = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[2] = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[3] = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[4] = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[5] = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[6] = 0x%08X\n"
-			KERN_INFO "   nSharedMemDescriptors[7] = 0x%08X\n",
+			"   nMemoryFlags             = 0x%04X\n"
+			"   nOperationID             = 0x%08X\n"
+			"   hDeviceContext           = 0x%08X\n"
+			"   nBlockID                 = 0x%08X\n"
+			"   nSharedMemSize           = 0x%08X\n"
+			"   nSharedMemStartOffset    = 0x%08X\n"
+			"   nSharedMemDescriptors[0] = 0x%08X\n"
+			"   nSharedMemDescriptors[1] = 0x%08X\n"
+			"   nSharedMemDescriptors[2] = 0x%08X\n"
+			"   nSharedMemDescriptors[3] = 0x%08X\n"
+			"   nSharedMemDescriptors[4] = 0x%08X\n"
+			"   nSharedMemDescriptors[5] = 0x%08X\n"
+			"   nSharedMemDescriptors[6] = 0x%08X\n"
+			"   nSharedMemDescriptors[7] = 0x%08X\n",
 			pMessage->sHeader.nMessageSize,
 			pMessage->sHeader.nMessageType,
 			pMessage->sRegisterSharedMemoryMessage.nMemoryFlags,
@@ -365,13 +365,13 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 		break;
 
 	case SCX_MESSAGE_TYPE_RELEASE_SHARED_MEMORY:
-		dprintk(
-			KERN_INFO "   nMessageSize    = 0x%02X\n"
-			KERN_INFO "   nMessageType    = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize    = 0x%02X\n"
+			"   nMessageType    = 0x%02X "
 				"SCX_MESSAGE_TYPE_RELEASE_SHARED_MEMORY\n"
-			KERN_INFO "   nOperationID    = 0x%08X\n"
-			KERN_INFO "   hDeviceContext  = 0x%08X\n"
-			KERN_INFO "   hBlock          = 0x%08X\n",
+			"   nOperationID    = 0x%08X\n"
+			"   hDeviceContext  = 0x%08X\n"
+			"   hBlock          = 0x%08X\n",
 			pMessage->sHeader.nMessageSize,
 			pMessage->sHeader.nMessageType,
 			pMessage->sHeader.nOperationID,
@@ -380,17 +380,17 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 		break;
 
 	case SCX_MESSAGE_TYPE_INVOKE_CLIENT_COMMAND:
-		dprintk(
-			KERN_INFO "   nMessageSize                = 0x%02X\n"
-			KERN_INFO "   nMessageType                = 0x%02X "
+		dprintk(KERN_INFO
+			 "   nMessageSize                = 0x%02X\n"
+			"   nMessageType                = 0x%02X "
 				"SCX_MESSAGE_TYPE_INVOKE_CLIENT_COMMAND\n"
-			KERN_INFO "   nParamTypes                 = 0x%04X\n"
-			KERN_INFO "   nOperationID                = 0x%08X\n"
-			KERN_INFO "   hDeviceContext              = 0x%08X\n"
-			KERN_INFO "   hClientSession              = 0x%08X\n"
-			KERN_INFO "   sTimeout                    = 0x%016llX\n"
-			KERN_INFO "   nCancellationID             = 0x%08X\n"
-			KERN_INFO "   nClientCommandIdentifier    = 0x%08X\n",
+			"   nParamTypes                 = 0x%04X\n"
+			"   nOperationID                = 0x%08X\n"
+			"   hDeviceContext              = 0x%08X\n"
+			"   hClientSession              = 0x%08X\n"
+			"   sTimeout                    = 0x%016llX\n"
+			"   nCancellationID             = 0x%08X\n"
+			"   nClientCommandIdentifier    = 0x%08X\n",
 			pMessage->sHeader.nMessageSize,
 			pMessage->sHeader.nMessageType,
 			pMessage->sInvokeClientCommandMessage.nParamTypes,
@@ -413,13 +413,13 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 		break;
 
 	case SCX_MESSAGE_TYPE_CANCEL_CLIENT_COMMAND:
-		dprintk(
-			KERN_INFO "   nMessageSize       = 0x%02X\n"
-			KERN_INFO "   nMessageType       = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize       = 0x%02X\n"
+			"   nMessageType       = 0x%02X "
 				"SCX_MESSAGE_TYPE_CANCEL_CLIENT_COMMAND\n"
-			KERN_INFO "   nOperationID       = 0x%08X\n"
-			KERN_INFO "   hDeviceContext     = 0x%08X\n"
-			KERN_INFO "   hClientSession     = 0x%08X\n",
+			"   nOperationID       = 0x%08X\n"
+			"   hDeviceContext     = 0x%08X\n"
+			"   hClientSession     = 0x%08X\n",
 			pMessage->sHeader.nMessageSize,
 			pMessage->sHeader.nMessageType,
 			pMessage->sHeader.nOperationID,
@@ -428,14 +428,14 @@ void SCXLNXDumpMessage(union SCX_COMMAND_MESSAGE *pMessage)
 		break;
 
 	case SCX_MESSAGE_TYPE_MANAGEMENT:
-		dprintk(
-			KERN_INFO "   nMessageSize             = 0x%02X\n"
-			KERN_INFO "   nMessageType             = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize             = 0x%02X\n"
+			"   nMessageType             = 0x%02X "
 				"SCX_MESSAGE_TYPE_MANAGEMENT\n"
-			KERN_INFO "   nOperationID             = 0x%08X\n"
-			KERN_INFO "   nCommand                 = 0x%08X\n"
-			KERN_INFO "   nW3BSize                 = 0x%08X\n"
-			KERN_INFO "   nW3BStartOffset          = 0x%08X\n",
+			"   nOperationID             = 0x%08X\n"
+			"   nCommand                 = 0x%08X\n"
+			"   nW3BSize                 = 0x%08X\n"
+			"   nW3BStartOffset          = 0x%08X\n",
 			pMessage->sHeader.nMessageSize,
 			pMessage->sHeader.nMessageType,
 			pMessage->sHeader.nOperationID,
@@ -466,13 +466,13 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 
 	switch (pAnswer->sHeader.nMessageType) {
 	case SCX_MESSAGE_TYPE_CREATE_DEVICE_CONTEXT:
-		dprintk(
-			KERN_INFO "   nMessageSize    = 0x%02X\n"
-			KERN_INFO "   nMessageType    = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize    = 0x%02X\n"
+			"   nMessageType    = 0x%02X "
 				"SCX_ANSWER_CREATE_DEVICE_CONTEXT\n"
-			KERN_INFO "   nOperationID    = 0x%08X\n"
-			KERN_INFO "   nErrorCode      = 0x%08X\n"
-			KERN_INFO "   hDeviceContext  = 0x%08X\n",
+			"   nOperationID    = 0x%08X\n"
+			"   nErrorCode      = 0x%08X\n"
+			"   hDeviceContext  = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
 			pAnswer->sHeader.nMessageType,
 			pAnswer->sHeader.nOperationID,
@@ -481,13 +481,13 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 		break;
 
 	case SCX_MESSAGE_TYPE_DESTROY_DEVICE_CONTEXT:
-		dprintk(
-			KERN_INFO "   nMessageSize     = 0x%02X\n"
-			KERN_INFO "   nMessageType     = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize     = 0x%02X\n"
+			"   nMessageType     = 0x%02X "
 				"ANSWER_DESTROY_DEVICE_CONTEXT\n"
-			KERN_INFO "   nOperationID     = 0x%08X\n"
-			KERN_INFO "   nErrorCode       = 0x%08X\n"
-			KERN_INFO "   nDeviceContextID = 0x%08X\n",
+			"   nOperationID     = 0x%08X\n"
+			"   nErrorCode       = 0x%08X\n"
+			"   nDeviceContextID = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
 			pAnswer->sHeader.nMessageType,
 			pAnswer->sHeader.nOperationID,
@@ -497,14 +497,14 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 
 
 	case SCX_MESSAGE_TYPE_OPEN_CLIENT_SESSION:
-		dprintk(
-			KERN_INFO "   nMessageSize      = 0x%02X\n"
-			KERN_INFO "   nMessageType      = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize      = 0x%02X\n"
+			"   nMessageType      = 0x%02X "
 				"SCX_ANSWER_OPEN_CLIENT_SESSION\n"
-			KERN_INFO "   nReturnOrigin     = 0x%02X\n"
-			KERN_INFO "   nOperationID      = 0x%08X\n"
-			KERN_INFO "   nErrorCode        = 0x%08X\n"
-			KERN_INFO "   hClientSession    = 0x%08X\n",
+			"   nReturnOrigin     = 0x%02X\n"
+			"   nOperationID      = 0x%08X\n"
+			"   nErrorCode        = 0x%08X\n"
+			"   hClientSession    = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
 			pAnswer->sHeader.nMessageType,
 			pAnswer->sOpenClientSessionAnswer.nReturnOrigin,
@@ -522,12 +522,12 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 		break;
 
 	case SCX_MESSAGE_TYPE_CLOSE_CLIENT_SESSION:
-		dprintk(
-			KERN_INFO "   nMessageSize      = 0x%02X\n"
-			KERN_INFO "   nMessageType      = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize      = 0x%02X\n"
+			"   nMessageType      = 0x%02X "
 				"ANSWER_CLOSE_CLIENT_SESSION\n"
-			KERN_INFO "   nOperationID      = 0x%08X\n"
-			KERN_INFO "   nErrorCode        = 0x%08X\n",
+			"   nOperationID      = 0x%08X\n"
+			"   nErrorCode        = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
 			pAnswer->sHeader.nMessageType,
 			pAnswer->sHeader.nOperationID,
@@ -535,13 +535,13 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 		break;
 
 	case SCX_MESSAGE_TYPE_REGISTER_SHARED_MEMORY:
-		dprintk(
-			KERN_INFO "   nMessageSize    = 0x%02X\n"
-			KERN_INFO "   nMessageType    = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize    = 0x%02X\n"
+			"   nMessageType    = 0x%02X "
 				"SCX_ANSWER_REGISTER_SHARED_MEMORY\n"
-			KERN_INFO "   nOperationID    = 0x%08X\n"
-			KERN_INFO "   nErrorCode      = 0x%08X\n"
-			KERN_INFO "   hBlock          = 0x%08X\n",
+			"   nOperationID    = 0x%08X\n"
+			"   nErrorCode      = 0x%08X\n"
+			"   hBlock          = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
 			pAnswer->sHeader.nMessageType,
 			pAnswer->sHeader.nOperationID,
@@ -550,13 +550,13 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 		break;
 
 	case SCX_MESSAGE_TYPE_RELEASE_SHARED_MEMORY:
-		dprintk(
-			KERN_INFO "   nMessageSize    = 0x%02X\n"
-			KERN_INFO "   nMessageType    = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize    = 0x%02X\n"
+			"   nMessageType    = 0x%02X "
 				"ANSWER_RELEASE_SHARED_MEMORY\n"
-			KERN_INFO "   nOperationID    = 0x%08X\n"
-			KERN_INFO "   nErrorCode      = 0x%08X\n"
-			KERN_INFO "   nBlockID        = 0x%08X\n",
+			"   nOperationID    = 0x%08X\n"
+			"   nErrorCode      = 0x%08X\n"
+			"   nBlockID        = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
 			pAnswer->sHeader.nMessageType,
 			pAnswer->sHeader.nOperationID,
@@ -565,18 +565,19 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 		break;
 
 	case SCX_MESSAGE_TYPE_INVOKE_CLIENT_COMMAND:
-		dprintk(
-			KERN_INFO "   nMessageSize      = 0x%02X\n"
-			KERN_INFO "   nMessageType      = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize      = 0x%02X\n"
+			"   nMessageType      = 0x%02X "
 				"SCX_ANSWER_INVOKE_CLIENT_COMMAND\n"
-			KERN_INFO "   nReturnOrigin     = 0x%02X\n"
-			KERN_INFO "   nOperationID      = 0x%08X\n"
-			KERN_INFO "   nErrorCode        = 0x%08X\n",
+			"   nReturnOrigin     = 0x%02X\n"
+			"   nOperationID      = 0x%08X\n"
+			"   nErrorCode        = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
 			pAnswer->sHeader.nMessageType,
+			pAnswer->sInvokeClientCommandAnswer.nReturnOrigin,
 			pAnswer->sHeader.nOperationID,
-			pAnswer->sInvokeClientCommandAnswer.nErrorCode,
-			pAnswer->sInvokeClientCommandAnswer.nReturnOrigin);
+			pAnswer->sInvokeClientCommandAnswer.nErrorCode
+			);
 		for (i = 0; i < 4; i++) {
 			dprintk(KERN_INFO "   sAnswers[%d]=0x%08X:0x%08X\n",
 				i,
@@ -588,12 +589,12 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 		break;
 
 	case SCX_MESSAGE_TYPE_CANCEL_CLIENT_COMMAND:
-		dprintk(
-			KERN_INFO "   nMessageSize      = 0x%02X\n"
-			KERN_INFO "   nMessageType      = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize      = 0x%02X\n"
+			"   nMessageType      = 0x%02X "
 				"SCX_ANSWER_CANCEL_CLIENT_COMMAND\n"
-			KERN_INFO "   nOperationID      = 0x%08X\n"
-			KERN_INFO "   nErrorCode        = 0x%08X\n",
+			"   nOperationID      = 0x%08X\n"
+			"   nErrorCode        = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
 			pAnswer->sHeader.nMessageType,
 			pAnswer->sHeader.nOperationID,
@@ -601,12 +602,12 @@ void SCXLNXDumpAnswer(union SCX_ANSWER_MESSAGE *pAnswer)
 		break;
 
 	case SCX_MESSAGE_TYPE_MANAGEMENT:
-		dprintk(
-			KERN_INFO "   nMessageSize      = 0x%02X\n"
-			KERN_INFO "   nMessageType      = 0x%02X "
+		dprintk(KERN_INFO
+			"   nMessageSize      = 0x%02X\n"
+			"   nMessageType      = 0x%02X "
 				"SCX_MESSAGE_TYPE_MANAGEMENT\n"
-			KERN_INFO "   nOperationID      = 0x%08X\n"
-			KERN_INFO "   nErrorCode        = 0x%08X\n",
+			"   nOperationID      = 0x%08X\n"
+			"   nErrorCode        = 0x%08X\n",
 			pAnswer->sHeader.nMessageSize,
 			pAnswer->sHeader.nMessageType,
 			pAnswer->sHeader.nOperationID,

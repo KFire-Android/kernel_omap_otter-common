@@ -30,6 +30,7 @@
 #include <linux/sysdev.h>
 #include <linux/sysfs.h>
 #include <linux/sched.h>
+#include <linux/semaphore.h>
 #ifdef CONFIG_HAS_WAKELOCK
 #include <linux/wakelock.h>
 #endif
@@ -313,8 +314,8 @@ struct SCXLNX_DEVICE {
 	bool bSHAM1IsPublic;
 
 	/* Semaphores used to serialize HWA accesses */
-	struct mutex sAES1CriticalSection;
-	struct mutex sAES2CriticalSection;
+	struct semaphore sAES1CriticalSection;
+	struct semaphore sAES2CriticalSection;
 	struct mutex sDESCriticalSection;
 	struct mutex sSHACriticalSection;
 
@@ -326,13 +327,9 @@ struct SCXLNX_DEVICE {
 	u8 *pDMABuffer;
 	dma_addr_t pDMABufferPhys;
 
-#ifdef CONFIG_DYNAMIC_SDP_STORAGE_ALLOC
-	/*
-	 * Memory areas reserved at boot time for SDP operations
-	 */
-	u32 nSDPBackingStoreAddr;
-	u32 nSDPBkExtStoreAddr;
-#endif
+	/* Workspace allocated at boot time and reserved to the Secure World */
+	u32 nWorkspaceAddr;
+	u32 nWorkspaceSize;
 #endif
 
 	/*
@@ -391,6 +388,25 @@ enum SCXLNX_CONN_STATE {
 	SCXLNX_CONN_STATE_CREATE_DEVICE_CONTEXT_SENT,
 	SCXLNX_CONN_STATE_VALID_DEVICE_CONTEXT,
 	SCXLNX_CONN_STATE_DESTROY_DEVICE_CONTEXT_SENT
+};
+
+
+/*
+ *  This type describes the  status of the command.
+ *
+ *  PENDING:
+ *     The initial state; the command has not been sent yet.
+ *	SENT:
+ *     The command has been sent, we are waiting for an answer.
+ *	ABORTED:
+ *     The command cannot be sent because the device context is invalid.
+ *     Note that this only covers the case where some other thread
+ *     sent a DESTROY_DEVICE_CONTEXT command.
+ */
+enum SCXLNX_COMMAND_STATE {
+	SCXLNX_COMMAND_STATE_PENDING = 0,
+	SCXLNX_COMMAND_STATE_SENT,
+	SCXLNX_COMMAND_STATE_ABORTED
 };
 
 
@@ -509,7 +525,7 @@ struct SCXLNX_DEVICE *SCXLNXGetDevice(void);
  * Kernel Differences
  */
 
-#ifdef CONFIG_TF_MSHIELD
+#ifdef CONFIG_ANDROID
 #define GROUP_INFO		get_current_groups()
 #else
 #define GROUP_INFO		(current->group_info)

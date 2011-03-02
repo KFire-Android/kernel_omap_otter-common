@@ -254,7 +254,7 @@ void SCXLNXDeviceDetachConn(SCXLNX_DEVICE_MONITOR *pDevice,
  *Driver Interface Implementations
  *-------------------------------------------------------------------------- */
 #ifdef SMC_EARLY_INIT
-void __init SCXLNXCtrlDeviceEarlyInit(void)
+void __init tf_allocate_workspace(void)
 {
 	memset(&g_SCXLNXDeviceMonitor, 0, sizeof(g_SCXLNXDeviceMonitor));
 

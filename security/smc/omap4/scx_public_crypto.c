@@ -38,10 +38,10 @@
 
 #define PUBLIC_CRYPTO_TIMEOUT_CONST	0x000FFFFF
 
-#define RPC_AES1_CODE		0x001
-#define RPC_AES2_CODE		0x002
-#define RPC_DES_CODE		0x004
-#define RPC_SHA_CODE		0x008
+#define RPC_AES1_CODE	PUBLIC_CRYPTO_HWA_AES1
+#define RPC_AES2_CODE	PUBLIC_CRYPTO_HWA_AES2
+#define RPC_DES_CODE	PUBLIC_CRYPTO_HWA_DES
+#define RPC_SHA_CODE	PUBLIC_CRYPTO_HWA_SHA
 
 #define RPC_CRYPTO_COMMAND_MASK	0x000003c0
 
@@ -67,9 +67,6 @@
 #define RPC_CLEAR_GLOBAL_KEY_CONTEXT			0x2c0
 #define RPC_CLEAR_GLOBAL_KEY_CONTEXT_CLEARED_AES	0x001
 #define RPC_CLEAR_GLOBAL_KEY_CONTEXT_CLEARED_DES	0x002
-
-#define LOCK_HWA	true
-#define UNLOCK_HWA	false
 
 #define ENABLE_CLOCK	true
 #define DISABLE_CLOCK	false
@@ -215,39 +212,49 @@ static struct SCXLNX_SHMEM_DESC *PDrvCryptoGetSharedMemoryFromBlockHandle(
 /*
  * HWA public lock or unlock one HWA according algo specified by nHWAID
  */
-static void PDrvCryptoLockUnlockHWA(u32 nHWAID, bool bDoLock)
+void PDrvCryptoLockUnlockHWA(u32 nHWAID, bool bDoLock)
 {
-	struct mutex *pHWAToLockUnlock;
-	struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
+	int is_sem = 0;
+	struct semaphore *s = NULL;
+	struct mutex *m = NULL;
+	struct SCXLNX_DEVICE *dev = SCXLNXGetDevice();
 
 	dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA:nHWAID=0x%04X bDoLock=%d\n",
 		nHWAID, bDoLock);
 
 	switch (nHWAID) {
 	case RPC_AES1_CODE:
-		pHWAToLockUnlock = &pDevice->sAES1CriticalSection;
+		s = &dev->sAES1CriticalSection;
+		is_sem = 1;
 		break;
 	case RPC_AES2_CODE:
-		pHWAToLockUnlock = &pDevice->sAES2CriticalSection;
+		s = &dev->sAES2CriticalSection;
+		is_sem = 1;
 		break;
 	case RPC_DES_CODE:
-		pHWAToLockUnlock = &pDevice->sDESCriticalSection;
+		m = &dev->sDESCriticalSection;
 		break;
 	default:
 	case RPC_SHA_CODE:
-		pHWAToLockUnlock = &pDevice->sSHACriticalSection;
+		m = &dev->sSHACriticalSection;
 		break;
 	}
 
 	if (bDoLock == LOCK_HWA) {
-		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "\
+		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "
 			"Wait for HWAID=0x%04X\n", nHWAID);
-		mutex_lock(pHWAToLockUnlock);
-		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "\
+		if (is_sem)
+			down(s);
+		else
+			mutex_lock(m);
+		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "
 			"Locked on HWAID=0x%04X\n", nHWAID);
 	} else {
-		mutex_unlock(pHWAToLockUnlock);
-		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "\
+		if (is_sem)
+			up(s);
+		else
+			mutex_unlock(m);
+		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "
 			"Released for HWAID=0x%04X\n", nHWAID);
 	}
 }
@@ -292,8 +299,8 @@ u32 SCXPublicCryptoInit(void)
 	PDrvCryptoDigestInit();
 
 	/*initialize the HWA semaphores */
-	mutex_init(&pDevice->sAES1CriticalSection);
-	mutex_init(&pDevice->sAES2CriticalSection);
+	sema_init(&pDevice->sAES1CriticalSection, 1);
+	sema_init(&pDevice->sAES2CriticalSection, 1);
 	mutex_init(&pDevice->sDESCriticalSection);
 	mutex_init(&pDevice->sSHACriticalSection);
 
@@ -358,13 +365,11 @@ void SCXPublicCryptoTerminate()
  *Perform a crypto update operation.
  *THIS FUNCTION IS CALLED FROM THE IOCTL
  */
-static void SCXPublicCryptoDisableClock(uint32_t vClockPhysAddr);
-static void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr);
-
-void SCXPublicCryptoUpdate(
+static bool SCXPublicCryptoUpdate(
 	struct CRYPTOKI_UPDATE_SHORTCUT_CONTEXT *pCUSContext,
 	struct CRYPTOKI_UPDATE_PARAMS *pCUSParams)
 {
+	bool status = true;
 	dprintk(KERN_INFO
 		"scxPublicCryptoUpdate(%x): "\
 		"HWAID=0x%x, In=%p, Out=%p, Len=%u\n",
@@ -372,14 +377,13 @@ void SCXPublicCryptoUpdate(
 		pCUSParams->pInputData,
 		pCUSParams->pResultData, pCUSParams->nInputDataLength);
 
-	tf_wake_lock();
-
 	/* Enable the clock and Process Data */
 	switch (pCUSContext->nHWAID) {
 	case RPC_AES1_CODE:
 		SCXPublicCryptoEnableClock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
-		PDrvCryptoUpdateAES(
-			pCUSContext->nHWA_CTRL,
+		pCUSContext->sOperationState.aes.key_is_public = 0;
+		pCUSContext->sOperationState.aes.CTRL = pCUSContext->nHWA_CTRL;
+		status = PDrvCryptoUpdateAES(
 			&pCUSContext->sOperationState.aes,
 			pCUSParams->pInputData,
 			pCUSParams->pResultData,
@@ -389,8 +393,9 @@ void SCXPublicCryptoUpdate(
 
 	case RPC_AES2_CODE:
 		SCXPublicCryptoEnableClock(PUBLIC_CRYPTO_AES2_CLOCK_REG);
-		PDrvCryptoUpdateAES(
-			pCUSContext->nHWA_CTRL,
+		pCUSContext->sOperationState.aes.key_is_public = 0;
+		pCUSContext->sOperationState.aes.CTRL = pCUSContext->nHWA_CTRL;
+		status = PDrvCryptoUpdateAES(
 			&pCUSContext->sOperationState.aes,
 			pCUSParams->pInputData,
 			pCUSParams->pResultData,
@@ -401,7 +406,7 @@ void SCXPublicCryptoUpdate(
 
 	case RPC_DES_CODE:
 		SCXPublicCryptoEnableClock(PUBLIC_CRYPTO_DES3DES_CLOCK_REG);
-		PDrvCryptoUpdateDES(
+		status = PDrvCryptoUpdateDES(
 			pCUSContext->nHWA_CTRL,
 			&pCUSContext->sOperationState.des,
 			pCUSParams->pInputData,
@@ -412,8 +417,8 @@ void SCXPublicCryptoUpdate(
 
 	case RPC_SHA_CODE:
 		SCXPublicCryptoEnableClock(PUBLIC_CRYPTO_SHA2MD5_CLOCK_REG);
+		pCUSContext->sOperationState.sha.CTRL = pCUSContext->nHWA_CTRL;
 		PDrvCryptoUpdateHash(
-			pCUSContext->nHWA_CTRL,
 			&pCUSContext->sOperationState.sha,
 			pCUSParams->pInputData,
 			pCUSParams->nInputDataLength);
@@ -425,9 +430,8 @@ void SCXPublicCryptoUpdate(
 		break;
 	}
 
-	tf_wake_unlock();
-
 	dprintk(KERN_INFO "scxPublicCryptoUpdate: Done\n");
+	return status;
 }
 
 /*------------------------------------------------------------------------- */
@@ -481,8 +485,8 @@ static bool SCXPublicCryptoIsShortcutedCommand(
 
 		if ((pCUSContext->hClientSession == pCommand->hClientSession)
 			&&
-			(pCUSContext->nCommandID == (pCommand->
-				nClientCommandIdentifier & 0x7FFF))) {
+			(pCUSContext->nCommandID == pCommand->
+				nClientCommandIdentifier)) {
 			dprintk(KERN_INFO
 				"scxPublicCryptoIsShortcutedCommand: "\
 				"shortcut is identified\n");
@@ -894,7 +898,16 @@ int SCXPublicCryptoTryShortcutedUpdate(struct SCXLNX_CONNECTION *pConn,
 			}
 
 			/* Perform the update in public <=> THE shortcut */
-			SCXPublicCryptoUpdate(pCUSContext, &sCUSParams);
+			if (!SCXPublicCryptoUpdate(pCUSContext, &sCUSParams)) {
+				/* Decrement CUS context use count */
+				pCUSContext->nUseCount--;
+
+				/* Release HWA lock */
+				PDrvCryptoLockUnlockHWA(pCUSContext->nHWAID,
+					UNLOCK_HWA);
+
+				return -1;
+			}
 
 			/* Write answer message */
 			SCXPublicCryptoWriteAnswerMessage(pCUSContext,
@@ -947,7 +960,7 @@ u32 SCXPublicCryptoWaitForReadyBit(u32 *pRegister, u32 vBit)
 
 /*------------------------------------------------------------------------- */
 
-static void SCXPublicCryptoDisableClock(uint32_t vClockPhysAddr)
+void SCXPublicCryptoDisableClock(uint32_t vClockPhysAddr)
 {
 	u32 *pClockReg;
 	u32 val;
@@ -969,14 +982,14 @@ static void SCXPublicCryptoDisableClock(uint32_t vClockPhysAddr)
 	while ((__raw_readl(pClockReg) & 0x30000) == 0)
 		;
 
-	SCXL4SECClockDomainDisable(false);
+	tf_l4sec_clkdm_allow_idle(false, true);
 
 	spin_unlock(&SCXLNXGetDevice()->sm.lock);
 }
 
 /*------------------------------------------------------------------------- */
 
-static void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr)
+void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr)
 {
 	u32 *pClockReg;
 	u32 val;
@@ -988,7 +1001,7 @@ static void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr)
 	/* Ensure none concurrent access when changing clock registers */
 	spin_lock(&SCXLNXGetDevice()->sm.lock);
 
-	SCXL4SECClockDomainEnable(false);
+	tf_l4sec_clkdm_wakeup(false, true);
 
 	pClockReg = (u32 *)IO_ADDRESS(vClockPhysAddr);
 

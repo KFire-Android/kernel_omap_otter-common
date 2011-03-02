@@ -67,7 +67,7 @@
 #define RPC_ADVANCEMENT_PENDING		1
 #define RPC_ADVANCEMENT_FINISHED	2
 
-atomic_t g_RPC_advancement = ATOMIC_INIT(RPC_ADVANCEMENT_NONE);
+u32 g_RPC_advancement;
 u32 g_RPC_parameters[4] = {0, 0, 0, 0};
 u32 g_secure_task_id;
 u32 g_service_end;
@@ -118,7 +118,8 @@ struct SCHANNEL_INIT_BUFFER {
 	u32 nL1SharedBufferPhysAddr;
 	u32 nBackingStoreAddr;
 	u32 nBackExtStorageAddr;
-	u32 nDataAddr;
+	u32 nWorkspaceAddr;
+	u32 nWorkspaceSize;
 	u32 nPropertiesBufferLength;
 	u8 pPropertiesBuffer[1];
 };
@@ -131,7 +132,7 @@ static atomic_t tf_wake_lock_count = ATOMIC_INIT(0);
 static struct clockdomain *smc_l4_sec_clkdm;
 static atomic_t smc_l4_sec_clkdm_use_count = ATOMIC_INIT(0);
 
-static int __init omap4_smc_init(void)
+static int __init tf_early_init(void)
 {
 	g_secure_task_id = 0;
 
@@ -148,27 +149,7 @@ static int __init omap4_smc_init(void)
 
 	return 0;
 }
-early_initcall(omap4_smc_init);
-
-void tf_wake_lock(void)
-{
-#ifdef CONFIG_HAS_WAKELOCK
-	spin_lock(&SCXLNXGetDevice()->sm.lock);
-	atomic_inc(&tf_wake_lock_count);
-	wake_lock(&g_tf_wake_lock);
-	spin_unlock(&SCXLNXGetDevice()->sm.lock);
-#endif
-}
-
-void tf_wake_unlock(void)
-{
-#ifdef CONFIG_HAS_WAKELOCK
-	spin_lock(&SCXLNXGetDevice()->sm.lock);
-	if (atomic_dec_return(&tf_wake_lock_count) == 0)
-		wake_unlock(&g_tf_wake_lock);
-	spin_unlock(&SCXLNXGetDevice()->sm.lock);
-#endif
-}
+early_initcall(tf_early_init);
 
 /*
  * Function responsible for formatting parameters to pass from NS world to
@@ -206,15 +187,20 @@ u32 omap4_secure_dispatcher(u32 app_id, u32 flags, u32 nargs,
 	/*
 	 * Put L4 Secure clock domain to SW_WKUP so that modules are accessible
 	 */
-	SCXL4SECClockDomainEnable(true);
+	tf_l4sec_clkdm_wakeup(true, false);
 
 	local_irq_save(nITFlags);
+#ifdef DEBUG
+	BUG_ON((read_mpidr() & 0x00000003) != 0);
+#endif
 	/* proc_id is always 0 */
 	ret = schedule_secure_world(app_id, 0, flags, __pa(pub2sec_args));
 	local_irq_restore(nITFlags);
 
 	/* Restore the HW_SUP on L4 Sec clock domain so hardware can idle */
-	SCXL4SECClockDomainDisable(true);
+	tf_l4sec_clkdm_allow_idle(true, false);
+
+	dprintk(KERN_INFO "omap4_secure_dispatcher()\n");
 
 	return ret;
 }
@@ -231,7 +217,7 @@ int tf_schedule_secure_world(struct SCXLNX_COMM *pComm, bool prepare_exit)
 
 	local_irq_save(nITFlags);
 
-	switch (atomic_read(&g_RPC_advancement)) {
+	switch (g_RPC_advancement) {
 	case  RPC_ADVANCEMENT_NONE:
 		/* Return from IRQ */
 		appli_id = SMICODEPUB_IRQ_END;
@@ -246,7 +232,7 @@ int tf_schedule_secure_world(struct SCXLNX_COMM *pComm, bool prepare_exit)
 		if (prepare_exit)
 			goto exit;
 		appli_id = SMICODEPUB_RPC_END;
-		atomic_set(&g_RPC_advancement, RPC_ADVANCEMENT_NONE);
+		g_RPC_advancement = RPC_ADVANCEMENT_NONE;
 		break;
 	}
 
@@ -273,8 +259,7 @@ int tf_schedule_secure_world(struct SCXLNX_COMM *pComm, bool prepare_exit)
 			if (ret == 0)
 				ret = -EFAULT;
 		}
-		test_and_clear_bit(SCXLNX_COMM_FLAG_PA_AVAILABLE,
-			&pComm->nFlags);
+		clear_bit(SCXLNX_COMM_FLAG_PA_AVAILABLE, &pComm->nFlags);
 		omap4_secure_dispatcher(API_HAL_LM_PAUNLOADALL_INDEX,
 			FLAG_START_HAL_CRITICAL, 0, 0, 0, 0, 0);
 		status = ret;
@@ -402,6 +387,9 @@ static u32 tf_rpc_init(struct SCXLNX_COMM *pComm)
 
 	spin_unlock(&(pComm->lock));
 
+	register_smc_public_crypto_digest();
+	register_smc_public_crypto_aes();
+
 	return nRPCError;
 }
 
@@ -432,12 +420,16 @@ int SCXLNXCommExecuteRPCCommand(struct SCXLNX_COMM *pComm)
 	u32 nRPCCommand;
 	u32 nRPCReturn = RPC_NO;
 
+#ifdef DEBUG
+	BUG_ON((read_mpidr() & 0x00000003) != 0);
+#endif
+
 	/* Lock the RPC */
 	mutex_lock(&(pComm->sRPCLock));
 
 	nRPCCommand = g_RPC_parameters[1];
 
-	if (atomic_read(&g_RPC_advancement) == RPC_ADVANCEMENT_PENDING) {
+	if (g_RPC_advancement == RPC_ADVANCEMENT_PENDING) {
 		dprintk(KERN_INFO "SCXLNXCommExecuteRPCCommand: "
 			"Executing CMD=0x%x\n",
 			g_RPC_parameters[1]);
@@ -465,7 +457,7 @@ int SCXLNXCommExecuteRPCCommand(struct SCXLNX_COMM *pComm)
 			nRPCReturn = RPC_NON_YIELD;
 			break;
 		}
-		atomic_set(&g_RPC_advancement, RPC_ADVANCEMENT_FINISHED);
+		g_RPC_advancement = RPC_ADVANCEMENT_FINISHED;
 	}
 
 	mutex_unlock(&(pComm->sRPCLock));
@@ -480,22 +472,33 @@ int SCXLNXCommExecuteRPCCommand(struct SCXLNX_COMM *pComm)
  * L4 SEC Clock domain handling
  *-------------------------------------------------------------------------- */
 
-void SCXL4SECClockDomainEnable(bool use_spin_lock)
+void tf_l4sec_clkdm_wakeup(bool use_spin_lock, bool wakelock)
 {
 	if (use_spin_lock)
 		spin_lock(&SCXLNXGetDevice()->sm.lock);
+#ifdef CONFIG_HAS_WAKELOCK
+	if (wakelock) {
+		atomic_inc(&tf_wake_lock_count);
+		wake_lock(&g_tf_wake_lock);
+	}
+#endif
 	atomic_inc(&smc_l4_sec_clkdm_use_count);
 	omap2_clkdm_wakeup(smc_l4_sec_clkdm);
 	if (use_spin_lock)
 		spin_unlock(&SCXLNXGetDevice()->sm.lock);
 }
 
-void SCXL4SECClockDomainDisable(bool use_spin_lock)
+void tf_l4sec_clkdm_allow_idle(bool use_spin_lock, bool wakeunlock)
 {
 	if (use_spin_lock)
 		spin_lock(&SCXLNXGetDevice()->sm.lock);
 	if (atomic_dec_return(&smc_l4_sec_clkdm_use_count) == 0)
 		omap2_clkdm_allow_idle(smc_l4_sec_clkdm);
+#ifdef CONFIG_HAS_WAKELOCK
+	if (wakeunlock)
+		if (atomic_dec_return(&tf_wake_lock_count) == 0)
+			wake_unlock(&g_tf_wake_lock);
+#endif
 	if (use_spin_lock)
 		spin_unlock(&SCXLNXGetDevice()->sm.lock);
 }
@@ -514,20 +517,73 @@ int SCXLNXCommHibernate(struct SCXLNX_COMM *pComm)
 	 * As we enter in CORE OFF, the keys are going to be cleared.
 	 * Reset the global key context.
 	 * When the system leaves CORE OFF, this will force the driver to go
-	 * through the secure world which will reconfigure the accelerator as
-	 * public.
+	 * through the secure world which will reconfigure the accelerators.
 	 */
 	pDevice->hAES1SecureKeyContext = 0;
 	pDevice->hAES2SecureKeyContext = 0;
 	pDevice->hDESSecureKeyContext = 0;
+#ifndef CONFIG_SMC_KERNEL_CRYPTO
 	pDevice->bSHAM1IsPublic = false;
+#endif
 	return 0;
 }
 
 
 int SCXLNXCommResume(struct SCXLNX_COMM *pComm)
 {
+#ifdef CONFIG_SMC_KERNEL_CRYPTO
+	union SCX_COMMAND_MESSAGE message;
+	union SCX_ANSWER_MESSAGE answer;
+	int ret;
+#endif
+
+	dprintk(KERN_INFO "SCXLNXCommResume()\n");
+	#if 0
+	{
+		void *workspace_va;
+		struct SCXLNX_DEVICE *pDevice = SCXLNXGetDevice();
+		workspace_va = ioremap(pDevice->nWorkspaceAddr,
+			pDevice->nWorkspaceSize);
+		printk(KERN_INFO
+		"Read first word of workspace [0x%x]\n",
+		*(uint32_t *)workspace_va);
+	}
+	#endif
+
+#ifdef CONFIG_SMC_KERNEL_CRYPTO
+	/*
+	 * When the system leaves CORE OFF, HWA are configured as secure.  We
+	 * need them as public for the Linux Crypto API.
+	 */
+	memset(&message, 0, sizeof(message));
+
+	message.sHeader.nMessageType = SCX_MESSAGE_TYPE_MANAGEMENT;
+	message.sHeader.nMessageSize =
+		(sizeof(struct SCX_COMMAND_MANAGEMENT) -
+			sizeof(struct SCX_COMMAND_HEADER))/sizeof(u32);
+	message.sManagementMessage.nCommand =
+		SCX_MANAGEMENT_RESUME_FROM_CORE_OFF;
+
+	ret = SCXLNXCommSendReceive(pComm, &message, &answer, NULL, false);
+	if (ret) {
+		dprintk(KERN_ERR "SCXLNXCommResume(%p): "
+			"SCXLNXCommSendReceive failed (error %d)!\n",
+			pComm, ret);
+
+		unregister_smc_public_crypto_digest();
+		unregister_smc_public_crypto_aes();
+		return ret;
+	}
+
+	if (answer.sHeader.nErrorCode) {
+		unregister_smc_public_crypto_digest();
+		unregister_smc_public_crypto_aes();
+	}
+
+	return answer.sHeader.nErrorCode;
+#else
 	return 0;
+#endif
 }
 
 /*--------------------------------------------------------------------------
@@ -553,10 +609,10 @@ int SCXLNXCommInit(struct SCXLNX_COMM *pComm)
 }
 
 /* Start the SMC PA */
-int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
-	u32 nSDPBkExtStoreAddr, u32 nDataAddr, u8 *pPABufferVAddr,
-	u32 nPABufferSize, u8 *pPropertiesBuffer,
-	u32 nPropertiesBufferLength)
+int SCXLNXCommStart(struct SCXLNX_COMM *pComm,
+	u32 nWorkspaceAddr, u32 nWorkspaceSize,
+	u8 *pPABufferVAddr, u32 nPABufferSize,
+	u8 *pPropertiesBuffer, u32 nPropertiesBufferLength)
 {
 	struct SCHANNEL_INIT_BUFFER *pInitSharedBuffer = NULL;
 	struct SCHANNEL_C1S_BUFFER *pL1SharedBuffer = NULL;
@@ -564,6 +620,8 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 	struct NS_PA_INFO sPAInfo;
 	int ret;
 	u32 descr;
+	u32 nSDPBackingStoreAddr;
+	u32 nSDPBkExtStoreAddr;
 #ifdef CONFIG_SMP
 	long ret_affinity;
 	cpumask_t saved_cpu_mask;
@@ -576,8 +634,13 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 		dprintk(KERN_ERR "sched_setaffinity #1 -> 0x%lX", ret_affinity);
 #endif
 
-	tf_wake_lock();
-	SCXL4SECClockDomainEnable(true);
+	tf_l4sec_clkdm_wakeup(true, true);
+
+	nWorkspaceSize -= SZ_1M;
+	nSDPBackingStoreAddr = nWorkspaceAddr + nWorkspaceSize;
+	nWorkspaceSize -= 0x20000;
+	nSDPBkExtStoreAddr = nWorkspaceAddr + nWorkspaceSize;
+
 	/*
 	 * Implementation notes:
 	 *
@@ -590,7 +653,7 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 
 	if (test_bit(SCXLNX_COMM_FLAG_PA_AVAILABLE, &pComm->nFlags)) {
 		dprintk(KERN_ERR "SCXLNXCommStart(%p): "
-			"The SM is already started\n", pComm);
+			"The SMC PA is already started\n", pComm);
 
 		ret = -EFAULT;
 		goto error1;
@@ -659,7 +722,8 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 
 	pInitSharedBuffer->nBackingStoreAddr = nSDPBackingStoreAddr;
 	pInitSharedBuffer->nBackExtStorageAddr = nSDPBkExtStoreAddr;
-	pInitSharedBuffer->nDataAddr = nDataAddr;
+	pInitSharedBuffer->nWorkspaceAddr = nWorkspaceAddr;
+	pInitSharedBuffer->nWorkspaceSize = nWorkspaceSize;
 
 	pInitSharedBuffer->nPropertiesBufferLength = nPropertiesBufferLength;
 	if (nPropertiesBufferLength == 0) {
@@ -675,7 +739,7 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 					pPropertiesBuffer,
 					 nPropertiesBufferLength);
 		} else {
-			printk(KERN_INFO "SCXLNXCommStart(%p): "
+			dprintk(KERN_INFO "SCXLNXCommStart(%p): "
 				"Configuration buffer size from userland is "
 				"incorrect(%d, %d)\n",
 				pComm, (u32) nPropertiesBufferLength,
@@ -730,7 +794,8 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 		FLAG_IRQ_ENABLE | FLAG_FIQ_ENABLE | FLAG_START_HAL_CRITICAL, 1,
 		__pa(&sPAInfo), 0, 0, 0);
 	if (ret != API_HAL_RET_VALUE_OK) {
-		printk(KERN_ERR "SMC: PA load failed [0x%x]\n", ret);
+		printk(KERN_ERR "SMC: Error while loading the PA [0x%x]\n",
+			ret);
 		goto error2;
 	}
 
@@ -738,7 +803,7 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm, u32 nSDPBackingStoreAddr,
 loop:
 	mutex_lock(&(pComm->sRPCLock));
 
-	if (atomic_read(&g_RPC_advancement) == RPC_ADVANCEMENT_PENDING) {
+	if (g_RPC_advancement == RPC_ADVANCEMENT_PENDING) {
 		dprintk(KERN_INFO "SCXLNXCommExecuteRPCCommand: "
 			"Executing CMD=0x%x\n",
 			g_RPC_parameters[1]);
@@ -766,7 +831,7 @@ loop:
 			g_RPC_parameters[0] = RPC_ERROR_BAD_PARAMETERS;
 			break;
 		}
-		atomic_set(&g_RPC_advancement, RPC_ADVANCEMENT_FINISHED);
+		g_RPC_advancement = RPC_ADVANCEMENT_FINISHED;
 	}
 
 	mutex_unlock(&(pComm->sRPCLock));
@@ -784,6 +849,17 @@ loop:
 	set_bit(SCXLNX_COMM_FLAG_PA_AVAILABLE, &pComm->nFlags);
 	wake_up(&(pComm->waitQueue));
 	ret = 0;
+
+	#if 0
+	{
+		void *workspace_va;
+		workspace_va = ioremap(nWorkspaceAddr, nWorkspaceSize);
+		printk(KERN_INFO
+		"Read first word of workspace [0x%x]\n",
+		*(uint32_t *)workspace_va);
+	}
+	#endif
+
 	goto exit;
 
 error2:
@@ -811,8 +887,7 @@ exit:
 		dprintk(KERN_ERR "sched_setaffinity #2 -> 0x%lX", ret_affinity);
 #endif
 
-	SCXL4SECClockDomainDisable(true);
-	tf_wake_unlock();
+	tf_l4sec_clkdm_allow_idle(true, true);
 
 	if (ret > 0)
 		ret = -EFAULT;

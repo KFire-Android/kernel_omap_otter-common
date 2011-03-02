@@ -142,7 +142,7 @@ void PDrvCryptoDESExit(void)
 	omap_iounmap(pDESReg_t);
 }
 
-void PDrvCryptoUpdateDES(u32 DES_CTRL,
+bool PDrvCryptoUpdateDES(u32 DES_CTRL,
 	struct PUBLIC_CRYPTO_DES_OPERATION_STATE *pDESState,
 	u8 *pSrc, u8 *pDest, u32 nbBlocks)
 {
@@ -165,7 +165,13 @@ void PDrvCryptoUpdateDES(u32 DES_CTRL,
 
 	if (nbBlocks == 0) {
 		dprintk(KERN_INFO "PDrvCryptoUpdateDES: Nothing to process\n");
-		return;
+		return true;
+	}
+
+	if (DES_CTRL_GET_DIRECTION(INREG32(&pDESReg_t->DES_CTRL)) !=
+		DES_CTRL_GET_DIRECTION(DES_CTRL)) {
+		dprintk(KERN_WARNING "HWA configured for another direction\n");
+		return false;
 	}
 
 	/*Restore the registers of the accelerator from the operation state */
@@ -221,6 +227,7 @@ void PDrvCryptoUpdateDES(u32 DES_CTRL,
 	PDrvCryptoSaveDESRegisters(DES_CTRL, pDESState);
 
 	dprintk(KERN_INFO "PDrvCryptoUpdateDES: Done\n");
+	return true;
 }
 
 /*------------------------------------------------------------------------- */

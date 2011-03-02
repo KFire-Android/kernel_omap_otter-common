@@ -259,8 +259,8 @@ static void __init _omap2_map_common_io(void)
 	omapfb_reserve_sdram();
 	omap_vram_reserve_sdram();
 
-#ifdef CONFIG_DYNAMIC_SDP_STORAGE_ALLOC
-	SCXLNXCtrlDeviceEarlyInit();
+#ifdef CONFIG_TF_MSHIELD
+	tf_allocate_workspace();
 #endif
 }
 

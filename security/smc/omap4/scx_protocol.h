@@ -78,6 +78,7 @@
 #define SCX_MANAGEMENT_HIBERNATE            (1)
 #define SCX_MANAGEMENT_SHUTDOWN             (2)
 #define SCX_MANAGEMENT_PREPARE_FOR_CORE_OFF (3)
+#define SCX_MANAGEMENT_RESUME_FROM_CORE_OFF (4)
 
 /*
  * The capacity of the Normal Word message queue, in number of slots.
