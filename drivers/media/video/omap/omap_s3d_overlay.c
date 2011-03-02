@@ -1769,6 +1769,10 @@ static void s3d_overlay_isr(void *arg, u32 irqstatus)
 	if (!dev->streaming)
 		return;
 
+	/* Filter erroneous VSYNC handling */
+	if (!dssdev_manually_updated(dev->cur_disp) && dispc_is_vsync_fake())
+		return;
+
 	spin_lock_irqsave(&dev->vbq_lock, flags);
 	if (dev->cur_buf == NULL) {
 		spin_unlock_irqrestore(&dev->vbq_lock, flags);

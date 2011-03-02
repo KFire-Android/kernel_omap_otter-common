@@ -1212,10 +1212,7 @@ static int omapvid_process_frame(struct omap_vout_device *vout)
 			printk(KERN_ERR VOUT_NAME
 				"failed to change mode\n");
 	}
-#ifdef CONFIG_PANEL_PICO_DLP
-	if (sysfs_streq(cur_display->name, "pico_DLP"))
-		dispc_go(OMAP_DSS_CHANNEL_LCD2);
-#endif
+
 	return ret;
 }
 
@@ -1303,14 +1300,9 @@ void omap_vout_isr(void *arg, unsigned int irqstatus)
 		}
 		break;
 	case OMAP_DISPLAY_TYPE_DPI:
-		if (!(irqstatus & (DISPC_IRQ_VSYNC | DISPC_IRQ_VSYNC2)))
+		if (!(irqstatus & (DISPC_IRQ_VSYNC | DISPC_IRQ_VSYNC2)) ||
+			dispc_is_vsync_fake())
 			goto vout_isr_err;
-#ifdef CONFIG_PANEL_PICO_DLP
-		if (dispc_go_busy(OMAP_DSS_CHANNEL_LCD2)) {
-			printk(KERN_INFO "dpi busy %d\n", cur_display->type);
-			goto vout_isr_err;
-		}
-#endif
 		break;
 #ifdef CONFIG_OMAP2_DSS_HDMI
 	case OMAP_DISPLAY_TYPE_HDMI:

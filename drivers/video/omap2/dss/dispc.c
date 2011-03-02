@@ -53,6 +53,11 @@
 
 struct dispc_reg { u16 idx; };
 void __iomem  *dispc_base;
+
+#ifdef CONFIG_OMAP2_DSS_FAKE_VSYNC
+static int fake_vsync;
+#endif
+
 #define DISPC_REG(idx)			((const struct dispc_reg) { idx })
 
 /* DISPC common */
@@ -1186,9 +1191,7 @@ void dispc_go(enum omap_channel channel)
 
 	if (cpu_is_omap44xx() && (channel == OMAP_DSS_CHANNEL_LCD2)) {
 		if (REG_GET(DISPC_CONTROL2, bit, bit) == 1) {
-			/* FIXME PICO DLP on Channel 2 needs GO bit to be UP
-			it will come as error so changing to DSSDBG*/
-			DSSDBG("GO bit not down for channel %d\n", channel);
+			DSSERR("GO bit not down for channel %d\n", channel);
 			goto end;
 		}
 	} else {
@@ -4884,6 +4887,8 @@ void dispc_fake_vsync_irq(enum omap_dsi_index ix)
 		return;
 	}
 
+	fake_vsync = 1;
+	wmb();
 	for (i = 0; i < DISPC_MAX_NR_ISRS; i++) {
 		struct omap_dispc_isr_data *isr_data;
 		isr_data = &dispc.registered_isr[i];
@@ -4894,8 +4899,21 @@ void dispc_fake_vsync_irq(enum omap_dsi_index ix)
 		if (isr_data->mask & irqstatus)
 			isr_data->isr(isr_data->arg, irqstatus);
 	}
+	fake_vsync = 0;
+	wmb();
 }
-#endif
+
+bool dispc_is_vsync_fake(void)
+{
+	rmb();
+	return (fake_vsync == 1);
+}
+#else /* CONFIG_OMAP2_DSS_FAKE_VSYNC not defined */
+bool dispc_is_vsync_fake(void)
+{
+	return false;
+}
+#endif /* CONFIG_OMAP2_DSS_FAKE_VSYNC */
 
 static void _omap_dispc_initialize_irq(void)
 {
@@ -4985,6 +5003,7 @@ int dispc_init(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	fake_vsync = 0;
 	enable_clocks(1);
 
 	_omap_dispc_initial_config();
