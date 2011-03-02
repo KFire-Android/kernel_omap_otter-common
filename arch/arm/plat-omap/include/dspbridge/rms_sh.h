@@ -30,7 +30,7 @@
 /* Memory Types: */
 #define RMS_CODE                0	/* Program space */
 #define RMS_DATA                1	/* Data space */
-#define RMS_IO                	2	/* I/O space */
+#define RMS_IO                  2	/* I/O space */
 
 /* RM Server Command and Response Buffer Sizes: */
 #define RMS_COMMANDBUFSIZE     256	/* Size of command buffer */

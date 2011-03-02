@@ -254,7 +254,7 @@ struct nldr_nodeobject {
 	 *  Mask indicating whether each mem segment specified in seg_id[]
 	 *  is preferred or required.
 	 *  For example
-	 *  	if (code_data_flag_mask & (1 << EXECUTEDATAFLAGBIT)) != 0,
+	 *	if (code_data_flag_mask & (1 << EXECUTEDATAFLAGBIT)) != 0,
 	 *  then it is required to load execute phase data into the memory
 	 *  specified by seg_id[EXECUTEDATAFLAGBIT].
 	 */
@@ -1922,7 +1922,7 @@ static u32 find_gcf(u32 a, u32 b)
  * @offset_output:		Symbol Output address
  * @sym_name:		String with the dsp symbol
  *
- * 	This function finds the node library for a given address and
+ *	This function finds the node library for a given address and
  *	retrieves the dsp symbol by calling dbll_find_dsp_symbol.
  */
 int nldr_find_addr(struct nldr_nodeobject *nldr_node, u32 sym_addr,

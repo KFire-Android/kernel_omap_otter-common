@@ -85,7 +85,7 @@ rvalue dload_unpack(struct dload_state *dlthis, tgt_au_t * data, int fieldsz,
  * Parameters:
  *	val		Value to insert
  *	data	Pointer to storage unit containing lowest host address of
- * 		image data
+ *		image data
  *	fieldsz	Size of bit field, 0 < fieldsz <= sizeof(rvalue)*BITS_PER_AU
  *	offset	Offset from LSB, 0 <= offset < BITS_PER_AU
  *	sgn	Signedness of the field (ROP_SGN, ROP_UNS, ROP_MAX, ROP_ANY)

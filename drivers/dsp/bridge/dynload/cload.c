@@ -226,8 +226,8 @@ int dynamic_load_module(struct dynamic_loader_stream *module,
  * Effect:
  *      The module image is read using *module.  Target storage for the new
  *      image is
- * 	obtained from *alloc.  Symbols defined and referenced by the module are
- * 	managed using *syms.  The image is then relocated and references
+ *	obtained from *alloc.  Symbols defined and referenced by the module are
+ *	managed using *syms.  The image is then relocated and references
  *      resolved as necessary, and the resulting executable bits are placed
  *      into target memory using *init.
  *
@@ -423,8 +423,8 @@ void dload_headers(struct dload_state *dlthis)
 /*	COFF Section Processing
  *
  *	COFF sections are read in and retained intact.  Each record is embedded
- * 	in a new structure that records the updated load and
- * 	run addresses of the section */
+ *	in a new structure that records the updated load and
+ *	run addresses of the section */
 
 static const char secn_errid[] = { "section" };
 

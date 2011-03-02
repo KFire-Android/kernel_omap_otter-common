@@ -95,21 +95,21 @@ static hw_status mmu_flush_entry(const void __iomem *baseAddress);
 *
 *
 *       Identifier      : virtual_addr_tag
-*       Type	    	: const u32
+*       Type		: const u32
 *       Description     : virtual Address
 *
 * RETURNS:
 *
-*       Type	    	: hw_status
+*       Type		: hw_status
 *       Description     : RET_OK		 -- No errors occured
 *			 RET_BAD_NULL_PARAM     -- A Pointer Paramater
 *						   was set to NULL
 *			 RET_PARAM_OUT_OF_RANGE -- Input Parameter out
 *						   of Range
 *
-* PURPOSE:	      	: Set MMU_CAM reg
+* PURPOSE:		: Set MMU_CAM reg
 *
-* METHOD:	       	: Check the Input parameters and set the CAM entry.
+* METHOD:		: Check the Input parameters and set the CAM entry.
  */
 static hw_status mmu_set_cam_entry(const void __iomem *baseAddress,
 				   const u32 pageSize,
@@ -123,29 +123,29 @@ static hw_status mmu_set_cam_entry(const void __iomem *baseAddress,
 * INPUTS:
 *
 *       Identifier      : baseAddress
-*       Type	    	: const u32
+*       Type		: const u32
 *       Description     : Base Address of instance of MMU module
 *
 *       Identifier      : physicalAddr
-*       Type	    	: const u32
+*       Type		: const u32
 *       Description     : Physical Address to which the corresponding
 *			 virtual   Address shouldpoint
 *
 *       Identifier      : endianism
-*       Type	    	: hw_endianism_t
+*       Type		: hw_endianism_t
 *       Description     : endianism for the given page
 *
 *       Identifier      : element_size
-*       Type	    	: hw_element_size_t
+*       Type		: hw_element_size_t
 *       Description     : The element size ( 8,16, 32 or 64 bit)
 *
 *       Identifier      : mixed_size
-*       Type	    	: hw_mmu_mixed_size_t
+*       Type		: hw_mmu_mixed_size_t
 *       Description     : Element Size to follow CPU or TLB
 *
 * RETURNS:
 *
-*       Type	    	: hw_status
+*	Type		: hw_status
 *       Description     : RET_OK		 -- No errors occured
 *			 RET_BAD_NULL_PARAM     -- A Pointer Paramater
 *							was set to NULL

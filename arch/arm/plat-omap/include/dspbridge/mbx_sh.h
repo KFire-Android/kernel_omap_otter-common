@@ -74,7 +74,7 @@
  *   ---------------------------------
  *   |0|0|1|0|0|0|x|x|x|x|x|c|c|c|c|c|
 
- * 	0010 00xx xxxc cccc
+ *	0010 00xx xxxc cccc
  *	0010 00nn pppp qqqq
  *	nn:
  *	00 = reserved

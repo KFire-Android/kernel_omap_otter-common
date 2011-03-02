@@ -78,7 +78,7 @@ extern int cfg_get_cd_version(OUT u32 *pdwVersion);
  *      Retrieve the Device Object handle for a given devnode.
  *  Parameters:
  *      dev_node_obj:	Platform's dev_node handle from which to retrieve
- *      		value.
+ *			value.
  *      pdwValue:       Ptr to location to store the value.
  *  Returns:
  *      0:                Success.

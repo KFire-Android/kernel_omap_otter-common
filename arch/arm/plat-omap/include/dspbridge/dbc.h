@@ -28,7 +28,7 @@
 /* Assertion Macros: */
 #ifdef CONFIG_BRIDGE_DEBUG
 
-#define DBC_ASSERT(exp) 						       \
+#define DBC_ASSERT(exp)						       \
 do {									       \
 	if (!(exp))							       \
 		pr_err("%s, line %d: Assertion (" #exp ") failed.\n", \

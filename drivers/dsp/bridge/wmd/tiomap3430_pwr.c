@@ -50,7 +50,7 @@ extern struct mailbox_context mboxsetting;
 
 /*
  *  ======== handle_constraints_set ========
- *  	Sets new DSP constraint
+ *	Sets new DSP constraint
  */
 int handle_constraints_set(struct wmd_dev_context *dev_context,
 				  IN void *pargs)
@@ -81,7 +81,7 @@ int handle_constraints_set(struct wmd_dev_context *dev_context,
 
 /*
  *  ======== handle_hibernation_from_dsp ========
- *  	Handle Hibernation requested from DSP
+ *	Handle Hibernation requested from DSP
  */
 int handle_hibernation_from_dsp(struct wmd_dev_context *dev_context)
 {
@@ -175,7 +175,7 @@ func_cont:
 
 /*
  *  ======== sleep_dsp ========
- *  	Put DSP in low power consuming state.
+ *	Put DSP in low power consuming state.
  */
 int sleep_dsp(struct wmd_dev_context *dev_context, IN u32 dw_cmd,
 		     IN void *pargs)
@@ -305,7 +305,7 @@ func_cont:
 
 /*
  *  ======== wake_dsp ========
- *  	Wake up DSP from sleep.
+ *	Wake up DSP from sleep.
  */
 int wake_dsp(struct wmd_dev_context *dev_context, IN void *pargs)
 {
@@ -328,7 +328,7 @@ int wake_dsp(struct wmd_dev_context *dev_context, IN void *pargs)
 
 /*
  *  ======== dsp_peripheral_clk_ctrl ========
- *  	Enable/Disable the DSP peripheral clocks as needed..
+ *	Enable/Disable the DSP peripheral clocks as needed..
  */
 int dsp_peripheral_clk_ctrl(struct wmd_dev_context *dev_context,
 				   IN void *pargs)

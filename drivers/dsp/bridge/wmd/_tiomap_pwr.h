@@ -33,7 +33,7 @@ extern int sleep_dsp(struct wmd_dev_context *dev_context,
 			    IN u32 dw_cmd, IN void *pargs);
 /*
  *  ========interrupt_dsp========
- *  	  Sends an interrupt to DSP unconditionally.
+ *	  Sends an interrupt to DSP unconditionally.
  */
 extern void interrupt_dsp(struct wmd_dev_context *dev_context, IN u16 mb_val);
 
@@ -45,28 +45,28 @@ extern int dsp_peripheral_clk_ctrl(struct wmd_dev_context *dev_context,
 					  IN void *pargs);
 /*
  *  ======== handle_hibernation_from_dsp ========
- *  	Handle Hibernation requested from DSP
+ *	Handle Hibernation requested from DSP
  */
 int handle_hibernation_from_dsp(struct wmd_dev_context *dev_context);
 /*
  *  ======== post_scale_dsp ========
- *  	Handle Post Scale notification to DSP
+ *	Handle Post Scale notification to DSP
  */
 int post_scale_dsp(struct wmd_dev_context *dev_context, IN void *pargs);
 /*
  *  ======== pre_scale_dsp ========
- *  	Handle Pre Scale notification to DSP
+ *	Handle Pre Scale notification to DSP
  */
 int pre_scale_dsp(struct wmd_dev_context *dev_context, IN void *pargs);
 /*
  *  ======== handle_constraints_set ========
- *  	Handle constraints request from DSP
+ *	Handle constraints request from DSP
  */
 int handle_constraints_set(struct wmd_dev_context *dev_context,
 				  IN void *pargs);
 /*
  *  ======== dsp_peripheral_clocks_disable ========
- *  	This function disables all the peripheral clocks that
+ *	This function disables all the peripheral clocks that
  *	were enabled by DSP. Call this function only when
  *	DSP is entering Hibernation or when DSP is in
  *	Error state
@@ -76,7 +76,7 @@ int dsp_peripheral_clocks_disable(struct wmd_dev_context *dev_context,
 
 /*
  *  ======== dsp_peripheral_clocks_enable ========
- *  	This function enables all the peripheral clocks that
+ *	This function enables all the peripheral clocks that
  *	were requested by DSP.
  */
 int dsp_peripheral_clocks_enable(struct wmd_dev_context *dev_context,

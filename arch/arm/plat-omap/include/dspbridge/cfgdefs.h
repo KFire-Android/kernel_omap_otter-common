@@ -60,7 +60,7 @@ struct cfg_hostres {
 	 *                          reserved.
 	 *      dw_chnl_buf_size:      Size of channel buffer to send to RMS
 	 *      dw_num_chnls:		Total number of channels
-	 *      			(including reserved).
+	 *				(including reserved).
 	 */
 	u32 dw_chnl_offset;
 	u32 dw_chnl_buf_size;

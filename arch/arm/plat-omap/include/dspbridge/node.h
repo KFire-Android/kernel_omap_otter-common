@@ -575,7 +575,7 @@ extern int node_get_uuid_props(void *hprocessor,
  * @sym_addr_output:	Symbol Output address
  * @sym_name:		String with the symbol name of the closest symbol
  *
- * 	This function finds the closest symbol to the address where a MMU
+ *	This function finds the closest symbol to the address where a MMU
  *	Fault occurred on the DSP side.
  */
 int node_find_addr(struct node_mgr *node_mgr, u32 sym_addr,

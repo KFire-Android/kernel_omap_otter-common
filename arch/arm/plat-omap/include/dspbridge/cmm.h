@@ -70,7 +70,7 @@ extern void *cmm_calloc_buf(struct cmm_object *hcmm_mgr,
  *      Create a communication memory manager object.
  *  Parameters:
  *      ph_cmm_mgr:	Location to store a communication manager handle on
- *      		output.
+ *			output.
  *      hdev_obj: Handle to a device object.
  *      pMgrAttrs:  Comm mem manager attributes.
  *  Returns:
@@ -152,7 +152,7 @@ extern int cmm_free_buf(struct cmm_object *hcmm_mgr,
  *  Parameters:
  *      hprocessor:   Handle to a Processor.
  *      ph_cmm_mgr:	Location to store the shared memory mgr handle on
- *      		output.
+ *			output.
  *
  *  Returns:
  *      0:        Cmm Mgr opaque handle returned.

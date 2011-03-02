@@ -38,7 +38,7 @@ struct ntfy_object {
  * ntfy_event - structure store specify event to be notified
  * @noti_block:	List of notify objects
  * @event:	event that it respond
- * @type: 	event type (only DSP_SIGNALEVENT supported)
+ * @type:	event type (only DSP_SIGNALEVENT supported)
  * @sync_obj:	sync_event used to set the event
  *
  */

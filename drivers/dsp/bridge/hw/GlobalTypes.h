@@ -115,7 +115,7 @@
 
 /*
  * Definition: RETURN32BITS_FROM48BIT_VALUES(lower8Bits, lowerMiddle8Bits,
- * 					lowerUpper8Bits, upper8Bits)
+ *					lowerUpper8Bits, upper8Bits)
  *
  * DESCRIPTION:  Returns a 32 bit value given four 8 bit values
  */

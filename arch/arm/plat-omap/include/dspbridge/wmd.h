@@ -369,7 +369,7 @@ typedef void (*fxn_deh_notify) (struct deh_mgr *hdeh_mgr,
  *  Parameters:
  *      phChnl:         Location to store a channel object handle.
  *      hchnl_mgr:	Handle to channel manager, as returned by
- *      		CHNL_GetMgr().
+ *			CHNL_GetMgr().
  *      chnl_mode:          One of {CHNL_MODETODSP, CHNL_MODEFROMDSP} specifies
  *                      direction of data transfer.
  *      uChnlId:        If CHNL_PICKFREE is specified, the channel manager will
