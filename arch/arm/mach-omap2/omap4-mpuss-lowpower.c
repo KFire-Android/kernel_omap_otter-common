@@ -51,6 +51,7 @@
 
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
+#include <linux/clk.h>
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
 
@@ -91,6 +92,7 @@ dma_addr_t omap4_secure_ram_phys;
 
 static void *secure_ram;
 static struct powerdomain *cpu0_pwrdm, *cpu1_pwrdm, *mpuss_pd;
+struct clk *l3_main_3_ick;
 
 struct tuple {
 	void __iomem *addr;
@@ -622,7 +624,7 @@ static inline void restore_l3instr_regs(void)
  */
 void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 {
-	unsigned int save_state, wakeup_cpu;
+	unsigned int save_state, wakeup_cpu, inst_clk_enab = 0;
 
 	if (cpu > NR_CPUS)
 		return;
@@ -672,9 +674,23 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	if (omap4_device_off_read_next_state() &&
 			 (omap_type() != OMAP2_DEVICE_TYPE_GP)) {
 		/* FIXME: Check if this can be optimised */
+
+		/* l3_main inst clock must be enabled for
+		 * a save ram operation
+		 */
+		if (!l3_main_3_ick->usecount) {
+			inst_clk_enab = 1;
+			clk_enable(l3_main_3_ick);
+		}
+
 		save_secure_all();
+
+		if (inst_clk_enab == 1)
+			clk_disable(l3_main_3_ick);
+
 		save_ivahd_tesla_regs();
 		save_l3instr_regs();
+
 		save_state = 3;
 		goto cpu_prepare;
 	}
@@ -700,7 +716,18 @@ void omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	case PWRDM_POWER_OFF:
 		/* MPUSS OFF */
 		if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+			/* l3_main inst clock must be enabled for
+			 * a save ram operation
+			 */
+			if (!l3_main_3_ick->usecount) {
+	                        inst_clk_enab = 1;
+				clk_enable(l3_main_3_ick);
+			}
 			save_secure_ram();
+
+			if (inst_clk_enab == 1)
+				clk_disable(l3_main_3_ick);
+
 			save_gic_wakeupgen_secure();
 			save_ivahd_tesla_regs();
 			save_l3instr_regs();
@@ -822,6 +849,7 @@ void __init omap4_mpuss_init(void)
 	if (!cpu0_pwrdm || !cpu1_pwrdm || !mpuss_pd)
 		pr_err("Failed to get lookup for CPUx/MPUSS pwrdm's\n");
 
+	l3_main_3_ick = clk_get(NULL, "l3_main_3_ick");
 	/*
 	 * Check the OMAP type and store it to scratchpad
 	 */
