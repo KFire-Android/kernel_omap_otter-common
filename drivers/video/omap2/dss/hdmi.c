@@ -1900,16 +1900,16 @@ static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
 		temp_vsync = temp.vfp + temp.vsw + temp.vbp;
 		timing_vsync = timing->vfp + timing->vsw + timing->vbp;
 
-		printk(KERN_INFO "Temp_hsync = %d, temp_vsync = %d, "
+		DSSDBG("Temp_hsync = %d, temp_vsync = %d, "
 			"timing_hsync = %d, timing_vsync = %d",
-			temp_hsync, temp_hsync, timing_hsync, timing_vsync);
+			temp_hsync, temp_vsync, timing_hsync, timing_vsync);
 
 		if (temp_hsync == timing_hsync && temp_vsync == timing_vsync) {
 			code = i;
 			cm.code = code_index[i];
 			cm.mode = code < 14;
-			DSSDBG("Hdmi_code = %d mode = %d\n", cm.code, cm.mode);
-			print_omap_video_timings(&temp);
+			DSSDBG("Video code = %d mode = %s\n",
+			cm.code, cm.mode ? "CEA" : "VESA");
 			break;
 		}
 	}
@@ -1926,6 +1926,8 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 	struct deep_color *vsdb_format;
 	struct latency *lat;
 	struct omap_video_timings timings;
+	struct hdmi_cm cm;
+	int no_timing_info = 0;
 
 	img_format = kzalloc(sizeof(*img_format), GFP_KERNEL);
 	if (!img_format) {
@@ -1989,10 +1991,16 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 
 	for (i = 0; i < EDID_SIZE_BLOCK0_TIMING_DESCRIPTOR; i++) {
 		printk(KERN_INFO "Extension 0 Block %d\n", i);
-		get_edid_timing_info(&edid_st->DTD[i], &timings);
+		no_timing_info = get_edid_timing_info(&edid_st->DTD[i],
+				&timings);
 		mark = dss_debug;
 		dss_debug = 1;
-		print_omap_video_timings(&timings);
+		if (!no_timing_info) {
+			cm = hdmi_get_code(&timings);
+			print_omap_video_timings(&timings);
+			printk(KERN_INFO "Video code: %d video mode %d",
+				cm.code, cm.mode);
+		}
 		dss_debug = mark;
 	}
 	if (edid[0x7e] != 0x00) {
@@ -2009,10 +2017,20 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 				mark = dss_debug;
 				dss_debug = 1;
 				print_omap_video_timings(&timings);
+				cm = hdmi_get_code(&timings);
+				printk(KERN_INFO "Video code: %d video mode %d",
+					cm.code, cm.mode);
 				dss_debug = mark;
 			}
 		}
+		printk(KERN_INFO "Supports basic audio: %s",
+				(edid[EDID_DESCRIPTOR_BLOCK1_ADDRESS + 3]
+			& HDMI_AUDIO_BASIC_MASK) ? "YES" : "NO");
+
 	}
+
+	printk(KERN_INFO "Has IEEE HDMI ID: %s",
+		hdmi_has_ieee_id(edid) ? "YES" : "NO");
 	hdmi_get_image_format(edid, img_format);
 	printk(KERN_INFO "%d audio length\n", img_format->length);
 	for (i = 0 ; i < img_format->length ; i++)
