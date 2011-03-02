@@ -271,8 +271,13 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 				const char *s);
 int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 				const char *s);
-int hsi_runtime_resume(struct device *dev);
-int hsi_runtime_suspend(struct device *dev);
+#ifdef CONFIG_PM_RUNTIME
+extern int hsi_runtime_resume(struct device *dev);
+extern int hsi_runtime_suspend(struct device *dev);
+#else
+static inline int hsi_runtime_resume(struct device *dev) { return -ENOSYS; }
+static inline int hsi_runtime_suspend(struct device *dev) { return -ENOSYS; }
+#endif
 void hsi_save_ctx(struct hsi_dev *hsi_ctrl);
 void hsi_restore_ctx(struct hsi_dev *hsi_ctrl);
 
