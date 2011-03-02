@@ -263,17 +263,27 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	struct snd_interval *channels = hw_param_interval(params,
                                        SNDRV_PCM_HW_PARAM_CHANNELS);
 	unsigned int be_id;
+	unsigned int val;
 
         be_id = rtd->dai_link->be_id;
 
-	if (be_id == OMAP_ABE_DAI_MM_FM)
+	switch (be_id) {
+	case OMAP_ABE_DAI_MM_FM:
 		channels->min = 2;
-	else if (be_id == OMAP_ABE_DAI_BT_VX)
+		val = SNDRV_PCM_FORMAT_S32_LE;
+		break;
+	case OMAP_ABE_DAI_BT_VX:
 		channels->min = 1;
+		val = SNDRV_PCM_FORMAT_S16_LE;
+		break;
+	default:
+		val = SNDRV_PCM_FORMAT_S16_LE;
+		break;
+	}
 
 	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
-	                            SNDRV_PCM_HW_PARAM_FIRST_MASK],
-	                            SNDRV_PCM_FORMAT_S16_LE);
+				    SNDRV_PCM_HW_PARAM_FIRST_MASK],
+		     val);
 	return 0;
 }
 
