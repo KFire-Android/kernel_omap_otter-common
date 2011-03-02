@@ -941,7 +941,12 @@ static int fill_dst(struct s3d_ovl_device *dev,
 			unsigned int dst_width,
 			unsigned int dst_height)
 {
-	unsigned int pos_x = 0, pos_y = 0;
+	unsigned int pos_x = dev->win.w.left, pos_y = dev->win.w.top;
+
+	info->r_pos_x = pos_x;
+	info->r_pos_y = pos_y;
+	info->l_pos_x = pos_x;
+	info->l_pos_y = pos_y;
 
 	switch (disp_info->type) {
 	case S3D_DISP_NONE:
@@ -968,14 +973,14 @@ static int fill_dst(struct s3d_ovl_device *dev,
 	case S3D_DISP_OVERUNDER:
 		info->dst_w = dst_width;
 		info->dst_h = (dst_height - disp_info->gap) / 2;
-		pos_y = (dst_height + disp_info->gap) / 2;
+		pos_y += (dst_height + disp_info->gap) / 2;
 		info->disp_ovls = 2;
 		info->a_view_per_ovl = true;
 		break;
 	case S3D_DISP_SIDEBYSIDE:
 		info->dst_w = (dst_width - disp_info->gap) / 2;
 		info->dst_h = dst_height;
-		pos_x = (dst_width + disp_info->gap) / 2;
+		pos_x += (dst_width + disp_info->gap) / 2;
 		info->disp_ovls = 2;
 		info->a_view_per_ovl = true;
 		break;
@@ -1032,6 +1037,10 @@ static int fill_formatter_config(struct s3d_ovl_device *dev,
 	info->disp_h = dst_height;
 	info->in_rotation = dev->rotation;
 	info->out_rotation = 0;
+	info->r_pos_x = dev->win.w.left;
+	info->r_pos_y = dev->win.w.top;
+	info->l_pos_x = dev->win.w.left;
+	info->l_pos_y = dev->win.w.top;
 
 	/*If the input matches what the display expects just feed it, no
 	 * special processing is needed */
@@ -1226,6 +1235,8 @@ static int init_overlay(struct s3d_ovl_device *dev, struct s3d_overlay *ovl)
 		ovl->src.h = dev->fter_config.disp_h;
 		ovl->dst.w = ovl->src.w;
 		ovl->dst.h = ovl->src.h;
+		ovl->dst.x = dev->fter_config.r_pos_x;
+		ovl->dst.y = dev->fter_config.r_pos_y;
 		ovl->state = OVL_ST_FETCH_ALL;
 	}
 
@@ -2922,7 +2933,7 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 	/*TODO: if the panel resolution changes after going to 3D
 	   what to do we do with the current window setting*/
-	set_default_window(dev, &dev->win);
+	/* set_default_window(dev, &dev->win); */
 
 	r = allocate_resources(dev);
 	if (r) {
