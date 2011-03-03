@@ -1171,7 +1171,7 @@ static void input_chnl(struct io_mgr *pio_mgr, struct chnl_object *pchnl,
 
 	/* Attempt to perform input */
 	if (!IO_GET_VALUE(pio_mgr->hwmd_context, struct shm, sm, input_full))
-		 goto func_end;
+		goto func_end;
 
 	bytes =
 	    IO_GET_VALUE(pio_mgr->hwmd_context, struct shm, sm,
@@ -1453,7 +1453,7 @@ static void output_chnl(struct io_mgr *pio_mgr, struct chnl_object *pchnl,
 	sm = pio_mgr->shared_mem;
 	/* Attempt to perform output */
 	if (IO_GET_VALUE(pio_mgr->hwmd_context, struct shm, sm, output_full))
-		 goto func_end;
+		goto func_end;
 
 	if (pchnl && !((pchnl->dw_state & ~CHNL_STATEEOS) == CHNL_STATEREADY))
 		goto func_end;
