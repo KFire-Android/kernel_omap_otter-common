@@ -211,9 +211,8 @@ int mgr_enum_processor_info(u32 processor_id,
 			if (dev_type != DSP_UNIT)
 				status = -EPERM;
 
-			if (DSP_SUCCEEDED(status)) {
+			if (DSP_SUCCEEDED(status))
 				processor_info->processor_type = DSPTYPE64;
-			}
 		}
 	}
 	if (DSP_FAILED(status))

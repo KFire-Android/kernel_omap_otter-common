@@ -835,9 +835,8 @@ void dbll_unload(struct dbll_library_obj *lib, struct dbll_attrs *attrs)
 					    &zl_lib->symbol.dl_symbol,
 					    &zl_lib->allocate.dl_alloc,
 					    &zl_lib->init.dl_init);
-		if (err != 0) {
+		if (err != 0)
 			dev_dbg(bridge, "%s: failed: %i\n", __func__, err);
-		}
 	}
 	/* remove symbols from symbol table */
 	if (zl_lib->sym_tab != NULL) {
@@ -1058,9 +1057,8 @@ static struct dynload_symbol *dbll_find_symbol(struct dynamic_loader_sym *this,
 		}
 	}
 
-	if (!status && gbl_search) {
+	if (!status && gbl_search)
 		dev_dbg(bridge, "%s: Symbol not found: %s\n", __func__, name);
-	}
 
 	DBC_ASSERT((status && (dbll_sym != NULL))
 		   || (!status && (dbll_sym == NULL)));

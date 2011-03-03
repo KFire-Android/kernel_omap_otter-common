@@ -483,9 +483,8 @@ int nldr_create(OUT struct nldr_object **phNldr,
 			psz_coff_buf =
 				kzalloc(ul_len * nldr_obj->us_dsp_mau_size,
 								GFP_KERNEL);
-			if (!psz_coff_buf) {
+			if (!psz_coff_buf)
 				status = -ENOMEM;
-			}
 		} else {
 			/* Ok to not have dynamic loading memory */
 			status = 0;

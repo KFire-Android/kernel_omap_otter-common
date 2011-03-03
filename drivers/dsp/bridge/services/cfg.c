@@ -216,9 +216,8 @@ int cfg_set_dev_object(struct cfg_devnode *dev_node_obj, u32 dwValue)
 	if (DSP_SUCCEEDED(status)) {
 		/* Store the WCD device object in the Registry */
 
-		if (!(strcmp((char *)dev_node_obj, "TIOMAP1510"))) {
+		if (!(strcmp((char *)dev_node_obj, "TIOMAP1510")))
 			drv_datap->dev_object = (void *) dwValue;
-		}
 	}
 	if (DSP_FAILED(status))
 		pr_err("%s: Failed, status %i\n", __func__, status);

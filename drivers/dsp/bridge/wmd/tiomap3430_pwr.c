@@ -290,9 +290,8 @@ int sleep_dsp(struct wmd_dev_context *dev_context, IN u32 dw_cmd,
 #endif
 func_cont:
 		spin_unlock_bh(&lock);
-		if (DSP_FAILED(status)) {
+		if (DSP_FAILED(status))
 			return status;
-		}
 #ifdef CONFIG_BRIDGE_DVFS
 		else if (target_pwr_state == PWRDM_POWER_OFF) {
 			/*
@@ -418,9 +417,8 @@ int dsp_peripheral_clk_ctrl(struct wmd_dev_context *dev_context,
 				resources->dw_sys_ctrl_base + 0x274);
 		}
 		dsp_clk_wakeup_event_ctrl(bpwr_clks[clk_id_index].clk_id, true);
-		if ((DSP_SUCCEEDED(status)) && (DSP_SUCCEEDED(status1))) {
+		if ((DSP_SUCCEEDED(status)) && (DSP_SUCCEEDED(status1)))
 			(dev_context->dsp_per_clks) |= (1 << clk_id_index);
-		}
 		break;
 	default:
 		dev_dbg(bridge, "%s: Unsupported CMD\n", __func__);
