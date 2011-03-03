@@ -650,7 +650,7 @@ int drv_remove_all_resources(bhandle hPCtxt)
 static ssize_t wdt3_show(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
-	return sprintf(buf, "%d\n", (dsp_wdt_get_enable())? 1 : 0);
+	return sprintf(buf, "%d\n", (dsp_wdt_get_enable()) ? 1 : 0);
 }
 
 static ssize_t wdt3_store(struct device *dev, struct device_attribute *attr,
