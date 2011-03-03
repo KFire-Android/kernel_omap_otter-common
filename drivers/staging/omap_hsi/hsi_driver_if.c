@@ -264,7 +264,7 @@ int hsi_open(struct hsi_device *dev)
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
 		return -EINVAL;
 	}
-	dev_dbg(dev->device.parent, "%s\n", __func__);
+	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
 
 	ch = dev->ch;
 	if (!ch->read_done || !ch->write_done) {
@@ -331,8 +331,8 @@ int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 			dev, addr, size);
 		return -EINVAL;
 	}
-	dev_dbg(dev->device.parent, "%s @%x, size %d u32\n", __func__,
-		(u32) addr, size);
+	dev_dbg(dev->device.parent, "%s ch %d, @%x, size %d u32\n", __func__,
+		dev->n_ch, (u32) addr, size);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
 		dev_err(dev->device.parent, "HSI device NOT open\n");
@@ -375,6 +375,7 @@ int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 	if (unlikely(err < 0)) {
 		ch->write_data.addr = NULL;
 		ch->write_data.size = 0;
+		dev_err(dev->device.parent, "Failed to program write\n");
 	}
 
 	spin_unlock_bh(&ch->hsi_port->hsi_controller->lock);
@@ -411,8 +412,8 @@ int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 			"hsi_device %p data %p count %d", dev, addr, size);
 		return -EINVAL;
 	}
-	dev_dbg(dev->device.parent, "%s @%x, size %d u32\n", __func__,
-		(u32) addr, size);
+	dev_dbg(dev->device.parent, "%s ch %d, @%x, size %d u32\n", __func__,
+		dev->n_ch, (u32) addr, size);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
 		dev_err(dev->device.parent, "HSI device NOT open\n");
@@ -452,6 +453,7 @@ int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 	if (unlikely(err < 0)) {
 		ch->read_data.addr = NULL;
 		ch->read_data.size = 0;
+		dev_err(dev->device.parent, "Failed to program read\n");
 	}
 
 done:
@@ -826,7 +828,7 @@ void hsi_close(struct hsi_device *dev)
 		pr_err(LOG_NAME "Trying to close wrong HSI device %p\n", dev);
 		return;
 	}
-	dev_dbg(dev->device.parent, "%s\n", __func__);
+	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
 
 	hsi_ctrl = dev->ch->hsi_port->hsi_controller;
 

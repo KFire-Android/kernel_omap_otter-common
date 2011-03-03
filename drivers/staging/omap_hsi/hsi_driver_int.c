@@ -189,7 +189,7 @@ void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
 			 HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 
 	if (!(enable & HSI_HST_DATAACCEPT(channel))) {
-		dev_dbg(&ch->dev->device, LOG_NAME "Write cancel on not "
+		dev_dbg(&ch->dev->device, "Write cancel on not "
 			"enabled channel %d ENABLE REG 0x%08X", channel,
 			enable);
 		return;

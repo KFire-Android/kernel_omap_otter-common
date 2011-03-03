@@ -254,7 +254,7 @@ void hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 
 	ccr = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	if (!(ccr & HSI_CCR_ENABLE)) {
-		dev_dbg(&hsi_ch->dev->device, LOG_NAME "Write cancel on not "
+		dev_dbg(&hsi_ch->dev->device, "Write cancel on not "
 			"enabled logical channel %d CCR REG 0x%08X\n", lch,
 			ccr);
 		return;
@@ -292,7 +292,7 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 
 	reg = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	if (!(reg & HSI_CCR_ENABLE)) {
-		dev_dbg(&hsi_ch->dev->device, LOG_NAME "Read cancel on not "
+		dev_dbg(&hsi_ch->dev->device, "Read cancel on not "
 			"enable logical channel %d CCR REG 0x%08X\n", lch, reg);
 		return;
 	}
