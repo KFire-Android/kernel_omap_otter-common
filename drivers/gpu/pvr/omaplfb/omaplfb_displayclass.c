@@ -61,7 +61,7 @@
 #include "omaplfb.h"
 
 #define OMAPLFB_COMMAND_COUNT		1
-#define MAX_BUFFERS_FLIPPING		3
+#define MAX_BUFFERS_FLIPPING		4
 /* Put 0 as desired bpp to use the default in the framebuffer */
 #define DESIRED_BPP			0 /* Possible values 32,16,0 */
 
