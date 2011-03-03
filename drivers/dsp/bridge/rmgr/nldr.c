@@ -951,7 +951,8 @@ static int add_ovly_info(void *handle, struct dbll_sect_info *sect_info,
 		goto func_end;
 
 	/* Determine which phase this section belongs to */
-	for (pch = sect_name + 1; *pch && *pch != seps; pch++) ;
+	for (pch = sect_name + 1; *pch && *pch != seps; pch++)
+		;
 
 	if (*pch) {
 		pch++;		/* Skip over the ':' */
