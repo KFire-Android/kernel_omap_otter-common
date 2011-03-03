@@ -476,6 +476,59 @@ static inline int calc_rotation(const struct omap_vout_device *vout)
 }
 
 /*
+ * Swap the overlay parameters in case of rotation is 90 or 270
+ */
+static void calc_overlay_window_params(struct omap_vout_device *vout,
+				       struct omap_overlay_info *info)
+{
+	__s32	temp;
+	struct omap_overlay *ovl;
+	struct omapvideo_info *ovid;
+	struct omap_video_timings *timing;
+	struct v4l2_window *win;
+
+	ovid = &vout->vid_info;
+	ovl = ovid->overlays[0];
+	win = &vout->win;
+
+	timing = &ovl->manager->device->panel.timings;
+	switch (vout->rotation) {
+	case dss_rotation_90_degree:
+	/* Invert the height and width for 90  and 270 degree rotation */
+		temp = info->out_width;
+		info->out_width = info->out_height;
+		info->out_height = temp;
+#ifndef CONFIG_ARCH_OMAP4
+		info->pos_y = (timing->y_res - win->w.width) - win->w.left;
+		info->pos_x = win->w.top;
+#endif
+		break;
+
+	case dss_rotation_180_degree:
+#ifndef CONFIG_ARCH_OMAP4
+		info->pos_x = (timing->x_res - win->w.width) - win->w.left;
+		info->pos_y = (timing->y_res - win->w.height) - win->w.top;
+#endif
+		break;
+
+	case dss_rotation_270_degree:
+		temp = info->out_width;
+		info->out_width = info->out_height;
+		info->out_height = temp;
+#ifndef CONFIG_ARCH_OMAP4
+		info->pos_y = win->w.left;
+		info->pos_x = (timing->x_res - win->w.height) - win->w.top;
+#endif
+		break;
+
+	default:
+		info->pos_x = win->w.left;
+		info->pos_y = win->w.top;
+		break;
+		}
+}
+
+/*
  * Free the V4L2 buffers
  */
 static void omap_vout_free_buffers(struct omap_vout_device *vout)
@@ -954,6 +1007,12 @@ int omapvid_setup_overlay(struct omap_vout_device *vout,
 	info.pos_y = posy;
 	info.out_width = outw;
 	info.out_height = outh;
+
+	/*Recalculate the overlay window parameters in rotation scenario
+	* This is required to meet DSS driver window requirements
+	*/
+	calc_overlay_window_params(vout, &info);
+
 	info.global_alpha =
 		vout->vid_info.overlays[0]->info.global_alpha;
 	if (!cpu_is_omap44xx()) {
@@ -1004,8 +1063,7 @@ int omapvid_init(struct omap_vout_device *vout, u32 addr, u32 uv_addr)
 	int ret = 0, i;
 	struct v4l2_window *win;
 	struct omap_overlay *ovl;
-	int posx, posy, outw, outh, temp;
-	struct omap_video_timings *timing;
+	int posx, posy, outw, outh;
 	struct omapvideo_info *ovid = &vout->vid_info;
 
 	win = &vout->win;
@@ -1014,48 +1072,10 @@ int omapvid_init(struct omap_vout_device *vout, u32 addr, u32 uv_addr)
 		if (!ovl->manager || !ovl->manager->device)
 			return -EINVAL;
 
-		timing = &ovl->manager->device->panel.timings;
-
 		outw = win->w.width;
 		outh = win->w.height;
 		posx = win->w.left;
 		posy = win->w.top;
-		switch (vout->rotation) {
-		case dss_rotation_90_degree:
-			/* Invert the height and width for 90
-			 * and 270 degree rotation
-			 */
-			temp = outw;
-			outw = outh;
-			outh = temp;
-#ifndef CONFIG_ARCH_OMAP4
-			posy = (timing->y_res - win->w.width) - win->w.left;
-			posx = win->w.top;
-#endif
-			break;
-
-		case dss_rotation_180_degree:
-#ifndef CONFIG_ARCH_OMAP4
-			posx = (timing->x_res - win->w.width) - win->w.left;
-			posy = (timing->y_res - win->w.height) - win->w.top;
-#endif
-			break;
-
-		case dss_rotation_270_degree:
-			temp = outw;
-			outw = outh;
-			outh = temp;
-#ifndef CONFIG_ARCH_OMAP4
-			posy = win->w.left;
-			posx = (timing->x_res - win->w.height) - win->w.top;
-#endif
-			break;
-
-		default:
-			posx = win->w.left;
-			posy = win->w.top;
-			break;
-		}
 
 		ret = omapvid_setup_overlay(vout, ovl, posx, posy,
 				outw, outh, addr, uv_addr);
@@ -2299,8 +2319,15 @@ static int vidioc_s_fmt_vid_overlay(struct file *file, void *fh,
 			info.pos_y = vout->win.w.top;
 			info.out_width = vout->win.w.width;
 			info.out_height = vout->win.w.height;
-                        if (cpu_is_omap44xx())
-                            info.zorder = vout->win.zorder;
+
+			if (cpu_is_omap44xx())
+				info.zorder = vout->win.zorder;
+
+			/* Recalculate the overlay window parameters in rotation
+			 * scenario. This is required to meet DSS driver
+			 * window requirements
+			 */
+			calc_overlay_window_params(vout, &info);
 
 			if (ovl->set_overlay_info(ovl, &info))
 				return -EINVAL;
