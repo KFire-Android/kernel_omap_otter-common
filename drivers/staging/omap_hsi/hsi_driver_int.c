@@ -58,6 +58,7 @@ bool hsi_is_channel_busy(struct hsi_channel *ch)
 bool hsi_is_hsi_port_busy(struct hsi_port *pport)
 {
 	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
+	bool cur_cawake = hsi_get_cawake(pport);
 	int ch;
 
 	if (pport->in_int_tasklet) {
@@ -70,12 +71,10 @@ bool hsi_is_hsi_port_busy(struct hsi_port *pport)
 		return true;
 	}
 
-	pport->cawake_status = hsi_get_cawake(pport);
-
-	if (pport->acwake_status || pport->cawake_status) {
+	if (pport->acwake_status || cur_cawake) {
 		dev_dbg(hsi_ctrl->dev, "Port %d: WAKE status: acwake_status %d,"
-			"cawake_status %d", pport->port_number,
-			pport->acwake_status, pport->cawake_status);
+			"cur_cawake %d", pport->port_number,
+			pport->acwake_status, cur_cawake);
 		return true;
 	}
 
