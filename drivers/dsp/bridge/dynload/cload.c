@@ -50,8 +50,8 @@ static const char loader_dllview_root[] = { "?DLModules?" };
  */
 static const char readstrm[] = { "Error reading %s from input stream" };
 static const char err_alloc[] = { "Syms->dload_allocate( %d ) failed" };
-static const char tgtalloc[] =
-    { "Target memory allocate failed, section %s size " FMT_UI32 };
+static const char tgtalloc[] = {
+  "Target memory allocate failed, section %s size " FMT_UI32 };
 static const char initfail[] = { "%s to target address " FMT_UI32 " failed" };
 static const char dlvwrite[] = { "Write to DLLview list failed" };
 static const char iconnect[] = { "Connect call to init interface failed" };
@@ -1043,11 +1043,10 @@ static void cload_cinit(struct dload_state *dlthis,
 			cinit_info = cinit_info_init;
 			cinit_info.page = dlthis->cinit_page;
 			if (!dlthis->myio->writemem(dlthis->myio, pktp,
-						    TDATA_TO_TADDR
-						    (dlthis->cinit_addr),
-						    &cinit_info,
-						    TDATA_TO_HOST(init_count)))
-			{
+						   TDATA_TO_TADDR
+						   (dlthis->cinit_addr),
+						   &cinit_info,
+						   TDATA_TO_HOST(init_count))) {
 				dload_error(dlthis, initfail, "write",
 					    dlthis->cinit_addr);
 			}

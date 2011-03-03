@@ -1952,8 +1952,8 @@ void configure_dsp_mmu(struct wmd_dev_context *dev_context, u32 dataBasePhys,
 		       enum hw_element_size_t elem_size,
 		       enum hw_mmu_mixed_size_t mixed_size)
 {
-	struct hw_mmu_map_attrs_t map_attrs =
-	    { endianism, elem_size, mixed_size };
+	struct hw_mmu_map_attrs_t map_attrs = {
+		endianism, elem_size, mixed_size };
 
 	DBC_REQUIRE(sizeInBytes > 0);
 	dev_dbg(bridge, "%s: entry %x pa %x, va %x, bytes %x endianism %x, "
