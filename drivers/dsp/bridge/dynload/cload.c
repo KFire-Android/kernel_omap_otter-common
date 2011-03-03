@@ -954,7 +954,7 @@ static void symbol_table_free(struct dload_state *dlthis)
 
 /* The following are only for use by reloc.c and things it calls */
 static const struct ldr_section_info cinit_info_init = { cinitname, 0, 0,
-	(ldr_addr) - 1, 0, DLOAD_BSS, 0
+	(ldr_addr)-1, 0, DLOAD_BSS, 0
 };
 
 /*************************************************************************
@@ -1612,11 +1612,11 @@ static char *copy_tgt_strings(void *dstp, void *srcp, unsigned charcount)
  *********************************************************************** */
 #ifndef _BIG_ENDIAN
 static const struct ldr_section_info dllview_info_init = { ".dllview", 0, 0,
-	(ldr_addr) - 1, DBG_LIST_PAGE, DLOAD_DATA, 0
+	(ldr_addr)-1, DBG_LIST_PAGE, DLOAD_DATA, 0
 };
 #else
 static const struct ldr_section_info dllview_info_init = { ".dllview", 0, 0,
-	(ldr_addr) - 1, DLOAD_DATA, DBG_LIST_PAGE, 0
+	(ldr_addr)-1, DLOAD_DATA, DBG_LIST_PAGE, 0
 };
 #endif
 static void init_module_handle(struct dload_state *dlthis)
