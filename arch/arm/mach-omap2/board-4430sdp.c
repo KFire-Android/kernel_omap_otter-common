@@ -915,6 +915,7 @@ static struct omap2_hsmmc_info mmc[] = {
 static struct wl12xx_platform_data omap4_panda_wlan_data __initdata = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
+	.board_tcxo_clock = 1,
 };
 #endif
 
