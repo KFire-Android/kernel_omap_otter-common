@@ -30,6 +30,7 @@
 /* HDMI EDID Extension Data Block Tags  */
 #define HDMI_EDID_EX_DATABLOCK_TAG_MASK		0xE0
 #define HDMI_EDID_EX_DATABLOCK_LEN_MASK		0x1F
+#define HDMI_EDID_EX_SUPPORTS_AI_MASK			0x80
 
 #define EDID_TIMING_DESCRIPTOR_SIZE		0x12
 #define EDID_DESCRIPTOR_BLOCK0_ADDRESS		0x36
@@ -278,6 +279,7 @@ void hdmi_get_av_delay(u8 *edid, struct latency *lat);
 void hdmi_deep_color_support_info(u8 *edid, struct deep_color *format);
 int hdmi_tv_yuv_supported(u8 *edid);
 bool hdmi_s3d_supported(u8 *edid);
+bool hdmi_ai_supported(u8 *edid);
 const struct omap_video_timings *hdmi_get_omap_timing(int ix);
 
 #ifdef __cplusplus

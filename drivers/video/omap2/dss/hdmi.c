@@ -1156,6 +1156,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	hdmi.cfg.hdmi_dvi = hdmi.mode;
 	hdmi.cfg.video_format = hdmi.code;
+	hdmi.cfg.supports_ai = hdmi_ai_supported(edid);
 
 	if ((hdmi.mode)) {
 		switch (hdmi.code) {
@@ -2031,6 +2032,9 @@ static void hdmi_get_edid(struct omap_dss_device *dssdev)
 
 	printk(KERN_INFO "Has IEEE HDMI ID: %s",
 		hdmi_has_ieee_id(edid) ? "YES" : "NO");
+	printk(KERN_INFO "Supports AI: %s", hdmi.cfg.supports_ai ?
+		"YES" : "NO");
+
 	hdmi_get_image_format(edid, img_format);
 	printk(KERN_INFO "%d audio length\n", img_format->length);
 	for (i = 0 ; i < img_format->length ; i++)

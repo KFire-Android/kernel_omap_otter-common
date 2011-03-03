@@ -373,3 +373,19 @@ bool hdmi_s3d_supported(u8 *edid)
 	}
 	return s3d_support;
 }
+
+bool hdmi_ai_supported(u8 *edid)
+{
+	int offset, current_byte, length = 0;
+
+	if (!hdmi_get_datablock_offset(edid, DATABLOCK_VENDOR, &offset)) {
+		current_byte = edid[offset];
+		length = current_byte & HDMI_EDID_EX_DATABLOCK_LEN_MASK;
+		if (length < 6)
+			return false;
+		offset += 6;
+		if (edid[offset] & HDMI_EDID_EX_SUPPORTS_AI_MASK)
+			return true;
+	}
+	return false;
+}

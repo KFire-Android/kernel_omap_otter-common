@@ -404,6 +404,7 @@ struct hdmi_config {
 	u16 s3d_structure;/*Frame Structure for the S3D Frame*/
 	u16 subsamp_pos; /*Subsampling used in Vendor Specific Infoframe */
 	int vsi_enabled; /* Vender Specific InfoFrame enabled/disabled*/
+	bool supports_ai;
 };
 
 enum hdmi_core_if_fs {

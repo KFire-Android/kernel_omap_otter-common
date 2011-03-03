@@ -1641,11 +1641,11 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	repeat_param.AudioPacketED = PACKETENABLE;
 	repeat_param.AudioPacketRepeat = PACKETREPEATON;
 	/* ISCR1 transmission */
-	repeat_param.MPEGInfoFrameED = PACKETENABLE;
-	repeat_param.MPEGInfoFrameRepeat = PACKETREPEATON;
+	repeat_param.MPEGInfoFrameED = PACKETDISABLE;
+	repeat_param.MPEGInfoFrameRepeat = PACKETREPEATOFF;
 	/* ACP transmission */
-	repeat_param.SPDInfoFrameED = PACKETENABLE;
-	repeat_param.SPDInfoFrameRepeat = PACKETREPEATON;
+	repeat_param.SPDInfoFrameED = cfg->supports_ai;
+	repeat_param.SPDInfoFrameRepeat = cfg->supports_ai;
 
 	r = hdmi_core_av_packet_config(av_name, repeat_param);
 
