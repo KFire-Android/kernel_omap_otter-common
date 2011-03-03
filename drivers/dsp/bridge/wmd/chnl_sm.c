@@ -510,8 +510,9 @@ int bridge_chnl_flush_io(struct chnl_object *chnl_obj, u32 dwTimeOut)
 			 * timeout: */
 			while (!LST_IS_EMPTY(pchnl->pio_requests) &&
 			       DSP_SUCCEEDED(status)) {
-				status = bridge_chnl_get_ioc(chnl_obj, dwTimeOut,
-							  &chnl_ioc_obj);
+				status = bridge_chnl_get_ioc(chnl_obj,
+							     dwTimeOut,
+							     &chnl_ioc_obj);
 				if (DSP_FAILED(status))
 					continue;
 

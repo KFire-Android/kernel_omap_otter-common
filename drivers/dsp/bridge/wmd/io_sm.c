@@ -933,9 +933,9 @@ static void io_dispatch_pm(struct io_mgr *pio_mgr)
 		parg[1] = pio_mgr->shared_mem->opp_request.rqst_opp_pt;
 		dev_dbg(bridge, "PM: Requested OPP = 0x%x\n", parg[1]);
 		status =
-		    pio_mgr->intf_fxns->pfn_dev_cntrl(pio_mgr->hwmd_context,
-						      WMDIOCTL_CONSTRAINT_REQUEST,
-						      parg);
+		  pio_mgr->intf_fxns->pfn_dev_cntrl(pio_mgr->hwmd_context,
+						    WMDIOCTL_CONSTRAINT_REQUEST,
+						    parg);
 		if (DSP_FAILED(status))
 			dev_dbg(bridge, "PM: Failed to set constraint "
 				"= 0x%x \n", parg[1]);

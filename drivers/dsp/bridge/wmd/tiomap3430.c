@@ -293,8 +293,9 @@ static int bridge_brd_monitor(struct wmd_dev_context *hDevContext)
 					OMAP3430_IVA2_MOD, OMAP2_CM_CLKSTCTRL);
 
 		/* Wait until the state has moved to ON */
-		while ((*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD, OMAP2_PM_PWSTST) &
-						OMAP_INTRANSITION)
+		while ((*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD,
+					      OMAP2_PM_PWSTST) &
+					      OMAP_INTRANSITION)
 			;
 		/* Disable Automatic transition */
 		(*pdata->dsp_cm_write)(OMAP34XX_CLKSTCTRL_DISABLE_AUTO,
@@ -448,7 +449,9 @@ static int bridge_brd_start(struct wmd_dev_context *hDevContext,
 		/* Reset and Unreset the RST2, so that BOOTADDR is copied to
 		 * IVA2 SYSC register */
 		(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST2_IVA2,
-			OMAP3430_RST1_IVA2, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+					   OMAP3430_RST1_IVA2,
+					   OMAP3430_IVA2_MOD,
+					   OMAP2_RM_RSTCTRL);
 		udelay(100);
 		(*pdata->dsp_prm_rmw_bits)(OMAP3430_RST2_IVA2, 0,
 					OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
@@ -724,8 +727,9 @@ static int bridge_brd_stop(struct wmd_dev_context *hDevContext)
 	 * before turning off the clocks.. This is to ensure that there are no
 	 * pending L3 or other transactons from IVA2 */
 
-	dsp_pwr_state = (*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD, OMAP2_PM_PWSTST) &
-					OMAP_POWERSTATEST_MASK;
+	dsp_pwr_state = (*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD,
+					       OMAP2_PM_PWSTST) &
+					       OMAP_POWERSTATEST_MASK;
 	if (dsp_pwr_state != PWRDM_POWER_OFF) {
 		sm_interrupt_dsp(dev_context, MBX_PM_DSPIDLE);
 		mdelay(10);
@@ -770,7 +774,9 @@ static int bridge_brd_stop(struct wmd_dev_context *hDevContext)
 	}
 	/* Reset IVA2 clocks*/
 	(*pdata->dsp_prm_write)(OMAP3430_RST1_IVA2 | OMAP3430_RST2_IVA2 |
-			OMAP3430_RST3_IVA2, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+				OMAP3430_RST3_IVA2,
+				OMAP3430_IVA2_MOD,
+				OMAP2_RM_RSTCTRL);
 
 	return status;
 }
@@ -826,7 +832,9 @@ static int wmd_brd_delete(struct wmd_dev_context *hDevContext)
 	}
 	/* Reset IVA2 clocks*/
 	(*pdata->dsp_prm_write)(OMAP3430_RST1_IVA2 | OMAP3430_RST2_IVA2 |
-			OMAP3430_RST3_IVA2, OMAP3430_IVA2_MOD, OMAP2_RM_RSTCTRL);
+				OMAP3430_RST3_IVA2,
+				OMAP3430_IVA2_MOD,
+				OMAP2_RM_RSTCTRL);
 
 	return status;
 }

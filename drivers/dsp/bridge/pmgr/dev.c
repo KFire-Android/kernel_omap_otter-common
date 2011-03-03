@@ -64,7 +64,7 @@ struct dev_object {
 	u32 dev_type;		/* Device Type */
 	struct cfg_devnode *dev_node_obj;	/* Platform specific dev id */
 	struct wmd_dev_context *hwmd_context;	/* WMD Context Handle */
-	struct bridge_drv_interface wmd_interface;	/* Function interface to WMD. */
+	struct bridge_drv_interface wmd_interface; /* WMD Function interface. */
 	struct brd_object *lock_owner;	/* Client with exclusive access. */
 	struct cod_manager *cod_mgr;	/* Code manager handle. */
 	struct chnl_mgr *hchnl_mgr;	/* Channel manager. */

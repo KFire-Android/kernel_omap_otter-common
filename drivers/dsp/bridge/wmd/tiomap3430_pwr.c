@@ -110,7 +110,8 @@ int handle_hibernation_from_dsp(struct wmd_dev_context *dev_context)
 			return -EPERM;
 		}
 		pwr_state = (*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD,
-					OMAP2_PM_PWSTST) & OMAP_POWERSTATEST_MASK;
+						   OMAP2_PM_PWSTST) &
+						   OMAP_POWERSTATEST_MASK;
 	}
 	if (timeout == 0) {
 		dev_context->dw_brd_state = prev_state;
@@ -121,7 +122,8 @@ int handle_hibernation_from_dsp(struct wmd_dev_context *dev_context)
 		/* disable bh to void concurrency with mbox tasklet */
 		spin_lock_bh(&lock);
 		pwr_state = (*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD,
-					OMAP2_PM_PWSTST) & OMAP_POWERSTATEST_MASK;
+						   OMAP2_PM_PWSTST) &
+						   OMAP_POWERSTATEST_MASK;
 		if (pwr_state != PWRDM_POWER_OFF) {
 			pr_info("%s: message received while DSP trying to"
 							" sleep\n", __func__);
@@ -244,7 +246,8 @@ int sleep_dsp(struct wmd_dev_context *dev_context, IN u32 dw_cmd,
 			return -EPERM;
 		}
 		pwr_state = (*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD,
-					OMAP2_PM_PWSTST) & OMAP_POWERSTATEST_MASK;
+						   OMAP2_PM_PWSTST) &
+						   OMAP_POWERSTATEST_MASK;
 	}
 
 	if (!timeout) {
@@ -260,7 +263,8 @@ int sleep_dsp(struct wmd_dev_context *dev_context, IN u32 dw_cmd,
 		/* disable bh to void concurrency with mbox tasklet */
 		spin_lock_bh(&lock);
 		pwr_state = (*pdata->dsp_prm_read)(OMAP3430_IVA2_MOD,
-					OMAP2_PM_PWSTST) & OMAP_POWERSTATEST_MASK;
+						   OMAP2_PM_PWSTST) &
+						   OMAP_POWERSTATEST_MASK;
 		if (pwr_state != target_pwr_state) {
 			pr_err("%s: message received while DSP trying to"
 							" sleep\n", __func__);

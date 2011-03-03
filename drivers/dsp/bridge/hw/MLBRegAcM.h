@@ -24,11 +24,11 @@
 
 #if defined(USE_LEVEL_1_MACROS)
 
-#define MLBMAILBOX_SYSCONFIG_READ_REGISTER32(baseAddress)			 \
+#define MLBMAILBOX_SYSCONFIG_READ_REGISTER32(baseAddress)		\
 	(_DEBUG_LEVEL1_EASI(EASIL1_MLBMAILBOX_SYSCONFIG_READ_REGISTER32), \
 	__raw_readl(((baseAddress)) + MLB_MAILBOX_SYSCONFIG_OFFSET))
 
-#define MLBMAILBOX_SYSCONFIG_WRITE_REGISTER32(baseAddress, value)		\
+#define MLBMAILBOX_SYSCONFIG_WRITE_REGISTER32(baseAddress, value)	\
 do {									\
 	const u32 offset = MLB_MAILBOX_SYSCONFIG_OFFSET;		\
 	register u32 newValue = ((u32)(value));				\
@@ -69,20 +69,20 @@ do {									    \
 	__raw_writel(newValue, (u32)(baseAddress) + offset);		    \
 } while (0)
 
-#define MLBMAILBOX_SYSCONFIG_AUTO_IDLE_READ32(baseAddress)			 \
+#define MLBMAILBOX_SYSCONFIG_AUTO_IDLE_READ32(baseAddress)		\
 	(_DEBUG_LEVEL1_EASI(EASIL1_MLBMAILBOX_SYSCONFIG_AUTO_IDLE_READ32), \
 	(((__raw_readl((((u32)(baseAddress)) +				 \
 	(MLB_MAILBOX_SYSCONFIG_OFFSET)))) &				 \
-	MLB_MAILBOX_SYSCONFIG_AUTO_IDLE_MASK) >>				 \
+	  MLB_MAILBOX_SYSCONFIG_AUTO_IDLE_MASK) >>			\
 	MLB_MAILBOX_SYSCONFIG_AUTO_IDLE_OFFSET))
 
-#define MLBMAILBOX_SYSCONFIG_AUTO_IDLE_WRITE32(baseAddress, value)		 \
+#define MLBMAILBOX_SYSCONFIG_AUTO_IDLE_WRITE32(baseAddress, value)	\
 do {									 \
 	const u32 offset = MLB_MAILBOX_SYSCONFIG_OFFSET;		 \
 	register u32 data = __raw_readl(((u32)(baseAddress)) + offset);	 \
 	register u32 newValue = ((u32)(value));				 \
 	_DEBUG_LEVEL1_EASI(EASIL1_MLBMAILBOX_SYSCONFIG_AUTO_IDLE_WRITE32); \
-	data &= ~(MLB_MAILBOX_SYSCONFIG_AUTO_IDLE_MASK);			 \
+	data &= ~(MLB_MAILBOX_SYSCONFIG_AUTO_IDLE_MASK);		\
 	newValue <<= MLB_MAILBOX_SYSCONFIG_AUTO_IDLE_OFFSET;		 \
 	newValue &= MLB_MAILBOX_SYSCONFIG_AUTO_IDLE_MASK;		 \
 	newValue |= data;						 \
@@ -131,7 +131,7 @@ do {									      \
 	MLB_MAILBOX_FIFOSTATUS015_FIFO_FULL_M_BM_MASK) >>		 \
 	MLB_MAILBOX_FIFOSTATUS015_FIFO_FULL_M_BM_OFFSET))
 
-#define MLBMAILBOX_MSGSTATUS015_NB_OF_MSG_M_BM_READ32(baseAddress, bank)	\
+#define MLBMAILBOX_MSGSTATUS015_NB_OF_MSG_M_BM_READ32(baseAddress, bank) \
 	(_DEBUG_LEVEL1_EASI(						\
 	EASIL1_MLBMAILBOX_MSGSTATUS015_NB_OF_MSG_M_BM_READ32),		\
 	(((__raw_readl(((baseAddress)) +				\

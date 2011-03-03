@@ -392,7 +392,7 @@ extern struct dev_object *dev_get_first(void);
  *      else:           *ppIntfFxns is NULL.
  */
 extern int dev_get_intf_fxns(struct dev_object *hdev_obj,
-				    OUT struct bridge_drv_interface **ppIntfFxns);
+			     OUT struct bridge_drv_interface **ppIntfFxns);
 
 /*
  *  ======== dev_get_io_mgr ========
