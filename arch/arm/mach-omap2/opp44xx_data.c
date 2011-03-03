@@ -90,7 +90,7 @@ static struct omap_opp_def __initdata omap44xx_pre_es2_1_opp_def_list[] = {
 	/* HSI OPP1 - OPP50 */
 	OMAP_OPP_DEF("hsi", true, 96000000, 930000),
 	/* HSI OPP2 - OPP100 */
-	OMAP_OPP_DEF("hsi", true, 192000000, 1100000),
+	OMAP_OPP_DEF("hsi", true, 96000000, 1100000),
 };
 
 static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
@@ -149,7 +149,7 @@ static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	/* HSI OPP1 - OPP50 */
 	OMAP_OPP_DEF("hsi", true, 96000000, 930000),
 	/* HSI OPP2 - OPP100 */
-	OMAP_OPP_DEF("hsi", true, 192000000, 1100000),
+	OMAP_OPP_DEF("hsi", true, 96000000, 1100000),
 };
 
 #define	L3_OPP50_RATE			100000000
