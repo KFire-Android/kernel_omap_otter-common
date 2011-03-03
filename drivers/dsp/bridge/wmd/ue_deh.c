@@ -343,7 +343,7 @@ void bridge_deh_notify(struct deh_mgr *hdeh_mgr, u32 ulEventMask, u32 dwErrInfo)
 			deh_mgr_obj->err_info.dw_val1 = 0L;
 			deh_mgr_obj->err_info.dw_val2 = 0L;
 			deh_mgr_obj->err_info.dw_val3 = 0L;
-			pr_err("bridge_deh_notify: DSP_WDTOVERFLOW \n ");
+			pr_err("bridge_deh_notify: DSP_WDTOVERFLOW\n ");
 			break;
 #endif
 		default:

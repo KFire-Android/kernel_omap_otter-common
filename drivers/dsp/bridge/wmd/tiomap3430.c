@@ -609,7 +609,7 @@ static int bridge_brd_start(struct wmd_dev_context *hDevContext,
 			/* Get the clock rate */
 			status = services_clk_get_rate(SERVICESCLK_IVA2_CK,
 						       &ul_dsp_clk_rate);
-			dev_dbg(bridge, "%s: DSP clock rate (KHZ): 0x%x \n",
+			dev_dbg(bridge, "%s: DSP clock rate (KHZ): 0x%x\n",
 				__func__, ul_dsp_clk_rate);
 			(void)bridge_brd_write(dev_context,
 					       (u8 *) &ul_dsp_clk_rate,

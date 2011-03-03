@@ -494,7 +494,7 @@ int bridge_io_on_loaded(struct io_mgr *hio_mgr)
 
 		dev_dbg(bridge, "%s: ul_gpp_pa %x, ul_gpp_va %x, ul_dsp_va %x, "
 			"shm0_end %x, ul_dyn_ext_base %x, ul_ext_end %x, "
-			"ul_seg_size %x ul_seg1_size %x \n", __func__,
+			"ul_seg_size %x ul_seg1_size %x\n", __func__,
 			ul_gpp_pa, ul_gpp_va, ul_dsp_va, shm0_end,
 			ul_dyn_ext_base, ul_ext_end, ul_seg_size, ul_seg1_size);
 
@@ -938,7 +938,7 @@ static void io_dispatch_pm(struct io_mgr *pio_mgr)
 						    parg);
 		if (DSP_FAILED(status))
 			dev_dbg(bridge, "PM: Failed to set constraint "
-				"= 0x%x \n", parg[1]);
+				"= 0x%x\n", parg[1]);
 	} else {
 		dev_dbg(bridge, "PM: clk control value of msg = 0x%x\n",
 			parg[0]);
@@ -1324,7 +1324,7 @@ static void input_msg(struct io_mgr *pio_mgr, struct msg_mgr *hmsg_mgr)
 		msg_queue_obj =
 		    (struct msg_queue *)lst_first(hmsg_mgr->queue_list);
 		dev_dbg(bridge,	"input msg: dw_cmd=0x%x dw_arg1=0x%x "
-			"dw_arg2=0x%x msgq_id=0x%x \n", msg.msg.dw_cmd,
+			"dw_arg2=0x%x msgq_id=0x%x\n", msg.msg.dw_cmd,
 			msg.msg.dw_arg1, msg.msg.dw_arg2, msg.msgq_id);
 		/*
 		 * Interrupt may occur before shared memory and message

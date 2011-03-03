@@ -1377,7 +1377,7 @@ int proc_stop(void *hprocessor)
 		status = node_enum_nodes(hnode_mgr, &hnode, node_tab_size,
 					 &num_nodes, &nodes_allocated);
 		if ((status == -EINVAL) || (nodes_allocated > 0)) {
-			pr_err("%s: Can't stop device, active nodes = %d \n",
+			pr_err("%s: Can't stop device, active nodes = %d\n",
 			       __func__, nodes_allocated);
 			return -EBADR;
 		}
