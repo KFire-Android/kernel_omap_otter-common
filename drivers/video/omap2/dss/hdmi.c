@@ -1502,6 +1502,7 @@ done:
 		DSSINFO("HDMI HPD  display\n");
 		/* force a new power-up to read EDID */
 		edid_set = false;
+		custom_set = false;
 		hdmi_reconfigure(dssdev);
 		set_hdmi_hot_plug_status(dssdev, true);
 		/* ignore return value for now */
