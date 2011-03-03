@@ -742,14 +742,25 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.default_device	=	&sdp4430_lcd_device,
 };
 
-
+static unsigned long retry_suspend;
 int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	/* TODO: wait for HCI-LL sleep */
+	struct kim_data_s *kim_gdata;
+	struct st_data_s *core_data;
+	kim_gdata = dev_get_drvdata(&pdev->dev);
+	core_data = kim_gdata->core_data;
+	 if (st_ll_getstate(core_data) != ST_LL_INVALID) {
+		 /*Prevent suspend until sleep indication from chip*/
+		   while(st_ll_getstate(core_data) != ST_LL_ASLEEP &&
+				   (retry_suspend++ < 5)) {
+			   return -1;
+		   }
+	 }
 	return 0;
 }
 int plat_kim_resume(struct platform_device *pdev)
 {
+	retry_suspend = 0;
 	return 0;
 }
 /* wl128x BT, FM, GPS connectivity chip */

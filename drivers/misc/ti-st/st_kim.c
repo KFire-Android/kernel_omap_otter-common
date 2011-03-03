@@ -267,6 +267,8 @@ static long download_firmware(struct kim_data_s *kim_gdata)
 	int wr_room_space;
 	int cmd_size;
 	unsigned long timeout;
+	struct st_data_s *core_data;
+	core_data = kim_gdata->core_data;
 
 	err = read_local_version(kim_gdata, bts_scr_name);
 	if (err != 0) {
@@ -308,6 +310,12 @@ static long download_firmware(struct kim_data_s *kim_gdata)
 				skip_change_remote_baud(&ptr, &len);
 				break;
 			}
+			/*Enable the ST_LL state machine if HCILL SLEEP command
+			 * enabled in BT init script*/
+			if (unlikely
+			   (((struct hci_command *)action_ptr)->opcode ==
+			     HCILL_SLEEP_MODE_OPCODE))
+				st_ll_enable(core_data);
 			/*
 			 * Make sure we have enough free space in uart
 			 * tx buffer to write current firmware command

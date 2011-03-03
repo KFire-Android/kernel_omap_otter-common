@@ -534,8 +534,6 @@ long st_register(struct st_proto_s *new_proto)
 		/* release lock previously held - re-locked below */
 		spin_unlock_irqrestore(&st_gdata->lock, flags);
 
-		/* enable the ST LL - to set default chip state */
-		st_ll_enable(st_gdata);
 		/* this may take a while to complete
 		 * since it involves BT fw download
 		 */
