@@ -998,11 +998,10 @@ int cmm_xlator_delete(struct cmm_xlatorobject *xlator, bool bForce)
 
 	DBC_REQUIRE(refs > 0);
 
-	if (xlator_obj) {
+	if (xlator_obj)
 		kfree(xlator_obj);
-	} else {
+	else
 		status = -EFAULT;
-	}
 
 	return status;
 }

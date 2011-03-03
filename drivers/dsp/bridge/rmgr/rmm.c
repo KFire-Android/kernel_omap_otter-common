@@ -232,11 +232,10 @@ func_cont:
 	if (DSP_SUCCEEDED(status)) {
 		target->ovly_list = kzalloc(sizeof(struct lst_list),
 							GFP_KERNEL);
-		if (target->ovly_list == NULL) {
+		if (target->ovly_list == NULL)
 			status = -ENOMEM;
-		} else {
+		else
 			INIT_LIST_HEAD(&target->ovly_list->head);
-		}
 	}
 
 	if (DSP_SUCCEEDED(status)) {
