@@ -54,9 +54,7 @@
 struct dispc_reg { u16 idx; };
 void __iomem  *dispc_base;
 
-#ifdef CONFIG_OMAP2_DSS_FAKE_VSYNC
 static int fake_vsync;
-#endif
 
 #define DISPC_REG(idx)			((const struct dispc_reg) { idx })
 
