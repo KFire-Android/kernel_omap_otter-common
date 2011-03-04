@@ -38,8 +38,8 @@
 bool omap4_lpmode = false;
 
 static struct clockdomain *l3_emif_clkdm;
-static struct clk *dpll_core_m2_ck;
-static struct clk *emif1_fck, *emif2_fck;
+static struct clk *dpll_core_m2_ck, *dpll_core_m5x2_ck;
+static struct clk *gpmc_ick;
 
 static struct dpll_cascade_saved_state {
 	unsigned long dpll_mpu_ck_rate;
@@ -95,15 +95,9 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	/* Just to avoid look-up on every call to speed up */
 	if (!l3_emif_clkdm)
 		l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
-	if (!emif1_fck)
-		emif1_fck = clk_get(NULL, "emif1_fck");
-	if (!emif2_fck)
-		emif2_fck = clk_get(NULL, "emif2_fck");
 
 	/* put MEMIF domain in SW_WKUP & increment usecount for clks */
 	omap2_clkdm_wakeup(l3_emif_clkdm);
-	omap2_clk_enable(emif1_fck);
-	omap2_clk_enable(emif2_fck);
 
 	/*
 	 * maybe program core m5 divider here
@@ -135,8 +129,6 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 
 	/* put MEMIF clkdm back to HW_AUTO & decrement usecount for clks */
 	omap2_clkdm_allow_idle(l3_emif_clkdm);
-	omap2_clk_disable(emif1_fck);
-	omap2_clk_disable(emif2_fck);
 
 	if (i == MAX_FREQ_UPDATE_TIMEOUT) {
 		pr_err("%s: Frequency update for CORE DPLL M2 change failed\n",
@@ -157,9 +149,9 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
  */
 int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 {
-	int i = 0, m2_div;
+	int i = 0, m2_div, m5_div;
 	u32 mask, reg;
-	u32 shadow_freq_cfg1 = 0;
+	u32 shadow_freq_cfg1 = 0, shadow_freq_cfg2 = 0;
 	struct clk *new_parent;
 	struct dpll_data *dd;
 
@@ -181,22 +173,18 @@ int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 	/* Just to avoid look-up on every call to speed up */
 	if (!l3_emif_clkdm)
 		l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
-	if (!emif1_fck)
-		emif1_fck = clk_get(NULL, "emif1_fck");
-	if (!emif2_fck)
-		emif2_fck = clk_get(NULL, "emif2_fck");
 	if (!dpll_core_m2_ck)
 		dpll_core_m2_ck = clk_get(NULL, "dpll_core_m2_ck");
+	if (!dpll_core_m5x2_ck)
+		dpll_core_m5x2_ck = clk_get(NULL, "dpll_core_m5x2_ck");
+	if (!gpmc_ick)
+		gpmc_ick = clk_get(NULL, "gpmc_ick");
 
-	/* Make sure MEMIF clkdm is in SW_WKUP and EMIF modules are func */
+	/* Make sure MEMIF clkdm is in SW_WKUP & GPMC clocks are active */
 	omap2_clkdm_wakeup(l3_emif_clkdm);
-	omap2_clk_enable(emif1_fck);
-	omap2_clk_enable(emif2_fck);
+	omap2_clk_enable(gpmc_ick);
 
-	/*
-	 * maybe program core m5 divider here
-	 * definitely program m3, m6 & m7 dividers here
-	 */
+	/* FIXME set m3, m6 & m7 rates here? */
 
 	/* check for bypass rate */
 	if (rate == dd->clk_bypass->rate &&
@@ -209,14 +197,23 @@ int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 		omap_emif_setup_registers(rate / 2, LPDDR2_VOLTAGE_STABLE);
 
 		/*
-		 * FIXME PRCM functional spec says we should program
-		 * CM_SHADOW_FREQ_CONFIG2.CLKSEL_L3 to 0 (corresponds to
-		 * CM_CLKSEL_CORE.CLKSEL_L3) for normal bypass operation.
-		 * This means L3_CLK is CORE_CLK divided by 1.  Same spec says
-		 * the value should be 1 when entering DPLL cascading.  All of
-		 * this assumes GPMC can scale frequency on the fly.  Too many
-		 * unknowns, skipping this for now...
+		 * program CM_DIV_M5_DPLL_CORE.DPLL_CLKOUT_DIV into shadow
+		 * register as well as L3_CLK freq and update GPMC frequency
+		 *
+		 * HACK: hardcode L3_CLK = CORE_CLK / 2 for DPLL cascading
+		 * HACK: hardcode CORE_CLK = CORE_X2_CLK / 2 for DPLL
+		 * cascading
 		 */
+		m5_div = omap4_prm_read_bits_shift(dpll_core_m5x2_ck->clksel_reg,
+				dpll_core_m5x2_ck->clksel_mask);
+
+		shadow_freq_cfg2 =
+			(m5_div << OMAP4430_DPLL_CORE_M5_DIV_SHIFT) |
+			(1 << OMAP4430_CLKSEL_L3_SHADOW_SHIFT) |
+			(0 << OMAP4430_CLKSEL_CORE_1_1_SHIFT) |
+			(1 << OMAP4430_GPMC_FREQ_UPDATE_SHIFT);
+
+		__raw_writel(shadow_freq_cfg2, OMAP4430_CM_SHADOW_FREQ_CONFIG2);
 
 		/*
 		 * program CM_DIV_M2_DPLL_CORE.DPLL_CLKOUT_DIV for divide by
@@ -263,14 +260,23 @@ int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 		omap4_prm_rmw_reg_bits(mask, reg, dd->mult_div1_reg);
 
 		/*
-		 * FIXME PRCM functional spec says we should program
-		 * CM_SHADOW_FREQ_CONFIG2.CLKSEL_L3 to 1 (corresponds to
-		 * CM_CLKSEL_CORE.CLKSEL_L3) for normal bypass operation.
-		 * This means L3_CLK is CORE_CLK divided by 2.  Same spec says
-		 * the value should be 0 when exiting DPLL cascading.  All of
-		 * this assumes GPMC can scale frequency on the fly.  Too many
-		 * unknowns, skipping this for now...
+		 * program CM_DIV_M5_DPLL_CORE.DPLL_CLKOUT_DIV into shadow
+		 * register as well as L3_CLK freq and update GPMC frequency
+		 *
+		 * HACK: hardcode L3_CLK = CORE_CLK / 2 for DPLL cascading
+		 * HACK: hardcode CORE_CLK = CORE_X2_CLK / 1 for DPLL
+		 * cascading
 		 */
+		m5_div = omap4_prm_read_bits_shift(dpll_core_m5x2_ck->clksel_reg,
+				dpll_core_m5x2_ck->clksel_mask);
+
+		shadow_freq_cfg2 =
+			(m5_div << OMAP4430_DPLL_CORE_M5_DIV_SHIFT) |
+			(1 << OMAP4430_CLKSEL_L3_SHADOW_SHIFT) |
+			(0 << OMAP4430_CLKSEL_CORE_1_1_SHIFT) |
+			(1 << OMAP4430_GPMC_FREQ_UPDATE_SHIFT);
+
+		__raw_writel(shadow_freq_cfg2, OMAP4430_CM_SHADOW_FREQ_CONFIG2);
 
 		/*
 		 * program DPLL_CORE_M2_DIV with same value as the one already
@@ -294,6 +300,11 @@ int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 					& OMAP4430_FREQ_UPDATE_MASK) == 0),
 			MAX_FREQ_UPDATE_TIMEOUT, i);
 
+	/* clear GPMC_FREQ_UPDATE bit */
+	shadow_freq_cfg2 = __raw_readl(OMAP4430_CM_SHADOW_FREQ_CONFIG2);
+	shadow_freq_cfg2 &= ~1;
+	__raw_writel(shadow_freq_cfg2, OMAP4430_CM_SHADOW_FREQ_CONFIG2);
+
 	/*
 	 * Switch the parent clock in the heirarchy, and make sure that the
 	 * new parent's usecount is correct.  Note: we enable the new parent
@@ -311,10 +322,9 @@ int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
 	omap2_clk_disable(dd->clk_bypass);
 	omap2_clk_disable(dd->clk_ref);
 
-	/* Configures MEMIF domain back to HW_WKUP */
+	/* Configures MEMIF domain back to HW_WKUP & let GPMC clocks to idle */
 	omap2_clkdm_allow_idle(l3_emif_clkdm);
-	omap2_clk_disable(emif1_fck);
-	omap2_clk_disable(emif2_fck);
+	omap2_clk_disable(gpmc_ick);
 
 	/*
 	 * FIXME PRCM functional spec says we should set GPMC_FREQ_UPDATE bit
