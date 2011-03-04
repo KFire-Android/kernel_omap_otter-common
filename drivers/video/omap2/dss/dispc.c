@@ -3139,6 +3139,9 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	row_inc = pix_inc = 0x1;
 	offset0 = offset1 = 0x0;
 
+	/* Reset the Tiler burst bit */
+	REG_FLD_MOD(dispc_reg_att[plane], 0x0, 29, 29); /*BURSTTYPE */
+
 	if (rotation_type == OMAP_DSS_ROT_TILER) {
 #ifdef CONFIG_TILER_OMAP
 		int bpp = color_mode_to_bpp(color_mode) / 8;
