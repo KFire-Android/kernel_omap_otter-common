@@ -3104,13 +3104,17 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 	struct dsi_struct *p_dsi;
 	enum omap_dsi_index ix;
 	unsigned channel;
-	/* line buffer is 1024 x 24bits */
-	/* XXX: for some reason using full buffer size causes considerable TX
-	 * slowdown with update sizes that fill the whole buffer */
-	const unsigned line_buf_size = 1023 * 3;
+	unsigned line_buf_size;
 
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
+
+	/* line buffer is 1365/1024 x 24bits */
+	/* XXX: for some reason using full buffer size causes considerable TX
+	 * slowdown with update sizes that fill the whole buffer so used total
+	 * size - 1. for DSI1, the max size is 1365 but for DSI2, it is 1024.
+	 */
+	line_buf_size = (ix == DSI1) ? (1364 * 3) : (1023 * 3);
 
 	channel = p_dsi->update_channel;
 
