@@ -346,7 +346,7 @@ static int hsi_char_ioctl(struct inode *inode, struct file *file,
 {
 	int ch = (int)file->private_data;
 	unsigned int state;
-	unsigned char occ;
+	size_t occ;
 	struct hsi_rx_config rx_cfg;
 	struct hsi_tx_config tx_cfg;
 	int ret = 0;

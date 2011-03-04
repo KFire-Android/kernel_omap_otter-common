@@ -319,7 +319,7 @@ void if_hsi_sw_reset(int ch)
 	spin_unlock_bh(&hsi_iface.lock);
 }
 
-void if_hsi_get_fifo_occupancy(int ch, unsigned char *occ)
+void if_hsi_get_fifo_occupancy(int ch, size_t *occ)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];

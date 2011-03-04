@@ -800,7 +800,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			err = -EFAULT;
 			goto out;
 		}
-		*(u8 *)arg = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
+		*(size_t *)arg = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
 		break;
 	default:
 		err = -ENOIOCTLCMD;
