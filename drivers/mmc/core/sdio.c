@@ -371,6 +371,9 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 			goto err;
 		}
 		card = oldcard;
+#ifdef CONFIG_TIWLAN_SDIO
+		return 0;
+#endif
 	}
 
 	/*

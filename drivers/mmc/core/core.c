@@ -1132,8 +1132,12 @@ void mmc_rescan(struct work_struct *work)
 	 * if there is a _removable_ card registered, check whether it is
 	 * still present
 	 */
+#ifdef CONFIG_TIWLAN_SDIO
+	if ((host->bus_ops != NULL) && host->bus_ops->detect && !host->bus_dead)
+#else
 	if ((host->bus_ops != NULL) && host->bus_ops->detect && !host->bus_dead
 					&& mmc_card_is_removable(host))
+#endif
 		host->bus_ops->detect(host);
 
 	/* If the card was removed the bus will be marked
