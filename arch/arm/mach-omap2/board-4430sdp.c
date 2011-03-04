@@ -30,6 +30,7 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/twl6040-vib.h>
+#include <linux/wl12xx.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -84,6 +85,9 @@
 #define LED_PWM2ON		0x03
 #define LED_PWM2OFF		0x04
 #define LED_TOGGLE3		0x92
+
+#define GPIO_WIFI_PMENA		54
+#define GPIO_WIFI_IRQ		53
 
 #define TWL6030_RTC_GPIO 6
 #define BLUETOOTH_UART UART2
@@ -798,6 +802,32 @@ static struct omap_musb_board_data musb_board_data = {
 	.power			= 100,
 };
 
+#ifndef CONFIG_TIWLAN_SDIO
+static int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
+{
+	static int power_state;
+
+	pr_debug("Powering %s wifi", (power_on ? "on" : "off"));
+
+	if (power_on == power_state)
+		return 0;
+	power_state = power_on;
+
+	if (power_on) {
+		gpio_set_value(GPIO_WIFI_PMENA, 1);
+		mdelay(15);
+		gpio_set_value(GPIO_WIFI_PMENA, 0);
+		mdelay(1);
+		gpio_set_value(GPIO_WIFI_PMENA, 1);
+		mdelay(70);
+	} else {
+		gpio_set_value(GPIO_WIFI_PMENA, 0);
+	}
+
+	return 0;
+}
+#endif
+
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 2,
@@ -820,6 +850,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.power_saving	= true,
 #endif
 	},
+#ifdef CONFIG_TIWLAN_SDIO
 	{
 		.mmc		= 5,
 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
@@ -827,8 +858,25 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_wp        = 4,
 		.ocr_mask	= MMC_VDD_165_195,
 	},
+#else
+	{
+		.mmc		= 5,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
+		.gpio_cd	= -EINVAL,
+		.gpio_wp	= -EINVAL,
+		.ocr_mask	= MMC_VDD_165_195,
+		.nonremovable	= true,
+	},
+#endif
 	{}	/* Terminator */
 };
+
+#ifndef CONFIG_TIWLAN_SDIO
+static struct wl12xx_platform_data omap4_panda_wlan_data __initdata = {
+	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
+	.board_ref_clock = WL12XX_REFCLOCK_26,
+};
+#endif
 
 static struct regulator_consumer_supply sdp4430_vmmc_supply[] = {
 	{
@@ -858,6 +906,13 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 						MMCDETECT_INTR_OFFSET;
 		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
 	}
+
+#ifndef CONFIG_TIWLAN_SDIO
+	/* Set the MMC5 (wlan) power function */
+	if (pdev->id == 4)
+		pdata->slots[0].set_power = wifi_set_power;
+#endif
+
 	return ret;
 }
 
@@ -1548,6 +1603,21 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
+#ifndef CONFIG_TIWLAN_SDIO
+	/* WLAN IRQ - GPIO 53 */
+	OMAP4_MUX(GPMC_NCS3, OMAP_MUX_MODE3 | OMAP_PIN_INPUT),
+	/* WLAN_EN - GPIO 54 */
+	OMAP4_MUX(GPMC_NWP, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
+	/* WLAN SDIO: MMC5 CMD */
+	OMAP4_MUX(SDMMC5_CMD, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
+	/* WLAN SDIO: MMC5 CLK */
+	OMAP4_MUX(SDMMC5_CLK, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
+	/* WLAN SDIO: MMC5 DAT[0-3] */
+	OMAP4_MUX(SDMMC5_DAT0, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
+	OMAP4_MUX(SDMMC5_DAT1, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
+	OMAP4_MUX(SDMMC5_DAT2, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
+	OMAP4_MUX(SDMMC5_DAT3, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP),
+#endif
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
@@ -1566,6 +1636,16 @@ static void enable_rtc_gpio(void){
 	return;
 }
 
+#ifndef CONFIG_TIWLAN_SDIO
+static void omap4_4430sdp_wifi_init(void)
+{
+	if (gpio_request(GPIO_WIFI_PMENA, "wl12xx") ||
+	    gpio_direction_output(GPIO_WIFI_PMENA, 0))
+		pr_err("Error initializing up WLAN_EN\n");
+	if (wl12xx_set_platform_data(&omap4_panda_wlan_data))
+		pr_err("Error setting wl12xx data\n");
+}
+#endif
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1591,6 +1671,8 @@ static void __init omap_4430sdp_init(void)
 
 #ifdef CONFIG_TIWLAN_SDIO
 	config_wlan_mux();
+#else
+	omap4_4430sdp_wifi_init();
 #endif
 
 	/* Power on the ULPI PHY */
