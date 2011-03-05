@@ -1663,8 +1663,15 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	return r;
 }
 
-int hdmi_lib_init(void){
-	u32 rev;
+/**
+ * hdmi_lib_init - Initializes hdmi library
+ *
+ * hdmi_lib_init is expected to be called by any user of the hdmi library (e.g.
+ * HDMI video driver, HDMI audio driver). This means that it is not safe to add
+ * anything in this function that requires the DSS clocks to be enabled.
+ */
+int hdmi_lib_init(void)
+{
 	static u8 initialized;
 
 	mutex_lock(&hdmi_mutex);
@@ -1692,10 +1699,6 @@ int hdmi_lib_init(void){
 #endif
 
 	INIT_LIST_HEAD(&hdmi.notifier_head);
-
-	rev = hdmi_read_reg(HDMI_WP, HDMI_WP_REVISION);
-	printk(KERN_INFO "OMAP HDMI W1 rev %d.%d\n",
-		FLD_GET(rev, 10, 8), FLD_GET(rev, 5, 0));
 
 	return 0;
 }
