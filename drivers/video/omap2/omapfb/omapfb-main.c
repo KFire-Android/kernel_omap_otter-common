@@ -45,6 +45,10 @@
 #define OMAPFB_PLANE_XRES_MIN		8
 #define OMAPFB_PLANE_YRES_MIN		8
 
+#ifdef CONFIG_SGX540
+#define SGX_HW_ALIGN_PIXELS		8
+#endif
+
 static char *def_mode;
 static char *def_vram;
 static int def_vrfb;
@@ -657,8 +661,12 @@ void set_fb_fix(struct fb_info *fbi)
 
 		fix->smem_len = var->yres_virtual * fix->line_length;
 	} else if (ofbi->rotation_type != OMAP_DSS_ROT_TILER) {
+		int aligned_width = var->xres_virtual;
+#ifdef CONFIG_SGX540
+		aligned_width = ALIGN(aligned_width, SGX_HW_ALIGN_PIXELS);
+#endif
 		fix->line_length =
-			(var->xres_virtual * var->bits_per_pixel) >> 3;
+			(aligned_width * var->bits_per_pixel) >> 3;
 
 		/* tiler line length is set during allocation, and cannot
 		   be changed */
