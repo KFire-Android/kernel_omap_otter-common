@@ -511,12 +511,24 @@ static void hdmi_core_init(enum hdmi_deep_mode deep_color,
 	v_cfg->CoreHdmiDvi = HDMI_DVI;
 	v_cfg->CoreTclkSelClkMult = FPLL10IDCK;
 	/* audio core */
-	audio_cfg->fs = FS_44100;
-	audio_cfg->n = 0;
-	audio_cfg->cts = 0;
-	audio_cfg->layout = LAYOUT_2CH; /* 2channel audio */
+	audio_cfg->fs = FS_48000;
+	audio_cfg->n = 6144;
+	audio_cfg->layout = LAYOUT_2CH;
+	audio_cfg->if_fs = IF_FS_NO;
+	audio_cfg->if_channel_number = 2;
+	audio_cfg->if_sample_size = IF_NO_PER_SAMPLE;
+	audio_cfg->if_audio_channel_location = HDMI_CEA_CODE_00;
+	audio_cfg->i2schst_max_word_length = I2S_CHST_WORD_MAX_20;
+	audio_cfg->i2schst_word_length = I2S_CHST_WORD_16_BITS;
+	audio_cfg->i2s_in_bit_length = I2S_IN_LENGTH_16;
+	audio_cfg->i2s_justify = HDMI_AUDIO_JUSTIFY_LEFT;
 	audio_cfg->aud_par_busclk = 0;
-	audio_cfg->cts_mode = CTS_MODE_HW;
+	audio_cfg->cts_mode = CTS_MODE_SW;
+
+	if (omap_rev() == OMAP4430_REV_ES1_0) {
+		audio_cfg->aud_par_busclk = (((128 * 31) - 1) << 8);
+		audio_cfg->cts_mode = CTS_MODE_HW;
+	}
 
 	/* info frame */
 	avi->db1y_rgb_yuv422_yuv444 = 0;
@@ -639,11 +651,10 @@ static int hdmi_core_audio_mode_enable(u32  instanceName)
 	return 0;
 }
 
-static int hdmi_core_audio_config(u32 name,
+static void hdmi_core_audio_config(u32 name,
 		struct hdmi_core_audio_config *audio_cfg)
 {
-	int ret = 0;
-	u32 SD3_EN, SD2_EN, SD1_EN, SD0_EN;
+	u32 SD3_EN = 0, SD2_EN = 0, SD1_EN = 0, SD0_EN = 0, r;
 	u8 DBYTE1, DBYTE2, DBYTE4, CHSUM;
 	u8 size1;
 	u16 size0;
@@ -684,18 +695,18 @@ static int hdmi_core_audio_config(u32 name,
 	REG_FLD_MOD(name, HDMI_CORE_AV__AUD_PAR_BUSCLK_3,
 				(audio_cfg->aud_par_busclk >> 16), 7, 0);
 	/* FS_OVERRIDE = 1 because // input is used */
-	WR_REG_32(name, HDMI_CORE_AV__SPDIF_CTRL, 0x1);
-	 /* refer to table209 p192 in func core spec */
-	WR_REG_32(name, HDMI_CORE_AV__I2S_CHST4, audio_cfg->fs);
+	REG_FLD_MOD(name, HDMI_CORE_AV__SPDIF_CTRL, 1, 1, 1);
+	/* refer to table171 p122 in func core spec*/
+	REG_FLD_MOD(name, HDMI_CORE_AV__I2S_CHST4, audio_cfg->fs, 3, 0);
 
 	/*
 	 * audio config is mainly due to wrapper hardware connection
-	 * and so are fixe (hardware) I2S deserializer is by-pass
+	 * and so are fixed (hardware) I2S deserializer is by-passed
 	 * so I2S configuration is not needed (I2S don't care).
-	 * Wrapper are directly connected at the I2S deserialiser
-	 * output level so some register call I2S... need to be
-	 * programm to configure this parallel bus, there configuration
-	 * is also fixe and due to the hardware connection (I2S hardware)
+	 * Wrapper is directly connected at the I2S deserialiser
+	 * output level so some registers call I2S and need to be
+	 * programmed to configure this parallel bus, there configuration
+	 * is also fixed and due to the hardware connection (I2S hardware)
 	 */
 	WR_REG_32(name, HDMI_CORE_AV__I2S_IN_CTRL,
 		(0 << 7) |	/* HBRA_ON */
@@ -703,17 +714,18 @@ static int hdmi_core_audio_config(u32 name,
 		(0 << 5) |	/* CBIT_ORDER */
 		(0 << 4) |	/* VBit, 0x0=PCM, 0x1=compressed */
 		(0 << 3) |	/* I2S_WS, 0xdon't care */
-		(0 << 2) |	/* I2S_JUST, 0=left- 1=right-justified */
+		(audio_cfg->i2s_justify << 2) | /* I2S_JUST*/
 		(0 << 1) |	/* I2S_DIR, 0xdon't care */
 		(0));		/* I2S_SHIFT, 0x0 don't care */
 
-	WR_REG_32(name, HDMI_CORE_AV__I2S_CHST5, /* mode only */
-		(0 << 4) |	/* FS_ORIG */
-		(1 << 1) |	/* I2S lenght 16bits (refer doc) */
-		(0));		/* Audio sample lenght */
+	r = hdmi_read_reg(name, HDMI_CORE_AV__I2S_CHST5);
+	r = FLD_MOD(r, audio_cfg->fs, 7, 4); /* FS_ORIG */
+	r = FLD_MOD(r, audio_cfg->i2schst_word_length, 3, 1);
+	r = FLD_MOD(r, audio_cfg->i2schst_max_word_length, 0, 0);
+	WR_REG_32(name, HDMI_CORE_AV__I2S_CHST5, r);
 
-	WR_REG_32(name, HDMI_CORE_AV__I2S_IN_LEN, /* mode only */
-		(0xb));		/* In length b=>24bits i2s hardware */
+	REG_FLD_MOD(name, HDMI_CORE_AV__I2S_IN_LEN,
+			audio_cfg->i2s_in_bit_length, 3, 0);
 
 	/* channel enable depend of the layout */
 	if (audio_cfg->layout == LAYOUT_2CH) {
@@ -728,15 +740,15 @@ static int hdmi_core_audio_config(u32 name,
 		SD0_EN = 0x1;
 	}
 
-	WR_REG_32(name, HDMI_CORE_AV__AUD_MODE,
-		(SD3_EN << 7) |	/* SD3_EN */
-		(SD2_EN << 6) |	/* SD2_EN */
-		(SD1_EN << 5) |	/* SD1_EN */
-		(SD0_EN << 4) |	/* SD0_EN */
-		(0 << 3) |	/* DSD_EN */
-		(1 << 2) |	/* AUD_PAR_EN */
-		(0 << 1) |	/* SPDIF_EN */
-		(0));		/* AUD_EN */
+	r = hdmi_read_reg(name, HDMI_CORE_AV__AUD_MODE);
+	r = FLD_MOD(r, SD3_EN, 7, 7); /* SD3_EN */
+	r = FLD_MOD(r, SD2_EN, 6, 6); /* SD2_EN */
+	r = FLD_MOD(r, SD1_EN, 5, 5); /* SD1_EN */
+	r = FLD_MOD(r, SD0_EN, 4, 4); /* SD0_EN */
+	r = FLD_MOD(r, 0, 3, 3); /* DSD_EN */
+	r = FLD_MOD(r, 1, 2, 2); /* AUD_PAR_EN */
+	r = FLD_MOD(r, 0, 1, 1); /* SPDIF_EN */
+	WR_REG_32(name, HDMI_CORE_AV__AUD_MODE, r);
 
 	/* Audio info frame setting refer to CEA-861-d spec p75 */
 	/* 0x0 because on HDMI CT must be = 0 / -1 because 1 is for 2 channel */
@@ -776,8 +788,6 @@ static int hdmi_core_audio_config(u32 name,
 	WR_REG_32(name, HDMI_CORE_AV__MPEG_VERS, 0x0);
 	WR_REG_32(name, HDMI_CORE_AV__MPEG_LEN, 0x0);
 	WR_REG_32(name, HDMI_CORE_AV__MPEG_CHSUM, 0x0);
-
-	return ret;
 }
 
 int hdmi_core_read_avi_infoframe(struct hdmi_core_infoframe_avi *info_avi)
@@ -1507,11 +1517,6 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 
 	v_core_cfg.CoreHdmiDvi = cfg->hdmi_dvi;
 
-	/* hnagalla */
-	audio_cfg.fs = 0x02;
-	audio_cfg.if_fs = 0x00;
-	audio_cfg.n = 6144;
-
 	r = hdmi_read_reg(HDMI_WP, HDMI_WP_VIDEO_CFG);
 	switch(r & 0x03) {
 	case 1:
@@ -1534,20 +1539,6 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 		audio_cfg.cts = cfg->pixel_clock;
 	else
 		audio_cfg.cts = (cfg->pixel_clock * deep_color) / 100;
-
-	/* audio channel */
-	audio_cfg.if_sample_size = 0x0;
-	audio_cfg.layout = 0;
-	audio_cfg.if_channel_number = 2;
-	audio_cfg.if_audio_channel_location = 0x00;
-
-	if (omap_rev() == OMAP4430_REV_ES1_0) {
-		audio_cfg.aud_par_busclk = (((128 * 31) - 1) << 8);
-		audio_cfg.cts_mode = CTS_MODE_HW;
-	} else {
-		audio_cfg.aud_par_busclk = 0;
-		audio_cfg.cts_mode = CTS_MODE_SW;
-	}
 
 	r = hdmi_core_video_config(&v_core_cfg);
 

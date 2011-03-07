@@ -116,8 +116,14 @@ struct hdmi_core_video_config_t {
 };
 
 enum hdmi_core_fs {
-	FS_32000 = 0,
-	FS_44100 = 1
+	FS_32000 = 0x3,
+	FS_44100 = 0x0,
+	FS_48000 = 0x2,
+	FS_88200 = 0x8,
+	FS_96000 = 0xA,
+	FS_176400 = 0xC,
+	FS_192000 = 0xE,
+	FS_NOT_INDICATED = 0x1
 };
 
 enum hdmi_core_layout {
@@ -425,6 +431,40 @@ enum hdmi_core_if_sample_size{
 	IF_24BIT_PER_SAMPLE = 0x3
 };
 
+enum hdmi_i2s_chst_audio_max_word_length{
+	I2S_CHST_WORD_MAX_20 = 0,
+	I2S_CHST_WORD_MAX_24 = 1,
+};
+
+/* The word length depends on how the max word length is set.
+ * Therefore, some values are duplicated. */
+enum hdmi_i2s_chst_audio_word_length{
+	I2S_CHST_WORD_NOT_SPECIFIED = 0x0,
+	I2S_CHST_WORD_16_BITS       = 0x1,
+	I2S_CHST_WORD_17_BITS       = 0x6,
+	I2S_CHST_WORD_18_BITS       = 0x2,
+	I2S_CHST_WORD_19_BITS       = 0x4,
+	I2S_CHST_WORD_20_BITS_20MAX = 0x5,
+	I2S_CHST_WORD_20_BITS_24MAX = 0x1,
+	I2S_CHST_WORD_21_BITS       = 0x6,
+	I2S_CHST_WORD_22_BITS       = 0x2,
+	I2S_CHST_WORD_23_BITS       = 0x4,
+	I2S_CHST_WORD_24_BITS       = 0x5,
+};
+
+enum hdmi_i2s_in_length{
+	I2S_IN_LENGTH_NA = 0x0,
+	I2S_IN_LENGTH_16 = 0x2,
+	I2S_IN_LENGTH_17 = 0xC,
+	I2S_IN_LENGTH_18 = 0x4,
+	I2S_IN_LENGTH_19 = 0x8,
+	I2S_IN_LENGTH_20 = 0xA,
+	I2S_IN_LENGTH_21 = 0xD,
+	I2S_IN_LENGTH_22 = 0x5,
+	I2S_IN_LENGTH_23 = 0x9,
+	I2S_IN_LENGTH_24 = 0xb,
+};
+
 enum hdmi_core_av_csc{
 	RGB	= 0x0,
 	RGB_TO_YUV = 0x1,
@@ -442,16 +482,20 @@ enum hdmi_audio_notify_state {
 
 
 struct hdmi_core_audio_config {
-	enum hdmi_core_fs		fs; /* 0=32KHz - 1=44.1KHz */
+	enum hdmi_core_fs		fs;
 	u32				n;
 	u32				cts;
 	u32				aud_par_busclk;
-	enum hdmi_core_layout		layout; /* 0: 2Ch - 1: 8Ch */
-	enum hdmi_core_cts_mode		cts_mode; /* 0: HW  - 1: SW*/
+	enum hdmi_core_layout		layout;
+	enum hdmi_core_cts_mode		cts_mode;
 	enum hdmi_core_if_fs		if_fs;
 	u32				if_channel_number;
 	enum hdmi_core_if_sample_size	if_sample_size;
 	enum hdmi_cea_code		if_audio_channel_location;
+	enum hdmi_i2s_chst_audio_max_word_length i2schst_max_word_length;
+	enum hdmi_i2s_chst_audio_word_length i2schst_word_length;
+	enum hdmi_i2s_in_length i2s_in_bit_length;
+	enum hdmi_audio_justify i2s_justify;
  };
 
 struct hdmi_notifier {
