@@ -186,7 +186,7 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 	/* When DMA is used for Rx, disable the Rx Interrupt.
 	 * (else DATAAVAILLABLE event would get triggered on first
 	 * received data word)
-	 * (By default, Rx interrupt is active for polling feature)
+	 * (Rx interrupt might be active for polling feature)
 	 */
 	hsi_driver_disable_read_interrupt(hsi_channel);
 
@@ -286,10 +286,9 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 	if (lch < 0)
 		return;
 
-	/* DMA transfer is over, re-enable default mode
-	 * (Interrupts for polling feature)
-	 */
-	hsi_driver_enable_read_interrupt(hsi_ch, NULL);
+	/* Re-enable interrupts for polling if needed */
+	if (hsi_ch->flags & HSI_CH_RX_POLL)
+		hsi_driver_enable_read_interrupt(hsi_ch, NULL);
 
 	reg = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	if (!(reg & HSI_CCR_ENABLE)) {
@@ -392,10 +391,10 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 					 DMA_FROM_DEVICE);
 			ch = hsi_ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_read(ch);
-			/* DMA transfer is over, re-enable default mode
-			 * (interrupts for polling feature)
-			 */
-			hsi_driver_enable_read_interrupt(ch, NULL);
+
+			/* Re-enable interrupts for polling if needed */
+			if (ch->flags & HSI_CH_RX_POLL)
+				hsi_driver_enable_read_interrupt(ch, NULL);
 
 			dev_dbg(hsi_ctrl->dev, "Calling read callback "
 						"(size %d).\n", size/4);

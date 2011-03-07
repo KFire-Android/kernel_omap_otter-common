@@ -296,14 +296,16 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 	dev_dbg(hsi_ctrl->dev,
 		"Data Available interrupt for channel %d.\n", n_ch);
 
+	/* Disable interrupts for polling if not needed */
+	if (!(ch->flags & HSI_CH_RX_POLL))
+		hsi_driver_disable_read_interrupt(ch);
+
 	/*
 	 * Check race condition: RX transmission initiated but DMA transmission
 	 * already started - acknowledge then ignore interrupt occurence
 	 */
-	if (ch->read_data.lch != -1) {
-		hsi_driver_disable_read_interrupt(ch);
+	if (ch->read_data.lch != -1)
 		goto done;
-	}
 
 	if (ch->flags & HSI_CH_RX_POLL)
 		rx_poll = 1;
@@ -316,7 +318,6 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		}
 	}
 
-	hsi_driver_disable_read_interrupt(ch);
 	hsi_reset_ch_read(ch);
 
 	/* Check if FIFO is correctly emptied */
