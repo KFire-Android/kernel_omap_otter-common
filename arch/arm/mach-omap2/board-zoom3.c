@@ -30,6 +30,8 @@
 #include "sdram-hynix-h8mbx00u0mer-0em.h"
 #include "smartreflex-class3.h"
 #include "board-zoom2-wifi.h"
+#include <linux/skbuff.h>
+#include <linux/ti_wilink_st.h>
 
 #define McBSP3_BT_GPIO 164
 
@@ -186,19 +188,41 @@ static const struct usbhs_omap_platform_data usbhs_pdata __initconst = {
 	.reset_gpio_port[1]	= 64,
 	.reset_gpio_port[2]	= -EINVAL,
 };
-/* wl127x BT, FM, GPS connectivity chip */
+int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	/* TODO: wait for HCI-LL sleep */
+	return 0;
+}
+int plat_kim_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+
+/* wl128x BT, FM, GPS connectivity chip */
 static int gpios[] = {109, 161, -1};
 
-static struct platform_device wl127x_device = {
-
-       .name           = "kim",
-       .id             = -1,
-       .dev.platform_data = &gpios,
-
+struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = 109,
+	.dev_name = "/dev/ttyO1",
+	.flow_cntrl = 1,
+	.baud_rate = 3000000,
+	.suspend = plat_kim_suspend,
+	.resume = plat_kim_resume,
 };
+static struct platform_device wl127x_device = {
+	.name           = "kim",
+	.id             = -1,
+	.dev.platform_data = &wilink_pdata,
+};
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+};
+
 static struct platform_device *zoom_devices[] __initdata = {
 
 	&wl127x_device,
+	&btwilink_device,
 };
 /* Fix to prevent VIO leakage on wl127x */
 static int wl127x_vio_leakage_fix(void)

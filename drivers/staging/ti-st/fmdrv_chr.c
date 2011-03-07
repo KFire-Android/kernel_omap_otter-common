@@ -261,7 +261,7 @@ static struct sk_buff *convert2_channel_4(struct sk_buff *ch8_skb)
 		skb_trim(ch4_skb, 7);
 
 		return ch4_skb;
-	} else if ((fm_opcode == CHAN8_FM_INTERRUPT) && !cpu_is_omap34xx()) {
+	} else if (fm_opcode == CHAN8_FM_INTERRUPT) {
 		FM_CHR_DRV_DBG("Converting FM interrupt event\n");
 		ch4_skb = alloc_skb(7, GFP_ATOMIC);
 		if (ch4_skb == NULL) {
