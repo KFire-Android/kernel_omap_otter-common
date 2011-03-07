@@ -558,10 +558,11 @@ void hdmi_notify_hpd(int state);
 void hdmi_notify_pwrchange(int state);
 int hdmi_rxdet(void);
 int hdmi_w1_get_video_state(void);
+int hdmi_configure_audio_sample_freq(u32 sample_freq);
+int hdmi_configure_audio_sample_size(u32 sample_size);
 #ifdef CONFIG_OMAP_HDMI_AUDIO_WA
 int hdmi_lib_start_acr_wa(void);
 int hdmi_lib_stop_acr_wa(void);
 #endif
-
 #endif
 
