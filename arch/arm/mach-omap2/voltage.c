@@ -39,6 +39,7 @@
 #include <plat/common.h>
 #include <plat/voltage.h>
 #include <plat/smartreflex.h>
+#include <plat/control.h>
 
 #include "prm-regbits-34xx.h"
 #include "prm44xx.h"
@@ -2469,12 +2470,36 @@ int omap_voltage_unregister_notifier(struct voltagedomain *voltdm,
 static int __init omap_voltage_init(void)
 {
 	int i;
+	u32 is_trimmed = 0;
 
 	if (!(cpu_is_omap34xx() || cpu_is_omap44xx())) {
 		pr_warning("%s: voltage driver support not added\n", __func__);
 		return 0;
 	}
 
+	/*
+	 * Some ES2.2 efuse  values for BGAP and SLDO trim
+	 * are not programmed. For these units
+	 * we can set overide mode for SLDO trim,
+	 * and program the max multiplication factor, to ensure
+	 * high enough voltage on SLDO output.
+	 */
+	if (cpu_is_omap44xx()
+		&& (omap_rev() == OMAP4430_REV_ES2_2)) {
+		is_trimmed = omap_ctrl_readl(
+			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL);
+		if (!is_trimmed) {
+			/* Trimm value is 0 for this unit.
+			 * we set force overide, insted of efuse.
+			 */
+			omap_ctrl_writel(0x0401040f,
+			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL);
+			omap_ctrl_writel(0x0401040f,
+			OMAP4_CTRL_MODULE_CORE_LDOSRAM_CORE_VOLTAGE_CTRL);
+			omap_ctrl_writel(0x0401040f,
+			OMAP4_CTRL_MODULE_CORE_LDOSRAM_IVA_VOLTAGE_CTRL);
+		}
+	}
 #ifdef CONFIG_PM_DEBUG
 	voltage_dir = debugfs_create_dir("voltage", pm_dbg_main_dir);
 #endif
