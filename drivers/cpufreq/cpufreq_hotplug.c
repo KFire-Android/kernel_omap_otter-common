@@ -536,7 +536,6 @@ static void do_dbs_timer(struct work_struct *work)
 
 	/* We want all related CPUs to do sampling nearly on same jiffy */
 	int delay = usecs_to_jiffies(dbs_tuners_ins.sampling_rate);
-	delay -= jiffies % delay;
 
 	mutex_lock(&dbs_info->timer_mutex);
 	dbs_check_cpu(dbs_info);
