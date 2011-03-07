@@ -36,11 +36,13 @@
 #include "omap-pcm.h"
 #include "omap-hdmi.h"
 
-#define OMAP_HDMI_RATES	(SNDRV_PCM_RATE_48000)
+#define OMAP_HDMI_RATES        (SNDRV_PCM_RATE_32000 | \
+			SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000)
 
-/* Currently, we support only 16b samples at HDMI */
-#define OMAP_HDMI_FORMATS (SNDRV_PCM_FMTBIT_S16_LE)
 
+/* Support for 16 and 24 bits */
+#define OMAP_HDMI_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | \
+			SNDRV_PCM_FMTBIT_S24_LE)
 
 
 struct omap_hdmi_data {
@@ -172,13 +174,23 @@ static int omap_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
-	case SNDRV_PCM_FORMAT_S32_LE:
-		omap_hdmi_dai_dma_params.data_type = OMAP_DMA_DATA_TYPE_S32;
+		err = hdmi_configure_audio_sample_size(HDMI_SAMPLE_16BITS);
 		break;
-
+	case SNDRV_PCM_FORMAT_S24_LE:
+		err = hdmi_configure_audio_sample_size(HDMI_SAMPLE_24BITS);
+		break;
 	default:
-		err = -EINVAL;
+		return -EINVAL;
 	}
+
+	if (err)
+		return err;
+
+	err = hdmi_configure_audio_sample_freq(params_rate(params));
+	if (err)
+		return err;
+
+	omap_hdmi_dai_dma_params.data_type = OMAP_DMA_DATA_TYPE_S32;
 	omap_hdmi_dai_dma_params.packet_size = 0x20;
 
 	snd_soc_dai_set_dma_data(dai, substream,
