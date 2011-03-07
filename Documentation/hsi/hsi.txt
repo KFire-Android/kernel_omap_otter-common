@@ -117,15 +117,15 @@ D) int hsi_open(struct hsi_device *dev);
 
   Parameter: The HSI channel
 
-E) int hsi_write(struct hsi_device *dev, u32 *data, unsigned int count);
+E) int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size);
 
   Description: Send data through an HSI channel. The transfer is only completed
   when the write_complete callback is called
 
   Parameters:
 	- dev: HSI channel
-	- data: pointer to the data to send
-	- count: number of 32-bit words to be sent
+	- addr: pointer to the data to send
+	- size: number of 32-bit words to be sent
 
 F) void hsi_write_cancel(struct hsi_device *dev);
 
@@ -133,15 +133,15 @@ F) void hsi_write_cancel(struct hsi_device *dev);
 
   Parameters: HSI channel
 
-G) int hsi_read(struct hsi_device *dev, u32 *data, unsigned int count);
+G) int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size);
 
   Description: Receive data through an HSI channel. The transfer is only
   completed when the read_complete callback is called
 
   Parameters:
 	- dev: HSI channel
-	- data: pointer where to store the data
-	- count: number of 32-bit words to be read
+	- addr: pointer where to store the data
+	- size: number of 32-bit words to be read
 
 H) void hsi_read_cancel(struct hsi_device *dev);
 
@@ -149,7 +149,19 @@ H) void hsi_read_cancel(struct hsi_device *dev);
 
   Parameters: HSI channel
 
-I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
+I) void hsi_poll(struct hsi_device *dev);
+
+  Description: Enables data interrupt on frame reception
+
+  Parameters: HSI channel
+
+J) void hsi_unpoll(struct hsi_device *dev);
+
+  Description: Disables data interrupt on frame reception
+
+  Parameters: HSI channel
+
+K) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 
   Description: Apply some control command to the port associated to the given
   HSI channel
@@ -160,19 +172,19 @@ I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 	- arg: parameter for the control command
 
   Commands:
-	- HSI_IOCTL_ACWAKE_UP:
-		Description: Set HSI wakeup line (acwake) for the channel
-		Parameters: None
 	- HSI_IOCTL_ACWAKE_DOWN:
 		Description: Unset HSI wakeup line (acwake) for the channel
+		Parameters: None
+	- HSI_IOCTL_ACWAKE_UP:
+		Description: Set HSI wakeup line (acwake) for the channel
 		Parameters: None
 	- HSI_IOCTL_SEND_BREAK:
 		Description: Send a HW BREAK frame in FRAME mode
 		Parameters: None
 	- HSI_IOCTL_GET_ACWAKE:
-		Description: Get HST WAKE line status
+		Description: Get HST ACWAKE line status
 		Parameters: Pointer to a u32 variable to return result
-		(Result: 0 means wakeline DOWN, other result means wakeline UP)
+		(Result: 0 means ACWAKE DOWN, other result means ACWAKE UP)
 	- HSI_IOCTL_FLUSH_RX:
 		Description: Force the HSR to idle state
 		Parameters: None
@@ -182,12 +194,12 @@ I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 	- HSI_IOCTL_GET_CAWAKE:
 		Description: Get CAWAKE (HSR) line status
 		Parameters: Pointer to a u32 variable to return result
-		(Result: 0 means wakeline DOWN, other result means wakeline UP)
+		(Result: 0 means CAWAKE DOWN, other result means CAWAKE UP)
 	- HSI_IOCTL_SET_RX:
 		Description: Set HSR configuration
 		Parameters: Pointer to a hsr_ctx structure describing
 		configurable HSR parameters (mode, frame size, channels,
-		data flow type, bit-rate divisor)
+		data flow type, bit-rate divisor, counters)
 		Notes:
 		HSI: A special value (0x1000) can be passed as bit-rate divisor
 		to request the HSR so switch to auto-divisor mode (in this mode,
@@ -203,7 +215,7 @@ I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 		Description: Get HSR configuration
 		Parameters: Pointer to a hsr_ctx structure describing
 		configurable HSR parameters (mode, frame size, channels,
-		data flow type, bit-rate divisor)
+		data flow type, bit-rate divisor, counters)
 	- HSI_IOCTL_SET_TX:
 		Description: Set HST configuration
 		Parameters: Pointer to a hst_ctx structure describing
@@ -223,14 +235,18 @@ I) int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg);
 	- HSI_IOCTL_SW_RESET:
 		Description: Force a Reset of HSI block and HSI DMA engine
 		Parameters: None
+	- HSI_IOCTL_GET_FIFO_OCCUPANCY
+		Description: Get amount of words in RX FIFO
+		Parameters: Pointer to a size_t variable to return result
 
-J) void hsi_close(struct hsi_device *dev);
+L) void hsi_close(struct hsi_device *dev);
 
   Description: Close an HSI channel
 
   Parameters: The HSI channel to close
 
-K) Callback configuration functions:
+M) Callback configuration functions:
+
 void hsi_set_read_cb(struct hsi_device *dev,
 		void (*read_cb)(struct hsi_device *dev, unsigned int size));
 void hsi_set_write_cb(struct hsi_device *dev,
@@ -254,7 +270,7 @@ void hsi_set_port_event_cb(struct hsi_device *dev,
 		event has happened (events can be: Break frame detected, error,
 		cawake-up, cawake-down or HSR-data-available).
 
-L) struct hsi_device_driver
+N) struct hsi_device_driver
 
 Description: Protocol drivers pass this struct to the hsi_register_driver
 function in order to register with the OMAP HSI driver. Among other things it
@@ -293,11 +309,34 @@ static struct hsi_device_driver hsi_protocol_driver = {
 	},
 };
 
+O) HSI RX configuration
+
+Structure given in argument to HSI_IOCTL_SET_RX and HSI_IOCTL_GET_RX is :
+struct hsi_tx_config {
+	__u32 mode;       /* Stream:1, Frame:2 */
+	__u32 flow;       /* Synchronized:0, Pipelined:1. No Real-time support */
+	__u32 frame_size; /* HSI: 31,  SSI: <= 31 */
+	__u32 channels;   /* 1, 2, 4, 8, 16(HSI only) */
+	__u32 divisor;    /* HSI: <= 0xFF,  SSI: <= 0x7F */
+	__u32 arb_mode;   /* Round Robin: 0, Priority: 1 */
+};
+
+P) HSI TX configuration
+
+Structure given in argument to HSI_IOCTL_SET_TX and HSI_IOCTL_GET_TX is :
+struct hsi_rx_config {
+	__u32 mode;       /* Stream:1, Frame:2 */
+	__u32 flow;       /* Synchronized:0, Pipelined:1. No Real-time support */
+	__u32 frame_size; /* HSI: 31,  SSI: <= 31 */
+	__u32 channels;   /* 1, 2, 4, 8, 16(HSI only) */
+	__u32 divisor;    /* Auto mode:0x1000, HSI: <= 0xFF,  SSI: <= 0x7F, Deactivate Auto mode (SSI only): 0x1001 */
+	__u32 counters;   /* HSI: FB[31..24], TB[23..20], FT[19..0] / SSI: FT[8..0] */
+};
+
 
 III) FUTURE WORK
 ----------------
- - Power management update and validation on OMAP 3430
- - Clocks and power management implementation and validation on OMAP 4430
+ - Move to generic framework
  - hsi-char documentation
 
 
@@ -306,6 +345,7 @@ Acknowledgements: The OMAP HSI driver is based on OMAP SSI driver, written by
 Carlos Chinea <carlos.chinea@nokia.com>.
 
 Contact: Sebastien Jan <s-jan@ti.com>
+Contact: Djamil Elaidi <d-elaidi@ti.com>
 
 Copyright (C) 2008 Nokia Corporation.
-Copyright (C) 2010 Texas Instruments, Inc.
+Copyright (C) 2011 Texas Instruments, Inc.

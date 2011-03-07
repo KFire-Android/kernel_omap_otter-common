@@ -315,7 +315,7 @@ EXPORT_SYMBOL(hsi_open);
  * Transfer is only completed when the write_done callback is called.
  *
  */
-int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
+int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size)
 {
 	struct hsi_channel *ch;
 	int err;
@@ -397,7 +397,7 @@ EXPORT_SYMBOL(hsi_write);
  * Data is only available in the buffer when the read_done callback is called.
  *
  */
-int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
+int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
 {
 	struct hsi_channel *ch;
 	int err;
