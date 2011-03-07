@@ -1611,10 +1611,12 @@ static int hdmi_start_display(struct omap_dss_device *dssdev)
 	/* enable clock(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 	dss_mainclk_state_enable();
-	if (!hdmi_opt_clk_state) {
-		r = hdmi_opt_clock_enable();
-		if (!r)
-			hdmi_opt_clk_state = true;
+	if (cpu_is_omap44xx()) {
+		if (!hdmi_opt_clk_state) {
+			r = hdmi_opt_clock_enable();
+			if (!r)
+				hdmi_opt_clk_state = true;
+		}
 	}
 err:
 	return r;
@@ -1684,16 +1686,18 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 		power_need, (state_need == HDMI_ACTIVE ? 'A' :
 			     state_need == HDMI_SUSPENDED ? 'S' : 'D'), r);
 
-	if (power_need == HDMI_POWER_FULL) {
-		if (!hdmi_opt_clk_state) {
-			r = hdmi_opt_clock_enable();
-			if (!r)
-				hdmi_opt_clk_state = true;
-		}
-	} else {
-		if (hdmi_opt_clk_state) {
-			hdmi_opt_clock_disable();
-			hdmi_opt_clk_state = false;
+	if (cpu_is_omap44xx()) {
+		if (power_need == HDMI_POWER_FULL) {
+			if (!hdmi_opt_clk_state) {
+				r = hdmi_opt_clock_enable();
+				if (!r)
+					hdmi_opt_clk_state = true;
+			}
+		} else {
+			if (hdmi_opt_clk_state) {
+				hdmi_opt_clock_disable();
+				hdmi_opt_clk_state = false;
+			}
 		}
 	}
 
