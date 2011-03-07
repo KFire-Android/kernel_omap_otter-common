@@ -249,7 +249,7 @@
 #define ONLY_APPM3_IDLE		0x2
 #define ONLY_SYSM3_IDLE		0x1
 #define ALL_CORES_IDLE		0x3
-#define WAIT_FOR_IDLE_TIMEOUT	40u
+#define WAIT_FOR_IDLE_TIMEOUT	500u
 
 /* Macro to make a correct module magic number with refCount */
 #define IPU_PM_MAKE_MAGICSTAMP(x) ((IPU_PM_MODULEID << 12u) | (x))
@@ -401,6 +401,22 @@ struct rcb_block {
 	};
 };
 
+struct ms_agent_block {
+	unsigned addr;
+	unsigned clrmsk;
+	unsigned setmsk;
+	unsigned cpyaddr;
+	unsigned cpyclr;
+	unsigned cpyset;
+	unsigned oldval;
+	unsigned newval;
+};
+
+struct event_int {
+	unsigned mbox_event;
+	unsigned inter_m3_event;
+};
+
 struct sms {
 	unsigned rat;
 	unsigned pm_version;
@@ -409,6 +425,8 @@ struct sms {
 	struct ipu_pm_override pm_flags;
 	unsigned hib_time;
 	struct rcb_block rcb[RCB_MAX];
+	struct ms_agent_block ms_agent[3];
+	struct event_int event_int;
 };
 
 struct pm_event {

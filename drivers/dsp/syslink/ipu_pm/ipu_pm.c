@@ -89,8 +89,14 @@
 /* Flag provided by BIOS */
 #define IDLE_FLAG_PHY_ADDR 0x9E0502D8
 
+/* A9-M3 mbox status */
+#define A9_M3_MBOX 0x4A0F4000
+#define MBOX_MESSAGE_STATUS 0x000000CC
+
 #define NUM_IDLE_CORES	((__raw_readl(appm3Idle) << 1) + \
 				(__raw_readl(sysm3Idle)))
+
+#define PENDING_MBOX_MSG	__raw_readl(a9_m3_mbox + MBOX_MESSAGE_STATUS)
 
 /** ============================================================================
  *  Forward declarations of internal functions
@@ -317,10 +323,12 @@ static struct omap_mbox *ducati_mbox;
 static struct iommu *ducati_iommu;
 static bool first_time = 1;
 static bool _is_iommu_up;
+static bool _is_mbox_up;
 
 /* BIOS flags states for each core in IPU */
 static void __iomem *sysm3Idle;
 static void __iomem *appm3Idle;
+static void __iomem *a9_m3_mbox;
 #ifdef SR_WA
 static void __iomem *issHandle;
 static void __iomem *fdifHandle;
@@ -2511,20 +2519,25 @@ int ipu_pm_save_ctx(int proc_id)
 		if (retval)
 			goto error;
 		handle->rcb_table->state_flag |= SYS_PROC_DOWN;
-		if (ducati_mbox)
+
+		/* If there is a message in the mbox restore
+		 * immediately after save.
+		 */
+		if (ducati_mbox && PENDING_MBOX_MSG)
+			goto restore;
+
+		if (ducati_mbox) {
 			omap_mbox_save_ctx(ducati_mbox);
-		else
+			_is_mbox_up = 0;
+		} else
 			pr_err("Not able to save mbox");
 		if (ducati_iommu) {
 			iommu_save_ctx(ducati_iommu);
 			_is_iommu_up = 0;
-		}
-		else
+		} else
 			pr_err("Not able to save iommu");
 	} else
 		goto error;
-
-
 exit:
 	mutex_unlock(ipu_pm_state.gate_handle);
 	return 0;
@@ -2535,6 +2548,11 @@ error:
 	mutex_unlock(ipu_pm_state.gate_handle);
 	pr_debug("Aborting hibernation process\n");
 	return -EINVAL;
+restore:
+	pr_debug("Starting restore_ctx since messages pending in mbox\n");
+	mutex_unlock(ipu_pm_state.gate_handle);
+	ipu_pm_restore_ctx(proc_id);
+	return 0;
 }
 EXPORT_SYMBOL(ipu_pm_save_ctx);
 
@@ -2602,15 +2620,15 @@ int ipu_pm_restore_ctx(int proc_id)
 		if (!(ipu_pm_get_state(proc_id) & SYS_PROC_DOWN))
 			goto exit;
 
-		if (ducati_mbox)
+		if (ducati_mbox && !_is_mbox_up) {
 			omap_mbox_restore_ctx(ducati_mbox);
-		else
+			_is_mbox_up = 1;
+		} else
 			pr_err("Not able to restore mbox");
-		if (ducati_iommu) {
+		if (ducati_iommu && !_is_iommu_up) {
 			iommu_restore_ctx(ducati_iommu);
 			_is_iommu_up = 1;
-		}
-		else
+		} else
 			pr_err("Not able to restore iommu");
 
 		pr_info("Wakeup SYSM3\n");
@@ -2737,9 +2755,17 @@ int ipu_pm_setup(struct ipu_pm_config *cfg)
 	memcpy(&ipu_pm_state.cfg, cfg, sizeof(struct ipu_pm_config));
 	ipu_pm_state.is_setup = true;
 
+	/* MBOX flag to check if there are pending messages */
+	a9_m3_mbox = ioremap(A9_M3_MBOX, PAGE_SIZE);
+	if (!a9_m3_mbox) {
+		retval = -ENOMEM;
+		goto exit;
+	}
+
 	/* BIOS flags to know the state of IPU cores */
 	sysm3Idle = ioremap(IDLE_FLAG_PHY_ADDR, (sizeof(void) * 2));
 	if (!sysm3Idle) {
+		iounmap(a9_m3_mbox);
 		retval = -ENOMEM;
 		goto exit;
 	}
@@ -2747,6 +2773,7 @@ int ipu_pm_setup(struct ipu_pm_config *cfg)
 	appm3Idle = (void *)sysm3Idle + sizeof(void *);
 	if (!appm3Idle) {
 		retval = -ENOMEM;
+		iounmap(a9_m3_mbox);
 		iounmap(sysm3Idle);
 		goto exit;
 	}
@@ -3027,6 +3054,7 @@ int ipu_pm_destroy(void)
 
 	first_time = 1;
 	iounmap(sysm3Idle);
+	iounmap(a9_m3_mbox);
 #ifdef SR_WA
 	iounmap(issHandle);
 	iounmap(fdifHandle);
