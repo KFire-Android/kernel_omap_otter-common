@@ -903,8 +903,8 @@ static struct platform_device *sdp4430_snd_device;
 static int __init sdp4430_soc_init(void)
 {
 	struct i2c_adapter *adapter;
-	u8 gpoctl;
-	int ret;
+	u8 gpoctl = 0;
+	int ret = 0;
 
 	if (!machine_is_omap_4430sdp() && !machine_is_omap4_panda()) {
 		pr_debug("Not SDP4430 or PandaBoard!\n");
