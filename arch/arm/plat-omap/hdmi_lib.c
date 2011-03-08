@@ -1345,8 +1345,19 @@ int hdmi_lib_acr_wa_send_event(u32 payload)
 			tout = schedule_timeout(msecs_to_jiffies(5000));
 			if (!tout)
 				return -EIO;
+
+			/*
+			 * Enable this code when the following patch
+			 * from Ducati MM is released:
+			 * hdmiwa: Reseting properly the hdmi status variable
+			 * It ensures that hdmi_status variable is reset for
+			 * each time a notification is received.
+			 */
+
+#if 0
 			if (payload != hdmi.ack_payload)
 				return -EBADE;
+#endif
 			return 0;
 		}
 		return -ENODEV;
