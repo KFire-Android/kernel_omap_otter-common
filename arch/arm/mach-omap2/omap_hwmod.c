@@ -344,7 +344,8 @@ static int _enable_wakeup(struct omap_hwmod *oh)
 		return -EINVAL;
 
 	if (!(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP) ||
-		(oh->class->sysc->idlemodes & SIDLE_SMART_WKUP))
+		(oh->class->sysc->idlemodes & SIDLE_SMART_WKUP) ||
+		(oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP))
 		return -EINVAL;
 
 	if (!oh->class->sysc->sysc_fields) {
@@ -357,6 +358,8 @@ static int _enable_wakeup(struct omap_hwmod *oh)
 		_set_enawakeup(oh, 1, &v);
 	if (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP)
 		_set_slave_idlemode(oh, HWMOD_IDLEMODE_SMART_WKUP, &v);
+	if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
+		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART_WKUP, &v);
 
 	_write_sysconfig(v, oh);
 
@@ -382,7 +385,8 @@ static int _disable_wakeup(struct omap_hwmod *oh)
 		return -EINVAL;
 
 	if (!(oh->class->sysc->sysc_flags & SYSC_HAS_ENAWAKEUP) ||
-		(oh->class->sysc->idlemodes & SIDLE_SMART_WKUP))
+		(oh->class->sysc->idlemodes & SIDLE_SMART_WKUP) ||
+		(oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP))
 		return -EINVAL;
 
 	if (!oh->class->sysc->sysc_fields) {
@@ -395,6 +399,8 @@ static int _disable_wakeup(struct omap_hwmod *oh)
 		_set_enawakeup(oh, 0, &v);
 	if (oh->class->sysc->idlemodes & SIDLE_SMART_WKUP)
 		_set_slave_idlemode(oh, HWMOD_IDLEMODE_SMART, &v);
+	if (oh->class->sysc->idlemodes & MSTANDBY_SMART_WKUP)
+		_set_master_standbymode(oh, HWMOD_IDLEMODE_SMART_WKUP, &v);
 
 	_write_sysconfig(v, oh);
 
@@ -740,8 +746,16 @@ static void _sysc_enable(struct omap_hwmod *oh)
 	}
 
 	if (sf & SYSC_HAS_MIDLEMODE) {
-		m_idlemode = (oh->flags & HWMOD_SWSUP_MSTANDBY) ?
-			HWMOD_IDLEMODE_NO : HWMOD_IDLEMODE_SMART;
+		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
+			m_idlemode = HWMOD_IDLEMODE_NO;
+		} else {
+			if (sf & SYSC_HAS_ENAWAKEUP)
+				_set_enawakeup(oh, 1, &v);
+			if (idlemodes & MSTANDBY_SMART_WKUP)
+				m_idlemode = HWMOD_IDLEMODE_SMART_WKUP;
+			else
+				m_idlemode = HWMOD_IDLEMODE_SMART;
+		}
 		_set_master_standbymode(oh, m_idlemode, &v);
 	}
 
@@ -767,8 +781,6 @@ static void _sysc_enable(struct omap_hwmod *oh)
 		_set_module_autoidle(oh, a_idlemode, &v);
 		_write_sysconfig(v, oh);
 	}
-
-
 }
 
 /**
@@ -808,8 +820,16 @@ static void _sysc_idle(struct omap_hwmod *oh)
 	}
 
 	if (sf & SYSC_HAS_MIDLEMODE) {
-		idlemode = (oh->flags & HWMOD_SWSUP_MSTANDBY) ?
-			HWMOD_IDLEMODE_FORCE : HWMOD_IDLEMODE_SMART;
+		if (oh->flags & HWMOD_SWSUP_MSTANDBY) {
+			idlemode = HWMOD_IDLEMODE_FORCE;
+		} else {
+			if (sf & SYSC_HAS_ENAWAKEUP)
+				_set_enawakeup(oh, 1, &v);
+			if (idlemodes & MSTANDBY_SMART_WKUP)
+				idlemode = HWMOD_IDLEMODE_SMART_WKUP;
+			else
+				idlemode = HWMOD_IDLEMODE_SMART;
+		}
 		_set_master_standbymode(oh, idlemode, &v);
 	}
 
