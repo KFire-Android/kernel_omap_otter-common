@@ -2503,7 +2503,7 @@ void dsp_wdt_enable(bool enable)
 
 	dev_get_wmd_context(dev_get_first(), &dev_ctxt);
 	dev_get_io_mgr(dev_get_first(), &io_mgr);
-	if (!dev_ctxt || !io_mgr)
+	if (!dev_ctxt || !io_mgr || (io_mgr->shared_mem == (void *)-1))
 		return;
 
 	if (enable) {
