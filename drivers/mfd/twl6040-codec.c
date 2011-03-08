@@ -37,7 +37,7 @@ static struct platform_device *twl6040_codec_dev;
 int twl6040_reg_read(struct twl6040_codec *twl6040, unsigned int reg)
 {
 	int ret;
-	u8 val;
+	u8 val = 0;
 
 	mutex_lock(&twl6040->io_mutex);
 	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, reg);
