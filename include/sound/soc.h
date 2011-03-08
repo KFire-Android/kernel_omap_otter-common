@@ -762,6 +762,8 @@ struct snd_soc_platform_driver {
 	/* platform IO - used for platform DAPM */
 	unsigned int (*read)(struct snd_soc_platform *, unsigned int);
 	int (*write)(struct snd_soc_platform *, unsigned int, unsigned int);
+
+	int (*bespoke_trigger)(struct snd_pcm_substream *, int);
 };
 
 struct snd_soc_platform {
