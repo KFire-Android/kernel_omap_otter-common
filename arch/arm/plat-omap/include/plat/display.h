@@ -721,6 +721,11 @@ struct omap_dss_device {
 	/* support for scheduling subsequent update */
 	struct omap_dss_sched_update sched_update;
 
+	/* HDMI specific */
+	void (*enable_device_detect)(struct omap_dss_device *dssdev, u8 enable);
+	bool (*get_device_detect)(struct omap_dss_device *dssdev);
+	int (*get_device_connected)(struct omap_dss_device *dssdev);
+
 	/* platform specific  */
 	int (*platform_enable)(struct omap_dss_device *dssdev);
 	void (*platform_disable)(struct omap_dss_device *dssdev);
@@ -780,6 +785,10 @@ struct omap_dss_driver {
 	int (*set_wss)(struct omap_dss_device *dssdev, u32 wss);
 	u32 (*get_wss)(struct omap_dss_device *dssdev);
 
+	void (*enable_device_detect)(struct omap_dss_device *dssdev, u8 enable);
+	bool (*get_device_detect)(struct omap_dss_device *dssdev);
+	int (*get_device_connected)(struct omap_dss_device *dssdev);
+
 	/*
 	 * used for sysfs control for panels that are not fully enabled
 	 * when powered on
@@ -787,7 +796,7 @@ struct omap_dss_driver {
 	bool (*smart_is_enabled)(struct omap_dss_device *dssdev);
 	int (*smart_enable)(struct omap_dss_device *display);
 
-/*HDMI specific */
+	/*HDMI specific */
 	void (*get_edid)(struct omap_dss_device *dssdev);
 	void (*set_custom_edid_timing_code)(struct omap_dss_device *dssdev,
 			int mode, int code);
