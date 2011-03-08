@@ -3353,7 +3353,7 @@ static int __init omap_vout_create_video_devices(struct platform_device *pdev)
 		vout->workqueue = create_singlethread_workqueue("OMAPVOUT");
 		if (vout->workqueue == NULL) {
 			ret = -ENOMEM;
-			goto error_q;
+			goto error;
 		}
 		vout->work = kzalloc(sizeof(struct omap_vout_work), GFP_KERNEL);
 		if (vout->work == NULL) {
