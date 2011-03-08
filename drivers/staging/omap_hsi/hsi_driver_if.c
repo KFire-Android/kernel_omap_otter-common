@@ -320,7 +320,12 @@ int hsi_write(struct hsi_device *dev, u32 * addr, unsigned int size)
 	struct hsi_channel *ch;
 	int err;
 
-	if (unlikely(!dev || !dev->ch || !addr || (size <= 0))) {
+	if (unlikely(!dev)) {
+		pr_err("Null dev pointer in hsi_write\n");
+		return -EINVAL;
+	}
+
+	if (unlikely(!dev->ch || !addr || (size <= 0))) {
 		dev_err(dev->device.parent,
 			"Wrong parameters hsi_device %p data %p count %d",
 			dev, addr, size);
@@ -396,7 +401,12 @@ int hsi_read(struct hsi_device *dev, u32 * addr, unsigned int size)
 	struct hsi_channel *ch;
 	int err;
 
-	if (unlikely(!dev || !dev->ch || !addr || (size <= 0))) {
+	if (unlikely(!dev)) {
+		pr_err("Null dev pointer in hsi_read\n");
+		return -EINVAL;
+	}
+
+	if (unlikely(!dev->ch || !addr || (size <= 0))) {
 		dev_err(dev->device.parent, "Wrong parameters "
 			"hsi_device %p data %p count %d", dev, addr, size);
 		return -EINVAL;
