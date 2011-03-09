@@ -67,7 +67,10 @@
 #define OMAP4_USBHOST_CLKSEL_UTMI_P2_EXT_P1_EXT		0x3
 
 /* L2 controller AUXCTRL value */
+#define OMAP4_L2X0_AUXCTL_VALUE_ES1			0x0e050000
 #define OMAP4_L2X0_AUXCTL_VALUE				0x1e470000
+
+#define A9_ES1_REV					0x410FC091
 
 #ifndef __ASSEMBLER__
 /*

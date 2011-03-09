@@ -57,6 +57,9 @@
 zero_params:
 .word 0
 
+POR_params:
+.word 1, 5
+
 /*
  * CPUx Wakeup Non-Secure Physical Address for
  * resume from OSWR/OFF
@@ -136,6 +139,25 @@ skip_enable_smp_bit:			@ GP device should execute from here
 	and	r0, #0x0f
 	cmp	r0, #1
 	beq	skip_l2en
+	/* Check ES revision */
+	mrc	p15, 0, r0, c0, c0, 0
+	ldr	r1, =A9_ES1_REV
+	cmp	r0, r1
+	bne	check_por
+	ldr	r0, =OMAP4_L2X0_AUXCTL_VALUE_ES1
+	ldr     r12, =0x109		@ Setup L2 AUXCTL value
+	dsb
+	smc     #0
+	b	skip_l2en
+check_por:
+	ldr	r0, =OMAP44XX_SAR_RAM_BASE  @ Check DEVICE type
+	ldr	r1, [r0, #OMAP_TYPE_OFFSET]
+	cmp	r1, #0x1                   @ Check for HS device
+	bne	skip_por
+	ldr	r0, =PPA_SERVICE_PL310_POR @ Setup PPA HAL call
+	adr	r3, POR_params
+	LM_CALL_PPA_SERVICE_PA
+skip_por:
 	ldr	r0, =OMAP4_L2X0_AUXCTL_VALUE
 	ldr     r12, =0x109		@ Setup L2 AUXCTL value
 	dsb
