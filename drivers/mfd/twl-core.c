@@ -992,6 +992,40 @@ static int __devexit twl_remove(struct i2c_client *client)
 	return 0;
 }
 
+static void _init_twl6030_settings(void)
+{
+	/* unmask PREQ transition */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xE0, 0x02);
+
+	/* USB_VBUS_CTRL_CLR */
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0xFF, 0x05);
+	/* USB_ID_CRTL_CLR */
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0xFF, 0x07);
+
+	/* GPADC_CTRL */
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x00, 0x2E);
+	/* TOGGLE1 */
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x51, 0x90);
+	/* MISC1 */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xE4);
+	/* MISC2 */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xE5);
+
+	/*
+	 * BBSPOR_CFG - Disable BB charging. It should be
+	 * taken care by proper driver
+	 */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x62, 0xE6);
+	/* CFG_INPUT_PUPD2 */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x65, 0xF1);
+	/* CFG_INPUT_PUPD4 */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xF3);
+	/* CFG_LDO_PD2 */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xF5);
+	/* CHARGERUSB_CTRL3 */
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x21, 0xEA);
+}
+
 /* NOTE:  this driver only handles a single twl4030/tps659x0 chip */
 static int __devinit
 twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
@@ -1088,6 +1122,10 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	if (twl_class_is_6030())
 		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xE1, CLK32KG_CFG_STATE);
+
+	/* Remove unwanted settings on twl chip as part of twl init. */
+	if (twl_class_is_6030())
+		_init_twl6030_settings();
 
 	status = add_children(pdata, id->driver_data);
 fail:

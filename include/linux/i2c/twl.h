@@ -169,6 +169,7 @@
 
 #define TWL4030_CLASS_ID 		0x4030
 #define TWL6030_CLASS_ID 		0x6030
+
 unsigned int twl_rev(void);
 #define GET_TWL_REV (twl_rev())
 #define TWL_CLASS_IS(class, id)			\
