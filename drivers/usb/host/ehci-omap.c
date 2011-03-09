@@ -58,10 +58,11 @@
 #define	EHCI_INSNREG05_ULPI_REGADD_SHIFT		16
 #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
 #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
+#define	L3INIT_HSUSBTLL_CLKCTRL				0x4A009368
 
 /*-------------------------------------------------------------------------*/
 
-static const struct hc_driver ehci_omap_hc_driver;
+static struct hc_driver ehci_omap_hc_driver;
 
 
 static inline void ehci_write(void __iomem *base, u32 reg, u32 val)
@@ -158,6 +159,242 @@ void omap_ehci_hw_phy_reset(const struct usb_hcd *hcd)
 	return;
 }
 
+static int omap4_ehci_tll_hub_control(
+	struct usb_hcd	*hcd,
+	u16		typeReq,
+	u16		wValue,
+	u16		wIndex,
+	char		*buf,
+	u16		wLength)
+{
+	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+	u32 __iomem	*status_reg = &ehci->regs->port_status[
+				(wIndex & 0xff) - 1];
+	u32 __iomem	*hostpc_reg = NULL;
+	u32		temp, temp1, status;
+	unsigned long	flags;
+	int		retval = 0;
+	u32		runstop, temp_reg;
+
+	spin_lock_irqsave(&ehci->lock, flags);
+	switch (typeReq) {
+	case GetPortStatus:
+		wIndex--;
+		status = 0;
+		temp = ehci_readl(ehci, status_reg);
+
+		/* wPortChange bits */
+		if (temp & PORT_CSC)
+			status |= USB_PORT_STAT_C_CONNECTION << 16;
+		if (temp & PORT_PEC)
+			status |= USB_PORT_STAT_C_ENABLE << 16;
+
+		if ((temp & PORT_OCC) && !ignore_oc) {
+			status |= USB_PORT_STAT_C_OVERCURRENT << 16;
+
+			/*
+			 * Hubs should disable port power on over-current.
+			 * However, not all EHCI implementations do this
+			 * automatically, even if they _do_ support per-port
+			 * power switching; they're allowed to just limit the
+			 * current.  khubd will turn the power back on.
+			 */
+			if (HCS_PPC(ehci->hcs_params)) {
+				ehci_writel(ehci,
+					temp & ~(PORT_RWC_BITS | PORT_POWER),
+					status_reg);
+			}
+		}
+
+		/* whoever resumes must GetPortStatus to complete it!! */
+		if (temp & PORT_RESUME) {
+
+			/* Remote Wakeup received? */
+			if (!ehci->reset_done[wIndex]) {
+				/* resume signaling for 20 msec */
+				ehci->reset_done[wIndex] = jiffies
+						+ msecs_to_jiffies(20);
+				/* check the port again */
+				mod_timer(&ehci_to_hcd(ehci)->rh_timer,
+						ehci->reset_done[wIndex]);
+			}
+
+			/* resume completed? */
+			else if (time_after_eq(jiffies,
+					ehci->reset_done[wIndex])) {
+				clear_bit(wIndex, &ehci->suspended_ports);
+				set_bit(wIndex, &ehci->port_c_suspend);
+				ehci->reset_done[wIndex] = 0;
+
+				/*
+				 * Workaround for OMAP errata:
+				 * To Stop Resume Signalling, it is required
+				 * to Stop the Host Controller and disable the
+				 * TLL Functional Clock.
+				 */
+
+				/* Stop the Host Controller */
+				runstop = ehci_readl(ehci,
+							&ehci->regs->command);
+				ehci_writel(ehci, (runstop & ~CMD_RUN),
+							&ehci->regs->command);
+				(void) ehci_readl(ehci, &ehci->regs->command);
+				handshake(ehci, &ehci->regs->status,
+							STS_HALT,
+							STS_HALT,
+							2000);
+
+				temp_reg = omap_readl(L3INIT_HSUSBTLL_CLKCTRL);
+				temp_reg &= ~(1 << (wIndex + 8));
+
+				/* stop resume signaling */
+				temp = ehci_readl(ehci, status_reg);
+				ehci_writel(ehci,
+					temp & ~(PORT_RWC_BITS | PORT_RESUME),
+					status_reg);
+
+				/* Disable the Channel Optional Fclk */
+				omap_writel(temp_reg, L3INIT_HSUSBTLL_CLKCTRL);
+
+				retval = handshake(ehci, status_reg,
+					   PORT_RESUME, 0, 2000 /* 2msec */);
+
+				/*
+				 * Enable the Host Controller and start the
+				 * Channel Optional Fclk since resume has
+				 * finished.
+				 */
+				udelay(3);
+				omap_writel((temp_reg | (1 << (wIndex + 8))),
+						L3INIT_HSUSBTLL_CLKCTRL);
+				ehci_writel(ehci, (runstop),
+						&ehci->regs->command);
+				(void) ehci_readl(ehci, &ehci->regs->command);
+
+				if (retval != 0) {
+					ehci_err(ehci,
+						"port %d resume error %d\n",
+						wIndex + 1, retval);
+					spin_unlock_irqrestore(&ehci->lock,
+									flags);
+					return -EPIPE;
+				}
+				temp &= ~(PORT_SUSPEND|PORT_RESUME|(3<<10));
+			}
+		}
+
+		/* whoever resets must GetPortStatus to complete it!! */
+		if ((temp & PORT_RESET)
+				&& time_after_eq(jiffies,
+					ehci->reset_done[wIndex])) {
+			status |= USB_PORT_STAT_C_RESET << 16;
+			ehci->reset_done[wIndex] = 0;
+
+			/* force reset to complete */
+			ehci_writel(ehci, temp & ~(PORT_RWC_BITS | PORT_RESET),
+					status_reg);
+			/* REVISIT:  some hardware needs 550+ usec to clear
+			 * this bit; seems too long to spin routinely...
+			 */
+			retval = handshake(ehci, status_reg,
+					PORT_RESET, 0, 1000);
+			if (retval != 0) {
+				ehci_err(ehci, "port %d reset error %d\n",
+					wIndex + 1, retval);
+				spin_unlock_irqrestore(&ehci->lock, flags);
+				return -EPIPE;
+			}
+
+			/* see what we found out */
+			temp = check_reset_complete(ehci, wIndex, status_reg,
+					ehci_readl(ehci, status_reg));
+		}
+
+		if (!(temp & (PORT_RESUME|PORT_RESET)))
+			ehci->reset_done[wIndex] = 0;
+
+		/* transfer dedicated ports to the companion hc */
+		if ((temp & PORT_CONNECT) &&
+				test_bit(wIndex, &ehci->companion_ports)) {
+			temp &= ~PORT_RWC_BITS;
+			temp |= PORT_OWNER;
+			ehci_writel(ehci, temp, status_reg);
+			ehci_dbg(ehci, "port %d --> companion\n", wIndex + 1);
+			temp = ehci_readl(ehci, status_reg);
+		}
+
+		/*
+		 * Even if OWNER is set, there's no harm letting khubd
+		 * see the wPortStatus values (they should all be 0 except
+		 * for PORT_POWER anyway).
+		 */
+
+		if (temp & PORT_CONNECT) {
+			status |= USB_PORT_STAT_CONNECTION;
+			/* status may be from integrated TT */
+			if (ehci->has_hostpc) {
+				temp1 = ehci_readl(ehci, hostpc_reg);
+				status |= ehci_port_speed(ehci, temp1);
+			} else
+				status |= ehci_port_speed(ehci, temp);
+		}
+		if (temp & PORT_PE)
+			status |= USB_PORT_STAT_ENABLE;
+
+		/* maybe the port was unsuspended without our knowledge */
+		if (temp & (PORT_SUSPEND|PORT_RESUME)) {
+			status |= USB_PORT_STAT_SUSPEND;
+		} else if (test_bit(wIndex, &ehci->suspended_ports)) {
+			clear_bit(wIndex, &ehci->suspended_ports);
+			ehci->reset_done[wIndex] = 0;
+			if (temp & PORT_PE)
+				set_bit(wIndex, &ehci->port_c_suspend);
+		}
+
+		if (temp & PORT_OC)
+			status |= USB_PORT_STAT_OVERCURRENT;
+		if (temp & PORT_RESET)
+			status |= USB_PORT_STAT_RESET;
+		if (temp & PORT_POWER)
+			status |= USB_PORT_STAT_POWER;
+		if (test_bit(wIndex, &ehci->port_c_suspend))
+			status |= USB_PORT_STAT_C_SUSPEND << 16;
+
+#ifndef	VERBOSE_DEBUG
+	if (status & ~0xffff)	/* only if wPortChange is interesting */
+#endif
+		dbg_port(ehci, "GetStatus", wIndex + 1, temp);
+		put_unaligned_le32(status, buf);
+		break;
+	default:
+		spin_unlock_irqrestore(&ehci->lock, flags);
+		return ehci_hub_control(hcd, typeReq, wValue, wIndex,
+								buf, wLength);
+	}
+	spin_unlock_irqrestore(&ehci->lock, flags);
+	return retval;
+}
+
+static int omap_ehci_hub_control(
+	struct usb_hcd	*hcd,
+	u16		typeReq,
+	u16		wValue,
+	u16		wIndex,
+	char		*buf,
+	u16		wLength)
+{
+	struct device *dev = hcd->self.controller;
+	struct ehci_hcd_omap_platform_data *pdata = dev->platform_data;
+
+	if ((wIndex > 0) && (wIndex < OMAP3_HS_USB_PORTS)) {
+		if (pdata->port_mode[wIndex-1] == OMAP_EHCI_PORT_MODE_TLL)
+			return omap4_ehci_tll_hub_control(hcd, typeReq, wValue,
+						wIndex, buf, wLength);
+	}
+
+	return ehci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
+}
+
 static void omap_ehci_soft_phy_reset(struct platform_device *pdev, u8 port)
 {
 	struct usb_hcd	*hcd = dev_get_drvdata(&pdev->dev);
@@ -239,8 +476,12 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	if (cpu_is_omap44xx() && (omap_rev() < OMAP4430_REV_ES2_3))
+		ehci_omap_hc_driver.hub_control = omap_ehci_hub_control;
+
 	hcd = usb_create_hcd(&ehci_omap_hc_driver, dev,
 			dev_name(dev));
+
 	if (!hcd) {
 		dev_err(dev, "failed to create hcd with err %d\n", ret);
 		ret = -ENOMEM;
@@ -433,7 +674,7 @@ static struct platform_driver ehci_hcd_omap_driver = {
 
 /*-------------------------------------------------------------------------*/
 
-static const struct hc_driver ehci_omap_hc_driver = {
+static struct hc_driver ehci_omap_hc_driver = {
 	.description		= hcd_name,
 	.product_desc		= "OMAP-EHCI Host Controller",
 	.hcd_priv_size		= sizeof(struct ehci_hcd),
