@@ -51,8 +51,54 @@ ENTRY(__omap4_cpu_suspend)
 
 restore_context:
         /*
-	 * Check  the wakeup CPU
+	 * Available for HS devices only:
+	 * Enable NS access to SMP for CPU1
+	 * CPU0 is setup in PPA
 	 */
+	ldr	r4, =OMAP44XX_SAR_RAM_BASE
+	ldr	r9, [r4, #OMAP_TYPE_OFFSET]	@ Get DEVICE type
+	cmp	r9, #0x1			@ Check for HS device
+	bne	skip_enable_smp_bit			@ if GP device
+
+	LM_CHECK_IF_CPU0
+	beq	enable_smp_bit				@ if CPU0
+
+	/*
+	 *     Check the WakeUp CPU
+	 * CPU1 must check if CPU0 is alive/awaken;
+	 * if PL310 is OFF, MPUSS was OFF and CPU0 is still off,
+	 * CPU1 must go to sleep and wait for CPU0
+	 */
+	ldr	r2, =OMAP44XX_L2CACHE_BASE
+	ldr	r0, [r2, #L2X0_CTRL]
+	and	r0, #0x0f
+	cmp	r0, #1
+	beq	set_ns_smp_access
+	mov     r0, #0x03		@ CPU1 to OFF state
+	mov     r1, #0x00		@ Secure L1 is already clean
+	ldr	r12, =0x108		@ SCU power state secure API
+	dsb
+	smc	#0
+	dsb				@ Necessary barriers before wfi
+	dmb
+	isb
+	wfi				@ wait for interrupt
+	nop
+	nop
+set_ns_smp_access:
+	mcr	p15, 0, r7, c7, c5, 6	@ invalidate BPIALL
+	isb
+	/* Setup PPA svc call */
+	mov     r0, #PPA_SERVICE_NS_SMP
+	adr	r3, zero_params		@ r3 must contain a pointer to params
+	LM_CALL_PPA_SERVICE_PA
+enable_smp_bit:
+	/* CPUx must join coherency */
+        mrc     p15, 0, r0, c1, c0, 1   @ Read SCTRL
+	orr	r0, r0, #0x40		@ Enable SMP bit
+        mcr     p15, 0, r0, c1, c0, 1
+	isb
+skip_enable_smp_bit:			@ GP device should execute from here
 #ifdef CONFIG_CACHE_L2X0
 	/* FIXME : Add POR register restore as well */
 	ldr	r2, =OMAP44XX_L2CACHE_BASE
