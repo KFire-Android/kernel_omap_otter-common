@@ -85,6 +85,7 @@ static int hdmi_set_s3d_disp_type(struct omap_dss_device *dssdev,
 static void hdmi_notify_queue(struct work_struct *work);
 static int hdmi_reset(struct omap_dss_device *dssdev,
 					enum omap_dss_reset_phase phase);
+static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing);
 
 /* Structures for chardevice move this to panel */
 static int hdmi_major;
@@ -504,6 +505,17 @@ static ssize_t audio_power_store(struct device *dev,
 	return size;
 }
 
+static ssize_t hdmi_code_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	struct hdmi_cm cm;
+
+	cm = hdmi_get_code(&dssdev->panel.timings);
+
+	return snprintf(buf, PAGE_SIZE, "%s:%u\n",
+			cm.mode ? "CEA" : "VESA", cm.code);
+}
 
 static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, hdmi_edid_store);
 static DEVICE_ATTR(yuv, S_IRUGO | S_IWUSR, hdmi_yuv_supported, hdmi_yuv_set);
@@ -512,6 +524,7 @@ static DEVICE_ATTR(deepcolor, S_IRUGO | S_IWUSR, hdmi_deepcolor_show,
 static DEVICE_ATTR(lr_fr, S_IRUGO | S_IWUSR, hdmi_lr_fr_show, hdmi_lr_fr_store);
 static DEVICE_ATTR(audio_power, S_IRUGO | S_IWUSR, audio_power_show,
 							audio_power_store);
+static DEVICE_ATTR(code, S_IRUGO, hdmi_code_show, NULL);
 
 static int set_hdmi_hot_plug_status(struct omap_dss_device *dssdev, bool onoff)
 {
@@ -2216,6 +2229,8 @@ int hdmi_init_display(struct omap_dss_device *dssdev)
 	if (device_create_file(&dssdev->dev, &dev_attr_lr_fr))
 		DSSERR("failed to create sysfs file\n");
 	if (device_create_file(&dssdev->dev, &dev_attr_audio_power))
+		DSSERR("failed to create sysfs file\n");
+	if (device_create_file(&dssdev->dev, &dev_attr_code))
 		DSSERR("failed to create sysfs file\n");
 
 	return 0;
