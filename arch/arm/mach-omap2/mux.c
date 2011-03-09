@@ -140,7 +140,7 @@ int __init omap_mux_init_gpio(int gpio, int val)
 	return -ENODEV;
 }
 
-static int __init _omap_mux_init_signal(struct omap_mux_partition *partition,
+static int _omap_mux_init_signal(struct omap_mux_partition *partition,
 					const char *muxname, int val)
 {
 	struct omap_mux_entry *e;
@@ -276,7 +276,7 @@ int omap_mux_disable_wakeup(const char *muxname)
 	return 0;
 }
 
-int __init omap_mux_init_signal(const char *muxname, int val)
+int omap_mux_init_signal(const char *muxname, int val)
 {
 	struct omap_mux_partition *partition;
 	int ret;
