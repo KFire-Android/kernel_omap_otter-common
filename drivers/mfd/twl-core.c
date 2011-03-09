@@ -1117,15 +1117,11 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
 	}
 
-	if (twl_class_is_6030())
+	if (twl_class_is_6030()) {
 		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xE1, CLK32KG_CFG_STATE);
-
-	if (twl_class_is_6030())
-		twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xE1, CLK32KG_CFG_STATE);
-
-	/* Remove unwanted settings on twl chip as part of twl init. */
-	if (twl_class_is_6030())
+		/* Remove unwanted settings on twl chip as part of twl init. */
 		_init_twl6030_settings();
+	}
 
 	status = add_children(pdata, id->driver_data);
 fail:
