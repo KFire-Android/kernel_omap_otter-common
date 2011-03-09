@@ -219,8 +219,15 @@ static int __init omap_l2_cache_init(void)
 	l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
 	BUG_ON(!l2cache_base);
 
-	if (omap_rev() != OMAP4430_REV_ES1_0)
+	if (omap_rev() != OMAP4430_REV_ES1_0) {
+		/* Set POR through PPA service only in EMU/HS devices */
+		if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+			omap4_secure_dispatcher(
+				PPA_SERVICE_PL310_POR, 0x7, 1,
+				PL310_POR, 0, 0, 0);
+
 		omap_smc1(0x109, OMAP4_L2X0_AUXCTL_VALUE);
+	}
 
 	/* Enable PL310 L2 Cache controller */
 	omap_smc1(0x102, 0x1);
