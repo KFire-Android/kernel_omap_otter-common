@@ -32,12 +32,20 @@
 #include "syslocal.h"
 #include "sysconfig.h"
 
+#include <linux/platform_device.h>
+#include <plat/omap_device.h>
+#include <plat/omap-pm.h>
+
 #include "ocpdefs.h"
 
 #if !defined(NO_HARDWARE) && \
      defined(SYS_USING_INTERRUPTS) && \
      defined(SGX540)
 #define SGX_OCP_REGS_ENABLED
+#endif
+
+#if defined(LDM_PLATFORM) && !defined(SUPPORT_DRI_DRM)
+extern struct platform_device *gpsPVRLDMDev;
 #endif
 
 SYS_DATA* gpsSysData = (SYS_DATA*)IMG_NULL;
@@ -410,6 +418,9 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 		
 		psDeviceNode = psDeviceNode->psNext;
 	}
+
+	omap_device_set_rate(&gpsPVRLDMDev->dev,
+			&gpsPVRLDMDev->dev, SYS_SGX_CLOCK_SPEED);
 
 	eError = EnableSystemClocksWrap(gpsSysData);
 	if (eError != PVRSRV_OK)
