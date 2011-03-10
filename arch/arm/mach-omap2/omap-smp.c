@@ -46,6 +46,9 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
 {
 	trace_hardirqs_off();
 
+	/* Enable NS access to SMP bit */
+	omap4_secure_dispatcher(PPA_SERVICE_NS_SMP, 4, 0, 0, 0, 0, 0);
+
 	/*
 	 * If any interrupts are already enabled for the primary
 	 * core (e.g. timer irq), then they will not have been enabled

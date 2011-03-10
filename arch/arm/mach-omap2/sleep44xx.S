@@ -15,6 +15,7 @@
 #include <asm/hardware/cache-l2x0.h>
 #include <mach/omap4-common.h>
 #include <plat/omap44xx.h>
+#include <asm/memory.h>
 
 #ifdef CONFIG_SMP
 
@@ -26,6 +27,35 @@
 #define TABLE_ENTRY				0x00000C02
 #define CACHE_DISABLE_MASK			0xFFFFE7FB
 #define SCU_CLEAR_STATE				0xFCFC
+
+
+/*
+ * Macro to call PPA svc when MMU is OFF
+ * Caller must setup r0 and r3 before calling this macro
+ * @r0: PPA service ID
+ * @r3: Pointer to params
+*/
+.macro LM_CALL_PPA_SERVICE_PA
+	mov	r1, #0x0        @ Process ID
+	mov	r2, #0x4	@ Flag
+	mov	r6, #0xff
+	mov	r12, #0x00      @ Secure Service ID
+	dsb
+	smc     #0
+.endm
+
+/*
+ * Macro to check CpuID
+ */
+.macro LM_CHECK_IF_CPU0
+	mrc	p15, 0, r0, c0, c0, 5		@ Get cpuID
+	ands	r0, r0, #0x0f
+.endm
+
+.equ LOCAL_VA2PA_OFFSET,		(PHYS_OFFSET-PAGE_OFFSET)
+
+zero_params:
+.word 0
 
 /*
  * CPUx Wakeup Non-Secure Physical Address for
@@ -51,8 +81,35 @@ ENTRY(__omap4_cpu_suspend)
 
 restore_context:
         /*
+	 * Available for HS devices only:
+	 * Enable NS access to SMP for CPU1
+	 * CPU0 is setup in PPA
+	 */
+	ldr	r4, =OMAP44XX_SAR_RAM_BASE
+	ldr	r9, [r4, #OMAP_TYPE_OFFSET]	@ Get DEVICE type
+	cmp	r9, #0x1			@ Check for HS device
+	bne	skip_enable_smp_bit			@ if GP device
+
+	LM_CHECK_IF_CPU0
+	beq	enable_smp_bit				@ if CPU0
+
+set_ns_smp_access:
+	mcr	p15, 0, r7, c7, c5, 6	@ invalidate BPIALL
+	isb
+	/* Setup PPA svc call */
+	mov     r0, #PPA_SERVICE_NS_SMP
+	adr	r3, zero_params		@ r3 must contain a pointer to params
+	LM_CALL_PPA_SERVICE_PA
+enable_smp_bit:
+	/* CPUx must join coherency */
+        mrc     p15, 0, r0, c1, c0, 1   @ Read SCTRL
+	orr	r0, r0, #0x40		@ Enable SMP bit
+        mcr     p15, 0, r0, c1, c0, 1
+	isb
+	/*
 	 * Check  the wakeup CPU
 	 */
+skip_enable_smp_bit:			@ GP device should execute from here
 #ifdef CONFIG_CACHE_L2X0
 	/* FIXME : Add POR register restore as well */
 	ldr	r2, =OMAP44XX_L2CACHE_BASE
@@ -68,14 +125,12 @@ restore_context:
 	ldr     r12, =0x102		@ Enable L2 Cache controller
 	dsb
 	smc     #0
-	dsb
 skip_l2en:
 #endif
 	ldr	r3, =OMAP44XX_SAR_RAM_BASE
 	mov	r1, #0
 	mcr	p15, 0, r1, c7, c5, 0	@ Invalidate $I to PoU
-	mrc	p15, 0, r0, c0, c0, 5	@ MPIDR
-	ands	r0, r0, #0x0f
+	LM_CHECK_IF_CPU0
 	orreq	r3, r3, #CPU0_SAVE_OFFSET
 	orrne	r3, r3, #CPU1_SAVE_OFFSET
 
@@ -253,6 +308,35 @@ clean_inv_l1_hs:
 	smc	#0
 	ldmfd   r13!, {r4-r12, r14}
 
+	LM_CHECK_IF_CPU0
+	beq	disable_smp_bit		@ skip if CPU0
+	mrc     p15, 0, r0, c1, c1, 2	@ read NACR
+	ands    r0, r0, #(1<<18)	@ check if NS can access SMP bit
+	bne     disable_smp_bit		@ skip if access is already there
+	stmfd   r13!, {r4-r12, r14}
+
+	/*
+	 * Cannot use LM_CALL_PPA_SVC_PA here because MMU is ON
+	 * @r0 PPA service
+	 * @r3 Pointer's PA of parameters, since MMU is on, it is
+	 * needed to calculate the PA
+	 */
+	mov     r0, #PPA_SERVICE_NS_SMP	@ Call svc to set NS access to SMP
+	mov	r1, #0x0	      	@ Process ID
+	mov	r2, #0x4		@ Flag
+	ldr	r3, =zero_params
+	ldr	r4, =LOCAL_VA2PA_OFFSET
+	add     r3, r3, r4		@ Pointer to params
+	mov	r6, #0xff
+	mov	r12, #0x00     		@ Secure Service ID
+	dsb
+	smc     #0
+	ldmfd   r13!, {r4-r12, r14}
+disable_smp_bit:
+	mrc     p15, 0, r0, c1, c0, 1
+	bic     r0, r0, #0x40		@ clear SMP
+	mcr     p15, 0, r0, c1, c0, 1
+	isb
 l2x_clean_inv:				@ Only for MPU OFF and last CPU
 #ifdef CONFIG_CACHE_L2X0
 	ldr	r8, =sar_ram_base
@@ -307,6 +391,10 @@ do_WFI:
 	dsb
 	smc	#0
 	ldmfd   r13!, {r4-r12, r14}
+	isb
+	mrc	p15, 0, r0, c1, c0, 1
+	orr	r0, r0, #0x40		@ Enable SMP bit
+	mcr	p15, 0, r0, c1, c0, 1
 	isb
 	b	skip_gp_clear
 scu_gp_clear:

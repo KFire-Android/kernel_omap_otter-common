@@ -42,6 +42,11 @@
 #define HAL_SAVEGIC_INDEX		0x1d
 
 /*
+ * Secure HAL, PPA services available
+ */
+#define PPA_SERVICE_NS_SMP		0x25
+
+/*
  * Secure HAL API flags
  */
 #define FLAG_START_CRITICAL		0x4
