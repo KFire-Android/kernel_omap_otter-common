@@ -288,7 +288,8 @@ int hsi_open(struct hsi_device *dev)
 		return -EBUSY;
 	}
 
-	ch->flags |= HSI_CH_OPEN;
+	/* Restart with flags cleaned up */
+	ch->flags = HSI_CH_OPEN;
 
 	hsi_driver_enable_interrupt(port, HSI_CAWAKEDETECTED | HSI_ERROROCCURED
 					| HSI_BREAKDETECTED);

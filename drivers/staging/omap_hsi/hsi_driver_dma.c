@@ -382,10 +382,6 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			ch = hsi_ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_read(ch);
 
-			/* Re-enable interrupts for polling if needed */
-			if (ch->flags & HSI_CH_RX_POLL)
-				hsi_driver_enable_read_interrupt(ch, NULL);
-
 			dev_dbg(hsi_ctrl->dev, "Calling read callback "
 						"(size %d).\n", size/4);
 			spin_unlock(&hsi_ctrl->lock);
@@ -412,6 +408,9 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 						fifo, fifo_words_avail,
 						HSI_HSR_FIFO_SIZE);
 			}
+			/* Re-enable interrupts for polling if needed */
+			if (ch->flags & HSI_CH_RX_POLL)
+				hsi_driver_enable_read_interrupt(ch, NULL);
 		} else {	/* Write path */
 			dma_h = hsi_inl(base, HSI_GDD_CSSA_REG(gdd_lch));
 			size = hsi_inw(base, HSI_GDD_CEN_REG(gdd_lch)) * 4;
