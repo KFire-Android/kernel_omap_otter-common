@@ -773,6 +773,7 @@ cpu_prepare:
 	} else {
 		pwrdm_set_next_pwrst(cpu0_pwrdm, PWRDM_POWER_ON);
 		pwrdm_set_next_pwrst(mpuss_pd, PWRDM_POWER_ON);
+		omap4_secure_dispatcher(0x21, 4, 0, 0, 0, 0, 0);
 	}
 
 	/*
