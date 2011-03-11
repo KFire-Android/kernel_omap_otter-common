@@ -278,10 +278,7 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 {
 	int lch = hsi_ch->read_data.lch;
 	struct hsi_dev *hsi_ctrl = hsi_ch->hsi_port->hsi_controller;
-	unsigned int port = hsi_ch->hsi_port->port_number;
-	unsigned int channel = hsi_ch->channel_number;
 	u32 reg;
-	long buff_offset;
 
 	if (lch < 0)
 		return;
@@ -302,11 +299,6 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	hsi_outl(HSI_GDD_LCH(lch), hsi_ctrl->base,
 		 HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
-
-	buff_offset = hsi_hsr_bufstate_f_reg(hsi_ctrl, port, channel);
-	if (buff_offset >= 0)
-		hsi_outl_and(~HSI_BUFSTATE_CHANNEL(channel), hsi_ctrl->base,
-			     buff_offset);
 
 	hsi_reset_ch_read(hsi_ch);
 }
