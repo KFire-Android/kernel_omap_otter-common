@@ -222,8 +222,28 @@ static struct platform_device btwilink_device = {
 static struct platform_device *zoom_devices[] __initdata = {
 
 	&wl127x_device,
-	&btwilink_device,
 };
+
+/* OPP MPU/IVA Clock Frequency */
+struct opp_frequencies {
+	unsigned long mpu;
+	unsigned long iva;
+};
+
+static struct opp_frequencies opp_freq_add_table[] __initdata = {
+  {
+	.mpu = 1000000000,
+	.iva =  800000000,
+  },
+  {
+	.mpu = 1200000000,
+	.iva =   65000000,
+  },
+
+  { 0, 0 },
+};
+
+
 /* Fix to prevent VIO leakage on wl127x */
 static int wl127x_vio_leakage_fix(void)
 {
@@ -277,6 +297,83 @@ static void __init omap_zoom_init(void)
 	platform_add_devices(zoom_devices, ARRAY_SIZE(zoom_devices));
 	wl127x_vio_leakage_fix();
 }
+
+/* must be called after omap2_common_pm_init() */
+static int __init zoom3_opp_init(void)
+{
+	struct omap_hwmod *mh, *dh;
+	struct omap_opp *mopp, *dopp;
+	struct device *mdev, *ddev;
+	struct opp_frequencies *opp_freq;
+
+
+	if (!cpu_is_omap3630())
+		return 0;
+
+	mh = omap_hwmod_lookup("mpu");
+	if (!mh || !mh->od) {
+		pr_err("%s: no MPU hwmod device.\n", __func__);
+		return 0;
+	}
+
+	dh = omap_hwmod_lookup("iva");
+	if (!dh || !dh->od) {
+		pr_err("%s: no DSP hwmod device.\n", __func__);
+		return 0;
+	}
+
+	mdev = &mh->od->pdev.dev;
+	ddev = &dh->od->pdev.dev;
+
+	/* add MPU and IVA clock frequencies */
+	for (opp_freq = opp_freq_add_table; opp_freq->mpu; opp_freq++) {
+		/* check enable/disable status of MPU frequecy setting */
+		mopp = opp_find_freq_exact(mdev, opp_freq->mpu, false);
+		if (IS_ERR(mopp))
+			mopp = opp_find_freq_exact(mdev, opp_freq->mpu, true);
+		if (IS_ERR(mopp)) {
+			pr_err("%s: MPU does not support %lu MHz\n", __func__, opp_freq->mpu / 1000000);
+			continue;
+		}
+
+		/* check enable/disable status of IVA frequency setting */
+		dopp = opp_find_freq_exact(ddev, opp_freq->iva, false);
+		if (IS_ERR(dopp))
+			dopp = opp_find_freq_exact(ddev, opp_freq->iva, true);
+		if (IS_ERR(dopp)) {
+			pr_err("%s: DSP does not support %lu MHz\n", __func__, opp_freq->iva / 1000000);
+			continue;
+		}
+
+		/* try to enable MPU frequency setting */
+		if (opp_enable(mopp)) {
+			pr_err("%s: OPP cannot enable MPU:%lu MHz\n", __func__, opp_freq->mpu / 1000000);
+			continue;
+		}
+
+		/* try to enable IVA frequency setting */
+		if (opp_enable(dopp)) {
+			pr_err("%s: OPP cannot enable DSP:%lu MHz\n", __func__, opp_freq->iva / 1000000);
+			opp_disable(mopp);
+			continue;
+		}
+
+		/* verify that MPU and IVA frequency settings are available */
+		mopp = opp_find_freq_exact(mdev, opp_freq->mpu, true);
+		dopp = opp_find_freq_exact(ddev, opp_freq->iva, true);
+		if (!mopp || !dopp) {
+			pr_err("%s: OPP requested MPU: %lu MHz and DSP: %lu MHz not found\n",
+				__func__, opp_freq->mpu / 1000000, opp_freq->iva / 1000000);
+			continue;
+		}
+
+		dev_info(mdev, "OPP enabled %lu MHz\n", opp_freq->mpu / 1000000);
+		dev_info(ddev, "OPP enabled %lu MHz\n", opp_freq->iva / 1000000);
+	}
+
+	return 0;
+}
+device_initcall(zoom3_opp_init);
 
 MACHINE_START(OMAP_ZOOM3, "OMAP3630 Zoom3 board")
 	.phys_io	= ZOOM_UART_BASE,

@@ -203,7 +203,7 @@ struct omap_opp *opp_find_freq_exact(struct device *dev,
 		return opp;
 
 	list_for_each_entry(temp_opp, &dev_opp->opp_list, node) {
-		if (temp_opp->enabled) {
+		if (temp_opp->enabled == enabled) {
 			unsigned long rate = temp_opp->rate / 1000000;
 
 			if (rate == req_freq) {
