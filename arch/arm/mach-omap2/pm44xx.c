@@ -232,7 +232,6 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_smartreflex_disable(vdd_iva);
 		omap_smartreflex_disable(vdd_core);
 
-		omap_hsi_prepare_idle();
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
 		omap_uart_prepare_idle(2);
