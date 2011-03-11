@@ -33,7 +33,6 @@
 #include <linux/clk.h>
 #include <linux/uaccess.h>
 #include <linux/irq.h>
-#include <linux/timer.h>
 
 #include <linux/platform_device.h>
 #include <syslink/notify.h>
@@ -67,9 +66,6 @@
 /* Module headers */
 #include <plat/ipu_dev.h>
 #include "../../../../arch/arm/mach-omap2/cm.h"
-#include "../../../../arch/arm/mach-omap2/prm.h"
-#include "../../../../arch/arm/mach-omap2/prcm-common.h"
-#include "../../../../arch/arm/mach-omap2/prm44xx.h"
 #include "ipu_pm.h"
 
 /** ============================================================================
@@ -313,9 +309,6 @@ static struct workqueue_struct *ipu_clean_up;
 struct work_struct clean;
 static DECLARE_COMPLETION(ipu_clean_up_comp);
 static bool recover;
-
-/* kernel timers */
-struct timer_list ivahd_init_timer;
 
 /* Latency cstrs */
 #ifdef CONFIG_OMAP_PM
@@ -1387,21 +1380,6 @@ static inline int ipu_pm_get_ivaseq0(struct ipu_pm_object *handle,
 	return PM_SUCCESS;
 }
 
-void ivahd_hwauto_init(unsigned long arg)
-{
-	pr_debug("%s delayed IVAHD HW_AUTO enable activated\n", __func__);
-
-	/* set Next State to INACTIVE for IVAHD */
-	prm_write_mod_reg(0xff0e02,
-			 OMAP4430_PRM_IVAHD_MOD,
-			 OMAP4_PM_IVAHD_PWRSTCTRL_OFFSET);
-
-	/* do the delayed switch to HW_AUTO for IVAHD */
-	cm_write_mod_reg(HW_AUTO,
-			 OMAP4430_CM2_IVAHD_MOD,
-			 OMAP4_CM_IVAHD_CLKSTCTRL_OFFSET);
-}
-
 /*
   Request IVA SEQ1 on behalf of an IPU client
  *
@@ -1434,14 +1412,6 @@ static inline int ipu_pm_get_ivaseq1(struct ipu_pm_object *handle,
 	}
 	params->pm_sl2if_counter++;
 	pr_debug("Request sl2if\n");
-
-	/* Need to delay after startup to allow time
-	  * for MM to load code and start ivahd running
-	  */
-	init_timer(&ivahd_init_timer);
-	ivahd_init_timer.expires = jiffies + 100;
-	ivahd_init_timer.function = ivahd_hwauto_init;
-	add_timer(&ivahd_init_timer);
 
 	return PM_SUCCESS;
 }
