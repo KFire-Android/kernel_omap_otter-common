@@ -130,6 +130,7 @@ static int dpi_set_mode(struct omap_dss_device *dssdev)
 {
 	struct omap_video_timings *t = &dssdev->panel.timings;
 	unsigned long pck = 0;
+	unsigned long cache_req_pck = 0;
 	bool is_tft;
 	int r = 0;
 
@@ -142,8 +143,13 @@ static int dpi_set_mode(struct omap_dss_device *dssdev)
 	r = dpi_set_dsi_clk(dssdev->channel, is_tft,
 			t->pixel_clock * 1000, &pck);
 #else /* #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL */
-	r = dpi_set_dispc_clk(dssdev->channel, is_tft,
-			t->pixel_clock * 1000, &pck);
+	cache_req_pck = dss_get_cache_req_pck();
+	if (cache_req_pck)
+		r = dpi_set_dispc_clk(dssdev->channel, is_tft,
+				cache_req_pck, &pck);
+	else
+		r = dpi_set_dispc_clk(dssdev->channel, is_tft,
+				t->pixel_clock * 1000, &pck);
 #endif /* CONFIG_OMAP2_DSS_USE_DSI_PLL */
 	if (r)
 		return r;

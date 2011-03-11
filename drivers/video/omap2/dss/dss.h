@@ -309,6 +309,7 @@ int dss_calc_clock_div(bool is_tft, unsigned long req_pck,
 		struct dispc_clock_info *dispc_cinfo);
 
 bool dss_get_mainclk_state(void);
+unsigned long dss_get_cache_req_pck(void);
 int dss_mainclk_enable(void);
 void dss_mainclk_disable(void);
 

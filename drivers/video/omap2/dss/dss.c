@@ -139,6 +139,11 @@ bool dss_get_mainclk_state()
 	return dss.mainclk_state;
 }
 
+unsigned long dss_get_cache_req_pck()
+{
+	return dss.cache_req_pck;
+}
+
 /*
  * OMAP4 does not allow aggressive DSS clock cutting, so we must keep the
  * clocks enabled during display use.  These next two methods on OMAP4
