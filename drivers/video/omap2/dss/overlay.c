@@ -90,10 +90,9 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 
 	if (mgr && sysfs_streq(mgr->name, "tv")) {
 		ovl->get_overlay_info(ovl, &info);
-		if (mgr->device->panel.timings.x_res < info.width ||
-			mgr->device->panel.timings.y_res < info.height) {
-			printk(KERN_ERR"TV does not support downscaling"
-			"Please configure overlay to supported format");
+		if (mgr->device->panel.timings.x_res < info.out_width ||
+			mgr->device->panel.timings.y_res < info.out_height) {
+			printk(KERN_ERR"output window size exceeds panel dimensions");
 			return -EINVAL;
 		}
 	}
