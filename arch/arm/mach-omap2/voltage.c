@@ -2480,9 +2480,10 @@ static int __init omap_voltage_init(void)
 	/*
 	 * Some ES2.2 efuse  values for BGAP and SLDO trim
 	 * are not programmed. For these units
-	 * we can set overide mode for SLDO trim,
+	 * 1. we can set overide mode for SLDO trim,
 	 * and program the max multiplication factor, to ensure
 	 * high enough voltage on SLDO output.
+	 * 2. trim VDAC value for TV output as per recomendation
 	 */
 	if (cpu_is_omap44xx()
 		&& (omap_rev() == OMAP4430_REV_ES2_2)) {
@@ -2498,6 +2499,9 @@ static int __init omap_voltage_init(void)
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_CORE_VOLTAGE_CTRL);
 			omap_ctrl_writel(0x0401040f,
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_IVA_VOLTAGE_CTRL);
+			/* write value of 0x0 to VDAC as per trim recomendation */
+			omap_ctrl_writel(0x000001c0,
+			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
 		}
 	}
 #ifdef CONFIG_PM_DEBUG
