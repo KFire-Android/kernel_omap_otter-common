@@ -463,6 +463,8 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
 	struct omap_musb_board_data *data = plat->board_data;
 
+	musb->xceiv->event = -1;
+
 	DBG(3, "<== Power=%02x, DevCtl=%02x, int_usb=0x%x\n", power, devctl,
 		int_usb);
 
@@ -727,13 +729,10 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 
 		musb->ep0_stage = MUSB_EP0_START;
 
+		musb->xceiv->event = USB_EVENT_ID;
+
 		/* Hold a wakelock */
 		wake_lock(&plat->musb_lock);
-
-		/* Hold a L3 constarint */
-		if (plat->set_min_bus_tput)
-			plat->set_min_bus_tput(musb->controller,
-					OCP_INITIATOR_AGENT, (200*1000*4));
 
 #ifdef CONFIG_USB_MUSB_OTG
 		/* flush endpoints when transitioning from Device Mode */
@@ -800,13 +799,10 @@ b_host:
 				MUSB_MODE(musb), devctl);
 		handled = IRQ_HANDLED;
 
+		musb->xceiv->event = USB_EVENT_NONE;
+
 		/* Release the wakelock */
 		wake_unlock(&plat->musb_lock);
-
-		/* Release L3 constraint */
-		if (plat->set_min_bus_tput)
-			plat->set_min_bus_tput(musb->controller,
-						OCP_INITIATOR_AGENT, -1);
 
 		switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
@@ -874,15 +870,10 @@ b_host:
 		} else if (is_peripheral_capable()) {
 			DBG(1, "BUS RESET as %s\n", otg_state_string(musb));
 
+			musb->xceiv->event = USB_EVENT_VBUS;
+
 			/* Hold a wakelock */
 			wake_lock(&plat->musb_lock);
-
-			/* hold the L3 constraint as there was performance drop
-			 * with ondemand governor
-			 */
-			if (plat->set_min_bus_tput)
-				plat->set_min_bus_tput(musb->controller,
-					OCP_INITIATOR_AGENT, (200*1000*4));
 
 			switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_OTG
@@ -1877,12 +1868,31 @@ static const struct attribute_group musb_attr_group = {
 static void musb_irq_work(struct work_struct *data)
 {
 	struct musb *musb = container_of(data, struct musb, irq_work);
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *plat = dev->platform_data;
 	static int old_state;
 
 	if (musb->xceiv->state != old_state) {
 		old_state = musb->xceiv->state;
 		sysfs_notify(&musb->controller->kobj, NULL, "mode");
 	}
+
+	if (musb->xceiv->event == USB_EVENT_VBUS) {
+		/* Hold a L3 constarint for better throughput */
+		if (plat->set_min_bus_tput)
+			plat->set_min_bus_tput(musb->controller,
+				OCP_INITIATOR_AGENT, (200*1000*4));
+	} else if (musb->xceiv->event == USB_EVENT_ID) {
+		/* Hold a L3 constarint for better throughput */
+		if (plat->set_min_bus_tput)
+			plat->set_min_bus_tput(musb->controller,
+				OCP_INITIATOR_AGENT, (200*1000*4));
+	} else if (musb->xceiv->event == USB_EVENT_NONE) {
+		/* Release L3 constraint on detach*/
+		if (plat->set_min_bus_tput)
+			plat->set_min_bus_tput(musb->controller,
+				OCP_INITIATOR_AGENT, -1);
+		}
 }
 
 /* --------------------------------------------------------------------------
