@@ -82,8 +82,6 @@ int musb_notifier_call(struct notifier_block *nb,
 		 * smart standby mode.
 		 */
 
-		omap_pm_set_max_mpu_wakeup_lat(&pdata->musb_qos_request, 4000);
-
 		musb_writel(musb->mregs, OTG_FORCESTDBY, 0);
 		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
 		if (cpu_is_omap44xx())
@@ -155,8 +153,6 @@ int musb_notifier_call(struct notifier_block *nb,
 		val &= ~(SMARTIDLEWKUP | SMARTSTDBY | ENABLEWAKEUP);
 		val |= FORCEIDLE | FORCESTDBY;
 		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
-
-		omap_pm_set_max_mpu_wakeup_lat(&pdata->musb_qos_request, -1);
 
 		val = __raw_readl(phymux_base +
 				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);

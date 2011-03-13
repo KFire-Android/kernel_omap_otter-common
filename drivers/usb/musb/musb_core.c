@@ -1883,11 +1883,15 @@ static void musb_irq_work(struct work_struct *data)
 			plat->set_min_bus_tput(musb->controller,
 				OCP_INITIATOR_AGENT, (200*1000*4));
 	} else if (musb->xceiv->event == USB_EVENT_ID) {
+		/* Hold a c-state constarint */
+		omap_pm_set_max_mpu_wakeup_lat(&plat->musb_qos_request, 4000);
 		/* Hold a L3 constarint for better throughput */
 		if (plat->set_min_bus_tput)
 			plat->set_min_bus_tput(musb->controller,
 				OCP_INITIATOR_AGENT, (200*1000*4));
 	} else if (musb->xceiv->event == USB_EVENT_NONE) {
+		/* Release c-state constraint */
+		omap_pm_set_max_mpu_wakeup_lat(&plat->musb_qos_request, -1);
 		/* Release L3 constraint on detach*/
 		if (plat->set_min_bus_tput)
 			plat->set_min_bus_tput(musb->controller,
