@@ -651,13 +651,6 @@ static int _omap_dss_wait_reset(void)
 	return 0;
 }
 
-static int _omap_dss_reset(void)
-{
-	/* Soft reset */
-	REG_FLD_MOD(DSS_SYSCONFIG, 1, 1, 1);
-	return _omap_dss_wait_reset();
-}
-
 void dss_set_venc_output(enum omap_dss_venc_type type)
 {
 	int l = 0;
@@ -735,10 +728,6 @@ int dss_init(struct platform_device *pdev)
 		 * enabling clocks.
 		 */
 		msleep(50);
-
-		/* In OMAP44xx HWMOD would take care of resetting the module */
-		if (cpu_is_omap44xx())
-			_omap_dss_reset();
 	}
 
 	/* autoidle */
