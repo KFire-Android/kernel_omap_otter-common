@@ -627,6 +627,7 @@ static void ipu_pm_work(struct work_struct *work)
 	int res;
 	int rcb_num;
 	int retval;
+	int len;
 
 	if (WARN_ON(handle == NULL))
 		return;
@@ -639,8 +640,14 @@ static void ipu_pm_work(struct work_struct *work)
 		/* set retval for each iteration asumming error */
 		retval = PM_UNSUPPORTED;
 		spin_lock_irq(&handle->lock);
-		kfifo_out(&handle->fifo, &im, sizeof(im));
+		len = kfifo_out(&handle->fifo, &im, sizeof(im));
 		spin_unlock_irq(&handle->lock);
+
+		if (unlikely(len != sizeof(im))) {
+			pr_err("%s: unexpected amount of data from kfifo_out: "
+					"%d\n", __func__, len);
+			continue;
+		}
 
 		/* Get the payload */
 		pm_msg.whole = im.pm_msg;
