@@ -141,6 +141,11 @@ static void omap_hdmi_dai_shutdown(struct snd_pcm_substream *substream,
 
 	if (hdmi_data.active)
 		hdmi_set_audio_power(0);
+
+#ifdef CONFIG_OMAP_HDMI_AUDIO_WA
+	if (hdmi_lib_stop_acr_wa())
+		printk(KERN_WARNING "HDMI WA may be in bad state");
+#endif
 #else
 	if (hdmi_audio_core.module_loaded)
 		hdmi_audio_core.wrapper_disable(HDMI_WP);
@@ -215,6 +220,13 @@ static int omap_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 
 	snd_soc_dai_set_dma_data(dai, substream,
 				 &omap_hdmi_dai_dma_params);
+
+#ifdef CONFIG_OMAP_HDMI_AUDIO_WA
+	err = hdmi_lib_start_acr_wa();
+	if (err)
+		printk(KERN_ERR "Failed to start ACR workaround[%d]]\n", err);
+#endif
+
 
 	return err;
 }

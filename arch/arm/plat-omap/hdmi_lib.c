@@ -49,6 +49,7 @@
 #include <syslink/notify_driver.h>
 #include <syslink/notifydefs.h>
 #include <syslink/notify_driverdefs.h>
+#include <linux/sched.h>
 
 #define SYS_M3 2
 #define HDMI_AUDIO_WA_EVENT 5
@@ -224,6 +225,8 @@ static struct {
 	u32 notify_event_reg;
 	u32 cts_interval;
 	struct omap_chip_id audio_wa_chip_ids;
+	struct task_struct *wa_task;
+	u32 ack_payload;
 #endif
 } hdmi;
 
@@ -1328,13 +1331,45 @@ static void hdmi_w1_audio_config_dma(u32 name, struct hdmi_audio_dma *audio_dma)
 }
 
 #ifdef CONFIG_OMAP_HDMI_AUDIO_WA
+int hdmi_lib_acr_wa_send_event(u32 payload)
+{
+	long tout;
+	if (omap_chip_is(hdmi.audio_wa_chip_ids)) {
+		if (hdmi.notify_event_reg == HDMI_NOTIFY_EVENT_REG) {
+			notify_send_event(SYS_M3, 0, HDMI_AUDIO_WA_EVENT,
+					payload, 0);
+			if (signal_pending(current))
+				return -ERESTARTSYS;
+			hdmi.wa_task = current;
+			set_current_state(TASK_INTERRUPTIBLE);
+			tout = schedule_timeout(msecs_to_jiffies(5000));
+			if (!tout)
+				return -EIO;
+			if (payload != hdmi.ack_payload)
+				return -EBADE;
+			return 0;
+		}
+		return -ENODEV;
+	}
+	return 0;
+}
+int hdmi_lib_start_acr_wa(void)
+{
+	return hdmi_lib_acr_wa_send_event(hdmi.cts_interval);
+}
+int hdmi_lib_stop_acr_wa(void)
+{
+	return hdmi_lib_acr_wa_send_event(0);
+}
+
 void hdmi_notify_event_ack_func(u16 proc_id, u16 line_id, u32 event_id,
 							u32 *arg, u32 payload)
 {
-	if (payload && (event_id == HDMI_AUDIO_WA_EVENT_ACK))
-		REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 1, 31, 31);
-	if (!payload && (event_id == HDMI_AUDIO_WA_EVENT_ACK))
-		REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 0, 31, 31);
+	hdmi.ack_payload = payload;
+	if (WARN_ON(!hdmi.wa_task))
+		return;
+
+	wake_up_process(hdmi.wa_task);
 }
 
 static int hdmi_syslink_notifier_call(struct notifier_block *nb,
@@ -1376,30 +1411,12 @@ static struct notifier_block hdmi_syslink_notify_block = {
 
 static void hdmi_w1_audio_enable(void)
 {
-#ifdef CONFIG_OMAP_HDMI_AUDIO_WA
-	if (omap_chip_is(hdmi.audio_wa_chip_ids)) {
-		if (hdmi.notify_event_reg == HDMI_NOTIFY_EVENT_REG)
-			notify_send_event(SYS_M3, 0, HDMI_AUDIO_WA_EVENT,
-					hdmi.cts_interval, 0);
-	} else
-		REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 1, 31, 31);
-#else
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 1, 31, 31);
-#endif
 }
 
 static void hdmi_w1_audio_disable(void)
 {
-#ifdef CONFIG_OMAP_HDMI_AUDIO_WA
-	if (omap_chip_is(hdmi.audio_wa_chip_ids)) {
-		/* Payload=0 disables workaround */
-		if (hdmi.notify_event_reg == HDMI_NOTIFY_EVENT_REG)
-			notify_send_event(SYS_M3, 0, HDMI_AUDIO_WA_EVENT, 0, 0);
-	} else
-		REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 0, 31, 31);
-#else
 	REG_FLD_MOD(HDMI_WP, HDMI_WP_AUDIO_CTRL, 0, 31, 31);
-#endif
 }
 
 static void hdmi_w1_audio_start(void)
