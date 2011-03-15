@@ -20,6 +20,7 @@
 #include <linux/bootmem.h>
 
 #include <mach/hardware.h>
+#include <mach/omap4-common.h>
 #include <asm/mach-types.h>
 #include <asm/mach/map.h>
 
@@ -422,6 +423,8 @@ static void omap_init_aess(void)
 	}
 
 	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
+	pdata->enter_dpll_cascade = omap4_dpll_low_power_cascade_check_entry;
+	pdata->exit_dpll_cascade = omap4_dpll_low_power_cascade_exit;
 
 	od = omap_device_build("omap-aess-audio", -1, oh, pdata,
 				sizeof(struct omap4_abe_dsp_pdata),
