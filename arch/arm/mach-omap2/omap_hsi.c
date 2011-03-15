@@ -185,9 +185,6 @@ int omap_hsi_prepare_suspend(void)
 	if (!hsi_ctrl)
 		return -ENODEV;
 
-	if (!hsi_ctrl->clock_enabled)
-		return 0;
-
 	if (device_may_wakeup(&pdev->dev))
 		omap_mux_enable_wakeup(OMAP_HSI_PADCONF_CAWAKE_PIN);
 	else
@@ -212,9 +209,6 @@ int omap_hsi_prepare_idle(void)
 
 	if (!hsi_ctrl)
 		return -ENODEV;
-
-	if (!hsi_ctrl->clock_enabled)
-		return 0;
 
 	/* If hsi_clocks_disable_channel() is used, it prevents board to */
 	/* enter sleep, due to the checks of HSI controller status. */
@@ -261,15 +255,13 @@ int omap_hsi_resume_idle(void)
 		dev_dbg(hsi_ctrl->dev, "HSI WAKEUP DETECTED from PADCONF : "
 				       "0x%04x\n", val);
 
-		if (!hsi_ctrl->clock_enabled) {
-			/* CAWAKE falling or rising edge detected */
-			hsi_ctrl->hsi_port->cawake_off_event = true;
-			tasklet_hi_schedule(&hsi_ctrl->hsi_port->hsi_tasklet);
+		/* CAWAKE falling or rising edge detected */
+		hsi_ctrl->hsi_port->cawake_off_event = true;
+		tasklet_hi_schedule(&hsi_ctrl->hsi_port->hsi_tasklet);
 
-			/* Disable interrupt until Bottom Half has cleared */
-			/* the IRQ status register */
-			disable_irq_nosync(hsi_ctrl->hsi_port->irq);
-		}
+		/* Disable interrupt until Bottom Half has cleared */
+		/* the IRQ status register */
+		disable_irq_nosync(hsi_ctrl->hsi_port->irq);
 	}
 
 	return 0;
