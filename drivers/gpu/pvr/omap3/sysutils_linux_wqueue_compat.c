@@ -77,20 +77,24 @@ static IMG_VOID PowerLockUnwrap(SYS_SPECIFIC_DATA *psSysSpecData)
 	}
 }
 
-PVRSRV_ERROR SysPowerLockWrap(SYS_DATA *psSysData)
+PVRSRV_ERROR SysPowerLockWrap(IMG_VOID)
 {
-	SYS_SPECIFIC_DATA *psSysSpecData = (SYS_SPECIFIC_DATA *) psSysData->pvSysSpecificData;
+	SYS_DATA	*psSysData;
 
-	PowerLockWrap(psSysSpecData);
+	SysAcquireData(&psSysData);
+
+	PowerLockWrap(psSysData->pvSysSpecificData);
 
 	return PVRSRV_OK;
 }
 
-IMG_VOID SysPowerLockUnwrap(SYS_DATA *psSysData)
+IMG_VOID SysPowerLockUnwrap(IMG_VOID)
 {
-	SYS_SPECIFIC_DATA *psSysSpecData = (SYS_SPECIFIC_DATA *) psSysData->pvSysSpecificData;
+	SYS_DATA	*psSysData;
 
-	PowerLockUnwrap(psSysSpecData);
+	SysAcquireData(&psSysData);
+
+	PowerLockUnwrap(psSysData->pvSysSpecificData);
 }
 
 IMG_BOOL WrapSystemPowerChange(SYS_SPECIFIC_DATA *psSysSpecData)
