@@ -790,6 +790,11 @@ int snd_soc_pcm_close(struct snd_pcm_substream *substream)
 	cpu_dai->runtime = NULL;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		if (rtd->dai_link->dynamic)
+			snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_PLAYBACK,
+					cpu_dai->driver->playback.stream_name,
+					SND_SOC_DAPM_STREAM_STOP);
+
 		/* start delayed pop wq here for playback streams */
 		codec_dai->pop_wait = 1;
 		schedule_delayed_work(&rtd->delayed_work,
