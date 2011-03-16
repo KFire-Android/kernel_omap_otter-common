@@ -263,13 +263,13 @@ static struct mem_type mem_types[] = {
 
 	[MT_MEMORY_SO] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
-				PMD_SECT_UNCACHED | PMD_SECT_XN,
+				PMD_SECT_UNCACHED | PMD_SECT_XN | PMD_SECT_S,
 		.domain    = DOMAIN_KERNEL,
 	},
 
 	[MT_MEMORY_SO_EXE] = {
 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE |
-				PMD_SECT_UNCACHED,
+				PMD_SECT_UNCACHED | PMD_SECT_S,
 		.domain    = DOMAIN_KERNEL,
 	},
 };
