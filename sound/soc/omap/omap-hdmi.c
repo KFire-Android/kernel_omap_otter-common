@@ -138,7 +138,9 @@ static void omap_hdmi_dai_shutdown(struct snd_pcm_substream *substream,
 #ifdef CONFIG_HDMI_NO_IP_MODULE
 	hdmi_w1_wrapper_disable(HDMI_WP);
 	hdmi_data.substream = NULL;
-	hdmi_set_audio_power(0);
+
+	if (hdmi_data.active)
+		hdmi_set_audio_power(0);
 #else
 	if (hdmi_audio_core.module_loaded)
 		hdmi_audio_core.wrapper_disable(HDMI_WP);
