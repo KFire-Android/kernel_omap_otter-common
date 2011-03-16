@@ -2583,7 +2583,7 @@ static int omapfb_probe(struct platform_device *pdev)
 		if (def_display->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
 			u16 w, h;
 			if (dssdrv->enable_te)
-				dssdrv->enable_te(def_display, 0);
+				dssdrv->enable_te(def_display, 1);
 			if (dssdrv->set_update_mode)
 				dssdrv->set_update_mode(def_display,
 						OMAP_DSS_UPDATE_MANUAL);
