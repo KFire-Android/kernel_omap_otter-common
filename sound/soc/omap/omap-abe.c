@@ -1095,14 +1095,14 @@ static void enable_be_ports(struct snd_pcm_substream *substream, int stream)
 				if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
 					/* MM_EXT connection to McBSP 2 ports */
 					format.f = 48000;
-					format.samp_format = STEREO_16_16;
+					format.samp_format = STEREO_RSHIFTED_16;
 					abe_connect_serial_port(MM_EXT_OUT_PORT,
 								&format, MCBSP2_TX);
 					abe_dai_enable_data_transfer(MM_EXT_OUT_PORT);
 				} else {
 					/* MM_EXT connection to McBSP 2 ports */
 					format.f = 48000;
-					format.samp_format = STEREO_16_16;
+					format.samp_format = STEREO_RSHIFTED_16;
 					abe_connect_serial_port(MM_EXT_IN_PORT,
 								&format, MCBSP2_RX);
 					abe_dai_enable_data_transfer(MM_EXT_IN_PORT);
