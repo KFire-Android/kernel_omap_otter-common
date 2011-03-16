@@ -26,6 +26,7 @@ struct cfhsi_omap {
 	struct hsi_device *hsi_dev;
 	int tx_len;
 	int rx_len;
+	bool awake;
 };
 
 /* TODO: Lists are not protected with regards to device removal. */
@@ -41,14 +42,6 @@ static int cfhsi_up (struct cfhsi_dev *dev)
 	struct cfhsi_omap *cfhsi = NULL;
 
 	cfhsi = container_of(dev, struct cfhsi_omap, dev);
-
-	/* Request the HSI.*/
-	res = hsi_open(cfhsi->hsi_dev);
-	if (res) {
-		dev_err(&cfhsi->pdev.dev, "%s: hsi_open failed: %d.\n",
-			__func__, res);
-		return res;
-	}
 
 	/* Flush both the receiver and the transmitter. */
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_FLUSH_TX, NULL);
@@ -84,9 +77,6 @@ static int cfhsi_down (struct cfhsi_dev *dev)
 	}
 	/* Cancel outstanding read request. */
 	hsi_read_cancel(cfhsi->hsi_dev);
-
-	/* Release the HSI. */
-	hsi_close(cfhsi->hsi_dev);
 
 	return 0;
 }
@@ -138,10 +128,11 @@ static int cfhsi_wake_up(struct cfhsi_dev *dev)
 	cfhsi = container_of(dev, struct cfhsi_omap, dev);
 
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_UP, NULL);
-	if (res) {
+	if (res)
 		dev_err(&cfhsi->pdev.dev, "%s: Wake up failed: %d.\n",
 			__func__, res);
-	}
+	else
+		cfhsi->awake = true;
 	return res;
 }
 
@@ -153,16 +144,16 @@ static int cfhsi_wake_down(struct cfhsi_dev *dev)
 	cfhsi = container_of(dev, struct cfhsi_omap, dev);
 
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_DOWN, NULL);
-	if (res) {
+	if (res)
 		dev_err(&cfhsi->pdev.dev, "%s: Wake down failed: %d.\n",
 			__func__, res);
-	}
+	else
+		cfhsi->awake = false;
 
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_FLUSH_RX, NULL);
-	if (res) {
+	if (res)
 		dev_err(&cfhsi->pdev.dev, "%s: RX flush failed: %d.\n",
 			__func__, res);
-	}
 
 	return res;
 }
@@ -175,10 +166,9 @@ static int cfhsi_fifo_occupancy(struct cfhsi_dev *dev, size_t *occupancy)
 	cfhsi = container_of(dev, struct cfhsi_omap, dev);
 
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_GET_FIFO_OCCUPANCY, occupancy);
-	if (res) {
+	if (res)
 		dev_err(&cfhsi->pdev.dev, "%s: HSI_IOCTL_GET_FIFO_OCCUPANCY failed: %d.\n",
 			__func__, res);
-	}
 
 	return res;
 }
@@ -269,12 +259,20 @@ static void cfhsi_omap_port_event_cb(struct hsi_device *dev,
 	}
 }
 
+static void hsi_proto_pre_close(struct cfhsi_omap *cfhsi)
+{
+	/* Set WAKE line low if not done already. */
+	if (cfhsi->awake)
+		WARN_ON(hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_DOWN, NULL));
+	/* Reset the HSI block; set AC_DATA and AC_FLAG low */
+	WARN_ON(hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SW_RESET, NULL));
+}
+
 static void hsi_proto_release(struct device *dev)
 {
 	struct cfhsi_omap *cfhsi = NULL;
 	struct list_head *list_node;
 	struct list_head *n;
-	int res;
 
 	list_for_each_safe(list_node, n, &cfhsi_dev_list) {
 		cfhsi = list_entry(list_node, struct cfhsi_omap, list);
@@ -282,13 +280,7 @@ static void hsi_proto_release(struct device *dev)
 		if (&cfhsi->pdev.dev == dev) {
 			/* Remove from list. */
 			list_del(list_node);
-
-			/*TODO: We should check if the device is open or not. */
-			res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_DOWN, NULL);
-			if (res) {
-				printk(KERN_WARNING "%s: failed to set WAKE: %d\n",
-						__func__, res);
-			}
+			hsi_proto_pre_close(cfhsi);
 			hsi_close(cfhsi->hsi_dev);
 			/* Free memory. */
 			kfree(cfhsi);
@@ -347,8 +339,6 @@ static int hsi_proto_probe(struct hsi_device *dev)
 		goto err_hsi_ioctl;
 	}
 
-	hsi_close(dev);
-
 	cfhsi = kzalloc(sizeof(struct cfhsi_omap), GFP_KERNEL);
 
 	/* Assign OMAP HSI device to this CAIF HSI device. */
@@ -367,6 +357,7 @@ static int hsi_proto_probe(struct hsi_device *dev)
 	cfhsi->pdev.dev.release = hsi_proto_release;
 	/* Use channel number as id. Assuming only one HSI port. */
 	cfhsi->pdev.id = cfhsi->hsi_dev->n_ch;
+
 	/* Register platform device. */
 	res = platform_device_register(&cfhsi->pdev);
 	if (res) {
@@ -403,6 +394,7 @@ static int hsi_proto_remove(struct hsi_device *dev)
 			list_del(list_node);
 			/* Our HSI device is gone, unregister CAIF HSI device. */
 			platform_device_del(&cfhsi->pdev);
+			hsi_proto_pre_close(cfhsi);
 			hsi_close(cfhsi->hsi_dev);
 			/* Free memory. */
 			kfree(cfhsi);
@@ -457,21 +449,14 @@ static void __exit cfhsi_omap_exit(void)
 	struct cfhsi_omap *cfhsi = NULL;
 	struct list_head *list_node;
 	struct list_head *n;
-	int res;
 
 	list_for_each_safe(list_node, n, &cfhsi_dev_list) {
 		cfhsi = list_entry(list_node, struct cfhsi_omap, list);
 		/* Remove from list. */
 		list_del(list_node);
-
 		/* Our HSI device is gone, unregister CAIF HSI device. */
 		platform_device_del(&cfhsi->pdev);
-		/*TODO: We should check if the device is open or not. */
-		res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_DOWN, NULL);
-		if (res) {
-			printk(KERN_WARNING "%s: failed to set WAKE: %d\n",
-					__func__, res);
-		}
+		hsi_proto_pre_close(cfhsi);
 		hsi_close(cfhsi->hsi_dev);
 		/* Free memory. */
 		kfree(cfhsi);
