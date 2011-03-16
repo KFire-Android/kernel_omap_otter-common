@@ -1309,6 +1309,9 @@ static int __init omap4_i2c_init(void)
 	omap_i2c_hwspinlock_init(2, 1, &sdp4430_i2c_2_bus_pdata);
 	omap_i2c_hwspinlock_init(3, 2, &sdp4430_i2c_3_bus_pdata);
 	omap_i2c_hwspinlock_init(4, 3, &sdp4430_i2c_4_bus_pdata);
+
+	regulator_has_full_constraints();
+
 	/*
 	 * Phoenix Audio IC needs I2C1 to
 	 * start with 400 KHz or less
