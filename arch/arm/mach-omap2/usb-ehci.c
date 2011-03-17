@@ -2129,7 +2129,8 @@ static void usbhs_ehci_devoff_suspend(struct uhhtll_hcd_omap *omap)
 {
 	enum usbhs_omap3_port_mode *portmode = &(omap->platdata.port_mode[0]);
 
-	usbhs_phy_safe = 1;
+	if (portmode[0] == OMAP_EHCI_PORT_MODE_PHY)
+		usbhs_phy_safe = 1;
 	usbhs_4430ehci_phy_mux(portmode, usbhs_phy_safe);
 
 }
