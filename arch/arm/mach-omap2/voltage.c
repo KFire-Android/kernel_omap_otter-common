@@ -2486,7 +2486,7 @@ static int __init omap_voltage_init(void)
 	 * 2. trim VDAC value for TV output as per recomendation
 	 */
 	if (cpu_is_omap44xx()
-		&& (omap_rev() == OMAP4430_REV_ES2_2)) {
+		&& (omap_rev() == CHIP_IS_OMAP4430ES2_2)) {
 		is_trimmed = omap_ctrl_readl(
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL);
 		if (!is_trimmed) {
@@ -2504,6 +2504,16 @@ static int __init omap_voltage_init(void)
 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
 		}
 	}
+
+	/*
+	 * for all ESx.y trimmed and untrimmed units LPDDR IO and
+	 * Smart IO override efuse with P:16/N:16 and P:0/N:0 respectively
+	 */
+	if (cpu_is_omap44xx())
+		omap_ctrl_writel(0x00084000,
+			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_2);
+
+
 #ifdef CONFIG_PM_DEBUG
 	voltage_dir = debugfs_create_dir("voltage", pm_dbg_main_dir);
 #endif
