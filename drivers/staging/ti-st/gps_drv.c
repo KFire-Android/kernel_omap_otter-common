@@ -302,6 +302,7 @@ int gpsdrv_open(struct inode *inod, struct file *file)
 	if (test_and_set_bit(GPS_ST_REGISTERED, &hgps->state)) {
 		GPSDRV_ERR("GPS Registered/Registration in progress with ST"
 				" ,open called again?");
+		kfree(hgps);
 		return -EAGAIN;
 	}
 
@@ -520,6 +521,7 @@ ssize_t gpsdrv_write(struct file *file, const char __user *data,
 	struct sk_buff *skb = NULL;
 	struct gpsdrv_data *hgps;
 
+	GPSDRV_DBG(" Inside %s", __func__);
 	/* Validate input parameters */
 	if ((NULL == file) || (((NULL == data) || (0 == size)))) {
 		GPSDRV_ERR("Invalid input params passed to %s", __func__);
@@ -565,7 +567,7 @@ ssize_t gpsdrv_write(struct file *file, const char __user *data,
 #ifdef VERBOSE
 	GPSDRV_VER("start data..");
 	print_hex_dump(KERN_INFO, "<out<", DUMP_PREFIX_NONE,
-			16, 1, skb->data, size);
+			16, 1, skb->data, size, 0);
 	GPSDRV_VER("\n..end data");
 #endif
 
@@ -642,7 +644,7 @@ static int gpsdrv_ioctl(struct inode *inode, struct file *file,
 	switch (cmd) {
 	case TCFLSH:
 		GPSDRV_VER(" IOCTL TCFLSH invoked with %ld argument", arg);
-	spin_lock(&hgps->lock);
+		spin_lock(&hgps->lock);
 		switch (arg) {
 		/* purge Rx/Tx SKB list queues depending on arg value */
 		case TCIFLUSH:
@@ -668,8 +670,8 @@ static int gpsdrv_ioctl(struct inode *inode, struct file *file,
 	* available in the available SKB
 	*/
 		spin_lock(&hgps->lock);
-		if (!skb_queue_empty(&hgps->rx_list)) {
-			skb = skb_dequeue(&hgps->rx_list);
+		skb = skb_dequeue(&hgps->rx_list);
+		if (skb != NULL) {
 			*(unsigned int *)arg = skb->len;
 			/* Re-Store the SKB for furtur Read operations */
 			skb_queue_head(&hgps->rx_list, skb);
@@ -760,7 +762,7 @@ static int __init gpsdrv_init(void)
 		GPSDRV_ERR("Error when registering to char dev");
 		return GPS_ERR_FAILURE;
 	}
-	GPSDRV_VER(" %d: allocated %d, %d", err, gpsdrv_major, 0);
+	GPSDRV_VER("allocated %d, %d", gpsdrv_major, 0);
 
 	/*  udev */
 	gpsdrv_class = class_create(THIS_MODULE, DEVICE_NAME);
