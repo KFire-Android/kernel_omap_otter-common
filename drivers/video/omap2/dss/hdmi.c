@@ -1471,6 +1471,12 @@ static void hdmi_work_queue(struct work_struct *ws)
 		mutex_lock(&hdmi.lock);
 		mutex_lock(&hdmi.lock_aux);
 
+		if (hdmi_power != HDMI_POWER_FULL || !hdmi_connected) {
+			DSSINFO("irqstatus=0x%08x ignoring FIRST_HPD when "
+				"hdmi_connected = %d, hdmi_power = %d\n",
+				r, hdmi_connected, hdmi_power);
+			goto done;
+		}
 		/*
 		 * HDMI should already be full on. We use this to read EDID
 		 * the first time we enable HDMI via HPD.
