@@ -464,8 +464,12 @@ u32 omap_prcm_get_reset_sources(void)
 }
 EXPORT_SYMBOL(omap_prcm_get_reset_sources);
 
+#ifdef CONFIG_ARCH_OMAP4
 extern void __iomem *sar_ram_base;
 #define PUBLIC_SAR_RAM_1_FREE		((char *)(sar_ram_base + 0xA0C))
+#else
+#define PUBLIC_SAR_RAM_1_FREE		"null"
+#endif
 
 void omap4_prm_global_sw_reset(const char *cmd)
 {
