@@ -66,6 +66,9 @@
 /* Module headers */
 #include <plat/ipu_dev.h>
 #include "../../../../arch/arm/mach-omap2/cm.h"
+#include "../../../../arch/arm/mach-omap2/prm.h"
+#include "../../../../arch/arm/mach-omap2/prcm-common.h"
+#include "../../../../arch/arm/mach-omap2/prm44xx.h"
 #include "ipu_pm.h"
 
 /** ============================================================================
@@ -1283,6 +1286,11 @@ static inline int ipu_pm_get_iva_hd(struct ipu_pm_object *handle,
 		pr_err("%s %d Error requesting IVA_HD\n", __func__, __LINE__);
 		return PM_UNSUPPORTED;
 	}
+	/* set Next State to INACTIVE for IVAHD */
+	prm_write_mod_reg(0xff0e02,
+			 OMAP4430_PRM_IVAHD_MOD,
+			 OMAP4_PM_IVAHD_PWRSTCTRL_OFFSET);
+
 	params->pm_iva_hd_counter++;
 	pr_debug("Request IVA_HD\n");
 
