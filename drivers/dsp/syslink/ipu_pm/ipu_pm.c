@@ -640,6 +640,8 @@ static void ipu_pm_work(struct work_struct *work)
 	if (WARN_ON(params == NULL))
 		return;
 
+	pr_debug("Processing %d msgs\n", kfifo_len(&handle->fifo));
+
 	while (kfifo_len(&handle->fifo) >= sizeof(im)) {
 		/* set retval for each iteration asumming error */
 		retval = PM_UNSUPPORTED;
@@ -734,10 +736,11 @@ void ipu_pm_callback(u16 proc_id, u16 line_id, u32 event_id,
 	im.pm_msg = payload;
 
 	spin_lock_irq(&handle->lock);
-	if (kfifo_avail(&handle->fifo) >= sizeof(im)) {
+	if (kfifo_avail(&handle->fifo) >= sizeof(im))
 		kfifo_in(&handle->fifo, (unsigned char *)&im, sizeof(im));
-		queue_work(ipu_resources, &handle->work);
-	}
+	else
+		pr_err("fifo for resources full losing messages!\n");
+	queue_work(ipu_resources, &handle->work);
 	spin_unlock_irq(&handle->lock);
 }
 EXPORT_SYMBOL(ipu_pm_callback);
