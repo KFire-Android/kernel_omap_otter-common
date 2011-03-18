@@ -628,7 +628,7 @@ int cma3000_poweron(struct cma3000_accl_data *data)
 	if (ret < 0)
 		return -EIO;
 
-	mdelay(CMA3000_SETDELAY);
+	msleep(CMA3000_SETDELAY);
 
 	return 0;
 }
@@ -638,7 +638,7 @@ int cma3000_poweroff(struct cma3000_accl_data *data)
 	int ret;
 
 	ret = cma3000_set(data, CMA3000_CTRL, CMAMODE_POFF, "Mode setting");
-	mdelay(CMA3000_SETDELAY);
+	msleep(CMA3000_SETDELAY);
 
 	return ret;
 }
