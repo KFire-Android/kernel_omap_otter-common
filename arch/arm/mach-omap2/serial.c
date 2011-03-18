@@ -608,6 +608,57 @@ void omap_uart_enable_clock_from_irq(int uart_num)
 }
 EXPORT_SYMBOL(omap_uart_enable_clock_from_irq);
 
+void omap_uart_recalibrate_baud(unsigned int enable)
+{
+	struct clk *func_48m_fclk;
+	struct omap_uart_state *uart;
+	struct uart_omap_port *up = NULL;
+	unsigned int baud_quot;
+	unsigned int divisor;
+	u16 lcr = 0;
+
+	func_48m_fclk = clk_get(NULL, "func_48m_fclk");
+
+	list_for_each_entry(uart, &uart_list, node) {
+		up = platform_get_drvdata(uart->pdev);
+		lcr = serial_read_reg(uart, UART_LCR);
+#if 0
+		up->port.uartclk = clk_get_rate(func_48m_fclk);
+#endif
+		if (enable == 1) /* Chnaged */
+		up->port.uartclk = 24576000;
+		else /* Original */
+		up->port.uartclk = 49152000;
+
+		/* if zero mean the driver has not been opened. */
+		if (up->baud_rate != 0) {
+			if (up->baud_rate > OMAP_MODE13X_SPEED
+				&& up->baud_rate != 3000000)
+				divisor = 13;
+			else
+				divisor = 16;
+
+			baud_quot = up->port.uartclk/(up->baud_rate * divisor);
+
+			serial_write_reg(uart, UART_OMAP_MDR1, 0x7);
+			serial_write_reg(uart, UART_LCR,
+					OMAP_UART_LCR_CONF_MDB);
+			serial_write_reg(uart, UART_DLL, baud_quot & 0xff);
+			serial_write_reg(uart, UART_DLM, baud_quot >> 8);
+			serial_write_reg(uart, UART_LCR, UART_LCR_WLEN8);
+			/* UART 16x mode */
+			serial_write_reg(uart, UART_OMAP_MDR1, 0x00);
+#if 0
+			dev_dbg(uart->pdev->dev, "Per Functional Clock Changed"
+				" %u Hz Change baud DLL %d DLM %d\n",
+				clk_get_rate(func_48m_fclk),
+				baud_quot & 0xff, baud_quot >> 8);
+#endif
+		}
+	}
+}
+EXPORT_SYMBOL(omap_uart_recalibrate_baud);
+
 static void omap_uart_idle_init(struct omap_uart_state *uart)
 {
 	int ret;

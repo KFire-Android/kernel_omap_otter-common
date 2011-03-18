@@ -172,6 +172,7 @@ struct uart_omap_port {
 	unsigned char		msr_saved_flags;
 	char			name[20];
 	unsigned long		port_activity;
+	unsigned int		baud_rate;
 	void			(*plat_hold_wakelock)(void *up, int flag);
 };
 
@@ -184,6 +185,7 @@ enum {
 
 int omap_uart_active(int num, u32 timeout);
 void omap_uart_update_jiffies(int num);
+void omap_uart_recalibrate_baud(unsigned int enable);
 #ifdef CONFIG_PM
 void omap_uart_enable_clock_from_irq(int uart_num);
 #endif

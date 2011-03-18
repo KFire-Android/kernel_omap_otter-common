@@ -611,6 +611,10 @@ static void serial_omap_shutdown(struct uart_port *port)
 		serial_out(up, UART_OMAP_SYSC, tmp); /* force-idle */
 	}
 	free_irq(up->port.irq, up);
+	/* Set this to zero, would be initialsed
+	 * to the corrcet value at set_stermios.
+	 */
+	up->baud_rate = 0;
 }
 
 static inline void
@@ -713,6 +717,12 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	 */
 
 	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/13);
+	/* Added for the suporrt of DPLL, frequency changes
+	 * This value can be used to recalculate the DLLand
+	 * DLH values. If this function is not called for
+	 * particulate UART it would remain as 0.
+	 */
+	up->baud_rate = baud;
 	quot = serial_omap_get_divisor(port, baud);
 
 	up->fcr = UART_FCR_R_TRIG_01 | UART_FCR_T_TRIG_01 |
@@ -1335,6 +1345,10 @@ static int serial_omap_probe(struct platform_device *pdev)
 	up->port.uartclk = omap_up_info->uartclk;
 	up->uart_dma.uart_base = mem->start;
 	up->plat_hold_wakelock = omap_up_info->plat_hold_wakelock;
+	/* Initialise this to zero, would be initialsed
+	 * to the corrcet value at set_stermios.
+	 */
+	up->baud_rate = 0;
 
 	if (omap_up_info->use_dma) {
 		up->uart_dma.uart_dma_tx = dma_tx->start;
