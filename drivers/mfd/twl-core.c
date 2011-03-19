@@ -1035,6 +1035,19 @@ static void _init_twl6030_settings(void)
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xF5);
 	/* CHARGERUSB_CTRL3 */
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x21, 0xEA);
+
+	/* SYSEN_CFG_TRANS */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xB3);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xB4);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x20, 0xB5);
+
+	/* TMP */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xCE);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xCF);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x20, 0xD0);
+
+	/* VBATMIN_HI */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xC9);
 }
 
 /* NOTE:  this driver only handles a single twl4030/tps659x0 chip */
