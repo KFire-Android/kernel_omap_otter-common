@@ -1886,7 +1886,7 @@ unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
 	 * we are probably masking a clock framework bug, so warn
 	 */
 	if (unlikely((freq / 1000000) != (vdd->volt_clk->rate / 1000000)))
-		pr_warning("%s: Available freq %ld != dpll freq %ld.\n",
+		pr_debug("%s: Available freq %ld != dpll freq %ld.\n",
 			__func__, freq, vdd->volt_clk->rate);
 
 	return opp_get_voltage(opp);
