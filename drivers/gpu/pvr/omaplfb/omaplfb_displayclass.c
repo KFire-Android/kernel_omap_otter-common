@@ -178,10 +178,8 @@ static void FlushInternalSyncQueue(OMAPLFB_SWAPCHAIN *psSwapChain)
 
 		/* Flip the buffer if it hasn't been flipped */
 		if(psFlipItem->bFlipped == OMAP_FALSE)
-		{
 			OMAPLFBFlip(psSwapChain,
-				(unsigned long)psFlipItem->sSysAddr);
-		}
+				(unsigned long)psFlipItem->sSysAddr->uiAddr);
 
 		/* If the command didn't complete, assume it did */
 		if(psFlipItem->bCmdCompleted == OMAP_FALSE)
