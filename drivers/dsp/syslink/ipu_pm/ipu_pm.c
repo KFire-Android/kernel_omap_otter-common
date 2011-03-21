@@ -334,6 +334,8 @@ static void __iomem *issHandle;
 static void __iomem *fdifHandle;
 #endif
 
+/* ISS optional clock */
+static struct clk *clk_opt_iss;
 /* Ducati Interrupt Capable Gptimers */
 static int ipu_timer_list[NUM_IPU_TIMERS] = {
 	GP_TIMER_9,
@@ -1432,6 +1434,7 @@ static inline int ipu_pm_get_iss(struct ipu_pm_object *handle,
 				 struct ipu_pm_params *params)
 {
 	int retval;
+	struct omap_ipupm_mod_platform_data *pd = ipupm_get_plat_data();
 
 	if (params->pm_iss_counter) {
 		pr_err("%s %d ISS already requested\n", __func__, __LINE__);
@@ -1449,15 +1452,19 @@ static inline int ipu_pm_get_iss(struct ipu_pm_object *handle,
 		return PM_UNSUPPORTED;
 	}
 
-	/* FIXME:
-	 * enable OPTFCLKEN_CTRLCLK for camera sensors
-	 * should be moved to a separate function for
-	 * independent control this also duplicates the
-	 * above call to avoid read modify write locking.
-	 */
-	cm_write_mod_reg((OPTFCLKEN | CAM_ENABLED),
-					OMAP4430_CM2_CAM_MOD,
-					OMAP4_CM_CAM_ISS_CLKCTRL_OFFSET);
+	clk_opt_iss = clk_get(pd[rcb_p->sub_type].dev, "ctrlclk");
+	if (!clk_opt_iss) {
+		pr_err("%s %d failed to get the iss ctrl clock\n",
+						__func__, __LINE__);
+		return PM_UNSUPPORTED;
+	}
+
+	retval = clk_enable(clk_opt_iss);
+	if (retval != 0) {
+		pr_err("%s %d failed to enable the iss opt clock\n",
+							__func__, __LINE__);
+		return PM_UNSUPPORTED;
+	}
 
 #ifdef CONFIG_OMAP_PM
 	pr_debug("Request MPU wakeup latency\n");
@@ -1958,16 +1965,11 @@ static inline int ipu_pm_rel_iss(struct ipu_pm_object *handle,
 							issHandle + 0x10);
 	}
 #endif
+	if (clk_opt_iss) {
+		clk_disable(clk_opt_iss);
+		clk_put(clk_opt_iss);
+	}
 
-	/* FIXME:
-	 * disable OPTFCLKEN_CTRLCLK for camera sensors
-	 * should be moved to a separate function for
-	 * independent control this also duplicates the
-	 * above call to avoid read modify write locking
-	 */
-	cm_write_mod_reg(CAM_DISABLED,
-				OMAP4430_CM2_CAM_MOD,
-				OMAP4_CM_CAM_ISS_CLKCTRL_OFFSET);
 	params->pm_iss_counter--;
 	pr_debug("Release ISS\n");
 

@@ -103,5 +103,6 @@ extern int ipu_pm_module_set_latency(unsigned rsrc,
 extern int ipu_pm_module_set_bandwidth(unsigned rsrc,
 				       unsigned target_rsrc,
 				       int bandwidth);
-
+extern struct omap_ipupm_mod_platform_data*
+				ipupm_get_plat_data(void);
 #endif /* IPU_PM_H */
