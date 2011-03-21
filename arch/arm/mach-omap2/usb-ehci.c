@@ -239,6 +239,8 @@ struct uhhtll_hcd_omap {
 
 	struct platform_device		*ohci_pdev;
 	struct platform_device		*ehci_pdev;
+	struct usb_hcd			*ohci_hcd;
+	struct usb_hcd			*ehci_hcd;
 	struct omap_hwmod		*uhh_hwmod;
 };
 
@@ -249,6 +251,8 @@ static struct uhhtll_hcd_omap uhhtll = {
 static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata);
 
 static int uhhtll_get_resource(enum driver_type, struct usbhs_omap_resource *);
+
+static int uhhtll_store(enum driver_type, enum data_type, void *);
 
 static int uhhtll_drv_enable(enum driver_type drvtype);
 
@@ -270,6 +274,7 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
 static struct uhhtll_apis uhhtll_export = {
 	.get_platform_data	= uhhtll_get_platform_data,
 	.get_resource		= uhhtll_get_resource,
+	.store			= uhhtll_store,
 	.enable			= uhhtll_drv_enable,
 	.disable		= uhhtll_drv_disable,
 	.suspend		= uhhtll_drv_suspend,
@@ -992,7 +997,7 @@ static void usbhs_resume_work(struct work_struct *work)
 	if (!omap->pdev)
 		return;
 
-	dev_dbg(&omap->pdev->dev, "usbhs_resume_work reamote wakeup\n");
+	dev_dbg(&omap->pdev->dev, "%s: remote wakeup\n", __func__);
 
 	if (test_bit(USBHS_EHCI_RMWKP, &omap->event_state)) {
 		uhhtll_drv_resume(OMAP_EHCI);
@@ -2205,8 +2210,13 @@ static void usbhs_ehci_phyactive(struct uhhtll_hcd_omap *omap)
 
 }
 
-
-
+static void usbhs_hw_accessible(struct usb_hcd *hcd, int enabled)
+{
+	if (enabled)
+		set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	else
+		clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+}
 
 static int uhhtll_get_platform_data(struct usbhs_omap_platform_data *pdata)
 {
@@ -2260,6 +2270,37 @@ static int uhhtll_get_resource(enum driver_type drvtype,
 	return ret;
 }
 
+
+static int uhhtll_store(enum driver_type drvtype, enum data_type datatype,
+				void *data)
+{
+	struct uhhtll_hcd_omap *omap = &uhhtll;
+	int ret = 0;
+
+	if (down_interruptible(&omap->mutex))
+		return -ERESTARTSYS;
+
+	switch (drvtype) {
+	case OMAP_EHCI:
+		if (datatype == OMAP_USB_HCD)
+			omap->ehci_hcd = (struct usb_hcd *)data;
+		else
+			ret = -EINVAL;
+		break;
+	case OMAP_OHCI:
+		if (datatype == OMAP_USB_HCD)
+			omap->ohci_hcd = (struct usb_hcd *)data;
+		else
+			ret = -EINVAL;
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	up(&omap->mutex);
+
+	return 0;
+}
 
 
 static int uhhtll_drv_enable(enum driver_type drvtype)
@@ -2366,6 +2407,9 @@ static int uhhtll_drv_suspend(enum driver_type drvtype)
 			usbhs_disable(omap, 0);
 			if (!is_ehciport0)
 				usbhs_ehci_devoff_suspend(omap);
+			disable_irq(omap->ehci_res.irq);
+			if (omap->ehci_hcd)
+				usbhs_hw_accessible(omap->ehci_hcd, 0);
 		}
 	} else if ((drvtype == OMAP_OHCI) &&
 		test_bit(USBHS_OHCI_LOADED , &omap->event_state)) {
@@ -2374,6 +2418,9 @@ static int uhhtll_drv_suspend(enum driver_type drvtype)
 			usbhs_ohci_clk(omap, 0);
 			set_bit(USBHS_OHCI_SUSPENED, &omap->event_state);
 			usbhs_disable(omap, 0);
+			disable_irq(omap->ohci_res.irq);
+			if (omap->ohci_hcd)
+				usbhs_hw_accessible(omap->ohci_hcd, 0);
 		}
 	} else
 		ret = -EINVAL;
@@ -2409,6 +2456,9 @@ static int uhhtll_drv_resume(enum driver_type drvtype)
 			usbhs_ehci_clk(omap, 1);
 			if (usbhs_phy_safe_local)
 				usbhs_ehci_phyactive(omap);
+			if (omap->ehci_hcd)
+				usbhs_hw_accessible(omap->ehci_hcd, 1);
+			enable_irq(omap->ehci_res.irq);
 		}
 	} else if ((drvtype == OMAP_OHCI) &&
 		test_bit(USBHS_OHCI_LOADED , &omap->event_state)) {
@@ -2417,6 +2467,9 @@ static int uhhtll_drv_resume(enum driver_type drvtype)
 			ret = usbhs_enable(omap, 0);
 			usbhs_ohci_io_wakeup(pdata->port_mode, 0);
 			usbhs_ohci_clk(omap, 1);
+			if (omap->ohci_hcd)
+				usbhs_hw_accessible(omap->ohci_hcd, 1);
+			enable_irq(omap->ohci_res.irq);
 		}
 	} else
 		ret = -EINVAL;

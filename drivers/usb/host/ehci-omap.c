@@ -189,6 +189,12 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	/* we know this is the memory we want, no need to ioremap again */
 	omap->ehci->caps = hcd->regs;
 
+	ret = uhhtllp->store(OMAP_EHCI, OMAP_USB_HCD, hcd);
+	if (ret) {
+		dev_dbg(&pdev->dev, "failed to store hcd\n");
+		goto err_regs;
+	}
+
 	ret = uhhtllp->enable(OMAP_EHCI);
 	if (ret) {
 		dev_dbg(&pdev->dev, "failed to start ehci\n");
@@ -315,7 +321,7 @@ static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
 		dev_dbg(dev, "ehci_bus_suspend failed %d\n", ret);
 
 	if (!ret && uhhtllp && uhhtllp->suspend)
-		uhhtllp->suspend(OMAP_EHCI);
+		ret = uhhtllp->suspend(OMAP_EHCI);
 
 	return ret;
 }
@@ -337,6 +343,7 @@ static int ehci_omap_bus_resume(struct usb_hcd *hcd)
 
 	return ret;
 }
+
 
 
 /*-------------------------------------------------------------------------*/

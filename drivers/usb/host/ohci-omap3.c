@@ -102,7 +102,7 @@ static int ohci_omap3_bus_suspend(struct usb_hcd *hcd)
 
 
 	if (!ret && uhhtllp && uhhtllp->suspend)
-		uhhtllp->suspend(OMAP_OHCI);
+		ret = uhhtllp->suspend(OMAP_OHCI);
 
 	return ret;
 }
@@ -239,6 +239,12 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 	hcd->rsrc_start = omapresp->start;
 	hcd->rsrc_len = omapresp->len;
 	hcd->regs =  omapresp->regs;
+
+	ret = uhhtllp->store(OMAP_OHCI, OMAP_USB_HCD, hcd);
+	if (ret) {
+		dev_dbg(&pdev->dev, "failed to store hcd\n");
+		goto err_regs;
+	}
 
 	ret = uhhtllp->enable(OMAP_OHCI);
 	if (ret) {

@@ -4,6 +4,8 @@
 #define	__ASM_ARCH_OMAP_USB_H
 
 #include <linux/usb/musb.h>
+#include <linux/usb.h>
+#include <linux/usb/hcd.h>
 #include <linux/platform_device.h>
 #include <plat/board.h>
 
@@ -29,6 +31,10 @@ enum usbhs_omap3_port_mode {
 enum driver_type {
 	OMAP_EHCI,
 	OMAP_OHCI
+};
+
+enum data_type {
+	OMAP_USB_HCD,
 };
 
 struct usbhs_omap_platform_data {
@@ -59,6 +65,7 @@ struct usbhs_omap_resource {
 struct uhhtll_apis {
 	int	(*get_platform_data) (struct usbhs_omap_platform_data *);
 	int	(*get_resource)(enum driver_type, struct usbhs_omap_resource *);
+	int	(*store) (enum driver_type, enum data_type, void *);
 	int	(*enable) (enum driver_type);
 	int	(*disable) (enum driver_type);
 	int	(*suspend) (enum driver_type);
