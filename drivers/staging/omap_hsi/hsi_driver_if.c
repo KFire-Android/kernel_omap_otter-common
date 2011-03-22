@@ -467,81 +467,122 @@ done:
 }
 EXPORT_SYMBOL(hsi_read);
 
-void __hsi_write_cancel(struct hsi_channel *ch)
+int __hsi_write_cancel(struct hsi_channel *ch)
 {
+	int err = -ENODATA;
+
 	if (ch->write_data.size == 1)
-		hsi_driver_cancel_write_interrupt(ch);
+		err = hsi_driver_cancel_write_interrupt(ch);
 	else if (ch->write_data.size > 1)
-		hsi_driver_cancel_write_dma(ch);
+		err = hsi_driver_cancel_write_dma(ch);
+	else
+		dev_dbg(ch->dev->device.parent, "%s : Nothing to cancel %d\n",
+			__func__, ch->write_data.size);
+
+	dev_dbg(ch->dev->device.parent, "%s : %d\n", __func__, err);
+
+	return err;
 }
 
 /**
  * hsi_write_cancel - Cancel pending write request.
  * @dev - hsi device channel where to cancel the pending write.
  *
- * write_done() callback will not be called after sucess of this function.
+ * write_done() callback will not be called after success of this function.
+ *
+ * Return: -ENXIO : No DMA channel found for specified HSI channel
+ *	   -ECANCELED : write cancel success, data not transfered to TX FIFO
+ *	   0 : transfer is already over, data already transfered to TX FIFO
+ *
+ * Note: whatever returned value, write callback will not be called after
+ *	 write cancel.
  */
-void hsi_write_cancel(struct hsi_device *dev)
+int hsi_write_cancel(struct hsi_device *dev)
 {
+	int err;
+
 	if (unlikely(!dev || !dev->ch)) {
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
-		return;
+		return -ENODEV;
 	}
 	dev_dbg(dev->device.parent, "%s\n", __func__);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
 		dev_err(dev->device.parent, "HSI device NOT open\n");
-		return;
+		return -ENODEV;
 	}
 
 	spin_lock_bh(&dev->ch->hsi_port->hsi_controller->lock);
 	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number,
 				__func__);
 
-	__hsi_write_cancel(dev->ch);
+	err = __hsi_write_cancel(dev->ch);
 
 	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
 				__func__);
 	spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
+
+	return err;
 }
 EXPORT_SYMBOL(hsi_write_cancel);
 
-void __hsi_read_cancel(struct hsi_channel *ch)
+int __hsi_read_cancel(struct hsi_channel *ch)
 {
+	int err = -ENODATA;
+
 	if (ch->read_data.size == 1)
-		hsi_driver_cancel_read_interrupt(ch);
+		err = hsi_driver_cancel_read_interrupt(ch);
 	else if (ch->read_data.size > 1)
-		hsi_driver_cancel_read_dma(ch);
+		err = hsi_driver_cancel_read_dma(ch);
+	else
+		dev_dbg(ch->dev->device.parent, "%s : Nothing to cancel %d\n",
+			__func__, ch->read_data.size);
+
+	dev_dbg(ch->dev->device.parent, "%s : %d\n", __func__, err);
+
+	return err;
 }
 
 /**
  * hsi_read_cancel - Cancel pending read request.
  * @dev - hsi device channel where to cancel the pending read.
  *
- * read_done() callback will not be called after sucess of this function.
+ * read_done() callback will not be called after success of this function.
+ *
+ * Return: -ENXIO : No DMA channel found for specified HSI channel
+ *	   -ECANCELED : read cancel success, data not available at expected
+ *			address.
+ *	   0 : transfer is already over, data already available at expected
+ *	       address.
+ *
+ * Note: whatever returned value, read callback will not be called after cancel.
  */
-void hsi_read_cancel(struct hsi_device *dev)
+int hsi_read_cancel(struct hsi_device *dev)
 {
+	int err;
+
 	if (unlikely(!dev || !dev->ch)) {
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
-		return;
+		return -ENODEV;
 	}
 	dev_dbg(dev->device.parent, "%s\n", __func__);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
 		dev_err(dev->device.parent, "HSI device NOT open\n");
-		return;
+		return -ENODEV;
 	}
 
 	spin_lock_bh(&dev->ch->hsi_port->hsi_controller->lock);
 	hsi_clocks_enable_channel(dev->device.parent, dev->ch->channel_number,
 				__func__);
 
-	__hsi_read_cancel(dev->ch);
+	err = __hsi_read_cancel(dev->ch);
 
 	hsi_clocks_disable_channel(dev->device.parent, dev->ch->channel_number,
 				__func__);
 	spin_unlock_bh(&dev->ch->hsi_port->hsi_controller->lock);
+
+	return err;
 }
 EXPORT_SYMBOL(hsi_read_cancel);
 

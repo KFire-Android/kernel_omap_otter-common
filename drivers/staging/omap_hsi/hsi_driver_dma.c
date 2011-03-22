@@ -238,25 +238,45 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 	return 0;
 }
 
-void hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
+/**
+ * hsi_driver_cancel_write_dma - Cancel an ongoing GDD [DMA] write for the
+ *				specified hsi channel.
+ * @hsi_ch - pointer to the hsi_channel to cancel DMA write.
+ *
+ * hsi_controller lock must be held before calling this function.
+ *
+ * Return: -ENXIO : No DMA channel found for specified HSI channel
+ *	   -ECANCELED : DMA cancel success, data not transfered to TX FIFO
+ *	   0 : DMA transfer is already over, data already transfered to TX FIFO
+ *
+ * Note: whatever returned value, write callback will not be called after
+ *       write cancel.
+ */
+int hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 {
 	int lch = hsi_ch->write_data.lch;
 	unsigned int port = hsi_ch->hsi_port->port_number;
 	unsigned int channel = hsi_ch->channel_number;
 	struct hsi_dev *hsi_ctrl = hsi_ch->hsi_port->hsi_controller;
-	u32 ccr;
+	u16 ccr;
 	long buff_offset;
+	u32 status_reg;
 
-	if (lch < 0)
-		return;
+	if (lch < 0) {
+		dev_dbg(&hsi_ch->dev->device, "No DMA channel found for HSI "
+			"channel %d\n", hsi_ch->channel_number);
+		return -ENXIO;
+	}
 
 	ccr = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	if (!(ccr & HSI_CCR_ENABLE)) {
 		dev_dbg(&hsi_ch->dev->device, "Write cancel on not "
-			"enabled logical channel %d CCR REG 0x%08X\n", lch,
+			"enabled logical channel %d CCR REG 0x%04X\n", lch,
 			ccr);
-		return;
 	}
+
+	status_reg = hsi_inl(hsi_ctrl->base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
+	status_reg &= hsi_inl(hsi_ctrl->base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 
 	hsi_outw_and(~HSI_CCR_ENABLE, hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	hsi_outl_and(~HSI_GDD_LCH(lch), hsi_ctrl->base,
@@ -270,27 +290,51 @@ void hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 			     buff_offset);
 
 	hsi_reset_ch_write(hsi_ch);
+
+	return status_reg & HSI_GDD_LCH(lch) ? 0 : -ECANCELED;
 }
 
-void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
+/**
+ * hsi_driver_cancel_read_dma - Cancel an ongoing GDD [DMA] read for the
+ *				specified hsi channel.
+ * @hsi_ch - pointer to the hsi_channel to cancel DMA read.
+ *
+ * hsi_controller lock must be held before calling this function.
+ *
+ * Return: -ENXIO : No DMA channel found for specified HSI channel
+ *	   -ECANCELED : DMA cancel success, data not available at expected
+ *	                address.
+ *	   0 : DMA transfer is already over, data already available at
+ *	       expected address.
+ *
+ * Note: whatever returned value, read callback will not be called after cancel.
+ */
+int hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 {
 	int lch = hsi_ch->read_data.lch;
 	struct hsi_dev *hsi_ctrl = hsi_ch->hsi_port->hsi_controller;
-	u32 reg;
-
-	if (lch < 0)
-		return;
+	u16 ccr;
+	u32 status_reg;
 
 	/* Re-enable interrupts for polling if needed */
 	if (hsi_ch->flags & HSI_CH_RX_POLL)
 		hsi_driver_enable_read_interrupt(hsi_ch, NULL);
 
-	reg = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
-	if (!(reg & HSI_CCR_ENABLE)) {
-		dev_dbg(&hsi_ch->dev->device, "Read cancel on not "
-			"enable logical channel %d CCR REG 0x%08X\n", lch, reg);
-		return;
+	if (lch < 0) {
+		dev_dbg(&hsi_ch->dev->device, "No DMA channel found for HSI "
+			"channel %d\n", hsi_ch->channel_number);
+		return -ENXIO;
 	}
+
+	ccr = hsi_inw(hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
+	if (!(ccr & HSI_CCR_ENABLE)) {
+		dev_dbg(&hsi_ch->dev->device, "Read cancel on not "
+			"enabled logical channel %d CCR REG 0x%04X\n", lch,
+			ccr);
+	}
+
+	status_reg = hsi_inl(hsi_ctrl->base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
+	status_reg &= hsi_inl(hsi_ctrl->base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 
 	hsi_outw_and(~HSI_CCR_ENABLE, hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
 	hsi_outl_and(~HSI_GDD_LCH(lch), hsi_ctrl->base,
@@ -299,6 +343,8 @@ void hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 		 HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
 
 	hsi_reset_ch_read(hsi_ch);
+
+	return status_reg & HSI_GDD_LCH(lch) ? 0 : -ECANCELED;
 }
 
 /**

@@ -175,24 +175,35 @@ int hsi_driver_enable_read_interrupt(struct hsi_channel *ch, u32 * data)
 	return 0;
 }
 
-void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
+/**
+ * hsi_driver_cancel_write_interrupt - Cancel pending write interrupt.
+ * @dev - hsi device channel where to cancel the pending interrupt.
+ *
+ * Return: -ECANCELED : write cancel success, data not transfered to TX FIFO
+ *	   0 : transfer is already over, data already transfered to TX FIFO
+ *
+ * Note: whatever returned value, write callback will not be called after
+ *       write cancel.
+ */
+int hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
 {
 	struct hsi_port *p = ch->hsi_port;
 	unsigned int port = p->port_number;
 	unsigned int channel = ch->channel_number;
 	void __iomem *base = p->hsi_controller->base;
-	u32 enable;
+	u32 status_reg;
 	long buff_offset;
 
-	enable = hsi_inl(base,
+	status_reg = hsi_inl(base,
 			 HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 
-	if (!(enable & HSI_HST_DATAACCEPT(channel))) {
+	if (!(status_reg & HSI_HST_DATAACCEPT(channel))) {
 		dev_dbg(&ch->dev->device, "Write cancel on not "
 			"enabled channel %d ENABLE REG 0x%08X", channel,
-			enable);
-		return;
+			status_reg);
 	}
+	status_reg &= hsi_inl(base, HSI_SYS_MPU_STATUS_CH_REG(port, p->n_irq,
+								channel));
 
 	hsi_outl_and(~HSI_HST_DATAACCEPT(channel), base,
 		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
@@ -201,18 +212,45 @@ void hsi_driver_cancel_write_interrupt(struct hsi_channel *ch)
 	if (buff_offset >= 0)
 		hsi_outl_and(~HSI_BUFSTATE_CHANNEL(channel), base, buff_offset);
 	hsi_reset_ch_write(ch);
+
+	return status_reg & HSI_HST_DATAACCEPT(channel) ? 0 : -ECANCELED;
 }
 
-void hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
+/**
+ * hsi_driver_cancel_read_interrupt - Cancel pending read interrupt.
+ * @dev - hsi device channel where to cancel the pending interrupt.
+ *
+ * Return: -ECANCELED : read cancel success data not available at expected
+ *			address.
+ *	   0 : transfer is already over, data already available at expected
+ *	       address.
+ *
+ * Note: whatever returned value, read callback will not be called after cancel.
+ */
+int hsi_driver_cancel_read_interrupt(struct hsi_channel *ch)
 {
 	struct hsi_port *p = ch->hsi_port;
 	unsigned int port = p->port_number;
 	unsigned int channel = ch->channel_number;
 	void __iomem *base = p->hsi_controller->base;
+	u32 status_reg;
+
+	status_reg = hsi_inl(base,
+			HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
+
+	if (!(status_reg & HSI_HSR_DATAAVAILABLE(channel))) {
+		dev_dbg(&ch->dev->device, "Read cancel on not "
+			"enabled channel %d ENABLE REG 0x%08X", channel,
+			status_reg);
+	}
+	status_reg &= hsi_inl(base, HSI_SYS_MPU_STATUS_CH_REG(port, p->n_irq,
+								channel));
 
 	hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
 		     HSI_SYS_MPU_ENABLE_CH_REG(port, p->n_irq, channel));
 	hsi_reset_ch_read(ch);
+
+	return status_reg & HSI_HSR_DATAAVAILABLE(channel) ? 0 : -ECANCELED;
 }
 
 void hsi_driver_disable_write_interrupt(struct hsi_channel *ch)
