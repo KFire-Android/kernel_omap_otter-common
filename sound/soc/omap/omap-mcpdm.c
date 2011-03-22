@@ -37,6 +37,7 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include <linux/workqueue.h>
+#include <linux/wakelock.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -76,6 +77,8 @@ struct omap_mcpdm {
 	struct omap_mcpdm_link *downlink;
 	struct omap_mcpdm_link *uplink;
 	struct completion irq_completion;
+
+	struct wake_lock wake_lock;
 
 	int dn_channels;
 	int up_channels;
@@ -547,9 +550,11 @@ static void omap_mcpdm_dai_shutdown(struct snd_pcm_substream *substream,
 	if (!dai->active) {
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 			omap_mcpdm_capture_close(mcpdm, mcpdm->uplink);
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-				schedule_delayed_work(&mcpdm->delayed_work,
-						msecs_to_jiffies(1000)); /* TODO: pdata ? */
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			wake_lock_timeout(&mcpdm->wake_lock, 2 * HZ);
+			schedule_delayed_work(&mcpdm->delayed_work,
+					      msecs_to_jiffies(1000)); /* TODO: pdata ? */
+		}
 	}
 
 	mutex_unlock(&mcpdm->mutex);
@@ -703,9 +708,11 @@ static void omap_mcpdm_abe_dai_shutdown(struct snd_pcm_substream *substream,
 			    !mcpdm->dl_active)
 				omap_mcpdm_free(mcpdm);
 		}
-		if (!mcpdm->dl_active && substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-				schedule_delayed_work(&mcpdm->delayed_abe_work,
-						msecs_to_jiffies(1000)); /* TODO: pdata ? */
+		if (!mcpdm->dl_active && substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			wake_lock_timeout(&mcpdm->wake_lock, 2 * HZ);
+			schedule_delayed_work(&mcpdm->delayed_abe_work,
+					      msecs_to_jiffies(1000)); /* TODO: pdata ? */
+		}
 	}
 
 	mutex_unlock(&mcpdm->mutex);
@@ -908,6 +915,8 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 	mcpdm->dl1_offset = 0x1F;
 	mcpdm->dl2_offset = 0x1F;
 
+	wake_lock_init(&mcpdm->wake_lock, WAKE_LOCK_SUSPEND, "mcpdm");
+
 	INIT_DELAYED_WORK(&mcpdm->delayed_work, playback_work);
 #ifdef CONFIG_SND_OMAP_SOC_ABE_DSP
 	INIT_DELAYED_WORK(&mcpdm->delayed_abe_work, playback_abe_work);
@@ -920,6 +929,7 @@ static __devinit int asoc_mcpdm_probe(struct platform_device *pdev)
 	return 0;
 
 dai_err:
+	wake_lock_destroy(&mcpdm->wake_lock);
 	free_irq(mcpdm->irq, mcpdm);
 err:
 	kfree(mcpdm);
@@ -933,6 +943,7 @@ static int __devexit asoc_mcpdm_remove(struct platform_device *pdev)
 
 	pdata = pdev->dev.platform_data;
 
+	wake_lock_destroy(&mcpdm->wake_lock);
 	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_mcpdm_dai));
 	free_irq(mcpdm->irq, mcpdm);
 	kfree(mcpdm);
