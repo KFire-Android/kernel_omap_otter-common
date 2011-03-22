@@ -620,6 +620,10 @@ int cma3000_poweron(struct cma3000_accl_data *data)
 #ifdef CONFIG_INPUT_CMA3000_I2C
 	ctrl |= CMA3000_BUSI2C;
 #endif
+	/* Disable IEQ if not configured for irq mode*/
+	if (!data->client->irq)
+		ctrl |= 0x1;
+
 
 	cma3000_set(data, CMA3000_MDTHR, mdthr, "Motion Detect Threshold");
 	cma3000_set(data, CMA3000_MDFFTMR, mdfftmr, "Time register");
@@ -637,7 +641,7 @@ int cma3000_poweroff(struct cma3000_accl_data *data)
 {
 	int ret;
 
-	ret = cma3000_set(data, CMA3000_CTRL, CMAMODE_POFF, "Mode setting");
+	ret = cma3000_set_mode(data, CMAMODE_POFF);
 	msleep(CMA3000_SETDELAY);
 
 	return ret;
@@ -647,6 +651,7 @@ int cma3000_init(struct cma3000_accl_data *data)
 {
 	int ret = 0, fuzz_x, fuzz_y, fuzz_z, g_range;
 	uint32_t irqflags;
+	uint8_t ctrl;
 
 	INIT_DELAYED_WORK(&data->input_work, cma3000_input_work_func);
 
@@ -725,6 +730,11 @@ int cma3000_init(struct cma3000_accl_data *data)
 				"request_threaded_irq failed\n");
 			goto err_op1_failed;
 		}
+	} else {
+		/*There is no IRQ set, disable IRQ on CMA*/
+		ctrl = cma3000_read(data, CMA3000_CTRL, "Status");
+		ctrl |= 0x1;
+		cma3000_set(data, CMA3000_CTRL, ctrl, "Disable IRQ");
 	}
 
 	ret = sysfs_create_group(&data->client->dev.kobj, &cma3000_attr_group);
@@ -733,6 +743,8 @@ int cma3000_init(struct cma3000_accl_data *data)
 			"failed to create sysfs entries\n");
 		goto err_op1_failed;
 	}
+
+	cma3000_set_mode(data, CMAMODE_POFF);
 
 	return 0;
 
