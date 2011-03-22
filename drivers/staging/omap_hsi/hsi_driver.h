@@ -226,6 +226,7 @@ int hsi_driver_enable_read_interrupt(struct hsi_channel *hsi_channel,
 					u32 *data);
 int hsi_driver_enable_write_interrupt(struct hsi_channel *hsi_channel,
 					u32 *data);
+bool hsi_is_dma_read_int_pending(struct hsi_dev *hsi_ctrl);
 int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 			unsigned int count);
 int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
@@ -237,7 +238,7 @@ void hsi_driver_disable_read_interrupt(struct hsi_channel *ch);
 void hsi_driver_disable_write_interrupt(struct hsi_channel *ch);
 int hsi_driver_cancel_write_dma(struct hsi_channel *ch);
 int hsi_driver_cancel_read_dma(struct hsi_channel *ch);
-void hsi_do_cawake_process(struct hsi_port *pport);
+int hsi_do_cawake_process(struct hsi_port *pport);
 
 int hsi_driver_device_is_hsi(struct platform_device *dev);
 

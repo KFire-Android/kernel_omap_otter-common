@@ -36,6 +36,41 @@ static unsigned char hsi_sync_table[2][2][8] = {
 };
 
 /**
+ * hsi_is_dma_read_int_pending - Indicates if a DMA read interrupt is pending
+ * @hsi_ctrl - HSI controller of the GDD.
+ *
+ * Needs to be called holding the hsi_controller lock
+ *
+ * Returns true if DMA read interrupt is pending, else false
+ */
+bool hsi_is_dma_read_int_pending(struct hsi_dev *hsi_ctrl)
+{
+	void __iomem *base = hsi_ctrl->base;
+	unsigned int gdd_lch = 0;
+	u32 status_reg = 0;
+	int i, j;
+
+	status_reg = hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
+	status_reg &= hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
+
+	if (!status_reg)
+		return false;
+
+	/* Scan all enabled DMA channels */
+	for (gdd_lch = 0; gdd_lch < hsi_ctrl->gdd_chan_count; gdd_lch++) {
+		if (!(status_reg & HSI_GDD_LCH(gdd_lch)))
+			continue;
+		for (i = 0; i < hsi_ctrl->max_p; i++)
+			for (j = 0; j < hsi_ctrl->hsi_port[i].max_ch; j++)
+				if (hsi_ctrl->hsi_port[i].
+					hsi_channel[j].read_data.lch == gdd_lch)
+					return true;
+	}
+
+	return false;
+}
+
+/**
  * hsi_get_free_lch - Get a free GDD(DMA) logical channel
  * @hsi_ctrl - HSI controller of the GDD.
  *
@@ -490,6 +525,7 @@ static u32 hsi_process_dma_event(struct hsi_dev *hsi_ctrl)
 	unsigned int gdd_max_count = hsi_ctrl->gdd_chan_count;
 
 	status_reg = hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
+	status_reg &= hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 
 	if (!status_reg) {
 		dev_dbg(hsi_ctrl->dev, "DMA : no event, exit.\n");
@@ -503,10 +539,8 @@ static u32 hsi_process_dma_event(struct hsi_dev *hsi_ctrl)
 		}
 	}
 
+	/* Acknowledge interrupt for DMA channel */
 	hsi_outl(lch_served, base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
-
-	status_reg = hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
-	status_reg &= hsi_inl(base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 
 	return status_reg;
 }
