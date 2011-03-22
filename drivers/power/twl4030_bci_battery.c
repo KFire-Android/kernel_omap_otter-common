@@ -25,6 +25,7 @@
 #include <linux/i2c/twl.h>
 #include <linux/power_supply.h>
 #include <linux/i2c/twl4030-madc.h>
+#include <linux/usb/otg.h>
 
 #define T2_BATTERY_VOLT		0x04
 #define T2_BATTERY_TEMP		0x06
@@ -158,6 +159,7 @@ struct twl4030_bci_device_info {
 	int			charge_status;
 	int			capacity;
 
+	struct notifier_block	nb;
 	struct power_supply	bat;
 	struct power_supply	bk_bat;
 	struct power_supply     usb_bat;
@@ -806,6 +808,13 @@ static inline int clear_n_set(u8 mod_no, u8 clear, u8 set, u8 reg)
 	return 0;
 }
 
+static int twl4030battery_charger_event(struct notifier_block *nb,
+		unsigned long event, void *_data)
+{
+	twl4030charger_usb_en(event == USB_EVENT_VBUS);
+	return 0;
+}
+
 static enum power_supply_property twl4030_bci_battery_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_ONLINE,
@@ -1121,8 +1130,17 @@ static int __devinit twl4030_bci_battery_probe(struct platform_device *pdev)
 		goto usb_batt_failed;
 	}
 
+	di->nb.notifier_call = twl4030battery_charger_event;
+	ret = otg_register_notifier(otg_get_transceiver(), &di->nb);
+	if (ret) {
+		dev_dbg(&pdev->dev, "failed to register usb battery\n");
+		goto otg_notify_failed;
+	}
+
 	return 0;
 
+otg_notify_failed:
+	power_supply_unregister(&di->usb_bat);
 usb_batt_failed:
 	power_supply_unregister(&di->bk_bat);
 bk_batt_failed:
@@ -1149,6 +1167,7 @@ static int __devexit twl4030_bci_battery_remove(struct platform_device *pdev)
 	struct twl4030_bci_device_info *di = platform_get_drvdata(pdev);
 	int irq;
 
+	otg_unregister_notifier(otg_get_transceiver(), &di->nb);
 	twl4030charger_ac_en(DISABLE);
 	twl4030charger_usb_en(DISABLE);
 	twl4030battery_hw_level_en(DISABLE);
