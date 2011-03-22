@@ -20,6 +20,7 @@
 #include <plat/clockdomain.h>
 #include <plat/prcm.h>
 #include <plat/opp.h>
+#include <plat/omap-serial.h>
 
 #include <mach/emif.h>
 #include <mach/omap4-common.h>
@@ -749,6 +750,9 @@ int omap4_dpll_low_power_cascade_enter()
 				func_48m_fclk->clksel_mask);
 	clk_set_rate(func_48m_fclk, (func_48m_fclk->parent->rate / 4));
 
+	/* recalibarte UART rate for half rates */
+	omap_uart_recalibrate_baud(1);
+
 	__raw_writel(1, OMAP4430_CM_L4_WKUP_CLKSEL);
 
 	/* never de-assert CLKREQ while in DPLL cascading scheme */
@@ -922,6 +926,9 @@ int omap4_dpll_low_power_cascade_exit()
 	if (ret)
 		pr_err("%s: failed to restore DPLL_PER bypass clock\n",
 				__func__);
+
+	/* recalibarte UART rate for normal clock rates */
+	omap_uart_recalibrate_baud(0);
 
 	/* restore CORE clock rates */
 	ret = clk_set_rate(div_core_ck, (div_core_ck->parent->rate /
