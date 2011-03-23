@@ -66,10 +66,10 @@ int hsi_fifo_get_id(struct hsi_dev *hsi_ctrl, unsigned int channel,
 
 fifo_id_bk:
 	if (unlikely(err < 0)) {
+		fifo_index = err;
 		dev_err(hsi_ctrl->dev, "Cannot map a FIFO to the requested "
 			"params: channel:%d, port:%d; ERR=%d\n", channel, port,
-			fifo_index);
-		fifo_index = err;
+			err);
 	}
 
 	return fifo_index;

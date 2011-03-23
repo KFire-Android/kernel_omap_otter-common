@@ -463,8 +463,8 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			ch = hsi_ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_read(ch);
 
-			dev_dbg(hsi_ctrl->dev, "Calling read callback "
-						"(size %d).\n", size/4);
+			dev_dbg(hsi_ctrl->dev, "Calling ch %d read callback "
+					      "(size %d).\n", channel,  size/4);
 			spin_unlock(&hsi_ctrl->lock);
 			ch->read_done(ch->dev, size / 4);
 			spin_lock(&hsi_ctrl->lock);
@@ -500,8 +500,8 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 			ch = hsi_ctrl_get_ch(hsi_ctrl, port, channel);
 			hsi_reset_ch_write(ch);
 
-			dev_dbg(hsi_ctrl->dev, "Calling write callback "
-						"(size %d).\n", size/4);
+			dev_dbg(hsi_ctrl->dev, "Calling ch %d write callback "
+					       "(size %d).\n", channel, size/4);
 			spin_unlock(&hsi_ctrl->lock);
 			ch->write_done(ch->dev, size / 4);
 			spin_lock(&hsi_ctrl->lock);

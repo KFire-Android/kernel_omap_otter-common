@@ -307,7 +307,7 @@ static void hsi_do_channel_tx(struct hsi_channel *ch)
 	}
 
 	spin_unlock(&hsi_ctrl->lock);
-	dev_dbg(hsi_ctrl->dev, "Calling write callback.\n");
+	dev_dbg(hsi_ctrl->dev, "Calling ch %d write callback.\n", n_ch);
 	(*ch->write_done) (ch->dev, 1);
 	spin_lock(&hsi_ctrl->lock);
 }
@@ -383,7 +383,7 @@ done:
 
 	if (data_read) {
 		spin_unlock(&hsi_ctrl->lock);
-		dev_dbg(hsi_ctrl->dev, "Calling read callback.\n");
+		dev_dbg(hsi_ctrl->dev, "Calling ch %d read callback.\n", n_ch);
 		(*ch->read_done) (ch->dev, 1);
 		spin_lock(&hsi_ctrl->lock);
 	}

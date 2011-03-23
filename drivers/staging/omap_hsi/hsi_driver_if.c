@@ -505,7 +505,7 @@ int hsi_write_cancel(struct hsi_device *dev)
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
 		return -ENODEV;
 	}
-	dev_dbg(dev->device.parent, "%s\n", __func__);
+	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
 		dev_err(dev->device.parent, "HSI device NOT open\n");
@@ -565,7 +565,7 @@ int hsi_read_cancel(struct hsi_device *dev)
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
 		return -ENODEV;
 	}
-	dev_dbg(dev->device.parent, "%s\n", __func__);
+	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
 		dev_err(dev->device.parent, "HSI device NOT open\n");
@@ -602,7 +602,7 @@ int hsi_poll(struct hsi_device *dev)
 
 	if (unlikely(!dev || !dev->ch))
 		return -EINVAL;
-	dev_dbg(dev->device.parent, "%s\n", __func__);
+	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
 		dev_err(dev->device.parent, "HSI device NOT open\n");
@@ -643,7 +643,7 @@ int hsi_unpoll(struct hsi_device *dev)
 
 	if (unlikely(!dev || !dev->ch))
 		return -EINVAL;
-	dev_dbg(dev->device.parent, "%s\n", __func__);
+	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
 
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
 		dev_err(dev->device.parent, "HSI device NOT open\n");
@@ -903,7 +903,7 @@ void hsi_set_read_cb(struct hsi_device *dev,
 		     void (*read_cb) (struct hsi_device *dev,
 				      unsigned int size))
 {
-	dev_dbg(dev->device.parent, "%s\n", __func__);
+	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
 
 	dev->ch->read_done = read_cb;
 }
@@ -921,7 +921,7 @@ void hsi_set_write_cb(struct hsi_device *dev,
 		      void (*write_cb) (struct hsi_device *dev,
 					unsigned int size))
 {
-	dev_dbg(dev->device.parent, "%s\n", __func__);
+	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
 
 	dev->ch->write_done = write_cb;
 }
@@ -940,7 +940,7 @@ void hsi_set_port_event_cb(struct hsi_device *dev,
 	struct hsi_port *port = dev->ch->hsi_port;
 	struct hsi_dev *hsi_ctrl = port->hsi_controller;
 
-	dev_dbg(dev->device.parent, "%s\n", __func__);
+	dev_dbg(dev->device.parent, "%s ch %d\n", __func__, dev->n_ch);
 
 	write_lock_bh(&dev->ch->rw_lock);
 	dev->ch->port_event = port_event_cb;

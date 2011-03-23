@@ -265,8 +265,8 @@ int omap_hsi_exit_suspend(void)
 		return 0;
 
 	if (val & OMAP44XX_PADCONF_WAKEUPEVENT0) {
-		dev_dbg(hsi_ctrl->dev, "HSI WAKEUP DETECTED from PADCONF : "
-				       "0x%04x\n", val);
+		dev_info(hsi_ctrl->dev, "Modem wakeup detected from HSI "
+					"PADCONF : 0x%04x\n", val);
 
 		/* CAWAKE falling or rising edge detected */
 		hsi_ctrl->hsi_port->cawake_off_event = true;
