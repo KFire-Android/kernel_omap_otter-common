@@ -1050,6 +1050,26 @@ static void _init_twl6030_settings(void)
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xC9);
 }
 
+#ifdef CONFIG_PM
+static int
+twl_suspend(struct i2c_client *client, pm_message_t message)
+{
+	/* Make sure below init twl settings are not left on */
+	_init_twl6030_settings();
+
+	return 0;
+}
+
+static int
+twl_resume(struct i2c_client *client)
+{
+	return 0;
+}
+#else
+#define twl_suspend NULL
+#define twl_resume NULL
+#endif
+
 /* NOTE:  this driver only handles a single twl4030/tps659x0 chip */
 static int __devinit
 twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
@@ -1171,6 +1191,8 @@ static struct i2c_driver twl_driver = {
 	.driver.name	= DRIVER_NAME,
 	.id_table	= twl_ids,
 	.probe		= twl_probe,
+	.suspend	= twl_suspend,
+	.resume		= twl_resume,
 	.remove		= __devexit_p(twl_remove),
 };
 
