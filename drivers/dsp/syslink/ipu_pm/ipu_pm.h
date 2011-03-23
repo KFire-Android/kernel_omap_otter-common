@@ -362,14 +362,15 @@ union message_slicer {
 };
 
 struct ipu_pm_override {
-	unsigned hibernateAllowed:1;
-	unsigned retentionAllowed:1;
-	unsigned inactiveAllowed:1;
-	unsigned cmAutostateAllowed:1;
-	unsigned deepSleepAllowed:1;
-	unsigned wfiAllowed:1;
-	unsigned idleAllowed:1;
-	unsigned reserved:24;
+	unsigned hibernate_allowed:1;
+	unsigned retention_allowed:1;
+	unsigned inactive_allowed:1;
+	unsigned cm_autostate_allowed:1;
+	unsigned deep_sleep_allowed:1;
+	unsigned wfi_allowed:1;
+	unsigned idle_allowed:1;
+	unsigned wdt_allowed:1;
+	unsigned reserved:23;
 	unsigned highbit:1;
 };
 

@@ -2609,14 +2609,14 @@ int ipu_pm_restore_ctx(int proc_id)
 	if (first_time) {
 		/* Enable/disable ipu hibernation*/
 #ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
-		handle->rcb_table->pm_flags.hibernateAllowed = 1;
+		handle->rcb_table->pm_flags.hibernate_allowed = 1;
 		/* turn on ducati hibernation timer */
 		ipu_pm_timer_state(PM_HIB_TIMER_ON);
 #else
-		handle->rcb_table->pm_flags.hibernateAllowed = 0;
+		handle->rcb_table->pm_flags.hibernate_allowed = 0;
 #endif
 		pr_debug("hibernateAllowed=%d\n",
-				handle->rcb_table->pm_flags.hibernateAllowed);
+				handle->rcb_table->pm_flags.hibernate_allowed);
 		first_time = 0;
 		cm_write_mod_reg(HW_AUTO,
 				 OMAP4430_CM2_CORE_MOD,
@@ -2686,7 +2686,7 @@ exit:
 #ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
 	/* turn on ducati hibernation timer */
 	if ((params->hib_timer_state == PM_HIB_TIMER_OFF) &&
-		global_rcb->pm_flags.hibernateAllowed)
+		global_rcb->pm_flags.hibernate_allowed)
 		ipu_pm_timer_state(PM_HIB_TIMER_ON);
 #endif
 	mutex_unlock(ipu_pm_state.gate_handle);
@@ -3140,14 +3140,17 @@ static int ipu_pm_timer_state(int event)
 		if (params->hib_timer_state == PM_HIB_TIMER_ON) {
 			pr_debug("Starting hibernation, waking up M3 cores");
 			handle->rcb_table->state_flag |= (SYS_PROC_HIB |
-					APP_PROC_HIB | ENABLE_IPU_HIB);
+							  APP_PROC_HIB |
+							  ENABLE_IPU_HIB);
 #ifdef CONFIG_DUCATI_WATCH_DOG
-			if (sys_rproc->dmtimer != NULL)
-				omap_dm_timer_set_load(sys_rproc->dmtimer, 1,
-						params->wdt_time);
-			params->hib_timer_state = PM_HIB_TIMER_WDRESET;
-		} else if (params->hib_timer_state ==
-			PM_HIB_TIMER_WDRESET) {
+			if (global_rcb->pm_flags.wdt_allowed) {
+				if (sys_rproc->dmtimer != NULL)
+					omap_dm_timer_set_load(
+							sys_rproc->dmtimer, 1,
+							params->wdt_time);
+				params->hib_timer_state = PM_HIB_TIMER_WDRESET;
+			}
+		} else if (params->hib_timer_state == PM_HIB_TIMER_WDRESET) {
 			/* notify devh to begin error recovery here */
 			pr_debug("Timer ISR: Trigger WD reset + recovery\n");
 			ipu_pm_recover_schedule();
@@ -3177,7 +3180,7 @@ static int ipu_pm_timer_state(int event)
 		 * having to rebuild the kernel.
 		 * Very useful when debugging IPU.
 		 */
-		if (!global_rcb->pm_flags.hibernateAllowed)
+		if (!global_rcb->pm_flags.hibernate_allowed)
 			break;
 
 		if (params->hib_timer_state == PM_HIB_TIMER_RESET) {
@@ -3194,6 +3197,10 @@ static int ipu_pm_timer_state(int event)
 					(void *)sys_rproc->dmtimer);
 			if (retval < 0)
 				pr_warn("request_irq status: %x\n", retval);
+#ifdef CONFIG_DUCATI_WATCH_DOG
+			/* Enable Watchdog */
+			global_rcb->pm_flags.wdt_allowed = 1;
+#endif
 			/*
 			 * store the dmtimer handle locally to use during
 			 * free_irq as dev_id token in cases where the remote
