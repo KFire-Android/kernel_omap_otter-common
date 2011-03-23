@@ -1604,6 +1604,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.plat_hold_wakelock = NULL,
 		.rts_padconf	= 0,
 		.rts_override	= 0,
+		.cts_padconf	= 0,
 		.padconf	= OMAP4_CTRL_MODULE_PAD_SDMMC1_CMD_OFFSET,
 		.padconf_wake_ev = 0,
 		.wk_mask	= 0,
@@ -1618,6 +1619,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.plat_hold_wakelock = plat_hold_wakelock,
 		.rts_padconf	= OMAP4_CTRL_MODULE_PAD_UART2_RTS_OFFSET,
 		.rts_override	= 0,
+		.cts_padconf	= OMAP4_CTRL_MODULE_PAD_UART2_CTS_OFFSET,
 		.padconf	= OMAP4_CTRL_MODULE_PAD_UART2_RX_OFFSET,
 		.padconf_wake_ev =
 			OMAP4_CTRL_MODULE_PAD_CORE_PADCONF_WAKEUPEVENT_3,
@@ -1637,6 +1639,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.plat_hold_wakelock = plat_hold_wakelock,
 		.rts_padconf	= 0,
 		.rts_override	= 0,
+		.cts_padconf	= 0,
 		.padconf	= OMAP4_CTRL_MODULE_PAD_UART3_RX_IRRX_OFFSET,
 		.padconf_wake_ev =
 			OMAP4_CTRL_MODULE_PAD_CORE_PADCONF_WAKEUPEVENT_4,
@@ -1656,6 +1659,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.plat_hold_wakelock = NULL,
 		.rts_padconf	= 0,
 		.rts_override	= 0,
+		.cts_padconf	= 0,
 		.padconf	= OMAP4_CTRL_MODULE_PAD_UART4_RX_OFFSET,
 		.padconf_wake_ev =
 			OMAP4_CTRL_MODULE_PAD_CORE_PADCONF_WAKEUPEVENT_4,

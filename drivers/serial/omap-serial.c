@@ -51,7 +51,7 @@ static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
 static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
 static void serial_omap_rxdma_poll(unsigned long uart_no);
 static int serial_omap_start_rxdma(struct uart_omap_port *up);
-static int omap4_uart_cts_wakeup(int uart_no, int state);
+static int omap_uart_cts_wakeup(int uart_no, int state);
 
 static inline unsigned int serial_in(struct uart_omap_port *up, int offset)
 {
@@ -151,9 +151,14 @@ static void serial_omap_stop_rx(struct uart_port *port)
 	up->port.read_status_mask &= ~UART_LSR_DR;
 	serial_out(up, UART_IER, up->ier);
 
-	/*Disable the UART CTS wakeup for UART1,UART2*/
-	if ((!port->suspended && ((up->pdev->id  - 1) == UART2)))
-		omap4_uart_cts_wakeup((up->pdev->id - 1), 0);
+	/*Disable the UART CTS wakeup for UARTs, Only for UARTs
+	 * Which have the platform Data defined for CTS wake-up
+	 * In the Board File. Else even if this function gets
+	 * called it wont have any impact on the register values
+	 * for MUX configuration.
+	 */
+	if (!port->suspended)
+		omap_uart_cts_wakeup(up->pdev->id, 0);
 
 }
 
@@ -497,8 +502,11 @@ static int serial_omap_startup(struct uart_port *port)
 	unsigned long flags = 0;
 	int retval;
 
-	if ((up->pdev->id  - 1) == UART2)
-		omap4_uart_cts_wakeup((up->pdev->id - 1), 1);
+	/* Enable the Wake-up on CTS for a UART. The UART for
+	 * which is defined in board file, would get enabled.
+	 */
+	omap_uart_cts_wakeup(up->pdev->id, 1);
+
 	/*
 	 * Allocate the IRQ
 	 */
@@ -1403,14 +1411,18 @@ static struct platform_driver serial_omap_driver = {
 	},
 };
 
-int omap4_uart_cts_wakeup(int uart_no, int state)
+int omap_uart_cts_wakeup(int uart_no, int state)
 {
 	struct uart_omap_port *up = ui[uart_no];
-	u32 padconf_cts;
+	struct omap_uart_port_info *omap_up_info = up->pdev->dev.platform_data;
+	u16 offset = 0; /* 32-bit align */
 	u32 v;
 
-	if (unlikely(uart_no < 0 || uart_no > OMAP_MAX_HSUART_PORTS)) {
-		dev_dbg(up->port.dev, "Bad uart id %d\n", uart_no);
+	/* No CTS based Wake-ups are enabled. If enabled this would
+	 * hold the CTS Pad Conf Register offset.
+	 */
+	if (!omap_up_info->cts_padconf) {
+		dev_dbg(up->port.dev, "No CTS wake-up for UART %d\n", uart_no);
 		return -EPERM;
 	}
 
@@ -1418,24 +1430,31 @@ int omap4_uart_cts_wakeup(int uart_no, int state)
 		/*
 		 * Enable the CTS for io pad wakeup
 		 */
-		switch (uart_no) {
-		case UART2:
-			dev_dbg(up->port.dev, "Enabling CTS wakeup for UART2");
-			padconf_cts = 0x4A100118;
-			v = omap_readl(padconf_cts);
-			break;
-		default:
-			dev_dbg(up->port.dev, "Wakeup on Uart%d is not \
-						supported\n", uart_no);
-			return -EPERM;
+		dev_dbg(up->port.dev, "Enable CTS wakeup for UART %d", uart_no);
+
+		offset = omap_up_info->cts_padconf & ~0x3; /* 32-bit align */
+
+		if (cpu_is_omap44xx())
+			v = omap4_ctrl_pad_readl(offset);
+		else
+			v = omap_ctrl_readl(offset);
+
+		if (omap_up_info->cts_padconf & 0x2) {
+			omap_up_info->cts_padvalue = 0xFFFF0000 & v;
+			v |= (((OMAP_WAKEUP_EN | OMAP_OFF_PULL_EN |
+				OMAP_OFF_PULL_UP | OMAP_OFFOUT_EN |
+				OMAP_OFF_EN | OMAP_PULL_UP)) << 16);
+		} else {
+			omap_up_info->cts_padvalue = 0x0000FFFF & v;
+			v |= ((OMAP_WAKEUP_EN | OMAP_OFF_PULL_EN |
+				OMAP_OFF_PULL_UP | OMAP_OFFOUT_EN |
+				OMAP_OFF_EN | OMAP_PULL_UP));
 		}
 
-		v |= ((OMAP_WAKEUP_EN | OMAP_OFF_PULL_EN |
-			OMAP_OFFOUT_VAL | OMAP_OFFOUT_EN |
-			OMAP_OFF_EN | OMAP_PULL_UP |
-			OMAP_MUX_MODE0));
-
-		omap_writel(v, padconf_cts);
+		if (cpu_is_omap44xx())
+			omap4_ctrl_pad_writel(v, offset);
+		else
+			omap_ctrl_writel(v, offset);
 
 		/*
 		 * Enable the CTS for module level wakeup
@@ -1443,28 +1462,26 @@ int omap4_uart_cts_wakeup(int uart_no, int state)
 		serial_out(up, UART_OMAP_WER,
 				serial_in(up, UART_OMAP_WER) | 0x1);
 	} else {
+		dev_dbg(up->port.dev, "Disable CTS wakeup for UART%d\n",
+				uart_no);
 		/*
 		 * Disable the CTS capability for io pad wakeup
 		 */
-		switch (uart_no) {
-		case UART2:
-			padconf_cts = 0x4A100118;
-			v = omap_readl(padconf_cts);
-		break;
-		default:
-			dev_dbg(up->port.dev, "Wakeup on Uart%d is not \
-						supported\n", uart_no);
-			return -EPERM;
-		}
+		offset = omap_up_info->cts_padconf & ~0x3; /* 32-bit align */
+		if (cpu_is_omap44xx())
+			v = omap4_ctrl_pad_readl(offset);
+		else
+			v = omap_ctrl_readl(offset);
+		v = ((omap_up_info->cts_padconf & 0x2 ? 0x0000FFFF : 0xFFFF0000)
+				& v) | omap_up_info->cts_padvalue;
 
-		v &= (u32)(~(OMAP_WAKEUP_EN | OMAP_OFF_PULL_EN |
-				OMAP_OFF_EN | OMAP_OFFOUT_EN));
-
-		omap_writel(v, padconf_cts);
+		if (cpu_is_omap44xx())
+			omap4_ctrl_pad_writel(v, offset);
+		else
+			omap_ctrl_writel(v, offset);
 	}
 	return 0;
 }
-EXPORT_SYMBOL(omap4_uart_cts_wakeup);
 
 /**
  * omap_uart_active() - Check if any ports managed by this

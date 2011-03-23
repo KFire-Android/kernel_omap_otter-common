@@ -967,14 +967,15 @@ void __init omap_serial_init_port(int port,
 	omap_up.idle_timeout = platform_data->idle_timeout;
 	omap_up.plat_hold_wakelock = platform_data->plat_hold_wakelock;
 
-	if (cpu_is_omap44xx()) {
-		uart->rts_padconf = platform_data->rts_padconf;
-		uart->rts_override = platform_data->rts_override;
+	uart->rts_padconf = platform_data->rts_padconf;
+	uart->rts_override = platform_data->rts_override;
 
-		uart->padconf = platform_data->padconf;
-		uart->padconf_wake_ev = platform_data->padconf_wake_ev;
-		uart->wk_mask = platform_data->wk_mask;
-	}
+	uart->padconf = platform_data->padconf;
+	uart->padconf_wake_ev = platform_data->padconf_wake_ev;
+	uart->wk_mask = platform_data->wk_mask;
+
+	omap_up.cts_padconf = platform_data->cts_padconf;
+	omap_up.cts_padvalue = 0;
 
 	pdata = &omap_up;
 	pdata_size = sizeof(struct omap_uart_port_info);
@@ -1032,6 +1033,9 @@ void __init omap_serial_init(struct omap_uart_port_info *platform_data)
 	struct omap_uart_state *uart;
 	unsigned int count = 0;
 
+	/* The Platform Specific Initialisations come from the baord file
+	 * which would initialise it to the platfrom requirement.
+	 */
 	list_for_each_entry(uart, &uart_list, node) {
 		omap_serial_init_port(uart->num, &platform_data[count]);
 		count++;

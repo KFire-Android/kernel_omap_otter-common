@@ -122,6 +122,9 @@ struct omap_uart_port_info {
 	u16			padconf_wake_ev;
 	u32			wk_mask;
 	u16			padconf;
+
+	u16			cts_padconf;
+	u32			cts_padvalue;
 };
 
 struct uart_omap_dma {
