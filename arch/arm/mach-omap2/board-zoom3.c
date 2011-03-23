@@ -222,6 +222,7 @@ static struct platform_device btwilink_device = {
 static struct platform_device *zoom_devices[] __initdata = {
 
 	&wl127x_device,
+	&btwilink_device,
 };
 
 /* OPP MPU/IVA Clock Frequency */
