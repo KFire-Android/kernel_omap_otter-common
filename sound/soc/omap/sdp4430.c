@@ -49,33 +49,10 @@
 #include "omap-hdmi.h"
 #endif
 
-#define TPS6130X_I2C_ADAPTER	1
 
 static struct regulator *av_switch_reg;
 static int twl6040_power_mode;
 static int mcbsp_cfg;
-
-static struct i2c_client *tps6130x_client;
-static struct i2c_board_info tps6130x_hwmon_info = {
-	I2C_BOARD_INFO("tps6130x", 0x33),
-};
-
-/* configure the TPS6130x Handsfree Boost Converter */
-static int sdp4430_tps6130x_configure(void)
-{
-	u8 data[2];
-
-	data[0] = 0x01;
-	data[1] = 0x60;
-	if (i2c_master_send(tps6130x_client, data, 2) != 2)
-		printk(KERN_ERR "I2C write to TPS6130x failed\n");
-
-	data[0] = 0x02;
-	if (i2c_master_send(tps6130x_client, data, 2) != 2)
-		printk(KERN_ERR "I2C write to TPS6130x failed\n");
-
-	return 0;
-}
 
 static int sdp4430_modem_mcbsp_configure(struct snd_pcm_substream *substream,
 	int flag)
@@ -962,8 +939,6 @@ static struct platform_device *sdp4430_snd_device;
 
 static int __init sdp4430_soc_init(void)
 {
-	struct i2c_adapter *adapter;
-	u8 gpoctl = 0;
 	int ret = 0;
 
 	if (!machine_is_omap_4430sdp() && !machine_is_omap4_panda()) {
@@ -994,35 +969,6 @@ static int __init sdp4430_soc_init(void)
 		goto reg_err;
 	}
 
-	/* enable tps6130x */
-	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &gpoctl,
-			      TWL6040_REG_GPOCTL);
-	if (ret)
-		goto gpo_err;
-
-	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl | TWL6040_GPO2,
-			       TWL6040_REG_GPOCTL);
-	if (ret)
-		goto gpo_err;
-
-	adapter = i2c_get_adapter(TPS6130X_I2C_ADAPTER);
-	if (!adapter) {
-		printk(KERN_ERR "can't get i2c adapter\n");
-		ret = -ENODEV;
-		goto adp_err;
-	}
-
-	tps6130x_client = i2c_new_device(adapter, &tps6130x_hwmon_info);
-	if (!tps6130x_client) {
-		printk(KERN_ERR "can't add i2c device\n");
-		ret = -ENODEV;
-		goto tps_err;
-	}
-
-	/* Only configure the TPS6130x on SDP4430 */
-	if (machine_is_omap_4430sdp())
-		sdp4430_tps6130x_configure();
-
 	/* Default mode is low-power, MCLK not required */
 	twl6040_power_mode = 0;
 	cdc_tcxo_set_req_int(CDC_TCXO_CLK2, 0);
@@ -1035,12 +981,6 @@ static int __init sdp4430_soc_init(void)
 
 	return ret;
 
-tps_err:
-	i2c_put_adapter(adapter);
-adp_err:
-	twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl, TWL6040_REG_GPOCTL);
-gpo_err:
-	regulator_put(av_switch_reg);
 reg_err:
 	platform_device_del(sdp4430_snd_device);
 plat_err:
@@ -1054,7 +994,6 @@ static void __exit sdp4430_soc_exit(void)
 {
 	regulator_put(av_switch_reg);
 	platform_device_unregister(sdp4430_snd_device);
-	i2c_unregister_device(tps6130x_client);
 }
 module_exit(sdp4430_soc_exit);
 
