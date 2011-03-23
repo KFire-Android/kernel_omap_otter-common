@@ -111,15 +111,16 @@ label_smc:
 #endif
 
 	INVALIDATE_BTB
-	mov	r0, #0x00
 	ldr	r8, =g_secure_task_id
 	str	r6, [r8]
+
+	mov	r0, #0x00
+	ldr	r8, =g_service_end
+	str	r0, [r8]
+
 	b	schedule_secure_world_exit
 
 service_end:
-	ldr	r8, =g_service_end
-	mov	r6, #0x1
-	str	r6, [r8]
 
 schedule_secure_world_exit:
 #ifdef CONFIG_SMC_BENCH_SECURE_CYCLE
@@ -170,8 +171,11 @@ rpc_handler:
 	ldr	r8, =g_secure_task_id
 	str	r6, [r8]
 
-	/* Restore registers */
 	mov	r0, #0x00
+	ldr	r8, =g_service_end
+	str	r0, [r8]
+
+	/* Restore registers */
 	pop	{r4-r12, pc}
 
 #ifdef CONFIG_SMC_BENCH_SECURE_CYCLE

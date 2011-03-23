@@ -162,14 +162,14 @@ u32 omap4_secure_dispatcher(u32 app_id, u32 flags, u32 nargs,
 	unsigned long nITFlags;
 	u32 pub2sec_args[5] = {0, 0, 0, 0, 0};
 
-	dprintk(KERN_INFO "omap4_secure_dispatcher: "
+	/*dprintk(KERN_INFO "omap4_secure_dispatcher: "
 		"app_id=0x%08x, flags=0x%08x, nargs=%u\n",
-		app_id, flags, nargs);
+		app_id, flags, nargs);*/
 
-	if (nargs != 0)
+	/*if (nargs != 0)
 		dprintk(KERN_INFO
 		"omap4_secure_dispatcher: args=%08x, %08x, %08x, %08x\n",
-		arg1, arg2, arg3, arg4);
+		arg1, arg2, arg3, arg4);*/
 
 	pub2sec_args[0] = nargs;
 	pub2sec_args[1] = arg1;
@@ -200,7 +200,7 @@ u32 omap4_secure_dispatcher(u32 app_id, u32 flags, u32 nargs,
 	/* Restore the HW_SUP on L4 Sec clock domain so hardware can idle */
 	tf_l4sec_clkdm_allow_idle(true, false);
 
-	dprintk(KERN_INFO "omap4_secure_dispatcher()\n");
+	/*dprintk(KERN_INFO "omap4_secure_dispatcher()\n");*/
 
 	return ret;
 }
@@ -236,7 +236,7 @@ int tf_schedule_secure_world(struct SCXLNX_COMM *pComm, bool prepare_exit)
 		break;
 	}
 
-	g_service_end = 0;
+	g_service_end = 1;
 	/* yield to the Secure World */
 	ret = omap4_secure_dispatcher(appli_id, /* app_id */
 	   0, 0,        /* flags, nargs */
