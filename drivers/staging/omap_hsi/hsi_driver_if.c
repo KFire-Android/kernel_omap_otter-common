@@ -790,11 +790,12 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			err = -EINVAL;
 			goto out;
 		}
-		if (dev->ch->hsi_port->cawake_gpio < 0) {
+		err = hsi_get_cawake(dev->ch->hsi_port);
+		if (err < 0) {
 			err = -ENODEV;
 			goto out;
 		}
-		*(u32 *)arg = hsi_get_cawake(dev->ch->hsi_port);
+		*(u32 *)arg = err;
 		break;
 	case HSI_IOCTL_SET_RX:
 		if (!arg) {

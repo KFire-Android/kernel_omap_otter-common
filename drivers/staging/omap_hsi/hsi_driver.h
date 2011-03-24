@@ -348,15 +348,20 @@ static inline void hsi_outw_and(u16 data, void __iomem *base, u32 offset)
 	hsi_outw((tmp & data), base, offset);
 }
 
-static inline u32 hsi_get_cawake(struct hsi_port *port)
+static inline int hsi_get_cawake(struct hsi_port *port)
 {
-	if (port->cawake_gpio >= 0)
-		return gpio_get_value(port->cawake_gpio);
-	else
+	struct platform_device *pdev =
+				to_platform_device(port->hsi_controller->dev);
+
+	if (hsi_driver_device_is_hsi(pdev))
 		return (HSI_HSR_MODE_WAKE_STATUS ==
 			(hsi_inl(port->hsi_controller->base,
 				HSI_HSR_MODE_REG(port->port_number)) &
 				HSI_HSR_MODE_WAKE_STATUS));
+	else if (port->cawake_gpio >= 0)
+		return gpio_get_value(port->cawake_gpio);
+	else
+		return -ENXIO;
 }
 
 static inline void hsi_clocks_disable(struct device *dev, const char *s)
