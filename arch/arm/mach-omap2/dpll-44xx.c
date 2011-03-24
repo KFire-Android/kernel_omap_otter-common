@@ -34,6 +34,10 @@
 #define DPLL_REGM4XEN_ENABLE	0x1
 #define LP_196M_RATE		196608000
 #define LP_98M_RATE		98304000
+#define LP_DELAY		1000000
+
+static struct workqueue_struct	*lpmode_wq;
+static struct delayed_work	lpmode_work;
 
 bool omap4_lpmode = false;
 
@@ -502,6 +506,29 @@ long omap4_dpll_regm4xen_round_rate(struct clk *clk, unsigned long target_rate)
 	return clk->dpll_data->last_rounded_rate;
 }
 
+int omap4_dpll_low_power_cascade_check_timer(struct delayed_work *dwork)
+{
+	int delay;
+
+	if (num_online_cpus() > 1) {
+		delay = usecs_to_jiffies(LP_DELAY);
+
+		return schedule_delayed_work_on(0, &lpmode_work, delay);
+	}
+
+	omap4_dpll_low_power_cascade_enter();
+}
+
+int omap4_dpll_low_power_cascade_check_entry()
+{
+	int delay = usecs_to_jiffies(LP_DELAY);
+
+	INIT_DELAYED_WORK_DEFERRABLE(&lpmode_work,
+			omap4_dpll_low_power_cascade_check_timer);
+
+	return schedule_delayed_work_on(0, &lpmode_work, delay);
+}
+
 /**
  * omap4_dpll_low_power_cascade - configure system for low power DPLL cascade
  *
@@ -845,6 +872,12 @@ int omap4_dpll_low_power_cascade_exit()
 		ret = -ENODEV;
 		goto out;
 	}
+
+	if (delayed_work_pending(&lpmode_work))
+		cancel_delayed_work_sync(&lpmode_work);
+
+	if (!omap4_lpmode)
+		return 0;
 
 	omap4_lpmode = false;
 
