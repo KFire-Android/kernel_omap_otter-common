@@ -526,6 +526,7 @@ static IMG_VOID
 FreeBuf (BM_BUF *pBuf, IMG_UINT32 ui32Flags, IMG_BOOL bFromAllocator)
 {
 	BM_MAPPING *pMapping;
+	PVRSRV_DEVICE_NODE *psDeviceNode;
 
 	PVR_DPF ((PVR_DBG_MESSAGE,
 			"FreeBuf: pBuf=0x%x: DevVAddr=%08X CpuVAddr=0x%x CpuPAddr=%08X",
@@ -534,6 +535,12 @@ FreeBuf (BM_BUF *pBuf, IMG_UINT32 ui32Flags, IMG_BOOL bFromAllocator)
 
 	
 	pMapping = pBuf->pMapping;
+
+	psDeviceNode = pMapping->pBMHeap->pBMContext->psDeviceNode;
+	if (psDeviceNode->pfnCacheInvalidate)
+	{
+		psDeviceNode->pfnCacheInvalidate(psDeviceNode);
+	}
 
 	if(ui32Flags & PVRSRV_MEM_USER_SUPPLIED_DEVVADDR)
 	{
@@ -695,7 +702,7 @@ BM_DestroyContext(IMG_HANDLE	hBMContext,
 	else
 	{
 		
-		eError = ResManFreeResByPtr(pBMContext->hResItem);
+		eError = ResManFreeResByPtr(pBMContext->hResItem, CLEANUP_WITH_POLL);
 		if(eError != PVRSRV_OK)
 		{
 			PVR_DPF ((PVR_DBG_ERROR, "BM_DestroyContext: ResManFreeResByPtr failed %d",eError));
@@ -745,13 +752,15 @@ static PVRSRV_ERROR BM_DestroyContextCallBack_AnyVaCb(BM_HEAP *psBMHeap, va_list
 }
 
 
-static PVRSRV_ERROR BM_DestroyContextCallBack(IMG_PVOID		pvParam,
-											  IMG_UINT32	ui32Param)
+static PVRSRV_ERROR BM_DestroyContextCallBack(IMG_PVOID   pvParam,
+											  IMG_UINT32  ui32Param,
+											  IMG_BOOL    bDummy)
 {
 	BM_CONTEXT *pBMContext = pvParam;
 	PVRSRV_DEVICE_NODE *psDeviceNode;
 	PVRSRV_ERROR eError;
 	PVR_UNREFERENCED_PARAMETER(ui32Param);
+	PVR_UNREFERENCED_PARAMETER(bDummy);
 
 	
 
@@ -969,7 +978,7 @@ BM_CreateContext(PVRSRV_DEVICE_NODE			*psDeviceNode,
 	return (IMG_HANDLE)pBMContext;
 
 cleanup:
-	(IMG_VOID)BM_DestroyContextCallBack(pBMContext, 0);
+	(IMG_VOID)BM_DestroyContextCallBack(pBMContext, 0, CLEANUP_WITH_POLL);
 
 	return IMG_NULL;
 }
@@ -1723,7 +1732,9 @@ DevMemoryFree (BM_MAPPING *pMapping)
 	psDeviceNode->pfnMMUFree (pMapping->pBMHeap->pMMUHeap, pMapping->DevVAddr, IMG_CAST_TO_DEVVADDR_UINT(pMapping->uSize));
 }
 
+#ifndef XPROC_WORKAROUND_NUM_SHAREABLES
 #define XPROC_WORKAROUND_NUM_SHAREABLES 200
+#endif
 
 #define XPROC_WORKAROUND_BAD_SHAREINDEX 0773407734
 

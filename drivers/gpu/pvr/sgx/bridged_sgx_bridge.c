@@ -49,6 +49,7 @@
 #include "bridged_pvr_bridge.h"
 #include "bridged_sgx_bridge.h"
 #include "sgxutils.h"
+#include "buffer_manager.h"
 #include "pdump_km.h"
 
 static IMG_INT
@@ -2185,7 +2186,8 @@ SGXUnregisterHWRenderContextBW(IMG_UINT32 ui32BridgeID,
 		return 0;
 	}
 
-	psRetOUT->eError = SGXUnregisterHWRenderContextKM(hHWRenderContextInt);
+	psRetOUT->eError = SGXUnregisterHWRenderContextKM(hHWRenderContextInt,
+													  psSGXUnregHWRenderContextIN->bForceCleanup);
 	if(psRetOUT->eError != PVRSRV_OK)
 	{
 		return 0;
@@ -2270,7 +2272,8 @@ SGXUnregisterHWTransferContextBW(IMG_UINT32 ui32BridgeID,
 		return 0;
 	}
 
-	psRetOUT->eError = SGXUnregisterHWTransferContextKM(hHWTransferContextInt);
+	psRetOUT->eError = SGXUnregisterHWTransferContextKM(hHWTransferContextInt,
+														psSGXUnregHWTransferContextIN->bForceCleanup);
 	if(psRetOUT->eError != PVRSRV_OK)
 	{
 		return 0;
@@ -2352,7 +2355,8 @@ SGXUnregisterHW2DContextBW(IMG_UINT32 ui32BridgeID,
 		return 0;
 	}
 
-	psRetOUT->eError = SGXUnregisterHW2DContextKM(hHW2DContextInt);
+	psRetOUT->eError = SGXUnregisterHW2DContextKM(hHW2DContextInt,
+												  psSGXUnregHW2DContextIN->bForceCleanup);
 	if(psRetOUT->eError != PVRSRV_OK)
 	{
 		return 0;
@@ -2386,7 +2390,7 @@ SGXFlushHWRenderTargetBW(IMG_UINT32 ui32BridgeID,
 		return 0;
 	}
 
-	SGXFlushHWRenderTargetKM(hDevCookieInt, psSGXFlushHWRenderTargetIN->sHWRTDataSetDevVAddr);
+	psRetOUT->eError = SGXFlushHWRenderTargetKM(hDevCookieInt, psSGXFlushHWRenderTargetIN->sHWRTDataSetDevVAddr, IMG_FALSE);
 
 	return 0;
 }

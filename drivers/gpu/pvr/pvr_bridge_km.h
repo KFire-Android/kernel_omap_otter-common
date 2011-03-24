@@ -109,7 +109,7 @@ PVRSRV_ERROR IMG_CALLCONV _PVRSRVAllocDeviceMemKM(IMG_HANDLE					hDevCookie,
 #if defined(PVRSRV_LOG_MEMORY_ALLOCS)
 	#define PVRSRVAllocDeviceMemKM(devCookie, perProc, devMemHeap, flags, size, alignment, memInfo, logStr) \
 		(PVR_TRACE(("PVRSRVAllocDeviceMemKM(" #devCookie ", " #perProc ", " #devMemHeap ", " #flags ", " #size \
-			", " #alignment "," #memInfo "): " logStr " (size = 0x%;x)", size)),\
+			", " #alignment "," #memInfo "): " logStr " (size = 0x%x)", size)),\
 			_PVRSRVAllocDeviceMemKM(devCookie, perProc, devMemHeap, flags, size, alignment, memInfo))
 #else
 	#define PVRSRVAllocDeviceMemKM(devCookie, perProc, devMemHeap, flags, size, alignment, memInfo, logStr) \

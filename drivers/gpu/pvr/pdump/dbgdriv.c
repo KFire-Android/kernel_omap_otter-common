@@ -707,7 +707,7 @@ void MonoOut(IMG_CHAR * pszString,IMG_BOOL bNewLine)
 	PVR_UNREFERENCED_PARAMETER(bNewLine);
 
 #else
-	IMG_UINT32	i;
+	IMG_UINT32 	i;
 	IMG_CHAR *	pScreen;
 
 	pScreen = (IMG_CHAR *) DBGDRIV_MONOBASE;
@@ -842,10 +842,10 @@ static IMG_UINT32 WriteExpandingBuffer(PDBG_STREAM psStream,IMG_UINT8 * pui8InBu
 }
 
 IMG_VOID * IMG_CALLCONV DBGDrivCreateStream(IMG_CHAR *		pszName,
-								   IMG_UINT32	ui32CapMode,
-								   IMG_UINT32	ui32OutMode,
+								   IMG_UINT32 	ui32CapMode,
+								   IMG_UINT32 	ui32OutMode,
 								   IMG_UINT32	ui32Flags,
-								   IMG_UINT32	ui32Size)
+								   IMG_UINT32 	ui32Size)
 {
 	PDBG_STREAM psStream;
 	PDBG_STREAM	psInitStream;

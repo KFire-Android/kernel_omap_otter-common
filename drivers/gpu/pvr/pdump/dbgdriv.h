@@ -29,9 +29,9 @@
 
 #define BUFFER_SIZE 64*PAGESIZE
 
-#define DBGDRIV_VERSION		0x100
-#define MAX_PROCESSES		2
-#define BLOCK_USED		0x01
+#define DBGDRIV_VERSION 	0x100
+#define MAX_PROCESSES 		2
+#define BLOCK_USED			0x01
 #define BLOCK_LOCKED		0x02
 #define DBGDRIV_MONOBASE	0x000B0000
 
@@ -39,10 +39,10 @@
 extern IMG_VOID *	g_pvAPIMutex;
 
 IMG_VOID * IMG_CALLCONV DBGDrivCreateStream(IMG_CHAR *		pszName,
-								   IMG_UINT32	ui32CapMode,
-								   IMG_UINT32	ui32OutMode,
+								   IMG_UINT32 	ui32CapMode,
+								   IMG_UINT32 	ui32OutMode,
 								   IMG_UINT32	ui32Flags,
-								   IMG_UINT32	ui32Pages);
+								   IMG_UINT32 	ui32Pages);
 IMG_VOID   IMG_CALLCONV DBGDrivDestroyStream(PDBG_STREAM psStream);
 IMG_VOID * IMG_CALLCONV DBGDrivFindStream(IMG_CHAR * pszName, IMG_BOOL bResetStream);
 IMG_UINT32 IMG_CALLCONV DBGDrivWriteString(PDBG_STREAM psStream,IMG_CHAR * pszString,IMG_UINT32 ui32Level);

@@ -521,6 +521,7 @@ typedef struct PVRSRV_BRIDGE_OUT_SGX_REGISTER_HW_RENDER_CONTEXT_TAG
 typedef struct PVRSRV_BRIDGE_IN_SGX_UNREGISTER_HW_RENDER_CONTEXT_TAG
 {
 	IMG_UINT32 ui32BridgeFlags; 
+	IMG_BOOL   bForceCleanup;
 #if defined (SUPPORT_SID_INTERFACE)
 	IMG_SID    hDevCookie;
 	IMG_SID    hHWRenderContext;
@@ -554,6 +555,7 @@ typedef struct PVRSRV_BRIDGE_OUT_SGX_REGISTER_HW_TRANSFER_CONTEXT_TAG
 typedef struct PVRSRV_BRIDGE_IN_SGX_UNREGISTER_HW_TRANSFER_CONTEXT_TAG
 {
 	IMG_UINT32 ui32BridgeFlags; 
+	IMG_BOOL   bForceCleanup;
 #if defined (SUPPORT_SID_INTERFACE)
 	IMG_SID    hDevCookie;
 	IMG_SID    hHWTransferContext;
@@ -600,6 +602,7 @@ typedef struct PVRSRV_BRIDGE_OUT_SGX_REGISTER_HW_2D_CONTEXT_TAG
 typedef struct PVRSRV_BRIDGE_IN_SGX_UNREGISTER_HW_2D_CONTEXT_TAG
 {
 	IMG_UINT32 ui32BridgeFlags; 
+	IMG_BOOL   bForceCleanup;
 #if defined (SUPPORT_SID_INTERFACE)
 	IMG_SID    hDevCookie;
 	IMG_SID    hHW2DContext;

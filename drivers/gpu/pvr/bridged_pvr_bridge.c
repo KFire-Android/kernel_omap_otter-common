@@ -822,6 +822,7 @@ PVRSRVMapDeviceMemoryBW(IMG_UINT32 ui32BridgeID,
 
     NEW_HANDLE_BATCH_OR_ERROR(psMapDevMemOUT->eError, psPerProc, 2)
 
+
     psMapDevMemOUT->eError = PVRSRVLookupHandle(KERNEL_HANDLE_BASE,
                                                 (IMG_VOID**)&psSrcKernelMemInfo,
                                                 psMapDevMemIN->hKernelMemInfo,
@@ -831,6 +832,7 @@ PVRSRVMapDeviceMemoryBW(IMG_UINT32 ui32BridgeID,
         return 0;
     }
 
+
     psMapDevMemOUT->eError = PVRSRVLookupHandle(psPerProc->psHandleBase,
                                                 &hDstDevMemHeap,
                                                 psMapDevMemIN->hDstDevMemHeap,
@@ -839,10 +841,19 @@ PVRSRVMapDeviceMemoryBW(IMG_UINT32 ui32BridgeID,
     {
         return 0;
     }
+
     
     if (psSrcKernelMemInfo->sShareMemWorkaround.bInUse)
     {
         PVR_DPF((PVR_DBG_MESSAGE, "using the mem wrap workaround."));
+
+
+
+
+
+
+
+
 
         psMapDevMemOUT->eError = BM_XProcWorkaroundSetShareIndex(psSrcKernelMemInfo->sShareMemWorkaround.ui32ShareIndex);
         if(psMapDevMemOUT->eError != PVRSRV_OK)
@@ -3833,11 +3844,13 @@ static PVRSRV_ERROR DoModifyCompleteSyncOps(MODIFY_SYNC_OP_INFO *psModSyncOpInfo
 
 
 static PVRSRV_ERROR ModifyCompleteSyncOpsCallBack(IMG_PVOID     pvParam,
-                                                    IMG_UINT32  ui32Param)
+                                                    IMG_UINT32  ui32Param,
+                                                    IMG_BOOL    bDummy)
 {
     MODIFY_SYNC_OP_INFO     *psModSyncOpInfo;
 
     PVR_UNREFERENCED_PARAMETER(ui32Param);
+    PVR_UNREFERENCED_PARAMETER(bDummy);
 
     if (!pvParam)
     {
@@ -3969,7 +3982,7 @@ PVRSRVDestroySyncInfoModObjBW(IMG_UINT32                                        
         return 0;
     }
 
-    psDestroySyncInfoModObjOUT->eError = ResManFreeResByPtr(psModSyncOpInfo->hResItem);
+    psDestroySyncInfoModObjOUT->eError = ResManFreeResByPtr(psModSyncOpInfo->hResItem, CLEANUP_WITH_POLL);
     if (psDestroySyncInfoModObjOUT->eError != PVRSRV_OK)
     {
         PVR_DPF((PVR_DBG_ERROR, "PVRSRVDestroySyncInfoModObjBW: ResManFreeResByPtr failed"));
@@ -4274,12 +4287,14 @@ PVRSRVSyncOpsFlushToDeltaBW(IMG_UINT32                                         u
 
 static PVRSRV_ERROR
 FreeSyncInfoCallback(IMG_PVOID  pvParam,
-                     IMG_UINT32 ui32Param)
+                     IMG_UINT32 ui32Param,
+                     IMG_BOOL	bDummy)
 {
     PVRSRV_KERNEL_SYNC_INFO *psSyncInfo;
     PVRSRV_ERROR eError;
 
     PVR_UNREFERENCED_PARAMETER(ui32Param);
+    PVR_UNREFERENCED_PARAMETER(bDummy);
 
     psSyncInfo = (PVRSRV_KERNEL_SYNC_INFO *)pvParam;
 
@@ -4396,7 +4411,7 @@ PVRSRVFreeSyncInfoBW(IMG_UINT32                                          ui32Bri
         return 0;
     }
 
-    eError = ResManFreeResByPtr(psSyncInfo->hResItem);
+    eError = ResManFreeResByPtr(psSyncInfo->hResItem, CLEANUP_WITH_POLL);
     if (eError != PVRSRV_OK)
     {
         PVR_DPF((PVR_DBG_ERROR, "PVRSRVFreeSyncInfoBW: ResManFreeResByPtr failed"));

@@ -140,7 +140,7 @@ PVRSRV_ERROR LinuxEventObjectDelete(IMG_HANDLE hOSEventObjectList, IMG_HANDLE hO
 #if defined(DEBUG)
 			PVR_DPF((PVR_DBG_MESSAGE, "LinuxEventObjectListDelete: Event object waits: %u", psLinuxEventObject->ui32Stats));
 #endif
-			if(ResManFreeResByPtr(psLinuxEventObject->hResItem) != PVRSRV_OK)
+			if(ResManFreeResByPtr(psLinuxEventObject->hResItem, CLEANUP_WITH_POLL) != PVRSRV_OK)
 			{
 				return PVRSRV_ERROR_UNABLE_TO_DESTROY_EVENT;
 			}
@@ -152,13 +152,14 @@ PVRSRV_ERROR LinuxEventObjectDelete(IMG_HANDLE hOSEventObjectList, IMG_HANDLE hO
 
 }
 
-static PVRSRV_ERROR LinuxEventObjectDeleteCallback(IMG_PVOID pvParam, IMG_UINT32 ui32Param)
+static PVRSRV_ERROR LinuxEventObjectDeleteCallback(IMG_PVOID pvParam, IMG_UINT32 ui32Param, IMG_BOOL bForceCleanup)
 {
 	PVRSRV_LINUX_EVENT_OBJECT *psLinuxEventObject = pvParam;
 	PVRSRV_LINUX_EVENT_OBJECT_LIST *psLinuxEventObjectList = psLinuxEventObject->psLinuxEventObjectList;
 	unsigned long ulLockFlags;
 
 	PVR_UNREFERENCED_PARAMETER(ui32Param);
+	PVR_UNREFERENCED_PARAMETER(bForceCleanup);
 
 	write_lock_irqsave(&psLinuxEventObjectList->sLock, ulLockFlags);
 	list_del(&psLinuxEventObject->sList);

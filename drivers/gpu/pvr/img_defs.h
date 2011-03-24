@@ -109,6 +109,9 @@ typedef char				TCHAR, *PTCHAR, *PTSTR;
 #define IMG_FORMAT_PRINTF(x,y)
 #endif
 
+#define  CLEANUP_WITH_POLL		IMG_FALSE
+#define  FORCE_CLEANUP			IMG_TRUE
+
 #if defined (_WIN64)
 #define IMG_UNDEF	(~0ULL)
 #else

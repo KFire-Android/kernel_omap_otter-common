@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -104,6 +104,13 @@ typedef void**          IMG_HVOID,	* IMG_PHVOID;
 typedef IMG_UINT32      IMG_SID;
 
 typedef IMG_UINT32      IMG_EVENTSID;
+
+#if defined(SUPPORT_SID_INTERFACE)
+	typedef IMG_SID IMG_S_HANDLE;
+#else
+	typedef IMG_HANDLE IMG_S_HANDLE;
+#endif
+
 typedef IMG_PVOID IMG_CPU_VIRTADDR;
 
 typedef struct _IMG_DEV_VIRTADDR

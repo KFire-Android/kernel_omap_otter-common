@@ -28,7 +28,9 @@
  #include <linux/config.h>
 #endif
 
-#if !defined(SUPPORT_DRI_DRM)
+#if defined(SUPPORT_DRI_DRM)
+#define	PVR_MOD_STATIC
+#else
 	
 	#if defined(LDM_PLATFORM)
 		#define	PVR_LDM_PLATFORM_MODULE
@@ -39,6 +41,13 @@
 			#define	PVR_LDM_MODULE
 		#endif
 	#endif
+#define	PVR_MOD_STATIC	static
+#endif
+
+#if defined(PVR_LDM_PLATFORM_PRE_REGISTERED)
+#if !defined(NO_HARDWARE)
+#define PVR_USE_PRE_REGISTERED_PLATFORM_DEV
+#endif
 #endif
 
 #include <linux/init.h>
@@ -152,7 +161,6 @@ static IMG_UINT32 gPVRPowerLevel;
 #define	LDM_DEV	struct pci_dev
 #define	LDM_DRV	struct pci_driver
 #endif 
-
 #if defined(PVR_LDM_PLATFORM_MODULE)
 static int PVRSRVDriverRemove(LDM_DEV *device);
 static int PVRSRVDriverProbe(LDM_DEV *device);
@@ -167,14 +175,21 @@ static int PVRSRVDriverResume(LDM_DEV *device);
 
 #if defined(PVR_LDM_PCI_MODULE)
 struct pci_device_id powervr_id_table[] __devinitdata = {
-	{ PCI_DEVICE(SYS_SGX_DEV_VENDOR_ID, SYS_SGX_DEV_DEVICE_ID) },
+	{PCI_DEVICE(SYS_SGX_DEV_VENDOR_ID, SYS_SGX_DEV_DEVICE_ID)},
 #if defined (SYS_SGX_DEV1_DEVICE_ID)
-	{ PCI_DEVICE(SYS_SGX_DEV_VENDOR_ID, SYS_SGX_DEV1_DEVICE_ID) },
+	{PCI_DEVICE(SYS_SGX_DEV_VENDOR_ID, SYS_SGX_DEV1_DEVICE_ID)},
 #endif
-	{ 0 }
+	{0}
 };
 
 MODULE_DEVICE_TABLE(pci, powervr_id_table);
+#endif
+
+#if defined(PVR_USE_PRE_REGISTERED_PLATFORM_DEV)
+static struct platform_device_id powervr_id_table[] __devinitdata = {
+	{SYS_SGX_DEV_NAME, 0},
+	{}
+};
 #endif
 
 static LDM_DRV powervr_driver = {
@@ -185,6 +200,8 @@ static LDM_DRV powervr_driver = {
 #endif
 #if defined(PVR_LDM_PCI_MODULE)
 	.name		= DRVNAME,
+#endif
+#if defined(PVR_LDM_PCI_MODULE) || defined(PVR_USE_PRE_REGISTERED_PLATFORM_DEV)
 	.id_table = powervr_id_table,
 #endif
 	.probe		= PVRSRVDriverProbe,
@@ -201,9 +218,9 @@ static LDM_DRV powervr_driver = {
 
 LDM_DEV *gpsPVRLDMDev;
 
-#if defined(MODULE) && defined(PVR_LDM_PLATFORM_MODULE)
-
-static IMG_VOID PVRSRVDeviceRelease(struct device unref__ *pDevice)
+#if defined(MODULE) && defined(PVR_LDM_PLATFORM_MODULE) && \
+	!defined(PVR_USE_PRE_REGISTERED_PLATFORM_DEV)
+static void PVRSRVDeviceRelease(struct device unref__ *pDevice)
 {
 }
 
@@ -214,8 +231,7 @@ static struct platform_device powervr_device = {
 		.release	= PVRSRVDeviceRelease
 	}
 };
-
-#endif 
+#endif
 
 #if defined(PVR_LDM_PLATFORM_MODULE)
 static int PVRSRVDriverProbe(LDM_DEV *pDevice)
@@ -273,7 +289,7 @@ static void __devexit PVRSRVDriverRemove(LDM_DEV *pDevice)
 		}
 	}
 #endif
-	(IMG_VOID)SysDeinitialise(psSysData);
+	(void) SysDeinitialise(psSysData);
 
 	gpsPVRLDMDev = IMG_NULL;
 
@@ -291,23 +307,25 @@ static void __devexit PVRSRVDriverRemove(LDM_DEV *pDevice)
 	return;
 #endif
 }
+#endif
 
 
-static IMG_VOID PVRSRVDriverShutdown(LDM_DEV *pDevice)
+#if defined(PVR_LDM_MODULE) || defined(PVR_DRI_DRM_PLATFORM_DEV)
+PVR_MOD_STATIC void PVRSRVDriverShutdown(LDM_DEV *pDevice)
 {
 	PVR_TRACE(("PVRSRVDriverShutdown(pDevice=%p)", pDevice));
 
-	(IMG_VOID) PVRSRVSetPowerStateKM(PVRSRV_SYS_POWER_STATE_D3);
+	(void) PVRSRVSetPowerStateKM(PVRSRV_SYS_POWER_STATE_D3);
 }
 
 #endif 
 
 
 #if defined(PVR_LDM_MODULE) || defined(SUPPORT_DRI_DRM)
-#if defined(SUPPORT_DRI_DRM)
+#if defined(SUPPORT_DRI_DRM) && !defined(PVR_DRI_DRM_PLATFORM_DEV)
 int PVRSRVDriverSuspend(struct drm_device *pDevice, pm_message_t state)
 #else
-static int PVRSRVDriverSuspend(LDM_DEV *pDevice, pm_message_t state)
+PVR_MOD_STATIC int PVRSRVDriverSuspend(LDM_DEV *pDevice, pm_message_t state)
 #endif
 {
 #if !(defined(DEBUG) && defined(PVR_MANUAL_POWER_CONTROL) && !defined(SUPPORT_DRI_DRM))
@@ -322,10 +340,10 @@ static int PVRSRVDriverSuspend(LDM_DEV *pDevice, pm_message_t state)
 }
 
 
-#if defined(SUPPORT_DRI_DRM)
+#if defined(SUPPORT_DRI_DRM) && !defined(PVR_DRI_DRM_PLATFORM_DEV)
 int PVRSRVDriverResume(struct drm_device *pDevice)
 #else
-static int PVRSRVDriverResume(LDM_DEV *pDevice)
+PVR_MOD_STATIC int PVRSRVDriverResume(LDM_DEV *pDevice)
 #endif
 {
 #if !(defined(DEBUG) && defined(PVR_MANUAL_POWER_CONTROL) && !defined(SUPPORT_DRI_DRM))
@@ -492,9 +510,9 @@ static int PVRSRVRelease(struct inode unref__ * pInode, struct file *pFile)
 
 
 #if defined(SUPPORT_DRI_DRM)
-int PVRCore_Init(IMG_VOID)
+int PVRCore_Init(void)
 #else
-static int __init PVRCore_Init(IMG_VOID)
+static int __init PVRCore_Init(void)
 #endif
 {
 	int error;
@@ -546,7 +564,7 @@ static int __init PVRCore_Init(IMG_VOID)
 		goto init_failed;
 	}
 
-#if defined(MODULE)
+#if defined(MODULE) && !defined(PVR_USE_PRE_REGISTERED_PLATFORM_DEV)
 	if ((error = platform_device_register(&powervr_device)) != 0)
 	{
 		platform_driver_unregister(&powervr_driver);
@@ -638,7 +656,7 @@ sys_deinit:
 #endif
 
 #if defined (PVR_LDM_PLATFORM_MODULE)
-#if defined (MODULE)
+#if defined(MODULE) && !defined(PVR_USE_PRE_REGISTERED_PLATFORM_DEV)
 	platform_device_unregister(&powervr_device);
 #endif
 	platform_driver_unregister(&powervr_driver);
@@ -652,7 +670,7 @@ sys_deinit:
 		psSysData = SysAcquireDataNoCheck();
 		if (psSysData != IMG_NULL)
 		{
-			(IMG_VOID)SysDeinitialise(psSysData);
+			(void) SysDeinitialise(psSysData);
 		}
 	}
 #endif	
@@ -674,11 +692,14 @@ void PVRCore_Cleanup(void)
 static void __exit PVRCore_Cleanup(void)
 #endif
 {
+#if !defined(PVR_LDM_MODULE)
 	SYS_DATA *psSysData;
-
+#endif
 	PVR_TRACE(("PVRCore_Cleanup"));
 
+#if !defined(PVR_LDM_MODULE)
 	SysAcquireData(&psSysData);
+#endif
 
 #if defined(PVR_LDM_MODULE)
 	device_destroy(psPvrClass, MKDEV(AssignedMajorNumber, 0));
@@ -707,7 +728,7 @@ static void __exit PVRCore_Cleanup(void)
 #endif
 
 #if defined (PVR_LDM_PLATFORM_MODULE)
-#if defined (MODULE)
+#if defined(MODULE) && !defined(PVR_USE_PRE_REGISTERED_PLATFORM_DEV)
 	platform_device_unregister(&powervr_device);
 #endif
 	platform_driver_unregister(&powervr_driver);
@@ -741,6 +762,6 @@ static void __exit PVRCore_Cleanup(void)
 }
 
 #if !defined(SUPPORT_DRI_DRM)
-late_initcall(PVRCore_Init);
+module_init(PVRCore_Init);
 module_exit(PVRCore_Cleanup);
 #endif

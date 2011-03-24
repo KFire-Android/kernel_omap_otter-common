@@ -48,7 +48,45 @@
 #endif 
 #endif 
 
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+#if !defined(LDM_PLATFORM)
+#error "LDM_PLATFORM must be set"
+#endif
+#define	PVR_LINUX_DYNAMIC_SGX_RESOURCE_INFO
+#include <linux/platform_device.h>
+#endif
+
+#if ((defined(DEBUG) || defined(TIMING)) && \
+    (LINUX_VERSION_CODE == KERNEL_VERSION(2,6,34))) && \
+    !defined(PVR_NO_OMAP_TIMER)
+#define	PVR_OMAP4_TIMING_PRCM
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+#include <plat/gpu.h>
+#if !defined(PVR_NO_OMAP_TIMER)
+#define	PVR_OMAP_USE_DM_TIMER_API
+#include <plat/dmtimer.h>
+#endif
+#endif
+
+#if !defined(PVR_NO_OMAP_TIMER)
+#define PVR_OMAP_TIMER_BASE_IN_SYS_SPEC_DATA
+#endif
 #endif 
+
+#if !defined(NO_HARDWARE) && \
+     defined(SYS_USING_INTERRUPTS) && \
+     defined(SGX540)
+#define SGX_OCP_REGS_ENABLED
+#endif
+
+#if defined(__linux__)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35)) && defined(SGX_OCP_REGS_ENABLED)
+#define SGX_OCP_NO_INT_BYPASS
+#endif
+#endif
 
 #if defined (__cplusplus)
 extern "C" {
@@ -56,8 +94,6 @@ extern "C" {
 
  
  
-IMG_CHAR *SysCreateVersionString(IMG_CPU_PHYADDR sRegRegion);
-
 IMG_VOID DisableSystemClocks(SYS_DATA *psSysData);
 PVRSRV_ERROR EnableSystemClocks(SYS_DATA *psSysData);
 
@@ -78,6 +114,9 @@ PVRSRV_ERROR EnableSGXClocks(SYS_DATA *psSysData);
 #define	SYS_SPECIFIC_DATA_PM_DISABLE_SYSCLOCKS	0x00000400
 #define SYS_SPECIFIC_DATA_ENABLE_OCPREGS	0x00000800
 #define SYS_SPECIFIC_DATA_ENABLE_PM_RUNTIME	0x00001000
+#if defined(SGX_OCP_REGS_ENABLED) && defined(SGX_OCP_NO_INT_BYPASS)
+#define SYS_SPECIFIC_DATA_IRQ_ENABLED		0x00002000
+#endif
 
 #define	SYS_SPECIFIC_DATA_SET(psSysSpecData, flag) ((IMG_VOID)((psSysSpecData)->ui32SysSpecificData |= (flag)))
 
@@ -90,6 +129,9 @@ typedef struct _SYS_SPECIFIC_DATA_TAG_
 	IMG_UINT32	ui32SysSpecificData;
 	PVRSRV_DEVICE_NODE *psSGXDevNode;
 	IMG_BOOL	bSGXInitComplete;
+#if defined(PVR_OMAP_TIMER_BASE_IN_SYS_SPEC_DATA)
+	IMG_CPU_PHYADDR	sTimerRegPhysBase;
+#endif
 #if !defined(__linux__)
 	IMG_BOOL	bSGXClocksEnabled;
 #endif
@@ -107,18 +149,25 @@ typedef struct _SYS_SPECIFIC_DATA_TAG_
 	atomic_t	sNotifyLockCPU;
 	IMG_BOOL	bCallVDD2PostFunc;
 #endif
-	struct clk	*psCORE_CK;
-	struct clk	*psSGX_FCK;
-	struct clk	*psSGX_ICK;
-	struct clk	*psMPU_CK;
 #if defined(DEBUG) || defined(TIMING)
 	struct clk	*psGPT11_FCK;
 	struct clk	*psGPT11_ICK;
+#endif
+#if defined(PVR_OMAP_USE_DM_TIMER_API)
+	struct omap_dm_timer *psGPTimer;
 #endif
 #endif	
 } SYS_SPECIFIC_DATA;
 
 extern SYS_SPECIFIC_DATA *gpsSysSpecificData;
+
+#if defined(SGX_OCP_REGS_ENABLED) && defined(SGX_OCP_NO_INT_BYPASS)
+IMG_VOID SysEnableSGXInterrupts(SYS_DATA* psSysData);
+IMG_VOID SysDisableSGXInterrupts(SYS_DATA* psSysData);
+#else
+#define	SysEnableSGXInterrupts(psSysData)
+#define SysDisableSGXInterrupts(psSysData)
+#endif
 
 #if defined(SYS_CUSTOM_POWERLOCK_WRAP)
 IMG_BOOL WrapSystemPowerChange(SYS_SPECIFIC_DATA *psSysSpecData);

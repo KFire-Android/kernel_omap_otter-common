@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -29,13 +29,17 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/string.h>
 #include <asm/page.h>
 #include <linux/vmalloc.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15))
 #include <linux/mutex.h>
+#else
+#include <asm/semaphore.h>
+#endif
 #include <linux/hardirq.h>
-#include <linux/slab.h>
 
 #if defined(SUPPORT_DBGDRV_EVENT_OBJECTS)
 #include <linux/sched.h>
@@ -51,13 +55,13 @@
 #include "hostfunc.h"
 #include "dbgdriv.h"
 
-#if defined(DEBUG) && !defined(SUPPORT_DRI_DRM)
-IMG_UINT32	gPVRDumpDebugLevel = (DBGPRIV_FATAL | DBGPRIV_ERROR | DBGPRIV_WARNING);
+#if defined(MODULE) && defined(DEBUG) && !defined(SUPPORT_DRI_DRM)
+IMG_UINT32	gPVRDebugLevel = (DBGPRIV_FATAL | DBGPRIV_ERROR | DBGPRIV_WARNING);
 
 #define PVR_STRING_TERMINATOR		'\0'
 #define PVR_IS_FILE_SEPARATOR(character) ( ((character) == '\\') || ((character) == '/') )
 
-void PVRSRVDumpDebugPrintf	(
+void PVRSRVDebugPrintf	(
 						IMG_UINT32	ui32DebugLevel,
 						const IMG_CHAR*	pszFileName,
 						IMG_UINT32	ui32Line,
@@ -79,7 +83,7 @@ void PVRSRVDumpDebugPrintf	(
 
 	bTrace = (IMG_BOOL)(ui32DebugLevel & DBGPRIV_CALLTRACE) ? IMG_TRUE : IMG_FALSE;
 
-	if (gPVRDumpDebugLevel & ui32DebugLevel)
+	if (gPVRDebugLevel & ui32DebugLevel)
 	{
 		va_list vaArgs;
 		static char szBuffer[256];
@@ -131,7 +135,7 @@ void PVRSRVDumpDebugPrintf	(
 		vsprintf (&szBuffer[strlen(szBuffer)], pszFormat, vaArgs);
 
 
-		if (bTrace == IMG_FALSE)
+ 		if (bTrace == IMG_FALSE)
 		{
 			sprintf (&szBuffer[strlen(szBuffer)], " [%d, %s]", (int)ui32Line, pszFileName);
 		}

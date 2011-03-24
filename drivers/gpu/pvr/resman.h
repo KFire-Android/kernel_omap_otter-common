@@ -76,7 +76,7 @@ enum {
 #define RESMAN_CRITERIA_PVOID_PARAM		0x00000002	
 #define RESMAN_CRITERIA_UI32_PARAM		0x00000004	
 
-typedef PVRSRV_ERROR (*RESMAN_FREE_FN)(IMG_PVOID pvParam, IMG_UINT32 ui32Param); 
+typedef PVRSRV_ERROR (*RESMAN_FREE_FN)(IMG_PVOID pvParam, IMG_UINT32 ui32Param, IMG_BOOL bForceCleanup);
 
 typedef struct _RESMAN_ITEM_ *PRESMAN_ITEM;
 typedef struct _RESMAN_CONTEXT_ *PRESMAN_CONTEXT;
@@ -90,7 +90,8 @@ PRESMAN_ITEM ResManRegisterRes(PRESMAN_CONTEXT	hResManContext,
 							   IMG_UINT32		ui32Param, 
 							   RESMAN_FREE_FN	pfnFreeResource);
 
-PVRSRV_ERROR ResManFreeResByPtr(PRESMAN_ITEM	psResItem);
+PVRSRV_ERROR ResManFreeResByPtr(PRESMAN_ITEM	psResItem,
+								IMG_BOOL		bForceCleanup);
 
 PVRSRV_ERROR ResManFreeResByCriteria(PRESMAN_CONTEXT	hResManContext,
 									 IMG_UINT32			ui32SearchCriteria, 
