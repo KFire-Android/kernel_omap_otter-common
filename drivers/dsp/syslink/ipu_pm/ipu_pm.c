@@ -2483,13 +2483,6 @@ int ipu_pm_save_ctx(int proc_id)
 		return 0;
 	}
 
-#ifdef CONFIG_OMAP_PM
-	retval = omap_pm_set_max_sdma_lat(&pm_qos_handle_2,
-						IPU_PM_NO_MPU_LAT_CONSTRAINT);
-	if (retval)
-		pr_info("Unable to remove cstr on IPU\n");
-#endif
-
 	/* Because of the current scheme, we need to check
 	 * if APPM3 is enable and we need to shut it down too
 	 * Sysm3 is the only want sending the hibernate message
@@ -2557,6 +2550,12 @@ int ipu_pm_save_ctx(int proc_id)
 			pr_err("Not able to save iommu");
 	} else
 		goto error;
+#ifdef CONFIG_OMAP_PM
+	retval = omap_pm_set_max_sdma_lat(&pm_qos_handle_2,
+						IPU_PM_NO_MPU_LAT_CONSTRAINT);
+	if (retval)
+		pr_info("Unable to remove cstr on IPU\n");
+#endif
 exit:
 	mutex_unlock(ipu_pm_state.gate_handle);
 	return 0;

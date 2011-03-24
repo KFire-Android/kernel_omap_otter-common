@@ -229,7 +229,9 @@ static int ipu_pm_drv_suspend(struct device *dev)
 				/* sysm3 is handling hibernation of ducati
 				 * currently
 				 */
-				ipu_pm_save_ctx(SYS_M3);
+				retval = ipu_pm_save_ctx(SYS_M3);
+				if (retval)
+					goto error;
 				need_resume_notifications = 1;
 			}
 		}
