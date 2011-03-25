@@ -129,7 +129,17 @@ static void __init omap_detect_sram(void)
 				omap_sram_start = OMAP3_SRAM_PUB_PA;
 				if ((omap_type() == OMAP2_DEVICE_TYPE_EMU) ||
 				    (omap_type() == OMAP2_DEVICE_TYPE_SEC)) {
+#ifdef CONFIG_TF_MSHIELD
+					/*
+					 * 4k for public SRAM
+					 * 60k for secure SRAM
+					 */
+					omap_sram_base = OMAP3_SRAM_VA + 0xf000;
+					omap_sram_start = OMAP3_SRAM_PA + 0xf000;
+					omap_sram_size = 0x1000;
+#else
 					omap_sram_size = 0x7000; /* 28K */
+#endif
 				} else {
 					omap_sram_size = 0x8000; /* 32K */
 				}
