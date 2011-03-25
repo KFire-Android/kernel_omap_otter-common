@@ -1,5 +1,5 @@
 obj-$(CONFIG_OMAP2_DSS) += omapdss.o
-omapdss-y := core.o dss.o dispc.o display.o manager.o overlay.o wb.o
+omapdss-y := core.o dss.o dispc.o display.o manager.o overlay.o wb.o fifothreshold.o
 omapdss-$(CONFIG_OMAP2_DSS_DPI) += dpi.o
 omapdss-$(CONFIG_OMAP2_DSS_RFBI) += rfbi.o
 omapdss-$(CONFIG_OMAP2_DSS_VENC) += venc.o

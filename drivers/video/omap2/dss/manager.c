@@ -909,7 +909,8 @@ static int configure_overlay(enum omap_plane plane)
 	dispc_set_burst_size(plane, c->burst_size);
 	dispc_set_zorder(plane, c->zorder);
 	dispc_enable_zorder(plane, 1);
-	dispc_setup_plane_fifo(plane, c->fifo_low, c->fifo_high);
+	if (!cpu_is_omap44xx())
+		dispc_setup_plane_fifo(plane, c->fifo_low, c->fifo_high);
 
 	if (source_of_wb && wb->dirty) {
 		/* writeback is enabled for this plane - set accordingly */
