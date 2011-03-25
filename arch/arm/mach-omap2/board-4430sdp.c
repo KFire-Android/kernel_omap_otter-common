@@ -1528,7 +1528,7 @@ static void omap_4430hsi_pad_conf(void)
 
 	/* hsi1_cawake */
 	omap_mux_init_signal("usbb1_ulpitll_clk.hsi1_cawake", \
-		OMAP_PIN_INPUT | \
+		OMAP_PIN_INPUT_PULLDOWN | \
 		OMAP_PIN_OFF_NONE | \
 		OMAP_PIN_OFF_WAKEUPENABLE);
 	/* hsi1_caflag */
@@ -1542,7 +1542,7 @@ static void omap_4430hsi_pad_conf(void)
 	/* hsi1_acready */
 	omap_mux_init_signal("usbb1_ulpitll_nxt.hsi1_acready", \
 		OMAP_PIN_OUTPUT | \
-		OMAP_PIN_OFF_NONE);
+		OMAP_PIN_OFF_OUTPUT_LOW);
 	/* hsi1_acwake */
 	omap_mux_init_signal("usbb1_ulpitll_dat0.hsi1_acwake", \
 		OMAP_PIN_OUTPUT | \
