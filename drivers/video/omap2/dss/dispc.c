@@ -1135,6 +1135,70 @@ void dispc_restore_context(void)
 #undef SR
 #undef RR
 
+static u32 dispc_calculate_threshold(enum omap_plane plane, u32 paddr,
+				u32 puv_addr, u16 width, u16 height,
+				s32 row_inc, s32 pix_inc)
+{
+	int shift;
+	u32 channel_no = plane;
+	struct sa_struct sa_info;
+	u32 val, burstsize, doublestride;
+	u32 rotation, bursttype, color_mode;
+	struct dispc_config dispc_reg_config;
+
+	if (width >= 1920)
+		return 1500;
+
+	/* Get the burst size */
+	shift = (plane == OMAP_DSS_GFX) ? 6 : 14;
+	val = dispc_read_reg(dispc_reg_att[plane]);
+	burstsize = FLD_GET(val, shift + 1, shift);
+	doublestride = FLD_GET(val, 22, 22);
+	rotation = (plane == OMAP_DSS_WB) ? 0 : FLD_GET(val, 13, 12);
+	bursttype = (plane == OMAP_DSS_WB) ? 0 : FLD_GET(val, 29, 29);
+	color_mode = FLD_GET(val, 4, 1);
+
+	/* base address for frame (Luma frame in case of YUV420) */
+	dispc_reg_config.ba = paddr;
+	/* base address for Chroma frame in case of YUV420 */
+	dispc_reg_config.bacbcr = puv_addr;
+	/* OrgSizeX for frame */
+	dispc_reg_config.sizex = width;
+	/* OrgSizeY for frame */
+	dispc_reg_config.sizey = height;
+	/* burst size */
+	dispc_reg_config.burstsize = burstsize;
+	/* pixel increment */
+	dispc_reg_config.pixelinc = pix_inc;
+	/* row increment */
+	dispc_reg_config.rowinc  = row_inc;
+	/* burst type: 1D/2D */
+	dispc_reg_config.bursttype = bursttype;
+	/* chroma DoubleStride when in YUV420 format */
+	dispc_reg_config.doublestride = doublestride;
+	/* Pixcel format of the frame.*/
+	dispc_reg_config.format = color_mode;
+	/* Rotation of frame */
+	dispc_reg_config.rotation = rotation;
+
+	/* DMA buffer allications - assuming reset values */
+	dispc_reg_config.gfx_top_buffer = 0;
+	dispc_reg_config.gfx_bottom_buffer = 0;
+	dispc_reg_config.vid1_top_buffer = 1;
+	dispc_reg_config.vid1_bottom_buffer = 1;
+	dispc_reg_config.vid2_top_buffer = 2;
+	dispc_reg_config.vid2_bottom_buffer = 2;
+	dispc_reg_config.vid3_top_buffer = 3;
+	dispc_reg_config.vid3_bottom_buffer = 3;
+	dispc_reg_config.wb_top_buffer = 4;
+	dispc_reg_config.wb_bottom_buffer = 4;
+
+	/* antiFlicker is off */
+	dispc_reg_config.antiflicker = 0;
+
+	return sa_calc_wrap(&dispc_reg_config, channel_no, &sa_info);
+}
+
 static inline void enable_clocks(bool enable)
 {
 	if (enable)
@@ -3010,6 +3074,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	s32 pix_inc;
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
+	u32 fifo_high, fifo_low;
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -3326,6 +3391,13 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	if ((plane != OMAP_DSS_VIDEO1) || (cpu_is_omap44xx()))
 		_dispc_setup_global_alpha(plane, global_alpha);
 
+	if (cpu_is_omap44xx()) {
+		fifo_low = dispc_calculate_threshold(plane, paddr + offset0,
+					puv_addr + offset0, width, height,
+					row_inc, pix_inc);
+		fifo_high = dispc_get_plane_fifo_size(plane) - 1;
+		dispc_setup_plane_fifo(plane, fifo_low, fifo_high);
+	}
 	return 0;
 }
 
@@ -5124,13 +5196,9 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	u16 width = wb->input_width;
 	u16 height = wb->input_height;
 	u32 lines_to_skip = wb->line_skip;
-
+	u32 fifo_low, fifo_high;
 	enum omap_color_mode color_mode = wb->color_mode;  /* output color */
-
-	u32 fifo_low = wb->fifo_low;
-	u32 fifo_high = wb->fifo_high;
 	enum omap_writeback_source			source = wb->source;
-
 	enum omap_plane plane = OMAP_DSS_WB;
 
 	const int maxdownscale = 2;
@@ -5308,7 +5376,6 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 	/*WB PIC_SIZE is the final destination size*/
 	_dispc_set_pic_size(plane, out_width, out_height);
-	dispc_setup_plane_fifo(plane, fifo_low, fifo_high);
 
 	/* non interlaced */
 	ch_width = width;
@@ -5354,8 +5421,12 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	pix_inc = dispc_read_reg(dispc_reg_att[plane]);
 	DSSDBG("vid[%d] attributes = %x\n", plane, pix_inc);
 
-	enable_clocks(0);
+	fifo_low = dispc_calculate_threshold(plane, paddr, puv_addr,
+					width, height, row_inc, pix_inc);
+	fifo_high = dispc_get_plane_fifo_size(plane) - 1;
+	dispc_setup_plane_fifo(plane, fifo_low, fifo_high);
 
+	enable_clocks(0);
 	return 0;
 }
 
