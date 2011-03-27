@@ -32,8 +32,14 @@
 
 #include <plat/control.h>
 #include <plat/dma.h>
+#include <plat/omap-pm.h>
 #include "omap-pcm.h"
 #include "omap-hdmi.h"
+
+#ifdef CONFIG_OMAP_PM
+#define HDMI_AUDIO_PM_LAT_CONSTRAINT	200
+#define HDMI_AUDIO_PM_NO_CONSTRAINT	-1
+#endif
 
 #define CONFIG_HDMI_NO_IP_MODULE
 #define OMAP_HDMI_RATES	(SNDRV_PCM_RATE_48000)
@@ -45,6 +51,7 @@
 #include <plat/hdmi_lib.h>
 
 struct omap_hdmi_data {
+	struct pm_qos_request_list *qos_request;
 	struct hdmi_notifier notifier;
 	struct snd_pcm_substream *substream;
 	int active;
@@ -120,6 +127,12 @@ static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
 		return -ENODEV;
 	}
 
+#ifdef CONFIG_OMAP_PM
+	err = omap_pm_set_max_sdma_lat(&hdmi_data.qos_request,
+				       HDMI_AUDIO_PM_LAT_CONSTRAINT);
+	if (err)
+		printk(KERN_WARNING "unable to set SDMA constraint %d\n", err);
+#endif
 	hdmi_set_audio_power(1);
 	hdmi_data.substream = substream;
 	err = hdmi_w1_wrapper_enable(HDMI_WP);
@@ -135,12 +148,21 @@ static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
 static void omap_hdmi_dai_shutdown(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
+	int err = 0;
 #ifdef CONFIG_HDMI_NO_IP_MODULE
 	hdmi_w1_wrapper_disable(HDMI_WP);
 	hdmi_data.substream = NULL;
 
 	if (hdmi_data.active)
 		hdmi_set_audio_power(0);
+
+#ifdef CONFIG_OMAP_PM
+	err = omap_pm_set_max_sdma_lat(&hdmi_data.qos_request,
+				HDMI_AUDIO_PM_NO_CONSTRAINT);
+	if (err)
+		printk(KERN_WARNING
+			"unable to remove SDMA constraint %d\n", err);
+#endif
 #else
 	if (hdmi_audio_core.module_loaded)
 		hdmi_audio_core.wrapper_disable(HDMI_WP);
