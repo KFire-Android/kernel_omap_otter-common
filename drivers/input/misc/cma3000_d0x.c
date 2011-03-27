@@ -81,6 +81,11 @@ static int mode_to_mg[8][2] = {
 	{0, 0},
 };
 
+/* interval between samples for the different rates, in msecs */
+static const unsigned int cma3000_measure_interval[] = {
+	0, 1000 / 100, 1000 / 400, 1000 / 40,
+};
+
 static uint32_t accl_debug;
 module_param_named(cma3000_debug, accl_debug, uint, 0664);
 
@@ -99,6 +104,9 @@ static int cma3000_set_mode(struct cma3000_accl_data *data, int val)
 
 	ctrl &= ~CMA3000_MODEMASK;
 	ctrl |= (val << 1);
+
+	if (!data->client->irq)
+		ctrl |= 0x01;
 
 	error = cma3000_set(data, CMA3000_CTRL, ctrl, "ctrl");
 	if (error < 0)
@@ -167,22 +175,34 @@ static ssize_t cma3000_store_attr_delay(struct device *dev,
 	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
 	unsigned long interval;
 	int error;
+	int i = 0;
 
 	error = strict_strtoul(buf, 0, &interval);
 	if (error)
 		return error;
 
-	if (interval <= 0 || interval > 200)
+	if (interval < 0)
 		return -EINVAL;
 
 	cancel_delayed_work_sync(&data->input_work);
-	data->req_poll_rate = interval;
 
-	/*TO DO: Figure out if we need to modify the rate*/
-	/*cma3000_set_mode(data, data->pdata.mode);*/
+	if (interval == 0) {
+		/* Set to the fastest speed */
+		i = CMAMODE_MEAS400;
+	} else {
+		if (interval < cma3000_measure_interval[CMAMODE_MEAS40])
+			i = CMAMODE_MEAS400;
+		else if (interval >= cma3000_measure_interval[CMAMODE_MEAS100])
+			i = CMAMODE_MEAS100;
+		else
+			i = CMAMODE_MEAS40;
+	}
+
+	data->req_poll_rate = interval;
+	cma3000_set_mode(data, i);
 	schedule_delayed_work(&data->input_work, 0);
 
-	return 1;
+	return count;
 
 }
 
@@ -229,7 +249,7 @@ static ssize_t cma3000_store_attr_enable(struct device *dev,
 	else
 		schedule_delayed_work(&data->input_work, 0);
 
-	return 1;
+	return count;
 }
 
 static ssize_t cma3000_show_attr_grange(struct device *dev,
