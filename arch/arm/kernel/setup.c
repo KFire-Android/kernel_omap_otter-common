@@ -818,10 +818,18 @@ static int c_show(struct seq_file *m, void *v)
 	/* dump out the processor features */
 	seq_puts(m, "Features\t: ");
 
-	for (i = 0; hwcap_str[i]; i++)
-		if (elf_hwcap & (1 << i))
+	for (i = 0; hwcap_str[i]; i++) {
+		if (elf_hwcap & (1 << i)) {
+#ifdef CONFIG_ARCH_OMAP
+			if ((HWCAP_NEON == (1 << i)) &&
+				(cpu_is_omap4430())  &&
+				(omap_rev() <= OMAP4430_REV_ES2_2))
+				continue;
+			else
+#endif
 			seq_printf(m, "%s ", hwcap_str[i]);
-
+		}
+	}
 	seq_printf(m, "\nCPU implementer\t: 0x%02x\n", read_cpuid_id() >> 24);
 	seq_printf(m, "CPU architecture: %s\n", proc_arch[cpu_architecture()]);
 
