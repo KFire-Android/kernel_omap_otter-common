@@ -840,7 +840,8 @@ omap_dma_set_prio_lch(int lch, unsigned char read_prio,
 	}
 	l = p->dma_read(CCR, lch);
 	l &= ~((1 << 6) | (1 << 26));
-	if (cpu_is_omap2430() || cpu_is_omap34xx() ||  cpu_is_omap44xx())
+	if (cpu_is_omap2430() || cpu_is_omap34xx() ||  cpu_is_omap44xx() ||
+							cpu_is_omap54xx())
 		l |= ((read_prio & 0x1) << 6) | ((write_prio & 0x1) << 26);
 	else
 		l |= ((read_prio & 0x1) << 6);
@@ -2091,7 +2092,8 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx())
+	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx() ||
+							cpu_is_omap54xx())
 		omap_dma_set_global_params(DMA_DEFAULT_ARB_RATE,
 				DMA_DEFAULT_FIFO_DEPTH, 0);
 
