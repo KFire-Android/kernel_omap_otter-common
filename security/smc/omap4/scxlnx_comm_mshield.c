@@ -20,7 +20,7 @@
 #include <asm/div64.h>
 #include <asm/system.h>
 #include <asm/cputype.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/io.h>
 #include <linux/interrupt.h>
 #include <linux/page-flags.h>
@@ -29,6 +29,7 @@
 #include <linux/version.h>
 #include <linux/jiffies.h>
 #include <linux/dma-mapping.h>
+#include <linux/cpu.h>
 
 #include <asm/cacheflush.h>
 
@@ -787,6 +788,9 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm,
 	 */
 	SCXLNXCommSetCurrentTime(pComm);
 
+	/* Workaround for issue #6082 */
+	disable_nonboot_cpus();
+
 	/*
 	 * Start the SMC PA
 	 */
@@ -860,9 +864,15 @@ loop:
 	}
 	#endif
 
+	/* Workaround for issue #6082 */
+	enable_nonboot_cpus();
+
 	goto exit;
 
 error2:
+	/* Workaround for issue #6082 */
+	enable_nonboot_cpus();
+
 	spin_lock(&(pComm->lock));
 	pL1SharedBuffer = pComm->pBuffer;
 	pInitSharedBuffer = pComm->pInitSharedBuffer;
