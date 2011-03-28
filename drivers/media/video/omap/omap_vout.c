@@ -2741,6 +2741,7 @@ static int vidioc_qbuf(struct file *file, void *fh,
 
 	/* also process frame if displayed on a manual update screen */
 	if ((vout->wb_enabled || manually_updated(vout)) &&
+			!vout->first_int &&
 			vout->cur_frm &&
 			vout->next_frm &&
 			vout->cur_frm->i == vout->next_frm->i &&
