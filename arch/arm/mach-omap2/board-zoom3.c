@@ -233,13 +233,21 @@ struct opp_frequencies {
 
 static struct opp_frequencies opp_freq_add_table[] __initdata = {
   {
+	.mpu = 800000000,
+	.iva = 660000000,
+  },
+  {
 	.mpu = 1000000000,
 	.iva =  800000000,
   },
+#if 0
+  1.2GHz has been observed to cause issues on ES1.1 boards and requires
+  further investigation.
   {
 	.mpu = 1200000000,
 	.iva =   65000000,
   },
+#endif
 
   { 0, 0 },
 };
