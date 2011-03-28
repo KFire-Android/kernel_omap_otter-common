@@ -2477,12 +2477,6 @@ int ipu_pm_save_ctx(int proc_id)
 	app_loaded = (ipu_pm_get_state(proc_id) & APP_PROC_LOADED) >>
 								PROC_LD_SHIFT;
 
-	/* If already down don't kill it twice */
-	if (ipu_pm_get_state(proc_id) & SYS_PROC_DOWN) {
-		pr_warn("ipu already hibernated, no need to save again");
-		return 0;
-	}
-
 	/* Because of the current scheme, we need to check
 	 * if APPM3 is enable and we need to shut it down too
 	 * Sysm3 is the only want sending the hibernate message
@@ -2491,6 +2485,12 @@ int ipu_pm_save_ctx(int proc_id)
 	if (proc_id == SYS_M3 || proc_id == APP_M3) {
 		if (!sys_loaded)
 			goto exit;
+
+		/* If already down don't kill it twice */
+		if (ipu_pm_get_state(proc_id) & SYS_PROC_DOWN) {
+			pr_warn("ipu already hibernated\n");
+			goto exit;
+		}
 
 		num_loaded_cores = app_loaded + sys_loaded;
 
@@ -2516,20 +2516,18 @@ int ipu_pm_save_ctx(int proc_id)
 		if (app_loaded) {
 			pr_info("Sleep APPM3\n");
 			retval = rproc_sleep(app_rproc);
-			cm_write_mod_reg(HW_AUTO,
-					 OMAP4430_CM2_CORE_MOD,
-					 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 			if (retval)
 				goto error;
+			cm_write_mod_reg(HW_AUTO, OMAP4430_CM2_CORE_MOD,
+					 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 			handle->rcb_table->state_flag |= APP_PROC_DOWN;
 		}
 		pr_info("Sleep SYSM3\n");
 		retval = rproc_sleep(sys_rproc);
-		cm_write_mod_reg(HW_AUTO,
-				 OMAP4430_CM2_CORE_MOD,
-				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 		if (retval)
 			goto error;
+		cm_write_mod_reg(HW_AUTO, OMAP4430_CM2_CORE_MOD,
+				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 		handle->rcb_table->state_flag |= SYS_PROC_DOWN;
 
 		/* If there is a message in the mbox restore
@@ -2657,20 +2655,18 @@ int ipu_pm_restore_ctx(int proc_id)
 
 		pr_info("Wakeup SYSM3\n");
 		retval = rproc_wakeup(sys_rproc);
-		cm_write_mod_reg(HW_AUTO,
-				 OMAP4430_CM2_CORE_MOD,
-				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 		if (retval)
 			goto error;
+		cm_write_mod_reg(HW_AUTO, OMAP4430_CM2_CORE_MOD,
+				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 		handle->rcb_table->state_flag &= ~SYS_PROC_DOWN;
 		if (ipu_pm_get_state(proc_id) & APP_PROC_LOADED) {
 			pr_info("Wakeup APPM3\n");
 			retval = rproc_wakeup(app_rproc);
-			cm_write_mod_reg(HW_AUTO,
-				 OMAP4430_CM2_CORE_MOD,
-				 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 			if (retval)
 				goto error;
+			cm_write_mod_reg(HW_AUTO, OMAP4430_CM2_CORE_MOD,
+					 OMAP4_CM_DUCATI_CLKSTCTRL_OFFSET);
 			handle->rcb_table->state_flag &= ~APP_PROC_DOWN;
 		}
 #ifdef CONFIG_OMAP_PM
