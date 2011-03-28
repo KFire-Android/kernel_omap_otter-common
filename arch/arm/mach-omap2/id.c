@@ -353,11 +353,16 @@ void __init omap4_check_revision(void)
 				omap_chip.oc |= CHIP_IS_OMAP4430ES2_1;
 				rev = 2;
 				dot = 1;
-			} else if (omap_rev_reg >= 0x4) {
+			} else if (omap_rev_reg == 0x4) {
 				omap_revision = OMAP4430_REV_ES2_2;
 				omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
 				rev = 2;
 				dot = 2;
+			} else if (omap_rev_reg >= 0x6) {
+				omap_revision = OMAP4430_REV_ES2_3;
+				omap_chip.oc |= CHIP_IS_OMAP4430ES2_3;
+				rev = 2;
+				dot = 3;
 			} else {
 				omap_revision = OMAP4430_REV_ES2_0;
 				omap_chip.oc |= CHIP_IS_OMAP4430ES2;
@@ -366,17 +371,17 @@ void __init omap4_check_revision(void)
 			}
 			break;
 		default:
-			omap_revision = OMAP4430_REV_ES2_2;
-			omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
+			omap_revision = OMAP4430_REV_ES2_3;
+			omap_chip.oc |= CHIP_IS_OMAP4430ES2_3;
 			rev = 2;
-			dot = 2;
+			dot = 3;
 		}
 	} else {
 		/* Assume the latest version */
-		omap_revision = OMAP4430_REV_ES2_2;
-		omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
+		omap_revision = OMAP4430_REV_ES2_3;
+		omap_chip.oc |= CHIP_IS_OMAP4430ES2_3;
 		rev = 2;
-		dot = 2;
+		dot = 3;
 	}
 
 	switch (omap_type()) {
