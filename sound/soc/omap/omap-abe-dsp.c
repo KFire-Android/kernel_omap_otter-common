@@ -397,7 +397,7 @@ static int abe_exit_dpll_cascading(struct abe_data *abe)
 static int abe_fe_event(struct snd_soc_dapm_widget *w,
 			struct snd_kcontrol *kcontrol, int event)
 {
-	int index, active, ret;
+	int index, active, ret = 0;
 
 	if ((w->reg < ABE_FE_START) || (w->reg >= ABE_FE_END))
 		return -EINVAL;
@@ -407,21 +407,10 @@ static int abe_fe_event(struct snd_soc_dapm_widget *w,
 	if (SND_SOC_DAPM_EVENT_ON(event)) {
 		abe->fe_active[index]++;
 		active = abe_fe_active_count(abe);
-
-		/*
-		 * enter dpll cascading when all conditions are met:
-		 * - system is in early suspend (screen is off)
-		 * - single stream is active and is LP (ping-pong)
-		 * - OPP is 50 or less (DL1 path only)
-		 */
-		if (abe->early_suspended && (active == 1) &&
-		    abe->fe_active[6] && (abe->opp <= 50))
-			ret = abe_enter_dpll_cascading(abe);
-		else
+		if (!abe->early_suspended || (active > 1) || !abe->fe_active[6])
 			ret = abe_exit_dpll_cascading(abe);
 	} else {
 		abe->fe_active[index]--;
-		ret = abe_exit_dpll_cascading(abe);
 	}
 
 	return ret;
@@ -1347,44 +1336,44 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	SND_SOC_DAPM_AIF_IN_E("TONES_DL", "Tones Playback", 0,
 			ABE_WIDGET(0), ABE_OPP_25, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("VX_DL", "Voice Playback", 0,
 			ABE_WIDGET(1), ABE_OPP_50, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_OUT_E("VX_UL", "Voice Capture", 0,
 			ABE_WIDGET(2), ABE_OPP_50, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	/* the MM_UL mapping is intentional */
 	SND_SOC_DAPM_AIF_OUT_E("MM_UL1", "MultiMedia1 Capture", 0,
 			ABE_WIDGET(3), ABE_OPP_100, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_OUT_E("MM_UL2", "MultiMedia2 Capture", 0,
 			ABE_WIDGET(4), ABE_OPP_50, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("MM_DL", " MultiMedia1 Playback", 0,
 			ABE_WIDGET(5), ABE_OPP_25, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("MM_DL_LP", " MultiMedia1 LP Playback", 0,
 			ABE_WIDGET(6), ABE_OPP_25, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("VIB_DL", "Vibra Playback", 0,
 			ABE_WIDGET(7), ABE_OPP_100, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_IN_E("MODEM_DL", "MODEM Playback", 0,
 			ABE_WIDGET(8), ABE_OPP_50, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_AIF_OUT_E("MODEM_UL", "MODEM Capture", 0,
 			ABE_WIDGET(9), ABE_OPP_50, 0,
 			abe_fe_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	/* Backend DAIs  */
 	// FIXME: must match BE order in abe_dai.h
@@ -2165,18 +2154,42 @@ static struct snd_pcm_ops omap_aess_pcm_ops = {
 	.mmap		= aess_mmap,
 };
 
-static int aess_stream_event(struct snd_soc_dapm_context *dapm)
+static int aess_stream_event(struct snd_soc_dapm_context *dapm, int event)
 {
 	/* TODO: do not use abe global structure to assign pdev */
 	struct platform_device *pdev = abe->pdev;
+	int active = abe_fe_active_count(abe);
+	int ret = 0;
 
-	if (abe->active) {
-		pm_runtime_get_sync(&pdev->dev);
-		aess_set_opp_mode();
-		pm_runtime_put_sync(&pdev->dev);
+	if (!abe->active)
+		return 0;
+
+	pm_runtime_get_sync(&pdev->dev);
+	aess_set_opp_mode();
+	pm_runtime_put_sync(&pdev->dev);
+
+	switch (event) {
+	case SND_SOC_DAPM_STREAM_START:
+		/*
+		 * enter dpll cascading when all conditions are met:
+		 * - system is in early suspend (screen is off)
+		 * - single stream is active and is LP (ping-pong)
+		 * - OPP is 50 or less (DL1 path only)
+		 */
+		if (abe->early_suspended && (active == 1) &&
+		    abe->fe_active[6] && (abe->opp <= 50))
+			ret = abe_enter_dpll_cascading(abe);
+		else
+			ret = abe_exit_dpll_cascading(abe);
+		break;
+	case SND_SOC_DAPM_STREAM_STOP:
+		ret = abe_exit_dpll_cascading(abe);
+		break;
+	default:
+		break;
 	}
 
-	return 0;
+	return ret;
 }
 
 static struct snd_soc_platform_driver omap_aess_platform = {

@@ -517,7 +517,7 @@ struct snd_soc_codec_driver {
 	int (*set_bias_level)(struct snd_soc_codec *,
 			      enum snd_soc_bias_level level);
 	/* codec stream completion event */
-	int (*stream_event)(struct snd_soc_dapm_context *dapm);
+	int (*stream_event)(struct snd_soc_dapm_context *dapm, int event);
 };
 
 /* SoC platform interface */
@@ -547,7 +547,7 @@ struct snd_soc_platform_driver {
 	int (*write)(struct snd_soc_platform *, unsigned int, unsigned int);
 
 	/* platform stream completion event */
-	int (*stream_event)(struct snd_soc_dapm_context *dapm);
+	int (*stream_event)(struct snd_soc_dapm_context *dapm, int event);
 };
 
 struct snd_soc_platform {
