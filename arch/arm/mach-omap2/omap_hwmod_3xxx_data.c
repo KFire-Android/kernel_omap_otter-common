@@ -2673,7 +2673,9 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
 	.slaves		= omap3_sr1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3_sr1_slaves),
 	.dev_attr	= &omap36xx_sr1_dev_attr,
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1|
+					CHIP_IS_OMAP3630ES1_1|
+					CHIP_IS_OMAP3630ES1_2),
 };
 
 /* SR2 */
@@ -2755,7 +2757,9 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
 	.slaves		= omap3_sr2_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3_sr2_slaves),
 	.dev_attr	= &omap36xx_sr2_dev_attr,
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1|
+					CHIP_IS_OMAP3630ES1_1|
+					CHIP_IS_OMAP3630ES1_2),
 };
 
 /*
