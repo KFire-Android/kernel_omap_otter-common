@@ -1167,7 +1167,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 		hdmi.cfg.vsi_enabled = false;
 	}
 
-	hdmi.cfg.hdmi_dvi = hdmi.mode;
+	hdmi.cfg.hdmi_dvi = hdmi_has_ieee_id((u8 *)edid) && hdmi.mode;
 	hdmi.cfg.video_format = hdmi.code;
 	hdmi.cfg.supports_ai = hdmi_ai_supported(edid);
 
@@ -1245,7 +1245,7 @@ static int hdmi_min_enable(void)
 		hdmi.cfg.vsi_enabled = false;
 	}
 
-	hdmi.cfg.hdmi_dvi = hdmi.mode;
+	hdmi.cfg.hdmi_dvi = hdmi_has_ieee_id((u8 *)edid) && hdmi.mode;
 	hdmi.cfg.video_format = hdmi.code;
 	hdmi_lib_enable(&hdmi.cfg);
 	return 0;
