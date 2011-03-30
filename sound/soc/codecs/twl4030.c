@@ -753,6 +753,17 @@ static void headset_ramp(struct snd_soc_codec *codec, int ramp)
 		/* Wait ramp delay time + 1, so the VMID can settle */
 		mdelay((ramp_base[(hs_pop & TWL4030_RAMP_DELAY) >> 2] /
 			twl4030->sysclk) + 1);
+
+		/* Disable external mute */
+		if (pdata && pdata->hs_extmute) {
+			if (pdata->set_hs_extmute) {
+				pdata->set_hs_extmute(0);
+			} else {
+				hs_pop &= ~TWL4030_EXTMUTE;
+				twl4030_write(codec, TWL4030_REG_HS_POPN_SET,
+						hs_pop);
+			}
+		}
 	} else {
 		/* Headset ramp-down _not_ according to
 		 * the TRM, but in a way that it is working */
@@ -768,16 +779,6 @@ static void headset_ramp(struct snd_soc_codec *codec, int ramp)
 
 		hs_pop &= ~TWL4030_VMID_EN;
 		twl4030_write(codec, TWL4030_REG_HS_POPN_SET, hs_pop);
-	}
-
-	/* Disable external mute */
-	if (pdata && pdata->hs_extmute) {
-		if (pdata->set_hs_extmute) {
-			pdata->set_hs_extmute(0);
-		} else {
-			hs_pop &= ~TWL4030_EXTMUTE;
-			twl4030_write(codec, TWL4030_REG_HS_POPN_SET, hs_pop);
-		}
 	}
 }
 
