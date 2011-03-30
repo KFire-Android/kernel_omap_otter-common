@@ -559,6 +559,16 @@ int abe_read_gain(u32 id, u32 *f_g, u32 p);
 int abe_read_mixer(u32 id, u32 *f_g, u32 p);
 
 /**
+ * abe_mono_mixer
+ * @id: name of the mixer (MIXDL1 or MIXDL2)
+ * @on_off: enable/disable stereo to mono conversion.
+ *
+ * This API Programs DL1Mixer or DL2Mixer to output mono data
+ * on both left and right data paths.
+ */
+int abe_mono_mixer(u32 id, u32 on_off);
+
+/**
  * abe_set_router_configuration
  * @Id: name of the router
  * @Conf: id of the configuration

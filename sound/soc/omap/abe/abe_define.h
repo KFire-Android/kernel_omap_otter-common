@@ -59,7 +59,7 @@
 #define _ABE_DEFINE_H_
 #define ATC_DESCRIPTOR_NUMBER                               64
 #define PROCESSING_SLOTS                                    25
-#define TASK_POOL_LENGTH                                    128
+#define TASK_POOL_LENGTH                                    136
 #define MCU_IRQ                                            0x24
 #define MCU_IRQ_SHIFT2                                     0x90
 #define DMA_REQ_SHIFT2                                     0x210
@@ -89,9 +89,9 @@
 #define SAMP_LOOP_48K                                       12
 #define SAMP_LOOP_16K                                       4
 #define SAMP_LOOP_8K                                        2
-#define INPUT_SCALE_SHIFTM2                                 5056
-#define OUTPUT_SCALE_SHIFTM2                                5060
-#define MUTE_SCALING                                        5064
+#define INPUT_SCALE_SHIFTM2                                 5088
+#define OUTPUT_SCALE_SHIFTM2                                5092
+#define MUTE_SCALING                                        5096
 #define ABE_PMEM                                            1
 #define ABE_CMEM                                            2
 #define ABE_SMEM                                            3
