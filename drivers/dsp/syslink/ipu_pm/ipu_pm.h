@@ -111,6 +111,7 @@
 #define NO_BW_CONSTRAINT		-1
 
 #define RCB_SIZE 8
+#define NAME_SIZE 20
 
 #define DATA_MAX (RCB_SIZE - 4)
 #define DATAX_MAX (RCB_SIZE - 5)
@@ -123,6 +124,9 @@
 #define AUX_CLK_MIN 0
 #define AUX_CLK_MAX 5
 #define NUM_AUX_CLK 6
+#define SRC_CLK_MIN 0
+#define SRC_CLK_MAX 2
+#define NUM_SRC_CLK 3
 
 #define GP_TIMER_3 3
 #define GP_TIMER_4 4
@@ -460,6 +464,12 @@ struct ipu_pm_params {
 	void *gate_mp;
 	int hib_timer_state;
 	int wdt_time;
+};
+
+struct ipu_pm_aux_clks {
+	struct clk *aux_clk;
+	struct clk *aux_clk_src;
+	struct clk *aux_clk_src_parent;
 };
 
 /* This structure defines attributes for initialization of the ipu_pm module. */
