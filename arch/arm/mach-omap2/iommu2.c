@@ -20,6 +20,9 @@
 
 #include <plat/iommu.h>
 #include <plat/omap_device.h>
+#ifdef CONFIG_OMAP_PM
+#include <plat/omap-pm.h>
+#endif
 
 /*
  * omap2 architecture specific register bit definitions
@@ -66,6 +69,12 @@
 	 ((pgsz) == MMU_CAM_PGSZ_64K) ? 0xffff0000 :	\
 	 ((pgsz) == MMU_CAM_PGSZ_4K)  ? 0xfffff000 : 0)
 
+#ifdef CONFIG_OMAP_PM
+struct pm_qos_request_list *pm_iommu1_handle;
+#define PM_IOMMU1_SDMA_LAT_CONSTRAINT	400
+#define PM_IOMMU1_NO_LAT_CONSTRAINT	-1
+#endif
+
 
 static void omap2_iommu_set_twl(struct iommu *obj, bool on)
 {
@@ -103,6 +112,16 @@ static int omap2_iommu_enable(struct iommu *obj)
 	if (!IS_ALIGNED(pa, SZ_16K))
 		return -EINVAL;
 
+#ifdef CONFIG_OMAP_PM
+	if (!strcmp(obj->name, "ducati")) {
+		ret = omap_pm_set_max_sdma_lat(&pm_iommu1_handle,
+				PM_IOMMU1_SDMA_LAT_CONSTRAINT);
+		if (ret) {
+			pr_err("omap2_iommu_enable - Unable to set constraint "
+				"on CORE domain\n");
+		}
+	}
+#endif
 	ret = omap_device_enable(obj->pdev);
 	if (ret)
 		return ret;
@@ -153,6 +172,17 @@ static void omap2_iommu_disable(struct iommu *obj)
 	dev_dbg(obj->dev, "%s is shutting down\n", obj->name);
 	if (omap_device_shutdown(obj->pdev))
 		dev_err(obj->dev, "%s err 0x%x\n", __func__, ret);
+
+#ifdef CONFIG_OMAP_PM
+	if (!strcmp(obj->name, "ducati")) {
+		int status1 = omap_pm_set_max_sdma_lat(&pm_iommu1_handle,
+					PM_IOMMU1_NO_LAT_CONSTRAINT);
+		if (status1) {
+			pr_err("omap2_iommu_disable failed to release "
+				"constraint on CORE domain\n");
+		}
+	}
+#endif
 }
 
 static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
