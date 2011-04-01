@@ -100,7 +100,7 @@ enum dma_channel_state {
 #define MAX_PIXELS_PER_LINE     2048
 
 #define VRFB_TX_TIMEOUT         1000
-#define VRFB_NUM_BUFS		4
+#define VRFB_NUM_BUFS		OMAP_VOUT_MAX_BUFFERS
 
 /* Max buffer size tobe allocated during init */
 #define OMAP_VOUT_MAX_BUF_SIZE (VID_MAX_WIDTH*VID_MAX_HEIGHT*4)
@@ -110,8 +110,8 @@ enum dma_channel_state {
 
 static struct videobuf_queue_ops video_vbq_ops;
 /* Variables configurable through module params*/
-static u32 video1_numbuffers = 3;
-static u32 video2_numbuffers = 3;
+static u32 video1_numbuffers = OMAP_VOUT_MAX_BUFFERS;
+static u32 video2_numbuffers = OMAP_VOUT_MAX_BUFFERS;
 static u32 video1_bufsize = OMAP_VOUT_MAX_BUF_SIZE;
 static u32 video2_bufsize = OMAP_VOUT_MAX_BUF_SIZE;
 static u32 video3_numbuffers = 3;
