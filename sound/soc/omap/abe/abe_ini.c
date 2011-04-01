@@ -67,11 +67,15 @@ void abe_build_scheduler_table()
 	abe->MultiFrame[4][6] = ABE_TASK_ID(C_ABE_FW_TASK_VIBRA1);
 	abe->MultiFrame[4][7] = ABE_TASK_ID(C_ABE_FW_TASK_VIBRA2);
 	abe->MultiFrame[5][1] = ABE_TASK_ID(C_ABE_FW_TASK_EARP_48_96_LP);
-	abe->MultiFrame[5][2] = ABE_TASK_ID(C_ABE_FW_TASK_IO_PDM_UL);
+#define TASK_IO_PDM_UL_SLT 5
+#define TASK_IO_PDM_UL_IDX 2
+	abe->MultiFrame[5][2] = 0;
 	abe->MultiFrame[5][7] = ABE_TASK_ID(C_ABE_FW_TASK_VIBRA_SPLIT);
 	abe->MultiFrame[6][0] = ABE_TASK_ID(C_ABE_FW_TASK_EARP_48_96_LP);
 	abe->MultiFrame[6][5] = ABE_TASK_ID(C_ABE_FW_TASK_EchoMixer);
-	abe->MultiFrame[7][0] = ABE_TASK_ID(C_ABE_FW_TASK_IO_PDM_DL);
+#define TASK_IO_PDM_DL_HALF1_SLT 7
+#define TASK_IO_PDM_DL_HALF1_IDX 0
+	abe->MultiFrame[7][0] = 0;
 	abe->MultiFrame[7][2] = ABE_TASK_ID(C_ABE_FW_TASK_BT_UL_SPLIT);
 	abe->MultiFrame[7][3] = ABE_TASK_ID(C_ABE_FW_TASK_DBG_SYNC);
 	abe->MultiFrame[7][5] = ABE_TASK_ID(C_ABE_FW_TASK_ECHO_REF_SPLIT);
@@ -120,7 +124,9 @@ void abe_build_scheduler_table()
 #define TASK_ASRC_BT_DL_SLT 18
 #define TASK_ASRC_BT_DL_IDX 6
 	abe->MultiFrame[18][6] = ABE_TASK_ID(C_ABE_FW_TASK_ASRC_BT_DL_8);
-	abe->MultiFrame[19][0] = ABE_TASK_ID(C_ABE_FW_TASK_IO_PDM_DL);
+#define TASK_IO_PDM_DL_HALF2_SLT 19
+#define TASK_IO_PDM_DL_HALF2_IDX 0
+	abe->MultiFrame[19][0] = 0;
 	/* MM_UL is moved to OPP 100% */
 #define TASK_IO_MM_UL_SLT 19
 #define TASK_IO_MM_UL_IDX 6
@@ -773,6 +779,17 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 				/* at OPP 50 without ASRC */
 				smem1 = smem_mm_ext_in_opp50;
 		}
+		if (PDM_UL_PORT == id) {
+			abe->MultiFrame[TASK_IO_PDM_UL_SLT][TASK_IO_PDM_UL_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_IO_PDM_UL);
+		}
+		if (PDM_DL_PORT == id) {
+			abe->MultiFrame[TASK_IO_PDM_DL_HALF1_SLT][TASK_IO_PDM_DL_HALF1_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_IO_PDM_DL);
+			abe->MultiFrame[TASK_IO_PDM_DL_HALF2_SLT][TASK_IO_PDM_DL_HALF2_IDX] =
+				ABE_TASK_ID(C_ABE_FW_TASK_IO_PDM_DL);
+		}
+
 		if (abe_port[id].protocol.direction == ABE_ATC_DIRECTION_IN)
 			direction = 0;
 		else
