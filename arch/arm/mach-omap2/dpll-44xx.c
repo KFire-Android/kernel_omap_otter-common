@@ -37,7 +37,6 @@
 #define LP_98M_RATE		98304000
 #define LP_DELAY		1000000
 
-static struct workqueue_struct	*lpmode_wq;
 static struct delayed_work	lpmode_work;
 
 bool omap4_lpmode = false;
@@ -507,17 +506,16 @@ long omap4_dpll_regm4xen_round_rate(struct clk *clk, unsigned long target_rate)
 	return clk->dpll_data->last_rounded_rate;
 }
 
-int omap4_dpll_low_power_cascade_check_timer(struct delayed_work *dwork)
+void omap4_dpll_low_power_cascade_check_timer(struct work_struct *dwork)
 {
 	int delay;
 
 	if (num_online_cpus() > 1) {
 		delay = usecs_to_jiffies(LP_DELAY);
 
-		return schedule_delayed_work_on(0, &lpmode_work, delay);
-	}
-
-	omap4_dpll_low_power_cascade_enter();
+		schedule_delayed_work_on(0, &lpmode_work, delay);
+	} else
+		omap4_dpll_low_power_cascade_enter();
 }
 
 int omap4_dpll_low_power_cascade_check_entry()
