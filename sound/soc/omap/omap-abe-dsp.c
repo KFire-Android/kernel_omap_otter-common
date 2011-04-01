@@ -70,7 +70,7 @@
 #define ABE_FORMATS	 (SNDRV_PCM_FMTBIT_S32_LE)
 
 // TODO: make all these into virtual registers or similar - split out by type */
-#define ABE_NUM_MIXERS		22
+#define ABE_NUM_MIXERS		24
 #define ABE_NUM_MUXES		12
 #define ABE_NUM_WIDGETS	        46	/* TODO - refine this val */
 #define ABE_NUM_DAPM_REG		\
@@ -155,6 +155,9 @@ struct abe_data {
 	unsigned int sdt_equ_profile;
 	unsigned int amic_equ_profile;
 	unsigned int dmic_equ_profile;
+
+	int dl1_mono;
+	int dl2_mono;
 
 	int active;
 
@@ -612,6 +615,39 @@ static int sdt_put_mixer(struct snd_kcontrol *kcontrol,
 		abe_disable_gain(MIXSDT, mc->reg);
 	}
 	pm_runtime_put_sync(&pdev->dev);
+
+	return 1;
+}
+
+static void abe_dsp_set_mono_mixer(unsigned int id, int enable)
+{
+	/* TODO: do not use abe global structure to assign pdev */
+	struct platform_device *pdev = abe->pdev;
+
+	switch (id) {
+	case MIXDL1:
+		abe->dl1_mono = enable;
+		break;
+	case MIXDL2:
+		abe->dl2_mono = enable;
+		break;
+	default:
+		return;
+	}
+
+	pm_runtime_get_sync(&pdev->dev);
+	abe_mono_mixer(id, enable);
+	pm_runtime_put_sync(&pdev->dev);
+}
+
+static int abe_put_mono_mixer(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+
+	abe->dapm[mc->shift] = ucontrol->value.integer.value[0];
+	abe_dsp_set_mono_mixer(mc->reg, abe->dapm[mc->shift]);
 
 	return 1;
 }
@@ -1330,6 +1366,11 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	SOC_ENUM_EXT("Sidetone Equalizer",
 			sdt_equalizer_enum ,
 			abe_get_equalizer, abe_put_equalizer),
+
+	SOC_SINGLE_EXT("DL1 Mono Mixer", MIXDL1, 22, 1, 0,
+			abe_get_mixer, abe_put_mono_mixer),
+	SOC_SINGLE_EXT("DL2 Mono Mixer", MIXDL2, 23, 1, 0,
+			abe_get_mixer, abe_put_mono_mixer),
 };
 
 static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
@@ -1955,6 +1996,9 @@ static int aess_restore_context(struct abe_data *abe)
 	abe_dsp_set_equalizer(EQAMIC, abe->amic_equ_profile);
 	abe_dsp_set_equalizer(EQDMIC, abe->dmic_equ_profile);
 	abe_dsp_set_equalizer(EQSDT, abe->sdt_equ_profile);
+
+	abe_dsp_set_mono_mixer(MIXDL1, abe->dl1_mono);
+	abe_dsp_set_mono_mixer(MIXDL2, abe->dl2_mono);
 
 	abe_set_router_configuration(UPROUTE, 0, (u32 *)abe->router);
 
