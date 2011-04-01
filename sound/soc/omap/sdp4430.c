@@ -451,7 +451,7 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	ret = snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
 				hs_jack_pins);
 
-	if (machine_is_omap_4430sdp())
+	if (machine_is_omap_4430sdp() || machine_is_omap_tabletblaze())
 		twl6040_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
 	else
 		snd_soc_jack_report(&hs_jack, SND_JACK_HEADSET, SND_JACK_HEADSET);
@@ -933,8 +933,9 @@ static int __init sdp4430_soc_init(void)
 {
 	int ret;
 
-	if (!machine_is_omap_4430sdp() && !machine_is_omap4_panda()) {
-		pr_debug("Not SDP4430 or PandaBoard!\n");
+	if (!machine_is_omap_4430sdp() && !machine_is_omap4_panda() &&
+		!machine_is_omap_tabletblaze()) {
+		pr_debug("Not SDP4430, BlazeTablet or PandaBoard!\n");
 		return -ENODEV;
 	}
 	printk(KERN_INFO "SDP4430 SoC init\n");
@@ -942,6 +943,8 @@ static int __init sdp4430_soc_init(void)
 		snd_soc_sdp4430.name = "SDP4430";
 	else if (machine_is_omap4_panda())
 		snd_soc_sdp4430.name = "Panda";
+	else if (machine_is_omap_tabletblaze())
+		snd_soc_sdp4430.name = "Tablet44xx";
 
 	sdp4430_snd_device = platform_device_alloc("soc-audio", -1);
 	if (!sdp4430_snd_device) {
@@ -973,7 +976,7 @@ static int __init sdp4430_soc_init(void)
 	}
 
 	/* Only configure the TPS6130x on SDP4430 */
-	if (machine_is_omap_4430sdp())
+	if (machine_is_omap_4430sdp() || machine_is_omap_tabletblaze())
 		sdp4430_tps6130x_configure();
 
 	return 0;
