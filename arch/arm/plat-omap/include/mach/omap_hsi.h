@@ -48,7 +48,7 @@
  *	port 2: 0x4805b000 (SSI) - 0x4a05b000 (HSI)
  */
 #define HSI_HST_OFFSET			0x2000
-#define HSI_HST_BASE(port)		(HSI_HST_OFFSET + ((port - 1) *\
+#define HSI_HST_BASE(port)		(HSI_HST_OFFSET + (((port) - 1) *\
 							(HSI_PORT_OFFSET)))
 /*
  * HSR base addr:
@@ -56,7 +56,7 @@
  *	port 2: 0x4805b800 (SSI) - 0x4A05b800 (HSI)
  */
 #define HSI_HSR_OFFSET			0x2800
-#define HSI_HSR_BASE(port)		(HSI_HSR_OFFSET + ((port - 1) *\
+#define HSI_HSR_BASE(port)		(HSI_HSR_OFFSET + (((port) - 1) *\
 							(HSI_PORT_OFFSET)))
 /*
  * HSI SYS registers
@@ -90,8 +90,8 @@
 
 #define HSI_SYS_MPU_STATUS_REG(port, irq)				\
 			(HSI_SYS_MPU_STATUS_BASE +			\
-			(((port - 1) * HSI_SYS_MPU_STATUS_PORT_OFFSET) +\
-			(irq * HSI_SYS_MPU_STATUS_IRQ_OFFSET)))
+			((((port) - 1) * HSI_SYS_MPU_STATUS_PORT_OFFSET) +\
+			((irq) * HSI_SYS_MPU_STATUS_IRQ_OFFSET)))
 
 #define HSI_SYS_MPU_ENABLE_BASE		0x080c
 #define HSI_SYS_MPU_ENABLE_PORT_OFFSET	0x10
@@ -99,17 +99,17 @@
 
 #define HSI_SYS_MPU_ENABLE_REG(port, irq)				\
 			(HSI_SYS_MPU_ENABLE_BASE +			\
-			(((port - 1) * HSI_SYS_MPU_ENABLE_PORT_OFFSET) +\
-			(irq * HSI_SYS_MPU_ENABLE_IRQ_OFFSET)))
-#define HSI_HST_DATAACCEPT(channel)	((channel < 8) ?		\
-					(1 << channel) :		\
-					(1 << (channel - 8)))
-#define HSI_HSR_DATAAVAILABLE(channel)	(channel < 8 ?			\
-					(1 << (channel + 8)) :		\
-					(1 << (channel - 8 + 8)))
-#define HSI_HSR_DATAOVERRUN(channel)	(channel < 8 ?			\
-					(1 << (channel + 16)) :		\
-					(1 << (channel - 8 + 16)))
+			((((port) - 1) * HSI_SYS_MPU_ENABLE_PORT_OFFSET) +\
+			((irq) * HSI_SYS_MPU_ENABLE_IRQ_OFFSET)))
+#define HSI_HST_DATAACCEPT(channel)	(((channel) < 8) ?		\
+					(1 << (channel)) :		\
+					(1 << ((channel) - 8)))
+#define HSI_HSR_DATAAVAILABLE(channel)	((channel) < 8 ?		\
+					(1 << ((channel) + 8)) :	\
+					(1 << ((channel) - 8 + 8)))
+#define HSI_HSR_DATAOVERRUN(channel)	((channel) < 8 ?		\
+					(1 << ((channel) + 16)) :	\
+					(1 << ((channel) - 8 + 16)))
 
 #define HSI_ERROROCCURED		(1 << 24)
 #define HSI_BREAKDETECTED		(1 << 25)
@@ -117,27 +117,27 @@
 
 #define HSI_SYS_GDD_MPU_IRQ_STATUS_REG	0x0800
 #define HSI_SYS_GDD_MPU_IRQ_ENABLE_REG	0x0804
-#define HSI_GDD_LCH(channel)		(1 << channel)
+#define HSI_GDD_LCH(channel)		(1 << (channel))
 
 #define HSI_SYS_WAKE_OFFSET		0x10
 #define HSI_SYS_WAKE_BASE		0x0c00
 #define HSI_SYS_WAKE_REG(port)		(HSI_SYS_WAKE_BASE +\
-					((port - 1) * HSI_SYS_WAKE_OFFSET))
+					(((port) - 1) * HSI_SYS_WAKE_OFFSET))
 #define HSI_SYS_CLEAR_WAKE_BASE		0x0c04
 #define HSI_SYS_CLEAR_WAKE_REG(port)	(HSI_SYS_CLEAR_WAKE_BASE +\
-					((port - 1) * HSI_SYS_WAKE_OFFSET))
+					(((port) - 1) * HSI_SYS_WAKE_OFFSET))
 #define HSI_SYS_SET_WAKE_BASE		0x0c08
 #define HSI_SYS_SET_WAKE_REG(port)	(HSI_SYS_SET_WAKE_BASE +\
-					((port - 1) * HSI_SYS_WAKE_OFFSET))
+					(((port) - 1) * HSI_SYS_WAKE_OFFSET))
 #define HSI_SSI_WAKE_MASK		0xff	/* for SSI */
 #define HSI_WAKE_MASK			0xffff	/* for HSI */
 #define HSI_SET_WAKE_4_WIRES		(0 << 16)
 #define HSI_SET_WAKE_READY_LVL_0	(0 << 17)
-#define HSI_SET_WAKE(channel)		(1 << channel |\
+#define HSI_SET_WAKE(channel)		(1 << (channel) |\
 						HSI_SET_WAKE_4_WIRES |\
 						HSI_SET_WAKE_READY_LVL_0)
-#define HSI_CLEAR_WAKE(channel)		(1 << channel)
-#define HSI_WAKE(channel)		(1 << channel)
+#define HSI_CLEAR_WAKE(channel)		(1 << (channel))
+#define HSI_WAKE(channel)		(1 << (channel))
 
 #define HSI_SYS_HWINFO_REG		0x0004	/* only for HSI */
 
@@ -145,14 +145,14 @@
 #define HSI_SYS_MPU_U_STATUS_BASE	0x0408
 #define HSI_SYS_MPU_U_STATUS_REG(port, irq)				\
 			(HSI_SYS_MPU_U_STATUS_BASE +			\
-			(((port - 1) * HSI_SYS_MPU_STATUS_PORT_OFFSET) +\
-			(irq * HSI_SYS_MPU_STATUS_IRQ_OFFSET)))
+			((((port) - 1) * HSI_SYS_MPU_STATUS_PORT_OFFSET) +\
+			((irq) * HSI_SYS_MPU_STATUS_IRQ_OFFSET)))
 
 #define HSI_SYS_MPU_U_ENABLE_BASE	0x040c
 #define HSI_SYS_MPU_U_ENABLE_REG(port, irq)				\
 			(HSI_SYS_MPU_U_ENABLE_BASE +			\
-			(((port - 1) * HSI_SYS_MPU_ENABLE_PORT_OFFSET) +\
-			(irq * HSI_SYS_MPU_ENABLE_IRQ_OFFSET)))
+			((((port) - 1) * HSI_SYS_MPU_ENABLE_PORT_OFFSET) +\
+			((irq) * HSI_SYS_MPU_ENABLE_IRQ_OFFSET)))
 
 /*
  * HSI HST registers
@@ -182,11 +182,12 @@
 #define	HSI_HST_TXSTATE_IDLE		0
 
 #define HSI_HST_BUFSTATE_REG(port)	(HSI_HST_BASE(port) + 0x0010)
-#define HSI_HST_BUFSTATE_FIFO_REG(fifo)	((fifo < 8) ?			\
+#define HSI_HST_BUFSTATE_FIFO_REG(fifo)	(((fifo) < 8) ?			\
 					HSI_HST_BUFSTATE_REG(1) :	\
 					HSI_HST_BUFSTATE_REG(2))
-#define	HSI_BUFSTATE_CHANNEL(channel)	(channel < 8 ?			\
-					(1 << channel) : (1 << (channel - 8)))
+#define	HSI_BUFSTATE_CHANNEL(channel)	((channel) < 8 ?		\
+					(1 << (channel)) :		\
+					(1 << ((channel) - 8)))
 
 #define HSI_HST_DIVISOR_REG(port)	(HSI_HST_BASE(port) + 0x0018)
 #define HSI_DIVISOR_DEFAULT		1
@@ -205,20 +206,20 @@
 
 #define HSI_HST_BUFFER_BASE(port)		(HSI_HST_BASE(port) + 0x0080)
 #define HSI_HST_BUFFER_CH_REG(port, channel)	(HSI_HST_BUFFER_BASE(port) +\
-						(channel * 4))
-#define HSI_HST_BUFFER_FIFO_REG(fifo)	((fifo < 8) ?			\
-			(HSI_HST_BUFFER_CH_REG(1, fifo)) :		\
-			(HSI_HST_BUFFER_CH_REG(2, fifo - 8)))
+						((channel) * 4))
+#define HSI_HST_BUFFER_FIFO_REG(fifo)	(((fifo) < 8) ?			\
+			(HSI_HST_BUFFER_CH_REG(1, (fifo))) :		\
+			(HSI_HST_BUFFER_CH_REG(2, (fifo) - 8)))
 
 #define HSI_HST_SWAPBUF_BASE(port)		(HSI_HST_BASE(port) + 0x00c0)
 #define HSI_HST_SWAPBUF_CH_REG(port, channel)	(HSI_HST_SWAPBUF_BASE(port) +\
-						(channel * 4))
+						((channel) * 4))
 
 /* Additional registers for HSI */
 #define	HSI_HST_FIFO_COUNT			16
 #define	HSI_HST_FIFO_SIZE			8
 #define HSI_HST_MAPPING_FIFO_REG(fifo)		(HSI_HST_BASE(1) + 0x0100 +\
-						(fifo * 4))
+						((fifo) * 4))
 #define HSI_MAPPING_ENABLE		1
 #define HSI_MAPPING_CH_NUMBER_OFFSET	1
 #define HSI_MAPPING_PORT_NUMBER_OFFSET	7
@@ -238,7 +239,7 @@
 #define HSI_HSR_RXSTATE_REG(port)	(HSI_HSR_BASE(port) + 0x000c)
 
 #define HSI_HSR_BUFSTATE_REG(port)	(HSI_HSR_BASE(port) + 0x0010)
-#define HSI_HSR_BUFSTATE_FIFO_REG(fifo)	((fifo < 8) ?			\
+#define HSI_HSR_BUFSTATE_FIFO_REG(fifo)	(((fifo) < 8) ?			\
 					HSI_HSR_BUFSTATE_REG(1) :	\
 					HSI_HSR_BUFSTATE_REG(2))
 
@@ -286,20 +287,20 @@
 
 #define HSI_HSR_BUFFER_BASE(port)	(HSI_HSR_BASE(port) + 0x0080)
 #define HSI_HSR_BUFFER_CH_REG(port, channel)	(HSI_HSR_BUFFER_BASE(port) +\
-						(channel * 4))
-#define HSI_HSR_BUFFER_FIFO_REG(fifo)	((fifo < 8) ?			\
-			(HSI_HSR_BUFFER_CH_REG(1, fifo)) :		\
-			(HSI_HSR_BUFFER_CH_REG(2, fifo - 8)))
+						((channel) * 4))
+#define HSI_HSR_BUFFER_FIFO_REG(fifo)	(((fifo) < 8) ?			\
+			(HSI_HSR_BUFFER_CH_REG(1, (fifo))) :		\
+			(HSI_HSR_BUFFER_CH_REG(2, (fifo) - 8)))
 
 #define HSI_HSR_SWAPBUF_BASE(port)	(HSI_HSR_BASE(port) + 0x00c0)
-#define HSI_HSR_SWAPBUF_CH_REG(port, channel)	(HSI_HSR_SWAPBUF_BASE +\
-						(channel * 4))
+#define HSI_HSR_SWAPBUF_CH_REG(port, channel)	(HSI_HSR_SWAPBUF_BASE(port) +\
+						((channel) * 4))
 
 /* Additional registers for HSI */
 #define	HSI_HSR_FIFO_COUNT		16
 #define	HSI_HSR_FIFO_SIZE		8
 #define HSI_HSR_MAPPING_FIFO_REG(fifo)	(HSI_HSR_BASE(1) + 0x0100 +\
-					(fifo * 4))
+					((fifo) * 4))
 #define HSI_HSR_MAPPING_WORDS_MASK	(0xf << 10)
 
 #define HSI_HSR_DLL_REG			(HSI_HSR_BASE(1) + 0x0144)
@@ -343,7 +344,7 @@
 #define HSI_GDD_CSDP_BASE		(HSI_GDD_BASE + 0x0800)
 #define HSI_GDD_CSDP_OFFSET		0x40
 #define HSI_GDD_CSDP_REG(channel)	(HSI_GDD_CSDP_BASE +\
-					(channel * HSI_GDD_CSDP_OFFSET))
+					((channel) * HSI_GDD_CSDP_OFFSET))
 #define HSI_DST_BURST_EN_MASK		0xc000
 #define HSI_DST_SINGLE_ACCESS0		0
 #define HSI_DST_SINGLE_ACCESS		(1 << 14)
@@ -370,7 +371,7 @@
 #define HSI_GDD_CCR_BASE		(HSI_GDD_BASE + 0x0802)
 #define HSI_GDD_CCR_OFFSET		0x40
 #define HSI_GDD_CCR_REG(channel)	(HSI_GDD_CCR_BASE +\
-					(channel * HSI_GDD_CCR_OFFSET))
+					((channel) * HSI_GDD_CCR_OFFSET))
 #define HSI_DST_AMODE_MASK		(3 << 14)
 #define HSI_DST_AMODE_CONST		0
 #define HSI_DST_AMODE_POSTINC		(1 << 14)
@@ -386,7 +387,7 @@
 #define HSI_GDD_CCIR_BASE		(HSI_GDD_BASE + 0x0804)
 #define HSI_GDD_CCIR_OFFSET		0x40
 #define HSI_GDD_CCIR_REG(channel)	(HSI_GDD_CCIR_BASE +\
-					(channel * HSI_GDD_CCIR_OFFSET))
+					((channel) * HSI_GDD_CCIR_OFFSET))
 #define HSI_BLOCK_IE			(1 << 5)
 #define HSI_HALF_IE			(1 << 2)
 #define HSI_TOUT_IE			(1 << 0)
@@ -394,7 +395,7 @@
 #define HSI_GDD_CSR_BASE		(HSI_GDD_BASE + 0x0806)
 #define HSI_GDD_CSR_OFFSET		0x40
 #define HSI_GDD_CSR_REG(channel)	(HSI_GDD_CSR_BASE +\
-					(channel * HSI_GDD_CSR_OFFSET))
+					((channel) * HSI_GDD_CSR_OFFSET))
 #define HSI_CSR_SYNC			(1 << 6)
 #define HSI_CSR_BLOCK			(1 << 5) /* Full block is transferred */
 #define HSI_CSR_HALF			(1 << 2) /* Half block is transferred */
@@ -403,27 +404,27 @@
 #define HSI_GDD_CSSA_BASE		(HSI_GDD_BASE + 0x0808)
 #define HSI_GDD_CSSA_OFFSET		0x40
 #define HSI_GDD_CSSA_REG(channel)	(HSI_GDD_CSSA_BASE +\
-					(channel * HSI_GDD_CSSA_OFFSET))
+					((channel) * HSI_GDD_CSSA_OFFSET))
 
 #define HSI_GDD_CDSA_BASE		(HSI_GDD_BASE + 0x080c)
 #define HSI_GDD_CDSA_OFFSET		0x40
 #define HSI_GDD_CDSA_REG(channel)	(HSI_GDD_CDSA_BASE +\
-					(channel * HSI_GDD_CDSA_OFFSET))
+					((channel) * HSI_GDD_CDSA_OFFSET))
 
 #define HSI_GDD_CEN_BASE		(HSI_GDD_BASE + 0x0810)
 #define HSI_GDD_CEN_OFFSET		0x40
 #define HSI_GDD_CEN_REG(channel)	(HSI_GDD_CEN_BASE +\
-					(channel * HSI_GDD_CEN_OFFSET))
+					((channel) * HSI_GDD_CEN_OFFSET))
 
 #define HSI_GDD_CSAC_BASE		(HSI_GDD_BASE + 0x0818)
 #define HSI_GDD_CSAC_OFFSET		0x40
 #define HSI_GDD_CSAC_REG(channel)	(HSI_GDD_CSAC_BASE +\
-					(channel * HSI_GDD_CSAC_OFFSET))
+					((channel) * HSI_GDD_CSAC_OFFSET))
 
 #define HSI_GDD_CDAC_BASE		(HSI_GDD_BASE + 0x081a)
 #define HSI_GDD_CDAC_OFFSET		0x40
 #define HSI_GDD_CDAC_REG(channel)	(HSI_GDD_CDAC_BASE +\
-					(channel * HSI_GDD_CDAC_OFFSET))
+					((channel) * HSI_GDD_CDAC_OFFSET))
 
 #define HSI_SSI_GDD_CLNK_CTRL_BASE	(HSI_GDD_BASE + 0x0828)
 #define HSI_SSI_GDD_CLNK_CTRL_OFFSET	0x40
@@ -438,7 +439,7 @@
  * HSI Helpers
  */
 #define HSI_SYS_MPU_ENABLE_CH_REG(port, irq, channel)			\
-				((channel < HSI_SSI_CHANNELS_MAX) ?	\
+				(((channel) < HSI_SSI_CHANNELS_MAX) ?	\
 				HSI_SYS_MPU_ENABLE_REG(port, irq) :	\
 				HSI_SYS_MPU_U_ENABLE_REG(port, irq))
 
