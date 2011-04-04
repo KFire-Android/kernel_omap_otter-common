@@ -114,7 +114,6 @@ void hsi_restore_ctx(struct hsi_dev *hsi_ctrl)
 		hsi_outl(p->hst.arb_mode, base, HSI_HST_ARBMODE_REG(port));
 
 		/* HSR */
-		hsi_outl(p->hsr.mode, base, HSI_HSR_MODE_REG(port));
 		if (!hsi_driver_device_is_hsi(pdev))
 			hsi_outl(p->hsr.frame_size, base,
 				HSI_HSR_FRAMESIZE_REG(port));
@@ -127,6 +126,14 @@ void hsi_restore_ctx(struct hsi_dev *hsi_ctrl)
 		/* SW strategy for HSI fifo management can be changed here */
 		hsi_fifo_mapping(hsi_ctrl, HSI_FIFO_MAPPING_DEFAULT);
 	}
+
+	/* As a last step move HSR from MODE_VAL.SLEEP to the relevant mode. */
+	/* This will enable the ACREADY flow control mechanism. */
+	for (port = 1; port <= pdata->num_ports; port++) {
+		p = &pdata->ctx->pctx[port - 1];
+		hsi_outl(p->hsr.mode, base, HSI_HSR_MODE_REG(port));
+	}
+
 }
 
 
