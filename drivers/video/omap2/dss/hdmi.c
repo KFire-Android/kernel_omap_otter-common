@@ -1378,18 +1378,6 @@ static void hdmi_work_queue(struct work_struct *ws)
 		if (hdmi_connected)
 			goto done;
 
-		/*
-		 * We only clear timings when hpd notification is emminent.
-		 * By contract we guarantee an hpd 1 event after each time we
-		 * clear the timings (if HDMI is plugged in), in case a previous
-		 * hpd 1 event is being processed after the clearing.  In this
-		 * case the listener would read all 0-s, but can simply assume
-		 * HDMI is off as it will get another hpd 1 event if HDMI is
-		 * plugged in (after EDID is successfully read).
-		 */
-		memset(&dssdev->panel.timings, 0,
-						sizeof(dssdev->panel.timings));
-
 		/* turn audio power off */
 		notify = !audio_on; /* notification is sent if audio is on */
 		hdmi_audio_power_off();
@@ -1558,9 +1546,6 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 static void hdmi_power_off_phy(struct omap_dss_device *dssdev)
 {
 	edid_set = false;
-
-	/* clear timings */
-	memset(&dssdev->panel.timings, 0, sizeof(dssdev->panel.timings));
 
 	HDMI_W1_StopVideoFrame(HDMI_WP);
 	hdmi_set_irqs(1);
