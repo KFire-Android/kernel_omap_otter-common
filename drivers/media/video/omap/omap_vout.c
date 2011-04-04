@@ -120,6 +120,8 @@ static u32 vid1_static_vrfb_alloc;
 static u32 vid2_static_vrfb_alloc;
 static int debug;
 
+static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i);
+
 /* Module parameters */
 module_param(video1_numbuffers, uint, S_IRUGO);
 MODULE_PARM_DESC(video1_numbuffers,
@@ -2915,7 +2917,7 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 streamon_err1:
 	if (ret)
-		videobuf_streamoff(q);
+		vidioc_streamoff(file, fh, i);
 streamon_err:
 	mutex_unlock(&vout->lock);
 	return ret;
