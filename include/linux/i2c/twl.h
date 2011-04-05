@@ -680,6 +680,7 @@ struct twl4030_platform_data {
 	struct regulator_init_data              *vana;
 	struct regulator_init_data              *vcxio;
 	struct regulator_init_data              *vusb;
+	struct regulator_init_data              *clk32kg;
 };
 
 /*----------------------------------------------------------------------*/
@@ -774,5 +775,6 @@ int twl4030_sih_setup(int module);
 
 /* INTERNAL LDOs */
 #define TWL6030_REG_VRTC	47
+#define TWL6030_REG_CLK32KG	48
 
 #endif /* End of __TWL4030_H */
