@@ -35,6 +35,8 @@
 #include <plat/common.h>
 #include <plat/smartreflex.h>
 
+#include <mach/omap4-common.h>
+
 #define SMARTREFLEX_NAME_LEN	16
 #define SR_DISABLE_TIMEOUT	200
 
@@ -230,14 +232,25 @@ static void sr_set_clk_length(struct omap_sr *sr)
 	struct clk *sys_ck;
 	u32 sys_clk_speed;
 
-	if (cpu_is_omap34xx())
+	if (cpu_is_omap34xx()) {
 		sys_ck = clk_get(NULL, "sys_ck");
-	else
-		sys_ck = clk_get(NULL, "sys_clkin_ck");
-	sys_clk_speed = clk_get_rate(sys_ck);
-	clk_put(sys_ck);
+		sys_clk_speed = clk_get_rate(sys_ck);
+		clk_put(sys_ck);
+	} else {
+		/* SR_xxx_SYSCLK runs at 12.288MHz in DPLL cascading */
+		if (omap4_lpmode)
+			sys_clk_speed = 12288000;
+		else {
+			sys_ck = clk_get(NULL, "sys_clkin_ck");
+			sys_clk_speed = clk_get_rate(sys_ck);
+			clk_put(sys_ck);
+		}
+	}
 
 	switch (sys_clk_speed) {
+	case 12288000:
+		sr->clk_length = 0x3d;
+		break;
 	case 12000000:
 		sr->clk_length = SRCLKLENGTH_12MHZ_SYSCLK;
 		break;
@@ -508,8 +521,7 @@ int sr_configure_errgen(struct voltagedomain *voltdm)
 
 	pdata = sr->pdev->dev.platform_data;
 
-	if (!sr->clk_length)
-		sr_set_clk_length(sr);
+	sr_set_clk_length(sr);
 
 	if (pdata) {
 		senp_en = pdata->senp_mod;
@@ -580,8 +592,7 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
 
 	pdata = sr->pdev->dev.platform_data;
 
-	if (!sr->clk_length)
-		sr_set_clk_length(sr);
+	sr_set_clk_length(sr);
 
 	if (pdata) {
 		senp_en = pdata->senp_mod;

@@ -21,6 +21,7 @@
 #include <plat/prcm.h>
 #include <plat/opp.h>
 #include <plat/omap-serial.h>
+#include <plat/smartreflex.h>
 
 #include <mach/emif.h>
 #include <mach/omap4-common.h>
@@ -559,6 +560,7 @@ int omap4_dpll_low_power_cascade_enter()
 	struct device *mpu_dev;
 	struct cpufreq_policy *cp;
 	struct omap_opp *opp;
+	struct voltagedomain *vdd_mpu, *vdd_iva, *vdd_core;
 
 	dpll_abe_ck = clk_get(NULL, "dpll_abe_ck");
 	dpll_mpu_ck = clk_get(NULL, "dpll_mpu_ck");
@@ -601,6 +603,16 @@ int omap4_dpll_low_power_cascade_enter()
 		ret = -ENODEV;
 		goto out;
 	}
+
+	/* look up the three scalable voltage domains */
+	vdd_mpu = omap_voltage_domain_get("mpu");
+	vdd_iva = omap_voltage_domain_get("iva");
+	vdd_core = omap_voltage_domain_get("core");
+
+	/* disable SR adaptive voltage scaling while changing freq */
+	omap_smartreflex_disable(vdd_mpu);
+	omap_smartreflex_disable(vdd_iva);
+	omap_smartreflex_disable(vdd_core);
 
 	/* prevent DPLL_ABE & DPLL_CORE from idling */
 	omap3_dpll_deny_idle(dpll_abe_ck);
@@ -747,6 +759,11 @@ int omap4_dpll_low_power_cascade_enter()
 	state.clkreqctrl = __raw_readl(OMAP4430_PRM_CLKREQCTRL);
 	__raw_writel(0x4, OMAP4430_PRM_CLKREQCTRL);
 
+	/* re-enable SR adaptive voltage scaling */
+	omap_smartreflex_enable(vdd_mpu);
+	omap_smartreflex_enable(vdd_iva);
+	omap_smartreflex_enable(vdd_core);
+
 	/* drive PM debug clocks from CORE_M6X2 and allow the clkdm to idle */
 	/*state.pmd_stm_clock_mux_ck_parent = pmd_stm_clock_mux_ck->parent;
 	state.pmd_trace_clk_mux_ck_parent = pmd_trace_clk_mux_ck->parent;
@@ -821,6 +838,7 @@ int omap4_dpll_low_power_cascade_exit()
 	struct clk *pmd_stm_clock_mux_ck, *pmd_trace_clk_mux_ck;
 	struct clockdomain *emu_sys_44xx_clkdm, *abe_44xx_clkdm;
 	struct cpufreq_policy *cp;
+	struct voltagedomain *vdd_mpu, *vdd_iva, *vdd_core;
 
 	sys_clkin_ck = clk_get(NULL, "sys_clkin_ck");
 	dpll_abe_ck = clk_get(NULL, "dpll_abe_ck");
@@ -870,6 +888,16 @@ int omap4_dpll_low_power_cascade_exit()
 
 	if (!omap4_lpmode)
 		return 0;
+
+	/* look up the three scalable voltage domains */
+	vdd_mpu = omap_voltage_domain_get("mpu");
+	vdd_iva = omap_voltage_domain_get("iva");
+	vdd_core = omap_voltage_domain_get("core");
+
+	/* disable SR adaptive voltage scaling while changing freq */
+	omap_smartreflex_disable(vdd_mpu);
+	omap_smartreflex_disable(vdd_iva);
+	omap_smartreflex_disable(vdd_core);
 
 	omap4_lpmode = false;
 
@@ -958,6 +986,11 @@ int omap4_dpll_low_power_cascade_exit()
 	if (ret)
 		pr_debug("%s: failed restoring parent to PMD clocks\n",
 				__func__);*/
+
+	/* re-enable SR adaptive voltage scaling */
+	omap_smartreflex_enable(vdd_mpu);
+	omap_smartreflex_enable(vdd_iva);
+	omap_smartreflex_enable(vdd_core);
 
 	recalculate_root_clocks();
 
