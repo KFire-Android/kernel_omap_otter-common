@@ -288,14 +288,14 @@ static struct sk_buff *convert2_channel_4(struct sk_buff *ch8_skb)
 		return ch4_skb;
 	}
 
-	/* To accomodate an extra 0 that Channel-4 response sends */
+	/* safe to allocate one more than necessary */
 	ch4_skb = alloc_skb((ch8_skb->len + 1), GFP_ATOMIC);
 	if (ch4_skb == NULL) {
 		FM_CHR_DRV_ERR(" SKB allocation failed ");
 
 		return NULL;
 	}
-	skb_put(ch4_skb, ch8_skb->len + 1);
+	memset(skb_put(ch4_skb, ch8_skb->len), 0, ch8_skb->len+1);
 
 	/*  Copy the command length, NUM_HCI, R/W values from Channl-8 reponse
 	 *  packet
@@ -350,7 +350,10 @@ static struct sk_buff *convert2_channel_4(struct sk_buff *ch8_skb)
 		chan8_index++;
 	}
 
-	/* Copy the extra 0 */
+	/* The length of parameters in HCI-Event responses to HCI-VS FM commands
+	 * are 0 and hence maintain the same here - Although CH8 do provide the
+	 * right parameter length rlen
+	 */
 	ch4_skb->data[chan4_index] = 0x00;
 	chan4_index++;
 
