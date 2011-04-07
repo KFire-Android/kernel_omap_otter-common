@@ -30,8 +30,10 @@
 #define RPROC_IOC_MAGIC		'P'
 
 #define RPROC_IOCMONITOR	_IO(RPROC_IOC_MAGIC, 0)
-#define RPROC_IOCSTART		_IO(RPROC_IOC_MAGIC, 1)
-#define RPROC_IOCSTOP		_IO(RPROC_IOC_MAGIC, 2)
+#define RPROC_IOCSTART		_IOWR(RPROC_IOC_MAGIC, 1, \
+					struct omap_rproc_start_args)
+#define RPROC_IOCSTOP		_IOWR(RPROC_IOC_MAGIC, 2, \
+					struct omap_rproc_common_args)
 #define RPROC_IOCGETSTATE	_IOR(RPROC_IOC_MAGIC, 3, int)
 #define RPROC_IOCREGEVENT	_IOR(RPROC_IOC_MAGIC, 4, \
 					struct omap_rproc_reg_event_args)
@@ -119,6 +121,7 @@ struct omap_rproc_ntfy {
 };
 
 struct omap_rproc_start_args {
+	struct omap_rproc_common_args cargs;
 	u32 start_addr;
 };
 
