@@ -230,7 +230,7 @@ int ispccdc_request(struct isp_ccdc_device *isp_ccdc);
 int ispccdc_free(struct isp_ccdc_device *isp_ccdc);
 void ispccdc_save_context(struct device *dev);
 void ispccdc_restore_context(struct device *dev);
-void ispccdc_enable_lsc(struct isp_ccdc_device *isp_ccdc, u8 enable);
+int ispccdc_enable_lsc(struct isp_ccdc_device *isp_ccdc, u8 enable);
 int ispccdc_lsc_delay_stop(struct isp_ccdc_device *isp_ccdc);
 void ispccdc_lsc_state_handler(struct isp_ccdc_device *isp_ccdc,
 			unsigned long status);

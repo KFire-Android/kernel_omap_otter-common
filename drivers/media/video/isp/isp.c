@@ -1378,9 +1378,10 @@ static int __isp_disable_modules(struct device *dev, int suspend)
 		}
 		msleep(1);
 	}
-	/* We can disable lsc now */
-	ispccdc_enable_lsc(&isp->isp_ccdc, 0);
-
+	/* We can disable lsc now, If an error ocured during
+	 * stopping of the LSC sw reset the isp */
+	if (ispccdc_enable_lsc(&isp->isp_ccdc, 0) < 0)
+		reset = 1;
 	/*
 	 * We need to stop all the modules after CCDC or they'll
 	 * never stop since they may not get a full frame from CCDC.

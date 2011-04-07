@@ -492,6 +492,9 @@ static void __ispccdc_enable_lsc(struct isp_ccdc_device *isp_ccdc, u8 enable)
 		       ISPCCDC_LSC_CONFIG,
 		       ~ISPCCDC_LSC_ENABLE,
 		       enable ? ISPCCDC_LSC_ENABLE : 0);
+
+	/* If LSC is enabled set flag for delayed stop */
+	isp_ccdc->lsc_delay_stop = enable ? 1 : 0;
 }
 
 /**
@@ -499,10 +502,10 @@ static void __ispccdc_enable_lsc(struct isp_ccdc_device *isp_ccdc, u8 enable)
  * @isp_ccdc: Pointer to ISP CCDC device.
  * @enable: 0 Disables LSC, 1 Enables LSC.
  **/
-void ispccdc_enable_lsc(struct isp_ccdc_device *isp_ccdc, u8 enable)
+int ispccdc_enable_lsc(struct isp_ccdc_device *isp_ccdc, u8 enable)
 {
 	struct device *dev = to_device(isp_ccdc);
-
+	int err;
 	if (enable) {
 		isp_reg_writel(dev, IRQ0ENABLE_CCDC_LSC_PREF_COMP_IRQ |
 			       IRQ0ENABLE_CCDC_LSC_DONE_IRQ,
@@ -525,6 +528,10 @@ void ispccdc_enable_lsc(struct isp_ccdc_device *isp_ccdc, u8 enable)
 			      IRQ0ENABLE_CCDC_LSC_DONE_IRQ));
 	}
 	isp_ccdc->lsc_enable = enable;
+
+	err = isp_ccdc->lsc_delay_stop ? -1 : 0;
+
+	return err;
 }
 
 /**
