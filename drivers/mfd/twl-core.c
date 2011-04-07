@@ -1052,6 +1052,9 @@ static void _init_twl6030_settings(void)
 
 	/* VBATMIN_HI */
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xC9);
+
+	/* Set DEVOFF, MOD/CON_ACT2OFF/SLP2OFF transition */
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x06, 0x25);
 }
 
 #ifdef CONFIG_PM
@@ -1059,7 +1062,8 @@ static int
 twl_suspend(struct i2c_client *client, pm_message_t message)
 {
 	/* Make sure below init twl settings are not left on */
-	_init_twl6030_settings();
+	if (twl_class_is_6030())
+		_init_twl6030_settings();
 
 	return 0;
 }
