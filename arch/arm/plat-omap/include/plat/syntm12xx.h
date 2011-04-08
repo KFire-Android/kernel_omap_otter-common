@@ -16,6 +16,7 @@ struct tm12xx_ts_platform_data {
 	unsigned num_buttons;  /* Registered buttons */
 	u8       repeat;       /* Input dev Repeat enable */
 	u8       swap_xy;      /* ControllerX==InputDevY...*/
+	u8	controller_num; /* Number of the controller */
 	int	suspend_state; /* Indicate IC state during suspend */
 };
 
