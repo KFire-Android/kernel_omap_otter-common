@@ -3105,11 +3105,11 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		if (fieldmode)
 			height /= 2;
 #endif
-		pos_y /= 2;
 		pic_height /= 2;
-		if (ilace & OMAP_FLAG_IDEV)
+		if (ilace & OMAP_FLAG_IDEV) {
+			pos_y /= 2;
 			out_height /= 2;
-
+		}
 		DSSDBG("adjusting for ilace: height %d, pos_y %d, "
 				"out_height %d\n",
 				height, pos_y, out_height);
