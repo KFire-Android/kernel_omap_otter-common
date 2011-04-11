@@ -627,6 +627,9 @@ struct twl4030_codec_audio_data {
 	unsigned int reset_registers:1;
 	unsigned int hs_extmute:1;
 	void (*set_hs_extmute)(int mute);
+
+	/* twl6040 */
+	int vddhf_uV;
 };
 
 struct twl4030_codec_vibra_data {
