@@ -31,6 +31,7 @@
 #include <linux/err.h>
 #include <linux/notifier.h>
 #include <linux/slab.h>
+#include <linux/wakelock.h>
 
 /* usb register definitions */
 #define USB_VENDOR_ID_LSB		0x00
@@ -102,7 +103,7 @@ struct twl6030_usb {
 };
 
 #define xceiv_to_twl(x)		container_of((x), struct twl6030_usb, otg);
-
+static struct wake_lock twl_lock;
 /*-------------------------------------------------------------------------*/
 
 static inline int twl6030_writeb(struct twl6030_usb *twl, u8 module,
@@ -175,6 +176,14 @@ static void twl6030_phy_shutdown(struct otg_transceiver *x)
 	struct device *dev;
 	struct twl4030_usb_data *pdata;
 
+	/* USB_VBUS_CTRL_CLR */
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0xFF, 0x05);
+	/* USB_ID_CRTL_CLR */
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0xFF, 0x07);
+        /* CHARGERUSB_CTRL3 */
+        twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x21, 0xEA);
+
+
 	twl = xceiv_to_twl(x);
 	dev  = twl->dev;
 	pdata = dev->platform_data;
@@ -183,7 +192,6 @@ static void twl6030_phy_shutdown(struct otg_transceiver *x)
 
 static int twl6030_usb_ldo_init(struct twl6030_usb *twl)
 {
-
 	/* Set to OTG_REV 1.3 and turn on the ID_WAKEUP_COMP */
 	twl6030_writeb(twl, TWL6030_MODULE_ID0 , 0x1, TWL6030_BACKUP_REG);
 
@@ -193,9 +201,11 @@ static int twl6030_usb_ldo_init(struct twl6030_usb *twl)
 	/* Program MISC2 register and set bit VUSB_IN_VBAT */
 	twl6030_writeb(twl, TWL6030_MODULE_ID0 , 0x10, TWL6030_MISC2);
 
-	twl->usb3v3 = regulator_get(twl->dev, "vusb");
-	if (IS_ERR(twl->usb3v3))
-		return -ENODEV;
+	if (!twl->usb3v3) {
+		twl->usb3v3 = regulator_get(twl->dev, "vusb");
+		if (IS_ERR(twl->usb3v3))
+			return -ENODEV;
+	}
 
 	/* Program the USB_VBUS_CTRL_SET and set VBUS_ACT_COMP bit */
 	twl6030_writeb(twl, TWL_MODULE_USB, 0x4, USB_VBUS_CTRL_SET);
@@ -249,6 +259,7 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 						CONTROLLER_STAT1);
 	if (!(hw_state & STS_USB_ID)) {
 		if (vbus_state & VBUS_DET) {
+			twl6030_usb_ldo_init(twl);
 			regulator_enable(twl->usb3v3);
 			twl->asleep = 1;
 			status = USB_EVENT_VBUS;
@@ -266,6 +277,7 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 				regulator_disable(twl->usb3v3);
 				twl->asleep = 0;
 			}
+			wake_lock_timeout(&twl_lock,1*HZ);
 		}
 	}
 	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
@@ -284,7 +296,7 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 	hw_state = twl6030_readb(twl, TWL6030_MODULE_ID0, STS_HW_CONDITIONS);
 
 	if (hw_state & STS_USB_ID) {
-
+		twl6030_usb_ldo_init(twl);
 		regulator_enable(twl->usb3v3);
 		twl->asleep = 1;
 		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_CLR, 0x1);
@@ -398,6 +410,8 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 
 	/* init spinlock for workqueue */
 	spin_lock_init(&twl->lock);
+
+	wake_lock_init(&twl_lock, WAKE_LOCK_SUSPEND, "twl_wake_lock");
 
 	err = twl6030_usb_ldo_init(twl);
 	if (err) {
