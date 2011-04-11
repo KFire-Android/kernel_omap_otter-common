@@ -440,19 +440,15 @@ static void hdmi_configure_lr_fr(void)
 {
 	int ret = 0;
 	if (hdmi.mode == 0 || (hdmi.mode == 1 && hdmi.code == 1)) {
-		ret = hdmi_configure_lrfr(HDMI_FULL_RANGE, 0);
+		ret = hdmi_configure_lrfr(HDMI_FULL_RANGE, 1);
 		if (!ret)
 			dispc_setup_color_fr_lr(1);
 		return;
-	}
-	if (hdmi.lr_fr) {
-		ret = hdmi_configure_lrfr(HDMI_FULL_RANGE, hdmi.force_set);
-		if (!ret && !hdmi.force_set)
-			dispc_setup_color_fr_lr(1);
 	} else {
-		ret = hdmi_configure_lrfr(HDMI_LIMITED_RANGE, hdmi.force_set);
-		if (!ret && !hdmi.force_set)
+		ret = hdmi_configure_lrfr(HDMI_LIMITED_RANGE, 1);
+		if (!ret)
 			dispc_setup_color_fr_lr(0);
+		return;
 	}
 }
 
@@ -1185,6 +1181,8 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 			break;
 		}
 	}
+
+	hdmi_configure_lr_fr();
 
 	hdmi_lib_enable(&hdmi.cfg);
 

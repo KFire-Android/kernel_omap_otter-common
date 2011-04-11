@@ -1645,11 +1645,36 @@ int hdmi_lib_enable(struct hdmi_config *cfg)
 	hdmi.avi_param.db1b_no_vert_hori_verthori = INFOFRAME_AVI_DB1B_NO;
 	hdmi.avi_param.db1s_0_1_2 = INFOFRAME_AVI_DB1S_0;
 	hdmi.avi_param.db2c_no_itu601_itu709_extented = INFOFRAME_AVI_DB2C_NO;
-	hdmi.avi_param.db2m_no_43_169 = INFOFRAME_AVI_DB2M_NO;
+
+	/* Support AR in AVI infoframe */
+	switch (cfg->video_format) {
+	/* 16:9 */
+	case 4:
+	case 5:
+	case 16:
+	case 19:
+	case 20:
+	case 31:
+	case 32:
+	case 39:
+		hdmi.avi_param.db2m_no_43_169 = INFOFRAME_AVI_DB2M_169;
+		break;
+	/* 4:3 */
+	case 1:
+	case 2:
+	case 6:
+	case 17:
+	case 21:
+	case 29:
+	case 35:
+	case 37:
+		hdmi.avi_param.db2m_no_43_169 = INFOFRAME_AVI_DB2M_43;
+		break;
+	}
+
 	hdmi.avi_param.db2r_same_43_169_149 = INFOFRAME_AVI_DB2R_SAME;
 	hdmi.avi_param.db3itc_no_yes = INFOFRAME_AVI_DB3ITC_NO;
 	hdmi.avi_param.db3ec_xvyuv601_xvyuv709 = INFOFRAME_AVI_DB3EC_XVYUV601;
-	hdmi.avi_param.db3q_default_lr_fr = INFOFRAME_AVI_DB3Q_DEFAULT;
 	hdmi.avi_param.db3sc_no_hori_vert_horivert = INFOFRAME_AVI_DB3SC_NO;
 	hdmi.avi_param.db4vic_videocode = cfg->video_format;
 	hdmi.avi_param.db5pr_no_2_3_4_5_6_7_8_9_10 = INFOFRAME_AVI_DB5PR_NO;
