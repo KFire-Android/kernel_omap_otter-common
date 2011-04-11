@@ -212,23 +212,6 @@ struct writeback_cache_data {
 	u32					fifo_high;
 };
 
-struct ddma_config {
-	u16 twomode;
-	u16 antifckr;
-	u16 double_stride;
-	u16 bpp;
-	u16 bitmap;
-	u16 pixel_inc;
-	u16 max_burst;
-	u16 gballoc;
-	u16 vballoc;
-	u16 yuv420;
-	u32 rowincr;
-	u32 ba;
-	u32 size_x;
-	u32 size_y;
-};
-
 struct dispc_config {
 	u32 sizex, sizey;
 	u32 burstsize;
@@ -251,14 +234,6 @@ struct dispc_config {
 	u32 vid3_bottom_buffer;
 	u32 wb_top_buffer;
 	u32 wb_bottom_buffer;
-};
-
-struct sa_struct {
-	u32 sa;
-	u32 min_sa;
-	u32 max_lt;
-	u32 min_lt;
-	u32 min_ht;
 };
 
 struct seq_file;
@@ -568,8 +543,7 @@ void dispc_go_wb(void);
 void dispc_cancel_go_wb(void);
 void dispc_flush_wb(struct writeback_cache_data *wb);
 int dispc_setup_wb(struct writeback_cache_data *wb);
-u32 sa_calc_wrap(struct dispc_config *dispc_reg_config,
-			u32 channel_no, struct sa_struct *sa_info);
+u32 sa_calc_wrap(struct dispc_config *dispc_reg_config, u32 channel_no);
 
 
 /* VENC */

@@ -4,20 +4,37 @@
 #define YUV422_UYVY     10
 #define YUV422_YUV2     11
 
+struct sa_struct {
+	u32 min_sa;
+	u32 max_lt;
+	u32 min_lt;
+};
+
+struct ddma_config {
+	u16 twomode;
+	u16 antifckr;
+	u16 double_stride;
+	u16 bpp;
+	u16 bitmap;
+	u16 pixel_inc;
+	u16 max_burst;
+	u16 gballoc;
+	u16 vballoc;
+	u16 yuv420;
+	u32 rowincr;
+	u32 ba;
+	u32 size_x;
+	u32 size_y;
+};
+
 /*
  * bitpk : used to return partial bit vectors of bigger
  * bit vector, as and when required in algorithm.
  * Ex: bitpk(BaseAddress,28,27) = BaseAddress[28:27]
- * works for 1 or 2-bit fields only
  */
-u32 bitpk(unsigned long a, u32 left, u32 right)
+static inline u32 bitpk(unsigned long a, u32 left, u32 right)
 {
-	u32 j, k;
-	unsigned long i;
-	i = (a >> right);
-	j = ((left == right) ? (u32)1 : (u32)3);
-	k =  ((u32)i) & j;
-	return k;
+	return (a >> right) & ((1 << (left - right)) - 1);
 }
 
 /*
@@ -29,12 +46,12 @@ u32 bitpk(unsigned long a, u32 left, u32 right)
  *		     0->Chroma frame parameters and calculation
  * bh_config       :: Output struct having information useful for the algorithm
  */
-void dispc_reg_to_ddma(struct dispc_config *dispc_reg_config, u32 *channel_no,
-			 u32 *y_nuv, struct ddma_config *bh_config)
+static void dispc_reg_to_ddma(struct dispc_config *dispc_reg_config,
+	u32 channel_no, u32 y_nuv, struct ddma_config *bh_config)
 {
 	u16 i;
 	/* GFX pipe specific conversions */
-	if (*channel_no == 0) {
+	if (channel_no == 0) {
 		/*
 		 * For bitmap formats the pixcel information is stored in bits.
 		 * This needs to be divided by 8 to convert into bytes.
@@ -99,7 +116,7 @@ void dispc_reg_to_ddma(struct dispc_config *dispc_reg_config, u32 *channel_no,
 		/* LUT for format<-->Bytesper pixel */
 		/* bpp:1 for Luma bpp:2 for Chroma */
 		case 0:
-			i = (*y_nuv ? 1 : 2);
+			i = (y_nuv ? 1 : 2);
 			break;
 		case 1:
 		case 2:
@@ -130,71 +147,68 @@ void dispc_reg_to_ddma(struct dispc_config *dispc_reg_config, u32 *channel_no,
 		 * + 1. For Chroma pixcelincrement should be doubled to leave
 		 * same number of Chroma pixels and Luma.
 		 */
-		bh_config->pixel_inc = (dispc_reg_config->format == 0) ?
-					((*y_nuv == 0) ?
-					((dispc_reg_config->pixelinc - 1) * 2) + 1 :
-					dispc_reg_config->pixelinc) :
-					dispc_reg_config->pixelinc;
+		bh_config->pixel_inc =
+			(dispc_reg_config->format == 0 && y_nuv == 0) ?
+			(dispc_reg_config->pixelinc - 1) * 2 + 1 :
+			dispc_reg_config->pixelinc;
 
 		/*
 		 * for YUV422+No rotation : bpp =bpp/2:: To correct Pixcel
 		 * increment accordingly use in stride calculation.
 		 */
 		bh_config->pixel_inc =
-			(((dispc_reg_config->format == YUV422_UYVY) ||
-			(dispc_reg_config->format == YUV422_YUV2)) &&
-					((dispc_reg_config->rotation == 0) ||
-					(dispc_reg_config->rotation == 2))) ?
-					((dispc_reg_config->pixelinc - 1)/2) + 1 :
-					bh_config->pixel_inc;
+			((dispc_reg_config->format == YUV422_UYVY ||
+			  dispc_reg_config->format == YUV422_YUV2) &&
+			 (dispc_reg_config->rotation == 0 ||
+			  dispc_reg_config->rotation == 2)) ?
+				(dispc_reg_config->pixelinc - 1) / 2 + 1 :
+				bh_config->pixel_inc;
 		bh_config->bpp = i;
-		bh_config->double_stride = (dispc_reg_config->format == 0) ?
-					 ((*y_nuv == 0) ?
-					 dispc_reg_config->doublestride : 0) : 0;
+		bh_config->double_stride =
+			(dispc_reg_config->format == 0 && y_nuv == 0) ?
+				dispc_reg_config->doublestride : 0;
 
 		/* Conditions in which SizeY is halfed = i; */
 		i = (((dispc_reg_config->rotation == 1 ||
-			dispc_reg_config->rotation == 3)
-			&& (dispc_reg_config->format == YUV422_UYVY ||
-			dispc_reg_config->format == YUV422_YUV2)) ||
-			(((dispc_reg_config->rotation == 1 ||
-			dispc_reg_config->rotation == 3) ||
-			(bh_config->double_stride == 1)) &&
-			((dispc_reg_config->format == 0)
-			&& (*y_nuv == 0)))) ? 1 : 0;
+		       dispc_reg_config->rotation == 3) &&
+		      (dispc_reg_config->format == YUV422_UYVY ||
+		       dispc_reg_config->format == YUV422_YUV2)) ||
+		     ((dispc_reg_config->rotation == 1 ||
+		       dispc_reg_config->rotation == 3 ||
+		       bh_config->double_stride == 1) &&
+		      dispc_reg_config->format == 0 && y_nuv == 0)) ? 1 : 0;
 
-		/* Choosing between ba for luma frame and bacbcr for
-		 * Chroma frame
-		 */
-		bh_config->ba = (dispc_reg_config->format == 0) ? ((*y_nuv == 1) ?
-				dispc_reg_config->ba : dispc_reg_config->bacbcr) :
-				dispc_reg_config->ba;
+		/* Choosing between BA_Y and BA_CbCr */
+		bh_config->ba =
+			(dispc_reg_config->format == 0 && y_nuv == 0) ?
+			dispc_reg_config->bacbcr :
+			dispc_reg_config->ba;
 
 		/* SizeX halfed for Chroma frame */
-		bh_config->size_x = (dispc_reg_config->format == 0) ?
-					((*y_nuv == 1) ?
-					dispc_reg_config->sizex :
-					((dispc_reg_config->sizex + 1) / 2 - 1)) :
-					dispc_reg_config->sizex;
+		bh_config->size_x =
+			(dispc_reg_config->format == 0 && y_nuv == 0) ?
+			(dispc_reg_config->sizex + 1) / 2 - 1 :
+			dispc_reg_config->sizex;
 	}
 
 	bh_config->twomode = dispc_reg_config->bursttype;
 	bh_config->size_y = ((dispc_reg_config->sizey + 1) >> i) - 1;
 	bh_config->rowincr = dispc_reg_config->rowinc;
 	bh_config->max_burst = 1 << (dispc_reg_config->burstsize + 1);
+
 	/* Decoding the burstSize to be used in BH calculation algorithm */
 	bh_config->gballoc =
-		(dispc_reg_config->gfx_bottom_buffer == *channel_no) +
-		(dispc_reg_config->gfx_top_buffer == *channel_no);
+		(dispc_reg_config->gfx_bottom_buffer == channel_no) +
+		(dispc_reg_config->gfx_top_buffer == channel_no);
 	bh_config->vballoc =
-		(dispc_reg_config->vid1_bottom_buffer == *channel_no) +
-		(dispc_reg_config->vid1_top_buffer == *channel_no) +
-		(dispc_reg_config->vid2_bottom_buffer == *channel_no) +
-		(dispc_reg_config->vid2_top_buffer == *channel_no) +
-		(dispc_reg_config->vid3_bottom_buffer == *channel_no) +
-		(dispc_reg_config->vid3_top_buffer == *channel_no) +
-		(dispc_reg_config->wb_bottom_buffer == *channel_no) +
-		(dispc_reg_config->wb_top_buffer == *channel_no);
+		(dispc_reg_config->vid1_bottom_buffer == channel_no) +
+		(dispc_reg_config->vid1_top_buffer == channel_no) +
+		(dispc_reg_config->vid2_bottom_buffer == channel_no) +
+		(dispc_reg_config->vid2_top_buffer == channel_no) +
+		(dispc_reg_config->vid3_bottom_buffer == channel_no) +
+		(dispc_reg_config->vid3_top_buffer == channel_no) +
+		(dispc_reg_config->wb_bottom_buffer == channel_no) +
+		(dispc_reg_config->wb_top_buffer == channel_no);
 }
 
 /*
@@ -205,8 +219,8 @@ void dispc_reg_to_ddma(struct dispc_config *dispc_reg_config, u32 *channel_no,
  *		     0->Chroma frame parameters and calculation
  * sa_info         :: Output struct having information of SA and LT values
  */
-void sa_calc(struct dispc_config *dispc_reg_config, u32 *channel_no,
-			u32 *y_nuv, struct sa_struct *sa_info)
+static void sa_calc(struct dispc_config *dispc_reg_config, u32 channel_no,
+			u32 y_nuv, struct sa_struct *sa_info)
 {
 	u32 Sorientation, mode, mode_0, mode_1;
 	int blkh_opt;
@@ -220,7 +234,7 @@ void sa_calc(struct dispc_config *dispc_reg_config, u32 *channel_no,
 	int stride_32k;
 	int stride_64k;
 	int stride_ok, stride_val;
-	long int linesRem;
+	int linesRem;
 	u32 BA_bhbit, bh_max;
 	int burstHeight;
 	int i;
@@ -248,20 +262,16 @@ void sa_calc(struct dispc_config *dispc_reg_config, u32 *channel_no,
 	/* Size including skipped pixels */
 	sizeX_pred = ((bh_config.size_x + 1) *
 		(bh_config.pixel_inc - 1 + bh_config.bpp)) / bh_config.bitmap;
-	stride = ((bh_config.rowincr - 1) + sizeX_pred) * bh_config.double_stride;
-	stride_8k = ((stride == 8192) && (mode_1 == 0) && (Sorientation == 1))
-			? 1 : 0;
-	stride_16k = (stride == 16384) && (((mode_0 != mode_1) &&
-			(Sorientation == 0)) ? 0 : 1);
-	stride_32k = (stride == 32768) && ((mode_1 == 1) ||
-			(Sorientation == 0));
-	stride_64k = (stride == 65536) && ((mode_0 == mode_1) ? 0 : 1) &&
-			(Sorientation == 0);
+	stride = ((bh_config.rowincr - 1) + sizeX_pred) *
+						bh_config.double_stride;
+	stride_8k = stride == 8192 && mode_1 == 0 && Sorientation;
+	stride_16k = stride == 16384 && !(mode_0 != mode_1 && !Sorientation);
+	stride_32k = stride == 32768 && (mode_1 == 1 || !Sorientation);
+	stride_64k = stride == 65536 && !(mode_0 == mode_1) && !Sorientation;
 	stride_ok = (stride_8k || stride_16k || stride_32k || stride_64k);
 	stride_val = stride_64k ? 16 : stride_32k ? 15 : stride_16k ? 14 : 13;
 
-	bh_config.size_y = bh_config.size_y + 1;
-	linesRem = bh_config.size_y;
+	linesRem = bh_config.size_y + 1;
 
 	/* Condition than enables 2D fetch of OCP */
 	bh2d_cond = (bh_config.twomode && (pagemode == 0)
@@ -272,7 +282,7 @@ void sa_calc(struct dispc_config *dispc_reg_config, u32 *channel_no,
 	 * other parameters of Tiler alignment of base address.
 	 */
 	C1 = C2 = c1flag = 0;
-	for (i = 1; (i <= 5 && (linesRem > 0) && (c1flag == 0)); i++) {
+	for (i = 1; i <= 5 && linesRem > 0 && c1flag == 0; i++) {
 		if (bh2d_cond) {
 			/* 2D transfer */
 			BA_bhbit = bitpk(bh_config.ba,
@@ -280,26 +290,21 @@ void sa_calc(struct dispc_config *dispc_reg_config, u32 *channel_no,
 					stride_val);
 			bh_max = blkh_opt - BA_bhbit;
 
-			if (linesRem > bh_config.max_burst) {
-				burstHeight = (bh_config.max_burst > bh_max) ?
-						bh_max : bh_config.max_burst;
-			} else {
-				burstHeight = (linesRem > bh_max) ? bh_max :
-						 linesRem;
-			}
-			burstHeight = ((burstHeight == 3) ||
-					(bh_config.antifckr == 1
-					&& burstHeight == 4)) ?
-					2 : burstHeight;
+			burstHeight = min(linesRem,
+				min((int) bh_config.max_burst, (int) bh_max));
+
+			if (burstHeight == 3 ||
+			    (burstHeight == 4 && bh_config.antifckr == 1))
+				burstHeight = 2;
 		} else {
 			burstHeight = 1;
 		}
-		if (((C1 + burstHeight) <= 4) && (c1flag == 0)) {
+		if ((C1 + burstHeight) <= 4 && c1flag == 0) {
 			/*
 			 * C1 incremented until its >= 4. ensures howmany
 			 * full lines are requested just before SA reaches
 			 */
-			C1 = C1 + burstHeight;
+			C1 += burstHeight;
 		} else {
 			if (c1flag == 0)
 				/*
@@ -324,8 +329,7 @@ void sa_calc(struct dispc_config *dispc_reg_config, u32 *channel_no,
 	 * Ceil(rounded to higher integer) of Number of 16Byte Word locations
 	 * used by single line of frame.
 	 */
-	pict_16word_ceil = ((sizeX_nopred % 16) > 0) ?
-				(sizeX_nopred / 16) + 1 : (sizeX_nopred / 16);
+	pict_16word_ceil = DIV_ROUND_UP(sizeX_nopred, 16);
 
 	/* Exact Number of 16Byte Word locations used by single line of frame */
 	pict_16word = sizeX_nopred / 16;
@@ -335,63 +339,32 @@ void sa_calc(struct dispc_config *dispc_reg_config, u32 *channel_no,
 	 * buffers allocated.
 	 */
 	i = Tot_mem / pict_16word_ceil;
-
-	sa_info->sa = (long int) (4 * (i - 1) * pict_16word + C1 *
-			pict_16word + C2 *
-			(Tot_mem - (pict_16word_ceil * i) - 8));
+	Tot_mem -= pict_16word_ceil * i;
 
 	if (i == 0) {
-		/*
-		 * When line Size is more than line buffer size
-		 * (Valid only for 1D)
-		 */
-		sa_info->min_sa = (Tot_mem - 8);
+		/* LineSize > MemoryLineBufferSize (Valid only for 1D) */
+		sa_info->min_sa = Tot_mem - 8;
 	} else if (i == 1) {
 		/*
 		 * When MemoryLineBufferSize > LineSize >
 		 * (MemoryLineBufferSize/2)
 		 */
-		sa_info->min_sa = pict_16word +
-				C2*(Tot_mem - pict_16word_ceil - 8);
+		sa_info->min_sa = pict_16word + C2 * (Tot_mem - 8);
 	} else {
 		/* All other cases */
-		sa_info->min_sa = ((4 * (i - 2) * pict_16word +
-					C1 * pict_16word) + C2 * (Tot_mem -
-					(pict_16word_ceil * i) - 8));
+		sa_info->min_sa = (4 * (i - 2) + C1) * pict_16word +
+			C2 * (Tot_mem - 8);
 	}
 
 	/* C2=0:: no partialy filed lines:: Then minLT = 0 */
-	sa_info->min_lt = (C2 == 0) ? 0 : (C2 - 1) * (Tot_mem -
-				(pict_16word_ceil * i));
-	sa_info->max_lt = ((sa_info->min_sa - 8) > sa_info->min_lt) ?
-				 (sa_info->min_sa - 8) : sa_info->min_lt;
-
-	if (bh_config.antifckr == 1) {
-		if (C2 == 0)
-			sa_info->min_lt = 0;
-		else {
-			if (C1 == 3)
-				sa_info->min_lt = 3 * pict_16word_ceil + C2 *
-						 (Tot_mem - (pict_16word_ceil *
-						 i));
-			else if (C1 == 4)
-				sa_info->min_lt = 2 * pict_16word_ceil +
-						C2 * (Tot_mem -
-						(pict_16word_ceil * i));
-		}
-	} else {
-		 sa_info->min_lt =  (C2 == 0) ? 0 : (C2 - 1) *
-					(Tot_mem - (pict_16word_ceil * i));
-	}
-
-	sa_info->max_lt = ((sa_info->min_sa - 8) > sa_info->min_lt) ?
-				(sa_info->min_sa - 8) : (sa_info->min_lt + 1);
-
-	if ((bh_config.antifckr == 1) &&
-		((4 * pict_16word_ceil) > sa_info->max_lt))
-			sa_info->min_ht = (4 * pict_16word_ceil) + 8;
+	if (C2 == 0)
+		sa_info->min_lt = 0;
+	else if (bh_config.antifckr == 1 && (C1 == 3 || C1 == 4))
+		sa_info->min_lt = (6 - C1) * pict_16word_ceil + C2 * Tot_mem;
 	else
-		sa_info->min_ht = sa_info->max_lt + 8;
+		sa_info->min_lt = (C2 - 1) * Tot_mem;
+
+	sa_info->max_lt = max(sa_info->min_sa - 8, sa_info->min_lt + 1);
 }
 
 /*
@@ -404,43 +377,21 @@ void sa_calc(struct dispc_config *dispc_reg_config, u32 *channel_no,
  *		     0->Chroma frame parameters and calculation
  * sa_info         :: Output struct having information of SA and LT values
  */
-u32 sa_calc_wrap(struct dispc_config *dispc_reg_config,
-				u32 channelno, struct sa_struct *sa_info)
+u32 sa_calc_wrap(struct dispc_config *dispc_reg_config, u32 channel_no)
 {
-	u32 i = 1;
 	struct sa_struct sa_info_y;
 	struct sa_struct sa_info_uv;
 
 	/* SA values calculated for Luma frame */
-	sa_calc(dispc_reg_config, &channelno, &i, &sa_info_y);
+	sa_calc(dispc_reg_config, channel_no, 1, &sa_info_y);
 
 	/* Going into this looop only for YUV420 Format and Channel != GFX */
-	if ((dispc_reg_config->format == 0) && (channelno > 0)) {
-		i = 0;
+	if (dispc_reg_config->format == 0 && channel_no > 0) {
 		/* SA values calculated for Chroma Frame */
-		sa_calc(dispc_reg_config, &channelno, &i, &sa_info_uv);
-		sa_info->sa = (sa_info_y.sa > sa_info_uv.sa) ?
-				sa_info_uv.sa : sa_info_y.sa;
-		/* min_SA = minimum(minSA_Y,minSA_UV) */
-		sa_info->min_sa = (sa_info_y.min_sa > sa_info_uv.min_sa) ?
-				sa_info_uv.min_sa : sa_info_y.min_sa;
-		/* minLT  = maximum(minLT_Y,minLT_UV) */
-		sa_info->min_lt = (sa_info_y.min_lt > sa_info_uv.min_lt) ?
-					sa_info_y.min_lt : sa_info_uv.min_lt;
-		/* LT = maximum(minSA-8 , minLT) */
-		sa_info->max_lt = ((sa_info->min_sa - 8) > sa_info->min_lt) ?
-				2 * (sa_info->min_sa - 8) :
-				2 * (sa_info->min_lt + 1);
-		/* HT = maximum(minHT-Y , minHT_UV) */
-		sa_info->min_ht = (sa_info_y.min_ht > sa_info_uv.min_ht) ?
-				2 * (sa_info->min_ht) : 2 * (sa_info->min_ht);
+		sa_calc(dispc_reg_config, channel_no, 0, &sa_info_uv);
+		return 2 * max(min(sa_info_y.min_sa, sa_info_uv.min_sa) - 8,
+			       max(sa_info_y.min_lt, sa_info_uv.min_lt) + 1);
 	} else {
-		sa_info->sa = sa_info_y.sa;
-		sa_info->min_sa = sa_info_y.min_sa;
-		sa_info->min_lt = sa_info_y.min_lt;
-		sa_info->max_lt = sa_info_y.max_lt;
-		sa_info->min_ht = sa_info_y.min_ht;
+		return sa_info_y.max_lt;
 	}
-
-	return sa_info->max_lt;
 }

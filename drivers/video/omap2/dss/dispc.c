@@ -1141,7 +1141,6 @@ static u32 dispc_calculate_threshold(enum omap_plane plane, u32 paddr,
 {
 	int shift;
 	u32 channel_no = plane;
-	struct sa_struct sa_info;
 	u32 val, burstsize, doublestride;
 	u32 rotation, bursttype, color_mode;
 	struct dispc_config dispc_reg_config;
@@ -1196,7 +1195,7 @@ static u32 dispc_calculate_threshold(enum omap_plane plane, u32 paddr,
 	/* antiFlicker is off */
 	dispc_reg_config.antiflicker = 0;
 
-	return sa_calc_wrap(&dispc_reg_config, channel_no, &sa_info);
+	return sa_calc_wrap(&dispc_reg_config, channel_no);
 }
 
 static inline void enable_clocks(bool enable)
