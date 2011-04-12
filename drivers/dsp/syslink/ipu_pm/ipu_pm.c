@@ -552,11 +552,13 @@ static void ipu_pm_clean_res(void)
 	}
 
 	global_rcb->rat = used_res_mask;
-	if (!used_res_mask)
-		goto complete_exit;
 
-	pr_warning("%s:Not all resources were released", __func__);
-	return;
+	/* Maybe an already released resource or currupted RAT
+	 * anyway call complete to allow the reload of the images
+	 */
+	if (used_res_mask)
+		pr_warning("%s: Not all resources were released\n", __func__);
+
 complete_exit:
 	complete_all(&ipu_clean_up_comp);
 	return;
