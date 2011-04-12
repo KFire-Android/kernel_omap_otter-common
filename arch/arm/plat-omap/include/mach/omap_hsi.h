@@ -232,7 +232,12 @@
 #define HSI_HSR_ID_REG(port)		(HSI_HSR_BASE(port) + 0x0000)
 
 #define HSI_HSR_MODE_REG(port)		(HSI_HSR_BASE(port) + 0x0004)
-#define HSI_HSR_MODE_WAKE_STATUS		(1 << 4)	/* HSI only */
+#define HSI_HSR_MODE_MODE_VAL_MASK	(3 << 0)	/* HSI only */
+#define HSI_HSR_MODE_FLOW_VAL_MASK	(3 << 2)	/* HSI only */
+#define HSI_HSR_MODE_WAKE_STATUS	(1 << 4)	/* HSI only */
+
+#define HSI_HSR_MODE_MODE_VAL_SLEEP	0xFFFFFFFC	/* HSI only */
+
 
 #define HSI_HSR_FRAMESIZE_REG(port)	(HSI_HSR_BASE(port) + 0x0008)
 
