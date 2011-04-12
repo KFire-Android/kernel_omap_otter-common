@@ -1081,6 +1081,15 @@ static inline int ipu_pm_get_regulator(struct ipu_pm_object *handle,
 		goto error;
 	}
 
+	/* enable regulator */
+	retval = regulator_enable(p_regulator);
+	if (retval) {
+		pr_err("%s %d Error enabling %s ldo\n", __func__
+							 , __LINE__
+							 , regulator_name);
+		goto error;
+	}
+
 	/* Get and store the regulator default voltage */
 	cam2_prev_volt = regulator_get_voltage(p_regulator);
 
@@ -1662,6 +1671,13 @@ static inline int ipu_pm_rel_regulator(struct ipu_pm_object *handle,
 					cam2_prev_volt);
 	if (retval) {
 		pr_err("%s %d Error restoring voltage\n", __func__, __LINE__);
+		return PM_INVAL_REGULATOR;
+	}
+
+	/* disable LDO */
+	retval = regulator_disable(p_regulator);
+	if (retval) {
+		pr_err("%s %d Error disabling ldo\n", __func__, __LINE__);
 		return PM_INVAL_REGULATOR;
 	}
 
