@@ -142,6 +142,10 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 	sync = hsi_sync_table[HSI_SYNC_WRITE][port - 1][channel];
 
 	src_addr = dma_map_single(hsi_ctrl->dev, data, size * 4, DMA_TO_DEVICE);
+	if (unlikely(dma_mapping_error(hsi_ctrl->dev, src_addr))) {
+		dev_err(hsi_ctrl->dev, "Failed to create DMA write mapping.\n");
+		return -ENOMEM;
+	}
 
 	tmp = HSI_SRC_SINGLE_ACCESS0 |
 	    HSI_SRC_MEMORY_PORT |
@@ -236,6 +240,10 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 
 	dest_addr = dma_map_single(hsi_ctrl->dev, data, count * 4,
 				  DMA_FROM_DEVICE);
+	if (unlikely(dma_mapping_error(hsi_ctrl->dev, dest_addr))) {
+		dev_err(hsi_ctrl->dev, "Failed to create DMA read mapping.\n");
+		return -ENOMEM;
+	}
 
 	tmp = HSI_DST_SINGLE_ACCESS0 |
 	    HSI_DST_MEMORY_PORT |
@@ -300,6 +308,8 @@ int hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 	u16 ccr, gdd_csr;
 	long buff_offset;
 	u32 status_reg;
+	dma_addr_t dma_h;
+	size_t size;
 
 	if (lch < 0) {
 		dev_dbg(&hsi_ch->dev->device, "No DMA channel found for HSI "
@@ -327,6 +337,11 @@ int hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	hsi_outl(HSI_GDD_LCH(lch), hsi_ctrl->base,
 		 HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
+
+	/* Unmap DMA region */
+	dma_h = hsi_inl(hsi_ctrl->base, HSI_GDD_CSSA_REG(lch));
+	size = hsi_inw(hsi_ctrl->base, HSI_GDD_CEN_REG(lch)) * 4;
+	dma_unmap_single(hsi_ctrl->dev, dma_h, size, DMA_TO_DEVICE);
 
 	buff_offset = hsi_hst_bufstate_f_reg(hsi_ctrl, port, channel);
 	if (buff_offset >= 0)
@@ -359,6 +374,8 @@ int hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 	struct hsi_dev *hsi_ctrl = hsi_ch->hsi_port->hsi_controller;
 	u16 ccr, gdd_csr;
 	u32 status_reg;
+	dma_addr_t dma_h;
+	size_t size;
 
 	/* Re-enable interrupts for polling if needed */
 	if (hsi_ch->flags & HSI_CH_RX_POLL)
@@ -390,6 +407,11 @@ int hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	hsi_outl(HSI_GDD_LCH(lch), hsi_ctrl->base,
 		 HSI_SYS_GDD_MPU_IRQ_STATUS_REG);
+
+	/* Unmap DMA region - Access to the buffer is now safe */
+	dma_h = hsi_inl(hsi_ctrl->base, HSI_GDD_CDSA_REG(lch));
+	size = hsi_inw(hsi_ctrl->base, HSI_GDD_CEN_REG(lch)) * 4;
+	dma_unmap_single(hsi_ctrl->dev, dma_h, size, DMA_FROM_DEVICE);
 
 	hsi_reset_ch_read(hsi_ch);
 
