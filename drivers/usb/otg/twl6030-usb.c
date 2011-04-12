@@ -391,7 +391,7 @@ static int twl6030_set_host(struct otg_transceiver *x, struct usb_bus *host)
 static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 {
 	struct twl6030_usb	*twl;
-	int			status, err;
+	int			status;
 	struct twl4030_usb_data *pdata;
 	struct device *dev = &pdev->dev;
 	pdata = dev->platform_data;
@@ -417,12 +417,6 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 
 	wake_lock_init(&twl_lock, WAKE_LOCK_SUSPEND, "twl_wake_lock");
 
-	err = twl6030_usb_ldo_init(twl);
-	if (err) {
-		dev_err(&pdev->dev, "ldo init failed\n");
-		kfree(twl);
-		return err;
-	}
 	otg_set_transceiver(&twl->otg);
 
 	platform_set_drvdata(pdev, twl);
