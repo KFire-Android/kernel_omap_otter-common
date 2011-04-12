@@ -1345,7 +1345,9 @@ static struct omap_hwmod omap3xxx_ispmmu_hwmod = {
 	.flags		= (HWMOD_NO_IDLEST | HWMOD_INIT_NO_RESET),
 	.slaves		= omap3xxx_ispmmu_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_ispmmu_slaves),
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1_2)
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1|
+					CHIP_IS_OMAP3630ES1_1|
+					CHIP_IS_OMAP3630ES1_2),
 };
 
 /*
