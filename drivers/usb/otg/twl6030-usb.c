@@ -410,6 +410,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->otg.set_vbus	= twl6030_set_vbus;
 	twl->otg.init		= twl6030_phy_init;
 	twl->otg.shutdown	= twl6030_phy_shutdown;
+	twl->otg.enable_irq	= twl6030_enable_irq;
 
 	/* init spinlock for workqueue */
 	spin_lock_init(&twl->lock);
