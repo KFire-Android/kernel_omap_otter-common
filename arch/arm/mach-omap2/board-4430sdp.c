@@ -989,6 +989,7 @@ static struct regulator_init_data sdp4430_vaux3 = {
 			.enabled	= false,
 			.disabled	= true,
 		},
+		.always_on	= true,
 	},
 	.num_consumer_supplies = 1,
 	.consumer_supplies = sdp4430_cam2_supply,
