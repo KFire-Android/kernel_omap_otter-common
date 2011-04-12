@@ -216,6 +216,9 @@ static int twl6030_usb_ldo_init(struct twl6030_usb *twl)
 	 */
 	twl6030_writeb(twl, TWL_MODULE_USB, 0x14, USB_ID_CTRL_SET);
 
+	/* CHARGERUSB_CTRL3 */
+	twl6030_writeb(twl, TWL6030_MODULE_ID1, 0x01, 0xEA);
+
 	return 0;
 }
 
