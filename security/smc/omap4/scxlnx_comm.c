@@ -184,8 +184,8 @@ struct SCXLNX_COARSE_PAGE_TABLE *SCXLNXAllocateCoarsePageTable(
 		 * The free list can provide us a coarse page table
 		 * descriptor
 		 */
-		pCoarsePageTable = list_entry(
-				pAllocationContext->sFreeCoarsePageTables.next,
+		pCoarsePageTable = list_first_entry(
+				&pAllocationContext->sFreeCoarsePageTables,
 				struct SCXLNX_COARSE_PAGE_TABLE, list);
 		list_del(&(pCoarsePageTable->list));
 
@@ -351,8 +351,8 @@ void SCXLNXReleaseCoarsePageTableAllocator(
 		struct SCXLNX_COARSE_PAGE_TABLE_ARRAY *pPageDesc;
 		u32 *pDescriptors;
 
-		pPageDesc = list_entry(
-			pAllocationContext->sCoarsePageTableArrays.next,
+		pPageDesc = list_first_entry(
+			&pAllocationContext->sCoarsePageTableArrays,
 			struct SCXLNX_COARSE_PAGE_TABLE_ARRAY, list);
 
 		pDescriptors = pPageDesc->sCoarsePageTables[0].pDescriptors;
@@ -1020,9 +1020,9 @@ static void tf_copy_answers(struct SCXLNX_COMM *pComm)
 			u32 *pTemp = (uint32_t *) &sHeader;
 
 			dprintk(KERN_INFO
-				"tf_copy_answers(%p)[thread %d]:"
+				"[pid=%d] tf_copy_answers(%p): "
 				"Read answers from L1\n",
-				pComm, current->pid);
+				current->pid, pComm);
 
 			/* Read the answer header */
 			for (i = 0;
@@ -1129,12 +1129,10 @@ static void tf_copy_command(
 					* DESTROY_DEVICE_CONTEXT.
 					*/
 					dprintk(KERN_INFO
-						"tf_copy_command(%p)"
-						"[thread=%d]: "
+						"[pid=%d] tf_copy_command(%p): "
 						"Connection no longer valid."
 						"ABORT\n",
-						pConn,
-						current->pid);
+						current->pid, pConn);
 					*command_status =
 						SCXLNX_COMMAND_STATE_ABORTED;
 					spin_unlock(
@@ -1149,12 +1147,10 @@ static void tf_copy_command(
 				SCXLNX_CONN_STATE_VALID_DEVICE_CONTEXT)
 						) {
 					dprintk(KERN_INFO
-					"tf_copy_command(%p)"
-					"[thread=%d]: "
+					"[pid=%d] tf_copy_command(%p): "
 					"Conn state is "
 					"DESTROY_DEVICE_CONTEXT_SENT\n",
-					pConn,
-					current->pid);
+					current->pid, pConn);
 					pConn->nState =
 			SCXLNX_CONN_STATE_DESTROY_DEVICE_CONTEXT_SENT;
 					}
@@ -1164,9 +1160,9 @@ copy:
 					* Copy the command to L1 Buffer
 					*/
 					dprintk(KERN_INFO
-				"tf_copy_command(%p)[thread=%d]: "
+				"[pid=%d] tf_copy_command(%p): "
 				"Write Message in the queue\n",
-				pMessage, current->pid);
+				current->pid, pMessage);
 					SCXLNXDumpMessage(pMessage);
 
 					for (i = 0; i < nCommandSize; i++)
@@ -1197,11 +1193,15 @@ copy:
  * Returns zero upon successful completion, or an appropriate error code upon
  * failure.
  */
-static int SCXLNXCommSendMessage(struct SCXLNX_COMM *pComm,
+static int tf_send_recv(struct SCXLNX_COMM *pComm,
 	union SCX_COMMAND_MESSAGE *pMessage,
 	struct SCXLNX_ANSWER_STRUCT *pAnswerStruct,
 	struct SCXLNX_CONNECTION *pConn,
-	int bKillable)
+	int bKillable
+	#ifdef CONFIG_TF_MSHIELD
+	, bool *secure_is_idle
+	#endif
+	)
 {
 	int result;
 	u64 sTimeout;
@@ -1209,28 +1209,11 @@ static int SCXLNXCommSendMessage(struct SCXLNX_COMM *pComm,
 	bool wait_prepared = false;
 	enum SCXLNX_COMMAND_STATE command_status = SCXLNX_COMMAND_STATE_PENDING;
 	DEFINE_WAIT(wait);
-#ifdef CONFIG_TF_MSHIELD
-	bool secure_locked = false;
-#endif
 #ifdef CONFIG_FREEZER
 	unsigned long saved_flags;
 #endif
-#ifdef CONFIG_SMP
-	long ret_affinity;
-	cpumask_t saved_cpu_mask;
-	cpumask_t local_cpu_mask = CPU_MASK_NONE;
-#endif
-
-	dprintk(KERN_INFO "SCXLNXCommSendMessage(%p)(thread=%d)\n",
-		 pMessage, current->pid);
-
-#ifdef CONFIG_SMP
-	cpu_set(0, local_cpu_mask);
-	sched_getaffinity(0, &saved_cpu_mask);
-	ret_affinity = sched_setaffinity(0, &local_cpu_mask);
-	if (ret_affinity != 0)
-		dprintk(KERN_ERR "sched_setaffinity #1 -> 0x%lX", ret_affinity);
-#endif
+	dprintk(KERN_INFO "[pid=%d] tf_send_recv(%p)\n",
+		 current->pid, pMessage);
 
 #ifdef CONFIG_FREEZER
 	saved_flags = current->flags;
@@ -1254,13 +1237,13 @@ copy_answers:
 	if (unlikely(freezing(current))) {
 
 #ifdef CONFIG_TF_MSHIELD
-		if (secure_locked) {
+		if (!(*secure_is_idle)) {
 			if (tf_schedule_secure_world(pComm, true) ==
 				STATUS_PENDING)
 				goto copy_answers;
 
 			tf_l4sec_clkdm_allow_idle(true, true);
-			secure_locked = false;
+			*secure_is_idle = true;
 		}
 #endif
 
@@ -1289,8 +1272,8 @@ copy_answers:
 	/*
 	 * Join wait queue
 	 */
-	/*dprintk(KERN_INFO "SCXLNXCommSendMessage(%p)[thread =%d]: "
-		"Prepare to wait\n", pMessage, current->pid);*/
+	/*dprintk(KERN_INFO "[pid=%d] tf_send_recv(%p): Prepare to wait\n",
+		current->pid, pMessage);*/
 	prepare_to_wait(&pComm->waitQueue, &wait,
 			bKillable ? TASK_INTERRUPTIBLE : TASK_UNINTERRUPTIBLE);
 	wait_prepared = true;
@@ -1298,25 +1281,22 @@ copy_answers:
 	/*
 	 * Check if our answer is available
 	 */
-	if (command_status ==
-		SCXLNX_COMMAND_STATE_ABORTED){
+	if (command_status == SCXLNX_COMMAND_STATE_ABORTED) {
 		/* Not waiting for an answer, return error code */
-		dprintk(KERN_ERR "SCXLNXCommSendMessage(thread=%u): "
+		result = -EINTR;
+		dprintk(KERN_ERR "[pid=%d] tf_send_recv: "
 			"Command status is ABORTED."
 			"Exit with 0x%x\n",
-			current->pid, -EINTR);
-		 result = -EINTR;
-		 goto exit;
+			current->pid, result);
+		goto exit;
 	}
-	if (pAnswerStruct != NULL) {
-		if (pAnswerStruct->bAnswerCopied) {
-			dprintk(KERN_INFO "SCXLNXCommSendMessage(thread=%u): "
-				"Received answer (type 0x%02X)\n",
-				current->pid,
-				pAnswerStruct->pAnswer->sHeader.nMessageType);
-			result = 0;
-			goto exit;
-		}
+	if (pAnswerStruct->bAnswerCopied) {
+		dprintk(KERN_INFO "[pid=%d] tf_send_recv: "
+			"Received answer (type 0x%02X)\n",
+			current->pid,
+			pAnswerStruct->pAnswer->sHeader.nMessageType);
+		result = 0;
+		goto exit;
 	}
 
 	/*
@@ -1330,9 +1310,8 @@ copy_answers:
 			/* Command was sent but no answer was received yet. */
 			result = -EIO;
 
-		dprintk(KERN_ERR "SCXLNXCommSendMessage(thread=%u): "
-			"Signal Pending."
-			"Return error %d\n",
+		dprintk(KERN_ERR "[pid=%d] tf_send_recv: "
+			"Signal Pending. Return error %d\n",
 			current->pid, result);
 		goto exit;
 	}
@@ -1373,9 +1352,9 @@ copy_answers:
 	 */
 #ifdef CONFIG_TF_MSHIELD
 schedule_secure_world:
-	if (!secure_locked) {
+	if (*secure_is_idle) {
 		tf_l4sec_clkdm_wakeup(true, true);
-		secure_locked = true;
+		*secure_is_idle = false;
 	}
 #endif
 
@@ -1392,39 +1371,39 @@ wait:
 			/* Command was sent but no answer was received yet. */
 			result = -EIO;
 
-		dprintk(KERN_ERR "SCXLNXCommSendMessage(thread=%u): "
+		dprintk(KERN_ERR "[pid=%d] tf_send_recv: "
 			"Signal Pending while waiting. Return error %d\n",
 			current->pid, result);
 		goto exit;
 	}
 
 	if (nRelativeTimeoutJiffies == MAX_SCHEDULE_TIMEOUT)
-		dprintk(KERN_INFO "SCXLNXCommSendMessage[thread = %d]: "
+		dprintk(KERN_INFO "[pid=%d] tf_send_recv: "
 			"prepare to sleep infinitely\n", current->pid);
 	else
-		dprintk(KERN_INFO "SCXLNXCommSendMessage: "
+		dprintk(KERN_INFO "tf_send_recv: "
 			"prepare to sleep 0x%lx jiffies\n",
 			nRelativeTimeoutJiffies);
 
 #ifdef CONFIG_TF_MSHIELD
-	if (secure_locked) {
+	if (!(*secure_is_idle)) {
 		if (tf_schedule_secure_world(pComm, true) == STATUS_PENDING) {
 			finish_wait(&pComm->waitQueue, &wait);
 			wait_prepared = false;
 			goto copy_answers;
 		}
 		tf_l4sec_clkdm_allow_idle(true, true);
-		secure_locked = false;
+		*secure_is_idle = true;
 	}
 #endif
 
 	/* go to sleep */
 	if (schedule_timeout(nRelativeTimeoutJiffies) == 0)
 		dprintk(KERN_INFO
-			"SCXLNXCommSendMessage: timeout expired\n");
+			"tf_send_recv: timeout expired\n");
 	else
 		dprintk(KERN_INFO
-			"SCXLNXCommSendMessage: signal delivered\n");
+			"tf_send_recv: signal delivered\n");
 
 	finish_wait(&pComm->waitQueue, &wait);
 	wait_prepared = false;
@@ -1437,24 +1416,18 @@ exit:
 	}
 
 #ifdef CONFIG_TF_MSHIELD
-	if (secure_locked) {
+	if ((!(*secure_is_idle)) && (result != -EIO)) {
 		if (tf_schedule_secure_world(pComm, true) == STATUS_PENDING)
 			goto copy_answers;
 
 		tf_l4sec_clkdm_allow_idle(true, true);
-		secure_locked = false;
+		*secure_is_idle = true;
 	}
 #endif
 
 #ifdef CONFIG_FREEZER
 	current->flags &= ~(PF_FREEZER_NOSIG);
 	current->flags |= (saved_flags & PF_FREEZER_NOSIG);
-#endif
-
-#ifdef CONFIG_SMP
-	ret_affinity = sched_setaffinity(0, &saved_cpu_mask);
-	if (ret_affinity != 0)
-		dprintk(KERN_ERR "sched_setaffinity #2 -> 0x%lX", ret_affinity);
 #endif
 
 	return result;
@@ -1480,6 +1453,14 @@ int SCXLNXCommSendReceive(struct SCXLNX_COMM *pComm,
 {
 	int nError;
 	struct SCXLNX_ANSWER_STRUCT sAnswerStructure;
+#ifdef CONFIG_SMP
+	long ret_affinity;
+	cpumask_t saved_cpu_mask;
+	cpumask_t local_cpu_mask = CPU_MASK_NONE;
+#endif
+#ifdef CONFIG_TF_MSHIELD
+	bool secure_is_idle = true;
+#endif
 
 	sAnswerStructure.pAnswer = pAnswer;
 	sAnswerStructure.bAnswerCopied = false;
@@ -1488,7 +1469,7 @@ int SCXLNXCommSendReceive(struct SCXLNX_COMM *pComm,
 		pMessage->sHeader.nOperationID = (u32) &sAnswerStructure;
 
 	dprintk(KERN_INFO "SCXLNXSMCommSendReceive: "
-		"SCXLNXCommSendMessage\n");
+		"tf_send_recv\n");
 
 #ifdef CONFIG_TF_MSHIELD
 	if (!test_bit(SCXLNX_COMM_FLAG_PA_AVAILABLE, &pComm->nFlags)) {
@@ -1505,12 +1486,24 @@ int SCXLNXCommSendReceive(struct SCXLNX_COMM *pComm,
 		return 0;
 	}
 
+#ifdef CONFIG_SMP
+	cpu_set(0, local_cpu_mask);
+	sched_getaffinity(0, &saved_cpu_mask);
+	ret_affinity = sched_setaffinity(0, &local_cpu_mask);
+	if (ret_affinity != 0)
+		dprintk(KERN_ERR "sched_setaffinity #1 -> 0x%lX", ret_affinity);
+#endif
+
 
 	/*
 	 * Send the command
 	 */
-	nError = SCXLNXCommSendMessage(pComm,
-		pMessage, &sAnswerStructure, pConn, bKillable);
+	nError = tf_send_recv(pComm,
+		pMessage, &sAnswerStructure, pConn, bKillable
+		#ifdef CONFIG_TF_MSHIELD
+		, &secure_is_idle
+		#endif
+		);
 
 	if (!bKillable && sigkill_pending()) {
 		if ((pMessage->sHeader.nMessageType ==
@@ -1544,34 +1537,28 @@ int SCXLNXCommSendReceive(struct SCXLNX_COMM *pComm,
 
 	if (nError == 0) {
 		/*
-		 * SCXLNXCommSendMessage returned Success.
+		 * tf_send_recv returned Success.
 		 */
 		if (pMessage->sHeader.nMessageType ==
 		SCX_MESSAGE_TYPE_CREATE_DEVICE_CONTEXT) {
 			spin_lock(&(pConn->stateLock));
 			pConn->nState = SCXLNX_CONN_STATE_VALID_DEVICE_CONTEXT;
 			spin_unlock(&(pConn->stateLock));
-		}
-		if (pMessage->sHeader.nMessageType ==
+		} else if (pMessage->sHeader.nMessageType ==
 		SCX_MESSAGE_TYPE_DESTROY_DEVICE_CONTEXT) {
 			spin_lock(&(pConn->stateLock));
 			pConn->nState = SCXLNX_CONN_STATE_NO_DEVICE_CONTEXT;
 			spin_unlock(&(pConn->stateLock));
 		}
-	}
-
-	if (nError  == -EINTR) {
+	} else if (nError  == -EINTR) {
 		/*
 		* No command was sent, return failure.
 		*/
 		dprintk(KERN_ERR
 			"SCXLNXSMCommSendReceive: "
-			"SCXLNXCommSendMessage failed (error %d) !\n",
+			"tf_send_recv failed (error %d) !\n",
 			nError);
-		return nError;
-	}
-
-	if (nError  == -EIO) {
+	} else if (nError  == -EIO) {
 		/*
 		* A command was sent but its answer is still pending.
 		*/
@@ -1579,7 +1566,7 @@ int SCXLNXCommSendReceive(struct SCXLNX_COMM *pComm,
 		/* means bKillable is true */
 		dprintk(KERN_ERR
 			"SCXLNXSMCommSendReceive: "
-			"SCXLNXCommSendMessage interrupted (error %d)."
+			"tf_send_recv interrupted (error %d)."
 			"Send DESTROY_DEVICE_CONTEXT.\n", nError);
 
 		/* Send the DESTROY_DEVICE_CONTEXT. */
@@ -1596,8 +1583,12 @@ int SCXLNXCommSendReceive(struct SCXLNX_COMM *pComm,
 		pMessage->sDestroyDeviceContextMessage.hDeviceContext =
 			pConn->hDeviceContext;
 
-		nError = SCXLNXCommSendMessage(pComm,
-			pMessage, &sAnswerStructure, pConn, false);
+		nError = tf_send_recv(pComm,
+			pMessage, &sAnswerStructure, pConn, false
+			#ifdef CONFIG_TF_MSHIELD
+			, &secure_is_idle
+			#endif
+			);
 		if (nError == -EINTR) {
 			/*
 			* Another thread already sent
@@ -1618,14 +1609,13 @@ int SCXLNXCommSendReceive(struct SCXLNX_COMM *pComm,
 				sAnswerStructure.bAnswerCopied = false;
 			 }
 			 spin_unlock(&pComm->lock);
-			 if (sAnswerStructure.bAnswerCopied ==
-				  false) {
+			 if (!sAnswerStructure.bAnswerCopied) {
 				/* Answer to DESTROY_DEVICE_CONTEXT
 				* was not yet received.
 				* Wait for the answer.
 				*/
 				dprintk(KERN_INFO
-					"SCXLNXCommSendReceive[thread %d]:"
+					"[pid=%d] SCXLNXCommSendReceive:"
 					"Answer to DESTROY_DEVICE_CONTEXT"
 					"not yet received.Retry\n",
 					current->pid);
@@ -1636,14 +1626,18 @@ int SCXLNXCommSendReceive(struct SCXLNX_COMM *pComm,
 	}
 
 	dprintk(KERN_INFO "SCXLNXCommSendReceive(): Message answer ready\n");
-	return nError;
+	goto exit;
 
 destroy_context:
-	nError = SCXLNXCommSendMessage(pComm,
-	pMessage, &sAnswerStructure, pConn, false);
+	nError = tf_send_recv(pComm,
+	pMessage, &sAnswerStructure, pConn, false
+	#ifdef CONFIG_TF_MSHIELD
+	, &secure_is_idle
+	#endif
+	);
 
 	/*
-	 * SCXLNXCommSendMessage cannot return an error because
+	 * tf_send_recv cannot return an error because
 	 * it's not killable and not within a connection
 	 */
 	BUG_ON(nError != 0);
@@ -1653,6 +1647,13 @@ destroy_context:
 	pConn->nState = SCXLNX_CONN_STATE_NO_DEVICE_CONTEXT;
 	spin_unlock(&(pConn->stateLock));
 
+exit:
+
+#ifdef CONFIG_SMP
+	ret_affinity = sched_setaffinity(0, &saved_cpu_mask);
+	if (ret_affinity != 0)
+		dprintk(KERN_ERR "sched_setaffinity #2 -> 0x%lX", ret_affinity);
+#endif
 	return nError;
 }
 

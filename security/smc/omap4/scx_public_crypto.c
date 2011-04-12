@@ -243,10 +243,13 @@ void PDrvCryptoLockUnlockHWA(u32 nHWAID, bool bDoLock)
 	if (bDoLock == LOCK_HWA) {
 		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "
 			"Wait for HWAID=0x%04X\n", nHWAID);
-		if (is_sem)
-			down(s);
-		else
-			mutex_lock(m);
+		if (is_sem) {
+			while (down_trylock(s))
+				cpu_relax();
+		} else {
+			while (!mutex_trylock(m))
+				cpu_relax();
+		}
 		dprintk(KERN_INFO "PDrvCryptoLockUnlockHWA: "
 			"Locked on HWAID=0x%04X\n", nHWAID);
 	} else {
@@ -960,17 +963,20 @@ u32 SCXPublicCryptoWaitForReadyBit(u32 *pRegister, u32 vBit)
 
 /*------------------------------------------------------------------------- */
 
+static DEFINE_SPINLOCK(clk_lock);
+
 void SCXPublicCryptoDisableClock(uint32_t vClockPhysAddr)
 {
 	u32 *pClockReg;
 	u32 val;
+	unsigned long flags;
 
 	dprintk(KERN_INFO "SCXPublicCryptoDisableClock: " \
 		"vClockPhysAddr=0x%08X\n",
 		vClockPhysAddr);
 
 	/* Ensure none concurrent access when changing clock registers */
-	spin_lock(&SCXLNXGetDevice()->sm.lock);
+	spin_lock_irqsave(&clk_lock, flags);
 
 	pClockReg = (u32 *)IO_ADDRESS(vClockPhysAddr);
 
@@ -982,9 +988,9 @@ void SCXPublicCryptoDisableClock(uint32_t vClockPhysAddr)
 	while ((__raw_readl(pClockReg) & 0x30000) == 0)
 		;
 
-	tf_l4sec_clkdm_allow_idle(false, true);
+	spin_unlock_irqrestore(&clk_lock, flags);
 
-	spin_unlock(&SCXLNXGetDevice()->sm.lock);
+	tf_l4sec_clkdm_allow_idle(false, true);
 }
 
 /*------------------------------------------------------------------------- */
@@ -993,15 +999,16 @@ void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr)
 {
 	u32 *pClockReg;
 	u32 val;
+	unsigned long flags;
 
 	dprintk(KERN_INFO "SCXPublicCryptoEnableClock: " \
 		"vClockPhysAddr=0x%08X\n",
 		vClockPhysAddr);
 
-	/* Ensure none concurrent access when changing clock registers */
-	spin_lock(&SCXLNXGetDevice()->sm.lock);
-
 	tf_l4sec_clkdm_wakeup(false, true);
+
+	/* Ensure none concurrent access when changing clock registers */
+	spin_lock_irqsave(&clk_lock, flags);
 
 	pClockReg = (u32 *)IO_ADDRESS(vClockPhysAddr);
 
@@ -1013,7 +1020,7 @@ void SCXPublicCryptoEnableClock(uint32_t vClockPhysAddr)
 	while ((__raw_readl(pClockReg) & 0x30000) != 0)
 		;
 
-	spin_unlock(&SCXLNXGetDevice()->sm.lock);
+	spin_unlock_irqrestore(&clk_lock, flags);
 }
 
 /*------------------------------------------------------------------------- */

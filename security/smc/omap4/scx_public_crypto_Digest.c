@@ -23,7 +23,7 @@
 #include "scx_public_dma.h"
 #include "scxlnx_mshield.h"
 
-#include <asm/io.h>
+#include <linux/io.h>
 #include <mach/io.h>
 #include <linux/crypto.h>
 #include <crypto/internal/hash.h>
@@ -229,15 +229,15 @@ void PDrvCryptoUpdateHash(struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
 	if (dataLength >= DMA_TRIGGER_IRQ_DIGEST)
 		dmaUse = PUBLIC_CRYPTO_DMA_USE_IRQ;
 
-	dprintk(KERN_INFO "PDrvCryptoUpdateHash : \
-		Data=0x%08x/%u, Chunck=%u, Processed=%u, dmaUse=0x%08x\n",
+	dprintk(KERN_INFO "PDrvCryptoUpdateHash : "\
+		"Data=0x%08x/%u, Chunk=%u, Processed=%u, dmaUse=0x%08x\n",
 		(u32)pData, (u32)dataLength,
 		pSHAState->nChunkLength, pSHAState->nBytesProcessed,
 		dmaUse);
 
 	if (dataLength == 0) {
-		dprintk(KERN_INFO "PDrvCryptoUpdateHash: \
-				Nothing to process\n");
+		dprintk(KERN_INFO "PDrvCryptoUpdateHash: "\
+				"Nothing to process\n");
 		return;
 	}
 
@@ -281,8 +281,8 @@ void PDrvCryptoUpdateHash(struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
 				/*We'll keep some data for the final */
 				pSHAState->nChunkLength =
 					HASH_BLOCK_BYTES_LENGTH;
-				dprintk(KERN_INFO "PDrvCryptoUpdateHash: \
-					Done: Chunck=%u; Processed=%u\n",
+				dprintk(KERN_INFO "PDrvCryptoUpdateHash: "\
+					"Done: Chunk=%u; Processed=%u\n",
 					pSHAState->nChunkLength,
 					pSHAState->nBytesProcessed);
 				return;
@@ -367,8 +367,8 @@ void PDrvCryptoUpdateHash(struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *pSHAState,
 		}
 	}
 
-	dprintk(KERN_INFO "PDrvCryptoUpdateHash: Done: \
-		Chunck=%u; Processed=%u\n",
+	dprintk(KERN_INFO "PDrvCryptoUpdateHash: Done: "\
+		"Chunk=%u; Processed=%u\n",
 		pSHAState->nChunkLength, pSHAState->nBytesProcessed);
 }
 
@@ -756,6 +756,9 @@ static int digest_update(struct shash_desc *desc, const u8 *data,
 {
 	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *state = shash_desc_ctx(desc);
 
+	/* Make sure SHA/MD5 HWA is accessible */
+	tf_delayed_secure_resume();
+
 	PDrvCryptoLockUnlockHWA(PUBLIC_CRYPTO_HWA_SHA, LOCK_HWA);
 
 	SCXPublicCryptoEnableClock(PUBLIC_CRYPTO_SHA2MD5_CLOCK_REG);
@@ -773,6 +776,9 @@ static int digest_final(struct shash_desc *desc, u8 *out)
 {
 	int ret;
 	struct PUBLIC_CRYPTO_SHA_OPERATION_STATE *state = shash_desc_ctx(desc);
+
+	/* Make sure SHA/MD5 HWA is accessible */
+	tf_delayed_secure_resume();
 
 	PDrvCryptoLockUnlockHWA(PUBLIC_CRYPTO_HWA_SHA, LOCK_HWA);
 

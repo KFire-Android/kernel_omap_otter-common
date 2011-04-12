@@ -529,14 +529,82 @@ int SCXLNXCommHibernate(struct SCXLNX_COMM *pComm)
 	return 0;
 }
 
+#ifdef CONFIG_SMC_KERNEL_CRYPTO
+#define DELAYED_RESUME_NONE	0
+#define DELAYED_RESUME_PENDING	1
+#define DELAYED_RESUME_ONGOING	2
+
+static DEFINE_SPINLOCK(tf_delayed_resume_lock);
+static int tf_need_delayed_resume = DELAYED_RESUME_NONE;
+
+int tf_delayed_secure_resume(void)
+{
+	int ret;
+	union SCX_COMMAND_MESSAGE message;
+	union SCX_ANSWER_MESSAGE answer;
+	struct SCXLNX_DEVICE *dev = SCXLNXGetDevice();
+
+	spin_lock(&tf_delayed_resume_lock);
+	if (likely(tf_need_delayed_resume == DELAYED_RESUME_NONE)) {
+		spin_unlock(&tf_delayed_resume_lock);
+		return 0;
+	}
+
+	if (unlikely(tf_need_delayed_resume == DELAYED_RESUME_ONGOING)) {
+		spin_unlock(&tf_delayed_resume_lock);
+
+		/*
+		 * Wait for the other caller to actually finish the delayed
+		 * resume operation
+		 */
+		while (tf_need_delayed_resume != DELAYED_RESUME_NONE)
+			cpu_relax();
+
+		return 0;
+	}
+
+	tf_need_delayed_resume = DELAYED_RESUME_ONGOING;
+	spin_unlock(&tf_delayed_resume_lock);
+
+	/*
+	 * When the system leaves CORE OFF, HWA are configured as secure.  We
+	 * need them as public for the Linux Crypto API.
+	 */
+	memset(&message, 0, sizeof(message));
+
+	message.sHeader.nMessageType = SCX_MESSAGE_TYPE_MANAGEMENT;
+	message.sHeader.nMessageSize =
+		(sizeof(struct SCX_COMMAND_MANAGEMENT) -
+			sizeof(struct SCX_COMMAND_HEADER))/sizeof(u32);
+	message.sManagementMessage.nCommand =
+		SCX_MANAGEMENT_RESUME_FROM_CORE_OFF;
+
+	ret = SCXLNXCommSendReceive(&dev->sm, &message, &answer, NULL, false);
+	if (ret) {
+		printk(KERN_ERR "SCXLNXCommResume(%p): "
+			"SCXLNXCommSendReceive failed (error %d)!\n",
+			&dev->sm, ret);
+
+		unregister_smc_public_crypto_digest();
+		unregister_smc_public_crypto_aes();
+		return ret;
+	}
+
+	if (answer.sHeader.nErrorCode) {
+		unregister_smc_public_crypto_digest();
+		unregister_smc_public_crypto_aes();
+	}
+
+	spin_lock(&tf_delayed_resume_lock);
+	tf_need_delayed_resume = DELAYED_RESUME_NONE;
+	spin_unlock(&tf_delayed_resume_lock);
+
+	return answer.sHeader.nErrorCode;
+}
+#endif
 
 int SCXLNXCommResume(struct SCXLNX_COMM *pComm)
 {
-#ifdef CONFIG_SMC_KERNEL_CRYPTO
-	union SCX_COMMAND_MESSAGE message;
-	union SCX_ANSWER_MESSAGE answer;
-	int ret;
-#endif
 
 	dprintk(KERN_INFO "SCXLNXCommResume()\n");
 	#if 0
@@ -552,39 +620,11 @@ int SCXLNXCommResume(struct SCXLNX_COMM *pComm)
 	#endif
 
 #ifdef CONFIG_SMC_KERNEL_CRYPTO
-	/*
-	 * When the system leaves CORE OFF, HWA are configured as secure.  We
-	 * need them as public for the Linux Crypto API.
-	 */
-	memset(&message, 0, sizeof(message));
-
-	message.sHeader.nMessageType = SCX_MESSAGE_TYPE_MANAGEMENT;
-	message.sHeader.nMessageSize =
-		(sizeof(struct SCX_COMMAND_MANAGEMENT) -
-			sizeof(struct SCX_COMMAND_HEADER))/sizeof(u32);
-	message.sManagementMessage.nCommand =
-		SCX_MANAGEMENT_RESUME_FROM_CORE_OFF;
-
-	ret = SCXLNXCommSendReceive(pComm, &message, &answer, NULL, false);
-	if (ret) {
-		dprintk(KERN_ERR "SCXLNXCommResume(%p): "
-			"SCXLNXCommSendReceive failed (error %d)!\n",
-			pComm, ret);
-
-		unregister_smc_public_crypto_digest();
-		unregister_smc_public_crypto_aes();
-		return ret;
-	}
-
-	if (answer.sHeader.nErrorCode) {
-		unregister_smc_public_crypto_digest();
-		unregister_smc_public_crypto_aes();
-	}
-
-	return answer.sHeader.nErrorCode;
-#else
-	return 0;
+	spin_lock(&tf_delayed_resume_lock);
+	tf_need_delayed_resume = DELAYED_RESUME_PENDING;
+	spin_unlock(&tf_delayed_resume_lock);
 #endif
+	return 0;
 }
 
 /*--------------------------------------------------------------------------
@@ -788,7 +828,7 @@ int SCXLNXCommStart(struct SCXLNX_COMM *pComm,
 	 */
 	SCXLNXCommSetCurrentTime(pComm);
 
-	/* Workaround for issue #6082 */
+	/* Workaround for issue #6081 */
 	disable_nonboot_cpus();
 
 	/*
@@ -864,13 +904,13 @@ loop:
 	}
 	#endif
 
-	/* Workaround for issue #6082 */
+	/* Workaround for issue #6081 */
 	enable_nonboot_cpus();
 
 	goto exit;
 
 error2:
-	/* Workaround for issue #6082 */
+	/* Workaround for issue #6081 */
 	enable_nonboot_cpus();
 
 	spin_lock(&(pComm->lock));

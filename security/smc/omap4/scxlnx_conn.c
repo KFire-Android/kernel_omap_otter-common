@@ -18,7 +18,7 @@
  */
 
 #include <asm/atomic.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/list.h>
@@ -142,8 +142,6 @@ static int SCXLNXConnMapShmem(
 			goto error;
 		}
 
-		atomic_inc(&(pConn->nShmemAllocated));
-
 		/* no descriptor available, allocate a new one */
 
 		pShmemDesc = (struct SCXLNX_SHMEM_DESC *) internal_kmalloc(
@@ -160,9 +158,11 @@ static int SCXLNXConnMapShmem(
 		pShmemDesc->nType = SCXLNX_SHMEM_TYPE_REGISTERED_SHMEM;
 		atomic_set(&pShmemDesc->nRefCnt, 1);
 		INIT_LIST_HEAD(&(pShmemDesc->list));
+
+		atomic_inc(&(pConn->nShmemAllocated));
 	} else {
 		/* take the first free shared memory descriptor */
-		pShmemDesc = list_entry(pConn->sFreeSharedMemoryList.next,
+		pShmemDesc = list_first_entry(&(pConn->sFreeSharedMemoryList),
 			struct SCXLNX_SHMEM_DESC, list);
 		list_del(&(pShmemDesc->list));
 	}
@@ -413,7 +413,7 @@ static void SCXLNXSharedMemoryCleanupList(
 	while (!list_empty(pList)) {
 		struct SCXLNX_SHMEM_DESC *pShmemDesc;
 
-		pShmemDesc = list_entry(pList->next, struct SCXLNX_SHMEM_DESC,
+		pShmemDesc = list_first_entry(pList, struct SCXLNX_SHMEM_DESC,
 			list);
 
 		SCXLNXConnUnmapShmem(pConn, pShmemDesc, 1);
@@ -1431,11 +1431,11 @@ int SCXLNXConnOpen(struct SCXLNX_DEVICE *pDevice,
 
 	memset(pConn, 0, sizeof(*pConn));
 
-	INIT_LIST_HEAD(&(pConn->list));
 	pConn->nState = SCXLNX_CONN_STATE_NO_DEVICE_CONTEXT;
 	pConn->pDevice = pDevice;
 	spin_lock_init(&(pConn->stateLock));
 	atomic_set(&(pConn->nPendingOpCounter), 0);
+	INIT_LIST_HEAD(&(pConn->list));
 
 	/*
 	 * Initialize the shared memory
@@ -1450,6 +1450,13 @@ int SCXLNXConnOpen(struct SCXLNX_DEVICE *pDevice,
 	 */
 	SCXPublicCryptoInitDeviceContext(pConn);
 #endif
+
+	/*
+	 * Attach the connection to the device.
+	 */
+	spin_lock(&(pDevice->connsLock));
+	list_add(&(pConn->list), &(pDevice->conns));
+	spin_unlock(&(pDevice->connsLock));
 
 	/*
 	 * Successful completion.
@@ -1518,6 +1525,10 @@ void SCXLNXConnClose(struct SCXLNX_CONNECTION *pConn)
 	 * Clean up the shared memory
 	 */
 	SCXLNXConnCleanupSharedMemory(pConn);
+
+	spin_lock(&(pConn->pDevice->connsLock));
+	list_del(&(pConn->list));
+	spin_unlock(&(pConn->pDevice->connsLock));
 
 	internal_kfree(pConn);
 

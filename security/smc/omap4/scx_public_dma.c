@@ -23,7 +23,6 @@
 #include <asm/atomic.h>
 
 static atomic_t g_dmaEventFlag = ATOMIC_INIT(0);
-static DECLARE_WAIT_QUEUE_HEAD(g_dmaWaitQueue);
 
 /*------------------------------------------------------------------------ */
 /*
@@ -33,8 +32,6 @@ static DECLARE_WAIT_QUEUE_HEAD(g_dmaWaitQueue);
 static void scxPublicDMACallback(int lch, u16 ch_status, void *data)
 {
 	atomic_inc(&g_dmaEventFlag);
-
-	wake_up(&g_dmaWaitQueue);
 }
 
 /*------------------------------------------------------------------------ */
@@ -106,7 +103,8 @@ void scxPublicDMAClearChannel(int lch)
 
 void scxPublicDMAWait(int nr_of_cb)
 {
-	wait_event(g_dmaWaitQueue, (atomic_read(&g_dmaEventFlag) == nr_of_cb));
+	while (atomic_read(&g_dmaEventFlag) < nr_of_cb)
+		cpu_relax();
 }
 
 /*------------------------------------------------------------------------ */

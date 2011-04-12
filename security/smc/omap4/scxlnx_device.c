@@ -18,7 +18,7 @@
  */
 
 #include <asm/atomic.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/mm.h>
@@ -414,13 +414,6 @@ static int SCXLNXDeviceOpen(struct inode *inode, struct file *file)
 		goto error;
 	}
 
-	/*
-	 * Attach the connection to the device.
-	 */
-	spin_lock(&(pDevice->connsLock));
-	list_add(&(pConn->list), &(pDevice->conns));
-	spin_unlock(&(pDevice->connsLock));
-
 	file->private_data = pConn;
 
 	/*
@@ -464,9 +457,6 @@ static int SCXLNXDeviceRelease(struct inode *inode, struct file *file)
 		imajor(inode), iminor(inode), file);
 
 	pConn = SCXLNXConnFromFile(file);
-	spin_lock(&g_SCXLNXDevice.connsLock);
-	list_del(&pConn->list);
-	spin_unlock(&g_SCXLNXDevice.connsLock);
 	SCXLNXConnClose(pConn);
 
 	dprintk(KERN_INFO "SCXLNXDeviceRelease(%p): Success\n", file);
@@ -686,7 +676,7 @@ static int SCXLNXDeviceShutdown(struct sys_device *sysdev)
 
 static int SCXLNXDeviceSuspend(struct sys_device *sysdev, pm_message_t state)
 {
-	printk(KERN_INFO "SCXLNXDeviceSuspend: Enter\n");
+	dprintk(KERN_INFO "SCXLNXDeviceSuspend: Enter\n");
 	return SCXLNXCommPowerManagement(&g_SCXLNXDevice.sm,
 		SCXLNX_POWER_OPERATION_HIBERNATE);
 }

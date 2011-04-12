@@ -38,4 +38,7 @@ u32 read_mpidr(void);
 void tf_l4sec_clkdm_wakeup(bool use_spin_lock, bool wakelock);
 void tf_l4sec_clkdm_allow_idle(bool use_spin_lock, bool wakeunlock);
 
+/* Delayed secure resume */
+int tf_delayed_secure_resume(void);
+
 #endif

@@ -22,13 +22,13 @@
 #include "scx_public_dma.h"
 #include "scxlnx_mshield.h"
 
+#include <linux/io.h>
 #include <linux/interrupt.h>
 #include <linux/crypto.h>
 #include <linux/scatterlist.h>
 #include <crypto/algapi.h>
 #include <crypto/scatterwalk.h>
 #include <crypto/aes.h>
-#include <asm/io.h>
 #include <mach/io.h>
 
 /*
@@ -290,8 +290,9 @@ bool PDrvCryptoUpdateAES(struct PUBLIC_CRYPTO_AES_OPERATION_STATE *pAESState,
 		return true;
 	}
 
-	if (AES_CTRL_GET_DIRECTION(INREG32(&pAESReg_t->AES_CTRL)) !=
-		AES_CTRL_GET_DIRECTION(pAESState->CTRL)) {
+	if ((AES_CTRL_GET_DIRECTION(INREG32(&pAESReg_t->AES_CTRL)) !=
+		AES_CTRL_GET_DIRECTION(pAESState->CTRL)) &&
+		!pAESState->key_is_public) {
 		dprintk(KERN_WARNING "HWA configured for another direction\n");
 		return false;
 	}
@@ -907,6 +908,9 @@ static int aes_operate(struct ablkcipher_request *req)
 	unsigned long flags;
 	int err;
 
+	/* Make sure AES HWA is accessible */
+	tf_delayed_secure_resume();
+
 	spin_lock_irqsave(&aes_ctx->lock, flags);
 	err = ablkcipher_enqueue_request(&aes_ctx->queue, req);
 	spin_unlock_irqrestore(&aes_ctx->lock, flags);
@@ -952,6 +956,9 @@ static void aes_single_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
 {
 	struct PUBLIC_CRYPTO_AES_OPERATION_STATE *state = crypto_tfm_ctx(tfm);
 
+	/* Make sure AES HWA is accessible */
+	tf_delayed_secure_resume();
+
 	state->CTRL |= AES_CTRL_DIRECTION_ENCRYPT;
 
 	PDrvCryptoLockUnlockHWA(PUBLIC_CRYPTO_HWA_AES1, LOCK_HWA);
@@ -967,6 +974,9 @@ static void aes_single_decrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
 {
 	struct PUBLIC_CRYPTO_AES_OPERATION_STATE *state =
 		crypto_tfm_ctx(tfm);
+
+	/* Make sure AES HWA is accessible */
+	tf_delayed_secure_resume();
 
 	state->CTRL &= ~(AES_CTRL_DIRECTION_ENCRYPT);
 	state->CTRL |= AES_CTRL_DIRECTION_DECRYPT;

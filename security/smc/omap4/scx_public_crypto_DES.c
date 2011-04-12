@@ -21,7 +21,7 @@
 #include "scx_public_crypto.h"
 #include "scx_public_dma.h"
 
-#include <asm/io.h>
+#include <linux/io.h>
 #include <mach/io.h>
 
 /*
