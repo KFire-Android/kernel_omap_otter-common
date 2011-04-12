@@ -293,7 +293,7 @@ int hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 	unsigned int port = hsi_ch->hsi_port->port_number;
 	unsigned int channel = hsi_ch->channel_number;
 	struct hsi_dev *hsi_ctrl = hsi_ch->hsi_port->hsi_controller;
-	u16 ccr;
+	u16 ccr, gdd_csr;
 	long buff_offset;
 	u32 status_reg;
 
@@ -314,6 +314,11 @@ int hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 	status_reg &= hsi_inl(hsi_ctrl->base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 
 	hsi_outw_and(~HSI_CCR_ENABLE, hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
+
+	/* Clear CSR register by reading it, as it is cleared automaticaly */
+	/* by HW after SW read. */
+	gdd_csr = hsi_inw(hsi_ctrl->base, HSI_GDD_CSR_REG(lch));
+
 	hsi_outl_and(~HSI_GDD_LCH(lch), hsi_ctrl->base,
 		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	hsi_outl(HSI_GDD_LCH(lch), hsi_ctrl->base,
@@ -348,7 +353,7 @@ int hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 {
 	int lch = hsi_ch->read_data.lch;
 	struct hsi_dev *hsi_ctrl = hsi_ch->hsi_port->hsi_controller;
-	u16 ccr;
+	u16 ccr, gdd_csr;
 	u32 status_reg;
 
 	/* Re-enable interrupts for polling if needed */
@@ -372,6 +377,11 @@ int hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 	status_reg &= hsi_inl(hsi_ctrl->base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 
 	hsi_outw_and(~HSI_CCR_ENABLE, hsi_ctrl->base, HSI_GDD_CCR_REG(lch));
+
+	/* Clear CSR register by reading it, as it is cleared automaticaly */
+	/* by HW after SW read */
+	gdd_csr = hsi_inw(hsi_ctrl->base, HSI_GDD_CSR_REG(lch));
+
 	hsi_outl_and(~HSI_GDD_LCH(lch), hsi_ctrl->base,
 		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	hsi_outl(HSI_GDD_LCH(lch), hsi_ctrl->base,
@@ -450,6 +460,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 
 	hsi_outl_and(~HSI_GDD_LCH(gdd_lch), base,
 		     HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
+	/* Warning : CSR register is cleared automaticaly by HW after SW read */
 	gdd_csr = hsi_inw(base, HSI_GDD_CSR_REG(gdd_lch));
 
 	if (!(gdd_csr & HSI_CSR_TOUT)) {
