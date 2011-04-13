@@ -734,6 +734,12 @@ static struct omap_board_mux board_mux[] __initdata = {
 #define board_mux	NULL
 #endif
 
+/* Dummy keypad to get compilation going for panda */
+void keyboard_mux_init(void)
+{
+	return;
+}
+
 /*
  * As OMAP4430 mux HSI and USB signals, when HSI is used (for instance HSI
  * modem is plugged) we should configure HSI pad conf and disable some USB
