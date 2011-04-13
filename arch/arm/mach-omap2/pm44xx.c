@@ -320,7 +320,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_uart_resume_idle(1);
 		omap_uart_resume_idle(2);
 		omap_uart_resume_idle(3);
-		omap_hsi_resume_idle();
+
 	}
 
 	if (core_next_state < PWRDM_POWER_INACTIVE) {
@@ -506,6 +506,8 @@ restore:
 	 * Enable all wakeup sources post wakeup
 	 */
 	omap4_wakeupgen_set_all(cpu_id);
+
+	omap_hsi_exit_suspend();
 
 	return 0;
 }

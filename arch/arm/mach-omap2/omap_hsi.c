@@ -231,7 +231,7 @@ int omap_hsi_prepare_idle(void)
 
 
 /**
-* omap_hsi_resume_idle - Prepare HSI for wakeup from low power
+* omap_hsi_exit_suspend - Prepare HSI for wakeup from suspend mode (RET/OFF)
 *
 * Return value :* -ENODEV if HSI platform device or HSI controller or CAWAKE
 *		  Padconf has not been found
@@ -239,7 +239,7 @@ int omap_hsi_prepare_idle(void)
 *		* else 0.
 *
 */
-int omap_hsi_resume_idle(void)
+int omap_hsi_exit_suspend(void)
 {
 	struct platform_device *pdev;
 	struct hsi_dev *hsi_ctrl;
