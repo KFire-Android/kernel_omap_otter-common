@@ -2389,7 +2389,7 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	volt = node->prio;
 
 	/* Disable smartreflex module across voltage and frequency scaling */
-	omap_smartreflex_disable(voltdm);
+	omap_smartreflex_disable_reset_volt(voltdm);
 
 	if (curr_volt == volt) {
 		is_volt_scaled = 1;
