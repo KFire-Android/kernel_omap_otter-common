@@ -144,8 +144,13 @@ static void __init sr_set_testing_nvalues(struct omap_sr_dev_data *dev_data,
 
 	sr_data->senn_mod = dev_data->test_sennenable;
 	sr_data->senp_mod = dev_data->test_senpenable;
-	for (i = 0; i < dev_data->volts_supported; i++)
+	for (i = 0; i < dev_data->volts_supported; i++) {
 		dev_data->volt_data[i].sr_nvalue = dev_data->test_nvalues[i];
+		pr_debug("%s: dom %s[%d]: using TEST ntarget 0x%08X\n",
+				__func__,
+				dev_data->vdd_name, i,
+				dev_data->test_nvalues[i]);
+	}
 }
 
 static void __init sr_set_nvalues(struct omap_sr_dev_data *dev_data,
