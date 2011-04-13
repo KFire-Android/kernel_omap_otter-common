@@ -311,6 +311,9 @@ static struct workqueue_struct *ipu_clean_up;
 struct work_struct clean;
 static DECLARE_COMPLETION(ipu_clean_up_comp);
 static bool recover;
+#ifdef CONFIG_DUCATI_WATCH_DOG
+static bool wd_error;
+#endif
 
 /* Latency cstrs */
 #ifdef CONFIG_OMAP_PM
@@ -570,6 +573,20 @@ complete_exit:
  */
 static void ipu_pm_clean_work(struct work_struct *work)
 {
+
+#ifdef CONFIG_DUCATI_WATCH_DOG
+	/* Notify devh about WD error */
+	if (wd_error) {
+		ipu_pm_notify_event(0, NULL);
+		wd_error = false;
+	}
+#endif
+
+#ifdef CONFIG_SYSLINK_IPU_SELF_HIBERNATION
+	/* Stop timer */
+	if (sys_rproc->dmtimer != NULL)
+		omap_dm_timer_stop(sys_rproc->dmtimer);
+#endif
 	ipu_pm_clean_res();
 }
 
@@ -3221,10 +3238,8 @@ static int ipu_pm_timer_state(int event)
 		} else if (params->hib_timer_state == PM_HIB_TIMER_WDRESET) {
 			/* notify devh to begin error recovery here */
 			pr_debug("Timer ISR: Trigger WD reset + recovery\n");
+			wd_error = true;
 			ipu_pm_recover_schedule();
-			ipu_pm_notify_event(0, NULL);
-			if (sys_rproc->dmtimer != NULL)
-				omap_dm_timer_stop(sys_rproc->dmtimer);
 			params->hib_timer_state = PM_HIB_TIMER_OFF;
 #endif
 		}
