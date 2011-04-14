@@ -34,10 +34,6 @@
 
 #include "ocpdefs.h"
 
-#if defined(LDM_PLATFORM) && !defined(PVR_DRI_DRM_NOT_PCI)
-#include <plat/omap_device.h>
-#endif
-
 SYS_DATA* gpsSysData = (SYS_DATA*)IMG_NULL;
 SYS_DATA  gsSysData;
 
@@ -426,11 +422,6 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 		
 		psDeviceNode = psDeviceNode->psNext;
 	}
-
-#if defined(LDM_PLATFORM) && !defined(PVR_DRI_DRM_NOT_PCI)
-	omap_device_set_rate(&gpsPVRLDMDev->dev,
-			&gpsPVRLDMDev->dev, SYS_SGX_CLOCK_SPEED);
-#endif
 
 	eError = EnableSystemClocksWrap(gpsSysData);
 	if (eError != PVRSRV_OK)

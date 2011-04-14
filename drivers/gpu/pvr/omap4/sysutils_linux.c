@@ -41,6 +41,11 @@
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 
+#if defined(LDM_PLATFORM) && !defined(PVR_DRI_DRM_NOT_PCI)
+#include <plat/omap_device.h>
+#endif
+
+
 #define	ONE_MHZ	1000000
 #define	HZ_TO_MHZ(m) ((m) / ONE_MHZ)
 
@@ -153,6 +158,9 @@ PVRSRV_ERROR EnableSGXClocks(SYS_DATA *psSysData)
 	PVR_DPF((PVR_DBG_MESSAGE, "EnableSGXClocks: Enabling SGX Clocks"));
 
 #if defined(LDM_PLATFORM) && !defined(PVR_DRI_DRM_NOT_PCI)
+	omap_device_set_rate(&gpsPVRLDMDev->dev,
+			&gpsPVRLDMDev->dev, SYS_SGX_CLOCK_SPEED);
+
 	{
 
 		int res = pm_runtime_get_sync(&gpsPVRLDMDev->dev);
@@ -198,6 +206,8 @@ IMG_VOID DisableSGXClocks(SYS_DATA *psSysData)
 			PVR_DPF((PVR_DBG_ERROR, "DisableSGXClocks: pm_runtime_put_sync failed (%d)", -res));
 		}
 	}
+	omap_device_set_rate(&gpsPVRLDMDev->dev,
+			&gpsPVRLDMDev->dev, 0);
 #endif
 
 	
