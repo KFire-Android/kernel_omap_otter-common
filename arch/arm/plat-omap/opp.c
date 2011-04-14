@@ -23,26 +23,6 @@
 #include <plat/omap_device.h>
 #include <plat/voltage.h>
 
-/**
- * struct omap_opp - OMAP OPP description structure
- * @enabled:	true/false - marking this OPP as enabled/disabled
- * @rate:	Frequency in hertz
- * @u_volt:	Nominal voltage in microvolts corresponding to this OPP
- * @opp_id:	opp identifier (deprecated)
- *
- * This structure stores the OPP information for a given domain.
- */
-struct omap_opp {
-	struct list_head node;
-
-	bool enabled;
-	unsigned long rate;
-	unsigned long u_volt;
-	u8 opp_id;
-
-	struct device_opp *dev_opp;  /* containing device_opp struct */
-};
-
 struct device_opp {
 	struct list_head node;
 
@@ -455,11 +435,13 @@ void opp_populate_rate_fns(struct device *dev,
 
 /* wrapper to reuse converting opp_def to opp struct */
 static void omap_opp_populate(struct omap_opp *opp,
-			      const struct omap_opp_def *opp_def)
+			      const struct omap_opp_def *opp_def,
+			      struct device_opp *dev_opp)
 {
 	opp->rate = opp_def->freq;
 	opp->enabled = opp_def->enabled;
 	opp->u_volt = opp_def->u_volt;
+	opp->dev_opp = dev_opp;
 }
 
 /**
@@ -499,7 +481,6 @@ int opp_add(const struct omap_opp_def *opp_def)
 			break;
 		}
 	}
-
 	if (!dev_opp) {
 		/* Allocate a new device OPP table */
 		dev_opp = kzalloc(sizeof(struct device_opp), GFP_KERNEL);
@@ -518,7 +499,7 @@ int opp_add(const struct omap_opp_def *opp_def)
 	if (WARN_ON(!new_opp))
 		/* FIXME: free dev_opp ? */
 		return -ENOMEM;
-	omap_opp_populate(new_opp, opp_def);
+	omap_opp_populate(new_opp, opp_def, dev_opp);
 
 	/* Insert new OPP in order of increasing frequency */
 	head = &dev_opp->opp_list;

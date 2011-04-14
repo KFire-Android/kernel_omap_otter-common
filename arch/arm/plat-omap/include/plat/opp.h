@@ -22,6 +22,26 @@
 #include <plat/voltage.h>
 
 /**
+ * struct omap_opp - OMAP OPP description structure
+ * @enabled:    true/false - marking this OPP as enabled/disabled
+ * @rate:       Frequency in hertz
+ * @u_volt:     Nominal voltage in microvolts corresponding to this OPP
+ * @opp_id:     opp identifier (deprecated)
+ *
+ * This structure stores the OPP information for a given domain.
+ */
+struct omap_opp {
+        struct list_head node;
+
+        bool enabled;
+        unsigned long rate;
+        unsigned long u_volt;
+        u8 opp_id;
+
+        struct device_opp *dev_opp;  /* containing device_opp struct */
+};
+
+/**
  * struct omap_opp_def - OMAP OPP Definition
  * @enabled:	True/false - is this OPP enabled/disabled by default
  * @freq:	Frequency in hertz corresponding to this OPP
@@ -59,8 +79,6 @@ struct omap_opp_def {
 	.freq		= _freq,		\
 	.u_volt		= _uv,			\
 }
-
-struct omap_opp;
 
 #ifdef CONFIG_PM
 
