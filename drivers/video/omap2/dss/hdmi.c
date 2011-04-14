@@ -1440,6 +1440,8 @@ static void hdmi_work_queue(struct work_struct *ws)
 		DSSINFO("Physical Connect\n");
 
 		/* turn on clocks on connect */
+		edid_set = false;
+		custom_set = true;
 		hdmi_reconfigure(dssdev);
 		mutex_unlock(&hdmi.lock_aux);
 		hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
@@ -1450,6 +1452,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 		if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 			/* HDMI is disabled, no need to process */
 			goto done;
+		custom_set = false;
 	}
 
 done:
@@ -2257,6 +2260,7 @@ static int hdmi_read_edid(struct omap_video_timings *dp)
 		ret = HDMI_CORE_DDC_READEDID(HDMI_CORE_SYS, edid,
 							HDMI_EDID_MAX_LENGTH);
 	if (ret != 0) {
+		edid_set = false;
 		printk(KERN_WARNING "HDMI failed to read E-EDID\n");
 	} else {
 		if (!memcmp(edid, header, sizeof(header))) {
