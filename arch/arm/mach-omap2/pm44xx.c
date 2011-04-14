@@ -209,7 +209,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
 	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
 
-	if (mpu_next_state < PWRDM_POWER_ON) {
+	if (mpu_next_state < PWRDM_POWER_INACTIVE) {
 		/* Disable SR for MPU VDD */
 		omap_smartreflex_disable(vdd_mpu);
 		/* Enable AUTO RET for mpu */
@@ -228,9 +228,6 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		 * for now. Needs a relook to see if this can be
 		 * optimized.
 		 */
-		/* Disable SR for CORE and IVA VDD*/
-		omap_smartreflex_disable(vdd_iva);
-		omap_smartreflex_disable(vdd_core);
 
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
@@ -249,6 +246,11 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 			omap2_gpio_prepare_for_idle(0);
 
 		omap4_trigger_ioctrl();
+	}
+	if (core_next_state < PWRDM_POWER_INACTIVE) {
+		/* Disable SR for CORE and IVA VDD*/
+		omap_smartreflex_disable(vdd_iva);
+		omap_smartreflex_disable(vdd_core);
 
 		if (!omap4_device_off_read_next_state()) {
 			/* Enable AUTO RET for IVA and CORE */
@@ -258,8 +260,9 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK,
 			0x2 << OMAP4430_AUTO_CTRL_VDD_CORE_L_SHIFT,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
-		}
+			}
 	}
+
 
 	/* FIXME  This call is not needed now for retention support and global
 	 * suspend resume support. All the required actions are taken based
@@ -301,15 +304,6 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 #endif
 
 	if (core_next_state < PWRDM_POWER_ON) {
-		if (!omap4_device_off_read_next_state()) {
-			/* Disable AUTO RET for IVA and CORE */
-			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK,
-			0x0,
-			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
-			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK,
-			0x0,
-			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
-		}
 
 		if (omap4_device_off_read_prev_state())
 			omap2_gpio_resume_after_idle(1);
@@ -327,13 +321,27 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_uart_resume_idle(2);
 		omap_uart_resume_idle(3);
 		omap_hsi_resume_idle();
+	}
+
+	if (core_next_state < PWRDM_POWER_INACTIVE) {
+
+		if (!omap4_device_off_read_next_state()) {
+				/* Disable AUTO RET for IVA and CORE */
+			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK,
+			0x0,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
+			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_CORE_L_MASK,
+			0x0,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
+		}
 
 		/* Enable SR for IVA and CORE */
 		omap_smartreflex_enable(vdd_iva);
 		omap_smartreflex_enable(vdd_core);
 	}
 
-	if (mpu_next_state < PWRDM_POWER_ON) {
+
+	if (mpu_next_state < PWRDM_POWER_INACTIVE) {
 		if (!omap4_device_off_read_next_state())
 			/* Disable AUTO RET for mpu */
 			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_MPU_L_MASK,
