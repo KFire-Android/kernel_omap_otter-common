@@ -1416,22 +1416,11 @@ static void hdmi_work_queue(struct work_struct *ws)
 		last_connect = ktime_get();
 
 	if (action & HDMI_CONNECT) {
-		if (!edid_set && !custom_set) {
-			/*
-			 * Schedule hot-plug-notify in 1 sec in case no HPD
-			 * event gets generated
-			 */
-			if (!delayed_work_pending(&hot_plug_notify_work))
-				queue_delayed_work(irq_wq,
-						&hot_plug_notify_work,
-						msecs_to_jiffies(1000));
-		} else {
-			if (custom_set)
-				user_hpd_state = false;
+		if (custom_set)
+			user_hpd_state = false;
 
-			if (!user_hpd_state && hdmi_power == HDMI_POWER_FULL)
-				set_hdmi_hot_plug_status(dssdev, true);
-		}
+		if (!user_hpd_state && (hdmi_power == HDMI_POWER_FULL))
+			set_hdmi_hot_plug_status(dssdev, true);
 	}
 
 	if ((action & HDMI_CONNECT) && (video_power == HDMI_POWER_MIN) &&
@@ -1467,12 +1456,6 @@ done:
 		mutex_lock(&hdmi.lock);
 		mutex_lock(&hdmi.lock_aux);
 
-		if (hdmi_power != HDMI_POWER_FULL || !hdmi_connected) {
-			DSSINFO("irqstatus=0x%08x ignoring FIRST_HPD when "
-				"hdmi_connected = %d, hdmi_power = %d\n",
-				r, hdmi_connected, hdmi_power);
-			goto done;
-		}
 		/*
 		 * HDMI should already be full on. We use this to read EDID
 		 * the first time we enable HDMI via HPD.
@@ -1480,10 +1463,18 @@ done:
 		DSSINFO("Connect 1 - Enabling display\n");
 		hdmi_reconfigure(dssdev);
 
+		if (!hdmi_connected) {
+			DSSINFO("irqstatus=0x%08x ignoring FIRST_HPD when "
+				"hdmi_connected = %d, hdmi_power = %d\n",
+				r, hdmi_connected, hdmi_power);
+			goto hpd_modify;
+		}
+
 		set_hdmi_hot_plug_status(dssdev, true);
 		/* ignore return value for now */
 	}
 
+hpd_modify:
 	if (r & HDMI_HPD_MODIFY) {
 		/*
 		 * HDMI HPD state low followed by a HPD state high
@@ -1943,7 +1934,7 @@ static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
 		if (temp_hsync == timing_hsync && temp_vsync == timing_vsync) {
 			code = i;
 			cm.code = code_index[i];
-			cm.mode = code < 14;
+			cm.mode = code < OMAP_HDMI_TIMINGS_VESA_START;
 			DSSDBG("Video code = %d mode = %s\n",
 			cm.code, cm.mode ? "CEA" : "VESA");
 			break;
