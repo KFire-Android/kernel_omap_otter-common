@@ -154,6 +154,9 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
 	u32 reg;
 
 	if (power_on) {
+		/* Allow 1ms for pbias to ramp up voltage */
+		mdelay(1);
+
 		reg = omap4_ctrl_pad_readl(control_pbias_offset);
 		reg |= OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK;
 		if ((1 << vdd) <= MMC_VDD_165_195)
