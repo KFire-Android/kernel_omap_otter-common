@@ -83,7 +83,7 @@ static int mode_to_mg[8][2] = {
 
 /* interval between samples for the different rates, in msecs */
 static const unsigned int cma3000_measure_interval[] = {
-	0, 1000 / 100, 1000 / 400, 1000 / 40,
+	0, 1000 / 10, 1000 / 400, 1000 / 40,
 };
 
 static uint32_t accl_debug;
