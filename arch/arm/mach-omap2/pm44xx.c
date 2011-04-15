@@ -760,14 +760,18 @@ static void __init prcm_clear_statdep_regs(void)
 
 	pr_info("%s: Clearing static depndencies\n", __func__);
 
+#if 0
 	/*
-	 * REVISIT: Seen issue with MPU/DSP -> L3_2 and L4CFG. Keeping
+	 * REVISIT: Seen SGX issues with MPU -> EMIF. Keeping
 	 * it enabled.
+	 * REVISIT: Seen issue with MPU/DSP -> L3_2 and L4CFG. 
+	 * Keeping them enabled
 	 */
-	/* MPU towards EMIF, L3_2 and L4CFG clockdomains */
+	/* MPU towards EMIF clockdomains */
 	reg = OMAP4430_MEMIF_STATDEP_MASK;
 	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
 		OMAP4_CM_MPU_STATICDEP_OFFSET);
+#endif
 
 	 /*
 	  * REVISIT: Issue seen with Ducati towards EMIF, L3_2, L3_1,
