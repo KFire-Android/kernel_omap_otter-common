@@ -1078,9 +1078,6 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	dssdev->panel.timings = all_timings_direct[code];
 
-	DSSINFO("%s:%d res=%dx%d ", hdmi.mode ? "CEA" : "VESA", hdmi.code,
-		dssdev->panel.timings.x_res, dssdev->panel.timings.y_res);
-
 	clkin = 3840; /* 38.4 mHz */
 	n = 15; /* this is a constant for our math */
 
@@ -1170,6 +1167,10 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	hdmi.cfg.hdmi_dvi = hdmi_has_ieee_id((u8 *)edid) && hdmi.mode;
 	hdmi.cfg.video_format = hdmi.code;
 	hdmi.cfg.supports_ai = hdmi_ai_supported(edid);
+
+	DSSINFO("%s:%d res=%dx%d ", hdmi.cfg.hdmi_dvi ? "CEA" : "VESA",
+		hdmi.code, dssdev->panel.timings.x_res,
+		dssdev->panel.timings.y_res);
 
 	if ((hdmi.mode)) {
 		switch (hdmi.code) {
@@ -1356,8 +1357,14 @@ static void hdmi_work_queue(struct work_struct *ws)
 	if (r & (HDMI_CONNECT | HDMI_DISCONNECT))
 		action = (hdmi_is_connected()) ? HDMI_CONNECT : HDMI_DISCONNECT;
 
+	DSSDBG("\n\n");
+	DSSDBG("<%s> action = %d, interrupt_q = 0x%x, hdmi_power = %d,\n"
+	       "hdmi_connected = %d",
+	       __func__, action, r, hdmi_power, hdmi_connected);
+
 	if (action & HDMI_DISCONNECT) {
 		/* cancel auto-notify */
+		DSSINFO("Disable Display - HDMI_DISCONNECT\n");
 		mutex_unlock(&hdmi.lock_aux);
 		mutex_unlock(&hdmi.lock);
 		cancel_hot_plug_notify_work();
@@ -1397,7 +1404,6 @@ static void hdmi_work_queue(struct work_struct *ws)
 			/* HDMI is disabled, no need to process */
 			goto done;
 
-		DSSINFO("Display disabled\n");
 		HDMI_W1_StopVideoFrame(HDMI_WP);
 		if (dssdev->platform_disable)
 			dssdev->platform_disable(dssdev);
@@ -1409,6 +1415,16 @@ static void hdmi_work_queue(struct work_struct *ws)
 		HDMI_W1_SetWaitPllPwrState(HDMI_WP, HDMI_PLLPWRCMD_ALLOFF);
 		edid_set = custom_set = false;
 		set_video_power(dssdev, HDMI_POWER_MIN);
+
+		/* turn OFF clocks on disconnect*/
+		if (cpu_is_omap44xx()) {
+			if (hdmi_opt_clk_state) {
+				DSSINFO("Disable HDMI_PHY_48MHz clock\n");
+				hdmi_opt_clock_disable();
+				hdmi_opt_clk_state = false;
+			}
+		}
+		DSSINFO("Disable Display Done - HDMI_DISCONNECT\n\n");
 	}
 
 	/* read connect timestamp */
@@ -1428,7 +1444,14 @@ static void hdmi_work_queue(struct work_struct *ws)
 
 		DSSINFO("Physical Connect\n");
 
-		/* turn on clocks on connect */
+		/* turn ON clocks on connect*/
+		if (cpu_is_omap44xx()) {
+			if (!hdmi_opt_clk_state) {
+				DSSINFO("Enable HDMI_PHY_48MHz clock\n");
+				hdmi_opt_clock_enable();
+				hdmi_opt_clk_state = true;
+			}
+		}
 		edid_set = false;
 		custom_set = true;
 		hdmi_reconfigure(dssdev);
@@ -1442,6 +1465,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 			/* HDMI is disabled, no need to process */
 			goto done;
 		custom_set = false;
+		DSSINFO("Physical Connect Done:\n\n");
 	}
 
 done:
@@ -1460,7 +1484,7 @@ done:
 		 * HDMI should already be full on. We use this to read EDID
 		 * the first time we enable HDMI via HPD.
 		 */
-		DSSINFO("Connect 1 - Enabling display\n");
+		DSSINFO("Enabling display - HDMI_FIRST_HPD\n");
 		hdmi_reconfigure(dssdev);
 
 		if (!hdmi_connected) {
@@ -1472,6 +1496,7 @@ done:
 
 		set_hdmi_hot_plug_status(dssdev, true);
 		/* ignore return value for now */
+		DSSINFO("Enabling display Done- HDMI_FIRST_HPD\n\n");
 	}
 
 hpd_modify:
@@ -1481,13 +1506,14 @@ hpd_modify:
 		 * with more than 100ms duration is recieved so EDID should
 		 * reread and HDMI reconfigued.
 		 */
-		DSSINFO("HDMI HPD  display\n");
+		DSSINFO("Reconfigure HDMI PHY - HDMI_HPD_MODIFY\n");
 		/* force a new power-up to read EDID */
 		edid_set = false;
 		custom_set = false;
 		hdmi_reconfigure(dssdev);
 		set_hdmi_hot_plug_status(dssdev, true);
 		/* ignore return value for now */
+		DSSINFO("Reconfigure HDMI PHY Done- HDMI_HPD_MODIFY\n\n");
 	}
 
 	mutex_unlock(&hdmi.lock_aux);
@@ -1677,20 +1703,13 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 		power_need, (state_need == HDMI_ACTIVE ? 'A' :
 			     state_need == HDMI_SUSPENDED ? 'S' : 'D'), r);
 
-	if (cpu_is_omap44xx()) {
-		if (power_need == HDMI_POWER_FULL) {
-			if (!hdmi_opt_clk_state) {
-				r = hdmi_opt_clock_enable();
-				if (!r)
-					hdmi_opt_clk_state = true;
-			}
-		} else {
-			if (hdmi_opt_clk_state) {
-				hdmi_opt_clock_disable();
-				hdmi_opt_clk_state = false;
-			}
+	if (cpu_is_omap44xx())
+		if ((power_need == HDMI_POWER_MIN) && hdmi_opt_clk_state) {
+			DSSINFO("Disable HDMI_PHY_48MHz clock, "
+				"hdmi_power = %d\n\n", power_need);
+			hdmi_opt_clock_disable();
+			hdmi_opt_clk_state = false;
 		}
-	}
 
 	return r;
 }
