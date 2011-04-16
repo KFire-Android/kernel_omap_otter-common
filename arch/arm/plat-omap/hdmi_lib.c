@@ -382,9 +382,15 @@ int hdmi_core_ddc_edid(u8 *pEDID, int ext)
 		/* Clk SCL Devices */
 		REG_FLD_MOD(ins, HDMI_CORE_DDC_CMD, 0xA, 3, 0);
 
+		mdelay(100);
 		/* HDMI_CORE_DDC_STATUS__IN_PROG */
-		while (FLD_GET(hdmi_read_reg(ins, sts), 4, 4) == 1)
-			;
+		while (FLD_GET(hdmi_read_reg(ins, sts), 4, 4) == 1) {
+			printk(KERN_ERR "<%s> ERROR reading DDC Status:"
+					"HDMI_CORE_DDC_STATUS__IN_PROG = "
+					"0x%x\n",
+			       __func__, hdmi_read_reg(ins, sts));
+			mdelay(10);
+		}
 
 		/* Clear FIFO */
 		REG_FLD_MOD(ins, HDMI_CORE_DDC_CMD, 0x9, 3, 0);
