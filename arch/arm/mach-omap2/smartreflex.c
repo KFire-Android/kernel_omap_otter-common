@@ -210,9 +210,17 @@ static irqreturn_t sr_omap_isr(int irq, void *data)
 		value = irqstat_to_notifier_v2(status);
 	}
 
-	/* Call the class driver notify function if registered*/
-	if (sr_class->notify)
-		sr_class->notify(sr_info->voltdm, value);
+	/* Attempt some resemblance of recovery! */
+	if (!value) {
+		dev_err(&sr_info->pdev->dev, "%s: Spurious interrupt!"
+			"status = 0x%08x. Disabling to prevent spamming!!\n",
+			__func__, status);
+		disable_irq_nosync(sr_info->irq);
+	} else {
+		/* Call the class driver notify function if registered */
+		if (sr_class->notify)
+			sr_class->notify(sr_info->voltdm, value);
+	}
 
 	return IRQ_HANDLED;
 }
