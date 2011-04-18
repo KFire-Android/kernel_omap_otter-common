@@ -49,6 +49,7 @@
 #include <plat/powerdomain.h>
 #include <plat/prcm.h>
 #include "../../../arch/arm/mach-omap2/pm.h"
+#include "../../../arch/arm/mach-omap2/cm-regbits-44xx.h"
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -63,6 +64,7 @@
 #include "omap-abe-coef.h"
 #include "omap-abe.h"
 #include "abe/abe_main.h"
+
 
 // TODO: change to S16 and use ARM SIMD to re-format to S32
 #define ABE_FORMATS	 (SNDRV_PCM_FMTBIT_S32_LE)
@@ -2236,6 +2238,14 @@ static void abe_early_suspend(struct early_suspend *handler)
 	struct abe_data *abe = container_of(handler, struct abe_data,
 					    early_suspend);
 	int active = abe_fe_active_count(abe);
+	u32 reg;
+
+	/* Disable SD for MPU towards EMIF,L3_2 and L4CFG */
+	reg = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_2_STATDEP_MASK
+		| OMAP4430_L4CFG_STATDEP_MASK;
+
+	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
+		OMAP4_CM_MPU_STATICDEP_OFFSET);
 
 	/*
 	 * enter dpll cascading when all conditions are met:
@@ -2253,6 +2263,16 @@ static void abe_late_resume(struct early_suspend *handler)
 {
 	struct abe_data *abe = container_of(handler, struct abe_data,
 					    early_suspend);
+	u32 reg, mask;
+
+	/* Enable SD for MPU towards EMIF,L3_2 and L4CFG */
+	reg = 1 << OMAP4430_MEMIF_STATDEP_SHIFT |
+		1 << OMAP4430_L3_2_STATDEP_SHIFT |
+		1 << OMAP4430_L4CFG_STATDEP_SHIFT;
+	mask = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_2_STATDEP_MASK
+		| OMAP4430_L4CFG_STATDEP_MASK;
+	cm_rmw_mod_reg_bits(mask, reg, OMAP4430_CM1_MPU_MOD,
+		OMAP4_CM_MPU_STATICDEP_OFFSET);
 
 	/* exit dpll cascading since screen will be turned on */
 	abe_exit_dpll_cascading(abe);
