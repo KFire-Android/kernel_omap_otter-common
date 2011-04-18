@@ -525,14 +525,19 @@ static int vp_volt_debug_get(void *data, u64 *val)
 static int nom_volt_debug_get(void *data, u64 *val)
 {
 	struct omap_vdd_info *vdd = (struct omap_vdd_info *) data;
+	struct omap_volt_data *vdata;
 
 	if (!vdd) {
 		pr_warning("Wrong paramater passed\n");
 		return -EINVAL;
 	}
 
-	*val = omap_get_operation_voltage(
-			omap_voltage_get_nom_volt(&vdd->voltdm));
+	vdata = omap_voltage_get_nom_volt(&vdd->voltdm);
+	if (IS_ERR_OR_NULL(vdata))
+		return -EINVAL;
+
+	*val = vdata->volt_nominal;
+
 	return 0;
 }
 
@@ -559,9 +564,55 @@ static int volt_users_dbg_open(struct inode *inode, struct file *file)
 		inode->i_private);
 }
 
+static int dyn_volt_debug_get(void *data, u64 *val)
+{
+	struct omap_vdd_info *vdd = (struct omap_vdd_info *) data;
+	struct omap_volt_data *volt_data;
+
+	if (!vdd) {
+		pr_warning("Wrong paramater passed\n");
+		return -EINVAL;
+	}
+
+	volt_data = omap_voltage_get_nom_volt(&vdd->voltdm);
+	if (IS_ERR_OR_NULL(volt_data)) {
+		pr_warning("%s: No voltage/domain?\n", __func__);
+		return -ENODEV;
+	}
+
+	*val = volt_data->volt_dynamic_nominal;
+
+	return 0;
+}
+
+static int calib_volt_debug_get(void *data, u64 *val)
+{
+	struct omap_vdd_info *vdd = (struct omap_vdd_info *) data;
+	struct omap_volt_data *volt_data;
+
+	if (!vdd) {
+		pr_warning("Wrong paramater passed\n");
+		return -EINVAL;
+	}
+
+	volt_data = omap_voltage_get_nom_volt(&vdd->voltdm);
+	if (IS_ERR_OR_NULL(volt_data)) {
+		pr_warning("%s: No voltage/domain?\n", __func__);
+		return -ENODEV;
+	}
+
+	*val = volt_data->volt_calibrated;
+
+	return 0;
+}
+
 DEFINE_SIMPLE_ATTRIBUTE(vp_debug_fops, vp_debug_get, vp_debug_set, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(vp_volt_debug_fops, vp_volt_debug_get, NULL, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(nom_volt_debug_fops, nom_volt_debug_get, NULL,
+								"%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(dyn_volt_debug_fops, dyn_volt_debug_get, NULL,
+								"%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(calib_volt_debug_fops, calib_volt_debug_get, NULL,
 								"%llu\n");
 static const struct file_operations volt_users_dbg_fops = {
 	.open           = volt_users_dbg_open,
@@ -1520,6 +1571,10 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 				(void *) vdd, &nom_volt_debug_fops);
 	(void) debugfs_create_file("volt_users", S_IRUGO, vdd_debug,
 				(void *) vdd, &volt_users_dbg_fops);
+	(void) debugfs_create_file("curr_dyn_nominal_volt", S_IRUGO, vdd_debug,
+				(void *) vdd, &dyn_volt_debug_fops);
+	(void) debugfs_create_file("curr_calibrated_volt", S_IRUGO, vdd_debug,
+				(void *) vdd, &calib_volt_debug_fops);
 #ifdef CONFIG_OMAP_ABB
 	if (cpu_is_omap44xx() && !strcmp("vdd_iva", name))
 		(void) debugfs_create_u8("fbb_enable", S_IRUGO | S_IWUGO,
@@ -1845,6 +1900,33 @@ struct omap_volt_data *omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
 	return vdd->curr_volt;
+}
+
+/**
+ * omap_voltage_calib_reset() - reset the calibrated voltage entries
+ * @voltdm: voltage domain to reset the entries for
+ *
+ * when the calibrated entries are no longer valid, this api allows
+ * the calibrated voltages to be reset.
+ */
+int omap_voltage_calib_reset(struct voltagedomain *voltdm)
+{
+	struct omap_vdd_info *vdd;
+	struct omap_volt_data *volt_data;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return -EINVAL;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	volt_data = vdd->volt_data;
+	/* reset the calibrated voltages as 0 */
+	while (volt_data->volt_nominal) {
+		volt_data->volt_calibrated = 0;
+		volt_data++;
+	}
+	return 0;
 }
 
 /**

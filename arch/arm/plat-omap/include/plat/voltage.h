@@ -61,6 +61,8 @@ struct voltagedomain {
        char *name;
 };
 
+#define OMAP3PLUS_DYNAMIC_NOMINAL_MARGIN_UV	50000
+
 /**
  * omap_volt_data - Omap voltage specific data.
  * @voltage_nominal	: The possible voltage value in uV
@@ -74,6 +76,8 @@ struct voltagedomain {
  */
 struct omap_volt_data {
 	u32	volt_nominal;
+	u32	volt_calibrated;
+	u32	volt_dynamic_nominal;
 	u32	sr_nvalue;
 	u8	sr_errminlimit;
 	u8	vp_errgain;
@@ -132,6 +136,7 @@ int omap_voltage_scale(struct voltagedomain *voltdm);
 bool omap_vp_is_transdone(struct voltagedomain *voltdm);
 bool omap_vp_clear_transdone(struct voltagedomain *voltdm);
 
+int omap_voltage_calib_reset(struct voltagedomain *voltdm);
 #ifdef CONFIG_PM
 void omap_voltage_init_vc(struct omap_volt_vc_data *setup_vc);
 void omap_change_voltscale_method(int voltscale_method);
@@ -161,7 +166,23 @@ static inline unsigned long omap_get_operation_voltage(
 {
 	if (IS_ERR_OR_NULL(vdata))
 		return 0;
-	return vdata->volt_nominal;
+	return (vdata->volt_calibrated) ? vdata->volt_calibrated :
+		(vdata->volt_dynamic_nominal) ? vdata->volt_dynamic_nominal :
+			vdata->volt_nominal;
 }
 
+/* what is my dynamic nominal? */
+static inline unsigned long omap_get_dyn_nominal(struct omap_volt_data *vdata)
+{
+	if (IS_ERR_OR_NULL(vdata))
+		return 0;
+	if (vdata->volt_calibrated) {
+		unsigned long v = vdata->volt_calibrated +
+			OMAP3PLUS_DYNAMIC_NOMINAL_MARGIN_UV;
+		if (v > vdata->volt_nominal)
+			return vdata->volt_nominal;
+		return v;
+	}
+	return vdata->volt_nominal;
+}
 #endif
