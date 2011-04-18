@@ -88,9 +88,11 @@ enum dma_channel_state {
 #ifdef CONFIG_ARCH_OMAP4
 #define VID_MAX_WIDTH		4096	/* Largest width */
 #define VID_MAX_HEIGHT		4096	/* Largest height */
+#define OMAP_VOUT_MAX_BUF_SIZE (VID_MAX_WIDTH*VID_MAX_HEIGHT*4)
 #else
 #define VID_MAX_WIDTH		1280	/* Largest width */
 #define VID_MAX_HEIGHT		720	/* Largest height */
+#define OMAP_VOUT_MAX_BUF_SIZE (VID_MAX_WIDTH*VID_MAX_HEIGHT*2)
 #endif
 /* Mimimum requirement is 2x2 for DSS */
 #define VID_MIN_WIDTH		2
@@ -101,9 +103,6 @@ enum dma_channel_state {
 
 #define VRFB_TX_TIMEOUT         1000
 #define VRFB_NUM_BUFS		OMAP_VOUT_MAX_BUFFERS
-
-/* Max buffer size tobe allocated during init */
-#define OMAP_VOUT_MAX_BUF_SIZE (VID_MAX_WIDTH*VID_MAX_HEIGHT*4)
 
 #define VDD2_OCP_FREQ_CONST     (cpu_is_omap34xx() ? \
 (cpu_is_omap3630() ? 200000 : 166000) : 0)
