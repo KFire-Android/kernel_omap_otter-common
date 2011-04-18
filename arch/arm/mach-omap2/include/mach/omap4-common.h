@@ -92,6 +92,7 @@ extern void __iomem *gic_cpu_base_addr;
 extern void __iomem *gic_dist_base_addr;
 extern void __iomem *sar_ram_base;
 extern dma_addr_t omap4_secure_ram_phys;
+extern void *so_ram_address;
 
 extern bool omap4_lpmode;
 
@@ -108,6 +109,8 @@ extern int omap4_set_freq_update(void);
 extern int omap4_dpll_low_power_cascade_check_entry(void);
 extern int omap4_dpll_low_power_cascade_enter(void);
 extern int omap4_dpll_low_power_cascade_exit(void);
+
+extern void DO_WFI(void);
 
 #ifdef CONFIG_PM
 extern void omap4_sar_save(void);

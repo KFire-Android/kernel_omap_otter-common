@@ -16,6 +16,7 @@
 #include <mach/omap4-common.h>
 #include <plat/omap44xx.h>
 #include <asm/memory.h>
+#include <plat/io.h>
 
 #ifdef CONFIG_SMP
 
@@ -27,6 +28,8 @@
 #define TABLE_ENTRY				0x00000C02
 #define CACHE_DISABLE_MASK			0xFFFFE7FB
 #define SCU_CLEAR_STATE				0xFCFC
+#define SRAM_VADDR                             (OMAP2_L4_IO_OFFSET + \
+						 OMAP44XX_SAR_RAM_BASE)
 
 
 /*
@@ -394,7 +397,17 @@ loop4:
 	ldr	r0, [r2, #L2X0_CLEAN_INV_WAY]
 	cmp	r0, #0
 	bne	loop4
+#endif
+
+do_WFI:
+	dsb				@ Necessary barriers before wfi
+	dmb
+	isb
+
+#ifdef CONFIG_CACHE_L2X0
 l2x_sync:
+	ldr	r2, =l2cache_base
+	ldr	r2, [r2]
 	mov	r0, #0x0
 	str	r0, [r2, #L2X0_CACHE_SYNC]
 loop5:
@@ -402,11 +415,32 @@ loop5:
 	ands	r0, r0, #0x1
 	bne	loop5
 #endif
-do_WFI:
-	dsb				@ Necessary barriers before wfi
-	dmb
-	isb
+	ldr     r0, =so_ram_address
+	ldr	r0, [r0]
+	ldr     r2, [r0]
+	str     r2, [r0]
+
+	ldr     r0, =SRAM_VADDR
+	ldr     r2, [r0]
+	str     r2, [r0]
 	wfi				@ wait for interrupt
+
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
 
 	/*
 	 * CPUx didn't hit targeted low power state.
@@ -450,5 +484,60 @@ skip_gp_clear:
 	ldmfd	sp!, {r0-r12, pc}	@ restore regs and return
 
 END(__omap4_cpu_suspend)
+
+/* Function to flush pl310 and SO write */
+ENTRY(DO_WFI)
+	stmfd	sp!, {lr}	@ save registers on stack
+
+	dsb			@ Necessary barriers before wfi
+	dmb
+	isb
+
+#ifdef CONFIG_CACHE_L2X0
+
+	ldr	r2, =l2cache_base
+	ldr	r2, [r2]
+	mov	r0, #0x0
+	str	r0, [r2, #L2X0_CACHE_SYNC]
+
+loop51:
+	ldr	r0, [r2, #L2X0_CACHE_SYNC]
+	ands	r0, r0, #0x1
+	bne	loop51
+#endif
+
+	ldr	r0, =so_ram_address
+	ldr	r0, [r0]
+	ldr	r2, [r0]
+	str	r2, [r0]
+
+	ldr	r0, =SRAM_VADDR
+	ldr	r2, [r0]
+	str	r2, [r0]
+
+	dsb
+
+	wfi
+
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+
+	ldmfd   sp!, {pc}	@ restore regs and return
+
+END(DO_WFI)
 
 #endif

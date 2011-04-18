@@ -20,6 +20,7 @@
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
+#include <linux/dma-mapping.h>
 
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
@@ -41,6 +42,8 @@
 #include "cm-regbits-44xx.h"
 #include "prm-regbits-44xx.h"
 #include "clock.h"
+
+void *so_ram_address;
 
 struct power_state {
 	struct powerdomain *pwrdm;
@@ -816,6 +819,7 @@ static void __init prcm_clear_statdep_regs(void)
 static int __init omap4_pm_init(void)
 {
 	int ret;
+	int ram_addr;
 
 	if (!cpu_is_omap44xx())
 		return -ENODEV;
@@ -839,6 +843,14 @@ static int __init omap4_pm_init(void)
 		printk(KERN_ERR "request_irq failed to register for 0x%x\n",
 		       OMAP44XX_IRQ_PRCM);
 		goto err2;
+	}
+
+	so_ram_address = (void *)dma_alloc_so_coherent(NULL, 1024,
+			(dma_addr_t *)&ram_addr, GFP_KERNEL);
+
+	if (!so_ram_address) {
+		printk ("omap4_pm_init: failed to allocate SO mem.\n");
+		return -ENOMEM;
 	}
 
 	ret = pwrdm_for_each(pwrdms_setup, NULL);

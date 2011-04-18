@@ -16,6 +16,7 @@
 #include <linux/delay.h>
 #include <mach/omap4-common.h>
 #include <mach/omap4-wakeupgen.h>
+#include <asm/hardware/cache-l2x0.h>
 #include "pm.h"
 #include "prm.h"
 #include "pm.h"
@@ -102,7 +103,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	 */
 	if (dev->cpu) {
 		wmb();
-		do_wfi();
+		DO_WFI();
 		goto return_sleep_time;
 	}
 
@@ -111,7 +112,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	 */
 	if (num_online_cpus() > 1) {
 		wmb();
-		do_wfi();
+		DO_WFI();
 		goto return_sleep_time;
 	}
 
@@ -121,7 +122,7 @@ static int omap4_enter_idle(struct cpuidle_device *dev,
 	cpu1_state = pwrdm_read_pwrst(cpu1_pd);
 	if (cpu1_state != PWRDM_POWER_OFF) {
 		wmb();
-		do_wfi();
+		DO_WFI();
 		goto return_sleep_time;
 	}
 
