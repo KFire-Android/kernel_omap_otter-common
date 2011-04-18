@@ -542,6 +542,17 @@ void omap_uart_prepare_suspend(void)
 	}
 }
 
+static bool plat_check_bt_active(struct omap_uart_state *uart)
+{
+	struct omap_uart_port_info *pdata;
+	pdata = uart->pdev->dev.platform_data;
+
+	if (pdata && pdata->plat_omap_bt_active)
+		return pdata->plat_omap_bt_active();
+
+	return false;
+}
+
 int omap_uart_can_sleep(void)
 {
 	struct omap_uart_state *uart;
@@ -552,6 +563,12 @@ int omap_uart_can_sleep(void)
 			continue;
 
 		if (!uart->can_sleep) {
+			can_sleep = 0;
+			continue;
+		}
+
+		/* Check if BT Use case is active */
+		if (plat_check_bt_active(uart)) {
 			can_sleep = 0;
 			continue;
 		}
@@ -966,6 +983,7 @@ void __init omap_serial_init_port(int port,
 	omap_up.flags = UPF_BOOT_AUTOCONF | UPF_SHARE_IRQ;
 	omap_up.idle_timeout = platform_data->idle_timeout;
 	omap_up.plat_hold_wakelock = platform_data->plat_hold_wakelock;
+	omap_up.plat_omap_bt_active = platform_data->plat_omap_bt_active;
 
 	uart->rts_padconf = platform_data->rts_padconf;
 	uart->rts_override = platform_data->rts_override;

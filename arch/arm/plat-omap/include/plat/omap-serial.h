@@ -125,6 +125,7 @@ struct omap_uart_port_info {
 
 	u16			cts_padconf;
 	u32			cts_padvalue;
+	bool                    (*plat_omap_bt_active)(void);
 };
 
 struct uart_omap_dma {
