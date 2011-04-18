@@ -17,10 +17,10 @@
 
 static int sr_class3_enable(struct voltagedomain *voltdm)
 {
-	unsigned long volt = 0;
+	struct omap_volt_data *volt;
 
 	volt = omap_voltage_get_nom_volt(voltdm);
-	if (!volt) {
+	if (IS_ERR_OR_NULL(volt)) {
 		pr_warning("%s: Curr voltage unknown. Cannot enable sr_%s\n",
 				__func__, voltdm->name);
 		return -ENODATA;

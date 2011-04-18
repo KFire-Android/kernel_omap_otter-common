@@ -264,7 +264,7 @@ void omap_smartreflex_disable(struct voltagedomain *voltdm);
 void omap_smartreflex_disable_reset_volt(struct voltagedomain *voltdm);
 
 /* Smartreflex driver hooks to be called from Smartreflex class driver */
-int sr_enable(struct voltagedomain *voltdm, unsigned long volt);
+int sr_enable(struct voltagedomain *voltdm, struct omap_volt_data *volt_data);
 void sr_disable(struct voltagedomain *voltdm);
 int sr_configure_errgen(struct voltagedomain *voltdm);
 int sr_configure_minmax(struct voltagedomain *voltdm);

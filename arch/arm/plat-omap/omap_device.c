@@ -945,7 +945,7 @@ int omap_device_set_rate(struct device *req_dev, struct device *dev,
 	}
 
 	/* Do the actual scaling */
-	return omap_voltage_scale(voltdm, volt);
+	return omap_voltage_scale(voltdm);
 }
 EXPORT_SYMBOL(omap_device_set_rate);
 

@@ -527,10 +527,9 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
  * enable a smartreflex module. Returns 0 on success. Returns error
  * value if the voltage passed is wrong or if ntarget value is wrong.
  */
-int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
+int sr_enable(struct voltagedomain *voltdm, struct omap_volt_data *volt_data)
 {
 	u32 nvalue_reciprocal;
-	struct omap_volt_data *volt_data;
 	struct omap_sr *sr = _sr_lookup(voltdm);
 	int ret;
 
@@ -540,11 +539,9 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
 		return -EINVAL;
 	}
 
-	volt_data = omap_voltage_get_voltdata(voltdm, volt);
-
 	if (IS_ERR(volt_data)) {
 		dev_warn(&sr->pdev->dev, "%s: Unable to get voltage table"
-			" for nominal voltage %ld\n", __func__, volt);
+			" for nominal voltage\n", __func__);
 		return -ENODATA;
 	}
 
@@ -552,7 +549,7 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
 
 	if (!nvalue_reciprocal) {
 		dev_warn(&sr->pdev->dev, "%s: NVALUE = 0 at voltage %ld\n",
-			__func__, volt);
+			__func__, omap_get_operation_voltage(volt_data));
 		return -ENODATA;
 	}
 
