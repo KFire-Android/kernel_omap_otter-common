@@ -320,6 +320,21 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gf
 EXPORT_SYMBOL(dma_alloc_coherent);
 
 /*
+ * Allocate DMA-coherent memory space and return both the kernel remapped
+ * virtual and bus address for that space for SO write operation.
+ */
+void *
+dma_alloc_so_coherent(struct device *dev, size_t size, dma_addr_t *handle,
+	gfp_t gfp)
+{
+	void *memory;
+
+	return __dma_alloc(dev, size, handle, gfp,
+		pgprot_so_dmacoherent(pgprot_kernel));
+}
+EXPORT_SYMBOL(dma_alloc_so_coherent);
+
+/*
  * Allocate a writecombining region, in much the same way as
  * dma_alloc_coherent above.
  */
