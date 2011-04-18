@@ -55,25 +55,26 @@ static int twl6040_power_mode;
 static int mcbsp_cfg;
 
 static int sdp4430_modem_mcbsp_configure(struct snd_pcm_substream *substream,
-	int flag)
+				struct snd_pcm_hw_params *params, int flag)
 {
 	int ret = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_pcm_substream *modem_substream[2];
 	struct snd_soc_pcm_runtime *modem_rtd;
+	int channels;
 
 	if (flag) {
+		modem_substream[substream->stream] =
+		snd_soc_get_dai_substream(rtd->card,
+						OMAP_ABE_BE_MM_EXT1,
+						substream->stream);
+		if (unlikely(modem_substream[substream->stream] == NULL))
+			return -ENODEV;
+
+		modem_rtd =
+			modem_substream[substream->stream]->private_data;
+
 		if (!mcbsp_cfg) {
-			modem_substream[substream->stream] =
-				snd_soc_get_dai_substream(rtd->card,
-							OMAP_ABE_BE_MM_EXT1,
-							substream->stream);
-			if (unlikely(modem_substream[substream->stream] == NULL))
-				return -ENODEV;
-
-			modem_rtd =
-				modem_substream[substream->stream]->private_data;
-
 			/* Set cpu DAI configuration */
 			ret = snd_soc_dai_set_fmt(modem_rtd->cpu_dai,
 					  SND_SOC_DAIFMT_I2S |
@@ -86,6 +87,18 @@ static int sdp4430_modem_mcbsp_configure(struct snd_pcm_substream *substream,
 			} else {
 				mcbsp_cfg = 1;
 			}
+		}
+
+		if (params != NULL) {
+			/* Configure McBSP internal buffer usage */
+			/* this need to be done for playback and/or record */
+			channels = params_channels(params);
+			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+				omap_mcbsp_set_rx_threshold(
+					modem_rtd->cpu_dai->id, channels);
+			else
+				omap_mcbsp_set_tx_threshold(
+					modem_rtd->cpu_dai->id, channels);
 		}
 	} else {
 		mcbsp_cfg = 0;
@@ -140,7 +153,7 @@ static int sdp4430_mcpdm_hw_params(struct snd_pcm_substream *substream,
 
 	if (rtd->current_fe == ABE_FRONTEND_DAI_MODEM) {
 		/* set Modem McBSP configuration  */
-		ret = sdp4430_modem_mcbsp_configure(substream, 1);
+		ret = sdp4430_modem_mcbsp_configure(substream, params, 1);
 	}
 
 	return ret;
@@ -153,7 +166,7 @@ static int sdp4430_mcpdm_hw_free(struct snd_pcm_substream *substream)
 
 	if (rtd->current_fe == ABE_FRONTEND_DAI_MODEM) {
 		/* freed Modem McBSP configuration */
-		ret = sdp4430_modem_mcbsp_configure(substream, 0);
+		ret = sdp4430_modem_mcbsp_configure(substream, NULL, 0);
 	}
 
 	return ret;
@@ -230,7 +243,7 @@ static int sdp4430_dmic_hw_params(struct snd_pcm_substream *substream,
 
 	if (rtd->current_fe == ABE_FRONTEND_DAI_MODEM) {
 		/* set Modem McBSP configuration  */
-		ret = sdp4430_modem_mcbsp_configure(substream, 1);
+		ret = sdp4430_modem_mcbsp_configure(substream, params, 1);
 	}
 
 	return ret;
@@ -243,7 +256,7 @@ static int sdp4430_dmic_hw_free(struct snd_pcm_substream *substream)
 
 	if (rtd->current_fe == ABE_FRONTEND_DAI_MODEM) {
 		/* freed Modem McBSP configuration */
-		ret = sdp4430_modem_mcbsp_configure(substream, 0);
+		ret = sdp4430_modem_mcbsp_configure(substream, NULL, 0);
 	}
 
 	return ret;
