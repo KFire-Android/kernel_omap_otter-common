@@ -1678,10 +1678,8 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	 * is <3us
 	 */
 	while (timeout++ < VP_TRANXDONE_TIMEOUT) {
-		prm_write_mod_reg(vdd->vp_reg.tranxdone_status,
-				vdd->ocp_mod, vdd->prm_irqst_reg);
-		if (!(prm_read_mod_reg(vdd->ocp_mod, vdd->prm_irqst_reg) &
-				vdd->vp_reg.tranxdone_status))
+		omap_vp_clear_transdone(&vdd->voltdm);
+		if (!omap_vp_is_transdone(&vdd->voltdm))
 				break;
 		udelay(1);
 	}
@@ -1738,10 +1736,8 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	 */
 	timeout = 0;
 	while (timeout++ < VP_TRANXDONE_TIMEOUT) {
-		prm_write_mod_reg(vdd->vp_reg.tranxdone_status,
-				vdd->ocp_mod, vdd->prm_irqst_reg);
-		if (!(prm_read_mod_reg(vdd->ocp_mod, vdd->prm_irqst_reg) &
-				vdd->vp_reg.tranxdone_status))
+		omap_vp_clear_transdone(&vdd->voltdm);
+		if (!omap_vp_is_transdone(&vdd->voltdm))
 				break;
 		udelay(1);
 	}
@@ -2048,6 +2044,48 @@ void omap_vp_disable(struct voltagedomain *voltdm)
 		pr_warning("%s: vdd_%s idle timedout\n",
 			__func__, voltdm->name);
 	return;
+}
+
+/**
+ * omap_vp_is_transdone() - is voltage transfer done on vp?
+ * @voltdm:	pointer to the VDD which is to be scaled.
+ *
+ * VP's transdone bit is the only way to ensure that the transfer
+ * of the voltage value has actually been send over to the PMIC
+ * This is hence useful for all users of voltage domain to precisely
+ * identify once the PMIC voltage has been set by the voltage processor
+ */
+bool omap_vp_is_transdone(struct voltagedomain *voltdm)
+{
+	struct omap_vdd_info *vdd;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_warning("%s: Bad Params vdm=%p\n", __func__, voltdm);
+		return false;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	return (prm_read_mod_reg(vdd->ocp_mod, vdd->prm_irqst_reg) &
+				vdd->vp_reg.tranxdone_status) ?  true : false;
+}
+
+/**
+ * omap_vp_clear_transdone() - clear voltage transfer done status on vp
+ * @voltdm:	pointer to the VDD which is to be scaled.
+ */
+bool omap_vp_clear_transdone(struct voltagedomain *voltdm)
+{
+	struct omap_vdd_info *vdd;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_warning("%s: Bad Params vdm=%p\n", __func__, voltdm);
+		return false;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	prm_write_mod_reg(vdd->vp_reg.tranxdone_status,
+			vdd->ocp_mod, vdd->prm_irqst_reg);
+	return true;
 }
 
 /**

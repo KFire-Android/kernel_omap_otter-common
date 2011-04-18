@@ -129,6 +129,8 @@ struct omap_volt_data *omap_voltage_get_nom_volt(struct voltagedomain *voltdm);
 int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 		unsigned long *volt);
 int omap_voltage_scale(struct voltagedomain *voltdm);
+bool omap_vp_is_transdone(struct voltagedomain *voltdm);
+bool omap_vp_clear_transdone(struct voltagedomain *voltdm);
 
 #ifdef CONFIG_PM
 void omap_voltage_init_vc(struct omap_volt_vc_data *setup_vc);
