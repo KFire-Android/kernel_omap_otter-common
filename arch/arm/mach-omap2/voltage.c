@@ -209,6 +209,8 @@ struct omap_vdd_info{
 	struct omap_volt_data *curr_volt;
 	u8 cmdval_reg;
 	u8 vdd_sr_reg;
+	u16 ocp_mod;
+	u8 prm_irqst_reg;
 	struct omap_volt_pmic_info *pmic;
 	struct device vdd_device;
 };
@@ -929,6 +931,9 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 		return;
 	}
 
+	vdd->prm_irqst_reg = OMAP3_PRM_IRQSTATUS_MPU_OFFSET;
+	vdd->ocp_mod = OCP_MOD;
+
 	volt_data = vdd->nominal_volt = vdd->curr_volt = get_init_voltage(&vdd->voltdm);
 
 	if (IS_ERR_OR_NULL(volt_data)) {
@@ -1152,6 +1157,7 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 				OMAP4430_VP_MPU_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_MPU_L_OFFSET;
 		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
+		vdd->prm_irqst_reg = OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET;
 	} else if (!strcmp(vdd->voltdm.name, "core")) {
 		vdd->vp_reg.vlimitto_vddmin = vdd->pmic->vp_vlimitto_vddmin;
 		vdd->vp_reg.vlimitto_vddmax = vdd->pmic->vp_vlimitto_vddmax;
@@ -1165,6 +1171,7 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 				OMAP4430_VP_CORE_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_CORE_L_OFFSET;
 		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
+		vdd->prm_irqst_reg = OMAP4_PRM_IRQSTATUS_MPU_OFFSET;
 	} else if (!strcmp(vdd->voltdm.name, "iva")) {
 		vdd->vp_reg.vlimitto_vddmin = vdd->pmic->vp_vlimitto_vddmin;
 		vdd->vp_reg.vlimitto_vddmax = vdd->pmic->vp_vlimitto_vddmax;
@@ -1180,12 +1187,14 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 			OMAP4430_VP_IVA_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_IVA_L_OFFSET;
 		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
+		vdd->prm_irqst_reg = OMAP4_PRM_IRQSTATUS_MPU_OFFSET;
 	} else {
 		pr_warning("%s: vdd_%s does not exisit in OMAP4\n",
 			__func__, vdd->voltdm.name);
 		return;
 	}
 
+	vdd->ocp_mod = OMAP4430_PRM_OCP_SOCKET_MOD;
 	volt_data = vdd->nominal_volt =  vdd->curr_volt = get_init_voltage(&vdd->voltdm);
 	if (IS_ERR(volt_data)) {
 		pr_warning("%s: Unable to get volt table for vdd_%s at init",
@@ -1633,7 +1642,6 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	int timeout = 0;
 	u8 target_vsel = 0, current_vsel = 0;
 	u8 vc_cmd_on_shift = 0;
-	u8 prm_irqst_reg_offs = 0, ocp_mod = 0;
 
 	if (IS_ERR_OR_NULL(target_volt)) {
 		pr_warning("%s: bad target data\n", __func__);
@@ -1642,16 +1650,9 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	if (cpu_is_omap34xx()) {
 		vc_cmd_on_shift = OMAP3430_VC_CMD_ON_SHIFT;
 		vc_cmd_on_mask = OMAP3430_VC_CMD_ON_MASK;
-		prm_irqst_reg_offs = OMAP3_PRM_IRQSTATUS_MPU_OFFSET;
-		ocp_mod = OCP_MOD;
 	} else if (cpu_is_omap44xx()) {
 		vc_cmd_on_shift = OMAP4430_ON_SHIFT;
 		vc_cmd_on_mask = OMAP4430_ON_MASK;
-		if (!strcmp(vdd->voltdm.name, "mpu"))
-			prm_irqst_reg_offs = OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET;
-		else
-			prm_irqst_reg_offs = OMAP4_PRM_IRQSTATUS_MPU_OFFSET;
-		ocp_mod = OMAP4430_PRM_OCP_SOCKET_MOD;
 	}
 
 	target_vsel = vdd->pmic->uv_to_vsel(
@@ -1678,8 +1679,8 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	 */
 	while (timeout++ < VP_TRANXDONE_TIMEOUT) {
 		prm_write_mod_reg(vdd->vp_reg.tranxdone_status,
-				ocp_mod, prm_irqst_reg_offs);
-		if (!(prm_read_mod_reg(ocp_mod, prm_irqst_reg_offs) &
+				vdd->ocp_mod, vdd->prm_irqst_reg);
+		if (!(prm_read_mod_reg(vdd->ocp_mod, vdd->prm_irqst_reg) &
 				vdd->vp_reg.tranxdone_status))
 				break;
 		udelay(1);
@@ -1715,7 +1716,7 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	 * Wait for TransactionDone. Typical latency is <200us.
 	 * Depends on SMPSWAITTIMEMIN/MAX and voltage change
 	 */
-	omap_test_timeout((prm_read_mod_reg(ocp_mod, prm_irqst_reg_offs) &
+	omap_test_timeout((prm_read_mod_reg(vdd->ocp_mod, vdd->prm_irqst_reg) &
 			vdd->vp_reg.tranxdone_status),
 			VP_TRANXDONE_TIMEOUT, timeout);
 
@@ -1738,8 +1739,8 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	timeout = 0;
 	while (timeout++ < VP_TRANXDONE_TIMEOUT) {
 		prm_write_mod_reg(vdd->vp_reg.tranxdone_status,
-				ocp_mod, prm_irqst_reg_offs);
-		if (!(prm_read_mod_reg(ocp_mod, prm_irqst_reg_offs) &
+				vdd->ocp_mod, vdd->prm_irqst_reg);
+		if (!(prm_read_mod_reg(vdd->ocp_mod, vdd->prm_irqst_reg) &
 				vdd->vp_reg.tranxdone_status))
 				break;
 		udelay(1);
