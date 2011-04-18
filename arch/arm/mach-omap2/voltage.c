@@ -518,7 +518,6 @@ static int vp_volt_debug_get(void *data, u64 *val)
 	}
 
 	vsel = voltage_read_reg(vdd->vp_offs.voltage);
-	pr_notice("curr_vsel = %x\n", vsel);
 	*val = vdd->pmic->vsel_to_uv(vsel);
 
 	return 0;
