@@ -932,7 +932,7 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 	sys_clk_speed /= 1000;
 
 	/* Nominal/Reset voltage of the VDD */
-	vdd->nominal_volt = 1200000;
+	vdd->nominal_volt = omap_voltage_get_nom_volt(&vdd->voltdm);
 
 	/* VPCONFIG bit fields */
 	vdd->vp_reg.vpconfig_erroroffset = (vdd->pmic->vp_config_erroroffset <<
@@ -1199,7 +1199,7 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 	sys_clk_speed /= 1000;
 
 	/* Nominal/Reset voltage of the VDD */
-	vdd->nominal_volt = 1200000;
+	vdd->nominal_volt = omap_voltage_get_nom_volt(&vdd->voltdm);
 
 	/* VPCONFIG bit fields */
 	vdd->vp_reg.vpconfig_erroroffset =
