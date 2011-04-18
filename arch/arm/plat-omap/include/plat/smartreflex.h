@@ -234,7 +234,8 @@ struct omap_smartreflex_pmic_data {
  *		to take any class based decisions.
  */
 struct omap_smartreflex_class_data {
-	int (*enable)(struct voltagedomain *voltdm);
+	int (*enable)(struct voltagedomain *voltdm,
+			struct omap_volt_data *volt_data);
 	int (*disable)(struct voltagedomain *voltdm, int is_volt_reset);
 	int (*start)(struct voltagedomain *voltdm, void *class_priv_data);
 	int (*stop)(struct voltagedomain *voltdm, void *class_priv_data);

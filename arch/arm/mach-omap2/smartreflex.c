@@ -301,7 +301,8 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
 	}
 
 	sr->is_autocomp_active = 1;
-	if (sr_class->enable(sr->voltdm))
+	if (sr_class->enable(sr->voltdm,
+				omap_voltage_get_nom_volt(sr->voltdm)))
 		sr->is_autocomp_active = 0;
 }
 
@@ -755,7 +756,7 @@ void omap_smartreflex_enable(struct voltagedomain *voltdm)
 			"registered\n", __func__);
 		return;
 	}
-	sr_class->enable(voltdm);
+	sr_class->enable(voltdm, omap_voltage_get_nom_volt(sr->voltdm));
 }
 
 /**
