@@ -216,6 +216,14 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
 		return;
 	}
 
+	if (sr_class->start &&
+	    sr_class->start(sr->voltdm, sr_class->class_priv_data)) {
+		dev_err(&sr->pdev->dev,
+			"%s: smartreflex class initialization failed\n",
+			__func__);
+		return;
+	}
+
 	sr->is_autocomp_active = 1;
 	if (sr_class->enable(sr->voltdm))
 		sr->is_autocomp_active = 0;
@@ -232,6 +240,13 @@ static void sr_stop_vddautocomp(struct omap_sr *sr)
 
 	if (sr->is_autocomp_active == 1) {
 		sr_class->disable(sr->voltdm, 1);
+		if (sr_class->stop &&
+		    sr_class->stop(sr->voltdm,
+			    sr_class->class_priv_data)) {
+			dev_err(&sr->pdev->dev,
+				"%s: SR[%d]Class deinitialization failed\n",
+				__func__, sr->srid);
+		}
 		sr->is_autocomp_active = 0;
 	}
 }
