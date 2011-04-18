@@ -143,7 +143,7 @@ static irqreturn_t sr_omap_isr(int irq, void *data)
 	}
 
 	/* Call the class driver notify function if registered*/
-	if (sr_class->class_type == SR_CLASS2 && sr_class->notify)
+	if (sr_class->notify)
 		sr_class->notify(sr_info->voltdm, status);
 
 	return IRQ_HANDLED;
@@ -253,8 +253,7 @@ static int sr_late_init(struct omap_sr *sr_info)
 	struct omap_sr_data *pdata = sr_info->pdev->dev.platform_data;
 	int ret = 0;
 
-	if (sr_class->class_type == SR_CLASS2 &&
-		sr_class->notify_flags && sr_info->irq) {
+	if (sr_class->notify && sr_class->notify_flags && sr_info->irq) {
 
 		strcpy(name, "sr_");
 		strcat(name, sr_info->voltdm->name);
