@@ -2370,6 +2370,7 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 {
 	unsigned long curr_volt;
 	int is_volt_scaled = 0, i;
+	bool is_sr_disabled = false;
 	struct omap_vdd_info *vdd;
 	struct plist_node *node;
 
@@ -2389,7 +2390,10 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	volt = node->prio;
 
 	/* Disable smartreflex module across voltage and frequency scaling */
-	omap_smartreflex_disable_reset_volt(voltdm);
+	if (curr_volt != volt) {
+		omap_smartreflex_disable_reset_volt(voltdm);
+		is_sr_disabled = true;
+	}
 
 	if (curr_volt == volt) {
 		is_volt_scaled = 1;
@@ -2421,11 +2425,12 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 		omap_voltage_scale_vdd(voltdm, volt);
 
 	/* Enable Smartreflex module */
-	omap_smartreflex_enable(voltdm);
+	if (is_sr_disabled)
+		omap_smartreflex_enable(voltdm);
 
 	mutex_unlock(&vdd->scaling_mutex);
 
-    /* calculate the voltages for dependent vdd's */
+	/* calculate the voltages for dependent vdd's */
 	if (calc_dep_vdd_volt(&vdd->vdd_device, vdd, volt)) {
 		pr_warning("%s: Error in calculating dependent vdd voltages"
 			"for vdd_%s\n", __func__, voltdm->name);
