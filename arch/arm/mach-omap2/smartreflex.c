@@ -280,6 +280,7 @@ static int sr_late_init(struct omap_sr *sr_info)
 			kfree(sr_info);
 			return ret;
 		}
+		disable_irq(sr_info->irq);
 	}
 
 	if (pdata && pdata->enable_on_init)
