@@ -816,6 +816,63 @@ void omap_smartreflex_disable_reset_volt(struct voltagedomain *voltdm)
 }
 
 /**
+ * sr_notifier_control() - control the notifier mechanism
+ * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
+ * @enable:	true to enable notifiers and false to disable the same
+ *
+ * SR modules allow an MCU interrupt mechanism that vary based on the IP
+ * revision, we allow the system to generate interrupt if the class driver
+ * has capability to handle the same. it is upto the class driver to ensure
+ * the proper sequencing and handling for a clean implementation. returns
+ * 0 if all goes fine, else returns failure results
+ */
+int sr_notifier_control(struct voltagedomain *voltdm, bool enable)
+{
+	struct omap_sr *sr = _sr_lookup(voltdm);
+	u32 value = 0;
+	if (IS_ERR_OR_NULL(sr)) {
+		pr_warning("%s: sr corresponding to domain not found\n",
+				__func__);
+		return -EINVAL;
+	}
+	if (!sr->is_autocomp_active)
+		return -EINVAL;
+
+	/* if I could never register an isr, why bother?? */
+	if (!(sr_class && sr_class->notify && sr_class->notify_flags &&
+			sr->irq)) {
+		dev_warn(&sr->pdev->dev,
+			"%s: unable to setup irq without handling mechanism\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	switch (sr->sr_ip_type) {
+	case SR_TYPE_V1:
+		value = notifier_to_irqen_v1(sr_class->notify_flags);
+		sr_modify_reg(sr, ERRCONFIG_V1, value,
+				(enable) ? value : 0);
+		break;
+	case SR_TYPE_V2:
+		value = notifier_to_irqen_v2(sr_class->notify_flags);
+		sr_write_reg(sr, (enable) ? IRQENABLE_SET : IRQENABLE_CLR,
+				value);
+		break;
+	default:
+		 dev_warn(&sr->pdev->dev, "%s: unknown type of sr??\n",
+				 __func__);
+		return -EINVAL;
+	}
+
+	if (enable)
+		enable_irq(sr->irq);
+	else
+		disable_irq_nosync(sr->irq);
+
+	return 0;
+}
+
+/**
  * omap_sr_register_class : API to register a smartreflex class parameters.
  * @class_data - The structure containing various sr class specific data.
  *
