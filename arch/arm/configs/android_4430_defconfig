@@ -834,7 +834,7 @@ CONFIG_UID_STAT=y
 #
 # Texas Instruments shared transport line discipline
 #
-CONFIG_TI_ST=m
+CONFIG_TI_ST=y
 CONFIG_HAVE_IDE=y
 # CONFIG_IDE is not set
 

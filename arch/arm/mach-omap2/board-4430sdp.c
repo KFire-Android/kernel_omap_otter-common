@@ -92,6 +92,7 @@
 
 #define TWL6030_RTC_GPIO 6
 #define BLUETOOTH_UART UART2
+#define BLUETOOTH_UART_DEV_NAME "/dev/ttyO1"
 #define CONSOLE_UART UART3
 
 static struct wake_lock uart_lock;
@@ -754,7 +755,7 @@ int plat_kim_resume(struct platform_device *pdev)
 /* wl128x BT, FM, GPS connectivity chip */
 struct ti_st_plat_data wilink_pdata = {
 	.nshutdown_gpio = 55,
-	.dev_name = "/dev/ttyO1",
+	.dev_name = BLUETOOTH_UART_DEV_NAME,
 	.flow_cntrl = 1,
 	.baud_rate = 3000000,
 	.suspend = plat_kim_suspend,
@@ -769,6 +770,24 @@ static struct platform_device btwilink_device = {
 	.name = "btwilink",
 	.id = -1,
 };
+
+#ifdef CONFIG_TI_ST
+static bool is_bt_active(void)
+{
+	struct platform_device  *pdev;
+	struct kim_data_s       *kim_gdata;
+
+	pdev = &wl128x_device;
+	kim_gdata = dev_get_drvdata(&pdev->dev);
+	if (st_ll_getstate(kim_gdata->core_data) != ST_LL_ASLEEP &&
+			st_ll_getstate(kim_gdata->core_data) != ST_LL_INVALID)
+		return true;
+	else
+		return false;
+}
+#else
+#define is_bt_active NULL
+#endif
 
 static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_disp_led,
@@ -1637,7 +1656,7 @@ static struct omap_uart_port_info omap_serial_platform_data[] = {
 		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
 		.flags		= 1,
 		.plat_hold_wakelock = plat_hold_wakelock,
-		.plat_omap_bt_active = NULL,
+		.plat_omap_bt_active = is_bt_active,
 		.rts_padconf	= OMAP4_CTRL_MODULE_PAD_UART2_RTS_OFFSET,
 		.rts_override	= 0,
 		.cts_padconf	= OMAP4_CTRL_MODULE_PAD_UART2_CTS_OFFSET,
