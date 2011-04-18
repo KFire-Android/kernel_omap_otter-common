@@ -212,6 +212,12 @@ struct omap_smartreflex_pmic_data {
 #define SR_CLASS2	0x2
 #define SR_CLASS3	0x3
 
+/* Smart reflex notifiers for class drivers to use */
+#define SR_NOTIFY_MCUDISACK		BIT(3)
+#define SR_NOTIFY_MCUBOUND		BIT(2)
+#define SR_NOTIFY_MCUVALID		BIT(1)
+#define SR_NOTIFY_MCUACCUM		BIT(0)
+
 /**
  * omap_smartreflex_class_data : Structure to be populated by
  * Smartreflex class driver with corresponding class enable disable API's
