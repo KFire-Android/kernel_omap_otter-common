@@ -279,7 +279,7 @@ void __init omap3_check_revision(void)
 	}
 }
 
-#define MAX_ID_STRING		(4*8 + 1)
+#define MAX_ID_STRING		(4*8 + 4)
 #define DIE_ID_REG_BASE		(L4_44XX_PHYS + 0x2000)
 #define DIE_ID_REG_OFFSET	0x200
 
