@@ -65,8 +65,11 @@ config TWL6030_USB
 	select USB_OTG_UTILS
 	help
 	  Enable this to support the USB OTG transceiver on TWL6030
-	  family chips. this tranciever has the VBUS and ID GND and OTG
-	  event capability. This tranciever does not have the USB PHY like TWL4030.
+	  family chips. This TWL6030 transceiver has the VBUS and ID GND
+	  and OTG SRP events capabilities. For all other transceiver functionality
+	  UTMI PHY is embedded in OMAP4430. The internal PHY configurations APIs
+	  are hooked to this driver through platform_data structure.
+	  The definition of internal PHY APIs are in the mach-omap2 layer.
 
 config NOP_USB_XCEIV
 	tristate "NOP USB Transceiver Driver"

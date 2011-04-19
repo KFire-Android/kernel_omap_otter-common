@@ -114,6 +114,10 @@ extern void usb_musb_init(struct omap_musb_board_data *board_data);
 
 extern void usb_uhhtll_init(const struct usbhs_omap_platform_data *pdata);
 
+extern int omap4430_phy_power(struct device *dev, int ID, int on);
+extern int omap4430_phy_set_clk(struct device *dev, int on);
+extern int omap4430_phy_init(struct device *dev);
+extern int omap4430_phy_exit(struct device *dev);
 extern void usbhs_wakeup(void);
 
 /* For saving and restoring the musb context during off/wakeup*/
@@ -230,5 +234,26 @@ void omap_usb_init(struct omap_usb_config *pdata);
 #	define	USBT2TLL5PI		(1 << 17)
 #	define	USB0PUENACTLOI		(1 << 16)
 #	define	USBSTANDBYCTRL		(1 << 15)
+/* AM35x */
+/* USB 2.0 PHY Control */
+#define CONF2_PHY_GPIOMODE	(1 << 23)
+#define CONF2_OTGMODE		(3 << 14)
+#define CONF2_NO_OVERRIDE	(0 << 14)
+#define CONF2_FORCE_HOST	(1 << 14)
+#define CONF2_FORCE_DEVICE	(2 << 14)
+#define CONF2_FORCE_HOST_VBUS_LOW (3 << 14)
+#define CONF2_SESENDEN		(1 << 13)
+#define CONF2_VBDTCTEN		(1 << 12)
+#define CONF2_REFFREQ_24MHZ	(2 << 8)
+#define CONF2_REFFREQ_26MHZ	(7 << 8)
+#define CONF2_REFFREQ_13MHZ	(6 << 8)
+#define CONF2_REFFREQ		(0xf << 8)
+#define CONF2_PHYCLKGD		(1 << 7)
+#define CONF2_VBUSSENSE		(1 << 6)
+#define CONF2_PHY_PLLON		(1 << 5)
+#define CONF2_RESET		(1 << 4)
+#define CONF2_PHYPWRDN		(1 << 3)
+#define CONF2_OTGPWRDN		(1 << 2)
+#define CONF2_DATPOL		(1 << 1)
 
 #endif	/* __ASM_ARCH_OMAP_USB_H */

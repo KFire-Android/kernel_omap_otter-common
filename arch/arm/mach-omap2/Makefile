@@ -190,8 +190,10 @@ obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o \
 obj-$(CONFIG_MACH_OMAP3_TOUCHBOOK)	+= board-omap3touchbook.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
+					   omap_phy_internal.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
+					   omap_phy_internal.o \
 					   hsmmc.o
 
 ifeq ($(CONFIG_ARCH_OMAP4),y)

@@ -859,6 +859,13 @@ static int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 }
 #endif
 
+static struct twl4030_usb_data omap4_usbphy_data = {
+	.phy_init	= omap4430_phy_init,
+	.phy_exit	= omap4430_phy_exit,
+	.phy_power	= omap4430_phy_power,
+	.phy_set_clock	= omap4430_phy_set_clk,
+};
+
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 2,
@@ -1224,6 +1231,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux1		= &sdp4430_vaux1,
 	.vaux2		= &sdp4430_vaux2,
 	.vaux3		= &sdp4430_vaux3,
+	.usb		= &omap4_usbphy_data,
 	.clk32kg        = &sdp4430_clk32kg,
 	.madc           = &sdp4430_gpadc_data,
 	.bci            = &sdp4430_bci_data,

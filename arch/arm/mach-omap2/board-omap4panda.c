@@ -202,6 +202,12 @@ static struct omap_musb_board_data musb_board_data = {
 	.power			= 100,
 };
 
+static struct twl4030_usb_data omap4_usbphy_data = {
+	.phy_init	= omap4430_phy_init,
+	.phy_exit	= omap4430_phy_exit,
+	.phy_power	= omap4430_phy_power,
+	.phy_set_clock	= omap4430_phy_set_clk,
+};
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 1,
@@ -412,6 +418,7 @@ static struct twl4030_platform_data panda_twldata = {
 	.vusb		= &panda_vusb,
 	.vaux2		= &panda_vaux2,
 	.vaux3		= &panda_vaux3,
+	.usb		= &omap4_usbphy_data,
 	.madc           = &panda_gpadc_data,
 
 	/* children */
