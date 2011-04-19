@@ -1507,12 +1507,35 @@ done:
 
 hpd_modify:
 	if (r & HDMI_HPD_MODIFY) {
+		struct omap_overlay *ovl;
+		int i;
+
+		/* check if any overlays are connected to TV and
+		 * return if connected after resetting the IRQ's
+		 */
+		for (i = 0; i < dssdev->manager->num_overlays; i++) {
+			ovl = dssdev->manager->overlays[i];
+			if (!(strcmp(ovl->manager->name, "tv")))
+				if (ovl->info.enabled) {
+					DSSINFO("Overlay %d is still "
+						"attached to tv\n", ovl->id);
+					DSSINFO("Cannot Rconfigure HDMI when "
+						"overlays are still attached "
+						"to tv\n"
+						"Dettach the overlays before "
+						"reconfiguring the HDMI\n\n");
+					/* clear the IRQ's*/
+					hdmi_set_irqs(0);
+					goto done2;
+				}
+		}
+
 		/*
 		 * HDMI HPD state low followed by a HPD state high
 		 * with more than 100ms duration is recieved so EDID should
 		 * reread and HDMI reconfigued.
 		 */
-		DSSINFO("Reconfigure HDMI PHY - HDMI_HPD_MODIFY\n");
+		DSSINFO("Reconfigure HDMI PHY - HDMI_HPD_MODIFY\n\n");
 		/* force a new power-up to read EDID */
 		edid_set = false;
 		custom_set = false;
@@ -1522,6 +1545,7 @@ hpd_modify:
 		DSSINFO("Reconfigure HDMI PHY Done- HDMI_HPD_MODIFY\n\n");
 	}
 
+done2:
 	mutex_unlock(&hdmi.lock_aux);
 	mutex_unlock(&hdmi.lock);
 	kfree(work);
@@ -1917,9 +1941,27 @@ static void hdmi_set_timings(struct omap_dss_device *dssdev,
 static void hdmi_set_custom_edid_timing_code(struct omap_dss_device *dssdev,
 							int code, int mode)
 {
+	struct omap_overlay *ovl;
+	int i;
+
 	/* for now only set this while on or on HPD */
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
 		return;
+
+	/* check if any overlays are connected to TV and return if connected*/
+	for (i = 0; i < dssdev->manager->num_overlays; i++) {
+		ovl = dssdev->manager->overlays[i];
+		if (!(strcmp(ovl->manager->name, "tv")))
+			if (ovl->info.enabled) {
+				DSSINFO("Overlay[%d] is still "
+					"attached to tv\n", ovl->id);
+				DSSINFO("Cannot change HDMI timing when "
+					"overlays are still attached to tv\n"
+					"Dettach the overlays before "
+					"timing change\n\n");
+				return;
+			}
+	}
 
 	/* ignore invalid codes */
 	if ((!mode && code < ARRAY_SIZE(code_vesa) && code_vesa[code] >= 0) ||
