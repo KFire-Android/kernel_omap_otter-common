@@ -39,7 +39,7 @@
 #define OMAP_HSI_HWMOD_NAME			"hsi"
 #define OMAP_HSI_HWMOD_CLASSNAME		"hsi"
 #define OMAP_HSI_PADCONF_CAWAKE_PIN		"usbb1_ulpitll_clk.hsi1_cawake"
-
+#define OMAP_HSI_PADCONF_CAWAKE_MODE		OMAP_MUX_MODE1
 
 
 /*
@@ -178,12 +178,22 @@ int omap_hsi_prepare_suspend(void)
 {
 	struct platform_device *pdev;
 	struct hsi_dev *hsi_ctrl;
+	u16 val;
 
 	pdev = hsi_get_hsi_platform_device();
 	hsi_ctrl = hsi_get_hsi_controller_data(pdev);
 
 	if (!hsi_ctrl)
 		return -ENODEV;
+
+	/* Check for IO pad wakeup */
+	val = omap_mux_read_signal(OMAP_HSI_PADCONF_CAWAKE_PIN);
+	if (val == -ENODEV)
+		return -ENODEV;
+
+	/* HSI can only wakeup OMAP if CAWAKE is muxed */
+	if ((val & OMAP_MUX_MODE_MASK) != OMAP_HSI_PADCONF_CAWAKE_MODE)
+		return 0;
 
 	if (device_may_wakeup(&pdev->dev))
 		omap_mux_enable_wakeup(OMAP_HSI_PADCONF_CAWAKE_PIN);
@@ -247,9 +257,12 @@ int omap_hsi_resume_idle(void)
 
 	/* Check for IO pad wakeup */
 	val = omap_mux_read_signal(OMAP_HSI_PADCONF_CAWAKE_PIN);
-
 	if (val == -ENODEV)
-		return val;
+		return -ENODEV;
+
+	/* Continue only if CAWAKE is muxed */
+	if ((val & OMAP_MUX_MODE_MASK) != OMAP_HSI_PADCONF_CAWAKE_MODE)
+		return 0;
 
 	if (val & OMAP44XX_PADCONF_WAKEUPEVENT0) {
 		dev_dbg(hsi_ctrl->dev, "HSI WAKEUP DETECTED from PADCONF : "

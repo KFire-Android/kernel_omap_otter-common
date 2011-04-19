@@ -23,6 +23,7 @@
 #define OMAP_MUX_TERMINATOR	0xffff
 
 /* 34xx/44xx mux mode options for each pin. See TRM for options */
+#define OMAP_MUX_MODE_MASK  0x7
 #define OMAP_MUX_MODE0      0
 #define OMAP_MUX_MODE1      1
 #define OMAP_MUX_MODE2      2
