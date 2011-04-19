@@ -1485,15 +1485,21 @@ done:
 		 * the first time we enable HDMI via HPD.
 		 */
 		DSSINFO("Enabling display - HDMI_FIRST_HPD\n");
-		hdmi_reconfigure(dssdev);
 
 		if (!hdmi_connected) {
 			DSSINFO("irqstatus=0x%08x ignoring FIRST_HPD when "
 				"hdmi_connected = %d, hdmi_power = %d\n",
 				r, hdmi_connected, hdmi_power);
+			/* If HDMI is disconnected before FIRST HPD is processed
+			 * return without reconfiguring the HDMI and do not
+			 * send any hot plug event to the userspace in this case
+			 *  and reset irq's before returning.
+			 */
+			hdmi_set_irqs(0);
 			goto hpd_modify;
 		}
 
+		hdmi_reconfigure(dssdev);
 		set_hdmi_hot_plug_status(dssdev, true);
 		/* ignore return value for now */
 		DSSINFO("Enabling display Done- HDMI_FIRST_HPD\n\n");
