@@ -76,6 +76,9 @@ struct twlreg_info {
 #define VREG_BC_PROC		3
 #define VREG_BC_CLK_RST		4
 
+/* TWL6030 TRANS bit offset */
+#define TWL6030_CFG_TRANS_ACT	0
+#define TWL6030_CFG_TRANS_SLEEP	2
 /* TWL6030 LDO register values for CFG_STATE */
 #define TWL6030_CFG_STATE_OFF	0x00
 #define TWL6030_CFG_STATE_ON	0x01
@@ -300,12 +303,22 @@ static int twl6030reg_set_mode(struct regulator_dev *rdev, unsigned mode)
 {
 	struct twlreg_info	*info = rdev_get_drvdata(rdev);
 	int grp;
-	int val;
+	int val = 0;
+	int trans_val = 0;
 
 	grp = twlreg_read(info, TWL_MODULE_PM_RECEIVER, VREG_GRP);
 
 	if (grp < 0)
 		return grp;
+
+	trans_val = twlreg_read(info, TWL_MODULE_PM_RECEIVER, VREG_TRANS);
+	/* For ACT map to ACT and SLEEP map to AMS */
+	trans_val |= (0x1 << TWL6030_CFG_TRANS_SLEEP) |
+				(0x3 << TWL6030_CFG_TRANS_ACT);
+	trans_val = twlreg_write(info, TWL_MODULE_PM_RECEIVER,
+				 VREG_TRANS, trans_val);
+	if (trans_val < 0)
+		return trans_val;
 
 	/* Compose the state register settings */
 	val = grp << TWL6030_CFG_STATE_GRP_SHIFT;
