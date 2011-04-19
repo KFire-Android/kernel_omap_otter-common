@@ -975,6 +975,7 @@ static int omap_sr_autocomp_show(void *data, u64 *val)
 
 static int omap_sr_autocomp_store(void *data, u64 val)
 {
+	int r;
 	struct omap_sr *sr_info = (struct omap_sr *) data;
 
 	if (!sr_info) {
@@ -991,10 +992,20 @@ static int omap_sr_autocomp_store(void *data, u64 val)
 
 	/* control enable/disable only if there is a delta in value */
 	if (sr_info->is_autocomp_active != val) {
+		r = omap_vscale_pause(sr_info->voltdm, false);
+		if (r) {
+			pr_warning("%s: unable to secure dvfs transition:%d\n",
+					__func__, r);
+			return r;
+		}
 		if (!val)
 			sr_stop_vddautocomp(sr_info);
 		else
 			sr_start_vddautocomp(sr_info);
+		r = omap_vscale_unpause(sr_info->voltdm);
+		if (r)
+			pr_err("%s: unable to release dvfs transition:%d\n",
+					__func__, r);
 	}
 	return 0;
 }

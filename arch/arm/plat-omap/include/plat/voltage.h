@@ -137,6 +137,9 @@ bool omap_vp_is_transdone(struct voltagedomain *voltdm);
 bool omap_vp_clear_transdone(struct voltagedomain *voltdm);
 
 int omap_voltage_calib_reset(struct voltagedomain *voltdm);
+int omap_vscale_pause(struct voltagedomain *voltdm, bool trylock);
+int omap_vscale_unpause(struct voltagedomain *voltdm);
+
 #ifdef CONFIG_PM
 void omap_voltage_init_vc(struct omap_volt_vc_data *setup_vc);
 void omap_change_voltscale_method(int voltscale_method);

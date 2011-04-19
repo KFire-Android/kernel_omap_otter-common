@@ -167,9 +167,15 @@ static void do_calibrate(struct work_struct *work)
 	}
 
 	/*
-	 * TODO:Handle the case where we might have just been scheduled AND
-	 * 1.5 disable was called. check and HOLD DVFS
+	 * Handle the case where we might have just been scheduled AND
+	 * 1.5 disable was called.
 	 */
+	if (omap_vscale_pause(work_data->voltdm, true)) {
+		schedule_delayed_work(&work_data->work,
+				      msecs_to_jiffies(SR1P5_SAMPLING_DELAY_MS *
+						       SR1P5_STABLE_SAMPLES));
+		return;
+	}
 
 	voltdm = work_data->voltdm;
 	/*
@@ -179,7 +185,7 @@ static void do_calibrate(struct work_struct *work)
 	if (unlikely(!work_data->work_active)) {
 		pr_err("%s:%s unplanned work invocation!\n", __func__,
 		       voltdm->name);
-		/* TODO release the DVFS */
+		omap_vscale_unpause(work_data->voltdm);
 		return;
 	}
 
@@ -218,7 +224,7 @@ start_sampling:
 	schedule_delayed_work(&work_data->work,
 			      msecs_to_jiffies(SR1P5_SAMPLING_DELAY_MS *
 					       SR1P5_STABLE_SAMPLES));
-	/* TODO: release DVFS */
+	omap_vscale_unpause(work_data->voltdm);
 	return;
 
 oscillating_calib:
@@ -254,7 +260,7 @@ done_calib:
 	 * vc_setup_on_voltage(voltdm, volt_data->volt_calibrated);
 	 */
 	work_data->work_active = false;
-	/* TODO: release DVFS */
+	omap_vscale_unpause(work_data->voltdm);
 }
 
 #if CONFIG_OMAP_SR_CLASS1P5_RECALIBRATION_DELAY
@@ -279,13 +285,15 @@ static void do_recalibrate(struct work_struct *work)
 			/* if sr is not enabled, we check later */
 			if (!is_sr_enabled(voltdm))
 				continue;
-			/* TODO: Pause the DVFS transitions */
-			/* if sr is not enabled, we check later */
+
+			/* if we can't pause it, check later */
+			if (omap_vscale_pause(voltdm, false))
+				continue;
 
 			/* Reset and force a recalibration for current opp */
 			sr_class1p5_reset_calib(voltdm, true, true);
 
-			/* TODO: unpause DVFS transitions */
+			omap_vscale_unpause(voltdm);
 		}
 	}
 	/* We come back again after time the usual delay */

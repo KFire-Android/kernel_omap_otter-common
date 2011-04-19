@@ -1882,6 +1882,60 @@ static int scale_dep_vdd(struct omap_vdd_info *main_vdd)
 }
 
 /* Public functions */
+
+/**
+ * omap_vscale_pause() - Pause the dvfs transition for this domain
+ * @voltdom: voltage domain to pause
+ * @trylock: should we return if we dvfs already in transition
+ *
+ * To ensure that the system accesses to internal registers of OMAP
+ * modules are made safe, we need to ensure exclusivity of access
+ * these module drivers request pause of the domain transition while
+ * they finish off their work. The users should ensure sanity
+ * between usual dvfs paths Vs usage of these APIs to prevent deadlocks
+ *
+ * Returns 0 if dvfs has been paused for the domain, else returns err val
+ */
+int omap_vscale_pause(struct voltagedomain *voltdm, bool trylock)
+{
+	struct omap_vdd_info *vdd;
+
+	if (!voltdm || IS_ERR(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return 0;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+
+	if (trylock)
+		return !mutex_trylock(&vdd->scaling_mutex);
+
+	mutex_lock(&vdd->scaling_mutex);
+	return 0;
+}
+
+/**
+ * omap_vscale_unpause() - Free up the dvfs transitions for this domain
+ * @voltdom: voltage domain to unpause
+ *
+ * In the cases where omap_vscale_pause operations are called, unpause
+ * is used to free up the sequences
+ */
+int omap_vscale_unpause(struct voltagedomain *voltdm)
+{
+	struct omap_vdd_info *vdd;
+
+	if (!voltdm || IS_ERR(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return 0;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+
+	mutex_unlock(&vdd->scaling_mutex);
+	return 0;
+}
+
 /**
  * omap_voltage_get_nom_volt : Gets the current non-auto-compensated voltage
  * @voltdm	: pointer to the VDD for which current voltage info is needed
