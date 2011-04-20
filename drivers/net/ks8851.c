@@ -1703,12 +1703,33 @@ static int __devexit ks8851_remove(struct spi_device *spi)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int ks8851_suspend(struct spi_device *spi, pm_message_t mesg)
+{
+	struct ks8851_net *priv = dev_get_drvdata(&spi->dev);
+	ks8851_net_stop(priv->netdev);
+	return 0;
+}
+
+static int ks8851_resume(struct spi_device *spi)
+{
+	struct ks8851_net *priv = dev_get_drvdata(&spi->dev);
+	ks8851_net_open(priv->netdev);
+	return 0;
+}
+#else
+#define ks8851_suspend NULL
+#define ks8851_resume  NULL
+#endif
+
 static struct spi_driver ks8851_driver = {
 	.driver = {
 		.name = "ks8851",
 		.owner = THIS_MODULE,
 	},
 	.probe = ks8851_probe,
+	.suspend = ks8851_suspend,
+	.resume = ks8851_resume,
 	.remove = __devexit_p(ks8851_remove),
 };
 
