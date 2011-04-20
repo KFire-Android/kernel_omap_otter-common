@@ -186,6 +186,7 @@ static int ipc_open(struct inode *inode, struct file *filp)
 		dev = container_of(inode->i_cdev, struct ipc_device,
 					cdev);
 		pr_ctxt->dev = dev;
+		pr_ctxt->tgid = current->tgid;
 		filp->private_data = pr_ctxt;
 	}
 
@@ -213,9 +214,9 @@ static int ipc_release(struct inode *inode, struct file *filp)
 		goto err;
 	}
 
-	ipc_notify_event(IPC_CLOSE, (void *)NULL);
-
 	pr_ctxt = filp->private_data;
+	ipc_notify_event(IPC_CLOSE, (void *)pr_ctxt->tgid);
+
 
 	list_for_each_entry_safe(info, temp, &pr_ctxt->resources, res) {
 		retval = ipc_release_resource(info->cmd, (ulong)info->data,

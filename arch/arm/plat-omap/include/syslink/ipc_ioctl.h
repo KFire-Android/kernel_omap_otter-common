@@ -100,6 +100,7 @@ struct ipc_process_context {
 	spinlock_t res_lock;
 
 	struct ipc_device *dev;
+	pid_t tgid;
 };
 
 void add_pr_res(struct ipc_process_context *pr_ctxt, unsigned int cmd,
