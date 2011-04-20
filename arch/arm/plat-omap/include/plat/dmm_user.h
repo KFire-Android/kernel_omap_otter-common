@@ -89,6 +89,7 @@ struct iodmm_struct {
 	struct iovmm_device	*iovmm;
 	struct list_head	map_list;
 	u32			pool_id;
+	pid_t			tgid;
 };
 
 struct iovmm_device {

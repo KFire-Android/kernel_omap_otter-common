@@ -111,6 +111,7 @@ static int omap_dmm_open(struct inode *inode, struct file *filp)
 	INIT_LIST_HEAD(&iodmm->map_list);
 
 	iodmm->iovmm = obj;
+	iodmm->tgid = current->tgid;
 	obj->iommu = iommu_get(obj->name);
 	filp->private_data = iodmm;
 
@@ -139,7 +140,7 @@ static int omap_dmm_release(struct inode *inode, struct file *filp)
 		 */
 		if (!list_empty(&obj->map_list)) {
 			iommu_notify_event(obj->iovmm->iommu, IOMMU_CLOSE,
-								NULL);
+							(void *)obj->tgid);
 		}
 		mutex_unlock(&obj->iovmm->dmm_map_lock);
 	} else {
