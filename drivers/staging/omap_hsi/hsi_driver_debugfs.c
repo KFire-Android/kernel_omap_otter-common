@@ -108,7 +108,7 @@ static int hsi_debug_port_show(struct seq_file *m, void *p)
 	}
 	seq_printf(m, "BREAK\t\t: 0x%08x\n",
 		   hsi_inl(base, HSI_HST_BREAK_REG(port)));
-	for (ch = 0; ch < hsi_port->max_ch; ch++) {
+	for (ch = 0; ch < 8; ch++) {
 		buff_offset = hsi_hst_buffer_reg(hsi_ctrl, port, ch);
 		if (buff_offset >= 0)
 			seq_printf(m, "BUFFER_CH%d\t: 0x%08x\n", ch,
@@ -148,7 +148,7 @@ static int hsi_debug_port_show(struct seq_file *m, void *p)
 		   hsi_inl(base, HSI_HSR_ERROR_REG(port)));
 	seq_printf(m, "ERRORACK\t: 0x%08x\n",
 		   hsi_inl(base, HSI_HSR_ERRORACK_REG(port)));
-	for (ch = 0; ch < hsi_port->max_ch; ch++) {
+	for (ch = 0; ch < 8; ch++) {
 		buff_offset = hsi_hsr_buffer_reg(hsi_ctrl, port, ch);
 		if (buff_offset >= 0)
 			seq_printf(m, "BUFFER_CH%d\t: 0x%08x\n", ch,
