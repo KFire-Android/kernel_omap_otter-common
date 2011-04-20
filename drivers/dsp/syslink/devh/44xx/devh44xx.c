@@ -110,7 +110,6 @@ static int devh44xx_notifier_call(struct notifier_block *nb,
 					struct omap_devh_platform_data *pdata)
 {
 	int err = 0;
-	pid_t my_pid = current->tgid;
 	struct omap_devh_runtime_info *pinfo = NULL;
 	struct omap_devh_platform_data *pdata2 = NULL;
 
@@ -124,7 +123,7 @@ static int devh44xx_notifier_call(struct notifier_block *nb,
 		if (err)
 			goto exit;
 		err = ipu_pm_notifications(APP_M3, PM_PID_DEATH,
-								(void *)my_pid);
+								(void *)v);
 		if (err) {
 			pinfo->brd_state = DEVH_BRDST_ERROR;
 			if (!strcmp(pdata->name, "SysM3")) {
