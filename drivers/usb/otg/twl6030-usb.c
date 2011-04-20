@@ -266,6 +266,8 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 
 static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 {
+
+#ifndef CONFIG_USB_MUSB_PERIPHERAL
 	struct twl6030_usb *twl = _twl;
 	int status = USB_EVENT_NONE;
 	u8 hw_state;
@@ -290,6 +292,7 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 	}
 	twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_LATCH_CLR, status);
 	twl->linkstat = status;
+#endif
 
 	return IRQ_HANDLED;
 }
