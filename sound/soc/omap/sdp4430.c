@@ -24,6 +24,7 @@
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
 #include <linux/i2c/twl.h>
+#include <linux/regulator/consumer.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -47,6 +48,7 @@
 
 #define TPS6130X_I2C_ADAPTER   1
 
+static struct regulator *av_switch_reg;
 static int twl6040_power_mode;
 static int mcbsp_cfg;
 static struct snd_soc_codec *twl6040_codec;
@@ -301,6 +303,19 @@ static struct snd_soc_jack_pin hs_jack_pins[] = {
 	},
 };
 
+static int sdp4430_av_switch_event(struct snd_soc_dapm_widget *w,
+				   struct snd_kcontrol *kcontrol, int event)
+{
+	int ret;
+
+	if (SND_SOC_DAPM_EVENT_ON(event))
+		ret = regulator_enable(av_switch_reg);
+	else
+		ret = regulator_disable(av_switch_reg);
+
+	return ret;
+}
+
 static int sdp4430_get_power_mode(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
@@ -339,6 +354,9 @@ static const struct snd_soc_dapm_widget sdp4430_twl6040_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
 	SND_SOC_DAPM_SPK("Earphone Spk", NULL),
 	SND_SOC_DAPM_INPUT("Aux/FM Stereo In"),
+	SND_SOC_DAPM_SUPPLY("AV Switch Supply",
+			    SND_SOC_NOPM, 0, 0, sdp4430_av_switch_event,
+			    SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_MIC("Digital Mic 0", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic 1", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic 2", NULL),
@@ -357,6 +375,7 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	/* Headset Mic: HSMIC with bias */
 	{"HSMIC", NULL, "Headset Mic Bias"},
 	{"Headset Mic Bias", NULL, "Headset Mic"},
+	{"Headset Mic", NULL, "AV Switch Supply"},
 
 	/* Headset Stereophone (Headphone): HSOL, HSOR */
 	{"Headset Stereophone", NULL, "HSOL"},
@@ -1088,19 +1107,27 @@ static int __init sdp4430_soc_init(void)
 		goto err_dev;
 	}
 
+	av_switch_reg = regulator_get(&sdp4430_snd_device->dev, "av-switch");
+	if (IS_ERR(av_switch_reg)) {
+		ret = PTR_ERR(av_switch_reg);
+		printk(KERN_ERR "couldn't get AV Switch regulator %d\n",
+			ret);
+		goto err_dev;
+	}
+
 	/* enable tps6130x */
 	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &gpoctl,
 		TWL6040_REG_GPOCTL);
 	if (ret) {
 		printk(KERN_ERR "i2c read error\n");
-		goto err_dev;
+		goto i2c_err;
 	}
 
 	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl | TWL6040_GPO2,
 		TWL6040_REG_GPOCTL);
 	if (ret) {
 		printk(KERN_ERR "i2c write error\n");
-		goto err_dev;
+		goto i2c_err;
 	}
 
 	adapter = i2c_get_adapter(TPS6130X_I2C_ADAPTER);
@@ -1126,9 +1153,11 @@ static int __init sdp4430_soc_init(void)
 	return ret;
 
 tps_err:
-       i2c_put_adapter(adapter);
+	i2c_put_adapter(adapter);
 adp_err:
-       twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl, TWL6040_REG_GPOCTL);
+	twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl, TWL6040_REG_GPOCTL);
+i2c_err:
+	regulator_put(av_switch_reg);
 err_dev:
 	snd_soc_unregister_dais(&sdp4430_snd_device->dev, ARRAY_SIZE(dai));
 err:
@@ -1139,6 +1168,7 @@ module_init(sdp4430_soc_init);
 
 static void __exit sdp4430_soc_exit(void)
 {
+	regulator_put(av_switch_reg);
 	platform_device_unregister(sdp4430_snd_device);
 	snd_soc_unregister_dais(&sdp4430_snd_device->dev, ARRAY_SIZE(dai));
 	i2c_unregister_device(tps6130x_client);
