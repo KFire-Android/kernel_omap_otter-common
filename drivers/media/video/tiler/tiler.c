@@ -854,7 +854,7 @@ static void _m_free_process_info(struct process_info *pi)
 	bool ai_autofreed, need2free;
 
 	if (!list_empty(&pi->bufs))
-		tiler_notify_event(TILER_DEVICE_CLOSE, NULL);
+		tiler_notify_event(TILER_DEVICE_CLOSE, (void *)pi->pid);
 
 	/* unregister all buffers */
 	list_for_each_entry_safe(_b, _b_, &pi->bufs, by_pid)
