@@ -348,6 +348,9 @@
 #define D_BT_DL_48_16_OPP100_WRAP_ADDR                      15640
 #define D_BT_DL_48_16_OPP100_WRAP_ADDR_END                  15647
 #define D_BT_DL_48_16_OPP100_WRAP_sizeof                    8
+#define D_VX_DL_8_48_FIR_WRAP_ADDR                          15648
+#define D_VX_DL_8_48_FIR_WRAP_ADDR_END                      15655
+#define D_VX_DL_8_48_FIR_WRAP_sizeof                        8
 #define D_PING_ADDR                                         16384
 #define D_PING_ADDR_END                                     40959
 #define D_PING_sizeof                                       24576

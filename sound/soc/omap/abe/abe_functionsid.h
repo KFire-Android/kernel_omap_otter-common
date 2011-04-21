@@ -88,6 +88,7 @@
 #define C_ABE_FW_FUNCTION_IIR_SRC2                          25
 #define C_ABE_FW_FUNCTION_ASRC_DL_wrapper_sibling           26
 #define C_ABE_FW_FUNCTION_ASRC_UL_wrapper_sibling           27
+#define C_ABE_FW_FUNCTION_FIR6                              28
 /*
  *    COPY function ID definitions
  */

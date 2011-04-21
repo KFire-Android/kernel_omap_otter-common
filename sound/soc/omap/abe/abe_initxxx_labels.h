@@ -367,4 +367,7 @@
 #define ASRC_BT_DL_16k_Regs_labelID                         307
 #define BT_DL_48_8_OPP100_WRAP_labelID                      308
 #define BT_DL_48_16_OPP100_WRAP_labelID                     309
+#define VX_DL_8_48_OSR_LP_labelID                           310
+#define SRC_FIR6_OSR_LP_labelID                             311
+#define VX_DL_8_48_FIR_WRAP_labelID                         312
 #endif /* _ABE_INITXXXX_LABELS_H_ */

@@ -89,9 +89,9 @@
 #define SAMP_LOOP_48K                                       12
 #define SAMP_LOOP_16K                                       4
 #define SAMP_LOOP_8K                                        2
-#define INPUT_SCALE_SHIFTM2                                 5088
-#define OUTPUT_SCALE_SHIFTM2                                5092
-#define MUTE_SCALING                                        5096
+#define INPUT_SCALE_SHIFTM2                                 5100
+#define OUTPUT_SCALE_SHIFTM2                                5104
+#define MUTE_SCALING                                        5108
 #define ABE_PMEM                                            1
 #define ABE_CMEM                                            2
 #define ABE_SMEM                                            3
