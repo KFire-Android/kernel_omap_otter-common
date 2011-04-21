@@ -24,6 +24,7 @@
  *
  ******************************************************************************/
 
+#include <linux/slab.h>
 #include "services_headers.h"
 #include "buffer_manager.h"
 #include "pvr_bridge_km.h"
@@ -1022,6 +1023,110 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 					return PVRSRV_ERROR_CACHEOP_FAILED;
 				}
 			}
+/* FIXME: Temporary fix needs to be revisited
+ * LinuxMemArea struct listing is not registered for memory areas
+ * wrapped through PVR2DMemWrap() call. For now, we are doing
+ * cache flush/inv by grabbing the physical pages through
+ * get_user_pages() for every blt call.
+ */
+			else if (psMiscInfo->sCacheOpCtl.eCacheOpType ==
+						PVRSRV_MISC_INFO_CPUCACHEOP_CUSTOM_FLUSH)
+			{
+#if defined(CONFIG_OUTER_CACHE) && defined(PVR_NO_FULL_CACHE_OPS)
+				if (1)
+				{
+					IMG_SIZE_T 	uPageOffset, uPageCount;
+					IMG_VOID	*pvPageAlignedCPUVAddr;
+					IMG_SYS_PHYADDR	 	*psIntSysPAddr = IMG_NULL;
+					IMG_HANDLE	hOSWrapMem = IMG_NULL;
+					PVRSRV_ERROR eError;
+					int i;
+
+					uPageOffset = (IMG_UINTPTR_T)psMiscInfo->sCacheOpCtl.pvBaseVAddr & (HOST_PAGESIZE() - 1);
+					uPageCount =
+						HOST_PAGEALIGN(psMiscInfo->sCacheOpCtl.ui32Length + uPageOffset)/HOST_PAGESIZE();
+					pvPageAlignedCPUVAddr = (IMG_VOID *)((IMG_UINTPTR_T)psMiscInfo->sCacheOpCtl.pvBaseVAddr - uPageOffset);
+
+					if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
+						uPageCount * sizeof(IMG_SYS_PHYADDR),
+						(IMG_VOID **)&psIntSysPAddr, IMG_NULL,
+						"Array of Page Addresses") != PVRSRV_OK)
+					{
+						PVR_DPF((PVR_DBG_ERROR,"PVRSRVWrapExtMemoryKM: Failed to alloc memory for block"));
+						return PVRSRV_ERROR_OUT_OF_MEMORY;
+					}
+
+					eError = OSAcquirePhysPageAddr(pvPageAlignedCPUVAddr,
+										uPageCount * HOST_PAGESIZE(),
+										psIntSysPAddr,
+										&hOSWrapMem);
+					for (i = 0; i < uPageCount; i++)
+					{
+						outer_flush_range(psIntSysPAddr[i].uiAddr, psIntSysPAddr[i].uiAddr + HOST_PAGESIZE() -1);
+					}
+
+					OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
+						uPageCount * sizeof(IMG_SYS_PHYADDR),
+						psIntSysPAddr, IMG_NULL);
+
+					kfree(hOSWrapMem);
+
+				}
+#else
+				OSFlushCPUCacheKM();
+#endif /* CONFIG_OUTER_CACHE && PVR_NO_FULL_CACHE_OPS*/
+			}
+			else if (psMiscInfo->sCacheOpCtl.eCacheOpType ==
+							PVRSRV_MISC_INFO_CPUCACHEOP_CUSTOM_INV)
+			{
+#if defined(CONFIG_OUTER_CACHE)
+				/* TODO: Need to check full cache invalidation, but
+				 * currently it is not exported through
+				 * outer_cache interface.
+				 */
+				if (1)
+				{
+					IMG_SIZE_T 	uPageOffset, uPageCount;
+					IMG_VOID	*pvPageAlignedCPUVAddr;
+					IMG_SYS_PHYADDR	 	*psIntSysPAddr = IMG_NULL;
+					IMG_HANDLE	hOSWrapMem = IMG_NULL;
+					PVRSRV_ERROR eError;
+					int i;
+
+					uPageOffset = (IMG_UINTPTR_T)psMiscInfo->sCacheOpCtl.pvBaseVAddr & (HOST_PAGESIZE() - 1);
+					uPageCount =
+						HOST_PAGEALIGN(psMiscInfo->sCacheOpCtl.ui32Length + uPageOffset)/HOST_PAGESIZE();
+					pvPageAlignedCPUVAddr = (IMG_VOID *)((IMG_UINTPTR_T)psMiscInfo->sCacheOpCtl.pvBaseVAddr - uPageOffset);
+
+					if(OSAllocMem(PVRSRV_OS_PAGEABLE_HEAP,
+						uPageCount * sizeof(IMG_SYS_PHYADDR),
+						(IMG_VOID **)&psIntSysPAddr, IMG_NULL,
+						"Array of Page Addresses") != PVRSRV_OK)
+					{
+						PVR_DPF((PVR_DBG_ERROR,"PVRSRVWrapExtMemoryKM: Failed to alloc memory for block"));
+						return PVRSRV_ERROR_OUT_OF_MEMORY;
+					}
+
+					eError = OSAcquirePhysPageAddr(pvPageAlignedCPUVAddr,
+										uPageCount * HOST_PAGESIZE(),
+										psIntSysPAddr,
+										&hOSWrapMem);
+					for (i = 0; i < uPageCount; i++)
+					{
+						outer_inv_range(psIntSysPAddr[i].uiAddr, psIntSysPAddr[i].uiAddr + HOST_PAGESIZE() -1);
+					}
+
+					OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
+						uPageCount * sizeof(IMG_SYS_PHYADDR),
+						psIntSysPAddr, IMG_NULL);
+
+					kfree(hOSWrapMem);
+
+				}
+
+#endif /* CONFIG_OUTER_CACHE */
+			}
+
 		}
 	}
 
@@ -1300,4 +1405,3 @@ IMG_VOID PVRSRVScheduleDevicesKM(IMG_VOID)
 {
 	PVRSRVScheduleDeviceCallbacks();
 }
-
