@@ -54,6 +54,7 @@
 int omap2_clk_enable(struct clk *clk);
 void omap2_clk_disable(struct clk *clk);
 long omap2_clk_round_rate(struct clk *clk, unsigned long rate);
+long omap2_clk_round_rate_parent(struct clk *clk, struct clk *parent);
 int omap2_clk_set_rate(struct clk *clk, unsigned long rate);
 int omap2_clk_set_parent(struct clk *clk, struct clk *new_parent);
 int omap2_dpll_set_rate_tolerance(struct clk *clk, unsigned int tolerance);
@@ -83,6 +84,9 @@ unsigned long omap2_clksel_recalc(struct clk *clk);
 long omap2_clksel_round_rate(struct clk *clk, unsigned long target_rate);
 int omap2_clksel_set_rate(struct clk *clk, unsigned long rate);
 int omap2_clksel_set_parent(struct clk *clk, struct clk *new_parent);
+/* XXX hack for clock notifiers */
+u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
+		u32 *field_val);
 
 u32 omap2_get_dpll_rate(struct clk *clk);
 void omap2_init_dpll_parent(struct clk *clk);
