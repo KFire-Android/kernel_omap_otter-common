@@ -52,6 +52,11 @@
 #include "dss.h"
 #include <plat/edid.h>
 
+#ifdef CONFIG_OMAP_PM
+#include <plat/omap-pm.h>
+#endif
+
+
 static int hdmi_enable_video(struct omap_dss_device *dssdev);
 static void hdmi_disable_video(struct omap_dss_device *dssdev);
 static int hdmi_suspend_video(struct omap_dss_device *dssdev);
@@ -1417,9 +1422,22 @@ static void hdmi_work_queue(struct work_struct *ws)
 		/* turn OFF clocks on disconnect*/
 		if (cpu_is_omap44xx()) {
 			if (hdmi_opt_clk_state) {
+#ifdef CONFIG_OMAP_PM
+				int ret = 0;
+#endif
 				DSSINFO("Disable HDMI_PHY_48MHz clock\n");
 				hdmi_opt_clock_disable();
 				hdmi_opt_clk_state = false;
+#ifdef CONFIG_OMAP_PM
+				DSSINFO("Release L3 constraint\n");
+				ret = omap_pm_set_min_bus_tput(
+					&dssdev->dev,
+					OCP_INITIATOR_AGENT,
+					-1);
+				if (ret)
+					DSSERR("Unable to release L3 "
+					       "constraint\n");
+#endif
 			}
 		}
 		DSSINFO("Disable Display Done - HDMI_DISCONNECT\n\n");
@@ -1445,9 +1463,22 @@ static void hdmi_work_queue(struct work_struct *ws)
 		/* turn ON clocks on connect*/
 		if (cpu_is_omap44xx()) {
 			if (!hdmi_opt_clk_state) {
+				int ret = 0;
 				DSSINFO("Enable HDMI_PHY_48MHz clock\n");
-				hdmi_opt_clock_enable();
-				hdmi_opt_clk_state = true;
+				ret = hdmi_opt_clock_enable();
+				if (!ret)
+					hdmi_opt_clk_state = true;
+				else
+					goto done2;
+#ifdef CONFIG_OMAP_PM
+				DSSINFO("Set L3 constraint to 200MHz\n");
+				ret = omap_pm_set_min_bus_tput(
+					&dssdev->dev,
+					OCP_INITIATOR_AGENT,
+					200*1000*4);
+				if (ret)
+					DSSERR("Unable to set L3 at 200MHz\n");
+#endif
 			}
 		}
 		edid_set = false;
@@ -1661,6 +1692,16 @@ static int hdmi_start_display(struct omap_dss_device *dssdev)
 			r = hdmi_opt_clock_enable();
 			if (!r)
 				hdmi_opt_clk_state = true;
+			else
+				goto err;
+#ifdef CONFIG_OMAP_PM
+			DSSINFO("Set L3 constraint to 200MHz\n");
+			r = omap_pm_set_min_bus_tput(&dssdev->dev,
+						       OCP_INITIATOR_AGENT,
+						       200*1000*4);
+			if (r)
+				DSSERR("Unable to set L3 at 200MHz\n");
+#endif
 		}
 	}
 err:
@@ -1738,6 +1779,14 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 				"hdmi_power = %d\n\n", power_need);
 			hdmi_opt_clock_disable();
 			hdmi_opt_clk_state = false;
+#ifdef CONFIG_OMAP_PM
+			DSSINFO("Release L3 constraint\n");
+			r = omap_pm_set_min_bus_tput(&dssdev->dev,
+						     OCP_INITIATOR_AGENT,
+						     -1);
+			if (r)
+				DSSERR("Unable to release L3 constraint\n");
+#endif
 		}
 
 	return r;
