@@ -487,6 +487,9 @@ static void twl4030_phy_resume(struct twl4030_usb *twl)
 {
 	if (!twl->asleep)
 		return;
+	/* Check the link status before enabling */
+	if (twl4030_usb_linkstat(twl) == USB_EVENT_NONE)
+		return;
 
 	twl4030_phy_power(twl, 1);
 	twl4030_i2c_access(twl, 1);
