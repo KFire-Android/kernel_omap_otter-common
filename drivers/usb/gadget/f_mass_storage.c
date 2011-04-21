@@ -352,6 +352,7 @@ struct fsg_operations {
 /* Data shared by all the FSG instances. */
 struct fsg_common {
 	struct usb_gadget	*gadget;
+	struct usb_composite_dev *cdev;
 	struct fsg_dev		*fsg, *new_fsg;
 	wait_queue_head_t	fsg_wait;
 
@@ -2443,7 +2444,7 @@ static int fsg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	struct fsg_dev *fsg = fsg_from_func(f);
 	fsg->common->new_fsg = fsg;
 	raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
-	return 0;
+	return USB_GADGET_DELAYED_STATUS;
 }
 
 static void fsg_disable(struct usb_function *f)
@@ -2571,6 +2572,8 @@ static void handle_exception(struct fsg_common *common)
 
 	case FSG_STATE_CONFIG_CHANGE:
 		do_set_interface(common, common->new_fsg);
+		if (common->new_fsg)
+			usb_composite_setup_continue(common->cdev);
 		switch_set_state(&common->sdev, common->running);
 		break;
 
@@ -3099,6 +3102,7 @@ static int fsg_bind_config(struct usb_composite_dev *cdev,
 	fsg->function.disable     = fsg_disable;
 
 	fsg->common               = common;
+	fsg->common->cdev         = cdev;
 
 	/* Our caller holds a reference to common structure so we
 	 * don't have to be worry about it being freed until we return
