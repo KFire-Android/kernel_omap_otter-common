@@ -28,7 +28,7 @@
 
 #include "mux.h"
 #include "sdram-hynix-h8mbx00u0mer-0em.h"
-#include "smartreflex-class3.h"
+#include "smartreflex-class1p5.h"
 #include "board-zoom2-wifi.h"
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
@@ -294,7 +294,7 @@ static void __init omap_zoom_init(void)
 	omap_mux_init_gpio(161, OMAP_PIN_OUTPUT);
 	omap_mux_init_gpio(McBSP3_BT_GPIO, OMAP_PIN_OUTPUT);
 	usb_uhhtll_init(&usbhs_pdata);
-	sr_class3_init();
+	sr_class1p5_init();
 
 #ifdef CONFIG_PM
 #ifdef CONFIG_TWL4030_CORE
