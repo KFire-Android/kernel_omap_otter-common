@@ -3206,9 +3206,8 @@ static int ipu_pm_timer_state(int event)
 	case PM_HIB_TIMER_EXPIRE:
 		if (params->hib_timer_state == PM_HIB_TIMER_ON) {
 			pr_debug("Starting hibernation, waking up M3 cores");
-			handle->rcb_table->state_flag |= (SYS_PROC_HIB |
-							  APP_PROC_HIB |
-							  ENABLE_IPU_HIB);
+			handle->rcb_table->state_flag |= ENABLE_SELF_HIB;
+			handle->rcb_table->hib_flag = START_HIB_FLAG;
 #ifdef CONFIG_DUCATI_WATCH_DOG
 			if (global_rcb->pm_flags.wdt_allowed) {
 				if (sys_rproc->dmtimer != NULL)

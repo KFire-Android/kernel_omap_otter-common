@@ -222,7 +222,9 @@
 /* A9 state flag 0000 | 0000 Ducati internal use*/
 #define SYS_PROC_DOWN		0x00010000
 #define APP_PROC_DOWN		0x00020000
-#define ENABLE_IPU_HIB		0x00000040
+#define ENABLE_SELF_HIB		0x00000040
+#define START_HIB_FLAG		0x00010001
+
 #define SYS_PROC_HIB		0x00000001
 #define APP_PROC_HIB		0x00000002
 #define HIB_REF_MASK		0x00000F80
@@ -426,6 +428,7 @@ struct sms {
 	struct rcb_block rcb[RCB_MAX];
 	struct ms_agent_block ms_agent[3];
 	struct event_int event_int;
+	unsigned hib_flag;
 };
 
 struct pm_event {
