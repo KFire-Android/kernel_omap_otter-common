@@ -1715,6 +1715,7 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 		} else if (power_need == HDMI_POWER_MIN) {
 			r = hdmi_min_enable();
 		} else {
+                        dssdev->manager->disable(dssdev->manager);
 			omap_dss_stop_device(dssdev);
 			hdmi_power_off(dssdev);
 		}
