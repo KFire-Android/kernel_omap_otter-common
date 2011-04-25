@@ -64,7 +64,6 @@ static struct dpll_cascade_saved_state {
 	u32 clkreqctrl;
 	unsigned long dpll_core_ck_rate;
 	u32 dpll_core_m2_div;
-	unsigned long cm2_scale_fclk_div;
 	struct clk *per_hsd_byp_clk_mux_ck_parent;
 	unsigned int cpufreq_policy_min_rate;
 	unsigned int cpufreq_policy_max_rate;
@@ -742,12 +741,6 @@ int omap4_dpll_low_power_cascade_enter()
 	} else
 		pr_debug("%s: DPLL_PER entered Low Power bypass\n",__func__);
 
-	/* run PER functional clocks at full speed */
-	state.cm2_scale_fclk_div =
-		omap4_prm_read_bits_shift(func_48m_fclk->clksel_reg,
-				func_48m_fclk->clksel_mask);
-	clk_set_rate(func_48m_fclk, (func_48m_fclk->parent->rate / 4));
-
 	/* recalibarte UART rate for half rates */
 	omap_uart_recalibrate_baud(1);
 
@@ -895,10 +888,6 @@ int omap4_dpll_low_power_cascade_exit()
 	ret = clk_set_rate(dpll_iva_ck, state.dpll_iva_ck_rate);
 	if (ret)
 		pr_err("%s: DPLL_IVA failed to relock\n", __func__);
-
-	/* restore PER functional clocks frequency */
-	clk_set_rate(func_48m_fclk, (func_48m_fclk->parent->rate /
-				(1 << state.cm2_scale_fclk_div)));
 
 	/* lock DPLL_PER */
 	ret = clk_set_rate(dpll_per_ck, state.dpll_per_ck_rate);
