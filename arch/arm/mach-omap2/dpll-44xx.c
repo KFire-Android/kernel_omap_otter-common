@@ -722,7 +722,7 @@ int omap4_dpll_low_power_cascade_enter()
 
 	/* bypass DPLL_IVA */
 	state.dpll_iva_ck_rate = dpll_iva_ck->rate;
-	ret = omap3_noncore_dpll_set_rate(dpll_iva_ck,
+	ret = clk_set_rate(dpll_iva_ck,
 			dpll_iva_ck->dpll_data->clk_bypass->rate);
 	if (ret) {
 		pr_err("%s: DPLL_IVA failed to enter Low Power bypass\n",
@@ -733,7 +733,7 @@ int omap4_dpll_low_power_cascade_enter()
 
 	/* bypass DPLL_PER */
 	state.dpll_per_ck_rate = dpll_per_ck->rate;
-	ret = omap3_noncore_dpll_set_rate(dpll_per_ck,
+	ret = clk_set_rate(dpll_per_ck,
 			dpll_per_ck->dpll_data->clk_bypass->rate);
 	if (ret) {
 		pr_debug("%s: DPLL_PER failed to enter Low Power bypass\n",
@@ -892,7 +892,7 @@ int omap4_dpll_low_power_cascade_exit()
 	opp_disable(state.mpu_opp);
 
 	/* lock DPLL_IVA */
-	ret = omap3_noncore_dpll_set_rate(dpll_iva_ck, state.dpll_iva_ck_rate);
+	ret = clk_set_rate(dpll_iva_ck, state.dpll_iva_ck_rate);
 	if (ret)
 		pr_err("%s: DPLL_IVA failed to relock\n", __func__);
 
@@ -901,7 +901,7 @@ int omap4_dpll_low_power_cascade_exit()
 				(1 << state.cm2_scale_fclk_div)));
 
 	/* lock DPLL_PER */
-	ret = omap3_noncore_dpll_set_rate(dpll_per_ck, state.dpll_per_ck_rate);
+	ret = clk_set_rate(dpll_per_ck, state.dpll_per_ck_rate);
 	if (ret)
 		pr_err("%s: DPLL_PER failed to relock\n", __func__);
 
