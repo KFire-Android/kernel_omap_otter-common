@@ -34,7 +34,7 @@ struct ddma_config {
  */
 static inline u32 bitpk(unsigned long a, u32 left, u32 right)
 {
-	return (a >> right) & ((1 << (left - right)) - 1);
+	return (a >> right) & ((2 << (left - right)) - 1);
 }
 
 /*
