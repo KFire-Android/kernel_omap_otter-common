@@ -944,7 +944,7 @@ static int twl4030_bk_bci_battery_get_property(struct power_supply *psy,
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = di->bk_voltage_uV;
+		val->intval = di->bk_voltage_uV * 1000; /* uVolt */
 		break;
 	default:
 		return -EINVAL;
@@ -987,13 +987,13 @@ static int twl4030_bci_battery_get_property(struct power_supply *psy,
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = di->voltage_uV;
+		val->intval = di->voltage_uV * 1000; /* uVolt */
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
-		val->intval = di->current_uA;
+		val->intval = di->current_uA * 1000; /* current in uAmperes */
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
-		val->intval = di->temp_C;
+		val->intval = di->temp_C * 10; /* in tenths of degree Celsius */
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
 		status = twl4030bci_status();
