@@ -109,7 +109,7 @@ int omap4430_phy_power(struct device *dev, int ID, int on)
 		/* power on the phy */
 		if (__raw_readl(ctrl_base + CONTROL_DEV_CONF) & PHY_PD) {
 			__raw_writel(~PHY_PD, ctrl_base + CONTROL_DEV_CONF);
-			mdelay(200);
+			msleep(200);
 		}
 		if (ID)
 			/* enable VBUS valid, IDDIG groung */
