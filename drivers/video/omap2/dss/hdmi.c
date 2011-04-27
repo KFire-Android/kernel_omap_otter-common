@@ -1775,7 +1775,7 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 			     state_need == HDMI_SUSPENDED ? 'S' : 'D'), r);
 
 	if (cpu_is_omap44xx())
-		if ((power_need == HDMI_POWER_MIN) && hdmi_opt_clk_state) {
+		if ((power_need < HDMI_POWER_FULL) && hdmi_opt_clk_state) {
 			DSSINFO("Disable HDMI_PHY_48MHz clock, "
 				"hdmi_power = %d\n\n", power_need);
 			hdmi_opt_clock_disable();
