@@ -2637,15 +2637,30 @@ static int __init omap_voltage_init(void)
 			/* Trimm value is 0 for this unit.
 			 * we set force overide, insted of efuse.
 			 */
-			omap_ctrl_writel(0x0401040f,
+			omap_ctrl_writel(0x0400040f,
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL);
-			omap_ctrl_writel(0x0401040f,
+			omap_ctrl_writel(0x0400040f,
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_CORE_VOLTAGE_CTRL);
-			omap_ctrl_writel(0x0401040f,
+			omap_ctrl_writel(0x0400040f,
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_IVA_VOLTAGE_CTRL);
 			/* write value of 0x0 to VDAC as per trim recomendation */
 			omap_ctrl_writel(0x000001c0,
 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
+		} else {
+			/*
+			 * Set SRAM MPU/CORE/IVA LDO RETMODE
+			 * Setting RETMODE for un-trimmed units cause random
+			 * system hang. So enabling it only for trimmed units.
+			 */
+			prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+				OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_CORE_CTRL_OFFSET);
+				prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_MPU_CTRL_OFFSET);
+				prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_IVA_CTRL_OFFSET);
 		}
 	}
 
