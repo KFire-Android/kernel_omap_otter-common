@@ -3572,6 +3572,7 @@ void dispc_enable_channel(enum omap_channel channel, bool enable)
 	else
 		BUG();
 
+#ifdef CONFIG_OMAP2_DSS_HDMI
 	/* Disable all video pipelines on suspend
 	 * to prevent DMA from invalid memory upon resume
 	 */
@@ -3589,6 +3590,7 @@ void dispc_enable_channel(enum omap_channel channel, bool enable)
 			ovl->info.enabled = false;
 		}
 	}
+#endif
 }
 
 void dispc_lcd_enable_signal_polarity(bool act_high)

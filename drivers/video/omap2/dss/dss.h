@@ -591,6 +591,7 @@ int hdmi_init(struct platform_device *pdev);
 void hdmi_exit(void);
 void hdmi_dump_regs(struct seq_file *s);
 int hdmi_init_display(struct omap_dss_device *display);
+extern bool hdmi_suspend;
 #endif
 
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
@@ -604,5 +605,4 @@ static inline void dss_collect_irq_stats(u32 irqstatus, unsigned *irq_arr)
 }
 #endif
 
-extern bool hdmi_suspend;
 #endif
