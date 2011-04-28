@@ -741,9 +741,6 @@ int omap4_dpll_low_power_cascade_enter()
 	} else
 		pr_debug("%s: DPLL_PER entered Low Power bypass\n",__func__);
 
-	/* recalibarte UART rate for half rates */
-	omap_uart_recalibrate_baud(1);
-
 	__raw_writel(1, OMAP4430_CM_L4_WKUP_CLKSEL);
 
 	/* never de-assert CLKREQ while in DPLL cascading scheme */
@@ -913,9 +910,6 @@ int omap4_dpll_low_power_cascade_exit()
 	if (ret)
 		pr_err("%s: failed to restore DPLL_PER bypass clock\n",
 				__func__);
-
-	/* recalibarte UART rate for normal clock rates */
-	omap_uart_recalibrate_baud(0);
 
 	/* restore CORE clock rates */
 	ret = clk_set_rate(div_core_ck, (div_core_ck->parent->rate /
