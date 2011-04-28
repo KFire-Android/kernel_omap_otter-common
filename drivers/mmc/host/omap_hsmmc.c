@@ -44,6 +44,9 @@
 #include <plat/mmc.h>
 #include <plat/cpu.h>
 
+#include <linux/notifier.h>
+#include <plat/clock.h>
+
 #define VS18			(1 << 26)
 #define VS30			(1 << 25)
 #define SDVS18			(0x5 << 9)
@@ -132,6 +135,7 @@
 
 #define MMC_TIMEOUT_MS		20
 #define OMAP_MMC_MASTER_CLOCK	96000000
+#define OMAP_MMC_DPLL_CLOCK	49152000
 #define OMAP_MMC_CLOCK_24MHZ	24000000
 #define DRIVER_NAME		"mmci-omap-hs"
 
@@ -171,6 +175,8 @@ struct omap_hsmmc_host {
 	struct	clk		*fclk;
 	struct	clk		*iclk;
 	struct	clk		*dbclk;
+	struct notifier_block	nb;
+
 	/*
 	 * vcc == configured supply
 	 * vcc_aux == optional
@@ -211,6 +217,9 @@ struct omap_hsmmc_host {
 	int			use_reg;
 	int			req_in_progress;
 	int			tput_constraint;
+	int			dpll_entry;
+	int			dpll_exit;
+	spinlock_t		dpll_lock;
 
 	struct	omap_mmc_platform_data	*pdata;
 };
@@ -1992,10 +2001,44 @@ static int omap_hsmmc_sleep_to_off(struct omap_hsmmc_host *host)
 	return 0;
 }
 
+static void
+omap_hsmmc_dpll_clocks_configure(struct omap_hsmmc_host *host, int clk) {
+	int regval = 0, dsor = 0;
+	unsigned long timeout = 0;
+
+	if (host->mmc->ios.clock != 0)
+		dsor = clk / host->mmc->ios.clock;
+	omap_hsmmc_stop_clock(host);
+	regval = OMAP_HSMMC_READ(host, SYSCTL);
+	regval = regval & ~(CLKD_MASK);
+	regval = regval | (dsor << 6) | (DTO << 16);
+	OMAP_HSMMC_WRITE(host, SYSCTL, regval);
+	OMAP_HSMMC_WRITE(host, SYSCTL,
+		OMAP_HSMMC_READ(host, SYSCTL) | ICE);
+	/* Wait till the ICS bit is set */
+	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
+	while ((OMAP_HSMMC_READ(host, SYSCTL) & ICS) != ICS
+		&& time_before(jiffies, timeout))
+		msleep(1);
+	OMAP_HSMMC_WRITE(host, SYSCTL,
+		OMAP_HSMMC_READ(host, SYSCTL) | CEN);
+}
+
 /* Handler for [DISABLED -> ENABLED] transition */
 static int omap_hsmmc_disabled_to_enabled(struct omap_hsmmc_host *host)
 {
+
 	pm_runtime_get_sync(host->dev);
+
+	spin_lock(&host->dpll_lock);
+	if (host->dpll_entry == 1) {
+		omap_hsmmc_dpll_clocks_configure(host, OMAP_MMC_DPLL_CLOCK);
+		host->dpll_entry = 0;
+	} else if (host->dpll_exit == 1) {
+		omap_hsmmc_dpll_clocks_configure(host, OMAP_MMC_MASTER_CLOCK);
+		host->dpll_exit = 0;
+	}
+	spin_unlock(&host->dpll_lock);
 
 	host->dpm_state = ENABLED;
 
@@ -2007,10 +2050,21 @@ static int omap_hsmmc_disabled_to_enabled(struct omap_hsmmc_host *host)
 /* Handler for [SLEEP -> ENABLED] transition */
 static int omap_hsmmc_sleep_to_enabled(struct omap_hsmmc_host *host)
 {
+
 	if (!mmc_try_claim_host(host->mmc))
 		return 0;
 
 	pm_runtime_get_sync(host->dev);
+
+	spin_lock(&host->dpll_lock);
+	if (host->dpll_entry == 1) {
+		omap_hsmmc_dpll_clocks_configure(host, OMAP_MMC_DPLL_CLOCK);
+		host->dpll_entry = 0;
+	} else if (host->dpll_exit == 1) {
+		omap_hsmmc_dpll_clocks_configure(host, OMAP_MMC_MASTER_CLOCK);
+		host->dpll_exit = 0;
+	}
+	spin_unlock(&host->dpll_lock);
 
 	if (mmc_slot(host).set_sleep)
 		mmc_slot(host).set_sleep(host->dev, host->slot_id, 0,
@@ -2255,6 +2309,35 @@ static void omap_hsmmc_debugfs(struct mmc_host *mmc)
 
 #endif
 
+static int hsmmc_dpll_notifier(struct notifier_block *nb,
+			unsigned long val, void *data) {
+
+	struct omap_hsmmc_host *host =
+		container_of(nb, struct omap_hsmmc_host, nb);
+	struct clk_notifier_data *cnd = (struct clk_notifier_data *)data;
+
+	spin_lock(&host->dpll_lock);
+	if (val == CLK_POST_RATE_CHANGE &&
+		cnd->old_rate == OMAP_MMC_DPLL_CLOCK) {
+		host->dpll_entry = 1;
+		host->master_clock = OMAP_MMC_DPLL_CLOCK;
+	} else if (val == CLK_PRE_RATE_CHANGE &&
+		cnd->old_rate == OMAP_MMC_DPLL_CLOCK) {
+		/*
+		 * DPLL exit while an active data transfer
+		 * wait for it to complete.
+		 * FIXME: can not sleep here.
+		 */
+		if (host->dpm_state == ENABLED)
+			while (OMAP_HSMMC_READ(host, PSTATE) & (1 << 2));
+		host->dpll_exit = 1;
+		host->master_clock = OMAP_MMC_MASTER_CLOCK;
+	}
+	spin_unlock(&host->dpll_lock);
+
+	return 0;
+}
+
 static int __init omap_hsmmc_probe(struct platform_device *pdev)
 {
 	struct omap_mmc_platform_data *pdata = pdev->dev.platform_data;
@@ -2310,6 +2393,11 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	host->power_mode = MMC_POWER_OFF;
 	host->tput_constraint = 0;
 
+	if (cpu_is_omap44xx() && host->id == 0) {
+		host->nb.notifier_call = hsmmc_dpll_notifier;
+		host->nb.next = NULL;
+	}
+
 	host->master_clock = OMAP_MMC_MASTER_CLOCK;
 	if (mmc_slot(host).features & HSMMC_HAS_48MHZ_MASTER_CLK)
 		host->master_clock = OMAP_MMC_MASTER_CLOCK / 2;
@@ -2358,6 +2446,12 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 		host->fclk = NULL;
 		clk_put(host->iclk);
 		goto err1;
+	}
+
+	/* Register handler for DPLL cascading */
+	if (cpu_is_omap44xx() && host->id == 0) {
+		clk_notifier_register(host->fclk, &host->nb);
+		spin_lock_init(&host->dpll_lock);
 	}
 
 	omap_hsmmc_context_save(host);
