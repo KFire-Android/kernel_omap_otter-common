@@ -190,9 +190,7 @@ int isppreview_config(struct isp_prev_device *isp_prev, void *userspace_add)
 	struct isp_device *isp = to_isp_device(isp_prev);
 	struct ispprev_hmed prev_hmed_t;
 	struct ispprev_csup csup_t;
-	struct ispprev_blkadj prev_blkadj_t;
 	struct ispprev_yclimit yclimit_t;
-	struct ispprev_dcor prev_dcor_t;
 	struct ispprv_update_config *config;
 	struct isptables_update isp_table_update;
 	int yen_t[ISPPRV_YENH_TBL_SIZE];
@@ -273,35 +271,38 @@ int isppreview_config(struct isp_prev_device *isp_prev, void *userspace_add)
 out_config_shadow:
 
 	if (ISP_ABS_PREV_GAMMABYPASS & config->flag) {
-		isppreview_enable_gammabypass(isp_prev, 1);
 		params->features |= PREV_GAMMA_BYPASS;
+		isp_prev->gamma_en = 1;
 	} else {
-		isppreview_enable_gammabypass(isp_prev, 0);
 		params->features &= ~PREV_GAMMA_BYPASS;
+		isp_prev->gamma_en = 0;
 	}
+	isp_prev->gamma_update = 1;
 
 	if (ISP_ABS_PREV_BLKADJ & config->update) {
-		if (copy_from_user(&prev_blkadj_t, (struct ispprev_blkadjl *)
+		if (copy_from_user(&params->blk_adj, (struct ispprev_blkadjl *)
 				   config->prev_blkadj,
 				   sizeof(struct ispprev_blkadj)))
 			goto err_copy_from_user;
-		isppreview_config_blkadj(isp_prev, prev_blkadj_t);
+		isp_prev->blkadj_update = 1;
 	}
 
-	if (ISP_ABS_PREV_DEFECT_COR & config->flag) {
-		if (ISP_ABS_PREV_DEFECT_COR & config->update) {
-			if (copy_from_user(&prev_dcor_t,
-					   (struct ispprev_dcor *)
-					   config->prev_dcor,
-					   sizeof(struct ispprev_dcor)))
-				goto err_copy_from_user;
-			isppreview_config_dcor(isp_prev, prev_dcor_t);
+	if (ISP_ABS_PREV_DEFECT_COR & config->update) {
+		if (copy_from_user(&params->dcor,
+					(struct ispprev_dcor *)
+					config->prev_dcor,
+					sizeof(struct ispprev_dcor)))
+			goto err_copy_from_user;
+
+		if (ISP_ABS_PREV_DEFECT_COR & config->flag) {
+			isp_prev->dcor_en = 1;
+			params->features |= PREV_DEFECT_COR;
+			}
+		else {
+			isp_prev->dcor_en = 0;
+			params->features &= ~PREV_DEFECT_COR;
 		}
-		isppreview_enable_dcor(isp_prev, 1);
-		params->features |= PREV_DEFECT_COR;
-	} else if (ISP_ABS_PREV_DEFECT_COR & config->update) {
-		isppreview_enable_dcor(isp_prev, 0);
-		params->features &= ~PREV_DEFECT_COR;
+		isp_prev->update_dcor = 1;
 	}
 
 	if (ISP_ABS_PREV_RGB2RGB & config->update) {
@@ -542,6 +543,23 @@ void isppreview_config_shadow_registers(struct isp_prev_device *isp_prev)
 					       flr_prev_csc[isp_prev->color]);
 		isp_prev->update_color_matrix = 0;
 	}
+
+	if (isp_prev->update_dcor) {
+		isp_prev->update_dcor = 0;
+		isppreview_config_dcor(isp_prev, isp_prev->params.dcor);
+		isppreview_enable_dcor(isp_prev, isp_prev->dcor_en);
+	}
+
+	if (isp_prev->blkadj_update) {
+		isp_prev->blkadj_update = 0;
+		isppreview_config_blkadj(isp_prev, isp_prev->params.blk_adj);
+	}
+
+	if (isp_prev->gamma_update) {
+		isp_prev->gamma_update = 0;
+		isppreview_enable_gammabypass(isp_prev, isp_prev->gamma_en);
+	}
+
 	if (isp_prev->update_rgb_blending) {
 		isp_prev->update_rgb_blending = 0;
 		isppreview_config_rgb_blending(isp_prev,
