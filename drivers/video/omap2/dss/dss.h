@@ -604,4 +604,5 @@ static inline void dss_collect_irq_stats(u32 irqstatus, unsigned *irq_arr)
 }
 #endif
 
+extern bool hdmi_suspend;
 #endif

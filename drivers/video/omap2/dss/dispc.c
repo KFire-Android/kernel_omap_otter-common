@@ -3571,6 +3571,24 @@ void dispc_enable_channel(enum omap_channel channel, bool enable)
 		dispc_enable_digit_out(enable);
 	else
 		BUG();
+
+	/* Disable all video pipelines on suspend
+	 * to prevent DMA from invalid memory upon resume
+	 */
+	if (!enable && hdmi_suspend) {
+		int i;
+		for (i = 1; i < omap_dss_get_num_overlays(); ++i) {
+			struct omap_overlay *ovl;
+			ovl = omap_dss_get_overlay(i);
+
+			if (ovl->info.enabled) {
+				dispc_enable_plane(ovl->id, 0);
+				DSSINFO("Disabling ovl->id[%d], ovl-%s\n",
+					ovl->id, ovl->name);
+			}
+			ovl->info.enabled = false;
+		}
+	}
 }
 
 void dispc_lcd_enable_signal_polarity(bool act_high)

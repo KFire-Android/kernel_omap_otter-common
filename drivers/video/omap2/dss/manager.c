@@ -1749,6 +1749,7 @@ static int dss_mgr_enable(struct omap_overlay_manager *mgr)
 
 static int dss_mgr_disable(struct omap_overlay_manager *mgr)
 {
+	printk(KERN_ERR "<%s> disabling %s\n", __func__, mgr->name);
 	dispc_enable_channel(mgr->id, 0);
 	return 0;
 }
