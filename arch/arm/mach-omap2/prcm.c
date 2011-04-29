@@ -534,9 +534,10 @@ void omap_prcm_arch_reset(char mode, const char *cmd)
 		 * cf. OMAP34xx TRM, Initialization / Software Booting
 		 * Configuration. */
 		omap_writel(l, OMAP343X_SCRATCHPAD + 4);
-	} else if (cpu_is_omap44xx())
+	} else if (cpu_is_omap44xx()) {
+		omap4_clk_prepare_for_reboot();
 		omap4_prm_global_sw_reset(cmd); /* never returns */
-	else
+	} else
 		WARN_ON(1);
 
 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
