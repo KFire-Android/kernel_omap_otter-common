@@ -15,6 +15,17 @@ struct cfpktq;
 struct caif_payload_info;
 struct caif_packet_funcs;
 
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#define CAIF_MAX_FRAMESIZE 4096
+#define CAIF_MAX_PAYLOAD_SIZE (4096 - 64)
+#ifndef CAIF_USB_HEADROOM
+#define CAIF_NEEDED_HEADROOM (10)
+#else
+#define CAIF_NEEDED_HEADROOM (32)
+#endif /* CAIF_USB_HEADROOM */
+#define CAIF_NEEDED_TAILROOM (2)
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
+
 #define CAIF_LAYER_NAME_SZ 16
 
 /**
