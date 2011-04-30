@@ -86,7 +86,7 @@ void cfspi_xfer(struct work_struct *work)
 
 #if CFSPI_DBG_PREFILL
 		/* Prefill buffers for easier debugging. */
-		memset(cfspi->xfer.va_tx, 0xFF, SPI_DMA_BUF_LEN);
+		memset(cfspi->xfer.va_tx[0], 0xFF, SPI_DMA_BUF_LEN);
 		memset(cfspi->xfer.va_rx, 0xFF, SPI_DMA_BUF_LEN);
 #endif	/* CFSPI_DBG_PREFILL */
 
@@ -99,7 +99,7 @@ void cfspi_xfer(struct work_struct *work)
 			cfspi_dbg_state(cfspi, CFSPI_STATE_FETCH_PKT);
 
 			/* Copy committed SPI frames after the SPI indication. */
-			ptr = (u8 *) cfspi->xfer.va_tx;
+			ptr = (u8 *) cfspi->xfer.va_tx[0];
 			ptr += SPI_IND_SZ;
 			len = cfspi_xmitfrm(cfspi, ptr, cfspi->tx_cpck_len);
 			WARN_ON(len != cfspi->tx_cpck_len);
@@ -116,7 +116,7 @@ void cfspi_xfer(struct work_struct *work)
 		 * Add indication and length at the beginning of the frame,
 		 * using little endian.
 		 */
-		ptr = (u8 *) cfspi->xfer.va_tx;
+		ptr = (u8 *) cfspi->xfer.va_tx[0];
 		*ptr++ = SPI_CMD_IND;
 		*ptr++ = (SPI_CMD_IND  & 0xFF00) >> 8;
 		*ptr++ = cfspi->tx_npck_len & 0x00FF;
