@@ -19,6 +19,7 @@
 #include <net/caif/cfcnfg.h>
 #include <linux/err.h>
 #include <linux/debugfs.h>
+#include <linux/sched.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Sjur Brendeland<sjur.brandeland@stericsson.com>");
@@ -48,6 +49,42 @@ MODULE_PARM_DESC(ser_use_stx, "STX enabled or not.");
 
 static int ser_use_fcs = 1;
 
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+#define MS_TO_JIFFIES(x)	((x)*HZ/1000)
+#define CWR_TOUT_MS		1000
+#define CWR_TOUT		(MS_TO_JIFFIES(CWR_TOUT_MS))
+
+#define POWER_BIT		5
+
+#define CWR_EDGE_ACTIVE_BIT	5
+#define CWR_EDGE_INACTIVE_BIT	6
+#define TX_ACTIVE_BIT		7
+#define RX_ACTIVE_BIT		8
+#define PM_STATE_ON_BIT		9
+#define CWR_CHECK_BIT		10
+
+#define IS_CWR_EDGE_ACTIVE	(test_bit(CWR_EDGE_ACTIVE_BIT, &ser->state))
+#define IS_CWR_EDGE_INACTIVE	(test_bit(CWR_EDGE_INACTIVE_BIT, &ser->state))
+#define IS_TX_ACTIVE		(test_bit(TX_ACTIVE_BIT, &ser->state))
+#define IS_RX_ACTIVE		(test_bit(RX_ACTIVE_BIT, &ser->state))
+
+/* Power management states. */
+#define PM_STATE_WAIT_FOR_WAKEUP 0
+#define PM_STATE_WAIT_FOR_CWR_HI 1
+#define PM_STATE_WAIT_FOR_TX_IDLE 2
+#define PM_STATE_WAIT_FOR_TX_FLUSH 3
+#define PM_STATE_WAIT_FOR_RX_IDLE 4
+#define PM_STATE_WAIT_FOR_CWR_LO 5
+
+static unsigned long power_state;
+
+static int inactivity = 1000;
+module_param(inactivity, int, S_IRUGO);
+MODULE_PARM_DESC(devices, "Number of milliseconds for the inactivity timer.");
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
+
 module_param(ser_use_fcs, bool, S_IRUGO);
 MODULE_PARM_DESC(ser_use_fcs, "FCS enabled or not.");
 
@@ -69,7 +106,14 @@ struct ser_device {
 	struct tty_struct *tty;
 	bool tx_started;
 	unsigned long state;
-	char *tty_name;
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+	wait_queue_head_t pm_wait;
+	struct work_struct pm_work;
+	struct workqueue_struct *pm_wq;
+	bool terminate;
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_tty_dir;
 	struct debugfs_blob_wrapper tx_blob;
@@ -77,8 +121,12 @@ struct ser_device {
 	u8 rx_data[128];
 	u8 tx_data[128];
 	u8 tty_status;
-
-#endif
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+	u8 pm_status;
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
+#endif /* CONFIG_DEBUG_FS */
 };
 
 static void caifdev_setup(struct net_device *dev);
@@ -115,6 +163,13 @@ static inline void debugfs_init(struct ser_device *ser, struct tty_struct *tty)
 				ser->debugfs_tty_dir,
 				&ser->tty_status);
 
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+		debugfs_create_x8("pm_state", S_IRUSR,
+				ser->debugfs_tty_dir,
+				&ser->pm_status);
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 	}
 	ser->tx_blob.data = ser->tx_data;
 	ser->tx_blob.size = 0;
@@ -144,6 +199,14 @@ static inline void debugfs_tx(struct ser_device *ser, const u8 *data, int size)
 	ser->tx_blob.data = ser->tx_data;
 	ser->tx_blob.size = size;
 }
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+static inline void update_pm_status(struct ser_device *ser, int status)
+{
+	ser->pm_status = status;
+}
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 #else
 static inline void debugfs_init(struct ser_device *ser, struct tty_struct *tty)
 {
@@ -164,8 +227,225 @@ static inline void debugfs_rx(struct ser_device *ser, const u8 *data, int size)
 static inline void debugfs_tx(struct ser_device *ser, const u8 *data, int size)
 {
 }
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+static inline void update_pm_status(struct ser_device *ser, int status)
+{
+}
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
+#endif /* CONFIG_DEBUG_FS */
 
-#endif
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+extern int pm_ext_init(struct tty_struct *tty);
+extern void pm_ext_deinit(struct tty_struct *tty);
+extern void pm_ext_prep_down(struct tty_struct *tty);
+extern void pm_ext_down(struct tty_struct *tty);
+extern void pm_ext_up(struct tty_struct *tty);
+
+static int handle_tx(struct ser_device *ser);
+
+void power_notify(bool is_on)
+{
+	if (is_on)
+		set_bit(POWER_BIT, &power_state);
+	else
+		clear_bit(POWER_BIT, &power_state);
+}
+
+void cwr_notify(struct tty_struct *tty, bool asserted)
+{
+	struct ser_device *ser = NULL;
+	struct list_head *node;
+	bool tty_found = false;
+
+	list_for_each(node, &ser_list) {
+		ser = list_entry(node, struct ser_device, node);
+		/* Find the corresponding device using tty as mapping. */
+		if (ser->tty == tty) {
+			tty_found = true;
+			break;
+		}
+	}
+
+	BUG_ON(!tty_found);
+
+	if (asserted) {
+		if (test_and_set_bit(CWR_CHECK_BIT, &ser->state)) {
+			printk(KERN_WARNING "Assume missed CWR edge (set).\n");
+			if (test_and_set_bit(CWR_EDGE_INACTIVE_BIT, &ser->state))
+				printk(KERN_WARNING "Inconsistent CWR state.\n");
+		}
+		if (test_and_set_bit(CWR_EDGE_ACTIVE_BIT, &ser->state))
+			printk(KERN_WARNING "Inconsistent CWR state. Race ?.\n");
+	} else {
+		if (!test_and_clear_bit(CWR_CHECK_BIT, &ser->state)) {
+			printk(KERN_WARNING "Assume missed CWR edge (clear).\n");
+			if (test_and_set_bit(CWR_EDGE_ACTIVE_BIT, &ser->state))
+				printk(KERN_WARNING "Inconsistent CWR state.\n");
+		}
+		if (test_and_set_bit(CWR_EDGE_INACTIVE_BIT, &ser->state))
+			printk(KERN_WARNING "Inconsistent CWR state. Race ?.\n");
+	}
+
+	wake_up_interruptible(&ser->pm_wait);
+}
+
+static void pm_work (struct work_struct *work)
+{
+	long ret;
+	struct ser_device *ser;
+
+	ser = container_of(work, struct ser_device, pm_work);
+
+	if (pm_ext_init(ser->tty)) {
+		printk(KERN_ERR "pm_work: pm_ext_init failed.\n");
+		return;
+	}
+
+ wait_for_wakeup:
+	update_pm_status(ser, PM_STATE_WAIT_FOR_WAKEUP);
+	ret = wait_event_interruptible(ser->pm_wait,
+				       IS_CWR_EDGE_ACTIVE | IS_TX_ACTIVE);
+
+	/* Interrupted by signal */
+	if (ret < 0) {
+		printk(KERN_ERR "cfser_pm_work: Received signal: %ld.\n", ret);
+		return;
+	}
+
+	/* Check termination condition. */
+	if (ser->terminate)
+		return;
+
+	/* Wait for resume to finish */
+	while (!test_bit(POWER_BIT, &power_state))
+		msleep(1);
+
+	/* Prepare for going up (Assert AWR). */
+	pm_ext_up(ser->tty);
+
+ wait_for_cwr_high:
+	update_pm_status(ser, PM_STATE_WAIT_FOR_CWR_HI);
+	/* Wait for CWR assertion. */
+	ret = wait_event_interruptible_timeout(ser->pm_wait,
+					       IS_CWR_EDGE_ACTIVE,
+					       MS_TO_JIFFIES(inactivity));
+
+	/* Interrupted by signal */
+	if (ret < 0) {
+		printk(KERN_ERR "cfser_pm_work: Received signal: %ld.\n", ret);
+		return;
+	}
+
+	/* Check termination condition. */
+	if (ser->terminate)
+		return;
+
+	if (!IS_CWR_EDGE_ACTIVE) {
+		printk(KERN_INFO "cfser_pm_work: CWR assertion tout.\n");
+		goto wait_for_cwr_high;
+	}
+	clear_bit(CWR_EDGE_ACTIVE_BIT, &ser->state);
+
+	/* We can now start transmitting. */
+	set_bit(PM_STATE_ON_BIT, &ser->state);
+	if (IS_TX_ACTIVE) {
+		(void)handle_tx(ser);
+	}
+
+ wait_for_tx_idle:
+	update_pm_status(ser, PM_STATE_WAIT_FOR_TX_IDLE);
+	/* Wait until transmission is idle. */
+	ret = wait_event_interruptible(ser->pm_wait, !IS_TX_ACTIVE);
+
+	/* Interrupted by signal */
+	if (ret < 0) {
+		printk(KERN_ERR "cfser_pm_work: Received signal: %ld.\n", ret);
+		return;
+	}
+
+	/* Check termination condition. */
+	if (ser->terminate)
+		return;
+
+	update_pm_status(ser, PM_STATE_WAIT_FOR_TX_FLUSH);
+	/* Block until tty buffer is empty (if available). */
+	if (ser->tty->ops->wait_until_sent)
+		ser->tty->ops->wait_until_sent(ser->tty, 0);
+	else
+		WARN_ONCE(1, "TTY does not implement wait_until_sent.\n");
+
+ wait_for_rx_idle:
+	update_pm_status(ser, PM_STATE_WAIT_FOR_RX_IDLE);
+	/* Wait until the reception times out or transmission resumes. */
+	clear_bit(RX_ACTIVE_BIT, &ser->state);
+	ret = wait_event_interruptible_timeout(ser->pm_wait,
+					       IS_TX_ACTIVE || IS_RX_ACTIVE,
+					       MS_TO_JIFFIES(inactivity));
+
+	/* Interrupted by signal */
+	if (ret < 0) {
+		printk(KERN_ERR "cfser_pm_work: Received signal: %ld.\n", ret);
+		return;
+	}
+
+	/* Check termination condition. */
+	if (ser->terminate)
+		return;
+
+	if (IS_TX_ACTIVE)
+		goto wait_for_tx_idle;
+
+	if (IS_RX_ACTIVE)
+		goto wait_for_rx_idle;
+
+	/* We can no longer transmit. */
+	clear_bit(PM_STATE_ON_BIT, &ser->state);
+
+	/* Prepare for going down (deassert AWR). */
+	pm_ext_prep_down(ser->tty);
+
+ wait_for_cwr_low:
+	update_pm_status(ser, PM_STATE_WAIT_FOR_CWR_LO);
+	ret = wait_event_interruptible_timeout(ser->pm_wait,
+					       IS_CWR_EDGE_INACTIVE,
+					       MS_TO_JIFFIES(inactivity));
+	/* Interrupted by signal */
+	if (ret < 0) {
+		printk(KERN_ERR "cfser_pm_work: Received signal: %ld.\n", ret);
+		return;
+	}
+
+	/* Check termination condition. */
+	if (ser->terminate)
+		return;
+
+	if (!IS_CWR_EDGE_INACTIVE) {
+		printk(KERN_INFO "cfser_pm_work: CWR de-assertion tout.\n");
+		goto wait_for_cwr_low;
+	}
+	clear_bit(CWR_EDGE_INACTIVE_BIT, &ser->state);
+
+	/* Prepare for going down (deassert AWR). */
+	pm_ext_down(ser->tty);
+
+	/*
+	 * EMARDAN: TODO: Change me !
+	 * Delay to make sure that the GPIO toggling time is respected with
+	 * regards to consecutive changes of the AWR signal state. The AWR
+	 * is not allowed to change earlier than 1/32768 seconds after the
+	 * last change.
+	 */
+	msleep(1);
+
+	/* Back in OFF mode. */
+	goto wait_for_wakeup;
+
+}
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 
 static void ldisc_receive(struct tty_struct *tty, const u8 *data,
 			char *flags, int count)
@@ -181,7 +461,13 @@ static void ldisc_receive(struct tty_struct *tty, const u8 *data,
 	 * NOTE: flags may contain information about break or overrun.
 	 * This is not yet handled.
 	 */
-
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+	if (!test_and_set_bit(RX_ACTIVE_BIT, &ser->state))
+		wake_up_interruptible(&ser->pm_wait);
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
+	BUG_ON(ser->dev == NULL);
 
 	/*
 	 * Workaround for garbage at start of transmission,
@@ -232,6 +518,15 @@ static int handle_tx(struct ser_device *ser)
 
 	/* skb_peek is safe because handle_tx is called after skb_queue_tail */
 	while ((skb = skb_peek(&ser->head)) != NULL) {
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+		if (!test_and_set_bit(TX_ACTIVE_BIT, &ser->state))
+			wake_up_interruptible(&ser->pm_wait);
+
+		if (!test_bit(PM_STATE_ON_BIT, &ser->state))
+			break;
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 
 		/* Make sure you don't write too much */
 		len = skb->len;
@@ -273,9 +568,23 @@ static int handle_tx(struct ser_device *ser)
 		test_and_clear_bit(CAIF_FLOW_OFF_SENT, &ser->state) &&
 		ser->common.flowctrl != NULL)
 				ser->common.flowctrl(ser->dev, ON);
+
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+	/* Report idle if queue is empty */
+	if (!ser->head.qlen && test_and_clear_bit(TX_ACTIVE_BIT, &ser->state))
+		wake_up_interruptible(&ser->pm_wait);
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 	clear_bit(CAIF_SENDING, &ser->state);
 	return 0;
 error:
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+	if (test_and_clear_bit(TX_ACTIVE_BIT, &ser->state))
+		wake_up_interruptible(&ser->pm_wait);
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 	clear_bit(CAIF_SENDING, &ser->state);
 	return tty_wr;
 }
@@ -332,6 +641,18 @@ static int ldisc_open(struct tty_struct *tty)
 	tty->receive_room = N_TTY_BUF_SIZE;
 	tty->disc_data = ser;
 	set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+	init_waitqueue_head(&ser->pm_wait);
+	INIT_WORK(&ser->pm_work, pm_work);
+	ser->pm_wq = create_singlethread_workqueue(name);
+	if (!ser->pm_wq) {
+		printk(KERN_WARNING "ldisc_open: failed to create work queue.\n");
+		free_netdev(dev);
+		return -ENODEV;
+	}
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 	rtnl_lock();
 	result = register_netdevice(dev);
 	if (result) {
@@ -344,6 +665,15 @@ static int ldisc_open(struct tty_struct *tty)
 	rtnl_unlock();
 	netif_stop_queue(dev);
 	update_tty_status(ser);
+
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+	/* EMARDAN: Fixme:  We need the list. */
+	printk(KERN_INFO "ldisc_open: PM schedule.\n");
+	queue_work(ser->pm_wq, &ser->pm_work);
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
+
 	return 0;
 }
 
@@ -431,6 +761,11 @@ static int __init caif_ser_init(void)
 	int ret;
 
 	ret = register_ldisc();
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+	power_notify(true);
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 	debugfsdir = debugfs_create_dir("caif_serial", NULL);
 	return ret;
 }
@@ -443,6 +778,14 @@ static void __exit caif_ser_exit(void)
 
 	list_for_each_safe(node, _tmp, &ser_list) {
 		ser = list_entry(node, struct ser_device, node);
+#ifdef CONFIG_CAIF_USE_DEPRECATED_FUNC
+#ifdef CONFIG_CAIF_TTY_PM
+		ser->terminate = true;
+		wake_up_interruptible(&ser->pm_wait);
+		destroy_workqueue(ser->pm_wq);
+		pm_ext_deinit(ser->tty);
+#endif /* CONFIG_CAIF_TTY_PM */
+#endif /*CONFIG_CAIF_USE_DEPRECATED_FUNC*/
 		dev_close(ser->dev);
 		unregister_netdevice(ser->dev);
 		list_del(node);

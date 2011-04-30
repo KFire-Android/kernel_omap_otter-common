@@ -38,3 +38,12 @@ config CAIF_SHM
 	default n
 	---help---
 	The CAIF shared memory protocol driver for the STE UX5500 platform.
+
+#deprecated-functionality-below
+config CAIF_TTY_PM
+	depends on CAIF_TTY && CAIF_USE_DEPRECATED_FUNC
+	boolean "Enable power management for serial link"
+	default n
+	---help---
+	Enable power management (AWR/CWR signals) for serial link.
+	Please note that a hardware dependent extension is required.
