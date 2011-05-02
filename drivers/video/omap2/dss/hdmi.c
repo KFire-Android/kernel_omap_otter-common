@@ -54,6 +54,7 @@
 
 #ifdef CONFIG_OMAP_PM
 #include <plat/omap-pm.h>
+static struct pm_qos_request_list *pm_qos_handle;
 #endif
 
 
@@ -314,6 +315,46 @@ struct hdmi_cm {
 	int mode;
 };
 struct omap_video_timings edid_timings;
+
+/* Set / Release 48MHz phy clock, L3-200 MHz and c-state constraints */
+static int hdmi_set_48Mhz_l3_cstr(struct omap_dss_device *dssdev, bool enable)
+{
+	int r, ret = 0;
+
+	if ((enable && !hdmi_opt_clk_state) ||
+	    (!enable && hdmi_opt_clk_state)) {
+
+		DSSINFO("%s HDMI_PHY_48MHz clock\n",
+			enable ? "Enable" : "Disable");
+		enable ? (ret = hdmi_opt_clock_enable()) :
+			hdmi_opt_clock_disable();
+		if (!ret)
+			hdmi_opt_clk_state = enable ? true : false;
+		else
+			goto err;
+	}
+
+#ifdef CONFIG_OMAP_PM
+	DSSINFO("%s L3-200Mhz constraint\n\n",
+		enable ? "Set" : "Release");
+	r = omap_pm_set_min_bus_tput(
+		&dssdev->dev,
+		OCP_INITIATOR_AGENT,
+		enable ? 200 * 1000 * 4 : -1);
+	if (r)
+		DSSERR("unable to %s L3-200Mhz constraint\n",
+		       enable ? "release" : "set");
+
+	r = omap_pm_set_max_sdma_lat(&pm_qos_handle,
+				       enable ? 10 : -1);
+	if (r)
+		DSSERR("Unable to %s core cstr\n",
+		       enable ? "set" : "remove");
+#endif
+
+err:
+	return ret;
+}
 
 static void update_cfg(struct hdmi_config *cfg,
 					struct omap_video_timings *timings)
@@ -1424,26 +1465,9 @@ static void hdmi_work_queue(struct work_struct *ws)
 		set_video_power(dssdev, HDMI_POWER_MIN);
 
 		/* turn OFF clocks on disconnect*/
-		if (cpu_is_omap44xx()) {
-			if (hdmi_opt_clk_state) {
-#ifdef CONFIG_OMAP_PM
-				int ret = 0;
-#endif
-				DSSINFO("Disable HDMI_PHY_48MHz clock\n");
-				hdmi_opt_clock_disable();
-				hdmi_opt_clk_state = false;
-#ifdef CONFIG_OMAP_PM
-				DSSINFO("Release L3 constraint\n");
-				ret = omap_pm_set_min_bus_tput(
-					&dssdev->dev,
-					OCP_INITIATOR_AGENT,
-					-1);
-				if (ret)
-					DSSERR("Unable to release L3 "
-					       "constraint\n");
-#endif
-			}
-		}
+		if (cpu_is_omap44xx())
+			hdmi_set_48Mhz_l3_cstr(dssdev, false);
+
 		DSSINFO("Disable Display Done - HDMI_DISCONNECT\n\n");
 	}
 
@@ -1464,27 +1488,11 @@ static void hdmi_work_queue(struct work_struct *ws)
 
 		DSSINFO("Physical Connect\n");
 
-		/* turn ON clocks on connect*/
-		if (cpu_is_omap44xx()) {
-			if (!hdmi_opt_clk_state) {
-				int ret = 0;
-				DSSINFO("Enable HDMI_PHY_48MHz clock\n");
-				ret = hdmi_opt_clock_enable();
-				if (!ret)
-					hdmi_opt_clk_state = true;
-				else
-					goto done2;
-#ifdef CONFIG_OMAP_PM
-				DSSINFO("Set L3 constraint to 200MHz\n");
-				ret = omap_pm_set_min_bus_tput(
-					&dssdev->dev,
-					OCP_INITIATOR_AGENT,
-					200*1000*4);
-				if (ret)
-					DSSERR("Unable to set L3 at 200MHz\n");
-#endif
-			}
-		}
+		/* turn ON clocks, set L3 and core constraints on connect*/
+		if (cpu_is_omap44xx())
+			if (hdmi_set_48Mhz_l3_cstr(dssdev, true))
+				goto done;
+
 		edid_set = false;
 		custom_set = true;
 		hdmi_reconfigure(dssdev);
@@ -1691,23 +1699,10 @@ static int hdmi_start_display(struct omap_dss_device *dssdev)
 	/* enable clock(s) */
 	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 	dss_mainclk_state_enable();
-	if (cpu_is_omap44xx()) {
-		if (!hdmi_opt_clk_state) {
-			r = hdmi_opt_clock_enable();
-			if (!r)
-				hdmi_opt_clk_state = true;
-			else
-				goto err;
-#ifdef CONFIG_OMAP_PM
-			DSSINFO("Set L3 constraint to 200MHz\n");
-			r = omap_pm_set_min_bus_tput(&dssdev->dev,
-						       OCP_INITIATOR_AGENT,
-						       200*1000*4);
-			if (r)
-				DSSERR("Unable to set L3 at 200MHz\n");
-#endif
-		}
-	}
+	/* turn ON clocks, L3 and core constraints on connect*/
+	if (cpu_is_omap44xx())
+		r = hdmi_set_48Mhz_l3_cstr(dssdev, true);
+
 err:
 	return r;
 }
@@ -1778,20 +1773,9 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 			     state_need == HDMI_SUSPENDED ? 'S' : 'D'), r);
 
 	if (cpu_is_omap44xx())
-		if ((power_need < HDMI_POWER_FULL) && hdmi_opt_clk_state) {
-			DSSINFO("Disable HDMI_PHY_48MHz clock, "
-				"hdmi_power = %d\n\n", power_need);
-			hdmi_opt_clock_disable();
-			hdmi_opt_clk_state = false;
-#ifdef CONFIG_OMAP_PM
-			DSSINFO("Release L3 constraint\n");
-			r = omap_pm_set_min_bus_tput(&dssdev->dev,
-						     OCP_INITIATOR_AGENT,
-						     -1);
-			if (r)
-				DSSERR("Unable to release L3 constraint\n");
-#endif
-		}
+		if ((power_need < HDMI_POWER_FULL) && hdmi_opt_clk_state)
+			/* Release clocks, L3 and core constraints*/
+			hdmi_set_48Mhz_l3_cstr(dssdev, false);
 
 	return r;
 }
