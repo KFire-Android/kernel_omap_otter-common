@@ -426,6 +426,8 @@ static int omap4_pm_suspend(void)
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_SYS_1N);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_HSI_P1);
 	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_HSI_DMA);
+	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_EMIF4_1);
+	omap4_wakeupgen_set_interrupt(cpu_id, OMAP44XX_IRQ_EMIF4_2);
 
 #ifdef CONFIG_ENABLE_L3_ERRORS
 	/* Allow the L3 errors to be logged */
