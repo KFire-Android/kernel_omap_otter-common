@@ -1527,7 +1527,7 @@ done:
 		 */
 		DSSINFO("Enabling display - HDMI_FIRST_HPD\n");
 
-		if (!hdmi_connected) {
+		if (!hdmi_connected || (hdmi_power == HDMI_POWER_MIN)) {
 			DSSINFO("irqstatus=0x%08x ignoring FIRST_HPD when "
 				"hdmi_connected = %d, hdmi_power = %d\n",
 				r, hdmi_connected, hdmi_power);
