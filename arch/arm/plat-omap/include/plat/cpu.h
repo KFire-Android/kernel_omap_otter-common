@@ -253,6 +253,7 @@ IS_OMAP_TYPE(2430, 0x2430)
 IS_OMAP_TYPE(3430, 0x3430)
 IS_OMAP_TYPE(3505, 0x3505)
 IS_OMAP_TYPE(3517, 0x3517)
+IS_OMAP_TYPE(4430, 0x4430)
 
 #define cpu_is_omap310()		0
 #define cpu_is_omap730()		0
@@ -274,8 +275,8 @@ IS_OMAP_TYPE(3517, 0x3517)
 #define cpu_is_omap3505()		0
 #define cpu_is_omap3517()		0
 #define cpu_is_omap3430()		0
-#define cpu_is_omap4430()		0
 #define cpu_is_omap3630()		0
+#define cpu_is_omap4430()		0
 
 /*
  * Whether we have MULTI_OMAP1 or not, we still need to distinguish
@@ -351,8 +352,10 @@ IS_OMAP_TYPE(3517, 0x3517)
 # if defined(CONFIG_ARCH_OMAP4)
 # undef cpu_is_omap44xx
 # undef cpu_is_omap443x
+# undef cpu_is_omap4430
 # define cpu_is_omap44xx()		is_omap44xx()
 # define cpu_is_omap443x()		is_omap443x()
+# define cpu_is_omap4430()		is_omap4430()
 # endif
 
 /* Macros to detect if we have OMAP1 or OMAP2 */
