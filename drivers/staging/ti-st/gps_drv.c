@@ -214,7 +214,7 @@ void gpsdrv_st_cb(void *arg, char data)
 
 static struct st_proto_s gpsdrv_proto = {
 	.chnl_id = 0x09,
-	.max_frame_size = 300,
+	.max_frame_size = 1024,
 	.hdr_len = 3,
 	.offset_len_in_hdr = 1,
 	.len_size = 2,
