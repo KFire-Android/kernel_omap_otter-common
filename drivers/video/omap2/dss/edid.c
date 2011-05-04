@@ -186,20 +186,20 @@ int hdmi_get_datablock_offset(u8 *edid, enum extension_edid_db datablock,
 		return 1;
 
 	disp = edid[(0x80) + 2];
-	printk(KERN_INFO "Extension block present db %d %x\n", datablock, disp);
+	printk(KERN_DEBUG "Extension block present db %d %x\n", datablock, disp);
 	if (disp == 0x4)
 		return 1;
 
 	i = 0x80 + 0x4;
-	printk(KERN_INFO "%x\n", i);
+	printk(KERN_DEBUG "%x\n", i);
 	while (i < (0x80 + disp)) {
 		current_byte = edid[i];
-		printk(KERN_INFO "i = %x cur_byte = %x (cur_byte & EX_DATABLOCK_TAG_MASK) = %d\n",
+		printk(KERN_DEBUG "i = %x cur_byte = %x (cur_byte & EX_DATABLOCK_TAG_MASK) = %d\n",
 			i, current_byte,
 			(current_byte & HDMI_EDID_EX_DATABLOCK_TAG_MASK));
 		if ((current_byte >> 5)	== datablock) {
 			*offset = i;
-			printk(KERN_INFO "datablock %d %d\n",
+			printk(KERN_DEBUG "datablock %d %d\n",
 							datablock, *offset);
 			return 0;
 		} else {
