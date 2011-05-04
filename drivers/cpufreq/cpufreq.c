@@ -668,8 +668,9 @@ static ssize_t store_boost_cpufreq(struct cpufreq_policy *policy,
 	if (ret != 1)
 		return -EINVAL;
 
-	/* call policy-gov-boost functionality */
-	policy->governor->boost_cpu_freq(policy);
+	/* call registered policy-gov-boost functionality */
+	if (policy->governor->boost_cpu_freq)
+		policy->governor->boost_cpu_freq(policy);
 
 	return count;
 
