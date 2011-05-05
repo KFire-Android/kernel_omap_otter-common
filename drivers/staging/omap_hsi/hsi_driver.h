@@ -205,6 +205,23 @@ struct hsi_dev { /* HSI_TODO:  should be later renamed into hsi_controller*/
 	struct device *dev;
 };
 
+/**
+ * struct hsi_platform_data - Board specific data
+*/
+struct hsi_platform_data {
+	void (*set_min_bus_tput) (struct device *dev, u8 agent_id,
+				  unsigned long r);
+	int (*device_enable) (struct platform_device *pdev);
+	int (*device_shutdown) (struct platform_device *pdev);
+	int (*device_idle) (struct platform_device *pdev);
+	int (*wakeup_enable) (struct hsi_dev *hsi_ctrl, int hsi_port);
+	int (*wakeup_disable) (struct hsi_dev *hsi_ctrl, int hsi_port);
+	u8 num_ports;
+	struct ctrl_ctx *ctx;
+	u8 hsi_gdd_chan_count;
+	unsigned long default_hsi_fclk;
+};
+
 /* HSI Bus */
 extern struct bus_type hsi_bus_type;
 
@@ -265,6 +282,9 @@ long hsi_hst_buffer_reg(struct hsi_dev *hsi_ctrl,
 long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
 			unsigned int port, unsigned int channel);
 u8 hsi_get_rx_fifo_occupancy(struct hsi_dev *hsi_ctrl, u8 fifo);
+
+void hsi_set_pm_force_hsi_on(struct hsi_dev *hsi_ctrl);
+void hsi_set_pm_default(struct hsi_dev *hsi_ctrl);
 
 int hsi_softreset(struct hsi_dev *hsi_ctrl);
 void hsi_softreset_driver(struct hsi_dev *hsi_ctrl);

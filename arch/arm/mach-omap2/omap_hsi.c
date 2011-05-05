@@ -34,6 +34,12 @@
 #include <asm/clkdev.h>
 #include <../drivers/staging/omap_hsi/hsi_driver.h>
 
+
+static int omap_hsi_wakeup_enable(struct hsi_dev *hsi_ctrl, int hsi_port);
+static int omap_hsi_wakeup_disable(struct hsi_dev *hsi_ctrl, int hsi_port);
+
+
+
 #define OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME	"omap_hsi"
 #define OMAP_HSI_PLATFORM_DEVICE_NAME		"omap_hsi.0"
 #define OMAP_HSI_HWMOD_NAME			"hsi"
@@ -82,6 +88,8 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 	.device_enable = omap_device_enable,
 	.device_idle = omap_device_idle,
 	.device_shutdown = omap_device_shutdown,
+	.wakeup_enable = omap_hsi_wakeup_enable,
+	.wakeup_disable = omap_hsi_wakeup_disable,
 };
 
 
@@ -123,6 +131,70 @@ static struct hsi_dev *hsi_get_hsi_controller_data(struct platform_device *pd)
 	}
 
 	return hsi_ctrl;
+}
+
+/**
+* omap_hsi_is_io_pad_hsi - Indicates if IO Pad has been muxed for HSI CAWAKE
+*
+* Return value :* 0 if CAWAKE Padconf has not been found or CAWAKE not muxed for
+*		CAWAKE
+*		* else 1
+*/
+static int omap_hsi_is_io_pad_hsi(void)
+{
+	u16 val;
+
+	/* Check for IO pad */
+	val = omap_mux_read_signal(OMAP_HSI_PADCONF_CAWAKE_PIN);
+	if (val == -ENODEV)
+		return 0;
+
+	/* Continue only if CAWAKE is muxed */
+	if ((val & OMAP_MUX_MODE_MASK) != OMAP_HSI_PADCONF_CAWAKE_MODE)
+		return 0;
+
+	return 1;
+}
+
+/**
+* omap_hsi_wakeup_enable - Enable HSI wakeup feature from RET/OFF mode
+*
+* @hsi_port - reference to the HSI port onto which enable wakeup feature.
+*
+*/
+static int omap_hsi_wakeup_enable(struct hsi_dev *hsi_ctrl, int hsi_port)
+{
+	dev_dbg(hsi_ctrl->dev, "%s\n", __func__);
+
+	if (omap_hsi_is_io_pad_hsi())
+		omap_mux_enable_wakeup(OMAP_HSI_PADCONF_CAWAKE_PIN);
+	else
+		dev_warn(hsi_ctrl->dev, "Trying to enable HSI IO wakeup on non "
+					"HSI board\n");
+
+	/* TODO: handle hsi_port param and use it to find the correct Pad */
+	return 0;
+}
+
+/**
+* omap_hsi_wakeup_disable - Disable HSI wakeup feature from RET/OFF mode
+*
+* @hsi_port - reference to the HSI port onto which disable wakeup feature.
+*
+*/
+static int omap_hsi_wakeup_disable(struct hsi_dev *hsi_ctrl, int hsi_port)
+{
+	dev_dbg(hsi_ctrl->dev, "%s\n", __func__);
+
+	if (omap_hsi_is_io_pad_hsi())
+		omap_mux_disable_wakeup(OMAP_HSI_PADCONF_CAWAKE_PIN);
+	else
+		dev_warn(hsi_ctrl->dev, "Trying to disable HSI IO wakeup on non"
+					" HSI board\n");
+
+	/* TODO: handle hsi_port param and use it to find the correct Pad */
+
+	return 0;
 }
 
 /* Note : for hsi_idle_hwmod() and hsi_enable_hwmod() :*/
@@ -186,6 +258,14 @@ int omap_hsi_prepare_suspend(void)
 	if (!hsi_ctrl)
 		return -ENODEV;
 
+	/* If HSI is enabled, CAWAKE IO wakeup has been disabled and */
+	/* we don't want to re-enable it here. HSI interrupt shall be */
+	/* generated normally because HSI HW is ON. */
+	if (hsi_ctrl->clock_enabled) {
+		dev_info(hsi_ctrl->dev, "Platform Suspend while HSI active\n");
+		return 0;
+	}
+
 	/* Check for IO pad wakeup */
 	val = omap_mux_read_signal(OMAP_HSI_PADCONF_CAWAKE_PIN);
 	if (val == -ENODEV)
@@ -196,9 +276,9 @@ int omap_hsi_prepare_suspend(void)
 		return 0;
 
 	if (device_may_wakeup(&pdev->dev))
-		omap_mux_enable_wakeup(OMAP_HSI_PADCONF_CAWAKE_PIN);
+		omap_hsi_wakeup_enable(hsi_ctrl, 0);
 	else
-		omap_mux_disable_wakeup(OMAP_HSI_PADCONF_CAWAKE_PIN);
+		omap_hsi_wakeup_disable(hsi_ctrl, 0);
 
 	return 0;
 }
@@ -273,8 +353,10 @@ int omap_hsi_wakeup(void)
 	pdev = hsi_get_hsi_platform_device();
 	if (!pdev)
 		return -ENODEV;
-	if (!device_may_wakeup(&pdev->dev))
+	if (!device_may_wakeup(&pdev->dev)) {
+		dev_info(&pdev->dev, "Modem not allowed to wakeup platform");
 		return -EPERM;
+	}
 
 	hsi_ctrl = hsi_get_hsi_controller_data(pdev);
 	if (!hsi_ctrl)
