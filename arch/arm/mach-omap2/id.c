@@ -339,6 +339,7 @@ void __init omap4_check_revision(void)
 	idcode = read_cpuid(CPUID_ID);
 	if (((idcode >> 4) & 0xfff) == 0xc09) {
 		idcode &= 0xf;
+		omap_rev_reg = (read_tap_reg(OMAP_TAP_IDCODE) >> 28);
 		switch (idcode) {
 		case 1:
 			omap_revision = OMAP4430_REV_ES1_0;
@@ -347,7 +348,6 @@ void __init omap4_check_revision(void)
 			dot = 0;
 			break;
 		case 2:
-			omap_rev_reg = (read_tap_reg(OMAP_TAP_IDCODE) >> 28);
 			if (omap_rev_reg == 0x3) {
 				omap_revision = OMAP4430_REV_ES2_1;
 				omap_chip.oc |= CHIP_IS_OMAP4430ES2_1;
@@ -358,16 +358,19 @@ void __init omap4_check_revision(void)
 				omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
 				rev = 2;
 				dot = 2;
-			} else if (omap_rev_reg >= 0x6) {
-				omap_revision = OMAP4430_REV_ES2_3;
-				omap_chip.oc |= CHIP_IS_OMAP4430ES2_3;
-				rev = 2;
-				dot = 3;
 			} else {
 				omap_revision = OMAP4430_REV_ES2_0;
 				omap_chip.oc |= CHIP_IS_OMAP4430ES2;
 				rev = 2;
 				dot = 0;
+			}
+			break;
+		case 3:
+			if (omap_rev_reg >= 0x6) {
+				omap_revision = OMAP4430_REV_ES2_3;
+				omap_chip.oc |= CHIP_IS_OMAP4430ES2_3;
+				rev = 2;
+				dot = 3;
 			}
 			break;
 		default:
