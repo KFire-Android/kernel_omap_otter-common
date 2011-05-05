@@ -229,13 +229,10 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
 		.power_saving	= true,
 	},
 	{
-		.name		= "internal",
 		.mmc		= 3,
 		.caps		= MMC_CAP_4_BIT_DATA,
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
-		.nonremovable	= true,
-		.power_saving	= true,
 	},
 	{}      /* Terminator */
 };
@@ -279,6 +276,15 @@ static int zoom_twl_gpio_setup(struct device *dev,
 {
 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
 	mmc[0].gpio_cd = gpio + 0;
+
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+	/* The controller that is connected to the 128x device
+	 * should have the card detect gpio disabled. This is
+	 * achieved by initializing it with a negative value
+	 */
+	mmc[CONFIG_TIWLAN_MMC_CONTROLLER - 1].gpio_cd = -EINVAL;
+#endif
+
 	omap2_hsmmc_init(mmc);
 
 	/* link regulators to MMC adapters ... we "know" the

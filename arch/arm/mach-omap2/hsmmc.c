@@ -232,14 +232,22 @@ static struct embedded_sdio_data omap_wifi_emb_data = {
 		.vendor         = SDIO_VENDOR_ID_TI,
 		.device         = SDIO_DEVICE_ID_TI_WL12xx,
 		.blksize        = 512,
+#ifdef CONFIG_ARCH_OMAP3
+		.max_dtr        = 24000000,
+#else
 		.max_dtr        = 48000000,
+#endif
 	},
 	.cccr   = {
 		.multi_block	= 1,
 		.low_speed	= 0,
 		.wide_bus	= 1,
 		.high_power	= 0,
+#ifdef CONFIG_ARCH_OMAP3
+		.high_speed	= 0,
+#else
 		.high_speed	= 1,
+#endif
 		.disable_cd	= 1,
 	},
 	.funcs  = wifi_func_array,
