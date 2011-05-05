@@ -286,8 +286,8 @@ void __init omap3_check_revision(void)
 void __init omap4_check_revision(void)
 {
 	u32 idcode;
-	u8 rev;
-	u8 dot;
+	u8 rev = 0;
+	u8 dot = 0;
 	u8 *type;
 	u32 id[4] = { 0 };
 	u32 reg;
