@@ -175,6 +175,8 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 	hsi_outl(src_addr, base, HSI_GDD_CSSA_REG(lch));
 	hsi_outw(size, base, HSI_GDD_CEN_REG(lch));
 
+	/* TODO : Need to clean interrupt status here to avoid spurious int */
+
 	hsi_outl_or(HSI_GDD_LCH(lch), base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	hsi_outw_or(HSI_CCR_ENABLE, base, HSI_GDD_CCR_REG(lch));
 
@@ -266,6 +268,8 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 	/* SSI CDSA register always takes a 32-bit address */
 	hsi_outl(dest_addr, base, HSI_GDD_CDSA_REG(lch));
 	hsi_outw(count, base, HSI_GDD_CEN_REG(lch));
+
+	/* TODO : Need to clean interrupt status here to avoid spurious int */
 
 	hsi_outl_or(HSI_GDD_LCH(lch), base, HSI_SYS_GDD_MPU_IRQ_ENABLE_REG);
 	hsi_outw_or(HSI_CCR_ENABLE, base, HSI_GDD_CCR_REG(lch));
@@ -521,6 +525,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 		dev_err(hsi_ctrl->dev, "Time-out overflow Error on GDD transfer"
 			" on gdd channel %d\n", gdd_lch);
 		spin_unlock(&hsi_ctrl->lock);
+		/* TODO : need to perform a DMA soft reset */
 		hsi_port_event_handler(&hsi_ctrl->hsi_port[port - 1],
 				       HSI_EVENT_ERROR, NULL);
 		spin_lock(&hsi_ctrl->lock);

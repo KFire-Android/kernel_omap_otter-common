@@ -476,11 +476,13 @@ extern int omap_hsi_config(struct omap_hsi_board_config *hsi_config);
 #ifdef CONFIG_OMAP_HSI
 extern int omap_hsi_prepare_suspend(void);
 extern int omap_hsi_prepare_idle(void);
-extern int omap_hsi_exit_suspend(void);
+extern int omap_hsi_wakeup(void);
+extern int omap_hsi_is_io_wakeup_from_hsi(void);
 #else
 inline int omap_hsi_prepare_suspend(void) { return -ENOSYS; }
 inline int omap_hsi_prepare_idle(void) { return -ENOSYS; }
-inline int omap_hsi_exit_suspend(void) { return -ENOSYS; }
+inline int omap_hsi_wakeup(void) { return -ENOSYS; }
+inline int omap_hsi_is_io_wakeup_from_hsi(void) { return -ENOSYS; }
 #endif
 
 #endif /* __OMAP_HSI_H__ */
