@@ -1721,7 +1721,7 @@ err:
 static int hdmi_set_power(struct omap_dss_device *dssdev,
 	enum hdmi_power_state v_power, bool suspend, bool _audio_on)
 {
-	int r = 0, old_power;
+	int r = 0;
 	enum hdmi_power_state power_need;
 	enum hdmi_dev_state state_need;
 
@@ -1738,8 +1738,6 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 		dssdev->state == HDMI_SUSPENDED, _audio_on, v_power, suspend,
 		power_need, (state_need == HDMI_ACTIVE ? 'A' :
 			     state_need == HDMI_SUSPENDED ? 'S' : 'D'));
-
-	old_power = hdmi_power;
 
 	/* turn on HDMI */
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE && power_need)
@@ -1915,9 +1913,11 @@ static int hdmi_suspend_video(struct omap_dss_device *dssdev)
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
 		ret = -EINVAL;
 	} else {
-		/* (attempt to=ignore result) turn audio power off */
+		/* (attempt to=ignore result) turn audio power off and
+		 * set hdmi video_power to min
+		 */
 		hdmi_audio_power_off();
-		ret = hdmi_set_power(dssdev, video_power, true, audio_on);
+		ret = hdmi_set_power(dssdev, HDMI_POWER_MIN, true, audio_on);
 	}
 
 	mutex_unlock(&hdmi.lock_aux);
@@ -1944,12 +1944,6 @@ static int hdmi_resume_video(struct omap_dss_device *dssdev)
 
 		/* signal power change */
 		mutex_unlock(&hdmi.lock_aux);
-		if (!ret)
-			hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
-
-		/* if edid is already read, give hot plug notification */
-		if (edid_set)
-			set_hdmi_hot_plug_status(dssdev, true);
 	}
 	mutex_unlock(&hdmi.lock);
 
