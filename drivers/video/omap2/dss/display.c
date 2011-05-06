@@ -35,6 +35,10 @@
 
 static LIST_HEAD(display_list);
 
+static struct {
+    struct mutex power_lock;
+} display;
+
 int omapdss_display_enable(struct omap_dss_device *dssdev)
 {
 	int r = 0;
@@ -675,6 +679,8 @@ void dss_init_device(struct platform_device *pdev,
 			dev_name(&dssdev->dev));
 	if (r)
 		DSSERR("failed to create sysfs display link\n");
+
+	mutex_init(&display.power_lock);
 }
 
 void dss_uninit_device(struct platform_device *pdev,
@@ -698,7 +704,8 @@ static int dss_suspend_device(struct device *dev, void *data)
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 
 	/* don't work on suspended displays */
-	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+	if ((dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED) ||
+	    (dssdev->state == OMAP_DSS_DISPLAY_DISABLED))
 		return 0;
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
@@ -726,7 +733,9 @@ int dss_suspend_all_devices(void)
 	int r;
 	struct bus_type *bus = dss_get_bus();
 
+	mutex_lock(&display.power_lock);
 	r = bus_for_each_dev(bus, NULL, NULL, dss_suspend_device);
+	mutex_unlock(&display.power_lock);
 	if (r) {
 		/* resume all displays that were suspended */
 		dss_resume_all_devices();
@@ -767,8 +776,13 @@ static int dss_resume_device(struct device *dev, void *data)
 int dss_resume_all_devices(void)
 {
 	struct bus_type *bus = dss_get_bus();
+	int r = 0;
 
-	return bus_for_each_dev(bus, NULL, NULL, dss_resume_device);
+	mutex_lock(&display.power_lock);
+	r = bus_for_each_dev(bus, NULL, NULL, dss_resume_device);
+	mutex_unlock(&display.power_lock);
+
+	return r;
 }
 
 static int dss_check_state_disabled(struct device *dev, void *data)
@@ -831,8 +845,11 @@ static int dss_disable_device(struct device *dev, void *data)
 {
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 
-	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
-		dssdev->driver->disable(dssdev);
+	if ((dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED) ||
+	    (dssdev->state == OMAP_DSS_DISPLAY_DISABLED))
+		return 0;
+
+	dssdev->driver->disable(dssdev);
 
 	return 0;
 }
@@ -840,7 +857,9 @@ static int dss_disable_device(struct device *dev, void *data)
 void dss_disable_all_devices(void)
 {
 	struct bus_type *bus = dss_get_bus();
+	mutex_lock(&display.power_lock);
 	bus_for_each_dev(bus, NULL, NULL, dss_disable_device);
+	mutex_unlock(&display.power_lock);
 }
 
 
