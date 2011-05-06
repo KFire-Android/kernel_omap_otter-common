@@ -412,6 +412,10 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->otg.shutdown	= twl6030_phy_shutdown;
 	twl->otg.enable_irq	= twl6030_enable_irq;
 
+
+	/*We need to make sure ID comparator is ON*/
+	twl6030_writeb(twl, TWL6030_MODULE_ID0 , 0x1, TWL6030_BACKUP_REG);
+
 	/* init spinlock for workqueue */
 	spin_lock_init(&twl->lock);
 
