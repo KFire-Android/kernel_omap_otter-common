@@ -1641,7 +1641,7 @@ static void hdmi_power_off_phy(struct omap_dss_device *dssdev)
 	HDMI_W1_StopVideoFrame(HDMI_WP);
 	hdmi_set_irqs(1);
 
-	dispc_enable_digit_out(0);
+	dssdev->manager->disable(dssdev->manager);
 
 	if (hdmi.hdmi_stop_frame_cb)
 		(*hdmi.hdmi_stop_frame_cb)();
@@ -1753,9 +1753,8 @@ static int hdmi_set_power(struct omap_dss_device *dssdev,
 		} else if (power_need == HDMI_POWER_MIN) {
 			r = hdmi_min_enable();
 		} else {
-                        dssdev->manager->disable(dssdev->manager);
-			omap_dss_stop_device(dssdev);
 			hdmi_power_off(dssdev);
+			omap_dss_stop_device(dssdev);
 		}
 		if (!r)
 			hdmi_power = power_need;
