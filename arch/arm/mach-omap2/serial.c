@@ -101,6 +101,7 @@ struct omap_uart_state {
 	u16 mcr;
 	u16 mdr3;
 	u16 dma_thresh;
+	u16 lcr;
 
 
 #endif
@@ -237,6 +238,7 @@ static void omap_uart_save_context(struct omap_uart_state *uart)
 		return;
 
 	lcr = serial_read_reg(uart, UART_LCR);
+	uart->lcr = lcr;
 	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDB);
 	uart->dll = serial_read_reg(uart, UART_DLL);
 	uart->dlh = serial_read_reg(uart, UART_DLM);
@@ -301,7 +303,7 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 	/* Config B mode */
 	serial_write_reg(uart, UART_LCR, OMAP_UART_LCR_CONF_MDB);
 	serial_write_reg(uart, UART_EFR, efr);
-	serial_write_reg(uart, UART_LCR, UART_LCR_WLEN8);
+	serial_write_reg(uart, UART_LCR, uart->lcr);
 	serial_write_reg(uart, UART_OMAP_SCR, uart->scr);
 	serial_write_reg(uart, UART_OMAP_WER, uart->wer);
 	serial_write_reg(uart, UART_OMAP_SYSC, uart->sysc);
