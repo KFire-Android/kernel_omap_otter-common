@@ -286,7 +286,8 @@ static void hsi_proto_release(struct device *dev)
 			/*TODO: We should check if the device is open or not. */
 			res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_DOWN, NULL);
 			if (res) {
-				printk(KERN_WARNING "hsi_proto_release: failed to set WAKE: %d\n", res);
+				printk(KERN_WARNING "%s: failed to set WAKE: %d\n",
+						__func__, res);
 			}
 			hsi_close(cfhsi->hsi_dev);
 			/* Free memory. */
@@ -468,7 +469,8 @@ static void __exit cfhsi_omap_exit(void)
 		/*TODO: We should check if the device is open or not. */
 		res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_DOWN, NULL);
 		if (res) {
-			printk(KERN_WARNING "hsi_proto_release: failed to set WAKE: %d\n", res);
+			printk(KERN_WARNING "%s: failed to set WAKE: %d\n",
+					__func__, res);
 		}
 		hsi_close(cfhsi->hsi_dev);
 		/* Free memory. */
