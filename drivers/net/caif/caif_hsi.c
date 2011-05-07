@@ -77,7 +77,8 @@ static void cfhsi_inactivity_tout(unsigned long arg)
 		__func__);
 
 	/* Schedule power down work queue. */
-	queue_work(cfhsi->wq, &cfhsi->wake_down_work);
+	if (!test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		queue_work(cfhsi->wq, &cfhsi->wake_down_work);
 }
 
 
@@ -98,8 +99,8 @@ static void cfhsi_abort_tx(struct cfhsi *cfhsi)
 		kfree_skb(skb);
 	}
 	cfhsi->tx_state = CFHSI_TX_STATE_IDLE;
-	cfhsi->timer.expires = jiffies + CFHSI_INACTIVITY_TOUT;
-	add_timer(&cfhsi->timer);
+	if (!test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		mod_timer(&cfhsi->timer, jiffies + CFHSI_INACTIVITY_TOUT);
 	spin_unlock_irqrestore(&cfhsi->lock, flags);
 }
 
@@ -216,6 +217,9 @@ static void cfhsi_tx_done_work(struct work_struct *work)
 	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
 		__func__);
 
+	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		return;
+
 	desc = (struct cfhsi_desc *)cfhsi->tx_buf;
 
 	do {
@@ -237,8 +241,8 @@ static void cfhsi_tx_done_work(struct work_struct *work)
 		if (!skb) {
 			cfhsi->tx_state = CFHSI_TX_STATE_IDLE;
 			/* Start inactivity timer. */
-			cfhsi->timer.expires = jiffies + CFHSI_INACTIVITY_TOUT;
-			add_timer(&cfhsi->timer);
+			mod_timer(&cfhsi->timer,
+					jiffies + CFHSI_INACTIVITY_TOUT);
 			spin_unlock_irqrestore(&cfhsi->lock, flags);
 			break;
 		}
@@ -265,6 +269,9 @@ static void cfhsi_tx_done_cb(struct cfhsi_drv *drv)
 	cfhsi = container_of(drv, struct cfhsi, drv);
 	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
 		__func__);
+
+	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		return;
 
 	queue_work(cfhsi->wq, &cfhsi->tx_done_work);
 }
@@ -469,6 +476,9 @@ static void cfhsi_rx_done_work(struct work_struct *work)
 	dev_dbg(&cfhsi->ndev->dev, "%s: Kick timer if pending.\n",
 		__func__);
 
+	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		return;
+
 	/* Update inactivity timer if pending. */
 	mod_timer_pending(&cfhsi->timer, jiffies + CFHSI_INACTIVITY_TOUT);
 
@@ -531,6 +541,9 @@ static void cfhsi_rx_done_cb(struct cfhsi_drv *drv)
 	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
 		__func__);
 
+	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		return;
+
 	set_bit(CFHSI_PENDING_RX, &cfhsi->bits);
 	queue_work(cfhsi->wq, &cfhsi->rx_done_work);
 }
@@ -545,6 +558,9 @@ static void cfhsi_wake_up(struct work_struct *work)
 
 	cfhsi = container_of(work, struct cfhsi, wake_up_work);
 
+	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		return;
+
 	if (unlikely(test_bit(CFHSI_AWAKE, &cfhsi->bits))) {
 		/* It happenes when wakeup is requested by
 		 * both ends at the same time. */
@@ -554,7 +570,7 @@ static void cfhsi_wake_up(struct work_struct *work)
 
 #ifdef CONFIG_WAKELOCK
 	/* Hold system wake lock */
-	if (!unlikely(test_and_clear_bit(CFHSI_WAKELOCK_HELD, &cfhsi->bits)))
+	if (!unlikely(test_bit(CFHSI_WAKELOCK_HELD, &cfhsi->bits)))
 		wake_lock(&cfhsi->link_wakelock);
 #endif
 
@@ -622,8 +638,8 @@ static void cfhsi_wake_up(struct work_struct *work)
 		dev_dbg(&cfhsi->ndev->dev, "%s: Peer wake, start timer.\n",
 			__func__);
 		/* Start inactivity timer. */
-		cfhsi->timer.expires = jiffies + CFHSI_INACTIVITY_TOUT;
-		add_timer(&cfhsi->timer);
+		mod_timer(&cfhsi->timer,
+				jiffies + CFHSI_INACTIVITY_TOUT);
 		spin_unlock_irqrestore(&cfhsi->lock, flags);
 		return;
 	}
@@ -662,6 +678,9 @@ static void cfhsi_wake_down(struct work_struct *work)
 	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
 		__func__);
 
+	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		return;
+
 	/* Check if there is something in FIFO. */
 	if (WARN_ON(cfhsi->dev->cfhsi_fifo_occupancy(cfhsi->dev,
 							&fifo_occupancy)))
@@ -673,8 +692,8 @@ static void cfhsi_wake_down(struct work_struct *work)
 				"%s: %d words in RX FIFO, restart timer.\n",
 				__func__, fifo_occupancy);
 		spin_lock_irqsave(&cfhsi->lock, flags);
-		cfhsi->timer.expires = jiffies + CFHSI_INACTIVITY_TOUT;
-		add_timer(&cfhsi->timer);
+		mod_timer(&cfhsi->timer,
+				jiffies + CFHSI_INACTIVITY_TOUT);
 		spin_unlock_irqrestore(&cfhsi->lock, flags);
 		return;
 	}
@@ -716,7 +735,6 @@ static void cfhsi_wake_down(struct work_struct *work)
 		dev_dbg(&cfhsi->ndev->dev,
 				"%s: %d words in RX FIFO, wakeup forced.\n",
 				__func__, fifo_occupancy);
-		set_bit(CFHSI_WAKELOCK_HELD, &cfhsi->bits);
 		if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits))
 			queue_work(cfhsi->wq, &cfhsi->wake_up_work);
 	} else {
@@ -724,6 +742,7 @@ static void cfhsi_wake_down(struct work_struct *work)
 			__func__);
 #ifdef CONFIG_WAKELOCK
 		/* Release system wake lock */
+		clear_bit(CFHSI_WAKELOCK_HELD, &cfhsi->bits);
 		wake_unlock(&cfhsi->link_wakelock);
 #endif
 	}
@@ -739,6 +758,10 @@ static void cfhsi_wake_up_cb(struct cfhsi_drv *drv)
 
 	set_bit(CFHSI_WAKE_UP_ACK, &cfhsi->bits);
 	wake_up_interruptible(&cfhsi->wake_up_wait);
+
+	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
+		return;
+
 	/* Schedule wake up work queue if the peer initiates. */
 	if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits))
 		queue_work(cfhsi->wq, &cfhsi->wake_up_work);
@@ -772,6 +795,13 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 	spin_lock_irqsave(&cfhsi->lock, flags);
 
 	skb_queue_tail(&cfhsi->qhead, skb);
+
+	/* Sanity check; xmit should not be called after unregister_netdev */
+	if (WARN_ON(test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))) {
+		spin_unlock_irqrestore(&cfhsi->lock, flags);
+		cfhsi_abort_tx(cfhsi);
+		return -EINVAL;
+	}
 
 	/* Send flow off if number of packets is above high water mark. */
 	if (!cfhsi->flow_off_sent &&
@@ -999,6 +1029,42 @@ int cfhsi_probe(struct platform_device *pdev)
 	return res;
 }
 
+static void cfhsi_shutdown(struct cfhsi *cfhsi)
+{
+	/* Unregister the network device. */
+	unregister_netdev(cfhsi->ndev);
+
+	/* going to shutdown driver */
+	set_bit(CFHSI_SHUTDOWN, &cfhsi->bits);
+
+	/* Flush workqueue */
+	flush_workqueue(cfhsi->wq);
+
+	/* Delete timer if pending */
+#ifdef CONFIG_SMP
+	del_timer_sync(&cfhsi->timer);
+#else
+	del_timer(&cfhsi->timer);
+#endif /* CONFIG_SMP */
+
+	/* Flush again and destroy workqueue */
+	destroy_workqueue(cfhsi->wq);
+
+	/* Free buffers. */
+	kfree(cfhsi->tx_buf);
+	kfree(cfhsi->rx_buf);
+
+	/* Flush transmit queues. */
+	cfhsi_abort_tx(cfhsi);
+
+	/* Destroy wakelock. Will also release if it is held. */
+#ifdef CONFIG_WAKELOCK
+	if (test_bit(CFHSI_WAKELOCK_HELD, &cfhsi->bits))
+		wake_unlock(&cfhsi->link_wakelock);
+	wake_lock_destroy(&cfhsi->link_wakelock);
+#endif
+}
+
 int cfhsi_remove(struct platform_device *pdev)
 {
 	struct list_head *list_node;
@@ -1015,23 +1081,10 @@ int cfhsi_remove(struct platform_device *pdev)
 			/* Remove from list. */
 			list_del(list_node);
 			spin_unlock(&cfhsi_list_lock);
-			/* Delete inactivity timer if started. */
-			/* Free buffers. */
-			kfree(cfhsi->tx_buf);
-			kfree(cfhsi->rx_buf);
-			/* Flush transmit queues. */
-			cfhsi_abort_tx(cfhsi);
-#ifdef CONFIG_SMP
-			del_timer_sync(&cfhsi->timer);
-#else
-			del_timer(&cfhsi->timer);
-#endif /* CONFIG_SMP */
-			/* Unregister the network device. */
-			destroy_workqueue(cfhsi->wq);
-#ifdef CONFIG_WAKELOCK
-			wake_lock_destroy(&cfhsi->link_wakelock);
-#endif
-			unregister_netdev(cfhsi->ndev);
+
+			/* Shutdown driver. */
+			cfhsi_shutdown(cfhsi);
+
 			return 0;
 		}
 	}
@@ -1057,24 +1110,17 @@ static void __exit cfhsi_exit_module(void)
 	spin_lock(&cfhsi_list_lock);
 	list_for_each_safe(list_node, n, &cfhsi_list) {
 		cfhsi = list_entry(list_node, struct cfhsi, list);
+
 		/* Remove from list. */
 		list_del(list_node);
 		spin_unlock(&cfhsi_list_lock);
-		/* Delete inactivity timer if started. */
+
 		/* Notify device. */
 		platform_device_unregister(cfhsi->pdev);
-		/* Free buffers. */
-		kfree(cfhsi->tx_buf);
-		kfree(cfhsi->rx_buf);
-		/* Flush transmit queues. */
-		cfhsi_abort_tx(cfhsi);
-#ifdef CONFIG_SMP
-		del_timer_sync(&cfhsi->timer);
-#else
-		del_timer(&cfhsi->timer);
-#endif /* CONFIG_SMP */
-		/* Unregister the network device. */
-		unregister_netdev(cfhsi->ndev);
+
+		/* Shutdown driver. */
+		cfhsi_shutdown(cfhsi);
+
 		spin_lock(&cfhsi_list_lock);
 	}
 	spin_unlock(&cfhsi_list_lock);

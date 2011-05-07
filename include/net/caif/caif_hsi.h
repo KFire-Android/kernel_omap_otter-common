@@ -78,6 +78,7 @@ struct cfhsi_desc {
 #define CFHSI_AWAKE				3
 #define CFHSI_PENDING_RX			4
 #define CFHSI_WAKELOCK_HELD			5
+#define CFHSI_SHUTDOWN				6
 
 #ifndef CFHSI_INACTIVITY_TOUT
 #define CFHSI_INACTIVITY_TOUT			(1 * HZ)
