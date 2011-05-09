@@ -482,7 +482,7 @@ static int __devinit if_hsi_probe(struct hsi_device *dev)
 	if (port == HSI_MAX_PORTS)
 		return -ENXIO;
 
-	if (dev->n_ch >= HSI_MAX_CHAR_DEVS) {
+	if (dev->n_ch >= HSI_MAX_CHAR_DEV_ID) {
 		pr_err("HSI char driver cannot handle channel %d\n", dev->n_ch);
 		return -ENXIO;
 	}
@@ -581,7 +581,8 @@ static void if_hsi_port_event(struct hsi_device *dev, unsigned int event,
 	}
 }
 
-int __init if_hsi_init(unsigned int port, unsigned int *channels_map)
+int __init if_hsi_init(unsigned int port, unsigned int *channels_map,
+		      unsigned int num_channels)
 {
 	struct if_hsi_channel *channel;
 	int i, ret = 0;
@@ -607,10 +608,10 @@ int __init if_hsi_init(unsigned int port, unsigned int *channels_map)
 		spin_lock_init(&channel->lock);
 	}
 
-	for (i = 0; (i < HSI_MAX_CHAR_DEVS) && channels_map[i]; i++) {
+	for (i = 0; (i < num_channels) && channels_map[i]; i++) {
 		pr_debug("%s, port = %d, channels_map[i] = %d\n", __func__,
 			 port, channels_map[i]);
-		if ((channels_map[i] - 1) < HSI_MAX_CHAR_DEVS)
+		if ((channels_map[i] - 1) < HSI_MAX_CHAR_DEV_ID)
 			if_hsi_char_driver.ch_mask[port] |=
 			    (1 << ((channels_map[i] - 1)));
 		else {

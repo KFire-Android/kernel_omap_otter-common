@@ -38,7 +38,8 @@ struct hsi_event {
 	unsigned int count;
 };
 
-int if_hsi_init(unsigned int port, unsigned int *channels_map);
+int if_hsi_init(unsigned int port, unsigned int *channels_map,
+	      unsigned int num_channels);
 int if_hsi_exit(void);
 
 int if_hsi_start(int ch);
