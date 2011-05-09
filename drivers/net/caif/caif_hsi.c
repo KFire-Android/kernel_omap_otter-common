@@ -1029,13 +1029,21 @@ int cfhsi_probe(struct platform_device *pdev)
 	return res;
 }
 
-static void cfhsi_shutdown(struct cfhsi *cfhsi)
+static void cfhsi_shutdown(struct cfhsi *cfhsi, bool remove_platform_dev)
 {
 	/* Unregister the network device. */
 	unregister_netdev(cfhsi->ndev);
 
 	/* going to shutdown driver */
 	set_bit(CFHSI_SHUTDOWN, &cfhsi->bits);
+
+	if (remove_platform_dev) {
+		/* Flush workqueue */
+		flush_workqueue(cfhsi->wq);
+
+		/* Notify device. */
+		platform_device_unregister(cfhsi->pdev);
+	}
 
 	/* Flush workqueue */
 	flush_workqueue(cfhsi->wq);
@@ -1083,7 +1091,7 @@ int cfhsi_remove(struct platform_device *pdev)
 			spin_unlock(&cfhsi_list_lock);
 
 			/* Shutdown driver. */
-			cfhsi_shutdown(cfhsi);
+			cfhsi_shutdown(cfhsi, false);
 
 			return 0;
 		}
@@ -1115,11 +1123,8 @@ static void __exit cfhsi_exit_module(void)
 		list_del(list_node);
 		spin_unlock(&cfhsi_list_lock);
 
-		/* Notify device. */
-		platform_device_unregister(cfhsi->pdev);
-
 		/* Shutdown driver. */
-		cfhsi_shutdown(cfhsi);
+		cfhsi_shutdown(cfhsi, true);
 
 		spin_lock(&cfhsi_list_lock);
 	}
