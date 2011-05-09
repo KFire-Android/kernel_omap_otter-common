@@ -300,7 +300,7 @@ fail1:
 
 static struct sfh7741_platform_data omap_sfh7741_data = {
 	.flags = SFH7741_WAKEABLE_INT,
-	.irq = OMAP_GPIO_IRQ(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO),
+	.irq_flags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 	.prox_enable = 0,
 	.activate_func = omap_prox_activate,
 	.read_prox = omap_prox_read,

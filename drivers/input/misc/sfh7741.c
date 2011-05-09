@@ -25,17 +25,22 @@
 #include <linux/input.h>
 #include <linux/input/sfh7741.h>
 #include <linux/slab.h>
+#include <linux/workqueue.h>
 
 #define SFH7741_PROX_ON	1
 #define SFH7741_PROX_OFF	0
 
 #define SFH7741_SUSPEND_RESUME
 
+#define SFH7741_POLL_RATE 250
+
 struct sfh7741_drvdata {
 	struct input_dev *input;
+	struct delayed_work input_work;
 	int irq;
 	int prox_enable;
 	int on_before_suspend;
+	int req_poll_rate;
 	/* mutex for sysfs operations */
 	struct mutex lock;
 	struct sfh7741_platform_data *pdata;
@@ -60,7 +65,6 @@ static ssize_t set_prox_state(struct device *dev,
 				const char *buf, size_t count)
 {
 	int state = SFH7741_PROX_OFF;
-	int proximity = 0;
 	struct platform_device *pdev = to_platform_device(dev);
 	struct sfh7741_drvdata *ddata = platform_get_drvdata(pdev);
 
@@ -73,17 +77,23 @@ static ssize_t set_prox_state(struct device *dev,
 	mutex_lock(&ddata->lock);
 	if (state != ddata->prox_enable) {
 		if (state) {
-			enable_irq(ddata->irq);
-			if (ddata->pdata->flags & SFH7741_WAKEABLE_INT)
-				enable_irq_wake(ddata->irq);
-
-			proximity = ddata->read_prox();
-			input_report_abs(ddata->input, ABS_DISTANCE, proximity);
-			input_sync(ddata->input);
+			if (ddata->irq) {
+				enable_irq(ddata->irq);
+				if (ddata->pdata->flags & SFH7741_WAKEABLE_INT)
+					enable_irq_wake(ddata->irq);
+			} else {
+				ddata->req_poll_rate = SFH7741_POLL_RATE;
+				schedule_delayed_work(&ddata->input_work, 0);
+			}
 		} else {
-			disable_irq_nosync(ddata->irq);
-			if (ddata->pdata->flags & SFH7741_WAKEABLE_INT)
-				disable_irq_wake(ddata->irq);
+			if (ddata->irq) {
+				disable_irq_nosync(ddata->irq);
+				if (ddata->pdata->flags & SFH7741_WAKEABLE_INT)
+					disable_irq_wake(ddata->irq);
+			} else {
+				cancel_delayed_work_sync(&ddata->input_work);
+				ddata->req_poll_rate = 0;
+			}
 		}
 
 		ddata->activate_func(state);
@@ -92,6 +102,22 @@ static ssize_t set_prox_state(struct device *dev,
 
 	mutex_unlock(&ddata->lock);
 	return strnlen(buf, count);
+}
+
+
+static void sfh7741_work(struct work_struct *work)
+{
+	struct sfh7741_drvdata *ddata = container_of((struct delayed_work *)work,
+						  struct sfh7741_drvdata,
+						  input_work);
+	int proximity;
+
+	proximity = ddata->read_prox();
+	input_report_abs(ddata->input, ABS_DISTANCE, proximity);
+	input_sync(ddata->input);
+	if (!ddata->irq)
+		schedule_delayed_work(&ddata->input_work,
+				msecs_to_jiffies(ddata->req_poll_rate));
 }
 
 static ssize_t show_prox_state(struct device *dev,
@@ -158,7 +184,7 @@ static int __devinit sfh7741_probe(struct platform_device *pdev)
 	input->id.bustype = BUS_HOST;
 	ddata->irq = ddata->pdata->irq;
 	ddata->prox_enable = ddata->pdata->prox_enable;
-
+	ddata->req_poll_rate = 0;
 	ddata->activate_func = ddata->pdata->activate_func;
 	ddata->read_prox =  ddata->pdata->read_prox;
 
@@ -174,19 +200,24 @@ static int __devinit sfh7741_probe(struct platform_device *pdev)
 		goto fail1;
 	}
 
-	platform_set_drvdata(pdev, ddata);
-
-	error = request_threaded_irq(ddata->irq , NULL ,
-				sfh7741_isr,
-				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-				"sfh7741_irq", ddata);
-	if (error) {
-		pr_err("%s: Unable to claim irq %d; error %d\n",
-			__func__, ddata->pdata->irq, error);
-		goto fail2;
+	if (ddata->irq) {
+		error = request_threaded_irq(ddata->irq , NULL ,
+					sfh7741_isr,
+					ddata->pdata->irq_flags,
+					"sfh7741_irq", ddata);
+		if (error) {
+			pr_err("%s: Unable to claim irq %d; error %d\n",
+				__func__, ddata->pdata->irq, error);
+			goto fail2;
+		}
+	} else {
+		INIT_DELAYED_WORK(&ddata->input_work, sfh7741_work);
 	}
 
 	mutex_init(&ddata->lock);
+
+	platform_set_drvdata(pdev, ddata);
+
 	error = sysfs_create_group(&dev->kobj, &sfh7741_attr_group);
 	if (error) {
 		pr_err("%s: Failed to create sysfs entries\n", __func__);

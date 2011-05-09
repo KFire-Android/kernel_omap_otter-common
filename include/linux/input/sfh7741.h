@@ -36,6 +36,7 @@
 struct sfh7741_platform_data {
 	int flags;
 	int irq;
+	int irq_flags;
 	int prox_enable;
 	void (*activate_func)(int state);
 	int (*read_prox)(void);
