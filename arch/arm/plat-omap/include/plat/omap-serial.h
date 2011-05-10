@@ -189,7 +189,7 @@ enum {
 
 int omap_uart_active(int num, u32 timeout);
 void omap_uart_update_jiffies(int num);
-void omap_uart_recalibrate_baud(unsigned int enable);
+bool omap_is_console_port(struct uart_port *port);
 #ifdef CONFIG_PM
 void omap_uart_enable_clock_from_irq(int uart_num);
 #endif

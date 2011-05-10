@@ -368,10 +368,11 @@ static unsigned int check_modem_status(struct uart_omap_port *up)
 	return status;
 }
 
-static inline bool omap_is_console_port(struct uart_port *port)
+inline bool omap_is_console_port(struct uart_port *port)
 {
 	return port->cons && port->cons->index == port->line;
 }
+EXPORT_SYMBOL(omap_is_console_port);
 
 /**
  * serial_omap_irq() - This handles the interrupt from one port

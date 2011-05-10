@@ -26,6 +26,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/serial_8250.h>
+#include <linux/console.h>
 
 #ifdef CONFIG_SERIAL_OMAP
 #include <plat/omap-serial.h>
@@ -87,6 +88,7 @@ struct omap_uart_state {
 	struct list_head node;
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
+	struct notifier_block nb;
 
 #if defined(CONFIG_PM)
 	int context_valid;
@@ -109,7 +111,6 @@ struct omap_uart_state {
 
 static LIST_HEAD(uart_list);
 static u8 num_uarts;
-
 
 void __init omap2_set_globals_uart(struct omap_globals *omap2_globals)
 {
@@ -627,32 +628,69 @@ void omap_uart_enable_clock_from_irq(int uart_num)
 }
 EXPORT_SYMBOL(omap_uart_enable_clock_from_irq);
 
-void omap_uart_recalibrate_baud(unsigned int enable)
+static int omap_uart_recalibrate_baud_cb(struct notifier_block *nb,
+			unsigned long status, void *data)
 {
-	struct clk *func_48m_fclk;
-	struct omap_uart_state *uart;
 	struct uart_omap_port *up = NULL;
+	struct omap_uart_state *uart = NULL;
+	struct clk_notifier_data *cnd = (struct clk_notifier_data *)data;
 	unsigned int baud_quot;
 	unsigned int divisor;
 	u16 lcr = 0;
 
-	func_48m_fclk = clk_get(NULL, "func_48m_fclk");
+	uart = container_of(nb, struct omap_uart_state, nb);
 
+	if (status == CLK_ABORT_RATE_CHANGE)
+		return 0;
+
+	if (status == CLK_PRE_RATE_CHANGE) {
+		list_for_each_entry(uart, &uart_list, node) {
+			up = platform_get_drvdata(uart->pdev);
+			/* If Console, Stop from here, till the Frequencies
+			 * Change.
+			 */
+			if (omap_is_console_port(&up->port))
+				console_stop(up->port.cons);
+
+			/* If the device uses the RTS based controlling,
+			 * Pull Up the signal to stop transaction. As the
+			 * Clocks are not disabled. It even if the data
+			 * comes in it should be able to sample.
+			 */
+			omap_uart_enable_rtspullup(uart);
+
+			/* This delay is based on the observation with
+			 * WL1283 and OMAP 4 Blaze, after Pulling the RTS
+			 * high, it takes almost 8us for the transactions
+			 * to stop plus another 2 us buffer. This would
+			 * allow the data to come in before the clocks are
+			 * changed.
+			 */
+			udelay(10);
+
+			/* Do the Required thing for the Devices in The
+			 * Pre State
+			 */
+		}
+		return 0;
+	}
+
+	/* These would take care of the POst Rate Change requirements */
 	list_for_each_entry(uart, &uart_list, node) {
 		up = platform_get_drvdata(uart->pdev);
 		lcr = serial_read_reg(uart, UART_LCR);
-#if 0
-		up->port.uartclk = clk_get_rate(func_48m_fclk);
-#endif
-		if (enable == 1) /* Chnaged */
-		up->port.uartclk = 24576000;
-		else /* Original */
-		up->port.uartclk = 49152000;
+		/* these are hard coded here since the clock
+		 * framework is not return the correct value.
+		 */
+		if (cnd->new_rate == 3072000) /* Chnaged */
+			up->port.uartclk = 24576000;
+		else if (cnd->new_rate == 24000000) /* Original */
+			up->port.uartclk = 49152000;
 
 		/* if zero mean the driver has not been opened. */
 		if (up->baud_rate != 0) {
 			if (up->baud_rate > OMAP_MODE13X_SPEED
-				&& up->baud_rate != 3000000)
+					&& up->baud_rate != 3000000)
 				divisor = 13;
 			else
 				divisor = 16;
@@ -669,14 +707,24 @@ void omap_uart_recalibrate_baud(unsigned int enable)
 			serial_write_reg(uart, UART_OMAP_MDR1, 0x00);
 #if 0
 			dev_dbg(uart->pdev->dev, "Per Functional Clock Changed"
-				" %u Hz Change baud DLL %d DLM %d\n",
-				clk_get_rate(func_48m_fclk),
-				baud_quot & 0xff, baud_quot >> 8);
+					" %u Hz Change baud DLL %d DLM %d\n",
+					clk_get_rate(func_48m_fclk),
+					baud_quot & 0xff, baud_quot >> 8);
 #endif
 		}
+
+		if (status == CLK_POST_RATE_CHANGE) {
+			/* Do the Required thing for the Devices in Post
+			 * State
+			 */
+			if (omap_is_console_port(&up->port))
+				console_start(up->port.cons);
+
+			omap_uart_disable_rtspullup(uart);
+		}
 	}
+	return 0;
 }
-EXPORT_SYMBOL(omap_uart_recalibrate_baud);
 
 static void omap_uart_idle_init(struct omap_uart_state *uart)
 {
@@ -896,6 +944,9 @@ void __init omap_serial_init_port(int port,
 	void *pdata = NULL;
 	u32 pdata_size = 0;
 	char *name;
+	struct clk *func_48m_fclk;
+	static unsigned int dll_cb_init;
+
 #ifndef CONFIG_SERIAL_OMAP
 	struct plat_serial8250_port ports[2] = {
 		{},
@@ -1008,6 +1059,14 @@ void __init omap_serial_init_port(int port,
 	     name, oh->name);
 
 	uart->pdev = &od->pdev;
+
+	if (dll_cb_init == 0) {
+		uart->nb.notifier_call = omap_uart_recalibrate_baud_cb;
+		uart->nb.next = NULL;
+		func_48m_fclk = clk_get(NULL, "func_48m_fclk");
+		clk_notifier_register(func_48m_fclk, &uart->nb);
+		dll_cb_init = 1;
+	}
 
 #ifdef CONFIG_PM_RUNTIME
 	/*
