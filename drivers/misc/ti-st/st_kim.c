@@ -244,9 +244,9 @@ void skip_change_remote_baud(unsigned char **ptr, long *len)
 		pr_err("invalid action after change remote baud command");
 	} else {
 		*ptr = *ptr + sizeof(struct bts_action) +
-			((struct bts_action *)nxt_action)->size;
+			((struct bts_action *)cur_action)->size;
 		*len = *len - (sizeof(struct bts_action) +
-				((struct bts_action *)nxt_action)->size);
+				((struct bts_action *)cur_action)->size);
 		/* warn user on not commenting these in firmware */
 		pr_warn("skipping the wait event of change remote baud");
 	}
@@ -393,6 +393,12 @@ static long download_firmware(struct kim_data_s *kim_gdata)
 	}
 	/* fw download complete */
 	release_firmware(kim_gdata->fw_entry);
+
+	/* If the firmware wasn't parsed completely, warn user about remaining commands
+	 * in firmware, so that the firmware can be relooked at
+	 */
+	if (len != 0)
+		pr_warn("%s:incomplete, script not parsed completely", __func__);
 	return 0;
 }
 
