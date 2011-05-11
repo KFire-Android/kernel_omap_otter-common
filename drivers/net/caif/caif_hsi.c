@@ -1031,8 +1031,8 @@ int cfhsi_probe(struct platform_device *pdev)
 
 static void cfhsi_shutdown(struct cfhsi *cfhsi, bool remove_platform_dev)
 {
-	/* Unregister the network device. */
-	unregister_netdev(cfhsi->ndev);
+	/* Stop TXing */
+	netif_tx_stop_all_queues(cfhsi->ndev);
 
 	/* going to shutdown driver */
 	set_bit(CFHSI_SHUTDOWN, &cfhsi->bits);
@@ -1071,6 +1071,9 @@ static void cfhsi_shutdown(struct cfhsi *cfhsi, bool remove_platform_dev)
 		wake_unlock(&cfhsi->link_wakelock);
 	wake_lock_destroy(&cfhsi->link_wakelock);
 #endif
+
+	/* Finally unregister the network device. */
+	unregister_netdev(cfhsi->ndev);
 }
 
 int cfhsi_remove(struct platform_device *pdev)
