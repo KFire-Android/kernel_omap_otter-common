@@ -1032,7 +1032,7 @@ static int __devexit twl_remove(struct i2c_client *client)
 static void _init_twl6030_settings(void)
 {
 	/* unmask PREQ transition */
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xE0, 0x02);
+	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xC0, 0x02);
 
 	/* USB_VBUS_CTRL_CLR */
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0xFF, 0x05);
