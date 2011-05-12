@@ -104,6 +104,81 @@ static void cfhsi_abort_tx(struct cfhsi *cfhsi)
 	spin_unlock_irqrestore(&cfhsi->lock, flags);
 }
 
+static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
+{
+	char buffer[32]; /* Any reasonable value */
+	size_t fifo_occupancy;
+	int ret;
+
+	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
+		__func__);
+
+	/* Activate HSI interface. */
+	ret = cfhsi->dev->cfhsi_up(cfhsi->dev);
+	if (ret) {
+		dev_warn(&cfhsi->ndev->dev,
+			"%s: can't activate HSI interface: %d.\n",
+			__func__, ret);
+		return ret;
+	}
+
+	do {
+		ret = cfhsi->dev->cfhsi_fifo_occupancy(cfhsi->dev,
+				&fifo_occupancy);
+		if (ret) {
+			dev_warn(&cfhsi->ndev->dev,
+				"%s: can't get FIFO occupancy: %d.\n",
+				__func__, ret);
+			break;
+		} else if (!fifo_occupancy)
+			/* No more data, exitting normally */
+			break;
+
+		fifo_occupancy = min(sizeof(buffer), fifo_occupancy);
+		set_bit(CFHSI_FLUSH_FIFO, &cfhsi->bits);
+		ret = cfhsi->dev->cfhsi_rx(buffer, fifo_occupancy,
+				cfhsi->dev);
+		if (ret) {
+			clear_bit(CFHSI_FLUSH_FIFO, &cfhsi->bits);
+			dev_warn(&cfhsi->ndev->dev,
+				"%s: can't read data: %d.\n",
+				__func__, ret);
+			break;
+		}
+
+		ret = 5 * HZ;
+		wait_event_interruptible_timeout(cfhsi->flush_fifo_wait,
+			 !test_bit(CFHSI_FLUSH_FIFO, &cfhsi->bits), ret);
+
+		if (ret < 0) {
+			dev_warn(&cfhsi->ndev->dev,
+				"%s: can't wait for flush complete: %d.\n",
+				__func__, ret);
+			break;
+		} else if (!ret) {
+			ret = -ETIMEDOUT;
+			dev_warn(&cfhsi->ndev->dev,
+				"%s: timeout waiting for flush complete.\n",
+				__func__);
+			break;
+		}
+	} while (1);
+
+	/* Deactivate HSI interface. */
+	if (ret)
+		cfhsi->dev->cfhsi_down(cfhsi->dev);
+	else {
+		ret = cfhsi->dev->cfhsi_down(cfhsi->dev);
+		if (ret) {
+			dev_warn(&cfhsi->ndev->dev,
+				"%s: can't deactivate HSI interface: %d.\n",
+				__func__, ret);
+		}
+	}
+
+	return ret;
+}
+
 static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 {
 	int nfrms = 0;
@@ -545,7 +620,11 @@ static void cfhsi_rx_done_cb(struct cfhsi_drv *drv)
 		return;
 
 	set_bit(CFHSI_PENDING_RX, &cfhsi->bits);
-	queue_work(cfhsi->wq, &cfhsi->rx_done_work);
+
+	if (test_and_clear_bit(CFHSI_FLUSH_FIFO, &cfhsi->bits))
+		wake_up_interruptible(&cfhsi->flush_fifo_wait);
+	else
+		queue_work(cfhsi->wq, &cfhsi->rx_done_work);
 }
 
 static void cfhsi_wake_up(struct work_struct *work)
@@ -990,6 +1069,7 @@ int cfhsi_probe(struct platform_device *pdev)
 	/* Initialize wait queues. */
 	init_waitqueue_head(&cfhsi->wake_up_wait);
 	init_waitqueue_head(&cfhsi->wake_down_wait);
+	init_waitqueue_head(&cfhsi->flush_fifo_wait);
 
 	/* Setup the inactivity timer. */
 	init_timer(&cfhsi->timer);
@@ -1004,6 +1084,14 @@ int cfhsi_probe(struct platform_device *pdev)
 	spin_lock(&cfhsi_list_lock);
 	list_add_tail(&cfhsi->list, &cfhsi_list);
 	spin_unlock(&cfhsi_list_lock);
+
+	/* Flush FIFO */
+	res = cfhsi_flush_fifo(cfhsi);
+	if (res) {
+		dev_err(&ndev->dev, "%s: Can't flush FIFO: %d.\n",
+			__func__, res);
+		goto err_net_reg;
+	}
 
 	/* Register network device. */
 	res = register_netdev(ndev);

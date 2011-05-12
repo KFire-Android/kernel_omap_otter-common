@@ -79,6 +79,7 @@ struct cfhsi_desc {
 #define CFHSI_PENDING_RX			4
 #define CFHSI_WAKELOCK_HELD			5
 #define CFHSI_SHUTDOWN				6
+#define CFHSI_FLUSH_FIFO			7
 
 #ifndef CFHSI_INACTIVITY_TOUT
 #define CFHSI_INACTIVITY_TOUT			(1 * HZ)
@@ -135,6 +136,7 @@ struct cfhsi {
 	struct workqueue_struct *wq;
 	wait_queue_head_t wake_up_wait;
 	wait_queue_head_t wake_down_wait;
+	wait_queue_head_t flush_fifo_wait;
 	struct timer_list timer;
 	unsigned long bits;
 #ifdef CONFIG_WAKELOCK
