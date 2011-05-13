@@ -332,25 +332,25 @@ static int hdmi_set_48Mhz_l3_cstr(struct omap_dss_device *dssdev, bool enable)
 			hdmi_opt_clk_state = enable ? true : false;
 		else
 			goto err;
-	}
 
 #ifdef CONFIG_OMAP_PM
-	DSSINFO("%s L3-200Mhz constraint\n\n",
-		enable ? "Set" : "Release");
-	r = omap_pm_set_min_bus_tput(
-		&dssdev->dev,
-		OCP_INITIATOR_AGENT,
-		enable ? 200 * 1000 * 4 : -1);
-	if (r)
-		DSSERR("unable to %s L3-200Mhz constraint\n",
-		       enable ? "release" : "set");
+		DSSINFO("%s L3-200Mhz constraint\n\n",
+			enable ? "Set" : "Release");
+		r = omap_pm_set_min_bus_tput(
+			&dssdev->dev,
+			OCP_INITIATOR_AGENT,
+			enable ? 200 * 1000 * 4 : -1);
+		if (r)
+			DSSERR("unable to %s L3-200Mhz constraint\n",
+			       enable ? "release" : "set");
 
-	r = omap_pm_set_max_sdma_lat(&pm_qos_handle,
-				       enable ? 10 : -1);
-	if (r)
-		DSSERR("Unable to %s core cstr\n",
-		       enable ? "set" : "remove");
+		r = omap_pm_set_max_sdma_lat(&pm_qos_handle,
+					       enable ? 10 : -1);
+		if (r)
+			DSSERR("Unable to %s core cstr\n",
+			       enable ? "set" : "remove");
 #endif
+	}
 
 err:
 	return ret;
