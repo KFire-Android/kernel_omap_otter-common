@@ -1560,6 +1560,15 @@ int omap_uart_active(int num, u32 timeout)
 	struct circ_buf *xmit;
 	unsigned int status;
 
+	/* Though when UART's initialised this can never happen,
+	 * but during initialisation, it can happen the "ui"
+	 * structure is not initialized and the timer kicks
+	 * in. This would result in a NULL value, resulting
+	 * in crash.
+	 */
+	if (up == NULL)
+		return 0;
+
 	/* Check for recent driver activity. If time delta from now
 	 * to last activty < "uart idle timeout" second keep clocks on.
 	 */
