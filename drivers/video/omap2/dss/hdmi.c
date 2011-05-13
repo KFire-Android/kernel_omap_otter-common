@@ -136,6 +136,7 @@ static u8 edid[HDMI_EDID_MAX_LENGTH] = {0};
 static u8 edid_set;
 static u8 header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
 static u8 custom_set;
+static bool in_hdmi_restart;
 
 enum hdmi_ioctl_cmds {
 	HDMI_ENABLE,
@@ -309,6 +310,7 @@ struct hdmi {
 	struct platform_device *pdev;
 	void (*hdmi_start_frame_cb)(void);
 	void (*hdmi_stop_frame_cb)(void);
+	void (*hdmi_irq_cb)(int status);
 } hdmi;
 
 struct hdmi_cm {
@@ -1059,6 +1061,8 @@ int hdmi_init(struct platform_device *pdev)
 
 	hdmi.hdmi_start_frame_cb = 0;
 	hdmi.hdmi_stop_frame_cb = 0;
+	hdmi.hdmi_irq_cb = 0;
+	in_hdmi_restart = false;
 
 	hdmi_enable_clocks(0);
 	/* Get the major number for this module */
@@ -1607,8 +1611,16 @@ hpd_modify:
 						"to tv\n"
 						"Dettach the overlays before "
 						"reconfiguring the HDMI\n\n");
+
 					/* clear the IRQ's*/
 					hdmi_set_irqs(0);
+
+					/* HDCP start callback must be called to
+					 * restart authentication
+					 */
+					if (hdmi.hdmi_start_frame_cb)
+						(*hdmi.hdmi_start_frame_cb)();
+
 					goto done2;
 				}
 		}
@@ -1658,6 +1670,7 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 	spin_lock_irqsave(&irqstatus_lock, flags);
 
 	HDMI_W1_HPD_handler(&r);
+
 	DSSDBG("Received IRQ r=%08x\n", r);
 
 	if (((r & HDMI_CONNECT) || (r & HDMI_FIRST_HPD)) &&
@@ -1671,6 +1684,9 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 	spin_unlock_irqrestore(&irqstatus_lock, flags);
 
 	hdmi_handle_irq_work(r | in_reset);
+
+	if (hdmi.hdmi_irq_cb != 0)
+		(*hdmi.hdmi_irq_cb)(r);
 
 	return IRQ_HANDLED;
 }
@@ -1694,8 +1710,9 @@ static void hdmi_power_off_phy(struct omap_dss_device *dssdev)
 
 static void hdmi_power_off(struct omap_dss_device *dssdev)
 {
-	set_hdmi_hot_plug_status(dssdev, false);
-	/* ignore return value for now */
+	if (!in_hdmi_restart)
+		set_hdmi_hot_plug_status(dssdev, false);
+		/* ignore return value for now */
 
 	/*
 	 * WORKAROUND: wait before turning off HDMI.  This may give
@@ -2556,10 +2573,12 @@ const struct omap_video_timings *hdmi_get_omap_timing(int ix)
 }
 
 int hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
-				 void (*hdmi_stop_frame_cb)(void))
+				 void (*hdmi_stop_frame_cb)(void),
+				 void (*hdmi_irq_cb)(int status))
 {
 	hdmi.hdmi_start_frame_cb = hdmi_start_frame_cb;
 	hdmi.hdmi_stop_frame_cb  = hdmi_stop_frame_cb;
+	hdmi.hdmi_irq_cb	 = hdmi_irq_cb;
 
 	return hdmi_w1_get_video_state();
 }
@@ -2569,7 +2588,9 @@ void hdmi_restart(void)
 {
 	struct omap_dss_device *dssdev = get_hdmi_device();
 
-	hdmi_disable_video(dssdev);
-	hdmi_enable_video(dssdev);
+	in_hdmi_restart = true;
+	set_video_power(dssdev, HDMI_POWER_OFF);
+	set_video_power(dssdev, HDMI_POWER_FULL);
+	in_hdmi_restart = false;
 }
 EXPORT_SYMBOL(hdmi_restart);

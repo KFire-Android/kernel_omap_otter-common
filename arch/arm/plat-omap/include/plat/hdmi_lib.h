@@ -526,6 +526,8 @@ enum hdmi_dev_state {
 #define HDMI_FIRST_HPD		0x08
 #define HDMI_HPD_LOW		0x10
 #define HDMI_HPD_HIGH		0x20
+#define HDMI_BCAP		0x40
+#define HDMI_RI_ERR		0x80
 
 #define HDMI_EVENT_POWEROFF	0x00
 #define HDMI_EVENT_POWERPHYOFF	0x01

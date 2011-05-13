@@ -211,7 +211,8 @@ void show_horz_vert_timing_info(u8 *edid);
 int hdmi_get_image_format(void);
 int hdmi_get_audio_format(void);
 int hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
-				 void (*hdmi_stop_frame_cb)(void));
+				 void (*hdmi_stop_frame_cb)(void),
+				 void (*hdmi_irq_cb)(int status));
 void hdmi_restart(void);
 
 enum hdmi_ioctl_cmds {

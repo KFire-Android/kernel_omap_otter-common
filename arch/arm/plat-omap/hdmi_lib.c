@@ -215,6 +215,9 @@
 
 #define HDMI_CORE_SYS__SYS_STAT_HPD 0x02
 
+#define HDMI_IP_CORE_SYSTEM__INTR2__BCAP	0x80
+#define HDMI_IP_CORE_SYSTEM__INTR3__RI_ERR	0xF0
+
 static struct {
 	void __iomem *base_core;	/* 0 */
 	void __iomem *base_core_av;	/* 1 */
@@ -1831,17 +1834,23 @@ int hdmi_set_irqs(int i)
 /* Interrupt handler */
 void HDMI_W1_HPD_handler(int *r)
 {
-	u32 val, set = 0, hpd_intr = 0, core_state = 0, time_in_ms;
+	u32 val, set = 0, hpd_intr = 0, core_state = 0;
+	u32 time_in_ms, intr2 = 0, intr3 = 0;
 	static bool first_hpd, dirty;
 	static ktime_t ts_hpd_low, ts_hpd_high;
+
 	//mdelay(30);
 	DBG("-------------DEBUG-------------------");
 	DBG("%x hdmi_wp_irqstatus\n", \
 		hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS));
 	DBG("%x hdmi_core_intr_state\n", \
 		hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR_STATE));
-	DBG("%x hdmi_core_irqstate\n", \
+	DBG("%x hdmi_core_intr1\n", \
 		hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1));
+	DBG("%x hdmi_core_intr2\n", \
+		hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR2));
+	DBG("%x hdmi_core_intr3\n", \
+		hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR3));
 	DBG("%x hdmi_core_sys_sys_stat\n", \
 		hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__SYS_STAT));
 	DBG("-------------DEBUG-------------------");
@@ -1851,13 +1860,24 @@ void HDMI_W1_HPD_handler(int *r)
 		core_state = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR_STATE);
 		if (core_state & 0x1) {
 			set = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__SYS_STAT);
-			hpd_intr = hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
+			hpd_intr = hdmi_read_reg(HDMI_CORE_SYS,
+						 HDMI_CORE_SYS__INTR1);
+			intr2 = hdmi_read_reg(HDMI_CORE_SYS,
+					      HDMI_CORE_SYS__INTR2);
+			intr3 = hdmi_read_reg(HDMI_CORE_SYS,
+					      HDMI_CORE_SYS__INTR3);
 
 			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1,
 				hpd_intr);
+			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR2,
+				intr2);
+			hdmi_write_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR3,
+				intr3);
 
 			/* Read to flush */
 			hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR1);
+			hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR2);
+			hdmi_read_reg(HDMI_CORE_SYS, HDMI_CORE_SYS__INTR3);
 		}
 	}
 
@@ -1879,7 +1899,7 @@ void HDMI_W1_HPD_handler(int *r)
 						time_in_ms =
 						(int)ktime_to_us(ktime_sub\
 						(ts_hpd_high, ts_hpd_low)) / 1000;
-				if (time_in_ms >= 100)
+				if (time_in_ms >= 80)
 							*r |= HDMI_HPD_MODIFY;
 				else
 							*r |= HDMI_HPD_HIGH;
@@ -1912,11 +1932,16 @@ void HDMI_W1_HPD_handler(int *r)
 		DBG("OCP timeout");
 	}
 
+	if (intr2 & HDMI_IP_CORE_SYSTEM__INTR2__BCAP)
+		*r |= HDMI_BCAP;
+
+	if (intr3 & HDMI_IP_CORE_SYSTEM__INTR3__RI_ERR)
+		*r |= HDMI_RI_ERR;
+
 	/* Ack other interrupts if any */
 	hdmi_write_reg(HDMI_WP, HDMI_WP_IRQSTATUS, val);
 	/* flush posted write */
 	hdmi_read_reg(HDMI_WP, HDMI_WP_IRQSTATUS);
-
 }
 
 int hdmi_rxdet(void)

@@ -172,6 +172,7 @@ int dss_mainclk_enable()
 
 	return ret;
 }
+EXPORT_SYMBOL(dss_mainclk_enable);
 
 void dss_mainclk_disable()
 {
@@ -183,6 +184,7 @@ void dss_mainclk_disable()
 			dss_opt_clock_disable();
 	}
 }
+EXPORT_SYMBOL(dss_mainclk_disable);
 
 void dss_sdi_init(u8 datapairs)
 {
