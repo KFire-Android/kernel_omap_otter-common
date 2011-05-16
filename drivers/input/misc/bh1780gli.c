@@ -194,8 +194,11 @@ static ssize_t bh1780_store_power_state(struct device *dev,
 	if (error)
 		return error;
 
-	if (val != BH1780_POFF)
+	if (val != BH1780_POFF) {
+		ddata->old_lux = -1;
+		ddata->current_lux = -1;
 		val = BH1780_PON;
+	}
 
 	error = bh1780_set_power(ddata, val);
 	if (error < 0)
