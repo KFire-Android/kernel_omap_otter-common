@@ -227,7 +227,8 @@ static void bh1780_input_work_func(struct work_struct *work)
 
 	bh1780_read_data(als);
 
-	if (abs(als->current_lux - als->old_lux) > LUX_MAX_CHANGE) {
+	if ((abs(als->current_lux - als->old_lux) > LUX_MAX_CHANGE) ||
+		(als->old_lux < 0)) {
 		bh1780_report_data(als);
 		als->old_lux = als->current_lux;
 	}
@@ -265,8 +266,8 @@ static int __devinit bh1780_probe(struct i2c_client *client,
 			(ret & BH1780_REVMASK));
 
 	ddata->req_poll_rate = BH1780_POLL_RATE;
-	ddata->old_lux = 0;
-	ddata->current_lux = 0;
+	ddata->old_lux = -1;
+	ddata->current_lux = -1;
 	INIT_DELAYED_WORK(&ddata->input_work, bh1780_input_work_func);
 
 	ddata->input_dev = input_allocate_device();
@@ -343,6 +344,9 @@ static int bh1780_suspend(struct i2c_client *client, pm_message_t mesg)
 		return ret;
 
 	ddata->power_state = BH1780_POFF;
+	ddata->current_lux = -1;
+	ddata->old_lux = -1;
+
 	return 0;
 }
 
