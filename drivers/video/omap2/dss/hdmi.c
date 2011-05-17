@@ -1406,9 +1406,9 @@ static void hdmi_work_queue(struct work_struct *ws)
 		action = (hdmi_is_connected()) ? HDMI_CONNECT : HDMI_DISCONNECT;
 
 	DSSDBG("\n\n");
-	DSSINFO("<%s> action = %d, r = 0x%x, hdmi_power = %d,"
-		"hdmi_connected = %d",
-		__func__, action, r, hdmi_power, hdmi_connected);
+	DSSDBG("<%s> action = %d, interrupt_q = 0x%x, hdmi_power = %d,\n"
+	       "hdmi_connected = %d",
+	       __func__, action, r, hdmi_power, hdmi_connected);
 
 	if (action & HDMI_DISCONNECT) {
 		/* cancel auto-notify */
@@ -1475,21 +1475,12 @@ static void hdmi_work_queue(struct work_struct *ws)
 	if (action & HDMI_CONNECT)
 		last_connect = ktime_get();
 
-	/* For custom timing change force a hot plug status notification
-	 * to the user after physical connect.
-	 */
-	if (action & HDMI_CONNECT &&
-	    hdmi_power == HDMI_POWER_FULL &&
-	    custom_set) {
+	if (action & HDMI_CONNECT) {
+		if (custom_set)
+			user_hpd_state = false;
 
-		user_hpd_state = false;
-		mutex_unlock(&hdmi.lock_aux);
-		hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
-		mutex_unlock(&hdmi.lock);
-		mdelay(100);
-		mutex_lock(&hdmi.lock);
-		mutex_lock(&hdmi.lock_aux);
-		set_hdmi_hot_plug_status(dssdev, true);
+		if (!user_hpd_state && (hdmi_power == HDMI_POWER_FULL))
+			set_hdmi_hot_plug_status(dssdev, true);
 	}
 
 	if ((action & HDMI_CONNECT) && (video_power == HDMI_POWER_MIN) &&
@@ -1506,6 +1497,7 @@ static void hdmi_work_queue(struct work_struct *ws)
 		custom_set = true;
 		hdmi_reconfigure(dssdev);
 		mutex_unlock(&hdmi.lock_aux);
+		hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
 		mutex_unlock(&hdmi.lock);
 		mdelay(100);
 		mutex_lock(&hdmi.lock);
@@ -1549,27 +1541,7 @@ done:
 		}
 
 		hdmi_reconfigure(dssdev);
-		mutex_unlock(&hdmi.lock_aux);
-		hdmi_notify_pwrchange(HDMI_EVENT_POWERON);
-		mutex_unlock(&hdmi.lock);
-		mdelay(100);
-		mutex_lock(&hdmi.lock);
-		mutex_lock(&hdmi.lock_aux);
-
 		set_hdmi_hot_plug_status(dssdev, true);
-
-		mdelay(50);
-
-		DSSINFO("Stop DISPC DIGIT channel\n");
-		HDMI_W1_StopVideoFrame(HDMI_WP);
-		dispc_enable_digit_out(0);
-
-		mdelay(50);
-
-		DSSINFO("Start DISPC DIGIT channel\n");
-		HDMI_W1_StartVideoFrame(HDMI_WP);
-		dispc_enable_digit_out(1);
-
 		/* ignore return value for now */
 		DSSINFO("Enabling display Done- HDMI_FIRST_HPD\n\n");
 	}
