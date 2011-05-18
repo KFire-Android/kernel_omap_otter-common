@@ -755,12 +755,10 @@ omap_i2c_dpll_configure(struct omap_i2c_dev *dev,
 	scll = (hsscll << OMAP_I2C_SCLL_HSSCLL) | fsscll;
 	sclh = (hssclh << OMAP_I2C_SCLH_HSSCLH) | fssclh;
 
-	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
-	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, psc);
+	dev->pscstate = psc;
+	dev->scllstate = scll;
+	dev->sclhstate = sclh;
 
-	/* SCL low and high time values */
-	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, scll);
-	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, sclh);
 }
 
 /*
@@ -786,12 +784,6 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	 */
 
 	omap_i2c_hwspinlock_lock(dev);
-	omap_i2c_unidle(dev);
-	enable_irq(dev->irq);
-
-	r = omap_i2c_wait_for_bb(dev);
-	if (r < 0)
-		goto out;
 
 	spin_lock(&dev->dpll_lock);
 	if (dev->dpll_entry == 1) {
@@ -809,6 +801,13 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		omap_i2c_dpll_configure(dev, pdata, dev->i2c_fclk_rate);
 	}
 	spin_unlock(&dev->dpll_lock);
+
+	omap_i2c_unidle(dev);
+	enable_irq(dev->irq);
+
+	r = omap_i2c_wait_for_bb(dev);
+	if (r < 0)
+		goto out;
 
 	for (i = 0; i < num; i++) {
 		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
