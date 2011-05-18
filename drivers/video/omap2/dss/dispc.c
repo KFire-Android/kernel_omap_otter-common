@@ -1145,7 +1145,8 @@ static u32 dispc_calculate_threshold(enum omap_plane plane, u32 paddr,
 	u32 rotation, bursttype, color_mode;
 	struct dispc_config dispc_reg_config;
 
-	if (width >= 1920)
+	/*For clips bigger than 720p use highest Low threshold value*/
+	if (width > 1280)
 		return 1500;
 
 	/* Get the burst size */
