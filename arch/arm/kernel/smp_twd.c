@@ -250,6 +250,7 @@ static int __init twd_init_cpufreq(void)
 	if (!twd_timer_rate)
 		return 0;
 
+	/* FIXME change this to be a clock fwk notifier instead of CPUfreq */
 	if (cpufreq_register_notifier(&twd_cpufreq_notifier_block,
 				      CPUFREQ_TRANSITION_NOTIFIER))
 		pr_err("smp_twd: Failed to setup cpufreq notifier\n");

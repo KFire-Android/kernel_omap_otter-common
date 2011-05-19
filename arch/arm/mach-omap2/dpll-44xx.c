@@ -508,9 +508,14 @@ long omap4_dpll_regm4xen_round_rate(struct clk *clk, unsigned long target_rate)
 
 void omap4_dpll_low_power_cascade_check_timer(struct work_struct *dwork)
 {
+	struct clk *dpll_mpu_m2_ck, *dpll_core_m2_ck;
 	int delay;
 
-	if (num_online_cpus() > 1) {
+	dpll_mpu_m2_ck = clk_get(NULL, "dpll_mpu_m2_ck");
+	dpll_core_m2_ck = clk_get(NULL, "dpll_core_m2_ck");
+
+	if (num_online_cpus() > 1 || clk_get_rate(dpll_core_m2_ck) > 400000000
+			|| clk_get_rate(dpll_mpu_m2_ck) > 300000000) {
 		delay = usecs_to_jiffies(LP_DELAY);
 
 		schedule_delayed_work_on(0, &lpmode_work, delay);
@@ -603,6 +608,8 @@ int omap4_dpll_low_power_cascade_enter()
 		ret = -ENODEV;
 		goto out;
 	}
+
+	omap4_lpmode = true;
 
 	/* look up the three scalable voltage domains */
 	vdd_mpu = omap_voltage_domain_get("mpu");
@@ -706,30 +713,14 @@ int omap4_dpll_low_power_cascade_enter()
 
 	/* bypass DPLL_MPU */
 	state.dpll_mpu_ck_rate = dpll_mpu_ck->rate;
-
-	mpu_dev = omap2_get_mpuss_device();
-	opp = opp_find_voltage(mpu_dev, 1005000, false);
-	opp_enable(opp);
-	state.mpu_opp = opp;
-
-	cp = cpufreq_cpu_get(0);
-	state.cpufreq_policy_cur_rate = cp->cur;
-	state.cpufreq_policy_min_rate = cp->min;
-	state.cpufreq_policy_max_rate = cp->max;
-
-	/* cpufreq takes in KHz */
-	cp->min = LP_196M_RATE / 1000;
-	cp->max = LP_196M_RATE / 1000;
-	cpufreq_cpu_put(cp);
-	ret = cpufreq_driver_target(cp, LP_196M_RATE / 1000, CPUFREQ_RELATION_H);
+	ret = clk_set_rate(dpll_mpu_ck,
+			dpll_mpu_ck->dpll_data->clk_bypass->rate);
 	if (ret) {
 		pr_err("%s: DPLL_MPU failed to enter Low Power bypass\n",
 				__func__);
 		goto dpll_mpu_bypass_fail;
 	} else
 		pr_debug("%s: DPLL_MPU entered Low Power bypass\n", __func__);
-
-	omap4_lpmode = true;
 
 	/* bypass DPLL_IVA */
 	state.dpll_iva_ck_rate = dpll_iva_ck->rate;
@@ -899,15 +890,10 @@ int omap4_dpll_low_power_cascade_exit()
 	omap_smartreflex_disable(vdd_iva);
 	omap_smartreflex_disable(vdd_core);
 
-	omap4_lpmode = false;
-
-	cp = cpufreq_cpu_get(0);
-	cp->min = state.cpufreq_policy_min_rate;
-	cp->max = state.cpufreq_policy_max_rate;
-	cpufreq_cpu_put(cp);
-	cpufreq_driver_target(cp, state.cpufreq_policy_cur_rate,
-			CPUFREQ_RELATION_H);
-	opp_disable(state.mpu_opp);
+	/* lock DPLL_MPU */
+	ret = clk_set_rate(dpll_mpu_ck, state.dpll_mpu_ck_rate);
+	if (ret)
+		pr_err("%s: DPLL_MPU failed to relock\n", __func__);
 
 	/* lock DPLL_IVA */
 	ret = clk_set_rate(dpll_iva_ck, state.dpll_iva_ck_rate);
@@ -993,6 +979,8 @@ int omap4_dpll_low_power_cascade_exit()
 	omap_smartreflex_enable(vdd_core);
 
 	recalculate_root_clocks();
+
+	omap4_lpmode = false;
 
 out:
 	return ret;
