@@ -2317,22 +2317,17 @@ static int hsmmc_dpll_notifier(struct notifier_block *nb,
 	struct clk_notifier_data *cnd = (struct clk_notifier_data *)data;
 
 	spin_lock(&host->dpll_lock);
-	if (val == CLK_POST_RATE_CHANGE &&
-		cnd->old_rate == OMAP_MMC_DPLL_CLOCK) {
-		host->dpll_entry = 1;
-		host->master_clock = OMAP_MMC_DPLL_CLOCK;
-	} else if (val == CLK_PRE_RATE_CHANGE &&
-		cnd->old_rate == OMAP_MMC_DPLL_CLOCK) {
-		/*
-		 * DPLL exit while an active data transfer
-		 * wait for it to complete.
-		 * FIXME: can not sleep here.
-		 */
-		if (host->dpm_state == ENABLED)
-			while (OMAP_HSMMC_READ(host, PSTATE) & (1 << 2));
-		host->dpll_exit = 1;
-		host->master_clock = OMAP_MMC_MASTER_CLOCK;
+
+	if (val != CLK_PRE_RATE_CHANGE) {
+		if (cnd->old_rate == OMAP_MMC_DPLL_CLOCK) {
+			host->dpll_entry = 1;
+			host->master_clock = OMAP_MMC_DPLL_CLOCK;
+		} else if (cnd->old_rate == OMAP_MMC_MASTER_CLOCK) {
+			host->dpll_exit = 1;
+			host->master_clock = OMAP_MMC_MASTER_CLOCK;
+		}
 	}
+
 	spin_unlock(&host->dpll_lock);
 
 	return 0;
