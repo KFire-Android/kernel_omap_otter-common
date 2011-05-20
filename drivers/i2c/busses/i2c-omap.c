@@ -368,20 +368,11 @@ static int i2c_dpll_notifier(struct notifier_block *nb,
 
 	spin_lock(&dev->dpll_lock);
 
-	if (val == CLK_POST_RATE_CHANGE &&
-		cnd->old_rate == OMAP_I2C_DPLL_CLOCK) {
+	if (val != CLK_PRE_RATE_CHANGE) {
+		if (cnd->old_rate == OMAP_I2C_DPLL_CLOCK)
 			dev->dpll_entry = 1;
-	} else if (val == CLK_PRE_RATE_CHANGE &&
-			cnd->old_rate == OMAP_I2C_DPLL_CLOCK) {
-		/*
-		 * If the device is not idle in the DPLL exit
-		 * wait for the bus to become free.
-		 * FIXME: Can not sleep here.
-		 */
-		if (dev->idle == 0)
-			while (omap_i2c_read_reg(dev,
-				OMAP_I2C_STAT_REG) & OMAP_I2C_STAT_BB);
-		dev->dpll_exit = 1;
+		else if (cnd->old_rate == OMAP_I2C_MASTER_CLOCK)
+			dev->dpll_exit = 1;
 	}
 
 	spin_unlock(&dev->dpll_lock);
