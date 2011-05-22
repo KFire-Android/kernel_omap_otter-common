@@ -120,6 +120,14 @@ void gic_dist_disable(void)
 		__raw_writel(0x0, gic_dist_base_addr + GIC_DIST_CTRL);
 }
 
+u32 gic_readl(u32 offset, u8 idx)
+{
+	if (!gic_dist_base_addr)
+		return 0;
+
+	return __raw_readl(gic_dist_base_addr + offset + 4 * idx);
+}
+
 #ifdef CONFIG_CACHE_L2X0
 
 void __iomem *omap4_get_l2cache_base(void)

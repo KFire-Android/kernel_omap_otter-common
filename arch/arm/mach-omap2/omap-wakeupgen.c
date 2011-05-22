@@ -43,6 +43,7 @@
 #define CPU1_ID			0x1
 #define OMAP4_NR_BANKS		4
 #define OMAP4_NR_IRQS		128
+#define GIC_ISR_NON_SECURE	0xffffffff
 
 static void __iomem *wakeupgen_base;
 static void __iomem *sar_base;
@@ -421,6 +422,7 @@ int __init omap_wakeupgen_init(void)
 {
 	int i;
 	unsigned int boot_cpu = smp_processor_id();
+	int max_spi_reg;
 
 	/* Not supported on OMAP4 ES1.0 silicon */
 	if (omap_rev() == OMAP4430_REV_ES1_0) {
@@ -463,6 +465,26 @@ int __init omap_wakeupgen_init(void)
 	/* Associate all the IRQs to boot CPU like GIC init does. */
 	for (i = 0; i < max_irqs; i++)
 		irq_target_cpu[i] = boot_cpu;
+
+	/*
+	 * Find out how many interrupts are supported.
+	 * OMAP4 supports max of 128 SPIs where as GIC can support
+	 * up to 1020 interrupt sources. On OMAP4, maximum SPIs are
+	 * fused in DIST_CTR bit-fields as 128. Hence the code is safe
+	 * from reserved register writes since its well within 1020.
+	 */
+	max_spi_reg = gic_readl(GIC_DIST_CTR, 0) & 0x1f;
+
+	if (omap_type() == OMAP2_DEVICE_TYPE_GP) {
+		sar_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
+		sar_writel(GIC_ISR_NON_SECURE, SAR_ICDISR_CPU0_OFFSET, 0);
+		sar_writel(GIC_ISR_NON_SECURE, SAR_ICDISR_CPU1_OFFSET, 0);
+		for (i = 0; i < max_spi_reg; i++)
+			sar_writel(GIC_ISR_NON_SECURE, SAR_ICDISR_SPI_OFFSET,
+				   i);
+		iounmap(sar_base);
+		sar_base = NULL;
+	}
 
 	irq_hotplug_init();
 	irq_pm_init();
