@@ -84,24 +84,23 @@ static void cfhsi_inactivity_tout(unsigned long arg)
 
 static void cfhsi_abort_tx(struct cfhsi *cfhsi)
 {
-	unsigned long flags;
 	struct sk_buff *skb;
 
 	for (;;) {
-		spin_lock_irqsave(&cfhsi->lock, flags);
+		spin_lock_bh(&cfhsi->lock);
 		skb = skb_dequeue(&cfhsi->qhead);
 		if (!skb)
 			break;
 
 		cfhsi->ndev->stats.tx_errors++;
 		cfhsi->ndev->stats.tx_dropped++;
-		spin_unlock_irqrestore(&cfhsi->lock, flags);
+		spin_unlock_bh(&cfhsi->lock);
 		kfree_skb(skb);
 	}
 	cfhsi->tx_state = CFHSI_TX_STATE_IDLE;
 	if (!test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
 		mod_timer(&cfhsi->timer, jiffies + CFHSI_INACTIVITY_TOUT);
-	spin_unlock_irqrestore(&cfhsi->lock, flags);
+	spin_unlock_bh(&cfhsi->lock);
 }
 
 static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
@@ -295,7 +294,6 @@ static void cfhsi_tx_done_work(struct work_struct *work)
 	struct cfhsi *cfhsi = NULL;
 	struct cfhsi_desc *desc = NULL;
 	struct sk_buff *skb;
-	unsigned long flags;
 	int len = 0;
 	int res;
 
@@ -309,7 +307,7 @@ static void cfhsi_tx_done_work(struct work_struct *work)
 	desc = (struct cfhsi_desc *)cfhsi->tx_buf;
 
 	do {
-		spin_lock_irqsave(&cfhsi->lock, flags);
+		spin_lock_bh(&cfhsi->lock);
 
 		/*
 		 * Send flow on if flow off has been previously signalled
@@ -329,7 +327,7 @@ static void cfhsi_tx_done_work(struct work_struct *work)
 			/* Start inactivity timer. */
 			mod_timer(&cfhsi->timer,
 					jiffies + CFHSI_INACTIVITY_TOUT);
-			spin_unlock_irqrestore(&cfhsi->lock, flags);
+			spin_unlock_bh(&cfhsi->lock);
 			break;
 		}
 
@@ -337,7 +335,7 @@ static void cfhsi_tx_done_work(struct work_struct *work)
 		len = cfhsi_tx_frm(desc, cfhsi);
 		BUG_ON(!len);
 
-		spin_unlock_irqrestore(&cfhsi->lock, flags);
+		spin_unlock_bh(&cfhsi->lock);
 
 		/* Set up new transfer. */
 		res = cfhsi->dev->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->dev);
@@ -644,7 +642,6 @@ static void cfhsi_wake_up(struct work_struct *work)
 	int res;
 	int len;
 	long ret;
-	unsigned long flags;
 
 	cfhsi = container_of(work, struct cfhsi, wake_up_work);
 
@@ -721,7 +718,7 @@ static void cfhsi_wake_up(struct work_struct *work)
 	/* Clear power up acknowledment. */
 	clear_bit(CFHSI_WAKE_UP_ACK, &cfhsi->bits);
 
-	spin_lock_irqsave(&cfhsi->lock, flags);
+	spin_lock_bh(&cfhsi->lock);
 
 	/* Resume transmit if queue is not empty. */
 	if (!skb_peek(&cfhsi->qhead)) {
@@ -730,7 +727,7 @@ static void cfhsi_wake_up(struct work_struct *work)
 		/* Start inactivity timer. */
 		mod_timer(&cfhsi->timer,
 				jiffies + CFHSI_INACTIVITY_TOUT);
-		spin_unlock_irqrestore(&cfhsi->lock, flags);
+		spin_unlock_bh(&cfhsi->lock);
 		return;
 	}
 
@@ -740,7 +737,7 @@ static void cfhsi_wake_up(struct work_struct *work)
 	/* Create HSI frame. */
 	len = cfhsi_tx_frm((struct cfhsi_desc *)cfhsi->tx_buf, cfhsi);
 
-	spin_unlock_irqrestore(&cfhsi->lock, flags);
+	spin_unlock_bh(&cfhsi->lock);
 
 	if (likely(len > 0)) {
 		/* Set up new transfer. */
@@ -777,14 +774,13 @@ static void cfhsi_wake_down(struct work_struct *work)
 		fifo_occupancy = 0;
 
 	if (fifo_occupancy) {
-		unsigned long flags;
 		dev_dbg(&cfhsi->ndev->dev,
 				"%s: %d words in RX FIFO, restart timer.\n",
 				__func__, fifo_occupancy);
-		spin_lock_irqsave(&cfhsi->lock, flags);
+		spin_lock_bh(&cfhsi->lock);
 		mod_timer(&cfhsi->timer,
 				jiffies + CFHSI_INACTIVITY_TOUT);
-		spin_unlock_irqrestore(&cfhsi->lock, flags);
+		spin_unlock_bh(&cfhsi->lock);
 		return;
 	}
 
@@ -873,7 +869,6 @@ static void cfhsi_wake_down_cb(struct cfhsi_drv *drv)
 static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct cfhsi *cfhsi = NULL;
-	unsigned long flags;
 	int start_xfer = 0;
 	int timer_active;
 
@@ -882,13 +877,13 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	cfhsi = netdev_priv(dev);
 
-	spin_lock_irqsave(&cfhsi->lock, flags);
+	spin_lock_bh(&cfhsi->lock);
 
 	skb_queue_tail(&cfhsi->qhead, skb);
 
 	/* Sanity check; xmit should not be called after unregister_netdev */
 	if (WARN_ON(test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))) {
-		spin_unlock_irqrestore(&cfhsi->lock, flags);
+		spin_unlock_bh(&cfhsi->lock);
 		cfhsi_abort_tx(cfhsi);
 		return -EINVAL;
 	}
@@ -907,7 +902,7 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	if (!start_xfer) {
-		spin_unlock_irqrestore(&cfhsi->lock, flags);
+		spin_unlock_bh(&cfhsi->lock);
 		return 0;
 	}
 
@@ -927,7 +922,7 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 		len = cfhsi_tx_frm(desc, cfhsi);
 		BUG_ON(!len);
 
-		spin_unlock_irqrestore(&cfhsi->lock, flags);
+		spin_unlock_bh(&cfhsi->lock);
 
 		/* Set up new transfer. */
 		res = cfhsi->dev->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->dev);
@@ -937,7 +932,7 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 			cfhsi_abort_tx(cfhsi);
 		}
 	} else {
-		spin_unlock_irqrestore(&cfhsi->lock, flags);
+		spin_unlock_bh(&cfhsi->lock);
 
 		/* Schedule wake up work queue if the we initiate. */
 		if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits))
