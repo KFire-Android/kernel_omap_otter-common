@@ -122,6 +122,15 @@ static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
 		return ret;
 	}
 
+	ret = cfhsi->dev->cfhsi_wake_up(cfhsi->dev);
+	if (ret) {
+		cfhsi->dev->cfhsi_down(cfhsi->dev);
+		dev_warn(&cfhsi->ndev->dev,
+			"%s: can't wake up HSI interface: %d.\n",
+			__func__, ret);
+		return ret;
+	}
+
 	do {
 		ret = cfhsi->dev->cfhsi_fifo_occupancy(cfhsi->dev,
 				&fifo_occupancy);
@@ -163,6 +172,8 @@ static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
 			break;
 		}
 	} while (1);
+
+	cfhsi->dev->cfhsi_wake_down(cfhsi->dev);
 
 	/* Deactivate HSI interface. */
 	if (ret)
@@ -1041,8 +1052,6 @@ int cfhsi_probe(struct platform_device *pdev)
 	/* Set up the driver. */
 	cfhsi->drv.tx_done_cb = cfhsi_tx_done_cb;
 	cfhsi->drv.rx_done_cb = cfhsi_rx_done_cb;
-	cfhsi->drv.wake_up_cb = cfhsi_wake_up_cb;
-	cfhsi->drv.wake_down_cb = cfhsi_wake_down_cb;
 
 	/* Initialize the work queues. */
 	INIT_WORK(&cfhsi->wake_up_work, cfhsi_wake_up);
@@ -1092,6 +1101,9 @@ int cfhsi_probe(struct platform_device *pdev)
 			__func__, res);
 		goto err_net_reg;
 	}
+
+	cfhsi->drv.wake_up_cb = cfhsi_wake_up_cb;
+	cfhsi->drv.wake_down_cb = cfhsi_wake_down_cb;
 
 	/* Register network device. */
 	res = register_netdev(ndev);
