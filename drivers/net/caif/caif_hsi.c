@@ -196,7 +196,7 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	struct sk_buff *skb;
 	u8 *pfrm = desc->emb_frm + CFHSI_MAX_EMB_FRM_SZ;
 
-	skb = skb_peek(&cfhsi->qhead);
+	skb = skb_dequeue(&cfhsi->qhead);
 	if (!skb)
 		return 0;
 
@@ -215,7 +215,6 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		/* Check if frame still fits with added alignment. */
 		if ((skb->len + hpad + tpad) <= CFHSI_MAX_EMB_FRM_SZ) {
 			u8 *pemb = desc->emb_frm;
-			skb = skb_dequeue(&cfhsi->qhead);
 			desc->offset = CFHSI_DESC_SHORT_SZ;
 			*pemb = (u8)(hpad - 1);
 			pemb += hpad;
@@ -227,6 +226,7 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 			/* Copy in embedded CAIF frame. */
 			skb_copy_bits(skb, 0, pemb, skb->len);
 			kfree_skb(skb);
+			skb = NULL;
 		}
 	} else {
 		/* Clear offset. */
@@ -235,12 +235,16 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 
 	/* Create payload CAIF frames. */
 	pfrm = desc->emb_frm + CFHSI_MAX_EMB_FRM_SZ;
-	while (skb_peek(&cfhsi->qhead) && nfrms < CFHSI_MAX_PKTS) {
+	while (nfrms < CFHSI_MAX_PKTS) {
 		struct caif_payload_info *info;
 		int hpad = 0;
 		int tpad = 0;
 
-		skb = skb_dequeue(&cfhsi->qhead);
+		if (!skb)
+			skb = skb_dequeue(&cfhsi->qhead);
+
+		if (!skb)
+			break;
 
 		/* Calculate needed head alignment and tail alignment. */
 		info = (struct caif_payload_info *)&skb->cb;
@@ -268,6 +272,7 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 		/* Update frame pointer. */
 		pfrm += skb->len + tpad;
 		kfree_skb(skb);
+		skb = NULL;
 
 		/* Update number of frames. */
 		nfrms++;
@@ -307,12 +312,11 @@ static void cfhsi_tx_done_work(struct work_struct *work)
 	desc = (struct cfhsi_desc *)cfhsi->tx_buf;
 
 	do {
-		spin_lock_bh(&cfhsi->lock);
-
 		/*
 		 * Send flow on if flow off has been previously signalled
 		 * and number of packets is below low water mark.
 		 */
+		spin_lock_bh(&cfhsi->lock);
 		if (cfhsi->flow_off_sent &&
 				cfhsi->qhead.qlen <= cfhsi->q_low_mark &&
 				cfhsi->cfdev.flowctrl) {
@@ -320,22 +324,17 @@ static void cfhsi_tx_done_work(struct work_struct *work)
 			cfhsi->flow_off_sent = 0;
 			cfhsi->cfdev.flowctrl(cfhsi->ndev, ON);
 		}
+		spin_unlock_bh(&cfhsi->lock);
 
-		skb = skb_peek(&cfhsi->qhead);
-		if (!skb) {
+		/* Create HSI frame. */
+		len = cfhsi_tx_frm(desc, cfhsi);
+		if (!len) {
 			cfhsi->tx_state = CFHSI_TX_STATE_IDLE;
 			/* Start inactivity timer. */
 			mod_timer(&cfhsi->timer,
 					jiffies + CFHSI_INACTIVITY_TOUT);
-			spin_unlock_bh(&cfhsi->lock);
 			break;
 		}
-
-		/* Create HSI frame. */
-		len = cfhsi_tx_frm(desc, cfhsi);
-		BUG_ON(!len);
-
-		spin_unlock_bh(&cfhsi->lock);
 
 		/* Set up new transfer. */
 		res = cfhsi->dev->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->dev);
@@ -734,10 +733,10 @@ static void cfhsi_wake_up(struct work_struct *work)
 	dev_dbg(&cfhsi->ndev->dev, "%s: Host wake.\n",
 		__func__);
 
+	spin_unlock_bh(&cfhsi->lock);
+
 	/* Create HSI frame. */
 	len = cfhsi_tx_frm((struct cfhsi_desc *)cfhsi->tx_buf, cfhsi);
-
-	spin_unlock_bh(&cfhsi->lock);
 
 	if (likely(len > 0)) {
 		/* Set up new transfer. */
@@ -901,10 +900,10 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 		start_xfer = 1;
 	}
 
-	if (!start_xfer) {
-		spin_unlock_bh(&cfhsi->lock);
+	spin_unlock_bh(&cfhsi->lock);
+
+	if (!start_xfer)
 		return 0;
-	}
 
 	/* Delete inactivity timer if started. */
 #ifdef CONFIG_SMP
@@ -922,8 +921,6 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 		len = cfhsi_tx_frm(desc, cfhsi);
 		BUG_ON(!len);
 
-		spin_unlock_bh(&cfhsi->lock);
-
 		/* Set up new transfer. */
 		res = cfhsi->dev->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->dev);
 		if (WARN_ON(res < 0)) {
@@ -932,8 +929,6 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 			cfhsi_abort_tx(cfhsi);
 		}
 	} else {
-		spin_unlock_bh(&cfhsi->lock);
-
 		/* Schedule wake up work queue if the we initiate. */
 		if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits))
 			queue_work(cfhsi->wq, &cfhsi->wake_up_work);
