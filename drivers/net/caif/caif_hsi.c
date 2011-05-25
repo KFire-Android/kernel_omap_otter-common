@@ -112,18 +112,9 @@ static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
 	dev_dbg(&cfhsi->ndev->dev, "%s.\n",
 		__func__);
 
-	/* Activate HSI interface. */
-	ret = cfhsi->dev->cfhsi_up(cfhsi->dev);
-	if (ret) {
-		dev_warn(&cfhsi->ndev->dev,
-			"%s: can't activate HSI interface: %d.\n",
-			__func__, ret);
-		return ret;
-	}
 
 	ret = cfhsi->dev->cfhsi_wake_up(cfhsi->dev);
 	if (ret) {
-		cfhsi->dev->cfhsi_down(cfhsi->dev);
 		dev_warn(&cfhsi->ndev->dev,
 			"%s: can't wake up HSI interface: %d.\n",
 			__func__, ret);
@@ -173,18 +164,6 @@ static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
 	} while (1);
 
 	cfhsi->dev->cfhsi_wake_down(cfhsi->dev);
-
-	/* Deactivate HSI interface. */
-	if (ret)
-		cfhsi->dev->cfhsi_down(cfhsi->dev);
-	else {
-		ret = cfhsi->dev->cfhsi_down(cfhsi->dev);
-		if (ret) {
-			dev_warn(&cfhsi->ndev->dev,
-				"%s: can't deactivate HSI interface: %d.\n",
-				__func__, ret);
-		}
-	}
 
 	return ret;
 }
@@ -298,7 +277,6 @@ static void cfhsi_tx_done_work(struct work_struct *work)
 {
 	struct cfhsi *cfhsi = NULL;
 	struct cfhsi_desc *desc = NULL;
-	struct sk_buff *skb;
 	int len = 0;
 	int res;
 
@@ -660,12 +638,6 @@ static void cfhsi_wake_up(struct work_struct *work)
 		wake_lock(&cfhsi->link_wakelock);
 #endif
 
-	/* Activate HSI interface. */
-	if (WARN_ON(cfhsi->dev->cfhsi_up(cfhsi->dev))) {
-		clear_bit(CFHSI_WAKE_UP, &cfhsi->bits);
-		return;
-	}
-
 	/* Activate wake line. */
 	cfhsi->dev->cfhsi_wake_up(cfhsi->dev);
 
@@ -683,16 +655,13 @@ static void cfhsi_wake_up(struct work_struct *work)
 			__func__, ret);
 		clear_bit(CFHSI_WAKE_UP, &cfhsi->bits);
 		cfhsi->dev->cfhsi_wake_down(cfhsi->dev);
-		/* Note: cfhsi_down will cancel outstanding read request. */
-		cfhsi->dev->cfhsi_down(cfhsi->dev);
 		return;
-	} else if (WARN_ON(!ret)) {
+	} else if (!ret) {
 		/* Wakeup timeout */
 		dev_err(&cfhsi->ndev->dev, "%s: Timeout.\n",
 			__func__);
 		clear_bit(CFHSI_WAKE_UP, &cfhsi->bits);
 		cfhsi->dev->cfhsi_wake_down(cfhsi->dev);
-		cfhsi->dev->cfhsi_down(cfhsi->dev);
 		return;
 	}
 	dev_dbg(&cfhsi->ndev->dev, "%s: Woken.\n",
@@ -783,6 +752,9 @@ static void cfhsi_wake_down(struct work_struct *work)
 		return;
 	}
 
+	/* Cancel pending RX requests */
+	cfhsi->dev->cfhsi_rx_cancel(cfhsi->dev);
+
 	/* Deactivate wake line. */
 	cfhsi->dev->cfhsi_wake_down(cfhsi->dev);
 
@@ -797,11 +769,10 @@ static void cfhsi_wake_down(struct work_struct *work)
 		dev_info(&cfhsi->ndev->dev, "%s: Signalled: %ld.\n",
 			__func__, ret);
 		return;
-	} else if (WARN_ON(!ret)) {
+	} else if (!ret) {
 		/* Timeout */
 		dev_err(&cfhsi->ndev->dev, "%s: Timeout.\n",
 			__func__);
-		return;
 	}
 
 	/* Clear power down acknowledment. */
@@ -812,9 +783,6 @@ static void cfhsi_wake_down(struct work_struct *work)
 	if (WARN_ON(cfhsi->dev->cfhsi_fifo_occupancy(cfhsi->dev,
 							&fifo_occupancy)))
 		fifo_occupancy = 0;
-
-	/* De-activate HSI interface. */
-	cfhsi->dev->cfhsi_down(cfhsi->dev);
 
 	if (fifo_occupancy) {
 		dev_dbg(&cfhsi->ndev->dev,
@@ -1084,6 +1052,15 @@ int cfhsi_probe(struct platform_device *pdev)
 	list_add_tail(&cfhsi->list, &cfhsi_list);
 	spin_unlock(&cfhsi_list_lock);
 
+	/* Activate HSI interface. */
+	res = cfhsi->dev->cfhsi_up(cfhsi->dev);
+	if (res) {
+		dev_err(&cfhsi->ndev->dev,
+			"%s: can't activate HSI interface: %d.\n",
+			__func__, res);
+		goto err_activate;
+	}
+
 	/* Flush FIFO */
 	res = cfhsi_flush_fifo(cfhsi);
 	if (res) {
@@ -1108,6 +1085,8 @@ int cfhsi_probe(struct platform_device *pdev)
 	return res;
 
  err_net_reg:
+	cfhsi->dev->cfhsi_down(cfhsi->dev);
+ err_activate:
 	destroy_workqueue(cfhsi->wq);
  err_create_wq:
 	kfree(cfhsi->rx_buf);
@@ -1121,6 +1100,8 @@ int cfhsi_probe(struct platform_device *pdev)
 
 static void cfhsi_shutdown(struct cfhsi *cfhsi, bool remove_platform_dev)
 {
+	u8 *tx_buf, *rx_buf;
+
 	/* Stop TXing */
 	netif_tx_stop_all_queues(cfhsi->ndev);
 
@@ -1145,15 +1126,21 @@ static void cfhsi_shutdown(struct cfhsi *cfhsi, bool remove_platform_dev)
 	del_timer(&cfhsi->timer);
 #endif /* CONFIG_SMP */
 
+	/* Cancel pending RX request (if any) */
+	cfhsi->dev->cfhsi_rx_cancel(cfhsi->dev);
+
 	/* Flush again and destroy workqueue */
 	destroy_workqueue(cfhsi->wq);
 
-	/* Free buffers. */
-	kfree(cfhsi->tx_buf);
-	kfree(cfhsi->rx_buf);
+	/* Store bufferes: will be freed later. */
+	tx_buf = cfhsi->tx_buf;
+	rx_buf = cfhsi->rx_buf;
 
 	/* Flush transmit queues. */
 	cfhsi_abort_tx(cfhsi);
+
+	/* Deactivate interface */
+	cfhsi->dev->cfhsi_down(cfhsi->dev);
 
 	/* Destroy wakelock. Will also release if it is held. */
 #ifdef CONFIG_WAKELOCK
@@ -1164,6 +1151,10 @@ static void cfhsi_shutdown(struct cfhsi *cfhsi, bool remove_platform_dev)
 
 	/* Finally unregister the network device. */
 	unregister_netdev(cfhsi->ndev);
+
+	/* Free buffers. */
+	kfree(tx_buf);
+	kfree(rx_buf);
 }
 
 int cfhsi_remove(struct platform_device *pdev)
