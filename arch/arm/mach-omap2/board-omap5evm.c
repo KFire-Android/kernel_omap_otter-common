@@ -25,6 +25,8 @@
 #include "common.h"
 #include <asm/hardware/gic.h>
 #include <plat/common.h>
+#include <plat/mmc.h>
+#include "hsmmc.h"
 #include "common-board-devices.h"
 #include "mux.h"
 
@@ -44,6 +46,25 @@ static struct __devinitdata emif_custom_configs custom_configs = {
 };
 #endif
 #endif
+
+static struct omap2_hsmmc_info mmc[] = {
+	{
+		.mmc		= 2,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.gpio_cd	= -EINVAL,
+		.gpio_wp	= -EINVAL,
+		.nonremovable	= true,
+		.ocr_mask	= MMC_VDD_29_30,
+		.no_off_init	= true,
+	},
+	{
+		.mmc		= 1,
+		.caps		= MMC_CAP_4_BIT_DATA,
+		.gpio_cd	= 67,
+		.gpio_wp	= -EINVAL,
+	},
+	{}	/* Terminator */
+};
 
 static void __init omap_5430evm_init(void)
 {
@@ -65,6 +86,7 @@ ifndef CONFIG_MACH_OMAP_5430ZEBU
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
 	omap_serial_init();
+	omap_hsmmc_init(mmc);
 }
 
 MACHINE_START(OMAP5_SEVM, "OMAP5430 evm board")
