@@ -29,6 +29,8 @@
 #include <asm/hardware/gic.h>
 #include <plat/common.h>
 #include <plat/omap4-keypad.h>
+#include <plat/mmc.h>
+#include "hsmmc.h"
 #include "common-board-devices.h"
 #include "mux.h"
 
@@ -138,9 +140,27 @@ static struct __devinitdata emif_custom_configs custom_configs = {
 #endif
 #endif
 
+static struct omap2_hsmmc_info mmc[] = {
+	{
+		.mmc		= 2,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.gpio_cd	= -EINVAL,
+		.gpio_wp	= -EINVAL,
+		.nonremovable	= true,
+		.ocr_mask	= MMC_VDD_29_30,
+		.no_off_init	= true,
+	},
+	{
+		.mmc		= 1,
+		.caps		= MMC_CAP_4_BIT_DATA,
+		.gpio_cd	= 67,
+		.gpio_wp	= -EINVAL,
+	},
+	{}	/* Terminator */
+};
+
 static int __init omap_5430evm_i2c_init(void)
 {
-
 	omap_register_i2c_bus(1, 400, NULL, 0);
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
@@ -174,6 +194,8 @@ static void __init omap_5430evm_init(void)
 	status = omap4_keyboard_init(&evm5430_keypad_data, &keypad_data);
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
+
+	omap_hsmmc_init(mmc);
 }
 
 MACHINE_START(OMAP5_SEVM, "OMAP5430 evm board")
