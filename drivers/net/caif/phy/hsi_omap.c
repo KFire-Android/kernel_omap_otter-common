@@ -6,6 +6,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
 
@@ -28,6 +29,10 @@ struct cfhsi_omap {
 	int rx_len;
 	bool awake;
 };
+
+static int sw_reset_on_cfhsi_up;
+module_param(sw_reset_on_cfhsi_up, bool, S_IRUGO);
+MODULE_PARM_DESC(sw_reset_on_cfhsi_up, "Perform software reset of HSI on interface up");
 
 /* TODO: Lists are not protected with regards to device removal. */
 static LIST_HEAD(cfhsi_dev_list);
@@ -58,6 +63,27 @@ static int cfhsi_up (struct cfhsi_dev *dev)
 			"%s: Failed to open HSI device: %d.\n",
 			__func__, res);
 		return res;
+	}
+
+	if (sw_reset_on_cfhsi_up) {
+		/* HACK!!! Flush the FIFO */
+		res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SW_RESET, NULL);
+		if (res) {
+			dev_err(&cfhsi->pdev.dev,
+				"%s: Failed to reset HSI block: %d.\n",
+				__func__, res);
+			hsi_close(cfhsi->hsi_dev);
+			return res;
+		}
+
+		/* Open OMAP HSI device again after reset. */
+		res = hsi_open(cfhsi->hsi_dev);
+		if (res) {
+			dev_err(&cfhsi->pdev.dev,
+				"%s: Failed to open HSI device: %d.\n",
+				__func__, res);
+			return res;
+		}
 	}
 
 	/* CAIF HSI TX configuration. */
