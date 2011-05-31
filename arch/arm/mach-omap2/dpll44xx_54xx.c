@@ -514,6 +514,76 @@ unsigned long omap4460_mpu_dpll_recalc(struct clk *clk)
 	return omap2_get_dpll_rate(clk->parent);
 }
 
+int omap4470_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
+{
+	struct dpll_data *dd;
+	unsigned long dpll_rate;
+	u32 v;
+
+	if (!clk || !rate || !clk->parent || !clk->parent->dpll_data)
+		return -EINVAL;
+
+	dd = clk->parent->dpll_data;
+
+	if (rate > clk->rate)
+		omap4460_mpu_dpll_update_children(rate);
+
+	dpll_rate = clk->parent->recalc(clk->parent);
+
+	if (rate <= OMAP_1GHz) {
+		/* If DCC is enabled, disable it */
+		v = __raw_readl(dd->mult_div1_reg);
+		if (v & OMAP4460_DCC_EN_MASK) {
+			v &= ~OMAP4460_DCC_EN_MASK;
+			__raw_writel(v, dd->mult_div1_reg);
+		}
+
+		if (rate != dpll_rate)
+			clk->parent->set_rate(clk->parent, rate);
+	} else {
+		/*
+		 * On OMAP4470, the MPU clk for frequencies higher than 1Ghz
+		 * is sourced from CLKOUTX2_M3, instead of CLKOUT_M2, while
+		 * value of M3 is fixed to 1. Hence for frequencies higher
+		 * than 1 Ghz, lock the DPLL at half the rate so the
+		 * CLKOUTX2_M3 then matches the requested rate.
+		 */
+		if (rate != dpll_rate * 2)
+			clk->parent->set_rate(clk->parent, rate / 2);
+
+		v = __raw_readl(dd->mult_div1_reg);
+		v &= ~OMAP4460_DCC_COUNT_MAX_MASK;
+		v |= (5 << OMAP4460_DCC_COUNT_MAX_SHIFT);
+		__raw_writel(v, dd->mult_div1_reg);
+
+		v |= OMAP4460_DCC_EN_MASK;
+		__raw_writel(v, dd->mult_div1_reg);
+	}
+
+	if (rate < clk->rate)
+		omap4460_mpu_dpll_update_children(rate);
+
+	clk->rate = rate;
+
+	return 0;
+}
+
+unsigned long omap4470_mpu_dpll_recalc(struct clk *clk)
+{
+	struct dpll_data *dd;
+	unsigned long dpll_rate;
+	u32 v;
+
+	if (!clk || !clk->parent || !clk->parent->dpll_data)
+		return -EINVAL;
+
+	dd = clk->parent->dpll_data;
+
+	dpll_rate = omap2_get_dpll_rate(clk->parent);
+	v = __raw_readl(dd->mult_div1_reg);
+	return (v & OMAP4460_DCC_EN_MASK) ? (dpll_rate * 2) : dpll_rate;
+}
+
 static void omap5_mpu_dpll_update_children(unsigned long rate)
 {
 	u32 v;

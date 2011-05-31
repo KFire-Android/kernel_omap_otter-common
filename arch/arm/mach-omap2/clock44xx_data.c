@@ -802,13 +802,22 @@ static struct clk dpll_mpu_m2_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
-static struct clk virt_dpll_mpu_ck = {
+static struct clk virt_4460_dpll_mpu_ck = {
 	.name		= "virt_dpll_mpu_ck",
 	.parent		= &dpll_mpu_ck,
 	.ops		= &clkops_null,
 	.recalc		= &omap4460_mpu_dpll_recalc,
 	.round_rate	= &omap4460_mpu_dpll_round_rate,
 	.set_rate	= &omap4460_mpu_dpll_set_rate,
+};
+
+static struct clk virt_4470_dpll_mpu_ck = {
+	.name		= "virt_dpll_mpu_ck",
+	.parent		= &dpll_mpu_ck,
+	.ops		= &clkops_null,
+	.recalc		= &omap4470_mpu_dpll_recalc,
+	.round_rate	= &omap4460_mpu_dpll_round_rate,
+	.set_rate	= &omap4470_mpu_dpll_set_rate,
 };
 
 static struct clk per_hs_clk_div_ck = {
@@ -1254,7 +1263,15 @@ static struct clk mpu_periphclk_443x = {
 
 static struct clk mpu_periphclk_446x = {
 	.name		= "mpu_periphclk",
-	.parent		= &virt_dpll_mpu_ck,
+	.parent		= &virt_4460_dpll_mpu_ck,
+	.ops		= &clkops_null,
+	.fixed_div	= 2,
+	.recalc		= &omap_fixed_divisor_recalc,
+};
+
+static struct clk mpu_periphclk_447x = {
+	.name		= "mpu_periphclk",
+	.parent		= &virt_4470_dpll_mpu_ck,
 	.ops		= &clkops_null,
 	.fixed_div	= 2,
 	.recalc		= &omap_fixed_divisor_recalc,
@@ -3490,7 +3507,7 @@ static struct clk_lookup omap443x_clks[] = {
 };
 
 static struct clk_lookup omap446x_clks[] = {
-	CLKDEV_INIT(NULL,	"virt_dpll_mpu_ck",		&virt_dpll_mpu_ck),
+	CLKDEV_INIT(NULL,	"virt_dpll_mpu_ck",		&virt_4460_dpll_mpu_ck),
 	CLKDEV_INIT(NULL,	"div_ts_ck",			&div_ts_ck),
 	CLKDEV_INIT(NULL,	"bandgap_ts_fclk",		&bandgap_ts_fclk),
 	CLKDEV_INIT("smp_twd",	NULL,				&mpu_periphclk_446x),
@@ -3500,11 +3517,11 @@ static struct clk_lookup omap446x_clks[] = {
 };
 
 static struct clk_lookup omap447x_clks[] = {
-	CLKDEV_INIT(NULL,	"virt_dpll_mpu_ck",		&virt_dpll_mpu_ck),
+	CLKDEV_INIT(NULL,	"virt_dpll_mpu_ck",		&virt_4470_dpll_mpu_ck),
 	CLKDEV_INIT(NULL,	"div_ts_ck",			&div_ts_ck),
 	CLKDEV_INIT(NULL,	"bandgap_ts_fclk",		&bandgap_ts_fclk),
 	CLKDEV_INIT(NULL,	"bb2d_fck",			&bb2d_fck),
-	CLKDEV_INIT("smp_twd",	NULL,				&mpu_periphclk_446x),
+	CLKDEV_INIT("smp_twd",	NULL,				&mpu_periphclk_447x),
 	CLKDEV_INIT(NULL,	"ipu_fck",			&ipu_fck_447x),
 	CLKDEV_INIT(NULL,	"iss_fck",			&iss_fck_447x),
 	CLKDEV_INIT(NULL,	NULL,				NULL),
