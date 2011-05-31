@@ -86,4 +86,20 @@ struct omap_pmic_map {
 extern int omap_pmic_register_data(struct omap_pmic_map *map);
 extern void omap_pmic_data_init(void);
 
+#ifdef CONFIG_OMAP_TPS6236X
+extern int omap_tps6236x_board_setup(bool use_62361, int gpio_vsel0,
+			int gpio_vsel1, int pull0, int pull1);
+extern int omap_tps6236x_init(void);
+#else
+static inline int omap_tps6236x_board_setup(bool use_62361, int gpio_vsel0,
+			int gpio_vsel1, int pull0, int pull1)
+{
+	return -EINVAL;
+}
+static inline int omap_tps6236x_init(void)
+{
+	return -EINVAL;
+}
+#endif
+
 #endif /* __OMAP_PMIC_COMMON__ */

@@ -83,6 +83,7 @@ void __init omap_pmic_late_init(void)
 	if (!pmic_i2c_board_info.irq || !omap4_i2c1_board_info[0].irq)
 		return;
 	omap_twl_init();
+	omap_tps6236x_init();
 }
 
 #if defined(CONFIG_ARCH_OMAP3)
