@@ -59,6 +59,12 @@
 #define	EHCI_INSNREG05_ULPI_EXTREGADD_SHIFT		8
 #define	EHCI_INSNREG05_ULPI_WRDATA_SHIFT		0
 #define	L3INIT_HSUSBTLL_CLKCTRL				0x4A009368
+#define USB_INT_EN_RISE_CLR_0				0x4A06280F
+#define USB_INT_EN_FALL_CLR_0				0x4A062812
+#define USB_INT_EN_RISE_CLR_1				0x4A06290F
+#define USB_INT_EN_FALL_CLR_1				0x4A062912
+#define OTG_CTRL_SET_0					0x4A06280B
+#define OTG_CTRL_SET_1					0x4A06290B
 
 /*-------------------------------------------------------------------------*/
 
@@ -575,6 +581,24 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 
 	omap_ehci = hcd_to_ehci(hcd);
 	omap_ehci->sbrn = 0x20;
+
+	/*
+	 * Errata i754: For OMAP4, when using TLL mode the ID pin state is
+	 * incorrectly restored after returning off mode. Workaround this
+	 * by enabling ID pin pull-up and disabling ID pin events.
+	 */
+	if (cpu_is_omap44xx()) {
+		if (pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_TLL) {
+			omap_writeb(0x10, USB_INT_EN_RISE_CLR_0);
+			omap_writeb(0x10, USB_INT_EN_FALL_CLR_0);
+			omap_writeb(0x01, OTG_CTRL_SET_0);
+		}
+		if (pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_TLL) {
+			omap_writeb(0x10, USB_INT_EN_RISE_CLR_1);
+			omap_writeb(0x10, USB_INT_EN_FALL_CLR_1);
+			omap_writeb(0x01, OTG_CTRL_SET_1);
+		}
+	}
 
 	omap_ehci->has_smsc_ulpi_bug = 1;
 	omap_ehci->no_companion_port_handoff = 1;
