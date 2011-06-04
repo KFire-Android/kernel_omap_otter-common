@@ -39,6 +39,7 @@
 #include "omap-abe.h"
 #include "omap-pcm.h"
 #include "omap-mcbsp.h"
+#include "omap-dmic.h"
 #include "../codecs/twl6040.h"
 
 static int twl6040_power_mode;
@@ -232,6 +233,31 @@ static struct snd_soc_ops sdp4430_mcbsp_ops = {
 	.hw_params = sdp4430_mcbsp_hw_params,
 };
 
+static int sdp4430_dmic_hw_params(struct snd_pcm_substream *substream,
+	struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	int ret = 0;
+
+	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_SYSCLK_PAD_CLKS,
+				     19200000, SND_SOC_CLOCK_IN);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set DMIC cpu system clock\n");
+		return ret;
+	}
+	ret = snd_soc_dai_set_clkdiv(cpu_dai, OMAP_DMIC_CLKDIV, 8);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set DMIC cpu clock divider\n");
+		return ret;
+	}
+	return 0;
+}
+
+static struct snd_soc_ops sdp4430_dmic_ops = {
+	.hw_params = sdp4430_dmic_hw_params,
+};
+
 static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 			struct snd_pcm_hw_params *params)
 {
@@ -246,6 +272,21 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
 	                            SNDRV_PCM_HW_PARAM_FIRST_MASK],
 	                            SNDRV_PCM_FORMAT_S16_LE);
+	return 0;
+}
+
+static int dmic_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
+			struct snd_pcm_hw_params *params)
+{
+	struct snd_interval *rate = hw_param_interval(params,
+			SNDRV_PCM_HW_PARAM_RATE);
+
+	/* The ABE will covert the FE rate to 96k */
+	rate->min = rate->max = 96000;
+
+	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
+	                            SNDRV_PCM_HW_PARAM_FIRST_MASK],
+	                            SNDRV_PCM_FORMAT_S32_LE);
 	return 0;
 }
 
@@ -301,6 +342,9 @@ static const struct snd_soc_dapm_widget sdp4430_twl6040_dapm_widgets[] = {
 	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
 	SND_SOC_DAPM_SPK("Earphone Spk", NULL),
 	SND_SOC_DAPM_INPUT("Aux/FM Stereo In"),
+	SND_SOC_DAPM_MIC("Digital Mic 0", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic 1", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic 2", NULL),
 };
 
 static const struct snd_soc_dapm_route audio_map[] = {
@@ -327,6 +371,16 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	/* Aux/FM Stereo In: AFML, AFMR */
 	{"AFML", NULL, "Aux/FM Stereo In"},
 	{"AFMR", NULL, "Aux/FM Stereo In"},
+
+	/* Digital Mics: DMic0, DMic1, DMic2 with bias */
+	{"DMIC0", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic 0"},
+
+	{"DMIC1", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic 1"},
+
+	{"DMIC2", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic 2"},
 };
 
 static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
@@ -365,6 +419,9 @@ static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "AFMR");
 	snd_soc_dapm_ignore_suspend(dapm, "Headset Mic");
 	snd_soc_dapm_ignore_suspend(dapm, "Headset Stereophone");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic 0");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic 1");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic 2");
 
 	ret = snd_soc_dapm_sync(dapm);
 	if (ret)
@@ -396,6 +453,39 @@ static int sdp4430_twl6040_dl2_init(struct snd_soc_pcm_runtime *rtd)
 	rtd->pmdown_time = 500;
 
 	return 0;
+}
+
+/* SDP4430 digital microphones DAPM */
+static const struct snd_soc_dapm_widget sdp4430_dmic_dapm_widgets[] = {
+	SND_SOC_DAPM_MIC("Digital Mic Legacy", NULL),
+};
+
+static const struct snd_soc_dapm_route dmic_audio_map[] = {
+	{"DMic", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic Legacy"},
+};
+
+static int sdp4430_dmic_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_codec *codec = rtd->codec;
+	struct snd_soc_dapm_context *dapm = &codec->dapm;
+	int ret;
+
+	ret = snd_soc_dapm_new_controls(dapm, sdp4430_dmic_dapm_widgets,
+				ARRAY_SIZE(sdp4430_dmic_dapm_widgets));
+	if (ret)
+		return ret;
+
+	ret = snd_soc_dapm_add_routes(dapm, dmic_audio_map,
+				ARRAY_SIZE(dmic_audio_map));
+	if (ret)
+		return ret;
+
+	snd_soc_dapm_enable_pin(dapm, "Digital Mic Legacy");
+
+	ret = snd_soc_dapm_sync(dapm);
+
+	return ret;
 }
 
 /* TODO: make this a separate BT CODEC driver or DUMMY */
@@ -602,6 +692,21 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		.ops = &sdp4430_mcpdm_ops,
 	},
+	{
+		.name = "Legacy DMIC",
+		.stream_name = "DMIC Capture",
+
+		/* ABE components - DMIC0 */
+		.cpu_dai_name = "omap-dmic-dai-0",
+		.platform_name = "omap-pcm-audio",
+
+		/* DMIC codec */
+		.codec_dai_name = "dmic-hifi",
+		.codec_name = "dmic-codec.0",
+
+		.init = sdp4430_dmic_init,
+		.ops = &sdp4430_dmic_ops,
+	},
 
 /*
  * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.
@@ -725,6 +830,57 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.ops = &sdp4430_mcbsp_ops,
 		.be_id = OMAP_ABE_DAI_MODEM,
 		.ignore_suspend = 1,
+	},
+	{
+		.name = OMAP_ABE_BE_DMIC0,
+		.stream_name = "DMIC0 Capture",
+
+		/* ABE components - DMIC UL 1 */
+		.cpu_dai_name = "omap-dmic-abe-dai-0",
+		.platform_name = "aess",
+
+		/* DMIC 0 */
+		.codec_dai_name = "dmic-hifi",
+		.codec_name = "dmic-codec.0",
+		.ops = &sdp4430_dmic_ops,
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_hw_params_fixup = dmic_be_hw_params_fixup,
+		.be_id = OMAP_ABE_DAI_DMIC0,
+	},
+	{
+		.name = OMAP_ABE_BE_DMIC1,
+		.stream_name = "DMIC1 Capture",
+
+		/* ABE components - DMIC UL 1 */
+		.cpu_dai_name = "omap-dmic-abe-dai-1",
+		.platform_name = "aess",
+
+		/* DMIC 1 */
+		.codec_dai_name = "dmic-hifi",
+		.codec_name = "dmic-codec.1",
+		.ops = &sdp4430_dmic_ops,
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_hw_params_fixup = dmic_be_hw_params_fixup,
+		.be_id = OMAP_ABE_DAI_DMIC1,
+	},
+	{
+		.name = OMAP_ABE_BE_DMIC2,
+		.stream_name = "DMIC2 Capture",
+
+		/* ABE components - DMIC UL 2 */
+		.cpu_dai_name = "omap-dmic-abe-dai-2",
+		.platform_name = "aess",
+
+		/* DMIC 2 */
+		.codec_dai_name = "dmic-hifi",
+		.codec_name = "dmic-codec.2",
+		.ops = &sdp4430_dmic_ops,
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_hw_params_fixup = dmic_be_hw_params_fixup,
+		.be_id = OMAP_ABE_DAI_DMIC2,
 	},
 };
 
