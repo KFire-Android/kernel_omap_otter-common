@@ -120,6 +120,7 @@ struct omap_globals {
 	void __iomem	*sms;            /* SDRAM Memory Scheduler */
 	void __iomem	*ctrl;           /* System Control Module */
 	void __iomem	*ctrl_pad;	/* PAD Control Module */
+	void __iomem	*ctrl_wk_pad;	/* WKPAD Control Module */
 	void __iomem	*prm;            /* Power and Reset Management */
 	void __iomem	*cm;             /* Clock Management */
 	void __iomem	*cm2;
