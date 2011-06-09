@@ -311,6 +311,7 @@ config MACH_OMAP_4430SDP
 	bool "OMAP 4430 SDP board"
 	default y
 	depends on ARCH_OMAP4
+	select INPUT_SFH7741
 	select INPUT_MISC
 	select INPUT_CMA3000
 	select INPUT_CMA3000_I2C
