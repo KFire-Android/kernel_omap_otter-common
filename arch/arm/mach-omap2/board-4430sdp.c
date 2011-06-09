@@ -523,6 +523,7 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 		I2C_BOARD_INFO("hmc5843", 0x1e),
 	},
 };
+
 static int __init omap4_i2c_init(void)
 {
 	omap4_pmic_init("twl6030", &sdp4430_twldata);
