@@ -489,6 +489,13 @@ config INPUT_CMA3000_I2C
 	  To compile this driver as a module, choose M here: the
 	  module will be called cma3000_d0x_i2c.
 
+config INPUT_BH1780
+	bool "ROHM BH1780GLI ambient light sensor"
+	depends on I2C && SYSFS
+	help
+	  If you say yes here you get support for the ROHM BH1780GLI
+	  ambient light sensor.
+
 config INPUT_BMP085
        bool "BMP085 digital pressure sensor"
        depends on I2C && SYSFS
