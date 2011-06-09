@@ -50,8 +50,8 @@
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
 #define ETH_KS8851_QUART		138
-#define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
-#define OMAP4_SFH7741_ENABLE_GPIO		188
+#define OMAP4_TOUCH_IRQ_1		35
+#define OMAP4_TOUCH_IRQ_2		36
 #define HDMI_GPIO_HPD 60 /* Hot plug pin for HDMI */
 #define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
 #define LCD_BL_GPIO		27	/* LCD Backlight GPIO */
@@ -182,16 +182,6 @@ static struct gpio_led sdp4430_gpio_leds[] = {
 
 };
 
-static struct gpio_keys_button sdp4430_gpio_keys[] = {
-	{
-		.desc			= "Proximity Sensor",
-		.type			= EV_SW,
-		.code			= SW_FRONT_PROXIMITY,
-		.gpio			= OMAP4_SFH7741_SENSOR_OUTPUT_GPIO,
-		.active_low		= 0,
-	}
-};
-
 static struct gpio_led_platform_data sdp4430_led_data = {
 	.leds	= sdp4430_gpio_leds,
 	.num_leds	= ARRAY_SIZE(sdp4430_gpio_leds),
@@ -216,32 +206,6 @@ static struct platform_device sdp4430_leds_pwm = {
 	.id	= -1,
 	.dev	= {
 		.platform_data = &sdp4430_pwm_data,
-	},
-};
-
-static int omap_prox_activate(struct device *dev)
-{
-	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 1);
-	return 0;
-}
-
-static void omap_prox_deactivate(struct device *dev)
-{
-	gpio_set_value(OMAP4_SFH7741_ENABLE_GPIO , 0);
-}
-
-static struct gpio_keys_platform_data sdp4430_gpio_keys_data = {
-	.buttons	= sdp4430_gpio_keys,
-	.nbuttons	= ARRAY_SIZE(sdp4430_gpio_keys),
-	.enable		= omap_prox_activate,
-	.disable	= omap_prox_deactivate,
-};
-
-static struct platform_device sdp4430_gpio_keys_device = {
-	.name	= "gpio-keys",
-	.id	= -1,
-	.dev	= {
-		.platform_data	= &sdp4430_gpio_keys_data,
 	},
 };
 
@@ -282,7 +246,6 @@ static int __init omap_ethernet_init(void)
 }
 
 static struct platform_device *sdp4430_devices[] __initdata = {
-	&sdp4430_gpio_keys_device,
 	&sdp4430_leds_gpio,
 	&sdp4430_leds_pwm,
 };
@@ -571,17 +534,6 @@ static int __init omap4_i2c_init(void)
 	return 0;
 }
 
-static void __init omap_sfh7741prox_init(void)
-{
-	int error;
-
-	error = gpio_request_one(OMAP4_SFH7741_ENABLE_GPIO,
-				 GPIOF_OUT_INIT_LOW, "sfh7741");
-	if (error < 0)
-		pr_err("%s:failed to request GPIO %d, error %d\n",
-			__func__, OMAP4_SFH7741_ENABLE_GPIO, error);
-}
-
 static int dsi1_panel_set_backlight(struct omap_dss_device *dssdev, int level)
 {
 	int r;
@@ -861,7 +813,6 @@ static void __init omap_4430sdp_init(void)
 
 	omap4_i2c_init();
 	blaze_sensor_init();
-	omap_sfh7741prox_init();
 	blaze_touch_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	board_serial_init();
