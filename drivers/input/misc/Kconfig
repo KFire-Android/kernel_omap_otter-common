@@ -489,6 +489,13 @@ config INPUT_CMA3000_I2C
 	  To compile this driver as a module, choose M here: the
 	  module will be called cma3000_d0x_i2c.
 
+config INPUT_BMP085
+       bool "BMP085 digital pressure sensor"
+       depends on I2C && SYSFS
+       help
+         If you say yes here you get support for the Bosch Sensortec
+         BMP086 digital pressure sensor
+
 config INPUT_XEN_KBDDEV_FRONTEND
 	tristate "Xen virtual keyboard and mouse support"
 	depends on XEN_FBDEV_FRONTEND
