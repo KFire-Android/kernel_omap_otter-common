@@ -137,6 +137,12 @@ static void omap_cma3000accl_init(void)
 	gpio_direction_input(OMAP4_CMA3000ACCL_GPIO);
 }
 
+static struct i2c_board_info __initdata blaze_bus3_sensor_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("bh1780", 0x29),
+	},
+};
+
 static struct i2c_board_info __initdata blaze_bus4_sensor_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("bmp085", 0x77),
@@ -151,6 +157,9 @@ int __init blaze_sensor_init(void)
 {
 	omap_sfh7741prox_init();
 	omap_cma3000accl_init();
+
+	i2c_register_board_info(3, blaze_bus3_sensor_boardinfo,
+		ARRAY_SIZE(blaze_bus3_sensor_boardinfo));
 
 	i2c_register_board_info(4, blaze_bus4_sensor_boardinfo,
 		ARRAY_SIZE(blaze_bus4_sensor_boardinfo));
