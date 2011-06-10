@@ -833,7 +833,7 @@ int omap_mcbsp_request(unsigned int id)
 			goto err_clk_disable;
 		}
 
-		if (mcbsp->rx_irq) {
+		if (mcbsp->rx_irq >= 0) {
 			init_completion(&mcbsp->rx_irq_completion);
 			err = request_irq(mcbsp->rx_irq,
 					omap_mcbsp_rx_irq_handler,
@@ -891,7 +891,7 @@ void omap_mcbsp_free(unsigned int id)
 
 	if (mcbsp->io_type == OMAP_MCBSP_IRQ_IO) {
 		/* Free IRQs */
-		if (mcbsp->rx_irq)
+		if (mcbsp->rx_irq >= 0)
 			free_irq(mcbsp->rx_irq, (void *)mcbsp);
 		free_irq(mcbsp->tx_irq, (void *)mcbsp);
 	}
