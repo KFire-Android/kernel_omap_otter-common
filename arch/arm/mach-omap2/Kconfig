@@ -313,6 +313,7 @@ config MACH_OMAP_4430SDP
 	depends on ARCH_OMAP4
 	select INPUT_BH1780
 	select INPUT_BMP085
+	select INPUT_HMC5843
 	select INPUT_SFH7741
 	select INPUT_MISC
 	select INPUT_CMA3000
