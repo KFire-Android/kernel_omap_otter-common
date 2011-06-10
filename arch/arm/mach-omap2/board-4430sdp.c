@@ -511,10 +511,9 @@ static struct twl4030_platform_data sdp4430_twldata = {
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
-	{
-		I2C_BOARD_INFO("tmp105", 0x48),
-	},
+
 };
+
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 
 };

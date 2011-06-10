@@ -139,6 +139,9 @@ static void omap_cma3000accl_init(void)
 
 static struct i2c_board_info __initdata blaze_bus3_sensor_boardinfo[] = {
 	{
+		I2C_BOARD_INFO("tmp105", 0x48),
+	},
+	{
 		I2C_BOARD_INFO("bh1780", 0x29),
 	},
 };
