@@ -489,6 +489,14 @@ config INPUT_CMA3000_I2C
 	  To compile this driver as a module, choose M here: the
 	  module will be called cma3000_d0x_i2c.
 
+config INPUT_HMC5843
+	bool "Honeywell HMC5843 3-Axis Magnetometer"
+	depends on I2C && SYSFS
+	select INPUT_POLLDEV
+	help
+	  Say Y here to add support for the Honeywell HMC 5843 3-Axis
+	  Magnetometer (digital compass).
+
 config INPUT_BH1780
 	bool "ROHM BH1780GLI ambient light sensor"
 	depends on I2C && SYSFS
