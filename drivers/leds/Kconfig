@@ -369,6 +369,13 @@ config LEDS_MC13783
 	  This option enable support for on-chip LED drivers found
 	  on Freescale Semiconductor MC13783 PMIC.
 
+config LEDS_OMAP4430_SDP_DISPLAY
+	bool "Display LED support for OMAP4430 SDP"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for display LEDs on the
+          OMAP4430 SDP.
+
 config LEDS_NS2
 	tristate "LED support for Network Space v2 GPIO LEDs"
 	depends on LEDS_CLASS
