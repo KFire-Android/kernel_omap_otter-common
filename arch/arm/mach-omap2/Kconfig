@@ -311,6 +311,9 @@ config MACH_OMAP_4430SDP
 	bool "OMAP 4430 SDP board"
 	default y
 	depends on ARCH_OMAP4
+	select NEW_LEDS
+	select LEDS_CLASS
+	select LEDS_OMAP4430_SDP_DISPLAY
 	select SENSORS_LM75
 	select INPUT_BH1780
 	select INPUT_BMP085
