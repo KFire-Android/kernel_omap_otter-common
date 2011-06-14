@@ -235,6 +235,10 @@ MODULE_DEVICE_TABLE(i2c, lm75_ids);
 #define LM75A_ID 0xA1
 
 /* Return 0 if detection is successful, -ENODEV otherwise */
+
+#if 0
+/* Commenting out function to prevent warning because it is not being used */
+
 static int lm75_detect(struct i2c_client *new_client,
 		       struct i2c_board_info *info)
 {
@@ -247,19 +251,19 @@ static int lm75_detect(struct i2c_client *new_client,
 				     I2C_FUNC_SMBUS_WORD_DATA))
 		return -ENODEV;
 
-	/* Now, we do the remaining detection. There is no identification-
-	   dedicated register so we have to rely on several tricks:
-	   unused bits, registers cycling over 8-address boundaries,
-	   addresses 0x04-0x07 returning the last read value.
-	   The cycling+unused addresses combination is not tested,
-	   since it would significantly slow the detection down and would
-	   hardly add any value.
+	  /* Now, we do the remaining detection. There is no identification-
+	     dedicated register so we have to rely on several tricks:
+	     unused bits, registers cycling over 8-address boundaries,
+	     addresses 0x04-0x07 returning the last read value.
+	     The cycling+unused addresses combination is not tested,
+	     since it would significantly slow the detection down and would
+	     hardly add any value.
 
-	   The National Semiconductor LM75A is different than earlier
-	   LM75s.  It has an ID byte of 0xaX (where X is the chip
-	   revision, with 1 being the only revision in existence) in
-	   register 7, and unused registers return 0xff rather than the
-	   last read value. */
+	     The National Semiconductor LM75A is different than earlier
+	     LM75s.  It has an ID byte of 0xaX (where X is the chip
+	     revision, with 1 being the only revision in existence) in
+	     register 7, and unused registers return 0xff rather than the
+	     last read value. */
 
 	/* Unused bits */
 	conf = i2c_smbus_read_byte_data(new_client, 1);
@@ -269,7 +273,7 @@ static int lm75_detect(struct i2c_client *new_client,
 	/* First check for LM75A */
 	if (i2c_smbus_read_byte_data(new_client, 7) == LM75A_ID) {
 		/* LM75A returns 0xff on unused registers so
-		   just to be sure we check for that too. */
+		    just to be sure we check for that too. */
 		if (i2c_smbus_read_byte_data(new_client, 4) != 0xff
 		 || i2c_smbus_read_byte_data(new_client, 5) != 0xff
 		 || i2c_smbus_read_byte_data(new_client, 6) != 0xff)
@@ -308,6 +312,7 @@ static int lm75_detect(struct i2c_client *new_client,
 
 	return 0;
 }
+#endif
 
 #ifdef CONFIG_PM
 static int lm75_suspend(struct device *dev)
@@ -356,7 +361,7 @@ static struct i2c_driver lm75_driver = {
 	.probe		= lm75_probe,
 	.remove		= lm75_remove,
 	.id_table	= lm75_ids,
-	.detect		= lm75_detect,
+	/*.detect		= lm75_detect,*/
 	.address_list	= normal_i2c,
 };
 
