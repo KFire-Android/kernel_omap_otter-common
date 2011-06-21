@@ -860,6 +860,7 @@ static void __init omap_4430sdp_init(void)
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
 
 	omap4_i2c_init();
+	blaze_sensor_init();
 	omap_sfh7741prox_init();
 	blaze_touch_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));

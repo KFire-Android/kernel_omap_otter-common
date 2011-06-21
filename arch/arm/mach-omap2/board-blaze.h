@@ -18,5 +18,6 @@
 #define _MACH_OMAP_BOARD_44XX_SDP_H
 
 int blaze_touch_init(void);
+int blaze_sensor_init(void);
 
 #endif
