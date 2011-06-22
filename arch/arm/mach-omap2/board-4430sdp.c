@@ -51,6 +51,10 @@
 #include "control.h"
 #include "common-board-devices.h"
 #include "pm.h"
+/* for TI WiLink devices */
+#include <linux/skbuff.h>
+#include <linux/ti_wilink_st.h>
+#define WILINK_UART_DEV_NAME "/dev/ttyO1"
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
@@ -253,9 +257,47 @@ static int __init omap_ethernet_init(void)
 	return status;
 }
 
+/* TODO: handle suspend/resume here.
+ * Upon every suspend, make sure the wilink chip is capable enough to wake-up the
+ * OMAP host.
+ */
+static int plat_wlink_kim_suspend(struct platform_device *pdev, pm_message_t
+		state)
+{
+	return 0;
+}
+
+static int plat_wlink_kim_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+
+/* wl128x BT, FM, GPS connectivity chip */
+static struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = 55,
+	.dev_name = WILINK_UART_DEV_NAME,
+	.flow_cntrl = 1,
+	.baud_rate = 3000000,
+	.suspend = plat_wlink_kim_suspend,
+	.resume = plat_wlink_kim_resume,
+};
+
+static struct platform_device wl128x_device = {
+	.name		= "kim",
+	.id		= -1,
+	.dev.platform_data = &wilink_pdata,
+};
+
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+};
+
 static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_leds_gpio,
 	&sdp4430_leds_pwm,
+	&wl128x_device,
+	&btwilink_device,
 };
 
 static struct omap_board_config_kernel sdp4430_config[] __initdata = {
