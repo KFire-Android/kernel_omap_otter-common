@@ -992,8 +992,21 @@ int omapfb_apply_changes(struct fb_info *fbi, int init)
 		if (r)
 			goto err;
 
-		if (!init && ovl->manager)
+		if (!init && ovl->manager) {
+			struct omap_dss_device *dev;
+			struct omap_dss_driver *drv;
+
 			ovl->manager->apply(ovl->manager);
+
+			drv = ovl->manager->device->driver;
+			dev = ovl->manager->device;
+
+			if (dev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE &&
+				drv->get_update_mode(dev) != OMAP_DSS_UPDATE_AUTO)
+				return drv->update(dev, 0, 0,
+							dev->panel.timings.x_res,
+							dev->panel.timings.y_res);
+		}
 	}
 	return 0;
 err:
