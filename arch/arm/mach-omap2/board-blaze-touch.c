@@ -33,12 +33,12 @@
 #define OMAP4_TOUCH_IRQ_2		36
 
 static char *tm12xx_idev_names[] = {
-	"Synaptic TM12XX TouchPoint 1",
-	"Synaptic TM12XX TouchPoint 2",
-	"Synaptic TM12XX TouchPoint 3",
-	"Synaptic TM12XX TouchPoint 4",
-	"Synaptic TM12XX TouchPoint 5",
-	"Synaptic TM12XX TouchPoint 6",
+	"syn_tm12xx_ts_1",
+	"syn_tm12xx_ts_2",
+	"syn_tm12xx_ts_3",
+	"syn_tm12xx_ts_4",
+	"syn_tm12xx_ts_5",
+	"syn_tm12xx_ts_6",
 	NULL,
 };
 
@@ -55,6 +55,7 @@ static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
 		.num_buttons = ARRAY_SIZE(tm12xx_button_map),
 		.repeat = 0,
 		.swap_xy = 1,
+		.controller_num = 0,
 	/* Android does not have touchscreen as wakeup source */
 #if !defined(CONFIG_ANDROID)
 		.suspend_state = SYNTM12XX_ON_ON_SUSPEND,
@@ -69,6 +70,7 @@ static struct tm12xx_ts_platform_data tm12xx_platform_data[] = {
 		.num_buttons = ARRAY_SIZE(tm12xx_button_map),
 		.repeat = 0,
 		.swap_xy = 1,
+		.controller_num = 1,
 	/* Android does not have touchscreen as wakeup source */
 #if !defined(CONFIG_ANDROID)
 		.suspend_state = SYNTM12XX_ON_ON_SUSPEND,
