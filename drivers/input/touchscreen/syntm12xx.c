@@ -739,6 +739,7 @@ static void syn_touch_parse_one_touch_data(struct syn *sd, struct touch_data *p,
 
 static void syn_touch_parse_touch_data(struct syn *sd, const u8 *d)
 {
+	struct tm12xx_ts_platform_data *pdata = sd->client->dev.platform_data;
 	unsigned i;
 	u8 fc;
 	u8 fs;
@@ -750,7 +751,7 @@ static void syn_touch_parse_touch_data(struct syn *sd, const u8 *d)
 		dev_err(&sd->client->dev, "error in finger count %d\n", fc);
 
 	for (i = 0; i < fc; i++) {
-		p = &sd->tp[i].cur_td;
+		p = &sd->tp[pdata->controller_num].cur_td;
 
 		fs = (d[(i >> 2)] >> ((i % 4) << 1)) & 0x03;
 
@@ -845,8 +846,8 @@ out:
 
 static void syn_isr_2d(struct syn *sd, u8 bits)
 {
+	struct tm12xx_ts_platform_data *pdata = sd->client->dev.platform_data;
 	int r;
-	int i;
 
 	if (!sd->touch) {
 		dev_warn(&sd->client->dev,
@@ -862,21 +863,17 @@ static void syn_isr_2d(struct syn *sd, u8 bits)
 
 	if (sd->debug_flag & DFLAG_VERBOSE) {
 		dev_info(&sd->client->dev,
-			 "1: state=0x%x, x=%d, y=%d, z=%d, wx=%d, wy=%d\n",
-			 sd->tp[0].cur_td.finger_state,
-			 sd->tp[0].cur_td.x, sd->tp[0].cur_td.y,
-			 sd->tp[0].cur_td.z, sd->tp[0].cur_td.wx,
-			 sd->tp[0].cur_td.wy);
-		dev_info(&sd->client->dev,
-			 "2: state=0x%x, x=%d, y=%d, z=%d, wx=%d, wy=%d\n",
-			 sd->tp[1].cur_td.finger_state,
-			 sd->tp[1].cur_td.x, sd->tp[1].cur_td.y,
-			 sd->tp[1].cur_td.z, sd->tp[1].cur_td.wx,
-			 sd->tp[1].cur_td.wy);
+			 "%i: state=0x%x, x=%d, y=%d, z=%d, wx=%d, wy=%d\n",
+			 pdata->controller_num,
+			 sd->tp[pdata->controller_num].cur_td.finger_state,
+			 sd->tp[pdata->controller_num].cur_td.x,
+			 sd->tp[pdata->controller_num].cur_td.y,
+			 sd->tp[pdata->controller_num].cur_td.z,
+			 sd->tp[pdata->controller_num].cur_td.wx,
+			 sd->tp[pdata->controller_num].cur_td.wy);
 	}
 
-	for (i = 0; i < sd->touch_caps.finger_count; i++)
-		syn_touch_report_data(sd, i);
+	syn_touch_report_data(sd, pdata->controller_num);
 }
 
 static int syn_button_report(struct syn *sd, unsigned button_nr, const int val)
@@ -1152,8 +1149,6 @@ static int syn_register_input_devices(struct syn *sd, int num_devices)
 {
 	struct tm12xx_ts_platform_data *pdata;
 	int r;
-	int i;
-	int j;
 
 	if (!sd || num_devices < 0 || num_devices > MAX_TOUCH_POINTS)
 		return -EINVAL;
@@ -1168,51 +1163,50 @@ static int syn_register_input_devices(struct syn *sd, int num_devices)
 		return 0;
 	}
 
-	for (i = 0; i < num_devices; i++) {
-		sd->tp[i].idev = input_allocate_device();
-		if (!sd->tp[i].idev) {
-			dev_err(&sd->client->dev,
-				"not enough memory for input device %d\n", i);
-			r = -ENOMEM;
-			goto err_alloc;
-		}
+	sd->tp[pdata->controller_num].idev = input_allocate_device();
+	if (!sd->tp[pdata->controller_num].idev) {
+		dev_err(&sd->client->dev,
+			"not enough memory for input device %d\n",
+			pdata->controller_num);
+		r = -ENOMEM;
+		goto err_alloc;
 	}
 
-	for (i = 0; i < num_devices; i++) {
-		r = syn_set_input_dev_params(sd, i);
-		if (r != 0)
-			goto err_alloc;
-
-		if (pdata->idev_name[i])
-			sd->tp[i].idev->name = pdata->idev_name[i];
-		else {
-			dev_err(&sd->client->dev,
-				"no input device name. check platform data\n");
-			goto err_alloc;
-		}
+	r = syn_set_input_dev_params(sd, pdata->controller_num);
+	if (r) {
+		dev_err(&sd->client->dev,
+			"%s: Setting input params for controller \
+			number %i failed.\n",
+			__func__, pdata->controller_num);
+		goto err_alloc;
 	}
 
-	/* We use j in the err_alloc to unregister */
-	for (j = 0; j < num_devices; j++) {
-		r = input_register_device(sd->tp[j].idev);
-		if (r) {
-			dev_err(&sd->client->dev,
-				"failed to register input device %d\n", j);
-			goto err_register;
-		}
+	if (pdata->idev_name[pdata->controller_num])
+		sd->tp[pdata->controller_num].idev->name =
+			pdata->idev_name[pdata->controller_num];
+	else {
+		dev_err(&sd->client->dev,
+			"%s: No input device name for controller \
+			number %i.\n", __func__, pdata->controller_num);
+		goto err_alloc;
+	}
+
+	r = input_register_device(sd->tp[pdata->controller_num].idev);
+	if (r) {
+		dev_err(&sd->client->dev,
+			"failed to register input device %d\n",
+			pdata->controller_num);
+		goto err_register;
 	}
 
 	return 0;
 
 err_register:
-	for (i = 0; i < j; i++)
-		input_unregister_device(sd->tp[i].idev);
+	input_unregister_device(sd->tp[pdata->controller_num].idev);
 err_alloc:
-	for (i = 0; i < num_devices; i++) {
-		if (sd->tp[i].idev) {
-			input_free_device(sd->tp[i].idev);
-			sd->tp[i].idev = NULL;
-		}
+	if (sd->tp[pdata->controller_num].idev) {
+		input_free_device(sd->tp[pdata->controller_num].idev);
+		sd->tp[pdata->controller_num].idev = NULL;
 	}
 
 	return r;
