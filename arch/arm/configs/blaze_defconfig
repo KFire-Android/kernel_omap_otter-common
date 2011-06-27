@@ -154,6 +154,10 @@ CONFIG_MISC_DEVICES=y
 # CONFIG_ANDROID_PMEM is not set
 CONFIG_KERNEL_DEBUGGER_CORE=y
 CONFIG_UID_STAT=y
+#
+# Texas Instruments shared transport line discipline
+#
+CONFIG_TI_ST=y
 CONFIG_SCSI=y
 CONFIG_BLK_DEV_SD=y
 CONFIG_CHR_DEV_SG=y
