@@ -239,7 +239,7 @@ static ssize_t hmc5843_store_rate(struct device *dev,
 		} else if (val == 2000) {
 			i = (ARRAY_SIZE(hmc5843_sample_interval) - 7);
 		} else {
-			for (i = 0; i < ARRAY_SIZE(hmc5843_sample_interval); i++) {
+			for (i = 0; i < (ARRAY_SIZE(hmc5843_sample_interval) - 1); i++) {
 				/* The array is from slowest to fastest */
 				if ((hmc5843_sample_interval[i] > val) &&
 				(hmc5843_sample_interval[i + 1] <= val))
