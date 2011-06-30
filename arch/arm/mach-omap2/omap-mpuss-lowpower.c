@@ -75,6 +75,7 @@ struct omap4_cpu_pm_info {
 	void __iomem *scu_sar_addr;
 	void __iomem *wkup_sar_addr;
 	void __iomem *l2x0_sar_addr;
+	void (*secondary_startup)(void);
 };
 
 struct cpu_pm_ops {
@@ -482,6 +483,12 @@ int __init omap_mpuss_init(void)
 	pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
 	pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
 	pm_info->l2x0_sar_addr = sar_base + l2x0_offset;
+
+	if (cpu_is_omap446x())
+		pm_info->secondary_startup = omap_secondary_startup_4460;
+	else
+		pm_info->secondary_startup = omap_secondary_startup;
+
 	pm_info->pwrdm = pwrdm_lookup("cpu1_pwrdm");
 	if (!pm_info->pwrdm) {
 		pr_err("Lookup failed for CPU1 pwrdm\n");
@@ -521,6 +528,12 @@ int __init omap_mpuss_init(void)
 		omap_pm_ops.resume = omap4_cpu_resume;
 		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
 		omap_pm_ops.hotplug_restart = omap_secondary_startup;
+		if (cpu_is_omap446x())
+			omap_pm_ops.hotplug_restart =
+						omap_secondary_startup_4460;
+		else
+			omap_pm_ops.hotplug_restart =
+						omap_secondary_startup;
 	} else if (cpu_is_omap54xx()) {
 		omap_pm_ops.finish_suspend = omap5_finish_suspend;
 		omap_pm_ops.hotplug_restart = omap5_secondary_startup;

@@ -38,6 +38,7 @@ static void __iomem *l2cache_base;
 #endif
 
 static void __iomem *sar_ram_base;
+static void __iomem *gic_dist_base_addr;
 
 #ifdef CONFIG_OMAP4_ERRATA_I688
 /* Used to implement memory barrier on DRAM path */
@@ -92,7 +93,6 @@ void __init omap_barriers_init(void)
 void __init gic_init_irq(void)
 {
 	void __iomem *omap_irq_base;
-	void __iomem *gic_dist_base_addr;
 
 	/* Static mapping, never released */
 	if (cpu_is_omap44xx())
@@ -113,6 +113,12 @@ void __init gic_init_irq(void)
 	omap_wakeupgen_init();
 
 	gic_init(0, 29, gic_dist_base_addr, omap_irq_base);
+}
+
+void gic_dist_disable(void)
+{
+	if (gic_dist_base_addr)
+		__raw_writel(0x0, gic_dist_base_addr + GIC_DIST_CTRL);
 }
 
 #ifdef CONFIG_CACHE_L2X0
