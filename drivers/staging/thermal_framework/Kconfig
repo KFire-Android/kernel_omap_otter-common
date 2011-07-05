@@ -9,6 +9,12 @@ menuconfig THERMAL_FRAMEWORK
 	  a central hub for sensors, governors and cooling devices
 	  to register and pass data to.
 
+config OMAP_THERMAL
+	bool "OMAP Thermal Framework support"
+	depends on THERMAL_FRAMEWORK && ARCH_OMAP4
+	help
+	  This is the thermal framework support for OMAP4
+	  processors.
 
 source "drivers/staging/thermal_framework/sensor/Kconfig"
 

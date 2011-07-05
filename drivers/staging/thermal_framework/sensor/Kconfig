@@ -1,0 +1,10 @@
+#
+# Thermal Temp sensor configuration
+#
+
+config OMAP4_DIE_TEMP_SENSOR
+	bool "OMAP On-Die temp sensor support"
+	depends on THERMAL_FRAMEWORK && OMAP_THERMAL && OMAP_TEMP_SENSOR
+	help
+	  Enabling this config will give support for the on-die
+	  temp sensor for the OMAP platform.
