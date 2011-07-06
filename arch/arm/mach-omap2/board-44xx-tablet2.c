@@ -49,6 +49,8 @@
 #include "common-board-devices.h"
 #include "pm.h"
 
+#include "board-44xx-tablet2.h"
+
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
 #define ETH_KS8851_QUART		138
@@ -457,18 +459,13 @@ static struct i2c_board_info __initdata tablet2_i2c_3_boardinfo[] = {
 
 };
 
-static struct i2c_board_info __initdata tablet2_i2c_4_boardinfo[] = {
-
-};
-
 static int __init omap4_i2c_init(void)
 {
 	omap4_pmic_init("twl6030", &tablet2_twldata);
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, tablet2_i2c_3_boardinfo,
 				ARRAY_SIZE(tablet2_i2c_3_boardinfo));
-	omap_register_i2c_bus(4, 400, tablet2_i2c_4_boardinfo,
-				ARRAY_SIZE(tablet2_i2c_4_boardinfo));
+	omap_register_i2c_bus(4, 400, NULL, 0);
 	return 0;
 }
 
@@ -770,6 +767,7 @@ static void __init omap_tablet2_init(void)
 	omap_board_config_size = ARRAY_SIZE(tablet2_config);
 
 	omap4_i2c_init();
+	tablet2_touch_init();
 	platform_add_devices(tablet2_devices, ARRAY_SIZE(tablet2_devices));
 	board_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);

@@ -339,6 +339,7 @@ config MACH_OMAP_BLAZE_TABLET2
 	depends on ARCH_OMAP4
 	select OMAP_PACKAGE_CBL
 	select OMAP_PACKAGE_CBS
+	select TOUCHSCREEN_QUANTUM_OBP 
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
