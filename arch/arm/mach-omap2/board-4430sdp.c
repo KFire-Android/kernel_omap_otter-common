@@ -759,7 +759,7 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.default_device	= &sdp4430_lcd_device,
 };
 
-void omap_4430sdp_display_init(void)
+static void omap_4430sdp_display_init(void)
 {
 	sdp4430_lcd_init();
 	sdp4430_hdmi_mux_init();
