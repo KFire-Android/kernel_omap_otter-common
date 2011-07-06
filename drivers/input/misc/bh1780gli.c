@@ -42,6 +42,8 @@
 #define BH1780_POFF           (0x0)
 #define BH1780_PON            (0x3)
 
+#define BH1780_ENABLE_OFF     0
+
 /* power on settling time in ms */
 #define BH1780_PON_DELAY      2
 
@@ -61,6 +63,7 @@ struct bh1780_data {
 #ifdef CONFIG_HAS_EARLYSUSPEND
        struct early_suspend early_suspend;
 #endif
+	int enable;
 	int current_lux;
 	int old_lux;
 	int power_state;
@@ -207,7 +210,42 @@ static ssize_t bh1780_store_power_state(struct device *dev,
 	return count;
 }
 
+static ssize_t bh1780_show_enable(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct bh1780_data *bh1780 = i2c_get_clientdata(client);
+
+	return sprintf(buf, "%d\n", bh1780->enable);
+}
+
+static ssize_t bh1780_store_enable(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct bh1780_data *bh1780 = i2c_get_clientdata(client);
+	unsigned long val;
+	int error;
+
+	error = strict_strtoul(buf, 0, &val);
+	if (error)
+		return error;
+
+	bh1780->enable = BH1780_POFF;
+	if (val != 0)
+		bh1780->enable = BH1780_PON;
+
+	bh1780_set_power(bh1780, bh1780->enable);
+
+	return count;
+}
+
 static DEVICE_ATTR(lux, S_IRUGO, bh1780_show_lux, NULL);
+
+static DEVICE_ATTR(enable, S_IWUSR | S_IRUGO, bh1780_show_enable,
+		bh1780_store_enable);
 
 static DEVICE_ATTR(power_state, S_IWUSR | S_IRUGO,
 		bh1780_show_power_state, bh1780_store_power_state);
@@ -215,6 +253,7 @@ static DEVICE_ATTR(power_state, S_IWUSR | S_IRUGO,
 static struct attribute *bh1780_attributes[] = {
 	&dev_attr_power_state.attr,
 	&dev_attr_lux.attr,
+	&dev_attr_enable.attr,
 	NULL
 };
 
@@ -296,8 +335,6 @@ static int __devinit bh1780_probe(struct i2c_client *client,
 	ret = sysfs_create_group(&client->dev.kobj, &bh1780_attr_group);
 	if (ret)
 		goto err_sysfs_failed;
-
-	bh1780_set_power(ddata, BH1780_PON);
 #ifdef CONFIG_PM
 #ifdef CONFIG_HAS_EARLYSUSPEND
        ddata->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1;
