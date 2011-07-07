@@ -558,6 +558,12 @@ static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
 	OPP_INITIALIZER(&fdif_dev_info, true, 64000000, OMAP4470_VDD_CORE_OPP50_UV),
 	/* FDIF OPP3 - OPP100 */
 	OPP_INITIALIZER(&fdif_dev_info, true, 128000000, OMAP4470_VDD_CORE_OPP100_UV),
+	/* DSP OPP1 - OPP50 */
+	OPP_INITIALIZER(&dsp_dev_info, true, 232750000, OMAP4470_VDD_IVA_OPP50_UV),
+	/* DSP OPP2 - OPP100 */
+	OPP_INITIALIZER(&dsp_dev_info, true, 465500000, OMAP4470_VDD_IVA_OPP100_UV),
+	/* DSP OPP3 - OPPTB */
+	OPP_INITIALIZER(&dsp_dev_info, true, 496000000, OMAP4470_VDD_IVA_OPPTURBO_UV),
 	/* HSI OPP1 - OPP50 */
 	OPP_INITIALIZER(&hsi_dev_info, true, 96000000, OMAP4470_VDD_CORE_OPP50_UV),
 	/* HSI OPP2 - OPP100 */
@@ -566,7 +572,7 @@ static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
 	OPP_INITIALIZER(&abe_dev_info, true, 98304000, OMAP4470_VDD_IVA_OPP50_UV),
 	/* ABE OPP2 - OPP100 */
 	OPP_INITIALIZER(&abe_dev_info, true, 196608000, OMAP4470_VDD_IVA_OPP100_UV),
-	/* TODO: add DSP */
+	/* TODO: Add DSS */
 };
 
 static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
@@ -610,6 +616,12 @@ static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
 	OPP_INITIALIZER(&fdif_dev_info, true, 64000000, OMAP4470_VDD_CORE_OPP50_UV),
 	/* FDIF OPP2 - OPP100 */
 	OPP_INITIALIZER(&fdif_dev_info, true, 128000000, OMAP4470_VDD_CORE_OPP100_UV),
+	/* DSP OPP1 - OPP50 */
+	OPP_INITIALIZER(&dsp_dev_info, true, 232750000, OMAP4470_VDD_IVA_OPP50_UV),
+	/* DSP OPP2 - OPP100 */
+	OPP_INITIALIZER(&dsp_dev_info, true, 465500000, OMAP4470_VDD_IVA_OPP100_UV),
+	/* DSP OPP3 - OPPTB */
+	OPP_INITIALIZER(&dsp_dev_info, true, 496000000, OMAP4470_VDD_IVA_OPPTURBO_UV),
 	/* HSI OPP1 - OPP50 */
 	OPP_INITIALIZER(&hsi_dev_info, true, 96000000, OMAP4470_VDD_CORE_OPP50_UV),
 	/* HSI OPP2 - OPP100 */
@@ -618,7 +630,7 @@ static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
 	OPP_INITIALIZER(&abe_dev_info, true, 98304000, OMAP4470_VDD_IVA_OPP50_UV),
 	/* ABE OPP2 - OPP100 */
 	OPP_INITIALIZER(&abe_dev_info, true, 196608000, OMAP4470_VDD_IVA_OPP100_UV),
-	/* TODO: add DSP */
+	/* TODO: Add DSS */
 };
 
 /*
