@@ -45,7 +45,7 @@
 
 #include "hsi-char.h"
 
-#define DRIVER_VERSION  "0.2.2"
+#define DRIVER_VERSION  "0.2.3"
 #define HSI_CHAR_DEVICE_NAME  "hsi_char"
 
 static unsigned int port = 1;
@@ -57,7 +57,9 @@ static unsigned int channels_map[HSI_MAX_CHAR_DEVS] = { 1 };
 module_param_array(channels_map, uint, &num_channels, S_IRUGO);
 MODULE_PARM_DESC(channels_map, "HSI channels to be probed");
 
-dev_t hsi_char_dev;
+static int hsi_char_major;	     /* HSI char major number */
+static struct class *hsi_char_class; /* HSI char class during class_create */
+static dev_t hsi_char_dev;	     /* HSI char dev with first minor number */
 
 struct char_queue {
 	struct list_head list;
@@ -501,10 +503,10 @@ static struct cdev hsi_char_cdev;
 
 static int __init hsi_char_init(void)
 {
-	int ret, i;
+	int ret, i, i_dev_create = 0;
 
 	pr_info("HSI character device version " DRIVER_VERSION "\n");
-	pr_info("HSI char driver: %d channels mapped\n", num_channels);
+	pr_info(HSI_CHAR_DEVICE_NAME ": %d channels mapped\n", num_channels);
 
 	for (i = 0; i < HSI_MAX_CHAR_DEVS; i++) {
 		init_waitqueue_head(&hsi_char_data[i].rx_wait);
@@ -516,34 +518,81 @@ static int __init hsi_char_init(void)
 		INIT_LIST_HEAD(&hsi_char_data[i].tx_queue);
 	}
 
-	/*printk(KERN_DEBUG "%s, devname = %s\n", __func__, devname); */
-
 	ret = if_hsi_init(port, channels_map, num_channels);
-	if (ret)
-		return ret;
-
-	ret =
-	    alloc_chrdev_region(&hsi_char_dev, 0, HSI_MAX_CHAR_DEVS,
-				HSI_CHAR_DEVICE_NAME);
 	if (ret < 0) {
-		pr_err("HSI character driver: Failed to register\n");
+		pr_err(HSI_CHAR_DEVICE_NAME ": Failed to init HSI driver\n");
 		return ret;
 	}
+
+	/* Allocate the range of minor numbers */
+	ret = alloc_chrdev_region(&hsi_char_dev, 0, num_channels,
+				  HSI_CHAR_DEVICE_NAME);
+	if (ret < 0) {
+		pr_err(HSI_CHAR_DEVICE_NAME": Failed to register char device "
+					   "numbers\n");
+		goto out_hsi_exit;
+	}
+	pr_debug(HSI_CHAR_DEVICE_NAME ": Allocated major %d, minor 0 to %d\n",
+		 MAJOR(hsi_char_dev), num_channels);
 
 	cdev_init(&hsi_char_cdev, &hsi_char_fops);
 	ret = cdev_add(&hsi_char_cdev, hsi_char_dev, HSI_MAX_CHAR_DEVS);
 	if (ret < 0) {
-		pr_err("HSI character device: Failed to add char device\n");
-		return ret;
+		pr_err(HSI_CHAR_DEVICE_NAME ": Failed to add char devices\n");
+		goto out_unregister_chrdev;
+	}
+
+	/* Expose the hsi_char device to user space*/
+	hsi_char_major = MAJOR(hsi_char_dev);
+	hsi_char_class = class_create(THIS_MODULE, HSI_CHAR_DEVICE_NAME);
+	if (IS_ERR(hsi_char_class)) {
+		pr_err(HSI_CHAR_DEVICE_NAME ": Failed to create class\n");
+		goto out_cdev_del;
+	}
+
+	for (i = 0; (i < num_channels) && channels_map[i]; i++) {
+		struct device *dev;
+		dev = device_create(hsi_char_class, NULL,
+				MKDEV(hsi_char_major, channels_map[i] - 1),
+				NULL, "hsi%d", channels_map[i] - 1);
+		if (IS_ERR(dev)) {
+			pr_err("Error in device_create hsi%d\n",
+				channels_map[i] - 1);
+			i_dev_create = i;
+			goto out_device_destroy;
+		}
+		pr_info("HSI device_created /dev/hsi%d\n", channels_map[i] - 1);
 	}
 
 	return 0;
+
+out_device_destroy:
+	for (i = 0; (i < i_dev_create) && channels_map[i]; i++)
+		device_destroy(hsi_char_class,
+			       MKDEV(hsi_char_major, channels_map[i] - 1));
+out_class_destroy:
+	class_destroy(hsi_char_class);
+out_cdev_del:
+	cdev_del(&hsi_char_cdev);
+out_unregister_chrdev:
+	unregister_chrdev_region(hsi_char_dev, num_channels);
+out_hsi_exit:
+	if_hsi_exit();
+out:
+	return ret;
 }
 
 static void __exit hsi_char_exit(void)
 {
+	int i;
+
 	cdev_del(&hsi_char_cdev);
-	unregister_chrdev_region(hsi_char_dev, HSI_MAX_CHAR_DEVS);
+	for (i = 0; (i < num_channels) && channels_map[i]; i++)
+		device_destroy(hsi_char_class,
+			       MKDEV(hsi_char_major, channels_map[i] - 1));
+
+	class_destroy(hsi_char_class);
+	unregister_chrdev_region(hsi_char_dev, num_channels);
 	if_hsi_exit();
 }
 
