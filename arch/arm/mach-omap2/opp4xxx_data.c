@@ -381,6 +381,12 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	OPP_INITIALIZER(&hsi_dev_info, true, 96000000, OMAP4460_VDD_CORE_OPP50_UV),
 	/* HSI OPP2 - OPP100 */
 	OPP_INITIALIZER(&hsi_dev_info, true, 192000000, OMAP4460_VDD_CORE_OPP100_UV),
+	/* DSP OPP1 - OPP50 */
+	OPP_INITIALIZER(&dsp_dev_info, true, 232750000, OMAP4460_VDD_IVA_OPP50_UV),
+	/* DSP OPP2 - OPP100 */
+	OPP_INITIALIZER(&dsp_dev_info, true, 465500000, OMAP4460_VDD_IVA_OPP100_UV),
+	/* DSP OPP3 - OPPTB */
+	OPP_INITIALIZER(&dsp_dev_info, true, 496000000, OMAP4460_VDD_IVA_OPPTURBO_UV),
 	/* ABE OPP1 - OPP50 */
 	OPP_INITIALIZER(&abe_dev_info, true, 98304000, OMAP4460_VDD_IVA_OPP50_UV),
 	/* ABE OPP2 - OPP100 */
@@ -391,7 +397,7 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	OPP_INITIALIZER(&gpu_dev_info, true, 307200000, OMAP4460_VDD_CORE_OPP100_UV),
 	/* SGX OPP3 - OPP100_OV */
 	OPP_INITIALIZER(&gpu_dev_info, true, 384000000, OMAP4460_VDD_CORE_OPP100_OV_UV),
-	/* TODO: Add DSP, DSS */
+	/* TODO: Add DSS */
 };
 
 /*
