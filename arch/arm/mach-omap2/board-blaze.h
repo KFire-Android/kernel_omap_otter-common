@@ -21,5 +21,6 @@ int blaze_touch_init(void);
 int blaze_sensor_init(void);
 int blaze_panel_init(void);
 int blaze_keypad_init(void);
+void omap4_create_board_props(void);
 
 #endif

@@ -766,6 +766,7 @@ static void __init omap_tablet2_init(void)
 	omap_board_config = tablet2_config;
 	omap_board_config_size = ARRAY_SIZE(tablet2_config);
 
+	omap4_create_board_props();
 	omap4_i2c_init();
 	tablet2_touch_init();
 	platform_add_devices(tablet2_devices, ARRAY_SIZE(tablet2_devices));
