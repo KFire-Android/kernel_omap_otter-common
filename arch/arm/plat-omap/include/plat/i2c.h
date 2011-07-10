@@ -22,6 +22,7 @@
 #define __ASM__ARCH_OMAP_I2C_H
 
 #include <linux/i2c.h>
+#include <linux/i2c-omap.h>
 #include <linux/hwspinlock.h>
 
 struct omap_i2c_bus_board_data {
