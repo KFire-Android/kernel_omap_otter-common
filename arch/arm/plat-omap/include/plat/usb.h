@@ -290,4 +290,22 @@ static inline u32 omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
 }
 #endif
 
+extern void usbhs_wakeup(void);
+extern void omap4_trigger_ioctrl(void);
+extern void usbhs_resume_work(struct work_struct *work);
+
+/* Keep track of which host controller drivers are loaded */
+#define USB_UHCI_LOADED         0
+#define USB_OHCI_LOADED         1
+#define USB_EHCI_LOADED         2
+
+/* USBHS state bits */
+#define OMAP_USBHS_INIT		BIT(0)
+#define OMAP_EHCI_RMWKP		BIT(1)
+#define OMAP_OHCI_RMWKP		BIT(2)
+
+#define	USBHS_OHCI_HWMODNAME	"usbhs_ohci"
+#define USBHS_EHCI_HWMODNAME	"usbhs_ehci"
+
+extern unsigned long usb_hcds_loaded;
 #endif	/* __ASM_ARCH_OMAP_USB_H */

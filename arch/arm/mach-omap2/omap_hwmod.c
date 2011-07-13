@@ -1236,6 +1236,7 @@ static int _reset(struct omap_hwmod *oh)
 	return ret;
 }
 
+void omap4_trigger_ioctrl(void);
 /**
  * _enable - enable an omap_hwmod
  * @oh: struct omap_hwmod *
@@ -1271,8 +1272,9 @@ static int _enable(struct omap_hwmod *oh)
 	/* Mux pins for device runtime if populated */
 	if (oh->mux && (!oh->mux->enabled ||
 			((oh->_state == _HWMOD_STATE_IDLE) &&
-			 oh->mux->pads_dynamic)))
+			 oh->mux->pads_dynamic))) {
 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
+}
 
 	_add_initiator_dep(oh, mpu_oh);
 	if (oh->_clk && oh->_clk->clkdm) {
@@ -1310,6 +1312,7 @@ static int _enable(struct omap_hwmod *oh)
  * no further work.  Returns -EINVAL if the hwmod is in the wrong
  * state or returns 0.
  */
+
 static int _idle(struct omap_hwmod *oh)
 {
 	if (oh->_state != _HWMOD_STATE_ENABLED) {
@@ -1326,8 +1329,10 @@ static int _idle(struct omap_hwmod *oh)
 	_disable_clocks(oh);
 
 	/* Mux pins for device idle if populated */
-	if (oh->mux && oh->mux->pads_dynamic)
+	if (oh->mux && oh->mux->pads_dynamic) {
 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
+		omap4_trigger_ioctrl();
+}
 
 	oh->_state = _HWMOD_STATE_IDLE;
 
@@ -1645,7 +1650,7 @@ struct omap_hwmod *omap_hwmod_lookup(const char *name)
 
 	return oh;
 }
-
+EXPORT_SYMBOL(omap_hwmod_lookup);
 /**
  * omap_hwmod_for_each - call function for each registered omap_hwmod
  * @fn: pointer to a callback function
@@ -2173,7 +2178,7 @@ int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh)
 	/* Enable pad wake-up capability */
 	return omap_hwmod_set_ioring_wakeup(oh, true);
 }
-
+EXPORT_SYMBOL(omap_hwmod_enable_ioring_wakeup);
 /**
  * omap_hwmod_disable_ioring_wakeup - Clear wakeup flag for iopad.
  * @oh: struct omap_hwmod *

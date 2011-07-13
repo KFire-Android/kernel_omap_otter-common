@@ -26,6 +26,7 @@
 #include <linux/spinlock.h>
 #include <linux/gpio.h>
 #include <plat/usb.h>
+#include <plat/omap_hwmod.h>
 #include <linux/pm_runtime.h>
 
 #define USBHS_DRIVER_NAME	"usbhs_omap"
@@ -134,6 +135,9 @@
 
 #define	OMAP_UHH_DEBUG_CSR				(0x44)
 
+#define USBHS_IO_WAKEUPENABLE		(1 << 14)
+#define USBHS_IO_WKUPEVNT		(1 << 15)
+
 /* Values of UHH_REVISION - Note: these are not given in the TRM */
 #define OMAP_USBHS_REV1		0x00000010	/* OMAP3 */
 #define OMAP_USBHS_REV2		0x50700100	/* OMAP4 */
@@ -147,6 +151,7 @@
 
 
 struct usbhs_hcd_omap {
+	struct platform_device		*pdev;
 	struct clk			*xclk60mhsp1_ck;
 	struct clk			*xclk60mhsp2_ck;
 	struct clk			*utmi_p1_fck;
@@ -161,10 +166,14 @@ struct usbhs_hcd_omap {
 	void __iomem			*tll_base;
 
 	struct usbhs_omap_platform_data	platdata;
+	struct work_struct		wakeup_work;
 
 	u32				usbhs_rev;
 	spinlock_t			lock;
+	unsigned long			state;
 };
+
+static struct usbhs_hcd_omap *hcd_omap;
 /*-------------------------------------------------------------------------*/
 
 const char usbhs_driver_name[] = USBHS_DRIVER_NAME;
@@ -421,6 +430,63 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 	}
 }
 
+void usbhs_wakeup()
+{
+	struct usbhs_hcd_omap *omap = hcd_omap;
+	struct omap_hwmod *oh;
+	char workq = 0;
+
+	if (!omap)
+		return;
+
+	if (test_bit(USB_OHCI_LOADED, &usb_hcds_loaded) &&
+		!test_bit(OMAP_OHCI_RMWKP, &omap->state)) {
+
+		oh = omap_hwmod_lookup(USBHS_OHCI_HWMODNAME);
+		if (omap_hwmod_pad_get_wakeup_status(oh)) {
+			set_bit(OMAP_OHCI_RMWKP, &omap->state);
+			workq = 1;
+		}
+	}
+
+	if (test_bit(USB_EHCI_LOADED, &usb_hcds_loaded) &&
+		!test_bit(OMAP_EHCI_RMWKP, &omap->state)) {
+
+		oh = omap_hwmod_lookup(USBHS_EHCI_HWMODNAME);
+		if (omap_hwmod_pad_get_wakeup_status(oh)) {
+			set_bit(OMAP_EHCI_RMWKP, &omap->state);
+			workq = 1;
+		}
+	}
+
+	if (workq)
+		queue_work(pm_wq, &omap->wakeup_work);
+}
+
+void usbhs_resume_work(struct work_struct *work)
+{
+	struct usbhs_hcd_omap *omap = container_of(work, struct usbhs_hcd_omap,
+								wakeup_work);
+	struct omap_hwmod	*oh;
+
+	dev_dbg(&omap->pdev->dev, "USB IO PAD Wakeup event triggered\n");
+
+	if (test_bit(OMAP_EHCI_RMWKP, &omap->state)) {
+		clear_bit(OMAP_EHCI_RMWKP, &omap->state);
+		oh = omap_hwmod_lookup(USBHS_EHCI_HWMODNAME);
+		omap_hwmod_disable_ioring_wakeup(oh);
+	}
+	if (test_bit(OMAP_OHCI_RMWKP, &omap->state)) {
+		clear_bit(OMAP_OHCI_RMWKP, &omap->state);
+		oh = omap_hwmod_lookup(USBHS_OHCI_HWMODNAME);
+		omap_hwmod_disable_ioring_wakeup(oh);
+	}
+	pm_runtime_get_sync(&omap->pdev->dev);
+	pm_runtime_put_sync(&omap->pdev->dev);
+
+	flush_scheduled_work();
+}
+
 static int usbhs_runtime_resume(struct device *dev)
 {
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
@@ -637,7 +703,6 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 {
 	struct device			*dev =  &pdev->dev;
 	struct usbhs_omap_platform_data	*pdata = dev->platform_data;
-	struct usbhs_hcd_omap		*omap;
 	struct resource			*res;
 	int				ret = 0;
 	int				i;
@@ -648,110 +713,110 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto end_probe;
 	}
 
-	omap = kzalloc(sizeof(*omap), GFP_KERNEL);
-	if (!omap) {
+	hcd_omap = kzalloc(sizeof(*hcd_omap), GFP_KERNEL);
+	if (!hcd_omap) {
 		dev_err(dev, "Memory allocation failed\n");
 		ret = -ENOMEM;
 		goto end_probe;
 	}
 
-	spin_lock_init(&omap->lock);
+	spin_lock_init(&hcd_omap->lock);
 
 	for (i = 0; i < OMAP3_HS_USB_PORTS; i++)
-		omap->platdata.port_mode[i] = pdata->port_mode[i];
+		hcd_omap->platdata.port_mode[i] = pdata->port_mode[i];
 
-	omap->platdata.ehci_data = pdata->ehci_data;
-	omap->platdata.ohci_data = pdata->ohci_data;
+	hcd_omap->platdata.ehci_data = pdata->ehci_data;
+	hcd_omap->platdata.ohci_data = pdata->ohci_data;
 
 	pm_runtime_enable(dev);
 
-	omap->utmi_p1_fck = clk_get(dev, "utmi_p1_gfclk");
-	if (IS_ERR(omap->utmi_p1_fck)) {
-		ret = PTR_ERR(omap->utmi_p1_fck);
+	hcd_omap->utmi_p1_fck = clk_get(dev, "utmi_p1_gfclk");
+	if (IS_ERR(hcd_omap->utmi_p1_fck)) {
+		ret = PTR_ERR(hcd_omap->utmi_p1_fck);
 		dev_err(dev, "utmi_p1_gfclk failed error:%d\n",	ret);
 		goto err_end;
 	}
 
-	omap->xclk60mhsp1_ck = clk_get(dev, "xclk60mhsp1_ck");
-	if (IS_ERR(omap->xclk60mhsp1_ck)) {
-		ret = PTR_ERR(omap->xclk60mhsp1_ck);
+	hcd_omap->xclk60mhsp1_ck = clk_get(dev, "xclk60mhsp1_ck");
+	if (IS_ERR(hcd_omap->xclk60mhsp1_ck)) {
+		ret = PTR_ERR(hcd_omap->xclk60mhsp1_ck);
 		dev_err(dev, "xclk60mhsp1_ck failed error:%d\n", ret);
 		goto err_utmi_p1_fck;
 	}
 
-	omap->utmi_p2_fck = clk_get(dev, "utmi_p2_gfclk");
-	if (IS_ERR(omap->utmi_p2_fck)) {
-		ret = PTR_ERR(omap->utmi_p2_fck);
+	hcd_omap->utmi_p2_fck = clk_get(dev, "utmi_p2_gfclk");
+	if (IS_ERR(hcd_omap->utmi_p2_fck)) {
+		ret = PTR_ERR(hcd_omap->utmi_p2_fck);
 		dev_err(dev, "utmi_p2_gfclk failed error:%d\n", ret);
 		goto err_xclk60mhsp1_ck;
 	}
 
-	omap->xclk60mhsp2_ck = clk_get(dev, "xclk60mhsp2_ck");
-	if (IS_ERR(omap->xclk60mhsp2_ck)) {
-		ret = PTR_ERR(omap->xclk60mhsp2_ck);
+	hcd_omap->xclk60mhsp2_ck = clk_get(dev, "xclk60mhsp2_ck");
+	if (IS_ERR(hcd_omap->xclk60mhsp2_ck)) {
+		ret = PTR_ERR(hcd_omap->xclk60mhsp2_ck);
 		dev_err(dev, "xclk60mhsp2_ck failed error:%d\n", ret);
 		goto err_utmi_p2_fck;
 	}
 
-	omap->usbhost_p1_fck = clk_get(dev, "usb_host_hs_utmi_p1_clk");
-	if (IS_ERR(omap->usbhost_p1_fck)) {
-		ret = PTR_ERR(omap->usbhost_p1_fck);
+	hcd_omap->usbhost_p1_fck = clk_get(dev, "usb_host_hs_utmi_p1_clk");
+	if (IS_ERR(hcd_omap->usbhost_p1_fck)) {
+		ret = PTR_ERR(hcd_omap->usbhost_p1_fck);
 		dev_err(dev, "usbhost_p1_fck failed error:%d\n", ret);
 		goto err_xclk60mhsp2_ck;
 	}
 
-	omap->usbtll_p1_fck = clk_get(dev, "usb_tll_hs_usb_ch0_clk");
-	if (IS_ERR(omap->usbtll_p1_fck)) {
-		ret = PTR_ERR(omap->usbtll_p1_fck);
+	hcd_omap->usbtll_p1_fck = clk_get(dev, "usb_tll_hs_usb_ch0_clk");
+	if (IS_ERR(hcd_omap->usbtll_p1_fck)) {
+		ret = PTR_ERR(hcd_omap->usbtll_p1_fck);
 		dev_err(dev, "usbtll_p1_fck failed error:%d\n", ret);
 		goto err_usbhost_p1_fck;
 	}
 
-	omap->usbhost_p2_fck = clk_get(dev, "usb_host_hs_utmi_p2_clk");
-	if (IS_ERR(omap->usbhost_p2_fck)) {
-		ret = PTR_ERR(omap->usbhost_p2_fck);
+	hcd_omap->usbhost_p2_fck = clk_get(dev, "usb_host_hs_utmi_p2_clk");
+	if (IS_ERR(hcd_omap->usbhost_p2_fck)) {
+		ret = PTR_ERR(hcd_omap->usbhost_p2_fck);
 		dev_err(dev, "usbhost_p2_fck failed error:%d\n", ret);
 		goto err_usbtll_p1_fck;
 	}
 
-	omap->usbtll_p2_fck = clk_get(dev, "usb_tll_hs_usb_ch1_clk");
-	if (IS_ERR(omap->usbtll_p2_fck)) {
-		ret = PTR_ERR(omap->usbtll_p2_fck);
+	hcd_omap->usbtll_p2_fck = clk_get(dev, "usb_tll_hs_usb_ch1_clk");
+	if (IS_ERR(hcd_omap->usbtll_p2_fck)) {
+		ret = PTR_ERR(hcd_omap->usbtll_p2_fck);
 		dev_err(dev, "usbtll_p2_fck failed error:%d\n", ret);
 		goto err_usbhost_p2_fck;
 	}
 
-	omap->init_60m_fclk = clk_get(dev, "init_60m_fclk");
-	if (IS_ERR(omap->init_60m_fclk)) {
-		ret = PTR_ERR(omap->init_60m_fclk);
+	hcd_omap->init_60m_fclk = clk_get(dev, "init_60m_fclk");
+	if (IS_ERR(hcd_omap->init_60m_fclk)) {
+		ret = PTR_ERR(hcd_omap->init_60m_fclk);
 		dev_err(dev, "init_60m_fclk failed error:%d\n", ret);
 		goto err_usbtll_p2_fck;
 	}
 
 	if (is_ehci_phy_mode(pdata->port_mode[0])) {
 		/* for OMAP3 , the clk set paretn fails */
-		ret = clk_set_parent(omap->utmi_p1_fck,
-					omap->xclk60mhsp1_ck);
+		ret = clk_set_parent(hcd_omap->utmi_p1_fck,
+					hcd_omap->xclk60mhsp1_ck);
 		if (ret != 0)
 			dev_err(dev, "xclk60mhsp1_ck set parent"
 				"failed error:%d\n", ret);
 	} else if (is_ehci_tll_mode(pdata->port_mode[0])) {
-		ret = clk_set_parent(omap->utmi_p1_fck,
-					omap->init_60m_fclk);
+		ret = clk_set_parent(hcd_omap->utmi_p1_fck,
+					hcd_omap->init_60m_fclk);
 		if (ret != 0)
 			dev_err(dev, "init_60m_fclk set parent"
 				"failed error:%d\n", ret);
 	}
 
 	if (is_ehci_phy_mode(pdata->port_mode[1])) {
-		ret = clk_set_parent(omap->utmi_p2_fck,
-					omap->xclk60mhsp2_ck);
+		ret = clk_set_parent(hcd_omap->utmi_p2_fck,
+					hcd_omap->xclk60mhsp2_ck);
 		if (ret != 0)
 			dev_err(dev, "xclk60mhsp2_ck set parent"
 					"failed error:%d\n", ret);
 	} else if (is_ehci_tll_mode(pdata->port_mode[1])) {
-		ret = clk_set_parent(omap->utmi_p2_fck,
-						omap->init_60m_fclk);
+		ret = clk_set_parent(hcd_omap->utmi_p2_fck,
+						hcd_omap->init_60m_fclk);
 		if (ret != 0)
 			dev_err(dev, "init_60m_fclk set parent"
 				"failed error:%d\n", ret);
@@ -764,8 +829,8 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto err_init_60m_fclk;
 	}
 
-	omap->uhh_base = ioremap(res->start, resource_size(res));
-	if (!omap->uhh_base) {
+	hcd_omap->uhh_base = ioremap(res->start, resource_size(res));
+	if (!hcd_omap->uhh_base) {
 		dev_err(dev, "UHH ioremap failed\n");
 		ret = -ENOMEM;
 		goto err_init_60m_fclk;
@@ -778,14 +843,14 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto err_tll;
 	}
 
-	omap->tll_base = ioremap(res->start, resource_size(res));
-	if (!omap->tll_base) {
+	hcd_omap->tll_base = ioremap(res->start, resource_size(res));
+	if (!hcd_omap->tll_base) {
 		dev_err(dev, "TLL ioremap failed\n");
 		ret = -ENOMEM;
 		goto err_tll;
 	}
 
-	platform_set_drvdata(pdev, omap);
+	platform_set_drvdata(pdev, hcd_omap);
 
 	ret = omap_usbhs_alloc_children(pdev);
 	if (ret) {
@@ -793,46 +858,51 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto err_alloc;
 	}
 
+#ifdef CONFIG_PM
+	INIT_WORK(&hcd_omap->wakeup_work, usbhs_resume_work);
+#endif
+	hcd_omap->pdev = pdev;
+
 	omap_usbhs_init(dev);
 
 	goto end_probe;
 
 err_alloc:
-	iounmap(omap->tll_base);
+	iounmap(hcd_omap->tll_base);
 
 err_tll:
-	iounmap(omap->uhh_base);
+	iounmap(hcd_omap->uhh_base);
 
 err_init_60m_fclk:
-	clk_put(omap->init_60m_fclk);
+	clk_put(hcd_omap->init_60m_fclk);
 
 err_usbtll_p2_fck:
-	clk_put(omap->usbtll_p2_fck);
+	clk_put(hcd_omap->usbtll_p2_fck);
 
 err_usbhost_p2_fck:
-	clk_put(omap->usbhost_p2_fck);
+	clk_put(hcd_omap->usbhost_p2_fck);
 
 err_usbtll_p1_fck:
-	clk_put(omap->usbtll_p1_fck);
+	clk_put(hcd_omap->usbtll_p1_fck);
 
 err_usbhost_p1_fck:
-	clk_put(omap->usbhost_p1_fck);
+	clk_put(hcd_omap->usbhost_p1_fck);
 
 err_xclk60mhsp2_ck:
-	clk_put(omap->xclk60mhsp2_ck);
+	clk_put(hcd_omap->xclk60mhsp2_ck);
 
 err_utmi_p2_fck:
-	clk_put(omap->utmi_p2_fck);
+	clk_put(hcd_omap->utmi_p2_fck);
 
 err_xclk60mhsp1_ck:
-	clk_put(omap->xclk60mhsp1_ck);
+	clk_put(hcd_omap->xclk60mhsp1_ck);
 
 err_utmi_p1_fck:
-	clk_put(omap->utmi_p1_fck);
+	clk_put(hcd_omap->utmi_p1_fck);
 
 err_end:
 	pm_runtime_disable(dev);
-	kfree(omap);
+	kfree(hcd_omap);
 
 end_probe:
 	return ret;
