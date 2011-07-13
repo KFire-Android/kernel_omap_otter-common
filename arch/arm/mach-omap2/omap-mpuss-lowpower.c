@@ -341,6 +341,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 */
 	mpuss_clear_prev_logic_pwrst();
 	if (pwrdm_read_next_pwrst(core_pd) == PWRDM_POWER_OFF) {
+		omap4_cm_prepare_off();
 		omap4_dpll_prepare_off();
 		save_state = 3;
 	} else if (pwrdm_read_next_pwrst(mpuss_pd) ==
@@ -372,8 +373,11 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	cpu_pwrdm_pre_post_transition(wakeup_cpu, 0);
 	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
 
-	if (pwrdm_read_prev_pwrst(core_pd) == PWRDM_POWER_OFF)
+	if (save_state == 3 &&
+	    pwrdm_read_prev_pwrst(core_pd) == PWRDM_POWER_OFF) {
 		omap4_dpll_resume_off();
+		omap4_cm_resume_off();
+	}
 
 	pwrdm_post_transition(mpuss_pd);
 
