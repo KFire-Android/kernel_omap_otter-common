@@ -23,4 +23,9 @@
 #define OMAP4_CM_CLKSTCTRL				0x0000
 #define OMAP4_CM_STATICDEP				0x0004
 
+#ifndef __ASSEMBLER__
+extern void omap4_dpll_prepare_off(void);
+extern void omap4_dpll_resume_off(void);
+#endif
+
 #endif

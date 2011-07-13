@@ -61,11 +61,11 @@
 #include "prcm44xx.h"
 #include "prm44xx.h"
 #include "prm-regbits-44xx.h"
-#include "prcm_mpu54xx.h"
 
 #include "prcm_mpu54xx.h"
 #include "prm54xx.h"
 #include "prm-regbits-54xx.h"
+#include "cm44xx.h"
 
 #ifdef CONFIG_SMP
 #define NUM_DEN_MASK			0xfffff000
@@ -340,10 +340,13 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
 	 */
 	mpuss_clear_prev_logic_pwrst();
-	if (pwrdm_read_next_pwrst(core_pd) == PWRDM_POWER_OFF)
+	if (pwrdm_read_next_pwrst(core_pd) == PWRDM_POWER_OFF) {
+		omap4_dpll_prepare_off();
 		save_state = 3;
-	else if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OSWR)
+	} else if (pwrdm_read_next_pwrst(mpuss_pd) ==
+		   PWRDM_POWER_OSWR) {
 		save_state = 2;
+	}
 
 	cpu_pwrdm_pre_post_transition(cpu, 1);
 	cpu_clear_prev_logic_pwrst(cpu);
@@ -368,6 +371,9 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	wakeup_cpu = smp_processor_id();
 	cpu_pwrdm_pre_post_transition(wakeup_cpu, 0);
 	set_cpu_next_pwrst(wakeup_cpu, PWRDM_POWER_ON);
+
+	if (pwrdm_read_prev_pwrst(core_pd) == PWRDM_POWER_OFF)
+		omap4_dpll_resume_off();
 
 	pwrdm_post_transition(mpuss_pd);
 
