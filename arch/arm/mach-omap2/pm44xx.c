@@ -499,6 +499,13 @@ static int __init omap4_pm_init(void)
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
 	per_pwrdm = pwrdm_lookup("l4per_pwrdm");
 
+	/*
+	 * Enable wake-up capability for PRCM IRQ always since
+	 * it is not directly associated with any device driver.
+	 * With device driver, this can be done in suspend hook.
+	 */
+	irq_set_irq_wake(OMAP44XX_IRQ_PRCM, 1);
+
 	omap4_idle_init();
 
 err2:
