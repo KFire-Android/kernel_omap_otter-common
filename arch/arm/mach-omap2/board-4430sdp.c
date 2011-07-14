@@ -984,6 +984,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_i2c_init();
 	blaze_sensor_init();
 	blaze_touch_init();
+	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	board_serial_init();
 	omap4_sdp4430_wifi_init();
@@ -1022,11 +1023,19 @@ static void __init omap_4430sdp_map_io(void)
 	omap2_set_globals_443x();
 	omap44xx_map_common_io();
 }
+static void __init omap_4430sdp_reserve(void)
+{
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
+#else
+	omap_reserve();
+#endif
+}
 
 MACHINE_START(OMAP_4430SDP, "OMAP4 blaze board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.boot_params	= 0x80000100,
-	.reserve	= omap_reserve,
+	.reserve	= omap_4430sdp_reserve,
 	.map_io		= omap_4430sdp_map_io,
 	.init_early	= omap_4430sdp_init_early,
 	.init_irq	= gic_init_irq,
