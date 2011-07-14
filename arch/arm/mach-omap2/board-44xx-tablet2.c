@@ -25,6 +25,7 @@
 #include <linux/regulator/fixed.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
+#include <linux/wl12xx.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -251,6 +252,24 @@ static struct regulator_init_data tablet2_vmmc5 = {
 	},
 	.num_consumer_supplies = 1,
 	.consumer_supplies = &omap4_tablet2_vmmc5_supply,
+};
+
+static struct fixed_voltage_config tablet2_vwlan = {
+	.supply_name		= "vwl1271",
+	.microvolts		= 1800000, /* 1.8V */
+	.gpio			= GPIO_WIFI_PMENA,
+	.startup_delay		= 70000, /* 70msec */
+	.enable_high		= 1,
+	.enabled_at_boot	= 0,
+	.init_data		= &tablet2_vmmc5,
+};
+
+static struct platform_device omap_vwlan_device = {
+	.name		= "reg-fixed-voltage",
+	.id		= 1,
+	.dev = {
+		.platform_data = &tablet2_vwlan,
+	},
 };
 
 static int omap4_twl6030_hsmmc_late_init(struct device *dev)
@@ -750,6 +769,41 @@ static inline void board_serial_init(void)
 }
  #endif
 
+
+static void omap4_tablet2_wifi_mux_init(void)
+{
+	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT |
+				OMAP_PIN_OFF_WAKEUPENABLE);
+	omap_mux_init_gpio(GPIO_WIFI_PMENA, OMAP_PIN_OUTPUT);
+
+	omap_mux_init_signal("sdmmc5_cmd.sdmmc5_cmd",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_clk.sdmmc5_clk",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat0.sdmmc5_dat0",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat1.sdmmc5_dat1",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat2.sdmmc5_dat2",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat3.sdmmc5_dat3",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+}
+
+static struct wl12xx_platform_data omap4_tablet2_wlan_data __initdata = {
+	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
+	.board_ref_clock = WL12XX_REFCLOCK_26,
+	.board_tcxo_clock = WL12XX_TCXOCLOCK_26,
+};
+
+static void omap4_tablet2_wifi_init(void)
+{
+	omap4_tablet2_wifi_mux_init();
+	if (wl12xx_set_platform_data(&omap4_tablet2_wlan_data))
+		pr_err("Error setting wl12xx data\n");
+	platform_device_register(&omap_vwlan_device);
+}
+
 static void __init omap_tablet2_init(void)
 {
 	int status;
@@ -770,6 +824,7 @@ static void __init omap_tablet2_init(void)
 	omap4_register_ion();
 	platform_add_devices(tablet2_devices, ARRAY_SIZE(tablet2_devices));
 	board_serial_init();
+	omap4_tablet2_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
 
 	usb_musb_init(&musb_board_data);
