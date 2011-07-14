@@ -194,6 +194,15 @@ void omap_wakeupgen_irqmask_all(unsigned int cpu, unsigned int set)
 	spin_unlock(&wakeupgen_lock);
 }
 
+#ifdef CONFIG_PM
+static int wakeupgen_set_wake(struct irq_data *d, unsigned int on)
+{
+	return 0;
+}
+#else
+#define wakeupgen_set_wake	NULL
+#endif
+
 /*
  * Initialse the wakeupgen module
  */
@@ -224,6 +233,7 @@ int __init omap_wakeupgen_init(void)
 	 */
 	gic_arch_extn.irq_mask = wakeupgen_mask;
 	gic_arch_extn.irq_unmask = wakeupgen_unmask;
+	gic_arch_extn.irq_set_wake = wakeupgen_set_wake;
 	gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
 
 	return 0;
