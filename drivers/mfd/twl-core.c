@@ -33,6 +33,7 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/err.h>
+#include <linux/interrupt.h>
 
 #include <linux/regulator/machine.h>
 
@@ -1166,6 +1167,21 @@ int twl4030_init_chip_irq(const char *chip);
 int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end);
 int twl6030_exit_irq(void);
 
+#ifdef CONFIG_PM
+static int twl_suspend(struct i2c_client *client, pm_message_t mesg)
+{
+	return irq_set_irq_wake(client->irq, 1);
+}
+
+static int twl_resume(struct i2c_client *client)
+{
+	return irq_set_irq_wake(client->irq, 0);
+}
+#else
+#define twl_suspend	NULL
+#define twl_resume	NULL
+#endif
+
 static int twl_remove(struct i2c_client *client)
 {
 	unsigned i;
@@ -1310,6 +1326,8 @@ static struct i2c_driver twl_driver = {
 	.id_table	= twl_ids,
 	.probe		= twl_probe,
 	.remove		= twl_remove,
+	.suspend	= twl_suspend,
+	.resume		= twl_resume,
 };
 
 static int __init twl_init(void)
