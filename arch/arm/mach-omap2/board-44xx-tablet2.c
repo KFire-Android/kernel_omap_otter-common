@@ -62,8 +62,6 @@
 #define LED_PWM2OFF		0x04
 #define TWL6030_TOGGLE3		0x92
 
-#define TPS62361_GPIO   7
-
 #define GPIO_WIFI_PMENA		54
 #define GPIO_WIFI_IRQ		53
 
