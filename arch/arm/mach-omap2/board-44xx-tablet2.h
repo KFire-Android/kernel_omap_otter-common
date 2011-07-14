@@ -19,5 +19,7 @@
 
 int tablet2_touch_init(void);
 void omap4_create_board_props(void);
+void omap_ion_init(void);
+void omap4_register_ion(void);
 
 #endif

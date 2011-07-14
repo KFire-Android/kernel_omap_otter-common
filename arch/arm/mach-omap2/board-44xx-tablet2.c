@@ -767,6 +767,7 @@ static void __init omap_tablet2_init(void)
 	omap4_create_board_props();
 	omap4_i2c_init();
 	tablet2_touch_init();
+	omap4_register_ion();
 	platform_add_devices(tablet2_devices, ARRAY_SIZE(tablet2_devices));
 	board_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
@@ -797,10 +798,20 @@ static void __init omap_tablet2_map_io(void)
 	omap44xx_map_common_io();
 }
 
+static void __init omap_tablet2_reserve(void)
+{
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
+#else
+	omap_reserve();
+#endif
+}
+
+
 MACHINE_START(OMAP_BLAZE, "OMAP4 blaze board")
 	/* Maintainer: Dan Murphy - Texas Instruments Inc */
 	.boot_params	= 0x80000100,
-	.reserve	= omap_reserve,
+	.reserve	= omap_tablet2_reserve,
 	.map_io		= omap_tablet2_map_io,
 	.init_early	= omap_tablet2_init_early,
 	.init_irq	= gic_init_irq,
