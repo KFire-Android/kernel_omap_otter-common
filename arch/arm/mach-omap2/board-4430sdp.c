@@ -283,7 +283,7 @@ static struct ti_st_plat_data wilink_pdata = {
 	.nshutdown_gpio = 55,
 	.dev_name = WILINK_UART_DEV_NAME,
 	.flow_cntrl = 1,
-	.baud_rate = 3000000,
+	.baud_rate = 3686400,
 	.suspend = plat_wlink_kim_suspend,
 	.resume = plat_wlink_kim_resume,
 };
