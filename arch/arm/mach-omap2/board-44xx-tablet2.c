@@ -845,6 +845,8 @@ static void __init omap_tablet2_init(void)
 		if (status)
 			pr_err("TPS62361 initialization failed: %d\n", status);
 	}
+
+	omap_enable_smartreflex_on_init();
 }
 
 static void __init omap_tablet2_map_io(void)
