@@ -400,10 +400,15 @@ a file off.
 
 --
 [mandatory]
-
---
-[mandatory]
 	->get_sb() is gone.  Switch to use of ->mount().  Typically it's just
 a matter of switching from calling get_sb_... to mount_... and changing the
 function type.  If you were doing it manually, just switch from setting ->mnt_root
 to some pointer to returning that pointer.  On errors return ERR_PTR(...).
+
+--
+[mandatory]
+	If you have your own ->fsync() you must make sure to call
+filemap_write_and_wait_range() so that all dirty pages are synced out properly.
+You must also keep in mind that ->fsync() is not called with i_mutex held
+anymore, so if you require i_mutex locking you must make sure to take it and
+release it yourself.
