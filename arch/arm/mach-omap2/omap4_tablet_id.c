@@ -1,0 +1,60 @@
+/*
+ * Support for the TI OMAP4 Tablet Application board.
+ *
+ * Copyright (C) 2011 Texas Instruments
+ *
+ * Author: Dan Murphy <dmurphy@ti.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ */
+#include <linux/kernel.h>
+#include <linux/i2c.h>
+
+#include <plat/omap_tablet_id.h>
+
+static int tablet_revision;
+
+bool omap_is_tablet_version(int req_tablet_version)
+{
+	if (req_tablet_version == tablet_revision)
+		return true;
+
+	return false;
+}
+
+int omap_get_tablet_version(void)
+{
+	return tablet_revision;
+}
+
+__init int omap_init_tablet_version(void)
+{
+	switch (system_rev) {
+	case OMAP4_TABLET_1_0:
+		tablet_revision = OMAP4_TABLET_1_0;
+		break;
+	case OMAP4_TABLET_2_0:
+		tablet_revision = OMAP4_TABLET_2_0;
+		break;
+	case OMAP4_BLAZE_ID:
+		tablet_revision = OMAP4_BLAZE_ID;
+		break;
+	default:
+		tablet_revision = -1;
+	}
+
+	return tablet_revision;
+}

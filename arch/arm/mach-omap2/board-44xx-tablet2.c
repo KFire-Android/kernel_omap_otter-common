@@ -42,6 +42,7 @@
 #include <plat/mmc.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
+#include <plat/omap_tablet_id.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -751,6 +752,7 @@ static void __init omap_tablet2_init(void)
 {
 	int status;
 	int package = OMAP_PACKAGE_CBS;
+	int tablet_rev = 0;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
@@ -760,6 +762,8 @@ static void __init omap_tablet2_init(void)
 
 	omap_board_config = tablet2_config;
 	omap_board_config_size = ARRAY_SIZE(tablet2_config);
+
+	tablet_rev = omap_init_tablet_version();
 
 	omap4_create_board_props();
 	omap4_i2c_init();
