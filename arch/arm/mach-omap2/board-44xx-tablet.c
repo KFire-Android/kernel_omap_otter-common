@@ -774,6 +774,7 @@ static void __init omap_tablet_init(void)
 	board_serial_init();
 	omap4_tablet_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
+	tablet_sensor_init();
 
 	usb_musb_init(&musb_board_data);
 

@@ -18,6 +18,7 @@
 #define _MACH_OMAP_BOARD_44XX_TABLET2_H
 
 int tablet_touch_init(void);
+int tablet_sensor_init(void);
 void omap4_create_board_props(void);
 void omap_ion_init(void);
 void omap4_register_ion(void);
