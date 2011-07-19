@@ -23,38 +23,38 @@
 #include <linux/kernel.h>
 #include <linux/i2c.h>
 
-#include <plat/omap_tablet_id.h>
+#include <plat/omap_apps_brd_id.h>
 
-static int tablet_revision;
+static int board_revision;
 
-bool omap_is_tablet_version(int req_tablet_version)
+bool omap_is_board_version(int req_board_version)
 {
-	if (req_tablet_version == tablet_revision)
+	if (req_board_version == board_revision)
 		return true;
 
 	return false;
 }
 
-int omap_get_tablet_version(void)
+int omap_get_board_version(void)
 {
-	return tablet_revision;
+	return board_revision;
 }
 
-__init int omap_init_tablet_version(void)
+__init int omap_init_board_version(void)
 {
 	switch (system_rev) {
 	case OMAP4_TABLET_1_0:
-		tablet_revision = OMAP4_TABLET_1_0;
+		board_revision = OMAP4_TABLET_1_0;
 		break;
 	case OMAP4_TABLET_2_0:
-		tablet_revision = OMAP4_TABLET_2_0;
+		board_revision = OMAP4_TABLET_2_0;
 		break;
 	case OMAP4_BLAZE_ID:
-		tablet_revision = OMAP4_BLAZE_ID;
+		board_revision = OMAP4_BLAZE_ID;
 		break;
 	default:
-		tablet_revision = -1;
+		board_revision = -1;
 	}
 
-	return tablet_revision;
+	return board_revision;
 }

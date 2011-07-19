@@ -27,6 +27,6 @@
 #define OMAP4_TABLET_1_0	2143
 #define OMAP4_TABLET_2_0	2158
 
-int omap_get_tablet_version(void);
-int omap_init_tablet_version(void);
-bool omap_is_tablet_version(int req_tablet_version);
+int omap_get_board_version(void);
+int omap_init_board_version(void);
+bool omap_is_board_version(int req_board_version);

@@ -42,7 +42,7 @@
 #include <plat/mmc.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
-#include <plat/omap_tablet_id.h>
+#include <plat/omap_apps_brd_id.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -763,7 +763,7 @@ static void __init omap_tablet2_init(void)
 	omap_board_config = tablet2_config;
 	omap_board_config_size = ARRAY_SIZE(tablet2_config);
 
-	tablet_rev = omap_init_tablet_version();
+	tablet_rev = omap_init_board_version();
 
 	omap4_create_board_props();
 	omap4_i2c_init();
