@@ -534,6 +534,13 @@ config INPUT_XEN_KBDDEV_FRONTEND
 	  To compile this driver as a module, choose M here: the
 	  module will be called xen-kbdfront.
 
+config INPUT_MPU3050
+	bool "MPU-3050 Tri-axis gyroscope"
+	depends on I2C && SYSFS
+	help
+	  Say Y here if you want to use MPU-3050 Tri-axis gyroscope
+	  through I2C interface.
+
 config INPUT_TSL2771
 	bool "TSL2771 ALS/Proximity Sensor Driver"
 	depends on I2C && SYSFS
