@@ -1,5 +1,5 @@
 /*
- * Board support file for OMAP44xx Tablet2.
+ * Board support file for OMAP44xx tablet.
  *
  * Copyright (C) 2009 Texas Instruments
  *
@@ -51,7 +51,7 @@
 #include "common-board-devices.h"
 #include "pm.h"
 
-#include "board-44xx-tablet2.h"
+#include "board-44xx-tablet.h"
 
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
@@ -69,7 +69,7 @@
 
 #define TPS62361_GPIO   7
 
-static struct gpio_led tablet2_gpio_leds[] = {
+static struct gpio_led tablet_gpio_leds[] = {
 	{
 		.name	= "omap4:green:debug0",
 		.gpio	= 61,
@@ -105,12 +105,12 @@ static struct gpio_led tablet2_gpio_leds[] = {
 
 };
 
-static struct gpio_led_platform_data tablet2_led_data = {
-	.leds	= tablet2_gpio_leds,
-	.num_leds	= ARRAY_SIZE(tablet2_gpio_leds),
+static struct gpio_led_platform_data tablet_led_data = {
+	.leds	= tablet_gpio_leds,
+	.num_leds	= ARRAY_SIZE(tablet_gpio_leds),
 };
 
-static struct led_pwm tablet2_pwm_leds[] = {
+static struct led_pwm tablet_pwm_leds[] = {
 	{
 		.name		= "omap4:green:chrg",
 		.pwm_id		= 1,
@@ -119,27 +119,27 @@ static struct led_pwm tablet2_pwm_leds[] = {
 	},
 };
 
-static struct led_pwm_platform_data tablet2_pwm_data = {
-	.num_leds	= ARRAY_SIZE(tablet2_pwm_leds),
-	.leds		= tablet2_pwm_leds,
+static struct led_pwm_platform_data tablet_pwm_data = {
+	.num_leds	= ARRAY_SIZE(tablet_pwm_leds),
+	.leds		= tablet_pwm_leds,
 };
 
-static struct platform_device tablet2_leds_pwm = {
+static struct platform_device tablet_leds_pwm = {
 	.name	= "leds_pwm",
 	.id	= -1,
 	.dev	= {
-		.platform_data = &tablet2_pwm_data,
+		.platform_data = &tablet_pwm_data,
 	},
 };
 
-static struct platform_device tablet2_leds_gpio = {
+static struct platform_device tablet_leds_gpio = {
 	.name	= "leds-gpio",
 	.id	= -1,
 	.dev	= {
-		.platform_data = &tablet2_led_data,
+		.platform_data = &tablet_led_data,
 	},
 };
-static struct spi_board_info tablet2_spi_board_info[] __initdata = {
+static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	{
 		.modalias               = "ks8851",
 		.bus_num                = 1,
@@ -149,7 +149,7 @@ static struct spi_board_info tablet2_spi_board_info[] __initdata = {
 	},
 };
 
-static struct gpio tablet2_eth_gpios[] __initdata = {
+static struct gpio tablet_eth_gpios[] __initdata = {
 	{ ETH_KS8851_POWER_ON,	GPIOF_OUT_INIT_HIGH,	"eth_power"	},
 	{ ETH_KS8851_QUART,	GPIOF_OUT_INIT_HIGH,	"quart"		},
 	{ ETH_KS8851_IRQ,	GPIOF_IN,		"eth_irq"	},
@@ -160,23 +160,23 @@ static int __init omap_ethernet_init(void)
 	int status;
 
 	/* Request of GPIO lines */
-	status = gpio_request_array(tablet2_eth_gpios,
-				    ARRAY_SIZE(tablet2_eth_gpios));
+	status = gpio_request_array(tablet_eth_gpios,
+				    ARRAY_SIZE(tablet_eth_gpios));
 	if (status)
 		pr_err("Cannot request ETH GPIOs\n");
 
 	return status;
 }
 
-static struct platform_device *tablet2_devices[] __initdata = {
-	&tablet2_leds_gpio,
-	&tablet2_leds_pwm,
+static struct platform_device *tablet_devices[] __initdata = {
+	&tablet_leds_gpio,
+	&tablet_leds_pwm,
 };
 
-static struct omap_board_config_kernel tablet2_config[] __initdata = {
+static struct omap_board_config_kernel tablet_config[] __initdata = {
 };
 
-static void __init omap_tablet2_init_early(void)
+static void __init omap_tablet_init_early(void)
 {
 	omap2_init_common_infrastructure();
 	omap2_init_common_devices(NULL, NULL);
@@ -225,51 +225,51 @@ static struct omap2_hsmmc_info mmc[] = {
 	{}	/* Terminator */
 };
 
-static struct regulator_consumer_supply tablet2_vaux_supply[] = {
+static struct regulator_consumer_supply tablet_vaux_supply[] = {
 	{
 		.supply = "vmmc",
 		.dev_name = "omap_hsmmc.1",
 	},
 };
-static struct regulator_consumer_supply tablet2_vmmc_supply[] = {
+static struct regulator_consumer_supply tablet_vmmc_supply[] = {
 	{
 		.supply = "vmmc",
 		.dev_name = "omap_hsmmc.0",
 	},
 };
-static struct regulator_consumer_supply tablet2_vcxio_supply[] = {
+static struct regulator_consumer_supply tablet_vcxio_supply[] = {
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi1"),
 };
 
-static struct regulator_consumer_supply omap4_tablet2_vmmc5_supply = {
+static struct regulator_consumer_supply omap4_tablet_vmmc5_supply = {
 	.supply = "vmmc",
 	.dev_name = "omap_hsmmc.4",
 };
 
-static struct regulator_init_data tablet2_vmmc5 = {
+static struct regulator_init_data tablet_vmmc5 = {
 	.constraints = {
 		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies = 1,
-	.consumer_supplies = &omap4_tablet2_vmmc5_supply,
+	.consumer_supplies = &omap4_tablet_vmmc5_supply,
 };
 
-static struct fixed_voltage_config tablet2_vwlan = {
+static struct fixed_voltage_config tablet_vwlan = {
 	.supply_name		= "vwl1271",
 	.microvolts		= 1800000, /* 1.8V */
 	.gpio			= GPIO_WIFI_PMENA,
 	.startup_delay		= 70000, /* 70msec */
 	.enable_high		= 1,
 	.enabled_at_boot	= 0,
-	.init_data		= &tablet2_vmmc5,
+	.init_data		= &tablet_vmmc5,
 };
 
 static struct platform_device omap_vwlan_device = {
 	.name		= "reg-fixed-voltage",
 	.id		= 1,
 	.dev = {
-		.platform_data = &tablet2_vwlan,
+		.platform_data = &tablet_vwlan,
 	},
 };
 
@@ -316,7 +316,7 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	return 0;
 }
 
-static struct regulator_init_data tablet2_vaux1 = {
+static struct regulator_init_data tablet_vaux1 = {
 	.constraints = {
 		.min_uV			= 1000000,
 		.max_uV			= 3000000,
@@ -328,10 +328,10 @@ static struct regulator_init_data tablet2_vaux1 = {
 					| REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies  = 1,
-	.consumer_supplies      = tablet2_vaux_supply,
+	.consumer_supplies      = tablet_vaux_supply,
 };
 
-static struct regulator_init_data tablet2_vaux2 = {
+static struct regulator_init_data tablet_vaux2 = {
 	.constraints = {
 		.min_uV			= 1200000,
 		.max_uV			= 2800000,
@@ -344,7 +344,7 @@ static struct regulator_init_data tablet2_vaux2 = {
 	},
 };
 
-static struct regulator_init_data tablet2_vaux3 = {
+static struct regulator_init_data tablet_vaux3 = {
 	.constraints = {
 		.min_uV			= 1000000,
 		.max_uV			= 3000000,
@@ -358,7 +358,7 @@ static struct regulator_init_data tablet2_vaux3 = {
 };
 
 /* VMMC1 for MMC1 card */
-static struct regulator_init_data tablet2_vmmc = {
+static struct regulator_init_data tablet_vmmc = {
 	.constraints = {
 		.min_uV			= 1200000,
 		.max_uV			= 3000000,
@@ -370,10 +370,10 @@ static struct regulator_init_data tablet2_vmmc = {
 					| REGULATOR_CHANGE_STATUS,
 	},
 	.num_consumer_supplies  = 1,
-	.consumer_supplies      = tablet2_vmmc_supply,
+	.consumer_supplies      = tablet_vmmc_supply,
 };
 
-static struct regulator_init_data tablet2_vpp = {
+static struct regulator_init_data tablet_vpp = {
 	.constraints = {
 		.min_uV			= 1800000,
 		.max_uV			= 2500000,
@@ -386,7 +386,7 @@ static struct regulator_init_data tablet2_vpp = {
 	},
 };
 
-static struct regulator_init_data tablet2_vusim = {
+static struct regulator_init_data tablet_vusim = {
 	.constraints = {
 		.min_uV			= 1200000,
 		.max_uV			= 2900000,
@@ -399,7 +399,7 @@ static struct regulator_init_data tablet2_vusim = {
 	},
 };
 
-static struct regulator_init_data tablet2_vana = {
+static struct regulator_init_data tablet_vana = {
 	.constraints = {
 		.min_uV			= 2100000,
 		.max_uV			= 2100000,
@@ -410,7 +410,7 @@ static struct regulator_init_data tablet2_vana = {
 	},
 };
 
-static struct regulator_init_data tablet2_vcxio = {
+static struct regulator_init_data tablet_vcxio = {
 	.constraints = {
 		.min_uV			= 1800000,
 		.max_uV			= 1800000,
@@ -420,11 +420,11 @@ static struct regulator_init_data tablet2_vcxio = {
 					| REGULATOR_CHANGE_STATUS,
 		.always_on	= true,
 	},
-	.num_consumer_supplies	= ARRAY_SIZE(tablet2_vcxio_supply),
-	.consumer_supplies	= tablet2_vcxio_supply,
+	.num_consumer_supplies	= ARRAY_SIZE(tablet_vcxio_supply),
+	.consumer_supplies	= tablet_vcxio_supply,
 };
 
-static struct regulator_init_data tablet2_vdac = {
+static struct regulator_init_data tablet_vdac = {
 	.constraints = {
 		.min_uV			= 1800000,
 		.max_uV			= 1800000,
@@ -435,7 +435,7 @@ static struct regulator_init_data tablet2_vdac = {
 	},
 };
 
-static struct regulator_init_data tablet2_vusb = {
+static struct regulator_init_data tablet_vusb = {
 	.constraints = {
 		.min_uV			= 3300000,
 		.max_uV			= 3300000,
@@ -447,42 +447,42 @@ static struct regulator_init_data tablet2_vusb = {
 	},
 };
 
-static struct regulator_init_data tablet2_clk32kg = {
+static struct regulator_init_data tablet_clk32kg = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 	},
 };
 
-static struct twl4030_platform_data tablet2_twldata = {
+static struct twl4030_platform_data tablet_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
 
 	/* Regulators */
-	.vmmc		= &tablet2_vmmc,
-	.vpp		= &tablet2_vpp,
-	.vusim		= &tablet2_vusim,
-	.vana		= &tablet2_vana,
-	.vcxio		= &tablet2_vcxio,
-	.vdac		= &tablet2_vdac,
-	.vusb		= &tablet2_vusb,
-	.vaux1		= &tablet2_vaux1,
-	.vaux2		= &tablet2_vaux2,
-	.vaux3		= &tablet2_vaux3,
-	.clk32kg	= &tablet2_clk32kg,
+	.vmmc		= &tablet_vmmc,
+	.vpp		= &tablet_vpp,
+	.vusim		= &tablet_vusim,
+	.vana		= &tablet_vana,
+	.vcxio		= &tablet_vcxio,
+	.vdac		= &tablet_vdac,
+	.vusb		= &tablet_vusb,
+	.vaux1		= &tablet_vaux1,
+	.vaux2		= &tablet_vaux2,
+	.vaux3		= &tablet_vaux3,
+	.clk32kg	= &tablet_clk32kg,
 	.usb		= &omap4_usbphy_data
 };
 
-static struct i2c_board_info __initdata tablet2_i2c_3_boardinfo[] = {
+static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
 
 };
 
 static int __init omap4_i2c_init(void)
 {
-	omap4_pmic_init("twl6030", &tablet2_twldata);
+	omap4_pmic_init("twl6030", &tablet_twldata);
 	omap_register_i2c_bus(2, 400, NULL, 0);
-	omap_register_i2c_bus(3, 400, tablet2_i2c_3_boardinfo,
-				ARRAY_SIZE(tablet2_i2c_3_boardinfo));
+	omap_register_i2c_bus(3, 400, tablet_i2c_3_boardinfo,
+				ARRAY_SIZE(tablet_i2c_3_boardinfo));
 	omap_register_i2c_bus(4, 400, NULL, 0);
 	return 0;
 }
@@ -524,7 +524,7 @@ static int dsi1_panel_set_backlight(struct omap_dss_device *dssdev, int level)
 
 static struct nokia_dsi_panel_data dsi1_panel;
 
-static void tablet2_lcd_init(void)
+static void tablet_lcd_init(void)
 {
 	u32 reg;
 	int status;
@@ -557,7 +557,7 @@ static void tablet2_lcd_init(void)
 	gpio_set_value(LCD_BL_GPIO, 0);
 }
 
-static void tablet2_hdmi_mux_init(void)
+static void tablet_hdmi_mux_init(void)
 {
 	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
 	omap_mux_init_signal("hdmi_hpd",
@@ -571,24 +571,24 @@ static void tablet2_hdmi_mux_init(void)
 			OMAP_PIN_INPUT_PULLUP);
 }
 
-static struct gpio tablet2_hdmi_gpios[] = {
+static struct gpio tablet_hdmi_gpios[] = {
 	{ HDMI_GPIO_HPD,	GPIOF_OUT_INIT_HIGH,	"hdmi_gpio_hpd"   },
 	{ HDMI_GPIO_LS_OE,	GPIOF_OUT_INIT_HIGH,	"hdmi_gpio_ls_oe" },
 };
 
-static int tablet2_panel_enable_hdmi(struct omap_dss_device *dssdev)
+static int tablet_panel_enable_hdmi(struct omap_dss_device *dssdev)
 {
 	int status;
 
-	status = gpio_request_array(tablet2_hdmi_gpios,
-				    ARRAY_SIZE(tablet2_hdmi_gpios));
+	status = gpio_request_array(tablet_hdmi_gpios,
+				    ARRAY_SIZE(tablet_hdmi_gpios));
 	if (status)
 		pr_err("%s: Cannot request HDMI GPIOs\n", __func__);
 
 	return status;
 }
 
-static void tablet2_panel_disable_hdmi(struct omap_dss_device *dssdev)
+static void tablet_panel_disable_hdmi(struct omap_dss_device *dssdev)
 {
 	gpio_free(HDMI_GPIO_LS_OE);
 	gpio_free(HDMI_GPIO_HPD);
@@ -603,7 +603,7 @@ static struct nokia_dsi_panel_data dsi1_panel = {
 		.set_backlight	= dsi1_panel_set_backlight,
 };
 
-static struct omap_dss_device tablet2_lcd_device = {
+static struct omap_dss_device tablet_lcd_device = {
 	.name			= "lcd",
 	.driver_name		= "taal",
 	.type			= OMAP_DISPLAY_TYPE_DSI,
@@ -640,7 +640,7 @@ static struct omap_dss_device tablet2_lcd_device = {
 	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
 
-static struct omap_dss_device tablet2_hdmi_device = {
+static struct omap_dss_device tablet_hdmi_device = {
 	.name = "hdmi",
 	.driver_name = "hdmi_panel",
 	.type = OMAP_DISPLAY_TYPE_HDMI,
@@ -653,28 +653,28 @@ static struct omap_dss_device tablet2_hdmi_device = {
 			.regm2	= 1,
 		},
 	},
-	.platform_enable = tablet2_panel_enable_hdmi,
-	.platform_disable = tablet2_panel_disable_hdmi,
+	.platform_enable = tablet_panel_enable_hdmi,
+	.platform_disable = tablet_panel_disable_hdmi,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
 };
 
-static struct omap_dss_device *tablet2_dss_devices[] = {
-	&tablet2_lcd_device,
-	&tablet2_hdmi_device,
+static struct omap_dss_device *tablet_dss_devices[] = {
+	&tablet_lcd_device,
+	&tablet_hdmi_device,
 };
 
-static struct omap_dss_board_info tablet2_dss_data = {
-	.num_devices	= ARRAY_SIZE(tablet2_dss_devices),
-	.devices	= tablet2_dss_devices,
-	.default_device	= &tablet2_lcd_device,
+static struct omap_dss_board_info tablet_dss_data = {
+	.num_devices	= ARRAY_SIZE(tablet_dss_devices),
+	.devices	= tablet_dss_devices,
+	.default_device	= &tablet_lcd_device,
 };
 
 /* TO DO: Need display support */
 static void omap_4430sdp_display_init(void)
 {
-	tablet2_lcd_init();
-	tablet2_hdmi_mux_init();
-	omap_display_init(&tablet2_dss_data);
+	tablet_lcd_init();
+	tablet_hdmi_mux_init();
+	omap_display_init(&tablet_dss_data);
 }
 
 #ifdef CONFIG_OMAP_MUX
@@ -714,7 +714,7 @@ static inline void board_serial_init(void)
  #endif
 
 
-static void omap4_tablet2_wifi_mux_init(void)
+static void omap4_tablet_wifi_mux_init(void)
 {
 	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT |
 				OMAP_PIN_OFF_WAKEUPENABLE);
@@ -734,21 +734,21 @@ static void omap4_tablet2_wifi_mux_init(void)
 				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
 }
 
-static struct wl12xx_platform_data omap4_tablet2_wlan_data __initdata = {
+static struct wl12xx_platform_data omap4_tablet_wlan_data __initdata = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = WL12XX_TCXOCLOCK_26,
 };
 
-static void omap4_tablet2_wifi_init(void)
+static void omap4_tablet_wifi_init(void)
 {
-	omap4_tablet2_wifi_mux_init();
-	if (wl12xx_set_platform_data(&omap4_tablet2_wlan_data))
+	omap4_tablet_wifi_mux_init();
+	if (wl12xx_set_platform_data(&omap4_tablet_wlan_data))
 		pr_err("Error setting wl12xx data\n");
 	platform_device_register(&omap_vwlan_device);
 }
 
-static void __init omap_tablet2_init(void)
+static void __init omap_tablet_init(void)
 {
 	int status;
 	int package = OMAP_PACKAGE_CBS;
@@ -760,18 +760,18 @@ static void __init omap_tablet2_init(void)
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
 
-	omap_board_config = tablet2_config;
-	omap_board_config_size = ARRAY_SIZE(tablet2_config);
+	omap_board_config = tablet_config;
+	omap_board_config_size = ARRAY_SIZE(tablet_config);
 
 	tablet_rev = omap_init_board_version();
 
 	omap4_create_board_props();
 	omap4_i2c_init();
-	tablet2_touch_init();
+	tablet_touch_init();
 	omap4_register_ion();
-	platform_add_devices(tablet2_devices, ARRAY_SIZE(tablet2_devices));
+	platform_add_devices(tablet_devices, ARRAY_SIZE(tablet_devices));
 	board_serial_init();
-	omap4_tablet2_wifi_init();
+	omap4_tablet_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
 
 	usb_musb_init(&musb_board_data);
@@ -780,9 +780,9 @@ static void __init omap_tablet2_init(void)
 	if (status) {
 		pr_err("Ethernet initialization failed: %d\n", status);
 	} else {
-		tablet2_spi_board_info[0].irq = gpio_to_irq(ETH_KS8851_IRQ);
-		spi_register_board_info(tablet2_spi_board_info,
-				ARRAY_SIZE(tablet2_spi_board_info));
+		tablet_spi_board_info[0].irq = gpio_to_irq(ETH_KS8851_IRQ);
+		spi_register_board_info(tablet_spi_board_info,
+				ARRAY_SIZE(tablet_spi_board_info));
 	}
 
 	if (cpu_is_omap446x()) {
@@ -796,13 +796,13 @@ static void __init omap_tablet2_init(void)
 	omap_enable_smartreflex_on_init();
 }
 
-static void __init omap_tablet2_map_io(void)
+static void __init omap_tablet_map_io(void)
 {
 	omap2_set_globals_443x();
 	omap44xx_map_common_io();
 }
 
-static void __init omap_tablet2_reserve(void)
+static void __init omap_tablet_reserve(void)
 {
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
@@ -815,10 +815,10 @@ static void __init omap_tablet2_reserve(void)
 MACHINE_START(OMAP_BLAZE, "OMAP4 blaze board")
 	/* Maintainer: Dan Murphy - Texas Instruments Inc */
 	.boot_params	= 0x80000100,
-	.reserve	= omap_tablet2_reserve,
-	.map_io		= omap_tablet2_map_io,
-	.init_early	= omap_tablet2_init_early,
+	.reserve	= omap_tablet_reserve,
+	.map_io		= omap_tablet_map_io,
+	.init_early	= omap_tablet_init_early,
 	.init_irq	= gic_init_irq,
-	.init_machine	= omap_tablet2_init,
+	.init_machine	= omap_tablet_init,
 	.timer		= &omap_timer,
 MACHINE_END

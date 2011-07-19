@@ -25,7 +25,7 @@
 
 #include <plat/i2c.h>
 
-#include "board-44xx-tablet2.h"
+#include "board-44xx-tablet.h"
 #include "mux.h"
 
 #define OMAP4_TOUCH_IRQ_1		35
@@ -157,7 +157,7 @@ static struct i2c_board_info __initdata omap4xx_i2c_bus4_touch_info[] = {
 	},
 };
 
-int __init tablet2_touch_init(void)
+int __init tablet_touch_init(void)
 {
 	gpio_request(OMAP4_TOUCH_IRQ_1, "atmel touch irq");
 	gpio_direction_input(OMAP4_TOUCH_IRQ_1);
