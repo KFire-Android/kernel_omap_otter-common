@@ -534,4 +534,11 @@ config INPUT_XEN_KBDDEV_FRONTEND
 	  To compile this driver as a module, choose M here: the
 	  module will be called xen-kbdfront.
 
+config INPUT_TSL2771
+	bool "TSL2771 ALS/Proximity Sensor Driver"
+	depends on I2C && SYSFS
+	help
+	  Say Y here if you want to use TSL2771 ALS/Proximity Sensor Driver
+	  through I2C interface.
+
 endif
