@@ -23,6 +23,7 @@
 #include <linux/gpio.h>
 
 #include <linux/i2c/tsl2771.h>
+#include <linux/i2c/mpu3050.h>
 
 #include <plat/i2c.h>
 
@@ -31,9 +32,9 @@
 
 #define OMAP4_TSL2771_INT_GPIO		184
 #define OMAP4_TSL2771_PWR_GPIO		188
+#define OMAP4_MPU3050GYRO_GPIO		2
 
 /* TSL2771 ALS/Prox Begin */
-
 static void omap_tsl2771_power(int state)
 {
 	gpio_set_value(OMAP4_TSL2771_PWR_GPIO, state);
@@ -78,8 +79,32 @@ struct tsl2771_platform_data tsl2771_data = {
 };
 /* TSL2771 ALS/Prox End */
 
+/* MPU3050 Gyro Begin */
+static void blaze_tablet_mpu3050_init(void)
+{
+	if (gpio_request(OMAP4_MPU3050GYRO_GPIO, "mpu3050") < 0) {
+		pr_err("%s: MPU3050 GPIO request failed\n", __func__);
+		return;
+	}
+	gpio_direction_input(OMAP4_MPU3050GYRO_GPIO);
+}
+
+static struct mpu3050gyro_platform_data mpu3050_platform_data = {
+	.irq_flags = (IRQF_TRIGGER_HIGH | IRQF_ONESHOT),
+	.slave_i2c_addr = 0x40,
+	.sample_rate_div = 0x00,
+	.dlpf_fs_sync = 0x10,
+	.interrupt_cfg = (MPU3050_INT_CFG_OPEN | MPU3050_INT_CFG_LATCH_INT_EN |
+		MPU3050_INT_CFG_MPU_RDY_EN | MPU3050_INT_CFG_RAW_RDY_EN),
+};
+/* MPU3050 Gyro End */
 
 static struct i2c_board_info __initdata blaze_tablet_i2c_bus4_sensor_info[] = {
+	{
+		I2C_BOARD_INFO("mpu3050_gyro", 0x68),
+		.platform_data = &mpu3050_platform_data,
+		.irq = OMAP_GPIO_IRQ(OMAP4_MPU3050GYRO_GPIO),
+	},
 	{
 		I2C_BOARD_INFO(TSL2771_NAME, 0x39),
 		.platform_data = &tsl2771_data,
@@ -90,6 +115,7 @@ static struct i2c_board_info __initdata blaze_tablet_i2c_bus4_sensor_info[] = {
 int __init tablet_sensor_init(void)
 {
 	blaze_tablet_tsl2771_init();
+	blaze_tablet_mpu3050_init();
 
 	i2c_register_board_info(4, blaze_tablet_i2c_bus4_sensor_info,
 		ARRAY_SIZE(blaze_tablet_i2c_bus4_sensor_info));
