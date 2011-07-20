@@ -22,6 +22,7 @@
 #include <linux/io.h>
 #include <linux/gpio.h>
 
+#include <linux/i2c/bma180.h>
 #include <linux/i2c/tsl2771.h>
 #include <linux/i2c/mpu3050.h>
 
@@ -30,9 +31,34 @@
 #include "board-44xx-tablet.h"
 #include "mux.h"
 
+#define OMAP4_BMA180ACCL_GPIO		178
 #define OMAP4_TSL2771_INT_GPIO		184
 #define OMAP4_TSL2771_PWR_GPIO		188
 #define OMAP4_MPU3050GYRO_GPIO		2
+
+/* BMA180 Accelerometer Begin */
+static struct bma180accel_platform_data bma180accel_platform_data = {
+	.ctrl_reg0	= 0x11,
+	.g_range	= BMA_GRANGE_2G,
+	.bandwidth	= BMA_BW_10HZ,
+	.mode		= BMA_MODE_LOW_NOISE,
+	.bit_mode	= BMA_BITMODE_14BITS,
+	.smp_skip	= 1,
+	.def_poll_rate	= 200,
+	.fuzz_x		= 25,
+	.fuzz_y		= 25,
+	.fuzz_z		= 25,
+};
+
+static void blaze_tablet_bma180accl_init(void)
+{
+	if (gpio_request(OMAP4_BMA180ACCL_GPIO, "Accelerometer") < 0) {
+		pr_err("Accelerometer GPIO request failed\n");
+		return;
+	}
+	gpio_direction_input(OMAP4_BMA180ACCL_GPIO);
+}
+/* BMA180 Accelerometer End */
 
 /* TSL2771 ALS/Prox Begin */
 static void omap_tsl2771_power(int state)
@@ -101,6 +127,10 @@ static struct mpu3050gyro_platform_data mpu3050_platform_data = {
 
 static struct i2c_board_info __initdata blaze_tablet_i2c_bus4_sensor_info[] = {
 	{
+		I2C_BOARD_INFO("bma180_accel", 0x40),
+		.platform_data = &bma180accel_platform_data,
+	},
+	{
 		I2C_BOARD_INFO("mpu3050_gyro", 0x68),
 		.platform_data = &mpu3050_platform_data,
 		.irq = OMAP_GPIO_IRQ(OMAP4_MPU3050GYRO_GPIO),
@@ -116,6 +146,7 @@ int __init tablet_sensor_init(void)
 {
 	blaze_tablet_tsl2771_init();
 	blaze_tablet_mpu3050_init();
+	blaze_tablet_bma180accl_init();
 
 	i2c_register_board_info(4, blaze_tablet_i2c_bus4_sensor_info,
 		ARRAY_SIZE(blaze_tablet_i2c_bus4_sensor_info));
