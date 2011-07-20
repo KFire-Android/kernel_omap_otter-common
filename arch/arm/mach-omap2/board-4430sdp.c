@@ -294,11 +294,24 @@ static struct platform_device btwilink_device = {
 	.id = -1,
 };
 
+static struct twl4030_madc_platform_data twl6030_madc = {
+	.irq_line = -1,
+};
+
+static struct platform_device twl6030_madc_device = {
+	.name   = "twl6030_madc",
+	.id = -1,
+	.dev	= {
+		.platform_data	= &twl6030_madc,
+	},
+};
+
 static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_leds_gpio,
 	&sdp4430_leds_pwm,
 	&wl128x_device,
 	&btwilink_device,
+	&twl6030_madc_device,
 };
 
 static struct omap_board_config_kernel sdp4430_config[] __initdata = {
@@ -634,6 +647,8 @@ static struct twl4030_platform_data sdp4430_twldata = {
 
 	/* children */
 	.codec		= &twl6040_codec,
+	.madc		= &twl6030_madc,
+
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
