@@ -52,6 +52,7 @@ obj-$(CONFIG_INPUT_XEN_KBDDEV_FRONTEND)	+= xen-kbdfront.o
 obj-$(CONFIG_INPUT_YEALINK)		+= yealink.o
 obj-$(CONFIG_INPUT_HMC5843)		+= hmc5843.o
 obj-$(CONFIG_INPUT_SFH7741)		+= sfh7741.o
+obj-$(CONFIG_INPUT_BMA180)		+= bma180.o
 obj-$(CONFIG_INPUT_MPU3050)		+= mpu3050.o
 obj-$(CONFIG_INPUT_TSL2771)		+= tsl2771.o
 
