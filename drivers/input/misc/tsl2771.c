@@ -506,9 +506,9 @@ static ssize_t tsl2771_store_attr_prox_enable(struct device *dev,
 			__func__, (val ? "on" : "off"));
 		goto error;
 	}
+
 	error = tsl2771_read_prox(data);
 	tsl2771_report_prox_input(data);
-
 error:
 	mutex_unlock(&data->enable_mutex);
 	return count;
@@ -731,6 +731,10 @@ static int __devinit tsl2771_driver_probe(struct i2c_client *client,
 		input_set_capability(data->prox_input_dev,
 					EV_ABS, ABS_DISTANCE);
 		input_set_drvdata(data->prox_input_dev, data);
+
+		__set_bit(EV_ABS, data->prox_input_dev->evbit);
+		input_set_abs_params(data->prox_input_dev, ABS_DISTANCE, 0, 1, 0, 0);
+
 		ret = input_register_device(data->prox_input_dev);
 		if (ret) {
 			pr_err("%s:Unable to register prox device\n", __func__);
