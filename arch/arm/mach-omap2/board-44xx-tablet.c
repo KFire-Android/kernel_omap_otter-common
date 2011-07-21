@@ -67,39 +67,33 @@
 #define GPIO_WIFI_PMENA		54
 #define GPIO_WIFI_IRQ		53
 
+#define TABLET2_GREEN_LED_GPIO		174
+#define TABLET2_GREEN_DBG2_LED_GPIO	173
+
 #define TPS62361_GPIO   7
 
 static struct gpio_led tablet_gpio_leds[] = {
 	{
-		.name	= "omap4:green:debug0",
-		.gpio	= 61,
-	},
-	{
-		.name	= "omap4:green:debug1",
-		.gpio	= 30,
-	},
-	{
 		.name	= "omap4:green:debug2",
 		.gpio	= 7,
-	},
-	{
-		.name	= "omap4:green:debug3",
-		.gpio	= 8,
 	},
 	{
 		.name	= "omap4:green:debug4",
 		.gpio	= 50,
 	},
 	{
-		.name	= "omap4:blue:user",
+		.name	= "blue",
+		.default_trigger = "timer",
 		.gpio	= 169,
 	},
 	{
-		.name	= "omap4:red:user",
+		.name	= "red",
+		.default_trigger = "timer",
 		.gpio	= 170,
 	},
 	{
-		.name	= "omap4:green:user",
+		.name	= "green",
+		.default_trigger = "timer",
 		.gpio	= 139,
 	},
 
@@ -764,6 +758,13 @@ static void __init omap_tablet_init(void)
 	omap_board_config_size = ARRAY_SIZE(tablet_config);
 
 	tablet_rev = omap_init_board_version();
+
+	if (omap_is_board_version(OMAP4_TABLET_2_0)) {
+		omap_mux_init_gpio(TABLET2_GREEN_LED_GPIO,
+			OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
+		tablet_gpio_leds[0].gpio = TABLET2_GREEN_DBG2_LED_GPIO;
+		tablet_gpio_leds[4].gpio = TABLET2_GREEN_LED_GPIO;
+	}
 
 	omap4_create_board_props();
 	omap4_i2c_init();
