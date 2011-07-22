@@ -23,10 +23,13 @@
 #include <linux/io.h>
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/platform_device.h>
+#include <linux/omapfb.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-tc358765.h>
 
 #include <linux/i2c/twl.h>
+
+#include <plat/vram.h>
 
 #include "board-44xx-tablet.h"
 #include "control.h"
@@ -242,11 +245,27 @@ static void tablet_lcd_init(void)
 		pr_err("%s: Could not get lcd_reset_gpio\n", __func__);
 }
 
+#define TABLET_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
+static struct omapfb_platform_data tablet_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = 1,
+		.region = {
+			[0] = {
+				.size = TABLET_FB_RAM_SIZE,
+			},
+		},
+	},
+};
+
 int __init tablet_panel_init(void)
 {
 	tablet_lcd_init();
 	omap_disp_led_init();
 	tablet_hdmi_mux_init();
+
+	omap_vram_set_sdram_vram(TABLET_FB_RAM_SIZE, 0);
+	omapfb_set_platform_data(&tablet_fb_pdata);
+
 	omap_display_init(&tablet_dss_data);
 	platform_device_register(&omap4_tablet_disp_led);
 
