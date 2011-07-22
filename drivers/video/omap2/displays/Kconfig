@@ -48,4 +48,11 @@ config PANEL_ACX565AKM
 	select BACKLIGHT_CLASS_DEVICE
 	help
 	  This is the LCD panel used on Nokia N900
+
+config PANEL_TC358765
+	tristate "Toshiba TC358765 DSI-2-LVDS chip"
+	depends on OMAP2_DSS_DSI && I2C
+	select BACKLIGHT_CLASS_DEVICE
+	help
+	  Toshiba TC358765 DSI-2-LVDS chip with 1024x768 panel
 endmenu
