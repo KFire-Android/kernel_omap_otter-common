@@ -256,6 +256,7 @@ obj-$(CONFIG_MACH_OMAP_BLAZE_TABLET2)	+= board-44xx-tablet.o \
 					   board-44xx-identity.o \
 					   board-44xx-tablet-touch.o \
 					   board-44xx-tablet-sensors.o \
+					   board-44xx-tablet-panel.o \
 					   omap4_apps_brd_id.o
 obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
 					   hsmmc.o \

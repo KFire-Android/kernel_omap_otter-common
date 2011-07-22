@@ -40,8 +40,6 @@
 #include <plat/common.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
-#include <video/omapdss.h>
-#include <video/omap-panel-nokia-dsi.h>
 #include <plat/omap_apps_brd_id.h>
 
 #include "mux.h"
@@ -56,13 +54,6 @@
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
 #define ETH_KS8851_QUART		138
-#define HDMI_GPIO_HPD 60 /* Hot plug pin for HDMI */
-#define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
-#define LCD_BL_GPIO		27	/* LCD Backlight GPIO */
-/* PWM2 and TOGGLE3 register offsets */
-#define LED_PWM2ON		0x03
-#define LED_PWM2OFF		0x04
-#define TWL6030_TOGGLE3		0x92
 
 #define GPIO_WIFI_PMENA		54
 #define GPIO_WIFI_IRQ		53
@@ -481,195 +472,7 @@ static int __init omap4_i2c_init(void)
 	return 0;
 }
 
-static int dsi1_panel_set_backlight(struct omap_dss_device *dssdev, int level)
-{
-	int r;
 
-	r = twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
-	if (r)
-		return r;
-
-	if (level > 1) {
-		if (level == 255)
-			level = 0x7F;
-		else
-			level = (~(level/2)) & 0x7F;
-
-		r = twl_i2c_write_u8(TWL_MODULE_PWM, level, LED_PWM2ON);
-		if (r)
-			return r;
-		r = twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-		if (r)
-			return r;
-	} else if (level <= 1) {
-		r = twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-		if (r)
-			return r;
-		r = twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x28, TWL6030_TOGGLE3);
-		if (r)
-			return r;
-		r = twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x00, TWL6030_TOGGLE3);
-		if (r)
-			return r;
-	}
-
-	return 0;
-}
-
-static struct nokia_dsi_panel_data dsi1_panel;
-
-static void tablet_lcd_init(void)
-{
-	u32 reg;
-	int status;
-
-	/* Enable 3 lanes in DSI1 module, disable pull down */
-	reg = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
-	reg &= ~OMAP4_DSI1_LANEENABLE_MASK;
-	reg |= 0x7 << OMAP4_DSI1_LANEENABLE_SHIFT;
-	reg &= ~OMAP4_DSI1_PIPD_MASK;
-	reg |= 0x7 << OMAP4_DSI1_PIPD_SHIFT;
-	omap4_ctrl_pad_writel(reg, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
-
-	/* Panel Taal reset and backlight GPIO init */
-	status = gpio_request_one(dsi1_panel.reset_gpio, GPIOF_DIR_OUT,
-		"lcd_reset_gpio");
-	if (status)
-		pr_err("%s: Could not get lcd_reset_gpio\n", __func__);
-
-	if (dsi1_panel.use_ext_te) {
-		status = omap_mux_init_signal("gpmc_ncs4.gpio_101",
-				OMAP_PIN_INPUT_PULLUP);
-		if (status)
-			pr_err("%s: Could not get ext_te gpio\n", __func__);
-	}
-
-	status = gpio_request_one(LCD_BL_GPIO, GPIOF_DIR_OUT, "lcd_bl_gpio");
-	if (status)
-		pr_err("%s: Could not get lcd_bl_gpio\n", __func__);
-
-	gpio_set_value(LCD_BL_GPIO, 0);
-}
-
-static void tablet_hdmi_mux_init(void)
-{
-	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
-	omap_mux_init_signal("hdmi_hpd",
-			OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("hdmi_cec",
-			OMAP_PIN_INPUT_PULLUP);
-	/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
-	omap_mux_init_signal("hdmi_ddc_scl",
-			OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("hdmi_ddc_sda",
-			OMAP_PIN_INPUT_PULLUP);
-}
-
-static struct gpio tablet_hdmi_gpios[] = {
-	{ HDMI_GPIO_HPD,	GPIOF_OUT_INIT_HIGH,	"hdmi_gpio_hpd"   },
-	{ HDMI_GPIO_LS_OE,	GPIOF_OUT_INIT_HIGH,	"hdmi_gpio_ls_oe" },
-};
-
-static int tablet_panel_enable_hdmi(struct omap_dss_device *dssdev)
-{
-	int status;
-
-	status = gpio_request_array(tablet_hdmi_gpios,
-				    ARRAY_SIZE(tablet_hdmi_gpios));
-	if (status)
-		pr_err("%s: Cannot request HDMI GPIOs\n", __func__);
-
-	return status;
-}
-
-static void tablet_panel_disable_hdmi(struct omap_dss_device *dssdev)
-{
-	gpio_free(HDMI_GPIO_LS_OE);
-	gpio_free(HDMI_GPIO_HPD);
-}
-
-static struct nokia_dsi_panel_data dsi1_panel = {
-		.name		= "taal",
-		.reset_gpio	= 102,
-		.use_ext_te	= false,
-		.ext_te_gpio	= 101,
-		.esd_interval	= 0,
-		.set_backlight	= dsi1_panel_set_backlight,
-};
-
-static struct omap_dss_device tablet_lcd_device = {
-	.name			= "lcd",
-	.driver_name		= "taal",
-	.type			= OMAP_DISPLAY_TYPE_DSI,
-	.data			= &dsi1_panel,
-	.phy.dsi		= {
-		.clk_lane	= 1,
-		.clk_pol	= 0,
-		.data1_lane	= 2,
-		.data1_pol	= 0,
-		.data2_lane	= 3,
-		.data2_pol	= 0,
-	},
-
-	.clocks = {
-		.dispc = {
-			.channel = {
-				.lck_div	= 1,	/* Logic Clock = 172.8 MHz */
-				.pck_div	= 5,	/* Pixel Clock = 34.56 MHz */
-				.lcd_clk_src	= OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
-			},
-			.dispc_fclk_src	= OMAP_DSS_CLK_SRC_FCK,
-		},
-
-		.dsi = {
-			.regn		= 16,	/* Fint = 2.4 MHz */
-			.regm		= 180,	/* DDR Clock = 216 MHz */
-			.regm_dispc	= 5,	/* PLL1_CLK1 = 172.8 MHz */
-			.regm_dsi	= 5,	/* PLL1_CLK2 = 172.8 MHz */
-
-			.lp_clk_div	= 10,	/* LP Clock = 8.64 MHz */
-			.dsi_fclk_src	= OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
-		},
-	},
-	.channel		= OMAP_DSS_CHANNEL_LCD,
-};
-
-static struct omap_dss_device tablet_hdmi_device = {
-	.name = "hdmi",
-	.driver_name = "hdmi_panel",
-	.type = OMAP_DISPLAY_TYPE_HDMI,
-	.clocks	= {
-		.dispc	= {
-			.dispc_fclk_src	= OMAP_DSS_CLK_SRC_FCK,
-		},
-		.hdmi	= {
-			.regn	= 15,
-			.regm2	= 1,
-		},
-	},
-	.platform_enable = tablet_panel_enable_hdmi,
-	.platform_disable = tablet_panel_disable_hdmi,
-	.channel = OMAP_DSS_CHANNEL_DIGIT,
-};
-
-static struct omap_dss_device *tablet_dss_devices[] = {
-	&tablet_lcd_device,
-	&tablet_hdmi_device,
-};
-
-static struct omap_dss_board_info tablet_dss_data = {
-	.num_devices	= ARRAY_SIZE(tablet_dss_devices),
-	.devices	= tablet_dss_devices,
-	.default_device	= &tablet_lcd_device,
-};
-
-/* TO DO: Need display support */
-static void omap_4430sdp_display_init(void)
-{
-	tablet_lcd_init();
-	tablet_hdmi_mux_init();
-	omap_display_init(&tablet_dss_data);
-}
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
@@ -769,6 +572,7 @@ static void __init omap_tablet_init(void)
 	omap4_create_board_props();
 	omap4_i2c_init();
 	tablet_touch_init();
+	tablet_panel_init();
 	omap4_register_ion();
 	platform_add_devices(tablet_devices, ARRAY_SIZE(tablet_devices));
 	board_serial_init();
