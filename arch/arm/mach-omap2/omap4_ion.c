@@ -21,8 +21,13 @@
 
 #define OMAP4_RAMCONSOLE_START	(PLAT_PHYS_OFFSET + SZ_512M)
 #define OMAP4_RAMCONSOLE_SIZE	SZ_2M
-#define PHYS_ADDR_DUCATI_MEM (0x80000000 + SZ_1G - (SZ_1M * 104))
-
+#define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
+#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 101)
+#define PHYS_ADDR_DUCATI_MEM	(0x80000000 + SZ_1G - \
+				 PHYS_ADDR_SMC_SIZE - PHYS_ADDR_DUCATI_SIZE)
+#define OMAP4_ION_HEAP_SECURE_INPUT_SIZE	SZ_64M
+#define OMAP4_ION_HEAP_TILER_SIZE		SZ_128M
+#define OMAP4_ION_HEAP_LARGE_SURFACES_SIZE	SZ_32M
 
 static struct ion_platform_data omap4_ion_data = {
 	.nr = 3,
@@ -31,21 +36,24 @@ static struct ion_platform_data omap4_ion_data = {
 			.type = ION_HEAP_TYPE_CARVEOUT,
 			.id = OMAP_ION_HEAP_SECURE_INPUT,
 			.name = "secure_input",
-			.base = PHYS_ADDR_DUCATI_MEM - SZ_256M - SZ_64M,
-			.size = SZ_64M,
+			.base = PHYS_ADDR_DUCATI_MEM -
+					OMAP4_ION_HEAP_TILER_SIZE -
+					OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
+			.size = OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
 		},
 		{	.type = OMAP_ION_HEAP_TYPE_TILER,
 			.id = OMAP_ION_HEAP_TILER,
 			.name = "tiler",
-			.base = PHYS_ADDR_DUCATI_MEM - SZ_256M,
-			.size = SZ_256M,
+			.base = PHYS_ADDR_DUCATI_MEM -
+					OMAP4_ION_HEAP_TILER_SIZE,
+			.size = OMAP4_ION_HEAP_TILER_SIZE,
 		},
 		{
 			.type = ION_HEAP_TYPE_CARVEOUT,
 			.id = OMAP_ION_HEAP_LARGE_SURFACES,
 			.name = "large_surfaces",
-			.base = 0x80000000 + SZ_512M + SZ_2M,
-			.size = SZ_32M,
+			.base = 0x80000000 + SZ_512M + OMAP4_RAMCONSOLE_SIZE,
+			.size = OMAP4_ION_HEAP_LARGE_SURFACES_SIZE,
 		},
 	},
 };
