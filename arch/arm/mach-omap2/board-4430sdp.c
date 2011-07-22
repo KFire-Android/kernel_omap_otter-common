@@ -25,6 +25,7 @@
 #include <linux/regulator/fixed.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
+#include <linux/omapfb.h>
 #include <linux/wl12xx.h>
 
 #include <mach/hardware.h>
@@ -44,6 +45,7 @@
 #include <plat/omap_apps_brd_id.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
+#include <plat/vram.h>
 
 #include "board-blaze.h"
 #include "mux.h"
@@ -852,10 +854,24 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 	.default_device	= &sdp4430_lcd_device,
 };
 
+#define BLAZE_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
+static struct omapfb_platform_data blaze_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = 1,
+		.region = {
+			[0] = {
+				.size = BLAZE_FB_RAM_SIZE,
+			},
+		},
+	},
+};
+
 static void omap_4430sdp_display_init(void)
 {
 	sdp4430_lcd_init();
 	sdp4430_hdmi_mux_init();
+	omap_vram_set_sdram_vram(BLAZE_FB_RAM_SIZE, 0);
+	omapfb_set_platform_data(&blaze_fb_pdata);
 	omap_display_init(&sdp4430_dss_data);
 }
 
