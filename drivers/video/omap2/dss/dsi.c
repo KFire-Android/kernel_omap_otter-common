@@ -204,6 +204,8 @@ struct dsi_reg { u16 idx; };
 #define DSI_DT_SET_MAX_RET_PKG_SIZE	0x37
 #define DSI_DT_NULL_PACKET		0x09
 #define DSI_DT_DCS_LONG_WRITE		0x39
+#define DSI_DT_GENERIC_READ_2		0x24
+#define DSI_DT_GENERIC_LONG_WRITE	0x29
 
 #define DSI_DT_RX_ACK_WITH_ERR		0x02
 #define DSI_DT_RX_LONG_READ		0x1a
@@ -733,9 +735,7 @@ static irqreturn_t omap_dsi_irq_handler(int irq, void *arg)
 			vcstatus[i] = 0;
 			continue;
 		}
-
 		vcstatus[i] = dsi_read_reg(dsidev, DSI_VC_IRQSTATUS(i));
-
 		dsi_write_reg(dsidev, DSI_VC_IRQSTATUS(i), vcstatus[i]);
 		/* flush posted write */
 		dsi_read_reg(dsidev, DSI_VC_IRQSTATUS(i));
@@ -2778,12 +2778,9 @@ static void dsi_vc_initial_config(struct platform_device *dsidev, int channel)
 	r = FLD_MOD(r, 1, 8, 8); /* ECC_TX_EN */
 	r = FLD_MOD(r, 0, 9, 9); /* MODE_SPEED, high speed on/off */
 	if (dss_has_feature(FEAT_DSI_VC_OCP_WIDTH))
-		r = FLD_MOD(r, 3, 11, 10);	/* OCP_WIDTH = 32 bit */
-/* TODO: This breaks DSI on Blaze: figure out what is the righ fix */
-#if 0
+		r = FLD_MOD(r, 3, 11, 10);      /* OCP_WIDTH = 32 bit */
 	if (channel == 0)
-		r = FLD_MOD(r, 1, 11, 10);	/* OCP_WIDTH = 32 bit */
-#endif
+		r = FLD_MOD(r, 1, 11, 10);      /* OCP_WIDTH = 32 bit */
 
 	r = FLD_MOD(r, 4, 29, 27); /* DMA_RX_REQ_NB = no dma */
 	r = FLD_MOD(r, 4, 23, 21); /* DMA_TX_REQ_NB = no dma */
@@ -2947,10 +2944,6 @@ static u16 dsi_vc_flush_receive_data(struct platform_device *dsidev,
 		} else if (dt == DSI_DT_RX_SHORT_READ_2) {
 			DSSERR("\tDCS short response, 2 byte: %#x\n",
 					FLD_GET(val, 23, 8));
-		} else if (dt == DSI_DT_RX_LONG_READ) {
-			DSSERR("\tlong response, len %d\n",
-					FLD_GET(val, 23, 8));
-			dsi_vc_flush_long_data(dsidev, channel);
 		} else if (dt == DSI_DT_RX_DCS_LONG_READ) {
 			DSSERR("\tDCS long response, len %d\n",
 					FLD_GET(val, 23, 8));
@@ -2986,13 +2979,8 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	DECLARE_COMPLETION_ONSTACK(completion);
-	int r = 0;
+	int r = 0, i = 0;
 	u32 err;
-
-	r = dsi_register_isr_vc(dsidev, channel, dsi_completion_handler,
-			&completion, DSI_VC_IRQ_BTA);
-	if (r)
-		goto err0;
 
 	r = dsi_register_isr(dsidev, dsi_completion_handler, &completion,
 			DSI_IRQ_ERROR_MASK);
@@ -3001,29 +2989,32 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 
 	r = dsi_vc_send_bta(dsidev, channel);
 	if (r)
-		goto err2;
+		goto err1;
 
-	if (wait_for_completion_timeout(&completion,
-				msecs_to_jiffies(500)) == 0) {
-		DSSERR("Failed to receive BTA\n");
-		r = -EIO;
-		goto err2;
+	/* wait for BTA ACK */
+	while (i < 500) {
+		if (REG_GET(dsidev, DSI_VC_IRQSTATUS(channel), 5, 5)) {
+			DSSDBG("BTA recieved\n");
+			REG_FLD_MOD(dsidev, DSI_VC_IRQSTATUS(channel), 1, 5, 5);
+			break;
+		}
+		i++;
+		mdelay(1);
 	}
+
+	if (i >= 500)
+		DSSERR("sending BTA failed\n");
 
 	err = dsi_get_errors(dsidev);
 	if (err) {
 		DSSERR("Error while sending BTA: %x\n", err);
 		r = -EIO;
-		goto err2;
 	}
-err2:
+
+err1:
 	dsi_unregister_isr(dsidev, dsi_completion_handler, &completion,
 			DSI_IRQ_ERROR_MASK);
-err1:
-	dsi_unregister_isr_vc(dsidev, channel, dsi_completion_handler,
-			&completion, DSI_VC_IRQ_BTA);
-err0:
-	return r;
+	return 0;
 }
 EXPORT_SYMBOL(dsi_vc_send_bta_sync);
 
@@ -3041,6 +3032,8 @@ static inline void dsi_vc_write_long_header(struct platform_device *dsidev,
 	val = FLD_VAL(data_id, 7, 0) | FLD_VAL(len, 23, 8) |
 		FLD_VAL(ecc, 31, 24);
 
+	DSSDBG("writing header %x\n", val);
+
 	dsi_write_reg(dsidev, DSI_VC_LONG_PACKET_HEADER(channel), val);
 }
 
@@ -3054,6 +3047,7 @@ static inline void dsi_vc_write_long_payload(struct platform_device *dsidev,
 /*	DSSDBG("\twriting %02x, %02x, %02x, %02x (%#010x)\n",
 			b1, b2, b3, b4, val); */
 
+	DSSDBG("sending payload %x\n", val);
 	dsi_write_reg(dsidev, DSI_VC_LONG_PACKET_PAYLOAD(channel), val);
 }
 
@@ -3067,8 +3061,7 @@ static int dsi_vc_send_long(struct platform_device *dsidev, int channel,
 	int r = 0;
 	u8 b1, b2, b3, b4;
 
-	if (dsi->debug_write)
-		DSSDBG("dsi_vc_send_long, %d bytes\n", len);
+	DSSDBG("dsi_vc_send_long, %d bytes\n", len);
 
 	/* len + header */
 	if (dsi->vc[channel].fifo_size * 32 * 4 < len + 4) {
@@ -3082,8 +3075,7 @@ static int dsi_vc_send_long(struct platform_device *dsidev, int channel,
 
 	p = data;
 	for (i = 0; i < len >> 2; i++) {
-		if (dsi->debug_write)
-			DSSDBG("\tsending full packet %d\n", i);
+		DSSDBG("\tsending full packet %d\n", i);
 
 		b1 = *p++;
 		b2 = *p++;
@@ -3097,8 +3089,7 @@ static int dsi_vc_send_long(struct platform_device *dsidev, int channel,
 	if (i) {
 		b1 = 0; b2 = 0; b3 = 0;
 
-		if (dsi->debug_write)
-			DSSDBG("\tsending remainder bytes %d\n", i);
+		DSSDBG("\tsending remainder bytes %d\n", i);
 
 		switch (i) {
 		case 3:
@@ -3117,6 +3108,20 @@ static int dsi_vc_send_long(struct platform_device *dsidev, int channel,
 
 		dsi_vc_write_long_payload(dsidev, channel, b1, b2, b3, 0);
 	}
+
+	/* wait for IRQ for long packet transmission confirmation */
+	for (i = 0; i < 1000; i++) {
+		u32 val;
+		val = dsi_read_reg(dsidev, DSI_VC_IRQSTATUS(channel));
+		if (val & 0x4) {
+			DSSDBG("long packet success\n");
+			REG_FLD_MOD(dsidev, DSI_VC_IRQSTATUS(channel), 1, 2, 2);
+			return 0;
+		}
+		udelay(1);
+	}
+
+	DSSERR("long packet send failed\n");
 
 	return r;
 }
@@ -3295,7 +3300,7 @@ int dsi_vc_dcs_read(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
 		buf[1] = (data >> 8) & 0xff;
 
 		return 2;
-	} else if (dt == DSI_DT_RX_DCS_LONG_READ || dt == DSI_DT_RX_LONG_READ) {
+	} else if (dt == DSI_DT_RX_DCS_LONG_READ) {
 		int w;
 		int len = FLD_GET(val, 23, 8);
 		if (dsi->debug_read)
@@ -3379,6 +3384,174 @@ int dsi_vc_dcs_read_2(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
 	return 0;
 }
 EXPORT_SYMBOL(dsi_vc_dcs_read_2);
+
+
+int dsi_vc_gen_write_nosync(struct omap_dss_device *dssdev, int channel,
+		u8 *data, int len)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+	int r;
+
+	BUG_ON(len == 0);
+
+	if (len == 1) {
+		BUG();
+		r = dsi_vc_send_short(dsidev, channel, DSI_DT_DCS_SHORT_WRITE_0,
+				data[0], 0);
+	} else if (len == 2) {
+		BUG();
+		r = dsi_vc_send_short(dsidev, channel, DSI_DT_DCS_SHORT_WRITE_1,
+				data[0] | (data[1] << 8), 0);
+	} else {
+		r = dsi_vc_send_long(dsidev, channel, DSI_DT_GENERIC_LONG_WRITE,
+				data, len, 0);
+	}
+
+	return r;
+}
+EXPORT_SYMBOL(dsi_vc_gen_write_nosync);
+
+int dsi_vc_gen_write(struct omap_dss_device *dssdev, int channel, u8 *data,
+		int len)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+	int r;
+
+	r = dsi_vc_gen_write_nosync(dssdev, channel, data, len);
+	if (r)
+		goto err;
+
+	r = dsi_vc_send_bta_sync(dssdev, channel);
+	if (r)
+		goto err;
+
+	/* RX_FIFO_NOT_EMPTY */
+	if (REG_GET(dsidev, DSI_VC_CTRL(channel), 20, 20)) {
+		DSSERR("rx fifo not empty after write, dumping data:\n");
+		dsi_vc_flush_receive_data(dsidev, channel);
+		r = -EIO;
+		goto err;
+	}
+
+	return 0;
+err:
+	DSSERR("dsi_vc_gen_write(ch %d, len %d) failed\n",
+			channel, len);
+	return r;
+}
+EXPORT_SYMBOL(dsi_vc_gen_write);
+
+int dsi_vc_gen_read_2(struct omap_dss_device *dssdev, int channel, u16 cmd,
+		u8 *buf, int buflen)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
+	u32 val;
+	u8 dt;
+	int r;
+
+	if (dsi->debug_read)
+		DSSDBG("dsi_vc_dcs_read(ch%d, dcs_cmd %x)\n", channel, cmd);
+
+	r = dsi_vc_send_short(dsidev, channel, DSI_DT_GENERIC_READ_2, cmd, 0);
+	if (r)
+		goto err;
+
+	r = dsi_vc_send_bta_sync(dssdev, channel);
+	if (r)
+		goto err;
+
+	/* RX_FIFO_NOT_EMPTY */
+	if (REG_GET(dsidev, DSI_VC_CTRL(channel), 20, 20) == 0) {
+		DSSERR("RX fifo empty when trying to read.\n");
+		r = -EIO;
+		goto err;
+	}
+
+	val = dsi_read_reg(dsidev, DSI_VC_SHORT_PACKET_HEADER(channel));
+	if (dsi->debug_read)
+		DSSDBG("\theader: %08x\n", val);
+	dt = FLD_GET(val, 5, 0);
+	if (dt == DSI_DT_RX_ACK_WITH_ERR) {
+		u16 err = FLD_GET(val, 23, 8);
+		dsi_show_rx_ack_with_err(err);
+		r = -EIO;
+		goto err;
+
+	} else if (dt == DSI_DT_RX_SHORT_READ_1) {
+		u8 data = FLD_GET(val, 15, 8);
+		if (dsi->debug_read)
+			DSSDBG("\tDCS short response, 1 byte: %02x\n", data);
+
+		if (buflen < 1) {
+			r = -EIO;
+			goto err;
+		}
+
+		buf[0] = data;
+
+		return 1;
+	} else if (dt == DSI_DT_RX_SHORT_READ_2) {
+		u16 data = FLD_GET(val, 23, 8);
+		if (dsi->debug_read)
+			DSSDBG("\tDCS short response, 2 byte: %04x\n", data);
+
+		if (buflen < 2) {
+			r = -EIO;
+			goto err;
+		}
+
+		buf[0] = data & 0xff;
+		buf[1] = (data >> 8) & 0xff;
+
+		return 2;
+	} else if (dt == DSI_DT_RX_LONG_READ) {
+		int w;
+		int len = FLD_GET(val, 23, 8);
+		if (dsi->debug_read)
+			DSSDBG("\tDCS long response, len %d\n", len);
+
+		if (len > buflen) {
+			r = -EIO;
+			goto err;
+		}
+
+		/* two byte checksum ends the packet, not included in len */
+		for (w = 0; w < len + 2;) {
+			int b;
+			val = dsi_read_reg(dsidev,
+				DSI_VC_SHORT_PACKET_HEADER(channel));
+			if (dsi->debug_read)
+				DSSDBG("\t\t%02x %02x %02x %02x\n",
+						(val >> 0) & 0xff,
+						(val >> 8) & 0xff,
+						(val >> 16) & 0xff,
+						(val >> 24) & 0xff);
+
+			for (b = 0; b < 4; ++b) {
+				if (w < len)
+					buf[w] = (val >> (b * 8)) & 0xff;
+				/* we discard the 2 byte checksum */
+				++w;
+			}
+		}
+
+		return len;
+	} else {
+		DSSERR("\tunknown datatype 0x%02x\n", dt);
+		r = -EIO;
+		goto err;
+	}
+
+	BUG();
+err:
+	DSSERR("dsi_vc_dcs_read(ch %d, cmd 0x%02x) failed\n",
+			channel, cmd);
+	return r;
+
+}
+EXPORT_SYMBOL(dsi_vc_gen_read_2);
+
 
 int dsi_vc_set_max_rx_packet_size(struct omap_dss_device *dssdev, int channel,
 		u16 len)
@@ -3510,7 +3683,7 @@ static void dsi_set_ta_timeout(struct platform_device *dsidev, unsigned ticks,
 	fck = dsi_fclk_rate(dsidev);
 
 	r = dsi_read_reg(dsidev, DSI_TIMING1);
-	r = FLD_MOD(r, to ? 1 : 0, 31, 31);	/* TA_TO */
+	r = FLD_MOD(r, 0, 31, 31);	/* TA_TO */
 	r = FLD_MOD(r, x16 ? 1 : 0, 30, 30);	/* TA_TO_X16 */
 	r = FLD_MOD(r, x8 ? 1 : 0, 29, 29);	/* TA_TO_X8 */
 	r = FLD_MOD(r, ticks, 28, 16);	/* TA_TO_COUNTER */
@@ -3762,13 +3935,12 @@ int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type)
 	u32 r;
 	u32 header;
 
-	dsi_if_enable(dsidev, 0);
-	dsi_vc_enable(dsidev, 1, 0);
-	dsi_vc_enable(dsidev, 0, 0);
+	dsi_if_enable(dsidev, false);
+	dsi_vc_enable(dsidev, 1, false);
+	dsi_vc_enable(dsidev, 0, false);
 
-	r = dsi_read_reg(dsidev, DSI_TIMING1);
-	r = FLD_MOD(r, 1, 15, 15);	/* FORCE_TX_STOP_MODE_IO */
-	dsi_write_reg(dsidev, DSI_TIMING1, r);
+	/* FORCE_TX_STOP_MODE_IO */
+	/* REG_FLD_MOD(dsidev, DSI_TIMING1, 1, 15, 15); */
 
 	if (wait_for_bit_change(dsidev, DSI_PLL_STATUS, 15, 0) != 0)
 		BUG();
@@ -3777,11 +3949,7 @@ int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type)
 	r = FLD_MOD(r, 1, 4, 4);
 	r = FLD_MOD(r, 1, 9, 9);
 	dsi_write_reg(dsidev, DSI_VC_CTRL(0), r);
-
-	r = dsi_read_reg(dsidev, DSI_VC_CTRL(1));
-	r = FLD_MOD(r, 0, 4, 4);
-	r = FLD_MOD(r, 1, 9, 9);
-	dsi_write_reg(dsidev, DSI_VC_CTRL(1), r);
+	dsi_write_reg(dsidev, DSI_VC_CTRL(0) , 0x20800790);
 
 	word_count = dssdev->panel.timings.x_res * 3;
 	header = FLD_VAL(0, 31, 24) | /* ECC */
@@ -3790,12 +3958,27 @@ int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type)
 		FLD_VAL(data_type, 5, 0);
 	dsi_write_reg(dsidev, DSI_VC_LONG_PACKET_HEADER(0), header);
 
-	dsi_vc_enable(dsidev, 1, 1);
-	dsi_vc_enable(dsidev, 0, 1);
-	dsi_if_enable(dsidev, 1);
+	dsi_vc_enable(dsidev, 0, true);
+	dsi_if_enable(dsidev, true);
+
+	msleep(2);
+
+	dssdev->manager->enable(dssdev->manager);
+
+	/* FORCE_TX_STOP_MODE_IO */
+	REG_FLD_MOD(dsidev, DSI_TIMING1, 0, 15, 15);
+
+	msleep(2);
 
 	return 0;
 }
+EXPORT_SYMBOL(dsi_video_mode_enable);
+
+void dsi_video_mode_disable(struct omap_dss_device *dssdev)
+{
+	dssdev->manager->disable(dssdev->manager);
+}
+EXPORT_SYMBOL(dsi_video_mode_disable);
 
 static void dsi_proto_timings(struct omap_dss_device *dssdev)
 {
@@ -4451,6 +4634,21 @@ static void dsi_display_uninit_dsi(struct omap_dss_device *dssdev,
 	dsi_pll_uninit(dsidev, disconnect_lanes);
 }
 
+static int _dsi_wait_reset(struct platform_device *dsidev)
+{
+	int t = 0;
+
+	while (REG_GET(dsidev, DSI_SYSSTATUS, 0, 0) == 0) {
+		if (++t > 5) {
+			DSSERR("soft reset failed\n");
+			return -ENODEV;
+		}
+		udelay(1);
+	}
+
+	return 0;
+}
+
 int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
@@ -4474,6 +4672,11 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 		goto err_get_dsi;
 
 	dsi_enable_pll_clock(dsidev, 1);
+
+	/* Soft reset */
+	REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
+	_dsi_wait_reset(dsidev);
+
 
 	_dsi_initialize_irq(dsidev);
 
@@ -4872,3 +5075,47 @@ void dsi_uninit_platform_driver(void)
 {
 	return platform_driver_unregister(&omap_dsi1hw_driver);
 }
+
+
+
+
+/* set extra register hardcoding values for now (according to kozio) */
+void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+
+	dsi_vc_enable(dsidev, 0, false);
+	dsi_vc_enable(dsidev, 1, false);
+	dsi_if_enable(dsidev, false);
+
+	/* configure timings */
+	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x010D301A);   /* HSA=1, HFP=211, HBP=26 */
+	dsi_write_reg(dsidev, DSI_VM_TIMING2, 0x04080F0F);   /* WINDOW_SIZE=4, VSA=8, VFP=15, VBP=15 */
+	dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x04B00320);	 /* TL(31:16)=1200, VACT(15:0)=800 */
+
+	dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00487296);   /* HSA_HS_INTERLEAVING(23:16)=72, HFP_HS_INTERLEAVING(15:8)=114, HBP_HS_INTERLEAVING(7:0)=150 */
+	dsi_write_reg(dsidev, DSI_VM_TIMING5, 0x0082DF3B);   /* VC3_FIFO_EMPTINESS, VC2_FIFO_EMPTINESS, VC1_FIFO_EMPTINESS, VC0_FIFO_EMPTINESS */
+	dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x7A6731D1);   /* HSA_LP_INTERLEAVING(23:16)=103, HFP_HS_INTERLEAVING(15:8)=49, HBP_HS_INTERLEAVING(7:0)=209 */
+	dsi_write_reg(dsidev, DSI_VM_TIMING7, 0x000E0013);   /* BL_HS_INTERLEAVING(23:16)=14, BL_LP_INTERLEAVING(15:0)=19 */
+
+
+	/* set TA_TO_COUNTER accordignly to kozio value(???) */
+	/* enable TA_TO and set it to max */
+	/* disable stop_mode but set it to max */
+	/* dsi_write_reg(dsidev, DSI_TIMING1, 0xFFFF7FFF) */
+
+	/* set TA_TO_COUNTER accordignly to kozio value(???) */
+	/* disable LP_RX_TO but set it to max */
+	/* enable HS_TX_TO and set it to max */
+	/* dsi_write_reg(dsidev, DSI_TIMING2, 0xFFFF7FFF) */
+
+	dsi_vc_enable(dsidev, 1, true);
+	dsi_vc_enable(dsidev, 0, true);
+	dsi_if_enable(dsidev, true);
+
+	/* Send null packet to start DDR clock  */
+	dsi_write_reg(dsidev, DSI_VC_SHORT_PACKET_HEADER(0), 0);
+	msleep(1);
+}
+EXPORT_SYMBOL(dsi_videomode_panel_preinit);
+
