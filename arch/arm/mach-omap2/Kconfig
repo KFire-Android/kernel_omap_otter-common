@@ -343,6 +343,7 @@ config MACH_OMAP_BLAZE_TABLET2
 	select INPUT_TSL2771
 	select INPUT_MPU3050
 	select INPUT_BMA180
+	select PANEL_TC358765
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
