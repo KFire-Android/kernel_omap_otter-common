@@ -38,7 +38,7 @@
 
 #include "panel-tc358765.h"
 
-static const struct omap_video_timings tc358765_timings = {
+static struct omap_video_timings tc358765_timings = {
 	.x_res		= TC358765_WIDTH,
 	.y_res		= TC358765_HEIGHT,
 	.pixel_clock	= TC358765_PCLK,
@@ -165,10 +165,13 @@ static int tc358765_hw_reset(struct omap_dss_device *dssdev)
 static int tc358765_probe(struct omap_dss_device *dssdev)
 {
 	struct tc358765_data *d2d;
+	struct tc358765_board_data *board_data = get_board_data(dssdev);
 	int r = 0;
 
 	dev_dbg(&dssdev->dev, "tc358765_probe\n");
 
+	tc358765_timings.x_res = board_data->x_res;
+	tc358765_timings.y_res = board_data->y_res;
 	dssdev->panel.config = OMAP_DSS_LCD_TFT;
 	dssdev->panel.timings = tc358765_timings;
 	dssdev->ctrl.pixel_size = 24;
@@ -265,6 +268,7 @@ static struct
 static int tc358765_write_init_config(struct omap_dss_device *dssdev)
 {
 	struct tc358765_data *d2d = dev_get_drvdata(&dssdev->dev);
+	struct tc358765_board_data *board_data = get_board_data(dssdev);
 	int i;
 	int r;
 
@@ -290,6 +294,10 @@ static int tc358765_write_init_config(struct omap_dss_device *dssdev)
 			return r;
 		}
 	}
+	tc358765_write_register(dssdev, HTIM2,
+		(TC358765_HFP << 16) | board_data->x_res);
+	tc358765_write_register(dssdev, VTIM2,
+		(TC358765_VFP << 16) | board_data->y_res);
 
 	return 0;
 }
@@ -358,8 +366,6 @@ err_disp_enable:
 
 static void tc358765_power_off(struct omap_dss_device *dssdev)
 {
-	struct tc358765_data *d2d = dev_get_drvdata(&dssdev->dev);
-
 	dsi_video_mode_disable(dssdev);
 
 	omapdss_dsi_display_disable(dssdev, false, false);

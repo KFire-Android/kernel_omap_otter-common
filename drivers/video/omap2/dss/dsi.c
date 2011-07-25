@@ -5099,7 +5099,13 @@ void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 	/* configure timings */
 	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x010D301A);   /* HSA=1, HFP=211, HBP=26 */
 	dsi_write_reg(dsidev, DSI_VM_TIMING2, 0x04080F0F);   /* WINDOW_SIZE=4, VSA=8, VFP=15, VBP=15 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x04B00320);	 /* TL(31:16)=1200, VACT(15:0)=800 */
+	/* TO DO: This is a HACK for tablet vs tablet 2
+	 * need to identify how to correctly calculate the lines
+	 * and program them based on the timing data */
+	if (omap_is_board_version(OMAP4_TABLET_1_0))
+		dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x03F00300); /* TL(31:16)=1008, VACT(15:0)=768 */
+	else
+		dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x04B00320); /* TL(31:16)=1200, VACT(15:0)=800 */
 
 	dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00487296);   /* HSA_HS_INTERLEAVING(23:16)=72, HFP_HS_INTERLEAVING(15:8)=114, HBP_HS_INTERLEAVING(7:0)=150 */
 	dsi_write_reg(dsidev, DSI_VM_TIMING5, 0x0082DF3B);   /* VC3_FIFO_EMPTINESS, VC2_FIFO_EMPTINESS, VC1_FIFO_EMPTINESS, VC0_FIFO_EMPTINESS */

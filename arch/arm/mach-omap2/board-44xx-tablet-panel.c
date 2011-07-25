@@ -30,6 +30,7 @@
 #include <linux/i2c/twl.h>
 
 #include <plat/vram.h>
+#include <plat/omap_apps_brd_id.h>
 
 #include "board-44xx-tablet.h"
 #include "control.h"
@@ -148,6 +149,8 @@ static void tablet_panel_disable_hdmi(struct omap_dss_device *dssdev)
 }
 
 static struct tc358765_board_data tablet_dsi_panel = {
+	.x_res		= 1280,
+	.y_res		= 800,
 	.reset_gpio     = 102,
 };
 
@@ -259,6 +262,11 @@ static struct omapfb_platform_data tablet_fb_pdata = {
 
 int __init tablet_panel_init(void)
 {
+	if (omap_is_board_version(OMAP4_TABLET_1_0)) {
+		tablet_dsi_panel.x_res	= 1024;
+		tablet_dsi_panel.y_res	= 768;
+	}
+
 	tablet_lcd_init();
 	omap_disp_led_init();
 	tablet_hdmi_mux_init();
