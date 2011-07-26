@@ -189,6 +189,11 @@ void omap_wakeupgen_irqmask_all(unsigned int cpu, unsigned int set)
 }
 
 #ifdef CONFIG_PM
+/*
+ * Masking wakeup irqs is handled by the IRQCHIP_MASK_ON_SUSPEND flag,
+ * so no action is necessary in set_wake, but implement an empty handler
+ * here to prevent enable_irq_wake() returning an error.
+ */
 static int wakeupgen_set_wake(struct irq_data *d, unsigned int on)
 {
 	return 0;

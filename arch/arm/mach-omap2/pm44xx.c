@@ -93,7 +93,8 @@ void omap4_trigger_ioctrl(void)
 /* This is a common low power function called from suspend and
  * cpuidle
  */
-void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
+
+void omap4_enter_sleep(unsigned int cpu, unsigned int power_state, bool suspend)
 {
 	int cpu0_next_state = PWRDM_POWER_ON;
 	int per_next_state = PWRDM_POWER_ON;
@@ -115,7 +116,8 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 			mpu_next_state = PWRDM_POWER_INACTIVE;
 			pwrdm_set_next_pwrst(mpu_pwrdm, mpu_next_state);
 		} else {
-			omap_sr_disable_reset_volt(mpu_voltdm);
+			if (!suspend)
+				omap_sr_disable_reset_volt(mpu_voltdm);
 			omap_vc_set_auto_trans(mpu_voltdm,
 				OMAP_VC_CHANNEL_AUTO_TRANSITION_RETENTION);
 		}
@@ -133,8 +135,10 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 			core_next_state = PWRDM_POWER_ON;
 			pwrdm_set_next_pwrst(core_pwrdm, core_next_state);
 		} else {
-			omap_sr_disable_reset_volt(iva_voltdm);
-			omap_sr_disable_reset_volt(core_voltdm);
+			if (!suspend) {
+				omap_sr_disable_reset_volt(iva_voltdm);
+				omap_sr_disable_reset_volt(core_voltdm);
+			}
 			omap_vc_set_auto_trans(core_voltdm,
 				OMAP_VC_CHANNEL_AUTO_TRANSITION_RETENTION);
 			omap_vc_set_auto_trans(iva_voltdm,
@@ -143,6 +147,9 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 			omap2_gpio_prepare_for_idle(0);
 		}
 	}
+
+	if (suspend && cpu_is_omap44xx())
+		omap4_pm_suspend_save_regs();
 
 	omap4_enter_lowpower(cpu, power_state);
 
@@ -153,14 +160,17 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap_vc_set_auto_trans(iva_voltdm,
 				OMAP_VC_CHANNEL_AUTO_TRANSITION_DISABLE);
 		omap2_gpio_resume_after_idle();
-		omap_sr_enable(iva_voltdm);
-		omap_sr_enable(core_voltdm);
+		if (!suspend) {
+			omap_sr_enable(iva_voltdm);
+			omap_sr_enable(core_voltdm);
+		}
 	}
 
 	if (mpu_next_state < PWRDM_POWER_INACTIVE) {
 		omap_vc_set_auto_trans(mpu_voltdm,
 				OMAP_VC_CHANNEL_AUTO_TRANSITION_DISABLE);
-		omap_sr_enable(mpu_voltdm);
+		if (!suspend)
+			omap_sr_enable(mpu_voltdm);
 	}
 
 	return;
@@ -247,7 +257,7 @@ static int omap4_pm_suspend(void)
 	 * domain CSWR is not supported by hardware.
 	 * More details can be found in OMAP4430 TRM section 4.3.4.2.
 	 */
-	omap4_enter_sleep(0, PWRDM_POWER_OFF);
+	omap4_enter_sleep(0, PWRDM_POWER_OFF, true);
 	omap4_print_wakeirq();
 
 	/* Disable wake-up irq's */
@@ -539,12 +549,8 @@ static int __init omap4_pm_init(void)
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
 	per_pwrdm = pwrdm_lookup("l4per_pwrdm");
 
-	/*
-	 * Enable wake-up capability for PRCM IRQ always since
-	 * it is not directly associated with any device driver.
-	 * With device driver, this can be done in suspend hook.
-	 */
-	irq_set_irq_wake(OMAP44XX_IRQ_PRCM, 1);
+	 /* Enable wakeup for PRCM IRQ for system wide suspend */
+	enable_irq_wake(OMAP44XX_IRQ_PRCM);
 
 	omap4_idle_init();
 
