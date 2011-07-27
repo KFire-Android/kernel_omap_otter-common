@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
+#include <linux/reboot.h>
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl.h>
@@ -45,6 +46,8 @@
 #include "control.h"
 #include "common-board-devices.h"
 #include "pm.h"
+#include "prm-regbits-44xx.h"
+#include "prm44xx.h"
 
 #include "board-44xx-tablet.h"
 
@@ -473,6 +476,44 @@ static void omap4_tablet_wifi_init(void)
 	platform_device_register(&omap_vwlan_device);
 }
 
+static int tablet_notifier_call(struct notifier_block *this,
+					unsigned long code, void *cmd)
+{
+	void __iomem *sar_base;
+	u32 v = OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+
+	sar_base = omap4_get_sar_ram_base();
+
+	if (!sar_base)
+		return notifier_from_errno(-ENOMEM);
+
+	if ((code == SYS_RESTART) && (cmd != NULL)) {
+		/* cmd != null; case: warm boot */
+		if (!strcmp(cmd, "bootloader")) {
+			/* Save reboot mode in scratch memory */
+			strcpy(sar_base + 0xA0C, cmd);
+			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+		} else if (!strcmp(cmd, "recovery")) {
+			/* Save reboot mode in scratch memory */
+			strcpy(sar_base + 0xA0C, cmd);
+			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+		} else {
+			v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+		}
+	}
+
+	omap4_prm_write_inst_reg(0xfff, OMAP4430_PRM_DEVICE_INST,
+			OMAP4_RM_RSTST);
+	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST, OMAP4_RM_RSTCTRL);
+	v = omap4_prm_read_inst_reg(WKUP_MOD, OMAP4_RM_RSTCTRL);
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block tablet_reboot_notifier = {
+	.notifier_call = tablet_notifier_call,
+};
+
 static void __init omap_tablet_init(void)
 {
 	int status;
@@ -489,7 +530,7 @@ static void __init omap_tablet_init(void)
 	omap_board_config_size = ARRAY_SIZE(tablet_config);
 
 	tablet_rev = omap_init_board_version();
-
+	register_reboot_notifier(&tablet_reboot_notifier);
 	omap4_create_board_props();
 	omap4_i2c_init();
 	tablet_touch_init();
