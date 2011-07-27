@@ -26,6 +26,7 @@
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
 #include <linux/omapfb.h>
+#include <linux/reboot.h>
 #include <linux/wl12xx.h>
 
 #include <mach/hardware.h>
@@ -54,6 +55,8 @@
 #include "control.h"
 #include "common-board-devices.h"
 #include "pm.h"
+#include "prm-regbits-44xx.h"
+#include "prm44xx.h"
 /* for TI WiLink devices */
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
@@ -980,6 +983,43 @@ static void __init omap4_ehci_ohci_init(void)
 static void __init omap4_ehci_ohci_init(void){}
 #endif
 
+static int blaze_notifier_call(struct notifier_block *this,
+					unsigned long code, void *cmd)
+{
+	void __iomem *sar_base;
+	u32 v = OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+
+	sar_base = omap4_get_sar_ram_base();
+
+	if (!sar_base)
+		return notifier_from_errno(-ENOMEM);
+
+	if ((code == SYS_RESTART) && (cmd != NULL)) {
+		/* cmd != null; case: warm boot */
+		if (!strcmp(cmd, "bootloader")) {
+			/* Save reboot mode in scratch memory */
+			strcpy(sar_base + 0xA0C, cmd);
+			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+		} else if (!strcmp(cmd, "recovery")) {
+			/* Save reboot mode in scratch memory */
+			strcpy(sar_base + 0xA0C, cmd);
+			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+		} else {
+			v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+		}
+	}
+
+	omap4_prm_write_inst_reg(0xfff, OMAP4430_PRM_DEVICE_INST,
+			OMAP4_RM_RSTST);
+	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST, OMAP4_RM_RSTCTRL);
+	v = omap4_prm_read_inst_reg(WKUP_MOD, OMAP4_RM_RSTCTRL);
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block blaze_reboot_notifier = {
+	.notifier_call = blaze_notifier_call,
+};
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -998,6 +1038,7 @@ static void __init omap_4430sdp_init(void)
 
 	omap4_audio_conf();
 	omap4_create_board_props();
+	register_reboot_notifier(&blaze_reboot_notifier);
 	omap4_i2c_init();
 	blaze_sensor_init();
 	blaze_touch_init();
