@@ -20,11 +20,8 @@
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl.h>
-#include <linux/gpio_keys.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
-#include <linux/leds.h>
-#include <linux/leds_pwm.h>
 #include <linux/wl12xx.h>
 
 #include <mach/hardware.h>
@@ -58,72 +55,8 @@
 #define GPIO_WIFI_PMENA		54
 #define GPIO_WIFI_IRQ		53
 
-#define TABLET2_GREEN_LED_GPIO		174
-#define TABLET2_GREEN_DBG2_LED_GPIO	173
-
 #define TPS62361_GPIO   7
 
-static struct gpio_led tablet_gpio_leds[] = {
-	{
-		.name	= "omap4:green:debug2",
-		.gpio	= 7,
-	},
-	{
-		.name	= "omap4:green:debug4",
-		.gpio	= 50,
-	},
-	{
-		.name	= "blue",
-		.default_trigger = "timer",
-		.gpio	= 169,
-	},
-	{
-		.name	= "red",
-		.default_trigger = "timer",
-		.gpio	= 170,
-	},
-	{
-		.name	= "green",
-		.default_trigger = "timer",
-		.gpio	= 139,
-	},
-
-};
-
-static struct gpio_led_platform_data tablet_led_data = {
-	.leds	= tablet_gpio_leds,
-	.num_leds	= ARRAY_SIZE(tablet_gpio_leds),
-};
-
-static struct led_pwm tablet_pwm_leds[] = {
-	{
-		.name		= "omap4:green:chrg",
-		.pwm_id		= 1,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 7812500,
-	},
-};
-
-static struct led_pwm_platform_data tablet_pwm_data = {
-	.num_leds	= ARRAY_SIZE(tablet_pwm_leds),
-	.leds		= tablet_pwm_leds,
-};
-
-static struct platform_device tablet_leds_pwm = {
-	.name	= "leds_pwm",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &tablet_pwm_data,
-	},
-};
-
-static struct platform_device tablet_leds_gpio = {
-	.name	= "leds-gpio",
-	.id	= -1,
-	.dev	= {
-		.platform_data = &tablet_led_data,
-	},
-};
 static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	{
 		.modalias               = "ks8851",
@@ -152,11 +85,6 @@ static int __init omap_ethernet_init(void)
 
 	return status;
 }
-
-static struct platform_device *tablet_devices[] __initdata = {
-	&tablet_leds_gpio,
-	&tablet_leds_pwm,
-};
 
 static struct omap_board_config_kernel tablet_config[] __initdata = {
 };
@@ -562,19 +490,12 @@ static void __init omap_tablet_init(void)
 
 	tablet_rev = omap_init_board_version();
 
-	if (omap_is_board_version(OMAP4_TABLET_2_0)) {
-		omap_mux_init_gpio(TABLET2_GREEN_LED_GPIO,
-			OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
-		tablet_gpio_leds[0].gpio = TABLET2_GREEN_DBG2_LED_GPIO;
-		tablet_gpio_leds[4].gpio = TABLET2_GREEN_LED_GPIO;
-	}
-
 	omap4_create_board_props();
 	omap4_i2c_init();
 	tablet_touch_init();
 	tablet_panel_init();
+	tablet_button_init();
 	omap4_register_ion();
-	platform_add_devices(tablet_devices, ARRAY_SIZE(tablet_devices));
 	board_serial_init();
 	omap4_tablet_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);

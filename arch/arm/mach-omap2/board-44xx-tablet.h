@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-omap2/board-44xx-tablet2.h
+ * arch/arm/mach-omap2/board-44xx-tablet.h
  *
  * Copyright (C) 2011 Texas Instruments
  *
@@ -23,5 +23,6 @@ void omap4_create_board_props(void);
 void omap_ion_init(void);
 void omap4_register_ion(void);
 int tablet_panel_init(void);
+int tablet_button_init(void);
 
 #endif
