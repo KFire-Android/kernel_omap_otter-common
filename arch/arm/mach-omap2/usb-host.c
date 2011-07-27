@@ -36,6 +36,8 @@
 
 #define OMAP_USBHS_DEVICE	"usbhs_omap"
 #define	USBHS_UHH_HWMODNAME	"usbhs_uhh"
+#define	USBHS_OHCI_HWMODNAME	"usbhs_ohci"
+#define USBHS_EHCI_HWMODNAME	"usbhs_ehci"
 #define USBHS_TLL_HWMODNAME	"usbhs_tll"
 
 static struct usbhs_omap_platform_data		usbhs_data;
@@ -51,391 +53,6 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
 };
 
 /* MUX settings for EHCI pins */
-static struct omap_device_pad port1_phy_pads[] __initdata = {
-	{
-		.name = "usbb1_ulpitll_stp.usbb1_ulpiphy_stp",
-		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_clk.usbb1_ulpiphy_clk",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_dir.usbb1_ulpiphy_dir",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~OMAP_WAKEUP_EN,
-		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_nxt.usbb1_ulpiphy_nxt",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_dat0.usbb1_ulpiphy_dat0",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~OMAP_WAKEUP_EN,
-		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_dat1.usbb1_ulpiphy_dat1",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_dat2.usbb1_ulpiphy_dat2",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_dat3.usbb1_ulpiphy_dat3",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_dat4.usbb1_ulpiphy_dat4",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_dat5.usbb1_ulpiphy_dat5",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_dat6.usbb1_ulpiphy_dat6",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb1_ulpitll_dat7.usbb1_ulpiphy_dat7",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-};
-
-static struct omap_device_pad port1_tll_pads[] __initdata = {
-	{
-		.name = "usbb1_ulpitll_stp.usbb1_ulpitll_stp",
-		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_clk.usbb1_ulpitll_clk",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_dir.usbb1_ulpitll_dir",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_nxt.usbb1_ulpitll_nxt",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_dat0.usbb1_ulpitll_dat0",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_dat1.usbb1_ulpitll_dat1",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_dat2.usbb1_ulpitll_dat2",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_dat3.usbb1_ulpitll_dat3",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_dat4.usbb1_ulpitll_dat4",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_dat5.usbb1_ulpitll_dat5",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_dat6.usbb1_ulpitll_dat6",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb1_ulpitll_dat7.usbb1_ulpitll_dat7",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-};
-
-static struct omap_device_pad port2_phy_pads[] __initdata = {
-	{
-		.name = "usbb2_ulpitll_stp.usbb2_ulpiphy_stp",
-		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_clk.usbb2_ulpiphy_clk",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_dir.usbb2_ulpiphy_dir",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_WAKEUP_EN
-							| OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_nxt.usbb2_ulpiphy_nxt",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_dat0.usbb2_ulpiphy_dat0",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_WAKEUP_EN
-							| OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_dat1.usbb2_ulpiphy_dat1",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_dat2.usbb2_ulpiphy_dat2",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_dat3.usbb2_ulpiphy_dat3",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_dat4.usbb2_ulpiphy_dat4",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_dat5.usbb2_ulpiphy_dat5",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_dat6.usbb2_ulpiphy_dat6",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "usbb2_ulpitll_dat7.usbb2_ulpiphy_dat7",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-};
-
-static struct omap_device_pad port2_tll_pads[] __initdata = {
-	{
-		.name = "usbb2_ulpitll_stp.usbb2_ulpitll_stp",
-		.enable = OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_clk.usbb2_ulpitll_clk",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_dir.usbb2_ulpitll_dir",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_nxt.usbb2_ulpitll_nxt",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_dat0.usbb2_ulpitll_dat0",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_dat1.usbb2_ulpitll_dat1",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_dat2.usbb2_ulpitll_dat2",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_dat3.usbb2_ulpitll_dat3",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_dat4.usbb2_ulpitll_dat4",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_dat5.usbb2_ulpitll_dat5",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_dat6.usbb2_ulpitll_dat6",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-	{
-		.name = "usbb2_ulpitll_dat7.usbb2_ulpitll_dat7",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0,
-	},
-};
-
-static struct omap_device_pad port1_6pin_pads[] __initdata = {
-	{
-		.name = "usbb1_ulpitll_stp.usbb1_mm_rxdp",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_nxt.usbb1_mm_rxdm",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat0.usbb1_mm_rxrcv",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat3.usbb1_mm_txen",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat1.usbb1_mm_txdat",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat2.usbb1_mm_txse0",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-};
-
-static struct omap_device_pad port1_4pin_pads[] __initdata = {
-	{
-		.name = "usbb1_ulpitll_dat0.usbb1_mm_rxrcv",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat3.usbb1_mm_txen",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat1.usbb1_mm_txdat",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat2.usbb1_mm_txse0",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-};
-
-static struct omap_device_pad port1_3pin_pads[] __initdata = {
-	{
-		.name = "usbb1_ulpitll_dat3.usbb1_mm_txen",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat1.usbb1_mm_txdat",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat2.usbb1_mm_txse0",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-};
-
-static struct omap_device_pad port1_2pin_pads[] __initdata = {
-	{
-		.name = "usbb1_ulpitll_dat1.usbb1_mm_txdat",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-	{
-		.name = "usbb1_ulpitll_dat2.usbb1_mm_txse0",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
-	},
-};
-
-static struct omap_device_pad port2_6pin_pads[] __initdata = {
-	{
-		.name = "abe_mcbsp2_dr.usbb2_mm_rxdp",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_mcbsp2_clkx.usbb2_mm_rxdm",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_mcbsp2_dx.usbb2_mm_rxrcv",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_mcbsp2_fsx.usbb2_mm_txen",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_dmic_din1.usbb2_mm_txdat",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_dmic_clk1.usbb2_mm_txse0",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-};
-
-static struct omap_device_pad port2_4pin_pads[] __initdata = {
-	{
-		.name = "abe_mcbsp2_dx.usbb2_mm_rxrcv",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_mcbsp2_fsx.usbb2_mm_txen",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_dmic_din1.usbb2_mm_txdat",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_dmic_clk1.usbb2_mm_txse0",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-};
-
-static struct omap_device_pad port2_3pin_pads[] __initdata = {
-	{
-		.name = "abe_mcbsp2_fsx.usbb2_mm_txen",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_dmic_din1.usbb2_mm_txdat",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_dmic_clk1.usbb2_mm_txse0",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-};
-
-static struct omap_device_pad port2_2pin_pads[] __initdata = {
-	{
-		.name = "abe_mcbsp2_fsx.usbb2_mm_txen",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_dmic_din1.usbb2_mm_txdat",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-	{
-		.name = "abe_dmic_clk1.usbb2_mm_txse0",
-		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
-	},
-};
 /*
  * setup_ehci_io_mux - initialize IO pad mux for USBHOST
  */
@@ -780,7 +397,6 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 {
 	struct omap_hwmod	*oh[4];
 	struct omap_device	*od;
-	struct omap_board_data	*bdata;
 	int			bus_id = -1;
 	int			i;
 
@@ -829,10 +445,32 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 		setup_ehci_io_mux(pdata->port_mode);
 		setup_ohci_io_mux(pdata->port_mode);
 	} else if (cpu_is_omap44xx()) {
-		setup_4430ehci_io_mux(pdata->port_mode, bdata);
-		oh[2]->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
-		setup_4430ohci_io_mux(pdata->port_mode, bdata);
-		oh[1]->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
+		setup_4430ehci_io_mux(pdata->port_mode);
+		setup_4430ohci_io_mux(pdata->port_mode);
+	}
+
+	oh[0] = omap_hwmod_lookup(USBHS_UHH_HWMODNAME);
+	if (!oh[0]) {
+		pr_err("Could not look up %s\n", USBHS_UHH_HWMODNAME);
+		return;
+	}
+
+	oh[1] = omap_hwmod_lookup(USBHS_OHCI_HWMODNAME);
+	if (!oh[1]) {
+		pr_err("Could not look up %s\n", USBHS_OHCI_HWMODNAME);
+		return;
+	}
+
+	oh[2] = omap_hwmod_lookup(USBHS_EHCI_HWMODNAME);
+	if (!oh[2]) {
+		pr_err("Could not look up %s\n", USBHS_EHCI_HWMODNAME);
+		return;
+	}
+
+	oh[3] = omap_hwmod_lookup(USBHS_TLL_HWMODNAME);
+	if (!oh[3]) {
+		pr_err("Could not look up %s\n", USBHS_TLL_HWMODNAME);
+		return;
 	}
 
 	od = omap_device_build_ss(OMAP_USBHS_DEVICE, bus_id, oh, 4,
@@ -843,12 +481,8 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 	if (IS_ERR(od)) {
 		pr_err("Could not build hwmod devices %s, %s\n",
 			USBHS_UHH_HWMODNAME, USBHS_TLL_HWMODNAME);
-		goto err;
+		return;
 	}
-
-err:
-	kfree(bdata);
-	return;
 }
 
 #else
