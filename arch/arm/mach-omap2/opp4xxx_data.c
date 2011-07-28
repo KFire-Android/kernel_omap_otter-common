@@ -295,6 +295,10 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	OPP_INITIALIZER(&iva_dev_info, false, 430000000, OMAP4460_VDD_IVA_OPPNITRO_UV),
 	/* IVA OPP5 - OPP-Nitro SpeedBin*/
 	OPP_INITIALIZER(&iva_dev_info, false, 500000000, OMAP4460_VDD_IVA_OPPNITROSB_UV),
+	/* FDIF OPP1 - OPP50 */
+	OPP_INITIALIZER(&fdif_dev_info, true, 64000000, OMAP4460_VDD_CORE_OPP50_UV),
+	/* FDIF OPP2 - OPP100 */
+	OPP_INITIALIZER(&fdif_dev_info, true, 128000000, OMAP4460_VDD_CORE_OPP100_UV),
 	/* ABE OPP1 - OPP50 */
 	OPP_INITIALIZER(&abe_dev_info, true, 98304000, OMAP4460_VDD_IVA_OPP50_UV),
 	/* ABE OPP2 - OPP100 */
@@ -305,6 +309,7 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	OPP_INITIALIZER(&gpu_dev_info, true, 307200000, OMAP4460_VDD_CORE_OPP100_UV),
 	/* SGX OPP3 - OPP100_OV */
 	OPP_INITIALIZER(&gpu_dev_info, true, 384000000, OMAP4460_VDD_CORE_OPP100_OV_UV),
+	/* TODO: Add HSI, DSP, DSS */
 };
 
 /**
