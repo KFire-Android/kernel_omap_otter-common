@@ -1031,6 +1031,9 @@ void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high)
 				hi_start, hi_end) * unit,
 			low * unit, high * unit);
 
+	/* preload to high threshold to avoid FIFO underflow */
+	dispc_write_reg(DISPC_OVL_PRELOAD(plane), min(high, 0xfffu));
+
 	dispc_write_reg(DISPC_OVL_FIFO_THRESHOLD(plane),
 			FLD_VAL(high, hi_start, hi_end) |
 			FLD_VAL(low, lo_start, lo_end));
