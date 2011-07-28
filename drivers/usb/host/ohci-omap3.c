@@ -31,7 +31,6 @@
 
 #include <linux/platform_device.h>
 #include <plat/usb.h>
-#include <linux/pm_runtime.h>
 
 /*-------------------------------------------------------------------------*/
 
@@ -173,7 +172,11 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 	hcd->rsrc_len = resource_size(res);
 	hcd->regs =  regs;
 
-	pm_runtime_get_sync(dev->parent);
+	ret = omap_usbhs_enable(dev);
+	if (ret) {
+		dev_dbg(dev, "failed to start ohci\n");
+		goto err_end;
+	}
 
 	ohci_hcd_init(hcd_to_ohci(hcd));
 
@@ -186,7 +189,7 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_hcd:
-	pm_runtime_get_sync(dev->parent);
+	omap_usbhs_disable(dev);
 
 err_end:
 	usb_put_hcd(hcd);
@@ -217,8 +220,9 @@ static int __devexit ohci_hcd_omap3_remove(struct platform_device *pdev)
 
 	iounmap(hcd->regs);
 	usb_remove_hcd(hcd);
-	pm_runtime_put_sync(dev->parent);
+	omap_usbhs_disable(dev);
 	usb_put_hcd(hcd);
+
 	return 0;
 }
 

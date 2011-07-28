@@ -41,7 +41,6 @@
 #include <linux/usb/ulpi.h>
 #include <plat/usb.h>
 #include <linux/regulator/consumer.h>
-#include <linux/pm_runtime.h>
 
 /* EHCI Register Set */
 #define EHCI_INSNREG04					(0xA0)
@@ -179,7 +178,11 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		}
 	}
 
-	pm_runtime_get_sync(dev->parent);
+	ret = omap_usbhs_enable(dev);
+	if (ret) {
+		dev_err(dev, "failed to start usbhs with err %d\n", ret);
+		goto err_enable;
+	}
 
 	/*
 	 * An undocumented "feature" in the OMAP3 EHCI controller,
@@ -225,7 +228,10 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_hcd:
-	pm_runtime_put_sync(dev->parent);
+	omap_usbhs_disable(dev);
+
+err_enable:
+	usb_put_hcd(hcd);
 
 err_io:
 	return ret;
@@ -246,7 +252,7 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
 	struct usb_hcd *hcd	= dev_get_drvdata(dev);
 
 	usb_remove_hcd(hcd);
-	pm_runtime_put_sync(dev->parent);
+	omap_usbhs_disable(dev);
 	usb_put_hcd(hcd);
 	return 0;
 }
