@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
+#include <linux/memblock.h>
 #include <linux/reboot.h>
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
@@ -39,6 +40,7 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/omap_apps_brd_id.h>
+#include <plat/remoteproc.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -59,6 +61,11 @@
 #define GPIO_WIFI_IRQ		53
 
 #define TPS62361_GPIO   7
+
+#define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
+#define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
+#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 101)
+#define PHYS_ADDR_DUCATI_MEM	(PHYS_ADDR_SMC_MEM - PHYS_ADDR_DUCATI_SIZE)
 
 static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	{
@@ -580,6 +587,11 @@ static void __init omap_tablet_map_io(void)
 
 static void __init omap_tablet_reserve(void)
 {
+	/* do the static reservations first */
+	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
+	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
+	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
+
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
 #else
