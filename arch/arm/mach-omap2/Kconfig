@@ -331,7 +331,7 @@ config MACH_OMAP_4430SDP
 	select TWL6030_POWEROFF
 	select INPUT_TWL6030_PWRBUTTON
 
-config MACH_OMAP_BLAZE_TABLET2
+config MACH_OMAP_BLAZE
 	bool "OMAP 44xx Tablet2 Board"
 	default y
 	depends on ARCH_OMAP4
