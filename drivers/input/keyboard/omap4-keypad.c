@@ -123,12 +123,6 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
 	/* clear pending interrupts */
 	__raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
 			keypad_data->base + OMAP4_KBD_IRQSTATUS);
-	/* REVISIT for some reason, if a key is pressed, there is a pending
-	 * keypad interrupt that is not getting cleared. We are clearing it
-	 * by writing 0x0f in OMAP4_KBD_IRQSTATUS Register
-	 */
-	__raw_writel(0x0f,
-			keypad_data->base + OMAP4_KBD_IRQSTATUS);
 	/* enable interrupts */
 	__raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
 			keypad_data->base + OMAP4_KBD_IRQENABLE);
@@ -152,8 +146,13 @@ static int omap4_keypad_open(struct input_dev *input)
 			keypad_data->base + OMAP4_KBD_IRQSTATUS);
 	__raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
 			keypad_data->base + OMAP4_KBD_IRQENABLE);
+	/*REVISIT: For some reason MPU/CORE not hitting RET with keypad
+	 * Disable keypad wakeup enable overcomes this issue
+	 */
+#if 0
 	__raw_writel(OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA,
 			keypad_data->base + OMAP4_KBD_WAKEUPENABLE);
+#endif
 	enable_irq(keypad_data->irq);
 
 	return 0;
@@ -331,10 +330,37 @@ static int __devexit omap4_keypad_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int omap4_keypad_suspend(struct platform_device *pdev)
+{
+	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+
+	__raw_writel(OMAP4_VAL_IRQDISABLE,
+			keypad_data->base + OMAP4_KBD_IRQENABLE);
+
+	__raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
+			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+
+	return 0;
+}
+
+static int omap4_keypad_resume(struct platform_device *pdev)
+{
+	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+
+	__raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
+			keypad_data->base + OMAP4_KBD_IRQENABLE);
+
+	__raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
+			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+
+	return 0;
+}
 
 static struct platform_driver omap4_keypad_driver = {
 	.probe		= omap4_keypad_probe,
 	.remove		= __devexit_p(omap4_keypad_remove),
+	.suspend	= omap4_keypad_suspend,
+	.resume		= omap4_keypad_resume,
 	.driver		= {
 		.name	= "omap4-keypad",
 		.owner	= THIS_MODULE,
