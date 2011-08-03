@@ -631,7 +631,7 @@ static void __init omap_tablet_reserve(void)
 }
 
 
-MACHINE_START(OMAP_BLAZE, "OMAP4 blaze board")
+MACHINE_START(OMAP_BLAZE, "OMAP4 Tablet board")
 	/* Maintainer: Dan Murphy - Texas Instruments Inc */
 	.boot_params	= 0x80000100,
 	.reserve	= omap_tablet_reserve,
