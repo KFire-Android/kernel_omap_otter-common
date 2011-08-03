@@ -24,6 +24,7 @@
 
 #include <asm/hardware/gic.h>
 #include <mach/omap4-common.h>
+#include <plat/omap_hsi.h>
 #include <plat/common.h>
 #include <plat/usb.h>
 
@@ -34,12 +35,12 @@
 #include "prcm44xx.h"
 #include "prm44xx.h"
 #include "prminst44xx.h"
-
 #include "clock.h"
 #include "cm2_44xx.h"
 #include "cm1_44xx.h"
 #include "cm-regbits-44xx.h"
 #include "cminst44xx.h"
+#include "prcm-debug.h"
 
 #include "smartreflex.h"
 #include "dvfs.h"
@@ -184,7 +185,9 @@ static void _print_wakeirq(int irq)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
 
-	if (!desc || !desc->action || !desc->action->name)
+	if (irq == OMAP44XX_IRQ_LOCALTIMER)
+		pr_info("Resume caused by IRQ %d, localtimer\n", irq);
+	else if (!desc || !desc->action || !desc->action->name)
 		pr_info("Resume caused by IRQ %d\n", irq);
 	else
 		pr_info("Resume caused by IRQ %d, %s\n", irq,
@@ -255,6 +258,9 @@ static void _print_gpio_wakeirq(int irq)
 	wkirqs = irqst & wken;
 
 	if (!wkirqs)
+		wkirqs = irqst;
+
+	if (!wkirqs)
 		goto punt;
 
 	for_each_set_bit(bit, &wkirqs, 32) {
@@ -278,6 +284,28 @@ out:
 		__raw_writel(clkctrl, gpio_clkctrl[bank]);
 }
 
+#define CONTROL_PADCONF_WAKEUPEVENT_0	0x4a1001d8
+
+static void _print_prcm_wakeirq(int irq)
+{
+	int i, bit;
+	int iopad_wake_found = 0;
+
+	for (i = 0; i <= 6; i++) {
+		long unsigned int wkevt =
+			omap_readw(CONTROL_PADCONF_WAKEUPEVENT_0 + i*4);
+
+		for_each_set_bit(bit, &wkevt, 32) {
+			printk("Resume caused by I/O pad: CONTROL_PADCONF_WAKEUPEVENT_%d[%d]\n",
+			       i, bit);
+			iopad_wake_found = 1;
+		}
+	}
+
+	if (!iopad_wake_found)
+		_print_wakeirq(irq);
+}
+
 static void omap4_print_wakeirq(void)
 {
 	int irq;
@@ -292,6 +320,8 @@ static void omap4_print_wakeirq(void)
 	if (irq >= OMAP44XX_IRQ_GPIO1 &&
 	    irq <= OMAP44XX_IRQ_GPIO1 + GPIO_BANKS - 1)
 		_print_gpio_wakeirq(irq);
+	else if (irq == OMAP44XX_IRQ_PRCM)
+		_print_prcm_wakeirq(irq);
 	else
 		_print_wakeirq(irq);
 }
@@ -344,6 +374,7 @@ static int omap4_pm_suspend(void)
 	 */
 	omap4_enter_sleep(0, PWRDM_POWER_OFF, true);
 	omap4_print_wakeirq();
+	prcmdebug_dump(PRCMDEBUG_LASTSLEEP);
 
 	/* Restore next powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
@@ -492,15 +523,8 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 	/* Check if a IO_ST interrupt */
 	if (irqstatus_mpu & OMAP4430_IO_ST_MASK) {
 		/* Check if HSI caused the IO wakeup */
-		#define CA_WAKE_MUX_REG		(0x4a1000C2)
-		#define CM_L3INIT_HSI_CLKCTRL	(0x4a009338)
-		#define HSI_SYSCONFIG		(0x4a058010)
-		if (omap_readw(CA_WAKE_MUX_REG) & (1<<15)) {
-			/* Enable HSI module */
-			omap_writel(omap_readl(CM_L3INIT_HSI_CLKCTRL) | 0x1, CM_L3INIT_HSI_CLKCTRL);
-			/* Put HSI in: No-standby and No-idle */
-			omap_writel( (1<<3) | (1<<12), HSI_SYSCONFIG);
-		}
+		if (omap_hsi_is_io_wakeup_from_hsi())
+			omap_hsi_wakeup(0);
 		omap_uart_resume_idle();
 		usbhs_wakeup();
 		omap4_trigger_ioctrl();
@@ -654,6 +678,10 @@ static int __init omap4_pm_init(void)
 	pm_idle = omap_default_idle;
 
 	omap4_idle_init();
+
+	omap_pm_is_ready_status = true;
+	/* let the other CPU know as well */
+	smp_wmb();
 
 err2:
 	return ret;
