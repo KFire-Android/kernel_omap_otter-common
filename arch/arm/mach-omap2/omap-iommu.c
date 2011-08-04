@@ -123,14 +123,13 @@ static int __init omap_iommu_init(void)
 		struct iommu_platform_data *data = &devices_data[i];
 
 		oh = omap_hwmod_lookup(data->oh_name);
-		data->io_base = oh->_mpu_rt_va;
-		data->irq = oh->mpu_irqs[0].irq;
-
 		if (!oh) {
 			pr_err("%s: could not look up %s\n", __func__,
 							data->oh_name);
 			continue;
 		}
+		data->io_base = oh->_mpu_rt_va;
+		data->irq = oh->mpu_irqs[0].irq;
 		od = omap_device_build("omap-iommu", i, oh,
 					data, sizeof(*data),
 					ohl, ohl_cnt, false);
