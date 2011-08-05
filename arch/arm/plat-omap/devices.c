@@ -33,7 +33,6 @@
 #include <plat/mcpdm.h>
 #include <plat/remoteproc.h>
 #include <plat/omap44xx.h>
-
 #include <sound/omap-abe-dsp.h>
 
 /*-------------------------------------------------------------------------*/
@@ -204,8 +203,6 @@ fail:
 }
 
 #endif
-
-/*-------------------------------------------------------------------------*/
 
 #if defined(CONFIG_SND_OMAP_SOC_ABE_DSP) || \
 	defined(CONFIG_SND_OMAP_SOC_ABE_DSP_MODULE)
