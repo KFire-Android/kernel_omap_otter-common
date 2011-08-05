@@ -30,10 +30,8 @@
 #include <mach/gpio.h>
 #include <plat/menelaus.h>
 #include <plat/mcbsp.h>
-#include <plat/mcpdm.h>
 #include <plat/remoteproc.h>
 #include <plat/omap44xx.h>
-#include <sound/omap-abe-dsp.h>
 
 /*-------------------------------------------------------------------------*/
 
@@ -114,48 +112,6 @@ static inline void omap_init_dmic(void) {}
 
 /*-------------------------------------------------------------------------*/
 
-#if defined(CONFIG_SND_OMAP_SOC_MCPDM) || \
-		defined(CONFIG_SND_OMAP_SOC_MCPDM_MODULE)
-
-static struct omap_device_pm_latency omap_mcpdm_latency[] = {
-	{
-		.deactivate_func = omap_device_idle_hwmods,
-		.activate_func = omap_device_enable_hwmods,
-		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-	},
-};
-
-static void omap_init_mcpdm(void)
-{
-	struct omap_hwmod *oh;
-	struct omap_device *od;
-	struct omap_mcpdm_platform_data *pdata;
-
-	oh = omap_hwmod_lookup("mcpdm");
-	if (!oh) {
-		printk(KERN_ERR "Could not look up mcpdm hw_mod\n");
-		return;
-	}
-
-	pdata = kzalloc(sizeof(struct omap_mcpdm_platform_data), GFP_KERNEL);
-	if (!pdata) {
-		printk(KERN_ERR "Could not allocate platform data\n");
-		return;
-	}
-
-	od = omap_device_build("omap-mcpdm", -1, oh, pdata,
-				sizeof(struct omap_mcpdm_platform_data),
-				omap_mcpdm_latency,
-				ARRAY_SIZE(omap_mcpdm_latency), 0);
-	if (IS_ERR(od))
-		printk(KERN_ERR "Could not build omap_device for omap-mcpdm-dai\n");
-}
-#else
-static inline void omap_init_mcpdm(void) {}
-#endif
-
-/*-------------------------------------------------------------------------*/
-
 #if defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE) || \
 	defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
 
@@ -203,53 +159,6 @@ fail:
 }
 
 #endif
-
-#if defined(CONFIG_SND_OMAP_SOC_ABE_DSP) || \
-	defined(CONFIG_SND_OMAP_SOC_ABE_DSP_MODULE)
-
-static struct omap_device_pm_latency omap_aess_latency[] = {
-	{
-		.deactivate_func = omap_device_idle_hwmods,
-		.activate_func = omap_device_enable_hwmods,
-		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-	},
-};
-
-static void omap_init_aess(void)
-{
-	struct omap_hwmod *oh;
-	struct omap_device *od;
-	struct omap4_abe_dsp_pdata *pdata;
-
-	oh = omap_hwmod_lookup("aess");
-	if (!oh) {
-		printk (KERN_ERR "Could not look up aess hw_mod\n");
-		return;
-	}
-
-	pdata = kzalloc(sizeof(struct omap4_abe_dsp_pdata), GFP_KERNEL);
-	if (!pdata) {
-		printk(KERN_ERR "Could not allocate platform data\n");
-		return;
-	}
-
-	/* FIXME: Add correct context loss counter */
-	//pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
-
-	od = omap_device_build("aess", -1, oh, pdata,
-				sizeof(struct omap4_abe_dsp_pdata),
-				omap_aess_latency,
-				ARRAY_SIZE(omap_aess_latency), 0);
-
-	kfree(pdata);
-
-	if (IS_ERR(od))
-		printk(KERN_ERR "Could not build omap_device for omap-aess-audio\n");
-}
-#else
-static inline void omap_init_aess(void) {}
-#endif
-
 
 /*-------------------------------------------------------------------------*/
 
@@ -453,8 +362,6 @@ static int __init omap_init_devices(void)
 	 */
 	omap_init_rng();
 	omap_init_dmic();
-	omap_init_mcpdm();
-	omap_init_aess();
 	omap_init_uwire();
 	return 0;
 }
