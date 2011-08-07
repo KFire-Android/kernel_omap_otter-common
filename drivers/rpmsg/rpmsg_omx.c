@@ -35,6 +35,7 @@
 #include <linux/rpmsg.h>
 #include <linux/rpmsg_omx.h>
 #include <linux/completion.h>
+#include <linux/remoteproc.h>
 
 #ifdef CONFIG_ION_OMAP
 #include <linux/ion.h>
@@ -104,32 +105,69 @@ static LIST_HEAD(rpmsg_omx_services_list);
 #endif
 #endif
 
-static u32 _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx, long buffer)
+static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
 {
+	int ret;
+	struct rproc *rproc;
+	u64 temp_da;
+
+	if (mutex_lock_interruptible(&omx->omxserv->lock))
+		return -EINTR;
+
+	rproc = vdev_to_rproc(omx->omxserv->rpdev->vrp->vdev);
+
+	ret = rproc_pa_to_da(rproc, (phys_addr_t) pa, &temp_da);
+	if (ret)
+		pr_err("error with pa to da from rproc %d\n", ret);
+	else
+		/* we know it is a 32 bit address */
+		*da = (u32)temp_da;
+
+	mutex_unlock(&omx->omxserv->lock);
+
+	return ret;
+}
+
+static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
+					long buffer, u32 *va)
+{
+	phys_addr_t pa;
+	int ret;
 #ifdef CONFIG_ION_OMAP
 	struct ion_handle *handle;
 	ion_phys_addr_t paddr;
 	size_t unused;
-	int fd;
 
 	/* is it an ion handle? */
 	handle = (struct ion_handle *)buffer;
-	if (!ion_phys(omx->ion_client, handle, &paddr, &unused))
-		return (u32)paddr;
+	if (!ion_phys(omx->ion_client, handle, &paddr, &unused)) {
+		pa = (phys_addr_t) paddr;
+		goto to_va;
+	}
 
 #ifdef CONFIG_PVR_SGX
 	/* how about an sgx buffer wrapping an ion handle? */
 	{
+		int fd;
 		struct ion_client *pvr_ion_client;
+
 		fd = buffer;
 		handle = PVRSRVExportFDToIONHandle(fd, &pvr_ion_client);
-		if (handle && !ion_phys(pvr_ion_client, handle, &paddr,
-								&unused))
-			return (u32)paddr;
+		if (handle &&
+			!ion_phys(pvr_ion_client, handle, &paddr, &unused)) {
+			pa = (phys_addr_t)paddr;
+			goto to_va;
+
+		}
 	}
 #endif
 #endif
-	return NULL;
+
+#ifdef CONFIG_ION_OMAP
+to_va:
+#endif
+	ret = _rpmsg_pa_to_da(omx, pa, va);
+	return ret;
 }
 
 static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
@@ -138,7 +176,7 @@ static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
 	long *buffer;
 	char *data;
 	enum rpc_omx_map_info_type maptype;
-	u32 pa = 0;
+	u32 da = 0;
 
 	data = (char *)((struct omx_packet *)packet)->data;
 	maptype = *((enum rpc_omx_map_info_type *)data);
@@ -154,34 +192,25 @@ static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
 	offset = *(int *)((int)data + sizeof(maptype));
 	buffer = (long *)((int)data + offset);
 
-	pa = _rpmsg_omx_buffer_lookup(omx, *buffer);
-	if (pa) {
-		*buffer = pa;
-		ret = 0;
-	}
+	ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+	if (!ret)
+		*buffer = da;
 
 	if (!ret && (maptype >= RPC_OMX_MAP_INFO_TWO_BUF)) {
 		buffer = (long *)((int)data + offset + sizeof(*buffer));
 		if (*buffer != 0) {
-			ret = -EIO;
-			pa = _rpmsg_omx_buffer_lookup(omx, *buffer);
-			if (pa) {
-				*buffer = pa;
-				ret = 0;
-			}
+			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+			if (!ret)
+				*buffer = da;
 		}
 	}
 
 	if (!ret && maptype >= RPC_OMX_MAP_INFO_THREE_BUF) {
 		buffer = (long *)((int)data + offset + 2*sizeof(*buffer));
 		if (*buffer != 0) {
-			ret = -1;
-			ret = -EIO;
-			pa = _rpmsg_omx_buffer_lookup(omx, *buffer);
-			if (pa) {
-				*buffer = pa;
-				ret = 0;
-			}
+			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+			if (!ret)
+				*buffer = da;
 		}
 	}
 	return ret;
@@ -710,7 +739,7 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 
 	mutex_lock(&omxserv->lock);
 	/*
-	 * If there is omx instrances that means it is a revovery.
+	 * If there are omx instances that means it is a recovery.
 	 * TODO: make sure it is a recovery.
 	 */
 	if (list_empty(&omxserv->list)) {
