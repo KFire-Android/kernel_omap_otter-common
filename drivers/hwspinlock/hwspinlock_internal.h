@@ -55,6 +55,7 @@ struct hwspinlock {
 	const struct hwspinlock_ops *ops;
 	int id;
 	spinlock_t lock;
+	struct mutex slock;
 	struct module *owner;
 };
 

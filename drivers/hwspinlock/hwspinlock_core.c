@@ -110,7 +110,7 @@ int __hwspin_trylock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
 	else if (mode == HWLOCK_IRQ)
 		ret = spin_trylock_irq(&hwlock->lock);
 	else
-		ret = spin_trylock(&hwlock->lock);
+		ret = mutex_trylock(&hwlock->slock);
 
 	/* is lock already taken by another context on the local cpu ? */
 	if (!ret)
@@ -126,7 +126,7 @@ int __hwspin_trylock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
 		else if (mode == HWLOCK_IRQ)
 			spin_unlock_irq(&hwlock->lock);
 		else
-			spin_unlock(&hwlock->lock);
+			mutex_unlock(&hwlock->slock);
 
 		return -EBUSY;
 	}
@@ -253,7 +253,7 @@ void __hwspin_unlock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
 	else if (mode == HWLOCK_IRQ)
 		spin_unlock_irq(&hwlock->lock);
 	else
-		spin_unlock(&hwlock->lock);
+		mutex_unlock(&hwlock->slock);
 }
 EXPORT_SYMBOL_GPL(__hwspin_unlock);
 
@@ -280,6 +280,7 @@ int hwspin_lock_register(struct hwspinlock *hwlock)
 	}
 
 	spin_lock_init(&hwlock->lock);
+	mutex_init(&hwlock->slock);
 
 	mutex_lock(&hwspinlock_tree_lock);
 
