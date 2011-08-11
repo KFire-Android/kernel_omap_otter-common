@@ -25,6 +25,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/kernel.h>
+#include <linux/input/mt.h>
 #include <linux/platform_device.h>
 #include <linux/qtouch_obp_ts.h>
 #include <linux/slab.h>
@@ -656,17 +657,19 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	for (i = 0; i < ts->pdata->multi_touch_cfg.num_touch; i++) {
 		if (ts->finger_data[i].down == 0)
 			continue;
+
+		input_mt_slot(ts->input_dev, i);
+		input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER,
+				down);
 		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
 				 ts->finger_data[i].z_data);
-		input_report_abs(ts->input_dev, ABS_MT_WIDTH_MAJOR,
-				 ts->finger_data[i].w_data);
 		input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
 				 ts->finger_data[i].x_data);
 		input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
 				 ts->finger_data[i].y_data);
-		input_report_abs(ts->input_dev, ABS_MT_TRACKING_ID, i);
-		input_mt_sync(ts->input_dev);
 	}
+
+	input_report_key(ts->input_dev, BTN_TOUCH, down);
 	input_sync(ts->input_dev);
 
 	if (!down) {
@@ -994,6 +997,8 @@ static int qtouch_ts_probe(struct i2c_client *client,
 	if (obj && obj->entry.num_inst > 0) {
 		set_bit(EV_ABS, ts->input_dev->evbit);
 		/* multi touch */
+		input_mt_init_slots(ts->input_dev,
+			pdata->multi_touch_cfg.num_touch);
 		input_set_abs_params(ts->input_dev, ABS_MT_POSITION_X,
 			pdata->abs_min_x, pdata->abs_max_x,
 			pdata->fuzz_x, 0);
@@ -1008,6 +1013,8 @@ static int qtouch_ts_probe(struct i2c_client *client,
 			pdata->fuzz_w, 0);
 		input_set_abs_params(ts->input_dev, ABS_MT_TRACKING_ID, 0,
 			pdata->multi_touch_cfg.num_touch - 1, 0, 0);
+
+
 
 		/* Legacy support for testing only */
 		input_set_capability(ts->input_dev, EV_KEY, BTN_TOUCH);
@@ -1030,8 +1037,6 @@ static int qtouch_ts_probe(struct i2c_client *client,
 		input_set_abs_params(ts->input_dev, ABS_TOOL_WIDTH,
 			pdata->abs_min_w, pdata->abs_max_w,
 			pdata->fuzz_w, 0);
-		input_set_abs_params(ts->input_dev, ABS_MT_TRACKING_ID,
-			0, pdata->multi_touch_cfg.num_touch - 1, 0, 0);
 	}
 
 	memset(&ts->finger_data[0], 0,
