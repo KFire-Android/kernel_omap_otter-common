@@ -30,46 +30,17 @@
 #include <mach/hardware.h>
 #include <mach/irqs.h>
 #include <plat/usb.h>
+#include <plat/omap_device.h>
 
 #include "mux.h"
 
 #ifdef CONFIG_MFD_OMAP_USB_HOST
 
-#define OMAP_USBHS_DEVICE	"usbhs-omap"
-
-static struct resource usbhs_resources[] = {
-	{
-		.name	= "uhh",
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.name	= "tll",
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.name	= "ehci",
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.name	= "ehci-irq",
-		.flags	= IORESOURCE_IRQ,
-	},
-	{
-		.name	= "ohci",
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.name	= "ohci-irq",
-		.flags	= IORESOURCE_IRQ,
-	}
-};
-
-static struct platform_device usbhs_device = {
-	.name		= OMAP_USBHS_DEVICE,
-	.id		= 0,
-	.num_resources	= ARRAY_SIZE(usbhs_resources),
-	.resource	= usbhs_resources,
-};
+#define OMAP_USBHS_DEVICE	"usbhs_omap"
+#define USBHS_UHH_HWMODNAME	"usbhs_uhh"
+#define USBHS_OHCI_HWMODNAME	"usbhs_ohci"
+#define USBHS_EHCI_HWMODNAME	"usbhs_ehci"
+#define USBHS_TLL_HWMODNAME	"usbhs_tll"
 
 static struct usbhs_omap_platform_data		usbhs_data;
 static struct ehci_hcd_omap_platform_data	ehci_data;
@@ -868,7 +839,7 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 	struct omap_hwmod	*oh[4];
 	struct omap_device	*od;
 	int			bus_id = -1;
-	int	i;
+	int			i;
 
 	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
 		usbhs_data.port_mode[i] = pdata->port_mode[i];
@@ -900,8 +871,11 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 		return;
 	}
 
-	if (platform_device_register(&usbhs_device) < 0)
-		printk(KERN_ERR "USBHS platform_device_register failed\n");
+	oh[3] = omap_hwmod_lookup(USBHS_TLL_HWMODNAME);
+	if (!oh[3]) {
+		pr_err("Could not look up %s\n", USBHS_TLL_HWMODNAME);
+		return;
+	}
 
 	if (cpu_is_omap34xx()) {
 		setup_ehci_io_mux(pdata->port_mode);
