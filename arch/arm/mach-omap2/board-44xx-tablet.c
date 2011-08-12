@@ -25,6 +25,8 @@
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/wl12xx.h>
+#include <linux/skbuff.h>
+#include <linux/ti_wilink_st.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -50,9 +52,9 @@
 #include "pm.h"
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
-
 #include "board-44xx-tablet.h"
 
+#define WILINK_UART_DEV_NAME	"/dev/ttyO1"
 #define ETH_KS8851_IRQ			34
 #define ETH_KS8851_POWER_ON		48
 #define ETH_KS8851_QUART		138
@@ -97,6 +99,42 @@ static int __init omap_ethernet_init(void)
 
 	return status;
 }
+
+/* TODO: handle suspend/resume here.
+ * Upon every suspend, make sure the wilink chip is
+ * capable enough to wake-up the OMAP host.
+ */
+static int plat_wlink_kim_suspend(struct platform_device *pdev, pm_message_t
+		state)
+{
+	return 0;
+}
+
+static int plat_wlink_kim_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+
+/* wl128x BT, FM, GPS connectivity chip */
+static struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = 55,
+	.dev_name = WILINK_UART_DEV_NAME,
+	.flow_cntrl = 1,
+	.baud_rate = 3686400,
+	.suspend = plat_wlink_kim_suspend,
+	.resume = plat_wlink_kim_resume,
+};
+
+static struct platform_device wl128x_device = {
+	.name		= "kim",
+	.id		= -1,
+	.dev.platform_data = &wilink_pdata,
+};
+
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+};
 
 static struct omap_board_config_kernel tablet_config[] __initdata = {
 };
@@ -561,6 +599,12 @@ static struct notifier_block tablet_reboot_notifier = {
 	.notifier_call = tablet_notifier_call,
 };
 
+
+static struct platform_device *tablet4430_devices[] __initdata = {
+	&wl128x_device,
+	&btwilink_device,
+};
+
 static void __init omap_tablet_init(void)
 {
 	int status;
@@ -589,6 +633,8 @@ static void __init omap_tablet_init(void)
 	omap4_tablet_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
 	tablet_sensor_init();
+	platform_add_devices(tablet4430_devices,
+			ARRAY_SIZE(tablet4430_devices));
 
 	usb_musb_init(&musb_board_data);
 
