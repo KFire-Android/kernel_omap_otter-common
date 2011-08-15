@@ -32,6 +32,7 @@ u32 fm_tx_set_radio_text(struct fmdev *, u8 *, u8);
 u32 fm_tx_set_af(struct fmdev *, u32);
 u32 fm_tx_set_preemph_filter(struct fmdev *, u32);
 u32 fm_tx_get_tune_cap_val(struct fmdev *);
-
+u32 set_rds_picode(struct fmdev *, u16);
+u32 set_rds_pty(struct fmdev *, u16);
 #endif
 

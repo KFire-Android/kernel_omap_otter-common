@@ -155,7 +155,7 @@ static u32 fm_rx_set_channel_spacing(struct fmdev *fmdev, u32 spacing)
 
 	/* set channel spacing */
 	payload = spacing;
-	ret = fmc_send_cmd(fmdev, CHANL_BW_SET, REG_WR, &payload,
+	ret = fmc_send_cmd(fmdev, SCAN_SPACING_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
 	if (ret < 0)
 		return ret;
