@@ -1102,7 +1102,7 @@ static void __init omap_4430sdp_init(void)
 	omap_board_config = sdp4430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
 
-	omap_init_board_version();
+	omap_init_board_version(0);
 
 	omap4_audio_conf();
 	omap4_create_board_props();

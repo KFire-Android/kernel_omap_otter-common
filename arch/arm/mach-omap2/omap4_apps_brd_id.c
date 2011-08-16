@@ -40,20 +40,24 @@ int omap_get_board_version(void)
 	return board_revision;
 }
 
-__init int omap_init_board_version(void)
+__init int omap_init_board_version(int forced_rev)
 {
-	switch (system_rev) {
-	case OMAP4_TABLET_1_0:
-		board_revision = OMAP4_TABLET_1_0;
-		break;
-	case OMAP4_TABLET_2_0:
-		board_revision = OMAP4_TABLET_2_0;
-		break;
-	case OMAP4_BLAZE_ID:
-		board_revision = OMAP4_BLAZE_ID;
-		break;
-	default:
-		board_revision = -1;
+	if (forced_rev != 0)
+		board_revision = forced_rev;
+	else {
+		switch (system_rev) {
+		case OMAP4_TABLET_1_0:
+			board_revision = OMAP4_TABLET_1_0;
+			break;
+		case OMAP4_TABLET_2_0:
+			board_revision = OMAP4_TABLET_2_0;
+			break;
+		case OMAP4_BLAZE_ID:
+			board_revision = OMAP4_BLAZE_ID;
+			break;
+		default:
+			board_revision = -1;
+		}
 	}
 
 	return board_revision;

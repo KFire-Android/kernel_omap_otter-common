@@ -23,10 +23,11 @@
  *
  */
 
+#define OMAP4_PANDA_ID		0xFF
 #define OMAP4_BLAZE_ID		0x10
 #define OMAP4_TABLET_1_0	2143
 #define OMAP4_TABLET_2_0	2158
 
 int omap_get_board_version(void);
-int omap_init_board_version(void);
+int omap_init_board_version(int forced_rev);
 bool omap_is_board_version(int req_board_version);

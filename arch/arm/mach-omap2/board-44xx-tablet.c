@@ -576,7 +576,7 @@ static void __init omap_tablet_init(void)
 	omap_board_config = tablet_config;
 	omap_board_config_size = ARRAY_SIZE(tablet_config);
 
-	tablet_rev = omap_init_board_version();
+	tablet_rev = omap_init_board_version(0);
 	register_reboot_notifier(&tablet_reboot_notifier);
 	omap4_create_board_props();
 	omap4_audio_conf();

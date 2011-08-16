@@ -59,6 +59,7 @@ static const char *app_board_rev_types[] = {
 	[OMAP4_TABLET_1_0]		= "Tablet",
 	[OMAP4_TABLET_2_0]		= "Tablet2",
 	[OMAP4_BLAZE_ID]		= "Blaze/SDP",
+	[OMAP4_PANDA_ID]		= "Panda",
 };
 
 static ssize_t omap4_board_rev_show(struct kobject *kobj,
@@ -67,7 +68,6 @@ static ssize_t omap4_board_rev_show(struct kobject *kobj,
 	int apps_brd_rev = 0;
 
 	apps_brd_rev = omap_get_board_version();
-	pr_info("Read %i and that would be %s\n", apps_brd_rev, app_board_rev_types[apps_brd_rev]);
 	if (apps_brd_rev < 0)
 		return -EINVAL;
 
