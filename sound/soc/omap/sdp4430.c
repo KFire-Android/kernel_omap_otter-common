@@ -23,6 +23,7 @@
 #include <linux/clk.h>
 #include <linux/platform_device.h>
 #include <linux/i2c.h>
+#include <linux/i2c/twl.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -42,6 +43,8 @@
 #include "omap-mcbsp.h"
 #include "omap-dmic.h"
 #include "../codecs/twl6040.h"
+
+#define TPS6130X_I2C_ADAPTER   1
 
 static int twl6040_power_mode;
 static int mcbsp_cfg;
@@ -908,6 +911,8 @@ static struct i2c_adapter *adapter;
 
 static int __init sdp4430_soc_init(void)
 {
+	struct i2c_adapter *adapter;
+	u8 gpoctl;
 	int ret;
 
 	if (!machine_is_omap_4430sdp() && !machine_is_omap4_panda() &&
@@ -931,40 +936,57 @@ static int __init sdp4430_soc_init(void)
 
 	ret = snd_soc_register_dais(&sdp4430_snd_device->dev, dai, ARRAY_SIZE(dai));
 	if (ret < 0)
-		goto err_dai;
+		goto err;
 	platform_set_drvdata(sdp4430_snd_device, &snd_soc_sdp4430);
 
 	ret = platform_device_add(sdp4430_snd_device);
 	if (ret)
 		goto err_dev;
 
-	adapter = i2c_get_adapter(1);
+	/* enable tps6130x */
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &gpoctl,
+		TWL6040_REG_GPOCTL);
+	if (ret) {
+		printk(KERN_ERR "i2c read error\n");
+		goto err_dev;
+	}
+
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl | TWL6040_GPO2,
+		TWL6040_REG_GPOCTL);
+	if (ret) {
+		printk(KERN_ERR "i2c write error\n");
+		goto err_dev;
+	}
+
+	adapter = i2c_get_adapter(TPS6130X_I2C_ADAPTER);
 	if (!adapter) {
 		printk(KERN_ERR "can't get i2c adapter\n");
 		ret = -ENODEV;
-		goto err_adap;
+		goto adp_err;
 	}
 
 	tps6130x_client = i2c_new_device(adapter, &tps6130x_hwmon_info);
 	if (!tps6130x_client) {
 		printk(KERN_ERR "can't add i2c device\n");
 		ret = -ENODEV;
-		goto err_i2c;
+		goto tps_err;
 	}
+
 
 	/* Only configure the TPS6130x on SDP4430 */
 	if (machine_is_omap_4430sdp() || machine_is_omap_tabletblaze())
 		sdp4430_tps6130x_configure();
-
-	return 0;
-
-err_i2c:
 	i2c_put_adapter(adapter);
-err_adap:
-	platform_device_del(sdp4430_snd_device);
+
+	return ret;
+
+tps_err:
+       i2c_put_adapter(adapter);
+adp_err:
+       twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl, TWL6040_REG_GPOCTL);
 err_dev:
 	snd_soc_unregister_dais(&sdp4430_snd_device->dev, ARRAY_SIZE(dai));
-err_dai:
+err:
 	platform_device_put(sdp4430_snd_device);
 	return ret;
 }
