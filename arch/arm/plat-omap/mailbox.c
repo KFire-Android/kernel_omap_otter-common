@@ -334,7 +334,8 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
 			pr_err("failed to register mailbox interrupt:%d\n",
 									ret);
 			goto fail_request_irq;
-		}
+		} else
+			mbox->ops->enable_irq(mbox, IRQ_RX);
 	}
 	mutex_unlock(&mbox_configured_lock);
 	return 0;
