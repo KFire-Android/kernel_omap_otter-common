@@ -56,7 +56,8 @@ static inline void omap_temp_sensor_resume_idle(void) { }
 static inline void omap_temp_sensor_prepare_idle(void) { }
 #endif
 
-#ifdef CONFIG_OMAP_DIE_TEMP_SENSOR
+#if defined (CONFIG_OMAP_DIE_TEMP_SENSOR) || \
+	defined(CONFIG_OMAP4_DIE_TEMP_SENSOR)
 void omap_temp_sensor_idle(int idle_state);
 #else
 static inline void omap_temp_sensor_idle(int idle_state) { }
