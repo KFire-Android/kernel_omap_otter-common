@@ -27,6 +27,7 @@
 #include <linux/io.h>
 #include <linux/opp.h>
 #include <linux/cpu.h>
+#include <linux/thermal_framework.h>
 
 #include <asm/system.h>
 #include <asm/smp_plat.h>
@@ -63,6 +64,7 @@ static unsigned int max_thermal;
 static unsigned int min_freq;
 static unsigned int max_freq;
 static unsigned int current_target_freq;
+static unsigned int current_cooling_level;
 
 static unsigned int omap_getspeed(unsigned int cpu)
 {
@@ -301,6 +303,91 @@ static inline void freq_table_free(void)
 		opp_free_cpufreq_table(mpu_dev, &freq_table);
 }
 
+#ifdef CONFIG_THERMAL_FRAMEWORK
+void omap_thermal_step_freq_down(void)
+{
+	unsigned int cur;
+
+	mutex_lock(&omap_cpufreq_lock);
+
+	max_thermal = omap_thermal_lower_speed();
+
+	pr_warn("%s: temperature too high, starting cpu throttling at max %u\n",
+		__func__, max_thermal);
+
+	cur = omap_getspeed(0);
+	if (cur > max_thermal)
+		omap_cpufreq_scale(max_thermal, cur);
+
+	mutex_unlock(&omap_cpufreq_lock);
+}
+
+void omap_thermal_step_freq_up(void)
+{
+	unsigned int cur;
+
+	mutex_lock(&omap_cpufreq_lock);
+
+	max_thermal = max_freq;
+
+	pr_warn("%s: temperature reduced, stepping up to %i\n",
+		__func__, current_target_freq);
+
+	cur = omap_getspeed(0);
+	omap_cpufreq_scale(current_target_freq, cur);
+
+	mutex_unlock(&omap_cpufreq_lock);
+}
+
+/*
+ * cpufreq_apply_cooling: based on requested cooling level, throttle the cpu
+ * @param cooling_level: percentage of required cooling at the moment
+ *
+ * The maximum cpu frequency will be readjusted based on the required
+ * cooling_level.
+*/
+static int cpufreq_apply_cooling(struct thermal_dev *dev,
+				int cooling_level)
+{
+	if (cooling_level < current_cooling_level) {
+		pr_err("%s: Unthrottle cool level %i curr cool %i\n",
+			__func__, cooling_level, current_cooling_level);
+		omap_thermal_step_freq_up();
+	} else if (cooling_level > current_cooling_level) {
+		pr_err("%s: Throttle cool level %i curr cool %i\n",
+			__func__, cooling_level, current_cooling_level);
+		omap_thermal_step_freq_down();
+	}
+
+	current_cooling_level = cooling_level;
+
+	return 0;
+}
+
+static struct thermal_dev_ops cpufreq_cooling_ops = {
+	.cool_device = cpufreq_apply_cooling,
+};
+
+static struct thermal_dev thermal_dev = {
+	.name		= "cpufreq_cooling",
+	.domain_name	= "cpu",
+	.dev_ops	= &cpufreq_cooling_ops,
+};
+
+static int __init omap_cpufreq_cooling_init(void)
+{
+	return thermal_cooling_dev_register(&thermal_dev);
+}
+
+static void __exit omap_cpufreq_cooling_exit(void)
+{
+	thermal_governor_dev_unregister(&thermal_dev);
+}
+#else
+static int __init omap_cpufreq_cooling_init(void) { return 0; }
+static void __exit omap_cpufreq_cooling_exit(void) { }
+#endif
+
 static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 {
 	int result = 0;
@@ -342,6 +429,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
 		min_freq = min(freq_table[i].frequency, min_freq);
 	max_thermal = max_freq;
+	current_cooling_level = 125000;
 
 	/*
 	 * On OMAP SMP configuartion, both processors share the voltage
@@ -355,6 +443,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 		cpumask_setall(policy->cpus);
 	}
 
+	omap_cpufreq_cooling_init();
 	/* FIXME: what's the actual transition time? */
 	policy->cpuinfo.transition_latency = 300 * 1000;
 
@@ -417,6 +506,7 @@ static int __init omap_cpufreq_init(void)
 
 static void __exit omap_cpufreq_exit(void)
 {
+	omap_cpufreq_cooling_exit();
 	cpufreq_unregister_driver(&omap_driver);
 }
 
