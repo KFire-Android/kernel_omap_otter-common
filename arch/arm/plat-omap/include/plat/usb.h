@@ -304,5 +304,6 @@ extern void usbhs_wakeup(void);
 extern void omap4_trigger_ioctrl(void);
 
 #define USBHS_EHCI_HWMODNAME	"usbhs_ehci"
+#define USBHS_OHCI_HWMODNAME    "usbhs_ohci"
 
 #endif	/* __ASM_ARCH_OMAP_USB_H */
