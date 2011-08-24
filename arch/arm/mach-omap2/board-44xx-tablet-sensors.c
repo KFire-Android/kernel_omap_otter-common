@@ -130,6 +130,9 @@ static struct i2c_board_info __initdata blaze_tablet_i2c_bus4_sensor_info[] = {
 		I2C_BOARD_INFO("bmp085", 0x77),
 	},
 	{
+		I2C_BOARD_INFO("hmc5843", 0x1e),
+	},
+	{
 		I2C_BOARD_INFO("bma180_accel", 0x40),
 		.platform_data = &bma180accel_platform_data,
 	},
