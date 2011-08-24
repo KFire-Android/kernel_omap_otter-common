@@ -127,6 +127,9 @@ static struct mpu3050gyro_platform_data mpu3050_platform_data = {
 
 static struct i2c_board_info __initdata blaze_tablet_i2c_bus4_sensor_info[] = {
 	{
+		I2C_BOARD_INFO("bmp085", 0x77),
+	},
+	{
 		I2C_BOARD_INFO("bma180_accel", 0x40),
 		.platform_data = &bma180accel_platform_data,
 	},
