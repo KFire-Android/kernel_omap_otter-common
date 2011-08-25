@@ -161,4 +161,7 @@ struct uart_omap_port {
 	bool (*chk_wakeup)(struct platform_device *);
 	void (*wake_peer)(struct uart_port *);
 };
+
+int omap_serial_ext_uart_enable(u8 port_id);
+int omap_serial_ext_uart_disable(u8 port_id);
 #endif /* __OMAP_SERIAL_H__ */

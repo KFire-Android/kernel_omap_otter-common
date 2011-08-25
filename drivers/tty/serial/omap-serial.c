@@ -1692,6 +1692,37 @@ static void __exit serial_omap_exit(void)
 	uart_unregister_driver(&serial_omap_reg);
 }
 
+/* Used by ext client device connected to uart to control uart */
+int omap_serial_ext_uart_enable(u8 port_id)
+{
+	struct uart_omap_port *up;
+	int err = 0;
+
+	if (port_id > OMAP_MAX_HSUART_PORTS) {
+		pr_err("Invalid Port_id %d passed to %s\n", port_id, __func__);
+		err = -ENODEV;
+	} else {
+		up = ui[port_id];
+		serial_omap_port_enable(up);
+	}
+	return err;
+}
+
+int omap_serial_ext_uart_disable(u8 port_id)
+{
+	struct uart_omap_port *up;
+	int err = 0;
+
+	if (port_id > OMAP_MAX_HSUART_PORTS) {
+		pr_err("Invalid Port_id %d passed to %s\n", port_id, __func__);
+		err = -ENODEV;
+	} else {
+		up = ui[port_id];
+		serial_omap_port_disable(up);
+	}
+	return err;
+}
+
 module_init(serial_omap_init);
 module_exit(serial_omap_exit);
 
