@@ -124,6 +124,7 @@ struct uart_omap_port {
 	unsigned char		wer;
 
 	int			use_dma;
+	bool			suspended;
 	/*
 	 * Some bits in registers are cleared on a read, so they must
 	 * be saved whenever the register is read but the bits will not
@@ -144,4 +145,6 @@ struct uart_omap_port {
 	struct work_struct	qos_work;
 };
 
+int omap_serial_ext_uart_enable(u8 port_id);
+int omap_serial_ext_uart_disable(u8 port_id);
 #endif /* __OMAP_SERIAL_H__ */
