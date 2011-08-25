@@ -9,6 +9,40 @@
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
 
+/**
+ * omap_vp_get_curr_volt() - API to get the current vp voltage.
+ * @voltdm:	pointer to the VDD.
+ *
+ * This API returns the current voltage for the specified voltage processor
+ */
+unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
+{
+	struct omap_vp_instance *vp = voltdm->vp;
+	u8 curr_vsel;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return 0;
+	}
+
+	if (!voltdm->read) {
+		pr_err("%s: No read API for reading vdd_%s regs\n",
+		       __func__, voltdm->name);
+		return 0;
+	}
+
+	curr_vsel = (voltdm->read(vp->voltage) & vp->common->vpvoltage_mask)
+		>> __ffs(vp->common->vpvoltage_mask);
+
+	if (!voltdm->pmic || !voltdm->pmic->vsel_to_uv) {
+		pr_warning("%s: PMIC function vsel_to_uv not registered\n",
+			   __func__);
+		return 0;
+	}
+
+	return voltdm->pmic->vsel_to_uv(curr_vsel);
+}
+
 static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
 {
 	struct omap_vp_instance *vp = voltdm->vp;
