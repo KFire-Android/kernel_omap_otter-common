@@ -5102,7 +5102,8 @@ void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 	/* TO DO: This is a HACK for tablet vs tablet 2
 	 * need to identify how to correctly calculate the lines
 	 * and program them based on the timing data */
-	if (omap_is_board_version(OMAP4_TABLET_1_0))
+	if (omap_is_board_version(OMAP4_TABLET_1_0) ||
+	    omap_is_board_version(OMAP4_TABLET_1_1))
 		dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x03F00300); /* TL(31:16)=1008, VACT(15:0)=768 */
 	else
 		dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x04B00320); /* TL(31:16)=1200, VACT(15:0)=800 */

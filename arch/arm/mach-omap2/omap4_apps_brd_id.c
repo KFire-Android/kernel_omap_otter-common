@@ -26,6 +26,7 @@
 #include <plat/omap_apps_brd_id.h>
 
 static int board_revision;
+static int board_id;
 
 bool omap_is_board_version(int req_board_version)
 {
@@ -40,6 +41,12 @@ int omap_get_board_version(void)
 	return board_revision;
 }
 
+int omap_get_board_id(void)
+{
+	return board_id;
+}
+
+
 __init int omap_init_board_version(int forced_rev)
 {
 	if (forced_rev != 0)
@@ -48,12 +55,26 @@ __init int omap_init_board_version(int forced_rev)
 		switch (system_rev) {
 		case OMAP4_TABLET_1_0:
 			board_revision = OMAP4_TABLET_1_0;
+			board_id = OMAP4_TABLET_1_0_ID;
+			break;
+		case OMAP4_TABLET_1_1:
+			board_revision = OMAP4_TABLET_1_1;
+			board_id = OMAP4_TABLET_1_1_ID;
 			break;
 		case OMAP4_TABLET_2_0:
 			board_revision = OMAP4_TABLET_2_0;
+			board_id = OMAP4_TABLET_2_0_ID;
 			break;
-		case OMAP4_BLAZE_ID:
-			board_revision = OMAP4_BLAZE_ID;
+		case OMAP4_TABLET_2_1:
+			board_revision = OMAP4_TABLET_2_1;
+			board_id = OMAP4_TABLET_2_1_ID;
+			break;
+		case OMAP4_TABLET_2_1_1:
+			board_revision = OMAP4_TABLET_2_1_1;
+			board_id = OMAP4_TABLET_2_1_1_ID;
+			break;
+		case OMAP4_BLAZE:
+			board_revision = OMAP4_BLAZE;
 			break;
 		default:
 			board_revision = -1;

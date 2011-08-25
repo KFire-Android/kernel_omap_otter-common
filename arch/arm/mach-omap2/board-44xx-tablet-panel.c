@@ -262,7 +262,8 @@ static struct omapfb_platform_data tablet_fb_pdata = {
 
 int __init tablet_panel_init(void)
 {
-	if (omap_is_board_version(OMAP4_TABLET_1_0)) {
+	if (omap_is_board_version(OMAP4_TABLET_1_0) ||
+	    omap_is_board_version(OMAP4_TABLET_1_1)) {
 		tablet_dsi_panel.x_res	= 1024;
 		tablet_dsi_panel.y_res	= 768;
 	}
