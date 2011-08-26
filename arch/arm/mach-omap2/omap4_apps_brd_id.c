@@ -75,6 +75,7 @@ __init int omap_init_board_version(int forced_rev)
 			break;
 		case OMAP4_BLAZE:
 			board_revision = OMAP4_BLAZE;
+			board_id = OMAP4_BLAZE_ID;
 			break;
 		default:
 			board_revision = -1;
