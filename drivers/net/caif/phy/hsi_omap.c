@@ -14,7 +14,7 @@
 
 #include <linux/hsi_driver_if.h>
 
-#include <mach/omap_hsi.h>
+#include <plat/omap_hsi.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Daniel Martensson<daniel.martensson@stericsson.com>");
