@@ -28,6 +28,7 @@
 #include <linux/wl12xx.h>
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
+#include <plat/omap-serial.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -117,6 +118,35 @@ static int plat_wlink_kim_resume(struct platform_device *pdev)
 	return 0;
 }
 
+static bool uart_req;
+/* Call the uart disable of serial driver */
+static int plat_uart_disable(void)
+{
+	int port_id = 0;
+	int err = 0;
+	if (uart_req) {
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
+		err = omap_serial_ext_uart_disable(port_id);
+		if (!err)
+			uart_req = false;
+	}
+	return err;
+}
+
+/* Call the uart enable of serial driver */
+static int plat_uart_enable(void)
+{
+	int port_id = 0;
+	int err = 0;
+	if (!uart_req) {
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
+		err = omap_serial_ext_uart_enable(port_id);
+		if (!err)
+			uart_req = true;
+	}
+	return err;
+}
+
 /* wl128x BT, FM, GPS connectivity chip */
 static struct ti_st_plat_data wilink_pdata = {
 	.nshutdown_gpio = 55,
@@ -125,6 +155,10 @@ static struct ti_st_plat_data wilink_pdata = {
 	.baud_rate = 3686400,
 	.suspend = plat_wlink_kim_suspend,
 	.resume = plat_wlink_kim_resume,
+	.chip_asleep = plat_uart_disable,
+	.chip_awake  = plat_uart_enable,
+	.chip_enable = plat_uart_enable,
+	.chip_disable = plat_uart_disable,
 };
 
 static struct platform_device wl128x_device = {
