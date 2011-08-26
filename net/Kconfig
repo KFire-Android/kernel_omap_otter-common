@@ -336,6 +336,7 @@ source "net/rfkill/Kconfig"
 source "net/9p/Kconfig"
 source "net/caif/Kconfig"
 source "net/ceph/Kconfig"
+source "drivers/net/caif/phy/Kconfig"
 
 
 endif   # if NET
