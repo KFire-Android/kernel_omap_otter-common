@@ -8,3 +8,5 @@ omapdss-$(CONFIG_OMAP2_DSS_SDI) += sdi.o
 omapdss-$(CONFIG_OMAP2_DSS_DSI) += dsi.o
 omapdss-$(CONFIG_OMAP4_DSS_HDMI) += hdmi.o \
 				    hdmi_panel.o ti_hdmi_4xxx_ip.o
+omapdss-$(CONFIG_OMAP5_DSS_HDMI) += hdmi.o \
+				hdmi_panel.o ti_hdmi_4xxx_ip.o ti_hdmi_5xxx_ip.o

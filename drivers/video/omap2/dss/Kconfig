@@ -72,6 +72,13 @@ config OMAP4_DSS_HDMI_AUDIO
 	bool
 	depends on OMAP4_DSS_HDMI
 
+config OMAP5_DSS_HDMI
+	bool "OMAP5 HDMI support"
+	depends on ARCH_OMAP5
+	default y
+	help
+	    HDMI Interface.This add the High Deinition Multimedia Interface.
+	    See http://wwww.hdmi.org/ for HDMI specification.
 config OMAP2_DSS_SDI
 	bool "SDI support"
 	depends on ARCH_OMAP3
