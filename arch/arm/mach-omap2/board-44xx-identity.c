@@ -83,6 +83,21 @@ static ssize_t omap4_board_rev_show(struct kobject *kobj,
 	return sprintf(buf, "%s\n", app_board_rev_types[apps_brd_rev]);
 }
 
+static ssize_t omap4_soc_type_max_freq(struct kobject *kobj,
+				 struct kobj_attribute *attr, char *buf)
+{
+	char *max_freq = "unknown";
+
+	if (omap4_has_mpu_1_5ghz())
+		max_freq = "1.5Ghz";
+	else if (omap4_has_mpu_1_2ghz())
+		max_freq = "1.2Ghz";
+	else
+		max_freq = "1.0Ghz";
+
+	return sprintf(buf, "%s\n", max_freq);
+}
+
 #define OMAP4_SOC_ATTR_RO(_name, _show) \
 	struct kobj_attribute omap4_soc_prop_attr_##_name = \
 		__ATTR(_name, S_IRUGO, _show, NULL)
@@ -94,6 +109,7 @@ static ssize_t omap4_board_rev_show(struct kobject *kobj,
 static OMAP4_SOC_ATTR_RO(family, omap4_soc_family_show);
 static OMAP4_SOC_ATTR_RO(revision, omap4_soc_revision_show);
 static OMAP4_SOC_ATTR_RO(type, omap4_soc_type_show);
+static OMAP4_SOC_ATTR_RO(max_freq, omap4_soc_type_max_freq);
 
 static OMAP4_BOARD_ATTR_RO(board_rev, omap4_board_rev_show);
 
@@ -101,6 +117,7 @@ static struct attribute *omap4_soc_prop_attrs[] = {
 	&omap4_soc_prop_attr_family.attr,
 	&omap4_soc_prop_attr_revision.attr,
 	&omap4_soc_prop_attr_type.attr,
+	&omap4_soc_prop_attr_max_freq.attr,
 	NULL,
 };
 
