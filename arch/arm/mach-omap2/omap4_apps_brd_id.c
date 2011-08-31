@@ -61,6 +61,10 @@ __init int omap_init_board_version(int forced_rev)
 			board_revision = OMAP4_TABLET_1_1;
 			board_id = OMAP4_TABLET_1_1_ID;
 			break;
+		case OMAP4_TABLET_1_2:
+			board_revision = OMAP4_TABLET_1_2;
+			board_id = OMAP4_TABLET_1_2_ID;
+			break;
 		case OMAP4_TABLET_2_0:
 			board_revision = OMAP4_TABLET_2_0;
 			board_id = OMAP4_TABLET_2_0_ID;

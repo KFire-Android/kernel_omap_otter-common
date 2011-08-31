@@ -58,6 +58,7 @@ static ssize_t omap4_soc_type_show(struct kobject *kobj,
 static const char *app_board_rev_types[] = {
 	[OMAP4_TABLET_1_0_ID]		= "Tablet 1.0",
 	[OMAP4_TABLET_1_1_ID]		= "Tablet 1.1",
+	[OMAP4_TABLET_1_2_ID]		= "Tablet 1.2",
 	[OMAP4_TABLET_2_0_ID]		= "Tablet 2.0",
 	[OMAP4_TABLET_2_1_ID]		= "Tablet 2.1",
 	[OMAP4_TABLET_2_1_1_ID]		= "Tablet 2.1.1",
