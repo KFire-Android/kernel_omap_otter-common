@@ -85,6 +85,8 @@
 #define BRR_ENABLE		(1 << 5)
 #define DTO_ENABLE		(1 << 20)
 #define INIT_STREAM		(1 << 1)
+#define ACEN_ACMD12		(1 << 2)
+#define ACEN_ACMD23		(2 << 2)
 #define DP_SELECT		(1 << 21)
 #define DDIR			(1 << 4)
 #define DMA_EN			0x1
@@ -109,6 +111,7 @@
 #define SOFTRESET		(1 << 1)
 #define RESETDONE		(1 << 0)
 
+#define AUTO_CMD12		(1 << 0)	/* Auto CMD12 support */
 /*
  * FIXME: Most likely all the data using these _DEVID defines should come
  * from the platform_data, or implemented in controller and slot specific
@@ -188,6 +191,7 @@ struct omap_hsmmc_host {
 	int			reqs_blocked;
 	int			use_reg;
 	int			req_in_progress;
+	unsigned int		flags;
 
 	struct	omap_mmc_platform_data	*pdata;
 };
@@ -852,6 +856,8 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 		cmdtype = 0x3;
 
 	cmdreg = (cmd->opcode << 24) | (resptype << 16) | (cmdtype << 22);
+	if ((host->flags & AUTO_CMD12) && mmc_op_multi(cmd->opcode))
+		cmdreg |= ACEN_ACMD12;
 
 	if (data) {
 		cmdreg |= DP_SELECT | MSBS | BCE;
@@ -923,11 +929,16 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 	else
 		data->bytes_xfered = 0;
 
-	if (!data->stop) {
+	if (data->stop && ((!(host->flags & AUTO_CMD12)) || data->error))
+		omap_hsmmc_start_command(host, data->stop, NULL);
+	else {
+		if (data->stop)
+			data->stop->resp[0] = OMAP_HSMMC_READ(host->base,
+							RSP76);
 		omap_hsmmc_request_done(host, data->mrq);
-		return;
 	}
-	omap_hsmmc_start_command(host, data->stop, NULL);
+
+	return;
 }
 
 /*
@@ -2073,6 +2084,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	host->mapbase	= res->start;
 	host->base	= ioremap(host->mapbase, SZ_4K);
 	host->power_mode = MMC_POWER_OFF;
+	host->flags	= AUTO_CMD12;
 
 	host->master_clock = OMAP_MMC_MASTER_CLOCK;
 	if (mmc_slot(host).features & HSMMC_HAS_48MHZ_MASTER_CLK)
