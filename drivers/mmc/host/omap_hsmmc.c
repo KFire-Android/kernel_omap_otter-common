@@ -220,6 +220,9 @@ static void omap_hsmmc_status_notify_cb(int card_present, void *dev_id)
 	}
 }
 
+static int
+omap_hsmmc_prepare_data(struct omap_hsmmc_host *host, struct mmc_request *req);
+
 static int omap_hsmmc_card_detect(struct device *dev, int slot)
 {
 	struct omap_mmc_platform_data *mmc = dev->platform_data;
@@ -826,7 +829,7 @@ static DEVICE_ATTR(slot_name, S_IRUGO, omap_hsmmc_show_slot_name, NULL);
  */
 static void
 omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
-	struct mmc_data *data)
+	struct mmc_data *data, bool no_autocmd12)
 {
 	int cmdreg = 0, resptype = 0, cmdtype = 0;
 
@@ -856,7 +859,8 @@ omap_hsmmc_start_command(struct omap_hsmmc_host *host, struct mmc_command *cmd,
 		cmdtype = 0x3;
 
 	cmdreg = (cmd->opcode << 24) | (resptype << 16) | (cmdtype << 22);
-	if ((host->flags & AUTO_CMD12) && mmc_op_multi(cmd->opcode))
+	if ((host->flags & AUTO_CMD12) && mmc_op_multi(cmd->opcode) &&
+								!no_autocmd12)
 		cmdreg |= ACEN_ACMD12;
 
 	if (data) {
@@ -930,7 +934,7 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 		data->bytes_xfered = 0;
 
 	if (data->stop && ((!(host->flags & AUTO_CMD12)) || data->error))
-		omap_hsmmc_start_command(host, data->stop, NULL);
+		omap_hsmmc_start_command(host, data->stop, NULL, 0);
 	else {
 		if (data->stop)
 			data->stop->resp[0] = OMAP_HSMMC_READ(host->base,
@@ -947,6 +951,26 @@ omap_hsmmc_xfer_done(struct omap_hsmmc_host *host, struct mmc_data *data)
 static void
 omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
 {
+	int err;
+	struct mmc_request *req;
+	req = host->mrq;
+
+	if ((host->mrq->sbc) && (host->cmd == host->mrq->sbc)) {
+		host->cmd = NULL;
+		err = omap_hsmmc_prepare_data(host, host->mrq);
+		if (err) {
+			req->cmd->error = err;
+			if (req->data)
+				req->data->error = err;
+			host->mrq = NULL;
+			mmc_request_done(host->mmc, req);
+			return;
+		}
+		omap_hsmmc_start_command(host, host->mrq->cmd,
+						host->mrq->data, 1);
+		return;
+	}
+
 	host->cmd = NULL;
 
 	if (cmd->flags & MMC_RSP_PRESENT) {
@@ -1535,6 +1559,11 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 		host->reqs_blocked = 0;
 	WARN_ON(host->mrq != NULL);
 	host->mrq = req;
+	if (req->sbc) {
+		omap_hsmmc_start_command(host, req->sbc, NULL, 0);
+		return;
+	}
+
 	err = omap_hsmmc_prepare_data(host, req);
 	if (err) {
 		req->cmd->error = err;
@@ -1545,7 +1574,7 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 		return;
 	}
 
-	omap_hsmmc_start_command(host, req->cmd, req->data);
+	omap_hsmmc_start_command(host, req->cmd, req->data, 0);
 }
 
 /* Routine to configure clock values. Exposed API to core */
@@ -2170,7 +2199,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	mmc->max_seg_size = mmc->max_req_size;
 
 	mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
-		     MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE;
+		     MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE | MMC_CAP_CMD23;
 
 	mmc->caps |= mmc_slot(host).caps;
 	if (mmc->caps & MMC_CAP_8_BIT_DATA)
