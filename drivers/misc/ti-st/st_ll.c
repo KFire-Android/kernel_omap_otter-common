@@ -74,11 +74,13 @@ static void ll_device_want_to_wakeup(struct st_data_s *st_data)
 		break;
 	case ST_LL_ASLEEP_TO_AWAKE:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind while waiting for Wake ack");
+		pr_debug("duplicate wake_ind while waiting for Wake ack");
+		send_ll_cmd(st_data, LL_WAKE_UP_ACK);	/* send wake_ack */
 		break;
 	case ST_LL_AWAKE:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind already AWAKE");
+		pr_debug("duplicate wake_ind already AWAKE");
+		send_ll_cmd(st_data, LL_WAKE_UP_ACK);	/* send wake_ack */
 		break;
 	case ST_LL_AWAKE_TO_ASLEEP:
 		/* duplicate wake_ind */
