@@ -46,6 +46,7 @@
 #include "cm44xx.h"
 #include "cm-regbits-44xx.h"
 #include "cminst44xx.h"
+#include "scrm44xx.h"
 #include "prcm-debug.h"
 
 #include "smartreflex.h"
@@ -201,8 +202,16 @@ abort_device_off:
 	if (omap4_device_prev_state_off()) {
 		omap_dma_global_context_restore();
 		omap_gpmc_restore_context();
-		omap2_gpio_resume_after_idle();
+		/* Reconfigure the trim settings as well */
+		omap4_ldo_trim_configure();
 	}
+
+	/*
+	 * GPIO: since we have put_synced clks, we need to resume
+	 * even if OFF was not really achieved
+	 */
+	if (omap4_device_next_state_off())
+		omap2_gpio_resume_after_idle();
 
 	if (mpu_next_state < PWRDM_POWER_INACTIVE) {
 		omap_vc_set_auto_trans(mpu_voltdm,
@@ -394,20 +403,37 @@ static void omap4_print_wakeirq(void)
  * get_achievable_state() - Provide achievable state
  * @available_states:	what states are available
  * @req_min_state:	what state is the minimum we'd like to hit
+ * @is_parent_pd:	is this a parent power domain?
  *
  * Power domains have varied capabilities. When attempting a low power
  * state such as OFF/RET, a specific min requested state may not be
- * supported on the power domain, in which case, the next higher power
- * state which is supported is returned. This is because a combination
- * of system power states where the parent PD's state is not in line
- * with expectation can result in system instabilities.
+ * supported on the power domain, in which case:
+ * a) if this power domain is a parent power domain, we do not intend
+ * for it to go to a lower power state(because we are not targetting it),
+ * select the next higher power state which is supported is returned.
+ * b) However, for all children power domains, we first try to match
+ * with a lower power domain state before attempting a higher state.
+ * This is because a combination of system power states where the
+ * parent PD's state is not in line with expectation can result in
+ * system instabilities.
  */
-static inline u8 get_achievable_state(u8 available_states, u8 req_min_state)
+static inline u8 get_achievable_state(u8 available_states, u8 req_min_state,
+				      bool is_parent_pd)
 {
-	u8 mask = 0xFF << req_min_state;
+	u8 max_mask = 0xFF << req_min_state;
+	u8 min_mask = ~max_mask;
 
-	if (available_states & mask)
-		return __ffs(available_states & mask);
+	/* First see if we have an accurate match */
+	if (available_states & BIT(req_min_state))
+		return req_min_state;
+
+	/* See if a lower power state is possible on this child domain */
+	if (!is_parent_pd && available_states & min_mask)
+		return __ffs(available_states & min_mask);
+
+	if (available_states & max_mask)
+		return __ffs(available_states & max_mask);
+
 	return PWRDM_POWER_ON;
 }
 
@@ -441,9 +467,14 @@ static void omap4_configure_pwdm_suspend(bool is_off_mode)
 #endif
 
 	list_for_each_entry(pwrst, &pwrst_list, node) {
+		bool parent_power_domain = false;
 		if ((!strcmp(pwrst->pwrdm->name, "cpu0_pwrdm")) ||
 			(!strcmp(pwrst->pwrdm->name, "cpu1_pwrdm")))
 				continue;
+		if (!strcmp(pwrst->pwrdm->name, "core_pwrdm") ||
+			!strcmp(pwrst->pwrdm->name, "mpu_pwrdm") ||
+			!strcmp(pwrst->pwrdm->name, "iva_pwrdm"))
+				parent_power_domain = true;
 		/*
 		 * Write only to registers which are writable! Don't touch
 		 * read-only/reserved registers. If pwrdm->pwrsts_logic_ret or
@@ -454,12 +485,13 @@ static void omap4_configure_pwdm_suspend(bool is_off_mode)
 		if (pwrst->pwrdm->pwrsts_logic_ret) {
 			als =
 			   get_achievable_state(pwrst->pwrdm->pwrsts_logic_ret,
-					logic_state);
+					logic_state, parent_power_domain);
 			pwrdm_set_logic_retst(pwrst->pwrdm, als);
 		}
 		if (pwrst->pwrdm->pwrsts) {
 			pwrst->next_state =
-			   get_achievable_state(pwrst->pwrdm->pwrsts, state);
+			   get_achievable_state(pwrst->pwrdm->pwrsts, state,
+							parent_power_domain);
 			omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 		}
 	}
@@ -603,8 +635,36 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 }
 
+static u32 __init _usec_to_val_scrm(unsigned long rate, u32 usec,
+				    u32 shift, u32 mask)
+{
+	u32 val;
+
+	/* limit to max value */
+	val = ((mask >> shift) * 1000000) / rate;
+	if (usec > val)
+		usec = val;
+
+	/* convert the time in usec to cycles */
+	val = DIV_ROUND_UP(rate * usec, 1000000);
+	return (val << shift) & mask;
+
+}
+
 static void __init prcm_setup_regs(void)
 {
+	struct clk *clk32k = clk_get(NULL, "sys_32k_ck");
+	unsigned long rate32k = 0;
+	u32 val, tshut, tstart;
+
+	if (clk32k) {
+		rate32k = clk_get_rate(clk32k);
+		clk_put(clk32k);
+	} else {
+		pr_err("%s: no 32k clk!!!\n", __func__);
+		dump_stack();
+	}
+
 	/* Enable IO_ST interrupt */
 	omap4_prminst_rmw_inst_reg_bits(OMAP4430_IO_ST_MASK, OMAP4430_IO_ST_MASK,
 		OMAP4430_PRM_PARTITION, OMAP4430_PRM_OCP_SOCKET_INST, OMAP4_PRM_IRQENABLE_MPU_OFFSET);
@@ -630,6 +690,18 @@ static void __init prcm_setup_regs(void)
 	/* Toggle CLKREQ in RET and OFF states */
 	omap4_prminst_write_inst_reg(0x2, OMAP4430_PRM_PARTITION,
 		OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_CLKREQCTRL_OFFSET);
+
+	/* Setup max clksetup time for oscillator */
+	if (rate32k) {
+		omap_pm_get_osc_lp_time(&tstart, &tshut);
+		val = _usec_to_val_scrm(rate32k, tstart, OMAP4_SETUPTIME_SHIFT,
+				OMAP4_SETUPTIME_MASK);
+		val |= _usec_to_val_scrm(rate32k, tshut, OMAP4_DOWNTIME_SHIFT,
+				OMAP4_DOWNTIME_MASK);
+		omap4_prminst_write_inst_reg(val, OMAP4430_SCRM_PARTITION, 0x0,
+				OMAP4_SCRM_CLKSETUPTIME_OFFSET);
+	}
+
 	/*
 	 * De-assert PWRREQ signal in Device OFF state
 	 *	0x3: PWRREQ is de-asserted if all voltage domain are in
@@ -639,6 +711,18 @@ static void __init prcm_setup_regs(void)
 	 */
 	omap4_prminst_write_inst_reg(0x3, OMAP4430_PRM_PARTITION,
 		OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_PWRREQCTRL_OFFSET);
+
+	/* Setup max PMIC startup time */
+	if (rate32k) {
+		omap_pm_get_pmic_lp_time(&tstart, &tshut);
+		val = _usec_to_val_scrm(rate32k, tstart, OMAP4_WAKEUPTIME_SHIFT,
+				OMAP4_WAKEUPTIME_MASK);
+		val |= _usec_to_val_scrm(rate32k, tshut, OMAP4_SLEEPTIME_SHIFT,
+				OMAP4_SLEEPTIME_MASK);
+		omap4_prminst_write_inst_reg(val, OMAP4430_SCRM_PARTITION, 0x0,
+				OMAP4_SCRM_PMICSETUPTIME_OFFSET);
+	}
+
 }
 static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 {
