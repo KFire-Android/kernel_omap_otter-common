@@ -588,7 +588,6 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			      void *_msg)
 {
 	struct qtm_touch_multi_msg *msg = _msg;
-	int i;
 	int x;
 	int y;
 	int pressure;
@@ -615,67 +614,25 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	if (ts->pdata->flags & QTOUCH_FLIP_X)
 		x = ts->pdata->abs_max_x - x;
 
+	down = !!(msg->status & 0x80);
 	if (qtouch_tsdebug & 2)
-		pr_info("%s: stat=%02x, f=%d x=%d y=%d p=%d w=%d\n", __func__,
-			msg->status, finger, x, y, pressure, width);
+		pr_info("%s: stat=%02x, f=%d x=%d y=%d p=%d w=%d down=%i\n", __func__,
+			msg->status, finger, x, y, pressure, width, down);
 
-	down = !(msg->status & QTM_TOUCH_MULTI_STATUS_RELEASE);
-
-	/* The chip may report erroneous points way
-	beyond what a user could possibly perform so we filter
-	these out */
-	if (ts->finger_data[finger].down &&
-			(abs(ts->finger_data[finger].x_data - x) > ts->x_delta ||
-			abs(ts->finger_data[finger].y_data - y) > ts->y_delta)) {
-				down = 0;
-				if (qtouch_tsdebug & 2)
-					pr_info("%s: x0 %i x1 %i y0 %i y1 %i\n",
-						__func__,
-						ts->finger_data[finger].x_data, x,
-						ts->finger_data[finger].y_data, y);
-	} else {
-		ts->finger_data[finger].x_data = x;
-		ts->finger_data[finger].y_data = y;
-		ts->finger_data[finger].w_data = width;
-	}
-	if (qtouch_tsdebug & 2)
-		pr_info("%s: Finger %i x %i y %i w %i\n",
-			__func__, finger,
-			ts->finger_data[finger].x_data,
-			ts->finger_data[finger].y_data,
-			ts->finger_data[finger].w_data);
-
-	/* The touch IC will not give back a pressure of zero
-	   so send a 0 when a liftoff is produced */
-	if (!down) {
-		ts->finger_data[finger].z_data = 0;
-	} else {
-		ts->finger_data[finger].z_data = pressure;
-		ts->finger_data[finger].down = down;
-	}
-
-	for (i = 0; i < ts->pdata->multi_touch_cfg.num_touch; i++) {
-		if (ts->finger_data[i].down == 0)
-			continue;
-
-		input_mt_slot(ts->input_dev, i);
+	if (down == 0) {
+		input_mt_slot(ts->input_dev, finger);
 		input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER,
-				down);
-		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR,
-				 ts->finger_data[i].z_data);
-		input_report_abs(ts->input_dev, ABS_MT_POSITION_X,
-				 ts->finger_data[i].x_data);
-		input_report_abs(ts->input_dev, ABS_MT_POSITION_Y,
-				 ts->finger_data[i].y_data);
+				false);
+	} else {
+		input_mt_slot(ts->input_dev, finger);
+		input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, true);
+		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, width);
+		input_report_abs(ts->input_dev, ABS_MT_POSITION_X, x);
+		input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, y);
+		input_report_abs(ts->input_dev, ABS_MT_PRESSURE, pressure);
 	}
 
-	input_report_key(ts->input_dev, BTN_TOUCH, down);
 	input_sync(ts->input_dev);
-
-	if (!down) {
-		memset(&ts->finger_data[finger], 0,
-		sizeof(struct coordinate_map));
-	}
 
 	return 0;
 }
@@ -995,7 +952,8 @@ static int qtouch_ts_probe(struct i2c_client *client,
 
 	obj = find_obj(ts, QTM_OBJ_TOUCH_MULTI);
 	if (obj && obj->entry.num_inst > 0) {
-		set_bit(EV_ABS, ts->input_dev->evbit);
+	        __set_bit(EV_ABS, ts->input_dev->evbit);
+	        __set_bit(INPUT_PROP_DIRECT, ts->input_dev->evbit);
 		/* multi touch */
 		input_mt_init_slots(ts->input_dev,
 			pdata->multi_touch_cfg.num_touch);
@@ -1006,37 +964,10 @@ static int qtouch_ts_probe(struct i2c_client *client,
 			pdata->abs_min_y, pdata->abs_max_y,
 			pdata->fuzz_y, 0);
 		input_set_abs_params(ts->input_dev, ABS_MT_TOUCH_MAJOR,
-			pdata->abs_min_p, pdata->abs_max_p,
-			pdata->fuzz_p, 0);
-		input_set_abs_params(ts->input_dev, ABS_MT_WIDTH_MAJOR,
 			pdata->abs_min_w, pdata->abs_max_w,
 			pdata->fuzz_w, 0);
-		input_set_abs_params(ts->input_dev, ABS_MT_TRACKING_ID, 0,
-			pdata->multi_touch_cfg.num_touch - 1, 0, 0);
-
-
-
-		/* Legacy support for testing only */
-		input_set_capability(ts->input_dev, EV_KEY, BTN_TOUCH);
-		input_set_capability(ts->input_dev, EV_KEY, BTN_2);
-		input_set_abs_params(ts->input_dev, ABS_X,
-			pdata->abs_min_x, pdata->abs_max_x,
-			pdata->fuzz_x, 0);
-		input_set_abs_params(ts->input_dev, ABS_HAT0X,
-			pdata->abs_min_x, pdata->abs_max_x,
-			pdata->fuzz_x, 0);
-		input_set_abs_params(ts->input_dev, ABS_Y,
-			pdata->abs_min_y, pdata->abs_max_y,
-			pdata->fuzz_y, 0);
-		input_set_abs_params(ts->input_dev, ABS_HAT0Y,
-			pdata->abs_min_x, pdata->abs_max_x,
-			pdata->fuzz_x, 0);
-		input_set_abs_params(ts->input_dev, ABS_PRESSURE,
-			pdata->abs_min_p, pdata->abs_max_p,
-			pdata->fuzz_p, 0);
-		input_set_abs_params(ts->input_dev, ABS_TOOL_WIDTH,
-			pdata->abs_min_w, pdata->abs_max_w,
-			pdata->fuzz_w, 0);
+		input_set_abs_params(ts->input_dev, ABS_MT_PRESSURE,
+			pdata->abs_min_p, pdata->abs_max_p, pdata->fuzz_p, 0);
 	}
 
 	memset(&ts->finger_data[0], 0,
