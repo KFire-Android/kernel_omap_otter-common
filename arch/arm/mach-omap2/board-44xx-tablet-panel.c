@@ -66,9 +66,11 @@ static void omap4_tablet_set_primary_brightness(u8 brightness)
 
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
 		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
+		gpio_set_value(LED_DISP_EN, 1);
 	} else if (brightness <= 1) {
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
+		gpio_set_value(LED_DISP_EN, 0);
 	}
 }
 
@@ -86,22 +88,6 @@ static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
 	.primary_display_set = omap4_tablet_set_primary_brightness,
 	.secondary_display_set = omap4_tablet_set_secondary_brightness,
 };
-
-static void __init omap_disp_led_init(void)
-{
-	/* Seconday backlight control */
-	gpio_request(DSI2_GPIO_59, "dsi2_bl_gpio");
-	gpio_direction_output(DSI2_GPIO_59, 0);
-
-	if (sdp4430_disp_led_data.flags & LEDS_CTRL_AS_ONE_DISPLAY) {
-		pr_info("%s: Configuring as one display LED\n", __func__);
-		gpio_set_value(DSI2_GPIO_59, 1);
-	}
-
-	gpio_request(LED_DISP_EN, "lcd_backlight_en");
-	gpio_direction_output(LED_DISP_EN, 1);
-	gpio_set_value(LED_DISP_EN, 1);
-}
 
 static struct platform_device omap4_tablet_disp_led = {
 	.name	=	"display_led",
@@ -270,7 +256,6 @@ int __init tablet_panel_init(void)
 	}
 
 	tablet_lcd_init();
-	omap_disp_led_init();
 	tablet_hdmi_mux_init();
 
 	omap_vram_set_sdram_vram(TABLET_FB_RAM_SIZE, 0);
