@@ -28,8 +28,8 @@
 #define CS_IO(num)		_IO(HSI_CHAR_BASE, num)
 
 #define CS_SEND_BREAK		CS_IO(1)
-#define CS_FLUSH_RX		CS_IO(2)
-#define CS_FLUSH_TX		CS_IO(3)
+#define CS_FLUSH_RX		CS_IOR(2, size_t)
+#define CS_FLUSH_TX		CS_IOR(3, size_t)
 #define CS_BOOTSTRAP		CS_IO(4)
 #define CS_SET_ACWAKELINE	CS_IOW(5, unsigned int)
 #define CS_GET_ACWAKELINE	CS_IOR(6, unsigned int)

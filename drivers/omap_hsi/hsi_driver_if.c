@@ -805,10 +805,29 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		*(u32 *)arg = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		break;
 	case HSI_IOCTL_FLUSH_RX:
-		hsi_outl(0, base, HSI_HSR_RXSTATE_REG(port));
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+		*(size_t *)arg = hsi_hsr_fifo_flush_channel(hsi_ctrl, port,
+							 channel);
+
+		/* Ack the RX Int */
+		hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
+			     HSI_SYS_MPU_STATUS_CH_REG(port, pport->n_irq,
+						       channel));
 		break;
 	case HSI_IOCTL_FLUSH_TX:
-		hsi_outl(0, base, HSI_HST_TXSTATE_REG(port));
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+		*(size_t *)arg = hsi_hst_fifo_flush_channel(hsi_ctrl, port,
+							 channel);
+		/* Ack the TX Int */
+		hsi_outl_and(~HSI_HST_DATAACCEPT(channel), base,
+			     HSI_SYS_MPU_STATUS_CH_REG(port, pport->n_irq,
+						       channel));
 		break;
 	case HSI_IOCTL_GET_CAWAKE:
 		if (!arg) {

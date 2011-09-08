@@ -298,6 +298,11 @@ long hsi_hst_buffer_reg(struct hsi_dev *hsi_ctrl,
 long hsi_hsr_buffer_reg(struct hsi_dev *hsi_ctrl,
 			unsigned int port, unsigned int channel);
 u8 hsi_get_rx_fifo_occupancy(struct hsi_dev *hsi_ctrl, u8 fifo);
+u8 hsi_hsr_fifo_flush_channel(struct hsi_dev *hsi_ctrl, unsigned int port,
+				unsigned int channel);
+u8 hsi_hst_fifo_flush_channel(struct hsi_dev *hsi_ctrl, unsigned int port,
+				unsigned int channel);
+
 void hsi_set_pm_force_hsi_on(struct hsi_dev *hsi_ctrl);
 void hsi_set_pm_default(struct hsi_dev *hsi_ctrl);
 int hsi_softreset(struct hsi_dev *hsi_ctrl);

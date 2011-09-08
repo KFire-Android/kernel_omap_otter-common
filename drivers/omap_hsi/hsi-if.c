@@ -219,11 +219,11 @@ void if_hsi_send_break(int ch)
 	hsi_ioctl(channel->dev, HSI_IOCTL_SEND_BREAK, NULL);
 }
 
-void if_hsi_flush_rx(int ch)
+void if_hsi_flush_rx(int ch, size_t *nb_flushed_frames)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
-	hsi_ioctl(channel->dev, HSI_IOCTL_FLUSH_RX, NULL);
+	hsi_ioctl(channel->dev, HSI_IOCTL_FLUSH_RX, nb_flushed_frames);
 }
 
 void if_hsi_flush_ch(int ch)
@@ -233,11 +233,11 @@ void if_hsi_flush_ch(int ch)
 	channel = &hsi_iface.channels[ch];
 }
 
-void if_hsi_flush_tx(int ch)
+void if_hsi_flush_tx(int ch, size_t *nb_flushed_frames)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
-	hsi_ioctl(channel->dev, HSI_IOCTL_FLUSH_TX, NULL);
+	hsi_ioctl(channel->dev, HSI_IOCTL_FLUSH_TX, nb_flushed_frames);
 }
 
 void if_hsi_get_acwakeline(int ch, unsigned int *state)

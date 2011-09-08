@@ -46,8 +46,8 @@ int if_hsi_start(int ch);
 void if_hsi_stop(int ch);
 
 void if_hsi_send_break(int ch);
-void if_hsi_flush_rx(int ch);
-void if_hsi_flush_tx(int ch);
+void if_hsi_flush_rx(int ch, size_t *nb_flushed_frames);
+void if_hsi_flush_tx(int ch, size_t *nb_flushed_frames);
 void if_hsi_bootstrap(int ch);
 void if_hsi_set_acwakeline(int ch, unsigned int state);
 void if_hsi_get_acwakeline(int ch, unsigned int *state);

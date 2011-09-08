@@ -338,3 +338,68 @@ u8 hsi_get_rx_fifo_occupancy(struct hsi_dev *hsi_ctrl, u8 fifo)
 	return mapping_words;
 }
 
+/**
+ * hsi_hsr_fifo_flush - Flush a given HSR FIFO
+ * @hsi_ctrl - HSI controler data
+ * @port - HSI port used
+ * @channel - channel to flush associated FIFO
+ *
+ * Returns the number of flushed frames
+ */
+u8 hsi_hsr_fifo_flush_channel(struct hsi_dev *hsi_ctrl, unsigned int port,
+				unsigned int channel)
+{
+	int fifo, fifo_words_avail, i, tmp;
+
+	if (!hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
+		/* SSI */
+		dev_info(hsi_ctrl->dev, "Flushing all SSR FIFOs.\n");
+		/* Warning : All RX FIFOs are flushed */
+		hsi_outl(0, hsi_ctrl->base, HSI_HSR_RXSTATE_REG(port));
+		return 0;
+	}
+
+	/* HSI */
+	fifo = hsi_fifo_get_id(hsi_ctrl, channel, port);
+	if (unlikely(fifo < 0)) {
+		dev_err(hsi_ctrl->dev, "No valid FIFO id found for channel "
+				       "%d.\n", channel);
+		return 0;
+	}
+
+	fifo_words_avail = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
+	for (i = 0; i < fifo_words_avail; i++) {
+		tmp = hsi_inl(hsi_ctrl->base, hsi_hsr_buffer_reg(hsi_ctrl, port,
+								 channel));
+		dev_info(hsi_ctrl->dev, "FIFO %d: Flushed 0x%08X\n", fifo, tmp);
+	}
+
+	if (fifo_words_avail)
+		dev_dbg(hsi_ctrl->dev, "Flushed %d frames from HSR FIFO %d.\n",
+			fifo_words_avail, fifo);
+
+	return fifo_words_avail;
+}
+
+/**
+ * hsi_hst_fifo_flush - Flush a given HST FIFO
+ * @hsi_ctrl - HSI controler data
+ * @port - HSI port used
+ * @channel - channel to flush associated FIFO
+ *
+ * Returns the number of flushed frames
+ */
+u8 hsi_hst_fifo_flush_channel(struct hsi_dev *hsi_ctrl, unsigned int port,
+				unsigned int channel)
+{
+	if (!hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev))) {
+		/* SSI */
+		dev_info(hsi_ctrl->dev, "Flushing all SST FIFOs.\n");
+		/* Warning : All TX FIFOs are flushed */
+		hsi_outl(0, hsi_ctrl->base, HSI_HST_TXSTATE_REG(port));
+		return 0;
+	}
+
+	return 0;
+}
+
