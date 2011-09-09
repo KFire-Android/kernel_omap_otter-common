@@ -537,6 +537,15 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	/* Decrease mpu / core usecounts to indicate we are entering idle */
 	omap_dec_mpu_core_pwrdm_usecount();
 
+	/* Extend Non-EMIF I/O isolation *AFTER* usecounts and callbacks */
+	if (pwrdm_read_device_off_state()) {
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_ISOOVR_EXTEND_MASK,
+				OMAP4430_ISOOVR_EXTEND_MASK,
+				OMAP4430_PRM_PARTITION,
+				OMAP4430_PRM_DEVICE_INST,
+				OMAP4_PRM_IO_PMCTRL_OFFSET);
+	}
+
 	/*
 	 * Check MPUSS next state and save interrupt controller if needed.
 	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
@@ -616,6 +625,18 @@ abort_suspend:
 sar_save_failed:
 	/* Increase mpu / core usecounts to indicate we are leaving idle */
 	omap_inc_mpu_core_pwrdm_usecount();
+
+	/*
+	 * Disable the extension of Non-EMIF I/O isolation *AFTER* usecounts
+	 * and callbacks. This is important to have the right sequence.
+	 */
+	if (pwrdm_read_device_off_state()) {
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_ISOOVR_EXTEND_MASK,
+						0,
+						OMAP4430_PRM_PARTITION,
+						OMAP4430_PRM_DEVICE_INST,
+						OMAP4_PRM_IO_PMCTRL_OFFSET);
+	}
 
 	pwrdm_post_transition(NULL);
 
