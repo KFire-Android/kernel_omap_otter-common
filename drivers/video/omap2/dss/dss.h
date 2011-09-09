@@ -471,7 +471,7 @@ static inline unsigned long venc_get_pixel_clock(void)
 #endif
 
 /* HDMI */
-#ifdef CONFIG_OMAP4_DSS_HDMI
+#if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 int hdmi_init_platform_driver(void);
 void hdmi_uninit_platform_driver(void);
 int hdmi_init_display(struct omap_dss_device *dssdev);
