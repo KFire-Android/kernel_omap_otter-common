@@ -2240,9 +2240,6 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 	else
 		format.samp_format = STEREO_16_16;
 
-	if (format.f == 44100)
-		abe_write_event_generator(EVENT_44100);
-
 	period_size = params_period_bytes(params);
 
 	/*Adding ping pong buffer subroutine*/
