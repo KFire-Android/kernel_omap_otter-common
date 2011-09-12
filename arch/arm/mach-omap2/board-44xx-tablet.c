@@ -387,6 +387,12 @@ static struct regulator_init_data tablet_vcxio = {
 	.consumer_supplies	= tablet_vcxio_supply,
 };
 
+static struct regulator_consumer_supply sdp4430_vdac_supply[] = {
+	{
+		.supply = "hdmi_vref",
+	},
+};
+
 static struct regulator_init_data tablet_vdac = {
 	.constraints = {
 		.min_uV			= 1800000,
@@ -396,6 +402,8 @@ static struct regulator_init_data tablet_vdac = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+	.num_consumer_supplies  = ARRAY_SIZE(sdp4430_vdac_supply),
+	.consumer_supplies      = sdp4430_vdac_supply,
 };
 
 static struct regulator_init_data tablet_vusb = {
