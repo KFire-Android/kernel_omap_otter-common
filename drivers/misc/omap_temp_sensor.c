@@ -54,10 +54,14 @@
 extern void omap_thermal_throttle(void);
 extern void omap_thermal_unthrottle(void);
 
+static void throttle_delayed_work_fn(struct work_struct *work);
+
+#define THROTTLE_DELAY_MS	1000
+
 #define TSHUT_THRESHOLD_TSHUT_HOT	122000	/* 122 deg C */
 #define TSHUT_THRESHOLD_TSHUT_COLD	100000	/* 100 deg C */
-#define BGAP_THRESHOLD_T_HOT		95000	/* 110 deg C */
-#define BGAP_THRESHOLD_T_COLD		85000	/* 100 deg C */
+#define BGAP_THRESHOLD_T_HOT		83000	/* 83 deg C */
+#define BGAP_THRESHOLD_T_COLD		76000	/* 76 deg C */
 #define OMAP_ADC_START_VALUE	530
 #define OMAP_ADC_END_VALUE	923
 
@@ -75,7 +79,7 @@ extern void omap_thermal_unthrottle(void);
  * @clk_rate - Holds current clock rate
  */
 struct omap_temp_sensor {
-	struct platform_device pdev;
+	struct platform_device *pdev;
 	struct device *dev;
 	struct clk *clock;
 	struct spinlock lock;
@@ -83,10 +87,11 @@ struct omap_temp_sensor {
 	unsigned int tshut_irq;
 	unsigned long phy_base;
 	int is_efuse_valid;
+	u8 clk_on;
 	unsigned long clk_rate;
 	u32 current_temp;
 	u32 save_ctx;
-	u8 clk_on;
+	struct delayed_work throttle_work;
 };
 
 #ifdef CONFIG_PM
@@ -260,8 +265,8 @@ static ssize_t omap_temp_show_current(struct device *dev,
 				struct device_attribute *devattr,
 				char *buf)
 {
-	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
-	struct omap_temp_sensor *temp_sensor = container_of(pdev, struct omap_temp_sensor, pdev);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 
 	return sprintf(buf, "%d\n", omap_read_current_temp(temp_sensor));
 }
@@ -304,7 +309,7 @@ static int omap_temp_sensor_enable(struct omap_temp_sensor *temp_sensor)
 		goto out;
 	}
 
-	ret = pm_runtime_get_sync(&temp_sensor->pdev.dev);
+	ret = pm_runtime_get_sync(&temp_sensor->pdev->dev);
 	if (ret) {
 		pr_err("%s:get sync failed\n", __func__);
 		ret = -EINVAL;
@@ -357,7 +362,7 @@ static int omap_temp_sensor_disable(struct omap_temp_sensor *temp_sensor)
 		temp = omap_temp_sensor_readl(temp_sensor,
 						BGAP_STATUS_OFFSET);
 	/* Gate the clock */
-	ret = pm_runtime_put_sync_suspend(&temp_sensor->pdev.dev);
+	ret = pm_runtime_put_sync_suspend(&temp_sensor->pdev->dev);
 	if (ret) {
 		pr_err("%s:put sync failed\n", __func__);
 		ret = -EINVAL;
@@ -368,6 +373,32 @@ static int omap_temp_sensor_disable(struct omap_temp_sensor *temp_sensor)
 out:
 	spin_unlock_irqrestore(&temp_sensor->lock, flags);
 	return ret;
+}
+
+/*
+ * Check if the die sensor is cooling down. If it's higher than
+ * t_hot since the last throttle then throttle it again.
+ * OMAP junction temperature could stay for a long time in an
+ * unacceptable temperature range. The idea here is to check after
+ * t_hot->throttle the system really came below t_hot else re-throttle
+ * and keep doing till it's under t_hot temp range.
+ */
+static void throttle_delayed_work_fn(struct work_struct *work)
+{
+	u32 curr;
+	struct omap_temp_sensor *temp_sensor =
+				container_of(work, struct omap_temp_sensor,
+					     throttle_work.work);
+	curr = omap_read_current_temp(temp_sensor);
+
+	if (curr >= BGAP_THRESHOLD_T_HOT || curr < 0) {
+		omap_thermal_throttle();
+		schedule_delayed_work(&temp_sensor->throttle_work,
+			msecs_to_jiffies(THROTTLE_DELAY_MS));
+	} else {
+		schedule_delayed_work(&temp_sensor->throttle_work,
+			msecs_to_jiffies(THROTTLE_DELAY_MS));
+	}
 }
 
 static irqreturn_t omap_tshut_irq_handler(int irq, void *data)
@@ -400,9 +431,12 @@ static irqreturn_t omap_talert_irq_handler(int irq, void *data)
 	temp_offset = omap_temp_sensor_readl(temp_sensor, BGAP_CTRL_OFFSET);
 	if (t_hot) {
 		omap_thermal_throttle();
+		schedule_delayed_work(&temp_sensor->throttle_work,
+			msecs_to_jiffies(THROTTLE_DELAY_MS));
 		temp_offset &= ~(OMAP4_MASK_HOT_MASK);
 		temp_offset |= OMAP4_MASK_COLD_MASK;
 	} else if (t_cold) {
+		cancel_delayed_work_sync(&temp_sensor->throttle_work);
 		omap_thermal_unthrottle();
 		temp_offset &= ~(OMAP4_MASK_COLD_MASK);
 		temp_offset |= OMAP4_MASK_HOT_MASK;
@@ -464,7 +498,7 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	}
 
 	temp_sensor->phy_base = pdata->offset;
-	temp_sensor->pdev = *pdev;
+	temp_sensor->pdev = pdev;
 	temp_sensor->dev = dev;
 	temp_sensor->save_ctx = 0;
 
@@ -479,7 +513,7 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 			OMAP4_CTRL_MODULE_CORE_STD_FUSE_OPP_BGAP))
 		temp_sensor->is_efuse_valid = 1;
 
-	temp_sensor->clock = clk_get(&temp_sensor->pdev.dev, "fck");
+	temp_sensor->clock = clk_get(&temp_sensor->pdev->dev, "fck");
 	if (IS_ERR(temp_sensor->clock)) {
 		ret = PTR_ERR(temp_sensor->clock);
 		pr_err("%s:Unable to get fclk: %d\n", __func__, ret);
@@ -487,13 +521,17 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 		goto clk_get_err;
 	}
 
+	/* Init delayed work for throttle decision */
+	INIT_DELAYED_WORK(&temp_sensor->throttle_work,
+			  throttle_delayed_work_fn);
+
+	platform_set_drvdata(pdev, temp_sensor);
+
 	ret = omap_temp_sensor_enable(temp_sensor);
 	if (ret) {
 		dev_err(dev, "%s:Cannot enable temp sensor\n", __func__);
 		goto sensor_enable_err;
 	}
-
-	platform_set_drvdata(pdev, temp_sensor);
 
 	omap_enable_continuous_mode(temp_sensor);
 	omap_configure_temp_sensor_thresholds(temp_sensor);
@@ -542,10 +580,12 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	dev_info(dev, "%s probed", pdata->name);
 
 	temp_sensor_pm = temp_sensor;
+
 	return 0;
 
 sysfs_create_err:
 	free_irq(temp_sensor->tshut_irq, temp_sensor);
+	cancel_delayed_work_sync(&temp_sensor->throttle_work);
 tshut_irq_req_err:
 	free_irq(temp_sensor->irq, temp_sensor);
 req_irq_err:
@@ -566,10 +606,10 @@ plat_res_err:
 
 static int __devexit omap_temp_sensor_remove(struct platform_device *pdev)
 {
-	struct omap_temp_sensor *temp_sensor = container_of(pdev,
-					struct omap_temp_sensor, pdev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 
 	sysfs_remove_group(&pdev->dev.kobj, &omap_temp_sensor_group);
+	cancel_delayed_work_sync(&temp_sensor->throttle_work);
 	omap_temp_sensor_disable(temp_sensor);
 	clk_put(temp_sensor->clock);
 	platform_set_drvdata(pdev, NULL);
@@ -619,8 +659,7 @@ static void omap_temp_sensor_restore_ctxt(struct omap_temp_sensor *temp_sensor)
 static int omap_temp_sensor_suspend(struct platform_device *pdev,
 				    pm_message_t state)
 {
-	struct omap_temp_sensor *temp_sensor = container_of(pdev,
-					struct omap_temp_sensor, pdev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 
 	omap_temp_sensor_disable(temp_sensor);
 
@@ -629,8 +668,8 @@ static int omap_temp_sensor_suspend(struct platform_device *pdev,
 
 static int omap_temp_sensor_resume(struct platform_device *pdev)
 {
-	struct omap_temp_sensor *temp_sensor = container_of(pdev,
-					struct omap_temp_sensor, pdev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+
 	omap_temp_sensor_enable(temp_sensor);
 
 	return 0;
@@ -654,9 +693,9 @@ omap_temp_sensor_resume NULL
 #endif /* CONFIG_PM */
 static int omap_temp_sensor_runtime_suspend(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_temp_sensor *temp_sensor = container_of(pdev,
-					struct omap_temp_sensor, pdev);
+	struct omap_temp_sensor *temp_sensor =
+			platform_get_drvdata(to_platform_device(dev));
+
 	omap_temp_sensor_save_ctxt(temp_sensor);
 	temp_sensor->save_ctx = 1;
 	return 0;
@@ -664,9 +703,8 @@ static int omap_temp_sensor_runtime_suspend(struct device *dev)
 
 static int omap_temp_sensor_runtime_resume(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_temp_sensor *temp_sensor = container_of(pdev,
-					struct omap_temp_sensor, pdev);
+	struct omap_temp_sensor *temp_sensor =
+			platform_get_drvdata(to_platform_device(dev));
 	if (temp_sensor->save_ctx)
 		return 0;
 	if (omap_pm_was_context_lost(dev)) {

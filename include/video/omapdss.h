@@ -21,6 +21,7 @@
 #include <linux/list.h>
 #include <linux/kobject.h>
 #include <linux/device.h>
+#include <linux/fb.h>
 
 #define DISPC_IRQ_FRAMEDONE		(1 << 0)
 #define DISPC_IRQ_VSYNC			(1 << 1)
@@ -538,6 +539,7 @@ struct omap_dss_device {
 			u16 regm_dsi;
 
 			u16 lp_clk_div;
+			unsigned offset_ddr_clk;
 			enum omap_dss_clk_source dsi_fclk_src;
 		} dsi;
 
@@ -555,6 +557,7 @@ struct omap_dss_device {
 		int acb;	/* ac-bias pin frequency */
 
 		enum omap_panel_config config;
+		struct fb_monspecs monspecs;
 	} panel;
 
 	struct {
@@ -642,6 +645,11 @@ struct omap_dss_driver {
 
 	int (*set_wss)(struct omap_dss_device *dssdev, u32 wss);
 	u32 (*get_wss)(struct omap_dss_device *dssdev);
+	int (*get_modedb)(struct omap_dss_device *dssdev,
+			  struct fb_videomode *modedb,
+			  int modedb_len);
+	int (*set_mode)(struct omap_dss_device *dssdev,
+			struct fb_videomode *mode);
 
 	/* for wrapping around state changes */
 	void (*disable_orig)(struct omap_dss_device *display);
