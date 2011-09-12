@@ -1085,6 +1085,9 @@ static int omap_temp_sensor_resume(struct platform_device *pdev)
 
 void omap_temp_sensor_idle(int idle_state)
 {
+	if (!cpu_is_omap446x())
+		return;
+
 	if (idle_state)
 		omap_temp_sensor_disable(temp_sensor_pm);
 	else
