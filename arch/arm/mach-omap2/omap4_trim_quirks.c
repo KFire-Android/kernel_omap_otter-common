@@ -84,10 +84,6 @@ int omap4_ldo_trim_configure(void)
 	val = OMAP4_LPDDR2_PTV_P5_MASK | OMAP4_LPDDR2_PTV_N5_MASK;
 	omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_2);
 
-	/* Required for DPLL_MPU to lock at 2.4 GHz */
-	if (cpu_is_omap446x())
-		omap_ctrl_writel(0x29, OMAP4_CTRL_MODULE_CORE_DPLL_NWELL_TRIM_0);
-
 	return 0;
 }
 arch_initcall(omap4_ldo_trim_configure);
