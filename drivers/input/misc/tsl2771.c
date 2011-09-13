@@ -869,8 +869,7 @@ static int tsl2771_driver_suspend(struct i2c_client *client,
 	if (!(data->power_state & 0x2)) {
 		if (data->pdata->tsl2771_pwr_control)
 			data->pdata->tsl2771_pwr_control(0);
-	} else
-		pr_info("%s:Not powering down the sensor\n", __func__);
+	}
 
 	return 0;
 }
