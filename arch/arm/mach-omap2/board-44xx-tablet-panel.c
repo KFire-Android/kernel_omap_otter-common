@@ -176,6 +176,7 @@ static struct omap_dss_device tablet_lcd_device = {
 			.regm_dispc     = 6,
 			.regm_dsi       = 9,
 			.lp_clk_div     = 5,
+			.offset_ddr_clk = 0,
 			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
 		},
 	},

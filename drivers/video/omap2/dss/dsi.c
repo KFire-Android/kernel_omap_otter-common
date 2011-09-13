@@ -2429,7 +2429,10 @@ static int dsi_cio_init(struct omap_dss_device *dssdev)
 
 	if (cpu_is_omap44xx()) {
 		/* DDR_CLK_ALWAYS_ON */
-		REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 0, 13, 13);
+                if (dssdev->clocks.dsi.offset_ddr_clk > 0)
+			REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 0, 13, 13);
+		else
+			REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 1, 13, 13);
 		/* HS_AUTO_STOP_ENABLE */
 		REG_FLD_MOD(dsidev, DSI_CLK_CTRL, 1, 18, 18);
 	}
@@ -3880,7 +3883,8 @@ static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 	r = FLD_MOD(r, 1, 15, 15);	/* VP_VSYNC_START */
 	r = FLD_MOD(r, 1, 17, 17);	/* VP_HSYNC_START */
 	r = FLD_MOD(r, 1, 19, 19);	/* EOT_ENABLE */
-	r = FLD_MOD(r, 1, 20, 20);	/* BLANKING_MODE */
+	if (dssdev->clocks.dsi.offset_ddr_clk > 0)
+		r = FLD_MOD(r, 1, 20, 20);	/* BLANKING_MODE */
 	r = FLD_MOD(r, 1, 21, 21);	/* HFP_BLANKING */
 	r = FLD_MOD(r, 1, 22, 22);	/* HBP_BLANKING */
 	r = FLD_MOD(r, 1, 23, 23);	/* HSA_BLANKING */
