@@ -429,6 +429,18 @@ static int twl6030reg_set_mode(struct regulator_dev *rdev, unsigned mode)
 	return twlreg_write(info, TWL_MODULE_PM_RECEIVER, VREG_STATE, val);
 }
 
+static int twl6030ldo_suspend_enable(struct regulator_dev *rdev)
+{
+	return twl6030reg_set_trans_state(rdev, TWL6030_CFG_TRANS_SLEEP_SHIFT,
+					TWL6030_CFG_TRANS_STATE_AUTO);
+}
+
+static int twl6030ldo_suspend_disable(struct regulator_dev *rdev)
+{
+	return twl6030reg_set_trans_state(rdev, TWL6030_CFG_TRANS_SLEEP_SHIFT,
+					TWL6030_CFG_TRANS_STATE_OFF);
+}
+
 /*----------------------------------------------------------------------*/
 
 /*
@@ -704,6 +716,9 @@ static struct regulator_ops twl6030ldo_ops = {
 	.set_mode	= twl6030reg_set_mode,
 
 	.get_status	= twl6030reg_get_status,
+
+	.set_suspend_enable	= twl6030ldo_suspend_enable,
+	.set_suspend_disable	= twl6030ldo_suspend_disable,
 };
 
 /*----------------------------------------------------------------------*/
@@ -751,6 +766,9 @@ static struct regulator_ops twl6030fixed_ops = {
 	.set_mode	= twl6030reg_set_mode,
 
 	.get_status	= twl6030reg_get_status,
+
+	.set_suspend_enable	= twl6030ldo_suspend_enable,
+	.set_suspend_disable	= twl6030ldo_suspend_disable,
 };
 
 static struct regulator_ops twl6030_fixed_resource = {
@@ -969,6 +987,9 @@ static struct regulator_ops twlsmps_ops = {
 	.set_mode		= twl6030reg_set_mode,
 
 	.get_status		= twl6030reg_get_status,
+
+	.set_suspend_enable	= twl6030ldo_suspend_enable,
+	.set_suspend_disable	= twl6030ldo_suspend_disable,
 };
 
 static struct regulator_ops twl6030_external_control_pin_ops = {
@@ -979,6 +1000,9 @@ static struct regulator_ops twl6030_external_control_pin_ops = {
 	.set_mode		= twl6030reg_set_mode,
 
 	.get_status		= twl6030reg_get_status,
+
+	.set_suspend_enable	= twl6030ldo_suspend_enable,
+	.set_suspend_disable	= twl6030ldo_suspend_disable,
 };
 
 static struct regulator_ops twl6032_ext_ops = {
