@@ -49,6 +49,7 @@
 
 static int twl6040_power_mode;
 static int mcbsp_cfg;
+static struct snd_soc_codec *twl6040_codec;
 static struct i2c_client *tps6130x_client;
 static struct i2c_board_info tps6130x_hwmon_info = {
 	I2C_BOARD_INFO("tps6130x", 0x33),
@@ -379,6 +380,27 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"Digital Mic1 Bias", NULL, "Digital Mic 2"},
 };
 
+static int sdp4430_set_pdm_dl1_gains(struct snd_soc_dapm_context *dapm)
+{
+	int output, val;
+
+	if (snd_soc_dapm_get_pin_power(dapm, "Earphone Spk")) {
+		output = OMAP_ABE_DL1_EARPIECE;
+	} else if (snd_soc_dapm_get_pin_power(dapm, "Headset Stereophone")) {
+		val = snd_soc_read(twl6040_codec, TWL6040_REG_HSLCTL);
+		if (val & TWL6040_HSDACMODEL)
+			/* HSDACL in LP mode */
+			output = OMAP_ABE_DL1_HEADSET_LP;
+		else
+			/* HSDACL in HP mode */
+			output = OMAP_ABE_DL1_HEADSET_HP;
+	} else {
+		output = OMAP_ABE_DL1_NO_PDM;
+	}
+
+	return omap_abe_set_dl1_output(output);
+}
+
 static int sdp4430_mcpdm_twl6040_pre(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -528,6 +550,15 @@ static int sdp4430_dmic_init(struct snd_soc_pcm_runtime *rtd)
 	ret = snd_soc_dapm_sync(dapm);
 
 	return ret;
+}
+
+static int sdp4430_stream_event(struct snd_soc_dapm_context *dapm)
+{
+	/*
+	 * set DL1 gains dynamically according to the active output
+	 * (Headset, Earpiece) and HSDAC power mode
+	 */
+	return sdp4430_set_pdm_dl1_gains(dapm);
 }
 
 /* TODO: make this a separate BT CODEC driver or DUMMY */
@@ -967,6 +998,7 @@ static struct snd_soc_card snd_soc_sdp4430 = {
 	.long_name = "TI OMAP4 Board",
 	.dai_link = sdp4430_dai,
 	.num_links = ARRAY_SIZE(sdp4430_dai),
+	.stream_event = sdp4430_stream_event,
 };
 
 static struct platform_device *sdp4430_snd_device;
@@ -1042,6 +1074,11 @@ static int __init sdp4430_soc_init(void)
 	i2c_put_adapter(adapter);
 
 	return ret;
+
+	twl6040_codec = snd_soc_card_get_codec(&snd_soc_sdp4430,
+					"twl6040-codec");
+
+	return 0;
 
 tps_err:
        i2c_put_adapter(adapter);
