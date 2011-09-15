@@ -46,6 +46,7 @@
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
 #include <plat/omap_apps_brd_id.h>
+#include <plat/omap-serial.h>
 #include <plat/remoteproc.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
@@ -986,20 +987,110 @@ static __initdata struct emif_device_details emif_devices = {
 	.cs1_device = &lpddr2_elpida_2G_S4_dev
 };
 
-static inline void __init board_serial_init(void)
-{
-	omap_serial_init();
-}
-
 #else
 #define board_mux	NULL
 #define board_wkup_mux NULL
+#endif
 
-static inline void board_serial_init(void)
+static struct omap_device_pad blaze_uart1_pads[] __initdata = {
+	{
+		.name	= "uart1_cts.uart1_cts",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart1_rts.uart1_rts",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart1_tx.uart1_tx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart1_rx.uart1_rx",
+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+};
+
+
+static struct omap_device_pad blaze_uart2_pads[] __initdata = {
+	{
+		.name	= "uart2_cts.uart2_cts",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.flags  = OMAP_DEVICE_PAD_REMUX,
+		.idle   = OMAP_WAKEUP_EN | OMAP_PIN_OFF_INPUT_PULLUP |
+			OMAP_OFFOUT_EN | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart2_rts.uart2_rts",
+		.flags  = OMAP_DEVICE_PAD_REMUX,
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+		.idle   = OMAP_PIN_OFF_INPUT_PULLUP | OMAP_MUX_MODE7,
+	},
+	{
+		.name	= "uart2_tx.uart2_tx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart2_rx.uart2_rx",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+};
+
+static struct omap_device_pad blaze_uart3_pads[] __initdata = {
+	{
+		.name	= "uart3_cts_rctx.uart3_cts_rctx",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart3_rts_sd.uart3_rts_sd",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart3_tx_irtx.uart3_tx_irtx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart3_rx_irrx.uart3_rx_irrx",
+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+	},
+};
+
+static struct omap_device_pad blaze_uart4_pads[] __initdata = {
+	{
+		.name	= "uart4_tx.uart4_tx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart4_rx.uart4_rx",
+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+	},
+};
+
+static struct omap_uart_port_info blaze_uart2_info __initdata = {
+	.use_dma	= 0,
+	.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
+	.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
+	.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
+	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+};
+
+static inline void __init board_serial_init(void)
 {
-	omap_serial_init();
+	omap_serial_init_port_pads(0, blaze_uart1_pads,
+		ARRAY_SIZE(blaze_uart1_pads), NULL);
+	omap_serial_init_port_pads(1, blaze_uart2_pads,
+		ARRAY_SIZE(blaze_uart2_pads), &blaze_uart2_info);
+	omap_serial_init_port_pads(2, blaze_uart3_pads,
+		ARRAY_SIZE(blaze_uart3_pads), NULL);
+	omap_serial_init_port_pads(3, blaze_uart4_pads,
+		ARRAY_SIZE(blaze_uart4_pads), NULL);
 }
- #endif
 
 static void omap4_sdp4430_wifi_mux_init(void)
 {
