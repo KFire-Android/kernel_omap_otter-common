@@ -24,6 +24,8 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/input.h>
+#include <linux/pm.h>
+#include <linux/platform_device.h>
 #include <linux/workqueue.h>
 #include <linux/i2c.h>
 #include <linux/i2c/tsl2771.h>
@@ -851,10 +853,11 @@ static int __devexit tsl2771_driver_remove(struct i2c_client *client)
 /* TO DO: Need to run through the power management APIs to make sure we
  * do not break power management and the sensor */
 #ifdef CONFIG_PM
-static int tsl2771_driver_suspend(struct i2c_client *client,
-				pm_message_t mesg)
+static int tsl2771_driver_suspend(struct device *dev)
 {
-	struct tsl2771_data *data = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct tsl2771_data *data = platform_get_drvdata(pdev);
+
 	/* TO DO: May need to retain the interrupt thresholds but won't know
 	 * until the thresholds are implemented */
 	data->power_context = data->power_state;
@@ -874,9 +877,10 @@ static int tsl2771_driver_suspend(struct i2c_client *client,
 	return 0;
 }
 
-static int tsl2771_driver_resume(struct i2c_client *client)
+static int tsl2771_driver_resume(struct device *dev)
 {
-	struct tsl2771_data *data = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct tsl2771_data *data = platform_get_drvdata(pdev);
 
 	if (data->pdata->tsl2771_pwr_control) {
 		data->pdata->tsl2771_pwr_control(1);
@@ -897,6 +901,11 @@ static int tsl2771_driver_resume(struct i2c_client *client)
 
 	return 0;
 }
+
+static const struct dev_pm_ops tsl2771_pm_ops = {
+	.suspend = tsl2771_driver_suspend,
+	.resume = tsl2771_driver_resume,
+};
 #endif
 
 static const struct i2c_device_id tsl2771_idtable[] = {
@@ -910,12 +919,11 @@ static struct i2c_driver tsl2771_driver = {
 	.probe		= tsl2771_driver_probe,
 	.remove		= tsl2771_driver_remove,
 	.id_table	= tsl2771_idtable,
-#ifdef CONFIG_PM
-	.suspend	= tsl2771_driver_suspend,
-	.resume		= tsl2771_driver_resume,
-#endif
 	.driver = {
-		.name = TSL2771_NAME
+		.name = TSL2771_NAME,
+#ifdef CONFIG_PM
+		.pm = &tsl2771_pm_ops,
+#endif
 	},
 };
 
