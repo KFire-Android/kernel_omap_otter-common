@@ -20,6 +20,8 @@
  */
 
 #include <linux/module.h>
+#include <linux/pm.h>
+#include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
 #include <linux/i2c/cma3000.h>
@@ -85,19 +87,27 @@ static int __devexit cma3000_accl_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
-static int cma3000_accl_suspend(struct i2c_client *client, pm_message_t mesg)
+static int cma3000_accl_suspend(struct device *dev)
 {
-	struct cma3000_accl_data *data = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
 
 	return cma3000_poweroff(data);
 }
 
-static int cma3000_accl_resume(struct i2c_client *client)
+static int cma3000_accl_resume(struct device *dev)
 {
-	struct cma3000_accl_data *data = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct cma3000_accl_data *data = platform_get_drvdata(pdev);
 
 	return cma3000_poweron(data);
 }
+
+static const struct dev_pm_ops cma3000_pm_ops = {
+	.suspend = cma3000_accl_suspend,
+	.resume = cma3000_accl_resume,
+};
+
 #endif
 
 static const struct i2c_device_id cma3000_id[] = {
@@ -109,12 +119,11 @@ static struct i2c_driver cma3000_accl_driver = {
 	.probe		= cma3000_accl_probe,
 	.remove		= cma3000_accl_remove,
 	.id_table	= cma3000_id,
-#ifdef CONFIG_PM
-	.suspend	= cma3000_accl_suspend,
-	.resume		= cma3000_accl_resume,
-#endif
 	.driver = {
-		.name = "cma3000_accl"
+		.name = "cma3000_accl",
+#ifdef CONFIG_PM
+		.pm = &cma3000_pm_ops,
+#endif
 	},
 };
 
