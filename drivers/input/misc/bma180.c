@@ -25,6 +25,8 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/input.h>
+#include <linux/pm.h>
+#include <linux/platform_device.h>
 #include <linux/workqueue.h>
 #include <linux/i2c.h>
 #include <linux/i2c/bma180.h>
@@ -746,10 +748,10 @@ static int __devexit bma180_accel_driver_remove(struct i2c_client *client)
 
 
 #ifdef CONFIG_PM
-static int bma180_accel_driver_suspend(struct i2c_client *client,
-				pm_message_t mesg)
+static int bma180_accel_driver_suspend(struct device *dev)
 {
-	struct bma180_accel_data *data = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct bma180_accel_data *data = platform_get_drvdata(pdev);
 
 	mutex_lock(&data->mutex);
 	if (!data->pdata->mode) {
@@ -767,9 +769,10 @@ static int bma180_accel_driver_suspend(struct i2c_client *client,
 	return 0;
 }
 
-static int bma180_accel_driver_resume(struct i2c_client *client)
+static int bma180_accel_driver_resume(struct device *dev)
 {
-	struct bma180_accel_data *data = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct bma180_accel_data *data = platform_get_drvdata(pdev);
 
 	mutex_lock(&data->mutex);
 	if (data->pdata->mode) {
@@ -791,6 +794,11 @@ static int bma180_accel_driver_resume(struct i2c_client *client)
 
 	return 0;
 }
+
+static const struct dev_pm_ops bma180_pm_ops = {
+	.suspend = bma180_accel_driver_suspend,
+	.resume = bma180_accel_driver_resume,
+};
 #endif
 
 static const struct i2c_device_id bma180_accel_idtable[] = {
@@ -804,12 +812,11 @@ static struct i2c_driver bma180_accel_driver = {
 	.probe		= bma180_accel_driver_probe,
 	.remove		= bma180_accel_driver_remove,
 	.id_table	= bma180_accel_idtable,
-#ifdef CONFIG_PM
-	.suspend	= bma180_accel_driver_suspend,
-	.resume		= bma180_accel_driver_resume,
-#endif
 	.driver = {
-		.name = DRIVER_NAME
+		.name = DRIVER_NAME,
+#ifdef CONFIG_PM
+		.pm = &bma180_pm_ops,
+#endif
 	},
 };
 
