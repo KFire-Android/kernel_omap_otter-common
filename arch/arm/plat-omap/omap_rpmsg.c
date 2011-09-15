@@ -50,6 +50,10 @@ struct omap_rpmsg_vproc {
 	struct rproc *rproc;
 	struct notifier_block nb;
 	struct notifier_block rproc_nb;
+	struct notifier_block rproc_nb_pos_suspend;
+	struct notifier_block rproc_nb_resume;
+	struct notifier_block rproc_nb_error;
+	struct work_struct reset_work;
 	struct virtqueue *vq[2];
 	int base_vq_id;
 	int num_of_vqs;
@@ -198,6 +202,20 @@ static int omap_rpmsg_mbox_callback(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
+static int rpmsg_rproc_error(struct notifier_block *this,
+				unsigned long type, void *data)
+{
+	struct omap_rpmsg_vproc *rpdev =
+		container_of(this, struct omap_rpmsg_vproc, rproc_nb_error);
+
+	pr_err("Fatal error in %s\n", rpdev->rproc_name);
+#ifdef CONFIG_OMAP_RPMSG_RECOVERY
+	schedule_work(&rpdev->reset_work);
+#endif
+
+	return NOTIFY_DONE;
+}
+
 static int rpmsg_rproc_suspend(struct notifier_block *this,
 				unsigned long type, void *data)
 {
@@ -209,6 +227,35 @@ static int rpmsg_rproc_suspend(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
+static int rpmsg_rproc_pos_suspend(struct notifier_block *this,
+				unsigned long type, void *data)
+{
+	struct omap_rpmsg_vproc *rpdev =
+			container_of(this,
+				     struct omap_rpmsg_vproc,
+				     rproc_nb_pos_suspend);
+
+	if (rpdev->mbox) {
+		omap_mbox_put(rpdev->mbox, &rpdev->nb);
+		rpdev->mbox = NULL;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static int rpmsg_rproc_resume(struct notifier_block *this,
+				unsigned long type, void *data)
+{
+	struct omap_rpmsg_vproc *rpdev =
+			container_of(this,
+				     struct omap_rpmsg_vproc,
+				     rproc_nb_resume);
+
+	if (!rpdev->mbox)
+		rpdev->mbox = omap_mbox_get(rpdev->mbox_name, &rpdev->nb);
+
+	return NOTIFY_DONE;
+}
 static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
 				    unsigned index,
 				    void (*callback)(struct virtqueue *vq),
@@ -267,6 +314,9 @@ static void omap_rpmsg_del_vqs(struct virtio_device *vdev)
 
 	rproc_event_unregister(rpdev->rproc, &rpdev->rproc_nb,
 				RPROC_PRE_SUSPEND);
+
+	rproc_event_unregister(rpdev->rproc, &rpdev->rproc_nb_error,
+				RPROC_ERROR);
 
 	list_for_each_entry_safe(vq, n, &vdev->vqs, list) {
 		struct omap_rpmsg_vq_info *rpvq = vq->priv;
@@ -360,6 +410,21 @@ static int omap_rpmsg_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 	rpdev->rproc_nb.notifier_call = rpmsg_rproc_suspend;
 	rproc_event_register(rpdev->rproc, &rpdev->rproc_nb, RPROC_PRE_SUSPEND);
 
+	/* register for remoteproc post-suspend */
+	rpdev->rproc_nb_pos_suspend.notifier_call = rpmsg_rproc_pos_suspend;
+	rproc_event_register(rpdev->rproc,
+			     &rpdev->rproc_nb_pos_suspend, RPROC_POS_SUSPEND);
+
+	/* register for remoteproc resume */
+	rpdev->rproc_nb_resume.notifier_call = rpmsg_rproc_resume;
+	rproc_event_register(rpdev->rproc,
+			     &rpdev->rproc_nb_resume, RPROC_RESUME);
+
+	/* register for fatal errors */
+	INIT_WORK(&rpdev->reset_work, rpmsg_reset_work);
+	rpdev->rproc_nb_error.notifier_call = rpmsg_rproc_error;
+	rproc_event_register(rpdev->rproc, &rpdev->rproc_nb_error, RPROC_ERROR);
+
 	return 0;
 
 put_mbox:
@@ -407,6 +472,21 @@ static void omap_rpmsg_finalize_features(struct virtio_device *vdev)
 static void omap_rpmsg_vproc_release(struct device *dev)
 {
 	/* this handler is provided so driver core doesn't yell at us */
+}
+
+static void rpmsg_reset_work(struct work_struct *work)
+{
+	struct omap_rpmsg_vproc *rpdev =
+		container_of(work, struct omap_rpmsg_vproc, reset_work);
+	int ret;
+
+	pr_err("reseting virtio device %d\n", rpdev->vdev.index);
+	unregister_virtio_device(&rpdev->vdev);
+	memset(&rpdev->vdev.dev, 0, sizeof(struct device));
+	rpdev->vdev.dev.release = omap_rpmsg_vproc_release;
+	ret = register_virtio_device(&rpdev->vdev);
+	if (ret)
+		pr_err("error creating virtio device %d\n", ret);
 }
 
 static struct virtio_config_ops omap_rpmsg_config_ops = {
