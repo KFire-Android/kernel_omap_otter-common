@@ -27,6 +27,8 @@
 #include <linux/i2c.h>
 #include <linux/input.h>
 #include <linux/input-polldev.h>
+#include <linux/pm.h>
+#include <linux/platform_device.h>
 #include <linux/slab.h>
 
 #define	HMC5843_CFG_A_REG			0
@@ -614,9 +616,10 @@ static int __devexit hmc5843_i2c_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
-static int hmc5843_suspend(struct i2c_client *client, pm_message_t mesg)
+static int hmc5843_suspend(struct device *dev)
 {
-	struct hmc5843 *hmc5843 = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct hmc5843 *hmc5843 = platform_get_drvdata(pdev);
 
 	/* save our current mode for resume and put device to sleep */
 	int m = hmc5843->mode;
@@ -629,9 +632,10 @@ static int hmc5843_suspend(struct i2c_client *client, pm_message_t mesg)
 	return 0;
 }
 
-static int hmc5843_resume(struct i2c_client *client)
+static int hmc5843_resume(struct device *dev)
 {
-	struct hmc5843 *hmc5843 = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct hmc5843 *hmc5843 = platform_get_drvdata(pdev);
 
 	/* restore whatever mode we were in before suspending */
 	if (hmc5843->enable != 0) {
@@ -643,6 +647,10 @@ static int hmc5843_resume(struct i2c_client *client)
 	return 0;
 }
 
+static const struct dev_pm_ops hmc5843_pm_ops = {
+	.suspend = hmc5843_suspend,
+	.resume = hmc5843_resume,
+};
 #endif
 
 static const struct i2c_device_id hmc5843_id[] = {
@@ -656,14 +664,13 @@ static struct i2c_driver hmc5843_i2c_driver = {
 	.driver		= {
 		.name	= "hmc5843",
 		.owner	= THIS_MODULE,
+#ifdef CONFIG_PM
+		.pm = &hmc5843_pm_ops,
+#endif
 	},
 	.probe		= hmc5843_i2c_probe,
 	.remove		= __devexit_p(hmc5843_i2c_remove),
 	.id_table	= hmc5843_id,
-#ifdef CONFIG_PM
-	.suspend = hmc5843_suspend,
-	.resume	= hmc5843_resume,
-#endif
 };
 
 static int __init hmc5843_init(void)
