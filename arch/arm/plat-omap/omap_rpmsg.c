@@ -61,6 +61,7 @@ struct omap_rpmsg_vproc {
 };
 
 #define to_omap_rpdev(vd) container_of(vd, struct omap_rpmsg_vproc, vdev)
+static void rpmsg_reset_work(struct work_struct *work);
 
 struct omap_rpmsg_vq_info {
 	__u16 num;	/* number of entries in the virtio_ring */
