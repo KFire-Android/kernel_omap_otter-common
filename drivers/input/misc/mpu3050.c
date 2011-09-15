@@ -27,6 +27,8 @@
 #include <linux/input.h>
 #include <linux/workqueue.h>
 #include <linux/i2c.h>
+#include <linux/pm.h>
+#include <linux/platform_device.h>
 #include <linux/i2c/mpu3050.h>
 #include <linux/gpio.h>
 
@@ -676,10 +678,10 @@ static int __devexit mpu3050_driver_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
-static int mpu3050_driver_suspend(struct i2c_client *client,
-		pm_message_t mesg)
+static int mpu3050_driver_suspend(struct device *dev)
 {
-	struct mpu3050_gyro_data *data = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu3050_gyro_data *data = platform_get_drvdata(pdev);
 
 	mutex_lock(&data->mutex);
 	if (!data->enable) {
@@ -701,9 +703,10 @@ static int mpu3050_driver_suspend(struct i2c_client *client,
 	return 0;
 }
 
-static int mpu3050_driver_resume(struct i2c_client *client)
+static int mpu3050_driver_resume(struct device *dev)
 {
-	struct mpu3050_gyro_data *data = i2c_get_clientdata(client);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu3050_gyro_data *data = platform_get_drvdata(pdev);
 
 	mutex_lock(&data->mutex);
 	if (data->enable) {
@@ -729,6 +732,11 @@ static int mpu3050_driver_resume(struct i2c_client *client)
 
 	return 0;
 }
+
+static const struct dev_pm_ops mpu3050_pm_ops = {
+	.suspend = mpu3050_driver_suspend,
+	.resume = mpu3050_driver_resume,
+};
 #endif
 
 static const struct i2c_device_id mpu3050_idtable[] = {
@@ -742,12 +750,11 @@ static struct i2c_driver mpu3050_driver = {
 	.probe		= mpu3050_driver_probe,
 	.remove		= mpu3050_driver_remove,
 	.id_table	= mpu3050_idtable,
-#ifdef CONFIG_PM
-	.suspend	= mpu3050_driver_suspend,
-	.resume		= mpu3050_driver_resume,
-#endif
 	.driver = {
-		.name = DRIVER_NAME
+		.name = DRIVER_NAME,
+#ifdef CONFIG_PM
+		.pm = &mpu3050_pm_ops,
+#endif
 	},
 };
 
