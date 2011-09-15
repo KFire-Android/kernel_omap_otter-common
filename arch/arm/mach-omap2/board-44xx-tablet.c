@@ -487,6 +487,12 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus(4, 400, NULL, 0);
 
 	/*
+	 * This will allow unused regulator to be shutdown. This flag
+	 * should be set in the board file. Before regulators are registered.
+	 */
+	regulator_has_full_constraints();
+
+	/*
 	 * Drive MSECURE high for TWL6030 write access.
 	 */
 	omap_mux_init_signal("fref_clk0_out.gpio_wk6", OMAP_PIN_OUTPUT);
