@@ -542,6 +542,11 @@ config OMAP_DIE_TEMP_SENSOR
           Enabling this config will give support for the on-die
           temp sensor for the OMAP platform.
 
+config TWL6040_VIB
+	bool "TWL6040 Vibrator"
+	depends on TWL6040_CODEC && ANDROID_TIMED_OUTPUT
+	default n
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
