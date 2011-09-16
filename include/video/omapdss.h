@@ -281,7 +281,6 @@ void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev);
 struct omap_dss_board_info {
 	int (*get_context_loss_count)(struct device *dev);
 	int num_devices;
-	bool move_wb_buffers;
 	struct omap_dss_device **devices;
 	struct omap_dss_device *default_device;
 	void (*dsi_mux_pads)(bool enable);
