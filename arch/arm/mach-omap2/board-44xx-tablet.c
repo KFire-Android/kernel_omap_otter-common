@@ -22,6 +22,7 @@
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
 #include <linux/i2c/twl.h>
+#include <linux/twl6040-vib.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/wl12xx.h>
@@ -442,7 +443,8 @@ static struct twl4030_codec_audio_data twl6040_audio = {
 };
 
 static struct twl4030_codec_vibra_data twl6040_vibra = {
-	/* Add vibra only data */
+	.max_timeout	= 15000,
+	.initial_vibrate = 0,
 };
 
 static struct twl4030_codec_data twl6040_codec = {
