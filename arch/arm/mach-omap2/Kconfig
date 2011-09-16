@@ -348,6 +348,7 @@ config MACH_OMAP_BLAZE
 	select INPUT_BMA180
 	select PANEL_TC358765
 	select KEYBOARD_GPIO
+	select TWL6040_VIB
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
