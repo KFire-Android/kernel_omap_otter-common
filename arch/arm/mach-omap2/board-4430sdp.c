@@ -27,6 +27,7 @@
 #include <linux/leds_pwm.h>
 #include <linux/omapfb.h>
 #include <linux/reboot.h>
+#include <linux/twl6040-vib.h>
 #include <linux/wl12xx.h>
 #include <linux/memblock.h>
 
@@ -693,7 +694,8 @@ static struct twl4030_codec_audio_data twl6040_audio = {
 };
 
 static struct twl4030_codec_vibra_data twl6040_vibra = {
-	/* Add vibra only data */
+	.max_timeout	= 15000,
+	.initial_vibrate = 0,
 };
 
 static struct twl4030_codec_data twl6040_codec = {
