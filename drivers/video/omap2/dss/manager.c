@@ -693,18 +693,26 @@ static int omap_dss_unset_device(struct omap_overlay_manager *mgr)
 static int dss_mgr_wait_for_vsync(struct omap_overlay_manager *mgr)
 {
 	unsigned long timeout = msecs_to_jiffies(500);
-	u32 irq;
+	u32 irq = 0; /* For non-supported panels will cause a timeout */
 
 	if (mgr->device->type == OMAP_DISPLAY_TYPE_VENC) {
 		irq = DISPC_IRQ_EVSYNC_ODD;
 	} else if (mgr->device->type == OMAP_DISPLAY_TYPE_HDMI) {
 		irq = DISPC_IRQ_EVSYNC_EVEN;
-	} else {
-		if (mgr->id == OMAP_DSS_CHANNEL_LCD)
+	} else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI) &&
+			(mgr->device->channel == OMAP_DSS_CHANNEL_LCD)) {
+		if (mgr->device->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE)
 			irq = DISPC_IRQ_VSYNC;
 		else
+			irq = DISPC_IRQ_FRAMEDONE;
+	} else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI) &&
+			(mgr->device->channel == OMAP_DSS_CHANNEL_LCD2)) {
+		if (mgr->device->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE)
 			irq = DISPC_IRQ_VSYNC2;
+		else
+			irq = DISPC_IRQ_FRAMEDONE2;
 	}
+
 	return omap_dispc_wait_for_irq_interruptible_timeout(irq, timeout);
 }
 
