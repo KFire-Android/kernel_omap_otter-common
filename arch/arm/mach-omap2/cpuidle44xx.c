@@ -104,23 +104,23 @@ static struct clockdomain *cpu1_cd;
 /*
  * Raw measured exit latency numbers (us):
  * state	average		max
- * C2		1597		3418
- * C3		2167		4153
- * C4		2225		4943
+ * C2		383		1068
+ * C3		641		1190
+ * C4		769		1323
  */
 
 static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 - CPUx WFI + MPU ON  + CORE ON */
 	{.exit_latency = 2 + 2,	.target_residency = 5, .valid = 1},
 	/* C2 - CPU0 INA + CPU1 INA + MPU INA  + CORE INA */
-	{.exit_latency = 3500, .target_residency = 3500, .valid = 1},
+	{.exit_latency = 1100, .target_residency = 1100, .valid = 1},
 	/* C3 - CPU0 OFF + CPU1 OFF + MPU CSWR + CORE CSWR */
-	{.exit_latency = 4200, .target_residency = 4200, .valid = 1},
+	{.exit_latency = 1200, .target_residency = 10, .valid = 1},
 #ifdef CONFIG_OMAP_ALLOW_OSWR
 	/* C4 - CPU0 OFF + CPU1 OFF + MPU OSWR + CORE OSWR */
-	{.exit_latency = 5000, .target_residency = 5000, .valid = 1},
+	{.exit_latency = 1500, .target_residency = 1200, .valid = 1},
 #else
-	{.exit_latency = 5000, .target_residency = 5000, .valid = 0},
+	{.exit_latency = 1500, .target_residency = 1500, .valid = 0},
 #endif
 };
 
@@ -135,6 +135,27 @@ static void omap4_update_actual_state(struct cpuidle_device *dev,
 			return;
 		}
 	}
+}
+
+/**
+ * omap4_wfi_until_interrupt
+ *
+ * wfi can sometimes return with no interrupts pending, for example on a
+ * broadcast cache flush or tlb op.  This function will call wfi repeatedly
+ * until an interrupt is actually pending.  Returning without looping would
+ * cause very short idle times to be reported to the idle governor, messing
+ * with repeating interrupt detection, and causing deep idle states to be
+ * avoided.
+ */
+static void omap4_wfi_until_interrupt(void)
+{
+	void __iomem *gic_cpu = omap4_get_gic_cpu_base();
+
+retry:
+	omap_do_wfi();
+
+	if (__raw_readl(gic_cpu + GIC_CPU_HIGHPRI) == 0x3FF)
+		goto retry;
 }
 
 /**
@@ -155,8 +176,7 @@ static bool omap4_idle_wait(void)
 	/* Unmask the "event" interrupt */
 	__raw_writel(bit, gic_dist + GIC_DIST_ENABLE_SET + reg);
 
-	dsb();
-	__asm__ volatile ("wfi");
+	omap4_wfi_until_interrupt();
 
 	/* Read the "event" interrupt pending bit */
 	poked = __raw_readl(gic_dist + GIC_DIST_PENDING_SET + reg) & bit;
@@ -204,7 +224,7 @@ static int omap4_enter_idle_wfi(struct cpuidle_device *dev,
 
 	preidle = ktime_get();
 
-	omap_do_wfi();
+	omap4_wfi_until_interrupt();
 
 	postidle = ktime_get();
 
