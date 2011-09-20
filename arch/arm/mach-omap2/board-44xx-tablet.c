@@ -79,6 +79,7 @@
 				OMAP_ION_HEAP_SECURE_INPUT_SIZE)
 
 #define OMAP4_MDM_PWR_EN_GPIO       157
+#define GPIO_WK30		    30
 
 static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	{
@@ -773,6 +774,17 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 
 static void __init omap4_ehci_ohci_init(void)
 {
+	omap_mux_init_signal("fref_clk3_req.gpio_wk30", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE | OMAP_PULL_ENA);
+
+	/* Enable 5V,1A USB power on external HS-USB ports */
+	if (gpio_is_valid(GPIO_WK30)) {
+		gpio_request(GPIO_WK30, "USB POWER GPIO");
+		gpio_direction_output(GPIO_WK30, 1);
+		gpio_set_value(GPIO_WK30, 0);
+	}
+
 	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
 		OMAP_PIN_OUTPUT | \
 		OMAP_PIN_OFF_NONE);
