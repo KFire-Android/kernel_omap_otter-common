@@ -459,6 +459,8 @@ static int omap_dmic_set_dai_sysclk(struct snd_soc_dai *dai,
 			dev_err(dmic->dev, "clock set to %d Hz failed\n", freq);
 		else
 			dmic->clk_freq = freq;
+	} else {
+		dmic->clk_freq = freq;
 	}
 
 err_busy:
