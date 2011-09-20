@@ -62,6 +62,7 @@
 #define TPS62361_GPIO			7
 
 #define OMAP4_MDM_PWR_EN_GPIO		157
+#define OMAP4_GPIO_WK30			30
 
 #define TABLET_FB_RAM_SIZE		SZ_16M /* 1920×1080*4 * 2 */
 
@@ -713,6 +714,17 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 
 static void __init omap4_ehci_ohci_init(void)
 {
+	omap_mux_init_signal("fref_clk3_req.gpio_wk30", \
+		OMAP_PIN_OUTPUT | \
+		OMAP_PIN_OFF_NONE | OMAP_PULL_ENA);
+
+	/* Enable 5V,1A USB power on external HS-USB ports */
+	if (gpio_is_valid(OMAP4_GPIO_WK30)) {
+		gpio_request(OMAP4_GPIO_WK30, "USB POWER GPIO");
+		gpio_direction_output(OMAP4_GPIO_WK30, 1);
+		gpio_set_value(OMAP4_GPIO_WK30, 0);
+	}
+
 	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
 		OMAP_PIN_OUTPUT | \
 		OMAP_PIN_OFF_NONE);
@@ -726,7 +738,6 @@ static void __init omap4_ehci_ohci_init(void)
 	usbhs_init(&usbhs_bdata);
 
 	return;
-
 }
 #else
 static void __init omap4_ehci_ohci_init(void){}
