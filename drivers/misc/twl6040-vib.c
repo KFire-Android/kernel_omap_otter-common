@@ -43,7 +43,7 @@ struct vib_data {
 	int vib_state;
 };
 
-struct vib_data *misc_data;
+static struct vib_data *misc_data;
 
 static irqreturn_t twl6040_vib_irq_handler(int irq, void *data)
 {
@@ -73,6 +73,7 @@ static irqreturn_t twl6040_vib_irq_handler(int irq, void *data)
 static void vib_set(int const new_power_state)
 {
 	struct twl6040 *twl6040 = misc_data->twl6040;
+	u8 speed = misc_data->pdata->voltage_raise_speed;
 
 	mutex_lock(&misc_data->io_mutex);
 
@@ -85,8 +86,11 @@ static void vib_set(int const new_power_state)
 	 *           setted in corresponding VIBCTLx registers
 	 */
 	if (new_power_state) {
-		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATL, 0x32);
-		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATR, 0x32);
+		if (speed == 0x00)
+			speed = 0x32;
+
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATL, speed);
+		twl6040_reg_write(twl6040, TWL6040_REG_VIBDATR, speed);
 
 		/*
 		 * ERRATA: Disable overcurrent protection for at least
