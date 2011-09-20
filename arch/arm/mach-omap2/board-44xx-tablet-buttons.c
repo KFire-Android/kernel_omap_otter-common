@@ -138,7 +138,10 @@ static struct platform_device *tablet_devices[] __initdata = {
 
 int __init tablet_button_init(void)
 {
-	if (omap_is_board_version(OMAP4_TABLET_2_0)) {
+	if (omap_is_board_version(OMAP4_TABLET_2_0) ||
+		omap_is_board_version(OMAP4_TABLET_2_1) ||
+		omap_is_board_version(OMAP4_TABLET_2_1_1)) {
+
 		omap_mux_init_gpio(TABLET2_GREEN_LED_GPIO,
 			OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
 		tablet_gpio_leds[0].gpio = TABLET2_GREEN_DBG2_LED_GPIO;
