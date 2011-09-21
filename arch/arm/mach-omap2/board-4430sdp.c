@@ -738,6 +738,13 @@ static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
 
 };
 
+static void __init blaze_pmic_mux_init(void)
+{
+
+	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP |
+						OMAP_WAKEUP_EN);
+}
+
 static int __init omap4_i2c_init(void)
 {
 	omap4_pmic_init("twl6030", &sdp4430_twldata);
@@ -1217,6 +1224,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_audio_conf();
 	omap4_create_board_props();
 	register_reboot_notifier(&blaze_reboot_notifier);
+	blaze_pmic_mux_init();
 	omap4_i2c_init();
 	blaze_sensor_init();
 	blaze_touch_init();
