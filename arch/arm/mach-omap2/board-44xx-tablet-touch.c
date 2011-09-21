@@ -163,8 +163,7 @@ int __init tablet_touch_init(void)
 	gpio_request(OMAP4_TOUCH_IRQ_1, "atmel touch irq");
 	gpio_direction_input(OMAP4_TOUCH_IRQ_1);
 	omap_mux_init_signal("gpmc_ad11.gpio_35",
-			OMAP_PULL_ENA | OMAP_PULL_UP |
-			OMAP_WAKEUP_EN | OMAP_MUX_MODE3 |
+			OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_MUX_MODE3 |
 			OMAP_INPUT_EN | OMAP_PIN_OFF_INPUT_PULLUP);
 
 	i2c_register_board_info(4, omap4xx_i2c_bus4_touch_info,
