@@ -482,6 +482,13 @@ static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
 
 };
 
+static void __init tablet_pmic_mux_init(void)
+{
+
+	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP |
+						OMAP_WAKEUP_EN);
+}
+
 static int __init omap4_i2c_init(void)
 {
 	omap4_pmic_init("twl6030", &tablet_twldata);
@@ -736,6 +743,7 @@ static void __init omap_tablet_init(void)
 	omap4_i2c_init();
 	tablet_touch_init();
 	tablet_panel_init();
+	tablet_pmic_mux_init();
 	tablet_button_init();
 	omap4_register_ion();
 	board_serial_init();
