@@ -52,6 +52,10 @@ static struct omap_uart_port_info omap_serial_default_info[] = {
 		.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
 		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
 		.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+                .wer = (OMAP_UART_WER_RLSI | \
+                        OMAP_UART_WER_RHRI | OMAP_UART_WER_RX | \
+                        OMAP_UART_WER_DCDCD | OMAP_UART_WER_RI | \
+                        OMAP_UART_WER_DSR | OMAP_UART_WER_CTS),
 	},
 };
 
@@ -245,13 +249,10 @@ static void omap_uart_wakeup_enable(struct platform_device *pdev, bool enable)
 static void omap_uart_idle_init(struct omap_uart_port_info *uart,
 				unsigned short num)
 {
-	if (cpu_is_omap44xx()) {
-		uart->wer |= OMAP4_UART_WER_MOD_WKUP;
-	} else if (cpu_is_omap34xx()) {
+	if (cpu_is_omap34xx()) {
 		u32 mod = num > 1 ? OMAP3430_PER_MOD : CORE_MOD;
 		u32 wk_mask = 0;
 
-		uart->wer |= OMAP2_UART_WER_MOD_WKUP;
 		uart->wk_en = OMAP34XX_PRM_REGADDR(mod, PM_WKEN1);
 		uart->wk_st = OMAP34XX_PRM_REGADDR(mod, PM_WKST1);
 		switch (num) {
@@ -431,6 +432,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
 	pdata->auto_sus_timeout = info->auto_sus_timeout;
 	pdata->wake_peer = info->wake_peer;
 	pdata->rts_mux_driver_control = info->rts_mux_driver_control;
+        pdata->wer = info->wer;
 	if (bdata->id == omap_uart_con_id) {
 		pdata->console_uart = true;
 #ifdef CONFIG_DEBUG_LL
