@@ -72,7 +72,8 @@
 #define ETH_KS8851_QUART		138
 #define OMAP4_TOUCH_IRQ_1		35
 #define OMAP4_TOUCH_IRQ_2		36
-#define HDMI_GPIO_HPD 60 /* Hot plug pin for HDMI */
+#define HDMI_GPIO_CT_CP_HPD		60
+#define HDMI_GPIO_HPD			63  /* Hot plug pin for HDMI */
 #define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
 #define LCD_BL_GPIO		27	/* LCD Backlight GPIO */
 /* PWM2 and TOGGLE3 register offsets */
@@ -84,6 +85,8 @@
 
 #define GPIO_WIFI_PMENA		54
 #define GPIO_WIFI_IRQ		53
+#define OMAP_HDMI_HPD_ADDR	0x4A100098
+#define OMAP_HDMI_PULLTYPE_MASK	0x00000010
 
 #define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
 #define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
@@ -840,42 +843,44 @@ static void sdp4430_lcd_init(void)
 	gpio_set_value(LCD_BL_GPIO, 0);
 }
 
-static void sdp4430_hdmi_mux_init(void)
-{
-	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
-	omap_mux_init_signal("hdmi_hpd",
-			OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("hdmi_cec",
-			OMAP_PIN_INPUT_PULLUP);
-	/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
-	omap_mux_init_signal("hdmi_ddc_scl",
-			OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("hdmi_ddc_sda",
-			OMAP_PIN_INPUT_PULLUP);
-}
-
 static struct gpio sdp4430_hdmi_gpios[] = {
-	{ HDMI_GPIO_HPD,	GPIOF_OUT_INIT_HIGH,	"hdmi_gpio_hpd"   },
-	{ HDMI_GPIO_LS_OE,	GPIOF_OUT_INIT_HIGH,	"hdmi_gpio_ls_oe" },
+	{HDMI_GPIO_CT_CP_HPD,  GPIOF_OUT_INIT_HIGH,    "hdmi_gpio_hpd"   },
+	{HDMI_GPIO_LS_OE,      GPIOF_OUT_INIT_HIGH,    "hdmi_gpio_ls_oe" },
 };
 
-static int sdp4430_panel_enable_hdmi(struct omap_dss_device *dssdev)
+
+static void sdp4430_hdmi_mux_init(void)
 {
+	u32 r;
 	int status;
+	/* PAD0_HDMI_HPD_PAD1_HDMI_CEC */
+	omap_mux_init_signal("hdmi_hpd.hdmi_hpd",
+				OMAP_PIN_INPUT_PULLDOWN);
+	omap_mux_init_signal("gpmc_wait2.gpio_100",
+			OMAP_PIN_INPUT_PULLDOWN);
+	omap_mux_init_signal("hdmi_cec.hdmi_cec",
+			OMAP_PIN_INPUT_PULLUP);
+	/* PAD0_HDMI_DDC_SCL_PAD1_HDMI_DDC_SDA */
+	omap_mux_init_signal("hdmi_ddc_scl.hdmi_ddc_scl",
+			OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("hdmi_ddc_sda.hdmi_ddc_sda",
+			OMAP_PIN_INPUT_PULLUP);
+
+	/* strong pullup on DDC lines using unpublished register */
+	r = ((1 << 24) | (1 << 28)) ;
+	omap4_ctrl_pad_writel(r, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_1);
+
+	gpio_request(HDMI_GPIO_HPD, NULL);
+	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT | OMAP_PULL_ENA);
+	gpio_direction_input(HDMI_GPIO_HPD);
 
 	status = gpio_request_array(sdp4430_hdmi_gpios,
-				    ARRAY_SIZE(sdp4430_hdmi_gpios));
+			ARRAY_SIZE(sdp4430_hdmi_gpios));
 	if (status)
-		pr_err("%s: Cannot request HDMI GPIOs\n", __func__);
-
-	return status;
+		pr_err("%s:Cannot request HDMI GPIOs %x \n", __func__, status);
 }
 
-static void sdp4430_panel_disable_hdmi(struct omap_dss_device *dssdev)
-{
-	gpio_free(HDMI_GPIO_LS_OE);
-	gpio_free(HDMI_GPIO_HPD);
-}
+
 
 static struct nokia_dsi_panel_data dsi1_panel = {
 		.name		= "taal",
@@ -936,8 +941,7 @@ static struct omap_dss_device sdp4430_hdmi_device = {
 			.regm2	= 1,
 		},
 	},
-	.platform_enable = sdp4430_panel_enable_hdmi,
-	.platform_disable = sdp4430_panel_disable_hdmi,
+	.hpd_gpio = HDMI_GPIO_HPD,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
 };
 
