@@ -188,6 +188,7 @@ static struct omap_dss_device tablet_lcd_device = {
 	},
 
 	.channel = OMAP_DSS_CHANNEL_LCD,
+	.skip_init = false,
 
 	.platform_enable = NULL,
 	.platform_disable = NULL,
