@@ -925,7 +925,8 @@ static struct omap_dss_device sdp4430_lcd_device = {
 			.dsi_fclk_src	= OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
 		},
 	},
-	.channel		= OMAP_DSS_CHANNEL_LCD,
+	.channel = OMAP_DSS_CHANNEL_LCD,
+	.skip_init = false,
 };
 
 static struct omap_dss_device sdp4430_hdmi_device = {
