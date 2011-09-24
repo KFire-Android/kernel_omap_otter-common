@@ -76,6 +76,7 @@ static struct tcm *tcm[TILER_FORMATS];
 static struct tmm *tmm[TILER_FORMATS];
 static u32 *dmac_va;
 static dma_addr_t dmac_pa;
+static DEFINE_MUTEX(dmac_mtx);
 
 /*
  *  TMM connectors
@@ -91,6 +92,7 @@ static s32 pin_mem_to_area(struct tmm *tmm, struct tcm_area *area, u32 *ptr)
 	/* Ensure the data reaches to main memory before PAT refill */
 	wmb();
 
+	mutex_lock(&dmac_mtx);
 	tcm_for_each_slice(slice, *area, area_s) {
 		p_area.x0 = slice.p0.x;
 		p_area.y0 = slice.p0.y;
@@ -106,6 +108,7 @@ static s32 pin_mem_to_area(struct tmm *tmm, struct tcm_area *area, u32 *ptr)
 			break;
 		}
 	}
+	mutex_unlock(&dmac_mtx);
 
 	return res;
 }
@@ -116,6 +119,7 @@ static void unpin_mem_from_area(struct tmm *tmm, struct tcm_area *area)
 	struct pat_area p_area = {0};
 	struct tcm_area slice, area_s;
 
+	mutex_lock(&dmac_mtx);
 	tcm_for_each_slice(slice, *area, area_s) {
 		p_area.x0 = slice.p0.x;
 		p_area.y0 = slice.p0.y;
@@ -124,6 +128,7 @@ static void unpin_mem_from_area(struct tmm *tmm, struct tcm_area *area)
 
 		tmm_unpin(tmm, p_area);
 	}
+	mutex_unlock(&dmac_mtx);
 }
 
 /*
@@ -1303,24 +1308,16 @@ struct tiler_pa_info *user_block_to_pa(u32 usr_addr, u32 num_pg)
 	 * space in order to be of use to us here.
 	 */
 	down_read(&mm->mmap_sem);
-	vma = find_vma(mm, usr_addr);
+	vma = find_vma(mm, usr_addr + (num_pg << PAGE_SHIFT));
 
-	/*
-	 * It is observed that under some circumstances, the user
-	 * buffer is spread across several vmas, so loop through
-	 * and check if the entire user buffer is covered.
-	 */
-	while ((vma) && (usr_addr + (num_pg << PAGE_SHIFT) > vma->vm_end)) {
-		/* jump to the next VMA region */
-		vma = find_vma(mm, vma->vm_end + 1);
-	}
-	if (!vma) {
-		printk(KERN_ERR "Failed to get the vma region for "
-			"user buffer.\n");
+	if (!vma || (usr_addr < vma->vm_start)) {
 		kfree(mem);
 		kfree(pa);
 		kfree(pages);
 		up_read(&mm->mmap_sem);
+		printk(KERN_ERR "Address is outside VMA: address start = %08x, "
+			"user end = %08x\n",
+			usr_addr, (usr_addr + (num_pg << PAGE_SHIFT)));
 		return ERR_PTR(-EFAULT);
 	}
 
@@ -1471,7 +1468,9 @@ static int tiler_resume(struct device *pdev)
 	/* clear out PAT entries and set dummy page */
 	area.x1 = tiler.width - 1;
 	area.y1 = tiler.height - 1;
+	mutex_lock(&dmac_mtx);
 	tmm_unpin(tmm[TILFMT_8BIT], area);
+	mutex_unlock(&dmac_mtx);
 
 	/* iterate over all the blocks and refresh the PAT entries */
 	list_for_each_entry(mi, &blocks, global) {
