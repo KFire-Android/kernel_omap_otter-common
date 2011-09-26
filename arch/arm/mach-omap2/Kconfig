@@ -465,6 +465,15 @@ config OMAP4_ARM_ERRATA_743622
 	  This is handled for HS devices in the PPA code and does not need to be
 	  enabled."
 
+config OMAP4_HSOTG_ED_CORRECTION
+	bool "OMAP 44XX HSOTG Eye diagram correction"
+	depends on ARCH_OMAP4
+	default y
+	help
+	  Select this option to overrive HSOTG PHY settings in
+	  order to improve Eye Diagramm. On 4430 CPUs this should
+	  improve Eye Diagram at least 8%.
+
 endmenu
 
 endif

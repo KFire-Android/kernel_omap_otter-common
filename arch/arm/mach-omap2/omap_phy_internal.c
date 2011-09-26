@@ -55,9 +55,22 @@ static struct clk *phyclk, *clk48m, *clk32k;
 static void __iomem *ctrl_base;
 static int usbotghs_control;
 
+#ifdef CONFIG_OMAP4_HSOTG_ED_CORRECTION
+#define OMAP4_HSOTG_SWTRIM_MASK		0xFFFF00FF
+static void __iomem *hsotg_base;
+#endif
+
 int omap4430_phy_init(struct device *dev)
 {
 	ctrl_base = ioremap(OMAP443X_SCM_BASE, SZ_1K);
+#ifdef CONFIG_OMAP4_HSOTG_ED_CORRECTION
+	hsotg_base = ioremap(OMAP44XX_HSUSB_OTG_BASE, SZ_16K);
+	if (!hsotg_base) {
+		dev_err(dev, "hsotg memory ioremap failed\n");
+		return -ENOMEM;
+	}
+
+#endif
 	if (!ctrl_base) {
 		pr_err("control module ioremap failed\n");
 		return -ENOMEM;
@@ -95,6 +108,63 @@ int omap4430_phy_init(struct device *dev)
 	}
 	return 0;
 }
+
+#ifdef CONFIG_OMAP4_HSOTG_ED_CORRECTION
+static void omap44xx_hsotg_ed_correction(void)
+{
+	u32 val;
+
+	/*
+	 * Software workaround #1
+	 * By this way we improve HS OTG
+	 * eye diagramm by 2-3%
+	 * Allow this change for all OMAP4 family
+	 */
+
+	/*
+	 * For prevent 4-bit shift issue
+	 * bit field SYNC2 of OCP2SCP_TIMING
+	 * should be set to value >6
+	 */
+
+	val = __raw_readl(hsotg_base + 0x2018);
+	val |= 0x0F;
+	__raw_writel(val, hsotg_base + 0x2018);
+
+	/*
+	 * USBPHY_ANA_CONFIG2[16:15] = RTERM_TEST = 11b
+	 */
+	val = __raw_readl(hsotg_base + 0x20D4);
+	val |= (3<<15);
+	__raw_writel(val, hsotg_base + 0x20D4);
+
+	/*
+	 * USBPHY_TERMINATION_CONTROL[13:11] = HS_CODE_SEL = 011b
+	 */
+	val = __raw_readl(hsotg_base + 0x2080);
+	val &= ~(7<<11);
+	val |= (3<<11);
+	__raw_writel(val, hsotg_base + 0x2080);
+
+	/*
+	 * Software workaround #2
+	 * Reducing interface output impedance
+	 * By this way we improve HS OTG eye diagramm by 8%
+	 * This change needed only for 4430 CPUs
+	 * because this change can impact Rx performance
+	 */
+
+	/*
+	 * Increase SWCAP trim code by 0x24
+	 * NOTE: Value should be between 0 and 0x24
+	 */
+	val = __raw_readl(hsotg_base + 0x20B8);
+	if (is_omap443x() && !(val & 0x8000)) {
+		val = min((val + (0x24<<8)), (val | (0x7F<<8))) | 0x8000;
+		__raw_writel(val, hsotg_base + 0x20B8);
+	}
+}
+#endif
 
 int omap4430_phy_set_clk(struct device *dev, int on)
 {
@@ -179,6 +249,12 @@ int omap4_charger_detect(void)
 int omap4430_phy_power(struct device *dev, int ID, int on)
 {
 	if (on) {
+
+#ifdef CONFIG_OMAP4_HSOTG_ED_CORRECTION
+		/* apply eye diagram improvement settings */
+		omap44xx_hsotg_ed_correction();
+#endif
+
 		if (ID)
 			/* enable VBUS valid, IDDIG groung */
 			__raw_writel(AVALID | VBUSVALID, ctrl_base +
