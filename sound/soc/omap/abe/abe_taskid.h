@@ -193,4 +193,16 @@
 #define C_ABE_FW_TASK_BT_DL_48_8_FIR_OPP100                 133
 #define C_ABE_FW_TASK_VX_UL_48_8_FIR                        134
 #define C_ABE_FW_TASK_VX_UL_48_8_LP_FIR                     135
+
+/*
+ * Alternate firmware compatibility macros
+ */
+#if !defined(CONFIG_SND_OMAP4_ABE_USE_ALT_FW)
+#define C_ABE_FW_TASK_BT_DL_48_8_FIR_OPP100_FW_COMPAT       C_ABE_FW_TASK_BT_DL_48_8_FIR_OPP100
+#define C_ABE_FW_TASK_BT_DL_48_8_FIR_FW_COMPAT              C_ABE_FW_TASK_BT_DL_48_8_FIR
+#else
+#define C_ABE_FW_TASK_BT_DL_48_8_FIR_OPP100_FW_COMPAT       C_ABE_FW_TASK_BT_DL_48_8_OPP100
+#define C_ABE_FW_TASK_BT_DL_48_8_FIR_FW_COMPAT              C_ABE_FW_TASK_BT_DL_48_8
+#endif
+
 #endif /* _ABE_TASKID_H_ */

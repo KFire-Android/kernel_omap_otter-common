@@ -228,9 +228,11 @@ void omap_abe_clean_temporary_buffers(struct omap_abe *abe, u32 id)
 		omap_abe_reset_mem(abe, OMAP_ABE_SMEM,
 				   OMAP_ABE_S_BT_DL_ADDR,
 				   OMAP_ABE_S_BT_DL_SIZE);
+#if !defined(CONFIG_SND_OMAP4_ABE_USE_ALT_FW)
 		omap_abe_reset_mem(abe, OMAP_ABE_SMEM,
 				   OMAP_ABE_S_BT_DL_8_48_OSR_LP_DATA_ADDR,
 				   OMAP_ABE_S_BT_DL_8_48_OSR_LP_DATA_SIZE);
+#endif
 		omap_abe_reset_mem(abe, OMAP_ABE_SMEM,
 				   OMAP_ABE_S_BT_DL_48_8_HP_DATA_ADDR,
 				   OMAP_ABE_S_BT_DL_48_8_HP_DATA_SIZE);
@@ -1233,11 +1235,11 @@ void abe_init_io_tasks(u32 id, abe_data_format_t *format,
 			if (abe_port[id].format.f == 8000) {
 				if (dOppMode32 == DOPPMODE32_OPP100) {
 					abe->MultiFrame[TASK_BT_DL_48_8_SLT][TASK_BT_DL_48_8_IDX] =
-						ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_8_FIR_OPP100);
+						ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_8_FIR_OPP100_FW_COMPAT);
 					smem1 = BT_DL_8k_opp100_labelID;
 				} else {
 					abe->MultiFrame[TASK_BT_DL_48_8_SLT][TASK_BT_DL_48_8_IDX] =
-						ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_8_FIR);
+						ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_8_FIR_FW_COMPAT);
 					smem1 = BT_DL_8k_labelID;
 				}
 #if 0

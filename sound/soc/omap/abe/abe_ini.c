@@ -78,7 +78,11 @@ void omap_abe_build_scheduler_table(struct omap_abe *abe);
 void omap_abe_reset_all_ports(struct omap_abe *abe);
 
 const u32 abe_firmware_array[ABE_FIRMWARE_MAX_SIZE] = {
+#if !defined(CONFIG_SND_OMAP4_ABE_USE_ALT_FW)
 #include "abe_firmware.c"
+#else
+#include "abe_firmware_alt.c"
+#endif
 };
 
 
@@ -294,11 +298,24 @@ void omap_abe_build_scheduler_table(struct omap_abe *abe)
 	abe->MultiFrame[7][3] = ABE_TASK_ID(C_ABE_FW_TASK_DBG_SYNC);
 	abe->MultiFrame[7][5] = ABE_TASK_ID(C_ABE_FW_TASK_ECHO_REF_SPLIT);
 
+#if !defined(CONFIG_SND_OMAP4_ABE_USE_ALT_FW)
 	abe->MultiFrame[9][2] = ABE_TASK_ID(C_ABE_FW_TASK_CHECK_IIR_RIGHT);
+#else
+	abe->MultiFrame[8][2] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC1_96_48_LP);
+	abe->MultiFrame[8][4] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC1_SPLIT);
 
+	abe->MultiFrame[9][2] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC2_96_48_LP);
+	abe->MultiFrame[9][4] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC2_SPLIT);
+#endif
 	abe->MultiFrame[9][6] = 0;
 	abe->MultiFrame[9][7] = ABE_TASK_ID(C_ABE_FW_TASK_IHF_48_96_LP);
 
+#if !defined(CONFIG_SND_OMAP4_ABE_USE_ALT_FW)
+	/* intentionally blank for uniformity */
+#else
+	abe->MultiFrame[10][2] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC3_96_48_LP);
+	abe->MultiFrame[10][4] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC3_SPLIT);
+#endif
 	abe->MultiFrame[10][7] = ABE_TASK_ID(C_ABE_FW_TASK_IHF_48_96_LP);
 
 	abe->MultiFrame[11][2] = ABE_TASK_ID(C_ABE_FW_TASK_AMIC_96_48_LP);
@@ -314,7 +331,7 @@ void omap_abe_build_scheduler_table(struct omap_abe *abe)
 	abe->MultiFrame[13][5] = 0/*ABE_TASK_ID(C_ABE_FW_TASK_IO_BT_VX_DL)*/;
 
 	abe->MultiFrame[14][3] = 0/*ABE_TASK_ID(C_ABE_FW_TASK_IO_DMIC)*/;
-	abe->MultiFrame[14][4] = ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_8_FIR);
+	abe->MultiFrame[14][4] = ABE_TASK_ID(C_ABE_FW_TASK_BT_DL_48_8_FIR_FW_COMPAT);
 
 	abe->MultiFrame[15][0] = 0/*ABE_TASK_ID(C_ABE_FW_TASK_IO_MM_EXT_OUT)*/;
 	abe->MultiFrame[15][3] = 0/*ABE_TASK_ID(C_ABE_FW_TASK_IO_BT_VX_UL)*/;
