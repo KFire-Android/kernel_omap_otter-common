@@ -1064,6 +1064,14 @@ static int __init sdp4430_soc_init(void)
 	if (ret)
 		goto err_dev;
 
+	twl6040_codec = snd_soc_card_get_codec(&snd_soc_sdp4430,
+					"twl6040-codec");
+	if(twl6040_codec <= 0) {
+		printk(KERN_ERR "sdp4430: could not find `twl6040-codec`\n");
+		ret = -ENODEV;
+		goto err_dev;
+	}
+
 	/* enable tps6130x */
 	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &gpoctl,
 		TWL6040_REG_GPOCTL);
@@ -1100,11 +1108,6 @@ static int __init sdp4430_soc_init(void)
 	i2c_put_adapter(adapter);
 
 	return ret;
-
-	twl6040_codec = snd_soc_card_get_codec(&snd_soc_sdp4430,
-					"twl6040-codec");
-
-	return 0;
 
 tps_err:
        i2c_put_adapter(adapter);
