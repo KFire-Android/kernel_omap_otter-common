@@ -38,6 +38,7 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/slab.h>
+#include <linux/hwspinlock.h>
 #include <linux/i2c-omap.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_qos_params.h>
@@ -264,6 +265,31 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
 {
 	return __raw_readw(i2c_dev->base +
 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
+}
+
+static int omap_i2c_hwspinlock_lock(struct omap_i2c_dev *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev->dev);
+	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+	int ret = 0;
+
+	if (pdata->hwspin_lock_timeout) {
+		ret = pdata->hwspin_lock_timeout(pdata->handle, 100);
+		if (ret != 0)
+			dev_err(&pdev->dev, "%s: TIMEDOUT: Failed to acquire "
+						"hwspinlock\n", __func__);
+		return ret;
+	} else
+		return -EINVAL;
+}
+
+static void omap_i2c_hwspinlock_unlock(struct omap_i2c_dev *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev->dev);
+	struct omap_i2c_bus_platform_data *pdata = pdev->dev.platform_data;
+
+	if (pdata->hwspin_unlock)
+		pdata->hwspin_unlock(pdata->handle);
 }
 
 static void omap_i2c_unidle(struct omap_i2c_dev *dev)
@@ -631,6 +657,15 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	int i;
 	int r;
 
+	if (dev == NULL)
+		return -EINVAL;
+
+	r = omap_i2c_hwspinlock_lock(dev);
+	/* To-Do: if we are unable to acquire the lock, we must
+	try to recover somehow */
+	if (r != 0)
+		return r;
+
 	omap_i2c_unidle(dev);
 
 	r = omap_i2c_wait_for_bb(dev);
@@ -661,6 +696,7 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	omap_i2c_wait_for_bb(dev);
 out:
 	omap_i2c_idle(dev);
+	omap_i2c_hwspinlock_unlock(dev);
 	return r;
 }
 

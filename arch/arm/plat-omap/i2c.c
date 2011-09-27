@@ -250,3 +250,44 @@ int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
 
 	return omap_i2c_add_bus(bus_id);
 }
+
+/**
+ * omap_register_i2c_bus_board_data - register hwspinlock data
+ * @bus_id: bus id counting from number 1
+ * @pdata: pointer to the I2C bus board data
+ */
+void omap_register_i2c_bus_board_data(int bus_id,
+				struct omap_i2c_bus_board_data *pdata)
+{
+	BUG_ON(bus_id < 1 || bus_id > omap_i2c_nr_ports());
+
+	if ((pdata != NULL) && (pdata->handle != NULL)) {
+		i2c_pdata[bus_id - 1].handle = pdata->handle;
+		i2c_pdata[bus_id - 1].hwspin_lock_timeout =
+					pdata->hwspin_lock_timeout;
+		i2c_pdata[bus_id - 1].hwspin_unlock = pdata->hwspin_unlock;
+	}
+}
+
+/**
+ * omap_i2c_get_hwspinlockid - Get HWSPINLOCK ID for I2C device
+ * @dev: I2C device
+ *
+ * returns the hwspinlock id or -1 if does not exist
+ */
+int omap_i2c_get_hwspinlockid(struct device *dev)
+{
+	struct omap_i2c_bus_platform_data *pdata;
+
+	pdata = dev_get_platdata(dev);
+	if (!pdata) {
+		dev_err(dev, "%s: platform data is missing\n", __func__);
+		return -EINVAL;
+	}
+
+	if (pdata->handle != NULL)
+		return hwspin_lock_get_id(pdata->handle);
+	else
+		return -1;
+}
+EXPORT_SYMBOL_GPL(omap_i2c_get_hwspinlockid);

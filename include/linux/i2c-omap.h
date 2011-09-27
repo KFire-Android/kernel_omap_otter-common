@@ -9,6 +9,10 @@ struct omap_i2c_bus_platform_data {
 	int		(*device_enable) (struct platform_device *pdev);
 	int		(*device_shutdown) (struct platform_device *pdev);
 	int		(*device_idle) (struct platform_device *pdev);
+	struct		hwspinlock *handle;
+	int		(*hwspin_lock_timeout)(struct hwspinlock *hwlock,
+							unsigned int to);
+	void		(*hwspin_unlock)(struct hwspinlock *hwlock);
 };
 
 #endif

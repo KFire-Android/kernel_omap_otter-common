@@ -19,6 +19,7 @@
 #include <linux/gpio.h>
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
+#include <linux/hwspinlock.h>
 #include <linux/i2c/twl.h>
 #include <linux/gpio_keys.h>
 #include <linux/regulator/machine.h>
@@ -782,8 +783,42 @@ static void __init blaze_pmic_mux_init(void)
 						OMAP_WAKEUP_EN);
 }
 
+static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
+				struct omap_i2c_bus_board_data *pdata)
+{
+	/* spinlock_id should be -1 for a generic lock request */
+	if (spinlock_id < 0)
+		pdata->handle = hwspin_lock_request();
+	else
+		pdata->handle = hwspin_lock_request_specific(spinlock_id);
+
+	if (pdata->handle != NULL) {
+		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
+		pdata->hwspin_unlock = hwspin_unlock;
+	} else {
+		pr_err("I2C hwspinlock request failed for bus %d\n", \
+								bus_id);
+	}
+}
+
+static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_1_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_2_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_3_bus_pdata;
+static struct omap_i2c_bus_board_data __initdata sdp4430_i2c_4_bus_pdata;
+
 static int __init omap4_i2c_init(void)
 {
+
+	omap_i2c_hwspinlock_init(1, 0, &sdp4430_i2c_1_bus_pdata);
+	omap_i2c_hwspinlock_init(2, 1, &sdp4430_i2c_2_bus_pdata);
+	omap_i2c_hwspinlock_init(3, 2, &sdp4430_i2c_3_bus_pdata);
+	omap_i2c_hwspinlock_init(4, 3, &sdp4430_i2c_4_bus_pdata);
+
+	omap_register_i2c_bus_board_data(1, &sdp4430_i2c_1_bus_pdata);
+	omap_register_i2c_bus_board_data(2, &sdp4430_i2c_2_bus_pdata);
+	omap_register_i2c_bus_board_data(3, &sdp4430_i2c_3_bus_pdata);
+	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
+
 	omap4_pmic_init("twl6030", &sdp4430_twldata);
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
