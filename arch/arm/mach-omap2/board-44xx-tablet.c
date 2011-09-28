@@ -31,6 +31,7 @@
 #include <linux/ti_wilink_st.h>
 #include <plat/omap-serial.h>
 
+#include <mach/dmm.h>
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
 #include <mach/emif.h>
@@ -810,6 +811,7 @@ static void __init omap_tablet_init(void)
 	omap4_audio_conf();
 	omap4_i2c_init();
 	tablet_touch_init();
+	omap_dmm_init();
 	tablet_panel_init();
 	tablet_pmic_mux_init();
 	tablet_button_init();
