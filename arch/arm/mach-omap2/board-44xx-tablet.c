@@ -696,24 +696,28 @@ static struct omap_device_pad tablet_uart4_pads[] __initdata = {
 	},
 };
 
-static struct omap_uart_port_info tablet_uart2_info __initdata = {
+static struct omap_uart_port_info tablet_uart_info_uncon __initdata = {
 	.use_dma	= 0,
-	.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
-	.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
-	.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
 	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+        .wer = 0,
+};
+
+static struct omap_uart_port_info tablet_uart_info __initdata = {
+	.use_dma	= 0,
+	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+        .wer = (OMAP_UART_WER_TX | OMAP_UART_WER_RX | OMAP_UART_WER_CTS),
 };
 
 static inline void __init board_serial_init(void)
 {
 	omap_serial_init_port_pads(0, tablet_uart1_pads,
-		ARRAY_SIZE(tablet_uart1_pads), NULL);
+		ARRAY_SIZE(tablet_uart1_pads), &tablet_uart_info_uncon);
 	omap_serial_init_port_pads(1, tablet_uart2_pads,
-		ARRAY_SIZE(tablet_uart2_pads), &tablet_uart2_info);
+		ARRAY_SIZE(tablet_uart2_pads), &tablet_uart_info);
 	omap_serial_init_port_pads(2, tablet_uart3_pads,
-		ARRAY_SIZE(tablet_uart3_pads), NULL);
+		ARRAY_SIZE(tablet_uart3_pads), &tablet_uart_info);
 	omap_serial_init_port_pads(3, tablet_uart4_pads,
-		ARRAY_SIZE(tablet_uart4_pads), NULL);
+		ARRAY_SIZE(tablet_uart4_pads), &tablet_uart_info_uncon);
 }
 
 static void omap4_tablet_wifi_mux_init(void)
