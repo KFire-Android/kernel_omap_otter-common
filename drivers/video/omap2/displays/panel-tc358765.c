@@ -307,6 +307,9 @@ static int tc358765_power_on(struct omap_dss_device *dssdev)
 	struct tc358765_data *d2d = dev_get_drvdata(&dssdev->dev);
 	int r;
 
+	/* At power on the first vsync has not been received yet */
+	dssdev->first_vsync = false;
+
 	dev_dbg(&dssdev->dev, "power_on\n");
 
 	if (dssdev->platform_enable)
