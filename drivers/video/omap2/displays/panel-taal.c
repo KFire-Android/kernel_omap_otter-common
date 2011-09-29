@@ -1163,6 +1163,9 @@ static int taal_power_on(struct omap_dss_device *dssdev)
 	u8 id1, id2, id3;
 	int r;
 
+	/* At power on the first vsync has not been received yet */
+        dssdev->first_vsync = false;
+
 	r = omapdss_dsi_display_enable(dssdev);
 	if (r) {
 		dev_err(&dssdev->dev, "failed to enable DSI\n");
