@@ -161,12 +161,6 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
 			reg &= ~(OMAP4_MMC1_PWRDNZ_MASK);
 			omap4_ctrl_pad_writel(reg, control_pbias_offset);
 		}
-	} else {
-		reg = omap4_ctrl_pad_readl(control_pbias_offset);
-		reg |= (OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK |
-			OMAP4_MMC1_PWRDNZ_MASK |
-			OMAP4_MMC1_PBIASLITE_VMODE_MASK);
-		omap4_ctrl_pad_writel(reg, control_pbias_offset);
 	}
 }
 
