@@ -236,13 +236,13 @@ static int sdp4430_dmic_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret = 0;
 
-	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_SYSCLK_SYNC_MUX_CLKS,
-				     24000000, SND_SOC_CLOCK_IN);
+	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_SYSCLK_PAD_CLKS,
+				     19200000, SND_SOC_CLOCK_IN);
 	if (ret < 0) {
 		printk(KERN_ERR "can't set DMIC cpu system clock\n");
 		return ret;
 	}
-	ret = snd_soc_dai_set_clkdiv(cpu_dai, OMAP_DMIC_CLKDIV, 10);
+	ret = snd_soc_dai_set_clkdiv(cpu_dai, OMAP_DMIC_CLKDIV, 8);
 	if (ret < 0) {
 		printk(KERN_ERR "can't set DMIC cpu clock divider\n");
 		return ret;
@@ -418,6 +418,21 @@ static void sdp4430_mcpdm_twl6040_post(struct snd_pcm_substream *substream)
 	struct twl6040 *twl6040 = codec->control_data;
 
 	/* TWL6040 supplies McPDM PAD_CLKS */
+	twl6040_disable(twl6040);
+}
+
+static int sdp4430_dmic_twl6040_pre(struct snd_pcm_substream *substream)
+{
+	struct twl6040 *twl6040 = twl6040_codec->control_data;
+	/* In order for the DMIC's to use the PAD CLOCKS, the twl6040
+	 * must be powered up, since it supplies the clock source.
+	 */
+	return twl6040_enable(twl6040);
+}
+
+static void sdp4430_dmic_twl6040_post(struct snd_pcm_substream *substream)
+{
+	struct twl6040 *twl6040 = twl6040_codec->control_data;
 	twl6040_disable(twl6040);
 }
 
@@ -974,6 +989,8 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.ops = &sdp4430_dmic_ops,
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.pre = sdp4430_dmic_twl6040_pre,
+		.post = sdp4430_dmic_twl6040_post,
 		.be_hw_params_fixup = dmic_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_DMIC0,
 	},
@@ -991,6 +1008,8 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.ops = &sdp4430_dmic_ops,
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.pre = sdp4430_dmic_twl6040_pre,
+		.post = sdp4430_dmic_twl6040_post,
 		.be_hw_params_fixup = dmic_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_DMIC1,
 	},
@@ -1008,6 +1027,8 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 		.ops = &sdp4430_dmic_ops,
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.pre = sdp4430_dmic_twl6040_pre,
+		.post = sdp4430_dmic_twl6040_post,
 		.be_hw_params_fixup = dmic_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_DMIC2,
 	},
