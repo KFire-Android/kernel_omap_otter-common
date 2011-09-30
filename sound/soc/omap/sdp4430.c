@@ -236,11 +236,6 @@ static int sdp4430_dmic_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret = 0;
 
-	if (params_format(params) != SNDRV_PCM_FORMAT_S32_LE) {
-		printk(KERN_ERR "Invalid DMIC sample format.  Must be S32_LE.\n");
-		return -EINVAL;
-	}
-
 	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_SYSCLK_SYNC_MUX_CLKS,
 				     24000000, SND_SOC_CLOCK_IN);
 	if (ret < 0) {
