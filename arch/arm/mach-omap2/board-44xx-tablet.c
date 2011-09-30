@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
+#include <linux/moduleparam.h>
 #include <linux/memblock.h>
 #include <linux/reboot.h>
 #include <linux/usb/otg.h>
@@ -48,6 +49,7 @@
 #include <plat/omap_apps_brd_id.h>
 #include <plat/omap-serial.h>
 #include <plat/remoteproc.h>
+#include <plat/omap-pm.h>
 
 #include "mux.h"
 #include "hsmmc.h"
@@ -583,6 +585,8 @@ static int __init omap4_i2c_init(void)
 }
 
 
+static bool enable_suspend_off = true;
+module_param(enable_suspend_off, bool, S_IRUSR | S_IRGRP | S_IROTH);
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
@@ -843,6 +847,9 @@ static void __init omap_tablet_init(void)
 	}
 
 	omap_enable_smartreflex_on_init();
+        if (enable_suspend_off)
+                omap_pm_enable_off_mode();
+
 }
 
 static void __init omap_tablet_map_io(void)
