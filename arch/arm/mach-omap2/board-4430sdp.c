@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
+#include <linux/moduleparam.h>
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
 #include <linux/hwspinlock.h>
@@ -53,6 +54,7 @@
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
 #include <plat/vram.h>
+#include <plat/omap-pm.h>
 
 #include "board-blaze.h"
 #include "mux.h"
@@ -842,6 +844,9 @@ static int __init omap4_i2c_init(void)
 	return 0;
 }
 
+static bool enable_suspend_off = true;
+module_param(enable_suspend_off, bool, S_IRUSR | S_IRGRP | S_IROTH);
+
 static int dsi1_panel_set_backlight(struct omap_dss_device *dssdev, int level)
 {
 	int r;
@@ -1339,6 +1344,9 @@ static void __init omap_4430sdp_init(void)
 	}
 
 	omap_enable_smartreflex_on_init();
+        if (enable_suspend_off)
+                omap_pm_enable_off_mode();
+
 }
 
 static void __init omap_4430sdp_map_io(void)
