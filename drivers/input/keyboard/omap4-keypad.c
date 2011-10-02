@@ -123,12 +123,7 @@ static irqreturn_t omap4_keypad_interrupt(int irq, void *dev_id)
 	/* clear pending interrupts */
 	__raw_writel(__raw_readl(keypad_data->base + OMAP4_KBD_IRQSTATUS),
 			keypad_data->base + OMAP4_KBD_IRQSTATUS);
-	/* REVISIT for some reason, if a key is pressed, there is a pending
-	 * keypad interrupt that is not getting cleared. We are clearing it
-	 * by writing 0x0f in OMAP4_KBD_IRQSTATUS Register
-	 */
-	__raw_writel(0x0f,
-			keypad_data->base + OMAP4_KBD_IRQSTATUS);
+
 	/* enable interrupts */
 	__raw_writel(OMAP4_DEF_IRQENABLE_EVENTEN | OMAP4_DEF_IRQENABLE_LONGKEY,
 			keypad_data->base + OMAP4_KBD_IRQENABLE);
@@ -154,6 +149,7 @@ static int omap4_keypad_open(struct input_dev *input)
 			keypad_data->base + OMAP4_KBD_IRQENABLE);
 	__raw_writel(OMAP4_DEF_WUP_EVENT_ENA | OMAP4_DEF_WUP_LONG_KEY_ENA,
 			keypad_data->base + OMAP4_KBD_WAKEUPENABLE);
+
 	enable_irq(keypad_data->irq);
 
 	return 0;
@@ -330,7 +326,6 @@ static int __devexit omap4_keypad_remove(struct platform_device *pdev)
 
 	return 0;
 }
-
 
 static struct platform_driver omap4_keypad_driver = {
 	.probe		= omap4_keypad_probe,
