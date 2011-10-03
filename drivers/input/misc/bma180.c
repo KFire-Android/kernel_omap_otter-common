@@ -167,6 +167,7 @@ struct bma180_reg {
 static int bma180_write(struct bma180_accel_data *data, u8 reg, u8 val)
 {
 	int ret = 0;
+
 	mutex_lock(&data->mutex);
 	ret = i2c_smbus_write_byte_data(data->client, reg, val);
 	if (ret < 0)
@@ -324,10 +325,12 @@ static void bma180_accel_device_worklogic(struct work_struct *work)
 	struct bma180_accel_data *data = container_of((struct delayed_work *)work,
 				struct bma180_accel_data, wq);
 
-	bma180_accel_data_ready(data);
-	if (!data->client->irq)
-		schedule_delayed_work(&data->wq,
-			msecs_to_jiffies(data->def_poll_rate));
+	if (data->pdata->mode) {
+		bma180_accel_data_ready(data);
+		if (!data->client->irq)
+			schedule_delayed_work(&data->wq,
+				msecs_to_jiffies(data->def_poll_rate));
+	}
 
 }
 
