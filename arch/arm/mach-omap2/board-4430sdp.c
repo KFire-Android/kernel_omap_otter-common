@@ -94,7 +94,6 @@
 #define OMAP_HDMI_HPD_ADDR	0x4A100098
 #define OMAP_HDMI_PULLTYPE_MASK	0x00000010
 
-#define OMAP4SDP_MDM_PWR_EN_GPIO	157
 
 static const int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -1240,7 +1239,7 @@ static void omap4_sdp4430_wifi_init(void)
 }
 
 #if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
-static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+struct usbhs_omap_board_data usbhs_bdata __initdata = {
 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
 	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
@@ -1258,9 +1257,9 @@ static void __init omap4_ehci_ohci_init(void)
 		OMAP_PIN_OFF_NONE);
 
 	/* Power on the ULPI PHY */
-	if (gpio_is_valid(OMAP4SDP_MDM_PWR_EN_GPIO)) {
-		gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
-		gpio_direction_output(OMAP4SDP_MDM_PWR_EN_GPIO, 1);
+	if (gpio_is_valid(BLAZE_MDM_PWR_EN_GPIO)) {
+		gpio_request(BLAZE_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
+		gpio_direction_output(BLAZE_MDM_PWR_EN_GPIO, 1);
 	}
 
 	usbhs_init(&usbhs_bdata);
@@ -1339,7 +1338,10 @@ static void __init omap_4430sdp_init(void)
 	omap4_sdp4430_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
 
+	/* blaze_modem_init shall be called before omap4_ehci_ohci_init */
+	blaze_modem_init();
 	omap4_ehci_ohci_init();
+
 	usb_musb_init(&musb_board_data);
 
 	status = omap_ethernet_init();

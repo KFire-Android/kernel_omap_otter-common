@@ -21,6 +21,12 @@ int blaze_touch_init(void);
 int blaze_sensor_init(void);
 int blaze_panel_init(void);
 int blaze_keypad_init(void);
+void blaze_modem_init(void);
 void omap4_create_board_props(void);
 
+#define BLAZE_MDM_PWR_EN_GPIO	157
+
+#if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
+extern struct usbhs_omap_board_data usbhs_bdata;
+#endif
 #endif
