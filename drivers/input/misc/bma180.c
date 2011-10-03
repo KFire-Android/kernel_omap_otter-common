@@ -82,9 +82,6 @@
 #define BMA180_VERSION			0x01
 #define BMA180_CHIP_ID			0x00
 
-#define SLEEP				0x00
-#define WAKEUP				0x01
-
 struct bma180_accel_data {
 	struct bma180accel_platform_data *pdata;
 	struct i2c_client *client;
@@ -93,7 +90,6 @@ struct bma180_accel_data {
 	struct mutex mutex;
 
 	uint32_t def_poll_rate;
-	int wakeup_flag;
 };
 
 static uint32_t accl_debug;
@@ -238,28 +234,23 @@ static int bma180_accel_device_hw_set_bandwidth(struct bma180_accel_data *data,
 	return 0;
 }
 
-static void bma180_device_sleep_wakeup(struct bma180_accel_data *data,
-							int do_wakeup)
+static void bma180_accel_device_sleep(struct bma180_accel_data *data)
 {
-	int ret;
 	uint8_t reg_val;
 
 	bma180_read_transfer(data, BMA180_CTRL_REG0, &reg_val, 1);
+	reg_val |= BMA180_SLEEP;
+	bma180_write(data, BMA180_CTRL_REG0, reg_val);
+}
 
-	if (do_wakeup) {
-		reg_val &= ~BMA180_SLEEP;
-		ret = bma180_write(data, BMA180_CTRL_REG0, reg_val);
-		if (ret < 0)
-			dev_err(&data->client->dev,
-				"can't wakeup device\n");
-		msleep(10);
-	} else {
-		reg_val |= BMA180_SLEEP;
-		ret = bma180_write(data, BMA180_CTRL_REG0, reg_val);
-		if (ret < 0)
-			dev_err(&data->client->dev,
-				"sleep mode can't be set\n");
-       }
+static void bma180_accel_device_wakeup(struct bma180_accel_data *data)
+{
+	uint8_t reg_val;
+
+	bma180_read_transfer(data, BMA180_CTRL_REG0, &reg_val, 1);
+	reg_val &= ~BMA180_SLEEP;
+	bma180_write(data, BMA180_CTRL_REG0, reg_val);
+	msleep(10);
 }
 
 static irqreturn_t bma180_accel_thread_irq(int irq, void *dev_data)
@@ -364,22 +355,15 @@ static ssize_t bma180_store_attr_enable(struct device *dev,
 		return error;
 	enable = !!val;
 
-	mutex_lock(&data->mutex);
-	if (data->pdata->mode == enable) {
-		mutex_unlock(&data->mutex);
+	if (data->pdata->mode == enable)
 		return count;
-	}
-
-	data->pdata->mode = enable;
-	mutex_unlock(&data->mutex);
 
 	if (enable) {
-		data->wakeup_flag = 0;
-		bma180_device_sleep_wakeup(data, WAKEUP);
+		bma180_accel_device_wakeup(data);
 		schedule_delayed_work(&data->wq, 0);
 	} else {
+		bma180_accel_device_sleep(data);
 		cancel_delayed_work_sync(&data->wq);
-		bma180_device_sleep_wakeup(data, SLEEP);
 	}
 
 	data->pdata->mode = enable;
@@ -753,18 +737,8 @@ static int bma180_accel_driver_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct bma180_accel_data *data = platform_get_drvdata(pdev);
 
-	mutex_lock(&data->mutex);
-	if (!data->pdata->mode) {
-		mutex_unlock(&data->mutex);
-		return 0;
-	}
-
-	data->pdata->mode = 0;
-	mutex_unlock(&data->mutex);
-	data->wakeup_flag = 1;
-
-	cancel_delayed_work_sync(&data->wq);
-	bma180_device_sleep_wakeup(data, SLEEP);
+	if (data->pdata->mode)
+		bma180_accel_device_sleep(data);
 
 	return 0;
 }
@@ -774,23 +748,8 @@ static int bma180_accel_driver_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct bma180_accel_data *data = platform_get_drvdata(pdev);
 
-	mutex_lock(&data->mutex);
-	if (data->pdata->mode) {
-		mutex_unlock(&data->mutex);
-		return 0;
-	}
-
-	if (!data->wakeup_flag) {
-		mutex_unlock(&data->mutex);
-		return 0;
-	}
-
-	data->pdata->mode = 1;
-	mutex_unlock(&data->mutex);
-	data->wakeup_flag = 0;
-
-	bma180_device_sleep_wakeup(data, WAKEUP);
-	schedule_delayed_work(&data->wq, 0);
+	if (data->pdata->mode)
+		bma180_accel_device_wakeup(data);
 
 	return 0;
 }
