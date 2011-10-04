@@ -89,6 +89,12 @@ config BATTERY_PMU
 	  Say Y here to expose battery information on Apple machines
 	  through the generic battery class.
 
+config CHARGER_BQ2415x
+	tristate "BQ2415x charger"
+	depends on TWL6030_BCI_BATTERY
+	help
+	  Say Y to enable support for BQ24156 battery charger.
+
 config BATTERY_OLPC
 	tristate "One Laptop Per Child battery"
 	depends on X86_32 && OLPC
