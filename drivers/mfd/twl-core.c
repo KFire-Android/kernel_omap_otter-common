@@ -84,6 +84,12 @@
 #define twl_has_madc()	false
 #endif
 
+#if defined(CONFIG_TWL6030_GPADC) || defined(CONFIG_TWL6030_GPADC_MODULE)
+#define twl_has_gpadc()	true
+#else
+#define twl_has_gpadc()	false
+#endif
+
 #if defined(CONFIG_TWL4030_POWER) || defined(CONFIG_TWL6030_POWER)
 #define twl_has_power()        true
 #else
@@ -117,7 +123,10 @@
 #define twl_has_codec()	false
 #endif
 
-#if defined(CONFIG_CHARGER_TWL4030) || defined(CONFIG_CHARGER_TWL4030_MODULE)
+#if defined(CONFIG_CHARGER_TWL4030) || \
+	defined(CONFIG_CHARGER_TWL4030_MODULE) || \
+	defined(CONFIG_TWL6030_BCI_BATTERY) || \
+	defined(CONFIG_TWL6030_BCI_BATTERY_MODULE)
 #define twl_has_bci()	true
 #else
 #define twl_has_bci()	false
@@ -671,11 +680,28 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
+	if (twl_has_bci() && pdata->bci) {
+		child = add_child(1, "twl6030_bci",
+				pdata->bci, sizeof(*pdata->bci),
+				false,
+				pdata->irq_base + CHARGER_INTR_OFFSET,
+				pdata->irq_base + CHARGERFAULT_INTR_OFFSET);
+	}
+
 
 	if (twl_has_madc() && pdata->madc) {
 		child = add_child(2, "twl4030_madc",
 				pdata->madc, sizeof(*pdata->madc),
 				true, pdata->irq_base + MADC_INTR_OFFSET, 0);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+	}
+
+	if (twl_has_gpadc() && pdata->madc) {
+		child = add_child(1, "twl6030_gpadc",
+				pdata->madc, sizeof(*pdata->madc),
+				true, pdata->irq_base + MADC_INTR_OFFSET,
+				pdata->irq_base + GPADCSW_INTR_OFFSET);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
@@ -1079,7 +1105,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 	}
 
 	if (twl_has_bci() && pdata->bci &&
-			!(features & (TPS_SUBSET | TWL5031))) {
+			!(features & (TPS_SUBSET | TWL5031)) && (features & TWL6030_CLASS)) {
 		child = add_child(3, "twl4030_bci",
 				pdata->bci, sizeof(*pdata->bci), false,
 				/* irq0 = CHG_PRES, irq1 = BCI */
@@ -1205,7 +1231,7 @@ static int twl_resume(struct i2c_client *client)
 #define twl_resume	NULL
 #endif
 
-static int twl_remove(struct i2c_client *client)
+static int __devexit twl_remove(struct i2c_client *client)
 {
 	unsigned i;
 	int status;
@@ -1258,6 +1284,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		struct twl_client	*twl = &twl_modules[i];
 
 		twl->address = client->addr + i;
+
 		if (i == 0)
 			twl->client = client;
 		else {
@@ -1352,7 +1379,7 @@ static struct i2c_driver twl_driver = {
 	.driver.name	= DRIVER_NAME,
 	.id_table	= twl_ids,
 	.probe		= twl_probe,
-	.remove		= twl_remove,
+	.remove		= __devexit_p(twl_remove),
 	.suspend	= twl_suspend,
 	.resume		= twl_resume,
 };

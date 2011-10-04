@@ -82,8 +82,10 @@
 #define TWL_MODULE_PM_RECEIVER	TWL4030_MODULE_PM_RECEIVER
 #define TWL_MODULE_RTC		TWL4030_MODULE_RTC
 #define TWL_MODULE_PWM		TWL4030_MODULE_PWM0
+#define TWL6030_MODULE_CHARGER TWL4030_MODULE_MAIN_CHARGE
 #define TWL_MODULE_PM_SLAVE_RES	TWL6030_MODULE_SLAVE_RES
 
+#define TWL6030_MODULE_GASGAUGE 0x0B
 #define TWL6030_MODULE_ID0	0x0D
 #define TWL6030_MODULE_ID1	0x0E
 #define TWL6030_MODULE_ID2	0x0F
@@ -111,6 +113,7 @@
 #define GASGAUGE_INTR_OFFSET	17
 #define USBOTG_INTR_OFFSET	4
 #define CHARGER_INTR_OFFSET	2
+#define GPADCSW_INTR_OFFSET	1
 #define RSV_INTR_OFFSET		0
 
 /* INT register offsets */
@@ -234,6 +237,11 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define TWL4030_SIH_CTRL_EXCLEN_MASK	BIT(0)
 #define TWL4030_SIH_CTRL_PENDDIS_MASK	BIT(1)
 #define TWL4030_SIH_CTRL_COR_MASK	BIT(2)
+
+int twl6030_register_notifier(struct notifier_block *nb,
+				unsigned int events);
+int twl6030_unregister_notifier(struct notifier_block *nb,
+				unsigned int events);
 
 /*----------------------------------------------------------------------*/
 
@@ -596,6 +604,15 @@ struct twl4030_clock_init_data {
 struct twl4030_bci_platform_data {
 	int *battery_tmp_tbl;
 	unsigned int tblsize;
+
+	unsigned int monitoring_interval;
+
+	unsigned int max_charger_currentmA;
+	unsigned int max_charger_voltagemV;
+	unsigned int termination_currentmA;
+
+	unsigned int max_bat_voltagemV;
+	unsigned int low_bat_voltagemV;
 };
 
 /* TWL4030_GPIO_MAX (18) GPIOs, with interrupts */
