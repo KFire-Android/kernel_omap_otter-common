@@ -299,6 +299,14 @@ config MFD_TC3589X
 	  additional drivers must be enabled in order to use the
 	  functionality of the device.
 
+config TWL6030_GPADC
+	tristate "TWL6030 GPADC (General Purpose A/D Convertor) Support"
+	depends on TWL4030_CORE
+	default n
+	help
+	  Say yes here if you want support for the TWL6030 General Purpose
+	  A/D Convertor.
+
 config MFD_TMIO
 	bool
 	default n
