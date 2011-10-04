@@ -1131,6 +1131,7 @@ EXPORT_SYMBOL(i2c_del_adapter);
  * This detects registered I2C devices which are controlled
  * by a remote/external proc.
  */
+#if !defined(CONFIG_HWSPINLOCK)
 void i2c_detect_ext_master(struct i2c_adapter *adap)
 {
 	struct i2c_adapter *found;
@@ -1160,6 +1161,9 @@ void i2c_detect_ext_master(struct i2c_adapter *adap)
 
 	return;
 }
+#else
+void i2c_detect_ext_master(struct i2c_adapter *adap) { return; }
+#endif
 EXPORT_SYMBOL(i2c_detect_ext_master);
 
 /* ------------------------------------------------------------------------- */
