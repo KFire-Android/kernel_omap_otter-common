@@ -27,6 +27,7 @@
 #include <linux/io.h>
 #include <linux/err.h>
 #include <linux/usb.h>
+#include <linux/power_supply.h>
 
 #include <plat/usb.h>
 #include "control.h"
@@ -41,6 +42,14 @@
 #define	VBUSVALID			BIT(2)
 #define	SESSEND				BIT(3)
 #define	IDDIG				BIT(4)
+
+#define CONTROL_USB2PHYCORE		0x620
+#define CHARGER_TYPE_PS2		0x2
+#define CHARGER_TYPE_DEDICATED		0x4
+#define CHARGER_TYPE_HOST		0x5
+#define CHARGER_TYPE_PC			0x6
+#define USB2PHY_CHGDETECTED		BIT(13)
+#define USB2PHY_DISCHGDET		BIT(30)
 
 static struct clk *phyclk, *clk48m, *clk32k;
 static void __iomem *ctrl_base;
@@ -107,9 +116,63 @@ int omap4430_phy_set_clk(struct device *dev, int on)
 	return 0;
 }
 
+int omap4_charger_detect(void)
+{
+	unsigned long timeout;
+	int charger = POWER_SUPPLY_TYPE_USB;
+	u32 usb2phycore = 0;
+	u32 chargertype = 0;
+
+	omap4430_phy_power(NULL, 0, 1);
+
+	usb2phycore = omap4_ctrl_pad_readl(CONTROL_USB2PHYCORE);
+	usb2phycore &= ~USB2PHY_DISCHGDET;
+	omap4_ctrl_pad_writel(usb2phycore, CONTROL_USB2PHYCORE);
+
+	timeout = jiffies + msecs_to_jiffies(500);
+	do {
+		usb2phycore = omap4_ctrl_pad_readl(CONTROL_USB2PHYCORE);
+		chargertype = ((usb2phycore >> 21) & 0x7);
+		if (usb2phycore & USB2PHY_CHGDETECTED)
+			break;
+		msleep_interruptible(10);
+	} while (!time_after(jiffies, timeout));
+
+	switch (chargertype) {
+	case CHARGER_TYPE_DEDICATED:
+		charger = POWER_SUPPLY_TYPE_USB_DCP;
+		pr_info("DCP detected\n");
+		break;
+	case CHARGER_TYPE_HOST:
+		charger = POWER_SUPPLY_TYPE_USB_CDP;
+		pr_info("CDP detected\n");
+		break;
+	case CHARGER_TYPE_PC:
+		charger = POWER_SUPPLY_TYPE_USB;
+		pr_info("PC detected\n");
+		break;
+	case CHARGER_TYPE_PS2:
+		pr_info("PS/2 detected!\n");
+		break;
+	default:
+		pr_err(KERN_ERR"Unknown charger detected! %d\n", chargertype);
+	}
+
+	omap4430_phy_power(NULL, 0, 0);
+
+	return charger;
+}
+
 int omap4430_phy_power(struct device *dev, int ID, int on)
 {
 	if (on) {
+		/* enabled the clocks */
+		omap4430_phy_set_clk(dev, 1);
+		/* power on the phy */
+		if (__raw_readl(ctrl_base + CONTROL_DEV_CONF) & PHY_PD) {
+			__raw_writel(~PHY_PD, ctrl_base + CONTROL_DEV_CONF);
+			msleep_interruptible(200);
+		}
 		if (ID)
 			/* enable VBUS valid, IDDIG groung */
 			__raw_writel(AVALID | VBUSVALID, ctrl_base +
@@ -125,6 +188,10 @@ int omap4430_phy_power(struct device *dev, int ID, int on)
 		/* Enable session END and IDIG to high impedance. */
 		__raw_writel(SESSEND | IDDIG, ctrl_base +
 					USBOTGHS_CONTROL);
+		/* Power down the phy */
+		__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
+		/* Disable the clocks */
+		omap4430_phy_set_clk(dev, 0);
 	}
 	return 0;
 }
