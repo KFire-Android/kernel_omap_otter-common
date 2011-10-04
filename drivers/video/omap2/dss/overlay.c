@@ -676,17 +676,15 @@ void dss_recheck_connections(struct omap_dss_device *dssdev, bool force)
 		}
 	}
 
-	if (mgr) {
+	if (mgr && force) {
 		dispc_runtime_get();
 
 		for (i = 0; i < dss_feat_get_num_ovls(); i++) {
 			struct omap_overlay *ovl;
 			ovl = omap_dss_get_overlay(i);
-			if (!ovl->manager || force) {
-				if (ovl->manager)
-					ovl->unset_manager(ovl);
-				ovl->set_manager(ovl, mgr);
-			}
+			if (ovl->manager)
+				ovl->unset_manager(ovl);
+			ovl->set_manager(ovl, mgr);
 		}
 
 		dispc_runtime_put();
