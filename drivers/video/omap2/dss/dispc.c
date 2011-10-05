@@ -1625,6 +1625,18 @@ static unsigned long calc_fclk_five_taps(enum omap_channel channel, u16 width,
 	u32 fclk = 0;
 	u64 tmp, pclk = dispc_mgr_pclk_rate(channel);
 
+	if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
+		/* do conservative TRM value on OMAP4 ES1.0 */
+		if (omap_rev() == OMAP4430_REV_ES1_0)
+			return pclk * DIV_ROUND_UP(width, out_width) *
+					DIV_ROUND_UP(height, out_height);
+
+		/* since 4430 ES2.0, fclk requirement only depends on width */
+		pclk *= max(width, out_width);
+		do_div(pclk, out_width);
+		return pclk;
+	}
+
 	if (height <= out_height && width <= out_width)
 		return (unsigned long) pclk;
 
@@ -1663,6 +1675,11 @@ static unsigned long calc_fclk(enum omap_channel channel, u16 width,
 {
 	unsigned int hf, vf;
 	unsigned long pclk = dispc_mgr_pclk_rate(channel);
+
+	/* on OMAP4/5 three-tap and five-tap clock requirements are the same */
+	if (cpu_is_omap44xx() || cpu_is_omap54xx())
+		return calc_fclk_five_taps(channel, width, height, out_width,
+					out_height, 0);
 
 	/*
 	 * FIXME how to determine the 'A' factor
