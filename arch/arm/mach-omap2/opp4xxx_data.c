@@ -324,8 +324,8 @@ int __init omap4_opp_init(void)
 	if (!r) {
 		if (omap4_has_mpu_1_2ghz())
 			omap4_mpu_opp_enable(1200000000);
-/*		if (omap4_has_mpu_1_5ghz())
-			omap4_mpu_opp_enable(1500000000);*/
+		if (omap4_has_mpu_1_5ghz())
+			omap4_mpu_opp_enable(1500000000);
 	}
 
 	return r;
