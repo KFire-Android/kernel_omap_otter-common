@@ -121,9 +121,10 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	/* Initialize the powerdomain's state counter */
 	memset(&pwrdm->count, 0, sizeof(pwrdm->count));
 	memset(&pwrdm->last_count, 0, sizeof(pwrdm->last_count));
+#ifdef CONFIG_PM_DEBUG
 	memset(&pwrdm->time, 0, sizeof(pwrdm->time));
 	memset(&pwrdm->last_time, 0, sizeof(pwrdm->last_time));
-
+#endif
 	pwrdm_wait_transition(pwrdm);
 	pwrdm->state = pwrdm_read_pwrst(pwrdm);
 	pwrdm->count.state[pwrdm->state] = 1;
