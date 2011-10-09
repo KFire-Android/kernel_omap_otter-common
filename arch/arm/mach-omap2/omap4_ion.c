@@ -23,6 +23,7 @@
 #define OMAP4_RAMCONSOLE_SIZE	SZ_2M
 #define OMAP4_ION_HEAP_SECURE_INPUT_SIZE	(SZ_1M * 90)
 #define OMAP4_ION_HEAP_TILER_SIZE		(SZ_128M - SZ_32M)
+#define OMAP_ION_HEAP_NONSECURE_TILER_SIZE	SZ_32M
 #define OMAP4_ION_HEAP_LARGE_SURFACES_SIZE	SZ_32M
 
 #define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
@@ -32,7 +33,7 @@
 				OMAP4_ION_HEAP_SECURE_INPUT_SIZE)
 
 static struct ion_platform_data omap4_ion_data = {
-	.nr = 3,
+	.nr = 4,
 	.heaps = {
 		{
 			.type = ION_HEAP_TYPE_CARVEOUT,
@@ -55,6 +56,14 @@ static struct ion_platform_data omap4_ion_data = {
 			.name = "large_surfaces",
 			.base = 0x80000000 + SZ_512M + OMAP4_RAMCONSOLE_SIZE,
 			.size = OMAP4_ION_HEAP_LARGE_SURFACES_SIZE,
+		},
+		{
+			.type = OMAP_ION_HEAP_TYPE_TILER,
+			.id = OMAP_ION_HEAP_NONSECURE_TILER,
+			.name = "nonsecure_tiler",
+			.base = 0x80000000 + SZ_512M + SZ_2M +
+				OMAP4_ION_HEAP_LARGE_SURFACES_SIZE,
+			.size = OMAP_ION_HEAP_NONSECURE_TILER_SIZE,
 		},
 	},
 };
