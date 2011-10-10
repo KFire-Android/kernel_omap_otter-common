@@ -156,7 +156,7 @@ int __init omap_mux_init_gpio(int gpio, int val)
 	return -ENODEV;
 }
 
-static int __init _omap_mux_get_by_name(struct omap_mux_partition *partition,
+static int _omap_mux_get_by_name(struct omap_mux_partition *partition,
 					const char *muxname,
 					struct omap_mux **found_mux)
 {
@@ -213,7 +213,7 @@ static int __init _omap_mux_get_by_name(struct omap_mux_partition *partition,
 	return -ENODEV;
 }
 
-static int __init
+static int
 omap_mux_get_by_name(const char *muxname,
 			struct omap_mux_partition **found_partition,
 			struct omap_mux **found_mux)
@@ -253,6 +253,41 @@ int __init omap_mux_init_signal(const char *muxname, int val)
 	pr_debug("%s: Setting signal %s 0x%04x -> 0x%04x\n",
 			 __func__, muxname, old_mode, mux_mode);
 	omap_mux_write(partition, mux_mode, mux->reg_offset);
+	return 0;
+}
+
+int omap_mux_enable_wkup(const char *muxname)
+{
+	struct omap_mux_partition *partition = NULL;
+	struct omap_mux *mux = NULL;
+	u16 old_mode;
+	int mux_mode;
+
+	mux_mode = omap_mux_get_by_name(muxname, &partition, &mux);
+	if (mux_mode < 0)
+		return mux_mode;
+	old_mode = omap_mux_read(partition, mux->reg_offset);
+	old_mode |= OMAP_WAKEUP_EN;
+	pr_debug("%s: Setting signal %s 0x%04x -> 0x%04x\n",
+			__func__, muxname, old_mode, mux_mode);
+	omap_mux_write(partition, old_mode, mux->reg_offset);
+	return 0;
+}
+
+int omap_mux_disable_wkup(const char *muxname)
+{
+	struct omap_mux_partition *partition = NULL;
+	struct omap_mux *mux = NULL;
+	u16 old_mode;
+	int mux_mode;
+	mux_mode = omap_mux_get_by_name(muxname, &partition, &mux);
+	if (mux_mode < 0)
+		return mux_mode;
+	old_mode = omap_mux_read(partition, mux->reg_offset);
+	old_mode &= ~OMAP_WAKEUP_EN;
+	pr_debug("%s: Setting signal %s 0x%04x -> 0x%04x\n",
+			__func__, muxname, old_mode, mux_mode);
+	omap_mux_write(partition, old_mode, mux->reg_offset);
 
 	return 0;
 }
