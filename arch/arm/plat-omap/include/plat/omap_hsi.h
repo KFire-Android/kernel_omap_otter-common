@@ -364,7 +364,7 @@
 #define HSI_DST_BURST_EN_MASK		0xc000
 #define HSI_DST_SINGLE_ACCESS0		0
 #define HSI_DST_SINGLE_ACCESS		(1 << 14)
-#define HSI_DST_BURST_4X32_BIT		(2 << 14)
+#define HSI_DST_BURST_4x32_BIT		(2 << 14)
 #define HSI_DST_BURST_8x32_BIT		(3 << 14)
 
 #define HSI_DST_MASK			0x1e00

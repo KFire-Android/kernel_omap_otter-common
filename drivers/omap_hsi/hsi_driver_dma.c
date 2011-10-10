@@ -143,9 +143,9 @@ int hsi_driver_write_dma(struct hsi_channel *hsi_channel, u32 * data,
 		return -ENOMEM;
 	}
 
-	tmp = HSI_SRC_SINGLE_ACCESS0 |
+	tmp = HSI_SRC_BURST_4x32_BIT|
 	    HSI_SRC_MEMORY_PORT |
-	    HSI_DST_SINGLE_ACCESS0 |
+	    HSI_DST_BURST_4x32_BIT |
 	    HSI_DST_PERIPHERAL_PORT | HSI_DATA_TYPE_S32;
 	hsi_outw(tmp, base, HSI_GDD_CSDP_REG(lch));
 
@@ -241,9 +241,9 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 		return -ENOMEM;
 	}
 
-	tmp = HSI_DST_SINGLE_ACCESS0 |
+	tmp = HSI_DST_BURST_4x32_BIT |
 	    HSI_DST_MEMORY_PORT |
-	    HSI_SRC_SINGLE_ACCESS0 |
+	    HSI_SRC_BURST_4x32_BIT |
 	    HSI_SRC_PERIPHERAL_PORT | HSI_DATA_TYPE_S32;
 	hsi_outw(tmp, base, HSI_GDD_CSDP_REG(lch));
 
