@@ -181,10 +181,48 @@ static struct matrix_keymap_data sdp4430_keymap_data = {
 	.keymap_size		= ARRAY_SIZE(sdp4430_keymap),
 };
 
+void keypad_pad_wkup(int enable)
+{
+	int (*set_wkup_fcn)(const char *muxname);
+
+	/* PAD wakup for keyboard is needed for off mode
+	 * due to IO isolation.
+	 */
+	if (!off_mode_enabled)
+		return;
+
+	if (enable)
+		set_wkup_fcn = omap_mux_enable_wkup;
+	else
+		set_wkup_fcn = omap_mux_disable_wkup;
+
+	set_wkup_fcn("kpd_col0.kpd_col0");
+	set_wkup_fcn("kpd_col1.kpd_col1");
+	set_wkup_fcn("kpd_col2.kpd_col2");
+	set_wkup_fcn("kpd_col0.kpd_col0");
+	set_wkup_fcn("kpd_col1.kpd_col1");
+	set_wkup_fcn("kpd_col2.kpd_col2");
+	set_wkup_fcn("kpd_col3.kpd_col3");
+	set_wkup_fcn("kpd_col4.kpd_col4");
+	set_wkup_fcn("kpd_col5.kpd_col5");
+	set_wkup_fcn("gpmc_a23.kpd_col7");
+	set_wkup_fcn("gpmc_a22.kpd_col6");
+	set_wkup_fcn("kpd_row0.kpd_row0");
+	set_wkup_fcn("kpd_row1.kpd_row1");
+	set_wkup_fcn("kpd_row2.kpd_row2");
+	set_wkup_fcn("kpd_row3.kpd_row3");
+	set_wkup_fcn("kpd_row4.kpd_row4");
+	set_wkup_fcn("kpd_row5.kpd_row5");
+	set_wkup_fcn("gpmc_a18.kpd_row6");
+	set_wkup_fcn("gpmc_a19.kpd_row7");
+
+}
+
 static struct omap4_keypad_platform_data sdp4430_keypad_data = {
 	.keymap_data		= &sdp4430_keymap_data,
 	.rows			= 8,
 	.cols			= 8,
+	.keypad_pad_wkup        = keypad_pad_wkup,
 };
 static struct gpio_led sdp4430_gpio_leds[] = {
 	{
