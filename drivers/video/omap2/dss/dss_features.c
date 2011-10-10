@@ -660,7 +660,7 @@ static const struct omap_dss_features omap5_dss_features = {
 	.hdmi_core_sys_offset = 0x20000,
 };
 
-#if defined(CONFIG_OMAP4_DSS_HDMI)
+#if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 /* HDMI OMAP4 Functions*/
 static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 
@@ -684,10 +684,25 @@ static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 
 };
 
+/* HDMI OMAP5 Functions*/
+static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
+
+	.video_configure	=	ti_hdmi_5xxx_basic_configure,
+	.phy_enable		=	ti_hdmi_4xxx_phy_enable,
+	.phy_disable		=	ti_hdmi_4xxx_phy_disable,
+	.read_edid		=	NULL,
+	.pll_enable		=	ti_hdmi_4xxx_pll_enable,
+	.pll_disable		=	ti_hdmi_4xxx_pll_disable,
+	.video_enable		=	ti_hdmi_4xxx_wp_video_start,
+
+};
+
 void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data)
 {
 	if (cpu_is_omap44xx())
 		ip_data->ops = &omap4_hdmi_functions;
+	else if (cpu_is_omap54xx())
+		ip_data->ops = &omap5_hdmi_functions;
 }
 #endif
 

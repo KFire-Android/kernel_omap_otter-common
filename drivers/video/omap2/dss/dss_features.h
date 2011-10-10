@@ -20,7 +20,7 @@
 #ifndef __OMAP2_DSS_FEATURES_H
 #define __OMAP2_DSS_FEATURES_H
 
-#if defined(CONFIG_OMAP4_DSS_HDMI)
+#if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 #include "ti_hdmi.h"
 #endif
 
@@ -119,7 +119,7 @@ unsigned long dss_feat_get_hdmi_core_sys_offset(void);
 bool dss_has_feature(enum dss_feat_id id);
 void dss_feat_get_reg_field(enum dss_feat_reg_field id, u8 *start, u8 *end);
 void dss_features_init(void);
-#if defined(CONFIG_OMAP4_DSS_HDMI)
+#if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
 void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data);
 #endif
 #endif
