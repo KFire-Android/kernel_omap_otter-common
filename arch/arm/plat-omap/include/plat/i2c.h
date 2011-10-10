@@ -71,8 +71,16 @@ struct omap_i2c_dev_attr {
 	u8	fifo_depth;
 	u8	flags;
 };
+enum omap_i2c_pullup_values {
+	I2C_PULLUP_STD_4K5_FAST_1K66 = 0,
+	I2C_PULLUP_STD_2K1_FAST_920OM,
+	I2C_PULLUP_STD_860_OM_FAST_500_OM,
+	I2C_PULLUP_STD_NA_FAST_300_OM
+};
 
 void __init omap1_i2c_mux_pins(int bus_id);
 void __init omap2_i2c_mux_pins(int bus_id);
+
+void omap2_i2c_pullup(int bus_id, enum omap_i2c_pullup_values pullup);
 
 #endif /* __ASM__ARCH_OMAP_I2C_H */

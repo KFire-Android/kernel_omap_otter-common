@@ -32,6 +32,7 @@
 #include <linux/clk.h>
 
 #include <mach/irqs.h>
+#include "../../../../arch/arm/mach-omap2/control.h"
 #include <plat/mux.h>
 #include <plat/i2c.h>
 #include <plat/omap-pm.h>
@@ -267,6 +268,69 @@ void omap_register_i2c_bus_board_data(int bus_id,
 					pdata->hwspin_lock_timeout;
 		i2c_pdata[bus_id - 1].hwspin_unlock = pdata->hwspin_unlock;
 	}
+}
+
+/**
+ * omap2_i2c_pullup - setup pull-up resistors for I2C bus
+ * @bus_id: bus id counting from number 1
+ * @sda_pullup: Pull-up resistor for SDA and SCL pins
+ *
+ */
+void omap2_i2c_pullup(int bus_id, enum omap_i2c_pullup_values pullup)
+{
+	u32 val = 0;
+
+
+	if (bus_id < 1 || bus_id > omap_i2c_nr_ports() ||
+			pullup > I2C_PULLUP_STD_NA_FAST_300_OM) {
+		pr_err("%s:Wrong pullup (%d) or use wrong I2C port (%d)\n",
+			__func__, pullup, bus_id);
+		return;
+	}
+
+	val = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_0);
+	switch (bus_id) {
+	case 1:
+		/* Setup PULL-UP resistor for I2C-1 */
+		val &= ~(OMAP4_I2C1_SDA_LOAD_BITS_MASK  |
+			OMAP4_I2C1_SCL_LOAD_BITS_MASK  |
+			OMAP4_I2C1_SDA_PULLUPRESX_MASK |
+			OMAP4_I2C1_SCL_PULLUPRESX_MASK);
+		val |= ((pullup << OMAP4_I2C1_SDA_LOAD_BITS_SHIFT) |
+			(pullup << OMAP4_I2C1_SCL_LOAD_BITS_SHIFT));
+		break;
+	case 2:
+		/* Setup PULL-UP resistor for I2C-2 */
+		val &= ~(OMAP4_I2C2_SDA_LOAD_BITS_MASK  |
+			OMAP4_I2C2_SCL_LOAD_BITS_MASK  |
+			OMAP4_I2C2_SDA_PULLUPRESX_MASK |
+			OMAP4_I2C2_SCL_PULLUPRESX_MASK);
+		val |= ((pullup << OMAP4_I2C2_SDA_LOAD_BITS_SHIFT) |
+			(pullup << OMAP4_I2C2_SCL_LOAD_BITS_SHIFT));
+		break;
+	case 3:
+		/* Setup PULL-UP resistor for I2C-3 */
+		val &= ~(OMAP4_I2C3_SDA_LOAD_BITS_MASK  |
+			OMAP4_I2C3_SCL_LOAD_BITS_MASK  |
+			OMAP4_I2C3_SDA_PULLUPRESX_MASK |
+			OMAP4_I2C3_SCL_PULLUPRESX_MASK);
+		val |= ((pullup << OMAP4_I2C3_SDA_LOAD_BITS_SHIFT) |
+			(pullup << OMAP4_I2C3_SCL_LOAD_BITS_SHIFT));
+		break;
+	case 4:
+		/* Setup PULL-UP resistor for I2C-4 */
+		val &= ~(OMAP4_I2C4_SDA_LOAD_BITS_MASK  |
+			OMAP4_I2C4_SCL_LOAD_BITS_MASK  |
+			OMAP4_I2C4_SDA_PULLUPRESX_MASK |
+			OMAP4_I2C4_SCL_PULLUPRESX_MASK);
+		val |= ((pullup << OMAP4_I2C4_SDA_LOAD_BITS_SHIFT) |
+			(pullup << OMAP4_I2C4_SCL_LOAD_BITS_SHIFT));
+		break;
+	default:
+		return;
+	}
+
+	omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_0);
 }
 
 /**
