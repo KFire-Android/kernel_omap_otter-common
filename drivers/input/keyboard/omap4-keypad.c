@@ -85,6 +85,7 @@ struct omap4_keypad {
 	unsigned int cols;
 	unsigned int row_shift;
 	unsigned char key_state[8];
+	void (*keypad_pad_wkup)(int enable);
 	unsigned short keymap[];
 };
 
@@ -246,6 +247,7 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
 	keypad_data->row_shift = row_shift;
 	keypad_data->rows = pdata->rows;
 	keypad_data->cols = pdata->cols;
+	keypad_data->keypad_pad_wkup = pdata->keypad_pad_wkup;
 
 	/* input device allocation */
 	keypad_data->input = input_dev = input_allocate_device();
@@ -338,6 +340,30 @@ static int __devexit omap4_keypad_remove(struct platform_device *pdev)
 
 	return 0;
 }
+static int omap4_keypad_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+
+	if (keypad_data->keypad_pad_wkup)
+		keypad_data->keypad_pad_wkup(1);
+
+	return 0;
+}
+static int omap4_keypad_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap4_keypad *keypad_data = platform_get_drvdata(pdev);
+
+	if (keypad_data->keypad_pad_wkup)
+		keypad_data->keypad_pad_wkup(0);
+
+	return 0;
+}
+static const struct dev_pm_ops omap4_keypad_pm_ops = {
+	.suspend = omap4_keypad_suspend,
+	.resume = omap4_keypad_resume,
+};
 
 static struct platform_driver omap4_keypad_driver = {
 	.probe		= omap4_keypad_probe,
@@ -345,6 +371,7 @@ static struct platform_driver omap4_keypad_driver = {
 	.driver		= {
 		.name	= "omap4-keypad",
 		.owner	= THIS_MODULE,
+		.pm	= &omap4_keypad_pm_ops,
 	},
 };
 
