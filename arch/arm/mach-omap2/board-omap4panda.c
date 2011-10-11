@@ -54,6 +54,7 @@
 #include "hsmmc.h"
 #include "control.h"
 #include "mux.h"
+#include "pm.h"
 #include "common-board-devices.h"
 
 #define GPIO_HUB_POWER		1
@@ -62,7 +63,7 @@
 #define GPIO_WIFI_IRQ		53
 #define HDMI_GPIO_HPD 60 /* Hot plug pin for HDMI */
 #define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
-
+#define TPS62361_GPIO   7 /* VCORE1 power control */
 
 #define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
 #define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
@@ -686,6 +687,7 @@ extern void __init omap4_panda_android_init(void);
 
 static void __init omap4_panda_init(void)
 {
+	int status;
 	int package = OMAP_PACKAGE_CBS;
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
@@ -717,6 +719,14 @@ static void __init omap4_panda_init(void)
 
 	omap_dmm_init();
 	omap4_panda_display_init();
+
+	if (cpu_is_omap446x()) {
+		/* Vsel0 = gpio, vsel1 = gnd */
+		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
+					OMAP_PIN_OFF_OUTPUT_HIGH, -1);
+		if (status)
+			pr_err("TPS62361 initialization failed: %d\n", status);
+	}
 
 }
 
