@@ -111,6 +111,18 @@ static int _abb_set_abb(struct voltagedomain *voltdm, int abb_type)
 	if (ret)
 		return ret;
 
+	/* Select FBB or RBB */
+	if (abb_type == OMAP_ABB_SLOW_OPP)
+		voltdm->rmw(abb->setup_bits->active_fbb_mask |
+				abb->setup_bits->active_rbb_mask,
+				abb->setup_bits->active_rbb_mask,
+				abb->setup_reg);
+	else
+		voltdm->rmw(abb->setup_bits->active_fbb_mask |
+				abb->setup_bits->active_rbb_mask,
+				abb->setup_bits->active_fbb_mask,
+				abb->setup_reg);
+
 	/* program next state of ABB ldo */
 	voltdm->rmw(abb->ctrl_bits->opp_sel_mask,
 		    abb_type << __ffs(abb->ctrl_bits->opp_sel_mask),
@@ -294,9 +306,6 @@ void __init omap_ldo_abb_init(struct voltagedomain *voltdm)
 		    wait_count_val << __ffs(abb->setup_bits->wait_count_mask),
 		    abb->setup_reg);
 
-	/* Allow Forward Body-Bias */
-	voltdm->rmw(abb->setup_bits->active_fbb_mask,
-		    abb->setup_bits->active_fbb_mask, abb->setup_reg);
 	/*
 	 * Determine MPU ABB state at OPP_TURBO on 4460
 	 *
@@ -334,15 +343,11 @@ void __init omap_ldo_abb_init(struct voltagedomain *voltdm)
 				OMAP4460_VDD_MPU_OPPTURBO_UV);
 
 		/* OPP_TURBO is FAST_OPP (FBB) by default */
-		if (rbb) {
-			/* Allow Reverse Body-Bias */
-			voltdm->rmw(abb->setup_bits->active_rbb_mask,
-					abb->setup_bits->active_rbb_mask,
-					abb->setup_reg);
+		if (rbb)
 			volt_data->abb_type = OMAP_ABB_SLOW_OPP;
-		} else if (!trim) {
+		else if (!trim)
 			volt_data->abb_type = OMAP_ABB_NOMINAL_OPP;
-		}
+
 	}
 	/* Enable ABB */
 	_abb_set_availability(voltdm, abb, true);
