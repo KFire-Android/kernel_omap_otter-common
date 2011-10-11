@@ -51,6 +51,7 @@
 #include "timer-gp.h"
 
 #include "board-panda.h"
+#include "omap4_ion.h"
 #include "hsmmc.h"
 #include "control.h"
 #include "mux.h"
@@ -703,6 +704,7 @@ static void __init omap4_panda_init(void)
 		pr_err("error setting wl12xx data\n");
 
 	omap4_panda_i2c_init();
+	omap4_register_ion();
 	omap4_audio_conf();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 /*
@@ -745,7 +747,11 @@ static void __init omap4_panda_reserve(void)
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP_ION_HEAP_SECURE_INPUT_SIZE);
 
-	omap_reserve();
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
+#else
+ 	omap_reserve();
+#endif
 }
 
 MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")

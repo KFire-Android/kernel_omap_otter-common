@@ -17,7 +17,7 @@
 
 #include <plat/common.h>
 
-#include "board-blaze.h"
+#include "omap4_ion.h"
 
 #define OMAP4_RAMCONSOLE_START	(PLAT_PHYS_OFFSET + SZ_512M)
 #define OMAP4_RAMCONSOLE_SIZE	SZ_2M

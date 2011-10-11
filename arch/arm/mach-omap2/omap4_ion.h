@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-omap2/board-44xx-tablet.h
+ * arch/arm/mach-omap2/board-blaze.h
  *
  * Copyright (C) 2011 Texas Instruments
  *
@@ -14,13 +14,15 @@
  *
  */
 
-#ifndef _MACH_OMAP_BOARD_44XX_TABLET2_H
-#define _MACH_OMAP_BOARD_44XX_TABLET2_H
+#ifndef _OMAP4_ION_H
+#define _OMAP4_ION_H
 
-int tablet_touch_init(void);
-int tablet_sensor_init(void);
-void omap4_create_board_props(void);
-int tablet_panel_init(void);
-int tablet_button_init(void);
+#ifdef CONFIG_ION_OMAP
+void omap_ion_init(void);
+void omap4_register_ion(void);
+#else
+inline void omap_ion_init(void) { return; }
+inline void omap4_register_ion(void) { return; }
+#endif
 
 #endif

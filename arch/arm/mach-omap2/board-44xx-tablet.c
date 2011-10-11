@@ -60,6 +60,7 @@
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
 #include "board-44xx-tablet.h"
+#include "omap4_ion.h"
 
 #define WILINK_UART_DEV_NAME	"/dev/ttyO1"
 #define ETH_KS8851_IRQ			34
