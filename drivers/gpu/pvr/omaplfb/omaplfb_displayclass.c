@@ -1190,7 +1190,6 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 		psPVRFBInfo->ulFBSize = FBSize;
 		psPVRFBInfo->bIs2D = OMAPLFB_FALSE;
 		psPVRFBInfo->psPageList = IMG_NULL;
-		psPVRFBInfo->psIONHandle = IMG_NULL;
 	}
 	psPVRFBInfo->ulBufferSize = psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
 	
@@ -1267,11 +1266,12 @@ static void OMAPLFBDeInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 	psLINFBOwner = psLINFBInfo->fbops->owner;
 
 	kfree(psPVRFBInfo->psPageList);
+#if defined(CONFIG_ION_OMAP)
 	if (psPVRFBInfo->psIONHandle)
 	{
 		ion_free(gpsIONClient, psPVRFBInfo->psIONHandle);
 	}
-
+#endif
 	if (psLINFBInfo->fbops->fb_release != NULL) 
 	{
 		(void) psLINFBInfo->fbops->fb_release(psLINFBInfo, 0);
