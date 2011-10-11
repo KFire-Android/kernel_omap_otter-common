@@ -698,22 +698,52 @@ static int dss_mgr_wait_for_vsync(struct omap_overlay_manager *mgr)
 	u32 irq = 0; /* For non-supported panels will cause a timeout */
 	int r;
 
-	if (mgr->device->type == OMAP_DISPLAY_TYPE_VENC) {
+	switch (mgr->device->type) {
+	case OMAP_DISPLAY_TYPE_VENC:
 		irq = DISPC_IRQ_EVSYNC_ODD;
-	} else if (mgr->device->type == OMAP_DISPLAY_TYPE_HDMI) {
+		break;
+	case OMAP_DISPLAY_TYPE_HDMI:
 		irq = DISPC_IRQ_EVSYNC_EVEN;
-	} else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI) &&
-			(mgr->device->channel == OMAP_DSS_CHANNEL_LCD)) {
-		if (mgr->device->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE)
+		break;
+	case OMAP_DISPLAY_TYPE_DSI:
+		switch (mgr->device->channel) {
+		case OMAP_DSS_CHANNEL_LCD:
+			if (mgr->device->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE)
+				irq = DISPC_IRQ_VSYNC;
+			else
+				irq = DISPC_IRQ_FRAMEDONE;
+			break;
+		case OMAP_DSS_CHANNEL_LCD2:
+			if (mgr->device->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE)
+				irq = DISPC_IRQ_VSYNC2;
+			else
+				irq = DISPC_IRQ_FRAMEDONE2;
+			break;
+		case OMAP_DSS_CHANNEL_DIGIT:
+		/* should not reach here */
+		/* OMAP_DSS_CHANNEL_DIGIT is for HDMI */
+			break;
+		}
+		break;
+	case OMAP_DISPLAY_TYPE_DPI:
+		switch (mgr->device->channel) {
+		case OMAP_DSS_CHANNEL_LCD:
 			irq = DISPC_IRQ_VSYNC;
-		else
-			irq = DISPC_IRQ_FRAMEDONE;
-	} else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI) &&
-			(mgr->device->channel == OMAP_DSS_CHANNEL_LCD2)) {
-		if (mgr->device->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE)
+			break;
+		case OMAP_DSS_CHANNEL_LCD2:
 			irq = DISPC_IRQ_VSYNC2;
-		else
-			irq = DISPC_IRQ_FRAMEDONE2;
+			break;
+		case OMAP_DSS_CHANNEL_DIGIT:
+		/* should not reach here */
+		/* OMAP_DSS_CHANNEL_DIGIT is for HDMI */
+			break;
+		}
+		break;
+	case OMAP_DISPLAY_TYPE_DBI:
+	case OMAP_DISPLAY_TYPE_SDI:
+	case OMAP_DISPLAY_TYPE_NONE:
+	/* non supported panels... */
+		break;
 	}
 
 	r = omap_dispc_wait_for_irq_interruptible_timeout(irq, timeout);
