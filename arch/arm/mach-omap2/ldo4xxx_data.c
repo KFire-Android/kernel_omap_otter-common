@@ -23,6 +23,7 @@ static struct omap_ldo_abb_ops omap4_ldo_abb_ops = {
 static struct omap_ldo_abb_setup_bits omap4_ldo_abb_setup_bits = {
 	.enable_mask		= OMAP_LDO_ABB_SETUP_SR2EN_MASK,
 	.active_fbb_mask	= OMAP_LDO_ABB_SETUP_ACTIVE_FBB_SEL_MASK,
+	.active_rbb_mask	= OMAP_LDO_ABB_SETUP_ACTIVE_RBB_SEL_MASK,
 	.wait_count_mask	= OMAP_LDO_ABB_SETUP_SR2_WTCNT_VALUE_MASK,
 };
 

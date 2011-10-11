@@ -121,6 +121,7 @@ struct omap_voltage_notifier {
 #define OMAP_ABB_NONE		-1
 #define OMAP_ABB_NOMINAL_OPP	0
 #define OMAP_ABB_FAST_OPP	1
+#define OMAP_ABB_SLOW_OPP	3
 
 /**
  * struct omap_volt_data - Omap voltage specific data.
