@@ -23,6 +23,7 @@
 #include <linux/io.h>
 #include <linux/leds.h>
 #include <linux/gpio.h>
+#include <linux/omapfb.h>
 #include <linux/usb/otg.h>
 #include <linux/i2c/twl.h>
 #include <linux/regulator/machine.h>
@@ -47,6 +48,7 @@
 #include <plat/mmc.h>
 #include <plat/omap_apps_brd_id.h>
 #include <plat/remoteproc.h>
+#include <plat/vram.h>
 #include <video/omap-panel-generic-dpi.h>
 #include "timer-gp.h"
 
@@ -684,6 +686,18 @@ void omap4_panda_display_init(void)
 	omap_display_init(&omap4_panda_dss_data);
 }
 
+#define PANDA_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
+static struct omapfb_platform_data panda_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = 1,
+		.region = {
+			[0] = {
+				.size = PANDA_FB_RAM_SIZE,
+			},
+		},
+	},
+};
+
 extern void __init omap4_panda_android_init(void);
 
 static void __init omap4_panda_init(void)
@@ -720,6 +734,8 @@ static void __init omap4_panda_init(void)
 	usb_musb_init(&musb_board_data);
 
 	omap_dmm_init();
+	omap_vram_set_sdram_vram(PANDA_FB_RAM_SIZE, 0);
+	omapfb_set_platform_data(&panda_fb_pdata);
 	omap4_panda_display_init();
 
 	if (cpu_is_omap446x()) {
