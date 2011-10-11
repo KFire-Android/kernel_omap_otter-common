@@ -738,6 +738,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	u32 acwake;
 	int err = 0;
 	int fifo = 0;
+	u8 ret;
 
 	if (unlikely((!dev) ||
 		     (!dev->ch) ||
@@ -827,12 +828,9 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		*(u32 *)arg = hsi_inl(base, HSI_SYS_WAKE_REG(port));
 		break;
 	case HSI_IOCTL_FLUSH_RX:
-		if (!arg) {
-			err = -EINVAL;
-			goto out;
-		}
-		*(size_t *)arg = hsi_hsr_fifo_flush_channel(hsi_ctrl, port,
-							 channel);
+		ret = hsi_hsr_fifo_flush_channel(hsi_ctrl, port, channel);
+		if (arg)
+			*(size_t *)arg = ret;
 
 		/* Ack the RX Int */
 		hsi_outl_and(~HSI_HSR_DATAAVAILABLE(channel), base,
@@ -840,12 +838,10 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 						       channel));
 		break;
 	case HSI_IOCTL_FLUSH_TX:
-		if (!arg) {
-			err = -EINVAL;
-			goto out;
-		}
-		*(size_t *)arg = hsi_hst_fifo_flush_channel(hsi_ctrl, port,
-							 channel);
+		ret = hsi_hst_fifo_flush_channel(hsi_ctrl, port, channel);
+		if (arg)
+			*(size_t *)arg = ret;
+
 		/* Ack the TX Int */
 		hsi_outl_and(~HSI_HST_DATAACCEPT(channel), base,
 			     HSI_SYS_MPU_STATUS_CH_REG(port, pport->n_irq,

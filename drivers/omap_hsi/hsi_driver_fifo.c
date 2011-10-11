@@ -398,6 +398,8 @@ u8 hsi_hst_fifo_flush_channel(struct hsi_dev *hsi_ctrl, unsigned int port,
 		/* Warning : All TX FIFOs are flushed */
 		hsi_outl(0, hsi_ctrl->base, HSI_HST_TXSTATE_REG(port));
 		return 0;
+	} else {
+		dev_warn(hsi_ctrl->dev, "HST FIFO Flush not possible on HSI\n");
 	}
 
 	return 0;
