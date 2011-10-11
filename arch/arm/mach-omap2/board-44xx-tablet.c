@@ -858,6 +858,25 @@ static struct platform_device *tablet4430_devices[] __initdata = {
 	&btwilink_device,
 };
 
+static void __init tablet_camera_mux_init(void)
+{
+	u32 r = 0;
+
+	/* Enable CSI22 pads for 4460 only*/
+	if (cpu_is_omap446x() &&
+		(omap_get_board_version() >= OMAP4_TABLET_2_0)) {
+		r = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
+		r |= (0x7 << OMAP4_CAMERARX_CSI22_LANEENABLE_SHIFT);
+		omap4_ctrl_pad_writel(r,
+			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
+
+		omap_mux_init_signal("csi22_dx2.csi22_dx2",
+				OMAP_PIN_INPUT | OMAP_MUX_MODE0);
+		omap_mux_init_signal("csi22_dy2.csi22_dy2",
+				OMAP_PIN_INPUT | OMAP_MUX_MODE0);
+	}
+}
+
 static void __init omap_tablet_init(void)
 {
 	int status;
@@ -872,13 +891,13 @@ static void __init omap_tablet_init(void)
 
 	omap_board_config = tablet_config;
 	omap_board_config_size = ARRAY_SIZE(tablet_config);
-
 	tablet_rev = omap_init_board_version(0);
 	register_reboot_notifier(&tablet_reboot_notifier);
 	omap4_create_board_props();
 	omap4_audio_conf();
 	omap4_i2c_init();
 	tablet_touch_init();
+	tablet_camera_mux_init();
 	omap_dmm_init();
 	tablet_panel_init();
 	tablet_pmic_mux_init();
