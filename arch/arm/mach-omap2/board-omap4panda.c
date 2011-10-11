@@ -729,7 +729,7 @@ static void __init omap4_panda_init(void)
 		if (status)
 			pr_err("TPS62361 initialization failed: %d\n", status);
 	}
-
+	omap_enable_smartreflex_on_init();
 }
 
 static void __init omap4_panda_map_io(void)
