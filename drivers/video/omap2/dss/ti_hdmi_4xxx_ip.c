@@ -196,8 +196,27 @@ static int hdmi_set_pll_pwr(struct hdmi_ip_data *ip_data, enum hdmi_pll_pwr val)
 
 static int hdmi_pll_reset(struct hdmi_ip_data *ip_data)
 {
+
+	enum omapdss_version ver = omapdss_get_version();
+	u32 val;
+
+	switch (ver) {
+	case OMAPDSS_VER_OMAP4430_ES1:
+	case OMAPDSS_VER_OMAP4430_ES2:
+	case OMAPDSS_VER_OMAP4:
+		val = 0;
+		break;
+	case OMAPDSS_VER_OMAP5:
+		val = 1;
+		break;
+	default:
+		DSSWARN("Invalid OMAP version");
+		return -EINVAL;
+	}
+
 	/* SYSRESET  controlled by power FSM */
-	REG_FLD_MOD(hdmi_pll_base(ip_data), PLLCTRL_PLL_CONTROL, 0x0, 3, 3);
+	REG_FLD_MOD(hdmi_pll_base(ip_data), PLLCTRL_PLL_CONTROL, val, 3, 3);
+
 
 	/* READ 0x0 reset is in progress */
 	if (hdmi_wait_for_bit_change(hdmi_pll_base(ip_data),
