@@ -37,8 +37,11 @@ static void __iomem *l2cache_base;
 
 static void __iomem *gic_dist_base_addr;
 static void __iomem *gic_cpu_base;
-static struct clockdomain *l4_secure_clkdm;
 static void *dram_barrier_base;
+
+#ifndef CONFIG_SECURITY_MIDDLEWARE_COMPONENT
+static struct clockdomain *l4_secure_clkdm;
+#endif
 
 static void omap_bus_sync_noop(void)
 { }
