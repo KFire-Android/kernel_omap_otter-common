@@ -1025,8 +1025,6 @@ static int __devexit omap_temp_sensor_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static void omap_temp_sensor_save_ctxt(struct omap_temp_sensor *temp_sensor)
 {
-	temp_sensor_context.temp_sensor_ctrl =
-	    omap_temp_sensor_readl(temp_sensor, TEMP_SENSOR_CTRL_OFFSET);
 	temp_sensor_context.bg_ctrl =
 	    omap_temp_sensor_readl(temp_sensor, BGAP_CTRL_OFFSET);
 	temp_sensor_context.bg_counter =
@@ -1039,9 +1037,6 @@ static void omap_temp_sensor_save_ctxt(struct omap_temp_sensor *temp_sensor)
 
 static void omap_temp_sensor_restore_ctxt(struct omap_temp_sensor *temp_sensor)
 {
-	omap_temp_sensor_writel(temp_sensor,
-				temp_sensor_context.temp_sensor_ctrl,
-				TEMP_SENSOR_CTRL_OFFSET);
 	omap_temp_sensor_writel(temp_sensor,
 				temp_sensor_context.bg_ctrl,
 				BGAP_CTRL_OFFSET);
