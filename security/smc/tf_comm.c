@@ -822,6 +822,7 @@ int tf_fill_descriptor_table(
 			for (j = page_shift;
 				  j < pages_to_get;
 				  j++) {
+				struct page *page;
 				void *addr =
 					(void *)(buffer_offset_vaddr +
 						(j - page_shift) * PAGE_SIZE);
@@ -830,14 +831,16 @@ int tf_fill_descriptor_table(
 						"tf_fill_descriptor_table: "
 						"cannot handle address %p\n",
 						addr);
+					error = -EFAULT;
 					goto error;
 				}
-				struct page *page = vmalloc_to_page(addr);
+				page = vmalloc_to_page(addr);
 				if (page == NULL) {
 					dprintk(KERN_ERR
 						"tf_fill_descriptor_table: "
 						"cannot map %p to page\n",
 						addr);
+					error = -ENOMEM;
 					goto error;
 				}
 				coarse_pg_table->descriptors[j] = (u32)page;
