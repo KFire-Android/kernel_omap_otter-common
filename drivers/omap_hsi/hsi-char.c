@@ -45,16 +45,16 @@
 
 #include "hsi-char.h"
 
-#define DRIVER_VERSION  "0.2.1"
+#define DRIVER_VERSION  "0.2.2"
 #define HSI_CHAR_DEVICE_NAME  "hsi_char"
 
 static unsigned int port = 1;
-module_param(port, uint, 1);
+module_param(port, uint, S_IRUGO);
 MODULE_PARM_DESC(port, "HSI port to be probed");
 
-static unsigned int num_channels;
-static unsigned int channels_map[HSI_MAX_CHAR_DEVS] = { 0 };
-module_param_array(channels_map, uint, &num_channels, 0);
+static unsigned int num_channels = 1;
+static unsigned int channels_map[HSI_MAX_CHAR_DEVS] = { 1 };
+module_param_array(channels_map, uint, &num_channels, S_IRUGO);
 MODULE_PARM_DESC(channels_map, "HSI channels to be probed");
 
 dev_t hsi_char_dev;
