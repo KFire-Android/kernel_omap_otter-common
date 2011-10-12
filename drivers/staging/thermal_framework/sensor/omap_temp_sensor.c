@@ -240,7 +240,7 @@ static void omap_configure_temp_sensor_thresholds(struct omap_temp_sensor
 		pr_err("%s:Temp thresholds out of bounds\n", __func__);
 		return;
 	}
-	temp |= ((t_hot << OMAP4_T_HOT_SHIFT) | (t_cold << OMAP4_T_COLD_SHIFT));
+	temp = ((t_hot << OMAP4_T_HOT_SHIFT) | (t_cold << OMAP4_T_COLD_SHIFT));
 	omap_temp_sensor_writel(temp_sensor, temp, BGAP_THRESHOLD_OFFSET);
 
 	tshut_hot = temp_to_adc_conversion(TSHUT_THRESHOLD_TSHUT_HOT);
@@ -249,7 +249,7 @@ static void omap_configure_temp_sensor_thresholds(struct omap_temp_sensor
 		pr_err("%s:Temp shutdown thresholds out of bounds\n", __func__);
 		return;
 	}
-	temp |= ((tshut_hot << OMAP4_TSHUT_HOT_SHIFT)
+	temp = ((tshut_hot << OMAP4_TSHUT_HOT_SHIFT)
 			| (tshut_cold << OMAP4_TSHUT_COLD_SHIFT));
 	omap_temp_sensor_writel(temp_sensor, temp, BGAP_TSHUT_OFFSET);
 }
@@ -307,16 +307,12 @@ static int omap_set_thresholds(struct omap_temp_sensor *temp_sensor,
 		return -EINVAL;
 	}
 
-	reg_val |= ((new_hot << OMAP4_T_HOT_SHIFT) |
+	reg_val = ((new_hot << OMAP4_T_HOT_SHIFT) |
 			(new_cold << OMAP4_T_COLD_SHIFT));
 	omap_temp_sensor_writel(temp_sensor, reg_val, BGAP_THRESHOLD_OFFSET);
 
-	curr_temp = omap_read_current_temp(temp_sensor);
-	if (curr_temp == -EINVAL) {
-		pr_err("%s:Current temp is invalid mask is not modified\n",
-			__func__);
-		return curr_temp;
-	}
+	curr_temp = omap_temp_sensor_readl(temp_sensor, TEMP_SENSOR_CTRL_OFFSET);
+	curr_temp &= (OMAP4_BGAP_TEMP_SENSOR_DTEMP_MASK);
 
 	if (new_hot >= curr_temp) {
 		reg_val = omap_temp_sensor_readl(temp_sensor, BGAP_CTRL_OFFSET);
