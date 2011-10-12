@@ -5,10 +5,11 @@
  * interface.
  *
  * Copyright (C) 2009 Nokia Corporation. All rights reserved.
- * Copyright (C) 2009 Texas Instruments, Inc.
+ * Copyright (C) 2011 Texas Instruments, Inc.
  *
  * Author: Andras Domokos <andras.domokos@nokia.com>
  * Author: Sebastien JAN <s-jan@ti.com>
+ * Author: Djamil ELAIDI <d-elaidi@ti.com>
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -548,6 +549,7 @@ static void __exit hsi_char_exit(void)
 
 MODULE_AUTHOR("Andras Domokos <andras.domokos@nokia.com>");
 MODULE_AUTHOR("Sebatien Jan <s-jan@ti.com> / Texas Instruments");
+MODULE_AUTHOR("Djamil Elaidi <d-elaidi@ti.com> / Texas Instruments");
 MODULE_DESCRIPTION("HSI character device");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(DRIVER_VERSION);
