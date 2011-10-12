@@ -177,7 +177,7 @@ static int omap_safe_zone(struct list_head *cooling_list, int cpu_temp)
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_debug("%s:Safe zone\n", __func__);
+	pr_info("%s:hot spot temp %d\n", __func__, cpu_temp);
 	/* TO DO: need to build an algo to find the right cooling agent */
 	list_for_each_entry_safe(cooling_dev, tmp, cooling_list, node) {
 		if (cooling_dev->dev_ops &&
@@ -230,7 +230,7 @@ static int omap_monitor_zone(struct list_head *cooling_list, int cpu_temp)
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_debug("%s:Monitor zone\n", __func__);
+	pr_info("%s:hot spot temp %d\n", __func__, cpu_temp);
 	/* TO DO: need to build an algo to find the right cooling agent */
 	list_for_each_entry_safe(cooling_dev, tmp, cooling_list, node) {
 		if (cooling_dev->dev_ops &&
@@ -286,7 +286,7 @@ static int omap_alert_zone(struct list_head *cooling_list, int cpu_temp)
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_debug("%s:Alert zone\n", __func__);
+	pr_info("%s:hot spot temp %d\n", __func__, cpu_temp);
 	/* TO DO: need to build an algo to find the right cooling agent */
 	list_for_each_entry_safe(cooling_dev, tmp, cooling_list, node) {
 		if (cooling_dev->dev_ops &&
@@ -347,7 +347,7 @@ static int omap_panic_zone(struct list_head *cooling_list, int cpu_temp)
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_debug("%s:Panic zone\n", __func__);
+	pr_info("%s:hot spot temp %d\n", __func__, cpu_temp);
 	/* TO DO: need to build an algo to find the right cooling agent */
 	list_for_each_entry_safe(cooling_dev, tmp, cooling_list, node) {
 		if (cooling_dev->dev_ops &&
