@@ -156,6 +156,30 @@ struct dsi_clock_info {
 	bool use_sys_clk;
 };
 
+struct dispc_config {
+	u32 sizex, sizey;
+	u32 burstsize;
+	u32 pixelinc;
+	u32 rowinc;
+	u32 bursttype;
+	u32 antiflicker;
+	u32 doublestride;
+	u32 ba;
+	u32 bacbcr;
+	u32 format;
+	u32 rotation;
+	u32 gfx_top_buffer;
+	u32 gfx_bottom_buffer;
+	u32 vid1_top_buffer;
+	u32 vid1_bottom_buffer;
+	u32 vid2_top_buffer;
+	u32 vid2_bottom_buffer;
+	u32 vid3_top_buffer;
+	u32 vid3_bottom_buffer;
+	u32 wb_top_buffer;
+	u32 wb_bottom_buffer;
+};
+
 struct seq_file;
 struct platform_device;
 
@@ -472,7 +496,7 @@ int dispc_set_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
 int dispc_get_clock_div(enum omap_channel channel,
 		struct dispc_clock_info *cinfo);
-
+u32 sa_calc_wrap(struct dispc_config *dispc_reg_config, u32 channel_no);
 
 /* VENC */
 #ifdef CONFIG_OMAP2_DSS_VENC
@@ -515,6 +539,7 @@ int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 					struct omap_video_timings *timings);
 int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 					struct fb_videomode *mode);
+void omapdss_hdmi_restart(void);
 int hdmi_panel_hpd_handler(int hpd);
 int omapdss_hdmi_get_pixel_clock(void);
 int omapdss_hdmi_get_mode(void);
@@ -523,11 +548,14 @@ void omapdss_hdmi_set_deepcolor(int val);
 int hdmi_get_current_hpd(void);
 void hdmi_get_monspecs(struct fb_monspecs *specs);
 u8 *hdmi_read_edid(struct omap_video_timings *);
+void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev);
 
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
 void hdmi_dump_regs(struct seq_file *s);
-
+int omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
+					 void (*hdmi_irq_cb)(int status),
+					 void (*hdmi_power_on_cb)(void));
 int omap_dss_ovl_set_info(struct omap_overlay *ovl,
 		struct omap_overlay_info *info);
 
