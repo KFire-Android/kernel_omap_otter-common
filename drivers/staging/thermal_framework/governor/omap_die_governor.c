@@ -30,25 +30,26 @@
 #define MONITOR_ZONE	2
 #define SAFE_ZONE	1
 #define NO_ACTION	0
+#define OMAP_FATAL_TEMP 125000
 #define OMAP_PANIC_TEMP 110000
 #define OMAP_ALERT_TEMP 100000
 #define OMAP_MONITOR_TEMP 85000
 
 
 /* TODO: Define this via a configurable file */
-#define OMAP_CPU_THRESHOLD_FATAL 123000
 #define HYSTERESIS_VALUE 2000
 #define NORMAL_TEMP_MONITORING_RATE 1000
 #define FAST_TEMP_MONITORING_RATE 250
 
-#define OMAP_GRADIENT_SLOPE 376
-#define OMAP_GRADIENT_CONST -16000
+#define OMAP_GRADIENT_SLOPE 481
+#define OMAP_GRADIENT_CONST -12945
 
 struct omap_die_governor {
 	struct thermal_dev *temp_sensor;
 	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
 	int report_rate;
 	int panic_zone_reached;
+	int cooling_level;
 };
 
 static struct thermal_dev *therm_fw;
@@ -195,14 +196,18 @@ out:
 			__func__);
 		return -ENODEV;
 	} else {
-		thermal_cooling_set_level(&cooling_agents, 0);
+		omap_gov->cooling_level = 0;
+		thermal_cooling_set_level(&cooling_agents,
+					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
-		die_temp_lower = hotspot_temp_to_sensor_temp(cpu_temp);
+		die_temp_lower = hotspot_temp_to_sensor_temp(
+			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
 		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_MONITOR_TEMP);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
-			(die_temp_lower - HYSTERESIS_VALUE), die_temp_upper);
+			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			NORMAL_TEMP_MONITORING_RATE);
+		omap_gov->panic_zone_reached = 0;
 	}
 
 	return 0;
@@ -244,15 +249,19 @@ out:
 			__func__);
 		return -ENODEV;
 	} else {
-		thermal_cooling_set_level(&cooling_agents, 50);
+		omap_gov->cooling_level = 0;
+		thermal_cooling_set_level(&cooling_agents,
+					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
-		die_temp_lower = hotspot_temp_to_sensor_temp(OMAP_MONITOR_TEMP);
+		die_temp_lower = hotspot_temp_to_sensor_temp(
+			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
 		die_temp_upper =
-			hotspot_temp_to_sensor_temp(OMAP_CPU_THRESHOLD_FATAL);
+			hotspot_temp_to_sensor_temp(OMAP_ALERT_TEMP);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
-			NORMAL_TEMP_MONITORING_RATE);
+			FAST_TEMP_MONITORING_RATE);
+		omap_gov->panic_zone_reached = 0;
 	}
 
 	return 0;
@@ -296,10 +305,23 @@ out:
 			__func__);
 		return -ENODEV;
 	} else {
-		thermal_cooling_set_level(&cooling_agents, 50);
+		if (omap_gov->panic_zone_reached == 0) {
+			/* Temperature rises and enters into alert zone */
+			omap_gov->cooling_level = 0;
+			thermal_cooling_set_level(&cooling_agents,
+						omap_gov->cooling_level);
+		} else { /* omap_gov->panic_zone_reached == 1 */
+			/*
+			 * Temperature falls from panic zone and
+			 * enters into alert zone
+			 * Wait until temperature falls into monitor zone
+			 */
+		}
 		list_del_init(&cooling_agents);
-		die_temp_lower = hotspot_temp_to_sensor_temp(OMAP_ALERT_TEMP);
-		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_PANIC_TEMP);
+		die_temp_lower = hotspot_temp_to_sensor_temp(
+			OMAP_ALERT_TEMP - HYSTERESIS_VALUE);
+		die_temp_upper = hotspot_temp_to_sensor_temp(
+			OMAP_PANIC_TEMP);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
@@ -344,14 +366,18 @@ out:
 			__func__);
 		return -ENODEV;
 	} else {
-		thermal_cooling_set_level(&cooling_agents, 99);
+		omap_gov->cooling_level++;
+		thermal_cooling_set_level(&cooling_agents,
+					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
-		die_temp_lower = hotspot_temp_to_sensor_temp(OMAP_PANIC_TEMP);
-		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_PANIC_TEMP);
+		die_temp_lower = hotspot_temp_to_sensor_temp(
+			OMAP_PANIC_TEMP - HYSTERESIS_VALUE);
+		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_FATAL_TEMP);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			FAST_TEMP_MONITORING_RATE);
+		omap_gov->panic_zone_reached = 1;
 	}
 
 	return 0;
@@ -381,21 +407,44 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 	pr_info("%s: triggered with these temp: temp %d cpu_temp %d\n",
 						__func__, temp, cpu_temp);
 #endif
-	if (cpu_temp >= OMAP_CPU_THRESHOLD_FATAL) {
+	if (cpu_temp >= OMAP_FATAL_TEMP) {
 		omap_fatal_zone(cpu_temp);
 		return FATAL_ZONE;
 	} else if (cpu_temp >= OMAP_PANIC_TEMP) {
 		omap_panic_zone(cooling_list, cpu_temp);
 		return PANIC_ZONE;
-	} else if (cpu_temp >= OMAP_ALERT_TEMP) {
+	} else if (cpu_temp < (OMAP_PANIC_TEMP - HYSTERESIS_VALUE)) {
+		if (cpu_temp >= OMAP_ALERT_TEMP) {
+			omap_alert_zone(cooling_list, cpu_temp);
+			return ALERT_ZONE;
+		} else if (cpu_temp < (OMAP_ALERT_TEMP - HYSTERESIS_VALUE)) {
+			if (cpu_temp >= OMAP_MONITOR_TEMP) {
+				omap_monitor_zone(cooling_list, cpu_temp);
+				return MONITOR_ZONE;
+			} else {
+				/*
+				 * this includes the case where :
+				 * (OMAP_MONITOR_TEMP - HYSTERESIS_VALUE) <= T
+				 * && T < OMAP_MONITOR_TEMP
+				 */
+				omap_safe_zone(cooling_list, cpu_temp);
+				return SAFE_ZONE;
+			}
+		} else {
+			/*
+			 * this includes the case where :
+			 * (OMAP_ALERT_TEMP - HYSTERESIS_VALUE) <= T < OMAP_ALERT_TEMP
+			 */
+			omap_monitor_zone(cooling_list, cpu_temp);
+			return MONITOR_ZONE;
+		}
+	} else {
+		/*
+		 * this includes the case where :
+		 * (OMAP_PANIC_TEMP - HYSTERESIS_VALUE) <= T < OMAP_PANIC_TEMP
+		 */
 		omap_alert_zone(cooling_list, cpu_temp);
 		return ALERT_ZONE;
-	} else if (cpu_temp >= OMAP_MONITOR_TEMP) {
-		omap_monitor_zone(cooling_list, cpu_temp);
-		return MONITOR_ZONE;
-	} else {
-		omap_safe_zone(cooling_list, cpu_temp);
-		return SAFE_ZONE;
 	}
 
 	return NO_ACTION;
