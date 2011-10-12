@@ -59,7 +59,7 @@
 /* #define TSHUT_DEBUG	1 */
 #define TEMP_DEBUG 1
 
-#define TSHUT_THRESHOLD_TSHUT_HOT	122000	/* 122 deg C */
+#define TSHUT_THRESHOLD_TSHUT_HOT	110000	/* 110 deg C */
 #define TSHUT_THRESHOLD_TSHUT_COLD	100000	/* 100 deg C */
 #define BGAP_THRESHOLD_T_HOT		73000	/* 73 deg C */
 #define BGAP_THRESHOLD_T_COLD		71000	/* 71 deg C */
