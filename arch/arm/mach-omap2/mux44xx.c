@@ -534,6 +534,10 @@ static struct omap_mux __initdata omap4_core_muxmodes[] = {
 	_OMAP4_MUXENTRY(DPM_EMU19, 191, "dpm_emu19", "dmtimer11_pwm_evt",
 			"dsi2_te1", "gpio_191", "rfbi_data0", "dispc2_data0",
 			"hw_dbg19", "reserved"),
+	_OMAP4_MUXENTRY(CSI22_DX2, 0, "csi22_dx2", NULL, "cam2_fid",
+			NULL, NULL, NULL, NULL, "safe_mode"),
+	_OMAP4_MUXENTRY(CSI22_DY2, 0, "csi22_dy2", NULL, "cam2_wen",
+			NULL, NULL, NULL, NULL, "safe_mode"),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
@@ -748,6 +752,8 @@ static struct omap_ball __initdata omap4_core_cbl_ball[] = {
 	_OMAP4_BALLENTRY(DPM_EMU17, "ab3", NULL),
 	_OMAP4_BALLENTRY(DPM_EMU18, "ab4", NULL),
 	_OMAP4_BALLENTRY(DPM_EMU19, "ac4", NULL),
+	_OMAP4_BALLENTRY(CSI22_DX2, "n27", NULL),
+	_OMAP4_BALLENTRY(CSI22_DY2, "m27", NULL),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
