@@ -106,6 +106,19 @@ module_param_named(hmc5843_debug, mag_debug, uint, 0664);
  * pointing to the first data register.
 */
 
+static int hmc5843_inc_index(int index)
+{
+	int rv;
+
+	rv = index + 1;
+	if ((8+1) == index)
+		rv = 3;
+	else if ((12+1) <= index)
+		rv = 0;
+
+	return rv;
+}
+
 static int hmc5843_write_register(struct hmc5843 *hmc5843, int index)
 {
 	u8 buf[2];
@@ -127,7 +140,7 @@ static int hmc5843_write_register(struct hmc5843 *hmc5843, int index)
 		hmc5843->index = -1;
 		return result;
 	}
-	hmc5843->index = index + 1;
+	hmc5843->index = hmc5843_inc_index(index);
 	return 0;
 }
 
@@ -138,7 +151,8 @@ static int hmc5843_read_xyz(struct hmc5843 *hmc5843, int *x, int *y, int *z)
 	int n = 0;
 	int result;
 
-	if (hmc5843->index != HMC5843_X_DATA_REG) {
+	/* attempts to send the address only when needed didn't work */
+	{
 		buf[0]		= HMC5843_X_DATA_REG;
 
 		msgs[0].addr	= hmc5843->client->addr;
@@ -152,7 +166,7 @@ static int hmc5843_read_xyz(struct hmc5843 *hmc5843, int *x, int *y, int *z)
 	msgs[n].addr	= hmc5843->client->addr;
 	msgs[n].flags	= I2C_M_RD;
 	msgs[n].buf	= buf;
-	msgs[n].len	= 7;
+	msgs[n].len	= 6;
 	++n;
 
 	result = i2c_transfer(hmc5843->client->adapter, msgs, n);
@@ -160,6 +174,7 @@ static int hmc5843_read_xyz(struct hmc5843 *hmc5843, int *x, int *y, int *z)
 		hmc5843->index = -1;
 		return result;
 	}
+	hmc5843->index = HMC5843_X_DATA_REG;
 
 	*x = (((int)((s8)buf[0])) << 8) | buf[1];
 	*y = (((int)((s8)buf[2])) << 8) | buf[3];
@@ -189,7 +204,7 @@ static ssize_t hmc5843_store_bias(struct device *dev,
 	unsigned long val;
 	int status = count;
 
-	if ((strict_strtol(buf, 10, &val) < 0) || (val > 2))
+	if (strict_strtol(buf, 10, &val) || (val < 0) || (val > 2))
 		return -EINVAL;
 	mutex_lock(&hmc5843->lock);
 	if (hmc5843->bias != val) {
@@ -220,48 +235,38 @@ static ssize_t hmc5843_store_rate(struct device *dev,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct hmc5843 *hmc5843 = i2c_get_clientdata(client);
-	unsigned long val;
+	unsigned long val_ms, pick_ms;
 	int status = count;
 	int i;
 
-	if (strict_strtol(buf, 10, &val)) {
-		if ((val > 2000) && (val < 0))
-			dev_err(&hmc5843->client->dev,
-				"Failed to input value\n");
+	if (strict_strtol(buf, 10, &val_ms) ||
+			(val_ms > 2000) || (val_ms < 0)) {
+		dev_err(&hmc5843->client->dev, "Failed to input value\n");
 		return -EINVAL;
 	}
 	mutex_lock(&hmc5843->lock);
-	if (hmc5843->rate != val) {
-		val = (val < 20) ? 20 : val;
-		hmc5843->rate = val;
-#ifdef HMC5843_USE_WORK_QUEUES
-		if (val == 0) {
-			/* Set to the fastest speed */
-			i = (ARRAY_SIZE(hmc5843_sample_interval) - 1);
-		} else if (val == 2000) {
-			i = (ARRAY_SIZE(hmc5843_sample_interval) - 7);
-		} else {
-			for (i = 0; i < (ARRAY_SIZE(hmc5843_sample_interval) - 1); i++) {
-				/* The array is from slowest to fastest */
-				if ((hmc5843_sample_interval[i] > val) &&
-				(hmc5843_sample_interval[i + 1] <= val))
-					break;
-			}
+	pick_ms = hmc5843->rate;
+	if (hmc5843->rate != val_ms) {
+		for (i = 0;
+				i < (ARRAY_SIZE(hmc5843_sample_interval) - 2);
+				i++) {
+			/* The array is from slowest to fastest */
+			if (val_ms > hmc5843_sample_interval[i + 1])
+				break;
 		}
-		if (mag_debug)
-			dev_info(&hmc5843->client->dev, "%s:Rate picked is %d\n",
-				__func__, hmc5843_sample_interval[i + 1]);
-
-		hmc5843->req_poll_rate = hmc5843_sample_interval[i + 1];
+		pick_ms = hmc5843_sample_interval[i];
+#ifdef HMC5843_USE_WORK_QUEUES
+		hmc5843->req_poll_rate = pick_ms;
 #else
-		if ((val < 0) || (val < 6))
-			hmc5843->ipdev->poll_interval = hmc5843_sample_interval[val];
-		else
-			return -EINVAL;
+		hmc5843->ipdev->poll_interval = pick_ms;
 #endif
+		hmc5843->rate = pick_ms;
 		status = hmc5843_write_register(hmc5843, HMC5843_CFG_A_REG);
 	}
 	mutex_unlock(&hmc5843->lock);
+	if (mag_debug)
+		dev_info(&hmc5843->client->dev, "%s:Rate picked is %lu\n",
+			__func__, pick_ms);
 	return status;
 }
 
@@ -288,7 +293,7 @@ static ssize_t hmc5843_store_gain(struct device *dev,
 	unsigned long val;
 	int status = count;
 
-	if ((strict_strtol(buf, 10, &val) < 0) || (val > 6))
+	if (strict_strtol(buf, 10, &val) || (val < 0) || (val > 6))
 		return -EINVAL;
 	mutex_lock(&hmc5843->lock);
 	if (hmc5843->gain != val) {
@@ -322,7 +327,7 @@ static ssize_t hmc5843_store_mode(struct device *dev,
 	unsigned long val;
 	int status = count;
 
-	if ((strict_strtol(buf, 10, &val) < 0) || (val > 3))
+	if (strict_strtol(buf, 10, &val) || (val < 0) || (val > 3))
 		return -EINVAL;
 	mutex_lock(&hmc5843->lock);
 	if (hmc5843->mode != val) {
@@ -363,21 +368,18 @@ static ssize_t hmc5843_store_enable(struct device *dev,
 	if (val < 0 || val > 1)
 		return -EINVAL;
 
-	if (val)
-		hmc5843->mode = HMC5843_MODE_REPEAT;
-	else
-		hmc5843->mode = HMC5843_MODE_SLEEP;
-
+	mutex_lock(&hmc5843->lock);
+	hmc5843->mode = (val) ? HMC5843_MODE_REPEAT : HMC5843_MODE_SLEEP;
 	error = hmc5843_write_register(hmc5843, HMC5843_MODE_REG);
-
 	if (error == 0) {
+		hmc5843->enable = val;
+		mutex_unlock(&hmc5843->lock);
 		if (val == 0)
 			cancel_delayed_work_sync(&hmc5843->input_work);
 		else
 			schedule_delayed_work(&hmc5843->input_work, 0);
-
-		hmc5843->enable = val;
-	}
+	} else
+		mutex_unlock(&hmc5843->lock);
 #endif
 	return count;
 }
@@ -554,7 +556,7 @@ static int __devinit hmc5843_device_init(struct hmc5843 *hmc5843)
 	hmc5843->gain = buf[4] >> MMC5843_CFG_B_GAIN_SHIFT;
 	hmc5843->mode = buf[5];
 
-	hmc5843->index = 3;
+	hmc5843->index = -1;
 	mutex_init(&hmc5843->lock);
 	return 0;
 }
@@ -622,13 +624,17 @@ static int hmc5843_suspend(struct device *dev)
 	struct hmc5843 *hmc5843 = platform_get_drvdata(pdev);
 
 	/* save our current mode for resume and put device to sleep */
-	int m = hmc5843->mode;
+	int m;
+
 #ifdef HMC5843_USE_WORK_QUEUES
 	cancel_delayed_work_sync(&hmc5843->input_work);
 #endif
+	mutex_lock(&hmc5843->lock);
+	m = hmc5843->mode;
 	hmc5843->mode = HMC5843_MODE_SLEEP;
 	hmc5843_write_register(hmc5843, HMC5843_MODE_REG);
 	hmc5843->mode = m;
+	mutex_unlock(&hmc5843->lock);
 	return 0;
 }
 
@@ -639,7 +645,9 @@ static int hmc5843_resume(struct device *dev)
 
 	/* restore whatever mode we were in before suspending */
 	if (hmc5843->enable != 0) {
+		mutex_lock(&hmc5843->lock);
 		hmc5843_write_register(hmc5843, HMC5843_MODE_REG);
+		mutex_unlock(&hmc5843->lock);
 #ifdef HMC5843_USE_WORK_QUEUES
 		schedule_delayed_work(&hmc5843->input_work, 0);
 #endif
