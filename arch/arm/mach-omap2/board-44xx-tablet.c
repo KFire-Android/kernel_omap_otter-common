@@ -24,6 +24,7 @@
 #include <linux/spi/spi.h>
 #include <linux/hwspinlock.h>
 #include <linux/i2c/twl.h>
+#include <linux/i2c/bq2415x.h>
 #include <linux/twl6040-vib.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
@@ -424,6 +425,7 @@ static struct regulator_init_data tablet_vana = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
 	},
 };
 
@@ -509,6 +511,32 @@ static struct twl4030_codec_data twl6040_codec = {
 	.irq_base       = TWL6040_CODEC_IRQ_BASE,
 };
 
+static int sdp4430_batt_table[] = {
+	/* adc code for temperature in degree C */
+	929, 925, /* -2 ,-1 */
+	920, 917, 912, 908, 904, 899, 895, 890, 885, 880, /* 00 - 09 */
+	875, 869, 864, 858, 853, 847, 841, 835, 829, 823, /* 10 - 19 */
+	816, 810, 804, 797, 790, 783, 776, 769, 762, 755, /* 20 - 29 */
+	748, 740, 732, 725, 718, 710, 703, 695, 687, 679, /* 30 - 39 */
+	671, 663, 655, 647, 639, 631, 623, 615, 607, 599, /* 40 - 49 */
+	591, 583, 575, 567, 559, 551, 543, 535, 527, 519, /* 50 - 59 */
+	511, 504, 496 /* 60 - 62 */
+};
+
+static struct twl4030_bci_platform_data sdp4430_bci_data = {
+	.monitoring_interval		= 10,
+	.max_charger_currentmA		= 1500,
+	.max_charger_voltagemV		= 4560,
+	.max_bat_voltagemV		= 4200,
+	.low_bat_voltagemV		= 3300,
+	.battery_tmp_tbl		= sdp4430_batt_table,
+	.tblsize			= ARRAY_SIZE(sdp4430_batt_table),
+};
+
+static struct twl4030_madc_platform_data twl6030_gpadc = {
+	.irq_line = -1,
+};
+
 static struct twl4030_platform_data tablet_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
@@ -529,6 +557,18 @@ static struct twl4030_platform_data tablet_twldata = {
 
 	/* children */
 	.codec		= &twl6040_codec,
+	.bci		= &sdp4430_bci_data,
+	.madc		= &twl6030_gpadc,
+};
+
+static struct bq2415x_platform_data sdp4430_bqdata = {
+	.max_charger_voltagemV = 4200,
+	.max_charger_currentmA = 1550,
+};
+
+static struct i2c_board_info __initdata sdp4430_i2c_boardinfo = {
+	I2C_BOARD_INFO("bq24156", 0x6a),
+	.platform_data = &sdp4430_bqdata,
 };
 
 static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
@@ -578,6 +618,7 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
 
 	omap4_pmic_init("twl6030", &tablet_twldata);
+	i2c_register_board_info(1, &sdp4430_i2c_boardinfo, 1);
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, tablet_i2c_3_boardinfo,
 				ARRAY_SIZE(tablet_i2c_3_boardinfo));
