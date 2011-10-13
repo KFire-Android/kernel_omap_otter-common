@@ -117,6 +117,7 @@ static void blaze_tablet_mpu3050_init(void)
 
 static struct mpu3050gyro_platform_data mpu3050_platform_data = {
 	.irq_flags = (IRQF_TRIGGER_HIGH | IRQF_ONESHOT),
+	.default_poll_rate = 200,
 	.slave_i2c_addr = 0x40,
 	.sample_rate_div = 0x00,
 	.dlpf_fs_sync = 0x10,
@@ -139,7 +140,6 @@ static struct i2c_board_info __initdata blaze_tablet_i2c_bus4_sensor_info[] = {
 	{
 		I2C_BOARD_INFO("mpu3050_gyro", 0x68),
 		.platform_data = &mpu3050_platform_data,
-		.irq = OMAP_GPIO_IRQ(OMAP4_MPU3050GYRO_GPIO),
 	},
 	{
 		I2C_BOARD_INFO(TSL2771_NAME, 0x39),
