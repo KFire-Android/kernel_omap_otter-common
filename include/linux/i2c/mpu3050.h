@@ -51,6 +51,7 @@
 struct mpu3050gyro_platform_data {
 	int irq_flags;
 
+	int default_poll_rate;
 	uint8_t slave_i2c_addr;
 	uint8_t sample_rate_div;
 	uint8_t dlpf_fs_sync;

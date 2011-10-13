@@ -341,7 +341,7 @@ static int mpu3050_device_work(void *work)
 		queue_delayed_work(data->wq, &data->d_work,
 			msecs_to_jiffies(data->def_poll_rate));
 	} else
-		queue_delayed_work(data->wq, &data->d_work, 1);
+		queue_delayed_work(data->wq, &data->d_work, 100);
 
 	return 0;
 }
@@ -619,6 +619,7 @@ static int __devinit mpu3050_driver_probe(struct i2c_client *client,
 		}
 		disable_irq_nosync(data->client->irq);
 	} else {
+		data->def_poll_rate = data->pdata->default_poll_rate;
 		INIT_DELAYED_WORK(&data->d_work,
 			(void *)mpu3050_device_work);
 
