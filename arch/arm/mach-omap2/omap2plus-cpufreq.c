@@ -375,7 +375,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
 		max_freq = max(freq_table[i].frequency, max_freq);
 	max_thermal = max_freq;
-	current_cooling_level = 125000;
+	current_cooling_level = 0;
 
 	/*
 	 * On OMAP SMP configuartion, both processors share the voltage
