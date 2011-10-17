@@ -71,6 +71,7 @@
 #define TWL4030_MODULE_PM_RECEIVER	0x15
 #define TWL4030_MODULE_RTC		0x16
 #define TWL4030_MODULE_SECURED_REG	0x17
+#define TWL6032_MODULE_CHARGER		0x18
 #define TWL6030_MODULE_SLAVE_RES	0x19
 
 #define TWL_MODULE_USB		TWL4030_MODULE_USB
@@ -184,7 +185,7 @@ static inline int twl_class_is_ ##class(void)	\
 TWL_CLASS_IS(4030, TWL4030_CLASS_ID)
 TWL_CLASS_IS(6030, TWL6030_CLASS_ID)
 
-#define TWL6025_SUBCLASS	BIT(4)  /* TWL6025 has changed registers */
+#define TWL6032_SUBCLASS	BIT(4)  /* Phoenix Lite is a varient*/
 
 /*
  * Read and write single 8-bit registers
@@ -826,7 +827,7 @@ struct twl4030_platform_data {
 	struct regulator_init_data              *vusb;
 	struct regulator_init_data		*clk32kg;
 	struct regulator_init_data              *clk32kaudio;
-	/* TWL6025 LDO regulators */
+	/* TWL6032 LDO regulators */
 	struct regulator_init_data		*ldo1;
 	struct regulator_init_data		*ldo2;
 	struct regulator_init_data		*ldo3;
@@ -836,10 +837,10 @@ struct twl4030_platform_data {
 	struct regulator_init_data		*ldo7;
 	struct regulator_init_data		*ldoln;
 	struct regulator_init_data		*ldousb;
-	/* TWL6025 DCDC regulators */
+	/* TWL6032 DCDC regulators */
 	struct regulator_init_data		*smps3;
 	struct regulator_init_data		*smps4;
-	struct regulator_init_data		*vio6025;
+	struct regulator_init_data		*vio6032;
 };
 
 /*----------------------------------------------------------------------*/
@@ -921,21 +922,21 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 #define TWL6030_REG_VRTC	47
 #define TWL6030_REG_CLK32KG	48
 
-/* LDOs on 6025 have different names */
-#define TWL6025_REG_LDO2	49
-#define TWL6025_REG_LDO4	50
-#define TWL6025_REG_LDO3	51
-#define TWL6025_REG_LDO5	52
-#define TWL6025_REG_LDO1	53
-#define TWL6025_REG_LDO7	54
-#define TWL6025_REG_LDO6	55
-#define TWL6025_REG_LDOLN	56
-#define TWL6025_REG_LDOUSB	57
+/* LDOs on 6032 have different names */
+#define TWL6032_REG_LDO2	49
+#define TWL6032_REG_LDO4	50
+#define TWL6032_REG_LDO3	51
+#define TWL6032_REG_LDO5	52
+#define TWL6032_REG_LDO1	53
+#define TWL6032_REG_LDO7	54
+#define TWL6032_REG_LDO6	55
+#define TWL6032_REG_LDOLN	56
+#define TWL6032_REG_LDOUSB	57
 
-/* 6025 DCDC supplies */
-#define TWL6025_REG_SMPS3	58
-#define TWL6025_REG_SMPS4	59
-#define TWL6025_REG_VIO		60
+/* 6032 DCDC supplies */
+#define TWL6032_REG_SMPS3	58
+#define TWL6032_REG_SMPS4	59
+#define TWL6032_REG_VIO		60
 
 #define TWL6030_REG_CLK32KAUDIO	61
 
