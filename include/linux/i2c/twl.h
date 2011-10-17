@@ -653,6 +653,7 @@ struct twl4030_gpio_platform_data {
 
 struct twl4030_madc_platform_data {
 	int		irq_line;
+	int		features;
 };
 
 /* Boards have unique mappings of {row, col} --> keycode.

@@ -37,6 +37,9 @@ struct twl6030_gpadc_conversion_method {
 };
 
 #define TWL6030_GPADC_MAX_CHANNELS 17
+#define TWL6032_GPADC_MAX_CHANNELS 19
+/* Define this as the biggest of all chips using this driver */
+#define GPADC_MAX_CHANNELS TWL6032_GPADC_MAX_CHANNELS
 
 /*
  * raw_code - raw adc value
@@ -56,14 +59,15 @@ struct twl6030_gpadc_request {
 	u16 type;
 	int active;
 	int result_pending;
-	int rbuf[TWL6030_GPADC_MAX_CHANNELS];
+	int rbuf[TWL6032_GPADC_MAX_CHANNELS];
 	void (*func_cb)(int len, int channels, int *buf);
-	struct twl6030_value buf[TWL6030_GPADC_MAX_CHANNELS];
+	struct twl6030_value buf[TWL6032_GPADC_MAX_CHANNELS];
 };
 
 enum conversion_methods {
 	TWL6030_GPADC_RT,
 	TWL6030_GPADC_SW2,
+	TWL6032_GPADC_SW2,
 	TWL6030_GPADC_NUM_METHODS
 };
 
@@ -74,13 +78,29 @@ enum sample_type {
 };
 
 #define TWL6030_GPADC_CTRL		0x00    /* 0x2e */
+#define TWL6030_GPADC_CTRL2		0x01	/* 0x2f */
 
 #define TWL6030_GPADC_RTSELECT_LSB	0x02    /* 0x30 */
 #define TWL6030_GPADC_RTSELECT_ISB	0x03
 #define TWL6030_GPADC_RTSELECT_MSB	0x04
 
+#define TWL6032_GPADC_RTSELECT_LSB	0x04    /* 0x32 */
+#define TWL6032_GPADC_RTSELECT_ISB	0x05
+#define TWL6032_GPADC_RTSELECT_MSB	0x06
+
 #define TWL6030_GPADC_CTRL_P1		0x05
 #define TWL6030_GPADC_CTRL_P2		0x06
+
+#define TWL6032_GPADC_GPSELECT_ISB	0x07
+#define TWL6032_GPADC_CTRL_P1		0x08
+
+#define TWL6032_RTCH0_LSB			0x09
+#define TWL6032_RTCH0_MSB			0x0a
+#define TWL6032_RTCH1_LSB			0x0b
+#define TWL6032_RTCH1_MSB			0x0c
+#define TWL6032_GPCH0_LSB			0x0d
+#define TWL6032_GPCH0_MSB			0x0e
+
 #define TWL6030_GPADC_CTRL_P1_SP1	(1 << 3)
 #define TWL6030_GPADC_CTRL_P1_EOCRT	(1 << 2)
 #define TWL6030_GPADC_CTRL_P1_EOCP1	(1 << 1)
@@ -105,6 +125,11 @@ enum sample_type {
 #define TWL6030_GPADC_CTRL_TEMP1_EN_MONITOR	(1 << 5)
 #define TWL6030_GPADC_CTRL_TEMP2_EN_MONITOR	(1 << 6)
 #define TWL6030_GPADC_CTRL_ISOURCE_EN		(1 << 7)
+
+#define TWL6030_GPADC_CTRL2_REMSENSE_0		(1 << 0)
+#define TWL6030_GPADC_CTRL2_REMSENSE_1		(1 << 1)
+#define TWL6030_GPADC_CTRL2_SCALER_EN_CH18	(1 << 2)
+#define TWL6030_GPADC_CTRL2_VBAT_SCALER_DIV4	(1 << 3)
 
 
 #define TWL6030_GPADC_IOC_MAGIC '`'
