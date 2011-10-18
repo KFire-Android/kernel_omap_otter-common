@@ -14,11 +14,14 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/memblock.h>
+#include <linux/cpu_pm.h>
 
 #include <asm/cacheflush.h>
 #include <asm/memblock.h>
 
 #include <mach/omap-secure.h>
+
+#include "common.h"
 
 static phys_addr_t omap_secure_memblock_base;
 
@@ -70,3 +73,36 @@ phys_addr_t omap_secure_ram_mempool_base(void)
 {
 	return omap_secure_memblock_base;
 }
+
+#ifdef CONFIG_CPU_PM
+static int secure_notifier(struct notifier_block *self, unsigned long cmd,
+			   void *v)
+{
+	switch (cmd) {
+	case CPU_CLUSTER_PM_EXIT:
+		/*
+		 * Dummy dispatcher call after OSWR and OFF
+		 * Restore the right return Kernel address (with MMU on) for
+		 * subsequent calls to secure ROM. Otherwise the return address
+		 * will be to a PA return address and the system will hang.
+		 */
+		omap_secure_dispatcher(OMAP4_PPA_SERVICE_0,
+				       FLAG_START_CRITICAL,
+				       0, 0, 0, 0, 0);
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block secure_notifier_block = {
+	.notifier_call = secure_notifier,
+};
+
+static int __init secure_pm_init(void)
+{
+	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+		cpu_pm_register_notifier(&secure_notifier_block);
+	return 0;
+}
+early_initcall(secure_pm_init);
+#endif
