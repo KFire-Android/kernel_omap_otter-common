@@ -33,6 +33,68 @@ static DEFINE_SPINLOCK(clockfw_lock);
 
 static struct clk_functions *arch_clock;
 
+/**
+ * omap_clk_notify - call clk notifier chain
+ * @clk: struct clk * that is changing rate
+ * @msg: clk notifier type (i.e., CLK_POST_RATE_CHANGE; see mach/clock.h)
+ * @old_rate: old rate
+ * @new_rate: new rate
+ *
+ * Triggers a notifier call chain on the post-clk-rate-change notifier
+ * for clock 'clk'.  Passes a pointer to the struct clk and the
+ * previous and current rates to the notifier callback.  Intended to be
+ * called by internal clock code only.  No return value.
+ */
+static void omap_clk_notify(struct clk *clk, unsigned long msg,
+		unsigned long old_rate, unsigned long new_rate)
+{
+	struct clk_notifier *cn;
+	struct clk_notifier_data cnd;
+
+	cnd.clk = clk;
+	cnd.old_rate = old_rate;
+	cnd.new_rate = new_rate;
+
+	list_for_each_entry(cn, &clk_notifier_list, node) {
+		if (cn->clk == clk) {
+			blocking_notifier_call_chain(&cn->notifier_head, msg,
+					&cnd);
+			break;
+		}
+	}
+}
+
+/**
+ * omap_clk_notify_downstream - trigger clock change notifications
+ * @clk: struct clk * to start the notifications with
+ * @msg: notifier msg - see "Clk notifier callback types"
+ * @new_rate: new rate
+ *
+ * Call clock change notifiers on clocks starting with @clk and including
+ * all of @clk's downstream children clocks.  Returns NOTIFY_DONE.
+ */
+static int omap_clk_notify_downstream(struct clk *clk, unsigned long msg,
+		unsigned long new_rate)
+{
+	unsigned long new_child_rate;
+	struct clk *child_clk;
+
+	/* send out notification for this clock */
+	if (clk->notifier_count)
+		omap_clk_notify(clk, msg, clk->rate, new_rate);
+
+	list_for_each_entry(child_clk, &clk->children, sibling) {
+		if (child_clk->speculate) {
+			new_child_rate =
+				child_clk->speculate(child_clk, new_rate);
+			omap_clk_notify_downstream(child_clk, msg,
+					new_child_rate);
+		}
+	}
+
+	return NOTIFY_DONE;
+}
+
 /*
  * Standard clock functions defined in include/linux/clk.h
  */
@@ -123,6 +185,8 @@ EXPORT_SYMBOL(clk_round_rate);
 int clk_set_rate(struct clk *clk, unsigned long rate)
 {
 	unsigned long flags;
+	unsigned long new_rate;
+	unsigned long msg;
 	int ret = -EINVAL;
 
 	if (clk == NULL || IS_ERR(clk))
@@ -131,11 +195,17 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
 	if (!arch_clock || !arch_clock->clk_set_rate)
 		return ret;
 
+	new_rate = clk->round_rate(clk, rate);
+	omap_clk_notify_downstream(clk, CLK_PRE_RATE_CHANGE, new_rate);
+
 	spin_lock_irqsave(&clockfw_lock, flags);
 	ret = arch_clock->clk_set_rate(clk, rate);
 	if (ret == 0)
 		propagate_rate(clk);
 	spin_unlock_irqrestore(&clockfw_lock, flags);
+
+	msg = (ret) ? CLK_ABORT_RATE_CHANGE : CLK_POST_RATE_CHANGE;
+	omap_clk_notify_downstream(clk, msg, clk->rate);
 
 	return ret;
 }
@@ -144,6 +214,8 @@ EXPORT_SYMBOL(clk_set_rate);
 int clk_set_parent(struct clk *clk, struct clk *parent)
 {
 	unsigned long flags;
+	unsigned long new_rate;
+	unsigned long msg;
 	int ret = -EINVAL;
 
 	if (clk == NULL || IS_ERR(clk) || parent == NULL || IS_ERR(parent))
@@ -151,6 +223,9 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
 
 	if (!arch_clock || !arch_clock->clk_set_parent)
 		return ret;
+
+	new_rate = arch_clock->clk_round_rate_parent(clk, parent);
+	omap_clk_notify_downstream(clk, CLK_PRE_RATE_CHANGE, new_rate);
 
 	spin_lock_irqsave(&clockfw_lock, flags);
 	if (clk->usecount == 0) {
@@ -160,6 +235,9 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
 	} else
 		ret = -EBUSY;
 	spin_unlock_irqrestore(&clockfw_lock, flags);
+
+	msg = (ret) ? CLK_ABORT_RATE_CHANGE : CLK_POST_RATE_CHANGE;
+	omap_clk_notify_downstream(clk, msg, clk->rate);
 
 	return ret;
 }

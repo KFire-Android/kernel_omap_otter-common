@@ -311,6 +311,7 @@ struct clk {
 	unsigned long		rate;
 	void __iomem		*enable_reg;
 	unsigned long		(*recalc)(struct clk *);
+	unsigned long		(*speculate)(struct clk *, unsigned long);
 	int			(*set_rate)(struct clk *, unsigned long);
 	long			(*round_rate)(struct clk *, unsigned long);
 	void			(*init)(struct clk *);
@@ -341,6 +342,8 @@ struct clk_functions {
 	int		(*clk_enable)(struct clk *clk);
 	void		(*clk_disable)(struct clk *clk);
 	long		(*clk_round_rate)(struct clk *clk, unsigned long rate);
+	long		(*clk_round_rate_parent)(struct clk *clk,
+						struct clk *parent);
 	int		(*clk_set_rate)(struct clk *clk, unsigned long rate);
 	int		(*clk_set_parent)(struct clk *clk, struct clk *parent);
 	void		(*clk_allow_idle)(struct clk *clk);

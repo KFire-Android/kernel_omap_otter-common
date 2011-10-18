@@ -93,7 +93,7 @@ static const struct clksel *_get_clksel_by_parent(struct clk *clk,
  * success (in this latter case, the corresponding register bitfield
  * value is passed back in the variable pointed to by @field_val)
  */
-static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
+u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
 				u32 *field_val)
 {
 	const struct clksel *clks;
@@ -396,6 +396,42 @@ unsigned long omap2_clksel_recalc(struct clk *clk)
 		return clk->rate;
 
 	rate = clk->parent->rate / div;
+
+	pr_debug("clock: %s: recalc'd rate is %ld (div %d)\n", clk->name,
+		 rate, div);
+
+	return rate;
+}
+
+/**
+ * omap2_clksel_speculate() - recalc rate from speculative parent clock rate
+ * @clk: struct clk * for the clock whose rate we are recalculating
+ * @parent_rate: speculative parent clock rate
+ *
+ * This function takes a speculative or ficticious parent clock rate and
+ * recalculates the rate for the clock in question based off of it.  Useful
+ * for clock rate change pre-notifiers where we don't want to actually change
+ * the clksel, or even the 'rate' field of a clk struct.
+ */
+unsigned long omap2_clksel_speculate(struct clk *clk, unsigned long parent_rate)
+{
+	unsigned long rate;
+	u32 div = 0;
+
+	/* check for fixed divisor */
+	if (clk->fixed_div)
+		return parent_rate / clk->fixed_div;
+
+	/* does clock follow parent rate? */
+	if (!clk->clksel)
+		return parent_rate;
+
+	/* clock must use clksel */
+	div = _read_divisor(clk);
+	if (div == 0)
+		return clk->rate;
+
+	rate = parent_rate / div;
 
 	pr_debug("clock: %s: recalc'd rate is %ld (div %d)\n", clk->name,
 		 rate, div);
