@@ -261,6 +261,18 @@ static int rpmsg_rproc_pos_suspend(struct omap_rpmsg_vproc *rpdev)
 	return NOTIFY_DONE;
 }
 
+static int rpmsg_rproc_load_error(struct omap_rpmsg_vproc *rpdev)
+{
+	mutex_lock(&rpdev->lock);
+	if (rpdev->mbox) {
+		omap_mbox_put(rpdev->mbox, &rpdev->nb);
+		rpdev->mbox = NULL;
+	}
+	mutex_unlock(&rpdev->lock);
+
+	return NOTIFY_DONE;
+}
+
 static int rpmsg_rproc_resume(struct omap_rpmsg_vproc *rpdev)
 {
 	mutex_lock(&rpdev->lock);
@@ -294,6 +306,8 @@ static int rpmsg_rproc_events(struct notifier_block *this,
 		return rpmsg_rproc_suspend(rpdev);
 	case RPROC_POS_SUSPEND:
 		return rpmsg_rproc_pos_suspend(rpdev);
+	case RPROC_LOAD_ERROR:
+		return rpmsg_rproc_load_error(rpdev);
 	case RPROC_RESUME:
 		return rpmsg_rproc_resume(rpdev);
 	case RPROC_SECURE:
