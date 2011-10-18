@@ -8,6 +8,7 @@
 #include <linux/interrupt.h>
 #include <linux/device.h>
 #include <linux/kfifo.h>
+#include <linux/pm_qos.h>
 
 typedef u32 mbox_msg_t;
 struct omap_mbox;
@@ -59,6 +60,7 @@ struct omap_mbox {
 	void			*priv;
 	int			use_count;
 	struct blocking_notifier_head   notifier;
+	struct dev_pm_qos_request qos_request;
 };
 
 int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
