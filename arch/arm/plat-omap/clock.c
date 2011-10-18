@@ -19,12 +19,15 @@
 #include <linux/clk.h>
 #include <linux/mutex.h>
 #include <linux/cpufreq.h>
+#include <linux/notifier.h>
 #include <linux/debugfs.h>
 #include <linux/io.h>
+#include <linux/slab.h>
 
 #include <plat/clock.h>
 
 static LIST_HEAD(clocks);
+static LIST_HEAD(clk_notifier_list);
 static DEFINE_MUTEX(clocks_mutex);
 static DEFINE_SPINLOCK(clockfw_lock);
 
@@ -369,6 +372,123 @@ int omap_clk_disable_autoidle_all(void)
 	spin_unlock_irqrestore(&clockfw_lock, flags);
 
 	return 0;
+}
+
+/*
+ * clock notifiers
+ */
+
+/**
+ * clk_notifier_register - add a clock parameter change notifier
+ * @clk: struct clk * to watch
+ * @nb: struct notifier_block * with callback info
+ *
+ * Request notification for changes to the clock 'clk'.  This uses a
+ * blocking notifier.  Callback code must not call back into the clock
+ * framework.  Pre-notifier callbacks will be passed the previous and
+ * new rate of the clock.
+ *
+ * clk_notifier_register() must be called from process
+ * context.  Returns -EINVAL if called with null arguments, -ENOMEM
+ * upon allocation failure; otherwise, passes along the return value
+ * of blocking_notifier_chain_register().
+ */
+int clk_notifier_register(struct clk *clk, struct notifier_block *nb)
+{
+	struct clk_notifier *cn = NULL, *cn_new = NULL;
+	int r;
+	unsigned long flags;
+	struct clk *clkp;
+
+	if (!clk || !nb)
+		return -EINVAL;
+
+	/* Allocate this here speculatively to avoid GFP_ATOMIC */
+	cn_new = kzalloc(sizeof(struct clk_notifier), GFP_KERNEL);
+	if (!cn_new)
+		return -ENOMEM;
+
+	spin_lock_irqsave(&clockfw_lock, flags);
+
+	list_for_each_entry(cn, &clk_notifier_list, node)
+		if (cn->clk == clk)
+			break;
+
+	if (cn->clk != clk) {
+		cn_new->clk = clk;
+		BLOCKING_INIT_NOTIFIER_HEAD(&cn_new->notifier_head);
+
+		list_add(&cn_new->node, &clk_notifier_list);
+		cn = cn_new;
+	} else {
+		kfree(cn_new); /* didn't need it after all */
+	}
+
+	r = blocking_notifier_chain_register(&cn->notifier_head, nb);
+	if (!r) {
+		clkp = clk;
+		do {
+			clkp->notifier_count++;
+		} while ((clkp = clkp->parent));
+	}
+
+	spin_unlock_irqrestore(&clockfw_lock, flags);
+
+	return r;
+}
+
+/**
+ * clk_notifier_unregister - remove a clock change notifier
+ * @clk: struct clk *
+ * @nb: struct notifier_block * with callback info
+ *
+ * Request no further notification for changes to clock 'clk'.  This
+ * function presently does not release memory allocated by its
+ * corresponding _register function; see inline comments for more
+ * information.  Returns -EINVAL if called with null arguments;
+ * otherwise, passes along the return value of
+ * blocking_notifier_chain_unregister().
+ */
+int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb)
+{
+	struct clk_notifier *cn = NULL;
+	struct clk *clkp;
+	int r = -EINVAL;
+	unsigned long flags;
+
+	if (!clk || !nb)
+		return -EINVAL;
+
+	spin_lock_irqsave(&clockfw_lock, flags);
+
+	list_for_each_entry(cn, &clk_notifier_list, node)
+		if (cn->clk == clk)
+			break;
+
+	if (cn->clk == clk) {
+		r = blocking_notifier_chain_unregister(&cn->notifier_head, nb);
+
+		if (!r) {
+			clkp = clk;
+			do {
+				clkp->notifier_count--;
+			} while ((clkp = clkp->parent));
+		}
+
+		/*
+		 * XXX ugh, layering violation.  there should be some
+		 * support in the notifier code for this.
+		 */
+		if (!cn->notifier_head.head)
+			kfree(cn);
+
+	} else {
+		r = -ENOENT;
+	}
+
+	spin_unlock_irqrestore(&clockfw_lock, flags);
+
+	return r;
 }
 
 /*
