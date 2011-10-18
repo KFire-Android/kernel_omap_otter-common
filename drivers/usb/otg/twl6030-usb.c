@@ -82,6 +82,11 @@
 /* in module TWL6030_MODULE_MAIN_CHARGE */
 
 #define CHARGERUSB_CTRL1		0x8
+#define SUSPEND_BOOT    (1 << 7)
+#define OPA_MODE        (1 << 6)
+#define HZ_MODE         (1 << 5)
+#define TERM            (1 << 4)
+
 
 #define CONTROLLER_STAT1		0x03
 #define	VBUS_DET			BIT(2)
@@ -419,6 +424,31 @@ static void otg_set_vbus_work(struct work_struct *data)
 						CHARGERUSB_CTRL1);
 }
 
+static int twl6030_set_hz_mode(struct otg_transceiver *x, bool enabled)
+{
+	u8 val;
+	struct twl6030_usb *twl;
+
+	if (!x)
+		return -ENODEV;
+
+	twl = xceiv_to_twl(x);
+
+	/* set/reset USB charger in High impedence mode on VBUS */
+	val = twl6030_readb(twl, TWL_MODULE_MAIN_CHARGE,
+						CHARGERUSB_CTRL1);
+
+	if (enabled)
+		val |= HZ_MODE;
+	else
+		val &= ~HZ_MODE;
+
+	twl6030_writeb(twl, TWL_MODULE_MAIN_CHARGE , val,
+						CHARGERUSB_CTRL1);
+
+	return 0;
+}
+
 static int twl6030_set_vbus(struct otg_transceiver *x, bool enabled)
 {
 	struct twl6030_usb *twl = xceiv_to_twl(x);
@@ -473,6 +503,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->otg.set_host	= twl6030_set_host;
 	twl->otg.set_peripheral	= twl6030_set_peripheral;
 	twl->otg.set_vbus	= twl6030_set_vbus;
+	twl->otg.set_hz_mode	= twl6030_set_hz_mode;
 	twl->otg.init		= twl6030_phy_init;
 	twl->otg.set_power    = twl6030_set_power;
 	twl->otg.enable_irq     = twl6030_enable_irq;

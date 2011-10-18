@@ -661,6 +661,16 @@ __acquires(musb->lock)
 	return retval;
 }
 
+extern void musb_hz_mode_work(struct work_struct *data)
+{
+	struct musb *musb = container_of(data, struct musb, hz_mode_work);
+
+	if (!musb)
+		return;
+
+	otg_set_hz_mode(musb->xceiv, 1);
+}
+
 /*
  * Handle peripheral ep0 interrupt
  *
@@ -750,6 +760,8 @@ irqreturn_t musb_g_ep0_irq(struct musb *musb)
 		/* enter test mode if needed (exit by reset) */
 		else if (musb->test_mode) {
 			dev_dbg(musb->controller, "entering TESTMODE\n");
+
+			schedule_work(&musb->hz_mode_work);
 
 			if (MUSB_TEST_PACKET == musb->test_mode_nr)
 				musb_load_testpacket(musb);
