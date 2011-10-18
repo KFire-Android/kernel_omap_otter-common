@@ -328,6 +328,8 @@ vbus_notify:
 
 static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 {
+
+#ifndef CONFIG_USB_MUSB_PERIPHERAL
 	struct twl6030_usb *twl = _twl;
 	int status = USB_EVENT_NONE;
 	u8 hw_state;
@@ -355,6 +357,7 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 								0x1);
 	}
 	twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_LATCH_CLR, status);
+#endif
 
 	return IRQ_HANDLED;
 }
