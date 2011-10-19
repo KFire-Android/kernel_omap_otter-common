@@ -356,7 +356,6 @@ struct dss2_ovl_info {
 		/* user-space interfaces */
 		struct {
 			void *address;	/* main buffer address */
-			void *uv_addr;	/* uv buffer address */
 
 			/*
 			 * For DSSCOMP_CHECK_OVL we allow specifying just the

@@ -234,13 +234,9 @@ static long setup_mgr(struct dsscomp_dev *cdev,
 		u32 addr = (u32) oi->address;
 
 		/* convert addresses to user space */
-		if (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12) {
-			if (oi->uv_addr)
-				oi->uv = hwc_virt_to_phys((u32) oi->uv_addr);
-			else
-				oi->uv = hwc_virt_to_phys(addr +
+		if (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12)
+			oi->uv = hwc_virt_to_phys(addr +
 					oi->cfg.height * oi->cfg.stride);
-		}
 		oi->ba = hwc_virt_to_phys(addr);
 
 		r = r ? : dsscomp_set_ovl(comp, oi);
