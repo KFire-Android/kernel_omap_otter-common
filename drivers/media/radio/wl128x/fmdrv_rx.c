@@ -550,7 +550,7 @@ int fm_rx_set_rssi_threshold(struct fmdev *fmdev, short rssi_lvl_toset)
 		fmerr("Invalid RSSI threshold level\n");
 		return -EINVAL;
 	}
-	payload = (u16)rssi_lvl_toset;
+	payload = (u16) rssi_lvl_toset;
 	ret = fmc_send_cmd(fmdev, SEARCH_LVL_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
 	if (ret < 0)
