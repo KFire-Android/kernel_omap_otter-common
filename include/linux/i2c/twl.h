@@ -153,6 +153,11 @@
 #define SW_FC				(0x1 << 2)
 #define STS_MMC			0x1
 
+#define TWL6030_MMCDEBOUNCING	0xED
+#define MMC_DEB_BYPASS			(0x1 << 7)
+#define MMC_MINS_DEB_MASK			(0xF << 3)
+#define MMC_MEXT_DEB_MASK			(0x7 << 0)
+
 #define TWL6030_CFG_INPUT_PUPD3	0xF2
 #define MMC_PU				(0x1 << 3)
 #define MMC_PD				(0x1 << 2)

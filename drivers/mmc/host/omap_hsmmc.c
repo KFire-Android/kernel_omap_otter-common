@@ -1260,10 +1260,17 @@ static void omap_hsmmc_detect(struct work_struct *work)
 		carddetect = -ENOSYS;
 	}
 
-	if (carddetect)
+	if (carddetect){
 		mmc_detect_change(host->mmc, (HZ * 200) / 1000);
-	else
-		mmc_detect_change(host->mmc, (HZ * 50) / 1000);
+	}
+	else{
+		if ((MMC_POWER_OFF != host->power_mode) &&
+			(mmc_slot(host).set_power != NULL)){
+			mmc_slot(host).set_power(host->dev, host->slot_id, 0, 0);
+			host->power_mode = MMC_POWER_OFF;
+		}
+		mmc_detect_change(host->mmc, 0);
+	}
 }
 
 /*
