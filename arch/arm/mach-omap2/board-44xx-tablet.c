@@ -73,13 +73,6 @@
 
 #define TPS62361_GPIO   7
 
-#define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
-#define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
-#define OMAP_ION_HEAP_SECURE_INPUT_SIZE		(SZ_1M * 90)
-#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 105)
-#define PHYS_ADDR_DUCATI_MEM	(PHYS_ADDR_SMC_MEM - PHYS_ADDR_DUCATI_SIZE - \
-				OMAP_ION_HEAP_SECURE_INPUT_SIZE)
-
 #define OMAP4_MDM_PWR_EN_GPIO       157
 #define GPIO_WK30		    30
 
@@ -990,7 +983,7 @@ static void __init omap_tablet_reserve(void)
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
-					OMAP_ION_HEAP_SECURE_INPUT_SIZE);
+					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
 
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
