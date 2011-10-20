@@ -653,7 +653,7 @@ void hsi_clocks_disable_channel(struct device *dev, u8 channel_number,
 	}
 
 	if (hsi_is_hst_controller_busy(hsi_ctrl))
-		dev_warn(dev, "Disabling clocks with HST FSM not IDLE !\n");
+		dev_dbg(dev, "Disabling clocks with HST FSM not IDLE !\n");
 
 #ifdef K3_0_PORTING_HSI_MISSING_FEATURE
 	/* Allow Fclk to change */
