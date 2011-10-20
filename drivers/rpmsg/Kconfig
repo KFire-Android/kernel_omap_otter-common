@@ -7,4 +7,14 @@ config RPMSG
 	select VIRTIO_RING
 	depends on EXPERIMENTAL
 
+config RPMSG_OMX
+	tristate "rpmsg OMX driver"
+	depends on RPMSG
+	---help---
+	  An rpmsg driver that exposes OMX API to user space, in order to
+	  allow multimedia applications to offload OMX processing to
+	  remote processors.
+
+	  If unsure, say N.
+
 endmenu
