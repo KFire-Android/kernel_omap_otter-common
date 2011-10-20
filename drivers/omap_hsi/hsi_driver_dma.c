@@ -223,13 +223,6 @@ int hsi_driver_read_dma(struct hsi_channel *hsi_channel, u32 * data,
 	 * received data word)
 	 * (Rx interrupt might be active for polling feature)
 	 */
-#if 0
-	if (omap_readl(0x4A05A810)) {
-		dev_err(hsi_ctrl->dev,
-			"READ INTERRUPT IS PENDING DMA() but still disabling %0x\n",
-			omap_readl(0x4A05A810));
-	}
-#endif
 	hsi_driver_disable_read_interrupt(hsi_channel);
 
 	/*

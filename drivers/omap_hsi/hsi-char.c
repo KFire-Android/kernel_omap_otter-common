@@ -580,7 +580,6 @@ out_device_destroy:
 	for (i = 0; (i < i_dev_create) && channels_map[i]; i++)
 		device_destroy(hsi_char_class,
 			       MKDEV(hsi_char_major, channels_map[i] - 1));
-out_class_destroy:
 	class_destroy(hsi_char_class);
 out_cdev_del:
 	cdev_del(&hsi_char_cdev);
@@ -588,7 +587,7 @@ out_unregister_chrdev:
 	unregister_chrdev_region(hsi_char_dev, num_channels);
 out_hsi_exit:
 	if_hsi_exit();
-out:
+
 	return ret;
 }
 

@@ -421,7 +421,7 @@ extern void omap_pm_clear_dsp_wake_up(void);
 #else
 #define IS_HSI_PM44XX_ERRATUM(id)		0
 #define OMAP4_PM_ERRATUM_HSI_SWAKEUP_iXXX       0
-#define static inline void omap_pm_clear_dsp_wake_up(void) { }
+static inline void omap_pm_clear_dsp_wake_up(void) { }
 #endif
 
 #endif /* __HSI_DRIVER_H__ */

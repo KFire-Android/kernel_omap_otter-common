@@ -447,11 +447,7 @@ int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
 			"hsi_device %p data %p count %d", dev, addr, size);
 		return -EINVAL;
 	}
-#if 0
-	if (dev->n_ch == 0)
-		dev_info(dev->device.parent, "%s ch %d, @%x, size %d u32\n",
-			__func__, dev->n_ch, (u32) addr, size);
-#endif
+
 	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
 		dev_err(dev->device.parent, "HSI device NOT open\n");
 		return -EINVAL;

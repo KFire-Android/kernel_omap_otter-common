@@ -224,8 +224,8 @@ static int omap_hsi_is_io_pad_hsi(int hsi_port)
 * @hsi_port - returns port number which triggered wakeup. Range [1, 2].
 *	      Only valid if return value is 1 (HSI wakeup detected)
 *
-* Return value :* false if CAWAKE Padconf has not been found or no IOWAKEUP event
-*		occured for CAWAKE.
+* Return value :* false if CAWAKE Padconf has not been found or no IOWAKEUP
+*		event occured for CAWAKE.
 *		* true if HSI wakeup detected on port *hsi_port
 */
 bool omap_hsi_is_io_wakeup_from_hsi(int *hsi_port)

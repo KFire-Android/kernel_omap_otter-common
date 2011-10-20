@@ -36,10 +36,6 @@
 
 #include "hsi_driver.h"
 
-#if 0
-static struct pm_qos_request_list *pm_qos_handle;
-#endif
-
 #define HSI_MODULENAME "omap_hsi"
 #define	HSI_DRIVER_VERSION	"0.4.3"
 #define HSI_RESETDONE_MAX_RETRIES	5 /* Max 5*L4 Read cycles waiting for */
@@ -819,10 +815,7 @@ static int __init hsi_platform_device_probe(struct platform_device *pd)
 			" %d\n", err);
 		goto rollback1;
 	}
-	/* Wakeup dependency was disabled for HSI <-> MPU PM_L3INIT_HSI_WKDEP */
-#if 0
-	omap_writel(0x141, 0x4A307338);
-#endif
+
 	pm_runtime_enable(hsi_ctrl->dev);
 	pm_runtime_irq_safe(hsi_ctrl->dev);
 	hsi_clocks_enable(hsi_ctrl->dev, __func__);
