@@ -94,6 +94,8 @@ static int omap_cpufreq_scale(unsigned int target_freq, unsigned int cur_freq)
 	if ((freqs.old == freqs.new) && (cur_freq = freqs.new))
 		return 0;
 
+	get_online_cpus();
+
 	/* notifiers */
 	for_each_online_cpu(freqs.cpu)
 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
@@ -135,6 +137,8 @@ static int omap_cpufreq_scale(unsigned int target_freq, unsigned int cur_freq)
 	/* notifiers */
 	for_each_online_cpu(freqs.cpu)
 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+
+	put_online_cpus();
 
 	return ret;
 }
