@@ -506,7 +506,6 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->otg.set_hz_mode	= twl6030_set_hz_mode;
 	twl->otg.init		= twl6030_phy_init;
 	twl->otg.set_power    = twl6030_set_power;
-	twl->otg.enable_irq     = twl6030_enable_irq;
 	twl->otg.shutdown	= twl6030_phy_shutdown;
 	twl->otg.set_suspend	= twl6030_phy_suspend;
 	twl->otg.start_srp	= twl6030_start_srp;
@@ -558,6 +557,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->asleep = 0;
 	pdata->phy_init(dev);
 	twl6030_phy_suspend(&twl->otg, 0);
+	twl6030_enable_irq(&twl->otg);
 	dev_info(&pdev->dev, "Initialized TWL6030 USB module\n");
 
 	return 0;

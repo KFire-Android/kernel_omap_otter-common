@@ -84,7 +84,6 @@ struct otg_transceiver {
 	/* initialize/shutdown the OTG controller */
 	int	(*init)(struct otg_transceiver *otg);
 	void	(*shutdown)(struct otg_transceiver *otg);
-	int     (*enable_irq)(struct otg_transceiver *otg);
 
 	/* bind/unbind the host controller */
 	int	(*set_host)(struct otg_transceiver *otg,
@@ -242,15 +241,6 @@ otg_set_suspend(struct otg_transceiver *otg, int suspend)
 {
 	if (otg->set_suspend != NULL)
 		return otg->set_suspend(otg, suspend);
-	else
-		return 0;
-}
-
-static inline int
-otg_set_irq(struct otg_transceiver *otg)
-{
-	if (otg->enable_irq != NULL)
-		return otg->enable_irq(otg);
 	else
 		return 0;
 }
