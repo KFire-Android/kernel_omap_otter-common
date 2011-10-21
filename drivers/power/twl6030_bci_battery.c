@@ -268,7 +268,8 @@ struct twl6030_bci_device_info {
 	struct delayed_work	twl6030_bci_monitor_work;
 	struct delayed_work	twl6030_current_avg_work;
 };
-static struct blocking_notifier_head notifier_list;
+
+static BLOCKING_NOTIFIER_HEAD(notifier_list);
 extern u32 wakeup_timer_seconds;
 
 static void twl6030_config_min_vbus_reg(struct twl6030_bci_device_info *di,
@@ -1979,7 +1980,6 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->charge_n1 = 0;
 	di->timer_n1 = 0;
 
-	BLOCKING_INIT_NOTIFIER_HEAD(&notifier_list);
 	INIT_DELAYED_WORK_DEFERRABLE(&di->twl6030_bci_monitor_work,
 				twl6030_bci_battery_work);
 	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
