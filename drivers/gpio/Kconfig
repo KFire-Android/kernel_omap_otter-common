@@ -514,4 +514,11 @@ config GPIO_TPS65910
 	help
 	  Select this option to enable GPIO driver for the TPS65910
 	  chip family.
+
+config GPIO_PALMAS
+	bool "PALMAS GPIO"
+	depends on MFD_PALMAS
+	help
+	  Select this option to enable GPIO driver for the Palmas
+	  chip familly.
 endif
