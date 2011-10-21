@@ -364,8 +364,6 @@ static int omap2430_musb_init(struct musb *musb)
 {
 	u32 l, status = 0;
 	struct device *dev = musb->controller;
-	struct musb_hdrc_platform_data *plat = dev->platform_data;
-	struct omap_musb_board_data *data = plat->board_data;
 
 	/* We require some kind of external transceiver, hooked
 	 * up through ULPI.  TWL4030-family PMICs include one,
