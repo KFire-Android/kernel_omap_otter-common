@@ -1389,6 +1389,7 @@ static unsigned int hp_rates[] = {
 	8000,
 	16000,
 	32000,
+	44100,
 	48000,
 	96000,
 };
@@ -1473,13 +1474,13 @@ static int twl6040_hw_params(struct snd_pcm_substream *substream,
 	switch (rate) {
 	case 11250:
 	case 22500:
-	case 44100:
 	case 88200:
 		sysclk = 17640000;
 		break;
 	case 8000:
 	case 16000:
 	case 32000:
+	case 44100:
 	case 48000:
 	case 96000:
 		sysclk = 19200000;
