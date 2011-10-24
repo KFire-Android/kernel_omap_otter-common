@@ -56,7 +56,7 @@
 #include <video/omap-panel-nokia-dsi.h>
 #include <plat/vram.h>
 #include <plat/omap-pm.h>
-
+#include <linux/wakelock.h>
 #include "board-blaze.h"
 #include "omap4_ion.h"
 #include "mux.h"
@@ -333,6 +333,7 @@ static int plat_wlink_kim_resume(struct platform_device *pdev)
 }
 
 static bool uart_req;
+static struct wake_lock st_wk_lock;
 /* Call the uart disable of serial driver */
 static int plat_uart_disable(void)
 {
@@ -344,6 +345,7 @@ static int plat_uart_disable(void)
 		if (!err)
 			uart_req = false;
 	}
+	wake_unlock(&st_wk_lock);
 	return err;
 }
 
@@ -358,6 +360,7 @@ static int plat_uart_enable(void)
 		if (!err)
 			uart_req = true;
 	}
+	wake_lock(&st_wk_lock);
 	return err;
 }
 
@@ -1331,6 +1334,7 @@ static void __init omap_4430sdp_init(void)
 	blaze_touch_init();
 	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
 	board_serial_init();
 	omap4_sdp4430_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
