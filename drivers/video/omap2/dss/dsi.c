@@ -3827,8 +3827,9 @@ static int dsi_cmd_proto_config(struct omap_dss_device *dssdev)
 
 static int dispc_to_dsi_clock(int val, int bytes_per_pixel, int lanes)
 {
-	return (val * bytes_per_pixel + lanes / 2) / lanes;
+	return (val * bytes_per_pixel) / lanes;
 }
+
 static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
@@ -3836,7 +3837,8 @@ static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 	int buswidth = 0;
 	u32 r;
 	int bytes_per_pixel;
-	int hbp, hfp, hsa, tl;
+	int hbp, hfp, hsa, tl, line;
+	int lanes;
 
 	dsi_config_tx_fifo(dsidev, DSI_FIFO_SIZE_32,
 			DSI_FIFO_SIZE_32,
@@ -3897,16 +3899,23 @@ static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 		dsi_vc_initial_config(dsidev, 3);
 	}
 
-	hbp = dispc_to_dsi_clock(timings->hbp, bytes_per_pixel, 4);
-	hfp = dispc_to_dsi_clock(timings->hfp, bytes_per_pixel, 4);
-	hsa = dispc_to_dsi_clock(timings->hsw, bytes_per_pixel, 4);
-	tl = hbp + hfp + hsa +
-		dispc_to_dsi_clock(timings->x_res, bytes_per_pixel, 4);
+	lanes = dsi_get_num_data_lanes_dssdev(dssdev);
+
+	hbp = dispc_to_dsi_clock((timings->hsw - 1) + (timings->hbp - 1),
+				bytes_per_pixel, lanes);
+	hfp = dispc_to_dsi_clock(timings->hfp - 1, bytes_per_pixel, lanes);
+	hsa = 0;
+
+	line = timings->hbp + timings->hfp + timings->hsw + timings->x_res;
+	WARN((line * bytes_per_pixel) % lanes != 0, "TL should be an exact "
+			"integer, try changing DISPC horizontal blanking parameters");
+
+	tl =  dispc_to_dsi_clock(line, bytes_per_pixel, lanes);
 
 	r = dsi_read_reg(dsidev, DSI_VM_TIMING1);
-	r = FLD_MOD(r, hbp - 1, 11, 0);   /* HBP */
-	r = FLD_MOD(r, hfp - 1, 23, 12);  /* HFP */
-	r = FLD_MOD(r, hsa - 1, 31, 24);  /* HSA */
+	r = FLD_MOD(r, hbp, 11, 0);   /* HBP */
+	r = FLD_MOD(r, hfp, 23, 12);  /* HFP */
+	r = FLD_MOD(r, hsa, 31, 24);  /* HSA */
 	dsi_write_reg(dsidev, DSI_VM_TIMING1, r);
 
 	r = dsi_read_reg(dsidev, DSI_VM_TIMING2);
@@ -3918,7 +3927,7 @@ static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 
 	r = dsi_read_reg(dsidev, DSI_VM_TIMING3);
 	r = FLD_MOD(r, timings->y_res, 14, 0);
-	r = FLD_MOD(r, tl - 1, 31, 16);
+	r = FLD_MOD(r, tl, 31, 16);
 	dsi_write_reg(dsidev, DSI_VM_TIMING3, r);
 
 	/* TODO: either calculate these values or make them configurable */
@@ -5109,50 +5118,10 @@ void dsi_uninit_platform_driver(void)
 	return platform_driver_unregister(&omap_dsi1hw_driver);
 }
 
-
-
-
-/* set extra register hardcoding values for now (according to kozio) */
+/* set extra videomode settings */
 void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
-
-	dsi_vc_enable(dsidev, 0, false);
-	dsi_vc_enable(dsidev, 1, false);
-	dsi_if_enable(dsidev, false);
-
-	/* configure timings */
-	dsi_write_reg(dsidev, DSI_VM_TIMING1, 0x010D301A);   /* HSA=1, HFP=211, HBP=26 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING2, 0x04080F0F);   /* WINDOW_SIZE=4, VSA=8, VFP=15, VBP=15 */
-	/* TO DO: This is a HACK for tablet vs tablet 2
-	 * need to identify how to correctly calculate the lines
-	 * and program them based on the timing data */
-	if (omap_is_board_version(OMAP4_TABLET_1_0) ||
-	    omap_is_board_version(OMAP4_TABLET_1_1) ||
-	    omap_is_board_version(OMAP4_TABLET_1_2))
-		dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x03F00300); /* TL(31:16)=1008, VACT(15:0)=768 */
-	else
-		dsi_write_reg(dsidev, DSI_VM_TIMING3, 0x04B00320); /* TL(31:16)=1200, VACT(15:0)=800 */
-
-	dsi_write_reg(dsidev, DSI_VM_TIMING4, 0x00487296);   /* HSA_HS_INTERLEAVING(23:16)=72, HFP_HS_INTERLEAVING(15:8)=114, HBP_HS_INTERLEAVING(7:0)=150 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING5, 0x0082DF3B);   /* VC3_FIFO_EMPTINESS, VC2_FIFO_EMPTINESS, VC1_FIFO_EMPTINESS, VC0_FIFO_EMPTINESS */
-	dsi_write_reg(dsidev, DSI_VM_TIMING6, 0x7A6731D1);   /* HSA_LP_INTERLEAVING(23:16)=103, HFP_HS_INTERLEAVING(15:8)=49, HBP_HS_INTERLEAVING(7:0)=209 */
-	dsi_write_reg(dsidev, DSI_VM_TIMING7, 0x000E0013);   /* BL_HS_INTERLEAVING(23:16)=14, BL_LP_INTERLEAVING(15:0)=19 */
-
-
-	/* set TA_TO_COUNTER accordignly to kozio value(???) */
-	/* enable TA_TO and set it to max */
-	/* disable stop_mode but set it to max */
-	/* dsi_write_reg(dsidev, DSI_TIMING1, 0xFFFF7FFF) */
-
-	/* set TA_TO_COUNTER accordignly to kozio value(???) */
-	/* disable LP_RX_TO but set it to max */
-	/* enable HS_TX_TO and set it to max */
-	/* dsi_write_reg(dsidev, DSI_TIMING2, 0xFFFF7FFF) */
-
-	dsi_vc_enable(dsidev, 1, true);
-	dsi_vc_enable(dsidev, 0, true);
-	dsi_if_enable(dsidev, true);
 
 	/* Send null packet to start DDR clock  */
 	dsi_write_reg(dsidev, DSI_VC_SHORT_PACKET_HEADER(0), 0);
