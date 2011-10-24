@@ -51,7 +51,7 @@
 #include <plat/omap-serial.h>
 #include <plat/remoteproc.h>
 #include <plat/omap-pm.h>
-
+#include <linux/wakelock.h>
 #include "mux.h"
 #include "hsmmc.h"
 #include "timer-gp.h"
@@ -121,6 +121,7 @@ static int plat_wlink_kim_resume(struct platform_device *pdev)
 }
 
 static bool uart_req;
+static struct wake_lock st_wk_lock;
 /* Call the uart disable of serial driver */
 static int plat_uart_disable(void)
 {
@@ -132,6 +133,7 @@ static int plat_uart_disable(void)
 		if (!err)
 			uart_req = false;
 	}
+	wake_unlock(&st_wk_lock);
 	return err;
 }
 
@@ -146,6 +148,7 @@ static int plat_uart_enable(void)
 		if (!err)
 			uart_req = true;
 	}
+	wake_lock(&st_wk_lock);
 	return err;
 }
 
@@ -945,7 +948,7 @@ static void __init omap_tablet_init(void)
 	tablet_sensor_init();
 	platform_add_devices(tablet4430_devices,
 			ARRAY_SIZE(tablet4430_devices));
-
+	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
 
