@@ -288,6 +288,80 @@ static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
 	OPP_INITIALIZER("aess", "abe_clk", "iva", true, 196608000, OMAP4460_VDD_IVA_OPP100_UV),
 };
 
+/*
+ * Structures containing OMAP4470 voltage supported and various
+ * voltage dependent data for each VDD.
+ */
+#define OMAP4470_VDD_MPU_OPP50_UV		1025000
+#define OMAP4470_VDD_MPU_OPP100_UV		1200000
+#define OMAP4470_VDD_MPU_OPPTURBO_UV		1312000
+#define OMAP4470_VDD_MPU_OPPNITRO_UV		1375000
+
+struct omap_volt_data omap447x_vdd_mpu_volt_data[] = {
+	VOLT_DATA_DEFINE(OMAP4470_VDD_MPU_OPP50_UV, OMAP44XX_CONTROL_FUSE_MPU_OPP50, 0xf4, 0x0c, OMAP_ABB_NOMINAL_OPP),
+	VOLT_DATA_DEFINE(OMAP4470_VDD_MPU_OPP100_UV, OMAP44XX_CONTROL_FUSE_MPU_OPP100, 0xf9, 0x16, OMAP_ABB_NOMINAL_OPP),
+	VOLT_DATA_DEFINE(OMAP4470_VDD_MPU_OPPTURBO_UV, OMAP44XX_CONTROL_FUSE_MPU_OPPTURBO, 0xfa, 0x23, OMAP_ABB_FAST_OPP),
+	VOLT_DATA_DEFINE(OMAP4470_VDD_MPU_OPPNITRO_UV, OMAP44XX_CONTROL_FUSE_MPU_OPPNITRO, 0xfa, 0x27, OMAP_ABB_FAST_OPP),
+	VOLT_DATA_DEFINE(0, 0, 0, 0, 0),
+};
+
+#define OMAP4470_VDD_IVA_OPP50_UV		 950000
+#define OMAP4470_VDD_IVA_OPP100_UV		1137000
+#define OMAP4470_VDD_IVA_OPPTURBO_UV		1287000
+#define OMAP4470_VDD_IVA_OPPNITRO_UV		1375000
+
+struct omap_volt_data omap447x_vdd_iva_volt_data[] = {
+	VOLT_DATA_DEFINE(OMAP4470_VDD_IVA_OPP50_UV, OMAP44XX_CONTROL_FUSE_IVA_OPP50, 0xf4, 0x0c, OMAP_ABB_NOMINAL_OPP),
+	VOLT_DATA_DEFINE(OMAP4470_VDD_IVA_OPP100_UV, OMAP44XX_CONTROL_FUSE_IVA_OPP100, 0xf9, 0x16, OMAP_ABB_NOMINAL_OPP),
+	VOLT_DATA_DEFINE(OMAP4470_VDD_IVA_OPPTURBO_UV, OMAP44XX_CONTROL_FUSE_IVA_OPPTURBO, 0xfa, 0x23, OMAP_ABB_NOMINAL_OPP),
+	VOLT_DATA_DEFINE(OMAP4470_VDD_IVA_OPPNITRO_UV, OMAP44XX_CONTROL_FUSE_IVA_OPPNITRO, 0xfa, 0x23, OMAP_ABB_FAST_OPP),
+	VOLT_DATA_DEFINE(0, 0, 0, 0, 0),
+};
+
+#define OMAP4470_VDD_CORE_OPP50_UV		 962000
+#define OMAP4470_VDD_CORE_OPP100_UV		1125000
+#define OMAP4470_VDD_CORE_OPP100_OV_UV		1250000
+
+struct omap_volt_data omap447x_vdd_core_volt_data[] = {
+	VOLT_DATA_DEFINE(OMAP4470_VDD_CORE_OPP50_UV, OMAP44XX_CONTROL_FUSE_CORE_OPP50, 0xf4, 0x0c, OMAP_ABB_NONE),
+	VOLT_DATA_DEFINE(OMAP4470_VDD_CORE_OPP100_UV, OMAP44XX_CONTROL_FUSE_CORE_OPP100, 0xf9, 0x16, OMAP_ABB_NONE),
+	VOLT_DATA_DEFINE(OMAP4470_VDD_CORE_OPP100_OV_UV, OMAP44XX_CONTROL_FUSE_CORE_OPP100OV, 0xf9, 0x16, OMAP_ABB_NONE),
+	VOLT_DATA_DEFINE(0, 0, 0, 0, 0),
+};
+
+/* OMAP 4470 MPU Core VDD dependency table */
+static struct omap_vdd_dep_volt omap447x_vdd_mpu_core_dep_data[] = {
+	{.main_vdd_volt = OMAP4470_VDD_MPU_OPP50_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP50_UV},
+	{.main_vdd_volt = OMAP4470_VDD_MPU_OPP100_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},
+	{.main_vdd_volt = OMAP4470_VDD_MPU_OPPTURBO_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},
+	{.main_vdd_volt = OMAP4470_VDD_MPU_OPPNITRO_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},
+};
+
+struct omap_vdd_dep_info omap447x_vddmpu_dep_info[] = {
+	{
+		.name	= "core",
+		.dep_table = omap447x_vdd_mpu_core_dep_data,
+		.nr_dep_entries = ARRAY_SIZE(omap447x_vdd_mpu_core_dep_data),
+	},
+	{.name = NULL, .dep_table = NULL, .nr_dep_entries = 0},
+};
+
+/* OMAP 4470 MPU IVA VDD dependency table */
+static struct omap_vdd_dep_volt omap447x_vdd_iva_core_dep_data[] = {
+	{.main_vdd_volt = OMAP4470_VDD_IVA_OPP50_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP50_UV},
+	{.main_vdd_volt = OMAP4470_VDD_IVA_OPP100_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},
+	{.main_vdd_volt = OMAP4470_VDD_IVA_OPPTURBO_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},
+	{.main_vdd_volt = OMAP4470_VDD_IVA_OPPNITRO_UV, .dep_vdd_volt = OMAP4470_VDD_CORE_OPP100_UV},
+};
+
+struct omap_vdd_dep_info omap447x_vddiva_dep_info[] = {
+	{
+		.name	= "core",
+		.dep_table = omap447x_vdd_iva_core_dep_data,
+		.nr_dep_entries = ARRAY_SIZE(omap447x_vdd_iva_core_dep_data),
+	},
+	{.name = NULL, .dep_table = NULL, .nr_dep_entries = 0},
+};
 /**
  * omap4_mpu_opp_enable() - helper to enable the OPP
  * @freq:	frequency to enable
