@@ -112,20 +112,6 @@ static int __init omap_ethernet_init(void)
 static int plat_wlink_kim_suspend(struct platform_device *pdev, pm_message_t
 		state)
 {
-	struct kim_data_s *kim_gdata;
-	struct st_data_s *core_data;
-	static unsigned short retry_suspend = 0;
-
-	kim_gdata = dev_get_drvdata(&pdev->dev);
-	core_data = kim_gdata->core_data;
-	/*Prevent suspend until sleep indication from chip*/
-	if (st_ll_getstate(core_data) != ST_LL_ASLEEP && retry_suspend++ < 5)
-		return -1;
-
-	if (retry_suspend >= 5)
-		pr_err("wilink not asleep: omap device will suspend \n");
-
-	retry_suspend = 0;
 	return 0;
 }
 
