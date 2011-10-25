@@ -337,6 +337,93 @@ static void hdmi_core_video_config(struct hdmi_ip_data *ip_data,
 		cfg->v_fc_config.cm.mode, 3, 3);
 }
 
+static void hdmi_core_config_video_packetizer(struct hdmi_ip_data *ip_data)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+	struct hdmi_config *cfg = &ip_data->cfg;
+	int clr_depth;
+
+	switch (cfg->deep_color) {
+	case HDMI_DEEP_COLOR_30BIT:
+		clr_depth = 5;
+		break;
+	case HDMI_DEEP_COLOR_36BIT:
+		clr_depth = 6;
+		break;
+	case HDMI_DEEP_COLOR_24BIT:
+	default:
+		clr_depth = 0;
+		break;
+	}
+
+	/* COLOR_DEPTH */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_VP_PR_CD, clr_depth, 7, 4);
+
+	/* BYPASS_EN */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_VP_CONF, clr_depth ? 0 : 1, 6, 6);
+
+	/* PP_EN */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_VP_CONF, clr_depth ? 1 : 0, 5, 5);
+
+	/* YCC422_EN */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_VP_CONF, 0, 3, 3);
+
+	/* PP_STUFFING */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_VP_STUFF, clr_depth ? 1 : 0, 1, 1);
+
+	/* YCC422_STUFFING */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_VP_STUFF, 1, 2, 2);
+
+	/* OUTPUT_SELECTOR */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_VP_CONF, clr_depth ? 0 : 2, 1, 0);
+}
+
+static void hdmi_core_config_csc(struct hdmi_ip_data *ip_data)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+	struct hdmi_config *cfg = &ip_data->cfg;
+	int clr_depth;
+
+	switch (cfg->deep_color) {
+	case HDMI_DEEP_COLOR_30BIT:
+		clr_depth = 5;
+		break;
+	case HDMI_DEEP_COLOR_36BIT:
+		clr_depth = 6;
+		break;
+	case HDMI_DEEP_COLOR_24BIT:
+	default:
+		clr_depth = 0;
+		break;
+	}
+
+	/* CSC_COLORDEPTH */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_SCALE, clr_depth, 7, 4);
+}
+
+static void hdmi_core_config_video_sampler(struct hdmi_ip_data *ip_data)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+	struct hdmi_config *cfg = &ip_data->cfg;
+	int video_mapping;
+
+	switch (cfg->deep_color) {
+	case HDMI_DEEP_COLOR_30BIT:
+		video_mapping = 3;
+		break;
+	case HDMI_DEEP_COLOR_36BIT:
+		video_mapping = 5;
+		break;
+	case HDMI_DEEP_COLOR_24BIT:
+	default:
+		video_mapping = 1;
+		break;
+	}
+
+	/* VIDEO_MAPPING */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_TX_INVID0, video_mapping, 4, 0);
+}
+
 static void hdmi_core_aux_infoframe_avi_config(struct hdmi_ip_data *ip_data)
 {
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
@@ -487,6 +574,10 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	v_core_cfg.packet_mode = HDMI_PACKETMODE24BITPERPIXEL;
 
 	hdmi_core_video_config(ip_data, &v_core_cfg);
+
+	hdmi_core_config_video_packetizer(ip_data);
+	hdmi_core_config_csc(ip_data);
+	hdmi_core_config_video_sampler(ip_data);
 
 	/*
 	 * configure packet

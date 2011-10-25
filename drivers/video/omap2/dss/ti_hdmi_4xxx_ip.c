@@ -795,7 +795,7 @@ void hdmi_wp_video_config_interface(struct hdmi_ip_data *ip_data)
 	r = FLD_MOD(r, ip_data->cfg.timings.vsync_pol, 7, 7);
 	r = FLD_MOD(r, ip_data->cfg.timings.hsync_pol, 6, 6);
 	r = FLD_MOD(r, ip_data->cfg.timings.interlace, 3, 3);
-	r = FLD_MOD(r, 1, 1, 0); /* HDMI_TIMING_MASTER_24BIT */
+	r = FLD_MOD(r, ip_data->cfg.deep_color + 1 , 1, 0);
 	hdmi_write_reg(hdmi_wp_base(ip_data), HDMI_WP_VIDEO_CFG, r);
 }
 
