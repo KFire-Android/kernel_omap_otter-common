@@ -47,6 +47,7 @@
 #include <linux/usb.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/musb.h>
+#include <linux/wakelock.h>
 
 struct musb;
 struct musb_hw_ep;
@@ -388,6 +389,7 @@ struct musb {
 	struct musb_context_registers context;
 
 	irqreturn_t		(*isr)(int, void *);
+	struct wake_lock	musb_wakelock;
 	struct work_struct	irq_work;
 	struct workqueue_struct	*otg_notifier_wq;
 	struct work_struct	hz_mode_work;
