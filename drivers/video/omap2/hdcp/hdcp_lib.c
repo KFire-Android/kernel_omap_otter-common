@@ -20,8 +20,6 @@
  */
 
 #include <linux/delay.h>
-#include <mach/omap4-common.h>
-#include <linux/dma-mapping.h>
 #include "hdcp.h"
 
 static void hdcp_lib_read_an(u8 *an);
@@ -35,8 +33,6 @@ static void hdcp_lib_toggle_repeater_bit_in_tx(void);
 static int hdcp_lib_initiate_step1(void);
 static int hdcp_lib_check_ksv(uint8_t ksv[5]);
 
-#define PPA_SERVICE_HDCP_READ_M0	0x30
-#define PPA_SERVICE_HDCP_CHECK_V	0x31
 /*-----------------------------------------------------------------------------
  * Function: hdcp_lib_read_an
  *-----------------------------------------------------------------------------
@@ -698,9 +694,7 @@ int hdcp_lib_step1_r0_check(void)
 		return -HDCP_CANCELLED_AUTH;
 
 	if (hdcp_lib_check_repeater_bit_in_tx()) {
-		status = omap4_secure_dispatcher(PPA_SERVICE_HDCP_READ_M0,
-						FLAG_START_CRITICAL,
-						0, 0, 0, 0, 0);
+		status = hdcp_user_space_task(HDCP_EVENT_STEP1);
 		/* Wait for user space */
 		if (status) {
 			printk(KERN_ERR "HDCP: omap4_secure_dispatcher M0 error "
@@ -811,15 +805,7 @@ int hdcp_lib_step2(void)
 	if (hdcp.pending_disable)
 		return -HDCP_CANCELLED_AUTH;
 
-	/* clear sha_input values in cache*/
-	dma_sync_single_for_device(NULL,
-				   __pa((u32)(&sha_input)),
-				   sizeof(struct hdcp_sha_in),
-				   DMA_TO_DEVICE);
-
-	status = omap4_secure_dispatcher(PPA_SERVICE_HDCP_CHECK_V,
-					FLAG_START_CRITICAL,
-					1, __pa((u32)&sha_input), 0, 0, 0);
+	status = hdcp_user_space_task(HDCP_EVENT_STEP2);
 	/* Wait for user space */
 	if (status) {
 		printk(KERN_ERR "HDCP: omap4_secure_dispatcher CHECH_V error "
