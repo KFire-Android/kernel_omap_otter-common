@@ -922,6 +922,9 @@ static int __init omap3_pm_init(void)
 
 	omap3_save_scratchpad_contents();
 	omap_pm_is_ready_status = true;
+
+	/* apply any pending bus throughput requests */
+	omap_pm_apply_min_bus_tput();
 err1:
 	return ret;
 err2:

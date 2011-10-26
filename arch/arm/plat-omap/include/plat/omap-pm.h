@@ -143,6 +143,18 @@ int omap_pm_set_max_mpu_wakeup_lat(struct pm_qos_request_list **qos_request,
  */
 int omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, long r);
 
+/**
+ * omap_pm_apply_min_bus_tput - apply the current minimum bus
+ * throughput needed by devices.
+ *
+ * It is expected that the OMAP PM code will call this function at the
+ * end of PM initialization in order to apply any pending throughput
+ * requirements requested by drivers before PM managed to initialize
+ * itself.
+ *
+ */
+int omap_pm_apply_min_bus_tput(void);
+
 
 /**
  * omap_pm_set_max_dev_wakeup_lat - set the maximum device enable latency
