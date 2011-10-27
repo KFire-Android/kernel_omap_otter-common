@@ -122,6 +122,15 @@ int omap4_charger_detect(void)
 	int charger = POWER_SUPPLY_TYPE_USB;
 	u32 usb2phycore = 0;
 	u32 chargertype = 0;
+	u32 val = 0;
+
+	/* enable the clocks */
+	omap4430_phy_set_clk(NULL, 1);
+	/* power on the phy */
+	if ((val = __raw_readl(ctrl_base + CONTROL_DEV_CONF)) & PHY_PD)
+		__raw_writel((val & ~PHY_PD), ctrl_base + CONTROL_DEV_CONF);
+
+	msleep_interruptible(200);
 
 	omap4430_phy_power(NULL, 0, 1);
 
@@ -159,6 +168,10 @@ int omap4_charger_detect(void)
 	}
 
 	omap4430_phy_power(NULL, 0, 0);
+	/* Power down the phy */
+	__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
+	/* Disable the clocks */
+	omap4430_phy_set_clk(NULL, 0);
 
 	return charger;
 }
@@ -166,13 +179,6 @@ int omap4_charger_detect(void)
 int omap4430_phy_power(struct device *dev, int ID, int on)
 {
 	if (on) {
-		/* enabled the clocks */
-		omap4430_phy_set_clk(dev, 1);
-		/* power on the phy */
-		if (__raw_readl(ctrl_base + CONTROL_DEV_CONF) & PHY_PD) {
-			__raw_writel(~PHY_PD, ctrl_base + CONTROL_DEV_CONF);
-			msleep_interruptible(200);
-		}
 		if (ID)
 			/* enable VBUS valid, IDDIG groung */
 			__raw_writel(AVALID | VBUSVALID, ctrl_base +
@@ -188,10 +194,6 @@ int omap4430_phy_power(struct device *dev, int ID, int on)
 		/* Enable session END and IDIG to high impedance. */
 		__raw_writel(SESSEND | IDDIG, ctrl_base +
 					USBOTGHS_CONTROL);
-		/* Power down the phy */
-		__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
-		/* Disable the clocks */
-		omap4430_phy_set_clk(dev, 0);
 	}
 	return 0;
 }
