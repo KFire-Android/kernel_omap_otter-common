@@ -50,13 +50,16 @@ int omap4_ldo_trim_configure(void)
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_IVA_VOLTAGE_CTRL);
 	}
 
-	/* For all trimmed and untrimmed write value as per recomendation */
-	val =  0x10 << OMAP4_AVDAC_TRIM_BYTE0_SHIFT;
-	val |=  0x01 << OMAP4_AVDAC_TRIM_BYTE1_SHIFT;
-	val |=  0x4d << OMAP4_AVDAC_TRIM_BYTE2_SHIFT;
-	val |=  0x1C << OMAP4_AVDAC_TRIM_BYTE3_SHIFT;
-	omap4_ctrl_pad_writel(val,
-		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
+	/* OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1 is reserved for 4470 */
+	if (!cpu_is_omap447x()) {
+		/* For all trimmed and untrimmed write recommended value */
+		val =  0x10 << OMAP4_AVDAC_TRIM_BYTE0_SHIFT;
+		val |=  0x01 << OMAP4_AVDAC_TRIM_BYTE1_SHIFT;
+		val |=  0x4d << OMAP4_AVDAC_TRIM_BYTE2_SHIFT;
+		val |=  0x1C << OMAP4_AVDAC_TRIM_BYTE3_SHIFT;
+		omap4_ctrl_pad_writel(val,
+			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
+	}
 	/*
 	 * Errata: i684
 	 * For all ESx.y trimmed and untrimmed units LPDDR I/O and
