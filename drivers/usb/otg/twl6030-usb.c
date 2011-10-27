@@ -477,7 +477,8 @@ static int twl6030_set_power(struct otg_transceiver *x, unsigned int mA)
 	struct twl6030_usb *twl = xceiv_to_twl(x);
 
 	twl->usb_cinlimit_mA = mA;
-	atomic_notifier_call_chain(&twl->otg.notifier, USB_EVENT_ENUMERATED,
+	if (mA)
+		atomic_notifier_call_chain(&twl->otg.notifier, USB_EVENT_ENUMERATED,
 				&twl->usb_cinlimit_mA);
 	return 0;
 }
