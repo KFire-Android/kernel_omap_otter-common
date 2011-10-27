@@ -243,6 +243,9 @@ static void __init omap4_check_features(void)
 		} else if (cpu_is_omap446x()) {
 			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
 			omap4_features |= OMAP4_HAS_MPU_1_5GHZ;
+		} else if (cpu_is_omap447x()) {
+			omap4_features |= OMAP4_HAS_MPU_1_3GHZ;
+			omap4_features |= OMAP4_HAS_MPU_1_5GHZ;
 		}
 		break;
 	case 0x1:
@@ -252,6 +255,8 @@ static void __init omap4_check_features(void)
 			omap4_features |= OMAP4_HAS_MPU_1GHZ;
 		else if (cpu_is_omap446x())
 			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
+		else if (cpu_is_omap447x())
+			omap4_features |= OMAP4_HAS_MPU_1_3GHZ;
 		break;
 	}
 }
