@@ -89,12 +89,12 @@ static void otgwl_handle_event(unsigned long event)
 
 	switch (event) {
 	case USB_EVENT_VBUS:
+	case USB_EVENT_ID:
 	case USB_EVENT_ENUMERATED:
 		otgwl_hold(&vbus_lock);
 		break;
 
 	case USB_EVENT_NONE:
-	case USB_EVENT_ID:
 	case USB_EVENT_CHARGER:
 		otgwl_temporary_hold(&vbus_lock);
 		break;
