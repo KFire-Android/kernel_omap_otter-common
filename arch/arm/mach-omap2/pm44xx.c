@@ -1080,7 +1080,7 @@ static int __init omap4_pm_init(void)
 
 	ret = request_irq(OMAP44XX_IRQ_PRCM,
 			  (irq_handler_t)prcm_interrupt_handler,
-			  IRQF_DISABLED, "prcm", NULL);
+			  IRQF_NO_SUSPEND | IRQF_DISABLED, "prcm", NULL);
 	if (ret) {
 		printk(KERN_ERR "request_irq failed to register for 0x%x\n",
 		       OMAP44XX_IRQ_PRCM);
@@ -1150,6 +1150,7 @@ static int __init omap4_pm_init(void)
 
 		/* There appears to be a problem between the MPUSS and L3_1 */
 		ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
+		ret |= clkdm_add_wkdep(mpuss_clkdm, l3_2_clkdm);
 
 		/* There appears to be a problem between the Ducati and L3/L4 */
 		ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
