@@ -428,6 +428,7 @@ static void omap2430_musb_enable(struct musb *musb)
 	struct device *dev = musb->controller;
 	struct musb_hdrc_platform_data *pdata = dev->platform_data;
 	struct omap_musb_board_data *data = pdata->board_data;
+	u32 val;
 
 	switch (musb->xceiv->last_event) {
 
@@ -452,6 +453,15 @@ static void omap2430_musb_enable(struct musb *musb)
 		break;
 
 	case USB_EVENT_VBUS:
+		val = musb_readl(musb->mregs, OTG_INTERFSEL);
+		if (data->interface_type ==
+			MUSB_INTERFACE_UTMI) {
+			val &= ~ULPI_12PIN;
+			val |= UTMI_8BIT;
+		} else {
+			val |= ULPI_12PIN;
+		}
+		musb_writel(musb->mregs, OTG_INTERFSEL, val);
 		otg_init(musb->xceiv);
 		break;
 
