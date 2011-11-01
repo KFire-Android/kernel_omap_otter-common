@@ -996,7 +996,7 @@ static void __init prcm_setup_regs(void)
 		OMAP4430_PRM_PARTITION, OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_LDO_SRAM_IVA_SETUP_OFFSET);
 
 	/* Allow SRAM LDO to enter RET during  low power state*/
-	if (cpu_is_omap446x()) {
+	if (cpu_is_omap446x() || cpu_is_omap447x()) {
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
 				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT, OMAP4430_PRM_PARTITION,
 				OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_LDO_SRAM_CORE_CTRL_OFFSET);
@@ -1363,7 +1363,13 @@ static int __init omap4_pm_init(void)
 			" MPUSS <-> L3_MAIN_1.\n");
 		pr_info("OMAP4 PM: Static dependency added between"
 			" DUCATI <-> L4_PER/CFG and DUCATI <-> L3.\n");
-	} else if (cpu_is_omap446x()) {
+	} else if (cpu_is_omap446x() || cpu_is_omap447x()) {
+		/*
+		 * Static dependency between mpuss and emif can only be
+		 * disabled if OSWR is disabled to avoid a HW bug that occurs
+		 * when mpuss enters OSWR
+		 */
+		/*ret |= clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);*/
 		ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per);
 		ret |= clkdm_add_wkdep(mpuss_clkdm, l4_cfg);
 
