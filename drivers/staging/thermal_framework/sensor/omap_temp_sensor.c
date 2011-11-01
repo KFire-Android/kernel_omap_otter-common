@@ -1175,7 +1175,7 @@ static int omap_temp_sensor_resume(struct platform_device *pdev)
 
 void omap_temp_sensor_idle(int idle_state)
 {
-	if (!cpu_is_omap446x())
+	if (!cpu_is_omap446x() && !cpu_is_omap447x())
 		return;
 
 	if (idle_state)
@@ -1231,7 +1231,7 @@ static struct platform_driver omap_temp_sensor_driver = {
 
 int __init omap_temp_sensor_init(void)
 {
-	if (!cpu_is_omap446x())
+	if (!cpu_is_omap446x() && !cpu_is_omap447x())
 		return 0;
 
 	return platform_driver_register(&omap_temp_sensor_driver);
