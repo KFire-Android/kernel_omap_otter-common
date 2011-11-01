@@ -1109,8 +1109,8 @@ static void __init tablet_camera_mux_init(void)
 {
 	u32 r = 0;
 
-	/* Enable CSI22 pads for 4460 only*/
-	if (cpu_is_omap446x() &&
+	/* Enable CSI22 pads for 4460 and 4470*/
+	if ((cpu_is_omap446x() || cpu_is_omap447x()) &&
 		(omap_get_board_version() >= OMAP4_TABLET_2_0)) {
 		r = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_CAMERA_RX);
 		r |= (0x7 << OMAP4_CAMERARX_CSI22_LANEENABLE_SHIFT);
