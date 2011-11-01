@@ -167,7 +167,7 @@ static int hdmi_audio_set_configuration(struct hdmi_codec_data *priv)
 	if (dss_has_feature(FEAT_HDMI_CTS_SWMODE)) {
 		core_cfg->aud_par_busclk = 0;
 		core_cfg->cts_mode = HDMI_AUDIO_CTS_MODE_SW;
-		core_cfg->use_mclk = cpu_is_omap446x();
+		core_cfg->use_mclk = (cpu_is_omap446x() || cpu_is_omap447x());
 	} else {
 		core_cfg->aud_par_busclk = (((128 * 31) - 1) << 8);
 		core_cfg->cts_mode = HDMI_AUDIO_CTS_MODE_HW;
