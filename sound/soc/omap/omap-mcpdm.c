@@ -657,16 +657,11 @@ static int omap_mcpdm_probe(struct snd_soc_dai *dai)
 
 	pm_runtime_enable(mcpdm->dev);
 
-	/* Disable lines while request is ongoing */
-	pm_runtime_get_sync(mcpdm->dev);
-	omap_mcpdm_write(mcpdm, MCPDM_CTRL, 0x00);
-
 	ret = request_irq(mcpdm->irq, omap_mcpdm_irq_handler,
 				0, "McPDM", (void *)mcpdm);
 	if (ret)
 		dev_err(mcpdm->dev, "Request for McPDM IRQ failed\n");
 
-	pm_runtime_put_sync(mcpdm->dev);
 	return ret;
 }
 
