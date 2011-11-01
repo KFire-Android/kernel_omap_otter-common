@@ -37,6 +37,7 @@
 #include <plat/serial.h>
 #include <plat/sdrc.h>
 #include <plat/prcm.h>
+#include <plat/omap-pm.h>
 #include <plat/gpmc.h>
 #include <plat/dma.h>
 
