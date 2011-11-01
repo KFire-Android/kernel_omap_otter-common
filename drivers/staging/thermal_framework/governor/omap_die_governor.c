@@ -310,13 +310,8 @@ out:
 			omap_gov->cooling_level = 0;
 			thermal_cooling_set_level(&cooling_agents,
 						omap_gov->cooling_level);
-		} else { /* omap_gov->panic_zone_reached == 1 */
-			/*
-			 * Temperature falls from panic zone and
-			 * enters into alert zone
-			 * Wait until temperature falls into monitor zone
-			 */
 		}
+
 		list_del_init(&cooling_agents);
 		die_temp_lower = hotspot_temp_to_sensor_temp(
 			OMAP_ALERT_TEMP - HYSTERESIS_VALUE);
@@ -367,17 +362,29 @@ out:
 		return -ENODEV;
 	} else {
 		omap_gov->cooling_level++;
+		omap_gov->panic_zone_reached++;
+		pr_info("%s: Panic zone reached %i times\n",
+			__func__, omap_gov->panic_zone_reached);
 		thermal_cooling_set_level(&cooling_agents,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
 		die_temp_lower = hotspot_temp_to_sensor_temp(
 			OMAP_PANIC_TEMP - HYSTERESIS_VALUE);
-		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_FATAL_TEMP);
+
+		/* Set the threshold window to below fatal.  This way the
+		 * governor can manage the thermal if the temp should rise
+		 * while throttling.  We need to be agressive with throttling
+		 * should we reach this zone. */
+		die_temp_upper = (((OMAP_FATAL_TEMP - OMAP_PANIC_TEMP) / 4) *
+			omap_gov->panic_zone_reached ) + OMAP_PANIC_TEMP;
+		if (die_temp_upper >= OMAP_FATAL_TEMP)
+			die_temp_upper = OMAP_FATAL_TEMP;
+
+		die_temp_upper = hotspot_temp_to_sensor_temp(die_temp_upper);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			FAST_TEMP_MONITORING_RATE);
-		omap_gov->panic_zone_reached = 1;
 	}
 
 	return 0;
