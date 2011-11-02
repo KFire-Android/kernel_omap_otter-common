@@ -883,7 +883,11 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 		setup_ohci_io_mux(pdata->port_mode);
 	} else if (cpu_is_omap44xx()) {
 		oh[2]->mux = setup_4430ehci_io_mux(pdata->port_mode);
+		if (oh[2]->mux)
+			omap_hwmod_mux(oh[2]->mux, _HWMOD_STATE_ENABLED);
 		oh[1]->mux = setup_4430ohci_io_mux(pdata->port_mode);
+		if (oh[1]->mux)
+			omap_hwmod_mux(oh[1]->mux, _HWMOD_STATE_ENABLED);
 	}
 
 	od = omap_device_build_ss(OMAP_USBHS_DEVICE, bus_id, oh, 4,
