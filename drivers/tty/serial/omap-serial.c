@@ -743,7 +743,6 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 {
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
 	unsigned char cval = 0;
-	unsigned char efr = 0;
 	unsigned long flags = 0;
 	unsigned int baud, quot;
 
