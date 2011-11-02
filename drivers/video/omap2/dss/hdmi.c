@@ -43,6 +43,11 @@
 #include "dss.h"
 #include "dss_features.h"
 
+#ifdef CONFIG_OMAP_PM
+#include <linux/pm_qos_params.h>
+static struct pm_qos_request_list pm_qos_handle;
+#endif
+
 #define HDMI_WP			0x0
 #define HDMI_CORE_SYS		0x400
 #define HDMI_CORE_AV		0x900
@@ -344,6 +349,22 @@ static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 		}
 	}
 }
+/* Set / Release c-state constraints */
+static void hdmi_set_l3_cstr(struct omap_dss_device *dssdev, bool enable)
+{
+#ifdef CONFIG_OMAP_PM
+	int r;
+	DSSINFO("%s c-state constraint for HDMI\n\n",
+		enable ? "Set" : "Release");
+
+	if (enable)
+		pm_qos_add_request(&pm_qos_handle, PM_QOS_CPU_DMA_LATENCY, 100);
+	else
+		pm_qos_remove_request(&pm_qos_handle);
+#else
+	DSSINFO("C-STATE Constraints require COMFIG_OMAP_PM to be set\n");
+#endif
+}
 
 static int hdmi_power_on(struct omap_dss_device *dssdev)
 {
@@ -355,6 +376,8 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	r = hdmi_runtime_get();
 	if (r)
 		return r;
+
+	hdmi_set_l3_cstr(dssdev, true);
 
 	/* Load the HDCP keys if not already loaded*/
 	hdmi_load_hdcp_keys(dssdev);
@@ -447,6 +470,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	return 0;
 err:
+	hdmi_set_l3_cstr(dssdev, false);
 	hdmi_runtime_put();
 	return -EIO;
 }
@@ -461,6 +485,7 @@ static void hdmi_power_off(struct omap_dss_device *dssdev)
 	dispc_enable_channel(OMAP_DSS_CHANNEL_DIGIT, dssdev->type, 0);
 	hdmi_ti_4xxx_phy_off(&hdmi.hdmi_data, hdmi.set_mode);
 	hdmi_ti_4xxx_set_pll_pwr(&hdmi.hdmi_data, HDMI_PLLPWRCMD_ALLOFF);
+	hdmi_set_l3_cstr(dssdev, false);
 	hdmi_runtime_put();
 	hdmi.deep_color = HDMI_DEEP_COLOR_24BIT;
 }
