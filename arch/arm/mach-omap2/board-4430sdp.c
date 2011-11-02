@@ -1128,7 +1128,7 @@ static struct omap_device_pad blaze_uart2_pads[] __initdata = {
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
 		.flags  = OMAP_DEVICE_PAD_REMUX,
 		.idle   = OMAP_WAKEUP_EN | OMAP_PIN_OFF_INPUT_PULLUP |
-			OMAP_OFFOUT_EN | OMAP_MUX_MODE0,
+			  OMAP_MUX_MODE0,
 	},
 	{
 		.name	= "uart2_rts.uart2_rts",

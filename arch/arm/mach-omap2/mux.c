@@ -512,7 +512,8 @@ static inline void omap_mux_decode(struct seq_file *s, u16 val)
 
 	OMAP_MUX_TEST_FLAG(val, OMAP_PIN_OFF_WAKEUPENABLE);
 	if (val & OMAP_OFF_EN) {
-		if (!(val & OMAP_OFFOUT_EN)) {
+		if (val & OMAP_OFFOUT_EN) {
+			/* Input */
 			if (!(val & OMAP_OFF_PULL_UP)) {
 				OMAP_MUX_TEST_FLAG(val,
 					OMAP_PIN_OFF_INPUT_PULLDOWN);
@@ -521,6 +522,7 @@ static inline void omap_mux_decode(struct seq_file *s, u16 val)
 					OMAP_PIN_OFF_INPUT_PULLUP);
 			}
 		} else {
+			/* Output */
 			if (!(val & OMAP_OFFOUT_VAL)) {
 				OMAP_MUX_TEST_FLAG(val,
 					OMAP_PIN_OFF_OUTPUT_LOW);

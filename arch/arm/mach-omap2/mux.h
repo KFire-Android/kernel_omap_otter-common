@@ -14,7 +14,7 @@
 
 #define OMAP_MUX_TERMINATOR	0xffff
 
-/* 34xx mux mode options for each pin. See TRM for options */
+/* 34xx/44xx mux mode options for each pin. See TRM for options */
 #define OMAP_MUX_MODE0      0
 #define OMAP_MUX_MODE1      1
 #define OMAP_MUX_MODE2      2
@@ -29,14 +29,14 @@
 #define OMAP_PULL_UP			(1 << 4)
 #define OMAP_ALTELECTRICALSEL		(1 << 5)
 
-/* 34xx specific mux bit defines */
-#define OMAP_INPUT_EN			(1 << 8)
-#define OMAP_OFF_EN			(1 << 9)
-#define OMAP_OFFOUT_EN			(1 << 10)
-#define OMAP_OFFOUT_VAL			(1 << 11)
-#define OMAP_OFF_PULL_EN		(1 << 12)
-#define OMAP_OFF_PULL_UP		(1 << 13)
-#define OMAP_WAKEUP_EN			(1 << 14)
+/* 34xx/44xx mux bit defines */
+#define OMAP_INPUT_EN		(1 << 8) /* INPUTENABLE: input */
+#define OMAP_OFF_EN		(1 << 9) /* OFFMODEENABLE: off values valid */
+#define OMAP_OFFOUT_EN		(1 << 10)/* OFFMODEOUTENABLE: input */
+#define OMAP_OFFOUT_VAL		(1 << 11)/* OFFMODEOUTVALUE: high */
+#define OMAP_OFF_PULL_EN	(1 << 12)/* OFFMODEPULLUDENABLE: activated */
+#define OMAP_OFF_PULL_UP	(1 << 13)/* OFFMODEPULLTYPESELECT: pullup */
+#define OMAP_WAKEUP_EN		(1 << 14)/* WAKEUPENABLE: enable IO wakeup */
 
 /* 44xx specific mux bit defines */
 #define OMAP_WAKEUP_EVENT		(1 << 15)
@@ -50,12 +50,12 @@
 
 /* Off mode states */
 #define OMAP_PIN_OFF_NONE		0
-#define OMAP_PIN_OFF_OUTPUT_HIGH	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
-						| OMAP_OFFOUT_VAL)
-#define OMAP_PIN_OFF_OUTPUT_LOW		(OMAP_OFF_EN | OMAP_OFFOUT_EN)
-#define OMAP_PIN_OFF_INPUT_PULLUP	(OMAP_OFF_EN | OMAP_OFF_PULL_EN \
-						| OMAP_OFF_PULL_UP)
-#define OMAP_PIN_OFF_INPUT_PULLDOWN	(OMAP_OFF_EN | OMAP_OFF_PULL_EN)
+#define OMAP_PIN_OFF_OUTPUT_HIGH	(OMAP_OFF_EN | OMAP_OFFOUT_VAL)
+#define OMAP_PIN_OFF_OUTPUT_LOW		OMAP_OFF_EN
+#define OMAP_PIN_OFF_INPUT_PULLUP	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
+					| OMAP_OFF_PULL_EN | OMAP_OFF_PULL_UP)
+#define OMAP_PIN_OFF_INPUT_PULLDOWN	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
+					| OMAP_OFF_PULL_EN)
 #define OMAP_PIN_OFF_WAKEUPENABLE	OMAP_WAKEUP_EN
 
 #define OMAP_MODE_GPIO(x)	(((x) & OMAP_MUX_MODE7) == OMAP_MUX_MODE4)
