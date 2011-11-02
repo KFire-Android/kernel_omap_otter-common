@@ -190,7 +190,7 @@ static int sdp4430_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret = 0;
-	unsigned int be_id;
+	unsigned int be_id, channels;
 
 
         be_id = rtd->dai_link->be_id;
@@ -211,6 +211,18 @@ static int sdp4430_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	if (ret < 0) {
 		printk(KERN_ERR "can't set cpu DAI configuration\n");
 		return ret;
+	}
+
+	if (params != NULL) {
+		/* Configure McBSP internal buffer usage */
+		/* this need to be done for playback and/or record */
+		channels = params_channels(params);
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			omap_mcbsp_set_tx_threshold(
+				cpu_dai->id, channels);
+		else
+			omap_mcbsp_set_rx_threshold(
+				cpu_dai->id, channels);
 	}
 
 	/*
