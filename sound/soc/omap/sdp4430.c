@@ -962,7 +962,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 	},
 	{
 		.name = OMAP_ABE_BE_MM_EXT0,
-		.stream_name = "FM",
+		.stream_name = "FM Playback",
 
 		/* ABE components - MCBSP2 - MM-EXT */
 		.cpu_dai_name = "omap-mcbsp-dai.1",
