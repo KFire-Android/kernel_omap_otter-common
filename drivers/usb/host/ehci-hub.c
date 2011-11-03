@@ -1141,6 +1141,7 @@ error_exit:
 	return retval;
 }
 
+#ifndef CONFIG_USB_EHCI_HCD_OMAP
 static void ehci_relinquish_port(struct usb_hcd *hcd, int portnum)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
@@ -1160,3 +1161,4 @@ static int ehci_port_handed_over(struct usb_hcd *hcd, int portnum)
 	reg = &ehci->regs->port_status[portnum - 1];
 	return ehci_readl(ehci, reg) & PORT_OWNER;
 }
+#endif
