@@ -254,16 +254,6 @@ static void bma180_accel_device_wakeup(struct bma180_accel_data *data)
 	msleep(10);
 }
 
-static irqreturn_t bma180_accel_thread_irq(int irq, void *dev_data)
-{
-	struct bma180_accel_data *data = (struct bma180_accel_data *) dev_data;
-
-	if (!data->client->irq)
-		schedule_delayed_work(&data->wq, 0);
-
-	return IRQ_HANDLED;
-}
-
 static int bma180_accel_data_ready(struct bma180_accel_data *data)
 {
 	int ret;
@@ -320,6 +310,18 @@ static int bma180_accel_data_ready(struct bma180_accel_data *data)
 	return 0;
 }
 
+static irqreturn_t bma180_accel_thread_irq(int irq, void *dev_data)
+{
+	struct bma180_accel_data *data = (struct bma180_accel_data *) dev_data;
+
+	if (!data->client->irq)
+		schedule_delayed_work(&data->wq, 0);
+	else
+		bma180_accel_data_ready(data);
+
+	return IRQ_HANDLED;
+}
+
 static void bma180_accel_device_worklogic(struct work_struct *work)
 {
 	struct bma180_accel_data *data = container_of((struct delayed_work *)work,
@@ -363,10 +365,12 @@ static ssize_t bma180_store_attr_enable(struct device *dev,
 
 	if (enable) {
 		bma180_accel_device_wakeup(data);
-		schedule_delayed_work(&data->wq, 0);
+		if (!data->client->irq)
+			schedule_delayed_work(&data->wq, 0);
 	} else {
 		bma180_accel_device_sleep(data);
-		cancel_delayed_work_sync(&data->wq);
+		if (!data->client->irq)
+			cancel_delayed_work_sync(&data->wq);
 	}
 
 	data->pdata->mode = enable;
@@ -401,7 +405,8 @@ static ssize_t bma180_store_attr_delay(struct device *dev,
 	if (interval < 0)
 		return -EINVAL;
 
-	cancel_delayed_work_sync(&data->wq);
+	if (!data->client->irq)
+		cancel_delayed_work_sync(&data->wq);
 
 	if (interval >=
 		bma180_measure_interval[BMA_BW_10HZ])
@@ -429,7 +434,9 @@ static ssize_t bma180_store_attr_delay(struct device *dev,
 
 	data->def_poll_rate = interval;
 	bma180_accel_device_hw_set_bandwidth(data, i);
-	schedule_delayed_work(&data->wq, 0);
+
+	if (!data->client->irq)
+		schedule_delayed_work(&data->wq, 0);
 
 	return count;
 
