@@ -20,7 +20,7 @@
 #include "omap4_ion.h"
 
 static struct ion_platform_data omap4_ion_data = {
-	.nr = 4,
+	.nr = 3,
 	.heaps = {
 		{
 			.type = ION_HEAP_TYPE_CARVEOUT,
@@ -38,18 +38,10 @@ static struct ion_platform_data omap4_ion_data = {
 			.size = OMAP4_ION_HEAP_TILER_SIZE,
 		},
 		{
-			.type = ION_HEAP_TYPE_CARVEOUT,
-			.id = OMAP_ION_HEAP_LARGE_SURFACES,
-			.name = "large_surfaces",
-			.base = 0x80000000 + SZ_512M + OMAP4_RAMCONSOLE_SIZE,
-			.size = OMAP4_ION_HEAP_LARGE_SURFACES_SIZE,
-		},
-		{
 			.type = OMAP_ION_HEAP_TYPE_TILER,
 			.id = OMAP_ION_HEAP_NONSECURE_TILER,
 			.name = "nonsecure_tiler",
-			.base = 0x80000000 + SZ_512M + SZ_2M +
-				OMAP4_ION_HEAP_LARGE_SURFACES_SIZE,
+			.base = 0x80000000 + SZ_512M + SZ_2M,
 			.size = OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
 		},
 	},
