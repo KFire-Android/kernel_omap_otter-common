@@ -207,7 +207,7 @@ static struct omap_musb_board_data musb_board_data = {
 #else
 	.mode			= MUSB_PERIPHERAL,
 #endif
-	.power			= 100,
+	.power			= 200,
 };
 
 static struct twl4030_usb_data omap4_usbphy_data = {
