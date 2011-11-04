@@ -420,8 +420,7 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		fifo_words_avail = hsi_get_rx_fifo_occupancy(hsi_ctrl, fifo);
 		if (!fifo_words_avail) {
 			dev_dbg(hsi_ctrl->dev,
-				"WARNING: RX FIFO %d empty before CPU copy\n",
-				fifo);
+				"RX FIFO %d empty before CPU copy\n", fifo);
 
 			/* Do not disable interrupt becaue another interrupt */
 			/* can still come, this time with a real frame. */
@@ -588,7 +587,8 @@ static u32 hsi_driver_int_proc(struct hsi_port *pport,
 	status_reg &= hsi_inl(base, enable_offset);
 
 	if (pport->cawake_off_event) {
-		dev_dbg(hsi_ctrl->dev, "CAWAKE detected from OFF mode.\n");
+		dev_dbg(hsi_ctrl->dev, "CAWAKE detected from IO daisy on port "
+				       "%d\n", port);
 	} else if (!status_reg) {
 		dev_dbg(hsi_ctrl->dev, "Channels [%d,%d] : no event, exit.\n",
 			start, stop);
@@ -722,11 +722,11 @@ static irqreturn_t hsi_mpu_handler(int irq, void *p)
 	if (test_and_set_bit(HSI_FLAGS_TASKLET_LOCK, &pport->flags))
 		return IRQ_HANDLED;
 
-		tasklet_hi_schedule(&pport->hsi_tasklet);
+	tasklet_hi_schedule(&pport->hsi_tasklet);
 
 	/* Disable interrupt until Bottom Half has cleared the IRQ status */
 	/* register */
-		disable_irq_nosync(pport->irq);
+	disable_irq_nosync(pport->irq);
 
 	return IRQ_HANDLED;
 }
