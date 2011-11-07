@@ -53,3 +53,4 @@ obj-$(CONFIG_APANIC)		+= apanic.o
 obj-$(CONFIG_SENSORS_AK8975)	+= akm8975.o
 obj-$(CONFIG_OMAP_DIE_TEMP_SENSOR)	+= omap_temp_sensor.o
 obj-$(CONFIG_TWL6040_VIB)	+= twl6040-vib.o
+obj-$(CONFIG_GC_CORE)		+= gc-core/
