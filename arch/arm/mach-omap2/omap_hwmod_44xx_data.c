@@ -2227,9 +2227,9 @@ static struct omap_hwmod_class omap44xx_hsi_hwmod_class = {
 
 /* hsi */
 static struct omap_hwmod_irq_info omap44xx_hsi_irqs[] = {
-	{ .name = "mpu_p1", .irq = 67 + OMAP44XX_IRQ_GIC_START },
-	{ .name = "mpu_p2", .irq = 68 + OMAP44XX_IRQ_GIC_START },
-	{ .name = "mpu_dma", .irq = 71 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "hsi_p1_mpu", .irq = 67 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "hsi_p2_mpu", .irq = 68 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "hsi_dma_mpu", .irq = 71 + OMAP44XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -5742,7 +5742,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_gpio6_hwmod,
 
 	/* hsi class */
-/*	&omap44xx_hsi_hwmod, */
+	&omap44xx_hsi_hwmod,
 
 	/* i2c class */
 	&omap44xx_i2c1_hwmod,
