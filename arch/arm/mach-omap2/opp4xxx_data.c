@@ -314,15 +314,21 @@ static void __init omap4_mpu_opp_enable(unsigned long freq)
 int __init omap4_opp_init(void)
 {
 	int r = -ENODEV;
+	int trimmed = 1;
 
 	if (!cpu_is_omap44xx())
 		return r;
 	if (cpu_is_omap443x())
 		r = omap_init_opp_table(omap443x_opp_def_list,
 			ARRAY_SIZE(omap443x_opp_def_list));
-	else if (cpu_is_omap446x())
+	else if (cpu_is_omap446x()) {
 		r = omap_init_opp_table(omap446x_opp_def_list,
 			ARRAY_SIZE(omap446x_opp_def_list));
+		trimmed = omap_readl(0x4a002268) & ((1 << 18) | (1 << 19));
+		/* if device is untrimmed override DPLL TRIM register */
+		if (!trimmed)
+			omap_writel(0x29, 0x4a002330);
+	}
 
 	if (!r) {
 		if (omap4_has_mpu_1_2ghz())
