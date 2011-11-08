@@ -276,9 +276,11 @@ void omap_thermal_step_freq_down(void)
 	pr_warn("%s: temperature too high, starting cpu throttling at max %u\n",
 		__func__, max_thermal);
 
-	cur = omap_getspeed(0);
-	if (cur > max_thermal)
-		omap_cpufreq_scale(max_thermal, cur);
+	if (!omap_cpufreq_suspended) {
+		cur = omap_getspeed(0);
+		if (cur > max_thermal)
+			omap_cpufreq_scale(max_thermal, cur);
+	}
 
 	mutex_unlock(&omap_cpufreq_lock);
 }
@@ -289,14 +291,21 @@ void omap_thermal_step_freq_up(void)
 
 	mutex_lock(&omap_cpufreq_lock);
 
+	if (max_thermal == max_freq) {
+		pr_warn("%s: not throttling\n", __func__);
+		goto out;
+	}
+
 	max_thermal = max_freq;
 
 	pr_warn("%s: temperature reduced, stepping up to %i\n",
 		__func__, current_target_freq);
 
-	cur = omap_getspeed(0);
-	omap_cpufreq_scale(current_target_freq, cur);
-
+	if (!omap_cpufreq_suspended) {
+		cur = omap_getspeed(0);
+		omap_cpufreq_scale(current_target_freq, cur);
+	}
+out:
 	mutex_unlock(&omap_cpufreq_lock);
 }
 
