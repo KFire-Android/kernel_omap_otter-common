@@ -101,12 +101,19 @@ static ssize_t omap4_soc_type_max_freq(struct kobject *kobj,
 static ssize_t omap4_soc_dpll_trimmed(struct kobject *kobj,
 				 struct kobj_attribute *attr, char *buf)
 {
-	int trimmed = 1;
+	int trimmed;
+	char *trim_freq = "2.0GhZ";
 
 	trimmed = omap_readl(0x4a002268) & ((1 << 18) | (1 << 19));
-	pr_info("%s:DPLL is %strimmed\n", __func__, trimmed ? "" : "un");
 
-	return sprintf(buf, "%s\n", trimmed ? "true" : "false");
+	if ((trimmed & (1 << 18)) && (trimmed & (1 << 19)))
+		trim_freq = "3.0GHz";
+	else if (trimmed & (1 << 18))
+		trim_freq = "2.4GHz";
+
+	pr_info("%s:DPLL is trimmed to %s\n", __func__, trim_freq);
+
+	return sprintf(buf, "%s\n", trim_freq);
 }
 
 #define OMAP4_SOC_ATTR_RO(_name, _show) \
