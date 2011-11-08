@@ -98,6 +98,17 @@ static ssize_t omap4_soc_type_max_freq(struct kobject *kobj,
 	return sprintf(buf, "%s\n", max_freq);
 }
 
+static ssize_t omap4_soc_dpll_trimmed(struct kobject *kobj,
+				 struct kobj_attribute *attr, char *buf)
+{
+	int trimmed = 1;
+
+	trimmed = omap_readl(0x4a002268) & ((1 << 18) | (1 << 19));
+	pr_info("%s:DPLL is %strimmed\n", __func__, trimmed ? "" : "un");
+
+	return sprintf(buf, "%s\n", trimmed ? "true" : "false");
+}
+
 #define OMAP4_SOC_ATTR_RO(_name, _show) \
 	struct kobj_attribute omap4_soc_prop_attr_##_name = \
 		__ATTR(_name, S_IRUGO, _show, NULL)
@@ -110,6 +121,7 @@ static OMAP4_SOC_ATTR_RO(family, omap4_soc_family_show);
 static OMAP4_SOC_ATTR_RO(revision, omap4_soc_revision_show);
 static OMAP4_SOC_ATTR_RO(type, omap4_soc_type_show);
 static OMAP4_SOC_ATTR_RO(max_freq, omap4_soc_type_max_freq);
+static OMAP4_SOC_ATTR_RO(dpll_trimmed, omap4_soc_dpll_trimmed);
 
 static OMAP4_BOARD_ATTR_RO(board_rev, omap4_board_rev_show);
 
@@ -118,6 +130,7 @@ static struct attribute *omap4_soc_prop_attrs[] = {
 	&omap4_soc_prop_attr_revision.attr,
 	&omap4_soc_prop_attr_type.attr,
 	&omap4_soc_prop_attr_max_freq.attr,
+	&omap4_soc_prop_attr_dpll_trimmed.attr,
 	NULL,
 };
 
