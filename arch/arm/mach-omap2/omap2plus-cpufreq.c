@@ -269,6 +269,12 @@ void omap_thermal_step_freq_down(void)
 {
 	unsigned int cur;
 
+	if (!omap_cpufreq_ready) {
+		pr_warn_once("%s: Thermal throttle prior to CPUFREQ ready\n",
+			     __func__);
+		return;
+	}
+
 	mutex_lock(&omap_cpufreq_lock);
 
 	max_thermal = omap_thermal_lower_speed();
@@ -288,6 +294,9 @@ void omap_thermal_step_freq_down(void)
 void omap_thermal_step_freq_up(void)
 {
 	unsigned int cur;
+
+	if (!omap_cpufreq_ready)
+		return;
 
 	mutex_lock(&omap_cpufreq_lock);
 
