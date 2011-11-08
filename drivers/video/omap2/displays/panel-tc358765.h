@@ -136,11 +136,11 @@
 #define TC358765_WIDTH		1280
 #define TC358765_HEIGHT		800
 #define TC358765_PCLK		65183
-#define TC358765_HFP		282
-#define TC358765_HSW		6
-#define TC358765_HBP		32
-#define TC358765_VFP		15
-#define TC358765_VSW		8
-#define TC358765_VBP		15
+#define TC358765_HFP		10
+#define TC358765_HSW		20
+#define TC358765_HBP		10
+#define TC358765_VFP		4
+#define TC358765_VSW		4
+#define TC358765_VBP		4
 
 #endif
