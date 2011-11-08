@@ -293,6 +293,9 @@
 #define OMAP4_TSHUT_COLD_SHIFT					0
 #define OMAP4_TSHUT_COLD_MASK					(0x3ff << 0)
 
+/* HW_TSHUT */
+#define OMAP4_HW_TSHUT_MASK					(1 << 0)
+
 /* BANDGAP_STATUS */
 #define OMAP4_CLEAN_STOP_SHIFT					3
 #define OMAP4_CLEAN_STOP_MASK					(1 << 3)
