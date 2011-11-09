@@ -118,7 +118,7 @@ static void blaze_hsi_pad_conf(void)
  * modem is plugged) HSI pad conf is configured and some USB
  * configurations are disabled.
  */
-void __init blaze_modem_init(void)
+void __init blaze_modem_init(bool force_mux)
 {
 	int modem_detected = 0;
 	int modem_enabled;
@@ -166,7 +166,7 @@ void __init blaze_modem_init(void)
 	}
 
 	modem_detected = blaze_modem_switch(1);
-	pr_info("%d modem has been detected\n", modem_detected);
+	pr_info("Modem %sdetected\n", modem_detected ? "" : "NOT ");
 
 	/* Disable Modem ONSW */
 	modem_enabled = blaze_modem_switch(0);
@@ -180,14 +180,13 @@ err_pwrstate2:
 	gpio_free(BLAZE_MDM_PWRSTATE);
 err_pwrstate1:
 	/* Configure omap4 pad for HSI if modem detected */
-	if (modem_detected) {
-	#if defined(CONFIG_USB_EHCI_HCD_OMAP) || \
-					defined(CONFIG_USB_OHCI_HCD_OMAP3)
+	if (modem_detected || force_mux) {
+#if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
 		/* USBB1 I/O pads conflict with HSI1 port */
 		usbhs_bdata.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED;
 		/* USBB2 I/O pads conflict with McBSP2 port */
 		usbhs_bdata.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED;
-	#endif
+#endif
 		/* Setup HSI pad conf for blaze platform */
 		blaze_hsi_pad_conf();
 	} else {

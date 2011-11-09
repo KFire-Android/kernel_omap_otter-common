@@ -1308,6 +1308,21 @@ static int blaze_notifier_call(struct notifier_block *this,
 static struct notifier_block blaze_reboot_notifier = {
 	.notifier_call = blaze_notifier_call,
 };
+
+/*
+ * As OMAP4430 mux HSI and USB signals, when HSI is used (for instance HSI
+ * modem is plugged) we should configure HSI pad conf and disable some USB
+ * configurations.
+ * HSI usage is declared using bootargs variable:
+ * board-4430sdp.modem_ipc=hsi
+ * Any other or missing value will not setup HSI pad conf, and port_mode[0]
+ * will be used by USB.
+ * Variable modem_ipc is used to catch bootargs parameter value.
+ */
+static char *modem_ipc = "n/a";
+module_param(modem_ipc, charp, 0);
+MODULE_PARM_DESC(modem_ipc, "Modem IPC setting");
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1339,7 +1354,11 @@ static void __init omap_4430sdp_init(void)
 	omap4_twl6030_hsmmc_init(mmc);
 
 	/* blaze_modem_init shall be called before omap4_ehci_ohci_init */
-	blaze_modem_init();
+	if (!strcmp(modem_ipc, "hsi"))
+		blaze_modem_init(true);
+	else
+		blaze_modem_init(false);
+
 	omap4_ehci_ohci_init();
 
 	usb_musb_init(&musb_board_data);

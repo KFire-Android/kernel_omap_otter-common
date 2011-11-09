@@ -21,7 +21,7 @@ int blaze_touch_init(void);
 int blaze_sensor_init(void);
 int blaze_panel_init(void);
 int blaze_keypad_init(void);
-void blaze_modem_init(void);
+void blaze_modem_init(bool force_mux);
 void omap4_create_board_props(void);
 
 #define BLAZE_MDM_PWR_EN_GPIO	157
