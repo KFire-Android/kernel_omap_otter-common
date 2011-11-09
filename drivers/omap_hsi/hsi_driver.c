@@ -1081,7 +1081,7 @@ int hsi_runtime_suspend(struct device *dev)
 	struct hsi_platform_data *pdata = dev_get_platdata(dev);
 	struct platform_device *pd = to_platform_device(dev);
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
-	int port, i;
+	int i;
 
 	dev_dbg(dev, "%s\n", __func__);
 
