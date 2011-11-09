@@ -24,6 +24,7 @@
 #include <linux/list.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/stddef.h>
 #include <linux/types.h>
 
 #include "s_version.h"
@@ -38,6 +39,8 @@
 #include "tf_crypto.h"
 #endif
 
+#define TF_PRIVILEGED_UID_GID 1000 /* Android system AID */
+
 /*----------------------------------------------------------------------------
  * Management of the shared memory blocks.
  *
@@ -48,7 +51,7 @@
 /**
  * Unmaps a shared memory
  **/
-static void tf_unmap_shmem(
+void tf_unmap_shmem(
 		struct tf_connection *connection,
 		struct tf_shmem_desc *shmem_desc,
 		u32 full_cleanup)
@@ -106,7 +109,7 @@ retry:
  * Update the buffer_start_offset and buffer_size fields
  * shmem_desc is updated to the mapped shared memory descriptor
  **/
-static int tf_map_shmem(
+int tf_map_shmem(
 		struct tf_connection *connection,
 		u32 buffer,
 		/* flags for read-write access rights on the memory */
@@ -190,7 +193,7 @@ static int tf_map_shmem(
 			error);
 		goto error;
 	}
-	desc->pBuffer = (u8 *) buffer;
+	desc->client_buffer = (u8 *) buffer;
 
 	/*
 	 * Successful completion.
@@ -275,7 +278,7 @@ struct vm_area_struct *tf_find_vma(struct mm_struct *mm,
 	return vma;
 }
 
-static int tf_validate_shmem_and_flags(
+int tf_validate_shmem_and_flags(
 	u32 shmem,
 	u32 shmem_size,
 	u32 flags)
@@ -383,7 +386,7 @@ static int tf_map_temp_shmem(struct tf_connection *connection,
 		/* Map the temp shmem block */
 
 		u32 shared_mem_descriptors[TF_MAX_COARSE_PAGES];
-		u32 descriptorCount;
+		u32 descriptor_count;
 
 		if (in_user_space) {
 			error = tf_validate_shmem_and_flags(
@@ -403,7 +406,7 @@ static int tf_map_temp_shmem(struct tf_connection *connection,
 				&(temp_memref->offset),
 				temp_memref->size,
 				shmem_desc,
-				&descriptorCount);
+				&descriptor_count);
 		temp_memref->descriptor = shared_mem_descriptors[0];
 	 }
 
@@ -690,13 +693,8 @@ int tf_open_client_session(
 		 */
 		*(u32 *) &command->open_client_session.login_data =
 			current_euid();
-#ifndef CONFIG_ANDROID
-		command->open_client_session.login_type =
-			(u32) TF_LOGIN_USER_LINUX_EUID;
-#else
 		command->open_client_session.login_type =
 			(u32) TF_LOGIN_USER_ANDROID_EUID;
-#endif
 
 		/* Added one word */
 		command->open_client_session.message_size += 1;
@@ -716,43 +714,13 @@ int tf_open_client_session(
 			error = -EACCES;
 			goto error;
 		}
-#ifndef CONFIG_ANDROID
-		command->open_client_session.login_type =
-			TF_LOGIN_GROUP_LINUX_GID;
-#else
 		command->open_client_session.login_type =
 			TF_LOGIN_GROUP_ANDROID_GID;
-#endif
 
 		command->open_client_session.message_size += 1; /* GID */
 		break;
 	}
 
-#ifndef CONFIG_ANDROID
-	case TF_LOGIN_APPLICATION: {
-		/*
-		 * Compute SHA-1 hash of the application fully-qualified path
-		 * name.  Truncate the hash to 16 bytes and send it as login
-		 * data.  Update message size.
-		 */
-		u8 pSHA1Hash[SHA1_DIGEST_SIZE];
-
-		error = tf_hash_application_path_and_data(pSHA1Hash,
-			NULL, 0);
-		if (error != 0) {
-			dprintk(KERN_ERR "tf_open_client_session: "
-				"error in tf_hash_application_path_and_data\n");
-			goto error;
-		}
-		memcpy(&command->open_client_session.login_data,
-			pSHA1Hash, 16);
-		command->open_client_session.login_type =
-			TF_LOGIN_APPLICATION_LINUX_PATH_SHA1_HASH;
-		/* 16 bytes */
-		command->open_client_session.message_size += 4;
-		break;
-	}
-#else
 	case TF_LOGIN_APPLICATION:
 		/*
 		 * Send the real UID of the calling application in the login
@@ -767,36 +735,7 @@ int tf_open_client_session(
 		/* Added one word */
 		command->open_client_session.message_size += 1;
 		break;
-#endif
 
-#ifndef CONFIG_ANDROID
-	case TF_LOGIN_APPLICATION_USER: {
-		/*
-		 * Compute SHA-1 hash of the concatenation of the application
-		 * fully-qualified path name and the EUID of the calling
-		 * application.  Truncate the hash to 16 bytes and send it as
-		 * login data.  Update message size.
-		 */
-		u8 pSHA1Hash[SHA1_DIGEST_SIZE];
-
-		error = tf_hash_application_path_and_data(pSHA1Hash,
-			(u8 *) &(current_euid()), sizeof(current_euid()));
-		if (error != 0) {
-			dprintk(KERN_ERR "tf_open_client_session: "
-				"error in tf_hash_application_path_and_data\n");
-			goto error;
-		}
-		memcpy(&command->open_client_session.login_data,
-			pSHA1Hash, 16);
-		command->open_client_session.login_type =
-			TF_LOGIN_APPLICATION_USER_LINUX_PATH_EUID_SHA1_HASH;
-
-		/* 16 bytes */
-		command->open_client_session.message_size += 4;
-
-		break;
-	}
-#else
 	case TF_LOGIN_APPLICATION_USER:
 		/*
 		 * Send the real UID and the EUID of the calling application in
@@ -813,49 +752,7 @@ int tf_open_client_session(
 		/* Added two words */
 		command->open_client_session.message_size += 2;
 		break;
-#endif
 
-#ifndef CONFIG_ANDROID
-	case TF_LOGIN_APPLICATION_GROUP: {
-		/*
-		 * Check requested GID.  Compute SHA-1 hash of the concatenation
-		 * of the application fully-qualified path name and the
-		 * requested GID.  Update message size
-		 */
-		gid_t  requested_gid;
-		u8     pSHA1Hash[SHA1_DIGEST_SIZE];
-
-		requested_gid =	*(u32 *) &command->open_client_session.
-			login_data;
-
-		if (!tf_check_gid(requested_gid)) {
-			dprintk(KERN_ERR "tf_open_client_session(%p) "
-			"TF_LOGIN_APPLICATION_GROUP: requested GID (0x%x) "
-			"does not match real eGID (0x%x)"
-			"or any of the supplementary GIDs\n",
-			connection, requested_gid, current_egid());
-			error = -EACCES;
-			goto error;
-		}
-
-		error = tf_hash_application_path_and_data(pSHA1Hash,
-			&requested_gid, sizeof(u32));
-		if (error != 0) {
-			dprintk(KERN_ERR "tf_open_client_session: "
-				"error in tf_hash_application_path_and_data\n");
-			goto error;
-		}
-
-		memcpy(&command->open_client_session.login_data,
-			pSHA1Hash, 16);
-		command->open_client_session.login_type =
-			TF_LOGIN_APPLICATION_GROUP_LINUX_PATH_GID_SHA1_HASH;
-
-		/* 16 bytes */
-		command->open_client_session.message_size += 4;
-		break;
-	}
-#else
 	case TF_LOGIN_APPLICATION_GROUP: {
 		/*
 		 * Check requested GID. Send the real UID and the requested GID
@@ -889,18 +786,17 @@ int tf_open_client_session(
 
 		break;
 	}
-#endif
 
 	case TF_LOGIN_PRIVILEGED:
 		/* A privileged login may be performed only on behalf of the
 		   kernel itself or on behalf of a process with euid=0 or
-		   egid=0. */
+		   egid=0 or euid=system or egid=system. */
 		if (connection->owner == TF_CONNECTION_OWNER_KERNEL) {
 			dprintk(KERN_DEBUG "tf_open_client_session: "
 				"TF_LOGIN_PRIVILEGED for kernel API\n");
-			command->open_client_session.login_type =
-				TF_LOGIN_PRIVILEGED_KERNEL;
-		} else if (current_euid() != 0 && current_egid() != 0) {
+		} else if ((current_euid() != TF_PRIVILEGED_UID_GID) &&
+			   (current_egid() != TF_PRIVILEGED_UID_GID) &&
+			   (current_euid() != 0) && (current_egid() != 0)) {
 			dprintk(KERN_ERR "tf_open_client_session: "
 				" user %d, group %d not allowed to open "
 				"session with TF_LOGIN_PRIVILEGED\n",
@@ -911,9 +807,9 @@ int tf_open_client_session(
 			dprintk(KERN_DEBUG "tf_open_client_session: "
 				"TF_LOGIN_PRIVILEGED for %u:%u\n",
 				current_euid(), current_egid());
-			command->open_client_session.login_type =
-				TF_LOGIN_PRIVILEGED;
 		}
+		command->open_client_session.login_type =
+			TF_LOGIN_PRIVILEGED;
 		break;
 
 	case TF_LOGIN_AUTHENTICATION: {
@@ -1088,7 +984,8 @@ int tf_register_shared_memory(
 
 	/* Initialize message_size with no descriptors */
 	msg->message_size
-		= (sizeof(struct tf_command_register_shared_memory) -
+		= (offsetof(struct tf_command_register_shared_memory,
+						shared_mem_descriptors) -
 			sizeof(struct tf_command_header)) / 4;
 
 	/* Map the shmem block and update the message */
@@ -1096,7 +993,7 @@ int tf_register_shared_memory(
 		/* Empty shared mem */
 		msg->shared_mem_start_offset = msg->shared_mem_descriptors[0];
 	} else {
-		u32 descriptorCount;
+		u32 descriptor_count;
 		error = tf_map_shmem(
 			connection,
 			msg->shared_mem_descriptors[0],
@@ -1106,13 +1003,13 @@ int tf_register_shared_memory(
 			&(msg->shared_mem_start_offset),
 			msg->shared_mem_size,
 			&shmem_desc,
-			&descriptorCount);
+			&descriptor_count);
 		if (error != 0) {
 			dprintk(KERN_ERR "tf_register_shared_memory: "
 				"unable to map shared memory block\n");
 			goto error;
 		}
-		msg->message_size += descriptorCount;
+		msg->message_size += descriptor_count;
 	}
 
 	/*
@@ -1230,6 +1127,7 @@ error:
 #ifdef CONFIG_TF_ION
 extern struct ion_device *omap_ion_device;
 #endif /* CONFIG_TF_ION */
+
 /*
  * Invokes a client command to the Secure World
  */
@@ -1263,7 +1161,6 @@ int tf_invoke_client_command(
 	for (i = 0; i < 4; i++) {
 		int param_type = TF_GET_PARAM_TYPE(
 			command->invoke_client_command.param_types, i);
-
 		if ((param_type & (TF_PARAM_TYPE_MEMREF_FLAG |
 					TF_PARAM_TYPE_REGISTERED_MEMREF_FLAG))
 				== TF_PARAM_TYPE_MEMREF_FLAG) {
@@ -1365,6 +1262,7 @@ error:
 	if (new_handle != NULL)
 		ion_free(connection->ion_client, new_handle);
 #endif /* CONFIG_TF_ION */
+
 	/* Unmap de temp mem refs */
 	for (i = 0; i < 4; i++) {
 		if (shmem_desc[i] != NULL) {

@@ -129,6 +129,10 @@ struct aes_reg {
 static struct aes_reg *paes_reg;
 
 #ifdef CONFIG_SMC_KERNEL_CRYPTO
+#define FLAGS_MODE_MASK		0x000f
+#define FLAGS_ENCRYPT		BIT(0)
+#define FLAGS_DECRYPT		0
+
 #define FLAGS_FAST	BIT(7)
 #define FLAGS_BUSY	8
 
@@ -141,6 +145,9 @@ struct aes_hwa_ctx {
 	struct tasklet_struct	task;
 
 	struct ablkcipher_request	*req;
+	struct crypto_async_request     *next_req;
+	struct crypto_async_request     *backlog;
+
 	size_t				total;
 	struct scatterlist		*in_sg;
 	size_t				in_offset;
@@ -161,13 +168,20 @@ struct aes_hwa_ctx {
 	struct tf_crypto_aes_operation_state *ctx;
 };
 static struct aes_hwa_ctx *aes_ctx;
+
+struct aes_reqctx {
+	u32 mode;
+};
 #endif
 
 /*---------------------------------------------------------------------------
  *Forward declarations
  *------------------------------------------------------------------------- */
 
-static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks, bool is_kernel);
+static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks,
+			      u32 ctrl, bool is_kernel);
+
+static bool reconfigure_dma;
 
 /*----------------------------------------------------------------------------
  *Save HWA registers into the specified operation state structure
@@ -192,9 +206,10 @@ static void tf_aes_save_registers(
  *Restore the HWA registers from the operation state structure
  *---------------------------------------------------------------------------*/
 static void tf_aes_restore_registers(
-	struct tf_crypto_aes_operation_state *aes_state)
+	struct tf_crypto_aes_operation_state *aes_state, int encrypt)
 {
 	struct tf_device *dev = tf_get_device();
+	u32 CTRL = aes_state->CTRL;
 
 	dprintk(KERN_INFO "tf_aes_restore_registers: "
 		"paes_reg(%p) <- aes_state(%p): CTRL=0x%08x\n",
@@ -216,15 +231,20 @@ static void tf_aes_restore_registers(
 		 * public crypto operations.
 		 */
 		dev->aes1_key_context = 0;
+
+		if (encrypt)
+			CTRL |= AES_CTRL_DIRECTION_ENCRYPT;
+		else
+			CTRL = CTRL & ~AES_CTRL_DIRECTION_ENCRYPT;
 	} else {
-		aes_state->CTRL |= INREG32(&paes_reg->AES_CTRL);
+		CTRL |= INREG32(&paes_reg->AES_CTRL);
 	}
 
 	/*
 	 * Restore the IV first if we are in CBC or CTR mode
 	 * (not required for ECB)
 	 */
-	if (!AES_CTRL_IS_MODE_ECB(aes_state->CTRL)) {
+	if (!AES_CTRL_IS_MODE_ECB(CTRL)) {
 		OUTREG32(&paes_reg->AES_IV_IN_0, aes_state->AES_IV_0);
 		OUTREG32(&paes_reg->AES_IV_IN_1, aes_state->AES_IV_1);
 		OUTREG32(&paes_reg->AES_IV_IN_2, aes_state->AES_IV_2);
@@ -236,15 +256,14 @@ static void tf_aes_restore_registers(
 	 * it leads to break the HWA process (observed by experimentation)
 	 */
 
-	aes_state->CTRL = (aes_state->CTRL & (3 << 3)) /* key size */
-		|  (aes_state->CTRL & ((1 << 2) | (1 << 5) | (1 << 6)))
+	CTRL = (CTRL & (3 << 3)) /* key size */
+		|  (CTRL & ((1 << 2) | (1 << 5) | (1 << 6)))
 		|  (0x3 << 7) /* Always set CTR_WIDTH to 128-bit */;
 
-	if ((aes_state->CTRL & 0x1FC) !=
-			(INREG32(&paes_reg->AES_CTRL) & 0x1FC))
-		OUTREG32(&paes_reg->AES_CTRL, aes_state->CTRL & 0x1FC);
+	if ((CTRL & 0x1FC) != (INREG32(&paes_reg->AES_CTRL) & 0x1FC))
+		OUTREG32(&paes_reg->AES_CTRL, CTRL & 0x1FC);
 
-	/* Set the SYSCONFIG register to 0 */
+	/* Reset the SYSCONFIG register */
 	OUTREG32(&paes_reg->AES_SYSCONFIG, 0);
 }
 
@@ -261,6 +280,36 @@ void tf_aes_exit(void)
 {
 	omap_iounmap(paes_reg);
 }
+
+#ifdef CONFIG_TF_DRIVER_FAULT_INJECTION
+#define FAULTY(mask, ctrl, chaining, key_size) \
+	(((mask) & TF_CRYPTO_ALG_AES_##chaining##_##key_size) && \
+	 AES_CTRL_IS_MODE_##chaining((ctrl)) && \
+	 AES_CTRL_GET_KEY_SIZE((ctrl)) == AES_CTRL_KEY_SIZE_##key_size)
+static void tf_aes_fault_injection(u32 ctrl, u8 *buf)
+{
+	if (FAULTY(tf_fault_injection_mask, ctrl, ECB, 128) ||
+	    FAULTY(tf_fault_injection_mask, ctrl, ECB, 192) ||
+	    FAULTY(tf_fault_injection_mask, ctrl, ECB, 256) ||
+	    FAULTY(tf_fault_injection_mask, ctrl, CBC, 128) ||
+	    FAULTY(tf_fault_injection_mask, ctrl, CBC, 192) ||
+	    FAULTY(tf_fault_injection_mask, ctrl, CBC, 256) ||
+	    FAULTY(tf_fault_injection_mask, ctrl, CTR, 128) ||
+	    FAULTY(tf_fault_injection_mask, ctrl, CTR, 192) ||
+	    FAULTY(tf_fault_injection_mask, ctrl, CTR, 256)) {
+		pr_warning("TF: injecting fault in AES!\n");
+		buf[0] = 0xff;
+		buf[1] ^= 0xff;
+	} else {
+		dprintk(KERN_INFO "%s: no fault "
+			"(mask=0x%x ctrl=0x%x mode=%u key_size=%u)\n",
+			__func__, tf_fault_injection_mask,
+			ctrl, AES_CTRL_GET_MODE(ctrl),
+			AES_CTRL_GET_KEY_SIZE(ctrl));
+	}
+}
+#undef FAULTY
+#endif
 
 bool tf_aes_update(struct tf_crypto_aes_operation_state *aes_state,
 	u8 *src, u8 *dest, u32 nb_blocks)
@@ -301,11 +350,12 @@ bool tf_aes_update(struct tf_crypto_aes_operation_state *aes_state,
 	}
 
 	/*Restore the registers of the accelerator from the operation state */
-	tf_aes_restore_registers(aes_state);
+	tf_aes_restore_registers(aes_state, 0);
 
 	if (dma_use == PUBLIC_CRYPTO_DMA_USE_IRQ) {
 		/* Perform the update with DMA */
-		if (!tf_aes_update_dma(src, dest, nb_blocks, is_kernel))
+		if (!tf_aes_update_dma(src, dest, nb_blocks,
+				       aes_state->CTRL, is_kernel))
 			return false;
 	} else {
 		u8 buf[DMA_TRIGGER_IRQ_AES];
@@ -373,6 +423,9 @@ bool tf_aes_update(struct tf_crypto_aes_operation_state *aes_state,
 			process_dest += 4;
 		}
 
+#ifdef CONFIG_TF_DRIVER_FAULT_INJECTION
+		tf_aes_fault_injection(paes_reg->AES_CTRL, buf);
+#endif
 		if (!is_kernel)
 			if (copy_to_user(dest, buf,
 					nb_blocks * AES_BLOCK_SIZE))
@@ -398,7 +451,8 @@ bool tf_aes_update(struct tf_crypto_aes_operation_state *aes_state,
  *                     | PUBLIC_CRYPTO_DMA_USE_POLLING (poll the end of DMA)
  *output: dest : pointer of the output data (can be eq to src)
  */
-static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks, bool is_kernel)
+static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks,
+			      u32 ctrl, bool is_kernel)
 {
 	/*
 	 *Note: The DMA only sees physical addresses !
@@ -539,6 +593,11 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks, bool is_kernel)
 		 *The dma transfer is complete
 		 */
 
+		pr_info("%s completing\n", __func__);
+#ifdef CONFIG_TF_DRIVER_FAULT_INJECTION
+		tf_aes_fault_injection(ctrl, dev->dma_buffer);
+#endif
+
 		/*The DMA output is in the preallocated aligned buffer
 		 *and needs to be copied to the output buffer.*/
 		if (!is_kernel) {
@@ -576,6 +635,10 @@ static bool tf_aes_update_dma(u8 *src, u8 *dest, u32 nb_blocks, bool is_kernel)
 /*
  * AES HWA registration into kernel crypto framework
  */
+
+#define CRYPTO_TFM_REQ_DMA_VISIBLE     0x80000000
+
+static void __iomem *omap_dma_base;
 
 static void sg_copy_buf(void *buf, struct scatterlist *sg,
 	unsigned int start, unsigned int nbytes, int out)
@@ -630,13 +693,12 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	struct omap_dma_channel_params dma_params;
 	struct tf_crypto_aes_operation_state *state =
 		crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(ctx->req));
+	static size_t last_count;
 
-	if (sg_is_last(ctx->in_sg) && sg_is_last(ctx->out_sg)) {
-		in = IS_ALIGNED((u32)ctx->in_sg->offset, sizeof(u32));
-		out = IS_ALIGNED((u32)ctx->out_sg->offset, sizeof(u32));
+	in = IS_ALIGNED((u32)ctx->in_sg->offset, sizeof(u32));
+	out = IS_ALIGNED((u32)ctx->out_sg->offset, sizeof(u32));
 
-		fast = in && out;
-	}
+	fast = in && out;
 
 	if (fast) {
 		count = min(ctx->total, sg_dma_len(ctx->in_sg));
@@ -645,15 +707,20 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 		if (count != ctx->total)
 			return -EINVAL;
 
-		err = dma_map_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
-		if (!err)
-			return -EINVAL;
+		/* Only call dma_map_sg if it has not yet been done */
+		if (!(ctx->req->base.flags & CRYPTO_TFM_REQ_DMA_VISIBLE)) {
+			err = dma_map_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
+			if (!err)
+				return -EINVAL;
 
-		err = dma_map_sg(NULL, ctx->out_sg, 1, DMA_FROM_DEVICE);
-		if (!err) {
-			dma_unmap_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
-			return -EINVAL;
+			err = dma_map_sg(NULL, ctx->out_sg, 1, DMA_FROM_DEVICE);
+			if (!err) {
+				dma_unmap_sg(
+					NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
+				return -EINVAL;
+			}
 		}
+		ctx->req->base.flags &= ~CRYPTO_TFM_REQ_DMA_VISIBLE;
 
 		addr_in = sg_dma_address(ctx->in_sg);
 		addr_out = sg_dma_address(ctx->out_sg);
@@ -662,7 +729,6 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	} else {
 		count = sg_copy(&ctx->in_sg, &ctx->in_offset, ctx->buf_in,
 			ctx->buflen, ctx->total, 0);
-
 		addr_in = ctx->dma_addr_in;
 		addr_out = ctx->dma_addr_out;
 
@@ -671,12 +737,10 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 
 	ctx->total -= count;
 
-	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_AES1, LOCK_HWA);
-
 	/* Configure HWA */
 	tf_crypto_enable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
 
-	tf_aes_restore_registers(state);
+	tf_aes_restore_registers(state, ctx->flags & FLAGS_ENCRYPT ? 1 : 0);
 
 	OUTREG32(&paes_reg->AES_SYSCONFIG, INREG32(&paes_reg->AES_SYSCONFIG)
 		| AES_SYSCONFIG_DMA_REQ_OUT_EN_BIT
@@ -695,6 +759,8 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	dma_params.dst_ei = 0;
 	dma_params.dst_fi = 0;
 	dma_params.sync_mode = OMAP_DMA_SYNC_FRAME;
+	dma_params.read_prio = 0;
+	dma_params.write_prio = 0;
 
 	/* IN */
 	dma_params.trigger = ctx->dma_in;
@@ -704,11 +770,25 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	dma_params.src_start = addr_in;
 	dma_params.src_amode = OMAP_DMA_AMODE_POST_INC;
 
-	omap_set_dma_params(ctx->dma_lch_in, &dma_params);
+	if (reconfigure_dma) {
+		omap_set_dma_params(ctx->dma_lch_in, &dma_params);
+		omap_set_dma_dest_burst_mode(ctx->dma_lch_in,
+			OMAP_DMA_DATA_BURST_8);
+		omap_set_dma_src_burst_mode(ctx->dma_lch_in,
+			OMAP_DMA_DATA_BURST_8);
+		omap_set_dma_src_data_pack(ctx->dma_lch_in, 1);
+	} else {
+		if (last_count != count)
+			omap_set_dma_transfer_params(ctx->dma_lch_in,
+				dma_params.data_type,
+				dma_params.elem_count, dma_params.frame_count,
+				dma_params.sync_mode, dma_params.trigger,
+				dma_params.src_or_dst_synch);
 
-	omap_set_dma_dest_burst_mode(ctx->dma_lch_in, OMAP_DMA_DATA_BURST_8);
-	omap_set_dma_src_burst_mode(ctx->dma_lch_in, OMAP_DMA_DATA_BURST_8);
-	omap_set_dma_src_data_pack(ctx->dma_lch_in, 1);
+		/* Configure input start address */
+		__raw_writel(dma_params.src_start,
+			omap_dma_base + (0x60 * (ctx->dma_lch_in) + 0x9c));
+	}
 
 	/* OUT */
 	dma_params.trigger = ctx->dma_out;
@@ -718,22 +798,63 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	dma_params.dst_start = addr_out;
 	dma_params.dst_amode = OMAP_DMA_AMODE_POST_INC;
 
-	omap_set_dma_params(ctx->dma_lch_out, &dma_params);
-
-	omap_set_dma_dest_burst_mode(ctx->dma_lch_out, OMAP_DMA_DATA_BURST_8);
-	omap_set_dma_src_burst_mode(ctx->dma_lch_out, OMAP_DMA_DATA_BURST_8);
-	omap_set_dma_dest_data_pack(ctx->dma_lch_out, 1);
+	if (reconfigure_dma) {
+		omap_set_dma_params(ctx->dma_lch_out, &dma_params);
+		omap_set_dma_dest_burst_mode(ctx->dma_lch_out,
+			OMAP_DMA_DATA_BURST_8);
+		omap_set_dma_src_burst_mode(ctx->dma_lch_out,
+			OMAP_DMA_DATA_BURST_8);
+		omap_set_dma_dest_data_pack(ctx->dma_lch_out, 1);
+		reconfigure_dma = false;
+	} else {
+		if (last_count != count) {
+			omap_set_dma_transfer_params(ctx->dma_lch_out,
+				dma_params.data_type,
+				dma_params.elem_count, dma_params.frame_count,
+				dma_params.sync_mode, dma_params.trigger,
+				dma_params.src_or_dst_synch);
+			last_count = count;
+		}
+		/* Configure output start address */
+		__raw_writel(dma_params.dst_start,
+			omap_dma_base + (0x60 * (ctx->dma_lch_out) + 0xa0));
+	}
 
 	/* Is this really needed? */
-	omap_disable_dma_irq(ctx->dma_lch_in, OMAP_DMA_DROP_IRQ);
 	omap_enable_dma_irq(ctx->dma_lch_in, OMAP_DMA_BLOCK_IRQ);
-	omap_disable_dma_irq(ctx->dma_lch_out, OMAP_DMA_DROP_IRQ);
 	omap_enable_dma_irq(ctx->dma_lch_out, OMAP_DMA_BLOCK_IRQ);
 
 	wmb();
 
 	omap_start_dma(ctx->dma_lch_in);
 	omap_start_dma(ctx->dma_lch_out);
+
+	if (ctx->next_req) {
+		struct ablkcipher_request *req =
+			ablkcipher_request_cast(ctx->next_req);
+
+		if (!(ctx->next_req->flags & CRYPTO_TFM_REQ_DMA_VISIBLE)) {
+			err = dma_map_sg(NULL, req->src, 1, DMA_TO_DEVICE);
+			if (!err)
+				/* Silently fail for now... */
+				return 0;
+
+			err = dma_map_sg(NULL, req->dst, 1, DMA_FROM_DEVICE);
+			if (!err) {
+				dma_unmap_sg(NULL, req->src, 1, DMA_TO_DEVICE);
+				/* Silently fail for now... */
+				return 0;
+			}
+
+			ctx->next_req->flags |= CRYPTO_TFM_REQ_DMA_VISIBLE;
+			ctx->next_req = NULL;
+		}
+	}
+
+	if (ctx->backlog) {
+		ctx->backlog->complete(ctx->backlog, -EINPROGRESS);
+		ctx->backlog = NULL;
+	}
 
 	return 0;
 }
@@ -760,25 +881,30 @@ static int aes_dma_stop(struct aes_hwa_ctx *ctx)
 
 	OUTREG32(&paes_reg->AES_SYSCONFIG, 0);
 
-	tf_crypto_disable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
-
-	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_AES1, UNLOCK_HWA);
 
 	omap_stop_dma(ctx->dma_lch_in);
 	omap_stop_dma(ctx->dma_lch_out);
 
-	if (ctx->flags & FLAGS_FAST) {
-		dma_unmap_sg(NULL, ctx->out_sg, 1, DMA_FROM_DEVICE);
-		dma_unmap_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
-	} else {
+	if (!(ctx->flags & FLAGS_FAST)) {
 		dma_sync_single_for_device(NULL, ctx->dma_addr_out,
 			ctx->dma_size, DMA_FROM_DEVICE);
+
+#ifdef CONFIG_TF_DRIVER_FAULT_INJECTION
+		tf_aes_fault_injection(paes_reg->AES_CTRL, ctx->buf_out);
+#endif
 
 		/* Copy data */
 		count = sg_copy(&ctx->out_sg, &ctx->out_offset, ctx->buf_out,
 			ctx->buflen, ctx->dma_size, 1);
 		if (count != ctx->dma_size)
 			err = -EINVAL;
+	} else {
+		dma_unmap_sg(NULL, ctx->out_sg, 1, DMA_FROM_DEVICE);
+		dma_unmap_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
+#ifdef CONFIG_TF_DRIVER_FAULT_INJECTION
+		tf_aes_fault_injection(paes_reg->AES_CTRL,
+			sg_virt(ctx->out_sg));
+#endif
 	}
 
 	if (err || !ctx->total)
@@ -791,6 +917,10 @@ static void aes_dma_callback(int lch, u16 ch_status, void *data)
 {
 	struct aes_hwa_ctx *ctx = data;
 
+	if (ch_status != OMAP_DMA_BLOCK_IRQ)
+		printk(KERN_ERR "%s: DMA error status: 0x%hx\n",
+			__func__, ch_status);
+
 	if (lch == ctx->dma_lch_out)
 		tasklet_schedule(&ctx->task);
 }
@@ -798,6 +928,7 @@ static void aes_dma_callback(int lch, u16 ch_status, void *data)
 static int aes_dma_init(struct aes_hwa_ctx *ctx)
 {
 	int err = -ENOMEM;
+	struct omap_dma_channel_params dma_params;
 
 	ctx->dma_lch_out = -1;
 	ctx->dma_lch_in = -1;
@@ -839,6 +970,46 @@ static int aes_dma_init(struct aes_hwa_ctx *ctx)
 		goto err_dma_out;
 	}
 
+	dma_params.data_type = OMAP_DMA_DATA_TYPE_S32;
+	dma_params.elem_count = DMA_CEN_Elts_per_Frame_AES;
+	dma_params.src_ei = 0;
+	dma_params.src_fi = 0;
+	dma_params.dst_ei = 0;
+	dma_params.dst_fi = 0;
+	dma_params.read_prio = 0;
+	dma_params.write_prio = 0;
+	dma_params.sync_mode = OMAP_DMA_SYNC_FRAME;
+
+	/* IN */
+	dma_params.trigger = ctx->dma_in;
+	dma_params.src_or_dst_synch = OMAP_DMA_DST_SYNC;
+	dma_params.dst_start = AES1_REGS_HW_ADDR + 0x60;
+	dma_params.dst_amode = OMAP_DMA_AMODE_CONSTANT;
+	dma_params.src_amode = OMAP_DMA_AMODE_POST_INC;
+
+	omap_set_dma_params(ctx->dma_lch_in, &dma_params);
+	omap_set_dma_dest_burst_mode(ctx->dma_lch_in, OMAP_DMA_DATA_BURST_8);
+	omap_set_dma_src_burst_mode(ctx->dma_lch_in, OMAP_DMA_DATA_BURST_8);
+	omap_set_dma_src_data_pack(ctx->dma_lch_in, 1);
+
+	/* OUT */
+	dma_params.trigger = ctx->dma_out;
+	dma_params.src_or_dst_synch = OMAP_DMA_SRC_SYNC;
+	dma_params.src_start = AES1_REGS_HW_ADDR + 0x60;
+	dma_params.src_amode = OMAP_DMA_AMODE_CONSTANT;
+	dma_params.dst_amode = OMAP_DMA_AMODE_POST_INC;
+
+	omap_set_dma_params(ctx->dma_lch_out, &dma_params);
+	omap_set_dma_dest_burst_mode(ctx->dma_lch_out, OMAP_DMA_DATA_BURST_8);
+	omap_set_dma_src_burst_mode(ctx->dma_lch_out, OMAP_DMA_DATA_BURST_8);
+	omap_set_dma_dest_data_pack(ctx->dma_lch_out, 1);
+
+	omap_dma_base = ioremap(0x4A056000, 0x1000);
+	if (!omap_dma_base) {
+		printk(KERN_ERR "SMC: Unable to ioremap DMA registers\n");
+		goto err_dma_out;
+	}
+
 	dprintk(KERN_INFO "aes_dma_init(%p) configured DMA channels"
 		"(RX = %d, TX = %d)\n", ctx, ctx->dma_lch_in, ctx->dma_lch_out);
 
@@ -859,20 +1030,22 @@ static void aes_dma_cleanup(struct aes_hwa_ctx *ctx)
 	omap_free_dma(ctx->dma_lch_in);
 	dma_free_coherent(NULL, ctx->buflen, ctx->buf_in, ctx->dma_addr_in);
 	dma_free_coherent(NULL, ctx->buflen, ctx->buf_out, ctx->dma_addr_out);
+	iounmap(omap_dma_base);
 }
 
 static int aes_handle_req(struct aes_hwa_ctx *ctx)
 {
 	struct tf_crypto_aes_operation_state *state;
-	struct crypto_async_request *async_req, *backlog;
+	struct crypto_async_request *async_req;
 	struct ablkcipher_request *req;
+	struct aes_reqctx *rctx;
 	unsigned long flags;
 
 	if (ctx->total)
 		goto start;
 
 	spin_lock_irqsave(&ctx->lock, flags);
-	backlog = crypto_get_backlog(&ctx->queue);
+	ctx->backlog = crypto_get_backlog(&ctx->queue);
 	async_req = crypto_dequeue_request(&ctx->queue);
 	if (!async_req)
 		clear_bit(FLAGS_BUSY, &ctx->flags);
@@ -880,9 +1053,6 @@ static int aes_handle_req(struct aes_hwa_ctx *ctx)
 
 	if (!async_req)
 		return 0;
-
-	if (backlog)
-		backlog->complete(backlog, -EINPROGRESS);
 
 	req = ablkcipher_request_cast(async_req);
 
@@ -892,6 +1062,27 @@ static int aes_handle_req(struct aes_hwa_ctx *ctx)
 	ctx->in_sg = req->src;
 	ctx->out_offset = 0;
 	ctx->out_sg = req->dst;
+
+	rctx = ablkcipher_request_ctx(req);
+	rctx->mode &= FLAGS_MODE_MASK;
+	ctx->flags = (ctx->flags & ~FLAGS_MODE_MASK) | rctx->mode;
+
+	/*
+	 * Try to get the next pending request so it can be prepared while the
+	 * first one is being processed.
+	 */
+	spin_lock_irqsave(&ctx->lock, flags);
+
+	if (likely(ctx->queue.qlen)) {
+		struct list_head *next_async_req;
+
+		next_async_req = ctx->queue.list.next;
+		ctx->next_req = list_entry(next_async_req,
+			struct crypto_async_request, list);
+	} else {
+		ctx->next_req = NULL;
+	}
+	spin_unlock_irqrestore(&ctx->lock, flags);
 
 	state = crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
 
@@ -959,9 +1150,6 @@ static int aes_operate(struct ablkcipher_request *req)
 	unsigned long flags;
 	int err;
 
-	/* Make sure AES HWA is accessible */
-	tf_delayed_secure_resume();
-
 	spin_lock_irqsave(&aes_ctx->lock, flags);
 	err = ablkcipher_enqueue_request(&aes_ctx->queue, req);
 	spin_unlock_irqrestore(&aes_ctx->lock, flags);
@@ -974,110 +1162,91 @@ static int aes_operate(struct ablkcipher_request *req)
 
 static int aes_encrypt(struct ablkcipher_request *req)
 {
-	struct tf_crypto_aes_operation_state *state =
-		crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
+	struct aes_reqctx *rctx = ablkcipher_request_ctx(req);
 
-	state->CTRL |= AES_CTRL_DIRECTION_ENCRYPT;
+	rctx->mode = FLAGS_ENCRYPT;
 
 	return aes_operate(req);
 }
 
 static int aes_decrypt(struct ablkcipher_request *req)
 {
-	struct tf_crypto_aes_operation_state *state =
-		crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(req));
+	struct aes_reqctx *rctx = ablkcipher_request_ctx(req);
 
-	state->CTRL &= ~(AES_CTRL_DIRECTION_ENCRYPT);
-	state->CTRL |= AES_CTRL_DIRECTION_DECRYPT;
+	rctx->mode = FLAGS_DECRYPT;
 
 	return aes_operate(req);
 }
 
+
+static void aes_sync_op_complete(
+	struct crypto_async_request *async_req, int err)
+{
+	struct ablkcipher_request *req = ablkcipher_request_cast(async_req);
+
+	/* Notify crypto operation has finished */
+	complete((struct completion *) req->base.data);
+}
+
 static int aes_sync_operate(struct blkcipher_desc *desc,
 	struct scatterlist *dst, struct scatterlist *src,
-	unsigned int nbytes)
+	unsigned int nbytes, int encrypt)
 {
-	struct crypto_tfm *tfm = crypto_blkcipher_tfm(desc->tfm);
-	struct tf_crypto_aes_operation_state *state = crypto_tfm_ctx(tfm);
-	struct blkcipher_walk walk;
+	struct ablkcipher_request *req;
+	struct aes_reqctx *rctx;
 	int err;
+	DECLARE_COMPLETION(aes_sync_op_completion);
 
 	if (nbytes % AES_BLOCK_SIZE)
 		return -EINVAL;
 
-	/* Make sure AES HWA is accessible */
-	tf_delayed_secure_resume();
+	req =  kmalloc(sizeof(struct ablkcipher_request) +
+		sizeof(struct aes_reqctx), GFP_KERNEL);
+	if (req == NULL)
+		return -ENOMEM;
 
-	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_AES1, LOCK_HWA);
-	tf_crypto_enable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
+	req->base.tfm = crypto_blkcipher_tfm(desc->tfm);
+	ablkcipher_request_set_crypt(req, src, dst, nbytes, desc->info);
+	ablkcipher_request_set_callback(req, desc->flags,
+		aes_sync_op_complete, &aes_sync_op_completion);
 
-	blkcipher_walk_init(&walk, dst, src, nbytes);
-	err = blkcipher_walk_virt(desc, &walk);
+	rctx = ablkcipher_request_ctx(req);
+	rctx->mode = encrypt ? FLAGS_ENCRYPT : FLAGS_DECRYPT;
 
-	if (!AES_CTRL_IS_MODE_ECB(state->CTRL)) {
-		u32 *ptr = (u32 *) walk.iv;
+	err = aes_operate(req);
+	switch (err) {
+	case -EINPROGRESS:
+	case -EBUSY:
+		break;
 
-		state->AES_IV_0 = ptr[0];
-		state->AES_IV_1 = ptr[1];
-		state->AES_IV_2 = ptr[2];
-		state->AES_IV_3 = ptr[3];
+	default:
+		return err;
 	}
 
-	while ((nbytes = walk.nbytes)) {
-		if (!tf_aes_update(state, walk.src.virt.addr,
-			walk.dst.virt.addr, nbytes / AES_BLOCK_SIZE)) {
-			err = -EINVAL;
-			break;
-		}
+	/* Wait for crypto operation to be actually finished */
+	wait_for_completion(&aes_sync_op_completion);
 
-		/* tf_aes_update processes all the data */
-		nbytes = 0;
+	kzfree(req);
 
-		err = blkcipher_walk_done(desc, &walk, nbytes);
-	}
-
-	if (!AES_CTRL_IS_MODE_ECB(state->CTRL)) {
-		u32 *ptr = (u32 *) walk.iv;
-
-		ptr[0] = state->AES_IV_0;
-		ptr[1] = state->AES_IV_1;
-		ptr[2] = state->AES_IV_2;
-		ptr[3] = state->AES_IV_3;
-	}
-
-	tf_crypto_disable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
-	tf_crypto_lock_hwa(PUBLIC_CRYPTO_HWA_AES1, UNLOCK_HWA);
-
-	return err;
+	return 0;
 }
 
 static int aes_sync_encrypt(struct blkcipher_desc *desc,
 	struct scatterlist *dst, struct scatterlist *src,
 	unsigned int nbytes)
 {
-	struct crypto_tfm *tfm = crypto_blkcipher_tfm(desc->tfm);
-	struct tf_crypto_aes_operation_state *state = crypto_tfm_ctx(tfm);
-
-	state->CTRL |= AES_CTRL_DIRECTION_ENCRYPT;
-
 	dprintk(KERN_INFO "aes_sync_encrypt nbytes=0x%x\n", nbytes);
 
-	return aes_sync_operate(desc, dst, src, nbytes);
+	return aes_sync_operate(desc, dst, src, nbytes, 1);
 }
 
 static int aes_sync_decrypt(struct blkcipher_desc *desc,
 	struct scatterlist *dst, struct scatterlist *src,
 	unsigned int nbytes)
 {
-	struct crypto_tfm *tfm = crypto_blkcipher_tfm(desc->tfm);
-	struct tf_crypto_aes_operation_state *state = crypto_tfm_ctx(tfm);
-
-	state->CTRL &= ~(AES_CTRL_DIRECTION_ENCRYPT);
-	state->CTRL |= AES_CTRL_DIRECTION_DECRYPT;
-
 	dprintk(KERN_INFO "aes_sync_decrypt\n");
 
-	return aes_sync_operate(desc, dst, src, nbytes);
+	return aes_sync_operate(desc, dst, src, nbytes, 0);
 }
 
 /* AES ECB */
@@ -1151,6 +1320,17 @@ static int aes_ctr_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
 	state->CTRL = AES_CTRL_MODE_CTR_BIT | AES_CTRL_CTR_WIDTH_128;
 
 	return aes_setkey(state, key, keylen);
+}
+
+static int aes_cra_init(struct crypto_tfm *tfm)
+{
+	tfm->crt_ablkcipher.reqsize = sizeof(struct aes_reqctx);
+
+	return 0;
+}
+
+static void aes_cra_exit(struct crypto_tfm *tfm)
+{
 }
 
 static struct crypto_alg smc_aes_ecb_sync_alg = {
@@ -1236,6 +1416,8 @@ static struct crypto_alg smc_aes_ecb_alg = {
 		sizeof(struct tf_crypto_aes_operation_state),
 	.cra_alignmask		= 3,
 	.cra_list		= LIST_HEAD_INIT(smc_aes_ecb_alg.cra_list),
+	.cra_init		= aes_cra_init,
+	.cra_exit		= aes_cra_exit,
 	.cra_u			= {
 		.ablkcipher = {
 			.min_keysize	= AES_MIN_KEY_SIZE,
@@ -1259,6 +1441,8 @@ static struct crypto_alg smc_aes_cbc_alg = {
 		sizeof(struct tf_crypto_aes_operation_state),
 	.cra_alignmask		= 3,
 	.cra_list		= LIST_HEAD_INIT(smc_aes_cbc_alg.cra_list),
+	.cra_init		= aes_cra_init,
+	.cra_exit		= aes_cra_exit,
 	.cra_u			= {
 		.ablkcipher = {
 			.min_keysize	= AES_MIN_KEY_SIZE,
@@ -1283,6 +1467,8 @@ static struct crypto_alg smc_aes_ctr_alg = {
 		sizeof(struct tf_crypto_aes_operation_state),
 	.cra_alignmask		= 3,
 	.cra_list		= LIST_HEAD_INIT(smc_aes_ctr_alg.cra_list),
+	.cra_init		= aes_cra_init,
+	.cra_exit		= aes_cra_exit,
 	.cra_u			= {
 		.ablkcipher = {
 			.min_keysize	= AES_MIN_KEY_SIZE,
@@ -1300,11 +1486,15 @@ int register_smc_public_crypto_aes(void)
 {
 	int ret;
 
+	tf_crypto_enable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
+	OUTREG32(&paes_reg->AES_SYSCONFIG, 0);
+	tf_crypto_disable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
+
 	aes_ctx = kzalloc(sizeof(struct aes_hwa_ctx), GFP_KERNEL);
 	if (aes_ctx == NULL)
 		return -ENOMEM;
 
-	crypto_init_queue(&aes_ctx->queue, 1);
+	crypto_init_queue(&aes_ctx->queue, 50);
 	tasklet_init(&aes_ctx->task, aes_tasklet, (unsigned long)aes_ctx);
 	spin_lock_init(&aes_ctx->lock);
 
@@ -1377,4 +1567,10 @@ void unregister_smc_public_crypto_aes(void)
 	tasklet_kill(&aes_ctx->task);
 	kfree(aes_ctx);
 }
-#endif
+
+#endif /* CONFIG_SMC_KERNEL_CRYPTO */
+
+void tf_aes_pm_resume(void)
+{
+	reconfigure_dma = true;
+}

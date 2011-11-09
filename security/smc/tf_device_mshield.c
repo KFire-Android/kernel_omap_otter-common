@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010 Trusted Logic S.A.
+ * Copyright (c) 2011 Trusted Logic S.A.
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -27,9 +27,7 @@
 #include <linux/sysdev.h>
 #include <linux/vmalloc.h>
 #include <linux/signal.h>
-#ifdef CONFIG_ANDROID
 #include <linux/device.h>
-#endif
 #include <linux/init.h>
 #include <linux/bootmem.h>
 
@@ -45,9 +43,7 @@
 #define TF_PA_CTRL_START		0x1
 #define TF_PA_CTRL_STOP		0x2
 
-#ifdef CONFIG_ANDROID
 static struct class *tf_ctrl_class;
-#endif
 
 #define TF_DEVICE_CTRL_BASE_NAME "tf_ctrl"
 
@@ -66,20 +62,37 @@ static int tf_ctrl_check_omap_type(void)
 	/* No need to do anything on a GP device */
 	switch (omap_type()) {
 	case OMAP2_DEVICE_TYPE_GP:
-		dprintk(KERN_INFO "SMC: Running on a GP device\n");
+		dpr_info("SMC: Running on a GP device\n");
 		return 0;
 
 	case OMAP2_DEVICE_TYPE_EMU:
 	case OMAP2_DEVICE_TYPE_SEC:
 	/*case OMAP2_DEVICE_TYPE_TEST:*/
-		dprintk(KERN_INFO "SMC: Running on a EMU or HS device\n");
+		dpr_info("SMC: Running on a EMU or HS device\n");
 		return 1;
 
 	default:
-		printk(KERN_ERR "SMC: unknown omap type %x\n", omap_type());
+		pr_err("SMC: unknown omap type %x\n", omap_type());
 		return -EFAULT;
 	}
 }
+/*----------------------------------------------------------------------------*/
+
+static int tf_ctrl_device_release(struct inode *inode, struct file *file)
+{
+	struct tf_connection *connection;
+
+	dpr_info("%s(%u:%u, %p)\n",
+		__func__, imajor(inode), iminor(inode), file);
+
+	connection = tf_conn_from_file(file);
+	tf_close(connection);
+
+	dpr_info("%s(%p): Success\n", __func__, file);
+	return 0;
+}
+
+/*----------------------------------------------------------------------------*/
 
 #define IOCTL_TF_PA_CTRL _IOWR('z', 0xFF, struct tf_pa_ctrl)
 
@@ -88,29 +101,25 @@ static long tf_ctrl_device_ioctl(struct file *file, unsigned int ioctl_num,
 {
 	int result = S_SUCCESS;
 	struct tf_pa_ctrl pa_ctrl;
-	u8 *pa_buffer = NULL;
-	u8 *conf_buffer = NULL;
 	struct tf_device *dev = tf_get_device();
 
-	dprintk(KERN_INFO "tf_ctrl_device_ioctl(%p, %u, %p)\n",
-		file, ioctl_num, (void *) ioctl_param);
+	dpr_info("%s(%p, %u, %p)\n",
+		__func__, file, ioctl_num, (void *) ioctl_param);
 
 	mutex_lock(&dev->dev_mutex);
 
 	if (ioctl_num != IOCTL_TF_PA_CTRL) {
-		dprintk(KERN_ERR "tf_ctrl_device_ioctl(%p): "
-			"ioctl number is invalid (%p)\n",
-			file, (void *)ioctl_num);
+		dpr_err("%s(%p): ioctl number is invalid (%p)\n",
+			__func__, file, (void *)ioctl_num);
 
 		result = -EFAULT;
 		goto exit;
 	}
 
 	if ((ioctl_param & 0x3) != 0) {
-		dprintk(KERN_ERR "tf_ctrl_device_ioctl(%p): "
-			"ioctl command message pointer is not word "
+		dpr_err("%s(%p): ioctl command message pointer is not word "
 			"aligned (%p)\n",
-			file, (void *)ioctl_param);
+			__func__, file, (void *)ioctl_param);
 
 		result = -EFAULT;
 		goto exit;
@@ -118,94 +127,88 @@ static long tf_ctrl_device_ioctl(struct file *file, unsigned int ioctl_num,
 
 	if (copy_from_user(&pa_ctrl, (struct tf_pa_ctrl *)ioctl_param,
 			sizeof(struct tf_pa_ctrl))) {
-		dprintk(KERN_ERR "tf_ctrl_device_ioctl(%p): "
-			"cannot access ioctl parameter (%p)\n",
-			file, (void *)ioctl_param);
+		dpr_err("%s(%p): cannot access ioctl parameter (%p)\n",
+			__func__, file, (void *)ioctl_param);
 
 		result = -EFAULT;
 		goto exit;
 	}
 
 	switch (pa_ctrl.nPACommand) {
-	case TF_PA_CTRL_START:
-		dprintk(KERN_INFO "tf_ctrl_device_ioctl(%p): "
-			"Start the SMC PA (%d bytes) with conf (%d bytes)\n",
-			file, pa_ctrl.pa_size, pa_ctrl.conf_size);
+	case TF_PA_CTRL_START: {
+		struct tf_shmem_desc *shmem_desc = NULL;
+		u32 shared_mem_descriptors[TF_MAX_COARSE_PAGES];
+		u32 descriptor_count;
+		u32 offset;
+		struct tf_connection *connection;
 
-		pa_buffer = (u8 *) internal_kmalloc(pa_ctrl.pa_size,
-						GFP_KERNEL);
-		if (pa_buffer == NULL) {
-			dprintk(KERN_ERR "tf_ctrl_device_ioctl(%p): "
-				"Out of memory for PA buffer\n", file);
+		dpr_info("%s(%p): Start the SMC PA (%d bytes) with conf "
+			"(%d bytes)\n",
+			__func__, file, pa_ctrl.pa_size, pa_ctrl.conf_size);
 
-			result = -ENOMEM;
-			goto exit;
-		}
-
-		if (copy_from_user(
-			pa_buffer, pa_ctrl.pa_buffer, pa_ctrl.pa_size)) {
-			dprintk(KERN_ERR "tf_ctrl_device_ioctl(%p): "
-				"Cannot access PA buffer (%p)\n",
-				file, (void *) pa_ctrl.pa_buffer);
-
-			internal_kfree(pa_buffer);
-
-			result = -EFAULT;
-			goto exit;
-		}
-
-		if (pa_ctrl.conf_size > 0) {
-			conf_buffer = (u8 *) internal_kmalloc(
-				pa_ctrl.conf_size, GFP_KERNEL);
-			if (conf_buffer == NULL) {
-				internal_kfree(pa_buffer);
-
-				result = -ENOMEM;
-				goto exit;
-			}
-
-			if (copy_from_user(conf_buffer,
-				pa_ctrl.conf_buffer, pa_ctrl.conf_size)) {
-				internal_kfree(pa_buffer);
-				internal_kfree(conf_buffer);
-
-				result = -EFAULT;
-				goto exit;
-			}
-		}
+		connection = tf_conn_from_file(file);
 
 		if (dev->workspace_addr == 0) {
 			result = -ENOMEM;
-			goto exit;
+			goto start_exit;
+		}
+
+		result = tf_validate_shmem_and_flags(
+				(u32)pa_ctrl.conf_buffer,
+				pa_ctrl.conf_size,
+				TF_SHMEM_TYPE_READ);
+		if (result != 0)
+			goto start_exit;
+
+		offset = 0;
+		result = tf_map_shmem(
+				connection,
+				(u32)pa_ctrl.conf_buffer,
+				TF_SHMEM_TYPE_READ,
+				true, /* in user space */
+				shared_mem_descriptors,
+				&offset,
+				pa_ctrl.conf_size,
+				&shmem_desc,
+				&descriptor_count);
+		if (result != 0)
+			goto start_exit;
+
+		if (descriptor_count > 1) {
+			dpr_err("%s(%p): configuration file is too long (%d)\n",
+				__func__, file, descriptor_count);
+
+			result = -ENOMEM;
+			goto start_exit;
 		}
 
 		result = tf_start(&dev->sm,
 			dev->workspace_addr,
 			dev->workspace_size,
-			pa_buffer,
+			pa_ctrl.pa_buffer,
 			pa_ctrl.pa_size,
-			conf_buffer,
+			shared_mem_descriptors[0],
+			offset,
 			pa_ctrl.conf_size);
 		if (result)
-			dprintk(KERN_ERR "SMC: start failed\n");
+			dpr_err("SMC: start failed\n");
 		else
-			dprintk(KERN_INFO "SMC: started\n");
+			dpr_info("SMC: started\n");
 
-		internal_kfree(pa_buffer);
-		internal_kfree(conf_buffer);
+start_exit:
+		tf_unmap_shmem(connection, shmem_desc, true); /* full cleanup */
 		break;
+	}
 
 	case TF_PA_CTRL_STOP:
-		dprintk(KERN_INFO "tf_ctrl_device_ioctl(%p): "
-			"Stop the SMC PA\n", file);
+		dpr_info("%s(%p): Stop the SMC PA\n", __func__, file);
 
 		result = tf_power_management(&dev->sm,
 			TF_POWER_OPERATION_SHUTDOWN);
 		if (result)
-			dprintk(KERN_WARNING "SMC: stop failed [0x%x]\n",
-				result);
+			dpr_err("SMC: stop failed [0x%x]\n", result);
 		else
-			dprintk(KERN_INFO "SMC: stopped\n");
+			dpr_info("SMC: stopped\n");
 		break;
 
 	default:
@@ -223,55 +226,53 @@ exit:
 static int tf_ctrl_device_open(struct inode *inode, struct file *file)
 {
 	int error;
+	struct tf_connection *connection = NULL;
 
-	dprintk(KERN_INFO "tf_ctrl_device_open(%u:%u, %p)\n",
-		imajor(inode), iminor(inode), file);
+	dpr_info("%s(%u:%u, %p)\n",
+		__func__, imajor(inode), iminor(inode), file);
 
 	/* Dummy lseek for non-seekable driver */
 	error = nonseekable_open(inode, file);
 	if (error != 0) {
-		dprintk(KERN_ERR "tf_ctrl_device_open(%p): "
+		dpr_err("%s(%p): "
 			"nonseekable_open failed (error %d)!\n",
-			file, error);
+			__func__, file, error);
 		goto error;
 	}
-
-#ifndef CONFIG_ANDROID
-	/*
-	 * Check file flags. We only autthorize the O_RDWR access
-	 */
-	if (file->f_flags != O_RDWR) {
-		dprintk(KERN_ERR "tf_ctrl_device_open(%p): "
-			"Invalid access mode %u\n",
-			file, file->f_flags);
-		error = -EACCES;
-		goto error;
-	}
-#endif
 
 	error = tf_ctrl_check_omap_type();
 	if (error <= 0)
 		return error;
 
+	error = tf_open(tf_get_device(), file, &connection);
+	if (error != 0) {
+		dpr_err("%s(%p): tf_open failed (error %d)!\n",
+			__func__, file, error);
+		goto error;
+	}
+
+	file->private_data = connection;
 	/*
 	 * Successful completion.
 	 */
 
-	dprintk(KERN_INFO "tf_ctrl_device_open(%p): Success\n", file);
+	dpr_info("%s(%p): Success\n", __func__, file);
 	return 0;
 
 	/*
 	 * Error handling.
 	 */
 error:
-	dprintk(KERN_INFO "tf_ctrl_device_open(%p): Failure (error %d)\n",
-		file, error);
+	tf_close(connection);
+	dpr_info("%s(%p): Failure (error %d)\n",
+		__func__, file, error);
 	return error;
 }
 
 static const struct file_operations g_tf_ctrl_device_file_ops = {
 	.owner = THIS_MODULE,
 	.open = tf_ctrl_device_open,
+	.release = tf_ctrl_device_release,
 	.unlocked_ioctl = tf_ctrl_device_ioctl,
 	.llseek = no_llseek,
 };
@@ -297,12 +298,10 @@ int __init tf_ctrl_device_register(void)
 		return error;
 	}
 
-#ifdef CONFIG_ANDROID
 	tf_ctrl_class = class_create(THIS_MODULE, TF_DEVICE_CTRL_BASE_NAME);
 	device_create(tf_ctrl_class, NULL,
 		dev->dev_number + 1,
 		NULL, TF_DEVICE_CTRL_BASE_NAME);
-#endif
 
 	mutex_init(&dev->dev_mutex);
 
@@ -315,6 +314,8 @@ static int __initdata smc_address;
 void __init tf_allocate_workspace(void)
 {
 	struct tf_device *dev = tf_get_device();
+
+	tf_clock_timer_init();
 
 	if (tf_ctrl_check_omap_type() <= 0)
 		return;
@@ -348,4 +349,34 @@ static int __init tf_mem_setup(char *str)
 	return 0;
 }
 
+#ifdef MODULE
+int __init tf_device_mshield_init(char *smc_mem)
+{
+	if (smc_mem != NULL)
+		tf_mem_setup(smc_mem);
+	tf_allocate_workspace();
+	return 0;
+}
+
+void __exit tf_device_mshield_exit(void)
+{
+	struct tf_device *dev = tf_get_device();
+	if (dev == NULL)
+		return;
+
+	mutex_lock(&dev->dev_mutex);
+	if (tf_ctrl_class != NULL) {
+		device_destroy(tf_ctrl_class, dev->dev_number + 1);
+		class_destroy(tf_ctrl_class);
+		tf_ctrl_class = NULL;
+	}
+	cdev_del(&(dev->cdev_ctrl));
+	unregister_chrdev_region(dev->dev_number + 1, 1);
+	mutex_unlock(&dev->dev_mutex);
+
+	dev->workspace_size = 0;
+	dev->workspace_addr = 0;
+}
+#else
 early_param("smc_mem", tf_mem_setup);
+#endif

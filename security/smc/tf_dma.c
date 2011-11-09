@@ -99,6 +99,8 @@ void tf_dma_set_channel_common_params(
 	dma_channel->src_fi = 0;
 	dma_channel->dst_ei = 0;
 	dma_channel->dst_fi = 0;
+	dma_channel->read_prio = 0;
+	dma_channel->write_prio = 0;
 	dma_channel->sync_mode = OMAP_DMA_SYNC_FRAME;
 	dma_channel->src_start = src_start;
 	dma_channel->dst_start = dst_start;

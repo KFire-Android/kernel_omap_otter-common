@@ -50,8 +50,7 @@
    arbitrary but one-to-one for supported error codes. */
 int TEEC_decode_error(TEEC_Result ret)
 {
-	switch (ret)
-	{
+	switch (ret) {
 	case TEEC_SUCCESS:                      return 0;
 	case TEEC_ERROR_GENERIC:                return -EIO;
 	case TEEC_ERROR_ACCESS_DENIED:          return -EPERM;
@@ -73,15 +72,15 @@ int TEEC_decode_error(TEEC_Result ret)
 	default:                                return -EIO;
 	}
 }
+EXPORT_SYMBOL(TEEC_decode_error);
 
 /* Associate POSIX/Linux errors to TEEC errors. The matching is somewhat
    arbitrary, but TEEC_encode_error(TEEC_decode_error(x))==x for supported
    error codes. */
 TEEC_Result TEEC_encode_error(int err)
 {
-	if (err >= 0) {
+	if (err >= 0)
 		return S_SUCCESS;
-	}
 	switch (err) {
 	case 0:		          return TEEC_SUCCESS;
 	case -EIO:		  return TEEC_ERROR_GENERIC;
@@ -104,21 +103,21 @@ TEEC_Result TEEC_encode_error(int err)
 	default:                  return TEEC_ERROR_GENERIC;
 	}
 }
+EXPORT_SYMBOL(TEEC_encode_error);
 
 /* Encode a TEEC time limit into an SChannel time limit. */
 static u64 TEEC_encode_timeout(const TEEC_TimeLimit *timeLimit)
 {
-	if (timeLimit == NULL) {
+	if (timeLimit == NULL)
 		return (u64)-1;
-	} else {
+	else
 		return *timeLimit;
-	}
 }
 
 /* Convert a timeout into a time limit in our internal format. */
-void TEEC_GetTimeLimit(TEEC_Context* sContext,
+void TEEC_GetTimeLimit(TEEC_Context *sContext,
 		       uint32_t nTimeout, /*ms from now*/
-		       TEEC_TimeLimit* sTimeLimit)
+		       TEEC_TimeLimit *sTimeLimit)
 {
 	/*Use the kernel time as the TEE time*/
 	struct timeval now;
@@ -128,6 +127,7 @@ void TEEC_GetTimeLimit(TEEC_Context* sContext,
 		 now.tv_usec / 1000 +
 		 nTimeout);
 }
+EXPORT_SYMBOL(TEEC_GetTimeLimit);
 
 #define TF_PARAM_TYPE_INPUT_FLAG                0x1
 #define TF_PARAM_TYPE_OUTPUT_FLAG               0x2
@@ -197,9 +197,8 @@ void TEEC_decode_parameters(union tf_answer_param *params,
 			    TEEC_Operation *operation)
 {
 	unsigned i;
-	if (operation == NULL) {
+	if (operation == NULL)
 		return;
-	}
 	for (i = 0; i < 4; i++) {
 		unsigned ty = TF_GET_PARAM_TYPE(operation->paramTypes, i);
 		TEEC_Parameter *op = operation->params + i;
@@ -273,6 +272,7 @@ error:
 	tf_close(connection);
 	return TEEC_encode_error(error);
 }
+EXPORT_SYMBOL(TEEC_InitializeContext);
 
 void TEEC_FinalizeContext(TEEC_Context *context)
 {
@@ -281,11 +281,12 @@ void TEEC_FinalizeContext(TEEC_Context *context)
 	tf_close(connection);
 	context->imp._connection = NULL;
 }
+EXPORT_SYMBOL(TEEC_FinalizeContext);
 
-TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context*      context,
-				      TEEC_SharedMemory* sharedMem)
+TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context *context,
+				      TEEC_SharedMemory *sharedMem)
 {
-	union tf_command command_message = {{0}};
+	union tf_command command_message = { { 0, } };
 	struct tf_command_register_shared_memory *cmd =
 		&command_message.register_shared_memory;
 	union tf_answer answer_message;
@@ -308,20 +309,20 @@ TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context*      context,
 		tf_register_shared_memory(context->imp._connection,
 					       &command_message,
 					       &answer_message));
-	if (ret == TEEC_SUCCESS) {
+	if (ret == TEEC_SUCCESS)
 		ret = ans->error_code;
-	}
 	if (ret == S_SUCCESS) {
 		sharedMem->imp._context = context;
 		sharedMem->imp._block = ans->block;
 	}
 	return ret;
 }
+EXPORT_SYMBOL(TEEC_RegisterSharedMemory);
 
-#define TEEC_POINTER_TO_ZERO_SIZED_BUFFER ((void*)0x010)
+#define TEEC_POINTER_TO_ZERO_SIZED_BUFFER ((void *)0x010)
 
-TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context* context,
-				      TEEC_SharedMemory* sharedMem)
+TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context *context,
+				      TEEC_SharedMemory *sharedMem)
 {
 	TEEC_Result ret;
 	dprintk(KERN_DEBUG "TEEC_AllocateSharedMemory: requested=%lu",
@@ -333,32 +334,30 @@ TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context* context,
 		sharedMem->buffer = TEEC_POINTER_TO_ZERO_SIZED_BUFFER;
 	} else {
 		sharedMem->buffer = internal_vmalloc(sharedMem->size);
-		if (sharedMem->buffer == NULL)
-		{
-			dprintk(KERN_INFO "TEEC_AllocateSharedMemory: could not allocate %lu bytes",
+		if (sharedMem->buffer == NULL) {
+			dprintk(KERN_INFO "TEEC_AllocateSharedMemory: could "
+				"not allocate %lu bytes",
 				(unsigned long)sharedMem->size);
 			return TEEC_ERROR_OUT_OF_MEMORY;
 		}
 	}
 
 	ret = TEEC_RegisterSharedMemory(context, sharedMem);
-	if (ret == TEEC_SUCCESS)
-	{
+	if (ret == TEEC_SUCCESS) {
 		sharedMem->imp._allocated = 1;
-	}
-	else
-	{
+	} else {
 		internal_vfree(sharedMem->buffer);
 		sharedMem->buffer = NULL;
 		memset(&sharedMem->imp, 0, sizeof(sharedMem->imp));
 	}
 	return ret;
 }
+EXPORT_SYMBOL(TEEC_AllocateSharedMemory);
 
-void TEEC_ReleaseSharedMemory(TEEC_SharedMemory* sharedMem)
+void TEEC_ReleaseSharedMemory(TEEC_SharedMemory *sharedMem)
 {
 	TEEC_Context *context = sharedMem->imp._context;
-	union tf_command command_message = {{0}};
+	union tf_command command_message = { { 0, } };
 	struct tf_command_release_shared_memory *cmd =
 		&command_message.release_shared_memory;
 	union tf_answer answer_message;
@@ -373,28 +372,28 @@ void TEEC_ReleaseSharedMemory(TEEC_SharedMemory* sharedMem)
 				      &command_message,
 				      &answer_message);
 	if (sharedMem->imp._allocated) {
-		if (sharedMem->buffer != TEEC_POINTER_TO_ZERO_SIZED_BUFFER) {
+		if (sharedMem->buffer != TEEC_POINTER_TO_ZERO_SIZED_BUFFER)
 			internal_vfree(sharedMem->buffer);
-		}
 		sharedMem->buffer = NULL;
 		sharedMem->size = 0;
 	}
 	memset(&sharedMem->imp, 0, sizeof(sharedMem->imp));
 }
+EXPORT_SYMBOL(TEEC_ReleaseSharedMemory);
 
-TEEC_Result TEEC_OpenSessionEx(TEEC_Context* context,
-			       TEEC_Session* session,
-			       const TEEC_TimeLimit* timeLimit,
-			       const TEEC_UUID* destination,
+TEEC_Result TEEC_OpenSessionEx(TEEC_Context *context,
+			       TEEC_Session *session,
+			       const TEEC_TimeLimit *timeLimit,
+			       const TEEC_UUID *destination,
 			       u32 connectionMethod,
-			       void* connectionData,
-			       TEEC_Operation* operation,
-			       u32* errorOrigin)
+			       void *connectionData,
+			       TEEC_Operation *operation,
+			       u32 *errorOrigin)
 {
-	union tf_command command_message = {{0}};
+	union tf_command command_message = { { 0, } };
 	struct tf_command_open_client_session *cmd =
 		&command_message.open_client_session;
-	union tf_answer answer_message = {{0}};
+	union tf_answer answer_message = { { 0, } };
 	struct tf_answer_open_client_session *ans =
 		&answer_message.open_client_session;
 	TEEC_Result ret;
@@ -413,8 +412,7 @@ TEEC_Result TEEC_OpenSessionEx(TEEC_Context* context,
 	cmd->login_type = connectionMethod;
 	TEEC_encode_parameters(&cmd->param_types, cmd->params, operation);
 
-	switch (connectionMethod)
-	{
+	switch (connectionMethod) {
 	case TEEC_LOGIN_PRIVILEGED:
 	case TEEC_LOGIN_PUBLIC:
 		break;
@@ -442,23 +440,23 @@ TEEC_Result TEEC_OpenSessionEx(TEEC_Context* context,
 				TEEC_ORIGIN_COMMS);
 	}
 
-	if (ret == TEEC_SUCCESS) {
+	if (ret == TEEC_SUCCESS)
 		ret = ans->error_code;
-	}
 	if (ret == S_SUCCESS) {
 		session->imp._client_session = ans->client_session;
 		session->imp._context = context;
 	}
 	return ret;
 }
+EXPORT_SYMBOL(TEEC_OpenSessionEx);
 
-TEEC_Result TEEC_OpenSession(TEEC_Context* context,
-			     TEEC_Session* session,
-			     const TEEC_UUID* destination,
+TEEC_Result TEEC_OpenSession(TEEC_Context *context,
+			     TEEC_Session *session,
+			     const TEEC_UUID *destination,
 			     u32 connectionMethod,
-			     void* connectionData,
-			     TEEC_Operation* operation,
-			     u32* errorOrigin)
+			     void *connectionData,
+			     TEEC_Operation *operation,
+			     u32 *errorOrigin)
 {
 	return TEEC_OpenSessionEx(context, session,
 				  NULL, /*timeLimit*/
@@ -466,12 +464,13 @@ TEEC_Result TEEC_OpenSession(TEEC_Context* context,
 				  connectionMethod, connectionData,
 				  operation, errorOrigin);
 }
+EXPORT_SYMBOL(TEEC_OpenSession);
 
-void TEEC_CloseSession(TEEC_Session* session)
+void TEEC_CloseSession(TEEC_Session *session)
 {
 	if (session != NULL) {
 		TEEC_Context *context = session->imp._context;
-		union tf_command command_message = {{0}};
+		union tf_command command_message = { { 0, } };
 		struct tf_command_close_client_session *cmd =
 			&command_message.close_client_session;
 		union tf_answer answer_message;
@@ -490,18 +489,19 @@ void TEEC_CloseSession(TEEC_Session* session)
 		session->imp._context = NULL;
 	}
 }
+EXPORT_SYMBOL(TEEC_CloseSession);
 
-TEEC_Result TEEC_InvokeCommandEx(TEEC_Session* session,
-				    const TEEC_TimeLimit* timeLimit,
+TEEC_Result TEEC_InvokeCommandEx(TEEC_Session *session,
+				    const TEEC_TimeLimit *timeLimit,
 				    u32 commandID,
-				    TEEC_Operation* operation,
-				    u32* errorOrigin)
+				    TEEC_Operation *operation,
+				    u32 *errorOrigin)
 {
 	TEEC_Context *context = session->imp._context;
-	union tf_command command_message = {{0}};
+	union tf_command command_message = { { 0, } };
 	struct tf_command_invoke_client_command *cmd =
 		&command_message.invoke_client_command;
-	union tf_answer answer_message = {{0}};
+	union tf_answer answer_message = { { 0, } };
 	struct tf_answer_invoke_client_command *ans =
 		&answer_message.invoke_client_command;
 	TEEC_Result ret;
@@ -531,31 +531,32 @@ TEEC_Result TEEC_InvokeCommandEx(TEEC_Session* session,
 				TEEC_ORIGIN_COMMS);
 	}
 
-	if (ret == TEEC_SUCCESS) {
+	if (ret == TEEC_SUCCESS)
 		ret = ans->error_code;
-	}
 	return ret;
 }
+EXPORT_SYMBOL(TEEC_InvokeCommandEx);
 
-TEEC_Result TEEC_InvokeCommand(TEEC_Session* session,
+TEEC_Result TEEC_InvokeCommand(TEEC_Session *session,
 			       u32 commandID,
-			       TEEC_Operation* operation,
-			       u32* errorOrigin)
+			       TEEC_Operation *operation,
+			       u32 *errorOrigin)
 {
 	return TEEC_InvokeCommandEx(session,
 				    NULL, /*timeLimit*/
 				    commandID,
 				    operation, errorOrigin);
 }
+EXPORT_SYMBOL(TEEC_InvokeCommand);
 
 TEEC_Result TEEC_send_cancellation_message(TEEC_Context *context,
 					   u32 client_session,
 					   u32 cancellation_id)
 {
-	union tf_command command_message = {{0}};
+	union tf_command command_message = { { 0, } };
 	struct tf_command_cancel_client_operation *cmd =
 		&command_message.cancel_client_operation;
-	union tf_answer answer_message = {{0}};
+	union tf_answer answer_message = { { 0, } };
 	struct tf_answer_cancel_client_operation *ans =
 		&answer_message.cancel_client_operation;
 	TEEC_Result ret;
@@ -572,13 +573,12 @@ TEEC_Result TEEC_send_cancellation_message(TEEC_Context *context,
 					      &command_message,
 					      &answer_message));
 
-	if (ret == TEEC_SUCCESS) {
+	if (ret == TEEC_SUCCESS)
 		ret = ans->error_code;
-	}
 	return ret;
 }
 
-void TEEC_RequestCancellation(TEEC_Operation* operation)
+void TEEC_RequestCancellation(TEEC_Operation *operation)
 {
 	TEEC_Result ret;
 	while (1) {
@@ -609,16 +609,6 @@ void TEEC_RequestCancellation(TEEC_Operation* operation)
 	}
 }
 
-EXPORT_SYMBOL(TEEC_encode_error);
-EXPORT_SYMBOL(TEEC_decode_error);
-EXPORT_SYMBOL(TEEC_InitializeContext);
-EXPORT_SYMBOL(TEEC_FinalizeContext);
-EXPORT_SYMBOL(TEEC_RegisterSharedMemory);
-EXPORT_SYMBOL(TEEC_AllocateSharedMemory);
-EXPORT_SYMBOL(TEEC_ReleaseSharedMemory);
-EXPORT_SYMBOL(TEEC_OpenSession);
-EXPORT_SYMBOL(TEEC_CloseSession);
-EXPORT_SYMBOL(TEEC_InvokeCommand);
 EXPORT_SYMBOL(TEEC_RequestCancellation);
 
 #endif /* defined(CONFIG_TF_TEEC) */

@@ -169,7 +169,7 @@ struct tf_shmem_desc {
 	u32 block_identifier;
 
 	/* Client buffer */
-	u8 *pBuffer;
+	u8 *client_buffer;
 
 	/* Up to eight coarse page table context */
 	struct tf_coarse_page_table *coarse_pg_table[TF_MAX_COARSE_PAGES];
@@ -212,7 +212,7 @@ struct tf_comm {
 	/*
 	 * The virtual address of the L1 shared buffer.
 	 */
-	struct tf_l1_shared_buffer *pBuffer;
+	struct tf_l1_shared_buffer *l1_buffer;
 
 	/*
 	 * The wait queue the client threads are waiting on.
@@ -246,8 +246,6 @@ struct tf_comm {
 	 */
 	int se_initialized;
 
-	/* Virtual address of the L0 communication buffer */
-	void *init_shared_buffer;
 
 	/*
 	 * Lock to be held by a client when executing an RPC
@@ -271,13 +269,6 @@ struct tf_comm {
 /*----------------------------------------------------------------------------*/
 
 struct tf_device_stats {
-	struct kobject kobj;
-
-	struct kobj_type kobj_type;
-
-	struct attribute kobj_stat_attribute;
-
-	struct attribute *kobj_attribute_list[2];
 
 	atomic_t stat_pages_allocated;
 	atomic_t stat_memories_allocated;
@@ -291,6 +282,11 @@ struct tf_device_stats {
 
  */
 struct tf_device {
+	/*
+	 * The kernel object for the device
+	 */
+	struct kobject kobj;
+
 	/*
 	 * The device number for the device.
 	 */
@@ -544,10 +540,6 @@ struct tf_device *tf_get_device(void);
  * Kernel Differences
  */
 
-#ifdef CONFIG_ANDROID
 #define GROUP_INFO		get_current_groups()
-#else
-#define GROUP_INFO		(current->group_info)
-#endif
 
 #endif  /* !defined(__TF_DEFS_H__) */

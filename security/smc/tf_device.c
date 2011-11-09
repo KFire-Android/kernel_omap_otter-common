@@ -27,9 +27,7 @@
 #include <linux/syscore_ops.h>
 #include <linux/vmalloc.h>
 #include <linux/signal.h>
-#ifdef CONFIG_ANDROID
 #include <linux/device.h>
-#endif
 
 #include "tf_protocol.h"
 #include "tf_defs.h"
@@ -39,6 +37,9 @@
 #ifdef CONFIG_TF_ZEBRA
 #include <plat/cpu.h>
 #include "tf_zebra.h"
+#endif
+#ifdef CONFIG_TF_DRIVER_CRYPTO_FIPS
+#include "tf_crypto.h"
 #endif
 
 #include "s_version.h"
@@ -129,9 +130,28 @@ MODULE_PARM_DESC(soft_interrupt,
 	"The softint interrupt line used by the Secure world");
 #endif
 
-#ifdef CONFIG_ANDROID
-static struct class *tf_class;
+#ifdef CONFIG_TF_DRIVER_DEBUG_SUPPORT
+unsigned tf_debug_level = UINT_MAX;
+module_param_named(debug, tf_debug_level, uint, 0644);
 #endif
+
+#ifdef CONFIG_TF_DRIVER_CRYPTO_FIPS
+char *tf_integrity_hmac_sha256_expected_value;
+module_param_named(hmac_sha256, tf_integrity_hmac_sha256_expected_value,
+		   charp, 0444);
+
+#ifdef CONFIG_TF_DRIVER_FAULT_INJECTION
+unsigned tf_fault_injection_mask;
+module_param_named(fault, tf_fault_injection_mask, uint, 0644);
+#endif
+
+int tf_self_test_blkcipher_align;
+module_param_named(post_align, tf_self_test_blkcipher_align, int, 0644);
+int tf_self_test_blkcipher_use_vmalloc;
+module_param_named(post_vmalloc, tf_self_test_blkcipher_use_vmalloc, int, 0644);
+#endif
+
+static struct class *tf_class;
 
 /*----------------------------------------------------------------------------
  * Global Variables
@@ -163,42 +183,114 @@ struct tf_device *tf_get_device(void)
 }
 
 /*
- * displays the driver stats
+ * sysfs entries
  */
-static ssize_t kobject_show(struct kobject *kobj,
-	struct attribute *attribute, char *buf)
+struct tf_sysfs_entry {
+	struct attribute attr;
+	ssize_t (*show)(struct tf_device *, char *);
+	ssize_t (*store)(struct tf_device *, const char *, size_t);
+};
+
+/*
+ * sysfs entry showing allocation stats
+ */
+static ssize_t info_show(struct tf_device *dev, char *buf)
 {
-	struct tf_device_stats *dev_stats = &g_tf_dev.stats;
-	u32 pages_allocated;
-	u32 pages_locked;
-	u32 memories_allocated;
+	struct tf_device_stats *dev_stats = &dev->stats;
 
-	memories_allocated =
-		atomic_read(&(dev_stats->stat_memories_allocated));
-	pages_allocated =
-		atomic_read(&(dev_stats->stat_pages_allocated));
-	pages_locked = atomic_read(&(dev_stats->stat_pages_locked));
-
-	/*
-	 * AFY: could we add the number of context switches (call to the SMI
-	 * instruction)
-	 */
 
 	return snprintf(buf, PAGE_SIZE,
 		"stat.memories.allocated: %d\n"
 		"stat.pages.allocated:    %d\n"
 		"stat.pages.locked:       %d\n",
-		memories_allocated,
-		pages_allocated,
-		pages_locked);
+		atomic_read(&dev_stats->stat_memories_allocated),
+		atomic_read(&dev_stats->stat_pages_allocated),
+		atomic_read(&dev_stats->stat_pages_locked));
+}
+static struct tf_sysfs_entry tf_info_entry = __ATTR_RO(info);
+
+#ifdef CONFIG_TF_ZEBRA
+/*
+ * sysfs entry showing whether secure world is up and running
+ */
+static ssize_t tf_started_show(struct tf_device *dev, char *buf)
+{
+	int tf_started = test_bit(TF_COMM_FLAG_PA_AVAILABLE,
+		&dev->sm.flags);
+
+	return snprintf(buf, PAGE_SIZE, "%s\n", tf_started ? "yes" : "no");
+}
+static struct tf_sysfs_entry tf_started_entry =
+	__ATTR_RO(tf_started);
+
+static ssize_t workspace_addr_show(struct tf_device *dev, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "0x%08x\n", dev->workspace_addr);
+}
+static struct tf_sysfs_entry tf_workspace_addr_entry =
+	__ATTR_RO(workspace_addr);
+
+static ssize_t workspace_size_show(struct tf_device *dev, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "0x%08x\n", dev->workspace_size);
+}
+static struct tf_sysfs_entry tf_workspace_size_entry =
+	__ATTR_RO(workspace_size);
+#endif
+
+static ssize_t tf_attr_show(struct kobject *kobj, struct attribute *attr,
+	char *page)
+{
+	struct tf_sysfs_entry *entry = container_of(attr, struct tf_sysfs_entry,
+		attr);
+	struct tf_device *dev = container_of(kobj, struct tf_device, kobj);
+
+	if (!entry->show)
+		return -EIO;
+
+	return entry->show(dev, page);
 }
 
-static const struct sysfs_ops kobj_sysfs_operations = {
-	.show = kobject_show,
+static ssize_t tf_attr_store(struct kobject *kobj, struct attribute *attr,
+	const char *page, size_t length)
+{
+	struct tf_sysfs_entry *entry = container_of(attr, struct tf_sysfs_entry,
+		attr);
+	struct tf_device *dev = container_of(kobj, struct tf_device, kobj);
+
+	if (!entry->store)
+		return -EIO;
+
+	return entry->store(dev, page, length);
+}
+
+static void tf_kobj_release(struct kobject *kobj) {}
+
+static struct attribute *tf_default_attrs[] = {
+	&tf_info_entry.attr,
+#ifdef CONFIG_TF_ZEBRA
+	&tf_started_entry.attr,
+	&tf_workspace_addr_entry.attr,
+	&tf_workspace_size_entry.attr,
+#endif
+	NULL,
+};
+static const struct sysfs_ops tf_sysfs_ops = {
+	.show	= tf_attr_show,
+	.store	= tf_attr_store,
+};
+static struct kobj_type tf_ktype = {
+	.release	= tf_kobj_release,
+	.sysfs_ops	= &tf_sysfs_ops,
+	.default_attrs	= tf_default_attrs
 };
 
 /*----------------------------------------------------------------------------*/
 
+#if defined(MODULE) && defined(CONFIG_TF_ZEBRA)
+static char *smc_mem;
+module_param(smc_mem, charp, S_IRUGO);
+#endif
 static const struct syscore_ops g_tf_syscore_ops = {
 	.shutdown = tf_device_shutdown,
 	.suspend = tf_device_suspend,
@@ -212,7 +304,6 @@ static int __init tf_device_register(void)
 {
 	int error;
 	struct tf_device *dev = &g_tf_dev;
-	struct tf_device_stats *dev_stats = &dev->stats;
 
 	dprintk(KERN_INFO "tf_device_register()\n");
 
@@ -227,21 +318,33 @@ static int __init tf_device_register(void)
 	INIT_LIST_HEAD(&dev->connection_list);
 	spin_lock_init(&dev->connection_list_lock);
 
+#if defined(MODULE) && defined(CONFIG_TF_ZEBRA)
+	error = (*tf_comm_early_init)();
+	if (error)
+		goto module_early_init_failed;
+
+	error = tf_device_mshield_init(smc_mem);
+	if (error)
+		goto mshield_init_failed;
+
+#ifdef CONFIG_TF_DRIVER_CRYPTO_FIPS
+	error = tf_crypto_hmac_module_init();
+	if (error)
+		goto hmac_init_failed;
+
+	error = tf_self_test_register_device();
+	if (error)
+		goto self_test_register_device_failed;
+#endif
+#endif
+
 	/* register the sysfs object driver stats */
-	dev_stats->kobj_type.sysfs_ops = &kobj_sysfs_operations;
-
-	dev_stats->kobj_stat_attribute.name = "info";
-	dev_stats->kobj_stat_attribute.mode = S_IRUGO;
-	dev_stats->kobj_attribute_list[0] =
-		&dev_stats->kobj_stat_attribute;
-
-	dev_stats->kobj_type.default_attrs =
-		dev_stats->kobj_attribute_list,
-	error = kobject_init_and_add(&(dev_stats->kobj),
-		 &(dev_stats->kobj_type), NULL, "%s",
+	error = kobject_init_and_add(&dev->kobj,  &tf_ktype, NULL, "%s",
 		 TF_DEVICE_BASE_NAME);
 	if (error) {
-		kobject_put(&dev_stats->kobj);
+		printk(KERN_ERR "tf_device_register(): "
+			"kobject_init_and_add failed (error %d)!\n", error);
+		kobject_put(&dev->kobj);
 		goto kobject_init_and_add_failed;
 	}
 
@@ -285,12 +388,22 @@ static int __init tf_device_register(void)
 		goto init_failed;
 	}
 
-#ifdef CONFIG_ANDROID
+#ifdef CONFIG_TF_DRIVER_CRYPTO_FIPS
+	error = tf_self_test_post_init(&(dev_stats->kobj));
+	/* N.B. error > 0 indicates a POST failure, which will not
+	   prevent the module from loading. */
+	if (error < 0) {
+		dprintk(KERN_ERR "tf_device_register(): "
+			"tf_self_test_post_vectors failed (error %d)!\n",
+			error);
+		goto post_failed;
+	}
+#endif
+
 	tf_class = class_create(THIS_MODULE, TF_DEVICE_BASE_NAME);
 	device_create(tf_class, NULL,
 		dev->dev_number,
 		NULL, TF_DEVICE_BASE_NAME);
-#endif
 
 #ifdef CONFIG_TF_ZEBRA
 	/*
@@ -298,11 +411,10 @@ static int __init tf_device_register(void)
 	 */
 	error = tf_ctrl_device_register();
 	if (error)
-		goto init_failed;
+		goto ctrl_failed;
 #endif
 
-#ifdef CONFIG_BENCH_SECURE_CYCLE
-	run_bogo_mips();
+#ifdef CONFIG_TF_DRIVER_DEBUG_SUPPORT
 	address_cache_property((unsigned long) &tf_device_register);
 #endif
 	/*
@@ -315,6 +427,13 @@ static int __init tf_device_register(void)
 	/*
 	 * Error: undo all operations in the reverse order
 	 */
+#ifdef CONFIG_TF_ZEBRA
+ctrl_failed:
+#endif
+#ifdef CONFIG_TF_DRIVER_CRYPTO_FIPS
+	tf_self_test_post_exit();
+post_failed:
+#endif
 init_failed:
 	cdev_del(&dev->cdev);
 cdev_add_failed:
@@ -322,8 +441,19 @@ cdev_add_failed:
 register_chrdev_region_failed:
 	unregister_syscore_ops((struct syscore_ops *)&g_tf_syscore_ops);
 kobject_init_and_add_failed:
-	kobject_del(&g_tf_dev.stats.kobj);
+	kobject_del(&g_tf_dev.kobj);
 
+#if defined(MODULE) && defined(CONFIG_TF_ZEBRA)
+#ifdef CONFIG_TF_DRIVER_CRYPTO_FIPS
+	tf_self_test_unregister_device();
+self_test_register_device_failed:
+	tf_crypto_hmac_module_exit();
+hmac_init_failed:
+#endif
+	tf_device_mshield_exit();
+mshield_init_failed:
+module_early_init_failed:
+#endif
 	dprintk(KERN_INFO "tf_device_register(): Failure (error %d)\n",
 		error);
 	return error;
@@ -348,19 +478,6 @@ static int tf_device_open(struct inode *inode, struct file *file)
 			file, error);
 		goto error;
 	}
-
-#ifndef CONFIG_ANDROID
-	/*
-	 * Check file flags. We only autthorize the O_RDWR access
-	 */
-	if (file->f_flags != O_RDWR) {
-		dprintk(KERN_ERR "tf_device_open(%p): "
-			"Invalid access mode %u\n",
-			file, file->f_flags);
-		error = -EACCES;
-		goto error;
-	}
-#endif
 
 	/*
 	 * Open a new connection.

@@ -102,16 +102,16 @@ void tf_set_current_time(struct tf_comm *comm)
 
 	/* read sync_serial_n and change the TimeSlot bit field */
 	new_sync_serial =
-		tf_read_reg32(&comm->pBuffer->sync_serial_n) + 1;
+		tf_read_reg32(&comm->l1_buffer->sync_serial_n) + 1;
 
 	do_gettimeofday(&now);
 	time64 = now.tv_sec;
 	time64 = (time64 * 1000) + (now.tv_usec / 1000);
 
 	/* Write the new time64 and nSyncSerial into shared memory */
-	tf_write_reg64(&comm->pBuffer->time_n[new_sync_serial &
+	tf_write_reg64(&comm->l1_buffer->time_n[new_sync_serial &
 		TF_SYNC_SERIAL_TIMESLOT_N], time64);
-	tf_write_reg32(&comm->pBuffer->sync_serial_n,
+	tf_write_reg32(&comm->l1_buffer->sync_serial_n,
 		new_sync_serial);
 
 	spin_unlock(&comm->lock);
@@ -134,12 +134,12 @@ static inline void tf_read_timeout(struct tf_comm *comm, u64 *time)
 
 	while (sync_serial_s_initial != sync_serial_s_final) {
 		sync_serial_s_initial = tf_read_reg32(
-			&comm->pBuffer->sync_serial_s);
+			&comm->l1_buffer->sync_serial_s);
 		time64 = tf_read_reg64(
-			&comm->pBuffer->timeout_s[sync_serial_s_initial&1]);
+			&comm->l1_buffer->timeout_s[sync_serial_s_initial&1]);
 
 		sync_serial_s_final = tf_read_reg32(
-			&comm->pBuffer->sync_serial_s);
+			&comm->l1_buffer->sync_serial_s);
 	}
 
 	spin_unlock(&comm->lock);
@@ -456,7 +456,11 @@ u32 tf_get_l2_descriptor_common(u32 vaddr, struct mm_struct *mm)
 			 * Linux's pte doesn't keep track of TEX value.
 			 * Have to jump to hwpte see include/asm/pgtable.h
 			 */
-			hwpte = (u32 *) (((u32) ptep) - 0x800);
+#ifdef PTE_HWTABLE_SIZE
+			hwpte = (u32 *) (ptep + PTE_HWTABLE_PTRS);
+#else
+			hwpte = (u32 *) (ptep - PTRS_PER_PTE);
+#endif
 			if (((*hwpte) & L2_DESCRIPTOR_ADDR_MASK) !=
 					((*ptep) & L2_DESCRIPTOR_ADDR_MASK))
 				goto error;
@@ -622,9 +626,9 @@ void tf_cleanup_shared_memory(
 }
 
 /*
- * Make sure the coarse pages are allocated. If not allocated, do it Locks down
- * the physical memory pages
- * Verifies the memory attributes depending on flags
+ * Make sure the coarse pages are allocated. If not allocated, do it.
+ * Locks down the physical memory pages.
+ * Verifies the memory attributes depending on flags.
  */
 int tf_fill_descriptor_table(
 	struct tf_coarse_page_table_allocation_context *alloc_context,
@@ -642,7 +646,7 @@ int tf_fill_descriptor_table(
 	u32 coarse_page_count;
 	u32 page_count;
 	u32 page_shift = 0;
-	int error;
+	int ret = 0;
 	unsigned int info = read_cpuid(CPUID_CACHETYPE);
 
 	dprintk(KERN_INFO "tf_fill_descriptor_table"
@@ -680,7 +684,7 @@ int tf_fill_descriptor_table(
 		dprintk(KERN_ERR "tf_fill_descriptor_table(%p): "
 			"%u pages required to map shared memory!\n",
 			shmem_desc, page_count);
-		error = -ENOMEM;
+		ret = -ENOMEM;
 		goto error;
 	}
 
@@ -729,11 +733,11 @@ int tf_fill_descriptor_table(
 
 			if (coarse_pg_table == NULL) {
 				dprintk(KERN_ERR
-					"tf_fill_descriptor_table(%p):"
-					" SCXLNXConnAllocateCoarsePageTable "
+					"tf_fill_descriptor_table(%p): "
+					"tf_alloc_coarse_page_table "
 					"failed for coarse page %d\n",
 					shmem_desc, coarse_page_index);
-				error = -ENOMEM;
+				ret = -ENOMEM;
 				goto error;
 			}
 
@@ -778,11 +782,11 @@ int tf_fill_descriptor_table(
 
 			if ((pages <= 0) ||
 				(pages != (pages_to_get - page_shift))) {
-				dprintk(KERN_ERR"tf_fill_descriptor_table:"
+				dprintk(KERN_ERR "tf_fill_descriptor_table:"
 					" get_user_pages got %d pages while "
 					"trying to get %d pages!\n",
 					pages, pages_to_get - page_shift);
-				error = -EFAULT;
+				ret = -EFAULT;
 				goto error;
 			}
 
@@ -813,34 +817,29 @@ int tf_fill_descriptor_table(
 						"memory. Rejecting!\n",
 						coarse_pg_table->
 							descriptors[j]);
-					error = -EFAULT;
+					ret = -EFAULT;
 					goto error;
 				}
 			}
-		} else {
-			/* Kernel-space memory */
-			for (j = page_shift;
-				  j < pages_to_get;
-				  j++) {
+		} else if (is_vmalloc_addr((void *)buffer_offset_vaddr)) {
+			/* Kernel-space memory obtained through vmalloc */
+			dprintk(KERN_INFO
+				"tf_fill_descriptor_table: "
+				"vmalloc'ed buffer starting at %p\n",
+			       (void *)buffer_offset_vaddr);
+			for (j = page_shift; j < pages_to_get; j++) {
 				struct page *page;
 				void *addr =
 					(void *)(buffer_offset_vaddr +
 						(j - page_shift) * PAGE_SIZE);
-				if (!is_vmalloc_addr(addr)) {
-					dprintk(KERN_ERR
-						"tf_fill_descriptor_table: "
-						"cannot handle address %p\n",
-						addr);
-					error = -EFAULT;
-					goto error;
-				}
 				page = vmalloc_to_page(addr);
 				if (page == NULL) {
 					dprintk(KERN_ERR
 						"tf_fill_descriptor_table: "
-						"cannot map %p to page\n",
+						"cannot map %p (vmalloc) "
+						"to page\n",
 						addr);
-					error = -ENOMEM;
+					ret = -EFAULT;
 					goto error;
 				}
 				coarse_pg_table->descriptors[j] = (u32)page;
@@ -853,6 +852,17 @@ int tf_fill_descriptor_table(
 					&init_mm,
 					vmas[j]);
 			}
+		} else {
+			/* Other kernel-space memory */
+			dprintk(KERN_INFO
+				"tf_fill_descriptor_table: "
+				"buffer starting at virtual address %p\n",
+			       (void *)buffer_offset_vaddr);
+			dprintk(KERN_WARNING
+				"tf_fill_descriptor_table: "
+				"address type not supported\n");
+			ret = -ENOSYS;
+			goto error;
 		}
 
 		dmac_flush_range((void *)coarse_pg_table->descriptors,
@@ -917,7 +927,7 @@ error:
 			shmem_desc,
 			0);
 
-	return error;
+	return ret;
 }
 
 
@@ -928,7 +938,7 @@ error:
 u8 *tf_get_description(struct tf_comm *comm)
 {
 	if (test_bit(TF_COMM_FLAG_L1_SHARED_ALLOCATED, &(comm->flags)))
-		return comm->pBuffer->version_description;
+		return comm->l1_buffer->version_description;
 
 	return NULL;
 }
@@ -1000,9 +1010,9 @@ static void tf_copy_answers(struct tf_comm *comm)
 	if (test_bit(TF_COMM_FLAG_L1_SHARED_ALLOCATED, &(comm->flags))) {
 		spin_lock(&comm->lock);
 		first_free_answer = tf_read_reg32(
-			&comm->pBuffer->first_free_answer);
+			&comm->l1_buffer->first_free_answer);
 		first_answer = tf_read_reg32(
-			&comm->pBuffer->first_answer);
+			&comm->l1_buffer->first_answer);
 
 		while (first_answer != first_free_answer) {
 			/* answer queue not empty */
@@ -1026,7 +1036,7 @@ static void tf_copy_answers(struct tf_comm *comm)
 			for (i = 0;
 			     i < sizeof(struct tf_answer_header)/sizeof(u32);
 			       i++)
-				temp[i] = comm->pBuffer->answer_queue[
+				temp[i] = comm->l1_buffer->answer_queue[
 					(first_answer + i) %
 						TF_S_ANSWER_QUEUE_CAPACITY];
 
@@ -1035,7 +1045,7 @@ static void tf_copy_answers(struct tf_comm *comm)
 				sizeof(struct tf_answer_header)/sizeof(u32);
 			temp = (uint32_t *) &sComAnswer;
 			for (i = 0; i < command_size; i++)
-				temp[i] = comm->pBuffer->answer_queue[
+				temp[i] = comm->l1_buffer->answer_queue[
 					(first_answer + i) %
 						TF_S_ANSWER_QUEUE_CAPACITY];
 
@@ -1049,7 +1059,7 @@ static void tf_copy_answers(struct tf_comm *comm)
 			answerStructureTemp->answer_copied = true;
 
 			first_answer += command_size;
-			tf_write_reg32(&comm->pBuffer->first_answer,
+			tf_write_reg32(&comm->l1_buffer->first_answer,
 				first_answer);
 		}
 		spin_unlock(&(comm->lock));
@@ -1078,9 +1088,9 @@ static void tf_copy_command(
 			spin_lock(&comm->lock);
 
 			first_command = tf_read_reg32(
-				&comm->pBuffer->first_command);
+				&comm->l1_buffer->first_command);
 			first_free_command = tf_read_reg32(
-				&comm->pBuffer->first_free_command);
+				&comm->l1_buffer->first_free_command);
 
 			queue_words_count = first_free_command - first_command;
 			command_size     = command->header.message_size +
@@ -1164,7 +1174,7 @@ copy:
 					tf_dump_command(command);
 
 					for (i = 0; i < command_size; i++)
-						comm->pBuffer->command_queue[
+						comm->l1_buffer->command_queue[
 						(first_free_command + i) %
 						TF_N_MESSAGE_QUEUE_CAPACITY] =
 						((uint32_t *) command)[i];
@@ -1175,7 +1185,7 @@ copy:
 
 					tf_write_reg32(
 						&comm->
-						pBuffer->first_free_command,
+						l1_buffer->first_free_command,
 						first_free_command);
 			}
 			spin_unlock(&comm->lock);
@@ -1196,9 +1206,6 @@ static int tf_send_recv(struct tf_comm *comm,
 	struct tf_answer_struct *answerStruct,
 	struct tf_connection *connection,
 	int bKillable
-	#ifdef CONFIG_TF_ZEBRA
-	, bool *secure_is_idle
-	#endif
 	)
 {
 	int result;
@@ -1233,17 +1240,6 @@ copy_answers:
 
 #ifdef CONFIG_FREEZER
 	if (unlikely(freezing(current))) {
-
-#ifdef CONFIG_TF_ZEBRA
-		if (!(*secure_is_idle)) {
-			if (tf_schedule_secure_world(comm, true) ==
-				STATUS_PENDING)
-				goto copy_answers;
-
-			tf_l4sec_clkdm_allow_idle(true);
-			*secure_is_idle = true;
-		}
-#endif
 
 		dprintk(KERN_INFO
 			"Entering refrigerator.\n");
@@ -1327,9 +1323,9 @@ copy_answers:
 		u32 first_command;
 		spin_lock(&comm->lock);
 		first_command = tf_read_reg32(
-			&comm->pBuffer->first_command);
+			&comm->l1_buffer->first_command);
 		first_free_command = tf_read_reg32(
-			&comm->pBuffer->first_free_command);
+			&comm->l1_buffer->first_free_command);
 		spin_unlock(&comm->lock);
 		tf_read_timeout(comm, &timeout);
 		if ((first_free_command == first_command) &&
@@ -1350,13 +1346,9 @@ copy_answers:
 	 */
 #ifdef CONFIG_TF_ZEBRA
 schedule_secure_world:
-	if (*secure_is_idle) {
-		tf_l4sec_clkdm_wakeup(true);
-		*secure_is_idle = false;
-	}
 #endif
 
-	result = tf_schedule_secure_world(comm, false);
+	result = tf_schedule_secure_world(comm);
 	if (result < 0)
 		goto exit;
 	goto copy_answers;
@@ -1383,18 +1375,6 @@ wait:
 			"prepare to sleep 0x%lx jiffies\n",
 			nRelativeTimeoutJiffies);
 
-#ifdef CONFIG_TF_ZEBRA
-	if (!(*secure_is_idle)) {
-		if (tf_schedule_secure_world(comm, true) == STATUS_PENDING) {
-			finish_wait(&comm->wait_queue, &wait);
-			wait_prepared = false;
-			goto copy_answers;
-		}
-		tf_l4sec_clkdm_allow_idle(true);
-		*secure_is_idle = true;
-	}
-#endif
-
 	/* go to sleep */
 	if (schedule_timeout(nRelativeTimeoutJiffies) == 0)
 		dprintk(KERN_INFO
@@ -1412,16 +1392,6 @@ exit:
 		finish_wait(&comm->wait_queue, &wait);
 		wait_prepared = false;
 	}
-
-#ifdef CONFIG_TF_ZEBRA
-	if ((!(*secure_is_idle)) && (result != -EIO)) {
-		if (tf_schedule_secure_world(comm, true) == STATUS_PENDING)
-			goto copy_answers;
-
-		tf_l4sec_clkdm_allow_idle(true);
-		*secure_is_idle = true;
-	}
-#endif
 
 #ifdef CONFIG_FREEZER
 	current->flags &= ~(PF_FREEZER_NOSIG);
@@ -1452,9 +1422,6 @@ int tf_send_receive(struct tf_comm *comm,
 	long ret_affinity;
 	cpumask_t saved_cpu_mask;
 	cpumask_t local_cpu_mask = CPU_MASK_NONE;
-#endif
-#ifdef CONFIG_TF_ZEBRA
-	bool secure_is_idle = true;
 #endif
 
 	answerStructure.answer = answer;
@@ -1493,11 +1460,7 @@ int tf_send_receive(struct tf_comm *comm,
 	 * Send the command
 	 */
 	error = tf_send_recv(comm,
-		command, &answerStructure, connection, bKillable
-		#ifdef CONFIG_TF_ZEBRA
-		, &secure_is_idle
-		#endif
-		);
+		command, &answerStructure, connection, bKillable);
 
 	if (!bKillable && sigkill_pending()) {
 		if ((command->header.message_type ==
@@ -1578,11 +1541,7 @@ int tf_send_receive(struct tf_comm *comm,
 			connection->device_context;
 
 		error = tf_send_recv(comm,
-			command, &answerStructure, connection, false
-			#ifdef CONFIG_TF_ZEBRA
-			, &secure_is_idle
-			#endif
-			);
+			command, &answerStructure, connection, false);
 		if (error == -EINTR) {
 			/*
 			* Another thread already sent
@@ -1624,11 +1583,7 @@ int tf_send_receive(struct tf_comm *comm,
 
 destroy_context:
 	error = tf_send_recv(comm,
-	command, &answerStructure, connection, false
-	#ifdef CONFIG_TF_ZEBRA
-	, &secure_is_idle
-	#endif
-	);
+	command, &answerStructure, connection, false);
 
 	/*
 	 * tf_send_recv cannot return an error because
@@ -1683,7 +1638,7 @@ int tf_power_management(struct tf_comm *comm,
 	}
 #endif
 
-	status = ((tf_read_reg32(&(comm->pBuffer->status_s))
+	status = ((tf_read_reg32(&(comm->l1_buffer->status_s))
 		& TF_STATUS_POWER_STATE_MASK)
 		>> TF_STATUS_POWER_STATE_SHIFT);
 

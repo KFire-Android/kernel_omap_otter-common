@@ -32,6 +32,24 @@ static inline struct tf_connection *tf_conn_from_file(
 	return file->private_data;
 }
 
+int tf_validate_shmem_and_flags(u32 shmem, u32 shmem_size, u32 flags);
+
+int tf_map_shmem(
+		struct tf_connection *connection,
+		u32 buffer,
+		/* flags for read-write access rights on the memory */
+		u32 flags,
+		bool in_user_space,
+		u32 descriptors[TF_MAX_COARSE_PAGES],
+		u32 *buffer_start_offset,
+		u32 buffer_size,
+		struct tf_shmem_desc **shmem_desc,
+		u32 *descriptor_count);
+
+void tf_unmap_shmem(
+		struct tf_connection *connection,
+		struct tf_shmem_desc *shmem_desc,
+		u32 full_cleanup);
 /*----------------------------------------------------------------------------
  * Connection operations to the Secure World
  *----------------------------------------------------------------------------*/

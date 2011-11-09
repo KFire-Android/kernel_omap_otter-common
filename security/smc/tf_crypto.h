@@ -26,6 +26,10 @@
 
 #include <clockdomain.h>
 
+#ifdef CONFIG_TF_DRIVER_CRYPTO_FIPS
+#include <linux/sysdev.h>
+#endif
+
 #ifdef __ASM_ARM_ARCH_OMAP_CLOCKDOMAIN_H
 #define clkdm_wakeup omap2_clkdm_wakeup
 #define clkdm_allow_idle omap2_clkdm_allow_idle
@@ -253,11 +257,10 @@ void tf_crypto_wait_for_ready_bit_infinitely(u32 *reg, u32 bit);
 
 void tf_crypto_enable_clock(uint32_t clock_paddr);
 void tf_crypto_disable_clock(uint32_t clock_paddr);
+u32 tf_crypto_turn_off_clocks(void);
 
 #define LOCK_HWA	true
 #define UNLOCK_HWA	false
-
-void tf_crypto_lock_hwa(u32 hwa_id, bool do_lock);
 
 /*---------------------------------------------------------------------------*/
 /*                               AES operations                              */
@@ -341,9 +344,55 @@ static inline void unregister_smc_public_crypto_digest(void) {}
  *sha_state:	State of the operation
  *data:			Input buffer to process
  *data_length:	Length in bytes of the input buffer.
+ *buffer_origin: TF_BUFFER_USER or TF_BUFFER_KERNEL
  */
 bool tf_digest_update(
 	struct tf_crypto_sha_operation_state *sha_state,
-	u8 *data, u32 data_length);
+	u8 *data, u32 data_length, unsigned int buffer_origin);
+
+void tf_aes_pm_resume(void);
+
+#define TF_BUFFER_USER   0
+#define TF_BUFFER_KERNEL 1
+
+#define TF_CRYPTO_ALG_MD5         0x00000001
+#define TF_CRYPTO_ALG_SHA1        0x00000002
+#define TF_CRYPTO_ALG_SHA224      0x00000004
+#define TF_CRYPTO_ALG_SHA256      0x00000008
+#define TF_CRYPTO_ALG_AES_ECB_128 0x00000100
+#define TF_CRYPTO_ALG_AES_ECB_192 0x00000200
+#define TF_CRYPTO_ALG_AES_ECB_256 0x00000400
+#define TF_CRYPTO_ALG_AES_CBC_128 0x00000800
+#define TF_CRYPTO_ALG_AES_CBC_192 0x00001000
+#define TF_CRYPTO_ALG_AES_CBC_256 0x00002000
+#define TF_CRYPTO_ALG_AES_CTR_128 0x00004000
+#define TF_CRYPTO_ALG_AES_CTR_192 0x00008000
+#define TF_CRYPTO_ALG_AES_CTR_256 0x00010000
+#define TF_CRYPTO_ALG_HMAC_MD5    0x00100000
+#define TF_CRYPTO_ALG_HMAC_SHA1   0x00200000
+#define TF_CRYPTO_ALG_HMAC_SHA224 0x00400000
+#define TF_CRYPTO_ALG_HMAC_SHA256 0x00800000
+#define TF_CRYPTO_ALG_HMAC_ALL    0x00f00000
+
+#ifdef CONFIG_TF_DRIVER_FAULT_INJECTION
+extern unsigned tf_fault_injection_mask;
+#endif
+
+#ifdef CONFIG_TF_DRIVER_CRYPTO_FIPS
+
+int __init tf_crypto_hmac_module_init(void);
+void __exit tf_crypto_hmac_module_exit(void);
+
+int __init tf_self_test_register_device(void);
+void __exit tf_self_test_unregister_device(void);
+
+int tf_self_test_post_init(struct kobject *parent);
+void tf_self_test_post_exit(void);
+unsigned tf_self_test_post_vectors(void);
+
+#define TF_CRYPTO_ALG_INTEGRITY   0x04000000
+extern char *tf_integrity_hmac_sha256_expected_value;
+
+#endif /* CONFIG_TF_DRIVER_CRYPTO_FIPS */
 
 #endif /*__TF_PUBLIC_CRYPTO_H */

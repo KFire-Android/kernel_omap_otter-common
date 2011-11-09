@@ -154,9 +154,7 @@ int tf_fill_descriptor_table(
  * Standard communication operations
  *----------------------------------------------------------------------------*/
 
-#define STATUS_PENDING 0x00000001
-
-int tf_schedule_secure_world(struct tf_comm *comm, bool prepare_exit);
+int tf_schedule_secure_world(struct tf_comm *comm);
 
 int tf_send_receive(
 	struct tf_comm *comm,
