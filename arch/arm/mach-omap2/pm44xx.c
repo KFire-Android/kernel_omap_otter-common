@@ -126,6 +126,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state, bool suspend)
 	int per_next_state = PWRDM_POWER_ON;
 	int core_next_state = PWRDM_POWER_ON;
 	int mpu_next_state = PWRDM_POWER_ON;
+	int ret;
 
 	pwrdm_clear_all_prev_pwrst(cpu0_pwrdm);
 	pwrdm_clear_all_prev_pwrst(mpu_pwrdm);
@@ -137,6 +138,10 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state, bool suspend)
 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
 	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+
+	ret = omap2_gpio_prepare_for_idle(omap4_device_next_state_off());
+	if (ret)
+		goto abort_gpio;
 
 	if (mpu_next_state < PWRDM_POWER_INACTIVE) {
 		if (omap_dvfs_is_scaling(mpu_voltdm)) {
@@ -174,10 +179,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state, bool suspend)
 		}
 	}
 
-	omap2_gpio_set_edge_wakeup();
-
 	if (omap4_device_next_state_off()) {
-		omap2_gpio_prepare_for_idle(true);
 		omap_gpmc_save_context();
 		omap_dma_global_context_save();
 	}
@@ -232,19 +234,11 @@ abort_device_off:
 	}
 
 	if (omap4_device_next_state_off()) {
-		/*
-		 * GPIO: since we have put_synced clks, we need to resume
-		 * even if OFF was not really achieved
-		 */
-		omap2_gpio_resume_after_idle();
-
 		/* Disable the extension of Non-EMIF I/O isolation */
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_ISOOVR_EXTEND_MASK,
 			0, OMAP4430_PRM_PARTITION,
 			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
 	}
-
-	omap2_gpio_restore_edge_wakeup();
 
 	if (mpu_next_state < PWRDM_POWER_INACTIVE) {
 		omap_vc_set_auto_trans(mpu_voltdm,
@@ -252,6 +246,9 @@ abort_device_off:
 		omap_sr_enable(mpu_voltdm);
 	}
 
+	omap2_gpio_resume_after_idle(omap4_device_next_state_off());
+
+abort_gpio:
 	return;
 }
 
@@ -752,13 +749,15 @@ static void __init syscontrol_setup_regs(void)
 {
 	u32 v;
 
-	/* Disable LPDDR VREF manual control */
+	/* Disable LPDDR VREF manual control and enable Auto control */
 	v = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_3);
 	v &= ~(OMAP4_LPDDR21_VREF_EN_CA_MASK | OMAP4_LPDDR21_VREF_EN_DQ_MASK);
+	v |= OMAP4_LPDDR21_VREF_AUTO_EN_CA_MASK | OMAP4_LPDDR21_VREF_AUTO_EN_DQ_MASK;
         omap4_ctrl_pad_writel(v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_3);
 
 	v = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_3);
 	v &= ~(OMAP4_LPDDR21_VREF_EN_CA_MASK | OMAP4_LPDDR21_VREF_EN_DQ_MASK);
+	v |= OMAP4_LPDDR21_VREF_AUTO_EN_CA_MASK | OMAP4_LPDDR21_VREF_AUTO_EN_DQ_MASK;
         omap4_ctrl_pad_writel(v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_3);
 
 	/*
