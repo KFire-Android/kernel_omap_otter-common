@@ -1914,7 +1914,6 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 	musb->gadget_driver = driver;
 	musb->g.dev.driver = &driver->driver;
 	driver->driver.bus = NULL;
-	musb->softconnect = 1;
 	spin_unlock_irqrestore(&musb->lock, flags);
 
 	retval = bind(&musb->g);
@@ -1927,13 +1926,9 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 	spin_lock_irqsave(&musb->lock, flags);
 
 	otg_set_peripheral(musb->xceiv, &musb->g);
-	musb->xceiv->state = OTG_STATE_B_IDLE;
-	musb->is_active = 1;
 
 	if (!is_otg_enabled(musb))
 		musb_start(musb);
-
-	otg_set_peripheral(musb->xceiv, &musb->g);
 
 	spin_unlock_irqrestore(&musb->lock, flags);
 
@@ -1952,14 +1947,13 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 			goto err2;
 		}
 
-		if ((musb->xceiv->last_event == USB_EVENT_ID)
-					&& musb->xceiv->set_vbus)
-			otg_set_vbus(musb->xceiv, 1);
-
 		hcd->self.uses_pio_for_control = 1;
 	}
-	if (musb->xceiv->last_event == USB_EVENT_NONE)
+
+	if (musb->xceiv->last_event == USB_EVENT_NONE) {
+		musb->xceiv->state = OTG_STATE_B_IDLE;
 		pm_runtime_put(musb->controller);
+	}
 
 	return 0;
 
