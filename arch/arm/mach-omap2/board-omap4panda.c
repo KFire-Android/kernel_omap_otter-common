@@ -413,6 +413,7 @@ static struct regulator_init_data omap4_panda_vusb = {
 static struct regulator_init_data omap4_panda_clk32kg = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
 	},
 };
 
