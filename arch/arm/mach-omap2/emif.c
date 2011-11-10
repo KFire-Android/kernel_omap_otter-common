@@ -19,6 +19,7 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
+#include <linux/reboot.h>
 #include <linux/slab.h>
 
 #include <plat/omap_hwmod.h>
@@ -801,6 +802,13 @@ static irqreturn_t emif_threaded_isr(int irq, void *dev_id)
 		emif_notify_pending &= ~(1 << emif_nr);
 	}
 
+	if (emif_temperature_level[emif_nr] >= SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
+		pr_emerg("%s %d: SDRAM temperature exceeds operating"
+			"limit.. Shutdown system...\n", __func__, emif_nr + 1);
+
+		kernel_power_off();
+	}
+
 	return IRQ_HANDLED;
 }
 
@@ -1145,9 +1153,12 @@ static void init_temperature(u32 emif_nr)
 				   &dev_attr_temperature));
 	kobject_uevent(&(emif[emif_nr].pdev->dev.kobj), KOBJ_ADD);
 
-	if (emif_temperature_level[emif_nr] == SDRAM_TEMP_VERY_HIGH_SHUTDOWN)
+	if (emif_temperature_level[emif_nr] >= SDRAM_TEMP_VERY_HIGH_SHUTDOWN) {
 		pr_emerg("EMIF %d: SDRAM temperature exceeds operating"
-			 "limit.. Needs shut down!!!", emif_nr + 1);
+			 "limit! Powering OFF\n", emif_nr + 1);
+
+		kernel_power_off();
+	}
 }
 
 /*
