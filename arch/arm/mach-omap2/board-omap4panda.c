@@ -817,13 +817,7 @@ static void __init omap4_panda_init(void)
 	omap4_register_ion();
 	omap4_audio_conf();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
-/*
- * 	This is temporaray. With WLAN regsitering, we see that UART2 is not
- * 	idling on panda and CORE RET is not happening. So removing this FTM.
- * 	Later will be enabled.
- *
- *	platform_device_register(&omap_vwlan_device);
- */
+	platform_device_register(&omap_vwlan_device);
 	board_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
 	omap4_ehci_init();
