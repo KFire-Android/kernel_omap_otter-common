@@ -721,7 +721,8 @@ static void hdmi_core_av_packet_config(struct hdmi_ip_data *ip_data,
 }
 
 void hdmi_wp_init(struct omap_video_timings *timings,
-			struct hdmi_video_format *video_fmt)
+			struct hdmi_video_format *video_fmt,
+			struct hdmi_irq_vector *irq_enable)
 {
 	pr_debug("Enter hdmi_wp_init\n");
 
@@ -736,6 +737,19 @@ void hdmi_wp_init(struct omap_video_timings *timings,
 	video_fmt->y_res = 0;
 	video_fmt->x_res = 0;
 
+	irq_enable->pll_recal = 0;
+	irq_enable->pll_unlock = 0;
+	irq_enable->pll_lock = 0;
+	irq_enable->phy_disconnect = 0;
+	irq_enable->phy_connect = 0;
+	irq_enable->phy_short_5v = 0;
+	irq_enable->video_end_fr = 0;
+	irq_enable->video_vsync = 0;
+	irq_enable->fifo_sample_req = 0;
+	irq_enable->fifo_overflow = 0;
+	irq_enable->fifo_underflow = 0;
+	irq_enable->ocp_timeout = 0;
+	irq_enable->core = 0;
 }
 
 void ti_hdmi_4xxx_wp_video_start(struct hdmi_ip_data *ip_data, bool start)
@@ -814,8 +828,9 @@ void ti_hdmi_4xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	struct hdmi_core_video_config v_core_cfg;
 	struct hdmi_core_packet_enable_repeat repeat_cfg;
 	struct hdmi_config *cfg = &ip_data->cfg;
+	struct hdmi_irq_vector irq_enable;
 
-	hdmi_wp_init(&video_timing, &video_format);
+	hdmi_wp_init(&video_timing, &video_format, &irq_enable);
 
 	hdmi_core_init(&v_core_cfg, avi_cfg, &repeat_cfg);
 

@@ -395,8 +395,9 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	struct hdmi_core_vid_config v_core_cfg;
 	struct hdmi_core_infoframe_avi *avi_cfg = &ip_data->avi_cfg;
 	struct hdmi_config *cfg = &ip_data->cfg;
+	struct hdmi_irq_vector irq_enable;
 
-	hdmi_wp_init(&video_timing, &video_format);
+	hdmi_wp_init(&video_timing, &video_format, &irq_enable);
 
 	hdmi_core_init(&v_core_cfg, avi_cfg, cfg);
 
