@@ -45,6 +45,7 @@
 /* #include <plat/control.h> */
 #include <plat/temperature_sensor.h>
 #include <plat/omap_device.h>
+#include <plat/omap-pm.h>
 #include <mach/ctrl_module_core_44xx.h>
 #include <linux/gpio.h>
 
@@ -878,10 +879,15 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 
 	temp_sensor->phy_base = pdata->offset;
 	temp_sensor->pdev = pdev;
-	temp_sensor->dev = &pdev->dev;
+	temp_sensor->dev = dev;
 
 	pm_runtime_enable(dev);
 	pm_runtime_irq_safe(dev);
+
+
+	kobject_uevent(&pdev->dev.kobj, KOBJ_ADD);
+	platform_set_drvdata(pdev, temp_sensor);
+
 
 	/*
 	 * check if the efuse has a non-zero value if not
@@ -918,9 +924,6 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto therm_fw_alloc_err;
 	}
-
-	kobject_uevent(&pdev->dev.kobj, KOBJ_ADD);
-	platform_set_drvdata(pdev, temp_sensor);
 
 	omap_enable_continuous_mode(temp_sensor, 1);
 	omap_configure_temp_sensor_thresholds(temp_sensor);
@@ -1025,6 +1028,8 @@ static int __devexit omap_temp_sensor_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static void omap_temp_sensor_save_ctxt(struct omap_temp_sensor *temp_sensor)
 {
+	temp_sensor_context.temp_sensor_ctrl =
+	    omap_temp_sensor_readl(temp_sensor, TEMP_SENSOR_CTRL_OFFSET);
 	temp_sensor_context.bg_ctrl =
 	    omap_temp_sensor_readl(temp_sensor, BGAP_CTRL_OFFSET);
 	temp_sensor_context.bg_counter =
@@ -1037,6 +1042,9 @@ static void omap_temp_sensor_save_ctxt(struct omap_temp_sensor *temp_sensor)
 
 static void omap_temp_sensor_restore_ctxt(struct omap_temp_sensor *temp_sensor)
 {
+	omap_temp_sensor_writel(temp_sensor,
+				temp_sensor_context.temp_sensor_ctrl,
+				TEMP_SENSOR_CTRL_OFFSET);
 	omap_temp_sensor_writel(temp_sensor,
 				temp_sensor_context.bg_ctrl,
 				BGAP_CTRL_OFFSET);
@@ -1099,18 +1107,11 @@ static int omap_temp_sensor_runtime_suspend(struct device *dev)
 
 static int omap_temp_sensor_runtime_resume(struct device *dev)
 {
-	static int context_loss_count;
-	int temp;
 	struct omap_temp_sensor *temp_sensor =
 			platform_get_drvdata(to_platform_device(dev));
-
-	temp = omap_device_get_context_loss_count(to_platform_device(dev));
-
-	if (temp != context_loss_count && context_loss_count != 0)
+	if (omap_pm_was_context_lost(dev)) {
 		omap_temp_sensor_restore_ctxt(temp_sensor);
-
-	context_loss_count = temp;
-
+	}
 	return 0;
 }
 
