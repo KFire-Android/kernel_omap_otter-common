@@ -818,6 +818,27 @@ void hdmi_wp_video_config_timing(struct hdmi_ip_data *ip_data,
 	hdmi_write_reg(hdmi_wp_base(ip_data), HDMI_WP_VIDEO_TIMING_V, timing_v);
 }
 
+void hdmi_wp_irq_enable(struct hdmi_ip_data *ip_data,
+			struct hdmi_irq_vector *irq_enable)
+{
+	u32 r = 0;
+	r = ((irq_enable->pll_recal << 31) |
+		(irq_enable->pll_unlock << 30) |
+		(irq_enable->pll_lock << 29) |
+		(irq_enable->phy_disconnect << 26) |
+		(irq_enable->phy_connect << 25) |
+		(irq_enable->phy_short_5v << 24) |
+		(irq_enable->video_end_fr << 17) |
+		(irq_enable->video_vsync << 16) |
+		(irq_enable->fifo_sample_req << 10) |
+		(irq_enable->fifo_overflow << 9) |
+		(irq_enable->fifo_underflow << 8) |
+		(irq_enable->ocp_timeout << 4) |
+		(irq_enable->core << 0));
+
+	hdmi_write_reg(hdmi_wp_base(ip_data), HDMI_WP_IRQENABLE_SET, r);
+}
+
 void ti_hdmi_4xxx_basic_configure(struct hdmi_ip_data *ip_data)
 {
 	/* HDMI */

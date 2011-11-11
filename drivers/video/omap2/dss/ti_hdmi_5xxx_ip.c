@@ -412,6 +412,13 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 
 	hdmi_wp_video_config_interface(ip_data);
 
+	/* Enable pll and core interrupts */
+	irq_enable.pll_unlock = 1;
+	irq_enable.pll_lock = 1;
+	irq_enable.core = 1;
+
+	/* enable IRQ */
+	hdmi_wp_irq_enable(ip_data, &irq_enable);
 	/*
 	 * configure core video part
 	 * set software reset in the core
