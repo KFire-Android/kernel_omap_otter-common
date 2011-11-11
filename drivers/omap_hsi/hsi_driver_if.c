@@ -913,11 +913,15 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		dev_info(hsi_ctrl->dev,
 			 "Entering RX wakeup in 3 wires mode (no CAWAKE)\n");
 		pport->wake_rx_3_wires_mode = 1;
-		/* HW errata HSI-C1BUG00085, HSI wakeup issue in 3 wires mode :
+
+		/* HSI-C1BUG00085: ixxx: HSI wakeup issue in 3 wires mode
 		 * HSI will NOT generate the Swakeup for 2nd frame if it entered
 		 * IDLE after 1st received frame */
-		if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev)))
-			hsi_set_pm_force_hsi_on(hsi_ctrl);
+		if (is_hsi_errata(hsi_ctrl, HSI_ERRATUM_ixxx_3WIRES_NO_SWAKEUP))
+			if (hsi_driver_device_is_hsi(to_platform_device
+							(hsi_ctrl->dev)))
+				hsi_set_pm_force_hsi_on(hsi_ctrl);
+
 		/* When WAKE is not available, ACREADY must be set to 1 at
 		 * reset else remote will never have a chance to transmit. */
 		hsi_outl_or(HSI_SET_WAKE_3_WIRES | HSI_SET_WAKE_READY_LVL_1,
@@ -927,9 +931,15 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	case HSI_IOCTL_SET_WAKE_RX_4WIRES_MODE:
 		dev_info(hsi_ctrl->dev, "Entering RX wakeup in 4 wires mode\n");
 		pport->wake_rx_3_wires_mode = 0;
-		/* HW errata HSI-C1BUG00085 : go back to normal IDLE mode */
-		if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev)))
-			hsi_set_pm_default(hsi_ctrl);
+
+		/* HSI-C1BUG00085: ixxx: HSI wakeup issue in 3 wires mode
+		 * HSI will NOT generate the Swakeup for 2nd frame if it entered
+		 * IDLE after 1st received frame */
+		if (is_hsi_errata(hsi_ctrl, HSI_ERRATUM_ixxx_3WIRES_NO_SWAKEUP))
+			if (hsi_driver_device_is_hsi(to_platform_device
+							(hsi_ctrl->dev)))
+				hsi_set_pm_default(hsi_ctrl);
+
 		hsi_driver_enable_interrupt(pport, HSI_CAWAKEDETECTED);
 		hsi_outl_and(HSI_SET_WAKE_3_WIRES_MASK,	base,
 			     HSI_SYS_SET_WAKE_REG(port));
