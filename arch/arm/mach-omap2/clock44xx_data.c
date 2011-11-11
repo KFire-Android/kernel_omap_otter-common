@@ -3855,6 +3855,9 @@ int __init omap4xxx_clk_init(void)
 	} else if (cpu_is_omap446x()) {
 		cpu_mask = RATE_IN_446X;
 		cpu_clkflg = CK_446X;
+	} else if (cpu_is_omap447x()) {
+		cpu_mask = RATE_IN_447X;
+		cpu_clkflg = CK_447X;
 	}
 
 	clk_init(&omap2_clk_functions);

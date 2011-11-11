@@ -36,7 +36,7 @@
 #include "cm-regbits-24xx.h"
 #include "cm-regbits-34xx.h"
 
-u8 cpu_mask;
+u16 cpu_mask;
 
 /*
  * OMAP2+ specific clock functions
