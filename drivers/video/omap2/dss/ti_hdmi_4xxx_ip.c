@@ -839,6 +839,26 @@ void hdmi_wp_irq_enable(struct hdmi_ip_data *ip_data,
 	hdmi_write_reg(hdmi_wp_base(ip_data), HDMI_WP_IRQENABLE_SET, r);
 }
 
+int ti_hdmi_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
+{
+	u32 val;
+	u32 r = 0;
+	void __iomem *wp_base = hdmi_wp_base(ip_data);
+
+	pr_debug("Enter hdmi_ti_4xxx_irq_handler\n");
+
+	val = hdmi_read_reg(wp_base, HDMI_WP_IRQSTATUS);
+	if (val & HDMI_WP_IRQSTATUS_CORE)
+		pr_debug("HDMI_WP_IRQSTATUS = 0x%x\n", val);
+
+	/* Ack other interrupts if any */
+	hdmi_write_reg(wp_base, HDMI_WP_IRQSTATUS, val);
+	/* flush posted write */
+	hdmi_read_reg(wp_base, HDMI_WP_IRQSTATUS);
+
+	return r;
+}
+
 void ti_hdmi_4xxx_basic_configure(struct hdmi_ip_data *ip_data)
 {
 	/* HDMI */

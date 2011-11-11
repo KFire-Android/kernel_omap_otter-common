@@ -45,6 +45,7 @@
 #define HDMI_WP_AUDIO_CFG2			0x84
 #define HDMI_WP_AUDIO_CTRL			0x88
 #define HDMI_WP_AUDIO_DATA			0x8C
+#define HDMI_WP_IRQSTATUS_CORE                  0x1
 
 /* HDMI IP Core System */
 
