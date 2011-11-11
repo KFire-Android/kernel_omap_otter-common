@@ -247,6 +247,9 @@ void hsi_bus_exit(void);
 
 void hsi_reset_ch_read(struct hsi_channel *ch);
 void hsi_reset_ch_write(struct hsi_channel *ch);
+bool hsi_is_channel_transfer_ongoing(struct hsi_channel *ch);
+bool hsi_is_port_transfer_ongoing(struct hsi_port *pport);
+bool hsi_is_controller_transfer_ongoing(struct hsi_dev *hsi_ctrl);
 bool hsi_is_channel_busy(struct hsi_channel *ch);
 bool hsi_is_hsi_port_busy(struct hsi_port *pport);
 bool hsi_is_hsi_controller_busy(struct hsi_dev *hsi_ctrl);

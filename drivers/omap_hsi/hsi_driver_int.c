@@ -35,6 +35,56 @@ void hsi_reset_ch_write(struct hsi_channel *ch)
 	ch->write_data.lch = -1;
 }
 
+/* Check if a Write (data transfer from AP to CP) or
+ * Read (data transfer from CP to AP) is
+ * ongoing for a given HSI channel
+ */
+bool hsi_is_channel_transfer_ongoing(struct hsi_channel *ch)
+{
+	if ((ch->write_data.addr == NULL) && (ch->read_data.addr == NULL))
+		return false;
+
+	return true;
+}
+
+/* Check if a Write (data transfer from AP to CP) or
+ * Read (data transfer from CP to AP) is
+ * ongoing in given HSI port
+ */
+bool hsi_is_port_transfer_ongoing(struct hsi_port *pport)
+{
+	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
+	int ch;
+
+	for (ch = 0; ch < pport->max_ch; ch++)
+		if (hsi_is_channel_transfer_ongoing(&pport->hsi_channel[ch])) {
+			dev_dbg(hsi_ctrl->dev, "Port %d; channel %d transfer"
+				"ongoing\n", pport->port_number, ch);
+			return true;
+		}
+
+	return false;
+}
+
+/* Check if a Write (data transfer from AP to CP) or
+ * Read (data transfer from CP to AP) is
+ * ongoing in whole HSI controller
+ */
+bool hsi_is_controller_transfer_ongoing(struct hsi_dev *hsi_ctrl)
+{
+	int port;
+
+	for (port = 0; port < hsi_ctrl->max_p; port++)
+		if (hsi_is_port_transfer_ongoing(&hsi_ctrl->hsi_port[port])) {
+			dev_dbg(hsi_ctrl->dev, "Transfer ongoing in Port %d\n",
+				port + 1);
+			return true;
+		}
+
+	dev_dbg(hsi_ctrl->dev, "No Transfer ongoing in HSI controller\n");
+	return false;
+}
+
 /* Check if a Write (data transfer from AP to CP) is
  * ongoing for a given HSI channel
  */
