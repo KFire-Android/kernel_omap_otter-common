@@ -20,6 +20,7 @@
  */
 #include <linux/module.h>
 #include <linux/opp.h>
+#include <linux/clk.h>
 
 #include <plat/cpu.h>
 #include <plat/common.h>
@@ -366,7 +367,9 @@ struct omap_vdd_dep_info omap447x_vddiva_dep_info[] = {
 	{.name = NULL, .dep_table = NULL, .nr_dep_entries = 0},
 };
 
-static struct omap_opp_def __initdata omap447x_opp_def_list[] = {
+#define OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ 1600000000
+
+static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
 	/* MPU OPP1 - OPP50 */
 	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 400000000, OMAP4470_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */
@@ -404,6 +407,65 @@ static struct omap_opp_def __initdata omap447x_opp_def_list[] = {
 	OPP_INITIALIZER("gpu", "dpll_per_m7x2_ck", "core", true, 307200000, OMAP4470_VDD_CORE_OPP100_UV),
 	/* SGX OPP3 - OPPOV */
 	OPP_INITIALIZER("gpu", "dpll_per_m7x2_ck", "core", false, 384000000, OMAP4470_VDD_CORE_OPP100_OV_UV),
+	/* FDIF OPP1 - OPP25 */
+	OPP_INITIALIZER("fdif", "fdif_fck", "core", true, 32000000, OMAP4470_VDD_CORE_OPP50_UV),
+	/* FDIF OPP2 - OPP50 */
+	OPP_INITIALIZER("fdif", "fdif_fck", "core", true, 64000000, OMAP4470_VDD_CORE_OPP50_UV),
+	/* FDIF OPP3 - OPP100 */
+	OPP_INITIALIZER("fdif", "fdif_fck", "core", true, 128000000, OMAP4470_VDD_CORE_OPP100_UV),
+	/* DSP OPP1 - OPP50 */
+	OPP_INITIALIZER("dsp", "dpll_iva_m4x2_ck", "iva", true, 232750000, OMAP4470_VDD_IVA_OPP50_UV),
+	/* DSP OPP2 - OPP100 */
+	OPP_INITIALIZER("dsp", "dpll_iva_m4x2_ck", "iva", true, 465500000, OMAP4470_VDD_IVA_OPP100_UV),
+	/* DSP OPP3 - OPPTB */
+	OPP_INITIALIZER("dsp", "dpll_iva_m4x2_ck", "iva", false, 496000000, OMAP4470_VDD_IVA_OPPTURBO_UV),
+	/* HSI OPP1 - OPP50 */
+	OPP_INITIALIZER("hsi", "hsi_fck", "core", true, 96000000, OMAP4470_VDD_CORE_OPP50_UV),
+	/* HSI OPP2 - OPP100 */
+	OPP_INITIALIZER("hsi", "hsi_fck", "core", true, 96000000, OMAP4470_VDD_CORE_OPP100_UV),
+	/* ABE OPP1 - OPP50 */
+	OPP_INITIALIZER("aess", "abe_clk", "iva", true, 98304000, OMAP4470_VDD_IVA_OPP50_UV),
+	/* ABE OPP2 - OPP100 */
+	OPP_INITIALIZER("aess", "abe_clk", "iva", true, 196608000, OMAP4470_VDD_IVA_OPP100_UV),
+};
+
+static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
+	/* MPU OPP1 - OPP50 */
+	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 400000000, OMAP4470_VDD_MPU_OPP50_UV),
+	/* MPU OPP2 - OPP100 */
+	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 800000000, OMAP4470_VDD_MPU_OPP100_UV),
+	/* MPU OPP3 - OPP-Turbo */
+	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 1100000000, OMAP4470_VDD_MPU_OPPTURBO_UV),
+	/* MPU OPP4 - OPP-Nitro */
+	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 1300000000, OMAP4470_VDD_MPU_OPPNITRO_UV),
+	/* MPU OPP4 - OPP-Nitro SpeedBin */
+	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", false, 1500000000, OMAP4470_VDD_MPU_OPPNITROSB_UV),
+	/* L3 OPP1 - OPP50 */
+	OPP_INITIALIZER("l3_main_1", "virt_l3_ck", "core", true, 116000000, OMAP4470_VDD_CORE_OPP50_UV),
+	/* L3 OPP2 - OPP100 is absent*/
+	/* L3 OPP3 - OPP-OV */
+	OPP_INITIALIZER("l3_main_1", "virt_l3_ck", "core", true, 233000000, OMAP4470_VDD_CORE_OPP100_OV_UV),
+	/* IVA OPP1 - OPP50 */
+	OPP_INITIALIZER("iva", "dpll_iva_m5x2_ck", "iva", true, 133000000, OMAP4470_VDD_IVA_OPP50_UV),
+	/* IVA OPP2 - OPP100 */
+	OPP_INITIALIZER("iva", "dpll_iva_m5x2_ck", "iva", true, 266100000, OMAP4470_VDD_IVA_OPP100_UV),
+	/*
+	 * IVA OPP3 - OPP-Turbo + Disabled as the reference schematics
+	 * recommends Phoenix VCORE2 which can supply only 600mA - so the ones
+	 * above this OPP frequency, even though OMAP is capable, should be
+	 * enabled by board file which is sure of the chip power capability
+	 */
+	OPP_INITIALIZER("iva", "dpll_iva_m5x2_ck", "iva", false, 332000000, OMAP4470_VDD_IVA_OPPTURBO_UV),
+	/* IVA OPP4 - OPP-Nitro */
+	OPP_INITIALIZER("iva", "dpll_iva_m5x2_ck", "iva", false, 430000000, OMAP4470_VDD_IVA_OPPNITRO_UV),
+	/* IVA OPP5 - OPP-Nitro SpeedBin*/
+	OPP_INITIALIZER("iva", "dpll_iva_m5x2_ck", "iva", false, 500000000, OMAP4470_VDD_IVA_OPPNITRO_UV),
+
+	/* SGX OPP1 - OPP50 */
+	OPP_INITIALIZER("gpu", "dpll_per_m7x2_ck", "core", true, 192000000, OMAP4470_VDD_CORE_OPP50_UV),
+	/* SGX OPP2 - OPP100 is absent*/
+	/* SGX OPP3 - OPPOV */
+	OPP_INITIALIZER("gpu", "dpll_per_m7x2_ck", "core", true, 384000000, OMAP4470_VDD_CORE_OPP100_OV_UV),
 	/* FDIF OPP1 - OPP25 */
 	OPP_INITIALIZER("fdif", "fdif_fck", "core", true, 32000000, OMAP4470_VDD_CORE_OPP50_UV),
 	/* FDIF OPP2 - OPP50 */
@@ -468,9 +530,23 @@ int __init omap4_opp_init(void)
 		/* if device is untrimmed override DPLL TRIM register */
 		if (!trimmed)
 			omap_writel(0x29, 0x4a002330);
-	} else if (cpu_is_omap447x())
-		r = omap_init_opp_table(omap447x_opp_def_list,
-			ARRAY_SIZE(omap447x_opp_def_list));
+	} else if (cpu_is_omap447x()) {
+		struct clk *dpll_core_ck;
+		unsigned long rate = 0;
+
+		dpll_core_ck = clk_get(NULL, "dpll_core_ck");
+		if (dpll_core_ck) {
+			rate = clk_get_rate(dpll_core_ck);
+			clk_put(dpll_core_ck);
+		}
+
+		if (rate > OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ / 2)
+			r = omap_init_opp_table(omap447x_opp_high_def_list,
+					ARRAY_SIZE(omap447x_opp_high_def_list));
+		else
+			r = omap_init_opp_table(omap447x_opp_low_def_list,
+					ARRAY_SIZE(omap447x_opp_low_def_list));
+	}
 
 	if (!r) {
 		if (omap4_has_mpu_1_2ghz())
