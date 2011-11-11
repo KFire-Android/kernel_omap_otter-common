@@ -1003,7 +1003,6 @@ static void __init omap_tablet_reserve(void)
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
 #endif
-
 	omap_reserve();
 }
 
