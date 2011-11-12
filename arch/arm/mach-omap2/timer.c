@@ -82,6 +82,9 @@
 #define MAX_GPTIMER_ID		12
 
 static u32 sys_timer_reserved;
+#ifdef CONFIG_PM_DEBUG
+extern u32	wakeup_timer_seconds;
+#endif
 
 /* Clockevent code */
 
@@ -138,6 +141,15 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
 		break;
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
+#ifdef CONFIG_PM_DEBUG
+		if (wakeup_timer_seconds) {
+			__omap_dm_timer_write(&clkev, OMAP_TIMER_LOAD_REG,
+			0xffffffff - (clkev.rate * wakeup_timer_seconds), 1);
+			__omap_dm_timer_load_start(&clkev, OMAP_TIMER_CTRL_ST,
+			0xffffffff - (clkev.rate * wakeup_timer_seconds), 1);
+		}
+#endif
+		break;
 	case CLOCK_EVT_MODE_RESUME:
 		break;
 	}
