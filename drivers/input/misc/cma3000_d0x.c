@@ -237,12 +237,9 @@ static ssize_t cma3000_store_attr_enable(struct device *dev,
 	if (val < CMAMODE_DEFAULT || val > CMAMODE_POFF)
 		return -EINVAL;
 
-	if (val == CMAMODE_DEFAULT || val == CMAMODE_POFF)
-		enable = val;
-	else
-		enable = data->pdata.mode;
-
+	enable = val;
 	cma3000_set_mode(data, enable);
+	data->pdata.mode = val;
 
 	if (val == CMAMODE_DEFAULT || val == CMAMODE_POFF)
 		cancel_delayed_work_sync(&data->input_work);
@@ -569,10 +566,13 @@ static void cma3000_input_work_func(struct work_struct *work)
 						  struct cma3000_accl_data,
 						  input_work);
 
-	cma3000_read_report_data(cma);
-	if (!cma->client->irq)
-		schedule_delayed_work(&cma->input_work,
-				msecs_to_jiffies(cma->req_poll_rate));
+	if (cma->pdata.mode > CMAMODE_DEFAULT &&
+			cma->pdata.mode < CMAMODE_POFF) {
+		cma3000_read_report_data(cma);
+		if (!cma->client->irq)
+			schedule_delayed_work(&cma->input_work,
+					msecs_to_jiffies(cma->req_poll_rate));
+	}
 }
 
 static irqreturn_t cma3000_isr(int irq, void *dev_id)
