@@ -851,6 +851,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		.init = sdp4430_dmic_init,
 		.ops = &sdp4430_dmic_ops,
+		.ignore_suspend = 1,
 	},
 
 /*
