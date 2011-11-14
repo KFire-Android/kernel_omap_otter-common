@@ -198,6 +198,8 @@
 
 #define TWL6040_CELLS			2
 
+#define TWL6040_POWER_UP_TIME		16 /* ms */
+
 #define TWL6040_IRQ_TH			0
 #define TWL6040_IRQ_PLUG		1
 #define TWL6040_IRQ_HOOK		2
