@@ -379,8 +379,8 @@
 #define BT_DL_48_8_FIR_OPP100_WRAP_labelID                  319
 #define VX_UL_48_8_FIR_WRAP_labelID                         320
 #define VX_UL_8_48_OSR_LP_labelID                           321
-#define Dummy_322_labelID                                   322
-#define Dummy_323_labelID                                   323
+#define CHECK_IIR_8K_labelID                                322
+#define CHECK_IIR_16K_labelID                               323
 #define Dummy_324_labelID                                   324
 #define Dummy_325_labelID                                   325
 #define Dummy_326_labelID                                   326

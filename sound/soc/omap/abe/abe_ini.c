@@ -78,11 +78,7 @@ void omap_abe_build_scheduler_table(struct omap_abe *abe);
 void omap_abe_reset_all_ports(struct omap_abe *abe);
 
 const u32 abe_firmware_array[ABE_FIRMWARE_MAX_SIZE] = {
-#if !defined(CONFIG_SND_OMAP4_ABE_USE_ALT_FW)
 #include "abe_firmware.c"
-#else
-#include "abe_firmware_alt.c"
-#endif
 };
 
 
@@ -257,7 +253,7 @@ void omap_abe_build_scheduler_table(struct omap_abe *abe)
 	     i < sizeof(abe->MultiFrame); i++)
 		*ptr++ = 0;
 
-	abe->MultiFrame[0][2] = 0; /*ABE_TASK_ID(C_ABE_FW_TASK_IO_VX_DL)*/
+	abe->MultiFrame[0][0] = 0/*ABE_TASK_ID(C_ABE_FW_TASK_IO_PDM_UL)*/;
 	abe->MultiFrame[0][3] = ABE_TASK_ID(C_ABE_FW_TASK_ASRC_VX_DL_8);
 
 	abe->MultiFrame[1][3] = ABE_TASK_ID(C_ABE_FW_TASK_VX_DL_8_48_FIR);
@@ -291,24 +287,16 @@ void omap_abe_build_scheduler_table(struct omap_abe *abe)
 	abe->MultiFrame[7][3] = ABE_TASK_ID(C_ABE_FW_TASK_DBG_SYNC);
 	abe->MultiFrame[7][5] = ABE_TASK_ID(C_ABE_FW_TASK_ECHO_REF_SPLIT);
 
-#if !defined(CONFIG_SND_OMAP4_ABE_USE_ALT_FW)
-	abe->MultiFrame[9][2] = ABE_TASK_ID(C_ABE_FW_TASK_CHECK_IIR_RIGHT);
-#else
 	abe->MultiFrame[8][2] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC1_96_48_LP);
 	abe->MultiFrame[8][4] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC1_SPLIT);
 
 	abe->MultiFrame[9][2] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC2_96_48_LP);
 	abe->MultiFrame[9][4] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC2_SPLIT);
-#endif
 	abe->MultiFrame[9][6] = 0;
 	abe->MultiFrame[9][7] = ABE_TASK_ID(C_ABE_FW_TASK_IHF_48_96_LP);
 
-#if !defined(CONFIG_SND_OMAP4_ABE_USE_ALT_FW)
-	/* intentionally blank for uniformity */
-#else
 	abe->MultiFrame[10][2] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC3_96_48_LP);
 	abe->MultiFrame[10][4] = ABE_TASK_ID(C_ABE_FW_TASK_DMIC3_SPLIT);
-#endif
 	abe->MultiFrame[10][7] = ABE_TASK_ID(C_ABE_FW_TASK_IHF_48_96_LP);
 
 	abe->MultiFrame[11][2] = ABE_TASK_ID(C_ABE_FW_TASK_AMIC_96_48_LP);
@@ -348,17 +336,18 @@ void omap_abe_build_scheduler_table(struct omap_abe *abe)
 	abe->MultiFrame[20][6] = 0; /*ABE_TASK_ID(C_ABE_FW_TASK_ASRC_MM_EXT_IN)*/
 
 	abe->MultiFrame[21][1] = ABE_TASK_ID(C_ABE_FW_TASK_DEBUGTRACE_VX_ASRCs);
-	abe->MultiFrame[21][3] = 0; /*ABE_TASK_ID(C_ABE_FW_TASK_IO_MM_EXT_IN)*/
+	abe->MultiFrame[21][2] = ABE_TASK_ID(C_ABE_FW_TASK_CHECK_IIR_RIGHT_8K);
+	abe->MultiFrame[21][3] = 0/*ABE_TASK_ID(C_ABE_FW_TASK_IO_MM_EXT_IN)*/;
 	/* MUST STAY ON SLOT 22 */
 	abe->MultiFrame[22][0] = ABE_TASK_ID(C_ABE_FW_TASK_DEBUG_IRQFIFO);
 	abe->MultiFrame[22][1] = ABE_TASK_ID(C_ABE_FW_TASK_INIT_FW_MEMORY);
-	abe->MultiFrame[22][2] = 0;
+	abe->MultiFrame[22][2] = ABE_TASK_ID(C_ABE_FW_TASK_IO_VX_DL);
 	/* MM_EXT_IN_SPLIT task must be after IO_MM_EXT_IN and before
 	   ASRC_MM_EXT_IN in order to manage OPP50 <-> transitions */
 	abe->MultiFrame[22][4] = ABE_TASK_ID(C_ABE_FW_TASK_MM_EXT_IN_SPLIT);
 
 	abe->MultiFrame[23][0] = ABE_TASK_ID(C_ABE_FW_TASK_GAIN_UPDATE);
-	abe->MultiFrame[23][2] = ABE_TASK_ID(C_ABE_FW_TASK_CHECK_IIR_LEFT);
+	abe->MultiFrame[23][2] = ABE_TASK_ID(C_ABE_FW_TASK_CHECK_IIR_LEFT_8K);
 
 	omap_abe_mem_write(abe, OMAP_ABE_DMEM, OMAP_ABE_D_MULTIFRAME_ADDR,
 		       (u32 *) abe->MultiFrame, sizeof(abe->MultiFrame));
