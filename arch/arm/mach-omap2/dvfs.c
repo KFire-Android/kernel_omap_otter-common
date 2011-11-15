@@ -765,7 +765,7 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 			dev_err(target_dev,
 				"%s: Unable to scale the %s to %ld volt\n",
 				__func__, voltdm->name, new_volt);
-			goto out;
+			goto fail;
 		}
 		volt_scale_dir = DVFS_VOLT_SCALE_UP;
 	}
