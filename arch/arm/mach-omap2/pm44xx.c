@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/irq.h>
+#include <linux/regulator/machine.h>
 
 #include <asm/hardware/gic.h>
 #include <mach/omap4-common.h>
@@ -748,13 +749,29 @@ static int omap4_pm_enter(suspend_state_t suspend_state)
 
 static int omap4_pm_begin(suspend_state_t state)
 {
+	int ret = 0;
+
 	disable_hlt();
+
+	ret = regulator_suspend_prepare(state);
+	if (ret)
+		pr_err("%s: Regulator suspend prepare failed (%d)!\n",
+				__func__, ret);
+
 	return 0;
 }
 
 static void omap4_pm_end(void)
 {
+	int ret = 0;
+
 	enable_hlt();
+
+	ret = regulator_suspend_finish();
+	if (ret)
+		pr_err("%s: resume regulators from suspend failed (%d)!\n",
+				__func__, ret);
+
 	return;
 }
 
