@@ -36,45 +36,10 @@
 #include "pm.h"
 #include "dvfs.h"
 
-static int omap_hsi_wakeup_enable(int hsi_port);
-static int omap_hsi_wakeup_disable(int hsi_port);
 #define OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME	"omap_hsi"
 #define OMAP_HSI_PLATFORM_DEVICE_NAME		"omap_hsi.0"
 #define OMAP_HSI_HWMOD_NAME			"hsi"
 #define OMAP_HSI_HWMOD_CLASSNAME		"hsi"
-
-#define OMAP_MUX_MODE_MASK	0x7
-
-
-/* Hack till correct hwmod-mux api gets used */
-#define CA_WAKE_MUX_REG		(0x4a1000C2)
-#define OMAP44XX_PADCONF_WAKEUPENABLE0 (1 << 14)
-#define OMAP44XX_PADCONF_WAKEUPEVENT0  (1 << 15)
-
-static int omap_mux_read_signal(const char *muxname)
-{
-	u16 val = 0;
-	val = omap_readw(CA_WAKE_MUX_REG);
-	return val;
-}
-
-static int omap_mux_enable_wakeup(const char *muxname)
-{
-	u16 val = 0;
-	val = omap_readw(CA_WAKE_MUX_REG);
-	val |= OMAP44XX_PADCONF_WAKEUPENABLE0;
-	omap_writew(val, CA_WAKE_MUX_REG);
-	return 0;
-}
-
-static int omap_mux_disable_wakeup(const char *muxname)
-{
-	u16 val = 0;
-	val = omap_readw(CA_WAKE_MUX_REG);
-	val &= ~OMAP44XX_PADCONF_WAKEUPENABLE0;
-	omap_writew(val, CA_WAKE_MUX_REG);
-	return 0;
-}
 
 /* MUX settings for HSI port 1 pins */
 static struct omap_device_pad hsi_port1_pads[] __initdata = {
@@ -111,8 +76,6 @@ static struct hsi_port_ctx omap_hsi_port_ctx[] = {
 	       .hsr.counters = HSI_COUNTERS_FT_DEFAULT |
 			       HSI_COUNTERS_TB_DEFAULT |
 			       HSI_COUNTERS_FB_DEFAULT,
-	       .cawake_padconf_name = "usbb1_ulpitll_clk.hsi1_cawake",
-	       .cawake_padconf_hsi_mode = OMAP_MUX_MODE1,
 	       },
 };
 
@@ -133,10 +96,6 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 	.device_idle = omap_device_idle,
 	.device_shutdown = omap_device_shutdown,
 	.device_scale = omap_device_scale,
-	.wakeup_enable = omap_hsi_wakeup_enable,
-	.wakeup_disable = omap_hsi_wakeup_disable,
-	.wakeup_is_from_hsi = omap_hsi_is_io_wakeup_from_hsi,
-	.board_suspend = omap_hsi_prepare_suspend,
 };
 
 static struct omap_device *hsi_od;
@@ -199,55 +158,6 @@ static struct hsi_dev *hsi_get_hsi_controller_data(struct platform_device *pd)
 }
 
 /**
-* hsi_get_hsi_port_ctx_data - Returns a pointer on the port context
-*
-* @hsi_port - port number to obtain context. Range [1, 2]
-*
-* Return value :* If success: pointer on the HSI port context requested
-*		* else NULL
-*/
-static struct hsi_port_ctx *hsi_get_hsi_port_ctx_data(int hsi_port)
-{
-	int i;
-
-	for (i = 0; i < omap_hsi_platform_data.num_ports; i++)
-		if (omap_hsi_platform_data.ctx->pctx[i].port_number == hsi_port)
-			return &omap_hsi_platform_data.ctx->pctx[i];
-
-	return NULL;
-}
-
-/**
-* omap_hsi_is_io_pad_hsi - Indicates if IO Pad has been muxed for HSI CAWAKE
-*
-* @hsi_port - port number to check for HSI muxing. Range [1, 2]
-*
-* Return value :* 0 if CAWAKE Padconf has not been found or CAWAKE not muxed for
-*		CAWAKE
-*		* else 1
-*/
-static int omap_hsi_is_io_pad_hsi(int hsi_port)
-{
-	struct hsi_port_ctx *port_ctx;
-	u16 val;
-
-	port_ctx = hsi_get_hsi_port_ctx_data(hsi_port);
-	if (!port_ctx)
-		return 0;
-
-	/* Check for IO pad */
-	val = omap_mux_read_signal(port_ctx->cawake_padconf_name);
-	if (val == -ENODEV)
-		return 0;
-
-	/* Continue only if CAWAKE is muxed */
-	if ((val & OMAP_MUX_MODE_MASK) != port_ctx->cawake_padconf_hsi_mode)
-		return 0;
-
-	return 1;
-}
-
-/**
 * omap_hsi_is_io_wakeup_from_hsi - Indicates an IO wakeup from HSI CAWAKE
 *
 * @hsi_port - returns port number which triggered wakeup. Range [1, 2].
@@ -271,80 +181,6 @@ bool omap_hsi_is_io_wakeup_from_hsi(int *hsi_port)
 	}
 
 	return false;
-}
-
-/**
-* omap_hsi_wakeup_enable - Enable HSI wakeup feature from RET/OFF mode
-*
-* @hsi_port - reference to the HSI port onto which enable wakeup feature.
-*	      Range [1, 2]
-*
-* Return value :* 0 if CAWAKE has been configured to wakeup platform
-*		* -ENODEV if CAWAKE is not muxed on padconf
-*/
-static int omap_hsi_wakeup_enable(int hsi_port)
-{
-	struct hsi_port_ctx *port_ctx;
-	int ret = -ENODEV;
-
-	if (omap_hsi_is_io_pad_hsi(hsi_port)) {
-		port_ctx = hsi_get_hsi_port_ctx_data(hsi_port);
-		ret = omap_mux_enable_wakeup(port_ctx->cawake_padconf_name);
-		omap4_trigger_ioctrl();
-	} else {
-		pr_debug("HSI port %d not muxed, failed to enable IO wakeup\n",
-			 hsi_port);
-	}
-
-	return ret;
-}
-
-/**
-* omap_hsi_wakeup_disable - Disable HSI wakeup feature from RET/OFF mode
-*
-* @hsi_port - reference to the HSI port onto which disable wakeup feature.
-*	      Range [1, 2]
-*
-* Return value :* 0 if CAWAKE has been configured to not wakeup platform
-*		* -ENODEV if CAWAKE is not muxed on padconf
-*/
-static int omap_hsi_wakeup_disable(int hsi_port)
-{
-	struct hsi_port_ctx *port_ctx;
-	int ret = -ENODEV;
-
-	if (omap_hsi_is_io_pad_hsi(hsi_port)) {
-		port_ctx = hsi_get_hsi_port_ctx_data(hsi_port);
-		ret = omap_mux_disable_wakeup(port_ctx->cawake_padconf_name);
-		omap4_trigger_ioctrl();
-	} else {
-		pr_debug("HSI port %d not muxed, failed to disable IO wakeup\n",
-			 hsi_port);
-	}
-
-	return ret;
-}
-
-/**
-* omap_hsi_prepare_suspend - Prepare HSI for suspend mode
-*
-* @hsi_port - reference to the HSI port. Range [1, 2]
-* @dev_may_wakeup - value of sysfs flag indicating device wakeup capability
-*
-* Return value :* 0 if CAWAKE padconf has been configured properly
-*		* -ENODEV if CAWAKE is not muxed on padconf.
-*
-*/
-int omap_hsi_prepare_suspend(int hsi_port, bool dev_may_wakeup)
-{
-	int ret;
-
-	if (dev_may_wakeup)
-		ret = omap_hsi_wakeup_enable(hsi_port);
-	else
-		ret = omap_hsi_wakeup_disable(hsi_port);
-
-	return ret;
 }
 
 /**
@@ -422,7 +258,7 @@ int omap_hsi_wakeup(int hsi_port)
 	/* the IRQ status register */
 	disable_irq_nosync(hsi_ctrl->hsi_port[i].irq);
 
-	 return 0;
+	return 0;
 }
 
 /* HSI_TODO : This requires some fine tuning & completion of
