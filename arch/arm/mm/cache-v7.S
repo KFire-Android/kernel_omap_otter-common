@@ -88,21 +88,24 @@ ENTRY(v7_flush_dcache_current_level)
 	ldr	r4, =0x3ff
 	ands	r4, r4, r1, lsr #3		@ find maximum number on the way size
 	clz	r5, r4				@ find bit position of way size increment
-	ldr	r7, =0x7fff
-	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
 loop2:
-	mov	r9, r4				@ create working copy of max way size
+	ldr	r7, =0x7fff							@
+	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
+	mov	r9, #0
+	mov	r3, r7
 loop3:
- ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
- THUMB(	lsl	r6, r9, r5		)
+ ARM(	orr	r11, r10, r4, lsl r5	)	@ factor way and cache number into r11
+ THUMB(	lsl	r6, r4, r5		)				@
  THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
- ARM(	orr	r11, r11, r7, lsl r2	)	@ factor index number into r11
- THUMB(	lsl	r6, r7, r2		)
+ ARM(	orr	r11, r11, r9, lsl r2	)	@ factor index number into r11
+ THUMB(	lsl	r6, r9, r2		)				@
  THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
 	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
-	subs	r9, r9, #1			@ decrement the way
-	bge	loop3
+	add	r9, #63
+	and	r9, r9, r3
 	subs	r7, r7, #1			@ decrement the index
+	bge	loop3
+	subs	r4, r4, #1			@ decrement the way
 	bge	loop2
 	mov	pc, lr
 ENDPROC(v7_flush_dcache_current_level)
