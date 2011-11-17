@@ -43,7 +43,6 @@ static int omap_hsi_wakeup_disable(int hsi_port);
 #define OMAP_HSI_HWMOD_NAME			"hsi"
 #define OMAP_HSI_HWMOD_CLASSNAME		"hsi"
 
-
 #define OMAP_MUX_MODE_MASK	0x7
 
 
@@ -77,12 +76,24 @@ static int omap_mux_disable_wakeup(const char *muxname)
 	return 0;
 }
 
+/* MUX settings for HSI port 1 pins */
+static struct omap_device_pad hsi_port1_pads[] __initdata = {
+	{
+		.name = "usbb1_ulpitll_clk.hsi1_cawake",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN) &
+			  ~OMAP_WAKEUP_EN,
+		.idle   = OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN |
+			  OMAP_WAKEUP_EN,
+		.off    = OMAP_MUX_MODE1 | OMAP_PIN_OFF_NONE |
+			  OMAP_WAKEUP_EN,
+	},
+};
+
 /*
  * NOTE: We abuse a little bit the struct port_ctx to use it also for
  * initialization.
  */
-
-
 static struct hsi_port_ctx omap_hsi_port_ctx[] = {
 	[0] = {
 	       .port_number = 1,
@@ -127,6 +138,8 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 	.wakeup_is_from_hsi = omap_hsi_is_io_wakeup_from_hsi,
 	.board_suspend = omap_hsi_prepare_suspend,
 };
+
+static struct omap_device *hsi_od;
 
 
 static u32 omap_hsi_configure_errata(void)
@@ -246,30 +259,16 @@ static int omap_hsi_is_io_pad_hsi(int hsi_port)
 */
 bool omap_hsi_is_io_wakeup_from_hsi(int *hsi_port)
 {
-	struct hsi_port_ctx *port_ctx;
-	u16 val;
-	int i;
-
-	for (i = 0; i < omap_hsi_platform_data.num_ports; i++) {
-		port_ctx = &omap_hsi_platform_data.ctx->pctx[i];
+	if (!hsi_od)
+		return false;
 
 	/* Check for IO pad wakeup */
-		val = omap_mux_read_signal(port_ctx->cawake_padconf_name);
-	if (val == -ENODEV)
-			continue;
+	if (omap_hwmod_pad_get_wakeup_status(hsi_od->hwmods[0]) == true) {
+		/* Only Port 1 is supported */
+		*hsi_port = 1;
 
-	/* Continue only if CAWAKE is muxed */
-		if ((val & OMAP_MUX_MODE_MASK) !=
-					port_ctx->cawake_padconf_hsi_mode)
-			continue;
-
-		if (val & OMAP44XX_PADCONF_WAKEUPEVENT0) {
-			*hsi_port = port_ctx->port_number;
 		return true;
-		}
 	}
-
-	*hsi_port = 0;
 
 	return false;
 }
@@ -440,7 +439,6 @@ static struct omap_device_pm_latency omap_hsi_latency[] = {
 /* HSI device registration */
 static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 {
-	struct omap_device *od;
 	struct hsi_platform_data *pdata = &omap_hsi_platform_data;
 
 	if (!oh) {
@@ -450,11 +448,14 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 	}
 
 	omap_hsi_platform_data.errata = omap_hsi_configure_errata();
+	/* Handle only port1 for now */
+	oh->mux = omap_hwmod_mux_init(hsi_port1_pads,
+				      ARRAY_SIZE(hsi_port1_pads));
 
-	od = omap_device_build(OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, 0, oh,
+	hsi_od = omap_device_build(OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, 0, oh,
 			       pdata, sizeof(*pdata), omap_hsi_latency,
 			       ARRAY_SIZE(omap_hsi_latency), false);
-	WARN(IS_ERR(od), "Can't build omap_device for %s:%s.\n",
+	WARN(IS_ERR(hsi_od), "Can't build omap_device for %s:%s.\n",
 	     OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, oh->name);
 
 	pr_info("HSI: device registered as omap_hwmod: %s\n", oh->name);
@@ -467,5 +468,5 @@ int __init omap_hsi_dev_init(void)
 	return omap_hwmod_for_each_by_class(OMAP_HSI_HWMOD_CLASSNAME,
 					    omap_hsi_register, NULL);
 }
-postcore_initcall(omap_hsi_dev_init);
+arch_initcall(omap_hsi_dev_init);
 
