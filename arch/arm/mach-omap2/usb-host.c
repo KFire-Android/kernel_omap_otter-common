@@ -801,13 +801,13 @@ void usbhs_wakeup()
 		return;
 
 	if (test_bit(USB_OHCI_LOADED, &usb_hcds_loaded) &&
-		    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ohci)) {
+	    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ohci) == true) {
 		usbhs_wake->wakeup_ohci = 1;
 		workq = 1;
 	}
 
 	if (test_bit(USB_EHCI_LOADED, &usb_hcds_loaded) &&
-		    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ehci)) {
+	    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ehci) == true) {
 		usbhs_wake->wakeup_ehci = 1;
 		workq = 1;
 	}
