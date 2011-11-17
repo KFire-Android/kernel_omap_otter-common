@@ -857,7 +857,7 @@ static int tablet_notifier_call(struct notifier_block *this,
 					unsigned long code, void *cmd)
 {
 	void __iomem *sar_base;
-	u32 v = OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+	u32 v = 0;
 
 	sar_base = omap4_get_sar_ram_base();
 
