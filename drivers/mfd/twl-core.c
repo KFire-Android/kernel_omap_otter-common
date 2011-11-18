@@ -1017,16 +1017,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 
-		child = add_regulator(TWL6030_REG_CLK32KG, pdata->clk32kg,
-					features);
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-
-		child = add_regulator(TWL6030_REG_CLK32KAUDIO,
-				pdata->clk32kaudio, features);
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-
 		child = add_regulator(TWL6030_REG_VDD1, pdata->vdd1,
 					features);
 		if (IS_ERR(child))
@@ -1057,6 +1047,16 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 	if (twl_has_regulator() && twl_class_is_6030()) {
 		child = add_regulator(TWL6030_REG_VANA, pdata->vana,
 					features);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+
+		child = add_regulator(TWL6030_REG_CLK32KG, pdata->clk32kg,
+					features);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+
+		child = add_regulator(TWL6030_REG_CLK32KAUDIO,
+				pdata->clk32kaudio, features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
