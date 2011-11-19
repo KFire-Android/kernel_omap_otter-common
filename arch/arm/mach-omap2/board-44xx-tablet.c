@@ -864,18 +864,19 @@ static int tablet_notifier_call(struct notifier_block *this,
 	if (!sar_base)
 		return notifier_from_errno(-ENOMEM);
 
-	if ((code == SYS_RESTART) && (cmd != NULL)) {
-		/* cmd != null; case: warm boot */
-		if (!strcmp(cmd, "bootloader")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else if (!strcmp(cmd, "recovery")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else {
-			v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+	if (code == SYS_RESTART) {
+		v = OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+		if (cmd != NULL) {
+			/* cmd != null; case: warm boot */
+			if (!strcmp(cmd, "bootloader")) {
+				/* Save reboot mode in scratch memory */
+				strcpy(sar_base + 0xA0C, cmd);
+				v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+			} else if (!strcmp(cmd, "recovery")) {
+				/* Save reboot mode in scratch memory */
+				strcpy(sar_base + 0xA0C, cmd);
+				v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+			}
 		}
 	}
 
