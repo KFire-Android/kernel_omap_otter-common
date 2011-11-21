@@ -139,6 +139,15 @@ config USB_MUSB_HDRC_HCD
 	select USB_OTG if USB_GADGET_MUSB_HDRC
 	default y
 
+config USB_MUSB_HSET
+	bool "MUSB HSET Driver"
+	depends on USB_MUSB_HDRC_HCD
+	default n
+	help
+	   Select this driver to add support for HSET(High Speed Electrical
+	   Testing). This driver is needed to enumerate OPT(OTG Protocol Tester)
+	   that is required to perform Embedded Host Electrical Tests for MUSB
+	   Host certification.
 
 config MUSB_PIO_ONLY
 	bool 'Disable DMA (always use PIO)'

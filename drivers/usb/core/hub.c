@@ -131,7 +131,13 @@ MODULE_PARM_DESC(initial_descriptor_timeout,
  * otherwise the new scheme is used.  If that fails and "use_both_schemes"
  * is set, then the driver will make another attempt, using the other scheme.
  */
+
+#ifdef CONFIG_USB_MUSB_HSET
+static int old_scheme_first = 1;
+#else
 static int old_scheme_first = 0;
+#endif
+
 module_param(old_scheme_first, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(old_scheme_first,
 		 "start with the old device initialization scheme");
