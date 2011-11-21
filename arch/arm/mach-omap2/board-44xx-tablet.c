@@ -853,46 +853,6 @@ static void __init omap4_ehci_ohci_init(void)
 static void __init omap4_ehci_ohci_init(void){}
 #endif
 
-static int tablet_notifier_call(struct notifier_block *this,
-					unsigned long code, void *cmd)
-{
-	void __iomem *sar_base;
-	u32 v = 0;
-
-	sar_base = omap4_get_sar_ram_base();
-
-	if (!sar_base)
-		return notifier_from_errno(-ENOMEM);
-
-	if (code == SYS_RESTART) {
-		v = OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-		if (cmd != NULL) {
-			/* cmd != null; case: warm boot */
-			if (!strcmp(cmd, "bootloader")) {
-				/* Save reboot mode in scratch memory */
-				strcpy(sar_base + 0xA0C, cmd);
-				v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-			} else if (!strcmp(cmd, "recovery")) {
-				/* Save reboot mode in scratch memory */
-				strcpy(sar_base + 0xA0C, cmd);
-				v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-			}
-		}
-	}
-
-	omap4_prm_write_inst_reg(0xfff, OMAP4430_PRM_DEVICE_INST,
-			OMAP4_RM_RSTST);
-	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST, OMAP4_RM_RSTCTRL);
-	v = omap4_prm_read_inst_reg(WKUP_MOD, OMAP4_RM_RSTCTRL);
-
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block tablet_reboot_notifier = {
-	.notifier_call = tablet_notifier_call,
-};
-
-
 static struct platform_device *tablet4430_devices[] __initdata = {
 	&wl128x_device,
 	&btwilink_device,
@@ -932,7 +892,6 @@ static void __init omap_tablet_init(void)
 	omap_board_config = tablet_config;
 	omap_board_config_size = ARRAY_SIZE(tablet_config);
 	tablet_rev = omap_init_board_version(0);
-	register_reboot_notifier(&tablet_reboot_notifier);
 	omap4_create_board_props();
 	omap4_audio_conf();
 	omap4_i2c_init();

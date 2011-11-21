@@ -334,6 +334,7 @@ config MACH_OMAP_4430SDP
 	select TWL6030_BCI_BATTERY
 	select CHARGER_BQ2415x
 	select TWL6030_GPADC
+	select OMAP_REBOOT_REASON
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44xx Tablet2 Board"
@@ -352,6 +353,7 @@ config MACH_OMAP_BLAZE
 	select PANEL_TC358765
 	select KEYBOARD_GPIO
 	select TWL6040_VIB
+	select OMAP_REBOOT_REASON
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
@@ -361,6 +363,7 @@ config MACH_OMAP4_PANDA
 	select OMAP_PACKAGE_CBS
 	select REGULATOR_FIXED_VOLTAGE
 	select OMAP_TPS6236X
+	select OMAP_REBOOT_REASON
 
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"
