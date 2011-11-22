@@ -365,3 +365,5 @@ endif
 ifneq ($(CONFIG_OMAP_RPMSG_RESMGR),)
 obj-y					+= rpmsg_resmgr.o
 endif
+
+obj-$(CONFIG_OMAP_REBOOT_REASON)	+= omap-reboot-reason.o
