@@ -80,6 +80,8 @@
 #define OMAP_UART_WER_DSR       0x02
 #define OMAP_UART_WER_CTS       0x01
 
+#define OMAP_UART_SCR_TX_EMPTY	0x08
+
 struct omap_uart_port_info {
 	int                     dma_rx_buf_size;/* DMA Rx Buffer Size */
 	int                     dma_rx_timeout; /* DMA RX timeout */
@@ -142,6 +144,7 @@ struct uart_omap_port {
 	unsigned char		dlh;
 	unsigned char		mdr1;
 	unsigned char		wer;
+	unsigned char		scr;
 
 	int			use_dma;
 	bool			suspended;
