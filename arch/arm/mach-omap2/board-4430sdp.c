@@ -1078,6 +1078,11 @@ static struct omap_board_mux board_mux[] __initdata = {
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
+#else
+#define board_mux	NULL
+#define board_wkup_mux NULL
+#endif
+
 /*
  * LPDDR2 Configeration Data:
  * The memory organisation is as below :
@@ -1094,11 +1099,6 @@ static __initdata struct emif_device_details emif_devices = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
 	.cs1_device = &lpddr2_elpida_2G_S4_dev
 };
-
-#else
-#define board_mux	NULL
-#define board_wkup_mux NULL
-#endif
 
 static struct omap_device_pad blaze_uart1_pads[] __initdata = {
 	{
