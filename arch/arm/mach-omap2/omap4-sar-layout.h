@@ -73,6 +73,8 @@
 #define SAR_BANK4_OFFSET		0x3000
 
 /* Scratch pad memory offsets from SAR_BANK1 */
+#define OMAP_REBOOT_REASON_OFFSET		0xA0C
+#define OMAP_REBOOT_REASON_SIZE			0xF /* till 0xA1B */
 #define CPU0_SAVE_OFFSET			0xb00
 #define CPU1_SAVE_OFFSET			0xc00
 #define MMU_OFFSET0				0xd00

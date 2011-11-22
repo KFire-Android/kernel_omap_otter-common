@@ -400,6 +400,10 @@ config OMAP_FIQ_DEBUGGER
 	help
 	  Enables the serial FIQ debugger on OMAP"
 
+config OMAP_REBOOT_REASON
+	depends on ARCH_OMAP4
+	bool
+
 endmenu
 
 endif
