@@ -1094,9 +1094,6 @@ static int twl6040_set_bias_level(struct snd_soc_codec *codec,
 		priv->codec_powered = 1;
 
 		twl6040_restore_regs(codec);
-
-		/* Set external boost GPO */
-		twl6040_write(codec, TWL6040_REG_GPOCTL, 0x02);
 		break;
 	case SND_SOC_BIAS_OFF:
 		if (!priv->codec_powered)
