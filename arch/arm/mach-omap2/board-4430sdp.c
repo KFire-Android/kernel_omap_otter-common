@@ -21,6 +21,7 @@
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
 #include <linux/hwspinlock.h>
+#include <linux/i2c.h>
 #include <linux/i2c/twl.h>
 #include <linux/i2c/bq2415x.h>
 #include <linux/i2c/tmp102.h>
@@ -28,6 +29,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/regulator/tps6130x.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
 #include <linux/platform_data/omap4-keypad.h>
@@ -89,6 +91,8 @@
 #define PWM2S			BIT(4)
 #define PWM2R			BIT(3)
 #define PWM2CTL_MASK		(PWM2EN | PWM2S | PWM2R)
+
+static struct twl6040 *twl6040_driver_data;
 
 static const uint32_t sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -610,12 +614,69 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	return 0;
 }
 
+static int tps6130x_enable(int on)
+{
+	u8 mask;
+	int ret;
+
+	if (!twl6040_driver_data) {
+		pr_err("%s: invalid twl6040 driver data\n", __func__);
+		return -EINVAL;
+	}
+
+	/*
+	 * tps6130x NRESET driven by:
+	 * - GPO2 in TWL6040
+	 * - GPO in TWL6041 (only one GPO supported)
+	 */
+	if (twl6040_driver_data->rev >= TWL6041_REV_2_0)
+		mask = TWL6040_GPO1;
+	else
+		mask = TWL6040_GPO2;
+
+	if (on)
+		ret = twl6040_set_bits(twl6040_driver_data,
+				       TWL6040_REG_GPOCTL, mask);
+	else
+		ret = twl6040_clear_bits(twl6040_driver_data,
+					 TWL6040_REG_GPOCTL, mask);
+
+	if (ret < 0)
+		pr_err("%s: failed to write GPOCTL %d\n", __func__, ret);
+	return ret;
+}
+
+static struct tps6130x_platform_data tps6130x_pdata = {
+	.chip_enable	= tps6130x_enable,
+};
+
+static struct regulator_consumer_supply twl6040_vddhf_supply[] = {
+	REGULATOR_SUPPLY("vddhf", "twl6040-codec"),
+};
+
+static struct regulator_init_data twl6040_vddhf_data = {
+	.constraints = {
+		.min_uV			= 4075000,
+		.max_uV			= 4950000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(twl6040_vddhf_supply),
+	.consumer_supplies	= twl6040_vddhf_supply,
+	.driver_data		= &tps6130x_pdata,
+};
+
 static struct twl6040_codec_data twl6040_codec = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step	= 0x0f,
 	.hs_right_step	= 0x0f,
 	.hf_left_step	= 0x1d,
 	.hf_right_step	= 0x1d,
+	.vddhf_uV	= 4075000,
 };
 
 static struct twl6040_vibra_data twl6040_vibra = {
@@ -627,10 +688,60 @@ static struct twl6040_vibra_data twl6040_vibra = {
 	.vddvibr_uV = 0,	/* fixed volt supply - VBAT */
 };
 
+static struct i2c_board_info sdp4430_i2c_1_tps6130x_boardinfo = {
+	I2C_BOARD_INFO("tps6130x", 0x33),
+	.platform_data = &twl6040_vddhf_data,
+};
+
+static int twl6040_platform_init(struct twl6040 *twl6040)
+{
+	if (cpu_is_omap447x())
+		return 0;
+
+	if (!twl6040) {
+		pr_err("%s: invalid twl6040 driver data\n", __func__);
+		return -EINVAL;
+	}
+
+	twl6040_driver_data = twl6040;
+
+	tps6130x_pdata.adapter = i2c_get_adapter(1);
+	if (!tps6130x_pdata.adapter) {
+		pr_err("%s: can't get i2c adapter\n", __func__);
+		return -ENODEV;
+	}
+
+	tps6130x_pdata.client = i2c_new_device(tps6130x_pdata.adapter,
+		&sdp4430_i2c_1_tps6130x_boardinfo);
+	if (!tps6130x_pdata.client) {
+		pr_err("%s: can't add i2c device\n", __func__);
+		i2c_put_adapter(tps6130x_pdata.adapter);
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static int twl6040_platform_exit(struct twl6040 *twl6040)
+{
+	if (cpu_is_omap447x())
+		return 0;
+
+	if (tps6130x_pdata.client) {
+		i2c_unregister_device(tps6130x_pdata.client);
+		tps6130x_pdata.client = NULL;
+		i2c_put_adapter(tps6130x_pdata.adapter);
+	}
+
+	return 0;
+}
+
 static struct twl6040_platform_data twl6040_data = {
 	.codec		= &twl6040_codec,
 	.vibra		= &twl6040_vibra,
 	.audpwron_gpio	= 127,
+	.platform_init	= twl6040_platform_init,
+	.platform_exit	= twl6040_platform_exit,
 };
 
 /*
@@ -845,6 +956,13 @@ static int __init omap4_i2c_init(void)
 		sdp4430_twldata.reg_setup_script = omap4430_twl6030_setup;
 	else if (cpu_is_omap446x())
 		sdp4430_twldata.reg_setup_script = omap4460_twl6030_setup;
+
+	/*
+	 * tps6130x regulator provides VDDHF supply for hands-free module
+	 * (part of twl6040) only on OMAP4430 and OMAP4460 boards.
+	 */
+	if (cpu_is_omap447x() && twl6040_data.codec)
+		twl6040_data.codec->vddhf_uV = 0;
 
 	omap4_pmic_init("twl6030", &sdp4430_twldata,
 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);

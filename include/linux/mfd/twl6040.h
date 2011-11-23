@@ -69,6 +69,14 @@
 #define TWL6040_REG_ACCCTL		0x2D
 #define TWL6040_REG_STATUS		0x2E
 
+/* ASICREV (0x02) values */
+
+#define TWL6040_REV_1_0			0x00
+#define TWL6040_REV_1_1			0x01
+#define TWL6040_REV_1_3			0x02
+#define TWL6041_REV_2_0			0x10
+#define TWL6041_REV_2_2			0x12
+
 /* INTID (0x03) fields */
 
 #define TWL6040_THINT			0x01
@@ -145,9 +153,9 @@
 
 /* GPOCTL (0x1E) fields */
 
-#define TWL6040_GPO1			0x01
-#define TWL6040_GPO2			0x02
-#define TWL6040_GPO3			0x03
+#define TWL6040_GPO1			(1 << 0)
+#define TWL6040_GPO2			(1 << 1)
+#define TWL6040_GPO3			(1 << 2)
 
 /* ACCCTL (0x2D) fields */
 

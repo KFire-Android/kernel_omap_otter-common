@@ -28,6 +28,8 @@
 
 struct tps6130x_platform_data {
 	int (*chip_enable)(int on);
+	struct i2c_client *client;
+	struct i2c_adapter *adapter;
 };
 
 #endif
