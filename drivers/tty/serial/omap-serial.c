@@ -50,7 +50,6 @@
 #define UART_OMAP_IIR_RX_TIMEOUT	0xc
 
 #define UART_OMAP_TXFIFO_LVL		(0x68/4)
-#define UART_FCR_T_TRIG_01_NUMCH           16
 
 static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
 
@@ -459,6 +458,7 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 	unsigned int int_id;
 	unsigned long flags;
 	int ret = IRQ_HANDLED;
+	u8 tx_fifo_lvl;
 
 	serial_omap_port_enable(up);
 	iir = serial_in(up, UART_IIR);
@@ -487,9 +487,9 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
 
 	check_modem_status(up);
 	if (int_id == UART_IIR_THRI) {
-		if (lsr & UART_LSR_THRE)
-			transmit_chars(up,
-			  (up->port.fifosize - UART_FCR_T_TRIG_01_NUMCH));
+		tx_fifo_lvl = serial_in(up, UART_OMAP_TXFIFO_LVL);
+		if (lsr & UART_LSR_THRE || tx_fifo_lvl < up->port.fifosize)
+			transmit_chars(up, tx_fifo_lvl);
 		else
 			ret = IRQ_NONE;
 	}
@@ -860,9 +860,9 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	serial_out(up, UART_IER, up->ier);
 	serial_out(up, UART_LCR, cval);		/* reset DLAB */
 	up->lcr = cval;
-	up->scr = OMAP_UART_SCR_TX_EMPTY;
 
 	/* FIFOs and DMA Settings */
+
 	/* FCR can be changed only when the
 	 * baud clock is not running
 	 * DLL_REG and DLH_REG set to 0.
@@ -891,10 +891,10 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 		}
 
 		serial_out(up, UART_TI752_TLR, 0);
-		up->scr |= (UART_FCR_TRIGGER_4 | UART_FCR_TRIGGER_8);
+		serial_out(up, UART_OMAP_SCR,
+			(UART_FCR_TRIGGER_4 | UART_FCR_TRIGGER_8));
 	}
 
-	serial_out(up, UART_OMAP_SCR, up->scr);
 	serial_out(up, UART_EFR, up->efr);
 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
 	serial_out(up, UART_MCR, up->mcr);
@@ -1639,7 +1639,8 @@ static void omap_uart_restore_context(struct uart_omap_port *up)
 		}
 
 		serial_out(up, UART_TI752_TLR, 0);
-		serial_out(up, UART_OMAP_SCR, up->scr);
+		serial_out(up, UART_OMAP_SCR,
+			(UART_FCR_TRIGGER_4 | UART_FCR_TRIGGER_8));
 	}
 
 	/* UART 16x mode */
