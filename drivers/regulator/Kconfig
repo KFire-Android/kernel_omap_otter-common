@@ -232,6 +232,13 @@ config REGULATOR_TPS6105X
 	  It is a single boost converter primarily for white LEDs and
 	  audio amplifiers.
 
+config REGULATOR_TPS6130X
+	tristate "TI TPS6130X Power regulators"
+	depends on I2C
+	help
+	  This driver supports TPS6130X family. TPS6130X can operate as a
+	  regulated current source and/or as a standard voltage boost converter.
+
 config REGULATOR_TPS65023
 	tristate "TI TPS65023 Power regulators"
 	depends on I2C
