@@ -26,6 +26,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/regulator/tps6130x.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
 #include <linux/omapfb.h>
@@ -33,6 +34,7 @@
 #include <linux/twl6040-vib.h>
 #include <linux/wl12xx.h>
 #include <linux/memblock.h>
+#include <linux/mfd/twl6040-codec.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -712,12 +714,61 @@ static void omap4_audio_conf(void)
 		OMAP_PIN_INPUT_PULLUP);
 }
 
+static int tps6130x_enable(int on)
+{
+	u8 val = 0;
+	int ret;
+
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, TWL6040_REG_GPOCTL);
+	if (ret < 0) {
+		pr_err("%s: failed to read GPOCTL %d\n", __func__, ret);
+		return ret;
+	}
+
+	/* TWL6040 GPO2 connected to TPS6130X NRESET */
+	if (on)
+		val |= TWL6040_GPO2;
+	else
+		val &= ~TWL6040_GPO2;
+
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, TWL6040_REG_GPOCTL);
+	if (ret < 0)
+		pr_err("%s: failed to write GPOCTL %d\n", __func__, ret);
+
+	return ret;
+}
+
+static struct tps6130x_platform_data tps6130x_pdata = {
+	.chip_enable	= tps6130x_enable,
+};
+
+static struct regulator_consumer_supply twl6040_vddhf_supply[] = {
+	REGULATOR_SUPPLY("vddhf", "twl6040-codec"),
+};
+
+static struct regulator_init_data twl6040_vddhf = {
+	.constraints = {
+		.min_uV			= 4075000,
+		.max_uV			= 4950000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(twl6040_vddhf_supply),
+	.consumer_supplies	= twl6040_vddhf_supply,
+	.driver_data		= &tps6130x_pdata,
+};
+
 static struct twl4030_codec_audio_data twl6040_audio = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step	= 0x0f,
 	.hs_right_step	= 0x0f,
 	.hf_left_step	= 0x1d,
 	.hf_right_step	= 0x1d,
+	.vddhf_uV	= 4075000,
 };
 
 static struct twl4030_codec_vibra_data twl6040_vibra = {
@@ -784,9 +835,15 @@ static struct bq2415x_platform_data sdp4430_bqdata = {
 	.max_charger_currentmA = 1550,
 };
 
-static struct i2c_board_info __initdata sdp4430_i2c_boardinfo = {
+static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
+	{
 		I2C_BOARD_INFO("bq24156", 0x6a),
 		.platform_data = &sdp4430_bqdata,
+	},
+	{
+		I2C_BOARD_INFO("tps6130x", 0x33),
+		.platform_data = &twl6040_vddhf,
+	},
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
@@ -841,7 +898,8 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
 
 	omap4_pmic_init("twl6030", &sdp4430_twldata);
-	i2c_register_board_info(1, &sdp4430_i2c_boardinfo, 1);
+	omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo,
+				ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));

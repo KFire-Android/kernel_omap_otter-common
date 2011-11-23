@@ -1054,7 +1054,6 @@ static struct snd_soc_card snd_soc_sdp4430 = {
 };
 
 static struct platform_device *sdp4430_snd_device;
-static struct i2c_adapter *adapter;
 
 static int __init sdp4430_soc_init(void)
 {
