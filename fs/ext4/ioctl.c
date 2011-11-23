@@ -44,7 +44,7 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (get_user(flags, (int __user *) arg))
 			return -EFAULT;
 
-		err = mnt_want_write(filp->f_path.mnt);
+		err = mnt_want_write_file(filp);
 		if (err)
 			return err;
 
@@ -154,7 +154,7 @@ flags_out:
 		if (!inode_owner_or_capable(inode))
 			return -EPERM;
 
-		err = mnt_want_write(filp->f_path.mnt);
+		err = mnt_want_write_file(filp);
 		if (err)
 			return err;
 		if (get_user(generation, (int __user *) arg)) {
@@ -213,7 +213,7 @@ setversion_out:
 		if (get_user(n_blocks_count, (__u32 __user *)arg))
 			return -EFAULT;
 
-		err = mnt_want_write(filp->f_path.mnt);
+		err = mnt_want_write_file(filp);
 		if (err)
 			return err;
 
@@ -253,7 +253,7 @@ setversion_out:
 			goto mext_out;
 		}
 
-		err = mnt_want_write(filp->f_path.mnt);
+		err = mnt_want_write_file(filp);
 		if (err)
 			goto mext_out;
 
@@ -283,7 +283,7 @@ mext_out:
 				sizeof(input)))
 			return -EFAULT;
 
-		err = mnt_want_write(filp->f_path.mnt);
+		err = mnt_want_write_file(filp);
 		if (err)
 			return err;
 
@@ -306,7 +306,7 @@ mext_out:
 		if (!inode_owner_or_capable(inode))
 			return -EACCES;
 
-		err = mnt_want_write(filp->f_path.mnt);
+		err = mnt_want_write_file(filp);
 		if (err)
 			return err;
 		/*
@@ -328,7 +328,7 @@ mext_out:
 		if (!inode_owner_or_capable(inode))
 			return -EACCES;
 
-		err = mnt_want_write(filp->f_path.mnt);
+		err = mnt_want_write_file(filp);
 		if (err)
 			return err;
 		err = ext4_alloc_da_blocks(inode);
