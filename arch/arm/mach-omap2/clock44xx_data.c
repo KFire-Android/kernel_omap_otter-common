@@ -1375,6 +1375,8 @@ static struct clk div_ts_ck = {
 	.clksel_mask	= OMAP4430_CLKSEL_24_25_MASK,
 	.ops		= &clkops_null,
 	.recalc		= &omap2_clksel_recalc,
+	.round_rate	= &omap2_clksel_round_rate,
+	.set_rate	= &omap2_clksel_set_rate,
 };
 
 static const struct clksel per_abe_nc_fclk_div[] = {
