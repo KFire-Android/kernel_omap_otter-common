@@ -1975,6 +1975,17 @@ static struct clk ipu_fck = {
 	.speculate	= &omap2_clksel_speculate,
 };
 
+static struct clk ipu_fck_4470 = {
+	.name		= "ipu_fck",
+	.ops		= &clkops_omap4_dflt_wait,
+	.enable_reg	= OMAP4430_CM_DUCATI_DUCATI_CLKCTRL,
+	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
+	.clkdm_name	= "ducati_clkdm",
+	.parent		= &div_core_ck,
+	.recalc		= &followparent_recalc,
+	.speculate	= &omap2_clksel_speculate,
+};
+
 static struct clk iss_ctrlclk = {
 	.name		= "iss_ctrlclk",
 	.ops		= &clkops_omap4_dflt_wait,
@@ -3567,7 +3578,8 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK("omap_i2c.2",	"fck",				&i2c2_fck,	CK_44XX),
 	CLK("omap_i2c.3",	"fck",				&i2c3_fck,	CK_44XX),
 	CLK("omap_i2c.4",	"fck",				&i2c4_fck,	CK_44XX),
-	CLK(NULL,	"ipu_fck",			&ipu_fck,	CK_44XX),
+	CLK(NULL,	"ipu_fck",			&ipu_fck,	CK_443X|CK_446X),
+	CLK(NULL,	"ipu_fck",			&ipu_fck_4470,	CK_447X),
 	CLK(NULL,	"iss_ctrlclk",			&iss_ctrlclk,	CK_44XX),
 	CLK(NULL,	"iss_fck",			&iss_fck,	CK_44XX),
 	CLK(NULL,	"iva_fck",			&iva_fck,	CK_44XX),
