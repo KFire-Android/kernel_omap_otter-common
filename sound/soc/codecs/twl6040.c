@@ -72,6 +72,7 @@ struct twl6040_output {
 	u16 right_step;
 	unsigned int step_delay;
 	u16 ramp;
+	u16 mute;
 	struct delayed_work work;
 	struct completion ramp_done;
 };
@@ -1436,11 +1437,27 @@ static int twl6040_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 	return 0;
 }
 
+
+static int twl6040_digital_mute(struct snd_soc_dai *dai, int mute)
+{
+	/*
+	 * pop-noise reduction sequence requires to shutdown
+	 * analog side before CPU DAI
+	 */
+
+	if (mute)
+		snd_soc_dapm_dai_stream_event(dai,
+				SNDRV_PCM_STREAM_PLAYBACK, SND_SOC_DAPM_STREAM_STOP);
+
+	return 0;
+}
+
 static const struct snd_soc_dai_ops twl6040_dai_ops = {
 	.startup	= twl6040_startup,
 	.hw_params	= twl6040_hw_params,
 	.prepare	= twl6040_prepare,
 	.set_sysclk	= twl6040_set_dai_sysclk,
+	.digital_mute	= twl6040_digital_mute,
 };
 
 static struct snd_soc_dai_driver twl6040_dai[] = {
@@ -1449,7 +1466,7 @@ static struct snd_soc_dai_driver twl6040_dai[] = {
 	.playback = {
 		.stream_name = "Legacy Playback",
 		.channels_min = 1,
-		.channels_max = 5,
+		.channels_max = 6,
 		.rates = TWL6040_RATES,
 		.formats = TWL6040_FORMATS,
 	},
@@ -1500,7 +1517,7 @@ static struct snd_soc_dai_driver twl6040_dai[] = {
 	.playback = {
 		.stream_name = "Vibra Playback",
 		.channels_min = 1,
-		.channels_max = 1,
+		.channels_max = 2,
 		.rates = SNDRV_PCM_RATE_CONTINUOUS,
 		.formats = TWL6040_FORMATS,
 	},
