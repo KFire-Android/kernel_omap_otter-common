@@ -2008,6 +2008,17 @@ static struct clk iss_fck = {
 	.speculate	= &omap2_clksel_speculate,
 };
 
+static struct clk iss_fck_4470 = {
+	.name		= "iss_fck",
+	.ops		= &clkops_omap4_dflt_wait,
+	.enable_reg	= OMAP4430_CM_CAM_ISS_CLKCTRL,
+	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+	.clkdm_name	= "iss_clkdm",
+	.parent		= &div_core_ck,
+	.recalc		= &followparent_recalc,
+	.speculate	= &omap2_clksel_speculate,
+};
+
 static struct clk iva_fck = {
 	.name		= "iva_fck",
 	.ops		= &clkops_omap4_dflt_wait,
@@ -3581,7 +3592,8 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"ipu_fck",			&ipu_fck,	CK_443X|CK_446X),
 	CLK(NULL,	"ipu_fck",			&ipu_fck_4470,	CK_447X),
 	CLK(NULL,	"iss_ctrlclk",			&iss_ctrlclk,	CK_44XX),
-	CLK(NULL,	"iss_fck",			&iss_fck,	CK_44XX),
+	CLK(NULL,	"iss_fck",			&iss_fck,	CK_443X|CK_446X),
+	CLK(NULL,	"iss_fck",			&iss_fck_4470,	CK_447X),
 	CLK(NULL,	"iva_fck",			&iva_fck,	CK_44XX),
 	CLK(NULL,	"kbd_fck",			&kbd_fck,	CK_44XX),
 	CLK(NULL,	"l3_instr_ick",			&l3_instr_ick,	CK_44XX),
