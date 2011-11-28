@@ -191,8 +191,10 @@ static unsigned int lp_rates[] = {
 
 static unsigned int hp_rates[] = {
 	8000,
+	11250,
 	16000,
-	32000,
+	22500,
+	44100,
 	48000,
 	96000,
 };
@@ -1366,9 +1368,6 @@ static int twl6040_hw_params(struct snd_pcm_substream *substream,
 
 	rate = params_rate(params);
 	switch (rate) {
-	case 11250:
-	case 22500:
-	case 44100:
 	case 88200:
 		/* These rates are not supported when HPPLL is in use */
 		if (unlikely(priv->pll == TWL6040_SYSCLK_SEL_HPPLL)) {
@@ -1379,8 +1378,11 @@ static int twl6040_hw_params(struct snd_pcm_substream *substream,
 		priv->sysclk = 17640000;
 		break;
 	case 8000:
+	case 11250:
 	case 16000:
+	case 22500:
 	case 32000:
+	case 44100:
 	case 48000:
 	case 96000:
 		priv->sysclk = 19200000;
