@@ -1530,6 +1530,27 @@ static struct clk bandgap_ts_fclk = {
 	.recalc		= &followparent_recalc,
 };
 
+static const struct clksel bb2d_clk_mux_sel[] = {
+	{ .parent = &dpll_core_m7x2_ck, .rates = div_1_0_rates },
+	{ .parent = &dpll_per_m6x2_ck, .rates = div_1_1_rates },
+	{ .parent = NULL },
+};
+
+/* Merged bb2d_clk_mux into bb2d */
+static struct clk bb2d_fck = {
+	.name		= "bb2d_fck",
+	.parent		= &dpll_core_m7x2_ck,
+	.clksel		= bb2d_clk_mux_sel,
+	.init		= &omap2_init_clksel_parent,
+	.clksel_reg	= OMAP4470_CM_DSS_BB2D_CLKCTRL,
+	.clksel_mask	= OMAP4470_CLKSEL_BB2D_FCLK_MASK,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &omap2_clksel_recalc,
+	.enable_reg	= OMAP4470_CM_DSS_BB2D_CLKCTRL,
+	.enable_bit	= OMAP4430_MODULEMODE_SWCTRL,
+	.clkdm_name	= "l3_dss_clkdm",
+};
+
 static struct clk des3des_fck = {
 	.name		= "des3des_fck",
 	.ops		= &clkops_omap4_dflt_wait,
@@ -3555,6 +3576,7 @@ static struct omap_clk omap44xx_clks[] = {
 	CLK(NULL,	"aess_fck",			&aess_fck,	CK_44XX),
 	CLK("omap_temp_sensor.0",	"fck",	&bandgap_fclk,	CK_443X),
 	CLK("omap_temp_sensor.0",	"fck",	&bandgap_ts_fclk, (CK_446X | CK_447X)),
+	CLK(NULL,	"bb2d_fck",			&bb2d_fck,	CK_447X),
 	CLK(NULL,	"des3des_fck",			&des3des_fck,	CK_44XX),
 	CLK(NULL,	"dmic_sync_mux_ck",		&dmic_sync_mux_ck,	CK_44XX),
 	CLK(NULL,	"dmic_fck",			&dmic_fck,	CK_44XX),
