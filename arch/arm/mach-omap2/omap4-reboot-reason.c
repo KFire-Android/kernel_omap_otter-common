@@ -49,6 +49,13 @@ static struct notifier_block omap_reboot_notifier = {
 
 static int __init omap_reboot_reason_init(void)
 {
+	void __iomem *sar_base;
+
+	sar_base = omap4_get_sar_ram_base();
+	if (sar_base)
+		strncpy(sar_base + OMAP_REBOOT_REASON_OFFSET,
+			"", OMAP_REBOOT_REASON_SIZE);
+
 	return register_reboot_notifier(&omap_reboot_notifier);
 }
 late_initcall(omap_reboot_reason_init);
