@@ -50,6 +50,7 @@ void tf_unmap_shmem(
 		struct tf_connection *connection,
 		struct tf_shmem_desc *shmem_desc,
 		u32 full_cleanup);
+
 /*----------------------------------------------------------------------------
  * Connection operations to the Secure World
  *----------------------------------------------------------------------------*/

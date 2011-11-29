@@ -76,6 +76,7 @@ static int tf_ctrl_check_omap_type(void)
 		return -EFAULT;
 	}
 }
+
 /*----------------------------------------------------------------------------*/
 
 static int tf_ctrl_device_release(struct inode *inode, struct file *file)
@@ -177,7 +178,6 @@ static long tf_ctrl_device_ioctl(struct file *file, unsigned int ioctl_num,
 		if (descriptor_count > 1) {
 			dpr_err("%s(%p): configuration file is too long (%d)\n",
 				__func__, file, descriptor_count);
-
 			result = -ENOMEM;
 			goto start_exit;
 		}
@@ -252,10 +252,10 @@ static int tf_ctrl_device_open(struct inode *inode, struct file *file)
 	}
 
 	file->private_data = connection;
+
 	/*
 	 * Successful completion.
 	 */
-
 	dpr_info("%s(%p): Success\n", __func__, file);
 	return 0;
 

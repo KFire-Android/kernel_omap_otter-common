@@ -81,6 +81,7 @@ TEEC_Result TEEC_encode_error(int err)
 {
 	if (err >= 0)
 		return S_SUCCESS;
+
 	switch (err) {
 	case 0:		          return TEEC_SUCCESS;
 	case -EIO:		  return TEEC_ERROR_GENERIC;
@@ -197,8 +198,10 @@ void TEEC_decode_parameters(union tf_answer_param *params,
 			    TEEC_Operation *operation)
 {
 	unsigned i;
+
 	if (operation == NULL)
 		return;
+
 	for (i = 0; i < 4; i++) {
 		unsigned ty = TF_GET_PARAM_TYPE(operation->paramTypes, i);
 		TEEC_Parameter *op = operation->params + i;
@@ -311,6 +314,7 @@ TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context *context,
 					       &answer_message));
 	if (ret == TEEC_SUCCESS)
 		ret = ans->error_code;
+
 	if (ret == S_SUCCESS) {
 		sharedMem->imp._context = context;
 		sharedMem->imp._block = ans->block;
@@ -442,6 +446,7 @@ TEEC_Result TEEC_OpenSessionEx(TEEC_Context *context,
 
 	if (ret == TEEC_SUCCESS)
 		ret = ans->error_code;
+
 	if (ret == S_SUCCESS) {
 		session->imp._client_session = ans->client_session;
 		session->imp._context = context;
@@ -608,7 +613,6 @@ void TEEC_RequestCancellation(TEEC_Operation *operation)
 		schedule();
 	}
 }
-
 EXPORT_SYMBOL(TEEC_RequestCancellation);
 
 #endif /* defined(CONFIG_TF_TEEC) */

@@ -881,7 +881,6 @@ static int aes_dma_stop(struct aes_hwa_ctx *ctx)
 
 	OUTREG32(&paes_reg->AES_SYSCONFIG, 0);
 
-
 	omap_stop_dma(ctx->dma_lch_in);
 	omap_stop_dma(ctx->dma_lch_out);
 

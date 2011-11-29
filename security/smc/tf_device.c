@@ -198,7 +198,6 @@ static ssize_t info_show(struct tf_device *dev, char *buf)
 {
 	struct tf_device_stats *dev_stats = &dev->stats;
 
-
 	return snprintf(buf, PAGE_SIZE,
 		"stat.memories.allocated: %d\n"
 		"stat.pages.allocated:    %d\n"

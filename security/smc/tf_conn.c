@@ -1161,6 +1161,7 @@ int tf_invoke_client_command(
 	for (i = 0; i < 4; i++) {
 		int param_type = TF_GET_PARAM_TYPE(
 			command->invoke_client_command.param_types, i);
+
 		if ((param_type & (TF_PARAM_TYPE_MEMREF_FLAG |
 					TF_PARAM_TYPE_REGISTERED_MEMREF_FLAG))
 				== TF_PARAM_TYPE_MEMREF_FLAG) {
@@ -1262,7 +1263,6 @@ error:
 	if (new_handle != NULL)
 		ion_free(connection->ion_client, new_handle);
 #endif /* CONFIG_TF_ION */
-
 	/* Unmap de temp mem refs */
 	for (i = 0; i < 4; i++) {
 		if (shmem_desc[i] != NULL) {

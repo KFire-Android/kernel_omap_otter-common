@@ -246,7 +246,6 @@ struct tf_comm {
 	 */
 	int se_initialized;
 
-
 	/*
 	 * Lock to be held by a client when executing an RPC
 	 */
@@ -269,7 +268,6 @@ struct tf_comm {
 /*----------------------------------------------------------------------------*/
 
 struct tf_device_stats {
-
 	atomic_t stat_pages_allocated;
 	atomic_t stat_memories_allocated;
 	atomic_t stat_pages_locked;

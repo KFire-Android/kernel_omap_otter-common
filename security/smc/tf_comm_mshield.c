@@ -108,7 +108,6 @@ struct tf_ns_pa_info {
 	void *results;
 };
 
-
 #ifdef CONFIG_HAS_WAKELOCK
 static struct wake_lock g_tf_wake_lock;
 #endif
@@ -690,7 +689,6 @@ int tf_start(struct tf_comm *comm,
 	workspace_size -= 0x20000;
 	sdp_bkext_store_addr = workspace_addr + workspace_size;
 
-
 	if (test_bit(TF_COMM_FLAG_PA_AVAILABLE, &comm->flags)) {
 		dpr_err("%s(%p): The SMC PA is already started\n",
 			__func__, comm);
@@ -712,7 +710,6 @@ int tf_start(struct tf_comm *comm,
 		dpr_err("%s(%p): SE initialization failed\n", __func__, comm);
 		goto error1;
 	}
-
 
 	l1_shared_buffer =
 		(struct tf_l1_shared_buffer *)
@@ -749,7 +746,6 @@ int tf_start(struct tf_comm *comm,
 	dpr_info("%s(%p): Starting PA (%d bytes)...\n",
 		__func__, comm, pa_size);
 
-
 	/*
 	 * Make sure all data is visible to the secure world
 	 */
@@ -777,6 +773,7 @@ int tf_start(struct tf_comm *comm,
 		}
 		iounmap(tmp);
 	}
+
 	dmac_flush_range((void *)&pa_info,
 		(void *)(((u32)&pa_info) + sizeof(struct tf_ns_pa_info)));
 	outer_clean_range(__pa(&pa_info),

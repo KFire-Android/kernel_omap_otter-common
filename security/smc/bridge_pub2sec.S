@@ -121,4 +121,3 @@ rpc_handler:
 
 	/* Restore registers */
 	pop	{r4-r12, pc}
-
