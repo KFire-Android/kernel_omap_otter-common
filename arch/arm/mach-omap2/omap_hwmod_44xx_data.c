@@ -1095,7 +1095,7 @@ static struct omap_hwmod omap44xx_ctrl_module_core_hwmod = {
 	.main_clk       = "l4_div_ck",
 	.slaves         = omap44xx_ctrl_module_core_slaves,
 	.slaves_cnt     = ARRAY_SIZE(omap44xx_ctrl_module_core_slaves),
-	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP446X),
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP446X | CHIP_IS_OMAP447X),
 };
 /*
  * 'thermal_sensor' class
@@ -1152,7 +1152,7 @@ static struct omap_hwmod omap44xx_thermal_sensor_hwmod = {
 	},
 	.opt_clks       = thermal_sensor446x_opt_clks,
 	.opt_clks_cnt   = ARRAY_SIZE(thermal_sensor446x_opt_clks),
-	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP446X),
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP446X | CHIP_IS_OMAP447X),
 };
 
 /*
@@ -1196,7 +1196,7 @@ static struct omap_hwmod omap446x_bandgap_hwmod = {
 	},
 	.opt_clks	= bandgap446x_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(bandgap446x_opt_clks),
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP446X),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP446X | CHIP_IS_OMAP447X),
 };
 
 /*
@@ -2522,7 +2522,7 @@ static struct omap_hwmod omap446x_gpio1_hwmod = {
 	.dev_attr	= &gpio_dev_attr,
 	.slaves		= omap44xx_gpio1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio1_slaves),
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP446X),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP446X | CHIP_IS_OMAP447X),
 };
 
 /* gpio2 */
