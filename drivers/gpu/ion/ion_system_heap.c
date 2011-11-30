@@ -23,51 +23,68 @@
 #include "ion_priv.h"
 
 static int ion_system_heap_allocate(struct ion_heap *heap,
-				     struct ion_buffer *buffer,
-				     unsigned long size, unsigned long align,
-				     unsigned long flags)
+				    struct ion_buffer *buffer,
+				    unsigned long size, unsigned long align,
+				    unsigned long flags)
 {
-	buffer->priv_virt = vmalloc_user(size);
-	if (!buffer->priv_virt)
-		return -ENOMEM;
+	int n_pages = PAGE_ALIGN(size) / PAGE_SIZE;
+	struct page **page_list;
+	const int gfp_mask = GFP_KERNEL | __GFP_HIGHMEM | __GFP_ZERO;
+	int i = 0;
+
+	page_list = kmalloc(n_pages * sizeof(void *), GFP_KERNEL);
+
+	for (i = 0; i < n_pages; i++) {
+		page_list[i] = alloc_page(gfp_mask);
+		if (page_list[i] == NULL)
+			goto out;
+	}
+
+	buffer->priv_virt = page_list;
 	return 0;
+
+out:
+	/* failed on i, so go to i-1 */
+	i--;
+
+	for (; i >= 0; i--)
+		__free_page(page_list[i]);
+
+	kfree(page_list);
+	return -ENOMEM;
 }
 
 void ion_system_heap_free(struct ion_buffer *buffer)
 {
-	vfree(buffer->priv_virt);
+	int i;
+	int n_pages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
+	struct page **page_list = (struct page **)buffer->priv_virt;
+
+	for (i = 0; i < n_pages; i++)
+		__free_page(page_list[i]);
+	kfree(page_list);
 }
 
 struct scatterlist *ion_system_heap_map_dma(struct ion_heap *heap,
 					    struct ion_buffer *buffer)
 {
 	struct scatterlist *sglist;
-	struct page *page;
+	struct page **page_list = (struct page **)buffer->priv_virt;
 	int i;
-	int npages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
-	void *vaddr = buffer->priv_virt;
+	int n_pages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
 
-	sglist = vmalloc(npages * sizeof(struct scatterlist));
+	sglist = vmalloc(n_pages * sizeof(struct scatterlist));
 	if (!sglist)
 		return ERR_PTR(-ENOMEM);
-	memset(sglist, 0, npages * sizeof(struct scatterlist));
-	sg_init_table(sglist, npages);
-	for (i = 0; i < npages; i++) {
-		page = vmalloc_to_page(vaddr);
-		if (!page)
-			goto end;
-		sg_set_page(&sglist[i], page, PAGE_SIZE, 0);
-		vaddr += PAGE_SIZE;
-	}
+	memset(sglist, 0, n_pages * sizeof(struct scatterlist));
+	sg_init_table(sglist, n_pages);
+	for (i = 0; i < n_pages; i++)
+		sg_set_page(&sglist[i], page_list[i], PAGE_SIZE, 0);
 	/* XXX do cache maintenance for dma? */
 	return sglist;
-end:
-	vfree(sglist);
-	return NULL;
 }
 
-void ion_system_heap_unmap_dma(struct ion_heap *heap,
-			       struct ion_buffer *buffer)
+void ion_system_heap_unmap_dma(struct ion_heap *heap, struct ion_buffer *buffer)
 {
 	/* XXX undo cache maintenance for dma? */
 	if (buffer->sglist)
@@ -77,18 +94,47 @@ void ion_system_heap_unmap_dma(struct ion_heap *heap,
 void *ion_system_heap_map_kernel(struct ion_heap *heap,
 				 struct ion_buffer *buffer)
 {
-	return buffer->priv_virt;
+	int n_pages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
+	struct page **page_list = (struct page **)buffer->priv_virt;
+
+	return vm_map_ram(page_list, n_pages, -1, PAGE_KERNEL);
 }
 
 void ion_system_heap_unmap_kernel(struct ion_heap *heap,
 				  struct ion_buffer *buffer)
 {
+	int n_pages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
+
+	vm_unmap_ram(buffer->vaddr, n_pages);
 }
 
 int ion_system_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
 			     struct vm_area_struct *vma)
 {
-	return remap_vmalloc_range(vma, buffer->priv_virt, vma->vm_pgoff);
+	unsigned long uaddr = vma->vm_start;
+	unsigned long usize = vma->vm_end - vma->vm_start;
+	int n_pages = PAGE_ALIGN(buffer->size) / PAGE_SIZE;
+	struct page **page_list = (struct page **)buffer->priv_virt;
+	int i;
+
+	if (usize /* + pgoff << PAGE_SHIFT */  > (n_pages << PAGE_SHIFT))
+		return -EINVAL;
+
+	i = 0;
+	do {
+		int ret;
+
+		ret = vm_insert_page(vma, uaddr, page_list[i]);
+		if (ret)
+			return ret;
+
+		uaddr += PAGE_SIZE;
+		usize -= PAGE_SIZE;
+	} while (usize > 0);
+
+	vma->vm_flags |= VM_RESERVED;
+
+	return 0;
 }
 
 static struct ion_heap_ops vmalloc_ops = {
@@ -163,8 +209,7 @@ int ion_system_contig_heap_map_user(struct ion_heap *heap,
 {
 	unsigned long pfn = __phys_to_pfn(virt_to_phys(buffer->priv_virt));
 	return remap_pfn_range(vma, vma->vm_start, pfn + vma->vm_pgoff,
-			       vma->vm_end - vma->vm_start,
-			       vma->vm_page_prot);
+			       vma->vm_end - vma->vm_start, vma->vm_page_prot);
 
 }
 
@@ -195,4 +240,3 @@ void ion_system_contig_heap_destroy(struct ion_heap *heap)
 {
 	kfree(heap);
 }
-
