@@ -737,6 +737,7 @@ ehci_hub_descriptor (
 /*-------------------------------------------------------------------------*/
 
 int omap_ehci_ulpi_write(const struct usb_hcd *hcd, u8 val, u8 reg, u8 retry_times);
+void omap_ehci_hw_phy_reset(const struct usb_hcd *hcd);
 #define CM_L3INIT_HSUSBHOST_CLKCTRL	(0x4A009358)
 #define L3INIT_HSUSBHOST_CLKCTRL	(0x4A009358)
 #define OMAP_UHH_SYSCONFIG		(0x4a064010)
@@ -786,10 +787,7 @@ void uhh_omap_reset_link(struct ehci_hcd *ehci)
 		pr_err("ehci:link_reset: soft-reset fail\n");
 
 	/* PHY reset via RESETB pin */
-	gpio_set_value(159, 0);
-	mdelay(2);
-	gpio_set_value(159, 1);
-	mdelay(2);
+	omap_ehci_hw_phy_reset(ehci_to_hcd(ehci));
 
 	/* switch back to external 60Mhz clock */
 	temp_reg &= ~(1 << 8);

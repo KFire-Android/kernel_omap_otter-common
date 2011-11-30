@@ -141,6 +141,23 @@ again:
 	return status;
 }
 
+void omap_ehci_hw_phy_reset(const struct usb_hcd *hcd)
+{
+	struct device *dev = hcd->self.controller;
+	struct ehci_hcd_omap_platform_data  *pdata;
+
+	pdata = dev->platform_data;
+
+	if (gpio_is_valid(pdata->reset_gpio_port[0])) {
+		gpio_set_value(pdata->reset_gpio_port[0], 0);
+		mdelay(2);
+		gpio_set_value(pdata->reset_gpio_port[0], 1);
+		mdelay(2);
+	}
+
+	return;
+}
+
 static void omap_ehci_soft_phy_reset(struct platform_device *pdev, u8 port)
 {
 	struct usb_hcd	*hcd = dev_get_drvdata(&pdev->dev);
