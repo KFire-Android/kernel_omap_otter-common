@@ -53,6 +53,8 @@ struct pcb_temp_sensor {
 	struct mutex sensor_mutex;
 	struct spinlock lock;
 	struct thermal_dev *therm_fw;
+	struct delayed_work pcb_sensor_work;
+	int work_delay;
 	int debug_temp;
 };
 
@@ -194,6 +196,24 @@ static int pcb_get_temp(struct thermal_dev *tdev)
 	return temp_sensor->therm_fw->current_temp;
 }
 
+static void pcb_report_fw_temp(struct thermal_dev *tdev)
+{
+	struct platform_device *pdev = to_platform_device(tdev->dev);
+	struct pcb_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+	int ret;
+
+	pcb_read_current_temp(temp_sensor);
+	if (temp_sensor->therm_fw->current_temp != -EINVAL) {
+		ret = thermal_sensor_set_temp(temp_sensor->therm_fw);
+		if (ret == -ENODEV)
+			pr_err("%s:thermal_sensor_set_temp reports error\n",
+				__func__);
+		else
+			cancel_delayed_work_sync(&temp_sensor->pcb_sensor_work);
+		kobject_uevent(&temp_sensor->dev->kobj, KOBJ_CHANGE);
+	}
+}
+
 /*
  * sysfs hook functions
  */
@@ -263,6 +283,17 @@ static struct thermal_dev_ops pcb_sensor_ops = {
 	.report_temp = pcb_get_temp,
 };
 
+static void pcb_sensor_delayed_work_fn(struct work_struct *work)
+{
+	struct pcb_temp_sensor *temp_sensor =
+				container_of(work, struct pcb_temp_sensor,
+					     pcb_sensor_work.work);
+
+	pcb_report_fw_temp(temp_sensor->therm_fw);
+	schedule_delayed_work(&temp_sensor->pcb_sensor_work,
+				msecs_to_jiffies(temp_sensor->work_delay));
+}
+
 static int __devinit pcb_temp_sensor_probe(struct platform_device *pdev)
 {
 	struct pcb_temp_sensor_pdata *pdata = pdev->dev.platform_data;
@@ -277,6 +308,10 @@ static int __devinit pcb_temp_sensor_probe(struct platform_device *pdev)
 	temp_sensor = kzalloc(sizeof(struct pcb_temp_sensor), GFP_KERNEL);
 	if (!temp_sensor)
 		return -ENOMEM;
+
+	/* Init delayed work for PCB sensor temperature */
+	INIT_DELAYED_WORK(&temp_sensor->pcb_sensor_work,
+			  pcb_sensor_delayed_work_fn);
 
 	spin_lock_init(&temp_sensor->lock);
 	mutex_init(&temp_sensor->sensor_mutex);
@@ -308,6 +343,10 @@ static int __devinit pcb_temp_sensor_probe(struct platform_device *pdev)
 		goto sysfs_create_err;
 	}
 
+	temp_sensor->work_delay = PCB_REPORT_DELAY_MS;
+	schedule_delayed_work(&temp_sensor->pcb_sensor_work,
+			msecs_to_jiffies(0));
+
 	dev_info(&pdev->dev, "%s : '%s'\n", temp_sensor->therm_fw->name,
 			pdata->name);
 
@@ -328,6 +367,7 @@ static int __devexit pcb_temp_sensor_remove(struct platform_device *pdev)
 	struct pcb_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
 
 	sysfs_remove_group(&pdev->dev.kobj, &pcb_temp_sensor_group);
+	cancel_delayed_work_sync(&temp_sensor->pcb_sensor_work);
 	thermal_sensor_dev_unregister(temp_sensor->therm_fw);
 	kfree(temp_sensor->therm_fw);
 	kobject_uevent(&temp_sensor->dev->kobj, KOBJ_REMOVE);

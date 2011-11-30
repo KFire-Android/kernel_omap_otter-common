@@ -131,9 +131,9 @@ int thermal_sensor_set_temp(struct thermal_dev *tdev)
 			if (thermal_domain->governor &&
 			    thermal_domain->governor->dev_ops &&
 			    thermal_domain->governor->dev_ops->process_temp) {
-			    thermal_domain->governor->dev_ops->process_temp
-						(&thermal_domain->cooling_agents,
-						tdev, tdev->current_temp);
+				thermal_domain->governor->dev_ops->process_temp
+					(&thermal_domain->cooling_agents,
+					tdev, tdev->current_temp);
 				ret = 0;
 				goto out;
 			} else {
@@ -181,10 +181,9 @@ int thermal_request_temp(struct thermal_dev *tdev)
 	}
 report:
 	mutex_unlock(&thermal_domain_list_lock);
-	if (thermal_domain->temp_sensor &&
-	    thermal_domain->temp_sensor->dev_ops &&
-	    thermal_domain->temp_sensor->dev_ops->report_temp) {
-			ret = thermal_domain->temp_sensor->dev_ops->report_temp(thermal_domain->temp_sensor);
+	if (tdev->dev_ops &&
+	    tdev->dev_ops->report_temp) {
+			ret = tdev->dev_ops->report_temp(tdev);
 	} else {
 		pr_err("%s:Getting temp is not supported for domain %s\n",
 			__func__, thermal_domain->domain_name);
@@ -241,7 +240,8 @@ int thermal_update_temp_rate(struct thermal_dev *temp_sensor, int rate)
 		    (temp_sensor->dev_ops->set_temp_report_rate)) {
 			pr_debug("%s: Setting new temp report rate to %i\n",
 				__func__, rate);
-			ret_rate = temp_sensor->dev_ops->set_temp_report_rate(temp_sensor, rate);
+			ret_rate = temp_sensor->dev_ops->set_temp_report_rate(
+					temp_sensor, rate);
 		}
 	} else
 		pr_err("%s:Temp sensor pointer is NULL\n", __func__);

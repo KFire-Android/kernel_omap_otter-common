@@ -49,8 +49,9 @@
 #include <mach/ctrl_module_core_44xx.h>
 #include <linux/gpio.h>
 
-
 #include <linux/thermal_framework.h>
+
+#define REPORT_DELAY_MS	1000
 
 /* This DEBUG flag is used to enable the sysfs entries
  * for the thermal shutdown thresholds, uncomment #define
@@ -93,6 +94,8 @@ struct omap_temp_sensor {
 	int is_efuse_valid;
 	u8 clk_on;
 	u32 clk_rate;
+	struct delayed_work omap_sensor_work;
+	int work_delay;
 	int debug;
 	int debug_temp;
 };
@@ -201,19 +204,16 @@ static int omap_read_current_temp(struct omap_temp_sensor *temp_sensor)
 	temp &= (OMAP4_BGAP_TEMP_SENSOR_DTEMP_MASK);
 
 	if (!temp_sensor->is_efuse_valid)
-		pr_err_once("Invalid EFUSE, Non-trimmed BGAP, \
-			Temp not accurate\n");
+		pr_err_once("Non-trimmed BGAP, Temp not accurate\n");
 
 	if (temp < OMAP_ADC_START_VALUE || temp > OMAP_ADC_END_VALUE) {
-		pr_err("%s:Invalid adc code reported by the sensor %d",
-			__func__, temp);
 		return -EINVAL;
 	} else {
 		return adc_to_temp[temp - OMAP_ADC_START_VALUE];
 	}
 }
 
-static int omap_report_temp(struct thermal_dev *tdev)
+static int omap_get_temp(struct thermal_dev *tdev)
 {
 	struct platform_device *pdev = to_platform_device(tdev->dev);
 	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
@@ -221,8 +221,26 @@ static int omap_report_temp(struct thermal_dev *tdev)
 	temp_sensor->therm_fw->current_temp =
 			omap_read_current_temp(temp_sensor);
 
+	return temp_sensor->therm_fw->current_temp;
+}
+
+static int omap_report_temp(struct thermal_dev *tdev)
+{
+	struct platform_device *pdev = to_platform_device(tdev->dev);
+	struct omap_temp_sensor *temp_sensor = platform_get_drvdata(pdev);
+	int ret;
+
+	temp_sensor->therm_fw->current_temp =
+			omap_read_current_temp(temp_sensor);
+
 	if (temp_sensor->therm_fw->current_temp != -EINVAL) {
-		thermal_sensor_set_temp(temp_sensor->therm_fw);
+		ret = thermal_sensor_set_temp(temp_sensor->therm_fw);
+		if (ret == -ENODEV)
+			pr_err("%s:thermal_sensor_set_temp reports error\n",
+				__func__);
+		else
+			cancel_delayed_work_sync(
+				&temp_sensor->omap_sensor_work);
 		kobject_uevent(&temp_sensor->dev->kobj, KOBJ_CHANGE);
 	}
 
@@ -804,8 +822,7 @@ static irqreturn_t omap_talert_irq_handler(int irq, void *data)
 	temp &= (OMAP4_BGAP_TEMP_SENSOR_DTEMP_MASK);
 
 	if (!temp_sensor->is_efuse_valid)
-		pr_err_once("Invalid EFUSE, Non-trimmed BGAP, \
-			Temp not accurate\n");
+		pr_err_once("Non-trimmed BGAP, Temp not accurate\n");
 
 	/* look up for temperature in the table and return the
 	   temperature */
@@ -822,10 +839,21 @@ static irqreturn_t omap_talert_irq_handler(int irq, void *data)
 }
 
 static struct thermal_dev_ops omap_sensor_ops = {
-	.report_temp = omap_report_temp,
+	.report_temp = omap_get_temp,
 	.set_temp_thresh = omap_set_temp_thresh,
 	.set_temp_report_rate = omap_set_measuring_rate,
 };
+
+static void omap_sensor_delayed_work_fn(struct work_struct *work)
+{
+	struct omap_temp_sensor *temp_sensor =
+				container_of(work, struct omap_temp_sensor,
+					     omap_sensor_work.work);
+
+	omap_report_temp(temp_sensor->therm_fw);
+	schedule_delayed_work(&temp_sensor->omap_sensor_work,
+				msecs_to_jiffies(temp_sensor->work_delay));
+}
 
 static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 {
@@ -843,6 +871,10 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	temp_sensor = kzalloc(sizeof(struct omap_temp_sensor), GFP_KERNEL);
 	if (!temp_sensor)
 		return -ENOMEM;
+
+	/* Init delayed work for PCB sensor temperature */
+	INIT_DELAYED_WORK(&temp_sensor->omap_sensor_work,
+			  omap_sensor_delayed_work_fn);
 
 	spin_lock_init(&temp_sensor->lock);
 	mutex_init(&temp_sensor->sensor_mutex);
@@ -971,6 +1003,10 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	val |= OMAP4_MASK_HOT_MASK;
 	omap_temp_sensor_writel(temp_sensor, val, BGAP_CTRL_OFFSET);
 
+	temp_sensor->work_delay = REPORT_DELAY_MS;
+	schedule_delayed_work(&temp_sensor->omap_sensor_work,
+			msecs_to_jiffies(0));
+
 	dev_info(&pdev->dev, "%s : '%s'\n", temp_sensor->therm_fw->name,
 			pdata->name);
 
@@ -1012,6 +1048,7 @@ static int __devexit omap_temp_sensor_remove(struct platform_device *pdev)
 	kfree(temp_sensor->therm_fw);
 	kobject_uevent(&temp_sensor->dev->kobj, KOBJ_REMOVE);
 	sysfs_remove_group(&temp_sensor->dev->kobj, &omap_temp_sensor_group);
+	cancel_delayed_work_sync(&temp_sensor->omap_sensor_work);
 	omap_temp_sensor_disable(temp_sensor);
 	if (temp_sensor->clock)
 		clk_put(temp_sensor->clock);
@@ -1110,9 +1147,8 @@ static int omap_temp_sensor_runtime_resume(struct device *dev)
 {
 	struct omap_temp_sensor *temp_sensor =
 			platform_get_drvdata(to_platform_device(dev));
-	if (omap_pm_was_context_lost(dev)) {
+	if (omap_pm_was_context_lost(dev))
 		omap_temp_sensor_restore_ctxt(temp_sensor);
-	}
 	return 0;
 }
 
