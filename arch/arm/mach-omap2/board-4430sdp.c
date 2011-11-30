@@ -774,6 +774,7 @@ static struct twl4030_codec_audio_data twl6040_audio = {
 static struct twl4030_codec_vibra_data twl6040_vibra = {
 	.max_timeout	= 15000,
 	.initial_vibrate = 0,
+	.voltage_raise_speed = 0x26,
 };
 
 static struct twl4030_codec_data twl6040_codec = {
