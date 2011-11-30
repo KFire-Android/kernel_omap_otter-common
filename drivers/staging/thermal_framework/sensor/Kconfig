@@ -26,10 +26,16 @@ config OMAP_DIE_TEMP_SENSOR
 	  This includes alert interrupts generation and also the TSHUT
 	  support.
 
+config THERMISTOR_SENSOR
+	bool "OMAP Thermistor sensor support"
+	depends on OMAP_THERMAL && TWL6030_GPADC
+	help
+	  Enabling this config will give support for the thermistor
+	  temp sensor for the OMAP platform.
+
 config CASE_TEMP_SENSOR
 	bool "Case temp sensor support"
 	depends on THERMAL_FRAMEWORK
 	help
 	  Enabling this config will give support for the case
 	  temp sensor for the OMAP platform.
-
