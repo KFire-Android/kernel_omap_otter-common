@@ -522,6 +522,13 @@ int omapdss_hdmi_get_deepcolor(void)
 	return hdmi.deep_color;
 }
 
+ssize_t omapdss_hdmi_get_edid(char *edid_buffer)
+{
+	ssize_t size = hdmi.enabled ? HDMI_EDID_MAX_LENGTH : 0;
+	memcpy(edid_buffer, hdmi.edid, size);
+	return size;
+}
+
 int hdmi_get_current_hpd()
 {
 	return gpio_get_value(hdmi.dssdev->hpd_gpio);
