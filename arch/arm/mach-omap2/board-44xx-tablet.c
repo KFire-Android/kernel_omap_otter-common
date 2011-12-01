@@ -476,6 +476,26 @@ static struct regulator_init_data tablet_vusb = {
 	},
 };
 
+static struct regulator_init_data tablet_vcore3 = {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
+static struct regulator_init_data tablet_vmem = {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
 static struct regulator_init_data tablet_clk32kg = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
@@ -672,6 +692,15 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(2, &sdp4430_i2c_2_bus_pdata);
 	omap_register_i2c_bus_board_data(3, &sdp4430_i2c_3_bus_pdata);
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
+
+	/*
+	 * VCORE3 & VMEM are not used in 4460. By register it to regulator
+	 * framework will ensures that resources are disabled.
+	 */
+	if (cpu_is_omap446x()) {
+		tablet_twldata.vdd3 = &tablet_vcore3;
+		tablet_twldata.vmem = &tablet_vmem;
+	}
 
 	omap4_pmic_init("twl6030", &tablet_twldata);
 	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
