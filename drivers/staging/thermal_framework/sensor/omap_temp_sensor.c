@@ -692,7 +692,7 @@ static int omap_temp_sensor_enable(struct omap_temp_sensor *temp_sensor)
 	spin_lock_irqsave(&temp_sensor->lock, flags);
 
 	if (temp_sensor->clk_on) {
-		pr_err("clock already on\n");
+		pr_debug("%s:clock already on\n", __func__);
 		goto out;
 	}
 
@@ -732,7 +732,7 @@ static int omap_temp_sensor_disable(struct omap_temp_sensor *temp_sensor)
 	spin_lock_irqsave(&temp_sensor->lock, flags);
 
 	if (!temp_sensor->clk_on) {
-		pr_err("clock already off\n");
+		pr_debug("%s:clock already off\n", __func__);
 		goto out;
 	}
 	temp = omap_temp_sensor_readl(temp_sensor,
