@@ -507,6 +507,8 @@ int omapdss_hdmi_set_range(int range);
 int omapdss_hdmi_get_deepcolor(void);
 int omapdss_hdmi_set_deepcolor(struct omap_dss_device *dssdev, int val,
 		bool hdmi_restart);
+int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
+					struct s3d_disp_info *info, int code);
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
 #ifdef CONFIG_OMAP4_DSS_HDMI_AUDIO
