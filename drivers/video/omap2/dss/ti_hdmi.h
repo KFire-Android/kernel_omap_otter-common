@@ -57,6 +57,37 @@ enum hdmi_range {
 	HDMI_FULL_RANGE,
 };
 
+enum hdmi_s3d_frame_structure {
+	HDMI_S3D_FRAME_PACKING          = 0,
+	HDMI_S3D_FIELD_ALTERNATIVE      = 1,
+	HDMI_S3D_LINE_ALTERNATIVE       = 2,
+	HDMI_S3D_SIDE_BY_SIDE_FULL      = 3,
+	HDMI_S3D_L_DEPTH                = 4,
+	HDMI_S3D_L_DEPTH_GP_GP_DEPTH    = 5,
+	HDMI_S3D_SIDE_BY_SIDE_HALF      = 8
+};
+
+/* Subsampling types used for Stereoscopic 3D over HDMI. Below HOR
+stands for Horizontal, QUI for Quinxcunx Subsampling, O for odd fields,
+E for Even fields, L for left view and R for Right view*/
+enum hdmi_s3d_subsampling_type {
+	HDMI_S3D_HOR_OL_OR = 0,
+	HDMI_S3D_HOR_OL_ER = 1,
+	HDMI_S3D_HOR_EL_OR = 2,
+	HDMI_S3D_HOR_EL_ER = 3,
+	HDMI_S3D_QUI_OL_OR = 4,
+	HDMI_S3D_QUI_OL_ER = 5,
+	HDMI_S3D_QUI_EL_OR = 6,
+	HDMI_S3D_QUI_EL_ER = 7
+};
+
+struct hdmi_s3d_info {
+	bool subsamp;
+	enum hdmi_s3d_frame_structure  frame_struct;
+	enum hdmi_s3d_subsampling_type  subsamp_pos;
+	bool vsi_enabled;
+};
+
 struct hdmi_cm {
 	int	code;
 	int	mode;
@@ -65,7 +96,8 @@ struct hdmi_cm {
 struct hdmi_config {
 	struct omap_video_timings timings;
 	struct hdmi_cm cm;
-
+	bool s3d_enabled;
+	struct hdmi_s3d_info s3d_info;
 	enum hdmi_deep_color_mode deep_color;
 	enum hdmi_range range;
 };
