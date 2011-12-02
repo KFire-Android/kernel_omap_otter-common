@@ -565,11 +565,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 	 * REVISIT: We should abort the transfer on signals, but the bus goes
 	 * into arbitration and we're currently unable to recover from it.
 	 */
-	r = wait_for_completion_timeout(&dev->cmd_complete,
-					OMAP_I2C_TIMEOUT);
+	r = wait_for_completion_timeout(&dev->cmd_complete, OMAP_I2C_TIMEOUT);
 	dev->buf_len = 0;
-	if (r < 0)
-		return r;
 	if (r == 0) {
 		dev_err(dev->dev, "controller timed out\n");
 		omap_i2c_reset(dev);
