@@ -155,19 +155,6 @@ enum {
 #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
 #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
 
-/* OCP_SYSSTATUS bit definitions */
-#define SYSS_RESETDONE_MASK		(1 << 0)
-
-/* OCP_SYSCONFIG bit definitions */
-#define SYSC_CLOCKACTIVITY_MASK		(0x3 << 8)
-#define SYSC_SIDLEMODE_MASK		(0x3 << 3)
-#define SYSC_ENAWAKEUP_MASK		(1 << 2)
-#define SYSC_SOFTRESET_MASK		(1 << 1)
-#define SYSC_AUTOIDLE_MASK		(1 << 0)
-
-#define SYSC_IDLEMODE_SMART		0x2
-#define SYSC_CLOCKACTIVITY_FCLK		0x2
-
 /* Errata definitions */
 #define I2C_OMAP_ERRATA_I207		(1 << 0)
 #define I2C_OMAP3_1P153			(1 << 1)
@@ -180,6 +167,7 @@ struct omap_i2c_dev {
 	struct completion	cmd_complete;
 	struct resource		*ioarea;
 	u32			latency;	/* maximum mpu wkup latency */
+	int			(*device_reset)(struct device *dev);
 	struct pm_qos_request_list *pm_qos;
 	u32			speed;		/* Speed of bus in Khz */
 	u16			cmd_err;
@@ -346,61 +334,33 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
 	pm_runtime_put_sync(&pdev->dev);
 }
 
+static inline void omap_i2c_reset(struct omap_i2c_dev *dev)
+{
+	if (!dev->device_reset)
+		return;
+
+	if (dev->device_reset(dev->dev) < 0)
+		dev_err(dev->dev, "reset failed\n");
+}
+
 static int omap_i2c_init(struct omap_i2c_dev *dev)
 {
 	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
 	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
 	unsigned long fclk_rate = 12000000;
-	unsigned long timeout;
 	unsigned long internal_clk = 0;
 	struct clk *fclk;
 
-	if (dev->rev >= OMAP_I2C_REV_2) {
-		/* Disable I2C controller before soft reset */
-		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
-			omap_i2c_read_reg(dev, OMAP_I2C_CON_REG) &
-				~(OMAP_I2C_CON_EN));
-
-		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, SYSC_SOFTRESET_MASK);
-		/* For some reason we need to set the EN bit before the
-		 * reset done bit gets set. */
-		timeout = jiffies + OMAP_I2C_TIMEOUT;
-		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-		while (!(omap_i2c_read_reg(dev, OMAP_I2C_SYSS_REG) &
-			 SYSS_RESETDONE_MASK)) {
-			if (time_after(jiffies, timeout)) {
-				dev_warn(dev->dev, "timeout waiting "
-						"for controller reset\n");
-				return -ETIMEDOUT;
-			}
-			msleep(1);
-		}
-
-		/* SYSC register is cleared by the reset; rewrite it */
-		if (dev->rev == OMAP_I2C_REV_ON_2430) {
-
-			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
-					   SYSC_AUTOIDLE_MASK);
-
-		} else if (dev->rev >= OMAP_I2C_REV_ON_3430) {
-			dev->syscstate = SYSC_AUTOIDLE_MASK;
-			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
-			dev->syscstate |= (SYSC_IDLEMODE_SMART <<
-			      __ffs(SYSC_SIDLEMODE_MASK));
-			dev->syscstate |= (SYSC_CLOCKACTIVITY_FCLK <<
-			      __ffs(SYSC_CLOCKACTIVITY_MASK));
-
-			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
-							dev->syscstate);
-			/*
-			 * Enabling all wakup sources to stop I2C freezing on
-			 * WFI instruction.
-			 * REVISIT: Some wkup sources might not be needed.
-			 */
-			dev->westate = OMAP_I2C_WE_ALL;
-			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
-		}
+	if (dev->rev >= OMAP_I2C_REV_ON_3430) {
+		/*
+		 * Enabling all wakup sources to stop I2C freezing on
+		 * WFI instruction.
+		 * REVISIT: Some wkup sources might not be needed.
+		 */
+		dev->westate = OMAP_I2C_WE_ALL;
+		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
 	}
+
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
 
 	if (cpu_class_is_omap1()) {
@@ -617,6 +577,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 		return r;
 	if (r == 0) {
 		dev_err(dev->dev, "controller timed out\n");
+		omap_i2c_reset(dev);
 		omap_i2c_init(dev);
 		return -ETIMEDOUT;
 	}
@@ -626,6 +587,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 
 	/* We have an error */
 	if (dev->cmd_err & OMAP_I2C_STAT_AL) {
+		omap_i2c_reset(dev);
 		omap_i2c_init(dev);
 		return -EIO;
 	}
@@ -1045,10 +1007,12 @@ omap_i2c_probe(struct platform_device *pdev)
 		goto err_release_region;
 	}
 
-	if (pdata)
+	if (pdata) {
 		speed = pdata->clkrate;
-	else
+		dev->device_reset = pdata->device_reset;
+	} else {
 		speed = 100;	/* Default speed */
+	}
 
 	dev->speed = speed;
 	dev->idle = 1;
