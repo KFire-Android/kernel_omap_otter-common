@@ -303,6 +303,8 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 			regulator_disable(twl->usb3v3);
 			status = USB_EVENT_CHARGER;
 			twl->usb_cinlimit_mA = 1800;
+			twl->otg.state = OTG_STATE_B_IDLE;
+			twl->linkstat = status;
 			twl->otg.last_event = status;
 		} else {
 			regulator_disable(twl->usb3v3);
@@ -315,18 +317,17 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 		status = USB_EVENT_NONE;
 		twl->linkstat = status;
 		twl->otg.last_event = status;
+		atomic_notifier_call_chain(&twl->otg.notifier,
+				status, twl->otg.gadget);
 		if (twl->asleep) {
-
-			atomic_notifier_call_chain(&twl->otg.notifier,
-					status, twl->otg.gadget);
 			regulator_disable(twl->usb3v3);
 			twl->asleep = 0;
 
 		}
 	}
-	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 
 vbus_notify:
+	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 	twl->prev_vbus = vbus_state;
 	return IRQ_HANDLED;
 }
