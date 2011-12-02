@@ -686,7 +686,6 @@ struct omap_dss_driver {
 
 	int (*read_edid)(struct omap_dss_device *dssdev, u8 *buf, int len);
 	bool (*detect)(struct omap_dss_device *dssdev);
-
 	/*
 	 * For display drivers that support audio. This encompasses
 	 * HDMI and DisplayPort at the moment.
@@ -697,6 +696,8 @@ struct omap_dss_driver {
 	int (*audio_config)(struct omap_dss_device *dssdev,
 		struct snd_aes_iec958 *iec, struct snd_cea_861_aud_if *aud_if);
 
+	int (*s3d_enable)(struct omap_dss_device *dssdev,
+				struct s3d_disp_info *info, int code);
 };
 
 int omap_dss_register_driver(struct omap_dss_driver *);
