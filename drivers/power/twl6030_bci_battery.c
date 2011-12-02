@@ -1053,6 +1053,11 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 			twl6030_start_usb_charger(di);
 	}
 
+	/* if battery is not present we assume it is on battery simulator and
+	 * current capacity is set to 100%
+	 */
+	if (!is_battery_present())
+		curr_capacity = 100;
 
 	/* Debouncing of voltage change. */
 	if (curr_capacity != di->capacity)
