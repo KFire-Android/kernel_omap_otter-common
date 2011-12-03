@@ -202,6 +202,11 @@ void omap4_prm_global_cold_sw_reset(void)
 {
 	u32 v;
 
+	/* If bootloader/PPA has'nt cleared, ensure it is cleared */
+	omap4_prm_write_inst_reg(OMAP4430_GLOBAL_COLD_RST_MASK,
+				 OMAP4430_PRM_DEVICE_INST,
+				 OMAP4_RM_RSTST);
+
 	v = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
 				    OMAP4_RM_RSTCTRL);
 	v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
@@ -211,6 +216,13 @@ void omap4_prm_global_cold_sw_reset(void)
 	/* OCP barrier */
 	v = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
 				    OMAP4_RM_RSTCTRL);
+
+	/*
+	 * upon writing the PRM_RSTCTRL.RST_GLOBAL_COLD_SW to '1',
+	 * PRCM takes 2-3 32KHz clock cycles to assert cold reset
+	 * inside OMAP - approx 91.6uSec. Wait double that time.
+	 */
+	udelay(184);
 }
 
 /* PRM VP */
