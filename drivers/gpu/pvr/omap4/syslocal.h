@@ -77,8 +77,7 @@
 #endif 
 
 #if !defined(NO_HARDWARE) && \
-     defined(SYS_USING_INTERRUPTS) && \
-     defined(SGX540)
+     defined(SYS_USING_INTERRUPTS)
 #define SGX_OCP_REGS_ENABLED
 #endif
 
