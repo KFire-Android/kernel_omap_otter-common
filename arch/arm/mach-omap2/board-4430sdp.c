@@ -1330,6 +1330,16 @@ static void __init omap4_ehci_ohci_init(void)
 static void __init omap4_ehci_ohci_init(void){}
 #endif
 
+static void blaze_set_osc_timings(void)
+{
+	/* Device Oscilator
+	 * tstart = 2ms + 2ms = 4ms.
+	 * tshut = Not defined in oscillator data sheet so setting to 1us
+	 */
+	omap_pm_set_osc_lp_time(4000, 1);
+}
+
+
 /*
  * As OMAP4430 mux HSI and USB signals, when HSI is used (for instance HSI
  * modem is plugged) we should configure HSI pad conf and disable some USB
@@ -1363,6 +1373,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_audio_conf();
 	omap4_create_board_props();
 	blaze_pmic_mux_init();
+	blaze_set_osc_timings();
 	omap4_i2c_init();
 	blaze_sensor_init();
 	blaze_touch_init();

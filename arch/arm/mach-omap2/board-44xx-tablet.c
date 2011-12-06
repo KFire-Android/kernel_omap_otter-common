@@ -1035,6 +1035,15 @@ static void __init tablet_camera_mux_init(void)
 	}
 }
 
+static void tablet_set_osc_timings(void)
+{
+	/* Device Oscilator
+	 * tstart = 2ms + 2ms = 4ms.
+	 * tshut = Not defined in oscillator data sheet so setting to 1us
+	 */
+	omap_pm_set_osc_lp_time(4000, 1);
+}
+
 static void __init omap_tablet_init(void)
 {
 	int status;
@@ -1058,6 +1067,7 @@ static void __init omap_tablet_init(void)
 	omap_dmm_init();
 	tablet_panel_init();
 	tablet_pmic_mux_init();
+	tablet_set_osc_timings();
 	tablet_button_init();
 	omap4_register_ion();
 	board_serial_init();
