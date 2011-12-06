@@ -218,8 +218,8 @@ static struct wake_lock chrg_lock;
 struct twl6030_bci_device_info {
 	struct device		*dev;
 
-	int			voltage_uV;
-	int			bk_voltage_uV;
+	int			voltage_mV;
+	int			bk_voltage_mV;
 	int			current_uA;
 	int			current_avg_uA;
 	int			temp_C;
@@ -1026,22 +1026,27 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 		twl6030_stop_charger(di);
 		/*voltage setteling time*/
 		msleep(200);
-		di->voltage_uV = twl6030_get_gpadc_conversion(7);
+		di->voltage_mV = twl6030_get_gpadc_conversion(7);
 
 	}
 
-	if (di->voltage_uV < 3500)
-		curr_capacity = 5;
-	else if (di->voltage_uV < 3600 && di->voltage_uV >= 3500)
-		curr_capacity = 20;
-	else if (di->voltage_uV < 3700 && di->voltage_uV >= 3600)
-		curr_capacity = 50;
-	else if (di->voltage_uV < 3800 && di->voltage_uV >= 3700)
-		curr_capacity = 75;
-	else if (di->voltage_uV < 3900 && di->voltage_uV >= 3800)
-		curr_capacity = 90;
-	else if (di->voltage_uV >= 3900)
-		curr_capacity = 100;
+	/* Setting the capacity level only makes sense when on
+	 * the battery is powering the board.
+	 */
+	if (di->charge_status == POWER_SUPPLY_STATUS_DISCHARGING) {
+		if (di->voltage_mV < 3500)
+			curr_capacity = 5;
+		else if (di->voltage_mV < 3600 && di->voltage_mV >= 3500)
+			curr_capacity = 20;
+		else if (di->voltage_mV < 3700 && di->voltage_mV >= 3600)
+			curr_capacity = 50;
+		else if (di->voltage_mV < 3800 && di->voltage_mV >= 3700)
+			curr_capacity = 75;
+		else if (di->voltage_mV < 3900 && di->voltage_mV >= 3800)
+			curr_capacity = 90;
+		else if (di->voltage_mV >= 3900)
+				curr_capacity = 100;
+	}
 
 	/* if we disabled charging to check capacity,
 	 * enable it again after we read the
@@ -1102,9 +1107,9 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	}
 
 	if (req.rbuf[7] > 0)
-		di->voltage_uV = req.rbuf[7];
+		di->voltage_mV = req.rbuf[7];
 	if (req.rbuf[8] > 0)
-		di->bk_voltage_uV = req.rbuf[8];
+		di->bk_voltage_mV = req.rbuf[8];
 
 	if (di->platform_data->battery_tmp_tbl == NULL)
 		return;
@@ -1183,7 +1188,7 @@ static int twl6030_ac_get_property(struct power_supply *psy,
 		val->intval = di->ac_online;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = twl6030_get_gpadc_conversion(9);
+		val->intval = twl6030_get_gpadc_conversion(9) * 1000;
 		break;
 	default:
 		return -EINVAL;
@@ -1206,7 +1211,7 @@ static int twl6030_usb_get_property(struct power_supply *psy,
 		val->intval = di->usb_online;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = twl6030_get_gpadc_conversion(10);
+		val->intval = twl6030_get_gpadc_conversion(10) * 1000;
 		break;
 	default:
 		return -EINVAL;
@@ -1226,7 +1231,7 @@ static int twl6030_bk_bci_battery_get_property(struct power_supply *psy,
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = di->bk_voltage_uV * 1000;
+		val->intval = di->bk_voltage_mV * 1000;
 		break;
 	default:
 		return -EINVAL;
@@ -1248,8 +1253,8 @@ static int twl6030_bci_battery_get_property(struct power_supply *psy,
 		val->intval = di->charge_status;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		di->voltage_uV = twl6030_get_gpadc_conversion(7);
-		val->intval = di->voltage_uV * 1000;
+		di->voltage_mV = twl6030_get_gpadc_conversion(18);
+		val->intval = di->voltage_mV * 1000;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		twl6030battery_current(di);
@@ -2024,9 +2029,9 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->stat1 = controller_stat;
 	di->charger_outcurrentmA = di->platform_data->max_charger_currentmA;
 	di->watchdog_duration = 32;
-	di->voltage_uV = twl6030_get_gpadc_conversion(7);
+	di->voltage_mV = twl6030_get_gpadc_conversion(7);
 	dev_info(&pdev->dev, "Battery Voltage at Bootup is %d mV\n",
-							di->voltage_uV);
+							di->voltage_mV);
 
 	INIT_WORK(&di->usb_work, twl6030_usb_charger_work);
 	di->nb.notifier_call = twl6030_usb_notifier_call;
