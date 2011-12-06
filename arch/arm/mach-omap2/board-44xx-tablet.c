@@ -961,6 +961,15 @@ static struct __devinitdata emif_custom_configs custom_configs = {
 };
 #endif
 
+static void set_osc_timings(void)
+{
+	/* Device Oscilator
+	 * tstart = 2ms + 2ms = 4ms.
+	 * tshut = Not defined in oscillator data sheet so setting to 1us
+	 */
+	omap_pm_setup_oscillator(4000, 1);
+}
+
 static void __init omap_tablet_init(void)
 {
 	int status;
@@ -990,6 +999,7 @@ static void __init omap_tablet_init(void)
 
 	omap4_mux_init(board_mux, NULL, package);
 
+	set_osc_timings();
 	omap4_i2c_init();
 	platform_add_devices(tablet_devices, ARRAY_SIZE(tablet_devices));
 	omap4_board_serial_init();

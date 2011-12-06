@@ -1304,6 +1304,15 @@ static struct __devinitdata emif_custom_configs custom_configs = {
 };
 #endif
 
+static void set_osc_timings(void)
+{
+	/* Device Oscilator
+	 * tstart = 2ms + 2ms = 4ms.
+	 * tshut = Not defined in oscillator data sheet so setting to 1us
+	 */
+	omap_pm_setup_oscillator(4000, 1);
+}
+
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1336,6 +1345,7 @@ static void __init omap_4430sdp_init(void)
 
 	omap4_mux_init(board_mux, NULL, package);
 
+	set_osc_timings();
 	omap4_i2c_init();
 	omap_sfh7741prox_init();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
