@@ -799,6 +799,12 @@ static void __init omap4_panda_init(void)
 			pr_err("TPS62361 initialization failed: %d\n", status);
 	}
 	omap_enable_smartreflex_on_init();
+	/*
+	 * 7X-38.400MBB-T oscillator uses:
+	 * Up time = startup time(max 10ms) + enable time (max 100ns: round 1us)
+	 * Down time = disable time (max 100ns: round 1us)
+	 */
+	omap_pm_set_osc_lp_time(11000, 1);
 }
 
 static void __init omap4_panda_map_io(void)
