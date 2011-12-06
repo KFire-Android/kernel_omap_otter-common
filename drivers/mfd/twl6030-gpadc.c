@@ -63,6 +63,7 @@ struct twl6030_ideal_code {
 
 static struct twl6030_calibration twl6030_calib_tbl[TWL6030_GPADC_MAX_CHANNELS];
 static const u32 calibration_bit_map = 0x47FF;
+static u8 gpadc_save_ctrl_reg;
 
 /* Trim address where measured offset from ideal code is stored */
 static const u8 twl6030_trim_addr[TWL6030_GPADC_MAX_CHANNELS] = {
@@ -743,12 +744,51 @@ static int __devexit twl6030_gpadc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int twl6030_gpadc_suspend(struct device *pdev)
+{
+	int ret;
+	u8 reg_val = 0;
+
+	ret = twl_i2c_read_u8(TWL_MODULE_MADC, &reg_val, TWL6030_GPADC_CTRL);
+	gpadc_save_ctrl_reg = reg_val;
+	if (!ret) {
+		reg_val &= ~TWL6030_GPADC_CTRL_TEMP1_EN;
+		ret = twl_i2c_write_u8(TWL_MODULE_MADC, reg_val,
+					TWL6030_GPADC_CTRL);
+	} else {
+		dev_err(the_gpadc->dev, "unable to disable madc temp1!\n");
+	}
+
+	return 0;
+};
+
+static int twl6030_gpadc_resume(struct device *pdev)
+{
+	int ret;
+
+	if (!(gpadc_save_ctrl_reg & TWL6030_GPADC_CTRL_TEMP1_EN)) {
+		gpadc_save_ctrl_reg |= TWL6030_GPADC_CTRL_TEMP1_EN;
+		ret = twl_i2c_write_u8(TWL_MODULE_MADC, gpadc_save_ctrl_reg,
+					TWL6030_GPADC_CTRL);
+		if (ret)
+			dev_err(the_gpadc->dev,
+				"unable to enable gpadc temp1!\n");
+	}
+
+	return 0;
+};
+static const struct dev_pm_ops twl6030_gpadc_pm_ops = {
+	.suspend = twl6030_gpadc_suspend,
+	.resume = twl6030_gpadc_resume,
+};
+
 static struct platform_driver twl6030_gpadc_driver = {
 	.probe		= twl6030_gpadc_probe,
 	.remove		= __devexit_p(twl6030_gpadc_remove),
 	.driver		= {
 		.name	= "twl6030_gpadc",
 		.owner	= THIS_MODULE,
+		.pm = &twl6030_gpadc_pm_ops,
 	},
 };
 
