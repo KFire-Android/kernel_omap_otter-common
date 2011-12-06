@@ -90,6 +90,9 @@ static struct {
 	bool set_mode;
 	bool wp_reset_done;
 
+	u8 s3d_mode;
+	bool s3d_enable;
+
 	void (*hdmi_start_frame_cb)(void);
 	void (*hdmi_irq_cb)(int);
 	bool (*hdmi_power_on_cb)(void);
@@ -440,7 +443,14 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	hdmi.cfg.cm.mode = hdmi.can_do_hdmi ? hdmi.mode : HDMI_DVI;
 	hdmi.cfg.cm.code = hdmi.code;
 	hdmi_ti_4xxx_basic_configure(&hdmi.hdmi_data, &hdmi.cfg);
-
+	if (hdmi.s3d_enable) {
+		struct hdmi_core_vendor_specific_infoframe config;
+		config.enable = hdmi.s3d_enable;
+		config.s3d_structure = hdmi.s3d_mode;
+		if (config.s3d_structure == 8)
+			config.s3d_ext_data = 1;
+		hdmi_core_vsi_config(&hdmi.hdmi_data, &config);
+	}
 	/* Make selection of HDMI in DSS */
 	dss_select_hdmi_venc_clk_source(DSS_HDMI_M_PCLK);
 
@@ -527,6 +537,28 @@ ssize_t omapdss_hdmi_get_edid(char *edid_buffer)
 	ssize_t size = hdmi.enabled ? HDMI_EDID_MAX_LENGTH : 0;
 	memcpy(edid_buffer, hdmi.edid, size);
 	return size;
+}
+
+void omapdss_hdmi_set_s3d_mode(int val)
+{
+	hdmi.s3d_mode = val;
+}
+
+int omapdss_hdmi_get_s3d_mode(void)
+{
+	return hdmi.s3d_mode;
+}
+
+void omapdss_hdmi_enable_s3d(bool enable)
+{
+	hdmi.s3d_enable = enable;
+	if (hdmi.enabled)
+		omapdss_hdmi_display_set_timing(hdmi.dssdev);
+}
+
+int omapdss_hdmi_get_s3d_enable(void)
+{
+	return hdmi.s3d_enable;
 }
 
 int hdmi_get_current_hpd()

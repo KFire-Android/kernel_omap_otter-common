@@ -645,6 +645,47 @@ static void hdmi_core_av_packet_config(struct hdmi_ip_data *ip_data,
 		(repeat_cfg.generic_pkt_repeat));
 }
 
+void hdmi_core_vsi_config(struct hdmi_ip_data *ip_data,
+		struct hdmi_core_vendor_specific_infoframe *config)
+{
+	u8 sum = 0, i;
+	/*For side-by-side(HALF) we need to specify subsampling in 3D_ext_data*/
+	int length = config->s3d_structure > 0x07 ? 6 : 5;
+	u8 info_frame_packet[] = {
+		0x81, /*Vendor-Specific InfoFrame*/
+		0x01, /*InfoFrame version number per CEA-861-D*/
+		length, /*InfoFrame length, excluding checksum and header*/
+		0x00, /*Checksum*/
+		0x03, 0x0C, 0x00, /*24-bit IEEE Registration Ident*/
+		0x40, /*3D format indication preset, 3D_Struct follows*/
+		config->s3d_structure << 4, /*3D_Struct, no 3D_Meta*/
+		config->s3d_ext_data << 4,/*3D_Ext_Data*/
+	};
+
+	if (!config->enable) {
+		REG_FLD_MOD(hdmi_av_base(ip_data),
+			HDMI_CORE_AV_PB_CTRL2, 0, 1, 0);
+		return;
+	}
+
+	/*Adding packet header and checksum length*/
+	length += 4;
+
+	/*Checksum is packet_header+checksum+infoframe_length = 0*/
+	for (i = 0; i < length; i++)
+		sum += info_frame_packet[i];
+	info_frame_packet[3] = 0x100-sum;
+
+	for (i = 0; i < length; i++)
+		hdmi_write_reg(hdmi_av_base(ip_data), HDMI_CORE_AV_GEN_DBYTE(i),
+						info_frame_packet[i]);
+
+	REG_FLD_MOD(hdmi_av_base(ip_data), HDMI_CORE_AV_PB_CTRL2, 0x3, 1, 0);
+	return;
+}
+EXPORT_SYMBOL(hdmi_core_vsi_config);
+
+
 static void hdmi_wp_init(struct omap_video_timings *timings,
 			struct hdmi_video_format *video_fmt,
 			struct hdmi_video_interface *video_int)
@@ -978,7 +1019,6 @@ void hdmi_ti_4xxx_dump_regs(struct hdmi_ip_data *ip_data, struct seq_file *s)
 	DUMPREG(av_base, HDMI_CORE_AV_AUD_DBYTE_NELEMS);
 	DUMPREG(av_base, HDMI_CORE_AV_MPEG_DBYTE);
 	DUMPREG(av_base, HDMI_CORE_AV_MPEG_DBYTE_NELEMS);
-	DUMPREG(av_base, HDMI_CORE_AV_GEN_DBYTE);
 	DUMPREG(av_base, HDMI_CORE_AV_GEN_DBYTE_NELEMS);
 	DUMPREG(av_base, HDMI_CORE_AV_GEN2_DBYTE);
 	DUMPREG(av_base, HDMI_CORE_AV_GEN2_DBYTE_NELEMS);
