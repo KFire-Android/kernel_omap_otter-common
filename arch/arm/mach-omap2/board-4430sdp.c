@@ -899,7 +899,7 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
 
 	omap4_pmic_init("twl6030", &sdp4430_twldata);
-	omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo,
+	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
