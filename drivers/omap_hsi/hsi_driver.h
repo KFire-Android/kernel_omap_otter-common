@@ -174,7 +174,9 @@ struct hsi_port {
  * @phy_base: HSI registers base physical address
  * @lock: Serializes access to internal data and regs
  * @clock_enabled: Indicates if HSI Clocks are ON
- * @clock_rate: Indicates current HSI Fclock speed
+ * @clock_change_ongoing: Indicates if HSI FClk is being changed (OPP change)
+ * @hsi_fclk_req: Indicates what HSI FClk user requested (96MHz/192MHz)
+ * @hsi_fclk_current: Current HSI Fclock
  * @gdd_irq: GDD (DMA) irq number
  * @fifo_mapping_strategy: Selected strategy for fifo to ports/channels mapping
  * @gdd_usecount: Holds the number of ongoning DMA transfers
@@ -182,8 +184,6 @@ struct hsi_port {
  * @gdd_chan_count: Number of available DMA channels on the device (must be ^2)
  * @in_dma_tasklet: True if DMA tasklet for the controller is currently running
  * @set_min_bus_tput: (PM) callback to set minimun bus throuput
- * @clk_notifier_register: (PM) callabck for DVFS support
- * @clk_notifier_unregister: (PM) callabck for DVFS support
  * @hsi_nb: (PM) Notification block for DVFS notification chain
  * @hsi_gdd_tasklet: Bottom half for DMA Interrupts when clocks are enabled
  * @dir: debugfs base directory
@@ -197,7 +197,9 @@ struct hsi_dev { /* HSI_TODO:  should be later renamed into hsi_controller*/
 	unsigned long phy_base;
 	spinlock_t lock; /* Serializes access to internal data and regs */
 	bool clock_enabled;
-	unsigned long clock_rate;
+	bool clock_change_ongoing;
+	unsigned long hsi_fclk_req;
+	unsigned long hsi_fclk_current;
 	int gdd_irq;
 	unsigned int fifo_mapping_strategy;
 	unsigned int gdd_usecount;

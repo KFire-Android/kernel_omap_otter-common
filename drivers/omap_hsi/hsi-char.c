@@ -351,6 +351,7 @@ static long  hsi_char_ioctl(struct file *file,
 	int ch = (int)file->private_data;
 	unsigned int state;
 	size_t size;
+	unsigned long fclock;
 	struct hsi_rx_config rx_cfg;
 	struct hsi_tx_config tx_cfg;
 	int ret = 0;
@@ -421,6 +422,17 @@ static long  hsi_char_ioctl(struct file *file,
 	case CS_GET_FIFO_OCCUPANCY:
 		if_hsi_get_fifo_occupancy(ch, &size);
 		if (copy_to_user((void __user *)arg, &size, sizeof(size)))
+			ret = -EFAULT;
+		break;
+	case CS_SET_HI_SPEED:
+		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
+			ret = -EFAULT;
+		else
+			if_hsi_set_hi_speed(ch, state);
+		break;
+	case CS_GET_SPEED:
+		if_hsi_get_speed(ch, &fclock);
+		if (copy_to_user((void __user *)arg, &fclock, sizeof(fclock)))
 			ret = -EFAULT;
 		break;
 	default:
