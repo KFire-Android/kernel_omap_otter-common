@@ -352,6 +352,22 @@ static void twl6030_config_iterm_reg(struct twl6030_bci_device_info *di,
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
 }
 
+static unsigned int twl6030_get_iterm_reg(struct twl6030_bci_device_info *di)
+{
+	int ret;
+	unsigned int currentmA;
+	u8 val = 0;
+
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &val, CHARGERUSB_CTRL2);
+	if (ret) {
+		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+		currentmA = 0;
+	} else
+		currentmA = 50 + (val >> 5) * 50;
+
+	return currentmA;
+}
+
 static void twl6030_config_voreg_reg(struct twl6030_bci_device_info *di,
 							unsigned int voltagemV)
 {
@@ -367,6 +383,22 @@ static void twl6030_config_voreg_reg(struct twl6030_bci_device_info *di,
 						CHARGERUSB_VOREG);
 	if (ret)
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+}
+
+static unsigned int twl6030_get_voreg_reg(struct twl6030_bci_device_info *di)
+{
+	int ret;
+	unsigned int voltagemV;
+	u8 val = 0;
+
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &val, CHARGERUSB_VOREG);
+	if (ret) {
+		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+		voltagemV = 0;
+	} else
+		voltagemV = 3500 + (val * 20);
+
+	return voltagemV;
 }
 
 static void twl6030_config_vichrg_reg(struct twl6030_bci_device_info *di,
@@ -431,6 +463,23 @@ static void twl6030_config_limit1_reg(struct twl6030_bci_device_info *di,
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
 }
 
+static unsigned int twl6030_get_limit1_reg(struct twl6030_bci_device_info *di)
+{
+	int ret;
+	unsigned int voltagemV;
+	u8 val = 0;
+
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &val,
+				CHARGERUSB_CTRLLIMIT1);
+	if (ret) {
+		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+		voltagemV = 0;
+	} else
+		voltagemV = 3500 + (val * 20);
+
+	return voltagemV;
+}
+
 static void twl6030_config_limit2_reg(struct twl6030_bci_device_info *di,
 							unsigned int currentmA)
 {
@@ -450,6 +499,28 @@ static void twl6030_config_limit2_reg(struct twl6030_bci_device_info *di,
 						CHARGERUSB_CTRLLIMIT2);
 	if (ret)
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+}
+
+static const int vichrg[] = {
+	300, 350, 400, 450, 500, 600, 700, 800,
+	900, 1000, 1100, 1200, 1300, 1400, 1500, 300
+};
+
+static unsigned int twl6030_get_limit2_reg(struct twl6030_bci_device_info *di)
+{
+	int ret;
+	unsigned int currentmA;
+	u8 val = 0;
+
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &val,
+					CHARGERUSB_CTRLLIMIT2);
+	if (ret) {
+		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+		currentmA = 0;
+	} else
+		currentmA = vichrg[val & 0xF];
+
+	return currentmA;
 }
 
 /*
@@ -532,6 +603,10 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 	if (di->charger_source == POWER_SUPPLY_TYPE_MAINS)
 		return;
 
+	if ((di->features & TWL6032_SUBCLASS) &&
+			di->platform_data->use_eeprom_config)
+		goto enable;
+
 	dev_dbg(di->dev, "USB input current limit %dmA\n",
 					di->charger_incurrentmA);
 	if (di->charger_incurrentmA < 50) {
@@ -548,6 +623,7 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 	twl6030_config_voreg_reg(di, di->platform_data->max_bat_voltagemV);
 	twl6030_config_iterm_reg(di, di->platform_data->termination_currentmA);
 
+enable:
 	if (di->charger_incurrentmA >= 50) {
 		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
 				CONTROLLER_CTRL1_EN_CHARGER |
@@ -2101,6 +2177,18 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->platform_data = pdata;
 	di->features = pdata->features;
 
+	if (pdata->use_eeprom_config &&
+			di->features & TWL6032_SUBCLASS) {
+		di->platform_data->max_charger_currentmA =
+				twl6030_get_limit2_reg(di);
+		di->platform_data->max_charger_voltagemV =
+				twl6030_get_limit1_reg(di);
+		di->platform_data->termination_currentmA =
+				twl6030_get_iterm_reg(di);
+		di->platform_data->max_bat_voltagemV =
+				twl6030_get_voreg_reg(di);
+	}
+
 	di->dev = &pdev->dev;
 	di->bat.name = "twl6030_battery";
 	di->bat.supplied_to = twl6030_bci_supplied_to;
@@ -2209,8 +2297,11 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "current measurement setup failed\n");
 
 	/* initialize for USB charging */
-	twl6030_config_limit1_reg(di, pdata->max_charger_voltagemV);
-	twl6030_config_limit2_reg(di, di->platform_data->max_charger_currentmA);
+	if (!pdata->use_eeprom_config) {
+		twl6030_config_limit1_reg(di, pdata->max_charger_voltagemV);
+		twl6030_config_limit2_reg(di,
+				di->platform_data->max_charger_currentmA);
+	}
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, MBAT_TEMP,
 						CONTROLLER_INT_MASK);
 	if (ret)
