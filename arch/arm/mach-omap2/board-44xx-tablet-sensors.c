@@ -126,6 +126,12 @@ static struct mpu3050gyro_platform_data mpu3050_platform_data = {
 };
 /* MPU3050 Gyro End */
 
+static struct i2c_board_info __initdata blaze_tablet_i2c_bus3_sensor_info[] = {
+	{
+		I2C_BOARD_INFO("tmp105", 0x48),
+	},
+};
+
 static struct i2c_board_info __initdata blaze_tablet_i2c_bus4_sensor_info[] = {
 	{
 		I2C_BOARD_INFO("bmp085", 0x77),
@@ -154,6 +160,8 @@ int __init tablet_sensor_init(void)
 	blaze_tablet_mpu3050_init();
 	blaze_tablet_bma180accl_init();
 
+	i2c_register_board_info(3, blaze_tablet_i2c_bus3_sensor_info,
+		ARRAY_SIZE(blaze_tablet_i2c_bus3_sensor_info));
 	i2c_register_board_info(4, blaze_tablet_i2c_bus4_sensor_info,
 		ARRAY_SIZE(blaze_tablet_i2c_bus4_sensor_info));
 
