@@ -1083,6 +1083,15 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 
 }
 
+static int twl6030_set_watchdog(struct twl6030_bci_device_info *di, int val)
+{
+	di->watchdog_duration = val;
+
+	dev_dbg(di->dev, "Watchdog reset %d", val);
+
+	return twl_i2c_write_u8(TWL6030_MODULE_CHARGER, val, CONTROLLER_WDG);
+
+}
 
 static void twl6030_bci_battery_work(struct work_struct *work)
 {
@@ -1095,6 +1104,10 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 
 	req.channels = (1 << 1) | (1 << 7) | (1 << 8);
 	req.method = TWL6030_GPADC_SW2;
+	/* Kick the charger watchdog */
+	if (di->charge_status == POWER_SUPPLY_STATUS_CHARGING)
+		twl6030_set_watchdog(di, di->watchdog_duration);
+
 	req.active = 0;
 	req.func_cb = NULL;
 	ret = twl6030_gpadc_conversion(&req);
@@ -1444,8 +1457,7 @@ static ssize_t set_watchdog(struct device *dev,
 
 	if ((strict_strtol(buf, 10, &val) < 0) || (val < 1) || (val > 127))
 		return -EINVAL;
-	di->watchdog_duration = val;
-	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, val, CONTROLLER_WDG);
+	ret = twl6030_set_watchdog(di, val);
 	if (ret)
 		return -EIO;
 
@@ -2028,8 +2040,10 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	di->stat1 = controller_stat;
 	di->charger_outcurrentmA = di->platform_data->max_charger_currentmA;
-	di->watchdog_duration = 32;
 	di->voltage_mV = twl6030_get_gpadc_conversion(7);
+
+	twl6030_set_watchdog(di, 32);
+
 	dev_info(&pdev->dev, "Battery Voltage at Bootup is %d mV\n",
 							di->voltage_mV);
 
