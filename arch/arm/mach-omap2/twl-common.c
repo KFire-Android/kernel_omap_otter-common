@@ -626,6 +626,9 @@ int __init omap_pmic_register_data(struct omap_pmic_map *map)
 		if (cpu_is_omap446x() && !(map->cpu & PMIC_CPU_OMAP4460))
 			goto next;
 
+		if (cpu_is_omap447x() && !(map->cpu & PMIC_CPU_OMAP4470))
+			goto next;
+
 		if (cpu_is_omap54xx() && !(map->cpu & PMIC_CPU_OMAP54XX))
 			goto next;
 

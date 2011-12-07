@@ -103,7 +103,9 @@ struct omap_pmic_map {
 #define PMIC_CPU_OMAP3		(1 << 0)
 #define PMIC_CPU_OMAP4430	(1 << 1)
 #define PMIC_CPU_OMAP4460	(1 << 2)
-#define PMIC_CPU_OMAP44XX	(PMIC_CPU_OMAP4430 | PMIC_CPU_OMAP4460)
+#define PMIC_CPU_OMAP4470	(1 << 4)
+#define PMIC_CPU_OMAP44XX	(PMIC_CPU_OMAP4430 | PMIC_CPU_OMAP4460 | \
+		PMIC_CPU_OMAP4470)
 #define PMIC_CPU_OMAP54XX	(1 << 3)
 
 extern int omap_pmic_register_data(struct omap_pmic_map *map);
