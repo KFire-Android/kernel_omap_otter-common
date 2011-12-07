@@ -80,6 +80,7 @@
  * @is_efuse_valid - Flag to determine if eFuse is valid or not
  * @clk_on - Manages the current clock state
  * @clk_rate - Holds current clock rate
+ * @context_saved - Flag to determine if context was saved
  */
 struct omap_temp_sensor {
 	struct platform_device *pdev;
@@ -98,6 +99,7 @@ struct omap_temp_sensor {
 	int work_delay;
 	int debug;
 	int debug_temp;
+	bool context_saved;
 };
 
 #ifdef CONFIG_PM
@@ -1139,6 +1141,7 @@ static int omap_temp_sensor_runtime_suspend(struct device *dev)
 			platform_get_drvdata(to_platform_device(dev));
 
 	omap_temp_sensor_save_ctxt(temp_sensor);
+	temp_sensor->context_saved = true;
 
 	return 0;
 }
@@ -1147,8 +1150,11 @@ static int omap_temp_sensor_runtime_resume(struct device *dev)
 {
 	struct omap_temp_sensor *temp_sensor =
 			platform_get_drvdata(to_platform_device(dev));
-	if (omap_pm_was_context_lost(dev))
+	if (omap_pm_was_context_lost(dev) &&
+				temp_sensor->context_saved) {
 		omap_temp_sensor_restore_ctxt(temp_sensor);
+		temp_sensor->context_saved = false;
+	}
 	return 0;
 }
 
