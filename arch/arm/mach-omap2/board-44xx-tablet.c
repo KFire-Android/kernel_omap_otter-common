@@ -373,6 +373,10 @@ static struct regulator_init_data tablet_vaux3 = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
 
@@ -419,6 +423,10 @@ static struct regulator_init_data tablet_vusim = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
 
@@ -431,6 +439,10 @@ static struct regulator_init_data tablet_vana = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
+		.state_mem = {
+			.enabled	= true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
 
