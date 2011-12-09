@@ -199,6 +199,13 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
 	u8 target_vsel, current_vsel;
 	int ret, timeout = 0;
 
+	ret = _vp_wait_for_idle(voltdm, vp);
+	if (ret) {
+		pr_warn_ratelimited("%s: vdd_%s idle timedout (v=%ld)\n",
+				    __func__, voltdm->name, target_volt);
+		return ret;
+	}
+
 	ret = omap_vc_pre_scale(voltdm, target_volt, &target_vsel, &current_vsel);
 	if (ret)
 		return ret;
