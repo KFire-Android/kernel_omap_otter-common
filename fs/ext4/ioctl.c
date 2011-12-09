@@ -138,7 +138,7 @@ flags_err:
 			err = ext4_ext_migrate(inode);
 flags_out:
 		mutex_unlock(&inode->i_mutex);
-		mnt_drop_write(filp->f_path.mnt);
+		mnt_drop_write_file(filp);
 		return err;
 	}
 	case EXT4_IOC_GETVERSION:
@@ -175,7 +175,7 @@ flags_out:
 		}
 		ext4_journal_stop(handle);
 setversion_out:
-		mnt_drop_write(filp->f_path.mnt);
+		mnt_drop_write_file(filp);
 		return err;
 	}
 #ifdef CONFIG_JBD2_DEBUG
@@ -225,7 +225,7 @@ setversion_out:
 		}
 		if (err == 0)
 			err = err2;
-		mnt_drop_write(filp->f_path.mnt);
+		mnt_drop_write_file(filp);
 
 		return err;
 	}
@@ -259,7 +259,7 @@ setversion_out:
 
 		err = ext4_move_extents(filp, donor_filp, me.orig_start,
 					me.donor_start, me.len, &me.moved_len);
-		mnt_drop_write(filp->f_path.mnt);
+		mnt_drop_write_file(filp);
 		if (me.moved_len > 0)
 			file_remove_suid(donor_filp);
 
@@ -295,7 +295,7 @@ mext_out:
 		}
 		if (err == 0)
 			err = err2;
-		mnt_drop_write(filp->f_path.mnt);
+		mnt_drop_write_file(filp);
 
 		return err;
 	}
@@ -318,7 +318,7 @@ mext_out:
 		mutex_lock(&(inode->i_mutex));
 		err = ext4_ext_migrate(inode);
 		mutex_unlock(&(inode->i_mutex));
-		mnt_drop_write(filp->f_path.mnt);
+		mnt_drop_write_file(filp);
 		return err;
 	}
 
@@ -332,7 +332,7 @@ mext_out:
 		if (err)
 			return err;
 		err = ext4_alloc_da_blocks(inode);
-		mnt_drop_write(filp->f_path.mnt);
+		mnt_drop_write_file(filp);
 		return err;
 	}
 
