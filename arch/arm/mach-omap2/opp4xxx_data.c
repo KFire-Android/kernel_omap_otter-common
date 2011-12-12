@@ -371,7 +371,7 @@ struct omap_vdd_dep_info omap447x_vddiva_dep_info[] = {
 
 static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
 	/* MPU OPP1 - OPP50 */
-	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 400000000, OMAP4470_VDD_MPU_OPP50_UV),
+	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 396800000, OMAP4470_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */
 	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 800000000, OMAP4470_VDD_MPU_OPP100_UV),
 	/* MPU OPP3 - OPP-Turbo */
@@ -431,7 +431,7 @@ static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
 
 static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
 	/* MPU OPP1 - OPP50 */
-	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 400000000, OMAP4470_VDD_MPU_OPP50_UV),
+	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 396800000, OMAP4470_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */
 	OPP_INITIALIZER("mpu", "virt_dpll_mpu_ck", "mpu", true, 800000000, OMAP4470_VDD_MPU_OPP100_UV),
 	/* MPU OPP3 - OPP-Turbo */
