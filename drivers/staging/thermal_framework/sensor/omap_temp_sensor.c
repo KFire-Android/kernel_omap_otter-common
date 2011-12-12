@@ -312,8 +312,7 @@ static int omap_set_thresholds(struct omap_temp_sensor *temp_sensor,
 			(new_cold << OMAP4_T_COLD_SHIFT));
 	omap_temp_sensor_writel(temp_sensor, reg_val, BGAP_THRESHOLD_OFFSET);
 
-	curr_temp = omap_temp_sensor_readl(temp_sensor, TEMP_SENSOR_CTRL_OFFSET);
-	curr_temp &= (OMAP4_BGAP_TEMP_SENSOR_DTEMP_MASK);
+	curr_temp = temp_to_adc_conversion(temp_sensor->therm_fw->current_temp);
 
 	if (new_hot >= curr_temp) {
 		reg_val = omap_temp_sensor_readl(temp_sensor, BGAP_CTRL_OFFSET);
@@ -426,6 +425,8 @@ static ssize_t set_temp_thresholds(struct device *dev,
 	pr_info("%s: Min thresh is %i Max thresh is %i\n",
 		__func__, min_thresh, max_thresh);
 	mutex_lock(&temp_sensor->sensor_mutex);
+	temp_sensor->therm_fw->current_temp =
+			omap_read_current_temp(temp_sensor);
 	omap_set_thresholds(temp_sensor, min_thresh, max_thresh);
 	mutex_unlock(&temp_sensor->sensor_mutex);
 
