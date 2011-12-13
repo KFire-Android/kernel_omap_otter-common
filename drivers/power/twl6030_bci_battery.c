@@ -567,11 +567,6 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 	u8 ac_or_vbus, no_ac_and_vbus = 0;
 	u8 hw_state = 0, temp = 0;
 
-	if (!is_battery_present()) {
-		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
-		return IRQ_HANDLED;
-	}
-
 	/* read charger controller_stat1 */
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &present_charge_state,
 		CONTROLLER_STAT1);
