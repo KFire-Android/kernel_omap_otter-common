@@ -460,6 +460,20 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 
 #define TWL6030_PM_MASTER_MSK_TRANSITION	0x01
 
+/*
+* PMC Slave SMPS Register Map (use TWL6030_MODULE_ID0)
+*/
+#define TWL6030_REG_VCORE1_CFG_GRP		0x52
+#define TWL6030_REG_VCORE1_CFG_TRANS		0x53
+#define TWL6030_REG_VCORE2_CFG_GRP		0x58
+#define TWL6030_REG_VCORE2_CFG_TRANS		0x59
+#define TWL6030_REG_VCORE3_CFG_GRP		0x5e
+#define TWL6030_REG_VCORE3_CFG_TRANS		0x5f
+
+#define TWL6030_REG_CFG_TRANS_OFF_CMD_OFFSET	0x4
+#define TWL6030_REG_CFG_TRANS_SLEEP_CMD_OFFSET	0x2
+#define TWL6030_REG_CFG_TRANS_ACT_CMD_OFFSET	0x0
+
 /*----------------------------------------------------------------------*/
 
 /* Power bus message definitions */
@@ -496,6 +510,12 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 #define RES_STATE_ACTIVE	0xE
 #define RES_STATE_SLEEP		0x8
 #define RES_STATE_OFF		0x0
+
+/* TWL6030 Resource power state commands */
+#define TWL6030_RES_OFF_CMD		0x0
+#define TWL6030_RES_AUTO_CMD		0x1
+#define TWL6030_RES_FORCE_PWM_CMD	0x3
+#define TWL6030_RES_CMD_MASK		0x3
 
 /* Power resources */
 
