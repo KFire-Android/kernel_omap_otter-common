@@ -69,6 +69,8 @@ struct sr_class1p5_work_data {
 static struct delayed_work recal_work;
 #endif
 
+static unsigned long class1p5_margin;
+
 /**
  * sr_class1p5_notify() - isr notifier for status events
  * @voltdm:	voltage domain for which we were triggered

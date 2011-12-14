@@ -1418,7 +1418,7 @@ void rproc_last_busy(struct rproc *rproc)
 
 	mutex_lock(&rproc->pm_lock);
 	if (pm_runtime_suspended(dev) ||
-		!pm_runtime_autosuspend_expiration(dev)) {
+			!pm_runtime_autosuspend_expiration(dev)) {
 		pm_runtime_mark_last_busy(dev);
 		mutex_unlock(&rproc->pm_lock);
 		/*
