@@ -305,12 +305,6 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 		if (!pas[i] || !oi->cfg.enabled)
 			goto skip_map1d;
 
-		/* framebuffer is marked with uv = 0 and is contiguous */
-		if (!oi->uv) {
-			oi->ba = pas[i]->mem[0] + (oi->ba & ~PAGE_MASK);
-			goto skip_map1d;
-		}
-
 		if (!slot) {
 			if (down_timeout(&free_slots_sem,
 						msecs_to_jiffies(100))) {
