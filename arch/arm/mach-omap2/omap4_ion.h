@@ -33,8 +33,8 @@
 void omap_ion_init(void);
 void omap4_register_ion(void);
 #else
-inline void omap_ion_init(void) { return; }
-inline void omap4_register_ion(void) { return; }
+static inline void omap_ion_init(void) { return; }
+static inline void omap4_register_ion(void) { return; }
 #endif
 
 #endif
