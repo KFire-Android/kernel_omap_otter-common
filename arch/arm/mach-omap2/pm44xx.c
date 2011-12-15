@@ -662,6 +662,11 @@ static int omap4_restore_pwdms_after_suspend(void)
 			ret = -1;
 		}
 
+		if (!strcmp(pwrst->pwrdm->name, "l3init_pwrdm")) {
+			pwrdm_set_logic_retst(pwrst->pwrdm, PWRDM_POWER_RET);
+			continue;
+		}
+
 		/* If state already ON due to h/w dep, don't do anything */
 		if (cstate == PWRDM_POWER_ON)
 			continue;
@@ -685,9 +690,6 @@ static int omap4_restore_pwdms_after_suspend(void)
 		 */
 		if (pwrst->saved_state > cstate)
 			continue;
-
-		if (pwrst->pwrdm->pwrsts)
-			omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
 
 		if (pwrst->pwrdm->pwrsts_logic_ret)
 			pwrdm_set_logic_retst(pwrst->pwrdm,
@@ -882,6 +884,9 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 			(!strcmp(pwrdm->name, "cpu0_pwrdm")) ||
 			(!strcmp(pwrdm->name, "cpu1_pwrdm")))
 		pwrst->next_state = PWRDM_POWER_ON;
+	else if (!strcmp(pwrdm->name, "l3init_pwrdm"))
+		/* REVISIT: Remove when EHCI IO wakeup is fixed */
+		ret = _set_pwrdm_state(pwrst, PWRDM_POWER_RET, PWRDM_POWER_RET);
 	else
 		ret = _set_pwrdm_state(pwrst, state, logic_state);
 
