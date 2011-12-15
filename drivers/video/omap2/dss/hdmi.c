@@ -65,6 +65,7 @@ static struct {
 	struct clk *sys_clk;
 
 	struct regulator *vdds_hdmi;
+	bool enabled;
 } hdmi;
 
 /*
@@ -521,6 +522,9 @@ int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 		goto err0;
 	}
 
+	if (hdmi.enabled)
+		goto err0;
+
 	r = omap_dss_start_device(dssdev);
 	if (r) {
 		DSSERR("failed to start device\n");
@@ -700,6 +704,8 @@ int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev)
 		goto err2;
 	}
 
+	hdmi.enabled = true;
+
 	mutex_unlock(&hdmi.lock);
 	return 0;
 
@@ -719,13 +725,20 @@ void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev)
 
 	mutex_lock(&hdmi.lock);
 
+	if (!hdmi.enabled) {
+		DSSERR("HDMI display not enabled\n");
+		goto done;
+	}
+
+	hdmi.enabled = false;
+
 	hdmi_power_off(dssdev);
 
 	if (dssdev->platform_disable)
 		dssdev->platform_disable(dssdev);
 
 	omap_dss_stop_device(dssdev);
-
+done:
 	mutex_unlock(&hdmi.lock);
 }
 
