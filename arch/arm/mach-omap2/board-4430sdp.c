@@ -708,6 +708,13 @@ static struct regulator_init_data sdp4430_clk32kg = {
 	},
 };
 
+static struct regulator_init_data sdp4430_clk32kaudio = {
+	.constraints = {
+		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+	},
+};
+
 static void omap4_audio_conf(void)
 {
 	/* twl6040 naudint */
@@ -848,7 +855,6 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux1		= &sdp4430_vaux1,
 	.vaux2		= &sdp4430_vaux2,
 	.vaux3		= &sdp4430_vaux3,
-	.clk32kg	= &sdp4430_clk32kg,
 
 	/* TWL6032 regulators at OMAP447X based SOMs */
 	.ldo1		= &sdp4430_vpp,
@@ -860,6 +866,10 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.ldo7		= &sdp4430_vusim,
 	.ldoln		= &sdp4430_vdac,
 	.ldousb		= &sdp4430_vusb,
+
+	/* TWL6030/6032 common resources */
+	.clk32kg	= &sdp4430_clk32kg,
+	.clk32kaudio	= &sdp4430_clk32kaudio,
 
 	/* children */
 	.bci		= &sdp4430_bci_data,
