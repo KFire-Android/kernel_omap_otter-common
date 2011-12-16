@@ -458,6 +458,27 @@ static struct regulator_init_data omap4_v2v1_idata = {
 	.consumer_supplies	= omap4_v2v1_supply,
 };
 
+static struct regulator_init_data omap4_sysen_idata = {
+	.constraints = {
+		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+	},
+};
+
+static struct regulator_init_data omap4_clk32kaudio_idata = {
+	.constraints = {
+		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+	},
+};
+
+static struct regulator_init_data omap4_regen1_idata = {
+	.constraints = {
+		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+	},
+};
+
 void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 				  u32 pdata_flags, u32 regulators_flags)
 {
@@ -513,6 +534,18 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 
 	if (regulators_flags & TWL_COMMON_REGULATOR_V2V1 && !pmic_data->v2v1)
 		pmic_data->v2v1 = &omap4_v2v1_idata;
+
+	if (regulators_flags & TWL_COMMON_REGULATOR_SYSEN &&
+	    !pmic_data->sysen)
+		pmic_data->sysen = &omap4_sysen_idata;
+
+	if (regulators_flags & TWL_COMMON_REGULATOR_CLK32KAUDIO &&
+	    !pmic_data->clk32kaudio)
+		pmic_data->clk32kaudio = &omap4_clk32kaudio_idata;
+
+	if (regulators_flags & TWL_COMMON_REGULATOR_REGEN1 &&
+	    !pmic_data->regen1)
+		pmic_data->regen1 = &omap4_regen1_idata;
 }
 #endif /* CONFIG_ARCH_OMAP4 */
 

@@ -520,7 +520,10 @@ static int __init omap4_i2c_init(void)
 			TWL_COMMON_REGULATOR_VUSB |
 			TWL_COMMON_REGULATOR_CLK32KG |
 			TWL_COMMON_REGULATOR_V1V8 |
-			TWL_COMMON_REGULATOR_V2V1);
+			TWL_COMMON_REGULATOR_V2V1 |
+			TWL_COMMON_REGULATOR_SYSEN |
+			TWL_COMMON_REGULATOR_CLK32KAUDIO |
+			TWL_COMMON_REGULATOR_REGEN1);
 	omap4_pmic_init("twl6030", &tablet_twldata,
 			&twl6040_data, OMAP44XX_IRQ_SYS_2N);
 	i2c_register_board_info(1, tablet_i2c_boardinfo,
