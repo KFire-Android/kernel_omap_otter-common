@@ -837,7 +837,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
 
-	/* Regulators */
+	/* TWL6030 regulators at OMAP443X/446X based SOMs */
 	.vmmc		= &sdp4430_vmmc,
 	.vpp		= &sdp4430_vpp,
 	.vusim		= &sdp4430_vusim,
@@ -849,9 +849,21 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux2		= &sdp4430_vaux2,
 	.vaux3		= &sdp4430_vaux3,
 	.clk32kg	= &sdp4430_clk32kg,
-	.usb		= &omap4_usbphy_data,
-	.bci		= &sdp4430_bci_data,
+
+	/* TWL6032 regulators at OMAP447X based SOMs */
+	.ldo1		= &sdp4430_vpp,
+	.ldo2		= &sdp4430_vaux1,
+	.ldo3		= &sdp4430_vaux3,
+	.ldo4		= &sdp4430_vaux2,
+	.ldo5		= &sdp4430_vmmc,
+	.ldo6		= &sdp4430_vcxio,
+	.ldo7		= &sdp4430_vusim,
+	.ldoln		= &sdp4430_vdac,
+	.ldousb		= &sdp4430_vusb,
+
 	/* children */
+	.bci		= &sdp4430_bci_data,
+	.usb		= &omap4_usbphy_data,
 	.codec		= &twl6040_codec,
 	.madc		= &twl6030_gpadc,
 
@@ -940,7 +952,7 @@ static int __init omap4_i2c_init(void)
 	regulator_has_full_constraints();
 
 	/*
-	 * Drive MSECURE high for TWL6030 write access.
+	 * Drive MSECURE high for TWL6030/6032 write access.
 	 */
 	omap_mux_init_signal("fref_clk0_out.gpio_wk6", OMAP_PIN_OUTPUT);
 	gpio_request(6, "msecure");
