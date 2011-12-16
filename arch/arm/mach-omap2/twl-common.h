@@ -14,20 +14,30 @@
 #define TWL_COMMON_PDATA_MADC		(1 << 2)
 #define TWL_COMMON_PDATA_AUDIO		(1 << 3)
 
-/* Common LDO regulators for TWL4030/TWL6030 */
+/* Common LDO regulators for TWL4030/TWL6030/TWL6032 */
+/* LDOLN for TWL6032 */
 #define TWL_COMMON_REGULATOR_VDAC	(1 << 0)
+/* LDO2 for TWL6032 */
 #define TWL_COMMON_REGULATOR_VAUX1	(1 << 1)
+/* LDO4 for TWL6032 */
 #define TWL_COMMON_REGULATOR_VAUX2	(1 << 2)
+/* LDO3 for TWL6032 */
 #define TWL_COMMON_REGULATOR_VAUX3	(1 << 3)
 
-/* TWL6030 LDO regulators */
+/* Common regulators for TWL6030/TWL6032 */
+/* LDO5 for TWL6032 */
 #define TWL_COMMON_REGULATOR_VMMC	(1 << 4)
+/* LDO1 for TWL6032 */
 #define TWL_COMMON_REGULATOR_VPP	(1 << 5)
+/* LDO7 for TWL6032 */
 #define TWL_COMMON_REGULATOR_VUSIM	(1 << 6)
 #define TWL_COMMON_REGULATOR_VANA	(1 << 7)
+/* LDO6 for TWL6032 */
 #define TWL_COMMON_REGULATOR_VCXIO	(1 << 8)
+/* LDOUSB for TWL6032 */
 #define TWL_COMMON_REGULATOR_VUSB	(1 << 9)
 #define TWL_COMMON_REGULATOR_CLK32KG	(1 << 10)
+/* SMPS4 for TWL6032 */
 #define TWL_COMMON_REGULATOR_V1V8	(1 << 11)
 #define TWL_COMMON_REGULATOR_V2V1	(1 << 12)
 #define TWL_COMMON_REGULATOR_SYSEN	(1 << 13)

@@ -495,42 +495,82 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 		pmic_data->madc = &omap4_madc_pdata;
 
 	/* Common regulator configurations */
-	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC && !pmic_data->vdac)
-		pmic_data->vdac = &omap4_vdac_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_VDAC) {
+		if (!pmic_data->vdac)
+			pmic_data->vdac = &omap4_vdac_idata;
+		if (!pmic_data->ldoln)
+			pmic_data->ldoln = &omap4_vdac_idata;
+	}
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX1 && !pmic_data->vaux1)
-		pmic_data->vaux1 = &omap4_vaux1_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX1) {
+		if (!pmic_data->vaux1)
+			pmic_data->vaux1 = &omap4_vaux1_idata;
+		if (!pmic_data->ldo2)
+			pmic_data->ldo2 = &omap4_vaux1_idata;
+	}
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX2 && !pmic_data->vaux2)
-		pmic_data->vaux2 = &omap4_vaux2_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX2) {
+		if (!pmic_data->vaux2)
+			pmic_data->vaux2 = &omap4_vaux2_idata;
+		if (!pmic_data->ldo4)
+			pmic_data->ldo4 = &omap4_vaux2_idata;
+	}
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX3 && !pmic_data->vaux3)
-		pmic_data->vaux3 = &omap4_vaux3_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_VAUX3) {
+		if (!pmic_data->vaux3)
+			pmic_data->vaux3 = &omap4_vaux3_idata;
+		if (!pmic_data->ldo3)
+			pmic_data->ldo3 = &omap4_vaux3_idata;
+	}
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_VMMC && !pmic_data->vmmc)
-		pmic_data->vmmc = &omap4_vmmc_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_VMMC) {
+		if (!pmic_data->vmmc)
+			pmic_data->vmmc = &omap4_vmmc_idata;
+		if (!pmic_data->ldo5)
+			pmic_data->ldo5 = &omap4_vmmc_idata;
+	}
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_VPP && !pmic_data->vpp)
-		pmic_data->vpp = &omap4_vpp_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_VPP) {
+		if (!pmic_data->vpp)
+			pmic_data->vpp = &omap4_vpp_idata;
+		if (!pmic_data->ldo1)
+			pmic_data->ldo1 = &omap4_vpp_idata;
+	}
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_VUSIM && !pmic_data->vusim)
-		pmic_data->vusim = &omap4_vusim_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_VUSIM) {
+		if (!pmic_data->vusim)
+			pmic_data->vusim = &omap4_vusim_idata;
+		if (!pmic_data->ldo7)
+			pmic_data->ldo7 = &omap4_vusim_idata;
+	}
 
 	if (regulators_flags & TWL_COMMON_REGULATOR_VANA && !pmic_data->vana)
 		pmic_data->vana = &omap4_vana_idata;
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_VCXIO && !pmic_data->vcxio)
-		pmic_data->vcxio = &omap4_vcxio_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_VCXIO) {
+		if (!pmic_data->vcxio)
+			pmic_data->vcxio = &omap4_vcxio_idata;
+		if (!pmic_data->ldo6)
+			pmic_data->ldo6 = &omap4_vcxio_idata;
+	}
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_VUSB && !pmic_data->vusb)
-		pmic_data->vusb = &omap4_vusb_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_VUSB) {
+		if (!pmic_data->vusb)
+			pmic_data->vusb = &omap4_vusb_idata;
+		if (!pmic_data->ldousb)
+			pmic_data->ldousb = &omap4_vusb_idata;
+	}
 
 	if (regulators_flags & TWL_COMMON_REGULATOR_CLK32KG &&
 	    !pmic_data->clk32kg)
 		pmic_data->clk32kg = &omap4_clk32kg_idata;
 
-	if (regulators_flags & TWL_COMMON_REGULATOR_V1V8 && !pmic_data->v1v8)
-		pmic_data->v1v8 = &omap4_v1v8_idata;
+	if (regulators_flags & TWL_COMMON_REGULATOR_V1V8) {
+		if (!pmic_data->v1v8)
+			pmic_data->v1v8 = &omap4_v1v8_idata;
+		if (!pmic_data->smps4)
+			pmic_data->smps4 = &omap4_v1v8_idata;
+	}
 
 	if (regulators_flags & TWL_COMMON_REGULATOR_V2V1 && !pmic_data->v2v1)
 		pmic_data->v2v1 = &omap4_v2v1_idata;
