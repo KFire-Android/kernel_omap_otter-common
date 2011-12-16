@@ -696,7 +696,7 @@ static struct twl4030_platform_data tablet_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,
 	.irq_end	= TWL6030_IRQ_END,
 
-	/* Regulators */
+	/* TWL6030 regulators at OMAP443X/4460 based SOMs */
 	.vmmc		= &tablet_vmmc,
 	.vpp		= &tablet_vpp,
 	.vusim		= &tablet_vusim,
@@ -708,15 +708,26 @@ static struct twl4030_platform_data tablet_twldata = {
 	.vaux2		= &tablet_vaux2,
 	.vaux3		= &tablet_vaux3,
 	.clk32kg	= &tablet_clk32kg,
-	.usb		= &omap4_usbphy_data,
+
+	/* TWL6032 regulators at OMAP447X based SOMs */
+	.ldo1		= &tablet_vpp,
+	.ldo2		= &tablet_vaux1,
+	.ldo3		= &tablet_vaux3,
+	.ldo4		= &tablet_vaux2,
+	.ldo5		= &tablet_vmmc,
+	.ldo6		= &tablet_vcxio,
+	.ldo7		= &tablet_vusim,
+	.ldoln		= &tablet_vdac,
+	.ldousb		= &tablet_vusb,
 
 	/* SMPS */
 	.vdd1		= &tablet_vcore1,
 	.vdd2		= &tablet_vcore2,
 
 	/* children */
-	.codec		= &twl6040_codec,
 	.bci		= &sdp4430_bci_data,
+	.usb		= &omap4_usbphy_data,
+	.codec		= &twl6040_codec,
 	.madc		= &twl6030_gpadc,
 };
 
@@ -808,7 +819,7 @@ static int __init omap4_i2c_init(void)
 	regulator_has_full_constraints();
 
 	/*
-	 * Drive MSECURE high for TWL6030 write access.
+	 * Drive MSECURE high for TWL6030/6032 write access.
 	 */
 	omap_mux_init_signal("fref_clk0_out.gpio_wk6", OMAP_PIN_OUTPUT);
 	gpio_request(6, "msecure");
