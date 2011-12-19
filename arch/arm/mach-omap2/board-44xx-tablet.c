@@ -593,6 +593,30 @@ static struct regulator_init_data twl6040_vddhf = {
 	.driver_data		= &tps6130x_pdata,
 };
 
+static int twl6040_init(void)
+{
+	u8 rev = 0;
+	int ret;
+
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE,
+				&rev, TWL6040_REG_ASICREV);
+	if (ret)
+		return ret;
+
+	/*
+	 * ERRATA: Reset value of PDM_UL buffer logic is 1 (VDDVIO)
+	 * when AUDPWRON = 0, which causes current drain on this pin's
+	 * pull-down on OMAP side. The workaround consists of disabling
+	 * pull-down resistor of ABE_PDM_UL_DATA pin
+	 * Impacted revisions: ES1.1 and ES1.2 (both share same ASICREV value)
+	 */
+	if (rev == TWL6040_REV_1_1)
+		omap_mux_init_signal("abe_pdm_ul_data.abe_pdm_ul_data",
+			OMAP_PIN_INPUT);
+
+	return 0;
+}
+
 static struct twl4030_codec_audio_data twl6040_audio = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step   = 0x0f,
@@ -614,6 +638,7 @@ static struct twl4030_codec_data twl6040_codec = {
 	.audpwron_gpio  = 127,
 	.naudint_irq    = OMAP44XX_IRQ_SYS_2N,
 	.irq_base       = TWL6040_CODEC_IRQ_BASE,
+	.init		= twl6040_init,
 };
 
 static int sdp4430_batt_table[] = {
