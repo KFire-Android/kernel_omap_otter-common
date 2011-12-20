@@ -717,8 +717,8 @@ static int __devinit twl6040_probe(struct platform_device *pdev)
 			goto gpio2_err;
 
 		ret = twl6040_request_irq(twl6040, TWL6040_IRQ_READY,
-				  twl6040_naudint_handler, "twl6040_irq_ready",
-				  twl6040);
+				twl6040_naudint_handler, 0,
+				"twl6040_irq_ready", twl6040);
 		if (ret) {
 			dev_err(twl6040->dev, "READY IRQ request failed: %d\n",
 				ret);

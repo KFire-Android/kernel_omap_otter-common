@@ -236,14 +236,15 @@ struct twl6040 {
 };
 
 static inline int twl6040_request_irq(struct twl6040 *twl6040, int irq,
-				      irq_handler_t handler, const char *name,
-				      void *data)
+				      irq_handler_t handler,
+				      unsigned long irqflags,
+				      const char *name, void *data)
 {
 	if (!twl6040->irq_base)
 		return -EINVAL;
 
 	return request_threaded_irq(twl6040->irq_base + irq, NULL, handler,
-				    0, name, data);
+				    irqflags, name, data);
 }
 
 static inline void twl6040_free_irq(struct twl6040 *twl6040, int irq,
