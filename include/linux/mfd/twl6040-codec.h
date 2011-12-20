@@ -218,6 +218,12 @@
 #define TWL6040_IRQ_VIB			4
 #define TWL6040_IRQ_READY		5
 
+/* Event IDs for Android userspace */
+#define TWL6040_THSHUT_EVENT		1
+#define TWL6040_THSHUT_RECOVERY		2
+#define TWL6040_HFOC_EVENT		3
+#define TWL6040_VIBOC_EVENT		4
+
 enum twl6040_pll_id {
 	TWL6040_NOPLL_ID,
 	TWL6040_LPPLL_ID,
@@ -282,6 +288,7 @@ int twl6040_set_pll(struct twl6040 *twl6040, enum twl6040_pll_id id,
 enum twl6040_pll_id twl6040_get_pll(struct twl6040 *twl6040);
 unsigned int twl6040_get_sysclk(struct twl6040 *twl6040);
 int twl6040_get_icrev(struct twl6040 *twl6040);
+void twl6040_report_event(struct twl6040 *twl6040, int event);
 int twl6040_irq_init(struct twl6040 *twl6040);
 void twl6040_irq_exit(struct twl6040 *twl6040);
 

@@ -29,6 +29,7 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/delay.h>
+#include <linux/kobject.h>
 #include <linux/i2c/twl.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/twl6040-codec.h>
@@ -645,6 +646,38 @@ int twl6040_get_icrev(struct twl6040 *twl6040)
 }
 EXPORT_SYMBOL(twl6040_get_icrev);
 
+#define EVENT_NAME "TWL6040_EVENT"
+
+void twl6040_report_event(struct twl6040 *twl6040, int event)
+{
+	char name_buf[120];
+	char state_buf[120];
+	char *envp[3];
+	int env_offset = 0;
+
+	switch (event) {
+	case TWL6040_THSHUT_EVENT:
+	case TWL6040_THSHUT_RECOVERY:
+	case TWL6040_HFOC_EVENT:
+	case TWL6040_VIBOC_EVENT:
+		snprintf(name_buf, sizeof(name_buf),
+			"EVENT_NAME=%s", EVENT_NAME);
+		envp[env_offset++] = name_buf;
+
+		snprintf(state_buf, sizeof(state_buf),
+			"EVENT_INDEX=%d", event);
+		envp[env_offset++] = state_buf;
+
+		envp[env_offset] = NULL;
+		kobject_uevent_env(&twl6040->dev->kobj, KOBJ_CHANGE, envp);
+		break;
+	default:
+		dev_err(twl6040->dev, "event not supported %d\n", event);
+		break;
+	}
+}
+EXPORT_SYMBOL(twl6040_report_event);
+
 static int __devinit twl6040_probe(struct platform_device *pdev)
 {
 	struct twl4030_codec_data *pdata = pdev->dev.platform_data;
@@ -682,7 +715,7 @@ static int __devinit twl6040_probe(struct platform_device *pdev)
 	twl6040->icrev = twl6040_reg_read(twl6040, TWL6040_REG_ASICREV);
 	if (twl6040->icrev < 0) {
 		ret = twl6040->icrev;
-		goto gpio1_err;
+		goto rev_err;
 	}
 
 	if (pdata && (twl6040_get_icrev(twl6040) > TWL6040_REV_1_0))
@@ -704,7 +737,7 @@ static int __devinit twl6040_probe(struct platform_device *pdev)
 	if (gpio_is_valid(audpwron)) {
 		ret = gpio_request(audpwron, "audpwron");
 		if (ret)
-			goto gpio1_err;
+			goto rev_err;
 
 		ret = gpio_direction_output(audpwron, 0);
 		if (ret)
@@ -782,7 +815,7 @@ irq_err:
 gpio2_err:
 	if (gpio_is_valid(audpwron))
 		gpio_free(audpwron);
-gpio1_err:
+rev_err:
 	if (pdata->exit)
 		pdata->exit();
 init_err:
