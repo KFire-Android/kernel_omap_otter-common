@@ -124,7 +124,6 @@ void omap4_trigger_ioctrl(void)
 	/* Trigger WUCLKIN enable */
 	omap4_prminst_rmw_inst_reg_bits(OMAP4430_WUCLK_CTRL_MASK, OMAP4430_WUCLK_CTRL_MASK,
 		OMAP4430_PRM_PARTITION, OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
-
 	omap_test_timeout((((omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
 						   OMAP4430_PRM_DEVICE_INST,
 						   OMAP4_PRM_IO_PMCTRL_OFFSET) &
