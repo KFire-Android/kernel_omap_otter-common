@@ -1798,7 +1798,7 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 		}
 
 	ret = twl6040_request_irq(codec->control_data, TWL6040_IRQ_PLUG,
-				twl6040_audio_handler, 0,
+				twl6040_audio_handler, IRQF_NO_SUSPEND,
 				"twl6040_irq_plug", codec);
 	if (ret) {
 		dev_err(codec->dev, "PLUG IRQ request failed: %d\n", ret);
