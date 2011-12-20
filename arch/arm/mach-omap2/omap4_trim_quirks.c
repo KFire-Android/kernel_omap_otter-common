@@ -58,11 +58,16 @@ int omap4_ldo_trim_configure(void)
 	omap4_ctrl_pad_writel(val,
 		OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
 	/*
-	 * For all ESx.y trimmed and untrimmed units LPDDR IO and
-	 * Smart IO override efuse.
+	 * Errata: i684
+	 * For all ESx.y trimmed and untrimmed units LPDDR I/O and
+	 * Smart I/O override efuse.
+	 * OMAP4470 not impacted.
 	 */
-	val = OMAP4_LPDDR2_PTV_P5_MASK | OMAP4_LPDDR2_PTV_N5_MASK;
-	omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_2);
+	if (!cpu_is_omap447x()) {
+		val = OMAP4_LPDDR2_PTV_P5_MASK | OMAP4_LPDDR2_PTV_N5_MASK;
+		omap4_ctrl_pad_writel(val,
+				OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_2);
+	}
 
 	/* Required for DPLL_MPU to lock at 2.4 GHz */
 	if (dpll_trim_override)
