@@ -202,6 +202,9 @@
 #define GPADC_CTRL_TEMP2_EN_MONITOR	(1 << 6)
 #define GPADC_CTRL_ISOURCE_EN		(1 << 7)
 
+#define GPADC_ISOURCE_22uA		22
+#define GPADC_ISOURCE_7uA		7
+
 /* TWL6030/6032 BATTERY VOLTAGE GPADC CHANNELS */
 
 #define TWL6030_GPADC_VBAT_CHNL	0x07
@@ -554,6 +557,7 @@ static int twl6030_get_gpadc_conversion(struct twl6030_bci_device_info *di,
 static int is_battery_present(struct twl6030_bci_device_info *di)
 {
 	int val;
+	static unsigned int current_src_val;
 
 	/*
 	 * Prevent charging on batteries were id resistor is
@@ -562,17 +566,31 @@ static int is_battery_present(struct twl6030_bci_device_info *di)
 	val = twl6030_get_gpadc_conversion(di, 0);
 
 	if (di->features & TWL6032_SUBCLASS) {
-		/* A 132K ID resistor will make approx 900mV on
-		 * channel 0 this is the maximum value of ID
-		 * PhoenixLite supports. Anything less than this
-		 * is a valid ID resistor.
+		/*
+		 * twl6030_get_gpadc_conversion for
+		 * 6030 return resistance, for 6032 - voltage and
+		 * it should be converted to resistance before
+		 * using.
 		 */
-		if (val > 900)
-			return 0;
-	} else {
-		if (val < 5000)
-			return 0;
+		if (!current_src_val) {
+			u8 reg = 0;
+
+			if (twl_i2c_read_u8(TWL_MODULE_MADC, &reg,
+						TWL6030_GPADC_CTRL))
+				pr_err("%s: Error reading TWL6030_GPADC_CTRL\n",
+					__func__);
+
+			current_src_val = (reg & GPADC_CTRL_ISOURCE_EN) ?
+						GPADC_ISOURCE_22uA :
+						GPADC_ISOURCE_7uA;
+		}
+
+		val = (val * 1000) / current_src_val;
 	}
+
+	if (val < 5000)
+		return 0;
+
 	return 1;
 }
 
