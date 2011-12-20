@@ -58,10 +58,6 @@ extern struct ion_client *gpsIONClient;
 #error "OMAPLFB_MAX_NUM_DEVICES must not be greater than FB_MAX"
 #endif
 
-#define MAX_FLIPV2_PAGES 4096
-#define MAX_FLIPV2_LAYERS 5
-static u32 aui32PageAddrs[MAX_FLIPV2_PAGES];
-
 static OMAPLFB_DEVINFO *gapsDevInfo[OMAPLFB_MAX_NUM_DEVICES];
 
 static PFN_DC_GET_PVRJTABLE gpfnGetPVRJTable = NULL;
@@ -876,8 +872,8 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 							  struct dsscomp_setup_dispc_data *psDssData,
 							  IMG_UINT32 uiDssDataLength)
 {
-	struct tiler_pa_info asTilerPAs[MAX_FLIPV2_LAYERS], *apsTilerPAs[MAX_FLIPV2_LAYERS];
-	IMG_UINT32 i, k, used_pas = 0, free_pas = ARRAY_SIZE(aui32PageAddrs);
+	struct tiler_pa_info *apsTilerPAs[5];
+	IMG_UINT32 i, k;
 
 	if(uiDssDataLength != sizeof(*psDssData))
 	{
@@ -894,6 +890,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 
 	for(i = k = 0; i < ui32NumMemInfos && k < ARRAY_SIZE(apsTilerPAs); i++, k++)
 	{
+		struct tiler_pa_info *psTilerInfo;
 		IMG_CPU_VIRTADDR virtAddr;
 		IMG_CPU_PHYADDR phyAddr;
 		IMG_UINT32 ui32NumPages;
@@ -927,23 +924,32 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 			continue;
 		}
 
-		if (ui32NumPages > free_pas)
+		psTilerInfo = kzalloc(sizeof(*psTilerInfo), GFP_KERNEL);
+		if(!psTilerInfo)
+		{
 			continue;
+		}
 
-		asTilerPAs[k].mem = &aui32PageAddrs[used_pas];
-		asTilerPAs[k].num_pg = ui32NumPages;
-		asTilerPAs[k].memtype = TILER_MEM_USING;
+		psTilerInfo->mem = kzalloc(sizeof(*psTilerInfo->mem) * ui32NumPages, GFP_KERNEL);
+		if(!psTilerInfo->mem)
+		{
+			kfree(psTilerInfo);
+			continue;
+		}
+
+		psTilerInfo->num_pg = ui32NumPages;
+		psTilerInfo->memtype = TILER_MEM_USING;
 
 		for(j = 0; j < ui32NumPages; j++)
 		{
 			psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], j << PAGE_SHIFT, &phyAddr);
-			aui32PageAddrs[used_pas++] = (u32)phyAddr.uiAddr;
+			psTilerInfo->mem[j] = (u32)phyAddr.uiAddr;
 		}
-		free_pas -= ui32NumPages;
+
 		/* need base address for in-page offset */
 		psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuVAddr(ppsMemInfos[i], &virtAddr);
 		psDssData->ovls[k].ba = (u32)virtAddr;
-		apsTilerPAs[k] = &asTilerPAs[k];
+		apsTilerPAs[k] = psTilerInfo;
 	}
 
 	/* set up cloned layer addresses (but don't duplicate tiler_pas) */
@@ -964,6 +970,11 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 	dsscomp_gralloc_queue(psDssData, apsTilerPAs, false,
 						  dsscomp_proxy_cmdcomplete,
 						  (void *)hCmdCookie);
+
+	for(i = 0; i < k; i++)
+	{
+		tiler_pa_free(apsTilerPAs[i]);
+	}
 
 	return IMG_TRUE;
 }
