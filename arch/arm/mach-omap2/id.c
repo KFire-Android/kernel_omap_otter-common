@@ -420,6 +420,7 @@ static void __init omap4_check_revision(void)
 		case 4:
 			omap_revision = OMAP4430_REV_ES2_2;
 			omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
+			break;
 		case 6:
 		default:
 			omap_revision = OMAP4430_REV_ES2_3;
