@@ -22,6 +22,7 @@
 #include <linux/rculist.h>
 #include <linux/rcupdate.h>
 #include <linux/opp.h>
+#include <linux/export.h>
 
 /*
  * Internal data structure organization with the OPP layer library is as
@@ -220,6 +221,7 @@ int opp_get_opp_count(struct device *dev)
 
 	return count;
 }
+EXPORT_SYMBOL(opp_get_opp_count);
 
 /**
  * opp_find_freq_exact() - search for an exact frequency
@@ -355,6 +357,7 @@ struct opp *opp_find_freq_floor(struct device *dev, unsigned long *freq)
 
 	return opp;
 }
+EXPORT_SYMBOL(opp_find_freq_floor);
 
 /**
  * opp_add()  - Add an OPP table from a table definitions
