@@ -434,7 +434,8 @@ static int omap_dmic_remove(struct snd_soc_dai *dai)
 	return 0;
 }
 
-static struct snd_soc_dai_driver omap_dmic_dai = {
+static struct snd_soc_dai_driver omap_dmic_dai[] = {
+{
 	.name = "omap-dmic",
 	.probe = omap_dmic_probe,
 	.remove = omap_dmic_remove,
@@ -446,6 +447,37 @@ static struct snd_soc_dai_driver omap_dmic_dai = {
 		.sig_bits = 24,
 	},
 	.ops = &omap_dmic_dai_ops,
+},
+{
+	.name = "omap-dmic-abe-dai-0",
+	.capture = {
+		.channels_min = 2,
+		.channels_max = 2,
+		.rates = SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000,
+		.formats = SNDRV_PCM_FMTBIT_S32_LE,
+	},
+	.ops = &omap_dmic_dai_ops,
+},
+{
+	.name = "omap-dmic-abe-dai-1",
+	.capture = {
+		.channels_min = 2,
+		.channels_max = 2,
+		.rates = SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000,
+		.formats = SNDRV_PCM_FMTBIT_S32_LE,
+	},
+	.ops = &omap_dmic_dai_ops,
+},
+{
+	.name = "omap-dmic-abe-dai-2",
+	.capture = {
+		.channels_min = 2,
+		.channels_max = 2,
+		.rates = SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000,
+		.formats = SNDRV_PCM_FMTBIT_S32_LE,
+	},
+	.ops = &omap_dmic_dai_ops,
+},
 };
 
 static __devinit int asoc_dmic_probe(struct platform_device *pdev)
@@ -507,7 +539,8 @@ static __devinit int asoc_dmic_probe(struct platform_device *pdev)
 		goto err_put_clk;
 	}
 
-	ret = snd_soc_register_dai(&pdev->dev, &omap_dmic_dai);
+	ret = snd_soc_register_dais(&pdev->dev, omap_dmic_dai,
+			ARRAY_SIZE(omap_dmic_dai));
 	if (ret)
 		goto err_put_clk;
 
@@ -522,7 +555,7 @@ static int __devexit asoc_dmic_remove(struct platform_device *pdev)
 {
 	struct omap_dmic *dmic = platform_get_drvdata(pdev);
 
-	snd_soc_unregister_dai(&pdev->dev);
+	snd_soc_unregister_dais(&pdev->dev, ARRAY_SIZE(omap_dmic_dai));
 	clk_put(dmic->fclk);
 
 	return 0;
