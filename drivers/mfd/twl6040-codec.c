@@ -217,6 +217,37 @@ int twl6040_clear_bits(struct twl6040 *twl6040, unsigned int reg, u8 mask)
 }
 EXPORT_SYMBOL(twl6040_clear_bits);
 
+/* Restore context of VDD/VSS or VIO/GND registers */
+static int twl6040_restore_ctx(struct twl6040 *twl6040, int supply)
+{
+	int reg, ret = 0;
+
+	for (reg = 1; reg < TWL6040_CACHEREGNUM; reg++) {
+		/* skip read-only registers */
+		switch (reg) {
+		case TWL6040_REG_ASICID:
+		case TWL6040_REG_ASICREV:
+		case TWL6040_REG_UPCRES:
+		case TWL6040_REG_DNCRES:
+			continue;
+		default:
+			break;
+		}
+
+		if (twl6040_get_reg_supply(reg) == supply) {
+			ret = twl6040_reg_write(twl6040, reg,
+						twl6040_cache_read(twl6040, reg));
+			if (ret) {
+				dev_err(twl6040->dev,
+					"failed to restore context %d\n", ret);
+				break;
+			}
+		}
+	}
+
+	return ret;
+}
+
 /* twl6040 codec manual power-up sequence */
 static int twl6040_power_up(struct twl6040 *twl6040)
 {
