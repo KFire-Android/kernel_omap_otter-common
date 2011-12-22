@@ -206,6 +206,7 @@
 #define TWL6040_PLUGCOMP		0x02
 #define TWL6040_VIBLOCDET		0x10
 #define TWL6040_VIBROCDET		0x20
+#define TWL6040_TSHUTDET		0x40
 
 #define TWL6040_CELLS			2
 
@@ -241,6 +242,7 @@ struct twl6040 {
 	int audpwron;
 	int powered;
 	int power_count;
+	int thshut;
 
 	enum twl6040_pll_id pll;
 	unsigned int sysclk;

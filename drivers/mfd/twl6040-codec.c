@@ -34,6 +34,8 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/twl6040-codec.h>
 
+static int twl6040_power(struct twl6040 *twl6040, int enable);
+
 int twl6040_get_reg_supply(unsigned int reg)
 {
 	if (reg > TWL6040_CACHEREGNUM)
@@ -100,7 +102,14 @@ int twl6040_reg_read(struct twl6040 *twl6040, unsigned int reg)
 	int ret;
 
 	mutex_lock(&twl6040->io_mutex);
-	ret = twl6040_i2c_read(twl6040, reg);
+	if (twl6040_reg_is_vio(reg) || likely(!twl6040->thshut)) {
+		ret = twl6040_i2c_read(twl6040, reg);
+	} else {
+		dev_warn(twl6040->dev,
+			"reg 0x%02x read from cache (thermal shutdown)\n",
+			reg);
+		ret = twl6040_cache_read(twl6040, reg);
+	}
 	mutex_unlock(&twl6040->io_mutex);
 
 	return ret;
@@ -132,7 +141,14 @@ int twl6040_reg_write(struct twl6040 *twl6040, unsigned int reg, u8 val)
 	int ret;
 
 	mutex_lock(&twl6040->io_mutex);
-	ret = twl6040_i2c_write(twl6040, reg, val);
+	if (twl6040_reg_is_vio(reg) || likely(!twl6040->thshut)) {
+		ret = twl6040_i2c_write(twl6040, reg, val);
+	} else {
+		dev_warn(twl6040->dev,
+			"reg 0x%02x write to cache (thermal shutdown)\n",
+			reg);
+		ret = twl6040_cache_write(twl6040, reg, val);
+	}
 	mutex_unlock(&twl6040->io_mutex);
 
 	return ret;
@@ -171,7 +187,14 @@ int twl6040_set_bits(struct twl6040 *twl6040, unsigned int reg, u8 mask)
 	int ret;
 
 	mutex_lock(&twl6040->io_mutex);
-	ret = twl6040_i2c_set_bits(twl6040, reg, mask);
+	if (twl6040_reg_is_vio(reg) || likely(!twl6040->thshut)) {
+		ret = twl6040_i2c_set_bits(twl6040, reg, mask);
+	} else {
+		dev_warn(twl6040->dev,
+			"reg 0x%02x access to cache (thermal shutdown)\n",
+			reg);
+		ret = twl6040_cache_set_bits(twl6040, reg, mask);
+	}
 	mutex_unlock(&twl6040->io_mutex);
 
 	return ret;
@@ -210,7 +233,14 @@ int twl6040_clear_bits(struct twl6040 *twl6040, unsigned int reg, u8 mask)
 	int ret;
 
 	mutex_lock(&twl6040->io_mutex);
-	ret = twl6040_i2c_clear_bits(twl6040, reg, mask);
+	if (twl6040_reg_is_vio(reg) || likely(!twl6040->thshut)) {
+		ret = twl6040_i2c_clear_bits(twl6040, reg, mask);
+	} else {
+		dev_warn(twl6040->dev,
+			"reg 0x%02x access to cache (thermal shutdown)\n",
+			reg);
+		ret = twl6040_cache_clear_bits(twl6040, reg, mask);
+	}
 	mutex_unlock(&twl6040->io_mutex);
 
 	return ret;
@@ -442,12 +472,53 @@ lppll_err:
 static irqreturn_t twl6040_naudint_handler(int irq, void *data)
 {
 	struct twl6040 *twl6040 = data;
-	u8 intid;
+	u8 intid, val;
 
 	intid = twl6040_reg_read(twl6040, TWL6040_REG_INTID);
 
 	if (intid & TWL6040_READYINT)
 		complete(&twl6040->ready);
+
+	if (intid & TWL6040_THINT) {
+		val = twl6040_reg_read(twl6040, TWL6040_REG_STATUS);
+		if (val & TWL6040_TSHUTDET) {
+			dev_err(twl6040->dev,
+				"thermal shutdown started\n");
+
+			twl6040->thshut = 1;
+
+			/*
+			 * power-down during thermal event keeps reference
+			 * system and temperature sensor active
+			 */
+			mutex_lock(&twl6040->mutex);
+			twl6040_power(twl6040, 0);
+			mutex_unlock(&twl6040->mutex);
+
+			twl6040_report_event(twl6040, TWL6040_THSHUT_EVENT);
+		} else {
+			dev_info(twl6040->dev,
+				"recovered from thermal shutdown\n");
+
+			twl6040->thshut = 0;
+
+			/*
+			 * power-up after recovered from thermal event can
+			 * be followed by power-down in case MFD is not
+			 * enabled so that reference system can be disabled
+			 */
+			mutex_lock(&twl6040->mutex);
+			twl6040_power(twl6040, 1);
+			if (!twl6040->power_count)
+				twl6040_power(twl6040, 0);
+			else
+				twl6040_restore_ctx(twl6040,
+						TWL6040_VDD_SUPPLY);
+			mutex_unlock(&twl6040->mutex);
+
+			twl6040_report_event(twl6040, TWL6040_THSHUT_RECOVERY);
+		}
+	}
 
 	return IRQ_HANDLED;
 }
@@ -630,6 +701,12 @@ static int twl6040_power(struct twl6040 *twl6040, int enable)
 int twl6040_enable(struct twl6040 *twl6040)
 {
 	int ret = 0;
+
+	if (twl6040->thshut) {
+		dev_warn(twl6040->dev,
+			"Power-up denied while in thermal shutdown\n");
+		return -EPERM;
+	}
 
 	mutex_lock(&twl6040->mutex);
 	if (!twl6040->power_count++)
@@ -907,6 +984,15 @@ static int __devinit twl6040_probe(struct platform_device *pdev)
 				ret);
 			goto irq_err;
 		}
+
+		ret = twl6040_request_irq(twl6040, TWL6040_IRQ_TH,
+				twl6040_naudint_handler, 0,
+				"twl6040_irq_thermal", twl6040);
+		if (ret) {
+			dev_err(twl6040->dev, "THERMAL IRQ request failed: %d\n",
+				ret);
+			goto thirq_err;
+		}
 	}
 
 	/* dual-access registers controlled by I2C only */
@@ -957,6 +1043,9 @@ mfd_err:
 		pdata->put_ext_clk32k();
 clk32k_err:
 	if (naudint)
+		twl6040_free_irq(twl6040, TWL6040_IRQ_TH, twl6040);
+thirq_err:
+	if (naudint)
 		twl6040_free_irq(twl6040, TWL6040_IRQ_READY, twl6040);
 irq_err:
 	if (naudint)
@@ -982,7 +1071,10 @@ static int __devexit twl6040_remove(struct platform_device *pdev)
 
 	twl6040_disable(twl6040);
 
-	twl6040_free_irq(twl6040, TWL6040_IRQ_READY, twl6040);
+	if (naudint) {
+		twl6040_free_irq(twl6040, TWL6040_IRQ_READY, twl6040);
+		twl6040_free_irq(twl6040, TWL6040_IRQ_TH, twl6040);
+	}
 
 	if (gpio_is_valid(audpwron))
 		gpio_free(audpwron);
