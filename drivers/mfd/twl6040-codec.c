@@ -34,67 +34,142 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/twl6040-codec.h>
 
-int twl6040_reg_read(struct twl6040 *twl6040, unsigned int reg)
+static inline int twl6040_cache_read(struct twl6040 *twl6040, unsigned int reg)
+{
+	return twl6040->cache[reg];
+}
+
+/* twl6040->io_mutex must already be locked when calling this function */
+static int twl6040_i2c_read(struct twl6040 *twl6040, unsigned int reg)
 {
 	int ret;
-	u8 val;
+	u8 val = 0;
 
-	mutex_lock(&twl6040->io_mutex);
 	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, reg);
-	if (ret < 0) {
-		mutex_unlock(&twl6040->io_mutex);
+	if (ret)
 		return ret;
-	}
-	mutex_unlock(&twl6040->io_mutex);
 
 	return val;
 }
+
+int twl6040_reg_read(struct twl6040 *twl6040, unsigned int reg)
+{
+	int ret;
+
+	mutex_lock(&twl6040->io_mutex);
+	ret = twl6040_i2c_read(twl6040, reg);
+	mutex_unlock(&twl6040->io_mutex);
+
+	return ret;
+}
 EXPORT_SYMBOL(twl6040_reg_read);
+
+static inline int twl6040_cache_write(struct twl6040 *twl6040,
+				unsigned int reg, u8 val)
+{
+	twl6040->cache[reg] = val;
+	return 0;
+}
+
+/* twl6040->io_mutex must already be locked when calling this function */
+static int twl6040_i2c_write(struct twl6040 *twl6040, unsigned int reg, u8 val)
+{
+	int ret;
+
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, reg);
+	if (ret)
+		return ret;
+
+	twl6040_cache_write(twl6040, reg, val);
+	return 0;
+}
 
 int twl6040_reg_write(struct twl6040 *twl6040, unsigned int reg, u8 val)
 {
 	int ret;
 
 	mutex_lock(&twl6040->io_mutex);
-	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, reg);
+	ret = twl6040_i2c_write(twl6040, reg, val);
 	mutex_unlock(&twl6040->io_mutex);
 
 	return ret;
 }
 EXPORT_SYMBOL(twl6040_reg_write);
 
-int twl6040_set_bits(struct twl6040 *twl6040, unsigned int reg, u8 mask)
+static inline int twl6040_cache_set_bits(struct twl6040 *twl6040,
+				unsigned int reg, u8 mask)
+{
+	twl6040->cache[reg] = twl6040->cache[reg] | mask;
+	return 0;
+}
+
+/* twl6040->io_mutex must already be locked when calling this function */
+static int twl6040_i2c_set_bits(struct twl6040 *twl6040,
+				unsigned int reg, u8 mask)
 {
 	int ret;
-	u8 val;
+	u8 val = 0;
 
-	mutex_lock(&twl6040->io_mutex);
 	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, reg);
 	if (ret)
-		goto out;
+		return ret;
 
 	val |= mask;
 	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, reg);
-out:
+	if (ret)
+		return ret;
+
+	twl6040_cache_write(twl6040, reg, val);
+	return 0;
+}
+
+int twl6040_set_bits(struct twl6040 *twl6040, unsigned int reg, u8 mask)
+{
+	int ret;
+
+	mutex_lock(&twl6040->io_mutex);
+	ret = twl6040_i2c_set_bits(twl6040, reg, mask);
 	mutex_unlock(&twl6040->io_mutex);
+
 	return ret;
 }
 EXPORT_SYMBOL(twl6040_set_bits);
 
-int twl6040_clear_bits(struct twl6040 *twl6040, unsigned int reg, u8 mask)
+static inline int twl6040_cache_clear_bits(struct twl6040 *twl6040,
+				unsigned int reg, u8 mask)
+{
+	twl6040->cache[reg] = twl6040->cache[reg] & ~mask;
+	return 0;
+}
+
+/* twl6040->io_mutex must already be locked when calling this function */
+static int twl6040_i2c_clear_bits(struct twl6040 *twl6040,
+				unsigned int reg, u8 mask)
 {
 	int ret;
-	u8 val;
+	u8 val = 0;
 
-	mutex_lock(&twl6040->io_mutex);
 	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, reg);
 	if (ret)
-		goto out;
+		return ret;
 
 	val &= ~mask;
 	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, reg);
-out:
+	if (ret)
+		return ret;
+
+	twl6040_cache_write(twl6040, reg, val);
+	return 0;
+}
+
+int twl6040_clear_bits(struct twl6040 *twl6040, unsigned int reg, u8 mask)
+{
+	int ret;
+
+	mutex_lock(&twl6040->io_mutex);
+	ret = twl6040_i2c_clear_bits(twl6040, reg, mask);
 	mutex_unlock(&twl6040->io_mutex);
+
 	return ret;
 }
 EXPORT_SYMBOL(twl6040_clear_bits);
