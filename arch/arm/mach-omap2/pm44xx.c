@@ -841,9 +841,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 		return -ENOMEM;
 
 	pwrst->pwrdm = pwrdm;
-
-	list_add(&pwrst->node, &pwrst_list);
-
 	if ((!strcmp(pwrdm->name, "mpu_pwrdm")) ||
 			(!strcmp(pwrdm->name, "core_pwrdm")) ||
 			(!strcmp(pwrdm->name, "cpu0_pwrdm")) ||
@@ -851,6 +848,8 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 		pwrst->next_state = PWRDM_POWER_ON;
 	else
 		omap4_configure_pwrst(off_mode_enabled);
+
+	list_add(&pwrst->node, &pwrst_list);
 
 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 }
