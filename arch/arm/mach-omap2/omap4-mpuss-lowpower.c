@@ -56,7 +56,7 @@
 #include <plat/omap44xx.h>
 #include <mach/omap4-common.h>
 #include <mach/omap-wakeupgen.h>
-
+#include <linux/clk.h>
 #include "omap4-sar-layout.h"
 #include "pm.h"
 #include "prcm_mpu44xx.h"
@@ -68,6 +68,7 @@
 #include "prm.h"
 #include "cm44xx.h"
 #include "prcm-common.h"
+#include "clockdomain.h"
 
 #ifdef CONFIG_SMP
 
@@ -90,6 +91,7 @@ static struct powerdomain *mpuss_pd;
  */
 dma_addr_t omap4_secure_ram_phys;
 static void *secure_ram;
+struct clk *l3_main_3_ick;
 
 /* Variables to store maximum spi(Shared Peripheral Interrupts) registers. */
 static u32 max_spi_irq, max_spi_reg;
@@ -496,6 +498,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 {
 	unsigned int save_state = 0;
 	unsigned int wakeup_cpu;
+	unsigned int inst_clk_enab = 0;
 
 	if ((cpu >= NR_CPUS) || (omap_rev() == OMAP4430_REV_ES1_0))
 		goto ret;
@@ -540,7 +543,18 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 			omap_wakeupgen_save();
 			gic_save_context();
 		} else {
+			/* FIXME: Check if this can be optimised */
+			/* l3_main inst clock must be enabled for
+			* a save ram operation
+			*/
+			if (!l3_main_3_ick->usecount) {
+				inst_clk_enab = 1;
+				clk_enable(l3_main_3_ick);
+			}
 			save_secure_all();
+
+			if (inst_clk_enab == 1)
+				clk_disable(l3_main_3_ick);
 			save_ivahd_tesla_regs();
 			save_l3instr_regs();
 		}
@@ -572,10 +586,19 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 			omap_wakeupgen_save();
 			gic_save_context();
 		} else {
+			/* l3_main inst clock must be enabled for
+			* a save ram operation
+			*/
+			if (!l3_main_3_ick->usecount) {
+				inst_clk_enab = 1;
+				clk_enable(l3_main_3_ick);
+			}
 			save_gic_wakeupgen_secure();
 			save_ivahd_tesla_regs();
 			save_l3instr_regs();
 			save_secure_ram();
+			if (inst_clk_enab == 1)
+				clk_disable(l3_main_3_ick);
 		}
 		save_state = 3;
 		break;
@@ -789,6 +812,8 @@ int __init omap4_mpuss_init(void)
 		pr_err("Failed to get lookup for MPUSS pwrdm\n");
 		return -ENODEV;
 	}
+
+	l3_main_3_ick = clk_get(NULL, "l3_main_3_ick");
 
 	/* Clear CPU previous power domain state */
 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
