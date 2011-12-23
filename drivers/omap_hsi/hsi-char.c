@@ -48,7 +48,7 @@
 #define DRIVER_VERSION  "0.2.4"
 #define HSI_CHAR_DEVICE_NAME  "hsi_char"
 
-static unsigned int port = 1;
+static unsigned int port = 2;
 module_param(port, uint, S_IRUGO);
 MODULE_PARM_DESC(port, "HSI port to be probed");
 

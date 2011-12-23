@@ -47,11 +47,9 @@
  * NOTE: We abuse a little bit the struct port_ctx to use it also for
  * initialization.
  */
-
-
 static struct hsi_port_ctx omap_hsi_port_ctx[] = {
 	[0] = {
-	       .port_number = 1,
+	       .port_number = 2,
 	       .hst.mode = HSI_MODE_FRAME,
 	       .hst.frame_size = HSI_FRAMESIZE_DEFAULT,
 	       .hst.divisor = HSI_DIVISOR_DEFAULT,
@@ -78,7 +76,7 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 	.num_ports = ARRAY_SIZE(omap_hsi_port_ctx),
 	.hsi_gdd_chan_count = HSI_HSI_DMA_CHANNEL_MAX,
 	.default_hsi_fclk = HSI_DEFAULT_FCLK,
-	.fifo_mapping_strategy = HSI_FIFO_MAPPING_ALL_PORT1,
+	.fifo_mapping_strategy = HSI_FIFO_MAPPING_ALL_PORT2,
 	.ctx = &omap_hsi_ctrl_ctx,
 	.device_enable = omap_device_enable,
 	.device_idle = omap_device_idle,
