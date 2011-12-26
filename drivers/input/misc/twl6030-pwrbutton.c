@@ -33,6 +33,7 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/i2c/twl.h>
+#include <linux/delay.h>
 
 #define PWR_PWRON_IRQ (1 << 0)
 #define STS_HW_CONDITIONS 0x21
@@ -76,12 +77,28 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 {
 	struct twl6030_pwr_button *pwr = _pwr;
 	int hw_state;
+	int pwr_val;
+	static int prev_hw_state = 0xFFFF;
 
 	hw_state = twl6030_readb(pwr, TWL6030_MODULE_ID0, STS_HW_CONDITIONS);
+	pwr_val = !(hw_state & PWR_PWRON_IRQ);
+	if (prev_hw_state != pwr_val) {
+		input_report_key(pwr->input_dev, pwr->report_key,
+							pwr_val);
+		input_sync(pwr->input_dev);
+	} else {
+		input_report_key(pwr->input_dev, pwr->report_key,
+							!pwr_val);
+		input_sync(pwr->input_dev);
 
-	input_report_key(pwr->input_dev, pwr->report_key,
-			!(hw_state & PWR_PWRON_IRQ));
-	input_sync(pwr->input_dev);
+		msleep(20);
+
+		input_report_key(pwr->input_dev, pwr->report_key,
+							pwr_val);
+		input_sync(pwr->input_dev);
+	}
+
+	prev_hw_state = pwr_val;
 
 	return IRQ_HANDLED;
 }
