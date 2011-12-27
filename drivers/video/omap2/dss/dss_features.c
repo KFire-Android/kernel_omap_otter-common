@@ -697,6 +697,7 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.video_enable		=	ti_hdmi_4xxx_wp_video_start,
 	.irq_handler		=	ti_hdmi_4xxx_irq_handler,
 	.irq_process		=	ti_hdmi_5xxx_irq_process,
+	.configure_range	=	ti_hdmi_5xxx_configure_range,
 
 };
 

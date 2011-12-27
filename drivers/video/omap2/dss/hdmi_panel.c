@@ -76,12 +76,47 @@ static ssize_t hdmi_deepcolor_store(struct device *dev,
 static DEVICE_ATTR(deepcolor, S_IRUGO | S_IWUSR, hdmi_deepcolor_show,
 			hdmi_deepcolor_store);
 
+static ssize_t hdmi_range_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	int r;
+
+	r = omapdss_hdmi_get_range();
+	return snprintf(buf, PAGE_SIZE, "%d\n", r);
+}
+
+static ssize_t hdmi_range_store(struct device *dev,
+	struct device_attribute *attr,
+	const char *buf, size_t size)
+{
+	unsigned long range;
+	int r = kstrtoul(buf, 0, &range);
+
+	if (r || range > 1)
+		return -EINVAL;
+
+	r = omapdss_hdmi_set_range(range);
+	if (r)
+		return r;
+	return size;
+}
+
+static DEVICE_ATTR(range, S_IRUGO | S_IWUSR, hdmi_range_show, hdmi_range_store);
+
 static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 {
 	DSSDBG("ENTER hdmi_panel_probe\n");
 
 	dssdev->panel.config = OMAP_DSS_LCD_TFT |
 			OMAP_DSS_LCD_IVS | OMAP_DSS_LCD_IHS;
+
+	hdmi.dssdev = dssdev;
+
+	/* sysfs entry to provide user space control to set
+	 * quantization range
+	 */
+	if (device_create_file(&dssdev->dev, &dev_attr_range))
+		DSSERR("failed to create sysfs file\n");
 
 	dssdev->panel.timings = (struct omap_video_timings){640, 480, 25175, 96, 16, 48, 2 , 11, 31};
 
@@ -98,6 +133,7 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 static void hdmi_panel_remove(struct omap_dss_device *dssdev)
 {
 	device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
+	device_remove_file(&dssdev->dev, &dev_attr_range);
 }
 
 static int hdmi_panel_enable(struct omap_dss_device *dssdev)

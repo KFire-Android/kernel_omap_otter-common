@@ -447,6 +447,34 @@ int omapdss_hdmi_get_deepcolor(void)
 	return hdmi.ip_data.cfg.deep_color;
 }
 
+int omapdss_hdmi_set_range(int range)
+{
+	int r = 0;
+	enum hdmi_range old_range;
+
+	old_range = hdmi.ip_data.cfg.range;
+	hdmi.ip_data.cfg.range = range;
+
+	/* HDMI 1.3 section 6.6 VGA (640x480) format requires Full Range */
+	if ((range == 0) &&
+		((hdmi.ip_data.cfg.cm.code == 4 &&
+		hdmi.ip_data.cfg.cm.mode == HDMI_DVI) ||
+		(hdmi.ip_data.cfg.cm.code == 1 &&
+		hdmi.ip_data.cfg.cm.mode == HDMI_HDMI)))
+			return -EINVAL;
+
+	r = hdmi.ip_data.ops->configure_range(&hdmi.ip_data);
+	if (r)
+		hdmi.ip_data.cfg.range = old_range;
+
+	return r;
+}
+
+int omapdss_hdmi_get_range(void)
+{
+	return hdmi.ip_data.cfg.range;
+}
+
 int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 					struct omap_video_timings *timings)
 {
