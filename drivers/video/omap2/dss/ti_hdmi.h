@@ -52,6 +52,11 @@ enum hdmi_deep_color_mode {
 	HDMI_DEEP_COLOR_36BIT = 2,
 };
 
+enum hdmi_range {
+	HDMI_LIMITED_RANGE = 0,
+	HDMI_FULL_RANGE,
+};
+
 struct hdmi_cm {
 	int	code;
 	int	mode;
@@ -62,6 +67,7 @@ struct hdmi_config {
 	struct hdmi_cm cm;
 
 	enum hdmi_deep_color_mode deep_color;
+	enum hdmi_range range;
 };
 
 /* HDMI PLL structure */
