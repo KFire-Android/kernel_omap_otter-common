@@ -31,6 +31,25 @@
 #include "ti_hdmi_5xxx_ip.h"
 #include "dss.h"
 
+const struct csc_table csc_table_deepcolor[4] = {
+	/* HDMI_DEEP_COLOR_24BIT */
+	[0] = { 7036, 0, 0, 32,
+		0, 7036, 0, 32,
+		0, 0, 7036, 32 },
+	/* HDMI_DEEP_COLOR_30BIT */
+	[1] = { 7015, 0, 0, 128,
+		0, 7015, 0, 128,
+		0, 0, 7015, 128 },
+	/* HDMI_DEEP_COLOR_36BIT */
+	[2] = { 7010, 0, 0, 512,
+		0, 7010, 0, 512,
+		0, 0, 7010, 512},
+	/* FULL RANGE */
+	[3] = { 8192, 0, 0, 0,
+		0, 8192, 0, 0,
+		0, 0, 8192, 0},
+};
+
 static inline void hdmi_write_reg(void __iomem *base_addr,
 		const unsigned long idx, u32 val)
 {
@@ -138,6 +157,7 @@ static int hdmi_core_ddc_edid(struct hdmi_ip_data *ip_data,
 		checksum += pedid[cur_addr++];
 		hdmi_core_ddc_req_addr(ip_data, cur_addr, ext);
 	}
+
 	return 0;
 
 }
@@ -167,7 +187,6 @@ int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 
 	return l;
 }
-
 void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s)
 {
 
@@ -457,6 +476,82 @@ static void hdmi_core_aux_infoframe_avi_config(struct hdmi_ip_data *ip_data)
 				info_avi.db5_pixel_repeat, 3, 0);
 }
 
+static void hdmi_core_csc_config(struct hdmi_ip_data *ip_data,
+				struct csc_table csc_coeff)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_A1_MSB, csc_coeff.a1 >> 8 , 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_A1_LSB, csc_coeff.a1, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_A2_MSB, csc_coeff.a2 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_A2_LSB, csc_coeff.a2, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_A3_MSB, csc_coeff.a3 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_A3_LSB, csc_coeff.a3, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_A4_MSB, csc_coeff.a4 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_A4_LSB, csc_coeff.a4, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_B1_MSB, csc_coeff.b1 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_B1_LSB, csc_coeff.b1, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_B2_MSB, csc_coeff.b2 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_B2_LSB, csc_coeff.b2, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_B3_MSB, csc_coeff.b3 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_B3_LSB, csc_coeff.b3, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_B4_MSB, csc_coeff.b4 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_B4_LSB, csc_coeff.b4, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_C1_MSB, csc_coeff.c1 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_C1_LSB, csc_coeff.c1, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_C2_MSB, csc_coeff.c2 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_C2_LSB, csc_coeff.c2, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_C3_MSB, csc_coeff.c3 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_C3_LSB, csc_coeff.c3, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_C4_MSB, csc_coeff.c4 >> 8, 6, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_CSC_COEF_C4_LSB, csc_coeff.c4, 7, 0);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_MC_FLOWCTRL, 0x1, 0, 0);
+
+}
+
+int ti_hdmi_5xxx_configure_range(struct hdmi_ip_data *ip_data)
+{
+	struct csc_table csc_coeff = {0};
+
+	switch (ip_data->cfg.range) {
+	case HDMI_LIMITED_RANGE:
+		csc_coeff =  csc_table_deepcolor[ip_data->cfg.deep_color];
+		ip_data->avi_cfg.db3_q_range = HDMI_INFOFRAME_AVI_DB3Q_LR;
+		break;
+	case HDMI_FULL_RANGE:
+		csc_coeff =  csc_table_deepcolor[3];  /* full range */
+		ip_data->avi_cfg.db3_q_range = HDMI_INFOFRAME_AVI_DB3Q_FR;
+		break;
+	}
+	hdmi_core_csc_config(ip_data, csc_coeff);
+	hdmi_core_aux_infoframe_avi_config(ip_data);
+	return 0;
+}
+
 void hdmi_enable_video_path(struct hdmi_ip_data *ip_data)
 {
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
@@ -559,6 +654,24 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	hdmi_wp_video_config_format(ip_data, &video_format);
 
 	hdmi_wp_video_config_interface(ip_data);
+
+	if (ip_data->cfg.cm.mode == HDMI_DVI ||
+	(ip_data->cfg.cm.code == 1 && ip_data->cfg.cm.mode == HDMI_HDMI)) {
+		ip_data->cfg.range = HDMI_FULL_RANGE;
+		ti_hdmi_5xxx_configure_range(ip_data);
+	} else {
+		ip_data->cfg.range = HDMI_LIMITED_RANGE;
+		ti_hdmi_5xxx_configure_range(ip_data);
+	}
+
+	if (ip_data->cfg.cm.mode == HDMI_DVI ||
+	(ip_data->cfg.cm.code == 1 && ip_data->cfg.cm.mode == HDMI_HDMI)) {
+		ip_data->cfg.range = HDMI_FULL_RANGE;
+		ti_hdmi_5xxx_configure_range(ip_data);
+	} else {
+		ip_data->cfg.range = HDMI_LIMITED_RANGE;
+		ti_hdmi_5xxx_configure_range(ip_data);
+	}
 
 	/* Enable pll and core interrupts */
 	irq_enable.pll_unlock = 1;

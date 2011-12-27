@@ -270,4 +270,10 @@ struct hdmi_core_vid_config	{
 	int hblank;
 	int vblank;
 };
+
+struct csc_table {
+	u16 a1, a2, a3, a4;
+	u16 b1, b2, b3, b4;
+	u16 c1, c2, c3, c4;
+};
 #endif
