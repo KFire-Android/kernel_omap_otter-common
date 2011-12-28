@@ -171,7 +171,7 @@ static const struct file_operations g_tf_device_file_ops = {
 };
 
 /* The single device supported by this driver */
-static struct tf_device g_tf_dev = {0, };
+static struct tf_device g_tf_dev = { { 0, } };
 
 /*----------------------------------------------------------------------------
  * Implementations
