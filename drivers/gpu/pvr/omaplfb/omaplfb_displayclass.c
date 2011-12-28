@@ -927,11 +927,19 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		{
 			asMemInfo[k].uiAddr = phyAddr.uiAddr;
 			if (tiler_fmt((u32)phyAddr.uiAddr) == TILFMT_8BIT) {
+
+#if defined(SUPPORT_NV12_FROM_2_HWADDRS)
 				/* NV12 buffers have 2 meminfos */
 				BUG_ON(i + 1 >= ui32NumMemInfos);
 				i++;
-				psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], 0, &phyAddr);
+				psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i],
+											0, &phyAddr);
 				asMemInfo[k].uiUVAddr = phyAddr.uiAddr;
+#else
+				psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i],
+									(uByteSize * 2) / 3, &phyAddr);
+				asMemInfo[k].uiUVAddr = phyAddr.uiAddr;
+#endif
 			}
 			continue;
 		}
