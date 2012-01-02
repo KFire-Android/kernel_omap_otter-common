@@ -1,0 +1,37 @@
+* Texas Instruments OMAP4+ AESS
+
+Required properties:
+- compatible: "ti,omap-mcpdm"
+- reg: Register location and size as an array:
+       <MPU access base address, size>,
+       <MPU DMEM access base address, size>,
+       <MPU CMEM access base address, size>,
+       <MPU SMEM access base address, size>,
+       <MPU PMEM access base address, size>,
+       <L3 interconnect address, size>;
+       <L3 DMEM access base address, size>,
+       <L3 CMEM access base address, size>,
+       <L3 SMEM access base address, size>,
+       <L3 PMEM access base address, size>,
+- interrupts: Interrupt number for AESS
+- interrupt-parent: The parent interrupt controller
+- ti,hwmods: Name of the hwmod associated to the AESS
+
+Example:
+
+aess: aess@401f1000 {
+	compatible = "ti,omap4-aess";
+	reg = <0x401f1000 0x3ff>, /* MPU private access */
+	      <0x40180000 0xffff>, /* DMEM - MPU */
+	      <0x401a0000 0x1fff>, /* CMEM - MPU */
+	      <0x401ce000 0x5fff>, /* SMEM - MPU */
+	      <0x401e0000 0x1fff>, /* PMEM - MPU */
+	      <0x4901f000 0x3ff>, /* L3 Interconnect */
+	      <0x49080000 0xffff>, /* DMEM - MPU */
+	      <0x490a0000 0x1fff>, /* CMEM - MPU */
+	      <0x490ce000 0x5fff>, /* SMEM - MPU */
+	      <0x490e0000 0x1fff>; /* PMEM - MPU */
+	interrupts = <0 99 0x4>;
+	interrupt-parent = <&gic>;
+	ti,hwmods = "aess";
+};
