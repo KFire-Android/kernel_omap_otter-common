@@ -101,6 +101,13 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 static struct omap_device *hsi_od;
 
 
+static bool omap_hsi_registration_allowed;
+
+void omap_hsi_allow_registration(void)
+{
+	omap_hsi_registration_allowed = true;
+}
+
 static u32 omap_hsi_configure_errata(void)
 {
 	u32 errata;
@@ -300,6 +307,10 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 
 int __init omap_hsi_dev_init(void)
 {
+	if (!omap_hsi_registration_allowed) {
+		pr_info("HSI: skipping omap_device registration\n");
+		return 0;
+	}
 	/* Keep this for genericity, although there is only one hwmod for HSI */
 	return omap_hwmod_for_each_by_class(OMAP_HSI_HWMOD_CLASSNAME,
 					    omap_hsi_register, NULL);
