@@ -317,3 +317,5 @@ obj-$(CONFIG_OMAP_FIQ_DEBUGGER)		+= omap_fiq_debugger.o
 ifeq ($(CONFIG_OMAP_REBOOT_REASON),y)
 obj-$(CONFIG_ARCH_OMAP4)		+= omap4-reboot-reason.o
 endif
+
+obj-$(CONFIG_OMAP_RAM_CONSOLE)		+= omap_ram_console.o
