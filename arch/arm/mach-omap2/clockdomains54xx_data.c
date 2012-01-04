@@ -424,7 +424,7 @@ static struct clockdomain cam_54xx_clkdm = {
 	.clkdm_offs	  = OMAP54XX_CM_CORE_CAM_CAM_CDOFFS,
 	.wkdep_srcs	  = cam_wkup_sleep_deps,
 	.sleepdep_srcs	  = cam_wkup_sleep_deps,
-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+	.flags		  = CLKDM_CAN_SWSUP,
 };
 
 /* As clockdomains are added or removed above, this list must also be changed */
