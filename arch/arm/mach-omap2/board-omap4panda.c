@@ -56,6 +56,7 @@
 
 #include "board-panda.h"
 #include "omap4_ion.h"
+#include "omap_ram_console.h"
 #include "hsmmc.h"
 #include "control.h"
 #include "mux.h"
@@ -815,6 +816,9 @@ static void __init omap4_panda_map_io(void)
 
 static void __init omap4_panda_reserve(void)
 {
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);

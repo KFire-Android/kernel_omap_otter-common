@@ -61,6 +61,7 @@
 #include <linux/wakelock.h>
 #include "board-blaze.h"
 #include "omap4_ion.h"
+#include "omap_ram_console.h"
 #include "mux.h"
 #include "hsmmc.h"
 #include "timer-gp.h"
@@ -1458,6 +1459,9 @@ static void __init omap_4430sdp_map_io(void)
 }
 static void __init omap_4430sdp_reserve(void)
 {
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
