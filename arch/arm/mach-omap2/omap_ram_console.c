@@ -61,7 +61,8 @@ int omap_ram_console_register(void)
 			__func__, (u32)ram_console_resources[0].start,
 			(u32)ram_console_resources[0].end, ret);
 		memblock_add(ram_console_resources[0].start,
-			(ram_console_resources[0].end - ram_console_resources[0].start));
+			(ram_console_resources[0].end -
+			 ram_console_resources[0].start + 1));
 	}
 
 	return ret;
