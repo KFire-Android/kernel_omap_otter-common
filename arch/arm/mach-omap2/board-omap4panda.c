@@ -771,7 +771,6 @@ static void __init omap4_panda_init(void)
 		package = OMAP_PACKAGE_CBL;
 	omap4_mux_init(board_mux, NULL, package);
 
-	omap_ram_console_register();
 	omap_init_board_version(OMAP4_PANDA);
 	omap4_create_board_props();
 

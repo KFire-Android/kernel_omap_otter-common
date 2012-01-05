@@ -1107,7 +1107,7 @@ static void __init omap_tablet_init(void)
 	omap4_mux_init(board_mux, NULL, package);
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
-	omap_ram_console_register();
+
 	omap_board_config = tablet_config;
 	omap_board_config_size = ARRAY_SIZE(tablet_config);
 	tablet_rev = omap_init_board_version(0);
@@ -1163,7 +1163,6 @@ static void __init omap_tablet_map_io(void)
 
 static void __init omap_tablet_reserve(void)
 {
-
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 
