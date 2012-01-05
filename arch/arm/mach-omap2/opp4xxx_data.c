@@ -39,6 +39,7 @@
  */
 #define OMAP4460_MPU_OPP_DPLL_TRIM	BIT(18)
 #define OMAP4460_MPU_OPP_DPLL_TURBO_RBB	BIT(20)
+#define OMAP4460_IVA_OPP_DPLL_TURBO_RBB	BIT(21)
 
 /*
  * Structures containing OMAP4430 voltage supported and various
@@ -595,6 +596,23 @@ static void __init omap4460_abb_update(void)
 			 OMAP4460_VDD_MPU_OPPTURBO_UV,
 			 abb_type);
 	pr_info("%s: MPU OPP Turbo: %s OPP ABB type\n", __func__, abb_msg);
+
+	/*
+	 * OMAP4460 IVA OPP Turbo configuration:
+	 * if bit 21 is set, enable RBB
+	 */
+	rbb = reg & OMAP4460_IVA_OPP_DPLL_TURBO_RBB;
+	if (rbb) {
+		abb_type = OMAP_ABB_SLOW_OPP;
+		abb_msg = "Slow";
+	} else {
+		abb_type = OMAP_ABB_NOMINAL_OPP;
+		abb_msg = "Nominal";
+	}
+	omap4_abb_update(omap446x_vdd_iva_volt_data,
+			 OMAP4460_VDD_IVA_OPPTURBO_UV,
+			 abb_type);
+	pr_info("%s: IVA OPP Turbo: %s OPP ABB type\n", __func__, abb_msg);
 }
 
 /**
