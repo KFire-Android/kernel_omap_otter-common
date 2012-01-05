@@ -42,17 +42,17 @@ static struct platform_device ram_console_device = {
 	},
 };
 
+static __initdata bool omap_ramconsole_inited;
+
 /**
- * omap_ram_console_register() - registers the ramconsole device
- *
- * Board files call this to register the ramconsole platform device.
- *
- * IMPORTANT: board files need to ensure that the DDR configurations
- * enable self refresh mode for this to function properly.
+ * omap_ram_console_register() - device_initcall to register ramconsole device
  */
-int omap_ram_console_register(void)
+static int __init omap_ram_console_register(void)
 {
 	int ret;
+
+	if (!omap_ramconsole_inited)
+		return -ENODEV;
 
 	ret = platform_device_register(&ram_console_device);
 	if (ret) {
@@ -67,6 +67,7 @@ int omap_ram_console_register(void)
 
 	return ret;
 }
+device_initcall(omap_ram_console_register);
 
 /**
  * omap_ram_console_init() - setup the ram console device for OMAP
@@ -100,6 +101,9 @@ int __init omap_ram_console_init(phys_addr_t phy_addr, size_t size)
 
 	ram_console_resources[0].start = phy_addr;
 	ram_console_resources[0].end = phy_addr + size - 1;
+
+	/* flag for registration */
+	omap_ramconsole_inited = true;
 
 	return ret;
 }

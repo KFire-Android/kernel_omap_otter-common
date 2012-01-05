@@ -23,14 +23,8 @@
 
 #ifdef CONFIG_OMAP_RAM_CONSOLE
 extern int omap_ram_console_init(phys_addr_t phy_addr, size_t size);
-extern int omap_ram_console_register(void);
 #else
 static inline int omap_ram_console_init(phys_addr_t phy_addr, size_t size)
-{
-	return 0;
-}
-
-static inline int omap_ram_console_register(void)
 {
 	return 0;
 }
