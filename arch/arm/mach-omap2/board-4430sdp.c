@@ -1390,7 +1390,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_mux_init(board_mux, NULL, package);
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
-
+	omap_ram_console_register();
 	omap_board_config = sdp4430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
 
