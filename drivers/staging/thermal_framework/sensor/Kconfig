@@ -15,3 +15,10 @@ config OMAP4_PCB_SENSOR
 	help
 	  Enabling this config will give support for the pcb
 	  temp sensor for the OMAP platform.
+
+config OMAP4_TMP102_SENSOR
+	bool "OMAP TMP102 temp sensor support"
+	depends on THERMAL_FRAMEWORK && OMAP_THERMAL && OMAP_TEMP_SENSOR
+	help
+	  Enabling this config will give support for the tmp102
+	  temp sensor for the OMAP platform.
