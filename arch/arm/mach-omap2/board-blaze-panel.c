@@ -38,7 +38,7 @@
 #define LED_PWM2OFF		0x04
 #define LED_TOGGLE3		0x92
 
-static void __init blaze_init_display_led(void)
+static void blaze_init_display_led(void)
 {
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
