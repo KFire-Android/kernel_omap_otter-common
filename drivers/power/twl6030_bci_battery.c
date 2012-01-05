@@ -173,8 +173,6 @@
 #define FGS			(1 << 5)
 #define FGR			(1 << 4)
 
-#define PWDNSTATUS2		0x94
-
 /* TWL6030_GPADC_CTRL */
 #define GPADC_CTRL_TEMP1_EN	(1 << 0)    /* input ch 1 */
 #define GPADC_CTRL_TEMP2_EN	(1 << 1)    /* input ch 4 */
@@ -894,20 +892,25 @@ static int twl6030battery_voltage_setup(void)
 	return ret;
 }
 
-static int twl6030battery_current_setup(void)
+static int twl6030battery_current_setup(bool enable)
 {
 	int ret = 0;
-	u8 rd_reg = 0;
+	u8  reg = 0;
 
-	ret = twl_i2c_read_u8(TWL6030_MODULE_ID1, &rd_reg, PWDNSTATUS2);
+	/*
+	 * Writing 0 to REG_TOGGLE1 has no effect, so
+	 * can directly set/reset FG.
+	 */
+	if (enable)
+		reg = FGDITHS | FGS;
+	else
+		reg = FGDITHR | FGR;
+
+	ret = twl_i2c_write_u8(TWL6030_MODULE_ID1, reg, REG_TOGGLE1);
 	if (ret)
 		return ret;
-	rd_reg = (rd_reg & 0x30) >> 2;
-	rd_reg = rd_reg | FGDITHS | FGS;
-	ret = twl_i2c_write_u8(TWL6030_MODULE_ID1, rd_reg, REG_TOGGLE1);
-	if (ret)
-		return ret;
-	ret = twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, CC_CAL_EN, FG_REG_00);
+
+	 ret = twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, CC_CAL_EN, FG_REG_00);
 
 	return ret;
 }
@@ -1992,7 +1995,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	if (ret)
 		dev_dbg(&pdev->dev, "voltage measurement setup failed\n");
 
-	ret = twl6030battery_current_setup();
+	ret = twl6030battery_current_setup(true);
 	if (ret)
 		dev_dbg(&pdev->dev, "current measurement setup failed\n");
 
@@ -2187,6 +2190,13 @@ static int twl6030_bci_battery_suspend(struct device *dev)
 		return ret;
 	}
 
+	ret = twl6030battery_current_setup(false);
+	if (ret) {
+		pr_err("%s: Current measurement setup failed (%d)!\n",
+				__func__, ret);
+		return ret;
+	}
+
 	return 0;
 err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
@@ -2204,6 +2214,13 @@ static int twl6030_bci_battery_resume(struct device *dev)
 	ret = twl6030battery_temp_setup(true);
 	if (ret) {
 		pr_err("%s: Temp measurement setup failed (%d)!\n",
+				__func__, ret);
+		return ret;
+	}
+
+	ret = twl6030battery_current_setup(true);
+	if (ret) {
+		pr_err("%s: Current measurement setup failed (%d)!\n",
 				__func__, ret);
 		return ret;
 	}
