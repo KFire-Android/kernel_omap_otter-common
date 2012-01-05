@@ -838,7 +838,7 @@ static int twl6030backupbatt_setup(void)
  * Setup the twl6030 BCI module to measure battery
  * temperature
  */
-static int twl6030battery_temp_setup(void)
+static int twl6030battery_temp_setup(bool enable)
 {
 	int ret;
 	u8 rd_reg = 0;
@@ -847,9 +847,15 @@ static int twl6030battery_temp_setup(void)
 	if (ret)
 		return ret;
 
-	rd_reg |= GPADC_CTRL_TEMP1_EN | GPADC_CTRL_TEMP2_EN |
-		GPADC_CTRL_TEMP1_EN_MONITOR | GPADC_CTRL_TEMP2_EN_MONITOR |
-		GPADC_CTRL_SCALER_DIV4;
+	if (enable)
+		rd_reg |= (GPADC_CTRL_TEMP1_EN | GPADC_CTRL_TEMP2_EN |
+			GPADC_CTRL_TEMP1_EN_MONITOR |
+			GPADC_CTRL_TEMP2_EN_MONITOR | GPADC_CTRL_SCALER_DIV4);
+	else
+		rd_reg ^= (GPADC_CTRL_TEMP1_EN | GPADC_CTRL_TEMP2_EN |
+			GPADC_CTRL_TEMP1_EN_MONITOR |
+			GPADC_CTRL_TEMP2_EN_MONITOR | GPADC_CTRL_SCALER_DIV4);
+
 	ret = twl_i2c_write_u8(TWL_MODULE_MADC, rd_reg, TWL6030_GPADC_CTRL);
 
 	return ret;
@@ -1923,7 +1929,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	wake_lock_init(&chrg_lock, WAKE_LOCK_SUSPEND, "ac_chrg_wake_lock");
 	/* settings for temperature sensing */
-	ret = twl6030battery_temp_setup();
+	ret = twl6030battery_temp_setup(true);
 	if (ret)
 		goto temp_setup_fail;
 
@@ -2174,6 +2180,13 @@ static int twl6030_bci_battery_suspend(struct device *dev)
 	events = BQ2415x_RESET_TIMER;
 	blocking_notifier_call_chain(&notifier_list, events, NULL);
 
+	ret = twl6030battery_temp_setup(false);
+	if (ret) {
+		pr_err("%s: Temp measurement setup failed (%d)!\n",
+				__func__, ret);
+		return ret;
+	}
+
 	return 0;
 err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
@@ -2187,6 +2200,13 @@ static int twl6030_bci_battery_resume(struct device *dev)
 	long int events;
 	u8 rd_reg = 0;
 	int ret;
+
+	ret = twl6030battery_temp_setup(true);
+	if (ret) {
+		pr_err("%s: Temp measurement setup failed (%d)!\n",
+				__func__, ret);
+		return ret;
+	}
 
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg, CONTROLLER_INT_MASK);
 	if (ret)
