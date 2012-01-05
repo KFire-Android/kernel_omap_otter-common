@@ -43,6 +43,31 @@ static struct platform_device ram_console_device = {
 };
 
 /**
+ * omap_ram_console_register() - registers the ramconsole device
+ *
+ * Board files call this to register the ramconsole platform device.
+ *
+ * IMPORTANT: board files need to ensure that the DDR configurations
+ * enable self refresh mode for this to function properly.
+ */
+int omap_ram_console_register(void)
+{
+	int ret;
+
+	ret = platform_device_register(&ram_console_device);
+	if (ret) {
+		pr_err("%s: unable to register ram console device:"
+			"start=0x%08x, end=0x%08x, ret=%d\n",
+			__func__, (u32)ram_console_resources[0].start,
+			(u32)ram_console_resources[0].end, ret);
+		memblock_add(ram_console_resources[0].start,
+			(ram_console_resources[0].end - ram_console_resources[0].start));
+	}
+
+	return ret;
+}
+
+/**
  * omap_ram_console_init() - setup the ram console device for OMAP
  * @phy_addr:	physical address of the start of ram console buffer
  * @size:	ram console buffer size
@@ -74,14 +99,6 @@ int __init omap_ram_console_init(phys_addr_t phy_addr, size_t size)
 
 	ram_console_resources[0].start = phy_addr;
 	ram_console_resources[0].end = phy_addr + size - 1;
-
-	ret = platform_device_register(&ram_console_device);
-	if (ret) {
-		pr_err("%s: unable to register ram console device:"
-			"start=0x%08x, size=0x%08x, ret=%d\n",
-			__func__, (u32)phy_addr, (u32)size, ret);
-		memblock_add(phy_addr, size);
-	}
 
 	return ret;
 }
