@@ -368,7 +368,6 @@ static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 static void hdmi_set_l3_cstr(struct omap_dss_device *dssdev, bool enable)
 {
 #ifdef CONFIG_OMAP_PM
-	int r;
 	DSSINFO("%s c-state constraint for HDMI\n\n",
 		enable ? "Set" : "Release");
 
