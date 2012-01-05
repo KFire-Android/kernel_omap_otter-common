@@ -30,6 +30,17 @@
 #include "pm.h"
 
 /*
+ * STD_FUSE_OPP_DPLL_1 contains info about ABB trim type for MPU/IVA.
+ * This bit field definition is specific for OMAP4460 TURBO alone.
+ * For future OMAP4 silicon it is possible that other efuse offsets might
+ * be used in addition to controlling other OPPs as well.
+ * This probably is an ugly location to put the DPLL trim details.. but,
+ * alternatives are even less attractive :( shrug..
+ */
+#define OMAP4460_MPU_OPP_DPLL_TRIM	BIT(18)
+#define OMAP4460_MPU_OPP_DPLL_TURBO_RBB	BIT(20)
+
+/*
  * Structures containing OMAP4430 voltage supported and various
  * voltage dependent data for each VDD.
  */
@@ -508,6 +519,85 @@ static void __init omap4_opp_enable(const char *oh_name, unsigned long freq)
 }
 
 /**
+ * omap4_abb_update() - update the ABB map for a specific voltage in table
+ * @vtable:	voltage table to update
+ * @voltage:	voltage whose voltage data needs update
+ * @abb_type:	what ABB type should we update it to?
+ */
+static void __init omap4_abb_update(struct omap_volt_data *vtable,
+				    unsigned long voltage, int abb_type)
+{
+	/* scan through and update the voltage table */
+	while (vtable->volt_nominal) {
+		if (vtable->volt_nominal == voltage) {
+			vtable->abb_type = abb_type;
+			return;
+		}
+		vtable++;
+	}
+	/* WARN noticably to get the developer to fix */
+	WARN(1, "%s: voltage %ld could not be set to ABB %d\n",
+	     __func__, voltage, abb_type);
+}
+
+/**
+ * omap4460_abb_update() - update the abb mapping quirks for OMAP4460
+ */
+static void __init omap4460_abb_update(void)
+{
+	u32 reg, trim, rbb;
+	char *abb_msg;
+	int abb_type;
+
+	/*
+	 * Determine MPU ABB state at OPP_TURBO on 4460
+	 *
+	 * On 4460 all OPPs have preset states for the MPU's ABB LDO, except
+	 * for OPP_TURBO.  OPP_TURBO may require bypass, FBB or RBB depending
+	 * on a combination of characterisation data blown into eFuse register
+	 * CONTROL_STD_FUSE_OPP_DPLL_1.
+	 *
+	 * Bits 18 & 19 of that register signify DPLL_MPU trim (see
+	 * arch/arm/mach-omap2/omap4-trim-quirks.c). OPP_TURBO might put MPU's
+	 * ABB LDO into bypass or FBB based on this value.
+	 *
+	 * Bit 20 siginifies if RBB should be enabled. If set it will always
+	 * override the values from bits 18 & 19.
+	 *
+	 * The table below captures the valid combinations:
+	 * trim		 rbb
+	 * Bit 18|Bit 19|Bit 20|ABB type
+	 * 0	  0	 0	bypass
+	 * 0	  1	 0	bypass	(invalid combination)
+	 * 1	  0	 0	FBB	(2.4GHz DPLL_MPU)
+	 * 1	  1	 0	FBB	(3GHz DPLL_MPU)
+	 * 0	  0	 1	RBB
+	 * 0	  1	 1	RBB	(invalid combination)
+	 * 1	  0	 1	RBB	(2.4GHz DPLL_MPU)
+	 * 1	  1	 1	RBB	(3GHz DPLL_MPU)
+	 */
+	reg = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STD_FUSE_OPP_DPLL_1);
+	trim = reg & OMAP4460_MPU_OPP_DPLL_TRIM;
+	rbb = reg & OMAP4460_MPU_OPP_DPLL_TURBO_RBB;
+
+	if (rbb) {
+		abb_type = OMAP_ABB_SLOW_OPP;
+		abb_msg = "Slow";
+	} else if (!trim) {
+		abb_type = OMAP_ABB_NOMINAL_OPP;
+		abb_msg = "un-trimmed Nominal";
+	} else {
+		abb_type = OMAP_ABB_FAST_OPP;
+		abb_msg = "Fast";
+	}
+
+	omap4_abb_update(omap446x_vdd_mpu_volt_data,
+			 OMAP4460_VDD_MPU_OPPTURBO_UV,
+			 abb_type);
+	pr_info("%s: MPU OPP Turbo: %s OPP ABB type\n", __func__, abb_msg);
+}
+
+/**
  * omap4_opp_init() - initialize omap4 opp table
  */
 int __init omap4_opp_init(void)
@@ -561,6 +651,10 @@ int __init omap4_opp_init(void)
 		pr_info("This is DPLL un-trimmed SOM. OPP is limited at 1.2 GHz\n");
 	if (omap4_has_mpu_1_5ghz() && trimmed)
 		omap4_opp_enable("mpu", 1500000000);
+
+	/* Update ABB settings */
+	if (cpu_is_omap446x())
+		omap4460_abb_update();
 
 out:
 	return r;
