@@ -54,6 +54,26 @@ static int palmas_resource_write(struct palmas *palmas, unsigned int reg,
 	return regmap_write(palmas->regmap[slave], addr, data);
 }
 
+int palmas_enable_clk32kgaudio(struct palmas_resource *resource)
+{
+	int ret;
+	u8 reg;
+
+	ret = palmas_resource_read(resource->palmas,
+			PALMAS_CLK32KGAUDIO_CTRL, &reg);
+
+	if (ret)
+		return ret;
+
+	reg |= CLK32KGAUDIO_CTRL_MODE_ACTIVE;
+
+	ret = palmas_resource_write(resource->palmas,
+			PALMAS_CLK32KGAUDIO_CTRL, reg);
+
+	return ret;
+}
+EXPORT_SYMBOL(palmas_enable_clk32kgaudio);
+
 int palmas_enable_regen1(struct palmas_resource *resource)
 {
 	int ret;
@@ -486,6 +506,9 @@ static int __devinit palmas_resource_probe(struct platform_device *pdev)
 
 	if (ret)
 		goto err_int;
+
+	/* Test */
+	palmas_enable_clk32kgaudio(resource);
 
 	return 0;
 
