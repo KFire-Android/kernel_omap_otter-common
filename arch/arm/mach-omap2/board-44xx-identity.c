@@ -75,8 +75,7 @@ static ssize_t omap4_prod_id_show(struct kobject *kobj,
 {
 	struct  omap_die_id opi;
 	omap_get_production_id(&opi);
-	return sprintf(buf, "Production ID: %08X%08X%08X%08X\n", opi.id_0,
-						opi.id_1, opi.id_2, opi.id_3);
+	return sprintf(buf, "%08X-%08X\n", opi.id_1, opi.id_0);
 }
 
 static ssize_t omap4_die_id_show(struct kobject *kobj,
