@@ -79,6 +79,15 @@ static ssize_t omap4_prod_id_show(struct kobject *kobj,
 						opi.id_1, opi.id_2, opi.id_3);
 }
 
+static ssize_t omap4_die_id_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	struct  omap_die_id opi;
+	omap_get_die_id(&opi);
+	return sprintf(buf, "%08X-%08X-%08X-%08X\n", opi.id_3,
+						opi.id_2, opi.id_1, opi.id_0);
+}
+
 static ssize_t omap4_board_rev_show(struct kobject *kobj,
 				 struct kobj_attribute *attr, char *buf)
 {
@@ -161,6 +170,7 @@ static OMAP4_SOC_ATTR_RO(max_freq, omap4_soc_type_max_freq);
 static OMAP4_SOC_ATTR_RO(dpll_trimmed, omap4_soc_dpll_trimmed);
 static OMAP4_SOC_ATTR_RO(rbb_trimmed, omap4_soc_rbb_trimmed);
 static OMAP4_SOC_ATTR_RO(production_id, omap4_prod_id_show);
+static OMAP4_SOC_ATTR_RO(die_id, omap4_die_id_show);
 
 static OMAP4_BOARD_ATTR_RO(board_rev, omap4_board_rev_show);
 
@@ -172,6 +182,7 @@ static struct attribute *omap4_soc_prop_attrs[] = {
 	&omap4_soc_prop_attr_dpll_trimmed.attr,
 	&omap4_soc_prop_attr_rbb_trimmed.attr,
 	&omap4_soc_prop_attr_production_id.attr,
+	&omap4_soc_prop_attr_die_id.attr,
 	NULL,
 };
 
