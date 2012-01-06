@@ -186,6 +186,12 @@ TWL_CLASS_IS(6030, TWL6030_CLASS_ID)
 
 #define TWL6025_SUBCLASS	BIT(4)  /* TWL6025 has changed registers */
 
+/* Added by Hashcode from L27.13.1-Beta Kernel */
+/* TWL6030 control interface  registers */
+#define TWL6030_TOGGLE1			0x90
+#define TWL6030_TOGGLE2			0x91
+#define TWL6030_TOGGLE3			0x92
+
 /*
  * Read and write single 8-bit registers
  */

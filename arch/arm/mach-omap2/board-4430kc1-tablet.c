@@ -29,16 +29,19 @@
 #include <linux/delay.h>
 #include <linux/twl6040-vib.h>
 #include <linux/regulator/machine.h>
+#include <linux/regulator/fixed.h>
 #include <linux/wl12xx.h>
 #include <linux/skbuff.h>
+#include <linux/reboot.h>
 #include <linux/ti_wilink_st.h>
 #include <linux/bootmem.h>
 #include <plat/omap-serial.h>
-
+#include <linux/memblock.h>
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
 #include <mach/emif.h>
 #include <mach/lpddr2-elpida.h>
+#include <mach/dmm.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -46,22 +49,25 @@
 
 #include <plat/board.h>
 #include <plat/common.h>
-//#include <plat/display.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
+#include <plat/omap_apps_brd_id.h>
 #include <plat/omap-serial.h>
 #include <linux/wakelock.h>
+#include <plat/remoteproc.h>
 #include <video/omapdss.h>
-//#include <plat/opp_twl_tps.h>
+#include <plat/omap-pm.h>
 
 #include <plat/dmtimer.h>
 #include "mux.h"
 #include "hsmmc.h"
 #include "timer-gp.h"
 #include "control.h"
-//#include "smartreflex-class3.h"
+#include "pm.h"
+#include "prm-regbits-44xx.h"
+#include "prm44xx.h"
 #include "board-44xx-tablet.h"
 #include "omap4_ion.h"
 #include "voltage.h"
@@ -393,6 +399,31 @@ static struct wl12xx_platform_data omap4_panda_wlan_data __initdata = {
 };
 #endif
 
+static struct regulator_consumer_supply omap4_sdp4430_vmmc5_supply = {
+	.supply = "vmmc",
+	.dev_name = "omap_hsmmc.4",
+};
+static struct regulator_init_data sdp4430_vmmc5 = {
+	.constraints = {
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies = 1,
+	.consumer_supplies = &omap4_sdp4430_vmmc5_supply,
+};
+static struct fixed_voltage_config sdp4430_vwlan = {
+	.supply_name = "vwl1271",
+	.microvolts = 1800000, /* 1.8V */
+	.gpio = GPIO_WIFI_PMENA,
+	.startup_delay = 70000, /* 70msec */
+	.enable_high = 1,
+	.enabled_at_boot = 0,
+	.init_data = &sdp4430_vmmc5,
+};
+static struct platform_device omap_vwlan_device = {
+	.name		= "reg-fixed-voltage",
+	.id		= 1,
+	.dev = { .platform_data = &sdp4430_vwlan, }
+};
 static struct regulator_consumer_supply sdp4430_vmmc_supply[] = {
 	{ .supply = "vmmc", .dev_name = "mmci-omap-hs.0", },
 };
@@ -782,6 +813,9 @@ static int __init omap4_i2c_init(void)
 	return 0;
 }
 
+static bool enable_suspend_off = true;
+module_param(enable_suspend_off, bool, S_IRUSR | S_IRGRP | S_IROTH);
+
 /******** END I2C BOARD INIT ********/
 
 static void __init omap4_display_init(void)
@@ -960,6 +994,8 @@ void omap_voltage_init_pmic()
 { }
 #endif
 
+#if 0
+/* FIXME-HASH: NEED TO HOLD WAKELOCK FOR CONSOLE/BT */
 void plat_hold_wakelock(void *up, int flag)
 {
 	struct uart_omap_port *up2 = (struct uart_omap_port *)up;
@@ -974,79 +1010,18 @@ void plat_hold_wakelock(void *up, int flag)
 		wake_lock_timeout(&uart_lock, 5*HZ);
 	return;
 }
+#endif
 
-static struct omap_uart_port_info omap_serial_platform_data[] = {
-	{
-		.use_dma	= 0,
-		.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
-		.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
-		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
-		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
-		.flags		= 1,
-		.plat_hold_wakelock = NULL,
-		.plat_omap_bt_active = NULL,
-		.rts_padconf	= 0,
-		.rts_override	= 0,
-		.cts_padconf	= 0,
-		.padconf	= OMAP4_CTRL_MODULE_PAD_SDMMC1_CMD_OFFSET,
-		.padconf_wake_ev = 0,
-		.wk_mask	= 0,
-	},
-	{
-		.use_dma	= 0,
-		.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
-		.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
-		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
-		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
-		.flags		= 1,
-		.plat_hold_wakelock = NULL,
-		.rts_padconf	= OMAP4_CTRL_MODULE_PAD_UART2_RTS_OFFSET,
-		.rts_override	= 0,
-		.cts_padconf	= OMAP4_CTRL_MODULE_PAD_UART2_CTS_OFFSET,
-		.padconf	= OMAP4_CTRL_MODULE_PAD_UART2_RX_OFFSET,
-		.padconf_wake_ev =
-			OMAP4_CTRL_MODULE_PAD_CORE_PADCONF_WAKEUPEVENT_3,
-		.wk_mask	=
-			OMAP4_UART2_TX_DUPLICATEWAKEUPEVENT_MASK |
-			OMAP4_UART2_RX_DUPLICATEWAKEUPEVENT_MASK |
-			OMAP4_UART2_RTS_DUPLICATEWAKEUPEVENT_MASK |
-			OMAP4_UART2_CTS_DUPLICATEWAKEUPEVENT_MASK,
-	},
-	{
-		.use_dma	= 0,
-		.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
-		.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
-		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
-		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
-		.flags		= 1,
-		.plat_hold_wakelock = plat_hold_wakelock,
-		.rts_padconf	= 0,
-		.rts_override	= 0,
-		.padconf	= OMAP4_CTRL_MODULE_PAD_UART3_RX_IRRX_OFFSET,
-		.padconf_wake_ev =
-			OMAP4_CTRL_MODULE_PAD_CORE_PADCONF_WAKEUPEVENT_4,
-		.wk_mask	=
-			OMAP4_UART3_TX_IRTX_DUPLICATEWAKEUPEVENT_MASK |
-			OMAP4_UART3_RX_IRRX_DUPLICATEWAKEUPEVENT_MASK |
-			OMAP4_UART3_RTS_SD_DUPLICATEWAKEUPEVENT_MASK |
-			OMAP4_UART3_CTS_RCTX_DUPLICATEWAKEUPEVENT_MASK,
-	},
-	{
-		.use_dma	= 0,
-		.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
-		.dma_rx_poll_rate = DEFAULT_RXDMA_POLLRATE,
-		.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
-		.idle_timeout	= DEFAULT_IDLE_TIMEOUT,
-		.flags		= 1,
-		.plat_hold_wakelock = NULL,
-		.rts_padconf	= 0,
-		.rts_override	= 0,
+static void omap_kc1_display_init(void)
+{
+	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
+	omap_display_init(&sdp4430_dss_data);
+	omap_voltage_init_pmic();
+#ifdef CONFIG_TOUCHSCREEN_ILITEK
+	omap_ilitek_init();
+#endif //CONFIG_TOUCHSCREEN_ILITEK
+}
 
-	},
-	{
-		.flags		= 0
-	}
-};
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
@@ -1066,13 +1041,117 @@ static struct omap_board_mux board_mux[] __initdata = {
  * Same devices installed on EMIF1 and EMIF2
  */
 static __initdata struct emif_device_details emif_devices = {
-	.cs0_device = &elpida_2G_S4,
-//	.cs1_device = &elpida_2G_S4
+	.cs0_device = &lpddr2_elpida_2G_S4_dev,
+	// .cs1_device = &lpddr2_elpida_2G_S4_dev
 };
 #else
 #define board_mux	NULL
 #endif
 
+
+static struct omap_device_pad blaze_uart1_pads[] __initdata = {
+	{
+		.name	= "uart1_cts.uart1_cts",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart1_rts.uart1_rts",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart1_tx.uart1_tx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart1_rx.uart1_rx",
+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+};
+
+
+static struct omap_device_pad blaze_uart2_pads[] __initdata = {
+	{
+		.name	= "uart2_cts.uart2_cts",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.flags  = OMAP_DEVICE_PAD_REMUX,
+		.idle   = OMAP_WAKEUP_EN | OMAP_PIN_OFF_INPUT_PULLUP |
+			OMAP_OFFOUT_EN | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart2_rts.uart2_rts",
+		.flags  = OMAP_DEVICE_PAD_REMUX,
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+		.idle   = OMAP_PIN_OFF_INPUT_PULLUP | OMAP_MUX_MODE7,
+	},
+	{
+		.name	= "uart2_tx.uart2_tx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart2_rx.uart2_rx",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+};
+
+static struct omap_device_pad blaze_uart3_pads[] __initdata = {
+	{
+		.name	= "uart3_cts_rctx.uart3_cts_rctx",
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart3_rts_sd.uart3_rts_sd",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart3_tx_irtx.uart3_tx_irtx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart3_rx_irrx.uart3_rx_irrx",
+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+	},
+};
+
+static struct omap_device_pad blaze_uart4_pads[] __initdata = {
+	{
+		.name	= "uart4_tx.uart4_tx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart4_rx.uart4_rx",
+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
+	},
+};
+
+static struct omap_uart_port_info blaze_uart_info_uncon __initdata = {
+	.use_dma	= 0,
+	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+        .wer = 0,
+};
+
+static struct omap_uart_port_info blaze_uart_info __initdata = {
+	.use_dma	= 0,
+	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
+        .wer = (OMAP_UART_WER_TX | OMAP_UART_WER_RX | OMAP_UART_WER_CTS),
+};
+
+static inline void __init board_serial_init(void)
+{
+	omap_serial_init_port_pads(0, blaze_uart1_pads,
+		ARRAY_SIZE(blaze_uart1_pads), &blaze_uart_info_uncon);
+	omap_serial_init_port_pads(1, blaze_uart2_pads,
+		ARRAY_SIZE(blaze_uart2_pads), &blaze_uart_info);
+	omap_serial_init_port_pads(2, blaze_uart3_pads,
+		ARRAY_SIZE(blaze_uart3_pads), &blaze_uart_info);
+	omap_serial_init_port_pads(3, blaze_uart4_pads,
+		ARRAY_SIZE(blaze_uart4_pads), &blaze_uart_info_uncon);
+}
 
 static void enable_rtc_gpio(void){
 	/* To access twl registers we enable gpio6
@@ -1086,16 +1165,36 @@ static void enable_rtc_gpio(void){
 	return;
 }
 
-static struct wl12xx_platform_data omap4_tablet_wlan_data __initdata = {
+static void omap4_kc1_wifi_mux_init(void)
+{
+	omap_mux_init_gpio(GPIO_WIFI_IRQ, OMAP_PIN_INPUT |
+				OMAP_PIN_OFF_WAKEUPENABLE);
+	omap_mux_init_gpio(GPIO_WIFI_PMENA, OMAP_PIN_OUTPUT);
+
+	omap_mux_init_signal("sdmmc5_cmd.sdmmc5_cmd",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_clk.sdmmc5_clk",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat0.sdmmc5_dat0",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat1.sdmmc5_dat1",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat2.sdmmc5_dat2",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("sdmmc5_dat3.sdmmc5_dat3",
+				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
+}
+
+static struct wl12xx_platform_data omap4_kc1_wlan_data __initdata = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = 0,
 };
 
-static void omap4_tablet_wifi_init(void)
+static void omap4_kc1_wifi_init(void)
 {
-	omap4_tablet_wifi_mux_init();
-	if (wl12xx_set_platform_data(&omap4_tablet_wlan_data))
+	omap4_kc1_wifi_mux_init();
+	if (wl12xx_set_platform_data(&omap4_kc1_wlan_data))
 		pr_err("Error setting wl12xx data\n");
 	platform_device_register(&omap_vwlan_device);
 }
@@ -1134,7 +1233,7 @@ static void __init omap4_ehci_ohci_init(void){}
 #endif
 
 
-static int tablet_notifier_call(struct notifier_block *this,
+static int kc1_notifier_call(struct notifier_block *this,
 					unsigned long code, void *cmd)
 {
 	void __iomem *sar_base;
@@ -1168,13 +1267,12 @@ static int tablet_notifier_call(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
-static struct notifier_block tablet_reboot_notifier = {
-	.notifier_call = tablet_notifier_call,
+static struct notifier_block kc1_reboot_notifier = {
+	.notifier_call = kc1_notifier_call,
 };
 
-static void __init omap_tablet_init(void)
+static void __init omap_kc1_init(void)
 {
-	int status;
 	int package = OMAP_PACKAGE_CBS;
 
 	quanta_boardids();
@@ -1183,31 +1281,33 @@ static void __init omap_tablet_init(void)
 	omap4_mux_init(board_mux, NULL, package);
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
-	omap_init_emif_timings();
 
 	omap_board_config = sdp4430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
 
 	omap_init_board_version(0);
 
-	//omap4_audio_conf();
+	// FIXME-HASH:
+        // omap4_audio_conf();
 	omap4_create_board_props();
-	register_reboot_notifier(&tablet_reboot_notifier);
+	register_reboot_notifier(&kc1_reboot_notifier);
 	kc1_pmic_mux_init();
 	omap4_i2c_init();
 	enable_rtc_gpio();
-	ramconsole_init();
+	//ramconsole_init();
 	omap4_display_init();
 	//omap_disp_led_init();
+	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 
-	gpio_request(0,"sysok");
+	gpio_request(0, "sysok");
 
 	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
-	omap_serial_init(omap_serial_platform_data);
+	omap_serial_init();
+
 	omap4_twl6030_hsmmc_init(mmc);
-	gpio_request(42,"OMAP_GPIO_ADC");
-	gpio_direction_output(42,0);
+	gpio_request(42, "OMAP_GPIO_ADC");
+	gpio_direction_output(42, 0);
 
 	/*For smb347*/
 	//Enable charger interrupt wakeup function.
@@ -1216,28 +1316,21 @@ static void __init omap_tablet_init(void)
 
 	if(quanta_mbid>=4) {
 		//EN pin
-		omap_mux_init_signal("c2c_data12.gpio_101", \
-		        OMAP_PIN_OUTPUT |OMAP_PIN_OFF_OUTPUT_LOW);
+		omap_mux_init_signal("c2c_data12.gpio_101", OMAP_PIN_OUTPUT |OMAP_PIN_OFF_OUTPUT_LOW);
 		//SUSP
-		omap_mux_init_signal("uart4_rx.gpio_155", \
-		        OMAP_PIN_OUTPUT |OMAP_PIN_OFF_OUTPUT_HIGH);
+		omap_mux_init_signal("uart4_rx.gpio_155", OMAP_PIN_OUTPUT |OMAP_PIN_OFF_OUTPUT_HIGH);
 		gpio_request(101, "CHARGE-en");
 		gpio_direction_output(101, 0);
 		gpio_request(155, "CHARGE-SUSP");
 		gpio_direction_output(155, 1);
 	}
-	omap4_tablet_wifi_init();
+	omap4_kc1_wifi_init();
 
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
 
-	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
-
-	omap_display_init(&sdp4430_dss_data);
-	omap_voltage_init_pmic();
-#ifdef CONFIG_TOUCHSCREEN_ILITEK
-	omap_ilitek_init();	// chris 2011_0124
-#endif //CONFIG_TOUCHSCREEN_ILITEK
+	omap_dmm_init();
+	omap_kc1_display_init();
 
 	gpio_request(119, "ADO_SPK_ENABLE");
 	gpio_direction_output(119, 1);
@@ -1245,30 +1338,52 @@ static void __init omap_tablet_init(void)
 	gpio_request(120, "SKIPB_GPIO");
 	gpio_direction_output(120, 1);
 	gpio_set_value(120, 1);
-	// Qunata_diagnostic 20110506 set GPIO 171 172 to be input
 
+	// Qunata_diagnostic 20110506 set GPIO 171 172 to be input
 	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017C); 
 	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017C);
 	 
 	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017E); 
 	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017E);
 	////////////////////////////////////////////
+
+	omap_enable_smartreflex_on_init();
+        if (enable_suspend_off)
+                omap_pm_enable_off_mode();
 }
 
 static void __init omap_4430sdp_map_io(void)
 {
-	ramconsole_reserve_sdram();
+	//ramconsole_reserve_sdram();
 	omap2_set_globals_443x();
 	omap44xx_map_common_io();
 }
+static void __init omap_4430sdp_reserve(void)
+{
 
-MACHINE_START(OMAP_4430SDP, "OMAP4430")
-	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
-	.phys_io	= 0x48000000,
-	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
+	/* do the static reservations first */
+	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
+	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
+	/* ipu needs to recognize secure input buffer area as well */
+	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
+					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
+
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
+#else
+	omap_reserve();
+#endif
+}
+
+MACHINE_START(OMAP_4430SDP, "Amazon KC1 (Otter)")
+        // FIXME-HASH
+	//.phys_io	= 0x48000000,
+	//.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
+	.reserve	= omap_4430sdp_reserve,
 	.map_io		= omap_4430sdp_map_io,
-	.init_irq	= omap_4430sdp_init_irq,
-	.init_machine	= omap_tablet_init,
+	.init_early	= omap_4430sdp_init_early,
+	.init_irq	= gic_init_irq,
+	.init_machine	= omap_kc1_init,
 	.timer		= &omap_timer,
 MACHINE_END

@@ -84,6 +84,7 @@ struct lm75_data {
 						   0 = input
 						   1 = max
 						   2 = hyst */
+	int			irq;
 };
 
 static int lm75_read_value(struct i2c_client *client, u8 reg);
@@ -215,7 +216,7 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
     		printk("lm75 gpio_direction_input error\n");
     	}
     	data->irq = gpio_to_irq(OMAP4_LM75_IRQ);	
-    	set_irq_type(data->irq, IRQ_TYPE_EDGE_BOTH);
+    	irq_set_irq_type(data->irq, IRQ_TYPE_EDGE_BOTH);
     	error = request_irq(data->irq, lm75_isr, (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING), "Lm75_IRQ", data);
     	if (error) {
     		printk("lm75 request_irq error\n");

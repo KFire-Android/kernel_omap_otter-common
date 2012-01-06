@@ -16,6 +16,7 @@
 #include <linux/sysdev.h>
 #include <linux/power_supply.h>
 #include <linux/slab.h>
+#include <linux/i2c/twl.h>
 
 /*
  * I2C registers that need to be read
@@ -842,8 +843,7 @@ static int bq27541_probe(struct i2c_client *client, const struct i2c_device_id *
 
 	bq27541_battery_present = 1;
 
-        twl6030_interrupt_unmask(0x4,
-                        REG_INT_MSK_STS_A);
+        twl6030_interrupt_unmask(0x4, REG_INT_MSK_STS_A);
 
 
         return 0;
@@ -857,8 +857,7 @@ static int bq27541_remove(struct i2c_client *client)
                 battery_driver_stopped = 1;
 		cancel_rearming_delayed_work(&battery_work);
                 bq27541_battery_sysdev_ctrl_exit();
-                twl6030_interrupt_mask(0x4,
-                        REG_INT_MSK_STS_A);
+                twl6030_interrupt_mask(0x4, REG_INT_MSK_STS_A);
         }
 
         i2c_set_clientdata(client, info);
@@ -889,9 +888,7 @@ static int bq27541_battery_resume(struct i2c_client *client)
 static unsigned short normal_i2c[] = { BQ27541_I2C_ADDRESS, I2C_CLIENT_END };
 
 static struct i2c_driver bq27541_i2c_driver = {
-	.driver = {
-			.name = DRIVER_NAME,
-		},
+	.driver = { .name = DRIVER_NAME, },
 	.probe = bq27541_probe,
 	.remove = bq27541_remove,
 	.suspend = bq27541_battery_suspend,

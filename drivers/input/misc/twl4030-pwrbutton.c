@@ -28,7 +28,6 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/i2c/twl.h>
-#include <linux/metricslog.h>
 #include <linux/jiffies.h>
 #include <linux/leds.h>
 #include <linux/wakelock.h>
@@ -68,7 +67,7 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 
 		sprintf(buf, "%s:powi%c:action=%s:", __func__, action[0], action);
 
-		log_to_metrics(ANDROID_LOG_INFO, "PowerKeyEvent", buf);
+		//log_to_metrics(ANDROID_LOG_INFO, "PowerKeyEvent", buf);
 
 		strcat(buf, "\n");
 		printk(buf);

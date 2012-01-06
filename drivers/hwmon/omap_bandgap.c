@@ -20,7 +20,9 @@
 
 #include <mach/omap4-common.h>
 
-#include <plat/control.h>
+/* TO DO: This needs to be fixed */
+#include "../../../../arch/arm/mach-omap2/control.h"
+/* #include <plat/control.h> */
 
 struct omap_bandgap_adc_entry {
 	int temp_min;

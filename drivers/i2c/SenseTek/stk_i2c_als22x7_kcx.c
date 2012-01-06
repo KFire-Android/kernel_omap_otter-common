@@ -737,7 +737,7 @@ static int stk_als_remove(struct i2c_client *client)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void stk_early_suspend(struct early_suspend *h)
 {
-	int err = 0;
+	//int err = 0;
 	struct stkals22x7_data*  data;
 	printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
 	data = container_of(h, struct stkals22x7_data, early_suspend);	
@@ -747,7 +747,7 @@ static void stk_early_suspend(struct early_suspend *h)
 
 static void stk_late_resume(struct early_suspend *h)
 {
-	int err = 0;
+	//int err = 0;
 	struct stkals22x7_data*  data;
 	printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
 	data = container_of(h, struct stkals22x7_data, early_suspend);

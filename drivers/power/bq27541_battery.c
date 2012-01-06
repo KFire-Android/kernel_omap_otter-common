@@ -19,7 +19,6 @@
 #include <linux/i2c.h>
 #include <linux/slab.h>
 #include <asm/unaligned.h>
-#include <linux/metricslog.h>
 #include <plat/led.h>
 #include "kc1_summit/smb347.h"
 #undef BAT_LOG
@@ -637,7 +636,7 @@ void bat_log_work_func(struct work_struct *work)
     struct bq27541_info *di = container_of(work,
                 struct bq27541_info, bat_log_work.work);
     sprintf(buf,"%s:def:capacity=%d,current=%d,voltage=%d",__func__,di->capacity,di->current_avg,di->voltage);
-    log_to_metrics(ANDROID_LOG_INFO, "Battery", buf);
+    //log_to_metrics(ANDROID_LOG_INFO, "Battery", buf);
     if(di->state==BAT_CRITICAL_STATE)
         queue_delayed_work(bat_work_queue,&di->bat_log_work,
                             msecs_to_jiffies(60000 * 1));
@@ -921,13 +920,13 @@ update_status:
 		power_supply_changed(&di->bat);
 
 		// LED function
-		u8 value = 0;
+		u8 led_value = 0;
 
 		if ((di->disable_led == 0) &&
-			!twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &value, 0x03)) {
+			!twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &led_value, 0x03)) {
 
 		        if ((di->status == POWER_SUPPLY_STATUS_CHARGING)
-					&& (value & (1 << 2))) {
+					&& (led_value & (1 << 2))) {
 				if(di->capacity < 90) {
 					/*
 					 * Battery being charged, capacity < 90%: Amber LED
@@ -942,7 +941,7 @@ update_status:
 					omap4430_green_led_set(NULL, 255);
 				}
 		        } else if (di->status == POWER_SUPPLY_STATUS_FULL) {
-				if (value & (1 << 2)) {
+				if (led_value & (1 << 2)) {
 					/* Set to green if connected to USB */
 					omap4430_orange_led_set(NULL, 0);
 					omap4430_green_led_set(NULL, 255);

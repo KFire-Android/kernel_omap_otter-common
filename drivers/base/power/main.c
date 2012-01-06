@@ -28,7 +28,6 @@
 #include <linux/async.h>
 #include <linux/suspend.h>
 #include <linux/timer.h>
-#include <linux/metricslog.h>
 
 #include "../base.h"
 #include "power.h"
@@ -425,7 +424,7 @@ static void dpm_show_time(ktime_t starttime, pm_message_t state, char *info)
 		usecs / USEC_PER_MSEC, usecs % USEC_PER_MSEC,
 		info ? : "", info ? " " : "", verb);
 
-	log_to_metrics(ANDROID_LOG_INFO, "dpm", buf);
+	//log_to_metrics(ANDROID_LOG_INFO, "dpm", buf);
 }
 
 /*------------------------- Resume routines -------------------------*/

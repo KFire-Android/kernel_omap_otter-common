@@ -567,7 +567,7 @@ static int
 ilitek_i2c_process_and_report(
 	void)
 {
-	int i, len, ret, org_x, org_y, x, y, key;
+	int i, len, ret, org_x, org_y, x, y; //, key;
 	struct input_dev *input = i2c.input_dev;
         unsigned char buf[9]={0};
 
@@ -620,7 +620,7 @@ ilitek_i2c_process_and_report(
 		unsigned char tp_id, key_id;
 		tp_id = buf[0];
 		key_id = buf[1] - 1;
-		int i = 0;
+		i = 0;
 
 		if(tp_id & 0x01)
 		{

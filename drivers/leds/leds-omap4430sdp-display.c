@@ -93,8 +93,7 @@ static void omap4430_sdp_secondary_disp_store(struct led_classdev *led_cdev,
 
 static void omap4430_sdp_display_work(struct work_struct *work)
 {
-    struct display_led_data *led_data = container_of(work,
-            struct display_led_data, work);
+    struct display_led_data *led_data = container_of(work, struct display_led_data, work);
 
     if (led_data->brightness == 0)
         led_data->blink_step = 1;

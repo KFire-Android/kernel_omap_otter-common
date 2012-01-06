@@ -761,10 +761,10 @@ static struct attribute *twl6030_gpadc_attributes[] = {
 	IN_ATTRS(14),
 	IN_ATTRS(15),
 	IN_ATTRS(16),
-	&dev_attr_ntc.attr,
-	&dev_attr_ntc_batt.attr,	
 	NULL
 };
+//	&dev_attr_ntc.attr,
+//	&dev_attr_ntc_batt.attr,	
 //	&sensor_dev_attr_ntcvalue.dev_attr.attr,	//leon add
 
 static const struct attribute_group twl6030_gpadc_group = {

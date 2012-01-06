@@ -217,7 +217,7 @@ static struct platform_driver omap4430_keypad_led_driver = {
 	.driver = {
 		   .name = "keypad_led",
 		   .owner = THIS_MODULE,
-		   .pm = &omap4430_sdp_keypad_led_pm_ops;
+		   .pm = &omap4430_sdp_keypad_led_pm_ops,
 		   },
 };
 
