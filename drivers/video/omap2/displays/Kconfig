@@ -55,4 +55,11 @@ config PANEL_TC358765
 	select BACKLIGHT_CLASS_DEVICE
 	help
 	  Toshiba TC358765 DSI-2-LVDS chip with 1024x768 panel
+
+config PANEL_OTTER1
+        tristate "LGD Panel"
+        depends on OMAP2_DSS
+        help
+          LCD Panel used in KC1 
+
 endmenu

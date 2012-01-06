@@ -330,6 +330,7 @@ struct omap_mcbsp_reg_cfg {
 	u16 xcerh;
 	u16 xccr;
 	u16 rccr;
+	u16 wken;
 };
 
 typedef enum {

@@ -32,7 +32,12 @@
 /* 34xx specific mux bit defines */
 #define OMAP_INPUT_EN			(1 << 8)
 #define OMAP_OFF_EN			(1 << 9)
+/* FIXME-HASH: MAY OR MAY NOT NEED THIS */
+#ifdef CONFIG_MACH_OMAP_4430_KC1
+#define OMAP_OFFOUT_EN			(0 << 10)
+#else
 #define OMAP_OFFOUT_EN			(1 << 10)
+#endif
 #define OMAP_OFFOUT_VAL			(1 << 11)
 #define OMAP_OFF_PULL_EN		(1 << 12)
 #define OMAP_OFF_PULL_UP		(1 << 13)

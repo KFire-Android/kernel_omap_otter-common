@@ -49,8 +49,8 @@
  * with the 60 second default assumed by most tools and docs.
  */
 #define TIMER_MARGIN_MAX	(24 * 60 * 60)	/* 1 day */
-#define TIMER_MARGIN_DEFAULT	60	/* 60 secs */
-#define TIMER_MARGIN_MIN	1
+#define TIMER_MARGIN_DEFAULT    240	/* 4 min */
+#define TIMER_MARGIN_MIN        1
 
 #define PTV			0	/* prescale */
 #define GET_WLDR_VAL(secs)	(0xffffffff - ((secs) * (32768/(1<<PTV))) + 1)

@@ -33,6 +33,7 @@
 #include <linux/mm.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
+#include <linux/sysrq.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/err.h>
@@ -94,6 +95,15 @@ static void omap_wdt_ping(struct omap_wdt_dev *wdev)
 static void omap_wdt_enable(struct omap_wdt_dev *wdev)
 {
 	void __iomem *base = wdev->base;
+	u32 i;
+
+	/* Clear the interrupt */
+	i = __raw_readl(base + OMAP_WATCHDOG_WIRQSTAT);
+	__raw_writel(i, base + OMAP_WATCHDOG_WIRQSTAT);
+	
+	/* Enable delay interrupt */
+	if (wdev->irq)
+		__raw_writel(0x2, base + OMAP_WATCHDOG_WIRQENSET);
 
 	/* Sequence to enable the watchdog */
 	__raw_writel(0xBBBB, base + OMAP_WATCHDOG_SPR);
@@ -108,6 +118,10 @@ static void omap_wdt_enable(struct omap_wdt_dev *wdev)
 static void omap_wdt_disable(struct omap_wdt_dev *wdev)
 {
 	void __iomem *base = wdev->base;
+
+	/* Disable interrupt */
+	if(wdev->irq)
+		__raw_writel(0x2, base + OMAP_WATCHDOG_WIRQENCLR);
 
 	/* sequence required to disable watchdog */
 	__raw_writel(0xAAAA, base + OMAP_WATCHDOG_SPR);	/* TIMER_MODE */
@@ -151,7 +165,6 @@ static void omap_wdt_set_timeout(struct omap_wdt_dev *wdev)
 
 	pm_runtime_put_sync(wdev->dev);
 }
-
 
 static irqreturn_t omap_wdt_interrupt(int irq, void *dev_id)
 {
@@ -205,6 +218,8 @@ static int omap_wdt_open(struct inode *inode, struct file *file)
 {
 	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
 	int ret;
+
+	pm_runtime_get_sync(wdev->dev);
 
 	ret = omap_wdt_setup(wdev);
 

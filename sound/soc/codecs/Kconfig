@@ -246,6 +246,9 @@ config SND_SOC_TWL6040
 config SND_SOC_OMAP_HDMI_CODEC
 	tristate
 
+config SND_SOC_AIC3110
+		tristate
+		
 config SND_SOC_UDA134X
        tristate
 

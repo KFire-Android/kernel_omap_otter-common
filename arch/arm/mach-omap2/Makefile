@@ -263,6 +263,10 @@ obj-$(CONFIG_MACH_OMAP_BLAZE)		+= board-44xx-tablet.o \
 					   board-44xx-tablet-panel.o \
 					   board-44xx-tablet-buttons.o \
 					   omap4_apps_brd_id.o
+obj-$(CONFIG_MACH_OMAP_4430_KC1)	+= board-4430kc1-tablet.o \
+					   board-44xx-identity.o \
+					   hsmmc.o \
+					   omap_phy_internal.o
 obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
 					   hsmmc.o \
 					   board-44xx-identity.o \

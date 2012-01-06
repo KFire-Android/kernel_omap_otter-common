@@ -1,0 +1,9 @@
+config SUMMIT_SMB347_Q
+	bool "SUMIT smb347 charger driver"
+	help
+	  Say Y here if you want to enable SUMIT smb347.
+	  If unsure, say Y.
+config DETECT_BY_PHY
+    bool "detect power source by omap phy"
+config DETECT_BY_CHARGER
+    bool "detect power source by summit charger"

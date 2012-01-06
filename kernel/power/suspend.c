@@ -168,7 +168,7 @@ static int suspend_enter(suspend_state_t state)
 
 	error = syscore_suspend();
 	if (!error) {
-		if (!(suspend_test(TEST_CORE) || pm_wakeup_pending())) {
+		if (!(suspend_test(TEST_CORE) || pm_wakeup_pending() || (omap_readl(0x4A10019C)&0x80000000))) {
 			error = suspend_ops->enter(state);
 			events_check_enabled = false;
 		}

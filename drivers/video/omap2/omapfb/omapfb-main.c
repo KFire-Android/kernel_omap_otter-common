@@ -705,6 +705,7 @@ int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 			var->xres, var->yres,
 			var->xres_virtual, var->yres_virtual);
 
+#if 0
 	if (display)
 		omapdss_display_get_dimensions(display, &w, &h);
 
@@ -715,7 +716,10 @@ int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 		var->height = -1;
 		var->width = -1;
 	}
-
+#else
+        var->width = display ? display->panel.width_in_mm : 0;
+        var->height = display ? display->panel.height_in_mm : 0;
+#endif
 	var->grayscale          = 0;
 
 	if (display && display->driver->get_timings) {

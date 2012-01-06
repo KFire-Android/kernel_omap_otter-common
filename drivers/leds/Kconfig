@@ -413,6 +413,13 @@ config LEDS_ASIC3
 	  cannot be used. This driver supports hardware blinking with an on+off
 	  period from 62ms to 125s. Say Y to enable LEDs on the HP iPAQ hx4700.
 
+config LEDS_OMAP_PWM
+    tristate "LED Support for OMAP PWM-controlled LEDs"
+    depends on LEDS_CLASS && ARCH_OMAP && OMAP_DM_TIMER
+    help
+      This options enables support for LEDs connected to GPIO lines
+      controlled by a PWM timer on OMAP CPUs.
+
 config LEDS_TRIGGERS
 	bool "LED Trigger support"
 	depends on LEDS_CLASS

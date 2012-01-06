@@ -310,6 +310,7 @@ int snd_soc_register_codec(struct device *dev,
 		const struct snd_soc_codec_driver *codec_drv,
 		struct snd_soc_dai_driver *dai_drv, int num_dai);
 void snd_soc_unregister_codec(struct device *dev);
+struct snd_soc_codec * snd_soc_get_codec(struct device *dev);
 int snd_soc_codec_volatile_register(struct snd_soc_codec *codec,
 				    unsigned int reg);
 int snd_soc_codec_readable_register(struct snd_soc_codec *codec,
@@ -759,6 +760,11 @@ struct snd_soc_dai_link {
 	/* hw_params re-writing for BE and FE sync */
 	int (*be_hw_params_fixup)(struct snd_soc_pcm_runtime *rtd,
 			struct snd_pcm_hw_params *params);
+
+	/* Void Pointer struct introduced to maintain
+	 * the ABE specific Port Details for OMAP4 
+	 */
+	 void *private_data;
 
 	/* machine stream operations */
 	struct snd_soc_ops *ops;

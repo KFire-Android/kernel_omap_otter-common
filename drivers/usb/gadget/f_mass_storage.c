@@ -1459,15 +1459,15 @@ static int do_start_stop(struct fsg_common *common)
 		return 0;
 	}
 
+	if (!loej)
+		return 0;
+
 	/* Are we allowed to unload the media? */
 	if (curlun->prevent_medium_removal) {
 		LDBG(curlun, "unload attempt prevented\n");
 		curlun->sense_data = SS_MEDIUM_REMOVAL_PREVENTED;
 		return -EINVAL;
 	}
-
-	if (!loej)
-		return 0;
 
 	/* Simulate an unload/eject */
 	if (common->ops && common->ops->pre_eject) {
