@@ -60,6 +60,9 @@ struct omap_rpmsg_vproc {
 	int base_vq_id;
 	int num_of_vqs;
 	struct rpmsg_channel_info *hardcoded_chnls;
+	unsigned long bootcstr_freq;
+	unsigned int bootcstr_type;
+	bool bootcstr_set;
 };
 
 #define to_omap_rpdev(vd) container_of(vd, struct omap_rpmsg_vproc, vdev)
@@ -195,6 +198,16 @@ static int omap_rpmsg_mbox_callback(struct notifier_block *this,
 	case RP_MBOX_ECHO_REPLY:
 		pr_info("received echo reply from %s !\n", rpdev->rproc_name);
 		break;
+	case RP_MSG_BOOTINIT_DONE:
+		if (rpdev->bootcstr_set) {
+			int val =
+			(rpdev->bootcstr_type == RPROC_CONSTRAINT_SCALE) ?
+									0 : -1;
+			rproc_set_constraints(rpdev->rproc,
+						rpdev->bootcstr_type, val);
+			rpdev->bootcstr_set = false;
+		}
+		break;
 	case RP_MBOX_PENDING_MSG:
 		/*
 		 * a new inbound message is waiting in our own vring (index 0).
@@ -268,6 +281,14 @@ static int rpmsg_rproc_load_error(struct omap_rpmsg_vproc *rpdev)
 		omap_mbox_put(rpdev->mbox, &rpdev->nb);
 		rpdev->mbox = NULL;
 	}
+
+	if (rpdev->bootcstr_set) {
+		int val = (rpdev->bootcstr_type == RPROC_CONSTRAINT_SCALE) ?
+									0 : -1;
+		rproc_set_constraints(rpdev->rproc,
+					rpdev->bootcstr_type, val);
+		rpdev->bootcstr_set = false;
+	}
 	mutex_unlock(&rpdev->lock);
 
 	return NOTIFY_DONE;
@@ -293,6 +314,20 @@ static int rpmsg_rproc_secure(struct omap_rpmsg_vproc *rpdev, bool s)
 	return NOTIFY_DONE;
 }
 
+static int rpmsg_rproc_preload(struct omap_rpmsg_vproc *rpdev)
+{
+	mutex_lock(&rpdev->lock);
+	if (rpdev->bootcstr_freq) {
+		rpdev->bootcstr_set = !rproc_set_constraints(rpdev->rproc,
+				rpdev->bootcstr_type, rpdev->bootcstr_freq);
+		if (!rpdev->bootcstr_set)
+			pr_debug("bumping the frequency for rproc %s failed\n",
+							rpdev->rproc_name);
+	}
+	mutex_unlock(&rpdev->lock);
+	return NOTIFY_DONE;
+}
+
 static int rpmsg_rproc_events(struct notifier_block *this,
 				unsigned long type, void *data)
 {
@@ -312,6 +347,8 @@ static int rpmsg_rproc_events(struct notifier_block *this,
 		return rpmsg_rproc_resume(rpdev);
 	case RPROC_SECURE:
 		return rpmsg_rproc_secure(rpdev, !!data);
+	case RPROC_PRELOAD:
+		return rpmsg_rproc_preload(rpdev);
 	}
 	return NOTIFY_DONE;
 }
@@ -385,8 +422,17 @@ static void omap_rpmsg_del_vqs(struct virtio_device *vdev)
 	if (rpdev->mbox)
 		omap_mbox_put(rpdev->mbox, &rpdev->nb);
 
-	if (rpdev->rproc)
+	if (rpdev->rproc) {
+		if (rpdev->bootcstr_set) {
+			int val =
+			(rpdev->bootcstr_type == RPROC_CONSTRAINT_SCALE) ?
+									0 : -1;
+			rproc_set_constraints(rpdev->rproc,
+						rpdev->bootcstr_type, val);
+			rpdev->bootcstr_set = false;
+		}
 		rproc_put(rpdev->rproc);
+	}
 
 	iounmap(rpdev->buf_mapped);
 }
@@ -464,6 +510,7 @@ static int omap_rpmsg_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 		err = -EINVAL;
 		goto put_mbox;
 	}
+
 	/* register for remoteproc events */
 	rpdev->rproc_nb.notifier_call = rpmsg_rproc_events;
 	rproc_event_register(rpdev->rproc, &rpdev->rproc_nb);
@@ -583,6 +630,8 @@ static struct omap_rpmsg_vproc omap_rpmsg_vprocs[] = {
 		.base_vq_id	= 0,
 		.hardcoded_chnls = omap_ipuc0_hardcoded_chnls,
 		.slave_next	= &omap_rpmsg_vprocs[1],
+		.bootcstr_freq	= 400000000,
+		.bootcstr_type	= RPROC_CONSTRAINT_BANDWIDTH,
 	},
 	/* ipu_c1's rpmsg backend */
 	{
@@ -603,6 +652,8 @@ static struct omap_rpmsg_vproc omap_rpmsg_vprocs[] = {
 		.rproc_name	= "dsp",
 		.base_vq_id	= 4,
 		.hardcoded_chnls = omap_dsp_hardcoded_chnls,
+		.bootcstr_freq	= 465500000,
+		.bootcstr_type	= RPROC_CONSTRAINT_SCALE,
 	},
 #endif
 };
