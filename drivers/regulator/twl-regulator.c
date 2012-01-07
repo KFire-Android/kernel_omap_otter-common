@@ -301,9 +301,12 @@ static int twl6030reg_disable(struct regulator_dev *rdev)
 	return ret;
 }
 
-static int twl4030reg_get_status(struct regulator_dev *rdev)
+static int twlreg_get_status(struct regulator_dev *rdev)
 {
 	int	state = twlreg_grp(rdev);
+
+	if (twl_class_is_6030())
+		return 0; /* FIXME return for 6030 regulator */
 
 	if (state < 0)
 		return state;
@@ -356,25 +359,6 @@ static int twl6030_disable(struct regulator_dev *rdev)
 	ret= twlreg_write(info, TWL_MODULE_PM_RECEIVER, 2, 0);
 
 	return ret;
-}
-
-static int twlreg_get_status(struct regulator_dev *rdev)
-{
-	int	state = twlreg_grp(rdev);
-
-	if (twl_class_is_6030())
-		return 0; /* FIXME return for 6030 regulator */
-
-	if (state < 0)
-		return state;
-	state &= 0x0f;
-
-	/* assume state != WARM_RESET; we'd not be running...  */
-	if (!state)
-		return REGULATOR_STATUS_OFF;
-	return (state & BIT(3))
-		? REGULATOR_STATUS_NORMAL
-		: REGULATOR_STATUS_STANDBY;
 }
 
 static int twlreg_set_mode(struct regulator_dev *rdev, unsigned mode)
@@ -575,8 +559,8 @@ static struct regulator_ops twl4030ldo_ops = {
 	.set_voltage	= twl4030ldo_set_voltage,
 	.get_voltage	= twl4030ldo_get_voltage,
 
-	.enable		= twlreg_enable,
-	.disable	= twlreg_disable,
+	.enable		= twl4030reg_enable,
+	.disable	= twl4030reg_disable,
 	.is_enabled	= twlreg_is_enabled,
 
 	.set_mode	= twlreg_set_mode,
@@ -877,11 +861,11 @@ static struct regulator_ops twlsmps_ops = {
 
 	.enable			= twl6030reg_enable,
 	.disable		= twl6030reg_disable,
-	.is_enabled		= twl6030reg_is_enabled,
+	.is_enabled		= twl6030_is_enabled,
 
-	.set_mode		= twl6030reg_set_mode,
+	.set_mode		= twlreg_set_mode,
 
-	.get_status		= twl6030reg_get_status,
+	.get_status		= twlreg_get_status,
 
 	.set_suspend_enable	= twl6030ldo_suspend_enable,
 	.set_suspend_disable	= twl6030ldo_suspend_disable,
@@ -1020,19 +1004,19 @@ static struct twlreg_info twl_regs[] = {
 	/* 6030 REG with base as PMC Slave Misc : 0x0030 */
 	/* Turnon-delay and remap configuration values for 6030 are not
 	   verified since the specification is not public */
-	TWL6030_ADJUSTABLE_LDO(VAUX1_6030, 0x54, 1000, 3300, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VAUX2_6030, 0x58, 1000, 3300, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VAUX3_6030, 0x5c, 1000, 3300, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VMMC, 0x68, 1000, 3300, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VPP, 0x6c, 1000, 3300, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VUSIM, 0x74, 1000, 3300, 0x21),
-	TWL6030_FIXED_LDO(VANA, 0x50, 2100, 0, 0x21),
+	TWL6030_ADJUSTABLE_LDO(VAUX1_6030, 0x54, 1000, 3300, 1, 0x21),
+	TWL6030_ADJUSTABLE_LDO(VAUX2_6030, 0x58, 1000, 3300, 2, 0x21),
+	TWL6030_ADJUSTABLE_LDO(VAUX3_6030, 0x5c, 1000, 3300, 3, 0x21),
+	TWL6030_ADJUSTABLE_LDO(VMMC, 0x68, 1000, 3300, 4, 0x21),
+	TWL6030_ADJUSTABLE_LDO(VPP, 0x6c, 1000, 3300, 5, 0x21),
+	TWL6030_ADJUSTABLE_LDO(VUSIM, 0x74, 1000, 3300, 7, 0x21),
+	TWL6030_FIXED_LDO(VANA, 0x50, 2100, 15, 0, 0x21),
 	//TWL6030_FIXED_LDO(VCXIO, 0x60, 1800, 16, 0, 0x21),
 	TWL6030_ADJUSTABLE_LDO(VCXIO, 0x60, 1800,1800, 16, 0x21),
 	//TWL6030_FIXED_LDO(VDAC, 0x64, 1800, 17, 0, 0x21),
 	TWL6030_ADJUSTABLE_LDO(VDAC, 0x64, 1800, 1800,17, 0x21),
-	//TWL6030_FIXED_LDO(VUSB, 0x70, 3300, 18, 0, 0x21)
-	TWL6030_ADJUSTABLE_LDO(VUSB, 0x70, 3300,3300, 18, 0x21)
+	//TWL6030_FIXED_LDO(VUSB, 0x70, 3300, 18, 0, 0x21),
+	TWL6030_ADJUSTABLE_LDO(VUSB, 0x70, 3300,3300, 18, 0x21),
 	//TWL6030_FIXED_RESOURCE(CLK32KG, 0x8C, 0),
 	//TWL6030_FIXED_RESOURCE(CLK32KAUDIO, 0x8F, 0),
 	TWL6030_ADJUSTABLE_SMPS(VDD3, 0x2e, 600, 4000),

@@ -717,8 +717,8 @@ int check_fb_var(struct fb_info *fbi, struct fb_var_screeninfo *var)
 		var->width = -1;
 	}
 #else
-        var->width = display ? display->panel.width_in_mm : 0;
-        var->height = display ? display->panel.height_in_mm : 0;
+        var->width = display ? display->panel.width_in_um : 0;
+        var->height = display ? display->panel.height_in_um : 0;
 #endif
 	var->grayscale          = 0;
 

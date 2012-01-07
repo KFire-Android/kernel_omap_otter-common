@@ -25,7 +25,7 @@
 #include <linux/platform_device.h>
 #include <linux/spi/spi.h>
 #include <asm/mach-types.h>
-#include <plat/display.h>
+#include <video/omapdss.h>
 #include <linux/gpio.h>
 
 static struct spi_device *otter1_spi;
