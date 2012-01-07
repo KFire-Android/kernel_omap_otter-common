@@ -631,9 +631,11 @@ static struct twl4030_madc_platform_data sdp4430_gpadc_data = {
 };
 
 #define SUMMIT_STAT 31
+#if 0
 static struct twl6030_qcharger_platform_data kc1_charger_data={
         .interrupt_pin = OMAP4_CHARGER_IRQ,
 };
+#endif
 
 static struct regulator_init_data sdp4430_clk32kg = {
        .constraints = {
@@ -862,6 +864,7 @@ static void omap_ilitek_init(void)
 }
 #endif //CONFIG_TOUCHSCREEN_ILITEK
 
+#if 0
 static void panel_enable(void)
 {
 	omap_mux_init_signal("dpm_emu17.gpio_28", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
@@ -871,6 +874,7 @@ static void panel_enable(void)
 	}
 	gpio_direction_output(OMAP4_LCD_EN_GPIO, 1);
 }
+#endif
 
 /* FIXME-HASH: DONE in omap-twl.c */
 #if 0
