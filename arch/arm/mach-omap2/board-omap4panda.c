@@ -413,6 +413,7 @@ static struct regulator_init_data omap4_panda_vusb = {
 static struct regulator_init_data omap4_panda_clk32kg = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
 	},
 };
 
@@ -743,43 +744,6 @@ void omap4_panda_display_init(void)
 	omap_display_init(&omap4_panda_dss_data);
 }
 
-static int panda_notifier_call(struct notifier_block *this,
-					unsigned long code, void *cmd)
-{
-	void __iomem *sar_base;
-	u32 v = OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-
-	sar_base = omap4_get_sar_ram_base();
-
-	if (!sar_base)
-		return notifier_from_errno(-ENOMEM);
-
-	if ((code == SYS_RESTART) && (cmd != NULL)) {
-		/* cmd != null; case: warm boot */
-		if (!strcmp(cmd, "bootloader")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else if (!strcmp(cmd, "recovery")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else {
-			v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-		}
-	}
-
-	omap4_prm_write_inst_reg(0xfff, OMAP4430_PRM_DEVICE_INST,
-			OMAP4_RM_RSTST);
-	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST, OMAP4_RM_RSTCTRL);
-	v = omap4_prm_read_inst_reg(WKUP_MOD, OMAP4_RM_RSTCTRL);
-
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block panda_reboot_notifier = {
-	.notifier_call = panda_notifier_call,
-};
 
 #define PANDA_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
 static struct omapfb_platform_data panda_fb_pdata = {
@@ -808,7 +772,6 @@ static void __init omap4_panda_init(void)
 
 	omap_init_board_version(OMAP4_PANDA);
 	omap4_create_board_props();
-	register_reboot_notifier(&panda_reboot_notifier);
 
 	if (wl12xx_set_platform_data(&omap_panda_wlan_data))
 		pr_err("error setting wl12xx data\n");
@@ -817,13 +780,7 @@ static void __init omap4_panda_init(void)
 	omap4_register_ion();
 	omap4_audio_conf();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
-/*
- * 	This is temporaray. With WLAN regsitering, we see that UART2 is not
- * 	idling on panda and CORE RET is not happening. So removing this FTM.
- * 	Later will be enabled.
- *
- *	platform_device_register(&omap_vwlan_device);
- */
+	platform_device_register(&omap_vwlan_device);
 	board_serial_init();
 	omap4_twl6030_hsmmc_init(mmc);
 	omap4_ehci_init();
@@ -858,12 +815,11 @@ static void __init omap4_panda_reserve(void)
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
-#else
- 	omap_reserve();
 #endif
+
+	omap_reserve();
 }
 
 MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")

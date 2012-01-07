@@ -762,7 +762,8 @@ static void omap_usbhs_init(struct device *dev)
 	reg |= (OMAP_UHH_HOSTCONFIG_INCR4_BURST_EN
 			| OMAP_UHH_HOSTCONFIG_INCR8_BURST_EN
 			| OMAP_UHH_HOSTCONFIG_INCR16_BURST_EN);
-	reg |= OMAP4_UHH_HOSTCONFIG_APP_START_CLK;
+
+	/* Keep ENA_INCR_ALIGN = 0: Known to cause OCP delays */
 	reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
 
 	if (is_omap_usbhs_rev1(omap)) {

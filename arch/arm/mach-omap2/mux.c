@@ -512,7 +512,8 @@ static inline void omap_mux_decode(struct seq_file *s, u16 val)
 
 	OMAP_MUX_TEST_FLAG(val, OMAP_PIN_OFF_WAKEUPENABLE);
 	if (val & OMAP_OFF_EN) {
-		if (!(val & OMAP_OFFOUT_EN)) {
+		if (val & OMAP_OFFOUT_EN) {
+			/* Input */
 			if (!(val & OMAP_OFF_PULL_UP)) {
 				OMAP_MUX_TEST_FLAG(val,
 					OMAP_PIN_OFF_INPUT_PULLDOWN);
@@ -521,6 +522,7 @@ static inline void omap_mux_decode(struct seq_file *s, u16 val)
 					OMAP_PIN_OFF_INPUT_PULLUP);
 			}
 		} else {
+			/* Output */
 			if (!(val & OMAP_OFFOUT_VAL)) {
 				OMAP_MUX_TEST_FLAG(val,
 					OMAP_PIN_OFF_OUTPUT_LOW);
@@ -971,7 +973,7 @@ static struct omap_mux *omap_mux_get_by_gpio(
 }
 
 /* Needed for dynamic muxing of GPIO pins for off-idle */
-u16 omap_mux_get_gpio(int gpio)
+struct omap_mux *omap_mux_get_gpio(int gpio)
 {
 	struct omap_mux_partition *partition;
 	struct omap_mux *m = NULL;
@@ -979,13 +981,10 @@ u16 omap_mux_get_gpio(int gpio)
 	list_for_each_entry(partition, &mux_partitions, node) {
 		m = omap_mux_get_by_gpio(partition, gpio);
 		if (m)
-			return omap_mux_read(partition, m->reg_offset);
+			return m;
 	}
 
-	if (!m || m->reg_offset == OMAP_MUX_TERMINATOR)
-		pr_err("%s: Could not get gpio%i\n", __func__, gpio);
-
-	return OMAP_MUX_TERMINATOR;
+	return NULL;
 }
 
 /* Needed for dynamic muxing of GPIO pins for off-idle */
@@ -1006,6 +1005,45 @@ void omap_mux_set_gpio(u16 val, int gpio)
 		pr_err("%s: Could not set gpio%i\n", __func__, gpio);
 }
 
+/* Has no locking, don't use on a pad that is remuxed (by hwmod or otherwise) */
+bool omap_mux_get_wakeupenable(struct omap_mux *m)
+{
+	u16 val;
+	if (IS_ERR_OR_NULL(m))
+		return false;
+
+	val = omap_mux_read(m->partition, m->reg_offset);
+	return val & OMAP_PIN_OFF_WAKEUPENABLE;
+}
+
+/* Has no locking, don't use on a pad that is remuxed (by hwmod or otherwise) */
+int omap_mux_set_wakeupenable(struct omap_mux *m)
+{
+	u16 val;
+	if (IS_ERR_OR_NULL(m))
+		return -EINVAL;
+
+	val = omap_mux_read(m->partition, m->reg_offset);
+	val |= OMAP_PIN_OFF_WAKEUPENABLE;
+	omap_mux_write(m->partition, val, m->reg_offset);
+
+	return 0;
+}
+
+/* Has no locking, don't use on a pad that is remuxed (by hwmod or otherwise) */
+int omap_mux_clear_wakeupenable(struct omap_mux *m)
+{
+	u16 val;
+	if (IS_ERR_OR_NULL(m))
+		return -EINVAL;
+
+	val = omap_mux_read(m->partition, m->reg_offset);
+	val &= ~OMAP_PIN_OFF_WAKEUPENABLE;
+	omap_mux_write(m->partition, val, m->reg_offset);
+
+	return 0;
+}
+
 static struct omap_mux * __init omap_mux_list_add(
 					struct omap_mux_partition *partition,
 					struct omap_mux *src)
@@ -1019,6 +1057,7 @@ static struct omap_mux * __init omap_mux_list_add(
 
 	m = &entry->mux;
 	entry->mux = *src;
+	m->partition = partition;
 
 #ifdef CONFIG_OMAP_MUX
 	if (omap_mux_copy_names(src, m)) {

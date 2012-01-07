@@ -111,8 +111,6 @@ qh_update (struct ehci_hcd *ehci, struct ehci_qh *qh, struct ehci_qtd *qtd)
 		}
 	}
 
-	/* HC must see latest qtd and qh data before we clear ACTIVE+HALT */
-	wmb ();
 	hw->hw_token &= cpu_to_hc32(ehci, QTD_TOGGLE | QTD_STS_PING);
 }
 
@@ -374,6 +372,17 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 		/* always clean up qtds the hc de-activated */
  retry_xacterr:
 		if ((token & QTD_STS_ACTIVE) == 0) {
+
+			/* Report Data Buffer Error: non-fatal but useful */
+			if (token & QTD_STS_DBE)
+				ehci_dbg(ehci,
+					"detected DataBufferErr for urb %p ep%d%s len %d, qtd %p [qh %p]\n",
+					urb,
+					usb_endpoint_num(&urb->ep->desc),
+					usb_endpoint_dir_in(&urb->ep->desc) ? "in" : "out",
+					urb->transfer_buffer_length,
+					qtd,
+					qh);
 
 			/* on STALL, error, and short reads this urb must
 			 * complete and all its qtds must be recycled.
@@ -729,7 +738,8 @@ qh_urb_transaction (
 
 	/*
 	 * control requests may need a terminating data "status" ack;
-	 * bulk ones may need a terminating short packet (zero length).
+	 * other OUT ones may need a terminating short packet
+	 * (zero length).
 	 */
 	if (likely (urb->transfer_buffer_length != 0)) {
 		int	one_more = 0;
@@ -738,7 +748,7 @@ qh_urb_transaction (
 			one_more = 1;
 			token ^= 0x0100;	/* "in" <--> "out"  */
 			token |= QTD_TOGGLE;	/* force DATA1 */
-		} else if (usb_pipebulk (urb->pipe)
+		} else if (usb_pipeout(urb->pipe)
 				&& (urb->transfer_flags & URB_ZERO_PACKET)
 				&& !(urb->transfer_buffer_length % maxpacket)) {
 			one_more = 1;
@@ -1000,12 +1010,6 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	head->qh_next.qh = qh;
 	head->hw->hw_next = dma;
 
-	/*
-	 * flush qh descriptor into memory immediately,
-	 * see comments in qh_append_tds.
-	 * */
-	ehci_sync_mem();
-
 	qh_get(qh);
 	qh->xacterrs = 0;
 	qh->qh_state = QH_STATE_LINKED;
@@ -1069,7 +1073,7 @@ static struct ehci_qh *qh_append_tds (
 			 */
 			token = qtd->hw_token;
 			qtd->hw_token = HALT_BIT(ehci);
-			wmb ();
+
 			dummy = qh->dummy;
 
 			dma = dummy->qtd_dma;
@@ -1092,18 +1096,6 @@ static struct ehci_qh *qh_append_tds (
 			/* let the hc process these next qtds */
 			wmb ();
 			dummy->hw_token = token;
-
-			/*
-			 * Writing to dma coherent buffer on ARM may
-			 * be delayed to reach memory, so HC may not see
-			 * hw_token of dummy qtd in time, which can cause
-			 * the qtd transaction to be executed very late,
-			 * and degrade performance a lot. ehci_sync_mem
-			 * is added to flush 'token' immediatelly into
-			 * memory, so that ehci can execute the transaction
-			 * ASAP.
-			 * */
-			ehci_sync_mem();
 
 			urb->hcpriv = qh_get (qh);
 		}

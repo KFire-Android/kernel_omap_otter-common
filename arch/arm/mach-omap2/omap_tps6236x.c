@@ -182,7 +182,7 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
 	.step_size		= STEP_SIZE_TPS6236X,
 	.on_volt		= 1375000,
 	.onlp_volt		= 1375000,
-	.ret_volt		= 830000,
+	.ret_volt		= 750000,
 	.off_volt		= 0,
 	.volt_setup_time	= 0,
 	.switch_on_time		= 1000,
@@ -259,6 +259,9 @@ static int __init omap4_twl_tps62361_enable(struct voltagedomain *voltdm)
 
 	/* We would like to ramp the voltage asap */
 	val |= REG_TPS6236X_RAMP_CTRL_RAMP_PFM;
+
+	/* We would like to ramp down the voltage asap as well*/
+	val |= REG_TPS6236X_RAMP_CTRL_EN_DISC;
 
 	ret = omap_vc_bypass_send_i2c_msg(voltdm, voltdm->pmic->i2c_slave_addr,
 			REG_TPS6236X_RAMP_CTRL, val);

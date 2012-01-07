@@ -397,8 +397,11 @@ static int omap_mcpdm_dai_startup(struct snd_pcm_substream *substream,
 	pm_runtime_get_sync(mcpdm->dev);
 
 	val = __raw_readl(OMAP4430_CM1_ABE_PDM_CLKCTRL);
-	if ((val & CLKCTRL_MODULEMODE_MASK) != CLKCTRL_MODULEMODE_ENABLED)
-		dev_err(mcpdm->dev, "Clock not enabled: PDM_CLKCTRL=0x%x\n", val);
+	if ((val & CLKCTRL_MODULEMODE_MASK) != CLKCTRL_MODULEMODE_ENABLED) {
+		WARN(1, "Clock not enabled: PDM_CLKCTRL=0x%x\n", val);
+		pm_runtime_put_sync(mcpdm->dev);
+		goto out;
+	}
 
 	/* Enable McPDM watch dog for ES above ES 1.0 to avoid saturation */
 	if (omap_rev() != OMAP4430_REV_ES1_0) {
@@ -513,8 +516,8 @@ static int omap_mcpdm_prepare(struct snd_pcm_substream *substream,
 		    omap_abe_port_is_enabled(mcpdm->abe, mcpdm->dl_port))
 			goto out;
 
-		/* PDM tasks require ABE OPP 50 */
-		abe_add_opp_req(mcpdm->dev, ABE_OPP_50);
+		/* PDM tasks require ABE OPP 25 */
+		abe_add_opp_req(mcpdm->dev, ABE_OPP_25);
 
 		/* start ATC before McPDM IP */
 		omap_abe_port_enable(mcpdm->abe, mcpdm->dl_port);
@@ -654,16 +657,11 @@ static int omap_mcpdm_probe(struct snd_soc_dai *dai)
 
 	pm_runtime_enable(mcpdm->dev);
 
-	/* Disable lines while request is ongoing */
-	pm_runtime_get_sync(mcpdm->dev);
-	omap_mcpdm_write(mcpdm, MCPDM_CTRL, 0x00);
-
 	ret = request_irq(mcpdm->irq, omap_mcpdm_irq_handler,
 				0, "McPDM", (void *)mcpdm);
 	if (ret)
 		dev_err(mcpdm->dev, "Request for McPDM IRQ failed\n");
 
-	pm_runtime_put_sync(mcpdm->dev);
 	return ret;
 }
 

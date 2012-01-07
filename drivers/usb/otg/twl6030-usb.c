@@ -343,6 +343,9 @@ static irqreturn_t twl6030_usbotg_irq(int irq, void *_twl)
 
 	if (hw_state & STS_USB_ID) {
 
+		if (twl->otg.state == OTG_STATE_A_IDLE)
+			return IRQ_HANDLED;
+
 		regulator_enable(twl->usb3v3);
 		twl->asleep = 1;
 		twl6030_writeb(twl, TWL_MODULE_USB, USB_ID_INT_EN_HI_CLR, 0x1);
@@ -510,6 +513,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	twl->otg.shutdown	= twl6030_phy_shutdown;
 	twl->otg.set_suspend	= twl6030_phy_suspend;
 	twl->otg.start_srp	= twl6030_start_srp;
+	twl->otg.state		= OTG_STATE_UNDEFINED;
 
 	/* init spinlock for workqueue */
 	spin_lock_init(&twl->lock);

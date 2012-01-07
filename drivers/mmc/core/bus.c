@@ -308,6 +308,7 @@ int mmc_add_card(struct mmc_card *card)
 			mmc_card_ddr_mode(card) ? "DDR " : "",
 			type, card->rca);
 	}
+	mmc_card_set_inserted(card);
 
 #ifdef CONFIG_DEBUG_FS
 	mmc_add_card_debugfs(card);
@@ -340,6 +341,7 @@ void mmc_remove_card(struct mmc_card *card)
 			printk(KERN_INFO "%s: card %04x removed\n",
 				mmc_hostname(card->host), card->rca);
 		}
+		card->state &= ~MMC_STATE_INSERTED;
 		device_del(&card->dev);
 	}
 

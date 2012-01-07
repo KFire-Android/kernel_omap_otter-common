@@ -499,6 +499,8 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
 
 #define TWL4030_PM_MASTER_GLOBAL_TST		0xb6
 
+#define TWL6030_PHOENIX_DEV_ON			0x06
+
 /*
  * TWL6030 PM Master module register offsets (use TWL_MODULE_PM_MASTER)
  */
@@ -744,10 +746,16 @@ struct twl4030_resconfig {
 	u8 remap_sleep;	/* sleep state remapping */
 };
 
+struct twl4030_system_config {
+	char *name;
+	u8 group;
+};
+
 struct twl4030_power_data {
 	struct twl4030_script **scripts;	/* used in TWL4030 only */
 	unsigned num;				/* used in TWL4030 only */
 	struct twl4030_resconfig *resource_config;
+	struct twl4030_system_config *sys_config; /*system resources*/
 #define TWL4030_RESCONFIG_UNDEF	((u8)-1)
 };
 
@@ -778,6 +786,9 @@ struct twl4030_codec_audio_data {
 	u16 hf_right_step;
 	u16 ep_step;
 	void (*set_hs_extmute)(int mute);
+
+	/* twl6040 */
+	int vddhf_uV;
 };
 
 struct twl4030_codec_vibra_data {
@@ -800,6 +811,9 @@ struct twl4030_codec_data {
 	int audpwron_gpio;	/* audio power-on gpio */
 	int naudint_irq;	/* audio interrupt */
 	unsigned int irq_base;
+	int (*get_ext_clk32k)(void);
+	void (*put_ext_clk32k)(void);
+	int (*set_ext_clk32k)(bool on);
 };
 
 struct twl4030_platform_data {

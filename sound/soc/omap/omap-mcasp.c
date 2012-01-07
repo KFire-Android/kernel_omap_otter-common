@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/io.h>
+#include <linux/interrupt.h>
 #include <linux/clk.h>
 #include <linux/pm_runtime.h>
 
@@ -150,6 +151,11 @@
 #define AHCLKXE		BIT(15)
 
 /*
+ * OMAP_MCASP_EVTCTLX_REG - Transmitter Interrupt Control Register bits
+ */
+#define EVTCTLX_XUNDRN		BIT(0)
+
+/*
  * OMAP_MCASP_TXSTAT_REG - Transmit Status Register Bits
  */
 #define TXSTAT_XUNDRN	(0x1 << 0)
@@ -198,6 +204,21 @@
  * OMAP_MCASP_TXEVTCTL_REG - Transmitter DMA Event Control Register bits
  */
 #define TXDATADMADIS	BIT(0)
+
+#define MCASP_ALLOWED_PPM	100
+
+/*
+ * OMAP_MCASP_DITCSRA_REG/OMAP_MCASP_DITCSRB_REG
+ */
+#define OMAP_MCASP_DITCSR_44100HZ	(0x0 << 24)
+#define OMAP_MCASP_DITCSR_48000HZ	(0x2 << 24)
+#define OMAP_MCASP_DITCSR_32000HZ	(0x3 << 24)
+#define OMAP_MCASP_DITCSR_22050HZ	(0x4 << 24)
+#define OMAP_MCASP_DITCSR_24000HZ	(0x6 << 24)
+#define OMAP_MCASP_DITCSR_88200HZ	(0x8 << 24)
+#define OMAP_MCASP_DITCSR_96000HZ	(0xA << 24)
+#define OMAP_MCASP_DITCSR_176400HZ	(0xC << 24)
+#define OMAP_MCASP_DITCSR_192000HZ	(0xE << 24)
 
 /*
  * Stream DMA parameters
@@ -254,22 +275,6 @@ static inline void mcasp_set_ctl_reg(void __iomem *regs, u32 val)
 		printk(KERN_ERR "GBLCTL write error\n");
 }
 
-static void mcasp_clk_on(struct omap_mcasp *mcasp)
-{
-	if (mcasp->clk_active)
-		return;
-	if (!omap_hwmod_enable_clocks(mcasp->oh))
-		mcasp->clk_active = 1;
-}
-
-static void mcasp_clk_off(struct omap_mcasp *mcasp)
-{
-	if (!mcasp->clk_active)
-		return;
-	omap_hwmod_disable_clocks(mcasp->oh);
-	mcasp->clk_active = 0;
-}
-
 static int mcasp_compute_clock_dividers(long fclk_rate, int tgt_sample_rate,
 			int *out_div_lo, int *out_div_hi)
 {
@@ -279,7 +284,8 @@ static int mcasp_compute_clock_dividers(long fclk_rate, int tgt_sample_rate,
 	 * the transmit clock.
 	 */
 	long divisor;
-	int i;
+	unsigned long ppm;
+	int sample_rate, i;
 	BUG_ON(!out_div_lo);
 	BUG_ON(!out_div_hi);
 
@@ -291,11 +297,19 @@ static int mcasp_compute_clock_dividers(long fclk_rate, int tgt_sample_rate,
 
 	fclk_rate >>= 7;
 
-	/* Next, make sure that our target Fs divides fClk/128 */
-	if  (fclk_rate % tgt_sample_rate)
+	/* rounded division: fclk_rate / tgt_sample_rate + 0.5 */
+	divisor = (2 * fclk_rate + tgt_sample_rate) / (2 * tgt_sample_rate);
+	if (!divisor)
 		return -EINVAL;
 
-	divisor = fclk_rate / tgt_sample_rate;
+	sample_rate = fclk_rate / divisor;
+
+	/* ppm calculation in two steps to avoid overflow */
+	ppm = abs(tgt_sample_rate - sample_rate);
+	ppm = (1000000 * ppm) / tgt_sample_rate;
+
+	if (ppm > MCASP_ALLOWED_PPM)
+		return -EINVAL;
 
 	/* At this point, divisor holds the product of the two divider values we
 	 * need to use for ACLKXCTL and AHCLKXCTL.  ACLKXCTL holds a 5 bit
@@ -319,43 +333,7 @@ static int mcasp_compute_clock_dividers(long fclk_rate, int tgt_sample_rate,
 	return (*out_div_hi <= 4096) ? 0 : -EINVAL;
 }
 
-static int mcasp_compute_playback_rates(long fclk_rate)
-{
-	static const int rate_table[][2] = {
-		{ 5512, SNDRV_PCM_RATE_5512 },
-		{ 8000, SNDRV_PCM_RATE_8000 },
-		{ 11025, SNDRV_PCM_RATE_11025 },
-		{ 16000, SNDRV_PCM_RATE_16000 },
-		{ 22050, SNDRV_PCM_RATE_22050 },
-		{ 32000, SNDRV_PCM_RATE_32000 },
-		{ 44100, SNDRV_PCM_RATE_44100 },
-		{ 48000, SNDRV_PCM_RATE_48000 },
-		{ 64000, SNDRV_PCM_RATE_64000 },
-		{ 88200, SNDRV_PCM_RATE_88200 },
-		{ 96000, SNDRV_PCM_RATE_96000 },
-		{ 176400, SNDRV_PCM_RATE_176400 },
-		{ 192000, SNDRV_PCM_RATE_192000 },
-	};
-	int i, res;
-
-	if (!fclk_rate)
-		return 0;
-
-	res = 0;
-	for (i = 0; i < ARRAY_SIZE(rate_table); ++i) {
-		int lo, hi;
-
-		if (!mcasp_compute_clock_dividers(fclk_rate,
-					rate_table[i][0],
-					&lo,
-					&hi))
-			res |= rate_table[i][1];
-	}
-
-	return res;
-}
-
-static int mcasp_start_tx(struct omap_mcasp *mcasp)
+static int omap_mcasp_start(struct omap_mcasp *mcasp)
 {
 	int i;
 	mcasp_set_ctl_reg(mcasp->base + OMAP_MCASP_GBLCTL_REG, TXHCLKRST);
@@ -383,68 +361,26 @@ static int mcasp_start_tx(struct omap_mcasp *mcasp)
 	mcasp_set_ctl_reg(mcasp->base + OMAP_MCASP_GBLCTL_REG, TXFSRST);
 	mcasp_clr_bits(mcasp->base + OMAP_MCASP_TXEVTCTL_REG, TXDATADMADIS);
 
+	/* enable IRQ sources */
+	mcasp_set_bits(mcasp->base + OMAP_MCASP_EVTCTLX_REG, EVTCTLX_XUNDRN);
+
 	return 0;
 }
 
-static int omap_mcasp_start(struct omap_mcasp *mcasp, int stream)
+static void omap_mcasp_stop(struct omap_mcasp *mcasp)
 {
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		return mcasp_start_tx(mcasp);
+	/* disable IRQ sources */
+	mcasp_set_reg(mcasp->base + OMAP_MCASP_EVTCTLX_REG, 0);
 
-	return -EINVAL;
-}
-
-static void mcasp_stop_tx(struct omap_mcasp *mcasp)
-{
 	mcasp_set_reg(mcasp->base + OMAP_MCASP_GBLCTL_REG, 0);
 	mcasp_set_reg(mcasp->base + OMAP_MCASP_TXSTAT_REG,
 			OMAP_MCASP_TXSTAT_MASK);
 }
 
-static void omap_mcasp_stop(struct omap_mcasp *mcasp, int stream)
-{
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		mcasp_stop_tx(mcasp);
-}
-
-static int omap_mcasp_startup(struct snd_pcm_substream *substream,
-			      struct snd_soc_dai *dai)
-{
-	struct platform_device *pdev;
-	struct omap_mcasp *mcasp = snd_soc_dai_get_drvdata(dai);
-
-	mcasp_clk_on(mcasp);
-
-	pdev = to_platform_device(mcasp->dev);
-
-	if (!mcasp->active++)
-		pm_runtime_get_sync(&pdev->dev);
-
-	mcasp_set_reg(mcasp->base + OMAP_MCASP_SYSCONFIG_REG, 0x1);
-
-	return 0;
-}
-
-static void omap_mcasp_shutdown(struct snd_pcm_substream *substream,
-				struct snd_soc_dai *dai)
-{
-	struct platform_device *pdev;
-	struct omap_mcasp *mcasp = snd_soc_dai_get_drvdata(dai);
-
-	pdev = to_platform_device(mcasp->dev);
-
-	mcasp_set_reg(mcasp->base + OMAP_MCASP_SYSCONFIG_REG, 0x2);
-
-	if (!--mcasp->active)
-		pm_runtime_put_sync(&pdev->dev);
-
-	mcasp_clk_off(mcasp);
-}
-
 /* S/PDIF */
-static int omap_hw_dit_param(struct omap_mcasp *mcasp, unsigned int rate)
+static int omap_mcasp_setup(struct omap_mcasp *mcasp, unsigned int rate)
 {
-	u32 aclkxdiv, ahclkxdiv;
+	u32 aclkxdiv, ahclkxdiv, ditcsr;
 	int res;
 
 	/* Set TX frame synch : DIT Mode, 1 bit width, internal, rising edge */
@@ -478,6 +414,41 @@ static int omap_hw_dit_param(struct omap_mcasp *mcasp, unsigned int rate)
 		return res;
 	}
 
+	switch (rate) {
+	case 22050:
+		ditcsr = OMAP_MCASP_DITCSR_22050HZ;
+		break;
+	case 24000:
+		ditcsr = OMAP_MCASP_DITCSR_24000HZ;
+		break;
+	case 32000:
+		ditcsr = OMAP_MCASP_DITCSR_32000HZ;
+		break;
+	case 44100:
+		ditcsr = OMAP_MCASP_DITCSR_44100HZ;
+		break;
+	case 48000:
+		ditcsr = OMAP_MCASP_DITCSR_48000HZ;
+		break;
+	case 88200:
+		ditcsr = OMAP_MCASP_DITCSR_88200HZ;
+		break;
+	case 96000:
+		ditcsr = OMAP_MCASP_DITCSR_96000HZ;
+		break;
+	case 176400:
+		ditcsr = OMAP_MCASP_DITCSR_176400HZ;
+		break;
+	case 192000:
+		ditcsr = OMAP_MCASP_DITCSR_192000HZ;
+		break;
+	default:
+		dev_err(mcasp->dev, "%s: Invalid sampling rate: %d\n",
+			__func__, rate);
+		return -EINVAL;
+	}
+	mcasp_set_reg(mcasp->base + OMAP_MCASP_DITCSRA_REG, ditcsr);
+	mcasp_set_reg(mcasp->base + OMAP_MCASP_DITCSRB_REG, ditcsr);
 	mcasp_set_bits(mcasp->base + OMAP_MCASP_AHCLKXCTL_REG,
 					AHCLKXDIV(ahclkxdiv));
 	mcasp_set_bits(mcasp->base + OMAP_MCASP_ACLKXCTL_REG,
@@ -509,6 +480,57 @@ static int omap_hw_dit_param(struct omap_mcasp *mcasp, unsigned int rate)
 	return 0;
 }
 
+static irqreturn_t omap_mcasp_irq_handler(int irq, void *data)
+{
+	struct omap_mcasp *mcasp = data;
+	u32 txstat;
+
+	txstat = mcasp_get_reg(mcasp->base + OMAP_MCASP_TXSTAT_REG);
+	if (txstat & TXSTAT_XUNDRN) {
+		dev_err(mcasp->dev, "%s: Underrun (0x%08x)\n", __func__,
+			txstat);
+
+		/* Try to recover from this state */
+		spin_lock(&mcasp->lock);
+		if (likely(mcasp->stream_rate)) {
+			dev_err(mcasp->dev, "%s: Trying to recover\n",
+				__func__);
+			omap_mcasp_stop(mcasp);
+			omap_mcasp_setup(mcasp, mcasp->stream_rate);
+			omap_mcasp_start(mcasp);
+		}
+		spin_unlock(&mcasp->lock);
+	}
+
+	mcasp_set_reg(mcasp->base + OMAP_MCASP_TXSTAT_REG, txstat);
+
+	return IRQ_HANDLED;
+}
+
+static int omap_mcasp_startup(struct snd_pcm_substream *substream,
+			      struct snd_soc_dai *dai)
+{
+	struct omap_mcasp *mcasp = snd_soc_dai_get_drvdata(dai);
+
+	/* HACK: Only allow C2 state */
+	pm_qos_add_request(mcasp->pm_qos, PM_QOS_CPU_DMA_LATENCY, 1150);
+
+	pm_runtime_get_sync(mcasp->dev);
+
+	return 0;
+}
+
+static void omap_mcasp_shutdown(struct snd_pcm_substream *substream,
+				struct snd_soc_dai *dai)
+{
+	struct omap_mcasp *mcasp = snd_soc_dai_get_drvdata(dai);
+
+	pm_runtime_put_sync(mcasp->dev);
+
+	/* HACK: remove qos */
+	pm_qos_remove_request(mcasp->pm_qos);
+}
+
 static int omap_mcasp_hw_params(struct snd_pcm_substream *substream,
 					struct snd_pcm_hw_params *params,
 					struct snd_soc_dai *dai)
@@ -516,14 +538,9 @@ static int omap_mcasp_hw_params(struct snd_pcm_substream *substream,
 	struct omap_mcasp *mcasp = snd_soc_dai_get_drvdata(dai);
 	int stream = substream->stream;
 
-	mcasp_stop_tx(mcasp);
+	omap_mcasp_stop(mcasp);
 
-	if ((params_format(params)) != SNDRV_PCM_FORMAT_S16_LE) {
-		printk(KERN_WARNING "omap-mcasp: unsupported PCM format");
-		return -EINVAL;
-	}
-
-	if (omap_hw_dit_param(mcasp, params_rate(params)) < 0)
+	if (omap_mcasp_setup(mcasp, params_rate(params)) < 0)
 		return -EPERM;
 
 	snd_soc_dai_set_dma_data(dai, substream,
@@ -536,24 +553,31 @@ static int omap_mcasp_trigger(struct snd_pcm_substream *substream,
 				     int cmd, struct snd_soc_dai *cpu_dai)
 {
 	struct omap_mcasp *mcasp = snd_soc_dai_get_drvdata(cpu_dai);
+	unsigned long flags;
 	int ret = 0;
+
+	spin_lock_irqsave(&mcasp->lock, flags);
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		ret = omap_mcasp_start(mcasp, substream->stream);
+		mcasp->stream_rate = substream->runtime->rate;
+		ret = omap_mcasp_start(mcasp);
 		break;
 
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		omap_mcasp_stop(mcasp, substream->stream);
+		mcasp->stream_rate = 0;
+		omap_mcasp_stop(mcasp);
 		break;
 
 	default:
 		ret = -EINVAL;
 	}
+
+	spin_unlock_irqrestore(&mcasp->lock, flags);
 
 	return ret;
 }
@@ -566,6 +590,11 @@ static struct snd_soc_dai_ops omap_mcasp_dai_ops = {
 
 };
 
+#define MCASP_RATES	(SNDRV_PCM_RATE_22050 | SNDRV_PCM_RATE_32000 | \
+			 SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 | \
+			 SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000 | \
+			 SNDRV_PCM_RATE_176400 | SNDRV_PCM_RATE_192000)
+
 static struct snd_soc_dai_driver omap_mcasp_dai[] = {
 	{
 		.name		= "omap-mcasp-dai",
@@ -573,6 +602,7 @@ static struct snd_soc_dai_driver omap_mcasp_dai[] = {
 			.channels_min	= 1,
 			.channels_max	= 384,
 			.formats	= SNDRV_PCM_FMTBIT_S16_LE,
+			.rates		= MCASP_RATES,
 		},
 		.ops		= &omap_mcasp_dai_ops,
 	},
@@ -581,61 +611,80 @@ static struct snd_soc_dai_driver omap_mcasp_dai[] = {
 static __devinit int omap_mcasp_probe(struct platform_device *pdev)
 {
 	struct omap_mcasp *mcasp;
-	struct omap_hwmod *oh;
+	struct resource *res;
 	long fclk_rate;
 	int ret = 0;
 
-	oh = omap_hwmod_lookup("omap-mcasp-dai");
-	if (oh == NULL) {
-		dev_err(&pdev->dev, "no hwmod device found\n");
-		return -ENODEV;
-	}
-
 	mcasp = kzalloc(sizeof(struct omap_mcasp), GFP_KERNEL);
 	if (!mcasp)
-		return	-ENOMEM;
-	mcasp->oh = oh;
+		return -ENOMEM;
 
-	mcasp->base = omap_hwmod_get_mpu_rt_va(oh);
-	if (!mcasp->base) {
+	spin_lock_init(&mcasp->lock);
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!res) {
+		dev_err(&pdev->dev, "no resource\n");
 		ret = -ENODEV;
-		goto err;
+		goto err_res;
+	}
+
+	mcasp->base = ioremap(res->start, resource_size(res));
+	if (!mcasp->base) {
+		ret = -ENOMEM;
+		goto err_res;
+	}
+
+	mcasp->irq = platform_get_irq(pdev, 0);
+	if (mcasp->irq < 0) {
+		ret = mcasp->irq;
+		goto err_irq;
+	}
+
+	ret = request_threaded_irq(mcasp->irq, NULL, omap_mcasp_irq_handler,
+				0, "McASP", mcasp);
+	if (ret) {
+		dev_err(mcasp->dev, "IRQ request failed\n");
+		goto err_irq;
 	}
 
 	mcasp->fclk = clk_get(&pdev->dev, "mcasp_fck");
 	if (!mcasp->fclk) {
 		ret = -ENODEV;
-		goto err;
+		goto err_clk;
 	}
-	mcasp_clk_on(mcasp);
+
+	pm_runtime_enable(&pdev->dev);
+	pm_runtime_get_sync(&pdev->dev);
+
 	fclk_rate = clk_get_rate(mcasp->fclk);
 
 	platform_set_drvdata(pdev, mcasp);
 	mcasp->dev = &pdev->dev;
 
-	omap_mcasp_dai[0].playback.rates =
-		mcasp_compute_playback_rates(fclk_rate);
-	if (!omap_mcasp_dai[0].playback.rates) {
-		dev_err(&pdev->dev, "no valid sample rates can be produce from"
-				" a %ld Hz fClk\n", fclk_rate);
-		ret = -ENODEV;
-		goto err;
+	ret = snd_soc_register_dai(&pdev->dev, omap_mcasp_dai);
+	if (ret < 0)
+		goto err_dai;
+
+	/* HACK: qos */
+	mcasp->pm_qos = kzalloc(sizeof(struct pm_qos_request_list), GFP_KERNEL);
+	if (!mcasp->pm_qos) {
+		ret = -ENOMEM;
+		goto err_dai;
 	}
 
-	ret = snd_soc_register_dai(&pdev->dev, omap_mcasp_dai);
-
-	if (ret < 0)
-		goto err;
-
-	pm_runtime_enable(&pdev->dev);
-	mcasp_clk_off(mcasp);
+	pm_runtime_put_sync(&pdev->dev);
 
 	return 0;
-err:
-	if (mcasp && mcasp->fclk)
-		mcasp_clk_off(mcasp);
-	kfree(mcasp);
 
+err_dai:
+	pm_runtime_put_sync(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
+err_clk:
+	free_irq(mcasp->irq, (void *)mcasp);
+err_irq:
+	iounmap(mcasp->base);
+err_res:
+	kfree(mcasp);
 	return ret;
 }
 
@@ -644,9 +693,12 @@ static __devexit int omap_mcasp_remove(struct platform_device *pdev)
 	struct omap_mcasp *mcasp = dev_get_drvdata(&pdev->dev);
 
 	snd_soc_unregister_dai(&pdev->dev);
-	mcasp_clk_off(mcasp);
+	pm_runtime_disable(&pdev->dev);
 	clk_put(mcasp->fclk);
-
+	free_irq(mcasp->irq, (void *)mcasp);
+	iounmap(mcasp->base);
+	/* HACK: qos */
+	kfree(mcasp->pm_qos);
 	kfree(mcasp);
 
 	return 0;

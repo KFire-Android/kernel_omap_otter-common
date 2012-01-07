@@ -296,26 +296,6 @@ void musb_read_fifo(struct musb_hw_ep *hw_ep, u16 len, u8 *dst)
 
 /*-------------------------------------------------------------------------*/
 
-/* for high speed test mode; see USB 2.0 spec 7.1.20 */
-static const u8 musb_test_packet[53] = {
-	/* implicit SYNC then DATA0 to start */
-
-	/* JKJKJKJK x9 */
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	/* JJKKJJKK x8 */
-	0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
-	/* JJJJKKKK x8 */
-	0xee, 0xee, 0xee, 0xee, 0xee, 0xee, 0xee, 0xee,
-	/* JJJJJJJKKKKKKK x8 */
-	0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-	/* JJJJJJJK x8 */
-	0x7f, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd,
-	/* JKKKKKKK x10, JK */
-	0xfc, 0x7e, 0xbf, 0xdf, 0xef, 0xf7, 0xfb, 0xfd, 0x7e
-
-	/* implicit CRC16 then EOP to end */
-};
-
 void musb_load_testpacket(struct musb *musb)
 {
 	void __iomem	*regs = musb->endpoints[0].regs;
@@ -937,15 +917,18 @@ void musb_start(struct musb *musb)
 	devctl = musb_readb(regs, MUSB_DEVCTL);
 	devctl &= ~MUSB_DEVCTL_SESSION;
 
+	/* Detects cold-boot scenario using omap2430_musb_enable() */
+	musb_platform_enable(musb);
+
 	if (is_otg_enabled(musb)) {
 		/* session started after:
 		 * (a) ID-grounded irq, host mode;
 		 * (b) vbus present/connect IRQ, peripheral mode;
 		 * (c) peripheral initiates, using SRP
 		 */
-		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
+		if (musb->xceiv->last_event == USB_EVENT_VBUS)
 			musb->is_active = 1;
-		else
+		else if (musb->xceiv->last_event == USB_EVENT_ID)
 			devctl |= MUSB_DEVCTL_SESSION;
 
 	} else if (is_host_enabled(musb)) {
@@ -953,10 +936,9 @@ void musb_start(struct musb *musb)
 		devctl |= MUSB_DEVCTL_SESSION;
 
 	} else /* peripheral is enabled */ {
-		if ((devctl & MUSB_DEVCTL_VBUS) == MUSB_DEVCTL_VBUS)
+		if (musb->xceiv->last_event == USB_EVENT_VBUS)
 			musb->is_active = 1;
 	}
-	musb_platform_enable(musb);
 	musb_writeb(regs, MUSB_DEVCTL, devctl);
 }
 
@@ -1507,6 +1489,10 @@ static int __init musb_core_init(u16 musb_type, struct musb *musb)
 			dev_dbg(musb->controller, "hw_ep %d not configured\n", i);
 	}
 
+#ifdef CONFIG_USB_MUSB_HSET
+	musb_init_hset("driver/musb_HSET", musb);
+#endif
+
 	return 0;
 }
 
@@ -2049,10 +2035,6 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	if (!is_otg_enabled(musb) && is_host_enabled(musb)) {
 		struct usb_hcd	*hcd = musb_to_hcd(musb);
 
-		MUSB_HST_MODE(musb);
-		musb->xceiv->default_a = 1;
-		musb->xceiv->state = OTG_STATE_A_IDLE;
-
 		status = usb_add_hcd(musb_to_hcd(musb), -1, 0);
 
 		hcd->self.uses_pio_for_control = 1;
@@ -2064,9 +2046,6 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 				? 'B' : 'A'));
 
 	} else /* peripheral is enabled */ {
-		MUSB_DEV_MODE(musb);
-		musb->xceiv->default_a = 0;
-		musb->xceiv->state = OTG_STATE_B_IDLE;
 
 		status = musb_gadget_setup(musb);
 

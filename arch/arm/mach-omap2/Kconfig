@@ -334,6 +334,7 @@ config MACH_OMAP_4430SDP
 	select TWL6030_BCI_BATTERY
 	select CHARGER_BQ2415x
 	select TWL6030_GPADC
+	select OMAP_REBOOT_REASON
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44xx Tablet2 Board"
@@ -351,7 +352,8 @@ config MACH_OMAP_BLAZE
 	select INPUT_BMA180
 	select PANEL_TC358765
 	select KEYBOARD_GPIO
-#	select TWL6040_VIB
+	select TWL6040_VIB
+	select OMAP_REBOOT_REASON
 
 config MACH_OMAP_4430_KC1
 	bool "OMAP 4430 KC1 board"
@@ -370,6 +372,7 @@ config MACH_OMAP_4430_KC1
 	select TWL6030_POWEROFF
 	select INPUT_TWL6030_PWRBUTTON
 	select TWL6030_GPADC
+	select OMAP_REBOOT_REASON
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
@@ -379,6 +382,7 @@ config MACH_OMAP4_PANDA
 	select OMAP_PACKAGE_CBS
 	select REGULATOR_FIXED_VOLTAGE
 	select OMAP_TPS6236X
+	select OMAP_REBOOT_REASON
 
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"
@@ -417,6 +421,10 @@ config OMAP_FIQ_DEBUGGER
 	select FIQ_DEBUGGER
 	help
 	  Enables the serial FIQ debugger on OMAP"
+
+config OMAP_REBOOT_REASON
+	depends on ARCH_OMAP4
+	bool
 
 endmenu
 

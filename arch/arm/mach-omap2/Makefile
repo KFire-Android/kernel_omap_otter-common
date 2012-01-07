@@ -78,6 +78,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm-debug.o
 endif
 obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
 obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
+obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS1P5)	+= smartreflex-class1p5.o
 
 AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
 AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a$(plus_sec)
@@ -252,6 +253,7 @@ obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   board-blaze-panel.o \
 					   board-blaze-keypad.o \
 					   board-blaze-sensors.o \
+					   board-blaze-modem.o \
 					   board-44xx-identity.o \
 					   hsmmc.o \
 					   omap_phy_internal.o \
@@ -315,3 +317,7 @@ obj-$(CONFIG_OMAP_HSI_DEVICE)		+= omap_hsi.o
 obj-$(CONFIG_ION_OMAP)			+= omap4_ion.o
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_dmm.o
 obj-$(CONFIG_OMAP_FIQ_DEBUGGER)		+= omap_fiq_debugger.o
+
+ifeq ($(CONFIG_OMAP_REBOOT_REASON),y)
+obj-$(CONFIG_ARCH_OMAP4)		+= omap4-reboot-reason.o
+endif

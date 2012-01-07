@@ -14,7 +14,7 @@
 
 #define OMAP_MUX_TERMINATOR	0xffff
 
-/* 34xx mux mode options for each pin. See TRM for options */
+/* 34xx/44xx mux mode options for each pin. See TRM for options */
 #define OMAP_MUX_MODE0      0
 #define OMAP_MUX_MODE1      1
 #define OMAP_MUX_MODE2      2
@@ -29,19 +29,19 @@
 #define OMAP_PULL_UP			(1 << 4)
 #define OMAP_ALTELECTRICALSEL		(1 << 5)
 
-/* 34xx specific mux bit defines */
-#define OMAP_INPUT_EN			(1 << 8)
-#define OMAP_OFF_EN			(1 << 9)
+/* 34xx/44xx mux bit defines */
+#define OMAP_INPUT_EN		(1 << 8) /* INPUTENABLE: input */
+#define OMAP_OFF_EN		(1 << 9) /* OFFMODEENABLE: off values valid */
 /* FIXME-HASH: MAY OR MAY NOT NEED THIS */
 #ifdef CONFIG_MACH_OMAP_4430_KC1
-#define OMAP_OFFOUT_EN			(0 << 10)
+#define OMAP_OFFOUT_EN		(0 << 10)
 #else
-#define OMAP_OFFOUT_EN			(1 << 10)
+#define OMAP_OFFOUT_EN		(1 << 10)/* OFFMODEOUTENABLE: input */
 #endif
-#define OMAP_OFFOUT_VAL			(1 << 11)
-#define OMAP_OFF_PULL_EN		(1 << 12)
-#define OMAP_OFF_PULL_UP		(1 << 13)
-#define OMAP_WAKEUP_EN			(1 << 14)
+#define OMAP_OFFOUT_VAL		(1 << 11)/* OFFMODEOUTVALUE: high */
+#define OMAP_OFF_PULL_EN	(1 << 12)/* OFFMODEPULLUDENABLE: activated */
+#define OMAP_OFF_PULL_UP	(1 << 13)/* OFFMODEPULLTYPESELECT: pullup */
+#define OMAP_WAKEUP_EN		(1 << 14)/* WAKEUPENABLE: enable IO wakeup */
 
 /* 44xx specific mux bit defines */
 #define OMAP_WAKEUP_EVENT		(1 << 15)
@@ -55,12 +55,12 @@
 
 /* Off mode states */
 #define OMAP_PIN_OFF_NONE		0
-#define OMAP_PIN_OFF_OUTPUT_HIGH	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
-						| OMAP_OFFOUT_VAL)
-#define OMAP_PIN_OFF_OUTPUT_LOW		(OMAP_OFF_EN | OMAP_OFFOUT_EN)
-#define OMAP_PIN_OFF_INPUT_PULLUP	(OMAP_OFF_EN | OMAP_OFF_PULL_EN \
-						| OMAP_OFF_PULL_UP)
-#define OMAP_PIN_OFF_INPUT_PULLDOWN	(OMAP_OFF_EN | OMAP_OFF_PULL_EN)
+#define OMAP_PIN_OFF_OUTPUT_HIGH	(OMAP_OFF_EN | OMAP_OFFOUT_VAL)
+#define OMAP_PIN_OFF_OUTPUT_LOW		OMAP_OFF_EN
+#define OMAP_PIN_OFF_INPUT_PULLUP	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
+					| OMAP_OFF_PULL_EN | OMAP_OFF_PULL_UP)
+#define OMAP_PIN_OFF_INPUT_PULLDOWN	(OMAP_OFF_EN | OMAP_OFFOUT_EN \
+					| OMAP_OFF_PULL_EN)
 #define OMAP_PIN_OFF_WAKEUPENABLE	OMAP_WAKEUP_EN
 
 #define OMAP_MODE_GPIO(x)	(((x) & OMAP_MUX_MODE7) == OMAP_MUX_MODE4)
@@ -136,6 +136,7 @@ struct omap_mux_partition {
 struct omap_mux {
 	u16	reg_offset;
 	u16	gpio;
+	struct omap_mux_partition *partition;
 #ifdef CONFIG_OMAP_MUX
 	char	*muxnames[OMAP_MUX_NR_MODES];
 #ifdef CONFIG_DEBUG_FS
@@ -286,11 +287,26 @@ static struct omap_board_mux *board_mux __initdata __maybe_unused;
 #endif
 
 /**
- * omap_mux_get_gpio() - get mux register value based on GPIO number
+ * omap_mux_get_gpio() - get mux struct based on GPIO number
  * @gpio:		GPIO number
  *
  */
-u16 omap_mux_get_gpio(int gpio);
+struct omap_mux *omap_mux_get_gpio(int gpio);
+
+/** omap_mux_set_wakeupenable() - set the wakeupenable bit on a mux struct
+ * @m:			mux struct
+ */
+int omap_mux_set_wakeupenable(struct omap_mux *m);
+
+/** omap_mux_clear_wakeupenable() - clear the wakeupenable bit on a mux struct
+ * @m:			mux struct
+ */
+int omap_mux_clear_wakeupenable(struct omap_mux *m);
+
+/** omap_mux_get_wakeupenable() - get the wakeupenable bit from a mux struct
+ * @m:			mux struct
+ */
+bool omap_mux_get_wakeupenable(struct omap_mux *m);
 
 /**
  * omap_mux_set_gpio() - set mux register value based on GPIO number

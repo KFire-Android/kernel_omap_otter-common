@@ -60,8 +60,8 @@ static void throttle_delayed_work_fn(struct work_struct *work);
 
 #define TSHUT_THRESHOLD_TSHUT_HOT	110000	/* 110 deg C */
 #define TSHUT_THRESHOLD_TSHUT_COLD	100000	/* 100 deg C */
-#define BGAP_THRESHOLD_T_HOT		83000	/* 83 deg C */
-#define BGAP_THRESHOLD_T_COLD		76000	/* 76 deg C */
+#define BGAP_THRESHOLD_T_HOT		64000	/* 64 deg C */
+#define BGAP_THRESHOLD_T_COLD		61000	/* 61 deg C */
 #define OMAP_ADC_START_VALUE	530
 #define OMAP_ADC_END_VALUE	923
 
@@ -197,8 +197,8 @@ static int omap_read_current_temp(struct omap_temp_sensor *temp_sensor)
 	adc &= (OMAP4_BGAP_TEMP_SENSOR_DTEMP_MASK);
 
 	if (!temp_sensor->is_efuse_valid)
-		pr_err_once("Invalid EFUSE, Non-trimmed BGAP, \
-			Temp not accurate\n");
+		pr_err_once("%s: Invalid EFUSE, Non-trimmed BGAP,"
+			    "Temp not accurate\n", __func__ );
 
 	if (adc < OMAP_ADC_START_VALUE || adc > OMAP_ADC_END_VALUE) {
 		pr_err("%s:Invalid adc code reported by the sensor %d",
@@ -304,7 +304,7 @@ static int omap_temp_sensor_enable(struct omap_temp_sensor *temp_sensor)
 	spin_lock_irqsave(&temp_sensor->lock, flags);
 
 	if (temp_sensor->clk_on) {
-		pr_err("clock already on\n");
+		pr_debug("%s: clock already on\n", __func__);
 		goto out;
 	}
 
@@ -344,7 +344,7 @@ static int omap_temp_sensor_disable(struct omap_temp_sensor *temp_sensor)
 	spin_lock_irqsave(&temp_sensor->lock, flags);
 
 	if (!temp_sensor->clk_on) {
-		pr_err("clock already off\n");
+		pr_debug("%s: clock already off\n", __func__);
 		goto out;
 	}
 	temp = omap_temp_sensor_readl(temp_sensor,
@@ -391,7 +391,8 @@ static void throttle_delayed_work_fn(struct work_struct *work)
 	curr = omap_read_current_temp(temp_sensor);
 
 	if (curr >= BGAP_THRESHOLD_T_HOT || curr < 0) {
-		pr_warn("OMAP temp read %d exceeds the threshold\n", curr);
+		pr_warn("%s: OMAP temp read %d exceeds the threshold\n",
+			__func__, curr);
 		omap_thermal_throttle();
 		schedule_delayed_work(&temp_sensor->throttle_work,
 			msecs_to_jiffies(THROTTLE_DELAY_MS));

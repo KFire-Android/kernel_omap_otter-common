@@ -15,8 +15,6 @@
 #include <linux/omap_ion.h>
 #include <linux/platform_device.h>
 
-#include <plat/common.h>
-
 #include "omap4_ion.h"
 
 static struct ion_platform_data omap4_ion_data = {
@@ -65,7 +63,6 @@ void __init omap_ion_init(void)
 	int i;
 	int ret;
 
-	omap_reserve();
 	memblock_remove(OMAP4_RAMCONSOLE_START, OMAP4_RAMCONSOLE_SIZE);
 
 	for (i = 0; i < omap4_ion_data.nr; i++)
@@ -78,5 +75,4 @@ void __init omap_ion_init(void)
 				       omap4_ion_data.heaps[i].size,
 				       omap4_ion_data.heaps[i].base);
 		}
-
 }

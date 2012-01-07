@@ -110,7 +110,8 @@ config SND_OMAP_SOC_SDP3430
 
 config SND_OMAP_SOC_SDP4430
 	tristate "SoC Audio support for Texas Instruments SDP4430 or PandaBoard"
-	depends on TWL4030_CORE && (MACH_OMAP_4430SDP || MACH_OMAP4_PANDA)
+	depends on TWL4030_CORE && \
+		(MACH_OMAP_4430SDP || MACH_OMAP4_PANDA || MACH_OMAP4_TABLET)
 	select SND_OMAP_SOC
 	select SND_OMAP_SOC_MCPDM
 	select SND_SOC_TWL6040
@@ -133,14 +134,16 @@ config SND_OMAP_SOC_OMAP4_HDMI
 	  OMAP4 chips
 
 config SND_OMAP4_ABE_USE_ALT_FW
-	bool "Use alternate ABE firmware, which includes DMIC support"
+	bool "Use alternate ABE firmware configuration (DMIC support)"
 	default n
 	depends on SND_OMAP_SOC && SND_OMAP_SOC_ABE_DSP
 	help
-	  The default firmware has several improvements, but disables the DMIC
-	  (Digital MICrophone) feature.
+	  The ABE firmware does not have enough room to use the Bluetooth FIR
+	  filters and also include digital microphone (DMIC) support.  Therefore
+	  DMIC support is disabled by default.  If you say Y, it will remove the
+          BT FIR filters and enable DMIC support.
 
-	  Say Y if you have DMIC (Digital Microphones) that you wish to use.
+	  Say Y if you have DMICs (Digital Microphones) that you wish to use.
 	  Say N otherwise, or if unsure.
 
 config SND_OMAP_SOC_OMAP3_PANDORA

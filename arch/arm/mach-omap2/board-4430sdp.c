@@ -26,6 +26,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/regulator/tps6130x.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
 #include <linux/omapfb.h>
@@ -33,6 +34,7 @@
 #include <linux/twl6040-vib.h>
 #include <linux/wl12xx.h>
 #include <linux/memblock.h>
+#include <linux/mfd/twl6040-codec.h>
 
 #include <mach/hardware.h>
 #include <mach/omap4-common.h>
@@ -56,7 +58,7 @@
 #include <video/omap-panel-nokia-dsi.h>
 #include <plat/vram.h>
 #include <plat/omap-pm.h>
-
+#include <linux/wakelock.h>
 #include "board-blaze.h"
 #include "omap4_ion.h"
 #include "mux.h"
@@ -94,7 +96,6 @@
 #define OMAP_HDMI_HPD_ADDR	0x4A100098
 #define OMAP_HDMI_PULLTYPE_MASK	0x00000010
 
-#define OMAP4SDP_MDM_PWR_EN_GPIO	157
 
 static const int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -324,20 +325,6 @@ static int __init omap_ethernet_init(void)
 static int plat_wlink_kim_suspend(struct platform_device *pdev, pm_message_t
 		state)
 {
-	struct kim_data_s *kim_gdata;
-	struct st_data_s *core_data;
-	static unsigned short retry_suspend = 0;
-
-	kim_gdata = dev_get_drvdata(&pdev->dev);
-	core_data = kim_gdata->core_data;
-	/*Prevent suspend until sleep indication from chip*/
-	if (st_ll_getstate(core_data) != ST_LL_ASLEEP && retry_suspend++ < 5)
-		return -1;
-
-	if (retry_suspend >= 5)
-		pr_err("wilink not asleep: omap device will suspend \n");
-
-	retry_suspend = 0;
 	return 0;
 }
 
@@ -347,6 +334,7 @@ static int plat_wlink_kim_resume(struct platform_device *pdev)
 }
 
 static bool uart_req;
+static struct wake_lock st_wk_lock;
 /* Call the uart disable of serial driver */
 static int plat_uart_disable(void)
 {
@@ -358,6 +346,7 @@ static int plat_uart_disable(void)
 		if (!err)
 			uart_req = false;
 	}
+	wake_unlock(&st_wk_lock);
 	return err;
 }
 
@@ -372,6 +361,7 @@ static int plat_uart_enable(void)
 		if (!err)
 			uart_req = true;
 	}
+	wake_lock(&st_wk_lock);
 	return err;
 }
 
@@ -444,7 +434,8 @@ static struct twl4030_usb_data omap4_usbphy_data = {
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 2,
-		.caps		=  MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
+					MMC_CAP_1_8V_DDR,
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
 		.nonremovable   = true,
@@ -453,7 +444,8 @@ static struct omap2_hsmmc_info mmc[] = {
 	},
 	{
 		.mmc		= 1,
-		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
+					MMC_CAP_1_8V_DDR,
 		.gpio_wp	= -EINVAL,
 	},
 	{
@@ -722,17 +714,67 @@ static void omap4_audio_conf(void)
 		OMAP_PIN_INPUT_PULLUP);
 }
 
+static int tps6130x_enable(int on)
+{
+	u8 val = 0;
+	int ret;
+
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, TWL6040_REG_GPOCTL);
+	if (ret < 0) {
+		pr_err("%s: failed to read GPOCTL %d\n", __func__, ret);
+		return ret;
+	}
+
+	/* TWL6040 GPO2 connected to TPS6130X NRESET */
+	if (on)
+		val |= TWL6040_GPO2;
+	else
+		val &= ~TWL6040_GPO2;
+
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, TWL6040_REG_GPOCTL);
+	if (ret < 0)
+		pr_err("%s: failed to write GPOCTL %d\n", __func__, ret);
+
+	return ret;
+}
+
+static struct tps6130x_platform_data tps6130x_pdata = {
+	.chip_enable	= tps6130x_enable,
+};
+
+static struct regulator_consumer_supply twl6040_vddhf_supply[] = {
+	REGULATOR_SUPPLY("vddhf", "twl6040-codec"),
+};
+
+static struct regulator_init_data twl6040_vddhf = {
+	.constraints = {
+		.min_uV			= 4075000,
+		.max_uV			= 4950000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(twl6040_vddhf_supply),
+	.consumer_supplies	= twl6040_vddhf_supply,
+	.driver_data		= &tps6130x_pdata,
+};
+
 static struct twl4030_codec_audio_data twl6040_audio = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step	= 0x0f,
 	.hs_right_step	= 0x0f,
 	.hf_left_step	= 0x1d,
 	.hf_right_step	= 0x1d,
+	.vddhf_uV	= 4075000,
 };
 
 static struct twl4030_codec_vibra_data twl6040_vibra = {
 	.max_timeout	= 15000,
 	.initial_vibrate = 0,
+	.voltage_raise_speed = 0x26,
 };
 
 static struct twl4030_codec_data twl6040_codec = {
@@ -794,9 +836,15 @@ static struct bq2415x_platform_data sdp4430_bqdata = {
 	.max_charger_currentmA = 1550,
 };
 
-static struct i2c_board_info __initdata sdp4430_i2c_boardinfo = {
+static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
+	{
 		I2C_BOARD_INFO("bq24156", 0x6a),
 		.platform_data = &sdp4430_bqdata,
+	},
+	{
+		I2C_BOARD_INFO("tps6130x", 0x33),
+		.platform_data = &twl6040_vddhf,
+	},
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
@@ -851,7 +899,8 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
 
 	omap4_pmic_init("twl6030", &sdp4430_twldata);
-	i2c_register_board_info(1, &sdp4430_i2c_boardinfo, 1);
+	omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo,
+				ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
@@ -1088,6 +1137,11 @@ static struct omap_board_mux board_mux[] __initdata = {
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
+#else
+#define board_mux	NULL
+#define board_wkup_mux NULL
+#endif
+
 /*
  * LPDDR2 Configeration Data:
  * The memory organisation is as below :
@@ -1104,11 +1158,6 @@ static __initdata struct emif_device_details emif_devices = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
 	.cs1_device = &lpddr2_elpida_2G_S4_dev
 };
-
-#else
-#define board_mux	NULL
-#define board_wkup_mux NULL
-#endif
 
 static struct omap_device_pad blaze_uart1_pads[] __initdata = {
 	{
@@ -1138,7 +1187,7 @@ static struct omap_device_pad blaze_uart2_pads[] __initdata = {
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
 		.flags  = OMAP_DEVICE_PAD_REMUX,
 		.idle   = OMAP_WAKEUP_EN | OMAP_PIN_OFF_INPUT_PULLUP |
-			OMAP_OFFOUT_EN | OMAP_MUX_MODE0,
+			  OMAP_MUX_MODE0,
 	},
 	{
 		.name	= "uart2_rts.uart2_rts",
@@ -1249,7 +1298,7 @@ static void omap4_sdp4430_wifi_init(void)
 }
 
 #if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
-static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+struct usbhs_omap_board_data usbhs_bdata __initdata = {
 	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
 	.port_mode[1] = OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
@@ -1267,9 +1316,9 @@ static void __init omap4_ehci_ohci_init(void)
 		OMAP_PIN_OFF_NONE);
 
 	/* Power on the ULPI PHY */
-	if (gpio_is_valid(OMAP4SDP_MDM_PWR_EN_GPIO)) {
-		gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
-		gpio_direction_output(OMAP4SDP_MDM_PWR_EN_GPIO, 1);
+	if (gpio_is_valid(BLAZE_MDM_PWR_EN_GPIO)) {
+		gpio_request(BLAZE_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
+		gpio_direction_output(BLAZE_MDM_PWR_EN_GPIO, 1);
 	}
 
 	usbhs_init(&usbhs_bdata);
@@ -1281,43 +1330,20 @@ static void __init omap4_ehci_ohci_init(void)
 static void __init omap4_ehci_ohci_init(void){}
 #endif
 
-static int blaze_notifier_call(struct notifier_block *this,
-					unsigned long code, void *cmd)
-{
-	void __iomem *sar_base;
-	u32 v = OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+/*
+ * As OMAP4430 mux HSI and USB signals, when HSI is used (for instance HSI
+ * modem is plugged) we should configure HSI pad conf and disable some USB
+ * configurations.
+ * HSI usage is declared using bootargs variable:
+ * board-4430sdp.modem_ipc=hsi
+ * Any other or missing value will not setup HSI pad conf, and port_mode[0]
+ * will be used by USB.
+ * Variable modem_ipc is used to catch bootargs parameter value.
+ */
+static char *modem_ipc = "n/a";
+module_param(modem_ipc, charp, 0);
+MODULE_PARM_DESC(modem_ipc, "Modem IPC setting");
 
-	sar_base = omap4_get_sar_ram_base();
-
-	if (!sar_base)
-		return notifier_from_errno(-ENOMEM);
-
-	if ((code == SYS_RESTART) && (cmd != NULL)) {
-		/* cmd != null; case: warm boot */
-		if (!strcmp(cmd, "bootloader")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else if (!strcmp(cmd, "recovery")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else {
-			v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-		}
-	}
-
-	omap4_prm_write_inst_reg(0xfff, OMAP4430_PRM_DEVICE_INST,
-			OMAP4_RM_RSTST);
-	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST, OMAP4_RM_RSTCTRL);
-	v = omap4_prm_read_inst_reg(WKUP_MOD, OMAP4_RM_RSTCTRL);
-
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block blaze_reboot_notifier = {
-	.notifier_call = blaze_notifier_call,
-};
 static void __init omap_4430sdp_init(void)
 {
 	int status;
@@ -1336,18 +1362,25 @@ static void __init omap_4430sdp_init(void)
 
 	omap4_audio_conf();
 	omap4_create_board_props();
-	register_reboot_notifier(&blaze_reboot_notifier);
 	blaze_pmic_mux_init();
 	omap4_i2c_init();
 	blaze_sensor_init();
 	blaze_touch_init();
 	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
+	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
 	board_serial_init();
 	omap4_sdp4430_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
 
+	/* blaze_modem_init shall be called before omap4_ehci_ohci_init */
+	if (!strcmp(modem_ipc, "hsi"))
+		blaze_modem_init(true);
+	else
+		blaze_modem_init(false);
+
 	omap4_ehci_ohci_init();
+
 	usb_musb_init(&musb_board_data);
 
 	status = omap_ethernet_init();
@@ -1389,19 +1422,17 @@ static void __init omap_4430sdp_map_io(void)
 }
 static void __init omap_4430sdp_reserve(void)
 {
-
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
-#else
-	omap_reserve();
 #endif
+
+	omap_reserve();
 }
 
 MACHINE_START(OMAP_4430SDP, "OMAP4 blaze board")

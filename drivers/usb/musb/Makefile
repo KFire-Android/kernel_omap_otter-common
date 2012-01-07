@@ -8,6 +8,7 @@ musb_hdrc-y := musb_core.o
 
 musb_hdrc-$(CONFIG_USB_GADGET_MUSB_HDRC)	+= musb_gadget_ep0.o musb_gadget.o
 musb_hdrc-$(CONFIG_USB_MUSB_HDRC_HCD)		+= musb_virthub.o musb_host.o
+musb_hdrc-$(CONFIG_USB_MUSB_HSET)		+= musb_hset.o
 musb_hdrc-$(CONFIG_DEBUG_FS)			+= musb_debugfs.o
 
 # Hardware Glue Layer

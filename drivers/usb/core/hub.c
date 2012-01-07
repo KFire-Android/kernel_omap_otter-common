@@ -131,7 +131,13 @@ MODULE_PARM_DESC(initial_descriptor_timeout,
  * otherwise the new scheme is used.  If that fails and "use_both_schemes"
  * is set, then the driver will make another attempt, using the other scheme.
  */
+
+#ifdef CONFIG_USB_MUSB_HSET
+static int old_scheme_first = 1;
+#else
 static int old_scheme_first = 0;
+#endif
+
 module_param(old_scheme_first, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(old_scheme_first,
 		 "start with the old device initialization scheme");
@@ -1634,12 +1640,13 @@ void usb_disconnect(struct usb_device **pdev)
 {
 	struct usb_device	*udev = *pdev;
 	int			i;
-	struct usb_hcd		*hcd = bus_to_hcd(udev->bus);
+	struct usb_hcd		*hcd;
 
 	if (!udev) {
 		pr_debug ("%s nodev\n", __func__);
 		return;
 	}
+	hcd = bus_to_hcd(udev->bus);
 
 	/* mark the device as inactive, so any further urb submissions for
 	 * this device (and any of its children) will fail immediately.
@@ -2246,7 +2253,7 @@ static int check_port_resume_type(struct usb_device *udev,
 	 * so try a reset-resume instead.
 	 */
 	else if (!(portstatus & USB_PORT_STAT_ENABLE) && !udev->reset_resume) {
-		if (udev->persist_enabled)
+		if (udev->persist_enabled && !(udev->quirks & USB_QUIRK_NO_RESET_RESUME))
 			udev->reset_resume = 1;
 		else
 			status = -ENODEV;
@@ -2429,7 +2436,8 @@ static int finish_port_resume(struct usb_device *udev)
 			status = (status > 0 ? 0 : -ENODEV);
 
 		/* If a normal resume failed, try doing a reset-resume */
-		if (status && !udev->reset_resume && udev->persist_enabled) {
+		if (status && !udev->reset_resume && udev->persist_enabled &&
+				!(udev->quirks & USB_QUIRK_NO_RESET_RESUME)) {
 			dev_dbg(&udev->dev, "retry with reset-resume\n");
 			udev->reset_resume = 1;
 			goto retry_reset_resume;

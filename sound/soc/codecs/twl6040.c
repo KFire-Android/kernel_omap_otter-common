@@ -31,6 +31,7 @@
 #include <linux/i2c/twl.h>
 #include <linux/switch.h>
 #include <linux/mfd/twl6040-codec.h>
+#include <linux/regulator/consumer.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -89,6 +90,7 @@ struct twl6040_data {
 	int headset_mode;
 	unsigned int clk_in;
 	unsigned int sysclk;
+	struct regulator *vddhf_reg;
 	u16 hs_left_step;
 	u16 hs_right_step;
 	u16 hf_left_step;
@@ -100,6 +102,7 @@ struct twl6040_data {
 	struct workqueue_struct *workqueue;
 	struct delayed_work delayed_work;
 	struct mutex mutex;
+	int hfdrv;
 	struct twl6040_output headset;
 	struct twl6040_output earphone;
 	struct twl6040_output handsfree;
@@ -714,6 +717,7 @@ static int pga_event(struct snd_soc_dapm_widget *w,
 	struct twl6040_output *out;
 	struct delayed_work *work;
 	struct workqueue_struct *queue;
+	int ret;
 
 	switch (w->shift) {
 	case 0:
@@ -739,10 +743,29 @@ static int pga_event(struct snd_soc_dapm_widget *w,
 		out->left_step = priv->hf_left_step;
 		out->right_step = priv->hf_right_step;
 		out->step_delay = 5;	/* 5 ms between volume ramp steps */
-		if (SND_SOC_DAPM_EVENT_ON(event))
+		if (SND_SOC_DAPM_EVENT_ON(event)) {
 			priv->non_lp++;
-		else
+			/* enable HF external boost after HFDRVs to reduce pop noise */
+			if (priv->vddhf_reg && (++priv->hfdrv == 2)) {
+				ret = regulator_enable(priv->vddhf_reg);
+				if (ret) {
+					dev_err(codec->dev, "failed to enable "
+						"VDDHF regulator %d\n", ret);
+					return ret;
+				}
+			}
+		} else {
 			priv->non_lp--;
+			/* disable HF external boost before HFDRVs to reduce pop noise */
+			if (priv->vddhf_reg && (priv->hfdrv-- == 2)) {
+				ret = regulator_disable(priv->vddhf_reg);
+				if (ret) {
+					dev_err(codec->dev, "failed to disable "
+						"VDDHF regulator %d\n", ret);
+					return ret;
+				}
+			}
+		}
 		break;
 	default:
 		return -1;
@@ -1389,6 +1412,7 @@ static unsigned int hp_rates[] = {
 	8000,
 	16000,
 	32000,
+	44100,
 	48000,
 	96000,
 };
@@ -1473,13 +1497,13 @@ static int twl6040_hw_params(struct snd_pcm_substream *substream,
 	switch (rate) {
 	case 11250:
 	case 22500:
-	case 44100:
 	case 88200:
 		sysclk = 17640000;
 		break;
 	case 8000:
 	case 16000:
 	case 32000:
+	case 44100:
 	case 48000:
 	case 96000:
 		sysclk = 19200000;
@@ -1659,8 +1683,10 @@ static int twl6040_suspend(struct snd_soc_codec *codec, pm_message_t state)
 
 static int twl6040_resume(struct snd_soc_codec *codec)
 {
-	twl6040_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-	twl6040_set_bias_level(codec, codec->dapm.suspend_bias_level);
+	if (codec->dapm.bias_level != codec->dapm.suspend_bias_level) {
+		twl6040_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
+		twl6040_set_bias_level(codec, codec->dapm.suspend_bias_level);
+	}
 
 	return 0;
 }
@@ -1719,6 +1745,24 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	INIT_DELAYED_WORK(&priv->delayed_work, twl6040_accessory_work);
 
 	mutex_init(&priv->mutex);
+
+	priv->vddhf_reg = regulator_get(codec->dev, "vddhf");
+	if (IS_ERR(priv->vddhf_reg)) {
+		ret = PTR_ERR(priv->vddhf_reg);
+		dev_warn(codec->dev, "couldn't get VDDHF regulator %d\n",
+			 ret);
+		priv->vddhf_reg = NULL;
+	}
+
+	if (priv->vddhf_reg) {
+		ret = regulator_set_voltage(priv->vddhf_reg,
+					    pdata->vddhf_uV, pdata->vddhf_uV);
+		if (ret) {
+			dev_warn(codec->dev, "failed to set VDDHF voltage %d\n",
+				 ret);
+			goto reg_err;
+		}
+	}
 
 	init_completion(&priv->headset.ramp_done);
 	init_completion(&priv->handsfree.ramp_done);
@@ -1782,6 +1826,8 @@ irq_err:
 	destroy_workqueue(priv->ep_workqueue);
 epwork_err:
 reg_err:
+	if (priv->vddhf_reg)
+		regulator_put(priv->vddhf_reg);
 	destroy_workqueue(priv->hs_workqueue);
 hswork_err:
 	destroy_workqueue(priv->hf_workqueue);
@@ -1799,6 +1845,8 @@ static int twl6040_remove(struct snd_soc_codec *codec)
 
 	twl6040_set_bias_level(codec, SND_SOC_BIAS_OFF);
 	twl6040_free_irq(codec->control_data, TWL6040_IRQ_PLUG, codec);
+	if (priv->vddhf_reg)
+		regulator_put(priv->vddhf_reg);
 	switch_dev_unregister(&jack->sdev);
 	destroy_workqueue(priv->workqueue);
 	destroy_workqueue(priv->hf_workqueue);
@@ -1824,6 +1872,13 @@ static struct snd_soc_codec_driver soc_codec_dev_twl6040 = {
 
 static int __devinit twl6040_codec_probe(struct platform_device *pdev)
 {
+	struct twl4030_codec_audio_data *pdata = pdev->dev.platform_data;
+
+	if (!pdata) {
+		dev_err(&pdev->dev, "platform_data is missing\n");
+		return -EINVAL;
+	}
+
 	return snd_soc_register_codec(&pdev->dev,
 			&soc_codec_dev_twl6040, twl6040_dai, ARRAY_SIZE(twl6040_dai));
 }

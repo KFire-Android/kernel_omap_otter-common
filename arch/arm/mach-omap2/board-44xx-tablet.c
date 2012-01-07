@@ -28,10 +28,12 @@
 #include <linux/twl6040-vib.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/regulator/tps6130x.h>
 #include <linux/wl12xx.h>
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
 #include <plat/omap-serial.h>
+#include <linux/mfd/twl6040-codec.h>
 
 #include <mach/dmm.h>
 #include <mach/hardware.h>
@@ -51,7 +53,7 @@
 #include <plat/omap-serial.h>
 #include <plat/remoteproc.h>
 #include <plat/omap-pm.h>
-
+#include <linux/wakelock.h>
 #include "mux.h"
 #include "hsmmc.h"
 #include "timer-gp.h"
@@ -74,6 +76,7 @@
 #define TPS62361_GPIO   7
 
 #define OMAP4_MDM_PWR_EN_GPIO       157
+#define GPIO_USB3320_PHY_RESETB	    171
 #define GPIO_WK30		    30
 
 static struct spi_board_info tablet_spi_board_info[] __initdata = {
@@ -112,20 +115,6 @@ static int __init omap_ethernet_init(void)
 static int plat_wlink_kim_suspend(struct platform_device *pdev, pm_message_t
 		state)
 {
-	struct kim_data_s *kim_gdata;
-	struct st_data_s *core_data;
-	static unsigned short retry_suspend = 0;
-
-	kim_gdata = dev_get_drvdata(&pdev->dev);
-	core_data = kim_gdata->core_data;
-	/*Prevent suspend until sleep indication from chip*/
-	if (st_ll_getstate(core_data) != ST_LL_ASLEEP && retry_suspend++ < 5)
-		return -1;
-
-	if (retry_suspend >= 5)
-		pr_err("wilink not asleep: omap device will suspend \n");
-
-	retry_suspend = 0;
 	return 0;
 }
 
@@ -135,6 +124,7 @@ static int plat_wlink_kim_resume(struct platform_device *pdev)
 }
 
 static bool uart_req;
+static struct wake_lock st_wk_lock;
 /* Call the uart disable of serial driver */
 static int plat_uart_disable(void)
 {
@@ -146,6 +136,7 @@ static int plat_uart_disable(void)
 		if (!err)
 			uart_req = false;
 	}
+	wake_unlock(&st_wk_lock);
 	return err;
 }
 
@@ -160,6 +151,7 @@ static int plat_uart_enable(void)
 		if (!err)
 			uart_req = true;
 	}
+	wake_lock(&st_wk_lock);
 	return err;
 }
 
@@ -221,7 +213,8 @@ static struct twl4030_usb_data omap4_usbphy_data = {
 static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc		= 2,
-		.caps		=  MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.caps		=  MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
+					MMC_CAP_1_8V_DDR,
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
 		.nonremovable   = true,
@@ -230,7 +223,8 @@ static struct omap2_hsmmc_info mmc[] = {
 	},
 	{
 		.mmc		= 1,
-		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA |
+					MMC_CAP_1_8V_DDR,
 		.gpio_wp	= -EINVAL,
 	},
 	{
@@ -482,6 +476,26 @@ static struct regulator_init_data tablet_vusb = {
 	},
 };
 
+static struct regulator_init_data tablet_vcore3 = {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
+static struct regulator_init_data tablet_vmem = {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
 static struct regulator_init_data tablet_clk32kg = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
@@ -496,12 +510,61 @@ static void omap4_audio_conf(void)
 		OMAP_PIN_INPUT_PULLUP);
 }
 
+static int tps6130x_enable(int on)
+{
+	u8 val = 0;
+	int ret;
+
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, TWL6040_REG_GPOCTL);
+	if (ret < 0) {
+		pr_err("%s: failed to read GPOCTL %d\n", __func__, ret);
+		return ret;
+	}
+
+	/* TWL6040 GPO2 connected to TPS6130X NRESET */
+	if (on)
+		val |= TWL6040_GPO2;
+	else
+		val &= ~TWL6040_GPO2;
+
+	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, TWL6040_REG_GPOCTL);
+	if (ret < 0)
+		pr_err("%s: failed to write GPOCTL %d\n", __func__, ret);
+
+	return ret;
+}
+
+static struct tps6130x_platform_data tps6130x_pdata = {
+	.chip_enable	= tps6130x_enable,
+};
+
+static struct regulator_consumer_supply twl6040_vddhf_supply[] = {
+	REGULATOR_SUPPLY("vddhf", "twl6040-codec"),
+};
+
+static struct regulator_init_data twl6040_vddhf = {
+	.constraints = {
+		.min_uV			= 4075000,
+		.max_uV			= 4950000,
+		.apply_uV		= true,
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+					| REGULATOR_MODE_STANDBY,
+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
+					| REGULATOR_CHANGE_MODE
+					| REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies	= ARRAY_SIZE(twl6040_vddhf_supply),
+	.consumer_supplies	= twl6040_vddhf_supply,
+	.driver_data		= &tps6130x_pdata,
+};
+
 static struct twl4030_codec_audio_data twl6040_audio = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step   = 0x0f,
 	.hs_right_step  = 0x0f,
 	.hf_left_step   = 0x1d,
 	.hf_right_step  = 0x1d,
+	.vddhf_uV	= 4075000,
 };
 
 static struct twl4030_codec_vibra_data twl6040_vibra = {
@@ -573,9 +636,15 @@ static struct bq2415x_platform_data sdp4430_bqdata = {
 	.max_charger_currentmA = 1550,
 };
 
-static struct i2c_board_info __initdata sdp4430_i2c_boardinfo = {
-	I2C_BOARD_INFO("bq24156", 0x6a),
-	.platform_data = &sdp4430_bqdata,
+static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("bq24156", 0x6a),
+		.platform_data = &sdp4430_bqdata,
+	},
+	{
+		I2C_BOARD_INFO("tps6130x", 0x33),
+		.platform_data = &twl6040_vddhf,
+	},
 };
 
 static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
@@ -624,8 +693,18 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(3, &sdp4430_i2c_3_bus_pdata);
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
 
+	/*
+	 * VCORE3 & VMEM are not used in 4460. By register it to regulator
+	 * framework will ensures that resources are disabled.
+	 */
+	if (cpu_is_omap446x()) {
+		tablet_twldata.vdd3 = &tablet_vcore3;
+		tablet_twldata.vmem = &tablet_vmem;
+	}
+
 	omap4_pmic_init("twl6030", &tablet_twldata);
-	i2c_register_board_info(1, &sdp4430_i2c_boardinfo, 1);
+	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
+				ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, tablet_i2c_3_boardinfo,
 				ARRAY_SIZE(tablet_i2c_3_boardinfo));
@@ -655,9 +734,35 @@ module_param(enable_suspend_off, bool, S_IRUSR | S_IRGRP | S_IROTH);
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
-	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
+	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT
+                        | OMAP_PULL_ENA),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+
+	/* IO optimization pdpu and offmode settings to reduce leakage */
+	OMAP4_MUX(GPMC_A17, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NBE1, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
+	OMAP4_MUX(GPMC_NCS4, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NCS5, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(GPMC_NCS7, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NBE1, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(GPMC_WAIT0, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
+	OMAP4_MUX(GPMC_NOE, OMAP_MUX_MODE1 | OMAP_INPUT_EN),
+	OMAP4_MUX(MCSPI1_CS1, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(MCSPI1_CS2, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
+					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
+	OMAP4_MUX(SDMMC5_CLK, OMAP_MUX_MODE0 | OMAP_INPUT_EN | OMAP_OFF_EN
+					| OMAP_OFF_PULL_EN),
+        OMAP4_MUX(GPMC_NCS1, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
+	OMAP4_MUX(GPMC_A24, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
 };
+
+#else
+#define board_mux	NULL
+#define board_wkup_mux	NULL
+#endif
 
 /*
  * LPDDR2 Configeration Data:
@@ -675,11 +780,6 @@ static __initdata struct emif_device_details emif_devices = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
 	.cs1_device = &lpddr2_elpida_2G_S4_dev
 };
-
-#else
-#define board_mux	NULL
-#define board_wkup_mux	NULL
-#endif
 
 static struct omap_device_pad tablet_uart1_pads[] __initdata = {
 	{
@@ -709,7 +809,7 @@ static struct omap_device_pad tablet_uart2_pads[] __initdata = {
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
 		.flags  = OMAP_DEVICE_PAD_REMUX,
 		.idle   = OMAP_WAKEUP_EN | OMAP_PIN_OFF_INPUT_PULLUP |
-			OMAP_OFFOUT_EN | OMAP_MUX_MODE0,
+			  OMAP_MUX_MODE0,
 	},
 	{
 		.name	= "uart2_rts.uart2_rts",
@@ -825,13 +925,15 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.phy_reset  = false,
-	.reset_gpio_port[0]  = -EINVAL,
+	.reset_gpio_port[0]  = GPIO_USB3320_PHY_RESETB,
 	.reset_gpio_port[1]  = -EINVAL,
 	.reset_gpio_port[2]  = -EINVAL
 };
 
 static void __init omap4_ehci_ohci_init(void)
 {
+	int ret = 0;
+
 	omap_mux_init_signal("fref_clk3_req.gpio_wk30", \
 		OMAP_PIN_OUTPUT | \
 		OMAP_PIN_OFF_NONE | OMAP_PULL_ENA);
@@ -842,6 +944,18 @@ static void __init omap4_ehci_ohci_init(void)
 		gpio_direction_output(GPIO_WK30, 1);
 		gpio_set_value(GPIO_WK30, 0);
 	}
+
+	/* configure the EHCI PHY USB3320C RESET GPIO */
+	omap_mux_init_gpio(GPIO_USB3320_PHY_RESETB, OMAP_PIN_OUTPUT |
+		OMAP_PIN_OFF_NONE);
+
+	ret = gpio_request(GPIO_USB3320_PHY_RESETB, "usb3320_phy_resetb");
+	if (ret) {
+		pr_err("omap: ehci: Cannot request GPIO %d",
+					GPIO_USB3320_PHY_RESETB);
+		return;
+	}
+	gpio_direction_output(GPIO_USB3320_PHY_RESETB, 1);
 
 	omap_mux_init_signal("usbb2_ulpitll_clk.gpio_157", \
 		OMAP_PIN_OUTPUT | \
@@ -861,45 +975,6 @@ static void __init omap4_ehci_ohci_init(void)
 #else
 static void __init omap4_ehci_ohci_init(void){}
 #endif
-
-static int tablet_notifier_call(struct notifier_block *this,
-					unsigned long code, void *cmd)
-{
-	void __iomem *sar_base;
-	u32 v = OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-
-	sar_base = omap4_get_sar_ram_base();
-
-	if (!sar_base)
-		return notifier_from_errno(-ENOMEM);
-
-	if ((code == SYS_RESTART) && (cmd != NULL)) {
-		/* cmd != null; case: warm boot */
-		if (!strcmp(cmd, "bootloader")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else if (!strcmp(cmd, "recovery")) {
-			/* Save reboot mode in scratch memory */
-			strcpy(sar_base + 0xA0C, cmd);
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-		} else {
-			v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-		}
-	}
-
-	omap4_prm_write_inst_reg(0xfff, OMAP4430_PRM_DEVICE_INST,
-			OMAP4_RM_RSTST);
-	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST, OMAP4_RM_RSTCTRL);
-	v = omap4_prm_read_inst_reg(WKUP_MOD, OMAP4_RM_RSTCTRL);
-
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block tablet_reboot_notifier = {
-	.notifier_call = tablet_notifier_call,
-};
-
 
 static struct platform_device *tablet4430_devices[] __initdata = {
 	&wl128x_device,
@@ -940,7 +1015,6 @@ static void __init omap_tablet_init(void)
 	omap_board_config = tablet_config;
 	omap_board_config_size = ARRAY_SIZE(tablet_config);
 	tablet_rev = omap_init_board_version(0);
-	register_reboot_notifier(&tablet_reboot_notifier);
 	omap4_create_board_props();
 	omap4_audio_conf();
 	omap4_i2c_init();
@@ -957,7 +1031,7 @@ static void __init omap_tablet_init(void)
 	tablet_sensor_init();
 	platform_add_devices(tablet4430_devices,
 			ARRAY_SIZE(tablet4430_devices));
-
+	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
 
@@ -998,12 +1072,10 @@ static void __init omap_tablet_reserve(void)
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
-#else
-	omap_reserve();
 #endif
+	omap_reserve();
 }
 
 

@@ -1,0 +1,5 @@
+config GC_CORE
+	tristate "Vivante 2D/3D Core Driver"
+	default y
+	help
+           Vivante 2D/3D Core Driver.

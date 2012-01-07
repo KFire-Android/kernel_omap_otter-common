@@ -44,6 +44,9 @@ extern struct ion_client *gpsIONClient;
 #endif
 #if defined(CONFIG_TI_TILER)
 #include <mach/tiler.h>
+#include <video/dsscomp.h>
+#include <plat/dsscomp.h>
+
 #endif
 
 #define OMAPLFB_COMMAND_COUNT		1
@@ -54,6 +57,10 @@ extern struct ion_client *gpsIONClient;
 #if (OMAPLFB_MAX_NUM_DEVICES > FB_MAX)
 #error "OMAPLFB_MAX_NUM_DEVICES must not be greater than FB_MAX"
 #endif
+
+#define MAX_FLIPV2_PAGES 4096
+#define MAX_FLIPV2_LAYERS 5
+static u32 aui32PageAddrs[MAX_FLIPV2_PAGES];
 
 static OMAPLFB_DEVINFO *gapsDevInfo[OMAPLFB_MAX_NUM_DEVICES];
 
@@ -868,15 +875,13 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 
 static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 							  OMAPLFB_DEVINFO *psDevInfo,
-							  IMG_VOID **ppvMemInfos,
+							  PDC_MEM_INFO *ppsMemInfos,
 							  IMG_UINT32 ui32NumMemInfos,
 							  struct dsscomp_setup_dispc_data *psDssData,
 							  IMG_UINT32 uiDssDataLength)
 {
-	PVRSRV_KERNEL_MEM_INFO **ppsMemInfos =
-		(PVRSRV_KERNEL_MEM_INFO **)ppvMemInfos;
-	struct tiler_pa_info *apsTilerPAs[5];
-	IMG_UINT32 i, k;
+	struct tiler_pa_info asTilerPAs[MAX_FLIPV2_LAYERS], *apsTilerPAs[MAX_FLIPV2_LAYERS];
+	IMG_UINT32 i, k, used_pas = 0, free_pas = ARRAY_SIZE(aui32PageAddrs);
 
 	if(uiDssDataLength != sizeof(*psDssData))
 	{
@@ -893,69 +898,68 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 
 	for(i = k = 0; i < ui32NumMemInfos && k < ARRAY_SIZE(apsTilerPAs); i++, k++)
 	{
-		struct tiler_pa_info *psTilerInfo;
-		LinuxMemArea *psLinuxMemArea;
+		IMG_CPU_VIRTADDR virtAddr;
+		IMG_CPU_PHYADDR phyAddr;
 		IMG_UINT32 ui32NumPages;
-		IMG_UINT32 uiAddr;
+		IMG_SIZE_T uByteSize;
 		int j;
 
-		psLinuxMemArea = ppsMemInfos[i]->sMemBlk.hOSMemHandle;
-		ui32NumPages = (psLinuxMemArea->ui32ByteSize + PAGE_SIZE - 1) >> PAGE_SHIFT;
+		psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetByteSize(ppsMemInfos[i], &uByteSize);
+		ui32NumPages = (uByteSize + PAGE_SIZE - 1) >> PAGE_SHIFT;
 
 		apsTilerPAs[k] = NULL;
 
-		uiAddr = (IMG_UINT32) LinuxMemAreaToCpuPAddr(psLinuxMemArea, 0).uiAddr;
+		psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], 0, &phyAddr);
+
 		/* NV12 buffers do not need meminfos */
 		if(psDssData->ovls[k].cfg.color_mode == OMAP_DSS_COLOR_NV12)
 		{
 			/* must have still 2 meminfos in array */
 			BUG_ON(i + 1 >= ui32NumMemInfos);
-			psDssData->ovls[k].ba = uiAddr;
+			psDssData->ovls[k].ba = (u32)phyAddr.uiAddr;
 
 			i++;
-			psLinuxMemArea = ppsMemInfos[i]->sMemBlk.hOSMemHandle;
-			psDssData->ovls[k].uv = (u32)LinuxMemAreaToCpuPAddr(psLinuxMemArea, 0).uiAddr;
+			psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], 0, &phyAddr);
+			psDssData->ovls[k].uv = (u32)phyAddr.uiAddr;
 
 			continue;
 		}
 		/* check if it is a TILER buffer */
-		else if(is_tiler_addr(uiAddr))
+		else if(is_tiler_addr((u32)phyAddr.uiAddr))
 		{
-			psDssData->ovls[k].ba = uiAddr;
+			psDssData->ovls[k].ba = (u32)phyAddr.uiAddr;
 			continue;
 		}
 
-		psTilerInfo = kzalloc(sizeof(*psTilerInfo), GFP_KERNEL);
-		if(!psTilerInfo)
-		{
+		if (ui32NumPages > free_pas)
 			continue;
-		}
 
-		psTilerInfo->mem = kzalloc(sizeof(*psTilerInfo->mem) * ui32NumPages, GFP_KERNEL);
-		if(!psTilerInfo->mem)
-		{
-			kfree(psTilerInfo);
-			continue;
-		}
-
-		psTilerInfo->num_pg = ui32NumPages;
-		psTilerInfo->memtype = TILER_MEM_USING;
+		asTilerPAs[k].mem = &aui32PageAddrs[used_pas];
+		asTilerPAs[k].num_pg = ui32NumPages;
+		asTilerPAs[k].memtype = TILER_MEM_USING;
 
 		for(j = 0; j < ui32NumPages; j++)
 		{
-			psTilerInfo->mem[j] =
-				(u32)LinuxMemAreaToCpuPAddr(psLinuxMemArea, j << PAGE_SHIFT).uiAddr;
+			psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], j << PAGE_SHIFT, &phyAddr);
+			aui32PageAddrs[used_pas++] = (u32)phyAddr.uiAddr;
 		}
-
+		free_pas -= ui32NumPages;
 		/* need base address for in-page offset */
-		psDssData->ovls[k].ba = (u32)ppsMemInfos[i]->pvLinAddrKM;
-		apsTilerPAs[k] = psTilerInfo;
+		psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuVAddr(ppsMemInfos[i], &virtAddr);
+		psDssData->ovls[k].ba = (u32)virtAddr;
+		apsTilerPAs[k] = &asTilerPAs[k];
 	}
 
 	/* set up cloned layer addresses (but don't duplicate tiler_pas) */
 	for(i = k; i < psDssData->num_ovls && i < ARRAY_SIZE(apsTilerPAs); i++)
 	{
 		unsigned int ix = psDssData->ovls[i].ba;
+		if(ix >= ARRAY_SIZE(apsTilerPAs))
+		{
+			WARN(1, "Invalid clone layer (%u); skipping all cloned layers", ix);
+			psDssData->num_ovls = k;
+			break;
+		}
 		apsTilerPAs[i] = apsTilerPAs[ix];
 		psDssData->ovls[i].ba = psDssData->ovls[ix].ba;
 		psDssData->ovls[i].uv = psDssData->ovls[ix].uv;
@@ -964,11 +968,6 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 	dsscomp_gralloc_queue(psDssData, apsTilerPAs, false,
 						  dsscomp_proxy_cmdcomplete,
 						  (void *)hCmdCookie);
-
-	for(i = 0; i < k; i++)
-	{
-		tiler_pa_free(apsTilerPAs[i]);
-	}
 
 	return IMG_TRUE;
 }
@@ -1011,7 +1010,7 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 		psFlipCmd2 = (DISPLAYCLASS_FLIP_COMMAND2 *)pvData;
 		return ProcessFlipV2(hCmdCookie,
 							 psDevInfo,
-							 psFlipCmd2->ppvMemInfos,
+							 psFlipCmd2->ppsMemInfos,
 							 psFlipCmd2->ui32NumMemInfos,
 							 psFlipCmd2->pvPrivData,
 							 psFlipCmd2->ui32PrivDataLength);

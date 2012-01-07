@@ -46,33 +46,10 @@
 #include "omap-dmic.h"
 #include "../codecs/twl6040.h"
 
-#define TPS6130X_I2C_ADAPTER   1
-
 static struct regulator *av_switch_reg;
 static int twl6040_power_mode;
 static int mcbsp_cfg;
 static struct snd_soc_codec *twl6040_codec;
-static struct i2c_client *tps6130x_client;
-static struct i2c_board_info tps6130x_hwmon_info = {
-	I2C_BOARD_INFO("tps6130x", 0x33),
-};
-
-/* configure the TPS6130x Handsfree Boost Converter */
-static int sdp4430_tps6130x_configure(void)
-{
-	u8 data[2];
-
-	data[0] = 0x01;
-	data[1] = 0x60;
-	if (i2c_master_send(tps6130x_client, data, 2) != 2)
-		printk(KERN_ERR "I2C write to TPS6130x failed\n");
-
-	data[0] = 0x02;
-	if (i2c_master_send(tps6130x_client, data, 2) != 2)
-		printk(KERN_ERR "I2C write to TPS6130x failed\n");
-
-	return 0;
-}
 
 static int sdp4430_modem_mcbsp_configure(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params, int flag)
@@ -190,27 +167,38 @@ static int sdp4430_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret = 0;
-	unsigned int be_id;
+	unsigned int be_id, channels;
 
+	be_id = rtd->dai_link->be_id;
 
-        be_id = rtd->dai_link->be_id;
-
-	if (be_id == OMAP_ABE_DAI_MM_FM) {
+	 if (be_id == OMAP_ABE_DAI_BT_VX) {
+		ret = snd_soc_dai_set_fmt(cpu_dai,
+			SND_SOC_DAIFMT_DSP_B |
+			SND_SOC_DAIFMT_NB_IF |
+			SND_SOC_DAIFMT_CBM_CFM);
+	} else {
 		/* Set cpu DAI configuration */
 		ret = snd_soc_dai_set_fmt(cpu_dai,
 				  SND_SOC_DAIFMT_I2S |
 				  SND_SOC_DAIFMT_NB_NF |
 				  SND_SOC_DAIFMT_CBM_CFM);
-	} else if (be_id == OMAP_ABE_DAI_BT_VX) {
-	        ret = snd_soc_dai_set_fmt(cpu_dai,
-                                  SND_SOC_DAIFMT_DSP_B |
-                                  SND_SOC_DAIFMT_NB_IF |
-                                  SND_SOC_DAIFMT_CBM_CFM);
 	}
 
 	if (ret < 0) {
 		printk(KERN_ERR "can't set cpu DAI configuration\n");
 		return ret;
+	}
+
+	if (params != NULL) {
+		/* Configure McBSP internal buffer usage */
+		/* this need to be done for playback and/or record */
+		channels = params_channels(params);
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+			omap_mcbsp_set_tx_threshold(
+				cpu_dai->id, channels);
+		else
+			omap_mcbsp_set_rx_threshold(
+				cpu_dai->id, channels);
 	}
 
 	/*
@@ -263,10 +251,11 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
                                        SNDRV_PCM_HW_PARAM_CHANNELS);
 	unsigned int be_id = rtd->dai_link->be_id;
 
-	if (be_id == OMAP_ABE_DAI_MM_FM)
-		channels->min = 2;
-	else if (be_id == OMAP_ABE_DAI_BT_VX)
+	if (be_id == OMAP_ABE_DAI_BT_VX)
 		channels->min = 1;
+	else
+		channels->min = 2;
+
 	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
 	                            SNDRV_PCM_HW_PARAM_FIRST_MASK],
 	                            SNDRV_PCM_FORMAT_S16_LE);
@@ -839,6 +828,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 
 		.init = sdp4430_dmic_init,
 		.ops = &sdp4430_dmic_ops,
+		.ignore_suspend = 1,
 	},
 
 /*
@@ -962,7 +952,7 @@ static struct snd_soc_dai_link sdp4430_dai[] = {
 	},
 	{
 		.name = OMAP_ABE_BE_MM_EXT0,
-		.stream_name = "FM",
+		.stream_name = "FM Playback",
 
 		/* ABE components - MCBSP2 - MM-EXT */
 		.cpu_dai_name = "omap-mcbsp-dai.1",
@@ -1064,12 +1054,9 @@ static struct snd_soc_card snd_soc_sdp4430 = {
 };
 
 static struct platform_device *sdp4430_snd_device;
-static struct i2c_adapter *adapter;
 
 static int __init sdp4430_soc_init(void)
 {
-	struct i2c_adapter *adapter;
-	u8 gpoctl;
 	int ret;
 
 	if (!machine_is_omap_4430sdp() && !machine_is_omap4_panda() &&
@@ -1116,49 +1103,8 @@ static int __init sdp4430_soc_init(void)
 		goto err_dev;
 	}
 
-	/* enable tps6130x */
-	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &gpoctl,
-		TWL6040_REG_GPOCTL);
-	if (ret) {
-		printk(KERN_ERR "i2c read error\n");
-		goto i2c_err;
-	}
-
-	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl | TWL6040_GPO2,
-		TWL6040_REG_GPOCTL);
-	if (ret) {
-		printk(KERN_ERR "i2c write error\n");
-		goto i2c_err;
-	}
-
-	adapter = i2c_get_adapter(TPS6130X_I2C_ADAPTER);
-	if (!adapter) {
-		printk(KERN_ERR "can't get i2c adapter\n");
-		ret = -ENODEV;
-		goto adp_err;
-	}
-
-	tps6130x_client = i2c_new_device(adapter, &tps6130x_hwmon_info);
-	if (!tps6130x_client) {
-		printk(KERN_ERR "can't add i2c device\n");
-		ret = -ENODEV;
-		goto tps_err;
-	}
-
-
-	/* Only configure the TPS6130x on SDP4430 */
-	if (machine_is_omap_4430sdp() || machine_is_omap_tabletblaze())
-		sdp4430_tps6130x_configure();
-	i2c_put_adapter(adapter);
-
 	return ret;
 
-tps_err:
-	i2c_put_adapter(adapter);
-adp_err:
-	twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, gpoctl, TWL6040_REG_GPOCTL);
-i2c_err:
-	regulator_put(av_switch_reg);
 err_dev:
 	snd_soc_unregister_dais(&sdp4430_snd_device->dev, ARRAY_SIZE(dai));
 err:
@@ -1172,8 +1118,6 @@ static void __exit sdp4430_soc_exit(void)
 	regulator_put(av_switch_reg);
 	platform_device_unregister(sdp4430_snd_device);
 	snd_soc_unregister_dais(&sdp4430_snd_device->dev, ARRAY_SIZE(dai));
-	i2c_unregister_device(tps6130x_client);
-	i2c_put_adapter(adapter);
 }
 module_exit(sdp4430_soc_exit);
 

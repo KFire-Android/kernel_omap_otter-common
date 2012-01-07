@@ -712,6 +712,8 @@ static void hdmi_wp_video_init_format(struct hdmi_video_format *video_fmt,
 	pr_debug("Enter hdmi_wp_video_init_format\n");
 
 	video_fmt->y_res = param->timings.yres;
+	if (param->timings.vmode & FB_VMODE_INTERLACED)
+		video_fmt->y_res /= 2;
 	video_fmt->x_res = param->timings.xres;
 
 	omapfb_fb2dss_timings(&param->timings, timings);

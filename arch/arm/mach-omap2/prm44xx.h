@@ -74,8 +74,8 @@
 
 /* OMAP4 specific register offsets */
 #define OMAP4_RM_RSTCTRL				0x0000
-#define OMAP4_RM_RSTTIME				0x0004
-#define OMAP4_RM_RSTST					0x0008
+#define OMAP4_RM_RSTST					0x0004
+#define OMAP4_RM_RSTTIME				0x0008
 #define OMAP4_PM_PWSTCTRL				0x0000
 #define OMAP4_PM_PWSTST					0x0004
 
@@ -772,6 +772,7 @@ extern int omap4_prm_assert_hardreset(void __iomem *rstctrl_reg, u8 shift);
 extern int omap4_prm_deassert_hardreset(void __iomem *rstctrl_reg, u8 shift);
 
 extern void omap4_prm_global_warm_sw_reset(void);
+extern void omap4_prm_global_cold_sw_reset(void);
 
 #define OMAP4_PRM_IRQ_VDD_CORE_ID	0
 #define OMAP4_PRM_IRQ_VDD_IVA_ID	1

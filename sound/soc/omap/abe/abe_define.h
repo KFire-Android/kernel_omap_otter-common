@@ -59,7 +59,7 @@
 #define _ABE_DEFINE_H_
 #define ATC_DESCRIPTOR_NUMBER                               64
 #define PROCESSING_SLOTS                                    25
-#define TASK_POOL_LENGTH                                    136
+#define TASK_POOL_LENGTH                                    150
 #define MCU_IRQ                                            0x24
 #define MCU_IRQ_SHIFT2                                     0x90
 #define DMA_REQ_SHIFT2                                     0x210

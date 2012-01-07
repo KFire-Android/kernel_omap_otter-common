@@ -425,12 +425,21 @@ static int tc358765_enable(struct omap_dss_device *dssdev)
 	return r;
 }
 
+static int tc358765_suspend(struct omap_dss_device *dssdev)
+{
+	/* Disable the panel and return 0;*/
+	tc358765_disable(dssdev);
+	return 0;
+}
+
 static struct omap_dss_driver tc358765_driver = {
 	.probe		= tc358765_probe,
 	.remove		= tc358765_remove,
 
 	.enable		= tc358765_enable,
 	.disable	= tc358765_disable,
+	.suspend	= tc358765_suspend,
+	.resume		= NULL,
 
 	.get_resolution	= tc358765_get_resolution,
 	.get_recommended_bpp = omapdss_default_get_recommended_bpp,

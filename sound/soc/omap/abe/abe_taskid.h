@@ -186,13 +186,15 @@
 #define C_ABE_FW_TASK_SRC44P1_TONES_1211                    126
 #define C_ABE_FW_TASK_SRC44P1_MMDL_PP                       127
 #define C_ABE_FW_TASK_SRC44P1_MMDL_1211_PP                  128
-#define C_ABE_FW_TASK_CHECK_IIR_LEFT                        129
-#define C_ABE_FW_TASK_CHECK_IIR_RIGHT                       130
+#define C_ABE_FW_TASK_CHECK_IIR_LEFT_8K                     129
+#define C_ABE_FW_TASK_CHECK_IIR_RIGHT_8K                    130
 #define C_ABE_FW_TASK_BT_DL_48_8_LP_FIR                     131
 #define C_ABE_FW_TASK_BT_DL_48_8_FIR                        132
 #define C_ABE_FW_TASK_BT_DL_48_8_FIR_OPP100                 133
 #define C_ABE_FW_TASK_VX_UL_48_8_FIR                        134
 #define C_ABE_FW_TASK_VX_UL_48_8_LP_FIR                     135
+#define C_ABE_FW_TASK_CHECK_IIR_LEFT_16K                    136
+#define C_ABE_FW_TASK_CHECK_IIR_RIGHT_16K                   137
 
 /*
  * Alternate firmware compatibility macros

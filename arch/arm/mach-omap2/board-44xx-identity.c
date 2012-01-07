@@ -28,6 +28,8 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
+#include "control.h"
+
 static ssize_t omap4_soc_family_show(struct kobject *kobj,
 				    struct kobj_attribute *attr, char *buf)
 {
@@ -98,6 +100,42 @@ static ssize_t omap4_soc_type_max_freq(struct kobject *kobj,
 	return sprintf(buf, "%s\n", max_freq);
 }
 
+static ssize_t omap4_soc_dpll_trimmed(struct kobject *kobj,
+				 struct kobj_attribute *attr, char *buf)
+{
+	int trimmed;
+	char *trim_freq = "2.0GhZ";
+
+	trimmed = omap_readl(0x4a002268) & ((1 << 18) | (1 << 19));
+
+	if ((trimmed & (1 << 18)) && (trimmed & (1 << 19)))
+		trim_freq = "3.0GHz";
+	else if (trimmed & (1 << 18))
+		trim_freq = "2.4GHz";
+
+	pr_info("%s:DPLL is trimmed to %s\n", __func__, trim_freq);
+
+	return sprintf(buf, "%s\n", trim_freq);
+}
+
+static ssize_t omap4_soc_rbb_trimmed(struct kobject *kobj,
+				 struct kobj_attribute *attr, char *buf)
+{
+	int trimmed = 1;
+	int reg = 0;
+
+	if (cpu_is_omap446x()) {
+		/* read eFuse register here */
+		reg = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STD_FUSE_OPP_DPLL_1);
+		trimmed = reg & (1 << 20);
+		pr_info("%s:RBB is %s set\n", __func__, trimmed ? "" : "not");
+
+		return sprintf(buf, "%s\n", trimmed ? "true" : "false");
+	}
+
+	return sprintf(buf, "%s\n", "Not Available");
+}
+
 #define OMAP4_SOC_ATTR_RO(_name, _show) \
 	struct kobj_attribute omap4_soc_prop_attr_##_name = \
 		__ATTR(_name, S_IRUGO, _show, NULL)
@@ -110,6 +148,8 @@ static OMAP4_SOC_ATTR_RO(family, omap4_soc_family_show);
 static OMAP4_SOC_ATTR_RO(revision, omap4_soc_revision_show);
 static OMAP4_SOC_ATTR_RO(type, omap4_soc_type_show);
 static OMAP4_SOC_ATTR_RO(max_freq, omap4_soc_type_max_freq);
+static OMAP4_SOC_ATTR_RO(dpll_trimmed, omap4_soc_dpll_trimmed);
+static OMAP4_SOC_ATTR_RO(rbb_trimmed, omap4_soc_rbb_trimmed);
 
 static OMAP4_BOARD_ATTR_RO(board_rev, omap4_board_rev_show);
 
@@ -118,6 +158,8 @@ static struct attribute *omap4_soc_prop_attrs[] = {
 	&omap4_soc_prop_attr_revision.attr,
 	&omap4_soc_prop_attr_type.attr,
 	&omap4_soc_prop_attr_max_freq.attr,
+	&omap4_soc_prop_attr_dpll_trimmed.attr,
+	&omap4_soc_prop_attr_rbb_trimmed.attr,
 	NULL,
 };
 

@@ -443,6 +443,7 @@ static int rprm_i2c_request(struct rprm_elem *e, struct rprm_i2c *obj)
 	i2c_put_adapter(adapter);
 
 	ret = pm_runtime_get_sync(i2c_dev);
+	ret -= ret == 1;
 	if (!ret)
 		e->handle = i2c_dev;
 	else

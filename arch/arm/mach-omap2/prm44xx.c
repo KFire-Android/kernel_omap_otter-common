@@ -21,6 +21,7 @@
 #include <plat/cpu.h>
 #include <plat/prcm.h>
 
+#include "voltage.h"
 #include "vp.h"
 #include "prm44xx.h"
 #include "prm-regbits-44xx.h"
@@ -189,6 +190,21 @@ void omap4_prm_global_warm_sw_reset(void)
 	v = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
 				    OMAP4_RM_RSTCTRL);
 	v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST,
+				 OMAP4_RM_RSTCTRL);
+
+	/* OCP barrier */
+	v = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+				    OMAP4_RM_RSTCTRL);
+}
+
+void omap4_prm_global_cold_sw_reset(void)
+{
+	u32 v;
+
+	v = omap4_prm_read_inst_reg(OMAP4430_PRM_DEVICE_INST,
+				    OMAP4_RM_RSTCTRL);
+	v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
 	omap4_prm_write_inst_reg(v, OMAP4430_PRM_DEVICE_INST,
 				 OMAP4_RM_RSTCTRL);
 
