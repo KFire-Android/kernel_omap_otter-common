@@ -81,6 +81,7 @@ typedef struct OMAPLFB_BUFFER_TAG
 
 	OMAPLFB_HANDLE      		hCmdComplete;
 	unsigned long    		ulSwapInterval;
+	void *bvmap_handle;
 } OMAPLFB_BUFFER;
 
 typedef struct OMAPLFB_SWAPCHAIN_TAG

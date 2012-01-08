@@ -31,6 +31,9 @@
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/notifier.h>
+#include <linux/bltsville.h>
+#include <linux/bvinternal.h>
+#include <linux/bv_gc2d.h>
 
 #include "img_defs.h"
 #include "servicesext.h"
@@ -46,8 +49,8 @@ extern struct ion_client *gpsIONClient;
 #include <mach/tiler.h>
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
-
 #endif
+#include <video/omap_hwc.h>
 
 #define OMAPLFB_COMMAND_COUNT		1
 
@@ -61,6 +64,9 @@ extern struct ion_client *gpsIONClient;
 static OMAPLFB_DEVINFO *gapsDevInfo[OMAPLFB_MAX_NUM_DEVICES];
 
 static PFN_DC_GET_PVRJTABLE gpfnGetPVRJTable = NULL;
+
+static int bv_gc2d_is_present;
+static struct bventry bv_gc2d_entry = {NULL, NULL, NULL};
 
 static inline unsigned long RoundUpToMultiple(unsigned long x, unsigned long y)
 {
@@ -374,6 +380,7 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 	IMG_UINT32 i;
 	PVRSRV_ERROR eError;
 	IMG_UINT32 ui32BuffersToSkip;
+	struct bventry *bv_entry;
 
 	UNREFERENCED_PARAMETER(ui32OEMFlags);
 	
@@ -497,7 +504,79 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 		}
 		psBuffer[i].psDevInfo = psDevInfo;
 		OMAPLFBInitBufferForSwap(&psBuffer[i]);
+		psBuffer[i].bvmap_handle = NULL;
 	}
+
+	if (!bv_gc2d_is_present)
+		goto skip_bv_map;
+	else
+		bv_entry = &bv_gc2d_entry;
+
+	for (i = 0; i < ui32BufferCount; i++) {
+		OMAPLFB_FBINFO *psPVRFBInfo = &psDevInfo->sFBInfo;
+		unsigned long phy_addr = psBuffer[i].sSysAddr.uiAddr;
+		unsigned int num_pages;
+		unsigned long *page_addrs;
+		enum bverror bv_error;
+		int j;
+		struct bvbuffdesc *buffdesc;
+
+		if (psPVRFBInfo->bIs2D) {
+			int pages_per_row =
+				psPVRFBInfo->ulByteStride >> PAGE_SHIFT;
+			num_pages = pages_per_row * psPVRFBInfo->ulHeight;
+		} else {
+			num_pages = ((psPVRFBInfo->ulByteStride *
+				psPVRFBInfo->ulHeight) + PAGE_SIZE - 1) >>
+				PAGE_SHIFT;
+		}
+
+		page_addrs = kzalloc(sizeof(*page_addrs) *
+			num_pages, GFP_KERNEL);
+		if (!page_addrs) {
+			WARN(1, "%s: Out of memory\n", __func__);
+			continue;
+		}
+
+		buffdesc = kzalloc(sizeof(*buffdesc), GFP_KERNEL);
+		if (!buffdesc) {
+			WARN(1, "%s: Out of memory\n", __func__);
+			kfree(page_addrs);
+			continue;
+		}
+
+		if (psDevInfo->sFBInfo.bIs2D) {
+			int pages_offset = (phy_addr -
+				psPVRFBInfo->psPageList->uiAddr) >> PAGE_SHIFT;
+			IMG_SYS_PHYADDR *base_sysaddr =
+				psPVRFBInfo->psPageList +
+				psPVRFBInfo->ulHeight * pages_offset;
+			for (j = 0; j < num_pages; j++) {
+				page_addrs[j] = base_sysaddr->uiAddr;
+				base_sysaddr++;
+			}
+		} else {
+			for (j = 0; j < num_pages; j++)
+				page_addrs[j] = phy_addr + (j * PAGE_SIZE);
+		}
+
+		buffdesc->structsize = sizeof(*buffdesc);
+		buffdesc->pagesize = PAGE_SIZE;
+		buffdesc->pagearray = page_addrs;
+		buffdesc->pagecount = num_pages;
+
+		bv_error = bv_entry->bv_map(buffdesc);
+		if (bv_error) {
+			WARN(1, "%s: BV map swapchain buffer failed %d\n",
+				__func__, bv_error);
+			psBuffer[i].bvmap_handle = NULL;
+			kfree(buffdesc);
+		} else
+			psBuffer[i].bvmap_handle = buffdesc;
+
+		kfree(page_addrs);
+	}
+skip_bv_map:
 
 	if (OMAPLFBCreateSwapQueue(psSwapChain) != OMAPLFB_OK)
 	{ 
@@ -547,7 +626,7 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 	OMAPLFB_DEVINFO	*psDevInfo;
 	OMAPLFB_SWAPCHAIN *psSwapChain;
 	OMAPLFB_ERROR eError;
-
+	int i;
 	
 	if(!hDevice || !hSwapChain)
 	{
@@ -577,7 +656,21 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 		printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Couldn't disable framebuffer event notification\n", __FUNCTION__, psDevInfo->uiFBDevID);
 	}
 
-	
+	if (bv_gc2d_is_present) {
+		struct bventry *bv_entry = &bv_gc2d_entry;
+
+		for (i = 0; i < psSwapChain->ulBufferCount; i++) {
+			struct bvbuffdesc *buffdesc;
+
+			if (!psSwapChain->psBuffer[i].bvmap_handle)
+				continue;
+
+			buffdesc = psSwapChain->psBuffer[i].bvmap_handle;
+			bv_entry->bv_unmap(buffdesc);
+			kfree(buffdesc);
+		}
+	}
+
 	OMAPLFBFreeKernelMem(psSwapChain->psBuffer);
 	OMAPLFBFreeKernelMem(psSwapChain);
 
@@ -878,28 +971,241 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 #include "services.h"
 #include "mm.h"
 
+/* FIXME: Manual clipping, this should be done in bltsville not here */
+static void clip_rects(struct bvbltparams *pParmsIn)
+{
+	if (pParmsIn->dstrect.left < 0 || pParmsIn->dstrect.top < 0 ||
+		(pParmsIn->dstrect.left + pParmsIn->dstrect.width) >
+			pParmsIn->dstgeom->width ||
+		(pParmsIn->dstrect.top + pParmsIn->dstrect.height) >
+			pParmsIn->dstgeom->height) {
+
+		/* Adjust src1 */
+		if (pParmsIn->dstrect.left < 0) {
+			pParmsIn->src1rect.left = abs(pParmsIn->dstrect.left);
+			pParmsIn->src1rect.width -= pParmsIn->src1rect.left;
+			pParmsIn->dstrect.left = 0;
+		}
+
+		if (pParmsIn->dstrect.top < 0) {
+			pParmsIn->src1rect.top = abs(pParmsIn->dstrect.top);
+			pParmsIn->src1rect.height -= pParmsIn->src1rect.top;
+			pParmsIn->dstrect.top = 0;
+		}
+
+		if (pParmsIn->dstrect.left + pParmsIn->dstrect.width >
+			pParmsIn->dstgeom->width) {
+			pParmsIn->dstrect.width -= (pParmsIn->dstrect.left +
+				pParmsIn->dstrect.width) -
+				pParmsIn->dstgeom->width;
+			pParmsIn->src1rect.width = pParmsIn->dstrect.width;
+		}
+
+		if (pParmsIn->dstrect.top + pParmsIn->dstrect.height >
+			pParmsIn->dstgeom->height) {
+			pParmsIn->dstrect.height -= (pParmsIn->dstrect.top +
+				pParmsIn->dstrect.height) -
+				pParmsIn->dstgeom->height;
+			pParmsIn->src1rect.height = pParmsIn->dstrect.height;
+		}
+
+		/* Adjust src2 */
+		if (pParmsIn->dstrect.left < 0) {
+			pParmsIn->src2rect.left = abs(pParmsIn->dstrect.left);
+			pParmsIn->src2rect.width -= pParmsIn->src2rect.left;
+			pParmsIn->dstrect.left = 0;
+		}
+
+		if (pParmsIn->dstrect.top < 0) {
+			pParmsIn->src2rect.top = abs(pParmsIn->dstrect.top);
+			pParmsIn->src2rect.height -= pParmsIn->src2rect.top;
+			pParmsIn->dstrect.top = 0;
+		}
+
+		if (pParmsIn->dstrect.left + pParmsIn->dstrect.width >
+			pParmsIn->dstgeom->width) {
+			pParmsIn->dstrect.width -= (pParmsIn->dstrect.left +
+				pParmsIn->dstrect.width) -
+				pParmsIn->dstgeom->width;
+			pParmsIn->src2rect.width = pParmsIn->dstrect.width;
+		}
+
+		if (pParmsIn->dstrect.top + pParmsIn->dstrect.height >
+			pParmsIn->dstgeom->height) {
+			pParmsIn->dstrect.height -= (pParmsIn->dstrect.top +
+				pParmsIn->dstrect.height) -
+				pParmsIn->dstgeom->height;
+			pParmsIn->src2rect.height = pParmsIn->dstrect.height;
+		}
+	}
+}
+
+/* XXX: Useful for debugging blit parameters sent from HWC */
+#if 0
+static void print_bvparams(struct bvbltparams *bltparams)
+{
+	printk(KERN_INFO "%s: blit param rop %x, flags %d\n", __func__,
+		bltparams->op.rop, bltparams->flags);
+
+	printk(KERN_INFO "%s: blit dst %d,%d pos %d,%d region %d,%d"
+		" stride %d\n", __func__,
+		bltparams->dstgeom->width,
+		bltparams->dstgeom->height,
+		bltparams->dstrect.left, bltparams->dstrect.top,
+		bltparams->dstrect.width, bltparams->dstrect.height,
+		bltparams->dstgeom->physstride);
+
+	printk(KERN_INFO "%s: blit src1 %d,%d pos %d,%d region %d,%d"
+		" stride %d, meminfo %d\n", __func__,
+		bltparams->src1geom->width,
+		bltparams->src1geom->height, bltparams->src1rect.left,
+		bltparams->src1rect.top, bltparams->src1rect.width,
+		bltparams->src1rect.height, bltparams->src1geom->physstride,
+		(int)bltparams->src1.desc->virtaddr);
+
+	if (!(bltparams->flags & BVFLAG_BLEND))
+		return;
+
+	printk(KERN_INFO "%s: blit src2 %d,%d pos %d,%d region %d,%d"
+		" stride %d, meminfo %d\n", __func__,
+		bltparams->src2geom->width,
+		bltparams->src2geom->height, bltparams->src2rect.left,
+		bltparams->src2rect.top, bltparams->src2rect.width,
+		bltparams->src2rect.height, bltparams->src2geom->physstride,
+		(int)bltparams->src2.desc->virtaddr);
+}
+#endif
+
+static enum bverror bv_map_meminfo(OMAPLFB_DEVINFO *psDevInfo,
+	struct bventry *bv_entry, struct bvbuffdesc *buffdesc,
+	PDC_MEM_INFO *meminfo)
+{
+	IMG_CPU_PHYADDR phyAddr;
+	IMG_UINT32 ui32NumPages;
+	IMG_SIZE_T uByteSize;
+	unsigned long *page_addrs;
+	enum bverror bv_error;
+	int i;
+
+	psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetByteSize(*meminfo,
+		&uByteSize);
+	ui32NumPages = (uByteSize + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	page_addrs = kzalloc(sizeof(*page_addrs) * ui32NumPages, GFP_KERNEL);
+	if (!page_addrs) {
+		WARN(1, "%s: Out of memory\n", __func__);
+		return BVERR_OOM;
+	}
+
+	for (i = 0; i < ui32NumPages; i++) {
+		psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(
+			*meminfo, i << PAGE_SHIFT, &phyAddr);
+		page_addrs[i] = (u32)phyAddr.uiAddr;
+	}
+
+	/* Assume the structsize and length is already assigned */
+	buffdesc->map = NULL;
+	buffdesc->pagesize = PAGE_SIZE;
+	buffdesc->pagearray = page_addrs;
+	buffdesc->pagecount = ui32NumPages;
+	buffdesc->pageoffset = 0;
+
+	bv_error = bv_entry->bv_map(buffdesc);
+
+	kfree(page_addrs);
+	return bv_error;
+}
+
+static void get_fb_bvmap(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *meminfo,
+	struct bvbuffdesc **buffdesc)
+{
+	OMAPLFB_SWAPCHAIN *psSwapChain = psDevInfo->psSwapChain;
+	IMG_CPU_PHYADDR phyAddr;
+	int i;
+
+	*buffdesc = NULL;
+
+	if (!bv_gc2d_is_present || !psSwapChain)
+		return;
+
+	psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(*meminfo,
+		0, &phyAddr);
+	for (i = psSwapChain->ulBufferCount - 1; i >= 0; i--) {
+
+		if (!psSwapChain->psBuffer[i].bvmap_handle)
+			continue;
+
+		if (phyAddr.uiAddr ==
+			psSwapChain->psBuffer[i].sSysAddr.uiAddr) {
+			*buffdesc = psSwapChain->psBuffer[i].bvmap_handle;
+			break;
+		}
+	}
+}
+
+static inline int meminfo_idx_valid(int meminfo_ix, int num_meminfos)
+{
+	if (meminfo_ix < 0 || meminfo_ix >= num_meminfos) {
+		WARN(1, "%s: Invalid meminfo index %d, max %d\n",
+			__func__, meminfo_ix, num_meminfos);
+		return 0;
+	}
+	return 1;
+}
+
 static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 							  OMAPLFB_DEVINFO *psDevInfo,
 							  PDC_MEM_INFO *ppsMemInfos,
 							  IMG_UINT32 ui32NumMemInfos,
-							  struct dsscomp_setup_dispc_data *psDssData,
-							  IMG_UINT32 uiDssDataLength)
+							  struct omap_hwc_data *psHwcData,
+							  IMG_UINT32 uiHwcDataSz)
 {
 	struct tiler_pa_info *apsTilerPAs[5];
-	IMG_UINT32 i, k;
+	IMG_UINT32 i, k, j;
 	struct {
 		IMG_UINTPTR_T uiAddr;
 		IMG_UINTPTR_T uiUVAddr;
 		struct tiler_pa_info *psTilerInfo;
 	} asMemInfo[5];
 
+	/* Framebuffer info just used to get FB geometry, the address to
+	 * use for blitting (dst buffer) is the first meminfo
+	 */
+	struct rgz_blt_entry *entry_list;
+	struct bventry *bv_entry = &bv_gc2d_entry;
+	struct bvbuffdesc src1desc;
+	struct bvbuffdesc src2desc;
+	struct bvbuffdesc *dstdesc;
+	struct bvsurfgeom src1geom;
+	struct bvsurfgeom src2geom;
+	struct bvsurfgeom dstgeom;
+	struct bvbltparams bltparams;
+	int rgz_items;
+	int calcsz;
+	struct dsscomp_setup_dispc_data *psDssData = &(psHwcData->dsscomp_data);
+
+	if (uiHwcDataSz <= offsetof(struct omap_hwc_data, blit_data))
+		rgz_items = 0;
+	else
+		rgz_items = psHwcData->blit_data.rgz_items;
+
+
+	psDssData = &(psHwcData->dsscomp_data);
+	calcsz = sizeof(*psHwcData) +
+		(sizeof(struct rgz_blt_entry) * rgz_items);
+
+	if (rgz_items > 0 && !bv_gc2d_is_present) {
+		/* We cannot blit if BV GC2D is not present!, likely a bug */
+		WARN(1, "Trying to blit when BV GC2D is not present");
+		rgz_items = 0; /* Prevent blits */
+	}
+
 	memset(asMemInfo, 0, sizeof(asMemInfo));
 
-	if(uiDssDataLength != sizeof(*psDssData))
+	/* Check the size of private data along with the blit operations */
+	if (uiHwcDataSz != calcsz)
 	{
 		WARN(1, "invalid size of private data (%d vs %d)",
-		     uiDssDataLength, sizeof(*psDssData));
-		return IMG_FALSE;
+		     uiHwcDataSz, calcsz);
 	}
 
 	if(psDssData->num_ovls == 0 || ui32NumMemInfos == 0)
@@ -908,8 +1214,9 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		return IMG_FALSE;
 	}
 
-	for(i = k = 0; i < ui32NumMemInfos && k < ARRAY_SIZE(apsTilerPAs); i++, k++)
-	{
+	for (i = k = 0; i < ui32NumMemInfos && k < ARRAY_SIZE(apsTilerPAs) &&
+		k < psDssData->num_ovls; i++, k++) {
+
 		struct tiler_pa_info *psTilerInfo;
 		IMG_CPU_VIRTADDR virtAddr;
 		IMG_CPU_PHYADDR phyAddr;
@@ -999,6 +1306,101 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		psDssData->ovls[i].ba = (u32) asMemInfo[ix].uiAddr;
 		psDssData->ovls[i].uv = (u32) asMemInfo[ix].uiUVAddr;
 		apsTilerPAs[i] = asMemInfo[ix].psTilerInfo;
+	}
+
+	/* DSS pipes are setup up to this point, we can begin blitting here */
+	entry_list = (struct rgz_blt_entry *) (psHwcData->blit_data.rgz_blts);
+	for (j = 0; j < rgz_items; j++) {
+		struct rgz_blt_entry *entry = &entry_list[j];
+		enum bverror bv_error = 0;
+		int meminfo_ix;
+		int src2_mapped = 0;
+
+		/* BV Parameters data */
+		bltparams = entry->bp;
+
+		/* Src1 buffer data */
+		src1desc = entry->src1desc;
+		src1geom = entry->src1geom;
+		src1geom.physstride = src1geom.virtstride;
+
+		meminfo_ix = (int)src1desc.virtaddr;
+		if (!meminfo_idx_valid(meminfo_ix, ui32NumMemInfos))
+			continue;
+
+		bv_error = bv_map_meminfo(psDevInfo, bv_entry, &src1desc,
+			&ppsMemInfos[meminfo_ix]);
+		if (bv_error) {
+			WARN(1, "%s: BV map src1 failed %d\n",
+				__func__, bv_error);
+			continue;
+		}
+
+		/* Dst buffer data, assume meminfo 0 is the FB */
+		dstgeom = entry->dstgeom;
+		dstgeom.physstride = psDevInfo->sDisplayDim.ui32ByteStride;
+		dstgeom.virtstride = dstgeom.physstride;
+
+		get_fb_bvmap(psDevInfo, &ppsMemInfos[0], &dstdesc);
+		if (!dstdesc) {
+			WARN(1, "%s: BV map dst not found\n", __func__);
+			goto unmap_srcs;
+		}
+
+		/* Src2 buffer data
+		 * Check if this blit involves src2 as the FB or another
+		 * buffer, if the last case is true then map the src2 buffer
+		 */
+		if (bltparams.flags & BVFLAG_BLEND) {
+			if (entry->src2desc.virtaddr == 0) {
+				/* Blending with destination (FB) */
+				src2desc = *dstdesc;
+				src2geom = dstgeom;
+				src2_mapped = 0;
+			} else {
+				/* Blending with other buffer */
+				src2desc = entry->src2desc;
+				src2geom = entry->src2geom;
+				src2geom.physstride = src2geom.virtstride;
+
+				meminfo_ix = (int)src2desc.virtaddr;
+				if (!meminfo_idx_valid(meminfo_ix,
+					ui32NumMemInfos))
+					goto unmap_srcs;
+
+				bv_error = bv_map_meminfo(psDevInfo, bv_entry,
+					&src2desc, &ppsMemInfos[meminfo_ix]);
+				if (bv_error) {
+					WARN(1, "%s: BV map dst failed %d\n",
+						__func__, bv_error);
+					goto unmap_srcs;
+				}
+				src2_mapped = 1;
+			}
+		}
+
+		bltparams.dstdesc = dstdesc;
+		bltparams.dstgeom = &dstgeom;
+		bltparams.src1.desc = &src1desc;
+		bltparams.src1geom = &src1geom;
+		bltparams.src2.desc = &src2desc;
+		bltparams.src2geom = &src2geom;
+
+		/* FIXME: BV GC2D clipping support is not done properly,
+		 * clip manually while this is fixed
+		 */
+		clip_rects(&bltparams);
+#if 0
+		print_bvparams(&bltparams);
+#endif
+		bv_error = bv_entry->bv_blt(&bltparams);
+		if (bv_error)
+			printk(KERN_ERR "%s: blit failed %d\n",
+				__func__, bv_error);
+unmap_srcs:
+		bv_entry->bv_unmap(&src1desc);
+		if (src2_mapped)
+			bv_entry->bv_unmap(&src2desc);
 	}
 
 	dsscomp_gralloc_queue(psDssData, apsTilerPAs, false,
@@ -1172,7 +1574,6 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 
 		printk(KERN_DEBUG DRIVER_PREFIX
 			" %s: Device %u: Requesting %d TILER 2D framebuffers\n", __FUNCTION__, uiFBDevID, n);
-
 		/* HACK: limit to MAX 3 FBs to save TILER container space */
 		if (n > 3)
 			n = 3;
@@ -1484,6 +1885,20 @@ OMAPLFB_ERROR OMAPLFBInit(void)
 		return OMAPLFB_ERROR_INIT_FAILURE;
 	}
 
+#if defined(CONFIG_GC_CORE)
+	/* Get the GC2D Bltsville implementation */
+	bv_gc2d_getentry(&bv_gc2d_entry);
+	bv_gc2d_is_present = bv_gc2d_entry.bv_map ? 1 : 0;
+#else
+	bv_gc2d_is_present = 0;
+#endif
+
+	if (bv_gc2d_is_present)
+		printk(KERN_INFO DRIVER_PREFIX "%s: Blitsville gc2d "
+			"present, blits enabled\n", __func__);
+	else
+		printk(KERN_INFO DRIVER_PREFIX "%s: Blitsville gc2d "
+			"not present, blits disabled\n", __func__);
 	
 	for(i = uiMaxFBDevIDPlusOne; i-- != 0;)
 	{
