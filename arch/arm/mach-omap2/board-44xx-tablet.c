@@ -544,6 +544,17 @@ static struct regulator_init_data tablet_vcore3 = {
 	},
 };
 
+static struct regulator_init_data tablet_v2v1 = {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
 static struct regulator_init_data tablet_vmem = {
 	.constraints = {
 		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
@@ -727,6 +738,7 @@ static struct twl4030_platform_data tablet_twldata = {
 	/* SMPS */
 	.vdd1		= &tablet_vcore1,
 	.vdd2		= &tablet_vcore2,
+	.v2v1		= &tablet_v2v1,
 
 	/* TWL6030/6032 common resources */
 	.clk32kg	= &tablet_clk32kg,
