@@ -30,6 +30,8 @@
 
 #include "../ion_priv.h"
 
+#define TILER_ENABLE_NON_PAGE_ALIGNED_ALLOCATIONS  1
+
 static int omap_tiler_heap_allocate(struct ion_heap *heap,
 				    struct ion_buffer *buffer,
 				    unsigned long size, unsigned long align,
@@ -97,9 +99,19 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	info->phys_addrs = (u32 *)(info + 1);
 	info->tiler_addrs = info->phys_addrs + n_phys_pages;
 
-	info->tiler_handle = tiler_alloc_block_area(data->fmt, data->w, data->h,
-						    &info->tiler_start,
-						    info->tiler_addrs);
+	if( (TILER_ENABLE_NON_PAGE_ALIGNED_ALLOCATIONS)
+			&& (data->token != 0) ) {
+		info->tiler_handle = tiler_alloc_block_area_aligned(data->fmt, data->w, data->h,
+									    &info->tiler_start,
+									    info->tiler_addrs,
+									    data->out_align,
+									    data->token);
+	} else {
+		info->tiler_handle = tiler_alloc_block_area(data->fmt, data->w, data->h,
+							    &info->tiler_start,
+							    info->tiler_addrs);
+	}
+
 	if (IS_ERR_OR_NULL(info->tiler_handle)) {
 		ret = PTR_ERR(info->tiler_handle);
 		pr_err("%s: failure to allocate address space from tiler\n",
@@ -148,6 +160,8 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	buffer->size = info->n_tiler_pages * PAGE_SIZE;
 	buffer->priv_virt = info;
 	data->handle = handle;
+	data->offset = (size_t)(info->tiler_start & ~PAGE_MASK);
+
 	return 0;
 
 err:
