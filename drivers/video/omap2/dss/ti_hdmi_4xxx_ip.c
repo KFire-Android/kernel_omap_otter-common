@@ -279,6 +279,8 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 {
 	u16 r = 0;
 	void __iomem *phy_base = hdmi_phy_base(ip_data);
+	unsigned long pclk = ip_data->cfg.timings.pixel_clock;
+	u16 freqout = 1;
 
 	r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
 	if (r)
@@ -294,7 +296,19 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	 * Write to phy address 0 to configure the clock
 	 * use HFBITCLK write HDMI_TXPHY_TX_CONTROL_FREQOUT field
 	 */
-	REG_FLD_MOD(phy_base, HDMI_TXPHY_TX_CTRL, 0x1, 31, 30);
+	if (cpu_is_omap44xx()) {
+		REG_FLD_MOD(phy_base, HDMI_TXPHY_TX_CTRL, 0x1, 31, 30);
+	} else if (cpu_is_omap54xx()) {
+		if (pclk < 62500) {
+			freqout = 0;
+		} else if ((pclk >= 62500) && (pclk < 185000)) {
+			freqout = 1;
+		} else {
+			/* clock frequency > 185MHz */
+			freqout = 2;
+		}
+		REG_FLD_MOD(phy_base, HDMI_TXPHY_TX_CTRL, freqout, 31, 30);
+	}
 
 	/* Write to phy address 1 to start HDMI line (TXVALID and TMDSCLKEN) */
 	hdmi_write_reg(phy_base, HDMI_TXPHY_DIGITAL_CTRL, 0xF0000000);
