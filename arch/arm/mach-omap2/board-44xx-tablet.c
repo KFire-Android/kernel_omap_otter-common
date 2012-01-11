@@ -839,7 +839,6 @@ module_param(enable_suspend_off, bool, S_IRUSR | S_IRGRP | S_IROTH);
 static struct omap_board_mux board_mux[] __initdata = {
 	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT
                         | OMAP_PULL_ENA),
-	{ .reg_offset = OMAP_MUX_TERMINATOR },
 
 	/* IO optimization pdpu and offmode settings to reduce leakage */
 	OMAP4_MUX(GPMC_A17, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
@@ -860,6 +859,7 @@ static struct omap_board_mux board_mux[] __initdata = {
 					| OMAP_OFF_PULL_EN),
         OMAP4_MUX(GPMC_NCS1, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
 	OMAP4_MUX(GPMC_A24, OMAP_MUX_MODE3 | OMAP_INPUT_EN | OMAP_WAKEUP_EN),
+	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
 #else
