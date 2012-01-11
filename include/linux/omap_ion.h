@@ -62,6 +62,7 @@ int omap_tiler_vinfo(struct ion_client *client,
 /* additional heaps used only on omap */
 enum {
 	OMAP_ION_HEAP_TYPE_TILER = ION_HEAP_TYPE_CUSTOM + 1,
+	OMAP_ION_HEAP_TYPE_TILER_RESERVATION,
 };
 
 #define OMAP_ION_HEAP_TILER_MASK (1 << OMAP_ION_HEAP_TYPE_TILER)
@@ -90,6 +91,7 @@ enum {
 	OMAP_ION_HEAP_TILER,
 	OMAP_ION_HEAP_SECURE_INPUT,
 	OMAP_ION_HEAP_NONSECURE_TILER,
+	OMAP_ION_HEAP_TILER_RESERVATION,
 };
 
 #endif /* _LINUX_ION_H */
