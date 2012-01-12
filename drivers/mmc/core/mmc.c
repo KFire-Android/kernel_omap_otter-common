@@ -912,7 +912,7 @@ static int mmc_suspend(struct mmc_host *host)
 	else if (!mmc_host_is_spi(host))
 		mmc_deselect_cards(host);
 	host->card->state &= ~MMC_STATE_HIGHSPEED;
-	mmc_release_host(host);
+	mmc_release_host_sync(host);
 
 	return err;
 }
@@ -932,7 +932,7 @@ static int mmc_resume(struct mmc_host *host)
 
 	mmc_claim_host(host);
 	err = mmc_init_card(host, host->ocr, host->card);
-	mmc_release_host(host);
+	mmc_release_host_sync(host);
 
 	return err;
 }
