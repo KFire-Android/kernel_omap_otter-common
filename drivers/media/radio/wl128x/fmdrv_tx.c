@@ -176,10 +176,10 @@ u32 fm_tx_set_af(struct fmdev *fmdev, u32 af)
 
 	fmdbg("AF: %d\n", af);
 
-	af = (af - 87500) / 100;
+	fmdev->tx_data.af_frq = af;
+	af = (af - FM_US_BAND_LOW) / FM_KHZ;
 	payload = (u16)af;
-	ret = fmc_send_cmd(fmdev, TA_SET, REG_WR, &payload,
-			sizeof(payload), NULL, NULL);
+	ret = fmc_send_cmd(fmdev, AF, REG_WR, &payload,	sizeof(payload), NULL, NULL);
 	if (ret < 0)
 		return ret;
 
