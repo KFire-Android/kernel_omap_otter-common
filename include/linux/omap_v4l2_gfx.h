@@ -16,7 +16,7 @@
 #ifndef _OMAP_V4L2_GFX_H_
 #define _OMAP_V4L2_GFX_H_
 
-#include <linux/videodev.h>
+#include <linux/videodev2.h>
 
 /*
  * @see V4L2_GFX_IOC_CONSUMER, struct v4l2_gfx_consumer_params
@@ -115,7 +115,7 @@ struct v4l2_gfx_buf_params {
  * 		Returns 0 if successful, or -1 on error, in which case errno indicates
  *		the error.
  */
-#define V4L2_GFX_IOC_CONSUMER _IOWR ('v', BASE_VIDIOCPRIVATE+0, \
+#define V4L2_GFX_IOC_CONSUMER _IOWR ('v', BASE_VIDIOC_PRIVATE+0, \
 									struct v4l2_gfx_consumer_params)
 
 /*
@@ -132,7 +132,7 @@ struct v4l2_gfx_buf_params {
  *		ENODEV		If the producer side of the stream stops this error will
  *					be returned.
  */
-#define V4L2_GFX_IOC_ACQ _IOR ('v', BASE_VIDIOCPRIVATE+1, \
+#define V4L2_GFX_IOC_ACQ _IOR ('v', BASE_VIDIOC_PRIVATE+1, \
 									struct v4l2_gfx_buf_params)
 
 /*
@@ -148,7 +148,7 @@ struct v4l2_gfx_buf_params {
  *					(This will probably go away to avoid render loop stalls)
  *		EINVAL		Attempted to release an invalid buffer index.
  */
-#define V4L2_GFX_IOC_REL _IOW ('v', BASE_VIDIOCPRIVATE+2, \
+#define V4L2_GFX_IOC_REL _IOW ('v', BASE_VIDIOC_PRIVATE+2, \
 									struct v4l2_gfx_buf_params)
 
 /*
@@ -160,7 +160,7 @@ struct v4l2_gfx_buf_params {
  * 		Returns 0 if successful, or -1 on error, in which case errno indicates
  *		the error.
  */
-#define V4L2_GFX_IOC_INFO _IOWR ('v', BASE_VIDIOCPRIVATE+3, \
+#define V4L2_GFX_IOC_INFO _IOWR ('v', BASE_VIDIOC_PRIVATE+3, \
 									struct v4l2_gfx_info_params)
 
 /*
@@ -172,6 +172,6 @@ struct v4l2_gfx_buf_params {
  * 		Returns 0 if successful, or -1 on error, in which case errno indicates
  *		the error.
  */
-#define V4L2_GFX_IOC_PRODUCER _IOWR ('v', BASE_VIDIOCPRIVATE+4, \
+#define V4L2_GFX_IOC_PRODUCER _IOWR ('v', BASE_VIDIOC_PRIVATE+4, \
 									struct v4l2_gfx_producer_params)
 #endif 	// _OMAP_V4L2_GFX_H_

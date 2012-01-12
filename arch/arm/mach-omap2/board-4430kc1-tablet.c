@@ -182,7 +182,7 @@ static void __init quanta_boardids(void)
     quanta_panelid = gpio_get_value(PANELID0_GPIO) | ( gpio_get_value(PANELID1_GPIO)<<1);
 }
 
-static struct spi_board_info tablet_spi_board_info[] __initdata = {
+static struct spi_board_info __initdata tablet_spi_board_info[] = {
 	{
 		.modalias		= "otter1_disp_spi",
 		.bus_num		= 4,     /* McSPI4 */
@@ -216,7 +216,7 @@ static void sdp4430_set_primary_brightness(u8 brightness)
 	}
 }
 
-static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
+static struct omap4430_sdp_disp_led_platform_data __initdata sdp4430_disp_led_data = {
 	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
 	.display_led_init = sdp4430_init_display_led,
 	.primary_display_set = sdp4430_set_primary_brightness,
@@ -241,11 +241,11 @@ static void __init omap_disp_led_init(void)
 }
 #endif
 
-static struct platform_device sdp4430_disp_led = {
+static struct platform_device __initdata  sdp4430_disp_led = {
 	.name = "display_led", .id = -1, .dev = { .platform_data = &sdp4430_disp_led_data, },
 };
 
-static struct platform_device sdp4430_keypad_led = {
+static struct platform_device __initdata sdp4430_keypad_led = {
 	.name = "keypad_led", .id = -1, .dev	= { .platform_data = NULL, },
 };
 
@@ -305,7 +305,7 @@ static struct omap_dss_board_info sdp4430_dss_data = {
 };
 
 
-static struct platform_device *sdp4430_devices[] __initdata = {
+static struct platform_device __initdata *sdp4430_devices[] = {
 	&sdp4430_disp_led,
 	&sdp4430_keypad_led,
         &sdp4430_aic3110,
@@ -318,7 +318,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 	&kc1_led_device,
 };
 
-static struct omap_board_config_kernel sdp4430_config[] __initdata = {
+static struct omap_board_config_kernel __initdata sdp4430_config[] = {
 };
 
 static void __init omap_4430sdp_init_early(void)
@@ -395,7 +395,7 @@ static struct omap2_hsmmc_info mmc[] = {
 };
 
 #ifndef CONFIG_MMC_EMBEDDED_SDIO
-static struct wl12xx_platform_data omap4_panda_wlan_data __initdata = {
+static struct wl12xx_platform_data __initdata omap4_panda_wlan_data = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = 0,
@@ -968,7 +968,7 @@ static struct omap_voltdm_pmic kc1_iva_pmic = {
 	.uv_to_vsel		= omap_twl_uv_to_vsel,
 };
 
-static __initdata struct omap_pmic_map kc1_twl_map[] = {
+static struct omap_pmic_map __initdata kc1_twl_map[] = {
 	{
 		.name = "mpu",
 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP443X),
@@ -1019,7 +1019,7 @@ void plat_hold_wakelock(void *up, int flag)
 }
 #endif
 
-static void omap_kc1_display_init(void)
+static void __init omap_kc1_display_init(void)
 {
 	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 	omap_display_init(&sdp4430_dss_data);
@@ -1031,7 +1031,7 @@ static void omap_kc1_display_init(void)
 
 
 #ifdef CONFIG_OMAP_MUX
-static struct omap_board_mux board_mux[] __initdata = {
+static struct omap_board_mux __initdata board_mux[] = {
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 
@@ -1047,7 +1047,7 @@ static struct omap_board_mux board_mux[] __initdata = {
  *
  * Same devices installed on EMIF1 and EMIF2
  */
-static __initdata struct emif_device_details emif_devices = {
+static struct emif_device_details __initdata emif_devices = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
 	// .cs1_device = &lpddr2_elpida_2G_S4_dev
 };
@@ -1056,7 +1056,7 @@ static __initdata struct emif_device_details emif_devices = {
 #endif
 
 
-static struct omap_device_pad blaze_uart1_pads[] __initdata = {
+static struct omap_device_pad __initdata blaze_uart1_pads[] = {
 	{
 		.name	= "uart1_cts.uart1_cts",
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
@@ -1078,7 +1078,7 @@ static struct omap_device_pad blaze_uart1_pads[] __initdata = {
 };
 
 
-static struct omap_device_pad blaze_uart2_pads[] __initdata = {
+static struct omap_device_pad __initdata blaze_uart2_pads[] = {
 	{
 		.name	= "uart2_cts.uart2_cts",
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
@@ -1102,7 +1102,7 @@ static struct omap_device_pad blaze_uart2_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad blaze_uart3_pads[] __initdata = {
+static struct omap_device_pad __initdata blaze_uart3_pads[]  = {
 	{
 		.name	= "uart3_cts_rctx.uart3_cts_rctx",
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
@@ -1123,7 +1123,7 @@ static struct omap_device_pad blaze_uart3_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad blaze_uart4_pads[] __initdata = {
+static struct omap_device_pad __initdata blaze_uart4_pads[]  = {
 	{
 		.name	= "uart4_tx.uart4_tx",
 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
@@ -1136,13 +1136,13 @@ static struct omap_device_pad blaze_uart4_pads[] __initdata = {
 	},
 };
 
-static struct omap_uart_port_info blaze_uart_info_uncon __initdata = {
+static struct omap_uart_port_info __initdata blaze_uart_info_uncon = {
 	.use_dma	= 0,
 	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
         .wer = 0,
 };
 
-static struct omap_uart_port_info blaze_uart_info __initdata = {
+static struct omap_uart_port_info __initdata blaze_uart_info = {
 	.use_dma	= 0,
 	.auto_sus_timeout = DEFAULT_AUTOSUSPEND_DELAY,
         .wer = (OMAP_UART_WER_TX | OMAP_UART_WER_RX | OMAP_UART_WER_CTS),
@@ -1192,13 +1192,13 @@ static void omap4_kc1_wifi_mux_init(void)
 				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
 }
 
-static struct wl12xx_platform_data omap4_kc1_wlan_data __initdata = {
+static struct wl12xx_platform_data __initdata omap4_kc1_wlan_data = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = 0,
 };
 
-static void omap4_kc1_wifi_init(void)
+static void __init omap4_kc1_wifi_init(void)
 {
 	omap4_kc1_wifi_mux_init();
 	if (wl12xx_set_platform_data(&omap4_kc1_wlan_data))
