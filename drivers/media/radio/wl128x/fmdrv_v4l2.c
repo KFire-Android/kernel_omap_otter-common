@@ -738,7 +738,7 @@ int fm_v4l2_init_video_device(struct fmdev *fmdev, int radio_nr)
 			FM_RX_VOLUME_MAX, 1, FM_RX_VOLUME_MAX);
 
 	v4l2_ctrl_new_std(&fmdev->ctrl_handler, &fm_ctrl_ops,
-			V4L2_CID_AUDIO_MUTE, 0, 1, 1, 1);
+			V4L2_CID_AUDIO_MUTE, 0, 1, 1, 0);
 
 	v4l2_ctrl_new_std(&fmdev->ctrl_handler, &fm_ctrl_ops,
 			V4L2_CID_RDS_TX_PI, 0x0, 0xf, 1, 0x0);

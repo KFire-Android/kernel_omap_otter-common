@@ -659,7 +659,7 @@ static void fm_rx_update_af_cache(struct fmdev *fmdev, u8 af)
 	if (reg_idx == FM_BAND_JAPAN && af > FM_RDS_MAX_AF_JAPAN)
 		return;
 
-	freq = fmdev->rx.region.bot_freq + (af * 100);
+	freq = fmdev->rx.region.bot_freq + (af * FM_KHZ);
 	if (freq == fmdev->rx.freq) {
 		fmdbg("Current freq(%d) is matching with received AF(%d)\n",
 				fmdev->rx.freq, freq);
@@ -1576,7 +1576,7 @@ int fmc_prepare(struct fmdev *fmdev)
 	fmdev->rx.rds.flag = FM_RDS_DISABLE;
 	fmdev->rx.freq = FM_UNDEFINED_FREQ;
 	fmdev->rx.rds_mode = FM_RDS_SYSTEM_RDS;
-	fmdev->rx.af_mode = FM_RX_RDS_AF_SWITCH_MODE_OFF;
+	fmdev->rx.af_mode = FM_RX_RDS_AF_SWITCH_MODE_ON;
 	fmdev->irq_info.retry = 0;
 
 	fmdev->tx_data.tx_frq = FM_UNDEFINED_FREQ;

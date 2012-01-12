@@ -156,7 +156,7 @@ static int fm_rx_set_channel_spacing(struct fmdev *fmdev, u32 spacing)
 
 	/* set channel spacing */
 	payload = spacing;
-	ret = fmc_send_cmd(fmdev, CHANL_BW_SET, REG_WR, &payload,
+	ret = fmc_send_cmd(fmdev, SCAN_SPACING_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
 	if (ret < 0)
 		return ret;
@@ -276,6 +276,10 @@ again:
 			/* Calculate frequency index to write */
 			next_frq = (fmdev->rx.freq -
 					fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
+
+			/* If no valid chanel then report default frequency */
+			wrap_around = 0;
+
 			goto again;
 		}
 	} else {
@@ -310,7 +314,6 @@ int fm_rx_set_volume(struct fmdev *fmdev, u16 vol_to_set)
 			   FM_RX_VOLUME_MIN, FM_RX_VOLUME_MAX);
 		return -EINVAL;
 	}
-	vol_to_set *= FM_RX_VOLUME_GAIN_STEP;
 
 	payload = vol_to_set;
 	ret = fmc_send_cmd(fmdev, VOLUME_SET, REG_WR, &payload,
@@ -333,7 +336,7 @@ int fm_rx_get_volume(struct fmdev *fmdev, u16 *curr_vol)
 		return -ENOMEM;
 	}
 
-	*curr_vol = fmdev->rx.volume / FM_RX_VOLUME_GAIN_STEP;
+	*curr_vol = fmdev->rx.volume;
 
 	return 0;
 }

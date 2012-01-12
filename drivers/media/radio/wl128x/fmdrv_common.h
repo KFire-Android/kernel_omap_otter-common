@@ -89,7 +89,7 @@ struct fm_reg_table {
 /* Transmitter API */
 
 #define CHANL_SET                55
-#define CHANL_BW_SET             56
+#define SCAN_SPACING_SET         56
 #define REF_SET                  57
 #define POWER_ENB_SET            90
 #define POWER_ATT_SET            58
@@ -216,11 +216,11 @@ struct fm_event_msg_hdr {
 
 /* Min and Max volume */
 #define FM_RX_VOLUME_MIN	0
-#define FM_RX_VOLUME_MAX	70
+#define FM_RX_VOLUME_MAX	0xffff
 
 /* Mute modes */
-#define FM_MUTE_ON		0
-#define FM_MUTE_OFF		1
+#define FM_MUTE_OFF		0
+#define FM_MUTE_ON		1
 #define FM_MUTE_ATTENUATE	2
 
 #define FM_RX_UNMUTE_MODE		0x00
@@ -349,7 +349,7 @@ struct fm_event_msg_hdr {
  * Default RX mode configuration. Chip will be configured
  * with this default values after loading RX firmware.
  */
-#define FM_DEFAULT_RX_VOLUME		10
+#define FM_DEFAULT_RX_VOLUME		10000
 #define FM_DEFAULT_RSSI_THRESHOLD	8	/* 12.0408 dBuV */
 
 /* Range for TX power level in units for dB/uV */
