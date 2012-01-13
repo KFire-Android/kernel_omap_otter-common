@@ -63,6 +63,9 @@ config OMAP2_DSS_VENC
 config OMAP4_DSS_HDMI
 	bool "HDMI support"
 	depends on ARCH_OMAP4
+	select FB
+	select FB_MODE_HELPERS
+	select FB_OMAP2
         default y
 	help
 	  HDMI Interface. This adds the High Definition Multimedia Interface.
@@ -75,6 +78,9 @@ config OMAP4_DSS_HDMI_AUDIO
 config OMAP5_DSS_HDMI
 	bool "OMAP5 HDMI support"
 	depends on ARCH_OMAP5
+	select FB
+	select FB_MODE_HELPERS
+	select FB_OMAP2
 	default y
 	help
 	    HDMI Interface.This add the High Deinition Multimedia Interface.
