@@ -842,7 +842,6 @@ static struct omap_board_mux board_mux[] __initdata = {
 
 	/* IO optimization pdpu and offmode settings to reduce leakage */
 	OMAP4_MUX(GPMC_A17, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
-	OMAP4_MUX(GPMC_NBE1, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
 	OMAP4_MUX(GPMC_NCS4, OMAP_MUX_MODE3 | OMAP_INPUT_EN),
 	OMAP4_MUX(GPMC_NCS5, OMAP_MUX_MODE3 | OMAP_PULL_ENA | OMAP_PULL_UP
 					| OMAP_OFF_EN | OMAP_OFF_PULL_EN),
