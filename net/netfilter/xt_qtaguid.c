@@ -2299,8 +2299,6 @@ static int ctrl_cmd_untag(const char *input)
 	sockfd_put(el_socket);
 
 	kfree(sock_tag_entry);
-<<<<<<< HEAD
-=======
 	atomic64_inc(&qtu_events.sockets_untagged);
 
 	return 0;
