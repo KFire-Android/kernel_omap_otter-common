@@ -796,13 +796,27 @@ void OMAPLFBSwapHandler(OMAPLFB_BUFFER *psBuffer)
 #include <mach/tiler.h>
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
+#include "../services_headers.h"
 
 void sgx_idle_log_flip(void);
 
 static void dsscomp_proxy_cmdcomplete(void * cookie, int i)
 {
+	COMMAND_COMPLETE_DATA *psCmdCompleteData =
+			(COMMAND_COMPLETE_DATA *)cookie;
+
 	sgx_idle_log_flip();
 	/* XXX: assumes that there is only one display */
+	/* LK: Check if we are destroying sync objects.
+	   In this case we are now in "late" callback,
+	   so we can't allow callback to access sync objects
+	   memory. To do this just set zero to count of source
+	   and destination sync objects.
+	*/
+	if (NULL == gapsDevInfo[0]->psSwapChain) {
+		psCmdCompleteData->ui32SrcSyncCount = 0;
+		psCmdCompleteData->ui32DstSyncCount = 0;
+	}
 	gapsDevInfo[0]->sPVRJTable.pfnPVRSRVCmdComplete(cookie, i);
 }
 
@@ -813,7 +827,6 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 							  unsigned long ulSwapInterval)
 {
 	OMAPLFBCreateSwapChainLock(psDevInfo);
-
 	
 	if (SwapChainHasChanged(psDevInfo, psSwapChain))
 	{
