@@ -349,6 +349,10 @@ static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 		    hdmi.custom_set &&
 		    hdmi.hdmi_power_on_cb()) {
 			hdmi_ti_4xxx_set_wait_soft_reset(&hdmi.hdmi_data);
+			/* HDCP keys are available in the AKSV registers 2ms after
+			 * the RESET# rising edge, hence the delay before reading
+			 * the registers*/
+			mdelay(10);
 			aksv = hdmi_ti_4xx_check_aksv_data(&hdmi.hdmi_data);
 			hdmi.wp_reset_done = (aksv == HDMI_AKSV_VALID) ?
 				true : false;
@@ -359,8 +363,8 @@ static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 			hdmi.wp_reset_done = false;
 
 		if (!hdmi.wp_reset_done)
-			DSSERR("*** INVALID AKSV: "
-				"Do not perform HDCP AUTHENTICATION\n");
+			DSSERR("*** INVALID AKSV: %d "
+				"Do not perform HDCP AUTHENTICATION\n", aksv);
 	}
 
 }
