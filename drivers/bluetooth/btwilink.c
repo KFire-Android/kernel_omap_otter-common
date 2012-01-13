@@ -114,7 +114,7 @@ static long st_receive(void *priv_data, struct sk_buff *skb)
 	err = hci_recv_frame(skb);
 	if (err < 0) {
 		BT_ERR("Unable to push skb to HCI core(%d)", err);
-		return err;
+		return 0;
 	}
 
 	lhst->hdev->stat.byte_rx += skb->len;
