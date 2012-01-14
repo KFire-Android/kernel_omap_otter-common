@@ -491,17 +491,16 @@ static int omap_mcpdm_remove(struct snd_soc_dai *dai)
 #define OMAP_MCPDM_RATES	(SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000)
 #define OMAP_MCPDM_FORMATS	SNDRV_PCM_FMTBIT_S32_LE
 
-#define MCPDM_LEGACY_DAI_DL	(MCPDM_LEGACY_MODE | (0 << 4))
-#define MCPDM_LEGACY_DAI_UL	(MCPDM_LEGACY_MODE | (1 << 4))
-#define MCPDM_ABE_DAI_DL1	(MCPDM_ABE_MODE | (2 << 4))
-#define MCPDM_ABE_DAI_DL2	(MCPDM_ABE_MODE | (3 << 4))
-#define MCPDM_ABE_DAI_VIB	(MCPDM_ABE_MODE | (4 << 4))
-#define MCPDM_ABE_DAI_UL1	(MCPDM_ABE_MODE | (5 << 4))
+#define MCPDM_LEGACY_DAI	(MCPDM_LEGACY_MODE | (0 << 4))
+#define MCPDM_ABE_DAI_DL1	(MCPDM_ABE_MODE | (1 << 4))
+#define MCPDM_ABE_DAI_DL2	(MCPDM_ABE_MODE | (2 << 4))
+#define MCPDM_ABE_DAI_VIB	(MCPDM_ABE_MODE | (3 << 4))
+#define MCPDM_ABE_DAI_UL1	(MCPDM_ABE_MODE | (4 << 4))
 
 static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 {
-	.name = "mcpdm-dl",
-	.id	= MCPDM_LEGACY_DAI_DL,
+	.name = "mcpdm-legacy",
+	.id	= MCPDM_LEGACY_DAI,
 	.probe = omap_mcpdm_probe,
 	.remove = omap_mcpdm_remove,
 	.probe_order = SND_SOC_COMP_ORDER_LATE,
@@ -513,13 +512,6 @@ static struct snd_soc_dai_driver omap_mcpdm_dai[] = {
 		.formats = OMAP_MCPDM_FORMATS,
 		.sig_bits = 24,
 	},
-	.ops = &omap_mcpdm_dai_ops,
-},
-{
-	.name = "mcpdm-ul",
-	.id	= MCPDM_LEGACY_DAI_UL,
-	.probe_order = SND_SOC_COMP_ORDER_LATE,
-	.remove_order = SND_SOC_COMP_ORDER_EARLY,
 	.capture = {
 		.channels_min = 1,
 		.channels_max = 3,

@@ -734,7 +734,7 @@ static struct snd_soc_dai_link omap_abe_dai[] = {
 		.stream_name = "Headset Playback",
 
 		/* ABE components - DL1 */
-		.cpu_dai_name = "mcpdm-dl",
+		.cpu_dai_name = "mcpdm-legacy",
 		.platform_name = "omap-pcm-audio",
 
 		/* Phoenix - DL1 DAC */
