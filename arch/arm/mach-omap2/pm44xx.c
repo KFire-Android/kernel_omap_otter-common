@@ -692,6 +692,7 @@ static const struct platform_suspend_ops omap_pm_ops = {
 };
 #else
 void omap4_enter_sleep(unsigned int cpu, unsigned int power_state, bool suspend){ return; }
+static void omap4_configure_pwrst(bool is_off_mode) { return; }
 #endif /* CONFIG_SUSPEND */
 
 /**

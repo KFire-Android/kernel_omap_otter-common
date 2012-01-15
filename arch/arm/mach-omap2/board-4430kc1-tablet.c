@@ -30,6 +30,7 @@
 #include <linux/twl6040-vib.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/omapfb.h>
 #include <linux/wl12xx.h>
 #include <linux/skbuff.h>
 #include <linux/reboot.h>
@@ -58,6 +59,7 @@
 #include <linux/wakelock.h>
 #include <plat/remoteproc.h>
 #include <video/omapdss.h>
+#include <plat/vram.h>
 #include <plat/omap-pm.h>
 
 #include <plat/dmtimer.h>
@@ -182,11 +184,12 @@ static void __init quanta_boardids(void)
     quanta_panelid = gpio_get_value(PANELID0_GPIO) | ( gpio_get_value(PANELID1_GPIO)<<1);
 }
 
-static struct spi_board_info __initdata tablet_spi_board_info[] = {
+static struct spi_board_info tablet_spi_board_info[]__initdata = {
 	{
 		.modalias		= "otter1_disp_spi",
 		.bus_num		= 4,     /* McSPI4 */
 		.chip_select		= 0,
+		/* FIXME-HASH: REALLY? 375000? */
 		.max_speed_hz		= 375000,
 	},
 };
@@ -289,8 +292,8 @@ static struct omap_dss_device sdp4430_otter1_device = {
 	.phy.dpi.data_lines	= 24,
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
         .panel          = {
-        .width_in_um = 158,
-        .height_in_um = 92,
+        	.width_in_um = 158,
+        	.height_in_um = 92,
         },
 };
 
@@ -1019,10 +1022,24 @@ void plat_hold_wakelock(void *up, int flag)
 }
 #endif
 
+#define KC1_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
+static struct omapfb_platform_data kc1_fb_pdata = {
+	.mem_desc = {
+		.region_cnt = 1,
+		.region = {
+			[0] = {
+				.size = KC1_FB_RAM_SIZE,
+			},
+		},
+	},
+};
+
 static void __init omap_kc1_display_init(void)
 {
-	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
+	omap_vram_set_sdram_vram(KC1_FB_RAM_SIZE, 0);
+	omapfb_set_platform_data(&kc1_fb_pdata);
 	omap_display_init(&sdp4430_dss_data);
+
 	omap_voltage_init_pmic();
 #ifdef CONFIG_TOUCHSCREEN_ILITEK
 	omap_ilitek_init();
@@ -1034,6 +1051,9 @@ static void __init omap_kc1_display_init(void)
 static struct omap_board_mux __initdata board_mux[] = {
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
+#else
+#define board_mux	NULL
+#endif
 
 /*
  * LPDDR2 Configeration Data:
@@ -1051,12 +1071,9 @@ static struct emif_device_details __initdata emif_devices = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
 	// .cs1_device = &lpddr2_elpida_2G_S4_dev
 };
-#else
-#define board_mux	NULL
-#endif
 
 
-static struct omap_device_pad __initdata blaze_uart1_pads[] = {
+static struct omap_device_pad blaze_uart1_pads[] __initdata = {
 	{
 		.name	= "uart1_cts.uart1_cts",
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
@@ -1078,13 +1095,13 @@ static struct omap_device_pad __initdata blaze_uart1_pads[] = {
 };
 
 
-static struct omap_device_pad __initdata blaze_uart2_pads[] = {
+static struct omap_device_pad blaze_uart2_pads[] __initdata = {
 	{
 		.name	= "uart2_cts.uart2_cts",
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
 		.flags  = OMAP_DEVICE_PAD_REMUX,
 		.idle   = OMAP_WAKEUP_EN | OMAP_PIN_OFF_INPUT_PULLUP |
-			OMAP_OFFOUT_EN | OMAP_MUX_MODE0,
+			  OMAP_MUX_MODE0,
 	},
 	{
 		.name	= "uart2_rts.uart2_rts",
@@ -1102,7 +1119,7 @@ static struct omap_device_pad __initdata blaze_uart2_pads[] = {
 	},
 };
 
-static struct omap_device_pad __initdata blaze_uart3_pads[]  = {
+static struct omap_device_pad blaze_uart3_pads[] __initdata = {
 	{
 		.name	= "uart3_cts_rctx.uart3_cts_rctx",
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
@@ -1123,7 +1140,7 @@ static struct omap_device_pad __initdata blaze_uart3_pads[]  = {
 	},
 };
 
-static struct omap_device_pad __initdata blaze_uart4_pads[]  = {
+static struct omap_device_pad blaze_uart4_pads[] __initdata = {
 	{
 		.name	= "uart4_tx.uart4_tx",
 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
@@ -1239,7 +1256,6 @@ static void __init omap4_ehci_ohci_init(void)
 static void __init omap4_ehci_ohci_init(void){}
 #endif
 
-
 static int kc1_notifier_call(struct notifier_block *this,
 					unsigned long code, void *cmd)
 {
@@ -1278,6 +1294,32 @@ static struct notifier_block kc1_reboot_notifier = {
 	.notifier_call = kc1_notifier_call,
 };
 
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+
+static struct resource ram_console_resource = {
+    .start  = 0x8E000000,
+    .end    = 0x8E000000 + 0x40000 - 1,
+    .flags  = IORESOURCE_MEM,
+};
+
+static struct platform_device ram_console_device = {
+    .name           = "ram_console",
+    .id             = 0,
+    .num_resources  = 1,
+    .resource       = &ram_console_resource,
+};
+
+static inline void ramconsole_init(void)
+{
+	platform_device_register(&ram_console_device);
+}
+
+#else
+
+static inline void ramconsole_init(void) {}
+
+#endif /* CONFIG_ANDROID_RAM_CONSOLE */
+
 static void __init omap_kc1_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -1298,19 +1340,20 @@ static void __init omap_kc1_init(void)
         // omap4_audio_conf();
 	omap4_create_board_props();
 	register_reboot_notifier(&kc1_reboot_notifier);
+
 	kc1_pmic_mux_init();
 	omap4_i2c_init();
 	enable_rtc_gpio();
 	//ramconsole_init();
 	omap4_display_init();
 	//omap_disp_led_init();
-	omap4_register_ion();
+	// **omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 
 	gpio_request(0, "sysok");
 
-	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
-	omap_serial_init();
+	// **wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
+	// **omap_serial_init();
 
 	omap4_twl6030_hsmmc_init(mmc);
 	gpio_request(42, "OMAP_GPIO_ADC");
@@ -1335,6 +1378,8 @@ static void __init omap_kc1_init(void)
 
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
+
+	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
 	omap_dmm_init();
 	omap_kc1_display_init();
@@ -1361,16 +1406,15 @@ static void __init omap_kc1_init(void)
 
 static void __init omap_4430sdp_map_io(void)
 {
-	//ramconsole_reserve_sdram();
 	omap2_set_globals_443x();
 	omap44xx_map_common_io();
 }
 static void __init omap_4430sdp_reserve(void)
 {
-
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
+	// memblock_remove(ram_console_resource.start, ram_console_resource.end - ram_console_resource.start + 1);
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);

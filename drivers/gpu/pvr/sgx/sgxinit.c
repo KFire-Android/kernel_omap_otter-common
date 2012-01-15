@@ -1013,14 +1013,17 @@ static IMG_VOID SGXDumpDebugReg (PVRSRV_SGXDEV_INFO	*psDevInfo,
 	PVR_LOG(("(P%u) %s%08X", ui32CoreNum, pszName, ui32RegVal));
 }
 
+#if defined(CONFIG_DSSCOMP)
 void dsscomp_kdump(void);
+#endif
 IMG_VOID SGXDumpDebugInfo (PVRSRV_SGXDEV_INFO	*psDevInfo,
 						   IMG_BOOL				bDumpSGXRegs)
 {
 	IMG_UINT32	ui32CoreNum;
 
+#if defined(CONFIG_DSSCOMP)
 	dsscomp_kdump();
-
+#endif
 	PVR_LOG(("SGX debug (%s)", PVRVERSION_STRING));
 
 	if (bDumpSGXRegs)

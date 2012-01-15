@@ -997,11 +997,15 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 
 	if(psFlipCmd->hExtBuffer)
 	{
+#if defined(CONFIG_DSSCOMP)
 		return ProcessFlipV1(hCmdCookie,
 							 psDevInfo,
 							 psFlipCmd->hExtSwapChain,
 							 psFlipCmd->hExtBuffer,
 							 psFlipCmd->ui32SwapInterval);
+#else
+		BUG();
+#endif
 	}
 	else
 	{

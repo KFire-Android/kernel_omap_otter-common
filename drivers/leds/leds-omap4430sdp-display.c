@@ -61,6 +61,18 @@ struct omap4430_sdp_reg {
 
 struct display_led_data *g_orange_led_data;
 
+// FIXME-HASH DOUBLE CHECK THIS
+#if 0
+static void omap4430_sdp_primary_disp_store(struct led_classdev *led_cdev, enum led_brightness value)
+{
+	struct display_led_data *led_data = container_of(led_cdev, struct display_led_data, pri_display_class_dev);
+	mutex_lock(&led_data->pri_disp_lock);
+	if (led_data->led_pdata->primary_display_set)
+		led_data->led_pdata->primary_display_set(value);
+	mutex_unlock(&led_data->pri_disp_lock);
+}
+#endif
+
 void omap4430_orange_led_set(struct led_classdev *led_cdev,
 				enum led_brightness value)
 {

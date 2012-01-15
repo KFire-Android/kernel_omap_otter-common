@@ -53,7 +53,7 @@ int touch_key_press[] = {0, 0, 0, 0};
 #define ILITEK_FILE_DRIVER_NAME			"ilitek_file"
 #define ILITEK_DEBUG_LEVEL			KERN_INFO
 #define ILITEK_ERROR_LEVEL			KERN_ALERT
-#define ILITEK_TS_RESET     104
+#define ILITEK_TS_RESET                         104
 
 // i2c command for ilitek touch screen
 #define ILITEK_TP_CMD_READ_DATA			0x10
@@ -80,13 +80,8 @@ int touch_key_press[] = {0, 0, 0, 0};
 #define ILITEK_IOCTL_I2C_UPDATE                 _IOWR(ILITEK_IOCTL_BASE, 11, int)
 #define ILITEK_IOCTL_STOP_READ_DATA             _IOWR(ILITEK_IOCTL_BASE, 12, int)
 #define ILITEK_IOCTL_START_READ_DATA            _IOWR(ILITEK_IOCTL_BASE, 13, int)
-#define ILITEK_IOCTL_GET_INTERFANCE				_IOWR(ILITEK_IOCTL_BASE, 14, int)//default setting is i2c interface
-#define ILITEK_IOCTL_I2C_SWITCH_IRQ				_IOWR(ILITEK_IOCTL_BASE, 15, int)
-
-// module information
-MODULE_AUTHOR("Steward_Fu");
-MODULE_DESCRIPTION("ILITEK I2C touch driver for Android platform");
-MODULE_LICENSE("GPL");
+#define ILITEK_IOCTL_GET_INTERFANCE             _IOWR(ILITEK_IOCTL_BASE, 14, int)//default setting is i2c interface
+#define ILITEK_IOCTL_I2C_SWITCH_IRQ             _IOWR(ILITEK_IOCTL_BASE, 15, int)
 
 // all implemented global functions must be defined in here 
 // in order to know how many function we had implemented
@@ -199,19 +194,6 @@ static const struct i2c_device_id ilitek_i2c_id[] ={
 	{ILITEK_I2C_DRIVER_NAME, 0}, {}
 };
 MODULE_DEVICE_TABLE(i2c, ilitek_i2c_id);
-
-// declare i2c function table
-static struct i2c_driver ilitek_i2c_driver = {
-	.id_table = ilitek_i2c_id,
-	.driver = {.name = ILITEK_I2C_DRIVER_NAME},
-#ifndef CONFIG_HAS_EARLYSUSPEND
-	.resume = ilitek_i2c_resume,
-    .suspend  = ilitek_i2c_suspend,
-#endif
-	.shutdown = ilitek_i2c_shutdown,
-	.probe = ilitek_i2c_probe,
-	.remove = ilitek_i2c_remove,
-};
 
 // declare file operations
 struct file_operations ilitek_fops = {
@@ -976,19 +958,15 @@ parameters
 return
         nothing
 */
-static void
-ilitek_i2c_shutdown(
-        struct i2c_client *client)
+static void ilitek_i2c_shutdown(struct i2c_client *client)
 {
         printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
         i2c.stop_polling = 1;
 }
 
-static int ilitek_i2c_read_info(struct i2c_client *client,
-		uint8_t cmd, uint8_t *data, int length);
+static int ilitek_i2c_read_info(struct i2c_client *client, uint8_t cmd, uint8_t *data, int length);
 
-static ssize_t ilitek_version_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
+static ssize_t ilitek_version_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	u8 ver[4];
 
@@ -1023,10 +1001,7 @@ parameters
 return
 	status
 */
-static int 
-ilitek_i2c_probe(
-	struct i2c_client *client, 
-	const struct i2c_device_id *id)
+static int ilitek_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	if (sysfs_create_group(&client->dev.kobj, &ilitek_attrs_group)) {
 		printk(ILITEK_ERROR_LEVEL "%s: Unable to create sysfs group\n",
@@ -1054,9 +1029,7 @@ parameters
 return
 	status
 */
-static int 
-ilitek_i2c_remove(
-	struct i2c_client *client)
+static int ilitek_i2c_remove(struct i2c_client *client)
 {
 	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	i2c.stop_polling = 1;
@@ -1078,12 +1051,7 @@ parameter
 return
 	status
 */
-static int 
-ilitek_i2c_read_info(
-	struct i2c_client *client,
-	uint8_t cmd, 
-	uint8_t *data, 
-	int length)
+static int ilitek_i2c_read_info(struct i2c_client *client, uint8_t cmd, uint8_t *data, int length)
 {
 	int ret;
 	struct i2c_msg msgs_cmd[] = {
@@ -1115,9 +1083,7 @@ parameters
 return
 	status
 */
-static int
-ilitek_i2c_read_tp_info(
-	void)
+static int ilitek_i2c_read_tp_info(void)
 {
 	int res_len;
 	unsigned char buf[32]={0};
@@ -1163,6 +1129,23 @@ ilitek_i2c_read_tp_info(
 	return 0;
 }
 
+
+// declare i2c function table
+static struct i2c_driver ilitek_i2c_driver = {
+	.probe = ilitek_i2c_probe,
+	.remove = ilitek_i2c_remove,
+#ifndef CONFIG_HAS_EARLYSUSPEND
+	.resume = ilitek_i2c_resume,
+	.suspend  = ilitek_i2c_suspend,
+#endif
+	.shutdown = ilitek_i2c_shutdown,
+	.id_table = ilitek_i2c_id,
+	.driver = {
+		.name = ILITEK_I2C_DRIVER_NAME,
+		.owner	= THIS_MODULE,
+	},
+};
+
 /*
 description
 	register i2c device and its input device
@@ -1171,9 +1154,7 @@ parameters
 return
 	status
 */
-static int 
-ilitek_i2c_register_device(
-	void)
+static int ilitek_i2c_register_device(void)
 {
 	int ret = i2c_add_driver(&ilitek_i2c_driver);
 	if(ret == 0){
@@ -1260,7 +1241,7 @@ parameters
 return
 	status
 */
-static int ilitek_init(void)
+static __init int ilitek_init(void)
 {
 	int ret = 0;
 
@@ -1273,21 +1254,20 @@ static int ilitek_init(void)
 	gpio_direction_output(ILITEK_TS_RESET ,0);
 
 	p_regulator = regulator_get(NULL, "vaux3");
-    if(IS_ERR(p_regulator)) {
-        printk("%s regulator_get error\n", __func__);
-        return -1;
-    }
-    ret = regulator_set_voltage(p_regulator, 3000000,
-                    3000000);
-    if(ret) {
-        printk("ilitek_init regulator_set 3.0V error\n");
-        return -1;
-    }
-    regulator_enable(p_regulator);
+	if(IS_ERR(p_regulator)) {
+		printk("%s regulator_get error\n", __func__);
+		return -1;
+	}
+	ret = regulator_set_voltage(p_regulator, 3000000, 3000000);
+	if(ret) {
+		printk("ilitek_init regulator_set 3.0V error\n");
+		return -1;
+	}
+	regulator_enable(p_regulator);
 
-    msleep(1);
-    gpio_direction_output(ILITEK_TS_RESET ,1);
-    msleep(15);
+	msleep(1);
+	gpio_direction_output(ILITEK_TS_RESET ,1);
+	msleep(15);
 
 	// initialize global variable
     	memset(&dev, 0, sizeof(struct dev_data));
@@ -1342,7 +1322,7 @@ parameters
 return
 	nothing
 */
-static void ilitek_exit(void)
+static __exit void ilitek_exit(void)
 {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&i2c.early_suspend);
@@ -1384,4 +1364,9 @@ static void ilitek_exit(void)
 /* set init and exit function for this module */
 module_init(ilitek_init);
 module_exit(ilitek_exit);
+
+// module information
+MODULE_AUTHOR("Steward_Fu");
+MODULE_DESCRIPTION("ILITEK I2C touch driver for Android platform");
+MODULE_LICENSE("GPL");
 

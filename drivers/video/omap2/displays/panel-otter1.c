@@ -29,8 +29,10 @@
 #include <linux/gpio.h>
 
 static struct spi_device *otter1_spi;
+
 static struct mutex lock_power_on;
 static struct mutex lock_panel;
+
 static struct omap_video_timings otter1_panel_timings = {
 	.x_res          = 1024,
 	.y_res          = 600,
@@ -42,6 +44,61 @@ static struct omap_video_timings otter1_panel_timings = {
 	.vsw            = 3,     /* VSW = 1~20 */
 	.vbp            = 20,    /* VSW + VBP = 23 */
 };
+
+struct panel_config {
+	const char *name;
+	int type;
+
+	struct omap_video_timings timings;
+
+	struct {
+		unsigned int sleep_in;
+		unsigned int sleep_out;
+		unsigned int hw_reset;
+		unsigned int enable_te;
+	} sleep;
+
+	struct {
+		unsigned int high;
+		unsigned int low;
+	} reset_sequence;
+
+	struct panel_regulator *regulators;
+	int num_regulators;
+};
+
+enum {
+	PANEL_OTTER1,
+};
+
+static struct panel_config panel_configs[] = {
+	{
+		.name		= "otter1",
+		.type		= PANEL_OTTER1,
+		.timings	= {
+			.x_res          = 1024,
+			.y_res          = 600,
+			.pixel_clock    = 46000, /* in kHz */
+			.hfp            = 160,   /* HFP fix 160 */
+			.hsw            = 10,    /* HSW = 1~140 */
+			.hbp            = 150,   /* HSW + HBP = 160 */
+			.vfp            = 12,    /* VFP fix 12 */
+			.vsw            = 3,     /* VSW = 1~20 */
+			.vbp            = 20,    /* VSW + VBP = 23 */
+		},
+		.sleep		= {
+			.sleep_in	= 5,
+			.sleep_out	= 5,
+			.hw_reset	= 5,
+			.enable_te	= 100, /* possible panel bug */
+		},
+		.reset_sequence	= {
+			.high		= 10,
+			.low		= 10,
+		},
+	},
+};
+
 extern u8 quanta_get_mbid(void);
 
 static int spi_send(struct spi_device *spi,
@@ -99,134 +156,146 @@ static struct attribute_group otter1_panel_attribute_group = {
        .attrs = otter1_panel_attributes
  };
 
-static void otter1_get_timings(struct omap_dss_device *dssdev,
-                        struct omap_video_timings *timings)
+static void otter1_get_timings(struct omap_dss_device *dssdev, struct omap_video_timings *timings)
 {
-        *timings = dssdev->panel.timings;
+        *timings = otter1_panel_timings;
 }
+
+/*
+static void otter1_get_resolution(struct omap_dss_device *dssdev, u16 *xres, u16 *yres)
+{
+	if (td->rotate == 0 || td->rotate == 2) {
+		*xres = otter1_panel_timings.x_res;
+		*yres = otter1_panel_timings.y_res;
+	} else {
+		*yres = otter1_panel_timings.x_res;
+		*xres = otter1_panel_timings.y_res;
+	}
+}
+*/
 
 int otter1_panel_power_on(void)
 {
 	int vendor0=1, vendor1=1;
 	int result = 0;
 	mutex_lock(&lock_power_on);
-    gpio_direction_output(47, 0);		
-    gpio_direction_output(37, 0);
-    gpio_direction_output(47, 1);
-    mdelay(1);
+	gpio_direction_output(47, 0);		
+	gpio_direction_output(37, 0);
+	gpio_direction_output(47, 1);
+	mdelay(1);
 
 	vendor1 = gpio_get_value(175); //LCD_ID PIN#17(Vendor[1])
 	vendor0 = gpio_get_value(176); //LCD_ID PIN#15(Vendor[0])
 
-    //Before DVT
-    if (quanta_get_mbid() < 4) {
-        if((vendor1 == 0) && (vendor0 == 0))
-        {
-            //printk("***************************************************\n");
-            //printk("******************  Panel of LG  ******************\n");
-            //printk("***************************************************\n");
-            result |= spi_send(otter1_spi, 0x00, 0x21);
-            result |= spi_send(otter1_spi, 0x00, 0xa5);
-            result |= spi_send(otter1_spi, 0x01, 0x30);
-            result |= spi_send(otter1_spi, 0x02, 0x40);
-            result |= spi_send(otter1_spi, 0x0e, 0x5f);
-            result |= spi_send(otter1_spi, 0x0f, 0xa4);
-            result |= spi_send(otter1_spi, 0x0d, 0x00);
-            result |= spi_send(otter1_spi, 0x02, 0x43);
-            result |= spi_send(otter1_spi, 0x0a, 0x28);
-            result |= spi_send(otter1_spi, 0x10, 0x41);
-            result |= spi_send(otter1_spi, 0x00, 0xad);
+	//Before DVT
+	if (quanta_get_mbid() < 4) {
+        	if((vendor1 == 0) && (vendor0 == 0))
+	        {
+			//printk("***************************************************\n");
+			//printk("******************  Panel of LG  ******************\n");
+			//printk("***************************************************\n");
+			result |= spi_send(otter1_spi, 0x00, 0x21);
+			result |= spi_send(otter1_spi, 0x00, 0xa5);
+			result |= spi_send(otter1_spi, 0x01, 0x30);
+			result |= spi_send(otter1_spi, 0x02, 0x40);
+			result |= spi_send(otter1_spi, 0x0e, 0x5f);
+			result |= spi_send(otter1_spi, 0x0f, 0xa4);
+			result |= spi_send(otter1_spi, 0x0d, 0x00);
+			result |= spi_send(otter1_spi, 0x02, 0x43);
+			result |= spi_send(otter1_spi, 0x0a, 0x28);
+			result |= spi_send(otter1_spi, 0x10, 0x41);
+			result |= spi_send(otter1_spi, 0x00, 0xad);
         }
         else if((vendor1 == 1) && (vendor0 == 0))
         {
-            printk("***************************************************\n");
-            printk("******************  Panel of HYDIS  ***************\n");
-            printk("***************************************************\n");
-            result |= spi_send(otter1_spi, 0x00, 0x29);
-            result |= spi_send(otter1_spi, 0x00, 0x25);
-            result |= spi_send(otter1_spi, 0x01, 0x30);
-            result |= spi_send(otter1_spi, 0x02, 0x40);
-            result |= spi_send(otter1_spi, 0x0e, 0x5f);
-            result |= spi_send(otter1_spi, 0x0f, 0xa4);
-            result |= spi_send(otter1_spi, 0x0d, 0x01);
-            result |= spi_send(otter1_spi, 0x00, 0x2d);
+			printk("***************************************************\n");
+			printk("******************  Panel of HYDIS  ***************\n");
+			printk("***************************************************\n");
+			result |= spi_send(otter1_spi, 0x00, 0x29);
+			result |= spi_send(otter1_spi, 0x00, 0x25);
+			result |= spi_send(otter1_spi, 0x01, 0x30);
+			result |= spi_send(otter1_spi, 0x02, 0x40);
+			result |= spi_send(otter1_spi, 0x0e, 0x5f);
+			result |= spi_send(otter1_spi, 0x0f, 0xa4);
+			result |= spi_send(otter1_spi, 0x0d, 0x01);
+			result |= spi_send(otter1_spi, 0x00, 0x2d);
         }
         else if((vendor1 == 0) && (vendor0 == 1))
         {
-            printk("****************************************************\n");
-            printk("******************  Panel of CMO  ******************\n");
-            printk("****************************************************\n");
-            result |= spi_send(otter1_spi, 0x00, 0xad);
-            result |= spi_send(otter1_spi, 0x01, 0x10);
-            result |= spi_send(otter1_spi, 0x02, 0x40);
-            result |= spi_send(otter1_spi, 0x03, 0x04);
+			printk("****************************************************\n");
+			printk("******************  Panel of CMO  ******************\n");
+			printk("****************************************************\n");
+			result |= spi_send(otter1_spi, 0x00, 0xad);
+			result |= spi_send(otter1_spi, 0x01, 0x10);
+			result |= spi_send(otter1_spi, 0x02, 0x40);
+			result |= spi_send(otter1_spi, 0x03, 0x04);
         }
         else
         {
-            printk("********************************************************************************\n");
-            printk("******************  undefined panel, use default LGD settings ******************\n");
-            printk("********************************************************************************\n");
-            result |= spi_send(otter1_spi, 0x00, 0x21);
-            result |= spi_send(otter1_spi, 0x00, 0xa5);
-            result |= spi_send(otter1_spi, 0x01, 0x30);
-            result |= spi_send(otter1_spi, 0x02, 0x40);
-            result |= spi_send(otter1_spi, 0x0e, 0x5f);
-            result |= spi_send(otter1_spi, 0x0f, 0xa4);
-            result |= spi_send(otter1_spi, 0x0d, 0x00);
-            result |= spi_send(otter1_spi, 0x02, 0x43);
-            result |= spi_send(otter1_spi, 0x0a, 0x28);
-            result |= spi_send(otter1_spi, 0x10, 0x41);
-            result |= spi_send(otter1_spi, 0x00, 0xad);
+			printk("********************************************************************************\n");
+			printk("******************  undefined panel, use default LGD settings ******************\n");
+			printk("********************************************************************************\n");
+			result |= spi_send(otter1_spi, 0x00, 0x21);
+			result |= spi_send(otter1_spi, 0x00, 0xa5);
+			result |= spi_send(otter1_spi, 0x01, 0x30);
+			result |= spi_send(otter1_spi, 0x02, 0x40);
+			result |= spi_send(otter1_spi, 0x0e, 0x5f);
+			result |= spi_send(otter1_spi, 0x0f, 0xa4);
+			result |= spi_send(otter1_spi, 0x0d, 0x00);
+			result |= spi_send(otter1_spi, 0x02, 0x43);
+			result |= spi_send(otter1_spi, 0x0a, 0x28);
+			result |= spi_send(otter1_spi, 0x10, 0x41);
+			result |= spi_send(otter1_spi, 0x00, 0xad);
         }
     } else {
         //After DVT
         if((vendor1 == 0) && (vendor0 == 0))
         {
-            //printk("***************************************************\n");
-            //printk("******************  Panel of LG  ******************\n");
-            //printk("***************************************************\n");
-            result |= spi_send(otter1_spi, 0x00, 0x21);
-            result |= spi_send(otter1_spi, 0x00, 0xa5);
-            result |= spi_send(otter1_spi, 0x01, 0x30);
-            result |= spi_send(otter1_spi, 0x02, 0x40);
-            result |= spi_send(otter1_spi, 0x0e, 0x5f);
-            result |= spi_send(otter1_spi, 0x0f, 0xa4);
-            result |= spi_send(otter1_spi, 0x0d, 0x00);
-            result |= spi_send(otter1_spi, 0x02, 0x43);
-            result |= spi_send(otter1_spi, 0x0a, 0x28);
-            result |= spi_send(otter1_spi, 0x10, 0x41);
-            result |= spi_send(otter1_spi, 0x00, 0xad);
+			//printk("***************************************************\n");
+			//printk("******************  Panel of LG  ******************\n");
+			//printk("***************************************************\n");
+			result |= spi_send(otter1_spi, 0x00, 0x21);
+			result |= spi_send(otter1_spi, 0x00, 0xa5);
+			result |= spi_send(otter1_spi, 0x01, 0x30);
+			result |= spi_send(otter1_spi, 0x02, 0x40);
+			result |= spi_send(otter1_spi, 0x0e, 0x5f);
+			result |= spi_send(otter1_spi, 0x0f, 0xa4);
+			result |= spi_send(otter1_spi, 0x0d, 0x00);
+			result |= spi_send(otter1_spi, 0x02, 0x43);
+			result |= spi_send(otter1_spi, 0x0a, 0x28);
+			result |= spi_send(otter1_spi, 0x10, 0x41);
+			result |= spi_send(otter1_spi, 0x00, 0xad);
         }
         else if((vendor1 == 0) && (vendor0 == 1))
         {
-            printk("***************************************************\n");
-            printk("******************  Panel of HYDIS  ***************\n");
-            printk("***************************************************\n");
-            result |= spi_send(otter1_spi, 0x00, 0x29);
-            result |= spi_send(otter1_spi, 0x00, 0x25);
-            result |= spi_send(otter1_spi, 0x01, 0x30);
-            result |= spi_send(otter1_spi, 0x02, 0x40);
-            result |= spi_send(otter1_spi, 0x0e, 0x5f);
-            result |= spi_send(otter1_spi, 0x0f, 0xa4);
-            result |= spi_send(otter1_spi, 0x0d, 0x01);
-            result |= spi_send(otter1_spi, 0x00, 0x2d);
+			printk("***************************************************\n");
+			printk("******************  Panel of HYDIS  ***************\n");
+			printk("***************************************************\n");
+			result |= spi_send(otter1_spi, 0x00, 0x29);
+			result |= spi_send(otter1_spi, 0x00, 0x25);
+			result |= spi_send(otter1_spi, 0x01, 0x30);
+			result |= spi_send(otter1_spi, 0x02, 0x40);
+			result |= spi_send(otter1_spi, 0x0e, 0x5f);
+			result |= spi_send(otter1_spi, 0x0f, 0xa4);
+			result |= spi_send(otter1_spi, 0x0d, 0x01);
+			result |= spi_send(otter1_spi, 0x00, 0x2d);
         }
         else
         {
-            printk("********************************************************************************\n");
-            printk("******************  undefined panel, use default LGD settings ******************\n");
-            printk("********************************************************************************\n");
-            result |= spi_send(otter1_spi, 0x00, 0x21);
-            result |= spi_send(otter1_spi, 0x00, 0xa5);
-            result |= spi_send(otter1_spi, 0x01, 0x30);
-            result |= spi_send(otter1_spi, 0x02, 0x40);
-            result |= spi_send(otter1_spi, 0x0e, 0x5f);
-            result |= spi_send(otter1_spi, 0x0f, 0xa4);
-            result |= spi_send(otter1_spi, 0x0d, 0x00);
-            result |= spi_send(otter1_spi, 0x02, 0x43);
-            result |= spi_send(otter1_spi, 0x0a, 0x28);
-            result |= spi_send(otter1_spi, 0x10, 0x41);
-            result |= spi_send(otter1_spi, 0x00, 0xad);
+			printk("********************************************************************************\n");
+			printk("******************  undefined panel, use default LGD settings ******************\n");
+			printk("********************************************************************************\n");
+			result |= spi_send(otter1_spi, 0x00, 0x21);
+			result |= spi_send(otter1_spi, 0x00, 0xa5);
+			result |= spi_send(otter1_spi, 0x01, 0x30);
+			result |= spi_send(otter1_spi, 0x02, 0x40);
+			result |= spi_send(otter1_spi, 0x0e, 0x5f);
+			result |= spi_send(otter1_spi, 0x0f, 0xa4);
+			result |= spi_send(otter1_spi, 0x0d, 0x00);
+			result |= spi_send(otter1_spi, 0x02, 0x43);
+			result |= spi_send(otter1_spi, 0x0a, 0x28);
+			result |= spi_send(otter1_spi, 0x10, 0x41);
+			result |= spi_send(otter1_spi, 0x00, 0xad);
         }
     }
 	//mdelay(1);
@@ -249,11 +318,11 @@ static int otter1_panel_probe(struct omap_dss_device *dssdev)
 	gpio_request(176, "LCD_VENDOR1");
 	gpio_direction_input(175);
 	gpio_direction_input(176);
-    gpio_request(47, "3V_ENABLE");
-    gpio_request(37, "OMAP_RGB_SHTDN");
+	gpio_request(47, "3V_ENABLE");
+	gpio_request(37, "OMAP_RGB_SHTDN");
 
-    //Already done in uboot
-    //otter1_panel_power_on();
+	//Already done in uboot
+	//otter1_panel_power_on();
 	mutex_init(&lock_power_on);
 	mutex_init(&lock_panel);
 	return 0;
@@ -316,15 +385,15 @@ static int otter1_panel_suspend(struct omap_dss_device *dssdev)
 #if 1 //RGB to LVDS SHTDN pin off
     	gpio_direction_output(37, 0);
 #endif
-mdelay(1);
-    //printk("%s Light_Sensor_Exist = %d\n", __func__, Light_Sensor_Exist);
+	mdelay(1);
+	//printk("%s Light_Sensor_Exist = %d\n", __func__, Light_Sensor_Exist);
 //#if 1 //3V LDO off when light sensor does not exist
-//if(Light_Sensor_Exist == 0) {
-	gpio_direction_output(47, 0);	
-//}
+	//if(Light_Sensor_Exist == 0) {
+		gpio_direction_output(47, 0);	
+	//}
 //#endif
-//gpio_direction_output(175, 0);
-//gpio_direction_output(176, 0);
+	//gpio_direction_output(175, 0);
+	//gpio_direction_output(176, 0);
 	otter1_panel_stop(dssdev);
 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
 	return 0;
@@ -353,17 +422,37 @@ static int otter1_panel_resume(struct omap_dss_device *dssdev)
 	return 0;
 }
 
+static int otter1_set_update_mode(struct omap_dss_device *dssdev, enum omap_dss_update_mode mode)
+{
+	if (mode != OMAP_DSS_UPDATE_MANUAL)
+		return -EINVAL;
+	return 0;
+}
+
+static enum omap_dss_update_mode otter1_get_update_mode(struct omap_dss_device *dssdev)
+{
+	return OMAP_DSS_UPDATE_MANUAL;
+}
+
 static struct omap_dss_driver otter1_driver = {
-	.probe		= otter1_panel_probe,
-	.remove		= otter1_panel_remove,
-	.enable		= otter1_panel_enable,
-	.disable	= otter1_panel_disable,
-	.suspend	= otter1_panel_suspend,
-	.resume		= otter1_panel_resume,
-	.get_timings    = otter1_get_timings,
-	.driver		= {
-		.name	= "otter1_panel_drv",
-		.owner	= THIS_MODULE,
+	.probe		 = otter1_panel_probe,
+	.remove		 = otter1_panel_remove,
+
+	.enable		 = otter1_panel_enable,
+	.disable	 = otter1_panel_disable,
+	.suspend	 = otter1_panel_suspend,
+	.resume		 = otter1_panel_resume,
+
+	.set_update_mode = otter1_set_update_mode,
+	.get_update_mode = otter1_get_update_mode,
+
+	//.get_resolution	 = otter1_get_resolution,
+	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
+
+	.get_timings     = otter1_get_timings,
+	.driver		 = {
+		.name	 = "otter1_panel_drv",
+		.owner	 = THIS_MODULE,
 	},
 };
 
