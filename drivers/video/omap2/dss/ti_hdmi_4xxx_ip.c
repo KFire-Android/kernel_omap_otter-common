@@ -253,15 +253,21 @@ static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
 		r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_TXON);
 	else
 		r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
-
+	/*
+	 * HDMI_WP_PWR_CTRL doesn't seem to reflect the change in power
+	 * states, ignore the error for now
+	 */
+#if 0
 	if (r) {
 		DSSERR("Failed to %s PHY TX power\n",
 				hpd ? "enable" : "disable");
 		goto err;
 	}
-
+#endif
 	ip_data->phy_tx_enabled = hpd;
+#if 0
 err:
+#endif
 	spin_unlock_irqrestore(&phy_tx_lock, flags);
 	return r;
 }
@@ -283,8 +289,15 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	u16 freqout = 1;
 
 	r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
+
+	/*
+	 * HDMI_WP_PWR_CTRL doesn't seem to reflect the change in power
+	 * states, ignore the error for now
+	 */
+#if 0
 	if (r)
 		return r;
+#endif
 
 	/*
 	 * Read address 0 in order to get the SCP reset done completed
