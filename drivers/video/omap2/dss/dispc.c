@@ -36,6 +36,7 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <linux/ratelimit.h>
 
 #include <plat/clock.h>
 #include "../../../drivers/staging/omapdrm/omap_dmm_tiler.h"
@@ -3384,9 +3385,9 @@ static void dispc_error_worker(struct work_struct *work)
 			struct omap_dss_device *dssdev = mgr->device;
 			bool enable;
 
-			DSSERR("SYNC_LOST on channel %s, restarting the output "
-					"with video overlays disabled\n",
-					mgr->name);
+			pr_err_ratelimited("SYNC_LOST on channel %s, restarting"
+					" the output with video overlays "
+					"disabled\n", mgr->name);
 
 			enable = dssdev->state == OMAP_DSS_DISPLAY_ACTIVE;
 			dssdev->driver->disable(dssdev);
