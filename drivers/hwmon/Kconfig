@@ -1118,6 +1118,18 @@ config SENSORS_MC13783_ADC
         help
           Support for the A/D converter on MC13783 PMIC.
 
+config SENSORS_OMAP_BANDGAP
+	tristate "OMAP Bandgap Temperature Sensor"
+	depends on ARCH_OMAP4
+	help
+	  Support for OMAP Bandgap Temperature Sensor
+
+config SENSORS_PMIC_THERMAL
+	tristate "PMIC Thermal Sensor"
+	depends on ARCH_OMAP4 && TWL6030_GPADC
+	help
+	  Support for PMIC Thermal Sensor
+
 if ACPI
 
 comment "ACPI drivers"

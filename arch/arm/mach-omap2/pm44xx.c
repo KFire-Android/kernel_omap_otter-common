@@ -42,6 +42,7 @@
 #include "cm-regbits-44xx.h"
 #include "prm-regbits-44xx.h"
 #include "clock.h"
+#include "scrm_44xx.h"
 
 void *so_ram_address;
 
@@ -212,6 +213,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
 	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
 
+
 	if (mpu_next_state < PWRDM_POWER_INACTIVE) {
 		/* Disable SR for MPU VDD */
 		omap_smartreflex_disable(vdd_mpu);
@@ -283,7 +285,15 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap4_sar_save();
 		omap4_sar_overwrite();
 	}
+	/*
+	if (core_next_state ==1 && cpu0_next_state == 0){
 
+		//Set command volatage to OPP1GHz just after suspend to fix lockup issue after resume
+		omap_writel(0x29b18c80 , 0x4a307B94);
+		omap_writel(0x37b78c80 , 0x4a307B98);
+		omap_writel(0x1ba98c80 , 0x4a307B9C);
+	}
+	*/
 	omap4_enter_lowpower(cpu, power_state);
 
 	if (omap4_device_off_read_prev_state()) {
@@ -292,6 +302,8 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 		omap4_device_off_counter++;
 #endif
 	}
+
+
 
 
 	/* FIXME  This call is not needed now for retention support and global
@@ -329,7 +341,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 	if (core_next_state < PWRDM_POWER_INACTIVE) {
 
 		if (!omap4_device_off_read_next_state()) {
-				/* Disable AUTO RET for IVA and CORE */
+			/* Disable AUTO RET for IVA and CORE */
 			prm_rmw_mod_reg_bits(OMAP4430_AUTO_CTRL_VDD_IVA_L_MASK,
 			0x0,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
@@ -352,7 +364,7 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state)
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_VOLTCTRL_OFFSET);
 		/* Enable SR for MPU VDD */
 		omap_smartreflex_enable(vdd_mpu);
-	}
+	}		
 
 	return;
 }
@@ -744,6 +756,13 @@ static void __init prcm_setup_regs(void)
 	 */
 	prm_write_mod_reg(0x3, OMAP4430_PRM_DEVICE_MOD,
 				OMAP4_PRM_PWRREQCTRL_OFFSET);
+
+
+	/*Set setuptime and downtime into CLKSETUPTIME register*/
+	__raw_writel(0x00050140, OMAP4_SCRM_CLKSETUPTIME);
+
+	/*Set wakeuptime and sleeptime into PMICSETUPTIME register*/
+	__raw_writel(0x00200020, OMAP4_SCRM_PMICSETUPTIME);
 }
 
 /**

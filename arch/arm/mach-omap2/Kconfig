@@ -82,7 +82,7 @@ config MACH_OMAP3EVM
 
 config WIFI_CONTROL_FUNC
         bool "Enable WiFi control function abstraction"
-	depends on MACH_OMAP_4430SDP || MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3
+	depends on MACH_OMAP_4430SDP || MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3 ||  MACH_OMAP_4430_KC1
         select WIRELESS_EXT
         select WEXT_CORE
         select WEXT_PROC
@@ -90,6 +90,12 @@ config WIFI_CONTROL_FUNC
         default Y
         help
            Enables Power/Reset/Carddetect function abstraction
+config TIWLAN_127x
+        bool "TI WLAN 127x chip select"
+        depends on WIFI_CONTROL_FUNC
+        default Y
+        help
+           Say Y here if you want to select TI's WLAN 127x device.If unsure, say N.
 config TIWLAN_SDIO
         bool "TI WLAN Enhanced SDIO Contoller support"
         depends on MMC_OMAP || MMC_OMAP_MODULE || MMC_OMAP_HS || MMC_OMAP_HS_MODULE
@@ -235,6 +241,22 @@ config MACH_OMAP_4430SDP
 config MACH_OMAP4_PANDA
 	bool "OMAP4 based Panda board"
 	depends on ARCH_OMAP4
+
+config MACH_OMAP_4430_KC1
+	bool "OMAP 4430 KC1 board"
+	depends on ARCH_OMAP4
+	select HIGHMEM
+	select TWL6030_PWM
+	select TWL6030_GPADC
+	select NEW_LEDS
+	select LEDS_CLASS
+	select LEDS_OMAP4430_SDP_DISPLAY
+	select MISC_DEVICES
+	select HWMON
+	select INPUT_MISC
+	select INPUT_TOUCHSCREEN
+	select POWER_SUPPLY
+	select SECURITY_MIDDLEWARE_COMPONENT
 
 config ERRATA_OMAP4_AXI2OCP
 	bool "OMAP 4430 axi2ocp errata workaround"

@@ -36,8 +36,10 @@ static void *wifi_status_cb_devid;
 
 void config_wlan_mux(void)
 {
-	omap_mux_init_gpio(SDP4430_WIFI_IRQ_GPIO, OMAP_PIN_INPUT |
-				OMAP_PIN_OFF_WAKEUPENABLE);
+//KC1 SOC off-mode
+//	omap_mux_init_gpio(SDP4430_WIFI_IRQ_GPIO, OMAP_PIN_INPUT |
+//				OMAP_PIN_OFF_WAKEUPENABLE);
+	omap_mux_init_gpio(SDP4430_WIFI_IRQ_GPIO, OMAP_PIN_INPUT);
 	omap_mux_init_gpio(SDP4430_WIFI_PMENA_GPIO, OMAP_PIN_OUTPUT);
 }
 

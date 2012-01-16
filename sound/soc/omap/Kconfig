@@ -21,6 +21,9 @@ config SND_OMAP_SOC_DMIC
 config SND_OMAP_SOC_VXREC
 	tristate
 
+config ABE_44100
+	tristate
+
 config SND_OMAP_SOC_N810
 	tristate "SoC Audio support for Nokia N810"
 	depends on SND_OMAP_SOC && MACH_NOKIA_N810 && I2C
@@ -111,8 +114,8 @@ config SND_OMAP_SOC_SDP3430
 	  SDP3430.
 
 config SND_OMAP_SOC_SDP4430
-	tristate "SoC Audio support for Texas Instruments SDP4430 or PandaBoard"
-	depends on (MACH_OMAP_4430SDP || MACH_OMAP4_PANDA)
+	tristate "SoC Audio support for Texas Instruments SDP4430"
+	depends on MACH_OMAP_4430SDP
 	depends on TWL4030_CORE && SND_OMAP_SOC
 	select SND_OMAP_SOC_ABE
 	select SND_OMAP_SOC_MCPDM
@@ -124,7 +127,32 @@ config SND_OMAP_SOC_SDP4430
 	select SND_OMAP_SOC_VXREC
 	help
 	  Say Y if you want to add support for SoC audio on Texas Instruments
-	  SDP4430 or PandaBoard.
+	  SDP4430.
+
+config SND_OMAP_SOC_OMAP4_PANDA
+	tristate "SoC Audio support for Texas Instruments OMAP4 Panda"
+	depends on MACH_OMAP4_PANDA
+	depends on TWL4030_CORE && SND_OMAP_SOC
+	select SND_OMAP_SOC_ABE
+	select SND_OMAP_SOC_MCPDM
+	select SND_SOC_TWL6040
+	select SND_OMAP_SOC_MCBSP
+	select SND_OMAP_SOC_ABE_DSP
+	select SND_OMAP_SOC_VXREC
+	help
+	  Say Y if you want to add support for SoC audio on Texas Instruments
+	  OMAP4 Panda board.
+	
+config SND_OMAP_SOC_KC1_AIC3110
+	tristate "SoC Audio support for OMAP4 and AIC3110 Audio Codec Chipset"
+	depends on SND_OMAP_SOC
+	select SND_OMAP_SOC_MCBSP
+	select SND_SOC_AIC3110
+	select SND_OMAP_SOC_ABE
+	select SND_OMAP_SOC_ABE_DSP
+        select ABE_44100
+	help
+	  Say Y if you want to add support for SoC audio on the OMAP4 Board
 
 config SND_OMAP_SOC_HDMI
 	tristate "SoC Audio support for HDMI interface on SDP4430"

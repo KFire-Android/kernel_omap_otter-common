@@ -217,11 +217,19 @@ static int mask_rtc_irq_bit(unsigned char bit)
 static int twl_rtc_alarm_irq_enable(struct device *dev, unsigned enabled)
 {
 	int ret;
+	u8 rd_reg;
 
 	if (enabled)
 		ret = set_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
-	else
+	else {
 		ret = mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
+		/* Clear possible pending STATUS bit
+		   This could occur if system goes to sleep at the exact same time
+		   as alarm scheduled time (see alarm_suspend function in alarm.c) */
+		ret |= twl_rtc_read_u8(&rd_reg, REG_RTC_STATUS_REG);
+		ret |= twl_rtc_write_u8(rd_reg | BIT_RTC_STATUS_REG_ALARM_M,
+				   REG_RTC_STATUS_REG);
+	}
 
 	return ret;
 }
@@ -361,9 +369,13 @@ static int twl_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 	unsigned char alarm_data[ALL_TIME_REGS + 1];
 	int ret;
 
+	// Disable Alarm IRQ
 	ret = twl_rtc_alarm_irq_enable(dev, 0);
 	if (ret)
 		goto out;
+
+	if (! alm->enabled)
+		return ret; // No need to go further. We have already disabled the alarm IRQ
 
 	alarm_data[1] = bin2bcd(alm->time.tm_sec);
 	alarm_data[2] = bin2bcd(alm->time.tm_min);
@@ -459,6 +471,7 @@ static struct rtc_class_ops twl_rtc_ops = {
 
 static int __devinit twl_rtc_probe(struct platform_device *pdev)
 {
+
 	struct rtc_device *rtc;
 	int ret = 0;
 	int irq = platform_get_irq(pdev, 0);
@@ -478,6 +491,14 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, rtc);
+
+	// RTC is starting up. We should not have RTC interrupt enabled
+	ret = twl_rtc_read_u8(&rd_reg, REG_RTC_INTERRUPTS_REG);
+	if (ret>=0) {
+		if (rd_reg & BIT_RTC_INTERRUPTS_REG_IT_ALARM_M) {
+			mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);	
+		}
+	}
 
 	ret = twl_rtc_read_u8(&rd_reg, REG_RTC_STATUS_REG);
 	if (ret < 0)
@@ -566,9 +587,11 @@ static int __devexit twl_rtc_remove(struct platform_device *pdev)
 
 static void twl_rtc_shutdown(struct platform_device *pdev)
 {
-	/* mask timer interrupts, but leave alarm interrupts on to enable
-	   power-on when alarm is triggered */
+ 	/* mask timer interrupts and alarm interrupts
+           power-on when alarm is triggered is not enabled */
 	mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_TIMER_M);
+	mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
+
 }
 
 #ifdef CONFIG_PM
@@ -586,6 +609,18 @@ static int twl_rtc_suspend(struct platform_device *pdev, pm_message_t state)
 static int twl_rtc_resume(struct platform_device *pdev)
 {
 	set_rtc_irq_bit(irqstat);
+#ifdef CONFIG_ANDROID
+	/*  ANDROID specific behaviour: upon resume, RTC alarm must be cleared 
+		[please consult drivers/rtc/alarm.c, alarm_resume() function]
+	    Unfortunately, in this function, before calling the rtc_alarm_set() function,
+	    alarm.c driver fills an alarm struct with zeros.
+	    this is not a valid alarm format [drivers/rtc/rtc-lib.c, rtc_valid_tm() function], hence, the TWL disable alarm function
+	    is never called. 
+	    For safety reason, we disable the alarm IRQ here.
+	*/
+	mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
+#endif
+
 	return 0;
 }
 

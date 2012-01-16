@@ -6074,13 +6074,13 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	/* usb_host_fs class */
 /*	&omap44xx_usb_host_fs_hwmod, */
 	/* usb_host_hs class */
-	&omap44xx_usb_host_hs_hwmod,
+	//&omap44xx_usb_host_hs_hwmod,
 	/* usb_otg_hs class */
 	&omap44xx_usb_otg_hs_hwmod,
 	/* usb_tll_hs class */
 	&omap44xx_usb_tll_hs_hwmod,
-	&omap44xx_usbhs_ehci_hwmod,
-	&omap44xx_usbhs_ohci_hwmod,
+	//&omap44xx_usbhs_ehci_hwmod,
+	//&omap44xx_usbhs_ohci_hwmod,
 	/* wd_timer class */
 	&omap44xx_wd_timer2_hwmod,
 /*	&omap44xx_wd_timer3_hwmod, */

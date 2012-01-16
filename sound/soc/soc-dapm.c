@@ -361,7 +361,8 @@ static int snd_soc_dapm_set_bias_level(struct snd_soc_card *card,
 		struct snd_soc_dapm_context *dapm, enum snd_soc_bias_level level)
 {
 	int ret = 0;
-
+        //printk (KERN_INFO "##snd_soc_dapm_set_bias_level %d \n", level);
+ 
 	switch (level) {
 	case SND_SOC_BIAS_ON:
 		dev_dbg(dapm->dev, "Setting full bias\n");
@@ -1172,7 +1173,8 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 		card = dapm->platform->card;
 	if (!card)
 		return -ENODEV;
-
+        //printk (KERN_INFO "##dapm_power_widgets Event %d\n", event);
+ 
 	/* Check which widgets we need to power and store them in
 	 * lists indicating if they should be powered up or down.
 	 */
@@ -1215,6 +1217,8 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 	 * event type.
 	 */
 	if (list_empty(&dapm->widgets)) {
+                //printk(KERN_INFO "##Codec Widgets are empty...\n");
+
 		switch (event) {
 		case SND_SOC_DAPM_STREAM_START:
 		case SND_SOC_DAPM_STREAM_RESUME:
@@ -1238,6 +1242,7 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 			break;
 		}
 	}
+        //printk (KERN_INFO "##sys_power %d bias_level %d\n", sys_power, dapm->bias_level);
 
 	if (sys_power && dapm->bias_level == SND_SOC_BIAS_OFF) {
 		ret = snd_soc_dapm_set_bias_level(card, dapm,
@@ -1245,6 +1250,7 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 		if (ret != 0)
 			pr_err("Failed to turn on bias: %d\n", ret);
 	}
+        //printk(KERN_INFO "##Now dapm bias level %d\n", dapm->bias_level);
 
 	/* If we're changing to all on or all off then prepare */
 	if ((sys_power && dapm->bias_level == SND_SOC_BIAS_STANDBY) ||
@@ -1274,6 +1280,7 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 		if (ret != 0)
 			pr_err("Failed to turn off bias: %d\n", ret);
 	}
+        //printk(KERN_INFO "##Finally dapm level %d\n", dapm->bias_level);
 
 	/* If we just powered up then move to active bias */
 	if (dapm->bias_level == SND_SOC_BIAS_PREPARE && sys_power) {
@@ -1281,7 +1288,8 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 		if (ret != 0)
 			pr_err("Failed to apply active bias: %d\n", ret);
 	}
-
+        //printk(KERN_INFO "### DAPM Sequencing finished...\n");
+ 
 	pop_dbg(dapm->pop_time, "DAPM sequencing finished, waiting %dms\n",
 		dapm->pop_time);
 	pop_wait(dapm->pop_time);

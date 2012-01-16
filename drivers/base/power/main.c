@@ -27,6 +27,7 @@
 #include <linux/sched.h>
 #include <linux/async.h>
 #include <linux/timer.h>
+#include <linux/metricslog.h>
 
 #include "../base.h"
 #include "power.h"
@@ -412,6 +413,8 @@ static void dpm_show_time(ktime_t starttime, pm_message_t state, char *info)
 	ktime_t calltime;
 	s64 usecs64;
 	int usecs;
+	char buf[64];
+	const char *verb;
 
 	calltime = ktime_get();
 	usecs64 = ktime_to_ns(ktime_sub(calltime, starttime));
@@ -419,9 +422,19 @@ static void dpm_show_time(ktime_t starttime, pm_message_t state, char *info)
 	usecs = usecs64;
 	if (usecs == 0)
 		usecs = 1;
+
+	verb = pm_verb(state.event);
+
 	pr_info("PM: %s%s%s of devices complete after %ld.%03ld msecs\n",
-		info ?: "", info ? " " : "", pm_verb(state.event),
+		info ? : "", info ? " " : "", verb,
 		usecs / USEC_PER_MSEC, usecs % USEC_PER_MSEC);
+
+	sprintf(buf, "dpmst:dpmd%c:time_ms=%ld.%03ld:%s%s%s complete",
+		info ? info[0] : verb[0],
+		usecs / USEC_PER_MSEC, usecs % USEC_PER_MSEC,
+		info ? : "", info ? " " : "", verb);
+
+	log_to_metrics(ANDROID_LOG_INFO, "dpm", buf);
 }
 
 /*------------------------- Resume routines -------------------------*/
@@ -615,7 +628,7 @@ static void dpm_drv_timeout(unsigned long data)
 static void dpm_drv_wdset(struct device *dev)
 {
 	dpm_drv_wd.data = (unsigned long) dev;
-	mod_timer(&dpm_drv_wd, jiffies + (HZ * 3));
+	mod_timer(&dpm_drv_wd, jiffies + (HZ * 6));
 }
 
 /**

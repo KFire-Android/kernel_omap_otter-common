@@ -166,7 +166,8 @@ static int suspend_enter(suspend_state_t state)
 
 	error = sysdev_suspend(PMSG_SUSPEND);
 	if (!error) {
-		if (!suspend_test(TEST_CORE))
+		//Check there is no NIRQ1 wakeup event before going in suspend
+		if (!suspend_test(TEST_CORE) && !(omap_readl(0x4A10019C)&0x80000000) )
 			error = suspend_ops->enter(state);
 		sysdev_resume();
 	}

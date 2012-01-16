@@ -232,6 +232,11 @@ int twl6030_mmc_card_detect(struct device *dev, int slot);
 #define TWL4030_SIH_CTRL_COR_MASK	BIT(2)
 
 /*----------------------------------------------------------------------*/
+/*
+* PMC Master Module offser
+*/
+#define REG_START_CONDITION         0x0
+#define REG_STS_HW_CONDITIONS       0x2
 
 /*
  * GPIO Block Register offsets (use TWL4030_MODULE_GPIO)
@@ -398,6 +403,26 @@ int twl6030_mmc_card_detect(struct device *dev, int slot);
 #define TWL5031_INTERRUPTS_BCIEDR2	0x6
 #define TWL5031_INTERRUPTS_BCISIHCTRL	0x7
 
+#define CONTROLLER_INT_MASK	0x00
+#define CONTROLLER_CTRL1	0x01
+#define CONTROLLER_WDG		0x02
+#define CONTROLLER_STAT1	0x03
+#define CHARGERUSB_INT_STATUS	0x04
+#define CHARGERUSB_INT_MASK	0x05
+#define CHARGERUSB_STATUS_INT1	0x06
+#define CHARGERUSB_STATUS_INT2	0x07
+#define CHARGERUSB_CTRL1	0x08
+#define CHARGERUSB_CTRL2	0x09
+#define CHARGERUSB_CTRL3	0x0A
+#define CHARGERUSB_STAT1	0x0B
+#define CHARGERUSB_VOREG	0x0C
+#define CHARGERUSB_VICHRG	0x0D
+#define CHARGERUSB_CINLIMIT	0x0E
+#define CHARGERUSB_CTRLLIMIT1	0x0F
+#define CHARGERUSB_CTRLLIMIT2	0x10
+#define ANTICOLLAPSE_CTRL1	0x11
+#define ANTICOLLAPSE_CTRL2	0x12
+
 /*----------------------------------------------------------------------*/
 
 /* Power bus message definitions */
@@ -507,7 +532,10 @@ int twl6030_mmc_card_detect(struct device *dev, int slot);
 struct twl4030_clock_init_data {
 	bool ck32k_lowpwr_enable;
 };
+struct twl6030_qcharger_platform_data{
+    unsigned int interrupt_pin;
 
+};
 struct twl4030_bci_platform_data {
 	int *battery_tmp_tbl;
 	unsigned int tblsize;
@@ -664,7 +692,7 @@ struct twl4030_platform_data {
 	struct twl4030_usb_data			*usb;
 	struct twl4030_power_data		*power;
 	struct twl4030_codec_data		*codec;
-
+    struct twl6030_qcharger_platform_data    *qcharger;
 	/* Common LDO regulators for TWL4030/TWL6030 */
 	struct regulator_init_data		*vdac;
 	struct regulator_init_data		*vaux1;

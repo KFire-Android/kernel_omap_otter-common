@@ -530,6 +530,7 @@ static int shrink_icache_memory(struct shrinker *shrink, int nr, gfp_t gfp_mask)
 static struct shrinker icache_shrinker = {
 	.shrink = shrink_icache_memory,
 	.seeks = DEFAULT_SEEKS,
+	.name = __FILE__,
 };
 
 static void __wait_on_freeing_inode(struct inode *inode);

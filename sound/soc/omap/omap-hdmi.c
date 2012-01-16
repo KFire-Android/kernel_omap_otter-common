@@ -231,7 +231,6 @@ static __devinit int omap_hdmi_probe(struct platform_device *pdev)
 	notifier->hpd_notifier = hdmi_hpd_notifier;
 	notifier->pwrchange_notifier = hdmi_pwrchange_notifier;
 	notifier->private_data = &hdmi_data;
-	hdmi_lib_init();
 	hdmi_add_notifier(notifier);
 
 	return snd_soc_register_dai(&pdev->dev, &omap_hdmi_dai);

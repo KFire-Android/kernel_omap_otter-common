@@ -24,11 +24,35 @@
 #include <linux/module.h>
 #include <linux/pm.h>
 #include <linux/i2c/twl.h>
+#include <linux/gpio.h>
 
 #define TWL6030_PHONIX_DEV_ON	0x25
 #define APP_DEVOFF	(1<<0)
 #define CON_DEVOFF	(1<<1)
 #define MOD_DEVOFF	(1<<2)
+#define SW_RESET_DEVOFF (1<<6)
+
+void twl6030_reboot(char str, const char *cmd)
+{
+	u8 uninitialized_var(val);
+	int err, i;
+//This is a work around to solve the OTA factory reset issue
+omap_writel(0x29b18c80 , 0x4a307B94);//VCORE 0x29
+omap_writel(0x37b78c80 , 0x4a307B98);//VMPU  0x37
+omap_writel(0x1ba98c80 , 0x4a307B9C);//VIVA  0x1b
+        
+	pr_warning("Device is rebooting thanks to Phonix... \n", i);
+
+	val = SW_RESET_DEVOFF;
+
+	err = twl_i2c_write_u8(TWL6030_MODULE_ID0, val,
+			       TWL6030_PHONIX_DEV_ON);
+
+	if (err) {
+		pr_warning("I2C error %d writing PHONIX_DEV_ON\n", err);
+	}
+}
+EXPORT_SYMBOL(twl6030_reboot);
 
 void twl6030_poweroff(void)
 {
@@ -54,11 +78,11 @@ void twl6030_poweroff(void)
 
 	return;
 }
-
+EXPORT_SYMBOL(twl6030_poweroff);
 static int __init twl6030_poweroff_init(void)
 {
-	pm_power_off = twl6030_poweroff;
-
+	pm_power_off   = twl6030_poweroff;
+	arm_pm_restart = twl6030_reboot;
 	return 0;
 }
 

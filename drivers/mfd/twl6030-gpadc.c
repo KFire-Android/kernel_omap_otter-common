@@ -51,6 +51,21 @@
 #define TWL6030_GPADC_MASK		0x20
 #define SCALE				(1 << 15)
 
+
+
+/* TWL6030_GPADC_CTRL */
+#define GPADC_CTRL_TEMP1_EN	(1 << 0)    /* input ch 1 */
+#define GPADC_CTRL_TEMP2_EN	(1 << 1)    /* input ch 4 */
+#define GPADC_CTRL_SCALER_EN	(1 << 2)    /* input ch 2 */
+#define GPADC_CTRL_SCALER_DIV4	(1 << 3)
+#define GPADC_CTRL_SCALER_EN_CH11	(1 << 4)    /* input ch 11 */
+#define GPADC_CTRL_TEMP1_EN_MONITOR	(1 << 5)
+#define GPADC_CTRL_TEMP2_EN_MONITOR	(1 << 6)
+#define GPADC_CTRL_ISOURCE_EN		(1 << 7)
+#define ENABLE_ISOURCE		0x80
+
+
+
 struct twl6030_calibration {
 	s32 gain_error;
 	s32 offset_error;
@@ -149,6 +164,41 @@ static const struct twl6030_ideal_code twl6030_ideal[17] = {
 	{0,	0},	/* CHANNEL 16 */
 };
 
+
+static int temperature_table[] =
+{
+	954,  952,  951,  949,  948,  /* -15C~ -11C*/
+	946,  944,  942,  940,  938,  936,  933,  931,  929,  926,   /* -10C~ -1C*/
+	923,  921,  918,  915,  911,  908,  905,  901,  898,  894,   /* 0C~ 9C*/
+	890,  886,  882,  877,  873,  868,  863,  858,  853,  848,   /* 10C~ 19C*/
+	843,  837,  831,  826,  819,  813,  807,  801,  794,  787,	/* 20C~ 29C*/
+	780,  773,  766,  759,  751,  744,  736,  728,  720,  712,	/* 30C~ 39C*/
+	704,  696,  688,  679,  671,  662,  654,  645,  636,  627,  /* 40C~ 49C*/
+	619,  610,  601,  592,  583,  574,  565,  556,  547,  538,  /* 50C~ 59C*/
+	529,  520,  511,  503,  494,  485,  476,  468,  459,  450,  /* 60C~ 69C*/
+	442,  434,  425,  417,  409,  401,  393,  385,  377,  370,  /* 70C~ 79C*/
+	362,  355,  348,  341,  334,  326,  319,  313,  306,  299,  /* 80C~ 89C*/
+	293,  287,  281,  274,  268,  262,  257,  251,  246,  240,  /* 90C~ 99C*/
+	235,  230,  224,  219,  214,  209  /* 100C~ 105C*/
+};
+
+static int temperature_batt_table[] =
+{
+	592,  590,  588,  586,  584,  582,  579,  577,  574,  571,/* -20C~ -11C*/
+	568,  565,  562,  559,  555,  551,  548,  544,  540,  535,   /* -10C~ -1C*/
+	531,  526,  522,  517,  512,  507,  502,  496,  491,  485,   /* 0C~ 9C*/
+	479,  473,  467,  461,  455,  448,  442,  435,  428,  422,   /* 10C~ 19C*/
+	415,  408,  401,  394,  387,  380,  372,  365,  358,  351,	/* 20C~ 29C*/
+	344,  336,  329,  322,  315,  308,  301,  294,  287,  280,	/* 30C~ 39C*/
+	273,  266,  260,  253,  247,  240,  234,  228,  222,  216,  /* 40C~ 49C*/
+	210,  204,  198,  193,  187,  182,  177,  172,  167,  162,  /* 50C~ 59C*/
+	157,  153,  148,  144,  140,  135,  131,  127,  124,  120,  /* 60C~ 69C*/
+	116,  113,  109,  106,  103,  100,   97,   94,   91,   88,  /* 70C~ 79C*/
+	 86,   83,   81,   78,   76,   74,   71,   69,   67,   65,  /* 80C~ 89C*/
+	 63,   61,   60,   58,   56,   55,   53,   51,   50,   49,  /* 90C~ 99C*/
+	 47,   46,   45,   43,   42,   41  /* 100C~ 105C*/
+};
+
 struct twl6030_gpadc_data {
 	struct device		*dev;
 	struct mutex		lock;
@@ -158,6 +208,7 @@ struct twl6030_gpadc_data {
 };
 
 static struct twl6030_gpadc_data *the_gpadc;
+
 
 static
 const struct twl6030_gpadc_conversion_method twl6030_conversion_methods[] = {
@@ -218,6 +269,130 @@ static ssize_t show_offset(struct device *dev,
 	return status;
 }
 
+///////////////leon add for NTC////////////////////////////////
+static ssize_t show_value(struct device *dev,
+		struct device_attribute *devattr, char *buf)
+{
+	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	int temp1 = 0;
+	int temp2 = 0;
+	int ret;
+	int status;
+	struct twl6030_gpadc_request req;
+
+	req.channels = (1 << attr->index);
+	req.method = TWL6030_GPADC_SW2;
+	req.active = 0;
+	req.func_cb = NULL;
+	ret = twl6030_gpadc_conversion(&req);
+	if (ret < 0)
+		return ret;
+
+	if (req.rbuf[attr->index] > 0) {
+		temp1 = req.rbuf[attr->index];
+		temp2 = req.buf[attr->index].raw_code;
+		}
+		status = sprintf(buf, "%d\n", temp1);
+	return status;
+}
+
+static ssize_t show_temperature(struct device *dev,
+		struct device_attribute *devattr, char *buf)
+{
+	int adcraw = 0;
+	int temp = 0;
+	int ret;
+	int status;
+	char i;
+	struct twl6030_gpadc_request req;
+
+	req.channels = (1 << 4);
+	req.method = TWL6030_GPADC_SW2;
+	req.active = 0;
+	req.func_cb = NULL;
+	ret = twl6030_gpadc_conversion(&req);
+	if (ret < 0)
+		return ret;
+
+	if (req.rbuf[4] > 0) {
+		adcraw = req.buf[4].raw_code;
+		}
+	for (i=0; i< 121; i++)
+	{
+		if (adcraw < temperature_table[i])
+			temp = -15 + i;
+		else
+			break;			
+	}
+		status = sprintf(buf, "%d\n", temp);
+	return status;
+
+}
+
+static ssize_t show_temperature_batt(struct device *dev,
+		struct device_attribute *devattr, char *buf)
+{
+	int adcraw = 0;
+	int temp = 0;
+	int ret;
+	int status;
+	char i;
+	struct twl6030_gpadc_request req;
+
+	req.channels = (1 << 1);
+	req.method = TWL6030_GPADC_SW2;
+	req.active = 0;
+	req.func_cb = NULL;
+	ret = twl6030_gpadc_conversion(&req);
+	if (ret < 0)
+		return ret;
+
+	if (req.rbuf[1] > 0) {
+		adcraw = req.buf[1].raw_code;
+		}
+	for (i=0; i< 126; i++)
+	{
+		if (adcraw < (temperature_batt_table[i]*36/25))
+			temp = -20 + i;
+		else
+			break;			
+	}
+		status = sprintf(buf, "%d\n", temp);
+	return status;
+
+}
+int twl_get_batntc()
+{
+	int adcraw = 0;
+	int temp = 0;
+	int ret;
+	int status;
+	char i;
+	struct twl6030_gpadc_request req;
+
+	req.channels = (1 << 1);
+	req.method = TWL6030_GPADC_SW2;
+	req.active = 0;
+	req.func_cb = NULL;
+	ret = twl6030_gpadc_conversion(&req);
+	if (ret < 0)
+		return ret;
+
+	if (req.rbuf[1] > 0) {
+		adcraw = req.buf[1].raw_code;
+		}
+	for (i=0; i< 126; i++)
+	{
+		if (adcraw < (temperature_batt_table[i]*36/25))
+			temp = -20 + i;
+		else
+			break;			
+	}
+    return temp;
+}
+EXPORT_SYMBOL_GPL(twl_get_batntc);
+//////////////////////////////////////////////////////////////////
+
 static ssize_t set_offset(struct device *dev,
 	struct device_attribute *devattr, const char *buf, size_t count)
 {
@@ -233,6 +408,7 @@ static ssize_t set_offset(struct device *dev,
 
 	return status;
 }
+
 
 static int twl6030_gpadc_read(struct twl6030_gpadc_data *gpadc, u8 reg)
 {
@@ -317,6 +493,8 @@ static int twl6030_gpadc_read_channels(struct twl6030_gpadc_data *gpadc,
 	return count;
 }
 
+
+
 static void twl6030_gpadc_enable_irq(u16 method)
 {
 	twl6030_interrupt_unmask(TWL6030_GPADC_MASK << method,
@@ -354,6 +532,24 @@ static irqreturn_t twl6030_gpadc_irq_handler(int irq, void *_req)
 
 	return IRQ_HANDLED;
 }
+
+
+////////////////////////////leon add for ntc/////////////////
+static int ntc_setup(void)
+{
+	int ret;
+	u8 rd_reg = 0;
+
+	ret = twl_i2c_read_u8(TWL_MODULE_MADC, &rd_reg, TWL6030_GPADC_CTRL);
+	rd_reg |= GPADC_CTRL_TEMP1_EN | GPADC_CTRL_TEMP2_EN |
+		GPADC_CTRL_TEMP1_EN_MONITOR | GPADC_CTRL_TEMP2_EN_MONITOR |
+		GPADC_CTRL_SCALER_DIV4;
+	ret |= twl_i2c_write_u8(TWL_MODULE_MADC, rd_reg, TWL6030_GPADC_CTRL);
+
+	return ret;
+}
+////////////////////////////////////////////////////////////////////////////////
+
 
 static void twl6030_gpadc_work(struct work_struct *ws)
 {
@@ -517,11 +713,18 @@ out:
 }
 EXPORT_SYMBOL(twl6030_gpadc_conversion);
 
+
+
+
+
 #define in_gain(index) \
 static SENSOR_DEVICE_ATTR(in##index##_gain, S_IRUGO|S_IWUSR, show_gain, \
 	set_gain, index); \
 static SENSOR_DEVICE_ATTR(in##index##_offset, S_IRUGO|S_IWUSR, show_offset, \
-	set_offset, index)
+	set_offset, index); \
+static SENSOR_DEVICE_ATTR(in##index##_value, S_IROTH|S_IWUSR, show_value, \
+	NULL, index);
+
 
 in_gain(0);
 in_gain(1);
@@ -540,10 +743,18 @@ in_gain(13);
 in_gain(14);
 in_gain(15);
 in_gain(16);
+static DEVICE_ATTR(ntc, S_IROTH|S_IWUSR, show_temperature, NULL);
+static DEVICE_ATTR(ntc_batt, S_IROTH|S_IWUSR, show_temperature_batt, NULL);
+//////////////leon add for NTC access
+//static SENSOR_DEVICE_ATTR(ntcvalue, S_IRUGO|S_IWUSR|S_IWGRP,
+//		get_ntc_value, NULL, 6);
 
 #define IN_ATTRS(X)\
 	&sensor_dev_attr_in##X##_gain.dev_attr.attr,	\
-	&sensor_dev_attr_in##X##_offset.dev_attr.attr	\
+	&sensor_dev_attr_in##X##_offset.dev_attr.attr,	\
+	&sensor_dev_attr_in##X##_value.dev_attr.attr
+
+
 
 static struct attribute *twl6030_gpadc_attributes[] = {
 	IN_ATTRS(0),
@@ -563,8 +774,11 @@ static struct attribute *twl6030_gpadc_attributes[] = {
 	IN_ATTRS(14),
 	IN_ATTRS(15),
 	IN_ATTRS(16),
+	&dev_attr_ntc.attr,
+	&dev_attr_ntc_batt.attr,	
 	NULL
 };
+//	&sensor_dev_attr_ntcvalue.dev_attr.attr,	//leon add
 
 static const struct attribute_group twl6030_gpadc_group = {
 	.attrs = twl6030_gpadc_attributes,
@@ -654,6 +868,13 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "could not register misc_device\n");
 		goto err_misc;
 	}
+//////////////////////////////////// leon add/////////////////////////////////////
+	ret = ntc_setup();
+	if (ret) {
+		dev_dbg(&pdev->dev, "could not setup ntc setting\n");
+		goto err_irq;
+	}
+////////////////////////////////////////////////////////////////////////////////////
 
 	ret = request_irq(platform_get_irq(pdev, 0), twl6030_gpadc_irq_handler,
 			0, "twl6030_gpadc", &gpadc->requests[TWL6030_GPADC_RT]);
@@ -736,7 +957,7 @@ static int __init twl6030_gpadc_init(void)
 {
 	return platform_driver_register(&twl6030_gpadc_driver);
 }
-module_init(twl6030_gpadc_init);
+subsys_initcall(twl6030_gpadc_init);
 
 static void __exit twl6030_gpadc_exit(void)
 {

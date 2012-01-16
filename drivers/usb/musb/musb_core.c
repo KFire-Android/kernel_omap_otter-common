@@ -732,7 +732,7 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 		musb->xceiv->event = USB_EVENT_ID;
 
 		/* Hold a wakelock */
-		wake_lock(&plat->musb_lock);
+		//wake_lock(&plat->musb_lock);
 
 #ifdef CONFIG_USB_MUSB_OTG
 		/* flush endpoints when transitioning from Device Mode */
@@ -802,7 +802,7 @@ b_host:
 		musb->xceiv->event = USB_EVENT_NONE;
 
 		/* Release the wakelock */
-		wake_unlock(&plat->musb_lock);
+		//wake_unlock(&plat->musb_lock);
 
 		switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
@@ -873,7 +873,7 @@ b_host:
 			musb->xceiv->event = USB_EVENT_VBUS;
 
 			/* Hold a wakelock */
-			wake_lock(&plat->musb_lock);
+			//wake_lock(&plat->musb_lock);
 
 			switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_OTG

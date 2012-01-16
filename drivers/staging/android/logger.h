@@ -20,6 +20,10 @@
 #include <linux/types.h>
 #include <linux/ioctl.h>
 
+#ifdef CONFIG_LAB126
+#include <linux/metricslog.h>
+#endif
+
 struct logger_entry {
 	__u16		len;	/* length of the payload */
 	__u16		__pad;	/* no matter what, we get 2 bytes of padding */
@@ -34,6 +38,11 @@ struct logger_entry {
 #define LOGGER_LOG_EVENTS	"log_events"	/* system/hardware events */
 #define LOGGER_LOG_SYSTEM	"log_system"	/* system/framework messages */
 #define LOGGER_LOG_MAIN		"log_main"	/* everything else */
+
+#ifdef CONFIG_LAB126
+#define LOGGER_LOG_METRICS	"log_metrics"	        /* metrics logs */
+#define LOGGER_LOG_AMAZON_MAIN	"log_amazon_main"	/* private buffer for amazon signed apk */
+#endif
 
 #define LOGGER_ENTRY_MAX_LEN		(4*1024)
 #define LOGGER_ENTRY_MAX_PAYLOAD	\

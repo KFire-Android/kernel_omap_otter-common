@@ -8,6 +8,8 @@ menuconfig POWER_SUPPLY
 
 if POWER_SUPPLY
 
+source "drivers/power/kc1_summit/Kconfig"
+
 config POWER_SUPPLY_DEBUG
 	bool "Power supply debug"
 	help
@@ -135,6 +137,12 @@ config BATTERY_BQ27x00
 	help
 	  Say Y here to enable support for batteries with BQ27x00 (I2C) chips.
 
+config BATTERY_BQ27541_Q
+	tristate "BQ27541 battery driver"
+	depends on I2C
+	help
+	  Say Y here to enable support for batteries with BQ27541 (I2C) chips.
+
 config BATTERY_DA9030
 	tristate "DA9030 battery driver"
 	depends on PMIC_DA903X
@@ -161,5 +169,16 @@ config CHARGER_PCF50633
 	depends on MFD_PCF50633
 	help
 	 Say Y to include support for NXP PCF50633 Main Battery Charger.
+
+config SUMMIT_SMB347
+	tristate "Summit SMB347 USB Charger IC"
+	depends on BATTERY_BQ27541
+	help
+	  Say Y to enable support for the Summit SMB347 USB Charger IC
+
+config BATTERY_BQ27541
+	tristate "BQ27541 Battery Driver"
+	help
+	  Say Y to enable support for interfacing the BQ27541 battery
 
 endif # POWER_SUPPLY

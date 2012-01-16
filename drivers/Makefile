@@ -79,6 +79,7 @@ obj-$(CONFIG_MPU_BRIDGE)        += dsp/bridge/
 obj-$(CONFIG_PPS)		+= pps/
 obj-$(CONFIG_W1)		+= w1/
 obj-$(CONFIG_POWER_SUPPLY)	+= power/
+obj-$(CONFIG_SUMMIT_SMB347_Q)		+= power/kc1_summit/
 obj-$(CONFIG_HWMON)		+= hwmon/
 obj-$(CONFIG_THERMAL)		+= thermal/
 obj-$(CONFIG_WATCHDOG)		+= watchdog/

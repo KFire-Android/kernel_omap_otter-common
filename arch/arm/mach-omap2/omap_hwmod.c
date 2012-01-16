@@ -585,7 +585,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
 {
 	int i;
 
-	pr_debug("omap_hwmod: %s: disabling clocks\n", oh->name);
+	//pr_debug("omap_hwmod: %s: disabling clocks\n", oh->name);
 
 	if (oh->_clk)
 		clk_disable(oh->_clk);
@@ -1113,12 +1113,14 @@ int _omap_hwmod_idle(struct omap_hwmod *oh)
 	 */
 	if ((oh->_state != _HWMOD_STATE_ENABLED) &&
 	    !(oh->flags & HWMOD_INIT_NO_IDLE)) {
-		WARN(1, "omap_hwmod: %s: idle state can only be entered from "
-		     "enabled state\n", oh->name);
+	    	// This is being called with mutex_lock...
+		// Hence should not print even with err
+		/*WARN(1, "omap_hwmod: %s: idle state can only be entered from "
+		     "enabled state\n", oh->name);*/
 		return -EINVAL;
 	}
 
-	pr_debug("omap_hwmod: %s: idling\n", oh->name);
+	//pr_debug("omap_hwmod: %s: idling\n", oh->name);
 
 	if (oh->class->sysc)
 		_sysc_idle(oh);

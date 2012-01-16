@@ -27,9 +27,13 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/err.h>
 #include <linux/mutex.h>
+#include <linux/irq.h>
+#include <linux/gpio.h>
+#include <linux/interrupt.h>
+//#include <linux/workqueue.h>
 #include "lm75.h"
 
-
+#define OMAP4_LM75_IRQ	60
 /*
  * This driver handles the LM75 and compatible digital temperature sensors.
  */
@@ -64,11 +68,15 @@ static const u8 LM75_REG_TEMP[3] = {
 	0x03,		/* max */
 	0x02,		/* hyst */
 };
+#define LM75_THIGH	 		72000
+#define LM75_TLOW			70000
+#define LM75_TCRITICAL			78000
 
 /* Each client has this additional data */
 struct lm75_data {
 	struct device		*hwmon_dev;
 	struct mutex		update_lock;
+	struct work_struct 		work;
 	u8			orig_conf;
 	char			valid;		/* !=0 if registers are valid */
 	unsigned long		last_updated;	/* In jiffies */
@@ -76,11 +84,17 @@ struct lm75_data {
 						   0 = input
 						   1 = max
 						   2 = hyst */
+	int			irq;	
+
 };
 
 static int lm75_read_value(struct i2c_client *client, u8 reg);
 static int lm75_write_value(struct i2c_client *client, u8 reg, u16 value);
 static struct lm75_data *lm75_update_device(struct device *dev);
+
+#if defined(CONFIG_TWL6030_POWEROFF)
+extern void twl6030_poweroff(void);
+#endif
 
 
 /*-----------------------------------------------------------------------*/
@@ -92,7 +106,14 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *da,
 {
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(da);
 	struct lm75_data *data = lm75_update_device(dev);
-	return sprintf(buf, "%d\n",
+
+#if defined(CONFIG_TWL6030_POWEROFF)
+	/* Driver fail-safe to shut down the system */
+	if (LM75_TEMP_FROM_REG(data->temp[attr->index]) >= LM75_TCRITICAL)
+		twl6030_poweroff();
+#endif
+
+	return sprintf(buf, "%d\nSuccess\n",
 		       LM75_TEMP_FROM_REG(data->temp[attr->index]));
 }
 
@@ -137,6 +158,32 @@ static const struct attribute_group lm75_group = {
 
 /*-----------------------------------------------------------------------*/
 
+/* interrupt */
+static void lm75_work(struct work_struct *work)
+{
+	struct lm75_data *data =
+		container_of(work, struct lm75_data, work);
+	kobject_uevent(&data->hwmon_dev->kobj, KOBJ_CHANGE);
+	printk("@@@@@@@@@@@@@@@@@@@@@@sending uevent change\n");
+//	mutex_lock(&priv->mutex);
+}
+
+static irqreturn_t lm75_isr(int irq, void *dev_id)
+{
+//	struct ilitek_ts_priv *priv = dev_id;
+	struct lm75_data *data = (struct lm75_data *)dev_id;
+//    	printk("lm75 irq\n");
+	 /* postpone I2C transactions as we are atomic */
+	schedule_work(&data->work);
+//	kobject_uevent(&data->hwmon_dev->kobj, KOBJ_CHANGE);
+	return IRQ_HANDLED;
+}
+
+
+
+
+/*-----------------------------------------------------------------------*/
+
 /* device probe and removal */
 
 static int
@@ -146,6 +193,8 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	int status;
 	u8 set_mask, clr_mask;
 	int new;
+	int error;
+
 
 	if (!i2c_check_functionality(client->adapter,
 			I2C_FUNC_SMBUS_BYTE_DATA | I2C_FUNC_SMBUS_WORD_DATA))
@@ -158,12 +207,29 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	i2c_set_clientdata(client, data);
 	mutex_init(&data->update_lock);
 
+	/*leon add for interrupt */
+	INIT_WORK(&data->work, lm75_work);
+	error=gpio_request(OMAP4_LM75_IRQ, "Lm75 IRQ");	
+    	if (error) {
+    		printk("lm75 gpio_request error\n");
+	}
+    	error =gpio_direction_input(OMAP4_LM75_IRQ);
+    	if (error) {
+    		printk("lm75 gpio_direction_input error\n");
+    	}
+    	data->irq = gpio_to_irq(OMAP4_LM75_IRQ);	
+    	set_irq_type(data->irq, IRQ_TYPE_EDGE_BOTH);
+    	error = request_irq(data->irq, lm75_isr, (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING), "Lm75_IRQ", data);
+    	if (error) {
+    		printk("lm75 request_irq error\n");
+    	}
+
 	/* Set to LM75 resolution (9 bits, 1/2 degree C) and range.
 	 * Then tweak to be more precise when appropriate.
 	 */
-	set_mask = 0;
+	set_mask =  0;	/*  POL=0 TM=interrupt mode set by leon*/
 	clr_mask = (1 << 0)			/* continuous conversions */
-		| (1 << 6) | (1 << 5);		/* 9-bit mode */
+		| (1 << 6) | (1 << 5) | (1 << 2) | (1 << 1);		/* 9-bit mode */
 
 	/* configure as specified */
 	status = lm75_read_value(client, LM75_REG_CONF);
@@ -178,6 +244,14 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		lm75_write_value(client, LM75_REG_CONF, new);
 	dev_dbg(&client->dev, "Config %02x\n", new);
 
+	/*Set init value of TEMP_high & TEMP_low */
+	mutex_lock(&data->update_lock);
+	data->temp[1] = LM75_TEMP_TO_REG(LM75_THIGH);
+	lm75_write_value(client, LM75_REG_TEMP[1], data->temp[1]);
+	data->temp[2] = LM75_TEMP_TO_REG(LM75_TLOW);
+	lm75_write_value(client, LM75_REG_TEMP[2], data->temp[2]);
+	mutex_unlock(&data->update_lock);
+
 	/* Register sysfs hooks */
 	status = sysfs_create_group(&client->dev.kobj, &lm75_group);
 	if (status)
@@ -189,7 +263,7 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto exit_remove;
 	}
 
-	dev_info(&client->dev, "%s: sensor '%s'\n",
+	dev_info(&client->dev, "%s driver: Found sensor '%s'\n",
 		 dev_name(data->hwmon_dev), client->name);
 
 	return 0;
@@ -207,10 +281,39 @@ static int lm75_remove(struct i2c_client *client)
 
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&client->dev.kobj, &lm75_group);
+	free_irq(data->irq, data);
 	lm75_write_value(client, LM75_REG_CONF, data->orig_conf);
 	kfree(data);
 	return 0;
 }
+
+#ifdef CONFIG_PM
+
+static int lm75_suspend(struct i2c_client *client){
+	struct lm75_data *data = i2c_get_clientdata(client);
+	int status;
+	disable_irq(data->irq);
+	status = lm75_read_value(client, LM75_REG_CONF);
+	status |= (1<<0);	
+	lm75_write_value(client, LM75_REG_CONF, status);
+	printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
+	return 0;
+}
+
+static int lm75_resume(struct i2c_client *client){
+	struct lm75_data *data = i2c_get_clientdata(client);
+	int status;
+	status = lm75_read_value(client, LM75_REG_CONF);
+	status &= ~(1<<0);
+	lm75_write_value(client, LM75_REG_CONF, status);
+	enable_irq(data->irq);
+	printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
+	return 0;
+}
+#else
+#define lm75_suspend NULL
+#define lm75_resume NULL
+#endif
 
 static const struct i2c_device_id lm75_ids[] = {
 	{ "ds1775", ds1775, },
@@ -292,6 +395,8 @@ static struct i2c_driver lm75_driver = {
 	},
 	.probe		= lm75_probe,
 	.remove		= lm75_remove,
+	.suspend 		= lm75_suspend,
+	.resume 		= lm75_resume,
 	.id_table	= lm75_ids,
 /*	.detect		= lm75_detect,*/
 	.address_list	= normal_i2c,

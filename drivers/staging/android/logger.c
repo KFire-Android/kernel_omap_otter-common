@@ -29,6 +29,12 @@
 
 #include <asm/ioctls.h>
 
+#ifdef CONFIG_LAB126
+#include <linux/metricslog.h>
+
+static int metrics_init = 0;
+#endif
+
 /*
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
  *
@@ -557,8 +563,93 @@ static struct logger_log VAR = { \
 
 DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, 64*1024)
 DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, 256*1024)
-DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 64*1024)
+DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, 128*1024)
 DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, 64*1024)
+#ifdef CONFIG_LAB126
+DEFINE_LOGGER_DEVICE(log_metrics, LOGGER_LOG_METRICS, 128*1024)
+DEFINE_LOGGER_DEVICE(log_amazon_main, LOGGER_LOG_AMAZON_MAIN, 64*1024)
+#endif
+
+#ifdef CONFIG_LAB126
+static void logger_kernel_write(const struct iovec *iov, unsigned long nr_segs)
+{
+	struct logger_log *log = &log_metrics;
+	struct logger_entry header;
+	struct timespec now;
+	unsigned long count = nr_segs;
+	size_t total_len = 0;
+
+	while (count-- > 0) {
+		total_len += iov[count].iov_len;
+	}
+
+	now = current_kernel_time();
+
+	header.pid = current->tgid;
+	header.tid = current->pid;
+	header.sec = now.tv_sec;
+	header.nsec = now.tv_nsec;
+	header.len = min_t(size_t, total_len, LOGGER_ENTRY_MAX_PAYLOAD);
+
+	/* null writes succeed, return zero */
+	if (unlikely(!header.len))
+		return;
+
+	mutex_lock(&log->mutex);
+
+	/*
+	 * Fix up any readers, pulling them forward to the first readable
+	 * entry after (what will be) the new write offset. We do this now
+	 * because if we partially fail, we can end up with clobbered log
+	 * entries that encroach on readable buffer.
+	 */
+	fix_up_readers(log, sizeof(struct logger_entry) + header.len);
+
+	do_write_log(log, &header, sizeof(struct logger_entry));
+
+	total_len = 0;
+
+	while (nr_segs-- > 0) {
+		size_t len;
+
+		/* figure out how much of this vector we can keep */
+		len = min_t(size_t, iov->iov_len, header.len - total_len);
+
+		/* write out this segment's payload */
+		do_write_log(log, iov->iov_base, len);
+
+		iov++;
+		total_len += len;
+	}
+
+	mutex_unlock(&log->mutex);
+
+	/* wake up any blocked readers */
+	wake_up_interruptible(&log->wq);
+}
+
+void log_to_metrics(android_LogPriority priority, const char *domain, const char *log_msg)
+{
+	if (metrics_init != 0 && log_msg != NULL) {
+		struct iovec vec[3];
+
+		if (domain == NULL) {
+			domain = "kernel";
+		}
+
+		vec[0].iov_base = (unsigned char *)&priority;
+		vec[0].iov_len  = 1;
+
+		vec[1].iov_base = (void *)domain;
+		vec[1].iov_len  = strlen(domain) + 1;
+
+		vec[2].iov_base = (void *)log_msg;
+		vec[2].iov_len  = strlen(log_msg) + 1;
+
+		logger_kernel_write(vec, 3);
+	}
+}
+#endif
 
 static struct logger_log *get_log_from_minor(int minor)
 {
@@ -570,7 +661,82 @@ static struct logger_log *get_log_from_minor(int minor)
 		return &log_radio;
 	if (log_system.misc.minor == minor)
 		return &log_system;
+#ifdef CONFIG_LAB126
+	if (log_metrics.misc.minor == minor)
+		return &log_metrics;
+	if (log_amazon_main.misc.minor == minor)
+		return &log_amazon_main;
+#endif
 	return NULL;
+}
+
+static void dump_logger(struct logger_log *log) 
+{
+	unsigned char buffer[LOGGER_ENTRY_MAX_LEN + 1];
+        size_t        pos = log->head;
+        size_t        len, len_1, len_2, i;
+
+	while( log->w_off != pos)
+        {
+        	len = get_entry_len(log, pos);
+            
+        	/*
+		* We read from the log in two disjoint operations. First, we read from
+		* the current read head offset up to 'count' bytes or to the end of
+		* the log, whichever comes first.
+		*/
+		len_1 = min(len, log->size - pos);
+		len_2 = len - len_1;
+		memcpy(buffer, log->buffer + pos, len_1);
+
+		/*
+		 * Second, we read any remaining bytes, starting back at the head of
+		 * the log.
+		 */
+		if (len_2)
+		{
+			memcpy(&buffer[len_1], log->buffer, len_2);
+		}
+
+		/* Update cursor */
+		pos = logger_offset(pos + len);
+
+		/* print entry */
+                for(i = sizeof(struct logger_entry); i < len; i++)
+                {
+                	if(buffer[i] == '\0') buffer[i] = ' ';
+                	if((buffer[i] < 32) || (buffer[i] > 126)) buffer[i] = '#';
+                }
+		buffer[len] = '\0';
+		printk(KERN_ERR "%s", &buffer[sizeof(struct logger_entry)]);
+	}
+
+}
+
+void dump_all_loggers(void)
+{
+	printk(KERN_ERR "===============================================================\n");
+        printk(KERN_ERR "             !!!!   L O G C A T         D U M P !!!!\n");
+	printk(KERN_ERR "---------------------------------------------------------------\n");
+        printk(KERN_ERR "main logcat----------------------------------------------------\n");
+	dump_logger(&log_main);
+
+        printk(KERN_ERR "events logcat--------------------------------------------------\n");
+        dump_logger(&log_main);
+
+        printk(KERN_ERR "radio logcat---------------------------------------------------\n");
+        dump_logger(&log_events);
+
+        printk(KERN_ERR "system logcat--------------------------------------------------\n");
+        dump_logger(&log_radio);
+
+#ifdef CONFIG_LAB126
+        printk(KERN_ERR "metrics--------------------------------------------------------\n");
+        dump_logger(&log_metrics);
+
+	printk(KERN_ERR "amazon main logcat---------------------------------------------\n");
+        dump_logger(&log_amazon_main);
+#endif 
 }
 
 static int __init init_log(struct logger_log *log)
@@ -610,7 +776,21 @@ static int __init logger_init(void)
 	if (unlikely(ret))
 		goto out;
 
+#ifdef CONFIG_LAB126
+	ret = init_log(&log_metrics);
+	if (unlikely(ret))
+		goto out;
+
+	metrics_init = 1;
+
+	ret = init_log(&log_amazon_main);
+	if (unlikely(ret))
+		goto out;
+#endif
+
 out:
 	return ret;
 }
+
 device_initcall(logger_init);
+

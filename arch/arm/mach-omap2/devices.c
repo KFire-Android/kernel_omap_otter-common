@@ -233,6 +233,9 @@ static int omap4_init_keypad(struct omap_hwmod *oh, void *user)
 int omap4_keypad_initialization(struct omap4_keypad_platform_data
 						*sdp4430_keypad_data)
 {
+	#if defined(CONFIG_MACH_OMAP_4430_KC1)
+		return -ENODEV;
+	#endif
 	if (!cpu_is_omap44xx())
 		return -ENODEV;
 

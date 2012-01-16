@@ -28,6 +28,7 @@
 #include <linux/ctype.h>
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
+#include <linux/gpio.h>
 
 #include "u_ether.h"
 
@@ -787,6 +788,7 @@ int gether_setup(struct usb_gadget *g, u8 ethaddr[ETH_ALEN])
 	struct eth_dev		*dev;
 	struct net_device	*net;
 	int			status;
+	int  			gpio_171, gpio_172, val;
 
 	if (the_dev)
 		return -EBUSY;
@@ -808,9 +810,51 @@ int gether_setup(struct usb_gadget *g, u8 ethaddr[ETH_ALEN])
 	dev->net = net;
 	strcpy(net->name, "usb%d");
 
-	if (get_ether_addr(dev_addr, net->dev_addr))
+	if (get_ether_addr(dev_addr, net->dev_addr)){
 		dev_warn(&g->dev,
-			"using random %s ethernet address\n", "self");
+			"using %s ethernet address\n", "Quanta defined");
+//			"using random %s ethernet address\n", "self");
+
+		net->dev_addr[0] = 0x00;
+		net->dev_addr[1] = 0x02;
+		net->dev_addr[2] = 0x00;		
+		net->dev_addr[3] = 0x00;
+		net->dev_addr[4] = 0x00;
+		
+		gpio_171 = gpio_get_value(171);
+		gpio_172 = gpio_get_value(172);
+		
+		//gpio_171 = 1;
+		//gpio_172 = 1;
+		
+		val = (gpio_171 << 1) + gpio_172;
+		 	
+		printk("< Quanta_diagnostic >  gpio_171 = %d  gpio_172 = %d  val = %d\n", gpio_171, gpio_172, val );
+		
+		switch (val)
+		{
+			case 0:
+				net->dev_addr[5] = 0x01;
+				break;
+			case 1:
+				net->dev_addr[5] = 0x03;
+				break;	
+			case 2:
+				net->dev_addr[5] = 0x07;	
+				break;
+			case 3:
+				net->dev_addr[5] = 0x09;
+				break;
+			default:
+				printk("default\n");
+				break;
+
+				//random_ether_addr(dev_addr);
+		}	
+		printk("< Quanta Diagnostic >  set dev_addr done !\n");
+
+	}
+
 	if (get_ether_addr(host_addr, dev->host_mac))
 		dev_warn(&g->dev,
 			"using random %s ethernet address\n", "host");

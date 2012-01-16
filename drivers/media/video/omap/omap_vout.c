@@ -3136,11 +3136,11 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 #ifdef CONFIG_PM
 	if (pdata->set_min_bus_tput) {
-		if (cpu_is_omap3630() || cpu_is_omap44xx()) {
+		if (cpu_is_omap3630()) {
 			pdata->set_min_bus_tput(
 				((vout->vid_dev)->v4l2_dev).dev ,
 					OCP_INITIATOR_AGENT, 200 * 1000 * 4);
-		} else {
+		} else if (!cpu_is_omap44xx()) {
 			pdata->set_min_bus_tput(
 				((vout->vid_dev)->v4l2_dev).dev ,
 					OCP_INITIATOR_AGENT, 166 * 1000 * 4);
@@ -3265,11 +3265,13 @@ static int vidioc_s_fbuf(struct file *file, void *fh,
 	if ((a->flags & V4L2_FBUF_FLAG_SRC_CHROMAKEY) &&
 			(a->flags & V4L2_FBUF_FLAG_CHROMAKEY))
 		return -EINVAL;
-	/* OMAP DSS Doesn't support the Destination color key
-	   and alpha blending together */
+
 	if ((a->flags & V4L2_FBUF_FLAG_CHROMAKEY) &&
-			(a->flags & V4L2_FBUF_FLAG_LOCAL_ALPHA))
-		return -EINVAL;
+	    (a->flags & V4L2_FBUF_FLAG_LOCAL_ALPHA)) {
+		printk(KERN_WARNING "%s: flags CHROMAKEY and ALPHA are both set! this is not an issue...\n",
+		       __func__);
+	}
+
 
 	if ((a->flags & V4L2_FBUF_FLAG_SRC_CHROMAKEY)) {
 		vout->fbuf.flags |= V4L2_FBUF_FLAG_SRC_CHROMAKEY;

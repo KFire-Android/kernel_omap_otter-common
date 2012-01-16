@@ -204,6 +204,11 @@ ifeq ($(CONFIG_ARCH_OMAP3),y)
 obj-$(CONFIG_TIWLAN_SDIO)		+= board-zoom2-wifi.o
 endif
 
+obj-$(CONFIG_MACH_OMAP_4430_KC1)		+= board-4430kc1.o \
+					   omap_phy_internal.o \
+					   hsmmc.o \
+						board-kc1-reboot.o
+
 obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
 
 obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o \

@@ -58,27 +58,34 @@ static int dpi_set_dsi_clk(enum omap_channel channel, bool is_tft,
 		if (r)
 			return r;
 	} else {
-		dsi_cinfo.regn = 17;
-		dsi_cinfo.regm = 150;
-		dsi_cinfo.regm_dispc = 4;
-		dsi_cinfo.regm_dsi = 4;
+		dsi_cinfo.regn = 16; /*it is (N+1)*/
+		dsi_cinfo.regm = 115;
+		dsi_cinfo.regm_dispc = 3;
+		dsi_cinfo.regm_dsi = 3;
 		dsi_cinfo.use_dss2_fck = true;
 		r = dsi_calc_clock_rates(channel, &dsi_cinfo);
+
 		if (r)
 			return r;
+
 		dispc_find_clk_divs(is_tft, pck_req,
 			dsi_cinfo.dsi_pll_dispc_fclk, &dispc_cinfo);
 	}
 
 	r = dsi_pll_set_clock_div(ix, &dsi_cinfo);
+
 	if (r)
 		return r;
 
-	if (cpu_is_omap44xx())
+	if (cpu_is_omap44xx()) {
 		dss_select_dispc_clk_source(ix, (ix == DSI1) ?
 			DSS_SRC_PLL1_CLK1 : DSS_SRC_PLL2_CLK1);
-	else
+
+		dss_select_lcd_clk_source(ix, (ix == DSI1) ?
+			DSS_SRC_PLL1_CLK1 : DSS_SRC_PLL2_CLK1);
+	} else {
 		dss_select_dispc_clk_source(ix, DSS_SRC_DSI1_PLL_FCLK);
+	}
 
 	dispc_set_clock_div(channel, &dispc_cinfo);
 
@@ -223,17 +230,26 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 	if (!cpu_is_omap44xx())
 		dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1);
+#ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
+	/*Should need only FCK2 (38.4MHz)*/
+	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_FCK2);
+#endif
 	dss_mainclk_state_enable();
 
 	dpi_basic_init(dssdev);
 
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
-	r = dsi_pll_init(dssdev, 0, 1);
+	if (!cpu_is_omap44xx())
+		r = dsi_pll_init(dssdev, 0, 1);
+	else {
+		r = dsi_pll_init(dssdev, 1, 1);
+	}
 	if (r)
 		goto err1;
 #endif /* CONFIG_OMAP2_DSS_USE_DSI_PLL */
 
 	r = dpi_set_mode(dssdev);
+
 	if (r)
 		goto err2;
 
@@ -270,7 +286,6 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 	if (dssdev->manager)
 		dssdev->manager->disable(dssdev->manager);
 
-#ifdef HWMOD
 #ifdef CONFIG_OMAP2_DSS_USE_DSI_PLL
 	{
 		enum omap_dsi_index ix;
@@ -279,7 +294,6 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 		dss_select_dispc_clk_source(ix, DSS_SRC_DSS1_ALWON_FCLK);
 		dsi_pll_uninit(ix);
 	}
-#endif
 #endif
 
 	/* cut clock(s) */
@@ -327,10 +341,10 @@ int dpi_check_timings(struct omap_dss_device *dssdev,
 		int r = 0;
 
 		if (cpu_is_omap44xx()) {
-			dsi_cinfo.regn = 17;
-			dsi_cinfo.regm = 150;
-			dsi_cinfo.regm_dispc = 4;
-			dsi_cinfo.regm_dsi = 4;
+			dsi_cinfo.regn = 16;
+			dsi_cinfo.regm = 115;
+			dsi_cinfo.regm_dispc = 3;
+			dsi_cinfo.regm_dsi = 3;
 			dsi_cinfo.use_dss2_fck = true;
 			r = dsi_calc_clock_rates(dssdev->channel, &dsi_cinfo);
 			if (r)

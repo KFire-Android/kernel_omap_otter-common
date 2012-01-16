@@ -621,4 +621,11 @@ config TOUCHSCREEN_TPS6507X
 	  To compile this driver as a module, choose M here: the
 	  module will be called tps6507x_ts.
 
+config TOUCHSCREEN_ILITEK
+	tristate "ilitek touchscreen driver"
+	help
+	  Say Y here if you have a Cypress based touchscreen.
+	  This is the i2c version of the driver.
+
+	  To compile this driver as a module, choose M here.
 endif

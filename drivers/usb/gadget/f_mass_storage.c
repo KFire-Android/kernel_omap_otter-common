@@ -1436,7 +1436,6 @@ static int do_start_stop(struct fsg_common *common)
 
 	loej  = common->cmnd[4] & 0x02;
 	start = common->cmnd[4] & 0x01;
-
 	/* Our emulation doesn't support mounting; the medium is
 	 * available for use as soon as it is loaded. */
 	if (start) {
@@ -1447,15 +1446,15 @@ static int do_start_stop(struct fsg_common *common)
 		return 0;
 	}
 
+	if (!loej)
+		return 0;
+
 	/* Are we allowed to unload the media? */
 	if (curlun->prevent_medium_removal) {
 		LDBG(curlun, "unload attempt prevented\n");
 		curlun->sense_data = SS_MEDIUM_REMOVAL_PREVENTED;
 		return -EINVAL;
 	}
-
-	if (!loej)
-		return 0;
 
 	/* Simulate an unload/eject */
 	if (common->ops && common->ops->pre_eject) {
@@ -1472,7 +1471,6 @@ static int do_start_stop(struct fsg_common *common)
 	fsg_lun_close(curlun);
 	up_write(&common->filesem);
 	down_read(&common->filesem);
-
 	return common->ops && common->ops->post_eject
 		? min(0, common->ops->post_eject(common, curlun,
 						 curlun - common->luns))
@@ -1971,6 +1969,7 @@ static int do_scsi_command(struct fsg_common *common)
 	common->short_packet_received = 0;
 
 	down_read(&common->filesem);	/* We're using the backing file */
+
 	switch (common->cmnd[0]) {
 
 	case SC_INQUIRY:
@@ -2477,7 +2476,7 @@ static void handle_exception(struct fsg_common *common)
 			if (common->state < FSG_STATE_EXIT)
 				DBG(common, "Main thread exiting on signal\n");
 			raise_exception(common, FSG_STATE_EXIT);
-		}
+		} 
 	}
 
 	/* Cancel all the pending transfers */

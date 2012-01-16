@@ -90,6 +90,16 @@ config ANDROID_LOW_MEMORY_KILLER
 	---help---
 	  Register processes to be killed when memory is low
 
+config ANDROID_MEMEATER
+	bool "Android Memory Eater"
+	default Y
+	---help---
+	  Eat memory (for testing only)
+
+config ANDROID_BOOT_REASON
+        bool "Display boot reason"
+        default y
+
 endif # if ANDROID
 
 endmenu

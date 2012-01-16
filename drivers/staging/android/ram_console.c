@@ -221,6 +221,20 @@ ram_console_save_old(struct ram_console_buffer *buffer, char *dest)
 #endif
 }
 
+static void append_uboot_log(void){
+	unsigned char *log_buf = NULL;
+	unsigned long *log_size;
+	log_size = (volatile unsigned long *)ioremap(0x9CAB0000-0x8,4);
+	log_buf = (unsigned char *)ioremap(0x9CAB0000-0x1000,0x998);
+	ram_console_write(NULL,log_buf,*log_size);
+	iounmap(log_buf);
+	iounmap(log_size);
+	//printk("=====%s \n",log_buf);
+	//memcpy(&buffer->data,log_buf, *log_size);
+	//buffer->size = *log_size;
+	//buffer->start = *log_size;
+}
+
 static int __init ram_console_init(struct ram_console_buffer *buffer,
 				   size_t buffer_size, char *old_buf)
 {
@@ -299,11 +313,12 @@ static int __init ram_console_init(struct ram_console_buffer *buffer,
 	buffer->sig = RAM_CONSOLE_SIG;
 	buffer->start = 0;
 	buffer->size = 0;
-
+	
 	register_console(&ram_console);
 #ifdef CONFIG_ANDROID_RAM_CONSOLE_ENABLE_VERBOSE
 	console_verbose();
 #endif
+	append_uboot_log();
 	return 0;
 }
 

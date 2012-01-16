@@ -74,7 +74,14 @@ static const struct spi_device_id *spi_match_id(const struct spi_device_id *id,
 
 const struct spi_device_id *spi_get_device_id(const struct spi_device *sdev)
 {
-	const struct spi_driver *sdrv = to_spi_driver(sdev->dev.driver);
+	const struct spi_driver *sdrv;
+
+	if (unlikely(!sdev)) {
+		printk(KERN_WARNING "%s: NULL == sdev\n", __func__);
+		return NULL;
+	}
+
+	sdrv	= to_spi_driver(sdev->dev.driver);
 
 	return spi_match_id(sdrv->id_table, sdev);
 }
@@ -175,6 +182,11 @@ static void spi_drv_shutdown(struct device *dev)
  */
 int spi_register_driver(struct spi_driver *sdrv)
 {
+	if (unlikely(!sdrv)) {
+		printk(KERN_WARNING "%s: NULL == sdrv\n", __func__);
+		return -EINVAL;
+	}
+
 	sdrv->driver.bus = &spi_bus_type;
 	if (sdrv->probe)
 		sdrv->driver.probe = spi_drv_probe;
@@ -223,7 +235,14 @@ static DEFINE_MUTEX(board_lock);
 struct spi_device *spi_alloc_device(struct spi_master *master)
 {
 	struct spi_device	*spi;
-	struct device		*dev = master->dev.parent;
+	struct device		*dev;
+
+	if (unlikely(!master)) {
+		printk(KERN_WARNING "%s: NULL == master\n", __func__);
+		return NULL;
+	}
+
+	dev = master->dev.parent;
 
 	if (!spi_master_get(master))
 		return NULL;
@@ -256,9 +275,16 @@ EXPORT_SYMBOL_GPL(spi_alloc_device);
 int spi_add_device(struct spi_device *spi)
 {
 	static DEFINE_MUTEX(spi_add_lock);
-	struct device *dev = spi->master->dev.parent;
+	struct device *dev;
 	struct device *d;
 	int status;
+
+	if (unlikely(!spi)) {
+		printk(KERN_WARNING "%s: NULL == spi\n", __func__);
+		return -EINVAL;
+	}
+
+	dev = spi->master->dev.parent;
 
 	/* Chipselects are numbered 0..max; validate. */
 	if (spi->chip_select >= spi->master->num_chipselect) {
@@ -343,6 +369,11 @@ struct spi_device *spi_new_device(struct spi_master *master,
 	proxy = spi_alloc_device(master);
 	if (!proxy)
 		return NULL;
+
+	if (unlikely(!chip)) {
+		printk(KERN_WARNING "%s: NULL == chip\n", __func__);
+		return NULL;
+	}
 
 	WARN_ON(strlen(chip->modalias) >= sizeof(proxy->modalias));
 
@@ -466,7 +497,7 @@ struct spi_master *spi_alloc_master(struct device *dev, unsigned size)
 {
 	struct spi_master	*master;
 
-	if (!dev)
+	if (unlikely(!dev))
 		return NULL;
 
 	master = kzalloc(size + sizeof *master, GFP_KERNEL);
@@ -505,9 +536,16 @@ EXPORT_SYMBOL_GPL(spi_alloc_master);
 int spi_register_master(struct spi_master *master)
 {
 	static atomic_t		dyn_bus_id = ATOMIC_INIT((1<<15) - 1);
-	struct device		*dev = master->dev.parent;
+	struct device		*dev;
 	int			status = -ENODEV;
 	int			dynamic = 0;
+
+	if (unlikely(!master)) {
+		printk(KERN_WARNING "%s: NULL == master\n", __func__);
+		return -EINVAL;
+	}
+
+	dev = master->dev.parent;
 
 	if (!dev)
 		return -ENODEV;
@@ -567,6 +605,11 @@ static int __unregister(struct device *dev, void *master_dev)
 void spi_unregister_master(struct spi_master *master)
 {
 	int dummy;
+
+	if (unlikely(!master)) {
+		printk(KERN_WARNING "%s: NULL == master\n", __func__);
+		return;
+	}
 
 	dummy = device_for_each_child(master->dev.parent, &master->dev,
 					__unregister);
@@ -637,6 +680,11 @@ int spi_setup(struct spi_device *spi)
 	unsigned	bad_bits;
 	int		status;
 
+	if (unlikely(!spi)) {
+		printk(KERN_WARNING "%s: NULL == spi\n", __func__);
+		return -EINVAL;
+	}
+
 	/* help drivers fail *cleanly* when they need options
 	 * that aren't supported with their current master
 	 */
@@ -697,7 +745,19 @@ EXPORT_SYMBOL_GPL(spi_setup);
  */
 int spi_async(struct spi_device *spi, struct spi_message *message)
 {
-	struct spi_master *master = spi->master;
+	struct spi_master *master;
+
+	if (unlikely(!spi)) {
+		printk(KERN_WARNING "%s: NULL == spi\n", __func__);
+		return -EINVAL;
+	}
+
+	master = spi->master;
+
+	if (unlikely(!message)) {
+		dev_warn(&spi->dev, "%s: NULL == message\n", __func__);
+		return -EINVAL;
+	}
 
 	/* Half-duplex links include original MicroWire, and ones with
 	 * only one data pin like SPI_3WIRE (switches direction) or where
@@ -763,6 +823,11 @@ int spi_sync(struct spi_device *spi, struct spi_message *message)
 {
 	DECLARE_COMPLETION_ONSTACK(done);
 	int status;
+
+	if (unlikely(!message)) {
+		dev_warn(&spi->dev, "%s: NULL == message\n", __func__);
+		return -EINVAL;
+	}
 
 	message->complete = spi_complete;
 	message->context = &done;

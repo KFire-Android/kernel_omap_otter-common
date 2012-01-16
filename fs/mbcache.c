@@ -120,6 +120,7 @@ static int mb_cache_shrink_fn(struct shrinker *shrink, int nr_to_scan, gfp_t gfp
 static struct shrinker mb_cache_shrinker = {
 	.shrink = mb_cache_shrink_fn,
 	.seeks = DEFAULT_SEEKS,
+	.name = __FILE__,
 };
 
 static inline int

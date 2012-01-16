@@ -98,7 +98,6 @@ static int omap_target(struct cpufreq_policy *policy,
 #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 	int i;
 	unsigned long freq;
-	struct cpufreq_freqs freqs_notify;
 	struct device *mpu_dev = omap2_get_mpuss_device();
 	int ret = 0;
 #endif
@@ -133,7 +132,7 @@ static int omap_target(struct cpufreq_policy *policy,
 #elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 #ifdef CONFIG_SMP
 	freqs.old = omap_getspeed(policy->cpu);;
-	freqs_notify.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
+	freqs.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
 	freqs.cpu = policy->cpu;
 
 	if (freqs.old == freqs.new)

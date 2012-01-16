@@ -160,6 +160,11 @@ static unsigned long zone_nr_lru_pages(struct zone *zone,
  */
 void register_shrinker(struct shrinker *shrinker)
 {
+	if(shrinker && shrinker->name)
+		printk(KERN_INFO "%s: registering shrinker from %s\n", __func__, shrinker->name);
+	else
+		printk(KERN_INFO "%s: no shrinker name registered for %p\n", __func__, shrinker);
+
 	shrinker->nr = 0;
 	down_write(&shrinker_rwsem);
 	list_add_tail(&shrinker->list, &shrinker_list);
@@ -172,6 +177,9 @@ EXPORT_SYMBOL(register_shrinker);
  */
 void unregister_shrinker(struct shrinker *shrinker)
 {
+	if(shrinker && shrinker->name)
+		printk(KERN_INFO "%s: unregistering shrinker from %s\n", __func__, shrinker->name);
+
 	down_write(&shrinker_rwsem);
 	list_del(&shrinker->list);
 	up_write(&shrinker_rwsem);
@@ -215,7 +223,18 @@ unsigned long shrink_slab(unsigned long scanned, gfp_t gfp_mask,
 		unsigned long total_scan;
 		unsigned long max_pass;
 
+
+/*
+		if (shrinker && shrinker->name)
+			printk (KERN_INFO "%s: trying shrinker from %s\n", __func__, shrinker->name);
+*/
 		max_pass = (*shrinker->shrink)(shrinker, 0, gfp_mask);
+/*
+		if (shrinker && shrinker->name)
+			printk (KERN_INFO "%s: shrinker %s suggested %u (pages?)\n", __func__, shrinker->name, max_pass);
+		else
+			printk (KERN_INFO "%s: shrinker %p suggested %u (pages?)\n", __func__, shrinker, max_pass);
+*/
 		delta = (4 * scanned) / shrinker->seeks;
 		delta *= max_pass;
 		do_div(delta, lru_pages + 1);

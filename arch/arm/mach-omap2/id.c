@@ -282,6 +282,7 @@ void __init omap3_check_revision(void)
 #define MAX_ID_STRING		(4*8 + 4)
 #define DIE_ID_REG_BASE		(L4_44XX_PHYS + 0x2000)
 #define DIE_ID_REG_OFFSET	0x200
+#define OMAP4_PRM_RSTST		0x4A307B04
 
 void __init omap4_check_revision(void)
 {
@@ -425,6 +426,7 @@ void __init omap4_check_revision(void)
 	snprintf(id_string, MAX_ID_STRING, "%08X-%08X",
 						id[1], id[0]);
 	pr_info("Prod-id  (%s)\n", id_string);
+	pr_info("Reset Reason(0x%08x)\n", omap_readl(OMAP4_PRM_RSTST));
 	pr_info("***********************");
 }
 

@@ -205,6 +205,7 @@ static void OMAPLFBFlipNoLock(OMAPLFB_SWAPCHAIN *psSwapChain,
 			if (!display)
 				continue;
 			driver = display->driver;
+			manager->set_manager_info(manager, &manager->info);
 			manager->apply(manager);
 		}
 
@@ -275,14 +276,14 @@ void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 		err = driver->sync(display);
 		OMAPLFBFlipNoLock(psDevInfo->psSwapChain,
 			(unsigned long)psFlipItem->sSysAddr->uiAddr);
-	} else if (manager && manager->wait_for_vsync) {
+	} else if (manager && manager->wait_for_go) {
 		/*
 		 * Update the video pipelines registers then wait until the
 		 * frame is shown with a VSYNC
 		 */
 		OMAPLFBFlipNoLock(psDevInfo->psSwapChain,
 			(unsigned long)psFlipItem->sSysAddr->uiAddr);
-		err = manager->wait_for_vsync(manager);
+		err = manager->wait_for_go(manager);
 	}
 
 	if (err)

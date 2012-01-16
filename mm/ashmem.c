@@ -379,6 +379,7 @@ static int ashmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 static struct shrinker ashmem_shrinker = {
 	.shrink = ashmem_shrink,
 	.seeks = DEFAULT_SEEKS * 4,
+	.name = __FILE__,
 };
 
 static int set_prot_mask(struct ashmem_area *asma, unsigned long prot)

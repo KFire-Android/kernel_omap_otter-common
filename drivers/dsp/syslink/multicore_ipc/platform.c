@@ -1721,17 +1721,18 @@ EXPORT_SYMBOL(platform_load_callback);
 int platform_start_callback(u16 proc_id, void *arg)
 {
 	int status = PLATFORM_S_SUCCESS;
+	int retry_count = 100;
 
 	do {
 		status = ipc_attach(proc_id);
-		msleep(1);
-	} while (status < 0);
+		msleep(5);
+	} while (--retry_count && (status < 0));
 
 	if (status < 0)
-		pr_err("platform_load_callback failed, status [0x%x]\n",
+		pr_err("platform_start_callback failed, status [0x%x]\n",
 			status);
-
-	ipc_notify_event(IPC_START, &proc_id);
+	else
+		ipc_notify_event(IPC_START, &proc_id);
 
 	return status;
 }

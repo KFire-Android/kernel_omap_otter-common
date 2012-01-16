@@ -461,6 +461,10 @@ void dispc_set_zorder(enum omap_plane plane,
 		enum omap_overlay_zorder zorder);
 void dispc_enable_zorder(enum omap_plane plane, bool enable);
 
+void dispc_enable_cpr(enum omap_channel channel, bool enable);
+void dispc_set_cpr_coef(enum omap_channel channel,
+		struct omap_dss_color_weight_coef *coefs);
+
 void dispc_set_plane_ba0(enum omap_plane plane, u32 paddr);
 void dispc_set_plane_ba1(enum omap_plane plane, u32 paddr);
 void dispc_enable_gamma_table(bool enable);

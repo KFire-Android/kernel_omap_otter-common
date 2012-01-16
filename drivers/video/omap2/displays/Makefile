@@ -9,3 +9,6 @@ obj-$(CONFIG_PANEL_TOPPOLY_TDO35S) += panel-toppoly-tdo35s.o
 obj-$(CONFIG_PANEL_TPO_TD043MTEA1) += panel-tpo-td043mtea1.o
 obj-$(CONFIG_PANEL_ACX565AKM) += panel-acx565akm.o
 obj-$(CONFIG_PANEL_SIL9022) += panel_sil9022.o
+obj-$(CONFIG_PANEL_OTTER1) += panel-otter1.o
+
+obj-$(CONFIG_DEMO_HDMI) += panel-hdmi.o

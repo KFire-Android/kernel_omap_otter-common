@@ -21,6 +21,7 @@
  *
  */
 
+
 #undef DEBUG
 
 #include <linux/module.h>
@@ -99,7 +100,7 @@
 #define ABE_OPP_50		1
 #define ABE_OPP_100		2
 
-#define ABE_ROUTES_UL		14
+#define ABE_ROUTES_UL		16
 
 /* TODO: fine tune for ping pong - buffer is 2 periods of 12k each*/
 static const struct snd_pcm_hardware omap_abe_hardware = {
@@ -188,6 +189,8 @@ static unsigned int abe_dsp_read(struct snd_soc_platform *platform,
 		unsigned int reg)
 {
 	struct abe_data *priv = snd_soc_platform_get_drvdata(platform);
+	//printk (KERN_INFO "%s: ABE_Reg %d Value 0x%x\n", __func__, reg, priv->dapm[reg]);
+
 	return priv->dapm[reg];
 }
 
@@ -197,8 +200,8 @@ static int abe_dsp_write(struct snd_soc_platform *platform, unsigned int reg,
 	struct abe_data *priv = snd_soc_platform_get_drvdata(platform);
 	priv->dapm[reg] = val;
 
-	//dev_dbg(platform->dev, "fe: %d widget %d %s\n", abe->fe_id,
-	//		reg - ABE_WIDGET_START, val ? "on" : "off");
+	dev_dbg(platform->dev, "fe: %d widget %d %s\n", abe->fe_id,
+			reg - ABE_WIDGET_START, val ? "on" : "off");
 	return 0;
 }
 
@@ -208,6 +211,8 @@ static void abe_irq_pingpong_subroutine(void)
 
 	abe_read_next_ping_pong_buffer(MM_DL_PORT, &dst, &n_bytes);
 	abe_set_ping_pong_buffer(MM_DL_PORT, n_bytes);
+
+	//printk (KERN_INFO "%s: Dst 0x%x NBytes 0x%x\n", dst, n_bytes);
 
 	/* Do not call ALSA function for first IRQ */
 	if (abe->first_irq) {
@@ -268,7 +273,11 @@ static int abe_init_engine(struct snd_soc_platform *platform)
 	mutex_unlock(&abe->opp_mutex);
 
 	/* "tick" of the audio engine */
+#ifdef CONFIG_ABE_44100
+        abe_write_event_generator (EVENT_44100);
+#else
 	abe_write_event_generator(EVENT_TIMER);
+#endif
 
 	dl2_eq.equ_length = NBDL2COEFFS;
 
@@ -672,6 +681,9 @@ static const abe_router_t router[] = {
 		BT_UL_L_labelID, BT_UL_R_labelID,
 		AMIC_L_labelID, AMIC_R_labelID,
 		VX_REC_L_labelID, VX_REC_R_labelID,
+        /* Added by Mistral for the Audio ABE Recording */
+		MM_EXT_IN_L_labelID, MM_EXT_IN_R_labelID,
+
 };
 
 static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
@@ -684,7 +696,6 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 
 	/* TODO: do not use abe global structure to assign pdev */
 	struct platform_device *pdev = abe->pdev;
-
 	pm_runtime_get_sync(&pdev->dev);
 
 	if (mux >= ABE_ROUTES_UL)
@@ -1110,24 +1121,26 @@ static const struct soc_enum dmic_equalizer_enum =
 static const struct soc_enum sdt_equalizer_enum =
 	SOC_ENUM_SINGLE(EQSDT, 0, NBSDTEQ_PROFILES, sdt_equ_texts);
 
+/* Mistral updated the route_ul_texts to include MM_EXT_IN Uplink Ports */
 static const char *route_ul_texts[] =
 	{"None", "DMic0L", "DMic0R", "DMic1L", "DMic1R", "DMic2L", "DMic2R",
-	"BT Left", "BT Right", "AMic0", "AMic1", "VX Left", "VX Right"};
+	"BT Left", "BT Right", "AMic0", "AMic1", "VX Left", "VX Right",
+	"MM_EXT_IN Left", "MM_EXT_IN Right"};
 
 /* ROUTE_UL Mux table */
 static const struct soc_enum abe_enum[] = {
-		SOC_ENUM_SINGLE(ABE_MM_UL1(0), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_MM_UL1(1), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_MM_UL1(2), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_MM_UL1(3), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_MM_UL1(4), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_MM_UL1(5), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_MM_UL1(6), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_MM_UL1(7), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_MM_UL2(0), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_MM_UL2(1), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_VX_UL(0), 0, 13, route_ul_texts),
-		SOC_ENUM_SINGLE(ABE_VX_UL(1), 0, 13, route_ul_texts),
+		SOC_ENUM_SINGLE(ABE_MM_UL1(0), 0, 15, route_ul_texts),
+       		SOC_ENUM_SINGLE(ABE_MM_UL1(1), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_MM_UL1(2), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_MM_UL1(3), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_MM_UL1(4), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_MM_UL1(5), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_MM_UL1(6), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_MM_UL1(7), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_MM_UL2(0), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_MM_UL2(1), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_VX_UL(0), 0, 15, route_ul_texts),
+        	SOC_ENUM_SINGLE(ABE_VX_UL(1), 0, 15, route_ul_texts),
 };
 
 static const struct snd_kcontrol_new mm_ul00_control =
@@ -1514,7 +1527,7 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 
 	/* Virtual MM_EXT_DL Switch TODO: confrm OPP level here */
 	SND_SOC_DAPM_MIXER("DL1 MM_EXT",
-			ABE_WIDGET(41), ABE_OPP_50, 0, &mm_ext_dl_switch_controls, 1),
+			ABE_WIDGET(41), ABE_OPP_25, 0, &mm_ext_dl_switch_controls, 1),
 
 	/*
 	 * The Following three are virtual switches to select the input port
@@ -1673,33 +1686,13 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MM_UL1", NULL, "MUX_UL07"},
 
 	/* MUX_UL10 - ROUTE_UL - Chan 10  */
-	{"MUX_UL10", "DMic0L", "DMIC0"},
-	{"MUX_UL10", "DMic0R", "DMIC0"},
-	{"MUX_UL10", "DMic1L", "DMIC1"},
-	{"MUX_UL10", "DMic1R", "DMIC1"},
-	{"MUX_UL10", "DMic2L", "DMIC2"},
-	{"MUX_UL10", "DMic2R", "DMIC2"},
-	{"MUX_UL10", "BT Left", "BT_VX_UL"},
-	{"MUX_UL10", "BT Right", "BT_VX_UL"},
-	{"MUX_UL10", "AMic0", "AMIC_UL"},
-	{"MUX_UL10", "AMic1", "AMIC_UL"},
-	{"MUX_UL10", "VX Left", "Capture Mixer"},
-	{"MUX_UL10", "VX Right", "Capture Mixer"},
+	{"MUX_UL10", "MM_EXT_IN Left","MM_EXT_UL"},
+	{"MUX_UL10", "MM_EXT_IN Right","MM_EXT_UL"},
 	{"MM_UL2", NULL, "MUX_UL10"},
 
 	/* MUX_UL11 - ROUTE_UL - Chan 11  */
-	{"MUX_UL11", "DMic0L", "DMIC0"},
-	{"MUX_UL11", "DMic0R", "DMIC0"},
-	{"MUX_UL11", "DMic1L", "DMIC1"},
-	{"MUX_UL11", "DMic1R", "DMIC1"},
-	{"MUX_UL11", "DMic2L", "DMIC2"},
-	{"MUX_UL11", "DMic2R", "DMIC2"},
-	{"MUX_UL11", "BT Left", "BT_VX_UL"},
-	{"MUX_UL11", "BT Right", "BT_VX_UL"},
-	{"MUX_UL11", "AMic0", "AMIC_UL"},
-	{"MUX_UL11", "AMic1", "AMIC_UL"},
-	{"MUX_UL11", "VX Left", "Capture Mixer"},
-	{"MUX_UL11", "VX Right", "Capture Mixer"},
+	{"MUX_UL11", "MM_EXT_IN Left","MM_EXT_UL"},
+	{"MUX_UL11", "MM_EXT_IN Right","MM_EXT_UL"},
 	{"MM_UL2", NULL, "MUX_UL11"},
 
 	/* MUX_VX0 - ROUTE_UL - Chan 20  */
@@ -1715,6 +1708,9 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_VX0", "AMic1", "AMIC_UL"},
 	{"MUX_VX0", "VX Left", "Capture Mixer"},
 	{"MUX_VX0", "VX Right", "Capture Mixer"},
+	{"MUX_VX0", "MM_EXT_IN Left","MM_EXT_UL"},
+	{"MUX_VX0", "MM_EXT_IN Right","MM_EXT_UL"},
+
 
 	/* MUX_VX1 - ROUTE_UL - Chan 20  */
 	{"MUX_VX1", "DMic0L", "DMIC0"},
@@ -1729,6 +1725,9 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_VX1", "AMic1", "AMIC_UL"},
 	{"MUX_VX1", "VX Left", "Capture Mixer"},
 	{"MUX_VX1", "VX Right", "Capture Mixer"},
+	{"MUX_VX1", "MM_EXT_IN Left","MM_EXT_UL"},
+	{"MUX_VX1", "MM_EXT_IN Right","MM_EXT_UL"},
+
 
 	/* Capture Input Selection  for AMIC_UL  */
 	{"AMIC_UL MM_EXT", "Switch", "MM_EXT_UL"},
@@ -1845,14 +1844,13 @@ static int aess_set_opp_mode(void)
 		opp |= abe->dapm[i];
 
 	opp = (1 << (fls(opp) - 1)) * 25;
-
 	if (abe->opp > opp) {
 		/* Decrease OPP mode - no need of OPP100% */
 		switch (opp) {
 		case 25:
 			abe_set_opp_processing(ABE_OPP25);
 			udelay(250);
-			omap_device_set_rate(&pdev->dev, &pdev->dev, 98304000);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 49150000);
 			break;
 		case 50:
 		default:
@@ -1865,7 +1863,7 @@ static int aess_set_opp_mode(void)
 		/* Increase OPP mode */
 		switch (opp) {
 		case 25:
-			omap_device_set_rate(&pdev->dev, &pdev->dev, 98304000);
+			omap_device_set_rate(&pdev->dev, &pdev->dev, 49150000);
 			abe_set_opp_processing(ABE_OPP25);
 			break;
 		case 50:
@@ -1880,7 +1878,7 @@ static int aess_set_opp_mode(void)
 		}
 	}
 	abe->opp = opp;
-
+	dev_dbg(&pdev->dev,  "OPP set = %d\n", opp);
 	mutex_unlock(&abe->opp_mutex);
 
 	pm_runtime_put_sync(&pdev->dev);
@@ -2036,6 +2034,7 @@ static int aess_open(struct snd_pcm_substream *substream)
 					 SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 1024);
 		break;
 	default:
+		dev_dbg(&rtd->dev, "%s: Doing Nothing and returning..\n", __func__);
 		break;
 	}
 
@@ -2074,7 +2073,8 @@ static int abe_ping_pong_init(struct snd_pcm_hw_params *params,
 				PING_PONG_WITH_MCU_IRQ);
 
 	/* Memory mapping for hw params */
-	runtime->dma_area  = abe->io_base + ABE_DMEM_BASE_OFFSET_MPU + dst;
+	runtime->dma_area  = abe->io_base + ABE_DMEM_BASE_OFFSET_MPU +
+				ABE_VM_AESS_OFFSET + dst;
 	runtime->dma_addr  = 0;
 	runtime->dma_bytes = period_size * 2;
 
@@ -2093,6 +2093,10 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 	int ret = 0;
 
 	dev_dbg(&rtd->dev, "%s ID %d\n", __func__, dai->id);
+	dev_dbg(&rtd->dev, "%s dai_name %s\n", __func__, dai->name);
+	dev_dbg(&rtd->dev, "%s be_active %d current_fe %d num_be [%d %d]\n",
+	   __func__, rtd->be_active, rtd->current_fe, rtd->num_be[0], rtd->num_be[1]);
+
 
 	switch (dai->id) {
 	case ABE_FRONTEND_DAI_MODEM:
@@ -2103,6 +2107,7 @@ static int aess_hw_params(struct snd_pcm_substream *substream,
 			return ret;
 		break;
 	default:
+		dev_dbg(&rtd->dev, "%s: Returning without any action..\n", __func__);
 		break;
 	}
 
@@ -2151,28 +2156,18 @@ static int aess_close(struct snd_pcm_substream *substream)
 static int aess_mmap(struct snd_pcm_substream *substream,
 	struct vm_area_struct *vma)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *dai = rtd->cpu_dai;
-	int offset, size, err = 0;
+	int offset, size, err;
 
-	switch (dai->id) {
-	case ABE_FRONTEND_DAI_LP_MEDIA:
-		/* TODO: we may need to check for underrun. */
-		vma->vm_flags |= VM_IO | VM_RESERVED;
-		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-		size = vma->vm_end - vma->vm_start;
-		offset = vma->vm_pgoff << PAGE_SHIFT;
+	/* TODO: we may need to check for underrun. */
+	vma->vm_flags |= VM_IO | VM_RESERVED;
+	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+	size = vma->vm_end - vma->vm_start;
+	offset = vma->vm_pgoff << PAGE_SHIFT;
 
-		err = io_remap_pfn_range(vma, vma->vm_start,
-				(ABE_DMEM_BASE_ADDRESS_MPU +
-				ABE_DMEM_BASE_OFFSET_PING_PONG +
-				offset) >> PAGE_SHIFT,
-				size, vma->vm_page_prot);
-		break;
-
-	default:
-		break;
-	}
+	err = io_remap_pfn_range(vma, vma->vm_start,
+			(ABE_DMEM_BASE_ADDRESS_MPU +
+			ABE_DMEM_BASE_OFFSET_PING_PONG + offset) >> PAGE_SHIFT,
+			size, vma->vm_page_prot);
 
 	if (err)
 		return -EAGAIN;
@@ -2210,7 +2205,8 @@ static int aess_stream_event(struct snd_soc_dapm_context *dapm, int event)
 	struct platform_device *pdev = abe->pdev;
 	int active = abe_fe_active_count(abe);
 	int ret = 0;
-
+	int gpio_status;
+	gpio_status = gpio_get_value (WLAN_DETECT_GPIO_PIN);
 	if (!abe->active)
 		return 0;
 
@@ -2224,10 +2220,11 @@ static int aess_stream_event(struct snd_soc_dapm_context *dapm, int event)
 		 * enter dpll cascading when all conditions are met:
 		 * - system is in early suspend (screen is off)
 		 * - single stream is active and is LP (ping-pong)
-		 * - OPP is 50 or less (DL1 path only)
+		 * - OPP is less than 50 (DL1 path only)
+		 * - Wifi is off
 		 */
 		if (abe->early_suspended && (active == 1) &&
-		    abe->fe_active[6] && (abe->opp <= 50))
+		    abe->fe_active[6] && (abe->opp < 50) && !gpio_status)
 			ret = abe_enter_dpll_cascading(abe);
 		else
 			ret = abe_exit_dpll_cascading(abe);
@@ -2282,11 +2279,12 @@ static void abe_early_suspend(struct early_suspend *handler)
 	struct abe_data *abe = container_of(handler, struct abe_data,
 					    early_suspend);
 	int active = abe_fe_active_count(abe);
+	int gpio_status;
 	u32 reg;
+	gpio_status = gpio_get_value (WLAN_DETECT_GPIO_PIN);
 
-	/* Disable SD for MPU towards EMIF,L3_2 and L4CFG */
-	reg = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_2_STATDEP_MASK
-		| OMAP4430_L4CFG_STATDEP_MASK;
+	/* Disable SD for MPU towards EMIF and L4CFG */
+	reg = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L4CFG_STATDEP_MASK;
 
 	cm_rmw_mod_reg_bits(reg, 0, OMAP4430_CM1_MPU_MOD,
 		OMAP4_CM_MPU_STATICDEP_OFFSET);
@@ -2295,9 +2293,10 @@ static void abe_early_suspend(struct early_suspend *handler)
 	 * enter dpll cascading when all conditions are met:
 	 * - system is in early suspend (screen is off)
 	 * - single stream is active and is LP (ping-pong)
-	 * - OPP is 50 or less (DL1 path only)
+	 * - OPP is less than 50 (DL1 path only)
+	 * - Wifi is off
 	 */
-	if ((active == 1) && abe->fe_active[6] && (abe->opp <= 50))
+	if ((active == 1) && abe->fe_active[6] && (abe->opp < 50) && !gpio_status)
 		abe_enter_dpll_cascading(abe);
 
 	abe->early_suspended = 1;
@@ -2309,12 +2308,10 @@ static void abe_late_resume(struct early_suspend *handler)
 					    early_suspend);
 	u32 reg, mask;
 
-	/* Enable SD for MPU towards EMIF,L3_2 and L4CFG */
+	/* Enable SD for MPU towards EMIF and L4CFG */
 	reg = 1 << OMAP4430_MEMIF_STATDEP_SHIFT |
-		1 << OMAP4430_L3_2_STATDEP_SHIFT |
 		1 << OMAP4430_L4CFG_STATDEP_SHIFT;
-	mask = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L3_2_STATDEP_MASK
-		| OMAP4430_L4CFG_STATDEP_MASK;
+	mask = OMAP4430_MEMIF_STATDEP_MASK | OMAP4430_L4CFG_STATDEP_MASK;
 	cm_rmw_mod_reg_bits(mask, reg, OMAP4430_CM1_MPU_MOD,
 		OMAP4_CM_MPU_STATICDEP_OFFSET);
 

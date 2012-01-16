@@ -180,7 +180,7 @@ void snd_soc_jack_notifier_unregister(struct snd_soc_jack *jack,
 }
 EXPORT_SYMBOL_GPL(snd_soc_jack_notifier_unregister);
 
-#ifdef CONFIG_GPIOLIB
+//#ifdef CONFIG_GPIOLIB
 /* gpio detect */
 static void snd_soc_jack_gpio_detect(struct snd_soc_jack_gpio *gpio)
 {
@@ -317,4 +317,4 @@ void snd_soc_jack_free_gpios(struct snd_soc_jack *jack, int count,
 	}
 }
 EXPORT_SYMBOL_GPL(snd_soc_jack_free_gpios);
-#endif	/* CONFIG_GPIOLIB */
+//#endif	/* CONFIG_GPIOLIB */

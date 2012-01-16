@@ -36,6 +36,8 @@
 
 #define MAX_DSS_MANAGERS (cpu_is_omap44xx() ? 3 : 2)
 
+#define CPR 1
+
 static int num_managers;
 static struct list_head manager_list;
 
@@ -276,6 +278,104 @@ static ssize_t manager_alpha_blending_enabled_store(
 	return size;
 }
 
+static ssize_t manager_cpr_enable_show(struct omap_overlay_manager *mgr,
+		char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", mgr->info.cpr_enable);
+}
+
+static ssize_t manager_cpr_enable_store(struct omap_overlay_manager *mgr,
+		const char *buf, size_t size)
+{
+	struct omap_overlay_manager_info info;
+	int enable;
+	int r;
+	
+	if (!CPR)
+		return -ENODEV;
+
+	if (sscanf(buf, "%d", &enable) != 1)
+		return -EINVAL;
+
+	mgr->get_manager_info(mgr, &info);
+
+	if (info.cpr_enable == enable)
+		return size;
+
+	info.cpr_enable = enable;
+
+	r = mgr->set_manager_info(mgr, &info);
+	if (r)
+		return r;
+
+	r = mgr->apply(mgr);
+	if (r)
+		return r;
+
+	return size;
+}
+
+static ssize_t manager_cpr_coef_show(struct omap_overlay_manager *mgr,
+		char *buf)
+{
+	struct omap_overlay_manager_info info;
+
+	mgr->get_manager_info(mgr, &info);
+
+	return snprintf(buf, PAGE_SIZE,
+			"%d %d %d %d %d %d %d %d %d\n",
+			info.cpr_coefs.rr,
+			info.cpr_coefs.rg,
+			info.cpr_coefs.rb,
+			info.cpr_coefs.gr,
+			info.cpr_coefs.gg,
+			info.cpr_coefs.gb,
+			info.cpr_coefs.br,
+			info.cpr_coefs.bg,
+			info.cpr_coefs.bb);
+}
+
+static ssize_t manager_cpr_coef_store(struct omap_overlay_manager *mgr,
+		const char *buf, size_t size)
+{
+	struct omap_overlay_manager_info info;
+	struct omap_dss_color_weight_coef coefs;
+	int r, i;
+	s16 *arr;
+
+	if (!CPR)
+		return -ENODEV;
+
+	if (sscanf(buf, "%d %d %d %d %d %d %d %d %d",
+				&coefs.rr, &coefs.rg, &coefs.rb,
+				&coefs.gr, &coefs.gg, &coefs.gb,
+				&coefs.br, &coefs.bg, &coefs.bb) != 9)
+		return -EINVAL;
+
+	arr = (s16[]){ coefs.rr, coefs.rg, coefs.rb,
+		coefs.gr, coefs.gg, coefs.gb,
+		coefs.br, coefs.bg, coefs.bb };
+
+	for (i = 0; i < 9; ++i) {
+		if (arr[i] < -512 || arr[i] > 511)
+			return -EINVAL;
+	}
+
+	mgr->get_manager_info(mgr, &info);
+
+	info.cpr_coefs = coefs;
+
+	r = mgr->set_manager_info(mgr, &info);
+	if (r)
+		return r;
+
+	r = mgr->apply(mgr);
+	if (r)
+		return r;
+
+	return size;
+}
+
 struct manager_attribute {
 	struct attribute attr;
 	ssize_t (*show)(struct omap_overlay_manager *, char *);
@@ -301,7 +401,12 @@ static MANAGER_ATTR(trans_key_enabled, S_IRUGO|S_IWUSR,
 static MANAGER_ATTR(alpha_blending_enabled, S_IRUGO|S_IWUSR,
 		manager_alpha_blending_enabled_show,
 		manager_alpha_blending_enabled_store);
-
+static MANAGER_ATTR(cpr_enable, S_IRUGO|S_IWUSR,
+		manager_cpr_enable_show,
+		manager_cpr_enable_store);
+static MANAGER_ATTR(cpr_coef, S_IRUGO|S_IWUSR,
+		manager_cpr_coef_show,
+		manager_cpr_coef_store);
 
 static struct attribute *manager_sysfs_attrs[] = {
 	&manager_attr_name.attr,
@@ -311,6 +416,8 @@ static struct attribute *manager_sysfs_attrs[] = {
 	&manager_attr_trans_key_value.attr,
 	&manager_attr_trans_key_enabled.attr,
 	&manager_attr_alpha_blending_enabled.attr,
+	&manager_attr_cpr_enable.attr,
+	&manager_attr_cpr_coef.attr,
 	NULL
 };
 
@@ -441,6 +548,9 @@ struct manager_cache_data {
 
 	bool alpha_enabled;
 
+	bool cpr_enable;
+	struct omap_dss_color_weight_coef cpr_coefs;
+
 	bool manual_upd_display;
 	bool manual_update;
 	bool do_manual_update;
@@ -559,20 +669,19 @@ static int dss_mgr_wait_for_go(struct omap_overlay_manager *mgr)
 		|| dssdev->type == OMAP_DISPLAY_TYPE_HDMI) {
 		irq = DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_EVSYNC_EVEN;
 	} else {
-		if (dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
-			enum omap_dss_update_mode mode;
-			mode = dssdev->driver->get_update_mode(dssdev);
-			if (mode != OMAP_DSS_UPDATE_AUTO)
-				return 0;
-
-			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-				DISPC_IRQ_FRAMEDONE
-				: DISPC_IRQ_FRAMEDONE2;
-		} else {
-			irq = (channel == OMAP_DSS_CHANNEL_LCD) ?
-				DISPC_IRQ_VSYNC
-				: DISPC_IRQ_VSYNC2;
-		}
+		
+		if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI)
+				&& (mgr->device->channel == OMAP_DSS_CHANNEL_LCD))
+			irq = DISPC_IRQ_FRAMEDONE;
+		else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI)
+				&& (mgr->device->channel == OMAP_DSS_CHANNEL_LCD2))
+			irq = DISPC_IRQ_FRAMEDONE2;
+		else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DPI)
+				&& (mgr->device->channel == OMAP_DSS_CHANNEL_LCD))
+				irq = DISPC_IRQ_VSYNC;
+		else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DPI)
+				&& (mgr->device->channel == OMAP_DSS_CHANNEL_LCD2))
+				irq = DISPC_IRQ_VSYNC2;
 	}
 
 	mc = &dss_cache.manager_cache[mgr->id];
@@ -935,6 +1044,10 @@ static void configure_manager(enum omap_channel channel)
 	dispc_set_trans_key(channel, c->trans_key_type, c->trans_key);
 	dispc_enable_trans_key(channel, c->trans_enabled);
 	dispc_enable_alpha_blending(channel, c->alpha_enabled);
+	if (CPR) {
+		dispc_enable_cpr(channel, c->cpr_enable);
+		dispc_set_cpr_coef(channel, &c->cpr_coefs);
+	}
 }
 
 /* configure_dispc() tries to write values from cache to shadow registers.
@@ -1444,6 +1557,8 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		mc->trans_key = mgr->info.trans_key;
 		mc->trans_enabled = mgr->info.trans_enabled;
 		mc->alpha_enabled = mgr->info.alpha_enabled;
+		mc->cpr_enable = mgr->info.cpr_enable;
+		mc->cpr_coefs = mgr->info.cpr_coefs;
 
 		mc->manual_upd_display =
 			dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE;

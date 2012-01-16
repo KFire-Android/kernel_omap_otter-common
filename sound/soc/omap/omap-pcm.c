@@ -235,11 +235,11 @@ static int omap_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		prtd->period_index = -1;
 		omap_stop_dma(prtd->dma_ch);
 		if (cpu_is_omap44xx()) {
-			/* Since we are using self linking, there is a
-		  	 chance that the DMA as re-enabled the channel
-		 	  just after disabling it */
-			while (omap_get_dma_active_status(prtd->dma_ch))
-				omap_stop_dma(prtd->dma_ch);
+		/* Since we are using self linking, there is a
+		   chance that the DMA as re-enabled the channel
+		   just after disabling it */
+		while (omap_get_dma_active_status(prtd->dma_ch))
+			omap_stop_dma(prtd->dma_ch);
 		}
 		break;
 	default:

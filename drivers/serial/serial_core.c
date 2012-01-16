@@ -1344,6 +1344,18 @@ static void uart_close(struct tty_struct *tty, struct file *filp)
 	tty_ldisc_flush(tty);
 
 	tty->closing = 0;
+
+	/* 
+	 * Console cflag need to be restored here. Indeed this field 
+         * has been cleared in the function uart_set_termios() when 
+         * the tty was being opened. As the tty object are going to be 
+         * destroyed the field tty->termios->c_flags won't be any more 
+         * accessible. That's why we need to restore its value now.
+         */
+	if (uart_console(uport) && (uport->cons->cflag == 0)) {
+		uport->cons->cflag = tty->termios->c_cflag;
+	}
+
 	tty_port_tty_set(port, NULL);
 
 	if (port->blocked_open) {

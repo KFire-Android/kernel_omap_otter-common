@@ -40,10 +40,20 @@
 #define CUSTOM_ERROR			0x2
 #define STANDARD_ERROR			0x0
 #define INBAND_ERROR			0x0
-#define CLEAR_STDERR_LOG		80000000
+#define CLEAR_STDERR_LOG		0x80000000
+#define MAIN_STDERR_LOG			0x80000000
+#define MAIN_ERR_FLTCNT			0x00080000
+#define MAIN_ERR_ERRCNT			0x00040000
+#define CLEAR_STDERR_LOG (MAIN_STDERR_LOG|MAIN_ERR_FLTCNT|MAIN_ERR_ERRCNT)
 #define EMIF_KERRLOG_OFFSET		0x10
 #define L3_SLAVE_ADDRESS_OFFSET		0x14
 #define LOGICAL_ADDR_ERRORLOG		0x4
+#define L3_STD_HDR_OFFSET			0x4
+#define L3_STD_MSTADDR_OFFSET		0x8
+#define L3_STD_SLVADDR_OFFSET		0xc
+#define L3_CUS_INFO_OFFSET			0x1c
+#define L3_CUS_MSTADDR_OFFSET		0x20
+#define L3_CUS_OPCODE_OFFSET		0x24
 
 u32 l3_flagmux_regerr[3] = {
 	0x50C,
@@ -225,6 +235,8 @@ static int __init omap_l2_cache_init(void)
 			omap4_secure_dispatcher(
 				PPA_SERVICE_PL310_POR, 0x7, 1,
 				PL310_POR, 0, 0, 0);
+		else
+			omap_smc1(0x113, 0x7);
 
 		omap_smc1(0x109, OMAP4_L2X0_AUXCTL_VALUE);
 	}
@@ -393,6 +405,11 @@ static irqreturn_t l3_interrupt_handler(int irq, void *dev_id)
 			stderrlog_main = (u32)l3_base[i] +
 				(*(l3_targ_stderrlog_main[i] + err_source));
 			stderrlog_main_reg_val =  readl(stderrlog_main);
+			source_name =
+				(char *)(*(l3_targ_stderrlog_main_sourcename[i]
+					+ err_source));
+			slave_addr = stderrlog_main +
+					L3_SLAVE_ADDRESS_OFFSET;
 
 			switch ((stderrlog_main_reg_val & CUSTOM_ERROR)) {
 			case STANDARD_ERROR:
@@ -401,23 +418,36 @@ static irqreturn_t l3_interrupt_handler(int irq, void *dev_id)
 						ctrl_sec_err_stat[inttype];
 				ctrl_sec_err_status_regval =
 						readl(ctrl_sec_err_status);
-				source_name =
-				(char *)(*(l3_targ_stderrlog_main_sourcename[i]
-					+ err_source));
-				slave_addr = stderrlog_main +
-
-						L3_SLAVE_ADDRESS_OFFSET;
 				if (!ctrl_sec_err_status_regval) {
 					/*
 					 * get the details about the inband
 					 * error as command etc and print
 					 * details
 					 */
-					pr_crit("L3 standard error: SOURCE:%s"
-						"at address 0x%x\n",
-						source_name, readl(slave_addr));
-					dump_stack();
+					pr_crit("***L3 standard error: "
+						"SOURCE:%s at address 0x%x "
+						"Hdr=0x%x MstAddr=0x%x "
+						"SlvAddr=0x%x\n",
+					source_name, readl(slave_addr),
+					readl(stderrlog_main +
+						L3_STD_HDR_OFFSET),
+					readl(stderrlog_main +
+						L3_STD_MSTADDR_OFFSET),
+					readl(stderrlog_main +
+						L3_STD_SLVADDR_OFFSET));
 				} else {
+					pr_crit("***L3 standard error "
+						"FIREWALL: "
+						"SOURCE:%s at address 0x%x "
+						"Hdr=0x%x MstAddr=0x%x "
+						"SlvAffr=0x%x\n",
+					source_name, readl(slave_addr),
+					readl(stderrlog_main +
+						L3_STD_HDR_OFFSET),
+					readl(stderrlog_main +
+						L3_STD_MSTADDR_OFFSET),
+					readl(stderrlog_main +
+						L3_STD_SLVADDR_OFFSET));
 					/* Then this is a Fire Wall Error */
 					if (omap_type() == OMAP2_DEVICE_TYPE_GP)
 						omap_fw_error_handler(
@@ -429,13 +459,15 @@ static irqreturn_t l3_interrupt_handler(int irq, void *dev_id)
 					CLEAR_STDERR_LOG), stderrlog_main);
 				break;
 			case CUSTOM_ERROR:
-				pr_crit("CUSTOM SRESP error with SOURCE:%s\n",
-				(char *)(*(l3_targ_stderrlog_main_sourcename[i]
-						+ err_source)));
+				pr_crit("***L3 CUSTOM error: SOURCE:%s "
+				"Info=0x%x MstAddr=0x%x OpCode=%d\n",
+				source_name,
+				readl(stderrlog_main + L3_CUS_INFO_OFFSET),
+				readl(stderrlog_main + L3_CUS_MSTADDR_OFFSET),
+				readl(stderrlog_main + L3_CUS_OPCODE_OFFSET));
 				/* clear the std error log*/
 				writel((stderrlog_main_reg_val |
 					CLEAR_STDERR_LOG), stderrlog_main);
-				dump_stack();
 				break;
 			default:
 				/* Nothing to be handled here as of now */

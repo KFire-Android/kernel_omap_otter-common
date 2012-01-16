@@ -668,16 +668,16 @@ int clkdm_del_sleepdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
 
 	cd = _clkdm_deps_lookup(clkdm2, clkdm1->sleepdep_srcs);
 	if (IS_ERR(cd)) {
-		pr_debug("clockdomain: hardware cannot set/clear sleep "
+		/*pr_debug("clockdomain: hardware cannot set/clear sleep "
 			 "dependency affecting %s from %s\n", clkdm1->name,
-			 clkdm2->name);
+			 clkdm2->name);*/
 		return PTR_ERR(cd);
 	}
 
 	if (atomic_dec_return(&cd->sleepdep_usecount) == 0) {
-		pr_debug("clockdomain: will no longer prevent %s from "
+		/*pr_debug("clockdomain: will no longer prevent %s from "
 			 "sleeping if %s is active\n", clkdm1->name,
-			 clkdm2->name);
+			 clkdm2->name);*/
 
 		cm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
 				      clkdm1->pwrdm.ptr->prcm_offs,
@@ -865,6 +865,14 @@ int omap2_clkdm_wakeup(struct clockdomain *clkdm)
 		v &= ~(clkdm->clktrctrl_mask);
 		v |= bits;
 		__raw_writel(v, clkdm->clkstctrl_reg);
+
+		/*
+		 * Must wait for pertaining pwrdm to switch ON.
+		 * pwrdm may hang in "in transition" state until next
+		 * clkdm wakeup, if clkdm idled back before pwrdm
+		 * transition completed.
+		 */
+		pwrdm_clkdm_state_switch(clkdm);
 
 	} else {
 		BUG();

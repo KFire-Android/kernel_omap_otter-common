@@ -531,6 +531,9 @@ struct omap_overlay_manager_info {
 	bool trans_enabled;
 
 	bool alpha_enabled;
+	bool cpr_enable;
+	struct omap_dss_color_weight_coef cpr_coefs;
+
 };
 
 struct omap_overlay_manager {
@@ -771,8 +774,8 @@ struct omap_dss_driver {
 
 	void (*get_resolution)(struct omap_dss_device *dssdev,
 			u16 *xres, u16 *yres);
-	void (*get_dimension)(struct omap_dss_device *dssdev,
-			u32 *width, u32 *height);
+//	void (*get_dimension)(struct omap_dss_device *dssdev,
+//			u32 *width, u32 *height);
 	int (*get_recommended_bpp)(struct omap_dss_device *dssdev);
 
 	int (*check_timings)(struct omap_dss_device *dssdev,

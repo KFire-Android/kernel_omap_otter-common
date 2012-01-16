@@ -199,7 +199,6 @@ struct omap_vdd_info{
 	struct omap_vdd_dep_info *dep_vdd_info;
 	spinlock_t user_lock;
 	struct plist_head user_list;
-	struct mutex scaling_mutex;
 	struct srcu_notifier_head volt_change_notify_list;
 	int volt_data_count;
 	int nr_dep_vdd;
@@ -219,6 +218,12 @@ static struct omap_vdd_info *vdd_info;
 static int omap3_abb_change_opp(struct omap_vdd_info *vdd_info);
 static int omap4_abb_change_opp(struct omap_vdd_info *vdd_info);
 #endif
+
+static struct mutex scaling_mutex;
+
+static int omap_voltage_scale_internal(struct voltagedomain *voltdm);
+static int omap_voltage_add_userreq_internal(struct voltagedomain *voltdm,
+		struct device *dev, unsigned long *volt);
 
 /*
  * Number of scalable voltage domains.
@@ -1111,37 +1116,42 @@ static void __init omap4_init_voltagecontroller(void)
 	 * used.
 	 */
 	voltage_write_reg(OMAP4_PRM_VOLTSETUP_CORE_RET_SLEEP_OFFSET,
-		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
-		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0x0 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x0 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
 		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
 		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
 	voltage_write_reg(OMAP4_PRM_VOLTSETUP_IVA_RET_SLEEP_OFFSET,
-		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
-		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
-		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
-		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+		(0x0 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x0 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0x1D << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0x1D << OMAP4430_RAMP_UP_COUNT_SHIFT));
 	voltage_write_reg(OMAP4_PRM_VOLTSETUP_MPU_RET_SLEEP_OFFSET,
-		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
-		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
-		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
-		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+		(0x0 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x0 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0x1D << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0x1D << OMAP4430_RAMP_UP_COUNT_SHIFT));
 
 	/* setup the VOLTSETUP* registers for OFF */
 	voltage_write_reg(OMAP4_PRM_VOLTSETUP_CORE_OFF_OFFSET,
-		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
-		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
-		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
-		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+		(0x2 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x2 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0x8 << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0x26 << OMAP4430_RAMP_UP_COUNT_SHIFT));
 	voltage_write_reg(OMAP4_PRM_VOLTSETUP_IVA_OFF_OFFSET,
-		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
-		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
-		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
-		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+		(0x2 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x2 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0x8 << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0x26 << OMAP4430_RAMP_UP_COUNT_SHIFT));
 	voltage_write_reg(OMAP4_PRM_VOLTSETUP_MPU_OFF_OFFSET,
-		(0x3 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
-		(0x3 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
-		(0xF << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
-		(0xF << OMAP4430_RAMP_UP_COUNT_SHIFT));
+		(0x2 << OMAP4430_RAMP_DOWN_PRESCAL_SHIFT) |
+		(0x2 << OMAP4430_RAMP_UP_PRESCAL_SHIFT) |
+		(0x8 << OMAP4430_RAMP_DOWN_COUNT_SHIFT) |
+		(0x26 << OMAP4430_RAMP_UP_COUNT_SHIFT));
+
+	/* setup the VOLTSETUP* registers for WARM RESET */
+	voltage_write_reg(OMAP4_PRM_VOLTSETUP_WARMRESET_OFFSET,
+		(0x1D << OMAP4430_STABLE_COUNT_SHIFT) |
+		(0x3 << OMAP4430_STABLE_PRESCAL_SHIFT));
 
 	on_cmd = vdd_info[impu].pmic->onforce_cmd(
 		vdd_info[impu].pmic->uv_to_vsel(vc_config.vdd0_on));
@@ -1184,6 +1194,7 @@ static void __init omap4_init_voltagecontroller(void)
 			(onlp_cmd << OMAP4430_ONLP_SHIFT) |
 			(ret_cmd << OMAP4430_RET_SHIFT) |
 			(off_cmd << OMAP4430_OFF_SHIFT));
+
 }
 
 /* Sets up all the VDD related info for OMAP4 */
@@ -1525,8 +1536,6 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 	/* Init the plist */
 	spin_lock_init(&vdd->user_lock);
 	plist_head_init(&vdd->user_list, &vdd->user_lock);
-	/* Init the DVFS mutex */
-	mutex_init(&vdd->scaling_mutex);
 
 	/* Get the devices associated with this VDD */
 	vdd->dev_list = opp_init_voltage_params(&vdd->voltdm, &vdd->dev_count);
@@ -1855,7 +1864,7 @@ static int calc_dep_vdd_volt(struct device *dev,
 		act_volt = dep_volt;
 
 		/* See if dep_volt is possible for the vdd*/
-		ret = omap_voltage_add_userreq(dep_vdds[i].voltdm, dev,
+		ret = omap_voltage_add_userreq_internal(dep_vdds[i].voltdm, dev,
 				&act_volt);
 
 	}
@@ -1877,7 +1886,7 @@ static int scale_dep_vdd(struct omap_vdd_info *main_vdd)
 	dep_vdds = main_vdd->dep_vdd_info;
 
 	for (i = 0; i < main_vdd->nr_dep_vdd; i++)
-		omap_voltage_scale(dep_vdds[i].voltdm);
+		omap_voltage_scale_internal(dep_vdds[i].voltdm);
 	return 0;
 }
 
@@ -1908,9 +1917,9 @@ int omap_vscale_pause(struct voltagedomain *voltdm, bool trylock)
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
 	if (trylock)
-		return !mutex_trylock(&vdd->scaling_mutex);
+		return !mutex_trylock(&scaling_mutex);
 
-	mutex_lock(&vdd->scaling_mutex);
+	mutex_lock(&scaling_mutex);
 	return 0;
 }
 
@@ -1932,7 +1941,7 @@ int omap_vscale_unpause(struct voltagedomain *voltdm)
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
-	mutex_unlock(&vdd->scaling_mutex);
+	mutex_unlock(&scaling_mutex);
 	return 0;
 }
 
@@ -2025,6 +2034,20 @@ unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
 int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 		unsigned long *volt)
 {
+	int res;
+
+	mutex_lock(&scaling_mutex);
+
+	res = omap_voltage_add_userreq_internal(voltdm, dev, volt);
+
+	mutex_unlock(&scaling_mutex);
+
+	return res;
+}
+
+static int omap_voltage_add_userreq_internal(struct voltagedomain *voltdm,
+		struct device *dev, unsigned long *volt)
+{
 	struct omap_vdd_info *vdd;
 	struct omap_vdd_user_list *user;
 	struct plist_node *node;
@@ -2036,8 +2059,6 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 	}
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
-
-	mutex_lock(&vdd->scaling_mutex);
 
 	plist_for_each_entry(user, &vdd->user_list, node) {
 		if (user->dev == dev) {
@@ -2051,7 +2072,6 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 		if (!user) {
 			pr_err("%s: Unable to creat a new user for vdd_%s\n",
 				__func__, voltdm->name);
-			mutex_unlock(&vdd->scaling_mutex);
 			return -ENOMEM;
 		}
 		user->dev = dev;
@@ -2063,8 +2083,6 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 	plist_add(&user->node, &vdd->user_list);
 	node = plist_last(&vdd->user_list);
 	*volt = node->prio;
-
-	mutex_unlock(&vdd->scaling_mutex);
 
 	return 0;
 }
@@ -2261,7 +2279,6 @@ int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
 	if (!ret)
 		srcu_notifier_call_chain(&vdd->volt_change_notify_list,
 			VOLTAGE_POSTCHANGE, (void *)&v_info);
-
 	return ret;
 }
 
@@ -2500,6 +2517,19 @@ struct voltagedomain *omap_voltage_domain_get(char *name)
  */
 int omap_voltage_scale(struct voltagedomain *voltdm)
 {
+	int res;
+
+	mutex_lock(&scaling_mutex);
+
+	res = omap_voltage_scale_internal(voltdm);
+
+	mutex_unlock(&scaling_mutex);
+
+	return res;
+}
+
+static int omap_voltage_scale_internal(struct voltagedomain *voltdm)
+{
 	unsigned long curr_volt;
 	int is_volt_scaled = 0, i;
 	bool is_sr_disabled = false;
@@ -2513,8 +2543,6 @@ int omap_voltage_scale(struct voltagedomain *voltdm)
 	}
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
-
-	mutex_lock(&vdd->scaling_mutex);
 
 	curr_volt = omap_get_operation_voltage(
 			omap_voltage_get_nom_volt(voltdm));
@@ -2532,6 +2560,16 @@ int omap_voltage_scale(struct voltagedomain *voltdm)
 	if (curr_volt == volt) {
 		is_volt_scaled = 1;
 	} else if (curr_volt < volt) {
+		/* Calculate the voltages for dependent vdd's */
+		if (calc_dep_vdd_volt(&vdd->vdd_device, vdd, volt)) {
+			pr_warning("%s: Error in calculating dependent vdd voltages"
+				"for vdd_%s\n", __func__, voltdm->name);
+			return -EINVAL;
+		}
+		/* Scale dependent voltage domain to new OPP */
+		scale_dep_vdd(vdd);
+
+		/* Scale main voltage domain */
 		omap_voltage_scale_vdd(voltdm,
 				omap_voltage_get_voltdata(voltdm, volt));
 		is_volt_scaled = 1;
@@ -2556,25 +2594,25 @@ int omap_voltage_scale(struct voltagedomain *voltdm)
 		opp_set_rate(vdd->dev_list[i], freq);
 	}
 
-	if (!is_volt_scaled)
+	if (!is_volt_scaled) {
+		/* Scale main voltage domain */
 		omap_voltage_scale_vdd(voltdm,
 				omap_voltage_get_voltdata(voltdm, volt));
+
+		/* calculate the voltages for dependent vdd's */
+		if (calc_dep_vdd_volt(&vdd->vdd_device, vdd, volt)) {
+			pr_warning("%s: Error in calculating dependent vdd voltages"
+				"for vdd_%s\n", __func__, voltdm->name);
+			return -EINVAL;
+		}
+
+		/* Scale dependent voltage domain to new OPP */
+		scale_dep_vdd(vdd);
+	}
 
 	/* Enable Smartreflex module */
 	if (is_sr_disabled)
 		omap_smartreflex_enable(voltdm);
-
-	mutex_unlock(&vdd->scaling_mutex);
-
-	/* calculate the voltages for dependent vdd's */
-	if (calc_dep_vdd_volt(&vdd->vdd_device, vdd, volt)) {
-		pr_warning("%s: Error in calculating dependent vdd voltages"
-			"for vdd_%s\n", __func__, voltdm->name);
-		return -EINVAL;
-	}
-
-	/* Scale dependent vdds */
-	scale_dep_vdd(vdd);
 
 	return 0;
 }
@@ -2621,6 +2659,8 @@ static int __init omap_voltage_init(void)
 		return 0;
 	}
 
+	mutex_init(&scaling_mutex);
+
 	/*
 	 * Some ES2.2 efuse  values for BGAP and SLDO trim
 	 * are not programmed. For these units
@@ -2630,7 +2670,7 @@ static int __init omap_voltage_init(void)
 	 * 2. trim VDAC value for TV output as per recomendation
 	 */
 	if (cpu_is_omap44xx()
-		&& (omap_rev() == CHIP_IS_OMAP4430ES2_2)) {
+		&& (omap_rev() >= CHIP_IS_OMAP4430ES2_2)) {
 		is_trimmed = omap_ctrl_readl(
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL);
 		if (!is_trimmed) {
@@ -2644,19 +2684,20 @@ static int __init omap_voltage_init(void)
 			omap_ctrl_writel(0x0400040f,
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_IVA_VOLTAGE_CTRL);
 			/* write value of 0x0 to VDAC as per trim recomendation */
-			omap_ctrl_writel(0x000001c0,
+			omap4_ctrl_pad_writel(0x000001c0,
 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
 		} else {
 			/*
 			 * Set SRAM MPU/CORE/IVA LDO RETMODE
 			 * Setting RETMODE for un-trimmed units cause random
 			 * system hang. So enabling it only for trimmed units.
-			 */
+			 * for 4430 series keep MPU SLDO at 0,that boards can hung on
+			 * RET -> ON transition, 4460 not impacted. */
 			prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
 				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
 				OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_CORE_CTRL_OFFSET);
 				prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
-				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+				0x0 << OMAP4430_RETMODE_ENABLE_SHIFT,
 			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_MPU_CTRL_OFFSET);
 				prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
 				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
@@ -2669,7 +2710,7 @@ static int __init omap_voltage_init(void)
 	 * Smart IO override efuse with P:16/N:16 and P:0/N:0 respectively
 	 */
 	if (cpu_is_omap44xx())
-		omap_ctrl_writel(0x00084000,
+		omap4_ctrl_pad_writel(0x00084000,
 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_2);
 
 

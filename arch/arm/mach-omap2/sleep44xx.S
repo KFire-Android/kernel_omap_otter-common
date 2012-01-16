@@ -94,7 +94,7 @@ restore_context:
 	ldr	r4, =OMAP44XX_SAR_RAM_BASE
 	ldr	r9, [r4, #OMAP_TYPE_OFFSET]	@ Get DEVICE type
 	cmp	r9, #0x1			@ Check for HS device
-	bne	skip_enable_smp_bit			@ if GP device
+	bne	gp_set_default_cp15		@ if GP device
 
 	LM_CHECK_IF_CPU0
 	beq	enable_smp_bit				@ if CPU0
@@ -134,6 +134,13 @@ enable_smp_bit:
 	orr	r0, r0, #0x40		@ Enable SMP bit
         mcr     p15, 0, r0, c1, c0, 1
 	isb
+	b	skip_enable_smp_bit
+gp_set_default_cp15:
+	mov r0, #0x810
+	mov r12, #0x114
+	dsb
+	smc #0
+	dsb
 skip_enable_smp_bit:			@ GP device should execute from here
 #ifdef CONFIG_CACHE_L2X0
 	/* FIXME : Add POR register restore as well */
@@ -151,15 +158,23 @@ skip_enable_smp_bit:			@ GP device should execute from here
 	ldr     r12, =0x109		@ Setup L2 AUXCTL value
 	dsb
 	smc     #0
+	dsb
 	b	skip_l2en
 check_por:
 	ldr	r0, =OMAP44XX_SAR_RAM_BASE  @ Check DEVICE type
 	ldr	r1, [r0, #OMAP_TYPE_OFFSET]
 	cmp	r1, #0x1                   @ Check for HS device
-	bne	skip_por
+	bne	gp_por
 	ldr	r0, =PPA_SERVICE_PL310_POR @ Setup PPA HAL call
 	adr	r3, POR_params
 	LM_CALL_PPA_SERVICE_PA
+	b	skip_por
+gp_por:
+	mov     r0, #0x7
+	ldr     r12, =0x113		@ Enable L2 Cache controller
+	dsb
+	smc     #0
+	dsb
 skip_por:
 	ldr	r0, =OMAP4_L2X0_AUXCTL_VALUE
 	ldr     r12, =0x109		@ Setup L2 AUXCTL value
@@ -389,6 +404,12 @@ l2x_clean_inv:				@ Only for MPU OFF and last CPU
 	ldr	r0, [r8, #L2X0_OFFSET]
 	cmp	r0, #3
 	bne	do_WFI
+#ifdef CONFIG_PL310_ERRATA_727915
+	mov 	r0, #0x03
+	mov	r12, #0x100
+	dsb
+	smc	#0
+#endif
 	ldr	r2, =l2cache_base
 	ldr	r2, [r2]
 	ldr	r0, =0xffff
@@ -414,6 +435,12 @@ loop5:
 	ldr	r0, [r2, #L2X0_CACHE_SYNC]
 	ands	r0, r0, #0x1
 	bne	loop5
+#ifdef CONFIG_PL310_ERRATA_727915
+	mov 	r0, #0x00
+	mov	r12, #0x100
+	dsb
+	smc	#0
+#endif
 #endif
 	ldr     r0, =so_ram_address
 	ldr	r0, [r0]

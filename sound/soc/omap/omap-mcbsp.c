@@ -36,6 +36,8 @@
 #include <plat/mcbsp.h>
 #include "omap-mcbsp.h"
 #include "omap-pcm.h"
+#include "omap-abe.h"
+#include "abe/abe_main.h"
 
 #define OMAP_MCBSP_RATES	(SNDRV_PCM_RATE_8000_96000)
 
@@ -349,6 +351,9 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	int pkt_size = 0;
 	unsigned long port;
 	unsigned int format, div, framesize, master;
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	t_port_config *port_config = (t_port_config*) rtd->dai_link->private_data;
+  	int sample_format = OMAP_DMA_DATA_TYPE_S16;
 
 	dma_data = &omap_mcbsp_dai_dma_params[cpu_dai->id][substream->stream];
 	if (cpu_class_is_omap1()) {
@@ -369,6 +374,9 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	} else {
 		return -ENODEV;
 	}
+
+	if(NULL == port_config)
+	{
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		dma_data->data_type = OMAP_DMA_DATA_TYPE_S16;
@@ -380,6 +388,50 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 		break;
 	default:
 		return -EINVAL;
+	}
+	}else{
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {	
+			sample_format = 	port_config->sample_format_dl;
+			if ((port_config->bit_reorder_dl  == 0) || (port_config->bit_reorder_dl  == 1))
+			{
+				regs->xcr2 |= XCOMPAND(port_config->bit_reorder_dl);
+			}
+			else
+			{
+				return -EINVAL;
+			}
+		}else{
+			sample_format = 	port_config->sample_format_ul;		
+			if ((port_config->bit_reorder_ul  == 0) || (port_config->bit_reorder_ul  == 1))
+			{
+				regs->rcr2 |= RCOMPAND(port_config->bit_reorder_ul);
+			}
+			else
+			{
+				return -EINVAL;
+			}
+		}
+		switch(sample_format)
+		{
+			case MONO_MSB:
+			case MONO_RSHIFTED_16:
+				dma_data->data_type = OMAP_DMA_DATA_TYPE_S8;
+				wlen = 8;
+				break;				
+			case STEREO_RSHIFTED_16:
+			case STEREO_MSB:
+				/*dma_data->data_type = OMAP_DMA_DATA_TYPE_S32;
+				wlen = 32; */
+				dma_data->data_type = OMAP_DMA_DATA_TYPE_S16;
+				wlen = 16;
+				break;
+			case STEREO_16_16:
+				dma_data->data_type = OMAP_DMA_DATA_TYPE_S16;
+				wlen = 16;
+				break;
+			default:
+				return -EINVAL;
+		}
 	}
 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
 		dma_data->set_threshold = omap_mcbsp_set_threshold;
@@ -456,6 +508,8 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	regs->rcr1	|= RFRLEN1(wpf - 1);
 	regs->xcr1	|= XFRLEN1(wpf - 1);
 
+	if(NULL == port_config)
+	{
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		/* Set word lengths */
@@ -474,6 +528,38 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	default:
 		/* Unsupported PCM format */
 		return -EINVAL;
+	}
+	}else{
+		switch(sample_format)
+		{
+			case MONO_MSB:
+			case MONO_RSHIFTED_16:
+				regs->rcr2	|= RWDLEN2(OMAP_MCBSP_WORD_8);
+				regs->rcr1	|= RWDLEN1(OMAP_MCBSP_WORD_8);
+				regs->xcr2	|= XWDLEN2(OMAP_MCBSP_WORD_8);
+				regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_8);
+				break;
+			case STEREO_RSHIFTED_16:
+			case STEREO_MSB:
+				/* regs->rcr2	|= RWDLEN2(OMAP_MCBSP_WORD_32);
+				regs->rcr1	|= RWDLEN1(OMAP_MCBSP_WORD_32);
+				regs->xcr2	|= XWDLEN2(OMAP_MCBSP_WORD_32);
+				regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_32); */
+
+				regs->rcr2	|= RWDLEN2(OMAP_MCBSP_WORD_16);
+				regs->rcr1	|= RWDLEN1(OMAP_MCBSP_WORD_16);
+				regs->xcr2	|= XWDLEN2(OMAP_MCBSP_WORD_16);
+				regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_16);
+				break;
+			case STEREO_16_16:
+				regs->rcr2	|= RWDLEN2(OMAP_MCBSP_WORD_16);
+				regs->rcr1	|= RWDLEN1(OMAP_MCBSP_WORD_16);
+				regs->xcr2	|= XWDLEN2(OMAP_MCBSP_WORD_16);
+				regs->xcr1	|= XWDLEN1(OMAP_MCBSP_WORD_16);
+				break;
+			default:
+				return -EINVAL;
+		}
 	}
 
 	/* In McBSP master modes, FRAME (i.e. sample rate) is generated
@@ -582,8 +668,12 @@ static int omap_mcbsp_dai_set_dai_fmt(struct snd_soc_dai *cpu_dai,
 		/* Sample rate generator drives the FS */
 		regs->srgr2	|= FSGM;
 		break;
+	case SND_SOC_DAIFMT_CBM_CFS:
+		regs->pcr0  |= FSXM | FSRM;
+		break;
 	case SND_SOC_DAIFMT_CBM_CFM:
 		/* McBSP slave */
+		regs->wken = XFSXEN | RFSREN;
 		break;
 	default:
 		/* Unsupported master/slave configuration */

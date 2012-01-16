@@ -899,6 +899,13 @@ int abe_enable_data_transfer(u32 id)
 		abe_init_atc(DMIC_PORT);
 		abe_init_io_tasks(DMIC_PORT, &format, protocol);
 	}
+	/* Added by Mistral */
+	if (id == MM_EXT_OUT_PORT) {
+		protocol = &(abe_port[MM_EXT_OUT_PORT].protocol);
+		format = abe_port[MM_EXT_OUT_PORT].format;
+		abe_init_atc(MM_EXT_OUT_PORT);
+		abe_init_io_tasks(MM_EXT_OUT_PORT, &format, protocol);
+	}
 	if (id == VX_UL_PORT) {
 		if (abe_port[VX_DL_PORT].status !=
 			OMAP_ABE_PORT_ACTIVITY_RUNNING) {
@@ -2078,7 +2085,11 @@ EXPORT_SYMBOL(abe_enable_test_pattern);
 int abe_wakeup(void)
 {
 	/* Restart event generator */
+#ifdef CONFIG_ABE_44100
+	abe_write_event_generator (EVENT_44100);
+#else
 	abe_write_event_generator(EVENT_TIMER);
+#endif
 	/* reconfigure DMA Req and MCU Irq visibility */
 	abe_hw_configuration();
 	return 0;

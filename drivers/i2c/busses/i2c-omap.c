@@ -681,6 +681,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
 			    OMAP_I2C_STAT_XUDF)) {
 		omap_i2c_init(dev);
+		dev_err(dev->dev, "EAGAIN error\n");
+		dump_stack();
 		return -EAGAIN;
 	}
 
@@ -692,8 +694,11 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 			w |= OMAP_I2C_CON_STP;
 			omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
 		}
+		dev_err(dev->dev, "remote io error\n");
+		dump_stack();
 		return -EREMOTEIO;
 	}
+	dev_err(dev->dev, "EIO error\n");
 	return -EIO;
 }
 

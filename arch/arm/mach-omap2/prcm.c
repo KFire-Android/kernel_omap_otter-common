@@ -475,33 +475,9 @@ void omap4_prm_global_sw_reset(const char *cmd)
 {
 	u32 v = 0;
 
-	if (cmd == NULL) {
-		/* cmd = NULL; case: cold boot */
-		v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-	} else {
-		/* cmd != null; case: warm boot */
-		if (!strcmp(cmd, "bootloader")) {
-
-			/* Save reboot mode in scratch memory */
-			strcpy(PUBLIC_SAR_RAM_1_FREE, cmd);
-
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-
-		} else if (!strcmp(cmd, "recovery")) {
-
-			/* Save reboot mode in scratch memory */
-			strcpy(PUBLIC_SAR_RAM_1_FREE, cmd);
-
-			v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
-
-		} else {
-			printk(KERN_EMERG "reboot: non-supported mode [%s]\n",
-									cmd);
-			/* otherwise cold boot */
-			v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
-		}
-	}
-	/* clear previous reboot status */
+	v |= OMAP4430_RST_GLOBAL_COLD_SW_MASK;
+	
+        /* clear previous reboot status */
 	prm_write_mod_reg(0xfff,
 			OMAP4430_PRM_DEVICE_MOD,
 			OMAP4_RM_RSTST);

@@ -37,6 +37,9 @@
 #include <linux/kthread.h>
 #include <linux/i2c/twl.h>
 #include <linux/platform_device.h>
+#include <linux/delay.h>
+#include <linux/wakelock.h>
+#include <linux/gpio.h>
 
 /*
  * TWL6030 (unlike its predecessors, which had two level interrupt handling)
@@ -49,6 +52,7 @@
  * specifies mapping between interrupt number and the associated module.
  *
  */
+struct wake_lock pmic_lock;
 
 static int twl6030_interrupt_mapping[24] = {
 	PWR_INTR_OFFSET,	/* Bit 0	PWRON			*/
@@ -93,6 +97,7 @@ static int twl6030_irq_thread(void *data)
 	static unsigned i2c_errors;
 	static const unsigned max_i2c_errors = 100;
 	int ret;
+	u8 usb_charge_sts = 0, usb_charge_sts1 = 0, usb_charge_sts2 = 0;
 
 	current->flags |= PF_NOFREEZE;
 
@@ -103,10 +108,10 @@ static int twl6030_irq_thread(void *data)
 		u8 bytes[4];
 		u32 int_sts;
 		} sts;
-
+		u8 bz[4] = {0,0,0,0};
 		/* Wait for IRQ, then read PIH irq status (also blocking) */
 		wait_for_completion_interruptible(&irq_event);
-
+		
 		/* read INT_STS_A, B and C in one shot using a burst read */
 		ret = twl_i2c_read(TWL_MODULE_PIH, sts.bytes,
 				REG_INT_STS_A, 3);
@@ -122,8 +127,20 @@ static int twl6030_irq_thread(void *data)
 			complete(&irq_event);
 			continue;
 		}
-
-
+		ret = twl_i2c_write(TWL_MODULE_PIH, bz,
+				REG_INT_STS_A, 3); /* clear INT_STS_A */
+		if (ret){
+			pr_info("twl6030: I2C error in clearing PIH ISR\n");		
+			for(i=0;i<=20;i++){
+				ret = twl_i2c_write(TWL_MODULE_PIH, bz,
+					REG_INT_STS_A, 3); /* clear INT_STS_A */
+				if (ret){
+					pr_info("twl6030: I2C error in clearing PIH ISR\n");	
+				}else
+					break;				
+				msleep(10);
+			}
+		}
 
 		sts.bytes[3] = 0; /* Only 24 bits are valid*/
 
@@ -139,45 +156,13 @@ static int twl6030_irq_thread(void *data)
 			if (sts.int_sts & 0x1) {
 				int module_irq = twl6030_irq_base +
 					twl6030_interrupt_mapping[i];
-				struct irq_desc *d = irq_to_desc(module_irq);
-
-				if (!d) {
-					pr_err("twl6030: Invalid SIH IRQ: %d\n",
-					       module_irq);
-					return -EINVAL;
-				}
-
-				/* this may be a wakeup event
-				 * d->status flag's are masked while we are
-				 * waking up, give some time for the
-				 * IRQ to be enabled.
-				 */
-				start_time = jiffies;
-				while ((d->status & IRQ_DISABLED) &&
-				       (jiffies_to_msecs(jiffies-start_time) < 100)) {
-					yield();
-				}
-
-				/* These can't be masked ... always warn
-				 * if we get any surprises.
-				 */
-				if (d->status & IRQ_DISABLED) {
-					pr_warning("twl handler not called, irq is disabled!\n");
-					note_interrupt(module_irq, d,
-							IRQ_NONE);
-				}
-				else
-					d->handle_irq(module_irq, d);
-
+				generic_handle_irq(module_irq);
 			}
-		local_irq_enable();
+			local_irq_enable();
 		}
-		ret = twl_i2c_write(TWL_MODULE_PIH, sts.bytes,
-				REG_INT_STS_A, 3); /* clear INT_STS_A */
-		if (ret)
-			pr_warning("twl6030: I2C error in clearing PIH ISR\n");
 
 		enable_irq(irq);
+		wake_unlock(&pmic_lock);
 	}
 
 	return 0;
@@ -195,6 +180,7 @@ static int twl6030_irq_thread(void *data)
 static irqreturn_t handle_twl6030_pih(int irq, void *devid)
 {
 	disable_irq_nosync(irq);
+	wake_lock(&pmic_lock);
 	complete(devid);
 	return IRQ_HANDLED;
 }
@@ -358,7 +344,7 @@ int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end)
 	twl6030_irq_next = i;
 	pr_info("twl6030: %s (irq %d) chaining IRQs %d..%d\n", "PIH",
 			irq_num, irq_base, twl6030_irq_next - 1);
-
+	wake_lock_init(&pmic_lock, WAKE_LOCK_SUSPEND, "pmic_wake_lock");
 	/* install an irq handler to demultiplex the TWL6030 interrupt */
 	init_completion(&irq_event);
 	task = kthread_run(twl6030_irq_thread, (void *)irq_num, "twl6030-irq");

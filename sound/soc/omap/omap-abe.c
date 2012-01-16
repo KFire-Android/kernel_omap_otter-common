@@ -321,6 +321,9 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 	abe_dma_t dma_params;
 	int ret;
 
+	dev_dbg(dai->dev, "%s: Channels %d DAI ID %d\n", __func__, 
+			params_channels(params), dai->id);
+
 	switch (params_channels(params)) {
 	case 1:
 		if (params_format(params) == SNDRV_PCM_FORMAT_S16_LE)
@@ -358,6 +361,9 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
+	dev_dbg(dai->dev, "%s: Configured SampFormat %d\n",
+			__func__, format.samp_format);
+
 	format.f = params_rate(params);
 
 	switch (dai->id) {
@@ -366,6 +372,8 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 			abe_connect_cbpr_dmareq_port(MM_DL_PORT, &format, ABE_CBPR0_IDX,
 					&dma_sink);
 			abe_read_port_address(MM_DL_PORT, &dma_params);
+			dev_dbg(dai->dev, "%s: dma_sink: data  0x%x  l3_dmem 0x%x l4_dmem 0x%x iterations %d\n", __func__, 
+					(unsigned int)dma_sink.data, (unsigned int)dma_sink.l3_dmem, (unsigned int)dma_sink.l4_dmem, (unsigned int)dma_sink.iter);
 		} else {
 			abe_connect_cbpr_dmareq_port(MM_UL_PORT, &format,  ABE_CBPR3_IDX,
 					&dma_sink);
@@ -434,6 +442,9 @@ static int abe_fe_hw_params(struct snd_pcm_substream *substream,
 			(unsigned long)dma_params.data;
 	omap_abe_dai_dma_params[dai->id][substream->stream].packet_size =
 			dma_params.iter;
+
+	dev_dbg(dai->dev, "%s: Configured ABE DMA Params PortAddr 0x%x PktSize %d\n",
+			__func__, (unsigned long)dma_params.data, (unsigned int)dma_params.iter);
 
 	if (dai->id == ABE_FRONTEND_DAI_MODEM) {
 		/* call hw_params on McBSP with correct DMA data */
@@ -608,7 +619,7 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 				abe_data.be_active[rtd->be_rtd[i][stream]->dai_link->be_id][stream]);
 		}
 	}
-
+	dev_dbg(dai->dev, "%s: invoking abe_fe_startup\n",__func__);
 	/* start the ABE frontend */
 	ret = abe_fe_startup(substream, dai);
 	if (ret < 0) {
@@ -700,6 +711,7 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 	params_fe = kzalloc(sizeof(struct snd_pcm_hw_params), GFP_KERNEL);
 	if (!params_fe) {
 		WARN_ON(1);
+		printk(KERN_INFO "%s function failed with ENOMEM\n", __func__);
 		return -ENOMEM;
 	}
 
@@ -988,6 +1000,12 @@ static void unmute_be_playback(struct snd_pcm_substream *substream)
 		case OMAP_ABE_DAI_PDM_VIB:
 		case OMAP_ABE_DAI_BT_VX:
 		case OMAP_ABE_DAI_MM_FM:
+		  /* Added the following by Mistral */
+			abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_5MS,
+				GAIN_LEFT_OFFSET);
+			abe_write_gain(GAINS_DL1, GAIN_0dB, RAMP_5MS,
+				GAIN_RIGHT_OFFSET);
+                 break; 
 		case OMAP_ABE_DAI_MODEM:
 			break;
 		}
@@ -1010,10 +1028,13 @@ static void inc_be_ports(struct snd_pcm_substream *substream, int stream)
 	for (i = 0; i < rtd->num_be[stream]; i++) {
 		be_rtd = rtd->be_rtd[i][stream];
 
-		if (be_is_running(be_rtd, stream))
+		dev_dbg(&rtd->dev, "%s: be_rtd->dai_link->Name %s be_rtd->platform->name %s\n",
+				__func__, be_rtd->dai_link->name, be_rtd->platform->name);
+
+		if (be_is_running(be_rtd, stream)) {
 			/* update TRIGGER ref counts */
 			trigger_inc_active(be_rtd, stream);
-
+                }  
 	}
 }
 
@@ -1037,15 +1058,23 @@ static void enable_be_ports(struct snd_pcm_substream *substream, int stream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_pcm_runtime *be_rtd;
+	t_port_config *port_config = NULL;
 	abe_data_format_t format;
 	int i;
 
 	for (i = 0; i < rtd->num_be[stream]; i++) {
 		be_rtd = rtd->be_rtd[i][stream];
+		
+		port_config = (t_port_config*) be_rtd->dai_link->private_data;
 
 		dev_dbg(&rtd->dev, "%s: be ID=%d stream %d active %d\n",
 				__func__, be_rtd->dai_link->be_id, stream,
 				be_get_active(be_rtd, stream));
+				
+		if (NULL == port_config) {
+			dev_dbg(&rtd->dev, "%s: be ID=%d stream %d active %d\n",
+					__func__, be_rtd->dai_link->be_id, stream,
+					be_get_active(be_rtd, stream));
 
 		switch (be_rtd->dai_link->be_id) {
 		case OMAP_ABE_DAI_PDM_DL1:
@@ -1127,6 +1156,41 @@ static void enable_be_ports(struct snd_pcm_substream *substream, int stream)
 				abe_dai_enable_data_transfer(DMIC_PORT2);
 			abe_data.dmic_status[2] = DAI_STARTED;
 			break;
+		}
+	}else{
+		dev_dbg(&rtd->dev, "%s: be ID=%d stream %d active %d\n",
+			__func__, be_rtd->dai_link->be_id, stream,
+			be_get_active(be_rtd, stream));
+		
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {				
+			dev_dbg(&rtd->dev, "BE ID %d connecting %d port to mcbsp%d with sample rate %d and format %d for playback",
+			 be_rtd->dai_link->be_id, port_config->abe_port_id_dl,
+			 port_config->serial_id_dl,
+			 port_config->sample_rate_dl,
+			 port_config->sample_format_dl);
+				
+			format.f = port_config->sample_rate_dl;
+			format.samp_format = port_config->sample_format_dl;
+			dev_dbg(&rtd->dev, "%s: calling abe_connect_serial_port with id = %d and mcbsp id = %d\n", __func__, port_config->abe_port_id_dl, port_config->serial_id_dl);
+ 		        abe_connect_serial_port(port_config->abe_port_id_dl,
+				&format, port_config->serial_id_dl);
+			dev_dbg(&rtd->dev, "%s: calling abe_dai_enable_data_transfer with abe port id = %d\n", __func__, port_config->abe_port_id_dl);
+
+			abe_dai_enable_data_transfer(port_config->abe_port_id_dl); 
+
+		} else {
+			dev_dbg(&rtd->dev, "BE ID %d connecting %d port to mcbsp%d with sample rate %d and format %d for capture",
+			 be_rtd->dai_link->be_id, port_config->abe_port_id_ul,
+			 port_config->serial_id_ul,
+			 port_config->sample_rate_ul,
+			 port_config->sample_format_ul);
+				
+			format.f = port_config->sample_rate_ul;
+			format.samp_format = port_config->sample_format_ul;
+			abe_connect_serial_port(port_config->abe_port_id_ul,
+					&format, port_config->serial_id_ul);
+			abe_dai_enable_data_transfer(port_config->abe_port_id_ul);
+			}		
 		}
 	}
 }
@@ -1350,7 +1414,11 @@ static void unmute_fe_port(struct snd_pcm_substream *substream, int stream)
 		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL2][SNDRV_PCM_STREAM_PLAYBACK]) {
 			abe_unmute_gain(MIXDL2, MIX_DL2_INPUT_MM_DL);
 		}
-		if (abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) {
+		/* Mistral: Updated the IF condition to check for DAI_MM_FM as
+		* well for unmuting the DL1 Gain.
+		*/
+		if ((abe_data.be_active[OMAP_ABE_DAI_PDM_DL1][SNDRV_PCM_STREAM_PLAYBACK]) ||
+		    (abe_data.be_active[OMAP_ABE_DAI_MM_FM][SNDRV_PCM_STREAM_PLAYBACK])) {
 			abe_unmute_gain(MIXDL1, MIX_DL1_INPUT_MM_DL);
 		}
 		break;
@@ -1474,8 +1542,12 @@ static void playback_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
+		dev_dbg(&rtd->dev, "Muting be playback first..\n");
+
 		/* mute splayback */
 		mute_be_playback(substream);
+
+		dev_dbg(&rtd->dev, "Enabling the BE Ports for Playback..\n");
 
 		/* enabled BE ports */
 		inc_be_ports(substream, SNDRV_PCM_STREAM_PLAYBACK);
@@ -1484,17 +1556,24 @@ static void playback_trigger(struct snd_pcm_substream *substream, int cmd)
 		/* DAI work must be started/stopped at least 250us after ABE */
 		udelay(250);
 
+		dev_dbg(&rtd->dev, "Triggering BE Ports for START..\n");
+
 		/*  trigger ALL BE ports */
 		trigger_be_ports(substream, cmd);
 
 		/* TODO: unmute DL1 */
 		unmute_be_playback(substream);
 
+		dev_dbg(&rtd->dev, "Enabling FE POrts for Playback..\n");
+
 		/* Enable Frontend sDMA  */
 		enable_fe_ports(substream, SNDRV_PCM_STREAM_PLAYBACK);
 
+		dev_dbg(&rtd->dev, "Unmuting the FE Ports for ABE_MM_DL\n");
+
 		/* unmute ABE_MM_DL */
 		unmute_fe_port(substream, SNDRV_PCM_STREAM_PLAYBACK);
+		dev_dbg(&rtd->dev, "%s: exiting SNDRV_PCM_TRIGGER_START:\n", __func__);
 		break;
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		/* Enable Frontend sDMA  */
@@ -1562,14 +1641,22 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "MultiMedia1 Playback",
 			.channels_min = 1,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.capture = {
 			.stream_name = "MultiMedia1 Capture",
 			.channels_min = 2,
 			.channels_max = 8,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,
@@ -1580,7 +1667,11 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "MultiMedia2 Capture",
 			.channels_min = 1,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,
+#else
 			.rates = SNDRV_PCM_RATE_48000,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,
@@ -1609,7 +1700,11 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 			.stream_name = "Tones Playback",
 			.channels_min = 1,
 			.channels_max = 2,
+#ifdef CONFIG_ABE_44100
+			.rates = SNDRV_PCM_RATE_44100,	
+#else
 			.rates = SNDRV_PCM_RATE_48000,
+#endif
 			.formats = OMAP_ABE_FORMATS,
 		},
 		.ops = &omap_abe_dai_ops,

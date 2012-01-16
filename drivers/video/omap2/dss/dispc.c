@@ -1878,6 +1878,43 @@ void dispc_enable_gamma_table(bool enable)
 	enable_clocks(0);
 }
 
+void dispc_enable_cpr(enum omap_channel channel, bool enable)
+{
+	if (channel == OMAP_DSS_CHANNEL_LCD)
+		REG_FLD_MOD(DISPC_CONFIG, enable, 15, 15);
+	else if (channel == OMAP_DSS_CHANNEL_LCD2)
+		REG_FLD_MOD(DISPC_CONFIG2, enable, 15, 15);
+	else
+		return;
+
+}
+
+void dispc_set_cpr_coef(enum omap_channel channel,
+		struct omap_dss_color_weight_coef *coefs)
+{
+	u32 coef_r, coef_g, coef_b;
+
+	if (channel != OMAP_DSS_CHANNEL_LCD && channel != OMAP_DSS_CHANNEL_LCD2)
+		return;
+
+	coef_r = FLD_VAL(coefs->rr, 31, 22) | FLD_VAL(coefs->rg, 20, 11) |
+		FLD_VAL(coefs->rb, 9, 0);
+	coef_g = FLD_VAL(coefs->gr, 31, 22) | FLD_VAL(coefs->gg, 20, 11) |
+		FLD_VAL(coefs->gb, 9, 0);
+	coef_b = FLD_VAL(coefs->br, 31, 22) | FLD_VAL(coefs->bg, 20, 11) |
+		FLD_VAL(coefs->bb, 9, 0);
+
+	if (channel == OMAP_DSS_CHANNEL_LCD) {
+		dispc_write_reg(DISPC_CPR_COEF_R, coef_r);
+		dispc_write_reg(DISPC_CPR_COEF_G, coef_g);
+		dispc_write_reg(DISPC_CPR_COEF_B, coef_b);
+	} else {
+		dispc_write_reg(DISPC_CPR2_COEF_R, coef_r);
+		dispc_write_reg(DISPC_CPR2_COEF_G, coef_g);
+		dispc_write_reg(DISPC_CPR2_COEF_B, coef_b);
+	}
+}
+
 static void _dispc_enable_vid_color_conv(enum omap_plane plane, bool enable)
 {
 	u32 val;

@@ -36,6 +36,9 @@
 #include <linux/sched.h>
 #include <linux/notifier.h>
 
+#include <linux/metricslog.h>
+#define METRICS_BUF_SIZE	512
+
 static uint32_t lowmem_debug_level = 2;
 static int lowmem_adj[6] = {
 	0,
@@ -58,7 +61,7 @@ static unsigned long lowmem_deathpending_timeout;
 #define lowmem_print(level, x...)			\
 	do {						\
 		if (lowmem_debug_level >= (level))	\
-			printk(x);			\
+			printk(KERN_INFO x);			\
 	} while (0)
 
 static int
@@ -93,6 +96,7 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 	int other_free = global_page_state(NR_FREE_PAGES);
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM);
+	char metricsbuf[METRICS_BUF_SIZE+1];
 
 	/*
 	 * If we already have a death outstanding, then
@@ -102,8 +106,10 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 	 *
 	 */
 	if (lowmem_deathpending &&
-	    time_before_eq(jiffies, lowmem_deathpending_timeout))
+	    time_before_eq(jiffies, lowmem_deathpending_timeout)) {
+	    	//printk(KERN_INFO "%s: already running or not time yet, exiting\n", __func__);
 		return 0;
+	};
 
 	if (lowmem_adj_size < array_size)
 		array_size = lowmem_adj_size;
@@ -125,8 +131,16 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 		global_page_state(NR_INACTIVE_ANON) +
 		global_page_state(NR_INACTIVE_FILE);
 	if (nr_to_scan <= 0 || min_adj == OOM_ADJUST_MAX + 1) {
-		lowmem_print(5, "lowmem_shrink %d, %x, return %d\n",
-			     nr_to_scan, gfp_mask, rem);
+#if 0
+		if (printk_ratelimit()) {
+			snprintf(metricsbuf, METRICS_BUF_SIZE,
+				"lowmemorykiller:event:message="
+					"advises freeing %u pages\n", rem);
+			log_to_metrics(ANDROID_LOG_INFO, "lowmem", metricsbuf);
+			lowmem_print(5, "lowmem_shrink A: %d, 0x%08x, return %d\n",
+				     nr_to_scan, gfp_mask, rem);
+		}
+#endif
 		return rem;
 	}
 	selected_oom_adj = min_adj;
@@ -150,6 +164,8 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 			continue;
 		}
 		tasksize = get_mm_rss(mm);
+		printk(KERN_INFO "%s: checking out %d (%s), adj %d, size %d, as kill candidate\n",
+			     __func__, p->pid, p->comm, oom_adj, tasksize);
 		task_unlock(p);
 		if (tasksize <= 0)
 			continue;
@@ -163,10 +179,23 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 		selected = p;
 		selected_tasksize = tasksize;
 		selected_oom_adj = oom_adj;
-		lowmem_print(2, "select %d (%s), adj %d, size %d, to kill\n",
+#if 0
+		snprintf(metricsbuf, METRICS_BUF_SIZE,
+			"lowmemorykiller:event:message="
+				"selected %d (%s) adj %d size %d to kill\n",
+				p->pid, p->comm, oom_adj, tasksize);
+		log_to_metrics(ANDROID_LOG_INFO, "lowmem", metricsbuf);
+		lowmem_print(2, "selected %d (%s), adj %d, size %d, to kill\n",
 			     p->pid, p->comm, oom_adj, tasksize);
+#endif
 	}
 	if (selected) {
+		snprintf(metricsbuf, METRICS_BUF_SIZE,
+			"lowmemorykiller:event:message="
+				"send sigkill to %d (%s) adj %d size %d\n",
+				selected->pid, selected->comm,
+				selected_oom_adj, selected_tasksize);
+		log_to_metrics(ANDROID_LOG_INFO, "lowmem", metricsbuf);
 		lowmem_print(1, "send sigkill to %d (%s), adj %d, size %d\n",
 			     selected->pid, selected->comm,
 			     selected_oom_adj, selected_tasksize);
@@ -175,15 +204,23 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 		force_sig(SIGKILL, selected);
 		rem -= selected_tasksize;
 	}
-	lowmem_print(4, "lowmem_shrink %d, %x, return %d\n",
+#if 0
+	snprintf(metricsbuf, METRICS_BUF_SIZE,
+			"lowmemorykiller:event:message="
+				"lowmem_shrink B %d, 0x%08x, return %d\n",
+				nr_to_scan, gfp_mask, rem);
+	log_to_metrics(ANDROID_LOG_INFO, "lowmem", metricsbuf);
+	lowmem_print(4, "lowmem_shrink B %d, 0x%08x, return %d\n",
 		     nr_to_scan, gfp_mask, rem);
+#endif
 	read_unlock(&tasklist_lock);
 	return rem;
 }
 
 static struct shrinker lowmem_shrinker = {
 	.shrink = lowmem_shrink,
-	.seeks = DEFAULT_SEEKS * 16
+	.seeks = DEFAULT_SEEKS * 16,
+	.name = __FILE__,
 };
 
 static int __init lowmem_init(void)

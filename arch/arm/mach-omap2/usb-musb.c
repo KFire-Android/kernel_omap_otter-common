@@ -63,10 +63,13 @@ static struct musb_hdrc_config musb_config = {
 
 #ifdef CONFIG_ANDROID
 #define MAX_USB_SERIAL_NUM		17
-#define OMAP_VENDOR_ID			0x0451
-#define OMAP_UMS_PRODUCT_ID		0xD100
+//#define OMAP_VENDOR_ID			0x0451
+#define OMAP_VENDOR_ID			0x1949
+//#define OMAP_UMS_PRODUCT_ID		0xD100
+#define OMAP_UMS_PRODUCT_ID		0x0005
 #define OMAP_ADB_PRODUCT_ID		0xD101
-#define OMAP_UMS_ADB_PRODUCT_ID		0xD102
+//#define OMAP_UMS_ADB_PRODUCT_ID		0xD102
+#define OMAP_UMS_ADB_PRODUCT_ID		0x0006
 #define OMAP_RNDIS_PRODUCT_ID		0xD103
 #define OMAP_RNDIS_ADB_PRODUCT_ID	0xD104
 #define OMAP_ACM_PRODUCT_ID		0xD105
@@ -209,8 +212,8 @@ static struct android_usb_product usb_products[] = {
 static struct android_usb_platform_data andusb_plat = {
 	.vendor_id		= OMAP_VENDOR_ID,
 	.product_id		= OMAP_UMS_PRODUCT_ID,
-	.manufacturer_name	= "Texas Instruments Inc.",
-	.product_name		= "OMAP-3/4",
+	.manufacturer_name	= "Amazon",
+	.product_name		= "Kindle",
 	.serial_number		= device_serial,
 	.num_products		= ARRAY_SIZE(usb_products),
 	.products		= usb_products,
@@ -228,8 +231,8 @@ static struct platform_device androidusb_device = {
 
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 static struct usb_mass_storage_platform_data usbms_plat = {
-	.vendor		= "Texas Instruments Inc.",
-	.product	= "OMAP4",
+	.vendor		= "Amazon",
+	.product	= "Kindle",
 	.release	= 1,
 	.nluns		= 1,
 };
