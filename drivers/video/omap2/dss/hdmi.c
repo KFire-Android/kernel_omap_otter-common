@@ -557,7 +557,7 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 
 	r = hdmi.ip_data.ops->irq_handler(&hdmi.ip_data);
 	DSSDBG("Received HDMI IRQ = %08x\n", r);
-
+	r = hdmi.ip_data.ops->irq_process(&hdmi.ip_data);
 	return IRQ_HANDLED;
 }
 
