@@ -562,6 +562,9 @@ static struct regulator_init_data sdp4430_vaux1 = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 	.num_consumer_supplies  = 1,
 	.consumer_supplies      = sdp4430_vaux_supply,
@@ -581,6 +584,9 @@ static struct regulator_init_data sdp4430_vaux2 = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 	.num_consumer_supplies	= 1,
 	.consumer_supplies	= sdp4430_vaux2_supply,
@@ -596,6 +602,9 @@ static struct regulator_init_data sdp4430_vaux3 = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 	.num_consumer_supplies = 1,
 	.consumer_supplies = sdp4430_cam2_supply,
@@ -612,6 +621,9 @@ static struct regulator_init_data sdp4430_vmmc = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 	.num_consumer_supplies  = 1,
 	.consumer_supplies      = sdp4430_vmmc_supply,
@@ -627,6 +639,9 @@ static struct regulator_init_data sdp4430_vpp = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 };
 
@@ -640,6 +655,9 @@ static struct regulator_init_data sdp4430_vusim = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 };
 
@@ -651,7 +669,10 @@ static struct regulator_init_data sdp4430_vana = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-		.always_on	= true,
+		.always_on = true,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 };
 
@@ -663,7 +684,10 @@ static struct regulator_init_data sdp4430_vcxio = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-		.always_on	= true,
+		.always_on = true,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(sdp4430_vcxio_supply),
 	.consumer_supplies	= sdp4430_vcxio_supply,
@@ -684,6 +708,9 @@ static struct regulator_init_data sdp4430_vdac = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on	= true,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 	.num_consumer_supplies  = ARRAY_SIZE(sdp4430_vdac_supply),
 	.consumer_supplies      = sdp4430_vdac_supply,
@@ -698,6 +725,9 @@ static struct regulator_init_data sdp4430_vusb = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 };
 

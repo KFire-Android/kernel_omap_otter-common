@@ -340,6 +340,9 @@ static struct regulator_init_data tablet_vaux1 = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 	.num_consumer_supplies  = 1,
 	.consumer_supplies      = tablet_vaux_supply,
@@ -359,6 +362,9 @@ static struct regulator_init_data tablet_vaux2 = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 	.num_consumer_supplies	= 1,
 	.consumer_supplies	= sdp4430_vaux2_supply,
@@ -392,6 +398,9 @@ static struct regulator_init_data tablet_vmmc = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
 	},
 	.num_consumer_supplies  = 1,
 	.consumer_supplies      = tablet_vmmc_supply,
@@ -439,9 +448,9 @@ static struct regulator_init_data tablet_vana = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-		.always_on		= true,
+		.always_on = true,
 		.state_mem = {
-			.enabled	= true,
+			.disabled       = true,
 		},
 		.initial_state          = PM_SUSPEND_MEM,
 	},
@@ -455,7 +464,7 @@ static struct regulator_init_data tablet_vcxio = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-		.always_on	= true,
+		.always_on = true,
 		.state_mem = {
 			.disabled       = true,
 		},
@@ -479,7 +488,7 @@ static struct regulator_init_data tablet_vdac = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
-		.always_on	= true,
+		.always_on = true,
 		.state_mem = {
 			.disabled       = true,
 		},
