@@ -14,6 +14,7 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
+#include <linux/delay.h>
 
 #include <mach/omap4-common.h>
 #include <mach/ctrl_module_wkup_44xx.h>
@@ -30,6 +31,9 @@
  */
 #define OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG	0x0114
 #define OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG	0x011c
+
+/* OMAP4 modulemode control */
+#define OMAP4430_MODULEMODE_SWCTRL			1
 
 static void __iomem *sar_ram_base;
 static void __iomem *omap4_sar_modules[MAX_SAR_MODULES];
@@ -794,6 +798,31 @@ static void save_sar_bank3(void)
 static int omap4_sar_not_accessible(void)
 {
 	u32 usbhost_state, usbtll_state;
+
+	/*
+	 * Errata i719: Multiple OFF Mode Transitions Introduce Corruption
+	 *
+	 * Workaround: Set the CM_L3INIT_HSUSBHOST_CLKCTRL[1:0] MODULEMODE
+	 * bit field to 0x2 (enabled) for 1 ms before save sequence
+	 */
+	if (cpu_is_omap443x()) {
+		u32 val;
+		val = omap4_cminst_read_inst_reg(OMAP4430_CM2_PARTITION,
+				OMAP4430_CM2_L3INIT_INST,
+				OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
+
+		if (!(val & BIT(OMAP4430_MODULEMODE_SWCTRL))) {
+			val |= BIT(OMAP4430_MODULEMODE_SWCTRL);
+			omap4_cminst_write_inst_reg(val, OMAP4430_CM2_PARTITION,
+				OMAP4430_CM2_L3INIT_INST,
+				OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
+			mdelay(1);
+			val &= ~BIT(OMAP4430_MODULEMODE_SWCTRL);
+			omap4_cminst_write_inst_reg(val, OMAP4430_CM2_PARTITION,
+				OMAP4430_CM2_L3INIT_INST,
+				OMAP4_CM_L3INIT_USB_HOST_CLKCTRL_OFFSET);
+		}
+	}
 
 	/*
 	 * Make sure that USB host and TLL modules are not
