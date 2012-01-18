@@ -91,6 +91,7 @@ pvrsrvkm-y := \
 	perproc.o \
 	lists.o \
 	refcount.o \
+	sysfs.o \
 	omap4/sysconfig.o \
 	omap4/sysutils.o \
 	sgx/bridged_sgx_bridge.o \

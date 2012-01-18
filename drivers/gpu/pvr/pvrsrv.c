@@ -32,6 +32,7 @@
 #include "pdump_km.h"
 #include "deviceid.h"
 #include "ra.h"
+#include "sysfs.h"
 #if defined(TTRACE)
 #include "ttrace.h"
 #endif
@@ -201,6 +202,12 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVEnumerateDevicesKM(IMG_UINT32 *pui32NumDevices,
 PVRSRV_ERROR IMG_CALLCONV PVRSRVInit(PSYS_DATA psSysData)
 {
 	PVRSRV_ERROR	eError;
+
+	eError = PVRSRVCreateSysfsEntry();
+	if (eError != PVRSRV_OK)
+	{
+		goto Error;
+	}
 
 	
 	eError = ResManInit();
