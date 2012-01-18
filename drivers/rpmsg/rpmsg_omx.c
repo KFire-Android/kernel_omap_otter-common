@@ -114,25 +114,29 @@ static LIST_HEAD(rpmsg_omx_services_list);
 #define ION_1D_START	0xBA300000
 #define ION_1D_END	0xBFD00000
 #define ION_1D_VA	0x88000000
-static u32 _rpmsg_pa_to_da(u32 pa)
+static int _rpmsg_pa_to_da(u32 pa, u32 *da)
 {
+	int ret = 0;
+
 	if (pa >= TILER_START && pa < TILER_END)
-		return pa;
+		*da = pa;
 	else if (pa >= ION_1D_START && pa < ION_1D_END)
-		return (pa - ION_1D_START + ION_1D_VA);
+		*da = (pa - ION_1D_START + ION_1D_VA);
 	else
-		return 0;
+		ret = -EIO;
+
+	return ret;
 }
 
-static u32 _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx, long buffer)
+static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
+					long buffer, u32 *va)
 {
 	phys_addr_t pa;
-	u32 va;
+	int ret;
 #ifdef CONFIG_ION_OMAP
 	struct ion_handle *handle;
 	ion_phys_addr_t paddr;
 	size_t unused;
-	int fd;
 
 	/* is it an ion handle? */
 	handle = (struct ion_handle *)buffer;
@@ -144,7 +148,9 @@ static u32 _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx, long buffer)
 #ifdef CONFIG_PVR_SGX
 	/* how about an sgx buffer wrapping an ion handle? */
 	{
+		int fd;
 		struct ion_client *pvr_ion_client;
+
 		fd = buffer;
 		handle = PVRSRVExportFDToIONHandle(fd, &pvr_ion_client);
 		if (handle &&
@@ -160,8 +166,8 @@ static u32 _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx, long buffer)
 #ifdef CONFIG_ION_OMAP
 to_va:
 #endif
-	va = _rpmsg_pa_to_da(pa);
-	return va;
+	ret = _rpmsg_pa_to_da(pa, va);
+	return ret;
 }
 
 static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
@@ -186,33 +192,25 @@ static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
 	offset = *(int *)((int)data + sizeof(maptype));
 	buffer = (long *)((int)data + offset);
 
-	da = _rpmsg_omx_buffer_lookup(omx, *buffer);
-	if (da) {
+	ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+	if (!ret)
 		*buffer = da;
-		ret = 0;
-	}
 
 	if (!ret && (maptype >= RPC_OMX_MAP_INFO_TWO_BUF)) {
 		buffer = (long *)((int)data + offset + sizeof(*buffer));
 		if (*buffer != 0) {
-			ret = -EIO;
-			da = _rpmsg_omx_buffer_lookup(omx, *buffer);
-			if (da) {
+			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+			if (!ret)
 				*buffer = da;
-				ret = 0;
-			}
 		}
 	}
 
 	if (!ret && maptype >= RPC_OMX_MAP_INFO_THREE_BUF) {
 		buffer = (long *)((int)data + offset + 2*sizeof(*buffer));
 		if (*buffer != 0) {
-			ret = -EIO;
-			da = _rpmsg_omx_buffer_lookup(omx, *buffer);
-			if (da) {
+			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+			if (!ret)
 				*buffer = da;
-				ret = 0;
-			}
 		}
 	}
 	return ret;
@@ -432,7 +430,7 @@ static int rpmsg_omx_open(struct inode *inode, struct file *filp)
 	}
 #ifdef CONFIG_ION_OMAP
 	omx->ion_client = ion_client_create(omap_ion_device,
-					    (1<< ION_HEAP_TYPE_CARVEOUT) |
+					    (1 << ION_HEAP_TYPE_CARVEOUT) |
 					    (1 << OMAP_ION_HEAP_TYPE_TILER),
 					    "rpmsg-omx");
 #endif
