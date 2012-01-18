@@ -383,13 +383,12 @@ static int tsl2771_als_enable(struct tsl2771_data *data, int val)
 				TSL2771_PWR_ON | enable_buf[0]);
 		data->power_state |= TSL2771_ALS_EN_FLAG;
 	} else {
-		write_buf = (~TSL2771_ALS_INT_EN & ~TSL2771_ADC_EN &
-				enable_buf[0]);
-
-		if (!(data->power_state & ~TSL2771_PROX_EN_FLAG))
-			write_buf &= ~TSL2771_PWR_ON;
+		write_buf = (~TSL2771_ALS_INT_EN & enable_buf[0]);
 
 		data->power_state &= ~TSL2771_ALS_EN_FLAG;
+
+		if (!data->power_state)
+			write_buf &= ~(TSL2771_PWR_ON | TSL2771_ADC_EN);
 	}
 
 	return tsl2771_write_reg(data, TSL2771_ENABLE, write_buf, 1);
@@ -403,17 +402,18 @@ static int tsl2771_prox_enable(struct tsl2771_data *data, int val)
 
 	tsl2771_read_reg(data, TSL2771_ENABLE, enable_buf, 1);
 	if (val) {
-		write_buf = (TSL2771_PROX_INT_EN | TSL2771_PROX_EN |
-				TSL2771_PWR_ON | enable_buf[0]);
+		write_buf = (TSL2771_PROX_INT_EN | TSL2771_ADC_EN |
+				TSL2771_PROX_EN | TSL2771_PWR_ON |
+				enable_buf[0]);
 		data->power_state |= TSL2771_PROX_EN_FLAG;
 	} else {
 		write_buf = (~TSL2771_PROX_INT_EN & ~TSL2771_PROX_EN &
 				enable_buf[0]);
 
-		if (!(data->power_state & ~TSL2771_ALS_EN_FLAG))
-			write_buf &= ~TSL2771_PWR_ON;
-
 		data->power_state &= ~TSL2771_PROX_EN_FLAG;
+
+		if (!data->power_state)
+			write_buf &= ~(TSL2771_PWR_ON | TSL2771_ADC_EN);
 	}
 	return tsl2771_write_reg(data, TSL2771_ENABLE, write_buf, 1);
 
@@ -861,18 +861,20 @@ static int tsl2771_driver_suspend(struct device *dev)
 	/* TO DO: May need to retain the interrupt thresholds but won't know
 	 * until the thresholds are implemented */
 	data->power_context = data->power_state;
-	if (data->power_state & 0x2) {
+
+	if (data->power_state & TSL2771_ALS_EN_FLAG) {
+		tsl2771_als_enable(data, 0);
+		if (als_prox_debug & 0x4)
+			pr_info("%s:ALS was disabled\n", __func__);
+	}
+
+	if (data->power_state & TSL2771_PROX_EN_FLAG) {
 		if (als_prox_debug & 0x4)
 			pr_info("%s:Prox was enabled into suspend\n", __func__);
-	} else
-		tsl2771_prox_enable(data, 0);
-
-	tsl2771_als_enable(data, 0);
-
-	if (!(data->power_state & 0x2)) {
-		if (data->pdata->tsl2771_pwr_control)
-			data->pdata->tsl2771_pwr_control(0);
 	}
+
+	if (!data->power_state && data->pdata->tsl2771_pwr_control)
+			data->pdata->tsl2771_pwr_control(0);
 
 	return 0;
 }
@@ -882,21 +884,22 @@ static int tsl2771_driver_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct tsl2771_data *data = platform_get_drvdata(pdev);
 
-	if (data->pdata->tsl2771_pwr_control) {
+	if (data->power_context &&
+	    !(data->power_context & TSL2771_PROX_EN_FLAG) &&
+	     (data->pdata->tsl2771_pwr_control)) {
 		data->pdata->tsl2771_pwr_control(1);
 		tsl2771_init_device(data);
 	}
 
-	if (data->power_context & 0x2) {
-		if (als_prox_debug & 0x4)
-			pr_info("%s:Prox was enabled into suspend\n", __func__);
-	} else
-		tsl2771_prox_enable(data, 1);
-
-	if (data->power_context & 0x1) {
+	if (data->power_context & TSL2771_ALS_EN_FLAG) {
+		tsl2771_als_enable(data, 1);
 		if (als_prox_debug & 0x4)
 			pr_info("%s:ALS was enabled\n", __func__);
-		tsl2771_als_enable(data, 1);
+	}
+
+	if (data->power_context & TSL2771_PROX_EN_FLAG) {
+		if (als_prox_debug & 0x4)
+			pr_info("%s:Prox was enabled into suspend\n", __func__);
 	}
 
 	return 0;
