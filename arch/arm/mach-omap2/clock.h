@@ -122,8 +122,12 @@ static inline void omap3_clk_prepare_for_reboot(void)
 
 #ifdef CONFIG_ARCH_OMAP4
 void omap4_clk_prepare_for_reboot(void);
+void omap4_dpll_abe_reconfigure(void);
 #else
 static inline void omap4_clk_prepare_for_reboot(void)
+{
+}
+static inline void omap4_dpll_abe_reconfigure(void)
 {
 }
 #endif

@@ -3895,6 +3895,8 @@ int __init omap4xxx_clk_init(void)
 	if (cpu_is_omap443x()) {
 		cpu_mask = RATE_IN_443X;
 		cpu_clkflg = CK_443X;
+		/* i723 errata fix. Reconfigure DPLL_ABE */
+		omap4_dpll_abe_reconfigure();
 	} else if (cpu_is_omap446x()) {
 		cpu_mask = RATE_IN_446X;
 		cpu_clkflg = CK_446X;
