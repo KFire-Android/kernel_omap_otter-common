@@ -74,8 +74,6 @@
 #define GPIO_WIFI_PMENA		54
 #define GPIO_WIFI_IRQ		53
 
-#define CAMERA_MUX_GPIO		99
-
 #define TPS62361_GPIO   7
 
 #define OMAP4_MDM_PWR_EN_GPIO       157
@@ -1121,12 +1119,6 @@ static void __init tablet_camera_mux_init(void)
 				OMAP_PIN_INPUT | OMAP_MUX_MODE0);
 		omap_mux_init_signal("csi22_dy2.csi22_dy2",
 				OMAP_PIN_INPUT | OMAP_MUX_MODE0);
-	}
-
-	if (cpu_is_omap447x()) {
-		gpio_request(CAMERA_MUX_GPIO, "CAMERA_MUX_GPIO");
-		omap_mux_init_gpio(CAMERA_MUX_GPIO, OMAP_PIN_OUTPUT);
-		gpio_direction_output(CAMERA_MUX_GPIO, 0);
 	}
 }
 
