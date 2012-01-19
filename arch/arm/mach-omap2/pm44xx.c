@@ -123,6 +123,15 @@ static struct clockdomain *emif_clkdm, *mpuss_clkdm;
 #define OMAP4_PM_ERRATUM_LPDDR_CLK_IO_iXXX		BIT(5)
 #define LPDDR_WD_PULL_DOWN				0x02
 
+/*
+ * The OFF mode isn't fully supported for OMAP4430GP ES2.0 - ES2.2
+ * When coming back from device off mode, the Cortex-A9 WUGEN enable registers
+ * are not restored by ROM code due to i625. The work around is using an
+ * alternative power state (instead of off mode) which maintains the proper
+ * register settings.
+ */
+#define OMAP4_PM_ERRATUM_WUGEN_LOST_i625	BIT(6)
+
 /* TI Errata i612 - Wkup Clk Recycling Needed After Warm Reset
  * CRITICALITY: Low
  * REVISIONS IMPACTED: OMAP4430 all
@@ -1256,7 +1265,7 @@ static void omap_default_idle(void)
 void omap4_device_set_state_off(u8 enable)
 {
 #ifdef CONFIG_OMAP_ALLOW_OSWR
-	if (enable)
+	if (enable && !(is_pm44xx_erratum(WUGEN_LOST_i625)))
 		omap4_prminst_write_inst_reg(0x1 <<
 				OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
 		OMAP4430_PRM_PARTITION, OMAP4430_PRM_DEVICE_INST,
@@ -1330,6 +1339,15 @@ static void __init omap4_pm_setup_errata(void)
 			OMAP4_PM_ERRATUM_IO_WAKEUP_CLOCK_NOT_RECYCLED_i612;
 	} else
 		pm44xx_errata |= OMAP4_PM_ERRATUM_MPU_EMIF_NO_DYNDEP_IDLE_iXXX;
+
+	/*
+	 * The OFF mode isn't fully supported for OMAP4430GP ES2.0 - ES2.2
+	 * due to errata i625
+	 * On ES1.0 OFF mode is not supported due to errata i498
+	 */
+	if (cpu_is_omap443x() && (omap_type() == OMAP2_DEVICE_TYPE_GP) &&
+			(omap_rev() < OMAP4430_REV_ES2_3))
+		pm44xx_errata |= OMAP4_PM_ERRATUM_WUGEN_LOST_i625;
 }
 
 /**
