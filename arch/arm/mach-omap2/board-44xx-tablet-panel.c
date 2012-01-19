@@ -205,6 +205,7 @@ static struct omap_dss_device tablet_hdmi_device = {
 		.hdmi	= {
 			.regn	= 15,
 			.regm2	= 1,
+			.max_pixclk_khz = 148500,
 		},
 	},
 	.hpd_gpio = HDMI_GPIO_HPD,
