@@ -649,6 +649,10 @@ void dss_set_dac_pwrdn_bgz(bool enable)
 
 void dss_select_hdmi_venc_clk_source(enum dss_hdmi_venc_clk_source_select hdmi)
 {
+	/* TV clock is not selectable on OMAP5 */
+	if (cpu_is_omap54xx())
+		return;
+
 	REG_FLD_MOD(DSS_CONTROL, hdmi, 15, 15);	/* VENC_HDMI_SWITCH */
 }
 
@@ -659,6 +663,10 @@ enum dss_hdmi_venc_clk_source_select dss_get_hdmi_venc_clk_source(void)
 	displays = dss_feat_get_supported_displays(OMAP_DSS_CHANNEL_DIGIT);
 	if ((displays & OMAP_DISPLAY_TYPE_HDMI) == 0)
 		return DSS_VENC_TV_CLK;
+
+	/* TV clock is always M_PCLK on OMAP5 */
+	if (cpu_is_omap54xx())
+		return DSS_HDMI_M_PCLK;
 
 	return REG_GET(DSS_CONTROL, 15, 15);
 }
