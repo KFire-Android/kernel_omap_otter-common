@@ -234,6 +234,7 @@
 #define BATTERY_RESISTOR	10000
 #define SIMULATOR_RESISTOR	5000
 #define BATTERY_DETECT_THRESHOLD	((BATTERY_RESISTOR + SIMULATOR_RESISTOR) / 2)
+#define CHARGING_CAPACITY_UPDATE_PERIOD	(1000 * 60 * 10)
 
 /* To get VBUS input limit from twl6030_usb */
 #if CONFIG_TWL6030_USB
@@ -291,7 +292,7 @@ struct twl6030_bci_device_info {
 
 	unsigned int		capacity;
 	unsigned int		capacity_debounce_count;
-	unsigned int		ac_last_refresh;
+	unsigned long		ac_next_refresh;
 	unsigned int		wakelock_enabled;
 
 	struct power_supply	bat;
@@ -1261,7 +1262,6 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 	int curr_capacity = di->capacity;
 	int charger_source = di->charger_source;
 	int charging_disabled = 0;
-	unsigned int time_delta = 0;
 
 	/* Because system load is always greater than
 	 * termination current, we will never get a CHARGE DONE
@@ -1274,13 +1274,13 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 	/* if it has been more than 10 minutes since our last update
 	 * and we are charging we force a update.
 	 */
-	time_delta = jiffies_to_msecs(jiffies - di->ac_last_refresh);
 
-	if ((time_delta > (1000 * 60 * 10))
+	if (time_after(jiffies, di->ac_next_refresh)
 		&& (di->charger_source != POWER_SUPPLY_TYPE_BATTERY)) {
 
 		charging_disabled = 1;
-		di->ac_last_refresh = jiffies;
+		di->ac_next_refresh = jiffies +
+			msecs_to_jiffies(CHARGING_CAPACITY_UPDATE_PERIOD);
 		di->capacity = -1;
 
 		/* We have to disable charging to read correct
@@ -2244,7 +2244,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->vac_priority = 2;
 	di->capacity = 100;
 	di->capacity_debounce_count = 0;
-	di->ac_last_refresh = jiffies;
+	di->ac_next_refresh = jiffies - 1;
 	platform_set_drvdata(pdev, di);
 
 	wake_lock_init(&chrg_lock, WAKE_LOCK_SUSPEND, "ac_chrg_wake_lock");
