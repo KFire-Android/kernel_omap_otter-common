@@ -1096,6 +1096,8 @@ static struct clk dpll_usb_ck = {
 	.speculate	= &omap2_clksel_speculate,
 	.round_rate	= &omap2_dpll_round_rate,
 	.set_rate	= &omap3_noncore_dpll_set_rate,
+        .clkdm_name     = "l3_init_clkdm",
+
 };
 
 static struct clk dpll_usb_clkdcoldo_ck = {
