@@ -2392,10 +2392,9 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 	 * setserial to be used to alter this ports parameters.
 	 */
 	tty_dev = tty_register_device(drv->tty_driver, uport->line, uport->dev);
-	if (likely(!IS_ERR(tty_dev))) {
-		device_init_wakeup(tty_dev, 1);
-		device_set_wakeup_enable(tty_dev, 0);
-	} else
+	if (likely(!IS_ERR(tty_dev)))
+		device_set_wakeup_capable(tty_dev, 1);
+	else
 		printk(KERN_ERR "Cannot register tty device on line %d\n",
 		       uport->line);
 
