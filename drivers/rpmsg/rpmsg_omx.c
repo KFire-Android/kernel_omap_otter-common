@@ -105,6 +105,7 @@ static LIST_HEAD(rpmsg_omx_services_list);
 #endif
 #endif
 
+#ifdef CONFIG_ION_OMAP
 static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
 {
 	int ret;
@@ -127,46 +128,69 @@ static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
 
 	return ret;
 }
+#endif
 
 static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
-					long buffer, u32 *va)
+					long buffer, u32 *va, u32 *va2)
 {
-	phys_addr_t pa;
-	int ret;
-#ifdef CONFIG_ION_OMAP
-	struct ion_handle *handle;
-	ion_phys_addr_t paddr;
-	size_t unused;
+	int ret = -EIO;
 
-	/* is it an ion handle? */
-	handle = (struct ion_handle *)buffer;
-	if (!ion_phys(omx->ion_client, handle, &paddr, &unused)) {
-		pa = (phys_addr_t) paddr;
-		goto to_va;
-	}
+	*va = 0;
+	*va2 = 0;
+
+#ifdef CONFIG_ION_OMAP
+	{
+		struct ion_handle *handle;
+		ion_phys_addr_t paddr;
+		size_t unused;
+
+		/* is it an ion handle? */
+		handle = (struct ion_handle *)buffer;
+		if (!ion_phys(omx->ion_client, handle, &paddr, &unused)) {
+			ret = _rpmsg_pa_to_da(omx, (phys_addr_t)paddr, va);
+			goto exit;
+		}
 
 #ifdef CONFIG_PVR_SGX
-	/* how about an sgx buffer wrapping an ion handle? */
-	{
-		int fd;
-		struct ion_client *pvr_ion_client;
+		/* how about an sgx buffer wrapping an ion handle? */
+		{
+			int fd;
+			struct ion_handle *handles[2] = { NULL, NULL };
+			struct ion_client *pvr_ion_client;
+			ion_phys_addr_t paddr2;
 
-		fd = buffer;
-		handle = PVRSRVExportFDToIONHandle(fd, &pvr_ion_client);
-		if (handle &&
-			!ion_phys(pvr_ion_client, handle, &paddr, &unused)) {
-			pa = (phys_addr_t)paddr;
-			goto to_va;
+			fd = buffer;
+			PVRSRVExportFDToIONHandles(fd, &pvr_ion_client,
+					handles);
 
+			/* Get the 1st buffer's da */
+			if ((handles[0]) && !ion_phys(pvr_ion_client,
+					handles[0], &paddr, &unused)) {
+				ret = _rpmsg_pa_to_da(omx,
+						(phys_addr_t)paddr, va);
+				if (ret)
+					goto exit;
+
+				/* Get the 2nd buffer's da in da2 */
+				if ((handles[1]) &&
+					!ion_phys(pvr_ion_client,
+					handles[1], &paddr2, &unused)) {
+					ret = _rpmsg_pa_to_da(omx,
+						(phys_addr_t)paddr2, va2);
+					goto exit;
+				} else
+					goto exit;
+			}
 		}
-	}
+
 #endif
+	}
+exit:
 #endif
 
-#ifdef CONFIG_ION_OMAP
-to_va:
-#endif
-	ret = _rpmsg_pa_to_da(omx, pa, va);
+	if (ret)
+		pr_err("%s: buffer lookup failed %x\n", __func__, ret);
+
 	return ret;
 }
 
@@ -176,43 +200,56 @@ static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
 	long *buffer;
 	char *data;
 	enum rpc_omx_map_info_type maptype;
-	u32 da = 0;
+	u32 da = 0 , da2 = 0;
 
 	data = (char *)((struct omx_packet *)packet)->data;
 	maptype = *((enum rpc_omx_map_info_type *)data);
 
-	/*Nothing to map*/
+	/* Nothing to map */
 	if (maptype == RPC_OMX_MAP_INFO_NONE)
 		return 0;
-	if ((maptype != RPC_OMX_MAP_INFO_THREE_BUF) &&
-		(maptype != RPC_OMX_MAP_INFO_TWO_BUF) &&
-			(maptype != RPC_OMX_MAP_INFO_ONE_BUF))
+
+	if ((maptype < RPC_OMX_MAP_INFO_ONE_BUF) ||
+			(maptype > RPC_OMX_MAP_INFO_THREE_BUF))
 		return ret;
 
 	offset = *(int *)((int)data + sizeof(maptype));
 	buffer = (long *)((int)data + offset);
 
-	ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+	/* Lookup for the da of 1st buffer */
+	ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da, &da2);
 	if (!ret)
 		*buffer = da;
 
+	/* If 2 buffers, get the 2nd buffers da */
 	if (!ret && (maptype >= RPC_OMX_MAP_INFO_TWO_BUF)) {
 		buffer = (long *)((int)data + offset + sizeof(*buffer));
+
 		if (*buffer != 0) {
-			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+			/* Use da2 if valid in case of NV12 contiguous bufs */
+			if (da2)
+				*buffer = da2;
+			/* If not, do the lookup for 2nd buf */
+			else {
+				ret = _rpmsg_omx_buffer_lookup(omx,
+						*buffer, &da, &da2);
+				if (!ret)
+					*buffer = da;
+			}
+		}
+	}
+
+	/* Get the da for the 3rd buffer if maptype is ..THREE_BUF */
+	if (!ret && maptype >= RPC_OMX_MAP_INFO_THREE_BUF) {
+		buffer = (long *)((int)data + offset + 2*sizeof(*buffer));
+		if (*buffer != 0) {
+			ret = _rpmsg_omx_buffer_lookup(omx,
+					*buffer, &da, &da2);
 			if (!ret)
 				*buffer = da;
 		}
 	}
 
-	if (!ret && maptype >= RPC_OMX_MAP_INFO_THREE_BUF) {
-		buffer = (long *)((int)data + offset + 2*sizeof(*buffer));
-		if (*buffer != 0) {
-			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
-			if (!ret)
-				*buffer = da;
-		}
-	}
 	return ret;
 }
 
