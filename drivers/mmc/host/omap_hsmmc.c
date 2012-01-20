@@ -399,6 +399,9 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
 		ret = gpio_direction_input(pdata->slots[0].switch_pin);
 		if (ret)
 			goto err_free_sp;
+		ret = gpio_set_debounce(pdata->slots[0].switch_pin, 50000);
+		if (ret)
+			goto err_free_sp;
 	} else
 		pdata->slots[0].switch_pin = -EINVAL;
 
