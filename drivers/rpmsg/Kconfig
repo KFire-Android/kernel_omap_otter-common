@@ -7,6 +7,17 @@ config RPMSG
 	select VIRTIO_RING
 	depends on EXPERIMENTAL
 
+config RPMSG_RESMGR_FWK
+	tristate
+	depends on RPMSG
+	---help---
+	  Add a framework based on RPMSG to request and release
+	  resources from a remote Processor. This generic layer
+	  takes advantage of RPMSG to exchange messages with the
+	  remote processor
+
+	  If unsure, say N.
+
 config RPMSG_OMX
 	tristate "rpmsg OMX driver"
 	depends on RPMSG
