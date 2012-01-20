@@ -163,6 +163,9 @@ struct palmas_reg_init {
 	 */
 	u8 vsel;
 
+	/* No bypass init */
+	int no_bypass;
+
 };
 
 struct palmas_pmic_platform_data {

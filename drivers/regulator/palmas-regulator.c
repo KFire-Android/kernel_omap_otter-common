@@ -669,7 +669,7 @@ int palmas_set_ldo9_bypass(struct palmas *palmas, int bypass)
 	int ret;
 	unsigned int reg;
 
-	ret = palmas_smps_read(palmas, PALMAS_LDO9_CTRL, &reg);
+	ret = palmas_ldo_read(palmas, PALMAS_LDO9_CTRL, &reg);
 	if (ret)
 		return ret;
 
@@ -678,7 +678,7 @@ int palmas_set_ldo9_bypass(struct palmas *palmas, int bypass)
 	else
 		reg &= ~LDO9_CTRL_LDO_BYPASS_EN;
 
-	ret = palmas_smps_write(palmas, PALMAS_LDO9_CTRL, reg);
+	ret = palmas_ldo_write(palmas, PALMAS_LDO9_CTRL, reg);
 
 	return ret;
 }
@@ -782,6 +782,13 @@ static int palmas_ldo_init(struct palmas *palmas, int id,
 	ret = palmas_smps_write(palmas, addr, reg);
 	if (ret)
 		return ret;
+
+	if (id == PALMAS_REG_LDO9) {
+		if (reg_init->no_bypass)
+			palmas_set_ldo9_bypass(palmas, 0);
+		else
+			palmas_set_ldo9_bypass(palmas, 1);
+	}
 
 	return 0;
 }
