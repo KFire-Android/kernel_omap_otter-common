@@ -880,8 +880,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 
 	pwrst->pwrdm = pwrdm;
 
-	list_add(&pwrst->node, &pwrst_list);
-
 	if ((!strcmp(pwrdm->name, "mpu_pwrdm")) ||
 			(!strcmp(pwrdm->name, "core_pwrdm")) ||
 			(!strcmp(pwrdm->name, "cpu0_pwrdm")) ||
