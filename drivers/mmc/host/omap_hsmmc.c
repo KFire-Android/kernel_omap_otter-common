@@ -326,7 +326,7 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
 	if (power_on) {
 		ret = mmc_regulator_set_ocr(host->mmc, host->vcc, ios->vdd);
 		/* Enable interface voltage rail, if needed */
-		if (ret == 0 && host->vcc_aux) {
+		if (host->vcc_aux) {
 			if (vdd_iopower == VDD_165_195)
 				ret = regulator_set_voltage(host->vcc_aux,
 				VDD_SIGNAL_VOLTAGE_180, VDD_SIGNAL_VOLTAGE_180);
