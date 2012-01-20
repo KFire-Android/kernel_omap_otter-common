@@ -136,19 +136,20 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
 	 */
 	sscanf(oh->name, "timer%2d", &id);
 	if (unlikely(id == system_timer_id))
-		return ret;
+		goto end;
 
 	pr_debug("%s: %s\n", __func__, oh->name);
 
 	/* do not register secure timer */
 	secure_timer_dev_attr = oh->dev_attr;
 	if (secure_timer_dev_attr && secure_timer_dev_attr->is_secure_timer)
-			return ret;
+		goto end;
 
 	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
 		pr_err("%s: No memory for [%s]\n", __func__, oh->name);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto end;
 	}
 	pdata->set_timer_src = omap2_dm_timer_set_src;
 	pdata->timer_ip_type = oh->class->rev;
@@ -156,7 +157,8 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
 	if (!pwrdm) {
 		pr_debug("%s: could not find pwrdm for (%s) in omap hwmod!\n",
 			__func__, oh->name);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_free_mem;
 	}
 	pdata->loses_context = pwrdm_can_ever_lose_context(pwrdm);
 
@@ -171,8 +173,9 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
 		ret = -EINVAL;
 	}
 
+err_free_mem:
 	kfree(pdata);
-
+end:
 	return ret;
 }
 
@@ -201,19 +204,21 @@ int __init omap2_system_timer_init(u8 id)
 	if (ret) {
 		pr_err("%s: omap_hwmod_setup_one(%s) failed.\n",
 				__func__, system_timer_name);
-		return ret;
+		goto end;
 	}
 	oh = omap_hwmod_lookup(system_timer_name);
 	if (!oh) {
 		pr_debug("%s: could not find (%s) in omap_hwmod_list!\n",
 			__func__, system_timer_name);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto end;
 	}
 
 	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
 		pr_err("%s: No memory for [%s]\n", __func__, oh->name);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto end;
 	}
 	pdata->is_early_init = 1;
 	pdata->set_timer_src = omap2_dm_timer_set_src;
@@ -229,16 +234,16 @@ int __init omap2_system_timer_init(u8 id)
 		pr_err("%s: Can't build omap_device for %s: %s.\n",
 			__func__, name, oh->name);
 		ret = -EINVAL;
+		goto err_free_mem;
 	}
 
+	early_platform_driver_register_all("earlytimer");
+	early_platform_driver_probe("earlytimer", 1, 0);
+
+err_free_mem:
 	kfree(pdata);
-
-	if (!ret) {
-		early_platform_driver_register_all("earlytimer");
-		early_platform_driver_probe("earlytimer", 1, 0);
-	}
-
-	return 0;
+end:
+	return ret;
 }
 
 /**
