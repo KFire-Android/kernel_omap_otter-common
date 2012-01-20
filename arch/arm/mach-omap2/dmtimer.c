@@ -195,6 +195,7 @@ int __init omap2_system_timer_init(u8 id)
 	struct dmtimer_platform_data *pdata;
 	struct omap_device *od;
 	struct omap_hwmod *oh;
+	struct powerdomain *pwrdm;
 	char system_timer_name[8]; /* 8 = sizeof("timerXX0") */
 
 	system_timer_id = id;
@@ -224,6 +225,14 @@ int __init omap2_system_timer_init(u8 id)
 	pdata->set_timer_src = omap2_dm_timer_set_src;
 	pdata->timer_ip_type = oh->class->rev;
 	pdata->needs_manual_reset = 0;
+	pwrdm = omap_hwmod_get_pwrdm(oh);
+	if (!pwrdm) {
+		pr_debug("%s: could not find pwrdm for (%s) in omap hwmod!\n",
+			__func__, oh->name);
+		ret = -EINVAL;
+		goto err_free_mem;
+	}
+	pdata->loses_context = pwrdm_can_ever_lose_context(pwrdm);
 
 	od = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
 			omap2_dmtimer_latency,
