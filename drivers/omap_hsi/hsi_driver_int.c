@@ -124,6 +124,7 @@ bool hsi_is_hsi_port_busy(struct hsi_port *pport)
 	struct hsi_dev *hsi_ctrl = pport->hsi_controller;
 	bool cur_cawake = hsi_get_cawake(pport);
 	int ch;
+	int hsr_mode;
 
 	if (pport->in_int_tasklet) {
 		dev_dbg(hsi_ctrl->dev, "Interrupt tasklet running\n");
@@ -139,6 +140,28 @@ bool hsi_is_hsi_port_busy(struct hsi_port *pport)
 		dev_dbg(hsi_ctrl->dev, "Receiver Port %d in 3 wires mode, acwake_status %d\n",
 			pport->port_number, pport->acwake_status);
 		return true;
+	}
+
+	/* If CAWAKE interrupt is pending, tasklet will take care of updating */
+	/* HSR state machine */
+	/* Only do this check in 4 wires mode ! */
+	if (!hsi_driver_is_interrupt_pending(pport, HSI_CAWAKEDETECTED,
+					     false)) {
+		hsr_mode = hsi_inl(hsi_ctrl->base,
+				   HSI_HSR_MODE_REG(pport->port_number));
+		if (cur_cawake &&
+		   ((hsr_mode & HSI_HSR_MODE_MODE_VAL_MASK) ==
+						HSI_MODE_SLEEP)) {
+			dev_warn(hsi_ctrl->dev, "CAWAKE high, but HSR in SLEEP. HSR MODE 0x%x !\n",
+				 hsr_mode);
+			hsi_hsr_resume(hsi_ctrl);
+		} else if (!cur_cawake &&
+			   (hsr_mode & HSI_HSR_MODE_MODE_VAL_MASK)) {
+			dev_warn(hsi_ctrl->dev,
+				"CAWAKE low, but HSR not in SLEEP. HSR MODE 0x%x !\n",
+				hsr_mode);
+			hsi_hsr_suspend(hsi_ctrl);
+		}
 	}
 
 	if (cur_cawake || pport->acwake_status) {
