@@ -395,6 +395,28 @@ static void __init omap_init_hdmi_audio(void)
 static inline void omap_init_hdmi_audio(void) {}
 #endif
 
+#if defined(CONFIG_SND_OMAP_SOC_ABE) || \
+	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
+
+static void omap_init_aess(void)
+{
+	struct omap_hwmod *oh;
+	struct platform_device *pdev;
+
+	oh = omap_hwmod_lookup("aess");
+	if (!oh) {
+		pr_err("Could not look up aess hw_mod\n");
+		return;
+	}
+
+	pdev = omap_device_build("aess", -1, oh, NULL, 0, NULL, 0, 0);
+	WARN(IS_ERR(pdev),
+	     "Could not build omap_device for omap-aess-audio\n");
+}
+#else
+static inline void omap_init_aess(void) {}
+#endif
+
 #if defined(CONFIG_SPI_OMAP24XX) || defined(CONFIG_SPI_OMAP24XX_MODULE)
 
 #include <linux/platform_data/spi-omap2-mcspi.h>
@@ -715,6 +737,7 @@ static int __init omap2_init_devices(void)
 	 * please keep these calls, and their implementations above,
 	 * in alphabetical order so they're easier to sort through.
 	 */
+	omap_init_aess();
 	omap_init_audio();
 	omap_init_camera();
 	omap_init_hdmi_audio();
