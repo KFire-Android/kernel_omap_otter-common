@@ -20,4 +20,5 @@ caif_shm-objs := caif_shmcore.o caif_shm_u5500.o
 obj-$(CONFIG_CAIF_SHM) += caif_shm.o
 
 # HSI interface
+ccflags-$(CONFIG_WAKELOCK) += -DCONFIG_WAKELOCK
 obj-$(CONFIG_CAIF_HSI) += caif_hsi.o
