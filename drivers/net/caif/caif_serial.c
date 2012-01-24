@@ -17,6 +17,7 @@
 #include <linux/if_arp.h>
 #include <net/caif/caif_device.h>
 #include <net/caif/cfcnfg.h>
+#include <net/caif/caif_serial.h>
 #include <linux/err.h>
 #include <linux/debugfs.h>
 
