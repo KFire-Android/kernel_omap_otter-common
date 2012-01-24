@@ -122,7 +122,7 @@ static const u8 twl6030_trim_addr[GPADC_MAX_CHANNELS] = {
  * 1.875 * 8 = 15
  */
 static const u16 twl6030_gain[GPADC_MAX_CHANNELS] = {
-	1142,	/* CHANNEL 0 */
+	10,	/* CHANNEL 0 */
 	8,	/* CHANNEL 1 */
 
 	/* 1.875 */

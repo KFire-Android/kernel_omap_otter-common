@@ -231,6 +231,10 @@
 #define STS_HW_CONDITIONS	0x21
 #define STS_USB_ID		(1 << 2)	/* Level status of USB ID */
 
+#define BATTERY_RESISTOR	10000
+#define SIMULATOR_RESISTOR	5000
+#define BATTERY_DETECT_THRESHOLD	((BATTERY_RESISTOR + SIMULATOR_RESISTOR) / 2)
+
 /* To get VBUS input limit from twl6030_usb */
 #if CONFIG_TWL6030_USB
 extern unsigned int twl6030_get_usb_max_power(struct otg_transceiver *x);
@@ -565,30 +569,28 @@ static int is_battery_present(struct twl6030_bci_device_info *di)
 	 */
 	val = twl6030_get_gpadc_conversion(di, 0);
 
-	if (di->features & TWL6032_SUBCLASS) {
-		/*
-		 * twl6030_get_gpadc_conversion for
-		 * 6030 return resistance, for 6032 - voltage and
-		 * it should be converted to resistance before
-		 * using.
-		 */
-		if (!current_src_val) {
-			u8 reg = 0;
+	/*
+	 * twl6030_get_gpadc_conversion for
+	 * 6030 return resistance, for 6032 - voltage and
+	 * it should be converted to resistance before
+	 * using.
+	 */
+	if (!current_src_val) {
+		u8 reg = 0;
 
-			if (twl_i2c_read_u8(TWL_MODULE_MADC, &reg,
-						TWL6030_GPADC_CTRL))
-				pr_err("%s: Error reading TWL6030_GPADC_CTRL\n",
-					__func__);
+		if (twl_i2c_read_u8(TWL_MODULE_MADC, &reg,
+					TWL6030_GPADC_CTRL))
+			pr_err("%s: Error reading TWL6030_GPADC_CTRL\n",
+				__func__);
 
-			current_src_val = (reg & GPADC_CTRL_ISOURCE_EN) ?
-						GPADC_ISOURCE_22uA :
-						GPADC_ISOURCE_7uA;
-		}
-
-		val = (val * 1000) / current_src_val;
+		current_src_val = (reg & GPADC_CTRL_ISOURCE_EN) ?
+					GPADC_ISOURCE_22uA :
+					GPADC_ISOURCE_7uA;
 	}
 
-	if (val < 5000)
+	val = (val * 1000) / current_src_val;
+
+	if (val < BATTERY_DETECT_THRESHOLD)
 		return 0;
 
 	return 1;
