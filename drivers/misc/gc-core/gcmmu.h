@@ -14,17 +14,11 @@
 
 #ifndef GCMMU_H
 #define GCMMU_H
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/semaphore.h>
 
-#define MMU2D_DUMP 0
+#include <linux/gccore.h>
+#include "gcmain.h"
 
-#if MMU2D_DUMP
-#	define MMU2D_PRINT printk
-#else
-#	define MMU2D_PRINT(...)
-#endif
+#define MMU_ENABLE 1
 
 /*
  * Master table can be configured in 1KB mode with 256 maximum entries
@@ -114,25 +108,24 @@ struct mmu2darena {
 	/* Number of pages. */
 	u32 count;
 
+	/* Mapped virtual pointer. */
+	u32 address;
+
+	/* Client's virtual pointer. */
+	void *logical;
+
+	/* Size of the mapped buffer. */
+	unsigned int size;
+
+	/* Page descriptor array. */
+	struct page **pages;
+
 	/* Next arena. */
 	struct mmu2darena *next;
 };
 
 struct mmu2darenablock {
 	struct mmu2darenablock *next;
-};
-
-#define ARENA_PREALLOC_SIZE	MMU_PAGE_SIZE
-#define ARENA_PREALLOC_COUNT \
-	((ARENA_PREALLOC_SIZE - sizeof(struct mmu2darenablock)) \
-		/ sizeof(struct mmu2darena))
-
-struct mmu2dpage {
-	u32 order;
-	u32 size;
-	struct page *pages;
-	u32 physical;
-	u32 *logical;
 };
 
 /* Private internal structure shared between contexts. */
@@ -144,7 +137,7 @@ struct mmu2dprivate {
 	int enabled;
 
 	/* Safe zone allocation. */
-	struct mmu2dpage safezone;
+	struct gcpage safezone;
 
 	/* Available page allocation arenas. */
 	struct mmu2darenablock *arena_blocks;
@@ -154,7 +147,7 @@ struct mmu2dprivate {
 /* This structure defines a list of allocated slave tables. */
 struct mmu2dstlb {
 	/* Slave table allocation. */
-	struct mmu2dpage pages;
+	struct gcpage pages;
 
 	/* Entries used. */
 	u32 count;
@@ -175,15 +168,12 @@ struct mmu2dstlbblock {
 struct mmu2dcontext {
 	struct mmu2dprivate *mmu;
 
-	/* The page table semaphore. */
-	struct semaphore pts;
-
 	/* Slave table allocation available wrappers. */
 	struct mmu2dstlbblock *slave_blocks;
 	struct mmu2dstlb *slave_recs;
 
 	/* Master table allocation. */
-	struct mmu2dpage master;
+	struct gcpage master;
 	struct mmu2dstlb **slave;
 
 	/* Hardware pointer to the master table. */
@@ -195,38 +185,29 @@ struct mmu2dcontext {
 };
 
 struct mmu2dphysmem {
-	/* Number of pages to map. */
-	u32 pagecount;
+	/* Virtual pointer and offset of the first page to map. */
+	u32 base;
+	u32 offset;
 
 	/* An array of physical addresses of the pages to map. */
+	u32 count;
 	pte_t *pages;
 
-	/* 0 => system default */
+	/* 0 => system default. */
 	int pagesize;
-
-	/* first page offset. */
-	u32 pageoffset;
-
-	/* Mapped virtual address. */
-	u32 logical;
 };
 
 /*----------------------------------------------------------------------------*/
 
-static inline struct mmu2dprivate *get_mmu(void)
-{
-	static struct mmu2dprivate _mmu;
-	return &_mmu;
-}
-
-int mmu2d_create_context(struct mmu2dcontext *ctxt);
-int mmu2d_destroy_context(struct mmu2dcontext *ctxt);
-int mmu2d_set_master(struct mmu2dcontext *ctxt);
-int mmu2d_map_phys(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem);
-int mmu2d_unmap(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem);
-int mmu2d_flush(u32 *logical, u32 address, u32 size);
+enum gcerror mmu2d_create_context(struct mmu2dcontext *ctxt);
+enum gcerror mmu2d_destroy_context(struct mmu2dcontext *ctxt);
+enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt);
+enum gcerror mmu2d_map(struct mmu2dcontext *ctxt,
+	struct mmu2dphysmem *mem, struct mmu2darena **mapped);
+enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt,
+	struct mmu2darena *mapped);
+int mmu2d_flush(void *logical, u32 address, u32 size);
+enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data);
 void mmu2d_dump(struct mmu2dcontext *ctxt);
-int mmu2d_alloc_pages(struct mmu2dpage *p, u32 size);
-void mmu2d_free_pages(struct mmu2dpage *p);
 
 #endif

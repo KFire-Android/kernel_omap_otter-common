@@ -13,89 +13,62 @@
  */
 
 #include <linux/version.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/cdev.h>            /* struct cdev */
-#include <linux/fs.h>              /* register_chrdev_region() */
-#include <linux/device.h>          /* struct class */
-#include <linux/platform_device.h> /* platform_device() */
-#include <linux/err.h>             /* IS_ERR() */
-#include <linux/errno.h>
+#include <linux/cdev.h>
+#include <linux/fs.h>
+#include <linux/platform_device.h>
 #include <linux/interrupt.h>
+#include <linux/uaccess.h>
+#include <linux/io.h>
+#include <linux/pagemap.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/uaccess.h>	   /* copy_from_user() */
-#include <linux/io.h>              /* ioremap_nocache() */
-#include <linux/sched.h>           /* send_sig() */
-#include <linux/pagemap.h>         /* page_cache_release() */
-#include <linux/wait.h>
-#include <linux/workqueue.h>
-#include <linux/list.h>
-#include <linux/syscalls.h>        /* sys_getpid() */
+#include <linux/clk.h>
+#include <linux/dma-mapping.h>
+#include <plat/cpu.h>
 
-#include "gccore.h"
-#include "gcreg.h"
+#include "gcmain.h"
 #include "gccmdbuf.h"
+#include "gcmmu.h"
+#include "gcreg.h"
+
+#if ENABLE_POLLING
+#include <linux/semaphore.h>
+#endif
+
+#ifndef GC_DUMP
+#	define GC_DUMP 0
+#endif
+
+#if GC_DUMP
+#	define GC_PRINT printk
+#else
+#	define GC_PRINT(...)
+#endif
 
 #define GC_DEVICE "gc-core"
 
-#if 1
-#	define DEVICE_INT	0
-#	define DEVICE_REG_BASE	0
-#	define DEVICE_REG_SIZE	(256 * 1024)
-
-#else
-#	define DEVICE_INT	9
-#	define DEVICE_REG_BASE	0xB0040000
-#	define DEVICE_REG_SIZE	(256 * 1024)
-
-#endif
-
-#if !defined(PFN_DOWN)
-#	define PFN_DOWN(x) \
-		((x) >> PAGE_SHIFT)
-#endif
-
-#if !defined(phys_to_pfn)
-#	define phys_to_pfn(phys) \
-		(PFN_DOWN(phys))
-#endif
-
-#if !defined(phys_to_page)
-#	define phys_to_page(paddr) \
-		(pfn_to_page(phys_to_pfn(paddr)))
-#endif
-
-#define db(x) \
-	printk(KERN_NOTICE "%s(%d): %s=(%08ld)\n", __func__, __LINE__, #x, \
-							 (unsigned long)x);
-
-#define dbx(x) \
-	printk(KERN_NOTICE "%s(%d): %s=(0x%08lx)\n", __func__, __LINE__, \
-						 #x, (unsigned long)x);
-
-#define dbs(x) \
-	printk(KERN_NOTICE "%s(%d): %s=(%s)\n", __func__, __LINE__, #x, x);
+#define DEVICE_INT	(32 + 125)
+#define DEVICE_REG_BASE	0x59000000
+#define DEVICE_REG_SIZE	(256 * 1024)
 
 static dev_t dev;
 static struct cdev cd;
 static struct device *device;
 static struct class *class;
-u8 *reg_base;
 
-DECLARE_WAIT_QUEUE_HEAD(gc_event);
-int done;
-
-struct gckGALDEVICE {
+struct gccore {
 	void *priv;
 };
 
-static struct gckGALDEVICE gckdevice;
+static struct gccore gcdevice;
 
 static int irqline = 48;
 module_param(irqline, int, 0644);
 
 static long registerMemBase = 0xF1840000;
 module_param(registerMemBase, long, 0644);
+
+static LIST_HEAD(mmu_list);
 
 struct clientinfo {
 	struct list_head head;
@@ -105,53 +78,179 @@ struct clientinfo {
 	int mmu_dirty;
 };
 
-enum memtype {
-	USER,
-	KERNEL,
-};
+/*******************************************************************************
+ * Register access.
+ */
 
-struct meminfo {
-	struct list_head mmu_node;
-	enum memtype memtype;
-	struct mmu2dphysmem mmu2dphysmem;
-};
+static void *g_reg_base;
 
-struct bufinfo {
-	struct list_head surf_node;
-	u32 pa;
-	u16 order;
-	struct page *pg;
-};
+unsigned int gc_read_reg(unsigned int address)
+{
+	return readl((unsigned char *) g_reg_base + address);
+}
 
-struct bltinfo {
-	u32 *cmdbuf;
-	u32 cmdlen;
-	u32 offset[128];
-};
+void gc_write_reg(unsigned int address, unsigned int data)
+{
+	writel(data, (unsigned char *) g_reg_base + address);
+}
 
-struct bvbuffmap;
 
-struct bvbuffdesc {
-	unsigned int structsize;
-	void *virtaddr;
-	unsigned long length;
-	struct bvbuffmap *map;
-};
+/*******************************************************************************
+ * Page allocation routines.
+ */
+
+enum gcerror gc_alloc_pages(struct gcpage *p, unsigned int size)
+{
+	enum gcerror gcerror;
+	void *logical;
+	int order, count;
+
+	p->pages = NULL;
+	p->logical = NULL;
+	p->physical = ~0UL;
+
+	order = get_order(size);
+
+	p->order = order;
+	p->size = (1 << order) * PAGE_SIZE;
+
+	GC_PRINT(KERN_ERR "%s(%d): requested size=%d\n",
+		__func__, __LINE__, size);
+
+	GC_PRINT(KERN_ERR "%s(%d): rounded up size=%d\n",
+		__func__, __LINE__, p->size);
+
+	GC_PRINT(KERN_ERR "%s(%d): order=%d\n",
+		__func__, __LINE__, order);
+
+	p->pages = alloc_pages(GFP_KERNEL, order);
+	if (p->pages == NULL) {
+		gcerror = GCERR_OOPM;
+		goto fail;
+	}
+
+	p->physical = page_to_phys(p->pages);
+	p->logical = (unsigned int *) page_address(p->pages);
+
+	if (p->logical == NULL) {
+		gcerror = GCERR_PMMAP;
+		goto fail;
+	}
+
+	/* Reserve pages. */
+	logical = p->logical;
+	count = p->size / PAGE_SIZE;
+
+	while (count) {
+		SetPageReserved(virt_to_page(logical));
+
+		logical = (unsigned char *) logical + PAGE_SIZE;
+		count  -= 1;
+	}
+
+	GC_PRINT(KERN_ERR "%s(%d): (0x%08X) pages=0x%08X,"
+				" logical=0x%08X, physical=0x%08X, size=%d\n",
+				__func__, __LINE__,
+				(unsigned int) p,
+				(unsigned int) p->pages,
+				(unsigned int) p->logical,
+				(unsigned int) p->physical,
+				p->size);
+
+	return GCERR_NONE;
+
+fail:
+	gc_free_pages(p);
+	return gcerror;
+}
+
+void gc_free_pages(struct gcpage *p)
+{
+	GC_PRINT(KERN_ERR "%s(%d): (0x%08X) pages=0x%08X,"
+				" logical=0x%08X, physical=0x%08X, size=%d\n",
+				__func__, __LINE__,
+				(unsigned int) p,
+				(unsigned int) p->pages,
+				(unsigned int) p->logical,
+				(unsigned int) p->physical,
+				p->size);
+
+	if (p->logical != NULL) {
+		void *logical;
+		int count;
+
+		logical = p->logical;
+		count = p->size / PAGE_SIZE;
+
+		while (count) {
+			ClearPageReserved(virt_to_page(logical));
+
+			logical = (unsigned char *) logical + PAGE_SIZE;
+			count  -= 1;
+		}
+
+		p->logical = NULL;
+	}
+
+	if (p->pages != NULL) {
+		__free_pages(p->pages, p->order);
+		p->pages = NULL;
+	}
+
+	p->physical = ~0UL;
+	p->order = 0;
+	p->size = 0;
+}
+
+void gc_flush_pages(struct gcpage *p)
+{
+	GC_PRINT(KERN_ERR "%s(%d): (0x%08X) pages=0x%08X,"
+				" logical=0x%08X, physical=0x%08X, size=%d\n",
+				__func__, __LINE__,
+				(unsigned int) p,
+				(unsigned int) p->pages,
+				(unsigned int) p->logical,
+				(unsigned int) p->physical,
+				p->size);
+
+	dmac_flush_range(p->logical, (unsigned char *) p->logical + p->size);
+	outer_flush_range(p->physical, p->physical + p->size);
+}
+
+/*******************************************************************************
+ * Interrupt handling.
+ */
+
+#if ENABLE_POLLING
+static struct semaphore g_gccoreint;
+static u32 g_gccoredata;
+
+void gc_wait_interrupt(void)
+{
+	down(&g_gccoreint);
+}
+
+u32 gc_get_interrupt_data(void)
+{
+	u32 data;
+
+	data = g_gccoredata;
+	g_gccoredata = 0;
+
+	return data;
+}
+#endif
+
+static struct workqueue_struct *gcwq;
+DECLARE_WAIT_QUEUE_HEAD(gc_event);
+int done;
 
 static void gc_work(struct work_struct *ignored)
 {
 	done = true;
 	wake_up_interruptible(&gc_event);
 }
-
 static DECLARE_WORK(gcwork, gc_work);
-static struct workqueue_struct *gcwq;
-static LIST_HEAD(mmu_list);
-static LIST_HEAD(surf_list);
-
-#if ENABLE_POLLING
-volatile u32 int_data;
-#endif
 
 static irqreturn_t gc_irq(int irq, void *p)
 {
@@ -161,23 +260,22 @@ static irqreturn_t gc_irq(int irq, void *p)
 	struct clientinfo *client = NULL;
 #endif
 
-	/* Read AQIntrAcknowledge register. */
-	data = hw_read_reg(AQ_INTR_ACKNOWLEDGE_Address);
+	/* Read gcregIntrAcknowledge register. */
+	data = gc_read_reg(GCREG_INTR_ACKNOWLEDGE_Address);
 
-	printk(KERN_ERR "%s():%d:data=(%lx)\n", __func__, __LINE__,
-						(unsigned long)data);
+	GC_PRINT(KERN_ERR "%s(%d): data=0x%08X\n", __func__, __LINE__, data);
 
 	/* Our interrupt? */
 	if (data != 0) {
-#if MMU2D_DUMP
+#if GC_DUMP
 		/* Dump GPU status. */
 		gpu_status((char *) __func__, __LINE__, data);
 #endif
 
 #if ENABLE_POLLING
-		int_data = data;
+		g_gccoredata = data & 0x3FFFFFFF;
+		up(&g_gccoreint);
 #else
-
 		/* TODO: we need to wait for an interrupt after enabling
 			 the mmu, but we don't want to send a signal to
 			 the user space.  Instead, we want to send a signal
@@ -188,7 +286,7 @@ static irqreturn_t gc_irq(int irq, void *p)
 			queue_work(gcwq, &gcwork);
 		} else {
 			client = (struct clientinfo *)
-					((struct gckGALDEVICE *)p)->priv;
+					((struct gccore *)p)->priv;
 			if (client != NULL)
 				send_sig(SIGUSR1, client->task, 0);
 		}
@@ -198,61 +296,48 @@ static irqreturn_t gc_irq(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
-static u32 virt2phys(u32 usr)
+/*******************************************************************************
+ * Internal routines.
+ */
+
+static enum gcerror find_client(struct clientinfo **client)
 {
-	pmd_t *pmd;
-	pte_t *ptep;
-	pgd_t *pgd = pgd_offset(current->mm, usr);
-
-	if (pgd_none(*pgd) || pgd_bad(*pgd))
-		return 0;
-
-	pmd = pmd_offset(pgd, usr);
-	if (pmd_none(*pmd) || pmd_bad(*pmd))
-		return 0;
-
-	ptep = pte_offset_map(pmd, usr);
-	if (ptep && pte_present(*ptep))
-		return (*ptep & PAGE_MASK) | (~PAGE_MASK & usr);
-
-	return 0;
-}
-
-static int find_client(struct clientinfo **client)
-{
-	int ret;
+	enum gcerror gcerror;
 	struct clientinfo *ci = NULL;
 	int found = false;
 
 	/* TODO: find the proc ID */
 	list_for_each_entry(ci, &mmu_list, head) {
-		if (ci->pid == current->tgid) {
+		/* FIXME: HACK, makes any kernel call to have
+		 * the same mmu view
+		 */
+		if (ci->pid == 0) {
 			found = true;
 			break;
 		}
 	}
 
 	if (!found) {
-		MMU2D_PRINT(KERN_ERR "%s(%d): Creating client record.\n",
-			__func__, __LINE__);
-
 		ci = kzalloc(sizeof(struct clientinfo), GFP_KERNEL);
 		if (ci == NULL) {
-			ret = -ENOMEM;
+			gcerror = GCERR_SETGRP(GCERR_OODM, GCERR_MMU_CLIENT);
 			goto fail;
 		}
 
 		memset(ci, 0, sizeof(struct clientinfo));
 		INIT_LIST_HEAD(&ci->head);
-		ci->pid = current->tgid;
+		/* FIXME: HACK, makes any kernel call to have
+		 * the same mmu view
+		 */
+		ci->pid = 0;
 		ci->task = current;
 
-		ret = mmu2d_create_context(&ci->ctxt);
-		if (ret != 0)
+		gcerror = mmu2d_create_context(&ci->ctxt);
+		if (gcerror != GCERR_NONE)
 			goto fail;
 
-		ret = cmdbuf_map(&ci->ctxt);
-		if (ret != 0)
+		gcerror = cmdbuf_map(&ci->ctxt);
+		if (gcerror != GCERR_NONE)
 			goto fail;
 
 		ci->mmu_dirty = true;
@@ -260,9 +345,10 @@ static int find_client(struct clientinfo **client)
 		list_add(&ci->head, &mmu_list);
 	}
 
-	gckdevice.priv = (void *) ci;
+	gcdevice.priv = (void *) ci;
 	*client = ci;
-	return 0;
+
+	return GCERR_NONE;
 
 fail:
 	if (ci != NULL) {
@@ -272,261 +358,252 @@ fail:
 		kfree(ci);
 	}
 
+	return gcerror;
+}
+
+/*******************************************************************************
+ * API/IOCTL functions.
+ */
+
+int gc_commit(struct gccommit *gccommit)
+{
+	int ret = 0;
+	struct clientinfo *client = NULL;
+	unsigned int cmdflushsize;
+	unsigned int mmuflushsize;
+	struct gcbuffer *buffer;
+	unsigned int buffersize;
+	unsigned int allocsize;
+	unsigned int *logical;
+	unsigned int address;
+	struct gcmopipesel *gcmopipesel;
+
+	/* Locate the client entry. */
+	gccommit->gcerror = find_client(&client);
+	if (gccommit->gcerror != GCERR_NONE)
+		goto exit;
+
+	/* Set 2D pipe. */
+	gccommit->gcerror = cmdbuf_alloc(sizeof(struct gcmopipesel),
+					(void **) &gcmopipesel, NULL);
+	if (gccommit->gcerror != GCERR_NONE)
+		return gccommit->gcerror;
+
+	gcmopipesel->pipesel_ldst = gcmopipesel_pipesel_ldst;
+	gcmopipesel->pipesel.reg = gcregpipeselect_2D;
+
+	/* Set the client's master table. */
+	gccommit->gcerror = mmu2d_set_master(&client->ctxt);
+	if (gccommit->gcerror != GCERR_NONE)
+		goto exit;
+
+	/* Determine command buffer flush size. */
+	cmdflushsize = cmdbuf_flush(NULL);
+
+	/* Go through all buffers one at a time. */
+	buffer = gccommit->buffer;
+	while (buffer != NULL) {
+
+		/* Compute the size of the command buffer. */
+		buffersize
+			= (unsigned char *) buffer->tail
+			- (unsigned char *) buffer->head;
+
+		/* Determine MMU flush size. */
+		mmuflushsize = client->mmu_dirty ? mmu2d_flush(NULL, 0, 0) : 0;
+
+		/* Reserve command buffer space. */
+		allocsize = mmuflushsize + buffersize + cmdflushsize;
+		gccommit->gcerror = cmdbuf_alloc(allocsize,
+						(void **) &logical, &address);
+		if (gccommit->gcerror != GCERR_NONE)
+			goto exit;
+
+		/* Append MMU flush. */
+		if (client->mmu_dirty) {
+			mmu2d_flush(logical, address, allocsize);
+
+			/* Skip MMU flush. */
+			logical = (unsigned int *)
+				((unsigned char *) logical + mmuflushsize);
+
+			/* Validate MMU state. */
+			client->mmu_dirty = false;
+		}
+
+		memcpy(logical, buffer->head, buffersize);
+
+		/* Process fixups. */
+		gccommit->gcerror = mmu2d_fixup(buffer->fixuphead, logical);
+		if (gccommit->gcerror != GCERR_NONE)
+			goto exit;
+
+		/* Skip the command buffer. */
+		logical = (unsigned int *)
+			((unsigned char *) logical + buffersize);
+
+		/* Execute the current command buffer. */
+		cmdbuf_flush(logical);
+
+		/* Get the next buffer. */
+		buffer = buffer->next;
+	}
+
+exit:
+
 	return ret;
 }
 
-static int doblit(unsigned long arg)
+int gc_map(struct gcmap *gcmap)
 {
-	int ret;
+	int ret = 0;
 	struct clientinfo *client = NULL;
-	struct bltinfo bltinfo = {0};
-	struct bufinfo *bufinfo = NULL;
-	u32 *buffer;
-	u32 physical;
-	u32 flush_size = 0, size;
-	u32 i;
+	struct mmu2dphysmem mem;
+	struct mmu2darena *mapped = NULL;
 
-	MMU2D_PRINT(KERN_ERR "%s(%d): submitting a blit.\n",
-		__func__, __LINE__);
+	/* Locate the client entry. */
+	gcmap->gcerror = find_client(&client);
+	if (gcmap->gcerror != GCERR_NONE)
+		goto exit;
 
-	ret = find_client(&client);
-	if (ret != 0)
-		return ret;
+	GC_PRINT(KERN_ERR "%s(%d): map client buffer\n",
+			__func__, __LINE__);
+	GC_PRINT(KERN_ERR "%s(%d):   logical = 0x%08X\n",
+			__func__, __LINE__, (unsigned int) gcmap->logical);
+	GC_PRINT(KERN_ERR "%s(%d):   size = %d\n",
+			__func__, __LINE__, gcmap->size);
 
-	if (copy_from_user(&bltinfo, (void __user *)arg,
-				sizeof(struct bltinfo)))
-		return -EFAULT;
-
-	/* 2d mmu fixup */
-	i = 0;
-	while (bltinfo.offset[i] != 0) {
-		bufinfo =
-		(struct bufinfo *)bltinfo.cmdbuf[bltinfo.offset[i] - 1];
-		bltinfo.cmdbuf[bltinfo.offset[i] - 1] = bufinfo->pa;
-		i++;
-	}
-
-	ret = mmu2d_set_master(&client->ctxt);
-	if (ret != 0)
-		return -EFAULT;
-
-	if (client->mmu_dirty) {
-		flush_size = mmu2d_flush(NULL, 0, 0);
-		if (flush_size <= 0)
-			return -ENOMEM;
-
-		size = flush_size + bltinfo.cmdlen;
-		if (ret != 0)
-			return ret;
-
-		ret = cmdbuf_alloc(size, &buffer, &physical);
-		if (ret != 0)
-			return ret;
-
-		mmu2d_flush(buffer, physical, bltinfo.cmdlen + 4 * sizeof(u32));
-
-		client->mmu_dirty = false;
-	} else {
-		ret = cmdbuf_alloc(bltinfo.cmdlen, &buffer, &physical);
-		if (ret != 0)
-			return ret;
-	}
-
-	memcpy((u8 *) buffer + flush_size, bltinfo.cmdbuf, bltinfo.cmdlen);
-
-	ret = cmdbuf_flush();
-	if (ret != 0)
-		return ret;
-
-	return 0;
-}
-
-/* get physical pages of a user block */
-static struct meminfo *user_block_to_pa(u32 usr_addr, u32 num_pg)
-{
-	struct task_struct *curr_task = current;
-	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma = NULL;
-
-	struct meminfo *pa = NULL;
-	struct page **pages = NULL;
-	u32 *mem = NULL, write = 0, i = 0;
-	int usr_count = 0;
-
-	pa = kzalloc(sizeof(*pa), GFP_KERNEL);
-	if (!pa)
-		return NULL;
-
-	mem = kzalloc(num_pg * sizeof(*mem), GFP_KERNEL);
-	if (!mem) {
-		kfree(pa);
-		return NULL;
-	}
-
-	pages = kmalloc(num_pg * sizeof(*pages), GFP_KERNEL);
-	if (!pages) {
-		kfree(mem);
-		kfree(pa);
-		return NULL;
-	}
-
-	/*
-	 * Important Note: usr_addr is mapped from user
-	 * application process to current process - it must lie
-	 * completely within the current virtual memory address
-	 * space in order to be of use to us here.
+	/* Initialize the mapping parameters. See if we were passed a list
+	 * of pages first
 	 */
-	down_read(&mm->mmap_sem);
-	vma = find_vma(mm, usr_addr + (num_pg << PAGE_SHIFT) - 1);
-
-	if (!vma || (usr_addr < vma->vm_start)) {
-		kfree(mem);
-		kfree(pa);
-		kfree(pages);
-		up_read(&mm->mmap_sem);
-		printk(KERN_ERR "Address is outside VMA: address start = %08x, "
-			"user end = %08x\n",
-			usr_addr, (usr_addr + (num_pg << PAGE_SHIFT)));
-		return ERR_PTR(-EFAULT);
-	}
-
-	if (vma->vm_flags & (VM_WRITE | VM_MAYWRITE))
-		write = 1;
-
-	usr_count = get_user_pages(curr_task, mm, usr_addr, num_pg, write, 1,
-					pages, NULL);
-
-	if (usr_count > 0) {
-		/* process user allocated buffer */
-		if (usr_count != num_pg) {
-			/* release the pages we did get */
-			for (i = 0; i < usr_count; i++)
-				page_cache_release(pages[i]);
-		} else {
-			/* fill in the physical address information */
-			for (i = 0; i < num_pg; i++) {
-				mem[i] = page_to_phys(pages[i]);
-				BUG_ON(pages[i] != phys_to_page(mem[i]));
-			}
-		}
+	if (gcmap->pagecount > 0 && gcmap->pagearray != NULL) {
+		GC_PRINT(KERN_ERR "%s: Got page array %p with %lu pages",
+			__func__, gcmap->pagearray, gcmap->pagecount);
+		mem.base = 0;
+		mem.offset = 0;
+		mem.count = gcmap->pagecount;
+		mem.pages = gcmap->pagearray;
 	} else {
-		/* fallback for kernel allocated buffers */
-		for (i = 0; i < num_pg; i++) {
-			mem[i] = virt2phys(usr_addr);
-
-			if (!mem[i]) {
-				printk(KERN_ERR "VMA not in page table\n");
-				break;
-			}
-
-			usr_addr += PAGE_SIZE;
-		}
+		GC_PRINT(KERN_ERR "%s: gcmap->logical = %p\n",
+			__func__, gcmap->logical);
+		mem.base = ((u32) gcmap->logical) & ~(PAGE_SIZE - 1);
+		mem.offset = ((u32) gcmap->logical) & (PAGE_SIZE - 1);
+		mem.count = DIV_ROUND_UP(gcmap->size + mem.offset, PAGE_SIZE);
+		mem.pages = NULL;
 	}
+	mem.pagesize = PAGE_SIZE;
 
-	up_read(&mm->mmap_sem);
+	/* Map the buffer. */
+	gcmap->gcerror = mmu2d_map(&client->ctxt, &mem, &mapped);
+	if (gcmap->gcerror != GCERR_NONE)
+		goto exit;
 
-	kfree(pages);
+	client->mmu_dirty = true;
 
-	/* if failed to map all pages */
-	if (i < num_pg) {
-		kfree(mem);
-		kfree(pa);
-		return ERR_PTR(-EFAULT);
-	}
+	gcmap->handle = (unsigned int) mapped;
 
-	pa->mmu2dphysmem.pages = (pte_t *)mem;
-	pa->memtype = usr_count > 0 ? USER : KERNEL;
-	pa->mmu2dphysmem.pagecount = num_pg;
-	return pa;
-}
+	GC_PRINT(KERN_ERR "%s(%d):   mapped address = 0x%08X\n",
+			__func__, __LINE__, mapped->address);
+	GC_PRINT(KERN_ERR "%s(%d):   handle = 0x%08X\n",
+			__func__, __LINE__, (unsigned int) mapped);
 
-static int domap(unsigned long arg)
-{
-	int ret;
-	u32 usr_addr = 0, offset = 0, num_pg = 0;
-	struct clientinfo *client = NULL;
-	struct bvbuffdesc bufdesc = {0};
-	struct bufinfo *bufinfo = NULL;
-	struct meminfo *mi = NULL;
-
-	if (copy_from_user(&bufdesc, (void __user *)arg, sizeof(bufdesc)))
-		return -EFAULT;
-
-	ret = find_client(&client);
-	if (ret)
-		return ret;
-
-	usr_addr = ((u32) bufdesc.virtaddr) & ~(PAGE_SIZE - 1);
-	offset   = ((u32) bufdesc.virtaddr) &  (PAGE_SIZE - 1);
-	num_pg   = DIV_ROUND_UP(bufdesc.length + offset, PAGE_SIZE);
-
-	/* TODO: track mi and bufinfo for cleanup */
-	mi = user_block_to_pa(usr_addr, num_pg);
-	if (!mi)
-		goto error;
-
-	bufinfo = kzalloc(sizeof(*bufinfo), GFP_KERNEL);
-	if (!bufinfo)
-		goto error;
-
-	mi->mmu2dphysmem.pagesize = PAGE_SIZE;
-	mi->mmu2dphysmem.pageoffset = offset;
-
-	ret = mmu2d_map_phys(&client->ctxt, &mi->mmu2dphysmem);
-	if (ret)
-		goto error;
-
-	bufinfo->pa = mi->mmu2dphysmem.logical;
-	bufdesc.map = (struct bvbuffmap *)bufinfo;
-
-	DBGPRINT(KERN_ERR
-		 "%s(%d): mapped 0x%08X to 0x%08X (pseudo ptr 0x%08X)\n",
-		__func__, __LINE__,
-		(u32) bufdesc.virtaddr,
-		(u32) bufinfo->pa,
-		(u32) bufdesc.map
-		);
-
-	if (copy_to_user((void __user *)arg, &bufdesc, sizeof(bufdesc)))
-		goto error;
-
-	/* no errors, so exit */
-	goto exit;
-error:
-	return -EFAULT;
 exit:
-	return 0;
+
+	if (gcmap->gcerror != GCERR_NONE) {
+		if (mapped != NULL)
+			mmu2d_unmap(&client->ctxt, mapped);
+	}
+
+	return ret;
 }
 
-static int dounmap(unsigned long arg)
+int gc_unmap(struct gcmap *gcmap)
 {
-	struct bvbuffdesc bufdesc = {0};
+	int ret = 0;
+	struct clientinfo *client = NULL;
 
-	if (copy_from_user(&bufdesc, (void __user *)arg,
-					sizeof(bufdesc)))
-		return -EFAULT;
+	GC_PRINT(KERN_ERR "%s(%d): unmap client buffer\n",
+			__func__, __LINE__);
+	GC_PRINT(KERN_ERR "%s(%d):   logical = 0x%08X\n",
+			__func__, __LINE__, (unsigned int) gcmap->logical);
+	GC_PRINT(KERN_ERR "%s(%d):   size = %d\n",
+			__func__, __LINE__, gcmap->size);
+	GC_PRINT(KERN_ERR "%s(%d):   handle = 0x%08X\n",
+			__func__, __LINE__, gcmap->handle);
 
-	if (copy_to_user((void __user *)arg, &bufdesc,
-			sizeof(bufdesc)))
-		return -EFAULT;
+	/* Locate the client entry. */
+	gcmap->gcerror = find_client(&client);
+	if (gcmap->gcerror != GCERR_NONE)
+		goto exit;
 
-	return 0;
+	/* Map the buffer. */
+	gcmap->gcerror = mmu2d_unmap(&client->ctxt,
+					(struct mmu2darena *) gcmap->handle);
+	if (gcmap->gcerror != GCERR_NONE)
+		goto exit;
+
+	client->mmu_dirty = true;
+
+	/* Invalidate the handle. */
+	gcmap->handle = ~0U;
+
+exit:
+	return ret;
 }
 
 static long ioctl(struct file *filp, u32 cmd, unsigned long arg)
 {
+	int ret, gc_rv;
+	void __user *ptr = (void __user *)arg;
+
 	switch (cmd) {
-	case BLT:
-		return doblit(arg);
-
-	case MAP:
-		return domap(arg);
-
-	case UMAP:
-		return dounmap(arg);
+	case GCIOCTL_COMMIT:
+	{
+		struct gccommit _gccommit;
+		/* Get gcmap input. */
+		ret = copy_from_user(&_gccommit, ptr, sizeof(_gccommit));
+		if (ret)
+			return ret;
+		gc_rv = gc_commit(&_gccommit);
+		ret = copy_to_user(&_gccommit, ptr, sizeof(_gccommit));
+		if (ret)
+			return ret;
+		ret = gc_rv;
+		break;
+	}
+	case GCIOCTL_MAP:
+	{
+		struct gcmap _gcmap;
+		/* Get gcmap input. */
+		ret = copy_from_user(&_gcmap, ptr, sizeof(_gcmap));
+		if (ret)
+			return ret;
+		gc_rv = gc_map(&_gcmap);
+		ret = copy_to_user(&_gcmap, ptr, sizeof(_gcmap));
+		if (ret)
+			return ret;
+		ret = gc_rv;
+		break;
+	}
+	case GCIOCTL_UNMAP:
+	{
+		struct gcmap _gcmap;
+		/* Get gcmap input. */
+		ret = copy_from_user(&_gcmap, ptr, sizeof(_gcmap));
+		if (ret)
+			return ret;
+		gc_rv = gc_unmap(&_gcmap);
+		ret = copy_to_user(&_gcmap, ptr, sizeof(_gcmap));
+		if (ret)
+			return ret;
+		ret = gc_rv;
+		break;
+	}
+	default:
+		ret = -EINVAL;
 	}
 
-	return -EINVAL;
+	return ret;
 }
 
 static s32 open(struct inode *ip, struct file *filp)
@@ -555,6 +632,10 @@ static struct platform_driver pd = {
 	.remove = NULL,
 };
 
+/*******************************************************************************
+ * Driver init/shutdown.
+ */
+
 #define GC_MINOR 0
 #define GC_COUNT 1
 
@@ -562,6 +643,34 @@ static int __init gc_init(void)
 {
 	int ret = 0;
 	u32 clock = 0;
+	struct clk *bb2d_clk;
+	int rate;
+
+	GC_PRINT(KERN_ERR "%s(%d): ****** %s %s ******\n",
+			 __func__, __LINE__, __DATE__, __TIME__);
+
+	/* Prevent the gc core from initializing if not 447x */
+	if (!cpu_is_omap447x())
+		goto exit;
+
+	bb2d_clk = clk_get(NULL, "bb2d_fck");
+	if (IS_ERR(bb2d_clk)) {
+		GC_PRINT(KERN_ERR "%s(%d): cannot find bb2d_fck.\n",
+			 __func__, __LINE__);
+		return -EINVAL;
+	}
+
+	rate = clk_get_rate(bb2d_clk);
+	GC_PRINT(KERN_ERR
+		"%s(%d): BB2D clock is %dMHz\n",
+		__func__, __LINE__, (rate / 1000000));
+
+	ret = clk_enable(bb2d_clk);
+	if (ret < 0) {
+		GC_PRINT(KERN_ERR "%s(%d): failed to enable bb2d_fck.\n",
+			 __func__, __LINE__);
+		return -EINVAL;
+	}
 
 	ret = alloc_chrdev_region(&dev, GC_MINOR, GC_COUNT, GC_DEVICE);
 	if (ret != 0)
@@ -580,7 +689,6 @@ static int __init gc_init(void)
 	}
 
 	device = device_create(class, NULL, dev, NULL, GC_DEVICE);
-
 	if (IS_ERR(device)) {
 		ret = PTR_ERR(device);
 		goto free_class;
@@ -590,15 +698,19 @@ static int __init gc_init(void)
 	if (ret)
 		goto free_device;
 
+	g_reg_base = ioremap_nocache(DEVICE_REG_BASE, DEVICE_REG_SIZE);
+	if (!g_reg_base)
+		goto free_plat_reg;
+
+#if ENABLE_POLLING
+	sema_init(&g_gccoreint, 0);
+#endif
+
 	/* TODO: clean this up in release call, after a blowup */
 	/* create interrupt handler */
 	ret = request_irq(DEVICE_INT, gc_irq, IRQF_SHARED, "gc-core",
-			&gckdevice);
+			&gcdevice);
 	if (ret)
-		goto free_plat_reg;
-
-	reg_base = ioremap_nocache(DEVICE_REG_BASE, DEVICE_REG_SIZE);
-	if (!reg_base)
 		goto free_plat_reg;
 
 	gcwq = create_workqueue("gcwq");
@@ -606,23 +718,24 @@ static int __init gc_init(void)
 		goto free_reg_mapping;
 
 	/* gcvPOWER_ON */
-	clock = SETFIELD(0, AQ_HI_CLOCK_CONTROL, CLK2D_DIS, 0) |
-		SETFIELD(0, AQ_HI_CLOCK_CONTROL, FSCALE_VAL, 64) |
-		SETFIELD(0, AQ_HI_CLOCK_CONTROL, FSCALE_CMD_LOAD, 1);
+	clock = SETFIELD(0, GCREG_HI_CLOCK_CONTROL, CLK2D_DIS, 0) |
+		SETFIELD(0, GCREG_HI_CLOCK_CONTROL, FSCALE_VAL, 64) |
+		SETFIELD(0, GCREG_HI_CLOCK_CONTROL, FSCALE_CMD_LOAD, 1);
 
-	hw_write_reg(AQ_HI_CLOCK_CONTROL_Address, clock);
+	gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address, clock);
 
 	/* Done loading the frequency scaler. */
-	clock = SETFIELD(clock, AQ_HI_CLOCK_CONTROL, FSCALE_CMD_LOAD, 0);
+	clock = SETFIELD(clock, GCREG_HI_CLOCK_CONTROL, FSCALE_CMD_LOAD, 0);
 
-	hw_write_reg(AQ_HI_CLOCK_CONTROL_Address, clock);
+	gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address, clock);
 
+#if GC_DUMP
 	/* Print GPU ID. */
 	gpu_id();
+#endif
 
 	/* Initialize the command buffer. */
-	ret = cmdbuf_init();
-	if (ret)
+	if (cmdbuf_init() != GCERR_NONE)
 		goto free_workq;
 
 	/* no errors, so exit */
@@ -630,7 +743,7 @@ static int __init gc_init(void)
 free_workq:
 	destroy_workqueue(gcwq);
 free_reg_mapping:
-	iounmap(reg_base);
+	iounmap(g_reg_base);
 free_plat_reg:
 	platform_driver_unregister(&pd);
 free_device:
@@ -648,7 +761,7 @@ exit:
 static void __exit gc_exit(void)
 {
 	destroy_workqueue(gcwq);
-	iounmap(reg_base);
+	iounmap(g_reg_base);
 	platform_driver_unregister(&pd);
 	device_destroy(class, MKDEV(MAJOR(dev), 0));
 	class_destroy(class);

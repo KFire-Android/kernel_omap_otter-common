@@ -15,28 +15,17 @@
 #ifndef GCCMDBUF_H
 #define GCCMDBUF_H
 
+#include <linux/gccore.h>
 #include "gcmmu.h"
-
-#define ENABLE_GPU_COUNTERS	1
-#define ENABLE_CMD_DEBUG	1
 
 extern wait_queue_head_t gc_event;
 extern int done;
-extern u8 *reg_base;
-#if ENABLE_CMD_DEBUG
-#	define CMDBUFPRINT printk
-#else
-#	define CMDBUFPRINT(...)
-#endif
 
-int cmdbuf_init(void);
-int cmdbuf_map(struct mmu2dcontext *ctxt);
-int cmdbuf_alloc(u32 size, u32 **logical, u32 *physical);
-int cmdbuf_flush(void);
+enum gcerror cmdbuf_init(void);
+enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt);
+enum gcerror cmdbuf_alloc(u32 size, void **logical, u32 *physical);
+int cmdbuf_flush(void *logical);
 void cmdbuf_dump(void);
-
-u32 hw_read_reg(u32 address);
-void hw_write_reg(u32 address, u32 data);
 
 void gpu_id(void);
 void gpu_status(char *function, int line, u32 acknowledge);
