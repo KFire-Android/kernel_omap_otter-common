@@ -30,6 +30,7 @@
 #include "gccmdbuf.h"
 #include "gcmmu.h"
 #include "gcreg.h"
+#include "bv_gc2d-priv.h"
 
 #if ENABLE_POLLING
 #include <linux/semaphore.h>
@@ -738,6 +739,9 @@ static int __init gc_init(void)
 	if (cmdbuf_init() != GCERR_NONE)
 		goto free_workq;
 
+	bv_gc2d_init();
+	bv_gc2d_fillentry();
+
 	/* no errors, so exit */
 	goto exit;
 free_workq:
@@ -767,6 +771,8 @@ static void __exit gc_exit(void)
 	class_destroy(class);
 	cdev_del(&cd);
 	unregister_chrdev_region(dev, 0);
+	bv_gc2d_clearentry();
+	bv_gc2d_exit();
 }
 
 MODULE_LICENSE("GPL v2");
