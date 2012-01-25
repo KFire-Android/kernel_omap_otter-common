@@ -397,6 +397,7 @@ static struct omap_abe_twl6040_data sdp4430_abe_audio_data = {
 	.has_aux	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	.has_vibra	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 
+	.has_abe	= 1,
 	.has_dmic	= 1,
 	.has_hsmic	= 1,
 	.has_mainmic	= 1,
