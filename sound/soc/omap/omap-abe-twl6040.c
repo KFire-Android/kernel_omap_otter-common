@@ -30,6 +30,8 @@
 #include <sound/pcm.h>
 #include <sound/soc.h>
 #include <sound/jack.h>
+#include <sound/pcm_params.h>
+#include <sound/soc-dapm.h>
 
 #include <asm/mach-types.h>
 #include <plat/hardware.h>
@@ -38,6 +40,9 @@
 #include "omap-dmic.h"
 #include "omap-mcpdm.h"
 #include "omap-pcm.h"
+#include "omap-abe-priv.h"
+#include "omap-mcbsp.h"
+#include "omap-dmic.h"
 #include "../codecs/twl6040.h"
 
 static int omap_abe_hw_params(struct snd_pcm_substream *substream,
@@ -114,7 +119,7 @@ static struct snd_soc_jack_pin hs_jack_pins[] = {
 	},
 };
 
-/* SDP4430 machine DAPM */
+/* OMAP ABE TWL6040 machine DAPM */
 static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 	/* Outputs */
 	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
@@ -271,6 +276,182 @@ static struct snd_soc_dai_link twl6040_only_dai[] = {
 	},
 };
 
+
+static int omapabe_twl6040_fe_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_platform *platform = rtd->platform;
+	struct snd_soc_card *card = rtd->card;
+
+	/* don't wait before switching of FE power */
+	rtd->pmdown_time = 0;
+
+	return 0;
+}
+
+static struct snd_soc_dai_link omapabe_dai[] = {
+
+/*
+ * Frontend DAIs - i.e. userspace visible interfaces (ALSA PCMs)
+ */
+
+	{
+		.name = "OMAP ABE Media",
+		.stream_name = "Multimedia",
+
+		/* ABE components - MM-UL & MM_DL */
+		.cpu_dai_name = "MultiMedia1",
+		.platform_name = "omap-pcm-audio",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.dynamic = 1, /* BE is dynamic */
+		.init = omapabe_twl6040_fe_init,
+		.trigger = {SND_SOC_DPCM_TRIGGER_BESPOKE, SND_SOC_DPCM_TRIGGER_BESPOKE},
+	},
+	{
+		.name = "OMAP ABE Media Capture",
+		.stream_name = "Multimedia Capture",
+
+		/* ABE components - MM-UL2 */
+		.cpu_dai_name = "MultiMedia2",
+		.platform_name = "omap-pcm-audio",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.dynamic = 1, /* BE is dynamic */
+		.trigger = {SND_SOC_DPCM_TRIGGER_BESPOKE, SND_SOC_DPCM_TRIGGER_BESPOKE},
+	},
+	{
+		.name = "OMAP ABE Voice",
+		.stream_name = "Voice",
+
+		/* ABE components - VX-UL & VX-DL */
+		.cpu_dai_name = "Voice",
+		.platform_name = "omap-pcm-audio",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.dynamic = 1, /* BE is dynamic */
+		.trigger = {SND_SOC_DPCM_TRIGGER_BESPOKE, SND_SOC_DPCM_TRIGGER_BESPOKE},
+		.no_host_mode = SND_SOC_DAI_LINK_OPT_HOST,
+	},
+	{
+		.name = "OMAP ABE Tones Playback",
+		.stream_name = "Tone Playback",
+
+		/* ABE components - TONES_DL */
+		.cpu_dai_name = "Tones",
+		.platform_name = "omap-pcm-audio",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.dynamic = 1, /* BE is dynamic */
+		.trigger = {SND_SOC_DPCM_TRIGGER_BESPOKE, SND_SOC_DPCM_TRIGGER_BESPOKE},
+	},
+	{
+		.name = "OMAP ABE Media LP",
+		.stream_name = "Multimedia",
+
+		/* ABE components - MM-DL (mmap) */
+		.cpu_dai_name = "MultiMedia1 LP",
+		.platform_name = "aess",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.dynamic = 1, /* BE is dynamic */
+		.trigger = {SND_SOC_DPCM_TRIGGER_BESPOKE, SND_SOC_DPCM_TRIGGER_BESPOKE},
+	},
+	{
+		.name = "Legacy McPDM",
+		.stream_name = "Headset Playback",
+
+		/* ABE components - DL1 */
+		.cpu_dai_name = "mcpdm-dl",
+		.platform_name = "omap-pcm-audio",
+
+		/* Phoenix - DL1 DAC */
+		.codec_dai_name =  "twl6040-legacy",
+		.codec_name = "twl6040-codec",
+
+		.ops = &omapabe_ops,
+		.ignore_suspend = 1,
+	},
+
+/*
+ * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.
+ * Matched to above interfaces at runtime, based upon use case.
+ */
+
+	{
+		.name = OMAP_ABE_BE_PDM_DL1,
+		.stream_name = "HS Playback",
+
+		/* ABE components - DL1 */
+		.cpu_dai_name = "mcpdm-dl1",
+		.platform_name = "aess",
+
+		/* Phoenix - DL1 DAC */
+		.codec_dai_name =  "twl6040-dl1",
+		.codec_name = "twl6040-codec",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.init = omapabe_twl6040_init,
+		.ops = &omapabe_ops,
+		.be_id = OMAP_ABE_DAI_PDM_DL1,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = OMAP_ABE_BE_PDM_UL1,
+		.stream_name = "Analog Capture",
+
+		/* ABE components - UL1 */
+		.cpu_dai_name = "mcpdm-ul1",
+		.platform_name = "aess",
+
+		/* Phoenix - UL ADC */
+		.codec_dai_name =  "twl6040-ul",
+		.codec_name = "twl6040-codec",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.ops = &omapabe_ops,
+		.be_id = OMAP_ABE_DAI_PDM_UL,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = OMAP_ABE_BE_PDM_DL2,
+		.stream_name = "HF Playback",
+
+		/* ABE components - DL2 */
+		.cpu_dai_name = "mcpdm-dl2",
+		.platform_name = "aess",
+
+		/* Phoenix - DL2 DAC */
+		.codec_dai_name =  "twl6040-dl2",
+		.codec_name = "twl6040-codec",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.ops = &omapabe_ops,
+		.be_id = OMAP_ABE_DAI_PDM_DL2,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = OMAP_ABE_BE_PDM_VIB,
+		.stream_name = "Vibra",
+
+		/* ABE components - VIB1 DL */
+		.cpu_dai_name = "mcpdm-vib",
+		.platform_name = "aess",
+
+		/* Phoenix - PDM to PWM */
+		.codec_dai_name =  "twl6040-vib",
+		.codec_name = "twl6040-codec",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.ops = &omapabe_ops,
+		.be_id = OMAP_ABE_DAI_PDM_VIB,
+	},
+};
+
 /* Audio machine driver */
 static struct snd_soc_card omap_abe_card = {
 	.owner = THIS_MODULE,
@@ -279,6 +460,7 @@ static struct snd_soc_card omap_abe_card = {
 	.num_dapm_widgets = ARRAY_SIZE(twl6040_dapm_widgets),
 	.dapm_routes = audio_map,
 	.num_dapm_routes = ARRAY_SIZE(audio_map),
+
 };
 
 static __devinit int omap_abe_probe(struct platform_device *pdev)
@@ -306,14 +488,16 @@ static __devinit int omap_abe_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	if (pdata->has_dmic) {
+	if (pdata->has_abe) {
+		card->dai_link = omapabe_dai;
+		card->num_links = ARRAY_SIZE(omapabe_dai);
+	} else if (pdata->has_dmic) {
 		card->dai_link = twl6040_dmic_dai;
 		card->num_links = ARRAY_SIZE(twl6040_dmic_dai);
 	} else {
 		card->dai_link = twl6040_only_dai;
 		card->num_links = ARRAY_SIZE(twl6040_only_dai);
 	}
-
 	ret = snd_soc_register_card(card);
 	if (ret)
 		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",

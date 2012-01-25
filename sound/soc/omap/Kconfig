@@ -14,6 +14,9 @@ config SND_OMAP_SOC_MCPDM
 config SND_OMAP_SOC_HDMI
 	tristate
 
+config SND_OMAP_SOC_ABE
+	tristate
+
 config SND_OMAP_SOC_N810
 	tristate "SoC Audio support for Nokia N810"
 	depends on SND_OMAP_SOC && MACH_NOKIA_N810 && I2C
@@ -102,6 +105,9 @@ config SND_OMAP_SOC_OMAP_ABE_TWL6040
 	select SND_OMAP_SOC_MCPDM
 	select SND_SOC_TWL6040
 	select SND_SOC_DMIC
+	select SND_OMAP_SOC_MCBSP
+	select SND_OMAP_SOC_ABE
+	select SND_DYNAMIC_MINORS
 
 	help
 	  Say Y if you want to add support for SoC audio on OMAP boards using
