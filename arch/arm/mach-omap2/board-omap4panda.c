@@ -106,6 +106,7 @@ static struct omap_abe_twl6040_data panda_abe_audio_data = {
 	.has_aux	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	/* PandaBoard: FM RX, PandaBoardES: audio in */
 	.has_afm	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
+	.has_abe	= 1,
 	/* No jack detection. */
 	.jack_detection	= 0,
 	/* MCLK input is 38.4MHz */
