@@ -1344,12 +1344,19 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		WARN(ret < 0, "Error: reading twl_idcode register value\n");
 	}
 
+	features = id->driver_data;
+	if (twl_class_is_6030()) {
+		twl_i2c_read_u8(TWL_MODULE_USB, &temp, USB_PRODUCT_ID_LSB);
+		if (temp == 0x32)
+			features |= TWL6032_SUBCLASS;
+	}
+
 	/* load power event scripts */
 	if (twl_has_power()) {
 		if (twl_class_is_4030() && pdata->power)
 			twl4030_power_init(pdata->power);
 		if (twl_class_is_6030())
-			twl6030_power_init(pdata->power);
+			twl6030_power_init(pdata->power, features);
 	}
 
 	/* Maybe init the T2 Interrupt subsystem */
@@ -1379,14 +1386,6 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		temp &= ~(SR_I2C_SDA_CTRL_PU | SR_I2C_SCL_CTRL_PU | \
 		I2C_SDA_CTRL_PU | I2C_SCL_CTRL_PU);
 		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
-	}
-
-
-	features = id->driver_data;
-	if (twl_class_is_6030()) {
-		twl_i2c_read_u8(TWL_MODULE_USB, &temp, USB_PRODUCT_ID_LSB);
-		if (temp == 0x32)
-			features |= TWL6032_SUBCLASS;
 	}
 
 	status = add_children(pdata, features);
