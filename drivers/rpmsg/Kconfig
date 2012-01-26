@@ -18,6 +18,18 @@ config RPMSG_RESMGR_FWK
 
 	  If unsure, say N.
 
+config RPMSG_RESMGR
+	tristate "Resource Manager based on RPMSG"
+	depends on RPMSG
+	select RPMSG_RESMGR_FWK
+	---help---
+	  Add the request and release mechanisms for various resources
+	  that can be made avaiable for the remote processors in an SoC.
+	  The resource manager ensures aribitration of resources requests
+	  from any remote processor within the SoC
+
+	  If unsure, say N.
+
 config RPMSG_OMX
 	tristate "rpmsg OMX driver"
 	depends on RPMSG
