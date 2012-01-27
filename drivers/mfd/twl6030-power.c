@@ -23,6 +23,7 @@
 #include <asm/mach-types.h>
 
 #define VREG_GRP		0
+#define MSK_TRANSITION_APP_SHIFT	0x5
 
 static u8 dev_on_group;
 
@@ -124,6 +125,26 @@ static __init void twl6030_process_system_config(void)
 			grp |= (dev_on_group & DEV_GRP_P3) ? 0 : P3_GRP_6030;
 			dev_on_group = grp;
 		}
+
+		/*
+		 *  unmask PREQ transition Executes ACT2SLP and SLP2ACT sleep
+		 *   sequence
+		 */
+		r = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &grp,
+				TWL6030_PM_MASTER_MSK_TRANSITION);
+		if (r) {
+			pr_err("%s: Error (%d) reading"
+				" TWL6030_MSK_TRANSITION\n", __func__, r);
+			return;
+		}
+
+		grp &= (dev_on_group << MSK_TRANSITION_APP_SHIFT);
+
+		r = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, grp,
+					TWL6030_PM_MASTER_MSK_TRANSITION);
+		if (r)
+			pr_err("%s: Error (%d) writing to"
+				" TWL6030_MSK_TRANSITION\n", __func__, r);
 	}
 }
 

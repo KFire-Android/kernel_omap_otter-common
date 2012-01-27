@@ -475,6 +475,7 @@ int twl6030_unregister_notifier(struct notifier_block *nb,
  * TWL6030 PM Master module register offsets (use TWL_MODULE_PM_MASTER)
  */
 
+#define TWL6030_PM_MASTER_MSK_TRANSITION	0x01
 #define TWL6030_VBATMIN_HI_THRESHOLD		0x05
 
 /*

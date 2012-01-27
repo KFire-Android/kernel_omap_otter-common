@@ -70,11 +70,9 @@
 #define TWL6030_REG_SYSEN_CFG_TRANS			0xB4
 #define TWL6030_REG_VCORE3_CFG_GRP			0x5E
 #define TWL6030_REG_VMEM_CFG_GRP			0x64
-#define TWL6030_REG_MSK_TRANSITION			0x20
 #define TWL6030_BIT_APE_GRP				BIT(0)
 #define TWL6030_BIT_CON_GRP				BIT(1)
 #define TWL6030_BIT_MOD_GRP				BIT(2)
-#define TWL6030_MSK_PREQ1				BIT(5)
 #define TWL6030_MSK_SYSEN_OFF				(0x3 << 4)
 #define TWL6030_MSK_SYSEN_SLEEP				(0x3 << 2)
 #define TWL6030_MSK_SYSEN_ACTIVE			(0x3 << 0)
@@ -289,15 +287,6 @@ static int __init omap4_twl_tps62361_enable(struct voltagedomain *voltdm)
 
 	/* if we have to work with TWL */
 #ifdef CONFIG_TWL4030_CORE
-
-	/* unmask PREQ transition Executes ACT2SLP and SLP2ACT sleep sequence */
-	ret1 = _twl_i2c_rmw_u8(TWL6030_MODULE_ID0, TWL6030_MSK_PREQ1,
-				0x00, TWL6030_REG_MSK_TRANSITION);
-	if (ret1) {
-		pr_err("%s:Err:TWL6030: map APE PREQ1(%d)\n", __func__, ret1);
-		ret = ret1;
-	}
-
 	/* Setup SYSEN to be 1 on Active and 0 for sleep and OFF states */
 	ret1 = _twl_i2c_rmw_u8(TWL6030_MODULE_ID0, TWL6030_MSK_SYSEN_ACTIVE,
 				0x01, TWL6030_REG_SYSEN_CFG_TRANS);
