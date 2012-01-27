@@ -38,17 +38,7 @@
 
 #include "panel-tc358765.h"
 
-static struct omap_video_timings tc358765_timings = {
-	.x_res		= TC358765_WIDTH,
-	.y_res		= TC358765_HEIGHT,
-	.pixel_clock	= TC358765_PCLK,
-	.hfp		= TC358765_HFP,
-	.hsw            = TC358765_HSW,
-	.hbp            = TC358765_HBP,
-	.vfp            = TC358765_VFP,
-	.vsw            = TC358765_VSW,
-	.vbp            = TC358765_VBP,
-};
+static struct omap_video_timings tc358765_timings;
 
 /* device private data structure */
 struct tc358765_data {
@@ -115,6 +105,7 @@ static void tc358765_get_timings(struct omap_dss_device *dssdev,
 static void tc358765_set_timings(struct omap_dss_device *dssdev,
 		struct omap_video_timings *timings)
 {
+	dev_info(&dssdev->dev, "set_timings() not implemented\n");
 }
 
 static int tc358765_check_timings(struct omap_dss_device *dssdev,
@@ -143,18 +134,16 @@ static void tc358765_get_resolution(struct omap_dss_device *dssdev,
 
 static int tc358765_hw_reset(struct omap_dss_device *dssdev)
 {
-	struct tc358765_board_data *board_data = get_board_data(dssdev);
-
-	if (board_data == NULL || board_data->reset_gpio == -1)
+	if (dssdev == NULL || dssdev->reset_gpio == -1)
 		return 0;
 
-	gpio_set_value(board_data->reset_gpio, 1);
+	gpio_set_value(dssdev->reset_gpio, 1);
 	udelay(100);
 	/* reset the panel */
-	gpio_set_value(board_data->reset_gpio, 0);
+	gpio_set_value(dssdev->reset_gpio, 0);
 	/* assert reset */
 	udelay(100);
-	gpio_set_value(board_data->reset_gpio, 1);
+	gpio_set_value(dssdev->reset_gpio, 1);
 
 	/* wait after releasing reset */
 	msleep(100);
@@ -165,16 +154,12 @@ static int tc358765_hw_reset(struct omap_dss_device *dssdev)
 static int tc358765_probe(struct omap_dss_device *dssdev)
 {
 	struct tc358765_data *d2d;
-	struct tc358765_board_data *board_data = get_board_data(dssdev);
 	int r = 0;
 
 	dev_dbg(&dssdev->dev, "tc358765_probe\n");
 
-	tc358765_timings.x_res = board_data->x_res;
-	tc358765_timings.y_res = board_data->y_res;
 	dssdev->panel.config = OMAP_DSS_LCD_TFT;
-	dssdev->panel.timings = tc358765_timings;
-	dssdev->ctrl.pixel_size = 24;
+	tc358765_timings = dssdev->panel.timings;
 	dssdev->panel.acbi = 0;
 	dssdev->panel.acb = 40;
 
@@ -222,53 +207,57 @@ static void tc358765_remove(struct omap_dss_device *dssdev)
 	kfree(d2d);
 }
 
-static struct
-{
-	u16 reg;
-	u32 data;
-} tc358765_init_seq[] = {
-	/* this register setting is required only if host wishes to
-	 * perform DSI read transactions
-	 */
-	{ PPI_TX_RX_TA, 0x00000004 },
-	/* SYSLPTX Timing Generation Counter */
-	{ PPI_LPTXTIMECNT, 0x00000004 },
-	/* D*S_CLRSIPOCOUNT = [(THS-SETTLE + THS-ZERO) / HS_byte_clock_period ] */
-	{ PPI_D0S_CLRSIPOCOUNT, 0x00000003 },
-	{ PPI_D1S_CLRSIPOCOUNT, 0x00000003 },
-	{ PPI_D2S_CLRSIPOCOUNT, 0x00000003 },
-	{ PPI_D3S_CLRSIPOCOUNT, 0x00000003 },
-	/* SpeedLaneSel == HS4L */
-	{ DSI_LANEENABLE, 0x0000001F },
-	/* SpeedLaneSel == HS4L */
-	{ PPI_LANEENABLE, 0x0000001F },
-	/* Changed to 1 */
-	{ PPI_STARTPPI, 0x00000001 },
-	/* Changed to 1 */
-	{ DSI_STARTDSI, 0x00000001 },
-
-	/* configure D2L on-chip PLL */
-	{ LVPHY1, 0x00000000 },
-	/* set frequency range allowed and clock/data lanes */
-	{ LVPHY0, 0x00044006 },
-
-	/* configure D2L chip LCD Controller configuration registers */
-	{ VPCTRL, 0x00F00110 },
-	{ HTIM1, ((TC358765_HBP << 16) | TC358765_HSW)},
-	{ HTIM2, ((TC358765_HFP << 16) | TC358765_WIDTH)},
-	{ VTIM1, ((TC358765_VBP << 16) | TC358765_VSW)},
-	{ VTIM2, ((TC358765_VFP << 16) | TC358765_HEIGHT)},
-	{ LVCFG, 0x00000001 },
-
-	/* Issue a soft reset to LCD Controller for a clean start */
-	{ SYSRST, 0x00000004 },
-	{ VFUEN, 0x00000001 },
-};
-
 static int tc358765_write_init_config(struct omap_dss_device *dssdev)
 {
+	struct {
+		u16 reg;
+		u32 data;
+	} tc358765_init_seq[] = {
+		/* this register setting is required only if host wishes to
+		 * perform DSI read transactions
+		 */
+		{ PPI_TX_RX_TA, 0x00000004 },
+		/* SYSLPTX Timing Generation Counter */
+		{ PPI_LPTXTIMECNT, 0x00000004 },
+		/* D*S_CLRSIPOCOUNT = [(THS-SETTLE + THS-ZERO) /
+					HS_byte_clock_period ] */
+		{ PPI_D0S_CLRSIPOCOUNT, 0x00000003 },
+		{ PPI_D1S_CLRSIPOCOUNT, 0x00000003 },
+		{ PPI_D2S_CLRSIPOCOUNT, 0x00000003 },
+		{ PPI_D3S_CLRSIPOCOUNT, 0x00000003 },
+		/* SpeedLaneSel == HS4L */
+		{ DSI_LANEENABLE, 0x0000001F },
+		/* SpeedLaneSel == HS4L */
+		{ PPI_LANEENABLE, 0x0000001F },
+		/* Changed to 1 */
+		{ PPI_STARTPPI, 0x00000001 },
+		/* Changed to 1 */
+		{ DSI_STARTDSI, 0x00000001 },
+
+		/* configure D2L on-chip PLL */
+		{ LVPHY1, 0x00000000 },
+		/* set frequency range allowed and clock/data lanes */
+		{ LVPHY0, 0x00044006 },
+
+		/* configure D2L chip LCD Controller configuration registers */
+		{ VPCTRL, 0x00F00110 },
+		{ HTIM1, ((tc358765_timings.hbp << 16) |
+				tc358765_timings.hsw)},
+		{ HTIM2, ((tc358765_timings.hfp << 16) |
+				tc358765_timings.x_res)},
+		{ VTIM1, ((tc358765_timings.vbp << 16) |
+				tc358765_timings.vsw)},
+		{ VTIM2, ((tc358765_timings.vfp << 16) |
+				tc358765_timings.y_res)},
+		{ LVCFG, 0x00000001 },
+
+		/* Issue a soft reset to LCD Controller for a clean start */
+		{ SYSRST, 0x00000004 },
+		{ VFUEN, 0x00000001 },
+	};
+
 	struct tc358765_data *d2d = dev_get_drvdata(&dssdev->dev);
-	struct tc358765_board_data *board_data = get_board_data(dssdev);
+	struct omap_video_timings *timings = &dssdev->panel.timings;
 	int i;
 	int r;
 
@@ -295,9 +284,9 @@ static int tc358765_write_init_config(struct omap_dss_device *dssdev)
 		}
 	}
 	tc358765_write_register(dssdev, HTIM2,
-		(TC358765_HFP << 16) | board_data->x_res);
+		(timings->hfp << 16) | timings->x_res);
 	tc358765_write_register(dssdev, VTIM2,
-		(TC358765_VFP << 16) | board_data->y_res);
+		(timings->vfp << 16) | timings->y_res);
 
 	return 0;
 }
