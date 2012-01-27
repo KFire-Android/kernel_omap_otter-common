@@ -841,8 +841,7 @@ void hdmi_wp_irq_enable(struct hdmi_ip_data *ip_data,
 
 int ti_hdmi_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
 {
-	u32 val;
-	u32 r = 0;
+	u32 val = 0;
 	void __iomem *wp_base = hdmi_wp_base(ip_data);
 
 	pr_debug("Enter hdmi_ti_4xxx_irq_handler\n");
@@ -856,7 +855,7 @@ int ti_hdmi_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
 	/* flush posted write */
 	hdmi_read_reg(wp_base, HDMI_WP_IRQSTATUS);
 
-	return r;
+	return val;
 }
 
 void ti_hdmi_4xxx_basic_configure(struct hdmi_ip_data *ip_data)
