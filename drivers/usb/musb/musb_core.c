@@ -733,9 +733,12 @@ b_host:
 		case OTG_STATE_A_SUSPEND:
 			usb_hcd_resume_root_hub(musb_to_hcd(musb));
 			musb_root_disconnect(musb);
+			/* FIX: Multiple times hotplug with removal and connect
+			 * time-gap less than a second. "0" delay gives 7ms time
+			 * to call musb_do_idle
+			 */
 			if (musb->a_wait_bcon != 0 && is_otg_enabled(musb))
-				musb_platform_try_idle(musb, jiffies
-					+ msecs_to_jiffies(musb->a_wait_bcon));
+				musb_platform_try_idle(musb, 0);
 			break;
 #endif	/* HOST */
 #ifdef CONFIG_USB_MUSB_OTG
