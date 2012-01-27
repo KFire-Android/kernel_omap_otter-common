@@ -174,7 +174,9 @@ static int omap4_ehci_tll_hub_control(
 	u32		temp, temp1, status;
 	unsigned long	flags;
 	int		retval = 0;
-	u32		runstop, temp_reg;
+	u32		runstop, temp_reg, tll_reg;
+
+	tll_reg = (u32)OMAP2_L4_IO_ADDRESS(L3INIT_HSUSBTLL_CLKCTRL);
 
 	spin_lock_irqsave(&ehci->lock, flags);
 	switch (typeReq) {
@@ -239,23 +241,25 @@ static int omap4_ehci_tll_hub_control(
 				ehci_writel(ehci, (runstop & ~CMD_RUN),
 							&ehci->regs->command);
 				(void) ehci_readl(ehci, &ehci->regs->command);
-				handshake(ehci, &ehci->regs->status,
+				if (handshake(ehci, &ehci->regs->status,
 							STS_HALT,
 							STS_HALT,
-							2000);
+							2000) != 0)
+					ehci_err(ehci,
+						"port %d would not halt!\n",
+						wIndex);
 
-				temp_reg = omap_readl(L3INIT_HSUSBTLL_CLKCTRL);
+				temp_reg = __raw_readl(tll_reg);
 				temp_reg &= ~(1 << (wIndex + 8));
 
 				/* stop resume signaling */
-				temp = ehci_readl(ehci, status_reg);
-				ehci_writel(ehci,
-					temp & ~(PORT_RWC_BITS | PORT_RESUME),
-					status_reg);
+				temp = __raw_readl(status_reg) &
+					~(PORT_RWC_BITS | PORT_RESUME);
+				__raw_writel(temp, status_reg);
 
 				/* Disable the Channel Optional Fclk */
-				omap_writel(temp_reg, L3INIT_HSUSBTLL_CLKCTRL);
-
+				__raw_writel(temp_reg, tll_reg);
+				dmb();
 				retval = handshake(ehci, status_reg,
 					   PORT_RESUME, 0, 2000 /* 2msec */);
 
