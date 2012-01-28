@@ -29,6 +29,8 @@
 #include <linux/delay.h>
 #include <plat/common.h>
 #include <asm/proc-fns.h>
+#include <linux/platform_data/emif_plat.h>
+#include <misc/jedec_ddr.h>
 
 #ifdef CONFIG_SOC_OMAP2420
 extern void omap242x_map_common_io(void);
@@ -255,5 +257,13 @@ struct omap_sdrc_params;
 extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
 				      struct omap_sdrc_params *sdrc_cs1);
 
+#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
+void __init omap_emif_set_device_details(u32 emif_nr,
+			struct ddr_device_info *device_info,
+			struct lpddr2_timings *timings,
+			u32 timings_arr_size,
+			struct lpddr2_min_tck *min_tck,
+			struct emif_custom_configs *custom_configs);
+#endif
 #endif /* __ASSEMBLER__ */
 #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
