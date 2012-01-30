@@ -76,20 +76,24 @@ static ssize_t rproc_format_trace_buf(char __user *userbuf, size_t count,
 	if (pos == 0)
 		*ppos = w_pos;
 
-	for (i = w_pos; i < size && buf[i]; i++);
+	for (i = w_pos; i < size && buf[i]; i++)
+		;
 
 	if (i > w_pos)
-		num_copied = simple_read_from_buffer(userbuf, count, ppos, src, i);
+		num_copied = simple_read_from_buffer(userbuf, count,
+							ppos, src, i);
 		if (!num_copied) {
 			from_beg = 1;
 			*ppos = 0;
 		} else
 			return num_copied;
 print_beg:
-	for (i = 0; i < w_pos && buf[i]; i++);
+	for (i = 0; i < w_pos && buf[i]; i++)
+		;
 
 	if (i) {
-		num_copied = simple_read_from_buffer(userbuf, count, ppos, src, i);
+		num_copied = simple_read_from_buffer(userbuf, count,
+							ppos, src, i);
 		if (!num_copied)
 			from_beg = 0;
 		return num_copied;
@@ -1043,9 +1047,8 @@ static int rproc_process_fw(struct rproc *rproc, struct fw_section *section,
 			ret = rproc_handle_resources(rproc,
 					(struct fw_resource *) section->content,
 					len, bootaddr);
-			if (ret) {
+			if (ret)
 				break;
-			}
 		}
 
 		if (section->type <= FW_DATA) {
