@@ -39,10 +39,10 @@
 #include "dss_features.h"
 
 #define HDMI_WP			0x0
-#define HDMI_CORE_SYS		0x400
-#define HDMI_CORE_AV		0x900
 #define HDMI_PLLCTRL		0x200
 #define HDMI_PHY		0x300
+
+#define HDMI_CORE_AV		0x900
 
 /* HDMI EDID Length move this */
 #define HDMI_EDID_MAX_LENGTH			256
@@ -717,7 +717,7 @@ static int omapdss_hdmihw_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(&pdev->dev);
 
-	hdmi.ip_data.core_sys_offset = HDMI_CORE_SYS;
+	hdmi.ip_data.core_sys_offset = dss_feat_get_hdmi_core_sys_offset();
 	hdmi.ip_data.core_av_offset = HDMI_CORE_AV;
 	hdmi.ip_data.pll_offset = HDMI_PLLCTRL;
 	hdmi.ip_data.phy_offset = HDMI_PHY;

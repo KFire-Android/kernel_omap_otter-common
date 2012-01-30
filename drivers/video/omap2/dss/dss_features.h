@@ -114,6 +114,8 @@ u32 dss_feat_get_burst_size_unit(void);		/* in bytes */
 
 int dss_feat_get_dsi_ddr_div(void);
 
+unsigned long dss_feat_get_hdmi_core_sys_offset(void);
+
 bool dss_has_feature(enum dss_feat_id id);
 void dss_feat_get_reg_field(enum dss_feat_reg_field id, u8 *start, u8 *end);
 void dss_features_init(void);
