@@ -125,9 +125,9 @@
 #define ADMA_ERR		(1 << 25)
 #define ADMA_XFER_INT		(1 << 3)
 
-#define ADMA_TABLE_SZ (PAGE_SIZE)
-#define ADMA_TABLE_NUM_ENTRIES \
-	(ADMA_TABLE_SZ / sizeof(struct adma_desc_table))
+#define DMA_TABLE_NUM_ENTRIES	1024
+#define ADMA_TABLE_SZ 	\
+	(DMA_TABLE_NUM_ENTRIES * sizeof(struct adma_desc_table))
 
 #define SDMA_XFER	1
 #define ADMA_XFER	2
@@ -1562,6 +1562,7 @@ static int mmc_populate_adma_desc_table(struct omap_hsmmc_host *host,
 				ADMA_XFER_VALID);
 
 		} else {
+			dev_err(mmc_dev(host->mmc), "unexpected dmalen %d\n", dmalen);
 			/* Each descritpor row can only support
 			 * transfer upto ADMA_MAX_XFER_PER_ROW.
 			 * If the current segment is bigger, it has to be
@@ -1584,7 +1585,7 @@ static int mmc_populate_adma_desc_table(struct omap_hsmmc_host *host,
 	}
 	/* Setup last entry to terminate */
 	pdesc[i + j - 1].attr |= ADMA_XFER_END;
-	WARN_ON((i + j - 1) > ADMA_TABLE_NUM_ENTRIES);
+	WARN_ON((i + j - 1) > DMA_TABLE_NUM_ENTRIES);
 	dev_dbg(mmc_dev(host->mmc),
 		"ADMA table has %d entries from %d sglist\n",
 		i + j, host->dma_len);
@@ -2385,11 +2386,18 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 
 	/* Since we do only SG emulation, we can have as many segs
 	 * as we want. */
-	mmc->max_segs = 1024;
+	mmc->max_segs = DMA_TABLE_NUM_ENTRIES;
 
-	mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
-	mmc->max_blk_count = 0xFFFF;    /* No. of Blocks is 16 bits */
-	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
+	if (host->dma_type == ADMA_XFER) {
+		mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
+		mmc->max_blk_count = 120;      /* ADMA Block size is 16 bits wide */
+		mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count
+					* DMA_TABLE_NUM_ENTRIES;
+	} else {
+		mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
+		mmc->max_blk_count = 0xFFFF;    /* No. of Blocks is 16 bits */
+		mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
+	}
 	mmc->max_seg_size = mmc->max_req_size;
 
 	mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
