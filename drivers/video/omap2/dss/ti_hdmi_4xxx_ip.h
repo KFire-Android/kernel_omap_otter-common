@@ -225,6 +225,7 @@
 #define HDMI_TXPHY_DIGITAL_CTRL			0x4
 #define HDMI_TXPHY_POWER_CTRL			0x8
 #define HDMI_TXPHY_PAD_CFG_CTRL			0xC
+#define HDMI_TXPHY_BIST_CONTROL			0x1C
 
 /* Interrupt masks */
 #define HDMI_WP_IRQSTATUS_CORE_MASK                  0x1

@@ -301,6 +301,14 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 {
 	u16 r = 0;
 	void __iomem *phy_base = hdmi_phy_base(ip_data);
+	enum omapdss_version version = omapdss_get_version();
+
+	/*
+	 * In OMAP5, the HFBITCLK must be divided by 2 before issuing the
+	 * HDMI_PHYPWRCMD_LDOON command.
+	 */
+	if (version == OMAPDSS_VER_OMAP5)
+		REG_FLD_MOD(phy_base, HDMI_TXPHY_BIST_CONTROL, 1, 11, 11);
 
 	r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
 
