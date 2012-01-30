@@ -181,6 +181,7 @@
 #define HDMI_TXPHY_DIGITAL_CTRL			0x4
 #define HDMI_TXPHY_POWER_CTRL			0x8
 #define HDMI_TXPHY_PAD_CFG_CTRL			0xC
+#define HDMI_TXPHY_BIST_CONTROL			0x1C
 
 #define REG_FLD_MOD(base, idx, val, start, end) \
 	hdmi_write_reg(base, idx, FLD_MOD(hdmi_read_reg(base, idx),\
