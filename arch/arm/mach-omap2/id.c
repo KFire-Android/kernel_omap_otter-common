@@ -76,6 +76,8 @@ out:
 }
 EXPORT_SYMBOL(omap_type);
 
+#define OMAP4_SILICON_TYPE_STANDARD	0x01
+#define OMAP4_SILICON_TYPE_PERFORMANCE	0x02
 
 /*----------------------------------------------------------------------------*/
 
@@ -235,20 +237,15 @@ static void __init omap4_check_features(void)
 	  (read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1) >> 16) & 3;
 
 	switch (si_type) {
-	case 0x2:
+	case OMAP4_SILICON_TYPE_PERFORMANCE:
 		/* High performance device */
-		if (cpu_is_omap443x()) {
-			omap4_features |= OMAP4_HAS_MPU_1GHZ;
+		if (cpu_is_omap443x())
 			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
-		} else if (cpu_is_omap446x()) {
-			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
+		else if (cpu_is_omap446x() || cpu_is_omap447x())
 			omap4_features |= OMAP4_HAS_MPU_1_5GHZ;
-		} else if (cpu_is_omap447x()) {
-			omap4_features |= OMAP4_HAS_MPU_1_3GHZ;
-			omap4_features |= OMAP4_HAS_MPU_1_5GHZ;
-		}
-		break;
-	case 0x1:
+
+		/* Fall through to Standard device features */
+	case OMAP4_SILICON_TYPE_STANDARD:
 	default:
 		/* Standard device */
 		if (cpu_is_omap443x())
