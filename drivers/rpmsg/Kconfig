@@ -30,6 +30,20 @@ config RPMSG_RESMGR
 
 	  If unsure, say N.
 
+config OMAP_RPMSG_RESMGR
+	tristate "OMAP rpmsg resource manager support"
+	depends on ARCH_OMAP4 || ARCH_OMAP5
+	depends on RPMSG
+	select RPMSG_RESMGR
+	---help---
+	  Add OMAP SoC specific request and release OMAP resources
+	  from a remote Processor. This extends the generic RPMSG_RESMGR
+	  to support OMAP specific resources. Common resources requested by
+	  a remote processor in the SoC include gptimers, sdma channels,
+	  auxiliary clocks,etc.
+
+	  If unsure, say N.
+
 config RPMSG_OMX
 	tristate "rpmsg OMX driver"
 	depends on RPMSG
