@@ -38,6 +38,7 @@
 #include <linux/types.h>
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
+#include <linux/idr.h>
 
 /* The feature bitmap for virtio rpmsg */
 #define VIRTIO_RPMSG_F_NS	0 /* RP supports name service notifications */
@@ -93,7 +94,43 @@ enum rpmsg_ns_flags {
 
 #define RPMSG_ADDR_ANY		0xFFFFFFFF
 
-struct virtproc_info;
+/**
+ * struct virtproc_info - virtual remote processor state
+ * @vdev:	the virtio device
+ * @rvq:	rx virtqueue
+ * @svq:	tx virtqueue
+ * @rbufs:	kernel address of rx buffers
+ * @sbufs:	kernel address of tx buffers
+ * @last_sbuf:	index of last tx buffer used
+ * @bufs_dma:	dma base addr of the buffers
+ * @tx_lock:	protects svq, sbufs and sleepers, to allow concurrent senders.
+ *		sending a message might require waking up a dozing remote
+ *		processor, which involves sleeping, hence the mutex.
+ * @endpoints:	idr of local endpoints, allows fast retrieval
+ * @endpoints_lock: lock of the endpoints set
+ * @sendq:	wait queue of sending contexts waiting for a tx buffers
+ * @sleepers:	number of senders that are waiting for a tx buffer
+ * @ns_ept:	the bus's name service endpoint
+ * @id:		unique system-wide index id for this vproc
+ *
+ * This structure stores the rpmsg state of a given virtio remote processor
+ * device (there might be several virtio proc devices for each physical
+ * remote processor).
+ */
+struct virtproc_info {
+	struct virtio_device *vdev;
+	struct virtqueue *rvq, *svq;
+	void *rbufs, *sbufs;
+	int last_sbuf;
+	dma_addr_t bufs_dma;
+	struct mutex tx_lock;
+	struct idr endpoints;
+	struct mutex endpoints_lock;
+	wait_queue_head_t sendq;
+	atomic_t sleepers;
+	struct rpmsg_endpoint *ns_ept;
+	int id;
+};
 
 /**
  * rpmsg_channel - devices that belong to the rpmsg bus are called channels
