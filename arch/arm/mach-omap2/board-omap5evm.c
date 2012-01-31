@@ -489,6 +489,7 @@ static struct regulator_consumer_supply omap5_dss_phy_supply[] = {
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.1"),
+	REGULATOR_SUPPLY("vdds_hdmi", "omapdss_hdmi"),
 };
 
 static struct regulator_init_data omap5_ldo7 = {
@@ -770,8 +771,28 @@ static struct omap_dss_device omap5evm_lcd_device = {
 	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
 
+static int omap5evm_panel_enable_hdmi(struct omap_dss_device *dssdev)
+{
+	return 0;
+}
+
+static void omap5evm_panel_disable_hdmi(struct omap_dss_device *dssdev)
+{
+
+}
+
+static struct omap_dss_device omap5evm_hdmi_device = {
+	.name = "hdmi",
+	.driver_name = "hdmi_panel",
+	.type = OMAP_DISPLAY_TYPE_HDMI,
+	.platform_enable = omap5evm_panel_enable_hdmi,
+	.platform_disable = omap5evm_panel_disable_hdmi,
+	.channel = OMAP_DSS_CHANNEL_DIGIT,
+};
+
 static struct omap_dss_device *omap5evm_dss_devices[] = {
 	&omap5evm_lcd_device,
+	&omap5evm_hdmi_device,
 };
 
 static struct omap_dss_board_info omap5evm_dss_data = {
