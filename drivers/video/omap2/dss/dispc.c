@@ -3996,10 +3996,7 @@ static void _omap_dispc_initial_config(void)
 	}
 
 	l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
-<<<<<<< HEAD
 	l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
-=======
->>>>>>> omap: dispc: force L3_1 CD to NOSLEEP when dispc module is active.
 
 	/* FUNCGATED */
 	if (dss_has_feature(FEAT_FUNCGATED))
