@@ -484,6 +484,13 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 	if (of_get_property(node, "tx-fifo-resize", NULL))
 		dwc->needs_fifo_resize = true;
 
+	/*
+	 * REVISIT: For internal releases, we still don't have a working DT
+	 * setup, so we will, temporarily, set this flag to 'true'
+	 * unconditionaly until we can use DT properly.
+	 */
+	dwc->needs_fifo_resize = true;
+
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
 	pm_runtime_forbid(dev);
