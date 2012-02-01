@@ -1339,12 +1339,11 @@ static void omap2_gpio_set_wakeupenables(struct gpio_bank *bank)
 		if (bank->id == 2)
 			pad_wakeup &= ~BIT(22);
 		/*
-		* Exclude GPIO 63 as it is used for HDMI HPD
-		* and GPIO 38 for secondary sensor as these are not
-		* intended to wakeup the system
+		* Exclude GPIO 63 too as it is used for HDMI HPD
+		* and is not intended to wakeup the system
 		*/
 		if (bank->id == 1)
-			pad_wakeup &= ~(BIT(6) | BIT(31));
+			pad_wakeup &= ~BIT(31);
 	}
 
 	for_each_set_bit(i, &pad_wakeup, bank->width) {
