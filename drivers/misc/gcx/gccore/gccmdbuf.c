@@ -19,11 +19,11 @@
 #include <linux/delay.h>
 #include <linux/wait.h>
 
-#include "gcreg.h"
+#include <linux/gcx.h>
 #include "gcmain.h"
 #include "gccmdbuf.h"
 
-#define GC_ENABLE_GPU_COUNTERS	1
+#define GC_ENABLE_GPU_COUNTERS	0
 
 #ifndef GC_DUMP
 #	define GC_DUMP 0
@@ -198,6 +198,9 @@ int cmdbuf_flush(void *logical)
 
 		gc_flush_pages(&cmdbuf.page);
 
+		/* Enable power to the chip. */
+		gc_set_power(GCPWR_ON);
+
 #if GC_DUMP || GC_ENABLE_GPU_COUNTERS
 		/* Reset hardware counters. */
 		gc_write_reg(GC_RESET_MEM_COUNTERS_Address, 1);
@@ -216,17 +219,16 @@ int cmdbuf_flush(void *logical)
 			);
 
 		/* Wait for the interrupt. */
-#if ENABLE_POLLING
+#if 1
 		gc_wait_interrupt();
 
 		GC_PRINT(KERN_INFO "%s(%d): data = 0x%08X\n",
 			__func__, __LINE__, gc_get_interrupt_data());
+
+		/* Go to suspend. */
+		gc_set_power(GCPWR_SUSPEND);
 #else
 		wait_event_interruptible(gc_event, done == true);
-#endif
-
-#if GC_DUMP
-		gpu_status((char *) __func__, __LINE__, 0);
 #endif
 
 		/* Reset the buffer. */
@@ -240,189 +242,9 @@ int cmdbuf_flush(void *logical)
 	return flushSize;
 }
 
-void gpu_id(void)
-{
-	u32 chipModel;
-	u32 chipRevision;
-	u32 chipDate;
-	u32 chipTime;
-	u32 chipFeatures;
-	u32 chipMinorFeatures;
-
-	chipModel = gc_read_reg(GC_CHIP_ID_Address);
-	chipRevision = gc_read_reg(GC_CHIP_REV_Address);
-	chipDate = gc_read_reg(GC_CHIP_DATE_Address);
-	chipTime = gc_read_reg(GC_CHIP_TIME_Address);
-	chipFeatures = gc_read_reg(GC_FEATURES_Address);
-	chipMinorFeatures = gc_read_reg(GC_MINOR_FEATURES0_Address);
-
-	GC_PRINT(KERN_INFO "CHIP IDENTITY\n");
-	GC_PRINT(KERN_INFO "  model=%X\n", chipModel);
-	GC_PRINT(KERN_INFO "  revision=%X\n", chipRevision);
-	GC_PRINT(KERN_INFO "  date=%X\n", chipDate);
-	GC_PRINT(KERN_INFO "  time=%X\n", chipTime);
-	GC_PRINT(KERN_INFO "  chipFeatures=0x%08X\n", chipFeatures);
-}
-
-#if 0
-#undef GC_PRINT
-#undef GC_DUMP
-#define GC_DUMP 1
-
-#if GC_DUMP
-#	define GC_PRINT printk
-#else
-#	define GC_PRINT(...)
-#endif
-#endif
-
-void gpu_status(char *function, int line, u32 acknowledge)
-{
-	int i;
-	u32 idle;
-	u32 dma_state, dma_addr;
-	u32 dma_low_data, dma_high_data;
-	u32 status;
-	u32 mmu;
-	u32 address;
-	u32 total_reads;
-	u32 total_writes;
-	u32 total_read_bursts;
-	u32 total_write_bursts;
-	u32 total_read_reqs;
-	u32 total_write_reqs;
-
-	GC_PRINT(KERN_INFO "%s(%d): Current GPU status.\n",
-		function, line);
-
-	idle = gc_read_reg(GCREG_HI_IDLE_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   idle = 0x%08X\n",
-		function, line, idle);
-
-	dma_state = gc_read_reg(GCREG_FE_DEBUG_STATE_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   DMA state = 0x%08X\n",
-		function, line, dma_state);
-
-	dma_addr = gc_read_reg(GCREG_FE_DEBUG_CUR_CMD_ADR_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   DMA address = 0x%08X\n",
-		function, line, dma_addr);
-
-	dma_low_data = gc_read_reg(GCREG_FE_DEBUG_CMD_LOW_REG_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   DMA low data = 0x%08X\n",
-		function, line, dma_low_data);
-
-	dma_high_data = gc_read_reg(GCREG_FE_DEBUG_CMD_HI_REG_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   DMA high data = 0x%08X\n",
-		function, line, dma_high_data);
-
-	total_reads = gc_read_reg(GC_TOTAL_READS_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   Total memory reads = %d\n",
-		function, line, total_reads);
-
-	total_writes = gc_read_reg(GC_TOTAL_WRITES_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   Total memory writes = %d\n",
-		function, line, total_writes);
-
-	total_read_bursts = gc_read_reg(GC_TOTAL_READ_BURSTS_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   Total memory read 64-bit bursts = %d\n",
-		function, line, total_read_bursts);
-
-	total_write_bursts = gc_read_reg(GC_TOTAL_WRITE_BURSTS_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   Total memory write 64-bit bursts = %d\n",
-		function, line, total_write_bursts);
-
-	total_read_reqs = gc_read_reg(GC_TOTAL_READ_REQS_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   Total memory read requests = %d\n",
-		function, line, total_read_reqs);
-
-	total_write_reqs = gc_read_reg(GC_TOTAL_WRITE_REQS_Address);
-	GC_PRINT(KERN_INFO "%s(%d):   Total memory write requests = %d\n",
-		function, line, total_write_reqs);
-
-	GC_PRINT(KERN_INFO "%s(%d):   interrupt acknowledge = 0x%08X\n",
-		function, line, acknowledge);
-
-	if (acknowledge & 0x80000000) {
-		GC_PRINT(KERN_INFO "%s(%d):   *** BUS ERROR ***\n",
-			function, line);
-	}
-
-	if (acknowledge & 0x40000000) {
-		u32 mtlb, stlb, offset;
-
-		GC_PRINT(KERN_INFO "%s(%d):   *** MMU ERROR ***\n",
-			function, line);
-
-		status = gc_read_reg(GCREG_MMU_STATUS_Address);
-		GC_PRINT(KERN_INFO "%s(%d):   MMU status = 0x%08X\n",
-			function, line, status);
-
-		for (i = 0; i < 4; i += 1) {
-			mmu = status & 0xF;
-			status >>= 4;
-
-			if (mmu == 0)
-				continue;
-
-			switch (mmu) {
-			case 1:
-				GC_PRINT(KERN_INFO
-					"%s(%d):   MMU%d: slave not present\n",
-					function, line, i);
-				break;
-
-			case 2:
-				GC_PRINT(KERN_INFO
-					"%s(%d):   MMU%d: page not present\n",
-					function, line, i);
-				break;
-
-			case 3:
-				GC_PRINT(KERN_INFO
-					"%s(%d):   MMU%d: write violation\n",
-					function, line, i);
-				break;
-
-			default:
-				GC_PRINT(KERN_INFO
-					"%s(%d):   MMU%d: unknown state\n",
-					function, line, i);
-			}
-
-			address = gc_read_reg(GCREG_MMU_EXCEPTION_Address + i);
-
-			mtlb   = (address & MMU_MTLB_MASK) >> MMU_MTLB_SHIFT;
-			stlb   = (address & MMU_STLB_MASK) >> MMU_STLB_SHIFT;
-			offset =  address & MMU_OFFSET_MASK;
-
-			GC_PRINT(KERN_INFO
-				"%s(%d):   MMU%d: exception address = 0x%08X\n",
-				function, line, i, address);
-
-			GC_PRINT(KERN_INFO
-				"%s(%d):            MTLB entry = %d\n",
-				function, line, mtlb);
-
-			GC_PRINT(KERN_INFO
-				"%s(%d):            STLB entry = %d\n",
-				function, line, stlb);
-
-			GC_PRINT(KERN_INFO
-				"%s(%d):            Offset = 0x%08X (%d)\n",
-				function, line, offset, offset);
-		}
-	}
-}
-
-#if 0
-#undef GC_DUMP
-#undef GC_PRINT
-#define GC_PRINT(...)
-#endif
-
 void cmdbuf_dump(void)
 {
-	u32 i, count, base;
+	unsigned int i, count, base;
 
 	base = cmdbuf.mapped ? cmdbuf.mapped_physical : cmdbuf.page.physical;
 
@@ -433,7 +255,7 @@ void cmdbuf_dump(void)
 		__func__, __LINE__, base, cmdbuf.mapped ? " (mapped)" : "");
 
 	GC_PRINT(KERN_INFO "%s(%d):   logical = 0x%08X\n",
-		__func__, __LINE__, (u32) cmdbuf.page.logical);
+		__func__, __LINE__, (unsigned int) cmdbuf.page.logical);
 
 	GC_PRINT(KERN_INFO "%s(%d):   current data size = %d\n",
 		__func__, __LINE__, cmdbuf.data_size);

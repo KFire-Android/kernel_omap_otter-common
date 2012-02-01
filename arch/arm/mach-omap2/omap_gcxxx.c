@@ -21,6 +21,12 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 
+/* gc-core platform device data structure */
+struct gccore_plat_data {
+	void __iomem *base;
+	int irq;
+};
+
 static struct gccore_plat_data omap_gcxxx;
 
 struct omap_device_pm_latency omap_gcxxx_latency[] = {

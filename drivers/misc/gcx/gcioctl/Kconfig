@@ -1,0 +1,6 @@
+config GCIOCTL
+	tristate "User interface to Vivante 2D/3D driver"
+	default n 
+	depends on GCCORE
+	help
+           User interface to Vivante 2D/3D driver.

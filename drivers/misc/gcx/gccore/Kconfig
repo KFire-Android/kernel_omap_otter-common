@@ -1,11 +1,5 @@
-config GC_CORE
-	tristate "Vivante 2D/3D Core Driver"
-	default n
+config GCCORE
+	tristate "Vivante Core Driver"
+	default n 
 	help
-           Vivante 2D/3D Core Driver.
-config GC2D
-	tristate "GCX BLTsville 2D Interface"
-	default y
-	depends on GC_CORE
-	help
-           GCX BLTsville 2D Interface.
+           Vivante Core Driver.

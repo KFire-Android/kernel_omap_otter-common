@@ -17,6 +17,8 @@
 
 #include <linux/gccore.h>
 
+#define DEV_NAME	"gccore"
+
 /*
  * Register access.
  */
@@ -40,9 +42,24 @@ enum gcerror gc_alloc_pages(struct gcpage *p, unsigned int size);
 void gc_free_pages(struct gcpage *p);
 void gc_flush_pages(struct gcpage *p);
 
-#if ENABLE_POLLING
+/*
+ * Power management.
+ */
+
+enum gcpower {
+	GCPWR_UNKNOWN,
+	GCPWR_OFF,
+	GCPWR_SUSPEND,
+	GCPWR_ON
+};
+
+enum gcerror gc_set_power(enum gcpower gcpower);
+
+/*
+ * Interrupt.
+ */
+
 void gc_wait_interrupt(void);
-u32 gc_get_interrupt_data(void);
-#endif
+unsigned int gc_get_interrupt_data(void);
 
 #endif

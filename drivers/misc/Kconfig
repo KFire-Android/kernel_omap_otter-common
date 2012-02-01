@@ -557,5 +557,7 @@ source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/gcx/gccore/Kconfig"
+source "drivers/misc/gcx/gcioctl/Kconfig"
+source "drivers/misc/gcx/gcbv/Kconfig"
 
 endif # MISC_DEVICES

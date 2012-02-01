@@ -20,7 +20,7 @@
 #include <linux/pagemap.h>
 #include <linux/sched.h>
 
-#include "gcreg.h"
+#include <linux/gcx.h>
 #include "gcmmu.h"
 #include "gccmdbuf.h"
 
@@ -30,10 +30,6 @@
 
 #ifndef GC_DUMP
 #	define GC_DUMP 0
-#endif
-
-#ifndef GC_DUMP_MMU
-#	define GC_DUMP_MMU 0
 #endif
 
 #ifndef GC_FLUSH_USER_PAGES
@@ -83,7 +79,6 @@ static inline struct mmu2dprivate *get_mmu(void)
 	return &_mmu;
 }
 
-#if GC_DUMP_MMU
 static u32 get_mtlb_present(u32 entry)
 {
 	return entry & MMU_MTLB_PRESENT_MASK;
@@ -174,7 +169,6 @@ static void mmu2d_dump_table(struct mm2dtable *desc, struct gcpage *table)
 			skipped);
 	}
 }
-#endif
 
 /*
  * Arena record management.
@@ -693,8 +687,7 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 		((mem->pagesize != 0) && (mem->pagesize != MMU_PAGE_SIZE)))
 		return GCERR_MMU_ARG;
 
-	if (current->mm != NULL)
-		down_read(&current->mm->mmap_sem);
+	down_read(&current->mm->mmap_sem);
 
 	/*
 	 * Find available sufficient arena.
@@ -877,8 +870,7 @@ fail:
 			release_physical_pages(vacant);
 	}
 
-	if (current->mm != NULL)
-		up_read(&current->mm->mmap_sem);
+	up_read(&current->mm->mmap_sem);
 	return gcerror;
 }
 
@@ -901,8 +893,7 @@ enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt, struct mmu2darena *mapped)
 	if ((ctxt == NULL) || (ctxt->mmu == NULL))
 		return GCERR_MMU_CTXT_BAD;
 
-	if (current->mm != NULL)
-		down_read(&current->mm->mmap_sem);
+	down_read(&current->mm->mmap_sem);
 
 	/*
 	 * Find the arena.
@@ -1040,9 +1031,7 @@ enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt, struct mmu2darena *mapped)
 	}
 
 fail:
-	if (current->mm != NULL)
-		up_read(&current->mm->mmap_sem);
-
+	up_read(&current->mm->mmap_sem);
 	return gcerror;
 }
 
@@ -1103,39 +1092,22 @@ int mmu2d_flush(void *logical, u32 address, u32 size)
 #endif
 }
 
-#if 0
-#undef GC_PRINT
-#undef GC_DUMP
-#define GC_DUMP 1
-
-#if GC_DUMP
-#	define GC_PRINT printk
-#else
-#	define GC_PRINT(...)
-#endif
-#endif
-
 enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
 {
 	enum gcerror gcerror = GCERR_NONE;
-	int fixedsize;
-	struct mmu2darena *arena;
 	struct gcfixupentry *table;
+	struct mmu2darena *arena;
 	unsigned int dataoffset;
 	unsigned int surfoffset;
 	unsigned int i;
 
-	/* Get the fixed sized of the structure. */
-	fixedsize = offsetof(struct gcfixup, fixup);
-
 	/* Process fixups. */
 	while (fixup != NULL) {
-		GC_PRINT(KERN_ERR "%s(%d): processing user fixup @ 0x%08X\n",
-			__func__, __LINE__, (unsigned int) fixup);
-
-		table = fixup->fixup;
+		GC_PRINT(KERN_ERR "%s(%d): processing %d fixup(s) @ 0x%08X\n",
+			__func__, __LINE__, fixup->count, (unsigned int) fixup);
 
 		/* Apply fixups. */
+		table = fixup->fixup;
 		for (i = 0; i < fixup->count; i += 1) {
 			GC_PRINT("%s(%d): [%02d] buffer offset = 0x%08X, "
 				"surface offset = 0x%08X\n",
@@ -1164,6 +1136,9 @@ enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
 
 			data[dataoffset] = arena->address + surfoffset;
 
+			GC_PRINT(KERN_ERR "%s(%d): surface address = 0x%08X\n",
+				__func__, __LINE__, data[dataoffset]);
+
 #if GC_FLUSH_USER_PAGES
 			flush_user_buffer(arena);
 #endif
@@ -1178,15 +1153,8 @@ enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
 	return gcerror;
 }
 
-#if 0
-#undef GC_DUMP
-#undef GC_PRINT
-#define GC_PRINT(...)
-#endif
-
 void mmu2d_dump(struct mmu2dcontext *ctxt)
 {
-#if GC_DUMP_MMU
 	static struct mm2dtable mtlb_desc = {
 		"Master",
 		MMU_MTLB_ENTRY_NUM,
@@ -1255,6 +1223,4 @@ void mmu2d_dump(struct mmu2dcontext *ctxt)
 	for (i = 0; i < MMU_MTLB_ENTRY_NUM; i += 1)
 		if (ctxt->slave[i] != NULL)
 			mmu2d_dump_table(&stlb_desc, &ctxt->slave[i]->pages);
-
-#endif
 }

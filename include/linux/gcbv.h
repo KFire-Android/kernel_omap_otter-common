@@ -1,7 +1,7 @@
 /*
- * bv_gc2d-priv.h
+ * gc2d.h
  *
- * Copyright (C) 2011, Texas Instruments, Inc.
+ * Copyright (C) 2010-2011 Vivante Corporation.
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,18 +12,15 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef BLTVILLE_BVGC2D_PRIV
-#define BLTVILLE_BVGC2D_PRIV
+#ifndef GC2D_H
+#define GC2D_H
 
 #include <linux/bltsville.h>
-#include <linux/gccore.h>
+#include <linux/bvinternal.h>
+#include <linux/ocd.h>
 
-enum bverror bv_gc2d_map(struct bvbuffdesc *buffdesc);
-enum bverror bv_gc2d_unmap(struct bvbuffdesc *buffdesc);
-enum bverror bv_gc2d_blt(struct bvbltparams *bltparams);
-void bv_gc2d_fillentry(void);
-void bv_gc2d_clearentry(void);
-int bv_gc2d_init(void);
-int bv_gc2d_exit(void);
+enum bverror bv_map(struct bvbuffdesc *buffdesc);
+enum bverror bv_unmap(struct bvbuffdesc *buffdesc);
+enum bverror bv_blt(struct bvbltparams *bltparams);
 
 #endif

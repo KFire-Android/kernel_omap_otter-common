@@ -20,6 +20,10 @@
 
 #define MMU_ENABLE 1
 
+#ifndef GC_DUMP_MMU
+#	define GC_DUMP_MMU 0
+#endif
+
 /*
  * Master table can be configured in 1KB mode with 256 maximum entries
  * or 4KB mode with 1024 maximum entries.
