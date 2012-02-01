@@ -694,6 +694,7 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	struct tf_crypto_aes_operation_state *state =
 		crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(ctx->req));
 	static size_t last_count;
+	unsigned long flags;
 
 	in = IS_ALIGNED((u32)ctx->in_sg->offset, sizeof(u32));
 	out = IS_ALIGNED((u32)ctx->out_sg->offset, sizeof(u32));
@@ -829,6 +830,7 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	omap_start_dma(ctx->dma_lch_in);
 	omap_start_dma(ctx->dma_lch_out);
 
+	spin_lock_irqsave(&ctx->lock, flags);
 	if (ctx->next_req) {
 		struct ablkcipher_request *req =
 			ablkcipher_request_cast(ctx->next_req);
@@ -855,6 +857,7 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 		ctx->backlog->complete(ctx->backlog, -EINPROGRESS);
 		ctx->backlog = NULL;
 	}
+	spin_unlock_irqrestore(&ctx->lock, flags);
 
 	return 0;
 }

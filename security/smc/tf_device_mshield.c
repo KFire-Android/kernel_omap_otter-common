@@ -364,7 +364,6 @@ void __exit tf_device_mshield_exit(void)
 	if (dev == NULL)
 		return;
 
-	mutex_lock(&dev->dev_mutex);
 	if (tf_ctrl_class != NULL) {
 		device_destroy(tf_ctrl_class, dev->dev_number + 1);
 		class_destroy(tf_ctrl_class);
@@ -372,7 +371,6 @@ void __exit tf_device_mshield_exit(void)
 	}
 	cdev_del(&(dev->cdev_ctrl));
 	unregister_chrdev_region(dev->dev_number + 1, 1);
-	mutex_unlock(&dev->dev_mutex);
 
 	dev->workspace_size = 0;
 	dev->workspace_addr = 0;

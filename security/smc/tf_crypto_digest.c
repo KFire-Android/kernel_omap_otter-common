@@ -465,17 +465,33 @@ static bool tf_digest_hw_perform_dma(u8 *data, u32 nDataLength,
 	struct omap_dma_channel_params ch0_parameters;
 	u32 length_loop = 0;
 	u32 algo_constant;
+	u8 *local_buf = NULL;
+	dma_addr_t local_buf_phys;
 	struct tf_device *dev = tf_get_device();
+	bool ret = true;
 
 	dpr_info(
 		"%s: Buffer=0x%08x/%u\n",
 		__func__, (u32)data, (u32)nDataLength);
 
 	/*lock the DMA */
-	mutex_lock(&dev->sm.dma_mutex);
+	if (!mutex_trylock(&dev->sm.dma_mutex)) {
+		local_buf = dma_alloc_coherent(NULL, dev->dma_buffer_length,
+			&local_buf_phys, GFP_KERNEL);
+		if (local_buf == NULL) {
+			printk(KERN_ERR "SMC: DMA buffer is already taken "
+				"and %s could not allocate a temporary one\n",
+				__func__);
+			return false;
+		}
+	} else {
+		local_buf = dev->dma_buffer;
+		local_buf_phys = dev->dma_buffer_phys;
+	}
+
 	if (tf_dma_request(&dma_ch0) != PUBLIC_CRYPTO_OPERATION_SUCCESS) {
-		mutex_unlock(&dev->sm.dma_mutex);
-		return false;
+		ret = false;
+		goto exit;
 	}
 
 	while (nDataLength > 0) {
@@ -498,11 +514,10 @@ static bool tf_digest_hw_perform_dma(u8 *data, u32 nDataLength,
 		 * buffer which has correct properties from efficient DMA
 		 * transfers.
 		 */
-		if (tf_cpy_from(
-			dev->dma_buffer, data, length_loop, buffer_origin)) {
+		if (tf_cpy_from(local_buf, data, length_loop, buffer_origin)) {
 			omap_free_dma(dma_ch0);
-			mutex_unlock(&dev->sm.dma_mutex);
-			return false;
+			ret = false;
+			goto exit;
 		}
 
 		/*DMA1: Mem -> HASH */
@@ -510,7 +525,7 @@ static bool tf_digest_hw_perform_dma(u8 *data, u32 nDataLength,
 			length_loop / HASH_BLOCK_BYTES_LENGTH,
 			DMA_CEN_Elts_per_Frame_SHA,
 			DIGEST1_REGS_HW_ADDR + 0x80,
-			dev->dma_buffer_phys,
+			local_buf_phys,
 			OMAP44XX_DMA_SHA2_DIN_P);
 
 		/*specific for Mem -> HWA */
@@ -553,12 +568,10 @@ static bool tf_digest_hw_perform_dma(u8 *data, u32 nDataLength,
 	}
 
 	/*For safety reasons, let's clean the working buffer */
-	memset(dev->dma_buffer, 0, length_loop);
+	memset(local_buf, 0, length_loop);
 
 	/*release the DMA */
 	omap_free_dma(dma_ch0);
-
-	mutex_unlock(&dev->sm.dma_mutex);
 
 	/*
 	 * The dma transfert is finished, now wait until the hash
@@ -568,7 +581,14 @@ static bool tf_digest_hw_perform_dma(u8 *data, u32 nDataLength,
 		(u32 *)&sha1_md5_reg->IRQSTATUS,
 		DIGEST_IRQSTATUS_CONTEXT_READY_BIT);
 
-	return true;
+exit:
+	if (dev->dma_buffer == local_buf)
+		mutex_unlock(&dev->sm.dma_mutex);
+	else
+		dma_free_coherent(NULL, dev->dma_buffer_length,
+			local_buf, local_buf_phys);
+
+	return ret;
 }
 
 /*------------------------------------------------------------------------- */

@@ -563,9 +563,8 @@ struct tf_post_data {
 };
 
 static const struct attribute tf_post_failures_attr = {
-	"failures",
-	THIS_MODULE,
-	0444
+	.name = "failures",
+	.mode = 0444,
 };
 
 static ssize_t tf_post_kobject_show(struct kobject *kobj,
