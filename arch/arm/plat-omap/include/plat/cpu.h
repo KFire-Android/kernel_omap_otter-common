@@ -534,6 +534,8 @@ extern u32 omap4_features;
 #define OMAP4_HAS_MPU_1_2GHZ		BIT(1)
 #define OMAP4_HAS_MPU_1_3GHZ		BIT(2)
 #define OMAP4_HAS_MPU_1_5GHZ		BIT(3)
+#define OMAP4_HAS_IVA_430MHZ		BIT(4)
+#define OMAP4_HAS_IVA_500MHZ		BIT(5)
 
 #define OMAP4_HAS_FEATURE(feat, flag)			\
 static inline unsigned int omap4_has_ ##feat(void)	\
@@ -545,5 +547,7 @@ OMAP4_HAS_FEATURE(mpu_1ghz, MPU_1GHZ)
 OMAP4_HAS_FEATURE(mpu_1_2ghz, MPU_1_2GHZ)
 OMAP4_HAS_FEATURE(mpu_1_3ghz, MPU_1_3GHZ)
 OMAP4_HAS_FEATURE(mpu_1_5ghz, MPU_1_5GHZ)
+OMAP4_HAS_FEATURE(iva_430mhz, IVA_430MHZ)
+OMAP4_HAS_FEATURE(iva_500mhz, IVA_500MHZ)
 
 #endif
