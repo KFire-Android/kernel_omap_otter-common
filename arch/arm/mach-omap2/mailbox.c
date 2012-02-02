@@ -29,6 +29,7 @@
 #define MAILBOX_IRQSTATUS(u)		(0x100 + 0x8 * (u))
 #define MAILBOX_IRQENABLE(u)		(0x104 + 0x8 * (u))
 
+/* These are valid for OMAP4 and OMAP5 as well */
 #define OMAP4_MAILBOX_IRQSTATUS(u)	(0x104 + 0x10 * (u))
 #define OMAP4_MAILBOX_IRQENABLE(u)	(0x108 + 0x10 * (u))
 #define OMAP4_MAILBOX_IRQENABLE_CLR(u)	(0x10c + 0x10 * (u))
@@ -38,8 +39,10 @@
 #define MAILBOX_SOFTRESET		1
 
 #define MBOX_NUM_USER                  2
-#define OMAP4_MBOX_NUM_USER            3
 #define MBOX_NR_REGS                   2
+
+/* These are valid for OMAP4 and OMAP5 as well */
+#define OMAP4_MBOX_NUM_USER            3
 #define OMAP4_MBOX_NR_REGS             3
 
 static void __iomem *mbox_base;
@@ -86,7 +89,7 @@ static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
 
 	/* Save irqs per user */
 	for (i = 0; i < nr_mbox_users; i++) {
-		if (cpu_is_omap44xx())
+		if (cpu_is_omap44xx() || cpu_is_omap54xx())
 			mbox_ctx[i] = mbox_read_reg(OMAP4_MAILBOX_IRQENABLE(i));
 		else
 			mbox_ctx[i] = mbox_read_reg(MAILBOX_IRQENABLE(i));
@@ -107,7 +110,7 @@ static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
 
 	/* Restore irqs per user */
 	for (i = 0; i < nr_mbox_users; i++) {
-		if (cpu_is_omap44xx())
+		if (cpu_is_omap44xx() || cpu_is_omap54xx())
 			mbox_write_reg(mbox_ctx[i], OMAP4_MAILBOX_IRQENABLE(i));
 		else
 			mbox_write_reg(mbox_ctx[i], MAILBOX_IRQENABLE(i));
@@ -199,7 +202,7 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
 	struct omap_mbox2_priv *p = mbox->priv;
 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
 
-	if (!cpu_is_omap44xx())
+	if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
 		bit = mbox_read_reg(p->irqdisable) & ~bit;
 
 	mbox_write_reg(bit, p->irqdisable);
@@ -317,7 +320,7 @@ struct omap_mbox *omap2_mboxes[] = {
 };
 #endif
 
-#if defined(CONFIG_ARCH_OMAP4)
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
 /* OMAP4 */
 static struct omap_mbox2_priv omap2_mbox_1_priv = {
 	.tx_fifo = {
@@ -393,8 +396,8 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
 		list[1]->irq = platform_get_irq_byname(pdev, "iva");
 	}
 #endif
-#if defined(CONFIG_ARCH_OMAP4)
-	else if (cpu_is_omap44xx()) {
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
+	else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		list = omap4_mboxes;
 
 		list[0]->irq = list[1]->irq = platform_get_irq(pdev, 0);
@@ -413,7 +416,8 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
 	if (!mbox_base)
 		return -ENOMEM;
 
-	nr_mbox_users = cpu_is_omap44xx() ? OMAP4_MBOX_NUM_USER : MBOX_NUM_USER;
+	nr_mbox_users = (cpu_is_omap44xx() || cpu_is_omap54xx()) ?
+					OMAP4_MBOX_NUM_USER : MBOX_NUM_USER;
 	mbox_ctx = kzalloc(sizeof(u32) * nr_mbox_users, GFP_KERNEL);
 	if (!mbox_ctx) {
 		ret = -ENOMEM;
