@@ -844,6 +844,14 @@ static int __init omap4_i2c_init(void)
 		tablet_twldata.vmem = &tablet_vmem;
 	}
 
+	/*
+	 * VCXIO can be disabled in off-mode for OMAP4430
+	 * and OMAP4460.
+	 * VCXIO must be always on for OMAP4470.
+	 */
+	if (cpu_is_omap447x())
+		tablet_twldata.vcxio->constraints.state_mem.disabled = false;
+
 	omap4_pmic_init("twl6030", &tablet_twldata);
 	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_boardinfo));
