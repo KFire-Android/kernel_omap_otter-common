@@ -53,4 +53,12 @@ struct rprm_gpio {
 	u32 id;
 };
 
+/**
+ * struct rprm_i2c - resource manager parameters for i2c
+ * @id:         id of the requested i2c
+ */
+struct rprm_i2c {
+	u32 id;
+};
+
 #endif /* _LINUX_RPMSG_RESMGR_COMMON_H */

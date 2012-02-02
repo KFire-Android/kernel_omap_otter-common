@@ -21,6 +21,8 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
 #include <linux/gpio.h>
+#include <linux/i2c.h>
+#include <linux/pm_runtime.h>
 #include <linux/err.h>
 #include <linux/rpmsg_resmgr.h>
 #include "rpmsg_resmgr_common.h"
@@ -29,6 +31,11 @@ struct rprm_regulator_depot {
 	struct rprm_regulator args;
 	struct regulator *reg_p;
 	u32 orig_uv;
+};
+
+struct rprm_i2c_depot {
+	u32 id;
+	struct device *dev;
 };
 
 static int rprm_gpio_request(void **handle, void *args, size_t len)
@@ -153,6 +160,71 @@ static int rprm_regulator_get_info(void *handle, char *buf, size_t len)
 		reg->name, reg->min_uv, reg->max_uv);
 }
 
+static int rprm_i2c_request(void **handle, void *data, size_t len)
+{
+	struct rprm_i2c *i2c = data;
+	struct i2c_adapter *adapter;
+	struct rprm_i2c_depot *i2cd;
+	int ret;
+
+	if (len != sizeof *i2c)
+		return -EINVAL;
+
+	i2cd = kmalloc(sizeof *i2cd, GFP_KERNEL);
+	if (!i2cd)
+		return -ENOMEM;
+
+	adapter = i2c_get_adapter(i2c->id);
+	if (!adapter) {
+		pr_err("could not get i2c%d adapter\n", i2c->id);
+		ret = -EINVAL;
+		goto err;
+	}
+
+	i2cd->dev = adapter->dev.parent;
+	i2c_put_adapter(adapter);
+
+	/* FIXME: don't use pm runtime framework */
+	ret = pm_runtime_get_sync(i2cd->dev);
+	/*
+	 * pm_runtime_get_sync can return 1 in case it is already active,
+	 * change it to 0 to indicate success.
+	 */
+	ret -= ret == 1;
+	if (ret)
+		goto err;
+
+	i2cd->id = i2c->id;
+	*handle = i2cd;
+
+	return 0;
+err:
+	kfree(i2cd);
+	return ret;
+}
+
+static int rprm_i2c_release(void *handle)
+{
+	struct rprm_i2c_depot *i2cd = handle;
+	int ret;
+
+	ret = pm_runtime_put_sync(i2cd->dev);
+	if (ret) {
+		pr_err("failed put sync %d\n", ret);
+		return ret;
+	}
+
+	kfree(i2cd);
+	return 0;
+}
+
+static int rprm_i2c_get_info(void *handle, char *buf, size_t len)
+{
+	struct rprm_i2c_depot *i2cd = handle;
+
+	return snprintf(buf, len, "id:%d\n", i2cd->id);
+}
+
 static struct rprm_res_ops gpio_ops = {
 	.request = rprm_gpio_request,
 	.release = rprm_gpio_release,
@@ -165,6 +237,12 @@ static struct rprm_res_ops regulator_ops = {
 	.get_info = rprm_regulator_get_info,
 };
 
+static struct rprm_res_ops i2c_ops = {
+	.request = rprm_i2c_request,
+	.release = rprm_i2c_release,
+	.get_info = rprm_i2c_get_info,
+};
+
 static struct rprm_res generic_res[] = {
 	{
 		.name = "gpio",
@@ -173,6 +251,10 @@ static struct rprm_res generic_res[] = {
 	{
 		.name = "regulator",
 		.ops = &regulator_ops,
+	},
+	{
+		.name = "i2c",
+		.ops = &i2c_ops,
 	},
 };
 
