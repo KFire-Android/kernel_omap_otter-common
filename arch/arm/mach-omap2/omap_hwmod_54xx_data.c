@@ -73,6 +73,7 @@ static struct omap_hwmod omap54xx_mpu_private_hwmod;
 static struct omap_hwmod omap54xx_sata_hwmod;
 static struct omap_hwmod omap54xx_usb_host_hs_hwmod;
 static struct omap_hwmod omap54xx_usb_otg_ss_hwmod;
+static struct omap_hwmod omap54xx_sl2if_hwmod;
 
 /*
  * Interconnects omap_hwmod structures
@@ -1312,6 +1313,13 @@ static struct omap_hwmod omap54xx_dsp_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_dsp_slaves),
 	.masters	= omap54xx_dsp_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_dsp_masters),
+};
+
+/* dsp -> sl2if */
+static struct omap_hwmod_ocp_if omap54xx_dsp__sl2if = {
+	.master		= &omap54xx_dsp_hwmod,
+	.slave		= &omap54xx_sl2if_hwmod,
+	.clk		= "dpll_iva_h12x2_ck",
 };
 
 /*
@@ -3045,8 +3053,16 @@ static struct omap_hwmod_rst_info omap54xx_iva_seq1_resets[] = {
 	{ .name = "seq1", .rst_shift = 1 },
 };
 
+/* iva -> sl2if */
+static struct omap_hwmod_ocp_if omap54xx_iva__sl2if = {
+	.master		= &omap54xx_iva_hwmod,
+	.slave		= &omap54xx_sl2if_hwmod,
+	.clk		= "dpll_iva_h12x2_ck",
+};
+
 /* iva master ports */
 static struct omap_hwmod_ocp_if *omap54xx_iva_masters[] = {
+	&omap54xx_iva__sl2if,
 	&omap54xx_iva__l3_main_2,
 	&omap54xx_iva__l3_instr,
 };
@@ -4198,6 +4214,45 @@ static struct omap_hwmod omap54xx_mmc5_hwmod = {
 	},
 	.slaves		= omap54xx_mmc5_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_mmc5_slaves),
+};
+
+/*
+ * 'sl2if' class
+ * shared level 2 memory interface
+ */
+
+static struct omap_hwmod_class omap54xx_sl2if_hwmod_class = {
+	.name = "sl2if",
+};
+
+/* sl2if */
+/* l3_main_2 -> sl2if */
+static struct omap_hwmod_ocp_if omap54xx_l3_main_2__sl2if = {
+	.master		= &omap54xx_l3_main_2_hwmod,
+	.slave		= &omap54xx_sl2if_hwmod,
+	.clk		= "l3_div_ck",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* sl2if slave ports */
+static struct omap_hwmod_ocp_if *omap54xx_sl2if_slaves[] = {
+	&omap54xx_l3_main_2__sl2if,
+	&omap54xx_iva__sl2if,
+	&omap54xx_dsp__sl2if,
+};
+
+static struct omap_hwmod omap54xx_sl2if_hwmod = {
+	.name		= "sl2if",
+	.class		= &omap54xx_sl2if_hwmod_class,
+	.clkdm_name	= "iva_clkdm",
+	.main_clk	= "sl2if_ick",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_IVA_SL2_CLKCTRL_OFFSET,
+		},
+	},
+	.slaves		= omap54xx_sl2if_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap54xx_sl2if_slaves),
 };
 
 /*
@@ -6071,6 +6126,8 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 
 	/* sata class */
 	&omap54xx_sata_hwmod,
+
+	&omap54xx_sl2if_hwmod,
 
 	/* smartreflex class */
 	&omap54xx_smartreflex_core_hwmod,
