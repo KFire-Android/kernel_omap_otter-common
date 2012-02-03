@@ -86,6 +86,9 @@ static int hsi_set_rx(struct hsi_port *sport, struct hsr_ctx *cfg)
 	void __iomem *base = hsi_ctrl->base;
 	int port = sport->port_number;
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
+	struct hsi_platform_data *pdata = dev_get_platdata(&pdev->dev);
+	int port_index = pdata->ctx->pctx[0].port_number == port ? 0 : 1;
+	struct hsi_port_ctx *p_ctx = &pdata->ctx->pctx[port_index];
 
 	if (((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_STREAM) &&
 	    ((cfg->mode & HSI_MODE_VAL_MASK) != HSI_MODE_FRAME) &&
@@ -123,10 +126,11 @@ static int hsi_set_rx(struct hsi_port *sport, struct hsr_ctx *cfg)
 			return -EINVAL;
 	}
 
-	if ((cfg->mode != NOT_SET) && (cfg->flow != NOT_SET))
-		hsi_outl(cfg->mode | ((cfg->flow & HSI_FLOW_VAL_MASK)
-				      << HSI_FLOW_OFFSET), base,
-			 HSI_HSR_MODE_REG(port));
+	if ((cfg->mode != NOT_SET) && (cfg->flow != NOT_SET)) {
+		p_ctx->hsr.mode = cfg->mode | ((cfg->flow & HSI_FLOW_VAL_MASK)
+						<< HSI_FLOW_OFFSET);
+		hsi_outl(p_ctx->hsr.mode, base, HSI_HSR_MODE_REG(port));
+	}
 
 	if (cfg->frame_size != NOT_SET)
 		hsi_outl(cfg->frame_size, base, HSI_HSR_FRAMESIZE_REG(port));
@@ -917,6 +921,9 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		hsi_outl_or(HSI_SET_WAKE_3_WIRES | HSI_SET_WAKE_READY_LVL_1,
 			    base, HSI_SYS_SET_WAKE_REG(port));
 		hsi_driver_disable_interrupt(pport, HSI_CAWAKEDETECTED);
+
+		/* Allow data reception */
+		hsi_hsr_resume(hsi_ctrl);
 		break;
 	case HSI_IOCTL_SET_WAKE_RX_4WIRES_MODE:
 		dev_info(hsi_ctrl->dev, "Entering RX wakeup in 4 wires mode\n");

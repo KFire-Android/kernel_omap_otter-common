@@ -105,7 +105,6 @@ void hsi_save_ctx(struct hsi_dev *hsi_ctrl)
 		p->hst.arb_mode = hsi_inl(base, HSI_HST_ARBMODE_REG(port));
 
 		/* HSR */
-		p->hsr.mode = hsi_inl(base, HSI_HSR_MODE_REG(port));
 		if (!hsi_driver_device_is_hsi(pdev))
 			p->hsr.frame_size = hsi_inl(base,
 						HSI_HSR_FRAMESIZE_REG(port));
@@ -1080,9 +1079,6 @@ int hsi_runtime_resume(struct device *dev)
 			hsi_restore_ctx(hsi_ctrl);
 	}
 
-	/* Allow data reception */
-	hsi_hsr_resume(hsi_ctrl);
-
 	/* HSI device is now fully operational and _must_ be able to */
 	/* complete I/O operations */
 
@@ -1115,9 +1111,6 @@ int hsi_runtime_suspend(struct device *dev)
 	hsi_save_ctx(hsi_ctrl);
 
 	hsi_ctrl->clock_enabled = false;
-
-	/* Forbid data reception */
-	hsi_hsr_suspend(hsi_ctrl);
 
 	/* HSI is now ready to be put in low power state */
 
