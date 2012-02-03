@@ -755,10 +755,6 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	},
 };
 
-static struct i2c_board_info __initdata tablet_i2c_3_boardinfo[] = {
-
-};
-
 static void __init tablet_pmic_mux_init(void)
 {
 
@@ -814,8 +810,7 @@ static int __init omap4_i2c_init(void)
 	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
-	omap_register_i2c_bus(3, 400, tablet_i2c_3_boardinfo,
-				ARRAY_SIZE(tablet_i2c_3_boardinfo));
+	omap_register_i2c_bus(3, 400, NULL, 0);
 	omap_register_i2c_bus(4, 400, NULL, 0);
 
 	omap2_i2c_pullup(3, I2C_PULLUP_STD_860_OM_FAST_500_OM);
