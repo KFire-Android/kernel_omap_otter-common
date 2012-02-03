@@ -559,6 +559,9 @@ int hsi_do_cawake_process(struct hsi_port *pport)
 		}
 		pport->cawake_status = 1;
 
+		/* Allow data reception */
+		hsi_hsr_resume(hsi_ctrl);
+
 		spin_unlock(&hsi_ctrl->lock);
 		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_UP, NULL);
 		spin_lock(&hsi_ctrl->lock);
@@ -596,6 +599,9 @@ int hsi_do_cawake_process(struct hsi_port *pport)
 						 true);
 		}
 		pport->cawake_status = 0;
+
+		/* Forbid data reception */
+		hsi_hsr_suspend(hsi_ctrl);
 
 		spin_unlock(&hsi_ctrl->lock);
 		hsi_port_event_handler(pport, HSI_EVENT_CAWAKE_DOWN, NULL);
