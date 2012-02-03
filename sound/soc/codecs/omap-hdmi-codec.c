@@ -80,6 +80,10 @@ static int hdmi_audio_set_configuration(struct hdmi_codec_data *priv)
 	int err, n, cts, channel_alloc;
 	enum hdmi_core_audio_sample_freq sample_freq;
 	u32 pclk = omapdss_hdmi_get_pixel_clock();
+	struct omap_chip_id audio_must_use_mclk;
+
+	audio_must_use_mclk.oc = CHIP_IS_OMAP4430ES2_3 | CHIP_IS_OMAP446X |
+				CHIP_IS_OMAP447X;
 
 	switch (priv->params.format) {
 	case SNDRV_PCM_FORMAT_S16_LE:
@@ -167,7 +171,7 @@ static int hdmi_audio_set_configuration(struct hdmi_codec_data *priv)
 	if (dss_has_feature(FEAT_HDMI_CTS_SWMODE)) {
 		core_cfg->aud_par_busclk = 0;
 		core_cfg->cts_mode = HDMI_AUDIO_CTS_MODE_SW;
-		core_cfg->use_mclk = (cpu_is_omap446x() || cpu_is_omap447x());
+		core_cfg->use_mclk = omap_chip_is(audio_must_use_mclk);
 	} else {
 		core_cfg->aud_par_busclk = (((128 * 31) - 1) << 8);
 		core_cfg->cts_mode = HDMI_AUDIO_CTS_MODE_HW;
