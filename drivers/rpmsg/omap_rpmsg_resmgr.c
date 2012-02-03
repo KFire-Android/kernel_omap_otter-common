@@ -36,6 +36,11 @@ struct rprm_auxclk_depot {
 	struct clk *clk;
 };
 
+static inline struct device *__find_device_by_name(const char *name)
+{
+	return bus_find_device_by_name(&platform_bus_type, NULL, name);
+}
+
 static int rprm_gptimer_request(void **handle, void *data, size_t len)
 {
 	int ret;
@@ -279,6 +284,90 @@ static int rprm_auxclk_get_info(void *handle, char *buf, size_t len)
 		auxck->name, auxck->clk_rate, auxck->pname, auxck->pclk_rate);
 }
 
+static int
+_enable_device_exclusive(void **handle, struct device **pdev, const char *name)
+{
+	struct device *dev = *pdev;
+	int ret;
+
+	/* if we already have dev do not search it again */
+	if (!dev) {
+		dev = __find_device_by_name(name);
+		if (!dev)
+			return -ENOENT;
+		if (dev && !pm_runtime_enabled(dev))
+			pm_runtime_enable(dev);
+		/* update pdev that works as cache to avoid searing again */
+		*pdev = dev;
+	}
+
+	ret = pm_runtime_get_sync(dev);
+	if (ret) {
+		/*
+		 * we want exclusive accesss to the device, so if it is already
+		 * enabled (ret == 1), call pm_runtime_put because somebody
+		 * else is using it and return error.
+		 */
+		if (ret == 1) {
+			pm_runtime_put_sync(dev);
+			ret = -EBUSY;
+		}
+
+		pr_err("error %d get sync for %s\n", ret, name);
+		return ret;
+	}
+
+	*handle = dev;
+	return 0;
+}
+
+static int _device_release(void *dev)
+{
+	return pm_runtime_put_sync(dev);
+}
+
+static int rprm_iva_request(void **handle, void *data, size_t len)
+{
+	static struct device *dev;
+
+	return  _enable_device_exclusive(handle, &dev, "iva.0");
+}
+
+static int rprm_iva_seq0_request(void **handle, void *data, size_t len)
+{
+	static struct device *dev;
+
+	return _enable_device_exclusive(handle, &dev, "iva_seq0.0");
+}
+
+static int rprm_iva_seq1_request(void **handle, void *data, size_t len)
+{
+	static struct device *dev;
+
+	return _enable_device_exclusive(handle, &dev, "iva_seq1.0");
+}
+
+static int rprm_fdif_request(void **handle, void *data, size_t len)
+{
+	static struct device *dev;
+
+	return _enable_device_exclusive(handle, &dev, "fdif");
+}
+
+static int rprm_sl2if_request(void **handle, void *data, size_t len)
+{
+	static struct device *dev;
+
+	return _enable_device_exclusive(handle, &dev, "sl2if");
+}
+
+static int rprm_iss_request(void **handle, void *data, size_t len)
+{
+	static struct device *dev;
+
+	return _enable_device_exclusive(handle, &dev, "iss");
+}
+
 static struct rprm_res_ops gptimer_ops = {
 	.request = rprm_gptimer_request,
 	.release = rprm_gptimer_release,
@@ -297,6 +386,36 @@ static struct rprm_res_ops auxclk_ops = {
 	.get_info = rprm_auxclk_get_info,
 };
 
+static struct rprm_res_ops iva_ops = {
+	.request = rprm_iva_request,
+	.release = _device_release,
+};
+
+static struct rprm_res_ops iva_seq0_ops = {
+	.request = rprm_iva_seq0_request,
+	.release = _device_release,
+};
+
+static struct rprm_res_ops iva_seq1_ops = {
+	.request = rprm_iva_seq1_request,
+	.release = _device_release,
+};
+
+static struct rprm_res_ops fdif_ops = {
+	.request = rprm_fdif_request,
+	.release = _device_release,
+};
+
+static struct rprm_res_ops sl2if_ops = {
+	.request = rprm_sl2if_request,
+	.release = _device_release,
+};
+
+static struct rprm_res_ops iss_ops = {
+	.request = rprm_iss_request,
+	.release = _device_release,
+};
+
 static struct rprm_res omap_res[] = {
 	{
 		.name = "omap-gptimer",
@@ -309,6 +428,30 @@ static struct rprm_res omap_res[] = {
 	{
 		.name = "omap-auxclk",
 		.ops = &auxclk_ops,
+	},
+	{
+		.name = "iva",
+		.ops = &iva_ops,
+	},
+	{
+		.name = "iva_seq0",
+		.ops = &iva_seq0_ops,
+	},
+	{
+		.name = "iva_seq1",
+		.ops = &iva_seq1_ops,
+	},
+	{
+		.name = "omap-fdif",
+		.ops = &fdif_ops,
+	},
+	{
+		.name = "omap-sl2if",
+		.ops = &sl2if_ops,
+	},
+	{
+		.name = "omap-iss",
+		.ops = &iss_ops,
 	},
 };
 
