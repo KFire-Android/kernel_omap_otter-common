@@ -120,18 +120,22 @@ static const u8 twl6030_trim_addr[GPADC_MAX_CHANNELS] = {
 /*
  * actual scaler gain is multiplied by 8 for fixed point operation
  * 1.875 * 8 = 15
+ * For channels 0, 1, 3, 4, 5, 6, 12, 13
+ * 1.25 * 8 = 10
+ * is used, as scaler is Vref * divider
+ * Vref = 1.25
  */
-static const u16 twl6030_gain[GPADC_MAX_CHANNELS] = {
+static const u16 twl6030_gain[TWL6030_GPADC_MAX_CHANNELS] = {
 	10,	/* CHANNEL 0 */
-	8,	/* CHANNEL 1 */
+	10,	/* CHANNEL 1 */
 
 	/* 1.875 */
 	15,	/* CHANNEL 2 */
 
-	8,	/* CHANNEL 3 */
-	8,	/* CHANNEL 4 */
-	8,	/* CHANNEL 5 */
-	8,	/* CHANNEL 6 */
+	10,	/* CHANNEL 3 */
+	10,	/* CHANNEL 4 */
+	10,	/* CHANNEL 5 */
+	10,	/* CHANNEL 6 */
 
 	/* 5 */
 	40,	/* CHANNEL 7 */
@@ -147,14 +151,18 @@ static const u16 twl6030_gain[GPADC_MAX_CHANNELS] = {
 
 	/* 1.875 */
 	15,	/* CHANNEL 11 */
-	8,	/* CHANNEL 12 */
-	8,	/* CHANNEL 13 */
+
+	10,	/* CHANNEL 12 */
+	10,	/* CHANNEL 13 */
 
 	/* 6.875 */
 	55,	/* CHANNEL 14 */
 
-	8,	/* CHANNEL 15 */
-	8,	/* CHANNEL 16 */
+	/* 6.25 */
+	50,	/* CHANNEL 15 */
+
+	/* 4.75 */
+	38,	/* CHANNEL 16 */
 };
 
 /*
