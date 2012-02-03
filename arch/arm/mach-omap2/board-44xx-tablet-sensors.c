@@ -160,13 +160,8 @@ int __init tablet_sensor_init(void)
 	blaze_tablet_mpu3050_init();
 	blaze_tablet_bma180accl_init();
 
-	/* <HACK> to remove the TMP105 sensor from I2C3
-	 * there is an interaction issue with the Camera sensor on I2C3
-	 * and this sensor when enabled.  We need to not allow registration
-	 * until this issue is determined.
 	i2c_register_board_info(3, blaze_tablet_i2c_bus3_sensor_info,
 		ARRAY_SIZE(blaze_tablet_i2c_bus3_sensor_info));
-	 * </HACK> */
 	i2c_register_board_info(4, blaze_tablet_i2c_bus4_sensor_info,
 		ARRAY_SIZE(blaze_tablet_i2c_bus4_sensor_info));
 
