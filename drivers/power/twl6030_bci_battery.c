@@ -293,6 +293,7 @@ struct twl6030_bci_device_info {
 	unsigned int		capacity;
 	unsigned int		capacity_debounce_count;
 	unsigned long		ac_next_refresh;
+	unsigned int		prev_capacity;
 	unsigned int		wakelock_enabled;
 
 	struct power_supply	bat;
@@ -1329,22 +1330,23 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 	if (!is_battery_present(di))
 		curr_capacity = 100;
 
-	/* Debouncing of voltage change. */
-	if (curr_capacity != di->capacity)
-		di->capacity_debounce_count++;
-	else
-		di->capacity_debounce_count = 0;
-
-	if ((di->capacity_debounce_count >= 4)
-		|| (di->capacity == -1)) {
+       /* Debouncing of voltage change. */
+	if (di->capacity == -1) {
 		di->capacity = curr_capacity;
 		di->capacity_debounce_count = 0;
 		return 1;
 	}
 
+	if (curr_capacity != di->prev_capacity) {
+		di->prev_capacity = curr_capacity;
+		di->capacity_debounce_count = 0;
+	} else if (++di->capacity_debounce_count >= 4) {
+		di->capacity = curr_capacity;
+		di->capacity_debounce_count = 0;
+		return 1;
+	}
 
 	return 0;
-
 }
 
 static int twl6030_set_watchdog(struct twl6030_bci_device_info *di, int val)
