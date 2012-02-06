@@ -852,6 +852,7 @@ struct twl4030_platform_data {
 
 	/* External control pins */
 	struct regulator_init_data		*sysen;
+	struct regulator_init_data		*regen1;
 };
 
 /*----------------------------------------------------------------------*/
@@ -953,5 +954,6 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 
 /* External control pins */
 #define TWL6030_REG_SYSEN	62
+#define TWL6030_REG_REGEN1	63
 
 #endif /* End of __TWL4030_H */
