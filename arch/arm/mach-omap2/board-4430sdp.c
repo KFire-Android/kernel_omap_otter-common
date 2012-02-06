@@ -715,6 +715,17 @@ static struct regulator_init_data sdp4430_clk32kaudio = {
 	},
 };
 
+static struct regulator_init_data sdp4430_v2v1 = {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.always_on              = true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
 static void omap4_audio_conf(void)
 {
 	/* twl6040 naudint */
@@ -855,6 +866,9 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux1		= &sdp4430_vaux1,
 	.vaux2		= &sdp4430_vaux2,
 	.vaux3		= &sdp4430_vaux3,
+
+	/* TWL6030 SMPS */
+	.v2v1		= &sdp4430_v2v1,
 
 	/* TWL6032 regulators at OMAP447X based SOMs */
 	.ldo1		= &sdp4430_vpp,
