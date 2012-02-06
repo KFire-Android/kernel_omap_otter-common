@@ -1195,7 +1195,6 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 	else
 		rgz_items = psHwcData->blit_data.rgz_items;
 
-
 	psDssData = &(psHwcData->dsscomp_data);
 	calcsz = sizeof(*psHwcData) +
 		(sizeof(struct rgz_blt_entry) * rgz_items);
@@ -1321,7 +1320,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		struct rgz_blt_entry *entry = &entry_list[j];
 		enum bverror bv_error = 0;
 		int meminfo_ix;
-		int src2_mapped = 0;
+		int src1_mapped = 0, src2_mapped = 0;
 
 		/* BV Parameters data */
 		bltparams = entry->bp;
@@ -1332,15 +1331,24 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		src1geom.physstride = src1geom.virtstride;
 
 		meminfo_ix = (int)src1desc.virtaddr;
-		if (!meminfo_idx_valid(meminfo_ix, ui32NumMemInfos))
-			continue;
+		/* Making fill, avoid mapping src1 */
+		/* This will change when the HWC starts to use HWC_BLT_FLAG_CLR */
+		if (meminfo_ix == -1) {
+			/* Clean FB with GC 320 with black transparent pixel */
+			static unsigned int pixel = 0;
+			src1desc.virtaddr = (void*)&pixel;
+		} else {
+			if (!meminfo_idx_valid(meminfo_ix, ui32NumMemInfos))
+				continue;
 
-		bv_error = bv_map_meminfo(psDevInfo, bv_entry, &src1desc,
-			&ppsMemInfos[meminfo_ix]);
-		if (bv_error) {
-			WARN(1, "%s: BV map src1 failed %d\n",
-				__func__, bv_error);
-			continue;
+			bv_error = bv_map_meminfo(psDevInfo, bv_entry, &src1desc,
+					&ppsMemInfos[meminfo_ix]);
+			if (bv_error) {
+				WARN(1, "%s: BV map src1 failed %d\n",
+						__func__, bv_error);
+				continue;
+			}
+			src1_mapped = 1;
 		}
 
 		/* Dst buffer data, assume meminfo 0 is the FB */
@@ -1405,7 +1413,8 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 			printk(KERN_ERR "%s: blit failed %d\n",
 				__func__, bv_error);
 unmap_srcs:
-		bv_entry->bv_unmap(&src1desc);
+		if (src1_mapped)
+			bv_entry->bv_unmap(&src1desc);
 		if (src2_mapped)
 			bv_entry->bv_unmap(&src2desc);
 	}
