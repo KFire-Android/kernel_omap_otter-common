@@ -849,6 +849,9 @@ struct twl4030_platform_data {
 	struct regulator_init_data		*smps3;
 	struct regulator_init_data		*smps4;
 	struct regulator_init_data		*vio6032;
+
+	/* External control pins */
+	struct regulator_init_data		*sysen;
 };
 
 /*----------------------------------------------------------------------*/
@@ -947,5 +950,8 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 #define TWL6032_REG_VIO		60
 
 #define TWL6030_REG_CLK32KAUDIO	61
+
+/* External control pins */
+#define TWL6030_REG_SYSEN	62
 
 #endif /* End of __TWL4030_H */

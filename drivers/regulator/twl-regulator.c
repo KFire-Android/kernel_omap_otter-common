@@ -920,6 +920,18 @@ static struct regulator_ops twlsmps_ops = {
 	.set_suspend_disable	= twl6030ldo_suspend_disable,
 };
 
+static struct regulator_ops twl6030_external_control_pin_ops = {
+	.enable			= twl6030reg_enable,
+	.disable		= twl6030reg_disable,
+	.is_enabled		= twl6030reg_is_enabled,
+
+	.set_mode		= twl6030reg_set_mode,
+
+	.get_status		= twl6030reg_get_status,
+
+	.set_suspend_enable	= twl6030ldo_suspend_enable,
+	.set_suspend_disable	= twl6030ldo_suspend_disable,
+};
 /*----------------------------------------------------------------------*/
 
 #define TWL4030_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
@@ -1032,6 +1044,18 @@ static struct regulator_ops twlsmps_ops = {
 		}, \
 	}
 
+#define TWL6030_EXTERNAL_CONTROL_PIN(label, offset, turnon_delay) { \
+	.base = offset, \
+	.delay = turnon_delay, \
+	.desc = { \
+		.name = #label, \
+		.id = TWL6030_REG_##label, \
+		.ops = &twl6030_external_control_pin_ops, \
+		.type = REGULATOR_VOLTAGE, \
+		.owner = THIS_MODULE, \
+		}, \
+	}
+
 /*
  * We list regulators here if systems need some level of
  * software control over them after boot.
@@ -1094,6 +1118,8 @@ static struct twlreg_info twl_regs[] = {
 	TWL6032_ADJUSTABLE_SMPS(SMPS3, 0x34),
 	TWL6032_ADJUSTABLE_SMPS(SMPS4, 0x10),
 	TWL6032_ADJUSTABLE_SMPS(VIO, 0x16),
+
+	TWL6030_EXTERNAL_CONTROL_PIN(SYSEN, 0x83, 0),
 };
 
 static u8 twl_get_smps_offset(void)

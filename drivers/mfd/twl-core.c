@@ -1059,6 +1059,11 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 				pdata->clk32kaudio, features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
+
+		child = add_regulator(TWL6030_REG_SYSEN,
+				pdata->sysen, features);
+		if (IS_ERR(child))
+			return PTR_ERR(child);
 	}
 
 	/* twl6032 regulators */
