@@ -590,6 +590,17 @@ static struct regulator_init_data tablet_sysen = {
 	},
 };
 
+static struct regulator_init_data tablet_regen1 = {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
 static void omap4_audio_conf(void)
 {
 	/* twl6040 naudint */
@@ -763,6 +774,7 @@ static struct twl4030_platform_data tablet_twldata = {
 
 	/* External control pins */
 	.sysen		= &tablet_sysen,
+	.regen1		= &tablet_regen1,
 };
 
 static struct bq2415x_platform_data sdp4430_bqdata = {
