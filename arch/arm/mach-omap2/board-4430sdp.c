@@ -726,6 +726,17 @@ static struct regulator_init_data sdp4430_v2v1 = {
 	},
 };
 
+static struct regulator_init_data sdp4430_sysen = {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.always_on		= true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
 static void omap4_audio_conf(void)
 {
 	/* twl6040 naudint */
@@ -891,6 +902,8 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.codec		= &twl6040_codec,
 	.madc		= &twl6030_gpadc,
 
+	/* External control pins */
+	.sysen		= &sdp4430_sysen,
 };
 
 static struct bq2415x_platform_data sdp4430_bqdata = {
