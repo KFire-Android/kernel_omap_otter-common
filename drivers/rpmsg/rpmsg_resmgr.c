@@ -38,6 +38,7 @@
  * @id: resource id
  * @base: base address of the resource registers (will be mapped to the rproc
  *	  address space in the future)
+ * @constraints: stores the constraints requested for the resource
  */
 struct rprm_elem {
 	struct list_head next;
@@ -45,6 +46,7 @@ struct rprm_elem {
 	void *handle;
 	u32 id;
 	u32 base;
+	struct rprm_constraints_data constraints;
 };
 
 /**
@@ -63,6 +65,13 @@ struct rprm {
 	struct rpmsg_channel *rpdev;
 };
 
+/* default constraint values for removing constraints */
+static struct rprm_constraints_data def_data = {
+	.frequency	= 0,
+	.bandwidth	= -1,
+	.latency	= -1,
+};
+
 /* List of availabe resources */
 static LIST_HEAD(res_table);
 static DEFINE_SPINLOCK(table_lock);
@@ -78,12 +87,128 @@ static struct rprm_res *__find_res_by_name(const char *name)
 	return NULL;
 }
 
+static int _set_constraints(struct device *dev, struct rprm_elem *e,
+				struct rprm_constraints_data *c)
+{
+	int ret = 0;
+	u32 mask = 0;
+
+	if (c->mask & RPRM_SCALE) {
+		if (!e->res->ops->scale) {
+			ret = -ENOSYS;
+			goto err;
+		}
+
+		ret = e->res->ops->scale(dev, e->handle, c->frequency);
+		if (ret)
+			goto err;
+		mask |= RPRM_SCALE;
+		e->constraints.frequency = c->frequency;
+	}
+
+	if (c->mask & RPRM_LATENCY) {
+		if (!e->res->ops->latency) {
+			ret = -ENOSYS;
+			goto err;
+		}
+
+		ret = e->res->ops->latency(dev, e->handle, c->latency);
+		if (ret)
+			goto err;
+		mask |= RPRM_LATENCY;
+		e->constraints.latency = c->latency;
+	}
+
+	if (c->mask & RPRM_BANDWIDTH) {
+		if (!e->res->ops->bandwidth) {
+			ret = -ENOSYS;
+			goto err;
+		}
+
+		ret = e->res->ops->bandwidth(dev, e->handle, c->bandwidth);
+		if (ret)
+			goto err;
+		mask |= RPRM_BANDWIDTH;
+		e->constraints.bandwidth = c->bandwidth;
+	}
+err:
+	if (ret)
+		dev_err(dev, "error updating contraints for %s:\n"
+			"Mask:0x%x\n"
+			"Frequency:%ld\n"
+			"Latency:%ld\n"
+			"Bandwidth:%ld\n",
+			e->res->name, c->mask, c->frequency,
+			c->latency, c->bandwidth);
+	/*
+	 * even in case of a error update the mask with the constraints that
+	 * were set, so that those constraints can be removed
+	 */
+	c->mask = mask;
+	return ret;
+}
+
+/* update constaints for a resource */
+static int rprm_update_constraints(struct rprm *rprm, int res_id,
+			   struct rprm_constraints_data *data, bool set)
+{
+	int ret = 0;
+	struct rprm_elem *e;
+	struct device *dev = &rprm->rpdev->dev;
+
+	mutex_lock(&rprm->lock);
+	e = idr_find(&rprm->id_list, res_id);
+	if (!e) {
+		ret = -ENOENT;
+		goto out;
+	}
+
+	dev_dbg(dev, "%s contraint for %s:\n"
+		"Mask:0x%x\n"
+		"Frequency:%ld\n"
+		"Latency:%ld\n"
+		"Bandwidth:%ld\n",
+		set ? "setting" : "clearing", e->res->name, data->mask,
+		data->frequency, data->latency, data->bandwidth);
+
+	if (set) {
+		ret = _set_constraints(dev, e, data);
+		if (!ret) {
+			e->constraints.mask |= data->mask;
+			goto out;
+		}
+		/* if error continue to remove the constraints that were set */
+	}
+
+	/* use def data structure values in order to remove constraints */
+	def_data.mask = data->mask;
+	if (def_data.mask) {
+		int tmp;
+
+		tmp = _set_constraints(dev, e, &def_data);
+		if (!tmp)
+			e->constraints.mask &= ~data->mask;
+		/* do not overwrite ret if there was a previous error */
+		ret = ret ? : tmp;
+	}
+out:
+	mutex_unlock(&rprm->lock);
+	return ret;
+}
+
 static int _resource_release(struct rprm *rprm, struct rprm_elem *e)
 {
 	int ret;
 	struct device *dev = &rprm->rpdev->dev;
 
 	dev_dbg(dev, "releasing %s resource\n", e->res->name);
+
+	/* if there are constraints then remove them */
+	if (e->constraints.mask) {
+		def_data.mask = e->constraints.mask;
+		 _set_constraints(dev, e, &def_data);
+		e->constraints.mask &= ~def_data.mask;
+	}
 
 	if (e->res->ops->release) {
 		ret = e->res->ops->release(e->handle);
@@ -204,11 +329,13 @@ static void rprm_cb(struct rpmsg_channel *rpdev, void *data, int len,
 	struct rprm_msg *msg = data;
 	struct rprm_request *req;
 	struct rprm_release *rel;
+	struct rprm_constraint *c;
 	char ack_msg[MAX_MSG];
 	struct rprm_ack *ack = (void *)ack_msg;
 	struct rprm_request_ack *rack = (void *)ack->data;
 	int res_id;
 	int ret;
+	bool set;
 
 	dev_dbg(dev, "resmgr msg from %u and len %d\n" , src, len);
 
@@ -264,6 +391,28 @@ static void rprm_cb(struct rpmsg_channel *rpdev, void *data, int len,
 			dev_err(dev, "resource release failed %d!\n", ret);
 		/* no ack for release resource */
 		return;
+	case RPRM_SET_CONSTRAINTS:
+	case RPRM_CLEAR_CONSTRAINTS:
+		len -= sizeof *c;
+		if (len < 0) {
+			dev_err(dev, "Bad message\n");
+			return;
+		}
+
+		set = msg->action == RPRM_SET_CONSTRAINTS;
+		c = (void *)msg->data;
+		ret = rprm_update_constraints(rprm, c->res_id, &c->cdata, set);
+		if (ret)
+			dev_err(dev, "%s constraints failed! ret %d\n",
+				set ? "set" : "clear", ret);
+
+		/* no ack when removing constraints */
+		if (!set)
+			return;
+
+		len = sizeof *c;
+		memcpy(ack->data, c, len);
+		break;
 	default:
 		dev_err(dev, "Unknow action %d\n", msg->action);
 		ret = -EINVAL;
@@ -275,6 +424,18 @@ out:
 	ret = rpmsg_sendto(rpdev, ack, sizeof *ack + len, src);
 	if (ret)
 		dev_err(dev, "rprm ack failed: %d\n", ret);
+}
+
+/* print constraint information for a resource */
+static int _snprint_constraints_info(struct rprm_elem *e, char *buf, size_t len)
+{
+	return snprintf(buf, len,
+		"Mask:0x%x\n"
+		"Frequency:%ld\n"
+		"Latency:%ld\n"
+		"Bandwidth:%ld\n",
+		e->constraints.mask, e->constraints.frequency,
+		e->constraints.latency, e->constraints.bandwidth);
 }
 
 static ssize_t rprm_dbg_read(struct file *filp, char __user *userbuf,
@@ -296,6 +457,9 @@ static ssize_t rprm_dbg_read(struct file *filp, char __user *userbuf,
 		if (e->res->ops->get_info)
 			c += e->res->ops->get_info(e->handle,
 						buf + c, len - c);
+
+		if (e->constraints.mask)
+			c += _snprint_constraints_info(e, buf + c, len - c);
 
 		p += c;
 		/* if resource already read then continue */
