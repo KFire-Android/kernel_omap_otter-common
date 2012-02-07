@@ -1344,10 +1344,10 @@ static void __init omap_kc1_init(void)
 	kc1_pmic_mux_init();
 	omap4_i2c_init();
 	enable_rtc_gpio();
-	//ramconsole_init();
+	ramconsole_init();
 	omap4_display_init();
 	//omap_disp_led_init();
-	// **omap4_register_ion();
+	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 
 	gpio_request(0, "sysok");
