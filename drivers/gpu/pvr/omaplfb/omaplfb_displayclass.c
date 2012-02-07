@@ -40,19 +40,26 @@
 #include "kerneldisplay.h"
 #include "omaplfb.h"
 
-#if defined(CONFIG_ION_OMAP)
+/*
+ * Just use CONFIG_DSSCOMP to distinguish code which was previously had
+ * additional mixes of CONFIG_TI_TILER and CONFIG_ION_OMAP. DSSCOMP makes
+ * it a given that ION and the TILER will be used.
+ */
+#if defined(CONFIG_DSSCOMP)
+#if !defined(CONFIG_TI_TILER) || !defined(CONFIG_ION_OMAP)
+#error Expected CONFIG_TI_TILER and CONFIG_ION_OMAP to be defined
+#endif
 #include <linux/ion.h>
 #include <linux/omap_ion.h>
-extern struct ion_client *gpsIONClient;
-#endif
-#if defined(CONFIG_TI_TILER)
 #include <mach/tiler.h>
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
-#endif
 #include <video/omap_hwc.h>
+#include "../services_headers.h"
 
-#if defined(CONFIG_ION_OMAP)
+void sgx_idle_log_flip(void);
+extern struct ion_client *gpsIONClient;
+
 /*
  * This is the number of framebuffers which will be rendered to by the SGX
  */
@@ -311,7 +318,7 @@ static PVRSRV_ERROR GetDCBufferAddr(IMG_HANDLE        hDevice,
                                     IMG_VOID          **ppvCpuVAddr,
                                     IMG_HANDLE        *phOSMapInfo,
                                     IMG_BOOL          *pbIsContiguous,
-	                                IMG_UINT32		  *pui32TilingStride)
+                                    IMG_UINT32        *pui32TilingStride)
 {
 	OMAPLFB_DEVINFO	*psDevInfo;
 	OMAPLFB_BUFFER *psSystemBuffer;
@@ -361,7 +368,7 @@ static PVRSRV_ERROR GetDCBufferAddr(IMG_HANDLE        hDevice,
 		*pbIsContiguous = !psDevInfo->sFBInfo.bIs2D;
 	}
 
-#if defined(CONFIG_TI_TILER)
+#if defined(CONFIG_DSSCOMP)
 	if (psDevInfo->sFBInfo.bIs2D) {
 		int i = (psSystemBuffer->sSysAddr.uiAddr - psDevInfo->sFBInfo.psPageList->uiAddr) >> PAGE_SHIFT;
 		*ppsSysAddr = psDevInfo->sFBInfo.psPageList + psDevInfo->sFBInfo.ulHeight * i;
@@ -628,7 +635,7 @@ ExitUnLock:
 }
 
 static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
-	IMG_HANDLE hSwapChain)
+                                       IMG_HANDLE hSwapChain)
 {
 	OMAPLFB_DEVINFO	*psDevInfo;
 	OMAPLFB_SWAPCHAIN *psSwapChain;
@@ -695,8 +702,8 @@ ExitUnLock:
 }
 
 static PVRSRV_ERROR SetDCDstRect(IMG_HANDLE hDevice,
-	IMG_HANDLE hSwapChain,
-	IMG_RECT *psRect)
+                                 IMG_HANDLE hSwapChain,
+                                 IMG_RECT *psRect)
 {
 	UNREFERENCED_PARAMETER(hDevice);
 	UNREFERENCED_PARAMETER(hSwapChain);
@@ -892,14 +899,6 @@ void OMAPLFBSwapHandler(OMAPLFB_BUFFER *psBuffer)
 }
 
 #if defined(CONFIG_DSSCOMP)
-
-#include <mach/tiler.h>
-#include <video/dsscomp.h>
-#include <plat/dsscomp.h>
-#include "../services_headers.h"
-
-void sgx_idle_log_flip(void);
-
 static void dsscomp_proxy_cmdcomplete(void * cookie, int i)
 {
 	COMMAND_COMPLETE_DATA *psCmdCompleteData =
@@ -919,6 +918,7 @@ static void dsscomp_proxy_cmdcomplete(void * cookie, int i)
 	}
 	gapsDevInfo[0]->sPVRJTable.pfnPVRSRVCmdComplete(cookie, i);
 }
+#endif
 
 static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 							  OMAPLFB_DEVINFO *psDevInfo,
@@ -938,6 +938,7 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 	{
 		psBuffer->hCmdComplete = (OMAPLFB_HANDLE)hCmdCookie;
 		psBuffer->ulSwapInterval = ulSwapInterval;
+#if defined(CONFIG_DSSCOMP)
 		if (is_tiler_addr(psBuffer->sSysAddr.uiAddr)) {
 			IMG_UINT32 w = psBuffer->psDevInfo->sDisplayDim.ui32Width;
 			IMG_UINT32 h = psBuffer->psDevInfo->sDisplayDim.ui32Height;
@@ -964,7 +965,9 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 			dsscomp_gralloc_queue(&comp, pas, true,
 					      dsscomp_proxy_cmdcomplete,
 					      (void *) psBuffer->hCmdComplete);
-		} else {
+		} else
+#endif
+		{
 			OMAPLFBQueueBufferForSwap(psSwapChain, psBuffer);
 		}
 	}
@@ -974,10 +977,7 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 	return IMG_TRUE;
 }
 
-#include "servicesint.h"
-#include "services.h"
-#include "mm.h"
-
+#if defined(CONFIG_DSSCOMP)
 /* FIXME: Manual clipping, this should be done in bltsville not here */
 static void clip_rects(struct bvbltparams *pParmsIn)
 {
@@ -1160,11 +1160,11 @@ static inline int meminfo_idx_valid(int meminfo_ix, int num_meminfos)
 }
 
 static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
-							  OMAPLFB_DEVINFO *psDevInfo,
-							  PDC_MEM_INFO *ppsMemInfos,
-							  IMG_UINT32 ui32NumMemInfos,
-							  struct omap_hwc_data *psHwcData,
-							  IMG_UINT32 uiHwcDataSz)
+                              OMAPLFB_DEVINFO *psDevInfo,
+                              PDC_MEM_INFO *ppsMemInfos,
+                              IMG_UINT32 ui32NumMemInfos,
+                              struct omap_hwc_data *psHwcData,
+                              IMG_UINT32 uiHwcDataSz)
 {
 	struct tiler_pa_info *apsTilerPAs[5];
 	IMG_UINT32 i, k, j;
@@ -1421,7 +1421,6 @@ unmap_srcs:
 
 	return IMG_TRUE;
 }
-
 #endif 
 
 static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
@@ -1469,6 +1468,78 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 #endif
 	}
 }
+
+#if defined(CONFIG_DSSCOMP)
+static OMAPLFB_ERROR OMAPLFBInitIonOmap(OMAPLFB_DEVINFO *psDevInfo,
+                                        struct fb_info *psLINFBInfo,
+                                        OMAPLFB_FBINFO *psPVRFBInfo)
+{
+	int n = OMAPLFB_NUM_SGX_FBS;
+	int res;
+	int i, x, y, w;
+	ion_phys_addr_t phys;
+	size_t size;
+	struct tiler_view_t view;
+
+	struct omap_ion_tiler_alloc_data sAllocData = {
+		/* TILER will align width to 128-bytes */
+		/* however, SGX must have full page width */
+		.w = ALIGN(psLINFBInfo->var.xres, PAGE_SIZE / (psLINFBInfo->var.bits_per_pixel / 8)),
+		.h = psLINFBInfo->var.yres,
+		.fmt = psLINFBInfo->var.bits_per_pixel == 16 ? TILER_PIXEL_FMT_16BIT : TILER_PIXEL_FMT_32BIT,
+		.flags = 0,
+	};
+	unsigned uiFBDevID = psDevInfo->uiFBDevID;
+
+	printk(KERN_DEBUG DRIVER_PREFIX
+		" %s: Device %u: Requesting %d TILER 2D framebuffers\n", __FUNCTION__, uiFBDevID, n);
+	sAllocData.w *= n;
+
+	psPVRFBInfo->uiBytesPerPixel = psLINFBInfo->var.bits_per_pixel >> 3;
+	psPVRFBInfo->bIs2D = OMAPLFB_TRUE;
+	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
+	if (res < 0)
+	{
+		printk(KERN_ERR DRIVER_PREFIX
+			" %s: Device %u: Could not allocate 2D framebuffer(%d)\n", __FUNCTION__, uiFBDevID, res);
+		return OMAPLFB_ERROR_INIT_FAILURE;
+	}
+
+	ion_phys(gpsIONClient, sAllocData.handle, &phys, &size);
+	psPVRFBInfo->sSysAddr.uiAddr = phys;
+	psPVRFBInfo->sCPUVAddr = 0;
+
+	psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
+	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
+	psPVRFBInfo->ulByteStride = PAGE_ALIGN(psPVRFBInfo->ulWidth * psPVRFBInfo->uiBytesPerPixel);
+	w = psPVRFBInfo->ulByteStride >> PAGE_SHIFT;
+
+	/* this is an "effective" FB size to get correct number of buffers */
+	psPVRFBInfo->ulFBSize = sAllocData.h * n * psPVRFBInfo->ulByteStride;
+	psPVRFBInfo->psPageList = kzalloc(w * n * psPVRFBInfo->ulHeight * sizeof(*psPVRFBInfo->psPageList), GFP_KERNEL);
+	if (!psPVRFBInfo->psPageList)
+	{
+		printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Could not allocate page list\n", __FUNCTION__, psDevInfo->uiFBDevID);
+		ion_free(gpsIONClient, sAllocData.handle);
+		return OMAPLFB_ERROR_INIT_FAILURE;
+	}
+	psPVRFBInfo->psIONHandle = sAllocData.handle;
+
+	tilview_create(&view, phys, psDevInfo->sFBInfo.ulWidth, psDevInfo->sFBInfo.ulHeight);
+	for(i=0; i<n; i++)
+	{
+		for(y=0; y<psDevInfo->sFBInfo.ulHeight; y++)
+		{
+			for(x=0; x<w; x++)
+			{
+				psPVRFBInfo->psPageList[i * psDevInfo->sFBInfo.ulHeight * w + y * w + x].uiAddr =
+					phys + view.v_inc * y + ((x + i * w) << PAGE_SHIFT);
+			}
+		}
+	}
+	return OMAPLFB_OK;
+}
+#endif
 
 static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 {
@@ -1558,72 +1629,13 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 	
 	OMAPLFBPrintInfo(psDevInfo);
 
-#if defined(CONFIG_ION_OMAP)
+#if defined(CONFIG_DSSCOMP)
+	eError = OMAPLFBInitIonOmap(psDevInfo, psLINFBInfo, psPVRFBInfo);
+	if (eError != OMAPLFB_OK)
 	{
-	int n = OMAPLFB_NUM_SGX_FBS;
-	int res;
-	int i, x, y, w;
-	ion_phys_addr_t phys;
-	size_t size;
-	struct tiler_view_t view;
-
-	struct omap_ion_tiler_alloc_data sAllocData = {
-		/* TILER will align width to 128-bytes */
-		/* however, SGX must have full page width */
-		.w = ALIGN(psLINFBInfo->var.xres, PAGE_SIZE / (psLINFBInfo->var.bits_per_pixel / 8)),
-		.h = psLINFBInfo->var.yres,
-		.fmt = psLINFBInfo->var.bits_per_pixel == 16 ? TILER_PIXEL_FMT_16BIT : TILER_PIXEL_FMT_32BIT,
-		.flags = 0,
-	};
-
-	printk(KERN_DEBUG DRIVER_PREFIX
-		" %s: Device %u: Requesting %d TILER 2D framebuffers\n", __FUNCTION__, uiFBDevID, n);
-	sAllocData.w *= n;
-
-	psPVRFBInfo->uiBytesPerPixel = psLINFBInfo->var.bits_per_pixel >> 3;
-	psPVRFBInfo->bIs2D = OMAPLFB_TRUE;
-	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
-	if (res < 0)
-	{
-		printk(KERN_ERR DRIVER_PREFIX
-			" %s: Device %u: Could not allocate 2D framebuffer(%d)\n", __FUNCTION__, uiFBDevID, res);
 		goto ErrorModPut;
 	}
-	psPVRFBInfo->psIONHandle = sAllocData.handle;
-
-	ion_phys(gpsIONClient, sAllocData.handle, &phys, &size);
-
-	psPVRFBInfo->sSysAddr.uiAddr = phys;
-	psPVRFBInfo->sCPUVAddr = 0;
-
-	psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
-	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
-	psPVRFBInfo->ulByteStride = PAGE_ALIGN(psPVRFBInfo->ulWidth * psPVRFBInfo->uiBytesPerPixel);
-	w = psPVRFBInfo->ulByteStride >> PAGE_SHIFT;
-
-	/* this is an "effective" FB size to get correct number of buffers */
-	psPVRFBInfo->ulFBSize = sAllocData.h * n * psPVRFBInfo->ulByteStride;
-	psPVRFBInfo->psPageList = kzalloc(w * n * psPVRFBInfo->ulHeight * sizeof(*psPVRFBInfo->psPageList), GFP_KERNEL);
-	if (!psPVRFBInfo->psPageList)
-	{
-		printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Could not allocate page list\n", __FUNCTION__, psDevInfo->uiFBDevID);
-		ion_free(gpsIONClient, sAllocData.handle);
-		goto ErrorModPut;
-	}
-
-	tilview_create(&view, phys, psDevInfo->sFBInfo.ulWidth, psDevInfo->sFBInfo.ulHeight);
-	for(i=0; i<n; i++)
-	{
-		for(y=0; y<psDevInfo->sFBInfo.ulHeight; y++)
-		{
-			for(x=0; x<w; x++)
-			{
-				psPVRFBInfo->psPageList[i * psDevInfo->sFBInfo.ulHeight * w + y * w + x].uiAddr =
-					phys + view.v_inc * y + ((x + i * w) << PAGE_SHIFT);
-			}
-		}
-	}
-	}
+	/* psPVRFBInfo->psIONHandle is now set */
 #else
 	psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
 	psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
@@ -1708,8 +1720,8 @@ static void OMAPLFBDeInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 
 	psLINFBOwner = psLINFBInfo->fbops->owner;
 
+#if defined(CONFIG_DSSCOMP)
 	kfree(psPVRFBInfo->psPageList);
-#if defined(CONFIG_ION_OMAP)
 	if (psPVRFBInfo->psIONHandle)
 	{
 		ion_free(gpsIONClient, psPVRFBInfo->psIONHandle);
@@ -1835,9 +1847,9 @@ static OMAPLFB_DEVINFO *OMAPLFBInitDev(unsigned uiFBDevID)
 
 
 	if (psDevInfo->sPVRJTable.pfnPVRSRVRegisterCmdProcList(psDevInfo->uiPVRDevID,
-															&pfnCmdProcList[0],
-															aui32SyncCountList,
-															OMAPLFB_COMMAND_COUNT) != PVRSRV_OK)
+			&pfnCmdProcList[0],
+			aui32SyncCountList,
+			OMAPLFB_COMMAND_COUNT) != PVRSRV_OK)
 	{
 		printk(KERN_ERR DRIVER_PREFIX
 			": %s: Device %u: Couldn't register command processing functions with PVR Services\n", __FUNCTION__, uiFBDevID);
