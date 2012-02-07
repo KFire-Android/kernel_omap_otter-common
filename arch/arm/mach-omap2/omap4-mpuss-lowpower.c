@@ -680,25 +680,30 @@ cpu_prepare:
 		/* Clear SAR BACKUP status on GP devices */
 		if (omap_type() == OMAP2_DEVICE_TYPE_GP)
 			__raw_writel(0x0, sar_base + SAR_BACKUP_STATUS_OFFSET);
-		/* Enable GIC distributor and inteface on CPU0*/
+		/* Enable GIC distributor and interface on CPU0*/
 		gic_cpu_enable();
 		gic_dist_enable();
 
-		/*
-		 * Dummy dispatcher call after OSWR and OFF
-		 * Restore the right return Kernel address (with MMU on) for
-		 * subsequent calls to secure ROM. Otherwise the return address
-		 * will be to a PA return address and the system will hang.
-		 */
-		if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+		if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
+			/*
+			 * Dummy dispatcher call after OSWR and OFF
+			 * Restore the right return Kernel address (with MMU on) for
+			 * subsequent calls to secure ROM. Otherwise the return address
+			 * will be to a PA return address and the system will hang.
+			 */
 			omap4_secure_dispatcher(PPA_SERVICE_0,
 						FLAG_START_CRITICAL,
 						0, 0, 0, 0, 0);
-	}
 
-	if (omap4_device_prev_state_off()) {
-		restore_ivahd_tesla_regs();
-		restore_l3instr_regs();
+			/* Due to ROM BUG at wake up from MPU OSWR/OFF
+			 * on HS/EMU device only (not GP device),
+			 * the ROM Code reconfigures some of
+			 * IVAHD/TESLA/L3INSTR registers.
+			 * So these IVAHD/TESLA and L3INSTR registers
+			 * need to be restored.*/
+			restore_ivahd_tesla_regs();
+			restore_l3instr_regs();
+		}
 	}
 
 	pwrdm_post_transition();
