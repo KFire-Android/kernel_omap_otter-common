@@ -1631,6 +1631,11 @@ static int omap_dss_mgr_blank(struct omap_overlay_manager *mgr,
 
 	spin_lock_irqsave(&dss_cache.lock, flags);
 
+	/* there is no GO on inactive displays */
+	if (!mgr->device ||
+	    mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE)
+		wait_for_go = false;
+
 	/* disable overlays in overlay info structs and in cache */
 	for (i = 0; i < omap_dss_get_num_overlays(); i++) {
 		struct omap_overlay_info oi = { .enabled = false };
@@ -1696,25 +1701,13 @@ static int omap_dss_mgr_blank(struct omap_overlay_manager *mgr,
 			oc = &dss_cache.overlay_cache[i];
 			if (oc->channel != mgr->id)
 				continue;
-			if (r && oc->dirty)
-				dss_ovl_configure_cb(&oc->cb, i, false);
-			if (oc->shadow_dirty) {
-				dss_ovl_program_cb(&oc->cb, i);
-				oc->dispc_channel = oc->channel;
-				oc->shadow_dirty = false;
-			} else {
-				pr_warn("ovl%d-shadow is not dirty\n", i);
-			}
+			dss_ovl_configure_cb(&oc->cb, i, false);
+			dss_ovl_program_cb(&oc->cb, i);
+			oc->dispc_channel = oc->channel;
 		}
 
-		if (r && mc->dirty)
-			dss_ovl_configure_cb(&mc->cb, i, false);
-		if (mc->shadow_dirty) {
-			dss_ovl_program_cb(&mc->cb, i);
-			mc->shadow_dirty = false;
-		} else {
-			pr_warn("mgr%d-shadow is not dirty\n", mgr->id);
-		}
+		dss_ovl_configure_cb(&mc->cb, i, false);
+		dss_ovl_program_cb(&mc->cb, i);
 	}
 
 	spin_unlock_irqrestore(&dss_cache.lock, flags);
