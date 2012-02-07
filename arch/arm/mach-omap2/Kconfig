@@ -458,6 +458,7 @@ config OMAP4_ARM_ERRATA_751472
 
 config OMAP4_ARM_ERRATA_743622
 	bool "Enabled the workaround for ARM errata 743622 on GP devices"
+	default y
 	help
 	  Enables the workaround for ARM errata 743622 on OMAP4.
 	  This involves setting bit 6 of the CP15 diagnostic control register.
