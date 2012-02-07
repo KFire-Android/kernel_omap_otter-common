@@ -1558,88 +1558,82 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 	
 	OMAPLFBPrintInfo(psDevInfo);
 
-	/* hijack LINFB */
 #if defined(CONFIG_ION_OMAP)
-	if(1)
 	{
-		int n = OMAPLFB_NUM_SGX_FBS;
-		int res;
-		int i, x, y, w;
-		ion_phys_addr_t phys;
-		size_t size;
-		struct tiler_view_t view;
+	int n = OMAPLFB_NUM_SGX_FBS;
+	int res;
+	int i, x, y, w;
+	ion_phys_addr_t phys;
+	size_t size;
+	struct tiler_view_t view;
 
-		struct omap_ion_tiler_alloc_data sAllocData = {
-			/* TILER will align width to 128-bytes */
-			/* however, SGX must have full page width */
-			.w = ALIGN(psLINFBInfo->var.xres, PAGE_SIZE / (psLINFBInfo->var.bits_per_pixel / 8)),
-			.h = psLINFBInfo->var.yres,
-			.fmt = psLINFBInfo->var.bits_per_pixel == 16 ? TILER_PIXEL_FMT_16BIT : TILER_PIXEL_FMT_32BIT,
-			.flags = 0,
-		};
+	struct omap_ion_tiler_alloc_data sAllocData = {
+		/* TILER will align width to 128-bytes */
+		/* however, SGX must have full page width */
+		.w = ALIGN(psLINFBInfo->var.xres, PAGE_SIZE / (psLINFBInfo->var.bits_per_pixel / 8)),
+		.h = psLINFBInfo->var.yres,
+		.fmt = psLINFBInfo->var.bits_per_pixel == 16 ? TILER_PIXEL_FMT_16BIT : TILER_PIXEL_FMT_32BIT,
+		.flags = 0,
+	};
 
-		printk(KERN_DEBUG DRIVER_PREFIX
-			" %s: Device %u: Requesting %d TILER 2D framebuffers\n", __FUNCTION__, uiFBDevID, n);
+	printk(KERN_DEBUG DRIVER_PREFIX
+		" %s: Device %u: Requesting %d TILER 2D framebuffers\n", __FUNCTION__, uiFBDevID, n);
+	sAllocData.w *= n;
 
-		sAllocData.w *= n;
+	psPVRFBInfo->uiBytesPerPixel = psLINFBInfo->var.bits_per_pixel >> 3;
+	psPVRFBInfo->bIs2D = OMAPLFB_TRUE;
+	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
+	if (res < 0)
+	{
+		printk(KERN_ERR DRIVER_PREFIX
+			" %s: Device %u: Could not allocate 2D framebuffer(%d)\n", __FUNCTION__, uiFBDevID, res);
+		goto ErrorModPut;
+	}
+	psPVRFBInfo->psIONHandle = sAllocData.handle;
 
-		psPVRFBInfo->uiBytesPerPixel = psLINFBInfo->var.bits_per_pixel >> 3;
-		psPVRFBInfo->bIs2D = OMAPLFB_TRUE;
-		res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
-		if (res < 0)
+	ion_phys(gpsIONClient, sAllocData.handle, &phys, &size);
+
+	psPVRFBInfo->sSysAddr.uiAddr = phys;
+	psPVRFBInfo->sCPUVAddr = 0;
+
+	psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
+	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
+	psPVRFBInfo->ulByteStride = PAGE_ALIGN(psPVRFBInfo->ulWidth * psPVRFBInfo->uiBytesPerPixel);
+	w = psPVRFBInfo->ulByteStride >> PAGE_SHIFT;
+
+	/* this is an "effective" FB size to get correct number of buffers */
+	psPVRFBInfo->ulFBSize = sAllocData.h * n * psPVRFBInfo->ulByteStride;
+	psPVRFBInfo->psPageList = kzalloc(w * n * psPVRFBInfo->ulHeight * sizeof(*psPVRFBInfo->psPageList), GFP_KERNEL);
+	if (!psPVRFBInfo->psPageList)
+	{
+		printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Could not allocate page list\n", __FUNCTION__, psDevInfo->uiFBDevID);
+		ion_free(gpsIONClient, sAllocData.handle);
+		goto ErrorModPut;
+	}
+
+	tilview_create(&view, phys, psDevInfo->sFBInfo.ulWidth, psDevInfo->sFBInfo.ulHeight);
+	for(i=0; i<n; i++)
+	{
+		for(y=0; y<psDevInfo->sFBInfo.ulHeight; y++)
 		{
-			printk(KERN_ERR DRIVER_PREFIX
-				" %s: Device %u: Could not allocate 2D framebuffer(%d)\n", __FUNCTION__, uiFBDevID, res);
-			goto ErrorModPut;
-		}
-		psPVRFBInfo->psIONHandle = sAllocData.handle;
-
-		ion_phys(gpsIONClient, sAllocData.handle, &phys, &size);
-
-		psPVRFBInfo->sSysAddr.uiAddr = phys;
-		psPVRFBInfo->sCPUVAddr = 0;
-
-		psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
-		psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
-		psPVRFBInfo->ulByteStride = PAGE_ALIGN(psPVRFBInfo->ulWidth * psPVRFBInfo->uiBytesPerPixel);
-		w = psPVRFBInfo->ulByteStride >> PAGE_SHIFT;
-
-		/* this is an "effective" FB size to get correct number of buffers */
-		psPVRFBInfo->ulFBSize = sAllocData.h * n * psPVRFBInfo->ulByteStride;
-		psPVRFBInfo->psPageList = kzalloc(w * n * psPVRFBInfo->ulHeight * sizeof(*psPVRFBInfo->psPageList), GFP_KERNEL);
-		if (!psPVRFBInfo->psPageList)
-		{
-			printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Could not allocate page list\n", __FUNCTION__, psDevInfo->uiFBDevID);
-			ion_free(gpsIONClient, sAllocData.handle);
-			goto ErrorModPut;
-		}
-
-		tilview_create(&view, phys, psDevInfo->sFBInfo.ulWidth, psDevInfo->sFBInfo.ulHeight);
-		for(i=0; i<n; i++)
-		{
-			for(y=0; y<psDevInfo->sFBInfo.ulHeight; y++)
+			for(x=0; x<w; x++)
 			{
-				for(x=0; x<w; x++)
-				{
-					psPVRFBInfo->psPageList[i * psDevInfo->sFBInfo.ulHeight * w + y * w + x].uiAddr =
-						phys + view.v_inc * y + ((x + i * w) << PAGE_SHIFT);
-				}
+				psPVRFBInfo->psPageList[i * psDevInfo->sFBInfo.ulHeight * w + y * w + x].uiAddr =
+					phys + view.v_inc * y + ((x + i * w) << PAGE_SHIFT);
 			}
 		}
 	}
-	else
-#endif
-	{
-		psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
-		psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
-
-		psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
-		psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
-		psPVRFBInfo->ulByteStride =  psLINFBInfo->fix.line_length;
-		psPVRFBInfo->ulFBSize = FBSize;
-		psPVRFBInfo->bIs2D = OMAPLFB_FALSE;
-		psPVRFBInfo->psPageList = IMG_NULL;
 	}
+#else
+	psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
+	psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
+	psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
+	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
+	psPVRFBInfo->ulByteStride =  psLINFBInfo->fix.line_length;
+	psPVRFBInfo->ulFBSize = FBSize;
+	psPVRFBInfo->bIs2D = OMAPLFB_FALSE;
+	psPVRFBInfo->psPageList = IMG_NULL;
+#endif
 	psPVRFBInfo->ulBufferSize = psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
 	
 	psPVRFBInfo->ulRoundedBufferSize = RoundUpToMultiple(psPVRFBInfo->ulBufferSize, ulLCM);
