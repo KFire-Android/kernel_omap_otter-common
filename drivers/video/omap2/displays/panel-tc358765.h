@@ -101,6 +101,12 @@
 #define GPIOO			0x0520		/* GPIO Output */
 #define GPIOI			0x0520		/* GPIO Input */
 
+/* I2C Registers */
+#define I2CTIMCTRL		0x0540
+#define I2CMADDR		0x0544
+#define WDATAQ			0x0548
+#define RDATAQ			0x054C
+
 /* Chip Revision Registers */
 #define IDREG			0x0580		/* Chip and Revision ID */
 
