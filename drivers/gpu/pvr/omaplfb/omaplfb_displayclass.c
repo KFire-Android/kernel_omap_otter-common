@@ -52,6 +52,13 @@ extern struct ion_client *gpsIONClient;
 #endif
 #include <video/omap_hwc.h>
 
+#if defined(CONFIG_ION_OMAP)
+/*
+ * This is the number of framebuffers which will be rendered to by the SGX
+ */
+#define OMAPLFB_NUM_SGX_FBS	2
+#endif
+
 #define OMAPLFB_COMMAND_COUNT		1
 
 #define	OMAPLFB_VSYNC_SETTLE_COUNT	5
@@ -1555,8 +1562,7 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 #if defined(CONFIG_ION_OMAP)
 	if(1)
 	{
-		/* for some reason we need at least 3 buffers in the swap chain */
-		int n = FBSize / RoundUpToMultiple(psLINFBInfo->fix.line_length * psLINFBInfo->var.yres, ulLCM);
+		int n = OMAPLFB_NUM_SGX_FBS;
 		int res;
 		int i, x, y, w;
 		ion_phys_addr_t phys;
@@ -1574,26 +1580,19 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 
 		printk(KERN_DEBUG DRIVER_PREFIX
 			" %s: Device %u: Requesting %d TILER 2D framebuffers\n", __FUNCTION__, uiFBDevID, n);
-		/* HACK: limit to MAX 3 FBs to save TILER container space */
-		if (n > 3)
-			n = 3;
+
 		sAllocData.w *= n;
 
 		psPVRFBInfo->uiBytesPerPixel = psLINFBInfo->var.bits_per_pixel >> 3;
 		psPVRFBInfo->bIs2D = OMAPLFB_TRUE;
-
 		res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
-		if (res < 0)
-		{
-			res = omap_ion_tiler_alloc(gpsIONClient, &sAllocData);
-		}
-		psPVRFBInfo->psIONHandle = sAllocData.handle;
 		if (res < 0)
 		{
 			printk(KERN_ERR DRIVER_PREFIX
 				" %s: Device %u: Could not allocate 2D framebuffer(%d)\n", __FUNCTION__, uiFBDevID, res);
 			goto ErrorModPut;
 		}
+		psPVRFBInfo->psIONHandle = sAllocData.handle;
 
 		ion_phys(gpsIONClient, sAllocData.handle, &phys, &size);
 
