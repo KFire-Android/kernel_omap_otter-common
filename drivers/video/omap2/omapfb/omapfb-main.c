@@ -1322,9 +1322,7 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 		if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
 			goto exit;
 
-		if (display->driver->suspend)
-			r = display->driver->suspend(display);
-		else if (display->driver->disable)
+		if (display->driver->disable)
 			display->driver->disable(display);
 
 		break;
