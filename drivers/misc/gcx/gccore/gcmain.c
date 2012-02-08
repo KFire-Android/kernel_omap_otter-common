@@ -69,6 +69,185 @@ static struct gccontext *g_context;
 static struct mutex g_contextlock;
 static struct mutex g_datalock;
 
+struct gccontextmap {
+	pid_t pid;
+	struct gccontext *context;
+	struct gccontextmap *prev;
+	struct gccontextmap *next;
+};
+static struct mutex g_maplock;
+static struct gccontextmap *g_map;
+static struct gccontextmap *g_mapvacant;
+
+static enum gcerror find_context(struct gccontextmap **context, int create)
+{
+	enum gcerror gcerror;
+	struct gccontextmap *prev;
+	struct gccontextmap *curr;
+	int maplocked = 0;
+	pid_t pid;
+
+	GC_PRINT(GC_INFO_MSG " getting lock mutex.\n", __func__, __LINE__);
+
+	/* Acquire map access mutex. */
+	gcerror = gc_acquire_mutex(&g_maplock, GC_INFINITE);
+	if (gcerror != GCERR_NONE) {
+		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
+				__func__, __LINE__, gcerror);
+		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_CTX_ALLOC);
+		goto exit;
+	}
+	maplocked = 1;
+
+	/* Get current PID. */
+	pid = current->tgid;
+
+	/* Search the list. */
+	prev = NULL;
+	curr = g_map;
+
+	GC_PRINT(GC_INFO_MSG " scanning existing records for pid %d.\n",
+		__func__, __LINE__, pid);
+
+	/* Try to locate the record. */
+	while (curr != NULL) {
+		/* Found the record? */
+		if (curr->pid == pid) {
+			/* Move to the top of the list. */
+			if (prev != NULL) {
+				prev->next = curr->next;
+				curr->next = g_map;
+				g_map = curr;
+			}
+
+			/* Success. */
+			GC_PRINT(GC_INFO_MSG " record is found @ 0x%08X\n",
+				__func__, __LINE__, (unsigned int) curr);
+
+			*context = curr;
+			goto exit;
+		}
+
+		/* Get the next record. */
+		prev = curr;
+		curr = curr->next;
+	}
+
+	/* Not found, do we need to create a new one? */
+	if (!create) {
+		GC_PRINT(GC_INFO_MSG " not found, exiting.\n",
+			__func__, __LINE__);
+		gcerror = GCERR_NOT_FOUND;
+		goto exit;
+	}
+
+	/* Get new record. */
+	if (g_mapvacant == NULL) {
+		GC_PRINT(GC_INFO_MSG " not found, allocating.\n",
+			__func__, __LINE__);
+
+		curr = kmalloc(sizeof(struct gccontextmap), GFP_KERNEL);
+		if (curr == NULL) {
+			GC_PRINT(GC_ERR_MSG " out of memory.\n",
+					__func__, __LINE__);
+			gcerror = GCERR_SETGRP(GCERR_OODM,
+						GCERR_IOCTL_CTX_ALLOC);
+			goto exit;
+		}
+
+		GC_PRINT(GC_INFO_MSG " allocated @ 0x%08X\n",
+			__func__, __LINE__, (unsigned int) curr);
+	} else {
+		GC_PRINT(GC_INFO_MSG " not found, reusing record @ 0x%08X\n",
+			__func__, __LINE__, (unsigned int) g_mapvacant);
+
+		curr = g_mapvacant;
+		g_mapvacant = g_mapvacant->next;
+	}
+
+	GC_PRINT(GC_INFO_MSG " creating new context.\n",
+		__func__, __LINE__);
+
+	/* Create the context. */
+	gcerror = gc_attach(&curr->context);
+
+	/* Success? */
+	if (gcerror == GCERR_NONE) {
+		GC_PRINT(GC_INFO_MSG " new context created @ 0x%08X\n",
+			__func__, __LINE__, (unsigned int) curr->context);
+
+		/* Set the PID. */
+		curr->pid = pid;
+
+		/* Add to the list. */
+		curr->prev = NULL;
+		curr->next = g_map;
+		if (g_map != NULL)
+			g_map->prev = curr;
+		g_map = curr;
+
+		/* Set return value. */
+		*context = curr;
+	} else {
+		GC_PRINT(GC_INFO_MSG " failed to create a context.\n",
+			__func__, __LINE__);
+
+		/* Add the record to the vacant list. */
+		curr->next = g_mapvacant;
+		g_mapvacant = curr;
+	}
+
+exit:
+	if (maplocked)
+		mutex_unlock(&g_maplock);
+
+	return gcerror;
+}
+
+static enum gcerror release_context(struct gccontextmap *context)
+{
+	enum gcerror gcerror;
+
+	/* Remove from the list. */
+	if (context->prev == NULL) {
+		if (context != g_map) {
+			gcerror = GCERR_NOT_FOUND;
+			goto exit;
+		}
+
+		g_map = context->next;
+		g_map->prev = NULL;
+	} else {
+		context->prev->next = context->next;
+		context->next->prev = context->prev;
+	}
+
+	if (context->context != NULL) {
+		gcerror = gc_detach(&context->context);
+		if (gcerror != GCERR_NONE)
+			goto exit;
+	}
+
+	kfree(context);
+
+exit:
+	return gcerror;
+}
+
+static void delete_context_map(void)
+{
+	struct gccontextmap *curr;
+
+	while (g_map != NULL)
+		release_context(g_map);
+
+	while (g_mapvacant != NULL) {
+		curr = g_mapvacant;
+		g_mapvacant = g_mapvacant->next;
+		kfree(curr);
+	}
+}
+
 /*******************************************************************************
 ** Register access.
 */
@@ -763,22 +942,20 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	unsigned int *logical;
 	unsigned int address;
 	struct gcmopipesel *gcmopipesel;
-	int datalocked = 0;
+	int locked = 0;
+	struct gccontextmap *context;
+	struct gccommit kgccommit;
 
-	/* Acquire context info acccess mutex. */
-	gccommit->gcerror = gc_acquire_mutex(&g_datalock, GC_INFINITE);
-	if (gccommit->gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gccommit->gcerror);
+	/* Locate the client entry. */
+	kgccommit.gcerror = find_context(&context, true);
+	if (kgccommit.gcerror != GCERR_NONE)
 		goto exit;
-	}
-	datalocked = 1;
 
-	/* Make sure the context is set. */
-	if (g_context == NULL) {
-		gccommit->gcerror = GCERR_CTX_NULL;
+	/* Set context. */
+	kgccommit.gcerror = gc_lock(context->context);
+	if (kgccommit.gcerror != GCERR_NONE)
 		goto exit;
-	}
+	locked = 1;
 
 	/* Set 2D pipe. */
 	gccommit->gcerror = cmdbuf_alloc(sizeof(struct gcmopipesel),
@@ -858,8 +1035,8 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	}
 
 exit:
-	if (datalocked)
-		mutex_unlock(&g_datalock);
+	if (locked)
+		gc_unlock(context->context);
 }
 EXPORT_SYMBOL(gc_commit);
 
@@ -867,22 +1044,20 @@ void gc_map(struct gcmap *gcmap)
 {
 	struct mmu2dphysmem mem;
 	struct mmu2darena *mapped = NULL;
-	int datalocked = 0;
+	int locked = 0;
+	struct gccontextmap *context;
+	struct gcmap kgcmap;
 
-	/* Acquire context info acccess mutex. */
-	gcmap->gcerror = gc_acquire_mutex(&g_datalock, GC_INFINITE);
-	if (gcmap->gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcmap->gcerror);
+	/* Locate the client entry. */
+	kgcmap.gcerror = find_context(&context, true);
+	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
-	}
-	datalocked = 1;
 
-	/* Make sure the context is set. */
-	if (g_context == NULL) {
-		gcmap->gcerror = GCERR_CTX_NULL;
+	/* Set context. */
+	kgcmap.gcerror = gc_lock(context->context);
+	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
-	}
+	locked = 1;
 
 	GC_PRINT(GC_INFO_MSG " map client buffer\n",
 			__func__, __LINE__);
@@ -914,29 +1089,27 @@ void gc_map(struct gcmap *gcmap)
 			__func__, __LINE__, (unsigned int) mapped);
 
 exit:
-	if (datalocked)
-		mutex_unlock(&g_datalock);
+	if (locked)
+		gc_unlock(context->context);
 }
 EXPORT_SYMBOL(gc_map);
 
 void gc_unmap(struct gcmap *gcmap)
 {
-	int datalocked = 0;
+	int locked = 0;
+	struct gccontextmap *context;
+	struct gcmap kgcmap;
 
-	/* Acquire context info acccess mutex. */
-	gcmap->gcerror = gc_acquire_mutex(&g_datalock, GC_INFINITE);
-	if (gcmap->gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcmap->gcerror);
+	/* Locate the client entry. */
+	kgcmap.gcerror = find_context(&context, true);
+	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
-	}
-	datalocked = 1;
 
-	/* Make sure the context is set. */
-	if (g_context == NULL) {
-		gcmap->gcerror = GCERR_CTX_NULL;
+	/* Set context. */
+	kgcmap.gcerror = gc_lock(context->context);
+	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
-	}
+	locked = 1;
 
 	GC_PRINT(GC_INFO_MSG " unmap client buffer\n",
 			__func__, __LINE__);
@@ -960,8 +1133,8 @@ void gc_unmap(struct gcmap *gcmap)
 	gcmap->handle = ~0U;
 
 exit:
-	if (datalocked)
-		mutex_unlock(&g_datalock);
+	if (locked)
+		gc_unlock(context->context);
 }
 EXPORT_SYMBOL(gc_unmap);
 
@@ -1015,6 +1188,7 @@ static int __init gc_init(void)
 	destroy_workqueue(gcwq);
 #endif
 
+	mutex_init(&g_maplock);
 	/* Success. */
 	return 0;
 
@@ -1029,6 +1203,10 @@ fail:
 
 static void __exit gc_exit(void)
 {
+
+	delete_context_map();
+	mutex_destroy(&g_maplock);
+
 	if (g_reg_base != NULL) {
 		iounmap(g_reg_base);
 		g_reg_base = NULL;

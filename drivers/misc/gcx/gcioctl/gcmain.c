@@ -36,189 +36,7 @@
 #	define GC_PRINT(...)
 #endif
 
-/*******************************************************************************
- * User context mapping.
- */
-
-struct gccontextmap {
-	pid_t pid;
-	struct gccontext *context;
-	struct gccontextmap *prev;
-	struct gccontextmap *next;
-};
-
 static struct mutex g_maplock;
-static struct gccontextmap *g_map;
-static struct gccontextmap *g_mapvacant;
-
-static enum gcerror find_context(struct gccontextmap **context, int create)
-{
-	enum gcerror gcerror;
-	struct gccontextmap *prev;
-	struct gccontextmap *curr;
-	int maplocked = 0;
-	pid_t pid;
-
-	GC_PRINT(GC_INFO_MSG " getting lock mutex.\n", __func__, __LINE__);
-
-	/* Acquire map access mutex. */
-	gcerror = gc_acquire_mutex(&g_maplock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_CTX_ALLOC);
-		goto exit;
-	}
-	maplocked = 1;
-
-	/* Get current PID. */
-	pid = current->tgid;
-
-	/* Search the list. */
-	prev = NULL;
-	curr = g_map;
-
-	GC_PRINT(GC_INFO_MSG " scanning existing records for pid %d.\n",
-		__func__, __LINE__, pid);
-
-	/* Try to locate the record. */
-	while (curr != NULL) {
-		/* Found the record? */
-		if (curr->pid == pid) {
-			/* Move to the top of the list. */
-			if (prev != NULL) {
-				prev->next = curr->next;
-				curr->next = g_map;
-				g_map = curr;
-			}
-
-			/* Success. */
-			GC_PRINT(GC_INFO_MSG " record is found @ 0x%08X\n",
-				__func__, __LINE__, (unsigned int) curr);
-
-			*context = curr;
-			goto exit;
-		}
-
-		/* Get the next record. */
-		prev = curr;
-		curr = curr->next;
-	}
-
-	/* Not found, do we need to create a new one? */
-	if (!create) {
-		GC_PRINT(GC_INFO_MSG " not found, exiting.\n",
-			__func__, __LINE__);
-		gcerror = GCERR_NOT_FOUND;
-		goto exit;
-	}
-
-	/* Get new record. */
-	if (g_mapvacant == NULL) {
-		GC_PRINT(GC_INFO_MSG " not found, allocating.\n",
-			__func__, __LINE__);
-
-		curr = kmalloc(sizeof(struct gccontextmap), GFP_KERNEL);
-		if (curr == NULL) {
-			GC_PRINT(GC_ERR_MSG " out of memory.\n",
-					__func__, __LINE__);
-			gcerror = GCERR_SETGRP(GCERR_OODM,
-						GCERR_IOCTL_CTX_ALLOC);
-			goto exit;
-		}
-
-		GC_PRINT(GC_INFO_MSG " allocated @ 0x%08X\n",
-			__func__, __LINE__, (unsigned int) curr);
-	} else {
-		GC_PRINT(GC_INFO_MSG " not found, reusing record @ 0x%08X\n",
-			__func__, __LINE__, (unsigned int) g_mapvacant);
-
-		curr = g_mapvacant;
-		g_mapvacant = g_mapvacant->next;
-	}
-
-	GC_PRINT(GC_INFO_MSG " creating new context.\n",
-		__func__, __LINE__);
-
-	/* Create the context. */
-	gcerror = gc_attach(&curr->context);
-
-	/* Success? */
-	if (gcerror == GCERR_NONE) {
-		GC_PRINT(GC_INFO_MSG " new context created @ 0x%08X\n",
-			__func__, __LINE__, (unsigned int) curr->context);
-
-		/* Set the PID. */
-		curr->pid = pid;
-
-		/* Add to the list. */
-		curr->prev = NULL;
-		curr->next = g_map;
-		if (g_map != NULL)
-			g_map->prev = curr;
-		g_map = curr;
-
-		/* Set return value. */
-		*context = curr;
-	} else {
-		GC_PRINT(GC_INFO_MSG " failed to create a context.\n",
-			__func__, __LINE__);
-
-		/* Add the record to the vacant list. */
-		curr->next = g_mapvacant;
-		g_mapvacant = curr;
-	}
-
-exit:
-	if (maplocked)
-		mutex_unlock(&g_maplock);
-
-	return gcerror;
-}
-
-static enum gcerror release_context(struct gccontextmap *context)
-{
-	enum gcerror gcerror;
-
-	/* Remove from the list. */
-	if (context->prev == NULL) {
-		if (context != g_map) {
-			gcerror = GCERR_NOT_FOUND;
-			goto exit;
-		}
-
-		g_map = context->next;
-		g_map->prev = NULL;
-	} else {
-		context->prev->next = context->next;
-		context->next->prev = context->prev;
-	}
-
-	if (context->context != NULL) {
-		gcerror = gc_detach(&context->context);
-		if (gcerror != GCERR_NONE)
-			goto exit;
-	}
-
-	kfree(context);
-
-exit:
-	return gcerror;
-}
-
-static void delete_context_map(void)
-{
-	struct gccontextmap *curr;
-
-	while (g_map != NULL)
-		release_context(g_map);
-
-	while (g_mapvacant != NULL) {
-		curr = g_mapvacant;
-		g_mapvacant = g_mapvacant->next;
-		kfree(curr);
-	}
-}
 
 /*******************************************************************************
  * Command buffer copy management.
@@ -352,8 +170,6 @@ exit:
 static int gc_commit_wrapper(struct gccommit *gccommit)
 {
 	int ret = 0;
-	int locked = 0;
-	struct gccontextmap *context;
 	struct gccommit kgccommit;
 	struct gcbuffer *head = NULL;
 	struct gcbuffer *tail;
@@ -371,17 +187,6 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 		kgccommit.gcerror = GCERR_USER_READ;
 		goto exit;
 	}
-
-	/* Locate the client entry. */
-	kgccommit.gcerror = find_context(&context, true);
-	if (kgccommit.gcerror != GCERR_NONE)
-		goto exit;
-
-	/* Set context. */
-	kgccommit.gcerror = gc_lock(context->context);
-	if (kgccommit.gcerror != GCERR_NONE)
-		goto exit;
-	locked = 1;
 
 	/* Make a copy of the user buffer structures. */
 	ubuffer = kgccommit.buffer;
@@ -477,9 +282,6 @@ exit:
 		ret = -EFAULT;
 	}
 
-	if (locked)
-		gc_unlock(context->context);
-
 	if (head != NULL)
 		put_buffer_tree(head);
 
@@ -490,8 +292,6 @@ static int gc_map_wrapper(struct gcmap *gcmap)
 {
 	int ret = 0;
 	int mapped = 0;
-	int locked = 0;
-	struct gccontextmap *context;
 	struct gcmap kgcmap;
 
 	/* Get IOCTL parameters. */
@@ -501,17 +301,6 @@ static int gc_map_wrapper(struct gcmap *gcmap)
 		kgcmap.gcerror = GCERR_USER_READ;
 		goto exit;
 	}
-
-	/* Locate the client entry. */
-	kgcmap.gcerror = find_context(&context, true);
-	if (kgcmap.gcerror != GCERR_NONE)
-		goto exit;
-
-	/* Set context. */
-	kgcmap.gcerror = gc_lock(context->context);
-	if (kgcmap.gcerror != GCERR_NONE)
-		goto exit;
-	locked = 1;
 
 	/* Call the core driver. */
 	gc_map(&kgcmap);
@@ -535,17 +324,12 @@ exit:
 			gc_unmap(&kgcmap);
 	}
 
-	if (locked)
-		gc_unlock(context->context);
-
 	return ret;
 }
 
 static int gc_unmap_wrapper(struct gcmap *gcmap)
 {
 	int ret = 0;
-	int locked = 0;
-	struct gccontextmap *context;
 	struct gcmap kgcmap;
 
 	/* Get IOCTL parameters. */
@@ -555,17 +339,6 @@ static int gc_unmap_wrapper(struct gcmap *gcmap)
 		kgcmap.gcerror = GCERR_USER_READ;
 		goto exit;
 	}
-
-	/* Locate the client entry. */
-	kgcmap.gcerror = find_context(&context, true);
-	if (kgcmap.gcerror != GCERR_NONE)
-		goto exit;
-
-	/* Set context. */
-	kgcmap.gcerror = gc_lock(context->context);
-	if (kgcmap.gcerror != GCERR_NONE)
-		goto exit;
-	locked = 1;
 
 	/* Call the core driver. */
 	gc_unmap(&kgcmap);
@@ -580,18 +353,12 @@ exit:
 		ret = -EFAULT;
 	}
 
-	if (locked)
-		gc_unlock(context->context);
-
 	return ret;
 }
 
 int gc_bvblt_wrapper(struct gcbvblt *gcbvblt)
 {
 	int ret = 0;
-	int locked = 0;
-	enum gcerror gcerror;
-	struct gccontextmap *context;
 	struct gcbvblt kgcbvblt;
 	struct bvbltparams kbvbltparams;
 	struct bvbuffdesc kdestbuffdesc;
@@ -717,21 +484,6 @@ int gc_bvblt_wrapper(struct gcbvblt *gcbvblt)
 		kbvbltparams.maskgeom = &kmasksurfgeom;
 	}
 
-	/* Locate the client entry. */
-	gcerror = find_context(&context, true);
-	if (gcerror != GCERR_NONE) {
-		ret = -EFAULT;
-		goto exit;
-	}
-
-	/* Set context. */
-	gcerror = gc_lock(context->context);
-	if (gcerror != GCERR_NONE) {
-		ret = -EFAULT;
-		goto exit;
-	}
-	locked = 1;
-
 	/* Call the core driver. */
 	kgcbvblt.bverror = bv_blt(&kbvbltparams);
 	if (kgcbvblt.bverror != BVERR_NONE) {
@@ -775,9 +527,6 @@ exit:
 		ret = -EFAULT;
 	}
 
-	if (locked)
-		gc_unlock(context->context);
-
 	return ret;
 }
 
@@ -785,9 +534,6 @@ int gc_bvmap_wrapper(struct gcbvmap *gcbvmap)
 {
 	int ret = 0;
 	int mapped = 0;
-	int locked = 0;
-	enum gcerror gcerror;
-	struct gccontextmap *context;
 	struct gcbvmap kgcbvmap;
 	struct bvbuffdesc kbvbuffdesc;
 
@@ -807,21 +553,6 @@ int gc_bvmap_wrapper(struct gcbvmap *gcbvmap)
 		ret = -EFAULT;
 		goto exit;
 	}
-
-	/* Locate the client entry. */
-	gcerror = find_context(&context, true);
-	if (gcerror != GCERR_NONE) {
-		ret = -EFAULT;
-		goto exit;
-	}
-
-	/* Set context. */
-	gcerror = gc_lock(context->context);
-	if (gcerror != GCERR_NONE) {
-		ret = -EFAULT;
-		goto exit;
-	}
-	locked = 1;
 
 	/* Call the core driver. */
 	kgcbvmap.bverror = bv_map(&kbvbuffdesc);
@@ -852,18 +583,12 @@ exit:
 			bv_unmap(&kbvbuffdesc);
 	}
 
-	if (locked)
-		gc_unlock(context->context);
-
 	return ret;
 }
 
 int gc_bvunmap_wrapper(struct gcbvmap *gcbvmap)
 {
 	int ret = 0;
-	int locked = 0;
-	enum gcerror gcerror;
-	struct gccontextmap *context;
 	struct gcbvmap kgcbvmap;
 	struct bvbuffdesc kbvbuffdesc;
 
@@ -883,21 +608,6 @@ int gc_bvunmap_wrapper(struct gcbvmap *gcbvmap)
 		ret = -EFAULT;
 		goto exit;
 	}
-
-	/* Locate the client entry. */
-	gcerror = find_context(&context, true);
-	if (gcerror != GCERR_NONE) {
-		ret = -EFAULT;
-		goto exit;
-	}
-
-	/* Set context. */
-	gcerror = gc_lock(context->context);
-	if (gcerror != GCERR_NONE) {
-		ret = -EFAULT;
-		goto exit;
-	}
-	locked = 1;
 
 	/* Call the core driver. */
 	kgcbvmap.bverror = bv_unmap(&kbvbuffdesc);
@@ -922,9 +632,6 @@ exit:
 		ret = -EFAULT;
 	}
 
-	if (locked)
-		gc_unlock(context->context);
-
 	return ret;
 }
 
@@ -938,41 +645,11 @@ static struct device *dev_object;
 
 static int dev_open(struct inode *inode, struct file *file)
 {
-	int ret = 0;
-	enum gcerror gcerror;
-	struct gccontextmap *context;
-
-	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
-
-	/* Locate the client entry. */
-	gcerror = find_context(&context, true);
-	if (gcerror != GCERR_NONE)
-		ret = -EFAULT;
-
-	return ret;
+	return 0;
 }
 
 static int dev_release(struct inode *inode, struct file *file)
 {
-	int ret = 0;
-	enum gcerror gcerror;
-	struct gccontextmap *context;
-
-	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
-
-	/* Locate the client entry. */
-	gcerror = find_context(&context, false);
-	if (gcerror == GCERR_NONE) {
-		ret = -EFAULT;
-		goto exit;
-	}
-
-	/* Destroy the context. */
-	gcerror = release_context(context);
-	if (gcerror == GCERR_NONE)
-		ret = -EFAULT;
-
-exit:
 	return 0;
 }
 
@@ -1088,8 +765,6 @@ failed:
 static void mod_exit(void)
 {
 	GC_PRINT(GC_INFO_MSG " cleaning up resources.\n", __func__, __LINE__);
-
-	delete_context_map();
 
 	if ((dev_object != NULL) && !IS_ERR(dev_object)) {
 		device_destroy(dev_class, MKDEV(dev_major, 0));
