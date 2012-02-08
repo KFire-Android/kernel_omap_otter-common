@@ -168,6 +168,7 @@ typedef u32 abe_patch_rev;
 #define EIGHT_MSB 11
 #define NINE_MSB 12
 #define TEN_MSB 13
+#define MONO_16_16 14
 /*
  *	PORT PROTOCOL TYPE - abe_port_protocol_switch_id
  */

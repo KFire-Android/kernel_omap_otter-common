@@ -508,4 +508,14 @@ void abe_init_mem(void __iomem **_io_base);
  */
 void abe_write_pdmdl_offset(u32 path, u32 offset_left, u32 offset_right);
 
+/**
+ * abe_write_select_pdm_output - Select the path for OPP25 route input
+ *
+ * Parameters:
+ *   path: 1 for output om headset, 2 for output on handsfree, 3 on the 2 output
+ *	 at the same time
+ *
+ */
+void abe_write_select_pdm_output(u32 path);
+
 #endif/* _ABE_API_H_ */

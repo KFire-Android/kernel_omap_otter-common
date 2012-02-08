@@ -219,3 +219,7 @@
 #define OMAP_ABE_C_SRC_FIR12_LP_GAIN_COEFS_SIZE            0x1E4
 #define OMAP_ABE_C_SRC_6_HP_NEW_COEFS_ADDR                 0x1D64
 #define OMAP_ABE_C_SRC_6_HP_NEW_COEFS_SIZE                 0x1C
+#define OMAP_ABE_C_48_96_LP_NEW_COEFS_ADDR                 0x1D80
+#define OMAP_ABE_C_48_96_LP_NEW_COEFS_SIZE                 0x4C
+#define OMAP_ABE_C_96_48_DMIC_COEFS_NO_PRESCALE_ADDR       0x1DCC
+#define OMAP_ABE_C_96_48_DMIC_COEFS_NO_PRESCALE_SIZE       0x2C

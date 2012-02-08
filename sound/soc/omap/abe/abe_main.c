@@ -760,5 +760,19 @@ int abe_mono_mixer(u32 id, u32 on_off)
 }
 EXPORT_SYMBOL(abe_mono_mixer);
 
+/**
+ * abe_write_select_pdm_output - Select the path for OPP25 route input
+ *
+ * Parameters:
+ *   path: 1 for output om headset, 2 for output on handsfree,
+ *	 3 for output on headset and handsfree at the same time
+ *
+ */
+void abe_write_select_pdm_output(u32 path)
+{
+	abe->mcpdm_path = path;
+}
+EXPORT_SYMBOL(abe_write_select_pdm_output);
+
 EXPORT_SYMBOL(abe_use_compensated_gain);
 
