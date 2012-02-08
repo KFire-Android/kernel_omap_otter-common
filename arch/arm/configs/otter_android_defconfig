@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.7
-# Mon Feb  6 22:51:30 2012
+# Wed Feb  8 15:26:16 2012
 #
 CONFIG_ARM=y
 CONFIG_HAVE_PWM=y
@@ -140,7 +140,8 @@ CONFIG_HAVE_CLK=y
 # GCOV-based kernel profiling
 #
 # CONFIG_GCOV_KERNEL is not set
-# CONFIG_SLOW_WORK is not set
+CONFIG_SLOW_WORK=y
+# CONFIG_SLOW_WORK_DEBUG is not set
 CONFIG_HAVE_GENERIC_DMA_COHERENT=y
 CONFIG_SLABINFO=y
 CONFIG_RT_MUTEXES=y
@@ -723,7 +724,9 @@ CONFIG_IP6_NF_RAW=y
 # CONFIG_RDS is not set
 # CONFIG_TIPC is not set
 # CONFIG_ATM is not set
-# CONFIG_L2TP is not set
+CONFIG_L2TP=y
+# CONFIG_L2TP_DEBUGFS is not set
+# CONFIG_L2TP_V3 is not set
 # CONFIG_BRIDGE is not set
 # CONFIG_NET_DSA is not set
 # CONFIG_VLAN_8021Q is not set
@@ -880,7 +883,7 @@ CONFIG_NETDEVICES=y
 # CONFIG_BONDING is not set
 # CONFIG_MACVLAN is not set
 # CONFIG_EQUALIZER is not set
-# CONFIG_TUN is not set
+CONFIG_TUN=m
 # CONFIG_VETH is not set
 # CONFIG_PHYLIB is not set
 CONFIG_NET_ETHERNET=y
@@ -2099,7 +2102,12 @@ CONFIG_RPCSEC_GSS_KRB5=y
 # CONFIG_RPCSEC_GSS_SPKM3 is not set
 # CONFIG_SMB_FS is not set
 # CONFIG_CEPH_FS is not set
-# CONFIG_CIFS is not set
+CONFIG_CIFS=y
+# CONFIG_CIFS_STATS is not set
+# CONFIG_CIFS_WEAK_PW_HASH is not set
+# CONFIG_CIFS_XATTR is not set
+# CONFIG_CIFS_DEBUG2 is not set
+# CONFIG_CIFS_EXPERIMENTAL is not set
 # CONFIG_NCP_FS is not set
 # CONFIG_CODA_FS is not set
 # CONFIG_AFS_FS is not set
