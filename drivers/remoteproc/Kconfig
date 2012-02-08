@@ -37,4 +37,12 @@ config OMAP_DUCATI_CMA_SIZE
 	  for OMAP's dual M3 "Ducati" sub-system. Vast majority of this
 	  memory isn't wasted in case the M3 sub-system isn't loaded.
 
+config OMAP_TESLA_CMA_SIZE
+	hex "Tesla dsp physically contiguous memory pool size (in bytes)"
+	depends on OMAP_REMOTEPROC
+	default 0x400000
+	help
+	  Allocate a specified size of physically contiguous memory (CMA)
+	  for OMAP's dsp "Tesla" sub-system. Vast majority of this
+	  memory isn't wasted in case the Dsp sub-system isn't loaded.
 endmenu
