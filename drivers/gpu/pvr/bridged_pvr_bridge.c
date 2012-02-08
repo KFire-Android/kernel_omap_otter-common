@@ -560,6 +560,12 @@ PVRSRVAllocDeviceMemBW(IMG_UINT32 ui32BridgeID,
 							   &psMemInfo,
 							   "" );
 
+	/* Allow mapping this buffer to the GC MMU only on allocation time, if
+	 * this buffer is mapped into another process context we don't want the
+	 * GC MMU mapping to happen.
+	 */
+	psAllocDeviceMemIN->ui32Attribs &= ~PVRSRV_MAP_GC_MMU;
+
 	if (bUseShareMemWorkaround)
 	{
         PVR_ASSERT(ui32ShareIndex != 7654321);

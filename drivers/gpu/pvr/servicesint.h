@@ -98,7 +98,7 @@ typedef struct _PVRSRV_KERNEL_MEM_INFO_
 
 	PVRSRV_MEMTYPE				memType;
 
-    
+	IMG_VOID *bvmap_handle;
 
 
 

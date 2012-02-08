@@ -109,6 +109,7 @@ pvrsrvkm-y := \
 	sgx/pb.o
 
 pvrsrvkm-$(CONFIG_ION_OMAP) += ion.o
+pvrsrvkm-$(CONFIG_GCCORE) += gc_bvmapping.o
 
 omaplfb-y := \
 	omaplfb/omaplfb_displayclass.o \
