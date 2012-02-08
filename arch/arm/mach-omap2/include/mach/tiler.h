@@ -495,6 +495,15 @@ u32 tiler_block_vstride(tiler_blk_handle handle);
 s32 tiler_fill_virt_array(tiler_blk_handle handle, u32 *virt_array,
 		u32 * array_size);
 
+/**
+ * Returns virtual size of a tiler block
+ *
+ * @param handle	Handle to tiler block allocation
+ *
+ * @return Size of buffer
+ */
+u32 tiler_block_vsize(tiler_blk_handle handle);
+
 struct tiler_pa_info *user_block_to_pa(u32 usr_addr, u32 num_pg);
 void tiler_pa_free(struct tiler_pa_info *pa);
 

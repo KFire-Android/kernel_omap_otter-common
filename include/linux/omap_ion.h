@@ -54,6 +54,9 @@ int omap_tiler_pages(struct ion_client *client, struct ion_handle *handle,
 int omap_ion_fd_to_handles(int fd, struct ion_client **client,
 		struct ion_handle **handles,
 		int *num_handles);
+int omap_tiler_vinfo(struct ion_client *client,
+			struct ion_handle *handle, unsigned int *vstride,
+			unsigned int *vsize);
 #endif /* __KERNEL__ */
 
 /* additional heaps used only on omap */

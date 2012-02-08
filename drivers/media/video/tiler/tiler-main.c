@@ -1876,6 +1876,12 @@ u32 tiler_block_vstride(tiler_blk_handle block)
 }
 EXPORT_SYMBOL(tiler_block_vstride);
 
+u32 tiler_block_vsize(tiler_blk_handle block)
+{
+	return tiler_size(&block->blk);
+}
+EXPORT_SYMBOL(tiler_block_vsize);
+
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Lajos Molnar <molnar@ti.com>");
 MODULE_AUTHOR("David Sin <davidsin@ti.com>");
