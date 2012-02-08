@@ -361,3 +361,7 @@
 #define OMAP_ABE_S_VX_UL_48_8_LP_NEW_DATA_SIZE             0x88
 #define OMAP_ABE_S_VX_UL_8_48_OSR_LP_DATA_ADDR             0x5148
 #define OMAP_ABE_S_VX_UL_8_48_OSR_LP_DATA_SIZE             0x3C8
+#define OMAP_ABE_S_EARP_48_96_LP_NEW_DATA_ADDR             0x5510
+#define OMAP_ABE_S_EARP_48_96_LP_NEW_DATA_SIZE             0x98
+#define OMAP_ABE_S_IHF_48_96_LP_NEW_DATA_ADDR              0x55A8
+#define OMAP_ABE_S_IHF_48_96_LP_NEW_DATA_SIZE              0x98

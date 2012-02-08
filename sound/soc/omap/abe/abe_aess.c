@@ -73,6 +73,8 @@
  */
 void omap_abe_hw_configuration(struct omap_abe *abe)
 {
+	/* enable AESS auto gating (required to release all AESS clocks) */
+	omap_abe_reg_writel(abe, AESS_AUTO_GATING_ENABLE, 1);
 	/* enables the DMAreq from AESS AESS_DMAENABLE_SET = 255 */
 	omap_abe_reg_writel(abe, AESS_DMAENABLE_SET, DMA_ENABLE_ALL);
 	/* enables the MCU IRQ from AESS to Cortex A9 */
