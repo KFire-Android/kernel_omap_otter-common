@@ -22,5 +22,6 @@ int tablet_sensor_init(void);
 void omap4_create_board_props(void);
 int tablet_panel_init(void);
 int tablet_button_init(void);
+void omap4_power_init(void);
 
 #endif
