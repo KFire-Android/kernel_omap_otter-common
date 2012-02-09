@@ -1184,6 +1184,34 @@ static int rproc_loader(struct rproc *rproc)
 	return 0;
 }
 
+int rproc_pa_to_da(struct rproc *rproc, phys_addr_t pa, u64 *da)
+{
+	int i, ret = -EINVAL;
+	struct rproc_mem_entry *maps = NULL;
+
+	if (!rproc || !da)
+		return -EINVAL;
+
+	if (mutex_lock_interruptible(&rproc->lock))
+		return -EINTR;
+
+	if (rproc->state == RPROC_RUNNING || rproc->state == RPROC_SUSPENDED) {
+		maps = rproc->memory_maps;
+		for (i = 0; maps->size; maps++) {
+			if (pa >= maps->pa && pa < (maps->pa + maps->size)) {
+				*da = maps->da + (pa - maps->pa);
+				ret = 0;
+				break;
+			}
+		}
+	}
+
+	mutex_unlock(&rproc->lock);
+	return ret;
+
+}
+EXPORT_SYMBOL(rproc_pa_to_da);
+
 int rproc_set_secure(const char *name, bool enable)
 {
 	struct rproc *rproc;
