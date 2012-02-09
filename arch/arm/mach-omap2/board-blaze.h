@@ -24,6 +24,7 @@ int blaze_keypad_init(void);
 void blaze_modem_init(bool force_mux);
 void omap4_create_board_props(void);
 void omap4_power_init(void);
+void board_serial_init(void);
 
 #define BLAZE_MDM_PWR_EN_GPIO	157
 

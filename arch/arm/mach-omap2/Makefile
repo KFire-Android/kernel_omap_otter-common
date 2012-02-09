@@ -274,12 +274,14 @@ obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o \
 					   board-blaze-modem.o \
 					   board-44xx-identity.o \
 					   board-44xx-power.o \
+					   board-44xx-serial.o \
 					   hsmmc.o \
 					   omap_phy_internal.o \
 					   omap4_apps_brd_id.o
 obj-$(CONFIG_MACH_OMAP_BLAZE)		+= board-44xx-tablet.o \
 					   board-44xx-identity.o \
 					   board-44xx-power.o \
+					   board-44xx-serial.o \
 					   board-44xx-tablet-touch.o \
 					   board-44xx-tablet-sensors.o \
 					   board-44xx-tablet-panel.o \
