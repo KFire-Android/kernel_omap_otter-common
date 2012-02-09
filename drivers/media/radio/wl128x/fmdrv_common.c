@@ -354,7 +354,7 @@ static void send_tasklet(unsigned long arg)
 
 	/* Check, is there any timeout happened to last transmitted packet */
 	if ((jiffies - fmdev->last_tx_jiffies) > FM_DRV_TX_TIMEOUT) {
-		fmerr("TX timeout occurred\n");
+		fmdbg("TX timeout occurred\n");
 		atomic_set(&fmdev->tx_cnt, 1);
 	}
 
@@ -615,7 +615,11 @@ static void fm_irq_handle_rds_start(struct fmdev *fmdev)
 {
 	if (fmdev->irq_info.flag & FM_RDS_EVENT & fmdev->irq_info.mask) {
 		fmdbg("irq: rds threshold reached\n");
-		fmdev->irq_info.stage = FM_RDS_SEND_RDS_GETCMD_IDX;
+		/* If RSSI reached below threshold then dont get RDS data */
+		if (fmdev->irq_info.flag & FM_LEV_EVENT)
+			fmdev->irq_info.stage = FM_HW_TUNE_OP_ENDED_IDX;
+		else
+			fmdev->irq_info.stage = FM_RDS_SEND_RDS_GETCMD_IDX;
 	} else {
 		/* Continue next function in interrupt handler table */
 		fmdev->irq_info.stage = FM_HW_TUNE_OP_ENDED_IDX;
@@ -1129,8 +1133,9 @@ int fmc_set_freq(struct fmdev *fmdev, u32 freq_to_set)
 
 int fmc_get_freq(struct fmdev *fmdev, u32 *cur_tuned_frq)
 {
-	if (fmdev->rx.freq == FM_UNDEFINED_FREQ) {
-		fmerr("RX frequency is not set\n");
+	if (fmdev->rx.freq == FM_UNDEFINED_FREQ &&
+			fmdev->tx_data.tx_frq == FM_UNDEFINED_FREQ) {
+		fmerr("RX/TX frequency is not set\n");
 		return -EPERM;
 	}
 	if (cur_tuned_frq == NULL) {
@@ -1144,7 +1149,7 @@ int fmc_get_freq(struct fmdev *fmdev, u32 *cur_tuned_frq)
 		return 0;
 
 	case FM_MODE_TX:
-		*cur_tuned_frq = 0;	/* TODO : Change this later */
+		*cur_tuned_frq = fmdev->tx_data.tx_frq;
 		return 0;
 
 	default:
@@ -1573,6 +1578,8 @@ int fmc_prepare(struct fmdev *fmdev)
 	fmdev->rx.rds_mode = FM_RDS_SYSTEM_RDS;
 	fmdev->rx.af_mode = FM_RX_RDS_AF_SWITCH_MODE_OFF;
 	fmdev->irq_info.retry = 0;
+
+	fmdev->tx_data.tx_frq = FM_UNDEFINED_FREQ;
 
 	fm_rx_reset_rds_cache(fmdev);
 	init_waitqueue_head(&fmdev->rx.rds.read_queue);

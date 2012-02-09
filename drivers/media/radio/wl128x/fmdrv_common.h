@@ -48,8 +48,8 @@ struct fm_reg_table {
 #define SEARCH_LVL_SET           15
 #define BAND_SET                 16
 #define MUTE_STATUS_SET          17
-#define RDS_PAUSE_LVL_SET        18
-#define RDS_PAUSE_DUR_SET        19
+#define AUD_PAUSE_LVL_SET        18
+#define AUD_PAUSE_DUR_SET        19
 #define RDS_MEM_SET              20
 #define RDS_BLK_B_SET            21
 #define RDS_MSK_B_SET            22
@@ -84,11 +84,12 @@ struct fm_reg_table {
 
 #define FM_POWER_MODE            254
 #define FM_INTERRUPT             255
+#define STATION_VALID		 123
 
 /* Transmitter API */
 
 #define CHANL_SET                55
-#define CHANL_BW_SET		56
+#define CHANL_BW_SET             56
 #define REF_SET                  57
 #define POWER_ENB_SET            90
 #define POWER_ATT_SET            58
@@ -103,7 +104,8 @@ struct fm_reg_table {
 #define MONO_SET                 66
 #define MUTE                     92
 #define MPX_LMT_ENABLE           67
-#define PI_SET                   93
+#define REF_ERR_SET		 93
+#define PI_SET                   68
 #define ECC_SET                  69
 #define PTY                      70
 #define AF                       71
@@ -120,6 +122,10 @@ struct fm_reg_table {
 #define TX_AUDIO_LEVEL_TEST      96
 #define TX_AUDIO_LEVEL_TEST_THRESHOLD    73
 #define TX_AUDIO_INPUT_LEVEL_RANGE_SET   54
+#define TX_AUDIO_LEVEL_GET		 7
+#define READ_FMANT_TUNE_VALUE            104
+
+/* New FM APIs (Rx and Tx) */
 #define RX_ANTENNA_SELECT        87
 #define I2C_DEV_ADDR_SET         86
 #define REF_ERR_CALIB_PARAM_SET          88
@@ -131,7 +137,6 @@ struct fm_reg_table {
 #define RSSI_BLOCK_SCAN_FREQ_SET 95
 #define RSSI_BLOCK_SCAN_START    97
 #define RSSI_BLOCK_SCAN_DATA_GET  5
-#define READ_FMANT_TUNE_VALUE            104
 
 /* SKB helpers */
 struct fm_skb_cb {
@@ -348,7 +353,7 @@ struct fm_event_msg_hdr {
  * with this default values after loading RX firmware.
  */
 #define FM_DEFAULT_RX_VOLUME		10
-#define FM_DEFAULT_RSSI_THRESHOLD	3
+#define FM_DEFAULT_RSSI_THRESHOLD	20
 
 /* Range for TX power level in units for dB/uV */
 #define FM_PWR_LVL_LOW			91
