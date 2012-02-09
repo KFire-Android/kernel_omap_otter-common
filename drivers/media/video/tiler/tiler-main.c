@@ -562,6 +562,51 @@ void fill_virt_array(struct tiler_block_t *blk, u32 *virt_array)
 	}
 }
 
+s32 tiler_fill_virt_array(tiler_blk_handle handle, u32 *virt_array,
+		u32 *array_size)
+{
+	u32 v, p, len, size, num_pages = 0;
+	u32 i = 0, offs = 0;
+	struct tiler_block_t *blk = &handle->blk;
+
+	if (!array_size)
+		return -1;
+
+	/* get page aligned stride */
+	v = tiler_vstride(blk);
+	p = tiler_pstride(blk);
+
+	/* get page aligned virtual size for the block */
+	size = PAGE_ALIGN(tiler_size(blk));
+
+	if(*array_size < (size/PAGE_SIZE) || !virt_array) {
+		*array_size = (size/PAGE_SIZE);
+		return -2;
+	}
+
+	offs = (blk->phys & PAGE_MASK);
+	while (size) {
+		/* set len to length of one row (2D), or full length if 1D */
+		len = v;
+
+		while (len && size) {
+			virt_array[i++] = offs;
+			num_pages++;
+			size -= PAGE_SIZE;
+			len -= PAGE_SIZE;
+			offs += PAGE_SIZE;
+		}
+
+		/* set offset to next row beginning */
+		offs += p - v;
+	}
+
+	*array_size = num_pages;
+
+	return 0;
+}
+EXPORT_SYMBOL(tiler_fill_virt_array);
+
 /**
  * Find a place where a 2D block would fit into a 2D area of the
  * same height.
