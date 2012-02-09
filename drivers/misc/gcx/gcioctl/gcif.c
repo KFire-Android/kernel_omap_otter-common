@@ -24,7 +24,7 @@
 #include <linux/gcx.h>
 #include <linux/gccore.h>
 #include <linux/gcbv.h>
-#include "gcmain.h"
+#include "gcif.h"
 
 #ifndef GC_DUMP
 #	define GC_DUMP 0
