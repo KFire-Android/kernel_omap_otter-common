@@ -154,9 +154,7 @@ struct gcbatch {
 
 	gcbatchend batchend;		/* Pointer to the function to finilize
 					   the current operation. */
-	union {
-		struct gcblit gcblit;
-	} op;				/* States of the current operation. */
+	struct gcblit gcblit;	/* States of the current operation. */
 
 	unsigned int size;		/* Total size of the command buffer. */
 
@@ -2276,7 +2274,7 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 	unsigned int buffersize;
 
 	GC_PRINT(GC_INFO_MSG " finalizing the blit, scrcount = %d\n",
-		__func__, __LINE__, batch->op.gcblit.srccount);
+		__func__, __LINE__, batch->gcblit.srccount);
 
 	buffersize
 		= sizeof(struct gcmomultisrc)
@@ -2296,7 +2294,7 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 	*/
 
 	gcmomultisrc->control_ldst = gcmomultisrc_control_ldst;
-	gcmomultisrc->control.reg.srccount = batch->op.gcblit.srccount - 1;
+	gcmomultisrc->control.reg.srccount = batch->gcblit.srccount - 1;
 	gcmomultisrc->control.reg.horblock
 		= GCREG_DE_MULTI_SOURCE_HORIZONTAL_BLOCK_PIXEL128;
 
@@ -2306,7 +2304,7 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 	gcmostart->startde.cmd.fld = gcfldstartde;
 
 	/* Set destination rectangle. */
-	gcmostart->rect = batch->op.gcblit.dstrect;
+	gcmostart->rect = batch->gcblit.dstrect;
 
 	/* Flush PE cache. */
 	gcmostart->flush.flush_ldst = gcmoflush_flush_ldst;
@@ -2394,10 +2392,10 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 	dstright += dstoffset;
 
 	/* Set destination coordinates. */
-	batch->op.gcblit.dstrect.left   = dstleft;
-	batch->op.gcblit.dstrect.top    = dsttop;
-	batch->op.gcblit.dstrect.right  = dstright;
-	batch->op.gcblit.dstrect.bottom = dstbottom;
+	batch->gcblit.dstrect.left   = dstleft;
+	batch->gcblit.dstrect.top    = dsttop;
+	batch->gcblit.dstrect.right  = dstright;
+	batch->gcblit.dstrect.bottom = dstbottom;
 
 	for (i = 0; i < srccount; i += 1) {
 		srcgeom = srcdesc[i].geom;
@@ -2479,7 +2477,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		__func__, __LINE__, multiblit);
 
 	if ((batch->batchend == do_blit_end) &&
-		(batch->op.gcblit.srccount < 4)) {
+		(batch->gcblit.srccount < 4)) {
 		GC_PRINT(GC_ERR_MSG " adding new source to the operation\n",
 			__func__, __LINE__);
 
@@ -2506,7 +2504,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			+ sizeof(struct gcmosrc) * srccount;
 
 		batch->batchend = do_blit_end;
-		batch->op.gcblit.srccount = 0;
+		batch->gcblit.srccount = 0;
 	}
 
 	bverror = claim_buffer(batch, buffersize, &buffer);
@@ -2587,7 +2585,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 	GC_PRINT(GC_INFO_MSG " processing %d sources\n",
 		__func__, __LINE__, srccount);
 
-	index = batch->op.gcblit.srccount;
+	index = batch->gcblit.srccount;
 
 	for (i = 0; i < srccount; i += 1, index += 1) {
 		srcgeom = srcdesc[i].geom;
@@ -2682,7 +2680,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 				= GCREG_ALPHA_CONTROL_ENABLE_OFF;
 
 		gcmosrc += 1;
-		batch->op.gcblit.srccount += 1;
+		batch->gcblit.srccount += 1;
 	}
 
 exit:
