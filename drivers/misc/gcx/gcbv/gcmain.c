@@ -15,6 +15,7 @@
 #include <linux/gcx.h>
 #include <linux/gcbv.h>
 #include "gcmain.h"
+#include "gcbv-priv.h"
 
 #ifndef GC_DUMP
 #	define GC_DUMP 0
@@ -85,12 +86,14 @@ static int __init mod_init(void)
 {
 	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
 	bv_init();
+	gcbv_assign();
 	return 0;
 }
 
 static void __exit mod_exit(void)
 {
 	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
+	gcbv_clear();
 	bv_exit();
 }
 

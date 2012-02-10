@@ -1,5 +1,5 @@
 /*
- * gc2d.h
+ * gcbv-iface.h
  *
  * Copyright (C) 2010-2011 Vivante Corporation.
  *
@@ -12,15 +12,11 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef GC2D_H
-#define GC2D_H
+#ifndef GCBV_IFACE_H
+#define GCBV_IFACE_H
 
 #include <linux/bltsville.h>
-#include <linux/bvinternal.h>
-#include <linux/ocd.h>
 
-enum bverror gcbv_map(struct bvbuffdesc *buffdesc);
-enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc);
-enum bverror gcbv_blt(struct bvbltparams *bltparams);
+void gcbv_init(struct bventry *entry);
 
 #endif

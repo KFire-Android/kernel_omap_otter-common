@@ -81,12 +81,19 @@
 	(rect1.width == rect2.width) && (rect1.height == rect2.height) \
 )
 
+#if 0
 #define STRUCTSIZE(structptr, lastmember) \
 ( \
 	(size_t) &structptr->lastmember + \
 	sizeof(structptr->lastmember) - \
 	(size_t) structptr \
 )
+#else
+#define STRUCTSIZE(structptr, lastmember) \
+( \
+	(size_t) sizeof(*structptr) \
+)
+#endif
 
 #define GET_MAP_HANDLE(map) \
 ( \
@@ -471,13 +478,11 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 	struct bvbuffmap *bvbuffmap;
 	struct bvbuffmapinfo *bvbuffmapinfo;
 	struct gcmap gcmap;
-	void *logical;
-	unsigned int offset;
 
 	/* Try to find existing mapping. */
 	bvbuffmap = buffdesc->map;
 	while (bvbuffmap != NULL) {
-		if (bvbuffmap->bv_unmap == bv_unmap)
+		if (bvbuffmap->bv_unmap == gcbv_unmap)
 			break;
 		bvbuffmap = bvbuffmap->nextmap;
 	}
@@ -505,31 +510,22 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 		}
 
 		bvbuffmap->structsize = sizeof(struct bvbuffmap);
-		bvbuffmap->bv_unmap = bv_unmap;
+		bvbuffmap->bv_unmap = gcbv_unmap;
 		bvbuffmap->handle = (unsigned long) (bvbuffmap + 1);
 	} else {
 		bvbuffmap = gccontext.vac_buffmap;
 		gccontext.vac_buffmap = bvbuffmap->nextmap;
 	}
 
-	/* Align the base address as required by 2D hardware. */
-	logical = (void *) ((unsigned int) buffdesc->virtaddr
-		& ~(GC_BASE_ALIGN - 1));
-	offset = (unsigned int) buffdesc->virtaddr
-		& (GC_BASE_ALIGN - 1);
-
 	/* Map the buffer. */
 	gcmap.gcerror = GCERR_NONE;
-	gcmap.logical = logical;
-	gcmap.size = buffdesc->length + offset;
+	gcmap.logical = 0;
+	gcmap.size = buffdesc->length;
 	gcmap.handle = 0;
+	gcmap.pagecount = buffdesc->pagecount;
+	gcmap.pagearray = buffdesc->pagearray;
 
-	gc_map_wrapper(&gcmap);
-	if (gcmap.gcerror != GCERR_NONE) {
-		BVSETERRORARG(BVERR_UNK, "mapping error occured (0x%08X)",
-					 gcmap.gcerror);
-		goto exit;
-	}
+	gc_map(&gcmap);
 
 	bvbuffmapinfo = (struct bvbuffmapinfo *) bvbuffmap->handle;
 
@@ -569,7 +565,7 @@ static enum bverror do_unmap(struct bvbuffdesc *buffdesc, int client)
 	/* Try to find existing mapping. */
 	bvbuffmap = buffdesc->map;
 	while (bvbuffmap != NULL) {
-		if (bvbuffmap->bv_unmap == bv_unmap)
+		if (bvbuffmap->bv_unmap == gcbv_unmap)
 			break;
 		prev = bvbuffmap;
 		bvbuffmap = bvbuffmap->nextmap;
@@ -598,7 +594,6 @@ static enum bverror do_unmap(struct bvbuffdesc *buffdesc, int client)
 
 	/* Setup buffer unmapping. */
 	gcmap.gcerror = GCERR_NONE;
-	gcmap.logical = buffdesc->virtaddr;
 	gcmap.size = buffdesc->length;
 	gcmap.handle = GET_MAP_HANDLE(bvbuffmap);
 
@@ -612,12 +607,7 @@ static enum bverror do_unmap(struct bvbuffdesc *buffdesc, int client)
 	gccontext.vac_buffmap = bvbuffmap;
 
 	/* Unmap the buffer. */
-	gc_unmap_wrapper(&gcmap);
-	if (gcmap.gcerror != GCERR_NONE) {
-		BVSETERRORARG(BVERR_UNK, "unmapping error occured (0x%08X)",
-					 gcmap.gcerror);
-		goto exit;
-	}
+	gc_unmap(&gcmap);
 
 	bverror = BVERR_NONE;
 
@@ -1980,12 +1970,16 @@ static enum bverror parse_blend(struct bvbltparams *bltparams,
 
 		alpha = gcfp2norm8(bltparams->globalalpha.fp);
 
+#if 0
 		gca->src_global_color =
 		gca->dst_global_color = alpha << 24;
 
 		gca->src_global_alpha_mode = GCREG_GLOBAL_ALPHA_MODE_GLOBAL;
 		gca->dst_global_alpha_mode = GCREG_GLOBAL_ALPHA_MODE_GLOBAL;
 		break;
+#else
+		BUG();
+#endif
 
 	default:
 		BVSETBLTERROR(BVERR_BLEND, "invalid global alpha mode");
@@ -2044,8 +2038,10 @@ static int verify_surface(unsigned int tile,
 								srcheight))
 			return BVERR_TILE_VERS;
 
+#if 0
 		if (surf->tileparams->virtaddr == NULL)
 			return BVERR_TILE_VIRTADDR;
+#endif
 
 		/* FIXME/TODO */
 		return BVERR_TILE;
@@ -2056,15 +2052,19 @@ static int verify_surface(unsigned int tile,
 		if (surf->desc->structsize != STRUCTSIZE(surf->desc, map))
 			return BVERR_DESC_VERS;
 
+#if 0
 		if (surf->desc->virtaddr == NULL)
 			return BVERR_DESC_VIRTADDR;
+#endif
 	}
 
 	if (geom == NULL)
 		return BVERR_GEOM;
 
+#if 0
 	if (geom->structsize != STRUCTSIZE(geom, palette))
 		return BVERR_GEOM_VERS;
+#endif
 
 #if GC_DUMP
 	{
@@ -2151,8 +2151,7 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 		goto exit;
 	}
 
-	dstoffset = (((unsigned int) bltparams->dstdesc->virtaddr
-			& (GC_BASE_ALIGN - 1)) * 8) / dstformat->bitspp;
+	dstoffset = 0;
 
 	bverror = claim_buffer(batch, sizeof(struct gcmofill),
 				(void **) &gcmofill);
@@ -2372,8 +2371,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 	dstright  = bltparams->dstrect.width  + dstleft;
 	dstbottom = bltparams->dstrect.height + dsttop;
 
-	dstoffset = (((unsigned int) bltparams->dstdesc->virtaddr
-			& (GC_BASE_ALIGN - 1)) * 8) / dstformat->bitspp;
+	dstoffset = 0;
 
 	GC_PRINT(GC_INFO_MSG " dstaddr = 0x%08X\n",
 		__func__, __LINE__,
@@ -2414,9 +2412,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			goto exit;
 		}
 
-		srcoffset = (((unsigned int) srcdesc[i].buf.desc->virtaddr
-				& (GC_BASE_ALIGN - 1)) * 8)
-				/ srcformat[i]->bitspp;
+		srcoffset = 0;
 
 		GC_PRINT(GC_INFO_MSG " srcaddr[%d] = 0x%08X\n",
 			__func__, __LINE__,
@@ -2771,7 +2767,7 @@ void bv_exit(void)
  * Library API.
  */
 
-enum bverror bv_map(struct bvbuffdesc *buffdesc)
+enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
 {
 	enum bverror bverror;
 	struct bvbuffmap *bvbuffmap;
@@ -2793,9 +2789,9 @@ enum bverror bv_map(struct bvbuffdesc *buffdesc)
 exit:
 	return bverror;
 }
-EXPORT_SYMBOL(bv_map);
+EXPORT_SYMBOL(gcbv_map);
 
-enum bverror bv_unmap(struct bvbuffdesc *buffdesc)
+enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 {
 	enum bverror bverror;
 	struct bvbuffmap *bvbuffmap;
@@ -2823,7 +2819,7 @@ enum bverror bv_unmap(struct bvbuffdesc *buffdesc)
 	}
 
 	/* Not our mapping? */
-	if (bvbuffmap->bv_unmap != bv_unmap) {
+	if (bvbuffmap->bv_unmap != gcbv_unmap) {
 		bverror = bvbuffmap->bv_unmap(buffdesc);
 		goto exit;
 	}
@@ -2843,7 +2839,7 @@ enum bverror bv_unmap(struct bvbuffdesc *buffdesc)
 			buffdesc->map = bvbuffmap->nextmap;
 
 			/* Call other implementations. */
-			bverror = bv_unmap(buffdesc);
+			bverror = gcbv_unmap(buffdesc);
 
 			/* Link the record back into the list. */
 			bvbuffmap->nextmap = buffdesc->map;
@@ -2859,15 +2855,15 @@ enum bverror bv_unmap(struct bvbuffdesc *buffdesc)
 			goto exit;
 
 		/* Call other implementations. */
-		bverror = bv_unmap(buffdesc);
+		bverror = gcbv_unmap(buffdesc);
 	}
 
 exit:
 	return bverror;
 }
-EXPORT_SYMBOL(bv_unmap);
+EXPORT_SYMBOL(gcbv_unmap);
 
-enum bverror bv_blt(struct bvbltparams *bltparams)
+enum bverror gcbv_blt(struct bvbltparams *bltparams)
 {
 	enum bverror bverror = BVERR_NONE;
 	struct gcalpha *gca = NULL;
@@ -3204,4 +3200,4 @@ exit:
 
 	return bverror;
 }
-EXPORT_SYMBOL(bv_blt);
+EXPORT_SYMBOL(gcbv_blt);
