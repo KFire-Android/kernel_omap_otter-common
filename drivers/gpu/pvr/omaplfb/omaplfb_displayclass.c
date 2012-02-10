@@ -33,7 +33,7 @@
 #include <linux/notifier.h>
 #include <linux/bltsville.h>
 #include <linux/bvinternal.h>
-#include <linux/bv_gc2d.h>
+#include <linux/gcbv-iface.h>
 
 #include "img_defs.h"
 #include "servicesext.h"
@@ -1885,9 +1885,9 @@ OMAPLFB_ERROR OMAPLFBInit(void)
 		return OMAPLFB_ERROR_INIT_FAILURE;
 	}
 
-#if defined(CONFIG_GC_CORE)
+#if defined(CONFIG_GCCORE)
 	/* Get the GC2D Bltsville implementation */
-	bv_gc2d_getentry(&bv_gc2d_entry);
+	gcbv_init(&bv_gc2d_entry);
 	bv_gc2d_is_present = bv_gc2d_entry.bv_map ? 1 : 0;
 #else
 	bv_gc2d_is_present = 0;
