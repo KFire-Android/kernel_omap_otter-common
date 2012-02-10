@@ -475,6 +475,15 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 						MMCDETECT_INTR_OFFSET;
 		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
 	}
+	/* Setting MMC5 SDIO card .built-in variable
+	  * This is to make sure that if WiFi driver is not loaded
+	  * at all, then the MMC/SD/SDIO driver does not keep
+	  * turning on/off the voltage to the SDIO card
+	  */
+	if (pdev->id == 4) {
+		ret = 0;
+		pdata->slots[0].mmc_data.built_in = 1;
+	}
 	return ret;
 }
 
