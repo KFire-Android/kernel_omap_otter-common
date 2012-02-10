@@ -57,6 +57,7 @@ static int usbotghs_control;
 
 #ifdef CONFIG_OMAP4_HSOTG_ED_CORRECTION
 #define OMAP4_HSOTG_SWTRIM_MASK		0xFFFF00FF
+#define OMAP4_HSOTG_REF_GEN_TEST_MASK	0xF8FFFFFF
 static void __iomem *hsotg_base;
 #endif
 
@@ -162,6 +163,17 @@ static void omap44xx_hsotg_ed_correction(void)
 	if (is_omap443x() && !(val & 0x8000)) {
 		val = min((val + (0x24<<8)), (val | (0x7F<<8))) | 0x8000;
 		__raw_writel(val, hsotg_base + 0x20B8);
+	}
+
+	/*
+	 * For 4460 and 4470 CPUs there is 10-15mV adjustable
+	 * improvement available via REF_GEN_TEST[26:24]=110
+	 */
+	if (is_omap446x() || is_omap447x()) {
+		val = __raw_readl(hsotg_base + 0x20D4);
+		val &= OMAP4_HSOTG_REF_GEN_TEST_MASK;
+		val |= (0x6<<24);
+		__raw_writel(val, hsotg_base + 0x20D4);
 	}
 }
 #endif
