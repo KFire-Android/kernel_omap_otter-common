@@ -419,6 +419,15 @@ void dsi_bus_unlock(struct omap_dss_device *dssdev)
 }
 EXPORT_SYMBOL(dsi_bus_unlock);
 
+bool dsi_bus_was_unlocked(struct omap_dss_device *dssdev)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
+
+	return dsi->bus_lock.count == 1;
+}
+EXPORT_SYMBOL(dsi_bus_was_unlocked);
+
 static bool dsi_bus_is_locked(struct platform_device *dsidev)
 {
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
