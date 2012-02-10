@@ -133,10 +133,19 @@ typedef struct OMAPLFB_FBINFO_TAG
 
 	OMAPLFB_BOOL        bIs2D;
 	IMG_SYS_PHYADDR     *psPageList;
-#if defined(CONFIG_ION_OMAP)
+#if defined(CONFIG_DSSCOMP)
 	struct ion_handle   *psIONHandle;
-	struct ion_handle   *psBltFBsHandle;
-	ion_phys_addr_t     psBltFBsPhys[2];
+	/* This is the ION handle for the blit framebuffers */
+	struct ion_handle   *psBltFBsIonHndl;
+	/* The number of blit framebuffers */
+	IMG_UINT32          psBltFBsNo;
+	/* These are the BV handles for the framebuffers */
+	void                **psBltFBsBvHndl;
+	/* Physical addresses of the blit framebuffers */
+	IMG_UINTPTR_T       *psBltFBsBvPhys;
+	/* The current blit buffer index */
+	unsigned int        iBltFBsIdx;
+
 #endif
 	IMG_UINT32          uiBytesPerPixel;
 }OMAPLFB_FBINFO;
