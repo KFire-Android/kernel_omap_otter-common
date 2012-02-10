@@ -109,15 +109,15 @@ static u32 fm_v4l2_fops_poll(struct file *file, struct poll_table_struct *pts)
 /* functions called from sysfs subsystem */
 
 static ssize_t show_fmtx_af(struct device *dev,
-                struct device_attribute *attr, char *buf)
+		struct device_attribute *attr, char *buf)
 {
 	struct fmdev *fmdev = dev_get_drvdata(dev);
 
-	return sprintf(buf,"%d\n",fmdev->tx_data.af_frq);
+	return sprintf(buf, "%d\n", fmdev->tx_data.af_frq);
 }
 
 static ssize_t store_fmtx_af(struct device *dev,
-                struct device_attribute *attr, char *buf, size_t size)
+		struct device_attribute *attr, char *buf, size_t size)
 {
 	int ret;
 	unsigned long af_freq;
@@ -128,7 +128,7 @@ static ssize_t store_fmtx_af(struct device *dev,
 
 	ret = fm_tx_set_af(fmdev, af_freq);
 	if (ret < 0) {
-		fmerr("Failed to set FM TX AF Frequency \n");
+		fmerr("Failed to set FM TX AF Frequency\n");
 		return ret;
 	}
 	return size;
@@ -139,11 +139,11 @@ static ssize_t show_fmrx_af(struct device *dev,
 {
 	struct fmdev *fmdev = dev_get_drvdata(dev);
 
-	return sprintf(buf,"%d\n",fmdev->rx.af_mode);
+	return sprintf(buf, "%d\n", fmdev->rx.af_mode);
 }
 
 static ssize_t store_fmrx_af(struct device *dev,
-                struct device_attribute *attr, char *buf, size_t size)
+		struct device_attribute *attr, char *buf, size_t size)
 {
 	int ret;
 	unsigned long af_mode;
@@ -165,15 +165,15 @@ static ssize_t store_fmrx_af(struct device *dev,
 }
 
 static ssize_t show_fmrx_band(struct device *dev,
-                struct device_attribute *attr, char *buf)
+		struct device_attribute *attr, char *buf)
 {
 	struct fmdev *fmdev = dev_get_drvdata(dev);
 
-	return sprintf(buf,"%d\n",fmdev->rx.region.fm_band);
+	return sprintf(buf, "%d\n", fmdev->rx.region.fm_band);
 }
 
 static ssize_t store_fmrx_band(struct device *dev,
-                struct device_attribute *attr, char *buf, size_t size)
+		struct device_attribute *attr, char *buf, size_t size)
 {
 	int ret;
 	unsigned long fm_band;
@@ -195,14 +195,14 @@ static ssize_t store_fmrx_band(struct device *dev,
 }
 
 static ssize_t show_fmrx_rssi_lvl(struct device *dev,
-                struct device_attribute *attr, char *buf)
+		struct device_attribute *attr, char *buf)
 {
 	struct fmdev *fmdev = dev_get_drvdata(dev);
 
-	return sprintf(buf,"%d\n",fmdev->rx.rssi_threshold);
+	return sprintf(buf, "%d\n", fmdev->rx.rssi_threshold);
 }
 static ssize_t store_fmrx_rssi_lvl(struct device *dev,
-                struct device_attribute *attr, char *buf, size_t size)
+		struct device_attribute *attr, char *buf, size_t size)
 {
 	int ret;
 	unsigned long rssi_lvl;
