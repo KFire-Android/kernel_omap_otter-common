@@ -35,6 +35,7 @@
 #include <linux/rpmsg.h>
 #include <linux/rpmsg_omx.h>
 #include <linux/completion.h>
+#include <linux/remoteproc.h>
 
 #include <mach/tiler.h>
 
@@ -105,25 +106,25 @@ static LIST_HEAD(rpmsg_omx_services_list);
 #endif
 #endif
 
-/*
- * TODO: Need to do this using lookup with rproc, but rproc is not
- * visible to rpmsg_omx
- */
-#define TILER_START	0x60000000
-#define TILER_END	0x80000000
-#define ION_1D_START	0xBA300000
-#define ION_1D_END	0xBFD00000
-#define ION_1D_VA	0x88000000
-static int _rpmsg_pa_to_da(u32 pa, u32 *da)
+static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
 {
-	int ret = 0;
+	int ret;
+	struct rproc *rproc;
+	u64 temp_da;
 
-	if (pa >= TILER_START && pa < TILER_END)
-		*da = pa;
-	else if (pa >= ION_1D_START && pa < ION_1D_END)
-		*da = (pa - ION_1D_START + ION_1D_VA);
+	if (mutex_lock_interruptible(&omx->omxserv->lock))
+		return -EINTR;
+
+	rproc = rpmsg_get_rproc_handle(omx->omxserv->rpdev);
+
+	ret = rproc_pa_to_da(rproc, (phys_addr_t) pa, &temp_da);
+	if (ret)
+		pr_err("error with pa to da from rproc %d\n", ret);
 	else
-		ret = -EIO;
+		/* we know it is a 32 bit address */
+		*da = (u32)temp_da;
+
+	mutex_unlock(&omx->omxserv->lock);
 
 	return ret;
 }
@@ -145,7 +146,7 @@ static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
 		/* is it an ion handle? */
 		handle = (struct ion_handle *)buffer;
 		if (!ion_phys(omx->ion_client, handle, &paddr, &unused)) {
-			ret = _rpmsg_pa_to_da((phys_addr_t)paddr, va);
+			ret = _rpmsg_pa_to_da(omx, (phys_addr_t)paddr, va);
 			goto exit;
 		}
 
@@ -164,7 +165,8 @@ static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
 			/* Get the 1st buffer's da */
 			if ((handles[0]) && !ion_phys(pvr_ion_client,
 					handles[0], &paddr, &unused)) {
-				ret = _rpmsg_pa_to_da((phys_addr_t)paddr, va);
+				ret = _rpmsg_pa_to_da(omx,
+						(phys_addr_t)paddr, va);
 				if (ret)
 					goto exit;
 
@@ -172,7 +174,7 @@ static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
 				if ((handles[1]) &&
 					!ion_phys(pvr_ion_client,
 					handles[1], &paddr2, &unused)) {
-					ret = _rpmsg_pa_to_da(
+					ret = _rpmsg_pa_to_da(omx,
 						(phys_addr_t)paddr2, va2);
 					goto exit;
 				} else
@@ -184,7 +186,7 @@ static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
 	}
 #endif
 
-	ret =  _rpmsg_pa_to_da((phys_addr_t)tiler_virt2phys(buffer), va);
+	ret =  _rpmsg_pa_to_da(omx, (phys_addr_t)tiler_virt2phys(buffer), va);
 exit:
 	if (ret)
 		pr_err("%s: buffer lookup failed %x\n", __func__, ret);
@@ -771,7 +773,7 @@ static void __devexit rpmsg_omx_remove(struct rpmsg_channel *rpdev)
 
 	mutex_lock(&omxserv->lock);
 	/*
-	 * If there is omx instrances that means it is a revovery.
+	 * If there are omx instances that means it is a recovery.
 	 * TODO: make sure it is a recovery.
 	 */
 	if (list_empty(&omxserv->list)) {
