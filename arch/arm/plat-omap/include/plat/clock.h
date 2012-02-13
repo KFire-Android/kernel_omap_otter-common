@@ -297,6 +297,8 @@ extern void recalculate_root_clocks(void);
 extern unsigned long followparent_recalc(struct clk *clk);
 extern int followparent_set_rate(struct clk *clk, unsigned long rate);
 extern void clk_enable_init_clocks(void);
+extern int omap_clk_for_each(int (*fn)(struct clk *clk, void *user),
+				void *user);
 unsigned long omap_fixed_divisor_recalc(struct clk *clk);
 extern struct clk *omap_clk_get_by_name(const char *name);
 extern int omap_clk_enable_autoidle_all(void);

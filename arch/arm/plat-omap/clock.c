@@ -377,6 +377,45 @@ int omap_clk_enable_autoidle_all(void)
 	return 0;
 }
 
+/**
+ * omap_clk_for_each - call a function for each registered clock
+ * @fn: pointer to callback function
+ * @data: void * data to pass to callback function
+ *
+ * Call @fn for each registered clock, passing @data to each function.
+ * @fn must return 0 for success or any other value for failure. If
+ * @fn returns non-zero, the iteration across clocks will stop and
+ * the non-zero return value will be passed to the caller of
+ * omap_clk_for_each(). @fn is called with clockfw_lock held.
+ */
+int omap_clk_for_each(int (*fn)(struct clk *clk, void *user), void *data)
+{
+	struct clk *c;
+	unsigned long flags;
+	int ret = 0;
+
+	if (!fn) {
+		WARN(1, "%s: fn = NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&clockfw_lock, flags);
+
+	list_for_each_entry(c, &clocks, node) {
+		ret = fn(c, data);
+		if (ret)
+			break;
+	}
+
+	spin_unlock_irqrestore(&clockfw_lock, flags);
+
+	if (ret)
+		pr_err("%s: Error encountered for clock %s, ret = %d\n",
+		       __func__, c->name, ret);
+
+	return ret;
+}
+
 int omap_clk_disable_autoidle_all(void)
 {
 	struct clk *c;
