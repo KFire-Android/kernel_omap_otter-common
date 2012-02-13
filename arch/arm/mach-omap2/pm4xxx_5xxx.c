@@ -181,6 +181,39 @@ static int omap4_5_pm_suspend(void)
 }
 #endif /* CONFIG_SUSPEND */
 
+static int _pwrdms_set_to_on(struct powerdomain *pwrdm, void *unused)
+{
+	int r = 0;
+
+	if (pwrdm->pwrsts)
+		r = omap_set_pwrdm_state(pwrdm, PWRDM_POWER_ON);
+
+	return r;
+}
+
+/**
+ * omap4_pm_cold_reset() - Cold reset OMAP4
+ * @reason:	why am I resetting?
+ *
+ * As per the TRM, it is recommended that we set all the power domains to
+ * ON state before we trigger cold reset.
+ */
+int omap4_pm_cold_reset(char *reason)
+{
+	/* Switch ON all pwrst registers */
+	if (pwrdm_for_each(_pwrdms_set_to_on, NULL))
+		pr_err("%s: Failed to setup powerdomains to ON\n", __func__);
+	/* Proceed even if failed */
+
+	WARN(1, "Arch Cold reset has been triggered due to %s\n", reason);
+	omap4_prminst_global_cold_sw_reset(); /* never returns */
+
+	/* If we reached here - something bad went on.. */
+	BUG();
+
+	/* make the compiler happy */
+	return -EINTR;
+}
 
 /* omap_pm_clear_dsp_wake_up - SW WA for hardcoded wakeup dependency
 * from HSI to DSP
