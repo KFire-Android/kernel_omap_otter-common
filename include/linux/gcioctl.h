@@ -87,6 +87,8 @@ struct gcmap {
 
 	void *logical;			/* Pointer to the buffer. */
 	unsigned int size;		/* Size of the buffer. */
+	unsigned long pagecount;
+	unsigned long *pagearray;
 };
 
 /*******************************************************************************
