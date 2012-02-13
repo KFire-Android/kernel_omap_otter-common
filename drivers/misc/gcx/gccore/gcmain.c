@@ -99,7 +99,7 @@ static enum gcerror find_context(struct gccontextmap **context, int create)
 	maplocked = 1;
 
 	/* Get current PID. */
-	pid = current->tgid;
+	pid = 0;
 
 	/* Search the list. */
 	prev = NULL;
