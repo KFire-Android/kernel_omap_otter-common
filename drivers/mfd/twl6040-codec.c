@@ -327,6 +327,7 @@ static int twl6040_power_up_completion(struct twl6040 *twl6040,
 	lppllctl_exp = TWL6040_LPLLENA;
 
 	do {
+		INIT_COMPLETION(twl6040->ready);
 		gpio_set_value(twl6040->audpwron, 1);
 		time_left = wait_for_completion_timeout(&twl6040->ready,
 							msecs_to_jiffies(700));
