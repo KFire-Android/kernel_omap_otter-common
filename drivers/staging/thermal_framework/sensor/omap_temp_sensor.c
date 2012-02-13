@@ -1028,9 +1028,9 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	/* Read the temperature once due to hw issue*/
 	omap_report_temp(temp_sensor->therm_fw);
 
-	/* Set 2 seconds time as default counter */
+	/* Set 250 milli-seconds time as default counter */
 	omap_configure_temp_sensor_counter(temp_sensor,
-						temp_sensor->clk_rate * 2);
+					temp_sensor->clk_rate * 250 / 1000);
 	ret = sysfs_create_group(&pdev->dev.kobj,
 				 &omap_temp_sensor_group);
 	if (ret) {
