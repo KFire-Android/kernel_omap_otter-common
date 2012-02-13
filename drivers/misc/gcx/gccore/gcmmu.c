@@ -687,8 +687,6 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 		((mem->pagesize != 0) && (mem->pagesize != MMU_PAGE_SIZE)))
 		return GCERR_MMU_ARG;
 
-	down_read(&current->mm->mmap_sem);
-
 	/*
 	 * Find available sufficient arena.
 	 */
@@ -870,7 +868,6 @@ fail:
 			release_physical_pages(vacant);
 	}
 
-	up_read(&current->mm->mmap_sem);
 	return gcerror;
 }
 
@@ -892,8 +889,6 @@ enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt, struct mmu2darena *mapped)
 
 	if ((ctxt == NULL) || (ctxt->mmu == NULL))
 		return GCERR_MMU_CTXT_BAD;
-
-	down_read(&current->mm->mmap_sem);
 
 	/*
 	 * Find the arena.
@@ -1031,7 +1026,6 @@ enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt, struct mmu2darena *mapped)
 	}
 
 fail:
-	up_read(&current->mm->mmap_sem);
 	return gcerror;
 }
 
