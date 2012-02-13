@@ -1054,11 +1054,24 @@ void gc_map(struct gcmap *gcmap)
 	GC_PRINT(GC_INFO_MSG "   size = %d\n",
 			__func__, __LINE__, gcmap->size);
 
-	/* Initialize the mapping parameters. */
-	mem.base = ((unsigned int) gcmap->logical) & ~(PAGE_SIZE - 1);
-	mem.offset = ((unsigned int) gcmap->logical) & (PAGE_SIZE - 1);
-	mem.count = DIV_ROUND_UP(gcmap->size + mem.offset, PAGE_SIZE);
-	mem.pages = NULL;
+	/* Initialize the mapping parameters. See if we were passed a list
+	 * of pages first
+	 */
+	if (gcmap->pagecount > 0 && gcmap->pagearray != NULL) {
+		GC_PRINT(KERN_ERR "%s: Got page array %p with %lu pages",
+			__func__, gcmap->pagearray, gcmap->pagecount);
+		mem.base = 0;
+		mem.offset = 0;
+		mem.count = gcmap->pagecount;
+		mem.pages = gcmap->pagearray;
+	} else {
+		GC_PRINT(KERN_ERR "%s: gcmap->logical = %p\n",
+			__func__, gcmap->logical);
+		mem.base = ((u32) gcmap->logical) & ~(PAGE_SIZE - 1);
+		mem.offset = ((u32) gcmap->logical) & (PAGE_SIZE - 1);
+		mem.count = DIV_ROUND_UP(gcmap->size + mem.offset, PAGE_SIZE);
+		mem.pages = NULL;
+	}
 	mem.pagesize = PAGE_SIZE;
 
 	/* Map the buffer. */
