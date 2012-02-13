@@ -67,6 +67,7 @@
 #define BGAP_THRESHOLD_T_COLD		71000	/* 71 deg C */
 #define OMAP_ADC_START_VALUE	530
 #define OMAP_ADC_END_VALUE	932
+#define OMAP_MIN_TEMP			-40000	/* sensor starts at -40 deg C */
 
 /*
  * omap_temp_sensor structure
@@ -323,9 +324,10 @@ static int omap_set_thresholds(struct omap_temp_sensor *temp_sensor,
 	int new_hot;
 	int curr_temp = 0;
 
-	/* A negative value is not acceptable for the thresholds */
-	if ((min < 0) || (max < 0)) {
-		pr_err("%s:Min or Max is invalid\n", __func__);
+	/* A too low value is not acceptable for the thresholds */
+	if ((min < OMAP_MIN_TEMP) || (max < OMAP_MIN_TEMP)) {
+		pr_err("%s:Min or Max is invalid %d %d\n", __func__,
+			min, max);
 		return -EINVAL;
 	}
 
