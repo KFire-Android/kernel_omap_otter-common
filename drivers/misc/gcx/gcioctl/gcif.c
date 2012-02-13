@@ -302,6 +302,9 @@ static int gc_map_wrapper(struct gcmap *gcmap)
 		goto exit;
 	}
 
+	kgcmap.pagecount = 0;
+	kgcmap.pagearray = NULL;
+
 	/* Call the core driver. */
 	gc_map(&kgcmap);
 	if (kgcmap.gcerror != GCERR_NONE)
