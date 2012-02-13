@@ -65,7 +65,6 @@ module_param(irqline, int, 0644);
 static long registerMemBase = 0xF1840000;
 module_param(registerMemBase, long, 0644);
 
-static struct gccontext *g_context;
 static struct mutex g_contextlock;
 static struct mutex g_datalock;
 
@@ -870,11 +869,7 @@ enum gcerror gc_lock(struct gccontext *gccontext)
 	}
 	contextlocked = 1;
 
-	/* Set the context. */
-	if (g_context != gccontext) {
-		g_context = gccontext;
-		gccontext->mmu_dirty = true;
-	}
+	gccontext->mmu_dirty = true;
 
 	GC_PRINT(GC_ERR_MSG " context locked\n",
 			__func__, __LINE__);
@@ -911,14 +906,7 @@ enum gcerror gc_unlock(struct gccontext *gccontext)
 	}
 	datalocked = 1;
 
-	/* Clear the context. */
-	if (g_context == gccontext) {
-		GC_PRINT(GC_ERR_MSG " context unlocked\n",
-				__func__, __LINE__);
-
-		g_context = NULL;
-		mutex_unlock(&g_contextlock);
-	}
+	mutex_unlock(&g_contextlock);
 
 exit:
 	if (datalocked)
@@ -967,7 +955,7 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	gcmopipesel->pipesel.reg = gcregpipeselect_2D;
 
 	/* Set the client's master table. */
-	gccommit->gcerror = mmu2d_set_master(&g_context->mmu);
+	gccommit->gcerror = mmu2d_set_master(&context->context->mmu);
 	if (gccommit->gcerror != GCERR_NONE)
 		goto exit;
 
@@ -983,7 +971,7 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 			- (unsigned char *) gcbuffer->head;
 
 		/* Determine MMU flush size. */
-		mmuflushsize = g_context->mmu_dirty
+		mmuflushsize = context->context->mmu_dirty
 			? mmu2d_flush(NULL, 0, 0) : 0;
 
 		/* Reserve command buffer space. */
@@ -994,7 +982,7 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 			goto exit;
 
 		/* Append MMU flush. */
-		if (g_context->mmu_dirty) {
+		if (context->context->mmu_dirty) {
 			mmu2d_flush(logical, address, allocsize);
 
 			/* Skip MMU flush. */
@@ -1002,7 +990,7 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 				((unsigned char *) logical + mmuflushsize);
 
 			/* Validate MMU state. */
-			g_context->mmu_dirty = false;
+			context->context->mmu_dirty = false;
 		}
 
 		if (fromuser) {
@@ -1074,12 +1062,12 @@ void gc_map(struct gcmap *gcmap)
 	mem.pagesize = PAGE_SIZE;
 
 	/* Map the buffer. */
-	gcmap->gcerror = mmu2d_map(&g_context->mmu, &mem, &mapped);
+	gcmap->gcerror = mmu2d_map(&context->context->mmu, &mem, &mapped);
 	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
 
 	/* Invalidate the MMU. */
-	g_context->mmu_dirty = true;
+	context->context->mmu_dirty = true;
 
 	gcmap->handle = (unsigned int) mapped;
 
@@ -1121,13 +1109,13 @@ void gc_unmap(struct gcmap *gcmap)
 			__func__, __LINE__, gcmap->handle);
 
 	/* Map the buffer. */
-	gcmap->gcerror = mmu2d_unmap(&g_context->mmu,
+	gcmap->gcerror = mmu2d_unmap(&context->context->mmu,
 					(struct mmu2darena *) gcmap->handle);
 	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
 
 	/* Invalidate the MMU. */
-	g_context->mmu_dirty = true;
+	context->context->mmu_dirty = true;
 
 	/* Invalidate the handle. */
 	gcmap->handle = ~0U;
