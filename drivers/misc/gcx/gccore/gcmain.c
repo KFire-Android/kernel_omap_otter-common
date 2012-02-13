@@ -78,6 +78,13 @@ static struct mutex g_maplock;
 static struct gccontextmap *g_map;
 static struct gccontextmap *g_mapvacant;
 
+/* Context management. */
+struct gccontext;
+static enum gcerror gc_attach(struct gccontext **gccontext);
+static enum gcerror gc_detach(struct gccontext **gccontext);
+static enum gcerror gc_lock(struct gccontext *gccontext);
+static enum gcerror gc_unlock(struct gccontext *gccontext);
+
 static enum gcerror find_context(struct gccontextmap **context, int create)
 {
 	enum gcerror gcerror;
@@ -769,7 +776,7 @@ fail:
 
 static int g_clientref;
 
-enum gcerror gc_attach(struct gccontext **gccontext)
+static enum gcerror gc_attach(struct gccontext **gccontext)
 {
 	enum gcerror gcerror;
 	struct gccontext *temp = NULL;
@@ -803,9 +810,8 @@ fail:
 	gc_detach(&temp);
 	return gcerror;
 }
-EXPORT_SYMBOL(gc_attach);
 
-enum gcerror gc_detach(struct gccontext **gccontext)
+static enum gcerror gc_detach(struct gccontext **gccontext)
 {
 	enum gcerror gcerror;
 	struct gccontext *temp;
@@ -838,9 +844,8 @@ enum gcerror gc_detach(struct gccontext **gccontext)
 exit:
 	return gcerror;
 }
-EXPORT_SYMBOL(gc_detach);
 
-enum gcerror gc_lock(struct gccontext *gccontext)
+static enum gcerror gc_lock(struct gccontext *gccontext)
 {
 	enum gcerror gcerror;
 	int contextlocked = 0;
@@ -886,9 +891,8 @@ fail:
 
 	return gcerror;
 }
-EXPORT_SYMBOL(gc_lock);
 
-enum gcerror gc_unlock(struct gccontext *gccontext)
+static enum gcerror gc_unlock(struct gccontext *gccontext)
 {
 	enum gcerror gcerror;
 	int datalocked = 0;
@@ -914,7 +918,6 @@ exit:
 
 	return gcerror;
 }
-EXPORT_SYMBOL(gc_unlock);
 
 /*******************************************************************************
  * Command buffer submission.

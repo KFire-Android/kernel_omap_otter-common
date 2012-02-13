@@ -30,13 +30,6 @@ enum gcerror gc_acquire_mutex(struct mutex *mutex,
 void gc_gpu_id(void);
 void gc_gpu_status(char *function, int line, unsigned int *acknowledge);
 
-/* Context management. */
-struct gccontext;
-enum gcerror gc_attach(struct gccontext **gccontext);
-enum gcerror gc_detach(struct gccontext **gccontext);
-enum gcerror gc_lock(struct gccontext *gccontext);
-enum gcerror gc_unlock(struct gccontext *gccontext);
-
 /* Command buffer submission. */
 void gc_commit(struct gccommit *gccommit, int fromuser);
 
