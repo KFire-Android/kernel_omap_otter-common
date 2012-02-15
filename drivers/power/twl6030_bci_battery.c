@@ -846,8 +846,6 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 
 	if (!((di->features & TWL6032_SUBCLASS) &&
 			di->platform_data->use_hw_charger)) {
-		if (!(stat_reset & (VBUS_DET | VAC_DET)))
-			goto stat_fault;
 		if (stat_reset & VBUS_DET) {
 			/* On a USB detach, UNMASK VBUS OVP if masked*/
 			ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &temp,
@@ -936,8 +934,6 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 		charger_fault = 1;
 		dev_dbg(di->dev, "Fault watchdog fired\n");
 	}
-
-stat_fault:
 	if (stat_reset & CONTROLLER_STAT1_FAULT_WDG)
 		dev_dbg(di->dev, "Fault watchdog recovered\n");
 	if (stat_set & CONTROLLER_STAT1_BAT_REMOVED)
