@@ -1244,7 +1244,7 @@ static struct omap_hwmod_irq_info omap54xx_dsp_irqs[] = {
 };
 
 static struct omap_hwmod_rst_info omap54xx_dsp_resets[] = {
-	{ .name = "mmu_cache", .rst_shift = 1 },
+	{ .name = "dsp_mmu_cache", .rst_shift = 1 },
 };
 
 static struct omap_hwmod_rst_info omap54xx_dsp_c0_resets[] = {
@@ -1258,11 +1258,19 @@ static struct omap_hwmod_ocp_if omap54xx_dsp__iva = {
 	.clk		= "dpll_iva_h12x2_ck",
 };
 
+/* dsp -> sl2if */
+static struct omap_hwmod_ocp_if omap54xx_dsp__sl2if = {
+	.master		= &omap54xx_dsp_hwmod,
+	.slave		= &omap54xx_sl2if_hwmod,
+	.clk		= "dpll_iva_h12x2_ck",
+};
+
 /* dsp master ports */
 static struct omap_hwmod_ocp_if *omap54xx_dsp_masters[] = {
 	&omap54xx_dsp__l3_main_1,
 	&omap54xx_dsp__iva,
 	&omap54xx_dsp__l4_abe,
+	&omap54xx_dsp__sl2if,
 };
 
 /* l4_cfg -> dsp */
@@ -1313,13 +1321,6 @@ static struct omap_hwmod omap54xx_dsp_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_dsp_slaves),
 	.masters	= omap54xx_dsp_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_dsp_masters),
-};
-
-/* dsp -> sl2if */
-static struct omap_hwmod_ocp_if omap54xx_dsp__sl2if = {
-	.master		= &omap54xx_dsp_hwmod,
-	.slave		= &omap54xx_sl2if_hwmod,
-	.clk		= "dpll_iva_h12x2_ck",
 };
 
 /*
