@@ -922,6 +922,9 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
 	if ((atomic_inc_return(&clkdm->usecount) > 1) && autodeps)
 		return 0;
 
+	if (clkdm->flags & CLKDM_SKIP_MANUAL_TRANS)
+		return 0;
+
 	spin_lock_irqsave(&clkdm->lock, flags);
 	arch_clkdm->clkdm_clk_enable(clkdm);
 	pwrdm_wait_transition(clkdm->pwrdm.ptr);
@@ -946,6 +949,9 @@ static int _clkdm_clk_hwmod_disable(struct clockdomain *clkdm)
 	}
 
 	if (atomic_dec_return(&clkdm->usecount) > 0)
+		return 0;
+
+	if (clkdm->flags & CLKDM_SKIP_MANUAL_TRANS)
 		return 0;
 
 	spin_lock_irqsave(&clkdm->lock, flags);
