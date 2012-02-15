@@ -612,6 +612,7 @@ static void twl6030_stop_usb_charger(struct twl6030_bci_device_info *di)
 static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 {
 	int ret;
+	u8 reg;
 
 	if ((di->features & TWL6032_SUBCLASS) &&
 			di->platform_data->use_hw_charger)
@@ -647,10 +648,12 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 
 enable:
 	if (di->charger_incurrentmA >= 50) {
-		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
-				CONTROLLER_CTRL1_EN_CHARGER |
-				(di->features & TWL6032_SUBCLASS) ?
-				CONTROLLER_CTRL1_EN_LINCH : 0,
+		reg = CONTROLLER_CTRL1_EN_CHARGER;
+
+		if (di->platform_data->use_power_path)
+			reg |= CONTROLLER_CTRL1_EN_LINCH;
+
+		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg,
 				CONTROLLER_CTRL1);
 		if (ret)
 			goto err;
