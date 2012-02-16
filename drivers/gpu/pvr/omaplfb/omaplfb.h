@@ -39,6 +39,10 @@
 #include <linux/notifier.h>
 #include <linux/mutex.h>
 
+#ifdef CONFIG_ION_OMAP
+#include <linux/ion.h>
+#endif
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
@@ -131,6 +135,8 @@ typedef struct OMAPLFB_FBINFO_TAG
 	IMG_SYS_PHYADDR     *psPageList;
 #if defined(CONFIG_ION_OMAP)
 	struct ion_handle   *psIONHandle;
+	struct ion_handle   *psBltFBsHandle;
+	ion_phys_addr_t     psBltFBsPhys[2];
 #endif
 	IMG_UINT32          uiBytesPerPixel;
 }OMAPLFB_FBINFO;

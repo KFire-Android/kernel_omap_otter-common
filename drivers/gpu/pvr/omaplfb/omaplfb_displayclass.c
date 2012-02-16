@@ -79,8 +79,8 @@ static OMAPLFB_DEVINFO *gapsDevInfo[OMAPLFB_MAX_NUM_DEVICES];
 
 static PFN_DC_GET_PVRJTABLE gpfnGetPVRJTable = NULL;
 
-static int bv_gc2d_is_present;
-static struct bventry bv_gc2d_entry = {NULL, NULL, NULL};
+static int gbBvInterfacePresent;
+static struct bventry gsBvInterface = {NULL, NULL, NULL};
 
 static inline unsigned long RoundUpToMultiple(unsigned long x, unsigned long y)
 {
@@ -521,10 +521,10 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 		psBuffer[i].bvmap_handle = NULL;
 	}
 
-	if (!bv_gc2d_is_present)
+	if (!gbBvInterfacePresent)
 		goto skip_bv_map;
 	else
-		bv_entry = &bv_gc2d_entry;
+		bv_entry = &gsBvInterface;
 
 	for (i = 0; i < ui32BufferCount; i++) {
 		OMAPLFB_FBINFO *psPVRFBInfo = &psDevInfo->sFBInfo;
@@ -670,8 +670,8 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 		printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Couldn't disable framebuffer event notification\n", __FUNCTION__, psDevInfo->uiFBDevID);
 	}
 
-	if (bv_gc2d_is_present) {
-		struct bventry *bv_entry = &bv_gc2d_entry;
+	if (gbBvInterfacePresent) {
+		struct bventry *bv_entry = &gsBvInterface;
 
 		for (i = 0; i < psSwapChain->ulBufferCount; i++) {
 			struct bvbuffdesc *buffdesc;
@@ -1131,7 +1131,7 @@ static void get_fb_bvmap(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *meminfo,
 
 	*buffdesc = NULL;
 
-	if (!bv_gc2d_is_present || !psSwapChain)
+	if (!gbBvInterfacePresent || !psSwapChain)
 		return;
 
 	psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(*meminfo,
@@ -1178,7 +1178,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 	 * use for blitting (dst buffer) is the first meminfo
 	 */
 	struct rgz_blt_entry *entry_list;
-	struct bventry *bv_entry = &bv_gc2d_entry;
+	struct bventry *bv_entry = &gsBvInterface;
 	struct bvbuffdesc src1desc;
 	struct bvbuffdesc src2desc;
 	struct bvbuffdesc *dstdesc;
@@ -1199,7 +1199,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 	calcsz = sizeof(*psHwcData) +
 		(sizeof(struct rgz_blt_entry) * rgz_items);
 
-	if (rgz_items > 0 && !bv_gc2d_is_present) {
+	if (rgz_items > 0 && !gbBvInterfacePresent) {
 		/* We cannot blit if BV GC2D is not present!, likely a bug */
 		WARN(1, "Trying to blit when BV GC2D is not present");
 		rgz_items = 0; /* Prevent blits */
@@ -1479,6 +1479,51 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 }
 
 #if defined(CONFIG_DSSCOMP)
+/*
+ * Allocate buffers from the blit 'framebuffers'. These buffers are not shared
+ * with the SGX flip chain to reduce complexity
+ */
+static OMAPLFB_ERROR OMAPLFBInitBltFBs(OMAPLFB_FBINFO *psPVRFBInfo)
+{
+	int n = 2;
+	int res;
+	ion_phys_addr_t phys;
+	size_t size;
+
+	/* TILER will align width to 128-bytes */
+	/* however, SGX must have full page width */
+	int w = ALIGN(psPVRFBInfo->ulWidth, PAGE_SIZE / psPVRFBInfo->uiBytesPerPixel);
+	int h = psPVRFBInfo->ulHeight;
+
+	struct omap_ion_tiler_alloc_data sAllocData = {
+		.w = n * w,
+		.h = h,
+		.fmt = psPVRFBInfo->uiBytesPerPixel == 2 ? TILER_PIXEL_FMT_16BIT : TILER_PIXEL_FMT_32BIT,
+		.flags = 0,
+	};
+
+	if (!gbBvInterfacePresent)
+	{
+		return OMAPLFB_OK;
+	}
+
+	printk(KERN_INFO DRIVER_PREFIX
+		"BltFBs alloc %d x (%d x %d) [stride %ld]\n", n, w, h, psPVRFBInfo->ulByteStride);
+	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
+	if (res < 0)
+	{
+		printk(KERN_ERR DRIVER_PREFIX
+			"Could not allocate BltFBs\n");
+		return OMAPLFB_ERROR_INIT_FAILURE;
+	}
+
+	ion_phys(gpsIONClient, sAllocData.handle, &phys, &size);
+
+	psPVRFBInfo->psBltFBsPhys[0] = phys;
+	psPVRFBInfo->psBltFBsPhys[1] = phys + psPVRFBInfo->ulByteStride;
+	return OMAPLFB_OK;
+}
+
 static OMAPLFB_ERROR OMAPLFBInitIonOmap(OMAPLFB_DEVINFO *psDevInfo,
                                         struct fb_info *psLINFBInfo,
                                         OMAPLFB_FBINFO *psPVRFBInfo)
@@ -1644,7 +1689,11 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 	{
 		goto ErrorModPut;
 	}
-	/* psPVRFBInfo->psIONHandle is now set */
+	eError = OMAPLFBInitBltFBs(psPVRFBInfo);
+	if (eError != OMAPLFB_OK)
+	{
+		goto ErrorModPut;
+	}
 #else
 	psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
 	psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
@@ -1734,6 +1783,10 @@ static void OMAPLFBDeInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 	if (psPVRFBInfo->psIONHandle)
 	{
 		ion_free(gpsIONClient, psPVRFBInfo->psIONHandle);
+	}
+	if (psPVRFBInfo->psBltFBsHandle)
+	{
+		ion_free(gpsIONClient, psPVRFBInfo->psBltFBsHandle);
 	}
 #endif
 	if (psLINFBInfo->fbops->fb_release != NULL) 
@@ -1901,13 +1954,13 @@ OMAPLFB_ERROR OMAPLFBInit(void)
 
 #if defined(CONFIG_GCCORE)
 	/* Get the GC2D Bltsville implementation */
-	gcbv_init(&bv_gc2d_entry);
-	bv_gc2d_is_present = bv_gc2d_entry.bv_map ? 1 : 0;
+	gcbv_init(&gsBvInterface);
+	gbBvInterfacePresent = gsBvInterface.bv_map ? 1 : 0;
 #else
-	bv_gc2d_is_present = 0;
+	gbBvInterfacePresent = 0;
 #endif
 
-	if (bv_gc2d_is_present)
+	if (gbBvInterfacePresent)
 		printk(KERN_INFO DRIVER_PREFIX "%s: Blitsville gc2d "
 			"present, blits enabled\n", __func__);
 	else
