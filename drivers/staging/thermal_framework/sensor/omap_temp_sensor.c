@@ -884,7 +884,7 @@ static irqreturn_t omap_talert_irq_handler(int irq, void *data)
 	/* look up for temperature in the table and return the
 	   temperature */
 	if (temp < OMAP_ADC_START_VALUE || temp > OMAP_ADC_END_VALUE) {
-		pr_err("invalid adc code reported by the sensor %d", temp);
+		pr_err("invalid adc code reported by the sensor %d\n", temp);
 	} else {
 		temp_sensor->therm_fw->current_temp =
 				adc_to_temp[temp - OMAP_ADC_START_VALUE];
