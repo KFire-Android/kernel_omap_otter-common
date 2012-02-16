@@ -1543,6 +1543,7 @@ int hdmi_ti_4xx_check_aksv_data(struct hdmi_ip_data *ip_data)
 		(one == 0) ? HDMI_AKSV_ZERO : HDMI_AKSV_ERROR;
 
 	return ret;
+
 }
 EXPORT_SYMBOL(hdmi_ti_4xx_check_aksv_data);
 

@@ -75,6 +75,24 @@
 							 0x01 << 0)
 #define TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC "OFF=OFF SLEEP=OFF ACT=AUTO"
 
+#define TWL6030_REG_VCORE1_CFG_GRP			0x52
+#define TWL6030_REG_VCORE1_CFG_TRANS			0x53
+#define TWL6030_REG_VCORE2_CFG_GRP			0x58
+#define TWL6030_REG_VCORE2_CFG_TRANS			0x59
+#define TWL6030_REG_VCORE3_CFG_GRP			0x5e
+#define TWL6030_REG_VCORE3_CFG_TRANS			0x5f
+#define TWL6030_BIT_APE_GRP				BIT(0)
+/*
+ * Setup CFG_TRANS mode as follows:
+ * 0x00 (OFF) when in OFF state(bit offset 4) and in sleep (bit offset 2)
+ * 0x01 (PWM/PFM Auto) when in ACTive state (bit offset 0)
+ * Dont trust Bootloader or reset values to set them up for kernel.
+ */
+#define TWL6030_REG_VCOREx_CFG_TRANS_MODE		(0x00 << 4 | \
+							 0x00 << 2 | \
+							 0x01 << 0)
+#define TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC "OFF=OFF SLEEP=OFF ACT=AUTO"
+
 static bool is_offset_valid;
 static u8 smps_offset;
 /*
@@ -404,7 +422,8 @@ static struct omap_voltdm_pmic omap447x_core_pmic = {
 	.on_volt		= 1200000,
 	.onlp_volt		= 1200000,
 	.ret_volt		= 830000,
-	.off_volt		= 0,
+	/* OMAP4 + TWL + TPS limitation keep off_volt same as ret_volt */
+	.off_volt		= 830000,
 	.volt_setup_time	= 0,
 	.switch_on_time		= 549,
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,

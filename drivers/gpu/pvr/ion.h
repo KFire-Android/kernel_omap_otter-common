@@ -31,7 +31,7 @@
 #include <linux/omap_ion.h>
 
 void PVRSRVExportFDToIONHandles(int fd, struct ion_client **client,
-					struct ion_handle *handles[2]);
+								struct ion_handle *handles[2]);
 
 struct ion_handle *PVRSRVExportFDToIONHandle(int fd,
 				struct ion_client **client);

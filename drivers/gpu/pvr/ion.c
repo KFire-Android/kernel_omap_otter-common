@@ -44,7 +44,7 @@
 extern struct ion_client *gpsIONClient;
 
 void PVRSRVExportFDToIONHandles(int fd, struct ion_client **client,
-					struct ion_handle *handles[2])
+								struct ion_handle *handles[2])
 {
 	PVRSRV_FILE_PRIVATE_DATA *psPrivateData;
 	PVRSRV_KERNEL_MEM_INFO *psKernelMemInfo;
@@ -99,7 +99,6 @@ err_unlock:
 	/* Allow PVRSRV clients to communicate with srvkm again */
 	LinuxUnLockMutex(&gPVRSRVLock);
 }
-EXPORT_SYMBOL(PVRSRVExportFDToIONHandles);
 
 struct ion_handle *
 PVRSRVExportFDToIONHandle(int fd, struct ion_client **client)
@@ -108,4 +107,6 @@ PVRSRVExportFDToIONHandle(int fd, struct ion_client **client)
 	PVRSRVExportFDToIONHandles(fd, client, psHandles);
 	return psHandles[0];
 }
+
+EXPORT_SYMBOL(PVRSRVExportFDToIONHandles);
 EXPORT_SYMBOL(PVRSRVExportFDToIONHandle);
