@@ -795,6 +795,12 @@ int __init omap4_mpuss_init(void)
 		writel(0x0, sar_base + OMAP_TYPE_OFFSET);
 	}
 
+	/*
+	 * Store OMAP revision to scratchpad.
+	 * ATM required for POR restore on GP devices.
+	 */
+	writel(omap_rev(), sar_base + OMAP_REV_OFFSET);
+
 	/* Clear CPU previous power domain state */
 	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
 	cpu_clear_prev_logic_pwrst(1);
