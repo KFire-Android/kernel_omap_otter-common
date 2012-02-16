@@ -527,6 +527,79 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 		psBuffer[i].bvmap_handle = NULL;
 	}
 
+	/* HACK: Map VRAM to make a blit to clear the FB, VRAM has black transparent pixels
+	 * only possible if FB is 2D otherwise it won't work!
+	 */
+	if (gbBvInterfacePresent && psDevInfo->sFBInfo.bIs2D) {
+		struct bventry *bv_entry = &gsBvInterface;
+		OMAPLFB_FBINFO *psPVRFBInfo = &psDevInfo->sFBInfo;
+		struct fb_info *psLINFBInfo = psDevInfo->psLINFBInfo;
+		unsigned long phy_addr = psLINFBInfo->fix.smem_start;
+		unsigned int num_pages;
+		unsigned long *page_addrs;
+		enum bverror bv_error;
+		int j;
+		struct bvbuffdesc *buffdesc;
+		struct bvsurfgeom *clr_fb_geom;
+
+		num_pages = ((psLINFBInfo->fix.line_length *
+			psLINFBInfo->var.yres) + PAGE_SIZE - 1) >> PAGE_SHIFT;
+
+		page_addrs = kzalloc(sizeof(*page_addrs) *
+			num_pages, GFP_KERNEL);
+		if (!page_addrs) {
+			WARN(1, "%s: Out of memory\n", __func__);
+			goto skip_bv_map;
+		}
+
+		buffdesc = kzalloc(sizeof(*buffdesc), GFP_KERNEL);
+		if (!buffdesc) {
+			WARN(1, "%s: Out of memory\n", __func__);
+			kfree(page_addrs);
+			goto skip_bv_map;
+		}
+
+		clr_fb_geom = kzalloc(sizeof(*clr_fb_geom), GFP_KERNEL);
+		if (!clr_fb_geom) {
+			WARN(1, "%s: Out of memory\n", __func__);
+			kfree(buffdesc);
+			kfree(page_addrs);
+			goto skip_bv_map;
+		}
+
+		for(j = 0; j < num_pages; j++) {
+			page_addrs[j] = phy_addr + (j * PAGE_SIZE);
+		}
+
+		buffdesc->structsize = sizeof(*buffdesc);
+		buffdesc->pagesize = PAGE_SIZE;
+		buffdesc->pagearray = page_addrs;
+		buffdesc->pagecount = num_pages;
+		/* Mark the buffer with != 0, otherwise GC driver blows up */
+		buffdesc->virtaddr = (void*)10;
+
+		bv_error = bv_entry->bv_map(buffdesc);
+		if (bv_error) {
+			WARN(1, "%s: BV map swapchain buffer failed %d\n",
+				__func__, bv_error);
+			psPVRFBInfo->clr_fb_desc = NULL;
+			kfree(buffdesc);
+		} else
+			psPVRFBInfo->clr_fb_desc = buffdesc;
+
+		kfree(page_addrs);
+
+		clr_fb_geom->structsize = sizeof(struct bvsurfgeom);
+		clr_fb_geom->format = OCDFMT_BGRA24;
+		clr_fb_geom->width = psLINFBInfo->var.xres;
+		clr_fb_geom->height = psLINFBInfo->var.yres;
+		clr_fb_geom->orientation = 0;
+		clr_fb_geom->virtstride = psLINFBInfo->fix.line_length;
+		clr_fb_geom->physstride = clr_fb_geom->virtstride;
+		psPVRFBInfo->clr_fb_geom = clr_fb_geom;
+	}
+skip_bv_map:
+
 	if (OMAPLFBCreateSwapQueue(psSwapChain) != OMAPLFB_OK)
 	{ 
 		printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Failed to create workqueue\n", __FUNCTION__, psDevInfo->uiFBDevID);
@@ -617,6 +690,20 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 			buffdesc = psSwapChain->psBuffer[i].bvmap_handle;
 			bv_entry->bv_unmap(buffdesc);
 			kfree(buffdesc);
+		}
+
+		/* HACK: Release VRAM bv map done for clear workaround */
+		if (psDevInfo->sFBInfo.bIs2D) {
+			struct bvbuffdesc *buffdesc;
+
+			if (psDevInfo->sFBInfo.clr_fb_desc) {
+				buffdesc = psDevInfo->sFBInfo.clr_fb_desc;
+				bv_entry->bv_unmap(buffdesc);
+				kfree(buffdesc);
+			}
+
+			if (psDevInfo->sFBInfo.clr_fb_geom)
+				kfree(psDevInfo->sFBInfo.clr_fb_geom);
 		}
 	}
 
@@ -1279,9 +1366,23 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		/* This will change when the HWC starts to use HWC_BLT_FLAG_CLR */
 		if (meminfo_ix == -1)
 		{
+#if 0
+			/* FIXME: Doesn't work! use below alternative */
 			/* Clean FB with GC 320 with black transparent pixel */
 			static unsigned int pixel = 0;
-			src1desc.virtaddr = (void*)&pixel;
+			src1desc->virtaddr = (void*)&pixel;
+#else
+			/* HACK: Use pre-mappped VRAM full of transparent pixels,
+			 * works only if FB is 2D
+			 */
+			if (psDevInfo->sFBInfo.bIs2D) {
+				dstgeom = entry->dstgeom;
+				bltparams.src1rect.width = dstgeom.width;
+				bltparams.src1rect.height = dstgeom.height;
+				src1desc = *(struct bvbuffdesc *)psDevInfo->sFBInfo.clr_fb_desc;
+				src1geom = *((struct bvsurfgeom *)psDevInfo->sFBInfo.clr_fb_geom);
+			}
+#endif
 		}
 		else if (meminfo_ix & HWC_BLT_DESC_FLAG)
 		{

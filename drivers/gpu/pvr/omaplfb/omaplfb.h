@@ -123,7 +123,8 @@ typedef struct OMAPLFB_FBINFO_TAG
 	unsigned long       ulPhysicalWidthmm;
 	unsigned long       ulPhysicalHeightmm;
 
-	
+	void *clr_fb_geom;
+	void *clr_fb_desc;
 	
 	IMG_SYS_PHYADDR     sSysAddr;
 	IMG_CPU_VIRTADDR    sCPUVAddr;
