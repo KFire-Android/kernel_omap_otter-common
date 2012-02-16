@@ -1958,7 +1958,14 @@ static OMAPLFB_DEVINFO *OMAPLFBInitDev(unsigned uiFBDevID)
 
 	
 	aui32SyncCountList[DC_FLIP_COMMAND][0] = 0; 
-	aui32SyncCountList[DC_FLIP_COMMAND][1] = 10; 
+	if (gbBvInterfacePresent)
+	{
+		aui32SyncCountList[DC_FLIP_COMMAND][1] = 32;
+	}
+	else
+	{
+		aui32SyncCountList[DC_FLIP_COMMAND][1] = 10;
+	}
 
 	
 
