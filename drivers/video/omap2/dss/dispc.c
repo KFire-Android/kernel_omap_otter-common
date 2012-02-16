@@ -199,6 +199,9 @@ static void dispc_save_context(void)
 		SR(CONFIG2);
 	}
 
+	if (dss_has_feature(FEAT_GLOBAL_MFLAG))
+		SR(GLOBAL_MFLAG);
+
 	SR(OVL_BA0(OMAP_DSS_GFX));
 	SR(OVL_BA1(OMAP_DSS_GFX));
 	SR(OVL_POSITION(OMAP_DSS_GFX));
@@ -209,6 +212,9 @@ static void dispc_save_context(void)
 	SR(OVL_PIXEL_INC(OMAP_DSS_GFX));
 	SR(OVL_WINDOW_SKIP(OMAP_DSS_GFX));
 	SR(OVL_TABLE_BA(OMAP_DSS_GFX));
+
+	if (dss_has_feature(FEAT_GLOBAL_MFLAG))
+		SR(OVL_MFLAG_THRESHOLD(OMAP_DSS_GFX));
 
 	SR(DATA_CYCLE1(OMAP_DSS_CHANNEL_LCD));
 	SR(DATA_CYCLE2(OMAP_DSS_CHANNEL_LCD));
@@ -287,6 +293,9 @@ static void dispc_save_context(void)
 
 		if (dss_has_feature(FEAT_PRELOAD))
 			SR(OVL_PRELOAD(o));
+
+		if (dss_has_feature(FEAT_GLOBAL_MFLAG))
+			SR(OVL_MFLAG_THRESHOLD(o));
 	}
 
 	if (dss_has_feature(FEAT_CORE_CLK_DIV))
@@ -343,6 +352,9 @@ static void dispc_restore_context(void)
 		RR(CONFIG2);
 	}
 
+	if (dss_has_feature(FEAT_GLOBAL_MFLAG))
+		RR(GLOBAL_MFLAG);
+
 	RR(OVL_BA0(OMAP_DSS_GFX));
 	RR(OVL_BA1(OMAP_DSS_GFX));
 	RR(OVL_POSITION(OMAP_DSS_GFX));
@@ -354,6 +366,8 @@ static void dispc_restore_context(void)
 	RR(OVL_WINDOW_SKIP(OMAP_DSS_GFX));
 	RR(OVL_TABLE_BA(OMAP_DSS_GFX));
 
+	if (dss_has_feature(FEAT_GLOBAL_MFLAG))
+			RR(OVL_MFLAG_THRESHOLD(OMAP_DSS_GFX));
 
 	RR(DATA_CYCLE1(OMAP_DSS_CHANNEL_LCD));
 	RR(DATA_CYCLE2(OMAP_DSS_CHANNEL_LCD));
@@ -433,6 +447,9 @@ static void dispc_restore_context(void)
 
 		if (dss_has_feature(FEAT_PRELOAD))
 			RR(OVL_PRELOAD(o));
+
+		if (dss_has_feature(FEAT_GLOBAL_MFLAG))
+			RR(OVL_MFLAG_THRESHOLD(o));
 	}
 
 	if (dss_has_feature(FEAT_CORE_CLK_DIV))
@@ -1385,6 +1402,10 @@ void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high)
 	dispc_write_reg(DISPC_OVL_FIFO_THRESHOLD(plane),
 			FLD_VAL(high, hi_start, hi_end) |
 			FLD_VAL(low, lo_start, lo_end));
+
+	if (dss_has_feature(FEAT_GLOBAL_MFLAG))
+		dispc_write_reg(DISPC_OVL_MFLAG_THRESHOLD(plane),
+			FLD_VAL(high, 31, 16) | FLD_VAL(low, 15, 0));
 }
 
 void dispc_enable_fifomerge(bool enable)
@@ -4037,6 +4058,9 @@ static void _omap_dispc_initial_config(void)
 	dispc_set_loadmode(OMAP_DSS_LOAD_FRAME_ONLY);
 
 	dispc_read_plane_fifo_sizes();
+
+	if (dss_has_feature(FEAT_GLOBAL_MFLAG))
+		dispc_write_reg(DISPC_GLOBAL_MFLAG, 2);
 }
 
 /* DISPC HW IP initialisation */

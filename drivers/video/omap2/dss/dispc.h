@@ -36,6 +36,7 @@
 #define DISPC_CONTROL2			0x0238
 #define DISPC_CONFIG2			0x0620
 #define DISPC_DIVISOR			0x0804
+#define DISPC_GLOBAL_MFLAG		0x085C
 
 /* DISPC overlay registers */
 #define DISPC_OVL_BA0(n)		(DISPC_OVL_BASE(n) + \
@@ -96,6 +97,7 @@
 					DISPC_FIR_COEF_V2_OFFSET(n, i))
 #define DISPC_OVL_PRELOAD(n)		(DISPC_OVL_BASE(n) + \
 					DISPC_PRELOAD_OFFSET(n))
+#define DISPC_OVL_MFLAG_THRESHOLD(n)	(0x0860 + 0x4*n)
 
 /* DISPC manager/channel specific registers */
 static inline u16 DISPC_DEFAULT_COLOR(enum omap_channel channel)
