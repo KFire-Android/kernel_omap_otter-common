@@ -635,10 +635,6 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 		return;
 	}
 
-	if ((di->features & TWL6032_SUBCLASS) &&
-			di->platform_data->use_eeprom_config)
-		goto enable;
-
 	dev_dbg(di->dev, "USB input current limit %dmA\n",
 					di->charger_incurrentmA);
 	if (di->charger_incurrentmA < 50) {
@@ -655,7 +651,6 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 	twl6030_config_voreg_reg(di, di->platform_data->max_bat_voltagemV);
 	twl6030_config_iterm_reg(di, di->platform_data->termination_currentmA);
 
-enable:
 	if (di->charger_incurrentmA >= 50) {
 		reg = CONTROLLER_CTRL1_EN_CHARGER;
 
@@ -2273,7 +2268,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->features = pdata->features;
 	di->errata = pdata->errata;
 
-	if (pdata->use_eeprom_config &&
+	if (pdata->use_hw_charger &&
 			di->features & TWL6032_SUBCLASS) {
 		di->platform_data->max_charger_currentmA =
 				twl6030_get_limit2_reg(di);
@@ -2411,7 +2406,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 		dev_dbg(&pdev->dev, "current measurement setup failed\n");
 
 	/* initialize for USB charging */
-	if (!pdata->use_eeprom_config) {
+	if (!pdata->use_hw_charger) {
 		twl6030_config_limit1_reg(di, pdata->max_charger_voltagemV);
 		twl6030_config_limit2_reg(di,
 				di->platform_data->max_charger_currentmA);
