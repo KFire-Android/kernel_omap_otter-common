@@ -2342,9 +2342,6 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	twl6030_set_watchdog(di, 32);
 
-	dev_info(&pdev->dev, "Battery Voltage at Bootup is %d mV\n",
-							di->voltage_mV);
-
 	INIT_WORK(&di->usb_work, twl6030_usb_charger_work);
 	di->nb.notifier_call = twl6030_usb_notifier_call;
 	di->otg = otg_get_transceiver();
@@ -2365,6 +2362,8 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	}
 
 	di->voltage_mV = twl6030_get_gpadc_conversion(di, di->gpadc_vbat_chnl);
+	dev_info(&pdev->dev, "Battery Voltage at Bootup is %d mV\n",
+							di->voltage_mV);
 
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
 	if (ret)
