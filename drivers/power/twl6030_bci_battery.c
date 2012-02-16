@@ -2242,7 +2242,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->bk_bat.get_property = twl6030_bk_bci_battery_get_property;
 
 	di->vac_priority = 2;
-	di->capacity = 100;
+	di->capacity = -1;
 	di->capacity_debounce_count = 0;
 	di->ac_next_refresh = jiffies - 1;
 	platform_set_drvdata(pdev, di);
