@@ -656,9 +656,8 @@ static int ehci_omap_bus_resume(struct usb_hcd *hcd)
 			OCP_INITIATOR_AGENT,
 			(200*1000*4));
 
-	if (dev->parent) {
+	if (dev->parent && pm_runtime_suspended(dev->parent))
 		pm_runtime_get_sync(dev->parent);
-	}
 
 	return ehci_bus_resume(hcd);
 }

@@ -824,8 +824,8 @@ static void usbhs_resume_work(struct work_struct *work)
 		omap_hwmod_disable_ioring_wakeup(usbhs_wake->oh_ohci);
 	}
 
-	pm_runtime_get_sync(usbhs_wake->dev);
-	pm_runtime_put_sync(usbhs_wake->dev);
+	if (pm_runtime_suspended(usbhs_wake->dev))
+		pm_runtime_get_sync(usbhs_wake->dev);
 }
 
 void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
