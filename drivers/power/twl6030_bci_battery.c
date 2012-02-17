@@ -1053,6 +1053,223 @@ err:
 	return IRQ_HANDLED;
 }
 
+/*
+ * In HW charger mode on 6032 irq routines must only deal with updating
+ * state of charger. The hardware deals with start/stop conditions
+ * automatically.
+ */
+static irqreturn_t twl6032charger_ctrl_interrupt_hw(int irq, void *_di)
+{
+	struct twl6030_bci_device_info *di = _di;
+	u8 stat1 = 0, linear = 0;
+	int charger_stop = 0, end_of_charge = 0;
+	int ret;
+
+	/* read charger controller_stat1 */
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &stat1,
+			CONTROLLER_STAT1);
+	if (ret)
+		goto out;
+
+	ret = twl_i2c_read_u8(TWL6032_MODULE_CHARGER, &linear,
+			LINEAR_CHRG_STS);
+	if (ret < 0)
+		goto out;
+
+	if (!(stat1 & (VBUS_DET | VAC_DET))) {
+		charger_stop = 1;
+		di->ac_online = di->usb_online = 0;
+	}
+
+	if (!(di->usb_online || di->ac_online)) {
+		if (stat1 & VBUS_DET) {
+			di->usb_online = 1;
+			di->bat_health = POWER_SUPPLY_HEALTH_GOOD;
+		} else if (stat1 & VAC_DET) {
+			di->ac_online = 1;
+			di->bat_health = POWER_SUPPLY_HEALTH_GOOD;
+		}
+	}
+
+	if (stat1 & CONTROLLER_STAT1_FAULT_WDG) {
+		charger_stop = 1;
+		di->bat_health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+		dev_dbg(di->dev, "Charger error : Fault watchdog\n");
+	}
+	if (stat1 & CONTROLLER_STAT1_BAT_REMOVED) {
+		charger_stop = 1;
+		di->bat_health = POWER_SUPPLY_HEALTH_DEAD;
+		dev_dbg(di->dev, "Battery removed\n");
+	}
+	if (stat1 & CONTROLLER_STAT1_BAT_TEMP_OVRANGE) {
+		charger_stop = 1;
+		dev_dbg(di->dev,
+			"Charger error : Battery temperature overrange\n");
+		di->bat_health = POWER_SUPPLY_HEALTH_OVERHEAT;
+	}
+
+	if ((stat1 & CONTROLLER_STAT1_LINCH_GATED) &&
+			di->use_power_path) {
+
+		charger_stop = 1;
+
+		if (linear & LINEAR_CHRG_STS_CRYSTL_OSC_OK) {
+			di->bat_health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+			dev_dbg(di->dev, "Charger error: CRYSTAL OSC OK\n");
+		}
+
+		if (linear & LINEAR_CHRG_STS_END_OF_CHARGE) {
+			end_of_charge = 1;
+			di->bat_health = POWER_SUPPLY_HEALTH_GOOD;
+			dev_dbg(di->dev, "Charger: Full charge\n");
+		}
+
+		if (linear & LINEAR_CHRG_STS_VBATOV) {
+			di->bat_health = POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+			dev_dbg(di->dev,
+				"Charger error : Linear Status: VBATOV\n");
+		}
+
+		if (linear & LINEAR_CHRG_STS_VSYSOV) {
+			di->bat_health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+			dev_dbg(di->dev,
+				"Charger error : Linear Status: VSYSOV\n");
+		}
+	}
+
+	if (charger_stop) {
+		if (!(stat1 & (VBUS_DET | VAC_DET))) {
+			di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+		} else {
+			if (end_of_charge)
+				di->charge_status =
+					POWER_SUPPLY_STATUS_FULL;
+			else
+				di->charge_status =
+					POWER_SUPPLY_STATUS_NOT_CHARGING;
+		}
+	}
+
+	power_supply_changed(&di->bat);
+
+out:
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t twl6032charger_fault_interrupt_hw(int irq, void *_di)
+{
+	struct twl6030_bci_device_info *di = _di;
+	int charger_stop = 0, charger_start = 0;
+	int ret;
+	u8 sts = 0, sts_int1 = 0, sts_int2 = 0, stat1 = 0;
+
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &sts,
+						CHARGERUSB_INT_STATUS);
+	if (ret)
+		goto out;
+
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &sts_int1,
+						CHARGERUSB_STATUS_INT1);
+	if (ret)
+		goto out;
+
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &sts_int2,
+						CHARGERUSB_STATUS_INT2);
+	if (ret)
+		goto out;
+
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &stat1,
+						CONTROLLER_STAT1);
+	if (ret)
+		goto out;
+
+	if (sts & EN_LINCH) {
+		charger_start = 1;
+		dev_dbg(di->dev, "Charger: EN_LINCH\n");
+		goto out;
+	}
+
+	if ((sts & CURRENT_TERM_INT) && !di->use_power_path) {
+		dev_dbg(di->dev, "Charger: CURRENT_TERM_INT\n");
+
+		if (sts_int2 & CURRENT_TERM) {
+			charger_stop = 1;
+			dev_dbg(di->dev, "Charger error: CURRENT_TERM\n");
+		}
+	}
+
+	if (sts & CHARGERUSB_STAT) {
+		dev_dbg(di->dev, "Charger: CHARGEUSB_STAT\n");
+
+		if (sts_int2 & ANTICOLLAPSE)
+			dev_dbg(di->dev, "Charger info: ANTICOLLAPSE\n");
+	}
+
+	if (sts & CHARGERUSB_THMREG) {
+		dev_dbg(di->dev, "Charger: CHARGERUSB_THMREG\n");
+
+		if (sts_int1 & CHARGERUSB_STATUS_INT1_TMREG)
+			dev_dbg(di->dev, "Charger error: TMREG\n");
+	}
+
+	if (sts & CHARGERUSB_FAULT) {
+		dev_dbg(di->dev, "Charger: CHARGERUSB_FAULT\n");
+
+		charger_stop = 1;
+
+		if (!di->use_power_path) {
+			if (sts_int1 & CHARGERUSB_STATUS_INT1_NO_BAT) {
+				di->bat_health = POWER_SUPPLY_HEALTH_DEAD;
+				dev_dbg(di->dev,
+					"Charger error : NO_BAT\n");
+			}
+			if (sts_int1 & CHARGERUSB_STATUS_INT1_BAT_OVP) {
+				di->bat_health =
+					POWER_SUPPLY_HEALTH_OVERVOLTAGE;
+				dev_dbg(di->dev, "Charger error : BAT_OVP\n");
+			}
+		}
+
+		if (sts_int1 & CHARGERUSB_STATUS_INT1_BST_OCP) {
+			di->bat_health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+			dev_dbg(di->dev, "Charger error : BST_OCP\n");
+		}
+		if (sts_int1 & CHARGERUSB_STATUS_INT1_TH_SHUTD) {
+			di->bat_health = POWER_SUPPLY_HEALTH_OVERHEAT;
+			dev_dbg(di->dev, "Charger error : TH_SHUTD\n");
+		}
+		if (sts_int1 & CHARGERUSB_STATUS_INT1_POOR_SRC) {
+			di->bat_health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+			dev_dbg(di->dev, "Charger error : POOR_SRC\n");
+		}
+		if (sts_int1 & CHARGERUSB_STATUS_INT1_SLP_MODE) {
+			di->bat_health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+			dev_dbg(di->dev, "Charger error: SLP_MODE\n");
+		}
+		if (sts_int1 & CHARGERUSB_STATUS_INT1_VBUS_OVP) {
+			di->bat_health = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+			dev_dbg(di->dev, "Charger error : VBUS_OVP\n");
+		}
+	}
+
+	if (charger_stop) {
+		if (!(stat1 & (VBUS_DET | VAC_DET)))
+			di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+		else
+			di->charge_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+	}
+
+out:
+	if (charger_start) {
+		di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
+		di->bat_health = POWER_SUPPLY_HEALTH_GOOD;
+	}
+
+	power_supply_changed(&di->bat);
+
+	return IRQ_HANDLED;
+}
+
 static void twl6030battery_current(struct twl6030_bci_device_info *di)
 {
 	int ret = 0;
@@ -2398,20 +2615,33 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	if (ret)
 		goto temp_setup_fail;
 
-	/* request charger fault interruption */
+	/* request charger fault interruption choosing between sw/hw mode */
 	irq = platform_get_irq(pdev, 1);
-	ret = request_threaded_irq(irq, NULL, twl6030charger_fault_interrupt,
-		0, "twl_bci_fault", di);
+	if (!di->use_hw_charger)
+		ret = request_threaded_irq(irq, NULL,
+				twl6030charger_fault_interrupt,
+				0, "twl_bci_fault", di);
+	else
+		ret = request_threaded_irq(irq, NULL,
+				twl6032charger_fault_interrupt_hw,
+				0, "twl_bci_fault", di);
+
 	if (ret) {
 		dev_dbg(&pdev->dev, "could not request irq %d, status %d\n",
 			irq, ret);
 		goto temp_setup_fail;
 	}
 
-	/* request charger ctrl interruption */
+	/* request charger ctrl interruption choosing between sw/hw mode */
 	irq = platform_get_irq(pdev, 0);
-	ret = request_threaded_irq(irq, NULL, twl6030charger_ctrl_interrupt,
-		0, "twl_bci_ctrl", di);
+	if (!di->use_hw_charger)
+		ret = request_threaded_irq(irq, NULL,
+				twl6030charger_ctrl_interrupt,
+				0, "twl_bci_ctrl", di);
+	else
+		ret = request_threaded_irq(irq, NULL,
+				twl6032charger_ctrl_interrupt_hw,
+				0, "twl_bci_ctrl", di);
 
 	if (ret) {
 		dev_dbg(&pdev->dev, "could not request irq %d, status %d\n",
