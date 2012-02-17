@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2011 Texas Instruments, Inc.
  * Original Author: Sebastien JAN <s-jan@ti.com>
+ * Original Author: Djamil ELAIDI <d-elaidi@ti.com>
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -42,6 +43,95 @@
 #define OMAP_HSI_HWMOD_NAME			"hsi"
 #define OMAP_HSI_HWMOD_CLASSNAME		"hsi"
 
+#ifdef CONFIG_OMAP_MUX
+/* OMAP44xx MUX settings for HSI port 1 & 2 */
+static struct omap_device_pad omap44xx_hsi_ports_pads[] __initdata = {
+	{
+		.name = "hsi1_cawake",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN) &
+			  ~OMAP_WAKEUP_EN,
+		.idle   = OMAP_MUX_MODE1 | OMAP_PIN_INPUT_PULLDOWN |
+			  OMAP_WAKEUP_EN,
+		.off    = OMAP_MUX_MODE1 | OMAP_PIN_OFF_NONE |
+			  OMAP_WAKEUP_EN,
+	},
+	{
+		.name = "hsi2_cawake",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN) &
+			  ~OMAP_WAKEUP_EN,
+		.idle   = OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLDOWN |
+			  OMAP_WAKEUP_EN,
+		.off    = OMAP_MUX_MODE4 | OMAP_PIN_OFF_NONE |
+			  OMAP_WAKEUP_EN,
+	},
+};
+
+/* OMAP54xx MUX settings for HSI port 1 & 2 */
+static struct omap_device_pad omap54xx_hsi_ports_pads[] __initdata = {
+	{
+		.name = "hsi1_cawake",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN) &
+			  ~OMAP_WAKEUP_EN,
+		.idle   = OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN |
+			  OMAP_WAKEUP_EN,
+		.off    = OMAP_MUX_MODE0 | OMAP_PIN_OFF_NONE |
+			  OMAP_WAKEUP_EN,
+	},
+	{
+		.name = "hsi2_cawake",
+		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable = (OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN) &
+			  ~OMAP_WAKEUP_EN,
+		.idle   = OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLDOWN |
+			  OMAP_WAKEUP_EN,
+		.off    = OMAP_MUX_MODE0 | OMAP_PIN_OFF_NONE |
+			  OMAP_WAKEUP_EN,
+	},
+};
+
+static struct omap_hwmod_mux_info * __init
+omap_hsi_fill_default_pads(struct hsi_platform_data *pdata)
+{
+	struct omap_device_pad	*pads_to_mux;
+	struct omap_device_pad	*omap_pads;
+
+	if ((pdata->ctx->pctx[0].port_number > 2) ||
+	    ((pdata->num_ports == 2) &&
+	     (pdata->ctx->pctx[1].port_number > 2))) {
+		pr_err("%s: invalid port info\n", __func__);
+		return NULL;
+	}
+
+	if (cpu_is_omap44xx())
+		omap_pads = omap44xx_hsi_ports_pads;
+	else if (cpu_is_omap54xx())
+		omap_pads = omap54xx_hsi_ports_pads;
+	else
+		return NULL;
+
+	if (pdata->num_ports == 1) {
+		/* Mux only port corresponding to first index */
+		pads_to_mux = &omap_pads[pdata->ctx->pctx[0].port_number - 1];
+		pr_info("%s: Muxed hsi port %d\n", __func__,
+			pdata->ctx->pctx[0].port_number);
+	} else if (pdata->num_ports == 2) {
+		/* Mux all ports */
+		pads_to_mux = &omap_pads[0];
+		pr_info("%s: Muxed hsi ports 1 & 2\n", __func__);
+	}
+
+	return omap_hwmod_mux_init(pads_to_mux, pdata->num_ports);
+}
+#else
+static struct omap_hwmod_mux_info * __init
+omap_hsi_fill_default_pads(struct hsi_platform_data *pdata)
+{
+	return NULL;
+}
+#endif
 
 /*
  * NOTE: We abuse a little bit the struct port_ctx to use it also for
@@ -86,7 +176,6 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 
 };
 
-
 static u32 omap_hsi_configure_errata(void)
 {
 	u32 errata = 0;
@@ -98,145 +187,6 @@ static u32 omap_hsi_configure_errata(void)
 	}
 
 	return errata;
-}
-
-static struct platform_device *hsi_get_hsi_platform_device(void)
-{
-	struct device *dev;
-	struct platform_device *pdev;
-
-	/* HSI_TODO: handle platform device id (or port) (0/1) */
-	dev = bus_find_device_by_name(&platform_bus_type, NULL,
-					OMAP_HSI_PLATFORM_DEVICE_NAME);
-	if (!dev) {
-		pr_debug("Could not find platform device %s\n",
-		       OMAP_HSI_PLATFORM_DEVICE_NAME);
-		return 0;
-	}
-
-	if (!dev->driver) {
-		/* Could not find driver for platform device. */
-		return 0;
-	}
-
-	pdev = to_platform_device(dev);
-
-	return pdev;
-}
-
-static struct hsi_dev *hsi_get_hsi_controller_data(struct platform_device *pd)
-{
-	struct hsi_dev *hsi_ctrl;
-
-	if (!pd)
-		return 0;
-
-	hsi_ctrl = (struct hsi_dev *) platform_get_drvdata(pd);
-	if (!hsi_ctrl) {
-		pr_err("Could not find HSI controller data\n");
-		return 0;
-	}
-
-	return hsi_ctrl;
-}
-
-/**
-* omap_hsi_is_io_wakeup_from_hsi - Indicates an IO wakeup from HSI CAWAKE
-*
-* @hsi_port - returns port number which triggered wakeup. Range [1, 2].
-*	      Only valid if return value is 1 (HSI wakeup detected)
-*
-* Return value :* false if CAWAKE Padconf has not been found or no IOWAKEUP
-*		event occured for CAWAKE.
-*		* true if HSI wakeup detected on port *hsi_port
-*/
-bool omap_hsi_is_io_wakeup_from_hsi(int *hsi_port)
-{
-
-	/* Check for IO pad wakeup */
-	/* TODO: Te be updated using hmod mux FW when it will be availbable on OMAP5 */
-
-	*hsi_port = 0;
-
-	return false;
-}
-
-/**
-* omap_hsi_io_wakeup_check - Check if IO wakeup is from HSI and schedule HSI
-*			     processing tasklet
-*
-* Return value : * 0 if HSI tasklet scheduled.
-*		 * negative value else.
-*/
-int omap_hsi_io_wakeup_check(void)
-{
-	int hsi_port, ret = -1;
-
-	/* Modem HSI wakeup */
-	if (omap_hsi_is_io_wakeup_from_hsi(&hsi_port))
-		ret = omap_hsi_wakeup(hsi_port);
-
-	return ret;
-}
-
-/**
-* omap_hsi_wakeup - Prepare HSI for wakeup from suspend mode (RET/OFF)
-*
-* @hsi_port - reference to the HSI port which triggered wakeup.
-*	      Range [1, 2]
-*
-* Return value : * 0 if HSI tasklet scheduled.
-*		 * negative value else.
-*/
-int omap_hsi_wakeup(int hsi_port)
-{
-	static struct platform_device *pdev;
-	static struct hsi_dev *hsi_ctrl;
-	int i;
-
-	if (!pdev) {
-		pdev = hsi_get_hsi_platform_device();
-		if (!pdev)
-			return -ENODEV;
-	}
-
-	if (!device_may_wakeup(&pdev->dev)) {
-		dev_info(&pdev->dev, "Modem not allowed to wakeup platform\n");
-		return -EPERM;
-	}
-
-	if (!hsi_ctrl) {
-		hsi_ctrl = hsi_get_hsi_controller_data(pdev);
-		if (!hsi_ctrl)
-			return -ENODEV;
-	}
-
-	for (i = 0; i < omap_hsi_platform_data.num_ports; i++) {
-		if (omap_hsi_platform_data.ctx->pctx[i].port_number == hsi_port)
-			break;
-	}
-
-	if (i == omap_hsi_platform_data.num_ports)
-		return -ENODEV;
-
-
-	/* Check no other interrupt handler has already scheduled the tasklet */
-	if (test_and_set_bit(HSI_FLAGS_TASKLET_LOCK,
-			     &hsi_ctrl->hsi_port[i].flags))
-		return -EBUSY;
-
-	dev_dbg(hsi_ctrl->dev, "Modem wakeup detected from HSI CAWAKE Pad port"
-			       " %d\n", hsi_port);
-
-	/* CAWAKE falling or rising edge detected */
-	hsi_ctrl->hsi_port[i].cawake_off_event = true;
-	tasklet_hi_schedule(&hsi_ctrl->hsi_port[i].hsi_tasklet);
-
-	/* Disable interrupt until Bottom Half has cleared */
-	/* the IRQ status register */
-	disable_irq_nosync(hsi_ctrl->hsi_port[i].irq);
-
-	return 0;
 }
 
 /* HSI_TODO : This requires some fine tuning & completion of
@@ -264,6 +214,8 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 
 	omap_hsi_platform_data.errata = omap_hsi_configure_errata();
 
+	oh->mux = omap_hsi_fill_default_pads(pdata);
+
 	od = omap_device_build(OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, 0, oh,
 			       pdata, sizeof(*pdata), omap_hsi_latency,
 			       ARRAY_SIZE(omap_hsi_latency), false);
@@ -280,5 +232,5 @@ int __init omap_hsi_dev_init(void)
 	return omap_hwmod_for_each_by_class(OMAP_HSI_HWMOD_CLASSNAME,
 					    omap_hsi_register, NULL);
 }
-postcore_initcall(omap_hsi_dev_init);
+arch_initcall(omap_hsi_dev_init);
 
