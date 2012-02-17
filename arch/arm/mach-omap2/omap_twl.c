@@ -82,16 +82,6 @@
 #define TWL6030_REG_VCORE3_CFG_GRP			0x5e
 #define TWL6030_REG_VCORE3_CFG_TRANS			0x5f
 #define TWL6030_BIT_APE_GRP				BIT(0)
-/*
- * Setup CFG_TRANS mode as follows:
- * 0x00 (OFF) when in OFF state(bit offset 4) and in sleep (bit offset 2)
- * 0x01 (PWM/PFM Auto) when in ACTive state (bit offset 0)
- * Dont trust Bootloader or reset values to set them up for kernel.
- */
-#define TWL6030_REG_VCOREx_CFG_TRANS_MODE		(0x00 << 4 | \
-							 0x00 << 2 | \
-							 0x01 << 0)
-#define TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC "OFF=OFF SLEEP=OFF ACT=AUTO"
 
 static bool is_offset_valid;
 static u8 smps_offset;

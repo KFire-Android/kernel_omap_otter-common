@@ -1754,6 +1754,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	unsigned long timeout;
 	u32 con;
 	int do_send_init_stream = 0;
+
 	mmc_claim_host(host->mmc);
 
 	if (ios->power_mode != host->power_mode) {
