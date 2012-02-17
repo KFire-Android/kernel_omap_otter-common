@@ -244,6 +244,21 @@ static struct snd_soc_ops sdp4430_mcbsp_ops = {
 	.hw_params = sdp4430_mcbsp_hw_params,
 };
 
+static int sdp4430_dmic_startup(struct snd_pcm_substream *substream)
+{
+	struct twl6040 *twl6040 = twl6040_codec->control_data;
+	/* In order for the DMIC's to use the PAD CLOCKS, the twl6040
+	 * must be powered up, since it supplies the clock source.
+	 */
+	return twl6040_enable(twl6040);
+}
+
+static void sdp4430_dmic_shutdown(struct snd_pcm_substream *substream)
+{
+	struct twl6040 *twl6040 = twl6040_codec->control_data;
+	twl6040_disable(twl6040);
+}
+
 static int sdp4430_dmic_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
@@ -266,6 +281,8 @@ static int sdp4430_dmic_hw_params(struct snd_pcm_substream *substream,
 }
 
 static struct snd_soc_ops sdp4430_dmic_ops = {
+	.startup = sdp4430_dmic_startup,
+	.shutdown = sdp4430_dmic_shutdown,
 	.hw_params = sdp4430_dmic_hw_params,
 };
 
@@ -432,21 +449,6 @@ static int sdp4430_set_pdm_dl1_gains(struct snd_soc_dapm_context *dapm)
 	}
 
 	return omap_abe_set_dl1_output(output);
-}
-
-static int sdp4430_dmic_twl6040_pre(struct snd_pcm_substream *substream)
-{
-	struct twl6040 *twl6040 = twl6040_codec->control_data;
-	/* In order for the DMIC's to use the PAD CLOCKS, the twl6040
-	 * must be powered up, since it supplies the clock source.
-	 */
-	return twl6040_enable(twl6040);
-}
-
-static void sdp4430_dmic_twl6040_post(struct snd_pcm_substream *substream)
-{
-	struct twl6040 *twl6040 = twl6040_codec->control_data;
-	twl6040_disable(twl6040);
 }
 
 static int sdp4430_twl6040_init(struct snd_soc_pcm_runtime *rtd)
