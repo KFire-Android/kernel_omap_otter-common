@@ -252,7 +252,7 @@ static inline unsigned int twl6030_get_usb_max_power(struct otg_transceiver *x)
 #endif
 
 /* Ptr to thermistor table */
-static const unsigned int fuelgauge_rate[4] = {4, 16, 64, 256};
+static const unsigned int fuelgauge_rate[4] = {1, 4, 16, 64};
 static struct wake_lock chrg_lock;
 
 
@@ -319,6 +319,9 @@ struct twl6030_bci_device_info {
 
 	int			use_hw_charger;
 	int			use_power_path;
+
+	/* max scale current based on sense resitor */
+	int			current_max_scale;
 };
 
 static BLOCKING_NOTIFIER_HEAD(notifier_list);
@@ -1071,7 +1074,7 @@ static void twl6030battery_current(struct twl6030_bci_device_info *di)
 	/* current drawn per sec */
 	current_now = current_now * fuelgauge_rate[di->fuelgauge_mode];
 	/* current in mAmperes */
-	current_now = (current_now * 3000) >> 14;
+	current_now = (current_now * di->current_max_scale) >> 13;
 	/* current in uAmperes */
 	current_now = current_now * 1000;
 	di->current_uA = current_now;
@@ -1252,12 +1255,26 @@ static void twl6030_current_avg(struct work_struct *work)
 	if (di->timer_n1 < di->timer_n2)
 		samples = samples + (1 << 24);
 
+	/* offset is accumulative over number of samples */
 	cc_offset = cc_offset * samples;
+
 	current_avg_uA = ((di->charge_n1 - di->charge_n2 - cc_offset)
-							* 3000) >> 12;
-	if (samples)
+					* di->current_max_scale) /
+					fuelgauge_rate[di->fuelgauge_mode];
+	/* clock is a fixed 32Khz */
+	current_avg_uA >>= 15;
+
+	/* Correct for the fuelguage sampling rate */
+	samples /= fuelgauge_rate[di->fuelgauge_mode] * 4;
+
+	/*
+	 * Only update the current average if we have had a valid number
+	 * of samples in the accumulation.
+	 */
+	if (samples) {
 		current_avg_uA = current_avg_uA / samples;
-	di->current_avg_uA = current_avg_uA * 1000;
+		di->current_avg_uA = current_avg_uA * 1000;
+	}
 
 	schedule_delayed_work(&di->twl6030_current_avg_work,
 		msecs_to_jiffies(1000 * di->current_avg_interval));
@@ -2343,6 +2360,17 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->capacity_debounce_count = 0;
 	di->ac_next_refresh = jiffies - 1;
 	platform_set_drvdata(pdev, di);
+
+	/* calculate current max scale from sense */
+	if (pdata->sense_resistor_mohm) {
+		di->current_max_scale = (62000) / pdata->sense_resistor_mohm;
+	} else {
+		/* Set sensible defaults if platform data is missing */
+		if (di->features & TWL6032_SUBCLASS)
+			di->current_max_scale = 3100;
+		else
+			di->current_max_scale = 6200;
+	}
 
 	wake_lock_init(&chrg_lock, WAKE_LOCK_SUSPEND, "ac_chrg_wake_lock");
 
