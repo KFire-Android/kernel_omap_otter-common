@@ -180,13 +180,71 @@ static void omap_dsi_disable_pads(int dsi_id, unsigned lane_mask)
 		omap4_dsi_mux_pads(dsi_id, 0);
 }
 
+static struct platform_device *create_dss_pdev(const char *pdev_name,
+		int pdev_id, const char *oh_name, void *pdata, int pdata_len,
+		struct platform_device *parent)
+{
+	struct platform_device *pdev;
+	struct omap_device *od;
+	struct omap_hwmod *ohs[1];
+	struct omap_hwmod *oh;
+	int r;
+
+	oh = omap_hwmod_lookup(oh_name);
+	if (!oh) {
+		pr_err("Could not look up %s\n", oh_name);
+		r = -ENODEV;
+		goto err;
+	}
+
+	pdev = platform_device_alloc(pdev_name, pdev_id);
+	if (!pdev) {
+		pr_err("Could not create pdev for %s\n", pdev_name);
+		r = -ENOMEM;
+		goto err;
+	}
+
+	if (parent != NULL)
+		pdev->dev.parent = &parent->dev;
+
+	if (pdev->id != -1)
+		dev_set_name(&pdev->dev, "%s.%d", pdev->name, pdev->id);
+	else
+		dev_set_name(&pdev->dev, "%s", pdev->name);
+
+	ohs[0] = oh;
+	od = omap_device_alloc(pdev, ohs, 1, NULL, 0);
+	if (!od) {
+		pr_err("Could not alloc omap_device for %s\n", pdev_name);
+		r = -ENOMEM;
+		goto err;
+	}
+
+	r = platform_device_add_data(pdev, pdata, pdata_len);
+	if (r) {
+		pr_err("Could not set pdata for %s\n", pdev_name);
+		goto err;
+	}
+
+	r = omap_device_register(pdev);
+	if (r) {
+		pr_err("Could not register omap_device for %s\n", pdev_name);
+		goto err;
+	}
+
+	return pdev;
+
+err:
+	return ERR_PTR(r);
+}
+
 int __init omap_display_init(struct omap_dss_board_info *board_data)
 {
 	int r = 0;
-	struct omap_hwmod *oh;
 	struct platform_device *pdev;
 	int i, oh_count;
 	const struct omap_dss_hwmod_data *curr_dss_hwmod;
+	struct platform_device *dss_pdev;
 
 	/* create omapdss device */
 
@@ -215,22 +273,24 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 		oh_count = ARRAY_SIZE(omap4_dss_hwmod_data);
 	}
 
+	dss_pdev = NULL;
+
 	for (i = 0; i < oh_count; i++) {
-		oh = omap_hwmod_lookup(curr_dss_hwmod[i].oh_name);
-		if (!oh) {
-			pr_err("Could not look up %s\n",
-				curr_dss_hwmod[i].oh_name);
-			return -ENODEV;
+		pdev = create_dss_pdev(curr_dss_hwmod[i].dev_name,
+				curr_dss_hwmod[i].id,
+				curr_dss_hwmod[i].oh_name,
+				NULL, 0,
+				dss_pdev);
+
+		if (IS_ERR(pdev)) {
+			pr_err("Could not build omap_device for %s\n",
+					curr_dss_hwmod[i].oh_name);
+
+			return PTR_ERR(pdev);
 		}
 
-		pdev = omap_device_build(curr_dss_hwmod[i].dev_name,
-				curr_dss_hwmod[i].id, oh,
-				NULL, 0,
-				NULL, 0, 0);
-
-		if (WARN((IS_ERR(pdev)), "Could not build omap_device for %s\n",
-				curr_dss_hwmod[i].oh_name))
-			return -ENODEV;
+		if (i == 0)
+			dss_pdev = pdev;
 	}
 
 	return 0;
