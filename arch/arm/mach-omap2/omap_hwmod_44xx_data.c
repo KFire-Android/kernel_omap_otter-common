@@ -2939,6 +2939,7 @@ static struct omap_hwmod_ocp_if *omap44xx_sl2if_slaves[] = {
 static struct omap_hwmod omap44xx_sl2if_hwmod = {
 	.name		= "sl2if",
 	.class		= &omap44xx_sl2if_hwmod_class,
+	.clkdm_name	= "ivahd_clkdm",
 	.main_clk	= "sl2if_ick",
 	.prcm = {
 		.omap4 = {
