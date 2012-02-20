@@ -386,6 +386,8 @@ int snd_soc_dapm_weak_routes(struct snd_soc_dapm_context *dapm,
 /* dapm events */
 void snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
 	int event);
+void snd_soc_dapm_dai_stream_event(struct snd_soc_dai *dai, int stream,
+	int event);
 void snd_soc_dapm_shutdown(struct snd_soc_card *card);
 
 /* external DAPM widget events */
@@ -530,6 +532,7 @@ struct snd_soc_dapm_widget {
 	unsigned char ignore_suspend:1;         /* kept enabled over suspend */
 	unsigned char new_power:1;		/* power from this run */
 	unsigned char power_checked:1;		/* power checked this run */
+	unsigned char dai_endpoint:1;	/* DAI end point for current stream event */
 	int subseq;				/* sort within widget type */
 
 	int (*power_check)(struct snd_soc_dapm_widget *w);
