@@ -3181,6 +3181,54 @@ void snd_soc_dapm_stream_event_locked(struct snd_soc_pcm_runtime *rtd, int strea
 }
 
 /**
+ * snd_soc_dapm_dai_stream_event - send a stream event to the dapm core
+ * @DAI: Digital Audio interface
+ * @stream: stream name
+ * @event: stream event
+ *
+ * Sends a stream event to the dapm core. The core then makes any
+ * necessary widget power changes.
+ *
+ * !!! TODO: Investigate RTD for 6040 mute
+ *
+ * Returns 0 for success else error.
+ */
+void snd_soc_dapm_dai_stream_event(struct snd_soc_dai *dai, int stream,
+	int event)
+{
+	struct snd_soc_dapm_widget *w;
+
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+		w = dai->playback_widget;
+	else
+		w = dai->capture_widget;
+
+	if (!w)
+		return;
+
+	dapm_mark_dirty(w, "stream event");
+	w->dai_endpoint = 1;
+
+	switch (event) {
+	case SND_SOC_DAPM_STREAM_START:
+		w->active = 1;
+		break;
+	case SND_SOC_DAPM_STREAM_STOP:
+		w->active = 0;
+		break;
+	case SND_SOC_DAPM_STREAM_SUSPEND:
+	case SND_SOC_DAPM_STREAM_RESUME:
+	case SND_SOC_DAPM_STREAM_PAUSE_PUSH:
+	case SND_SOC_DAPM_STREAM_PAUSE_RELEASE:
+		break;
+	}
+
+	dapm_power_widgets(&dai->card->dapm, event);
+	w->dai_endpoint = 0;
+}
+EXPORT_SYMBOL_GPL(snd_soc_dapm_dai_stream_event);
+
+/**
  * snd_soc_dapm_enable_pin - enable pin.
  * @dapm: DAPM context
  * @pin: pin name
