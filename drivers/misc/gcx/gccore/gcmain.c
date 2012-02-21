@@ -85,6 +85,11 @@ static enum gcerror gc_detach(struct gccontext **gccontext);
 static enum gcerror gc_lock(struct gccontext *gccontext);
 static enum gcerror gc_unlock(struct gccontext *gccontext);
 
+static int clk_enabled;
+static struct clk *g_bb2d_clk;
+static unsigned long g_bb2d_clk_rate;
+static void *g_reg_base;
+
 static enum gcerror find_context(struct gccontextmap **context, int create)
 {
 	enum gcerror gcerror;
@@ -104,6 +109,22 @@ static enum gcerror find_context(struct gccontextmap **context, int create)
 		goto exit;
 	}
 	maplocked = 1;
+
+	if (!clk_enabled) {
+		/* Locate the clock entry. */
+		g_bb2d_clk = clk_get(NULL, "bb2d_fck");
+		if (IS_ERR(g_bb2d_clk)) {
+			GC_PRINT(GC_ERR_MSG " cannot find bb2d_fck.\n",
+				 __func__, __LINE__);
+			goto exit;
+		}
+
+		g_bb2d_clk_rate = clk_get_rate(g_bb2d_clk);
+		GC_PRINT(GC_INFO_MSG " BB2D clock is %ldMHz\n",
+			__func__, __LINE__, (g_bb2d_clk_rate / 1000000));
+
+		clk_enabled = 1;
+	}
 
 	/* Get current PID. */
 	pid = 0;
@@ -125,7 +146,6 @@ static enum gcerror find_context(struct gccontextmap **context, int create)
 				curr->next = g_map;
 				g_map = curr;
 			}
-
 			/* Success. */
 			GC_PRINT(GC_INFO_MSG " record is found @ 0x%08X\n",
 				__func__, __LINE__, (unsigned int) curr);
@@ -257,8 +277,6 @@ static void delete_context_map(void)
 /*******************************************************************************
 ** Register access.
 */
-
-static void *g_reg_base;
 
 unsigned int gc_read_reg(unsigned int address)
 {
@@ -604,8 +622,6 @@ static struct gctransition g_gctransition[4][4] = {
 };
 
 enum gcpower g_gcpower;
-static struct clk *g_bb2d_clk;
-unsigned long g_bb2d_clk_rate;
 
 enum gcerror gc_set_power(enum gcpower gcpower)
 {
@@ -1157,18 +1173,6 @@ static int __init gc_init(void)
 
 	/* Set power mode. */
 	g_gcpower = GCPWR_UNKNOWN;
-
-	/* Locate the clock entry. */
-	g_bb2d_clk = clk_get(NULL, "bb2d_fck");
-	if (IS_ERR(g_bb2d_clk)) {
-		GC_PRINT(GC_ERR_MSG " cannot find bb2d_fck.\n",
-			 __func__, __LINE__);
-		goto fail;
-	}
-
-	g_bb2d_clk_rate = clk_get_rate(g_bb2d_clk);
-	GC_PRINT(GC_INFO_MSG " BB2D clock is %ldMHz\n",
-			__func__, __LINE__, (g_bb2d_clk_rate / 1000000));
 
 	/* Map GPU registers. */
 	g_reg_base = ioremap_nocache(DEVICE_REG_BASE, DEVICE_REG_SIZE);
