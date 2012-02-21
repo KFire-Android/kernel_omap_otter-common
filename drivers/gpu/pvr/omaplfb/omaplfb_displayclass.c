@@ -1710,6 +1710,8 @@ static OMAPLFB_ERROR OMAPLFBInitIonOmap(OMAPLFB_DEVINFO *psDevInfo,
 	psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
 	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
 	psPVRFBInfo->ulByteStride = PAGE_ALIGN(psPVRFBInfo->ulWidth * psPVRFBInfo->uiBytesPerPixel);
+	psPVRFBInfo->ulBufferSize = psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
+	psPVRFBInfo->ulRoundedBufferSize = psPVRFBInfo->ulBufferSize;
 	w = psPVRFBInfo->ulByteStride >> PAGE_SHIFT;
 
 	/* this is an "effective" FB size to get correct number of buffers */
@@ -1847,10 +1849,9 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 	psPVRFBInfo->ulFBSize = FBSize;
 	psPVRFBInfo->bIs2D = OMAPLFB_FALSE;
 	psPVRFBInfo->psPageList = IMG_NULL;
-#endif
 	psPVRFBInfo->ulBufferSize = psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
-	
 	psPVRFBInfo->ulRoundedBufferSize = RoundUpToMultiple(psPVRFBInfo->ulBufferSize, ulLCM);
+#endif
 
 	if(psLINFBInfo->var.bits_per_pixel == 16)
 	{
@@ -1991,7 +1992,11 @@ static OMAPLFB_DEVINFO *OMAPLFBInitDev(unsigned uiFBDevID)
 		goto ErrorFreeDevInfo;
 	}
 
+#if defined(CONFIG_ION_OMAP)
+	psDevInfo->sDisplayInfo.ui32MaxSwapChainBuffers = OMAPLFB_NUM_SGX_FBS;
+#else
 	psDevInfo->sDisplayInfo.ui32MaxSwapChainBuffers = (IMG_UINT32)(psDevInfo->sFBInfo.ulFBSize / psDevInfo->sFBInfo.ulRoundedBufferSize);
+#endif
 	if (psDevInfo->sDisplayInfo.ui32MaxSwapChainBuffers != 0)
 	{
 		psDevInfo->sDisplayInfo.ui32MaxSwapChains = 1;
