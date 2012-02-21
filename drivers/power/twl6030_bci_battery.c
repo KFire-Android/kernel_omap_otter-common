@@ -2376,11 +2376,9 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	INIT_DELAYED_WORK_DEFERRABLE(&di->twl6030_bci_monitor_work,
 				twl6030_bci_battery_work);
-	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
 
 	INIT_DELAYED_WORK_DEFERRABLE(&di->twl6030_current_avg_work,
 						twl6030_current_avg);
-	schedule_delayed_work(&di->twl6030_current_avg_work, 500);
 
 	ret = twl6030battery_voltage_setup(di);
 	if (ret)
@@ -2506,6 +2504,10 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	ret = sysfs_create_group(&pdev->dev.kobj, &twl6030_bci_attr_group);
 	if (ret)
 		dev_dbg(&pdev->dev, "could not create sysfs files\n");
+
+	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
+
+	schedule_delayed_work(&di->twl6030_current_avg_work, 0);
 
 	return 0;
 
