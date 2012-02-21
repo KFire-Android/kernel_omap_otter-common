@@ -3839,9 +3839,9 @@ static int dsi_cmd_proto_config(struct omap_dss_device *dssdev)
 	return 0;
 }
 
-static int dispc_to_dsi_clock(int val, int bytes_per_pixel, int lanes)
+static int dispc_to_dsi_clock(int val, int pixel_size, int lanes)
 {
-	return (val * bytes_per_pixel) / lanes;
+	return (val * pixel_size / 8) / lanes;
 }
 
 static int dsi_video_proto_config(struct omap_dss_device *dssdev)
@@ -3850,7 +3850,6 @@ static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 	struct omap_video_timings *timings = &dssdev->panel.timings;
 	int buswidth = 0;
 	u32 r;
-	int bytes_per_pixel;
 	int hbp, hfp, hsa, tl, line;
 	int lanes;
 
@@ -3872,15 +3871,12 @@ static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 	switch (dssdev->ctrl.pixel_size) {
 	case 16:
 		buswidth = 0;
-		bytes_per_pixel = 2;
 		break;
 	case 18:
 		buswidth = 1;
-		bytes_per_pixel = 3;
 		break;
 	case 24:
 		buswidth = 2;
-		bytes_per_pixel = 3;
 		break;
 	default:
 		BUG();
@@ -3916,15 +3912,16 @@ static int dsi_video_proto_config(struct omap_dss_device *dssdev)
 	lanes = dsi_get_num_data_lanes_dssdev(dssdev);
 
 	hbp = dispc_to_dsi_clock((timings->hsw - 1) + (timings->hbp - 1),
-				bytes_per_pixel, lanes);
-	hfp = dispc_to_dsi_clock(timings->hfp - 1, bytes_per_pixel, lanes);
+				dssdev->ctrl.pixel_size, lanes);
+	hfp = dispc_to_dsi_clock(timings->hfp - 1,
+		dssdev->ctrl.pixel_size, lanes);
 	hsa = 0;
 
 	line = timings->hbp + timings->hfp + timings->hsw + timings->x_res;
-	WARN((line * bytes_per_pixel) % lanes != 0, "TL should be an exact "
+	WARN((line * dssdev->ctrl.pixel_size / 8) % lanes != 0, "TL should be an exact "
 			"integer, try changing DISPC horizontal blanking parameters");
 
-	tl =  dispc_to_dsi_clock(line, bytes_per_pixel, lanes);
+	tl =  dispc_to_dsi_clock(line, dssdev->ctrl.pixel_size, lanes);
 
 	r = dsi_read_reg(dsidev, DSI_VM_TIMING1);
 	r = FLD_MOD(r, hbp, 11, 0);   /* HBP */
@@ -3989,7 +3986,7 @@ int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type)
 	dsi_write_reg(dsidev, DSI_VC_CTRL(0), r);
 	dsi_write_reg(dsidev, DSI_VC_CTRL(0) , 0x20800790);
 
-	word_count = dssdev->panel.timings.x_res * 3;
+	word_count = dssdev->panel.timings.x_res * dssdev->ctrl.pixel_size / 8;
 	header = FLD_VAL(0, 31, 24) | /* ECC */
 		FLD_VAL(word_count, 23, 8) | /* WORD_COUNT */
 		FLD_VAL(0, 7, 6) | /* VC_ID */
