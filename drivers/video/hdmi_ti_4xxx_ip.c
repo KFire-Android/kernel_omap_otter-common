@@ -407,7 +407,7 @@ int hdmi_ti_4xxx_pll_program(struct hdmi_ip_data *ip_data,
 	return 0;
 }
 
-int hdmi_ti_4xxx_phy_init(struct hdmi_ip_data *ip_data)
+int hdmi_ti_4xxx_phy_init(struct hdmi_ip_data *ip_data, int phy)
 {
 	u16 r = 0;
 
@@ -430,7 +430,15 @@ int hdmi_ti_4xxx_phy_init(struct hdmi_ip_data *ip_data)
 	 * Write to phy address 0 to configure the clock
 	 * use HFBITCLK write HDMI_TXPHY_TX_CONTROL_FREQOUT field
 	 */
-	REG_FLD_MOD(hdmi_phy_base(ip_data), HDMI_TXPHY_TX_CTRL, 0x1, 31, 30);
+	if (phy <= 50000)
+		REG_FLD_MOD(hdmi_phy_base(ip_data), HDMI_TXPHY_TX_CTRL, 0x0, 31,
+				30);
+	else if ((50000 < phy) && (phy <= 100000))
+		REG_FLD_MOD(hdmi_phy_base(ip_data), HDMI_TXPHY_TX_CTRL, 0x1, 31,
+				30);
+	else
+		REG_FLD_MOD(hdmi_phy_base(ip_data), HDMI_TXPHY_TX_CTRL, 0x2, 31,
+				30);
 
 	/* Write to phy address 1 to start HDMI line (TXVALID and TMDSCLKEN) */
 	hdmi_write_reg(hdmi_phy_base(ip_data),

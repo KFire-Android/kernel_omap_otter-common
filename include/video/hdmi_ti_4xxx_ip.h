@@ -386,8 +386,7 @@ enum hdmi_aksv_err {
 	HDMI_AKSV_VALID = 2
 };
 
-
-int hdmi_ti_4xxx_phy_init(struct hdmi_ip_data *ip_data);
+int hdmi_ti_4xxx_phy_init(struct hdmi_ip_data *ip_data, int phy);
 void hdmi_ti_4xxx_phy_off(struct hdmi_ip_data *ip_data,
 			enum hdmi_pwrchg_reasons reason);
 int read_ti_4xxx_edid(struct hdmi_ip_data *ip_data, u8 *pedid, u16 max_length);
