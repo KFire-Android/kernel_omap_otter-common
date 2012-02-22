@@ -1,5 +1,5 @@
 config GCCORE
 	tristate "Vivante Core Driver"
-	default n 
+	default y
 	help
            Vivante Core Driver.

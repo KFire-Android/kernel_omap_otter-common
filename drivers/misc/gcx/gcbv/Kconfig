@@ -1,6 +1,6 @@
 config GCBV
 	tristate "Vivante BLTsville library"
-	default n 
+	default y
 	depends on GCCORE
 	help
            Vivante BLTsville library.
