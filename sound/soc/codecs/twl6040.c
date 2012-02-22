@@ -1131,9 +1131,9 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 			TWL6040_REG_MICRCTL, 1, 0, NULL, 0),
 
 	/* ADCs */
-	SND_SOC_DAPM_ADC("ADC Left", "Left Front Capture",
+	SND_SOC_DAPM_ADC("ADC Left", NULL,
 			TWL6040_REG_MICLCTL, 2, 0),
-	SND_SOC_DAPM_ADC("ADC Right", "Right Front Capture",
+	SND_SOC_DAPM_ADC("ADC Right", NULL,
 			TWL6040_REG_MICRCTL, 2, 0),
 
 	/* Microphone bias */
@@ -1147,15 +1147,12 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 			    TWL6040_REG_DMICBCTL, 4, 0, NULL, 0),
 
 	/* DACs */
-	SND_SOC_DAPM_DAC("HSDAC Left", "Headset Playback", SND_SOC_NOPM, 0, 0),
-	SND_SOC_DAPM_DAC("HSDAC Right", "Headset Playback", SND_SOC_NOPM, 0, 0),
-	SND_SOC_DAPM_DAC("HFDAC Left", "Handsfree Playback",
-			 TWL6040_REG_HFLCTL, 0, 0),
-	SND_SOC_DAPM_DAC("HFDAC Right", "Handsfree Playback",
-			 TWL6040_REG_HFRCTL, 0, 0),
+	SND_SOC_DAPM_DAC("HSDAC Left", NULL, TWL6040_REG_HSLCTL, 0, 0),
+	SND_SOC_DAPM_DAC("HSDAC Right", NULL, TWL6040_REG_HSRCTL, 0, 0),
+	SND_SOC_DAPM_DAC("HFDAC Left", NULL, TWL6040_REG_HFLCTL, 0, 0),
+	SND_SOC_DAPM_DAC("HFDAC Right", NULL, TWL6040_REG_HFRCTL, 0, 0),
 	/* Virtual DAC for vibra path (DL4 channel) */
-	SND_SOC_DAPM_DAC("VIBRA DAC", "Vibra Playback",
-			SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_DAC("VIBRA DAC", NULL, SND_SOC_NOPM, 0, 0),
 
 	SND_SOC_DAPM_MUX("Handsfree Left Playback",
 			SND_SOC_NOPM, 0, 0, &hfl_mux_controls),
@@ -1236,6 +1233,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 	{"ADC Left", NULL, "MicAmpL"},
 	{"ADC Right", NULL, "MicAmpR"},
+	{"PDM Capture", NULL, "ADC Left"},
+	{"PDM Capture", NULL, "ADC Right"},
 
 	/* AFM path */
 	{"AFMAmpL", NULL, "AFML"},
@@ -1244,9 +1243,11 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"HSDAC Left", NULL, "HSDAC Power"},
 	{"HSDAC Right", NULL, "HSDAC Power"},
 
+	{"HSDAC Left", NULL, "Headset Playback"},
 	{"Headset Left Playback", "HS DAC", "HSDAC Left"},
 	{"Headset Left Playback", "Line-In amp", "AFMAmpL"},
 
+	{"HSDAC Right", NULL, "Headset Playback"},
 	{"Headset Right Playback", "HS DAC", "HSDAC Right"},
 	{"Headset Right Playback", "Line-In amp", "AFMAmpR"},
 
@@ -1261,9 +1262,11 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"Earphone Driver", NULL, "Earphone Playback"},
 	{"EP", NULL, "Earphone Driver"},
 
+	{"HFDAC Left", NULL, "Handsfree Playback"},
 	{"Handsfree Left Playback", "HF DAC", "HFDAC Left"},
 	{"Handsfree Left Playback", "Line-In amp", "AFMAmpL"},
 
+	{"HFDAC Right", NULL, "Handsfree Playback"},
 	{"Handsfree Right Playback", "HF DAC", "HFDAC Right"},
 	{"Handsfree Right Playback", "Line-In amp", "AFMAmpR"},
 
@@ -1283,6 +1286,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"AUXR", NULL, "AUXR Playback"},
 
 	/* Vibrator paths */
+	{"VIBRA DAC", NULL, "Vibra Playback"},
 	{"Vibra Left Playback", "Audio PDM", "VIBRA DAC"},
 	{"Vibra Right Playback", "Audio PDM", "VIBRA DAC"},
 
@@ -1443,14 +1447,14 @@ static struct snd_soc_dai_driver twl6040_dai[] = {
 {
 	.name = "twl6040-legacy",
 	.playback = {
-		.stream_name = "Playback",
+		.stream_name = "Legacy Playback",
 		.channels_min = 1,
 		.channels_max = 5,
 		.rates = TWL6040_RATES,
 		.formats = TWL6040_FORMATS,
 	},
 	.capture = {
-		.stream_name = "Capture",
+		.stream_name = "Legacy Capture",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = TWL6040_RATES,
@@ -1461,7 +1465,7 @@ static struct snd_soc_dai_driver twl6040_dai[] = {
 {
 	.name = "twl6040-ul",
 	.capture = {
-		.stream_name = "Capture",
+		.stream_name = "PDM Capture",
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = TWL6040_RATES,
