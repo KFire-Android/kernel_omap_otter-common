@@ -32,6 +32,12 @@ enum hdmi_pll_pwr {
 	HDMI_PLLPWRCMD_BOTHON_NOPHYCLK = 3
 };
 
+enum hdmi_pwrchg_reasons {
+	HDMI_PWRCHG_DEFAULT = 0,
+	HDMI_PWRCHG_MODE_CHANGE = (1L << 0),
+	HDMI_PWRCHG_RESYNC = (1L << 1),
+};
+
 enum hdmi_core_hdmi_dvi {
 	HDMI_DVI = 0,
 	HDMI_HDMI = 1
@@ -377,7 +383,8 @@ enum hdmi_aksv_err {
 };
 
 int hdmi_ti_4xxx_phy_init(struct hdmi_ip_data *ip_data);
-void hdmi_ti_4xxx_phy_off(struct hdmi_ip_data *ip_data, bool set_mode);
+void hdmi_ti_4xxx_phy_off(struct hdmi_ip_data *ip_data,
+			enum hdmi_pwrchg_reasons reason);
 int read_ti_4xxx_edid(struct hdmi_ip_data *ip_data, u8 *pedid, u16 max_length);
 void hdmi_ti_4xxx_wp_video_start(struct hdmi_ip_data *ip_data, bool start);
 int hdmi_ti_4xxx_pll_program(struct hdmi_ip_data *ip_data,
