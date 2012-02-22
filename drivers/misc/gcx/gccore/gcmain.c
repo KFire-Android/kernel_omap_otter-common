@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>
+#include <plat/cpu.h>
 
 #include <linux/gcx.h>
 #include <linux/gccore.h>
@@ -1164,6 +1165,10 @@ EXPORT_SYMBOL(gc_unmap);
 
 static int __init gc_init(void)
 {
+	/* check if hardware is available */
+	if (!cpu_is_omap447x())
+		return 0;
+
 	/* Initialize context mutexes. */
 	mutex_init(&g_contextlock);
 	mutex_init(&g_datalock);
