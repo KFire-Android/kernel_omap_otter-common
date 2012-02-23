@@ -67,6 +67,11 @@ struct qtouch_ts_data {
 	struct qtm_object		obj_tbl[QTM_OBP_MAX_OBJECT_NUM];
 	unsigned long			obj_map[_BITMAP_LEN];
 
+	uint8_t				xpos_rshift_lsb;
+	uint8_t				ypos_rshift_lsb;
+	uint8_t				xpos_lshift_msb;
+	uint8_t				ypos_lshift_msb;
+
 	uint32_t			last_keystate;
 	uint16_t			eeprom_checksum;
 	uint8_t			    checksum_cnt;
@@ -688,15 +693,12 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	if (finger >= ts->pdata->multi_touch_cfg.num_touch)
 		return 0;
 
-	/* x/y are 10bit values, with bottom 2 bits inside the xypos_lsb */
-	if (ts->pdata->abs_max_x > 1024)
-		x = (msg->ypos_msb << 4) | ((msg->xypos_lsb) & 0xf);
-	else
-		x = (msg->xpos_msb << 2) | ((msg->xypos_lsb >> 6) & 0x3);
-	if (ts->pdata->abs_max_y > 1024)
-		y = (msg->ypos_msb << 4) | ((msg->xypos_lsb) & 0xf);
-	else
-		y = (msg->xpos_msb << 2) | ((msg->xypos_lsb >> 6) & 0x3);
+	/* x/y are 10bit values(<1024), with bottom 2 bits inside the xypos_lsb */
+	/* x/y are 12bit values(>1023), with bottom 4 bits inside the xypos_lsb */
+	x = (msg->xpos_msb << ts->xpos_lshift_msb) |
+		((msg->xypos_lsb >> ts->xpos_rshift_lsb) & 0xf);
+	y = (msg->ypos_msb << ts->ypos_lshift_msb) |
+		((msg->xypos_lsb >> ts->ypos_rshift_lsb) & 0xf);
 
 	width = msg->touch_area;
 	pressure = msg->touch_amp;
@@ -991,6 +993,20 @@ static int qtouch_ts_probe(struct i2c_client *client,
 	ts->x_delta = ts->pdata->x_delta;
 	ts->y_delta = ts->pdata->y_delta;
 	ts->reset_type = 0x00;
+
+	ts->xpos_rshift_lsb = 6;
+	ts->xpos_lshift_msb = 2;
+	ts->ypos_rshift_lsb = 2;
+	ts->ypos_lshift_msb = 2;
+
+	if (ts->pdata->multi_touch_cfg.x_res > 1023) {
+		ts->xpos_rshift_lsb = 4;
+		ts->xpos_lshift_msb = 4;
+	}
+	if (ts->pdata->multi_touch_cfg.y_res > 1023) {
+		ts->ypos_rshift_lsb = 0;
+		ts->ypos_lshift_msb = 4;
+	}
 
 	if (!pdata->hw_reset)
 		ts->reset_type = 0x01;
