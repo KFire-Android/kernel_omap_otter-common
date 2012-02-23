@@ -550,6 +550,14 @@ static struct rpmsg_channel_info omap_ipuc1_hardcoded_chnls[] = {
 };
 #endif
 
+#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
+static struct rpmsg_channel_info omap_dsp_hardcoded_chnls[] = {
+	{ "rpmsg-resmgr", 100, RPMSG_ADDR_ANY },
+	{ "rpmsg-server-sample", 137, RPMSG_ADDR_ANY },
+	{ },
+};
+#endif
+
 static struct omap_rpmsg_vproc omap_rpmsg_vprocs[] = {
 #ifdef CONFIG_OMAP_REMOTE_PROC_IPU
 	/* ipu_c0's rpmsg backend */
@@ -571,6 +579,16 @@ static struct omap_rpmsg_vproc omap_rpmsg_vprocs[] = {
 		.base_vq_id	= 2,
 		.hardcoded_chnls = omap_ipuc1_hardcoded_chnls,
 		.slave_reset	= true,
+	},
+#endif
+#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
+	{
+		.vdev.id.device = VIRTIO_ID_RPMSG,
+		.vdev.config	= &omap_rpmsg_config_ops,
+		.mbox_name	= "mailbox-2",
+		.rproc_name	= "dsp",
+		.base_vq_id	= 4,
+		.hardcoded_chnls = omap_dsp_hardcoded_chnls,
 	},
 #endif
 };
