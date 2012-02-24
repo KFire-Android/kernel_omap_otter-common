@@ -138,6 +138,11 @@ static void omap_rpmsg_get(struct virtio_device *vdev, unsigned int request,
 		BUG_ON(len != sizeof(rpdev->hardcoded_chnls));
 		memcpy(buf, &rpdev->hardcoded_chnls, len);
 		break;
+	case VPROC_RPROC_REF:
+		/* user data is at stake so bugs here cannot be tolerated */
+		BUG_ON(len != sizeof(rpdev->rproc));
+		memcpy(buf, &rpdev->rproc, len);
+		break;
 	default:
 		dev_err(&vdev->dev, "invalid request: %d\n", request);
 	}
