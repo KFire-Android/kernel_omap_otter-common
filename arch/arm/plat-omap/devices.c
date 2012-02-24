@@ -274,7 +274,7 @@ phys_addr_t omap_dsp_get_mempool_size(void)
 EXPORT_SYMBOL(omap_dsp_get_mempool_size);
 #endif
 
-#if defined(CONFIG_OMAP_REMOTE_PROC)
+#if defined(CONFIG_OMAP_REMOTE_PROC_IPU)
 static phys_addr_t omap_ipu_phys_mempool_base;
 static u32 omap_ipu_phys_mempool_size;
 static phys_addr_t omap_ipu_phys_st_mempool_base;

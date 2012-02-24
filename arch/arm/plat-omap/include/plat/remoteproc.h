@@ -72,7 +72,7 @@ enum omap_rproc_mempool_type {
 	OMAP_RPROC_MEMPOOL_DYNAMIC
 };
 
-#if defined(CONFIG_OMAP_REMOTE_PROC)
+#if defined(CONFIG_OMAP_REMOTE_PROC_IPU)
 void omap_ipu_reserve_sdram_memblock(void);
 u32 omap_ipu_get_mempool_size(enum omap_rproc_mempool_type type);
 phys_addr_t omap_ipu_get_mempool_base(enum omap_rproc_mempool_type type);

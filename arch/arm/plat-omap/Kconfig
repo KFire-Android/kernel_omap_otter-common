@@ -262,7 +262,7 @@ config OMAP_TEMP_SENSOR
 # this carveout should probably become generic and not omap specific
 config OMAP_REMOTEPROC_MEMPOOL_SIZE
 	hex "Physical carveout memory pool size (Byte)"
-	depends on OMAP_REMOTE_PROC
+	depends on OMAP_REMOTE_PROC_IPU
 	default 0x700000
 	help
 	  Allocate specified size of memory at boot time so we can ioremap

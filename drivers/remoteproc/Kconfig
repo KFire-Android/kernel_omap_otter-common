@@ -34,6 +34,28 @@ config OMAP_REMOTE_PROC
 	  It's safe to say n here if you're not interested in multimedia
 	  offloading or just want a bare minium kernel.
 
+config OMAP_REMOTE_PROC_IPU
+	bool "OMAP remoteproc support for IPU"
+	depends on OMAP_REMOTE_PROC
+	default y
+	help
+	  Say Y here if you want to enable OMAP's IPU remote processor.
+
+	  This option controls only the dual M3 processor sub-system. You
+	  would want to say y here usually, as this is the sub-system where
+	  typically video & imaging codec control s/w is offloaded.
+
+config OMAP_REMOTE_PROC_DSP
+	bool "OMAP remoteproc support for DSP"
+	depends on OMAP_REMOTE_PROC
+	default n
+	help
+	  Say Y here if you want to enable OMAP's DSP remote processor.
+
+	  This option controls only the DSP processor sub-system. DSP would
+	  typically be used to offload audio codecs or other advanced
+	  processing algorithms.
+
 config OMAP_RPRES
 	bool "Remote Processor Resources"
 	depends on OMAP_REMOTE_PROC

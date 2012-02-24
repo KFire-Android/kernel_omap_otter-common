@@ -97,6 +97,7 @@ struct omap_rpmsg_vq_info {
 /* The total IPC space needed to communicate with a remote processor */
 #define RPMSG_IPC_MEM	(RPMSG_BUFS_SPACE + 2 * RPMSG_RING_SIZE)
 
+#if defined(CONFIG_OMAP_REMOTE_PROC_IPU) || defined(CONFIG_OMAP_REMOTE_PROC_DSP)
 /* provide drivers with platform-specific details */
 static void omap_rpmsg_get(struct virtio_device *vdev, unsigned int request,
 		   void *buf, unsigned len)
@@ -496,6 +497,7 @@ static void omap_rpmsg_finalize_features(struct virtio_device *vdev)
 	/* Give virtio_ring a chance to accept features */
 	vring_transport_features(vdev);
 }
+#endif
 
 static void omap_rpmsg_vproc_release(struct device *dev)
 {
@@ -522,6 +524,7 @@ static void rpmsg_reset_work(struct work_struct *work)
 	}
 }
 
+#if defined(CONFIG_OMAP_REMOTE_PROC_IPU) || defined(CONFIG_OMAP_REMOTE_PROC_DSP)
 static struct virtio_config_ops omap_rpmsg_config_ops = {
 	.get_features	= omap_rpmsg_get_features,
 	.finalize_features = omap_rpmsg_finalize_features,
@@ -532,7 +535,9 @@ static struct virtio_config_ops omap_rpmsg_config_ops = {
 	.set_status	= omap_rpmsg_set_status,
 	.get_status	= omap_rpmsg_get_status,
 };
+#endif
 
+#ifdef CONFIG_OMAP_REMOTE_PROC_IPU
 static struct rpmsg_channel_info omap_ipuc0_hardcoded_chnls[] = {
 	{ "rpmsg-resmgr", 100, RPMSG_ADDR_ANY },
 	{ "rpmsg-server-sample", 137, RPMSG_ADDR_ANY },
@@ -543,8 +548,10 @@ static struct rpmsg_channel_info omap_ipuc1_hardcoded_chnls[] = {
 	{ "rpmsg-resmgr", 100, RPMSG_ADDR_ANY },
 	{ },
 };
+#endif
 
 static struct omap_rpmsg_vproc omap_rpmsg_vprocs[] = {
+#ifdef CONFIG_OMAP_REMOTE_PROC_IPU
 	/* ipu_c0's rpmsg backend */
 	{
 		.vdev.id.device	= VIRTIO_ID_RPMSG,
@@ -565,6 +572,7 @@ static struct omap_rpmsg_vproc omap_rpmsg_vprocs[] = {
 		.hardcoded_chnls = omap_ipuc1_hardcoded_chnls,
 		.slave_reset	= true,
 	},
+#endif
 };
 
 static int __init omap_rpmsg_ini(void)
