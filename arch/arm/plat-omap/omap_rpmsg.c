@@ -577,18 +577,35 @@ static struct omap_rpmsg_vproc omap_rpmsg_vprocs[] = {
 
 static int __init omap_rpmsg_ini(void)
 {
-	int i, ret = 0;
-	phys_addr_t paddr = omap_ipu_get_mempool_base(
-						OMAP_RPROC_MEMPOOL_STATIC);
-	phys_addr_t psize = omap_ipu_get_mempool_size(
-						OMAP_RPROC_MEMPOOL_STATIC);
+	int i, ret = 0, mret = 0;
+	phys_addr_t paddr = 0;
+	phys_addr_t psize = 0;
+	bool set_ipu = true;
 
 	for (i = 0; i < ARRAY_SIZE(omap_rpmsg_vprocs); i++) {
 		struct omap_rpmsg_vproc *rpdev = &omap_rpmsg_vprocs[i];
 
+		if (!strcmp(rpdev->rproc_name, "ipu")) {
+			/* ok to require all vprocs for a rproc be together */
+			if (set_ipu) {
+				paddr = omap_ipu_get_mempool_base(
+						OMAP_RPROC_MEMPOOL_STATIC);
+				psize = omap_ipu_get_mempool_size(
+						OMAP_RPROC_MEMPOOL_STATIC);
+				set_ipu = false;
+			}
+		} else if (!strcmp(rpdev->rproc_name, "dsp")) {
+			paddr = omap_dsp_get_mempool_tbase(
+					OMAP_RPROC_MEMPOOL_STATIC);
+			psize = omap_dsp_get_mempool_tsize(
+					OMAP_RPROC_MEMPOOL_STATIC);
+		} else
+			break;
+
 		if (psize < RPMSG_IPC_MEM) {
 			pr_err("out of carveout memory: %d (%d)\n", psize, i);
-			return -ENOMEM;
+			mret = -ENOMEM;
+			continue;
 		}
 
 		/*
@@ -616,7 +633,7 @@ static int __init omap_rpmsg_ini(void)
 		}
 	}
 
-	return ret;
+	return ret | mret;
 }
 module_init(omap_rpmsg_ini);
 
