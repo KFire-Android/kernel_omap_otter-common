@@ -146,6 +146,7 @@ typedef struct OMAPLFB_FBINFO_TAG
 	IMG_UINTPTR_T       *psBltFBsBvPhys;
 	/* The current blit buffer index */
 	unsigned int        iBltFBsIdx;
+	IMG_UINT            uiBltFBsByteStride;
 
 #endif
 	IMG_UINT32          uiBytesPerPixel;
