@@ -351,6 +351,7 @@ static void hdmi_core_video_config(struct hdmi_ip_data *ip_data,
 						FB_SYNC_VERT_HIGH_ACT), 6, 6);
 	r = FLD_MOD(r, !!(cfg->v_fc_config.timings.sync &
 						FB_SYNC_HOR_HIGH_ACT), 5, 5);
+	r = FLD_MOD(r, cfg->hdcp_keepout, 7, 7);
 	r = FLD_MOD(r, cfg->data_enable_pol, 4, 4);
 	r = FLD_MOD(r, cfg->vblank_osc, 1, 1);
 	r = FLD_MOD(r, cfg->v_fc_config.interlace, 0, 0);
@@ -852,6 +853,7 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	 * set software reset in the core
 	 */
 	v_core_cfg.packet_mode = HDMI_PACKETMODE24BITPERPIXEL;
+	v_core_cfg.hdcp_keepout = 1;
 
 	hdmi_core_video_config(ip_data, &v_core_cfg);
 

@@ -330,6 +330,7 @@ struct hdmi_core_vid_config	{
 	int vblank_osc;
 	int hblank;
 	int vblank;
+	int hdcp_keepout;
 };
 
 struct csc_table {
