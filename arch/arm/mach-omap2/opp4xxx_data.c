@@ -31,31 +31,44 @@
 
 /*
  * STD_FUSE_OPP_DPLL_1 contains info about ABB trim type for MPU/IVA.
- * This bit field definition is specific for OMAP4460 TURBO alone.
- * For future OMAP4 silicon it is possible that other efuse offsets might
- * be used in addition to controlling other OPPs as well.
  * This probably is an ugly location to put the DPLL trim details.. but,
  * alternatives are even less attractive :( shrug..
  *
  * CONTROL_STD_FUSE_OPP_DPLL_1 bit fields:
- * Bit #|       Name       |        Description     |        Comment
- * -----+------------------+------------------------+-------------------------
- * 18-19|MPU_DPLL_TRIM_FREQ| 0 - 2.0GHz             | If RBB is not trimmed,
- *      |                  | 1 - 2.4GHz             | but MPU DPLL is trimmed
- *      |                  | 2 - Reserved           | to 2.4GHz of higher,
- *      |                  | 3 - 3.0GHz             | it is recommended to
- *      |                  |                        | enable FBB for MPU at
- *      |                  |                        | OPPTB and OPPNT
- * -----+------------------+------------------------+-------------------------
- *  20  |    MPU_RBB_TB    | 0 - RBB is trimmed     | If trimmed RBB can be
- *      |                  | 1 - RBB is not trimmed | enabled at OPPTB on MPU
- * -----+------------------+                        +-------------------------
- *  21  |    IVA_RBB_TB    |                        | If trimmed RBB can be
- *      |                  |                        | enabled at OPPTB on IVA
-*/
-#define OMAP4460_MPU_OPP_DPLL_TRIM	BIT(18)
-#define OMAP4460_MPU_OPP_DPLL_TURBO_RBB	BIT(20)
-#define OMAP4460_IVA_OPP_DPLL_TURBO_RBB	BIT(21)
+ * Bit #|       Name       |        Description     |        Comment          |  Device
+ * -----+------------------+------------------------+-------------------------|----------
+ * 18-19|MPU_DPLL_TRIM_FREQ| 0 - 2.0GHz             | If RBB is not trimmed,  | OMAP4460
+ *      |                  | 1 - 2.4GHz             | but MPU DPLL is trimmed |
+ *      |                  | 2 - Reserved           | to 2.4GHz of higher,    |
+ *      |                  | 3 - 3.0GHz             | it is recommended to    |
+ *      |                  |                        | enable FBB for MPU at   |
+ *      |                  |                        | OPPTB and OPPNT         |
+ * -----+------------------+------------------------+-------------------------|----------
+ *  20  |    MPU_RBB_TB    | 0 - RBB is trimmed     | If trimmed RBB can be   | OMAP4460/
+ *      |                  | 1 - RBB is not trimmed | enabled at OPPTB on MPU | OMAP4470
+ * -----+------------------+                        +-------------------------|----------
+ *  21  |    IVA_RBB_TB    |                        | If trimmed RBB can be   | OMAP4460/
+ *      |                  |                        | enabled at OPPTB on IVA | OMAP4470
+ * -----+------------------+                        +-------------------------|----------
+ *  22  |    MPU_RBB_NT    |                        | If trimmed RBB can be   | OMAP4470
+ *      |                  |                        | enabled at OPPNT on MPU |
+ * -----+------------------+                        +-------------------------|----------
+ *  23  |    MPU_RBB_SB    |                        | If trimmed RBB can be   | OMAP4470
+ *      |                  |                        | enabled at OPPSB on MPU |
+ * -----+------------------+                        +-------------------------|----------
+ *  24  |    IVA_RBB_NT    |                        | If trimmed RBB can be   | OMAP4470
+ *      |                  |                        | enabled at OPPNT on IVA |
+ * -----+------------------+                        +-------------------------|----------
+ *  25  |    IVA_RBB_SB    |                        | If trimmed RBB can be   | OMAP4470
+ *      |                  |                        | enabled at OPPSB on IVA |
+ */
+#define OMAP4460_MPU_OPP_DPLL_TRIM		BIT(18)
+#define OMAP4460_MPU_OPP_DPLL_TURBO_RBB		BIT(20)
+#define OMAP4460_IVA_OPP_DPLL_TURBO_RBB		BIT(21)
+#define OMAP4470_MPU_OPP_DPLL_NITRO_RBB		BIT(22)
+#define OMAP4470_MPU_OPP_DPLL_NITROSB_RBB	BIT(23)
+#define OMAP4470_IVA_OPP_DPLL_NITRO_RBB		BIT(24)
+#define OMAP4470_IVA_OPP_DPLL_NITROSB_RBB	BIT(25)
 
 /**
  * struct omap4_ldo_abb_trim_data - describe ABB trim bits for specific voltage
@@ -422,6 +435,16 @@ struct omap_vdd_dep_info omap447x_vddiva_dep_info[] = {
 	{.name = NULL, .dep_table = NULL, .nr_dep_entries = 0},
 };
 
+static struct omap4_ldo_abb_trim_data __initdata omap447x_ldo_abb_trim_data[] = {
+	{.volt_data = omap447x_vdd_mpu_volt_data, .volt_nominal = OMAP4470_VDD_MPU_OPPTURBO_UV, .rbb_trim_mask = OMAP4460_MPU_OPP_DPLL_TURBO_RBB},
+	{.volt_data = omap447x_vdd_mpu_volt_data, .volt_nominal = OMAP4470_VDD_MPU_OPPNITRO_UV, .rbb_trim_mask = OMAP4470_MPU_OPP_DPLL_NITRO_RBB},
+	{.volt_data = omap447x_vdd_mpu_volt_data, .volt_nominal = OMAP4470_VDD_MPU_OPPNITROSB_UV, .rbb_trim_mask = OMAP4470_MPU_OPP_DPLL_NITROSB_RBB},
+	{.volt_data = omap447x_vdd_iva_volt_data, .volt_nominal = OMAP4470_VDD_IVA_OPPTURBO_UV, .rbb_trim_mask = OMAP4460_IVA_OPP_DPLL_TURBO_RBB},
+	{.volt_data = omap447x_vdd_iva_volt_data, .volt_nominal = OMAP4470_VDD_IVA_OPPNITRO_UV, .rbb_trim_mask = OMAP4470_IVA_OPP_DPLL_NITRO_RBB},
+	{.volt_data = omap447x_vdd_iva_volt_data, .volt_nominal = OMAP4470_VDD_IVA_OPPNITROSB_UV, .rbb_trim_mask = OMAP4470_IVA_OPP_DPLL_NITROSB_RBB},
+	{.volt_data = NULL},
+};
+
 #define OMAP4470_LP_OPP_SET_CORE_DPLL_FREQ 1600000000
 
 static struct omap_opp_def __initdata omap447x_opp_low_def_list[] = {
@@ -634,6 +657,8 @@ int __init omap4_opp_init(void)
 	} else if (cpu_is_omap447x()) {
 		struct clk *dpll_core_ck;
 		unsigned long rate = 0;
+
+		omap4_abb_trim_update(omap447x_ldo_abb_trim_data);
 
 		dpll_core_ck = clk_get(NULL, "dpll_core_ck");
 		if (dpll_core_ck) {
