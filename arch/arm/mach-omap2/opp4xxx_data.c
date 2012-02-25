@@ -36,10 +36,40 @@
  * be used in addition to controlling other OPPs as well.
  * This probably is an ugly location to put the DPLL trim details.. but,
  * alternatives are even less attractive :( shrug..
- */
+ *
+ * CONTROL_STD_FUSE_OPP_DPLL_1 bit fields:
+ * Bit #|       Name       |        Description     |        Comment
+ * -----+------------------+------------------------+-------------------------
+ * 18-19|MPU_DPLL_TRIM_FREQ| 0 - 2.0GHz             | If RBB is not trimmed,
+ *      |                  | 1 - 2.4GHz             | but MPU DPLL is trimmed
+ *      |                  | 2 - Reserved           | to 2.4GHz of higher,
+ *      |                  | 3 - 3.0GHz             | it is recommended to
+ *      |                  |                        | enable FBB for MPU at
+ *      |                  |                        | OPPTB and OPPNT
+ * -----+------------------+------------------------+-------------------------
+ *  20  |    MPU_RBB_TB    | 0 - RBB is trimmed     | If trimmed RBB can be
+ *      |                  | 1 - RBB is not trimmed | enabled at OPPTB on MPU
+ * -----+------------------+                        +-------------------------
+ *  21  |    IVA_RBB_TB    |                        | If trimmed RBB can be
+ *      |                  |                        | enabled at OPPTB on IVA
+*/
 #define OMAP4460_MPU_OPP_DPLL_TRIM	BIT(18)
 #define OMAP4460_MPU_OPP_DPLL_TURBO_RBB	BIT(20)
 #define OMAP4460_IVA_OPP_DPLL_TURBO_RBB	BIT(21)
+
+/**
+ * struct omap4_ldo_abb_trim_data - describe ABB trim bits for specific voltage
+ * @volt_data:		voltage table
+ * @volt_nominal:	voltage for which ABB type should be modified according to trim bits.
+ * @rbb_trim_mask:	If this bit is set in trim register, ABB type should be modified to RBB.
+ * @fbb_trim_mask:	If this bit is set in trim register, ABB type should be modified to FBB.
+ */
+struct omap4_ldo_abb_trim_data {
+	struct omap_volt_data *volt_data;
+	u32 volt_nominal;
+	u32 rbb_trim_mask;
+	u32 fbb_trim_mask;
+};
 
 /*
  * Structures containing OMAP4430 voltage supported and various
@@ -247,6 +277,13 @@ struct omap_vdd_dep_info omap446x_vddiva_dep_info[] = {
 		.nr_dep_entries = ARRAY_SIZE(omap446x_vdd_iva_core_dep_data),
 	},
 	{.name = NULL, .dep_table = NULL, .nr_dep_entries = 0},
+};
+
+static struct omap4_ldo_abb_trim_data __initdata omap446x_ldo_abb_trim_data[] = {
+	{.volt_data = omap446x_vdd_mpu_volt_data, .volt_nominal = OMAP4460_VDD_MPU_OPPTURBO_UV, .rbb_trim_mask = OMAP4460_MPU_OPP_DPLL_TURBO_RBB,
+			.fbb_trim_mask = OMAP4460_MPU_OPP_DPLL_TRIM},
+	{.volt_data = omap446x_vdd_iva_volt_data, .volt_nominal = OMAP4460_VDD_IVA_OPPTURBO_UV, .rbb_trim_mask = OMAP4460_IVA_OPP_DPLL_TURBO_RBB},
+	{.volt_data = NULL},
 };
 
 static struct omap_opp_def __initdata omap446x_opp_def_list[] = {
@@ -542,77 +579,34 @@ static void __init omap4_abb_update(struct omap_volt_data *vtable,
 }
 
 /**
- * omap4460_abb_update() - update the abb mapping quirks for OMAP4460
+ * omap4_abb_trim_update() - update the ABB mapping quirks for OMAP4460/4470
  */
-static void __init omap4460_abb_update(void)
+static void __init omap4_abb_trim_update(
+		struct omap4_ldo_abb_trim_data *trim_data)
 {
-	u32 reg, trim, rbb;
-	char *abb_msg;
+	u32 reg;
 	int abb_type;
 
-	/*
-	 * Determine MPU ABB state at OPP_TURBO on 4460
-	 *
-	 * On 4460 all OPPs have preset states for the MPU's ABB LDO, except
-	 * for OPP_TURBO.  OPP_TURBO may require bypass, FBB or RBB depending
-	 * on a combination of characterisation data blown into eFuse register
-	 * CONTROL_STD_FUSE_OPP_DPLL_1.
-	 *
-	 * Bits 18 & 19 of that register signify DPLL_MPU trim (see
-	 * arch/arm/mach-omap2/omap4-trim-quirks.c). OPP_TURBO might put MPU's
-	 * ABB LDO into bypass or FBB based on this value.
-	 *
-	 * Bit 20 siginifies if RBB should be enabled. If set it will always
-	 * override the values from bits 18 & 19.
-	 *
-	 * The table below captures the valid combinations:
-	 * trim		 rbb
-	 * Bit 18|Bit 19|Bit 20|ABB type
-	 * 0	  0	 0	bypass
-	 * 0	  1	 0	bypass	(invalid combination)
-	 * 1	  0	 0	FBB	(2.4GHz DPLL_MPU)
-	 * 1	  1	 0	FBB	(3GHz DPLL_MPU)
-	 * 0	  0	 1	RBB
-	 * 0	  1	 1	RBB	(invalid combination)
-	 * 1	  0	 1	RBB	(2.4GHz DPLL_MPU)
-	 * 1	  1	 1	RBB	(3GHz DPLL_MPU)
-	 */
+	if (!trim_data) {
+		pr_err("%s: Trim data is not valid\n", __func__);
+		return;
+	}
+
 	reg = omap_ctrl_readl(OMAP4_CTRL_MODULE_CORE_STD_FUSE_OPP_DPLL_1);
-	trim = reg & OMAP4460_MPU_OPP_DPLL_TRIM;
-	rbb = reg & OMAP4460_MPU_OPP_DPLL_TURBO_RBB;
 
-	if (rbb) {
-		abb_type = OMAP_ABB_SLOW_OPP;
-		abb_msg = "Slow";
-	} else if (!trim) {
-		abb_type = OMAP_ABB_NOMINAL_OPP;
-		abb_msg = "un-trimmed Nominal";
-	} else {
-		abb_type = OMAP_ABB_FAST_OPP;
-		abb_msg = "Fast";
+	/* Update ABB configuration if at least one of trim bits is set
+	 * Leave default configuration in opposite case. */
+	for (; trim_data->volt_data; trim_data++) {
+		if (reg & trim_data->rbb_trim_mask)
+			abb_type = OMAP_ABB_SLOW_OPP;
+		else if (reg & trim_data->fbb_trim_mask)
+			abb_type = OMAP_ABB_FAST_OPP;
+		else
+			continue;
+
+		omap4_abb_update(trim_data->volt_data, trim_data->volt_nominal,
+				abb_type);
 	}
-
-	omap4_abb_update(omap446x_vdd_mpu_volt_data,
-			 OMAP4460_VDD_MPU_OPPTURBO_UV,
-			 abb_type);
-	pr_info("%s: MPU OPP Turbo: %s OPP ABB type\n", __func__, abb_msg);
-
-	/*
-	 * OMAP4460 IVA OPP Turbo configuration:
-	 * if bit 21 is set, enable RBB
-	 */
-	rbb = reg & OMAP4460_IVA_OPP_DPLL_TURBO_RBB;
-	if (rbb) {
-		abb_type = OMAP_ABB_SLOW_OPP;
-		abb_msg = "Slow";
-	} else {
-		abb_type = OMAP_ABB_NOMINAL_OPP;
-		abb_msg = "Nominal";
-	}
-	omap4_abb_update(omap446x_vdd_iva_volt_data,
-			 OMAP4460_VDD_IVA_OPPTURBO_UV,
-			 abb_type);
-	pr_info("%s: IVA OPP Turbo: %s OPP ABB type\n", __func__, abb_msg);
 }
 
 /**
@@ -629,6 +623,8 @@ int __init omap4_opp_init(void)
 		r = omap_init_opp_table(omap443x_opp_def_list,
 			ARRAY_SIZE(omap443x_opp_def_list));
 	else if (cpu_is_omap446x()) {
+		omap4_abb_trim_update(omap446x_ldo_abb_trim_data);
+
 		r = omap_init_opp_table(omap446x_opp_def_list,
 			ARRAY_SIZE(omap446x_opp_def_list));
 		trimmed = omap_readl(0x4a002268) & ((1 << 18) | (1 << 19));
@@ -669,10 +665,6 @@ int __init omap4_opp_init(void)
 		pr_info("This is DPLL un-trimmed SOM. OPP is limited at 1.2 GHz\n");
 	if (omap4_has_mpu_1_5ghz() && trimmed)
 		omap4_opp_enable("mpu", 1500000000);
-
-	/* Update ABB settings */
-	if (cpu_is_omap446x())
-		omap4460_abb_update();
 
 out:
 	return r;
