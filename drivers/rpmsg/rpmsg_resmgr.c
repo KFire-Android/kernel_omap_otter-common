@@ -545,6 +545,7 @@ int _set_constraints(struct rprm_elem *e, struct rprm_constraints_data *c)
 		_set_constraints_func = _rpres_set_constraints;
 		break;
 	case RPRM_IPU:
+	case RPRM_DSP:
 		_set_constraints_func = _rproc_set_constraints;
 		break;
 	default:
