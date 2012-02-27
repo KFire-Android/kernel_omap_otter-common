@@ -485,6 +485,7 @@ struct snd_soc_dapm_widget {
 	const char *sname;	/* stream name */
 	struct snd_soc_codec *codec;
 	struct snd_soc_platform *platform;
+	struct snd_soc_dai *dai;
 	struct list_head list;
 	struct snd_soc_dapm_context *dapm;
 
