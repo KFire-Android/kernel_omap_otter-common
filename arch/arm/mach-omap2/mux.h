@@ -85,6 +85,7 @@
  */
 #define OMAP_MUX_REG_8BIT		(1 << 0)
 #define OMAP_MUX_GPIO_IN_MODE3		(1 << 1)
+#define OMAP_MUX_GPIO_IN_MODE6		(1 << 2)
 
 /**
  * struct omap_board_data - board specific device data
