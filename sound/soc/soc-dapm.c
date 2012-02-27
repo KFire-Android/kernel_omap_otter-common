@@ -44,6 +44,7 @@
 
 #include <trace/events/asoc.h>
 
+#define NAME_SIZE	32
 #define DAPM_UPDATE_STAT(widget, val) widget->dapm->card->dapm_stats.val++;
 
 /* dapm power sequences - make this per codec in the future */
@@ -2975,6 +2976,7 @@ int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 {
 	struct snd_soc_dapm_widget template;
 	struct snd_soc_dapm_widget *w;
+	char name[NAME_SIZE];
 
 	WARN_ON(dapm->dev != dai->dev);
 
@@ -2982,40 +2984,48 @@ int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 	template.reg = SND_SOC_NOPM;
 
 	if (dai->driver->playback.stream_name) {
-		template.id = snd_soc_dapm_dai;
 		template.name = dai->driver->playback.stream_name;
 		template.sname = dai->driver->playback.stream_name;
-
-		dev_dbg(dai->dev, "adding %s widget\n",
-			template.name);
-
-		w = snd_soc_dapm_new_control(dapm, &template);
-		if (!w) {
-			dev_err(dapm->dev, "Failed to create %s widget\n",
-				dai->driver->playback.stream_name);
-		}
-
-		w->priv = dai;
-		dai->playback_widget = w;
+	} else {
+		snprintf(name, NAME_SIZE, "%s %s", dev_name(dai->dev), "Playback");
+		template.name = name;
+		template.sname = name;
 	}
+
+	template.id = snd_soc_dapm_dai;
+	dev_dbg(dai->dev, "adding %s widget\n",
+		template.name);
+
+	w = snd_soc_dapm_new_control(dapm, &template);
+	if (!w) {
+		dev_err(dapm->dev, "Failed to create %s widget\n",
+			dai->driver->playback.stream_name);
+	}
+
+	dai->playback_widget = w;
+	w->dai = dai;
 
 	if (dai->driver->capture.stream_name) {
-		template.id = snd_soc_dapm_dai;
 		template.name = dai->driver->capture.stream_name;
 		template.sname = dai->driver->capture.stream_name;
-
-		dev_dbg(dai->dev, "adding %s widget\n",
-			template.name);
-
-		w = snd_soc_dapm_new_control(dapm, &template);
-		if (!w) {
-			dev_err(dapm->dev, "Failed to create %s widget\n",
-				dai->driver->capture.stream_name);
-		}
-
-		w->priv = dai;
-		dai->capture_widget = w;
+	} else {
+		snprintf(name, NAME_SIZE, "%s %s", dev_name(dai->dev), "Capture");
+		template.name = name;
+		template.sname = name;
 	}
+	template.id = snd_soc_dapm_dai;
+
+	dev_dbg(dai->dev, "adding %s widget\n",
+		template.name);
+
+	w = snd_soc_dapm_new_control(dapm, &template);
+	if (!w) {
+		dev_err(dapm->dev, "Failed to create %s widget\n",
+			dai->driver->capture.stream_name);
+	}
+
+	dai->capture_widget = w;
+	w->dai = dai;
 
 	return 0;
 }
@@ -3033,7 +3043,7 @@ int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card)
 		if (dai_w->id != snd_soc_dapm_dai)
 			continue;
 
-		dai = dai_w->priv;
+		dai = dai_w->dai;
 
 		/* ...find all widgets with the same stream and link them */
 		list_for_each_entry(w, &card->widgets, list) {
