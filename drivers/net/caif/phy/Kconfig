@@ -4,12 +4,12 @@
 # Some options here should be made platform dependent
 
 menu "CAIF ZOOM2/ZOOM3/BLAZE low level physical drivers"
-	depends on CAIF && MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3 || ARCH_OMAP4
+	depends on CAIF && MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3 || ARCH_OMAP4 || ARCH_OMAP5
 
 config CAIF_HSI_OMAP
 	tristate "CAIF HSI OMAP driver"
 	default n
-	depends on ARCH_OMAP4
+	depends on ARCH_OMAP4 || ARCH_OMAP5
 	---help---
 	CAIF OMAP HSI driver using the OMAP HSI interface.
 	This driver is required if you want to use CAIF HSI with OMAP.
