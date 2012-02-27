@@ -1070,7 +1070,7 @@ static struct bvformatxlate formatxlate[] = {
 
 	/* BITS=24 ALPHA=1 REVERSED=1 LEFT_JUSTIFIED=1 */
 	BVFORMATRGBA(32, A8R8G8B8, ABGR,
-		BVRED(0, 8), BVGREEN(8, 8), BVBLUE(16, 8), BVALPHA(24, 0)),
+		BVRED(0, 8), BVGREEN(8, 8), BVBLUE(16, 8), BVALPHA(24, 8)),
 };
 
 static int parse_format(enum ocdformat ocdformat, struct bvformatxlate **format)
@@ -1174,30 +1174,44 @@ static inline unsigned int extract_component(unsigned int pixel,
 	unsigned int component8;
 
 	component = (pixel & desc->mask) >> desc->shift;
+	GC_PRINT(GC_INFO_MSG " mask=0x%08X, shift=%d, component=0x%08X\n",
+		__func__, __LINE__, desc->mask, desc->shift, component);
 
 	switch (desc->size) {
 	case 0:
 		component8 = 0xFF;
+		GC_PRINT(GC_INFO_MSG " component8=0x%08X\n",
+			__func__, __LINE__, component8);
 		break;
 
 	case 1:
 		component8 = component ? 0xFF : 0x00;
+		GC_PRINT(GC_INFO_MSG " component8=0x%08X\n",
+			__func__, __LINE__, component8);
 		break;
 
 	case 4:
 		component8 = component | (component << 4);
+		GC_PRINT(GC_INFO_MSG " component8=0x%08X\n",
+			__func__, __LINE__, component8);
 		break;
 
 	case 5:
 		component8 = (component << 3) | (component >> 2);
+		GC_PRINT(GC_INFO_MSG " component8=0x%08X\n",
+			__func__, __LINE__, component8);
 		break;
 
 	case 6:
 		component8 = (component << 2) | (component >> 4);
+		GC_PRINT(GC_INFO_MSG " component8=0x%08X\n",
+			__func__, __LINE__, component8);
 		break;
 
 	default:
 		component8 = component;
+		GC_PRINT(GC_INFO_MSG " component8=0x%08X\n",
+			__func__, __LINE__, component8);
 	}
 
 	return component8;
@@ -1211,14 +1225,20 @@ static unsigned int getinternalcolor(void *ptr, struct bvformatxlate *format)
 	switch (format->bitspp) {
 	case 16:
 		pixel = *(unsigned short *) ptr;
+		GC_PRINT(GC_INFO_MSG " pixel=0x%08X\n",
+			__func__, __LINE__, pixel);
 		break;
 
 	case 32:
 		pixel = *(unsigned int *) ptr;
+		GC_PRINT(GC_INFO_MSG " pixel=0x%08X\n",
+			__func__, __LINE__, pixel);
 		break;
 
 	default:
 		pixel = 0;
+		GC_PRINT(GC_INFO_MSG " pixel=0x%08X\n",
+			__func__, __LINE__, pixel);
 	}
 
 	r = extract_component(pixel, &format->rgba.r);
