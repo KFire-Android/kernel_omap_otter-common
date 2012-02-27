@@ -133,8 +133,11 @@ static int __init _omap_mux_init_gpio(struct omap_mux_partition *partition,
 	mux_mode = val & ~(OMAP_MUX_NR_MODES - 1);
 	if (partition->flags & OMAP_MUX_GPIO_IN_MODE3)
 		mux_mode |= OMAP_MUX_MODE3;
+	else if (partition->flags & OMAP_MUX_GPIO_IN_MODE6)
+		mux_mode |= OMAP_MUX_MODE6;
 	else
 		mux_mode |= OMAP_MUX_MODE4;
+
 	pr_debug("%s: Setting signal %s.gpio%i 0x%04x -> 0x%04x\n", __func__,
 		 gpio_mux->muxnames[0], gpio, old_mode, mux_mode);
 	omap_mux_write(partition, mux_mode, gpio_mux->reg_offset);
