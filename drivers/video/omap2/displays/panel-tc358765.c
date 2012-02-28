@@ -701,7 +701,17 @@ static int tc358765_power_on(struct omap_dss_device *dssdev)
 	 * 0x2e - unpacked 18bit
 	 * 0x3e - 24bit
 	 */
-	dsi_video_mode_enable(dssdev, 0x3e);
+	switch (dssdev->ctrl.pixel_size) {
+	case 18:
+		dsi_video_mode_enable(dssdev, 0x1e);
+		break;
+	case 24:
+		dsi_video_mode_enable(dssdev, 0x3e);
+		break;
+	default:
+		dev_warn(&dssdev->dev, "not expected pixel size: %d\n",
+					dssdev->ctrl.pixel_size);
+	}
 
 	dev_dbg(&dssdev->dev, "power_on done\n");
 
