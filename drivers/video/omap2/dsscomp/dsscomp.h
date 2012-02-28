@@ -49,10 +49,12 @@
 /**
  * DSS Composition Device Driver
  *
+ * @pdev:  hook for platform device data
  * @dev:   misc device base
  * @dbgfs: debugfs hook
  */
 struct dsscomp_dev {
+	struct device *pdev;
 	struct miscdevice dev;
 	struct dentry *dbgfs;
 
