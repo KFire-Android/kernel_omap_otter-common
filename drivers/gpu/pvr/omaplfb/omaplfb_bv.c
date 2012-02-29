@@ -396,8 +396,10 @@ static OMAPLFB_ERROR InitBltFBsVram(OMAPLFB_DEVINFO *psDevInfo)
 		pBvDesc->pagesize = PAGE_SIZE;
 		pBvDesc->pagearray = pPaddrs;
 		pBvDesc->pagecount = uiNumPages;
+		pBvDesc->length = pBvDesc->pagecount * pBvDesc->pagesize;
 		/* Mark the buffer with != 0, otherwise GC driver blows up */
 		pBvDesc->virtaddr = (void*)0xFACEC0D;
+
 
 		iBvErr = gsBvInterface.bv_map(pBvDesc);
 		if (iBvErr)
@@ -405,9 +407,11 @@ static OMAPLFB_ERROR InitBltFBsVram(OMAPLFB_DEVINFO *psDevInfo)
 			WARN(1, "%s: BV map Blt FB buffer failed %d\n",
 					__func__, iBvErr);
 			kfree(pBvDesc);
+			kfree(pPaddrs);
 			return OMAPLFB_ERROR_GENERIC;
 		}
 		psPVRFBInfo->psBltFBsBvHndl[uiFb] = pBvDesc;
+		kfree(pPaddrs);
 	}
 	return OMAPLFB_OK;
 }
@@ -666,6 +670,12 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 					goto unmap_srcs;
 				}
 				src2_mapped = 1;
+				/* FIXME: Not sure why the virtaddr needs to be
+				 * unique for the buffers involved in the blit,
+				 * if the following is not done the blit fails,
+				 * BV GC driver issue?
+				 */
+				src2desc.virtaddr = (void *)0x00C0FFEE;
 			}
 		}
 
