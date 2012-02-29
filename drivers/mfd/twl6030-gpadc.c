@@ -971,7 +971,7 @@ static long twl6030_gpadc_ioctl(struct file *filp, unsigned int cmd,
 		val = twl6030_gpadc_conversion(&req);
 		if (likely(val > 0)) {
 			par.status = 0;
-			par.result = (u16)req.rbuf[par.channel];
+			par.result = (u16)req.buf[par.channel].raw_code;
 		} else if (val == 0) {
 			par.status = -ENODATA;
 		} else {
