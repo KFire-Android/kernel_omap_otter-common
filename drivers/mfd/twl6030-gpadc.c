@@ -914,11 +914,13 @@ static long twl6030_gpadc_ioctl(struct file *filp, unsigned int cmd,
 	switch (cmd) {
 	case TWL6030_GPADC_IOCX_ADC_RAW_READ: {
 		struct twl6030_gpadc_request req;
-		if ((the_gpadc->features & TWL6032_SUBCLASS)
-			&& (par.channel >= TWL6032_GPADC_MAX_CHANNELS))
-			return -EINVAL;
-		else if (par.channel >= TWL6030_GPADC_MAX_CHANNELS)
-			return -EINVAL;
+		if (the_gpadc->features & TWL6032_SUBCLASS) {
+			if (par.channel >= TWL6032_GPADC_MAX_CHANNELS)
+				return -EINVAL;
+		} else {
+			if (par.channel >= TWL6030_GPADC_MAX_CHANNELS)
+				return -EINVAL;
+		}
 
 		req.channels = (1 << par.channel);
 		if (the_gpadc->features & TWL6032_SUBCLASS)
