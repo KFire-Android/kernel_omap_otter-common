@@ -31,6 +31,7 @@
 #include <linux/notifier.h>
 #include <linux/module.h>
 #include <linux/pm.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/mailbox.h>
 
@@ -298,6 +299,9 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
 	struct omap_mbox_queue *mq;
 
 	mutex_lock(&mbox_configured_lock);
+
+	omap_mbox_enable(mbox);
+
 	if (!mbox_configured++) {
 		dev_pm_qos_update_request(&mbox->qos_request,
 					SET_MPU_CORE_CONSTRAINT);
@@ -371,6 +375,8 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
 		}
 	}
 
+	omap_mbox_disable(mbox);
+
 	mutex_unlock(&mbox_configured_lock);
 }
 
@@ -410,6 +416,18 @@ void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb)
 }
 EXPORT_SYMBOL(omap_mbox_put);
 
+int omap_mbox_enable(struct omap_mbox *mbox)
+{
+	return pm_runtime_get_sync(mbox->dev->parent);
+}
+EXPORT_SYMBOL(omap_mbox_enable);
+
+int omap_mbox_disable(struct omap_mbox *mbox)
+{
+	return pm_runtime_put_sync(mbox->dev->parent);
+}
+EXPORT_SYMBOL(omap_mbox_disable);
+
 static struct class omap_mbox_class = { .name = "mbox", };
 
 int omap_mbox_register(struct device *parent, struct omap_mbox **list)
@@ -437,6 +455,9 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
 
 		BLOCKING_INIT_NOTIFIER_HEAD(&mbox->notifier);
 	}
+
+	pm_runtime_enable(parent);
+
 	return 0;
 
 err_out:
@@ -448,7 +469,7 @@ err_out:
 }
 EXPORT_SYMBOL(omap_mbox_register);
 
-int omap_mbox_unregister(void)
+int omap_mbox_unregister(struct device *parent)
 {
 	int i;
 
@@ -460,6 +481,9 @@ int omap_mbox_unregister(void)
 		device_unregister(mboxes[i]->dev);
 	}
 	mboxes = NULL;
+
+	pm_runtime_disable(parent);
+
 	return 0;
 }
 EXPORT_SYMBOL(omap_mbox_unregister);

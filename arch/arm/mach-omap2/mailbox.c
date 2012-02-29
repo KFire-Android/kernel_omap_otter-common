@@ -142,9 +142,6 @@ static int omap2_mbox_startup(struct omap_mbox *mbox)
 {
 	u32 l;
 
-	pm_runtime_enable(mbox->dev->parent);
-	pm_runtime_get_sync(mbox->dev->parent);
-
 	l = mbox_read_reg(MAILBOX_REVISION);
 	pr_debug("omap mailbox rev %d.%d\n", (l & 0xf0) >> 4, (l & 0x0f));
 
@@ -155,8 +152,7 @@ static int omap2_mbox_startup(struct omap_mbox *mbox)
 
 static void omap2_mbox_shutdown(struct omap_mbox *mbox)
 {
-	pm_runtime_put_sync(mbox->dev->parent);
-	pm_runtime_disable(mbox->dev->parent);
+	/* Do nothing */
 }
 
 /* Mailbox FIFO handle functions */
@@ -443,7 +439,7 @@ unmap_base:
 
 static int __devexit omap2_mbox_remove(struct platform_device *pdev)
 {
-	omap_mbox_unregister();
+	omap_mbox_unregister(&pdev->dev);
 	iounmap(mbox_base);
 	return 0;
 }

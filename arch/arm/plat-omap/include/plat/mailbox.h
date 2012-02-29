@@ -72,7 +72,10 @@ struct omap_mbox *omap_mbox_get(const char *, struct notifier_block *nb);
 void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb);
 
 int omap_mbox_register(struct device *parent, struct omap_mbox **);
-int omap_mbox_unregister(void);
+int omap_mbox_unregister(struct device *parent);
+
+int omap_mbox_enable(struct omap_mbox *mbox);
+int omap_mbox_disable(struct omap_mbox *mbox);
 
 static inline void omap_mbox_enable_irq(struct omap_mbox *mbox,
 					omap_mbox_irq_t irq)
