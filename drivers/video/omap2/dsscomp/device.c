@@ -525,6 +525,7 @@ static int dsscomp_probe(struct platform_device *pdev)
 
 	ret = misc_register(&cdev->dev);
 	if (ret) {
+		kfree(cdev);
 		pr_err("dsscomp: failed to register misc device.\n");
 		return ret;
 	}
