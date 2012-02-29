@@ -20,8 +20,11 @@
 #include <linux/err.h>
 #include <linux/rpmsg_resmgr.h>
 #include <linux/pm_runtime.h>
+#include <linux/pm_qos.h>
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
+#include <plat/omap-pm.h>
+#include <plat/rpmsg_resmgr.h>
 #include "omap_rpmsg_resmgr.h"
 
 #define GPTIMERS_MAX	11
@@ -35,6 +38,15 @@ struct rprm_auxclk_depot {
 	struct rprm_auxclk args;
 	struct clk *clk;
 };
+
+/* device handle for resources which use the generic apis */
+struct rprm_gen_device_handle {
+	struct device *dev;
+	struct dev_pm_qos_request req;
+};
+
+/* pointer to the constraint ops exported by omap mach module */
+static struct omap_rprm_ops *cnstrnt_ops;
 
 static inline struct device *__find_device_by_name(const char *name)
 {
@@ -288,6 +300,7 @@ static int
 _enable_device_exclusive(void **handle, struct device **pdev, const char *name)
 {
 	struct device *dev = *pdev;
+	struct rprm_gen_device_handle *rprm_handle;
 	int ret;
 
 	/* if we already have dev do not search it again */
@@ -300,6 +313,15 @@ _enable_device_exclusive(void **handle, struct device **pdev, const char *name)
 		/* update pdev that works as cache to avoid searing again */
 		*pdev = dev;
 	}
+
+	rprm_handle = kzalloc(sizeof *rprm_handle, GFP_KERNEL);
+	if (!rprm_handle)
+		return -ENOMEM;
+
+	ret = dev_pm_qos_add_request(dev, &rprm_handle->req,
+						PM_QOS_DEFAULT_VALUE);
+	if (ret < 0)
+		goto err_handle_free;
 
 	ret = pm_runtime_get_sync(dev);
 	if (ret) {
@@ -314,16 +336,61 @@ _enable_device_exclusive(void **handle, struct device **pdev, const char *name)
 		}
 
 		pr_err("error %d get sync for %s\n", ret, name);
-		return ret;
+		goto err_qos_free;
 	}
 
-	*handle = dev;
+	rprm_handle->dev = dev;
+	*handle = rprm_handle;
+
 	return 0;
+
+err_qos_free:
+	dev_pm_qos_remove_request(&rprm_handle->req);
+err_handle_free:
+	kfree(rprm_handle);
+	return ret;
 }
 
-static int _device_release(void *dev)
+static int _device_release(void *handle)
 {
+	struct rprm_gen_device_handle *obj = handle;
+	struct device *dev = obj->dev;
+
+	dev_pm_qos_remove_request(&obj->req);
+	kfree(obj);
+
 	return pm_runtime_put_sync(dev);
+}
+
+static int _device_scale(struct device *rdev, void *handle, unsigned long val)
+{
+	struct rprm_gen_device_handle *obj = handle;
+
+	return 0;
+
+	if (!cnstrnt_ops || !cnstrnt_ops->device_scale)
+			return -ENOSYS;
+
+	return cnstrnt_ops->device_scale(rdev, obj->dev, val);
+}
+
+static int _device_latency(struct device *rdev, void *handle, unsigned long val)
+{
+	struct rprm_gen_device_handle *obj = handle;
+	int ret = dev_pm_qos_update_request(&obj->req, val);
+
+	return ret -= ret == 1;
+}
+
+static int _device_bandwidth(struct device *rdev, void *handle,
+							 unsigned long val)
+{
+	struct rprm_gen_device_handle *obj = handle;
+
+	if (!cnstrnt_ops || !cnstrnt_ops->set_min_bus_tput)
+		return -ENOSYS;
+
+	return cnstrnt_ops->set_min_bus_tput(rdev, obj->dev, val);
 }
 
 static int rprm_iva_request(void **handle, void *data, size_t len)
@@ -389,6 +456,9 @@ static struct rprm_res_ops auxclk_ops = {
 static struct rprm_res_ops iva_ops = {
 	.request = rprm_iva_request,
 	.release = _device_release,
+	.latency = _device_latency,
+	.bandwidth = _device_bandwidth,
+	.scale = _device_scale,
 };
 
 static struct rprm_res_ops iva_seq0_ops = {
@@ -404,6 +474,9 @@ static struct rprm_res_ops iva_seq1_ops = {
 static struct rprm_res_ops fdif_ops = {
 	.request = rprm_fdif_request,
 	.release = _device_release,
+	.latency = _device_latency,
+	.bandwidth = _device_bandwidth,
+	.scale = _device_scale,
 };
 
 static struct rprm_res_ops sl2if_ops = {
@@ -414,6 +487,8 @@ static struct rprm_res_ops sl2if_ops = {
 static struct rprm_res_ops iss_ops = {
 	.request = rprm_iss_request,
 	.release = _device_release,
+	.latency = _device_latency,
+	.bandwidth = _device_bandwidth,
 };
 
 static struct rprm_res omap_res[] = {
@@ -455,9 +530,37 @@ static struct rprm_res omap_res[] = {
 	},
 };
 
+static int omap_rprm_probe(struct platform_device *pdev)
+{
+	struct omap_rprm_pdata *pdata = pdev->dev.platform_data;
+
+	cnstrnt_ops = pdata->ops;
+	return 0;
+}
+
+static int omap_rprm_remove(struct platform_device *pdev)
+{
+	cnstrnt_ops = NULL;
+
+	return 0;
+}
+
+static struct platform_driver omap_rprm_driver = {
+	.probe = omap_rprm_probe,
+	.remove = __devexit_p(omap_rprm_remove),
+	.driver = {
+		.name = "omap-rprm",
+		.owner = THIS_MODULE,
+	},
+};
+
 int __init omap_rprm_init(void)
 {
-	int i;
+	int i, ret;
+
+	ret = platform_driver_register(&omap_rprm_driver);
+	if (ret)
+		return ret;
 
 	for (i = 0; i < ARRAY_SIZE(omap_res); i++) {
 		omap_res[i].owner = THIS_MODULE;
@@ -473,6 +576,8 @@ static void __exit omap_rprm_fini(void)
 
 	for (i = 0; i < ARRAY_SIZE(omap_res); i++)
 		rprm_resource_unregister(&omap_res[i]);
+
+	platform_driver_unregister(&omap_rprm_driver);
 }
 module_init(omap_rprm_init);
 module_exit(omap_rprm_fini);
