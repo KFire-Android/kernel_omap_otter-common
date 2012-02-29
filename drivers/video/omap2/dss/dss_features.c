@@ -734,7 +734,7 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.cec_set_reg_device_list        =       ti_hdmi_5xxx_cec_set_reg_device_list,
 	.hdcp_init			=	ti_hdmi_5xxx_hdcp_init,
 	.hdcp_enable			=	ti_hdmi_5xxx_hdcp_enable,
-	.hdcp_disable			=	NULL,
+	.hdcp_disable		=	ti_hdmi_5xxx_hdcp_disable,
 };
 
 void dss_init_hdmi_ip_ops(struct hdmi_ip_data *ip_data)

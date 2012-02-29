@@ -545,6 +545,16 @@ int ti_hdmi_5xxx_hdcp_enable(struct hdmi_ip_data *ip_data)
 
 }
 
+int ti_hdmi_5xxx_hdcp_disable(struct hdmi_ip_data *ip_data)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_A_HDCPCFG0, 0, 2, 2);
+
+	return 0;
+
+}
+
 static void hdmi_core_config_video_sampler(struct hdmi_ip_data *ip_data)
 {
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);

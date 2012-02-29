@@ -345,5 +345,6 @@ int ti_hdmi_5xxx_cec_set_reg_device_list(struct hdmi_ip_data *ip_data,
 	int mask);
 int ti_hdmi_5xxx_hdcp_init(struct hdmi_ip_data *ip_data);
 int ti_hdmi_5xxx_hdcp_enable(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_hdcp_disable(struct hdmi_ip_data *ip_data);
 
 #endif
