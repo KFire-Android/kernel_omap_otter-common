@@ -260,9 +260,8 @@ static int setup_rproc_elf_core_dump(struct core_rproc *d)
 {
 	short __phnum;
 	struct elf_phdr *nphdr;
-	struct exc_regs *xregs = d->rproc->cdump_buf1;
-	struct pt_regs *regs =
-		(struct pt_regs *)&d->core.core_note.prstatus.pr_reg;
+	struct exc_regs *xregs;
+	struct pt_regs *regs;
 
 	memset(&d->core.elf, 0, sizeof(d->core.elf));
 
@@ -297,8 +296,12 @@ static int setup_rproc_elf_core_dump(struct core_rproc *d)
 	d->core.core_note.note_prstatus.n_type = NT_PRSTATUS;
 	memcpy(d->core.core_note.name, CORE_STR, sizeof(CORE_STR));
 
-	remoteproc_fill_pt_regs(regs, xregs);
-
+	/* fill in registers for ipu only, dsp yet to be supported */
+	if (!strcmp(d->rproc->name, "ipu")) {
+		xregs = d->rproc->cdump_buf1;
+		regs = (struct pt_regs *)&d->core.core_note.prstatus.pr_reg;
+		remoteproc_fill_pt_regs(regs, xregs);
+	}
 	/* We ignore the NVIC registers for now */
 
 	d->offset = sizeof(struct core);
@@ -758,7 +761,8 @@ static int rproc_add_mem_entry(struct rproc *rproc, struct fw_resource *rsc)
 		 * Perhaps the ION carveout should be reported as RSC_DEVMEM.
 		 */
 		me->core = (rsc->type == RSC_CARVEOUT &&
-				strcmp(rsc->name, "IPU_MEM_IOBUFS"));
+				strcmp(rsc->name, "IPU_MEM_IOBUFS") &&
+				strcmp(rsc->name, "DSP_MEM_IOBUFS"));
 #endif
 	}
 
