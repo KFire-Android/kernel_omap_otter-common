@@ -30,6 +30,7 @@
 #include <linux/err.h>
 #include <linux/notifier.h>
 #include <linux/module.h>
+#include <linux/pm.h>
 
 #include <plat/mailbox.h>
 
@@ -44,6 +45,49 @@ static DEFINE_MUTEX(mbox_configured_lock);
 static unsigned int mbox_kfifo_size = CONFIG_OMAP_MBOX_KFIFO_SIZE;
 module_param(mbox_kfifo_size, uint, S_IRUGO);
 MODULE_PARM_DESC(mbox_kfifo_size, "Size of omap's mailbox kfifo (bytes)");
+
+/* Runtime PM */
+static int omap_mbox_save_ctx(struct device *dev, void *data)
+{
+	struct omap_mbox *mbox = dev_get_drvdata(dev);
+
+	if (!mbox->ops->save_ctx) {
+		dev_err(mbox->dev, "%s:\tno save\n", __func__);
+		return -EINVAL;
+	}
+
+	mbox->ops->save_ctx(mbox);
+
+	return 0;
+}
+
+static int omap_mbox_restore_ctx(struct device *dev, void *data)
+{
+	struct omap_mbox *mbox = dev_get_drvdata(dev);
+
+	if (!mbox->ops->restore_ctx) {
+		dev_err(mbox->dev, "%s:\tno restore\n", __func__);
+		return -EINVAL;
+	}
+
+	mbox->ops->restore_ctx(mbox);
+
+	return 0;
+}
+
+static int mbox_runtime_resume(struct device *dev)
+{
+	return device_for_each_child(dev, NULL, omap_mbox_restore_ctx);
+}
+
+static int mbox_runtime_suspend(struct device *dev)
+{
+	return device_for_each_child(dev, NULL, omap_mbox_save_ctx);
+}
+
+const struct dev_pm_ops mbox_pm_ops = {
+	SET_RUNTIME_PM_OPS(mbox_runtime_suspend, mbox_runtime_resume, NULL)
+};
 
 /* Mailbox FIFO handle functions */
 static inline mbox_msg_t mbox_fifo_read(struct omap_mbox *mbox)
