@@ -453,12 +453,20 @@ static int twl6030_gpadc_read_channels(struct twl6030_gpadc_data *gpadc,
 			raw_code = twl6030_gpadc_channel_raw_read(gpadc, 0);
 			dev_dbg(gpadc->dev, "GPADC raw: %d\n", raw_code);
 			count++;
-			req->buf[i].raw_channel_value = raw_code;
+			req->buf[i].raw_code = raw_code;
+
 			/* No correction for channels 15-17 */
 			if (unlikely((i >= 15) && (i <= 17))) {
+				raw_channel_value = raw_code;
 				req->buf[i].code = raw_code;
 				req->rbuf[i] = raw_code;
 			} else {
+				raw_channel_value = (raw_code *
+					gpadc->twl6032_cal_tbl[i].gain);
+
+				/* Shift back into mV range */
+				raw_channel_value /= 1000;
+
 				req->buf[i].code = corrected_code =
 				((raw_code * 1000) -
 				gpadc->twl6032_cal_tbl[i].offset_error) /
@@ -473,6 +481,7 @@ static int twl6030_gpadc_read_channels(struct twl6030_gpadc_data *gpadc,
 				/* Shift back into mV range */
 				req->rbuf[i] /= 1000;
 			}
+			req->buf[i].raw_channel_value = raw_channel_value;
 			dev_dbg(gpadc->dev, "GPADC val: %d\n", req->rbuf[i]);
 		}
 	} else {
