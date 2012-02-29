@@ -174,6 +174,16 @@ int soc_dpcm_dapm_stream_event(struct snd_soc_pcm_runtime *fe, int dir,
 	return 0;
 }
 
+static inline void soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd,
+	int dir, int event)
+{
+	/* locks held already by dynamic PCM core */
+	if (rtd->dai_link->dynamic || rtd->dai_link->no_pcm)
+		snd_soc_dapm_stream_event(rtd, dir, event);
+	else
+		snd_soc_dapm_stream_event_locked(rtd, dir, event);
+}
+
 /*
  * Called by ALSA when a PCM substream is opened, the runtime->hw record is
  * then initialized and any private data can be allocated. This also calls
@@ -389,7 +399,7 @@ static void close_delayed_work(struct work_struct *work)
 	/* are we waiting on this codec DAI stream */
 	if (codec_dai->pop_wait == 1) {
 		codec_dai->pop_wait = 0;
-		snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_PLAYBACK,
+		soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_PLAYBACK,
 					  SND_SOC_DAPM_STREAM_STOP);
 	}
 
@@ -453,7 +463,7 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 		if (!rtd->pmdown_time || codec->ignore_pmdown_time ||
 		    rtd->dai_link->ignore_pmdown_time) {
 			/* powered down playback stream now */
-			snd_soc_dapm_stream_event(rtd,
+			soc_dapm_stream_event(rtd,
 						  SNDRV_PCM_STREAM_PLAYBACK,
 						  SND_SOC_DAPM_STREAM_STOP);
 		} else {
@@ -464,7 +474,7 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 		}
 	} else {
 		/* capture streams can be powered down now */
-		snd_soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_CAPTURE,
+		soc_dapm_stream_event(rtd, SNDRV_PCM_STREAM_CAPTURE,
 					  SND_SOC_DAPM_STREAM_STOP);
 	}
 
@@ -534,7 +544,7 @@ static int soc_pcm_prepare(struct snd_pcm_substream *substream)
 		cancel_delayed_work(&rtd->delayed_work);
 	}
 
-	snd_soc_dapm_stream_event(rtd, substream->stream,
+	soc_dapm_stream_event(rtd, substream->stream,
 			SND_SOC_DAPM_STREAM_START);
 
 	snd_soc_dai_digital_mute(codec_dai, 0);
