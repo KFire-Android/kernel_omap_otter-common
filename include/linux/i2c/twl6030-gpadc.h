@@ -134,6 +134,7 @@ enum sample_type {
 
 #define TWL6030_GPADC_IOC_MAGIC '`'
 #define TWL6030_GPADC_IOCX_ADC_RAW_READ	_IO(TWL6030_GPADC_IOC_MAGIC, 0)
+#define TWL6030_GPADC_IOCX_ADC_READ	_IO(TWL6030_GPADC_IOC_MAGIC+1, 0)
 
 struct twl6030_gpadc_user_parms {
 	int channel;
