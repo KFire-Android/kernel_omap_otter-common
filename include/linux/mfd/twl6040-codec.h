@@ -290,6 +290,9 @@ enum twl6040_pll_id twl6040_get_pll(struct twl6040 *twl6040);
 unsigned int twl6040_get_sysclk(struct twl6040 *twl6040);
 int twl6040_get_icrev(struct twl6040 *twl6040);
 void twl6040_report_event(struct twl6040 *twl6040, int event);
+int twl6040_get_reg_supply(unsigned int reg);
+int twl6040_reg_is_vdd(unsigned int reg);
+int twl6040_reg_is_vio(unsigned int reg);
 int twl6040_irq_init(struct twl6040 *twl6040);
 void twl6040_irq_exit(struct twl6040 *twl6040);
 
