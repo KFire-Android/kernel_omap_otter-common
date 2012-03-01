@@ -54,7 +54,7 @@
  *
  */
 
-static int twl6030_interrupt_mapping[24] = {
+static int twl6030_interrupt_mapping_table[24] = {
 	PWR_INTR_OFFSET,	/* Bit 0	PWRON			*/
 	PWR_INTR_OFFSET,	/* Bit 1	RPWRON			*/
 	TWL_VLOW_INTR_OFFSET,	/* Bit 2	BAT_VLOW		*/
@@ -82,6 +82,37 @@ static int twl6030_interrupt_mapping[24] = {
 	CHARGERFAULT_INTR_OFFSET,	/* Bit 22	INT_CHRG	*/
 	RSV_INTR_OFFSET,	/* Bit 23	Reserved		*/
 };
+
+static int twl6032_interrupt_mapping_table[24] = {
+	PWR_INTR_OFFSET,	/* Bit 0	PWRON			*/
+	PWR_INTR_OFFSET,	/* Bit 1	RPWRON			*/
+	TWL_VLOW_INTR_OFFSET,	/* Bit 2	SYS_VLOW		*/
+	RTC_INTR_OFFSET,	/* Bit 3	RTC_ALARM		*/
+	RTC_INTR_OFFSET,	/* Bit 4	RTC_PERIOD		*/
+	HOTDIE_INTR_OFFSET,	/* Bit 5	HOT_DIE			*/
+	SMPSLDO_INTR_OFFSET,	/* Bit 6	VXXX_SHORT		*/
+	PWR_INTR_OFFSET,	/* Bit 7	SPDURATION		*/
+
+	PWR_INTR_OFFSET,	/* Bit 8	WATCHDOG		*/
+	BATDETECT_INTR_OFFSET,	/* Bit 9	BAT			*/
+	SIMDETECT_INTR_OFFSET,	/* Bit 10	SIM			*/
+	MMCDETECT_INTR_OFFSET,	/* Bit 11	MMC			*/
+	MADC_INTR_OFFSET,	/* Bit 12	GPADC_RT_EOC		*/
+	GPADCSW_INTR_OFFSET,	/* Bit 13	GPADC_SW_EOC		*/
+	GASGAUGE_INTR_OFFSET,	/* Bit 14	CC_EOC		*/
+	GASGAUGE_INTR_OFFSET,	/* Bit 15	CC_AUTOCAL		*/
+
+	USBOTG_INTR_OFFSET,	/* Bit 16	ID_WKUP			*/
+	USBOTG_INTR_OFFSET,	/* Bit 17	VBUS_WKUP		*/
+	USBOTG_INTR_OFFSET,	/* Bit 18	ID			*/
+	USB_PRES_INTR_OFFSET,	/* Bit 19	VBUS			*/
+	CHARGER_INTR_OFFSET,	/* Bit 20	CHRG_CTRL		*/
+	CHARGERFAULT_INTR_OFFSET,	/* Bit 21	EXT_CHRG	*/
+	CHARGERFAULT_INTR_OFFSET,	/* Bit 22	INT_CHRG	*/
+	RSV_INTR_OFFSET,	/* Bit 23	Reserved		*/
+};
+
+static int *twl6030_interrupt_mapping = twl6030_interrupt_mapping_table;
 /*----------------------------------------------------------------------*/
 
 static unsigned twl6030_irq_base, twl6030_irq_end;
@@ -453,7 +484,8 @@ int twl6030_vlow_init(int vlow_irq)
 	return 0;
 }
 
-int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end)
+int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end,
+			unsigned long features)
 {
 
 	int	status = 0;
@@ -462,6 +494,10 @@ int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end)
 	u8 mask[4];
 
 	static struct irq_chip	twl6030_irq_chip;
+
+	if (features & TWL6032_SUBCLASS)
+		twl6030_interrupt_mapping = twl6032_interrupt_mapping_table;
+
 	mask[1] = 0xFF;
 	mask[2] = 0xFF;
 	mask[3] = 0xFF;

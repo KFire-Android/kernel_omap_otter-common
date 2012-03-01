@@ -39,6 +39,7 @@
 
 #include <linux/i2c.h>
 #include <linux/i2c/twl.h>
+#include "twl-core.h"
 
 #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
 #include <plat/cpu.h>
@@ -1232,12 +1233,6 @@ static void clocks_init(struct device *dev,
 
 /*----------------------------------------------------------------------*/
 
-int twl4030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end);
-int twl4030_exit_irq(void);
-int twl4030_init_chip_irq(const char *chip);
-int twl6030_init_irq(int irq_num, unsigned irq_base, unsigned irq_end);
-int twl6030_exit_irq(void);
-
 #ifdef CONFIG_PM
 static int twl_suspend(struct i2c_client *client, pm_message_t mesg)
 {
@@ -1364,7 +1359,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			pdata->irq_end);
 		} else {
 			status = twl6030_init_irq(client->irq, pdata->irq_base,
-			pdata->irq_end);
+			pdata->irq_end, features);
 		}
 
 		if (status < 0)
