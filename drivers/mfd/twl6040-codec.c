@@ -34,6 +34,49 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/twl6040-codec.h>
 
+int twl6040_get_reg_supply(unsigned int reg)
+{
+	if (reg > TWL6040_CACHEREGNUM)
+		return -EINVAL;
+
+	switch (reg) {
+	case TWL6040_REG_ASICID:
+	case TWL6040_REG_ASICREV:
+	case TWL6040_REG_INTID:
+	case TWL6040_REG_INTMR:
+	case TWL6040_REG_NCPCTL:
+	case TWL6040_REG_LDOCTL:
+	case TWL6040_REG_AMICBCTL:
+	case TWL6040_REG_DMICBCTL:
+	case TWL6040_REG_HKCTL1:
+	case TWL6040_REG_HKCTL2:
+	case TWL6040_REG_GPOCTL:
+	case TWL6040_REG_TRIM1:
+	case TWL6040_REG_TRIM2:
+	case TWL6040_REG_TRIM3:
+	case TWL6040_REG_HSOTRIM:
+	case TWL6040_REG_HFOTRIM:
+	case TWL6040_REG_ACCCTL:
+	case TWL6040_REG_STATUS:
+		return TWL6040_VIO_SUPPLY;
+	default:
+		return TWL6040_VDD_SUPPLY;
+	}
+}
+EXPORT_SYMBOL(twl6040_get_reg_supply);
+
+int twl6040_reg_is_vdd(unsigned int reg)
+{
+	return twl6040_get_reg_supply(reg) == TWL6040_VDD_SUPPLY;
+}
+EXPORT_SYMBOL(twl6040_reg_is_vdd);
+
+int twl6040_reg_is_vio(unsigned int reg)
+{
+	return twl6040_get_reg_supply(reg) == TWL6040_VIO_SUPPLY;
+}
+EXPORT_SYMBOL(twl6040_reg_is_vio);
+
 static inline int twl6040_cache_read(struct twl6040 *twl6040, unsigned int reg)
 {
 	return twl6040->cache[reg];
