@@ -881,7 +881,13 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 				rsc->pa = pa;
 			} else {
 				ret = rproc_check_poolmem(rproc, rsc->len, pa);
-				if (ret) {
+				/*
+				 * ignore the error for DSP buffers as they can
+				 * not be assigned together with rest of dsp
+				 * pool memory
+				 */
+				if (ret &&
+					strcmp(rsc->name, "DSP_MEM_IOBUFS")) {
 					dev_err(dev, "static memory for %s "
 						"doesn't belong to poolmem\n",
 						rsc->name);
