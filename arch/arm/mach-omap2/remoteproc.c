@@ -37,6 +37,67 @@
 
 #define CONTROL_DSP_BOOTADDR (0x4A002304)
 
+static void dump_ipu_registers(struct rproc *rproc)
+{
+	unsigned long flags;
+	char buf[64];
+	struct pt_regs regs;
+
+	if (!rproc->cdump_buf1)
+		return;
+
+	remoteproc_fill_pt_regs(&regs,
+			(struct exc_regs *)rproc->cdump_buf1);
+
+	pr_info("REGISTER DUMP FOR REMOTEPROC %s\n", rproc->name);
+	pr_info("PC is at %08lx\n", instruction_pointer(&regs));
+	pr_info("LR is at %08lx\n", regs.ARM_lr);
+	pr_info("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
+	       "sp : %08lx  ip : %08lx  fp : %08lx\n",
+		regs.ARM_pc, regs.ARM_lr, regs.ARM_cpsr,
+		regs.ARM_sp, regs.ARM_ip, regs.ARM_fp);
+	pr_info("r10: %08lx  r9 : %08lx  r8 : %08lx\n",
+		regs.ARM_r10, regs.ARM_r9,
+		regs.ARM_r8);
+	pr_info("r7 : %08lx  r6 : %08lx  r5 : %08lx  r4 : %08lx\n",
+		regs.ARM_r7, regs.ARM_r6,
+		regs.ARM_r5, regs.ARM_r4);
+	pr_info("r3 : %08lx  r2 : %08lx  r1 : %08lx  r0 : %08lx\n",
+		regs.ARM_r3, regs.ARM_r2,
+		regs.ARM_r1, regs.ARM_r0);
+
+	flags = regs.ARM_cpsr;
+	buf[0] = flags & PSR_N_BIT ? 'N' : 'n';
+	buf[1] = flags & PSR_Z_BIT ? 'Z' : 'z';
+	buf[2] = flags & PSR_C_BIT ? 'C' : 'c';
+	buf[3] = flags & PSR_V_BIT ? 'V' : 'v';
+	buf[4] = '\0';
+
+	pr_info("Flags: %s  IRQs o%s  FIQs o%s\n",
+		buf, interrupts_enabled(&regs) ? "n" : "ff",
+		fast_interrupts_enabled(&regs) ? "n" : "ff");
+}
+
+static void dump_dsp_registers(struct rproc *rproc)
+{
+	struct exc_dspRegs *regs;
+
+	regs = (struct exc_dspRegs *)rproc->cdump_buf0;
+
+	pr_info("REGISTER DUMP FOR REMOTEPROC %s\n", rproc->name);
+	pr_info("PC is at %08x\n", regs->IRP);
+	pr_info("SP is at %08x\n", regs->b15);
+	pr_info("pc : [<%08x>]    sp : [<%08x>]", regs->IRP, regs->b15);
+}
+
+static struct rproc_ops ipu_ops = {
+	.dump_registers = dump_ipu_registers,
+};
+
+static struct rproc_ops dsp_ops = {
+	.dump_registers = dump_dsp_registers,
+};
+
 static struct omap_rproc_timers_info ipu_timers[] = {
 	{ .id = 3 },
 	{ .id = 4 },
@@ -66,6 +127,7 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.sus_timeout	= 5000,
 		.sus_mbox_name	= "mailbox-2",
 		.boot_reg	= CONTROL_DSP_BOOTADDR,
+		.ops		= &dsp_ops,
 	},
 	{
 		.name		= "ipu",
@@ -82,6 +144,7 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.suspend_mask	= ~0,
 		.sus_timeout	= 5000,
 		.sus_mbox_name	= "mailbox-1",
+		.ops		= &ipu_ops,
 	},
 };
 
