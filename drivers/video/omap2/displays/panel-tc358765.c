@@ -245,7 +245,8 @@ static int tc358765_read_register(struct omap_dss_device *dssdev, u16 reg)
 	*/
 	if (sd1)
 		ret = tc358765_i2c_read(reg);
-	ret = tc358765_dsi_read(dssdev, reg);
+	else
+		ret = tc358765_dsi_read(dssdev, reg);
 	pm_runtime_put_sync(&dssdev->dev);
 	return ret;
 }
