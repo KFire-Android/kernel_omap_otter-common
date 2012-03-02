@@ -743,6 +743,26 @@ static int _twl6032_gpadc_conversion(struct twl6030_gpadc_request *req,
 		twl6030_gpadc_write(the_gpadc, method->sel, ch_lsb);
 	}
 
+	/*
+	 * For the TWL6032 Asynchronous Conversion
+	 * maximum channels count is 1
+	 */
+	if ((req->method == TWL6030_GPADC_SW2) &&
+		 (req->type == TWL6030_GPADC_IRQ_ONESHOT)) {
+		if (channelcnt > 1) {
+			ret = -EINVAL;
+			goto out;
+		}
+
+		for (i = 0; i < TWL6032_GPADC_MAX_CHANNELS; i++) {
+			if (!(req->channels & BIT(i)))
+				continue;
+
+			/* select the ADC channel to be read */
+			twl6030_gpadc_write(the_gpadc, method->sel, i);
+		}
+	}
+
 	if (req->type == TWL6030_GPADC_IRQ_ONESHOT) {
 		twl6030_gpadc_set_irq(the_gpadc, req);
 		twl6030_gpadc_start_conversion(the_gpadc, req->method);
