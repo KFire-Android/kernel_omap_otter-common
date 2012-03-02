@@ -1314,6 +1314,13 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 			continue;
 		}
 
+		if (phyAddr.uiAddr >= psDevInfo->psLINFBInfo->fix.smem_start &&
+		    phyAddr.uiAddr < (psDevInfo->psLINFBInfo->fix.smem_start + psDevInfo->psLINFBInfo->fix.smem_len))
+		{
+			asMemInfo[k].uiAddr = phyAddr.uiAddr;
+			continue;
+		}
+
 		/* normal gralloc layer */
 		psTilerInfo = kzalloc(sizeof(*psTilerInfo), GFP_KERNEL);
 		if(!psTilerInfo)
