@@ -60,7 +60,7 @@ struct twl6030_gpadc_request {
 	int active;
 	int result_pending;
 	int rbuf[TWL6032_GPADC_MAX_CHANNELS];
-	void (*func_cb)(int len, int channels, int *buf);
+	void (*func_cb)(struct twl6030_gpadc_request *req);
 	struct twl6030_value buf[TWL6032_GPADC_MAX_CHANNELS];
 };
 
