@@ -290,6 +290,12 @@ static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift,
 		"not suppose to be used on omap4\n");
 	return 0;
 }
+static inline void omap3xxx_prm_reconfigure_io_chain(void)
+{
+	WARN(1, "%s:prm: omap2xxx/omap3xxx specific function and "
+		"not suppose to be used on omap4\n", __func__);
+	return;
+}
 static inline void omap2_prm_enable_prcm_module_wakeup(s16 prcm_mod,
 		u8 prm_reg_id, u8 prm_reg_shift, bool set_wake)
 {
@@ -324,6 +330,8 @@ void omap3_prm_vp_clear_txdone(u8 vp_id);
 extern u32 omap3_prm_vcvp_read(u8 offset);
 extern void omap3_prm_vcvp_write(u32 val, u8 offset);
 extern u32 omap3_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+
+extern void omap3xxx_prm_reconfigure_io_chain(void);
 
 /* PRM interrupt-related functions */
 extern void omap3xxx_prm_read_pending_irqs(unsigned long *events);
