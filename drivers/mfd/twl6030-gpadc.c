@@ -48,7 +48,6 @@
 #define GPADCS		(1 << 1)
 #define GPADCR		(1 << 0)
 
-#define TWL6030_GPADC_MASK		0x20
 #define SCALE				(1 << 15)
 
 struct twl6030_chnl_calib {
@@ -307,11 +306,12 @@ struct twl6030_gpadc_data {
 
 static struct twl6030_gpadc_data *the_gpadc;
 
-static
-const struct twl6030_gpadc_conversion_method twl6030_conversion_methods[] = {
+static const
+struct twl6030_gpadc_conversion_method twl6030_conversion_methods_table[] = {
 	[TWL6030_GPADC_RT] = {
 		.sel	= TWL6030_GPADC_RTSELECT_LSB,
 		.rbase	= TWL6030_GPADC_RTCH0_LSB,
+		.mask	= TWL6030_GPADC_RT_SW1_EOC_MASK,
 	},
 	/*
 	 * TWL6030_GPADC_SW1 is not supported as
@@ -321,14 +321,28 @@ const struct twl6030_gpadc_conversion_method twl6030_conversion_methods[] = {
 		.rbase	= TWL6030_GPADC_GPCH0_LSB,
 		.ctrl	= TWL6030_GPADC_CTRL_P2,
 		.enable = TWL6030_GPADC_CTRL_P2_SP2,
-	},
-	[TWL6032_GPADC_SW2] = {
-		.sel	= TWL6032_GPADC_GPSELECT_ISB,
-		.rbase	= TWL6030_GPADC_GPCH0_LSB,
-		.ctrl	= TWL6032_GPADC_CTRL_P1,
-		.enable = TWL6030_GPADC_CTRL_P1_SP1,
+		.mask	= TWL6030_GPADC_SW2_EOC_MASK,
 	},
 };
+
+static const
+struct twl6030_gpadc_conversion_method twl6032_conversion_methods_table[] = {
+	[TWL6030_GPADC_RT] = {
+		.sel	= TWL6032_GPADC_RTSELECT_LSB,
+		.rbase	= TWL6032_RTCH0_LSB,
+		.mask	= TWL6032_GPADC_RT_EOC_MASK,
+	},
+	[TWL6030_GPADC_SW2] = {
+		.sel	= TWL6032_GPADC_GPSELECT_ISB,
+		.rbase	= TWL6032_GPCH0_LSB,
+		.ctrl	= TWL6032_GPADC_CTRL_P1,
+		.enable = TWL6030_GPADC_CTRL_P1_SP1,
+		.mask	= TWL6032_GPADC_SW_EOC_MASK,
+	},
+};
+
+static const
+struct twl6030_gpadc_conversion_method *twl6030_conversion_methods;
 
 static ssize_t show_gain(struct device *dev,
 		struct device_attribute *devattr, char *buf)
@@ -417,19 +431,12 @@ static int twl6030_gpadc_channel_raw_read(struct twl6030_gpadc_data *gpadc,
 {
 	u8 msb, lsb;
 
-	if (gpadc->features & TWL6032_SUBCLASS) {
-		/* read the channel data */
-		msb = twl6030_gpadc_read(gpadc, TWL6032_GPCH0_MSB);
-		lsb = twl6030_gpadc_read(gpadc, TWL6032_GPCH0_LSB);
-	} else {
-
-		/* For each ADC channel, we have MSB and LSB register pair.
-		 * MSB address is always LSB address+1. reg parameter is the
-		 * addr of LSB register
-		 */
-		msb = twl6030_gpadc_read(gpadc, reg + 1);
-		lsb = twl6030_gpadc_read(gpadc, reg);
-	}
+	/* For each ADC channel, we have MSB and LSB register pair.
+	 * MSB address is always LSB address+1. reg parameter is the
+	 * addr of LSB register
+	 */
+	msb = twl6030_gpadc_read(gpadc, reg + 1);
+	lsb = twl6030_gpadc_read(gpadc, reg);
 	return (int)((msb << 8) | lsb);
 }
 
@@ -449,8 +456,11 @@ static int twl6030_gpadc_read_channels(struct twl6030_gpadc_data *gpadc,
 		for (i = 0; i < TWL6032_GPADC_MAX_CHANNELS; i++) {
 			if (channels & BIT(i))
 				continue;
+
+			reg = reg_base + 2 * count;
+
 			dev_dbg(gpadc->dev, "GPADC chn: %d\n", i);
-			raw_code = twl6030_gpadc_channel_raw_read(gpadc, 0);
+			raw_code = twl6030_gpadc_channel_raw_read(gpadc, reg);
 			dev_dbg(gpadc->dev, "GPADC raw: %d\n", raw_code);
 			count++;
 			req->buf[i].raw_code = raw_code;
@@ -521,23 +531,17 @@ static int twl6030_gpadc_read_channels(struct twl6030_gpadc_data *gpadc,
 
 static void twl6030_gpadc_enable_irq(u16 method)
 {
-	if (method == TWL6032_GPADC_SW2)
-		method = TWL6030_GPADC_SW2;
-
-	twl6030_interrupt_unmask(TWL6030_GPADC_MASK << method,
+	twl6030_interrupt_unmask(twl6030_conversion_methods[method].mask,
 						REG_INT_MSK_LINE_B);
-	twl6030_interrupt_unmask(TWL6030_GPADC_MASK << method,
+	twl6030_interrupt_unmask(twl6030_conversion_methods[method].mask,
 						REG_INT_MSK_STS_B);
 }
 
 static void twl6030_gpadc_disable_irq(u16 method)
 {
-	if (method == TWL6032_GPADC_SW2)
-		method = TWL6030_GPADC_SW2;
-
-	twl6030_interrupt_mask(TWL6030_GPADC_MASK << method,
+	twl6030_interrupt_mask(twl6030_conversion_methods[method].mask,
 						REG_INT_MSK_LINE_B);
-	twl6030_interrupt_mask(TWL6030_GPADC_MASK << method,
+	twl6030_interrupt_mask(twl6030_conversion_methods[method].mask,
 						REG_INT_MSK_STS_B);
 }
 
@@ -628,7 +632,6 @@ twl6030_gpadc_start_conversion(struct twl6030_gpadc_data *gpadc,
 
 	switch (conv_method) {
 	case TWL6030_GPADC_SW2:
-	case TWL6032_GPADC_SW2:
 		twl6030_gpadc_write(gpadc, method->ctrl, method->enable);
 		break;
 	case TWL6030_GPADC_RT:
@@ -708,7 +711,45 @@ out:
 static int _twl6032_gpadc_conversion(struct twl6030_gpadc_request *req,
 	const struct twl6030_gpadc_conversion_method *method)
 {
-	int i, ret, count = 0;
+	int i, ret, count = 0, channelcnt = 0;
+	u8 ch_msb, ch_lsb, ch_isb;
+
+	if ((req->type == TWL6030_GPADC_IRQ_ONESHOT) &&
+		(req->func_cb == NULL)) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	for (i = 0; i < TWL6032_GPADC_MAX_CHANNELS; i++)
+		if (req->channels & BIT(i))
+			channelcnt++;
+
+	if (req->method == TWL6030_GPADC_RT) {
+		/*
+		 * For the TWL6032 real time conversion
+		 * maximum channels count is 2
+		 */
+		if ((req->type != TWL6030_GPADC_IRQ_ONESHOT) ||
+			 (channelcnt > 2)) {
+			ret = -EINVAL;
+			goto out;
+		}
+
+		ch_msb = (req->channels >> 16) & 0x07;
+		ch_isb = (req->channels >> 8) & 0xff;
+		ch_lsb = req->channels & 0xff;
+		twl6030_gpadc_write(the_gpadc, method->sel + 2, ch_msb);
+		twl6030_gpadc_write(the_gpadc, method->sel + 1, ch_isb);
+		twl6030_gpadc_write(the_gpadc, method->sel, ch_lsb);
+	}
+
+	if (req->type == TWL6030_GPADC_IRQ_ONESHOT) {
+		twl6030_gpadc_set_irq(the_gpadc, req);
+		twl6030_gpadc_start_conversion(the_gpadc, req->method);
+		the_gpadc->requests[req->method].active = 1;
+		ret = 0;
+		goto out;
+	}
 
 	for (i = 0; i < TWL6032_GPADC_MAX_CHANNELS; i++) {
 		if (!(req->channels & BIT(i)))
@@ -791,10 +832,7 @@ static ssize_t show_channel(struct device *dev,
 	int ret;
 
 	req.channels = (1 << attr->index);
-	if (the_gpadc->features & TWL6032_SUBCLASS)
-		req.method = TWL6032_GPADC_SW2;
-	else
-		req.method = TWL6030_GPADC_SW2;
+	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
 	ret = twl6030_gpadc_conversion(&req);
@@ -818,10 +856,7 @@ static ssize_t show_raw_code(struct device *dev,
 	int ret;
 
 	req.channels = (1 << attr->index);
-	if (the_gpadc->features & TWL6032_SUBCLASS)
-		req.method = TWL6032_GPADC_SW2;
-	else
-		req.method = TWL6030_GPADC_SW2;
+	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
 	ret = twl6030_gpadc_conversion(&req);
@@ -963,10 +998,7 @@ static long twl6030_gpadc_ioctl(struct file *filp, unsigned int cmd,
 		}
 
 		req.channels = (1 << par.channel);
-		if (the_gpadc->features & TWL6032_SUBCLASS)
-			req.method	= TWL6032_GPADC_SW2;
-		else
-			req.method	= TWL6030_GPADC_SW2;
+		req.method	= TWL6030_GPADC_SW2;
 		req.func_cb	= NULL;
 
 		val = twl6030_gpadc_conversion(&req);
@@ -1236,6 +1268,11 @@ static int __devinit twl6030_gpadc_probe(struct platform_device *pdev)
 	gpadc->dev = &pdev->dev;
 
 	gpadc->features = pdata->features;
+
+	twl6030_conversion_methods = twl6030_conversion_methods_table;
+
+	if (gpadc->features & TWL6032_SUBCLASS)
+		twl6030_conversion_methods = twl6032_conversion_methods_table;
 
 	ret = misc_register(&twl6030_gpadc_device);
 	if (ret) {

@@ -544,10 +544,7 @@ static int twl6030_get_gpadc_conversion(struct twl6030_bci_device_info *di,
 	int ret;
 
 	req.channels = (1 << channel_no);
-	if (di->features & TWL6032_SUBCLASS)
-		req.method = TWL6032_GPADC_SW2;
-	else
-		req.method = TWL6030_GPADC_SW2;
+	req.method = TWL6030_GPADC_SW2;
 	req.active = 0;
 	req.func_cb = NULL;
 	ret = twl6030_gpadc_conversion(&req);
@@ -1373,10 +1370,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	if (di->charge_status == POWER_SUPPLY_STATUS_CHARGING)
 		twl6030_set_watchdog(di, di->watchdog_duration);
 
-	if (di->features & TWL6032_SUBCLASS)
-		req.method = TWL6032_GPADC_SW2;
-	else
-		req.method = TWL6030_GPADC_SW2;
+	req.method = TWL6030_GPADC_SW2;
 	req.channels = (1 << 1) | (1 << di->gpadc_vbat_chnl) | (1 << 8);
 
 	req.active = 0;
