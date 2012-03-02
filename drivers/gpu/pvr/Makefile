@@ -114,6 +114,7 @@ pvrsrvkm-$(CONFIG_GCCORE) += gc_bvmapping.o
 omaplfb-y := \
 	omaplfb/omaplfb_displayclass.o \
 	omaplfb/omaplfb_linux.o
+omaplfb-$(CONFIG_GCBV) += omaplfb/omaplfb_bv.o
 
 obj-$(CONFIG_PVR_SGX) += pvrsrvkm.o
 obj-$(CONFIG_PVR_SGX) += omaplfb.o

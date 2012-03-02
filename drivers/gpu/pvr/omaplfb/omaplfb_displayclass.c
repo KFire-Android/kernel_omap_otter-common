@@ -31,9 +31,6 @@
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/notifier.h>
-#include <linux/bltsville.h>
-#include <linux/bvinternal.h>
-#include <linux/gcbv-iface.h>
 
 #include "img_defs.h"
 #include "servicesext.h"
@@ -57,25 +54,8 @@
 #include <video/omap_hwc.h>
 #include "../services_headers.h"
 
-int debugbv;
-
 void sgx_idle_log_flip(void);
 extern struct ion_client *gpsIONClient;
-
-/*
- * This is the number of framebuffers which will be rendered to by the SGX
- */
-#define OMAPLFB_NUM_SGX_FBS	2
-
-/*
- * This is the number of framebuffers rendered to by GC320
- */
-#define OMAPLFB_NUM_BLT_FBS	2
-
-/*
- * Are the blit framebuffers in VRAM?
- */
-#define OMAPLFB_BLT_FBS_VRAM 1
 
 #endif
 
@@ -92,12 +72,9 @@ static OMAPLFB_DEVINFO *gapsDevInfo[OMAPLFB_MAX_NUM_DEVICES];
 
 static PFN_DC_GET_PVRJTABLE gpfnGetPVRJTable = NULL;
 
-static int gbBvInterfacePresent;
-static struct bventry gsBvInterface = {NULL, NULL, NULL};
-
-#if defined(CONFIG_DSSCOMP)
-static OMAPLFB_ERROR InitBltFBs(OMAPLFB_DEVINFO *psDevInfo);
-#endif
+static IMG_BOOL gbBvInterfacePresent;
+static IMG_BOOL gbBvReady = IMG_FALSE;
+static IMG_BOOL bBltReady = IMG_FALSE;
 
 static inline unsigned long RoundUpToMultiple(unsigned long x, unsigned long y)
 {
@@ -585,7 +562,6 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 	OMAPLFB_DEVINFO	*psDevInfo;
 	OMAPLFB_SWAPCHAIN *psSwapChain;
 	OMAPLFB_ERROR eError;
-	int i;
 	
 	if(!hDevice || !hSwapChain)
 	{
@@ -615,35 +591,9 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 		printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Couldn't disable framebuffer event notification\n", __FUNCTION__, psDevInfo->uiFBDevID);
 	}
 
-	if (gbBvInterfacePresent) {
-		struct bventry *bv_entry = &gsBvInterface;
-
-		for (i = 0; i < psSwapChain->ulBufferCount; i++) {
-			struct bvbuffdesc *buffdesc;
-
-			if (!psSwapChain->psBuffer[i].bvmap_handle)
-				continue;
-
-			buffdesc = psSwapChain->psBuffer[i].bvmap_handle;
-			bv_entry->bv_unmap(buffdesc);
-			kfree(buffdesc);
-		}
-
-		/* HACK: Release VRAM bv map done for clear workaround */
-		if (psDevInfo->sFBInfo.bIs2D) {
-			struct bvbuffdesc *buffdesc;
-
-			if (psDevInfo->sFBInfo.clr_fb_desc) {
-				buffdesc = psDevInfo->sFBInfo.clr_fb_desc;
-				bv_entry->bv_unmap(buffdesc);
-				kfree(buffdesc);
-			}
-
-			if (psDevInfo->sFBInfo.clr_fb_geom)
-				kfree(psDevInfo->sFBInfo.clr_fb_geom);
-		}
-	}
-
+	OMAPLFBDeInitBltFBs(psDevInfo);
+	gbBvReady = IMG_FALSE;
+	bBltReady = IMG_FALSE;
 	OMAPLFBFreeKernelMem(psSwapChain->psBuffer);
 	OMAPLFBFreeKernelMem(psSwapChain);
 
@@ -791,6 +741,36 @@ static PVRSRV_ERROR SwapToDCSystem(IMG_HANDLE hDevice,
 	return PVRSRV_OK;
 }
 
+#if !defined(CONFIG_GCBV)
+IMG_BOOL OMAPLFBInitBlt(void)
+{
+	return IMG_FALSE;
+}
+
+OMAPLFB_ERROR OMAPLFBInitBltFBs(OMAPLFB_DEVINFO *psDevInfo)
+{
+	return OMAPLFB_ERROR_INIT_FAILURE;
+}
+
+void OMAPLFBDeInitBltFBs(OMAPLFB_DEVINFO *psDevInfo)
+{
+}
+
+IMG_BOOL OMAPLFBBltFbClearWorkaround(OMAPLFB_DEVINFO *psDevInfo)
+{
+	return IMG_FALSE;
+}
+void OMAPLFBGetBltFBsBvHndl(OMAPLFB_FBINFO *psPVRFBInfo, IMG_UINTPTR_T *ppPhysAddr)
+{
+	*ppPhysAddr = 0;
+}
+
+void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struct omap_hwc_blit_data *blit_data, IMG_UINT32 ui32NumMemInfos)
+{
+}
+#endif /* CONFIG_GCBV */
+
+
 static OMAPLFB_BOOL WaitForVSyncSettle(OMAPLFB_DEVINFO *psDevInfo)
 {
 		unsigned i;
@@ -936,274 +916,12 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 	return IMG_TRUE;
 }
 
-#if defined(CONFIG_DSSCOMP)
-static IMG_BOOL InitBltFbClearWorkaround(OMAPLFB_DEVINFO *psDevInfo)
-{
-	/* Work-around: Map VRAM to make a blit to clear the FB, VRAM has black
-	 * transparent pixels only possible if FB is 2D otherwise it won't
-	 * work!
-	 */
-
-	struct bventry *bv_entry = &gsBvInterface;
-	OMAPLFB_FBINFO *psPVRFBInfo = &psDevInfo->sFBInfo;
-	struct fb_info *psLINFBInfo = psDevInfo->psLINFBInfo;
-	unsigned long phy_addr, phy_base, phy_sz;
-	unsigned int num_pages;
-	unsigned long *page_addrs;
-	enum bverror bv_error;
-	int j;
-	struct bvbuffdesc *buffdesc;
-	struct bvsurfgeom *clr_fb_geom;
-
-	phy_base = phy_addr = psLINFBInfo->fix.smem_start;
-	if (!psPVRFBInfo->bIs2D)
-	{
-		phy_addr += psPVRFBInfo->ulRoundedBufferSize *
-			    psDevInfo->psSwapChain->ulBufferCount;
-	}
-	phy_addr += (OMAPLFB_BLT_FBS_VRAM) ?
-			psPVRFBInfo->psBltFBsNo *
-			psPVRFBInfo->ulRoundedBufferSize : 0;
-
-	phy_sz = (psLINFBInfo->fix.line_length * psLINFBInfo->var.yres) + PAGE_SIZE - 1;
-	num_pages = phy_sz >> PAGE_SHIFT;
-	if ((phy_addr + phy_sz) > (phy_base + psLINFBInfo->fix.smem_len))
-	{
-		WARN(1, "%s: Blt clear area exceeds VRAM, off %ld sz %ld\n",
-			__func__, phy_addr - phy_base, phy_sz);
-		return IMG_FALSE;
-	}
-
-	page_addrs = kzalloc(sizeof(*page_addrs) *
-			num_pages, GFP_KERNEL);
-	if (!page_addrs) {
-		WARN(1, "%s: Out of memory\n", __func__);
-		return IMG_FALSE;
-	}
-
-	buffdesc = kzalloc(sizeof(*buffdesc), GFP_KERNEL);
-	if (!buffdesc) {
-		WARN(1, "%s: Out of memory\n", __func__);
-		kfree(page_addrs);
-		return IMG_FALSE;
-	}
-
-	clr_fb_geom = kzalloc(sizeof(*clr_fb_geom), GFP_KERNEL);
-	if (!clr_fb_geom) {
-		WARN(1, "%s: Out of memory\n", __func__);
-		kfree(buffdesc);
-		kfree(page_addrs);
-		return IMG_FALSE;
-	}
-
-	for(j = 0; j < num_pages; j++) {
-		page_addrs[j] = phy_addr + (j * PAGE_SIZE);
-	}
-
-	buffdesc->structsize = sizeof(*buffdesc);
-	buffdesc->pagesize = PAGE_SIZE;
-	buffdesc->pagearray = page_addrs;
-	buffdesc->pagecount = num_pages;
-	/* Mark the buffer with != 0, otherwise GC driver blows up */
-	buffdesc->virtaddr = (void*)10;
-
-	bv_error = bv_entry->bv_map(buffdesc);
-	if (bv_error) {
-		WARN(1, "%s: BV map swapchain buffer failed %d\n",
-				__func__, bv_error);
-		psPVRFBInfo->clr_fb_desc = NULL;
-		kfree(buffdesc);
-		kfree(clr_fb_geom);
-		kfree(page_addrs);
-		return IMG_FALSE;
-	} else
-		psPVRFBInfo->clr_fb_desc = buffdesc;
-
-	kfree(page_addrs);
-
-	clr_fb_geom->structsize = sizeof(struct bvsurfgeom);
-	clr_fb_geom->format = OCDFMT_BGRA24;
-	clr_fb_geom->width = psLINFBInfo->var.xres;
-	clr_fb_geom->height = psLINFBInfo->var.yres;
-	clr_fb_geom->orientation = 0;
-	clr_fb_geom->virtstride = psLINFBInfo->fix.line_length;
-	clr_fb_geom->physstride = clr_fb_geom->virtstride;
-	psPVRFBInfo->clr_fb_geom = clr_fb_geom;
-	return IMG_TRUE;
-}
-
-/* FIXME: Manual clipping, this should be done in bltsville not here */
-static void clip_rects(struct bvbltparams *pParmsIn)
-{
-	if (pParmsIn->dstrect.left < 0 || pParmsIn->dstrect.top < 0 ||
-		(pParmsIn->dstrect.left + pParmsIn->dstrect.width) >
-			pParmsIn->dstgeom->width ||
-		(pParmsIn->dstrect.top + pParmsIn->dstrect.height) >
-			pParmsIn->dstgeom->height) {
-
-		/* Adjust src1 */
-		if (pParmsIn->dstrect.left < 0) {
-			pParmsIn->src1rect.left = abs(pParmsIn->dstrect.left);
-			pParmsIn->src1rect.width -= pParmsIn->src1rect.left;
-			pParmsIn->dstrect.left = 0;
-		}
-
-		if (pParmsIn->dstrect.top < 0) {
-			pParmsIn->src1rect.top = abs(pParmsIn->dstrect.top);
-			pParmsIn->src1rect.height -= pParmsIn->src1rect.top;
-			pParmsIn->dstrect.top = 0;
-		}
-
-		if (pParmsIn->dstrect.left + pParmsIn->dstrect.width >
-			pParmsIn->dstgeom->width) {
-			pParmsIn->dstrect.width -= (pParmsIn->dstrect.left +
-				pParmsIn->dstrect.width) -
-				pParmsIn->dstgeom->width;
-			pParmsIn->src1rect.width = pParmsIn->dstrect.width;
-		}
-
-		if (pParmsIn->dstrect.top + pParmsIn->dstrect.height >
-			pParmsIn->dstgeom->height) {
-			pParmsIn->dstrect.height -= (pParmsIn->dstrect.top +
-				pParmsIn->dstrect.height) -
-				pParmsIn->dstgeom->height;
-			pParmsIn->src1rect.height = pParmsIn->dstrect.height;
-		}
-
-		/* Adjust src2 */
-		if (pParmsIn->dstrect.left < 0) {
-			pParmsIn->src2rect.left = abs(pParmsIn->dstrect.left);
-			pParmsIn->src2rect.width -= pParmsIn->src2rect.left;
-			pParmsIn->dstrect.left = 0;
-		}
-
-		if (pParmsIn->dstrect.top < 0) {
-			pParmsIn->src2rect.top = abs(pParmsIn->dstrect.top);
-			pParmsIn->src2rect.height -= pParmsIn->src2rect.top;
-			pParmsIn->dstrect.top = 0;
-		}
-
-		if (pParmsIn->dstrect.left + pParmsIn->dstrect.width >
-			pParmsIn->dstgeom->width) {
-			pParmsIn->dstrect.width -= (pParmsIn->dstrect.left +
-				pParmsIn->dstrect.width) -
-				pParmsIn->dstgeom->width;
-			pParmsIn->src2rect.width = pParmsIn->dstrect.width;
-		}
-
-		if (pParmsIn->dstrect.top + pParmsIn->dstrect.height >
-			pParmsIn->dstgeom->height) {
-			pParmsIn->dstrect.height -= (pParmsIn->dstrect.top +
-				pParmsIn->dstrect.height) -
-				pParmsIn->dstgeom->height;
-			pParmsIn->src2rect.height = pParmsIn->dstrect.height;
-		}
-	}
-}
-
-static void print_bvparams(struct bvbltparams *bltparams,
-                           unsigned int pSrc1DescInfo, unsigned int pSrc2DescInfo)
-{
-	if (bltparams->flags & BVFLAG_BLEND)
-	{
-		printk(KERN_INFO "%s: param %s %x (%s), flags %ld\n",
-			"bv", "blend", bltparams->op.blend,
-			bltparams->op.blend == BVBLEND_SRC1OVER ? "src1over" : "??",
-			bltparams->flags);
-	}
-
-	if (bltparams->flags & BVFLAG_ROP)
-	{
-		printk(KERN_INFO "%s: param %s %x (%s), flags %ld\n",
-			"bv", "rop", bltparams->op.rop,
-			bltparams->op.rop == 0xCCCC ? "srccopy" : "??",
-			bltparams->flags);
-	}
-
-	printk(KERN_INFO "%s: dst %d,%d rect{%d,%d sz %d,%d}"
-		" stride %ld desc 0x%p\n", "bv",
-		bltparams->dstgeom->width,
-		bltparams->dstgeom->height,
-		bltparams->dstrect.left, bltparams->dstrect.top,
-		bltparams->dstrect.width, bltparams->dstrect.height,
-		bltparams->dstgeom->physstride,
-		bltparams->dstdesc->pagearray);
-
-	printk(KERN_INFO "%s: src1 %d,%d rect{%d,%d sz %d,%d}"
-		" stride %ld, virtaddr 0x%x (0x%x)\n", "bv",
-		bltparams->src1geom->width,
-		bltparams->src1geom->height, bltparams->src1rect.left,
-		bltparams->src1rect.top, bltparams->src1rect.width,
-		bltparams->src1rect.height, bltparams->src1geom->physstride,
-		(unsigned int)bltparams->src1.desc->virtaddr, pSrc1DescInfo);
-
-	if (!(bltparams->flags & BVFLAG_BLEND))
-		return;
-
-	printk(KERN_INFO "%s: src2 %d,%d rect{%d,%d sz %d,%d}"
-		" stride %ld, virtaddr 0x%x (0x%x)\n", "bv",
-		bltparams->src2geom->width,
-		bltparams->src2geom->height, bltparams->src2rect.left,
-		bltparams->src2rect.top, bltparams->src2rect.width,
-		bltparams->src2rect.height, bltparams->src2geom->physstride,
-		(unsigned int)bltparams->src2.desc->virtaddr, pSrc2DescInfo);
-}
-
-static enum bverror bv_map_meminfo(OMAPLFB_DEVINFO *psDevInfo,
-	struct bventry *bv_entry, struct bvbuffdesc *buffdesc,
-	PDC_MEM_INFO *meminfo)
-{
-	IMG_CPU_PHYADDR phyAddr;
-	IMG_UINT32 ui32NumPages;
-	IMG_SIZE_T uByteSize;
-	unsigned long *page_addrs;
-	enum bverror bv_error;
-	int i;
-
-	psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetByteSize(*meminfo,
-		&uByteSize);
-	ui32NumPages = (uByteSize + PAGE_SIZE - 1) >> PAGE_SHIFT;
-	page_addrs = kzalloc(sizeof(*page_addrs) * ui32NumPages, GFP_KERNEL);
-	if (!page_addrs) {
-		WARN(1, "%s: Out of memory\n", __func__);
-		return BVERR_OOM;
-	}
-
-	for (i = 0; i < ui32NumPages; i++) {
-		psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(
-			*meminfo, i << PAGE_SHIFT, &phyAddr);
-		page_addrs[i] = (u32)phyAddr.uiAddr;
-	}
-
-	/* Assume the structsize and length is already assigned */
-	buffdesc->map = NULL;
-	buffdesc->pagesize = PAGE_SIZE;
-	buffdesc->pagearray = page_addrs;
-	buffdesc->pagecount = ui32NumPages;
-	buffdesc->pageoffset = 0;
-
-	bv_error = bv_entry->bv_map(buffdesc);
-
-	kfree(page_addrs);
-	return bv_error;
-}
-
-static void getBltFBsBvHndl(OMAPLFB_FBINFO *psPVRFBInfo,
-                            struct bvbuffdesc **buffdesc, IMG_UINTPTR_T *ppPhysAddr)
-{
-	if (++psPVRFBInfo->iBltFBsIdx >= OMAPLFB_NUM_BLT_FBS)
-	{
-		psPVRFBInfo->iBltFBsIdx = 0;
-	}
-	*buffdesc = psPVRFBInfo->psBltFBsBvHndl[psPVRFBInfo->iBltFBsIdx];
-	*ppPhysAddr = psPVRFBInfo->psBltFBsBvPhys[psPVRFBInfo->iBltFBsIdx];
-}
-
-static inline int meminfo_idx_valid(unsigned int meminfo_ix, int num_meminfos)
+#if defined(CONFIG_DSSCOMP) && defined(CONFIG_TI_TILER)
+int meminfo_idx_valid(unsigned int meminfo_ix, int num_meminfos)
 {
 	if (meminfo_ix < 0 || meminfo_ix >= num_meminfos) {
 		WARN(1, "%s: Invalid meminfo index %d, max %d\n",
-			__func__, meminfo_ix, num_meminfos);
+				__func__, meminfo_ix, num_meminfos);
 		return 0;
 	}
 	return 1;
@@ -1217,7 +935,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
                               IMG_UINT32 uiHwcDataSz)
 {
 	struct tiler_pa_info *apsTilerPAs[5];
-	IMG_UINT32 i, k, j;
+	IMG_UINT32 i, k;
 	struct {
 		IMG_UINTPTR_T uiAddr;
 		IMG_UINTPTR_T uiUVAddr;
@@ -1227,20 +945,10 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 	/* Framebuffer info just used to get FB geometry, the address to
 	 * use for blitting (dst buffer) is the first meminfo
 	 */
-	struct rgz_blt_entry *entry_list;
-	struct bventry *bv_entry = &gsBvInterface;
-	struct bvbuffdesc src1desc;
-	struct bvbuffdesc src2desc;
-	struct bvbuffdesc *dstdesc = NULL;
-	struct bvsurfgeom src1geom;
-	struct bvsurfgeom src2geom;
-	struct bvsurfgeom dstgeom;
-	struct bvbltparams bltparams;
 	int rgz_items;
 	int calcsz;
 	struct dsscomp_setup_dispc_data *psDssData = &(psHwcData->dsscomp_data);
 	int iMemIdx = 0;
-	static IMG_BOOL bBltReady = IMG_FALSE;
 
 	if (uiHwcDataSz <= offsetof(struct omap_hwc_data, blit_data))
 		rgz_items = 0;
@@ -1261,12 +969,12 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 	if (rgz_items > 0 && !bBltReady)
 	{
 		/* Defer allocation and mapping of blit buffers */
-		if (InitBltFBs(psDevInfo) != OMAPLFB_OK)
+		if (OMAPLFBInitBltFBs(psDevInfo) != OMAPLFB_OK)
 		{
 			WARN(1, "Could not initialize blit FBs");
 			return IMG_FALSE;
 		}
-		if (InitBltFbClearWorkaround(psDevInfo) != IMG_TRUE)
+		if (OMAPLFBBltFbClearWorkaround(psDevInfo) != IMG_TRUE)
 		{
 			WARN(1, "Could not initialize blit clear region");
 			return IMG_FALSE;
@@ -1292,7 +1000,8 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 	if (rgz_items > 0)
 	{
 		iMemIdx++;
-		getBltFBsBvHndl(&psDevInfo->sFBInfo, &dstdesc, &asMemInfo[0].uiAddr);
+		/* Increment the Blt framebuffer and get new address */
+		OMAPLFBGetBltFBsBvHndl(&psDevInfo->sFBInfo, &asMemInfo[0].uiAddr);
 	}
 
 	for (i = 0, k = iMemIdx; i < ui32NumMemInfos && k < ARRAY_SIZE(apsTilerPAs) &&
@@ -1396,154 +1105,14 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		apsTilerPAs[i] = asMemInfo[ix].psTilerInfo;
 	}
 
-	/* DSS pipes are setup up to this point, we can begin blitting here */
-	entry_list = (struct rgz_blt_entry *) (psHwcData->blit_data.rgz_blts);
-	for (j = 0; j < rgz_items; j++) {
-		struct rgz_blt_entry *entry = &entry_list[j];
-		enum bverror bv_error = 0;
-		unsigned int meminfo_ix;
-		int src1_mapped = 0, src2_mapped = 0;
-		unsigned int iSrc1DescInfo = 0, iSrc2DescInfo = 0;
-		if (debugbv)
-		{
-			iSrc1DescInfo = (unsigned int)entry->src1desc.virtaddr;
-			iSrc2DescInfo = (unsigned int)entry->src2desc.virtaddr;
-		}
-
-		/* BV Parameters data */
-		bltparams = entry->bp;
-
-		/* Src1 buffer data */
-		src1desc = entry->src1desc;
-		src1geom = entry->src1geom;
-		src1geom.physstride = src1geom.virtstride;
-
-		meminfo_ix = (unsigned int)src1desc.virtaddr;
-		/* Making fill, avoid mapping src1 */
-		/* This will change when the HWC starts to use HWC_BLT_FLAG_CLR */
-		if (meminfo_ix == -1)
-		{
-#if 0
-			/* FIXME: Doesn't work! use below alternative */
-			/* Clean FB with GC 320 with black transparent pixel */
-			static unsigned int pixel = 0;
-			src1desc->virtaddr = (void*)&pixel;
-#else
-			/* HACK: Use pre-mappped VRAM full of transparent pixels,
-			 * works only if FB is 2D
-			 */
-			if (psDevInfo->sFBInfo.bIs2D) {
-				dstgeom = entry->dstgeom;
-				bltparams.src1rect.width = dstgeom.width;
-				bltparams.src1rect.height = dstgeom.height;
-				src1desc = *(struct bvbuffdesc *)psDevInfo->sFBInfo.clr_fb_desc;
-				src1geom = *((struct bvsurfgeom *)psDevInfo->sFBInfo.clr_fb_geom);
-			}
-#endif
-		}
-		else if (meminfo_ix & HWC_BLT_DESC_FLAG)
-		{
-			/* This code might be redundant? Do we want to ever blit out of the framebuffer? */
-			if (meminfo_ix & HWC_BLT_DESC_FB)
-			{
-				src1desc = *dstdesc;
-			}
-		}
-		else
-		{
-			if (!meminfo_idx_valid(meminfo_ix, ui32NumMemInfos))
-				continue;
-
-			bv_error = bv_map_meminfo(psDevInfo, bv_entry, &src1desc,
-					&ppsMemInfos[meminfo_ix]);
-			if (bv_error) {
-				WARN(1, "%s: BV map src1 failed %d\n",
-						__func__, bv_error);
-				continue;
-			}
-			src1_mapped = 1;
-			/* FIXME: Not sure why the virtaddr needs to be unique
-			 * for the buffers involved in the blit, if the
-			 * following is not done the blit fails, BV GC driver
-			 * issue?
-			 */
-			src1desc.virtaddr = (void*)0xBADFACE;
-		}
-
-		/* Dst buffer data, assume meminfo 0 is the FB */
-		dstgeom = entry->dstgeom;
-		dstgeom.virtstride = dstgeom.physstride = psDevInfo->sFBInfo.uiBltFBsByteStride;
-
-		/* Src2 buffer data
-		 * Check if this blit involves src2 as the FB or another
-		 * buffer, if the last case is true then map the src2 buffer
-		 */
-		if (bltparams.flags & BVFLAG_BLEND) {
-			src2desc = entry->src2desc;
-			meminfo_ix = (unsigned int)src2desc.virtaddr;
-			if (meminfo_ix & HWC_BLT_DESC_FLAG)
-			{
-				if (meminfo_ix & HWC_BLT_DESC_FB)
-				{
-					/* Blending with destination (FB) */
-					src2desc = *dstdesc;
-					src2geom = dstgeom; /* Why XXX ?? */
-					src2_mapped = 0;
-				}
-			}
-			else {
-				/* Blending with other buffer */
-
-				src2geom = entry->src2geom;
-				src2geom.physstride = src2geom.virtstride;
-
-				if (!meminfo_idx_valid(meminfo_ix,
-					ui32NumMemInfos))
-					goto unmap_srcs;
-
-				bv_error = bv_map_meminfo(psDevInfo, bv_entry,
-					&src2desc, &ppsMemInfos[meminfo_ix]);
-				if (bv_error) {
-					WARN(1, "%s: BV map dst failed %d\n",
-						__func__, bv_error);
-					goto unmap_srcs;
-				}
-				src2_mapped = 1;
-			}
-		}
-
-		bltparams.dstdesc = dstdesc;
-		bltparams.dstgeom = &dstgeom;
-		bltparams.src1.desc = &src1desc;
-		bltparams.src1geom = &src1geom;
-		bltparams.src2.desc = &src2desc;
-		bltparams.src2geom = &src2geom;
-
-		/* FIXME: BV GC2D clipping support is not done properly,
-		 * clip manually while this is fixed
-		 */
-		clip_rects(&bltparams);
-
-		if (debugbv)
-		{
-			print_bvparams(&bltparams, iSrc1DescInfo, iSrc2DescInfo);
-		}
-
-		bv_error = bv_entry->bv_blt(&bltparams);
-		if (bv_error)
-			printk(KERN_ERR "%s: blit failed %d\n",
-				__func__, bv_error);
-unmap_srcs:
-		if (src1_mapped)
-			bv_entry->bv_unmap(&src1desc);
-		if (src2_mapped)
-			bv_entry->bv_unmap(&src2desc);
+	if (rgz_items > 0)
+	{
+		OMAPLFBDoBlits(psDevInfo, ppsMemInfos, &psHwcData->blit_data, ui32NumMemInfos);
 	}
 
 	dsscomp_gralloc_queue(psDssData, apsTilerPAs, false,
 						  dsscomp_proxy_cmdcomplete,
 						  (void *)hCmdCookie);
-
 	for(i = 0; i < k; i++)
 	{
 		tiler_pa_free(apsTilerPAs[i]);
@@ -1551,7 +1120,7 @@ unmap_srcs:
 
 	return IMG_TRUE;
 }
-#endif 
+#endif
 
 static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
                             IMG_UINT32  ui32DataSize,
@@ -1584,7 +1153,7 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	}
 	else
 	{
-#if defined(CONFIG_DSSCOMP)
+#if defined(CONFIG_DSSCOMP) && defined(CONFIG_TI_TILER)
 		DISPLAYCLASS_FLIP_COMMAND2 *psFlipCmd2;
 		psFlipCmd2 = (DISPLAYCLASS_FLIP_COMMAND2 *)pvData;
 		return ProcessFlipV2(hCmdCookie,
@@ -1600,229 +1169,6 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 }
 
 #if defined(CONFIG_DSSCOMP)
-static OMAPLFB_ERROR InitBltFBsCommon(OMAPLFB_DEVINFO *psDevInfo)
-{
-	OMAPLFB_FBINFO *psPVRFBInfo = &psDevInfo->sFBInfo;
-	IMG_INT n = OMAPLFB_NUM_SGX_FBS;
-
-	psPVRFBInfo->psBltFBsNo = n;
-	psPVRFBInfo->psBltFBsIonHndl = NULL;
-	psPVRFBInfo->psBltFBsBvHndl = kzalloc(n * sizeof(*psPVRFBInfo->psBltFBsBvHndl), GFP_KERNEL);
-	if (!psPVRFBInfo->psBltFBsBvHndl)
-	{
-		return OMAPLFB_ERROR_INIT_FAILURE;
-	}
-
-	psPVRFBInfo->psBltFBsBvPhys = kzalloc(n * sizeof(*psPVRFBInfo->psBltFBsBvPhys), GFP_KERNEL);
-	if (!psPVRFBInfo->psBltFBsBvPhys)
-	{
-		return OMAPLFB_ERROR_INIT_FAILURE;
-	}
-	/* Freeing of resources is handled in deinit code */
-	return OMAPLFB_OK;
-}
-
-/*
- * Initialize the blit framebuffers and create the Bltsville mappings, these
- * buffers are separate from the swapchain to reduce complexity
- */
-static OMAPLFB_ERROR InitBltFBsVram(OMAPLFB_DEVINFO *psDevInfo)
-{
-	OMAPLFB_FBINFO *psPVRFBInfo = &psDevInfo->sFBInfo;
-	IMG_UINT uiNumPages = psPVRFBInfo->ulRoundedBufferSize >> PAGE_SHIFT;
-	IMG_UINT uiFb;
-
-	if (InitBltFBsCommon(psDevInfo) != OMAPLFB_OK)
-	{
-		return OMAPLFB_ERROR_INIT_FAILURE;
-	}
-	psPVRFBInfo->uiBltFBsByteStride = psDevInfo->psLINFBInfo->fix.line_length;
-
-	for (uiFb = 0; uiFb < psPVRFBInfo->psBltFBsNo; uiFb++)
-	{
-		unsigned long *pPaddrs;
-		enum bverror iBvErr;
-		IMG_UINT j;
-		struct bvbuffdesc *pBvDesc;
-		IMG_UINT uiVramStart;
-		IMG_UINT uiFbOff;
-
-		pPaddrs = kzalloc(sizeof(*pPaddrs) *
-				uiNumPages, GFP_KERNEL);
-		if (!pPaddrs)
-		{
-			return OMAPLFB_ERROR_OUT_OF_MEMORY;
-		}
-
-		pBvDesc = kzalloc(sizeof(*pBvDesc), GFP_KERNEL);
-		if (!pBvDesc)
-		{
-			kfree(pPaddrs);
-			return OMAPLFB_ERROR_OUT_OF_MEMORY;
-		}
-		/*
-		 * Handle the swapchain buffers being located in TILER2D or in
-		 * VRAM
-		 */
-		uiFbOff = psPVRFBInfo->bIs2D ? 0 :
-					psPVRFBInfo->ulRoundedBufferSize *
-					psDevInfo->psSwapChain->ulBufferCount;
-		uiVramStart = psDevInfo->psLINFBInfo->fix.smem_start + uiFbOff +
-					(psPVRFBInfo->ulRoundedBufferSize * uiFb);
-		for(j = 0; j < uiNumPages; j++)
-		{
-			pPaddrs[j] = uiVramStart + (j * PAGE_SIZE);
-		}
-		psPVRFBInfo->psBltFBsBvPhys[uiFb] = pPaddrs[0];
-
-		pBvDesc->structsize = sizeof(*pBvDesc);
-		pBvDesc->pagesize = PAGE_SIZE;
-		pBvDesc->pagearray = pPaddrs;
-		pBvDesc->pagecount = uiNumPages;
-		/* Mark the buffer with != 0, otherwise GC driver blows up */
-		pBvDesc->virtaddr = (void*)0xFACEC0D;
-
-		iBvErr = gsBvInterface.bv_map(pBvDesc);
-		if (iBvErr)
-		{
-			WARN(1, "%s: BV map Blt FB buffer failed %d\n",
-					__func__, iBvErr);
-			kfree(pBvDesc);
-			return OMAPLFB_ERROR_GENERIC;
-		}
-		psPVRFBInfo->psBltFBsBvHndl[uiFb] = pBvDesc;
-	}
-	return OMAPLFB_OK;
-}
-
-static PVRSRV_ERROR InitBltFBsMapTiler2D(OMAPLFB_DEVINFO *psDevInfo)
-{
-	OMAPLFB_FBINFO *psPVRFBInfo = &psDevInfo->sFBInfo;
-	struct fb_info *psLINFBInfo = psDevInfo->psLINFBInfo;
-	struct bvbuffdesc *pBvDesc;
-	struct bventry *pBvEntry;
-	enum bverror eBvErr;
-	int iFB;
-	ion_phys_addr_t phys;
-	size_t size;
-	int res = PVRSRV_OK;
-
-	pBvEntry = &gsBvInterface;
-	ion_phys(gpsIONClient, psPVRFBInfo->psBltFBsIonHndl, &phys, &size);
-
-	for (iFB = 0; iFB < psPVRFBInfo->psBltFBsNo; iFB++)
-	{
-		unsigned long *pPageList;
-
-		struct tiler_view_t view;
-		int wpages = psPVRFBInfo->uiBltFBsByteStride >> PAGE_SHIFT;
-		int h = psLINFBInfo->var.yres;
-		int x, y;
-
-		phys += psPVRFBInfo->uiBltFBsByteStride * iFB;
-		pPageList = kzalloc(
-				wpages * h * sizeof(*pPageList),
-		                GFP_KERNEL);
-		if ( !pPageList) {
-			printk(KERN_WARNING DRIVER_PREFIX
-					": %s: Could not allocate page list\n",
-					__FUNCTION__);
-			return OMAPLFB_ERROR_INIT_FAILURE;
-		}
-		tilview_create(&view, phys, psLINFBInfo->var.xres, h);
-		for (y = 0; y < h; y++) {
-			for (x = 0; x < wpages; x++) {
-				pPageList[y * wpages + x] = phys + view.v_inc * y
-						+ (x << PAGE_SHIFT);
-			}
-		}
-		pBvDesc = kzalloc(sizeof(*pBvDesc), GFP_KERNEL);
-		pBvDesc->structsize = sizeof(*pBvDesc);
-		pBvDesc->pagesize = PAGE_SIZE;
-		pBvDesc->pagearray = pPageList;
-		pBvDesc->pagecount = wpages * h;
-
-		eBvErr = pBvEntry->bv_map(pBvDesc);
-
-		pBvDesc->pagearray = NULL;
-
-		if (eBvErr)
-		{
-			WARN(1, "%s: BV map blt buffer failed %d\n",__func__, eBvErr);
-			psPVRFBInfo->psBltFBsBvHndl[iFB]= NULL;
-			kfree(pBvDesc);
-			res = PVRSRV_ERROR_OUT_OF_MEMORY;
-		}
-		else
-		{
-			psPVRFBInfo->psBltFBsBvHndl[iFB] = pBvDesc;
-			psPVRFBInfo->psBltFBsBvPhys[iFB] = pPageList[0];
-		}
-		kfree(pPageList);
-	}
-
-	return res;
-}
-
-/*
- * Allocate buffers from the blit 'framebuffers'. These buffers are not shared
- * with the SGX flip chain to reduce complexity
- */
-static OMAPLFB_ERROR InitBltFBsTiler2D(OMAPLFB_DEVINFO *psDevInfo)
-{
-	/*
-	 * Pick up the calculated bytes per pixel from the deduced
-	 * OMAPLFB_FBINFO, get the rest of the display parameters from the
-	 * struct fb_info
-	 */
-	OMAPLFB_FBINFO *psPVRFBInfo = &psDevInfo->sFBInfo;
-	struct fb_info *psLINFBInfo = psDevInfo->psLINFBInfo;
-	int res, w, h;
-
-	struct omap_ion_tiler_alloc_data sAllocData = {
-		.fmt = psPVRFBInfo->uiBytesPerPixel == 2 ? TILER_PIXEL_FMT_16BIT : TILER_PIXEL_FMT_32BIT,
-		.flags = 0,
-	};
-
-	if (InitBltFBsCommon(psDevInfo) != OMAPLFB_OK)
-	{
-		return OMAPLFB_ERROR_INIT_FAILURE;
-	}
-	psPVRFBInfo->uiBltFBsByteStride = PAGE_ALIGN(psLINFBInfo->var.xres * psPVRFBInfo->uiBytesPerPixel);
-
-	/* TILER will align width to 128-bytes */
-	/* however, SGX must have full page width */
-	w = ALIGN(psLINFBInfo->var.xres, PAGE_SIZE / psPVRFBInfo->uiBytesPerPixel);
-	h = psLINFBInfo->var.yres;
-	sAllocData.h = h;
-	sAllocData.w = psPVRFBInfo->psBltFBsNo * w;
-
-	printk(KERN_INFO DRIVER_PREFIX
-		":BltFBs alloc %d x (%d x %d) [stride %d]\n",
-		psPVRFBInfo->psBltFBsNo, w, h, psPVRFBInfo->uiBltFBsByteStride);
-	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
-	if (res < 0)
-	{
-		printk(KERN_ERR DRIVER_PREFIX
-			"Could not allocate BltFBs\n");
-		return OMAPLFB_ERROR_INIT_FAILURE;
-	}
-
-	psPVRFBInfo->psBltFBsIonHndl = sAllocData.handle;
-
-	res = InitBltFBsMapTiler2D(psDevInfo);
-	if (res != OMAPLFB_OK)
-	{
-		return OMAPLFB_ERROR_INIT_FAILURE;
-	}
-	return OMAPLFB_OK;
-}
-
-static OMAPLFB_ERROR InitBltFBs(OMAPLFB_DEVINFO *psDevInfo)
-{
-	return (OMAPLFB_BLT_FBS_VRAM) ? InitBltFBsVram(psDevInfo) : InitBltFBsTiler2D(psDevInfo);
-}
-
 static OMAPLFB_ERROR OMAPLFBInitIonOmap(OMAPLFB_DEVINFO *psDevInfo,
                                         struct fb_info *psLINFBInfo,
                                         OMAPLFB_FBINFO *psPVRFBInfo)
@@ -2267,14 +1613,7 @@ OMAPLFB_ERROR OMAPLFBInit(void)
 		return OMAPLFB_ERROR_INIT_FAILURE;
 	}
 
-#if defined(CONFIG_GCCORE)
-	/* Get the GC2D Bltsville implementation */
-	gcbv_init(&gsBvInterface);
-	gbBvInterfacePresent = gsBvInterface.bv_map ? 1 : 0;
-#else
-	gbBvInterfacePresent = 0;
-#endif
-
+	gbBvInterfacePresent = OMAPLFBInitBlt();
 	if (!gbBvInterfacePresent)
 	{
 		printk(KERN_INFO DRIVER_PREFIX "%s: Blitsville gc2d "

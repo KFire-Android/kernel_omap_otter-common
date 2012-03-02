@@ -47,6 +47,10 @@
 #include <linux/earlysuspend.h>
 #endif
 
+#include <video/dsscomp.h>
+#include <linux/bltsville.h>
+#include <video/omap_hwc.h>
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
 #define	OMAPLFB_CONSOLE_LOCK()		console_lock()
 #define	OMAPLFB_CONSOLE_UNLOCK()	console_unlock()
@@ -297,6 +301,22 @@ void OMAPLFBAtomicIntDeInit(OMAPLFB_ATOMIC_INT *psAtomic);
 void OMAPLFBAtomicIntSet(OMAPLFB_ATOMIC_INT *psAtomic, int iVal);
 int OMAPLFBAtomicIntRead(OMAPLFB_ATOMIC_INT *psAtomic);
 void OMAPLFBAtomicIntInc(OMAPLFB_ATOMIC_INT *psAtomic);
+IMG_UINT32 GetVramStart(OMAPLFB_DEVINFO *psDevInfo);
+unsigned long GetVramFBSize(OMAPLFB_DEVINFO *psDevInfo);
+unsigned long GetVramFBTotalSize(struct fb_info *psLINFBInfo);
+
+#if defined (CONFIG_DSSCOMP)
+int meminfo_idx_valid(unsigned int meminfo_ix, int num_meminfos);
+#endif
+
+/* Blt stubs implemented when CONFIG_GCBV is enabled */
+IMG_BOOL OMAPLFBInitBlt(void);
+OMAPLFB_ERROR OMAPLFBInitBltFBs(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBDeInitBltFBs(OMAPLFB_DEVINFO *psDevInfo);
+IMG_BOOL OMAPLFBBltFbClearWorkaround(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBGetBltFBsBvHndl(OMAPLFB_FBINFO *psPVRFBInfo, IMG_UINTPTR_T *ppPhysAddr);
+void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos,
+		    struct omap_hwc_blit_data *blit_data, IMG_UINT32 ui32NumMemInfos);
 
 #if defined(DEBUG)
 void OMAPLFBPrintInfo(OMAPLFB_DEVINFO *psDevInfo);
@@ -304,5 +324,15 @@ void OMAPLFBPrintInfo(OMAPLFB_DEVINFO *psDevInfo);
 #define	OMAPLFBPrintInfo(psDevInfo)
 #endif
 
-#endif 
+/*
+ * This is the number of framebuffers which will be rendered to by the SGX
+ */
+#define OMAPLFB_NUM_SGX_FBS	2
 
+#if defined(CONFIG_GCBV)
+/*
+ * This is the number of framebuffers rendered to by GC320
+ */
+#define OMAPLFB_NUM_BLT_FBS	2
+#endif /* CONFIG_GCBV */
+#endif /* __OMAPLFB_H__ */
