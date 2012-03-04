@@ -895,7 +895,14 @@ static int twl6040_hs_dac_right_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+static int twl6040_hf_dac_event(struct snd_soc_dapm_widget *w,
+			struct snd_kcontrol *kcontrol, int event)
+{
+	/* HFDAC settling time */
+	usleep_range(80, 200);
 
+	return 0;
+}
 
 static int twl6040_power_mode_event(struct snd_soc_dapm_widget *w,
 			struct snd_kcontrol *kcontrol, int event)
@@ -1334,11 +1341,11 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 			SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_DAC_E("HFDAC Left", "Handsfree Playback",
 			TWL6040_REG_HFLCTL, 0, 0,
-			twl6040_power_mode_event,
+			twl6040_hf_dac_event,
 			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_DAC_E("HFDAC Right", "Handsfree Playback",
 			TWL6040_REG_HFRCTL, 0, 0,
-			twl6040_power_mode_event,
+			twl6040_hf_dac_event,
 			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MUX("Handsfree Left Playback",
