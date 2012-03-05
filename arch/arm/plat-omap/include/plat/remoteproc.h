@@ -30,6 +30,7 @@ struct platform_device;
  * @ops: start/stop rproc handlers
  * @device_enable: omap-specific handler for enabling a device
  * @device_shutdown: omap-specific handler for shutting down a device
+ * @boot_reg: physical address of the control register for storing boot address
  */
 struct omap_rproc_pdata {
 	const char *name;
@@ -40,6 +41,7 @@ struct omap_rproc_pdata {
 	const struct rproc_ops *ops;
 	int (*device_enable) (struct platform_device *pdev);
 	int (*device_shutdown) (struct platform_device *pdev);
+	u32 boot_reg;
 };
 
 #if defined(CONFIG_OMAP_REMOTEPROC) || defined(CONFIG_OMAP_REMOTEPROC_MODULE)

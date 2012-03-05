@@ -39,11 +39,13 @@
  * @mbox: omap mailbox handle
  * @nb: notifier block that will be invoked on inbound mailbox messages
  * @rproc: rproc handle
+ * @boot_reg: virtual address of the register where the bootaddr is stored
  */
 struct omap_rproc {
 	struct omap_mbox *mbox;
 	struct notifier_block nb;
 	struct rproc *rproc;
+	void __iomem *boot_reg;
 };
 
 /**
@@ -113,6 +115,10 @@ static int omap_rproc_start(struct rproc *rproc)
 	struct platform_device *pdev = to_platform_device(rproc->dev);
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	int ret;
+
+	/* load remote processor boot address if needed. */
+	if (oproc->boot_reg)
+		writel(rproc->bootaddr, oproc->boot_reg);
 
 	oproc->nb.notifier_call = omap_rproc_mbox_callback;
 
@@ -194,6 +200,12 @@ static int __devinit omap_rproc_probe(struct platform_device *pdev)
 	oproc = rproc->priv;
 	oproc->rproc = rproc;
 
+	if (pdata->boot_reg) {
+		oproc->boot_reg = ioremap(pdata->boot_reg, sizeof(u32));
+		if (!oproc->boot_reg)
+			goto err_ioremap;
+	}
+
 	platform_set_drvdata(pdev, rproc);
 
 	ret = rproc_register(rproc);
@@ -203,6 +215,9 @@ static int __devinit omap_rproc_probe(struct platform_device *pdev)
 	return 0;
 
 free_rproc:
+	if (oproc->boot_reg)
+		iounmap(oproc->boot_reg);
+err_ioremap:
 	rproc_free(rproc);
 	return ret;
 }
@@ -210,6 +225,10 @@ free_rproc:
 static int __devexit omap_rproc_remove(struct platform_device *pdev)
 {
 	struct rproc *rproc = platform_get_drvdata(pdev);
+	struct omap_rproc *oproc = rproc->priv;
+
+	if (oproc->boot_reg)
+		iounmap(oproc->boot_reg);
 
 	return rproc_unregister(rproc);
 }
