@@ -61,6 +61,21 @@ static struct omap_device_pm_latency omap_emif_latency[] = {
 	       },
 };
 
+/*
+ * EMIF Power Management timer for Self Refresh will put the external SDRAM
+ * in Self Refresh mode after the EMIF is idle for number of DDR clock cycles
+ * set with REG_SR_TIM. The minimal value starts at 16 cycles mapped to 1 in
+ * REG_SR_TIM.
+ * However due to Errata i735, the minimal value of REG_SR_TIM is 6. That
+ * corresponds to 512 DDR cycles required for OPP100
+*/
+#define EMIF_ERRATUM_SR_TIMER_i735	BIT(0)
+#define EMIF_ERRATUM_SR_TIMER_MIN	6
+
+static u32 emif_errata;
+#define is_emif_erratum(erratum) (emif_errata & EMIF_ERRATUM_##erratum)
+
+
 static void do_cancel_out(u32 *num, u32 *den, u32 factor)
 {
 	while (1) {
@@ -1124,6 +1139,12 @@ static void init_temperature(u32 emif_nr)
 	}
 }
 
+static void __init emif_setup_errata(void)
+{
+	if (cpu_is_omap44xx())
+		emif_errata |= EMIF_ERRATUM_SR_TIMER_i735;
+}
+
 /*
  * omap_emif_device_init needs to be done before
  * ddr reconfigure function call.
@@ -1131,6 +1152,8 @@ static void init_temperature(u32 emif_nr)
  */
 static int __init omap_emif_device_init(void)
 {
+	/* setup the erratas */
+	emif_setup_errata();
 	/*
 	 * To avoid code running on other OMAPs in
 	 * multi-omap builds
@@ -1340,6 +1363,18 @@ static void __init setup_lowpower_regs(u32 emif_nr,
 		else
 			ddr_sr_timer = 0;
 
+		if (is_emif_erratum(SR_TIMER_i735) &&
+				ddr_sr_timer < EMIF_ERRATUM_SR_TIMER_MIN) {
+			/*
+			 * Operating with such SR_TIM value will cause
+			 * instability, so re-adjust to safe value as stated
+			 * by erratum i735
+			 */
+			ddr_sr_timer = EMIF_ERRATUM_SR_TIMER_MIN;
+			pr_warning("%s: PM timer for self refresh is set to %i"
+					" cycles\n", __func__,
+					16 << (EMIF_ERRATUM_SR_TIMER_MIN - 1));
+		}
 		/* Program the idle delay */
 		temp = __raw_readl(base + OMAP44XX_EMIF_PWR_MGMT_CTRL_SHDW);
 		mask_n_set(temp, OMAP44XX_REG_SR_TIM_SHDW_SHIFT,
