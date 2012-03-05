@@ -590,16 +590,12 @@ void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struc
 			static unsigned int pixel = 0;
 			src1desc->virtaddr = (void*)&pixel;
 #else
-			/* HACK: Use pre-mappped VRAM full of transparent pixels,
-			 * works only if FB is 2D
-			 */
-			if (psDevInfo->sFBInfo.bIs2D) {
-				dstgeom = entry->dstgeom;
-				bltparams.src1rect.width = dstgeom.width;
-				bltparams.src1rect.height = dstgeom.height;
-				src1desc = *(struct bvbuffdesc *)psDevInfo->sFBInfo.clr_fb_desc;
-				src1geom = *((struct bvsurfgeom *)psDevInfo->sFBInfo.clr_fb_geom);
-			}
+			/* Use pre-mappped VRAM full of transparent pixels */
+			dstgeom = entry->dstgeom;
+			bltparams.src1rect.width = dstgeom.width;
+			bltparams.src1rect.height = dstgeom.height;
+			src1desc = *(struct bvbuffdesc *)psDevInfo->sFBInfo.clr_fb_desc;
+			src1geom = *((struct bvsurfgeom *)psDevInfo->sFBInfo.clr_fb_geom);
 #endif
 		}
 		else if (meminfo_ix & HWC_BLT_DESC_FLAG)
