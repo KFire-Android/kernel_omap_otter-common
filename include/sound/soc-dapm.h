@@ -367,6 +367,8 @@ int snd_soc_dapm_weak_routes(struct snd_soc_dapm_context *dapm,
 			     const struct snd_soc_dapm_route *route, int num);
 
 /* dapm events */
+void snd_soc_dapm_stream_event_locked(struct snd_soc_pcm_runtime *rtd,
+	int stream, int event);
 void snd_soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
 	int event);
 void snd_soc_dapm_shutdown(struct snd_soc_card *card);
