@@ -691,6 +691,8 @@ struct omap_dss_device {
 
 		u32 width_in_um;
 		u32 height_in_um;
+		u16 fb_xres;
+		u16 fb_yres;
 	} panel;
 
 	struct {
