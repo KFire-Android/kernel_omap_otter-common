@@ -134,6 +134,8 @@ int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 
 int omapfb_enable_vsync(struct omapfb2_device *fbdev);
 void omapfb_disable_vsync(struct omapfb2_device *fbdev);
+void get_fb_resolution(struct omap_dss_device *dssdev,
+		u16 *xres, u16 *yres);
 
 /* find the display connected to this fb, if any */
 static inline struct omap_dss_device *fb2display(struct fb_info *fbi)
