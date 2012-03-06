@@ -835,44 +835,30 @@ static int twl6040_hs_dac_left_event(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_codec *codec = w->codec;
 	struct twl6040 *twl6040 = codec->control_data;
-	int hsrctl, earpiece_on;
+	int hsrctl;
 
 	/* SW Workaround for DC Offset On EAR Differential Output Errata */
 	if (twl6040_get_icrev(twl6040) < TWL6040_REV_1_3) {
 		hsrctl = twl6040_read_reg_cache(codec, TWL6040_REG_HSRCTL);
-		earpiece_on = twl6040_read_reg_cache(codec, TWL6040_REG_EARCTL)
-						& TWL6040_EARENA;
 		switch (event) {
 		case SND_SOC_DAPM_PRE_PMU:
-			if (!(hsrctl & TWL6040_HSDACENAR))
-				twl6040_write(codec, TWL6040_REG_HSRCTL,
-						hsrctl | TWL6040_HSDACENAR);
+			/* HSDACL reset is done when HSDACR is enabled */
+			twl6040_reg_write(twl6040, TWL6040_REG_HSRCTL,
+					  hsrctl | TWL6040_HSDACENAR);
 			break;
-
-		case SND_SOC_DAPM_PRE_PMD:
-			if (!(hsrctl & TWL6040_HSDACENAR))
-				twl6040_write(codec, TWL6040_REG_HSRCTL,
-						hsrctl | TWL6040_HSDACENAR);
-			break;
-
 		case SND_SOC_DAPM_POST_PMU:
-			if ((hsrctl & TWL6040_HSDACENAR) || earpiece_on)
-				twl6040_write(codec, TWL6040_REG_HSRCTL,
-						hsrctl & ~TWL6040_HSDACENAR);
-			break;
-
+			/* Sync HSDACR with reg cache */
+			twl6040_reg_write(twl6040, TWL6040_REG_HSRCTL, hsrctl);
+			/* Fall through */
 		case SND_SOC_DAPM_POST_PMD:
-			if (hsrctl & TWL6040_HSDACENAR)
-				twl6040_write(codec, TWL6040_REG_HSRCTL,
-						hsrctl & ~TWL6040_HSDACENAR);
+			/* HSDAC settling time */
+			usleep_range(80, 200);
 			break;
-
 		default:
 			break;
 		}
 	}
 
-	msleep(1);
 	return 0;
 }
 
@@ -882,36 +868,23 @@ static int twl6040_hs_dac_right_event(struct snd_soc_dapm_widget *w,
 	struct snd_soc_codec *codec = w->codec;
 	struct twl6040 *twl6040 = codec->control_data;
 	int hslctl;
-	int earpiece_on;
 
 	/* SW Workaround for DC Offset On EAR Differential Output Errata */
 	if (twl6040_get_icrev(twl6040) < TWL6040_REV_1_3) {
 		hslctl = twl6040_read_reg_cache(codec, TWL6040_REG_HSLCTL);
-		earpiece_on = twl6040_read_reg_cache(codec, TWL6040_REG_EARCTL)
-						& TWL6040_EARENA;
 		switch (event) {
-		case SND_SOC_DAPM_PRE_PMU:
-			if (!(hslctl & TWL6040_HSDACENAL))
-				twl6040_write(codec, TWL6040_REG_HSLCTL,
-						hslctl | TWL6040_HSDACENAL);
-			break;
-
 		case SND_SOC_DAPM_PRE_PMD:
-			if (!(hslctl & TWL6040_HSDACENAL))
-				twl6040_write(codec, TWL6040_REG_HSLCTL,
-						hslctl | TWL6040_HSDACENAL);
+			/* HSDACR reset is done when HSDACL is enabled */
+			twl6040_reg_write(twl6040, TWL6040_REG_HSLCTL,
+					  hslctl | TWL6040_HSDACENAL);
 			break;
-
-		case SND_SOC_DAPM_POST_PMU:
-			if ((hslctl & TWL6040_HSDACENAL) && earpiece_on)
-				twl6040_write(codec, TWL6040_REG_HSLCTL,
-						hslctl & ~TWL6040_HSDACENAL);
-			break;
-
 		case SND_SOC_DAPM_POST_PMD:
-			if (hslctl & TWL6040_HSDACENAL)
-				twl6040_write(codec, TWL6040_REG_HSLCTL,
-						hslctl & ~TWL6040_HSDACENAL);
+			/* Sync HSDACL with reg cache */
+			twl6040_reg_write(twl6040, TWL6040_REG_HSLCTL, hslctl);
+			/* Fall through */
+		case SND_SOC_DAPM_POST_PMU:
+			/* HSDAC settling time */
+			usleep_range(80, 200);
 			break;
 
 		default:
@@ -919,7 +892,6 @@ static int twl6040_hs_dac_right_event(struct snd_soc_dapm_widget *w,
 		}
 	}
 
-	msleep(1);
 	return 0;
 }
 
@@ -1353,13 +1325,13 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 	SND_SOC_DAPM_DAC_E("HSDAC Left", "Headset Playback",
 			TWL6040_REG_HSLCTL, 0, 0,
 			twl6040_hs_dac_left_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_PRE_PMD |
-			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
+			SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_DAC_E("HSDAC Right", "Headset Playback",
 			TWL6040_REG_HSRCTL, 0, 0,
 			twl6040_hs_dac_right_event,
-			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_PRE_PMD |
-			SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+			SND_SOC_DAPM_POST_PMU |
+			SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_DAC_E("HFDAC Left", "Handsfree Playback",
 			TWL6040_REG_HFLCTL, 0, 0,
 			twl6040_power_mode_event,
