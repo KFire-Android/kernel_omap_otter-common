@@ -1304,6 +1304,7 @@ static struct omap_hwmod omap54xx_dsp_c0_hwmod = {
 	.flags		= HWMOD_INIT_NO_RESET,
 	.rst_lines	= omap54xx_dsp_c0_resets,
 	.rst_lines_cnt	= ARRAY_SIZE(omap54xx_dsp_c0_resets),
+	.main_clk	= "dsp_fck",
 	.prcm = {
 		.omap4 = {
 			.rstctrl_offs = OMAP54XX_RM_DSP_RSTCTRL_OFFSET,
