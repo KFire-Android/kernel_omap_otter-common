@@ -1049,7 +1049,8 @@ irqreturn_t musb_h_ep0_irq(struct musb *musb)
 					| MUSB_CSR0_H_REQPKT;
 			else
 				csr = MUSB_CSR0_H_STATUSPKT
-					| MUSB_CSR0_TXPKTRDY;
+					| MUSB_CSR0_TXPKTRDY
+					| MUSB_CSR0_H_DIS_PING;
 
 			/* flag status stage */
 			musb->ep0_stage = MUSB_EP0_STATUS;
