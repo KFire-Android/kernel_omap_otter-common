@@ -474,7 +474,14 @@ static int __init thermal_framework_init(void)
 
 static void __exit thermal_framework_exit(void)
 {
-	return;
+	struct thermal_domain *domain, *tmp;
+
+	mutex_lock(&thermal_domain_list_lock);
+	list_for_each_entry_safe(domain, tmp, &thermal_domain_list, node) {
+		list_del(&domain->node);
+		kfree(domain);
+	}
+	mutex_unlock(&thermal_domain_list_lock);
 }
 
 module_init(thermal_framework_init);
