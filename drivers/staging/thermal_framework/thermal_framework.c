@@ -365,7 +365,6 @@ void thermal_governor_dev_unregister(struct thermal_dev *tdev)
 	}
 
 	mutex_unlock(&thermal_domain_list_lock);
-	return;
 }
 EXPORT_SYMBOL_GPL(thermal_governor_dev_unregister);
 
@@ -413,7 +412,6 @@ void thermal_cooling_dev_unregister(struct thermal_dev *tdev)
 		list_del(&tdev->node);
 
 	mutex_unlock(&thermal_domain_list_lock);
-	return;
 }
 EXPORT_SYMBOL_GPL(thermal_cooling_dev_unregister);
 
@@ -463,7 +461,6 @@ void thermal_sensor_dev_unregister(struct thermal_dev *tdev)
 	}
 
 	mutex_unlock(&thermal_domain_list_lock);
-	return;
 }
 EXPORT_SYMBOL_GPL(thermal_sensor_dev_unregister);
 
