@@ -57,6 +57,10 @@
 #include <linux/gcbv.h>
 #include "gcmain.h"
 
+#ifndef SOFTWARE_CLIP
+#	define SOFTWARE_CLIP 1
+#endif
+
 #ifndef GC_DUMP
 #	define GC_DUMP 0
 #endif
@@ -183,6 +187,10 @@ struct gccontext {
 };
 
 static struct gccontext gccontext;
+
+#if SOFTWARE_CLIP
+static enum bverror pre_clip(struct bvbltparams *);
+#endif
 
 /*******************************************************************************
  * Debugging.
@@ -2245,6 +2253,16 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	gcmofill->dst.clip.lt_ldst = gcmoclip_lt_ldst;
 
 	if ((bltparams->flags & BVFLAG_CLIP) == BVFLAG_CLIP) {
+#if SOFTWARE_CLIP
+		bverror = pre_clip(bltparams);
+		if (bverror != BVERR_NONE)
+			goto exit;
+
+		gcmofill->dst.clip.lt.reg.left = 0;
+		gcmofill->dst.clip.lt.reg.top = 0;
+		gcmofill->dst.clip.rb.reg.right = bltparams->dstgeom->width;
+		gcmofill->dst.clip.rb.reg.bottom = bltparams->dstgeom->height;
+#else
 		gcmofill->dst.clip.lt.reg.left
 			= bltparams->cliprect.left + dstoffset;
 		gcmofill->dst.clip.lt.reg.top
@@ -2255,6 +2273,7 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 		gcmofill->dst.clip.rb.reg.bottom
 			= gcmofill->dst.clip.lt.reg.top
 			+ bltparams->cliprect.height;
+#endif
 	} else {
 		gcmofill->dst.clip.lt.reg.left = GC_CLIP_RESET_LEFT;
 		gcmofill->dst.clip.lt.reg.top = GC_CLIP_RESET_TOP;
@@ -2653,6 +2672,17 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		gcmodst->clip.lt_ldst = gcmoclip_lt_ldst;
 
 		if ((bltparams->flags & BVFLAG_CLIP) == BVFLAG_CLIP) {
+#if SOFTWARE_CLIP
+			bverror = pre_clip(bltparams);
+			if (bverror != BVERR_NONE)
+				goto exit;
+
+			gcmodst->clip.lt.reg.left = 0;
+			gcmodst->clip.lt.reg.top = 0;
+			gcmodst->clip.rb.reg.right = bltparams->dstgeom->width;
+			gcmodst->clip.rb.reg.bottom =
+				bltparams->dstgeom->height;
+#else
 			gcmodst->clip.lt.reg.left
 				= bltparams->cliprect.left + dstoffset;
 			gcmodst->clip.lt.reg.top
@@ -2663,6 +2693,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			gcmodst->clip.rb.reg.bottom
 				= gcmodst->clip.lt.reg.top
 				+ bltparams->cliprect.height;
+#endif
 		} else {
 			gcmodst->clip.lt.reg.left = GC_CLIP_RESET_LEFT;
 			gcmodst->clip.lt.reg.top = GC_CLIP_RESET_TOP;
@@ -2890,6 +2921,241 @@ static enum bverror do_filter(struct bvbltparams *bltparams,
 	return bverror;
 }
 
+#if SOFTWARE_CLIP
+enum bverror pre_clip(struct bvbltparams *bltparams)
+{
+	enum bverror bverror = BVERR_NONE;
+	int src1right, src1bottom;
+	int src2right, src2bottom;
+	int maskright, maskbottom;
+	int src1used, src2used, maskused;
+	int dstright, dstbottom;
+	int clipright, clipbottom;
+	int rightclip, bottomclip;
+	int leftclip;
+	int topclip;
+
+	switch ((bltparams->flags & BVFLAG_OP_MASK) >> BVFLAG_OP_SHIFT) {
+	case (BVFLAG_ROP >> BVFLAG_OP_SHIFT):
+	{
+		unsigned short rop = bltparams->op.rop;
+		src1used = ((rop & 0xCCCC) >> 2) ^ (rop & 0x3333);
+		src2used = ((rop & 0xF0F0) >> 4) ^ (rop & 0x0F0F);
+		maskused = ((rop & 0xFF00) >> 8) ^ (rop & 0x00FF);
+	}
+	break;
+
+	case (BVFLAG_BLEND >> BVFLAG_OP_SHIFT):
+		switch ((bltparams->op.blend & BVBLENDDEF_FORMAT_MASK) >>
+		BVBLENDDEF_FORMAT_SHIFT) {
+		case (BVBLENDDEF_FORMAT_CLASSIC >>
+					BVBLENDDEF_FORMAT_SHIFT):
+			src1used = bltparams->op.blend & 0x00FC0FC0;
+			src2used = bltparams->op.blend & 0x0003F03F;
+			maskused = bltparams->op.blend & BVBLENDDEF_REMOTE;
+		break;
+
+		default:
+			BVSETBLTERROR(BVERR_BLEND, "unrecognized blend");
+			goto Error;
+		}
+	break;
+
+	default:
+		BVSETBLTERROR(BVERR_OP, "unrecognized operation");
+		goto Error;
+	}
+
+	GC_PRINT(GC_INFO_MSG " src1used = %d, src2used = %d, maskused = %d\n",
+			__func__, __LINE__,  src1used, src2used, maskused);
+
+
+	src1right = 0;
+	src1bottom = 0;
+	src2right = 0;
+	src2bottom = 0;
+	maskright = 0;
+	maskbottom = 0;
+
+	if (src1used) {
+		if ((bltparams->src1rect.width != bltparams->dstrect.width) ||
+		(bltparams->src1rect.height != bltparams->dstrect.height)) {
+			if ((bltparams->src1rect.width == 1) &&
+				(bltparams->src1rect.height == 1)) {
+				src1used = 0; /* Don't try to clip at all */
+				GC_PRINT(GC_INFO_MSG
+					" Source 1 is 1x1, not clipping.\n",
+					__func__, __LINE__);
+			} else {
+				GC_PRINT(GC_INFO_MSG " Source 1 is scaled.\n",
+					__func__, __LINE__);
+				goto Scale;
+			}
+		}
+		src1right = bltparams->src1rect.left +
+				(int)bltparams->src1rect.width;
+		src1bottom = bltparams->src1rect.top +
+				(int)bltparams->src1rect.height;
+	}
+
+	if (src2used) {
+		if ((bltparams->src2rect.width != bltparams->dstrect.width) ||
+		(bltparams->src2rect.height != bltparams->dstrect.height)) {
+			if ((bltparams->src2rect.width == 1) &&
+			(bltparams->src2rect.height == 1)) {
+				src2used = 0; /* Don't try to clip at all */
+				GC_PRINT(GC_INFO_MSG
+					" Source 2 is 1x1, not clipping.\n",
+					__func__, __LINE__);
+			} else {
+				GC_PRINT(GC_INFO_MSG " Source 2 is scaled.\n",
+					__func__, __LINE__);
+				goto Scale;
+			}
+		}
+		src2right = bltparams->src2rect.left +
+			(int)bltparams->src2rect.width;
+		src2bottom = bltparams->src2rect.top +
+			(int)bltparams->src2rect.height;
+	}
+
+	if (maskused) {
+		if ((bltparams->maskrect.width != bltparams->dstrect.width) ||
+		(bltparams->maskrect.height != bltparams->dstrect.height)) {
+			if ((bltparams->maskrect.width == 1) &&
+			(bltparams->maskrect.height == 1)) {
+				maskused = 0; /* Don't try to clip at all */
+				GC_PRINT(GC_INFO_MSG
+					" Mask is 1x1, not clipping.\n",
+					__func__, __LINE__);
+			} else {
+				GC_PRINT(GC_INFO_MSG " Mask is scaled.\n",
+					__func__, __LINE__);
+				goto Scale;
+			}
+		}
+		maskright = bltparams->maskrect.left +
+			(int)bltparams->maskrect.width;
+		maskbottom = bltparams->maskrect.top +
+			(int)bltparams->maskrect.height;
+	}
+
+	dstright = bltparams->dstrect.left + (int)bltparams->dstrect.width;
+	clipright = bltparams->cliprect.left + (int)bltparams->cliprect.width;
+	rightclip = dstright - clipright;
+	if (rightclip > 0) {
+		dstright -= rightclip;
+		if (src1used)
+			src1right -= rightclip;
+		if (src2used)
+			src2right -= rightclip;
+		if (maskused)
+			maskright -= rightclip;
+	}
+
+	dstbottom = bltparams->dstrect.top + (int)bltparams->dstrect.height;
+	clipbottom = bltparams->cliprect.top + (int)bltparams->cliprect.height;
+	bottomclip = dstbottom - clipbottom;
+
+	if (bottomclip > 0) {
+		dstbottom -= bottomclip;
+		if (src1used)
+			src1bottom -= bottomclip;
+		if (src2used)
+			src2bottom -= bottomclip;
+		if (maskused)
+			maskbottom -= bottomclip;
+	}
+
+	leftclip = bltparams->cliprect.left - bltparams->dstrect.left;
+	if (leftclip > 0) {
+		bltparams->dstrect.left += leftclip;
+		if (src1used)
+			bltparams->src1rect.left += leftclip;
+		if (src2used)
+			bltparams->src2rect.left += leftclip;
+		if (maskused)
+			bltparams->maskrect.left += leftclip;
+	}
+
+	topclip = bltparams->cliprect.top - bltparams->dstrect.top;
+	if (topclip > 0) {
+		bltparams->dstrect.top += topclip;
+		if (src1used)
+			bltparams->src1rect.top += topclip;
+		if (src2used)
+			bltparams->src2rect.top += topclip;
+		if (maskused)
+			bltparams->maskrect.top += topclip;
+	}
+
+	if ((dstright <= bltparams->dstrect.left) ||
+	(dstbottom <= bltparams->dstrect.top)) {
+		bltparams->dstrect.width = 0;
+		bltparams->dstrect.height = 0;
+		GC_PRINT(GC_INFO_MSG
+			" After clipping, destination rectangle is empty.\n",
+			__func__, __LINE__);
+		goto NullRect;
+	}
+
+	bltparams->dstrect.width = dstright - bltparams->dstrect.left;
+	bltparams->dstrect.height = dstbottom - bltparams->dstrect.top;
+
+	if (src1used) {
+		if ((src1right <= bltparams->src1rect.left) ||
+		(src1bottom <= bltparams->src1rect.top) ||
+		(src1right > (int)bltparams->src1geom->width) ||
+		(src1bottom > (int)bltparams->src1geom->height)) {
+			BVSETBLTERROR(BVERR_SRC1RECT,
+				"clipped source 1 rectangle is invalid.");
+			goto Error;
+		}
+		bltparams->src1rect.width =
+				src1right - bltparams->src1rect.left;
+		bltparams->src1rect.height =
+				src1bottom - bltparams->src1rect.top;
+	}
+
+	if (src2used) {
+		if ((src2right <= bltparams->src2rect.left) ||
+		(src2bottom <= bltparams->src2rect.top) ||
+		(src2right > (int)bltparams->src2geom->width) ||
+		(src2bottom > (int)bltparams->src2geom->height)) {
+			BVSETBLTERROR(BVERR_SRC2RECT,
+				"clipped source 2 rectangle is invalid.");
+			goto Error;
+		}
+		bltparams->src2rect.width =
+			src2right - bltparams->src2rect.left;
+		bltparams->src2rect.height =
+			src2bottom - bltparams->src2rect.top;
+	}
+
+	if (maskused) {
+		if ((maskright <= bltparams->maskrect.left) ||
+		(maskbottom <= bltparams->maskrect.top) ||
+		(maskright > (int)bltparams->maskgeom->width) ||
+		(maskbottom > (int)bltparams->maskgeom->height)) {
+			BVSETBLTERROR(BVERR_MASKRECT,
+				"clipped mask rectangle is invalid.");
+			goto Error;
+		}
+		bltparams->maskrect.width =
+			maskright - bltparams->maskrect.left;
+		bltparams->maskrect.height =
+			maskbottom - bltparams->maskrect.top;
+	}
+
+	bltparams->flags &= ~BVFLAG_CLIP;
+
+Scale:
+NullRect:
+Error:
+	return bverror;
+}
+#endif
+
 /*******************************************************************************
  * Library constructor and destructor.
  */
@@ -3050,7 +3316,7 @@ exit:
 }
 EXPORT_SYMBOL(gcbv_unmap);
 
-enum bverror gcbv_blt(struct bvbltparams *bltparams)
+enum bverror gcbv_blt(struct bvbltparams *bltparams_in)
 {
 	enum bverror bverror = BVERR_NONE;
 	struct gcalpha *gca = NULL;
@@ -3064,6 +3330,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	unsigned short rop, blend, format;
 	struct gccommit gccommit;
 	int srccount, res;
+	struct bvbltparams workbltparams;
+	struct bvbltparams *bltparams = &workbltparams;
 
 	GC_PRINT("++" GC_INFO_MSG " bltparams=0x%08X\n",
 		__func__, __LINE__, bltparams);
@@ -3071,16 +3339,19 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	/* FIXME/TODO: add check for initialization success. */
 
 	/* Verify blt parameters structure. */
-	if (bltparams == NULL) {
+	if (bltparams_in == NULL) {
 		BVSETERROR(BVERR_UNK,
 				"pointer to bvbltparams struct is expected");
 		goto exit;
 	}
 
-	if (bltparams->structsize != STRUCTSIZE(bltparams, callbackdata)) {
+	if (bltparams_in->structsize != STRUCTSIZE(bltparams, callbackdata)) {
 		BVSETERROR(BVERR_BLTPARAMS_VERS, "argument has invalid size");
 		goto exit;
 	}
+
+/*TODO: change to memcpy */
+	workbltparams = *bltparams_in;
 
 	/* Reset the error message. */
 	bltparams->errdesc = NULL;
@@ -3384,6 +3655,17 @@ exit:
 
 	GC_PRINT("--" GC_INFO_MSG " bverror=0x%08X\n",
 		__func__, __LINE__, bverror);
+
+	bltparams_in->batch = bltparams->batch;
+	bltparams_in->batchflags = bltparams->batchflags;
+	bltparams_in->errdesc = bltparams->errdesc;
+
+	if (bltparams_in->flags & BVFLAG_SCALE_RETURN)
+		bltparams_in->scalemode = bltparams->scalemode;
+
+	if (bltparams_in->flags & BVFLAG_DITHER_RETURN)
+		bltparams_in->dithermode = bltparams->dithermode;
+
 	return bverror;
 }
 EXPORT_SYMBOL(gcbv_blt);
