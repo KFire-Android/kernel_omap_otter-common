@@ -28,8 +28,6 @@
 static LIST_HEAD(thermal_domain_list);
 static DEFINE_MUTEX(thermal_domain_list_lock);
 
-static atomic_t device_count;
-
 /**
  * DOC: Introduction
  * =================
@@ -302,7 +300,6 @@ int thermal_governor_dev_register(struct thermal_dev *tdev)
 	struct thermal_domain *therm_dom;
 	struct thermal_domain *domain;
 
-	tdev->index = atomic_inc_return(&device_count);
 	if (list_empty(&thermal_domain_list)) {
 		goto init_governor;
 	} else {
@@ -379,7 +376,6 @@ int thermal_cooling_dev_register(struct thermal_dev *tdev)
 	struct thermal_domain *domain;
 
 	pr_debug("%s:Registering %s cooling device\n", __func__, tdev->name);
-	tdev->index = atomic_inc_return(&device_count);
 
 	if (list_empty(&thermal_domain_list)) {
 		goto init_cooling_agent;
@@ -453,7 +449,6 @@ int thermal_sensor_dev_register(struct thermal_dev *tdev)
 	struct thermal_domain *therm_dom;
 	struct thermal_domain *domain;
 
-	tdev->index = atomic_inc_return(&device_count);
 	if (list_empty(&thermal_domain_list)) {
 		pr_debug("%s:Need to init the %s domain\n",
 			__func__, tdev->domain_name);
