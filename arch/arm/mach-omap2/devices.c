@@ -921,6 +921,8 @@ static void omap_init_gpu(void)
 	pdata->device_enable = omap_device_enable;
 	pdata->device_idle = omap_device_idle;
 	pdata->device_shutdown = omap_device_shutdown;
+	pdata->opp_get_opp_count = opp_get_opp_count;
+	pdata->opp_find_freq_ceil = opp_find_freq_ceil;
 
 	pdata->ovfreqs = 0;
 	if (cpu_is_omap446x())
