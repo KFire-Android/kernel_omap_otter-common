@@ -71,6 +71,19 @@ struct thermal_dev {
 	struct thermal_domain	*domain;
 };
 
+/**
+ * Call the specific call back for a thermal device. In case some pointer
+ * is missing, returns -EOPNOTSUPP, otherwise will return the result from
+ * callback function.
+ */
+#define thermal_device_call(tdev, f, args...)				\
+({									\
+	int __err = -EOPNOTSUPP;					\
+	if ((tdev) && (tdev)->dev_ops && (tdev)->dev_ops->f)		\
+		__err = (tdev)->dev_ops->f((tdev) , ##args);		\
+	__err;								\
+})
+
 extern int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
 		int min, int max);
 extern int thermal_request_temp(struct thermal_dev *tdev);

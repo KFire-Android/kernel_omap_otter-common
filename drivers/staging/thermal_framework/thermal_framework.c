@@ -86,15 +86,10 @@ int thermal_cooling_set_level(struct list_head *cooling_list,
 	int ret = -ENODEV;
 
 	list_for_each_entry(cooling_dev, cooling_list, node) {
-		if (cooling_dev->dev_ops &&
-			cooling_dev->dev_ops->cool_device) {
-			pr_debug("%s:Found %s\n", __func__, cooling_dev->name);
-			cooling_dev->dev_ops->cool_device(cooling_dev, level);
-			ret = 0;
-		} else {
-			pr_err("%s:Cannot find cool_device for %s\n",
-				__func__, cooling_dev->name);
-		}
+		ret = thermal_device_call(cooling_dev, cool_device, level);
+		if (ret < 0)
+			pr_err("%s: failed to cool device %s at level %d\n",
+				__func__, cooling_dev->name, level);
 	}
 	return ret;
 }
@@ -130,20 +125,11 @@ int thermal_sensor_set_temp(struct thermal_dev *tdev)
 		goto out;
 	}
 
-	if (thermal_domain->governor &&
-			thermal_domain->governor->dev_ops &&
-			thermal_domain->governor->dev_ops->process_temp) {
-		thermal_domain->governor->dev_ops->process_temp
-			(thermal_domain->governor,
-			 &thermal_domain->cooling_agents,
-			 tdev, tdev->current_temp);
-		ret = 0;
-		goto out;
-	} else {
-		pr_debug("%s:Gov did not have right function\n",
-				__func__);
-		goto out;
-	}
+	ret = thermal_device_call(thermal_domain->governor, process_temp,
+					&thermal_domain->cooling_agents,
+					tdev, tdev->current_temp);
+	if (ret < 0)
+		pr_debug("%s: governor does not have callback\n", __func__);
 out:
 	return ret;
 }
@@ -175,11 +161,9 @@ int thermal_request_temp(struct thermal_dev *tdev)
 		return ret;
 	}
 
-	if (tdev->dev_ops &&
-	    tdev->dev_ops->report_temp) {
-			ret = tdev->dev_ops->report_temp(tdev);
-	} else {
-		pr_err("%s:Getting temp is not supported for domain %s\n",
+	ret = thermal_device_call(tdev, report_temp);
+	if (ret < 0) {
+		pr_err("%s: getting temp is not supported for domain %s\n",
 			__func__, thermal_domain->domain_name);
 		ret = -EOPNOTSUPP;
 	}
@@ -199,21 +183,7 @@ EXPORT_SYMBOL_GPL(thermal_request_temp);
 int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
 			int min, int max)
 {
-	if (temp_sensor) {
-		if ((temp_sensor->dev_ops) &&
-		    (temp_sensor->dev_ops->set_temp_thresh)) {
-			pr_debug("%s: Setting new temp thresholds to %i & %i\n",
-				__func__, min, max);
-			temp_sensor->dev_ops->set_temp_thresh(temp_sensor,
-				min, max);
-			return 0;
-		} else
-			pr_err("%s:Updating temp thresholds is not supported \
-				for sensor %s\n", __func__, temp_sensor->name);
-	} else
-		pr_err("%s:Temp sensor pointer is NULL\n", __func__);
-
-	return -EOPNOTSUPP;
+	return thermal_device_call(temp_sensor, set_temp_thresh, min, max);
 }
 EXPORT_SYMBOL_GPL(thermal_update_temp_thresholds);
 
@@ -228,19 +198,7 @@ EXPORT_SYMBOL_GPL(thermal_update_temp_thresholds);
  */
 int thermal_update_temp_rate(struct thermal_dev *temp_sensor, int rate)
 {
-	int ret_rate = -EOPNOTSUPP;
-	if (temp_sensor) {
-		if ((temp_sensor->dev_ops) &&
-		    (temp_sensor->dev_ops->set_temp_report_rate)) {
-			pr_debug("%s: Setting new temp report rate to %i\n",
-				__func__, rate);
-			ret_rate = temp_sensor->dev_ops->set_temp_report_rate(
-					temp_sensor, rate);
-		}
-	} else
-		pr_err("%s:Temp sensor pointer is NULL\n", __func__);
-
-	return ret_rate;
+	return thermal_device_call(temp_sensor, set_temp_report_rate, rate);
 }
 EXPORT_SYMBOL_GPL(thermal_update_temp_rate);
 
@@ -269,9 +227,8 @@ static int thermal_init_thermal_state(struct thermal_dev *tdev)
 		return -ENODEV;
 	}
 
-	if (domain->temp_sensor &&
-		domain->governor &&
-		domain->cooling_agents.next)
+	if (domain->temp_sensor && domain->governor &&
+				!list_empty(&domain->cooling_agents))
 		thermal_request_temp(tdev);
 	else
 		pr_debug("%s:Not all components registered for %s domain\n",
