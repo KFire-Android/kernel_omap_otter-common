@@ -302,10 +302,8 @@ void thermal_governor_dev_unregister(struct thermal_dev *tdev)
 {
 	mutex_lock(&thermal_domain_list_lock);
 
-	if (tdev->domain) {
-		kfree(tdev->domain->governor);
+	if (tdev->domain)
 		tdev->domain->governor = NULL;
-	}
 
 	mutex_unlock(&thermal_domain_list_lock);
 }
@@ -398,10 +396,8 @@ void thermal_sensor_dev_unregister(struct thermal_dev *tdev)
 {
 	mutex_lock(&thermal_domain_list_lock);
 
-	if (tdev->domain) {
-		kfree(tdev->domain->temp_sensor);
+	if (tdev->domain)
 		tdev->domain->temp_sensor = NULL;
-	}
 
 	mutex_unlock(&thermal_domain_list_lock);
 }
