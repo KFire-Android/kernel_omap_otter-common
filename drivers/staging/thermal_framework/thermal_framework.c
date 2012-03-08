@@ -137,37 +137,6 @@ int thermal_request_temp(struct thermal_dev *tdev)
 EXPORT_SYMBOL_GPL(thermal_request_temp);
 
 /**
- * thermal_update_temp_thresholds() - Update the temperature reporting
- *			thresholds on the temp sensor.
- *
- * @min: The minimum temperature that should trigger a temperature event.
- * @max: The maximum temperature that should trigger a temperature event.
- *
- * EOPNOTSUPP if the temperature sensor does not support this API.
- */
-int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
-			int min, int max)
-{
-	return thermal_device_call(temp_sensor, set_temp_thresh, min, max);
-}
-EXPORT_SYMBOL_GPL(thermal_update_temp_thresholds);
-
-/**
- * thermal_update_temp_rate() - Update the rate for the temp sensor to read and
- *				report the temperature data.
- *
- * @rate: The rate to read and report the data to the governor.  Rate is defined
- *	per the temperature sensor driver
- *
- * Return is the current rate of the temperature acquisition.
- */
-int thermal_update_temp_rate(struct thermal_dev *temp_sensor, int rate)
-{
-	return thermal_device_call(temp_sensor, set_temp_report_rate, rate);
-}
-EXPORT_SYMBOL_GPL(thermal_update_temp_rate);
-
-/**
  * thermal_init_thermal_state() - Initialize the domain thermal state machine.
  *		Once all the thermal devices are available in the domain.
  *		Force the thermal sensor for the domain to report it's current
