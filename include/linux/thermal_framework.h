@@ -84,13 +84,30 @@ struct thermal_dev {
 	__err;								\
 })
 
+/**
+ * Call the specific call back for a set of thermal devices. It will call
+ * until an error occurs or until all calls are done successfully. It will
+ * continue even if any of the thermal devices is missing the callback.
+ */
+#define thermal_device_call_all(tdev_list, f, args...)			\
+({									\
+	struct thermal_dev *tdev;					\
+	int ret = -ENODEV;						\
+									\
+	list_for_each_entry(tdev, (tdev_list), node) {			\
+		ret = thermal_device_call(tdev, f , ##args);		\
+		if (ret < 0)						\
+			pr_debug("%s: failed to call " #f		\
+				" on thermal device\n", __func__);	\
+	}								\
+	ret;								\
+})
+
 extern int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
 		int min, int max);
 extern int thermal_request_temp(struct thermal_dev *tdev);
 extern int thermal_sensor_set_temp(struct thermal_dev *tdev);
 extern int thermal_update_temp_rate(struct thermal_dev *temp_sensor, int rate);
-extern int thermal_cooling_set_level(struct list_head *cooling_list,
-		unsigned int level);
 
 /* Registration and unregistration calls for the thermal devices */
 extern int thermal_sensor_dev_register(struct thermal_dev *tdev);

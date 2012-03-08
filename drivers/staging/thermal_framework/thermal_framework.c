@@ -71,31 +71,6 @@ struct thermal_domain {
 };
 
 /**
- * thermal_cooling_set_level() - Calls a list of cooling devices to cool the
- *				thermal domain
- * @cooling_list: A list of cooling agents to call to cool the domain
- * @level: The level of cooling that the agent should perform
- *
- * Returns 0 for a successfull call to the cooling agent. ENODEV if a cooling
- * agent does not exist.
- */
-int thermal_cooling_set_level(struct list_head *cooling_list,
-		unsigned int level)
-{
-	struct thermal_dev *cooling_dev;
-	int ret = -ENODEV;
-
-	list_for_each_entry(cooling_dev, cooling_list, node) {
-		ret = thermal_device_call(cooling_dev, cool_device, level);
-		if (ret < 0)
-			pr_err("%s: failed to cool device %s at level %d\n",
-				__func__, cooling_dev->name, level);
-	}
-	return ret;
-}
-EXPORT_SYMBOL_GPL(thermal_cooling_set_level);
-
-/**
  * thermal_sensor_set_temp() - External API to allow a sensor driver to set
  *				the current temperature for a domain
  * @tdev: The thermal device setting the temperature

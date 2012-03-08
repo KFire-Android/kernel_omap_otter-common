@@ -252,7 +252,7 @@ out:
 		return -ENODEV;
 	} else {
 		omap_gov->cooling_level = 0;
-		thermal_cooling_set_level(&cooling_agents,
+		thermal_device_call_all(&cooling_agents, cool_device,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
 		omap_gov->hotspot_temp_lower = OMAP_SAFE_TEMP;
@@ -311,7 +311,7 @@ out:
 		return -ENODEV;
 	} else {
 		omap_gov->cooling_level = 0;
-		thermal_cooling_set_level(&cooling_agents,
+		thermal_device_call_all(&cooling_agents, cool_device,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
 		omap_gov->hotspot_temp_lower =
@@ -375,7 +375,7 @@ out:
 		if (omap_gov->panic_zone_reached == 0) {
 			/* Temperature rises and enters into alert zone */
 			omap_gov->cooling_level = 0;
-			thermal_cooling_set_level(&cooling_agents,
+			thermal_device_call_all(&cooling_agents, cool_device,
 						omap_gov->cooling_level);
 		}
 
@@ -437,7 +437,7 @@ out:
 		omap_gov->panic_zone_reached++;
 		pr_info("%s: Panic zone reached %i times\n",
 			__func__, omap_gov->panic_zone_reached);
-		thermal_cooling_set_level(&cooling_agents,
+		thermal_device_call_all(&cooling_agents, cool_device,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
 		omap_gov->hotspot_temp_lower =
