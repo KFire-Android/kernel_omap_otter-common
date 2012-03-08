@@ -44,8 +44,9 @@ struct thermal_dev_ops {
 	/* Cooling agent call backs */
 	int (*cool_device) (struct thermal_dev *, int temp);
 	/* Governor call backs */
-	int (*process_temp) (struct list_head *cooling_list,
-			struct thermal_dev *temp_sensor, int temp);
+	int (*process_temp) (struct thermal_dev *gov,
+				struct list_head *cooling_list,
+				struct thermal_dev *temp_sensor, int temp);
 };
 
 /**

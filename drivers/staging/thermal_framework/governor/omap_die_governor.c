@@ -611,7 +611,8 @@ static void average_cpu_sensor_delayed_work_fn(struct work_struct *work)
 				msecs_to_jiffies(omap_gov->average_period));
 }
 
-static int omap_process_cpu_temp(struct list_head *cooling_list,
+static int omap_process_cpu_temp(struct thermal_dev *gov,
+				struct list_head *cooling_list,
 				struct thermal_dev *temp_sensor,
 				int temp)
 {
