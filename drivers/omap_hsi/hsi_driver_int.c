@@ -434,7 +434,6 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 	unsigned int n_p;
 	unsigned int irq;
 	long buff_offset;
-	int rx_poll = 0;
 	int data_read = 0;
 	int fifo, fifo_words_avail;
 
@@ -464,9 +463,11 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		}
 	}
 
-	/* Disable interrupts if not needed for polling */
-	if (!(ch->flags & HSI_CH_RX_POLL))
-		hsi_driver_disable_read_interrupt(ch);
+	/* Disable RX interrupt even if needed for polling. Useful to avoid */
+	/* a RX interrupt every time a frame is received. One RX interrupt is */
+	/* enough to notify upper layer (hsi_char or Link Layer). RX int will */
+	/* be re-enabled later if needed. */
+	hsi_driver_disable_read_interrupt(ch);
 
 	/*
 	 * Check race condition: RX transmission initiated but DMA transmission
@@ -479,9 +480,6 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 		goto done;
 	}
 
-	if (ch->flags & HSI_CH_RX_POLL)
-		rx_poll = 1;
-
 	if (ch->read_data.addr) {
 		buff_offset = hsi_hsr_buffer_reg(hsi_ctrl, n_p, n_ch);
 		if (buff_offset >= 0) {
@@ -493,7 +491,8 @@ static void hsi_do_channel_rx(struct hsi_channel *ch)
 	hsi_reset_ch_read(ch);
 
 done:
-	if (rx_poll) {
+	if (ch->flags & HSI_CH_RX_POLL) {
+		ch->flags &= ~HSI_CH_RX_POLL;
 		spin_unlock(&hsi_ctrl->lock);
 		hsi_port_event_handler(ch->hsi_port,
 				       HSI_EVENT_HSR_DATAAVAILABLE,

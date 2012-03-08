@@ -563,7 +563,7 @@ static int __hsi_read_cancel(struct hsi_channel *ch)
 	int err = -ENODATA;
 	struct hsi_dev *hsi_ctrl = ch->hsi_port->hsi_controller;
 
-	if (ch->read_data.size == 1)
+	if ((ch->read_data.size == 1) && !(ch->flags & HSI_CH_RX_POLL))
 		err = hsi_driver_cancel_read_interrupt(ch);
 	else if (ch->read_data.size > 1)
 		err = hsi_driver_cancel_read_dma(ch);
@@ -1034,6 +1034,12 @@ void hsi_close(struct hsi_device *dev)
 		dev->ch->flags &= ~HSI_CH_OPEN;
 		__hsi_write_cancel(dev->ch);
 		__hsi_read_cancel(dev->ch);
+	}
+
+	if (dev->ch->flags & HSI_CH_RX_POLL) {
+		/* Disable RX interrupt for polling */
+		dev->ch->flags &= ~HSI_CH_RX_POLL;
+		hsi_driver_disable_read_interrupt(dev->ch);
 	}
 
 	hsi_clocks_disable_channel(hsi_ctrl->dev, dev->ch->channel_number,
