@@ -838,7 +838,7 @@ static int twl6040_hs_dac_left_event(struct snd_soc_dapm_widget *w,
 	int hsrctl;
 
 	/* SW Workaround for DC Offset On EAR Differential Output Errata */
-	if (twl6040_get_icrev(twl6040) < TWL6040_REV_1_3) {
+	if (twl6040_get_icrev(twl6040) <= TWL6041_REV_2_0) {
 		hsrctl = twl6040_read_reg_cache(codec, TWL6040_REG_HSRCTL);
 		switch (event) {
 		case SND_SOC_DAPM_PRE_PMU:
