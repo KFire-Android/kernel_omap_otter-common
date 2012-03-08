@@ -1020,7 +1020,7 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 
 	ret = request_threaded_irq(temp_sensor->irq, NULL,
 			omap_talert_irq_handler,
-			IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+			IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
 			"temp_sensor", (void *)temp_sensor);
 	if (ret) {
 		dev_err(&pdev->dev, "Request threaded irq failed.\n");
