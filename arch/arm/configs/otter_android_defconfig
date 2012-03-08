@@ -2521,7 +2521,9 @@ CONFIG_HAVE_ARCH_KGDB=y
 # CONFIG_STRICT_DEVMEM is not set
 # CONFIG_ARM_UNWIND is not set
 # CONFIG_DEBUG_USER is not set
-# CONFIG_DEBUG_LL is not set
+CONFIG_DEBUG_LL=y
+# CONFIG_EARLY_PRINTK is not set
+# CONFIG_DEBUG_ICEDCC is not set
 # CONFIG_OC_ETM is not set
 
 #

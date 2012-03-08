@@ -584,7 +584,7 @@ static struct regulator_init_data sdp4430_vana = {
 	.constraints = {
 		.min_uV			= 2100000,
 		.max_uV			= 2100000,
-		.apply_uV		= true,
+		//.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
 		.state_mem		= { .enabled = false, .disabled = true, },
@@ -596,7 +596,7 @@ static struct regulator_init_data sdp4430_vcxio = {
 	.constraints = {
 		.min_uV			= 1800000,
 		.max_uV			= 1800000,
-		.apply_uV		= true,
+		//.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
 		.state_mem		= { .enabled = false, .disabled = true, },
@@ -608,7 +608,7 @@ static struct regulator_init_data sdp4430_vdac = {
 	.constraints = {
 		.min_uV			= 1800000,
 		.max_uV			= 1800000,
-		.apply_uV		= true,
+		//.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
 		.state_mem		= { .enabled = false, .disabled = true, },
@@ -1334,26 +1334,26 @@ static void __init omap_kc1_init(void)
 	omap_board_config = sdp4430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
 
-	omap_init_board_version(0);
+//	omap_init_board_version(0);
 
 	// FIXME-HASH:
         // omap4_audio_conf();
-	omap4_create_board_props();
+//	omap4_create_board_props();
 	register_reboot_notifier(&kc1_reboot_notifier);
 
-	kc1_pmic_mux_init();
+//	kc1_pmic_mux_init();
 	omap4_i2c_init();
 	enable_rtc_gpio();
-	ramconsole_init();
-	omap4_display_init();
+//	ramconsole_init();
+//	omap4_display_init();
 	//omap_disp_led_init();
-	omap4_register_ion();
+//	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 
 	gpio_request(0, "sysok");
 
-	// **wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
-	// **omap_serial_init();
+	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
+	omap_serial_init();
 
 	omap4_twl6030_hsmmc_init(mmc);
 	gpio_request(42, "OMAP_GPIO_ADC");
@@ -1374,34 +1374,34 @@ static void __init omap_kc1_init(void)
 		gpio_request(155, "CHARGE-SUSP");
 		gpio_direction_output(155, 1);
 	}
-	omap4_kc1_wifi_init();
+//	omap4_kc1_wifi_init();
 
-	omap4_ehci_ohci_init();
-	usb_musb_init(&musb_board_data);
+//	omap4_ehci_ohci_init();
+//	usb_musb_init(&musb_board_data);
 
-	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
+//	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
-	omap_dmm_init();
-	omap_kc1_display_init();
+//	omap_dmm_init();
+//	omap_kc1_display_init();
 
-	gpio_request(119, "ADO_SPK_ENABLE");
-	gpio_direction_output(119, 1);
-	gpio_set_value(119, 1);
-	gpio_request(120, "SKIPB_GPIO");
-	gpio_direction_output(120, 1);
-	gpio_set_value(120, 1);
+//	gpio_request(119, "ADO_SPK_ENABLE");
+//	gpio_direction_output(119, 1);
+//	gpio_set_value(119, 1);
+//	gpio_request(120, "SKIPB_GPIO");
+//	gpio_direction_output(120, 1);
+//	gpio_set_value(120, 1);
 
 	// Qunata_diagnostic 20110506 set GPIO 171 172 to be input
-	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017C); 
-	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017C);
+//	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017C); 
+//	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017C);
 	 
-	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017E); 
-	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017E);
+//	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017E); 
+//	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017E);
 	////////////////////////////////////////////
 
-	omap_enable_smartreflex_on_init();
-        if (enable_suspend_off)
-                omap_pm_enable_off_mode();
+//	omap_enable_smartreflex_on_init();
+//	if (enable_suspend_off)
+//		omap_pm_enable_off_mode();
 }
 
 static void __init omap_4430sdp_map_io(void)
@@ -1421,15 +1421,11 @@ static void __init omap_4430sdp_reserve(void)
 
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
-#else
-	omap_reserve();
 #endif
+	omap_reserve();
 }
 
 MACHINE_START(OMAP_4430SDP, "Amazon KC1 (Otter)")
-        // FIXME-HASH
-	//.phys_io	= 0x48000000,
-	//.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
 	.reserve	= omap_4430sdp_reserve,
 	.map_io		= omap_4430sdp_map_io,
