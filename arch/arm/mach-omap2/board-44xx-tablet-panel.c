@@ -29,6 +29,7 @@
 
 #include <linux/i2c/twl.h>
 
+#include <plat/android-display.h>
 #include <plat/vram.h>
 #include <plat/omap_apps_brd_id.h>
 
@@ -200,6 +201,8 @@ static struct omap_dss_device tablet_lcd_device = {
 			.vsw		= 4,
 			.vbp		= 4,
 		},
+		.width_in_um = 210300,
+		.height_in_um = 147600,
 	},
 
 	.ctrl = {
@@ -280,7 +283,7 @@ static struct i2c_board_info __initdata omap4xx_i2c_bus2_d2l_info[] = {
 	},
 };
 
-int __init tablet_panel_init(void)
+static void set_panel_size(void)
 {
 	if (omap_is_board_version(OMAP4_TABLET_1_0) ||
 	    omap_is_board_version(OMAP4_TABLET_1_1) ||
@@ -288,6 +291,22 @@ int __init tablet_panel_init(void)
 		tablet_lcd_device.panel.timings.x_res	= 1024;
 		tablet_lcd_device.panel.timings.y_res	= 768;
 	}
+}
+
+void tablet_android_display_setup(struct omap_ion_platform_data *ion)
+{
+	set_panel_size();
+
+	omap_android_display_setup(&tablet_dss_data,
+				   NULL,
+				   NULL,
+				   &tablet_fb_pdata,
+				   ion);
+}
+
+int __init tablet_panel_init(void)
+{
+	set_panel_size();
 
 	tablet_lcd_init();
 	tablet_hdmi_mux_init();

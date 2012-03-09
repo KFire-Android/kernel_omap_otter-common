@@ -737,7 +737,10 @@ static void __init omap_tablet_reserve(void)
 #endif
 
 #ifdef CONFIG_ION_OMAP
+	tablet_android_display_setup(get_omap_ion_platform_data());
 	omap_ion_init();
+#else
+	tablet_android_display_setup(NULL);
 #endif
 	omap_reserve();
 }
