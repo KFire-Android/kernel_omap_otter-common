@@ -144,6 +144,7 @@
 #include "powerdomain.h"
 #include <plat/clock.h>
 #include <plat/omap_hwmod.h>
+#include <plat/omap_device.h>
 #include <plat/prcm.h>
 
 #include "cm2xxx_3xxx.h"
@@ -2880,6 +2881,57 @@ ohsps_unlock:
 	spin_unlock_irqrestore(&oh->_lock, flags);
 
 	return ret;
+}
+
+/**
+ * omap_hwmod_set_wakeuplat_constraint - set/release a wake-up latency
+ * constraint
+ * @oh: struct omap_hwmod* to which the target device belongs to.
+ * @cookie: identifier of the constraints list for @oh.
+ * @min_latency: the minimum allowed wake-up latency for @oh.
+ *
+ * Returns the return value from pwrdm_wakeuplat_update_constraint(),
+ * or -EINVAL in case of invalid parameters.
+ */
+int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
+					long min_latency)
+{
+	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
+
+	if (!pwrdm)
+		return -EINVAL;
+
+	/*
+	 * XXX Update to use pwrdm_wakeuplat_update_constraint() when
+	 * that code is ready
+	 */
+	return -EINVAL;
+
+}
+
+/**
+ * omap_hwmod_remove_wakeuplat_constraint - Release a wake-up latency
+ * constraint
+ * @oh: struct omap_hwmod* to which the target device belongs to.
+ * @cookie: identifier of the constraints list for @oh.
+ *
+ * Removes a wakeup latency contraint.  Returns the return value from
+ * pwrdm_wakeuplat_update_constraint(), or -EINVAL in case of invalid
+ * parameters.
+ */
+int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie)
+{
+	struct powerdomain *pwrdm = omap_hwmod_get_pwrdm(oh);
+
+	if (!pwrdm)
+		return -EINVAL;
+
+	/*
+	 * XXX Update to use pwrdm_wakeuplat_remove_constraint() when
+	 * that code is ready
+	 */
+	return -EINVAL;
+
 }
 
 /**
