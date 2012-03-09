@@ -885,6 +885,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 	struct device	*child;
 	unsigned sub_chip_id;
 
+	pr_info("enter twl-core::add_children()\n");
 	if (twl_has_gpio() && pdata->gpio) {
 		child = add_child(SUB_CHIP_ID1, "twl4030_gpio",
 				pdata->gpio, sizeof(*pdata->gpio),
@@ -1003,7 +1004,8 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			usb3v1.dev = child;
 		}
 	}
-        /* FIXME-HASH: This was remved in KC1 kernel
+        /* FIXME-HASH: This was remved in KC1 kernel */
+#if 0
 	if (twl_has_usb() && pdata->usb && twl_class_is_6030()) {
 
 		static struct regulator_consumer_supply usb3v3;
@@ -1046,8 +1048,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			if (IS_ERR(child))
 					return PTR_ERR(child);
 	}
-        */
-
+#endif
 	if (twl_has_watchdog()) {
 		child = add_child(0, "twl4030_wdt", NULL, 0, false, 0, 0);
 		if (IS_ERR(child))
@@ -1060,14 +1061,14 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			return PTR_ERR(child);
 	}
 
-	/*
+#if 0
         if (twl6030_has_pwrbutton()) {
 		child = add_child(1, "twl6030_pwrbutton",
 				NULL, 0, true, pdata->irq_base, 0);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
-	*/
+#endif
 
 	/* FIXME-HASH: Watch this */
 	if (twl_has_codec() && pdata->codec && twl_class_is_4030()) {
@@ -1080,7 +1081,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 	}
 
 	/* Phoenix codec driver is probed directly atm */
-	/*
+#if 0
 	if (twl_has_codec() && pdata->codec && twl_class_is_6030()) {
 		sub_chip_id = twl_map[TWL_MODULE_AUDIO_VOICE].sid;
 		child = add_child(sub_chip_id, "twl6040-audio",
@@ -1089,7 +1090,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
-	*/
+#endif
 
 	/* twl4030 regulators */
 	if (twl_has_regulator() && twl_class_is_4030()) {
@@ -1264,6 +1265,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			return PTR_ERR(child);
 	}
 
+#if 0
 	/* 6030 and 6025 share this regulator */
 	if (twl_has_regulator() && twl_class_is_6030()) {
 		child = add_regulator(TWL6030_REG_VANA, pdata->vana,
@@ -1271,6 +1273,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
+#endif
 
 	/* twl6025 regulators */
 	if (twl_has_regulator() && twl_class_is_6030() &&
@@ -1354,12 +1357,12 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 		/* we need to connect regulators to this transceiver */
-		/* This ware removed in KC1 kernel
+		/* This ware removed in KC1 kernel */
+#if 0
 		if (twl_has_regulator() && child)
 			usb3v3.dev = child;
-		*/
+#endif
 	}
-
 	return 0;
 }
 

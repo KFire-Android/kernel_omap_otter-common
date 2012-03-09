@@ -63,6 +63,8 @@
 #include <plat/omap-pm.h>
 
 #include <plat/dmtimer.h>
+
+#include "common-board-devices.h"
 #include "mux.h"
 #include "hsmmc.h"
 #include "timer-gp.h"
@@ -379,20 +381,42 @@ static struct twl4030_usb_data omap4_usbphy_data = {
 };
 
 static struct omap2_hsmmc_info mmc[] = {
-	{ .mmc = 2, .caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_1_8V_DDR, .gpio_cd = -EINVAL, .gpio_wp = -EINVAL, .ocr_mask = MMC_VDD_165_195, .nonremovable = true,
+	{
+		.mmc = 2,
+		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_1_8V_DDR,
+		.gpio_cd = 0, // -EINVAL,
+		.gpio_wp = 4, // -EINVAL,
+		.ocr_mask = MMC_VDD_165_195,
+		.nonremovable = true,
 #ifdef CONFIG_PM_RUNTIME
 		.power_saving	= true,
 #endif
 	},
-	{ .mmc = 1, .caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_1_8V_DDR, .gpio_wp = -EINVAL,
+	{
+		.mmc = 1,
+		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_1_8V_DDR,
+		.gpio_wp = -EINVAL,
 #ifdef CONFIG_PM_RUNTIME
 		.power_saving	= true,
 #endif
 	},
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
-	{ .mmc = 5, .caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA, .gpio_cd = -EINVAL, .gpio_wp = 4, .ocr_mask = MMC_VDD_165_195, },
+	{
+		.mmc = 5,
+		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.gpio_cd = -EINVAL,
+		.gpio_wp = 4,
+		.ocr_mask = MMC_VDD_165_195,
+	},
 #else
-	{ .mmc = 5, .caps = MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD, .gpio_cd = -EINVAL, .gpio_wp = -EINVAL, .ocr_mask = MMC_VDD_165_195, .nonremovable = true, },
+	{
+		.mmc = 5,
+		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
+		.gpio_cd = -EINVAL,
+		.gpio_wp = -EINVAL,
+		.ocr_mask = MMC_VDD_165_195,
+		.nonremovable = true,
+	},
 #endif
 	{}	/* Terminator */
 };
@@ -480,22 +504,26 @@ static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
 {
 	struct omap_mmc_platform_data *pdata;
 
+	pr_info("omap4_twl6030_hsmmc_set_late_init start\n");
 	/* dev can be null if CONFIG_MMC_OMAP_HS is not set */
 	if (!dev)
 		return;
 
 	pdata = dev->platform_data;
 	pdata->init = omap4_twl6030_hsmmc_late_init;
+	pr_info("omap4_twl6030_hsmmc_set_late_init end\n");
 }
 
 static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 {
 	struct omap2_hsmmc_info *c;
 
+	pr_info("omap4_twl6030_hsmmc_init start\n");
 	omap2_hsmmc_init(controllers);
 	for (c = controllers; c->mmc; c++)
 		omap4_twl6030_hsmmc_set_late_init(c->dev);
 
+	pr_info("omap4_twl6030_hsmmc_init end\n");
 	return 0;
 }
 
@@ -662,7 +690,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.vaux2		= &sdp4430_vaux2,
 	.vaux3		= &sdp4430_vaux3,
 	.usb		= &omap4_usbphy_data,
-	.clk32kg        = &sdp4430_clk32kg,
+	.clk32kg	= &sdp4430_clk32kg,
 	.madc           = &sdp4430_gpadc_data,
 };
 
@@ -681,20 +709,27 @@ static void __init kc1_pmic_mux_init(void)
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo_dvt[] = {
 #ifdef CONFIG_BATTERY_BQ27541_Q
-	{ I2C_BOARD_INFO("bq27541", 0x55), },
-#endif 
-	{ I2C_BOARD_INFO("twl6030", 0x48), .flags = I2C_CLIENT_WAKE, .irq = OMAP44XX_IRQ_SYS_1N, .platform_data = &sdp4430_twldata, },
+	{
+		I2C_BOARD_INFO("bq27541", 0x55),
+	},
+#endif
 };
+//	{ I2C_BOARD_INFO("twl6030", 0x48), .flags = I2C_CLIENT_WAKE, .irq = OMAP44XX_IRQ_SYS_1N, .platform_data = &sdp4430_twldata, },
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 #ifdef CONFIG_BATTERY_BQ27541_Q
-	{ I2C_BOARD_INFO("bq27541", 0x55), },
+	{
+		I2C_BOARD_INFO("bq27541", 0x55),
+	},
 #endif
 #ifdef CONFIG_SUMMIT_SMB347_Q
-	{ I2C_BOARD_INFO("summit_smb347", 0x6), .irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ), },
+	{
+		I2C_BOARD_INFO("summit_smb347", 0x6),
+		.irq = OMAP_GPIO_IRQ(OMAP4_CHARGER_IRQ),
+	},
 #endif    
-	{ I2C_BOARD_INFO("twl6030", 0x48), .flags = I2C_CLIENT_WAKE, .irq = OMAP44XX_IRQ_SYS_1N, .platform_data = &sdp4430_twldata, },
 };
+//	{ I2C_BOARD_INFO("twl6030", 0x48), .flags = I2C_CLIENT_WAKE, .irq = OMAP44XX_IRQ_SYS_1N, .platform_data = &sdp4430_twldata, },
 
 static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
 	{ I2C_BOARD_INFO("ilitek_i2c", 0x41), .irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1), },
@@ -783,8 +818,19 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, unsigned int spinlock_id
 	}
 }
 
+static void otter_set_osc_timings(void)
+{
+	/* Device Oscilator
+	 * tstart = 2ms + 2ms = 4ms.
+	 * tshut = Not defined in oscillator data sheet so setting to 1us
+	 */
+	omap_pm_set_osc_lp_time(4000, 1);
+}
+
 static int __init omap4_i2c_init(void)
 {
+	int err;
+
 	omap_i2c_hwspinlock_init(1, 0, &sdp4430_i2c_bus_pdata);
 	omap_i2c_hwspinlock_init(2, 1, &sdp4430_i2c_2_bus_pdata);
 	omap_i2c_hwspinlock_init(3, 2, &sdp4430_i2c_3_bus_pdata);
@@ -795,29 +841,44 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(3, &sdp4430_i2c_3_bus_pdata);
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
 
-	regulator_has_full_constraints();
+	omap4_pmic_init("twl6030", &sdp4430_twldata);
 
 	/*
 	 * Phoenix Audio IC needs I2C1 to
 	 * start with 400 KHz or less
 	 */
-        if (quanta_mbid<0x04)
-		omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo, ARRAY_SIZE(sdp4430_i2c_boardinfo));
+        if (quanta_mbid < 0x04) {
+		// omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo, ARRAY_SIZE(sdp4430_i2c_boardinfo));
+		err = i2c_register_board_info(1,sdp4430_i2c_boardinfo, ARRAY_SIZE(sdp4430_i2c_boardinfo));
+        }
 	// DVT
-        else
-		omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo_dvt, ARRAY_SIZE(sdp4430_i2c_boardinfo_dvt));
+        else {
+		// omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo_dvt, ARRAY_SIZE(sdp4430_i2c_boardinfo_dvt));
+		err = i2c_register_board_info(1,sdp4430_i2c_boardinfo_dvt, ARRAY_SIZE(sdp4430_i2c_boardinfo_dvt));
+        }
+	if (err)
+	  return err;
+
+	regulator_has_full_constraints();
+
 	omap_register_i2c_bus(2, 400, sdp4430_i2c_2_boardinfo, ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo, ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
-	if (quanta_mbid<0x02)
+	if (quanta_mbid<0x02) {
 		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_c1c, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_c1c));
-	else if (quanta_mbid<0x04)
-		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo, ARRAY_SIZE(sdp4430_i2c_4_boardinfo));	
+	}
+	else if (quanta_mbid<0x04) {
+		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo, ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
+	}
 	// DVT
-	else if (quanta_mbid<0x06)
+	else if (quanta_mbid<0x06) {
+		pr_info("quanta_mbid < 0x06\n");
 		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_dvt, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_dvt));
+	}
 	// PVT
-	else
+	else {
+		pr_info("quanta_mbid >= 0x06\n");
 		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_pvt, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_pvt));
+	}
 	return 0;
 }
 
@@ -1334,26 +1395,30 @@ static void __init omap_kc1_init(void)
 	omap_board_config = sdp4430_config;
 	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
 
-//	omap_init_board_version(0);
+	omap_init_board_version(0);
 
 	// FIXME-HASH:
         // omap4_audio_conf();
-//	omap4_create_board_props();
+	omap4_create_board_props();
 	register_reboot_notifier(&kc1_reboot_notifier);
 
-//	kc1_pmic_mux_init();
+	otter_set_osc_timings();
 	omap4_i2c_init();
 	enable_rtc_gpio();
+
+	kc1_pmic_mux_init();
 //	ramconsole_init();
-//	omap4_display_init();
+	omap4_display_init();
 	//omap_disp_led_init();
-//	omap4_register_ion();
+
+	omap_dmm_init();
+	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 
 	gpio_request(0, "sysok");
 
-	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
-	omap_serial_init();
+	// wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
+	// omap_serial_init();
 
 	omap4_twl6030_hsmmc_init(mmc);
 	gpio_request(42, "OMAP_GPIO_ADC");
@@ -1374,34 +1439,33 @@ static void __init omap_kc1_init(void)
 		gpio_request(155, "CHARGE-SUSP");
 		gpio_direction_output(155, 1);
 	}
-//	omap4_kc1_wifi_init();
+	omap4_kc1_wifi_init();
 
-//	omap4_ehci_ohci_init();
-//	usb_musb_init(&musb_board_data);
+	omap4_ehci_ohci_init();
+	usb_musb_init(&musb_board_data);
 
-//	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
+	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
-//	omap_dmm_init();
-//	omap_kc1_display_init();
+	omap_kc1_display_init();
 
-//	gpio_request(119, "ADO_SPK_ENABLE");
-//	gpio_direction_output(119, 1);
-//	gpio_set_value(119, 1);
-//	gpio_request(120, "SKIPB_GPIO");
-//	gpio_direction_output(120, 1);
-//	gpio_set_value(120, 1);
+	gpio_request(119, "ADO_SPK_ENABLE");
+	gpio_direction_output(119, 1);
+	gpio_set_value(119, 1);
+	gpio_request(120, "SKIPB_GPIO");
+	gpio_direction_output(120, 1);
+	gpio_set_value(120, 1);
 
 	// Qunata_diagnostic 20110506 set GPIO 171 172 to be input
-//	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017C); 
-//	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017C);
+	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017C); 
+	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017C);
 	 
-//	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017E); 
-//	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017E);
+	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017E); 
+	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017E);
 	////////////////////////////////////////////
 
-//	omap_enable_smartreflex_on_init();
-//	if (enable_suspend_off)
-//		omap_pm_enable_off_mode();
+	omap_enable_smartreflex_on_init();
+	if (enable_suspend_off)
+		omap_pm_enable_off_mode();
 }
 
 static void __init omap_4430sdp_map_io(void)
@@ -1414,7 +1478,6 @@ static void __init omap_4430sdp_reserve(void)
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
-	// memblock_remove(ram_console_resource.start, ram_console_resource.end - ram_console_resource.start + 1);
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
