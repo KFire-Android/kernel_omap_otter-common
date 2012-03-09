@@ -3515,8 +3515,10 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams_in)
 			}
 
 			/* Same as the destination? */
-			if ((bltparams->src1.desc->virtaddr
-				== bltparams->dstdesc->virtaddr) &&
+			if ((bltparams->src1.desc
+				== bltparams->dstdesc) &&
+				(bltparams->src1geom
+				== bltparams->dstgeom) &&
 				EQ_ORIGIN(bltparams->src1rect,
 						bltparams->dstrect) &&
 				EQ_SIZE(bltparams->src1rect,
@@ -3549,8 +3551,10 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams_in)
 			}
 
 			/* Same as the destination? */
-			if ((bltparams->src2.desc->virtaddr
-				== bltparams->dstdesc->virtaddr) &&
+			if ((bltparams->src2.desc
+				== bltparams->dstdesc) &&
+				(bltparams->src2geom
+				== bltparams->dstgeom) &&
 				EQ_ORIGIN(bltparams->src2rect,
 						bltparams->dstrect) &&
 				EQ_SIZE(bltparams->src2rect,
