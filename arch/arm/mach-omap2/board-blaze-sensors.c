@@ -57,7 +57,8 @@ static int omap_prox_read(void)
 static void omap_sfh7741prox_init(void)
 {
 	int  error;
-	int  gpio_val;
+	struct omap_mux *prox_gpio_mux;
+	bool wake_enable;
 
 	error = gpio_request(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO, "sfh7741");
 	if (error < 0) {
@@ -86,11 +87,11 @@ static void omap_sfh7741prox_init(void)
 		goto fail3;
 	}
 
-	gpio_val = omap_mux_get_gpio(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	if ((gpio_val & OMAP_WAKEUP_EN) == 0) {
-		gpio_val |= OMAP_WAKEUP_EN;
-		omap_mux_set_gpio(gpio_val, OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
-	}
+	prox_gpio_mux = omap_mux_get_gpio(OMAP4_SFH7741_SENSOR_OUTPUT_GPIO);
+	wake_enable = omap_mux_get_wakeupenable(prox_gpio_mux);
+	if (!wake_enable)
+		omap_mux_set_wakeupenable(prox_gpio_mux);
+
 	return;
 
 fail3:

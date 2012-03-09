@@ -34,6 +34,7 @@
 #define OMAP_PANIC_TEMP 110000
 #define OMAP_ALERT_TEMP 100000
 #define OMAP_MONITOR_TEMP 85000
+#define OMAP_SAFE_TEMP  25000
 
 
 /* TODO: Define this via a configurable file */
@@ -44,16 +45,32 @@
 #define OMAP_GRADIENT_SLOPE 481
 #define OMAP_GRADIENT_CONST -12945
 
+/* PCB sensor calculation constants */
+#define OMAP_GRADIENT_SLOPE_WITH_PCB 1370
+#define OMAP_GRADIENT_CONST_WITH_PCB -635
+#define AVERAGE_NUMBER	      20
+
 struct omap_die_governor {
 	struct thermal_dev *temp_sensor;
 	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
 	int report_rate;
 	int panic_zone_reached;
 	int cooling_level;
+	int hotspot_temp_upper;
+	int hotspot_temp_lower;
+	int pcb_temp;
+	int sensor_temp;
+	int absolute_delta;
+	int average_period;
+	int avg_cpu_sensor_temp;
+	int avg_is_valid;
+	struct delayed_work average_cpu_sensor_work;
 };
 
 static struct thermal_dev *therm_fw;
 static struct omap_die_governor *omap_gov;
+static struct thermal_dev *pcb_sensor;
+static int cpu_sensor_temp_table[AVERAGE_NUMBER];
 
 static LIST_HEAD(cooling_agents);
 
@@ -127,6 +144,8 @@ static void omap_update_report_rate(struct thermal_dev *temp_sensor,
  *		OMAP on-die temp sensor into OMAP hot spot temperature.
  *		This takes care of the existing temperature gradient between
  *		the OMAP hot spot and the on-die temp sensor.
+ *		When PCB sensor is used, the temperature gradient is computed
+ *		from PCB and averaged on-die sensor temperatures.
  *
  * @sensor_temp: Raw temperature reported by the OMAP die temp sensor
  *
@@ -136,15 +155,37 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 {
 	int absolute_delta;
 
-	absolute_delta = ((sensor_temp * OMAP_GRADIENT_SLOPE / 1000) +
+	if (pcb_sensor && (omap_gov->avg_is_valid == 1)) {
+		omap_gov->pcb_temp = thermal_request_temp(pcb_sensor);
+		if (omap_gov->pcb_temp < 0)
+			return sensor_temp + omap_gov->absolute_delta;
+
+		absolute_delta = (
+			((omap_gov->avg_cpu_sensor_temp - omap_gov->pcb_temp) *
+			OMAP_GRADIENT_SLOPE_WITH_PCB / 1000) +
+			OMAP_GRADIENT_CONST_WITH_PCB);
+
+		/* Ensure that this formula never returns negative value */
+		if (absolute_delta < 0)
+			absolute_delta = 0;
+	} else {
+		absolute_delta = ((sensor_temp * OMAP_GRADIENT_SLOPE / 1000) +
 			OMAP_GRADIENT_CONST);
+	}
+
+	omap_gov->absolute_delta = absolute_delta;
+	pr_debug("%s:sensor %d avg sensor %d pcb %d, delta %d hot spot %d\n",
+			__func__, sensor_temp, omap_gov->avg_cpu_sensor_temp,
+			omap_gov->pcb_temp, omap_gov->absolute_delta,
+			sensor_temp + absolute_delta);
+
 	return sensor_temp + absolute_delta;
 }
 
 /*
  * hotspot_temp_to_omap_sensor_temp() - Convert the temperature from
  *		the OMAP hot spot temperature into the OMAP on-die temp sensor.
- * 		This is useful to configure the thresholds at OMAP on-die
+ *		This is useful to configure the thresholds at OMAP on-die
  *		sensor level. This takes care of the existing temperature
  *		gradient between the OMAP hot spot and the on-die temp sensor.
  *
@@ -156,7 +197,10 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 
 static signed hotspot_temp_to_sensor_temp(int hot_spot_temp)
 {
-	return ((hot_spot_temp - OMAP_GRADIENT_CONST) * 1000) /
+	if (pcb_sensor && (omap_gov->avg_is_valid == 1))
+		return hot_spot_temp - omap_gov->absolute_delta;
+	else
+		return ((hot_spot_temp - OMAP_GRADIENT_CONST) * 1000) /
 			(1000 + OMAP_GRADIENT_SLOPE);
 }
 
@@ -200,13 +244,19 @@ out:
 		thermal_cooling_set_level(&cooling_agents,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
+		omap_gov->hotspot_temp_lower = OMAP_SAFE_TEMP;
+		omap_gov->hotspot_temp_upper = OMAP_MONITOR_TEMP;
 		die_temp_lower = hotspot_temp_to_sensor_temp(
-			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
-		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_MONITOR_TEMP);
+			omap_gov->hotspot_temp_lower);
+		die_temp_upper = hotspot_temp_to_sensor_temp(
+			omap_gov->hotspot_temp_upper);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			NORMAL_TEMP_MONITORING_RATE);
+		if (pcb_sensor)
+			omap_gov->average_period = NORMAL_TEMP_MONITORING_RATE;
+
 		omap_gov->panic_zone_reached = 0;
 	}
 
@@ -253,14 +303,20 @@ out:
 		thermal_cooling_set_level(&cooling_agents,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
+		omap_gov->hotspot_temp_lower =
+			(OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
+		omap_gov->hotspot_temp_upper = OMAP_ALERT_TEMP;
 		die_temp_lower = hotspot_temp_to_sensor_temp(
-			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
-		die_temp_upper =
-			hotspot_temp_to_sensor_temp(OMAP_ALERT_TEMP);
+			omap_gov->hotspot_temp_lower);
+		die_temp_upper = hotspot_temp_to_sensor_temp(
+			omap_gov->hotspot_temp_upper);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			FAST_TEMP_MONITORING_RATE);
+		if (pcb_sensor)
+			omap_gov->average_period = FAST_TEMP_MONITORING_RATE;
+
 		omap_gov->panic_zone_reached = 0;
 	}
 
@@ -313,14 +369,19 @@ out:
 		}
 
 		list_del_init(&cooling_agents);
+		omap_gov->hotspot_temp_lower =
+			(OMAP_ALERT_TEMP - HYSTERESIS_VALUE);
+		omap_gov->hotspot_temp_upper = OMAP_PANIC_TEMP;
 		die_temp_lower = hotspot_temp_to_sensor_temp(
-			OMAP_ALERT_TEMP - HYSTERESIS_VALUE);
+			omap_gov->hotspot_temp_lower);
 		die_temp_upper = hotspot_temp_to_sensor_temp(
-			OMAP_PANIC_TEMP);
+			omap_gov->hotspot_temp_upper);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			FAST_TEMP_MONITORING_RATE);
+		if (pcb_sensor)
+			omap_gov->average_period = FAST_TEMP_MONITORING_RATE;
 	}
 
 	return 0;
@@ -368,23 +429,31 @@ out:
 		thermal_cooling_set_level(&cooling_agents,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
-		die_temp_lower = hotspot_temp_to_sensor_temp(
-			OMAP_PANIC_TEMP - HYSTERESIS_VALUE);
+		omap_gov->hotspot_temp_lower =
+			(OMAP_PANIC_TEMP - HYSTERESIS_VALUE);
 
-		/* Set the threshold window to below fatal.  This way the
+		/*
+		 * Set the threshold window to below fatal.  This way the
 		 * governor can manage the thermal if the temp should rise
 		 * while throttling.  We need to be agressive with throttling
-		 * should we reach this zone. */
-		die_temp_upper = (((OMAP_FATAL_TEMP - OMAP_PANIC_TEMP) / 4) *
-			omap_gov->panic_zone_reached ) + OMAP_PANIC_TEMP;
-		if (die_temp_upper >= OMAP_FATAL_TEMP)
-			die_temp_upper = OMAP_FATAL_TEMP;
+		 * should we reach this zone.
+		 */
+		omap_gov->hotspot_temp_upper = (
+			((OMAP_FATAL_TEMP - OMAP_PANIC_TEMP) / 4) *
+			omap_gov->panic_zone_reached) + OMAP_PANIC_TEMP;
+		if (omap_gov->hotspot_temp_upper >= OMAP_FATAL_TEMP)
+			omap_gov->hotspot_temp_upper = OMAP_FATAL_TEMP;
 
-		die_temp_upper = hotspot_temp_to_sensor_temp(die_temp_upper);
+		die_temp_lower = hotspot_temp_to_sensor_temp(
+			omap_gov->hotspot_temp_lower);
+		die_temp_upper = hotspot_temp_to_sensor_temp(
+			omap_gov->hotspot_temp_upper);
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			FAST_TEMP_MONITORING_RATE);
+		if (pcb_sensor)
+			omap_gov->average_period = FAST_TEMP_MONITORING_RATE;
 	}
 
 	return 0;
@@ -392,7 +461,7 @@ out:
 
 /**
  * omap_fatal_zone() - Shut-down the system to ensure OMAP Junction
- * 			temperature decreases enough
+ *			temperature decreases enough
  *
  * @cpu_temp:	The current adjusted CPU temperature
  *
@@ -409,11 +478,14 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 {
 	int cpu_temp;
 
+	omap_gov->sensor_temp = temp;
 	cpu_temp = convert_omap_sensor_temp_to_hotspot_temp(temp);
-#if 0
-	pr_info("%s: triggered with these temp: temp %d cpu_temp %d\n",
-						__func__, temp, cpu_temp);
-#endif
+
+	pr_info("%s:sensor %d avg sensor %d pcb %d, delta %d hot spot %d\n",
+			__func__, temp, omap_gov->avg_cpu_sensor_temp,
+			omap_gov->pcb_temp, omap_gov->absolute_delta,
+			cpu_temp);
+
 	if (cpu_temp >= OMAP_FATAL_TEMP) {
 		omap_fatal_zone(cpu_temp);
 		return FATAL_ZONE;
@@ -440,7 +512,8 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 		} else {
 			/*
 			 * this includes the case where :
-			 * (OMAP_ALERT_TEMP - HYSTERESIS_VALUE) <= T < OMAP_ALERT_TEMP
+			 * (OMAP_ALERT_TEMP - HYSTERESIS_VALUE) <= T
+			 * && T < OMAP_ALERT_TEMP
 			 */
 			omap_monitor_zone(cooling_list, cpu_temp);
 			return MONITOR_ZONE;
@@ -455,14 +528,92 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 	}
 
 	return NO_ACTION;
+}
 
+/*
+ * Make an average of the OMAP on-die temperature
+ * this is helpful to handle burst activity of OMAP when extrapolating
+ * the OMAP hot spot temperature from on-die sensor and PCB temperature
+ * Re-evaluate the temperature gradient between hot spot and on-die sensor
+ * (See absolute_delta) and reconfigure the thresholds if needed
+ */
+static void average_on_die_temperature(void)
+{
+	int i;
+	int die_temp_lower = 0;
+	int die_temp_upper = 0;
+
+	if (omap_gov->temp_sensor == NULL)
+		return;
+
+	/* Read current temperature */
+	omap_gov->sensor_temp = thermal_request_temp(omap_gov->temp_sensor);
+
+	/* if on-die sensor does not report a correct value, then return */
+	if (omap_gov->sensor_temp == -EINVAL)
+		return;
+
+	/* Update historical buffer */
+	for (i = 1; i < AVERAGE_NUMBER; i++) {
+		cpu_sensor_temp_table[AVERAGE_NUMBER - i] =
+		cpu_sensor_temp_table[AVERAGE_NUMBER - i - 1];
+	}
+	cpu_sensor_temp_table[0] = omap_gov->sensor_temp;
+
+	if (cpu_sensor_temp_table[AVERAGE_NUMBER - 1] == 0)
+		omap_gov->avg_is_valid = 0;
+	else
+		omap_gov->avg_is_valid = 1;
+
+	/* Compute the new average value */
+	omap_gov->avg_cpu_sensor_temp = 0;
+	for (i = 0; i < AVERAGE_NUMBER; i++)
+		omap_gov->avg_cpu_sensor_temp += cpu_sensor_temp_table[i];
+
+	omap_gov->avg_cpu_sensor_temp =
+		(omap_gov->avg_cpu_sensor_temp / AVERAGE_NUMBER);
+
+	/*
+	 * Reconfigure the current temperature thresholds according
+	 * to the current PCB temperature
+	 */
+	convert_omap_sensor_temp_to_hotspot_temp(omap_gov->sensor_temp);
+	die_temp_lower = hotspot_temp_to_sensor_temp(
+		omap_gov->hotspot_temp_lower);
+	die_temp_upper = hotspot_temp_to_sensor_temp(
+		omap_gov->hotspot_temp_upper);
+	thermal_update_temp_thresholds(omap_gov->temp_sensor,
+		die_temp_lower, die_temp_upper);
+
+	return;
+}
+
+static void average_cpu_sensor_delayed_work_fn(struct work_struct *work)
+{
+	struct omap_die_governor *omap_gov =
+				container_of(work, struct omap_die_governor,
+					     average_cpu_sensor_work.work);
+
+	average_on_die_temperature();
+
+	schedule_delayed_work(&omap_gov->average_cpu_sensor_work,
+				msecs_to_jiffies(omap_gov->average_period));
 }
 
 static int omap_process_cpu_temp(struct list_head *cooling_list,
 				struct thermal_dev *temp_sensor,
 				int temp)
 {
-	pr_debug("%s: Received temp %i\n", __func__, temp);
+	if (!strcmp(temp_sensor->name, "pcb_sensor")) {
+		if (pcb_sensor == NULL) {
+			pr_info("%s: Setting %s pointer\n",
+				__func__, temp_sensor->name);
+			pcb_sensor = temp_sensor;
+		}
+		omap_gov->pcb_temp = temp;
+		return 0;
+	}
+
 	omap_gov->temp_sensor = temp_sensor;
 	return omap_cpu_thermal_manager(cooling_list, temp);
 }
@@ -494,11 +645,22 @@ static int __init omap_die_governor_init(void)
 		return -ENOMEM;
 	}
 
+	pcb_sensor = NULL;
+
+	/* Init delayed work to average on-die temperature */
+	INIT_DELAYED_WORK(&omap_gov->average_cpu_sensor_work,
+			  average_cpu_sensor_delayed_work_fn);
+
+	omap_gov->average_period = NORMAL_TEMP_MONITORING_RATE;
+	omap_gov->avg_is_valid = 0;
+	schedule_delayed_work(&omap_gov->average_cpu_sensor_work,
+			msecs_to_jiffies(0));
 	return 0;
 }
 
 static void __exit omap_die_governor_exit(void)
 {
+	cancel_delayed_work_sync(&omap_gov->average_cpu_sensor_work);
 	thermal_governor_dev_unregister(therm_fw);
 	kfree(therm_fw);
 	kfree(omap_gov);

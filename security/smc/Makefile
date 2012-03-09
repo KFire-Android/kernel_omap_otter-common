@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2006-2010 Trusted Logic S.A.
+# Copyright (c) 2011 Trusted Logic S.A.
 # All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or
@@ -40,6 +40,12 @@ tf_driver-objs += tf_comm_mshield.o
 tf_driver-objs += tf_device_mshield.o
 tf_driver-objs += bridge_pub2sec.o
 tf_driver-objs += tf_teec.o
+
+ifeq ($(CONFIG_TF_DRIVER_CRYPTO_FIPS),y)
+tf_driver-objs += tf_crypto_hmac.o
+tf_driver-objs += tf_self_test_device.o
+tf_driver-objs += tf_self_test_post.o
+endif
 
 obj-$(CONFIG_SECURITY_MIDDLEWARE_COMPONENT) += tf_driver.o
 obj-$(CONFIG_SECURITY_MIDDLEWARE_COMPONENT) += rproc_drm.o

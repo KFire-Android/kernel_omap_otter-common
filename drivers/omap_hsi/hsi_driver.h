@@ -129,6 +129,7 @@ struct hsi_channel {
  * @cawake_gpio_irq: IRQ number for cawake gpio events
  * @cawake_status: Tracks CAWAKE line status
  * @cawake_off_event: True if CAWAKE event was detected from OFF mode
+ * @cawake_double_int: True if new CAWAKE detected while tasklet still executing
  * @acwake_status: Bitmap to track ACWAKE line status per channel
  * @in_int_tasklet: True if interrupt tasklet for this port is currently running
  * @in_cawake_tasklet: True if CAWAKE tasklet for this port is currently running
@@ -152,6 +153,7 @@ struct hsi_port {
 	int cawake_gpio_irq;
 	int cawake_status;
 	bool cawake_off_event;
+	bool cawake_double_int;
 	unsigned int acwake_status;	/* HSI_TODO : fine tune init values */
 	bool in_int_tasklet;
 	bool in_cawake_tasklet;
@@ -174,7 +176,9 @@ struct hsi_port {
  * @phy_base: HSI registers base physical address
  * @lock: Serializes access to internal data and regs
  * @clock_enabled: Indicates if HSI Clocks are ON
- * @clock_rate: Indicates current HSI Fclock speed
+ * @clock_change_ongoing: Indicates if HSI FClk is being changed (OPP change)
+ * @hsi_fclk_req: Indicates what HSI FClk user requested (96MHz/192MHz)
+ * @hsi_fclk_current: Current HSI Fclock
  * @gdd_irq: GDD (DMA) irq number
  * @fifo_mapping_strategy: Selected strategy for fifo to ports/channels mapping
  * @gdd_usecount: Holds the number of ongoning DMA transfers
@@ -182,8 +186,6 @@ struct hsi_port {
  * @gdd_chan_count: Number of available DMA channels on the device (must be ^2)
  * @in_dma_tasklet: True if DMA tasklet for the controller is currently running
  * @set_min_bus_tput: (PM) callback to set minimun bus throuput
- * @clk_notifier_register: (PM) callabck for DVFS support
- * @clk_notifier_unregister: (PM) callabck for DVFS support
  * @hsi_nb: (PM) Notification block for DVFS notification chain
  * @hsi_gdd_tasklet: Bottom half for DMA Interrupts when clocks are enabled
  * @dir: debugfs base directory
@@ -197,7 +199,9 @@ struct hsi_dev { /* HSI_TODO:  should be later renamed into hsi_controller*/
 	unsigned long phy_base;
 	spinlock_t lock; /* Serializes access to internal data and regs */
 	bool clock_enabled;
-	unsigned long clock_rate;
+	bool clock_change_ongoing;
+	unsigned long hsi_fclk_req;
+	unsigned long hsi_fclk_current;
 	int gdd_irq;
 	unsigned int fifo_mapping_strategy;
 	unsigned int gdd_usecount;
@@ -229,12 +233,13 @@ struct hsi_platform_data {
 	int (*wakeup_disable) (int hsi_port);
 	bool (*wakeup_is_from_hsi) (int *hsi_port);
 	int (*board_suspend)(int hsi_port, bool dev_may_wakeup);
-	int (*board_resume)(int hsi_port);
+	int (*board_resume)(int hsi_port, bool dev_may_wakeup);
 	u8 num_ports;
 	struct hsi_ctrl_ctx *ctx;
 	u8 hsi_gdd_chan_count;
 	unsigned long default_hsi_fclk;
 	unsigned int fifo_mapping_strategy;
+	u32 errata;
 };
 
 /* HSI Bus */
@@ -255,7 +260,9 @@ bool hsi_is_hsi_port_busy(struct hsi_port *pport);
 bool hsi_is_hsi_controller_busy(struct hsi_dev *hsi_ctrl);
 bool hsi_is_hst_port_busy(struct hsi_port *pport);
 bool hsi_is_hst_controller_busy(struct hsi_dev *hsi_ctrl);
-
+void hsi_driver_ack_interrupt(struct hsi_port *pport, u32 flag, bool backup);
+bool hsi_driver_is_interrupt_pending(struct hsi_port *pport, u32 flag,
+					bool backup);
 int hsi_driver_enable_interrupt(struct hsi_port *pport, u32 flag);
 int hsi_driver_disable_interrupt(struct hsi_port *pport, u32 flag);
 int hsi_driver_enable_read_interrupt(struct hsi_channel *hsi_channel,
@@ -416,14 +423,17 @@ static inline int hsi_clocks_enable(struct device *dev, const char *s)
 	return hsi_clocks_enable_channel(dev, HSI_CH_NUMBER_NONE, s);
 }
 
+static inline int is_hsi_errata(struct hsi_dev *hsi_ctrl, unsigned int id)
+{
+	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
+
+	return IS_HSI_ERRATA(pdata->errata, id);
+}
+
+
 #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP4)
-extern u8 pm44xx_errata;
-#define IS_HSI_PM44XX_ERRATUM(id)   (pm44xx_errata & (id))
-#define OMAP4_PM_ERRATUM_HSI_SWAKEUP_iXXX       BIT(2)
 extern void omap_pm_clear_dsp_wake_up(void);
 #else
-#define IS_HSI_PM44XX_ERRATUM(id)		0
-#define OMAP4_PM_ERRATUM_HSI_SWAKEUP_iXXX       0
 static inline void omap_pm_clear_dsp_wake_up(void) { }
 #endif
 

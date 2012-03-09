@@ -95,7 +95,8 @@ struct twlreg_info {
 #define TWL6030_CFG_TRANS_SLEEP_SHIFT	2
 
 /* TWL6030 LDO register values for CFG_STATE */
-/* FIXME-HASH REMOVED in KC1 Kernel
+/* FIXME-HASH REMOVED in KC1 Kernel */
+#if 0
 #define TWL6030_CFG_STATE_OFF	0x00
 #define TWL6030_CFG_STATE_ON	0x01
 #define TWL6030_CFG_STATE_OFF2	0x02
@@ -105,7 +106,7 @@ struct twlreg_info {
 #define TWL6030_CFG_STATE_APP_MASK	(0x03 << TWL6030_CFG_STATE_APP_SHIFT)
 #define TWL6030_CFG_STATE_APP(v)	(((v) & TWL6030_CFG_STATE_APP_MASK) >>\
 						TWL6030_CFG_STATE_APP_SHIFT)
-*/
+#endif
 
 /* Flags for SMPS Voltage reading */
 #define SMPS_OFFSET_EN		BIT(0)
@@ -648,6 +649,7 @@ static int twlfixed_get_voltage(struct regulator_dev *rdev)
 	return info->min_mV * 1000;
 }
 
+// FIXME-HASH: KFire Struct
 static struct regulator_ops twlfixed_ops = {
 	.list_voltage	= twlfixed_list_voltage,
 
@@ -661,9 +663,58 @@ static struct regulator_ops twlfixed_ops = {
 
 	.get_status	= twlreg_get_status,
 
-	.set_suspend_enable	= twl6030ldo_suspend_enable,
+	.set_suspend_enable		= twl6030ldo_suspend_enable,
 	.set_suspend_disable	= twl6030ldo_suspend_disable,
 };
+
+static struct regulator_ops twl6030_fixed_resource = {
+	.enable		= twl4030reg_enable,
+	.disable	= twl4030reg_disable,
+	.is_enabled	= twlreg_is_enabled,
+	.get_status	= twlreg_get_status,
+};
+
+// FIXME-HASH: 4.AI5 Structs
+#if 0
+static struct regulator_ops twl4030fixed_ops = {
+	.list_voltage	= twlfixed_list_voltage,
+
+	.get_voltage	= twlfixed_get_voltage,
+
+	.enable		= twl4030reg_enable,
+	.disable	= twl4030reg_disable,
+	.is_enabled	= twl4030reg_is_enabled,
+
+	.set_mode	= twl4030reg_set_mode,
+
+	.get_status	= twl4030reg_get_status,
+};
+
+static struct regulator_ops twl6030fixed_ops = {
+	.list_voltage	= twlfixed_list_voltage,
+
+	.get_voltage	= twlfixed_get_voltage,
+
+	.enable		= twl6030reg_enable,
+	.disable	= twl6030reg_disable,
+	.is_enabled	= twl6030reg_is_enabled,
+
+	.set_mode	= twl6030reg_set_mode,
+
+	.get_status	= twl6030reg_get_status,
+
+	.set_suspend_enable		= twl6030ldo_suspend_enable,
+	.set_suspend_disable	= twl6030ldo_suspend_disable,
+};
+
+static struct regulator_ops twl6030_fixed_resource = {
+	.enable		= twl6030reg_enable,
+	.disable	= twl6030reg_disable,
+	.is_enabled	= twl6030reg_is_enabled,
+	.get_status	= twl6030reg_get_status,
+};
+#endif
+
 
 /*
  * SMPS status and control
@@ -946,6 +997,18 @@ static struct regulator_ops twlsmps_ops = {
 		}, \
 	}
 
+#define TWL6030_FIXED_RESOURCE(label, offset, turnon_delay) { \
+	.base = offset, \
+	.delay = turnon_delay, \
+	.desc = { \
+		.name = #label, \
+		.id = TWL6030_REG_##label, \
+		.ops = &twl6030_fixed_resource, \
+		.type = REGULATOR_VOLTAGE, \
+		.owner = THIS_MODULE, \
+		}, \
+	}
+
 #define TWL6030_ADJUSTABLE_SMPS(label, offset, min_mVolts, max_mVolts) { \
 	.base = offset, \
 	.min_mV = min_mVolts, \
@@ -1004,6 +1067,7 @@ static struct twlreg_info twl_regs[] = {
 	/* 6030 REG with base as PMC Slave Misc : 0x0030 */
 	/* Turnon-delay and remap configuration values for 6030 are not
 	   verified since the specification is not public */
+// FIXME-HASH: KFire Settings
 	TWL6030_ADJUSTABLE_LDO(VAUX1_6030, 0x54, 1000, 3300, 1, 0x21),
 	TWL6030_ADJUSTABLE_LDO(VAUX2_6030, 0x58, 1000, 3300, 2, 0x21),
 	TWL6030_ADJUSTABLE_LDO(VAUX3_6030, 0x5c, 1000, 3300, 3, 0x21),
@@ -1014,11 +1078,30 @@ static struct twlreg_info twl_regs[] = {
 	//TWL6030_FIXED_LDO(VCXIO, 0x60, 1800, 16, 0, 0x21),
 	TWL6030_ADJUSTABLE_LDO(VCXIO, 0x60, 1800,1800, 16, 0x21),
 	//TWL6030_FIXED_LDO(VDAC, 0x64, 1800, 17, 0, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VDAC, 0x64, 1800, 1800,17, 0x21),
+	TWL6030_ADJUSTABLE_LDO(VDAC, 0x64, 1800, 1800, 17, 0x21),
 	//TWL6030_FIXED_LDO(VUSB, 0x70, 3300, 18, 0, 0x21),
 	TWL6030_ADJUSTABLE_LDO(VUSB, 0x70, 3300,3300, 18, 0x21),
+// FIXME-HASH: 4.AI5 settings below
+#if 0
+	TWL6030_FIXED_LDO(VCXIO, 0x60, 1800, 0),
+	TWL6030_FIXED_LDO(VDAC, 0x64, 1800, 0),
+	TWL6030_FIXED_LDO(VUSB, 0x70, 3300, 0),
+	TWL6030_ADJUSTABLE_LDO(VAUX1_6030, 0x54, 1000, 3300),
+	TWL6030_ADJUSTABLE_LDO(VAUX2_6030, 0x58, 1000, 3300),
+	TWL6030_ADJUSTABLE_LDO(VAUX3_6030, 0x5c, 1000, 3300),
+	TWL6030_ADJUSTABLE_LDO(VMMC, 0x68, 1000, 3300),
+	TWL6030_ADJUSTABLE_LDO(VPP, 0x6c, 1000, 3300),
+	TWL6030_ADJUSTABLE_LDO(VUSIM, 0x74, 1000, 3300),
+	TWL6030_FIXED_LDO(VANA, 0x50, 2100, 0),
+
+	TWL6030_FIXED_LDO(VCXIO, 0x60, 1800, 0),
+	TWL6030_FIXED_LDO(VDAC, 0x64, 1800, 0),
+	TWL6030_FIXED_LDO(VUSB, 0x70, 3300, 0),
+#endif
 	//TWL6030_FIXED_RESOURCE(CLK32KG, 0x8C, 0),
 	//TWL6030_FIXED_RESOURCE(CLK32KAUDIO, 0x8F, 0),
+	//TWL6030_ADJUSTABLE_SMPS(VDD1, 0x22, 600, 4000),
+	//TWL6030_ADJUSTABLE_SMPS(VDD2, 0x28, 600, 4000),
 	TWL6030_ADJUSTABLE_SMPS(VDD3, 0x2e, 600, 4000),
 	TWL6030_ADJUSTABLE_SMPS(VMEM, 0x34, 600, 4000),
 	TWL6030_ADJUSTABLE_SMPS(V2V1, 0x1c, 1800, 2100),

@@ -2,10 +2,11 @@ config TF_ZEBRA
 	bool
 
 config SECURITY_MIDDLEWARE_COMPONENT
-	bool "Enable SMC Driver"
+	tristate "Enable SMC Driver"
 	depends on ARCH_OMAP3 || ARCH_OMAP4
 	default n
 	select TF_ZEBRA
+        select CRYPTO_SHA1 if ARCH_OMAP4
 	help
 	  This option adds kernel support for communication with the SMC
 	  Protected Application.
@@ -37,9 +38,23 @@ config TF_DRIVER_DEBUG_SUPPORT
 	help
 	  This options enables debug traces in the driver.
 
-config SMC_BENCH_SECURE_CYCLE
-	bool "Enable secure cycles benchmarks"
-	depends on TF_DRIVER_DEBUG_SUPPORT && ARCH_OMAP4
+config TF_DRIVER_CRYPTO_FIPS
+	bool "FIPS compliance support"
+	depends on SMC_KERNEL_CRYPTO && ARCH_OMAP4 && MODULE_EXTRA_COPY
 	default n
 	help
-	  This options enables benchmarks.
+          This option enables features for FIPS certification of the SMC
+          cryptographic driver: built-in test vectors for POST, and a
+          device for user space programs to submit more test vectors.
+
+          If you are unsure how to answer this question, answer Y.
+
+config TF_DRIVER_FAULT_INJECTION
+	bool "Fault injection support"
+	depends on TF_DRIVER_CRYPTO_FIPS && ARCH_OMAP4
+	default n
+	help
+	  This option allows forcing cryptographic operations in the SMC
+	  driver to fail.
+
+	  If you are unsure how to answer this question, answer Y.

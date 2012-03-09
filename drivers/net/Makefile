@@ -305,6 +305,8 @@ obj-$(CONFIG_SFC) += sfc/
 
 obj-$(CONFIG_WIMAX) += wimax/
 obj-$(CONFIG_CAIF) += caif/
+obj-$(CONFIG_CAIF_PHY_SPI) += caif/phy/
+obj-$(CONFIG_CAIF_HSI_OMAP) += caif/phy/
 
 obj-$(CONFIG_OCTEON_MGMT_ETHERNET) += octeon/
 obj-$(CONFIG_PCH_GBE) += pch_gbe/

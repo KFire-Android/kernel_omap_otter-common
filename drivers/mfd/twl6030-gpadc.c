@@ -951,12 +951,39 @@ static int __devexit twl6030_gpadc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int twl6030_gpadc_suspend(struct device *pdev)
+{
+	int ret;
+
+	ret = twl_i2c_write_u8(TWL6030_MODULE_ID1, GPADCR, REG_TOGGLE1);
+	if (ret)
+		pr_err("%s: Error reseting GPADC (%d)!\n", __func__, ret);
+
+	return 0;
+};
+
+static int twl6030_gpadc_resume(struct device *pdev)
+{
+	int ret;
+
+	ret = twl_i2c_write_u8(TWL6030_MODULE_ID1, GPADCS, REG_TOGGLE1);
+	if (ret)
+		pr_err("%s: Error setting GPADC (%d)!\n", __func__, ret);
+
+	return 0;
+};
+static const struct dev_pm_ops twl6030_gpadc_pm_ops = {
+	.suspend = twl6030_gpadc_suspend,
+	.resume = twl6030_gpadc_resume,
+};
+
 static struct platform_driver twl6030_gpadc_driver = {
 	.probe		= twl6030_gpadc_probe,
 	.remove		= __devexit_p(twl6030_gpadc_remove),
 	.driver		= {
 		.name	= "twl6030_gpadc",
 		.owner	= THIS_MODULE,
+		.pm = &twl6030_gpadc_pm_ops,
 	},
 };
 

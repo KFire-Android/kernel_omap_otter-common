@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 #include "board-blaze.h"
 #include "mux.h"
+#include <plat/omap_hsi.h>
 
 #if defined(CONFIG_USB_EHCI_HCD_OMAP) || defined(CONFIG_USB_OHCI_HCD_OMAP3)
 #include <plat/usb.h>
@@ -189,6 +190,9 @@ err_pwrstate1:
 #endif
 		/* Setup HSI pad conf for blaze platform */
 		blaze_hsi_pad_conf();
+		/* Allow HSI omap_device to be registered later */
+		omap_hsi_allow_registration();
+
 	} else {
 		gpio_direction_output(BLAZE_MDM_PWR_EN_GPIO, 0);
 		gpio_free(BLAZE_MDM_PWR_EN_GPIO);

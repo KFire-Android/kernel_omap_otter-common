@@ -39,10 +39,29 @@
  *----------------------------------------------------------------------------*/
 
 #ifdef CONFIG_TF_DRIVER_DEBUG_SUPPORT
+extern unsigned tf_debug_level;
 
 void address_cache_property(unsigned long va);
 
-#define dprintk  printk
+#define dprintk(args...) ((void)(tf_debug_level >= 6 ? printk(args) : 0))
+#define dpr_info(args...) ((void)(tf_debug_level >= 3 ? pr_info(args) : 0))
+#define dpr_err(args...) ((void)(tf_debug_level >= 1 ? pr_err(args) : 0))
+#define INFO(fmt, args...) \
+	(void)dprintk(KERN_INFO "%s: " fmt "\n", __func__, ## args)
+#define WARNING(fmt, args...)  \
+	(tf_debug_level >= 3 ?						\
+	 printk(KERN_WARNING "%s: " fmt "\n", __func__, ## args) :	\
+	 (void)0)
+#define ERROR(fmt, args...) \
+	(tf_debug_level >= 1 ?						\
+	 printk(KERN_ERR "%s: " fmt "\n", __func__, ## args) :	\
+	 (void)0)
+void tf_trace_array(const char *fun, const char *msg,
+		    const void *ptr, size_t len);
+#define TF_TRACE_ARRAY(ptr, len) \
+	(tf_debug_level >= 7 ? \
+	 tf_trace_array(__func__, #ptr "/" #len, ptr, len) : \
+	 0)
 
 void tf_dump_l1_shared_buffer(struct tf_l1_shared_buffer *buffer);
 
@@ -50,16 +69,15 @@ void tf_dump_command(union tf_command *command);
 
 void tf_dump_answer(union tf_answer *answer);
 
-#ifdef CONFIG_BENCH_SECURE_CYCLE
-void setup_counters(void);
-void run_bogo_mips(void);
-int run_code_speed(unsigned int loop);
-int run_data_speed(unsigned int loop, unsigned long va);
-#endif /* CONFIG_BENCH_SECURE_CYCLE */
-
 #else /* defined(CONFIG_TF_DRIVER_DEBUG_SUPPORT) */
 
 #define dprintk(args...)  do { ; } while (0)
+#define dpr_info(args...)  do { ; } while (0)
+#define dpr_err(args...)  do { ; } while (0)
+#define INFO(fmt, args...) ((void)0)
+#define WARNING(fmt, args...) ((void)0)
+#define ERROR(fmt, args...) ((void)0)
+#define TF_TRACE_ARRAY(ptr, len) ((void)(ptr), (void)(len))
 #define tf_dump_l1_shared_buffer(buffer)  ((void) 0)
 #define tf_dump_command(command)  ((void) 0)
 #define tf_dump_answer(answer)  ((void) 0)
@@ -73,10 +91,6 @@ int run_data_speed(unsigned int loop, unsigned long va);
  *----------------------------------------------------------------------------*/
 
 int tf_get_current_process_hash(void *hash);
-
-#ifndef CONFIG_ANDROID
-int tf_hash_application_path_and_data(char *buffer, void *data, u32 data_len);
-#endif /* !CONFIG_ANDROID */
 
 /*----------------------------------------------------------------------------
  * Statistic computation

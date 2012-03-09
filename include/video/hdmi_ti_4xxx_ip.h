@@ -276,7 +276,22 @@ struct hdmi_core_infoframe_audio {
 	u8 db5_lsv;	/* Level shift values for downmix */
 };
 
+enum hdmi_3d_format {
+	HDMI_FRAME_PACKING = 0,
+	HDMI_FIELD_ALTERNATIVE = 1,
+	HDMI_LINE_ALTERNATIVE = 2,
+	HDMI_SIDE_BY_SIDE_FULL = 3,
+	HDMI_L_DEPTH = 4,
+	HDMI_L_DEPTH_GFX_GFX_DEPTH = 5,
+	HDMI_TOPBOTTOM = 6,
+	HDMI_SIDE_BY_SIDE_HALF = 8
+};
 
+struct hdmi_core_vendor_specific_infoframe {
+	bool enable;
+	u8 s3d_structure;
+	u8 s3d_ext_data;
+};
 
 /* INFOFRAME_AVI_ and INFOFRAME_AUDIO_ definitions */
 enum hdmi_core_infoframe {
@@ -355,6 +370,11 @@ enum hdmi_core_infoframe {
 	HDMI_INFOFRAME_AUDIO_DB5_DM_INH_PROHIBITED = 1
 };
 
+enum hdmi_aksv_err {
+	HDMI_AKSV_ZERO = 0,
+	HDMI_AKSV_ERROR = 1,
+	HDMI_AKSV_VALID = 2
+};
 
 int hdmi_ti_4xxx_phy_init(struct hdmi_ip_data *ip_data);
 void hdmi_ti_4xxx_phy_off(struct hdmi_ip_data *ip_data, bool set_mode);
@@ -382,5 +402,7 @@ void hdmi_ti_4xxx_core_audio_infoframe_config(struct hdmi_ip_data *ip_data,
 		struct hdmi_core_infoframe_audio *info_aud);
 void hdmi_ti_4xxx_audio_enable(struct hdmi_ip_data *ip_data, bool idle);
 int hdmi_ti_4xxx_set_wait_soft_reset(struct hdmi_ip_data *ip_data);
-bool hdmi_ti_4xx_check_aksv_data(struct hdmi_ip_data *ip_data);
+int hdmi_ti_4xx_check_aksv_data(struct hdmi_ip_data *ip_data);
+void hdmi_core_vsi_config(struct hdmi_ip_data *ip_data,
+		struct hdmi_core_vendor_specific_infoframe *config);
 #endif

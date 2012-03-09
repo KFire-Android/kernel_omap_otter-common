@@ -75,9 +75,7 @@ static struct omap_device_pad port1_phy_pads[] __initdata = {
 	},
 	{
 		.name = "usbb1_ulpitll_dir.usbb1_ulpiphy_dir",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~OMAP_WAKEUP_EN,
-		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
 	},
 	{
 		.name = "usbb1_ulpitll_nxt.usbb1_ulpiphy_nxt",
@@ -181,10 +179,7 @@ static struct omap_device_pad port2_phy_pads[] __initdata = {
 	},
 	{
 		.name = "usbb2_ulpitll_dir.usbb2_ulpiphy_dir",
-		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_WAKEUP_EN
-							| OMAP_MUX_MODE4,
+		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
 	},
 	{
 		.name = "usbb2_ulpitll_nxt.usbb2_ulpiphy_nxt",
@@ -194,8 +189,7 @@ static struct omap_device_pad port2_phy_pads[] __initdata = {
 		.name = "usbb2_ulpitll_dat0.usbb2_ulpiphy_dat0",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
 		.enable = (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4) & ~(OMAP_WAKEUP_EN),
-		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_WAKEUP_EN
-							| OMAP_MUX_MODE4,
+		.idle	= OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
 	},
 	{
 		.name = "usbb2_ulpitll_dat1.usbb2_ulpiphy_dat1",
@@ -801,13 +795,13 @@ void usbhs_wakeup()
 		return;
 
 	if (test_bit(USB_OHCI_LOADED, &usb_hcds_loaded) &&
-		    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ohci)) {
+	    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ohci) == true) {
 		usbhs_wake->wakeup_ohci = 1;
 		workq = 1;
 	}
 
 	if (test_bit(USB_EHCI_LOADED, &usb_hcds_loaded) &&
-		    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ehci)) {
+	    omap_hwmod_pad_get_wakeup_status(usbhs_wake->oh_ehci) == true) {
 		usbhs_wake->wakeup_ehci = 1;
 		workq = 1;
 	}

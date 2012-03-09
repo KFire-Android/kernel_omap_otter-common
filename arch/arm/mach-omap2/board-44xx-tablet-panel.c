@@ -54,7 +54,7 @@
 #define OMAP_HDMI_PULLTYPE_MASK 0x00000010
 
 
-static void __init omap4_tablet_init_display_led(void)
+static void omap4_tablet_init_display_led(void)
 {
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);

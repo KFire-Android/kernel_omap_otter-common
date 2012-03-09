@@ -289,22 +289,10 @@ int hsi_open(struct hsi_device *dev)
 		return -EINVAL;
 	}
 
-	if (hsi_ctrl->clock_rate == 0) {
+	if (hsi_ctrl->hsi_fclk_current == 0) {
 		struct hsi_platform_data *pdata;
 
 		pdata = dev_get_platdata(hsi_ctrl->dev);
-		if (!pdata) {
-			dev_err(dev->device.parent,
-				"%s: Port %d Channel %d has no pdata\n",
-				__func__, dev->n_p, dev->n_ch);
-			return -EINVAL;
-		}
-		if (!pdata->device_scale) {
-			dev_err(dev->device.parent,
-			       "%s: Undefined platform device_scale function\n",
-			       __func__);
-			return -ENXIO;
-		}
 
 		/* Retry to set the HSI FCLK to default. */
 		err = pdata->device_scale(hsi_ctrl->dev, hsi_ctrl->dev,
@@ -318,7 +306,7 @@ int hsi_open(struct hsi_device *dev)
 		} else {
 			dev_info(dev->device.parent, "HSI clock is now %ld\n",
 				 pdata->default_hsi_fclk);
-			hsi_ctrl->clock_rate = pdata->default_hsi_fclk;
+			hsi_ctrl->hsi_fclk_current = pdata->default_hsi_fclk;
 		}
 	}
 	spin_lock_bh(&hsi_ctrl->lock);
@@ -391,6 +379,11 @@ int hsi_write(struct hsi_device *dev, u32 *addr, unsigned int size)
 
 	spin_lock_bh(&hsi_ctrl->lock);
 
+	if (hsi_ctrl->clock_change_ongoing) {
+		dev_warn(hsi_ctrl->dev, "HSI Fclock change ongoing, retry.\n");
+		spin_unlock_bh(&hsi_ctrl->lock);
+		return -EAGAIN;
+	}
 
 	if (pm_runtime_suspended(hsi_ctrl->dev) || !hsi_ctrl->clock_enabled)
 		dev_dbg(hsi_ctrl->dev,
@@ -460,6 +453,13 @@ int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
 	hsi_ctrl = ch->hsi_port->hsi_controller;
 
 	spin_lock_bh(&hsi_ctrl->lock);
+
+	if (hsi_ctrl->clock_change_ongoing) {
+		dev_warn(hsi_ctrl->dev, "HSI Fclock change ongoing, retry.\n");
+		spin_unlock_bh(&hsi_ctrl->lock);
+		return -EAGAIN;
+	}
+
 	if (pm_runtime_suspended(hsi_ctrl->dev) || !hsi_ctrl->clock_enabled)
 		dev_dbg(hsi_ctrl->dev,
 			"hsi_read with HSI clocks OFF, clock_enabled = %d\n",
@@ -739,6 +739,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	int err = 0;
 	int fifo = 0;
 	u8 ret;
+	struct hsi_platform_data *pdata;
 
 	if (unlikely((!dev) ||
 		     (!dev->ch) ||
@@ -912,11 +913,15 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		dev_info(hsi_ctrl->dev,
 			 "Entering RX wakeup in 3 wires mode (no CAWAKE)\n");
 		pport->wake_rx_3_wires_mode = 1;
-		/* HW errata HSI-C1BUG00085, HSI wakeup issue in 3 wires mode :
+
+		/* HSI-C1BUG00085: ixxx: HSI wakeup issue in 3 wires mode
 		 * HSI will NOT generate the Swakeup for 2nd frame if it entered
 		 * IDLE after 1st received frame */
-		if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev)))
-			hsi_set_pm_force_hsi_on(hsi_ctrl);
+		if (is_hsi_errata(hsi_ctrl, HSI_ERRATUM_ixxx_3WIRES_NO_SWAKEUP))
+			if (hsi_driver_device_is_hsi(to_platform_device
+							(hsi_ctrl->dev)))
+				hsi_set_pm_force_hsi_on(hsi_ctrl);
+
 		/* When WAKE is not available, ACREADY must be set to 1 at
 		 * reset else remote will never have a chance to transmit. */
 		hsi_outl_or(HSI_SET_WAKE_3_WIRES | HSI_SET_WAKE_READY_LVL_1,
@@ -926,13 +931,69 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	case HSI_IOCTL_SET_WAKE_RX_4WIRES_MODE:
 		dev_info(hsi_ctrl->dev, "Entering RX wakeup in 4 wires mode\n");
 		pport->wake_rx_3_wires_mode = 0;
-		/* HW errata HSI-C1BUG00085 : go back to normal IDLE mode */
-		if (hsi_driver_device_is_hsi(to_platform_device(hsi_ctrl->dev)))
-			hsi_set_pm_default(hsi_ctrl);
+
+		/* HSI-C1BUG00085: ixxx: HSI wakeup issue in 3 wires mode
+		 * HSI will NOT generate the Swakeup for 2nd frame if it entered
+		 * IDLE after 1st received frame */
+		if (is_hsi_errata(hsi_ctrl, HSI_ERRATUM_ixxx_3WIRES_NO_SWAKEUP))
+			if (hsi_driver_device_is_hsi(to_platform_device
+							(hsi_ctrl->dev)))
+				hsi_set_pm_default(hsi_ctrl);
+
 		hsi_driver_enable_interrupt(pport, HSI_CAWAKEDETECTED);
 		hsi_outl_and(HSI_SET_WAKE_3_WIRES_MASK,	base,
 			     HSI_SYS_SET_WAKE_REG(port));
 		break;
+	case HSI_IOCTL_SET_HI_SPEED:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+		hsi_ctrl->hsi_fclk_req = *(unsigned int *)arg ?
+					HSI_FCLK_HI_SPEED : HSI_FCLK_LOW_SPEED;
+
+		if (hsi_ctrl->hsi_fclk_req == hsi_ctrl->hsi_fclk_current) {
+			dev_dbg(hsi_ctrl->dev, "HSI FClk already @%ldHz\n",
+				 hsi_ctrl->hsi_fclk_current);
+			goto out;
+		}
+
+		if (hsi_is_controller_transfer_ongoing(hsi_ctrl)) {
+			err = -EBUSY;
+			goto out;
+		}
+		hsi_ctrl->clock_change_ongoing = true;
+		spin_unlock_bh(&hsi_ctrl->lock);
+
+		pdata = dev_get_platdata(hsi_ctrl->dev);
+
+		/* Set the HSI FCLK to requested value. */
+		err = pdata->device_scale(hsi_ctrl->dev, hsi_ctrl->dev,
+					  hsi_ctrl->hsi_fclk_req);
+		if (err < 0) {
+			dev_err(hsi_ctrl->dev, "%s: Cannot set HSI FClk to"
+				" %ldHz, err %d\n", __func__,
+				hsi_ctrl->hsi_fclk_req, err);
+		} else {
+			dev_info(hsi_ctrl->dev, "HSI FClk changed from %ldHz to"
+				 " %ldHz\n", hsi_ctrl->hsi_fclk_current,
+				 hsi_ctrl->hsi_fclk_req);
+			hsi_ctrl->hsi_fclk_current = hsi_ctrl->hsi_fclk_req;
+		}
+
+		spin_lock_bh(&hsi_ctrl->lock);
+		hsi_ctrl->clock_change_ongoing = false;
+
+		break;
+	case HSI_IOCTL_GET_SPEED:
+		if (!arg) {
+			err = -EINVAL;
+			goto out;
+		}
+
+		*(unsigned long *)arg = hsi_ctrl->hsi_fclk_current;
+		break;
+
 	default:
 		err = -ENOIOCTLCMD;
 		break;

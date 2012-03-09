@@ -74,11 +74,13 @@ static void ll_device_want_to_wakeup(struct st_data_s *st_data)
 		break;
 	case ST_LL_ASLEEP_TO_AWAKE:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind while waiting for Wake ack");
+		pr_debug("duplicate wake_ind while waiting for Wake ack");
+		send_ll_cmd(st_data, LL_WAKE_UP_ACK);	/* send wake_ack */
 		break;
 	case ST_LL_AWAKE:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind already AWAKE");
+		pr_debug("duplicate wake_ind already AWAKE");
+		send_ll_cmd(st_data, LL_WAKE_UP_ACK);	/* send wake_ack */
 		break;
 	case ST_LL_AWAKE_TO_ASLEEP:
 		/* duplicate wake_ind */
@@ -94,15 +96,12 @@ static void ll_device_want_to_wakeup(struct st_data_s *st_data)
 /* functions invoked by ST Core */
 
 /* called when ST Core wants to
- * enable ST LL */
+ * enable ST LL
+ * Function which resets the ST-LL state, being called with spin lock held and
+ * hence expected to reset the ll_state and do nothing more than that
+ */
 void st_ll_enable(struct st_data_s *ll)
 {
-	struct kim_data_s      *kim_data = ll->kim_data;
-	struct ti_st_plat_data *pdata = kim_data->kim_pdev->dev.platform_data;
-	/* communicate to platform about chip enable */
-	if (pdata->chip_enable)
-		pdata->chip_enable();
-
 	ll->ll_state = ST_LL_AWAKE;
 }
 
@@ -110,12 +109,6 @@ void st_ll_enable(struct st_data_s *ll)
  * disable ST LL */
 void st_ll_disable(struct st_data_s *ll)
 {
-	struct kim_data_s      *kim_data = ll->kim_data;
-	struct ti_st_plat_data *pdata = kim_data->kim_pdev->dev.platform_data;
-	/* communicate to platform about chip disable */
-	if (pdata->chip_disable)
-		pdata->chip_disable();
-
 	ll->ll_state = ST_LL_INVALID;
 }
 

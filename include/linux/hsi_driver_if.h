@@ -38,6 +38,9 @@
 #define HSI_HSR_DIVISOR_AUTO		0x1000	/* Activate auto Rx */
 #define HSI_SSR_DIVISOR_USE_TIMEOUT	0x1001	/* De-activate auto-Rx (SSI) */
 
+#define HSI_SPEED_LOW_SPEED	0	/* Switch to 96MHz */
+#define HSI_SPEED_HI_SPEED	1	/* Switch to 192MHz */
+
 enum {
 	HSI_EVENT_BREAK_DETECTED = 0,
 	HSI_EVENT_ERROR,
@@ -64,6 +67,8 @@ enum {
 	HSI_IOCTL_GET_FIFO_OCCUPANCY, /* Get amount of words in RX FIFO */
 	HSI_IOCTL_SET_WAKE_RX_3WIRES_MODE, /* Enable RX wakeup 3-wires mode */
 	HSI_IOCTL_SET_WAKE_RX_4WIRES_MODE, /* Enable RX wakeup 4-wires mode */
+	HSI_IOCTL_SET_HI_SPEED, /* Change HSI Fclock (96MHz/192MHz) */
+	HSI_IOCTL_GET_SPEED, /* Get HSI Fclock (96MHz/192MHz) */
 };
 
 /* Forward references */
@@ -94,8 +99,6 @@ struct hsi_port_ctx {
 	u32 sys_mpu_enable[2];
 	struct hst_ctx hst;
 	struct hsr_ctx hsr;
-	const char *cawake_padconf_name;
-	int cawake_padconf_hsi_mode;
 };
 
 /**

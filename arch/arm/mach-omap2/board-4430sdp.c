@@ -61,6 +61,7 @@
 #include <linux/wakelock.h>
 #include "board-blaze.h"
 #include "omap4_ion.h"
+#include "omap_ram_console.h"
 #include "mux.h"
 #include "hsmmc.h"
 #include "timer-gp.h"
@@ -762,6 +763,30 @@ static struct regulator_init_data twl6040_vddhf = {
 	.driver_data		= &tps6130x_pdata,
 };
 
+static int twl6040_init(void)
+{
+	u8 rev = 0;
+	int ret;
+
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE,
+				&rev, TWL6040_REG_ASICREV);
+	if (ret)
+		return ret;
+
+	/*
+	 * ERRATA: Reset value of PDM_UL buffer logic is 1 (VDDVIO)
+	 * when AUDPWRON = 0, which causes current drain on this pin's
+	 * pull-down on OMAP side. The workaround consists of disabling
+	 * pull-down resistor of ABE_PDM_UL_DATA pin
+	 * Impacted revisions: ES1.1 and ES1.2 (both share same ASICREV value)
+	 */
+	if (rev == TWL6040_REV_1_1)
+		omap_mux_init_signal("abe_pdm_ul_data.abe_pdm_ul_data",
+			OMAP_PIN_INPUT);
+
+	return 0;
+}
+
 static struct twl4030_codec_audio_data twl6040_audio = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step	= 0x0f,
@@ -783,6 +808,7 @@ static struct twl4030_codec_data twl6040_codec = {
 	.audpwron_gpio	= 127,
 	.naudint_irq	= OMAP44XX_IRQ_SYS_2N,
 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
+	.init		= twl6040_init,
 };
 
 static int sdp4430_batt_table[] = {
@@ -899,7 +925,7 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
 
 	omap4_pmic_init("twl6030", &sdp4430_twldata);
-	omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo,
+	i2c_register_board_info(1, sdp4430_i2c_boardinfo,
 				ARRAY_SIZE(sdp4430_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo,
@@ -1330,6 +1356,16 @@ static void __init omap4_ehci_ohci_init(void)
 static void __init omap4_ehci_ohci_init(void){}
 #endif
 
+static void blaze_set_osc_timings(void)
+{
+	/* Device Oscilator
+	 * tstart = 2ms + 2ms = 4ms.
+	 * tshut = Not defined in oscillator data sheet so setting to 1us
+	 */
+	omap_pm_set_osc_lp_time(4000, 1);
+}
+
+
 /*
  * As OMAP4430 mux HSI and USB signals, when HSI is used (for instance HSI
  * modem is plugged) we should configure HSI pad conf and disable some USB
@@ -1363,6 +1399,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_audio_conf();
 	omap4_create_board_props();
 	blaze_pmic_mux_init();
+	blaze_set_osc_timings();
 	omap4_i2c_init();
 	blaze_sensor_init();
 	blaze_touch_init();
@@ -1422,6 +1459,9 @@ static void __init omap_4430sdp_map_io(void)
 }
 static void __init omap_4430sdp_reserve(void)
 {
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);

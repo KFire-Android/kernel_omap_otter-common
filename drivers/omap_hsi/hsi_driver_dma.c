@@ -307,9 +307,6 @@ int hsi_driver_cancel_write_dma(struct hsi_channel *hsi_ch)
 	dma_addr_t dma_h;
 	size_t size;
 
-	dev_err(&hsi_ch->dev->device, "hsi_driver_cancel_write_dma( "
-				"channel %d\n", hsi_ch->channel_number);
-
 	if (lch < 0) {
 		dev_err(&hsi_ch->dev->device, "No DMA channel found for HSI "
 				"channel %d\n", hsi_ch->channel_number);
@@ -370,9 +367,6 @@ int hsi_driver_cancel_read_dma(struct hsi_channel *hsi_ch)
 	u32 status_reg;
 	dma_addr_t dma_h;
 	size_t size;
-
-	dev_err(&hsi_ch->dev->device, "hsi_driver_cancel_read_dma "
-				"channel %d\n", hsi_ch->channel_number);
 
 	/* Re-enable interrupts for polling if needed */
 	if (hsi_ch->flags & HSI_CH_RX_POLL)
@@ -513,7 +507,7 @@ static void do_hsi_gdd_lch(struct hsi_dev *hsi_ctrl, unsigned int gdd_lch)
 								fifo);
 				if (fifo_words_avail)
 					dev_dbg(hsi_ctrl->dev,
-						"WARNING: FIFO %d not empty "
+						"FIFO %d not empty "
 						"after DMA copy, remaining "
 						"%d/%d frames\n",
 						fifo, fifo_words_avail,

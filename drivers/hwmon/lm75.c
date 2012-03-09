@@ -320,7 +320,7 @@ MODULE_DEVICE_TABLE(i2c, lm75_ids);
 
 /* Return 0 if detection is successful, -ENODEV otherwise */
 
-#if 0
+#if 1
 /* Commenting out function to prevent warning because it is not being used */
 
 static int lm75_detect(struct i2c_client *new_client,
@@ -445,7 +445,7 @@ static struct i2c_driver lm75_driver = {
 	.probe		= lm75_probe,
 	.remove		= lm75_remove,
 	.id_table	= lm75_ids,
-	/*.detect		= lm75_detect,*/
+	.detect		= lm75_detect,
 	.address_list	= normal_i2c,
 };
 

@@ -90,6 +90,9 @@ static struct {
 	bool set_mode;
 	bool wp_reset_done;
 
+	u8 s3d_mode;
+	bool s3d_enable;
+
 	void (*hdmi_start_frame_cb)(void);
 	void (*hdmi_irq_cb)(int);
 	bool (*hdmi_power_on_cb)(void);
@@ -337,23 +340,34 @@ static void hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
 
 static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 {
+	int aksv;
 	DSSDBG("hdmi_load_hdcp_keys\n");
 	/* load the keys and reset the wrapper to populate the AKSV registers*/
 	if (hdmi.hdmi_power_on_cb) {
-		if (!hdmi_ti_4xx_check_aksv_data(&hdmi.hdmi_data) &&
+		aksv = hdmi_ti_4xx_check_aksv_data(&hdmi.hdmi_data);
+		if ((aksv == HDMI_AKSV_ZERO) &&
 		    hdmi.custom_set &&
 		    hdmi.hdmi_power_on_cb()) {
 			hdmi_ti_4xxx_set_wait_soft_reset(&hdmi.hdmi_data);
-			hdmi.wp_reset_done = true;
+			aksv = hdmi_ti_4xx_check_aksv_data(&hdmi.hdmi_data);
+			hdmi.wp_reset_done = (aksv == HDMI_AKSV_VALID) ?
+				true : false;
 			DSSINFO("HDMI_WRAPPER RESET DONE\n");
-		}
+		} else if (aksv == HDMI_AKSV_VALID)
+			hdmi.wp_reset_done = true;
+		else if (aksv == HDMI_AKSV_ERROR)
+			hdmi.wp_reset_done = false;
+
+		if (!hdmi.wp_reset_done)
+			DSSERR("*** INVALID AKSV: "
+				"Do not perform HDCP AUTHENTICATION\n");
 	}
+
 }
 /* Set / Release c-state constraints */
 static void hdmi_set_l3_cstr(struct omap_dss_device *dssdev, bool enable)
 {
 #ifdef CONFIG_OMAP_PM
-	int r;
 	DSSINFO("%s c-state constraint for HDMI\n\n",
 		enable ? "Set" : "Release");
 
@@ -440,7 +454,14 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 	hdmi.cfg.cm.mode = hdmi.can_do_hdmi ? hdmi.mode : HDMI_DVI;
 	hdmi.cfg.cm.code = hdmi.code;
 	hdmi_ti_4xxx_basic_configure(&hdmi.hdmi_data, &hdmi.cfg);
-
+	if (hdmi.s3d_enable) {
+		struct hdmi_core_vendor_specific_infoframe config;
+		config.enable = hdmi.s3d_enable;
+		config.s3d_structure = hdmi.s3d_mode;
+		if (config.s3d_structure == 8)
+			config.s3d_ext_data = 1;
+		hdmi_core_vsi_config(&hdmi.hdmi_data, &config);
+	}
 	/* Make selection of HDMI in DSS */
 	dss_select_hdmi_venc_clk_source(DSS_HDMI_M_PCLK);
 
@@ -520,6 +541,35 @@ void omapdss_hdmi_set_deepcolor(int val)
 int omapdss_hdmi_get_deepcolor(void)
 {
 	return hdmi.deep_color;
+}
+
+ssize_t omapdss_hdmi_get_edid(char *edid_buffer)
+{
+	ssize_t size = hdmi.enabled ? HDMI_EDID_MAX_LENGTH : 0;
+	memcpy(edid_buffer, hdmi.edid, size);
+	return size;
+}
+
+void omapdss_hdmi_set_s3d_mode(int val)
+{
+	hdmi.s3d_mode = val;
+}
+
+int omapdss_hdmi_get_s3d_mode(void)
+{
+	return hdmi.s3d_mode;
+}
+
+void omapdss_hdmi_enable_s3d(bool enable)
+{
+	hdmi.s3d_enable = enable;
+	if (hdmi.enabled)
+		omapdss_hdmi_display_set_timing(hdmi.dssdev);
+}
+
+int omapdss_hdmi_get_s3d_enable(void)
+{
+	return hdmi.s3d_enable;
 }
 
 int hdmi_get_current_hpd()
@@ -672,8 +722,7 @@ void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev)
 		goto done;
 
 	hdmi.enabled = false;
-	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
-		hdmi.wp_reset_done = false;
+	hdmi.wp_reset_done = false;
 
 	hdmi_power_off(dssdev);
 	if (dssdev->sync_lost_error == 0)

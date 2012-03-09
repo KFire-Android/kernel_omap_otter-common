@@ -56,6 +56,7 @@
 
 #include "board-panda.h"
 #include "omap4_ion.h"
+#include "omap_ram_console.h"
 #include "hsmmc.h"
 #include "control.h"
 #include "mux.h"
@@ -799,6 +800,12 @@ static void __init omap4_panda_init(void)
 			pr_err("TPS62361 initialization failed: %d\n", status);
 	}
 	omap_enable_smartreflex_on_init();
+	/*
+	 * 7X-38.400MBB-T oscillator uses:
+	 * Up time = startup time(max 10ms) + enable time (max 100ns: round 1us)
+	 * Down time = disable time (max 100ns: round 1us)
+	 */
+	omap_pm_set_osc_lp_time(11000, 1);
 }
 
 static void __init omap4_panda_map_io(void)
@@ -809,6 +816,9 @@ static void __init omap4_panda_map_io(void)
 
 static void __init omap4_panda_reserve(void)
 {
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);

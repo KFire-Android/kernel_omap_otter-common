@@ -1372,11 +1372,19 @@ static void omap_hsmmc_detect(struct work_struct *work)
 		mmc_detect_change(host->mmc, (HZ * 200) / 1000);
 	}
 	else{
+	/*
+	 * Because of OMAP4 Silicon errata (i705), we have to turn off the
+	 * PBIAS and VMMC for SD card as soon as we get card disconnect
+	 * interrupt. Because of this, we don't wait for all higher layer
+	 * structures to be dismantled before turning off power
+	 */
+		mmc_claim_host(host->mmc);
 		if ((MMC_POWER_OFF != host->power_mode) &&
 			(mmc_slot(host).set_power != NULL)){
 			mmc_slot(host).set_power(host->dev, host->slot_id, 0, 0);
 			host->power_mode = MMC_POWER_OFF;
 		}
+		mmc_release_host(host->mmc);
 		mmc_detect_change(host->mmc, 0);
 	}
 }
@@ -1698,6 +1706,26 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 	} else if (host->reqs_blocked)
 		host->reqs_blocked = 0;
 	WARN_ON(host->mrq != NULL);
+
+	/*
+	 * Because of OMAP4 Silicon errata (i705), we have to turn off the
+	 * PBIAS and VMMC for SD card as soon as we get card disconnect
+	 * interrupt. Because of this, we don't wait for all higher layer
+	 * structures to be dismantled before turning off power. Because
+	 * of this, we might end up here even after SD card is removed
+	 * and VMMC and PBIAS are turned off. In that case, just fail
+	 * the commands immediately
+	 */
+	if (host->power_mode == MMC_POWER_OFF) {
+		req->cmd->error = EIO;
+		if (req->data)
+			req->data->error = -EIO;
+		dev_warn(mmc_dev(host->mmc),
+		"Card is no longer present\n");
+		mmc_request_done(mmc, req);
+		return;
+	}
+
 	host->mrq = req;
 	if (req->sbc) {
 		omap_hsmmc_start_command(host, req->sbc, NULL, 0);
@@ -2571,8 +2599,8 @@ static int omap_hsmmc_suspend(struct device *dev)
 		if (mmc_slot(host).mmc_data.built_in)
 			host->mmc->pm_flags |= MMC_PM_KEEP_POWER;
 		ret = mmc_suspend_host(host->mmc);
-		mmc_host_enable(host->mmc);
 		if (ret == 0) {
+			mmc_host_enable(host->mmc);
 			omap_hsmmc_disable_irq(host);
 			OMAP_HSMMC_WRITE(host->base, HCTL,
 				OMAP_HSMMC_READ(host->base, HCTL) & ~SDBP);
@@ -2589,13 +2617,6 @@ static int omap_hsmmc_suspend(struct device *dev)
 					dev_dbg(mmc_dev(host->mmc),
 						"Unmask interrupt failed\n");
 			}
-
-			/*
-			 * Directly call platform_bus suspend. runtime PM
-			 * PM lock is held during system suspend, so will
-			 * not be auto-matically called
-			 */
-			mmc_host_disable(host->mmc);
 		}
 
 	}

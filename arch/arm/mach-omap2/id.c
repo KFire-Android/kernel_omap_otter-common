@@ -231,25 +231,28 @@ static void __init omap4_check_features(void)
 
 	omap4_features = 0;
 
-	if (cpu_is_omap443x())
-		omap4_features |= OMAP4_HAS_MPU_1GHZ;
+	si_type =
+	  (read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1) >> 16) & 3;
 
-
-	if (cpu_is_omap446x()) {
-		si_type =
-			read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1);
-		switch ((si_type & (3 << 16)) >> 16) {
-		case 2:
-			/* High performance device */
+	switch (si_type) {
+	case 0x2:
+		/* High performance device */
+		if (cpu_is_omap443x()) {
+			omap4_features |= OMAP4_HAS_MPU_1GHZ;
+			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
+		} else if (cpu_is_omap446x()) {
+			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
 			omap4_features |= OMAP4_HAS_MPU_1_5GHZ;
-			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
-			break;
-		case 1:
-		default:
-			/* Standard device */
-			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
-			break;
 		}
+		break;
+	case 0x1:
+	default:
+		/* Standard device */
+		if (cpu_is_omap443x())
+			omap4_features |= OMAP4_HAS_MPU_1GHZ;
+		else if (cpu_is_omap446x())
+			omap4_features |= OMAP4_HAS_MPU_1_2GHZ;
+		break;
 	}
 }
 
@@ -418,9 +421,13 @@ static void __init omap4_check_revision(void)
 			omap_chip.oc |= CHIP_IS_OMAP4430ES2_1;
 			break;
 		case 4:
-		default:
 			omap_revision = OMAP4430_REV_ES2_2;
 			omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
+			break;
+		case 6:
+		default:
+			omap_revision = OMAP4430_REV_ES2_3;
+			omap_chip.oc |= CHIP_IS_OMAP4430ES2_3;
 		}
 		break;
 	case 0xb94e:
@@ -438,8 +445,8 @@ static void __init omap4_check_revision(void)
 		break;
 	default:
 		/* Unknown default to latest silicon rev as default */
-		omap_revision = OMAP4430_REV_ES2_2;
-		omap_chip.oc |= CHIP_IS_OMAP4430ES2_2;
+		omap_revision = OMAP4430_REV_ES2_3;
+		omap_chip.oc |= CHIP_IS_OMAP4430ES2_3;
 	}
 
 	pr_info("OMAP%04x ES%d.%d\n", omap_rev() >> 16,

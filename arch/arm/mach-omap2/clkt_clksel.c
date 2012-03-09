@@ -280,6 +280,7 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
 	u32 last_div = 0;
+	long last_diff;
 
 	if (!clk->clksel || !clk->clksel_mask)
 		return ~0;
@@ -293,7 +294,11 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 	if (!clks)
 		return ~0;
 
+	last_diff = clk->parent->rate;
+
 	for (clkr = clks->rates; clkr->div; clkr++) {
+		long diff;
+
 		if (!(clkr->flags & cpu_mask))
 			continue;
 
@@ -306,8 +311,15 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 
 		test_rate = clk->parent->rate / clkr->div;
 
-		if (test_rate <= target_rate)
+		diff = abs(test_rate - target_rate);
+
+		if (test_rate <= target_rate) {
+			if (diff > last_diff)
+				clkr--;
 			break; /* found it */
+		}
+
+		last_diff = diff;
 	}
 
 	if (!clkr->div) {

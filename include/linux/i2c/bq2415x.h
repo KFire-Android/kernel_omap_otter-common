@@ -70,6 +70,8 @@
 #define BQ24156 (1 << 6)
 #define BQ24158 (1 << 8)
 
+#define BQ2415x_WATCHDOG_TIMEOUT	20000
+
 struct bq2415x_platform_data {
 	int max_charger_currentmA;
 	int max_charger_voltagemV;

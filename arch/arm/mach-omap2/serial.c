@@ -220,7 +220,7 @@ static bool omap_uart_chk_wakeup(struct platform_device *pdev)
 	bool ret = false;
 
 	od = to_omap_device(pdev);
-	if (omap_hwmod_pad_get_wakeup_status(od->hwmods[0]))
+	if (omap_hwmod_pad_get_wakeup_status(od->hwmods[0]) == true)
 		ret = true;
 
 	if (up->wk_st && up->wk_en && up->wk_mask) {

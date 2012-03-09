@@ -199,12 +199,6 @@ static struct clk tie_low_clock_ck = {
 	.ops		= &clkops_null,
 };
 
-static struct clk utmi_phy_clkout_ck = {
-	.name		= "utmi_phy_clkout_ck",
-	.rate		= 60000000,
-	.ops		= &clkops_null,
-};
-
 static struct clk xclk60mhsp1_ck = {
 	.name		= "xclk60mhsp1_ck",
 	.rate		= 60000000,
@@ -1077,7 +1071,8 @@ static struct dpll_data dpll_usb_dd = {
 	.flags		= DPLL_J_TYPE,
 	.clk_ref	= &sys_clkin_ck,
 	.control_reg	= OMAP4430_CM_CLKMODE_DPLL_USB,
-	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED),
+	.modes		= (1 << DPLL_LOW_POWER_BYPASS) | (1 << DPLL_LOCKED)
+			| (1 << DPLL_LOW_POWER_STOP),
 	.autoidle_reg	= OMAP4430_CM_AUTOIDLE_DPLL_USB,
 	.idlest_reg	= OMAP4430_CM_IDLEST_DPLL_USB,
 	.mult_mask	= OMAP4430_DPLL_MULT_MASK,
@@ -1110,6 +1105,13 @@ static struct clk dpll_usb_clkdcoldo_ck = {
 	.clksel_reg	= OMAP4430_CM_CLKDCOLDO_DPLL_USB,
 	.recalc		= &followparent_recalc,
 	.speculate	= &omap2_clksel_speculate,
+};
+
+static struct clk utmi_phy_clkout_ck = {
+	.name		= "utmi_phy_clkout_ck",
+	.ops		= &clkops_null,
+	.parent		= &dpll_usb_clkdcoldo_ck,
+	.recalc		= &followparent_recalc,
 };
 
 static const struct clksel dpll_usb_m2_div[] = {
@@ -2939,7 +2941,7 @@ static struct clk usb_otg_hs_ick = {
 	.enable_reg	= OMAP4430_CM_L3INIT_USB_OTG_CLKCTRL,
 	.enable_bit	= OMAP4430_MODULEMODE_HWCTRL,
 	.clkdm_name	= "l3_init_clkdm",
-	.parent		= &l3_div_ck,
+	.parent		= &otg_60m_gfclk,
 	.recalc		= &followparent_recalc,
 	.speculate	= &omap2_clksel_speculate,
 };

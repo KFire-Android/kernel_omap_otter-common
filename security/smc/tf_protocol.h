@@ -191,7 +191,12 @@ union tf_answer_param {
  * Descriptor tables capacity
  */
 #define TF_MAX_W3B_COARSE_PAGES                 (2)
-#define TF_MAX_COARSE_PAGES                     (8)
+/* TF_MAX_COARSE_PAGES is the number of level 1 descriptors (describing
+ * 1MB each) that can be shared with the secure world in a single registered
+ * shared memory block. It must be kept in synch with
+ * SCHANNEL6_MAX_DESCRIPTORS_PER_REGISTERED_SHARED_MEM in the SChannel
+ * protocol spec. */
+#define TF_MAX_COARSE_PAGES                     128
 #define TF_DESCRIPTOR_TABLE_CAPACITY_BIT_SHIFT  (8)
 #define TF_DESCRIPTOR_TABLE_CAPACITY \
 	(1 << TF_DESCRIPTOR_TABLE_CAPACITY_BIT_SHIFT)
@@ -619,11 +624,27 @@ union tf_answer {
 
 /* Structure of the Communication Buffer */
 struct tf_l1_shared_buffer {
+	#ifdef CONFIG_TF_ZEBRA
+	u32 exit_code;
+	u32 l1_shared_buffer_descr;
+	u32 backing_store_addr;
+	u32 backext_storage_addr;
+	u32 workspace_addr;
+	u32 workspace_size;
+	u32 conf_descriptor;
+	u32 conf_size;
+	u32 conf_offset;
+	u32 protocol_version;
+	u32 rpc_command;
+	u32 rpc_status;
+	u8  reserved1[16];
+	#else
 	u32 config_flag_s;
 	u32 w3b_size_max_s;
 	u32 reserved0;
 	u32 w3b_size_current_s;
 	u8  reserved1[48];
+	#endif
 	u8  version_description[TF_DESCRIPTION_BUFFER_LENGTH];
 	u32 status_s;
 	u32 reserved2;

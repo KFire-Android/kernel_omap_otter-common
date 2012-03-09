@@ -29,6 +29,7 @@
 /* Implementation-defined login types  */
 #define TEEC_LOGIN_AUTHENTICATION      0x80000000
 #define TEEC_LOGIN_PRIVILEGED          0x80000002
+#define TEEC_LOGIN_PRIVILEGED_KERNEL   0x80000002
 
 /* Type definitions */
 

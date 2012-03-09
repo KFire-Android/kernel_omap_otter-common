@@ -227,7 +227,7 @@ u32 omap_debug_uart_resume_idle(void)
 			continue;
 
 		od = to_omap_device(dbg->pdev);
-		if (omap_hwmod_pad_get_wakeup_status(od->hwmods[0])) {
+		if (omap_hwmod_pad_get_wakeup_status(od->hwmods[0]) == true) {
 			/*
 			 * poke the uart and let it stay on long enough
 			 * to process any further data. It's ok to use

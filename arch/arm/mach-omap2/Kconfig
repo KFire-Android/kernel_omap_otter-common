@@ -335,6 +335,7 @@ config MACH_OMAP_4430SDP
 	select CHARGER_BQ2415x
 	select TWL6030_GPADC
 	select OMAP_REBOOT_REASON
+	select OMAP_RAM_CONSOLE
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44xx Tablet2 Board"
@@ -354,6 +355,7 @@ config MACH_OMAP_BLAZE
 	select KEYBOARD_GPIO
 	select TWL6040_VIB
 	select OMAP_REBOOT_REASON
+	select OMAP_RAM_CONSOLE
 
 config MACH_OMAP_4430_KC1
 	bool "OMAP 4430 KC1 board"
@@ -383,6 +385,7 @@ config MACH_OMAP4_PANDA
 	select REGULATOR_FIXED_VOLTAGE
 	select OMAP_TPS6236X
 	select OMAP_REBOOT_REASON
+	select OMAP_RAM_CONSOLE
 
 config OMAP3_EMU
 	bool "OMAP3 debugging peripherals"
@@ -425,6 +428,16 @@ config OMAP_FIQ_DEBUGGER
 config OMAP_REBOOT_REASON
 	depends on ARCH_OMAP4
 	bool
+
+config OMAP_RAM_CONSOLE
+        bool "Enable OMAP support for Android RAM console"
+        depends on ANDROID_RAM_CONSOLE
+        help
+          Select this option to enable Android RAM console support on OMAP.
+          This allows saving the kernel printk messages to a buffer in RAM, so
+          that after a kernel panic they can be viewed in the next kernel
+          invocation, by accessing /proc/last_kmsg
+          NOTE: Board file needs to invoke relevant api to enable the support
 
 endmenu
 

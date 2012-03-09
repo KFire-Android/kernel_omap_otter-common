@@ -348,7 +348,7 @@ static void bq2415x_charger_work(struct work_struct *work)
 
 	bq2415x_charger_update_status(di);
 	schedule_delayed_work(&di->bq2415x_charger_work,
-						msecs_to_jiffies(30000));
+				msecs_to_jiffies(BQ2415x_WATCHDOG_TIMEOUT));
 }
 
 

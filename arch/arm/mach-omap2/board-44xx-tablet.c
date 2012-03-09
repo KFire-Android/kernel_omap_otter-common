@@ -64,6 +64,7 @@
 #include "prm44xx.h"
 #include "board-44xx-tablet.h"
 #include "omap4_ion.h"
+#include "omap_ram_console.h"
 
 #define WILINK_UART_DEV_NAME	"/dev/ttyO1"
 #define ETH_KS8851_IRQ			34
@@ -373,6 +374,10 @@ static struct regulator_init_data tablet_vaux3 = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
 
@@ -402,6 +407,10 @@ static struct regulator_init_data tablet_vpp = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
 
@@ -415,6 +424,10 @@ static struct regulator_init_data tablet_vusim = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_VOLTAGE
 					| REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
 
@@ -427,6 +440,10 @@ static struct regulator_init_data tablet_vana = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
+		.state_mem = {
+			.enabled	= true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
 
@@ -439,6 +456,10 @@ static struct regulator_init_data tablet_vcxio = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on	= true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(tablet_vcxio_supply),
 	.consumer_supplies	= tablet_vcxio_supply,
@@ -459,9 +480,17 @@ static struct regulator_init_data tablet_vdac = {
 		.valid_ops_mask	 = REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 		.always_on	= true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 	.num_consumer_supplies  = ARRAY_SIZE(sdp4430_vdac_supply),
 	.consumer_supplies      = sdp4430_vdac_supply,
+};
+
+static struct regulator_consumer_supply tablet_vusb_supply[] = {
+	REGULATOR_SUPPLY("vusb", "twl6030_usb"),
 };
 
 static struct regulator_init_data tablet_vusb = {
@@ -473,6 +502,35 @@ static struct regulator_init_data tablet_vusb = {
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+	.num_consumer_supplies  = ARRAY_SIZE(tablet_vusb_supply),
+	.consumer_supplies      = tablet_vusb_supply,
+
+};
+
+static struct regulator_init_data tablet_vcore1	= {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.always_on              = true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
+	},
+};
+
+static struct regulator_init_data tablet_vcore2	= {
+	.constraints = {
+		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
+		.always_on              = true,
+		.state_mem = {
+			.disabled       = true,
+		},
+		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
 
@@ -558,6 +616,30 @@ static struct regulator_init_data twl6040_vddhf = {
 	.driver_data		= &tps6130x_pdata,
 };
 
+static int twl6040_init(void)
+{
+	u8 rev = 0;
+	int ret;
+
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE,
+				&rev, TWL6040_REG_ASICREV);
+	if (ret)
+		return ret;
+
+	/*
+	 * ERRATA: Reset value of PDM_UL buffer logic is 1 (VDDVIO)
+	 * when AUDPWRON = 0, which causes current drain on this pin's
+	 * pull-down on OMAP side. The workaround consists of disabling
+	 * pull-down resistor of ABE_PDM_UL_DATA pin
+	 * Impacted revisions: ES1.1 and ES1.2 (both share same ASICREV value)
+	 */
+	if (rev == TWL6040_REV_1_1)
+		omap_mux_init_signal("abe_pdm_ul_data.abe_pdm_ul_data",
+			OMAP_PIN_INPUT);
+
+	return 0;
+}
+
 static struct twl4030_codec_audio_data twl6040_audio = {
 	/* single-step ramp for headset and handsfree */
 	.hs_left_step   = 0x0f,
@@ -579,6 +661,7 @@ static struct twl4030_codec_data twl6040_codec = {
 	.audpwron_gpio  = 127,
 	.naudint_irq    = OMAP44XX_IRQ_SYS_2N,
 	.irq_base       = TWL6040_CODEC_IRQ_BASE,
+	.init		= twl6040_init,
 };
 
 static int sdp4430_batt_table[] = {
@@ -624,6 +707,10 @@ static struct twl4030_platform_data tablet_twldata = {
 	.vaux3		= &tablet_vaux3,
 	.clk32kg	= &tablet_clk32kg,
 	.usb		= &omap4_usbphy_data,
+
+	/* SMPS */
+	.vdd1		= &tablet_vcore1,
+	.vdd2		= &tablet_vcore2,
 
 	/* children */
 	.codec		= &twl6040_codec,
@@ -1000,6 +1087,15 @@ static void __init tablet_camera_mux_init(void)
 	}
 }
 
+static void tablet_set_osc_timings(void)
+{
+	/* Device Oscilator
+	 * tstart = 2ms + 2ms = 4ms.
+	 * tshut = Not defined in oscillator data sheet so setting to 1us
+	 */
+	omap_pm_set_osc_lp_time(4000, 1);
+}
+
 static void __init omap_tablet_init(void)
 {
 	int status;
@@ -1023,6 +1119,7 @@ static void __init omap_tablet_init(void)
 	omap_dmm_init();
 	tablet_panel_init();
 	tablet_pmic_mux_init();
+	tablet_set_osc_timings();
 	tablet_button_init();
 	omap4_register_ion();
 	board_serial_init();
@@ -1066,6 +1163,9 @@ static void __init omap_tablet_map_io(void)
 
 static void __init omap_tablet_reserve(void)
 {
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
 	/* do the static reservations first */
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);

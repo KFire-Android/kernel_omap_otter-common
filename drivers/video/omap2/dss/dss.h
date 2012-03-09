@@ -544,7 +544,13 @@ int hdmi_panel_hpd_handler(int hpd);
 int omapdss_hdmi_get_pixel_clock(void);
 int omapdss_hdmi_get_mode(void);
 int omapdss_hdmi_get_deepcolor(void);
+ssize_t omapdss_hdmi_get_edid(char *edid);
 void omapdss_hdmi_set_deepcolor(int val);
+int omapdss_hdmi_get_s3d_mode(void);
+void omapdss_hdmi_set_s3d_mode(int val);
+void omapdss_hdmi_enable_s3d(bool enable);
+int omapdss_hdmi_get_s3d_enable(void);
+
 int hdmi_get_current_hpd(void);
 void hdmi_get_monspecs(struct fb_monspecs *specs);
 u8 *hdmi_read_edid(struct omap_video_timings *);

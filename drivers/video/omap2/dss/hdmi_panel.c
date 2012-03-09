@@ -56,8 +56,117 @@ static ssize_t hdmi_deepcolor_store(struct device *dev,
 	return size;
 }
 
+static ssize_t hdmi_edid_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return omapdss_hdmi_get_edid(buf);
+}
+
+static ssize_t hdmi_s3d_mode_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int r;
+	ssize_t size;
+	r = omapdss_hdmi_get_s3d_mode();
+	switch (r) {
+	case HDMI_FRAME_PACKING:
+		size = snprintf(buf, PAGE_SIZE, "frame_packing\n");
+		break;
+	case HDMI_FIELD_ALTERNATIVE:
+		size = snprintf(buf, PAGE_SIZE, "field_alternative\n");
+		break;
+	case HDMI_LINE_ALTERNATIVE:
+		size = snprintf(buf, PAGE_SIZE, "line_alternative\n");
+		break;
+	case HDMI_SIDE_BY_SIDE_FULL:
+		size = snprintf(buf, PAGE_SIZE, "side_by_side_full\n");
+		break;
+	case HDMI_L_DEPTH:
+		size = snprintf(buf, PAGE_SIZE, "l_depth\n");
+		break;
+	case HDMI_L_DEPTH_GFX_GFX_DEPTH:
+		size = snprintf(buf, PAGE_SIZE, "l_depth_gfx_depth\n");
+		break;
+	case HDMI_TOPBOTTOM:
+		size = snprintf(buf, PAGE_SIZE, "top_bottom\n");
+		break;
+	case HDMI_SIDE_BY_SIDE_HALF:
+		size = snprintf(buf, PAGE_SIZE, "side_by_side_half\n");
+		break;
+	default:
+		return -EINVAL;
+	}
+	return size;
+}
+
+static ssize_t hdmi_s3d_mode_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	unsigned long s3d_mode;
+	int r = kstrtoul(buf, 0, &s3d_mode);
+	if (r)
+		return -EINVAL;
+	switch (s3d_mode) {
+	case HDMI_FRAME_PACKING:
+	case HDMI_FIELD_ALTERNATIVE:
+	case HDMI_LINE_ALTERNATIVE:
+	case HDMI_SIDE_BY_SIDE_FULL:
+	case HDMI_L_DEPTH:
+	case HDMI_L_DEPTH_GFX_GFX_DEPTH:
+	case HDMI_TOPBOTTOM:
+	case HDMI_SIDE_BY_SIDE_HALF:
+		omapdss_hdmi_set_s3d_mode(s3d_mode);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return size;
+}
+
+static ssize_t hdmi_s3d_enable_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	int enable;
+
+	int r = kstrtoint(buf, 0, &enable);
+	if (r)
+		return -EINVAL;
+	enable = !!enable;
+
+	omapdss_hdmi_enable_s3d(enable);
+
+	return size;
+}
+
+static ssize_t hdmi_s3d_enable_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int r;
+	r = omapdss_hdmi_get_s3d_enable();
+	return snprintf(buf, PAGE_SIZE, "%d\n", r);
+}
+
+static DEVICE_ATTR(s3d_enable, S_IRUGO | S_IWUSR, hdmi_s3d_enable_show,
+							hdmi_s3d_enable_store);
+static DEVICE_ATTR(s3d_type, S_IRUGO | S_IWUSR, hdmi_s3d_mode_show,
+							hdmi_s3d_mode_store);
+static DEVICE_ATTR(edid, S_IRUGO, hdmi_edid_show, NULL);
 static DEVICE_ATTR(deepcolor, S_IRUGO | S_IWUSR, hdmi_deepcolor_show,
 							hdmi_deepcolor_store);
+
+static struct attribute *hdmi_panel_attrs[] = {
+	&dev_attr_s3d_enable.attr,
+	&dev_attr_s3d_type.attr,
+	&dev_attr_edid.attr,
+	&dev_attr_deepcolor.attr,
+	NULL,
+};
+
+static struct attribute_group hdmi_panel_attr_group = {
+	.attrs = hdmi_panel_attrs,
+};
 
 static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 {
@@ -75,8 +184,8 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 	dssdev->panel.timings.y_res = 480;
 
 	/* sysfs entry to provide user space control to set deepcolor mode */
-	if (device_create_file(&dssdev->dev, &dev_attr_deepcolor))
-		DSSERR("failed to create sysfs file\n");
+	if (sysfs_create_group(&dssdev->dev.kobj, &hdmi_panel_attr_group))
+		DSSERR("failed to create sysfs entries\n");
 
 	DSSDBG("hdmi_panel_probe x_res= %d y_res = %d\n",
 		dssdev->panel.timings.x_res,
@@ -86,7 +195,7 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 
 static void hdmi_panel_remove(struct omap_dss_device *dssdev)
 {
-	device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
+	sysfs_remove_group(&dssdev->dev.kobj, &hdmi_panel_attr_group);
 }
 
 static int hdmi_panel_enable(struct omap_dss_device *dssdev)
@@ -200,6 +309,7 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 		if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
 			mutex_unlock(&hdmi.hdmi_lock);
 			dssdev->driver->disable(dssdev);
+			omapdss_hdmi_enable_s3d(false);
 			mutex_lock(&hdmi.hdmi_lock);
 		}
 		goto done;
