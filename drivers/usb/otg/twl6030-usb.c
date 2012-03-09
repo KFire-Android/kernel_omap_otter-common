@@ -972,7 +972,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 
 	// twl->asleep = 0;
 	// pdata->phy_init(dev);
-	twl6030_enable_irq(&twl->otg);
+	// twl6030_enable_irq(&twl->otg);
 	// twl6030_phy_suspend(&twl->otg, 0);
 
 	pr_info("usb_probe::1\n");
