@@ -37,6 +37,7 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
+#include <plat/android-display.h>
 #include <plat/common.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
@@ -901,6 +902,15 @@ static struct omap_dss_device sdp4430_lcd_device = {
 		.data2_pol	= 0,
 	},
 
+	.panel = {
+		.timings = {
+			.x_res = 864,
+			.y_res = 480,
+		},
+		.width_in_um = 84400,
+		.height_in_um = 47000,
+	},
+
 	.clocks = {
 		.dispc = {
 			.channel = {
@@ -1206,7 +1216,18 @@ static void __init omap_4430sdp_reserve(void)
 #endif
 
 #ifdef CONFIG_ION_OMAP
+	omap_android_display_setup(&sdp4430_dss_data,
+				   NULL,
+				   NULL,
+				   &blaze_fb_pdata,
+				   get_omap_ion_platform_data());
 	omap_ion_init();
+#else
+	omap_android_display_setup(&sdp4430_dss_data,
+				   NULL,
+				   NULL,
+				   &blaze_fb_pdata,
+				   NULL);
 #endif
 
 	omap_reserve();
