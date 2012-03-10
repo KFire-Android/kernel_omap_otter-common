@@ -227,8 +227,7 @@ static struct omap4430_sdp_disp_led_platform_data __initdata sdp4430_disp_led_da
 	.primary_display_set = sdp4430_set_primary_brightness,
 };
 
-/* done in twl_leds */
-#if 0
+/* FIXME-HASH: Done in twl_leds? */
 static void __init omap_disp_led_init(void)
 {
 	/* Seconday backlight control */
@@ -244,7 +243,6 @@ static void __init omap_disp_led_init(void)
 	mdelay(120);
 	gpio_set_value(LED_SEC_DISP_GPIO, 0);
 }
-#endif
 
 static struct platform_device __initdata  sdp4430_disp_led = {
 	.name = "display_led", .id = -1, .dev = { .platform_data = &sdp4430_disp_led_data, },
@@ -1409,7 +1407,7 @@ static void __init omap_kc1_init(void)
 	kc1_pmic_mux_init();
 //	ramconsole_init();
 	omap4_display_init();
-	//omap_disp_led_init();
+	omap_disp_led_init();
 
 	omap_dmm_init();
 	omap4_register_ion();

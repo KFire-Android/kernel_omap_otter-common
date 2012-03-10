@@ -114,10 +114,10 @@ u8 omap4_ctrl_temp_sensor_single_conv(void)
 	else
 		celsius = 255;
 
-	//pr_info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-	//pr_info("OMAP4_CTRL_MODULE_CORE_TEMP_SENSOR = [0x%x] \n", val);
-	//pr_info("Silicon Temp around [%d - 40] degree Celsius \n", celsius);
-	//pr_info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+	pr_info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+	pr_info("OMAP4_CTRL_MODULE_CORE_TEMP_SENSOR = [0x%x] \n", val);
+	pr_info("Silicon Temp around [%d - 40] degree Celsius \n", celsius);
+	pr_info("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 	
 	return celsius;
 }

@@ -930,7 +930,7 @@ static struct regulator_ops twlsmps_ops = {
 			remap_conf, TWL4030)
 #define TWL6030_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
 			remap_conf) \
-		TWL_FIXED_LDO(label, offset, mVolts, 0x0, turnon_delay, \
+		TWL_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
 			remap_conf, TWL6030)
 
 #define TWL4030_ADJUSTABLE_LDO(label, offset, num, turnon_delay, remap_conf) { \
@@ -953,6 +953,7 @@ static struct regulator_ops twlsmps_ops = {
 #define TWL6030_ADJUSTABLE_LDO(label, offset, min_mVolts, max_mVolts, num, \
 		remap_conf) { \
 	.base = offset, \
+	.id = num, \
 	.min_mV = min_mVolts, \
 	.max_mV = max_mVolts, \
 	.remap = remap_conf, \

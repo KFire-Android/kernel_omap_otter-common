@@ -973,15 +973,10 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	// twl6030_enable_irq(&twl->otg);
 	// twl6030_phy_suspend(&twl->otg, 0);
 
-	pr_info("usb_probe::1\n");
-
         vbus_state = twl6030_readb(twl, TWL6030_MODULE_CHARGER, CONTROLLER_STAT1);
-	pr_info("usb_probe::2\n");
         wake_lock_init(&twlusb_lock, WAKE_LOCK_SUSPEND, "usb_wake_lock");
-	pr_info("usb_probe::3\n");
 	ctrl_base = ioremap(0x4A002000, SZ_1K);
 
-	pr_info("usb_probe::4\n");
 	/* power down the phy by default can be enabled on connect */
 	__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
 
