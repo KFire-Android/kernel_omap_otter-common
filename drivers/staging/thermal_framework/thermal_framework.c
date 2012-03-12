@@ -205,6 +205,36 @@ static struct thermal_domain *thermal_domain_add(const char *name)
 }
 
 /**
+ * thermal_lookup_temp() - Requests the thermal sensor to report it's current
+ *			    temperature to the governor.
+ *
+ * @tdev: The agent requesting the updated temperature.
+ *
+ * Returns the current temperature of the current domain.
+ * ENODEV if the temperature sensor does not exist.
+ */
+int thermal_lookup_temp(const char *name)
+{
+	struct thermal_domain *thermal_domain;
+	int ret = -ENODEV;
+
+	thermal_domain = thermal_domain_find(name);
+	if (!thermal_domain) {
+		pr_err("%s: %s is a non existing domain\n", __func__, name);
+		return ret;
+	}
+
+	ret = thermal_device_call(thermal_domain->temp_sensor, report_temp);
+	if (ret < 0) {
+		pr_err("%s: getting temp is not supported for domain %s\n",
+			__func__, thermal_domain->domain_name);
+		ret = -EOPNOTSUPP;
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(thermal_lookup_temp);
+
+/**
  * thermal_governor_dev_register() - Registration call for thermal domain governors
  *
  * @tdev: The thermal governor device structure.
