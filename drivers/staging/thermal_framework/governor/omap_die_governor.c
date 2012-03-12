@@ -111,7 +111,6 @@ static struct omap_thermal_zone omap_thermal_zones[] = {
 };
 static struct thermal_dev *therm_fw;
 static struct omap_die_governor *omap_gov;
-static struct thermal_dev *pcb_sensor;
 static int cpu_sensor_temp_table[AVERAGE_NUMBER];
 
 /**
@@ -194,9 +193,11 @@ static void omap_update_report_rate(struct thermal_dev *temp_sensor,
 static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 {
 	int absolute_delta;
+	int pcb_temp;
 
-	if (pcb_sensor && (omap_gov->avg_is_valid == 1)) {
-		omap_gov->pcb_temp = thermal_request_temp(pcb_sensor);
+	pcb_temp = thermal_lookup_temp("pcb");
+	if (pcb_temp >= 0 && (omap_gov->avg_is_valid == 1)) {
+		omap_gov->pcb_temp = pcb_temp;
 		if (omap_gov->pcb_temp < 0)
 			return sensor_temp + omap_gov->absolute_delta;
 
@@ -238,7 +239,7 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 
 static signed hotspot_temp_to_sensor_temp(int hot_spot_temp)
 {
-	if (pcb_sensor && (omap_gov->avg_is_valid == 1))
+	if (thermal_lookup_temp("pcb") >= 0 && (omap_gov->avg_is_valid == 1))
 		return hot_spot_temp - omap_gov->absolute_delta;
 	else
 		return ((hot_spot_temp - omap_gov->gradient_const) * 1000) /
@@ -275,7 +276,7 @@ static int omap_enter_zone(struct omap_thermal_zone *zone,
 	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh, temp_lower,
 								temp_upper);
 	omap_update_report_rate(omap_gov->temp_sensor, zone->update_rate);
-	if (pcb_sensor)
+	if (thermal_lookup_temp("pcb") >= 0)
 		omap_gov->average_period = zone->average_rate;
 
 	return 0;
@@ -439,18 +440,8 @@ static int omap_process_cpu_temp(struct thermal_dev *gov,
 				struct thermal_dev *temp_sensor,
 				int temp)
 {
-	if (!strcmp(temp_sensor->name, "pcb_sensor") ||
-		!strcmp(temp_sensor->name, TMP102_SENSOR_NAME)) {
-		if (pcb_sensor == NULL) {
-			pr_info("%s: Setting %s pointer\n",
-				__func__, temp_sensor->name);
-			pcb_sensor = temp_sensor;
-		}
-		omap_gov->pcb_temp = temp;
-		return 0;
-	}
-
-	omap_gov->temp_sensor = temp_sensor;
+	if (!omap_gov->temp_sensor)
+		omap_gov->temp_sensor = temp_sensor;
 	return omap_cpu_thermal_manager(cooling_list, temp);
 }
 
@@ -499,8 +490,6 @@ static int __init omap_die_governor_init(void)
 		kfree(omap_gov);
 		return -ENOMEM;
 	}
-
-	pcb_sensor = NULL;
 
 	if (cpu_is_omap446x()) {
 		omap_gov->gradient_slope = OMAP_GRADIENT_SLOPE_4460;

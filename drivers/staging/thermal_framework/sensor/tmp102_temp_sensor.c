@@ -48,8 +48,6 @@
 
 #include <linux/thermal_framework.h>
 
-#define REPORT_DELAY_MS	1000
-
 #define	TMP102_TEMP_REG			0x00
 #define	TMP102_CONF_REG			0x01
 /* note: these bit definitions are byte swapped */
@@ -87,8 +85,6 @@ struct tmp102_temp_sensor {
 	u16 config_orig;
 	unsigned long last_update;
 	int temp[3];
-	struct delayed_work tmp102_sensor_work;
-	int work_delay;
 	int debug_temp;
 };
 
@@ -156,23 +152,6 @@ static int tmp102_get_temp(struct thermal_dev *tdev)
 	return tmp102->therm_fw->current_temp;
 }
 
-static void tmp102_report_temp(struct tmp102_temp_sensor *tmp102)
-{
-	int ret;
-
-	tmp102->therm_fw->current_temp = tmp102_read_current_temp(tmp102->dev);
-
-	if (tmp102->therm_fw->current_temp != -EINVAL) {
-		ret = thermal_sensor_set_temp(tmp102->therm_fw);
-		if (ret == -ENODEV)
-			pr_err("%s:thermal_sensor_set_temp reports error\n",
-				__func__);
-		else
-			cancel_delayed_work_sync(&tmp102->tmp102_sensor_work);
-		kobject_uevent(&tmp102->dev->kobj, KOBJ_CHANGE);
-	}
-}
-
 /*
  * sysfs hook functions
  */
@@ -236,18 +215,6 @@ static struct thermal_dev_ops tmp102_temp_sensor_ops = {
 	.report_temp = tmp102_get_temp,
 };
 
-static void tmp102_sensor_delayed_work_fn(struct work_struct *work)
-{
-	struct tmp102_temp_sensor *tmp102 =
-			container_of(work, struct tmp102_temp_sensor,
-					tmp102_sensor_work.work);
-
-	tmp102_report_temp(tmp102);
-
-	schedule_delayed_work(&tmp102->tmp102_sensor_work,
-				msecs_to_jiffies(tmp102->work_delay));
-}
-
 #define TMP102_CONFIG  (TMP102_CONF_TM | TMP102_CONF_EM | TMP102_CONF_CR1)
 #define TMP102_CONFIG_RD_ONLY (TMP102_CONF_R0 | TMP102_CONF_R1 | TMP102_CONF_AL)
 
@@ -268,10 +235,6 @@ static int __devinit tmp102_temp_sensor_probe(
 	tmp102 = kzalloc(sizeof(struct tmp102_temp_sensor), GFP_KERNEL);
 	if (!tmp102)
 		return -ENOMEM;
-
-	/* Init delayed work for PCB sensor temperature */
-	INIT_DELAYED_WORK(&tmp102->tmp102_sensor_work,
-			  tmp102_sensor_delayed_work_fn);
 
 	mutex_init(&tmp102->sensor_mutex);
 
@@ -314,7 +277,7 @@ static int __devinit tmp102_temp_sensor_probe(
 	tmp102->therm_fw = kzalloc(sizeof(struct thermal_dev), GFP_KERNEL);
 	if (tmp102->therm_fw) {
 		tmp102->therm_fw->name = TMP102_SENSOR_NAME;
-		tmp102->therm_fw->domain_name = "cpu";
+		tmp102->therm_fw->domain_name = "pcb";
 		tmp102->therm_fw->dev = tmp102->dev;
 		tmp102->therm_fw->dev_ops = &tmp102_temp_sensor_ops;
 		thermal_sensor_dev_register(tmp102->therm_fw);
@@ -322,10 +285,6 @@ static int __devinit tmp102_temp_sensor_probe(
 		ret = -ENOMEM;
 		goto therm_fw_alloc_err;
 	}
-
-	tmp102->work_delay = REPORT_DELAY_MS;
-	schedule_delayed_work(&tmp102->tmp102_sensor_work,
-			msecs_to_jiffies(0));
 
 	dev_info(&client->dev, "initialized\n");
 
