@@ -231,7 +231,7 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		/* if the client doesn't support this heap type */
 		if (!((1 << heap->type) & client->heap_mask))
 			continue;
-		/* if the caller didn't specify this heap type */
+		/* if the caller didn't specify this heap ID */
 		if (!((1 << heap->id) & flags))
 			continue;
 		buffer = ion_buffer_create(heap, dev, len, align, flags);
