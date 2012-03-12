@@ -158,7 +158,7 @@ static int thermal_init_thermal_state(struct thermal_dev *tdev)
 
 	if (domain->temp_sensor && domain->governor &&
 				!list_empty(&domain->cooling_agents))
-		thermal_request_temp(tdev);
+		thermal_sensor_set_temp(domain->temp_sensor);
 	else
 		pr_debug("%s:Not all components registered for %s domain\n",
 			__func__, domain->domain_name);
