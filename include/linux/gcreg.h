@@ -8263,6 +8263,9 @@ static const struct gccmdldstate gcmofillsrc_rotationheight_ldst =
 static const struct gccmdldstate gcmofillsrc_rop_ldst =
 	GCLDSTATE(gcregRopRegAddrs, 1);
 
+static const struct gccmdldstate gcmofillsrc_alphacontrol_ldst =
+	GCLDSTATE(gcregAlphaControlRegAddrs, 1);
+
 struct gcmofillsrc {
 	/* gcregSrcRotationConfigRegAddrs */
 	struct gccmdldstate rotation_ldst;
@@ -8299,6 +8302,15 @@ struct gcmofillsrc {
 			struct gcregrop reg;
 			unsigned int raw;
 		} rop;
+
+	/* gcregAlphaControlRegAddrs */
+	struct gccmdldstate alphacontrol_ldst;
+
+		/* gcregAlphaControlRegAddrs */
+		union {
+			struct gcregalphacontrol reg;
+			unsigned int raw;
+		} alphacontrol;
 };
 
 /*******************************************************************************

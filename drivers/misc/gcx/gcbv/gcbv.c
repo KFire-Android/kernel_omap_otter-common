@@ -494,6 +494,17 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 		else
 			bvbuffmapinfo->automap += 1;
 
+		GC_PRINT(GC_INFO_MSG " bufffer already mapped:\n",
+			__func__, __LINE__);
+
+		GC_PRINT(GC_INFO_MSG "   virtaddr = 0x%08X\n",
+			__func__, __LINE__,
+			buffdesc->virtaddr);
+
+		GC_PRINT(GC_INFO_MSG "   addr = 0x%08X\n",
+			__func__, __LINE__,
+			GET_MAP_HANDLE(bvbuffmap));
+
 		*map = bvbuffmap;
 		return BVERR_NONE;
 	}
@@ -539,6 +550,17 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 
 	bvbuffmap->nextmap = buffdesc->map;
 	buffdesc->map = bvbuffmap;
+
+	GC_PRINT(GC_INFO_MSG " new mapping:\n",
+		__func__, __LINE__);
+
+	GC_PRINT(GC_INFO_MSG "   virtaddr = 0x%08X\n",
+		__func__, __LINE__,
+		buffdesc->virtaddr);
+
+	GC_PRINT(GC_INFO_MSG "   addr = 0x%08X\n",
+		__func__, __LINE__,
+		GET_MAP_HANDLE(bvbuffmap));
 
 	*map = bvbuffmap;
 	return BVERR_NONE;
@@ -1963,11 +1985,11 @@ static enum bverror parse_blend(struct bvbltparams *bltparams,
 		GC_PRINT(GC_INFO_MSG " BVBLENDDEF_GLOBAL_NONE\n",
 			__func__, __LINE__);
 
+		gca->src_global_color =
+		gca->dst_global_color = 0;
+
 		gca->src_global_alpha_mode = GCREG_GLOBAL_ALPHA_MODE_NORMAL;
 		gca->dst_global_alpha_mode = GCREG_GLOBAL_ALPHA_MODE_NORMAL;
-
-		gca->src_global_alpha_mode =
-		gca->dst_global_alpha_mode = 0;
 		break;
 
 	case (BVBLENDDEF_GLOBAL_UCHAR >> BVBLENDDEF_GLOBAL_SHIFT):
@@ -1988,16 +2010,12 @@ static enum bverror parse_blend(struct bvbltparams *bltparams,
 
 		alpha = gcfp2norm8(bltparams->globalalpha.fp);
 
-#if 0
 		gca->src_global_color =
 		gca->dst_global_color = alpha << 24;
 
 		gca->src_global_alpha_mode = GCREG_GLOBAL_ALPHA_MODE_GLOBAL;
 		gca->dst_global_alpha_mode = GCREG_GLOBAL_ALPHA_MODE_GLOBAL;
 		break;
-#else
-		BUG();
-#endif
 
 	default:
 		BVSETBLTERROR(BVERR_BLEND, "invalid global alpha mode");
@@ -2145,7 +2163,11 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	struct bvbuffmap *dstmap = NULL;
 	struct bvsurfgeom *dstgeom = bltparams->dstgeom;
 	struct bvrect *dstrect = &bltparams->dstrect;
+	unsigned int dstleft, dsttop;
+	unsigned int dstright, dstbottom;
 	unsigned int dstoffset;
+
+	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
 
 	if (!parse_format(srcdesc->geom->format, &srcformat)) {
 		BVSETBLTERRORARG((srcdesc->index == 0)
@@ -2169,7 +2191,34 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 		goto exit;
 	}
 
+	/* Determine destination coordinates. */
+	dstleft   = dstrect->left;
+	dsttop    = dstrect->top;
+	dstright  = dstrect->width  + dstleft;
+	dstbottom = dstrect->height + dsttop;
+
 	dstoffset = 0;
+
+	GC_PRINT(GC_INFO_MSG " dstvirtaddr = 0x%08X\n",
+		__func__, __LINE__,
+		(unsigned int) bltparams->dstdesc->virtaddr);
+
+	GC_PRINT(GC_INFO_MSG " dstaddr = 0x%08X\n",
+		__func__, __LINE__,
+		GET_MAP_HANDLE(dstmap));
+
+	GC_PRINT(GC_INFO_MSG " dstsurf = %dx%d, stride = %ld\n",
+		__func__, __LINE__,
+		bltparams->dstgeom->width, bltparams->dstgeom->height,
+		bltparams->dstgeom->virtstride);
+
+	GC_PRINT(GC_INFO_MSG " dstrect = (%d,%d)-(%d,%d), dstoffset = %d\n",
+		__func__, __LINE__,
+		dstleft, dsttop, dstright, dstbottom, dstoffset);
+
+	GC_PRINT(GC_INFO_MSG " dstrect = %dx%d\n",
+		__func__, __LINE__,
+		bltparams->dstrect.width, bltparams->dstrect.height);
 
 	bverror = claim_buffer(batch, sizeof(struct gcmofill),
 				(void **) &gcmofill);
@@ -2223,6 +2272,9 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 		gcmofill->dst.clip.lt.reg.top = GC_CLIP_RESET_TOP;
 		gcmofill->dst.clip.rb.reg.right = GC_CLIP_RESET_RIGHT;
 		gcmofill->dst.clip.rb.reg.bottom = GC_CLIP_RESET_BOTTOM;
+
+		GC_PRINT(GC_INFO_MSG " default clipping\n",
+			__func__, __LINE__);
 	}
 
 	/***********************************************************************
@@ -2239,6 +2291,10 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	gcmofill->src.rop_ldst = gcmofillsrc_rop_ldst;
 	gcmofill->src.rop.reg.type = GCREG_ROP_TYPE_ROP3;
 	gcmofill->src.rop.reg.fg = (unsigned char) bltparams->op.rop;
+
+	/* Disable alpha blending. */
+	gcmofill->src.alphacontrol_ldst = gcmofillsrc_alphacontrol_ldst;
+	gcmofill->src.alphacontrol.reg.enable = GCREG_ALPHA_CONTROL_ENABLE_OFF;
 
 	/***********************************************************************
 	** Set fill color.
@@ -2260,14 +2316,10 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	gcmofill->start.startde.cmd.fld = gcfldstartde;
 
 	/* Set destination rectangle. */
-	gcmofill->start.rect.left
-		= dstrect->left + dstoffset;
-	gcmofill->start.rect.top
-		= dstrect->top;
-	gcmofill->start.rect.right
-		= gcmofill->start.rect.left + dstrect->width;
-	gcmofill->start.rect.bottom
-		= gcmofill->start.rect.top + dstrect->height;
+	gcmofill->start.rect.left = dstleft + dstoffset;
+	gcmofill->start.rect.top = dsttop;
+	gcmofill->start.rect.right = dstright + dstoffset;
+	gcmofill->start.rect.bottom = dstbottom;
 
 	/* Flush PE cache. */
 	gcmofill->start.flush.flush_ldst = gcmoflush_flush_ldst;
@@ -2370,6 +2422,8 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 	unsigned int multiblit = 1;
 
+	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
+
 	if (!parse_format(dstgeom->format, &dstformat)) {
 		BVSETBLTERRORARG(BVERR_DSTGEOM_FORMAT,
 				"invalid destination format (%d)",
@@ -2391,9 +2445,13 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 	dstoffset = 0;
 
-	GC_PRINT(GC_INFO_MSG " dstaddr = 0x%08X\n",
+	GC_PRINT(GC_INFO_MSG " dstvirtaddr = 0x%08X\n",
 		__func__, __LINE__,
 		(unsigned int) bltparams->dstdesc->virtaddr);
+
+	GC_PRINT(GC_INFO_MSG " dstaddr = 0x%08X\n",
+		__func__, __LINE__,
+		GET_MAP_HANDLE(dstmap));
 
 	GC_PRINT(GC_INFO_MSG " dstsurf = %dx%d, stride = %ld\n",
 		__func__, __LINE__,
@@ -2586,6 +2644,9 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			gcmodst->clip.lt.reg.top = GC_CLIP_RESET_TOP;
 			gcmodst->clip.rb.reg.right = GC_CLIP_RESET_RIGHT;
 			gcmodst->clip.rb.reg.bottom = GC_CLIP_RESET_BOTTOM;
+
+			GC_PRINT(GC_INFO_MSG " default clipping\n",
+				__func__, __LINE__);
 		}
 
 		/* Determine location of source states. */
@@ -2730,6 +2791,7 @@ static enum bverror do_filter(struct bvbltparams *bltparams,
 				struct gcbatch *batch)
 {
 	enum bverror bverror;
+	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
 	BVSETBLTERROR(BVERR_UNK, "FIXME/TODO");
 	return bverror;
 }
@@ -2790,6 +2852,8 @@ enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
 	enum bverror bverror;
 	struct bvbuffmap *bvbuffmap;
 
+	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
+
 	/* FIXME/TODO: add check for initialization success. */
 
 	if (buffdesc == NULL) {
@@ -2803,6 +2867,15 @@ enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
 	}
 
 	bverror = do_map(buffdesc, 1, &bvbuffmap);
+	if (bverror == BVERR_NONE) {
+		GC_PRINT(GC_INFO_MSG " virtaddr = 0x%08X\n",
+			__func__, __LINE__,
+			(unsigned int) buffdesc->virtaddr);
+
+		GC_PRINT(GC_INFO_MSG " addr = 0x%08X\n",
+			__func__, __LINE__,
+			GET_MAP_HANDLE(bvbuffmap));
+	}
 
 exit:
 	return bverror;
@@ -2814,6 +2887,8 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 	enum bverror bverror;
 	struct bvbuffmap *bvbuffmap;
 	struct bvbuffmapinfo *bvbuffmapinfo;
+
+	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
 
 	/* FIXME/TODO: add check for initialization success. */
 
@@ -2895,6 +2970,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	unsigned short rop, blend, format;
 	struct gccommit gccommit;
 	int srccount, res;
+
+	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
 
 	/* FIXME/TODO: add check for initialization success. */
 
