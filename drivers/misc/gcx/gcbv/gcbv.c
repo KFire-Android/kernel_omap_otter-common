@@ -1282,8 +1282,16 @@ struct gcblendconfig {
 	unsigned char factor_mode;
 	unsigned char color_reverse;
 
-	unsigned char destuse;
-	unsigned char srcuse;
+	unsigned char src1used;
+	unsigned char src2used;
+};
+
+struct bvblendxlate {
+	unsigned char match1;
+	unsigned char match2;
+
+	struct gcblendconfig k1;
+	struct gcblendconfig k2;
 };
 
 struct gcalpha {
@@ -1293,16 +1301,11 @@ struct gcalpha {
 	unsigned char src_global_alpha_mode;
 	unsigned char dst_global_alpha_mode;
 
-	struct gcblendconfig *src_config;
-	struct gcblendconfig *dst_config;
-};
+	struct gcblendconfig *k1;
+	struct gcblendconfig *k2;
 
-struct bvblendxlate {
-	unsigned char match1;
-	unsigned char match2;
-
-	struct gcblendconfig dst;
-	struct gcblendconfig src;
+	unsigned int src1used;
+	unsigned int src2used;
 };
 
 #define BVBLENDMATCH(Mode, Inverse, Normal) \
@@ -1312,10 +1315,10 @@ struct bvblendxlate {
 	BVBLENDDEF_ ## Normal \
 )
 
-#define BVDEST(Use) \
+#define BVSRC1USE(Use) \
 	Use
 
-#define BVSRC(Use) \
+#define BVSRC2USE(Use) \
 	Use
 
 #define BVBLENDUNDEFINED() \
@@ -1323,645 +1326,610 @@ struct bvblendxlate {
 
 static struct bvblendxlate blendxlate[64] = {
 	/**********************************************************************/
-	/* color factor: 00 00 00 A:(1-Cd,Cd)=zero
-	   alpha factor: zero ==> 00 00 00 */
+	/* #0: color factor: 00 00 00 A:(1-C1,C1)=zero
+	       alpha factor: zero ==> 00 00 00 */
 	{
 		0x00,
 		0x00,
 
 		{
-			/* k1 * Cd = 0 * Cd
-			   k3 * Ad = 0 * Ad */
 			GCREG_BLENDING_MODE_ZERO,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(0), BVSRC(0),
+			BVSRC1USE(0), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = 0 * Cs
-			   k4 * As = 0 * As */
 			GCREG_BLENDING_MODE_ZERO,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(0), BVSRC(0)
+			BVSRC1USE(0), BVSRC2USE(0)
 		}
 	},
 
-	/* color factor: 00 00 01 A:(1-Cd,Ad)=Ad
-	   alpha factor: Ad ==> 00 00 01 or 00 10 01 */
+	/* #1: color factor: 00 00 01 A:(1-C1,A1)=A1
+	       alpha factor: A1 ==> 00 00 01 or 00 10 01 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_C1, NORM_A1),
 		BVBLENDMATCH(ONLY_A, INV_C2, NORM_A1),
 
 		{
-			/* k1 * Cd = Ad * Cd
-			   k3 * Ad = Ad * Ad */
 			GCREG_BLENDING_MODE_NORMAL,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(1), BVSRC(0),
+			BVSRC1USE(1), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = Ad * Cs
-			   k4 * As = Ad * As */
 			GCREG_BLENDING_MODE_NORMAL,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 00 00 10 A:(1-Cd,Cs)=undefined
-	   alpha factor: N/A */
+	/* #2: color factor: 00 00 10 A:(1-C1,C2)=undefined
+	       alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 00 00 11 A:(1-Cd,As)=As
-	   alpha factor: As ==> 00 00 11 or 00 10 11 */
+	/* #3: color factor: 00 00 11 A:(1-C1,A2)=A2
+	       alpha factor: A2 ==> 00 00 11 or 00 10 11 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_C1, NORM_A2),
 		BVBLENDMATCH(ONLY_A, INV_C2, NORM_A2),
 
 		{
-			/* k1 * Cd = As * Cd
-			   k3 * Ad = As * Ad */
 			GCREG_BLENDING_MODE_NORMAL,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = As * Cs
-			   k4 * As = As * As */
 			GCREG_BLENDING_MODE_NORMAL,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(0), BVSRC(1)
+			BVSRC1USE(0), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 00 01 00 A:(1-Ad,Cd)=1-Ad
-	   alpha factor: 1-Ad ==> 00 01 00 or 00 01 10 */
+	/* #4: color factor: 00 01 00 A:(1-A1,C1)=1-A1
+	       alpha factor: 1-A1 ==> 00 01 00 or 00 01 10 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_A1, NORM_C1),
 		BVBLENDMATCH(ONLY_A, INV_A1, NORM_C2),
 
 		{
-			/* k1 * Cd = (1 - Ad) * Cd
-			   k3 * Ad = (1 - Ad) * Ad */
 			GCREG_BLENDING_MODE_INVERSED,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(1), BVSRC(0),
+			BVSRC1USE(1), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = (1 - Ad) * Cs
-			   k4 * As = (1 - Ad) * As */
 			GCREG_BLENDING_MODE_INVERSED,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 00 01 01 A:(1-Ad,Ad)=undefined
-	   alpha factor: N/A */
+	/* #5: color factor: 00 01 01 A:(1-A1,A1)=undefined
+	       alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 00 01 10 A:(1-Ad,Cs)=1-Ad
-	   alpha factor: 1-Ad ==> 00 01 00 or 00 01 10 */
+	/* #6: color factor: 00 01 10 A:(1-A1,C2)=1-A1
+	       alpha factor: 1-A1 ==> 00 01 00 or 00 01 10 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_A1, NORM_C1),
 		BVBLENDMATCH(ONLY_A, INV_A1, NORM_C2),
 
 		{
-			/* k1 * Cd = (1 - Ad) * Cd
-			   k3 * Ad = (1 - Ad) * Ad */
 			GCREG_BLENDING_MODE_INVERSED,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(1), BVSRC(0),
+			BVSRC1USE(1), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = (1 - Ad) * Cs
-			   k4 * As = (1 - Ad) * As */
 			GCREG_BLENDING_MODE_INVERSED,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 00 01 11 A:(1-Ad,As)=undefined
-	   alpha factor: N/A */
+	/* #7: color factor: 00 01 11 A:(1-A1,A2)=undefined
+	       alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 00 10 00 A:(1-Cs,Cd)=undefined
-	   alpha factor: N/A */
+	/* #8: color factor: 00 10 00 A:(1-C2,C1)=undefined
+	       alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 00 10 01 A:(1-Cs,Ad)=Ad
-	   alpha factor: Ad ==> 00 00 01 or 00 10 01 */
+	/* #9: color factor: 00 10 01 A:(1-C2,A1)=A1
+	       alpha factor: A1 ==> 00 00 01 or 00 10 01 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_C1, NORM_A1),
 		BVBLENDMATCH(ONLY_A, INV_C2, NORM_A1),
 
 		{
-			/* k1 * Cd = Ad * Cd
-			   k3 * Ad = Ad * Ad */
 			GCREG_BLENDING_MODE_NORMAL,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(1), BVSRC(0),
+			BVSRC1USE(1), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = Ad * Cs
-			   k4 * As = Ad * As */
 			GCREG_BLENDING_MODE_NORMAL,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 00 10 10 A:(1-Cs,Cs)=undefined
-	   alpha factor: N/A */
+	/* #10: color factor: 00 10 10 A:(1-C2,C2)=undefined
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 00 10 11 A:(1-Cs,As)=As
-	   alpha factor: As ==> 00 00 11 or 00 10 11 */
+	/* #11: color factor: 00 10 11 A:(1-C2,A2)=A2
+		alpha factor: A2 ==> 00 00 11 or 00 10 11 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_C1, NORM_A2),
 		BVBLENDMATCH(ONLY_A, INV_C2, NORM_A2),
 
 		{
-			/* k1 * Cd = As * Cd
-			   k3 * Ad = As * Ad */
 			GCREG_BLENDING_MODE_NORMAL,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = As * Cs
-			   k4 * As = As * As */
 			GCREG_BLENDING_MODE_NORMAL,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(0), BVSRC(1)
+			BVSRC1USE(0), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 00 11 00 A:(1-As,Cd)=1-As
-	   alpha factor: 1-As ==> 00 11 00 or 00 11 10 */
+	/* #12: color factor: 00 11 00 A:(1-A2,C1)=1-A2
+		alpha factor: 1-A2 ==> 00 11 00 or 00 11 10 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_A2, NORM_C1),
 		BVBLENDMATCH(ONLY_A, INV_A2, NORM_C2),
 
 		{
-			/* k1 * Cd = (1 - As) * Cd
-			   k3 * Ad = (1 - As) * Ad */
 			GCREG_BLENDING_MODE_INVERSED,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = (1 - As) * Cs
-			   k4 * As = (1 - As) * As */
 			GCREG_BLENDING_MODE_INVERSED,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(0), BVSRC(1)
+			BVSRC1USE(0), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 00 11 01 A:(1-As,Ad)=undefined
-	   alpha factor: N/A */
+	/* #13: color factor: 00 11 01 A:(1-A2,A1)=undefined
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 00 11 10 A:(1-As,Cs)=1-As
-	   alpha factor: 1-As ==> 00 11 00 or 00 11 10 */
+	/* #14: color factor: 00 11 10 A:(1-A2,C2)=1-A2
+		alpha factor: 1-A2 ==> 00 11 00 or 00 11 10 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_A2, NORM_C1),
 		BVBLENDMATCH(ONLY_A, INV_A2, NORM_C2),
 
 		{
-			/* k1 * Cd = (1 - As) * Cd
-			   k3 * Ad = (1 - As) * Ad */
 			GCREG_BLENDING_MODE_INVERSED,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = (1 - As) * Cs
-			   k4 * As = (1 - As) * As */
 			GCREG_BLENDING_MODE_INVERSED,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(0), BVSRC(1)
+			BVSRC1USE(0), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 00 11 11 A:(1-As,As)=undefined
-	   alpha factor: N/A */
+	/* #15: color factor: 00 11 11 A:(1-A2,A2)=undefined
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
 	/**********************************************************************/
-	/* color factor: 01 00 00 MIN:(1-Cd,Cd) ==> not supported
-	   alpha factor: N/A */
+	/* #16: color factor: 01 00 00 MIN:(1-C1,C1) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 00 01 MIN:(1-Cd,Ad) ==> not supported
-	   alpha factor: N/A */
+	/* #17: color factor: 01 00 01 MIN:(1-C1,A1) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 00 10 MIN:(1-Cd,Cs) ==> not supported
-	   alpha factor: N/A */
+	/* #18: color factor: 01 00 10 MIN:(1-C1,C2) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 00 11 MIN:(1-Cd,As) ==> not supported
-	   alpha factor: N/A */
+	/* #19: color factor: 01 00 11 MIN:(1-C1,A2) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 01 00 MIN:(1-Ad,Cd) ==> not supported
-	   alpha factor: N/A */
+	/* #20: color factor: 01 01 00 MIN:(1-A1,C1) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 01 01 MIN:(1-Ad,Ad) ==> not supported
-	   alpha factor: N/A */
+	/* #21: color factor: 01 01 01 MIN:(1-A1,A1) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 01 10 MIN:(1-Ad,Cs) ==> not supported
-	   alpha factor: N/A */
+	/* #22: color factor: 01 01 10 MIN:(1-A1,C2) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 01 11 MIN:(1-Ad,As)
-	   alpha factor: one ==> 11 11 11 */
+	/* #23: color factor: 01 01 11 MIN:(1-A1,A2)
+		alpha factor: one ==> 11 11 11 */
 	{
 		0x3F,
 		0x3F,
 
 		{
-			/* k1 * Cd = MIN:(1 - Ad, As) * Cd
-			   k3 * Ad = 1 * Ad */
 			GCREG_BLENDING_MODE_SATURATED_DEST_ALPHA,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = MIN:(1 - Ad, As) * Cs
-			   k4 * As = 1 * As */
 			GCREG_BLENDING_MODE_SATURATED_ALPHA,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 01 10 00 MIN:(1-Cs,Cd) ==> not supported
-	   alpha factor: N/A */
+	/* #24: color factor: 01 10 00 MIN:(1-C2,C1) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 10 01 MIN:(1-Cs,Ad) ==> not supported
-	   alpha factor: N/A */
+	/* #25: color factor: 01 10 01 MIN:(1-C2,A1) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 10 10 MIN:(1-Cs,Cs) ==> not supported
-	   alpha factor: N/A */
+	/* #26: color factor: 01 10 10 MIN:(1-C2,C2) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 10 11 MIN:(1-Cs,As) ==> not supported
-	   alpha factor: N/A */
+	/* #27: color factor: 01 10 11 MIN:(1-C2,A2) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 11 00 MIN:(1-As,Cd) ==> not supported
-	   alpha factor: N/A */
+	/* #28: color factor: 01 11 00 MIN:(1-A2,C1) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 11 01 MIN:(1-As,Ad)
-	   alpha factor: one ==> 11 11 11 */
+	/* #29: color factor: 01 11 01 MIN:(1-A2,A1)
+		alpha factor: one ==> 11 11 11 */
 	{
 		0x3F,
 		0x3F,
 
 		{
-			/* k1 * Cd = MIN:(1 - As, Ad) * Cd
-			   k3 * Ad = 1 * Ad */
 			GCREG_BLENDING_MODE_SATURATED_ALPHA,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = MIN:(1 - As, Ad) * Cs
-			   k4 * As = 1 * As */
 			GCREG_BLENDING_MODE_SATURATED_DEST_ALPHA,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 01 11 10 MIN:(1-As,Cs) ==> not supported
-	   alpha factor: N/A */
+	/* #30: color factor: 01 11 10 MIN:(1-A2,C2) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 01 11 11 MIN:(1-As,As) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/**********************************************************************/
-	/* color factor: 10 00 00 MAX:(1-Cd,Cd) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 00 01 MAX:(1-Cd,Ad) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 00 10 MAX:(1-Cd,Cs) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 00 11 MAX:(1-Cd,As) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 01 00 MAX:(1-Ad,Cd) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 01 01 MAX:(1-Ad,Ad) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 01 10 MAX:(1-Ad,Cs) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 01 11 MAX:(1-Ad,As) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 10 00 MAX:(1-Cs,Cd) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 10 01 MAX:(1-Cs,Ad) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 10 10 MAX:(1-Cs,Cs) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 10 11 MAX:(1-Cs,As) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 11 00 MAX:(1-As,Cd) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 11 01 MAX:(1-As,Ad) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 11 10 MAX:(1-As,Cs) ==> not supported
-	   alpha factor: N/A */
-	BVBLENDUNDEFINED(),
-
-	/* color factor: 10 11 11 MAX:(1-As,As) ==> not supported
-	   alpha factor: N/A */
+	/* #31: color factor: 01 11 11 MIN:(1-A2,A2) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
 	/**********************************************************************/
-	/* color factor: 11 00 00 C:(1-Cd,Cd)=undefined
-	   alpha factor: N/A */
+	/* #32: color factor: 10 00 00 MAX:(1-C1,C1) ==> not supported
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 11 00 01 C:(1-Cd,Ad)=1-Cd
-	   alpha factor: 1-Ad ==> 00 01 00 or 00 01 10 */
+	/* #33: color factor: 10 00 01 MAX:(1-C1,A1) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #34: color factor: 10 00 10 MAX:(1-C1,C2) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #35: color factor: 10 00 11 MAX:(1-C1,A2) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #36: color factor: 10 01 00 MAX:(1-A1,C1) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #37: color factor: 10 01 01 MAX:(1-A1,A1) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #38: color factor: 10 01 10 MAX:(1-A1,C2) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #39: color factor: 10 01 11 MAX:(1-A1,A2) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #40: color factor: 10 10 00 MAX:(1-C2,C1) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #41: color factor: 10 10 01 MAX:(1-C2,A1) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #42: color factor: 10 10 10 MAX:(1-C2,C2) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #43: color factor: 10 10 11 MAX:(1-C2,A2) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #44: color factor: 10 11 00 MAX:(1-A2,C1) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #45: color factor: 10 11 01 MAX:(1-A2,A1) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #46: color factor: 10 11 10 MAX:(1-A2,C2) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #47: color factor: 10 11 11 MAX:(1-A2,A2) ==> not supported
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/**********************************************************************/
+	/* #48: color factor: 11 00 00 C:(1-C1,C1)=undefined
+		alpha factor: N/A */
+	BVBLENDUNDEFINED(),
+
+	/* #49: color factor: 11 00 01 C:(1-C1,A1)=1-C1
+		alpha factor: 1-A1 ==> 00 01 00 or 00 01 10 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_A1, NORM_C1),
 		BVBLENDMATCH(ONLY_A, INV_A1, NORM_C2),
 
 		{
-			/* k1 * Cd = (1 - Cd) * Cd
-			   k3 * Ad = (1 - Ad) * Ad */
 			GCREG_BLENDING_MODE_COLOR_INVERSED,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(1), BVSRC(0),
+			BVSRC1USE(1), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = (1 - Cd) * Cs
-			   k4 * As = (1 - Ad) * As */
 			GCREG_BLENDING_MODE_COLOR_INVERSED,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 11 00 10 C:(1-Cd,Cs)=undefined
-	   alpha factor: N/A */
+	/* #50: color factor: 11 00 10 C:(1-C1,C2)=undefined
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 11 00 11 C:(1-Cd,As)=1-Cd
-	   alpha factor: 1-Ad ==> 00 01 00 or 00 01 10 */
+	/* #51: color factor: 11 00 11 C:(1-C1,A2)=1-C1
+		alpha factor: 1-A1 ==> 00 01 00 or 00 01 10 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_A1, NORM_C1),
 		BVBLENDMATCH(ONLY_A, INV_A1, NORM_C2),
 
 		{
-			/* k1 * Cd = (1 - Cd) * Cd
-			   k3 * Ad = (1 - Ad) * Ad */
 			GCREG_BLENDING_MODE_COLOR_INVERSED,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(1), BVSRC(0),
+			BVSRC1USE(1), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = (1 - Cd) * Cs
-			   k4 * As = (1 - Ad) * As */
 			GCREG_BLENDING_MODE_COLOR_INVERSED,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 11 01 00 C:(1-Ad,Cd)=Cd
-	   alpha factor: Ad ==> 00 00 01 or 00 10 01 */
+	/* #52: color factor: 11 01 00 C:(1-A1,C1)=C1
+		alpha factor: A1 ==> 00 00 01 or 00 10 01 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_C1, NORM_A1),
 		BVBLENDMATCH(ONLY_A, INV_C2, NORM_A1),
 
 		{
-			/* k1 * Cd = Cd * Cd
-			   k3 * Ad = Ad * Ad */
 			GCREG_BLENDING_MODE_COLOR,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(1), BVSRC(0),
+			BVSRC1USE(1), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = Cd * Cs
-			   k4 * As = Ad * As */
 			GCREG_BLENDING_MODE_COLOR,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 11 01 01 C:(1-Ad,Ad)=undefined
-	   alpha factor: N/A */
+	/* #53: color factor: 11 01 01 C:(1-A1,A1)=undefined
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 11 01 10 C:(1-Ad,Cs)=Cs
-	   alpha factor: As ==> 00 00 11 or 00 10 11 */
+	/* #54: color factor: 11 01 10 C:(1-A1,C2)=C2
+		alpha factor: A2 ==> 00 00 11 or 00 10 11 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_C1, NORM_A2),
 		BVBLENDMATCH(ONLY_A, INV_C2, NORM_A2),
 
 		{
-			/* k1 * Cd = Cs * Cd
-			   k3 * Ad = As * Ad */
 			GCREG_BLENDING_MODE_COLOR,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = Cs * Cs
-			   k4 * As = As * As */
 			GCREG_BLENDING_MODE_COLOR,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(0), BVSRC(1)
+			BVSRC1USE(0), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 11 01 11 C:(1-Ad,As)=undefined
-	   alpha factor: N/A */
+	/* #55: color factor: 11 01 11 C:(1-A1,A2)=undefined
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 11 10 00 C:(1-Cs,Cd)=undefined
-	   alpha factor: N/A */
+	/* #56: color factor: 11 10 00 C:(1-C2,C1)=undefined
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 11 10 01 C:(1-Cs,Ad)=1-Cs
-	   alpha factor: 1-As ==> 00 11 00 or 00 11 10 */
+	/* #57: color factor: 11 10 01 C:(1-C2,A1)=1-C2
+		alpha factor: 1-A2 ==> 00 11 00 or 00 11 10 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_A2, NORM_C1),
 		BVBLENDMATCH(ONLY_A, INV_A2, NORM_C2),
 
 		{
-			/* k1 * Cd = (1 - Cs) * Cd
-			   k3 * Ad = (1 - As) * Ad */
 			GCREG_BLENDING_MODE_COLOR_INVERSED,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = (1 - Cs) * Cs
-			   k4 * As = (1 - As) * As */
 			GCREG_BLENDING_MODE_COLOR_INVERSED,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(0), BVSRC(1)
+			BVSRC1USE(0), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 11 10 10 C:(1-Cs,Cs)=undefined
-	   alpha factor: N/A */
+	/* #58: color factor: 11 10 10 C:(1-C2,C2)=undefined
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 11 10 11 C:(1-Cs,As)=1-Cs
-	   alpha factor: 1-As ==> 00 11 00 or 00 11 10 */
+	/* #59: color factor: 11 10 11 C:(1-C2,A2)=1-C2
+		alpha factor: 1-A2 ==> 00 11 00 or 00 11 10 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_A2, NORM_C1),
 		BVBLENDMATCH(ONLY_A, INV_A2, NORM_C2),
 
 		{
-			/* k1 * Cd = (1 - Cs) * Cd
-			   k3 * Ad = (1 - As) * Ad */
 			GCREG_BLENDING_MODE_COLOR_INVERSED,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = (1 - Cs) * Cs
-			   k4 * As = (1 - As) * As */
 			GCREG_BLENDING_MODE_COLOR_INVERSED,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(0), BVSRC(0)
+			BVSRC1USE(0), BVSRC2USE(0)
 		}
 	},
 
-	/* color factor: 11 11 00 C:(1-As,Cd)=Cd
-	   alpha factor: Ad ==> 00 00 01 or 00 10 01 */
+	/* #60: color factor: 11 11 00 C:(1-A2,C1)=C1
+		alpha factor: A1 ==> 00 00 01 or 00 10 01 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_C1, NORM_A1),
 		BVBLENDMATCH(ONLY_A, INV_C2, NORM_A1),
 
 		{
-			/* k1 * Cd = Cd * Cd
-			   k3 * Ad = Ad * Ad */
 			GCREG_BLENDING_MODE_COLOR,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(1), BVSRC(0),
+			BVSRC1USE(1), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = Cd * Cs
-			   k4 * As = Ad * As */
 			GCREG_BLENDING_MODE_COLOR,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1)
+			BVSRC1USE(1), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 11 11 01 C:(1-As,Ad)=undefined
-	   alpha factor: N/A */
+	/* #61: color factor: 11 11 01 C:(1-A2,A1)=undefined
+		alpha factor: N/A */
 	BVBLENDUNDEFINED(),
 
-	/* color factor: 11 11 10 C:(1-As,Cs)=Cs
-	   alpha factor: As ==> 00 00 11 or 00 10 11 */
+	/* #62: color factor: 11 11 10 C:(1-A2,C2)=C2
+		alpha factor: A2 ==> 00 00 11 or 00 10 11 */
 	{
 		BVBLENDMATCH(ONLY_A, INV_C1, NORM_A2),
 		BVBLENDMATCH(ONLY_A, INV_C2, NORM_A2),
 
 		{
-			/* k1 * Cd = Cs * Cd
-			   k3 * Ad = As * Ad */
 			GCREG_BLENDING_MODE_COLOR,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(1),
+			BVSRC1USE(1), BVSRC2USE(1),
 		},
 
 		{
-			/* k2 * Cs = Cs * Cs
-			   k4 * As = As * As */
 			GCREG_BLENDING_MODE_COLOR,
 			GCREG_FACTOR_INVERSE_ENABLE,
-			BVDEST(0), BVSRC(1)
+			BVSRC1USE(0), BVSRC2USE(1)
 		}
 	},
 
-	/* color factor: 11 11 11 C:(1-As,As)=one
-	   alpha factor: one ==> 11 11 11 */
+	/* #63: color factor: 11 11 11 C:(1-A2,A2)=one
+		alpha factor: one ==> 11 11 11 */
 	{
 		0x3F,
 		0x3F,
 
 		{
-			/* k1 * Cd = 1 * Cd
-			   k3 * Ad = 1 * Ad */
 			GCREG_BLENDING_MODE_ONE,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(1), BVSRC(0),
+			BVSRC1USE(1), BVSRC2USE(0),
 		},
 
 		{
-			/* k2 * Cs = 1 * Cs
-			   k4 * As = 1 * As */
 			GCREG_BLENDING_MODE_ONE,
 			GCREG_FACTOR_INVERSE_DISABLE,
-			BVDEST(0), BVSRC(1)
+			BVSRC1USE(0), BVSRC2USE(1)
 		}
 	}
 };
+
+#if GC_DUMP
+static char *blend_name(enum bvblend blend)
+{
+	switch (blend) {
+	case BVBLEND_CLEAR:		return "BVBLEND_CLEAR";
+	case BVBLEND_SRC1:		return "BVBLEND_SRC1";
+	case BVBLEND_SRC2:		return "BVBLEND_SRC2";
+	case BVBLEND_SRC1OVER:		return "BVBLEND_SRC1OVER";
+	case BVBLEND_SRC2OVER:		return "BVBLEND_SRC2OVER";
+	case BVBLEND_SRC1IN:		return "BVBLEND_SRC1IN";
+	case BVBLEND_SRC2IN:		return "BVBLEND_SRC2IN";
+	case BVBLEND_SRC1OUT:		return "BVBLEND_SRC1OUT";
+	case BVBLEND_SRC2OUT:		return "BVBLEND_SRC2OUT";
+	case BVBLEND_SRC1ATOP:		return "BVBLEND_SRC1ATOP";
+	case BVBLEND_SRC2ATOP:		return "BVBLEND_SRC2ATOP";
+	case BVBLEND_XOR:		return "BVBLEND_XOR";
+	case BVBLEND_PLUS:		return "BVBLEND_PLUS";
+	case BVBLEND_NORMAL:		return "BVBLEND_NORMAL";
+	case BVBLEND_LIGHTEN:		return "BVBLEND_LIGHTEN";
+	case BVBLEND_DARKEN:		return "BVBLEND_DARKEN";
+	case BVBLEND_MULTIPLY:		return "BVBLEND_MULTIPLY";
+	case BVBLEND_AVERAGE:		return "BVBLEND_AVERAGE";
+	case BVBLEND_ADD:		return "BVBLEND_ADD";
+	case BVBLEND_SUBTRACT:		return "BVBLEND_SUBTRACT";
+	case BVBLEND_DIFFERENCE:	return "BVBLEND_DIFFERENCE";
+	case BVBLEND_NEGATE:		return "BVBLEND_NEGATE";
+	case BVBLEND_SCREEN:		return "BVBLEND_SCREEN";
+	case BVBLEND_EXCLUSION:		return "BVBLEND_EXCLUSION";
+	case BVBLEND_OVERLAY:		return "BVBLEND_OVERLAY";
+	case BVBLEND_SOFT_LIGHT:	return "BVBLEND_SOFT_LIGHT";
+	case BVBLEND_HARD_LIGHT:	return "BVBLEND_HARD_LIGHT";
+	case BVBLEND_COLOR_DODGE:	return "BVBLEND_COLOR_DODGE";
+	case BVBLEND_COLOR_BURN:	return "BVBLEND_COLOR_BURN";
+	case BVBLEND_LINEAR_LIGHT:	return "BVBLEND_LINEAR_LIGHT";
+	case BVBLEND_VIVID_LIGHT:	return "BVBLEND_VIVID_LIGHT";
+	case BVBLEND_PIN_LIGHT:		return "BVBLEND_PIN_LIGHT";
+	case BVBLEND_HARD_MIX:		return "BVBLEND_HARD_MIX";
+	case BVBLEND_REFLECT:		return "BVBLEND_REFLECT";
+	case BVBLEND_GLOW:		return "BVBLEND_GLOW";
+	case BVBLEND_PHOENIX:		return "BVBLEND_PHOENIX";
+	default:			return "[UNKNOWN]";
+	}
+}
+#endif
 
 static enum bverror parse_blend(struct bvbltparams *bltparams,
 	enum bvblend blend, struct gcalpha *gca)
@@ -1969,9 +1937,12 @@ static enum bverror parse_blend(struct bvbltparams *bltparams,
 	enum bverror bverror;
 	unsigned int global;
 	unsigned int k1, k2, k3, k4;
-	struct bvblendxlate *dstxlate;
-	struct bvblendxlate *srcxlate;
+	struct bvblendxlate *k1_xlate;
+	struct bvblendxlate *k2_xlate;
 	unsigned int alpha;
+
+	GC_PRINT(GC_INFO_MSG " blend = 0x%08X (%s)\n",
+		__func__, __LINE__, blend, blend_name(blend));
 
 	if ((blend & BVBLENDDEF_REMOTE) != 0) {
 		BVSETBLTERROR(BVERR_BLEND, "remote alpha not supported");
@@ -2023,8 +1994,8 @@ static enum bverror parse_blend(struct bvbltparams *bltparams,
 	}
 
 	/*
-		Co = k1 x Cd + k2 x Cs
-		Ao = k3 x Ad + k4 x As
+		Co = k1 x C1 + k2 x C2
+		Ao = k3 x A1 + k4 x A2
 	*/
 
 	k1 = (blend >> 18) & 0x3F;
@@ -2032,24 +2003,26 @@ static enum bverror parse_blend(struct bvbltparams *bltparams,
 	k3 = (blend >>  6) & 0x3F;
 	k4 =  blend        & 0x3F;
 
-	GC_PRINT(GC_INFO_MSG " blend = 0x%08X\n", __func__, __LINE__, blend);
 	GC_PRINT(GC_INFO_MSG " k1 = %d\n", __func__, __LINE__, k1);
 	GC_PRINT(GC_INFO_MSG " k2 = %d\n", __func__, __LINE__, k2);
 	GC_PRINT(GC_INFO_MSG " k3 = %d\n", __func__, __LINE__, k3);
 	GC_PRINT(GC_INFO_MSG " k4 = %d\n", __func__, __LINE__, k4);
 
-	dstxlate = &blendxlate[k1];
-	srcxlate = &blendxlate[k2];
+	k1_xlate = &blendxlate[k1];
+	k2_xlate = &blendxlate[k2];
 
-	if (((k3 != dstxlate->match1) && (k3 != dstxlate->match2)) ||
-		((k4 != srcxlate->match1) && (k4 != srcxlate->match2))) {
+	if (((k3 != k1_xlate->match1) && (k3 != k1_xlate->match2)) ||
+		((k4 != k2_xlate->match1) && (k4 != k2_xlate->match2))) {
 		BVSETBLTERROR(BVERR_BLEND,
 				"not supported coefficient combination");
 		goto exit;
 	}
 
-	gca->src_config = &dstxlate->dst;
-	gca->dst_config = &srcxlate->src;
+	gca->k1 = &k1_xlate->k1;
+	gca->k2 = &k2_xlate->k2;
+
+	gca->src1used = gca->k1->src1used | gca->k2->src1used;
+	gca->src2used = gca->k1->src2used | gca->k2->src2used;
 
 	bverror = BVERR_NONE;
 
@@ -2745,20 +2718,66 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 				= gca->src_global_alpha_mode;
 			gcmosrc->alphamodes.reg.dst_global_alpha
 				= gca->dst_global_alpha_mode;
-			gcmosrc->alphamodes.reg.src_blend
-				= gca->src_config->factor_mode;
-			gcmosrc->alphamodes.reg.dst_blend
-				= gca->dst_config->factor_mode;
-			gcmosrc->alphamodes.reg.src_color_reverse
-				= gca->src_config->color_reverse;
-			gcmosrc->alphamodes.reg.dst_color_reverse
-				= gca->dst_config->color_reverse;
+
+			if (srccount == 1) {
+				GC_PRINT(GC_INFO_MSG " k1 sets src blend.\n",
+					__func__, __LINE__);
+				GC_PRINT(GC_INFO_MSG " k2 sets dst blend.\n",
+					__func__, __LINE__);
+
+				gcmosrc->alphamodes.reg.src_blend
+					= gca->k1->factor_mode;
+				gcmosrc->alphamodes.reg.src_color_reverse
+					= gca->k1->color_reverse;
+
+				gcmosrc->alphamodes.reg.dst_blend
+					= gca->k2->factor_mode;
+				gcmosrc->alphamodes.reg.dst_color_reverse
+					= gca->k2->color_reverse;
+			} else {
+				GC_PRINT(GC_INFO_MSG " k1 sets dst blend.\n",
+					__func__, __LINE__);
+				GC_PRINT(GC_INFO_MSG " k2 sets src blend.\n",
+					__func__, __LINE__);
+
+				gcmosrc->alphamodes.reg.src_blend
+					= gca->k2->factor_mode;
+				gcmosrc->alphamodes.reg.src_color_reverse
+					= gca->k2->color_reverse;
+
+				gcmosrc->alphamodes.reg.dst_blend
+					= gca->k1->factor_mode;
+				gcmosrc->alphamodes.reg.dst_color_reverse
+					= gca->k1->color_reverse;
+			}
+
+			GC_PRINT(GC_INFO_MSG " dst blend:\n",
+				__func__, __LINE__);
+			GC_PRINT(GC_INFO_MSG "   factor = %d\n",
+				__func__, __LINE__,
+				gcmosrc->alphamodes.reg.dst_blend);
+			GC_PRINT(GC_INFO_MSG "   inverse = %d\n",
+				__func__, __LINE__,
+				gcmosrc->alphamodes.reg.dst_color_reverse);
+
+			GC_PRINT(GC_INFO_MSG " src blend:\n",
+				__func__, __LINE__);
+			GC_PRINT(GC_INFO_MSG "   factor = %d\n",
+				__func__, __LINE__,
+				gcmosrc->alphamodes.reg.src_blend);
+			GC_PRINT(GC_INFO_MSG "   inverse = %d\n",
+				__func__, __LINE__,
+				gcmosrc->alphamodes.reg.src_color_reverse);
 
 			gcmosrc->srcglobal.raw = gca->src_global_color;
 			gcmosrc->dstglobal.raw = gca->dst_global_color;
-		} else
+		} else {
+			GC_PRINT(GC_INFO_MSG " blending disabled.\n",
+				__func__, __LINE__);
+
 			gcmosrc->alphacontrol.reg.enable
 				= GCREG_ALPHA_CONTROL_ENABLE_OFF;
+		}
 
 		gcmosrc += 1;
 		batch->gcblit.srccount += 1;
@@ -3110,14 +3129,9 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			switch (format) {
 			case (BVBLENDDEF_FORMAT_CLASSIC
 				>> BVBLENDDEF_FORMAT_SHIFT):
-				src1used
-					= gca->dst_config->destuse
-					| gca->src_config->destuse;
-				src2used
-					= gca->dst_config->srcuse
-					| gca->src_config->srcuse;
-				maskused
-					= blend & BVBLENDDEF_REMOTE;
+				src1used = gca->src1used;
+				src2used = gca->src2used;
+				maskused = blend & BVBLENDDEF_REMOTE;
 				break;
 
 			default:
