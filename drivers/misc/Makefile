@@ -56,3 +56,4 @@ obj-$(CONFIG_CDC_TCXO)		+= cdc_tcxo.o
 obj-$(CONFIG_GCCORE)		+= gcx/gccore/
 obj-$(CONFIG_GCBV)		+= gcx/gcbv/
 obj-$(CONFIG_GCIOCTL)		+= gcx/gcioctl/
+obj-$(CONFIG_CACHE2DMANAGER)	+= cache-2dmanager/
