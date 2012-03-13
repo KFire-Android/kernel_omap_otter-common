@@ -694,7 +694,6 @@ static enum bverror append_buffer(struct gcbatch *batch);
 static enum bverror do_end(struct bvbltparams *bltparams,
 				struct gcbatch *batch)
 {
-	GC_PRINT(GC_INFO_MSG " dummy operation end\n", __func__, __LINE__);
 	return BVERR_NONE;
 }
 
@@ -2331,6 +2330,8 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 		goto exit;
 	}
 
+	memset(gcmomultisrc, 0, buffersize);
+
 	/* Reset the finalizer. */
 	batch->batchend = do_end;
 
@@ -2528,31 +2529,36 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		__func__, __LINE__, multiblit);
 
 	if ((batch->batchend == do_blit_end) &&
-		(batch->gcblit.srccount < 4)) {
-		GC_PRINT(GC_ERR_MSG " adding new source to the operation\n",
+		(batch->gcblit.srccount + srccount <= 4) && multiblit) {
+		GC_PRINT(GC_ERR_MSG " adding new source(s) to multiblit\n",
 			__func__, __LINE__);
 
 		startblit = 0;
 		buffersize = sizeof(struct gcmosrc) * srccount;
 	} else {
-		if (batch->batchend == do_blit_end) {
-			GC_PRINT(GC_INFO_MSG
-				" maximum number of sources reached\n",
-				__func__, __LINE__);
-		} else {
-			GC_PRINT(GC_INFO_MSG
-				" another operation in progress\n",
-				__func__, __LINE__);
-		}
+		GC_PRINT(GC_INFO_MSG " finilizing previous blits (if any)\n",
+			__func__, __LINE__);
 
 		bverror = batch->batchend(bltparams, batch);
 		if (bverror != BVERR_NONE)
 			goto exit;
 
 		startblit = 1;
-		buffersize
-			= sizeof(struct gcmodst)
-			+ sizeof(struct gcmosrc) * srccount;
+
+		if (multiblit) {
+			GC_PRINT(GC_INFO_MSG
+				" appending multiblit with %d source(s)\n",
+				__func__, __LINE__, srccount);
+			buffersize
+				= sizeof(struct gcmodst)
+				+ sizeof(struct gcmosrc) * srccount;
+		} else {
+			GC_PRINT(GC_INFO_MSG " appending %d single blit(s)\n",
+				__func__, __LINE__, srccount);
+			buffersize
+				= sizeof(struct gcmodst)
+				+ sizeof(struct gcmosrc);
+		}
 
 		batch->batchend = do_blit_end;
 		batch->gcblit.srccount = 0;
@@ -2641,7 +2647,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 	index = batch->gcblit.srccount;
 
-	for (i = 0; i < srccount; i += 1, index += 1) {
+	for (i = 0; i < srccount; i += 1) {
 		srcgeom = srcdesc[i].geom;
 
 		add_fixup(batch, &gcmosrc->address, srcshift[i]);
@@ -2779,8 +2785,29 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 				= GCREG_ALPHA_CONTROL_ENABLE_OFF;
 		}
 
-		gcmosrc += 1;
-		batch->gcblit.srccount += 1;
+		if (multiblit) {
+			index += 1;
+			batch->gcblit.srccount += 1;
+			gcmosrc += 1;
+		} else if (i + 1 < srccount) {
+			bverror = batch->batchend(bltparams, batch);
+			if (bverror != BVERR_NONE)
+				goto exit;
+
+			batch->batchend = do_blit_end;
+			batch->gcblit.srccount = 0;
+
+			bverror = claim_buffer(batch, sizeof(struct gcmosrc),
+						&buffer);
+			if (bverror != BVERR_NONE) {
+				BVSETBLTERROR(BVERR_OOM,
+					"failed to allocate command buffer");
+				goto exit;
+			}
+
+			memset(buffer, 0, buffersize);
+			gcmosrc = (struct gcmosrc *) buffer;
+		}
 	}
 
 exit:
@@ -3125,7 +3152,6 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 			gca = &_gca;
 
-			/* FIXME/TODO: logic here is incorrect */
 			switch (format) {
 			case (BVBLENDDEF_FORMAT_CLASSIC
 				>> BVBLENDDEF_FORMAT_SHIFT):
