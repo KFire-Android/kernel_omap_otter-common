@@ -1402,7 +1402,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 		}
 
 		/* first 2 values are for negative temperature */
-		di->temp_C = (temp - 2) * 10; /* in tenths of degree Celsius */
+		di->temp_C = (temp - 2); /* in degrees Celsius */
 	}
 
 	if (capacity_changed(di))
