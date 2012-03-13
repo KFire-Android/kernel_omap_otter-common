@@ -912,7 +912,9 @@ static void cfhsi_wake_down(struct work_struct *work)
 		return;
 
 	/* Clear spurious states (if any) */
-	WARN_ON(test_and_clear_bit(CFHSI_WAKE_DOWN_ACK, &cfhsi->bits));
+	if (test_and_clear_bit(CFHSI_WAKE_DOWN_ACK, &cfhsi->bits))
+		dev_err(&cfhsi->ndev->dev, "%s: Wrong CAWAKE state.\n",
+			__func__);
 
 	/* Deactivate wake line. */
 	cfhsi->ops->cfhsi_wake_down(cfhsi->ops);
