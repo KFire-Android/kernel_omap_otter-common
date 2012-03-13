@@ -1012,6 +1012,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		int regulator;
 
 		if (twl_has_regulator()) {
+			/* this is a template that gets copied */
 			struct regulator_init_data usb_fixed = {
 				.constraints.valid_modes_mask =
 					REGULATOR_MODE_NORMAL
@@ -1037,6 +1038,18 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 
 		pdata->usb->features = features;
 
+		child = add_child(0, "twl6030_usb",
+			pdata->usb, sizeof(*pdata->usb),
+			true,
+			/* irq1 = VBUS_PRES, irq0 = USB ID */
+			pdata->irq_base + USBOTG_INTR_OFFSET,
+			pdata->irq_base + USB_PRES_INTR_OFFSET);
+
+		if (IS_ERR(child))
+			return PTR_ERR(child);
+		/* we need to connect regulators to this transceiver */
+		if (twl_has_regulator() && child)
+			usb3v3.dev = child;
 	} else if (twl_has_regulator() && twl_class_is_6030()) {
 		if (features & TWL6025_SUBCLASS)
 			child = add_regulator(TWL6025_REG_LDOUSB,
@@ -1070,7 +1083,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 	}
 #endif
 
-	/* FIXME-HASH: Watch this */
 	if (twl_has_codec() && pdata->codec && twl_class_is_4030()) {
 		sub_chip_id = twl_map[TWL_MODULE_AUDIO_VOICE].sid;
 		child = add_child(sub_chip_id, "twl4030-audio",
@@ -1081,7 +1093,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 	}
 
 	/* Phoenix codec driver is probed directly atm */
-#if 0
 	if (twl_has_codec() && pdata->codec && twl_class_is_6030()) {
 		sub_chip_id = twl_map[TWL_MODULE_AUDIO_VOICE].sid;
 		child = add_child(sub_chip_id, "twl6040-audio",
@@ -1090,7 +1101,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
-#endif
 
 	/* twl4030 regulators */
 	if (twl_has_regulator() && twl_class_is_4030()) {
@@ -1179,11 +1189,12 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
-
+#if 0
 		child = add_regulator(TWL6030_REG_CLK32KG, pdata->clk32kg,
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
+#endif
 	}
 
 	/* twl6030 regulators */
@@ -1204,11 +1215,12 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 
+#if 0
 		child = add_regulator(TWL6030_REG_VANA, pdata->vana,
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
-
+#endif
 		child = add_regulator(TWL6030_REG_VCXIO, pdata->vcxio,
 					features);
 		if (IS_ERR(child))
@@ -1275,7 +1287,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			return PTR_ERR(child);
 	}
 
-#if 0
 	/* 6030 and 6025 share this regulator */
 	if (twl_has_regulator() && twl_class_is_6030()) {
 		child = add_regulator(TWL6030_REG_VANA, pdata->vana,
@@ -1283,7 +1294,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
-#endif
 
 	/* twl6025 regulators */
 	if (twl_has_regulator() && twl_class_is_6030() &&
@@ -1362,7 +1372,8 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			true,
 			/* irq1 = VBUS_PRES, irq0 = USB ID */
 			pdata->irq_base + USBOTG_INTR_OFFSET,
-			pdata->irq_base + USB_PRES_INTR_OFFSET);
+			pdata->irq_base + USB_PRES_INTR_OFFSET
+			);
 
 		if (IS_ERR(child))
 			return PTR_ERR(child);

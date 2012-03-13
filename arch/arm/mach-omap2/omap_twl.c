@@ -491,6 +491,7 @@ static __initdata struct omap_pmic_description twl6030_pmic_desc = {
 
 int __init omap_twl_init(void)
 {
+	printk("****%s:: ENTER\n", __func__);
 	struct omap_pmic_description *desc = NULL;
 
 	/* Reuse OMAP3430 values */
@@ -503,6 +504,7 @@ int __init omap_twl_init(void)
 	if (cpu_is_omap44xx())
 		desc = &twl6030_pmic_desc;
 
+	printk("****%s:: EXIT\n", __func__);
 	return omap_pmic_register_data(omap_twl_map, desc);
 }
 

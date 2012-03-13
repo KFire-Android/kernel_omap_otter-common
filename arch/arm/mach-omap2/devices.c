@@ -237,6 +237,9 @@ struct omap_device_pm_latency omap_keyboard_latency[] = {
 int __init omap4_keyboard_init(struct omap4_keypad_platform_data
 						*sdp4430_keypad_data)
 {
+#if defined(CONFIG_MACH_OMAP_4430_KC1)
+	return -ENODEV;
+#endif
 	struct omap_device *od;
 	struct omap_hwmod *oh;
 	struct omap4_keypad_platform_data *keypad_data;

@@ -71,6 +71,7 @@ enum {
 	PANEL_OTTER1,
 };
 
+#if 0
 static struct panel_config panel_configs[] = {
 	{
 		.name		= "otter1",
@@ -98,6 +99,7 @@ static struct panel_config panel_configs[] = {
 		},
 	},
 };
+#endif
 
 extern u8 quanta_get_mbid(void);
 
@@ -156,23 +158,23 @@ static struct attribute_group otter1_panel_attribute_group = {
        .attrs = otter1_panel_attributes
  };
 
+static void otter1_get_resolution(struct omap_dss_device *dssdev,
+				 u16 *xres, u16 *yres)
+{
+
+	*xres = dssdev->panel.timings.x_res;
+	*yres = dssdev->panel.timings.y_res;
+}
+
+int otter1_get_recommended_bpp(struct omap_dss_device *dssdev)
+{
+	return 24;
+}
+
 static void otter1_get_timings(struct omap_dss_device *dssdev, struct omap_video_timings *timings)
 {
         *timings = otter1_panel_timings;
 }
-
-/*
-static void otter1_get_resolution(struct omap_dss_device *dssdev, u16 *xres, u16 *yres)
-{
-	if (td->rotate == 0 || td->rotate == 2) {
-		*xres = otter1_panel_timings.x_res;
-		*yres = otter1_panel_timings.y_res;
-	} else {
-		*yres = otter1_panel_timings.x_res;
-		*xres = otter1_panel_timings.y_res;
-	}
-}
-*/
 
 int otter1_panel_power_on(void)
 {
@@ -191,9 +193,9 @@ int otter1_panel_power_on(void)
 	if (quanta_get_mbid() < 4) {
         	if((vendor1 == 0) && (vendor0 == 0))
 	        {
-			//printk("***************************************************\n");
-			//printk("******************  Panel of LG  ******************\n");
-			//printk("***************************************************\n");
+			printk("***************************************************\n");
+			printk("******************  Panel of LG  ******************\n");
+			printk("***************************************************\n");
 			result |= spi_send(otter1_spi, 0x00, 0x21);
 			result |= spi_send(otter1_spi, 0x00, 0xa5);
 			result |= spi_send(otter1_spi, 0x01, 0x30);
@@ -251,9 +253,9 @@ int otter1_panel_power_on(void)
         //After DVT
         if((vendor1 == 0) && (vendor0 == 0))
         {
-			//printk("***************************************************\n");
-			//printk("******************  Panel of LG  ******************\n");
-			//printk("***************************************************\n");
+			printk("***************************************************\n");
+			printk("******************  Panel of LG  ******************\n");
+			printk("***************************************************\n");
 			result |= spi_send(otter1_spi, 0x00, 0x21);
 			result |= spi_send(otter1_spi, 0x00, 0xa5);
 			result |= spi_send(otter1_spi, 0x01, 0x30);
@@ -422,6 +424,7 @@ static int otter1_panel_resume(struct omap_dss_device *dssdev)
 	return 0;
 }
 
+#if 0
 static int otter1_set_update_mode(struct omap_dss_device *dssdev, enum omap_dss_update_mode mode)
 {
 	if (mode != OMAP_DSS_UPDATE_MANUAL)
@@ -433,6 +436,7 @@ static enum omap_dss_update_mode otter1_get_update_mode(struct omap_dss_device *
 {
 	return OMAP_DSS_UPDATE_MANUAL;
 }
+#endif
 
 static struct omap_dss_driver otter1_driver = {
 	.probe		 = otter1_panel_probe,
@@ -443,11 +447,13 @@ static struct omap_dss_driver otter1_driver = {
 	.suspend	 = otter1_panel_suspend,
 	.resume		 = otter1_panel_resume,
 
-	.set_update_mode = otter1_set_update_mode,
-	.get_update_mode = otter1_get_update_mode,
+	.get_resolution	 = otter1_get_resolution,
+	.get_recommended_bpp = otter1_get_recommended_bpp,
 
-	//.get_resolution	 = otter1_get_resolution,
-	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
+	// .set_update_mode = otter1_set_update_mode,
+	// .get_update_mode = otter1_get_update_mode,
+
+	// .get_recommended_bpp = omapdss_default_get_recommended_bpp,
 
 	.get_timings     = otter1_get_timings,
 	.driver		 = {
@@ -455,6 +461,8 @@ static struct omap_dss_driver otter1_driver = {
 		.owner	 = THIS_MODULE,
 	},
 };
+
+/*--------------------SPI probe-------------------------*/
 
 static int otter1_spi_probe(struct spi_device *spi)
 {
@@ -476,13 +484,13 @@ static int otter1_spi_remove(struct spi_device *spi)
 
 
 static struct spi_driver otter1_spi_driver = {
-	.probe		= otter1_spi_probe,
-	.remove		= __devexit_p(otter1_spi_remove),
 	.driver		= {
 		.name	= "otter1_disp_spi",
 		.bus	= &spi_bus_type,
 		.owner	= THIS_MODULE,
 	},
+	.probe		= otter1_spi_probe,
+	.remove		= __devexit_p(otter1_spi_remove),
 };
 
 static int __init otter1_lcd_init(void)

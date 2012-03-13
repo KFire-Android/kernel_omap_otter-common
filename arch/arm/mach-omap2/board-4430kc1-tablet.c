@@ -22,7 +22,7 @@
 #include <linux/gpio.h>
 #include <linux/usb/otg.h>
 #include <linux/spi/spi.h>
-#include <linux/hwspinlock.h>
+// #include <linux/hwspinlock.h>
 #include <linux/i2c/twl.h>
 #include <linux/leds-omap4430sdp-display.h>
 #include <linux/interrupt.h>
@@ -191,7 +191,6 @@ static struct spi_board_info tablet_spi_board_info[]__initdata = {
 		.modalias		= "otter1_disp_spi",
 		.bus_num		= 4,     /* McSPI4 */
 		.chip_select		= 0,
-		/* FIXME-HASH: REALLY? 375000? */
 		.max_speed_hz		= 375000,
 	},
 };
@@ -230,6 +229,8 @@ static struct omap4430_sdp_disp_led_platform_data __initdata sdp4430_disp_led_da
 /* FIXME-HASH: Done in twl_leds? */
 static void __init omap_disp_led_init(void)
 {
+	pr_info("%s: enter\n", __func__);
+
 	/* Seconday backlight control */
 	gpio_request(DSI2_GPIO_59, "dsi2_bl_gpio");
 	gpio_direction_output(DSI2_GPIO_59, 0);
@@ -242,14 +243,24 @@ static void __init omap_disp_led_init(void)
 	gpio_direction_output(LED_SEC_DISP_GPIO, 1);
 	mdelay(120);
 	gpio_set_value(LED_SEC_DISP_GPIO, 0);
+
+	pr_info("%s: exit\n", __func__);
 }
 
 static struct platform_device __initdata  sdp4430_disp_led = {
-	.name = "display_led", .id = -1, .dev = { .platform_data = &sdp4430_disp_led_data, },
+	.name = "display_led",
+	.id = -1,
+	.dev = {
+		.platform_data = &sdp4430_disp_led_data,
+	},
 };
 
 static struct platform_device __initdata sdp4430_keypad_led = {
-	.name = "keypad_led", .id = -1, .dev	= { .platform_data = NULL, },
+	.name = "keypad_led",
+	.id = -1,
+	.dev	= {
+		.platform_data = NULL,
+	},
 };
 
 void kc1_led_set_power(struct omap_pwm_led_platform_data *self, int on_off)
@@ -291,10 +302,12 @@ static struct omap_dss_device sdp4430_otter1_device = {
 	.type			= OMAP_DISPLAY_TYPE_DPI,
 	.phy.dpi.data_lines	= 24,
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
+#if 0
         .panel          = {
         	.width_in_um = 158,
         	.height_in_um = 92,
         },
+#endif
 };
 
 static struct omap_dss_device *sdp4430_dss_devices[] = {
@@ -382,8 +395,8 @@ static struct omap2_hsmmc_info mmc[] = {
 	{
 		.mmc = 2,
 		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA | MMC_CAP_1_8V_DDR,
-		.gpio_cd = 0, // -EINVAL,
-		.gpio_wp = 4, // -EINVAL,
+		.gpio_cd = -EINVAL,
+		.gpio_wp = -EINVAL,
 		.ocr_mask = MMC_VDD_165_195,
 		.nonremovable = true,
 #ifdef CONFIG_PM_RUNTIME
@@ -660,11 +673,9 @@ static struct twl4030_madc_platform_data sdp4430_gpadc_data = {
 };
 
 #define SUMMIT_STAT 31
-#if 0
 static struct twl6030_qcharger_platform_data kc1_charger_data={
         .interrupt_pin = OMAP4_CHARGER_IRQ,
 };
-#endif
 
 static struct regulator_init_data sdp4430_clk32kg = {
        .constraints = {
@@ -690,6 +701,11 @@ static struct twl4030_platform_data sdp4430_twldata = {
 	.usb		= &omap4_usbphy_data,
 	.clk32kg	= &sdp4430_clk32kg,
 	.madc           = &sdp4430_gpadc_data,
+//	.qcharger	= &kc1_charger_data,
+//	.bci            = &sdp4430_bci_data,
+
+	/* children */
+//	.codec          = &twl6040_codec,
 };
 
 static void __init kc1_pmic_mux_init(void)
@@ -712,7 +728,6 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo_dvt[] = {
 	},
 #endif
 };
-//	{ I2C_BOARD_INFO("twl6030", 0x48), .flags = I2C_CLIENT_WAKE, .irq = OMAP44XX_IRQ_SYS_1N, .platform_data = &sdp4430_twldata, },
 
 static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 #ifdef CONFIG_BATTERY_BQ27541_Q
@@ -727,13 +742,27 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 	},
 #endif    
 };
-//	{ I2C_BOARD_INFO("twl6030", 0x48), .flags = I2C_CLIENT_WAKE, .irq = OMAP44XX_IRQ_SYS_1N, .platform_data = &sdp4430_twldata, },
 
 static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
-	{ I2C_BOARD_INFO("ilitek_i2c", 0x41), .irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1), },
+	{
+		I2C_BOARD_INFO("ilitek_i2c", 0x41),
+		 .irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1),
+	},
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
+#ifdef CONFIG_DEMO_HDMI
+	{
+		I2C_BOARD_INFO("adi7526", 0x39),
+		.irq = OMAP_GPIO_IRQ(OMAP4_ADI7526_IRQ),
+	},
+#endif
+/* Mistral: Updated this array to include the AIC3110 Audio Codec */
+#if 0
+	{
+		I2C_BOARD_INFO("tlv320aic3110", 0x18),
+	},
+#endif
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
@@ -846,20 +875,16 @@ static int __init omap4_i2c_init(void)
 	 * start with 400 KHz or less
 	 */
         if (quanta_mbid < 0x04) {
-		// omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo, ARRAY_SIZE(sdp4430_i2c_boardinfo));
-		err = i2c_register_board_info(1,sdp4430_i2c_boardinfo, ARRAY_SIZE(sdp4430_i2c_boardinfo));
+		err = i2c_register_board_info(1, sdp4430_i2c_boardinfo, ARRAY_SIZE(sdp4430_i2c_boardinfo));
         }
 	// DVT
         else {
-		// omap_register_i2c_bus(1, 400, sdp4430_i2c_boardinfo_dvt, ARRAY_SIZE(sdp4430_i2c_boardinfo_dvt));
-		err = i2c_register_board_info(1,sdp4430_i2c_boardinfo_dvt, ARRAY_SIZE(sdp4430_i2c_boardinfo_dvt));
+		err = i2c_register_board_info(1, sdp4430_i2c_boardinfo_dvt, ARRAY_SIZE(sdp4430_i2c_boardinfo_dvt));
         }
 	if (err)
 	  return err;
 
-	regulator_has_full_constraints();
-
-	omap_register_i2c_bus(2, 400, sdp4430_i2c_2_boardinfo, ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
+	// omap_register_i2c_bus(2, 400, sdp4430_i2c_2_boardinfo, ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo, ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
 	if (quanta_mbid<0x02) {
 		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_c1c, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_c1c));
@@ -877,6 +902,9 @@ static int __init omap4_i2c_init(void)
 		pr_info("quanta_mbid >= 0x06\n");
 		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_pvt, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_pvt));
 	}
+
+	regulator_has_full_constraints();
+
 	return 0;
 }
 
@@ -1386,6 +1414,7 @@ static void __init omap_kc1_init(void)
 	quanta_boardids();
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
+
 	omap4_mux_init(board_mux, NULL, package);
 
 	omap_emif_setup_device_details(&emif_devices, &emif_devices);
@@ -1437,7 +1466,8 @@ static void __init omap_kc1_init(void)
 		gpio_request(155, "CHARGE-SUSP");
 		gpio_direction_output(155, 1);
 	}
-	omap4_kc1_wifi_init();
+//	omap4_kc1_wifi_init();
+//	config_wlan_mux();
 
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);

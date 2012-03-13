@@ -1063,6 +1063,13 @@ no_32k:
 	omap4_prminst_write_inst_reg(0x3, OMAP4430_PRM_PARTITION,
 		OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_PWRREQCTRL_OFFSET);
 
+	// FIXME-HASH: Added from KFire Kernel
+	/*Set setuptime and downtime into CLKSETUPTIME register*/
+	__raw_writel(0x00050140, OMAP4_SCRM_CLKSETUPTIME);
+
+	/*Set wakeuptime and sleeptime into PMICSETUPTIME register*/
+	__raw_writel(0x00200020, OMAP4_SCRM_PMICSETUPTIME);
+
 }
 
 

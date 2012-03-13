@@ -107,12 +107,9 @@ static ssize_t show_temp(struct device *dev, struct device_attribute *da,
 	struct lm75_data *data = lm75_update_device(dev);
 
 #if defined(CONFIG_TWL6030_POWEROFF)
-// FIXME-HASH REMOVED FOR TESTING
-#if 0
 	/* Driver fail-safe to shut down the system */
 	if (LM75_TEMP_FROM_REG(data->temp[attr->index]) >= LM75_TCRITICAL)
 		twl6030_poweroff();
-#endif
 #endif
 
 	return sprintf(buf, "%d\nSuccess\n",
@@ -160,8 +157,6 @@ static const struct attribute_group lm75_group = {
 
 /*-----------------------------------------------------------------------*/
 
-// FIXME-HASH REMOVED FOR TESTING
-#if 0
 /* interrupt */
 static void lm75_work(struct work_struct *work)
 {
@@ -182,7 +177,6 @@ static irqreturn_t lm75_isr(int irq, void *dev_id)
 //	kobject_uevent(&data->hwmon_dev->kobj, KOBJ_CHANGE);
 	return IRQ_HANDLED;
 }
-#endif
 
 
 
@@ -210,32 +204,31 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	i2c_set_clientdata(client, data);
 	mutex_init(&data->update_lock);
 
-	// FIXME-HASH REMOVED FOR TESTING
-#if 0
 	/*leon add for interrupt */
 	INIT_WORK(&data->work, lm75_work);
 	error=gpio_request(OMAP4_LM75_IRQ, "Lm75 IRQ");	
-    	if (error) {
-    		printk("lm75 gpio_request error\n");
-	}
-    	error =gpio_direction_input(OMAP4_LM75_IRQ);
-    	if (error) {
-    		printk("lm75 gpio_direction_input error\n");
-    	}
-    	data->irq = gpio_to_irq(OMAP4_LM75_IRQ);	
-    	irq_set_irq_type(data->irq, IRQ_TYPE_EDGE_BOTH);
-    	error = request_irq(data->irq, lm75_isr, (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING), "Lm75_IRQ", data);
-    	if (error) {
-    		printk("lm75 request_irq error\n");
-    	}
-#endif
+    if (error) {
+        printk("lm75 gpio_request error\n");
+    }
+    error =gpio_direction_input(OMAP4_LM75_IRQ);
+    if (error) {
+        printk("lm75 gpio_direction_input error\n");
+    }
+    data->irq = gpio_to_irq(OMAP4_LM75_IRQ);	
+    irq_set_irq_type(data->irq, IRQ_TYPE_EDGE_BOTH);
+    error = request_irq(data->irq, lm75_isr, (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING), "Lm75_IRQ", data);
+    if (error) {
+        printk("lm75 request_irq error\n");
+    }
 	/* Set to LM75 resolution (9 bits, 1/2 degree C) and range.
 	 * Then tweak to be more precise when appropriate.
 	 */
-	set_mask =  0;	/*  POL=0 TM=interrupt mode set by leon*/
-	clr_mask = (1 << 0) | (1 << 6) | (1 << 5);		/* 9-bit mode */
-	// FIXME-HASH REMOVED FOR TESTING
-	// clr_mask = (1 << 0) | (1 << 6) | (1 << 5) | (1 << 2) | (1 << 1);		/* 9-bit mode */
+	set_mask = 0;
+	clr_mask = (1 << 0)			/* continuous conversions */
+		| (1 << 6) | (1 << 5);		/* 9-bit mode */
+	// FIXME-HASH: KFire Code
+    /* 9-bit mode */
+    clr_mask = (1 << 0) | (1 << 6) | (1 << 5) | (1 << 2) | (1 << 1);
 
 	/* configure as specified */
 	status = lm75_read_value(client, LM75_REG_CONF);
@@ -251,7 +244,6 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	dev_dbg(&client->dev, "Config %02x\n", new);
 
 	// FIXME-HASH REMOVED FOR TESTING
-#if 0
 	/*Set init value of TEMP_high & TEMP_low */
 	mutex_lock(&data->update_lock);
 	data->temp[1] = LM75_TEMP_TO_REG(LM75_THIGH);
@@ -259,7 +251,6 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	data->temp[2] = LM75_TEMP_TO_REG(LM75_TLOW);
 	lm75_write_value(client, LM75_REG_TEMP[2], data->temp[2]);
 	mutex_unlock(&data->update_lock);
-#endif
 	/* Register sysfs hooks */
 	status = sysfs_create_group(&client->dev.kobj, &lm75_group);
 	if (status)
@@ -271,7 +262,7 @@ lm75_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto exit_remove;
 	}
 
-	dev_info(&client->dev, "%s driver: Found sensor '%s'\n",
+	dev_info(&client->dev, "%s: sensor '%s'\n",
 		 dev_name(data->hwmon_dev), client->name);
 
 	return 0;
@@ -289,8 +280,7 @@ static int lm75_remove(struct i2c_client *client)
 
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&client->dev.kobj, &lm75_group);
-	// FIXME-HASH REMOVED FOR TESTING
-	// free_irq(data->irq, data);
+	free_irq(data->irq, data);
 	lm75_write_value(client, LM75_REG_CONF, data->orig_conf);
 	kfree(data);
 	return 0;

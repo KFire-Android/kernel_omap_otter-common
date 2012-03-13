@@ -1498,7 +1498,7 @@ static struct i2c_driver bq27541_i2c_driver = {
     .probe = bq27541_probe,
     .remove = bq27541_remove,
     .id_table = bq27541_id,
-	.shutdown = bq27541_shutdown,
+    .shutdown = bq27541_shutdown,
 };
 
 static int __init bq27541_init(void)

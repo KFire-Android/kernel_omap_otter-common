@@ -470,9 +470,10 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.platform_name = "omap-aess-audio",
 
 		.dynamic = 1, /* BE is dynamic */
-		.supported_be = mm_lp_be,
-		.num_be = ARRAY_SIZE(mm_lp_be),
-		.fe_playback_channels = 2,
+		/* FIXME-HASH: Removed for compile */
+		//.supported_be = mm_lp_be,
+		//.num_be = ARRAY_SIZE(mm_lp_be),
+		//.fe_playback_channels = 2,
 		.no_host_mode = SND_SOC_DAI_LINK_OPT_HOST,
 	},
 	{
@@ -484,10 +485,11 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.platform_name = "omap-pcm-audio",
 
 		.dynamic = 1, /* BE is dynamic */
-		.supported_be = mm1_be,
-		.num_be = ARRAY_SIZE(mm1_be),
-		.fe_playback_channels = 2,
-		.fe_capture_channels = 8,
+		/* FIXME-HASH: Removed for compile */
+		//.supported_be = mm1_be,
+		//.num_be = ARRAY_SIZE(mm1_be),
+		//.fe_playback_channels = 2,
+		//.fe_capture_channels = 8,
 	},
 /*
  * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.

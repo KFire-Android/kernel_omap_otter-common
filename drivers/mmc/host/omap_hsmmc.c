@@ -1685,7 +1685,6 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 
 	BUG_ON(host->req_in_progress);
 	BUG_ON(host->dma_ch != -1);
-
 	if (host->protect_card) {
 		if (host->reqs_blocked < 3) {
 			/*
@@ -2698,6 +2697,7 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
 
 	return 0;
 }
+
 
 static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
 	.suspend	= omap_hsmmc_suspend,
