@@ -725,6 +725,9 @@ static enum bverror allocate_batch(struct gcbatch **batch)
 		goto exit;
 	}
 
+	GC_PRINT(GC_INFO_MSG " batch allocated = 0x%08X\n",
+		__func__, __LINE__, temp);
+
 	*batch = temp;
 
 exit:
@@ -3058,7 +3061,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	struct gccommit gccommit;
 	int srccount, res;
 
-	GC_PRINT("++" GC_INFO_MSG "\n", __func__, __LINE__);
+	GC_PRINT("++" GC_INFO_MSG " bltparams=0x%08X\n",
+		__func__, __LINE__, bltparams);
 
 	/* FIXME/TODO: add check for initialization success. */
 
@@ -3374,6 +3378,8 @@ exit:
 		bltparams->batch = NULL;
 	}
 
+	GC_PRINT("--" GC_INFO_MSG " bverror=0x%08X\n",
+		__func__, __LINE__, bverror);
 	return bverror;
 }
 EXPORT_SYMBOL(gcbv_blt);
