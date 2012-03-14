@@ -708,7 +708,7 @@ static struct twl4030_platform_data sdp4430_twldata = {
 //	.codec          = &twl6040_codec,
 };
 
-static void __init kc1_pmic_mux_init(void)
+static void kc1_pmic_mux_init(void)
 {
 	/*
 	 * Enable IO daisy for sys_nirq1/2, to be able to
@@ -1123,9 +1123,11 @@ static struct omapfb_platform_data kc1_fb_pdata = {
 
 static void __init omap_kc1_display_init(void)
 {
-	omap_vram_set_sdram_vram(KC1_FB_RAM_SIZE, 0);
-	omapfb_set_platform_data(&kc1_fb_pdata);
+	//omap_vram_set_sdram_vram(KC1_FB_RAM_SIZE, 0);
+	//omapfb_set_platform_data(&kc1_fb_pdata);
 	omap_display_init(&sdp4430_dss_data);
+
+	kc1_pmic_mux_init();
 
 	omap_voltage_init_pmic();
 #ifdef CONFIG_TOUCHSCREEN_ILITEK
@@ -1433,12 +1435,10 @@ static void __init omap_kc1_init(void)
 	omap4_i2c_init();
 	enable_rtc_gpio();
 
-	kc1_pmic_mux_init();
 //	ramconsole_init();
 	omap4_display_init();
-	omap_disp_led_init();
+	//omap_disp_led_init();
 
-	omap_dmm_init();
 	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 
@@ -1474,6 +1474,7 @@ static void __init omap_kc1_init(void)
 
 	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
+	omap_dmm_init();
 	omap_kc1_display_init();
 
 	gpio_request(119, "ADO_SPK_ENABLE");
@@ -1516,7 +1517,7 @@ static void __init omap_4430sdp_reserve(void)
 	omap_reserve();
 }
 
-MACHINE_START(OMAP_4430SDP, "Amazon KC1 (Otter)")
+MACHINE_START(OMAP_4430SDP, "OMAP4430")
 	.boot_params	= 0x80000100,
 	.reserve	= omap_4430sdp_reserve,
 	.map_io		= omap_4430sdp_map_io,
