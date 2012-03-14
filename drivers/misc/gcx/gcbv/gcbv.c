@@ -145,6 +145,7 @@ typedef enum bverror (*gcbatchend) (struct bvbltparams *bltparams,
 /* Blit states. */
 struct gcblit {
 	unsigned int srccount;
+	unsigned short rop;
 	struct gccmdstartderect dstrect;
 };
 
@@ -154,7 +155,7 @@ struct gcbatch {
 
 	gcbatchend batchend;		/* Pointer to the function to finilize
 					   the current operation. */
-	struct gcblit gcblit;	/* States of the current operation. */
+	struct gcblit gcblit;		/* States of the current operation. */
 
 	unsigned int size;		/* Total size of the command buffer. */
 
@@ -494,7 +495,7 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 		else
 			bvbuffmapinfo->automap += 1;
 
-		GC_PRINT(GC_INFO_MSG " bufffer already mapped:\n",
+		GC_PRINT(GC_INFO_MSG " buffer already mapped:\n",
 			__func__, __LINE__);
 
 		GC_PRINT(GC_INFO_MSG "   virtaddr = 0x%08X\n",
@@ -2092,20 +2093,32 @@ static int verify_surface(unsigned int tile,
 				+ ((rect->left + rect->width)
 				* format->bitspp) / 8;
 
-			if (geomsize > surf->desc->length) {
+			if ((geomsize > surf->desc->length) ||
+				(rectsize > surf->desc->length)) {
 				GC_PRINT(GC_INFO_MSG
-					" *** invalid geometry %dx%d\n",
+					" *** INVALID SURFACE PARAMETERS\n",
+					__func__, __LINE__);
+				GC_PRINT(GC_INFO_MSG
+					"     dimensions = %dx%d\n",
 					__func__, __LINE__,
 					geom->width, geom->height);
-			}
-
-			if (rectsize > surf->desc->length) {
 				GC_PRINT(GC_INFO_MSG
-					" *** invalid rectangle "
-					"(%d,%d %dx%d)\n",
+					"     rectangle = (%d,%d %dx%d)\n",
 					__func__, __LINE__,
 					rect->left, rect->top,
 					rect->width, rect->height);
+				GC_PRINT(GC_INFO_MSG
+					"     size based on dimensions = %d\n",
+					__func__, __LINE__,
+					geomsize);
+				GC_PRINT(GC_INFO_MSG
+					"     size based on rectangle = %d\n",
+					__func__, __LINE__,
+					rectsize);
+				GC_PRINT(GC_INFO_MSG
+					"     size specified = %d\n",
+					__func__, __LINE__,
+					surf->desc->length);
 			}
 		}
 	}
@@ -2259,11 +2272,6 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	gcmofill->src.rotationheight_ldst = gcmofillsrc_rotationheight_ldst;
 	gcmofill->src.rotationheight.reg.height = dstgeom->height;
 
-	/* Set ROP3. */
-	gcmofill->src.rop_ldst = gcmofillsrc_rop_ldst;
-	gcmofill->src.rop.reg.type = GCREG_ROP_TYPE_ROP3;
-	gcmofill->src.rop.reg.fg = (unsigned char) bltparams->op.rop;
-
 	/* Disable alpha blending. */
 	gcmofill->src.alphacontrol_ldst = gcmofillsrc_alphacontrol_ldst;
 	gcmofill->src.alphacontrol.reg.enable = GCREG_ALPHA_CONTROL_ENABLE_OFF;
@@ -2283,6 +2291,11 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	/***********************************************************************
 	** Configure and start fill.
 	*/
+
+	/* Set ROP3. */
+	gcmofill->start.rop_ldst = gcmostart_rop_ldst;
+	gcmofill->start.rop.reg.type = GCREG_ROP_TYPE_ROP3;
+	gcmofill->start.rop.reg.fg = (unsigned char) bltparams->op.rop;
 
 	/* Set START_DE command. */
 	gcmofill->start.startde.cmd.fld = gcfldstartde;
@@ -2346,6 +2359,11 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 
 	gcmostart = (struct gcmostart *) (gcmomultisrc + 1);
 
+	/* Set ROP. */
+	gcmostart->rop_ldst = gcmostart_rop_ldst;
+	gcmostart->rop.reg.type = GCREG_ROP_TYPE_ROP3;
+	gcmostart->rop.reg.fg = (unsigned char) batch->gcblit.rop;
+
 	/* Set START_DE command. */
 	gcmostart->startde.cmd.fld = gcfldstartde;
 
@@ -2386,6 +2404,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 	int srcshift[2];
 	int srcoffset;
 	int srcadjust;
+	int srcalign;
 
 	struct bvformatxlate *dstformat;
 	struct bvbuffmap *dstmap = NULL;
@@ -2396,7 +2415,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 	unsigned int multiblit = 1;
 
-	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
+	GC_PRINT("++" GC_INFO_MSG "\n", __func__, __LINE__);
 
 	if (!parse_format(dstgeom->format, &dstformat)) {
 		BVSETBLTERRORARG(BVERR_DSTGEOM_FORMAT,
@@ -2418,6 +2437,9 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 	dstbottom = bltparams->dstrect.height + dsttop;
 
 	dstoffset = 0;
+
+	GC_PRINT(GC_INFO_MSG " ----------------------\n",
+		__func__, __LINE__);
 
 	GC_PRINT(GC_INFO_MSG " dstvirtaddr = 0x%08X\n",
 		__func__, __LINE__,
@@ -2464,6 +2486,9 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 		srcoffset = 0;
 
+		GC_PRINT(GC_INFO_MSG " ----------------------\n",
+			__func__, __LINE__);
+
 		GC_PRINT(GC_INFO_MSG " srcaddr[%d] = 0x%08X\n",
 			__func__, __LINE__,
 			i, (unsigned int) srcdesc[i].buf.desc->virtaddr);
@@ -2490,30 +2515,46 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		srcsurfleft = srcrect->left - dstleft + srcoffset;
 		srcsurftop  = srcrect->top  - dsttop;
 
-		GC_PRINT(GC_INFO_MSG " source %d surface origin = %d,%d\n",
+		GC_PRINT(GC_INFO_MSG " source surfaceorigin%d = %d,%d\n",
 			__func__, __LINE__, i, srcsurfleft, srcsurftop);
 
-		srcadjust = srcsurfleft % 4;
-		srcsurfleft -= srcadjust;
-		srcleft[i] = dstleft + srcadjust;
-		srctop[i]  = dsttop;
+		/* (srcsurfleft,srcsurftop) are the coordinates of the source
+		   surface origin. PE requires 16 byte alignment of the base
+		   address. Compute the alignment requirement in pixels. */
+		srcalign = 16 * 8 / srcformat[i]->bitspp;
+
+		GC_PRINT(GC_INFO_MSG " srcalign%d = %d\n",
+			__func__, __LINE__, i, srcalign);
+
+		/* Compute the number of pixels the origin has to be
+		   aligned by. */
+		srcadjust = srcsurfleft % srcalign;
 
 		GC_PRINT(GC_INFO_MSG " srcadjust%d = %d\n",
 			__func__, __LINE__, i, srcadjust);
+
+		if (srcadjust != 0)
+			multiblit = 0;
+
+		/* Adjust the origin. */
+		srcsurfleft -= srcadjust;
 
 		GC_PRINT(GC_INFO_MSG
 			" adjusted source %d surface origin = %d,%d\n",
 			__func__, __LINE__, i, srcsurfleft, srcsurftop);
 
-		GC_PRINT(GC_INFO_MSG " source %d rectangle origin = %d,%d\n",
+		/* Adjust the source rectangle for the single source walker. */
+		srcleft[i] = dstleft + srcadjust;
+		srctop[i]  = dsttop;
+
+		GC_PRINT(GC_INFO_MSG
+			" source %d rectangle origin = %d,%d\n",
 			__func__, __LINE__, i, srcleft[i], srctop[i]);
 
+		/* Compute the surface offset in bytes. */
 		srcshift[i]
 			= srcsurftop * (int) srcgeom->virtstride
 			+ srcsurfleft * (int) srcformat[i]->bitspp / 8;
-
-		if (srcadjust != 0)
-			multiblit = 0;
 
 		GC_PRINT(GC_INFO_MSG " srcshift[%d] = 0x%08X\n",
 			__func__, __LINE__, i, srcshift[i]);
@@ -2536,7 +2577,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		startblit = 0;
 		buffersize = sizeof(struct gcmosrc) * srccount;
 	} else {
-		GC_PRINT(GC_INFO_MSG " finilizing previous blits (if any)\n",
+		GC_PRINT(GC_INFO_MSG " finalizing previous blits (if any)\n",
 			__func__, __LINE__);
 
 		bverror = batch->batchend(bltparams, batch);
@@ -2562,6 +2603,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 		batch->batchend = do_blit_end;
 		batch->gcblit.srccount = 0;
+		batch->gcblit.rop = (gca != NULL) ? 0xCC : bltparams->op.rop;
 	}
 
 	bverror = claim_buffer(batch, buffersize, &buffer);
@@ -2667,9 +2709,9 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		gcmosrc->config.reg.format = srcformat[i]->format;
 
 		gcmosrc->origin_ldst = gcmosrc_origin_ldst[index];
-		if (multiblit) {
+		if (multiblit)
 			gcmosrc->origin.reg = gcregsrcorigin_min;
-		} else {
+		else {
 			gcmosrc->origin.reg.x = srcleft[i];
 			gcmosrc->origin.reg.y = srctop[i];
 		}
@@ -2683,8 +2725,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 		gcmosrc->rop_ldst = gcmosrc_rop_ldst[index];
 		gcmosrc->rop.reg.type = GCREG_ROP_TYPE_ROP3;
-		gcmosrc->rop.reg.fg = (gca != NULL)
-			? 0xCC : (unsigned char) bltparams->op.rop;
+		gcmosrc->rop.reg.fg = (unsigned char) batch->gcblit.rop;
 
 		gcmosrc->mult_ldst = gcmosrc_mult_ldst[index];
 		gcmosrc->mult.reg.srcglobalpremul
@@ -2798,15 +2839,14 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			batch->gcblit.srccount = 0;
 
 			bverror = claim_buffer(batch, sizeof(struct gcmosrc),
-						&buffer);
+							(void **) &gcmosrc);
 			if (bverror != BVERR_NONE) {
 				BVSETBLTERROR(BVERR_OOM,
 					"failed to allocate command buffer");
 				goto exit;
 			}
 
-			memset(buffer, 0, buffersize);
-			gcmosrc = (struct gcmosrc *) buffer;
+			memset(gcmosrc, 0, sizeof(struct gcmosrc));
 		}
 	}
 
@@ -2830,6 +2870,7 @@ exit:
 		}
 	}
 
+	GC_PRINT("--" GC_INFO_MSG "\n", __func__, __LINE__);
 	return bverror;
 }
 
@@ -3017,7 +3058,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	struct gccommit gccommit;
 	int srccount, res;
 
-	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
+	GC_PRINT("++" GC_INFO_MSG "\n", __func__, __LINE__);
 
 	/* FIXME/TODO: add check for initialization success. */
 

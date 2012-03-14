@@ -8241,7 +8241,19 @@ struct gcmomultisrc {
 ** Modular operations: startde
 */
 
+static const struct gccmdldstate gcmostart_rop_ldst =
+	GCLDSTATE(gcregRopRegAddrs, 1);
+
 struct gcmostart {
+	/* gcregRopRegAddrs */
+	struct gccmdldstate rop_ldst;
+
+		/* gcregRopRegAddrs */
+		union {
+			struct gcregrop reg;
+			unsigned int raw;
+		} rop;
+
 	/* Start DE command. */
 	struct gccmdstartde startde;
 	struct gccmdstartderect rect;
@@ -8259,9 +8271,6 @@ static const struct gccmdldstate gcmofillsrc_rotation_ldst =
 
 static const struct gccmdldstate gcmofillsrc_rotationheight_ldst =
 	GCLDSTATE(gcregSrcRotationHeightRegAddrs, 1);
-
-static const struct gccmdldstate gcmofillsrc_rop_ldst =
-	GCLDSTATE(gcregRopRegAddrs, 1);
 
 static const struct gccmdldstate gcmofillsrc_alphacontrol_ldst =
 	GCLDSTATE(gcregAlphaControlRegAddrs, 1);
@@ -8293,15 +8302,6 @@ struct gcmofillsrc {
 			struct gcregsrcrotationheight reg;
 			unsigned int raw;
 		} rotationheight;
-
-	/* gcregRopRegAddrs */
-	struct gccmdldstate rop_ldst;
-
-		/* gcregRopRegAddrs */
-		union {
-			struct gcregrop reg;
-			unsigned int raw;
-		} rop;
 
 	/* gcregAlphaControlRegAddrs */
 	struct gccmdldstate alphacontrol_ldst;
