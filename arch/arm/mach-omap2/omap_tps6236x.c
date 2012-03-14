@@ -187,8 +187,8 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.vp_vddmin		= OMAP4_VP_MPU_VLIMITTO_VDDMIN,
-	.vp_vddmax		= OMAP4_VP_MPU_VLIMITTO_VDDMAX,
+	.min_volt		= OMAP4_VP_MPU_VLIMITTO_VDDMIN,
+	.max_volt		= OMAP4_VP_MPU_VLIMITTO_VDDMAX,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= I2C_TPS6236X_SLAVE_ADDR,
 	.volt_reg_addr		= REG_TPS6236X_SET_0,
@@ -246,7 +246,7 @@ static int __init omap4_twl_tps62361_enable(struct voltagedomain *voltdm)
 	u8 val;
 
 	/* Dont trust the bootloader. start with max, pm will set to proper */
-	val = voltdm->pmic->uv_to_vsel(voltdm->pmic->vp_vddmax);
+	val = voltdm->pmic->uv_to_vsel(voltdm->pmic->max_volt);
 	ret = omap_vc_bypass_send_i2c_msg(voltdm, voltdm->pmic->i2c_slave_addr,
 			default_reg, val);
 
