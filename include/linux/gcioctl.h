@@ -17,6 +17,7 @@
 
 #include "gcerror.h"
 #include <linux/bverror.h>
+#include <linux/cache-2dmanager.h>
 
 /* IOCTL parameters. */
 #define GCIOCTL_TYPE 0x5D
@@ -99,6 +100,23 @@ struct gcmap {
 
 	unsigned int size;		/* Size of the buffer. */
 };
+
+/*****************************************************************************
+ * Cache manipulation API entries.
+ */
+
+struct bvcachexfer;
+
+#define GCIOCTL_CACHE _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x22,\
+			struct bvcachexfer)
+
+struct bvcachexfer {
+	int count;			/* number of regions */
+	struct c2dmrgn rgn[3];		/* The most regions that we deal with
+					   is 3 */
+	int dir;			/* direction of data */
+};
+
 
 /*******************************************************************************
  * BLTsville: blit API entry.
