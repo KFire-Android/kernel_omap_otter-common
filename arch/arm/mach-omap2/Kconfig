@@ -336,6 +336,7 @@ config MACH_OMAP_4430SDP
 	select TWL6030_GPADC
 	select OMAP_REBOOT_REASON
 	select OMAP_RAM_CONSOLE
+	select CDC_TCXO
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44xx Tablet2 Board"
