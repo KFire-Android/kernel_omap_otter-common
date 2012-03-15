@@ -9,6 +9,16 @@ menuconfig THERMAL_FRAMEWORK
 	  a central hub for sensors, governors and cooling devices
 	  to register and pass data to.
 
+config THERMAL_FRAMEWORK_DEBUG
+	bool "Thermal Framework Debug support"
+	depends on THERMAL_FRAMEWORK && DEBUG_FS
+	help
+	  Say 'Y' here if you want to have the debugfs support for
+	  the Thermal Framework. The debugfs support will create
+	  debug files under DEBUG_FS to represent the thermal
+	  components, e.g. thermal domains, governors, sensors and
+	  cooling devices and their attributes.
+
 config OMAP_THERMAL
 	bool "OMAP Thermal Framework support"
 	depends on THERMAL_FRAMEWORK && ARCH_OMAP4

@@ -22,6 +22,8 @@
 #include <linux/fs.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/seq_file.h>
+#include <linux/debugfs.h>
 
 #include <linux/thermal_framework.h>
 
@@ -70,6 +72,106 @@ struct thermal_domain {
 	struct list_head cooling_agents;
 };
 
+#ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
+static struct dentry *thermal_dbg;
+static struct dentry *thermal_domains_dbg;
+static struct dentry *thermal_devices_dbg;
+
+static int thermal_debug_show_domain(struct seq_file *s, void *data)
+{
+	struct thermal_domain *domain = (struct thermal_domain *)s->private;
+	struct thermal_dev *tdev;
+
+	mutex_lock(&thermal_domain_list_lock);
+	seq_printf(s, "Domain name: %s\n", domain->domain_name);
+	seq_printf(s, "Temperature sensor:\n");
+	if (domain->temp_sensor) {
+		seq_printf(s, "\tName: %s\n", domain->temp_sensor->name);
+		seq_printf(s, "\tCurrent temperature: %d\n",
+			thermal_device_call(domain->temp_sensor, report_temp));
+		thermal_device_call(domain->temp_sensor, debug_report, s);
+	}
+	seq_printf(s, "Governor:\n");
+	if (domain->governor) {
+		seq_printf(s, "\tName: %s\n", domain->governor->name);
+		thermal_device_call(domain->temp_sensor, debug_report, s);
+	}
+	seq_printf(s, "Cooling agents:\n");
+	list_for_each_entry(tdev, &domain->cooling_agents, node) {
+		seq_printf(s, "\tName: %s\n", tdev->name);
+		thermal_device_call(domain->temp_sensor, debug_report, s);
+	}
+	mutex_unlock(&thermal_domain_list_lock);
+
+	return 0;
+}
+
+static int thermal_debug_domain_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, thermal_debug_show_domain, inode->i_private);
+}
+
+static const struct file_operations thermal_debug_fops = {
+	.open           = thermal_debug_domain_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static int thermal_debug_domain(struct thermal_domain *domain)
+{
+	return PTR_ERR(debugfs_create_file(domain->domain_name, S_IRUGO,
+		thermal_domains_dbg, (void *)domain, &thermal_debug_fops));
+}
+
+static void thermal_debug_register_device(struct thermal_dev *tdev)
+{
+	struct dentry *d;
+
+	d = debugfs_create_dir(tdev->name, thermal_devices_dbg);
+	if (IS_ERR(d))
+		return;
+
+	thermal_device_call(tdev, register_debug_entries, d);
+}
+
+static int __init thermal_debug_init(void)
+{
+	thermal_dbg = debugfs_create_dir("thermal_debug", NULL);
+	if (IS_ERR(thermal_dbg))
+		return PTR_ERR(thermal_dbg);
+
+	thermal_domains_dbg = debugfs_create_dir("domains", thermal_dbg);
+	if (IS_ERR(thermal_domains_dbg))
+		return PTR_ERR(thermal_domains_dbg);
+
+	thermal_devices_dbg = debugfs_create_dir("devices", thermal_dbg);
+	if (IS_ERR(thermal_domains_dbg))
+		return PTR_ERR(thermal_domains_dbg);
+
+	return 0;
+}
+
+static void __exit thermal_debug_exit(void)
+{
+	debugfs_remove_recursive(thermal_dbg);
+}
+#else
+static int __init thermal_debug_init(void)
+{
+	return 0;
+}
+static void __exit thermal_debug_exit(void)
+{
+}
+static int thermal_debug_domain(struct thermal_domain *domain)
+{
+	return 0;
+}
+static void thermal_debug_register_device(struct thermal_dev *tdev)
+{
+}
+#endif
 /**
  * thermal_sensor_set_temp() - External API to allow a sensor driver to set
  *				the current temperature for a domain
@@ -198,6 +300,7 @@ static struct thermal_domain *thermal_domain_add(const char *name)
 	strlcpy(domain->domain_name, name, sizeof(domain->domain_name));
 	mutex_lock(&thermal_domain_list_lock);
 	list_add(&domain->node, &thermal_domain_list);
+	thermal_debug_domain(domain);
 	mutex_unlock(&thermal_domain_list_lock);
 	pr_debug("%s: added thermal domain %s\n", __func__, name);
 
@@ -257,6 +360,7 @@ int thermal_governor_dev_register(struct thermal_dev *tdev)
 	mutex_lock(&thermal_domain_list_lock);
 	domain->governor = tdev;
 	tdev->domain = domain;
+	thermal_debug_register_device(tdev);
 	mutex_unlock(&thermal_domain_list_lock);
 	thermal_init_thermal_state(tdev);
 	pr_debug("%s: added %s governor\n", __func__, tdev->name);
@@ -305,6 +409,7 @@ int thermal_cooling_dev_register(struct thermal_dev *tdev)
 	mutex_lock(&thermal_domain_list_lock);
 	list_add(&tdev->node, &domain->cooling_agents);
 	tdev->domain = domain;
+	thermal_debug_register_device(tdev);
 	mutex_unlock(&thermal_domain_list_lock);
 	thermal_init_thermal_state(tdev);
 	pr_debug("%s: added cooling agent %s\n", __func__, tdev->name);
@@ -352,6 +457,7 @@ int thermal_sensor_dev_register(struct thermal_dev *tdev)
 	mutex_lock(&thermal_domain_list_lock);
 	domain->temp_sensor = tdev;
 	tdev->domain = domain;
+	thermal_debug_register_device(tdev);
 	mutex_unlock(&thermal_domain_list_lock);
 	thermal_init_thermal_state(tdev);
 	pr_debug("%s: added %s sensor\n", __func__, tdev->name);
@@ -379,6 +485,7 @@ EXPORT_SYMBOL_GPL(thermal_sensor_dev_unregister);
 
 static int __init thermal_framework_init(void)
 {
+	thermal_debug_init();
 	return 0;
 }
 
@@ -394,7 +501,7 @@ static void __exit thermal_framework_exit(void)
 	mutex_unlock(&thermal_domain_list_lock);
 }
 
-module_init(thermal_framework_init);
+fs_initcall(thermal_framework_init);
 module_exit(thermal_framework_exit);
 
 MODULE_AUTHOR("Dan Murphy <DMurphy@ti.com>");

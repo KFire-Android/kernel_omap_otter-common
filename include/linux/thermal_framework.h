@@ -18,6 +18,8 @@
 #ifndef __LINUX_THERMAL_FRAMEWORK_H__
 #define __LINUX_THERMAL_FRAMEWORK_H__
 
+#include <linux/seq_file.h>
+
 struct thermal_dev;
 struct thermal_domain;
 
@@ -47,6 +49,11 @@ struct thermal_dev_ops {
 	int (*process_temp) (struct thermal_dev *gov,
 				struct list_head *cooling_list,
 				struct thermal_dev *temp_sensor, int temp);
+#ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
+	/* Debugging interface */
+	int (*debug_report) (struct thermal_dev *, struct seq_file *s);
+	int (*register_debug_entries) (struct thermal_dev *, struct dentry *d);
+#endif
 };
 
 /**
