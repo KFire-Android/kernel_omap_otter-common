@@ -49,6 +49,9 @@ int omap_ion_nonsecure_tiler_alloc(struct ion_client *client,
 /* given a handle in the tiler, return a list of tiler pages that back it */
 int omap_tiler_pages(struct ion_client *client, struct ion_handle *handle,
 		     int *n, u32 ** tiler_pages);
+int omap_ion_fd_to_handles(int fd, struct ion_client **client,
+		struct ion_handle **handles,
+		int *num_handles);
 #endif /* __KERNEL__ */
 
 /* additional heaps used only on omap */
