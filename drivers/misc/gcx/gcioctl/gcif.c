@@ -31,6 +31,8 @@
 #include <linux/gcbv.h>
 #include "gcif.h"
 
+#include <linux/cache-2dmanager.h>
+
 static struct mutex g_maplock;
 
 /*******************************************************************************
@@ -322,6 +324,46 @@ exit:
 	return ret;
 }
 
+static int gc_cache_wrapper(struct bvcachexfer *bvcachexfer)
+{
+	int ret = 0;
+	struct bvcachexfer xfer;
+
+	/* Get IOCTL parameters. */
+	if (copy_from_user(&xfer, bvcachexfer,
+			sizeof(struct bvcachexfer))) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			" failed to read data.\n",
+			__func__, __LINE__);
+		goto exit;
+	}
+
+	switch (xfer.dir) {
+
+	case DMA_FROM_DEVICE:
+		c2dm_l2cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		c2dm_l1cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		break;
+	case DMA_TO_DEVICE:
+		c2dm_l1cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		c2dm_l2cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		break;
+	case DMA_BIDIRECTIONAL:
+		c2dm_l1cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		c2dm_l2cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		break;
+	}
+
+exit:
+	return ret;
+
+}
 
 /*******************************************************************************
  * Device definitions/operations.
@@ -365,6 +407,12 @@ static long dev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
 			"GCIOCTL_UNMAP\n", __func__, __LINE__);
 		ret = gc_unmap_wrapper((struct gcmap *) arg);
+		break;
+
+	case GCIOCTL_CACHE:
+		GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
+			"GCIOCTL_CACHE\n", __func__, __LINE__);
+		ret = gc_cache_wrapper((struct bvcachexfer *) arg);
 		break;
 
 	default:
