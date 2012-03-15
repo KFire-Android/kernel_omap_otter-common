@@ -1434,6 +1434,7 @@ static void __init omap_kc1_init(void)
 	otter_set_osc_timings();
 	omap4_i2c_init();
 	enable_rtc_gpio();
+	omap_dmm_init();
 
 //	ramconsole_init();
 	omap4_display_init();
@@ -1474,7 +1475,6 @@ static void __init omap_kc1_init(void)
 
 	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
-	omap_dmm_init();
 	omap_kc1_display_init();
 
 	gpio_request(119, "ADO_SPK_ENABLE");

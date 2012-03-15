@@ -450,7 +450,7 @@ CONFIG_ALIGNMENT_TRAP=y
 # CONFIG_USE_OF is not set
 CONFIG_ZBOOT_ROM_TEXT=0x0
 CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_CMDLINE="androidboot.console=ttyO2 console=ttyO2,115200n8 mem=460M@0x80000000 init=/init vram=32M omapfb.vram=0:16M"
+CONFIG_CMDLINE="console=ttyO2,115200n8 mem=460M@0x80000000 init=/init vram=32M omapfb.vram=0:16M"
 # CONFIG_CMDLINE_FROM_BOOTLOADER is not set
 # CONFIG_CMDLINE_EXTEND is not set
 CONFIG_CMDLINE_FORCE=y

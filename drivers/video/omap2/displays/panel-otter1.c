@@ -1,5 +1,5 @@
 /*
- * Otter1 panel support
+ * Boxer (Kindle Fire Version) panel support
  *
  * Copyright (C) 2008 Nokia Corporation
  * Author: Tomi Valkeinen <tomi.valkeinen@nokia.com>
@@ -28,12 +28,11 @@
 #include <video/omapdss.h>
 #include <linux/gpio.h>
 
-static struct spi_device *otter1_spi;
-
 static struct mutex lock_power_on;
 static struct mutex lock_panel;
 
-static struct omap_video_timings otter1_panel_timings = {
+static struct spi_device *boxer_spi;
+static struct omap_video_timings boxer_panel_timings = {
 	.x_res          = 1024,
 	.y_res          = 600,
 	.pixel_clock    = 46000, /* in kHz */
@@ -45,62 +44,6 @@ static struct omap_video_timings otter1_panel_timings = {
 	.vbp            = 20,    /* VSW + VBP = 23 */
 };
 
-struct panel_config {
-	const char *name;
-	int type;
-
-	struct omap_video_timings timings;
-
-	struct {
-		unsigned int sleep_in;
-		unsigned int sleep_out;
-		unsigned int hw_reset;
-		unsigned int enable_te;
-	} sleep;
-
-	struct {
-		unsigned int high;
-		unsigned int low;
-	} reset_sequence;
-
-	struct panel_regulator *regulators;
-	int num_regulators;
-};
-
-enum {
-	PANEL_OTTER1,
-};
-
-#if 0
-static struct panel_config panel_configs[] = {
-	{
-		.name		= "otter1",
-		.type		= PANEL_OTTER1,
-		.timings	= {
-			.x_res          = 1024,
-			.y_res          = 600,
-			.pixel_clock    = 46000, /* in kHz */
-			.hfp            = 160,   /* HFP fix 160 */
-			.hsw            = 10,    /* HSW = 1~140 */
-			.hbp            = 150,   /* HSW + HBP = 160 */
-			.vfp            = 12,    /* VFP fix 12 */
-			.vsw            = 3,     /* VSW = 1~20 */
-			.vbp            = 20,    /* VSW + VBP = 23 */
-		},
-		.sleep		= {
-			.sleep_in	= 5,
-			.sleep_out	= 5,
-			.hw_reset	= 5,
-			.enable_te	= 100, /* possible panel bug */
-		},
-		.reset_sequence	= {
-			.high		= 10,
-			.low		= 10,
-		},
-	},
-};
-#endif
-
 extern u8 quanta_get_mbid(void);
 
 static int spi_send(struct spi_device *spi,
@@ -108,6 +51,7 @@ static int spi_send(struct spi_device *spi,
 {
 	uint16_t msg = 0;
 	int result = 0;
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 	msg = (reg_addr << 10) | reg_data;
 	result = spi_write(spi, (unsigned char *) &msg, 2);
 	if (result != 0)
@@ -117,7 +61,9 @@ static int spi_send(struct spi_device *spi,
 	
 	return result;
 }
-static ssize_t set_cabc (struct device *dev, struct device_attribute *attr, const char *buffer, size_t count)
+
+static ssize_t set_cabc (struct device *dev, struct device_attribute *attr,
+                         const char *buffer, size_t count)
 {
 	int mode = 0;
 	sscanf(buffer, "%d", &mode);
@@ -126,23 +72,23 @@ static ssize_t set_cabc (struct device *dev, struct device_attribute *attr, cons
 	{
 	case 0:
 		printk("set the cabc value to 0b00\n");
-		spi_send(otter1_spi, 0x01, 0x30);
+		spi_send(boxer_spi, 0x01, 0x30);
 		break;
 	case 1:
 		printk("set the cabc value to 0b01\n");
-		spi_send(otter1_spi, 0x01, 0x70);
+		spi_send(boxer_spi, 0x01, 0x70);
 		break;
 	case 2:
 		printk("set the cabc value to 0b10\n");
-		spi_send(otter1_spi, 0x01, 0xb0);
+		spi_send(boxer_spi, 0x01, 0xb0);
 		break;
 	case 3:
 		printk("set the cabc value to 0b11\n");
-		spi_send(otter1_spi, 0x01, 0xf0);
+		spi_send(boxer_spi, 0x01, 0xf0);
 		break;
 	default:
 		printk("set the cabc value to 0b00\n");
-		spi_send(otter1_spi, 0x01, 0x30);
+		spi_send(boxer_spi, 0x01, 0x30);
 		break;
 	}
 		return count;
@@ -158,7 +104,7 @@ static struct attribute_group otter1_panel_attribute_group = {
        .attrs = otter1_panel_attributes
  };
 
-static void otter1_get_resolution(struct omap_dss_device *dssdev,
+static void boxer_get_resolution(struct omap_dss_device *dssdev,
 				 u16 *xres, u16 *yres)
 {
 
@@ -166,22 +112,18 @@ static void otter1_get_resolution(struct omap_dss_device *dssdev,
 	*yres = dssdev->panel.timings.y_res;
 }
 
-int otter1_get_recommended_bpp(struct omap_dss_device *dssdev)
+static void boxer_get_timings(struct omap_dss_device *dssdev,
+                        struct omap_video_timings *timings)
 {
-	return 24;
+        *timings = dssdev->panel.timings;
 }
 
-static void otter1_get_timings(struct omap_dss_device *dssdev, struct omap_video_timings *timings)
-{
-        *timings = otter1_panel_timings;
-}
-
-int otter1_panel_power_on(void)
+int boxer_panel_power_on(void)
 {
 	int vendor0=1, vendor1=1;
 	int result = 0;
 	mutex_lock(&lock_power_on);
-	gpio_direction_output(47, 0);		
+	gpio_direction_output(47, 0);
 	gpio_direction_output(37, 0);
 	gpio_direction_output(47, 1);
 	mdelay(1);
@@ -196,58 +138,58 @@ int otter1_panel_power_on(void)
 			printk("***************************************************\n");
 			printk("******************  Panel of LG  ******************\n");
 			printk("***************************************************\n");
-			result |= spi_send(otter1_spi, 0x00, 0x21);
-			result |= spi_send(otter1_spi, 0x00, 0xa5);
-			result |= spi_send(otter1_spi, 0x01, 0x30);
-			result |= spi_send(otter1_spi, 0x02, 0x40);
-			result |= spi_send(otter1_spi, 0x0e, 0x5f);
-			result |= spi_send(otter1_spi, 0x0f, 0xa4);
-			result |= spi_send(otter1_spi, 0x0d, 0x00);
-			result |= spi_send(otter1_spi, 0x02, 0x43);
-			result |= spi_send(otter1_spi, 0x0a, 0x28);
-			result |= spi_send(otter1_spi, 0x10, 0x41);
-			result |= spi_send(otter1_spi, 0x00, 0xad);
+			result |= spi_send(boxer_spi, 0x00, 0x21);
+			result |= spi_send(boxer_spi, 0x00, 0xa5);
+			result |= spi_send(boxer_spi, 0x01, 0x30);
+			result |= spi_send(boxer_spi, 0x02, 0x40);
+			result |= spi_send(boxer_spi, 0x0e, 0x5f);
+			result |= spi_send(boxer_spi, 0x0f, 0xa4);
+			result |= spi_send(boxer_spi, 0x0d, 0x00);
+			result |= spi_send(boxer_spi, 0x02, 0x43);
+			result |= spi_send(boxer_spi, 0x0a, 0x28);
+			result |= spi_send(boxer_spi, 0x10, 0x41);
+			result |= spi_send(boxer_spi, 0x00, 0xad);
         }
         else if((vendor1 == 1) && (vendor0 == 0))
         {
 			printk("***************************************************\n");
 			printk("******************  Panel of HYDIS  ***************\n");
 			printk("***************************************************\n");
-			result |= spi_send(otter1_spi, 0x00, 0x29);
-			result |= spi_send(otter1_spi, 0x00, 0x25);
-			result |= spi_send(otter1_spi, 0x01, 0x30);
-			result |= spi_send(otter1_spi, 0x02, 0x40);
-			result |= spi_send(otter1_spi, 0x0e, 0x5f);
-			result |= spi_send(otter1_spi, 0x0f, 0xa4);
-			result |= spi_send(otter1_spi, 0x0d, 0x01);
-			result |= spi_send(otter1_spi, 0x00, 0x2d);
+			result |= spi_send(boxer_spi, 0x00, 0x29);
+			result |= spi_send(boxer_spi, 0x00, 0x25);
+			result |= spi_send(boxer_spi, 0x01, 0x30);
+			result |= spi_send(boxer_spi, 0x02, 0x40);
+			result |= spi_send(boxer_spi, 0x0e, 0x5f);
+			result |= spi_send(boxer_spi, 0x0f, 0xa4);
+			result |= spi_send(boxer_spi, 0x0d, 0x01);
+			result |= spi_send(boxer_spi, 0x00, 0x2d);
         }
         else if((vendor1 == 0) && (vendor0 == 1))
         {
 			printk("****************************************************\n");
 			printk("******************  Panel of CMO  ******************\n");
 			printk("****************************************************\n");
-			result |= spi_send(otter1_spi, 0x00, 0xad);
-			result |= spi_send(otter1_spi, 0x01, 0x10);
-			result |= spi_send(otter1_spi, 0x02, 0x40);
-			result |= spi_send(otter1_spi, 0x03, 0x04);
+			result |= spi_send(boxer_spi, 0x00, 0xad);
+			result |= spi_send(boxer_spi, 0x01, 0x10);
+			result |= spi_send(boxer_spi, 0x02, 0x40);
+			result |= spi_send(boxer_spi, 0x03, 0x04);
         }
         else
         {
 			printk("********************************************************************************\n");
 			printk("******************  undefined panel, use default LGD settings ******************\n");
 			printk("********************************************************************************\n");
-			result |= spi_send(otter1_spi, 0x00, 0x21);
-			result |= spi_send(otter1_spi, 0x00, 0xa5);
-			result |= spi_send(otter1_spi, 0x01, 0x30);
-			result |= spi_send(otter1_spi, 0x02, 0x40);
-			result |= spi_send(otter1_spi, 0x0e, 0x5f);
-			result |= spi_send(otter1_spi, 0x0f, 0xa4);
-			result |= spi_send(otter1_spi, 0x0d, 0x00);
-			result |= spi_send(otter1_spi, 0x02, 0x43);
-			result |= spi_send(otter1_spi, 0x0a, 0x28);
-			result |= spi_send(otter1_spi, 0x10, 0x41);
-			result |= spi_send(otter1_spi, 0x00, 0xad);
+			result |= spi_send(boxer_spi, 0x00, 0x21);
+			result |= spi_send(boxer_spi, 0x00, 0xa5);
+			result |= spi_send(boxer_spi, 0x01, 0x30);
+			result |= spi_send(boxer_spi, 0x02, 0x40);
+			result |= spi_send(boxer_spi, 0x0e, 0x5f);
+			result |= spi_send(boxer_spi, 0x0f, 0xa4);
+			result |= spi_send(boxer_spi, 0x0d, 0x00);
+			result |= spi_send(boxer_spi, 0x02, 0x43);
+			result |= spi_send(boxer_spi, 0x0a, 0x28);
+			result |= spi_send(boxer_spi, 0x10, 0x41);
+			result |= spi_send(boxer_spi, 0x00, 0xad);
         }
     } else {
         //After DVT
@@ -256,48 +198,48 @@ int otter1_panel_power_on(void)
 			printk("***************************************************\n");
 			printk("******************  Panel of LG  ******************\n");
 			printk("***************************************************\n");
-			result |= spi_send(otter1_spi, 0x00, 0x21);
-			result |= spi_send(otter1_spi, 0x00, 0xa5);
-			result |= spi_send(otter1_spi, 0x01, 0x30);
-			result |= spi_send(otter1_spi, 0x02, 0x40);
-			result |= spi_send(otter1_spi, 0x0e, 0x5f);
-			result |= spi_send(otter1_spi, 0x0f, 0xa4);
-			result |= spi_send(otter1_spi, 0x0d, 0x00);
-			result |= spi_send(otter1_spi, 0x02, 0x43);
-			result |= spi_send(otter1_spi, 0x0a, 0x28);
-			result |= spi_send(otter1_spi, 0x10, 0x41);
-			result |= spi_send(otter1_spi, 0x00, 0xad);
+			result |= spi_send(boxer_spi, 0x00, 0x21);
+			result |= spi_send(boxer_spi, 0x00, 0xa5);
+			result |= spi_send(boxer_spi, 0x01, 0x30);
+			result |= spi_send(boxer_spi, 0x02, 0x40);
+			result |= spi_send(boxer_spi, 0x0e, 0x5f);
+			result |= spi_send(boxer_spi, 0x0f, 0xa4);
+			result |= spi_send(boxer_spi, 0x0d, 0x00);
+			result |= spi_send(boxer_spi, 0x02, 0x43);
+			result |= spi_send(boxer_spi, 0x0a, 0x28);
+			result |= spi_send(boxer_spi, 0x10, 0x41);
+			result |= spi_send(boxer_spi, 0x00, 0xad);
         }
         else if((vendor1 == 0) && (vendor0 == 1))
         {
 			printk("***************************************************\n");
 			printk("******************  Panel of HYDIS  ***************\n");
 			printk("***************************************************\n");
-			result |= spi_send(otter1_spi, 0x00, 0x29);
-			result |= spi_send(otter1_spi, 0x00, 0x25);
-			result |= spi_send(otter1_spi, 0x01, 0x30);
-			result |= spi_send(otter1_spi, 0x02, 0x40);
-			result |= spi_send(otter1_spi, 0x0e, 0x5f);
-			result |= spi_send(otter1_spi, 0x0f, 0xa4);
-			result |= spi_send(otter1_spi, 0x0d, 0x01);
-			result |= spi_send(otter1_spi, 0x00, 0x2d);
+			result |= spi_send(boxer_spi, 0x00, 0x29);
+			result |= spi_send(boxer_spi, 0x00, 0x25);
+			result |= spi_send(boxer_spi, 0x01, 0x30);
+			result |= spi_send(boxer_spi, 0x02, 0x40);
+			result |= spi_send(boxer_spi, 0x0e, 0x5f);
+			result |= spi_send(boxer_spi, 0x0f, 0xa4);
+			result |= spi_send(boxer_spi, 0x0d, 0x01);
+			result |= spi_send(boxer_spi, 0x00, 0x2d);
         }
         else
         {
 			printk("********************************************************************************\n");
 			printk("******************  undefined panel, use default LGD settings ******************\n");
 			printk("********************************************************************************\n");
-			result |= spi_send(otter1_spi, 0x00, 0x21);
-			result |= spi_send(otter1_spi, 0x00, 0xa5);
-			result |= spi_send(otter1_spi, 0x01, 0x30);
-			result |= spi_send(otter1_spi, 0x02, 0x40);
-			result |= spi_send(otter1_spi, 0x0e, 0x5f);
-			result |= spi_send(otter1_spi, 0x0f, 0xa4);
-			result |= spi_send(otter1_spi, 0x0d, 0x00);
-			result |= spi_send(otter1_spi, 0x02, 0x43);
-			result |= spi_send(otter1_spi, 0x0a, 0x28);
-			result |= spi_send(otter1_spi, 0x10, 0x41);
-			result |= spi_send(otter1_spi, 0x00, 0xad);
+			result |= spi_send(boxer_spi, 0x00, 0x21);
+			result |= spi_send(boxer_spi, 0x00, 0xa5);
+			result |= spi_send(boxer_spi, 0x01, 0x30);
+			result |= spi_send(boxer_spi, 0x02, 0x40);
+			result |= spi_send(boxer_spi, 0x0e, 0x5f);
+			result |= spi_send(boxer_spi, 0x0f, 0xa4);
+			result |= spi_send(boxer_spi, 0x0d, 0x00);
+			result |= spi_send(boxer_spi, 0x02, 0x43);
+			result |= spi_send(boxer_spi, 0x0a, 0x28);
+			result |= spi_send(boxer_spi, 0x10, 0x41);
+			result |= spi_send(boxer_spi, 0x00, 0xad);
         }
     }
 	//mdelay(1);
@@ -306,14 +248,14 @@ int otter1_panel_power_on(void)
 	mutex_unlock(&lock_power_on);
     return result;
 }
-EXPORT_SYMBOL(otter1_panel_power_on);
 
-static int otter1_panel_probe(struct omap_dss_device *dssdev)
+static int boxer_panel_probe(struct omap_dss_device *dssdev)
 {
-	printk(KERN_INFO "Otter1 LCD probe called\n");
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
+
 	dssdev->panel.config	= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
 				  OMAP_DSS_LCD_IHS;
-	dssdev->panel.timings	= otter1_panel_timings;
+	dssdev->panel.timings	= boxer_panel_timings;
 
 	omap_writel(0x00020000,0x4a1005cc); //PCLK impedance
 	gpio_request(175, "LCD_VENDOR0");
@@ -324,21 +266,23 @@ static int otter1_panel_probe(struct omap_dss_device *dssdev)
 	gpio_request(37, "OMAP_RGB_SHTDN");
 
 	//Already done in uboot
-	//otter1_panel_power_on();
+	// boxer_panel_power_on();
 	mutex_init(&lock_power_on);
 	mutex_init(&lock_panel);
 	return 0;
 }
 
-static void otter1_panel_remove(struct omap_dss_device *dssdev)
+static void boxer_panel_remove(struct omap_dss_device *dssdev)
 {
 	mutex_destroy(&lock_power_on);
 	mutex_destroy(&lock_panel);
 }
 
-static int otter1_panel_start(struct omap_dss_device *dssdev)
+static int boxer_panel_start(struct omap_dss_device *dssdev)
 {
 	int r = 0;
+
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 
 	if (dssdev->platform_enable) {
 		r = dssdev->platform_enable(dssdev);
@@ -347,16 +291,20 @@ static int otter1_panel_start(struct omap_dss_device *dssdev)
 	}
 
 	r = omapdss_dpi_display_enable(dssdev);
+	printk(KERN_INFO " omapdss_dpi_display_enable == %d", r);
 	if (r && dssdev->platform_disable)
 		dssdev->platform_disable(dssdev);
+
+	dssdev->state=OMAP_DSS_DISPLAY_ACTIVE;
 
 	return r;
 }
 
-static void otter1_panel_stop(struct omap_dss_device *dssdev)
+static void boxer_panel_stop(struct omap_dss_device *dssdev)
 {
 	mutex_lock(&lock_panel);
 
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 	omapdss_dpi_display_disable(dssdev);
 
 	if (dssdev->platform_disable)
@@ -365,144 +313,124 @@ static void otter1_panel_stop(struct omap_dss_device *dssdev)
 	mutex_unlock(&lock_panel);
 }
 
-static int otter1_panel_enable(struct omap_dss_device *dssdev)
+static int boxer_panel_enable(struct omap_dss_device *dssdev)
 {
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)
 		return -EINVAL;
 
-	return otter1_panel_start(dssdev);
+	return boxer_panel_start(dssdev);
 }
 
-static void otter1_panel_disable(struct omap_dss_device *dssdev)
+static void boxer_panel_disable(struct omap_dss_device *dssdev)
 {
-	otter1_panel_stop(dssdev);
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
+	boxer_panel_stop(dssdev);
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 }
 
 extern int Light_Sensor_Exist;
 
-static int otter1_panel_suspend(struct omap_dss_device *dssdev)
+static int boxer_panel_suspend(struct omap_dss_device *dssdev)
 {
-	printk(KERN_INFO "!!!!!!!%s state:%d!!!!!!!!!!\n",__func__, dssdev->state);
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 #if 1 //RGB to LVDS SHTDN pin off
     	gpio_direction_output(37, 0);
 #endif
 	mdelay(1);
-	//printk("%s Light_Sensor_Exist = %d\n", __func__, Light_Sensor_Exist);
-//#if 1 //3V LDO off when light sensor does not exist
-	//if(Light_Sensor_Exist == 0) {
-		gpio_direction_output(47, 0);	
-	//}
-//#endif
-	//gpio_direction_output(175, 0);
-	//gpio_direction_output(176, 0);
-	otter1_panel_stop(dssdev);
+	gpio_direction_output(47, 0);	
+	boxer_panel_stop(dssdev);
 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
 	return 0;
 }
 
-static int otter1_panel_resume(struct omap_dss_device *dssdev)
+static int boxer_panel_resume(struct omap_dss_device *dssdev)
 {
 	int result = 0;
-	printk(KERN_INFO "!!!!!!!%s state:%d!!!!!!!!!!\n",__func__, dssdev->state);
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
 		printk(KERN_INFO "%s panel is already active",__func__);
 		dump_stack ();
 		return 0;
 	}
 
-	otter1_panel_start(dssdev);
-        result = otter1_panel_power_on();
+	boxer_panel_start(dssdev);
+    result = boxer_panel_power_on();
 	if (result != 0) {
 		printk (KERN_ERR "!!!!%s failed\n!!!", __func__);
 	}
 	else {
 		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 	}
-	/* Return 0. If any issue then next power button press
-	will power it up */
+	/* Return 0. If any issue then next power button press will power it up */
 	return 0;
 }
 
-#if 0
-static int otter1_set_update_mode(struct omap_dss_device *dssdev, enum omap_dss_update_mode mode)
-{
-	if (mode != OMAP_DSS_UPDATE_MANUAL)
-		return -EINVAL;
-	return 0;
-}
-
-static enum omap_dss_update_mode otter1_get_update_mode(struct omap_dss_device *dssdev)
-{
-	return OMAP_DSS_UPDATE_MANUAL;
-}
-#endif
-
-static struct omap_dss_driver otter1_driver = {
-	.probe		 = otter1_panel_probe,
-	.remove		 = otter1_panel_remove,
-
-	.enable		 = otter1_panel_enable,
-	.disable	 = otter1_panel_disable,
-	.suspend	 = otter1_panel_suspend,
-	.resume		 = otter1_panel_resume,
-
-	.get_resolution	 = otter1_get_resolution,
-	.get_recommended_bpp = otter1_get_recommended_bpp,
-
-	// .set_update_mode = otter1_set_update_mode,
-	// .get_update_mode = otter1_get_update_mode,
-
-	// .get_recommended_bpp = omapdss_default_get_recommended_bpp,
-
-	.get_timings     = otter1_get_timings,
-	.driver		 = {
-		.name	 = "otter1_panel_drv",
-		.owner	 = THIS_MODULE,
+static struct omap_dss_driver boxer_driver = {
+	.probe		= boxer_panel_probe,
+	.remove		= boxer_panel_remove,
+	.enable		= boxer_panel_enable,
+	.disable	= boxer_panel_disable,
+	.suspend	= boxer_panel_suspend,
+	.resume		= boxer_panel_resume,
+	.get_timings    = boxer_get_timings,
+	.set_timings    = dpi_set_timings,
+	.check_timings  = dpi_check_timings,
+	.get_resolution	= boxer_get_resolution,
+	//.get_dimension  = boxer_get_dimension,
+	//.reset	= boxer_panel_reset,
+	.driver		= {
+		.name	= "otter1_panel_drv",
+		.owner	= THIS_MODULE,
 	},
 };
 
-/*--------------------SPI probe-------------------------*/
-
-static int otter1_spi_probe(struct spi_device *spi)
+static int boxer_spi_probe(struct spi_device *spi)
 {
 	spi->mode = SPI_MODE_0;
 	spi->bits_per_word = 16;
-	spi_setup(spi);
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
+	int ret = spi_setup(spi);
+	printk(KERN_INFO "boxer: spi setup returned : %d\n", ret);
 
-	otter1_spi = spi;
+	boxer_spi = spi;
 	sysfs_create_group(&spi->dev.kobj, &otter1_panel_attribute_group);
 
-	return omap_dss_register_driver(&otter1_driver);
+	return omap_dss_register_driver(&boxer_driver);
 }
 
-static int otter1_spi_remove(struct spi_device *spi)
+static int boxer_spi_remove(struct spi_device *spi)
 {
-	omap_dss_unregister_driver(&otter1_driver);
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
+	omap_dss_unregister_driver(&boxer_driver);
 	return 0;
 }
 
 
-static struct spi_driver otter1_spi_driver = {
+static struct spi_driver boxer_spi_driver = {
+	.probe		= boxer_spi_probe,
+	.remove		= __devexit_p(boxer_spi_remove),
 	.driver		= {
 		.name	= "otter1_disp_spi",
 		.bus	= &spi_bus_type,
 		.owner	= THIS_MODULE,
 	},
-	.probe		= otter1_spi_probe,
-	.remove		= __devexit_p(otter1_spi_remove),
 };
 
-static int __init otter1_lcd_init(void)
+static int __init boxer_lcd_init(void)
 {
-	return spi_register_driver(&otter1_spi_driver);
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
+	return spi_register_driver(&boxer_spi_driver);
 }
 
-static void __exit otter1_lcd_exit(void)
+static void __exit boxer_lcd_exit(void)
 {
-	spi_unregister_driver(&otter1_spi_driver);
+	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
+	spi_unregister_driver(&boxer_spi_driver);
 }
 
-module_init(otter1_lcd_init);
-module_exit(otter1_lcd_exit);
+module_init(boxer_lcd_init);
+module_exit(boxer_lcd_exit);
+
+MODULE_LICENSE("GPL");
 

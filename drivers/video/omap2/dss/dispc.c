@@ -4022,6 +4022,8 @@ static int omap_dispchw_probe(struct platform_device *pdev)
 	struct resource *dispc_mem;
 	struct clk *clk;
 
+	printk(KERN_INFO " dss/disp.c : %s called , line %d\n", __FUNCTION__ , __LINE__);
+
 	dispc.pdev = pdev;
 
 	clk = clk_get(&pdev->dev, "dss_clk");
@@ -4030,6 +4032,8 @@ static int omap_dispchw_probe(struct platform_device *pdev)
 		r = PTR_ERR(clk);
 		goto err_get_clk;
 	}
+
+	printk(KERN_INFO " dss/disp.c : %s called , line %d\n", __FUNCTION__ , __LINE__);
 
 	dispc.dss_clk = clk;
 
@@ -4048,12 +4052,18 @@ static int omap_dispchw_probe(struct platform_device *pdev)
 		r = -EINVAL;
 		goto err_ioremap;
 	}
+
+	printk(KERN_INFO " dss/disp.c : %s called , line %d\n", __FUNCTION__ , __LINE__);
+
 	dispc.base = ioremap(dispc_mem->start, resource_size(dispc_mem));
 	if (!dispc.base) {
 		DSSERR("can't ioremap DISPC\n");
 		r = -ENOMEM;
 		goto err_ioremap;
 	}
+
+	printk(KERN_INFO " dss/disp.c : %s called , line %d\n", __FUNCTION__ , __LINE__);
+
 	dispc.irq = platform_get_irq(dispc.pdev, 0);
 	if (dispc.irq < 0) {
 		DSSERR("platform_get_irq failed\n");
@@ -4061,12 +4071,16 @@ static int omap_dispchw_probe(struct platform_device *pdev)
 		goto err_irq;
 	}
 
+	printk(KERN_INFO " dss/disp.c : %s called , line %d\n", __FUNCTION__ , __LINE__);
+
 	r = request_irq(dispc.irq, omap_dispc_irq_handler, IRQF_SHARED,
 		"OMAP DISPC", dispc.pdev);
 	if (r < 0) {
 		DSSERR("request_irq failed\n");
 		goto err_irq;
 	}
+
+	printk(KERN_INFO " dss/disp.c : %s called , line %d\n", __FUNCTION__ , __LINE__);
 
 	mutex_init(&dispc.runtime_lock);
 
@@ -4079,6 +4093,8 @@ static int omap_dispchw_probe(struct platform_device *pdev)
 	_omap_dispc_initial_config();
 
 	_omap_dispc_initialize_irq();
+
+	printk(KERN_INFO " dss/disp.c : %s called , line %d\n", __FUNCTION__ , __LINE__);
 
 	rev = dispc_read_reg(DISPC_REVISION);
 	dev_dbg(&pdev->dev, "OMAP DISPC rev %d.%d\n",

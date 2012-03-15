@@ -770,6 +770,20 @@ static int dss_mgr_wait_for_go(struct omap_overlay_manager *mgr)
 		irq = DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_EVSYNC_EVEN
 						| DISPC_IRQ_FRAMEDONETV;
 	} else {
+/* FIXME-HASH: Changed from KFire Kernel */
+		if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI)
+				&& (dssdev->manager->id == OMAP_DSS_CHANNEL_LCD))
+			irq = DISPC_IRQ_FRAMEDONE;
+		else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DSI)
+				&& (dssdev->manager->id == OMAP_DSS_CHANNEL_LCD2))
+			irq = DISPC_IRQ_FRAMEDONE2;
+		else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DPI)
+				&& (dssdev->manager->id == OMAP_DSS_CHANNEL_LCD))
+				irq = DISPC_IRQ_VSYNC;
+		else if ((mgr->device->type == OMAP_DISPLAY_TYPE_DPI)
+				&& (dssdev->manager->id == OMAP_DSS_CHANNEL_LCD2))
+				irq = DISPC_IRQ_VSYNC2;
+#if 0
 		if (dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
 			enum omap_dss_update_mode mode;
 			mode = dssdev->driver->get_update_mode(dssdev);
@@ -784,6 +798,7 @@ static int dss_mgr_wait_for_go(struct omap_overlay_manager *mgr)
 				DISPC_IRQ_VSYNC
 				: DISPC_IRQ_VSYNC2;
 		}
+#endif
 	}
 
 	mc = &dss_cache.manager_cache[mgr->id];
