@@ -150,17 +150,18 @@ static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
 			goto exit;
 		}
 
-#ifdef CONFIG_PVR_SGX
 		/* how about an sgx buffer wrapping an ion handle? */
 		{
 			int fd;
 			struct ion_handle *handles[2] = { NULL, NULL };
 			struct ion_client *pvr_ion_client;
 			ion_phys_addr_t paddr2;
+			int num_handles = 2;
 
 			fd = buffer;
-			PVRSRVExportFDToIONHandles(fd, &pvr_ion_client,
-					handles);
+			if (omap_ion_fd_to_handles(fd, &pvr_ion_client,
+					handles, &num_handles) < 0)
+				goto nopvr;
 
 			/* Get the 1st buffer's da */
 			if ((handles[0]) && !ion_phys(pvr_ion_client,
@@ -182,10 +183,9 @@ static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
 			}
 		}
 
-#endif
 	}
+nopvr:
 #endif
-
 	ret =  _rpmsg_pa_to_da(omx, (phys_addr_t)tiler_virt2phys(buffer), va);
 exit:
 	if (ret)
