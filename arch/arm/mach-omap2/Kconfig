@@ -356,6 +356,7 @@ config MACH_OMAP_BLAZE
 	select TWL6040_VIB
 	select OMAP_REBOOT_REASON
 	select OMAP_RAM_CONSOLE
+	select CDC_TCXO
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
