@@ -538,6 +538,7 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	return 0;
 }
 
+
 static struct regulator_init_data sdp4430_vaux1 = {
 	.constraints = {
 		.min_uV			= 1000000,
@@ -678,9 +679,11 @@ static struct twl6030_qcharger_platform_data kc1_charger_data={
 };
 
 static struct regulator_init_data sdp4430_clk32kg = {
-       .constraints = {
-		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
-       },
+	.constraints = {
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
+		.valid_ops_mask	 = REGULATOR_CHANGE_STATUS,
+		.always_on	= true,
+	},
 };
 
 static struct twl4030_platform_data sdp4430_twldata = {
@@ -966,7 +969,6 @@ static void panel_enable(void)
 }
 #endif
 
-/* FIXME-HASH: DONE in omap-twl.c */
 #if 0
 #define KC1_OMAP4_VP_CORE_VLIMITTO_VDDMIN	830000
 #define KC1_OMAP4_VP_CORE_VLIMITTO_VDDMAX	1200000
@@ -1123,8 +1125,8 @@ static struct omapfb_platform_data kc1_fb_pdata = {
 
 static void __init omap_kc1_display_init(void)
 {
-	//omap_vram_set_sdram_vram(KC1_FB_RAM_SIZE, 0);
-	//omapfb_set_platform_data(&kc1_fb_pdata);
+	omap_vram_set_sdram_vram(KC1_FB_RAM_SIZE, 0);
+	omapfb_set_platform_data(&kc1_fb_pdata);
 	omap_display_init(&sdp4430_dss_data);
 
 	kc1_pmic_mux_init();
@@ -1383,32 +1385,6 @@ static struct notifier_block kc1_reboot_notifier = {
 	.notifier_call = kc1_notifier_call,
 };
 
-#ifdef CONFIG_ANDROID_RAM_CONSOLE
-
-static struct resource ram_console_resource = {
-    .start  = 0x8E000000,
-    .end    = 0x8E000000 + 0x40000 - 1,
-    .flags  = IORESOURCE_MEM,
-};
-
-static struct platform_device ram_console_device = {
-    .name           = "ram_console",
-    .id             = 0,
-    .num_resources  = 1,
-    .resource       = &ram_console_resource,
-};
-
-static inline void ramconsole_init(void)
-{
-	platform_device_register(&ram_console_device);
-}
-
-#else
-
-static inline void ramconsole_init(void) {}
-
-#endif /* CONFIG_ANDROID_RAM_CONSOLE */
-
 static void __init omap_kc1_init(void)
 {
 	int package = OMAP_PACKAGE_CBS;
@@ -1429,14 +1405,13 @@ static void __init omap_kc1_init(void)
 	// FIXME-HASH:
         // omap4_audio_conf();
 	omap4_create_board_props();
-	register_reboot_notifier(&kc1_reboot_notifier);
+//	register_reboot_notifier(&kc1_reboot_notifier);
 
 	otter_set_osc_timings();
 	omap4_i2c_init();
 	enable_rtc_gpio();
 	omap_dmm_init();
 
-//	ramconsole_init();
 	omap4_display_init();
 	//omap_disp_led_init();
 
