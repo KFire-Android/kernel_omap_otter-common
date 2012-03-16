@@ -504,6 +504,13 @@ int omapdss_hdmi_read_edid(u8 *buf, int len);
 bool omapdss_hdmi_detect(void);
 int hdmi_panel_init(void);
 void hdmi_panel_exit(void);
+#ifdef CONFIG_OMAP4_DSS_HDMI_AUDIO
+int hdmi_audio_enable(bool enable);
+int hdmi_audio_start(bool start);
+bool hdmi_mode_has_audio(void);
+int hdmi_audio_config(struct snd_aes_iec958 *iec,
+		struct snd_cea_861_aud_if *aud_if);
+#endif
 
 /* RFBI */
 #ifdef CONFIG_OMAP2_DSS_RFBI

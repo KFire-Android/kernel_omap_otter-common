@@ -31,6 +31,10 @@
 
 static struct {
 	struct mutex hdmi_lock;
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
+	/* protects calls to HDMI driver audio functionality */
+	spinlock_t hdmi_sp_lock;
+#endif
 } hdmi;
 
 
@@ -222,6 +226,68 @@ err:
 	return r;
 }
 
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
+static int hdmi_panel_audio_enable(struct omap_dss_device *dssdev, bool enable)
+{
+	unsigned long flags;
+	int r;
+
+	spin_lock_irqsave(&hdmi.hdmi_sp_lock, flags);
+
+	r = hdmi_audio_enable(enable);
+
+	spin_unlock_irqrestore(&hdmi.hdmi_sp_lock, flags);
+	return r;
+}
+
+static int hdmi_panel_audio_start(struct omap_dss_device *dssdev, bool start)
+{
+	unsigned long flags;
+	int r;
+
+	spin_lock_irqsave(&hdmi.hdmi_sp_lock, flags);
+
+	r = hdmi_audio_start(start);
+
+	spin_unlock_irqrestore(&hdmi.hdmi_sp_lock, flags);
+	return r;
+}
+
+static bool hdmi_panel_audio_detect(struct omap_dss_device *dssdev)
+{
+	unsigned long flags;
+	bool r = false;
+
+	spin_lock_irqsave(&hdmi.hdmi_sp_lock, flags);
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE)
+		goto err;
+
+	if (!hdmi_mode_has_audio())
+		goto err;
+
+	r = true;
+err:
+	spin_unlock_irqrestore(&hdmi.hdmi_sp_lock, flags);
+	return r;
+}
+
+static int hdmi_panel_audio_config(struct omap_dss_device *dssdev,
+		struct snd_aes_iec958 *iec, struct snd_cea_861_aud_if *aud_if)
+{
+	unsigned long flags;
+	int r;
+
+	spin_lock_irqsave(&hdmi.hdmi_sp_lock, flags);
+
+	r = hdmi_audio_config(iec, aud_if);
+
+	spin_unlock_irqrestore(&hdmi.hdmi_sp_lock, flags);
+	return r;
+}
+
+#endif
+
 static struct omap_dss_driver hdmi_driver = {
 	.probe		= hdmi_panel_probe,
 	.remove		= hdmi_panel_remove,
@@ -234,6 +300,12 @@ static struct omap_dss_driver hdmi_driver = {
 	.check_timings	= hdmi_check_timings,
 	.read_edid	= hdmi_read_edid,
 	.detect		= hdmi_detect,
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
+	.audio_enable	= hdmi_panel_audio_enable,
+	.audio_start	= hdmi_panel_audio_start,
+	.audio_detect	= hdmi_panel_audio_detect,
+	.audio_config	= hdmi_panel_audio_config,
+#endif
 	.driver			= {
 		.name   = "hdmi_panel",
 		.owner  = THIS_MODULE,
@@ -243,6 +315,10 @@ static struct omap_dss_driver hdmi_driver = {
 int hdmi_panel_init(void)
 {
 	mutex_init(&hdmi.hdmi_lock);
+
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
+	spin_lock_init(&hdmi.hdmi_sp_lock);
+#endif
 
 	omap_dss_register_driver(&hdmi_driver);
 
