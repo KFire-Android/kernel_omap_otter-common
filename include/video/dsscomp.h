@@ -632,6 +632,46 @@ struct dsscomp_wait_data {
 	enum dsscomp_wait_phase phase;	/* phase to wait for */
 };
 
+/*
+ * ioctl: DSSCIOC_QUERY_PLATFORM, struct dsscomp_platform_info
+ *
+ * Use this ioctl to get platform information needed to decide
+ * DSS/DSSCOMP capabilities, by filling out the passed structure with:
+ *
+ * A) predecimation limits
+ * B) maximum fclk (DSS is assumed to scale up to this fclk automatically
+ *    to support frames)
+ * C) minimum and maximum sizes (for now we use the same limits for
+ *    both source and window sizes, which works for OMAP4/5)
+ * D) scaler limitations. (assuming same max downscale limitation both
+ *    horizontally/vertically; however, fclock requirements are only
+ *    dependent on horizontal scaling, which works for OMAP4 ES1.1+ and
+ *    OMAP5 only).
+ *    integer_scale_ratio_limit is the maximum source width to round up
+ *    fclock/pixclock to an integer.
+ * E) Tiler1D slot size
+ *
+ * Returns: 0 on success, <0 error value on failure (unlikely)
+ */
+
+struct dsscomp_platform_info {
+	/* decimation limits for 2D and 1D buffers */
+	__u8 max_xdecim_2d;
+	__u8 max_ydecim_2d;
+	__u8 max_xdecim_1d;
+	__u8 max_ydecim_1d;
+	__u32 fclk;		/* dispc max fclk */
+	/* pipeline source/destination limits */
+	__u8 min_width;
+	__u16 max_width;
+	__u16 max_height;
+	/* scaler limitations */
+	__u8 max_downscale;
+	/* below this width, we assume integer pixelclk scale */
+	__u16 integer_scale_ratio_limit;
+	__u32 tiler1d_slot_size;
+};
+
 /* IOCTLS */
 #define DSSCIOC_SETUP_MGR	_IOW('O', 128, struct dsscomp_setup_mgr_data)
 #define DSSCIOC_CHECK_OVL	_IOWR('O', 129, struct dsscomp_check_ovl_data)
@@ -641,4 +681,5 @@ struct dsscomp_wait_data {
 
 #define DSSCIOC_SETUP_DISPC	_IOW('O', 133, struct dsscomp_setup_dispc_data)
 #define DSSCIOC_SETUP_DISPLAY	_IOW('O', 134, struct dsscomp_setup_display_data)
+#define DSSCIOC_QUERY_PLATFORM	_IOR('O', 135, struct dsscomp_platform_info)
 #endif

@@ -4,6 +4,7 @@
 #include <linux/vmalloc.h>
 #include <mach/tiler.h>
 #include <video/dsscomp.h>
+#include <plat/android-display.h>
 #include <plat/dsscomp.h>
 #include "dsscomp.h"
 
@@ -12,15 +13,13 @@
 #endif
 static bool blanked;
 
-#define NUM_TILER1D_SLOTS 2
-
 static struct tiler1d_slot {
 	struct list_head q;
 	tiler_blk_handle slot;
 	u32 phys;
 	u32 size;
 	u32 *page_map;
-} slots[NUM_TILER1D_SLOTS];
+} slots[NUM_ANDROID_TILER1D_SLOTS];
 static struct list_head free_slots;
 static struct dsscomp_dev *cdev;
 static DEFINE_MUTEX(mtx);
@@ -45,13 +44,6 @@ static struct kmem_cache *gsync_cachep;
 static LIST_HEAD(flip_queue);
 
 static u32 ovl_use_mask[MAX_MANAGERS];
-
-static unsigned int tiler1d_slot_size(struct dsscomp_dev *cdev)
-{
-	struct dsscomp_platform_data *pdata;
-	pdata = (struct dsscomp_platform_data *)cdev->pdev->platform_data;
-	return pdata->tiler1d_slotsz;
-}
 
 static void unpin_tiler_blocks(struct list_head *slots)
 {
@@ -584,7 +576,7 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 
 	if (!free_slots.next) {
 		INIT_LIST_HEAD(&free_slots);
-		for (i = 0; i < NUM_TILER1D_SLOTS; i++) {
+		for (i = 0; i < NUM_ANDROID_TILER1D_SLOTS; i++) {
 			u32 phys;
 			tiler_blk_handle slot =
 				tiler_alloc_block_area(TILFMT_PAGE,
