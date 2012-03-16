@@ -656,9 +656,6 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 	/* Enable/disable external clock. */
 	if (gctransition->clk) {
 		if (gctransition->clk_on) {
-			GC_PRINT(GC_INFO_MSG " CLOCK ON\n",
-				__func__, __LINE__);
-
 			ret = clk_enable(g_bb2d_clk);
 			if (ret < 0) {
 				GC_PRINT(GC_ERR_MSG
@@ -667,20 +664,16 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 				gcerror = GCERR_POWER_CLOCK_ON;
 				goto fail;
 			}
+			pr_info("gcx: clock enabled.\n");
 		} else {
-			GC_PRINT(GC_INFO_MSG " CLOCK OFF\n",
-				__func__, __LINE__);
-
 			clk_disable(g_bb2d_clk);
+			pr_info("gcx: clock disabled.\n");
 		}
 	}
 
 	/* Install/remove IRQ handler. */
 	if (gctransition->irq) {
 		if (gctransition->irq_install) {
-			GC_PRINT(GC_INFO_MSG " IRQ INSTALL\n",
-				__func__, __LINE__);
-
 			ret = request_irq(DEVICE_INT, gc_irq, IRQF_SHARED,
 						DEV_NAME, &gcdevice);
 			if (ret < 0) {
@@ -690,11 +683,10 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 				gcerror = GCERR_POWER_CLOCK_ON;
 				goto fail;
 			}
+			pr_info("gcx: irq installed.\n");
 		} else {
-			GC_PRINT(GC_INFO_MSG " IRQ REMOVE\n",
-				__func__, __LINE__);
-
 			free_irq(DEVICE_INT, &gcdevice);
+			pr_info("gcx: irq removed.\n");
 		}
 	}
 
@@ -702,9 +694,6 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 	if (gctransition->reset) {
 		union gcclockcontrol gcclockcontrol;
 		union gcidle gcidle;
-
-		GC_PRINT(GC_INFO_MSG " RESET\n",
-			__func__, __LINE__);
 
 		/* Read current clock control value. */
 		gcclockcontrol.raw
@@ -760,6 +749,7 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 			/* GPU is idle. */
 			break;
 		}
+		pr_info("gcx: gpu reset.\n");
 	}
 
 	/* Enable/disable pulse skipping. */
@@ -1008,6 +998,57 @@ exit:
 }
 EXPORT_SYMBOL(gc_unmap);
 
+static int gc_probe(struct platform_device *pdev)
+{
+	return 0;
+}
+
+#ifndef CONFIG_HAS_EARLYSUSPEND
+static int gc_suspend(struct platform_device *pdev, pm_message_t s)
+{
+	if (gc_set_power(GCPWR_OFF))
+		printk(KERN_ERR "gcx: suspend failure.\n");
+	return 0;
+}
+
+static int gc_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+#endif
+
+static struct platform_driver plat_drv = {
+	.probe = gc_probe,
+#ifndef CONFIG_HAS_EARLYSUSPEND
+	.suspend = gc_suspend,
+	.resume = gc_resume,
+#endif
+	.driver = {
+		.owner = THIS_MODULE,
+		.name = "gccore",
+	},
+};
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+
+static void gccore_early_suspend(struct early_suspend *h)
+{
+	if (gc_set_power(GCPWR_OFF))
+		printk(KERN_ERR "gcx: early suspend failure.\n");
+}
+
+static void gccore_late_resume(struct early_suspend *h)
+{
+}
+
+static struct early_suspend early_suspend_info = {
+	.suspend = gccore_early_suspend,
+	.resume = gccore_late_resume,
+	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
+};
+#endif
+
 /*******************************************************************************
  * Driver init/shutdown.
  */
@@ -1025,7 +1066,8 @@ static int __init gc_init(void)
 	init_completion(&g_gccoreint);
 
 	/* Set power mode. */
-	g_gcpower = GCPWR_UNKNOWN;
+	g_gcpower = GCPWR_OFF;
+
 
 	/* Map GPU registers. */
 	g_reg_base = ioremap_nocache(DEVICE_REG_BASE, DEVICE_REG_SIZE);
@@ -1050,9 +1092,12 @@ static int __init gc_init(void)
 #endif
 
 	mutex_init(&g_maplock);
-	/* Success. */
-	return 0;
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	register_early_suspend(&early_suspend_info);
+#endif
+
+	return platform_driver_register(&plat_drv);
 fail:
 	if (g_reg_base != NULL) {
 		iounmap(g_reg_base);
@@ -1064,6 +1109,12 @@ fail:
 
 static void __exit gc_exit(void)
 {
+
+	platform_driver_unregister(&plat_drv);
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&early_suspend_info);
+#endif
 
 	delete_context_map();
 	mutex_destroy(&g_maplock);
