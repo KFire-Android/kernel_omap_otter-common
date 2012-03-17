@@ -78,9 +78,11 @@ int accc[]={
 int summit_bat_notifier_call(struct notifier_block *nb, unsigned long val, void *priv)
 {
 	int result = NOTIFY_OK;
+	struct summit_smb347_info* di_smb;
+
 	// unsigned long flags;
 	printk("%s val=%d \n",__func__,val);
-	struct summit_smb347_info* di_smb = container_of(nb, struct summit_smb347_info, bat_notifier);
+	di_smb = container_of(nb, struct summit_smb347_info, bat_notifier);
 	// spin_lock_irqsave(&di_smb->lock, flags);
 	writeIntoCBuffer(&di_smb->events,val);
 	queue_delayed_work_on(0, summit_work_queue, &di_smb->summit_monitor_work, 0);
@@ -390,7 +392,7 @@ int summit_find_pre_cc(int cc){
 int summit_find_fast_cc(int cc){
     int i=0;
     for(i=7;i>-1;i--){
-        printk("fast_current=%d cc=%d\n",pre_current[i],cc);
+        printk("fast_current=%d cc=%d\n",fast_current[i],cc);
         if(fast_current[i]<=cc)
             break;
     }
@@ -709,6 +711,7 @@ int summit_get_apsd_result(struct summit_smb347_info *di) {
 		switch(APSD_RESULTS(result)){
 			case APSD_NOT_RUN:
 				dev_info(di->dev,"APSD_NOT_RUN\n");
+				// return APSD_NOT_RUN;
 			break;
 			case APSD_CHARGING_DOWNSTREAM_PORT:
 				dev_info(di->dev,"CHARGING_DOWNSTREAM_PORT\n");  

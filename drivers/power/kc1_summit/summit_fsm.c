@@ -253,7 +253,7 @@ void summit_fsm_doAction(struct summit_smb347_info *di,int event)
         break;
         case STATE_PC:
             if(event==EVENT_DETECT_PC){
-                blocking_notifier_call_chain(&di->xceiv->notifier,USB_EVENT_VBUS, di->xceiv->gadget);
+                atomic_notifier_call_chain(&di->xceiv->notifier,USB_EVENT_VBUS, di->xceiv->gadget);
                 di->usb_online=1;
                 di->ac_online=0;
                 power_supply_changed(&di->usb);
@@ -269,7 +269,7 @@ void summit_fsm_doAction(struct summit_smb347_info *di,int event)
                 di->ac_online=0;
                 power_supply_changed(&di->usb);
                 power_supply_changed(&di->ac);
-                blocking_notifier_call_chain(&di->xceiv->notifier,USB_EVENT_VBUS, di->xceiv->gadget);
+                atomic_notifier_call_chain(&di->xceiv->notifier,USB_EVENT_VBUS, di->xceiv->gadget);
             }
             
         break;

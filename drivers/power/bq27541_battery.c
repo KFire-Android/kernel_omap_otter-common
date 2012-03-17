@@ -1229,7 +1229,7 @@ static int bat_name[3][8] = {
 static int check_manufacturer(struct bq27541_info *di)
 {
 	u8 m_name[8];
-	int i = 0, ret = -1, offset = 0, value = 0;
+	int i = 0, offset = 0; //, value = 0, ret = -1;
 
 	i2c_smbus_write_byte_data(di->bat_client, BQ27541_DATAFLASHBLOCK, 1);
 	mdelay(10);
@@ -1292,9 +1292,9 @@ static ssize_t bq_proc_write(struct file *filp,
     	const char *buff,unsigned long len, void *data)
 {
     struct bq27541_info *di=data;
-    u32 reg_val,value;
-    int event  = USB_EVENT_VBUS;
-    char messages[256], vol[256];
+    u32 reg_val; //,value;
+    // int event  = USB_EVENT_VBUS;
+    char messages[256]; //, vol[256];
 
     if (len > 256)
     	len = 256;

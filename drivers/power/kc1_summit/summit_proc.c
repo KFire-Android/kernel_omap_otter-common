@@ -219,7 +219,7 @@ disable
                 //summit_config_apsd(di,0);
             break;
             case '8':
-                blocking_notifier_call_chain(&di->xceiv->notifier,USB_EVENT_NONE, di->xceiv->gadget);
+                atomic_notifier_call_chain(&di->xceiv->notifier,USB_EVENT_NONE, di->xceiv->gadget);
                 //summit_suspend_mode(di,1);
             break;
             case '9':
