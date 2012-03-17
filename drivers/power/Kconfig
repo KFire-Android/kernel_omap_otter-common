@@ -212,12 +212,6 @@ config SUMMIT_SMB347
 	help
 	  Say Y to enable support for the Summit SMB347 USB Charger IC
 
-config BATTERY_BQ27541
-	tristate "BQ27541 Battery Driver"
-	help
-	  Say Y to enable support for interfacing the BQ27541 battery
-
-
 config BATTERY_JZ4740
 	tristate "Ingenic JZ4740 battery"
 	depends on MACH_JZ4740
