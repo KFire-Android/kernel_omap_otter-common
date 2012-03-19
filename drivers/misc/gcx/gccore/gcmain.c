@@ -635,6 +635,9 @@ static struct gctransition g_gctransition[4][4] = {
 	},
 };
 
+#include <plat/omap_hwmod.h>
+#include <plat/omap-pm.h>
+
 enum gcpower g_gcpower;
 
 enum gcerror gc_set_power(enum gcpower gcpower)
@@ -754,12 +757,15 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 
 	/* Enable/disable pulse skipping. */
 	if (gctransition->pulse) {
+		struct device *dev = omap_hwmod_name_get_dev("bb2d");
 		union gcclockcontrol gcclockcontrol;
 		gcclockcontrol.raw = 0;
 
 		if (gctransition->pulse_skip) {
 			GC_PRINT(GC_INFO_MSG " PULSE SKIP ENABLE\n",
 				__func__, __LINE__);
+
+			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, -1);
 
 			/* Enable loading and set to minimum value. */
 			gcclockcontrol.reg.pulsecount = 1;
@@ -769,6 +775,10 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 		} else {
 			GC_PRINT(GC_INFO_MSG " PULSE SKIP DISABLE\n",
 				__func__, __LINE__);
+
+			/* set the min l3 data throughput to 2.5 GB */
+			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT,
+								0xA0000000);
 
 			/* Enable loading and set to maximum value. */
 			gcclockcontrol.reg.pulsecount = 64;
