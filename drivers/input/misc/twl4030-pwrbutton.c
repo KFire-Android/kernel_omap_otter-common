@@ -97,7 +97,8 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 						msecs_to_jiffies(2000));
 				}
 			}
-		}else{
+		}
+		else{
 			if(g_in_suspend==1){
 					wake_lock(&pwrbutton_wakelock);
 					cancel_delayed_work_sync(&pwrbutton_work);
@@ -114,10 +115,10 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 		dev_err(pwr->dev.parent, "twl4030: i2c error %d while reading"
 			" TWL4030 PM_MASTER STS_HW_CONDITIONS register\n", err);
 
-                /* If an error occurs we don't want to display the SysReq the next time user will
-                 * push and release power button.
-                 */
-                prev_press = STATE_UNKNOWN;
+		/* If an error occurs we don't want to display the SysReq the next time user will
+		* push and release power button.
+		*/
+		prev_press = STATE_UNKNOWN;
 	}
 
 	return IRQ_HANDLED;
@@ -144,15 +145,16 @@ static void pwrbutton_work_func(struct work_struct *work)
 	wake_unlock(&pwrbutton_wakelock);
 }
 
-static int twl4030_pwrbutton_suspend(struct platform_device *pdev)
+static int twl4030_pwrbutton_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	int err;
-	u8 value;
-	int press;
-	struct input_dev *pwr = platform_get_drvdata(pdev);
+	//int err;
+	//u8 value;
+	//int press;
+	//struct input_dev *pwr = platform_get_drvdata(pdev);
 	g_in_suspend=1;
-    	return 0;
+	return 0;
 }
+
 static int twl4030_pwrbutton_resume(struct platform_device *pdev)
 {
 	int err;
@@ -162,20 +164,19 @@ static int twl4030_pwrbutton_resume(struct platform_device *pdev)
 	g_in_suspend=0;
 	err = twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER, &value,REG_STS_HW_CONDITIONS);
 	press = (value & PWR_PWRON_IRQ) ? STATE_RELEASE : STATE_PRESS;
-	if(press) {
+	if (press) {
 		prev_press = STATE_PRESS;
 		input_report_key(pwr, KEY_POWER, 1);
 		input_report_key(pwr, KEY_POWER, 0);
 		input_sync(pwr);
 		//Turn green LED on immediately at full intensity and keep on for 2 seconds and then turn off
-		if (!twl_i2c_read_u8(TWL6030_MODULE_CHARGER,
-						&value, 0x03) && !(value & (1 << 2))) {
-					/* If it's not connected to USB, blink */
-					omap4430_orange_led_set(NULL, 0);
-					omap4430_green_led_set(NULL, 255);
+		if (!twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &value, 0x03) && !(value & (1 << 2))) {
+			/* If it's not connected to USB, blink */
+			omap4430_orange_led_set(NULL, 0);
+			omap4430_green_led_set(NULL, 255);
 		}
 	}
-    	return 0;
+	return 0;
 }
 
 static int __init twl4030_pwrbutton_probe(struct platform_device *pdev)
@@ -199,8 +200,9 @@ static int __init twl4030_pwrbutton_probe(struct platform_device *pdev)
 
 	twl6030_interrupt_unmask(0x03,REG_INT_MSK_LINE_A);
 	twl6030_interrupt_unmask(0x03,REG_INT_MSK_STS_A);
-	err = request_threaded_irq(irq, NULL, powerbutton_irq, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
-				"twl4030_pwrbutton", pwr);
+	err = request_threaded_irq(irq, NULL, powerbutton_irq,
+			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+			"twl4030_pwrbutton", pwr);
 	if (err < 0) {
 		dev_dbg(&pdev->dev, "Can't get IRQ for pwrbutton: %d\n", err);
 		goto free_input_dev;
@@ -242,21 +244,15 @@ static int __exit twl4030_pwrbutton_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct dev_pm_ops twl4030_pwrbutton_pm_ops = {
-	.suspend = twl4030_pwrbutton_suspend,
-	.resume = twl4030_pwrbutton_resume,
-};
-
 static struct platform_driver twl4030_pwrbutton_driver = {
 /* FIXME-HASH: WATCH THIS .probe CALL */
- 	.probe		= twl4030_pwrbutton_probe,
+ 	//.probe		= twl4030_pwrbutton_probe,
 	.remove		= __exit_p(twl4030_pwrbutton_remove),
 	.suspend	= twl4030_pwrbutton_suspend,
 	.resume		= twl4030_pwrbutton_resume,
 	.driver		= {
 		.name	= "twl4030_pwrbutton",
 		.owner	= THIS_MODULE,
-		.pm = &twl4030_pwrbutton_pm_ops,
 	},
 };
 
