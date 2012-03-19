@@ -942,7 +942,6 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		struct tiler_pa_info *psTilerInfo;
 	} asMemInfo[5];
 
-	memset(asMemInfo, 0, sizeof(asMemInfo));
 	/* Framebuffer info just used to get FB geometry, the address to
 	 * use for blitting (dst buffer) is the first meminfo
 	 */
@@ -966,7 +965,6 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		WARN(1, "Trying to blit when BV GC2D is not present");
 		rgz_items = 0; /* Prevent blits */
 	}
->>>>>>> 2185a3781e214dbaee2ae4142fe7b827e1c4eb36
 
 	if (rgz_items > 0 && !bBltReady)
 	{
@@ -1120,11 +1118,6 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		tiler_pa_free(apsTilerPAs[i]);
 	}
 
-	for(i = 0; i < k; i++)
-	{
-		tiler_pa_free(apsTilerPAs[i]);
-	}
-
 	return IMG_TRUE;
 }
 #endif
@@ -1152,15 +1145,11 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 
 	if(psFlipCmd->hExtBuffer)
 	{
-#if defined(CONFIG_DSSCOMP)
 		return ProcessFlipV1(hCmdCookie,
 							 psDevInfo,
 							 psFlipCmd->hExtSwapChain,
 							 psFlipCmd->hExtBuffer,
 							 psFlipCmd->ui32SwapInterval);
-#else
-		BUG();
-#endif
 	}
 	else
 	{
@@ -1336,7 +1325,6 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 
 	
 	OMAPLFBPrintInfo(psDevInfo);
-
 #if defined(CONFIG_DSSCOMP)
 	eError = OMAPLFBInitIonOmap(psDevInfo, psLINFBInfo, psPVRFBInfo);
 	if (eError != OMAPLFB_OK)

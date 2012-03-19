@@ -341,6 +341,7 @@ static int twl6030_usb_ldo_init(struct twl6030_usb *twl)
 {
 	char *regulator_name;
 	u8 misc2_data = 0;
+	u8 data2 = 0;
 
 	if (twl->features & TWL6032_SUBCLASS)
 		regulator_name = "ldousb";

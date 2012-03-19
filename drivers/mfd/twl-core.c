@@ -59,11 +59,6 @@
  */
 
 #define DRIVER_NAME			"twl"
-//#if defined(CONFIG_Q_CHARGER)
-#define    twl_has_qcharger()   true
-//#else
-//#define    twl_has_qcharger()    false
-//#endif
 
 #if defined(CONFIG_KEYBOARD_TWL4030) || defined(CONFIG_KEYBOARD_TWL4030_MODULE)
 #define twl_has_keypad()	true
@@ -243,6 +238,7 @@
 #define HIGH_PERF_SQ			(1 << 3)
 #define CK32K_LOWPWR_EN			(1 << 7)
 
+#if 0
 #define CLK32KG_CFG_STATE		0xBE
 #define PHOENIX_START_CONDITION		0x1F
 #define PHOENIX_MSK_TRANSITION 		0x20
@@ -310,6 +306,7 @@
 #define VUSIM_CFG_TRANS 0xa5
 #define VUSIM_CFG_STATE 0xa6
 #define VUSIM_CFG_VOLTAGE 0xa7
+#endif
 
 /* chip-specific feature flags, for i2c_device_id.driver_data */
 #define TWL4030_VAUX2		BIT(0)	/* pre-5030 voltage ranges */
@@ -431,6 +428,7 @@ static struct twl_mapping twl6030_map[] = {
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_SLAVE_RES },
 };
 
+#if 0
 //For proc
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
@@ -576,6 +574,8 @@ static void remove_twl_proc_file(void)
 	printk(KERN_INFO "%s\n",__func__);
 	remove_proc_entry(SKELETON_PROC_FILE, NULL);
 }
+#endif
+
 #endif
 /*----------------------------------------------------------------------*/
 
@@ -1070,7 +1070,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 	}
 
 	if (twl_has_pwrbutton()) {
-		child = add_child(1, "twl4030_pwrbutton",NULL, 0, true, pdata->irq_base + PWR_INTR_OFFSET, 0);
+		child = add_child(1, "twl4030_pwrbutton",NULL, 0, true, pdata->irq_base + 8 + 0, 0);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
@@ -1504,8 +1504,8 @@ static void clocks_init(struct device *dev,
 static int twl_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	/* Make sure below init twl settings are not left on */
-	if (twl_class_is_6030())
-		_init_twl6030_settings();
+//	if (twl_class_is_6030())
+//		_init_twl6030_settings();
 	return irq_set_irq_wake(client->irq, 1);
 }
 

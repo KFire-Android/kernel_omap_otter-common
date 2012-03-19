@@ -852,17 +852,6 @@ int tf_fill_descriptor_table(
 					flags,
 					&init_mm);
 			}
-		} else {
-			/* Other kernel-space memory */
-			dprintk(KERN_INFO
-				"tf_fill_descriptor_table: "
-				"buffer starting at virtual address %p\n",
-			       (void *)buffer_offset_vaddr);
-			dprintk(KERN_WARNING
-				"tf_fill_descriptor_table: "
-				"address type not supported\n");
-			ret = -ENOSYS;
-			goto error;
 		}
 
 		dmac_flush_range((void *)coarse_pg_table->descriptors,

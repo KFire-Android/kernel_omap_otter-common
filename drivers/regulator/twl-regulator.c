@@ -927,11 +927,11 @@ static struct regulator_ops twlsmps_ops = {
 static struct regulator_ops twl6030_external_control_pin_ops = {
 	.enable			= twl6030reg_enable,
 	.disable		= twl6030reg_disable,
-	.is_enabled		= twl6030reg_is_enabled,
+	.is_enabled		= twl6030_is_enabled,
 
-	.set_mode		= twl6030reg_set_mode,
+	.set_mode		= twlreg_set_mode,
 
-	.get_status		= twl6030reg_get_status,
+	.get_status		= twlreg_get_status,
 
 	.set_suspend_enable	= twl6030ldo_suspend_enable,
 	.set_suspend_disable	= twl6030ldo_suspend_disable,
