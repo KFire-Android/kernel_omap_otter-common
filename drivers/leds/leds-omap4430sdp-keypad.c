@@ -29,12 +29,12 @@
 
 struct keypad_led_data {
 	struct led_classdev keypad_led_class_dev;
-	struct timer_list timer;
-	struct work_struct work;
-	int delay_on;
-	int delay_off;
-	int blink_step;
-	int brightness;
+	//struct timer_list timer;
+	//struct work_struct work;
+	//int delay_on;
+	//int delay_off;
+	//int blink_step;
+	//int brightness;
 };
 
 #define KP_LED_PWM1ON		0x00
@@ -48,6 +48,7 @@ void omap4430_green_led_set(struct led_classdev *led_cdev,
 {
 	u8 brightness = 0;
 
+#if 0
 	flush_work(&g_green_led_data->work);
 	del_timer_sync(&g_green_led_data->timer);
 
@@ -63,10 +64,11 @@ void omap4430_green_led_set(struct led_classdev *led_cdev,
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x01, TWL6030_TOGGLE3);
 		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x07, TWL6030_TOGGLE3);
 	}
-
+#endif
 }
 EXPORT_SYMBOL(omap4430_green_led_set);
 
+#if 0
 static void omap4430_keypad_led_work(struct work_struct *work)
 {
     struct keypad_led_data *led_data = container_of(work,
@@ -115,6 +117,7 @@ static void omap4430_keypad_led_timer(unsigned long data)
 
     schedule_work(&led_data->work);
 }
+#endif
 
 int omap4430_green_led_set_blink(struct led_classdev *led_cdev, 
         unsigned long *delay_on, unsigned long *delay_off)
@@ -122,11 +125,11 @@ int omap4430_green_led_set_blink(struct led_classdev *led_cdev,
     if (*delay_on == 0 || *delay_off == 0)
         return -1;
 
-    g_green_led_data->delay_on = *delay_on;
-    g_green_led_data->delay_off = *delay_off;
-    g_green_led_data->brightness = 0;
-    omap4430_green_led_set(&g_green_led_data->keypad_led_class_dev, g_green_led_data->brightness);
-    mod_timer(&g_green_led_data->timer, jiffies + msecs_to_jiffies(g_green_led_data->delay_on));
+    //g_green_led_data->delay_on = *delay_on;
+    //g_green_led_data->delay_off = *delay_off;
+    //g_green_led_data->brightness = 0;
+    //omap4430_green_led_set(&g_green_led_data->keypad_led_class_dev, g_green_led_data->brightness);
+    //mod_timer(&g_green_led_data->timer, jiffies + msecs_to_jiffies(g_green_led_data->delay_on));
 
     return 0;
 }
@@ -152,12 +155,12 @@ static int omap4430_keypad_led_probe(struct platform_device *pdev)
 	info->keypad_led_class_dev.brightness_set =
 			omap4430_green_led_set;
 	info->keypad_led_class_dev.max_brightness = LED_FULL;
-	info->keypad_led_class_dev.brightness = LED_OFF;
-	info->keypad_led_class_dev.blink_set = omap4430_green_led_set_blink;
-	init_timer(&info->timer);
-	info->timer.function = omap4430_keypad_led_timer;
-	info->timer.data = (unsigned long) info;
-	INIT_WORK(&info->work, omap4430_keypad_led_work);
+	//info->keypad_led_class_dev.brightness = LED_OFF;
+	//info->keypad_led_class_dev.blink_set = omap4430_green_led_set_blink;
+	//init_timer(&info->timer);
+	//info->timer.function = omap4430_keypad_led_timer;
+	//info->timer.data = (unsigned long) info;
+	//INIT_WORK(&info->work, omap4430_keypad_led_work);
 
 	ret = led_classdev_register(&pdev->dev,
 				    &info->keypad_led_class_dev);
@@ -183,11 +186,12 @@ static int omap4430_keypad_led_remove(struct platform_device *pdev)
 {
 	struct keypad_led_data *info = platform_get_drvdata(pdev);
 	led_classdev_unregister(&info->keypad_led_class_dev);
-	flush_work(&info->work);
-	del_timer_sync(&info->timer);
+	//flush_work(&info->work);
+	//del_timer_sync(&info->timer);
 	return 0;
 }
 
+#if 0
 static int omap4430_keypad_led_suspend(struct platform_device *pdev)
 {
 	printk("!!!!!!!%s!!!!!!!!!!\n",__func__);
@@ -210,6 +214,7 @@ static const struct dev_pm_ops omap4430_sdp_keypad_led_pm_ops = {
 	.suspend = omap4430_keypad_led_suspend,
 	.resume = omap4430_keypad_led_resume,
 };
+#endif
 
 static struct platform_driver omap4430_keypad_led_driver = {
 	.probe = omap4430_keypad_led_probe,
@@ -217,7 +222,7 @@ static struct platform_driver omap4430_keypad_led_driver = {
 	.driver = {
 		   .name = "keypad_led",
 		   .owner = THIS_MODULE,
-		   .pm = &omap4430_sdp_keypad_led_pm_ops,
+		   //.pm = &omap4430_sdp_keypad_led_pm_ops,
 		   },
 };
 
@@ -231,7 +236,7 @@ static void __exit omap4430_keypad_led_exit(void)
 	platform_driver_unregister(&omap4430_keypad_led_driver);
 }
 
-subsys_initcall(omap4430_keypad_led_init);
+module_init(omap4430_keypad_led_init);
 module_exit(omap4430_keypad_led_exit);
 
 MODULE_DESCRIPTION("OMAP4430 SDP Keypad Lighting driver");
