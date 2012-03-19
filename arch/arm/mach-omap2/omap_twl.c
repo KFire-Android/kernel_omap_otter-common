@@ -86,13 +86,6 @@
 /* Pull down control */
 #define TWL6030_REG_CFG_SMPS_PD		0xF6
 
-#define TWL6030_REG_VCORE1_CFG_GRP			0x52
-#define TWL6030_REG_VCORE1_CFG_TRANS			0x53
-#define TWL6030_REG_VCORE2_CFG_GRP			0x58
-#define TWL6030_REG_VCORE2_CFG_TRANS			0x59
-#define TWL6030_REG_VCORE3_CFG_GRP			0x5e
-#define TWL6030_REG_VCORE3_CFG_TRANS			0x5f
-#define TWL6030_BIT_APE_GRP				BIT(0)
 /*
  * Setup CFG_TRANS mode as follows:
  * 0x00 (OFF) when in OFF state(bit offset 4) and in sleep (bit offset 2)

@@ -120,12 +120,6 @@ static void omap_mcbsp_dump_reg(u8 id)
 			MCBSP_READ(mcbsp, SRGR1));
 	dev_dbg(mcbsp->dev, "PCR0:  0x%04x\n",
 			MCBSP_READ(mcbsp, PCR0));
-	dev_dbg(mcbsp->dev, "WAKEUPEN0:  0x%04x\n",
-			MCBSP_READ(mcbsp, WAKEUPEN));
-	dev_dbg(mcbsp->dev, "THRSH1:  0x%04x\n",
-			MCBSP_READ(mcbsp, THRSH1));
-	dev_dbg(mcbsp->dev, "THRSH2:  0x%04x\n",
-			MCBSP_READ(mcbsp, THRSH2));
 	dev_dbg(mcbsp->dev, "***********************\n");
 }
 

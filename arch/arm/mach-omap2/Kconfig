@@ -492,4 +492,6 @@ config OMAP4_HSOTG_ED_CORRECTION
 	  order to improve Eye Diagramm. On 4430 CPUs this should
 	  improve Eye Diagram at least 8%.
 
+endmenu
+
 endif

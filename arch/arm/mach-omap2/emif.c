@@ -136,7 +136,6 @@ u8 omap4_ctrl_temp_sensor_single_conv(void)
 static u32 emif_errata;
 #define is_emif_erratum(erratum) (emif_errata & EMIF_ERRATUM_##erratum)
 
->>>>>>> 2185a3781e214dbaee2ae4142fe7b827e1c4eb36
 
 static void do_cancel_out(u32 *num, u32 *den, u32 factor)
 {

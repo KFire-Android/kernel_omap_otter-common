@@ -6260,7 +6260,6 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
 	&omap44xx_wd_timer2_hwmod,
 	&omap44xx_wd_timer3_hwmod,
 
-	// FIXME-HASH: Removed in KFire Kernel
 	&omap44xx_usb_host_hs_hwmod,
 	&omap44xx_usbhs_ohci_hwmod,
 	&omap44xx_usbhs_ehci_hwmod,

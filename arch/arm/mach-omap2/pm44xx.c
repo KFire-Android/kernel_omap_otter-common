@@ -145,7 +145,6 @@ static struct clockdomain *emif_clkdm, *mpuss_clkdm;
  * at PM initialization time for I/O pads daisy chain reseting.
  **/
 #define OMAP4_PM_ERRATUM_IO_WAKEUP_CLOCK_NOT_RECYCLED_i612	BIT(7)
->>>>>>> 2185a3781e214dbaee2ae4142fe7b827e1c4eb36
 
 u8 pm44xx_errata;
 #define is_pm44xx_erratum(erratum) (pm44xx_errata & OMAP4_PM_ERRATUM_##erratum)
@@ -875,7 +874,6 @@ static const struct platform_suspend_ops omap_pm_ops = {
 };
 #else
 void omap4_enter_sleep(unsigned int cpu, unsigned int power_state, bool suspend){ return; }
-static void omap4_configure_pwrst(bool is_off_mode) { return; }
 #endif /* CONFIG_SUSPEND */
 
 /**
