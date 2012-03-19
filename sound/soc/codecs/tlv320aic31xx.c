@@ -159,7 +159,7 @@ static int aic31xx_hp_power_down (struct snd_soc_codec *codec);
  *           
  *----------------------------------------------------------------------------
  */
-static unsigned int n_control_info(struct snd_kcontrol *kcontrol,
+static int n_control_info(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_info *uinfo)
 {
 	struct soc_mixer_control *mc =
@@ -187,7 +187,7 @@ static unsigned int n_control_info(struct snd_kcontrol *kcontrol,
  *           
  *----------------------------------------------------------------------------
  */
-static unsigned int n_control_get(struct snd_kcontrol *kcontrol,
+static int n_control_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
@@ -215,7 +215,7 @@ static unsigned int n_control_get(struct snd_kcontrol *kcontrol,
  *
  *----------------------------------------------------------------------------
  */
-static unsigned int n_control_put(struct snd_kcontrol *kcontrol,
+static int n_control_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
