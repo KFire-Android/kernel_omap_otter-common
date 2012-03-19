@@ -24,6 +24,9 @@
 #include <linux/string.h>
 #include <video/omapdss.h>
 #include "ti_hdmi.h"
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
+#include <sound/asound.h>
+#endif
 
 /* HDMI Wrapper */
 
@@ -416,11 +419,8 @@ struct hdmi_audio_dma {
 };
 
 struct hdmi_core_audio_i2s_config {
-	u8 word_max_length;
-	u8 word_length;
 	u8 in_length_bits;
 	u8 justification;
-	u8 en_high_bitrate_aud;
 	u8 sck_edge_mode;
 	u8 cbit_order;
 	u8 vbit;
@@ -432,7 +432,7 @@ struct hdmi_core_audio_i2s_config {
 
 struct hdmi_core_audio_config {
 	struct hdmi_core_audio_i2s_config	i2s_cfg;
-	u32 freq_sample;
+	struct snd_aes_iec958 *iec60958_cfg;
 	bool					fs_override;
 	u32					n;
 	u32					cts;
@@ -445,6 +445,7 @@ struct hdmi_core_audio_config {
 	bool					en_dsd_audio;
 	bool					en_parallel_aud_input;
 	bool					en_spdif;
+	bool					en_high_bitrate_aud;
 };
 
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
