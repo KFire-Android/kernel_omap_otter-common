@@ -302,7 +302,7 @@ static ssize_t show_temperature(struct device *dev,
 	int temp = 0;
 	int ret;
 	int status;
-	char i;
+	int i;
 	struct twl6030_gpadc_request req;
 
 	req.channels = (1 << 4);
@@ -335,7 +335,7 @@ static ssize_t show_temperature_batt(struct device *dev,
 	int temp = 0;
 	int ret;
 	int status;
-	char i;
+	int i;
 	struct twl6030_gpadc_request req;
 
 	req.channels = (1 << 1);
@@ -365,8 +365,8 @@ int twl_get_batntc()
 	int adcraw = 0;
 	int temp = 0;
 	int ret;
-	int status;
-	char i;
+	//int status;
+	int i;
 	struct twl6030_gpadc_request req;
 
 	req.channels = (1 << 1);
@@ -735,6 +735,11 @@ in_gain(13);
 in_gain(14);
 in_gain(15);
 in_gain(16);
+static DEVICE_ATTR(ntc, S_IROTH|S_IWUSR, show_temperature, NULL);
+static DEVICE_ATTR(ntc_batt, S_IROTH|S_IWUSR, show_temperature_batt, NULL);
+//////////////leon add for NTC access
+//static SENSOR_DEVICE_ATTR(ntcvalue, S_IRUGO|S_IWUSR|S_IWGRP,
+//		get_ntc_value, NULL, 6);
 
 #define IN_ATTRS(X)\
 	&sensor_dev_attr_in##X##_gain.dev_attr.attr,	\
@@ -761,10 +766,10 @@ static struct attribute *twl6030_gpadc_attributes[] = {
 	IN_ATTRS(14),
 	IN_ATTRS(15),
 	IN_ATTRS(16),
+	&dev_attr_ntc.attr,
+	&dev_attr_ntc_batt.attr,	
 	NULL
 };
-//	&dev_attr_ntc.attr,
-//	&dev_attr_ntc_batt.attr,	
 //	&sensor_dev_attr_ntcvalue.dev_attr.attr,	//leon add
 
 static const struct attribute_group twl6030_gpadc_group = {
