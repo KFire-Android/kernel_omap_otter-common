@@ -424,8 +424,9 @@ static void release_gi(struct gid_info *gi)
 
 /* allocate an reserved area of size, alignment and link it to gi */
 /* leaves mutex locked to be able to add block to area */
-static struct area_info *area_new_m(u16 width, u16 height, u16 align,
-				  struct tcm *tcm, struct gid_info *gi)
+static struct area_info *area_new_m(enum tiler_fmt fmt, u16 width, u16 height,
+					u16 align, struct gid_info *gi,
+					u32 alloc_flags)
 {
 	struct area_info *ai = kmalloc(sizeof(*ai), GFP_KERNEL);
 	if (!ai)
@@ -436,12 +437,15 @@ static struct area_info *area_new_m(u16 width, u16 height, u16 align,
 	INIT_LIST_HEAD(&ai->blocks);
 
 	/* reserve an allocation area */
-	if (tcm_reserve_2d(tcm, width, height, align, &ai->area)) {
+	if (tcm_reserve_2d(tcm[fmt], width, height, align, &ai->area)) {
 		kfree(ai);
 		return NULL;
 	}
 
 	ai->gi = gi;
+	if (alloc_flags & FLAGS_ALLOC_NO_COLOCATE)
+		ai->allowed_modes |= 1 << fmt;
+
 	mutex_lock(&mtx);
 	list_add_tail(&ai->by_gid, &gi->areas);
 	return ai;
@@ -665,8 +669,9 @@ struct mem_info *_m_add2area(struct mem_info *mi, struct area_info *ai,
 	return mi;
 }
 
-static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
-					struct gid_info *gi, struct tcm *tcm)
+static struct mem_info *get_2d_area(enum tiler_fmt fmt, u16 w, u16 h, u16 align,
+					u16 offs, u16 band, struct gid_info *gi,
+					u32 alloc_flags)
 {
 	struct area_info *ai = NULL;
 	struct mem_info *mi = NULL;
@@ -678,7 +683,7 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 	/* see if there is available prereserved space */
 	mutex_lock(&mtx);
 	list_for_each_entry(mi, &gi->reserved, global) {
-		if (mi->area.tcm == tcm &&
+		if (mi->area.tcm == tcm[fmt] &&
 		    tcm_aheight(mi->area) == h &&
 		    tcm_awidth(mi->area) == w &&
 		    (mi->area.p0.x & (align - 1)) == offs) {
@@ -710,8 +715,10 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 	/* this sets x, ai and before */
 	mutex_lock(&mtx);
 	list_for_each_entry(ai, &gi->areas, by_gid) {
-		if (ai->area.tcm == tcm &&
-		    tcm_aheight(ai->area) == h) {
+		if (ai->area.tcm == tcm[fmt] &&
+		    tcm_aheight(ai->area) == h &&
+		    (!ai->allowed_modes ||
+			(ai->allowed_modes & (1 << fmt)))) {
 			x = _m_blk_find_fit(w, align, offs, ai, &before);
 			if (x) {
 				_m_add2area(mi, ai, x - w, w, before);
@@ -732,8 +739,8 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 	mutex_unlock(&mtx);
 
 	/* if no area fit, reserve a new one */
-	ai = area_new_m(ALIGN(w + offs, max(band, align)), h,
-		      max(band, align), tcm, gi);
+	ai = area_new_m(fmt, ALIGN(w + offs, max(band, align)), h,
+		      max(band, align), gi, alloc_flags);
 	if (ai) {
 		_m_add2area(mi, ai, ai->area.p0.x + offs, w, &ai->blocks);
 		if (tiler_alloc_debug & 1)
@@ -768,8 +775,8 @@ static s32 lay_2d(enum tiler_fmt fmt, u16 n, u16 w, u16 h, u16 band,
 
 	/* calculate dimensions, band, offs, and alignment in slots */
 	/* reserve an area */
-	ai = area_new_m(ALIGN(w_res + offs, max(band, align)), h,
-			max(band, align), tcm[fmt], gi);
+	ai = area_new_m(fmt, ALIGN(w_res + offs, max(band, align)), h,
+			max(band, align), gi, 0);
 	if (!ai)
 		return -ENOMEM;
 
@@ -806,7 +813,7 @@ static s32 lay_nv12(int n, u16 w, u16 w1, u16 h, struct gid_info *gi, u8 *p)
 	struct list_head *pos;
 
 	/* reserve area */
-	ai = area_new_m(w, h, a, TILFMT_8BIT, gi);
+	ai = area_new_m(TILFMT_8BIT, w, h, a, gi, 0);
 	if (!ai)
 		return -ENOMEM;
 
@@ -1161,7 +1168,8 @@ static void fill_block_info(struct mem_info *i, struct tiler_block_info *blk)
  *  ==========================================================================
  */
 static struct mem_info *alloc_area(enum tiler_fmt fmt, u32 width, u32 height,
-				   struct gid_info *gi, u16 align, u16 offs)
+				   struct gid_info *gi, u16 align, u16 offs,
+					u32 alloc_flags)
 {
 	u16 x, y, band, remainder = 0;
 	struct mem_info *mi = NULL;
@@ -1193,7 +1201,7 @@ static struct mem_info *alloc_area(enum tiler_fmt fmt, u32 width, u32 height,
 		mi->parent = gi;
 		list_add(&mi->by_area, &gi->onedim);
 	} else {
-		mi = get_2d_area(x, y, align, offs, band, gi, tcm[fmt]);
+		mi = get_2d_area(fmt, x, y, align, offs, band, gi, alloc_flags);
 		if (!mi)
 			return NULL;
 
@@ -1218,6 +1226,7 @@ static struct mem_info *alloc_block_area(enum tiler_fmt fmt, u32 width,
 {
 	struct mem_info *mi = NULL;
 	struct gid_info *gi = NULL;
+	unsigned int alloc_flags = 0;
 
 	/* validate parameters */
 	if (!si || align > PAGE_SIZE || offs >= (align ? : PAGE_SIZE))
@@ -1231,8 +1240,11 @@ static struct mem_info *alloc_block_area(enum tiler_fmt fmt, u32 width,
 	if (!gi)
 		return ERR_PTR(-ENOMEM);
 
+	if (align && align < PAGE_SIZE)
+		alloc_flags |= FLAGS_ALLOC_NO_COLOCATE;
+
 	/* reserve area in tiler container */
-	mi = alloc_area(fmt, width, height, gi, align, offs);
+	mi = alloc_area(fmt, width, height, gi, align, offs, alloc_flags);
 	if (!mi) {
 		mutex_lock(&mtx);
 		gi->refs--;

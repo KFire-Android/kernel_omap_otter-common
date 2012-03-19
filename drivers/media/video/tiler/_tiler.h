@@ -45,6 +45,8 @@
 
 #define TILER_FORMATS		(TILFMT_MAX - TILFMT_MIN + 1)
 
+#define FLAGS_ALLOC_NO_COLOCATE	0x1
+
 enum secure_id_type {
 	SECURE_BY_PID = 0,
 	SECURE_BY_TOKEN
@@ -88,6 +90,8 @@ struct area_info {
 
 	struct tcm_area area;		/* area details */
 	struct gid_info *gi;		/* link to parent, if still alive */
+
+	u32 allowed_modes;
 };
 
 /* info for a block */
