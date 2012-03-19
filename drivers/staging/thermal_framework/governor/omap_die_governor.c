@@ -20,6 +20,7 @@
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/suspend.h>
 #include <linux/thermal_framework.h>
 #include <plat/tmp102_temp_sensor.h>
 
@@ -619,8 +620,27 @@ static int omap_process_cpu_temp(struct list_head *cooling_list,
 	return omap_cpu_thermal_manager(cooling_list, temp);
 }
 
+static int omap_die_pm_notifier_cb(struct notifier_block *notifier,
+				unsigned long pm_event,  void *unused)
+{
+	switch (pm_event) {
+	case PM_SUSPEND_PREPARE:
+		cancel_delayed_work_sync(&omap_gov->average_cpu_sensor_work);
+		break;
+	case PM_POST_SUSPEND:
+		schedule_work(&omap_gov->average_cpu_sensor_work.work);
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
 static struct thermal_dev_ops omap_gov_ops = {
 	.process_temp = omap_process_cpu_temp,
+};
+
+static struct notifier_block omap_die_pm_notifier = {
+	.notifier_call = omap_die_pm_notifier_cb,
 };
 
 static int __init omap_die_governor_init(void)
@@ -654,8 +674,13 @@ static int __init omap_die_governor_init(void)
 
 	omap_gov->average_period = NORMAL_TEMP_MONITORING_RATE;
 	omap_gov->avg_is_valid = 0;
+
+	if (register_pm_notifier(&omap_die_pm_notifier))
+		pr_err("%s: omap_die pm registration failed!\n", __func__);
+
 	schedule_delayed_work(&omap_gov->average_cpu_sensor_work,
 			msecs_to_jiffies(0));
+
 	return 0;
 }
 
