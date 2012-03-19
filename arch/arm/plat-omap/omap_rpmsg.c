@@ -97,6 +97,7 @@ struct omap_rpmsg_vq_info {
 /* The total IPC space needed to communicate with a remote processor */
 #define RPMSG_IPC_MEM	(RPMSG_BUFS_SPACE + 2 * RPMSG_RING_SIZE)
 
+#if defined(CONFIG_OMAP_REMOTE_PROC_IPU) || defined(CONFIG_OMAP_REMOTE_PROC_DSP)
 /* provide drivers with platform-specific details */
 static void omap_rpmsg_get(struct virtio_device *vdev, unsigned int request,
 		   void *buf, unsigned len)
@@ -137,6 +138,11 @@ static void omap_rpmsg_get(struct virtio_device *vdev, unsigned int request,
 		/* user data is at stake so bugs here cannot be tolerated */
 		BUG_ON(len != sizeof(rpdev->hardcoded_chnls));
 		memcpy(buf, &rpdev->hardcoded_chnls, len);
+		break;
+	case VPROC_RPROC_REF:
+		/* user data is at stake so bugs here cannot be tolerated */
+		BUG_ON(len != sizeof(rpdev->rproc));
+		memcpy(buf, &rpdev->rproc, len);
 		break;
 	default:
 		dev_err(&vdev->dev, "invalid request: %d\n", request);
@@ -357,6 +363,7 @@ static void omap_rpmsg_del_vqs(struct virtio_device *vdev)
 
 	list_for_each_entry_safe(vq, n, &vdev->vqs, list) {
 		struct omap_rpmsg_vq_info *rpvq = vq->priv;
+		iounmap(rpvq->addr);
 		vring_del_virtqueue(vq);
 		kfree(rpvq);
 	}
@@ -490,6 +497,7 @@ static void omap_rpmsg_finalize_features(struct virtio_device *vdev)
 	/* Give virtio_ring a chance to accept features */
 	vring_transport_features(vdev);
 }
+#endif
 
 static void omap_rpmsg_vproc_release(struct device *dev)
 {
@@ -516,6 +524,7 @@ static void rpmsg_reset_work(struct work_struct *work)
 	}
 }
 
+#if defined(CONFIG_OMAP_REMOTE_PROC_IPU) || defined(CONFIG_OMAP_REMOTE_PROC_DSP)
 static struct virtio_config_ops omap_rpmsg_config_ops = {
 	.get_features	= omap_rpmsg_get_features,
 	.finalize_features = omap_rpmsg_finalize_features,
@@ -526,7 +535,9 @@ static struct virtio_config_ops omap_rpmsg_config_ops = {
 	.set_status	= omap_rpmsg_set_status,
 	.get_status	= omap_rpmsg_get_status,
 };
+#endif
 
+#ifdef CONFIG_OMAP_REMOTE_PROC_IPU
 static struct rpmsg_channel_info omap_ipuc0_hardcoded_chnls[] = {
 	{ "rpmsg-resmgr", 100, RPMSG_ADDR_ANY },
 	{ "rpmsg-server-sample", 137, RPMSG_ADDR_ANY },
@@ -537,8 +548,18 @@ static struct rpmsg_channel_info omap_ipuc1_hardcoded_chnls[] = {
 	{ "rpmsg-resmgr", 100, RPMSG_ADDR_ANY },
 	{ },
 };
+#endif
+
+#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
+static struct rpmsg_channel_info omap_dsp_hardcoded_chnls[] = {
+	{ "rpmsg-resmgr", 100, RPMSG_ADDR_ANY },
+	{ "rpmsg-server-sample", 137, RPMSG_ADDR_ANY },
+	{ },
+};
+#endif
 
 static struct omap_rpmsg_vproc omap_rpmsg_vprocs[] = {
+#ifdef CONFIG_OMAP_REMOTE_PROC_IPU
 	/* ipu_c0's rpmsg backend */
 	{
 		.vdev.id.device	= VIRTIO_ID_RPMSG,
@@ -559,22 +580,50 @@ static struct omap_rpmsg_vproc omap_rpmsg_vprocs[] = {
 		.hardcoded_chnls = omap_ipuc1_hardcoded_chnls,
 		.slave_reset	= true,
 	},
+#endif
+#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
+	{
+		.vdev.id.device = VIRTIO_ID_RPMSG,
+		.vdev.config	= &omap_rpmsg_config_ops,
+		.mbox_name	= "mailbox-2",
+		.rproc_name	= "dsp",
+		.base_vq_id	= 4,
+		.hardcoded_chnls = omap_dsp_hardcoded_chnls,
+	},
+#endif
 };
 
 static int __init omap_rpmsg_ini(void)
 {
-	int i, ret = 0;
-	phys_addr_t paddr = omap_ipu_get_mempool_base(
-						OMAP_RPROC_MEMPOOL_STATIC);
-	phys_addr_t psize = omap_ipu_get_mempool_size(
-						OMAP_RPROC_MEMPOOL_STATIC);
+	int i, ret = 0, mret = 0;
+	phys_addr_t paddr = 0;
+	phys_addr_t psize = 0;
+	bool set_ipu = true;
 
 	for (i = 0; i < ARRAY_SIZE(omap_rpmsg_vprocs); i++) {
 		struct omap_rpmsg_vproc *rpdev = &omap_rpmsg_vprocs[i];
 
+		if (!strcmp(rpdev->rproc_name, "ipu")) {
+			/* ok to require all vprocs for a rproc be together */
+			if (set_ipu) {
+				paddr = omap_ipu_get_mempool_base(
+						OMAP_RPROC_MEMPOOL_STATIC);
+				psize = omap_ipu_get_mempool_size(
+						OMAP_RPROC_MEMPOOL_STATIC);
+				set_ipu = false;
+			}
+		} else if (!strcmp(rpdev->rproc_name, "dsp")) {
+			paddr = omap_dsp_get_mempool_tbase(
+					OMAP_RPROC_MEMPOOL_STATIC);
+			psize = omap_dsp_get_mempool_tsize(
+					OMAP_RPROC_MEMPOOL_STATIC);
+		} else
+			break;
+
 		if (psize < RPMSG_IPC_MEM) {
 			pr_err("out of carveout memory: %d (%d)\n", psize, i);
-			return -ENOMEM;
+			mret = -ENOMEM;
+			continue;
 		}
 
 		/*
@@ -602,7 +651,7 @@ static int __init omap_rpmsg_ini(void)
 		}
 	}
 
-	return ret;
+	return ret | mret;
 }
 module_init(omap_rpmsg_ini);
 

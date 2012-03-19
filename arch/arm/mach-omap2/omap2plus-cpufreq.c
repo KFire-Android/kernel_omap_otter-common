@@ -500,7 +500,7 @@ static int __init omap_cpufreq_init(void)
 		mpu_clk_name = "dpll1_ck";
 	else if (cpu_is_omap443x())
 		mpu_clk_name = "dpll_mpu_ck";
-	else if (cpu_is_omap446x())
+	else if (cpu_is_omap446x() || cpu_is_omap447x())
 		mpu_clk_name = "virt_dpll_mpu_ck";
 
 	if (!mpu_clk_name) {

@@ -1,0 +1,83 @@
+﻿Texas Instruments Android Linux kernel releases
+
+Kernel Name
+-----------------------------------------------
+
+Texas Instruments releases the Android kernel with associated kernel name. The kernel name consists of
+<kernel major >.<kernel minor>-Android-<TI's Android project revision>.
+
+For example:
+3.0.19-Android-L4AI-R0001 denotes
+
+Kernel Major Version: For Example 3
+Kernel Minor Version: For Example 0.19
+Kernel Type – Android
+TI Project Minor Kernel Release – For Examle R0001
+
+Please note that TI “Project Release” does not follow the repository's version TAG, such as L4AI.1.1.
+It has it's own version with the project and can use the program's name without the version appended.
+
+TI “Project Minor Kernel Release” changes when kernel's ABI of the major TI major subcomponent changes in such a way
+that it prevents other major subcomponents to operate correctly.
+For example the DSS/DSSCOMP or PM RUNTIME API or behavior change, etc.
+
+A developer, changing a major Kernel ABI initiates the change of the kernel revision name.
+The maintainer of the kernel for the respective Android project is responsible for verifying that new patches to the kernel
+do not change the major API (Kernel API) in a way to break other components/modules. In case where such events arises,
+the maintainer of the kernel  must initiate the revision change of the kernel name and notify the owner of the affected
+components.
+
+To change the kernel name, please update the CONFIG_LOCALVERSION filed of the kernel's respective “defconfig” file.
+For Blaze, for example, the location of the file is  at /arch/arm/configs/blaze_defconfig.
+As per the example above the filed would be updated as “-Android-R0001”
+
+====================================================================================
+
+Texas Instruments Major Kernel Subcomponents
+--------------------------------------------------
+
+All TI kernel major subsystem APIs have:
+Name, Version, Component Dependency, Component API version dependencies and API Owner.
+
+The Name of the API has the following format TI_KERNEL_API_<API NUMBER>_<API_NAME>.
+
+The following API are defined as of the day, this README is updated:
+
+1. TI_KERNEL_API_01_PM RUNTIME – Kernel Power Management
+2. TI_KERNEL_API_02_GFX – SGX Kernel Graphics Driver
+3. TI_KERNEL_API_03_DISPLAY – DSS/DSSCOMP Display subsystem
+4. TI_KERNEL_API_04_OMX – Kernel OpenMax Components
+5. …..............
+
+Kernel Power Management Subcomponent
+---------------------------------------
+API Name:  TI_KERNEL_API_01_PM RUNTIME
+TBD
+
+Kernel Graphics Driver Subcomponent
+---------------------------------------
+
+API Name:  TI_KERNEL_API_02_GFX
+Current Version: 1.8@785978
+Version Source Location: drivers/gpu/pvr/pvrversion.h
+Version RT Location: /proc/pvr/version
+Major Subcomponent API dependencies:
+	TI_KERNEL_API_01_PM RUNTIME version xxx_tbd
+	TI_KERNEL_API_03_DISPLAY  version xxx_tbd
+API maintainers: Atanas (Tony) Zlatinski <zlatinski@gmail.com>, Hemant Hariyani <hemanthariyani@ti.com>
+
+Notes: SGX kernel component are built outside the kernel tree as a kernel loadable module.
+Please refer to SGX Graphics Driver README file for details.
+
+DSS/DSSCOMP Display Driver Subcomponent
+----------------------------------------
+
+API Name:   TI_KERNEL_API_03_DISPLAY
+TBD
+
+Kernel OpenMax Subcomponents
+----------------------------------------
+
+API Name:   TI_KERNEL_API_04_OMX
+TBD
+

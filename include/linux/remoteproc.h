@@ -300,6 +300,7 @@ int rproc_register(struct device *, const char *, const struct rproc_ops *,
 		unsigned int timeout);
 int rproc_unregister(const char *);
 void rproc_last_busy(struct rproc *);
+int rproc_pa_to_da(struct rproc *, phys_addr_t, u64 *);
 #ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
 extern const struct dev_pm_ops rproc_gen_pm_ops;
 #define GENERIC_RPROC_PM_OPS	(&rproc_gen_pm_ops)

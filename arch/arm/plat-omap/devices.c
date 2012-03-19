@@ -235,14 +235,19 @@ static void omap_init_uwire(void)
 static inline void omap_init_uwire(void) {}
 #endif
 
-#if defined(CONFIG_TIDSPBRIDGE) || defined(CONFIG_TIDSPBRIDGE_MODULE)
+#if defined(CONFIG_TIDSPBRIDGE) || defined(CONFIG_TIDSPBRIDGE_MODULE) \
+				|| defined(CONFIG_OMAP_REMOTE_PROC_DSP)
 
 static phys_addr_t omap_dsp_phys_mempool_base;
 static phys_addr_t omap_dsp_phys_mempool_size;
 
 void __init omap_dsp_reserve_sdram_memblock(void)
 {
+#if defined(CONFIG_OMAP_REMOTE_PROC_DSP)
+	phys_addr_t size = CONFIG_OMAP_REMOTEPROC_MEMPOOL_SIZE_DSP;
+#else
 	phys_addr_t size = CONFIG_TIDSPBRIDGE_MEMPOOL_SIZE;
+#endif
 	phys_addr_t paddr;
 
 	if (!size)
@@ -260,7 +265,9 @@ void __init omap_dsp_reserve_sdram_memblock(void)
 	omap_dsp_phys_mempool_base = paddr;
 	omap_dsp_phys_mempool_size = size;
 }
+#endif
 
+#if defined(CONFIG_TIDSPBRIDGE) || defined(CONFIG_TIDSPBRIDGE_MODULE)
 phys_addr_t omap_dsp_get_mempool_base(void)
 {
 	return omap_dsp_phys_mempool_base;
@@ -274,7 +281,44 @@ phys_addr_t omap_dsp_get_mempool_size(void)
 EXPORT_SYMBOL(omap_dsp_get_mempool_size);
 #endif
 
-#if defined(CONFIG_OMAP_REMOTE_PROC)
+#if defined(CONFIG_OMAP_REMOTE_PROC_DSP)
+static phys_addr_t omap_dsp_phys_st_mempool_base;
+static phys_addr_t omap_dsp_phys_st_mempool_size;
+
+void __init omap_dsp_set_static_mempool(u32 start, u32 size)
+{
+	omap_dsp_phys_st_mempool_base = start;
+	omap_dsp_phys_st_mempool_size = size;
+}
+
+phys_addr_t omap_dsp_get_mempool_tbase(enum omap_rproc_mempool_type type)
+{
+	switch (type) {
+	case OMAP_RPROC_MEMPOOL_STATIC:
+		return omap_dsp_phys_st_mempool_base;
+	case OMAP_RPROC_MEMPOOL_DYNAMIC:
+		return omap_dsp_phys_mempool_base;
+	default:
+		return 0;
+	}
+}
+EXPORT_SYMBOL(omap_dsp_get_mempool_tbase);
+
+phys_addr_t omap_dsp_get_mempool_tsize(enum omap_rproc_mempool_type type)
+{
+	switch (type) {
+	case OMAP_RPROC_MEMPOOL_STATIC:
+		return omap_dsp_phys_st_mempool_size;
+	case OMAP_RPROC_MEMPOOL_DYNAMIC:
+		return omap_dsp_phys_mempool_size;
+	default:
+		return 0;
+	}
+}
+EXPORT_SYMBOL(omap_dsp_get_mempool_tsize);
+#endif
+
+#if defined(CONFIG_OMAP_REMOTE_PROC_IPU)
 static phys_addr_t omap_ipu_phys_mempool_base;
 static u32 omap_ipu_phys_mempool_size;
 static phys_addr_t omap_ipu_phys_st_mempool_base;

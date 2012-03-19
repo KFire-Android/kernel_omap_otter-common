@@ -33,6 +33,7 @@
 #include <plat/omap-pm.h>
 #include <plat/gpmc.h>
 #include <plat/dma.h>
+#include <plat/omap_device.h>
 
 #include <mach/omap_fiq_debugger.h>
 
@@ -84,7 +85,7 @@ static struct clockdomain *emif_clkdm, *mpuss_clkdm;
 /*
 * HSI - OMAP4430-2.2BUG00055:
 * HSI: DSP Swakeup generated is the same than MPU Swakeup.
-* System can’t enter in off mode due to the DSP.
+* System can't enter in off mode due to the DSP.
 */
 #define OMAP4_PM_ERRATUM_HSI_SWAKEUP_iXXX	BIT(2)
 
@@ -105,10 +106,74 @@ static struct clockdomain *emif_clkdm, *mpuss_clkdm;
  */
 #define OMAP4_PM_ERRATUM_MPU_EMIF_NO_DYNDEP_IDLE_iXXX	BIT(4)
 
+/*
+ * There is a HW bug in CMD PHY which gives ISO signals as same for both
+ * PADn and PADp on differential IO pad, because of which IO leaks higher
+ * as pull controls are differential internally and pull value does not
+ * match A value.
+ * Though there is no functionality impact due to this bug, it is seen
+ * that by disabling the pulls there is a savings ~500uA in OSWR, but draws
+ * ~300uA more during OFF mode.
+ * To save power during both idle/suspend following approach taken:
+ * 1) Enable WA during boot-up.
+ * 2) Disable WA while attempting suspend and enable during resume.
+ *
+ * CDDS no: OMAP4460-1.0BUG00291 (OMAP official errata ID yet to be available).
+ */
+#define OMAP4_PM_ERRATUM_LPDDR_CLK_IO_iXXX		BIT(5)
+#define LPDDR_WD_PULL_DOWN				0x02
+
+/*
+ * The OFF mode isn't fully supported for OMAP4430GP ES2.0 - ES2.2
+ * When coming back from device off mode, the Cortex-A9 WUGEN enable registers
+ * are not restored by ROM code due to i625. The work around is using an
+ * alternative power state (instead of off mode) which maintains the proper
+ * register settings.
+ */
+#define OMAP4_PM_ERRATUM_WUGEN_LOST_i625	BIT(6)
+
+/* TI Errata i612 - Wkup Clk Recycling Needed After Warm Reset
+ * CRITICALITY: Low
+ * REVISIONS IMPACTED: OMAP4430 all
+ * Hardware does not recycle the I/O wake-up clock upon a global warm reset.
+ * When a warm reset is done, wakeups of daisy I/Os are disabled,
+ * but without the wake-up clock running, this change is not latched.
+ * Hence there is a possibility of seeing unexpected I/O wake-up events
+ * after warm reset.
+ *
+ * As W/A the call to omap4_trigger_ioctrl() has been added
+ * at PM initialization time for I/O pads daisy chain reseting.
+ **/
+#define OMAP4_PM_ERRATUM_IO_WAKEUP_CLOCK_NOT_RECYCLED_i612	BIT(7)
+>>>>>>> 2185a3781e214dbaee2ae4142fe7b827e1c4eb36
+
 u8 pm44xx_errata;
 #define is_pm44xx_erratum(erratum) (pm44xx_errata & OMAP4_PM_ERRATUM_##erratum)
 
 #define MAX_IOPAD_LATCH_TIME 1000
+
+void syscontrol_lpddr_clk_io_errata(bool enable)
+{
+	u32 v = 0;
+
+	if (!is_pm44xx_erratum(LPDDR_CLK_IO_iXXX))
+		return;
+
+	v = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_2);
+	if (enable)
+		v &= ~OMAP4_LPDDR2IO1_GR10_WD_MASK;
+	else
+		v |= LPDDR_WD_PULL_DOWN << OMAP4_LPDDR2IO1_GR10_WD_SHIFT;
+	omap4_ctrl_pad_writel(v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_2);
+
+	v = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_2);
+	if (enable)
+		v &= ~OMAP4_LPDDR2IO2_GR10_WD_MASK;
+	else
+		v |= LPDDR_WD_PULL_DOWN << OMAP4_LPDDR2IO1_GR10_WD_SHIFT;
+	omap4_ctrl_pad_writel(v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_2);
+}
+
 void omap4_trigger_ioctrl(void)
 {
 	int i = 0;
@@ -210,7 +275,6 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state, bool suspend)
 		if (omap_sr_disable_reset_volt(mpu_voltdm))
 			goto abort_device_off;
 
-		omap_sr_disable_reset_volt(mpu_voltdm);
 		omap_vc_set_auto_trans(mpu_voltdm,
 			OMAP_VC_CHANNEL_AUTO_TRANSITION_RETENTION);
 	}
@@ -258,7 +322,13 @@ void omap4_enter_sleep(unsigned int cpu, unsigned int power_state, bool suspend)
 			OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_IO_PMCTRL_OFFSET);
 	}
 
+	if (suspend)
+		syscontrol_lpddr_clk_io_errata(false);
+
 	omap4_enter_lowpower(cpu, power_state);
+
+	if (suspend)
+		syscontrol_lpddr_clk_io_errata(true);
 
 	if (omap4_device_prev_state_off()) {
 		/* Reconfigure the trim settings as well */
@@ -880,6 +950,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 #endif
 
 	pwrst->pwrdm = pwrdm;
+
 	if ((!strcmp(pwrdm->name, "mpu_pwrdm")) ||
 			(!strcmp(pwrdm->name, "core_pwrdm")) ||
 			(!strcmp(pwrdm->name, "cpu0_pwrdm")) ||
@@ -946,16 +1017,7 @@ static void __init syscontrol_setup_regs(void)
 	v |= OMAP4_LPDDR21_VREF_AUTO_EN_CA_MASK | OMAP4_LPDDR21_VREF_AUTO_EN_DQ_MASK;
         omap4_ctrl_pad_writel(v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_3);
 
-	/*
-	 * Workaround for CK differential IO PADn, PADp values due to bug in
-	 * EMIF CMD phy.
-	 */
-	v = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_2);
-	v &= ~OMAP4_LPDDR2IO1_GR10_WD_MASK;
-	omap4_ctrl_pad_writel(v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO1_2);
-	v = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_2);
-	v &= ~OMAP4_LPDDR2IO2_GR10_WD_MASK;
-	omap4_ctrl_pad_writel(v, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_LPDDR2IO2_2);
+	syscontrol_lpddr_clk_io_errata(true);
 }
 
 static void __init prcm_setup_regs(void)
@@ -997,7 +1059,7 @@ static void __init prcm_setup_regs(void)
 		OMAP4430_PRM_PARTITION, OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_LDO_SRAM_IVA_SETUP_OFFSET);
 
 	/* Allow SRAM LDO to enter RET during  low power state*/
-	if (cpu_is_omap446x()) {
+	if (cpu_is_omap446x() || cpu_is_omap447x()) {
 		omap4_prminst_rmw_inst_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
 				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT, OMAP4430_PRM_PARTITION,
 				OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_LDO_SRAM_CORE_CTRL_OFFSET);
@@ -1063,13 +1125,9 @@ no_32k:
 	omap4_prminst_write_inst_reg(0x3, OMAP4430_PRM_PARTITION,
 		OMAP4430_PRM_DEVICE_INST, OMAP4_PRM_PWRREQCTRL_OFFSET);
 
-	// FIXME-HASH: Added from KFire Kernel
-	/*Set setuptime and downtime into CLKSETUPTIME register*/
-	__raw_writel(0x00050140, OMAP4_SCRM_CLKSETUPTIME);
-
-	/*Set wakeuptime and sleeptime into PMICSETUPTIME register*/
-	__raw_writel(0x00200020, OMAP4_SCRM_PMICSETUPTIME);
-
+	/* Handle errata i612 */
+	if (is_pm44xx_erratum(IO_WAKEUP_CLOCK_NOT_RECYCLED_i612))
+		omap4_trigger_ioctrl();
 }
 
 
@@ -1209,7 +1267,7 @@ static void omap_default_idle(void)
 void omap4_device_set_state_off(u8 enable)
 {
 #ifdef CONFIG_OMAP_ALLOW_OSWR
-	if (enable)
+	if (enable && !(is_pm44xx_erratum(WUGEN_LOST_i625)))
 		omap4_prminst_write_inst_reg(0x1 <<
 				OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
 		OMAP4430_PRM_PARTITION, OMAP4430_PRM_DEVICE_INST,
@@ -1272,12 +1330,26 @@ static void __init omap4_pm_setup_errata(void)
 	 */
 	if (cpu_is_omap44xx())
 		pm44xx_errata |= OMAP4_PM_ERRATUM_IVA_AUTO_RET_iXXX |
-				 OMAP4_PM_ERRATUM_HSI_SWAKEUP_iXXX;
-	/* Dynamic Dependency errata for all silicon !=443x */
-	if (cpu_is_omap443x())
+				 OMAP4_PM_ERRATUM_HSI_SWAKEUP_iXXX |
+				 OMAP4_PM_ERRATUM_LPDDR_CLK_IO_iXXX;
+
+	if (cpu_is_omap443x()) {
+		/* Dynamic Dependency errata for all silicon !=443x */
 		pm44xx_errata |= OMAP4_PM_ERRATUM_MPU_EMIF_NO_DYNDEP_i688;
-	else
+		/* Enable errata i612 */
+		pm44xx_errata |=
+			OMAP4_PM_ERRATUM_IO_WAKEUP_CLOCK_NOT_RECYCLED_i612;
+	} else
 		pm44xx_errata |= OMAP4_PM_ERRATUM_MPU_EMIF_NO_DYNDEP_IDLE_iXXX;
+
+	/*
+	 * The OFF mode isn't fully supported for OMAP4430GP ES2.0 - ES2.2
+	 * due to errata i625
+	 * On ES1.0 OFF mode is not supported due to errata i498
+	 */
+	if (cpu_is_omap443x() && (omap_type() == OMAP2_DEVICE_TYPE_GP) &&
+			(omap_rev() < OMAP4430_REV_ES2_3))
+		pm44xx_errata |= OMAP4_PM_ERRATUM_WUGEN_LOST_i625;
 }
 
 /**
@@ -1291,6 +1363,8 @@ static int __init omap4_pm_init(void)
 	int ret = 0;
 	struct clockdomain *l3_1_clkdm;
 	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per, *l4_cfg;
+	char *init_devices[] = {"mpu", "iva"};
+	int i;
 
 	if (!cpu_is_omap44xx())
 		return -ENODEV;
@@ -1371,7 +1445,13 @@ static int __init omap4_pm_init(void)
 			" MPUSS <-> L3_MAIN_1.\n");
 		pr_info("OMAP4 PM: Static dependency added between"
 			" DUCATI <-> L4_PER/CFG and DUCATI <-> L3.\n");
-	} else if (cpu_is_omap446x()) {
+	} else if (cpu_is_omap446x() || cpu_is_omap447x()) {
+		/*
+		 * Static dependency between mpuss and emif can only be
+		 * disabled if OSWR is disabled to avoid a HW bug that occurs
+		 * when mpuss enters OSWR
+		 */
+		/*ret |= clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);*/
 		ret |= clkdm_add_wkdep(mpuss_clkdm, l4_per);
 		ret |= clkdm_add_wkdep(mpuss_clkdm, l4_cfg);
 
@@ -1454,6 +1534,36 @@ static int __init omap4_pm_init(void)
 	omap_pm_is_ready_status = true;
 	/* let the other CPU know as well */
 	smp_wmb();
+
+	/* Setup the scales for every init device appropriately */
+	for (i = 0; i < ARRAY_SIZE(init_devices); i++) {
+		struct omap_hwmod *oh = omap_hwmod_lookup(init_devices[i]);
+		struct clk *clk;
+		struct device *dev;
+		unsigned int rate;
+
+		if (!oh || !oh->od || !oh->main_clk) {
+			pr_warn("%s: no hwmod or odev or clk for %s, [%d] "
+				"oh=%p od=%p clk=%p cannot add OPPs.\n",
+				__func__, init_devices[i], i, oh,
+				(oh) ? oh->od : NULL,
+				(oh) ? oh->main_clk :  NULL);
+			continue;
+		}
+
+		clk = oh->_clk;
+		dev = &oh->od->pdev.dev;
+		/* Get the current rate */
+		rate = clk_get_rate(clk);
+
+		/* Update DVFS framework with rate information */
+		ret = omap_device_scale(dev, dev, rate);
+		if (ret) {
+			dev_warn(dev, "%s unable to scale to %d - %d\n",
+				__func__, rate, ret);
+			/* Continue to next device */
+		}
+	}
 
 err2:
 	return ret;

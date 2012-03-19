@@ -694,6 +694,7 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	struct tf_crypto_aes_operation_state *state =
 		crypto_ablkcipher_ctx(crypto_ablkcipher_reqtfm(ctx->req));
 	static size_t last_count;
+	unsigned long flags;
 
 	in = IS_ALIGNED((u32)ctx->in_sg->offset, sizeof(u32));
 	out = IS_ALIGNED((u32)ctx->out_sg->offset, sizeof(u32));
@@ -829,6 +830,7 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 	omap_start_dma(ctx->dma_lch_in);
 	omap_start_dma(ctx->dma_lch_out);
 
+	spin_lock_irqsave(&ctx->lock, flags);
 	if (ctx->next_req) {
 		struct ablkcipher_request *req =
 			ablkcipher_request_cast(ctx->next_req);
@@ -855,6 +857,7 @@ static int aes_dma_start(struct aes_hwa_ctx *ctx)
 		ctx->backlog->complete(ctx->backlog, -EINPROGRESS);
 		ctx->backlog = NULL;
 	}
+	spin_unlock_irqrestore(&ctx->lock, flags);
 
 	return 0;
 }
@@ -884,6 +887,8 @@ static int aes_dma_stop(struct aes_hwa_ctx *ctx)
 	omap_stop_dma(ctx->dma_lch_in);
 	omap_stop_dma(ctx->dma_lch_out);
 
+	tf_crypto_disable_clock(PUBLIC_CRYPTO_AES1_CLOCK_REG);
+
 	if (!(ctx->flags & FLAGS_FAST)) {
 		dma_sync_single_for_device(NULL, ctx->dma_addr_out,
 			ctx->dma_size, DMA_FROM_DEVICE);
@@ -900,6 +905,7 @@ static int aes_dma_stop(struct aes_hwa_ctx *ctx)
 	} else {
 		dma_unmap_sg(NULL, ctx->out_sg, 1, DMA_FROM_DEVICE);
 		dma_unmap_sg(NULL, ctx->in_sg, 1, DMA_TO_DEVICE);
+
 #ifdef CONFIG_TF_DRIVER_FAULT_INJECTION
 		tf_aes_fault_injection(paes_reg->AES_CTRL,
 			sg_virt(ctx->out_sg));

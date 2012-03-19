@@ -37,15 +37,25 @@
 #include "kerneldisplay.h"
 #include "omaplfb.h"
 
-#if defined(CONFIG_ION_OMAP)
+/*
+ * Just use CONFIG_DSSCOMP to distinguish code which was previously had
+ * additional mixes of CONFIG_TI_TILER and CONFIG_ION_OMAP. DSSCOMP makes
+ * it a given that ION and the TILER will be used.
+ */
+#if defined(CONFIG_DSSCOMP)
+#if !defined(CONFIG_TI_TILER) || !defined(CONFIG_ION_OMAP)
+#error Expected CONFIG_TI_TILER and CONFIG_ION_OMAP to be defined
+#endif
 #include <linux/ion.h>
 #include <linux/omap_ion.h>
-extern struct ion_client *gpsIONClient;
-#endif
-#if defined(CONFIG_TI_TILER)
 #include <mach/tiler.h>
 #include <video/dsscomp.h>
 #include <plat/dsscomp.h>
+#include <video/omap_hwc.h>
+#include "../services_headers.h"
+
+void sgx_idle_log_flip(void);
+extern struct ion_client *gpsIONClient;
 
 #endif
 
@@ -61,6 +71,10 @@ extern struct ion_client *gpsIONClient;
 static OMAPLFB_DEVINFO *gapsDevInfo[OMAPLFB_MAX_NUM_DEVICES];
 
 static PFN_DC_GET_PVRJTABLE gpfnGetPVRJTable = NULL;
+
+static IMG_BOOL gbBvInterfacePresent;
+static IMG_BOOL gbBvReady = IMG_FALSE;
+static IMG_BOOL bBltReady = IMG_FALSE;
 
 static inline unsigned long RoundUpToMultiple(unsigned long x, unsigned long y)
 {
@@ -298,7 +312,7 @@ static PVRSRV_ERROR GetDCBufferAddr(IMG_HANDLE        hDevice,
                                     IMG_VOID          **ppvCpuVAddr,
                                     IMG_HANDLE        *phOSMapInfo,
                                     IMG_BOOL          *pbIsContiguous,
-	                                IMG_UINT32		  *pui32TilingStride)
+                                    IMG_UINT32        *pui32TilingStride)
 {
 	OMAPLFB_DEVINFO	*psDevInfo;
 	OMAPLFB_BUFFER *psSystemBuffer;
@@ -348,7 +362,7 @@ static PVRSRV_ERROR GetDCBufferAddr(IMG_HANDLE        hDevice,
 		*pbIsContiguous = !psDevInfo->sFBInfo.bIs2D;
 	}
 
-#if defined(CONFIG_TI_TILER)
+#if defined(CONFIG_DSSCOMP)
 	if (psDevInfo->sFBInfo.bIs2D) {
 		int i = (psSystemBuffer->sSysAddr.uiAddr - psDevInfo->sFBInfo.psPageList->uiAddr) >> PAGE_SHIFT;
 		*ppsSysAddr = psDevInfo->sFBInfo.psPageList + psDevInfo->sFBInfo.ulHeight * i;
@@ -497,6 +511,7 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 		}
 		psBuffer[i].psDevInfo = psDevInfo;
 		OMAPLFBInitBufferForSwap(&psBuffer[i]);
+		psBuffer[i].bvmap_handle = NULL;
 	}
 
 	if (OMAPLFBCreateSwapQueue(psSwapChain) != OMAPLFB_OK)
@@ -542,12 +557,11 @@ ExitUnLock:
 }
 
 static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
-	IMG_HANDLE hSwapChain)
+                                       IMG_HANDLE hSwapChain)
 {
 	OMAPLFB_DEVINFO	*psDevInfo;
 	OMAPLFB_SWAPCHAIN *psSwapChain;
 	OMAPLFB_ERROR eError;
-
 	
 	if(!hDevice || !hSwapChain)
 	{
@@ -577,7 +591,9 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 		printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Couldn't disable framebuffer event notification\n", __FUNCTION__, psDevInfo->uiFBDevID);
 	}
 
-	
+	OMAPLFBDeInitBltFBs(psDevInfo);
+	gbBvReady = IMG_FALSE;
+	bBltReady = IMG_FALSE;
 	OMAPLFBFreeKernelMem(psSwapChain->psBuffer);
 	OMAPLFBFreeKernelMem(psSwapChain);
 
@@ -595,8 +611,8 @@ ExitUnLock:
 }
 
 static PVRSRV_ERROR SetDCDstRect(IMG_HANDLE hDevice,
-	IMG_HANDLE hSwapChain,
-	IMG_RECT *psRect)
+                                 IMG_HANDLE hSwapChain,
+                                 IMG_RECT *psRect)
 {
 	UNREFERENCED_PARAMETER(hDevice);
 	UNREFERENCED_PARAMETER(hSwapChain);
@@ -725,6 +741,36 @@ static PVRSRV_ERROR SwapToDCSystem(IMG_HANDLE hDevice,
 	return PVRSRV_OK;
 }
 
+#if !defined(CONFIG_GCBV)
+IMG_BOOL OMAPLFBInitBlt(void)
+{
+	return IMG_FALSE;
+}
+
+OMAPLFB_ERROR OMAPLFBInitBltFBs(OMAPLFB_DEVINFO *psDevInfo)
+{
+	return OMAPLFB_ERROR_INIT_FAILURE;
+}
+
+void OMAPLFBDeInitBltFBs(OMAPLFB_DEVINFO *psDevInfo)
+{
+}
+
+IMG_BOOL OMAPLFBBltFbClearWorkaround(OMAPLFB_DEVINFO *psDevInfo)
+{
+	return IMG_FALSE;
+}
+void OMAPLFBGetBltFBsBvHndl(OMAPLFB_FBINFO *psPVRFBInfo, IMG_UINTPTR_T *ppPhysAddr)
+{
+	*ppPhysAddr = 0;
+}
+
+void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos, struct omap_hwc_blit_data *blit_data, IMG_UINT32 ui32NumMemInfos)
+{
+}
+#endif /* CONFIG_GCBV */
+
+
 static OMAPLFB_BOOL WaitForVSyncSettle(OMAPLFB_DEVINFO *psDevInfo)
 {
 		unsigned i;
@@ -792,19 +838,26 @@ void OMAPLFBSwapHandler(OMAPLFB_BUFFER *psBuffer)
 }
 
 #if defined(CONFIG_DSSCOMP)
-
-#include <mach/tiler.h>
-#include <video/dsscomp.h>
-#include <plat/dsscomp.h>
-
-void sgx_idle_log_flip(void);
-
 static void dsscomp_proxy_cmdcomplete(void * cookie, int i)
 {
+	COMMAND_COMPLETE_DATA *psCmdCompleteData =
+			(COMMAND_COMPLETE_DATA *)cookie;
+
 	sgx_idle_log_flip();
 	/* XXX: assumes that there is only one display */
+	/* LK: Check if we are destroying sync objects.
+	   In this case we are now in "late" callback,
+	   so we can't allow callback to access sync objects
+	   memory. To do this just set zero to count of source
+	   and destination sync objects.
+	*/
+	if (NULL == gapsDevInfo[0]->psSwapChain) {
+		psCmdCompleteData->ui32SrcSyncCount = 0;
+		psCmdCompleteData->ui32DstSyncCount = 0;
+	}
 	gapsDevInfo[0]->sPVRJTable.pfnPVRSRVCmdComplete(cookie, i);
 }
+#endif
 
 static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 							  OMAPLFB_DEVINFO *psDevInfo,
@@ -813,7 +866,6 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 							  unsigned long ulSwapInterval)
 {
 	OMAPLFBCreateSwapChainLock(psDevInfo);
-
 	
 	if (SwapChainHasChanged(psDevInfo, psSwapChain))
 	{
@@ -825,6 +877,7 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 	{
 		psBuffer->hCmdComplete = (OMAPLFB_HANDLE)hCmdCookie;
 		psBuffer->ulSwapInterval = ulSwapInterval;
+#if defined(CONFIG_DSSCOMP)
 		if (is_tiler_addr(psBuffer->sSysAddr.uiAddr)) {
 			IMG_UINT32 w = psBuffer->psDevInfo->sDisplayDim.ui32Width;
 			IMG_UINT32 h = psBuffer->psDevInfo->sDisplayDim.ui32Height;
@@ -851,7 +904,9 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 			dsscomp_gralloc_queue(&comp, pas, true,
 					      dsscomp_proxy_cmdcomplete,
 					      (void *) psBuffer->hCmdComplete);
-		} else {
+		} else
+#endif
+		{
 			OMAPLFBQueueBufferForSwap(psSwapChain, psBuffer);
 		}
 	}
@@ -861,16 +916,23 @@ static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 	return IMG_TRUE;
 }
 
-#include "servicesint.h"
-#include "services.h"
-#include "mm.h"
+#if defined(CONFIG_DSSCOMP) && defined(CONFIG_TI_TILER)
+int meminfo_idx_valid(unsigned int meminfo_ix, int num_meminfos)
+{
+	if (meminfo_ix < 0 || meminfo_ix >= num_meminfos) {
+		WARN(1, "%s: Invalid meminfo index %d, max %d\n",
+				__func__, meminfo_ix, num_meminfos);
+		return 0;
+	}
+	return 1;
+}
 
 static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
-							  OMAPLFB_DEVINFO *psDevInfo,
-							  PDC_MEM_INFO *ppsMemInfos,
-							  IMG_UINT32 ui32NumMemInfos,
-							  struct dsscomp_setup_dispc_data *psDssData,
-							  IMG_UINT32 uiDssDataLength)
+                              OMAPLFB_DEVINFO *psDevInfo,
+                              PDC_MEM_INFO *ppsMemInfos,
+                              IMG_UINT32 ui32NumMemInfos,
+                              struct omap_hwc_data *psHwcData,
+                              IMG_UINT32 uiHwcDataSz)
 {
 	struct tiler_pa_info *apsTilerPAs[5];
 	IMG_UINT32 i, k;
@@ -881,12 +943,54 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 	} asMemInfo[5];
 
 	memset(asMemInfo, 0, sizeof(asMemInfo));
+	/* Framebuffer info just used to get FB geometry, the address to
+	 * use for blitting (dst buffer) is the first meminfo
+	 */
+	int rgz_items;
+	int calcsz;
+	struct dsscomp_setup_dispc_data *psDssData = &(psHwcData->dsscomp_data);
+	int iMemIdx = 0;
 
-	if(uiDssDataLength != sizeof(*psDssData))
+	if (uiHwcDataSz <= offsetof(struct omap_hwc_data, blit_data))
+		rgz_items = 0;
+	else
+		rgz_items = psHwcData->blit_data.rgz_items;
+
+	psDssData = &(psHwcData->dsscomp_data);
+	calcsz = sizeof(*psHwcData) +
+		(sizeof(struct rgz_blt_entry) * rgz_items);
+
+	if (rgz_items > 0 && !gbBvInterfacePresent)
+	{
+		/* We cannot blit if BV GC2D is not present!, likely a bug */
+		WARN(1, "Trying to blit when BV GC2D is not present");
+		rgz_items = 0; /* Prevent blits */
+	}
+>>>>>>> 2185a3781e214dbaee2ae4142fe7b827e1c4eb36
+
+	if (rgz_items > 0 && !bBltReady)
+	{
+		/* Defer allocation and mapping of blit buffers */
+		if (OMAPLFBInitBltFBs(psDevInfo) != OMAPLFB_OK)
+		{
+			WARN(1, "Could not initialize blit FBs");
+			return IMG_FALSE;
+		}
+		if (OMAPLFBBltFbClearWorkaround(psDevInfo) != IMG_TRUE)
+		{
+			WARN(1, "Could not initialize blit clear region");
+			return IMG_FALSE;
+		}
+		bBltReady = IMG_TRUE;
+	}
+
+	memset(asMemInfo, 0, sizeof(asMemInfo));
+
+	/* Check the size of private data along with the blit operations */
+	if (uiHwcDataSz != calcsz)
 	{
 		WARN(1, "invalid size of private data (%d vs %d)",
-		     uiDssDataLength, sizeof(*psDssData));
-		return IMG_FALSE;
+		     uiHwcDataSz, calcsz);
 	}
 
 	if(psDssData->num_ovls == 0 || ui32NumMemInfos == 0)
@@ -895,8 +999,16 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		return IMG_FALSE;
 	}
 
-	for(i = k = 0; i < ui32NumMemInfos && k < ARRAY_SIZE(apsTilerPAs); i++, k++)
+	if (rgz_items > 0)
 	{
+		iMemIdx++;
+		/* Increment the Blt framebuffer and get new address */
+		OMAPLFBGetBltFBsBvHndl(&psDevInfo->sFBInfo, &asMemInfo[0].uiAddr);
+	}
+
+	for (i = 0, k = iMemIdx; i < ui32NumMemInfos && k < ARRAY_SIZE(apsTilerPAs) &&
+		k < psDssData->num_ovls; i++, k++) {
+
 		struct tiler_pa_info *psTilerInfo;
 		IMG_CPU_VIRTADDR virtAddr;
 		IMG_CPU_PHYADDR phyAddr;
@@ -914,12 +1026,27 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		{
 			asMemInfo[k].uiAddr = phyAddr.uiAddr;
 			if (tiler_fmt((u32)phyAddr.uiAddr) == TILFMT_8BIT) {
+
+#if defined(SUPPORT_NV12_FROM_2_HWADDRS)
 				/* NV12 buffers have 2 meminfos */
 				BUG_ON(i + 1 >= ui32NumMemInfos);
 				i++;
-				psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], 0, &phyAddr);
+				psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i],
+											0, &phyAddr);
 				asMemInfo[k].uiUVAddr = phyAddr.uiAddr;
+#else
+				psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i],
+									(uByteSize * 2) / 3, &phyAddr);
+				asMemInfo[k].uiUVAddr = phyAddr.uiAddr;
+#endif
 			}
+			continue;
+		}
+
+		if (phyAddr.uiAddr >= psDevInfo->psLINFBInfo->fix.smem_start &&
+		    phyAddr.uiAddr < (psDevInfo->psLINFBInfo->fix.smem_start + psDevInfo->psLINFBInfo->fix.smem_len))
+		{
+			asMemInfo[k].uiAddr = phyAddr.uiAddr;
 			continue;
 		}
 
@@ -980,9 +1107,18 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		apsTilerPAs[i] = asMemInfo[ix].psTilerInfo;
 	}
 
+	if (rgz_items > 0)
+	{
+		OMAPLFBDoBlits(psDevInfo, ppsMemInfos, &psHwcData->blit_data, ui32NumMemInfos);
+	}
+
 	dsscomp_gralloc_queue(psDssData, apsTilerPAs, false,
 						  dsscomp_proxy_cmdcomplete,
 						  (void *)hCmdCookie);
+	for(i = 0; i < k; i++)
+	{
+		tiler_pa_free(apsTilerPAs[i]);
+	}
 
 	for(i = 0; i < k; i++)
 	{
@@ -991,8 +1127,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 
 	return IMG_TRUE;
 }
-
-#endif 
+#endif
 
 static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
                             IMG_UINT32  ui32DataSize,
@@ -1029,7 +1164,7 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 	}
 	else
 	{
-#if defined(CONFIG_DSSCOMP)
+#if defined(CONFIG_DSSCOMP) && defined(CONFIG_TI_TILER)
 		DISPLAYCLASS_FLIP_COMMAND2 *psFlipCmd2;
 		psFlipCmd2 = (DISPLAYCLASS_FLIP_COMMAND2 *)pvData;
 		return ProcessFlipV2(hCmdCookie,
@@ -1043,6 +1178,79 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE  hCmdCookie,
 #endif
 	}
 }
+
+#if defined(CONFIG_DSSCOMP)
+static OMAPLFB_ERROR OMAPLFBInitIonOmap(OMAPLFB_DEVINFO *psDevInfo,
+                                        struct fb_info *psLINFBInfo,
+                                        OMAPLFB_FBINFO *psPVRFBInfo)
+{
+	int n = OMAPLFB_NUM_SGX_FBS;
+	int res;
+	int i, x, y, w;
+	ion_phys_addr_t phys;
+	size_t size;
+	struct tiler_view_t view;
+
+	struct omap_ion_tiler_alloc_data sAllocData = {
+
+		.w = ALIGN(psLINFBInfo->var.xres, PAGE_SIZE / (psLINFBInfo->var.bits_per_pixel / 8)),
+		.h = psLINFBInfo->var.yres,
+		.fmt = psLINFBInfo->var.bits_per_pixel == 16 ? TILER_PIXEL_FMT_16BIT : TILER_PIXEL_FMT_32BIT,
+		.flags = 0,
+	};
+	unsigned uiFBDevID = psDevInfo->uiFBDevID;
+
+	printk(KERN_DEBUG DRIVER_PREFIX
+		" %s: Device %u: Requesting %d TILER 2D framebuffers\n", __FUNCTION__, uiFBDevID, n);
+	sAllocData.w *= n;
+
+	psPVRFBInfo->uiBytesPerPixel = psLINFBInfo->var.bits_per_pixel >> 3;
+	psPVRFBInfo->bIs2D = OMAPLFB_TRUE;
+	res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
+	if (res < 0)
+	{
+		printk(KERN_ERR DRIVER_PREFIX
+			" %s: Device %u: Could not allocate 2D framebuffer(%d)\n", __FUNCTION__, uiFBDevID, res);
+		return OMAPLFB_ERROR_INIT_FAILURE;
+	}
+
+	ion_phys(gpsIONClient, sAllocData.handle, &phys, &size);
+	psPVRFBInfo->sSysAddr.uiAddr = phys;
+	psPVRFBInfo->sCPUVAddr = 0;
+
+	psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
+	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
+	psPVRFBInfo->ulByteStride = PAGE_ALIGN(psPVRFBInfo->ulWidth * psPVRFBInfo->uiBytesPerPixel);
+	psPVRFBInfo->ulBufferSize = psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
+	psPVRFBInfo->ulRoundedBufferSize = psPVRFBInfo->ulBufferSize;
+	w = psPVRFBInfo->ulByteStride >> PAGE_SHIFT;
+
+	/* this is an "effective" FB size to get correct number of buffers */
+	psPVRFBInfo->ulFBSize = sAllocData.h * n * psPVRFBInfo->ulByteStride;
+	psPVRFBInfo->psPageList = kzalloc(w * n * psPVRFBInfo->ulHeight * sizeof(*psPVRFBInfo->psPageList), GFP_KERNEL);
+	if (!psPVRFBInfo->psPageList)
+	{
+		printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Could not allocate page list\n", __FUNCTION__, psDevInfo->uiFBDevID);
+		ion_free(gpsIONClient, sAllocData.handle);
+		return OMAPLFB_ERROR_INIT_FAILURE;
+	}
+	psPVRFBInfo->psIONHandle = sAllocData.handle;
+
+	tilview_create(&view, phys, psDevInfo->sFBInfo.ulWidth, psDevInfo->sFBInfo.ulHeight);
+	for(i=0; i<n; i++)
+	{
+		for(y=0; y<psDevInfo->sFBInfo.ulHeight; y++)
+		{
+			for(x=0; x<w; x++)
+			{
+				psPVRFBInfo->psPageList[i * psDevInfo->sFBInfo.ulHeight * w + y * w + x].uiAddr =
+					phys + view.v_inc * y + ((x + i * w) << PAGE_SHIFT);
+			}
+		}
+	}
+	return OMAPLFB_OK;
+}
+#endif
 
 static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 {
@@ -1063,10 +1271,7 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 		goto ErrorRelSem;
 	}
 
-	FBSize = (psLINFBInfo->screen_size) != 0 ?
-					psLINFBInfo->screen_size :
-					psLINFBInfo->fix.smem_len;
-
+	FBSize = psLINFBInfo->fix.smem_len;
 	
 	if (FBSize == 0 || psLINFBInfo->fix.line_length == 0)
 	{
@@ -1103,7 +1308,7 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 
 	DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX
 			": Device %u: Framebuffer physical address: 0x%lx\n",
-			psDevInfo->uiFBDevID, psLINFBInfo->fix.smem_start));
+			psDevInfo->uiFBDevID, psDevInfo->psLINFBInfo->fix.smem_start));
 	DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX
 			": Device %u: Framebuffer virtual address: 0x%lx\n",
 			psDevInfo->uiFBDevID, (unsigned long)psLINFBInfo->screen_base));
@@ -1132,100 +1337,25 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 	
 	OMAPLFBPrintInfo(psDevInfo);
 
-	/* hijack LINFB */
-#if defined(CONFIG_ION_OMAP)
-	if(1)
+#if defined(CONFIG_DSSCOMP)
+	eError = OMAPLFBInitIonOmap(psDevInfo, psLINFBInfo, psPVRFBInfo);
+	if (eError != OMAPLFB_OK)
 	{
-		/* for some reason we need at least 3 buffers in the swap chain */
-		int n = FBSize / RoundUpToMultiple(psLINFBInfo->fix.line_length * psLINFBInfo->var.yres, ulLCM);
-		int res;
-		int i, x, y, w;
-		ion_phys_addr_t phys;
-		size_t size;
-		struct tiler_view_t view;
-
-		struct omap_ion_tiler_alloc_data sAllocData = {
-			/* TILER will align width to 128-bytes */
-			/* however, SGX must have full page width */
-			.w = ALIGN(psLINFBInfo->var.xres, PAGE_SIZE / (psLINFBInfo->var.bits_per_pixel / 8)),
-			.h = psLINFBInfo->var.yres,
-			.fmt = psLINFBInfo->var.bits_per_pixel == 16 ? TILER_PIXEL_FMT_16BIT : TILER_PIXEL_FMT_32BIT,
-			.flags = 0,
-		};
-
-		printk(KERN_DEBUG DRIVER_PREFIX
-			" %s: Device %u: Requesting %d TILER 2D framebuffers\n", __FUNCTION__, uiFBDevID, n);
-
-		/* HACK: limit to MAX 3 FBs to save TILER container space */
-		if (n > 3)
-			n = 3;
-		sAllocData.w *= n;
-
-		psPVRFBInfo->uiBytesPerPixel = psLINFBInfo->var.bits_per_pixel >> 3;
-		psPVRFBInfo->bIs2D = OMAPLFB_TRUE;
-
-		res = omap_ion_nonsecure_tiler_alloc(gpsIONClient, &sAllocData);
-		if (res < 0)
-		{
-			res = omap_ion_tiler_alloc(gpsIONClient, &sAllocData);
-		}
-		psPVRFBInfo->psIONHandle = sAllocData.handle;
-		if (res < 0)
-		{
-			printk(KERN_ERR DRIVER_PREFIX
-				" %s: Device %u: Could not allocate 2D framebuffer(%d)\n", __FUNCTION__, uiFBDevID, res);
-			goto ErrorModPut;
-		}
-
-		ion_phys(gpsIONClient, sAllocData.handle, &phys, &size);
-
-		psPVRFBInfo->sSysAddr.uiAddr = phys;
-		psPVRFBInfo->sCPUVAddr = 0;
-
-		psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
-		psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
-		psPVRFBInfo->ulByteStride = PAGE_ALIGN(psPVRFBInfo->ulWidth * psPVRFBInfo->uiBytesPerPixel);
-		w = psPVRFBInfo->ulByteStride >> PAGE_SHIFT;
-
-		/* this is an "effective" FB size to get correct number of buffers */
-		psPVRFBInfo->ulFBSize = sAllocData.h * n * psPVRFBInfo->ulByteStride;
-		psPVRFBInfo->psPageList = kzalloc(w * n * psPVRFBInfo->ulHeight * sizeof(*psPVRFBInfo->psPageList), GFP_KERNEL);
-		if (!psPVRFBInfo->psPageList)
-		{
-			printk(KERN_WARNING DRIVER_PREFIX ": %s: Device %u: Could not allocate page list\n", __FUNCTION__, psDevInfo->uiFBDevID);
-			ion_free(gpsIONClient, sAllocData.handle);
-			goto ErrorModPut;
-		}
-
-		tilview_create(&view, phys, psDevInfo->sFBInfo.ulWidth, psDevInfo->sFBInfo.ulHeight);
-		for(i=0; i<n; i++)
-		{
-			for(y=0; y<psDevInfo->sFBInfo.ulHeight; y++)
-			{
-				for(x=0; x<w; x++)
-				{
-					psPVRFBInfo->psPageList[i * psDevInfo->sFBInfo.ulHeight * w + y * w + x].uiAddr =
-						phys + view.v_inc * y + ((x + i * w) << PAGE_SHIFT);
-				}
-			}
-		}
+		goto ErrorModPut;
 	}
-	else
-#endif
-	{
-		psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
-		psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
-
-		psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
-		psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
-		psPVRFBInfo->ulByteStride =  psLINFBInfo->fix.line_length;
-		psPVRFBInfo->ulFBSize = FBSize;
-		psPVRFBInfo->bIs2D = OMAPLFB_FALSE;
-		psPVRFBInfo->psPageList = IMG_NULL;
-	}
+#else
+	/* This code path cannot handle integration with DSSCOMP, ION, Tiler2D or GC320 */
+	psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
+	psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
+	psPVRFBInfo->ulWidth = psLINFBInfo->var.xres;
+	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
+	psPVRFBInfo->ulByteStride =  psLINFBInfo->fix.line_length;
+	psPVRFBInfo->ulFBSize = FBSize;
+	psPVRFBInfo->bIs2D = OMAPLFB_FALSE;
+	psPVRFBInfo->psPageList = IMG_NULL;
 	psPVRFBInfo->ulBufferSize = psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
-	
 	psPVRFBInfo->ulRoundedBufferSize = RoundUpToMultiple(psPVRFBInfo->ulBufferSize, ulLCM);
+#endif
 
 	if(psLINFBInfo->var.bits_per_pixel == 16)
 	{
@@ -1297,11 +1427,28 @@ static void OMAPLFBDeInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 
 	psLINFBOwner = psLINFBInfo->fbops->owner;
 
+#if defined(CONFIG_DSSCOMP)
 	kfree(psPVRFBInfo->psPageList);
-#if defined(CONFIG_ION_OMAP)
 	if (psPVRFBInfo->psIONHandle)
 	{
 		ion_free(gpsIONClient, psPVRFBInfo->psIONHandle);
+	}
+	if (psPVRFBInfo->psBltFBsIonHndl)
+	{
+		ion_free(gpsIONClient, psPVRFBInfo->psBltFBsIonHndl);
+	}
+	if (psPVRFBInfo->psBltFBsBvHndl)
+	{
+		int i;
+		for (i = 0; i < psPVRFBInfo->psBltFBsNo; i++)
+		{
+			if (psPVRFBInfo->psBltFBsBvHndl[i])
+			{
+				kfree(psPVRFBInfo->psBltFBsBvHndl[i]);
+			}
+		}
+		kfree(psPVRFBInfo->psBltFBsBvHndl);
+		kfree(psPVRFBInfo->psBltFBsBvPhys);
 	}
 #endif
 	if (psLINFBInfo->fbops->fb_release != NULL) 
@@ -1349,7 +1496,11 @@ static OMAPLFB_DEVINFO *OMAPLFBInitDev(unsigned uiFBDevID)
 		goto ErrorFreeDevInfo;
 	}
 
+#if defined(CONFIG_ION_OMAP)
+	psDevInfo->sDisplayInfo.ui32MaxSwapChainBuffers = OMAPLFB_NUM_SGX_FBS;
+#else
 	psDevInfo->sDisplayInfo.ui32MaxSwapChainBuffers = (IMG_UINT32)(psDevInfo->sFBInfo.ulFBSize / psDevInfo->sFBInfo.ulRoundedBufferSize);
+#endif
 	if (psDevInfo->sDisplayInfo.ui32MaxSwapChainBuffers != 0)
 	{
 		psDevInfo->sDisplayInfo.ui32MaxSwapChains = 1;
@@ -1417,16 +1568,23 @@ static OMAPLFB_DEVINFO *OMAPLFBInitDev(unsigned uiFBDevID)
 
 	
 	aui32SyncCountList[DC_FLIP_COMMAND][0] = 0; 
-	aui32SyncCountList[DC_FLIP_COMMAND][1] = 10; 
+	if (gbBvInterfacePresent)
+	{
+		aui32SyncCountList[DC_FLIP_COMMAND][1] = 32;
+	}
+	else
+	{
+		aui32SyncCountList[DC_FLIP_COMMAND][1] = 10;
+	}
 
 	
 
 
 
 	if (psDevInfo->sPVRJTable.pfnPVRSRVRegisterCmdProcList(psDevInfo->uiPVRDevID,
-															&pfnCmdProcList[0],
-															aui32SyncCountList,
-															OMAPLFB_COMMAND_COUNT) != PVRSRV_OK)
+			&pfnCmdProcList[0],
+			aui32SyncCountList,
+			OMAPLFB_COMMAND_COUNT) != PVRSRV_OK)
 	{
 		printk(KERN_ERR DRIVER_PREFIX
 			": %s: Device %u: Couldn't register command processing functions with PVR Services\n", __FUNCTION__, uiFBDevID);
@@ -1467,7 +1625,12 @@ OMAPLFB_ERROR OMAPLFBInit(void)
 		return OMAPLFB_ERROR_INIT_FAILURE;
 	}
 
-	
+	gbBvInterfacePresent = OMAPLFBInitBlt();
+	if (!gbBvInterfacePresent)
+	{
+		printk(KERN_INFO DRIVER_PREFIX "%s: Blitsville gc2d "
+			"not present, blits disabled\n", __func__);
+	}
 	for(i = uiMaxFBDevIDPlusOne; i-- != 0;)
 	{
 		OMAPLFB_DEVINFO *psDevInfo = OMAPLFBInitDev(i);

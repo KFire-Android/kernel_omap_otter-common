@@ -103,7 +103,9 @@ struct twlreg_info {
 #define TWL6030_CFG_STATE_SLEEP	0x03
 #define TWL6030_CFG_STATE_GRP_SHIFT	5
 #define TWL6030_CFG_STATE_APP_SHIFT	2
-#define TWL6030_CFG_STATE_APP_MASK	(0x03 << TWL6030_CFG_STATE_APP_SHIFT)
+#define TWL6030_CFG_STATE_MASK		0x03
+#define TWL6030_CFG_STATE_APP_MASK	(TWL6030_CFG_STATE_MASK << \
+						TWL6030_CFG_STATE_APP_SHIFT)
 #define TWL6030_CFG_STATE_APP(v)	(((v) & TWL6030_CFG_STATE_APP_MASK) >>\
 						TWL6030_CFG_STATE_APP_SHIFT)
 #endif
@@ -112,7 +114,7 @@ struct twlreg_info {
 #define SMPS_OFFSET_EN		BIT(0)
 #define SMPS_EXTENDED_EN	BIT(1)
 
-/* twl6025 SMPS EPROM values */
+/* twl6032 SMPS EPROM values */
 #define TWL6030_SMPS_OFFSET		0xB0
 #define TWL6030_SMPS_MULT		0xB3
 #define SMPS_MULTOFFSET_SMPS4	BIT(0)
@@ -238,7 +240,7 @@ static int twl6030reg_enable(struct regulator_dev *rdev)
 	int			grp = 0;
 	int			ret;
 
-	if (!(twl_class_is_6030() && (info->features & TWL6025_SUBCLASS)))
+	if (!(twl_class_is_6030() && (info->features & TWL6032_SUBCLASS)))
 		grp = twlreg_read(info, TWL_MODULE_PM_RECEIVER, VREG_GRP);
 	if (grp < 0)
 		return grp;
@@ -284,7 +286,7 @@ static int twl6030reg_disable(struct regulator_dev *rdev)
 	int			grp = 0;
 	int			ret;
 
-	if (!(twl_class_is_6030() && (info->features & TWL6025_SUBCLASS)))
+	if (!(twl_class_is_6030() && (info->features & TWL6032_SUBCLASS)))
 		grp = P1_GRP_6030 | P2_GRP_6030 | P3_GRP_6030;
 
 	/* For 6030, set the off state for all grps enabled */
@@ -922,6 +924,18 @@ static struct regulator_ops twlsmps_ops = {
 	.set_suspend_disable	= twl6030ldo_suspend_disable,
 };
 
+static struct regulator_ops twl6030_external_control_pin_ops = {
+	.enable			= twl6030reg_enable,
+	.disable		= twl6030reg_disable,
+	.is_enabled		= twl6030reg_is_enabled,
+
+	.set_mode		= twl6030reg_set_mode,
+
+	.get_status		= twl6030reg_get_status,
+
+	.set_suspend_enable	= twl6030ldo_suspend_enable,
+	.set_suspend_disable	= twl6030ldo_suspend_disable,
+};
 /*----------------------------------------------------------------------*/
 
 #define TWL4030_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
@@ -967,13 +981,13 @@ static struct regulator_ops twlsmps_ops = {
 		}, \
 	}
 
-#define TWL6025_ADJUSTABLE_LDO(label, offset, min_mVolts, max_mVolts) { \
+#define TWL6032_ADJUSTABLE_LDO(label, offset, min_mVolts, max_mVolts) { \
 	.base = offset, \
 	.min_mV = min_mVolts, \
 	.max_mV = max_mVolts, \
 	.desc = { \
 		.name = #label, \
-		.id = TWL6025_REG_##label, \
+		.id = TWL6032_REG_##label, \
 		.n_voltages = ((max_mVolts - min_mVolts)/100) + 1, \
 		.ops = &twl6030ldo_ops, \
 		.type = REGULATOR_VOLTAGE, \
@@ -1024,15 +1038,27 @@ static struct regulator_ops twlsmps_ops = {
 		}, \
 	}
 
-#define TWL6025_ADJUSTABLE_SMPS(label, offset) { \
+#define TWL6032_ADJUSTABLE_SMPS(label, offset) { \
 	.base = offset, \
 	.min_mV = 600, \
 	.max_mV = 2100, \
 	.desc = { \
 		.name = #label, \
-		.id = TWL6025_REG_##label, \
+		.id = TWL6032_REG_##label, \
 		.n_voltages = TWL603X_SMPS_NUMBER_VOLTAGES, \
 		.ops = &twlsmps_ops, \
+		.type = REGULATOR_VOLTAGE, \
+		.owner = THIS_MODULE, \
+		}, \
+	}
+
+#define TWL6030_EXTERNAL_CONTROL_PIN(label, offset, turnon_delay) { \
+	.base = offset, \
+	.delay = turnon_delay, \
+	.desc = { \
+		.name = #label, \
+		.id = TWL6030_REG_##label, \
+		.ops = &twl6030_external_control_pin_ops, \
 		.type = REGULATOR_VOLTAGE, \
 		.owner = THIS_MODULE, \
 		}, \
@@ -1107,20 +1133,23 @@ static struct twlreg_info twl_regs[] = {
 	TWL6030_ADJUSTABLE_SMPS(VMEM, 0x34, 600, 4000),
 	TWL6030_ADJUSTABLE_SMPS(V2V1, 0x1c, 1800, 2100),
 
-	/* 6025 are renamed compared to 6030 versions */
-	TWL6025_ADJUSTABLE_LDO(LDO2, 0x54, 1000, 3300),
-	TWL6025_ADJUSTABLE_LDO(LDO4, 0x58, 1000, 3300),
-	TWL6025_ADJUSTABLE_LDO(LDO3, 0x5c, 1000, 3300),
-	TWL6025_ADJUSTABLE_LDO(LDO5, 0x68, 1000, 3300),
-	TWL6025_ADJUSTABLE_LDO(LDO1, 0x6c, 1000, 3300),
-	TWL6025_ADJUSTABLE_LDO(LDO7, 0x74, 1000, 3300),
-	TWL6025_ADJUSTABLE_LDO(LDO6, 0x60, 1000, 3300),
-	TWL6025_ADJUSTABLE_LDO(LDOLN, 0x64, 1000, 3300),
-	TWL6025_ADJUSTABLE_LDO(LDOUSB, 0x70, 1000, 3300),
+	/* 6032 are renamed compared to 6030 versions */
+	TWL6032_ADJUSTABLE_LDO(LDO2, 0x54, 1000, 3300),
+	TWL6032_ADJUSTABLE_LDO(LDO4, 0x58, 1000, 3300),
+	TWL6032_ADJUSTABLE_LDO(LDO3, 0x5c, 1000, 3300),
+	TWL6032_ADJUSTABLE_LDO(LDO5, 0x68, 1000, 3300),
+	TWL6032_ADJUSTABLE_LDO(LDO1, 0x6c, 1000, 3300),
+	TWL6032_ADJUSTABLE_LDO(LDO7, 0x74, 1000, 3300),
+	TWL6032_ADJUSTABLE_LDO(LDO6, 0x60, 1000, 3300),
+	TWL6032_ADJUSTABLE_LDO(LDOLN, 0x64, 1000, 3300),
+	TWL6032_ADJUSTABLE_LDO(LDOUSB, 0x70, 1000, 3300),
 
-	TWL6025_ADJUSTABLE_SMPS(SMPS3, 0x34),
-	TWL6025_ADJUSTABLE_SMPS(SMPS4, 0x10),
-	TWL6025_ADJUSTABLE_SMPS(VIO, 0x16),
+	TWL6032_ADJUSTABLE_SMPS(SMPS3, 0x34),
+	TWL6032_ADJUSTABLE_SMPS(SMPS4, 0x10),
+	TWL6032_ADJUSTABLE_SMPS(VIO, 0x16),
+
+	TWL6030_EXTERNAL_CONTROL_PIN(SYSEN, 0x83, 0),
+	TWL6030_EXTERNAL_CONTROL_PIN(REGEN1, 0x7d, 0),
 };
 
 static u8 twl_get_smps_offset(void)
@@ -1202,19 +1231,19 @@ static int __devinit twlreg_probe(struct platform_device *pdev)
 	}
 
 	switch (pdev->id) {
-	case TWL6025_REG_SMPS3:
+	case TWL6032_REG_SMPS3:
 		if (twl_get_smps_mult() & SMPS_MULTOFFSET_SMPS3)
 			info->flags |= SMPS_EXTENDED_EN;
 		if (twl_get_smps_offset() & SMPS_MULTOFFSET_SMPS3)
 			info->flags |= SMPS_OFFSET_EN;
 		break;
-	case TWL6025_REG_SMPS4:
+	case TWL6032_REG_SMPS4:
 		if (twl_get_smps_mult() & SMPS_MULTOFFSET_SMPS4)
 			info->flags |= SMPS_EXTENDED_EN;
 		if (twl_get_smps_offset() & SMPS_MULTOFFSET_SMPS4)
 			info->flags |= SMPS_OFFSET_EN;
 		break;
-	case TWL6025_REG_VIO:
+	case TWL6032_REG_VIO:
 		if (twl_get_smps_mult() & SMPS_MULTOFFSET_VIO)
 			info->flags |= SMPS_EXTENDED_EN;
 		if (twl_get_smps_offset() & SMPS_MULTOFFSET_VIO)

@@ -1,7 +1,7 @@
 /*
- * gccore.h
+ * gcbv-priv.h
  *
- * Copyright (C) 2010-2011 Vivante Corporation.
+ * Copyright (C) 2011, Texas Instruments, Inc.
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,21 +12,16 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef GCCORE_H
-#define GCCORE_H
+#ifndef GCBV_PRIV
+#define GCBV_PRIV
 
-#if 1
-#	define DBGPRINT printk
-#else
-#	define DBGPRINT(...)
-#endif
+#include <linux/bltsville.h>
+#include <linux/gccore.h>
 
-#define ENABLE_POLLING 1
+enum bverror gcbv_map(struct bvbuffdesc *buffdesc);
+enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc);
+enum bverror gcbv_blt(struct bvbltparams *bltparams);
+void gcbv_assign(void);
+void gcbv_clear(void);
 
-#define BLT _IOW('x', 100, u32)
-#define MAP _IOWR('x', 101, u32)
-#define UMAP _IOW('x', 102, u32)
-
-extern u32 *cmdbuf_start_logical;
-extern u32 cmdbuf_start_physical;
 #endif

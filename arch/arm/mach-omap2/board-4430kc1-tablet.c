@@ -871,6 +871,7 @@ static int __init omap4_i2c_init(void)
 	omap_register_i2c_bus_board_data(3, &sdp4430_i2c_3_bus_pdata);
 	omap_register_i2c_bus_board_data(4, &sdp4430_i2c_4_bus_pdata);
 
+	/* FIXME-HASH: changed to: omap4_power_init(); */
 	omap4_pmic_init("twl6030", &sdp4430_twldata);
 
 	/*

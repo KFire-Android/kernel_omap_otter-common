@@ -180,7 +180,7 @@ static int pcb_read_current_temp(struct pcb_temp_sensor *temp_sensor)
 			__func__, val);
 		return -EINVAL;
 	}
-	temp = adc_to_temp_conversion(req.rbuf[TWL6030_GPADC_CHANNEL]);
+	temp = adc_to_temp_conversion(req.buf[TWL6030_GPADC_CHANNEL].code);
 
 	return temp;
 }

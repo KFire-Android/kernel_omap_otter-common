@@ -20,8 +20,8 @@
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/types.h>
-
 #include <linux/thermal_framework.h>
+#include <plat/tmp102_temp_sensor.h>
 
 /* CPU Zone information */
 #define FATAL_ZONE	5
@@ -253,7 +253,7 @@ out:
 		thermal_update_temp_thresholds(omap_gov->temp_sensor,
 			die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
-			NORMAL_TEMP_MONITORING_RATE);
+			FAST_TEMP_MONITORING_RATE);
 		if (pcb_sensor)
 			omap_gov->average_period = NORMAL_TEMP_MONITORING_RATE;
 
@@ -604,7 +604,8 @@ static int omap_process_cpu_temp(struct list_head *cooling_list,
 				struct thermal_dev *temp_sensor,
 				int temp)
 {
-	if (!strcmp(temp_sensor->name, "pcb_sensor")) {
+	if (!strcmp(temp_sensor->name, "pcb_sensor") ||
+		!strcmp(temp_sensor->name, TMP102_SENSOR_NAME)) {
 		if (pcb_sensor == NULL) {
 			pr_info("%s: Setting %s pointer\n",
 				__func__, temp_sensor->name);

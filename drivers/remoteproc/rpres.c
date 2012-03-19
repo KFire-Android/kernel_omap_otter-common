@@ -75,12 +75,13 @@ void rpres_put(struct rpres *obj)
 }
 EXPORT_SYMBOL(rpres_put);
 
-int rpres_set_constraints(struct rpres *obj, enum rpres_constraint type, long val)
+int rpres_set_constraints(struct rpres *obj, enum rpres_constraint type,
+				long val)
 {
 	int ret;
 	struct rpres_platform_data *pdata = obj->pdev->dev.platform_data;
 	struct platform_device *pdev = obj->pdev;
-	static const char *cname[] = {"scale", "latency", "bandwidth"};
+	static char * const cname[] = {"scale", "latency", "bandwidth"};
 	int (*func)(struct platform_device *, long);
 
 	switch (type) {

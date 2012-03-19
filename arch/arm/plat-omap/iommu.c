@@ -22,6 +22,7 @@
 #include <asm/cacheflush.h>
 
 #include <plat/iommu.h>
+#include <plat/omap-pm.h>
 
 #include "iopgtable.h"
 
@@ -29,6 +30,10 @@
 	for (__i = 0;							\
 	     (__i < (n)) && (cr = __iotlb_read_cr((obj), __i), true);	\
 	     __i++)
+
+#define SET_MPU_CORE_CONSTRAINT	10
+#define SET_DSP_CONSTRAINT	10
+#define CLEAR_CONSTRAINT	-1
 
 /* accommodate the difference between omap1 and omap2/3 */
 static const struct iommu_functions *arch_iommu;
@@ -842,6 +847,27 @@ int iommu_set_da_range(struct iommu *obj, u32 start, u32 end)
 EXPORT_SYMBOL_GPL(iommu_set_da_range);
 
 /**
+ * _set_latency_cstr - set a latency constraint in the proper pwrdm
+ * @obj:		target iommu
+ * @set:		true will set the constraint, false will release it
+ *
+ * Put a latency constraint so the corresponding power domain remains on.
+ **/
+static void _set_latency_cstr(struct iommu *obj, bool set)
+{
+	int val;
+
+	if (!strcmp(obj->name, "ducati")) {
+		val = set ? SET_MPU_CORE_CONSTRAINT : CLEAR_CONSTRAINT;
+		pm_qos_update_request(obj->qos_request, val);
+	} else if (!strcmp(obj->name, "tesla")) {
+		val = set ? SET_DSP_CONSTRAINT : CLEAR_CONSTRAINT;
+		omap_pm_set_max_dev_wakeup_lat(obj->dev, obj->dev, val);
+	}
+	return;
+}
+
+/**
  * iommu_get - Get iommu handler
  * @name:	target iommu name
  **/
@@ -861,11 +887,10 @@ struct iommu *iommu_get(const char *name)
 	mutex_lock(&obj->iommu_lock);
 
 	if (obj->refcount++ == 0) {
-		dev_info(obj->dev, "%s: %s qos_request\n", __func__, obj->name);
-		pm_qos_update_request(obj->qos_request, 10);
+		_set_latency_cstr(obj, true);
 		err = iommu_enable(obj);
 		if (err) {
-			pm_qos_update_request(obj->qos_request, -1);
+			_set_latency_cstr(obj, false);
 			goto err_enable;
 		}
 		flush_iotlb_all(obj);
@@ -908,7 +933,7 @@ void iommu_put(struct iommu *obj)
 
 	if (--obj->refcount == 0) {
 		iommu_disable(obj);
-		pm_qos_update_request(obj->qos_request, -1);
+		_set_latency_cstr(obj, false);
 	}
 
 	module_put(obj->owner);

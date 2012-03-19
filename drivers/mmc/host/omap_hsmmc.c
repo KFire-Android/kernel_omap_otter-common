@@ -125,9 +125,9 @@
 #define ADMA_ERR		(1 << 25)
 #define ADMA_XFER_INT		(1 << 3)
 
-#define ADMA_TABLE_SZ (PAGE_SIZE)
-#define ADMA_TABLE_NUM_ENTRIES \
-	(ADMA_TABLE_SZ / sizeof(struct adma_desc_table))
+#define DMA_TABLE_NUM_ENTRIES	1024
+#define ADMA_TABLE_SZ 	\
+	(DMA_TABLE_NUM_ENTRIES * sizeof(struct adma_desc_table))
 
 #define SDMA_XFER	1
 #define ADMA_XFER	2
@@ -139,6 +139,7 @@
  * Hence rounding it to a lesser value.
  */
 #define ADMA_MAX_XFER_PER_ROW (60 * 1024)
+#define ADMA_MAX_BLKS_PER_ROW (ADMA_MAX_XFER_PER_ROW / 512)
 
 
 #define AUTO_CMD12		(1 << 0)	/* Auto CMD12 support */
@@ -1584,7 +1585,7 @@ static int mmc_populate_adma_desc_table(struct omap_hsmmc_host *host,
 	}
 	/* Setup last entry to terminate */
 	pdesc[i + j - 1].attr |= ADMA_XFER_END;
-	WARN_ON((i + j - 1) > ADMA_TABLE_NUM_ENTRIES);
+	WARN_ON((i + j - 1) > DMA_TABLE_NUM_ENTRIES);
 	dev_dbg(mmc_dev(host->mmc),
 		"ADMA table has %d entries from %d sglist\n",
 		i + j, host->dma_len);
@@ -1753,6 +1754,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	unsigned long timeout;
 	u32 con;
 	int do_send_init_stream = 0;
+
 	mmc_claim_host(host->mmc);
 
 	if (ios->power_mode != host->power_mode) {
@@ -2385,11 +2387,27 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 
 	/* Since we do only SG emulation, we can have as many segs
 	 * as we want. */
-	mmc->max_segs = 1024;
 
-	mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
-	mmc->max_blk_count = 0xFFFF;    /* No. of Blocks is 16 bits */
-	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
+	if (host->dma_type == ADMA_XFER) {
+		/* Worst case is when above block layer gives us 512 segments,
+		  * in which there are 511 single block entries, but one large
+		  * block that is of size mmc->max_req_size - (511*512) bytes.
+		  * In this case, we use the reserved 512 table entries to
+		  * break up the large request. This is also the reason why we
+		  * say we can only handle DMA_TABLE_NUM_ENTRIES/2
+		  * segments instead of DMA_TABLE_NUM_ENTRIES.
+		  */
+		mmc->max_segs = DMA_TABLE_NUM_ENTRIES/2;
+		mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
+		mmc->max_blk_count = ADMA_MAX_BLKS_PER_ROW *
+							DMA_TABLE_NUM_ENTRIES/2;
+		mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
+	} else {
+		mmc->max_segs = DMA_TABLE_NUM_ENTRIES;
+		mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
+		mmc->max_blk_count = 0xFFFF;    /* No. of Blocks is 16 bits */
+		mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
+	}
 	mmc->max_seg_size = mmc->max_req_size;
 
 	mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |

@@ -26,10 +26,77 @@
 #include <plat/dsp.h>
 #include <plat/io.h>
 #include "cm2_44xx.h"
+#include "cm1_44xx.h"
 #include "cm-regbits-44xx.h"
 
 #define OMAP4430_CM_M3_M3_CLKCTRL (OMAP4430_CM2_BASE + OMAP4430_CM2_CORE_INST \
 		+ OMAP4_CM_DUCATI_DUCATI_CLKCTRL_OFFSET)
+
+#define OMAP4430_CM_DSP_DSP_CLKCTRL (OMAP4430_CM1_BASE \
+		+ OMAP4430_CM1_TESLA_INST + OMAP4_CM_TESLA_TESLA_CLKCTRL_OFFSET)
+
+#define CONTROL_DSP_BOOTADDR (0x4A002304)
+
+static void dump_ipu_registers(struct rproc *rproc)
+{
+	unsigned long flags;
+	char buf[64];
+	struct pt_regs regs;
+
+	if (!rproc->cdump_buf1)
+		return;
+
+	remoteproc_fill_pt_regs(&regs,
+			(struct exc_regs *)rproc->cdump_buf1);
+
+	pr_info("REGISTER DUMP FOR REMOTEPROC %s\n", rproc->name);
+	pr_info("PC is at %08lx\n", instruction_pointer(&regs));
+	pr_info("LR is at %08lx\n", regs.ARM_lr);
+	pr_info("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
+	       "sp : %08lx  ip : %08lx  fp : %08lx\n",
+		regs.ARM_pc, regs.ARM_lr, regs.ARM_cpsr,
+		regs.ARM_sp, regs.ARM_ip, regs.ARM_fp);
+	pr_info("r10: %08lx  r9 : %08lx  r8 : %08lx\n",
+		regs.ARM_r10, regs.ARM_r9,
+		regs.ARM_r8);
+	pr_info("r7 : %08lx  r6 : %08lx  r5 : %08lx  r4 : %08lx\n",
+		regs.ARM_r7, regs.ARM_r6,
+		regs.ARM_r5, regs.ARM_r4);
+	pr_info("r3 : %08lx  r2 : %08lx  r1 : %08lx  r0 : %08lx\n",
+		regs.ARM_r3, regs.ARM_r2,
+		regs.ARM_r1, regs.ARM_r0);
+
+	flags = regs.ARM_cpsr;
+	buf[0] = flags & PSR_N_BIT ? 'N' : 'n';
+	buf[1] = flags & PSR_Z_BIT ? 'Z' : 'z';
+	buf[2] = flags & PSR_C_BIT ? 'C' : 'c';
+	buf[3] = flags & PSR_V_BIT ? 'V' : 'v';
+	buf[4] = '\0';
+
+	pr_info("Flags: %s  IRQs o%s  FIQs o%s\n",
+		buf, interrupts_enabled(&regs) ? "n" : "ff",
+		fast_interrupts_enabled(&regs) ? "n" : "ff");
+}
+
+static void dump_dsp_registers(struct rproc *rproc)
+{
+	struct exc_dspRegs *regs;
+
+	regs = (struct exc_dspRegs *)rproc->cdump_buf0;
+
+	pr_info("REGISTER DUMP FOR REMOTEPROC %s\n", rproc->name);
+	pr_info("PC is at %08x\n", regs->IRP);
+	pr_info("SP is at %08x\n", regs->b15);
+	pr_info("pc : [<%08x>]    sp : [<%08x>]", regs->IRP, regs->b15);
+}
+
+static struct rproc_ops ipu_ops = {
+	.dump_registers = dump_ipu_registers,
+};
+
+static struct rproc_ops dsp_ops = {
+	.dump_registers = dump_dsp_registers,
+};
 
 static struct omap_rproc_timers_info ipu_timers[] = {
 	{ .id = 3 },
@@ -40,6 +107,13 @@ static struct omap_rproc_timers_info ipu_timers[] = {
 #endif
 };
 
+static struct omap_rproc_timers_info dsp_timers[] = {
+	{ .id = 5 },
+#ifdef CONFIG_REMOTEPROC_WATCHDOG
+	{ .id = 6 },
+#endif
+};
+
 static struct omap_rproc_pdata omap4_rproc_data[] = {
 	{
 		.name		= "dsp",
@@ -47,6 +121,16 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.firmware	= "tesla-dsp.bin",
 		.oh_name	= "dsp_c0",
 		.clkdm_name	= "dsp_clkdm",
+		.timers		= dsp_timers,
+		.timers_cnt	= ARRAY_SIZE(dsp_timers),
+		.idle_addr	= OMAP4430_CM_DSP_DSP_CLKCTRL,
+		.idle_mask	= OMAP4430_STBYST_MASK,
+		.suspend_addr   = 0xad6e134c,
+		.suspend_mask	= ~0,
+		.sus_timeout	= 5000,
+		.sus_mbox_name	= "mailbox-2",
+		.boot_reg	= CONTROL_DSP_BOOTADDR,
+		.ops		= &dsp_ops,
 	},
 	{
 		.name		= "ipu",
@@ -63,6 +147,7 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.suspend_mask	= ~0,
 		.sus_timeout	= 5000,
 		.sus_mbox_name	= "mailbox-1",
+		.ops		= &ipu_ops,
 	},
 };
 
@@ -75,37 +160,49 @@ static struct omap_device_pm_latency omap_rproc_latency[] = {
 static struct rproc_mem_pool *omap_rproc_get_pool(const char *name)
 {
 	struct rproc_mem_pool *pool = NULL;
+	phys_addr_t paddr1;
+	phys_addr_t paddr2;
+	u32 len1;
+	u32 len2;
 
-	/* check for ipu currently. dsp will be handled later */
+	/* get ipu mempool  */
 	if (!strcmp("ipu", name)) {
-		phys_addr_t paddr1 = omap_ipu_get_mempool_base(
+		paddr1 = omap_ipu_get_mempool_base(
 						OMAP_RPROC_MEMPOOL_STATIC);
-		phys_addr_t paddr2 = omap_ipu_get_mempool_base(
+		paddr2 = omap_ipu_get_mempool_base(
 						OMAP_RPROC_MEMPOOL_DYNAMIC);
-		u32 len1 = omap_ipu_get_mempool_size(OMAP_RPROC_MEMPOOL_STATIC);
-		u32 len2 = omap_ipu_get_mempool_size(OMAP_RPROC_MEMPOOL_DYNAMIC);
+		len1 = omap_ipu_get_mempool_size(OMAP_RPROC_MEMPOOL_STATIC);
+		len2 = omap_ipu_get_mempool_size(OMAP_RPROC_MEMPOOL_DYNAMIC);
+	/* get dsp mempool*/
+	} else if (!strcmp("dsp", name)) {
+		paddr1 = omap_dsp_get_mempool_tbase(
+						OMAP_RPROC_MEMPOOL_STATIC);
+		paddr2 = omap_dsp_get_mempool_tbase(
+						OMAP_RPROC_MEMPOOL_DYNAMIC);
+		len1 = omap_dsp_get_mempool_tsize(OMAP_RPROC_MEMPOOL_STATIC);
+		len2 = omap_dsp_get_mempool_tsize(OMAP_RPROC_MEMPOOL_DYNAMIC);
+	} else
+		return pool;
 
-		if (!paddr1 && !paddr2) {
-			pr_err("no carveout memory available at all for "
-				"remotproc\n");
-			return pool;
-		}
-		if (!paddr1 || !len1)
-			pr_warn("static memory is unavailable: 0x%x, 0x%x\n",
-				paddr1, len1);
-		if (!paddr2 || !len2)
-			pr_warn("carveout memory is unavailable: 0x%x, 0x%x\n",
-				paddr2, len2);
+	if (!paddr1 && !paddr2) {
+		pr_err("%s - no carveout memory is available at all\n", name);
+		return pool;
+	}
+	if (!paddr1 || !len1)
+		pr_warn("%s - static memory is unavailable: 0x%x, 0x%x\n",
+			name, paddr1, len1);
+	if (!paddr2 || !len2)
+		pr_warn("%s - carveout memory is unavailable: 0x%x, 0x%x\n",
+			name, paddr2, len2);
 
-		pool = kzalloc(sizeof(*pool), GFP_KERNEL);
-		if (pool) {
-			pool->st_base = paddr1;
-			pool->st_size = len1;
-			pool->mem_base = paddr2;
-			pool->mem_size = len2;
-			pool->cur_base = paddr2;
-			pool->cur_size = len2;
-		}
+	pool = kzalloc(sizeof(*pool), GFP_KERNEL);
+	if (pool) {
+		pool->st_base = paddr1;
+		pool->st_size = len1;
+		pool->mem_base = paddr2;
+		pool->mem_size = len2;
+		pool->cur_base = paddr2;
+		pool->cur_size = len2;
 	}
 
 	return pool;

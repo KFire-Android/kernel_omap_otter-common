@@ -1088,10 +1088,10 @@ static const struct snd_kcontrol_new abe_controls[] = {
 		MIX_VXREC_INPUT_TONES, 0, 149, 0,
 		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_tones_tlv),
 	SOC_SINGLE_EXT_TLV("VXREC Voice DL Volume",
-		MIX_VXREC_INPUT_VX_UL, 0, 149, 0,
+		MIX_VXREC_INPUT_VX_DL, 0, 149, 0,
 		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_vx_dl_tlv),
 	SOC_SINGLE_EXT_TLV("VXREC Voice UL Volume",
-		MIX_VXREC_INPUT_VX_DL, 0, 149, 0,
+		MIX_VXREC_INPUT_VX_UL, 0, 149, 0,
 		volume_get_vxrec_mixer, volume_put_vxrec_mixer, vxrec_vx_ul_tlv),
 
 	/* AUDUL mixer gains */
@@ -1193,6 +1193,8 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			W_AIF_DMIC1, ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_IN("DMIC2", "DMIC2 Capture", 0,
 			W_AIF_DMIC2, ABE_OPP_50, 0),
+	SND_SOC_DAPM_AIF_IN("VXREC", "VXREC Capture", 0,
+			W_AIF_VXREC, ABE_OPP_50, 0),
 
 	/* ROUTE_UL Capture Muxes */
 	SND_SOC_DAPM_MUX("MUX_UL00",
@@ -1522,10 +1524,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"PDM_DL2", NULL, "DL2 Mixer"},
 
 	/* VxREC Mixer */
-	{"Capture Mixer", "Tones", "TONES_DL"},
-	{"Capture Mixer", "Voice Playback", "VX DL VMixer"},
-	{"Capture Mixer", "Voice Capture", "VX UL VMixer"},
-	{"Capture Mixer", "Media Playback", "MM_DL VMixer"},
+	{"Capture Mixer", "Tones", "VXREC"},
+	{"Capture Mixer", "Voice Playback", "VXREC"},
+	{"Capture Mixer", "Voice Capture", "VXREC"},
+	{"Capture Mixer", "Media Playback", "VXREC"},
 	{"MM_DL VMixer", NULL, "MM_DL"},
 	{"MM_DL VMixer", NULL, "MM_DL_LP"},
 
@@ -1562,6 +1564,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"DMIC0", NULL, "BE_IN"},
 	{"DMIC1", NULL, "BE_IN"},
 	{"DMIC2", NULL, "BE_IN"},
+	{"VXREC", NULL, "BE_IN"},
 };
 
 #ifdef CONFIG_DEBUG_FS

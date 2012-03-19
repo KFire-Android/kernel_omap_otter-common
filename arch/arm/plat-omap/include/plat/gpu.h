@@ -34,6 +34,9 @@ struct gpu_platform_data {
 	int (*device_enable) (struct platform_device *pdev);
 	int (*device_shutdown) (struct platform_device *pdev);
 	int (*device_idle) (struct platform_device *pdev);
+	int (*opp_get_opp_count) (struct device *dev);
+	struct opp *(*opp_find_freq_ceil) (struct device *dev,
+					   unsigned long *freq);
 };
 
 #endif

@@ -327,6 +327,7 @@ static int twl6040_power_up_completion(struct twl6040 *twl6040,
 	lppllctl_exp = TWL6040_LPLLENA;
 
 	do {
+		INIT_COMPLETION(twl6040->ready);
 		gpio_set_value(twl6040->audpwron, 1);
 		time_left = wait_for_completion_timeout(&twl6040->ready,
 							msecs_to_jiffies(700));
@@ -717,8 +718,8 @@ static int __devinit twl6040_probe(struct platform_device *pdev)
 			goto gpio2_err;
 
 		ret = twl6040_request_irq(twl6040, TWL6040_IRQ_READY,
-				  twl6040_naudint_handler, "twl6040_irq_ready",
-				  twl6040);
+				twl6040_naudint_handler, 0,
+				"twl6040_irq_ready", twl6040);
 		if (ret) {
 			dev_err(twl6040->dev, "READY IRQ request failed: %d\n",
 				ret);

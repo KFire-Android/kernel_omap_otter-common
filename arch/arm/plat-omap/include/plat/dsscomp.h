@@ -3,6 +3,10 @@
 
 #include <video/omapdss.h>
 
+struct dsscomp_platform_data {
+	unsigned int tiler1d_slotsz;
+};
+
 /* queuing operations */
 typedef struct dsscomp_data *dsscomp_t;		/* handle */
 

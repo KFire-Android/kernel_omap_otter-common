@@ -67,6 +67,7 @@ extern "C" {
 #define PVRSRV_HAP_MULTI_PROCESS			(1U<<17)
 #define PVRSRV_HAP_FROM_EXISTING_PROCESS	(1U<<18)
 #define PVRSRV_HAP_NO_CPU_VIRTUAL			(1U<<19)
+#define PVRSRV_MAP_GC_MMU				(1UL<<20)
 #define PVRSRV_HAP_MAPTYPE_MASK				(PVRSRV_HAP_KERNEL_ONLY \
                                             |PVRSRV_HAP_SINGLE_PROCESS \
                                             |PVRSRV_HAP_MULTI_PROCESS \
@@ -423,9 +424,13 @@ typedef struct _PVRSRV_MISC_INFO_
 
 		
 		IMG_VOID *pvBaseVAddr;
-
-		
 		IMG_UINT32	ui32Length;
+
+		IMG_BYTE *pbRowStart;
+		IMG_BYTE *pbRowEnd;
+		IMG_BYTE *pbRowThresh;
+		IMG_BOOL bStridedCacheOp;
+		IMG_UINT32 ui32Stride;
 	} sCacheOpCtl;
 
 	

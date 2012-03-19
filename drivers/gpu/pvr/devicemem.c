@@ -31,6 +31,9 @@
 #include "pdump_km.h"
 #include "pvr_bridge_km.h"
 #include "osfunc.h"
+#if defined(CONFIG_GCCORE)
+#include "gc_bvmapping.h"
+#endif
 
 static PVRSRV_ERROR AllocDeviceMem(IMG_HANDLE		hDevCookie,
 									IMG_HANDLE		hDevMemHeap,
@@ -807,6 +810,10 @@ PVRSRV_ERROR FreeMemCallBackCommon(PVRSRV_KERNEL_MEM_INFO *psMemInfo,
 		}
 	}
 
+#if defined(CONFIG_GCCORE)
+	if (psMemInfo->ui32Flags & PVRSRV_MAP_GC_MMU)
+		gc_bvunmap_meminfo(psMemInfo);
+#endif
 	
 	if (eError == PVRSRV_OK)
 	{
@@ -902,6 +909,11 @@ PVRSRV_ERROR IMG_CALLCONV _PVRSRVAllocDeviceMemKM(IMG_HANDLE				hDevCookie,
 	{
 		return eError;
 	}
+
+#if defined(CONFIG_GCCORE)
+	if (ui32Flags & PVRSRV_MAP_GC_MMU)
+		gc_bvmap_meminfo(psMemInfo);
+#endif
 
 	if (ui32Flags & PVRSRV_MEM_NO_SYNCOBJ)
 	{
@@ -1766,8 +1778,12 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVMapDeviceClassMemoryKM(PVRSRV_PER_PROCESS_DATA	*
 
 #if defined(SUPPORT_PDUMP_MULTI_PROCESS)
 	
-	PDUMPCOMMENT("Dump display surface");
-	PDUMPMEM(IMG_NULL, psMemInfo, ui32Offset, psMemInfo->uAllocSize, PDUMP_FLAGS_CONTINUOUS, ((BM_BUF*)psMemInfo->sMemBlk.hBuffer)->pMapping);
+	if(psMemInfo->pvLinAddrKM)
+	{
+		
+		PDUMPCOMMENT("Dump display surface");
+		PDUMPMEM(IMG_NULL, psMemInfo, ui32Offset, psMemInfo->uAllocSize, PDUMP_FLAGS_CONTINUOUS, ((BM_BUF*)psMemInfo->sMemBlk.hBuffer)->pMapping);
+	}
 #endif
 	return PVRSRV_OK;
 

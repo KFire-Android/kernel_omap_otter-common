@@ -12,6 +12,8 @@
  * XXX Missing values for the OMAP4 DPLL_USB
  * XXX Missing min_multiplier values for all OMAP4 DPLLs
  */
+#define OMAP4470_MAX_DPLL_MULT	4095
+#define OMAP4470_MAX_DPLL_DIV	256
 #define OMAP4430_MAX_DPLL_MULT	2047
 #define OMAP4430_MAX_DPLL_DIV	128
 #define OMAP4430_REGM4XEN_MULT 4

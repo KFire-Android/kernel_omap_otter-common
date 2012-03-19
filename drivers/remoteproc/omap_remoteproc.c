@@ -85,43 +85,10 @@ static int omap_suspend(struct rproc *rproc, bool force)
 
 static void omap_rproc_dump_registers(struct rproc *rproc)
 {
-	unsigned long flags;
-	char buf[64];
-	struct pt_regs regs;
+	struct device *dev = rproc->dev;
+	struct omap_rproc_pdata *pdata = dev->platform_data;
 
-	if (!rproc->cdump_buf1)
-		return;
-
-	remoteproc_fill_pt_regs(&regs,
-			(struct exc_regs *)rproc->cdump_buf1);
-
-	pr_info("REGISTER DUMP FOR REMOTEPROC %s\n", rproc->name);
-	pr_info("PC is at %08lx\n", instruction_pointer(&regs));
-	pr_info("LR is at %08lx\n", regs.ARM_lr);
-	pr_info("pc : [<%08lx>]    lr : [<%08lx>]    psr: %08lx\n"
-	       "sp : %08lx  ip : %08lx  fp : %08lx\n",
-		regs.ARM_pc, regs.ARM_lr, regs.ARM_cpsr,
-		regs.ARM_sp, regs.ARM_ip, regs.ARM_fp);
-	pr_info("r10: %08lx  r9 : %08lx  r8 : %08lx\n",
-		regs.ARM_r10, regs.ARM_r9,
-		regs.ARM_r8);
-	pr_info("r7 : %08lx  r6 : %08lx  r5 : %08lx  r4 : %08lx\n",
-		regs.ARM_r7, regs.ARM_r6,
-		regs.ARM_r5, regs.ARM_r4);
-	pr_info("r3 : %08lx  r2 : %08lx  r1 : %08lx  r0 : %08lx\n",
-		regs.ARM_r3, regs.ARM_r2,
-		regs.ARM_r1, regs.ARM_r0);
-
-	flags = regs.ARM_cpsr;
-	buf[0] = flags & PSR_N_BIT ? 'N' : 'n';
-	buf[1] = flags & PSR_Z_BIT ? 'Z' : 'z';
-	buf[2] = flags & PSR_C_BIT ? 'C' : 'c';
-	buf[3] = flags & PSR_V_BIT ? 'V' : 'v';
-	buf[4] = '\0';
-
-	pr_info("Flags: %s  IRQs o%s  FIQs o%s\n",
-		buf, interrupts_enabled(&regs) ? "n" : "ff",
-		fast_interrupts_enabled(&regs) ? "n" : "ff");
+	pdata->ops->dump_registers(rproc);
 }
 
 static int
@@ -437,6 +404,16 @@ static irqreturn_t omap_rproc_watchdog_isr(int irq, void *p)
 	return IRQ_HANDLED;
 }
 #endif
+
+static inline void _load_boot_addr(struct rproc *rproc, u64 bootaddr)
+{
+	struct omap_rproc_pdata *pdata = rproc->dev->platform_data;
+
+	if (pdata->boot_reg)
+		omap_writel(bootaddr, pdata->boot_reg);
+	return;
+}
+
 static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
 {
 	struct device *dev = rproc->dev;
@@ -457,8 +434,11 @@ static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
 	}
 
 #ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
-	_init_pm_flags(rproc);
+	ret = _init_pm_flags(rproc);
+	if (ret)
+		return ret;
 #endif
+
 	for (i = 0; i < pdata->timers_cnt; i++) {
 		timers[i].odt = omap_dm_timer_request_specific(timers[i].id);
 		if (!timers[i].odt) {
@@ -467,8 +447,10 @@ static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
 		}
 		omap_dm_timer_set_source(timers[i].odt, OMAP_TIMER_SRC_SYS_CLK);
 #ifdef CONFIG_REMOTEPROC_WATCHDOG
-		/* GPT 9 and 11 are using as WDT */
-		if (timers[i].id == 9 || timers[i].id == 11) {
+		/* GPT 9 & 11 (ipu); GPT 6 (dsp) are used as watchdog timers */
+		if ((!strcmp(rproc->name, "dsp") && timers[i].id == 6) ||
+		    (!strcmp(rproc->name, "ipu") &&
+				(timers[i].id == 9 || timers[i].id == 11))) {
 			ret = request_irq(omap_dm_timer_get_irq(timers[i].odt),
 					 omap_rproc_watchdog_isr, IRQF_DISABLED,
 					"rproc-wdt", rproc);
@@ -478,6 +460,7 @@ static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
 #endif
 	}
 
+	_load_boot_addr(rproc, bootaddr);
 	ret = omap_device_enable(pdev);
 out:
 	if (ret) {
@@ -532,8 +515,10 @@ static inline int omap_rproc_stop(struct rproc *rproc)
 
 	for (i = 0; i < pdata->timers_cnt; i++) {
 #ifdef CONFIG_REMOTEPROC_WATCHDOG
-		/* GPT 9 and 11 are used as WDT */
-		if (timers[i].id == 9 || timers[i].id == 11)
+		/* GPT 9 & 11 (ipu); GPT 6 (dsp) are used as watchdog timers */
+		if ((!strcmp(rproc->name, "dsp") && timers[i].id == 6) ||
+		    (!strcmp(rproc->name, "ipu") &&
+				(timers[i].id == 9 || timers[i].id == 11)))
 			free_irq(omap_dm_timer_get_irq(timers[i].odt), rproc);
 #endif
 		omap_dm_timer_free(timers[i].odt);
@@ -545,8 +530,15 @@ err:
 
 static int omap_rproc_set_lat(struct rproc *rproc, long val)
 {
-	pm_qos_update_request(rproc->qos_request, val);
-	return 0;
+	int ret = 0;
+
+	if (!strcmp(rproc->name, "ipu"))
+		pm_qos_update_request(rproc->qos_request, val);
+	else
+		ret = omap_pm_set_max_dev_wakeup_lat(rproc->dev,
+						rproc->dev, val);
+
+	return ret;
 }
 
 static int omap_rproc_set_l3_bw(struct rproc *rproc, long val)

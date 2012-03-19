@@ -39,9 +39,17 @@
 #include <linux/notifier.h>
 #include <linux/mutex.h>
 
+#ifdef CONFIG_ION_OMAP
+#include <linux/ion.h>
+#endif
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
+
+#include <video/dsscomp.h>
+#include <linux/bltsville.h>
+#include <video/omap_hwc.h>
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
 #define	OMAPLFB_CONSOLE_LOCK()		console_lock()
@@ -81,6 +89,7 @@ typedef struct OMAPLFB_BUFFER_TAG
 
 	OMAPLFB_HANDLE      		hCmdComplete;
 	unsigned long    		ulSwapInterval;
+	void *bvmap_handle;
 } OMAPLFB_BUFFER;
 
 typedef struct OMAPLFB_SWAPCHAIN_TAG
@@ -118,7 +127,8 @@ typedef struct OMAPLFB_FBINFO_TAG
 	unsigned long       ulPhysicalWidthmm;
 	unsigned long       ulPhysicalHeightmm;
 
-	
+	void *clr_fb_geom;
+	void *clr_fb_desc;
 	
 	IMG_SYS_PHYADDR     sSysAddr;
 	IMG_CPU_VIRTADDR    sCPUVAddr;
@@ -128,8 +138,20 @@ typedef struct OMAPLFB_FBINFO_TAG
 
 	OMAPLFB_BOOL        bIs2D;
 	IMG_SYS_PHYADDR     *psPageList;
-#if defined(CONFIG_ION_OMAP)
+#if defined(CONFIG_DSSCOMP)
 	struct ion_handle   *psIONHandle;
+	/* This is the ION handle for the blit framebuffers */
+	struct ion_handle   *psBltFBsIonHndl;
+	/* The number of blit framebuffers */
+	IMG_UINT32          psBltFBsNo;
+	/* These are the BV handles for the framebuffers */
+	void                **psBltFBsBvHndl;
+	/* Physical addresses of the blit framebuffers */
+	IMG_UINTPTR_T       *psBltFBsBvPhys;
+	/* The current blit buffer index */
+	unsigned int        iBltFBsIdx;
+	IMG_UINT            uiBltFBsByteStride;
+
 #endif
 	IMG_UINT32          uiBytesPerPixel;
 }OMAPLFB_FBINFO;
@@ -279,6 +301,22 @@ void OMAPLFBAtomicIntDeInit(OMAPLFB_ATOMIC_INT *psAtomic);
 void OMAPLFBAtomicIntSet(OMAPLFB_ATOMIC_INT *psAtomic, int iVal);
 int OMAPLFBAtomicIntRead(OMAPLFB_ATOMIC_INT *psAtomic);
 void OMAPLFBAtomicIntInc(OMAPLFB_ATOMIC_INT *psAtomic);
+IMG_UINT32 GetVramStart(OMAPLFB_DEVINFO *psDevInfo);
+unsigned long GetVramFBSize(OMAPLFB_DEVINFO *psDevInfo);
+unsigned long GetVramFBTotalSize(struct fb_info *psLINFBInfo);
+
+#if defined (CONFIG_DSSCOMP)
+int meminfo_idx_valid(unsigned int meminfo_ix, int num_meminfos);
+#endif
+
+/* Blt stubs implemented when CONFIG_GCBV is enabled */
+IMG_BOOL OMAPLFBInitBlt(void);
+OMAPLFB_ERROR OMAPLFBInitBltFBs(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBDeInitBltFBs(OMAPLFB_DEVINFO *psDevInfo);
+IMG_BOOL OMAPLFBBltFbClearWorkaround(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBGetBltFBsBvHndl(OMAPLFB_FBINFO *psPVRFBInfo, IMG_UINTPTR_T *ppPhysAddr);
+void OMAPLFBDoBlits(OMAPLFB_DEVINFO *psDevInfo, PDC_MEM_INFO *ppsMemInfos,
+		    struct omap_hwc_blit_data *blit_data, IMG_UINT32 ui32NumMemInfos);
 
 #if defined(DEBUG)
 void OMAPLFBPrintInfo(OMAPLFB_DEVINFO *psDevInfo);
@@ -286,5 +324,15 @@ void OMAPLFBPrintInfo(OMAPLFB_DEVINFO *psDevInfo);
 #define	OMAPLFBPrintInfo(psDevInfo)
 #endif
 
-#endif 
+/*
+ * This is the number of framebuffers which will be rendered to by the SGX
+ */
+#define OMAPLFB_NUM_SGX_FBS	2
 
+#if defined(CONFIG_GCBV)
+/*
+ * This is the number of framebuffers rendered to by GC320
+ */
+#define OMAPLFB_NUM_BLT_FBS	2
+#endif /* CONFIG_GCBV */
+#endif /* __OMAPLFB_H__ */

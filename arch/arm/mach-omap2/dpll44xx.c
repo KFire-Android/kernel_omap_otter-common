@@ -33,6 +33,9 @@
 #include "clockdomain.h"
 #include "cm-regbits-44xx.h"
 #include "prcm44xx.h"
+#include "prm44xx.h"
+#include "prm-regbits-44xx.h"
+#include "prminst44xx.h"
 
 #define MAX_FREQ_UPDATE_TIMEOUT  100000
 
@@ -298,13 +301,15 @@ int omap4460_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 		omap4460_mpu_dpll_update_children(rate);
 
 	/*
-	 * On OMAP4460, to obtain MPU DPLL frequency higher
-	 * than 1GHz, DCC (Duty Cycle Correction) needs to
-	 * be enabled.
+	 * To obtain MPU DPLL frequency higher than 1GHz, On OMAP4470,
+	 * DCC (Duty Cycle Correction) needs to be enabled.
 	 * And needs to be kept disabled for < 1 Ghz.
+	 *
+	 * OMAP4460 has a HW issue with DCC so until proper WA is found
+	 * DCC shouldn't be used at any frequency.
 	 */
 	dpll_rate = omap2_get_dpll_rate(clk->parent);
-	if (rate <= OMAP_1_5GHz) {
+	if (!cpu_is_omap447x() || rate <= OMAP_1GHz) {
 		/* If DCC is enabled, disable it */
 		v = __raw_readl(dd->mult_div1_reg);
 		if (v & OMAP4460_DCC_EN_MASK) {
@@ -316,7 +321,7 @@ int omap4460_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
 			clk->parent->set_rate(clk->parent, rate);
 	} else {
 		/*
-		 * On 4460, the MPU clk for frequencies higher than 1Ghz
+		 * On OMAP4470, the MPU clk for frequencies higher than 1Ghz
 		 * is sourced from CLKOUTX2_M3, instead of CLKOUT_M2, while
 		 * value of M3 is fixed to 1. Hence for frequencies higher
 		 * than 1 Ghz, lock the DPLL at half the rate so the
@@ -617,4 +622,63 @@ void omap4_dpll_resume_off(void)
 		/* Restore autoidle settings after the dpll is locked */
 		omap4_dpll_restore_reg(dpll_reg, &dpll_reg->autoidle);
 	}
+}
+
+/*
+ * PRCM bug WA: i723 errata. DPLL_ABE must be reconfigured
+ * before clocks initialize when boot by warm reset
+ */
+void omap4_dpll_abe_reconfigure(void)
+{
+	u32 reset_state, warm_state;
+	int i = 0;
+
+	/* Read the last reset state */
+	reset_state = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+						OMAP4430_PRM_DEVICE_INST,
+						OMAP4_PRM_RSTST_OFFSET);
+
+	/* Global Warm Reset is already cared to WA before warm resetting */
+	warm_state = OMAP4430_MPU_WDT_RST_MASK |
+			OMAP4430_EXTERNAL_WARM_RST_MASK |
+			OMAP4430_GLOBAL_WARM_SW_RST_MASK;
+
+	/* don't care WA when not warm reset */
+	if (!(reset_state & warm_state))
+		return;
+
+	/* Support only sys_clk is 38.4 MHz */
+	if (omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+					OMAP4430_PRM_CKGEN_INST,
+					OMAP4_CM_SYS_CLKSEL_OFFSET) != 0x7)
+		return;
+
+	/* Reconfigure DPLL_MULT bits of CM_CLKSEL_DPLL_ABE */
+	omap4_cminst_rmw_inst_reg_bits(OMAP4430_DPLL_MULT_MASK,
+					0x2ee << OMAP4430_DPLL_MULT_SHIFT,
+					OMAP4430_CM1_PARTITION,
+					OMAP4430_CM1_CKGEN_INST,
+					OMAP4_CM_CLKSEL_DPLL_ABE_OFFSET);
+
+	/* Lock the ABE DPLL */
+	omap4_cminst_rmw_inst_reg_bits(OMAP4430_DPLL_EN_MASK,
+					OMAP4430_DPLL_EN_MASK,
+					OMAP4430_CM1_PARTITION,
+					OMAP4430_CM1_CKGEN_INST,
+					OMAP4_CM_CLKMODE_DPLL_ABE_OFFSET);
+
+	/* Wait until DPLL is locked */
+	while (((omap4_cminst_read_inst_reg(OMAP4430_CM1_PARTITION,
+					OMAP4430_CM1_CKGEN_INST,
+					OMAP4_CM_IDLEST_DPLL_ABE_OFFSET) &
+					OMAP4430_ST_DPLL_CLK_MASK) != 0x1) &&
+						(i < MAX_DPLL_WAIT_TRIES)) {
+		i++;
+		udelay(1);
+	}
+
+	if (i >= MAX_DPLL_WAIT_TRIES)
+		pr_err("Warm Reset WA: failed to lock the ABE DPLL\n");
+	else
+		pr_info("Warm Reset WA: succeeded to reconfigure the ABE DPLL\n");
 }

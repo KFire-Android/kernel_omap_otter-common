@@ -270,10 +270,6 @@ cpu_resume_l1_flags:
  *	Initialise TLB, Caches, and MMU state ready to switch the MMU
  *	on.  Return in r0 the new CP15 C1 control register setting.
  *
- *	We automatically detect if we have a Harvard cache, and use the
- *	Harvard cache control instructions insead of the unified cache
- *	control instructions.
- *
  *	This should be able to cover all ARMv7 cores.
  *
  *	It is assumed that:
@@ -361,11 +357,42 @@ __v7_setup:
 	orrlt	r10, r10, #1 << 11		@ set bit #11
 	mcrlt	p15, 0, r10, c15, c0, 1		@ write diagnostic register
 #endif
-
-3:	mov	r10, #0
-#ifdef HARVARD_CACHE
-	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
+#if (defined(CONFIG_OMAP4_ARM_ERRATA_742230) || \
+	defined(CONFIG_OMAP4_ARM_ERRATA_751472) || \
+	defined(CONFIG_OMAP4_ARM_ERRATA_743622))
+	stmia	r12, {r0-r4}
+	ldr	r0, =0x4a0022c4			@ Ctrl module status reg addr
+	ldr	r1, [r0]
+	and	r1, r1, #0x700			@ Bits 10:8 = Processor type
+	cmp	r1, #0x300			@ GP devices have this to be 3
+	bne	zero_diagctrl0
+	mrc	p15, 0, r0, c15, c0, 1		@ read diagnostic register
+#ifdef CONFIG_OMAP4_ARM_ERRATA_742230
+	cmp	r6, #0x22
+	orrle	r0, r0, #1 << 4			@ set bit #4
 #endif
+#ifdef CONFIG_OMAP4_ARM_ERRATA_751472
+	cmp	r6, #0x30			@ present prior to r3p0
+	orrlt	r0, r0, #1 << 11		@ set bit #11
+#endif
+#ifdef CONFIG_OMAP4_ARM_ERRATA_743622
+	cmp	r6, #0x30
+	orrlt	r0, r0, #1 << 6			@ set bit #6
+#endif
+	cmp	r0, #0
+	beq	zero_diagctrl0
+	mov	r10, r12
+	mov	r12, #0x114			@ prep for SMC call to 0x114
+	dsb
+	smc	#0
+	dsb
+	mov	r12, r10
+
+zero_diagctrl0:
+	ldmia	r12, {r0-r4}
+#endif
+3:	mov	r10, #0
+	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
 	dsb
 #ifdef CONFIG_MMU
 	mcr	p15, 0, r10, c8, c7, 0		@ invalidate I + D TLBs

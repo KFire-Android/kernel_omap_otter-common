@@ -97,21 +97,8 @@ config TILER_SECURE
            If set, process security will be hardwired and ssptr and offset
            lookup APIs are removed.
 
-config TILER_EXPOSE_SSPTR
-        bool "Expose SSPtr to userspace"
-        default y
-        depends on TI_TILER
-        help
-           This option sets whether SSPtr-s for blocks are exposed
-           during TILIOC_GBLK ioctls (MemMgr_Alloc APIs).  In a secure
-           TILER build, this may be the only way for the userspace code
-           to learn the system-space addresses of TILER blocks.
-
-           You can use this flag to see if the userspace is relying on
-           having access to the SSPtr.
-
 config TILER_ENABLE_NV12
-        bool "Enable NV12 support"
+        bool "Enable NV12 support (deprecated)"
         default y
         depends on TI_TILER
         help
@@ -121,9 +108,22 @@ config TILER_ENABLE_NV12
 	    will be enabled.
 
 config TILER_ENABLE_USERSPACE
-	bool "Enable userspace API"
-	default y
+	bool "Enable userspace API (deprecated)"
+	default n
 	depends on TI_TILER
 	help
 	    This option enabled the userspace API.  If set, an ioctl interface
 	    will be available to users.
+
+config TILER_EXPOSE_SSPTR
+        bool "Expose SSPtr to userspace (deprecated)"
+        default y
+        depends on TILER_ENABLE_USERSPACE
+        help
+           This option sets whether SSPtr-s for blocks are exposed
+           during TILIOC_GBLK ioctls (MemMgr_Alloc APIs).  In a secure
+           TILER build, this may be the only way for the userspace code
+           to learn the system-space addresses of TILER blocks.
+
+           You can use this flag to see if the userspace is relying on
+           having access to the SSPtr.

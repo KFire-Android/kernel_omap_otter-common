@@ -82,7 +82,7 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 
 	hw_state = twl6030_readb(pwr, TWL6030_MODULE_ID0, STS_HW_CONDITIONS);
 	pwr_val = !(hw_state & PWR_PWRON_IRQ);
-	if (prev_hw_state != pwr_val) {
+	if ((prev_hw_state != pwr_val) &&  (prev_hw_state != 0xFFFF)) {
 		input_report_key(pwr->input_dev, pwr->report_key,
 							pwr_val);
 		input_sync(pwr->input_dev);

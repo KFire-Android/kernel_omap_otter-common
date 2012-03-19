@@ -17,6 +17,9 @@ choice
 config PVR_SGXCORE_540
 	bool "SGX 540"
 
+config PVR_SGXCORE_544
+	bool "SGX 544"
+
 endchoice
 
 choice

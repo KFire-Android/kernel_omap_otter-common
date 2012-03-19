@@ -1095,7 +1095,7 @@ static struct omap_hwmod omap44xx_ctrl_module_core_hwmod = {
 	.main_clk       = "l4_div_ck",
 	.slaves         = omap44xx_ctrl_module_core_slaves,
 	.slaves_cnt     = ARRAY_SIZE(omap44xx_ctrl_module_core_slaves),
-	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP446X),
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP446X | CHIP_IS_OMAP447X),
 };
 /*
  * 'thermal_sensor' class
@@ -1152,7 +1152,7 @@ static struct omap_hwmod omap44xx_thermal_sensor_hwmod = {
 	},
 	.opt_clks       = thermal_sensor446x_opt_clks,
 	.opt_clks_cnt   = ARRAY_SIZE(thermal_sensor446x_opt_clks),
-	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP446X),
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP446X | CHIP_IS_OMAP447X),
 };
 
 /*
@@ -1196,7 +1196,7 @@ static struct omap_hwmod omap446x_bandgap_hwmod = {
 	},
 	.opt_clks	= bandgap446x_opt_clks,
 	.opt_clks_cnt	= ARRAY_SIZE(bandgap446x_opt_clks),
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP446X),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP446X | CHIP_IS_OMAP447X),
 };
 
 /*
@@ -1508,6 +1508,7 @@ static struct omap_hwmod omap44xx_dsp_c0_hwmod = {
 	.flags		= HWMOD_INIT_NO_RESET,
 	.rst_lines	= omap44xx_dsp_c0_resets,
 	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_dsp_c0_resets),
+	.main_clk       = "dsp_fck",
 	.prcm = {
 		.omap4 = {
 			.rstctrl_reg = OMAP4430_RM_TESLA_RSTCTRL,
@@ -2522,7 +2523,7 @@ static struct omap_hwmod omap446x_gpio1_hwmod = {
 	.dev_attr	= &gpio_dev_attr,
 	.slaves		= omap44xx_gpio1_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_gpio1_slaves),
-	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP446X),
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP446X | CHIP_IS_OMAP447X),
 };
 
 /* gpio2 */
@@ -5470,6 +5471,7 @@ static struct omap_hwmod_ocp_if *omap44xx_uart1_slaves[] = {
 static struct omap_hwmod omap44xx_uart1_hwmod = {
 	.name		= "uart1",
 	.class		= &omap44xx_uart_hwmod_class,
+	.flags          = HWMOD_SWSUP_SIDLE,
 	.mpu_irqs	= omap44xx_uart1_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_uart1_irqs),
 	.sdma_reqs	= omap44xx_uart1_sdma_reqs,

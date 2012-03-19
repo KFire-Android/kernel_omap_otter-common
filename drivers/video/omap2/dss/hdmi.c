@@ -349,6 +349,10 @@ static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 		    hdmi.custom_set &&
 		    hdmi.hdmi_power_on_cb()) {
 			hdmi_ti_4xxx_set_wait_soft_reset(&hdmi.hdmi_data);
+			/* HDCP keys are available in the AKSV registers 2ms after
+			 * the RESET# rising edge, hence the delay before reading
+			 * the registers*/
+			mdelay(10);
 			aksv = hdmi_ti_4xx_check_aksv_data(&hdmi.hdmi_data);
 			hdmi.wp_reset_done = (aksv == HDMI_AKSV_VALID) ?
 				true : false;
@@ -359,11 +363,12 @@ static void hdmi_load_hdcp_keys(struct omap_dss_device *dssdev)
 			hdmi.wp_reset_done = false;
 
 		if (!hdmi.wp_reset_done)
-			DSSERR("*** INVALID AKSV: "
-				"Do not perform HDCP AUTHENTICATION\n");
+			DSSERR("*** INVALID AKSV: %d "
+				"Do not perform HDCP AUTHENTICATION\n", aksv);
 	}
 
 }
+
 /* Set / Release c-state constraints */
 static void hdmi_set_l3_cstr(struct omap_dss_device *dssdev, bool enable)
 {
@@ -498,13 +503,18 @@ err:
 
 static void hdmi_power_off(struct omap_dss_device *dssdev)
 {
+	enum hdmi_pwrchg_reasons reason = HDMI_PWRCHG_DEFAULT;
 	if (hdmi.hdmi_irq_cb)
 		hdmi.hdmi_irq_cb(HDMI_HPD_LOW);
 
 	hdmi_ti_4xxx_wp_video_start(&hdmi.hdmi_data, 0);
 
 	dispc_enable_channel(OMAP_DSS_CHANNEL_DIGIT, dssdev->type, 0);
-	hdmi_ti_4xxx_phy_off(&hdmi.hdmi_data, hdmi.set_mode);
+	if (hdmi.set_mode)
+		reason = reason | HDMI_PWRCHG_MODE_CHANGE;
+	if (dssdev->sync_lost_error)
+		reason = reason | HDMI_PWRCHG_RESYNC;
+	hdmi_ti_4xxx_phy_off(&hdmi.hdmi_data, reason);
 	hdmi_ti_4xxx_set_pll_pwr(&hdmi.hdmi_data, HDMI_PLLPWRCMD_ALLOFF);
 	hdmi_set_l3_cstr(dssdev, false);
 	hdmi_runtime_put();

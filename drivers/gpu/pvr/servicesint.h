@@ -98,7 +98,7 @@ typedef struct _PVRSRV_KERNEL_MEM_INFO_
 
 	PVRSRV_MEMTYPE				memType;
 
-    
+	IMG_VOID *bvmap_handle;
 
 
 
@@ -340,16 +340,6 @@ IMG_IMPORT
 PVRSRV_ERROR PVRSRVQueueCommand(IMG_HANDLE hQueueInfo,
 								PVRSRV_COMMAND *psCommand);
 
-
-
-IMG_IMPORT PVRSRV_ERROR IMG_CALLCONV
-PVRSRVGetMMUContextPDDevPAddr(const PVRSRV_CONNECTION *psConnection,
-#if defined (SUPPORT_SID_INTERFACE)
-                              IMG_SID hDevMemContext,
-#else
-                              IMG_HANDLE hDevMemContext,
-#endif
-                              IMG_DEV_PHYADDR *sPDDevPAddr);
 
 IMG_IMPORT PVRSRV_ERROR IMG_CALLCONV
 PVRSRVAllocSharedSysMem(const PVRSRV_CONNECTION *psConnection,
