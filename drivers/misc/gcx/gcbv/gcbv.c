@@ -2833,23 +2833,27 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			index += 1;
 			batch->gcblit.srccount += 1;
 			gcmosrc += 1;
-		} else if (i + 1 < srccount) {
+		} else {
 			bverror = batch->batchend(bltparams, batch);
 			if (bverror != BVERR_NONE)
 				goto exit;
 
-			batch->batchend = do_blit_end;
-			batch->gcblit.srccount = 0;
+			if (i + 1 < srccount) {
+				batch->batchend = do_blit_end;
+				batch->gcblit.srccount = 0;
 
-			bverror = claim_buffer(batch, sizeof(struct gcmosrc),
-							(void **) &gcmosrc);
-			if (bverror != BVERR_NONE) {
-				BVSETBLTERROR(BVERR_OOM,
-					"failed to allocate command buffer");
-				goto exit;
+				bverror = claim_buffer(batch,
+					sizeof(struct gcmosrc),
+					(void **) &gcmosrc);
+				if (bverror != BVERR_NONE) {
+					BVSETBLTERROR(BVERR_OOM,
+						"failed to allocate "
+						"command buffer");
+					goto exit;
+				}
+
+				memset(gcmosrc, 0, sizeof(struct gcmosrc));
 			}
-
-			memset(gcmosrc, 0, sizeof(struct gcmosrc));
 		}
 	}
 
