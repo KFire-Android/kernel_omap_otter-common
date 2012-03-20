@@ -72,9 +72,10 @@
 #include "pm.h"
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
-#include "board-4430kc1-tablet.h"
 #include "omap4_ion.h"
 #include "voltage.h"
+
+#include "board-4430kc1-tablet.h"
 
 #define WILINK_UART_DEV_NAME		"/dev/ttyO1"
 #define BLUETOOTH_UART			(0x1)
@@ -92,7 +93,6 @@
 
 #define OMAP4_TOUCH_IRQ_1		35
 #define OMAP4_TOUCH_IRQ_2		36
-#define OMAP4_CHARGER_IRQ		7
 #define OMAP_UART_GPIO_MUX_MODE_143	143
 
 #define LED_SEC_DISP_GPIO		27 /* brightness = dsi1_bl_gpio */

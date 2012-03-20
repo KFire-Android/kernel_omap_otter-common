@@ -24,6 +24,8 @@
 #include <plat/omap-serial.h>
 #include "common-board-devices.h"
 
+#include "board-4430kc1-tablet.h"
+
 static struct regulator_consumer_supply vmmc_supply[] = {
 	{ .supply = "vmmc", .dev_name = "mmci-omap-hs.0", },
 };
@@ -199,21 +201,21 @@ static struct twl6030_qcharger_platform_data kc1_charger_data={
         .interrupt_pin = OMAP4_CHARGER_IRQ,
 };
 
-static struct regulator_init_data clk32kg = {
+static struct regulator_init_data sdp4430_clk32kg = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 	},
 };
 
-static struct regulator_init_data clk32kaudio = {
+static struct regulator_init_data sdp4430_clk32kaudio = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 	},
 };
 
-static struct regulator_init_data v2v1 = {
+static struct regulator_init_data sdp4430_v2v1 = {
 	.constraints = {
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
@@ -224,7 +226,7 @@ static struct regulator_init_data v2v1 = {
 	},
 };
 
-static struct regulator_init_data vcore1	= {
+static struct regulator_init_data sdp4430_vcore1	= {
 	.constraints = {
 		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
 		.always_on              = true,
@@ -235,7 +237,7 @@ static struct regulator_init_data vcore1	= {
 	},
 };
 
-static struct regulator_init_data vcore2	= {
+static struct regulator_init_data sdp4430_vcore2	= {
 	.constraints = {
 		.valid_ops_mask         = REGULATOR_CHANGE_STATUS,
 		.always_on              = true,
@@ -271,14 +273,14 @@ static struct twl4030_platform_data sdp4430_twldata = {
 
 	/* TWL6030/6032 common resources */
 	.clk32kg	= &sdp4430_clk32kg,
-	.clk32kaudio	= &clk32kaudio,
+	.clk32kaudio	= &sdp4430_clk32kaudio,
 
 //	.qcharger	= &kc1_charger_data,
 
 	/* SMPS */
-	.vdd1		= &vcore1,
-	.vdd2		= &vcore2,
-	.v2v1		= &v2v1,
+	.vdd1		= &sdp4430_vcore1,
+	.vdd2		= &sdp4430_vcore2,
+	.v2v1		= &sdp4430_v2v1,
 
 	/* children */
 //	.bci            = &sdp4430_bci_data,
@@ -289,23 +291,6 @@ static struct twl4030_platform_data sdp4430_twldata = {
 
 void __init omap4_power_init(void)
 {
-	/*
-	 * VCORE3 & VMEM are not used in 4460. By register it to regulator
-	 * framework will ensures that resources are disabled.
-	 */
-	if (cpu_is_omap446x()) {
-		twldata.vdd3 = &vcore3;
-		twldata.vmem = &vmem;
-	}
-
-	/*
-	 * VCXIO can be disabled in off-mode for OMAP4430
-	 * and OMAP4460.
-	 * VCXIO must be always on for OMAP4470.
-	 */
-	if (cpu_is_omap447x())
-		twldata.vcxio->constraints.state_mem.disabled = false;
-
-	omap4_pmic_init("twl6030", &twldata);
+	omap4_pmic_init("twl6030", &sdp4430_twldata);
 }
 
