@@ -1342,26 +1342,6 @@ static void omap2_gpio_set_wakeupenables(struct gpio_bank *bank, bool suspend)
 			pad_wakeup &= ~BIT(22);
 	}
 
-	/*
-	 * HACK: Ignore gpios that have multiple sources.
-	 * Gpio 0-3 and 86 are special and may be used as gpio
-	 * interrupts without being connected to the pad that
-	 * mux points to.
-	 */
-	if (cpu_is_omap44xx()) {
-		if (bank->id == 0)
-			pad_wakeup &= ~0xf;
-		if (bank->id == 2)
-			pad_wakeup &= ~BIT(22);
-		/*
-		* Exclude GPIO 63 as it is used for HDMI HPD
-		* and GPIO 38 for secondary sensor as these are not
-		* intended to wakeup the system
-		*/
-		if (bank->id == 1)
-			pad_wakeup &= ~(BIT(6) | BIT(31));
-	}
-
 	for_each_set_bit(i, &pad_wakeup, bank->width) {
 		if (!omap_mux_get_wakeupenable(bank->mux[i])) {
 			bank->context.pad_set_wakeupenable |= BIT(i);

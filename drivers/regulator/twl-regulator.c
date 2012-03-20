@@ -95,8 +95,6 @@ struct twlreg_info {
 #define TWL6030_CFG_TRANS_SLEEP_SHIFT	2
 
 /* TWL6030 LDO register values for CFG_STATE */
-/* FIXME-HASH REMOVED in KC1 Kernel */
-#if 0
 #define TWL6030_CFG_STATE_OFF	0x00
 #define TWL6030_CFG_STATE_ON	0x01
 #define TWL6030_CFG_STATE_OFF2	0x02
@@ -108,7 +106,6 @@ struct twlreg_info {
 						TWL6030_CFG_STATE_APP_SHIFT)
 #define TWL6030_CFG_STATE_APP(v)	(((v) & TWL6030_CFG_STATE_APP_MASK) >>\
 						TWL6030_CFG_STATE_APP_SHIFT)
-#endif
 
 /* Flags for SMPS Voltage reading */
 #define SMPS_OFFSET_EN		BIT(0)
@@ -175,18 +172,36 @@ static int twlreg_grp(struct regulator_dev *rdev)
 #define P2_GRP_6030	BIT(1)		/* "peripherals" */
 #define P1_GRP_6030	BIT(0)		/* CPU/Linux */
 
-static int twlreg_is_enabled(struct regulator_dev *rdev)
+static int twl4030reg_is_enabled(struct regulator_dev *rdev)
 {
 	int	state = twlreg_grp(rdev);
 
 	if (state < 0)
 		return state;
 
-	if (twl_class_is_4030())
-		state &= P1_GRP_4030;
-	else
-		state &= P1_GRP_6030;
-	return state;
+	return state & P1_GRP_4030;
+}
+
+static int twl6030reg_is_enabled(struct regulator_dev *rdev)
+{
+	struct twlreg_info	*info = rdev_get_drvdata(rdev);
+	int			grp = 0, val;
+
+	if (!(info->features & TWL6032_SUBCLASS)) {
+		grp = twlreg_read(info, TWL_MODULE_PM_RECEIVER, VREG_GRP);
+		if (grp < 0)
+			return grp;
+
+		grp &= P1_GRP_6030;
+		val = twlreg_read(info, TWL_MODULE_PM_RECEIVER, VREG_STATE);
+		val = TWL6030_CFG_STATE_APP(val);
+	} else {
+		val = twlreg_read(info, TWL_MODULE_PM_RECEIVER, VREG_STATE);
+		val &= TWL6030_CFG_STATE_MASK;
+		grp = 1;
+	}
+
+	return grp && (val == TWL6030_CFG_STATE_ON);
 }
 
 static int twl6030reg_set_trans_state(struct regulator_dev *rdev,
@@ -245,11 +260,9 @@ static int twl6030reg_enable(struct regulator_dev *rdev)
 	if (grp < 0)
 		return grp;
 
-        /* FIXME-HASH: Removed in KC1 kernel
 	ret = twlreg_write(info, TWL_MODULE_PM_RECEIVER, VREG_STATE,
 			grp << TWL6030_CFG_STATE_GRP_SHIFT |
 			TWL6030_CFG_STATE_ON);
-        */
 	/*
 	 * Ensure it stays in Auto mode when we enter suspend state.
 	 * (TWL6030 in sleep mode).
@@ -290,11 +303,9 @@ static int twl6030reg_disable(struct regulator_dev *rdev)
 		grp = P1_GRP_6030 | P2_GRP_6030 | P3_GRP_6030;
 
 	/* For 6030, set the off state for all grps enabled */
-        /* FIXME-HASH: Removed in KC1 kernel
 	ret = twlreg_write(info, TWL_MODULE_PM_RECEIVER, VREG_STATE,
 			(grp) << TWL6030_CFG_STATE_GRP_SHIFT |
 			TWL6030_CFG_STATE_OFF);
-        */
 
 	/* Ensure it remains OFF when we enter suspend (TWL6030 in sleep). */
 	if (!ret)
@@ -304,12 +315,9 @@ static int twl6030reg_disable(struct regulator_dev *rdev)
 	return ret;
 }
 
-static int twlreg_get_status(struct regulator_dev *rdev)
+static int twl4030reg_get_status(struct regulator_dev *rdev)
 {
 	int	state = twlreg_grp(rdev);
-
-	if (twl_class_is_6030())
-		return 0; /* FIXME return for 6030 regulator */
 
 	if (state < 0)
 		return state;
@@ -323,55 +331,43 @@ static int twlreg_get_status(struct regulator_dev *rdev)
 		: REGULATOR_STATUS_STANDBY;
 }
 
-static int twl6030_is_enabled(struct regulator_dev *rdev)
-{
-	int	state ;
-    struct twlreg_info  *info = rdev_get_drvdata(rdev);
-    state = twlreg_read(info, TWL_MODULE_PM_RECEIVER, 2);
-    if(state & 1)
-        return 1;
-    else
-        return 0;
-}
-
-static int twl6030_enable(struct regulator_dev *rdev)
+static int twl6030reg_get_status(struct regulator_dev *rdev)
 {
 	struct twlreg_info	*info = rdev_get_drvdata(rdev);
-	int			state;
-	int			ret;
-	state = twlreg_read(info, TWL_MODULE_PM_RECEIVER, 2);
-	state |= 1;
-	ret = twlreg_write(info, TWL_MODULE_PM_RECEIVER, 2 , state);
-	state = twlreg_read(info, TWL_MODULE_PM_RECEIVER, 2);
-	printk("%s: %s state=0x%x\n",__func__,rdev->desc->name,state);
-	udelay(info->delay);
-	return ret;
+	int			val;
+
+	val = twlreg_grp(rdev);
+	if (val < 0)
+		return val;
+
+	val = twlreg_read(info, TWL_MODULE_PM_RECEIVER, VREG_STATE);
+
+	if (info->features & TWL6032_SUBCLASS)
+		val &= TWL6030_CFG_STATE_MASK;
+	else
+		val = TWL6030_CFG_STATE_APP(val);
+
+	switch (val) {
+	case TWL6030_CFG_STATE_ON:
+		return REGULATOR_STATUS_NORMAL;
+
+	case TWL6030_CFG_STATE_SLEEP:
+		return REGULATOR_STATUS_STANDBY;
+
+	case TWL6030_CFG_STATE_OFF:
+	case TWL6030_CFG_STATE_OFF2:
+	default:
+		break;
+	}
+
+	return REGULATOR_STATUS_OFF;
 }
 
-static int twl6030_disable(struct regulator_dev *rdev)
-{
-	struct twlreg_info	*info = rdev_get_drvdata(rdev);
-	int			state;
-	int         ret;
-	state = twlreg_read(info, TWL_MODULE_PM_RECEIVER, 2);
-//	if (state < 0)
-//		return state;
-	//state &= ~ 3;
-	state=0;
-	printk("%s: %s state=0x%x\n", __func__, rdev->desc->name, state);
-	ret= twlreg_write(info, TWL_MODULE_PM_RECEIVER, 2, 0);
-
-	return ret;
-}
-
-static int twlreg_set_mode(struct regulator_dev *rdev, unsigned mode)
+static int twl4030reg_set_mode(struct regulator_dev *rdev, unsigned mode)
 {
 	struct twlreg_info	*info = rdev_get_drvdata(rdev);
 	unsigned		message;
 	int			status;
-
-	if (twl_class_is_6030())
-		return 0; /* FIXME return for 6030 regulator */
 
 	/* We can only set the mode through state machine commands... */
 	switch (mode) {
@@ -399,6 +395,36 @@ static int twlreg_set_mode(struct regulator_dev *rdev, unsigned mode)
 
 	return twl_i2c_write_u8(TWL_MODULE_PM_MASTER,
 			message & 0xff, TWL4030_PM_MASTER_PB_WORD_LSB);
+}
+
+static int twl6030reg_set_mode(struct regulator_dev *rdev, unsigned mode)
+{
+	struct twlreg_info	*info = rdev_get_drvdata(rdev);
+	int grp = 0;
+	int val;
+
+	if (!(twl_class_is_6030() && (info->features & TWL6032_SUBCLASS)))
+		grp = twlreg_read(info, TWL_MODULE_PM_RECEIVER, VREG_GRP);
+
+	if (grp < 0)
+		return grp;
+
+	/* Compose the state register settings */
+	val = grp << TWL6030_CFG_STATE_GRP_SHIFT;
+	/* We can only set the mode through state machine commands... */
+	switch (mode) {
+	case REGULATOR_MODE_NORMAL:
+		val |= TWL6030_CFG_STATE_ON;
+		break;
+	case REGULATOR_MODE_STANDBY:
+		val |= TWL6030_CFG_STATE_SLEEP;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return twlreg_write(info, TWL_MODULE_PM_RECEIVER, VREG_STATE, val);
 }
 
 static int twl6030ldo_suspend_enable(struct regulator_dev *rdev)
@@ -533,7 +559,6 @@ twl4030ldo_set_voltage(struct regulator_dev *rdev, int min_uV, int max_uV,
 
 		/* use the first in-range value */
 		if (min_uV <= uV && uV <= max_uV) {
-			printk("%s : %s  uV=%d\n",__func__,rdev->desc->name,uV);
 			*selector = vsel;
 			return twlreg_write(info, TWL_MODULE_PM_RECEIVER,
 							VREG_VOLTAGE, vsel);
@@ -564,11 +589,11 @@ static struct regulator_ops twl4030ldo_ops = {
 
 	.enable		= twl4030reg_enable,
 	.disable	= twl4030reg_disable,
-	.is_enabled	= twlreg_is_enabled,
+	.is_enabled	= twl4030reg_is_enabled,
 
-	.set_mode	= twlreg_set_mode,
+	.set_mode	= twl4030reg_set_mode,
 
-	.get_status	= twlreg_get_status,
+	.get_status	= twl4030reg_get_status,
 };
 
 static int twl6030ldo_list_voltage(struct regulator_dev *rdev, unsigned index)
@@ -622,11 +647,11 @@ static struct regulator_ops twl6030ldo_ops = {
 
 	.enable		= twl6030reg_enable,
 	.disable	= twl6030reg_disable,
-	.is_enabled	= twl6030_is_enabled,
+	.is_enabled	= twl6030reg_is_enabled,
 
-	.set_mode	= twlreg_set_mode,
+	.set_mode	= twl6030reg_set_mode,
 
-	.get_status	= twlreg_get_status,
+	.get_status	= twl6030reg_get_status,
 
 	.set_suspend_enable	= twl6030ldo_suspend_enable,
 	.set_suspend_disable	= twl6030ldo_suspend_disable,
@@ -651,33 +676,6 @@ static int twlfixed_get_voltage(struct regulator_dev *rdev)
 	return info->min_mV * 1000;
 }
 
-// FIXME-HASH: KFire Struct
-static struct regulator_ops twlfixed_ops = {
-	.list_voltage	= twlfixed_list_voltage,
-
-	.get_voltage	= twlfixed_get_voltage,
-
-	.enable		= twl4030reg_enable,
-	.disable	= twl4030reg_disable,
-	.is_enabled	= twlreg_is_enabled,
-
-	.set_mode	= twlreg_set_mode,
-
-	.get_status	= twlreg_get_status,
-
-	.set_suspend_enable		= twl6030ldo_suspend_enable,
-	.set_suspend_disable	= twl6030ldo_suspend_disable,
-};
-
-static struct regulator_ops twl6030_fixed_resource = {
-	.enable		= twl4030reg_enable,
-	.disable	= twl4030reg_disable,
-	.is_enabled	= twlreg_is_enabled,
-	.get_status	= twlreg_get_status,
-};
-
-// FIXME-HASH: 4.AI5 Structs
-#if 0
 static struct regulator_ops twl4030fixed_ops = {
 	.list_voltage	= twlfixed_list_voltage,
 
@@ -705,7 +703,7 @@ static struct regulator_ops twl6030fixed_ops = {
 
 	.get_status	= twl6030reg_get_status,
 
-	.set_suspend_enable		= twl6030ldo_suspend_enable,
+	.set_suspend_enable	= twl6030ldo_suspend_enable,
 	.set_suspend_disable	= twl6030ldo_suspend_disable,
 };
 
@@ -715,8 +713,6 @@ static struct regulator_ops twl6030_fixed_resource = {
 	.is_enabled	= twl6030reg_is_enabled,
 	.get_status	= twl6030reg_get_status,
 };
-#endif
-
 
 /*
  * SMPS status and control
@@ -914,11 +910,11 @@ static struct regulator_ops twlsmps_ops = {
 
 	.enable			= twl6030reg_enable,
 	.disable		= twl6030reg_disable,
-	.is_enabled		= twl6030_is_enabled,
+	.is_enabled		= twl6030reg_is_enabled,
 
-	.set_mode		= twlreg_set_mode,
+	.set_mode		= twl6030reg_set_mode,
 
-	.get_status		= twlreg_get_status,
+	.get_status		= twl6030reg_get_status,
 
 	.set_suspend_enable	= twl6030ldo_suspend_enable,
 	.set_suspend_disable	= twl6030ldo_suspend_disable,
@@ -927,11 +923,11 @@ static struct regulator_ops twlsmps_ops = {
 static struct regulator_ops twl6030_external_control_pin_ops = {
 	.enable			= twl6030reg_enable,
 	.disable		= twl6030reg_disable,
-	.is_enabled		= twl6030_is_enabled,
+	.is_enabled		= twl6030reg_is_enabled,
 
-	.set_mode		= twlreg_set_mode,
+	.set_mode		= twl6030reg_set_mode,
 
-	.get_status		= twlreg_get_status,
+	.get_status		= twl6030reg_get_status,
 
 	.set_suspend_enable	= twl6030ldo_suspend_enable,
 	.set_suspend_disable	= twl6030ldo_suspend_disable,
@@ -941,11 +937,10 @@ static struct regulator_ops twl6030_external_control_pin_ops = {
 #define TWL4030_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
 			remap_conf) \
 		TWL_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
-			remap_conf, TWL4030)
-#define TWL6030_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
-			remap_conf) \
-		TWL_FIXED_LDO(label, offset, mVolts, num, turnon_delay, \
-			remap_conf, TWL6030)
+			remap_conf, TWL4030, twl4030fixed_ops)
+#define TWL6030_FIXED_LDO(label, offset, mVolts, turnon_delay) \
+		TWL_FIXED_LDO(label, offset, mVolts, 0x0, turnon_delay, \
+			0x0, TWL6030, twl6030fixed_ops)
 
 #define TWL4030_ADJUSTABLE_LDO(label, offset, num, turnon_delay, remap_conf) { \
 	.base = offset, \
@@ -964,13 +959,10 @@ static struct regulator_ops twl6030_external_control_pin_ops = {
 		}, \
 	}
 
-#define TWL6030_ADJUSTABLE_LDO(label, offset, min_mVolts, max_mVolts, num, \
-		remap_conf) { \
+#define TWL6030_ADJUSTABLE_LDO(label, offset, min_mVolts, max_mVolts) { \
 	.base = offset, \
-	.id = num, \
 	.min_mV = min_mVolts, \
 	.max_mV = max_mVolts, \
-	.remap = remap_conf, \
 	.desc = { \
 		.name = #label, \
 		.id = TWL6030_REG_##label, \
@@ -996,7 +988,7 @@ static struct regulator_ops twl6030_external_control_pin_ops = {
 	}
 
 #define TWL_FIXED_LDO(label, offset, mVolts, num, turnon_delay, remap_conf, \
-		family) { \
+		family, operations) { \
 	.base = offset, \
 	.id = num, \
 	.min_mV = mVolts, \
@@ -1006,7 +998,7 @@ static struct regulator_ops twl6030_external_control_pin_ops = {
 		.name = #label, \
 		.id = family##_REG_##label, \
 		.n_voltages = 1, \
-		.ops = &twlfixed_ops, \
+		.ops = &operations, \
 		.type = REGULATOR_VOLTAGE, \
 		.owner = THIS_MODULE, \
 		}, \
@@ -1094,25 +1086,6 @@ static struct twlreg_info twl_regs[] = {
 	/* 6030 REG with base as PMC Slave Misc : 0x0030 */
 	/* Turnon-delay and remap configuration values for 6030 are not
 	   verified since the specification is not public */
-// FIXME-HASH: KFire Settings
-	TWL6030_ADJUSTABLE_LDO(VAUX1_6030, 0x54, 1000, 3300, 1, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VAUX2_6030, 0x58, 1000, 3300, 2, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VAUX3_6030, 0x5c, 1000, 3300, 3, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VMMC, 0x68, 1000, 3300, 4, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VPP, 0x6c, 1000, 3300, 5, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VUSIM, 0x74, 1000, 3300, 7, 0x21),
-	TWL6030_FIXED_LDO(VANA, 0x50, 2100, 15, 0, 0x21),
-	//TWL6030_FIXED_LDO(VCXIO, 0x60, 1800, 16, 0, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VCXIO, 0x60, 1800,1800, 16, 0x21),
-	//TWL6030_FIXED_LDO(VDAC, 0x64, 1800, 17, 0, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VDAC, 0x64, 1800, 1800, 17, 0x21),
-	//TWL6030_FIXED_LDO(VUSB, 0x70, 3300, 18, 0, 0x21),
-	TWL6030_ADJUSTABLE_LDO(VUSB, 0x70, 3300,3300, 18, 0x21),
-// FIXME-HASH: 4.AI5 settings below
-#if 0
-	TWL6030_FIXED_LDO(VCXIO, 0x60, 1800, 0),
-	TWL6030_FIXED_LDO(VDAC, 0x64, 1800, 0),
-	TWL6030_FIXED_LDO(VUSB, 0x70, 3300, 0),
 	TWL6030_ADJUSTABLE_LDO(VAUX1_6030, 0x54, 1000, 3300),
 	TWL6030_ADJUSTABLE_LDO(VAUX2_6030, 0x58, 1000, 3300),
 	TWL6030_ADJUSTABLE_LDO(VAUX3_6030, 0x5c, 1000, 3300),
@@ -1120,15 +1093,13 @@ static struct twlreg_info twl_regs[] = {
 	TWL6030_ADJUSTABLE_LDO(VPP, 0x6c, 1000, 3300),
 	TWL6030_ADJUSTABLE_LDO(VUSIM, 0x74, 1000, 3300),
 	TWL6030_FIXED_LDO(VANA, 0x50, 2100, 0),
-
 	TWL6030_FIXED_LDO(VCXIO, 0x60, 1800, 0),
 	TWL6030_FIXED_LDO(VDAC, 0x64, 1800, 0),
 	TWL6030_FIXED_LDO(VUSB, 0x70, 3300, 0),
-#endif
-	//TWL6030_FIXED_RESOURCE(CLK32KG, 0x8C, 0),
-	//TWL6030_FIXED_RESOURCE(CLK32KAUDIO, 0x8F, 0),
-	//TWL6030_ADJUSTABLE_SMPS(VDD1, 0x22, 600, 4000),
-	//TWL6030_ADJUSTABLE_SMPS(VDD2, 0x28, 600, 4000),
+	TWL6030_FIXED_RESOURCE(CLK32KG, 0x8C, 0),
+	TWL6030_FIXED_RESOURCE(CLK32KAUDIO, 0x8F, 0),
+	TWL6030_ADJUSTABLE_SMPS(VDD1, 0x22, 600, 4000),
+	TWL6030_ADJUSTABLE_SMPS(VDD2, 0x28, 600, 4000),
 	TWL6030_ADJUSTABLE_SMPS(VDD3, 0x2e, 600, 4000),
 	TWL6030_ADJUSTABLE_SMPS(VMEM, 0x34, 600, 4000),
 	TWL6030_ADJUSTABLE_SMPS(V2V1, 0x1c, 1800, 2100),
@@ -1173,7 +1144,6 @@ static u8 twl_get_smps_mult(void)
 static int __devinit twlreg_probe(struct platform_device *pdev)
 {
 	int				i;
-	int				group;
 	struct twlreg_info		*info;
 	struct regulator_init_data	*initdata;
 	struct regulation_constraints	*c;
@@ -1251,9 +1221,6 @@ static int __devinit twlreg_probe(struct platform_device *pdev)
 		break;
 	}
 
-group=twlreg_read(info, TWL_MODULE_PM_RECEIVER,0);
-
-//twlreg_write(info, TWL_MODULE_PM_RECEIVER, 0,0);
 	rdev = regulator_register(&info->desc, &pdev->dev, initdata, info);
 	if (IS_ERR(rdev)) {
 		dev_err(&pdev->dev, "can't register %s, %ld\n",
@@ -1262,8 +1229,9 @@ group=twlreg_read(info, TWL_MODULE_PM_RECEIVER,0);
 	}
 	platform_set_drvdata(pdev, rdev);
 
-//	twlreg_write(info, TWL_MODULE_PM_RECEIVER, VREG_REMAP,
-//						info->remap);
+	if (twl_class_is_4030())
+		twlreg_write(info, TWL_MODULE_PM_RECEIVER, VREG_REMAP,
+						info->remap);
 
 	/* NOTE:  many regulators support short-circuit IRQs (presentable
 	 * as REGULATOR_OVER_CURRENT notifications?) configured via:

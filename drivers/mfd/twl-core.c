@@ -36,7 +36,7 @@
 #include <linux/interrupt.h>
 
 #include <linux/regulator/machine.h>
-#include <linux/regulator/consumer.h>
+
 #include <linux/i2c.h>
 #include <linux/i2c/twl.h>
 #include "twl-core.h"
@@ -238,75 +238,6 @@
 #define HIGH_PERF_SQ			(1 << 3)
 #define CK32K_LOWPWR_EN			(1 << 7)
 
-#if 0
-#define CLK32KG_CFG_STATE		0xBE
-#define PHOENIX_START_CONDITION		0x1F
-#define PHOENIX_MSK_TRANSITION 		0x20
-#define PHOENIX_STS_HW_CONDITIONS 	0x21
-#define PHOENIX_LAST_TURNOFF_STS 	0x22
-#define PHOENIX_SENS_TRANSITION 	0x2A	
-
-
-#define VMEM_CFG_GRP 0x64
-#define VMEM_CFG_TRANS 0x65
-#define VMEM_CFG_STATE 0x66
-#define VMEM_CFG_VOLTAGE 0x68
-
-#define V1V29_CFG_GRP 0x40
-#define V1V29_CFG_TRANS 0x41
-#define V1V29_CFG_STATE 0x42
-#define V1V29_CFG_VOLTAGE 0x44
-
-#define V2V1_CFG_GRP 0x4c
-#define V2V1_CFG_TRANS 0x4d
-#define V2V1_CFG_STATE 0x4e
-#define V2V1_CFG_VOLTAGE 0x50
-
-#define VMEM_CFG_GRP 0x64
-#define VMEM_CFG_TRANS 0x65
-#define VMEM_CFG_STATE 0x66
-#define VMEM_CFG_VOLTAGE 0x68
-
-#define VAUX1_CFG_GRP 0x84
-#define VAUX1_CFG_TRANS 0x85
-#define VAUX1_CFG_STATE 0x86
-#define VAUX1_CFG_VOLTAGE 0x87
-
-#define VUSB_CFG_GRP 0xa0
-#define VUSB_CFG_TRANS 0xa1
-#define VUSB_CFG_STATE 0xa2
-#define VUSB_CFG_VOLTAGE 0xa3
-
-#define VAUX2_CFG_GRP 0x88
-#define VAUX2_CFG_TRANS 0x89
-#define VAUX2_CFG_STATE 0x8a
-#define VAUX2_CFG_VOLTAGE 0x8b
-
-#define VAUX3_CFG_GRP 0x8c
-#define VAUX3_CFG_TRANS 0X8D
-#define VAUX3_CFG_STATE 0x8E
-#define VAUX3_CFG_VOLTAGE 0x8f
-
-#define VCXIO_CFG_GRP 0x90
-#define VCXIO_CFG_TRANS 0x91
-#define VCXIO_CFG_STATE 0x92
-#define VCXIO_CFG_VOLTAGE 0x93
-
-#define VDAC_CFG_GRP 0x94
-#define VDAC_CFG_TRANS 0x95
-#define VDAC_CFG_STATE 0x96
-#define VDAC_CFG_VOLTAGE 0x97
-
-#define VMMC_CFG_GRP 0x98
-#define VMMC_CFG_TRANS 0x99
-#define VMMC_CFG_STATE 0x9A
-#define VMMC_CFG_VOLTAGE 0x9B
-
-#define VUSIM_CFG_GRP 0xa4
-#define VUSIM_CFG_TRANS 0xa5
-#define VUSIM_CFG_STATE 0xa6
-#define VUSIM_CFG_VOLTAGE 0xa7
-#endif
 
 /* chip-specific feature flags, for i2c_device_id.driver_data */
 #define TWL4030_VAUX2		BIT(0)	/* pre-5030 voltage ranges */
@@ -428,155 +359,6 @@ static struct twl_mapping twl6030_map[] = {
 	{ SUB_CHIP_ID0, TWL6030_BASEADD_PM_SLAVE_RES },
 };
 
-#if 0
-//For proc
-#include <linux/proc_fs.h>
-#include <asm/uaccess.h>
-
-#include <linux/gpio.h>
-//====================================================================================================
-#ifdef	CONFIG_PROC_FS
-#define	SKELETON_PROC_FILE	    "driver/twl"
-#define SKELETON_MAJOR                699
-static struct proc_dir_entry *twl_proc_file;
-static int index;
-static int mod_no;
-
-static ssize_t twl_proc_read(char *page, char **start, off_t off, int count,
-			 int *eof, void *data)
-{
-	
-	//printk(KERN_INFO "%s\n",__func__);
-	u8 value=0;
-	char	*next = page;
-	unsigned size = count;
-	int t;
-
-	if (off != 0)
-		return 0;
-	//you can read value from the register of hardwae in here
-	twl_i2c_read_u8(mod_no, &value,index);
-	if (value < 0) {
-	    printk(KERN_INFO"error reading index=0x%x value=0x%x\n",index,value);
-	    return value;
-	}
-	t = scnprintf(next, size, "%d",value);
-	size -= t;
-	next += t;
-	printk(KERN_INFO"%s:register 0x%x: return value 0x%x\n",__func__, index, value);
-	*eof = 1;
-	return count - size;
-}
-static ssize_t twl_proc_write(struct file *filp, 
-		const char *buff,unsigned long len, void *data)
-{
-	//printk(KERN_INFO "%s\n",__func__);
-	u32 reg_val;
-    	u8 value=0;
-    	struct regulator *vdds_dsi_reg;
-	char messages[256], vol[256];
-	if (len > 256)
-		len = 256;
-	if (copy_from_user(messages, buff, len))
-		return -EFAULT;
-
-	if ('-' == messages[0]) {
-		/* set the register index */
-		memcpy(vol, messages+1, len-1);
-		index = (int) simple_strtoul(vol, NULL, 16);
-		printk(KERN_INFO"%s:set register 0x%x\n",__func__, index);
-	}else if('+'==messages[0]) {
-		// set the register value 
-		memcpy(vol, messages+1, len-1);
-		reg_val = (int)simple_strtoul(vol, NULL, 16);
-		//you can read value from the register of hardwae in here
-		twl_i2c_write_u8(mod_no, reg_val, index);
-		printk(KERN_INFO"%s:register 0x%x: set value 0x%x\n",__func__, index, reg_val);
-    	} else if ('!' == messages[0]) {
-		switch(messages[1]){
-			case 'a'://TWL6030_BASEADD_PWM
-				mod_no=0x0c;
-			break;
-			case 'b'://TWL6030_BASEADD_PIH
-				mod_no=0x04;
-			break;
-			case 'c'://TWL6030_BASEADD_PIH
-				mod_no=0x04;
-			break;
-			case 'd'://SUB_CHIP_ID0, TWL6030_BASEADD_ZERO
-				mod_no=0x0d;
-			break;
-			case 'e':// SUB_CHIP_ID1, TWL6030_BASEADD_ZERO 
-				mod_no=0x0e;
-			break;
-			case 'f':// SUB_CHIP_ID2, TWL6030_BASEADD_ZERO
-				mod_no=0x0f;
-                twl_i2c_read_u8(TWL6030_MODULE_ID0, &value, 0xA0);
-                printk("VUSB_CFG_GRP=0%x\n",value);
-                twl_i2c_read_u8(TWL6030_MODULE_ID0, &value, 0xA1);
-                printk("VUSB_CFG_TRANS=0%x\n",value);
-                twl_i2c_read_u8(TWL6030_MODULE_ID0, &value, 0xA2);
-                printk("VUSB_CFG_STATE=0%x\n",value);
-			break;
-            case 'g':
-                vdds_dsi_reg = regulator_get(NULL, "usb-phy");    
-                if (IS_ERR(vdds_dsi_reg)) {
-                    pr_err("Unable to get usb-phy regulator\n");
-                }
-                regulator_enable(vdds_dsi_reg);
-                regulator_put(vdds_dsi_reg);
-            break;
-            case 'h':
-                vdds_dsi_reg = regulator_get(NULL, "usb-phy");
-                if (IS_ERR(vdds_dsi_reg)) {
-                    pr_err("Unable to get usb-phy regulator\n");
-                }
-                regulator_disable(vdds_dsi_reg);
-                regulator_put(vdds_dsi_reg);
-            break;
-            case 'i':
-                vdds_dsi_reg = regulator_get(NULL, "audio-pwr");
-                regulator_disable(vdds_dsi_reg);
-                //regulator_set_voltage(vdds_dsi_reg,1200000,1200000);
-                regulator_put(vdds_dsi_reg);
-            break;
-
-            case 'j':
-                vdds_dsi_reg = regulator_get(NULL, "audio-pwr");
-                regulator_set_voltage(vdds_dsi_reg,1200000,2800000);
-                regulator_put(vdds_dsi_reg);
-            break;
-
-            case 'k':
-                vdds_dsi_reg = regulator_get(NULL, "audio-pwr");
-                regulator_set_voltage(vdds_dsi_reg,2950000,2950000);
-                regulator_put(vdds_dsi_reg);
-            break;
-		}
-	}
-
-	return len;
-}
-
-static void create_twl_proc_file(void)
-{
-	twl_proc_file = create_proc_entry(SKELETON_PROC_FILE, SKELETON_MAJOR, NULL);
-	if (twl_proc_file) {
-		//skeleton_proc_file->data = driver_info; 
-		twl_proc_file->read_proc = twl_proc_read; 
-		twl_proc_file->write_proc = twl_proc_write; 
-	} else
-		printk(KERN_ERR "%sproc file create failed!\n",__func__);
-}
-
-static void remove_twl_proc_file(void)
-{
-	printk(KERN_INFO "%s\n",__func__);
-	remove_proc_entry(SKELETON_PROC_FILE, NULL);
-}
-#endif
-
-#endif
 /*----------------------------------------------------------------------*/
 
 /* Exported Functions */
@@ -889,7 +671,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 	struct device	*child;
 	unsigned sub_chip_id;
 
-	pr_info("enter twl-core::add_children()\n");
 	if (twl_has_gpio() && pdata->gpio) {
 		child = add_child(SUB_CHIP_ID1, "twl4030_gpio",
 				pdata->gpio, sizeof(*pdata->gpio),
@@ -1010,8 +791,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			usb3v1.dev = child;
 		}
 	}
-        /* FIXME-HASH: This was remved in KC1 kernel */
-#if 0
 	if (twl_has_usb() && pdata->usb && twl_class_is_6030()) {
 
 		static struct regulator_consumer_supply usb3v3;
@@ -1062,27 +841,26 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			if (IS_ERR(child))
 					return PTR_ERR(child);
 	}
-#endif
-	if (twl_has_watchdog()) {
+
+	if (twl_has_watchdog() && twl_class_is_4030()) {
 		child = add_child(0, "twl4030_wdt", NULL, 0, false, 0, 0);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
 
-	if (twl_has_pwrbutton()) {
-		child = add_child(1, "twl4030_pwrbutton",NULL, 0, true, pdata->irq_base + 8 + 0, 0);
+	if (twl_has_pwrbutton() && twl_class_is_4030()) {
+		child = add_child(1, "twl4030_pwrbutton",
+				NULL, 0, true, pdata->irq_base + 8 + 0, 0);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
 
-#if 0
-        if (twl6030_has_pwrbutton()) {
+	if (twl6030_has_pwrbutton()) {
 		child = add_child(1, "twl6030_pwrbutton",
 				NULL, 0, true, pdata->irq_base, 0);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 	}
-#endif
 
 	if (twl_has_codec() && pdata->codec && twl_class_is_4030()) {
 		sub_chip_id = twl_map[TWL_MODULE_AUDIO_VOICE].sid;
@@ -1190,12 +968,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
-#if 0
-		child = add_regulator(TWL6030_REG_CLK32KG, pdata->clk32kg,
-					features);
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-#endif
 	}
 
 	/* twl6030 regulators */
@@ -1216,23 +988,12 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 
-#if 0
-		child = add_regulator(TWL6030_REG_VANA, pdata->vana,
-					features);
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-#endif
 		child = add_regulator(TWL6030_REG_VCXIO, pdata->vcxio,
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
 
 		child = add_regulator(TWL6030_REG_VDAC, pdata->vdac,
-					features);
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-
-		child = add_regulator(TWL6030_REG_VUSB, pdata->vusb,
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
@@ -1248,16 +1009,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			return PTR_ERR(child);
 
 		child = add_regulator(TWL6030_REG_VAUX3_6030, pdata->vaux3,
-					features);
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-
-		child = add_regulator(TWL6030_REG_VDD1, pdata->vdd1,
-					features);
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-
-		child = add_regulator(TWL6030_REG_VDD2, pdata->vdd2,
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
@@ -1387,24 +1138,6 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 			return PTR_ERR(child);
 	}
 
-	if (twl_has_usb() && twl_class_is_6030()) {
-		child = add_child(0, "twl6030_usb",
-			pdata->usb, sizeof(*pdata->usb),
-			true,
-			/* irq1 = VBUS_PRES, irq0 = USB ID */
-			pdata->irq_base + USBOTG_INTR_OFFSET,
-			pdata->irq_base + USB_PRES_INTR_OFFSET
-			);
-
-		if (IS_ERR(child))
-			return PTR_ERR(child);
-		/* we need to connect regulators to this transceiver */
-		/* This ware removed in KC1 kernel */
-#if 0
-		if (twl_has_regulator() && child)
-			usb3v3.dev = child;
-#endif
-	}
 	return 0;
 }
 
@@ -1503,9 +1236,6 @@ static void clocks_init(struct device *dev,
 #ifdef CONFIG_PM
 static int twl_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-	/* Make sure below init twl settings are not left on */
-//	if (twl_class_is_6030())
-//		_init_twl6030_settings();
 	return irq_set_irq_wake(client->irq, 1);
 }
 
@@ -1693,3 +1423,4 @@ module_exit(twl_exit);
 MODULE_AUTHOR("Texas Instruments, Inc.");
 MODULE_DESCRIPTION("I2C Core interface for TWL");
 MODULE_LICENSE("GPL");
+

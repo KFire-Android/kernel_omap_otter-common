@@ -1270,8 +1270,6 @@ static int serial_omap_suspend(struct device *dev)
 		}
 		up->suspended = true;
 		uart_suspend_port(&serial_omap_reg, &up->port);
-		omap_pm_set_min_bus_tput( &up->pdev->dev, 
-			OCP_INITIATOR_AGENT, 800000);
 		serial_omap_pm(&up->port, 3, 0);
 	}
 	return 0;
@@ -1283,8 +1281,6 @@ static int serial_omap_resume(struct device *dev)
 
 	if (up) {
 		uart_resume_port(&serial_omap_reg, &up->port);
-		omap_pm_set_min_bus_tput( &up->pdev->dev, 
-			OCP_INITIATOR_AGENT, 0);
 		up->suspended = false;
 		enable_irq(up->port.irq);
 	}

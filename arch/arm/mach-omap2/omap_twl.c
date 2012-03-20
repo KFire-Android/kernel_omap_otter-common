@@ -86,17 +86,6 @@
 /* Pull down control */
 #define TWL6030_REG_CFG_SMPS_PD		0xF6
 
-/*
- * Setup CFG_TRANS mode as follows:
- * 0x00 (OFF) when in OFF state(bit offset 4) and in sleep (bit offset 2)
- * 0x01 (PWM/PFM Auto) when in ACTive state (bit offset 0)
- * Dont trust Bootloader or reset values to set them up for kernel.
- */
-#define TWL6030_REG_VCOREx_CFG_TRANS_MODE		(0x00 << 4 | \
-							 0x00 << 2 | \
-							 0x01 << 0)
-#define TWL6030_REG_VCOREx_CFG_TRANS_MODE_DESC "OFF=OFF SLEEP=OFF ACT=AUTO"
-
 static bool is_offset_valid;
 static u8 smps_offset;
 /*
@@ -603,7 +592,6 @@ static __initdata struct omap_pmic_description twl6030_pmic_desc = {
 
 int __init omap_twl_init(void)
 {
-	printk("****%s:: ENTER\n", __func__);
 	struct omap_pmic_description *desc = NULL;
 
 	/* Reuse OMAP3430 values */
@@ -617,7 +605,6 @@ int __init omap_twl_init(void)
 	if (cpu_is_omap44xx())
 		desc = &twl6030_pmic_desc;
 
-	printk("****%s:: EXIT\n", __func__);
 	return omap_pmic_register_data(omap_twl_map, desc);
 }
 

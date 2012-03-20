@@ -26,7 +26,6 @@
 #include <linux/mutex.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
-#include <linux/regulator/consumer.h>
 #include <asm/uaccess.h>
 #include <linux/earlysuspend.h>
 #include <linux/wakelock.h>

@@ -16,6 +16,7 @@
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/mmc.h>
+
 //qvx_emmc
 #include <linux/scatterlist.h>
 #include <asm/io.h>
@@ -62,6 +63,7 @@ static const unsigned int tacc_mant[] = {
 			__res |= resp[__off-1] << ((32 - __shft) % 32);	\
 		__res & __mask;						\
 	})
+
 #if EMMC //qvx_emmc
 static DEFINE_MUTEX(mmc_test_lock);
 
@@ -150,7 +152,8 @@ static int mmc_parse_ext_csd(struct mmc_card *card, u8 *ext_csd)
 
 static bool mmc_create_gpp(struct mmc_card *card, int gpp1, int gpp2, int gpp3, int gpp4)
 {
-	int err, base; // size, 
+//	int size;
+	int err, base;
 	static u8 *ext_csd_data;
 
 	int gp1_size_multi_0 = 0;
@@ -165,19 +168,19 @@ static bool mmc_create_gpp(struct mmc_card *card, int gpp1, int gpp2, int gpp3, 
 	int gp4_size_multi_0 = 0;
 	int gp4_size_multi_1 = 0;
 	int gp4_size_multi_2 = 0;
-	// int enh_size_multi_0 = 1;
-	// int enh_size_multi_1 = 0;
-	// int enh_size_multi_2 = 0;
-	// int enh_start_addr_0 = 0;
-	// int enh_start_addr_1 = 0;
-	// int enh_start_addr_2 = 0;
-	// int enh_start_addr_3 = 0;
+//	int enh_size_multi_0 = 1;
+//	int enh_size_multi_1 = 0;
+//	int enh_size_multi_2 = 0;
+//	int enh_start_addr_0 = 0;
+//	int enh_start_addr_1 = 0;
+//	int enh_start_addr_2 = 0;
+//	int enh_start_addr_3 = 0;
 	int enh_attribute = 0x0e;
-	// int addr_offset = 0;
+//	int addr_offset = 0;
 
 	int enable_erase_greop_def = 1; /* 175 */
 	int gpp_completed = 1; /* 155 */
-	// int densidy = 0;
+//	int densidy = 0;
 
 	ext_csd_data = kmalloc(512, GFP_KERNEL);
 	if (!ext_csd_data) {
@@ -235,7 +238,8 @@ static bool mmc_create_gpp(struct mmc_card *card, int gpp1, int gpp2, int gpp3, 
 	base = ext_csd_data[EXT_CSD_HC_WP_GRP_SIZE] * ext_csd_data[EXT_CSD_HC_ERASE_GRP_SIZE] * 512/1024;
 
 	printk ("Set ERASE_GROUP_DEF to indicate EXT_CSD_HC_WP_GRP_SIZE and EXT_CSD_HC_ERASE_GRP_SIZE are used\n");
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, enable_erase_greop_def, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_ERASE_GROUP_DEF, enable_erase_greop_def, 0);
 	if (err)
 	{
 		printk ("Fail to set EXT_CSD_ERASE_GROUP_DEF\n");
@@ -264,91 +268,105 @@ static bool mmc_create_gpp(struct mmc_card *card, int gpp1, int gpp2, int gpp3, 
 	gp4_size_multi_0 = (gpp4/base)%256;
 	printk ("gp4_size_multi_2 = %d, gp4_size_multi_1 = %d, gp4_size_multi_0 = %d\n", gp4_size_multi_2, gp4_size_multi_1, gp4_size_multi_0);
 #if 1
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT, gp1_size_multi_0, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT, gp1_size_multi_0, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_1_0\n");
 		return false;
 	}
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 1, gp1_size_multi_1, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 1, gp1_size_multi_1, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_1_1\n");
 		return false;
 	}
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 2, gp1_size_multi_2, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 2, gp1_size_multi_2, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_1_2\n");
 		return false;
 	}
 
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 3, gp2_size_multi_0, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 3, gp2_size_multi_0, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_2_0\n");
 		return false;
 	}
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 4, gp2_size_multi_1, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 4, gp2_size_multi_1, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_2_1\n");
 		return false;
 	}
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 5, gp2_size_multi_2, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 5, gp2_size_multi_2, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_2_2\n");
 		return false;
 	}
 
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 6, gp3_size_multi_0, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 6, gp3_size_multi_0, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_3_0\n");
 		return false;
 	}
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 7, gp3_size_multi_1, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 7, gp3_size_multi_1, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_3_1\n");
 		return false;
 	}
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 8, gp3_size_multi_2, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 8, gp3_size_multi_2, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_3_2\n");
 		return false;
 	}
 
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 9, gp4_size_multi_0, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 9, gp4_size_multi_0, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_4_0\n");
 		return false;
 	}
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 10, gp4_size_multi_1, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 10, gp4_size_multi_1, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_4_1\n");
 		return false;
 	}
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_GP_SIZE_MULT + 11, gp4_size_multi_2, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_GP_SIZE_MULT + 11, gp4_size_multi_2, 0);
 	if (err)
 	{
 		printk ("Fail to set GP_SIZE_MULTI_4_2\n");
 		return false;
 	}
 
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PARTITION_ATTRIBUTE, enh_attribute, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PARTITION_ATTRIBUTE, enh_attribute, 0);
 	if (err)
 	{
-		printk ("Fail to set PARTITION_ATTRIBUTE\n");
+		printk ("Fail to set PARTITIONS_ATTRIBUTE\n");
 		return false;
 	}
 
 	printk ("Set EXT_CSD_PARTITION_SETTING_COMPLETED\n");
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PARTITION_SETTING_COMPLETED, gpp_completed, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PARTITION_SETTING_COMPLETED, gpp_completed, 0);
 	if (err)
 	{
 		printk ("Fail to set EXT_CSD_PARTITION_SETTING_COMPLETED\n");
@@ -461,7 +479,8 @@ static bool mmc_write_gpp(struct mmc_card *card, int partition, int offset, cons
 	if (part_complete)
 	{
 		printk ("Set ERASE_GROUP_DEF before read, write, erase, and write protect\n");
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, enable_erase_greop_def, card->ext_csd.part_time);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_ERASE_GROUP_DEF, enable_erase_greop_def, 0);
 		if (err)
 		{
 			printk ("Fail to set EXT_CSD_ERASE_GROUP_DEF\n");
@@ -481,7 +500,8 @@ static bool mmc_write_gpp(struct mmc_card *card, int partition, int offset, cons
 	}
 #endif
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, gpp_action, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PART_CONFIG, gpp_action, 0);
 	if (err)
 	{
 		printk ("Fail to set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
@@ -523,7 +543,8 @@ static bool mmc_write_gpp(struct mmc_card *card, int partition, int offset, cons
 		return false;
 	}
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, 0, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PART_CONFIG, 0, 0);
 	if (err)
 	{
 		printk ("Fail to set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
@@ -532,7 +553,8 @@ static bool mmc_write_gpp(struct mmc_card *card, int partition, int offset, cons
 	}
 	if (part_complete){
 		printk ("Reset ERASE_GROUP_DEF before read, write, erase, and write protect\n");
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, 0, card->ext_csd.part_time);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_ERASE_GROUP_DEF, 0, 0);
 		if (err){
 			printk ("Fail to reset EXT_CSD_ERASE_GROUP_DEF\n");
 			kfree(ext_csd_data);
@@ -642,7 +664,8 @@ static bool mmc_read_gpp(struct mmc_card *card, int partition, int offset, char*
 	if (part_complete)
 	{
 		printk ("Set ERASE_GROUP_DEF before read, write, erase, and write protect\n");
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, enable_erase_group, card->ext_csd.part_time);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_ERASE_GROUP_DEF, enable_erase_group, 0);
 		if (err){
 			printk ("Fail to set EXT_CSD_ERASE_GROUP_DEF\n");
 			kfree(ext_csd_data);
@@ -660,7 +683,8 @@ static bool mmc_read_gpp(struct mmc_card *card, int partition, int offset, char*
 	}
 #endif
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, gpp_action, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PART_CONFIG, gpp_action, 0);
 	if (err)
         {
 		printk ("Fail to set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
@@ -697,9 +721,19 @@ static bool mmc_read_gpp(struct mmc_card *card, int partition, int offset, char*
 		return false;
 	}
 
+#if 0
+	printk("00 ");
+	for (i = 0; i < 512; i++)
+	{
+		printk("%02x ", test_data_read[i]);
+		if ((i%16) == 15)
+			printk("\n%02d ", (i/16) + 1);
+	}
+#endif
 	memcpy(read_data, test_data_read, 512);
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, 0, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PART_CONFIG, 0, 0);
 	if (err)
 	{
 		printk ("Fail to set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
@@ -708,7 +742,8 @@ static bool mmc_read_gpp(struct mmc_card *card, int partition, int offset, char*
 	}
 	if (part_complete){
 		printk ("Reset ERASE_GROUP_DEF before read, write, erase, and write protect\n");
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, 0, card->ext_csd.part_time);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_ERASE_GROUP_DEF, 0, 0);
 		if (err){
 			printk ("Fail to reset EXT_CSD_ERASE_GROUP_DEF\n");
 			kfree(ext_csd_data);
@@ -719,13 +754,14 @@ static bool mmc_read_gpp(struct mmc_card *card, int partition, int offset, char*
 	return true;
 }
 
-static ssize_t set_emmc_data(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t set_emmc_data(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t len) //, loff_t *f_ops)
 {
 	struct mmc_card *card;
 	static u8 *ext_csd_data;
-	// int gpp1_size;
+	int gpp1_size;
 	int err;
-	// int offset;
+	int offset;
 
 	mutex_lock(&mmc_test_lock);
 	card = container_of(dev, struct mmc_card, dev);
@@ -743,9 +779,25 @@ static ssize_t set_emmc_data(struct device *dev, struct device_attribute *attr, 
 	}
 	//printk ("READ EXT_CSD first\n");
 	err = mmc_send_ext_csd(card, ext_csd_data);
+#if 0 //with GPP1
+	gpp1_size = ext_csd_data[EXT_CSD_GP_SIZE_MULT+2]*65536 + ext_csd_data[EXT_CSD_GP_SIZE_MULT+1]*256 + ext_csd_data[EXT_CSD_GP_SIZE_MULT]
+			* ext_csd_data[EXT_CSD_HC_WP_GRP_SIZE] * ext_csd_data[EXT_CSD_HC_ERASE_GRP_SIZE] * 512 * 1024;
+	printk ("gpp1_size = %d\n", gpp1_size);
 
-	//only use boot partition 2
+	offset = (gpp1_size-512*1024)/(256*1024);
+
+	if (offset < 0)
+	{
+		mmc_write_gpp(card, 5, 0, buf);
+	}
+	else
+	{
+		mmc_write_gpp(card, 1, offset, buf);
+	}
+#else //only use boot partition 2
+
 	mmc_write_gpp(card, 5, 0, buf);
+#endif
 
 	//mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,EXT_CSD_PART_CONF, 0); //qvx_emmc
 
@@ -755,12 +807,15 @@ static ssize_t set_emmc_data(struct device *dev, struct device_attribute *attr, 
 	return (512*1024);
 }
 
-static ssize_t get_emmc_data(struct device *dev, struct device_attribute *devattr, char *buf)
+static ssize_t get_emmc_data(struct device *dev, struct device_attribute *devattr,
+				char *buf) //, size_t len, loff_t *f_ops)
 {
 	struct mmc_card *card;
 	int ret, err;
 	static u8 *ext_csd_data;
 	u8* read_data;
+	static int offset;
+	int gpp1_size;
 	printk ("\n%s\n", __func__);
 
 	mutex_lock(&mmc_test_lock);
@@ -785,7 +840,34 @@ static ssize_t get_emmc_data(struct device *dev, struct device_attribute *devatt
 	//mmc_parse_ext_csd(card, ext_csd_data); //qvx_emmc
 
 	read_data = kmalloc(512, GFP_KERNEL);
+#if 0 //with GPP1
+	gpp1_size = ext_csd_data[EXT_CSD_GP_SIZE_MULT+2]*65536 + ext_csd_data[EXT_CSD_GP_SIZE_MULT+1]*256 + ext_csd_data[EXT_CSD_GP_SIZE_MULT]
+			* ext_csd_data[EXT_CSD_HC_WP_GRP_SIZE] * ext_csd_data[EXT_CSD_HC_ERASE_GRP_SIZE] * 512 * 1024;
+	printk ("gpp1_size = %d\n", gpp1_size);
+
+	offset = (gpp1_size-512*1024)/(256*1024);
+
+	if (offset < 0)
+	{
+		err = mmc_read_gpp(card, 5, 0, read_data);
+	}
+	else
+	{
+		err = mmc_read_gpp(card, 1, offset, read_data);
+	}
+	//offset++;
+#else
+
 	err = mmc_read_gpp(card, 5, 0, read_data);
+#endif
+#if 0
+	buf = kmalloc(512, GFP_KERNEL);
+
+	for (i = 0; i < 512; i++)
+	{
+		buf[i] = 0x00;
+	}
+#endif
 	if (err == true)
 	{
 		memcpy(buf, read_data, 512);
@@ -796,6 +878,16 @@ static ssize_t get_emmc_data(struct device *dev, struct device_attribute *devatt
 		printk("Fail to read data\n");
 	}
 
+#if 0
+	printk("00 ");
+	for (i = 0; i < 512; i++){
+		printk("%02x ", buf[i]);
+		if ((i%16) == 15)
+			printk("\n%02d ", (i/16) + 1);
+	}
+	printk("\n");
+#endif
+
 	kfree(ext_csd_data);
 	mmc_release_host(card->host);
         mutex_unlock(&mmc_test_lock);
@@ -803,7 +895,8 @@ static ssize_t get_emmc_data(struct device *dev, struct device_attribute *devatt
 	return ret;
 }
 
-static ssize_t get_emmc_extcsd(struct device *dev, struct device_attribute *devattr, char *buf)
+static ssize_t get_emmc_extcsd(struct device *dev, struct device_attribute *devattr,
+				char *buf, size_t len, loff_t *f_ops)
 {
 	struct mmc_card *card;
 	int ret, err;
@@ -829,13 +922,15 @@ static ssize_t get_emmc_extcsd(struct device *dev, struct device_attribute *deva
 	return ret;
 }
 
-static ssize_t set_offset(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t set_offset(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t len) //, loff_t *f_ops)
 {
 	memcpy(&RW_OFFSET, buf, sizeof(RW_OFFSET));
 	printk("set Offset 0x%x, %d \n",RW_OFFSET,RW_OFFSET);
 	return sizeof(RW_OFFSET);
 }
-static ssize_t get_offset(struct device *dev, struct device_attribute *devattr, char *buf)
+static ssize_t get_offset(struct device *dev, struct device_attribute *devattr,
+				char *buf) // , size_t len, loff_t *f_ops
 {
 
 	memcpy(buf, &RW_OFFSET, sizeof(RW_OFFSET));
@@ -845,8 +940,8 @@ static ssize_t get_offset(struct device *dev, struct device_attribute *devattr, 
 #endif //EMMC
 
 /*
- * Given the decoded CSD structure, decode the raw CID to our CID structure.
- */
+* Given the decoded CSD structure, decode the raw CID to our CID structure.
+*/
 static int mmc_decode_cid(struct mmc_card *card)
 {
 	u32 *resp = card->raw_cid;
@@ -914,7 +1009,7 @@ static void mmc_set_erase_size(struct mmc_card *card)
 static int mmc_decode_csd(struct mmc_card *card)
 {
 	struct mmc_csd *csd = &card->csd;
-	unsigned int e, m, a, b; //, csd_struct;
+	unsigned int e, m, a, b;
 	u32 *resp = card->raw_csd;
 
 	/*
@@ -1273,6 +1368,7 @@ out:
 	return err;
 }
 
+
 static bool mmc_write_bp1(struct mmc_card *card, int partition, int offset, const char* data)
 {
 	struct mmc_request mrq;
@@ -1374,7 +1470,8 @@ static bool mmc_write_bp1(struct mmc_card *card, int partition, int offset, cons
 	if (part_complete)
 	{
 		printk ("Set ERASE_GROUP_DEF before read, write, erase, and write protect\n");
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, enable_erase_greop_def, card->ext_csd.part_time);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_ERASE_GROUP_DEF, enable_erase_greop_def, 0);
 		if (err)
 		{
 			printk ("Fail to set EXT_CSD_ERASE_GROUP_DEF\n");
@@ -1394,7 +1491,8 @@ static bool mmc_write_bp1(struct mmc_card *card, int partition, int offset, cons
 	}
 #endif
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, gpp_action, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PART_CONFIG, gpp_action, 0);
 	if (err)
 	{
 		printk ("Fail to set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
@@ -1436,7 +1534,8 @@ static bool mmc_write_bp1(struct mmc_card *card, int partition, int offset, cons
 		return false;
 	}
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, 0, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PART_CONFIG, 0, 0);
 	if (err)
 	{
 		printk ("Fail to set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
@@ -1445,7 +1544,8 @@ static bool mmc_write_bp1(struct mmc_card *card, int partition, int offset, cons
 	}
 	if (part_complete){
 		printk ("Reset ERASE_GROUP_DEF before read, write, erase, and write protect\n");
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, 0, card->ext_csd.part_time);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_ERASE_GROUP_DEF, 0, 0);
 		if (err){
 			printk ("Fail to reset EXT_CSD_ERASE_GROUP_DEF\n");
 			kfree(ext_csd_data);
@@ -1556,7 +1656,8 @@ static bool mmc_read_bp1(struct mmc_card *card, int partition, int offset, char*
 	if (part_complete)
 	{
 		printk ("Set ERASE_GROUP_DEF before read, write, erase, and write protect\n");
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, enable_erase_group, card->ext_csd.part_time);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_ERASE_GROUP_DEF, enable_erase_group, 0);
 		if (err){
 			printk ("Fail to set EXT_CSD_ERASE_GROUP_DEF\n");
 			kfree(ext_csd_data);
@@ -1574,7 +1675,8 @@ static bool mmc_read_bp1(struct mmc_card *card, int partition, int offset, char*
 	}
 #endif
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, gpp_action, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PART_CONFIG, gpp_action, 0);
 	if (err)
         {
 		printk ("Fail to set PARTITION_ACCESS in PARTITION_CONFIG to partition %d\n", partition);
@@ -1622,7 +1724,8 @@ static bool mmc_read_bp1(struct mmc_card *card, int partition, int offset, char*
 #endif
 	memcpy(read_data, test_data_read, 512);
 	//printk ("Set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, 0, card->ext_csd.part_time);
+	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+			EXT_CSD_PART_CONFIG, 0, 0);
 	if (err)
 	{
 		printk ("Fail to set PARTITION_ACCESS in PARTITION_CONFIG to default\n");
@@ -1631,7 +1734,8 @@ static bool mmc_read_bp1(struct mmc_card *card, int partition, int offset, char*
 	}
 	if (part_complete){
 		printk ("Reset ERASE_GROUP_DEF before read, write, erase, and write protect\n");
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, 0, card->ext_csd.part_time);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				EXT_CSD_ERASE_GROUP_DEF, 0, 0);
 		if (err){
 			printk ("Fail to reset EXT_CSD_ERASE_GROUP_DEF\n");
 			kfree(ext_csd_data);
@@ -1644,14 +1748,15 @@ static bool mmc_read_bp1(struct mmc_card *card, int partition, int offset, char*
 }
 
 
-static ssize_t get_bp1_data(struct device *dev, struct device_attribute *devattr, char *buf)
+static ssize_t get_bp1_data(struct device *dev, struct device_attribute *devattr,
+				char *buf) //, size_t len, loff_t *f_ops)
 {
 	struct mmc_card *card;
 	int ret, err;
 	static u8 *ext_csd_data;
 	u8* read_data;
-	// static int offset;
-	// int gpp1_size;
+	static int offset;
+	int gpp1_size;
 
 	mutex_lock(&mmc_test_lock);
 
@@ -1730,13 +1835,14 @@ static ssize_t get_bp1_data(struct device *dev, struct device_attribute *devattr
 	return ret;
 }
 
-static ssize_t set_bp1_data(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t set_bp1_data(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t len) //, loff_t *f_ops)
 {
 	struct mmc_card *card;
 	static u8 *ext_csd_data;
-	// int gpp1_size;
+	int gpp1_size;
 	int err;
-	// int offset;
+	int offset;
 
 	mutex_lock(&mmc_test_lock);
 	card = container_of(dev, struct mmc_card, dev);
@@ -1754,27 +1860,45 @@ static ssize_t set_bp1_data(struct device *dev, struct device_attribute *attr, c
 	}
 	//printk ("READ EXT_CSD first\n");
 	err = mmc_send_ext_csd(card, ext_csd_data);
+#if 0 //with GPP1
+	gpp1_size = ext_csd_data[EXT_CSD_GP_SIZE_MULT+2]*65536 + ext_csd_data[EXT_CSD_GP_SIZE_MULT+1]*256 + ext_csd_data[EXT_CSD_GP_SIZE_MULT]
+			* ext_csd_data[EXT_CSD_HC_WP_GRP_SIZE] * ext_csd_data[EXT_CSD_HC_ERASE_GRP_SIZE] * 512 * 1024;
+	printk ("gpp1_size = %d\n", gpp1_size);
 
-	//only use boot partition 2
+	offset = (gpp1_size-512*1024)/(256*1024);
+
+	if (offset < 0)
+	{
+		mmc_write_gpp(card, 5, 0, buf);
+	}
+	else
+	{
+		mmc_write_gpp(card, 1, offset, buf);
+	}
+#else //only use boot partition 2
+
 	mmc_write_bp1(card, 6, 0, buf);
+#endif
 
 	//mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,EXT_CSD_PART_CONF, 0); //qvx_emmc
 
 	kfree(ext_csd_data);
 	mmc_release_host(card->host);
-    mutex_unlock(&mmc_test_lock);
+	mutex_unlock(&mmc_test_lock);
 	return (512*1024);
 }
 
 
-static ssize_t get_shift(struct device *dev, struct device_attribute *devattr, char *buf)
+static ssize_t get_shift(struct device *dev, struct device_attribute *devattr,
+				char *buf) //, size_t len, loff_t *f_ops)
 {
 	memcpy(buf, &RW_SHIFT, sizeof(RW_SHIFT));
 	//printk("<ker> RW_SHIFT 0x%x\n",RW_SHIFT);
 	return sizeof(RW_SHIFT);
 }
 
-static ssize_t set_shift(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+static ssize_t set_shift(struct device *dev, struct device_attribute *attr,
+				const char *buf, size_t len) //, loff_t *f_ops)
 {
 	memcpy(&RW_SHIFT, buf, sizeof(RW_SHIFT));
 	//printk("<ker> set shift 0x%x, %d \n",RW_SHIFT,RW_SHIFT);
@@ -1809,6 +1933,7 @@ static DEVICE_ATTR(bp1, 0666, get_bp1_data, set_bp1_data);
 static DEVICE_ATTR(shift, 0666, get_shift, set_shift);
 // boot partition 1 control
 #endif
+
 static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_cid.attr,
 	&dev_attr_csd.attr,
@@ -1984,7 +2109,8 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 * bit.  This bit will be lost every time after a reset or power off.
 	 */
 	if (card->ext_csd.enhanced_area_en) {
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_ERASE_GROUP_DEF, 1, 0);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_ERASE_GROUP_DEF, 1, 0);
 
 		if (err && err != -EBADMSG)
 			goto free_card;
@@ -2014,7 +2140,9 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 */
 	if (card->ext_csd.part_config & EXT_CSD_PART_CONFIG_ACC_MASK) {
 		card->ext_csd.part_config &= ~EXT_CSD_PART_CONFIG_ACC_MASK;
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, card->ext_csd.part_config, card->ext_csd.part_time);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG,
+				 card->ext_csd.part_config,
+				 card->ext_csd.part_time);
 		if (err && err != -EBADMSG)
 			goto free_card;
 	}
@@ -2024,7 +2152,8 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	 */
 	if ((card->ext_csd.hs_max_dtr != 0) &&
 		(host->caps & MMC_CAP_MMC_HIGHSPEED)) {
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING, 1, 0);
+		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+				 EXT_CSD_HS_TIMING, 1, 0);
 		if (err && err != -EBADMSG)
 			goto free_card;
 
@@ -2091,7 +2220,10 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			bus_width = bus_widths[idx];
 			if (bus_width == MMC_BUS_WIDTH_1)
 				ddr = 0; /* no DDR for 1-bit width */
-			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH, ext_csd_bits[idx][0], 0);
+			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+					 EXT_CSD_BUS_WIDTH,
+					 ext_csd_bits[idx][0],
+					 0);
 			if (!err) {
 				mmc_set_bus_width(card->host, bus_width);
 
@@ -2111,7 +2243,10 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		}
 
 		if (!err && ddr) {
-			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_BUS_WIDTH, ext_csd_bits[idx][1], 0);
+			err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+					 EXT_CSD_BUS_WIDTH,
+					 ext_csd_bits[idx][1],
+					 0);
 		}
 		if (err) {
 			printk(KERN_WARNING "%s: switch to bus width %d ddr %d "

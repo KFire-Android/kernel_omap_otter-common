@@ -1293,7 +1293,6 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 						di->gpadc_vbat_chnl);
 	}
 
-
 	/* Setting the capacity level only makes sense when on
 	 * the battery is powering the board.
 	 */

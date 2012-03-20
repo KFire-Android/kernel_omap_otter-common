@@ -172,8 +172,6 @@ static int omap_dss_probe(struct platform_device *pdev)
 	int r;
 	int i;
 
-	printk(KERN_INFO " dss/core.c : %s called , line %d\n", __FUNCTION__ , __LINE__);
-
 	core.pdev = pdev;
 
 	dss_features_init();
@@ -182,42 +180,36 @@ static int omap_dss_probe(struct platform_device *pdev)
 	dss_init_overlays(pdev);
 
 	r = dss_init_platform_driver();
-	printk(KERN_INFO " dss/core.c : dss_init_platform_driver == %d\n", r);
 	if (r) {
 		DSSERR("Failed to initialize DSS platform driver\n");
 		goto err_dss;
 	}
 
 	r = dispc_init_platform_driver();
-	printk(KERN_INFO " dss/core.c : dispc_init_platform_driver == %d\n", r);
 	if (r) {
 		DSSERR("Failed to initialize dispc platform driver\n");
 		goto err_dispc;
 	}
 
 	r = rfbi_init_platform_driver();
-	printk(KERN_INFO " dss/core.c : rfbi_init_platform_driver == %d\n", r);
 	if (r) {
 		DSSERR("Failed to initialize rfbi platform driver\n");
 		goto err_rfbi;
 	}
 
 	r = venc_init_platform_driver();
-	printk(KERN_INFO " dss/core.c : venc_init_platform_driver == %d\n", r);
 	if (r) {
 		DSSERR("Failed to initialize venc platform driver\n");
 		goto err_venc;
 	}
 
 	r = dsi_init_platform_driver();
-	printk(KERN_INFO " dss/core.c : dsi_init_platform_driver == %d\n", r);
 	if (r) {
 		DSSERR("Failed to initialize DSI platform driver\n");
 		goto err_dsi;
 	}
 
 	r = hdmi_init_platform_driver();
-	printk(KERN_INFO " dss/core.c : hdmi_init_platform_driver == %d\n", r);
 	if (r) {
 		DSSERR("Failed to initialize hdmi\n");
 		goto err_hdmi;

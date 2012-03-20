@@ -403,8 +403,6 @@ static void dpm_show_time(ktime_t starttime, pm_message_t state, char *info)
 	ktime_t calltime;
 	u64 usecs64;
 	int usecs;
-	char buf[64];
-	const char *verb;
 
 	calltime = ktime_get();
 	usecs64 = ktime_to_ns(ktime_sub(calltime, starttime));
@@ -412,19 +410,9 @@ static void dpm_show_time(ktime_t starttime, pm_message_t state, char *info)
 	usecs = usecs64;
 	if (usecs == 0)
 		usecs = 1;
-
-	verb = pm_verb(state.event);
-
 	pr_info("PM: %s%s%s of devices complete after %ld.%03ld msecs\n",
-		info ? : "", info ? " " : "", verb,
+		info ?: "", info ? " " : "", pm_verb(state.event),
 		usecs / USEC_PER_MSEC, usecs % USEC_PER_MSEC);
-
-	sprintf(buf, "dpmst:dpmd%c:time_ms=%ld.%03ld:%s%s%s complete",
-		info ? info[0] : verb[0],
-		usecs / USEC_PER_MSEC, usecs % USEC_PER_MSEC,
-		info ? : "", info ? " " : "", verb);
-
-	//log_to_metrics(ANDROID_LOG_INFO, "dpm", buf);
 }
 
 /*------------------------- Resume routines -------------------------*/
@@ -1003,9 +991,7 @@ int dpm_suspend(pm_message_t state)
 		get_device(dev);
 		mutex_unlock(&dpm_list_mtx);
 
-		/* FIXME-HASH: no watchdog code here */
 		error = device_suspend(dev);
-		/* FIXME-HASH: no watchdog code here */
 
 		mutex_lock(&dpm_list_mtx);
 		if (error) {

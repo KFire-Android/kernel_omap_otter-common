@@ -338,6 +338,9 @@ struct _mmc_csd {
 #define EXT_CSD_HPI_FEATURES		503 /* RO */
 #define EXT_CSD_S_CMD_SET		504 /* RO */
 
+#define EXT_CSD_PART_CONF	179	/* R/W */
+
+
 /*
  * EXT_CSD field definitions
  */

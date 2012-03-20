@@ -449,7 +449,6 @@ postcore_initcall(omap2_common_pm_init);
 
 static int __init omap2_common_pm_late_init(void)
 {
-	printk("**************************%s:: ENTER\n", __func__);
 	/* Init the OMAP PMIC parameters */
 	omap_pmic_data_init();
 
@@ -463,7 +462,6 @@ static int __init omap2_common_pm_late_init(void)
 	/* Smartreflex device init */
 	omap_devinit_smartreflex();
 
-	printk("**************************%s:: EXIT\n", __func__);
 	return 0;
 }
 late_initcall(omap2_common_pm_late_init);
