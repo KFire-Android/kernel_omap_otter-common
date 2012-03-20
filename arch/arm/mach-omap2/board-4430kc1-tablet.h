@@ -18,5 +18,7 @@
 #define _MACH_OMAP_BOARD_4430KC1_TABLET_H
 
 void omap4_create_board_props(void);
+void omap4_power_init(void);
+void board_serial_init(void);
 
 #endif
