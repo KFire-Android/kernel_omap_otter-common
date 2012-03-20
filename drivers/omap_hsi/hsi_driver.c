@@ -37,7 +37,7 @@
 #include "hsi_driver.h"
 
 #define HSI_MODULENAME "omap_hsi"
-#define	HSI_DRIVER_VERSION	"0.4.3"
+#define	HSI_DRIVER_VERSION	"0.4.4"
 #define HSI_RESETDONE_MAX_RETRIES	5 /* Max 5*L4 Read cycles waiting for */
 					  /* reset to complete */
 #define HSI_RESETDONE_NORMAL_RETRIES	1 /* Reset should complete in 1 R/W */
@@ -469,6 +469,10 @@ void hsi_softreset_driver(struct hsi_dev *hsi_ctrl)
 		hsi_p = &hsi_ctrl->hsi_port[i];
 		hsi_p->counters_on = 1;
 		hsi_p->reg_counters = pdata->ctx->pctx[i].hsr.counters;
+		hsi_p->wake_rx_3_wires_mode = 0; /* 4 wires */
+		hsi_p->cawake_status = -1; /* Unknown */
+		hsi_p->cawake_off_event = false;
+		hsi_p->acwake_status = 0;
 		hsi_port_channels_reset(&hsi_ctrl->hsi_port[i]);
 	}
 
@@ -1251,4 +1255,5 @@ MODULE_AUTHOR("Carlos Chinea / Nokia");
 MODULE_AUTHOR("Sebastien JAN / Texas Instruments");
 MODULE_AUTHOR("Djamil ELAIDI / Texas Instruments");
 MODULE_DESCRIPTION("MIPI High-speed Synchronous Serial Interface (HSI) Driver");
+MODULE_VERSION(HSI_DRIVER_VERSION);
 MODULE_LICENSE("GPL");
