@@ -320,7 +320,7 @@ static int omap4_duty_cycle_cpu_callback(struct notifier_block *nfb,
 }
 
 static struct notifier_block __refdata omap4_duty_cycle_cpu_notifier = {
-    .notifier_call = omap4_duty_cycle_cpu_callback,
+	.notifier_call = omap4_duty_cycle_cpu_callback,
 };
 
 static ssize_t show_nitro_interval(struct device *dev,
