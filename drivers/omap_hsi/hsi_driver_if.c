@@ -433,13 +433,16 @@ int hsi_read(struct hsi_device *dev, u32 *addr, unsigned int size)
 		return -EINVAL;
 	}
 
-	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
-		dev_err(dev->device.parent, "HSI device NOT open\n");
-		return -EINVAL;
-	}
-
 	ch = dev->ch;
 	hsi_ctrl = ch->hsi_port->hsi_controller;
+
+	dev_dbg(hsi_ctrl->dev, "%s ch %d, @%x, size %d u32\n", __func__,
+		dev->n_ch, (u32) addr, size);
+
+	if (unlikely(!(dev->ch->flags & HSI_CH_OPEN))) {
+		dev_err(hsi_ctrl->dev, "HSI device NOT open\n");
+		return -EINVAL;
+	}
 
 	spin_lock_bh(&hsi_ctrl->lock);
 
