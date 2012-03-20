@@ -37,6 +37,8 @@ struct gpu_platform_data {
 	int (*opp_get_opp_count) (struct device *dev);
 	struct opp *(*opp_find_freq_ceil) (struct device *dev,
 					   unsigned long *freq);
+	int (*access_process_vm) (struct task_struct *tsk, unsigned long addr,
+				  void *buf, int len, int write);
 };
 
 #endif
