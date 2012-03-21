@@ -47,6 +47,12 @@
 #define A_WO 0x2
 #define A_RW (A_RO|A_WO)
 
+#define FLD_MASK(start, end)	(((1 << ((start) - (end) + 1)) - 1) << (end))
+#define FLD_VAL(val, start, end) (((val) << (end)) & FLD_MASK(start, end))
+#define FLD_GET(val, start, end) (((val) & FLD_MASK(start, end)) >> (end))
+#define FLD_MOD(orig, val, start, end) \
+	(((orig) & ~FLD_MASK(start, end)) | FLD_VAL(val, start, end))
+
 static struct omap_video_timings tc358765_timings;
 static struct tc358765_board_data *get_board_data(struct omap_dss_device
 					*dssdev) __attribute__ ((unused));
