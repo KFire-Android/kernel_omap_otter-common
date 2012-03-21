@@ -165,8 +165,6 @@ int omap_ion_fd_to_handles(int fd, struct ion_client **client,
 		struct ion_handle **handles,
 		int *num_handles)
 {
-	struct ion_buffer *ionbuff;
-	int i;
 #ifdef CONFIG_PVR_SGX
 	if (*num_handles == 2)
 		PVRSRVExportFDToIONHandles(fd, client, handles);
@@ -187,10 +185,6 @@ int omap_ion_fd_to_handles(int fd, struct ion_client **client,
 		return -EINVAL;
 	}
 #endif
-	for (i = 0; i < *num_handles; i++) {
-		ionbuff = ion_share(*client, handles[i]);
-		handles[i] = ion_import(*client, ionbuff);
-	}
 
 	return 0;
 }
