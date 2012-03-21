@@ -1056,20 +1056,12 @@ static int omap_abe_dai_hw_params(struct snd_pcm_substream *substream,
 
 	dma_data = &omap_abe_dai_dma_params[dai->id][substream->stream];
 
-	/* Reset DMA info that may have been overridden */
-	dma_data->port_addr = 0L;
-	dma_data->set_threshold = NULL;
-	dma_data->data_type = OMAP_DMA_DATA_TYPE_S32;
-	dma_data->packet_size = 0;
-
 	switch (params_channels(params)) {
 	case 1:
-		if (params_format(params) == SNDRV_PCM_FORMAT_S16_LE) {
-			format.samp_format = MONO_RSHIFTED_16;
-			dma_data->data_type = OMAP_DMA_DATA_TYPE_S16;
-		} else {
+		if (params_format(params) == SNDRV_PCM_FORMAT_S16_LE)
+			format.samp_format = MONO_16_16;
+		else
 			format.samp_format = MONO_MSB;
-		}
 		break;
 	case 2:
 		if (params_format(params) == SNDRV_PCM_FORMAT_S16_LE)
