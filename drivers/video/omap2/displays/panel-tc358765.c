@@ -577,88 +577,171 @@ static void tc358765_remove(struct omap_dss_device *dssdev)
 	kfree(d2d);
 }
 
+static int tc358765_init_ppi(struct omap_dss_device *dssdev)
+{
+	u32 go_cnt, sure_cnt, val = 0;
+	u8 lanes = 0;
+	int ret = 0;
+	struct tc358765_board_data *board_data = get_board_data(dssdev);
+
+	/* this register setting is required only if host wishes to
+	 * perform DSI read transactions
+	 */
+	go_cnt = (board_data->lp_time * 5 - 3) / 4;
+	sure_cnt = DIV_ROUND_UP(board_data->lp_time * 3, 2);
+	val = FLD_MOD(val, go_cnt, 26, 16);
+	val = FLD_MOD(val, sure_cnt, 10, 0);
+	ret |= tc358765_write_register(dssdev, PPI_TX_RX_TA, val);
+
+	/* SYSLPTX Timing Generation Counter */
+	ret |= tc358765_write_register(dssdev, PPI_LPTXTIMECNT,
+					board_data->lp_time);
+
+	/* D*S_CLRSIPOCOUNT = [(THS-SETTLE + THS-ZERO) /
+					HS_byte_clock_period ] */
+
+	if (dssdev->phy.dsi.clk_lane)
+		lanes |= (1 << 0);
+
+	if (dssdev->phy.dsi.data1_lane) {
+		lanes |= (1 << 1);
+		ret |= tc358765_write_register(dssdev, PPI_D0S_CLRSIPOCOUNT,
+							board_data->clrsipo);
+	}
+	if (dssdev->phy.dsi.data2_lane) {
+		lanes |= (1 << 2);
+		ret |= tc358765_write_register(dssdev, PPI_D1S_CLRSIPOCOUNT,
+							board_data->clrsipo);
+	}
+	if (dssdev->phy.dsi.data3_lane) {
+		lanes |= (1 << 3);
+		ret |= tc358765_write_register(dssdev, PPI_D2S_CLRSIPOCOUNT,
+							board_data->clrsipo);
+	}
+	if (dssdev->phy.dsi.data4_lane) {
+		lanes |= (1 << 4);
+		ret |= tc358765_write_register(dssdev, PPI_D3S_CLRSIPOCOUNT,
+							board_data->clrsipo);
+	}
+
+	ret |= tc358765_write_register(dssdev, PPI_LANEENABLE, lanes);
+	ret |= tc358765_write_register(dssdev, DSI_LANEENABLE, lanes);
+
+	return ret;
+}
+
+static int tc358765_init_video_timings(struct omap_dss_device *dssdev)
+{
+	u32 val;
+	struct tc358765_board_data *board_data = get_board_data(dssdev);
+	int ret;
+	ret = tc358765_read_register(dssdev, VPCTRL, &val);
+	if (ret < 0) {
+		dev_warn(&dssdev->dev,
+			"couldn't access VPCTRL, going on with reset value\n");
+		val = 0;
+	}
+
+	if (dssdev->ctrl.pixel_size == 18) {
+		/* Magic Square FRC available for RGB666 only */
+		val = FLD_MOD(val, board_data->msf, 0, 0);
+		val = FLD_MOD(val, 0, 8, 8);
+	} else {
+		val = FLD_MOD(val, 1, 8, 8);
+	}
+
+	val = FLD_MOD(val, board_data->vtgen, 4, 4);
+	val = FLD_MOD(val, board_data->evtmode, 5, 5);
+	val = FLD_MOD(val, board_data->vsdelay, 31, 20);
+
+	ret = tc358765_write_register(dssdev, VPCTRL, val);
+
+	ret |= tc358765_write_register(dssdev, HTIM1,
+		(tc358765_timings.hbp << 16) | tc358765_timings.hsw);
+	ret |= tc358765_write_register(dssdev, HTIM2,
+		((tc358765_timings.hfp << 16) | tc358765_timings.x_res));
+	ret |= tc358765_write_register(dssdev, VTIM1,
+		((tc358765_timings.vbp << 16) |	tc358765_timings.vsw));
+	ret |= tc358765_write_register(dssdev, VTIM2,
+		((tc358765_timings.vfp << 16) |	tc358765_timings.y_res));
+	return ret;
+}
+
 static int tc358765_write_init_config(struct omap_dss_device *dssdev)
 {
-	struct {
-		u16 reg;
-		u32 data;
-	} tc358765_init_seq[] = {
-		/* this register setting is required only if host wishes to
-		 * perform DSI read transactions
-		 */
-		{ PPI_TX_RX_TA, 0x00000004 },
-		/* SYSLPTX Timing Generation Counter */
-		{ PPI_LPTXTIMECNT, 0x00000004 },
-		/* D*S_CLRSIPOCOUNT = [(THS-SETTLE + THS-ZERO) /
-					HS_byte_clock_period ] */
-		{ PPI_D0S_CLRSIPOCOUNT, 0x00000003 },
-		{ PPI_D1S_CLRSIPOCOUNT, 0x00000003 },
-		{ PPI_D2S_CLRSIPOCOUNT, 0x00000003 },
-		{ PPI_D3S_CLRSIPOCOUNT, 0x00000003 },
-		/* SpeedLaneSel == HS4L */
-		{ DSI_LANEENABLE, 0x0000001F },
-		/* SpeedLaneSel == HS4L */
-		{ PPI_LANEENABLE, 0x0000001F },
-		/* Changed to 1 */
-		{ PPI_STARTPPI, 0x00000001 },
-		/* Changed to 1 */
-		{ DSI_STARTDSI, 0x00000001 },
-
-		/* configure D2L on-chip PLL */
-		{ LVPHY1, 0x00000000 },
-		/* set frequency range allowed and clock/data lanes */
-		{ LVPHY0, 0x00044006 },
-
-		/* configure D2L chip LCD Controller configuration registers */
-		{ VPCTRL, 0x00F00110 },
-		{ HTIM1, ((tc358765_timings.hbp << 16) |
-				tc358765_timings.hsw)},
-		{ HTIM2, ((tc358765_timings.hfp << 16) |
-				tc358765_timings.x_res)},
-		{ VTIM1, ((tc358765_timings.vbp << 16) |
-				tc358765_timings.vsw)},
-		{ VTIM2, ((tc358765_timings.vfp << 16) |
-				tc358765_timings.y_res)},
-		{ LVCFG, 0x00000001 },
-
-		/* Issue a soft reset to LCD Controller for a clean start */
-		{ SYSRST, 0x00000004 },
-		{ VFUEN, 0x00000001 },
-	};
-
-	struct tc358765_data *d2d = dev_get_drvdata(&dssdev->dev);
-	struct omap_video_timings *timings = &dssdev->panel.timings;
-	int i;
+	struct tc358765_board_data *board_data = get_board_data(dssdev);
+	u32 val;
 	int r;
 
-	for (i = 0; i < ARRAY_SIZE(tc358765_init_seq); ++i) {
-		u16 reg = tc358765_init_seq[i].reg;
-		u32 data = tc358765_init_seq[i].data;
+	/* HACK: dummy read: if we read via DSI, first reads always fail */
+	tc358765_read_register(dssdev, DSI_INTSTATUS, &val);
 
-		r = tc358765_write_register(dssdev, reg, data);
-		if (r) {
-			dev_err(&dssdev->dev,
-					"failed to write initial config (write) %d\n", i);
-			return r;
-		}
-
-		/* send the first commands without bta */
-		if (i < 3)
-			continue;
-
-		r = dsi_vc_send_bta_sync(dssdev, d2d->channel1);
-		if (r) {
-			dev_err(&dssdev->dev,
-					"failed to write initial config (BTA) %d\n", i);
-			return r;
-		}
+	r = tc358765_init_ppi(dssdev);
+	if (r) {
+		dev_err(&dssdev->dev, "failed to initialize PPI layer\n");
+		return r;
 	}
-	tc358765_write_register(dssdev, HTIM2,
-		(timings->hfp << 16) | timings->x_res);
-	tc358765_write_register(dssdev, VTIM2,
-		(timings->vfp << 16) | timings->y_res);
 
-	return 0;
+	r = tc358765_write_register(dssdev, PPI_STARTPPI, 0x1);
+	if (r) {
+		dev_err(&dssdev->dev, "failed to start PPI-TX\n");
+		return r;
+	}
+
+	r = tc358765_write_register(dssdev, DSI_STARTDSI, 0x1);
+	if (r) {
+		dev_err(&dssdev->dev, "failed to start DSI-RX\n");
+		return r;
+	}
+
+	/* reset LVDS-PHY */
+	tc358765_write_register(dssdev, LVPHY0, (1 << 22));
+	mdelay(2);
+
+	r = tc358765_read_register(dssdev, LVPHY0, &val);
+	if (r < 0) {
+		dev_warn(&dssdev->dev, "couldn't access LVPHY0, going on with reset value\n");
+		val = 0;
+	}
+	val = FLD_MOD(val, 0, 22, 22);
+	val = FLD_MOD(val, board_data->lv_is, 15, 14);
+	val = FLD_MOD(val, board_data->lv_nd, 4, 0);
+	r = tc358765_write_register(dssdev, LVPHY0, val);
+	if (r) {
+		dev_err(&dssdev->dev, "failed to initialize LVDS-PHY\n");
+		return r;
+	}
+	r = tc358765_init_video_timings(dssdev);
+	if (r) {
+		dev_err(&dssdev->dev, "failed to initialize video path layer\n");
+		return r;
+	}
+
+	r = tc358765_read_register(dssdev, LVCFG, &val);
+	if (r < 0) {
+		dev_warn(&dssdev->dev,
+			"couldn't access LVCFG, going on with reset value\n");
+		val = 0;
+	}
+
+	val = FLD_MOD(val, board_data->pclkdiv, 9, 8);
+	val = FLD_MOD(val, board_data->pclksel, 11, 10);
+	val = FLD_MOD(val, board_data->lvdlink, 1, 1);
+	/* enable LVDS transmitter */
+	val = FLD_MOD(val, 1, 0, 0);
+	r = tc358765_write_register(dssdev, LVCFG, val);
+	if (r) {
+		dev_err(&dssdev->dev, "failed to start LVDS transmitter\n");
+		return r;
+	}
+
+	/* Issue a soft reset to LCD Controller for a clean start */
+	r = tc358765_write_register(dssdev, SYSRST, (1 << 2));
+	/* commit video configuration */
+	r |= tc358765_write_register(dssdev, VFUEN, 0x1);
+	if (r)
+		dev_err(&dssdev->dev, "failed to latch video timings\n");
+	return r;
 }
 
 static int tc358765_power_on(struct omap_dss_device *dssdev)
@@ -695,14 +778,6 @@ static int tc358765_power_on(struct omap_dss_device *dssdev)
 	r = tc358765_write_init_config(dssdev);
 	if (r)
 		goto err_write_init;
-
-	tc358765_read_register(dssdev, PPI_TX_RX_TA);
-
-	dsi_vc_send_bta_sync(dssdev, d2d->channel1);
-	dsi_vc_send_bta_sync(dssdev, d2d->channel1);
-	dsi_vc_send_bta_sync(dssdev, d2d->channel1);
-
-	tc358765_read_register(dssdev, PPI_TX_RX_TA);
 
 	omapdss_dsi_vc_enable_hs(dssdev, d2d->channel1, true);
 
