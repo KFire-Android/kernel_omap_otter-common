@@ -673,6 +673,7 @@ static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
 	.audio_enable		=       ti_hdmi_4xxx_wp_audio_enable,
 	.audio_start		=       ti_hdmi_4xxx_audio_start,
+	.audio_config		=	ti_hdmi_4xxx_audio_config,
 #endif
 
 };
