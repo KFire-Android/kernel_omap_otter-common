@@ -207,36 +207,40 @@ static int tc358765_read_block(u16 reg, u8 *data, int len)
 	return r;
 }
 
-static int tc358765_i2c_read(u16 reg)
+static int tc358765_i2c_read(u16 reg, u32 *val)
 {
 	int r;
 	u8 data[4];
 	data[0] = data[1] = data[2] = data[3] = 0;
 
 	r = tc358765_read_block(reg, data, 4);
-	return ((int)data[3] << 24) | ((int)(data[2]) << 16) |
+	if (r != 4)
+		return -EIO;
+
+	*val = ((int)data[3] << 24) | ((int)(data[2]) << 16) |
 	    ((int)(data[1]) << 8) | ((int)(data[0]));
+	return 0;
 }
 
-static int tc358765_dsi_read(struct omap_dss_device *dssdev, u16 reg)
+static int tc358765_dsi_read(struct omap_dss_device *dssdev, u16 reg, u32 *val)
 {
 	struct tc358765_data *d2d = dev_get_drvdata(&dssdev->dev);
 	u8 buf[4];
-	u32 val;
 	int r;
 
 	r = dsi_vc_gen_read_2(dssdev, d2d->channel1, reg, buf, 4);
 	if (r < 0) {
-		dev_err(&dssdev->dev, "gen read failed\n");
+		dev_err(&dssdev->dev, "0x%x read failed with status %d\n",
+								reg, r);
 		return r;
 	}
 
-	val = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
-	dev_dbg(&dssdev->dev, "reg read %x, val=%08x\n", reg, val);
-	return val;
+	*val = buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+	return 0;
 }
 
-static int tc358765_read_register(struct omap_dss_device *dssdev, u16 reg)
+static int tc358765_read_register(struct omap_dss_device *dssdev,
+					u16 reg, u32 *val)
 {
 	int ret = 0;
 	pm_runtime_get_sync(&dssdev->dev);
@@ -244,9 +248,9 @@ static int tc358765_read_register(struct omap_dss_device *dssdev, u16 reg)
 	 * if I2C didn't got initialized
 	*/
 	if (sd1)
-		ret = tc358765_i2c_read(reg);
+		ret = tc358765_i2c_read(reg, val);
 	else
-		ret = tc358765_dsi_read(dssdev, reg);
+		ret = tc358765_dsi_read(dssdev, reg, val);
 	pm_runtime_put_sync(&dssdev->dev);
 	return ret;
 }
@@ -325,7 +329,7 @@ static int tc358765_registers_show(struct seq_file *seq, void *pos)
 	pm_runtime_get_sync(dev);
 	for (i = 0; i < reg_count; i++) {
 		if (tc358765_regs[i].perm & A_RO) {
-			value = tc358765_i2c_read(tc358765_regs[i].reg);
+			tc358765_i2c_read(tc358765_regs[i].reg, &value);
 			seq_printf(seq, "%-20s = 0x%02X\n",
 					tc358765_regs[i].name, value);
 		}
