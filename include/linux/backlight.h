@@ -11,6 +11,7 @@
 #include <linux/device.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
+#include <linux/thermal_framework.h>
 
 /* Notes on locking:
  *
@@ -63,6 +64,8 @@ struct backlight_properties {
 	int brightness;
 	/* Maximal value for brightness (read-only) */
 	int max_brightness;
+	/* Maximum value duet to thermal limits (< max_brightness) */
+	int max_thermal_brightness;
 	/* Current FB Power mode (0: full on, 1..3: power saving
 	   modes; 4: full off), see FB_BLANK_XXX */
 	int power;
@@ -99,6 +102,9 @@ struct backlight_device {
 
 	/* The framebuffer notifier block */
 	struct notifier_block fb_notif;
+
+	/* reference to our cooling device */
+	struct thermal_dev *tdev;
 
 	struct device dev;
 };
