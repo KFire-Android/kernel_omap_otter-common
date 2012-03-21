@@ -550,6 +550,48 @@ static void hdmi_put_clocks(void)
 		clk_put(hdmi.sys_clk);
 }
 
+#if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
+int hdmi_compute_acr(u32 sample_freq, u32 *n, u32 *cts)
+{
+	u32 deep_color;
+	u32 pclk = hdmi.ip_data.cfg.timings.pixel_clock;
+
+	if (n == NULL || cts == NULL)
+		return -EINVAL;
+
+	/* TODO: When implemented, query deep color mode here. */
+	deep_color = 100;
+
+	switch (sample_freq) {
+	case 32000:
+		if ((deep_color == 125) && ((pclk == 54054) ||
+		    (pclk == 74250)))
+			*n = 8192;
+		else
+			*n = 4096;
+		break;
+	case 44100:
+		*n = 6272;
+		break;
+	case 48000:
+		if ((deep_color == 125) && ((pclk == 54054) ||
+		    (pclk == 74250)))
+			*n = 8192;
+		else
+			*n = 6144;
+		break;
+	default:
+		*n = 0;
+		return -EINVAL;
+	}
+
+	/* Calculate CTS. See HDMI 1.3a or 1.4a specifications */
+	*cts = pclk * (*n / 128) * deep_color / (sample_freq / 10);
+
+	return 0;
+}
+#endif
+
 /* HDMI HW IP initialisation */
 static int omapdss_hdmihw_probe(struct platform_device *pdev)
 {
