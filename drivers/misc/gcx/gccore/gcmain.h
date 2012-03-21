@@ -17,7 +17,7 @@
 
 #include <linux/gccore.h>
 
-#define DEV_NAME	"gccore"
+#define GC_DEV_NAME	"gccore"
 
 /*
  * Register access.

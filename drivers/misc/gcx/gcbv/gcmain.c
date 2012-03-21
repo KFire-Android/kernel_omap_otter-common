@@ -18,16 +18,6 @@
 #include "gcmain.h"
 #include "gcbv-priv.h"
 
-#ifndef GC_DUMP
-#	define GC_DUMP 0
-#endif
-
-#if GC_DUMP
-#	define GC_PRINT gcdump
-#else
-#	define GC_PRINT(...)
-#endif
-
 /*******************************************************************************
  * Convert floating point in 0..1 range to an 8-bit value in range 0..255.
  */
@@ -85,7 +75,6 @@ unsigned char gcfp2norm8(float value)
 
 static int __init mod_init(void)
 {
-	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
 	bv_init();
 	/* Assign BV function parameters only if SoC contains a GC core */
 	if (cpu_is_omap447x())
@@ -95,7 +84,6 @@ static int __init mod_init(void)
 
 static void __exit mod_exit(void)
 {
-	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
 	gcbv_clear();
 	bv_exit();
 }

@@ -12,6 +12,13 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include "gcmain.h"
+
+#define GCZONE_ALL		(~0U)
+#define GCZONE_MAPPING		(1 << 0)
+#define GCZONE_FIXUP		(1 << 1)
+#define GCZONE_FLUSH		(1 << 2)
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/highmem.h>
@@ -28,18 +35,8 @@
  * Debugging.
  */
 
-#ifndef GC_DUMP
-#	define GC_DUMP 0
-#endif
-
 #ifndef GC_FLUSH_USER_PAGES
 #	define GC_FLUSH_USER_PAGES 0
-#endif
-
-#if GC_DUMP
-#	define GC_PRINT printk
-#else
-#	define GC_PRINT(...)
 #endif
 
 #if !defined(PFN_DOWN)
@@ -77,97 +74,6 @@ static inline struct mmu2dprivate *get_mmu(void)
 {
 	static struct mmu2dprivate _mmu;
 	return &_mmu;
-}
-
-static u32 get_mtlb_present(u32 entry)
-{
-	return entry & MMU_MTLB_PRESENT_MASK;
-}
-
-static u32 get_stlb_present(u32 entry)
-{
-	return entry & MMU_STLB_PRESENT_MASK;
-}
-
-static void print_mtlb_entry(u32 index, u32 entry)
-{
-	GC_PRINT(KERN_ERR
-		"  entry[%03d]: 0x%08X (stlb=0x%08X, ps=%d, ex=%d, pr=%d)\n",
-			index,
-			entry,
-			entry & MMU_MTLB_SLAVE_MASK,
-			(entry & MMU_MTLB_PAGE_SIZE_MASK) >> 2,
-			(entry & MMU_MTLB_EXCEPTION_MASK) >> 1,
-			(entry & MMU_MTLB_PRESENT_MASK)
-			);
-}
-
-static void print_stlb_entry(u32 index, u32 entry)
-{
-	GC_PRINT(KERN_ERR
-		"  entry[%03d]: 0x%08X (user=0x%08X, wr=%d, ex=%d, pr=%d)\n",
-			index,
-			entry,
-			entry & MMU_STLB_ADDRESS_MASK,
-			(entry & MMU_STLB_WRITEABLE_MASK) >> 2,
-			(entry & MMU_STLB_EXCEPTION_MASK) >> 1,
-			(entry & MMU_STLB_PRESENT_MASK)
-			);
-}
-
-static void mmu2d_dump_table(struct mm2dtable *desc, struct gcpage *table)
-{
-	int present, vacant, skipped;
-	u32 *logical;
-	u32 entry;
-	u32 i;
-
-	if (table->size == 0) {
-		GC_PRINT(KERN_ERR "%s table is not allocated.\n", desc->name);
-		return;
-	}
-
-	GC_PRINT(KERN_ERR "\n%s table:\n", desc->name);
-	GC_PRINT(KERN_ERR "  physical=0x%08X\n", (u32) table->physical);
-	GC_PRINT(KERN_ERR "  size=%d\n", table->size);
-
-	vacant = -1;
-	logical = table->logical;
-
-	for (i = 0; i < desc->entry_count; i += 1) {
-		entry = logical[i];
-
-		present = desc->get_present(entry);
-
-		if (!present && (entry == desc->vacant_entry)) {
-			if (vacant == -1)
-				vacant = i;
-			continue;
-		}
-
-		if (vacant != -1) {
-			skipped = i - vacant;
-			vacant = -1;
-			GC_PRINT(KERN_ERR
-				"              skipped %d vacant entries\n",
-				skipped);
-		}
-
-		if (present) {
-			desc->print_entry(i, entry);
-		} else {
-			GC_PRINT(KERN_ERR
-				"  entry[%03d]: invalid entry value (0x%08X)\n",
-				i, entry);
-		}
-	}
-
-	if (vacant != -1) {
-		skipped = i - vacant;
-		vacant = -1;
-		GC_PRINT(KERN_ERR "              skipped %d vacant entries\n",
-			skipped);
-	}
 }
 
 /*
@@ -421,7 +327,8 @@ static void flush_user_buffer(struct mmu2darena *arena)
 	unsigned char *logical;
 
 	if (arena->pages == NULL) {
-		GC_PRINT(KERN_ERR "%s(%d): page array is NULL.\n",
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"page array is NULL.\n",
 			__func__, __LINE__);
 		return;
 	}
@@ -429,9 +336,10 @@ static void flush_user_buffer(struct mmu2darena *arena)
 
 	logical = arena->logical;
 	if (logical == NULL) {
-		GC_PRINT(KERN_ERR "%s(%d): buffer base is NULL.\n",
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"buffer base is NULL.\n",
 			__func__, __LINE__);
-			return;
+		return;
 	}
 
 	for (i = 0; i < arena->count; i += 1) {
@@ -440,24 +348,24 @@ static void flush_user_buffer(struct mmu2darena *arena)
 
 		gcpage.pages = arena->pages[i];
 		if (gcpage.pages == NULL) {
-			GC_PRINT(KERN_ERR
-				"%s(%d): page structure %d is NULL.\n",
+			GCPRINT(NULL, 0, GC_MOD_PREFIX
+				"page structure %d is NULL.\n",
 				__func__, __LINE__, i);
 			continue;
 		}
 
 		gcpage.physical = page_to_phys(gcpage.pages);
 		if (gcpage.physical == 0) {
-			GC_PRINT(KERN_ERR
-				"%s(%d): physical address of page %d is 0.\n",
+			GCPRINT(NULL, 0, GC_MOD_PREFIX
+				"physical address of page %d is 0.\n",
 				__func__, __LINE__, i);
 			continue;
 		}
 
 		gcpage.logical = (unsigned int *) (logical + i * PAGE_SIZE);
 		if (gcpage.logical == NULL) {
-			GC_PRINT(KERN_ERR
-				"%s(%d): virtual address of page %d is NULL.\n",
+			GCPRINT(NULL, 0, GC_MOD_PREFIX
+				"virtual address of page %d is NULL.\n",
 				__func__, __LINE__, i);
 			continue;
 		}
@@ -621,7 +529,9 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 
 	/* Is MMU enabled? */
 	if (enabled) {
-		GC_PRINT(KERN_INFO "gcx: mmu is already enabled.\n");
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"gcx: mmu is already enabled.\n",
+			__func__, __LINE__);
 
 		/* Allocate command buffer space. */
 		gcerror = cmdbuf_alloc(sizeof(struct gcmommumaster),
@@ -633,7 +543,9 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 		gcmommumaster->master_ldst = gcmommumaster_master_ldst;
 		gcmommumaster->master = ctxt->physical;
 	} else {
-		GC_PRINT(KERN_INFO "gcx: mmu is disabled, enabling.\n");
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"gcx: mmu is disabled, enabling.\n",
+			__func__, __LINE__);
 
 		/* MMU disabled, force physical mode. */
 		cmdbuf_physical(true);
@@ -703,7 +615,8 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 	 * Find available sufficient arena.
 	 */
 
-	GC_PRINT(KERN_ERR "%s(%d): mapping (%d) pages\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"mapping (%d) pages\n",
 		__func__, __LINE__, mem->count);
 
 	prev = NULL;
@@ -721,13 +634,17 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 		goto fail;
 	}
 
-	GC_PRINT(KERN_ERR "%s(%d): found vacant arena:\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"found vacant arena:\n",
 		__func__, __LINE__);
-	GC_PRINT(KERN_ERR "%s(%d):   mtlb=%d\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  mtlb=%d\n",
 		__func__, __LINE__, vacant->mtlb);
-	GC_PRINT(KERN_ERR "%s(%d):   stlb=%d\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  stlb=%d\n",
 		__func__, __LINE__, vacant->stlb);
-	GC_PRINT(KERN_ERR "%s(%d):   count=%d\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  count=%d\n",
 		__func__, __LINE__, vacant->count);
 
 	/*
@@ -755,14 +672,14 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 
 		parray = parray_alloc;
 
-		GC_PRINT(KERN_ERR
-			"%s(%d): physical page array allocated (0x%08X)\n",
+		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+			"physical page array allocated (0x%08X)\n",
 			__func__, __LINE__, (unsigned int) parray);
 	} else {
 		parray = mem->pages;
 
-		GC_PRINT(KERN_ERR
-			"%s(%d): physical page array provided (0x%08X)\n",
+		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+			"physical page array provided (0x%08X)\n",
 			__func__, __LINE__, (unsigned int) parray);
 	}
 
@@ -906,7 +823,8 @@ enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt, struct mmu2darena *mapped)
 	 * Find the arena.
 	 */
 
-	GC_PRINT(KERN_ERR "%s(%d): unmapping arena 0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"unmapping arena 0x%08X\n",
 		__func__, __LINE__, (unsigned int) mapped);
 
 	prev = NULL;
@@ -925,19 +843,26 @@ enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt, struct mmu2darena *mapped)
 		goto fail;
 	}
 
-	GC_PRINT(KERN_ERR "%s(%d): found allocated arena:\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"found allocated arena:\n",
 		__func__, __LINE__);
-	GC_PRINT(KERN_ERR "%s(%d):   mtlb=%d\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  mtlb=%d\n",
 		__func__, __LINE__, allocated->mtlb);
-	GC_PRINT(KERN_ERR "%s(%d):   stlb=%d\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  stlb=%d\n",
 		__func__, __LINE__, allocated->stlb);
-	GC_PRINT(KERN_ERR "%s(%d):   count=%d\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  count=%d\n",
 		__func__, __LINE__, allocated->count);
-	GC_PRINT(KERN_ERR "%s(%d):   address=0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  address=0x%08X\n",
 		__func__, __LINE__, allocated->address);
-	GC_PRINT(KERN_ERR "%s(%d):   logical=0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  logical=0x%08X\n",
 		__func__, __LINE__, (unsigned int) allocated->logical);
-	GC_PRINT(KERN_ERR "%s(%d):   pages=0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  pages=0x%08X\n",
 		__func__, __LINE__, (unsigned int) allocated->pages);
 
 	mtlb_idx = allocated->mtlb;
@@ -1048,7 +973,18 @@ int mmu2d_flush(void *logical, u32 address, u32 size)
 	struct gcmommuflush *gcmommuflush;
 	u32 count;
 
+	GCPRINT(GCDBGFILTER, GCZONE_FLUSH, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
 	if (logical != NULL) {
+		GCPRINT(GCDBGFILTER, GCZONE_FLUSH, GC_MOD_PREFIX
+			"address = 0x%08X\n",
+			__func__, __LINE__, address);
+
+		GCPRINT(GCDBGFILTER, GCZONE_FLUSH, GC_MOD_PREFIX
+			"size = %d\n",
+			__func__, __LINE__, size);
+
 		/* Compute the buffer count. */
 		count = (size - flushSize + 7) >> 3;
 
@@ -1091,6 +1027,9 @@ int mmu2d_flush(void *logical, u32 address, u32 size)
 		gcmommuflush->link.address = address + flushSize;
 	}
 
+	GCPRINT(GCDBGFILTER, GCZONE_FLUSH, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
 	/* Return the size in bytes required for the flush. */
 	return flushSize;
 #else
@@ -1109,13 +1048,15 @@ enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
 
 	/* Process fixups. */
 	while (fixup != NULL) {
-		GC_PRINT(KERN_ERR "%s(%d): processing %d fixup(s) @ 0x%08X\n",
+		GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
+			"processing %d fixup(s) @ 0x%08X\n",
 			__func__, __LINE__, fixup->count, (unsigned int) fixup);
 
 		/* Apply fixups. */
 		table = fixup->fixup;
 		for (i = 0; i < fixup->count; i += 1) {
-			GC_PRINT("%s(%d): [%02d] buffer offset = 0x%08X, "
+			GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
+				"[%02d] buffer offset = 0x%08X, "
 				"surface offset = 0x%08X\n",
 				__func__, __LINE__, i,
 				table->dataoffset * 4,
@@ -1124,11 +1065,14 @@ enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
 			dataoffset = table->dataoffset;
 			arena = (struct mmu2darena *) data[dataoffset];
 
-			GC_PRINT(KERN_ERR "%s(%d): arena = 0x%08X\n",
+			GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
+				"arena = 0x%08X\n",
 				__func__, __LINE__,  (unsigned int) arena);
-			GC_PRINT(KERN_ERR "%s(%d): arena phys = 0x%08X\n",
+			GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
+				"arena phys = 0x%08X\n",
 				__func__, __LINE__, arena->address);
-			GC_PRINT(KERN_ERR "%s(%d): arena size = %d\n",
+			GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
+				"arena size = %d\n",
 				__func__, __LINE__, arena->size);
 
 			surfoffset = table->surfoffset;
@@ -1142,7 +1086,8 @@ enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
 
 			data[dataoffset] = arena->address + surfoffset;
 
-			GC_PRINT(KERN_ERR "%s(%d): surface address = 0x%08X\n",
+			GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
+				"surface address = 0x%08X\n",
 				__func__, __LINE__, data[dataoffset]);
 
 #if GC_FLUSH_USER_PAGES
@@ -1157,76 +1102,4 @@ enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
 	}
 
 	return gcerror;
-}
-
-void mmu2d_dump(struct mmu2dcontext *ctxt)
-{
-	static struct mm2dtable mtlb_desc = {
-		"Master",
-		MMU_MTLB_ENTRY_NUM,
-		MMU_MTLB_ENTRY_VACANT,
-		get_mtlb_present,
-		print_mtlb_entry
-	};
-
-	static struct mm2dtable stlb_desc = {
-		"Slave",
-		MMU_STLB_ENTRY_NUM,
-		MMU_STLB_ENTRY_VACANT,
-		get_stlb_present,
-		print_stlb_entry
-	};
-
-	struct mmu2darena *vacant;
-	u32 size;
-	char *unit;
-	int i;
-
-	GC_PRINT(KERN_ERR "\n*** MMU DUMP ***\n");
-
-	if (ctxt->vacant == NULL) {
-		GC_PRINT(KERN_ERR "\nNo vacant arenas defined!\n");
-	} else {
-		vacant = ctxt->vacant;
-
-		while (vacant != NULL) {
-
-			size = vacant->count * 4;
-
-			if (size < 1024) {
-				unit = "KB";
-			} else {
-				size /= 1024;
-				if (size < 1024) {
-					unit = "MB";
-				} else {
-					size /= 1024;
-					unit = "GB";
-				}
-			}
-
-			GC_PRINT(KERN_ERR
-				"Vacant arena: 0x%08X\n", (u32) vacant);
-
-			GC_PRINT(KERN_ERR
-				"  mtlb       = %d\n", vacant->mtlb);
-
-			GC_PRINT(KERN_ERR
-				"  stlb       = %d\n", vacant->stlb);
-
-			GC_PRINT(KERN_ERR
-				"  page count = %d\n", vacant->count);
-
-			GC_PRINT(KERN_ERR
-				"  size       = %d%s\n", size, unit);
-
-			vacant = vacant->next;
-		}
-	}
-
-	mmu2d_dump_table(&mtlb_desc, &ctxt->master);
-
-	for (i = 0; i < MMU_MTLB_ENTRY_NUM; i += 1)
-		if (ctxt->slave[i] != NULL)
-			mmu2d_dump_table(&stlb_desc, &ctxt->slave[i]->pages);
 }

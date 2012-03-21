@@ -19,21 +19,18 @@
 #include <linux/delay.h>
 #include <linux/wait.h>
 
-#include <linux/gcx.h>
 #include "gcmain.h"
+
+#define GCZONE_ALL		(~0U)
+#define GCZONE_INIT		(1 << 0)
+#define GCZONE_MAPPING		(1 << 1)
+#define GCZONE_COMMIT		(1 << 2)
+#define GCZONE_BUFFER		(1 << 3)
+#define GCZONE_ALLOC		(1 << 4)
+#define GCZONE_FLUSH		(1 << 5)
+
+#include <linux/gcx.h>
 #include "gccmdbuf.h"
-
-#define GC_ENABLE_GPU_COUNTERS	0
-
-#ifndef GC_DUMP
-#	define GC_DUMP 0
-#endif
-
-#if GC_DUMP
-#	define GC_PRINT printk
-#else
-#	define GC_PRINT(...)
-#endif
 
 #define GC_CMD_BUF_PAGES	20
 #define GC_CMD_BUF_SIZE		(PAGE_SIZE * GC_CMD_BUF_PAGES)
@@ -56,6 +53,9 @@ enum gcerror cmdbuf_init(void)
 {
 	enum gcerror gcerror;
 
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
 	gcerror = gc_alloc_pages(&cmdbuf.page, GC_CMD_BUF_SIZE);
 	if (gcerror != GCERR_NONE)
 		return GCERR_SETGRP(gcerror, GCERR_CMD_ALLOC);
@@ -66,24 +66,38 @@ enum gcerror cmdbuf_init(void)
 	cmdbuf.available = cmdbuf.page.size;
 	cmdbuf.data_size = 0;
 
-	GC_PRINT(KERN_INFO "%s(%d): Initialized command buffer.\n",
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+		"initialized command buffer.\n",
 		__func__, __LINE__);
 
-	GC_PRINT(KERN_INFO "%s(%d):   physical = 0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+		"  physical = 0x%08X\n",
 		__func__, __LINE__, cmdbuf.page.physical);
 
-	GC_PRINT(KERN_INFO "%s(%d):   logical = 0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+		"  logical = 0x%08X\n",
 		__func__, __LINE__, (u32) cmdbuf.page.logical);
 
-	GC_PRINT(KERN_INFO "%s(%d):   size = %d\n",
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+		"  size = %d\n",
 		__func__, __LINE__, cmdbuf.page.size);
+
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
 	return GCERR_NONE;
 }
 
 void cmdbuf_physical(bool forcephysical)
 {
+	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, "++" GC_MOD_PREFIX
+		"forcephysical = %d\n",
+		__func__, __LINE__, forcephysical);
+
 	cmdbuf.forcephysical = forcephysical;
+
+	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 }
 
 enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
@@ -94,6 +108,14 @@ enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
 	pte_t physpages[GC_CMD_BUF_PAGES];
 	unsigned char *logical;
 	int i;
+
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	if (cmdbuf.data_size != 0)
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"command buffer has data!\n",
+			__func__, __LINE__);
 
 	logical = (unsigned char *) cmdbuf.page.logical;
 	for (i = 0; i < GC_CMD_BUF_PAGES; i += 1) {
@@ -113,8 +135,8 @@ enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
 
 	if (cmdbuf.mapped) {
 		if (mapped->address != cmdbuf.mappedbase) {
-			GC_PRINT(KERN_WARNING
-				"%s(%d): inconsitent command buffer mapping!\n",
+			GCPRINT(NULL, 0, GC_MOD_PREFIX
+				"inconsitent command buffer mapping!\n",
 				__func__, __LINE__);
 		}
 	} else {
@@ -123,17 +145,24 @@ enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
 
 	cmdbuf.mappedbase = mapped->address;
 
-	GC_PRINT(KERN_INFO "%s(%d): Mapped command buffer.\n",
-		__func__, __LINE__);
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  physical address = 0x%08X\n",
+		__func__, __LINE__, cmdbuf.physicalbase);
 
-	GC_PRINT(KERN_INFO "%s(%d):   physical = 0x%08X (mapped)\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  mapped address = 0x%08X\n",
 		__func__, __LINE__, cmdbuf.mappedbase);
 
-	GC_PRINT(KERN_INFO "%s(%d):   logical = 0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  logical = 0x%08X\n",
 		__func__, __LINE__, (u32) cmdbuf.page.logical);
 
-	GC_PRINT(KERN_INFO "%s(%d):   size = %d\n",
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  size = %d\n",
 		__func__, __LINE__, cmdbuf.page.size);
+
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
 	return GCERR_NONE;
 }
@@ -142,6 +171,9 @@ enum gcerror cmdbuf_alloc(u32 size, void **logical, u32 *physical)
 {
 	enum gcerror gcerror = GCERR_NONE;
 	unsigned int base;
+
+	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
 	if (size > cmdbuf.available) {
 		gcerror = GCERR_CMD_ALLOC;
@@ -160,6 +192,21 @@ enum gcerror cmdbuf_alloc(u32 size, void **logical, u32 *physical)
 	if (physical != NULL)
 		*physical = base + cmdbuf.data_size;
 
+	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, GC_MOD_PREFIX
+		"logical = 0x%08X\n",
+		__func__, __LINE__,
+		(unsigned int)
+			((unsigned char *) cmdbuf.page.logical
+					+ cmdbuf.data_size));
+
+	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, GC_MOD_PREFIX
+		"address = 0x%08X\n",
+		__func__, __LINE__, base + cmdbuf.data_size);
+
+	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, GC_MOD_PREFIX
+		"size = %d\n",
+		__func__, __LINE__, size);
+
 	/* Determine the data size. */
 	size = (size + 3) & ~3;
 
@@ -168,6 +215,9 @@ enum gcerror cmdbuf_alloc(u32 size, void **logical, u32 *physical)
 	cmdbuf.data_size += size;
 
 fail:
+	GCPRINT(GCDBGFILTER, GCZONE_ALLOC, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
 	return gcerror;
 }
 
@@ -176,10 +226,14 @@ int cmdbuf_flush(void *logical)
 	static const int flushSize
 		= sizeof(struct gcmosignal) + sizeof(struct gccmdend);
 
+	GCPRINT(GCDBGFILTER, GCZONE_FLUSH, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
 	if (logical != NULL) {
 		struct gcmosignal *gcmosignal;
 		struct gccmdend *gccmdend;
 		u32 base, count;
+		u32 ack;
 
 		/* Configure the signal. */
 		gcmosignal = (struct gcmosignal *) logical;
@@ -193,11 +247,6 @@ int cmdbuf_flush(void *logical)
 		gccmdend = (struct gccmdend *) (gcmosignal + 1);
 		gccmdend->cmd.fld = gcfldend;
 
-#if GC_DUMP
-		/* Dump command buffer. */
-		cmdbuf_dump();
-#endif
-
 		/* Determine the command buffer base address. */
 		base = (cmdbuf.mapped && !cmdbuf.forcephysical)
 			? cmdbuf.mappedbase : cmdbuf.physicalbase;
@@ -205,15 +254,15 @@ int cmdbuf_flush(void *logical)
 		/* Compute the data count. */
 		count = (cmdbuf.data_size + 7) >> 3;
 
-		GC_PRINT("starting DMA at 0x%08X with count of %d\n",
-			base, count);
+		GCPRINT(GCDBGFILTER, GCZONE_COMMIT, GC_MOD_PREFIX
+			"starting DMA at 0x%08X with count of %d\n",
+			__func__, __LINE__, base, count);
+
+		/* Dump command buffer. */
+		GCDUMPBUFFER(GCDBGFILTER, GCZONE_BUFFER,
+				cmdbuf.page.logical, base, cmdbuf.data_size);
 
 		gc_flush_pages(&cmdbuf.page);
-
-#if GC_DUMP || GC_ENABLE_GPU_COUNTERS
-		/* Reset hardware counters. */
-		gc_write_reg(GC_RESET_MEM_COUNTERS_Address, 1);
-#endif
 
 		/* Enable all events. */
 		gc_write_reg(GCREG_INTR_ENBL_Address, ~0U);
@@ -229,47 +278,22 @@ int cmdbuf_flush(void *logical)
 
 		/* Wait for the interrupt. */
 		gc_wait_interrupt();
+		ack = gc_get_interrupt_data();
 
-		GC_PRINT(KERN_INFO "%s(%d): data = 0x%08X\n",
-			__func__, __LINE__, gc_get_interrupt_data());
+		GCPRINT(GCDBGFILTER, GCZONE_COMMIT, GC_MOD_PREFIX
+			"ack = 0x%08X\n",
+			__func__, __LINE__, ack);
+
+		if ((ack & 0xC0000000) != 0)
+			GCGPUSTATUS(NULL, 0, __func__, __LINE__, &ack);
 
 		/* Reset the buffer. */
 		cmdbuf.available = cmdbuf.page.size;
 		cmdbuf.data_size = 0;
 	}
 
+	GCPRINT(GCDBGFILTER, GCZONE_FLUSH, "--" GC_MOD_PREFIX
+		"flushSize = %d\n", __func__, __LINE__, flushSize);
+
 	return flushSize;
-}
-
-void cmdbuf_dump(void)
-{
-	unsigned int i, count, base;
-
-	base = (cmdbuf.mapped && !cmdbuf.forcephysical)
-		? cmdbuf.mappedbase : cmdbuf.physicalbase;
-
-	GC_PRINT(KERN_INFO "%s(%d): Current command buffer.\n",
-		__func__, __LINE__);
-
-	GC_PRINT(KERN_INFO "%s(%d):   physical = 0x%08X%s\n",
-		__func__, __LINE__, base, cmdbuf.mapped ? " (mapped)" : "");
-
-	GC_PRINT(KERN_INFO "%s(%d):   logical = 0x%08X\n",
-		__func__, __LINE__, (unsigned int) cmdbuf.page.logical);
-
-	GC_PRINT(KERN_INFO "%s(%d):   current data size = %d\n",
-		__func__, __LINE__, cmdbuf.data_size);
-
-	GC_PRINT(KERN_INFO "%s(%d)\n",
-		__func__, __LINE__);
-
-	count = cmdbuf.data_size / 4;
-
-	for (i = 0; i < count; i += 1) {
-		GC_PRINT(KERN_INFO "%s(%d):   [0x%08X]: 0x%08X\n",
-			__func__, __LINE__,
-			base + i * 4,
-			cmdbuf.page.logical[i]
-			);
-	}
 }
