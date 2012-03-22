@@ -37,6 +37,7 @@ struct omap_ldo_abb_ops {
  * struct omap_ldo_abb_setup_bits - setup register bit defns
  * @enable_mask:	SR2EN field
  * @active_fbb_mask:	ACTIVE_FBB_SEL field
+ * @active_rbb_mask:	ACTIVE_RBB_SEL field
  * @wait_count_mask:	SR2_WTCNT_VALUE field
  */
 struct omap_ldo_abb_setup_bits {

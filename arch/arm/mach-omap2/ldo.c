@@ -111,17 +111,37 @@ static int _abb_set_abb(struct voltagedomain *voltdm, int abb_type)
 	if (ret)
 		return ret;
 
-	/* Select FBB or RBB */
-	if (abb_type == OMAP_ABB_SLOW_OPP)
+	/* Select proper Adaptive Body-Bias(ABB) */
+	switch (abb_type) {
+	case OMAP_ABB_NOMINAL_OPP:
+		/* setup to bypass */
 		voltdm->rmw(abb->setup_bits->active_fbb_mask |
-				abb->setup_bits->active_rbb_mask,
-				abb->setup_bits->active_rbb_mask,
-				abb->setup_reg);
-	else
+			    abb->setup_bits->active_rbb_mask,
+			    0x0,
+			    abb->setup_reg);
+		break;
+	case OMAP_ABB_SLOW_OPP:
+		/* setup to RBB */
 		voltdm->rmw(abb->setup_bits->active_fbb_mask |
-				abb->setup_bits->active_rbb_mask,
-				abb->setup_bits->active_fbb_mask,
-				abb->setup_reg);
+			    abb->setup_bits->active_rbb_mask,
+			    abb->setup_bits->active_rbb_mask,
+			    abb->setup_reg);
+		break;
+	case OMAP_ABB_FAST_OPP:
+		/* setup to FBB */
+		voltdm->rmw(abb->setup_bits->active_fbb_mask |
+			    abb->setup_bits->active_rbb_mask,
+			    abb->setup_bits->active_fbb_mask,
+			    abb->setup_reg);
+		break;
+	case OMAP_ABB_NONE:
+		/* Fall through */
+	default:
+		/* Should have never been here! */
+		WARN_ONCE(1, "%s: voltage domain %s: abb type %d!!!\n",
+			 __func__, voltdm->name, abb_type);
+		return -EINVAL;
+	}
 
 	/* program next state of ABB ldo */
 	voltdm->rmw(abb->ctrl_bits->opp_sel_mask,
@@ -188,19 +208,21 @@ static int _abb_scale(struct voltagedomain *voltdm,
 		return -EINVAL;
 	}
 
-	/*
-	 * We set up ABB as follows:
-	 * if we are scaling *to* a voltage which needs ABB, do it in post
-	 * if we are scaling *from* a voltage which needs ABB, do it in pre
-	 * So, if the conditions are in reverse, we just return happy
-	 */
-	if (is_prescale && (target_abb > curr_abb))
-		goto out;
+	/* Prescale - override and always go bypass */
+	if (is_prescale) {
+		/* if we are already in bypass, dont need to do it again */
+		if (curr_abb == OMAP_ABB_NOMINAL_OPP)
+			goto out;
+		target_abb = OMAP_ABB_NOMINAL_OPP;
+	}
 
-	if (!is_prescale && (target_abb < curr_abb))
+	/* Use RBB ONLY if calibrated voltage is achieved */
+	if (!is_prescale && target_abb == OMAP_ABB_SLOW_OPP &&
+	    !target_vdata->volt_calibrated) {
+		/* Skip setting up RBB at this point of transition */
 		goto out;
+	}
 
-	/* Time to set ABB now */
 	ret = _abb_set_abb(voltdm, target_abb);
 	if (!ret) {
 		abb->__cur_abb_type = target_abb;
