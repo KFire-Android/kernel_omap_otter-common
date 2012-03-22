@@ -1662,6 +1662,7 @@ static void __exit emif_unregister(void)
 	platform_driver_unregister(&emif_driver);
 }
 
+postcore_initcall(emif_register);
 module_init(emif_register);
 module_exit(emif_unregister);
 MODULE_DESCRIPTION("TI EMIF SDRAM Controller Driver");
