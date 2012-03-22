@@ -31,7 +31,7 @@
 #include <linux/mutex.h>
 #include <linux/platform_device.h>
 #include <linux/omap4_duty_cycle_governor.h>
-
+#include <linux/omap4_duty_cycle.h>
 #include <plat/omap_device.h>
 
 MODULE_LICENSE("GPL");
@@ -59,12 +59,16 @@ module_param(nitro_rate, int, 0);
 static unsigned int cooling_rate = 1008000;
 module_param(cooling_rate, int, 0);
 
-static bool enabled;
-static bool saved_hotplug_enabled;
-static int heating_budget;
-static unsigned long t_heating_start;
-static struct duty_cycle *t_duty;
+struct duty_cycle_desc {
+	bool enabled;
+	bool saved_hotplug_enabled;
+	int heating_budget;
+	unsigned long t_heating_start;
+	int (*cool_device) (struct thermal_dev *, int temp);
+};
 
+static struct duty_cycle_desc duty_desc;
+static struct duty_cycle *t_duty;
 static struct workqueue_struct *duty_wq;
 static struct delayed_work work_exit_cool;
 static struct delayed_work work_exit_heat;
@@ -91,11 +95,11 @@ static void omap4_duty_enter_normal(void)
 
 	pr_debug("%s enter at (%u)\n", __func__, policy->cur);
 	state = OMAP4_DUTY_NORMAL;
-	heating_budget = NITRO_P(nitro_percentage, nitro_interval);
+	duty_desc.heating_budget = NITRO_P(nitro_percentage, nitro_interval);
 
-	policy->max = nitro_rate;
-	policy->user_policy.max = nitro_rate;
-	cpufreq_update_policy(policy->cpu);
+	if (duty_desc.cool_device != NULL)
+		duty_desc.cool_device(NULL, 0);
+
 }
 
 static void omap4_duty_exit_cool_wq(struct work_struct *work)
@@ -120,9 +124,8 @@ static void omap4_duty_enter_cooling(unsigned int next_max,
 	state = next_state;
 	pr_debug("%s enter at (%u)\n", __func__, policy->cur);
 
-	policy->max = next_max;
-	policy->user_policy.max = next_max;
-	cpufreq_update_policy(policy->cpu);
+	if ((duty_desc.cool_device != NULL) && (next_max != nitro_rate))
+		duty_desc.cool_device(NULL, 1);
 
 	queue_delayed_work(duty_wq, &work_exit_cool, msecs_to_jiffies(
 		NITRO_P(100 - nitro_percentage, nitro_interval)));
@@ -161,7 +164,7 @@ static void omap4_duty_enter_heating(void)
 	state = OMAP4_DUTY_HEATING;
 
 	queue_delayed_work(duty_wq, &work_exit_heat,
-					msecs_to_jiffies(heating_budget));
+				msecs_to_jiffies(duty_desc.heating_budget));
 }
 
 static void omap4_duty_enter_heat_wq(struct work_struct *work)
@@ -188,19 +191,19 @@ static int omap4_duty_frequency_change(struct notifier_block *nb,
 	switch (state) {
 	case OMAP4_DUTY_NORMAL:
 		if (freqs->new == nitro_rate) {
-			t_heating_start = jiffies;
+			duty_desc.t_heating_start = jiffies;
 			queue_work(duty_wq, &work_enter_heat.work);
 		}
 		break;
 	case OMAP4_DUTY_HEATING:
 		if (freqs->new < nitro_rate) {
 			int diff = jiffies_to_msecs(jiffies) -
-				jiffies_to_msecs(t_heating_start);
+				jiffies_to_msecs(duty_desc.t_heating_start);
 			if (diff < 0)
-				heating_budget = 0;
+				duty_desc.heating_budget = 0;
 			else
-				heating_budget -= diff;
-			if (heating_budget <= 0) {
+				duty_desc.heating_budget -= diff;
+			if (duty_desc.heating_budget <= 0) {
 				queue_work(duty_wq, &work_enter_cool0);
 			} else {
 				cancel_delayed_work_sync(&work_exit_heat);
@@ -212,7 +215,7 @@ static int omap4_duty_frequency_change(struct notifier_block *nb,
 		break;
 	case OMAP4_DUTY_COOLING_1:
 		if (freqs->new == nitro_rate) {
-			t_heating_start = jiffies;
+			duty_desc.t_heating_start = jiffies;
 			cancel_delayed_work_sync(&work_exit_cool);
 			queue_work(duty_wq, &work_enter_heat.work);
 		}
@@ -239,9 +242,9 @@ static int omap4_duty_cycle_set_enabled(bool val, bool update)
 	if (ret)
 		goto unlock_enabled;
 
-	if (enabled != val) {
-		enabled = val;
-		if (enabled) {
+	if (duty_desc.enabled != val) {
+		duty_desc.enabled = val;
+		if (duty_desc.enabled) {
 			/* Register the cpufreq notification */
 			if (cpufreq_register_notifier(&omap4_duty_nb,
 						CPUFREQ_TRANSITION_NOTIFIER)) {
@@ -271,7 +274,7 @@ static int omap4_duty_cycle_set_enabled(bool val, bool update)
 		}
 		/* we want to make sure the user gets what is asked */
 		if (num_online_cpus() == 1 && update)
-			saved_hotplug_enabled = enabled;
+			duty_desc.saved_hotplug_enabled = duty_desc.enabled;
 	}
 
 unlock:
@@ -283,14 +286,14 @@ unlock_enabled:
 
 static void omap4_duty_enable_wq(struct work_struct *work)
 {
-	omap4_duty_cycle_set_enabled(saved_hotplug_enabled, false);
+	omap4_duty_cycle_set_enabled(duty_desc.saved_hotplug_enabled, false);
 }
 
 static void omap4_duty_disable_wq(struct work_struct *work)
 {
 	/* we don't want to overwrite what the user has requested */
 	mutex_lock(&mutex_duty);
-	saved_hotplug_enabled = enabled;
+	duty_desc.saved_hotplug_enabled = duty_desc.enabled;
 	mutex_unlock(&mutex_duty);
 	omap4_duty_cycle_set_enabled(false, false);
 }
@@ -489,7 +492,7 @@ static ssize_t show_enabled(struct device *dev,
 	ret = mutex_lock_interruptible(&mutex_duty);
 	if (ret)
 		return ret;
-	ret = sprintf(buf, "%u\n", (unsigned int)enabled);
+	ret = sprintf(buf, "%u\n", (unsigned int)duty_desc.enabled);
 	mutex_unlock(&mutex_duty);
 
 	return ret;
@@ -576,6 +579,18 @@ static int update_params(struct duty_cycle_params *dc_params)
 	return 0;
 }
 
+int duty_cooling_dev_register(struct duty_cycle_dev *duty_cycle_dev)
+{
+	duty_desc.cool_device = duty_cycle_dev->cool_device;
+
+	return 0;
+}
+
+void duty_cooling_dev_unregister(void)
+{
+	duty_desc.cool_device = NULL;
+}
+
 static int __init omap4_duty_register(void)
 {
 	t_duty = kzalloc(sizeof(struct duty_cycle), GFP_KERNEL);
@@ -613,7 +628,7 @@ static int __init omap4_duty_module_init(void)
 	INIT_WORK(&work_enter_cool1, omap4_duty_enter_c1_wq);
 	INIT_WORK(&work_cpu1_plugin, omap4_duty_enable_wq);
 	INIT_WORK(&work_cpu1_plugout, omap4_duty_disable_wq);
-	heating_budget = NITRO_P(nitro_percentage, nitro_interval);
+	duty_desc.heating_budget = NITRO_P(nitro_percentage, nitro_interval);
 
 	if (num_online_cpus() > 1)
 		err = omap4_duty_cycle_set_enabled(true, false);
@@ -656,7 +671,7 @@ exit_pdevice:
 unregister_hotplug:
 	unregister_hotcpu_notifier(&omap4_duty_cycle_cpu_notifier);
 disable:
-	if (enabled)
+	if (duty_desc.enabled)
 		omap4_duty_cycle_set_enabled(false, false);
 exit:
 	return err;
