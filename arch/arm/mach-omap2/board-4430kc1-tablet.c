@@ -80,12 +80,6 @@
 #define WILINK_UART_DEV_NAME		"/dev/ttyO1"
 #define BLUETOOTH_UART			(0x1)
 #define CONSOLE_UART			(0x2)
-/* no ethernet */
-#if 0
-#define ETH_KS8851_IRQ			34
-#define ETH_KS8851_POWER_ON		48
-#define ETH_KS8851_QUART		138
-#endif
 
 #define OMAP4_LCD_EN_GPIO		28
 
@@ -95,13 +89,8 @@
 #define OMAP4_TOUCH_IRQ_2		36
 #define OMAP_UART_GPIO_MUX_MODE_143	143
 
-#define LED_SEC_DISP_GPIO		27 /* brightness = dsi1_bl_gpio */
-#define DSI2_GPIO_59			59 /* direction output = dsi2_bl_glpio */
 #define PANEL_IRQ			34
 
-#define LED_PWM2ON			0x03
-#define LED_PWM2OFF			0x04
-#define TWL6030_TOGGLE3			0x92
 
 #define GPIO_WIFI_PMENA			54
 #define GPIO_WIFI_IRQ			53
@@ -186,152 +175,15 @@ static void __init quanta_boardids(void)
     quanta_panelid = gpio_get_value(PANELID0_GPIO) | ( gpio_get_value(PANELID1_GPIO)<<1);
 }
 
-static struct spi_board_info tablet_spi_board_info[]__initdata = {
-	{
-		.modalias		= "otter1_disp_spi",
-		.bus_num		= 4,     /* McSPI4 */
-		.chip_select		= 0,
-		.max_speed_hz		= 375000,
-	},
-};
-
-static void __init sdp4430_init_display_led(void)
-{
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
-	//twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-}
-
-static void sdp4430_set_primary_brightness(u8 brightness)
-{
-	if (brightness > 1) {
-		if (brightness == 255)
-			brightness = 0x7f;
-		else
-			brightness = (~(brightness/2)) & 0x7f;
-
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
-	} else if (brightness <= 1) {
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-	}
-}
-
-static struct omap4430_sdp_disp_led_platform_data __initdata sdp4430_disp_led_data = {
-	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
-	.display_led_init = sdp4430_init_display_led,
-	.primary_display_set = sdp4430_set_primary_brightness,
-};
-
-/* FIXME-HASH: Done in twl_leds? */
-static void __init omap_disp_led_init(void)
-{
-	pr_info("%s: enter\n", __func__);
-
-	/* Seconday backlight control */
-	gpio_request(DSI2_GPIO_59, "dsi2_bl_gpio");
-	gpio_direction_output(DSI2_GPIO_59, 0);
-
-	if (sdp4430_disp_led_data.flags & LEDS_CTRL_AS_ONE_DISPLAY) {
-		pr_info("%s: Configuring as one display LED\n", __func__);
-		gpio_set_value(DSI2_GPIO_59, 1);
-	}
-	gpio_request(LED_SEC_DISP_GPIO, "dsi1_bl_gpio");
-	gpio_direction_output(LED_SEC_DISP_GPIO, 1);
-	mdelay(120);
-	gpio_set_value(LED_SEC_DISP_GPIO, 0);
-
-	pr_info("%s: exit\n", __func__);
-}
-
-static struct platform_device __initdata  sdp4430_disp_led = {
-	.name = "display_led",
-	.id = -1,
-	.dev = {
-		.platform_data = &sdp4430_disp_led_data,
-	},
-};
-
-static struct platform_device __initdata sdp4430_keypad_led = {
-	.name = "keypad_led",
-	.id = -1,
-	.dev	= {
-		.platform_data = NULL,
-	},
-};
-
-void kc1_led_set_power(struct omap_pwm_led_platform_data *self, int on_off)
-{
-	if (on_off) {
-		gpio_request(119, "ADO_SPK_ENABLE");
-		gpio_direction_output(119, 1);
-		gpio_set_value(119, 1);
-		gpio_request(120, "SKIPB_GPIO");
-		gpio_direction_output(120, 1);
-		gpio_set_value(120, 1);
-	} else {
-		gpio_request(119, "ADO_SPK_ENABLE");
-		gpio_direction_output(119, 0);
-		gpio_set_value(119, 0);
-		gpio_request(120, "SKIPB_GPIO");
-		gpio_direction_output(120, 0);
-		gpio_set_value(120, 0);
-	}
-}
-
-static struct omap_pwm_led_platform_data kc1_led_data = {
-	.name = "backlight",
-	.intensity_timer = 10,
-	.def_brightness = 0x7F,
-};
-
-static struct platform_device kc1_led_device = {
-	.name       = "omap_pwm_led",
-	.id     = -1,
-	.dev        = {
-		.platform_data = &kc1_led_data,
-	},
-};
-
-static struct omap_dss_device sdp4430_otter1_device = {
-	.name			= "lcd2",
-	.driver_name		= "otter1_panel_drv",
-	.type			= OMAP_DISPLAY_TYPE_DPI,
-	.phy.dpi.data_lines	= 24,
-	.channel		= OMAP_DSS_CHANNEL_LCD2,
-#if 0
-        .panel          = {
-        	.width_in_um = 158,
-        	.height_in_um = 92,
-        },
-#endif
-};
-
-static struct omap_dss_device *sdp4430_dss_devices[] = {
-	&sdp4430_otter1_device,
-};
-
-static struct omap_dss_board_info sdp4430_dss_data = {
-	.num_devices	=	ARRAY_SIZE(sdp4430_dss_devices),
-	.devices	=	sdp4430_dss_devices,
-	.default_device	=	&sdp4430_otter1_device,
-};
-
 
 static struct platform_device __initdata *sdp4430_devices[] = {
-//	&sdp4430_disp_led,
-//	&sdp4430_keypad_led,
-//        &sdp4430_aic3110,
+//      &sdp4430_aic3110,
 #if defined(CONFIG_SENSORS_OMAP_BANDGAP)
 //	&sdp4430_omap_bandgap_sensor,
 #endif
 #if defined(CONFIG_SENSORS_PMIC_THERMAL)
 //	&sdp4430_pmic_thermal_sensor,
 #endif
-	&kc1_led_device,
 };
 
 static struct omap_board_config_kernel __initdata sdp4430_config[] = {
@@ -489,40 +341,25 @@ static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
 {
 	struct omap_mmc_platform_data *pdata;
 
-	pr_info("omap4_twl6030_hsmmc_set_late_init start\n");
 	/* dev can be null if CONFIG_MMC_OMAP_HS is not set */
 	if (!dev)
 		return;
 
 	pdata = dev->platform_data;
 	pdata->init = omap4_twl6030_hsmmc_late_init;
-	pr_info("omap4_twl6030_hsmmc_set_late_init end\n");
 }
 
 static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 {
 	struct omap2_hsmmc_info *c;
 
-	pr_info("omap4_twl6030_hsmmc_init start\n");
 	omap2_hsmmc_init(controllers);
 	for (c = controllers; c->mmc; c++)
 		omap4_twl6030_hsmmc_set_late_init(c->dev);
 
-	pr_info("omap4_twl6030_hsmmc_init end\n");
 	return 0;
 }
 
-
-static void kc1_pmic_mux_init(void)
-{
-	/*
-	 * Enable IO daisy for sys_nirq1/2, to be able to
-	 * wakeup from interrupts from PMIC/Audio IC.
-	 * Needed only in Device OFF mode.
-	 */
-	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_WAKEUP_EN);
-	omap_mux_init_signal("sys_nirq2", OMAP_PIN_INPUT_PULLUP | OMAP_WAKEUP_EN);
-}
 
 /***** I2C BOARD INIT ****/
 
@@ -563,11 +400,9 @@ static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
 	},
 #endif
 /* Mistral: Updated this array to include the AIC3110 Audio Codec */
-#if 0
 	{
 		I2C_BOARD_INFO("tlv320aic3110", 0x18),
 	},
-#endif
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
@@ -690,7 +525,7 @@ static int __init omap4_i2c_init(void)
 	  return err;
 
 	// omap_register_i2c_bus(2, 400, sdp4430_i2c_2_boardinfo, ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
-	// omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo, ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
+	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo, ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
 	if (quanta_mbid<0x02) {
 		//omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_c1c, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_c1c));
 	}
@@ -717,26 +552,6 @@ static bool enable_suspend_off = true;
 module_param(enable_suspend_off, bool, S_IRUSR | S_IRGRP | S_IROTH);
 
 /******** END I2C BOARD INIT ********/
-
-static void __init omap4_display_init(void)
-{
-	void __iomem *phymux_base = NULL;
-	u32 val;
-
-	phymux_base = ioremap(0x4A100000, 0x1000);
-
-	/* GPIOs 101, 102 */
-	val = __raw_readl(phymux_base + 0x90);
-	val = (val & 0xFFF8FFF8) | 0x00030003;
-	__raw_writel(val, phymux_base + 0x90);
-
-	/* GPIOs 103, 104 */
-	val = __raw_readl(phymux_base + 0x94);
-	val = (val & 0xFFF8FFF8) | 0x00030003;
-	__raw_writel(val, phymux_base + 0x94);
-
-	iounmap(phymux_base);
-}
 
 #ifdef CONFIG_TOUCHSCREEN_ILITEK
 static void omap_ilitek_init(void)
@@ -789,31 +604,6 @@ void plat_hold_wakelock(void *up, int flag)
 	return;
 }
 #endif
-
-#define KC1_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
-static struct omapfb_platform_data kc1_fb_pdata = {
-	.mem_desc = {
-		.region_cnt = 1,
-		.region = {
-			[0] = {
-				.size = KC1_FB_RAM_SIZE,
-			},
-		},
-	},
-};
-
-static void __init omap_kc1_display_init(void)
-{
-	omap_vram_set_sdram_vram(KC1_FB_RAM_SIZE, 0);
-	omapfb_set_platform_data(&kc1_fb_pdata);
-	omap_display_init(&sdp4430_dss_data);
-
-	kc1_pmic_mux_init();
-
-#ifdef CONFIG_TOUCHSCREEN_ILITEK
-	omap_ilitek_init();
-#endif //CONFIG_TOUCHSCREEN_ILITEK
-}
 
 
 #ifdef CONFIG_OMAP_MUX
@@ -986,7 +776,7 @@ static void __init omap_kc1_init(void)
 	omap_dmm_init();
 
 	omap4_display_init();
-	//omap_disp_led_init();
+	omap4_disp_led_init();
 
 	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
@@ -1015,15 +805,16 @@ static void __init omap_kc1_init(void)
 		gpio_request(155, "CHARGE-SUSP");
 		gpio_direction_output(155, 1);
 	}
-//	omap4_kc1_wifi_init();
-//	config_wlan_mux();
+	omap4_kc1_wifi_init();
+	// config_wlan_mux();
 
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
 
-	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
-
-	omap_kc1_display_init();
+	omap4_kc1_display_init();
+#ifdef CONFIG_TOUCHSCREEN_ILITEK
+	omap_ilitek_init();
+#endif //CONFIG_TOUCHSCREEN_ILITEK
 
 	gpio_request(119, "ADO_SPK_ENABLE");
 	gpio_direction_output(119, 1);
@@ -1050,6 +841,7 @@ static void __init omap_4430sdp_map_io(void)
 	omap2_set_globals_443x();
 	omap44xx_map_common_io();
 }
+
 static void __init omap_4430sdp_reserve(void)
 {
 	/* do the static reservations first */

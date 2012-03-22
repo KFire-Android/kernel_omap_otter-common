@@ -20,7 +20,13 @@
 #define OMAP4_CHARGER_IRQ		7
 
 void omap4_create_board_props(void);
+
 void omap4_power_init(void);
+
 void board_serial_init(void);
+
+void omap4_display_init(void);
+void omap4_disp_led_init(void);
+void omap4_kc1_display_init(void);
 
 #endif
