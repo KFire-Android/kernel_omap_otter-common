@@ -32,17 +32,6 @@ static struct mutex lock_power_on;
 static struct mutex lock_panel;
 
 static struct spi_device *boxer_spi;
-static struct omap_video_timings boxer_panel_timings = {
-	.x_res          = 1024,
-	.y_res          = 600,
-	.pixel_clock    = 46000, /* in kHz */
-	.hfp            = 160,   /* HFP fix 160 */
-	.hsw            = 10,    /* HSW = 1~140 */
-	.hbp            = 150,   /* HSW + HBP = 160 */
-	.vfp            = 12,    /* VFP fix 12 */
-	.vsw            = 3,     /* VSW = 1~20 */
-	.vbp            = 20,    /* VSW + VBP = 23 */
-};
 
 extern u8 quanta_get_mbid(void);
 
@@ -255,8 +244,6 @@ static int boxer_panel_probe(struct omap_dss_device *dssdev)
 
 	dssdev->panel.config	= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
 				  OMAP_DSS_LCD_IHS;
-	dssdev->panel.timings	= boxer_panel_timings;
-
 	omap_writel(0x00020000,0x4a1005cc); //PCLK impedance
 	gpio_request(175, "LCD_VENDOR0");
 	gpio_request(176, "LCD_VENDOR1");
