@@ -912,8 +912,10 @@ void musb_start(struct musb *musb)
 	/* put into basic highspeed mode and start session */
 	temp = MUSB_POWER_ISOUPDATE | MUSB_POWER_HSENAB;
 					/* MUSB_POWER_ENSUSPEND wedges tusb */
+#ifdef CONFIG_USB_GADGET_MUSB_HDRC
 	if (musb->softconnect)
 		temp |= MUSB_POWER_SOFTCONN;
+#endif
 	musb_writeb(regs, MUSB_POWER, temp);
 
 	musb->is_active = 0;
@@ -1995,7 +1997,9 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 
 	/* Init IRQ workqueue before request_irq */
 	INIT_WORK(&musb->irq_work, musb_irq_work);
+#ifdef CONFIG_USB_GADGET_MUSB_HDRC
 	INIT_WORK(&musb->hz_mode_work, musb_hz_mode_work);
+#endif
 
 	/* attach to the IRQ */
 	if (request_irq(nIrq, musb->isr, 0, dev_name(dev), musb)) {
