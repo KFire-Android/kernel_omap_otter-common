@@ -31,6 +31,7 @@
 #include <linux/mutex.h>
 #include <linux/suspend.h>
 #include <linux/platform_device.h>
+#include <linux/omap4_duty_cycle_governor.h>
 #include <linux/omap4_duty_cycle.h>
 #include <plat/omap_device.h>
 
@@ -68,6 +69,7 @@ struct duty_cycle_desc {
 };
 
 static struct duty_cycle_desc duty_desc;
+static struct duty_cycle *t_duty;
 static struct workqueue_struct *duty_wq;
 static struct delayed_work work_exit_cool;
 static struct delayed_work work_exit_heat;
@@ -550,6 +552,24 @@ static int  __exit omap4_duty_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int update_params(struct duty_cycle_params *dc_params)
+{
+	int ret;
+
+	ret = mutex_lock_interruptible(&mutex_duty);
+	if (ret)
+		return ret;
+
+	cooling_rate = dc_params->cooling_rate;
+	nitro_rate = dc_params->nitro_rate;
+	nitro_percentage = dc_params->nitro_percentage;
+	nitro_interval = dc_params->nitro_interval;
+
+	mutex_unlock(&mutex_duty);
+
+	return 0;
+}
+
 int duty_cooling_dev_register(struct duty_cycle_dev *duty_cycle_dev)
 {
 	duty_desc.cool_device = duty_cycle_dev->cool_device;
@@ -560,6 +580,21 @@ int duty_cooling_dev_register(struct duty_cycle_dev *duty_cycle_dev)
 void duty_cooling_dev_unregister(void)
 {
 	duty_desc.cool_device = NULL;
+}
+
+static int __init omap4_duty_register(void)
+{
+	t_duty = kzalloc(sizeof(struct duty_cycle), GFP_KERNEL);
+	if (IS_ERR_OR_NULL(t_duty)) {
+		pr_err("%s:Cannot allocate memory\n", __func__);
+
+		return -ENOMEM;
+	}
+	t_duty->enable = omap4_duty_cycle_set_enabled;
+	t_duty->update_params = update_params;
+	omap4_duty_cycle_register(t_duty);
+
+	return 0;
 }
 
 #ifdef CONFIG_PM
@@ -680,12 +715,18 @@ static int __init omap4_duty_module_init(void)
 		goto unregister_hotplug;
 	}
 
-	err = platform_driver_probe(&omap4_duty_driver, omap4_duty_probe);
+	err = omap4_duty_register();
 	if (err)
 		goto exit_pdevice;
 
+	err = platform_driver_probe(&omap4_duty_driver, omap4_duty_probe);
+	if (err)
+		goto unregister_duty;
+
 	return 0;
 
+unregister_duty:
+	kfree(t_duty);
 exit_pdevice:
 	platform_device_unregister(omap4_duty_device);
 unregister_hotplug:
@@ -713,6 +754,7 @@ static void __exit omap4_duty_module_exit(void)
 	cancel_work_sync(&work_enter_cool1);
 	cancel_work_sync(&work_cpu1_plugin);
 	cancel_work_sync(&work_cpu1_plugout);
+	kfree(t_duty);
 	destroy_workqueue(duty_wq);
 
 	pr_debug("%s Done\n", __func__);
