@@ -47,6 +47,49 @@
 #define LED_PWM2OFF			0x04
 #define TWL6030_TOGGLE3			0x92
 
+
+static struct omap_dss_device tablet_lcd_device = {
+	.name			= "lcd2",
+	.driver_name		= "otter1_panel_drv",
+	.type			= OMAP_DISPLAY_TYPE_DPI,
+	//.max_backlight_level	= 255,
+	.phy		= {
+		.dpi	= {
+			.data_lines	= 24,
+		},
+	},
+	.clocks		= {
+		.dsi	= {
+			.regn		= 16, /*it is (N+1)*/
+			.regm		= 115,
+			.regm_dispc	= 3,
+			.regm_dsi	= 3,
+		},
+	},
+        .panel          = {
+		.timings	= {
+			.x_res          = 1024,
+			.y_res          = 600,
+			.pixel_clock    = 46000, /* in kHz */
+			.hfp            = 160,   /* HFP fix 160 */
+			.hsw            = 10,    /* HSW = 1~140 */
+			.hbp            = 150,   /* HSW + HBP = 160 */
+			.vfp            = 12,    /* VFP fix 12 */
+			.vsw            = 3,     /* VSW = 1~20 */
+			.vbp            = 20,    /* VSW + VBP = 23 */
+		},
+        },
+	.ctrl = {
+		.pixel_size = 24,
+	},
+	.reset_gpio     = 102,
+	.channel		= OMAP_DSS_CHANNEL_LCD2,
+};
+#if 0
+        	.width_in_um = 158,
+        	.height_in_um = 92,
+#endif
+
 void omap4_display_init(void)
 {
 	void __iomem *phymux_base = NULL;
@@ -137,28 +180,14 @@ void kc1_led_set_power(struct omap_pwm_led_platform_data *self, int on_off)
 	}
 }
 
-static struct omap_dss_device sdp4430_otter1_device = {
-	.name			= "lcd2",
-	.driver_name		= "otter1_panel_drv",
-	.type			= OMAP_DISPLAY_TYPE_DPI,
-	.phy.dpi.data_lines	= 24,
-	.channel		= OMAP_DSS_CHANNEL_LCD2,
-#if 0
-        .panel          = {
-        	.width_in_um = 158,
-        	.height_in_um = 92,
-        },
-#endif
-};
-
 static struct omap_dss_device *sdp4430_dss_devices[] = {
-	&sdp4430_otter1_device,
+	&tablet_lcd_device,
 };
 
 static struct omap_dss_board_info sdp4430_dss_data = {
 	.num_devices	=	ARRAY_SIZE(sdp4430_dss_devices),
 	.devices	=	sdp4430_dss_devices,
-	.default_device	=	&sdp4430_otter1_device,
+	.default_device	=	&tablet_lcd_device,
 };
 
 static struct spi_board_info tablet_spi_board_info[] __initdata = {
@@ -182,40 +211,43 @@ static struct omapfb_platform_data kc1_fb_pdata = {
 	},
 };
 
-static struct platform_device __initdata  sdp4430_disp_led = {
-	.name = "display_led",
-	.id = -1,
-	.dev = {
+static struct platform_device sdp4430_disp_led = {
+	.name	=	"display_led",
+	.id	=	-1,
+	.dev	= {
 		.platform_data = &sdp4430_disp_led_data,
 	},
 };
 
-static struct led_pwm tablet_pwm_leds[] = {
-	{
-		.name		= "backlight",
-		.pwm_id		= 2,
-		.max_brightness	= 255,
-		.pwm_period_ns	= 7812500,
-	},
-};
-
-static struct led_pwm_platform_data tablet_pwm_data = {
-	.num_leds	= ARRAY_SIZE(tablet_pwm_leds),
-	.leds		= tablet_pwm_leds,
-};
-
-static struct platform_device tablet_leds_pwm = {
-	.name	= "leds_pwm",
-	.id	= -1,
+static struct platform_device sdp4430_keypad_led = {
+	.name	=	"keypad_led",
+	.id	=	-1,
 	.dev	= {
-		.platform_data = &tablet_pwm_data,
+		.platform_data = NULL,
 	},
+};
+
+static struct omap_pwm_led_platform_data kc1_led_data = {
+    .name = "backlight",
+    .intensity_timer = 10,
+    //.def_on = 1,
+    .def_brightness = 0x7F,
+    //.blink_timer = 11,
+    //.set_power = kc1_led_set_power,
+};
+
+static struct platform_device kc1_led_device = {
+    .name       = "omap_pwm_led",
+    .id     = -1,
+    .dev        = {
+        .platform_data = &kc1_led_data,
+    },
 };
 
 static struct platform_device __initdata *sdp4430_panel_devices[] = {
-//	&sdp4430_disp_led,
-//	&sdp4430_keypad_led,
-	&tablet_leds_pwm,
+	&sdp4430_disp_led,
+	&sdp4430_keypad_led,
+	&kc1_led_device,
 };
 
 static void kc1_pmic_mux_init(void)

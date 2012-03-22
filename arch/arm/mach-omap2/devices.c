@@ -244,6 +244,10 @@ int __init omap4_keyboard_init(struct omap4_keypad_platform_data
 	char *oh_name = "kbd";
 	char *name = "omap4-keypad";
 
+	#if defined(CONFIG_MACH_OMAP_4430_KC1)
+		return -ENODEV;
+	#endif
+
 	oh = omap_hwmod_lookup(oh_name);
 	if (!oh) {
 		pr_err("Could not look up %s\n", oh_name);

@@ -179,10 +179,10 @@ static void __init quanta_boardids(void)
 static struct platform_device __initdata *sdp4430_devices[] = {
 //      &sdp4430_aic3110,
 #if defined(CONFIG_SENSORS_OMAP_BANDGAP)
-//	&sdp4430_omap_bandgap_sensor,
+	&sdp4430_omap_bandgap_sensor,
 #endif
 #if defined(CONFIG_SENSORS_PMIC_THERMAL)
-//	&sdp4430_pmic_thermal_sensor,
+	&sdp4430_pmic_thermal_sensor,
 #endif
 };
 
@@ -399,10 +399,6 @@ static struct i2c_board_info __initdata sdp4430_i2c_3_boardinfo[] = {
 		.irq = OMAP_GPIO_IRQ(OMAP4_ADI7526_IRQ),
 	},
 #endif
-/* Mistral: Updated this array to include the AIC3110 Audio Codec */
-	{
-		I2C_BOARD_INFO("tlv320aic3110", 0x18),
-	},
 };
 
 static struct i2c_board_info __initdata sdp4430_i2c_4_boardinfo[] = {
