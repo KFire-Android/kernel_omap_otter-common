@@ -57,6 +57,8 @@
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
 #include <plat/omap-serial.h>
+#include <linux/omap4_duty_cycle_governor.h>
+
 #define WILINK_UART_DEV_NAME "/dev/ttyO1"
 
 #define ETH_KS8851_IRQ			34
@@ -196,6 +198,87 @@ void keypad_pad_wkup(int enable)
 	set_wkup_fcn("gpmc_a19.kpd_row7");
 
 }
+
+#ifdef CONFIG_OMAP4_DUTY_CYCLE
+
+static struct pcb_section omap4_duty_governor_pcb_sections[] = {
+	{
+		.pcb_temp_level			= 65,
+		.max_opp			= 1200000,
+		.duty_cycle_enabled		= false,
+		.tduty_params = {
+			.nitro_rate		= 0,
+			.cooling_rate		= 0,
+			.nitro_interval		= 0,
+			.nitro_percentage	= 0,
+		},
+	},
+	{
+		.pcb_temp_level			= 70,
+		.max_opp			= 1200000,
+		.duty_cycle_enabled		= true,
+		.tduty_params = {
+			.nitro_rate		= 1200000,
+			.cooling_rate		= 1008000,
+			.nitro_interval		= 20000,
+			.nitro_percentage	= 37,
+		},
+	},
+	{
+		.pcb_temp_level			= 75,
+		.max_opp			= 1200000,
+		.duty_cycle_enabled		= true,
+		.tduty_params = {
+			.nitro_rate		= 1200000,
+			.cooling_rate		= 1008000,
+			.nitro_interval		= 20000,
+			.nitro_percentage	= 24,
+		},
+	},
+	{
+		.pcb_temp_level			= 80,
+		.max_opp			= 1200000,
+		.duty_cycle_enabled		= true,
+		.tduty_params = {
+			.nitro_rate		= 1200000,
+			.cooling_rate		= 1008000,
+			.nitro_interval		= 20000,
+			.nitro_percentage	= 19,
+		},
+	},
+	{
+		.pcb_temp_level			= 90,
+		.max_opp			= 1200000,
+		.duty_cycle_enabled		= true,
+		.tduty_params = {
+			.nitro_rate		= 1200000,
+			.cooling_rate		= 1008000,
+			.nitro_interval		= 20000,
+			.nitro_percentage	= 14,
+		},
+	},
+	{
+		.pcb_temp_level			= 110,
+		.max_opp			= 1008000,
+		.duty_cycle_enabled		= true,
+		.tduty_params = {
+			.nitro_rate		= 1008000,
+			.cooling_rate		= 800000,
+			.nitro_interval		= 20000,
+			.nitro_percentage	= 1,
+		},
+	},
+};
+
+void init_duty_governor(void)
+{
+	omap4_duty_pcb_section_reg(omap4_duty_governor_pcb_sections,
+		ARRAY_SIZE(omap4_duty_governor_pcb_sections));
+}
+#else
+void init_duty_governor(void){}
+#endif /*CONFIG_OMAP4_DUTY_CYCLE*/
+
 
 static struct omap4_keypad_platform_data sdp4430_keypad_data = {
 	.keymap_data		= &sdp4430_keymap_data,
@@ -1060,7 +1143,7 @@ static void __init omap_4430sdp_init(void)
 	omap_4430sdp_display_init();
 	blaze_panel_init();
 	blaze_keypad_init();
-
+	init_duty_governor();
 	if (cpu_is_omap446x()) {
 		/* Vsel0 = gpio, vsel1 = gnd */
 		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
