@@ -637,6 +637,7 @@ static struct gctransition g_gctransition[4][4] = {
 
 #include <plat/omap_hwmod.h>
 #include <plat/omap-pm.h>
+#define GCGPOUT0 0x64
 
 enum gcpower g_gcpower;
 
@@ -669,6 +670,7 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 			}
 			pr_info("gcx: clock enabled.\n");
 		} else {
+			gc_write_reg(GCGPOUT0, 0x1);
 			clk_disable(g_bb2d_clk);
 			pr_info("gcx: clock disabled.\n");
 		}
