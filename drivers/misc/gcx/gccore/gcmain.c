@@ -668,6 +668,7 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 				gcerror = GCERR_POWER_CLOCK_ON;
 				goto fail;
 			}
+			gc_write_reg(GCGPOUT0, 0);
 			pr_info("gcx: clock enabled.\n");
 		} else {
 			gc_write_reg(GCGPOUT0, 0x1);
