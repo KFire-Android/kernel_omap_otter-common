@@ -53,6 +53,7 @@ enum gcpower {
 };
 
 enum gcerror gc_set_power(enum gcpower gcpower);
+enum gcerror gc_get_power(void);
 
 /*
  * Interrupt.

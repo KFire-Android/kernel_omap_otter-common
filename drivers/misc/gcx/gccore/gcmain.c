@@ -25,12 +25,14 @@
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>
 #include <plat/cpu.h>
+#include <linux/debugfs.h>
 
 #include <linux/gcx.h>
 #include <linux/gccore.h>
 #include "gcmain.h"
 #include "gccmdbuf.h"
 #include "gcmmu.h"
+#include <linux/gcdebug.h>
 
 #ifndef GC_DUMP
 #	define GC_DUMP 0
@@ -70,6 +72,7 @@ static long registerMemBase = 0xF1840000;
 module_param(registerMemBase, long, 0644);
 
 static struct mutex mtx;
+static struct dentry *g_debugRoot;
 
 struct gccontextmap {
 	pid_t pid;
@@ -445,6 +448,8 @@ static irqreturn_t gc_irq(int irq, void *p)
 	if (data == 0)
 		return IRQ_NONE;
 
+	gc_debug_cache_gpu_status_from_irq(data);
+
 #if 1
 	g_gccoredata = data;
 	complete(&g_gccoreint);
@@ -687,6 +692,7 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 			break;
 
 		case GCPWR_OFF:
+			gc_debug_poweroff_cache();
 			gcpwr_enable_pulse_skipping(g_gcpower);
 			gcpwr_disable_clock(g_gcpower);
 
@@ -707,6 +713,11 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 
 exit:
 	return gcerror;
+}
+
+enum gcerror gc_get_power(void)
+{
+	return g_gcpower;
 }
 
 /*******************************************************************************
@@ -1049,6 +1060,11 @@ static int __init gc_init(void)
 	destroy_workqueue(gcwq);
 #endif
 
+	/* Create debugfs entry */
+	g_debugRoot = debugfs_create_dir("gcx", NULL);
+	if (g_debugRoot)
+		gc_debug_init(g_debugRoot);
+
 	mutex_init(&g_maplock);
 
 #if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
@@ -1092,6 +1108,9 @@ static void __exit gc_exit(void)
 
 	if (g_bb2d_clk)
 		clk_put(g_bb2d_clk);
+
+	if (g_debugRoot)
+		debugfs_remove_recursive(g_debugRoot);
 
 	mutex_destroy(&mtx);
 

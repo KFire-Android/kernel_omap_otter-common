@@ -55,6 +55,7 @@
 #include <linux/gcx.h>
 #include <linux/gcioctl.h>
 #include <linux/gcbv.h>
+#include <linux/gcdebug.h>
 #include "gcmain.h"
 
 #ifndef GC_DUMP
@@ -2522,6 +2523,10 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 
 	/* Reset the finalizer. */
 	batch->batchend = do_end;
+
+	gc_debug_blt(batch->gcblit.srccount,
+		     abs(batch->gcblit.rect.right - batch->gcblit.rect.left),
+		     abs(batch->gcblit.rect.top   - batch->gcblit.rect.bottom));
 
 exit:
 	GC_PRINT(GC_INFO_MSG
