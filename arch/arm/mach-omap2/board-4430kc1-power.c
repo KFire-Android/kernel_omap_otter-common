@@ -62,7 +62,7 @@ static struct regulator_consumer_supply audio_supply[] = {
 static struct regulator_init_data sdp4430_vusim = {
 	.constraints = {
 		.min_uV			= 1200000,
-		.max_uV			= 2900000,
+		.max_uV			= 3000000,
 		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
@@ -146,7 +146,7 @@ static struct regulator_consumer_supply emmc_supply[] = {
 static struct regulator_init_data sdp4430_vaux1 = {
 	.constraints = {
 		.min_uV			= 1000000,
-		.max_uV			= 3000000,
+		.max_uV			= 3300000,
 		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
@@ -203,6 +203,7 @@ static struct twl6030_qcharger_platform_data kc1_charger_data={
 
 static struct regulator_init_data sdp4430_clk32kg = {
 	.constraints = {
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 	},
@@ -210,6 +211,7 @@ static struct regulator_init_data sdp4430_clk32kg = {
 
 static struct regulator_init_data sdp4430_clk32kaudio = {
 	.constraints = {
+		.valid_modes_mask	= REGULATOR_MODE_NORMAL,
 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
 		.always_on		= true,
 	},

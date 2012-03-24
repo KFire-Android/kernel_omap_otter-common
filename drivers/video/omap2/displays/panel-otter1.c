@@ -93,20 +93,6 @@ static struct attribute_group otter1_panel_attribute_group = {
        .attrs = otter1_panel_attributes
  };
 
-static void boxer_get_resolution(struct omap_dss_device *dssdev,
-				 u16 *xres, u16 *yres)
-{
-
-	*xres = dssdev->panel.timings.x_res;
-	*yres = dssdev->panel.timings.y_res;
-}
-
-static void boxer_get_timings(struct omap_dss_device *dssdev,
-                        struct omap_video_timings *timings)
-{
-        *timings = dssdev->panel.timings;
-}
-
 int boxer_panel_power_on(void)
 {
 	int vendor0=1, vendor1=1;
@@ -238,12 +224,24 @@ int boxer_panel_power_on(void)
     return result;
 }
 
+static void boxer_get_resolution(struct omap_dss_device *dssdev,
+				 u16 *xres, u16 *yres)
+{
+
+	*xres = dssdev->panel.timings.x_res;
+	*yres = dssdev->panel.timings.y_res;
+}
+
+static void boxer_get_timings(struct omap_dss_device *dssdev,
+                        struct omap_video_timings *timings)
+{
+        *timings = dssdev->panel.timings;
+}
+
 static int boxer_panel_probe(struct omap_dss_device *dssdev)
 {
 	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 
-	dssdev->panel.config	= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
-				  OMAP_DSS_LCD_IHS;
 	omap_writel(0x00020000,0x4a1005cc); //PCLK impedance
 	gpio_request(175, "LCD_VENDOR0");
 	gpio_request(176, "LCD_VENDOR1");
@@ -356,16 +354,18 @@ static int boxer_panel_resume(struct omap_dss_device *dssdev)
 static struct omap_dss_driver boxer_driver = {
 	.probe		= boxer_panel_probe,
 	.remove		= boxer_panel_remove,
+
 	.enable		= boxer_panel_enable,
 	.disable	= boxer_panel_disable,
 	.suspend	= boxer_panel_suspend,
 	.resume		= boxer_panel_resume,
-	.get_timings    = boxer_get_timings,
-	.set_timings    = dpi_set_timings,
-	.check_timings  = dpi_check_timings,
+
 	.get_resolution	= boxer_get_resolution,
-	//.get_dimension  = boxer_get_dimension,
-	//.reset	= boxer_panel_reset,
+
+	.get_recommended_bpp = omapdss_default_get_recommended_bpp,
+
+	.get_timings    = boxer_get_timings,
+
 	.driver		= {
 		.name	= "otter1_panel_drv",
 		.owner	= THIS_MODULE,
@@ -374,10 +374,11 @@ static struct omap_dss_driver boxer_driver = {
 
 static int boxer_spi_probe(struct spi_device *spi)
 {
+	int ret;
 	spi->mode = SPI_MODE_0;
 	spi->bits_per_word = 16;
 	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
-	int ret = spi_setup(spi);
+	ret = spi_setup(spi);
 	printk(KERN_INFO "boxer: spi setup returned : %d\n", ret);
 
 	boxer_spi = spi;
@@ -406,13 +407,11 @@ static struct spi_driver boxer_spi_driver = {
 
 static int __init boxer_lcd_init(void)
 {
-	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 	return spi_register_driver(&boxer_spi_driver);
 }
 
 static void __exit boxer_lcd_exit(void)
 {
-	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 	spi_unregister_driver(&boxer_spi_driver);
 }
 

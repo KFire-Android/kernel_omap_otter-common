@@ -37,6 +37,7 @@
 #include "board-4430kc1-tablet.h"
 #include "control.h"
 #include "mux.h"
+#include "mux44xx.h"
 
 
 #define OMAP4_LCD_EN_GPIO		28
@@ -48,64 +49,29 @@
 #define TWL6030_TOGGLE3			0x92
 
 
-static struct omap_dss_device tablet_lcd_device = {
-	.name			= "lcd2",
-	.driver_name		= "otter1_panel_drv",
-	.type			= OMAP_DISPLAY_TYPE_DPI,
-	//.max_backlight_level	= 255,
-	.phy		= {
-		.dpi	= {
-			.data_lines	= 24,
-		},
-	},
-	.clocks		= {
-		.dsi	= {
-			.regn		= 16, /*it is (N+1)*/
-			.regm		= 115,
-			.regm_dispc	= 3,
-			.regm_dsi	= 3,
-		},
-	},
-        .panel          = {
-		.timings	= {
-			.x_res          = 1024,
-			.y_res          = 600,
-			.pixel_clock    = 46000, /* in kHz */
-			.hfp            = 160,   /* HFP fix 160 */
-			.hsw            = 10,    /* HSW = 1~140 */
-			.hbp            = 150,   /* HSW + HBP = 160 */
-			.vfp            = 12,    /* VFP fix 12 */
-			.vsw            = 3,     /* VSW = 1~20 */
-			.vbp            = 20,    /* VSW + VBP = 23 */
-		},
-        },
-	.ctrl = {
-		.pixel_size = 24,
-	},
-	.reset_gpio     = 102,
-	.channel		= OMAP_DSS_CHANNEL_LCD2,
-};
-#if 0
-        	.width_in_um = 158,
-        	.height_in_um = 92,
-#endif
 
 void omap4_display_init(void)
 {
 	void __iomem *phymux_base = NULL;
 	u32 val;
 
-	phymux_base = ioremap(0x4A100000, 0x1000);
+	phymux_base = ioremap(OMAP4_CTRL_MODULE_PAD_CORE_MUX_PBASE, 0x1000);
 
 	/* GPIOs 101, 102 */
-	val = __raw_readl(phymux_base + 0x90);
+	// 101 == OMAP_PULL_UP
+	// 102 == NOT OMAP_PULL_UP
+	val = __raw_readl(phymux_base + OMAP4_CTRL_MODULE_PAD_C2C_DATA12_OFFSET);
 	val = (val & 0xFFF8FFF8) | 0x00030003;
-	__raw_writel(val, phymux_base + 0x90);
+	pr_info("%s: GPIO 101 MUXED TO C2C_DATA12 == %u\n", __func__, val);
+	__raw_writel(val, phymux_base + OMAP4_CTRL_MODULE_PAD_C2C_DATA12_OFFSET);
 
 	/* GPIOs 103, 104 */
-	val = __raw_readl(phymux_base + 0x94);
+	// 103 == OMAP_PULL_UP
+	// 104 == OMAP_PULL_UP
+	val = __raw_readl(phymux_base + OMAP4_CTRL_MODULE_PAD_C2C_DATA14_OFFSET);
 	val = (val & 0xFFF8FFF8) | 0x00030003;
-	__raw_writel(val, phymux_base + 0x94);
+	pr_info("%s: GPIO 103 MUXED TO C2C_DATA14 == %u\n", __func__, val);
+	__raw_writel(val, phymux_base + OMAP4_CTRL_MODULE_PAD_C2C_DATA14_OFFSET);
 
 	iounmap(phymux_base);
 }
@@ -180,6 +146,75 @@ void kc1_led_set_power(struct omap_pwm_led_platform_data *self, int on_off)
 	}
 }
 
+static int tablet_panel_enable_lcd(struct omap_dss_device *dssdev)
+{
+	pr_info("Boxer LCD Enable!\n");
+	return 0;
+}
+
+static void tablet_panel_disable_lcd(struct omap_dss_device *dssdev)
+{
+  	pr_info("Boxer LCD Disable!\n");
+}
+
+static int tablet_set_bl_intensity(struct omap_dss_device *dssdev, int level)
+{
+	pr_info("Boxer LCD Set BL Intensity == %d!\n", level);
+	return 0;
+}
+
+static struct omap_dss_device tablet_lcd_device = {
+	.phy		= {
+		.dpi	= {
+			.data_lines	= 24,
+		},
+	},
+	.clocks		= {
+		.dispc	= {
+			.channel	= {
+				.lcd_clk_src    = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+			},
+			.dispc_fclk_src = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+		},
+		.dsi	= {
+			.regn		= 16, /*it is (N+1)*/
+			.regm		= 115,
+			.regm_dispc	= 3,
+			.regm_dsi	= 3,
+			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+		},
+	},
+        .panel          = {
+		.config		= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS | OMAP_DSS_LCD_IHS,
+		.timings	= {
+			.x_res          = 1024,
+			.y_res          = 600,
+			.pixel_clock    = 46000, /* in kHz */
+			.hfp            = 160,   /* HFP fix 160 */
+			.hsw            = 10,    /* HSW = 1~140 */
+			.hbp            = 150,   /* HSW + HBP = 160 */
+			.vfp            = 12,    /* VFP fix 12 */
+			.vsw            = 3,     /* VSW = 1~20 */
+			.vbp            = 20,    /* VSW + VBP = 23 */
+		},
+//        	.width_in_um = 158,
+//        	.height_in_um = 92,
+        },
+	.ctrl = {
+		.pixel_size = 24,
+	},
+	.name			= "lcd2",
+	.driver_name		= "otter1_panel_drv",
+	.type			= OMAP_DISPLAY_TYPE_DPI,
+	.reset_gpio     	= 102,
+	.channel		= OMAP_DSS_CHANNEL_LCD2,
+  	.platform_enable	= tablet_panel_enable_lcd,
+  	.platform_disable	= tablet_panel_disable_lcd,
+ 	.set_backlight		= tablet_set_bl_intensity,
+//	.caps			= OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE,
+//	.max_backlight_level	= 255,
+};
+
 static struct omap_dss_device *sdp4430_dss_devices[] = {
 	&tablet_lcd_device,
 };
@@ -245,9 +280,9 @@ static struct platform_device kc1_led_device = {
 };
 
 static struct platform_device __initdata *sdp4430_panel_devices[] = {
-	&sdp4430_disp_led,
-	&sdp4430_keypad_led,
-	&kc1_led_device,
+	// &sdp4430_disp_led,
+	// &sdp4430_keypad_led,
+	// &kc1_led_device,
 };
 
 static void kc1_pmic_mux_init(void)
@@ -261,13 +296,15 @@ static void kc1_pmic_mux_init(void)
 	omap_mux_init_signal("sys_nirq2", OMAP_PIN_INPUT_PULLUP | OMAP_WAKEUP_EN);
 }
 
-void omap4_kc1_display_init(void)
+void __init omap4_kc1_display_init(void)
 {
-	platform_add_devices(sdp4430_panel_devices, ARRAY_SIZE(sdp4430_panel_devices));
 	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
+
 	omap_vram_set_sdram_vram(KC1_FB_RAM_SIZE, 0);
 	omapfb_set_platform_data(&kc1_fb_pdata);
+
 	omap_display_init(&sdp4430_dss_data);
+	platform_add_devices(sdp4430_panel_devices, ARRAY_SIZE(sdp4430_panel_devices));
 
 	kc1_pmic_mux_init();
 }
