@@ -2807,7 +2807,7 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
  */
 static int aic3x_i2c_remove(struct i2c_client *client) {
 	/* Get the Codec Pointer and switch of the Codec Members */
-	// struct snd_soc_codec *codec = snd_soc_get_codec (&client->dev);
+	struct snd_soc_codec *codec = snd_soc_get_codec (&client->dev);
 
 	snd_soc_unregister_codec(&client->dev);
 
