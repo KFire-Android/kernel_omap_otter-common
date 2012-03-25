@@ -179,10 +179,10 @@ static void __init quanta_boardids(void)
 static struct platform_device __initdata *sdp4430_devices[] = {
 //      &sdp4430_aic3110,
 #if defined(CONFIG_SENSORS_OMAP_BANDGAP)
-	&sdp4430_omap_bandgap_sensor,
+//	&sdp4430_omap_bandgap_sensor,
 #endif
 #if defined(CONFIG_SENSORS_PMIC_THERMAL)
-	&sdp4430_pmic_thermal_sensor,
+//	&sdp4430_pmic_thermal_sensor,
 #endif
 };
 
@@ -520,28 +520,48 @@ static int __init omap4_i2c_init(void)
 	if (err)
 	  return err;
 
-	// omap_register_i2c_bus(2, 400, sdp4430_i2c_2_boardinfo, ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
+	omap_register_i2c_bus(2, 400, sdp4430_i2c_2_boardinfo, ARRAY_SIZE(sdp4430_i2c_2_boardinfo));
 	omap_register_i2c_bus(3, 400, sdp4430_i2c_3_boardinfo, ARRAY_SIZE(sdp4430_i2c_3_boardinfo));
 	if (quanta_mbid<0x02) {
-		//omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_c1c, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_c1c));
+		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_c1c, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_c1c));
 	}
 	else if (quanta_mbid<0x04) {
-		//omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo, ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
+		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo, ARRAY_SIZE(sdp4430_i2c_4_boardinfo));
 	}
 	// DVT
 	else if (quanta_mbid<0x06) {
 		pr_info("quanta_mbid < 0x06\n");
-		//omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_dvt, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_dvt));
+		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_dvt, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_dvt));
 	}
 	// PVT
 	else {
 		pr_info("quanta_mbid >= 0x06\n");
-		//omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_pvt, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_pvt));
+		omap_register_i2c_bus(4, 400, sdp4430_i2c_4_boardinfo_pvt, ARRAY_SIZE(sdp4430_i2c_4_boardinfo_pvt));
 	}
 
 	regulator_has_full_constraints();
 
 	return 0;
+}
+
+static void __init omap4_display_init(void)
+{
+	void __iomem *phymux_base = NULL;
+	u32 val;
+
+	phymux_base = ioremap(0x4A100000, 0x1000);
+
+	/* GPIOs 101, 102 */
+	val = __raw_readl(phymux_base + 0x90);
+	val = (val & 0xFFF8FFF8) | 0x00030003;
+	__raw_writel(val, phymux_base + 0x90);
+
+	/* GPIOs 103, 104 */
+	val = __raw_readl(phymux_base + 0x94);
+	val = (val & 0xFFF8FFF8) | 0x00030003;
+	__raw_writel(val, phymux_base + 0x94);
+
+	iounmap(phymux_base);
 }
 
 static bool enable_suspend_off = true;
@@ -583,8 +603,8 @@ static void panel_enable(void)
 #endif
 
 
-#if 0
 /* FIXME-HASH: NEED TO HOLD WAKELOCK FOR CONSOLE/BT */
+#if 0
 void plat_hold_wakelock(void *up, int flag)
 {
 	struct uart_omap_port *up2 = (struct uart_omap_port *)up;
@@ -600,7 +620,6 @@ void plat_hold_wakelock(void *up, int flag)
 	return;
 }
 #endif
-
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux __initdata board_mux[] = {
@@ -761,8 +780,6 @@ static void __init omap_kc1_init(void)
 
 	omap_init_board_version(0);
 
-	// FIXME-HASH:
-        // omap4_audio_conf();
 	omap4_create_board_props();
 //	register_reboot_notifier(&kc1_reboot_notifier);
 
@@ -772,15 +789,14 @@ static void __init omap_kc1_init(void)
 	omap_dmm_init();
 
 	omap4_display_init();
-	omap4_disp_led_init();
 
 	omap4_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 
 	gpio_request(0, "sysok");
 
-	// wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
-	// omap_serial_init();
+//	wake_lock_init(&uart_lock, WAKE_LOCK_SUSPEND, "uart_wake_lock");
+//	omap_serial_init();
 
 	omap4_twl6030_hsmmc_init(mmc);
 	gpio_request(42, "OMAP_GPIO_ADC");
@@ -802,7 +818,6 @@ static void __init omap_kc1_init(void)
 		gpio_direction_output(155, 1);
 	}
 	omap4_kc1_wifi_init();
-	// config_wlan_mux();
 
 	omap4_ehci_ohci_init();
 	usb_musb_init(&musb_board_data);
