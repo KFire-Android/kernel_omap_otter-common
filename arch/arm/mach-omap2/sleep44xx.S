@@ -48,6 +48,19 @@
 .endm
 
 /*
+ * Macro to check OMAP4 revision
+ * @a: bits 31:08 of omap_rev
+ */
+.macro OMAP4_REV_CMP a
+	ldr	r0, =OMAP44XX_SAR_RAM_BASE
+	ldr	r1, [r0, #OMAP_REV_OFFSET]
+	lsr	r2, r1, #8
+	and	r2, r2, #0xffffff
+	ldr	r3, =\a
+	cmp	r2, r3
+.endm
+
+/*
  * To load POR which was saved in SAR RAM
  */
 POR_params:
@@ -586,14 +599,22 @@ check_por:
 	ldr	r0, =OMAP44XX_SAR_RAM_BASE  @ Check DEVICE type
 	ldr	r1, [r0, #OMAP_TYPE_OFFSET]
 	cmp	r1, #0x1                   @ Check for HS device
-	bne	skip_por
+	bne	check_por_gp
 	ldr	r0, =PPA_SERVICE_PL310_POR @ Setup PPA HAL call
 	ldr	r1, =OMAP44XX_SAR_RAM_BASE
 	ldr	r4, [r1, #L2X0_PREFETCHCTRL_OFFSET]
 	adr	r3, POR_params
 	str	r4, [r3, #0x04]
 	LM_CALL_PPA_SERVICE_PA
-
+	b	skip_por
+check_por_gp:
+	OMAP4_REV_CMP 0x443022
+	blt	skip_por  @ for GP POR setup possible only on >= OMAP4430ES2.2
+	ldr	r3, =OMAP44XX_SAR_RAM_BASE
+	ldr	r0, [r3, #L2X0_PREFETCHCTRL_OFFSET]
+	ldr	r12, =0x113			@ Setup L2 POR value
+	dsb
+	smc	#0
 skip_por:
 	ldr	r3, =OMAP44XX_SAR_RAM_BASE
 	ldr	r0, [r3, #L2X0_AUXCTRL_OFFSET]

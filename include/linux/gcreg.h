@@ -7969,7 +7969,7 @@ struct gcmoclip {
 */
 
 static const struct gccmdldstate gcmodst_address_ldst =
-	GCLDSTATE(gcregDestAddressRegAddrs, 4);
+	GCLDSTATE(gcregDestAddressRegAddrs, 3);
 
 static const struct gccmdldstate gcmodst_rotationheight_ldst =
 	GCLDSTATE(gcregDstRotationHeightRegAddrs, 1);
@@ -7989,15 +7989,6 @@ struct gcmodst {
 			struct gcregdstrotationconfig reg;
 			unsigned int raw;
 		} rotation;
-
-		/* gcregDestConfigRegAddrs */
-		union {
-			struct gcregdstconfig reg;
-			unsigned int raw;
-		} config;
-
-		/* Alignment filler. */
-		unsigned int _filler;
 
 	/* gcregDstRotationHeightRegAddrs */
 	struct gccmdldstate rotationheight_ldst;
@@ -8241,7 +8232,31 @@ struct gcmomultisrc {
 ** Modular operations: startde
 */
 
+static const struct gccmdldstate gcmostart_config_ldst =
+	GCLDSTATE(gcregDestConfigRegAddrs, 1);
+
+static const struct gccmdldstate gcmostart_rop_ldst =
+	GCLDSTATE(gcregRopRegAddrs, 1);
+
 struct gcmostart {
+	/* gcregDestConfigRegAddrs */
+	struct gccmdldstate config_ldst;
+
+		/* gcregDestConfigRegAddrs */
+		union {
+			struct gcregdstconfig reg;
+			unsigned int raw;
+		} config;
+
+	/* gcregRopRegAddrs */
+	struct gccmdldstate rop_ldst;
+
+		/* gcregRopRegAddrs */
+		union {
+			struct gcregrop reg;
+			unsigned int raw;
+		} rop;
+
 	/* Start DE command. */
 	struct gccmdstartde startde;
 	struct gccmdstartderect rect;
@@ -8260,8 +8275,8 @@ static const struct gccmdldstate gcmofillsrc_rotation_ldst =
 static const struct gccmdldstate gcmofillsrc_rotationheight_ldst =
 	GCLDSTATE(gcregSrcRotationHeightRegAddrs, 1);
 
-static const struct gccmdldstate gcmofillsrc_rop_ldst =
-	GCLDSTATE(gcregRopRegAddrs, 1);
+static const struct gccmdldstate gcmofillsrc_alphacontrol_ldst =
+	GCLDSTATE(gcregAlphaControlRegAddrs, 1);
 
 struct gcmofillsrc {
 	/* gcregSrcRotationConfigRegAddrs */
@@ -8291,14 +8306,14 @@ struct gcmofillsrc {
 			unsigned int raw;
 		} rotationheight;
 
-	/* gcregRopRegAddrs */
-	struct gccmdldstate rop_ldst;
+	/* gcregAlphaControlRegAddrs */
+	struct gccmdldstate alphacontrol_ldst;
 
-		/* gcregRopRegAddrs */
+		/* gcregAlphaControlRegAddrs */
 		union {
-			struct gcregrop reg;
+			struct gcregalphacontrol reg;
 			unsigned int raw;
-		} rop;
+		} alphacontrol;
 };
 
 /*******************************************************************************
@@ -8309,7 +8324,6 @@ static const struct gccmdldstate gcmofill_clearcolor_ldst =
 	GCLDSTATE(gcregClearPixelValue32RegAddrs, 1);
 
 struct gcmofill {
-	struct gcmodst dst;
 	struct gcmofillsrc src;
 
 	/* gcregClearPixelValue32RegAddrs */

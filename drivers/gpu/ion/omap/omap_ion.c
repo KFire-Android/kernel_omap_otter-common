@@ -22,6 +22,9 @@
 #include <linux/uaccess.h>
 #include "../ion_priv.h"
 #include "omap_ion_priv.h"
+#ifdef CONFIG_PVR_SGX
+#include "../../pvr/ion.h"
+#endif
 
 struct ion_device *omap_ion_device;
 EXPORT_SYMBOL(omap_ion_device);
@@ -147,6 +150,45 @@ int omap_ion_remove(struct platform_device *pdev)
 	kfree(heaps);
 	return 0;
 }
+
+static void (*export_fd_to_ion_handles)(int fd,
+		struct ion_client **client,
+		struct ion_handle **handles,
+		int *num_handles);
+void omap_ion_register_pvr_export(void *pvr_export_fd)
+{
+	export_fd_to_ion_handles = pvr_export_fd;
+}
+EXPORT_SYMBOL(omap_ion_register_pvr_export);
+
+int omap_ion_fd_to_handles(int fd, struct ion_client **client,
+		struct ion_handle **handles,
+		int *num_handles)
+{
+#ifdef CONFIG_PVR_SGX
+	if (*num_handles == 2)
+		PVRSRVExportFDToIONHandles(fd, client, handles);
+	else if (*num_handles == 1)
+		handles[0] = PVRSRVExportFDToIONHandle(fd, client);
+	else
+		return -EINVAL;
+#else
+	if (export_fd_to_ion_handles) {
+		export_fd_to_ion_handles(fd,
+				client,
+				handles,
+				num_handles);
+	} else {
+		pr_err("%s: export_fd_to_ion_handles"
+				"not initiazied",
+				__func__);
+		return -EINVAL;
+	}
+#endif
+
+	return 0;
+}
+
 
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,

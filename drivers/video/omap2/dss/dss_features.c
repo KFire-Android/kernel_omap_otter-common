@@ -353,6 +353,30 @@ static const struct omap_dss_features omap4430_es1_0_dss_features  = {
 	.dss_params = omap4_dss_param_range,
 };
 
+/* For OMAP4470 version */
+static const struct omap_dss_features omap4470_dss_features = {
+	.reg_fields = omap4_dss_reg_fields,
+	.num_reg_fields = ARRAY_SIZE(omap4_dss_reg_fields),
+
+	.has_feature	=
+		FEAT_GLOBAL_ALPHA | FEAT_PRE_MULT_ALPHA |
+		FEAT_MGR_LCD2 | FEAT_GLOBAL_ALPHA_VID1 |
+		FEAT_CORE_CLK_DIV | FEAT_LCD_CLK_SRC |
+		FEAT_DSI_DCS_CMD_CONFIG_VC | FEAT_DSI_VC_OCP_WIDTH |
+		FEAT_DSI_GNQ | FEAT_HDMI_CTS_SWMODE |
+		FEAT_HANDLE_UV_SEPARATE | FEAT_ATTR2 | FEAT_CPR |
+		FEAT_PRELOAD | FEAT_FIR_COEF_V |
+		FEAT_ALPHA_OMAP3_COMPAT | FEAT_OVL_VID3 |
+		FEAT_OVL_ZORDER | FEAT_GLOBAL_MFLAG,
+
+	.num_mgrs = 3,
+	.num_ovls = 4,
+	.supported_displays = omap4_dss_supported_displays,
+	.supported_color_modes = omap4_dss_supported_color_modes,
+	.clksrc_names = omap4_dss_clk_source_names,
+	.dss_params = omap4_dss_param_range,
+};
+
 /* For all the other OMAP4 versions */
 static const struct omap_dss_features omap4_dss_features = {
 	.reg_fields = omap4_dss_reg_fields,
@@ -445,8 +469,11 @@ void dss_features_init(void)
 		omap_current_dss_features = &omap3430_dss_features;
 	else if (omap_rev() == OMAP4430_REV_ES1_0)
 		omap_current_dss_features = &omap4430_es1_0_dss_features;
+	else if (cpu_is_omap447x())
+		omap_current_dss_features = &omap4470_dss_features;
 	else if (cpu_is_omap44xx())
 		omap_current_dss_features = &omap4_dss_features;
 	else
 		DSSWARN("Unsupported OMAP version");
+
 }

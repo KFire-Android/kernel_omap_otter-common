@@ -254,9 +254,6 @@ int omap_hsi_wakeup(int hsi_port)
 			     &hsi_ctrl->hsi_port[i].flags))
 		return -EBUSY;
 
-	dev_info(hsi_ctrl->dev, "Modem wakeup detected from HSI CAWAKE Pad port"
-				" %d\n", hsi_port);
-
 	/* CAWAKE falling or rising edge detected */
 	hsi_ctrl->hsi_port[i].cawake_off_event = true;
 	tasklet_hi_schedule(&hsi_ctrl->hsi_port[i].hsi_tasklet);

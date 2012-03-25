@@ -410,6 +410,29 @@ tiler_blk_handle tiler_alloc_block_area(enum tiler_fmt fmt, u32 width,
 					u32 *virt_array);
 
 /**
+ * Allocate an area of container space in the Tiler with a specific alignment
+ * and user specified security token
+ *
+ * @param fmt		Tiler bpp mode
+ * @param width		Width in pixels
+ * @param height	Height in pixels
+ * @param ssptr		Value of tiler physical address of allocation
+ * @param virt_array	Array of physical address for the start of each virtual
+			page
+ * @align		Alignment in bytes
+ * @offset		Offset into 4KiB
+ * @token		Security token
+ *
+ * @return handle	Handle to tiler block information.  NULL on error.
+ *
+ * NOTE: For 1D allocations, specify the full size in the width field, and
+ *       specify a height of 1.
+ */
+tiler_blk_handle tiler_alloc_block_area_aligned(enum tiler_fmt fmt, u32 width,
+			u32 height, u32 *ssptr, u32 *virt_array, u32 align,
+			u32 offset, u32 token);
+
+/**
  * Free a reserved area in the Tiler
  *
  * @param handle	Handle to tiler block information
@@ -459,6 +482,27 @@ s32 tiler_memsize(enum tiler_fmt fmt, u32 width, u32 height, u32 *alloc_pages,
  * @return Size of virtual stride
  */
 u32 tiler_block_vstride(tiler_blk_handle handle);
+
+/**
+ * Fills an array virtual size of a tiler block
+ *
+ * @param handle	Handle to tiler block allocation
+ * @param virt_array	Array of physical address for the start of each virtual
+ *			page
+ * @param handle	Pointer to the size of the virt_array array
+ * @return 0 for success.  Non zero for error
+ */
+s32 tiler_fill_virt_array(tiler_blk_handle handle, u32 *virt_array,
+		u32 * array_size);
+
+/**
+ * Returns virtual size of a tiler block
+ *
+ * @param handle	Handle to tiler block allocation
+ *
+ * @return Size of buffer
+ */
+u32 tiler_block_vsize(tiler_blk_handle handle);
 
 struct tiler_pa_info *user_block_to_pa(u32 usr_addr, u32 num_pg);
 void tiler_pa_free(struct tiler_pa_info *pa);

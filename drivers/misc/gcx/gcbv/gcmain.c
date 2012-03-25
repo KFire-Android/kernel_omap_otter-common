@@ -12,6 +12,7 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+#include <plat/cpu.h>
 #include <linux/gcx.h>
 #include <linux/gcbv.h>
 #include "gcmain.h"
@@ -86,7 +87,9 @@ static int __init mod_init(void)
 {
 	GC_PRINT(GC_INFO_MSG "\n", __func__, __LINE__);
 	bv_init();
-	gcbv_assign();
+	/* Assign BV function parameters only if SoC contains a GC core */
+	if (cpu_is_omap447x())
+		gcbv_assign();
 	return 0;
 }
 

@@ -66,8 +66,7 @@ module_param(irqline, int, 0644);
 static long registerMemBase = 0xF1840000;
 module_param(registerMemBase, long, 0644);
 
-static struct mutex g_contextlock;
-static struct mutex g_datalock;
+static struct mutex mtx;
 
 struct gccontextmap {
 	pid_t pid;
@@ -78,13 +77,7 @@ struct gccontextmap {
 static struct mutex g_maplock;
 static struct gccontextmap *g_map;
 static struct gccontextmap *g_mapvacant;
-
-/* Context management. */
-struct gccontext;
-static enum gcerror gc_attach(struct gccontext **gccontext);
-static enum gcerror gc_detach(struct gccontext **gccontext);
-static enum gcerror gc_lock(struct gccontext *gccontext);
-static enum gcerror gc_unlock(struct gccontext *gccontext);
+static int g_clientref;
 
 static int clk_enabled;
 static struct clk *g_bb2d_clk;
@@ -93,23 +86,14 @@ static void *g_reg_base;
 
 static enum gcerror find_context(struct gccontextmap **context, int create)
 {
-	enum gcerror gcerror;
+	enum gcerror gcerror = GCERR_NONE;
 	struct gccontextmap *prev;
 	struct gccontextmap *curr;
-	int maplocked = 0;
 	pid_t pid;
 
 	GC_PRINT(GC_INFO_MSG " getting lock mutex.\n", __func__, __LINE__);
 
-	/* Acquire map access mutex. */
-	gcerror = gc_acquire_mutex(&g_maplock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_CTX_ALLOC);
-		goto exit;
-	}
-	maplocked = 1;
+	mutex_lock(&mtx);
 
 	if (!clk_enabled) {
 		/* Locate the clock entry. */
@@ -195,8 +179,23 @@ static enum gcerror find_context(struct gccontextmap **context, int create)
 	GC_PRINT(GC_INFO_MSG " creating new context.\n",
 		__func__, __LINE__);
 
-	/* Create the context. */
-	gcerror = gc_attach(&curr->context);
+	curr->context = kzalloc(sizeof(*curr->context), GFP_KERNEL);
+	if (curr->context == NULL) {
+		gcerror = GCERR_SETGRP(GCERR_OODM, GCERR_CTX_ALLOC);
+		goto exit;
+	}
+
+	gcerror = mmu2d_create_context(&curr->context->mmu);
+	if (gcerror != GCERR_NONE)
+		goto free_map_ctx;
+
+	gcerror = cmdbuf_map(&curr->context->mmu);
+	if (gcerror != GCERR_NONE)
+		goto free_2d_ctx;
+
+	curr->context->mmu_dirty = true;
+
+	g_clientref += 1;
 
 	/* Success? */
 	if (gcerror == GCERR_NONE) {
@@ -223,11 +222,14 @@ static enum gcerror find_context(struct gccontextmap **context, int create)
 		curr->next = g_mapvacant;
 		g_mapvacant = curr;
 	}
+	goto exit;
 
+free_2d_ctx:
+	mmu2d_destroy_context(&curr->context->mmu);
+free_map_ctx:
+	kfree(curr->context);
 exit:
-	if (maplocked)
-		mutex_unlock(&g_maplock);
-
+	mutex_unlock(&mtx);
 	return gcerror;
 }
 
@@ -250,9 +252,20 @@ static enum gcerror release_context(struct gccontextmap *context)
 	}
 
 	if (context->context != NULL) {
-		gcerror = gc_detach(&context->context);
+		gcerror = mmu2d_destroy_context(&context->context->mmu);
 		if (gcerror != GCERR_NONE)
 			goto exit;
+
+		kfree(context->context);
+		context->context = NULL;
+
+		g_clientref -= 1;
+		if (g_clientref == 0) {
+			gcerror = gc_set_power(GCPWR_OFF);
+			if (gcerror != GCERR_NONE)
+				goto exit;
+		}
+
 	}
 
 	kfree(context);
@@ -622,6 +635,10 @@ static struct gctransition g_gctransition[4][4] = {
 	},
 };
 
+#include <plat/omap_hwmod.h>
+#include <plat/omap-pm.h>
+#define GCGPOUT0 0x64
+
 enum gcpower g_gcpower;
 
 enum gcerror gc_set_power(enum gcpower gcpower)
@@ -643,9 +660,6 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 	/* Enable/disable external clock. */
 	if (gctransition->clk) {
 		if (gctransition->clk_on) {
-			GC_PRINT(GC_INFO_MSG " CLOCK ON\n",
-				__func__, __LINE__);
-
 			ret = clk_enable(g_bb2d_clk);
 			if (ret < 0) {
 				GC_PRINT(GC_ERR_MSG
@@ -654,20 +668,18 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 				gcerror = GCERR_POWER_CLOCK_ON;
 				goto fail;
 			}
+			gc_write_reg(GCGPOUT0, 0);
+			pr_info("gcx: clock enabled.\n");
 		} else {
-			GC_PRINT(GC_INFO_MSG " CLOCK OFF\n",
-				__func__, __LINE__);
-
+			gc_write_reg(GCGPOUT0, 0x1);
 			clk_disable(g_bb2d_clk);
+			pr_info("gcx: clock disabled.\n");
 		}
 	}
 
 	/* Install/remove IRQ handler. */
 	if (gctransition->irq) {
 		if (gctransition->irq_install) {
-			GC_PRINT(GC_INFO_MSG " IRQ INSTALL\n",
-				__func__, __LINE__);
-
 			ret = request_irq(DEVICE_INT, gc_irq, IRQF_SHARED,
 						DEV_NAME, &gcdevice);
 			if (ret < 0) {
@@ -677,11 +689,10 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 				gcerror = GCERR_POWER_CLOCK_ON;
 				goto fail;
 			}
+			pr_info("gcx: irq installed.\n");
 		} else {
-			GC_PRINT(GC_INFO_MSG " IRQ REMOVE\n",
-				__func__, __LINE__);
-
 			free_irq(DEVICE_INT, &gcdevice);
+			pr_info("gcx: irq removed.\n");
 		}
 	}
 
@@ -689,9 +700,6 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 	if (gctransition->reset) {
 		union gcclockcontrol gcclockcontrol;
 		union gcidle gcidle;
-
-		GC_PRINT(GC_INFO_MSG " RESET\n",
-			__func__, __LINE__);
 
 		/* Read current clock control value. */
 		gcclockcontrol.raw
@@ -747,16 +755,20 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 			/* GPU is idle. */
 			break;
 		}
+		pr_info("gcx: gpu reset.\n");
 	}
 
 	/* Enable/disable pulse skipping. */
 	if (gctransition->pulse) {
+		struct device *dev = omap_hwmod_name_get_dev("bb2d");
 		union gcclockcontrol gcclockcontrol;
 		gcclockcontrol.raw = 0;
 
 		if (gctransition->pulse_skip) {
 			GC_PRINT(GC_INFO_MSG " PULSE SKIP ENABLE\n",
 				__func__, __LINE__);
+
+			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, -1);
 
 			/* Enable loading and set to minimum value. */
 			gcclockcontrol.reg.pulsecount = 1;
@@ -766,6 +778,10 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 		} else {
 			GC_PRINT(GC_INFO_MSG " PULSE SKIP DISABLE\n",
 				__func__, __LINE__);
+
+			/* set the min l3 data throughput to 2.5 GB */
+			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT,
+								0xA0000000);
 
 			/* Enable loading and set to maximum value. */
 			gcclockcontrol.reg.pulsecount = 64;
@@ -788,155 +804,6 @@ fail:
 }
 
 /*******************************************************************************
- * Context management.
- */
-
-static int g_clientref;
-
-static enum gcerror gc_attach(struct gccontext **gccontext)
-{
-	enum gcerror gcerror;
-	struct gccontext *temp = NULL;
-	int mmuinit = 0;
-	int cmdbufmap = 0;
-
-	temp = kzalloc(sizeof(struct gccontext), GFP_KERNEL);
-	if (temp == NULL) {
-		gcerror = GCERR_SETGRP(GCERR_OODM, GCERR_CTX_ALLOC);
-		goto fail;
-	}
-
-	gcerror = mmu2d_create_context(&temp->mmu);
-	if (gcerror != GCERR_NONE)
-		goto fail;
-	mmuinit = 1;
-
-	gcerror = cmdbuf_map(&temp->mmu);
-	if (gcerror != GCERR_NONE)
-		goto fail;
-	cmdbufmap = 1;
-
-	temp->mmu_dirty = true;
-	*gccontext = temp;
-
-	g_clientref += 1;
-
-	return GCERR_NONE;
-
-fail:
-	gc_detach(&temp);
-	return gcerror;
-}
-
-static enum gcerror gc_detach(struct gccontext **gccontext)
-{
-	enum gcerror gcerror;
-	struct gccontext *temp;
-
-	temp = *gccontext;
-	if (temp == NULL) {
-		gcerror = GCERR_NONE;
-	} else {
-		gcerror = gc_unlock(temp);
-		if (gcerror != GCERR_NONE)
-			goto exit;
-
-		gcerror = mmu2d_destroy_context(&temp->mmu);
-		if (gcerror != GCERR_NONE)
-			goto exit;
-
-		kfree(temp);
-		*gccontext = NULL;
-
-		g_clientref -= 1;
-		if (g_clientref == 0) {
-			gcerror = gc_set_power(GCPWR_OFF);
-			if (gcerror != GCERR_NONE)
-				goto exit;
-		}
-
-		gcerror = GCERR_NONE;
-	}
-
-exit:
-	return gcerror;
-}
-
-static enum gcerror gc_lock(struct gccontext *gccontext)
-{
-	enum gcerror gcerror;
-	int contextlocked = 0;
-	int datalocked = 0;
-
-	GC_PRINT(GC_ERR_MSG " locking on context 0x%08X\n",
-			__func__, __LINE__, (unsigned int) gccontext);
-
-	/* Acquire context info acccess mutex. */
-	gcerror = gc_acquire_mutex(&g_datalock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_CTX_CHANGE);
-		goto fail;
-	}
-	datalocked = 1;
-
-	/* Acquire conntext lock mutex. */
-	gcerror = gc_acquire_mutex(&g_contextlock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_CTX_CHANGE);
-		goto fail;
-	}
-	contextlocked = 1;
-
-	gccontext->mmu_dirty = true;
-
-	GC_PRINT(GC_ERR_MSG " context locked\n",
-			__func__, __LINE__);
-
-	mutex_unlock(&g_datalock);
-	return GCERR_NONE;
-
-fail:
-	if (contextlocked)
-		mutex_unlock(&g_contextlock);
-
-	if (datalocked)
-		mutex_unlock(&g_datalock);
-
-	return gcerror;
-}
-
-static enum gcerror gc_unlock(struct gccontext *gccontext)
-{
-	enum gcerror gcerror;
-	int datalocked = 0;
-
-	GC_PRINT(GC_ERR_MSG " unlocking from context 0x%08X\n",
-			__func__, __LINE__, (unsigned int) gccontext);
-
-	/* Acquire context info acccess mutex. */
-	gcerror = gc_acquire_mutex(&g_datalock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_CTX_CHANGE);
-		goto exit;
-	}
-	datalocked = 1;
-
-	mutex_unlock(&g_contextlock);
-
-exit:
-	if (datalocked)
-		mutex_unlock(&g_datalock);
-
-	return gcerror;
-}
-
-/*******************************************************************************
  * Command buffer submission.
  */
 
@@ -950,7 +817,6 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	unsigned int *logical;
 	unsigned int address;
 	struct gcmopipesel *gcmopipesel;
-	int locked = 0;
 	struct gccontextmap *context;
 	struct gccommit kgccommit;
 
@@ -959,11 +825,8 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	if (kgccommit.gcerror != GCERR_NONE)
 		goto exit;
 
-	/* Set context. */
-	kgccommit.gcerror = gc_lock(context->context);
-	if (kgccommit.gcerror != GCERR_NONE)
-		goto exit;
-	locked = 1;
+	mutex_lock(&mtx);
+	context->context->mmu_dirty = true;
 
 	/* Set 2D pipe. */
 	gccommit->gcerror = cmdbuf_alloc(sizeof(struct gcmopipesel),
@@ -1043,8 +906,7 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	}
 
 exit:
-	if (locked)
-		gc_unlock(context->context);
+	mutex_unlock(&mtx);
 }
 EXPORT_SYMBOL(gc_commit);
 
@@ -1052,7 +914,6 @@ void gc_map(struct gcmap *gcmap)
 {
 	struct mmu2dphysmem mem;
 	struct mmu2darena *mapped = NULL;
-	int locked = 0;
 	struct gccontextmap *context;
 	struct gcmap kgcmap;
 
@@ -1061,11 +922,8 @@ void gc_map(struct gcmap *gcmap)
 	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
 
-	/* Set context. */
-	kgcmap.gcerror = gc_lock(context->context);
-	if (kgcmap.gcerror != GCERR_NONE)
-		goto exit;
-	locked = 1;
+	mutex_lock(&mtx);
+	context->context->mmu_dirty = true;
 
 	GC_PRINT(GC_INFO_MSG " map client buffer\n",
 			__func__, __LINE__);
@@ -1110,14 +968,12 @@ void gc_map(struct gcmap *gcmap)
 			__func__, __LINE__, (unsigned int) mapped);
 
 exit:
-	if (locked)
-		gc_unlock(context->context);
+	mutex_unlock(&mtx);
 }
 EXPORT_SYMBOL(gc_map);
 
 void gc_unmap(struct gcmap *gcmap)
 {
-	int locked = 0;
 	struct gccontextmap *context;
 	struct gcmap kgcmap;
 
@@ -1126,11 +982,8 @@ void gc_unmap(struct gcmap *gcmap)
 	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
 
-	/* Set context. */
-	kgcmap.gcerror = gc_lock(context->context);
-	if (kgcmap.gcerror != GCERR_NONE)
-		goto exit;
-	locked = 1;
+	mutex_lock(&mtx);
+	context->context->mmu_dirty = true;
 
 	GC_PRINT(GC_INFO_MSG " unmap client buffer\n",
 			__func__, __LINE__);
@@ -1154,10 +1007,60 @@ void gc_unmap(struct gcmap *gcmap)
 	gcmap->handle = ~0U;
 
 exit:
-	if (locked)
-		gc_unlock(context->context);
+	mutex_unlock(&mtx);
 }
 EXPORT_SYMBOL(gc_unmap);
+
+static int gc_probe(struct platform_device *pdev)
+{
+	return 0;
+}
+
+#ifndef CONFIG_HAS_EARLYSUSPEND
+static int gc_suspend(struct platform_device *pdev, pm_message_t s)
+{
+	if (gc_set_power(GCPWR_OFF))
+		printk(KERN_ERR "gcx: suspend failure.\n");
+	return 0;
+}
+
+static int gc_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+#endif
+
+static struct platform_driver plat_drv = {
+	.probe = gc_probe,
+#ifndef CONFIG_HAS_EARLYSUSPEND
+	.suspend = gc_suspend,
+	.resume = gc_resume,
+#endif
+	.driver = {
+		.owner = THIS_MODULE,
+		.name = "gccore",
+	},
+};
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+
+static void gccore_early_suspend(struct early_suspend *h)
+{
+	if (gc_set_power(GCPWR_OFF))
+		printk(KERN_ERR "gcx: early suspend failure.\n");
+}
+
+static void gccore_late_resume(struct early_suspend *h)
+{
+}
+
+static struct early_suspend early_suspend_info = {
+	.suspend = gccore_early_suspend,
+	.resume = gccore_late_resume,
+	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
+};
+#endif
 
 /*******************************************************************************
  * Driver init/shutdown.
@@ -1169,15 +1072,15 @@ static int __init gc_init(void)
 	if (!cpu_is_omap447x())
 		return 0;
 
-	/* Initialize context mutexes. */
-	mutex_init(&g_contextlock);
-	mutex_init(&g_datalock);
+	/* Initialize context mutex. */
+	mutex_init(&mtx);
 
 	/* Initialize interrupt completion. */
 	init_completion(&g_gccoreint);
 
 	/* Set power mode. */
-	g_gcpower = GCPWR_UNKNOWN;
+	g_gcpower = GCPWR_OFF;
+
 
 	/* Map GPU registers. */
 	g_reg_base = ioremap_nocache(DEVICE_REG_BASE, DEVICE_REG_SIZE);
@@ -1202,9 +1105,12 @@ static int __init gc_init(void)
 #endif
 
 	mutex_init(&g_maplock);
-	/* Success. */
-	return 0;
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	register_early_suspend(&early_suspend_info);
+#endif
+
+	return platform_driver_register(&plat_drv);
 fail:
 	if (g_reg_base != NULL) {
 		iounmap(g_reg_base);
@@ -1217,6 +1123,12 @@ fail:
 static void __exit gc_exit(void)
 {
 
+	platform_driver_unregister(&plat_drv);
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	unregister_early_suspend(&early_suspend_info);
+#endif
+
 	delete_context_map();
 	mutex_destroy(&g_maplock);
 
@@ -1224,6 +1136,7 @@ static void __exit gc_exit(void)
 		iounmap(g_reg_base);
 		g_reg_base = NULL;
 	}
+	mutex_destroy(&mtx);
 }
 
 MODULE_LICENSE("GPL v2");

@@ -19,7 +19,7 @@
 #include "gcreg.h"
 
 /* Debug print prefixes. */
-#define GC_INFO_MSG	KERN_INFO DEV_NAME ": %s(%d)"
-#define GC_ERR_MSG	KERN_ERR DEV_NAME ": %s(%d)"
+#define GC_INFO_MSG	DEV_NAME ": %s(%d)"
+#define GC_ERR_MSG	DEV_NAME ": %s(%d)"
 
 #endif

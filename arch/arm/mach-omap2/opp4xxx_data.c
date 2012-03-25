@@ -467,7 +467,7 @@ static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
 	/* FDIF OPP2 - OPP50 */
 	OPP_INITIALIZER("fdif", "fdif_fck", "core", true, 64000000, OMAP4470_VDD_CORE_OPP50_UV),
 	/* FDIF OPP3 - OPP100 */
-	OPP_INITIALIZER("fdif", "fdif_fck", "core", true, 128000000, OMAP4470_VDD_CORE_OPP100_UV),
+	OPP_INITIALIZER("fdif", "fdif_fck", "core", true, 128000000, OMAP4470_VDD_CORE_OPP100_OV_UV),
 	/* DSP OPP1 - OPP50 */
 	OPP_INITIALIZER("dsp_c0", "virt_dsp_ck", "iva", true, 232750000, OMAP4470_VDD_IVA_OPP50_UV),
 	/* DSP OPP2 - OPP100 */
@@ -477,7 +477,7 @@ static struct omap_opp_def __initdata omap447x_opp_high_def_list[] = {
 	/* HSI OPP1 - OPP50 */
 	OPP_INITIALIZER("hsi", "hsi_fck", "core", true, 96000000, OMAP4470_VDD_CORE_OPP50_UV),
 	/* HSI OPP2 - OPP100 */
-	OPP_INITIALIZER("hsi", "hsi_fck", "core", true, 192000000, OMAP4470_VDD_CORE_OPP100_UV),
+	OPP_INITIALIZER("hsi", "hsi_fck", "core", true, 192000000, OMAP4470_VDD_CORE_OPP100_OV_UV),
 	/* ABE OPP1 - OPP50 */
 	OPP_INITIALIZER("aess", "abe_clk", "iva", true, 98304000, OMAP4470_VDD_IVA_OPP50_UV),
 	/* ABE OPP2 - OPP100 */

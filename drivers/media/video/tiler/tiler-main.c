@@ -343,14 +343,14 @@ static const struct file_operations tiler_debug_fops = {
  */
 
 /* get or create new gid_info object */
-static struct gid_info *_m_get_gi(struct process_info *pi, u32 gid)
+static struct gid_info *_m_get_gi(struct security_info *si, u32 gid)
 {
 	struct gid_info *gi;
 
 	/* have mutex */
 
 	/* see if group already exist */
-	list_for_each_entry(gi, &pi->groups, by_pid) {
+	list_for_each_entry(gi, &si->groups, by_sid) {
 		if (gi->gid == gid)
 			goto done;
 	}
@@ -364,9 +364,9 @@ static struct gid_info *_m_get_gi(struct process_info *pi, u32 gid)
 	INIT_LIST_HEAD(&gi->areas);
 	INIT_LIST_HEAD(&gi->onedim);
 	INIT_LIST_HEAD(&gi->reserved);
-	gi->pi = pi;
+	gi->si = si;
 	gi->gid = gid;
-	list_add(&gi->by_pid, &pi->groups);
+	list_add(&gi->by_sid, &si->groups);
 done:
 	/*
 	 * Once area is allocated, the group info's ref count will be
@@ -384,13 +384,14 @@ static void _m_try_free_group(struct gid_info *gi)
 	    /* also ensure noone is still using this group */
 	    !gi->refs) {
 		BUG_ON(!list_empty(&gi->reserved));
-		list_del(&gi->by_pid);
+		list_del(&gi->by_sid);
 
 		/* if group is tracking kernel objects, we may free even
 		   the process info */
-		if (gi->pi->kernel && list_empty(&gi->pi->groups)) {
-			list_del(&gi->pi->list);
-			kfree(gi->pi);
+		if (gi->si->kernel &&
+			list_empty(&gi->si->groups)) {
+			list_del(&gi->si->list);
+			kfree(gi->si);
 		}
 
 		kfree(gi);
@@ -399,11 +400,11 @@ static void _m_try_free_group(struct gid_info *gi)
 
 /* --- external versions --- */
 
-static struct gid_info *get_gi(struct process_info *pi, u32 gid)
+static struct gid_info *get_gi(struct security_info *si, u32 gid)
 {
 	struct gid_info *gi;
 	mutex_lock(&mtx);
-	gi = _m_get_gi(pi, gid);
+	gi = _m_get_gi(si, gid);
 	mutex_unlock(&mtx);
 	return gi;
 }
@@ -456,18 +457,15 @@ static inline void _m_area_free(struct area_info *ai)
 }
 
 static s32 __analize_area(enum tiler_fmt fmt, u32 width, u32 height,
-			  u16 *x_area, u16 *y_area, u16 *band,
-			  u16 *align)
+			  u16 *x_area, u16 *y_area, u16 *band, u16 *align,
+			u16 *offs, u16 *remainder)
 {
-	/* input: width, height is in pixels */
-	/* output: x_area, y_area, band, align */
+	/* input: width, height is in pixels, align, offs in bytes */
+	/* output: x_area, y_area, band, offs in slots, remaining bytes */
 
 	/* slot width, height, and row size */
 	u32 slot_row, min_align;
 	const struct tiler_geom *g;
-
-	/* set alignment to page size */
-	*align = PAGE_SIZE;
 
 	/* width and height must be positive */
 	if (!width || !height)
@@ -478,14 +476,21 @@ static s32 __analize_area(enum tiler_fmt fmt, u32 width, u32 height,
 		return -EINVAL;
 
 	if (fmt == TILFMT_PAGE) {
+		/* adjust size to accomodate offset, only do page alignment */
+		*align = PAGE_SIZE;
+		*remainder = *offs & ~PAGE_MASK; /* calculate remainder */
+		width += *remainder;
+
 		/* for 1D area keep the height (1), width is in tiler slots */
-		*x_area = DIV_ROUND_UP(width, tiler.page);
+		*x_area = DIV_ROUND_UP(width , tiler.page);
 		*y_area = *band = 1;
 
 		if (*x_area * *y_area > tiler.width * tiler.height)
 			return -ENOMEM;
 		return 0;
 	}
+
+	*remainder = 0;
 
 	/* format must be valid */
 	g = tiler.geom(fmt);
@@ -500,12 +505,26 @@ static s32 __analize_area(enum tiler_fmt fmt, u32 width, u32 height,
 
 	/* minimum alignment is at least 1 slot */
 	min_align = max(slot_row, granularity);
-	*align = ALIGN(*align, min_align);
+	*align = ALIGN(*align ? : PAGE_SIZE, min_align);
+
+	/* offset must be multiple of bpp */
+	if (*offs & (g->bpp - 1) || *offs >= *align)
+		return -EINVAL;
+
+	/* round down the offset to the nearest slot size, and increase width
+	   to allow space for having the correct offset */
+	width += (*offs & (min_align - 1)) / g->bpp;
+
+	*offs &= ~(min_align - 1);
+
+	/* expand width to block size */
+	width = ALIGN(width, min_align / g->bpp);
 
 	/* adjust to slots */
 	*x_area = DIV_ROUND_UP(width, g->slot_w);
 	*y_area = DIV_ROUND_UP(height, g->slot_h);
 	*align /= slot_row;
+	*offs /= slot_row;
 
 	if (*x_area > tiler.width || *y_area > tiler.height)
 		return -ENOMEM;
@@ -543,6 +562,51 @@ void fill_virt_array(struct tiler_block_t *blk, u32 *virt_array)
 	}
 }
 
+s32 tiler_fill_virt_array(tiler_blk_handle handle, u32 *virt_array,
+		u32 *array_size)
+{
+	u32 v, p, len, size, num_pages = 0;
+	u32 i = 0, offs = 0;
+	struct tiler_block_t *blk = &handle->blk;
+
+	if (!array_size)
+		return -1;
+
+	/* get page aligned stride */
+	v = tiler_vstride(blk);
+	p = tiler_pstride(blk);
+
+	/* get page aligned virtual size for the block */
+	size = PAGE_ALIGN(tiler_size(blk));
+
+	if(*array_size < (size/PAGE_SIZE) || !virt_array) {
+		*array_size = (size/PAGE_SIZE);
+		return -2;
+	}
+
+	offs = (blk->phys & PAGE_MASK);
+	while (size) {
+		/* set len to length of one row (2D), or full length if 1D */
+		len = v;
+
+		while (len && size) {
+			virt_array[i++] = offs;
+			num_pages++;
+			size -= PAGE_SIZE;
+			len -= PAGE_SIZE;
+			offs += PAGE_SIZE;
+		}
+
+		/* set offset to next row beginning */
+		offs += p - v;
+	}
+
+	*array_size = num_pages;
+
+	return 0;
+}
+EXPORT_SYMBOL(tiler_fill_virt_array);
+
 /**
  * Find a place where a 2D block would fit into a 2D area of the
  * same height.
@@ -561,10 +625,10 @@ void fill_virt_array(struct tiler_block_t *blk, u32 *virt_array)
  *
  * (must have mutex)
  */
-static u16 _m_blk_find_fit(u16 w, u16 align,
+static u16 _m_blk_find_fit(u16 w, u16 align, u16 offs,
 		     struct area_info *ai, struct list_head **before)
 {
-	int x = ai->area.p0.x + w;
+	int x = ai->area.p0.x + w + offs;
 	struct mem_info *mi;
 
 	/* area blocks are sorted by x */
@@ -574,7 +638,7 @@ static u16 _m_blk_find_fit(u16 w, u16 align,
 			*before = &mi->by_area;
 			return x;
 		}
-		x = ALIGN(mi->area.p1.x + 1, align) + w;
+		x = ALIGN(mi->area.p1.x + 1 -offs, align) + w + offs;
 	}
 	*before = &ai->blocks;
 
@@ -596,7 +660,7 @@ struct mem_info *_m_add2area(struct mem_info *mi, struct area_info *ai,
 	return mi;
 }
 
-static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 band,
+static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 offs, u16 band,
 					struct gid_info *gi, struct tcm *tcm)
 {
 	struct area_info *ai = NULL;
@@ -612,7 +676,7 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 band,
 		if (mi->area.tcm == tcm &&
 		    tcm_aheight(mi->area) == h &&
 		    tcm_awidth(mi->area) == w &&
-		    (mi->area.p0.x & (align - 1)) == 0) {
+		    (mi->area.p0.x & (align - 1)) == offs) {
 			/* this area is already set up */
 
 			/* remove from reserved list */
@@ -643,7 +707,7 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 band,
 	list_for_each_entry(ai, &gi->areas, by_gid) {
 		if (ai->area.tcm == tcm &&
 		    tcm_aheight(ai->area) == h) {
-			x = _m_blk_find_fit(w, align, ai, &before);
+			x = _m_blk_find_fit(w, align, offs, ai, &before);
 			if (x) {
 				_m_add2area(mi, ai, x - w, w, before);
 
@@ -663,10 +727,10 @@ static struct mem_info *get_2d_area(u16 w, u16 h, u16 align, u16 band,
 	mutex_unlock(&mtx);
 
 	/* if no area fit, reserve a new one */
-	ai = area_new_m(ALIGN(w, max(band, align)), h,
+	ai = area_new_m(ALIGN(w + offs, max(band, align)), h,
 		      max(band, align), tcm, gi);
 	if (ai) {
-		_m_add2area(mi, ai, ai->area.p0.x, w, &ai->blocks);
+		_m_add2area(mi, ai, ai->area.p0.x + offs, w, &ai->blocks);
 		if (tiler_alloc_debug & 1)
 			printk(KERN_ERR "(+2d (%d-%d,%d-%d) in (%d-%d,%d-%d) new)\n",
 					mi->area.p0.x, mi->area.p1.x,
@@ -685,9 +749,9 @@ done:
 }
 
 /* layout reserved 2d blocks in a larger area */
-/* NOTE: band, w, h, a(lign) is in slots */
+/* NOTE: band, w, h, a(lign), o(ffs) is in slots */
 static s32 lay_2d(enum tiler_fmt fmt, u16 n, u16 w, u16 h, u16 band,
-		      u16 align, struct gid_info *gi,
+		      u16 align, u16 offs, struct gid_info *gi,
 		      struct list_head *pos)
 {
 	u16 x, x0, e = ALIGN(w, align), w_res = (n - 1) * e + w;
@@ -697,15 +761,15 @@ static s32 lay_2d(enum tiler_fmt fmt, u16 n, u16 w, u16 h, u16 band,
 	printk(KERN_INFO "packing %u %u buffers into %u width\n",
 	       n, w, w_res);
 
-	/* calculate dimensions, band, and alignment in slots */
+	/* calculate dimensions, band, offs, and alignment in slots */
 	/* reserve an area */
-	ai = area_new_m(ALIGN(w_res, max(band, align)), h,
+	ai = area_new_m(ALIGN(w_res + offs, max(band, align)), h,
 			max(band, align), tcm[fmt], gi);
 	if (!ai)
 		return -ENOMEM;
 
 	/* lay out blocks in the reserved area */
-	for (n = 0, x = 0; x < w_res; x += e, n++) {
+	for (n = 0, x = offs; x < w_res; x += e, n++) {
 		/* reserve a block struct */
 		mi = kmalloc(sizeof(*mi), GFP_KERNEL);
 		if (!mi)
@@ -956,7 +1020,7 @@ static void unlock_n_free(struct mem_info *mi, bool free)
  *
  * allocated blocks, and unreferenced blocks.  Any blocks/areas still referenced
  * will move to the orphaned lists to avoid issues if a new process is created
- * with the same pid.
+ * with the same sid.
  *
  * (must have mutex)
  */
@@ -1092,14 +1156,15 @@ static void fill_block_info(struct mem_info *i, struct tiler_block_info *blk)
  *  ==========================================================================
  */
 static struct mem_info *alloc_area(enum tiler_fmt fmt, u32 width, u32 height,
-				   struct gid_info *gi)
+				   struct gid_info *gi, u16 align, u16 offs)
 {
-	u16 x, y, band, align;
+	u16 x, y, band, remainder = 0;
 	struct mem_info *mi = NULL;
 	const struct tiler_geom *g = tiler.geom(fmt);
 
 	/* calculate dimensions, band, and alignment in slots */
-	if (__analize_area(fmt, width, height, &x, &y, &band, &align))
+	if (__analize_area(fmt, width, height, &x, &y, &band, &align, &offs,
+				&remainder))
 		return NULL;
 
 	if (fmt == TILFMT_PAGE)	{
@@ -1123,7 +1188,7 @@ static struct mem_info *alloc_area(enum tiler_fmt fmt, u32 width, u32 height,
 		mi->parent = gi;
 		list_add(&mi->by_area, &gi->onedim);
 	} else {
-		mi = get_2d_area(x, y, align, band, gi, tcm[fmt]);
+		mi = get_2d_area(x, y, align, offs, band, gi, tcm[fmt]);
 		if (!mi)
 			return NULL;
 
@@ -1137,31 +1202,32 @@ static struct mem_info *alloc_area(enum tiler_fmt fmt, u32 width, u32 height,
 	mutex_unlock(&mtx);
 
 	mi->blk.phys = tiler.addr(fmt,
-		mi->area.p0.x * g->slot_w, mi->area.p0.y * g->slot_h);
+		mi->area.p0.x * g->slot_w,
+		mi->area.p0.y * g->slot_h) + remainder;
 	return mi;
 }
 
 static struct mem_info *alloc_block_area(enum tiler_fmt fmt, u32 width,
 		u32 height, u32 key, u32 gid,
-		struct process_info *pi)
+		struct security_info *si, u16 align, u16 offs)
 {
 	struct mem_info *mi = NULL;
 	struct gid_info *gi = NULL;
 
 	/* validate parameters */
-	if (!pi)
+	if (!si || align > PAGE_SIZE || offs >= (align ? : PAGE_SIZE))
 		return ERR_PTR(-EINVAL);
 
 	/* get group context */
 	mutex_lock(&mtx);
-	gi = _m_get_gi(pi, gid);
+	gi = _m_get_gi(si, gid);
 	mutex_unlock(&mtx);
 
 	if (!gi)
 		return ERR_PTR(-ENOMEM);
 
 	/* reserve area in tiler container */
-	mi = alloc_area(fmt, width, height, gi);
+	mi = alloc_area(fmt, width, height, gi, align, offs);
 	if (!mi) {
 		mutex_lock(&mtx);
 		gi->refs--;
@@ -1242,7 +1308,7 @@ static struct tiler_pa_info *get_new_pa(struct tmm *tmm, u32 num_pg)
 }
 
 static s32 alloc_block(enum tiler_fmt fmt, u32 width, u32 height,
-		u32 key, u32 gid, struct process_info *pi,
+		u32 key, u32 gid, struct security_info *si,
 		struct mem_info **info)
 {
 	struct mem_info *mi;
@@ -1252,7 +1318,7 @@ static s32 alloc_block(enum tiler_fmt fmt, u32 width, u32 height,
 	*info = NULL;
 
 	/* allocate tiler container area */
-	mi = alloc_block_area(fmt, width, height, key, gid, pi);
+	mi = alloc_block_area(fmt, width, height, key, gid, si, PAGE_SIZE, 0);
 	if (IS_ERR_OR_NULL(mi))
 		return mi ? -ENOMEM : PTR_ERR(mi);
 
@@ -1382,7 +1448,7 @@ EXPORT_SYMBOL(user_block_to_pa);
 
 /* allocate area from container and pin memory */
 static s32 pin_any_block(enum tiler_fmt fmt, u32 width, u32 height,
-		     u32 key, u32 gid, struct process_info *pi,
+		     u32 key, u32 gid, struct security_info *si,
 		     struct mem_info **info, struct tiler_pa_info *pa)
 {
 	s32 res = -EPERM;
@@ -1395,7 +1461,7 @@ static s32 pin_any_block(enum tiler_fmt fmt, u32 width, u32 height,
 		goto done;
 
 	/* get allocation area */
-	mi = alloc_block_area(fmt, width, height, key, gid, pi);
+	mi = alloc_block_area(fmt, width, height, key, gid, si, PAGE_SIZE, 0);
 	if (IS_ERR_OR_NULL(mi)) {
 		res = mi ? PTR_ERR(mi) : -ENOMEM;
 		goto done;
@@ -1418,7 +1484,7 @@ done:
 }
 
 static s32 pin_block(enum tiler_fmt fmt, u32 width, u32 height,
-		     u32 key, u32 gid, struct process_info *pi,
+		     u32 key, u32 gid, struct security_info *si,
 		     struct mem_info **info, u32 usr_addr)
 {
 	struct tiler_pa_info *pa = NULL;
@@ -1432,7 +1498,7 @@ static s32 pin_block(enum tiler_fmt fmt, u32 width, u32 height,
 	if (IS_ERR_OR_NULL(pa))
 		return pa ? PTR_ERR(pa) : -ENOMEM;
 
-	return pin_any_block(fmt, width, height, key, gid, pi, info, pa);
+	return pin_any_block(fmt, width, height, key, gid, si, info, pa);
 }
 
 s32 tiler_pin_block(tiler_blk_handle block, u32 *addr_array, u32 nents)
@@ -1708,7 +1774,8 @@ tiler_blk_handle tiler_map_1d_block(struct tiler_pa_info *pa)
 	struct mem_info *mi = NULL;
 	struct tiler_pa_info *pa_tmp = kmemdup(pa, sizeof(*pa), GFP_KERNEL);
 	s32 res = pin_any_block(TILFMT_PAGE, pa->num_pg << PAGE_SHIFT, 1, 0, 0,
-						__get_pi(0, true), &mi, pa_tmp);
+					__get_si(0, true, SECURE_BY_PID), &mi,
+					pa_tmp);
 	return res ? ERR_PTR(res) : mi;
 }
 EXPORT_SYMBOL(tiler_map_1d_block);
@@ -1731,7 +1798,8 @@ tiler_blk_handle tiler_alloc_block_area(enum tiler_fmt fmt, u32 width,
 	if (!tilerdev_class)
 		return NULL;
 
-	mi = alloc_block_area(fmt, width, height, 0, 0, __get_pi(0, true));
+	mi = alloc_block_area(fmt, width, height, 0, 0,
+				__get_si(0, true, SECURE_BY_PID), PAGE_SIZE, 0);
 
 	if (IS_ERR_OR_NULL(mi))
 		goto done;
@@ -1744,6 +1812,31 @@ done:
 }
 EXPORT_SYMBOL(tiler_alloc_block_area);
 
+tiler_blk_handle tiler_alloc_block_area_aligned(enum tiler_fmt fmt, u32 width,
+			u32 height, u32 *ssptr, u32 *virt_array, u32 align,
+			u32 offset, u32 token)
+{
+	struct mem_info *mi;
+	*ssptr = 0;
+
+	/* if tiler is not initialized fail gracefully */
+	if (!tilerdev_class)
+		return NULL;
+
+	mi = alloc_block_area(fmt, width, height, 0, 0, __get_si(token, true,
+				SECURE_BY_TOKEN), align, offset);
+
+	if (IS_ERR_OR_NULL(mi))
+		goto done;
+
+	fill_virt_array(&mi->blk, virt_array);
+	*ssptr = mi->blk.phys;
+
+done:
+	return mi;
+}
+EXPORT_SYMBOL(tiler_alloc_block_area_aligned);
+
 void tiler_unpin_block(tiler_blk_handle block)
 {
 	mutex_lock(&mtx);
@@ -1755,13 +1848,14 @@ EXPORT_SYMBOL(tiler_unpin_block);
 s32 tiler_memsize(enum tiler_fmt fmt, u32 width, u32 height, u32 *alloc_pages,
 		  u32 *virt_pages)
 {
-	u16 x, y, band, align;
+	u16 x, y, band, align = PAGE_SIZE, offs = 0, remainder = 0;
 	int res;
 	struct tiler_block_t blk;
 
 	*alloc_pages = *virt_pages = 0;
 
-	res = tiler.analize(fmt, width, height, &x, &y, &align, &band);
+	res = tiler.analize(fmt, width, height, &x, &y, &band, &align, &offs,
+				&remainder);
 
 	if (!res) {
 		blk.height = height;
@@ -1772,6 +1866,7 @@ s32 tiler_memsize(enum tiler_fmt fmt, u32 width, u32 height, u32 *alloc_pages,
 	}
 
 	return res;
+
 }
 EXPORT_SYMBOL(tiler_memsize);
 
@@ -1780,6 +1875,12 @@ u32 tiler_block_vstride(tiler_blk_handle block)
 	return tiler_vstride(&block->blk);
 }
 EXPORT_SYMBOL(tiler_block_vstride);
+
+u32 tiler_block_vsize(tiler_blk_handle block)
+{
+	return tiler_size(&block->blk);
+}
+EXPORT_SYMBOL(tiler_block_vsize);
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Lajos Molnar <molnar@ti.com>");
