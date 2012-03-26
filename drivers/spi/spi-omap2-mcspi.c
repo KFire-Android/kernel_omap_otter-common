@@ -1098,7 +1098,7 @@ static const struct of_device_id omap_mcspi_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, omap_mcspi_of_match);
 
-static int __init omap2_mcspi_probe(struct platform_device *pdev)
+static int __devinit omap2_mcspi_probe(struct platform_device *pdev)
 {
 	struct spi_master	*master;
 	struct omap2_mcspi_platform_config *pdata;
@@ -1245,7 +1245,7 @@ free_master:
 	return status;
 }
 
-static int __exit omap2_mcspi_remove(struct platform_device *pdev)
+static int __devexit omap2_mcspi_remove(struct platform_device *pdev)
 {
 	struct spi_master	*master;
 	struct omap2_mcspi	*mcspi;
@@ -1320,13 +1320,14 @@ static struct platform_driver omap2_mcspi_driver = {
 		.pm =		&omap2_mcspi_pm_ops,
 		.of_match_table = omap_mcspi_of_match,
 	},
-	.remove =	__exit_p(omap2_mcspi_remove),
+	.probe =	omap2_mcspi_probe,
+	.remove =	__devexit_p(omap2_mcspi_remove),
 };
 
 
 static int __init omap2_mcspi_init(void)
 {
-	return platform_driver_probe(&omap2_mcspi_driver, omap2_mcspi_probe);
+	return platform_driver_register(&omap2_mcspi_driver);
 }
 subsys_initcall(omap2_mcspi_init);
 
