@@ -156,15 +156,17 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 	if (!pwrdm || IS_ERR(pwrdm))
 		return -EINVAL;
 
+	spin_lock(&pwrdm->lock);
+
 	while (!(pwrdm->pwrsts & (1 << pwrst))) {
 		if (pwrst == PWRDM_POWER_OFF)
-			return ret;
+			goto out;
 		pwrst--;
 	}
 
 	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
 	if (next_pwrst == pwrst)
-		return ret;
+		goto out;
 
 	curr_pwrst = pwrdm_read_pwrst(pwrdm);
 	if (curr_pwrst < PWRDM_POWER_ON) {
@@ -197,6 +199,8 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 		break;
 	}
 
+out:
+	spin_unlock(&pwrdm->lock);
 	return ret;
 }
 

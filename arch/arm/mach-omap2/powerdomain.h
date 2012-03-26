@@ -19,7 +19,7 @@
 
 #include <linux/types.h>
 #include <linux/list.h>
-
+#include <linux/spinlock.h>
 #include <linux/atomic.h>
 
 #include <plat/cpu.h>
@@ -107,6 +107,7 @@ struct powerdomain;
  * @state_counter:
  * @timer:
  * @state_timer:
+ * @lock: lock to keep the pwrdm structure access sanity.
  *
  * @prcm_partition possible values are defined in mach-omap2/prcm44xx.h.
  */
@@ -127,6 +128,8 @@ struct powerdomain {
 	struct clockdomain *pwrdm_clkdms[PWRDM_MAX_CLKDMS];
 	struct list_head node;
 	struct list_head voltdm_node;
+	/* Lock to secure accesses around pwrdm data structure updates */
+	spinlock_t lock;
 	int state;
 	unsigned state_counter[PWRDM_MAX_PWRSTS];
 	unsigned ret_logic_off_counter;
