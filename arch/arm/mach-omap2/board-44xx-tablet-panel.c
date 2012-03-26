@@ -381,6 +381,20 @@ static struct omap_dss_device tablet_hdmi_device = {
 	.name = "hdmi",
 	.driver_name = "hdmi_panel",
 	.type = OMAP_DISPLAY_TYPE_HDMI,
+	.panel = {
+		.hdmi_default_cea_code = 34,
+		.timings = {
+			.x_res = 1920,
+			.y_res = 1080,
+			.pixel_clock = 74250,
+			.hsw = 44,
+			.hfp = 88,
+			.hbp = 148,
+			.vsw = 5,
+			.vfp = 4,
+			.vbp = 36,
+		},
+	},
 	.clocks	= {
 		.dispc	= {
 			.dispc_fclk_src	= OMAP_DSS_CLK_SRC_FCK,
