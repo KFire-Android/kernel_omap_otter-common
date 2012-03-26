@@ -640,6 +640,13 @@ twl6030_gpadc_start_conversion(struct twl6030_gpadc_data *gpadc,
 	}
 }
 
+static int twl6030_gpadc_is_conversion_ready(
+		struct twl6030_gpadc_data *gpadc, u8 status_reg)
+{
+	u8 reg = twl6030_gpadc_read(gpadc, status_reg);
+	return !(reg & TWL6030_GPADC_BUSY) && (reg & TWL6030_GPADC_EOC_SW);
+}
+
 static int twl6030_gpadc_wait_conversion_ready(
 		struct twl6030_gpadc_data *gpadc,
 		unsigned int timeout_ms, u8 status_reg)
@@ -648,14 +655,15 @@ static int twl6030_gpadc_wait_conversion_ready(
 
 	timeout = jiffies + msecs_to_jiffies(timeout_ms);
 	do {
-		u8 reg;
-
-		reg = twl6030_gpadc_read(gpadc, status_reg);
-		if (!(reg & TWL6030_GPADC_BUSY) && (reg & TWL6030_GPADC_EOC_SW))
+		if (twl6030_gpadc_is_conversion_ready(gpadc, status_reg))
 			return 0;
 	} while (!time_after(jiffies, timeout));
 
-	return -EAGAIN;
+	/* one more checking against scheduler-caused timeout */
+	if (twl6030_gpadc_is_conversion_ready(gpadc, status_reg))
+		return 0;
+	else
+		return -EAGAIN;
 }
 
 /* locks held by caller */
