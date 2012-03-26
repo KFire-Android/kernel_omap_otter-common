@@ -2799,12 +2799,25 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 			}
 		}
 	} else {
-		twl_i2c_read_u8(TWL6032_MODULE_CHARGER, &reg, LINEAR_CHRG_STS);
+		int fault, charge_usb, charge_ac;
 
-		if (reg & (LINEAR_CHRG_STS_CC_STS | LINEAR_CHRG_STS_CV_STS))
+		twl_i2c_read_u8(TWL6032_MODULE_CHARGER, &reg,
+				CHARGERUSB_INT_STATUS);
+
+		fault = !(di->stat1 & CONTROLLER_STAT1_LINCH_GATED) &&
+				!(di->stat1 & CONTROLLER_STAT1_FAULT_WDG);
+		charge_usb = (di->stat1 & VBUS_DET) &&
+				!(reg & CHARGERUSB_FAULT);
+		charge_ac = (di->stat1 & VAC_DET) &&
+				!(di->stat1 & CONTROLLER_STAT1_EXTCHRG_STATZ);
+
+		dev_dbg(di->dev, "boot charge state fault %d, usb %d, ac %d\n",
+				fault, charge_usb, charge_ac);
+
+		if (fault && (charge_usb || charge_ac))
 			di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 		else {
-			if (controller_stat & (VBUS_DET | VAC_DET))
+			if (di->stat1 & (VBUS_DET | VAC_DET))
 				di->charge_status =
 					POWER_SUPPLY_STATUS_NOT_CHARGING;
 			else
