@@ -253,8 +253,8 @@ static const struct twl6032_ideal_code
 		.v2 = 9000,
 	},
 	{	/* CHANNEL 10 */
-		.code1 = 149,
-		.code2 = 745,
+		.code1 = 150,
+		.code2 = 751,
 		.v1 = 1000,
 		.v2 = 5000,
 	},
@@ -1142,33 +1142,39 @@ static int twl6032_calibration(struct twl6030_gpadc_data *gpadc)
 			/* D1 */
 			d1 = (trim_regs[3] & 0x1F) << 2;
 			d1 |= (trim_regs[1] & 0x06) >> 1;
-			d1 |= (trim_regs[1] & 0x01) ? 0xFFFFFF80 : 0;
+			if (trim_regs[1] & 0x01)
+				d1 = -d1;
 
 			/* D2 */
 			d2 = (trim_regs[4] & 0x3F) << 2;
 			d2 |= (trim_regs[2] & 0x06) >> 1;
-			d2 |= (trim_regs[2] & 0x01) ? 0xFFFFFF00 : 0;
+			if (trim_regs[2] & 0x01)
+				d2 = -d2;
 			break;
 		case 8:
 			/* D1 */
 			temp = (trim_regs[3] & 0x1F) << 2;
 			temp |= (trim_regs[1] & 0x06) >> 1;
-			temp |= (trim_regs[1] & 0x01) ? 0xFFFFFF80 : 0;
+			if (trim_regs[1] & 0x01)
+				temp = -temp;
 
 			d1 = (trim_regs[8] & 0x18) << 1;
 			d1 |= (trim_regs[7] & 0x1E) >> 1;
-			d1 |= (trim_regs[7] & 0x01) ? 0xFFFFFFC0 : 0;
+			if (trim_regs[7] & 0x01)
+				d1 = -d1;
 
 			d1 += temp;
 
 			/* D2 */
 			temp = (trim_regs[4] & 0x3F) << 2;
 			temp |= (trim_regs[2] & 0x06) >> 1;
-			temp |= (trim_regs[2] & 0x01) ? 0xFFFFFF00 : 0;
+			if (trim_regs[2] & 0x01)
+				temp = -temp;
 
 			d2 = (trim_regs[10] & 0x1F) << 2;
 			d2 |= (trim_regs[8] & 0x06) >> 1;
-			d2 |= (trim_regs[8] & 0x01) ? 0xFFFFFF80 : 0;
+			if (trim_regs[8] & 0x01)
+				d2 = -d2;
 
 			d2 += temp;
 			break;
@@ -1176,54 +1182,64 @@ static int twl6032_calibration(struct twl6030_gpadc_data *gpadc)
 			/* D1 */
 			temp = (trim_regs[3] & 0x1F) << 2;
 			temp |= (trim_regs[1] & 0x06) >> 1;
-			temp |= (trim_regs[1] & 0x01) ? 0xFFFFFF80 : 0;
+			if (trim_regs[1] & 0x01)
+				temp = -temp;
 
 			d1 = (trim_regs[14] & 0x18) << 1;
 			d1 |= (trim_regs[12] & 0x1E) >> 1;
-			d1 |= (trim_regs[12] & 0x01) ? 0xFFFFFFC0 : 0;
+			if (trim_regs[12] & 0x01)
+				d1 = -d1;
 
 			d1 += temp;
 
 			/* D2 */
 			temp = (trim_regs[4] & 0x3F) << 2;
 			temp |= (trim_regs[2] & 0x06) >> 1;
-			temp |= (trim_regs[2] & 0x01) ? 0xFFFFFF00 : 0;
+			if (trim_regs[2] & 0x01)
+				temp = -temp;
 
 			d2 = (trim_regs[16] & 0x1F) << 2;
 			d2 |= (trim_regs[14] & 0x06) >> 1;
-			d2 |= (trim_regs[14] & 0x01) ? 0xFFFFFF80 : 0;
+			if (trim_regs[14] & 0x01)
+				d2 = -d2;
 
 			d2 += temp;
 		case 10:
 			/* D1 */
 			d1 = (trim_regs[11] & 0x0F) << 3;
 			d1 |= (trim_regs[9] & 0x0E) >> 1;
-			d1 |= (trim_regs[1] & 0x01) ? 0xFFFFFF80 : 0;
+			if (trim_regs[1] & 0x01)
+				d1 = -d1;
 
 			/* D2 */
 			d2 = (trim_regs[15] & 0x0F) << 2;
 			d2 |= (trim_regs[13] & 0x0E) >> 1;
-			d2 |= (trim_regs[13] & 0x01) ? 0xFFFFFF80 : 0;
+			if (trim_regs[13] & 0x01)
+				d2 = -d2;
 			break;
 		case 7:
 		case 18:
 			/* D1 */
 			temp = (trim_regs[3] & 0x1F) << 2;
 			temp |= (trim_regs[1] & 0x06) >> 1;
-			temp |= (trim_regs[1] & 0x01) ? 0xFFFFFF80 : 0;
+			if (trim_regs[1] & 0x01)
+				temp = -temp;
 
 			d1 = (trim_regs[1] & 0x7E) >> 1;
-			d1 |= (trim_regs[12] & 0x01) ? 0xFFFFFFC0 : 0;
+			if (trim_regs[12] & 0x01)
+				d1 = -d1;
 
 			d1 += temp;
 
 			/* D2 */
 			temp = (trim_regs[4] & 0x3F) << 2;
 			temp |= (trim_regs[2] & 0x06) >> 1;
-			temp |= (trim_regs[2] & 0x01) ? 0xFFFFFF00 : 0;
+			if (trim_regs[2] & 0x01)
+				temp = -temp;
 
 			d2 = (trim_regs[6] & 0x7F) >> 1;
-			d2 |= (trim_regs[14] & 0x01) ? 0xFFFFFF80 : 0;
+			if (trim_regs[14] & 0x01)
+				d2 = -d2;
 
 			d2 += temp;
 			break;
