@@ -14,4 +14,11 @@ config TI_ST
 	  are returned to relevant protocol drivers based on their
 	  packet types.
 
+config ST_GPS
+	tristate "gps driver for ST"
+	select TI_ST
+	help
+	  This enables the GPS driver for TI BT/FM/GPS combo devices.
+	  It will provide a character device for the TI GPS host software to
+	  access the GPS core.
 endmenu
