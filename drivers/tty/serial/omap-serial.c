@@ -929,11 +929,23 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->port.line);
 }
 
+static int serial_omap_set_wake(struct uart_port *port, unsigned int state)
+{
+	struct uart_omap_port *up = (struct uart_omap_port *)port;
+	struct omap_uart_port_info *pdata = up->pdev->dev.platform_data;
+
+	if (pdata->enable_wakeup)
+		pdata->enable_wakeup(up->pdev, state ? true : false);
+
+	return 0;
+}
+
 static void
 serial_omap_pm(struct uart_port *port, unsigned int state,
 	       unsigned int oldstate)
 {
 	struct uart_omap_port *up = (struct uart_omap_port *)port;
+	struct omap_uart_port_info *pdata = up->pdev->dev.platform_data;
 	unsigned char efr;
 
 	dev_dbg(up->port.dev, "serial_omap_pm+%d\n", up->port.line);
@@ -949,12 +961,8 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
 	serial_out(up, UART_EFR, efr);
 	serial_out(up, UART_LCR, 0);
 
-	if (!device_may_wakeup(&up->pdev->dev)) {
-		if (!state)
-			pm_runtime_forbid(&up->pdev->dev);
-		else
-			pm_runtime_allow(&up->pdev->dev);
-	}
+	if (!state && pdata->enable_wakeup)
+		pdata->enable_wakeup(up->pdev, true);
 
 	pm_runtime_put(&up->pdev->dev);
 }
@@ -1182,6 +1190,7 @@ static struct uart_ops serial_omap_pops = {
 	.shutdown	= serial_omap_shutdown,
 	.set_termios	= serial_omap_set_termios,
 	.pm		= serial_omap_pm,
+	.set_wake	= serial_omap_set_wake,
 	.type		= serial_omap_type,
 	.release_port	= serial_omap_release_port,
 	.request_port	= serial_omap_request_port,
@@ -1205,10 +1214,14 @@ static struct uart_driver serial_omap_reg = {
 static int serial_omap_suspend(struct device *dev)
 {
 	struct uart_omap_port *up = dev_get_drvdata(dev);
+	struct omap_uart_port_info *pdata = dev->platform_data;
 
 	if (up) {
 		uart_suspend_port(&serial_omap_reg, &up->port);
 		flush_work_sync(&up->qos_work);
+
+		if (!device_may_wakeup(dev))
+			pdata->enable_wakeup(up->pdev, false);
 	}
 
 	return 0;
@@ -1553,6 +1566,9 @@ static int __devinit serial_omap_probe(struct platform_device *pdev)
 	if (ret != 0)
 		goto err_add_port;
 
+	if (omap_up_info->enable_wakeup)
+		omap_up_info->enable_wakeup(pdev, false);
+
 	pm_runtime_put(&pdev->dev);
 	platform_set_drvdata(pdev, up);
 	return 0;
@@ -1659,18 +1675,6 @@ static int serial_omap_runtime_suspend(struct device *dev)
 
 	if (pdata->get_context_loss_count)
 		up->context_loss_cnt = pdata->get_context_loss_count(dev);
-
-	if (device_may_wakeup(dev)) {
-		if (!up->wakeups_enabled) {
-			pdata->enable_wakeup(up->pdev, true);
-			up->wakeups_enabled = true;
-		}
-	} else {
-		if (up->wakeups_enabled) {
-			pdata->enable_wakeup(up->pdev, false);
-			up->wakeups_enabled = false;
-		}
-	}
 
 	/* Errata i291 */
 	if (up->use_dma && pdata->set_forceidle &&
