@@ -135,7 +135,6 @@ struct uart_omap_port {
 	unsigned long		port_activity;
 	int			context_loss_cnt;
 	u32			errata;
-	u8			wakeups_enabled;
 
 	u32			features;
 
