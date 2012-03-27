@@ -1393,17 +1393,15 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	if (di->platform_data->battery_tmp_tbl == NULL)
 		return;
 
-	if (req.rbuf[1] > 100 && req.rbuf[1] < 950) {
-		adc_code = req.rbuf[1];
-		for (temp = 0; temp < di->platform_data->tblsize; temp++) {
-			if (adc_code >= di->platform_data->
-					battery_tmp_tbl[temp])
-				break;
-		}
-
-		/* first 2 values are for negative temperature */
-		di->temp_C = (temp - 2) * 10; /* in tenths of degree Celsius */
+	adc_code = req.rbuf[1];
+	for (temp = 0; temp < di->platform_data->tblsize; temp++) {
+		if (adc_code >= di->platform_data->
+				battery_tmp_tbl[temp])
+			break;
 	}
+
+	/* first 2 values are for negative temperature */
+	di->temp_C = (temp - 2); /* in degrees Celsius */
 
 	if (capacity_changed(di))
 		power_supply_changed(&di->bat);
