@@ -35,6 +35,10 @@ struct power_state {
 
 static LIST_HEAD(pwrst_list);
 
+static u8 pm44xx_54xx_errata;
+#define is_pm44xx_54xx_erratum(erratum) (pm44xx_54xx_errata & \
+					OMAP44xx_54xx_PM_ERRATUM_##erratum)
+
 #ifdef CONFIG_SUSPEND
 static int omap4_5_pm_suspend(void)
 {
@@ -199,6 +203,12 @@ static inline int omap5_init_static_deps(void)
 	return ret;
 }
 
+static void __init omap_pm_setup_errata(void)
+{
+	if (cpu_is_omap44xx())
+		pm44xx_54xx_errata |= 0;
+}
+
 /**
  * omap_pm_init - Init routine for OMAP4 PM
  *
@@ -218,6 +228,9 @@ static int __init omap_pm_init(void)
 	}
 
 	pr_info("Power Management for TI OMAP4XX/OMAP5XXX devices.\n");
+
+	/* setup the erratas */
+	omap_pm_setup_errata();
 
 	ret = pwrdm_for_each(pwrdms_setup, NULL);
 	if (ret) {
