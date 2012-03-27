@@ -2331,12 +2331,13 @@ static int omapfb_init_display(struct omapfb2_device *fbdev,
 {
 	struct omap_dss_driver *dssdrv = dssdev->driver;
 	int r;
-
-	r = dssdrv->enable(dssdev);
-	if (r) {
-		dev_warn(fbdev->dev, "Failed to enable display '%s'\n",
-				dssdev->name);
-		return r;
+	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED) {
+		r = dssdrv->enable(dssdev);
+		if (r) {
+			dev_warn(fbdev->dev, "Failed to enable display '%s'\n",
+					dssdev->name);
+			return r;
+		}
 	}
 
 	if (dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
