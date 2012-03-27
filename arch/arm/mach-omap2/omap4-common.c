@@ -223,8 +223,10 @@ static int __init omap_l2_cache_init(void)
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
 		omap4_secure_dispatcher(PPA_SERVICE_PL310_POR, 0x7, 1,
 				por_ctrl, 0, 0, 0);
-	else if (omap_rev() >= OMAP4430_REV_ES2_2)
-		omap_smc1(0x113, por_ctrl);
+	else if (omap_rev() >= OMAP4430_REV_ES2_2) {
+		//omap_smc1(0x113, por_ctrl); // Was setting 0x5
+		omap_smc1(0x113, 0x7);
+	}
 
 
 	/*

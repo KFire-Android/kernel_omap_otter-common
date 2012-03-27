@@ -27,6 +27,8 @@
 #include <linux/omapfb.h>
 #include <video/omapdss.h>
 #include <linux/leds_pwm.h>
+#include <linux/regulator/machine.h>
+#include <linux/regulator/fixed.h>
 
 #include <linux/i2c/twl.h>
 
@@ -78,6 +80,38 @@ static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data __initda
 	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
 	.display_led_init = sdp4430_init_display_led,
 	.primary_display_set = sdp4430_set_primary_brightness,
+};
+
+static struct regulator_consumer_supply lcd_supply[] = {
+	{ .supply = "vlcd" },
+};
+
+static struct regulator_init_data lcd_vinit = {
+	.constraints = {
+		.min_uV = 3300000,
+		.max_uV = 3300000,
+		.valid_modes_mask = REGULATOR_MODE_NORMAL,
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies = 1,
+	.consumer_supplies = lcd_supply,
+};
+
+static struct fixed_voltage_config lcd_reg_data = {
+	.supply_name = "vdd_lcd",
+	.microvolts = 3300000,
+	.gpio = 47,
+	.enable_high = 1,
+	.enabled_at_boot = 1,
+	.init_data = &lcd_vinit,
+};
+
+static struct platform_device lcd_regulator_device = {
+	.name   = "reg-fixed-voltage",
+	.id     = -1,
+	.dev    = {
+		.platform_data = &lcd_reg_data,
+	},
 };
 
 #if 0
@@ -156,25 +190,28 @@ static struct omap_dss_device tablet_lcd_device = {
 			.data_lines	= 24,
 		},
 	},
+#if 0
 	.clocks		= {
 		.dispc	= {
 			.channel	= {
 				.lck_div        = 1,
 				.pck_div        = 4,
-				.lcd_clk_src    = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+				.lcd_clk_src    = OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DISPC,
 			},
-			.dispc_fclk_src = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+			.dispc_fclk_src = OMAP_DSS_CLK_SRC_FCK,
 		},
 		.dsi	= {
 			.regn		= 16, /*it is (N+1)*/
 			.regm		= 115,
 			.regm_dispc	= 3,
 			.regm_dsi	= 3,
-			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DSI,
 		},
 	},
+#endif
         .panel          = {
-		// .config		= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS | OMAP_DSS_LCD_IHS,
+		.config		= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
+				  OMAP_DSS_LCD_IHS,
 		.timings	= {
 			.x_res          = 1024,
 			.y_res          = 600,
@@ -186,12 +223,14 @@ static struct omap_dss_device tablet_lcd_device = {
 			.vsw            = 3,     /* VSW = 1~20 */
 			.vbp            = 20,    /* VSW + VBP = 23 */
 		},
-//        	.width_in_um = 158,
-//        	.height_in_um = 92,
+        	.width_in_um = 158000,
+        	.height_in_um = 92000,
         },
+#if 0
 	.ctrl = {
 		.pixel_size = 24,
 	},
+#endif
 	.name			= "lcd2",
 	.driver_name		= "otter1_panel_drv",
 	.type			= OMAP_DISPLAY_TYPE_DPI,
@@ -300,6 +339,7 @@ static struct platform_device __initdata *sdp4430_panel_devices[] = {
 	// &sdp4430_keypad_led,
 	// &kc1_led_device,
 	// &sdp4430_leds_pwm,
+	&lcd_regulator_device,
 };
 
 static void kc1_pmic_mux_init(void)

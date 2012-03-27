@@ -32,7 +32,7 @@
 /* 34xx/44xx mux bit defines */
 #define OMAP_INPUT_EN		(1 << 8) /* INPUTENABLE: input */
 #define OMAP_OFF_EN		(1 << 9) /* OFFMODEENABLE: off values valid */
-#define OMAP_OFFOUT_EN		(1 << 10)/* OFFMODEOUTENABLE: input */
+#define OMAP_OFFOUT_EN		(0 << 10)/* OFFMODEOUTENABLE: input */
 #define OMAP_OFFOUT_VAL		(1 << 11)/* OFFMODEOUTVALUE: high */
 #define OMAP_OFF_PULL_EN	(1 << 12)/* OFFMODEPULLUDENABLE: activated */
 #define OMAP_OFF_PULL_UP	(1 << 13)/* OFFMODEPULLTYPESELECT: pullup */

@@ -97,8 +97,10 @@ static struct regulator_init_data sdp4430_vcxio = {
 		.state_mem		= { .enabled = false, .disabled = true, },
 		.always_on		= true,
 	},
+#if 0
 	.num_consumer_supplies	= ARRAY_SIZE(vcxio_supply),
 	.consumer_supplies	= vcxio_supply,
+#endif
 };
 
 static struct regulator_consumer_supply vdac_supply[] = {

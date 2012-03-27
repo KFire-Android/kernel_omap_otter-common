@@ -641,9 +641,23 @@ static struct omap_board_mux __initdata board_mux[] = {
  *
  * Same devices installed on EMIF1 and EMIF2
  */
+#if 0
+struct lpddr2_device_info otter_lpddr2_elpida_2G_S4_dev = {
+	.device_timings = {
+		&lpddr2_elpida_timings_200_mhz,
+		&lpddr2_elpida_timings_333_mhz,
+		&lpddr2_elpida_timings_400_mhz,
+		&lpddr2_elpida_timings_466_mhz,
+	},
+	.min_tck	= &lpddr2_elpida_min_tck,
+	.type		= LPDDR2_TYPE_S4,
+	.density	= LPDDR2_DENSITY_2Gb,
+	.io_width	= LPDDR2_IO_WIDTH_32,
+	.emif_ddr_selfrefresh_cycles = 262144,
+};
+#endif
 static struct emif_device_details __initdata emif_devices = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
-	// .cs1_device = &lpddr2_elpida_2G_S4_dev
 };
 
 static void enable_rtc_gpio(void){
