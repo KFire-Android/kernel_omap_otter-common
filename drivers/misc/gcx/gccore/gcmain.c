@@ -775,6 +775,7 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 	if (gctransition->clk && !gctransition->clk_on) {
 		gc_write_reg(GCGPOUT0, 0x1);
 		clk_disable(g_bb2d_clk);
+		mmu2d_reset();
 		pr_info("gcx: clock disabled.\n");
 	}
 
@@ -802,12 +803,13 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	struct gccontextmap *context;
 	struct gccommit kgccommit;
 
+	mutex_lock(&mtx);
+
 	/* Locate the client entry. */
 	kgccommit.gcerror = find_context(&context, true);
 	if (kgccommit.gcerror != GCERR_NONE)
 		goto exit;
 
-	mutex_lock(&mtx);
 	context->context->mmu_dirty = true;
 
 	/* Set 2D pipe. */
@@ -899,12 +901,13 @@ void gc_map(struct gcmap *gcmap)
 	struct gccontextmap *context;
 	struct gcmap kgcmap;
 
+	mutex_lock(&mtx);
+
 	/* Locate the client entry. */
 	kgcmap.gcerror = find_context(&context, true);
 	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
 
-	mutex_lock(&mtx);
 	context->context->mmu_dirty = true;
 
 	GC_PRINT(GC_INFO_MSG " map client buffer\n",
@@ -959,12 +962,13 @@ void gc_unmap(struct gcmap *gcmap)
 	struct gccontextmap *context;
 	struct gcmap kgcmap;
 
+	mutex_lock(&mtx);
+
 	/* Locate the client entry. */
 	kgcmap.gcerror = find_context(&context, true);
 	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
 
-	mutex_lock(&mtx);
 	context->context->mmu_dirty = true;
 
 	GC_PRINT(GC_INFO_MSG " unmap client buffer\n",
@@ -1071,7 +1075,7 @@ static int __init gc_init(void)
 		__func__, __LINE__, (clk_get_rate(g_bb2d_clk) / 1000000));
 
 	/* Set power mode. */
-	g_gcpower = GCPWR_OFF;
+	g_gcpower = GCPWR_UNKNOWN;
 
 
 	/* Map GPU registers. */

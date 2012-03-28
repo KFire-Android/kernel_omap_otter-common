@@ -473,8 +473,6 @@ enum gcerror mmu2d_create_context(struct mmu2dcontext *ctxt)
 
 #if MMU_ENABLE
 	int i;
-	struct gcmommuinit *gcmommuinit;
-	u32 cmdflushsize, size;
 #endif
 
 	struct mmu2dprivate *mmu = get_mmu();
@@ -528,50 +526,19 @@ enum gcerror mmu2d_create_context(struct mmu2dcontext *ctxt)
 	ctxt->allocated = NULL;
 
 #if MMU_ENABLE
-	if (!mmu->enabled) {
-		/* Allocate the safe zone. */
-		if (mmu->safezone.size == 0) {
-			gcerror = gc_alloc_pages(&mmu->safezone,
-							MMU_SAFE_ZONE_SIZE);
-			if (gcerror != GCERR_NONE) {
-				gcerror = GCERR_SETGRP(gcerror,
-							GCERR_MMU_SAFE_ALLOC);
-				goto fail;
-			}
+	/* Allocate the safe zone. */
+	if (mmu->safezone.size == 0) {
+		gcerror = gc_alloc_pages(&mmu->safezone,
+						MMU_SAFE_ZONE_SIZE);
+		if (gcerror != GCERR_NONE) {
+			gcerror = GCERR_SETGRP(gcerror,
+						GCERR_MMU_SAFE_ALLOC);
+			goto fail;
 		}
 
 		/* Initialize safe zone to a value. */
 		for (i = 0; i < MMU_SAFE_ZONE_SIZE / sizeof(u32); i += 1)
 			mmu->safezone.logical[i] = 0xDEADC0DE;
-
-		/* Determine command buffer flush size. */
-		cmdflushsize = cmdbuf_flush(NULL);
-
-		/* Allocate command buffer space. */
-		size = sizeof(struct gcmommuinit) + cmdflushsize;
-		gcerror = cmdbuf_alloc(size, (void **) &gcmommuinit, NULL);
-		if (gcerror != GCERR_NONE) {
-			gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_INIT);
-			goto fail;
-		}
-
-		gcmommuinit->safe_ldst = gcmommuinit_safe_ldst;
-		gcmommuinit->safe = mmu->safezone.physical;
-		gcmommuinit->mtlb = ctxt->physical;
-
-		/* Execute the current command buffer. */
-		cmdbuf_flush(gcmommuinit + 1);
-
-		/*
-		 * Enable MMU. For security reasons, once it is enabled,
-		 * the only way to disable is to reset the system.
-		 */
-		gc_write_reg(
-			GCREG_MMU_CONTROL_Address,
-			SETFIELDVAL(0, GCREG_MMU_CONTROL, ENABLE, ENABLE));
-
-		/* Mark as enabled. */
-		mmu->enabled = 1;
 	}
 #endif
 
@@ -641,24 +608,71 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 #if MMU_ENABLE
 	enum gcerror gcerror;
 	struct gcmommumaster *gcmommumaster;
-#endif
+	struct gcmommuinit *gcmommuinit;
+	unsigned int size;
+	struct mmu2dprivate *mmu = get_mmu();
 
 	if ((ctxt == NULL) || (ctxt->mmu == NULL))
 		return GCERR_MMU_CTXT_BAD;
 
-#if MMU_ENABLE
-	/* Allocate command buffer space. */
-	gcerror = cmdbuf_alloc(sizeof(struct gcmommumaster),
-				(void **) &gcmommumaster, NULL);
-	if (gcerror != GCERR_NONE)
-		return GCERR_SETGRP(gcerror, GCERR_MMU_MTLB_SET);
+	/* Is MMU enabled? */
+	if (mmu->enabled) {
+		/* Allocate command buffer space. */
+		gcerror = cmdbuf_alloc(sizeof(struct gcmommumaster),
+					(void **) &gcmommumaster, NULL);
+		if (gcerror != GCERR_NONE)
+			return GCERR_SETGRP(gcerror, GCERR_MMU_MTLB_SET);
 
-	/* Progfram master table address. */
-	gcmommumaster->master_ldst = gcmommumaster_master_ldst;
-	gcmommumaster->master = ctxt->physical;
-#endif
+		/* Program master table address. */
+		gcmommumaster->master_ldst = gcmommumaster_master_ldst;
+		gcmommumaster->master = ctxt->physical;
+	} else {
+		/* MMU disabled, force physical mode. */
+		cmdbuf_physical(true);
+
+		/* Allocate command buffer space. */
+		size = sizeof(struct gcmommuinit) + cmdbuf_flush(NULL);
+		gcerror = cmdbuf_alloc(size, (void **) &gcmommuinit, NULL);
+		if (gcerror != GCERR_NONE)
+			return GCERR_SETGRP(gcerror, GCERR_MMU_INIT);
+
+		/* Program the safe zone and the master table address. */
+		gcmommuinit->safe_ldst = gcmommuinit_safe_ldst;
+		gcmommuinit->safe = mmu->safezone.physical;
+		gcmommuinit->mtlb = ctxt->physical;
+
+		/* Execute the buffer. */
+		cmdbuf_flush(gcmommuinit + 1);
+
+		/* Resume normal mode. */
+		cmdbuf_physical(false);
+
+		/*
+		* Enable MMU. For security reasons, once it is enabled,
+		* the only way to disable is to reset the system.
+		*/
+		gc_write_reg(
+			GCREG_MMU_CONTROL_Address,
+			SETFIELDVAL(0, GCREG_MMU_CONTROL, ENABLE, ENABLE));
+
+		/* Mark as enabled. */
+		mmu->enabled = 1;
+	}
+
 
 	return GCERR_NONE;
+#else
+	if ((ctxt == NULL) || (ctxt->mmu == NULL))
+		return GCERR_MMU_CTXT_BAD;
+
+	return GCERR_NONE;
+#endif
+}
+
+void mmu2d_reset(void)
+{
+	struct mmu2dprivate *mmu = get_mmu();
+	mmu->enabled = 0;
 }
 
 enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,

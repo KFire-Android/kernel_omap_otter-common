@@ -41,11 +41,10 @@
 struct cmdbuf {
 	struct gcpage page;
 
-	int mapped;
-	u32 mapped_physical;
-
-	u32 *logical;
-	u32 physical;
+	bool mapped;
+	bool forcephysical;
+	u32 physicalbase;
+	u32 mappedbase;
 
 	u32 available;
 	u32 data_size;
@@ -61,12 +60,9 @@ enum gcerror cmdbuf_init(void)
 	if (gcerror != GCERR_NONE)
 		return GCERR_SETGRP(gcerror, GCERR_CMD_ALLOC);
 
-	memset(cmdbuf.page.logical, 0x0, cmdbuf.page.size);
-
 	cmdbuf.mapped = false;
-	cmdbuf.logical = cmdbuf.page.logical;
-	cmdbuf.physical = cmdbuf.page.physical;
-
+	cmdbuf.forcephysical = false;
+	cmdbuf.physicalbase = cmdbuf.page.physical;
 	cmdbuf.available = cmdbuf.page.size;
 	cmdbuf.data_size = 0;
 
@@ -83,6 +79,11 @@ enum gcerror cmdbuf_init(void)
 		__func__, __LINE__, cmdbuf.page.size);
 
 	return GCERR_NONE;
+}
+
+void cmdbuf_physical(bool forcephysical)
+{
+	cmdbuf.forcephysical = forcephysical;
 }
 
 enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
@@ -111,7 +112,7 @@ enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
 		return gcerror;
 
 	if (cmdbuf.mapped) {
-		if (mapped->address != cmdbuf.mapped_physical) {
+		if (mapped->address != cmdbuf.mappedbase) {
 			GC_PRINT(KERN_WARNING
 				"%s(%d): inconsitent command buffer mapping!\n",
 				__func__, __LINE__);
@@ -120,14 +121,13 @@ enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
 		cmdbuf.mapped = true;
 	}
 
-	cmdbuf.mapped_physical = mapped->address;
-	cmdbuf.physical        = mapped->address + cmdbuf.data_size;
+	cmdbuf.mappedbase = mapped->address;
 
 	GC_PRINT(KERN_INFO "%s(%d): Mapped command buffer.\n",
 		__func__, __LINE__);
 
 	GC_PRINT(KERN_INFO "%s(%d):   physical = 0x%08X (mapped)\n",
-		__func__, __LINE__, cmdbuf.mapped_physical);
+		__func__, __LINE__, cmdbuf.mappedbase);
 
 	GC_PRINT(KERN_INFO "%s(%d):   logical = 0x%08X\n",
 		__func__, __LINE__, (u32) cmdbuf.page.logical);
@@ -140,23 +140,35 @@ enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
 
 enum gcerror cmdbuf_alloc(u32 size, void **logical, u32 *physical)
 {
-	if ((cmdbuf.logical == NULL) || (size > cmdbuf.available))
-		return GCERR_CMD_ALLOC;
+	enum gcerror gcerror = GCERR_NONE;
+	unsigned int base;
 
-	size = (size + 3) & ~3;
+	if (size > cmdbuf.available) {
+		gcerror = GCERR_CMD_ALLOC;
+		goto fail;
+	}
+
+	/* Determine the command buffer base address. */
+	base = (cmdbuf.mapped && !cmdbuf.forcephysical)
+		? cmdbuf.mappedbase : cmdbuf.physicalbase;
 
 	if (logical != NULL)
-		*logical = cmdbuf.logical;
+		*logical = (unsigned int *)
+			((unsigned char *) cmdbuf.page.logical
+					+ cmdbuf.data_size);
 
 	if (physical != NULL)
-		*physical = cmdbuf.physical;
+		*physical = base + cmdbuf.data_size;
 
-	cmdbuf.logical   += (size >> 2);
-	cmdbuf.physical  += size;
+	/* Determine the data size. */
+	size = (size + 3) & ~3;
+
+	/* Update current sizes. */
 	cmdbuf.available -= size;
 	cmdbuf.data_size += size;
 
-	return GCERR_NONE;
+fail:
+	return gcerror;
 }
 
 int cmdbuf_flush(void *logical)
@@ -187,8 +199,8 @@ int cmdbuf_flush(void *logical)
 #endif
 
 		/* Determine the command buffer base address. */
-		base = cmdbuf.mapped
-			? cmdbuf.mapped_physical : cmdbuf.page.physical;
+		base = (cmdbuf.mapped && !cmdbuf.forcephysical)
+			? cmdbuf.mappedbase : cmdbuf.physicalbase;
 
 		/* Compute the data count. */
 		count = (cmdbuf.data_size + 7) >> 3;
@@ -232,9 +244,6 @@ int cmdbuf_flush(void *logical)
 #endif
 
 		/* Reset the buffer. */
-		cmdbuf.logical  = cmdbuf.page.logical;
-		cmdbuf.physical = base;
-
 		cmdbuf.available = cmdbuf.page.size;
 		cmdbuf.data_size = 0;
 	}
@@ -246,7 +255,8 @@ void cmdbuf_dump(void)
 {
 	unsigned int i, count, base;
 
-	base = cmdbuf.mapped ? cmdbuf.mapped_physical : cmdbuf.page.physical;
+	base = (cmdbuf.mapped && !cmdbuf.forcephysical)
+		? cmdbuf.mappedbase : cmdbuf.physicalbase;
 
 	GC_PRINT(KERN_INFO "%s(%d): Current command buffer.\n",
 		__func__, __LINE__);
