@@ -464,6 +464,11 @@
  * acknowledged, the HSR FSM is stucked. */
 #define HSI_ERRATUM_i696_SW_RESET_FSM_STUCK		BIT(0)
 
+/* HSI-C1BUG00085: ixxx: HSI wakeup issue in 3 wires mode
+ * HSI will NOT generate the Swakeup for 2nd frame if it entered
+ * IDLE after 1st received frame */
+#define HSI_ERRATUM_ixxx_3WIRES_NO_SWAKEUP		BIT(1)
+
 
 
 #ifdef CONFIG_OMAP_HSI
