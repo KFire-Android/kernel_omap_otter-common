@@ -881,6 +881,7 @@ struct twl_regulator_driver_data {
 	int		(*get_voltage)(void *data);
 	void		*data;
 	unsigned long	features;
+	u32		errata;
 };
 
 /*----------------------------------------------------------------------*/
@@ -986,6 +987,8 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 
 /* 6032 external SMPSs */
 #define TWL6032_REG_EXT_V2V1	64
+
+#define TWL6032_ERRATA_LDO_MUST_BE_ALWAYS_ON	(1 << 3)
 
 #define TWL6032_PREQ1_RES_ASS_A	0xd7
 #endif /* End of __TWL4030_H */

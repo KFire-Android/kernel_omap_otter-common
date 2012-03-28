@@ -660,9 +660,11 @@ add_regulator_linked(int num, struct regulator_init_data *pdata,
 		/* If we have existing drv_data, just add the flags */
 		struct twl_regulator_driver_data *tmp;
 		tmp = pdata->driver_data;
+		tmp->errata |= twl_errata;
 		tmp->features |= features;
 	} else {
 		/* add new driver data struct, used only during init */
+		drv_data.errata = twl_errata;
 		drv_data.features = features;
 		drv_data.set_voltage = NULL;
 		drv_data.get_voltage = NULL;
@@ -1405,6 +1407,24 @@ static void __devinit twl_setup_errata(int features)
 		twl_id, twlrev, eepromrev);
 
 	/* Put errata detection code here */
+
+	if (features & TWL6032_SUBCLASS) {
+		/*
+		 * For TWL6032 revision < ES1.1 with EEPROM
+		 * revision < rev56.0 LDO6 and LDOLN must be
+		 * always ON because of the hardware bug in the TWL6032.
+		 * If LDO6 or LDOLN is always on then SYSEN must be
+		 * always on.
+		 * For TWL6032 revision >= ES1.1 with EEPROM
+		 * revision >= rev56.0 those LDOs can be off in
+		 * sleep-mode.
+		 */
+		if ((eepromrev < 56) && (twlrev < 1)) {
+			WARN(1, "This TWL6032 is an older revision that does" \
+				" not support full PM functionality\n");
+			twl_errata |= TWL6032_ERRATA_LDO_MUST_BE_ALWAYS_ON;
+		}
+	}
 }
 
 /* NOTE: This driver only handles a single twl4030/tps659x0 chip */
