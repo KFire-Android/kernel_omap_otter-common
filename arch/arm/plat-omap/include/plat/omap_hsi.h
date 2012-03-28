@@ -458,6 +458,12 @@
 #define IS_HSI_ERRATA(errata, id)		(errata & (id))
 #define SET_HSI_ERRATA(errata, id)		(errata |= (id))
 
+/* HSI-C1BUG00088: i696: HSI: Issue with SW reset
+ * No recovery from SW reset under specific circumstances
+ * If a SW RESET is done while some HSI errors are still not
+ * acknowledged, the HSR FSM is stucked. */
+#define HSI_ERRATUM_i696_SW_RESET_FSM_STUCK		BIT(0)
+
 
 
 #ifdef CONFIG_OMAP_HSI
