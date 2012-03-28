@@ -469,6 +469,13 @@
  * IDLE after 1st received frame */
 #define HSI_ERRATUM_ixxx_3WIRES_NO_SWAKEUP		BIT(1)
 
+/*
+* HSI - OMAP4430-2.2BUG00055: i702
+* HSI: DSP Swakeup generated is the same than MPU Swakeup.
+* System cannot enter in off mode due to the DSP.
+*/
+#define HSI_ERRATUM_i702_PM_HSI_SWAKEUP			BIT(2)
+
 
 
 #ifdef CONFIG_OMAP_HSI

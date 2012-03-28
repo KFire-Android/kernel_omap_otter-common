@@ -189,6 +189,7 @@ static u32 omap_hsi_configure_errata(void)
 	    (cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0))) {
 		SET_HSI_ERRATA(errata, HSI_ERRATUM_i696_SW_RESET_FSM_STUCK);
 		SET_HSI_ERRATA(errata, HSI_ERRATUM_ixxx_3WIRES_NO_SWAKEUP);
+		SET_HSI_ERRATA(errata, HSI_ERRATUM_i702_PM_HSI_SWAKEUP);
 	}
 
 	return errata;
