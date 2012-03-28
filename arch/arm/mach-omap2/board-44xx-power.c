@@ -465,14 +465,6 @@ void __init omap4_power_init(void)
 		twldata.vmem = &vmem;
 	}
 
-	/*
-	 * VCXIO can be disabled in off-mode for OMAP4430
-	 * and OMAP4460.
-	 * VCXIO must be always on for OMAP4470.
-	 */
-	if (cpu_is_omap447x())
-		twldata.vcxio->constraints.state_mem.disabled = false;
-
 	omap4_pmic_init("twl6030", &twldata);
 }
 
