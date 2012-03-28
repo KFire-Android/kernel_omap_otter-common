@@ -123,6 +123,9 @@ int dsscomp_queue_init(struct dsscomp_dev *cdev_)
 			    cdev->ovls[j]->manager == mgr)
 				mgrq[i].ovl_mask |= 1 << j;
 		}
+		if (cdev->wb_ovl && cdev->wb_ovl->info.enabled &&
+			mgr && (cdev->wb_ovl->info.source == mgr->id))
+				mgrq[i].ovl_mask |= 1 << OMAP_DSS_WB;
 	}
 
 	cb_wkq = create_singlethread_workqueue("dsscomp_cb");
@@ -219,7 +222,7 @@ int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl)
 
 	ix = comp->ix;
 
-	if (ovl->cfg.ix >= cdev->num_ovls) {
+	if (ovl->cfg.ix >= cdev->num_ovls && ovl->cfg.ix != OMAP_DSS_WB) {
 		r = -EINVAL;
 		goto done;
 	}
@@ -250,8 +253,15 @@ int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl)
 
 		/* and disabled (unless forced) if on another manager */
 		o = cdev->ovls[ovl->cfg.ix];
-		if (o->info.enabled && (!o->manager || o->manager->id != ix))
-			goto done;
+		if (ovl->cfg.ix == OMAP_DSS_WB) {
+			struct omap_writeback *wb = cdev->wb_ovl;
+			if (wb && wb->info.enabled && wb->info.source != ix)
+				goto done;
+		} else {
+			if (o->info.enabled &&
+			   (!o->manager || o->manager->id != ix))
+				goto done;
+		}
 
 		/* add overlay to composition & display */
 		comp->ovl_mask |= mask;
@@ -279,7 +289,7 @@ int dsscomp_get_ovl(dsscomp_t comp, u32 ix, struct dss2_ovl_info *ovl)
 	BUG_ON(!ovl);
 	BUG_ON(comp->state != DSSCOMP_STATE_ACTIVE);
 
-	if (ix >= cdev->num_ovls) {
+	if (ix >= cdev->num_ovls && ix != OMAP_DSS_WB) {
 		r = -EINVAL;
 	} else if (comp->ovl_mask & (1 << ix)) {
 		r = 0;
@@ -459,6 +469,8 @@ static int dsscomp_apply(dsscomp_t comp)
 	struct dsscomp_setup_mgr_data *d;
 	u32 oix;
 	bool cb_programmed = false;
+	struct omap_writeback *wb = cdev->wb_ovl;
+	bool wb_apply = false;
 
 	struct omapdss_ovl_cb cb = {
 		.fn = dsscomp_mgr_callback,
@@ -500,31 +512,45 @@ static int dsscomp_apply(dsscomp_t comp)
 
 		dump_ovl_info(cdev, oi);
 
-		if (oi->cfg.ix >= cdev->num_ovls) {
+		if (oi->cfg.ix >= cdev->num_ovls && oi->cfg.ix != OMAP_DSS_WB) {
 			r = -EINVAL;
 			continue;
 		}
-		ovl = cdev->ovls[oi->cfg.ix];
 
-		/* set overlays' manager & info */
-		if (ovl->info.enabled && ovl->manager != mgr) {
-			r = -EBUSY;
-			goto skip_ovl_set;
-		}
-		if (ovl->manager != mgr) {
-			/*
-			 * Ideally, we should call ovl->unset_manager(ovl),
-			 * but it may block on go even though the disabling
-			 * of the overlay already went through.  So instead,
-			 * we are just clearing the manager.
-			 */
-			ovl->manager = NULL;
-			r = ovl->set_manager(ovl, mgr);
-			if (r)
+		if (oi->cfg.ix == OMAP_DSS_WB) {
+			enum omap_writeback_source src;
+			if (wb->info.enabled && wb->info.source != mgr->id) {
+				dmask |= 1 << oi->cfg.ix;
+				continue;
+			}
+			/* update status of WB */
+			wb_apply = true;
+			src = mgr->id;
+
+			r = set_dss_wb_info(oi, src);
+		} else {
+			ovl = cdev->ovls[oi->cfg.ix];
+
+			/* set overlays' manager & info */
+			if (ovl->info.enabled && ovl->manager != mgr) {
+				r = -EBUSY;
 				goto skip_ovl_set;
+			}
+			if (ovl->manager != mgr) {
+				/*
+				 * Ideally, we should call ovl->unset_manager(ovl),
+				 * but it may block on go even though the disabling
+				 * of the overlay already went through.  So instead,
+				 * we are just clearing the manager.
+				 */
+				ovl->manager = NULL;
+				r = ovl->set_manager(ovl, mgr);
+				if (r)
+					goto skip_ovl_set;
+			}
+			r = set_dss_ovl_info(oi);
 		}
 
-		r = set_dss_ovl_info(oi);
 skip_ovl_set:
 		if (r && comp->must_apply) {
 			dev_err(DEV(cdev), "[%p] set ovl%d failed %d", comp,
@@ -573,6 +599,21 @@ skip_ovl_set:
 				mutex_unlock(&mtx);
 			}
 		}
+		/*
+		  * special treatment for WB overlay as its not
+		  * part of omap_overlay array in kernel
+		  */
+		if (cdev->wb_ovl) {
+			u32 mask = 1 << OMAP_DSS_WB;
+			if ((~comp->ovl_mask & mask) &&
+			    cdev->wb_ovl->info.enabled &&
+			    cdev->wb_ovl->info.source == mgr->id) {
+				mutex_lock(&mtx);
+				comp->ovl_mask |= mask;
+				maskref_incbit(&mgrq[comp->ix].ovl_qmask, i);
+				mutex_unlock(&mtx);
+			}
+		}
 	}
 
 	/* apply changes and call update on manual panels */
@@ -591,6 +632,12 @@ skip_ovl_set:
 				    mgr->name);
 		r = -ENODEV;
 	} else {
+		if (wb_apply) {
+			r = omap_dss_wb_apply(mgr, cdev->wb_ovl);
+			if (r)
+				dev_err(DEV(cdev),
+					"omap_dss_wb_apply failed %d", r);
+		}
 		r = mgr->apply(mgr);
 		if (r)
 			dev_err(DEV(cdev), "failed while applying %d", r);
@@ -664,7 +711,6 @@ int dsscomp_state_notifier(struct notifier_block *nb,
 	}
 	return 0;
 }
-
 
 static void dsscomp_do_apply(struct work_struct *work)
 {
