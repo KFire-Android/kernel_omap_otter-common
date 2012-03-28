@@ -704,6 +704,14 @@ next:
 		_dep_scale_domains(target_dev, voltdm->dep_vdd_info);
 	}
 
+	/* Ensure that current voltage data pointer points to new volt */
+	if (volt_scale_dir == DVFS_VOLT_SCALE_NONE &&
+	    omap_get_nominal_voltage(new_vdata) !=
+			omap_get_nominal_voltage(curr_vdata)) {
+		voltdm->curr_volt = new_vdata;
+		omap_vp_update_errorgain(voltdm, new_vdata);
+	}
+
 	/* All clear.. go out gracefully */
 	goto out;
 
