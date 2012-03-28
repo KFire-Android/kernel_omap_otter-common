@@ -204,6 +204,8 @@ static int omap2_clkdm_clk_disable(struct clockdomain *clkdm)
 	} else {
 		if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
 			omap2_clkdm_sleep(clkdm);
+		else if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
+			omap2_clkdm_allow_idle(clkdm);
 	}
 
 	return 0;
