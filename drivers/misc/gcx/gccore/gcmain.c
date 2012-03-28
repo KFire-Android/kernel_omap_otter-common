@@ -638,24 +638,18 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 
 	gctransition = &g_gctransition[g_gcpower][gcpower];
 
-	/* Enable/disable external clock. */
-	if (gctransition->clk) {
-		if (gctransition->clk_on) {
-			ret = clk_enable(g_bb2d_clk);
-			if (ret < 0) {
-				GC_PRINT(GC_ERR_MSG
+	/* Enable external clock. */
+	if (gctransition->clk && gctransition->clk_on) {
+		ret = clk_enable(g_bb2d_clk);
+		if (ret < 0) {
+			GC_PRINT(GC_ERR_MSG
 					" failed to enable bb2d_fck (%d).\n",
-					 __func__, __LINE__, ret);
-				gcerror = GCERR_POWER_CLOCK_ON;
-				goto fail;
-			}
-			gc_write_reg(GCGPOUT0, 0);
-			pr_info("gcx: clock enabled.\n");
-		} else {
-			gc_write_reg(GCGPOUT0, 0x1);
-			clk_disable(g_bb2d_clk);
-			pr_info("gcx: clock disabled.\n");
+					__func__, __LINE__, ret);
+			gcerror = GCERR_POWER_CLOCK_ON;
+			goto fail;
 		}
+		gc_write_reg(GCGPOUT0, 0);
+		pr_info("gcx: clock enabled.\n");
 	}
 
 	/* Install/remove IRQ handler. */
@@ -775,6 +769,13 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 		gcclockcontrol.reg.pulseset = false;
 		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
 				gcclockcontrol.raw);
+	}
+
+	/* Disable external clock. */
+	if (gctransition->clk && !gctransition->clk_on) {
+		gc_write_reg(GCGPOUT0, 0x1);
+		clk_disable(g_bb2d_clk);
+		pr_info("gcx: clock disabled.\n");
 	}
 
 	/* Set new power state. */
