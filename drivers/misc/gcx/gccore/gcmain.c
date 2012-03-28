@@ -81,9 +81,7 @@ static struct gccontextmap *g_map;
 static struct gccontextmap *g_mapvacant;
 static int g_clientref;
 
-static int clk_enabled;
 static struct clk *g_bb2d_clk;
-static unsigned long g_bb2d_clk_rate;
 static void *g_reg_base;
 
 static enum gcerror find_context(struct gccontextmap **context, int create)
@@ -94,24 +92,6 @@ static enum gcerror find_context(struct gccontextmap **context, int create)
 	pid_t pid;
 
 	GC_PRINT(GC_INFO_MSG " getting lock mutex.\n", __func__, __LINE__);
-
-	mutex_lock(&mtx);
-
-	if (!clk_enabled) {
-		/* Locate the clock entry. */
-		g_bb2d_clk = clk_get(NULL, "bb2d_fck");
-		if (IS_ERR(g_bb2d_clk)) {
-			GC_PRINT(GC_ERR_MSG " cannot find bb2d_fck.\n",
-				 __func__, __LINE__);
-			goto exit;
-		}
-
-		g_bb2d_clk_rate = clk_get_rate(g_bb2d_clk);
-		GC_PRINT(GC_INFO_MSG " BB2D clock is %ldMHz\n",
-			__func__, __LINE__, (g_bb2d_clk_rate / 1000000));
-
-		clk_enabled = 1;
-	}
 
 	/* Get current PID. */
 	pid = 0;
@@ -231,7 +211,6 @@ free_2d_ctx:
 free_map_ctx:
 	kfree(curr->context);
 exit:
-	mutex_unlock(&mtx);
 	return gcerror;
 }
 
@@ -1080,6 +1059,16 @@ static int __init gc_init(void)
 	/* Initialize interrupt completion. */
 	init_completion(&g_gccoreint);
 
+	g_bb2d_clk = clk_get(NULL, "bb2d_fck");
+	if (IS_ERR(g_bb2d_clk)) {
+		GC_PRINT(GC_ERR_MSG " cannot find bb2d_fck.\n",
+			 __func__, __LINE__);
+		goto fail;
+	}
+
+	GC_PRINT(GC_INFO_MSG " BB2D clock is %ldMHz\n",
+		__func__, __LINE__, (clk_get_rate(g_bb2d_clk) / 1000000));
+
 	/* Set power mode. */
 	g_gcpower = GCPWR_OFF;
 
@@ -1119,11 +1108,17 @@ fail:
 		g_reg_base = NULL;
 	}
 
+	if (g_bb2d_clk)
+		clk_put(g_bb2d_clk);
+
 	return -EINVAL;
 }
 
 static void __exit gc_exit(void)
 {
+
+	if (!cpu_is_omap447x())
+		return;
 
 	platform_driver_unregister(&plat_drv);
 
@@ -1138,6 +1133,9 @@ static void __exit gc_exit(void)
 		iounmap(g_reg_base);
 		g_reg_base = NULL;
 	}
+
+	if (g_bb2d_clk)
+		clk_put(g_bb2d_clk);
 	mutex_destroy(&mtx);
 }
 
