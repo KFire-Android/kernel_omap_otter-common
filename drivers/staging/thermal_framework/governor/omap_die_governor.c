@@ -23,6 +23,7 @@
 #include <linux/suspend.h>
 #include <linux/thermal_framework.h>
 #include <plat/tmp102_temp_sensor.h>
+#include <plat/cpu.h>
 
 /* CPU Zone information */
 #define FATAL_ZONE	5
@@ -43,12 +44,16 @@
 #define NORMAL_TEMP_MONITORING_RATE 1000
 #define FAST_TEMP_MONITORING_RATE 250
 
-#define OMAP_GRADIENT_SLOPE 481
-#define OMAP_GRADIENT_CONST -12945
+#define OMAP_GRADIENT_SLOPE_4460    348
+#define OMAP_GRADIENT_CONST_4460  -9301
+#define OMAP_GRADIENT_SLOPE_4470    308
+#define OMAP_GRADIENT_CONST_4470  -7896
 
 /* PCB sensor calculation constants */
-#define OMAP_GRADIENT_SLOPE_WITH_PCB 1370
-#define OMAP_GRADIENT_CONST_WITH_PCB -635
+#define OMAP_GRADIENT_SLOPE_W_PCB_4460  1142
+#define OMAP_GRADIENT_CONST_W_PCB_4460  -393
+#define OMAP_GRADIENT_SLOPE_W_PCB_4470  1063
+#define OMAP_GRADIENT_CONST_W_PCB_4470  -477
 #define AVERAGE_NUMBER	      20
 
 struct omap_die_governor {
@@ -66,6 +71,10 @@ struct omap_die_governor {
 	int avg_cpu_sensor_temp;
 	int avg_is_valid;
 	struct delayed_work average_cpu_sensor_work;
+	int gradient_slope;
+	int gradient_const;
+	int gradient_slope_w_pcb;
+	int gradient_const_w_pcb;
 };
 
 static struct thermal_dev *therm_fw;
@@ -163,15 +172,16 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 
 		absolute_delta = (
 			((omap_gov->avg_cpu_sensor_temp - omap_gov->pcb_temp) *
-			OMAP_GRADIENT_SLOPE_WITH_PCB / 1000) +
-			OMAP_GRADIENT_CONST_WITH_PCB);
+			omap_gov->gradient_slope_w_pcb / 1000) +
+			omap_gov->gradient_const_w_pcb);
 
 		/* Ensure that this formula never returns negative value */
 		if (absolute_delta < 0)
 			absolute_delta = 0;
 	} else {
-		absolute_delta = ((sensor_temp * OMAP_GRADIENT_SLOPE / 1000) +
-			OMAP_GRADIENT_CONST);
+		absolute_delta = (
+			(sensor_temp * omap_gov->gradient_slope / 1000) +
+			omap_gov->gradient_const);
 	}
 
 	omap_gov->absolute_delta = absolute_delta;
@@ -201,8 +211,8 @@ static signed hotspot_temp_to_sensor_temp(int hot_spot_temp)
 	if (pcb_sensor && (omap_gov->avg_is_valid == 1))
 		return hot_spot_temp - omap_gov->absolute_delta;
 	else
-		return ((hot_spot_temp - OMAP_GRADIENT_CONST) * 1000) /
-			(1000 + OMAP_GRADIENT_SLOPE);
+		return ((hot_spot_temp - omap_gov->gradient_const) * 1000) /
+			(1000 + omap_gov->gradient_slope);
 }
 
 /**
@@ -667,6 +677,23 @@ static int __init omap_die_governor_init(void)
 	}
 
 	pcb_sensor = NULL;
+
+	if (cpu_is_omap446x()) {
+		omap_gov->gradient_slope = OMAP_GRADIENT_SLOPE_4460;
+		omap_gov->gradient_const = OMAP_GRADIENT_CONST_4460;
+		omap_gov->gradient_slope_w_pcb = OMAP_GRADIENT_SLOPE_W_PCB_4460;
+		omap_gov->gradient_const_w_pcb = OMAP_GRADIENT_CONST_W_PCB_4460;
+	} else if (cpu_is_omap447x()) {
+		omap_gov->gradient_slope = OMAP_GRADIENT_SLOPE_4470;
+		omap_gov->gradient_const = OMAP_GRADIENT_CONST_4470;
+		omap_gov->gradient_slope_w_pcb = OMAP_GRADIENT_SLOPE_W_PCB_4470;
+		omap_gov->gradient_const_w_pcb = OMAP_GRADIENT_CONST_W_PCB_4470;
+	} else {
+		omap_gov->gradient_slope = 0;
+		omap_gov->gradient_const = 0;
+		omap_gov->gradient_slope_w_pcb = 0;
+		omap_gov->gradient_const_w_pcb = 0;
+	}
 
 	/* Init delayed work to average on-die temperature */
 	INIT_DELAYED_WORK(&omap_gov->average_cpu_sensor_work,
