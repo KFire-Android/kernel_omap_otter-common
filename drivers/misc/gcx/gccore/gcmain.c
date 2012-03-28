@@ -48,6 +48,8 @@
 #define DEVICE_REG_BASE	0x59000000
 #define DEVICE_REG_SIZE	(256 * 1024)
 
+#define GC_ENABLE_SUSPEND 0
+
 /* Driver context structure. */
 struct gccontext {
 	struct mmu2dcontext mmu;
@@ -1032,7 +1034,7 @@ static int gc_resume(struct platform_device *pdev)
 
 static struct platform_driver plat_drv = {
 	.probe = gc_probe,
-#ifndef CONFIG_HAS_EARLYSUSPEND
+#if !defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
 	.suspend = gc_suspend,
 	.resume = gc_resume,
 #endif
@@ -1042,7 +1044,7 @@ static struct platform_driver plat_drv = {
 	},
 };
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
 #include <linux/earlysuspend.h>
 
 static void gccore_early_suspend(struct early_suspend *h)
@@ -1106,7 +1108,7 @@ static int __init gc_init(void)
 
 	mutex_init(&g_maplock);
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
 	register_early_suspend(&early_suspend_info);
 #endif
 
@@ -1125,7 +1127,7 @@ static void __exit gc_exit(void)
 
 	platform_driver_unregister(&plat_drv);
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
 	unregister_early_suspend(&early_suspend_info);
 #endif
 
