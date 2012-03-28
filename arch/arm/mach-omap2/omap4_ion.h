@@ -17,25 +17,25 @@
 /*
  * Adjusted for 512M
  * |----------- 0   (0x800000000)
- * |-------- FREE (182M) - 24M VRAM
- * |-------- 182 ION NON SECURE (32M)
- * |-------- 214 (TESLA *OPTIONAL) (4M)
- * |-------- 218 ION HEAP (96M)
- * |-------- 314 DUCATI SIZE (105M)
- * |-------- 419 ION HEAP SECURE (90M)
+ * |-------- FREE (353M) - 24M VRAM
+ * |-------- 353 ION NON SECURE (32M)
+ * |-------- 385 (TESLA *OPTIONAL) (4M)
+ * |-------- 389 ION HEAP (40M)
+ * |-------- 429 DUCATI SIZE (40M)
+ * |-------- 469 ION HEAP SECURE (40M)
  * |-------- 509 SMC MEM (3M)
  * |----------- 512
  */
 #ifndef _OMAP4_ION_H
 #define _OMAP4_ION_H
 
-#define OMAP4_ION_HEAP_SECURE_INPUT_SIZE	(SZ_1M * 90)
-#define OMAP4_ION_HEAP_TILER_SIZE		(SZ_128M - SZ_32M)
+#define OMAP4_ION_HEAP_SECURE_INPUT_SIZE	(SZ_1M * 40)
+#define OMAP4_ION_HEAP_TILER_SIZE		((SZ_1M * 72) - SZ_32M)
 #define OMAP4_ION_HEAP_NONSECURE_TILER_SIZE	SZ_32M
 
 #define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
 #define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_512M - PHYS_ADDR_SMC_SIZE)
-#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 105)
+#define PHYS_ADDR_DUCATI_SIZE	(SZ_1M * 45)
 #define PHYS_ADDR_DUCATI_MEM	(PHYS_ADDR_SMC_MEM - PHYS_ADDR_DUCATI_SIZE - \
 				OMAP4_ION_HEAP_SECURE_INPUT_SIZE)
 
