@@ -248,6 +248,10 @@
 /* need to access USB_PRODUCT_ID_LSB to identify which 6030 varient we are */
 #define USB_PRODUCT_ID_LSB	0x02
 
+/* need to check eeprom revision and jtagver number */
+#define TWL6030_REG_EPROM_REV	0xdf
+#define TWL6030_REG_JTAGVERNUM	0x87
+
 /*----------------------------------------------------------------------*/
 
 /* is driver active, bound to a chip? */
@@ -659,6 +663,9 @@ add_regulator(int num, struct regulator_init_data *pdata,
 	return add_regulator_linked(num, pdata, NULL, 0, features);
 }
 
+#define SET_LDO_STATE_MEM(ldo, state) \
+	ldo->constraints.state_mem.disabled = state
+
 /*
  * NOTE:  We know the first 8 IRQs after pdata->base_irq are
  * for the PIH, and the next are for the PWR_INT SIH, since
@@ -670,6 +677,8 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 {
 	struct device	*child;
 	unsigned sub_chip_id;
+	u8 eepromrev = 0;
+	u8 twlrev = 0;
 
 	if (twl_has_gpio() && pdata->gpio) {
 		child = add_child(SUB_CHIP_ID1, "twl4030_gpio",
@@ -968,6 +977,32 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 					features);
 		if (IS_ERR(child))
 			return PTR_ERR(child);
+	}
+
+	if (twl_has_regulator() && twl_class_is_6030()) {
+		/*
+		 * For TWL6032 revision < ES1.1 with EEPROM revision < rev56.0
+		 * LDO6 and LDOLN must be always ON
+		 * if LDO6 or LDOLN is always on then SYSEN must be always on
+		 * for TWL6030 or TWL6032 revision >= ES1.1 with EEPROM
+		 * revision >= rev56.0 those LDOs can be off in sleep-mode
+		 */
+		if (features & TWL6032_SUBCLASS) {
+			twl_i2c_read_u8(TWL6030_MODULE_ID2, &eepromrev,
+					TWL6030_REG_EPROM_REV);
+
+			twl_i2c_read_u8(TWL6030_MODULE_ID2, &twlrev,
+					TWL6030_REG_JTAGVERNUM);
+
+			if ((eepromrev < 56) && (twlrev < 1)) {
+				SET_LDO_STATE_MEM(pdata->ldo6, false);
+				SET_LDO_STATE_MEM(pdata->ldoln, false);
+				SET_LDO_STATE_MEM(pdata->sysen, false);
+				WARN(1, "This TWL6032 is an older revision that "
+						"does not support low power "
+						"measurements\n");
+			}
+		}
 	}
 
 	/* twl6030 regulators */
