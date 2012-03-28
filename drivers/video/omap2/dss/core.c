@@ -179,6 +179,9 @@ static int omap_dss_probe(struct platform_device *pdev)
 	dss_init_overlay_managers(pdev);
 	dss_init_overlays(pdev);
 
+	if (dss_has_feature(FEAT_OVL_WB))
+		dss_init_writeback(pdev);
+
 	r = dss_init_platform_driver();
 	if (r) {
 		DSSERR("Failed to initialize DSS platform driver\n");
@@ -272,6 +275,8 @@ static int omap_dss_remove(struct platform_device *pdev)
 	hdmi_uninit_platform_driver();
 	dss_uninit_platform_driver();
 
+	if (dss_has_feature(FEAT_OVL_WB))
+		dss_uninit_writeback(pdev);
 	dss_uninit_overlays(pdev);
 	dss_uninit_overlay_managers(pdev);
 
