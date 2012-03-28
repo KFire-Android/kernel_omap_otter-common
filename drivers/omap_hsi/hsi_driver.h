@@ -244,6 +244,7 @@ struct hsi_platform_data {
 	u8 hsi_gdd_chan_count;
 	unsigned long default_hsi_fclk;
 	unsigned int fifo_mapping_strategy;
+	u32 errata;
 };
 
 /* HSI Bus */
@@ -433,5 +434,13 @@ static inline int hsi_clocks_enable(struct device *dev, const char *s)
 {
 	return hsi_clocks_enable_channel(dev, HSI_CH_NUMBER_NONE, s);
 }
+
+static inline int is_hsi_errata(struct hsi_dev *hsi_ctrl, unsigned int id)
+{
+	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
+
+	return IS_HSI_ERRATA(pdata->errata, id);
+}
+
 
 #endif /* __HSI_DRIVER_H__ */

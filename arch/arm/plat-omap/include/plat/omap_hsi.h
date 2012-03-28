@@ -453,6 +453,13 @@
 			      HSI_SYS_MPU_STATUS_REG(port, irq) :    \
 			      HSI_SYS_MPU_U_STATUS_REG(port, irq))
 
+
+/* HSI errata handling */
+#define IS_HSI_ERRATA(errata, id)		(errata & (id))
+#define SET_HSI_ERRATA(errata, id)		(errata |= (id))
+
+
+
 #ifdef CONFIG_OMAP_HSI
 extern int omap_hsi_prepare_suspend(int hsi_port, bool dev_may_wakeup);
 extern int omap_hsi_io_wakeup_check(void);

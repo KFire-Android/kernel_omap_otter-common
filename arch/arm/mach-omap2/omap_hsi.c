@@ -87,6 +87,13 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 };
 
 
+static u32 omap_hsi_configure_errata(void)
+{
+	u32 errata = 0;
+
+	return errata;
+}
+
 static struct platform_device *hsi_get_hsi_platform_device(void)
 {
 	struct device *dev;
@@ -248,6 +255,8 @@ static int __init omap_hsi_register(struct omap_hwmod *oh, void *user)
 		       OMAP_HSI_HWMOD_NAME);
 		return -EEXIST;
 	}
+
+	omap_hsi_platform_data.errata = omap_hsi_configure_errata();
 
 	od = omap_device_build(OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME, 0, oh,
 			       pdata, sizeof(*pdata), omap_hsi_latency,
