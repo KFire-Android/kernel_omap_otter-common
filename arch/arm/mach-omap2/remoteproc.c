@@ -63,7 +63,9 @@ static struct omap_rproc_timers_info ipu_timers[] = {
 static int
 _ducati_set_bandwidth(struct device *dev, struct rproc *rproc, long val)
 {
-	return omap_pm_set_min_bus_tput(rproc->dev, OCP_INITIATOR_AGENT, val);
+	struct device *tdev = rproc->dev.parent;
+
+	return omap_pm_set_min_bus_tput(tdev, OCP_INITIATOR_AGENT, val);
 }
 
 static int

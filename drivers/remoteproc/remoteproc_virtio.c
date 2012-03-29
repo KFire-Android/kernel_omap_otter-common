@@ -36,7 +36,7 @@ static void rproc_virtio_notify(struct virtqueue *vq)
 	struct rproc *rproc = rvring->rvdev->rproc;
 	int notifyid = rvring->notifyid;
 
-	dev_dbg(rproc->dev, "kicking vq index: %d\n", notifyid);
+	dev_dbg(&rproc->dev, "kicking vq index: %d\n", notifyid);
 
 	rproc->ops->kick(rproc, notifyid);
 }
@@ -57,7 +57,7 @@ irqreturn_t rproc_vq_interrupt(struct rproc *rproc, int notifyid)
 {
 	struct rproc_vring *rvring;
 
-	dev_dbg(rproc->dev, "vq index %d is interrupted\n", notifyid);
+	dev_dbg(&rproc->dev, "vq index %d is interrupted\n", notifyid);
 
 	/* if rproc already crashed there is not point processing the msg */
 	if (rproc->state == RPROC_CRASHED)
@@ -78,6 +78,7 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
 {
 	struct rproc_vdev *rvdev = vdev_to_rvdev(vdev);
 	struct rproc *rproc = vdev_to_rproc(vdev);
+	struct device *dev = &rproc->dev;
 	struct rproc_vring *rvring;
 	struct virtqueue *vq;
 	void *addr;
@@ -99,7 +100,7 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
 	size = vring_size(len, rvring->align);
 	memset(addr, 0, size);
 
-	dev_dbg(rproc->dev, "vring%d: va %p qsz %d notifyid %d\n",
+	dev_dbg(dev, "vring%d: va %p qsz %d notifyid %d\n",
 					id, addr, len, rvring->notifyid);
 
 	/*
@@ -109,7 +110,7 @@ static struct virtqueue *rp_find_vq(struct virtio_device *vdev,
 	vq = vring_new_virtqueue(len, rvring->align, vdev, false, addr,
 					rproc_virtio_notify, callback, name);
 	if (!vq) {
-		dev_err(rproc->dev, "vring_new_virtqueue %s failed\n", name);
+		dev_err(dev, "vring_new_virtqueue %s failed\n", name);
 		rproc_free_vring(rvring);
 		return ERR_PTR(-ENOMEM);
 	}
@@ -156,7 +157,7 @@ static int rproc_virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 	/* now that the vqs are all set, boot the remote processor */
 	ret = rproc_boot(rproc);
 	if (ret) {
-		dev_err(rproc->dev, "rproc_boot() failed %d\n", ret);
+		dev_err(&rproc->dev, "rproc_boot() failed %d\n", ret);
 		goto error;
 	}
 
@@ -258,7 +259,7 @@ static void rproc_vdev_release(struct device *dev)
 int rproc_add_virtio_dev(struct rproc_vdev *rvdev, int id)
 {
 	struct rproc *rproc = rvdev->rproc;
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	struct virtio_device *vdev = &rvdev->vdev;
 	int ret;
 

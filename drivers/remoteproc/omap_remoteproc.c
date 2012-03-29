@@ -63,10 +63,11 @@ struct _thread_data {
 static int _vq_interrupt_thread(struct _thread_data *d)
 {
 	struct omap_rproc *oproc = d->rproc->priv;
+	struct device *dev = d->rproc->dev.parent;
 
 	/* msg contains the index of the triggered vring */
 	if (rproc_vq_interrupt(d->rproc, d->msg) == IRQ_NONE)
-		dev_dbg(d->rproc->dev, "no message was found in vqid 0x0\n");
+		dev_dbg(dev, "no message was found in vqid 0x0\n");
 	kfree(d);
 	atomic_dec(&oproc->thrd_cnt);
 	return 0;
@@ -92,7 +93,7 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 {
 	mbox_msg_t msg = (mbox_msg_t) data;
 	struct omap_rproc *oproc = container_of(this, struct omap_rproc, nb);
-	struct device *dev = oproc->rproc->dev;
+	struct device *dev = oproc->rproc->dev.parent;
 	const char *name = oproc->rproc->name;
 	struct _thread_data *d;
 
@@ -128,18 +129,19 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 static void omap_rproc_kick(struct rproc *rproc, int vqid)
 {
 	struct omap_rproc *oproc = rproc->priv;
+	struct device *dev = oproc->rproc->dev.parent;
 	int ret;
 
 	/* send the index of the triggered virtqueue in the mailbox payload */
 	ret = omap_mbox_msg_send(oproc->mbox, vqid);
 	if (ret)
-		dev_err(rproc->dev, "omap_mbox_msg_send failed: %d\n", ret);
+		dev_err(dev, "omap_mbox_msg_send failed: %d\n", ret);
 }
 
 static int
 omap_rproc_set_latency(struct device *dev, struct rproc *rproc, long val)
 {
-	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct platform_device *pdev = to_platform_device(rproc->dev.parent);
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	struct omap_rproc *oproc = rproc->priv;
 	int ret;
@@ -160,7 +162,7 @@ omap_rproc_set_latency(struct device *dev, struct rproc *rproc, long val)
 static int
 omap_rproc_set_bandwidth(struct device *dev, struct rproc *rproc, long val)
 {
-	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct platform_device *pdev = to_platform_device(rproc->dev.parent);
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 
 	/* Call device specific api if any */
@@ -175,7 +177,7 @@ omap_rproc_set_bandwidth(struct device *dev, struct rproc *rproc, long val)
 static int
 omap_rproc_set_frequency(struct device *dev, struct rproc *rproc, long val)
 {
-	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct platform_device *pdev = to_platform_device(rproc->dev.parent);
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 
 	/* Call device specific api if any */
@@ -197,7 +199,8 @@ omap_rproc_set_frequency(struct device *dev, struct rproc *rproc, long val)
 static int omap_rproc_start(struct rproc *rproc)
 {
 	struct omap_rproc *oproc = rproc->priv;
-	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct device *dev = rproc->dev.parent;
+	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
@@ -214,7 +217,7 @@ static int omap_rproc_start(struct rproc *rproc)
 	oproc->mbox = omap_mbox_get(pdata->mbox_name, &oproc->nb);
 	if (IS_ERR(oproc->mbox)) {
 		ret = PTR_ERR(oproc->mbox);
-		dev_err(rproc->dev, "omap_mbox_get failed: %d\n", ret);
+		dev_err(dev, "omap_mbox_get failed: %d\n", ret);
 		return ret;
 	}
 
@@ -227,7 +230,7 @@ static int omap_rproc_start(struct rproc *rproc)
 	 */
 	ret = omap_mbox_msg_send(oproc->mbox, RP_MBOX_ECHO_REQUEST);
 	if (ret) {
-		dev_err(rproc->dev, "omap_mbox_get failed: %d\n", ret);
+		dev_err(dev, "omap_mbox_get failed: %d\n", ret);
 		goto put_mbox;
 	}
 
@@ -235,8 +238,7 @@ static int omap_rproc_start(struct rproc *rproc)
 		timers[i].odt = omap_dm_timer_request_specific(timers[i].id);
 		if (!timers[i].odt) {
 			ret = -EBUSY;
-			dev_err(rproc->dev,
-				"omap_dm_timer_request failed: %d\n", ret);
+			dev_err(dev, "omap_dm_timer_request failed: %d\n", ret);
 			goto err_timers;
 		}
 		omap_dm_timer_set_source(timers[i].odt, OMAP_TIMER_SRC_SYS_CLK);
@@ -245,7 +247,7 @@ static int omap_rproc_start(struct rproc *rproc)
 
 	ret = pdata->device_enable(pdev);
 	if (ret) {
-		dev_err(rproc->dev, "omap_device_enable failed: %d\n", ret);
+		dev_err(dev, "omap_device_enable failed: %d\n", ret);
 		goto put_mbox;
 	}
 
@@ -266,7 +268,8 @@ put_mbox:
 /* power off the remote processor */
 static int omap_rproc_stop(struct rproc *rproc)
 {
-	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct device *dev = rproc->dev.parent;
+	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	struct omap_rproc *oproc = rproc->priv;
 	struct omap_rproc_timers_info *timers = pdata->timers;

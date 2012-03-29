@@ -416,6 +416,7 @@ enum rproc_err {
  * @error_handler: workqueue for reseting virtio devices
  * @crash_cnt: counter for fatal errors
  * @recovery_disabled: flag that state if recovery was disabled
+ * @index: index of this rproc device
  */
 struct rproc {
 	struct klist_node node;
@@ -424,7 +425,7 @@ struct rproc {
 	const char *firmware;
 	void *priv;
 	const struct rproc_ops *ops;
-	struct device *dev;
+	struct device dev;
 	struct kref refcount;
 	atomic_t power;
 	unsigned int state;
@@ -441,6 +442,7 @@ struct rproc {
 	struct work_struct error_handler;
 	unsigned crash_cnt;
 	bool recovery_disabled;
+	int index;
 };
 
 /* we currently support only two vrings per rvdev */
