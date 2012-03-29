@@ -18,9 +18,13 @@
 #include <linux/slab.h>
 #include <linux/clk.h>
 #include <asm/system_misc.h>
+#include <linux/io.h>
 
 #include <plat/omap_device.h>
 #include <plat/dvfs.h>
+
+#include <mach/ctrl_module_wkup_44xx.h>
+#include <mach/hardware.h>
 
 #include "common.h"
 #include "clockdomain.h"
@@ -31,6 +35,8 @@
 #include "prm-regbits-44xx.h"
 #include "prminst44xx.h"
 #include "pm.h"
+
+#define EMIF_SDRAM_CONFIG2_OFFSET	0xc
 
 struct power_state {
 	struct powerdomain *pwrdm;
@@ -338,6 +344,38 @@ static int __init omap_pm_init(void)
 	}
 
 	pr_info("Power Management for TI OMAP4XX/OMAP5XXX devices.\n");
+
+	/*
+	 * Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
+	 * Mode Transition When CS1 Is Used On EMIF":
+	 * Overwrite EMIF1/EMIF2
+	 * SECURE_EMIF1_SDRAM_CONFIG2_REG
+	 * SECURE_EMIF2_SDRAM_CONFIG2_REG
+	 */
+	if (cpu_is_omap443x()) {
+		void __iomem *secure_ctrl_mod;
+		void __iomem *emif1;
+		void __iomem *emif2;
+		u32 val;
+
+		secure_ctrl_mod = ioremap(OMAP4_CTRL_MODULE_WKUP, SZ_4K);
+		emif1 = ioremap(OMAP44XX_EMIF1_BASE, SZ_1M);
+		emif2 = ioremap(OMAP44XX_EMIF2_BASE, SZ_1M);
+
+		BUG_ON(!secure_ctrl_mod || !emif1 || !emif2);
+
+		val = __raw_readl(emif1 + EMIF_SDRAM_CONFIG2_OFFSET);
+		__raw_writel(val, secure_ctrl_mod +
+			     OMAP4_CTRL_SECURE_EMIF1_SDRAM_CONFIG2_REG);
+		val = __raw_readl(emif2 + EMIF_SDRAM_CONFIG2_OFFSET);
+		__raw_writel(val, secure_ctrl_mod +
+			     OMAP4_CTRL_SECURE_EMIF2_SDRAM_CONFIG2_REG);
+		/* barrier to ensure everything is in sync */
+		wmb();
+		iounmap(secure_ctrl_mod);
+		iounmap(emif1);
+		iounmap(emif2);
+	}
 
 	/* setup the erratas */
 	omap_pm_setup_errata();
