@@ -1008,6 +1008,20 @@ static void playback_trigger(struct snd_pcm_substream *substream,
 	}
 }
 
+static int omap_abe_hwrule_period_step(struct snd_pcm_hw_params *params,
+					struct snd_pcm_hw_rule *rule)
+{
+	struct snd_interval *period_size = hw_param_interval(params,
+				     SNDRV_PCM_HW_PARAM_PERIOD_SIZE);
+	unsigned int rate = params_rate(params);
+
+	/* 44.1kHz has the same iteration number as 48kHz */
+	rate = (rate == 44100) ? 48000 : rate;
+
+	/* ABE requires chunks of 250us worth of data */
+	return snd_interval_step(period_size, 0, rate / 4000);
+}
+
 static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 			struct snd_soc_dai *dai)
 {
@@ -1036,6 +1050,17 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 			dev_err(abe_priv->modem_dai->dev, "failed to open DAI %d\n", ret);
 			return ret;
 		}
+	} else {
+		/*
+		 * Period size must be aligned with the Audio Engine
+		 * processing loop which is 250 us long
+		 */
+		snd_pcm_hw_rule_add(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_PERIOD_SIZE,
+				omap_abe_hwrule_period_step,
+				NULL,
+				SNDRV_PCM_HW_PARAM_PERIOD_SIZE,
+				SNDRV_PCM_HW_PARAM_RATE, -1);
 	}
 
 	return ret;
