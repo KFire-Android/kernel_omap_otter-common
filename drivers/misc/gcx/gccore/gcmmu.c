@@ -609,14 +609,20 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 	enum gcerror gcerror;
 	struct gcmommumaster *gcmommumaster;
 	struct gcmommuinit *gcmommuinit;
-	unsigned int size;
+	unsigned int size, status, enabled;
 	struct mmu2dprivate *mmu = get_mmu();
 
 	if ((ctxt == NULL) || (ctxt->mmu == NULL))
 		return GCERR_MMU_CTXT_BAD;
 
+	/* Read the MMU status. */
+	status = gc_read_reg(GCREG_MMU_CONTROL_Address);
+	enabled = GETFIELD(status, GCREG_MMU_CONTROL, ENABLE);
+
 	/* Is MMU enabled? */
-	if (mmu->enabled) {
+	if (enabled) {
+		GC_PRINT(KERN_INFO "gcx: mmu is already enabled.\n");
+
 		/* Allocate command buffer space. */
 		gcerror = cmdbuf_alloc(sizeof(struct gcmommumaster),
 					(void **) &gcmommumaster, NULL);
@@ -627,6 +633,8 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 		gcmommumaster->master_ldst = gcmommumaster_master_ldst;
 		gcmommumaster->master = ctxt->physical;
 	} else {
+		GC_PRINT(KERN_INFO "gcx: mmu is disabled, enabling.\n");
+
 		/* MMU disabled, force physical mode. */
 		cmdbuf_physical(true);
 
@@ -654,11 +662,7 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 		gc_write_reg(
 			GCREG_MMU_CONTROL_Address,
 			SETFIELDVAL(0, GCREG_MMU_CONTROL, ENABLE, ENABLE));
-
-		/* Mark as enabled. */
-		mmu->enabled = 1;
 	}
-
 
 	return GCERR_NONE;
 #else
@@ -667,12 +671,6 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 
 	return GCERR_NONE;
 #endif
-}
-
-void mmu2d_reset(void)
-{
-	struct mmu2dprivate *mmu = get_mmu();
-	mmu->enabled = 0;
 }
 
 enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,

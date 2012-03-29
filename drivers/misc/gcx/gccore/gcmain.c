@@ -61,6 +61,7 @@ struct gccore {
 };
 
 static struct gccore gcdevice;
+static bool g_irqinstalled;
 
 static int irqline = 48;
 module_param(irqline, int, 0644);
@@ -81,7 +82,6 @@ static struct gccontextmap *g_map;
 static struct gccontextmap *g_mapvacant;
 static int g_clientref;
 
-static struct clk *g_bb2d_clk;
 static void *g_reg_base;
 
 static enum gcerror find_context(struct gccontextmap **context, int create)
@@ -246,7 +246,6 @@ static enum gcerror release_context(struct gccontextmap *context)
 			if (gcerror != GCERR_NONE)
 				goto exit;
 		}
-
 	}
 
 	kfree(context);
@@ -446,16 +445,8 @@ static irqreturn_t gc_irq(int irq, void *p)
 	if (data == 0)
 		return IRQ_NONE;
 
-	GC_PRINT(GC_INFO_MSG " data=0x%08X\n",
-		__func__, __LINE__, data);
-
-#if GC_DUMP
-	/* Dump GPU status. */
-	gc_gpu_status((char *) __func__, __LINE__, &data);
-#endif
-
 #if 1
-	g_gccoredata = data & 0x3FFFFFFF;
+	g_gccoredata = data;
 	complete(&g_gccoreint);
 #else
 	/* TODO: we need to wait for an interrupt after enabling
@@ -481,308 +472,240 @@ static irqreturn_t gc_irq(int irq, void *p)
  * GPU power level control.
  */
 
-struct gctransition {
-	int irq;
-	int irq_install;
-
-	int reset;
-
-	int clk;
-	int clk_on;
-
-	int pulse;
-	int pulse_skip;
-};
-
-static struct gctransition g_gctransition[4][4] = {
-	/* FROM: GCPWR_UNKNOWN */
-	{
-		/* TO: GCPWR_UNKNOWN */
-		{0},
-
-		/* TO: GCPWR_OFF */
-		{
-			true, false,		/* IRQ routine. */
-			true,			/* Hardware reset. */
-			true, false,		/* External clock. */
-			false, false		/* Internal pulse skipping. */
-		},
-
-		/* TO: GCPWR_SUSPEND */
-		{
-			true, true,		/* IRQ routine. */
-			true,			/* Hardware reset. */
-			true, true,		/* External clock. */
-			true, true		/* Internal pulse skipping. */
-		},
-
-		/* TO: GCPWR_ON */
-		{
-			true, true,		/* IRQ routine. */
-			true,			/* Hardware reset. */
-			true, true,		/* External clock. */
-			false, false		/* Internal pulse skipping. */
-		},
-	},
-
-	/* FROM: GCPWR_OFF */
-	{
-		/* TO: GCPWR_UNKNOWN */
-		{0},
-
-		/* TO: GCPWR_OFF */
-		{
-			false, false,		/* IRQ routine. */
-			false,			/* Hardware reset. */
-			false, false,		/* External clock. */
-			false, false		/* Internal pulse skipping. */
-		},
-
-		/* TO: GCPWR_SUSPEND */
-		{
-			true, true,		/* IRQ routine. */
-			false,			/* Hardware reset. */
-			true, true,		/* External clock. */
-			true, true		/* Internal pulse skipping. */
-		},
-
-		/* TO: GCPWR_ON */
-		{
-			true, true,		/* IRQ routine. */
-			false,			/* Hardware reset. */
-			true, true,		/* External clock. */
-			false, false		/* Internal pulse skipping. */
-		},
-	},
-
-	/* FROM: GCPWR_SUSPEND */
-	{
-		/* TO: GCPWR_UNKNOWN */
-		{0},
-
-		/* TO: GCPWR_OFF */
-		{
-			true, false,		/* IRQ routine. */
-			false,			/* Hardware reset. */
-			true, false,		/* External clock. */
-			false, false		/* Internal pulse skipping. */
-		},
-
-		/* TO: GCPWR_SUSPEND */
-		{
-			false, false,		/* IRQ routine. */
-			false,			/* Hardware reset. */
-			false, false,		/* External clock. */
-			false, false		/* Internal pulse skipping. */
-		},
-
-		/* TO: GCPWR_ON */
-		{
-			false, false,		/* IRQ routine. */
-			false,			/* Hardware reset. */
-			false, false,		/* External clock. */
-			true, false		/* Internal pulse skipping. */
-		},
-	},
-
-	/* FROM: GCPWR_ON */
-	{
-		/* TO: GCPWR_UNKNOWN */
-		{0},
-
-		/* TO: GCPWR_OFF */
-		{
-			true, false,		/* IRQ routine. */
-			false,			/* Hardware reset. */
-			true, false,		/* External clock. */
-			false, false		/* Internal pulse skipping. */
-		},
-
-		/* TO: GCPWR_SUSPEND */
-		{
-			false, false,		/* IRQ routine. */
-			false,			/* Hardware reset. */
-			false, false,		/* External clock. */
-			true, true		/* Internal pulse skipping. */
-		},
-
-		/* TO: GCPWR_ON */
-		{
-			false, false,		/* IRQ routine. */
-			false,			/* Hardware reset. */
-			false, false,		/* External clock. */
-			false, false		/* Internal pulse skipping. */
-		},
-	},
-};
-
 #include <plat/omap_hwmod.h>
 #include <plat/omap-pm.h>
-#define GCGPOUT0 0x64
 
-enum gcpower g_gcpower;
+static struct clk *g_bb2d_clk;
+struct device *g_bb2d_dev;
+static enum gcpower g_gcpower = GCPWR_UNKNOWN;
+static bool g_clockenabled;
+static bool g_irqenabled;
+static bool g_pulseskipping;
 
-enum gcerror gc_set_power(enum gcpower gcpower)
+void gc_reset_gpu(void)
 {
-	enum gcerror gcerror = GCERR_NONE;
-	struct gctransition *gctransition;
-	int ret;
+	union gcclockcontrol gcclockcontrol;
+	union gcidle gcidle;
 
-	if (gcpower == GCPWR_UNKNOWN) {
-		gcerror = GCERR_POWER_MODE;
-		goto fail;
+	/* Read current clock control value. */
+	gcclockcontrol.raw
+		= gc_read_reg(GCREG_HI_CLOCK_CONTROL_Address);
+
+	while (true) {
+		/* Isolate the GPU. */
+		gcclockcontrol.reg.isolate = 1;
+		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
+				gcclockcontrol.raw);
+
+		/* Set soft reset. */
+		gcclockcontrol.reg.reset = 1;
+		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
+				gcclockcontrol.raw);
+
+		/* Wait for reset. */
+		gc_delay(1);
+
+		/* Reset soft reset bit. */
+		gcclockcontrol.reg.reset = 0;
+		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
+				gcclockcontrol.raw);
+
+		/* Reset GPU isolation. */
+		gcclockcontrol.reg.isolate = 0;
+		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
+				gcclockcontrol.raw);
+
+		/* Read idle register. */
+		gcidle.raw = gc_read_reg(GCREG_HI_IDLE_Address);
+
+		/* Try resetting again if FE not idle. */
+		if (!gcidle.reg.fe) {
+			GC_PRINT(GC_ERR_MSG " FE NOT IDLE\n",
+				__func__, __LINE__);
+
+			continue;
+		}
+
+		/* Read reset register. */
+		gcclockcontrol.raw
+			= gc_read_reg(GCREG_HI_CLOCK_CONTROL_Address);
+
+		/* Try resetting again if 2D is not idle. */
+		if (!gcclockcontrol.reg.idle2d) {
+			GC_PRINT(GC_ERR_MSG " 2D NOT IDLE\n",
+				__func__, __LINE__);
+
+			continue;
+		}
+
+		/* GPU is idle. */
+		break;
 	}
 
-	GC_PRINT(GC_INFO_MSG " power state %d --> %d\n",
-			__func__, __LINE__, g_gcpower, gcpower);
+	/* Pulse skipping disabled. */
+	g_pulseskipping = false;
 
-	gctransition = &g_gctransition[g_gcpower][gcpower];
+	GC_PRINT("gcx: gpu reset.\n");
+}
 
-	/* Enable external clock. */
-	if (gctransition->clk && gctransition->clk_on) {
+enum gcerror gcpwr_enable_clock(enum gcpower prevstate)
+{
+	enum gcerror gcerror = GCERR_NONE;
+	int ret;
+
+	if (g_clockenabled) {
+		GC_PRINT("gcx: clock is already enabled.\n");
+	} else {
+		/* Enable the clock. */
 		ret = clk_enable(g_bb2d_clk);
 		if (ret < 0) {
 			GC_PRINT(GC_ERR_MSG
 					" failed to enable bb2d_fck (%d).\n",
 					__func__, __LINE__, ret);
 			gcerror = GCERR_POWER_CLOCK_ON;
-			goto fail;
+			goto exit;
 		}
-		gc_write_reg(GCGPOUT0, 0);
-		pr_info("gcx: clock enabled.\n");
+
+		/* Signal software not idle. */
+		gc_write_reg(GC_GP_OUT0_Address, 0);
+
+		/* Clock enabled. */
+		g_clockenabled = true;
+		GC_PRINT("gcx: clock enabled.\n");
 	}
 
-	/* Install/remove IRQ handler. */
-	if (gctransition->irq) {
-		if (gctransition->irq_install) {
-			ret = request_irq(DEVICE_INT, gc_irq, IRQF_SHARED,
-						DEV_NAME, &gcdevice);
-			if (ret < 0) {
-				GC_PRINT(GC_ERR_MSG
-					" failed to install IRQ (%d).\n",
-					 __func__, __LINE__, ret);
-				gcerror = GCERR_POWER_CLOCK_ON;
-				goto fail;
-			}
-			pr_info("gcx: irq installed.\n");
-		} else {
-			free_irq(DEVICE_INT, &gcdevice);
-			pr_info("gcx: irq removed.\n");
-		}
+	if (prevstate == GCPWR_UNKNOWN)
+		gc_reset_gpu();
+
+exit:
+	return gcerror;
+}
+
+void gcpwr_disable_clock(enum gcpower prevstate)
+{
+	if (g_clockenabled) {
+		/* Signal software idle. */
+		gc_write_reg(GC_GP_OUT0_Address, 1);
+
+		/* Disable the clock. */
+		clk_disable(g_bb2d_clk);
+
+		/* Clock disabled. */
+		g_clockenabled = false;
+		GC_PRINT("gcx: clock disabled.\n");
+	} else {
+		GC_PRINT("gcx: clock is already disabled.\n");
 	}
+}
 
-	/* Reset the GPU. */
-	if (gctransition->reset) {
-		union gcclockcontrol gcclockcontrol;
-		union gcidle gcidle;
+void gcpwr_enable_pulse_skipping(enum gcpower prevstate)
+{
+	union gcclockcontrol gcclockcontrol;
 
-		/* Read current clock control value. */
-		gcclockcontrol.raw
-			= gc_read_reg(GCREG_HI_CLOCK_CONTROL_Address);
+	if (!g_clockenabled)
+		return;
 
-		while (true) {
-			/* Isolate the GPU. */
-			gcclockcontrol.reg.isolate = 1;
-			gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-					gcclockcontrol.raw);
+	if (g_pulseskipping) {
+		GC_PRINT("gcx: pulse skipping is already enabled.\n");
+	} else {
+		omap_pm_set_min_bus_tput(g_bb2d_dev, OCP_INITIATOR_AGENT, -1);
 
-			/* Set soft reset. */
-			gcclockcontrol.reg.reset = 1;
-			gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-					gcclockcontrol.raw);
-
-			/* Wait for reset. */
-			gc_delay(1);
-
-			/* Reset soft reset bit. */
-			gcclockcontrol.reg.reset = 0;
-			gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-					gcclockcontrol.raw);
-
-			/* Reset GPU isolation. */
-			gcclockcontrol.reg.isolate = 0;
-			gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-					gcclockcontrol.raw);
-
-			/* Read idle register. */
-			gcidle.raw = gc_read_reg(GCREG_HI_IDLE_Address);
-
-			/* Try resetting again if FE not idle. */
-			if (!gcidle.reg.fe) {
-				GC_PRINT(GC_ERR_MSG " FE NOT IDLE\n",
-					__func__, __LINE__);
-
-				continue;
-			}
-
-			/* Read reset register. */
-			gcclockcontrol.raw
-				= gc_read_reg(GCREG_HI_CLOCK_CONTROL_Address);
-
-			/* Try resetting again if 2D is not idle. */
-			if (!gcclockcontrol.reg.idle2d) {
-				GC_PRINT(GC_ERR_MSG " 2D NOT IDLE\n",
-					__func__, __LINE__);
-
-				continue;
-			}
-
-			/* GPU is idle. */
-			break;
-		}
-		pr_info("gcx: gpu reset.\n");
-	}
-
-	/* Enable/disable pulse skipping. */
-	if (gctransition->pulse) {
-		struct device *dev = omap_hwmod_name_get_dev("bb2d");
-		union gcclockcontrol gcclockcontrol;
+		/* Enable loading and set to minimum value. */
 		gcclockcontrol.raw = 0;
-
-		if (gctransition->pulse_skip) {
-			GC_PRINT(GC_INFO_MSG " PULSE SKIP ENABLE\n",
-				__func__, __LINE__);
-
-			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, -1);
-
-			/* Enable loading and set to minimum value. */
-			gcclockcontrol.reg.pulsecount = 1;
-			gcclockcontrol.reg.pulseset = true;
-			gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-					gcclockcontrol.raw);
-		} else {
-			GC_PRINT(GC_INFO_MSG " PULSE SKIP DISABLE\n",
-				__func__, __LINE__);
-
-			/* set the min l3 data throughput to 2.5 GB */
-			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT,
-								0xA0000000);
-
-			/* Enable loading and set to maximum value. */
-			gcclockcontrol.reg.pulsecount = 64;
-			gcclockcontrol.reg.pulseset = true;
-			gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
-					gcclockcontrol.raw);
-		}
+		gcclockcontrol.reg.pulsecount = 1;
+		gcclockcontrol.reg.pulseset = true;
+		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
+				gcclockcontrol.raw);
 
 		/* Disable loading. */
 		gcclockcontrol.reg.pulseset = false;
 		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
 				gcclockcontrol.raw);
+
+		/* Pulse skipping enabled. */
+		g_pulseskipping = true;
+		GC_PRINT("gcx: pulse skipping enabled.\n");
+	}
+}
+
+void gcpwr_disable_pulse_skipping(enum gcpower prevstate)
+{
+	union gcclockcontrol gcclockcontrol;
+
+	if (!g_clockenabled)
+		return;
+
+	if (g_pulseskipping) {
+		/* Set the min l3 data throughput to 2.5 GB. */
+		omap_pm_set_min_bus_tput(g_bb2d_dev, OCP_INITIATOR_AGENT,
+						0xA0000000);
+
+		/* Enable loading and set to maximum value. */
+		gcclockcontrol.reg.pulsecount = 64;
+		gcclockcontrol.reg.pulseset = true;
+		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
+				gcclockcontrol.raw);
+
+		/* Disable loading. */
+		gcclockcontrol.reg.pulseset = false;
+		gc_write_reg(GCREG_HI_CLOCK_CONTROL_Address,
+				gcclockcontrol.raw);
+
+		/* Pulse skipping disabled. */
+		g_pulseskipping = false;
+		GC_PRINT("gcx: pulse skipping disabled.\n");
+	} else {
+		GC_PRINT("gcx: pulse skipping is already disabled.\n");
+	}
+}
+
+enum gcerror gc_set_power(enum gcpower gcpower)
+{
+	enum gcerror gcerror = GCERR_NONE;
+
+	if (gcpower == GCPWR_UNKNOWN) {
+		gcerror = GCERR_POWER_MODE;
+		goto exit;
 	}
 
-	/* Disable external clock. */
-	if (gctransition->clk && !gctransition->clk_on) {
-		gc_write_reg(GCGPOUT0, 0x1);
-		clk_disable(g_bb2d_clk);
-		mmu2d_reset();
-		pr_info("gcx: clock disabled.\n");
+	if (gcpower != g_gcpower) {
+		GC_PRINT(GC_INFO_MSG " power state %d --> %d\n",
+				__func__, __LINE__, g_gcpower, gcpower);
+
+		switch (gcpower) {
+		case GCPWR_ON:
+			gcerror = gcpwr_enable_clock(g_gcpower);
+			if (gcerror != GCERR_NONE)
+				goto exit;
+
+			gcpwr_disable_pulse_skipping(g_gcpower);
+
+			if (!g_irqenabled) {
+				enable_irq(DEVICE_INT);
+				g_irqenabled = true;
+			}
+			break;
+
+		case GCPWR_OFF:
+			gcpwr_enable_pulse_skipping(g_gcpower);
+			gcpwr_disable_clock(g_gcpower);
+
+			if (g_irqenabled) {
+				disable_irq(DEVICE_INT);
+				g_irqenabled = false;
+			}
+			break;
+
+		default:
+			gcerror = GCERR_POWER_MODE;
+			goto exit;
+		}
+
+		/* Set new power state. */
+		g_gcpower = gcpower;
 	}
 
-	/* Set new power state. */
-	g_gcpower = gcpower;
-
-fail:
+exit:
 	return gcerror;
 }
 
@@ -805,12 +728,20 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 
 	mutex_lock(&mtx);
 
+	/* Enable power to the chip. */
+	gc_set_power(GCPWR_ON);
+
 	/* Locate the client entry. */
 	kgccommit.gcerror = find_context(&context, true);
 	if (kgccommit.gcerror != GCERR_NONE)
 		goto exit;
 
 	context->context->mmu_dirty = true;
+
+	/* Set the client's master table. */
+	gccommit->gcerror = mmu2d_set_master(&context->context->mmu);
+	if (gccommit->gcerror != GCERR_NONE)
+		goto exit;
 
 	/* Set 2D pipe. */
 	gccommit->gcerror = cmdbuf_alloc(sizeof(struct gcmopipesel),
@@ -820,11 +751,6 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 
 	gcmopipesel->pipesel_ldst = gcmopipesel_pipesel_ldst;
 	gcmopipesel->pipesel.reg = gcregpipeselect_2D;
-
-	/* Set the client's master table. */
-	gccommit->gcerror = mmu2d_set_master(&context->context->mmu);
-	if (gccommit->gcerror != GCERR_NONE)
-		goto exit;
 
 	/* Determine command buffer flush size. */
 	cmdflushsize = cmdbuf_flush(NULL);
@@ -890,6 +816,9 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	}
 
 exit:
+	/* Shut down. */
+	gc_set_power(GCPWR_OFF);
+
 	mutex_unlock(&mtx);
 }
 EXPORT_SYMBOL(gc_commit);
@@ -1054,6 +983,8 @@ static struct early_suspend early_suspend_info = {
 
 static int __init gc_init(void)
 {
+	int ret;
+
 	/* check if hardware is available */
 	if (!cpu_is_omap447x())
 		return 0;
@@ -1074,9 +1005,12 @@ static int __init gc_init(void)
 	GC_PRINT(GC_INFO_MSG " BB2D clock is %ldMHz\n",
 		__func__, __LINE__, (clk_get_rate(g_bb2d_clk) / 1000000));
 
-	/* Set power mode. */
-	g_gcpower = GCPWR_UNKNOWN;
-
+	g_bb2d_dev = omap_hwmod_name_get_dev("bb2d");
+	if (g_bb2d_dev == NULL) {
+		GC_PRINT(GC_ERR_MSG " cannot find bb2d device.\n",
+			 __func__, __LINE__);
+		goto fail;
+	}
 
 	/* Map GPU registers. */
 	g_reg_base = ioremap_nocache(DEVICE_REG_BASE, DEVICE_REG_SIZE);
@@ -1085,6 +1019,21 @@ static int __init gc_init(void)
 			 __func__, __LINE__);
 		goto fail;
 	}
+
+	/* Install IRQ. */
+	ret = request_irq(DEVICE_INT, gc_irq, IRQF_SHARED,
+				DEV_NAME, &gcdevice);
+	if (ret < 0) {
+		GC_PRINT(GC_ERR_MSG " failed to install IRQ (%d).\n",
+			__func__, __LINE__, ret);
+		goto fail;
+	}
+
+	g_irqinstalled = true;
+
+	/* Disable IRQ. */
+	disable_irq(DEVICE_INT);
+	g_irqenabled = false;
 
 	/* Initialize the command buffer. */
 	if (cmdbuf_init() != GCERR_NONE) {
@@ -1108,6 +1057,9 @@ static int __init gc_init(void)
 
 	return platform_driver_register(&plat_drv);
 fail:
+	if (g_irqinstalled)
+		free_irq(DEVICE_INT, &gcdevice);
+
 	if (g_reg_base != NULL) {
 		iounmap(g_reg_base);
 		g_reg_base = NULL;
@@ -1121,7 +1073,6 @@ fail:
 
 static void __exit gc_exit(void)
 {
-
 	if (!cpu_is_omap447x())
 		return;
 
@@ -1141,7 +1092,11 @@ static void __exit gc_exit(void)
 
 	if (g_bb2d_clk)
 		clk_put(g_bb2d_clk);
+
 	mutex_destroy(&mtx);
+
+	if (g_irqinstalled)
+		free_irq(DEVICE_INT, &gcdevice);
 }
 
 MODULE_LICENSE("GPL v2");

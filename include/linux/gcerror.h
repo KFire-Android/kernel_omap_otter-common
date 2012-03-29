@@ -164,6 +164,9 @@ enum gcerror {
 	GCERR_POWER_IRQ_ON		/* Failed to install IRQ handler. */
 	= GCERR_GROUP(0x04020),
 
+	GCERR_POWER_PULSE		/* Pulse skipping error. */
+	= GCERR_GROUP(0x04030),
+
 	/**** GCIOCTL module errors. */
 	GCERR_IOCTL_CTX_ALLOC		/* Context wrapper allocation. */
 	= GCERR_GROUP(0x11000),

@@ -210,9 +210,6 @@ int cmdbuf_flush(void *logical)
 
 		gc_flush_pages(&cmdbuf.page);
 
-		/* Enable power to the chip. */
-		gc_set_power(GCPWR_ON);
-
 #if GC_DUMP || GC_ENABLE_GPU_COUNTERS
 		/* Reset hardware counters. */
 		gc_write_reg(GC_RESET_MEM_COUNTERS_Address, 1);
@@ -236,9 +233,6 @@ int cmdbuf_flush(void *logical)
 
 		GC_PRINT(KERN_INFO "%s(%d): data = 0x%08X\n",
 			__func__, __LINE__, gc_get_interrupt_data());
-
-		/* Go to suspend. */
-		gc_set_power(GCPWR_SUSPEND);
 #else
 		wait_event_interruptible(gc_event, done == true);
 #endif
