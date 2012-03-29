@@ -178,6 +178,11 @@ int omap_abe_set_dl1_output(int output)
 	case OMAP_ABE_DL1_EARPIECE:
 		gain = GAIN_M1dB;
 		break;
+#if !defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+	case OMAP_ABE_DL1_HANDSFREE:
+		gain = GAIN_M7dB;
+		break;
+#endif
 	case OMAP_ABE_DL1_NO_PDM:
 		gain = GAIN_0dB;
 		break;
@@ -194,13 +199,22 @@ EXPORT_SYMBOL(omap_abe_set_dl1_output);
 
 static int omap_abe_dl1_enabled(struct omap_abe_data *abe_priv)
 {
+	int dl1;
+
 	/* DL1 path is common for PDM_DL1, BT_VX_DL and MM_EXT_DL */
-	return omap_abe_port_is_enabled(abe_priv->abe,
+	dl1 = omap_abe_port_is_enabled(abe_priv->abe,
 				abe_priv->port[OMAP_ABE_BE_PORT_PDM_DL1]) +
 		omap_abe_port_is_enabled(abe_priv->abe,
 				abe_priv->port[OMAP_ABE_BE_PORT_BT_VX_DL]) +
 		omap_abe_port_is_enabled(abe_priv->abe,
 				abe_priv->port[OMAP_ABE_BE_PORT_MM_EXT_DL]);
+
+#if !defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+	dl1 += omap_abe_port_is_enabled(abe_priv->abe,
+				abe_priv->port[OMAP_ABE_BE_PORT_PDM_DL2]);
+#endif
+
+	return dl1;
 }
 
 static int omap_abe_dl2_enabled(struct omap_abe_data *abe_priv)
@@ -233,8 +247,16 @@ static void mute_be(struct snd_soc_pcm_runtime *be,
 			}
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 			abe_mute_gain(GAINS_DL2, GAIN_LEFT_OFFSET);
 			abe_mute_gain(GAINS_DL2, GAIN_RIGHT_OFFSET);
+#else
+			if (omap_abe_dl1_enabled(abe_priv) == 1) {
+				abe_mute_gain(GAINS_DL1, GAIN_LEFT_OFFSET);
+				abe_mute_gain(GAINS_DL1, GAIN_RIGHT_OFFSET);
+				abe_mute_gain(MIXSDT, MIX_SDT_INPUT_DL1_MIXER);
+			}
+#endif
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
 		case OMAP_ABE_DAI_MODEM:
@@ -289,8 +311,14 @@ static void unmute_be(struct snd_soc_pcm_runtime *be,
 			abe_unmute_gain(MIXSDT, MIX_SDT_INPUT_DL1_MIXER);
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
+#if defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
 			abe_unmute_gain(GAINS_DL2, GAIN_LEFT_OFFSET);
 			abe_unmute_gain(GAINS_DL2, GAIN_RIGHT_OFFSET);
+#else
+			abe_unmute_gain(GAINS_DL1, GAIN_LEFT_OFFSET);
+			abe_unmute_gain(GAINS_DL1, GAIN_RIGHT_OFFSET);
+			abe_unmute_gain(MIXSDT, MIX_SDT_INPUT_DL1_MIXER);
+#endif
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
 			break;
