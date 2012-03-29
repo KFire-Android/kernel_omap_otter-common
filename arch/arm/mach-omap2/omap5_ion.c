@@ -18,7 +18,7 @@
 #include "omap5_ion.h"
 
 static struct ion_platform_data omap5_ion_data = {
-	.nr = 3,
+	.nr = 4,
 	.heaps = {
 		{
 			.type = ION_HEAP_TYPE_CARVEOUT,
@@ -45,6 +45,11 @@ static struct ion_platform_data omap5_ion_data = {
 					OMAP5_ION_HEAP_TILER_SIZE -
 					OMAP5_ION_HEAP_NONSECURE_TILER_SIZE,
 			.size = OMAP5_ION_HEAP_NONSECURE_TILER_SIZE,
+		},
+		{
+			.type = ION_HEAP_TYPE_SYSTEM,
+			.id = OMAP_ION_HEAP_SYSTEM,
+			.name = "system",
 		},
 	},
 };
