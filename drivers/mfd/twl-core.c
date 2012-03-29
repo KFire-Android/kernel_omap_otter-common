@@ -663,8 +663,11 @@ add_regulator(int num, struct regulator_init_data *pdata,
 	return add_regulator_linked(num, pdata, NULL, 0, features);
 }
 
-#define SET_LDO_STATE_MEM(ldo, state) \
-	ldo->constraints.state_mem.disabled = state
+#define SET_LDO_STATE_MEM(ldo, state)				\
+	do {							\
+		ldo->constraints.state_mem.enabled = state;	\
+		ldo->constraints.state_mem.disabled = !state;	\
+	} while (0)
 
 /*
  * NOTE:  We know the first 8 IRQs after pdata->base_irq are
@@ -995,9 +998,9 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 					TWL6030_REG_JTAGVERNUM);
 
 			if ((eepromrev < 56) && (twlrev < 1)) {
-				SET_LDO_STATE_MEM(pdata->ldo6, false);
-				SET_LDO_STATE_MEM(pdata->ldoln, false);
-				SET_LDO_STATE_MEM(pdata->sysen, false);
+				SET_LDO_STATE_MEM(pdata->ldo6, true);
+				SET_LDO_STATE_MEM(pdata->ldoln, true);
+				SET_LDO_STATE_MEM(pdata->sysen, true);
 				WARN(1, "This TWL6032 is an older revision that "
 						"does not support low power "
 						"measurements\n");
