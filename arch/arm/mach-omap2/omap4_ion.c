@@ -24,22 +24,23 @@ static struct ion_platform_data omap4_ion_data = {
 			.type = ION_HEAP_TYPE_CARVEOUT,
 			.id = OMAP_ION_HEAP_SECURE_INPUT,
 			.name = "secure_input",
-			.base = PHYS_ADDR_SMC_MEM -
-					OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
+			.base = PHYS_ADDR_TESLA_MEM - OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
 			.size = OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
 		},
 		{	.type = OMAP_ION_HEAP_TYPE_TILER,
 			.id = OMAP_ION_HEAP_TILER,
 			.name = "tiler",
-			.base = PHYS_ADDR_DUCATI_MEM -
-					OMAP4_ION_HEAP_TILER_SIZE,
+			.base = PHYS_ADDR_TESLA_MEM - OMAP4_ION_HEAP_SECURE_INPUT_SIZE - OMAP4_ION_HEAP_TILER_SIZE,
 			.size = OMAP4_ION_HEAP_TILER_SIZE,
 		},
 		{
 			.type = OMAP_ION_HEAP_TYPE_TILER,
 			.id = OMAP_ION_HEAP_NONSECURE_TILER,
 			.name = "nonsecure_tiler",
-			.base = 0x80000000 + (SZ_1M * 353),
+			.base = PHYS_ADDR_TESLA_MEM - \
+					OMAP4_ION_HEAP_SECURE_INPUT_SIZE - \
+					OMAP4_ION_HEAP_TILER_SIZE - \
+					OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
 			.size = OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
 		},
 	},
