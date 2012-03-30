@@ -40,8 +40,11 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_ring.h>
 #include <asm/byteorder.h>
+#include <linux/pm_runtime.h>
 
 #include "remoteproc_internal.h"
+
+#define DEFAULT_AUTOSUSPEND_TIMEOUT 5000
 
 #define dev_to_rproc(dev) container_of(dev, struct rproc, dev)
 
@@ -83,9 +86,32 @@ static int rproc_resume(struct device *dev)
 	dev_dbg(dev, "Enter %s\n", __func__);
 
 	mutex_lock(&rproc->lock);
+	/* system suspend has finished */
+	rproc->system_suspended = false;
 	if (rproc->state != RPROC_SUSPENDED)
 		goto out;
 
+	/* resume no needed (already autosuspended when system suspend) */
+	if (!rproc->need_resume)
+		goto out;
+
+	/*
+	 * if a message came after rproc was system suspended, need_resume is
+	 * true and if runtime status is suspended in this case  we need to
+	 * resume and then runtime status needs to be updated too, thas is easy
+	 * acomplish by calling pm_runtime_resume
+	 */
+	if (pm_runtime_status_suspended(dev)) {
+		pm_runtime_resume(dev);
+		goto mark;
+	}
+
+	/*
+	 * if a system suspend request came when rproc was running, the
+	 * rproc was forced to go to suspend by the system suspend callback.
+	 * However, the rproc runtime status is still active. In this
+	 * case we only need to wake up the rproc and update rproc state
+	 */
 	if (rproc->ops->resume) {
 		ret = rproc->ops->resume(rproc);
 		if (ret) {
@@ -93,8 +119,11 @@ static int rproc_resume(struct device *dev)
 			goto out;
 		}
 	}
-
 	rproc->state = RPROC_RUNNING;
+mark:
+	/* if a resume was needed we need to schedule next autosupend */
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_autosuspend(dev);
 out:
 	mutex_unlock(&rproc->lock);
 	return ret;
@@ -112,21 +141,96 @@ static int rproc_suspend(struct device *dev)
 		goto out;
 
 	if (rproc->ops->suspend) {
-		ret = rproc->ops->suspend(rproc);
+		ret = rproc->ops->suspend(rproc, false);
 		if (ret) {
 			dev_err(dev, "suspend failed %d\n", ret);
 			goto out;
 		}
 	}
 
+	/*
+	 * rproc was not already suspended, so we forced the suspend and
+	 * therefore we need a resume in the system resume callback
+	 */
+	rproc->need_resume = 1;
 	rproc->state = RPROC_SUSPENDED;
 out:
+	if (!ret)
+		rproc->system_suspended = true;
 	mutex_unlock(&rproc->lock);
 	return ret;
 }
 
+static int rproc_runtime_resume(struct device *dev)
+{
+	struct rproc *rproc = dev_to_rproc(dev);
+	int ret = 0;
+
+	dev_dbg(dev, "Enter %s\n", __func__);
+
+	if (rproc->state != RPROC_SUSPENDED)
+		goto out;
+
+	/*
+	 * if we are in system suspend we cannot wakeup the rproc yet,
+	 * instead set need_resume flag so that rproc can be resumed in
+	 * the system resume callback
+	 */
+	if (rproc->system_suspended) {
+		rproc->need_resume = true;
+		return -EAGAIN;
+	}
+
+	if (rproc->ops->resume) {
+		ret = rproc->ops->resume(rproc);
+		if (ret) {
+			dev_err(dev, "resume failed %d\n", ret);
+			goto out;
+		}
+	}
+
+	rproc->state = RPROC_RUNNING;
+out:
+	return ret;
+}
+
+static int rproc_runtime_suspend(struct device *dev)
+{
+	struct rproc *rproc = dev_to_rproc(dev);
+	int ret;
+
+	dev_dbg(dev, "Enter %s\n", __func__);
+
+	if (rproc->state != RPROC_RUNNING)
+		goto out;
+
+	if (rproc->ops->suspend) {
+		ret = rproc->ops->suspend(rproc, true);
+		if (ret)
+			goto abort;
+	}
+
+	rproc->state = RPROC_SUSPENDED;
+out:
+	return 0;
+abort:
+	dev_dbg(dev, "auto suspend aborted %d\n", ret);
+	pm_runtime_mark_last_busy(dev);
+	return ret;
+}
+
+static int rproc_runtime_idle(struct device *dev)
+{
+	dev_dbg(dev, "Enter %s\n", __func__);
+
+	/* try to auto suspend when idle is called */
+	return pm_runtime_autosuspend(dev);
+}
+
 static const struct dev_pm_ops rproc_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(rproc_suspend, rproc_resume)
+	SET_RUNTIME_PM_OPS(rproc_runtime_suspend, rproc_runtime_resume,
+			rproc_runtime_idle)
 };
 
 /* translate rproc_err to string */
@@ -883,6 +987,29 @@ free_mapping:
 	return ret;
 }
 
+/**
+ * rproc_handle_suspd_time() - handle auto suspend timeout resource
+ * @rproc: the remote processor
+ * @rsc: auto suspend tiemout resource descriptor
+ * @avail: size of available data (for sanity checking the image)
+ *
+ * Set the autosuspend timeout the rproc will use
+ *
+ * Returns 0 on success, or an appropriate error code otherwise
+ */
+static int rproc_handle_suspd_time(struct rproc *rproc,
+		 struct fw_rsc_suspd_time *rsc, int avail)
+{
+	struct device *dev = &rproc->dev;
+
+	if (sizeof(*rsc) > avail) {
+		dev_err(dev, "suspend timeout rsc is truncated\n");
+		return -EINVAL;
+	}
+
+	rproc->auto_suspend_timeout = rsc->suspd_time;
+	return 0;
+}
 /*
  * A lookup table for resource handlers. The indices are defined in
  * enum fw_resource_type.
@@ -891,6 +1018,7 @@ static rproc_handle_resource_t rproc_handle_rsc[] = {
 	[RSC_CARVEOUT] = (rproc_handle_resource_t)rproc_handle_carveout,
 	[RSC_DEVMEM] = (rproc_handle_resource_t)rproc_handle_devmem,
 	[RSC_TRACE] = (rproc_handle_resource_t)rproc_handle_trace,
+	[RSC_SUSPD_TIME] = (rproc_handle_resource_t)rproc_handle_suspd_time,
 	[RSC_VDEV] = NULL, /* VDEVs were handled upon registrarion */
 };
 
@@ -1213,6 +1341,18 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	rproc->state = RPROC_RUNNING;
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+	pm_runtime_get_noresume(dev);
+	rproc->auto_suspend_timeout = rproc->auto_suspend_timeout ? :
+					DEFAULT_AUTOSUSPEND_TIMEOUT;
+	if (rproc->auto_suspend_timeout >= 0) {
+		pm_runtime_set_autosuspend_delay(dev,
+						 rproc->auto_suspend_timeout);
+		pm_runtime_use_autosuspend(dev);
+		pm_runtime_mark_last_busy(dev);
+		pm_runtime_put_autosuspend(dev);
+	}
 
 	dev_info(dev, "remote processor %s is now up\n", rproc->name);
 
@@ -1369,6 +1509,19 @@ void rproc_shutdown(struct rproc *rproc)
 	/* if the remote proc is still needed, bail out */
 	if (!atomic_dec_and_test(&rproc->power))
 		goto out;
+
+	/*
+	 * if autosuspend is enabled we need to cancel possible already
+	 * scheduled runtime suspend. Also, if it is already autosuspended
+	 * we need to wake it up to avoid stopping the processor with
+	 * context saved which can cause a issue when it is started again
+	 */
+	if (rproc->auto_suspend_timeout >= 0)
+		pm_runtime_get_sync(dev);
+
+	pm_runtime_put_noidle(&rproc->dev);
+	pm_runtime_disable(&rproc->dev);
+	pm_runtime_set_suspended(&rproc->dev);
 
 	/* power off the remote processor */
 	ret = rproc->ops->stop(rproc);

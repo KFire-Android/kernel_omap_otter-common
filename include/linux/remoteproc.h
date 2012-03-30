@@ -102,6 +102,7 @@ struct fw_rsc_hdr {
  *		    the remote processor will be writing logs.
  * @RSC_VDEV:       declare support for a virtio device, and serve as its
  *		    virtio header.
+ * @RSC_SUSPD_TIME: suspend timeout used for autosuspend feature
  * @RSC_LAST:       just keep this one at the end
  *
  * For more details regarding a specific resource type, please see its
@@ -117,7 +118,8 @@ enum fw_resource_type {
 	RSC_DEVMEM	= 1,
 	RSC_TRACE	= 2,
 	RSC_VDEV	= 3,
-	RSC_LAST	= 4,
+	RSC_SUSPD_TIME	= 4,
+	RSC_LAST	= 5,
 };
 
 #define FW_RSC_ADDR_ANY (0xFFFFFFFFFFFFFFFF)
@@ -308,6 +310,14 @@ struct fw_rsc_vdev {
 } __packed;
 
 /**
+ * struct fw_rsc_suspd_time - suspend timeout resource
+ * @suspd_time: auto suspend timeout
+ */
+struct fw_rsc_suspd_time {
+	s32 suspd_time;
+} __packed;
+
+/**
  * struct rproc_mem_entry - memory entry descriptor
  * @va:	virtual address
  * @dma: dma address
@@ -332,7 +342,7 @@ struct rproc;
  * @start:	power on the device and boot it
  * @stop:	power off the device
  * @kick:	kick a virtqueue (virtqueue id given as a parameter)
- * @suspend:	suspend callback
+ * @suspend:	suspend callback (auto_suspend flag as a parameter)
  * @resume:	resume callback
  * @set_latency		set latency on remote processor
  * @set_bandwidth	set bandwidth on remote processor
@@ -342,7 +352,7 @@ struct rproc_ops {
 	int (*start)(struct rproc *rproc);
 	int (*stop)(struct rproc *rproc);
 	void (*kick)(struct rproc *rproc, int vqid);
-	int (*suspend)(struct rproc *rproc);
+	int (*suspend)(struct rproc *rproc, bool auto_suspend);
 	int (*resume)(struct rproc *rproc);
 	int (*set_latency)(struct device *dev, struct rproc *rproc, long v);
 	int (*set_bandwidth)(struct device *dev, struct rproc *rproc, long v);
@@ -421,6 +431,9 @@ enum rproc_err {
  * @crash_cnt: counter for fatal errors
  * @recovery_disabled: flag that state if recovery was disabled
  * @index: index of this rproc device
+ * @auto_suspend_timeout: store the auto suspend timeout for a rproc in msecs
+ * @need resume: if true a resume is needed in the system resume callback
+ * @system_suspended: true if a system suspend has happened
  */
 struct rproc {
 	struct klist_node node;
@@ -447,6 +460,9 @@ struct rproc {
 	unsigned crash_cnt;
 	bool recovery_disabled;
 	int index;
+	int auto_suspend_timeout;
+	bool need_resume;
+	bool system_suspended;
 };
 
 /* we currently support only two vrings per rvdev */

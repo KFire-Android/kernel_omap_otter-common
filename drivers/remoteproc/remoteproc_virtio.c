@@ -26,6 +26,7 @@
 #include <linux/err.h>
 #include <linux/kref.h>
 #include <linux/slab.h>
+#include <linux/pm_runtime.h>
 
 #include "remoteproc_internal.h"
 
@@ -35,10 +36,30 @@ static void rproc_virtio_notify(struct virtqueue *vq)
 	struct rproc_vring *rvring = vq->priv;
 	struct rproc *rproc = rvring->rvdev->rproc;
 	int notifyid = rvring->notifyid;
+	struct device *dev = &rproc->dev;
+	int ret;
 
-	dev_dbg(&rproc->dev, "kicking vq index: %d\n", notifyid);
+	dev_dbg(dev, "kicking vq index: %d\n", notifyid);
 
+	mutex_lock(&rproc->lock);
+	/* wakeup rproc before kick it */
+	ret = pm_runtime_get_sync(dev);
+	/*
+	 * ret < 0 can happen because of 2 things in normal cases:
+	 * 1. System suspend has happened and we detect that on our
+	 *    runtime_resume callback.
+	 * 2. System suspend has happened and runtime has been disabled by
+	 *    PM framework.
+	 * In both cases we need to indicate we need a resume on system resume.
+	 * However, we can continue. Kicks while suspend need to be managed by
+	 * low level driver.
+	 */
+	if (ret < 0)
+		rproc->need_resume = true;
 	rproc->ops->kick(rproc, notifyid);
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_put_autosuspend(dev);
+	mutex_unlock(&rproc->lock);
 }
 
 /**

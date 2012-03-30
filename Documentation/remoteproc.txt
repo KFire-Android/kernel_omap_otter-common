@@ -169,14 +169,14 @@ drivers:
  * @start:	power on the device and boot it
  * @stop:	power off the device
  * @kick:	kick a virtqueue (virtqueue id given as a parameter)
- * @suspend:	suspend the device
+ * @suspend:	suspend the device (auto_suspend flag as a parameter)
  * @resume:	resume the device
  */
 struct rproc_ops {
 	int (*start)(struct rproc *rproc);
 	int (*stop)(struct rproc *rproc);
 	void (*kick)(struct rproc *rproc, int vqid);
-	int (*suspend)(struct rproc *rproc);
+	int (*suspend)(struct rproc *rproc, bool auto_suspend);
 	int (*resume)(struct rproc *rproc);
 };
 
@@ -202,7 +202,15 @@ too expensive) to go through the existing virtqueues and look for new buffers
 in the used rings.
 
 The ->suspend() handler takes an rproc handle and it should save the context
-of that rproc and then put it in a low power state.
+of that rproc and then put it in a low power state. If @auto_suspend flag is
+true, that means it comes from a auto suspend request. This kind of request
+is not a mandatory suspend  which means you can abort suspend without any
+issue. In order to abort this auto suspend you just need to return -EBUSY.
+This will abort auto suspend and another attempt will be done only after
+another inactivity timeout. So, in this cause if the remoteproc is not really
+idle it should abort autosuspend. It is responsibility of the low lever
+driver to confirm when the remoteproc is really idle and when it is ok to
+suspend and when no suspend.
 On success, 0 is returned, and on failure, an appropriate error code.
 
 The ->resume() handler takes an rproc handle and it should restore the context
