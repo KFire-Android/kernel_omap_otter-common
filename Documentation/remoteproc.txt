@@ -169,16 +169,21 @@ drivers:
  * @start:	power on the device and boot it
  * @stop:	power off the device
  * @kick:	kick a virtqueue (virtqueue id given as a parameter)
+ * @suspend:	suspend the device
+ * @resume:	resume the device
  */
 struct rproc_ops {
 	int (*start)(struct rproc *rproc);
 	int (*stop)(struct rproc *rproc);
 	void (*kick)(struct rproc *rproc, int vqid);
+	int (*suspend)(struct rproc *rproc);
+	int (*resume)(struct rproc *rproc);
 };
 
 Every remoteproc implementation should at least provide the ->start and ->stop
 handlers. If rpmsg/virtio functionality is also desired, then the ->kick handler
-should be provided as well.
+should be provided as well. If suspend/resume functionality is desired, then
+the ->suspend and ->resume handlers should be provided.
 
 The ->start() handler takes an rproc handle and should then power on the
 device and boot it (use rproc->priv to access platform-specific private data).
@@ -195,6 +200,14 @@ processor and let it know it has pending messages. Notifying remote processors
 the exact virtqueue index to look in is optional: it is easy (and not
 too expensive) to go through the existing virtqueues and look for new buffers
 in the used rings.
+
+The ->suspend() handler takes an rproc handle and it should save the context
+of that rproc and then put it in a low power state.
+On success, 0 is returned, and on failure, an appropriate error code.
+
+The ->resume() handler takes an rproc handle and it should restore the context
+of that rproc and then put it in a functional power state.
+On success, 0 is returned, and on failure, an appropriate error code.
 
 6. Binary Firmware Structure
 

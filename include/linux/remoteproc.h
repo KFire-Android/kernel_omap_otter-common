@@ -332,6 +332,8 @@ struct rproc;
  * @start:	power on the device and boot it
  * @stop:	power off the device
  * @kick:	kick a virtqueue (virtqueue id given as a parameter)
+ * @suspend:	suspend callback
+ * @resume:	resume callback
  * @set_latency		set latency on remote processor
  * @set_bandwidth	set bandwidth on remote processor
  * @set_frequency	set frequency of remote processor
@@ -340,6 +342,8 @@ struct rproc_ops {
 	int (*start)(struct rproc *rproc);
 	int (*stop)(struct rproc *rproc);
 	void (*kick)(struct rproc *rproc, int vqid);
+	int (*suspend)(struct rproc *rproc);
+	int (*resume)(struct rproc *rproc);
 	int (*set_latency)(struct device *dev, struct rproc *rproc, long v);
 	int (*set_bandwidth)(struct device *dev, struct rproc *rproc, long v);
 	int (*set_frequency)(struct device *dev, struct rproc *rproc, long v);
