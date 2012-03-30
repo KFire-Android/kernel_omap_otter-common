@@ -45,8 +45,6 @@ static struct ion_platform_data omap4_ion_data = {
 
 static struct omap_ion_platform_data omap4_ion_pdata = {
 	.ion = &omap4_ion_data,
-	.tiler2d_size = OMAP4_ION_HEAP_TILER_SIZE,
-	.nonsecure_tiler2d_size = OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
 };
 
 static struct platform_device omap4_ion_device = {
