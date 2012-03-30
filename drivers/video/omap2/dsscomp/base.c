@@ -355,6 +355,81 @@ done:
 	return ovl->set_overlay_info(ovl, &info);
 }
 
+int set_dss_wb_info(struct dss2_ovl_info *oi,
+	enum omap_writeback_source src)
+{
+	struct omap_writeback_info info;
+	struct omap_writeback *wb;
+	struct dss2_ovl_cfg *cfg;
+	union rect crop, win;
+	struct omap_overlay_manager *manager;
+
+	/* check overlay number */
+	if (!oi || oi->cfg.ix != OMAP_DSS_WB)
+		return -EINVAL;
+
+	/* current support only for manager capture mode */
+	if (src != oi->cfg.mgr_ix)
+		return -EINVAL;
+
+	cfg = &oi->cfg;
+	wb = omap_dss_get_wb(0);
+	manager = omap_dss_get_overlay_manager(cfg->mgr_ix);
+
+	/* just in case there are new fields, we get the current info */
+	wb->get_wb_info(wb, &info);
+
+	info.enabled = cfg->enabled;
+	if (!cfg->enabled)
+		goto done;
+
+	/* Currently, we always use output of manager for WB input */
+	info.source = manager->id;
+	info.capturemode = OMAP_WB_CAPTURE_ALL;
+	info.mode = OMAP_WB_CAPTURE_MODE;
+
+	/* WB overlay does not support cropping */
+	if ((cfg->crop.w != manager->device->panel.timings.x_res) ||
+		(cfg->crop.h != manager->device->panel.timings.y_res) ||
+		(cfg->crop.x != 0) || (cfg->crop.y != 0)) {
+		info.enabled = false;
+		goto done;
+	}
+
+	/* calculate input/output height and width */
+	crop.r = cfg->crop;
+	win.r = cfg->win;
+	info.width = cfg->crop.w;
+	info.height = cfg->crop.h;
+	info.out_width = cfg->win.w;
+	info.out_height = cfg->win.h;
+	info.dss_mode = cfg->color_mode;
+
+	/* calculate addresses */
+	info.paddr = oi->ba;
+	info.p_uv_addr = (info.dss_mode == OMAP_DSS_COLOR_NV12) ? oi->uv : 0;
+
+	info.rotation = cfg->rotation;
+	/* swap height & width for 90/270 degrees */
+	if (info.rotation & 1)
+		swap(info.out_width, info.out_height);
+	/* If its TILER 2D buffer, use TILER for rotation */
+	if (info.paddr >= 0x60000000 && info.paddr < 0x78000000)
+		info.rotation_type = OMAP_DSS_ROT_TILER;
+	else
+		info.rotation_type = OMAP_DSS_ROT_DMA;
+done:
+
+	pr_debug("Writeback: en=%d %x/%x (%dx%d => (%dx%d) "
+		"col=%x src=%d mode=%d capt=%d\n",
+		info.enabled, info.paddr, info.p_uv_addr, info.width,
+		info.height, info.out_width, info.out_height, info.dss_mode,
+		info.source, info.mode, info.capturemode);
+
+	/* set overlay info */
+	return wb->set_wb_info(wb, &info);
+}
+
 void swap_rb_in_ovl_info(struct dss2_ovl_info *oi)
 {
 	/* we need to swap YUV color matrix if we are swapping R and B */

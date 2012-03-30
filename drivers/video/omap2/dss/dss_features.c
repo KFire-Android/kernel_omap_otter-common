@@ -343,7 +343,7 @@ static const struct omap_dss_features omap4430_es1_0_dss_features  = {
 		FEAT_DSI_GNQ | FEAT_HANDLE_UV_SEPARATE | FEAT_ATTR2 |
 		FEAT_CPR | FEAT_PRELOAD | FEAT_FIR_COEF_V |
 		FEAT_ALPHA_OMAP3_COMPAT | FEAT_OVL_VID3 |
-		FEAT_OVL_ZORDER,
+		FEAT_OVL_ZORDER | FEAT_OVL_WB,
 
 	.num_mgrs = 3,
 	.num_ovls = 4,
@@ -367,7 +367,7 @@ static const struct omap_dss_features omap4470_dss_features = {
 		FEAT_HANDLE_UV_SEPARATE | FEAT_ATTR2 | FEAT_CPR |
 		FEAT_PRELOAD | FEAT_FIR_COEF_V |
 		FEAT_ALPHA_OMAP3_COMPAT | FEAT_OVL_VID3 |
-		FEAT_OVL_ZORDER | FEAT_GLOBAL_MFLAG,
+		FEAT_OVL_ZORDER | FEAT_GLOBAL_MFLAG | FEAT_OVL_WB,
 
 	.num_mgrs = 3,
 	.num_ovls = 4,
@@ -391,7 +391,7 @@ static const struct omap_dss_features omap4_dss_features = {
 		FEAT_HANDLE_UV_SEPARATE | FEAT_ATTR2 | FEAT_CPR |
 		FEAT_PRELOAD | FEAT_FIR_COEF_V |
 		FEAT_ALPHA_OMAP3_COMPAT | FEAT_OVL_VID3 |
-		FEAT_OVL_ZORDER,
+		FEAT_OVL_ZORDER | FEAT_OVL_WB,
 
 	.num_mgrs = 3,
 	.num_ovls = 4,

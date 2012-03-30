@@ -36,7 +36,6 @@
 #include <plat/clock.h>
 #include <plat/dma.h>
 #include <plat/i2c.h>
-#include <plat/omap_hwmod.h>
 
 #define NAME_SIZE	50
 #define REGULATOR_MAX	1
@@ -423,21 +422,16 @@ static int rprm_i2c_request(struct rprm_elem *e, struct rprm_i2c *obj)
 {
 	struct device *i2c_dev;
 	struct i2c_adapter *adapter;
-	char i2c_name[NAME_SIZE];
 	int ret = -EINVAL;
-
-	sprintf(i2c_name, "i2c%d", obj->id);
-	i2c_dev = omap_hwmod_name_get_dev(i2c_name);
-	if (IS_ERR_OR_NULL(i2c_dev)) {
-		pr_err("%s: unable to lookup %s\n", __func__, i2c_name);
-		return ret;
-	}
 
 	adapter = i2c_get_adapter(obj->id);
 	if (!adapter) {
 		pr_err("%s: could not get i2c%d adapter\n", __func__, obj->id);
 		return -EINVAL;
 	}
+
+	i2c_dev = adapter->dev.parent;
+
 	i2c_detect_ext_master(adapter);
 	i2c_put_adapter(adapter);
 

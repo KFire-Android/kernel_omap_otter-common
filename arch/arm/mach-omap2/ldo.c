@@ -65,6 +65,36 @@ static inline void _abb_set_availability(struct voltagedomain *voltdm,
 }
 
 /**
+ * _abb_wait_tranx() - wait for abb tranxdone event
+ * @voltdm:	voltage domain we are operating on
+ * @abb:	pointer to the abb instance
+ *
+ * Returns -ETIMEDOUT if the event is not set on time.
+ */
+static int _abb_wait_tranx(struct voltagedomain *voltdm,
+			    struct omap_ldo_abb_instance *abb)
+{
+	int timeout;
+	int ret;
+
+	timeout = 0;
+	while (timeout++ < abb->tranx_timeout) {
+		ret = abb->ops->check_txdone(abb->prm_irq_id);
+		if (ret)
+			break;
+
+		udelay(1);
+	}
+
+	if (timeout >= abb->tranx_timeout) {
+		pr_warning("%s:%s: ABB TRANXDONE waittimeout(timeout=%d)\n",
+			   __func__, voltdm->name, timeout);
+		return -ETIMEDOUT;
+	}
+	return 0;
+}
+
+/**
  * _abb_clear_tranx() - clear abb tranxdone event
  * @voltdm:	voltage domain we are operating on
  * @abb:	pointer to the abb instance
@@ -111,17 +141,37 @@ static int _abb_set_abb(struct voltagedomain *voltdm, int abb_type)
 	if (ret)
 		return ret;
 
-	/* Select FBB or RBB */
-	if (abb_type == OMAP_ABB_SLOW_OPP)
+	/* Select proper Adaptive Body-Bias(ABB) */
+	switch (abb_type) {
+	case OMAP_ABB_NOMINAL_OPP:
+		/* setup to bypass */
 		voltdm->rmw(abb->setup_bits->active_fbb_mask |
-				abb->setup_bits->active_rbb_mask,
-				abb->setup_bits->active_rbb_mask,
-				abb->setup_reg);
-	else
+			    abb->setup_bits->active_rbb_mask,
+			    0x0,
+			    abb->setup_reg);
+		break;
+	case OMAP_ABB_SLOW_OPP:
+		/* setup to RBB */
 		voltdm->rmw(abb->setup_bits->active_fbb_mask |
-				abb->setup_bits->active_rbb_mask,
-				abb->setup_bits->active_fbb_mask,
-				abb->setup_reg);
+			    abb->setup_bits->active_rbb_mask,
+			    abb->setup_bits->active_rbb_mask,
+			    abb->setup_reg);
+		break;
+	case OMAP_ABB_FAST_OPP:
+		/* setup to FBB */
+		voltdm->rmw(abb->setup_bits->active_fbb_mask |
+			    abb->setup_bits->active_rbb_mask,
+			    abb->setup_bits->active_fbb_mask,
+			    abb->setup_reg);
+		break;
+	case OMAP_ABB_NONE:
+		/* Fall through */
+	default:
+		/* Should have never been here! */
+		WARN_ONCE(1, "%s: voltage domain %s: abb type %d!!!\n",
+			 __func__, voltdm->name, abb_type);
+		return -EINVAL;
+	}
 
 	/* program next state of ABB ldo */
 	voltdm->rmw(abb->ctrl_bits->opp_sel_mask,
@@ -132,8 +182,12 @@ static int _abb_set_abb(struct voltagedomain *voltdm, int abb_type)
 	voltdm->rmw(abb->ctrl_bits->opp_change_mask,
 		    abb->ctrl_bits->opp_change_mask, abb->ctrl_reg);
 
+	/* Wait for conversion completion */
+	ret = _abb_wait_tranx(voltdm, abb);
+	WARN_ONCE(ret, "%s: voltdm %s ABB TRANXDONE was not set on time:%d\n",
+			__func__, voltdm->name, ret);
 	/* clear interrupt status */
-	ret = _abb_clear_tranx(voltdm, abb);
+	ret |= _abb_clear_tranx(voltdm, abb);
 
 	return ret;
 }
@@ -149,15 +203,12 @@ static int _abb_set_abb(struct voltagedomain *voltdm, int abb_type)
  * of LDO functions
  */
 static int _abb_scale(struct voltagedomain *voltdm,
-		      unsigned long target_volt, bool is_prescale)
+		      struct omap_volt_data *target_vdata, bool is_prescale)
 {
 	int ret = 0;
-	struct omap_volt_data *target_vdata;
 	int curr_abb, target_abb;
 	struct omap_ldo_abb_instance *abb;
 
-	/* get per-voltage ABB data */
-	target_vdata = omap_voltage_get_voltdata(voltdm, target_volt);
 	if (IS_ERR_OR_NULL(target_vdata)) {
 		pr_err("%s:%s: Invalid volt data tv=%p!\n", __func__,
 		       voltdm->name, target_vdata);
@@ -174,8 +225,8 @@ static int _abb_scale(struct voltagedomain *voltdm,
 	target_abb = target_vdata->abb_type;
 
 	pr_debug("%s: %s: Enter: t_v=%ld scale=%d c_abb=%d t_abb=%d ret=%d\n",
-		 __func__, voltdm->name, target_volt, is_prescale, curr_abb,
-		 target_abb, ret);
+		 __func__, voltdm->name, omap_get_nominal_voltage(target_vdata),
+		 is_prescale, curr_abb, target_abb, ret);
 
 	/* If we were'nt booting and there is no change, we get out */
 	if (target_abb == curr_abb && voltdm->curr_volt)
@@ -188,19 +239,21 @@ static int _abb_scale(struct voltagedomain *voltdm,
 		return -EINVAL;
 	}
 
-	/*
-	 * We set up ABB as follows:
-	 * if we are scaling *to* a voltage which needs ABB, do it in post
-	 * if we are scaling *from* a voltage which needs ABB, do it in pre
-	 * So, if the conditions are in reverse, we just return happy
-	 */
-	if (is_prescale && (target_abb > curr_abb))
-		goto out;
+	/* Prescale - override and always go bypass */
+	if (is_prescale) {
+		/* if we are already in bypass, dont need to do it again */
+		if (curr_abb == OMAP_ABB_NOMINAL_OPP)
+			goto out;
+		target_abb = OMAP_ABB_NOMINAL_OPP;
+	}
 
-	if (!is_prescale && (target_abb < curr_abb))
+	/* Use RBB ONLY if calibrated voltage is achieved */
+	if (!is_prescale && target_abb == OMAP_ABB_SLOW_OPP &&
+	    !target_vdata->volt_calibrated) {
+		/* Skip setting up RBB at this point of transition */
 		goto out;
+	}
 
-	/* Time to set ABB now */
 	ret = _abb_set_abb(voltdm, target_abb);
 	if (!ret) {
 		abb->__cur_abb_type = target_abb;
@@ -213,8 +266,8 @@ static int _abb_scale(struct voltagedomain *voltdm,
 
 out:
 	pr_debug("%s: %s:Exit: t_v=%ld scale=%d c_abb=%d t_abb=%d ret=%d\n",
-		 __func__, voltdm->name, target_volt, is_prescale, curr_abb,
-		 target_abb, ret);
+		 __func__, voltdm->name, omap_get_nominal_voltage(target_vdata),
+		 is_prescale, curr_abb, target_abb, ret);
 	return ret;
 
 }
@@ -222,12 +275,12 @@ out:
 /**
  * omap_ldo_abb_pre_scale() - Enable required ABB strategy before voltage scale
  * @voltdm:		voltage domain to operate on
- * @target_volt:	target voltage we moved to.
+ * @target_volt:	target voltage data we moved to.
  */
 int omap_ldo_abb_pre_scale(struct voltagedomain *voltdm,
-			   unsigned long target_volt)
+			   struct omap_volt_data *target_vdata)
 {
-	return _abb_scale(voltdm, target_volt, true);
+	return _abb_scale(voltdm, target_vdata, true);
 }
 
 /**
@@ -236,9 +289,9 @@ int omap_ldo_abb_pre_scale(struct voltagedomain *voltdm,
  * @target_volt:	target voltage we are going to
  */
 int omap_ldo_abb_post_scale(struct voltagedomain *voltdm,
-			    unsigned long target_volt)
+			    struct omap_volt_data *target_vdata)
 {
-	return _abb_scale(voltdm, target_volt, false);
+	return _abb_scale(voltdm, target_vdata, false);
 }
 
 /**

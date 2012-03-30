@@ -138,10 +138,20 @@ static void tablet_hdmi_mux_init(void)
 		pr_err("%s: Cannot request HDMI GPIOs %x\n", __func__, status);
 }
 
+static struct tc358765_board_data tablet_dsi_panel = {
+	.lp_time	= 0x4,
+	.clrsipo	= 0x3,
+	.lv_is		= 0x1,
+	.lv_nd		= 0x6,
+	.vtgen		= 0x1,
+	.vsdelay	= 0xf,
+};
+
 static struct omap_dss_device tablet_lcd_device = {
 	.name                   = "lcd",
 	.driver_name            = "tc358765",
 	.type                   = OMAP_DISPLAY_TYPE_DSI,
+	.data			= &tablet_dsi_panel,
 	.phy.dsi                = {
 		.clk_lane       = 1,
 		.clk_pol        = 0,

@@ -16,6 +16,14 @@ config OMAP_THERMAL
 	  This is the thermal framework support for OMAP4
 	  processors.
 
+config OMAP4_DUTY_CYCLE
+	tristate "Control OPP_NITRO usage based on duty cycle strategy"
+	depends on ARCH_OMAP4
+	default n
+	---help---
+	If you are going to use OPP_NITRO with high level of leakage which.
+	could pontentially sustain a thermal runaway, say Y here.
+
 source "drivers/staging/thermal_framework/sensor/Kconfig"
 
 source "drivers/staging/thermal_framework/governor/Kconfig"

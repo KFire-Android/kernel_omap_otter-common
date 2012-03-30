@@ -48,6 +48,8 @@
 #define DEVICE_REG_BASE	0x59000000
 #define DEVICE_REG_SIZE	(256 * 1024)
 
+#define GC_ENABLE_SUSPEND 0
+
 /* Driver context structure. */
 struct gccontext {
 	struct mmu2dcontext mmu;
@@ -79,9 +81,7 @@ static struct gccontextmap *g_map;
 static struct gccontextmap *g_mapvacant;
 static int g_clientref;
 
-static int clk_enabled;
 static struct clk *g_bb2d_clk;
-static unsigned long g_bb2d_clk_rate;
 static void *g_reg_base;
 
 static enum gcerror find_context(struct gccontextmap **context, int create)
@@ -92,24 +92,6 @@ static enum gcerror find_context(struct gccontextmap **context, int create)
 	pid_t pid;
 
 	GC_PRINT(GC_INFO_MSG " getting lock mutex.\n", __func__, __LINE__);
-
-	mutex_lock(&mtx);
-
-	if (!clk_enabled) {
-		/* Locate the clock entry. */
-		g_bb2d_clk = clk_get(NULL, "bb2d_fck");
-		if (IS_ERR(g_bb2d_clk)) {
-			GC_PRINT(GC_ERR_MSG " cannot find bb2d_fck.\n",
-				 __func__, __LINE__);
-			goto exit;
-		}
-
-		g_bb2d_clk_rate = clk_get_rate(g_bb2d_clk);
-		GC_PRINT(GC_INFO_MSG " BB2D clock is %ldMHz\n",
-			__func__, __LINE__, (g_bb2d_clk_rate / 1000000));
-
-		clk_enabled = 1;
-	}
 
 	/* Get current PID. */
 	pid = 0;
@@ -229,7 +211,6 @@ free_2d_ctx:
 free_map_ctx:
 	kfree(curr->context);
 exit:
-	mutex_unlock(&mtx);
 	return gcerror;
 }
 
@@ -657,24 +638,18 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 
 	gctransition = &g_gctransition[g_gcpower][gcpower];
 
-	/* Enable/disable external clock. */
-	if (gctransition->clk) {
-		if (gctransition->clk_on) {
-			ret = clk_enable(g_bb2d_clk);
-			if (ret < 0) {
-				GC_PRINT(GC_ERR_MSG
+	/* Enable external clock. */
+	if (gctransition->clk && gctransition->clk_on) {
+		ret = clk_enable(g_bb2d_clk);
+		if (ret < 0) {
+			GC_PRINT(GC_ERR_MSG
 					" failed to enable bb2d_fck (%d).\n",
-					 __func__, __LINE__, ret);
-				gcerror = GCERR_POWER_CLOCK_ON;
-				goto fail;
-			}
-			gc_write_reg(GCGPOUT0, 0);
-			pr_info("gcx: clock enabled.\n");
-		} else {
-			gc_write_reg(GCGPOUT0, 0x1);
-			clk_disable(g_bb2d_clk);
-			pr_info("gcx: clock disabled.\n");
+					__func__, __LINE__, ret);
+			gcerror = GCERR_POWER_CLOCK_ON;
+			goto fail;
 		}
+		gc_write_reg(GCGPOUT0, 0);
+		pr_info("gcx: clock enabled.\n");
 	}
 
 	/* Install/remove IRQ handler. */
@@ -796,6 +771,14 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 				gcclockcontrol.raw);
 	}
 
+	/* Disable external clock. */
+	if (gctransition->clk && !gctransition->clk_on) {
+		gc_write_reg(GCGPOUT0, 0x1);
+		clk_disable(g_bb2d_clk);
+		mmu2d_reset();
+		pr_info("gcx: clock disabled.\n");
+	}
+
 	/* Set new power state. */
 	g_gcpower = gcpower;
 
@@ -820,12 +803,13 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	struct gccontextmap *context;
 	struct gccommit kgccommit;
 
+	mutex_lock(&mtx);
+
 	/* Locate the client entry. */
 	kgccommit.gcerror = find_context(&context, true);
 	if (kgccommit.gcerror != GCERR_NONE)
 		goto exit;
 
-	mutex_lock(&mtx);
 	context->context->mmu_dirty = true;
 
 	/* Set 2D pipe. */
@@ -917,12 +901,13 @@ void gc_map(struct gcmap *gcmap)
 	struct gccontextmap *context;
 	struct gcmap kgcmap;
 
+	mutex_lock(&mtx);
+
 	/* Locate the client entry. */
 	kgcmap.gcerror = find_context(&context, true);
 	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
 
-	mutex_lock(&mtx);
 	context->context->mmu_dirty = true;
 
 	GC_PRINT(GC_INFO_MSG " map client buffer\n",
@@ -977,12 +962,13 @@ void gc_unmap(struct gcmap *gcmap)
 	struct gccontextmap *context;
 	struct gcmap kgcmap;
 
+	mutex_lock(&mtx);
+
 	/* Locate the client entry. */
 	kgcmap.gcerror = find_context(&context, true);
 	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
 
-	mutex_lock(&mtx);
 	context->context->mmu_dirty = true;
 
 	GC_PRINT(GC_INFO_MSG " unmap client buffer\n",
@@ -1032,7 +1018,7 @@ static int gc_resume(struct platform_device *pdev)
 
 static struct platform_driver plat_drv = {
 	.probe = gc_probe,
-#ifndef CONFIG_HAS_EARLYSUSPEND
+#if !defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
 	.suspend = gc_suspend,
 	.resume = gc_resume,
 #endif
@@ -1042,7 +1028,7 @@ static struct platform_driver plat_drv = {
 	},
 };
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
 #include <linux/earlysuspend.h>
 
 static void gccore_early_suspend(struct early_suspend *h)
@@ -1078,8 +1064,18 @@ static int __init gc_init(void)
 	/* Initialize interrupt completion. */
 	init_completion(&g_gccoreint);
 
+	g_bb2d_clk = clk_get(NULL, "bb2d_fck");
+	if (IS_ERR(g_bb2d_clk)) {
+		GC_PRINT(GC_ERR_MSG " cannot find bb2d_fck.\n",
+			 __func__, __LINE__);
+		goto fail;
+	}
+
+	GC_PRINT(GC_INFO_MSG " BB2D clock is %ldMHz\n",
+		__func__, __LINE__, (clk_get_rate(g_bb2d_clk) / 1000000));
+
 	/* Set power mode. */
-	g_gcpower = GCPWR_OFF;
+	g_gcpower = GCPWR_UNKNOWN;
 
 
 	/* Map GPU registers. */
@@ -1106,7 +1102,7 @@ static int __init gc_init(void)
 
 	mutex_init(&g_maplock);
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
 	register_early_suspend(&early_suspend_info);
 #endif
 
@@ -1117,15 +1113,21 @@ fail:
 		g_reg_base = NULL;
 	}
 
+	if (g_bb2d_clk)
+		clk_put(g_bb2d_clk);
+
 	return -EINVAL;
 }
 
 static void __exit gc_exit(void)
 {
 
+	if (!cpu_is_omap447x())
+		return;
+
 	platform_driver_unregister(&plat_drv);
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
 	unregister_early_suspend(&early_suspend_info);
 #endif
 
@@ -1136,6 +1138,9 @@ static void __exit gc_exit(void)
 		iounmap(g_reg_base);
 		g_reg_base = NULL;
 	}
+
+	if (g_bb2d_clk)
+		clk_put(g_bb2d_clk);
 	mutex_destroy(&mtx);
 }
 

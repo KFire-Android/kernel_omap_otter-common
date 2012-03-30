@@ -112,6 +112,7 @@ struct twl6030_usb {
 	u8			prev_vbus;
 	bool			irq_enabled;
 	bool			vbus_enable;
+	bool			is_phy_suspended;
 	unsigned long		features;
 };
 
@@ -197,8 +198,13 @@ static int twl6030_phy_suspend(struct otg_transceiver *x, int suspend)
 	struct device *dev = twl->dev;
 	struct twl4030_usb_data *pdata = dev->platform_data;
 
-	pdata->phy_suspend(dev, suspend);
-
+	if (suspend && !twl->is_phy_suspended) {
+		pdata->phy_suspend(dev, 1);
+		twl->is_phy_suspended = true;
+	} else if (!suspend && twl->is_phy_suspended) {
+		pdata->phy_suspend(dev, 0);
+		twl->is_phy_suspended = false;
+	}
 	return 0;
 }
 
@@ -303,7 +309,9 @@ static irqreturn_t twl6030_usb_irq(int irq, void *_twl)
 						TWL6030_MISC2);
 
 		regulator_enable(twl->usb3v3);
+		twl6030_phy_suspend(&twl->otg, 0);
 		charger_type = omap4_charger_detect();
+		twl6030_phy_suspend(&twl->otg, 1);
 		if ((charger_type == POWER_SUPPLY_TYPE_USB_CDP)
 				|| (charger_type == POWER_SUPPLY_TYPE_USB)) {
 
@@ -583,6 +591,7 @@ static int __devinit twl6030_usb_probe(struct platform_device *pdev)
 	}
 
 	twl->asleep = 0;
+	twl->is_phy_suspended = true;
 	pdata->phy_init(dev);
 	twl6030_phy_suspend(&twl->otg, 0);
 	twl6030_enable_irq(&twl->otg);
