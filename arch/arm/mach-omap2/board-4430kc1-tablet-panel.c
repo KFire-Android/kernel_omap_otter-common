@@ -87,38 +87,7 @@ static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data __initda
 };
 #endif
 
-static struct regulator_consumer_supply lcd_supply[] = {
-	{ .supply = "vlcd" },
-};
-
-static struct regulator_init_data lcd_vinit = {
-	.constraints = {
-		.min_uV = 3300000,
-		.max_uV = 3300000,
-		.valid_modes_mask = REGULATOR_MODE_NORMAL,
-		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
-	},
-	.num_consumer_supplies = 1,
-	.consumer_supplies = lcd_supply,
-};
-
-static struct fixed_voltage_config lcd_reg_data = {
-	.supply_name = "vdd_lcd",
-	.microvolts = 3300000,
-	.gpio = 47,
-	.enable_high = 1,
-	.enabled_at_boot = 1,
-	.init_data = &lcd_vinit,
-};
-
-static struct platform_device lcd_regulator_device = {
-	.name   = "reg-fixed-voltage",
-	.id     = -1,
-	.dev    = {
-		.platform_data = &lcd_reg_data,
-	},
-};
-
+#if 0
 void kc1_led_set_power(struct omap_pwm_led_platform_data *self, int on_off)
 {
 	if (on_off) {
@@ -137,6 +106,7 @@ void kc1_led_set_power(struct omap_pwm_led_platform_data *self, int on_off)
 		gpio_set_value(120, 0);
 	}
 }
+#endif
 
 static int tablet_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
@@ -149,6 +119,7 @@ static void tablet_panel_disable_lcd(struct omap_dss_device *dssdev)
   	pr_info("Boxer LCD Disable!\n");
 }
 
+#if 0
 static int tablet_set_bl_intensity(struct omap_dss_device *dssdev, int brightness)
 {
 	pr_info("Boxer LCD Set BL Intensity == %d!\n", brightness);
@@ -166,6 +137,7 @@ static int tablet_set_bl_intensity(struct omap_dss_device *dssdev, int brightnes
 	}
 	return 0;
 }
+#endif
 
 static struct omap_dss_device tablet_lcd_device = {
 	.phy		= {
@@ -288,7 +260,7 @@ static struct platform_device kc1_backlight = {
 };
 
 static struct platform_device __initdata *sdp4430_panel_devices[] = {
-	&lcd_regulator_device,
+	//&lcd_regulator_device,
 	&kc1_backlight,
 };
 

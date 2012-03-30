@@ -129,6 +129,39 @@ static struct platform_device sdp4430_pmic_thermal_sensor = {
 };
 #endif
 
+/* Panel Power */
+static struct regulator_consumer_supply lcd_supply[] = {
+	{ .supply = "vlcd" },
+};
+
+static struct regulator_init_data lcd_vinit = {
+	.constraints = {
+		.min_uV = 3300000,
+		.max_uV = 3300000,
+		.valid_modes_mask = REGULATOR_MODE_NORMAL,
+		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+	},
+	.num_consumer_supplies = 1,
+	.consumer_supplies = lcd_supply,
+};
+
+static struct fixed_voltage_config lcd_reg_data = {
+	.supply_name = "vdd_lcd",
+	.microvolts = 3300000,
+	.gpio = 47,
+	.enable_high = 1,
+	.enabled_at_boot = 1,
+	.init_data = &lcd_vinit,
+};
+
+static struct platform_device lcd_regulator_device = {
+	.name   = "reg-fixed-voltage",
+	.id     = -1,
+	.dev    = {
+		.platform_data = &lcd_reg_data,
+	},
+};
+
 /* Board IDs */
 static u8 quanta_mbid;
 static u8 quanta_touchid;
@@ -177,7 +210,8 @@ static void __init quanta_boardids(void)
 
 
 static struct platform_device __initdata *sdp4430_devices[] = {
-//      &sdp4430_aic3110,
+     &sdp4430_aic3110,
+     &lcd_regulator_device,
 #if defined(CONFIG_SENSORS_OMAP_BANDGAP)
 //	&sdp4430_omap_bandgap_sensor,
 #endif
@@ -590,18 +624,6 @@ static void omap_ilitek_init(void)
 }
 #endif //CONFIG_TOUCHSCREEN_ILITEK
 
-#if 0
-static void panel_enable(void)
-{
-	omap_mux_init_signal("dpm_emu17.gpio_28", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
-	if (gpio_request(OMAP4_LCD_EN_GPIO, "gpio 28") < 0) {
-		pr_err("GPIO 28 request failed\n");
-		return;
-	}
-	gpio_direction_output(OMAP4_LCD_EN_GPIO, 1);
-}
-#endif
-
 
 /* FIXME-HASH: NEED TO HOLD WAKELOCK FOR CONSOLE/BT */
 #if 0
@@ -849,10 +871,10 @@ static void __init omap_kc1_init(void)
 	gpio_set_value(120, 1);
 
 	// Qunata_diagnostic 20110506 set GPIO 171 172 to be input
-	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017C); 
+	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017C); // KPD_COL3
 	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017C);
 	 
-	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017E); 
+	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017E); // KPD_COL4
 	omap_writew(omap_readw(0x4a10017C) & ~0x04, 0x4a10017E);
 	////////////////////////////////////////////
 
