@@ -15,7 +15,7 @@
 #include <linux/omap_ion.h>
 #include <linux/platform_device.h>
 
-#include "omap4_ion.h"
+#include <mach/omap4_ion.h>
 
 static struct ion_platform_data omap4_ion_data = {
 	.nr = 3,
