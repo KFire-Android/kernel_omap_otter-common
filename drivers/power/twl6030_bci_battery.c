@@ -856,89 +856,84 @@ static irqreturn_t twl6030charger_ctrl_interrupt(int irq, void *_di)
 		blocking_notifier_call_chain(&notifier_list, events, NULL);
 	}
 
-	if (!di->use_hw_charger) {
-		if (stat_reset & VBUS_DET) {
-			/* On a USB detach, UNMASK VBUS OVP if masked*/
-			ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &temp,
+	if (stat_reset & VBUS_DET) {
+		/* On a USB detach, UNMASK VBUS OVP if masked*/
+		ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &temp,
 				CHARGERUSB_INT_MASK);
+		if (ret)
+			goto err;
+
+		if (temp & MASK_MCHARGERUSB_FAULT) {
+			ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
+					(temp & ~MASK_MCHARGERUSB_FAULT),
+					CHARGERUSB_INT_MASK);
+			if (ret)
+				goto err;
+		}
+		di->usb_online = 0;
+		dev_dbg(di->dev, "usb removed\n");
+		twl6030_stop_usb_charger(di);
+		if (present_charge_state & VAC_DET)
+			twl6030_start_ac_charger(di);
+
+	}
+
+	if (stat_set & VBUS_DET) {
+		/* In HOST mode (ID GROUND) when a device is connected,
+		 * Mask VBUS OVP interrupt and do no enable usb
+		 * charging
+		 */
+		if (hw_state & STS_USB_ID) {
+			ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER,
+					&temp,
+					CHARGERUSB_INT_MASK);
 			if (ret)
 				goto err;
 
-			if (temp & MASK_MCHARGERUSB_FAULT) {
-				ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER,
-					(temp & ~MASK_MCHARGERUSB_FAULT),
-						CHARGERUSB_INT_MASK);
-				if (ret)
-					goto err;
-			}
-			di->usb_online = 0;
-			dev_dbg(di->dev, "usb removed\n");
-			twl6030_stop_usb_charger(di);
-			if (present_charge_state & VAC_DET)
-				twl6030_start_ac_charger(di);
-
-		}
-
-		if (stat_set & VBUS_DET) {
-			/* In HOST mode (ID GROUND) when a device is connected,
-			 * Mask VBUS OVP interrupt and do no enable usb
-			 * charging
-			 */
-			if (hw_state & STS_USB_ID) {
-				ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER,
-						&temp,
-						CHARGERUSB_INT_MASK);
-				if (ret)
-					goto err;
-
-				if (!(temp & MASK_MCHARGERUSB_FAULT)) {
-					ret = twl_i2c_write_u8(
+			if (!(temp & MASK_MCHARGERUSB_FAULT)) {
+				ret = twl_i2c_write_u8(
 						TWL6030_MODULE_CHARGER,
 						(temp | MASK_MCHARGERUSB_FAULT),
 						CHARGERUSB_INT_MASK);
-					if (ret)
-						goto err;
-				}
-			} else {
-				di->usb_online = POWER_SUPPLY_TYPE_USB;
-				if ((present_charge_state & VAC_DET) &&
-					(di->vac_priority == 2))
-					dev_dbg(di->dev, "USB charger detected"
-						", continue with VAC\n");
-				else {
-					di->charger_source =
-							POWER_SUPPLY_TYPE_USB;
-					di->charge_status =
-						POWER_SUPPLY_STATUS_CHARGING;
-				}
-			dev_dbg(di->dev, "vbus detect\n");
+				if (ret)
+					goto err;
 			}
-		}
-
-		if (stat_reset & VAC_DET) {
-			di->ac_online = 0;
-			dev_dbg(di->dev, "vac removed\n");
-			twl6030_stop_ac_charger(di);
-			if (present_charge_state & VBUS_DET) {
-				di->charger_source = POWER_SUPPLY_TYPE_USB;
+		} else {
+			di->usb_online = POWER_SUPPLY_TYPE_USB;
+			if ((present_charge_state & VAC_DET) &&
+					(di->vac_priority == 2))
+				dev_dbg(di->dev, "USB charger detected"
+						", continue with VAC\n");
+			else {
+				di->charger_source =
+						POWER_SUPPLY_TYPE_USB;
 				di->charge_status =
 						POWER_SUPPLY_STATUS_CHARGING;
-				twl6030_start_usb_charger(di);
 			}
+			dev_dbg(di->dev, "vbus detect\n");
 		}
-		if (stat_set & VAC_DET) {
-			di->ac_online = POWER_SUPPLY_TYPE_MAINS;
-			if ((present_charge_state & VBUS_DET) &&
-						(di->vac_priority == 3))
-				dev_dbg(di->dev,
+	}
+
+	if (stat_reset & VAC_DET) {
+		di->ac_online = 0;
+		dev_dbg(di->dev, "vac removed\n");
+		twl6030_stop_ac_charger(di);
+		if (present_charge_state & VBUS_DET) {
+			di->charger_source = POWER_SUPPLY_TYPE_USB;
+			di->charge_status =
+					POWER_SUPPLY_STATUS_CHARGING;
+			twl6030_start_usb_charger(di);
+		}
+	}
+	if (stat_set & VAC_DET) {
+		di->ac_online = POWER_SUPPLY_TYPE_MAINS;
+		if ((present_charge_state & VBUS_DET) &&
+				(di->vac_priority == 3))
+			dev_dbg(di->dev,
 					"AC charger detected"
-						", continue with VBUS\n");
-			else
-				twl6030_start_ac_charger(di);
-		}
-	} else {
-		if (!(charge_state & (VBUS_DET | VAC_DET)))
-			di->charge_status = POWER_SUPPLY_STATUS_DISCHARGING;
+					", continue with VBUS\n");
+		else
+			twl6030_start_ac_charger(di);
 	}
 
 	if (stat_set & CONTROLLER_STAT1_FAULT_WDG) {
@@ -1029,7 +1024,7 @@ static irqreturn_t twl6030charger_fault_interrupt(int irq, void *_di)
 	if (usb_charge_sts1 & CHARGERUSB_STATUS_INT1_VBUS_OVP)
 		dev_dbg(di->dev, "USB CHARGER VBUS over voltage\n");
 
-	if ((usb_charge_sts2 & CHARGE_DONE) && !di->use_hw_charger) {
+	if (usb_charge_sts2 & CHARGE_DONE) {
 		di->charge_status = POWER_SUPPLY_STATUS_FULL;
 		dev_dbg(di->dev, "USB charge done\n");
 	}
