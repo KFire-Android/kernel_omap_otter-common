@@ -420,6 +420,19 @@ static irqreturn_t omap_rproc_watchdog_isr(int irq, void *p)
 }
 #endif
 
+static int omap_rproc_pm_init(struct rproc *rproc, u64 susp_addr)
+{
+	struct omap_rproc_pdata *pdata = rproc->dev->platform_data;
+	phys_addr_t pa;
+	int ret;
+
+	ret = rproc_da_to_pa(rproc, susp_addr, &pa);
+	if (!ret)
+		pdata->suspend_addr = (u32)pa;
+
+	return ret;
+}
+
 static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
 {
 	struct device *dev = rproc->dev;
@@ -574,6 +587,7 @@ static struct rproc_ops omap_rproc_ops = {
 	.watchdog_exit = omap_rproc_watchdog_exit,
 #endif
 	.dump_registers = omap_rproc_dump_registers,
+	.pm_init = omap_rproc_pm_init,
 };
 
 static int omap_rproc_probe(struct platform_device *pdev)

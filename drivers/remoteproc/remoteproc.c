@@ -822,6 +822,7 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 	u64 trace_da1 = 0;
 	u64 cdump_da0 = 0;
 	u64 cdump_da1 = 0;
+	u64 susp_addr = 0;
 	int ret = 0;
 
 	while (len >= sizeof(*rsc) && !ret) {
@@ -871,6 +872,9 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 			break;
 		case RSC_BOOTADDR:
 			*bootaddr = da;
+			break;
+		case RSC_SUSPENDADDR:
+			susp_addr = da;
 			break;
 		case RSC_DEVMEM:
 			ret = rproc_add_mem_entry(rproc, rsc);
@@ -1015,6 +1019,9 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 			goto error;
 		}
 	}
+	/* post-process pm data types */
+	if (susp_addr)
+		ret = rproc->ops->pm_init(rproc, susp_addr);
 
 error:
 	if (ret && rproc->dbg_dir) {
