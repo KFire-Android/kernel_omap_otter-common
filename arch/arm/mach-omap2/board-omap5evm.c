@@ -389,6 +389,7 @@ static struct regulator_init_data omap5_smps9 = {
 	},
 	.num_consumer_supplies	= ARRAY_SIZE(omap5_adac_supply),
 	.consumer_supplies	= omap5_adac_supply,
+
 };
 
 static struct regulator_consumer_supply omap5_vbus_supply[] = {
