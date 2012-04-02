@@ -113,6 +113,7 @@ static struct attribute_group otter1_panel_attribute_group = {
 };
 
 static void boxer_init_panel(void) {
+#if 0
 	spi_send(boxer_spi_device, 0x00, 0x21);
 	spi_send(boxer_spi_device, 0x00, 0xa5);
 	spi_send(boxer_spi_device, 0x01, 0x30);
@@ -124,6 +125,15 @@ static void boxer_init_panel(void) {
 	spi_send(boxer_spi_device, 0x0a, 0x28);
 	spi_send(boxer_spi_device, 0x10, 0x41);
 	spi_send(boxer_spi_device, 0x00, 0xad);
+#endif
+	spi_send(boxer_spi_device, 0x00, 0x29);
+	spi_send(boxer_spi_device, 0x00, 0x25);
+	spi_send(boxer_spi_device, 0x01, 0x30);
+	spi_send(boxer_spi_device, 0x02, 0x40);
+	spi_send(boxer_spi_device, 0x0e, 0x5f);
+	spi_send(boxer_spi_device, 0x0f, 0xa4);
+	spi_send(boxer_spi_device, 0x0d, 0x01);
+	spi_send(boxer_spi_device, 0x00, 0x2d);
 }
 
 static void boxer_panel_work_func(struct work_struct *work)
@@ -275,7 +285,7 @@ static int boxer_panel_suspend(struct omap_dss_device *dssdev)
 	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
     	gpio_direction_output(37, 0);
 	msleep(LCD_RST_DELAY);
-	gpio_direction_output(47, 0);	
+	gpio_direction_output(47, 0);
 	boxer_panel_stop(dssdev);
 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
 	return 0;
@@ -335,6 +345,24 @@ static struct omap_dss_driver boxer_driver = {
 
 static int boxer_spi_probe(struct spi_device *spi)
 {
+	int ret = 0;
+
+	boxer_panel_regulator = regulator_get(&spi->dev, "vlcd");
+	if (!regulator_is_enabled(boxer_panel_regulator)) {
+		if (g_ft_i2c_adapter) {
+			i2c_lock_adapter(g_ft_i2c_adapter);
+		}
+		ret = regulator_enable(boxer_panel_regulator);
+		mdelay(2);
+		if (g_ft_i2c_adapter) {
+			i2c_unlock_adapter(g_ft_i2c_adapter);
+		}
+		if (ret) {
+			regulator_put(boxer_panel_regulator);
+			goto out;
+		}
+	}
+
 	spi->mode = SPI_MODE_0;
 	spi->bits_per_word = 16;
 	spi->chip_select=0;
@@ -345,6 +373,8 @@ static int boxer_spi_probe(struct spi_device *spi)
 	sysfs_create_group(&spi->dev.kobj, &otter1_panel_attribute_group);
 
 	return omap_dss_register_driver(&boxer_driver);
+out:
+	return ret;
 }
 
 static int boxer_spi_remove(struct spi_device *spi)
@@ -352,6 +382,8 @@ static int boxer_spi_remove(struct spi_device *spi)
 	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 	sysfs_remove_group(&spi->dev.kobj, &otter1_panel_attribute_group);
 	omap_dss_unregister_driver(&boxer_driver);
+	regulator_disable(boxer_panel_regulator);
+	regulator_put(boxer_panel_regulator);
 	return 0;
 }
 
@@ -370,29 +402,20 @@ static int __init boxer_lcd_init(void)
 {
 	int ret = 0;
 
+#if 0
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
+	//twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
+	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
+#endif
 	boxer_panel_wq = create_singlethread_workqueue("boxer-panel-wq");
-
-	boxer_panel_regulator = regulator_get(NULL, "vlcd");
 
 	if (IS_ERR(boxer_panel_regulator)) {
 		printk(KERN_ERR "Unable to get vlcd regulator, reason: %ld!\n",
 		       IS_ERR(boxer_panel_regulator));
 		ret = -ENODEV;
 		goto out;
-	}
-	if (!regulator_is_enabled(boxer_panel_regulator)) {
-		if (g_ft_i2c_adapter) {
-			i2c_lock_adapter(g_ft_i2c_adapter);
-		}
-		ret = regulator_enable(boxer_panel_regulator);
-		mdelay(2);
-		if (g_ft_i2c_adapter) {
-			i2c_unlock_adapter(g_ft_i2c_adapter);
-		}
-		if (ret) {
-			regulator_put(boxer_panel_regulator);
-			goto out;
-		}
 	}
 
 	return spi_register_driver(&boxer_spi_driver);
@@ -403,8 +426,6 @@ out:
 static void __exit boxer_lcd_exit(void)
 {
 	spi_unregister_driver(&boxer_spi_driver);
-	regulator_disable(boxer_panel_regulator);
-	regulator_put(boxer_panel_regulator);
 }
 
 module_init(boxer_lcd_init);

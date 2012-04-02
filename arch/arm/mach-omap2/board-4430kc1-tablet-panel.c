@@ -29,8 +29,6 @@
 #include <linux/leds_pwm.h>
 #include <linux/leds.h>
 #include <linux/pwm_backlight.h>
-#include <linux/regulator/machine.h>
-#include <linux/regulator/fixed.h>
 
 #include <linux/i2c/twl.h>
 
@@ -46,67 +44,10 @@
 #include "dmtimer.h"
 
 
-#define OMAP4_LCD_EN_GPIO		28
-#define LED_SEC_DISP_GPIO		27 /* brightness = dsi1_bl_gpio */
-#define DSI2_GPIO_59			59 /* direction output = dsi2_bl_glpio */
-
 #define LED_PWM2ON			0x03
 #define LED_PWM2OFF			0x04
 #define TWL6030_TOGGLE3			0x92
 
-#if 0
-static void __init sdp4430_init_display_led(void)
-{
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
-	//twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-}
-
-static void sdp4430_set_primary_brightness(u8 brightness)
-{
-	if (brightness > 1) {
-		if (brightness == 255)
-			brightness = 0x7f;
-		else
-			brightness = (~(brightness/2)) & 0x7f;
-
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
-	} else if (brightness <= 1) {
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-	}
-}
-
-static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data __initdata = {
-	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
-	.display_led_init = sdp4430_init_display_led,
-	.primary_display_set = sdp4430_set_primary_brightness,
-};
-#endif
-
-#if 0
-void kc1_led_set_power(struct omap_pwm_led_platform_data *self, int on_off)
-{
-	if (on_off) {
-		gpio_request(119, "ADO_SPK_ENABLE");
-		gpio_direction_output(119, 1);
-		gpio_set_value(119, 1);
-		gpio_request(120, "SKIPB_GPIO");
-		gpio_direction_output(120, 1);
-		gpio_set_value(120, 1);
-	} else {
-		gpio_request(119, "ADO_SPK_ENABLE");
-		gpio_direction_output(119, 0);
-		gpio_set_value(119, 0);
-		gpio_request(120, "SKIPB_GPIO");
-		gpio_direction_output(120, 0);
-		gpio_set_value(120, 0);
-	}
-}
-#endif
 
 static int tablet_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
@@ -118,26 +59,6 @@ static void tablet_panel_disable_lcd(struct omap_dss_device *dssdev)
 {
   	pr_info("Boxer LCD Disable!\n");
 }
-
-#if 0
-static int tablet_set_bl_intensity(struct omap_dss_device *dssdev, int brightness)
-{
-	pr_info("Boxer LCD Set BL Intensity == %d!\n", brightness);
-	if (brightness > 1) {
-		if (brightness == 255)
-			brightness = 0x7f;
-		else
-			brightness = (~(brightness/2)) & 0x7f;
-
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
-	} else if (brightness <= 1) {
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-	}
-	return 0;
-}
-#endif
 
 static struct omap_dss_device tablet_lcd_device = {
 	.phy		= {
@@ -189,12 +110,9 @@ static struct omap_dss_device tablet_lcd_device = {
 	.name			= "lcd2",
 	.driver_name		= "otter1_panel_drv",
 	.type			= OMAP_DISPLAY_TYPE_DPI,
-//	.reset_gpio     	= 102,
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
   	.platform_enable	= tablet_panel_enable_lcd,
   	.platform_disable	= tablet_panel_disable_lcd,
- 	// .set_backlight	= tablet_set_bl_intensity,
-//	.caps			= OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE,
 	.max_backlight_level	= 255,
 };
 
@@ -217,63 +135,21 @@ static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	},
 };
 
-static int kc1_backlight_init(struct device *dev)
-{
-	struct platform_pwm_backlight_data *data = dev->platform_data;
-	pr_info("OMAP PWM LED (pwm-backlight) at GP timer %d\n", data->pwm_id);
-	return 0;
-}
-
-static int kc1_backlight_notify(struct device *dev, int brightness)
-{
-	pr_info("kc1_backlight_notify (brightness == %d)\n", brightness);
-	if (!brightness) {
-		/* Power Timer Off */
-	} else {
-		/* Enable Timer */
-	}
-	return brightness;
-}
-
-static void kc1_backlight_exit(struct device *dev)
-{
-	pr_info("kc1_backlight_exit\n");
-}
-
-static struct platform_pwm_backlight_data backlight_data = {
-	.pwm_id         = 10,
-	.max_brightness = 0xFF,
-	.dft_brightness = 0x7F,
-	.pwm_period_ns  = 32768, //7812500
-	.init           = kc1_backlight_init,
-	.notify		= kc1_backlight_notify,
-	.exit           = kc1_backlight_exit,
-	// .check_fb	= kc1_backlight_checkfb,
+static struct omap_backlight_config kc1_backlight_data = {
+	.default_intensity = 0x7F,
 };
 
 static struct platform_device kc1_backlight = {
-	.name = "pwm-backlight",
-	.dev  = {
-		.platform_data = &backlight_data,
+	.name		= "omap-bl",
+	.id		= -1,
+	.dev		= {
+		.platform_data = &kc1_backlight_data,
 	},
-	.id   = -1,
 };
 
 static struct platform_device __initdata *sdp4430_panel_devices[] = {
-	//&lcd_regulator_device,
 	&kc1_backlight,
 };
-
-static void kc1_pmic_mux_init(void)
-{
-	/*
-	 * Enable IO daisy for sys_nirq1/2, to be able to
-	 * wakeup from interrupts from PMIC/Audio IC.
-	 * Needed only in Device OFF mode.
-	 */
-	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_WAKEUP_EN);
-	omap_mux_init_signal("sys_nirq2", OMAP_PIN_INPUT_PULLUP | OMAP_WAKEUP_EN);
-}
 
 void __init omap4_kc1_display_init(void)
 {
@@ -281,8 +157,9 @@ void __init omap4_kc1_display_init(void)
 
 	omap_display_init(&sdp4430_dss_data);
 
-	platform_add_devices(sdp4430_panel_devices, ARRAY_SIZE(sdp4430_panel_devices));
+	omap_mux_enable_wkup("sys_nirq1");
+	omap_mux_enable_wkup("sys_nirq2");
 
-	kc1_pmic_mux_init();
+	platform_add_devices(sdp4430_panel_devices, ARRAY_SIZE(sdp4430_panel_devices));
 }
 

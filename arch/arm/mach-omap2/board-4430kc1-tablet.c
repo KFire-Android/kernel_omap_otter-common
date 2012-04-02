@@ -110,6 +110,7 @@
 
 static struct wake_lock uart_lock;
 
+
 static struct platform_device sdp4430_aic3110 = {
         .name           = "tlv320aic3110-codec",
         .id             = -1,
@@ -150,7 +151,7 @@ static struct fixed_voltage_config lcd_reg_data = {
 	.microvolts = 3300000,
 	.gpio = 47,
 	.enable_high = 1,
-	.enabled_at_boot = 1,
+	.enabled_at_boot = 0,
 	.init_data = &lcd_vinit,
 };
 
