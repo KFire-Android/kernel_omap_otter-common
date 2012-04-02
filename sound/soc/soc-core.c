@@ -3427,7 +3427,6 @@ EXPORT_SYMBOL_GPL(snd_soc_register_dais);
 void snd_soc_unregister_dais(struct device *dev, size_t count)
 {
 	int i;
-	int ret = 0;
 
 	for (i = 0; i < count; i++)
 		snd_soc_unregister_dai(dev);
@@ -3470,7 +3469,7 @@ int snd_soc_register_platform(struct device *dev,
 
 	pr_debug("Registered platform '%s'\n", platform->name);
 
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_register_platform);
 
