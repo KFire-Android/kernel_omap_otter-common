@@ -52,6 +52,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
+#include <sound/soc-dsp.h>
 #include <sound/soc-dapm.h>
 #include <sound/jack.h>
 
@@ -422,6 +423,7 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 
+#if 0
 static const char *mm1_be[] = {
 		OMAP_ABE_BE_MM_EXT0,
 };
@@ -429,6 +431,8 @@ static const char *mm1_be[] = {
 static const char *mm_lp_be[] = {
 		OMAP_ABE_BE_MM_EXT0,
 };
+#endif
+
 /* ABE Port configuration structure introduced within the
 * DAI_LINK Structure as private_data void pointer member
 */
@@ -457,6 +461,20 @@ t_port_config mm_ext0_config = {
 	.bit_reorder_dl = 0,
 };
 
+
+struct snd_soc_dsp_link fe_lp_media = {
+	.playback	= true,
+	.trigger =
+		{SND_SOC_DSP_TRIGGER_BESPOKE, SND_SOC_DSP_TRIGGER_BESPOKE},
+};
+
+struct snd_soc_dsp_link fe_media_capture = {
+	.capture	= true,
+	.trigger =
+		{SND_SOC_DSP_TRIGGER_BESPOKE, SND_SOC_DSP_TRIGGER_BESPOKE},
+};
+
+
 /* DAI_LINK Structure definition with both Front-End and
  * Back-end DAI Declarations.
  */
@@ -470,12 +488,13 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.platform_name = "aess",
 
 		.dynamic = 1, /* BE is dynamic */
-		/* FIXME-HASH: Removed for compile */
-		//.supported_be = mm_lp_be,
-		//.num_be = ARRAY_SIZE(mm_lp_be),
-		//.fe_playback_channels = 2,
+		.dsp_link = &fe_lp_media,
+#if 0
+		.supported_be = mm_lp_be,
+		.num_be = ARRAY_SIZE(mm_lp_be),
+		.fe_playback_channels = 2,
 		.no_host_mode = SND_SOC_DAI_LINK_OPT_HOST,
-		// .dsp_link = &fe_lp_media,
+#endif
 	},
 	{
 		.name = "tlv320aic3110 Media",
@@ -486,11 +505,13 @@ static struct snd_soc_dai_link omap4_dai_abe[] = {
 		.platform_name = "omap-pcm-audio",
 
 		.dynamic = 1, /* BE is dynamic */
-		/* FIXME-HASH: Removed for compile */
-		//.supported_be = mm1_be,
-		//.num_be = ARRAY_SIZE(mm1_be),
-		//.fe_playback_channels = 2,
-		//.fe_capture_channels = 8,
+		.dsp_link = &fe_media_capture,
+#if 0
+		.supported_be = mm1_be,
+		.num_be = ARRAY_SIZE(mm1_be),
+		.fe_playback_channels = 2,
+		.fe_capture_channels = 8,
+#endif
 	},
 /*
  * Backend DAIs - i.e. dynamically matched interfaces, invisible to userspace.

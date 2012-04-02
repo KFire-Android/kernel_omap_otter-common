@@ -159,7 +159,7 @@ static int aic31xx_hp_power_down (struct snd_soc_codec *codec);
  *           
  *----------------------------------------------------------------------------
  */
-static int n_control_info(struct snd_kcontrol *kcontrol,
+static unsigned int n_control_info(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_info *uinfo)
 {
 	struct soc_mixer_control *mc =
@@ -187,7 +187,7 @@ static int n_control_info(struct snd_kcontrol *kcontrol,
  *           
  *----------------------------------------------------------------------------
  */
-static int n_control_get(struct snd_kcontrol *kcontrol,
+static unsigned int n_control_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
@@ -215,7 +215,7 @@ static int n_control_get(struct snd_kcontrol *kcontrol,
  *
  *----------------------------------------------------------------------------
  */
-static int n_control_put(struct snd_kcontrol *kcontrol,
+static unsigned int n_control_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
@@ -2637,11 +2637,6 @@ static int aic31xx_remove (struct snd_soc_codec *codec)
 		aic31xx_set_bias_level(codec, SND_SOC_BIAS_OFF);
 	}
 
-	if (codec != NULL) {
-		aic31xx_hp_power_down (codec);
-                aic31xx_power_down (codec);
-	}
-
 #ifdef NO_PCMS
 	snd_soc_free_pcms(socdev);
 #endif
@@ -2775,8 +2770,8 @@ struct snd_soc_dai_driver tlv320aic31xx_dai[] = {
  * Core Layer Initialization. This function is used to register the Audio Codec with the
  * ALSA Core Layer using the snd_soc_register_codec API.
  */
-static int aic3x_i2c_probe(struct i2c_client *i2c,
-			   const struct i2c_device_id *id) {
+static int __devinit tlv320aic31xx_codec_probe (struct platform_device *pdev)
+{
 
 	int ret;
 	int err;
@@ -2793,50 +2788,46 @@ static int aic3x_i2c_probe(struct i2c_client *i2c,
 	}
 	regulator_enable(audio_regulator);
 
-	ret =  snd_soc_register_codec(&i2c->dev,
+	ret =  snd_soc_register_codec(&pdev->dev,
 			&soc_codec_dev_aic31xx, tlv320aic31xx_dai, ARRAY_SIZE(tlv320aic31xx_dai));
 
 	DBG ("snd_soc_register_codec returned %d \n", ret);
 
-	return (ret);
+	return (ret); 
 }
 
 /*
  * aic31xx_codec_remove
  * This function is to unregister the Audio Codec from the ALSA Core Layer.
  */
-static int aic3x_i2c_remove(struct i2c_client *client) {
+static int __devexit aic31xx_codec_remove(struct platform_device *pdev)
+{
 	/* Get the Codec Pointer and switch of the Codec Members */
-	struct snd_soc_codec *codec = snd_soc_get_codec (&client->dev);
+	struct snd_soc_codec *codec = snd_soc_get_codec (&pdev->dev);
 
-	snd_soc_unregister_codec(&client->dev);
+	if (codec != NULL) {
+		aic31xx_hp_power_down (codec);
+                aic31xx_power_down (codec);
+	}
 
+	snd_soc_unregister_codec(&pdev->dev);
 	regulator_disable(audio_regulator);
 	regulator_put(audio_regulator);
-
-	kfree(i2c_get_clientdata(client));
 	return 0;
 }
-
-static const struct i2c_device_id tlv320aic3110_id[] = {
-	{"tlv320aic31xx", 0},
-	{}
-};
-MODULE_DEVICE_TABLE(i2c, tlv320aic3110_id);
 
 /*
  * @struct tlv320aic31xx_i2c_driver
  *
  * Platform Driver structure used to describe the Driver structure.
  */
-static struct i2c_driver tlv320aic31xx_i2c_driver = {
+static struct platform_driver tlv320aic31xx_i2c_driver = {
 	.driver = {
 		.name = "tlv320aic3110-codec",
 		.owner = THIS_MODULE,
 	},
-	.probe = aic3x_i2c_probe,
-	.remove = aic3x_i2c_remove,
-	.id_table = tlv320aic3110_id,
+	.probe = tlv320aic31xx_codec_probe,
+	.remove = __devexit_p(aic31xx_codec_remove),
 };
 
 /*
@@ -2846,10 +2837,9 @@ static struct i2c_driver tlv320aic31xx_i2c_driver = {
 static int __init tlv320aic31xx_init (void)
 {
 	int ret;
-#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
 	DBG ("##Came to Codec DRiver Init routine...\n");
-	// ret = platform_driver_register (&tlv320aic31xx_i2c_driver);
-	ret = i2c_add_driver(&tlv320aic31xx_i2c_driver);
+
+	ret = platform_driver_register (&tlv320aic31xx_i2c_driver);
 
 	if (ret != 0) {
 		DBG ("Failed to register TLV320AIC31xx I2C driver: "
@@ -2857,7 +2847,6 @@ static int __init tlv320aic31xx_init (void)
 		return ret;
 	}
 	DBG ("tlv320aic31xx_init success !!! \n");
-#endif
 
 	return ret;
 }
@@ -2869,13 +2858,11 @@ module_init(tlv320aic31xx_init);
  */
 static void __exit tlv320aic31xx_exit (void)
 {
-#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
 	DBG ("tlv320aic3xx_exit....\n");
 
-	// platform_driver_unregister (&tlv320aic31xx_i2c_driver);
-	i2c_del_driver(&tlv320aic31xx_i2c_driver);
-#endif
+	platform_driver_unregister (&tlv320aic31xx_i2c_driver); 
 }
+
 module_exit(tlv320aic31xx_exit);
 
 MODULE_DESCRIPTION("ASoC TLV320AIC3100 codec driver");
