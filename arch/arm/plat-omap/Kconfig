@@ -97,6 +97,15 @@ config OMAP_MUX
 	  sets the multiplexing correctly, say N. Otherwise, or if unsure,
 	  say Y.
 
+config OMAP5_SEVM_PALMAS
+	bool "PALMAS Support on OMAP5"
+	depends on ARCH_OMAP5
+	default n
+	help
+	  For PALMAS support in OMAP5 say Y. Only for SEVM boards with
+	  PALMAS/TWL6035 mounted on them say y else
+	  say n.
+
 config OMAP_MUX_DEBUG
 	bool "Multiplexing debug output"
 	depends on OMAP_MUX
