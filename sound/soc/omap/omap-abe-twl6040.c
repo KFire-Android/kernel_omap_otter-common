@@ -465,15 +465,14 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	twl6040_disconnect_pin(dapm, pdata->has_afm, "Line In");
 
 	/* allow audio paths from the audio modem to run during suspend */
-	snd_soc_dapm_ignore_suspend(dapm, "Ext Mic");
-	snd_soc_dapm_ignore_suspend(dapm, "Ext Spk");
+	snd_soc_dapm_ignore_suspend(&card->dapm, "Ext Spk");
 	snd_soc_dapm_ignore_suspend(dapm, "AFML");
 	snd_soc_dapm_ignore_suspend(dapm, "AFMR");
-	snd_soc_dapm_ignore_suspend(dapm, "Headset Mic");
-	snd_soc_dapm_ignore_suspend(dapm, "Headset Stereophone");
-	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic 0");
-	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic 1");
-	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic 2");
+	snd_soc_dapm_ignore_suspend(&card->dapm, "Headset Mic");
+	snd_soc_dapm_ignore_suspend(&card->dapm, "Headset Stereophone");
+	snd_soc_dapm_ignore_suspend(&card->dapm, "Digital Mic 0");
+	snd_soc_dapm_ignore_suspend(&card->dapm, "Digital Mic 1");
+	snd_soc_dapm_ignore_suspend(&card->dapm, "Digital Mic 2");
 
 	/* DC offset cancellation computation only if ABE is enabled */
 	if (pdata->has_abe) {
