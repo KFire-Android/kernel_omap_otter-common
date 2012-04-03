@@ -95,11 +95,19 @@ void __init gic_init_irq(void)
 	void __iomem *gic_dist_base_addr;
 
 	/* Static mapping, never released */
-	gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
+	if (cpu_is_omap44xx())
+		gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
+	else
+		gic_dist_base_addr = ioremap(OMAP54XX_GIC_DIST_BASE, SZ_4K);
+
 	BUG_ON(!gic_dist_base_addr);
 
 	/* Static mapping, never released */
-	omap_irq_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
+	if (cpu_is_omap44xx())
+		omap_irq_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
+	else
+		omap_irq_base = ioremap(OMAP54XX_GIC_CPU_BASE, SZ_512);
+
 	BUG_ON(!omap_irq_base);
 
 	omap_wakeupgen_init();
