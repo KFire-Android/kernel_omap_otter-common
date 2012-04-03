@@ -450,6 +450,7 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_platform *platform = rtd->platform;
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	struct omap_abe_twl6040_data *pdata = dev_get_platdata(card->dev);
+	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
 	u32 hsotrim, left_offset, right_offset, step_mV;
 	int ret = 0;
 
@@ -498,6 +499,25 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 			twl6040_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
 		else
 			snd_soc_jack_report(&hs_jack, SND_JACK_HEADSET, SND_JACK_HEADSET);
+	}
+
+	/* Only configure the TPS6130x on SDP4430 */
+	if (machine_is_omap_4430sdp()) {
+		card_data->adapter = i2c_get_adapter(1);
+		if (!card_data->adapter) {
+			dev_err(card->dev, "can't get i2c adapter\n");
+			return -ENODEV;
+		}
+
+		card_data->tps6130x = i2c_new_device(card_data->adapter,
+				&tps6130x_hwmon_info);
+		if (!card_data->tps6130x) {
+			dev_err(card->dev, "can't add i2c device\n");
+			i2c_put_adapter(card_data->adapter);
+			return -ENODEV;
+		}
+
+		omap_abe_tps6130x_configure(card_data);
 	}
 
 	return ret;
@@ -1296,37 +1316,10 @@ static __devinit int omap_abe_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	snd_soc_card_set_drvdata(card, card_data);
 
-	/* Only configure the TPS6130x on SDP4430 */
-	if (machine_is_omap_4430sdp()) {
-		card_data->adapter = i2c_get_adapter(1);
-		if (!card_data->adapter) {
-			dev_err(&pdev->dev, "can't get i2c adapter\n");
-			return -ENODEV;
-		}
-
-		card_data->tps6130x = i2c_new_device(card_data->adapter,
-				&tps6130x_hwmon_info);
-		if (!card_data->tps6130x) {
-			dev_err(&pdev->dev, "can't add i2c device\n");
-			ret = -ENODEV;
-			goto err_i2c;
-		}
-
-		omap_abe_tps6130x_configure(card_data);
-	}
-
 	ret = snd_soc_register_card(card);
-	if (ret) {
+	if (ret)
 		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n", ret);
-		goto err_card;
-	}
 
-	return 0;
-
-err_card:
-	i2c_unregister_device(card_data->tps6130x);
-err_i2c:
-	i2c_put_adapter(card_data->adapter);
 	return ret;
 }
 
