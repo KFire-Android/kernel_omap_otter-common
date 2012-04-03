@@ -438,7 +438,7 @@
 #define OMAP_PRCM_IRQ_END	OMAP_GPMC_IRQ_END
 #endif
 
-#define NR_IRQS			OMAP_PRCM_IRQ_END
+#define NR_IRQS			(OMAP_PRCM_IRQ_END+64)
 
 #define OMAP_IRQ_BIT(irq)	(1 << ((irq) % 32))
 
