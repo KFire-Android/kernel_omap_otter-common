@@ -27,6 +27,9 @@
 #include <linux/mfd/palmas.h>
 #endif
 
+#include <linux/i2c/twl.h>
+#include <linux/mfd/twl6040.h>
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -593,6 +596,30 @@ static struct palmas_platform_data palmas_omap5 = {
 };
 #endif  /* CONFIG_OMAP5_SEVM_PALMAS */
 
+static struct twl6040_codec_data twl6040_codec = {
+	/* single-step ramp for headset and handsfree */
+	.hs_left_step	= 0x0f,
+	.hs_right_step	= 0x0f,
+	.hf_left_step	= 0x1d,
+	.hf_right_step	= 0x1d,
+};
+
+static struct twl6040_vibra_data twl6040_vibra = {
+	.vibldrv_res = 8,
+	.vibrdrv_res = 3,
+	.viblmotor_res = 10,
+	.vibrmotor_res = 10,
+	.vddvibl_uV = 0,	/* fixed volt supply - VBAT */
+	.vddvibr_uV = 0,	/* fixed volt supply - VBAT */
+};
+
+static struct twl6040_platform_data twl6040_data = {
+	.codec		= &twl6040_codec,
+	.vibra		= &twl6040_vibra,
+	.audpwron_gpio	= 145,
+	.irq_base	= TWL6040_CODEC_IRQ_BASE,
+};
+
 static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 #ifdef CONFIG_OMAP5_SEVM_PALMAS
 	{
@@ -601,6 +628,11 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 		.irq = OMAP44XX_IRQ_SYS_1N,
 	},
 #endif
+	{
+		I2C_BOARD_INFO("twl6040", 0x4b),
+		.platform_data = &twl6040_data,
+		.irq = OMAP44XX_IRQ_SYS_2N,
+	},
 };
 
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_1_bus_pdata;
