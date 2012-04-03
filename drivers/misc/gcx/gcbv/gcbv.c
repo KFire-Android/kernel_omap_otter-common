@@ -52,10 +52,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <linux/gcx.h>
-#include <linux/gcioctl.h>
-#include <linux/gcbv.h>
-#include <linux/gcdebug.h>
 #include "gcmain.h"
 
 #ifndef GC_DUMP
@@ -82,7 +78,7 @@
 	(rect1.width == rect2.width) && (rect1.height == rect2.height) \
 )
 
-#if 0
+#if 1
 #define STRUCTSIZE(structptr, lastmember) \
 ( \
 	(size_t) &structptr->lastmember + \
@@ -2056,8 +2052,8 @@ static int verify_surface(unsigned int tile,
 		if (surf->tileparams == NULL)
 			return BVERR_TILE;
 
-		if (surf->tileparams->structsize != STRUCTSIZE(surf->tileparams,
-								srcheight))
+		if (surf->tileparams->structsize <
+		    STRUCTSIZE(surf->tileparams, srcheight))
 			return BVERR_TILE_VERS;
 
 #if 0
@@ -2071,7 +2067,7 @@ static int verify_surface(unsigned int tile,
 		if (surf->desc == NULL)
 			return BVERR_DESC;
 
-		if (surf->desc->structsize != STRUCTSIZE(surf->desc, map))
+		if (surf->desc->structsize < STRUCTSIZE(surf->desc, map))
 			return BVERR_DESC_VERS;
 
 #if 0
@@ -2084,7 +2080,7 @@ static int verify_surface(unsigned int tile,
 		return BVERR_GEOM;
 
 #if 0
-	if (geom->structsize != STRUCTSIZE(geom, palette))
+	if (geom->structsize < STRUCTSIZE(geom, palette))
 		return BVERR_GEOM_VERS;
 #endif
 
@@ -2990,7 +2986,7 @@ enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
 		goto exit;
 	}
 
-	if (buffdesc->structsize != STRUCTSIZE(buffdesc, map)) {
+	if (buffdesc->structsize < STRUCTSIZE(buffdesc, map)) {
 		BVSETERROR(BVERR_BUFFERDESC_VERS, "argument has invalid size");
 		goto exit;
 	}
@@ -3026,7 +3022,7 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 		goto exit;
 	}
 
-	if (buffdesc->structsize != STRUCTSIZE(buffdesc, map)) {
+	if (buffdesc->structsize < STRUCTSIZE(buffdesc, map)) {
 		BVSETERROR(BVERR_BUFFERDESC_VERS, "argument has invalid size");
 		goto exit;
 	}
@@ -3035,7 +3031,7 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 	if (bvbuffmap == NULL)
 		return BVERR_NONE;
 
-	if (bvbuffmap->structsize != STRUCTSIZE(bvbuffmap, nextmap)) {
+	if (bvbuffmap->structsize < STRUCTSIZE(bvbuffmap, nextmap)) {
 		BVSETERROR(BVERR_UNK, "invalid map structure size");
 		goto exit;
 	}
@@ -3112,7 +3108,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		goto exit;
 	}
 
-	if (bltparams->structsize != STRUCTSIZE(bltparams, callbackdata)) {
+	if (bltparams->structsize < STRUCTSIZE(bltparams, callbackdata)) {
 		BVSETERROR(BVERR_BLTPARAMS_VERS, "argument has invalid size");
 		goto exit;
 	}
@@ -3171,7 +3167,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			goto exit;
 		}
 
-		if (batch->structsize != STRUCTSIZE(batch, unmap)) {
+		if (batch->structsize < STRUCTSIZE(batch, unmap)) {
 			BVSETBLTERROR(BVERR_BATCH, "invalid batch");
 			goto exit;
 		}
@@ -3189,7 +3185,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			goto exit;
 		}
 
-		if (batch->structsize != STRUCTSIZE(batch, unmap)) {
+		if (batch->structsize < STRUCTSIZE(batch, unmap)) {
 			BVSETBLTERROR(BVERR_BATCH, "invalid batch");
 			goto exit;
 		}

@@ -228,14 +228,10 @@ int cmdbuf_flush(void *logical)
 			);
 
 		/* Wait for the interrupt. */
-#if 1
 		gc_wait_interrupt();
 
 		GC_PRINT(KERN_INFO "%s(%d): data = 0x%08X\n",
 			__func__, __LINE__, gc_get_interrupt_data());
-#else
-		wait_event_interruptible(gc_event, done == true);
-#endif
 
 		/* Reset the buffer. */
 		cmdbuf.available = cmdbuf.page.size;

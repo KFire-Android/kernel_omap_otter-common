@@ -65,12 +65,6 @@ struct gccore {
 static struct gccore gcdevice;
 static bool g_irqinstalled;
 
-static int irqline = 48;
-module_param(irqline, int, 0644);
-
-static long registerMemBase = 0xF1840000;
-module_param(registerMemBase, long, 0644);
-
 static struct mutex mtx;
 static struct dentry *g_debugRoot;
 
@@ -424,19 +418,6 @@ unsigned int gc_get_interrupt_data(void)
 	return data;
 }
 
-#if 0
-static struct workqueue_struct *gcwq;
-DECLARE_WAIT_QUEUE_HEAD(gc_event);
-int done;
-
-static void gc_work(struct work_struct *ignored)
-{
-	done = true;
-	wake_up_interruptible(&gc_event);
-}
-static DECLARE_WORK(gcwork, gc_work);
-#endif
-
 static irqreturn_t gc_irq(int irq, void *p)
 {
 	unsigned int data;
@@ -450,25 +431,8 @@ static irqreturn_t gc_irq(int irq, void *p)
 
 	gc_debug_cache_gpu_status_from_irq(data);
 
-#if 1
 	g_gccoredata = data;
 	complete(&g_gccoreint);
-#else
-	/* TODO: we need to wait for an interrupt after enabling
-			the mmu, but we don't want to send a signal to
-			the user space.  Instead, we want to send a signal
-			to the driver.
-	*/
-
-	if (data == 0x10000) {
-		queue_work(gcwq, &gcwork);
-	} else {
-		client = (struct clientinfo *)
-				((struct gccore *)p)->priv;
-		if (client != NULL)
-			send_sig(SIGUSR1, client->task, 0);
-	}
-#endif
 
 	return IRQ_HANDLED;
 }
@@ -1052,13 +1016,6 @@ static int __init gc_init(void)
 			 __func__, __LINE__);
 		goto fail;
 	}
-
-#if 0
-	gcwq = create_workqueue("gcwq");
-	if (!gcwq)
-		goto free_reg_mapping;
-	destroy_workqueue(gcwq);
-#endif
 
 	/* Create debugfs entry */
 	g_debugRoot = debugfs_create_dir("gcx", NULL);
