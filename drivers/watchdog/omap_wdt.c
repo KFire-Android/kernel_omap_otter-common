@@ -134,8 +134,6 @@ static void omap_wdt_set_timeout(struct omap_wdt_dev *wdev)
 	u32 delay_period = GET_WLDR_VAL(timer_margin / 2);
 	void __iomem *base = wdev->base;
 
-	pm_runtime_get_sync(wdev->dev);
-
 	/* just count up at 32 KHz */
 	while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 0x04)
 		cpu_relax();
@@ -148,8 +146,6 @@ static void omap_wdt_set_timeout(struct omap_wdt_dev *wdev)
 	while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 1 << 5)
 		cpu_relax();
 	__raw_writel(delay_period, base + OMAP_WATCHDOG_WDLY);
-
-	pm_runtime_put_sync(wdev->dev);
 }
 
 
@@ -159,11 +155,9 @@ static irqreturn_t omap_wdt_interrupt(int irq, void *dev_id)
 	void __iomem *base = wdev->base;
 	u32 i;
 
-	pm_runtime_get_sync(wdev->dev);
 	omap_wdt_ping(wdev);
 	i = __raw_readl(base + OMAP_WATCHDOG_WIRQSTAT);
 	__raw_writel(i, base + OMAP_WATCHDOG_WIRQSTAT);
-	pm_runtime_put_sync_suspend(wdev->dev);
 	return IRQ_HANDLED;
 }
 
@@ -173,8 +167,6 @@ static int omap_wdt_setup(struct omap_wdt_dev *wdev)
 
 	if (test_and_set_bit(1, (unsigned long *)&(wdev->omap_wdt_users)))
 		return -EBUSY;
-
-	pm_runtime_get_sync(wdev->dev);
 
 	/* initialize prescaler */
 	while (__raw_readl(base + OMAP_WATCHDOG_WPS) & 0x01)
@@ -194,7 +186,6 @@ static int omap_wdt_setup(struct omap_wdt_dev *wdev)
 
 	omap_wdt_enable(wdev);
 
-	pm_runtime_put_sync(wdev->dev);
 	return 0;
 }
 
@@ -206,10 +197,14 @@ static int omap_wdt_open(struct inode *inode, struct file *file)
 	struct omap_wdt_dev *wdev = platform_get_drvdata(omap_wdt_dev);
 	int ret;
 
+	pm_runtime_get_sync(wdev->dev);
+
 	ret = omap_wdt_setup(wdev);
 
-	if (ret)
+	if (ret) {
+		pm_runtime_put_sync(wdev->dev);
 		return ret;
+	}
 
 	file->private_data = (void *) wdev;
 	return nonseekable_open(inode, file);
@@ -224,8 +219,6 @@ static int omap_wdt_release(struct inode *inode, struct file *file)
 	 *      Shut off the timer unless NOWAYOUT is defined.
 	 */
 #ifndef CONFIG_WATCHDOG_NOWAYOUT
-	pm_runtime_get_sync(wdev->dev);
-
 	omap_wdt_disable(wdev);
 
 	/* Disable delay interrupt */
@@ -248,11 +241,9 @@ static ssize_t omap_wdt_write(struct file *file, const char __user *data,
 
 	/* Refresh LOAD_TIME. */
 	if (len) {
-		pm_runtime_get_sync(wdev->dev);
 		spin_lock(&wdt_lock);
 		omap_wdt_ping(wdev);
 		spin_unlock(&wdt_lock);
-		pm_runtime_put_sync(wdev->dev);
 	}
 	return len;
 }
@@ -284,18 +275,15 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
 			return put_user(omap_prcm_get_reset_sources(),
 					(int __user *)arg);
 	case WDIOC_KEEPALIVE:
-		pm_runtime_get_sync(wdev->dev);
 		spin_lock(&wdt_lock);
 		omap_wdt_ping(wdev);
 		spin_unlock(&wdt_lock);
-		pm_runtime_put_sync(wdev->dev);
 		return 0;
 	case WDIOC_SETTIMEOUT:
 		if (get_user(new_margin, (int __user *)arg))
 			return -EFAULT;
 		omap_wdt_adjust_timeout(new_margin);
 
-		pm_runtime_get_sync(wdev->dev);
 		spin_lock(&wdt_lock);
 		omap_wdt_disable(wdev);
 		omap_wdt_set_timeout(wdev);
@@ -303,7 +291,6 @@ static long omap_wdt_ioctl(struct file *file, unsigned int cmd,
 
 		omap_wdt_ping(wdev);
 		spin_unlock(&wdt_lock);
-		pm_runtime_put_sync(wdev->dev);
 		/* Fall */
 	case WDIOC_GETTIMEOUT:
 		return put_user(timer_margin, (int __user *)arg);
@@ -325,9 +312,7 @@ static int omap_wdt_nb_func(struct notifier_block *nb, unsigned long val,
 	void *v)
 {
 	struct omap_wdt_dev *wdev = container_of(nb, struct omap_wdt_dev, nb);
-	pm_runtime_get_sync(wdev->dev);
 	omap_wdt_ping(wdev);
-	pm_runtime_put_sync_suspend(wdev->dev);
 
 	return NOTIFY_OK;
 }
@@ -386,6 +371,11 @@ static int __devinit omap_wdt_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, wdev);
 
+	/*
+	 * Note: PM runtime functions must be used only when watchdog driver
+	 * is enabling/disabling. Dynamic handling of clock of watchdog timer on
+	 * OMAP4/5 (like provided with runtime API) will cause system failure
+	 */
 	pm_runtime_enable(wdev->dev);
 	pm_runtime_irq_safe(wdev->dev);
 	pm_runtime_get_sync(wdev->dev);
@@ -406,8 +396,6 @@ static int __devinit omap_wdt_probe(struct platform_device *pdev)
 		__raw_readl(wdev->base + OMAP_WATCHDOG_REV) & 0xFF,
 		timer_margin);
 
-	pm_runtime_put_sync(wdev->dev);
-
 	omap_wdt_dev = pdev;
 
 	if (kernelpet && wdev->irq) {
@@ -417,9 +405,11 @@ static int __devinit omap_wdt_probe(struct platform_device *pdev)
 		return omap_wdt_setup(wdev);
 	}
 
+	pm_runtime_put_sync(wdev->dev);
 	return 0;
 
 err_misc:
+	pm_runtime_put_sync(wdev->dev);
 	platform_set_drvdata(pdev, NULL);
 
 	if (wdev->irq)
@@ -446,7 +436,6 @@ static void omap_wdt_shutdown(struct platform_device *pdev)
 	struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
 
 	if (wdev->omap_wdt_users) {
-		pm_runtime_get_sync(wdev->dev);
 		omap_wdt_disable(wdev);
 		pm_runtime_put_sync(wdev->dev);
 	}
@@ -493,7 +482,6 @@ static int omap_wdt_suspend(struct device *dev)
 	struct omap_wdt_dev *wdev = platform_get_drvdata(pdev);
 
 	if (wdev->omap_wdt_users) {
-		pm_runtime_get_sync(wdev->dev);
 		omap_wdt_disable(wdev);
 		pm_runtime_put_sync_suspend(wdev->dev);
 	}
@@ -510,7 +498,6 @@ static int omap_wdt_resume(struct device *dev)
 		pm_runtime_get_sync(wdev->dev);
 		omap_wdt_enable(wdev);
 		omap_wdt_ping(wdev);
-		pm_runtime_put_sync_suspend(wdev->dev);
 	}
 
 	return 0;
