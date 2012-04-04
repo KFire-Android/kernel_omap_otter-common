@@ -1214,7 +1214,6 @@ static int soc_dpcm_fe_dai_startup(struct snd_pcm_substream *fe_substream)
 	struct snd_pcm_runtime *runtime = fe_substream->runtime;
 	int stream = fe_substream->stream, ret = 0;
 
-	mutex_lock_nested(&fe->card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_FE;
 
 	ret = soc_dpcm_be_dai_startup(fe, fe_substream->stream);
@@ -1238,14 +1237,12 @@ static int soc_dpcm_fe_dai_startup(struct snd_pcm_substream *fe_substream)
 	snd_pcm_limit_hw_rates(runtime);
 
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_NO;
-	mutex_unlock(&fe->card->mutex);
 	return 0;
 
 unwind:
 	soc_dpcm_be_dai_startup_unwind(fe, fe_substream->stream);
 be_err:
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_NO;
-	mutex_unlock(&fe->card->mutex);
 	return ret;
 }
 
@@ -1293,7 +1290,6 @@ static int soc_dpcm_fe_dai_shutdown(struct snd_pcm_substream *substream)
 	struct snd_soc_pcm_runtime *fe = substream->private_data;
 	int stream = substream->stream;
 
-	mutex_lock_nested(&fe->card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_FE;
 	/* shutdown the BEs */
 	soc_dpcm_be_dai_shutdown(fe, substream->stream);
@@ -1311,7 +1307,6 @@ static int soc_dpcm_fe_dai_shutdown(struct snd_pcm_substream *substream)
 
 	fe->dpcm[stream].state = SND_SOC_DPCM_STATE_CLOSE;
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_NO;
-	mutex_unlock(&fe->card->mutex);
 	return 0;
 }
 
@@ -1927,7 +1922,7 @@ static int dpcm_run_old_update(struct snd_soc_pcm_runtime *fe, int stream)
 }
 
 /* Called by DAPM mixer/mux changes to update audio routing between PCMs and
- * any DAI links. Caller must hold the card mutex.
+ * any DAI links.
  */
 int soc_dpcm_runtime_update(struct snd_soc_dapm_widget *widget)
 {
@@ -2364,11 +2359,13 @@ int soc_dpcm_fe_dai_open(struct snd_pcm_substream *fe_substream)
 	int ret;
 	int stream = fe_substream->stream;
 
+	mutex_lock_nested(&fe->card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
 	fe->dpcm[stream].runtime = fe_substream->runtime;
 
 	if (fe_path_get(fe, stream, &list) <= 0) {
 		dev_warn(fe->dev, "asoc: %s no valid %s route from source to sink\n",
 			fe->dai_link->name, stream ? "capture" : "playback");
+			mutex_unlock(&fe->card->mutex);
 			return -EINVAL;
 	}
 
@@ -2387,6 +2384,7 @@ int soc_dpcm_fe_dai_open(struct snd_pcm_substream *fe_substream)
 
 	fe_clear_pending(fe, stream);
 	fe_path_put(&list);
+	mutex_unlock(&fe->card->mutex);
 	return ret;
 }
 
@@ -2397,6 +2395,7 @@ int soc_dpcm_fe_dai_close(struct snd_pcm_substream *fe_substream)
 	struct snd_soc_dpcm_params *dpcm_params;
 	int stream = fe_substream->stream, ret;
 
+	mutex_lock_nested(&fe->card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
 	ret = soc_dpcm_fe_dai_shutdown(fe_substream);
 
 	/* mark FE's links ready to prune */
@@ -2406,7 +2405,7 @@ int soc_dpcm_fe_dai_close(struct snd_pcm_substream *fe_substream)
 	be_disconnect(fe, stream);
 
 	fe->dpcm[stream].runtime = NULL;
-
+	mutex_unlock(&fe->card->mutex);
 	return ret;
 }
 
