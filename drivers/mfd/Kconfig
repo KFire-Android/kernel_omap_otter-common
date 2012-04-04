@@ -910,6 +910,13 @@ config MFD_PALMAS_RESOURCE
 	  If you say yes here you get support for the misc RESOURCES on
 	  Palmas series of PMIC chips from Texas Instruments.
 
+config MFD_PALMAS_PWM
+	bool "Support for the PWM on the Palmas series chips"
+	depends on MFD_PALMAS
+	help
+	  If you say yes here you get support for the PWM on
+	  Palmas series of PMIC chips from Texas Instruments.
+
 endmenu
 endif
 
