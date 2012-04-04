@@ -156,4 +156,9 @@
 			ti,hwmods = "i2c4";
 		};
 	};
+
+	keypad@4ae1c000 {
+		compatible = "ti,omap4-keypad";
+		ti,hwmods = "kbd";
+	};
 };
