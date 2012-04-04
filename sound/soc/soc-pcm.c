@@ -1941,6 +1941,7 @@ int soc_dpcm_runtime_update(struct snd_soc_dapm_widget *widget)
 	else
 		return -EINVAL;
 
+	mutex_lock_nested(&card->mutex, SND_SOC_CARD_CLASS_RUNTIME);
 	for (i = 0; i < card->num_rtd; i++) {
 		struct snd_soc_dapm_widget_list *list;
 		struct snd_soc_pcm_runtime *fe = &card->rtd[i];
@@ -1964,6 +1965,7 @@ int soc_dpcm_runtime_update(struct snd_soc_dapm_widget *widget)
 		if (paths < 0) {
 			dev_warn(fe->dev, "%s no valid %s route from source to sink\n",
 					fe->dai_link->name,  "playback");
+			mutex_unlock(&card->mutex);
 			return paths;
 		}
 
@@ -1992,6 +1994,7 @@ capture:
 		if (paths < 0) {
 			dev_warn(fe->dev, "%s no valid %s route from source to sink\n",
 					fe->dai_link->name,  "capture");
+			mutex_unlock(&card->mutex);
 			return paths;
 		}
 
@@ -2014,6 +2017,7 @@ capture:
 		fe_path_put(&list);
 	}
 
+	mutex_unlock(&card->mutex);
 	return 0;
 }
 
