@@ -16,3 +16,8 @@ config ION_OMAP
 	help
 	  Choose this option if you wish to use ion on OMAP4.
 
+config ION_OMAP_DYNAMIC
+	bool "Dynamic Ion heap extension"
+	depends on ION_OMAP
+	help
+	  Allows the ion on OMAP4 to dynamically allocate when there is no more size on tiler heap

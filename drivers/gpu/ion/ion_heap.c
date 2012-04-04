@@ -18,6 +18,10 @@
 #include <linux/ion.h>
 #include "ion_priv.h"
 
+#ifdef CONFIG_ION_OMAP_DYNAMIC
+#include "omap/omap_ion_priv.h"
+#endif
+
 struct ion_heap *ion_heap_create(struct ion_platform_heap *heap_data)
 {
 	struct ion_heap *heap = NULL;
@@ -30,7 +34,11 @@ struct ion_heap *ion_heap_create(struct ion_platform_heap *heap_data)
 		heap = ion_system_heap_create(heap_data);
 		break;
 	case ION_HEAP_TYPE_CARVEOUT:
+#ifdef CONFIG_ION_OMAP_DYNAMIC
+		heap = omap_carveout_tiler_heap_create(heap_data);
+#else
 		heap = ion_carveout_heap_create(heap_data);
+#endif
 		break;
 	default:
 		pr_err("%s: Invalid heap type %d\n", __func__,
@@ -63,7 +71,11 @@ void ion_heap_destroy(struct ion_heap *heap)
 		ion_system_heap_destroy(heap);
 		break;
 	case ION_HEAP_TYPE_CARVEOUT:
+#ifdef CONFIG_ION_OMAP_DYNAMIC
+		omap_carveout_tiler_heap_destroy(heap);
+#else
 		ion_carveout_heap_destroy(heap);
+#endif
 		break;
 	default:
 		pr_err("%s: Invalid heap type %d\n", __func__,

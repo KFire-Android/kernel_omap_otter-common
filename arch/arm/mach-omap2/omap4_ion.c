@@ -17,6 +17,7 @@
 
 #include "omap4_ion.h"
 
+#ifndef CONFIG_ION_OMAP_DYNAMIC
 static struct ion_platform_data omap4_ion_data = {
 	.nr = 3,
 	.heaps = {
@@ -24,27 +25,46 @@ static struct ion_platform_data omap4_ion_data = {
 			.type = ION_HEAP_TYPE_CARVEOUT,
 			.id = OMAP_ION_HEAP_SECURE_INPUT,
 			.name = "secure_input",
-			.base = PHYS_ADDR_TESLA_MEM - OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
+			.base = PHYS_ADDR_ION_HEAP_SECURE_INPUT,
 			.size = OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
 		},
 		{	.type = OMAP_ION_HEAP_TYPE_TILER,
 			.id = OMAP_ION_HEAP_TILER,
 			.name = "tiler",
-			.base = PHYS_ADDR_TESLA_MEM - OMAP4_ION_HEAP_SECURE_INPUT_SIZE - OMAP4_ION_HEAP_TILER_SIZE,
+			.base = PHYS_ADDR_ION_HEAP_TILER,
 			.size = OMAP4_ION_HEAP_TILER_SIZE,
 		},
 		{
 			.type = OMAP_ION_HEAP_TYPE_TILER,
 			.id = OMAP_ION_HEAP_NONSECURE_TILER,
 			.name = "nonsecure_tiler",
-			.base = PHYS_ADDR_TESLA_MEM - \
-					OMAP4_ION_HEAP_SECURE_INPUT_SIZE - \
-					OMAP4_ION_HEAP_TILER_SIZE - \
-					OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
+			.base = PHYS_ADDR_ION_HEAP_NONSECURE_TILER,
 			.size = OMAP4_ION_HEAP_NONSECURE_TILER_SIZE,
 		},
 	},
 };
+#else
+//We need structure for mempool
+// So declare at least one heap of each kind with 1MB size
+static struct ion_platform_data omap4_ion_data = {
+	.nr = 2,
+	.heaps = {
+		{
+			.type = ION_HEAP_TYPE_CARVEOUT,
+			.id = OMAP_ION_HEAP_SECURE_INPUT,
+			.name = "secure_input",
+			.base = PHYS_ADDR_ION_HEAP_SECURE_INPUT,
+			.size = OMAP4_ION_HEAP_SECURE_INPUT_SIZE,
+		},
+		{	.type = OMAP_ION_HEAP_TYPE_TILER,
+			.id = OMAP_ION_HEAP_TILER,
+			.name = "tiler",
+			.base = PHYS_ADDR_ION_HEAP_TILER,
+			.size = OMAP4_ION_HEAP_TILER_SIZE,
+		},
+	},
+};
+#endif
 
 static struct platform_device omap4_ion_device = {
 	.name = "ion-omap4",
