@@ -337,6 +337,8 @@ static void serial_omap_start_tx(struct uart_port *port)
 
 		if (ret < 0) {
 			serial_omap_enable_ier_thri(up);
+			pm_runtime_mark_last_busy(&up->pdev->dev);
+			pm_runtime_put_autosuspend(&up->pdev->dev);
 			return;
 		}
 	}
@@ -1051,8 +1053,10 @@ static int serial_omap_poll_get_char(struct uart_port *port)
 
 	pm_runtime_get_sync(&up->pdev->dev);
 	status = serial_in(up, UART_LSR);
-	if (!(status & UART_LSR_DR))
+	if (!(status & UART_LSR_DR)) {
+		pm_runtime_put(&up->pdev->dev);
 		return NO_POLL_CHAR;
+	}
 
 	status = serial_in(up, UART_RX);
 	pm_runtime_put(&up->pdev->dev);
