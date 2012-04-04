@@ -947,6 +947,7 @@ static int is_connected_input_ep(struct snd_soc_dapm_widget *widget,
  * Queries DAPM graph as to whether an valid audio stream path exists for
  * the initial stream specified by name. This takes into account
  * current mixer and mux kcontrol settings. Creates list of valid widgets.
+ * Intended for internal use atm where caller holds the card mutex.
  *
  * Returns the number of valid paths or negative error.
  */
@@ -956,7 +957,6 @@ int snd_soc_dapm_dai_get_connected_widgets(struct snd_soc_dai *dai, int stream,
 	struct snd_soc_card *card = dai->card;
 	int paths;
 
-	mutex_lock_nested(&card->dapm_mutex, SND_SOC_DAPM_CLASS_RUNTIME);
 	dapm_reset(card);
 
 	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
@@ -966,7 +966,6 @@ int snd_soc_dapm_dai_get_connected_widgets(struct snd_soc_dai *dai, int stream,
 
 	trace_snd_soc_dapm_connected(paths, stream);
 	dapm_clear_walk(&card->dapm);
-	mutex_unlock(&card->dapm_mutex);
 
 	return paths;
 }
