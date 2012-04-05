@@ -23,6 +23,34 @@
  */
 struct bvbuffmap;
 
+#define BVATDEF_VENDOR_SHIFT	24
+#define BVATDEF_VENDOR_MASK	(0xFF << BVATDEF_VENDOR_SHIFT)
+
+/* Common aux type */
+#define BVATDEF_VENDOR_ALL	(0x00 << BVATDEF_VENDOR_SHIFT)
+
+/* Texas Instruments, Inc. */
+#define BVATDEF_VENDOR_TI	(0x01 << BVATDEF_VENDOR_SHIFT)
+
+enum bvauxtype {
+	BVAT_NONE = 0,	/* auxptr not used */
+	BVAT_PHYSDESC =	/* handle points to bvphysdesc struct */
+		BVATDEF_VENDOR_ALL + 1,
+
+#ifdef BVAT_EXTERNAL_INCLUDE
+#include BVAT_EXTERNAL_INCLUDE
+#endif
+};
+
+
+struct bvphysdesc {
+	unsigned int structsize;	/* used to identify struct version */
+	unsigned long pagesize;		/* page size in bytes */
+	unsigned long *pagearray;	/* array of physical pages */
+	unsigned int pagecount;		/* number of pages in the pagearray */
+	unsigned long pageoffset;	/* page offset in bytes */
+};
+
 /*
  * bvbuffdesc - This structure is used to specify the buffer parameters
  * in a call to bv_map().
@@ -32,10 +60,9 @@ struct bvbuffdesc {
 	void *virtaddr;			/* virtual ptr to start of buffer */
 	unsigned long length;		/* length of the buffer in bytes */
 	struct bvbuffmap *map;		/* resource(s) associated w/buffer */
-	unsigned long pagesize;		/* page size in bytes */
-	unsigned long *pagearray;	/* array of physical page addresses */
-	unsigned int pagecount;		/* number of pages in the page array */
-	unsigned long pageoffset;	/* page offset in bytes */
+	enum bvauxtype auxtype;		/* type of auxptr */
+	void *auxptr;			/* additional buffer description data;
+					type depends on auxtype */
 };
 
 #endif /* BVBUFFDESC_H */
