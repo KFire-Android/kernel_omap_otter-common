@@ -3180,6 +3180,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	unsigned int op, type;
 	unsigned int batchflags;
 	unsigned int batchexec = 0;
+	bool nop = false;
 	struct gcbatch *batch;
 	int src1used, src2used, maskused;
 	struct srcdesc srcdesc[2];
@@ -3287,9 +3288,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		}
 
 		batchexec = 1;
-		batchflags = (bltparams->batchflags & BVBATCH_ENDNOP)
-			? 0
-			: bltparams->batchflags;
+		nop = (bltparams->batchflags & BVBATCH_ENDNOP) != 0;
+		batchflags = bltparams->batchflags;
 		break;
 
 	default:
@@ -3301,23 +3301,23 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		"batchflags=0x%08X\n",
 		__func__, __LINE__, batchflags);
 
-	/* Determine whether the destination has changed. */
-	batch->dstchanged = batchflags
-		& (BVBATCH_DST
-		| BVBATCH_DSTRECT_ORIGIN
-		| BVBATCH_DSTRECT_SIZE
-		| BVBATCH_CLIPRECT_ORIGIN
-		| BVBATCH_CLIPRECT_SIZE);
+	if (!nop) {
+		/* Determine whether the destination has changed. */
+		batch->dstchanged = batchflags
+			& (BVBATCH_DST
+			| BVBATCH_DSTRECT_ORIGIN
+			| BVBATCH_DSTRECT_SIZE
+			| BVBATCH_CLIPRECT_ORIGIN
+			| BVBATCH_CLIPRECT_SIZE);
 
-	GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX
-		"dstchanged=%d\n",
-		__func__, __LINE__, (batch->dstchanged != 0));
+		GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX
+			"dstchanged=%d\n",
+			__func__, __LINE__, (batch->dstchanged != 0));
 
-	/* Verify the batch change flags. */
-	VERIFYBATCH(batchflags >> 12, &g_prevdstrect,
+		/* Verify the batch change flags. */
+		VERIFYBATCH(batchflags >> 12, &g_prevdstrect,
 				&bltparams->dstrect);
 
-	if (batchflags != 0) {
 		switch (op) {
 		case (BVFLAG_ROP >> BVFLAG_OP_SHIFT):
 			GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX
