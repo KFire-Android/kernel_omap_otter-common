@@ -1300,10 +1300,7 @@ static int soc_dpcm_fe_dai_shutdown(struct snd_pcm_substream *substream)
 	soc_pcm_close(substream);
 
 	/* run the stream event for each BE */
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_STOP);
-	else
-		soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_STOP);
+	soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_STOP);
 
 	fe->dpcm[stream].state = SND_SOC_DPCM_STATE_CLOSE;
 	fe->dpcm[stream].runtime_update = SND_SOC_DPCM_UPDATE_NO;
@@ -1671,10 +1668,7 @@ int soc_dpcm_fe_dai_prepare(struct snd_pcm_substream *substream)
 	}
 
 	/* run the stream event for each BE */
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_START);
-	else
-		soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_START);
+	soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_START);
 
 	fe->dpcm[stream].state = SND_SOC_DPCM_STATE_PREPARE;
 
@@ -1794,10 +1788,7 @@ static int dpcm_run_update_shutdown(struct snd_soc_pcm_runtime *fe, int stream)
 		dev_err(fe->dev, "dpcm: shutdown FE failed %d\n", err);
 
 	/* run the stream event for each BE */
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_NOP);
-	else
-		soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_NOP);
+	soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_NOP);
 
 	return 0;
 }
@@ -1846,10 +1837,7 @@ static int dpcm_run_update_startup(struct snd_soc_pcm_runtime *fe, int stream)
 	}
 
 	/* run the stream event for each BE */
-	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-		soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_NOP);
-	else
-		soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_NOP);
+	soc_dpcm_dapm_stream_event(fe, stream, SND_SOC_DAPM_STREAM_NOP);
 
 	/* keep going if FE state is > prepare */
 	if (fe->dpcm[stream].state == SND_SOC_DPCM_STATE_PREPARE ||
