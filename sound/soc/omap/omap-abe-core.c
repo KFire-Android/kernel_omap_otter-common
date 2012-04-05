@@ -281,10 +281,11 @@ static int abe_probe(struct snd_soc_platform *platform)
 		goto err_irq;
 	}
 
+#if 0
 	ret = abe_opp_init_initial_opp(abe);
 	if (ret < 0)
 		goto err_opp;
-
+#endif
 	/* aess_clk has to be enabled to access hal register.
 	 * Disable the clk after it has been used.
 	 */
@@ -337,7 +338,9 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.resume		= abe_pm_resume,
 	.read		= abe_mixer_read,
 	.write		= abe_mixer_write,
+#if 0
 	.stream_event = abe_opp_stream_event,
+#endif
 };
 
 static int __devinit abe_engine_probe(struct platform_device *pdev)
