@@ -653,6 +653,7 @@ static struct twl6040_codec_data twl6040_codec = {
 	.hs_right_step	= 0x0f,
 	.hf_left_step	= 0x1d,
 	.hf_right_step	= 0x1d,
+	.amic_bias_settle_ms = 0xeb, /* 235 ms */
 };
 
 static struct twl6040_vibra_data twl6040_vibra = {
