@@ -124,6 +124,15 @@
 
 #define GPU_CMD_SIZE	(sizeof(unsigned int) * 2)
 
+#define GC_BUFFER_RESERVE \
+( \
+	sizeof(struct gcmopipesel) + \
+	sizeof(struct gcmommumaster) + \
+	sizeof(struct gcmommuflush) + \
+	sizeof(struct gcmosignal) + \
+	sizeof(struct gccmdend) \
+)
+
 /*******************************************************************************
 ** Internal structures.
 */
@@ -739,15 +748,24 @@ static enum bverror append_buffer(struct gcbatch *batch)
 					"command buffer allocation failed");
 			goto exit;
 		}
+
+		GCPRINT(GCDBGFILTER, GCZONE_BUFFER, GC_MOD_PREFIX
+			"allocated new buffer = 0x%08X\n",
+			__func__, __LINE__, (unsigned int) temp);
 	} else {
 		temp = gccontext.vac_buffers;
 		gccontext.vac_buffers = temp->next;
+
+		GCPRINT(GCDBGFILTER, GCZONE_BUFFER, GC_MOD_PREFIX
+			"reusing buffer = 0x%08X\n",
+			__func__, __LINE__, (unsigned int) temp);
 	}
 
 	memset(temp, 0, sizeof(struct gcbuffer));
 	temp->head =
 	temp->tail = (unsigned int *) (temp + 1);
-	temp->available = GC_BUFFER_SIZE - sizeof(struct gcbuffer);
+	temp->available = GC_BUFFER_SIZE - max(sizeof(struct gcbuffer),
+						GC_BUFFER_RESERVE);
 
 	if (batch->bufhead == NULL)
 		batch->bufhead = temp;
@@ -834,7 +852,7 @@ static enum bverror add_fixup(struct gcbatch *batch, unsigned int *fixup,
 	bverror = BVERR_NONE;
 
 exit:
-	GCPRINT(GCDBGFILTER, GCZONE_BUFFER, "--" GC_MOD_PREFIX
+	GCPRINT(GCDBGFILTER, GCZONE_FIXUP, "--" GC_MOD_PREFIX
 		"bverror = %d\n", __func__, __LINE__, bverror);
 
 	return bverror;
@@ -867,6 +885,16 @@ static enum bverror claim_buffer(struct gcbatch *batch,
 		curbuf = batch->buftail;
 	}
 
+	if (curbuf->available < size) {
+		GCPRINT(GCDBGFILTER, GCZONE_BUFFER, GC_MOD_PREFIX
+			"requested size is too large.\n",
+			__func__, __LINE__);
+
+		BVSETERROR(BVERR_OOM,
+				"command buffer allocation failed");
+		goto exit;
+	}
+
 	*buffer = curbuf->tail;
 	curbuf->tail = (unsigned int *) ((unsigned char *) curbuf->tail + size);
 	curbuf->available -= size;
@@ -874,7 +902,7 @@ static enum bverror claim_buffer(struct gcbatch *batch,
 	bverror = BVERR_NONE;
 
 exit:
-	GCPRINT(GCDBGFILTER, GCZONE_FIXUP, "--" GC_MOD_PREFIX
+	GCPRINT(GCDBGFILTER, GCZONE_BUFFER, "--" GC_MOD_PREFIX
 		"bverror = %d\n", __func__, __LINE__, bverror);
 
 	return bverror;

@@ -32,7 +32,7 @@
 #include <linux/gcx.h>
 #include "gccmdbuf.h"
 
-#define GC_CMD_BUF_PAGES	20
+#define GC_CMD_BUF_PAGES	32
 #define GC_CMD_BUF_SIZE		(PAGE_SIZE * GC_CMD_BUF_PAGES)
 
 struct cmdbuf {

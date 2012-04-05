@@ -40,7 +40,7 @@ struct gccommit {
 };
 
 /* Command buffer header. */
-#define GC_BUFFER_SIZE 81920
+#define GC_BUFFER_SIZE (128 * 1024)
 struct gcbuffer {
 	struct gcfixup *fixuphead;	/* Address fixup list. */
 	struct gcfixup *fixuptail;
