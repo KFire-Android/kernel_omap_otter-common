@@ -646,7 +646,7 @@ static struct omap_abe_twl6040_data omap5evm_abe_audio_data = {
 	/* Jack detection. */
 	.jack_detection	= 1,
 	/* MCLK input is 19.2MHz */
-	.mclk_freq	= 38400000,
+	.mclk_freq	= 19200000,
 	.card_name = "OMAP5EVM",
 
 };
