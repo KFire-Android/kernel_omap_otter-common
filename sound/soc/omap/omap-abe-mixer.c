@@ -761,6 +761,8 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 
 	SND_SOC_DAPM_AIF_IN("MM_DL", NULL, 0,
 			OMAP_ABE_AIF_MM_DL, OMAP_ABE_OPP_25, 0),
+	SND_SOC_DAPM_AIF_IN("MM_DL_LP", NULL, 0,
+			OMAP_ABE_AIF_MM_DL, OMAP_ABE_OPP_25, 0),
 
 	SND_SOC_DAPM_AIF_IN("VIB_DL", NULL, 0,
 			OMAP_ABE_AIF_VIB_DL, OMAP_ABE_OPP_100, 0),
@@ -872,6 +874,9 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 	/* Virtual MODEM and VX_UL mixer */
 	SND_SOC_DAPM_MIXER("VX UL VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("VX DL VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
+
+	/* Virtual MM1 and MM LP mixer */
+	SND_SOC_DAPM_MIXER("MM VMixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 
 	/* Virtual Pins to force backends ON atm */
 	SND_SOC_DAPM_OUTPUT("BE_OUT"),
@@ -1088,7 +1093,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"DL1 Mixer", "Capture", "DL1 Capture VMixer"},
 	{"DL1 Capture VMixer", NULL, "MUX_UL10"},
 	{"DL1 Capture VMixer", NULL, "MUX_UL11"},
-	{"DL1 Mixer", "Multimedia", "MM_DL"},
+	{"DL1 Mixer", "Multimedia", "MM VMixer"},
 
 	/* Sidetone Mixer */
 	{"Sidetone Mixer", "Playback", "DL1 Mixer"},
@@ -1110,18 +1115,18 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"DL2 Mixer", "Capture", "DL2 Capture VMixer"},
 	{"DL2 Capture VMixer", NULL, "MUX_UL10"},
 	{"DL2 Capture VMixer", NULL, "MUX_UL11"},
-	{"DL2 Mixer", "Multimedia", "MM_DL"},
+	{"DL2 Mixer", "Multimedia", "MM VMixer"},
 	{"PDM_DL2", NULL, "DL2 Mixer"},
 
 	/* VxREC Mixer */
 	{"Capture Mixer", "Tones", "TONES_DL"},
 	{"Capture Mixer", "Voice Playback", "VX DL VMixer"},
 	{"Capture Mixer", "Voice Capture", "VX UL VMixer"},
-	{"Capture Mixer", "Media Playback", "MM_DL"},
+	{"Capture Mixer", "Media Playback", "MM VMixer"},
 
 	/* Audio UL mixer */
 	{"Voice Capture Mixer", "Tones Playback", "TONES_DL"},
-	{"Voice Capture Mixer", "Media Playback", "MM_DL"},
+	{"Voice Capture Mixer", "Media Playback", "MM VMixer"},
 	{"Voice Capture Mixer", "Capture", "Voice Capture VMixer"},
 	{"Voice Capture VMixer", NULL, "MUX_VX0"},
 	{"Voice Capture VMixer", NULL, "MUX_VX1"},
@@ -1143,8 +1148,11 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MM2 Capture", NULL, "MM_UL2"},
 	{"TONES_DL", NULL, "Tones Playback"},
 	{"VIB_DL", NULL, "Vibra Playback"},
+	{"MM VMixer", NULL, "MM_DL_LP"},
+	{"MM VMixer", NULL, "MM_DL"},
+	{"MM_DL_LP", NULL, "MMLP Playback"},
 	{"MM_DL", NULL, "MM1 Playback"},
-	{"MM_DL", NULL, "MMLP Playback"},
+
 	{"VX_DL", NULL, "Voice Playback"},
 	{"Voice Capture", NULL, "VX_UL"},
 	{"MODEM_DL", NULL, "Modem Playback"},
