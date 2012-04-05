@@ -547,8 +547,8 @@ static struct rproc *__find_rproc_by_name(const char *name)
 }
 
 /**
- * __rproc_da_to_pa - convert a device (virtual) address to its physical address
- * @maps: the remote processor's memory mappings array
+ * rproc_da_to_pa - convert a device (virtual) address to its physical address
+ * @rproc: the remote processor handle
  * @da: a device address (as seen by the remote processor)
  * @pa: pointer to the physical address result
  *
@@ -559,26 +559,32 @@ static struct rproc *__find_rproc_by_name(const char *name)
  * On success 0 is returned, and the @pa is updated with the result.
  * Otherwise, -EINVAL is returned.
  */
-static int
-rproc_da_to_pa(const struct rproc_mem_entry *maps, u64 da, phys_addr_t *pa)
+int rproc_da_to_pa(struct rproc *rproc, u64 da, phys_addr_t *pa)
 {
-	int i;
-	u64 offset;
+	int i, ret = -EINVAL;
+	struct rproc_mem_entry *maps = NULL;
 
-	for (i = 0; maps[i].size; i++) {
-		const struct rproc_mem_entry *me = &maps[i];
+	if (!rproc || !pa)
+		return -EINVAL;
 
-		if (da >= me->da && da < (me->da + me->size)) {
-			offset = da - me->da;
+	if (mutex_lock_interruptible(&rproc->lock))
+		return -EINTR;
+
+	maps = rproc->memory_maps;
+	for (i = 0; maps->size; maps++) {
+		if (da >= maps->da && da < (maps->da + maps->size)) {
 			pr_debug("%s: matched mem entry no. %d\n",
 				__func__, i);
-			*pa = me->pa + offset;
-			return 0;
+			*pa = maps->pa + (da - maps->da);
+			ret = 0;
+			break;
 		}
 	}
 
-	return -EINVAL;
+	mutex_unlock(&rproc->lock);
+	return ret;
 }
+EXPORT_SYMBOL(rproc_da_to_pa);
 
 static int rproc_mmu_fault_isr(struct rproc *rproc, u64 da, u32 flags)
 {
@@ -927,7 +933,7 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 	 * __iomem to make sparse happy
 	 */
 	if (trace_da0) {
-		ret = rproc_da_to_pa(rproc->memory_maps, trace_da0, &pa);
+		ret = rproc_da_to_pa(rproc, trace_da0, &pa);
 		if (ret)
 			goto error;
 		rproc->trace_buf0 = (__force void *)
@@ -951,7 +957,7 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 		}
 	}
 	if (trace_da1) {
-		ret = rproc_da_to_pa(rproc->memory_maps, trace_da1, &pa);
+		ret = rproc_da_to_pa(rproc, trace_da1, &pa);
 		if (ret)
 			goto error;
 		rproc->trace_buf1 = (__force void *)
@@ -982,7 +988,7 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 	 * make sparse happy
 	 */
 	if (cdump_da0) {
-		ret = rproc_da_to_pa(rproc->memory_maps, cdump_da0, &pa);
+		ret = rproc_da_to_pa(rproc, cdump_da0, &pa);
 		if (ret)
 			goto error;
 		rproc->cdump_buf0 = (__force void *)
@@ -996,7 +1002,7 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 		}
 	}
 	if (cdump_da1) {
-		ret = rproc_da_to_pa(rproc->memory_maps, cdump_da1, &pa);
+		ret = rproc_da_to_pa(rproc, cdump_da1, &pa);
 		if (ret)
 			goto error;
 		rproc->cdump_buf1 = (__force void *)
@@ -1063,7 +1069,7 @@ static int rproc_process_fw(struct rproc *rproc, struct fw_section *section,
 		}
 
 		if (section->type <= FW_DATA) {
-			ret = rproc_da_to_pa(rproc->memory_maps, da, &pa);
+			ret = rproc_da_to_pa(rproc, da, &pa);
 			if (ret) {
 				dev_err(dev, "rproc_da_to_pa failed:%d\n", ret);
 				break;
