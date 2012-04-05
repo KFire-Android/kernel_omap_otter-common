@@ -824,7 +824,9 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"ADC Left", NULL, "MicAmpL"},
 	{"ADC Right", NULL, "MicAmpR"},
 	{"PDM Capture", NULL, "ADC Left"},
+	{"Legacy Capture", NULL, "ADC Left"},
 	{"PDM Capture", NULL, "ADC Right"},
+	{"Legacy Capture", NULL, "ADC Right"},
 
 	/* AFM path */
 	{"AFMAmpL", NULL, "AFML"},
@@ -834,10 +836,12 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"HSDAC Right", NULL, "HSDAC Power"},
 
 	{"HSDAC Left", NULL, "Headset Playback"},
+	{"HSDAC Left", NULL, "Legacy Playback"},
 	{"Headset Left Playback", "HS DAC", "HSDAC Left"},
 	{"Headset Left Playback", "Line-In amp", "AFMAmpL"},
 
 	{"HSDAC Right", NULL, "Headset Playback"},
+	{"HSDAC Right", NULL, "Legacy Playback"},
 	{"Headset Right Playback", "HS DAC", "HSDAC Right"},
 	{"Headset Right Playback", "Line-In amp", "AFMAmpR"},
 
@@ -853,10 +857,12 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"EP", NULL, "Earphone Driver"},
 
 	{"HFDAC Left", NULL, "Handsfree Playback"},
+	{"HFDAC Left", NULL, "Legacy Playback"},
 	{"Handsfree Left Playback", "HF DAC", "HFDAC Left"},
 	{"Handsfree Left Playback", "Line-In amp", "AFMAmpL"},
 
 	{"HFDAC Right", NULL, "Handsfree Playback"},
+	{"HFDAC Right", NULL, "Legacy Playback"},
 	{"Handsfree Right Playback", "HF DAC", "HFDAC Right"},
 	{"Handsfree Right Playback", "Line-In amp", "AFMAmpR"},
 
@@ -877,6 +883,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 
 	/* Vibrator paths */
 	{"VIBRA DAC", NULL, "Vibra Playback"},
+	{"VIBRA DAC", NULL, "Legacy Playback"},
 	{"Vibra Left Playback", "Audio PDM", "VIBRA DAC"},
 	{"Vibra Right Playback", "Audio PDM", "VIBRA DAC"},
 
