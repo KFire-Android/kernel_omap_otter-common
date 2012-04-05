@@ -384,7 +384,7 @@ static int __init palmas_i2c_init(void)
 	return i2c_add_driver(&palmas_i2c_driver);
 }
 /* init early so consumer devices can complete system boot */
-module_init(palmas_i2c_init);
+subsys_initcall(palmas_i2c_init);
 
 static void __exit palmas_i2c_exit(void)
 {
