@@ -44,7 +44,7 @@
 
 #define DEVICE_INT	(32 + 125)
 #define DEVICE_REG_BASE	0x59000000
-#define DEVICE_REG_SIZE	(256 * 1024)
+#define DEVICE_REG_SIZE	(32 * 1024)
 
 #define GC_ENABLE_SUSPEND 0
 

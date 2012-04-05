@@ -190,6 +190,13 @@ struct gcbatch {
 	int deltaright;
 	int deltabottom;
 
+#if GCDEBUG_ENABLE
+	struct bvrect prevdstrect;	/* Rectangle validation. */
+	struct bvrect prevsrc1rect;
+	struct bvrect prevsrc2rect;
+	struct bvrect prevmaskrect;
+#endif
+
 	unsigned int size;		/* Total size of the command buffer. */
 
 	struct gcbuffer *bufhead;	/* Command buffer list. */
@@ -318,15 +325,15 @@ do { \
 	bltparams->errdesc = gccontext.bverrorstr; \
 } while (0)
 
-#define BVERR_DESC		0
-#define BVERR_DESC_VERS		1
-#define BVERR_DESC_VIRTADDR	2
-#define BVERR_TILE		3
-#define BVERR_TILE_VERS		4
-#define BVERR_TILE_VIRTADDR	5
-#define BVERR_GEOM		6
-#define BVERR_GEOM_VERS		7
-#define BVERR_GEOM_FORMAT	8
+#define GCBVERR_DESC		0
+#define GCBVERR_DESC_VERS	1
+#define GCBVERR_DESC_VIRTADDR	2
+#define GCBVERR_TILE		3
+#define GCBVERR_TILE_VERS	4
+#define GCBVERR_TILE_VIRTADDR	5
+#define GCBVERR_GEOM		6
+#define GCBVERR_GEOM_VERS	7
+#define GCBVERR_GEOM_FORMAT	8
 
 struct bvsurferrorid {
 	char *id;
@@ -339,31 +346,31 @@ struct bvsurferror {
 };
 
 static struct bvsurferror g_surferr[] = {
-	/* BVERR_DESC */
+	/* GCBVERR_DESC */
 	{    0, "%s(%d): %s desc structure is not set" },
 
-	/* BVERR_DESC_VERS */
+	/* GCBVERR_DESC_VERS */
 	{  100, "%s(%d): %s desc structure has invalid size" },
 
-	/* BVERR_DESC_VIRTADDR */
+	/* GCBVERR_DESC_VIRTADDR */
 	{  200, "%s(%d): %s desc virtual pointer is not set" },
 
-	/* BVERR_TILE: FIXME/TODO define error code */
+	/* GCBVERR_TILE: FIXME/TODO define error code */
 	{    0, "%s(%d): %s tileparams structure is not set" },
 
-	/* BVERR_TILE_VERS */
+	/* GCBVERR_TILE_VERS */
 	{ 3000, "%s(%d): %s tileparams structure has invalid size" },
 
-	/* BVERR_TILE_VIRTADDR: FIXME/TODO define error code */
+	/* GCBVERR_TILE_VIRTADDR: FIXME/TODO define error code */
 	{  200, "%s(%d): %s tileparams virtual pointer is not set" },
 
-	/* BVERR_GEOM */
+	/* GCBVERR_GEOM */
 	{ 1000, "%s(%d): %s geom structure is not set" },
 
-	/* BVERR_GEOM_VERS */
+	/* GCBVERR_GEOM_VERS */
 	{ 1100, "%s(%d): %s geom structure has invalid size" },
 
-	/* BVERR_GEOM_FORMAT */
+	/* GCBVERR_GEOM_FORMAT */
 	{ 1200, "%s(%d): %s invalid format specified" },
 };
 
@@ -371,44 +378,6 @@ static struct bvsurferrorid g_destsurferr = { "dst",  BVERR_DSTDESC };
 static struct bvsurferrorid g_src1surferr = { "src1", BVERR_SRC1DESC };
 static struct bvsurferrorid g_src2surferr = { "src2", BVERR_SRC2DESC };
 static struct bvsurferrorid g_masksurferr = { "mask", BVERR_MASKDESC };
-
-/*******************************************************************************
- * Threads etc... TBD
- */
-
-#if 0
-#define MAX_THRD 1
-static pthread_t id[MAX_THRD];
-
-/* TODO: check that we aren't using more logic than we need */
-static void sig_handler(int sig)
-{
-	GC_PRINT(GC_INFO_MSG " %s(%d): %lx:%d\n", __func__, __LINE__,
-		(unsigned long) pthread_self(), sig);
-	sleep(2); sched_yield();
-}
-
-/* TODO: check that we aren't using more logic than we need */
-static void *thread(void *p)
-{
-	int r = 0;
-	sigset_t set;
-	struct sigaction sa;
-
-	sigemptyset(&set);
-	sa.sa_handler = sig_handler;
-	sa.sa_flags = SA_RESTART;
-	sigaction(SIGUSR1, &sa, NULL);
-
-	while (1) {
-		GC_PRINT(GC_INFO_MSG " %s(%d)\n", __func__, __LINE__);
-		sigwait(&set, &r);
-		GC_PRINT(GC_INFO_MSG " %s(%d)\n", __func__, __LINE__);
-	}
-
-	return NULL;
-}
-#endif
 
 /*******************************************************************************
  * Memory management.
@@ -2054,39 +2023,36 @@ static int verify_surface(unsigned int tile,
 {
 	if (tile) {
 		if (surf->tileparams == NULL)
-			return BVERR_TILE;
+			return GCBVERR_TILE;
 
 		if (surf->tileparams->structsize <
 		    STRUCTSIZE(surf->tileparams, srcheight))
-			return BVERR_TILE_VERS;
+			return GCBVERR_TILE_VERS;
 
 #if 0
 		if (surf->tileparams->virtaddr == NULL)
-			return BVERR_TILE_VIRTADDR;
+			return GCBVERR_TILE_VIRTADDR;
 #endif
-
 		/* FIXME/TODO */
-		return BVERR_TILE;
+		return GCBVERR_TILE;
 	} else {
 		if (surf->desc == NULL)
-			return BVERR_DESC;
+			return GCBVERR_DESC;
 
 		if (surf->desc->structsize < STRUCTSIZE(surf->desc, map))
-			return BVERR_DESC_VERS;
+			return GCBVERR_DESC_VERS;
 
 #if 0
 		if (surf->desc->virtaddr == NULL)
-			return BVERR_DESC_VIRTADDR;
+			return GCBVERR_DESC_VIRTADDR;
 #endif
 	}
 
 	if (geom == NULL)
-		return BVERR_GEOM;
+		return GCBVERR_GEOM;
 
-#if 0
 	if (geom->structsize < STRUCTSIZE(geom, palette))
-		return BVERR_GEOM_VERS;
-#endif
+		return GCBVERR_GEOM_VERS;
 
 #if GCDEBUG_ENABLE
 	{
@@ -2144,11 +2110,6 @@ static int verify_surface(unsigned int tile,
 #	define VERIFYBATCH(changeflags, prevrect, currrect) \
 		verify_batch(__func__, __LINE__, \
 				changeflags, prevrect, currrect)
-
-static struct bvrect g_prevdstrect;
-static struct bvrect g_prevsrc1rect;
-static struct bvrect g_prevsrc2rect;
-static struct bvrect g_prevmaskrect;
 
 static void verify_batch(const char *function, int line,
 				unsigned int changeflags,
@@ -2995,7 +2956,7 @@ static enum bverror do_filter(struct bvbltparams *bltparams,
 	GCPRINT(GCDBGFILTER, GCZONE_DO_FILTER, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
 
-	BVSETBLTERROR(BVERR_UNK, "FIXME/TODO");
+	BVSETBLTERROR(BVERR_SRC1_HORZSCALE, "scaling not supported");
 
 	GCPRINT(GCDBGFILTER, GCZONE_DO_FILTER, "--" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
@@ -3064,7 +3025,7 @@ enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
 	/* FIXME/TODO: add check for initialization success. */
 
 	if (buffdesc == NULL) {
-		BVSETERROR(BVERR_UNK, "invalid argument");
+		BVSETERROR(BVERR_BUFFERDESC, "bvbuffdesc is NULL");
 		goto exit;
 	}
 
@@ -3106,7 +3067,7 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 	/* FIXME/TODO: add check for initialization success. */
 
 	if (buffdesc == NULL) {
-		BVSETERROR(BVERR_UNK, "invalid argument");
+		BVSETERROR(BVERR_BUFFERDESC, "bvbuffdesc is NULL");
 		goto exit;
 	}
 
@@ -3120,7 +3081,8 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 		return BVERR_NONE;
 
 	if (bvbuffmap->structsize < STRUCTSIZE(bvbuffmap, nextmap)) {
-		BVSETERROR(BVERR_UNK, "invalid map structure size");
+		BVSETERROR(BVERR_BUFFERDESC_VERS,
+			"unsupported bvbuffdesc version (structsize)");
 		goto exit;
 	}
 
@@ -3196,8 +3158,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 	/* Verify blt parameters structure. */
 	if (bltparams == NULL) {
-		BVSETERROR(BVERR_UNK,
-				"pointer to bvbltparams struct is expected");
+		BVSETERROR(BVERR_BLTPARAMS_VERS, "bvbltparams is NULL");
 		goto exit;
 	}
 
@@ -3366,7 +3327,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX
 				"BVFLAG_FILTER\n",
 				__func__, __LINE__);
-			BVSETBLTERROR(BVERR_UNK, "FIXME/TODO");
+			BVSETBLTERROR(BVERR_OP,
+				"filter operation not supported");
 			goto exit;
 
 		default:
@@ -3392,7 +3354,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			}
 
 			/* Verify the batch change flags. */
-			VERIFYBATCH(batchflags >> 14, &g_prevsrc1rect,
+			VERIFYBATCH(batchflags >> 14, &batch->prevsrc1rect,
 					&bltparams->src1rect);
 
 			/* Same as the destination? */
@@ -3433,7 +3395,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			}
 
 			/* Verify the batch change flags. */
-			VERIFYBATCH(batchflags >> 16, &g_prevsrc2rect,
+			VERIFYBATCH(batchflags >> 16, &batch->prevsrc2rect,
 					&bltparams->src2rect);
 
 			/* Same as the destination? */
@@ -3473,10 +3435,11 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			}
 
 			/* Verify the batch change flags. */
-			VERIFYBATCH(batchflags >> 18, &g_prevmaskrect,
+			VERIFYBATCH(batchflags >> 18, &batch->prevmaskrect,
 					&bltparams->maskrect);
 
-			BVSETERROR(BVERR_UNK, "FIXME/TODO");
+			BVSETERROR(BVERR_OP,
+				"operation with mask not supported");
 			goto exit;
 		}
 
@@ -3507,16 +3470,16 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 					bverror = do_blit(bltparams, batch,
 							srcdesc, 2, gca);
 				else
-					BVSETBLTERROR(
-						BVERR_UNK, "FIXME/TODO");
+					BVSETBLTERROR(BVERR_SRC2_HORZSCALE,
+						"scaling not supported");
 			else
 				if (EQ_SIZE((*srcdesc[1].rect),
 					bltparams->dstrect))
-					BVSETBLTERROR(
-						BVERR_UNK, "FIXME/TODO");
+					BVSETBLTERROR(BVERR_SRC1_HORZSCALE,
+						"scaling not supported");
 				else
-					BVSETBLTERROR(
-						BVERR_UNK, "FIXME/TODO");
+					BVSETBLTERROR(BVERR_SRC1_HORZSCALE,
+						"scaling not supported");
 		}
 	}
 
@@ -3533,10 +3496,18 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 		gc_commit_wrapper(&gccommit);
 		if (gccommit.gcerror != GCERR_NONE) {
-			BVSETBLTERRORARG(BVERR_UNK,
-					"blit error occured (0x%08X)",
-					gccommit.gcerror);
-			goto exit;
+			switch (gccommit.gcerror) {
+			case GCERR_OODM:
+			case GCERR_CTX_ALLOC:
+				BVSETBLTERROR(BVERR_OOM,
+					"unable to allocate gccore memory");
+				goto exit;
+			default:
+				BVSETBLTERROR(BVERR_RSRC,
+					"gccore error");
+
+				goto exit;
+			}
 		}
 
 		GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX
