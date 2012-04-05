@@ -527,8 +527,9 @@ static struct omap_hwmod_class omap54xx_l4_hwmod_class = {
 /* l4_abe */
 static struct omap_hwmod_addr_space omap54xx_l4_abe_addrs[] = {
 	{
-		.pa_start	= 0x40100000,
-		.pa_end		= 0x401fffff,
+		.name		= "mpu",
+		.pa_start	= 0x401f1000,
+		.pa_end		= 0x401f13ff,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
@@ -545,8 +546,9 @@ static struct omap_hwmod_ocp_if omap54xx_aess__l4_abe = {
 
 static struct omap_hwmod_addr_space omap54xx_l4_abe_dma_addrs[] = {
 	{
-		.pa_start	= 0x49000000,
-		.pa_end		= 0x490fffff,
+		.name		= "dma",
+		.pa_start	= 0x490f1000,
+		.pa_end		= 0x490f13ff,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
@@ -1112,6 +1114,7 @@ static struct omap_hwmod_dma_info omap54xx_dmic_sdma_reqs[] = {
 
 static struct omap_hwmod_addr_space omap54xx_dmic_addrs[] = {
 	{
+		.name		= "mpu",
 		.pa_start	= 0x4012e000,
 		.pa_end		= 0x4012e07f,
 		.flags		= ADDR_TYPE_RT
@@ -1130,6 +1133,7 @@ static struct omap_hwmod_ocp_if omap54xx_l4_abe__dmic = {
 
 static struct omap_hwmod_addr_space omap54xx_dmic_dma_addrs[] = {
 	{
+		.name		= "dma",
 		.pa_start	= 0x4902e000,
 		.pa_end		= 0x4902e07f,
 		.flags		= ADDR_TYPE_RT
