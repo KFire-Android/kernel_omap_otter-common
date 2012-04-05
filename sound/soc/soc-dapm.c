@@ -2864,6 +2864,11 @@ snd_soc_dapm_new_control(struct snd_soc_dapm_context *dapm,
 	size_t name_len;
 	int ret;
 
+	if (dapm_find_widget(dapm, widget->name, false)) {
+		dev_err(dapm->dev, "widget %s already exists for context\n",
+			widget->name);
+	}
+
 	if ((w = dapm_cnew_widget(widget)) == NULL)
 		return NULL;
 
@@ -2998,6 +3003,9 @@ int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 	memset(&template, 0, sizeof(template));
 	template.reg = SND_SOC_NOPM;
 
+	if (!dai->driver->playback.channels_max)
+		goto capture;
+
 	if (dai->driver->playback.stream_name) {
 		template.name = dai->driver->playback.stream_name;
 		template.sname = dai->driver->playback.stream_name;
@@ -3015,10 +3023,14 @@ int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 	if (!w) {
 		dev_err(dapm->dev, "Failed to create %s widget\n",
 			dai->driver->playback.stream_name);
+	} else {
+		dai->playback_widget = w;
+		w->dai = dai;
 	}
 
-	dai->playback_widget = w;
-	w->dai = dai;
+capture:
+	if (!dai->driver->capture.channels_max)
+		return 0;
 
 	if (dai->driver->capture.stream_name) {
 		template.name = dai->driver->capture.stream_name;
@@ -3037,10 +3049,10 @@ int snd_soc_dapm_new_dai_widgets(struct snd_soc_dapm_context *dapm,
 	if (!w) {
 		dev_err(dapm->dev, "Failed to create %s widget\n",
 			dai->driver->capture.stream_name);
+	} else {
+		dai->capture_widget = w;
+		w->dai = dai;
 	}
-
-	dai->capture_widget = w;
-	w->dai = dai;
 
 	return 0;
 }
