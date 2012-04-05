@@ -348,10 +348,8 @@ static ssize_t rpmsg_omx_write(struct file *filp, const char __user *ubuf,
 	hdr->flags = 0;
 	hdr->len = use;
 
-	use += sizeof(*hdr);
-
 	ret = rpmsg_send_offchannel(omxserv->rpdev, omx->ept->addr,
-						omx->dst, kbuf, use);
+					omx->dst, kbuf, use + sizeof(*hdr));
 	if (ret) {
 		dev_err(omxserv->dev, "rpmsg_send failed: %d\n", ret);
 		return ret;
