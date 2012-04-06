@@ -1396,6 +1396,17 @@ config PL310_ERRATA_769419
 	  on systems with an outer cache, the store buffer is drained
 	  explicitly.
 
+config ARM_ERRATA_761171
+	bool "ARM errata: Streaming write that does not allocate in L2 may cause data corruption"
+	depends on CPU_V7
+	help
+	  This option enables the workaround for erratum 761171
+	  affecting Cortex-A15 MPCore with two or more processors (all
+	  revisions till r0p3). Streaming write that will not allocate
+	  in L2 could lead to data corruption. This workaround disables the
+	  write no streaming no allocate threshold of the L1 ACTLR register
+	  to a value of 0x3.
+
 endmenu
 
 source "arch/arm/common/Kconfig"
