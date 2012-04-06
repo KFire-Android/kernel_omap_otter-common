@@ -41,13 +41,13 @@ struct omap_rproc_priv {
 	struct iommu *iommu;
 	int (*iommu_cb)(struct rproc *, u64, u32);
 	int (*wdt_cb)(struct rproc *);
+	u64 bootaddr;
 #ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
 	struct omap_mbox *mbox;
 	void __iomem *idle;
 	u32 idle_mask;
 	void __iomem *suspend;
 	u32 suspend_mask;
-	u64 bootaddr;
 #endif
 };
 
