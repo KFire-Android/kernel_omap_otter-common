@@ -1407,6 +1407,15 @@ config ARM_ERRATA_761171
 	  write no streaming no allocate threshold of the L1 ACTLR register
 	  to a value of 0x3.
 
+config ARM_ERRATA_4668
+	bool "ARM errata: Hang condition or data corruption possible when GIC writes hazard against older load requests"
+	depends on CPU_V7
+	help
+	  This option enables the workaround for BUG 4668
+	  affecting Cortex-A15 MPCore with two or more processors (all
+	  revisions till r0p3). Hang condition or data corruption possible
+	  when GIC writes hazard against older load requests.
+
 endmenu
 
 source "arch/arm/common/Kconfig"
