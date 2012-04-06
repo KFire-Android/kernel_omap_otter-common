@@ -310,7 +310,6 @@ int snd_soc_register_codec(struct device *dev,
 		const struct snd_soc_codec_driver *codec_drv,
 		struct snd_soc_dai_driver *dai_drv, int num_dai);
 void snd_soc_unregister_codec(struct device *dev);
-struct snd_soc_codec * snd_soc_get_codec(struct device *dev);
 int snd_soc_codec_volatile_register(struct snd_soc_codec *codec,
 				    unsigned int reg);
 int snd_soc_codec_readable_register(struct snd_soc_codec *codec,
@@ -344,7 +343,6 @@ struct snd_pcm_substream *snd_soc_get_dai_substream(struct snd_soc_card *card,
 		const char *dai_link, int stream);
 struct snd_soc_pcm_runtime *snd_soc_get_pcm_runtime(struct snd_soc_card *card,
 		const char *dai_link);
-int snd_soc_card_active_links(struct snd_soc_card *card);
 
 /* Utility functions to get clock rates from various things */
 int snd_soc_calc_frame_size(int sample_size, int channels, int tdm_slots);
@@ -738,6 +736,12 @@ struct snd_soc_dai_link {
 	const char *cpu_dai_name;
 	const char *codec_dai_name;
 
+	/* supported BE */
+	const char **supported_be;
+	int num_be;
+	int fe_playback_channels;
+	int fe_capture_channels;
+
 	struct snd_soc_dsp_link *dsp_link;
 	/* Keep DAI active over suspend */
 	unsigned int ignore_suspend:1;
@@ -765,12 +769,15 @@ struct snd_soc_dai_link {
 			struct snd_pcm_hw_params *params);
 
 	/* Void Pointer struct introduced to maintain
-	 * the ABE specific Port Details for OMAP4 
-	 */
-	 void *private_data;
-
+	* the ABE specific Port Details for OMAP4
+	*/
+	void *private_data;
 	/* machine stream operations */
 	struct snd_soc_ops *ops;
+
+	/* pre and post DAI link activity */
+	int (*pre)(struct snd_pcm_substream *substream);
+	void (*post)(struct snd_pcm_substream *substream);
 };
 
 struct snd_soc_codec_conf {

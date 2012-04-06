@@ -26,9 +26,6 @@ config SND_OMAP_SOC_DMIC
 config SND_OMAP_SOC_HDMI
 	tristate
 
-config SND_OMAP_SOC_VXREC
-	tristate
-
 config SND_OMAP_SOC_N810
 	tristate "SoC Audio support for Nokia N810"
 	depends on SND_OMAP_SOC && MACH_NOKIA_N810 && I2C
@@ -123,21 +120,21 @@ config SND_OMAP_SOC_SDP4430
 	select SND_SOC_DMIC
 	select SND_OMAP_SOC_DMIC
 	select SND_OMAP_SOC_ABE_DSP
-	select SND_OMAP_SOC_VXREC
 	help
 	  Say Y if you want to add support for SoC audio on Texas Instruments
 	  SDP4430 or PandaBoard.
 
-config SND_OMAP_SOC_KC1_AIC3110
+config SND_OMAP_SOC_RY_AIC3110
 	tristate "SoC Audio support for OMAP4 and AIC3110 Audio Codec Chipset"
 	depends on SND_OMAP_SOC
 	select SND_OMAP_SOC_MCBSP
 	select SND_SOC_AIC3110
 	select SND_OMAP_SOC_ABE
 	select SND_OMAP_SOC_ABE_DSP
-        select ABE_44100
+	select ABE_44100
 	help
-	  Say Y if you want to add support for SoC audio on the OMAP4 Board
+	Say Y if you want to add support for SoC audio on the OMAP4 Board
+
 
 config SND_OMAP_SOC_OMAP4_HDMI
 	tristate "SoC Audio support for Texas Instruments OMAP4 HDMI"
@@ -149,16 +146,14 @@ config SND_OMAP_SOC_OMAP4_HDMI
 	  OMAP4 chips
 
 config SND_OMAP4_ABE_USE_ALT_FW
-	bool "Use alternate ABE firmware configuration (DMIC support)"
+	bool "Use alternate ABE firmware, which includes DMIC support"
 	default n
 	depends on SND_OMAP_SOC && SND_OMAP_SOC_ABE_DSP
 	help
-	  The ABE firmware does not have enough room to use the Bluetooth FIR
-	  filters and also include digital microphone (DMIC) support.  Therefore
-	  DMIC support is disabled by default.  If you say Y, it will remove the
-          BT FIR filters and enable DMIC support.
+	  The default firmware has several improvements, but disables the DMIC
+	  (Digital MICrophone) feature.
 
-	  Say Y if you have DMICs (Digital Microphones) that you wish to use.
+	  Say Y if you have DMIC (Digital Microphones) that you wish to use.
 	  Say N otherwise, or if unsure.
 
 config SND_OMAP_SOC_OMAP3_PANDORA

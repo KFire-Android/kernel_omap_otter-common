@@ -7,7 +7,6 @@ snd-soc-omap-dmic-objs := omap-dmic.o
 snd-soc-omap-abe-objs := omap-abe.o
 snd-soc-omap-abe-dsp-objs := omap-abe-dsp.o
 snd-soc-omap-hdmi-objs := omap-hdmi.o
-snd-soc-omap-vxrec-objs := omap-vxrec.o
 
 obj-$(CONFIG_SND_OMAP_SOC) += snd-soc-omap.o
 obj-$(CONFIG_SND_OMAP_SOC_MCASP) += snd-soc-omap-mcasp.o
@@ -17,7 +16,6 @@ obj-$(CONFIG_SND_OMAP_SOC_DMIC) += snd-soc-omap-dmic.o
 obj-$(CONFIG_SND_OMAP_SOC_ABE) += snd-soc-omap-abe.o
 obj-$(CONFIG_SND_OMAP_SOC_ABE_DSP) += snd-soc-omap-abe-dsp.o abe/
 obj-$(CONFIG_SND_OMAP_SOC_HDMI) += snd-soc-omap-hdmi.o
-obj-$(CONFIG_SND_OMAP_SOC_VXREC) += snd-soc-omap-vxrec.o
 
 # OMAP Machine Support
 snd-soc-n810-objs := n810.o
@@ -33,8 +31,8 @@ snd-soc-omap3pandora-objs := omap3pandora.o
 snd-soc-omap3beagle-objs := omap3beagle.o
 snd-soc-zoom2-objs := zoom2.o
 snd-soc-igep0020-objs := igep0020.o
-snd-soc-omap4-hdmi-objs := omap4-hdmi-card.o
 snd-soc-omap4-panda-aic31xx-objs := omap4_panda_aic31xx.o
+snd-soc-omap4-hdmi-objs := omap4-hdmi-card.o
 
 obj-$(CONFIG_SND_OMAP_SOC_N810) += snd-soc-n810.o
 obj-$(CONFIG_SND_OMAP_SOC_RX51) += snd-soc-rx51.o
@@ -46,10 +44,9 @@ obj-$(CONFIG_SND_OMAP_SOC_OMAP3EVM) += snd-soc-omap3evm.o
 obj-$(CONFIG_SND_OMAP_SOC_AM3517EVM) += snd-soc-am3517evm.o
 obj-$(CONFIG_SND_OMAP_SOC_SDP3430) += snd-soc-sdp3430.o
 obj-$(CONFIG_SND_OMAP_SOC_SDP4430) += snd-soc-sdp4430.o
-obj-$(CONFIG_SND_OMAP_SOC_KC1_AIC3110) += snd-soc-omap4-panda-aic31xx.o
 obj-$(CONFIG_SND_OMAP_SOC_OMAP3_PANDORA) += snd-soc-omap3pandora.o
 obj-$(CONFIG_SND_OMAP_SOC_OMAP3_BEAGLE) += snd-soc-omap3beagle.o
 obj-$(CONFIG_SND_OMAP_SOC_ZOOM2) += snd-soc-zoom2.o
 obj-$(CONFIG_SND_OMAP_SOC_IGEP0020) += snd-soc-igep0020.o
+obj-$(CONFIG_SND_OMAP_SOC_RY_AIC3110) += snd-soc-omap4-panda-aic31xx.o
 obj-$(CONFIG_SND_OMAP_SOC_OMAP4_HDMI) += snd-soc-omap4-hdmi.o
-

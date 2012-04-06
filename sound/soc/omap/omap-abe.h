@@ -44,8 +44,7 @@
 #define OMAP_ABE_DAI_DMIC0			7
 #define OMAP_ABE_DAI_DMIC1			8
 #define OMAP_ABE_DAI_DMIC2			9
-#define OMAP_ABE_DAI_VXREC			10
-#define OMAP_ABE_DAI_NUM			11
+#define OMAP_ABE_DAI_NUM			10
 
 #define OMAP_ABE_BE_PDM_DL1		"PDM-DL1"
 #define OMAP_ABE_BE_PDM_UL1		"PDM-UL1"
@@ -53,12 +52,13 @@
 #define OMAP_ABE_BE_PDM_VIB		"PDM-VIB"
 #define OMAP_ABE_BE_BT_VX_UL		"BT-VX-UL"
 #define OMAP_ABE_BE_BT_VX_DL		"BT-VX-DL"
-#define OMAP_ABE_BE_MM_EXT0		"FM-EXT"
+//#define OMAP_ABE_BE_MM_EXT0		"FM-EXT"
+#define OMAP_ABE_BE_MM_EXT0_DL		"FM-EXT-DL"
+#define OMAP_ABE_BE_MM_EXT0_UL		"FM-EXT-UL"
 #define OMAP_ABE_BE_MM_EXT1		"MODEM-EXT"
 #define OMAP_ABE_BE_DMIC0		"DMIC0"
 #define OMAP_ABE_BE_DMIC1		"DMIC1"
 #define OMAP_ABE_BE_DMIC2		"DMIC2"
-#define OMAP_ABE_BE_VXREC		"VXREC"
 
 #define OMAP_ABE_DL1_NO_PDM		0
 #define OMAP_ABE_DL1_HEADSET_LP		1
@@ -81,5 +81,4 @@ typedef struct
 	int sample_rate_dl;	/* Sample rate ? */
 	int bit_reorder_dl;	/* 1: transfer LSB first   0: transfer MSB first */
 }t_port_config;
-
 #endif	/* End of __OMAP_MCPDM_H__ */

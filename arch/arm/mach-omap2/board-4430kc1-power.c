@@ -166,7 +166,7 @@ static struct regulator_consumer_supply gsensor_supply[] = {
 static struct regulator_init_data sdp4430_vaux2 = {
 	.constraints = {
 		.min_uV			= 1200000,
-		.max_uV			= 3300000,
+		.max_uV			= 2800000,
 		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE | REGULATOR_CHANGE_MODE | REGULATOR_CHANGE_STATUS,
@@ -251,6 +251,7 @@ static struct regulator_init_data sdp4430_vcore2	= {
 		.initial_state          = PM_SUSPEND_MEM,
 	},
 };
+
 static struct twl4030_usb_data omap4_usbphy_data = {
 	.phy_init	= omap4430_phy_init,
 	.phy_exit	= omap4430_phy_exit,
@@ -258,6 +259,30 @@ static struct twl4030_usb_data omap4_usbphy_data = {
 	.phy_set_clock	= omap4430_phy_set_clk,
 	.phy_suspend	= omap4430_phy_suspend,
 };
+
+#if 0
+static struct twl4030_codec_audio_data twl6040_audio = {
+	/* single-step ramp for headset and handsfree */
+	.hs_left_step   = 0x0f,
+	.hs_right_step  = 0x0f,
+	.hf_left_step   = 0x1d,
+	.hf_right_step  = 0x1d,
+};
+
+static struct twl4030_codec_vibra_data twl6040_vibra = {
+	.max_timeout	= 15000,
+	.initial_vibrate = 0,
+	.voltage_raise_speed = 0x26,
+};
+
+static struct twl4030_codec_data twl6040_codec = {
+	.audio          = &twl6040_audio,
+	.vibra          = &twl6040_vibra,
+//	.audpwron_gpio  = 127,  ??
+	.naudint_irq    = OMAP44XX_IRQ_SYS_2N,
+	.irq_base       = TWL6040_CODEC_IRQ_BASE,
+};
+#endif
 
 static struct twl4030_platform_data sdp4430_twldata = {
 	.irq_base	= TWL6030_IRQ_BASE,

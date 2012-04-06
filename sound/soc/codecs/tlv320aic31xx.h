@@ -13,9 +13,9 @@
  *
  * History:
  *
- * Rev 0.1   ASoC driver support    Mistral         14-04-2010
+ * Rev 0.1   ASoC driver support			14-04-2010
  *
- * Rev 0.2   Updated based Review Comments Mistral      29-06-2010
+ * Rev 0.2   Updated based Review Comments		29-06-2010
  *
  * Rev 0.3   Updated for Codec Family Compatibility     12-07-2010
  *
@@ -23,8 +23,9 @@
  *
  * Rev 0.5   Updated the code-base with ADC related register #defines.
  *
- * Rev 0.6   Added the PAGE_3 #define and the Prog Delay Timer Register
- *	     define to be used for HP and DAC Rampup time.
+ * Rev 0.6   Updated the code-base with DAC and HP related ENUMS
+ *
+ * Rev 0.7   Ported to 3.0 Kernel			20-01-2012
  */
 
 #ifndef _TLV320AIC31xx_H
@@ -32,7 +33,7 @@
 
 #define AIC31XX_VERSION "0.1"
 
-//#define AIC31x_CODEC_DEBUG 1
+/* #define AIC31x_CODEC_DEBUG 1 */
 
 #ifdef AIC31x_CODEC_DEBUG
 #define DBG(x...) printk(KERN_INFO x)
@@ -50,14 +51,14 @@
 
 #ifdef AIC3110_CODEC_SUPPORT
 
-/* 
+/*
  ****************************************************************************
  * BOARD SPECIFIC DEFINES
  ****************************************************************************
  */
 
-/* The headset jack insertion GPIO used on the KC1 Board */
-#define KC1_HEADSET_DETECT_GPIO_PIN 		49
+/* The headset jack insertion GPIO used on the Qoo Board */
+#define Qoo_HEADSET_DETECT_GPIO_PIN		49
 
 /* Regulator Minimum Voltage */
 #define REGU_MIN_VOL			3000000
@@ -65,11 +66,11 @@
 /* Regulator Maximum Voltage */
 #define REGU_MAX_VOL			3000000
 
-/* 5V Boost Voltage GPIO Input on KC1 Board */
+/* 5V Boost Voltage GPIO Input on Qoo Board */
 #define ADO_SPK_ENABLE_GPIO		119
 
-/* Audio Gain Tuning as per the KC1 Board */
-#define KC1_AUDIO_GAIN_TUNING_SELECT 1
+/* Audio Gain Tuning as per the Qoo Board */
+#define Qoo_AUDIO_GAIN_TUNING_SELECT 1
 
 
 #define AUDIO_NAME "aic3110"
@@ -106,11 +107,13 @@
 #define HEADSET_DETECTION
 
 /* AIC31xx supported sample rate are 8k to 192k */
-//#define AIC31XX_RATES	SNDRV_PCM_RATE_8000_192000
+/*#define AIC31XX_RATES	SNDRV_PCM_RATE_8000_192000*/
 
-#define AIC31XX_RATES	(SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 | SNDRV_PCM_RATE_16000 \
-                    | SNDRV_PCM_RATE_22050 | SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 \
-  		    | SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000)
+#define AIC31XX_RATES	(SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 | \
+			SNDRV_PCM_RATE_16000 | SNDRV_PCM_RATE_22050 | \
+			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 | \
+			SNDRV_PCM_RATE_48000 | SNDRV_PCM_RATE_96000 | \
+			SNDRV_PCM_RATE_192000)
 
 /* AIC31xx supports the word formats 16bits, 20bits, 24bits and 32 bits */
 #define AIC31XX_FORMATS	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S20_3LE \
@@ -192,7 +195,7 @@
 #define INTL_CRTL_REG_1			   48
 #define INTL_CRTL_REG_2			   49
 #define GPIO_CRTL_REG_1			   51
-#define DOUT_CTRL			   53 	
+#define DOUT_CTRL			   53
 #define DIN_CTRL			   54
 #define DAC_PRB_SEL_REG			   60
 #define ADC_PRB_SEL_REG			   61
@@ -258,7 +261,7 @@
 #define MIC_PGA				(PAGE_1 + 47)
 #define MIC_GAIN			(PAGE_1 + 48)
 #define ADC_IP_SEL			(PAGE_1 + 49)
-#define CM_SET	         		(PAGE_1 + 50)
+#define CM_SET				(PAGE_1 + 50)
 
 #define L_MICPGA_P			(PAGE_1 + 52)
 #define L_MICPGA_N			(PAGE_1 + 54)
@@ -289,18 +292,18 @@
 #define CODEC_MUX_VALUE			0X03
 /*Bclk_in selection*/
 #define BDIV_CLKIN_MASK			0x03
-#define	DAC_MOD_CLK_2_BDIV_CLKIN 	BIT0
+#define	DAC_MOD_CLK_2_BDIV_CLKIN	BIT0
 #define ADC_MOD_CLK_2_BDIV_CLKIN	(BIT1 | BIT0)
 #define SOFT_RESET			0x01
 #define PAGE0				0x00
 #define PAGE1				0x01
 #define BIT_CLK_MASTER			BIT3
 #define WORD_CLK_MASTER			BIT2
-#define	HIGH_PLL 			    BIT6
-#define ENABLE_PLL			    BIT7
-#define ENABLE_NDAC			    BIT7
-#define ENABLE_MDAC			    BIT7
-#define ENABLE_NADC			    BIT7
+#define	HIGH_PLL			BIT6
+#define ENABLE_PLL			BIT7
+#define ENABLE_NDAC			BIT7
+#define ENABLE_MDAC			BIT7
+#define ENABLE_NADC			BIT7
 #define ENABLE_MADC			BIT7
 #define ENABLE_BCLK			BIT7
 #define LDAC_2_LCHN			BIT4
@@ -392,6 +395,11 @@
 #define MIC2_ENUM		    19
 #define MIC3_ENUM		    20
 #define ADCMUTE_ENUM		    21
+#define HPL_ENUM		    22
+#define HPR_ENUM		    23
+#define LDAC_ENUM		    24
+#define RDAC_ENUM		    25
+
 
 /*****************************************************************************
  * Structures Definitions
@@ -405,8 +413,7 @@
  *          Unsigned short for i2c address.
  *----------------------------------------------------------------------------
  */
-struct aic31xx_setup_data
-{
+struct aic31xx_setup_data {
 	unsigned short i2c_address;
 };
 
@@ -423,8 +430,7 @@ struct aic31xx_setup_data
 
  *----------------------------------------------------------------------------
  */
-struct aic31xx_configs
-{
+struct aic31xx_configs {
 	u16 reg_offset;
 	u8 reg_val;
 };
@@ -445,25 +451,26 @@ struct aic31xx_configs
  *          codec strucuture. Used while freeing the Driver Resources
  *----------------------------------------------------------------------------
  */
-struct aic31xx_priv
-{
+struct aic31xx_priv {
 	u32 sysclk;
 	s32 master;
 	u8 page_no;
 	void *control_data;
 	u8  mute;
 	u8  headset_connected;
-        u8  headset_current_status; 
+	u8  headset_current_status;
 	u8  power_status;
 	u8  playback_status;
 	struct mutex mutex_codec;
-        struct snd_soc_codec codec;
-        u8  i2c_regs_status;
-        u32   hp_driver_pop_time;
-        u32   hp_driver_ramp_time; 
-	u8 playback_stream;	/* 1 denotes Playback and 0 denotes record */
-        struct aic31xx_configs hp_analog_right_vol[120];
-        struct aic31xx_configs hp_analog_left_vol[120];
+	struct snd_soc_codec codec;
+	u8 i2c_regs_status;
+	u32 hp_driver_pop_time;
+	u32 hp_driver_ramp_time;
+	u8 playback_stream;	/* 1 denotes Playback */
+	u8 record_stream;	/* 1 denotes Capture */
+	struct aic31xx_configs hp_analog_right_vol[120];
+	struct aic31xx_configs hp_analog_left_vol[120];
+
 };
 
 /*
@@ -499,8 +506,7 @@ struct aic31xx_priv
  *          configurations for aic31xx register value
  *----------------------------------------------------------------------------
  */
-struct aic31xx_rate_divs
-{
+struct aic31xx_rate_divs {
 	u32 mclk;
 	u32 rate;
 	u8 p_val;
@@ -534,12 +540,12 @@ extern struct snd_soc_dai_driver tlv320aic31xx_dai[];
  *			aic31xx_suspend() and aic31xx_resume()
  *
  */
-extern struct snd_soc_codec_driver soc_codec_dev_aic31xx; 
+extern struct snd_soc_codec_driver soc_codec_dev_aic31xx;
 
 /* Extern Function Declaration for Headset Speaker Path Detection */
 extern int aic31xx_headset_speaker_path (struct snd_soc_codec *codec, int gpio_status);
 extern u8 aic31xx_abe_fixup;
 extern int aic31xx_mic_check(struct snd_soc_codec *codec);
-extern int aic31xx_startup (struct snd_pcm_substream *, struct snd_soc_codec *);
+extern int aic31xx_startup(struct snd_pcm_substream *, struct snd_soc_codec *);
 
 #endif /* _TLV320AIC31XX_H */
