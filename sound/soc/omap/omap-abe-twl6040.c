@@ -346,10 +346,6 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Digital Mic 0", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic 1", NULL),
 	SND_SOC_DAPM_MIC("Digital Mic 2", NULL),
-
-	/* MODEM */
-	SND_SOC_DAPM_INPUT("MODEM IN"),
-	SND_SOC_DAPM_OUTPUT("MODEM OUT"),
 };
 
 static const struct snd_soc_dapm_route audio_map[] = {
@@ -404,10 +400,6 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	/* FM <--> ABE */
 	{"omap-mcbsp.2 Playback", NULL, "MM_EXT_DL"},
 	{"MM_EXT_UL", NULL, "omap-mcbsp.2 Capture"},
-
-	/* MODEM <--> ABE */
-	{"Voice Playback", NULL, "MODEM OUT"},
-	{"MODEM IN", NULL, "Voice Capture"},
 };
 
 static inline void twl6040_disconnect_pin(struct snd_soc_dapm_context *dapm,
