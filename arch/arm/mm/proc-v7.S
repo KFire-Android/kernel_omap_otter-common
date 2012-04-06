@@ -18,6 +18,12 @@
 #include <asm/pgtable.h>
 
 #include "proc-macros.S"
+#ifdef CONFIG_SECURE_REGS
+#include <mach/secure-regs.S>
+#else
+	.macro set_secure_regs, base, value
+	.endm
+#endif
 
 #ifdef CONFIG_ARM_LPAE
 #include "proc-v7-3level.S"
@@ -179,7 +185,7 @@ __v7_setup:
 	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
 	and	r10, r0, #0xff000000		@ ARM?
 	teq	r10, #0x41000000
-	bne	3f
+	bne	4f
 	and	r5, r0, #0x00f00000		@ variant
 	and	r6, r0, #0x0000000f		@ revision
 	orr	r6, r6, r5, lsr #20-4		@ combine variant and revision
@@ -209,7 +215,7 @@ __v7_setup:
 	orreq	r10, r10, #(1 << 22)		@ set the Write Allocate disable bit
 	mcreq	p15, 1, r10, c9, c0, 2		@ write the L2 cache aux ctrl register
 #endif
-	b	3f
+	b	4f
 
 	/* Cortex-A9 Errata */
 2:	ldr	r10, =0x00000c09		@ Cortex-A9 primary part number
@@ -244,8 +250,16 @@ __v7_setup:
 	mcrlt	p15, 0, r10, c15, c0, 1		@ write diagnostic register
 1:
 #endif
+	b	4f
 
-3:	mov	r10, #0
+	/* Cortex-A15 initialisations */
+3:	ldr	r10, =0x00000c0A		@ Cortex-A15 primary part number
+	teq	r0, r10
+	bne	4f
+
+	set_secure_regs	r12, r0			@ write secure l2 actlr register
+
+4:	mov	r10, #0
 	mcr	p15, 0, r10, c7, c5, 0		@ I+BTB cache invalidate
 	dsb
 #ifdef CONFIG_MMU
@@ -286,7 +300,7 @@ ENDPROC(__v7_setup)
 
 	.align	2
 __v7_setup_stack:
-	.space	4 * 11				@ 11 registers
+	.space	4 * 15				@ 15 registers
 
 	__INITDATA
 
