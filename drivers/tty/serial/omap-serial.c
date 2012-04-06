@@ -1435,7 +1435,7 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
 	return omap_up_info;
 }
 
-static int serial_omap_probe(struct platform_device *pdev)
+static int __devinit serial_omap_probe(struct platform_device *pdev)
 {
 	struct uart_omap_port	*up;
 	struct resource		*mem, *irq, *dma_tx, *dma_rx;
@@ -1567,7 +1567,7 @@ err_port_line:
 	return ret;
 }
 
-static int serial_omap_remove(struct platform_device *dev)
+static int __devexit serial_omap_remove(struct platform_device *dev)
 {
 	struct uart_omap_port *up = platform_get_drvdata(dev);
 
@@ -1733,7 +1733,7 @@ MODULE_DEVICE_TABLE(of, omap_serial_of_match);
 
 static struct platform_driver serial_omap_driver = {
 	.probe          = serial_omap_probe,
-	.remove         = serial_omap_remove,
+	.remove         = __devexit_p(serial_omap_remove),
 	.driver		= {
 		.name	= DRIVER_NAME,
 		.pm	= &serial_omap_dev_pm_ops,
