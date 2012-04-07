@@ -186,6 +186,17 @@ config MACH_OMAP3EVM
 	default y
 	select OMAP_PACKAGE_CBB
 
+config WIFI_CONTROL_FUNC
+	bool "Enable WiFi control function abstraction"
+	depends on MACH_OMAP_4430_KC1 || MACH_OMAP_4430SDP || MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3
+	select WIRELESS_EXT
+	select WEXT_CORE
+	select WEXT_PROC
+	select WEXT_PRIV
+	default Y
+	help
+	  Enables Power/Reset/Carddetect function abstraction
+
 config MACH_OMAP3517EVM
 	bool "OMAP3517/ AM3517 EVM board"
 	depends on ARCH_OMAP3
