@@ -2463,10 +2463,6 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	/* Set destination rectangle. */
 	gcmofill->start.rect = batch->gcblit.rect;
 
-	/* Flush PE cache. */
-	gcmofill->start.flush.flush_ldst = gcmoflush_flush_ldst;
-	gcmofill->start.flush.flush.reg = gcregflush_pe2D;
-
 exit:
 	if (dstmap != NULL) {
 		unmap_bverror = schedule_unmap(batch, bltparams->dstdesc);
@@ -2554,10 +2550,6 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 
 	/* Set destination rectangle. */
 	gcmostart->rect = batch->gcblit.rect;
-
-	/* Flush PE cache. */
-	gcmostart->flush.flush_ldst = gcmoflush_flush_ldst;
-	gcmostart->flush.flush.reg = gcregflush_pe2D;
 
 	/* Reset the finalizer. */
 	batch->batchend = do_end;
@@ -3490,11 +3482,26 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	}
 
 	if (batchexec) {
+		struct gcmoflush *flush;
+
 		/* Finalize the current operation. */
 		bverror = batch->batchend(bltparams, batch);
 		if (bverror != BVERR_NONE)
 			goto exit;
 
+		/* Add PE flush. */
+		bverror = claim_buffer(batch, sizeof(struct gcmoflush),
+					(void **) &flush);
+		if (bverror != BVERR_NONE) {
+			BVSETBLTERROR(BVERR_OOM,
+				"failed to allocate command buffer");
+			goto exit;
+		}
+
+		flush->flush_ldst = gcmoflush_flush_ldst;
+		flush->flush.reg = gcregflush_pe2D;
+
+		/* Pass the batch for execution. */
 		GCDUMPBATCH(batch);
 
 		gccommit.gcerror = GCERR_NONE;
