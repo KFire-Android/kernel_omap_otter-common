@@ -99,6 +99,15 @@ static const struct omap_dss_hwmod_data omap4_dss_hwmod_data[] __initdata = {
 	{ "dss_hdmi", "omapdss_hdmi", -1 },
 };
 
+static const struct omap_dss_hwmod_data omap5_dss_hwmod_data[] __initdata = {
+	{ "dss_core", "omapdss_dss", -1 },
+	{ "dss_dispc", "omapdss_dispc", -1 },
+	{ "dss_rfbi", "omapdss_rfbi", -1 },
+	{ "dss_dsi1_a", "omapdss_dsi", 0 },
+	{ "dss_dsi1_c", "omapdss_dsi", 1 },
+	{ "dss_hdmi", "omapdss_hdmi", -1 },
+};
+
 static void __init omap4_hdmi_mux_pads(enum omap_hdmi_flags flags)
 {
 	u32 reg;
@@ -308,9 +317,12 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 	} else if (cpu_is_omap34xx()) {
 		curr_dss_hwmod = omap3_dss_hwmod_data;
 		oh_count = ARRAY_SIZE(omap3_dss_hwmod_data);
-	} else {
+	} else if (cpu_is_omap44xx()) {
 		curr_dss_hwmod = omap4_dss_hwmod_data;
 		oh_count = ARRAY_SIZE(omap4_dss_hwmod_data);
+	} else {
+		curr_dss_hwmod = omap5_dss_hwmod_data;
+		oh_count = ARRAY_SIZE(omap5_dss_hwmod_data);
 	}
 
 	dss_pdev = NULL;
