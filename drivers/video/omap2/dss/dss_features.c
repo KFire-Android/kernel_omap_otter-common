@@ -493,6 +493,26 @@ static const enum dss_feat_id omap4_dss_feat_list[] = {
 	FEAT_FIFO_MERGE,
 };
 
+static const enum dss_feat_id omap5_dss_feat_list[] = {
+	FEAT_MGR_LCD2,
+	FEAT_CORE_CLK_DIV,
+	FEAT_LCD_CLK_SRC,
+	FEAT_DSI_DCS_CMD_CONFIG_VC,
+	FEAT_DSI_VC_OCP_WIDTH,
+	FEAT_DSI_GNQ,
+	FEAT_HDMI_CTS_SWMODE,
+	FEAT_HDMI_AUDIO_USE_MCLK,
+	FEAT_HANDLE_UV_SEPARATE,
+	FEAT_ATTR2,
+	FEAT_CPR,
+	FEAT_PRELOAD,
+	FEAT_FIR_COEF_V,
+	FEAT_ALPHA_FREE_ZORDER,
+	FEAT_FIFO_MERGE,
+	FEAT_DSI_PLL_SELFREQDCO,
+	FEAT_DSI_PLL_REFSEL,
+};
+
 /* OMAP2 DSS Features */
 static const struct omap_dss_features omap2_dss_features = {
 	.reg_fields = omap2_dss_reg_fields,
@@ -612,8 +632,8 @@ static const struct omap_dss_features omap5_dss_features = {
 	.reg_fields = omap5_dss_reg_fields,
 	.num_reg_fields = ARRAY_SIZE(omap5_dss_reg_fields),
 
-	.features = omap4_dss_feat_list,
-	.num_features = ARRAY_SIZE(omap4_dss_feat_list),
+	.features = omap5_dss_feat_list,
+	.num_features = ARRAY_SIZE(omap5_dss_feat_list),
 
 	.num_mgrs = 3,
 	.num_ovls = 4,

@@ -1561,10 +1561,17 @@ int dsi_pll_set_clock_div(struct platform_device *dsidev,
 			0x7;
 	}
 
+	if (dss_has_feature(FEAT_DSI_PLL_SELFREQDCO))
+		f = cinfo->clkin4ddr < 1000000000 ? 0x2 : 0x4;
+
 	l = dsi_read_reg(dsidev, DSI_PLL_CONFIGURATION2);
 
-	if (dss_has_feature(FEAT_DSI_PLL_FREQSEL))
-		l = FLD_MOD(l, f, 4, 1);	/* DSI_PLL_FREQSEL */
+	if (dss_has_feature(FEAT_DSI_PLL_FREQSEL) ||
+			dss_has_feature(FEAT_DSI_PLL_SELFREQDCO))
+		l = FLD_MOD(l, f, 4, 1);	/*
+						 * OMAP3: DSI_PLL_FREQSEL
+						 * OMAP5: PLL_SELFREQDCO
+						 */
 	l = FLD_MOD(l, cinfo->use_sys_clk ? 0 : 1,
 			11, 11);		/* DSI_PLL_CLKSEL */
 	l = FLD_MOD(l, cinfo->highfreq,
@@ -1572,6 +1579,8 @@ int dsi_pll_set_clock_div(struct platform_device *dsidev,
 	l = FLD_MOD(l, 1, 13, 13);		/* DSI_PLL_REFEN */
 	l = FLD_MOD(l, 0, 14, 14);		/* DSIPHY_CLKINEN */
 	l = FLD_MOD(l, 1, 20, 20);		/* DSI_HSDIVBYPASS */
+	if (dss_has_feature(FEAT_DSI_PLL_REFSEL))
+		l = FLD_MOD(l, 3, 22, 21);	/* REF_SYSCLK */
 	dsi_write_reg(dsidev, DSI_PLL_CONFIGURATION2, l);
 
 	REG_FLD_MOD(dsidev, DSI_PLL_GO, 1, 0, 0);	/* DSI_PLL_GO */
@@ -2068,6 +2077,8 @@ static unsigned dsi_get_line_buf_size(struct platform_device *dsidev)
 		return 1194 * 3;	/* 1194x24 bits */
 	case 6:
 		return 1365 * 3;	/* 1365x24 bits */
+	case 7:
+		return 1920 * 3;	/* 1920x24 bits */
 	default:
 		BUG();
 	}
