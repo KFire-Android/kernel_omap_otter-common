@@ -64,6 +64,10 @@
 #define HWC_BLT_DESC_FB_FN(ovlno) \
 	(HWC_BLT_DESC_FLAG | HWC_BLT_DESC_FB | (ovlno))
 
+/*
+ * This flag hints OMAPLFB the HWC has configured a DSS pipe for a blit FB
+ */
+#define HWC_BLT_FLAG_USE_FB (1 << 0)
 
 /*****************************************************************************/
 /* WARNING - These structs must keep in sync with user space code            */
@@ -78,6 +82,7 @@ struct rgz_blt_entry {
 };
 
 struct omap_hwc_blit_data {
+	__u16 rgz_flags;
 	/* if rgz_items is 0 there is nothing to blit */
 	__u16 rgz_items;
 	struct rgz_blt_entry rgz_blts[0];
