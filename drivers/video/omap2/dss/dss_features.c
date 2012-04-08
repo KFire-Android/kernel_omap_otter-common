@@ -54,6 +54,8 @@ struct omap_dss_features {
 
 	const u32 buffer_size_unit;
 	const u32 burst_size_unit;
+
+	const int dsi_ddr_div;
 };
 
 /* This struct is assigned to one of the below during initialization */
@@ -549,6 +551,7 @@ static const struct omap_dss_features omap3430_dss_features = {
 	.dss_params = omap3_dss_param_range,
 	.buffer_size_unit = 1,
 	.burst_size_unit = 8,
+	.dsi_ddr_div = 4,
 };
 
 static const struct omap_dss_features omap3630_dss_features = {
@@ -567,6 +570,7 @@ static const struct omap_dss_features omap3630_dss_features = {
 	.dss_params = omap3_dss_param_range,
 	.buffer_size_unit = 1,
 	.burst_size_unit = 8,
+	.dsi_ddr_div = 4,
 };
 
 /* OMAP4 DSS Features */
@@ -587,6 +591,7 @@ static const struct omap_dss_features omap4430_es1_0_dss_features  = {
 	.dss_params = omap4_dss_param_range,
 	.buffer_size_unit = 16,
 	.burst_size_unit = 16,
+	.dsi_ddr_div = 4,
 };
 
 /* For OMAP4430 ES 2.0, 2.1 and 2.2 revisions */
@@ -606,6 +611,7 @@ static const struct omap_dss_features omap4430_es2_0_1_2_dss_features = {
 	.dss_params = omap4_dss_param_range,
 	.buffer_size_unit = 16,
 	.burst_size_unit = 16,
+	.dsi_ddr_div = 4,
 };
 
 /* For all the other OMAP4 versions */
@@ -625,6 +631,7 @@ static const struct omap_dss_features omap4_dss_features = {
 	.dss_params = omap4_dss_param_range,
 	.buffer_size_unit = 16,
 	.burst_size_unit = 16,
+	.dsi_ddr_div = 4,
 };
 
 /* OMAP5 DSS Features */
@@ -644,6 +651,7 @@ static const struct omap_dss_features omap5_dss_features = {
 	.dss_params = omap5_dss_param_range,
 	.buffer_size_unit = 16,
 	.burst_size_unit = 16,
+	.dsi_ddr_div = 2,
 };
 
 #if defined(CONFIG_OMAP4_DSS_HDMI)
@@ -732,6 +740,11 @@ u32 dss_feat_get_buffer_size_unit(void)
 u32 dss_feat_get_burst_size_unit(void)
 {
 	return omap_current_dss_features->burst_size_unit;
+}
+
+int dss_feat_get_dsi_ddr_div()
+{
+	return omap_current_dss_features->dsi_ddr_div;
 }
 
 /* DSS has_feature check */
