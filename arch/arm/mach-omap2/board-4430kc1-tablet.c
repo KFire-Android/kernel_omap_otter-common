@@ -245,7 +245,7 @@ static struct omap_musb_board_data musb_board_data = {
 	.power			= 100,
 };
 
-#ifndef CONFIG_MMC_EMBEDDED_SDIO
+#if 0
 static int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 {
 	static int power_state;
@@ -291,7 +291,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.power_saving	= true,
 #endif
 	},
-#ifdef CONFIG_MMC_EMBEDDED_SDIO
+#if 0
 	{
 		.mmc = 5,
 		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
@@ -299,7 +299,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_wp = 4,
 		.ocr_mask = MMC_VDD_165_195,
 	},
-#else
+#endif
 	{
 		.mmc = 5,
 		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
@@ -308,11 +308,10 @@ static struct omap2_hsmmc_info mmc[] = {
 		.ocr_mask = MMC_VDD_165_195,
 		.nonremovable = true,
 	},
-#endif
 	{}	/* Terminator */
 };
 
-#ifndef CONFIG_MMC_EMBEDDED_SDIO
+#if 0
 static struct wl12xx_platform_data __initdata omap4_panda_wlan_data = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
@@ -332,13 +331,13 @@ static struct regulator_init_data sdp4430_vmmc5 = {
 	.consumer_supplies = &omap4_sdp4430_vmmc5_supply,
 };
 static struct fixed_voltage_config sdp4430_vwlan = {
-	.supply_name = "vwl1271",
-	.microvolts = 1800000, /* 1.8V */
-	.gpio = GPIO_WIFI_PMENA,
-	.startup_delay = 70000, /* 70msec */
-	.enable_high = 1,
-	.enabled_at_boot = 0,
-	.init_data = &sdp4430_vmmc5,
+	.supply_name		= "vwl1271",
+	.microvolts		= 1800000, /* 1.8V */
+	.gpio			= GPIO_WIFI_PMENA,
+	.startup_delay		= 70000, /* 70msec */
+	.enable_high		= 1,
+	.enabled_at_boot	= 0,
+	.init_data		= &sdp4430_vmmc5,
 };
 static struct platform_device omap_vwlan_device = {
 	.name		= "reg-fixed-voltage",
@@ -367,6 +366,16 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 	/* Set the MMC5 (wlan) power function */
 	if (pdev->id == 4)
 		pdata->slots[0].set_power = wifi_set_power;
+#else
+	/* Setting MMC5 SDIO card .built-in variable
+	  * This is to make sure that if WiFi driver is not loaded
+	  * at all, then the MMC/SD/SDIO driver does not keep
+	  * turning on/off the voltage to the SDIO card
+	  */
+	if (pdev->id == 4) {
+		ret = 0;
+		pdata->slots[0].mmc_data.built_in = 1;
+	}
 #endif
 
 	return ret;
@@ -715,10 +724,10 @@ static void omap4_kc1_wifi_mux_init(void)
 				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
 }
 
-static struct wl12xx_platform_data __initdata omap4_kc1_wlan_data = {
+static struct wl12xx_platform_data omap4_kc1_wlan_data __initdata = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
-	.board_tcxo_clock = 0,
+	.board_tcxo_clock = WL12XX_TCXOCLOCK_26,
 };
 
 static void __init omap4_kc1_wifi_init(void)
