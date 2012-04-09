@@ -394,6 +394,7 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 	struct bvbuffmap *bvbuffmap;
 	struct bvbuffmapinfo *bvbuffmapinfo;
 	struct gcmap gcmap;
+	struct bvphysdesc *physdesc;
 
 	/* Try to find existing mapping. */
 	bvbuffmap = buffdesc->map;
@@ -452,8 +453,13 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 	gcmap.logical = 0;
 	gcmap.size = buffdesc->length;
 	gcmap.handle = 0;
-	gcmap.pagecount = buffdesc->pagecount;
-	gcmap.pagearray = buffdesc->pagearray;
+	if (buffdesc->auxtype == BVAT_PHYSDESC) {
+		physdesc = buffdesc->auxptr;
+		gcmap.pagecount = physdesc->pagecount;
+		gcmap.pagearray = physdesc->pagearray;
+		/* TODO: structsize needs to be checked to validate the
+		 * version */
+	}
 
 	gc_map(&gcmap);
 
