@@ -447,7 +447,6 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 		cpumask_setall(policy->cpus);
 	}
 
-	omap_duty_cooling_init();
 	/* FIXME: what's the actual transition time? */
 	policy->cpuinfo.transition_latency = 300 * 1000;
 
@@ -557,6 +556,14 @@ static int __init omap_cpufreq_init(void)
 			pr_warn("%s_init: platform_driver_register failed\n",
 				__func__);
 		ret = omap_cpufreq_cooling_init();
+
+		if (ret)
+			return ret;
+
+		ret = omap_duty_cooling_init();
+		if (ret)
+			pr_warn("%s: omap_duty_cooling_init failed\n",
+				__func__);
 	}
 
 	return ret;
