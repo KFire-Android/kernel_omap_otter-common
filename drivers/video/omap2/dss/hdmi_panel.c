@@ -180,8 +180,9 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 	 * This is only for framebuffer update not for TV timing setting
 	 * Setting TV timing will be done only on enable
 	 */
-	dssdev->panel.timings.x_res = 640;
-	dssdev->panel.timings.y_res = 480;
+	if (dssdev->panel.timings.x_res == 0)
+		dssdev->panel.timings = (struct omap_video_timings)
+			{640, 480, 31746, 128, 24, 29, 9, 40, 2};
 
 	/* sysfs entry to provide user space control to set deepcolor mode */
 	if (sysfs_create_group(&dssdev->dev.kobj, &hdmi_panel_attr_group))
@@ -409,6 +410,12 @@ static int hdmi_get_modedb(struct omap_dss_device *dssdev,
 	memcpy(modedb, specs->modedb, sizeof(*modedb) * modedb_len);
 	return modedb_len;
 }
+static void hdmi_get_resolution(struct omap_dss_device *dssdev,
+			       u16 *xres, u16 *yres)
+{
+	*xres = dssdev->panel.timings.x_res;
+	*yres = dssdev->panel.timings.y_res;
+}
 
 static struct omap_dss_driver hdmi_driver = {
 	.probe		= hdmi_panel_probe,
@@ -420,6 +427,7 @@ static struct omap_dss_driver hdmi_driver = {
 	.get_timings	= hdmi_get_timings,
 	.set_timings	= hdmi_set_timings,
 	.check_timings	= hdmi_check_timings,
+	.get_resolution = hdmi_get_resolution,
 	.get_modedb	= hdmi_get_modedb,
 	.set_mode	= omapdss_hdmi_display_set_mode,
 	.driver			= {
