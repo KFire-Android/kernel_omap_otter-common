@@ -171,9 +171,11 @@ static enum gcerror find_context(struct gccontextmap **context, int create)
 	if (gcerror != GCERR_NONE)
 		goto free_map_ctx;
 
+#if MMU_ENABLE
 	gcerror = cmdbuf_map(&curr->context->mmu);
 	if (gcerror != GCERR_NONE)
 		goto free_2d_ctx;
+#endif
 
 	curr->context->mmu_dirty = true;
 
@@ -291,8 +293,7 @@ void gc_write_reg(unsigned int address, unsigned int data)
 enum gcerror gc_alloc_pages(struct gcpage *p, unsigned int size)
 {
 	enum gcerror gcerror;
-	void *logical;
-	int order, count;
+	int order;
 
 	p->pages = NULL;
 	p->logical = NULL;
@@ -312,29 +313,11 @@ enum gcerror gc_alloc_pages(struct gcpage *p, unsigned int size)
 	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
 		"order=%d\n", __func__, __LINE__, order);
 
-	p->pages = alloc_pages(GFP_KERNEL, order);
-	if (p->pages == NULL) {
+	p->logical = dma_alloc_coherent(NULL, p->size, &p->physical,
+								GFP_KERNEL);
+	if (!p->logical) {
 		gcerror = GCERR_OOPM;
 		goto fail;
-	}
-
-	p->physical = page_to_phys(p->pages);
-	p->logical = (unsigned int *) page_address(p->pages);
-
-	if (p->logical == NULL) {
-		gcerror = GCERR_PMMAP;
-		goto fail;
-	}
-
-	/* Reserve pages. */
-	logical = p->logical;
-	count = p->size / PAGE_SIZE;
-
-	while (count) {
-		SetPageReserved(virt_to_page(logical));
-
-		logical = (unsigned char *) logical + PAGE_SIZE;
-		count  -= 1;
 	}
 
 	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
@@ -387,25 +370,8 @@ void gc_free_pages(struct gcpage *p)
 		__func__, __LINE__, p->size);
 
 	if (p->logical != NULL) {
-		void *logical;
-		int count;
-
-		logical = p->logical;
-		count = p->size / PAGE_SIZE;
-
-		while (count) {
-			ClearPageReserved(virt_to_page(logical));
-
-			logical = (unsigned char *) logical + PAGE_SIZE;
-			count  -= 1;
-		}
-
+		dma_free_coherent(NULL, p->size, p->logical, p->physical);
 		p->logical = NULL;
-	}
-
-	if (p->pages != NULL) {
-		__free_pages(p->pages, p->order);
-		p->pages = NULL;
 	}
 
 	p->physical = ~0UL;
@@ -434,9 +400,6 @@ void gc_flush_pages(struct gcpage *p)
 	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
 		"size=%d\n",
 		__func__, __LINE__, p->size);
-
-	dmac_flush_range(p->logical, (unsigned char *) p->logical + p->size);
-	outer_flush_range(p->physical, p->physical + p->size);
 }
 
 /*******************************************************************************

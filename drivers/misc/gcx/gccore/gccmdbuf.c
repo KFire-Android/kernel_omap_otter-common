@@ -106,7 +106,7 @@ enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
 	struct mmu2dphysmem mem;
 	struct mmu2darena *mapped;
 	pte_t physpages[GC_CMD_BUF_PAGES];
-	unsigned char *logical;
+	unsigned char *physical;
 	int i;
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
@@ -117,10 +117,10 @@ enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt)
 			"command buffer has data!\n",
 			__func__, __LINE__);
 
-	logical = (unsigned char *) cmdbuf.page.logical;
+	physical = (unsigned char *) cmdbuf.page.physical;
 	for (i = 0; i < GC_CMD_BUF_PAGES; i += 1) {
-		physpages[i] = page_to_phys(virt_to_page(logical));
-		logical += PAGE_SIZE;
+		physpages[i] = (pte_t)physical;
+		physical += PAGE_SIZE;
 	}
 
 	mem.base = (u32) cmdbuf.page.logical;
@@ -269,6 +269,8 @@ int cmdbuf_flush(void *logical)
 
 		/* Write address register. */
 		gc_write_reg(GCREG_CMD_BUFFER_ADDR_Address, base);
+
+		wmb();
 
 		/* Write control register. */
 		gc_write_reg(GCREG_CMD_BUFFER_CTRL_Address,
