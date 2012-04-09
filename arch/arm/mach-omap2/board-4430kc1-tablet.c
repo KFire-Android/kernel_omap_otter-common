@@ -291,15 +291,15 @@ static struct omap2_hsmmc_info mmc[] = {
 		.power_saving	= true,
 #endif
 	},
-#if 0
 	{
 		.mmc = 5,
 		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
 		.gpio_cd = -EINVAL,
 		.gpio_wp = 4,
 		.ocr_mask = MMC_VDD_165_195,
+		.nonremovable = true,
 	},
-#endif
+#if 0
 	{
 		.mmc = 5,
 		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
@@ -308,6 +308,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.ocr_mask = MMC_VDD_165_195,
 		.nonremovable = true,
 	},
+#endif
 	{}	/* Terminator */
 };
 
@@ -318,6 +319,11 @@ static struct wl12xx_platform_data __initdata omap4_panda_wlan_data = {
 	.board_tcxo_clock = 0,
 };
 #endif
+static struct wl12xx_platform_data omap4_kc1_wlan_data __initdata = {
+	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
+	.board_ref_clock = WL12XX_REFCLOCK_26,
+	.board_tcxo_clock = WL12XX_TCXOCLOCK_26,
+};
 
 static struct regulator_consumer_supply omap4_sdp4430_vmmc5_supply = {
 	.supply = "vmmc",
@@ -367,6 +373,7 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 	if (pdev->id == 4)
 		pdata->slots[0].set_power = wifi_set_power;
 #else
+#if 0
 	/* Setting MMC5 SDIO card .built-in variable
 	  * This is to make sure that if WiFi driver is not loaded
 	  * at all, then the MMC/SD/SDIO driver does not keep
@@ -376,6 +383,7 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 		ret = 0;
 		pdata->slots[0].mmc_data.built_in = 1;
 	}
+#endif
 #endif
 
 	return ret;
@@ -431,8 +439,14 @@ static struct i2c_board_info __initdata sdp4430_i2c_boardinfo[] = {
 
 static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
 	{
+#ifdef CONFIG_TOUCHSCREEN_ILITEK
 		I2C_BOARD_INFO("ilitek_i2c", 0x41),
 		 .irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1),
+#endif
+#ifdef CONFIG_TOUCHSCREEN_ILI210X
+		I2C_BOARD_INFO("ili210x_i2c", 0x41),
+		 .irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1),
+#endif
 	},
 };
 
@@ -613,7 +627,7 @@ module_param(enable_suspend_off, bool, S_IRUSR | S_IRGRP | S_IROTH);
 
 /******** END I2C BOARD INIT ********/
 
-#ifdef CONFIG_TOUCHSCREEN_ILITEK
+#if defined(CONFIG_TOUCHSCREEN_ILITEK) || defined(CONFIG_TOUCHSCREEN_ILI210X)
 static void omap_ilitek_init(void)
 {
 	//printk("~~~~~~~~%s\n", __func__);
@@ -631,27 +645,10 @@ static void omap_ilitek_init(void)
 		return;
 	}
 	gpio_direction_input(OMAP4_TOUCH_IRQ_1);
+
 }
-#endif //CONFIG_TOUCHSCREEN_ILITEK
+#endif //CONFIG_TOUCHSCREEN_ILITEK || CONFIG_TOUCHSCREEN_ILI210X
 
-
-/* FIXME-HASH: NEED TO HOLD WAKELOCK FOR CONSOLE/BT */
-#if 0
-void plat_hold_wakelock(void *up, int flag)
-{
-	struct uart_omap_port *up2 = (struct uart_omap_port *)up;
-	/*Specific wakelock for bluetooth usecases*/
-	if ((up2->pdev->id == BLUETOOTH_UART)
-		&& ((flag == WAKELK_TX) || (flag == WAKELK_RX)))
-		wake_lock_timeout(&uart_lock, 2*HZ);
-
-	/*Specific wakelock for console usecases*/
-	if ((up2->pdev->id == CONSOLE_UART)
-		&& ((flag == WAKELK_IRQ) || (flag == WAKELK_RESUME)))
-		wake_lock_timeout(&uart_lock, 5*HZ);
-	return;
-}
-#endif
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux __initdata board_mux[] = {
@@ -673,21 +670,6 @@ static struct omap_board_mux __initdata board_mux[] = {
  *
  * Same devices installed on EMIF1 and EMIF2
  */
-#if 0
-struct lpddr2_device_info otter_lpddr2_elpida_2G_S4_dev = {
-	.device_timings = {
-		&lpddr2_elpida_timings_200_mhz,
-		&lpddr2_elpida_timings_333_mhz,
-		&lpddr2_elpida_timings_400_mhz,
-		&lpddr2_elpida_timings_466_mhz,
-	},
-	.min_tck	= &lpddr2_elpida_min_tck,
-	.type		= LPDDR2_TYPE_S4,
-	.density	= LPDDR2_DENSITY_2Gb,
-	.io_width	= LPDDR2_IO_WIDTH_32,
-	.emif_ddr_selfrefresh_cycles = 262144,
-};
-#endif
 static struct emif_device_details __initdata emif_devices = {
 	.cs0_device = &lpddr2_elpida_2G_S4_dev,
 };
@@ -723,12 +705,6 @@ static void omap4_kc1_wifi_mux_init(void)
 	omap_mux_init_signal("sdmmc5_dat3.sdmmc5_dat3",
 				OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP);
 }
-
-static struct wl12xx_platform_data omap4_kc1_wlan_data __initdata = {
-	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
-	.board_ref_clock = WL12XX_REFCLOCK_26,
-	.board_tcxo_clock = WL12XX_TCXOCLOCK_26,
-};
 
 static void __init omap4_kc1_wifi_init(void)
 {
@@ -869,9 +845,9 @@ static void __init omap_kc1_init(void)
 	usb_musb_init(&musb_board_data);
 
 	omap4_kc1_display_init();
-#ifdef CONFIG_TOUCHSCREEN_ILITEK
+#if defined(CONFIG_TOUCHSCREEN_ILITEK) || defined(CONFIG_TOUCHSCREEN_ILI210X)
 	omap_ilitek_init();
-#endif //CONFIG_TOUCHSCREEN_ILITEK
+#endif //CONFIG_TOUCHSCREEN_ILITEK || CONFIG_TOUCHSCREEN_ILI210X
 
 	gpio_request(119, "ADO_SPK_ENABLE");
 	gpio_direction_output(119, 1);
