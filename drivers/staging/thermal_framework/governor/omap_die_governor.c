@@ -43,6 +43,7 @@
 #define HYSTERESIS_VALUE 2000
 #define NORMAL_TEMP_MONITORING_RATE 1000
 #define FAST_TEMP_MONITORING_RATE 250
+#define DECREASE_MPU_FREQ_PERIOD 2000
 
 #define OMAP_GRADIENT_SLOPE_4460    348
 #define OMAP_GRADIENT_CONST_4460  -9301
@@ -61,6 +62,7 @@ struct omap_die_governor {
 	void (*update_temp_thresh) (struct thermal_dev *, int min, int max);
 	int report_rate;
 	int panic_zone_reached;
+	int decrease_mpu_freq_period;
 	int cooling_level;
 	int hotspot_temp_upper;
 	int hotspot_temp_lower;
@@ -71,6 +73,7 @@ struct omap_die_governor {
 	int avg_cpu_sensor_temp;
 	int avg_is_valid;
 	struct delayed_work average_cpu_sensor_work;
+	struct delayed_work decrease_mpu_freq_work;
 	int gradient_slope;
 	int gradient_const;
 	int gradient_slope_w_pcb;
@@ -297,6 +300,12 @@ static void omap_fatal_zone(int cpu_temp)
 	kernel_restart(NULL);
 }
 
+static void start_panic_guard(void)
+{
+	schedule_delayed_work(&omap_gov->decrease_mpu_freq_work,
+		msecs_to_jiffies(omap_gov->decrease_mpu_freq_period));
+}
+
 static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 {
 	int cpu_temp, zone = NO_ACTION;
@@ -358,11 +367,27 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 		zone = ALERT_ZONE;
 	}
 
-	if (zone != NO_ACTION)
+	if (zone != NO_ACTION) {
+		if (omap_gov->panic_zone_reached)
+			start_panic_guard();
+		else
+			cancel_delayed_work(&omap_gov->decrease_mpu_freq_work);
 		omap_enter_zone(&omap_thermal_zones[zone - 1],
 				set_cooling_level, cooling_list, cpu_temp);
+	}
 
 	return zone;
+}
+
+static void decrease_mpu_freq_fn(struct work_struct *work)
+{
+	struct omap_die_governor *omap_gov;
+
+	omap_gov = container_of(work, struct omap_die_governor,
+				decrease_mpu_freq_work.work);
+
+	omap_gov->sensor_temp = thermal_request_temp(omap_gov->temp_sensor);
+	thermal_sensor_set_temp(omap_gov->temp_sensor);
 }
 
 /*
@@ -451,6 +476,7 @@ static int omap_die_pm_notifier_cb(struct notifier_block *notifier,
 	switch (pm_event) {
 	case PM_SUSPEND_PREPARE:
 		cancel_delayed_work_sync(&omap_gov->average_cpu_sensor_work);
+		cancel_delayed_work(&omap_gov->decrease_mpu_freq_work);
 		break;
 	case PM_POST_SUSPEND:
 		schedule_work(&omap_gov->average_cpu_sensor_work.work);
@@ -511,8 +537,11 @@ static int __init omap_die_governor_init(void)
 	/* Init delayed work to average on-die temperature */
 	INIT_DELAYED_WORK(&omap_gov->average_cpu_sensor_work,
 			  average_cpu_sensor_delayed_work_fn);
+	INIT_DELAYED_WORK(&omap_gov->decrease_mpu_freq_work,
+			  decrease_mpu_freq_fn);
 
 	omap_gov->average_period = NORMAL_TEMP_MONITORING_RATE;
+	omap_gov->decrease_mpu_freq_period = DECREASE_MPU_FREQ_PERIOD;
 	omap_gov->avg_is_valid = 0;
 
 	if (register_pm_notifier(&omap_die_pm_notifier))
@@ -527,6 +556,7 @@ static int __init omap_die_governor_init(void)
 static void __exit omap_die_governor_exit(void)
 {
 	cancel_delayed_work_sync(&omap_gov->average_cpu_sensor_work);
+	cancel_delayed_work_sync(&omap_gov->decrease_mpu_freq_work);
 	thermal_governor_dev_unregister(therm_fw);
 	kfree(therm_fw);
 	kfree(omap_gov);
