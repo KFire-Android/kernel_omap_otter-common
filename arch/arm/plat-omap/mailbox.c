@@ -40,9 +40,6 @@ static struct omap_mbox **mboxes;
 static int mbox_configured;
 static DEFINE_MUTEX(mbox_configured_lock);
 
-#define SET_MPU_CORE_CONSTRAINT 10
-#define CLEAR_MPU_CORE_CONSTRAINT PM_QOS_DEFAULT_VALUE
-
 static unsigned int mbox_kfifo_size = CONFIG_OMAP_MBOX_KFIFO_SIZE;
 module_param(mbox_kfifo_size, uint, S_IRUGO);
 MODULE_PARM_DESC(mbox_kfifo_size, "Size of omap's mailbox kfifo (bytes)");
@@ -303,8 +300,10 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
 	omap_mbox_enable(mbox);
 
 	if (!mbox_configured++) {
-		dev_pm_qos_update_request(&mbox->qos_request,
-					SET_MPU_CORE_CONSTRAINT);
+		if (mbox->pm_constraint)
+			dev_pm_qos_update_request(&mbox->qos_request,
+					mbox->pm_constraint);
+
 		if (likely(mbox->ops->startup)) {
 			ret = mbox->ops->startup(mbox);
 			if (unlikely(ret))
@@ -350,8 +349,9 @@ fail_alloc_txq:
 	mbox->use_count--;
 fail_startup:
 	if (!--mbox_configured)
-		dev_pm_qos_update_request(&mbox->qos_request,
-					 CLEAR_MPU_CORE_CONSTRAINT);
+		if (mbox->pm_constraint)
+			dev_pm_qos_update_request(&mbox->qos_request,
+					 PM_QOS_DEFAULT_VALUE);
 	mutex_unlock(&mbox_configured_lock);
 	return ret;
 }
@@ -371,8 +371,9 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
 	if (likely(mbox->ops->shutdown)) {
 		if (!--mbox_configured) {
 			mbox->ops->shutdown(mbox);
-			dev_pm_qos_update_request(&mbox->qos_request,
-						CLEAR_MPU_CORE_CONSTRAINT);
+			if (mbox->pm_constraint)
+				dev_pm_qos_update_request(&mbox->qos_request,
+						PM_QOS_DEFAULT_VALUE);
 		}
 	}
 

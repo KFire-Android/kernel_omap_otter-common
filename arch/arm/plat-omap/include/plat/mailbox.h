@@ -63,6 +63,7 @@ struct omap_mbox {
 	int			use_count;
 	struct blocking_notifier_head   notifier;
 	struct dev_pm_qos_request qos_request;
+	unsigned int		pm_constraint;
 };
 
 int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
