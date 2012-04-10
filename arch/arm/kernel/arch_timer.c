@@ -333,8 +333,11 @@ int __init arch_timer_register(struct arch_timer *at)
 
 	arch_timer_ppi = at->res[0].start;
 
-	if (at->res[1].start > 0 || (at->res[1].flags & IORESOURCE_IRQ))
+	if ((at->res[1].start > 0) && (at->res[1].flags & IORESOURCE_IRQ))
 		arch_timer_ppi2 = at->res[1].start;
+
+	if ((at->res[1].start > 0) && (at->res[1].flags & IORESOURCE_MEM))
+		arch_timer_rate = at->res[1].start;
 
 	return arch_timer_common_register();
 }
