@@ -190,20 +190,38 @@ static int arch_timer_available(void)
 
 static inline cycle_t arch_counter_get_cntpct(void)
 {
-	u32 cvall, cvalh;
+	u32 cvall1, cvalh1, cvall2, cvalh2;
 
-	asm volatile("mrrc p15, 0, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
+	asm volatile("mrrc p15, 0, %0, %1, c14" : "=r" (cvall1), "=r" (cvalh1));
 
-	return ((cycle_t) cvalh << 32) | cvall;
+	/* Workaround for TM bug 4718 */
+	if (read_cpuid_id() & 0x410FC0F0) {
+		asm volatile("mrrc p15, 0, %0, %1, c14" : "=r" (cvall2), "=r" (cvalh2));
+		if (cvalh1 != cvalh2)
+			asm volatile("mrrc p15, 0, %0, %1, c14" : "=r" (cvall2), "=r" (cvalh2));
+
+		return ((u64) cvalh2 << 32) | cvall2;
+	}
+
+	return ((u64) cvalh1 << 32) | cvall1;
 }
 
 static inline cycle_t arch_counter_get_cntvct(void)
 {
-	u32 cvall, cvalh;
+	u32 cvall1, cvalh1, cvall2, cvalh2;
 
-	asm volatile("mrrc p15, 1, %0, %1, c14" : "=r" (cvall), "=r" (cvalh));
+	asm volatile("mrrc p15, 1, %0, %1, c14" : "=r" (cvall1), "=r" (cvalh1));
 
-	return ((cycle_t) cvalh << 32) | cvall;
+	/* Workaround for TM bug 4718. Valid only for A15 R0P0 revision */
+	if (read_cpuid_id() & 0x410FC0F0) {
+		asm volatile("mrrc p15, 1, %0, %1, c14" : "=r" (cvall2), "=r" (cvalh2));
+		if (cvalh1 != cvalh2)
+			asm volatile("mrrc p15, 0, %0, %1, c14" : "=r" (cvall2), "=r" (cvalh2));
+
+		return ((u64) cvalh2 << 32) | cvall2;
+	}
+
+	return ((u64) cvalh1 << 32) | cvall1;
 }
 
 static u32 notrace arch_counter_get_cntvct32(void)
