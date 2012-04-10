@@ -41,6 +41,7 @@
 #include <plat/dmtimer.h>
 #include <asm/smp_twd.h>
 #include <asm/sched_clock.h>
+#include <asm/arch_timer.h>
 #include "common.h"
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -352,12 +353,39 @@ static void __init omap4_timer_init(void)
 OMAP_SYS_TIMER(4)
 #endif
 
+#ifdef CONFIG_ARM_ARCH_TIMER
+static struct arch_timer arch_timer_resources[] = {
+	{
+		.res[0] = {
+			.start  = 30,
+			.end    = 30,
+			.flags  = IORESOURCE_IRQ,
+		},
+		.res[1] = {
+			.start  = 6144000,
+			.end    = 6144000,
+			.flags  = IORESOURCE_MEM,
+		},
+
+	},
+};
+#endif
+
 #ifdef CONFIG_ARCH_OMAP5
 static void __init omap5_timer_init(void)
 {
+	int err;
+
 	omap2_gp_clockevent_init(1, OMAP5_CLKEV_SOURCE);
 
 	omap2_gp_clocksource_init(2, OMAP5_MPU_SOURCE);
+
+#ifdef CONFIG_ARM_ARCH_TIMER
+	omap_mpuss_timer_init();
+	err = arch_timer_register(arch_timer_resources);
+	if (err)
+		pr_err("arch_timer_register failed %d\n", err);
+#endif
 }
 OMAP_SYS_TIMER(5)
 #endif
