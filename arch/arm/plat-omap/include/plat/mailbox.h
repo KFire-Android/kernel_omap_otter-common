@@ -59,6 +59,7 @@ struct omap_mbox {
 	void			*priv;
 	int			use_count;
 	struct blocking_notifier_head   notifier;
+	unsigned int		pm_constraint;
 };
 
 int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
