@@ -483,13 +483,34 @@ int __init omap_wakeupgen_init(void)
 	 */
 	max_spi_reg = gic_readl(GIC_DIST_CTR, 0) & 0x1f;
 
+	/*
+	 * Set CPU0 GIC backup flag permanently for omap4460 GP,
+	 * this is needed because of the ROM code bug that breaks
+	 * GIC during wakeup from device off. This errata fix also
+	 * clears the GIC save area during init to prevent restoring
+	 * garbage to the GIC.
+	 */
+	if (cpu_is_omap446x() && omap_type() == OMAP2_DEVICE_TYPE_GP)
+		pm44xx_errata |= PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx;
+
 	if (omap_type() == OMAP2_DEVICE_TYPE_GP) {
 		sar_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
+
+		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx))
+			for (i = SAR_BACKUP_STATUS_OFFSET;
+			     i < WAKEUPGENENB_OFFSET_CPU0; i += 4)
+				sar_writel(0, i, 0);
+
 		sar_writel(GIC_ISR_NON_SECURE, SAR_ICDISR_CPU0_OFFSET, 0);
 		sar_writel(GIC_ISR_NON_SECURE, SAR_ICDISR_CPU1_OFFSET, 0);
 		for (i = 0; i < max_spi_reg; i++)
 			sar_writel(GIC_ISR_NON_SECURE, SAR_ICDISR_SPI_OFFSET,
 				   i);
+
+		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx))
+			__raw_writel(SAR_BACKUP_STATUS_GIC_CPU0,
+				     sar_base + SAR_BACKUP_STATUS_OFFSET);
+
 		iounmap(sar_base);
 		sar_base = NULL;
 	} else {

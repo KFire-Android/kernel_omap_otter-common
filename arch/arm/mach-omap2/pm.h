@@ -112,6 +112,7 @@ static inline void enable_omap3630_toggle_l2_on_restore(void) { }
 #define PM_OMAP4_ROM_SMP_BOOT_ERRATUM_xxx	(1 << 0)
 #define PM_OMAP4_ROM_IVAHD_TESLA_ERRATUM_xxx	(1 << 1)
 #define PM_OMAP4_ROM_L3INSTR_ERRATUM_xxx	(1 << 2)
+#define PM_OMAP4_ROM_CPU1_BACKUP_ERRATUM_xxx	(1 << 3)
 
 #if defined(CONFIG_ARCH_OMAP4)
 extern u16 pm44xx_errata;
