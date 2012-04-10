@@ -1428,7 +1428,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	if (di->platform_data->battery_tmp_tbl == NULL)
 		return;
 
-	adc_code = req.rbuf[1];
+	adc_code = req.buf[1].code;
 	for (temp = 0; temp < di->platform_data->tblsize; temp++) {
 		if (adc_code >= di->platform_data->
 				battery_tmp_tbl[temp])
