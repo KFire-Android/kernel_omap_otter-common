@@ -42,6 +42,7 @@
 #include <linux/errno.h>
 #include <linux/linkage.h>
 #include <linux/smp.h>
+#include <linux/clk.h>
 
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
@@ -61,7 +62,12 @@
 #include "prm44xx.h"
 #include "prm-regbits-44xx.h"
 
+#include "prcm_mpu54xx.h"
+#include "prm54xx.h"
+#include "prm-regbits-54xx.h"
+
 #ifdef CONFIG_SMP
+#define NUM_DEN_MASK			0xfffff000
 
 struct omap4_cpu_pm_info {
 	struct powerdomain *pwrdm;
@@ -392,4 +398,68 @@ int __init omap4_mpuss_init(void)
 	return 0;
 }
 
+/* Initialise local timer clock */
+void __init omap_mpuss_timer_init(void)
+{
+	static struct clk *sys_clk;
+	unsigned long rate;
+	u32 reg, num, den;
+
+	sys_clk = clk_get(NULL, "sys_clkin_ck");
+	if (!sys_clk) {
+		pr_err("Could not get SYS clock\n");
+		return;
+	}
+
+	rate = clk_get_rate(sys_clk);
+	switch (rate) {
+	case 12000000:
+		num = 64;
+		den = 125;
+		break;
+	case 13000000:
+		num = 768;
+		den = 1625;
+		break;
+	case 19200000:
+		num = 8;
+		den = 25;
+		break;
+	case 2600000:
+		num = 384;
+		den = 1625;
+		break;
+	case 2700000:
+		num = 256;
+		den = 1125;
+		break;
+	case 38400000:
+		num = 4;
+		den = 25;
+		break;
+	default:
+		/* Program it for 38.4 MHz */
+		num = 4;
+		den = 25;
+		break;
+	}
+
+	reg = omap4_prcm_mpu_read_inst_reg(
+		OMAP54XX_PRCM_MPU_DEVICE_INST,
+		OMAP54XX_PRM_FRAC_INCREMENTER_NUMERATOR_OFFSET);
+	reg &= NUM_DEN_MASK;
+	reg |= num;
+	omap4_prcm_mpu_write_inst_reg(reg,
+		OMAP54XX_PRCM_MPU_DEVICE_INST,
+		OMAP54XX_PRM_FRAC_INCREMENTER_NUMERATOR_OFFSET);
+
+	reg = omap4_prcm_mpu_read_inst_reg(
+		OMAP54XX_PRCM_MPU_DEVICE_INST,
+		OMAP54XX_PRM_FRAC_INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+	reg &= NUM_DEN_MASK;
+	reg |= den;
+	omap4_prcm_mpu_write_inst_reg(reg,
+		OMAP54XX_PRCM_MPU_DEVICE_INST,
+		OMAP54XX_PRM_FRAC_INCREMENTER_DENUMERATOR_RELOAD_OFFSET);
+}
 #endif
