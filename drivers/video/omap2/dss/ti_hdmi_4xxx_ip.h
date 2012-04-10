@@ -490,4 +490,18 @@ struct hdmi_core_audio_config {
 	bool					en_spdif;
 };
 
+void hdmi_wp_video_config_timing(struct hdmi_ip_data *ip_data,
+				 struct omap_video_timings *timings);
+void hdmi_wp_video_config_interface(struct hdmi_ip_data *ip_data);
+void hdmi_wp_video_config_format(struct hdmi_ip_data *ip_data,
+				 struct hdmi_video_format *video_fmt);
+void hdmi_wp_video_init_format(struct hdmi_video_format *video_fmt,
+			       struct omap_video_timings *timings,
+			       struct hdmi_config *param);
+void hdmi_wp_init(struct omap_video_timings *timings,
+		  struct hdmi_video_format *video_fmt,
+		  struct hdmi_irq_vector *irq_enable);
+void hdmi_wp_irq_enable(struct hdmi_ip_data *ip_data,
+			struct hdmi_irq_vector *irq_enable);
+
 #endif
