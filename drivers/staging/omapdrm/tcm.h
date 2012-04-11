@@ -57,6 +57,7 @@ struct tcm_area {
 
 struct tcm {
 	u16 width, height;	/* container dimensions */
+	u32 *lut;		/* ptr to LUT table */
 	int lut_id;		/* Lookup table identifier */
 
 	/* 'pvt' structure shall contain any tcm details (attr) along with
