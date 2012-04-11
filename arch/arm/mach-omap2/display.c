@@ -23,7 +23,6 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/delay.h>
-
 #include <video/omapdss.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -171,6 +170,7 @@ static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
 
 #define CONTROL_PAD_BASE	0x4A002800
 #define CONTROL_DSIPHY		0x614
+#define CONTROL_HDMI_HPD	0x13C
 
 static int omap5_dsi_mux_pads(int dsi_id, unsigned lanes)
 {
@@ -201,9 +201,15 @@ static int omap5_dsi_mux_pads(int dsi_id, unsigned lanes)
 
 int __init omap_hdmi_init(enum omap_hdmi_flags flags)
 {
+	void __iomem *ctrl_pad_base = NULL;
+	u32 reg;
+
 	if (cpu_is_omap44xx())
 		omap4_hdmi_mux_pads(flags);
-
+	if (cpu_is_omap54xx()) {
+		ctrl_pad_base = ioremap(CONTROL_PAD_BASE, SZ_4K);
+		reg = __raw_writel(0x1060100, ctrl_pad_base + CONTROL_HDMI_HPD);
+	}
 	return 0;
 }
 

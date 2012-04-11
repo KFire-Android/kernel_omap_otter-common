@@ -178,6 +178,8 @@ static struct omap2_hsmmc_info mmc[] = {
 #ifdef CONFIG_OMAP5_SEVM_PALMAS
 #define OMAP5_GPIO_END	0
 
+#define HDMI_GPIO_HPD 193
+
 static struct palmas_gpadc_platform_data omap5_palmas_gpadc = {
 	.ch3_current = 0,
 	.ch0_current = 0,
@@ -715,9 +717,23 @@ static void omap5evm_lcd_init(void)
 		pr_err("%s: Could not get lcd1_reset_gpio\n", __func__);
 }
 
+static void omap5evm_hdmi_init(void)
+{
+	int r;
+
+	r = gpio_request_one(HDMI_GPIO_HPD, GPIOF_DIR_IN,
+				"hdmi_gpio_hpd");
+	if (r)
+		pr_err("%s: Could not get HDMI\n", __func__);
+
+	/* Need to configure HPD as a gpio in mux */
+	omap_hdmi_init(0);
+}
+
 static void __init omap5evm_display_init(void)
 {
 	omap5evm_lcd_init();
+	omap5evm_hdmi_init();
 	omap_display_init(&omap5evm_dss_data);
 }
 
@@ -781,6 +797,10 @@ static void omap5evm_panel_disable_hdmi(struct omap_dss_device *dssdev)
 
 }
 
+static struct omap_dss_hdmi_data sdp54xx_hdmi_data = {
+	.hpd_gpio = HDMI_GPIO_HPD,
+};
+
 static struct omap_dss_device omap5evm_hdmi_device = {
 	.name = "hdmi",
 	.driver_name = "hdmi_panel",
@@ -788,6 +808,7 @@ static struct omap_dss_device omap5evm_hdmi_device = {
 	.platform_enable = omap5evm_panel_enable_hdmi,
 	.platform_disable = omap5evm_panel_disable_hdmi,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
+	.data = &sdp54xx_hdmi_data,
 };
 
 static struct omap_dss_device *omap5evm_dss_devices[] = {
