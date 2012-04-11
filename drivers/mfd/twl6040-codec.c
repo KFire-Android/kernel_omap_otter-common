@@ -582,6 +582,10 @@ static int twl6040_power_up_completion(struct twl6040 *twl6040,
 		gpio_set_value(twl6040->audpwron, 1);
 		time_left = wait_for_completion_timeout(&twl6040->ready,
 							msecs_to_jiffies(700));
+
+		if (twl6040_is_powered(twl6040))
+			return 0;
+
 		if (!time_left) {
 			intid = twl6040_reg_read(twl6040, TWL6040_REG_INTID);
 			if (!(intid & TWL6040_READYINT)) {
@@ -590,17 +594,14 @@ static int twl6040_power_up_completion(struct twl6040 *twl6040,
 				return -ETIMEDOUT;
 			}
 		}
+
 		/*
 		 * Power on seemingly completed.
-		 * Look for clues that the twl6040 might be still booting.
+		 * READYINT received, but not in expected state, retry.
 		 */
-		if (!twl6040_is_powered(twl6040)) {
-			round++;
-			gpio_set_value(twl6040->audpwron, 0);
-			usleep_range(1000, 1500);
-			continue;
-		}
-	} while (round && (round < 3));
+		gpio_set_value(twl6040->audpwron, 0);
+		usleep_range(1000, 1500);
+	} while (round++ < 3);
 
 	if (round >= 3) {
 		dev_err(twl6040->dev,
