@@ -413,7 +413,7 @@ static void _clear_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
 	/* Workaround for clearing DSP GPIO interrupts to allow retention */
 	if (bank->regs->irqstatus2) {
 		reg = bank->base + bank->regs->irqstatus2;
-		__raw_writel(gpio_mask, reg);
+			__raw_writel(0xffffffff, reg);
 	}
 
 	/* Flush posted write for the irq status to avoid spurious interrupts */
