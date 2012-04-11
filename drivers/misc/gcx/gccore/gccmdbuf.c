@@ -262,8 +262,6 @@ int cmdbuf_flush(void *logical)
 		GCDUMPBUFFER(GCDBGFILTER, GCZONE_BUFFER,
 				cmdbuf.page.logical, base, cmdbuf.data_size);
 
-		gc_flush_pages(&cmdbuf.page);
-
 		/* Enable all events. */
 		gc_write_reg(GCREG_INTR_ENBL_Address, ~0U);
 

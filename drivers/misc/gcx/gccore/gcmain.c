@@ -46,9 +46,6 @@
 #include "gcmmu.h"
 #include <linux/gcdebug.h>
 
-#define DEVICE_INT	(32 + 125)
-#define DEVICE_REG_BASE	0x59000000
-#define DEVICE_REG_SIZE	(32 * 1024)
 #define GC_POLL_PRCM_STBY 100
 
 /* Driver context structure. */
@@ -63,6 +60,7 @@ struct gccore {
 
 static struct gccore gcdevice;
 static bool g_irqinstalled;
+static unsigned int gcirq;
 
 static struct mutex mtx;
 static struct dentry *g_debugRoot;
@@ -379,29 +377,6 @@ void gc_free_pages(struct gcpage *p)
 	p->size = 0;
 }
 
-void gc_flush_pages(struct gcpage *p)
-{
-	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
-		"container = 0x%08X\n",
-		__func__, __LINE__, (unsigned int) p);
-
-	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
-		"page array=0x%08X\n",
-		__func__, __LINE__, (unsigned int) p->pages);
-
-	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
-		"logical=0x%08X\n",
-		__func__, __LINE__, (unsigned int) p->logical);
-
-	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
-		"physical=0x%08X\n",
-		__func__, __LINE__, (unsigned int) p->physical);
-
-	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
-		"size=%d\n",
-		__func__, __LINE__, p->size);
-}
-
 /*******************************************************************************
  * Interrupt handling.
  */
@@ -676,7 +651,7 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 			gcpwr_disable_pulse_skipping(g_gcpower);
 
 			if (!g_irqenabled) {
-				enable_irq(DEVICE_INT);
+				enable_irq(gcirq);
 				g_irqenabled = true;
 			}
 			break;
@@ -688,7 +663,7 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 		case GCPWR_OFF:
 			gcpwr_disable_clock(g_gcpower);
 			if (g_irqenabled) {
-				disable_irq(DEVICE_INT);
+				disable_irq(gcirq);
 				g_irqenabled = false;
 			}
 			break;
@@ -975,7 +950,27 @@ EXPORT_SYMBOL(gc_unmap);
 
 static int gc_probe(struct platform_device *pdev)
 {
+	int ret;
+
 	g_gcxplat = (struct omap_gcx_platform_data *)pdev->dev.platform_data;
+	g_reg_base = g_gcxplat->regbase;
+	gcirq = platform_get_irq(pdev, pdev->id);
+
+	ret = request_irq(gcirq, gc_irq, IRQF_SHARED,
+				GC_DEV_NAME, &gcdevice);
+	if (ret < 0) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to install IRQ (%d).\n",
+			__func__, __LINE__, ret);
+		return -ENODEV;
+	}
+
+	g_irqinstalled = true;
+
+	/* Disable IRQ. */
+	disable_irq(gcirq);
+	g_irqenabled = false;
+
 	return 0;
 }
 
@@ -1049,8 +1044,6 @@ static struct early_suspend early_suspend_info = {
 
 static int __init gc_init(void)
 {
-	int ret;
-
 	/* check if hardware is available */
 	if (!cpu_is_omap447x())
 		return 0;
@@ -1081,31 +1074,6 @@ static int __init gc_init(void)
 		goto fail;
 	}
 
-	/* Map GPU registers. */
-	g_reg_base = ioremap_nocache(DEVICE_REG_BASE, DEVICE_REG_SIZE);
-	if (g_reg_base == NULL) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to map registers.\n",
-			__func__, __LINE__);
-		goto fail;
-	}
-
-	/* Install IRQ. */
-	ret = request_irq(DEVICE_INT, gc_irq, IRQF_SHARED,
-				GC_DEV_NAME, &gcdevice);
-	if (ret < 0) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to install IRQ (%d).\n",
-			__func__, __LINE__, ret);
-		goto fail;
-	}
-
-	g_irqinstalled = true;
-
-	/* Disable IRQ. */
-	disable_irq(DEVICE_INT);
-	g_irqenabled = false;
-
 	/* Initialize the command buffer. */
 	if (cmdbuf_init() != GCERR_NONE) {
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
@@ -1127,13 +1095,6 @@ static int __init gc_init(void)
 
 	return platform_driver_register(&plat_drv);
 fail:
-	if (g_irqinstalled)
-		free_irq(DEVICE_INT, &gcdevice);
-
-	if (g_reg_base != NULL) {
-		iounmap(g_reg_base);
-		g_reg_base = NULL;
-	}
 
 	if (g_bb2d_clk)
 		clk_put(g_bb2d_clk);
@@ -1154,11 +1115,6 @@ static void __exit gc_exit(void)
 	mutex_destroy(&g_maplock);
 	gc_set_power(GCPWR_OFF);
 
-	if (g_reg_base != NULL) {
-		iounmap(g_reg_base);
-		g_reg_base = NULL;
-	}
-
 	if (g_bb2d_clk)
 		clk_put(g_bb2d_clk);
 
@@ -1168,7 +1124,7 @@ static void __exit gc_exit(void)
 	mutex_destroy(&mtx);
 
 	if (g_irqinstalled)
-		free_irq(DEVICE_INT, &gcdevice);
+		free_irq(gcirq, &gcdevice);
 }
 
 MODULE_LICENSE("GPL v2");

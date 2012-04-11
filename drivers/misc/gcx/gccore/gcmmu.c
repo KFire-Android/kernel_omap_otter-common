@@ -369,8 +369,6 @@ static void flush_user_buffer(struct mmu2darena *arena)
 				__func__, __LINE__, i);
 			continue;
 		}
-
-		gc_flush_pages(&gcpage);
 	}
 }
 #endif
@@ -736,17 +734,11 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 
 			parray += 1;
 		}
-
-		gc_flush_pages(&stlb_array[i]->pages);
 #endif
 
 		count -= available;
 		stlb_idx = next_idx;
 	}
-
-#if MMU_ENABLE
-	gc_flush_pages(&ctxt->master);
-#endif
 
 	/*
 	 * Claim arena.
