@@ -62,11 +62,10 @@ static struct omap_dma_dev_attr *d;
 static int enable_1510_mode;
 static u32 errata;
 
-static struct omap_dma_global_context_registers {
-	u32 dma_irqenable_l0;
-	u32 dma_ocp_sysconfig;
-	u32 dma_gcr;
-} omap_dma_global_context;
+static struct global_context_registers {
+	u32 irqenable_l0;
+	u32 gcr;
+} global_ctx_regs;
 
 struct dma_link_info {
 	int *linked_dmach_q;
@@ -1970,31 +1969,40 @@ static struct irqaction omap24xx_dma_irq;
 
 /*----------------------------------------------------------------------------*/
 
-void omap_dma_global_context_save(void)
+void omap2_dma_context_save(void)
 {
-	omap_dma_global_context.dma_irqenable_l0 =
-		p->dma_read(IRQENABLE_L0, 0);
-	omap_dma_global_context.dma_ocp_sysconfig =
-		p->dma_read(OCP_SYSCONFIG, 0);
-	omap_dma_global_context.dma_gcr = p->dma_read(GCR, 0);
+	int ch, i, ch_count = 0;
+
+	global_ctx_regs.irqenable_l0	= p->dma_read(IRQENABLE_L0, 0);
+	global_ctx_regs.gcr		= p->dma_read(GCR, 0);
+
+	for (ch = 0; ch < dma_chan_count; ch++) {
+		if (dma_chan[ch].dev_id == -1)
+			continue;
+		for (i = 0; i <= ch_spec_regs; i++)
+			ch_ctx_regs[ch_count++] =
+				p->dma_read(omap_context_registers[i], ch);
+	}
 }
 
-void omap_dma_global_context_restore(void)
+void omap2_dma_context_restore(void)
 {
-	int ch;
+	int ch, i, ch_count = 0;
 
-	p->dma_write(omap_dma_global_context.dma_gcr, GCR, 0);
-	p->dma_write(omap_dma_global_context.dma_ocp_sysconfig,
-		OCP_SYSCONFIG, 0);
-	p->dma_write(omap_dma_global_context.dma_irqenable_l0,
-		IRQENABLE_L0, 0);
+	p->dma_write(global_ctx_regs.gcr, GCR, 0);
+	p->dma_write(global_ctx_regs.irqenable_l0, IRQENABLE_L0, 0);
+
+	for (ch = 0; ch < dma_chan_count; ch++) {
+		if (dma_chan[ch].dev_id == -1)
+			continue;
+		for (i = 0; i <= ch_spec_regs; i++)
+			p->dma_write(ch_ctx_regs[ch_count++],
+					omap_context_registers[i], ch);
+	}
 
 	if (IS_DMA_ERRATA(DMA_ROMCODE_BUG))
 		p->dma_write(0x3 , IRQSTATUS_L0, 0);
 
-	for (ch = 0; ch < dma_chan_count; ch++)
-		if (dma_chan[ch].dev_id != -1)
-			omap_clear_dma(ch);
 }
 
 static int __devinit omap_system_dma_probe(struct platform_device *pdev)
@@ -2136,11 +2144,41 @@ static int __devexit omap_system_dma_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int omap_dma_suspend(struct device *dev)
+{
+	if (p->dma_context_save)
+		p->dma_context_save();
+
+	return 0;
+
+}
+
+static int omap_dma_resume(struct device *dev)
+{
+	/*
+	 * This may not restore sysconfig register if multiple DMA channels
+	 * are in use during suspend.
+	 * Work around: restroing sysconfig manually in machine specific dma
+	 * driver.
+	 */
+	if (p->dma_context_restore)
+		p->dma_context_restore();
+
+	return 0;
+
+}
+
+static const struct dev_pm_ops dma_pm_ops = {
+	.suspend	 = omap_dma_suspend,
+	.resume		 = omap_dma_resume,
+};
+
 static struct platform_driver omap_system_dma_driver = {
 	.probe		= omap_system_dma_probe,
 	.remove		= __devexit_p(omap_system_dma_remove),
 	.driver		= {
-		.name	= "omap_dma_system"
+		.name	= "omap_dma_system",
+		.pm     = &dma_pm_ops,
 	},
 };
 
