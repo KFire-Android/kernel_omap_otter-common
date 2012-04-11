@@ -75,11 +75,13 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
 	if (!vp->vlimits) {
 		WARN(1, "%s: voldm_%s: No limits for VP? Using PMIC data\n",
 			   __func__, voltdm->name);
-		vddmin = voltdm->pmic->uv_to_vsel(voltdm->pmic->min_volt);
+		vddmin = voltdm->pmic->uv_to_vsel(max(voltdm->pmic->ret_volt,
+						voltdm->pmic->min_volt));
 		vddmax = voltdm->pmic->uv_to_vsel(voltdm->pmic->max_volt);
 	} else {
-		vddmin = voltdm->pmic->uv_to_vsel(max(voltdm->pmic->min_volt,
-				vp->vlimits->vddmin));
+		vddmin = voltdm->pmic->uv_to_vsel(max(voltdm->pmic->ret_volt,
+					max(voltdm->pmic->min_volt,
+						vp->vlimits->vddmin)));
 		vddmax = voltdm->pmic->uv_to_vsel(min(voltdm->pmic->max_volt,
 				vp->vlimits->vddmax));
 	}
