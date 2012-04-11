@@ -58,6 +58,9 @@ void __init omap_emif_set_device_details(u32 emif_nr,
 	if (cpu_is_omap44xx()) {
 		omap_emif_platform_data.ip_rev = EMIF_4D;
 		omap_emif_platform_data.phy_type = EMIF_PHY_TYPE_ATTILAPHY;
+	} else if (cpu_is_omap54xx()) {
+		omap_emif_platform_data.ip_rev = EMIF_4D5;
+		omap_emif_platform_data.phy_type = EMIF_PHY_TYPE_INTELLIPHY;
 	} else {
 		goto error;
 	}
