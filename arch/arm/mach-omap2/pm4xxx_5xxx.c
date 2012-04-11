@@ -35,6 +35,7 @@
 #include "prm-regbits-44xx.h"
 #include "prminst44xx.h"
 #include "pm.h"
+#include "voltage.h"
 
 #define EMIF_SDRAM_CONFIG2_OFFSET	0xc
 
@@ -334,6 +335,7 @@ static int __init omap_pm_init(void)
 {
 	int ret, i;
 	char *init_devices[] = {"mpu", "iva"};
+	struct voltagedomain *mpu_voltdm;
 
 	if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
 		return -ENODEV;
@@ -395,6 +397,24 @@ static int __init omap_pm_init(void)
 		pr_err("Failed to initialise static depedencies\n");
 		goto err2;
 	}
+
+	/*
+	 * XXX: voltage config is not still completely valid for
+	 * OMAP4, and this causes crashes on some platform during
+	 * device off because voltage transitions for device off
+	 * are enabled on reset. Thus, we have to disable the I2C
+	 * channel completely in the VOLTCTRL register to avoid
+	 * trouble. Remove this once voltconfigs are valid.
+	 */
+	mpu_voltdm = voltdm_lookup("mpu");
+	if (!mpu_voltdm) {
+		pr_err("Failed to get MPU voltdm\n");
+		goto err2;
+	}
+	mpu_voltdm->write(OMAP4430_VDD_MPU_I2C_DISABLE_MASK |
+			  OMAP4430_VDD_CORE_I2C_DISABLE_MASK |
+			  OMAP4430_VDD_IVA_I2C_DISABLE_MASK,
+			  OMAP4_PRM_VOLTCTRL_OFFSET);
 
 	ret = omap_mpuss_init();
 	if (ret) {
