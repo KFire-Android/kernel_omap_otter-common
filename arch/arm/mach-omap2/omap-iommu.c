@@ -62,6 +62,7 @@ static struct platform_device *omap3_iommu_pdev[NR_OMAP3_IOMMU_DEVICES];
 
 #ifdef CONFIG_ARCH_OMAP4
 static struct iommu_device omap4_devices[] = {
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU
 	{
 		.base = OMAP4_MMU1_BASE,
 		.irq = OMAP44XX_IRQ_DUCATI_MMU,
@@ -73,6 +74,8 @@ static struct iommu_device omap4_devices[] = {
 			.da_end = 0xFFFFF000,
 		},
 	},
+#endif
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP
 	{
 		.base = OMAP4_MMU2_BASE,
 		.irq = OMAP44XX_IRQ_TESLA_MMU,
@@ -84,6 +87,7 @@ static struct iommu_device omap4_devices[] = {
 			.da_end = 0xFFFFF000,
 		},
 	},
+#endif
 };
 #define NR_OMAP4_IOMMU_DEVICES ARRAY_SIZE(omap4_devices)
 static struct platform_device *omap4_iommu_pdev[NR_OMAP4_IOMMU_DEVICES];

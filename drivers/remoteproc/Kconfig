@@ -5,32 +5,56 @@ config REMOTEPROC
 	tristate
 	depends on EXPERIMENTAL
 
+# OMAP_REMOTEPROC depends on selection of IPU or DSP instances
 config OMAP_REMOTEPROC
 	tristate "OMAP remoteproc support"
 	depends on ARCH_OMAP4
 	depends on OMAP_IOMMU
+	depends on OMAP_REMOTEPROC_IPU || OMAP_REMOTEPROC_DSP
 	select REMOTEPROC
 	select OMAP_MBOX_FWK
 	select RPMSG
 	help
-	  Say y here to support OMAP's remote processors (dual M3
+	  Support for OMAP's remote processors (dual M3
 	  and DSP on OMAP4) via the remote processor framework.
 
 	  Currently only supported on OMAP4.
 
-	  Usually you want to say y here, in order to enable multimedia
-	  use-cases to run on your platform (multimedia codecs are
-	  offloaded to remote DSP processors using this framework).
+	  It gets selected by DSP or IPU OMAP_REMOTEPROC instances,
+	  in order to enable multimedia use-cases to run on your platform
+	  (multimedia codecs are offloaded to remote DSP processors using
+	  this framework).
+
+config OMAP_REMOTEPROC_IPU
+	bool "OMAP remoteproc support for IPU"
+	help
+	  Say Y here if you want to enable OMAP's IPU remote processor.
+
+	  This option controls only the dual M3 processor sub-system. You
+	  would want to say y here usually, as this is the sub-system where
+	  typically video & imaging codec control s/w is offloaded.
 
 	  It's safe to say n here if you're not interested in multimedia
-	  offloading or just want a bare minimum kernel.
+	  offloading (by IPU) or just want a bare minimum kernel.
+
+config OMAP_REMOTEPROC_DSP
+	bool "OMAP remoteproc support for DSP"
+	help
+	  Say Y here if you want to enable OMAP's DSP remote processor.
+
+	  This option controls only the DSP processor sub-system. DSP would
+	  typically be used to offload audio codecs or other advanced
+	  processing algorithms.
+
+	  It's safe to say n here if you're not interested in offloading
+	  audio or any other algorithm (by DSP) or just want a bare minimum kernel.
 
 # Amount of CMA memory to reserve for OMAP's dual-M3 "Ducati" sub-system.
 # We need quite much. Fortunately, CMA makes sure this memory isn't
 # wasted in case we're not loading the remote processors.
 config OMAP_DUCATI_CMA_SIZE
 	hex "Ducati M3 physically contiguous memory pool size (in bytes)"
-	depends on OMAP_REMOTEPROC
+	depends on OMAP_REMOTEPROC_IPU
 	default 0x6500000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)
@@ -39,7 +63,7 @@ config OMAP_DUCATI_CMA_SIZE
 
 config OMAP_TESLA_CMA_SIZE
 	hex "Tesla dsp physically contiguous memory pool size (in bytes)"
-	depends on OMAP_REMOTEPROC
+	depends on OMAP_REMOTEPROC_DSP
 	default 0x400000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)
