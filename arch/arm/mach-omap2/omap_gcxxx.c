@@ -70,6 +70,7 @@ int __init gcxxx_init(void)
 	if (oh == NULL)
 		return -EINVAL;
 
+	omap_gcxxx.regbase = omap_hwmod_get_mpu_rt_va(oh);
 	od = omap_device_build(dev_name, 0, oh, &omap_gcxxx,
 				sizeof(omap_gcxxx), omap_gcxxx_latency,
 				ARRAY_SIZE(omap_gcxxx_latency), false);

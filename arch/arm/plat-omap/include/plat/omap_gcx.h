@@ -20,6 +20,7 @@
 #define OMAP_GCX_H
 
 struct omap_gcx_platform_data {
+	void *regbase;
 	u32 (*prcm_bb2d_idlest)(void);
 };
 
