@@ -284,8 +284,8 @@ static struct omap_voltdm_pmic omap443x_447x_mpu_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.min_volt		= OMAP4_VP_MPU_VLIMITTO_VDDMIN,
-	.max_volt		= OMAP4_VP_MPU_VLIMITTO_VDDMAX,
+	.min_volt		= 709000,
+	.max_volt		= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6030_VCORE1_SR_VOLT_REG,
@@ -311,8 +311,8 @@ static struct omap_voltdm_pmic omap443x_446x_iva_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.min_volt		= OMAP4_VP_IVA_VLIMITTO_VDDMIN,
-	.max_volt		= OMAP4_VP_IVA_VLIMITTO_VDDMAX,
+	.min_volt		= 709000,
+	.max_volt		= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6030_VCORE2_SR_VOLT_REG,
@@ -338,8 +338,8 @@ static struct omap_voltdm_pmic omap447x_iva_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.min_volt		= OMAP4_VP_IVA_VLIMITTO_VDDMIN,
-	.max_volt		= OMAP4_VP_IVA_VLIMITTO_VDDMAX,
+	.min_volt		= 709000,
+	.max_volt		= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6032_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6032_SMPS5_SR_VOLT_REG,
@@ -365,8 +365,8 @@ static struct omap_voltdm_pmic omap443x_core_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.min_volt		= OMAP4_VP_CORE_VLIMITTO_VDDMIN,
-	.max_volt		= OMAP4_VP_CORE_VLIMITTO_VDDMAX,
+	.min_volt		= 709000,
+	.max_volt		= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6030_VCORE3_SR_VOLT_REG,
@@ -394,8 +394,8 @@ static struct omap_voltdm_pmic omap446x_core_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.min_volt		= OMAP4_VP_CORE_VLIMITTO_VDDMIN,
-	.max_volt		= OMAP4_VP_CORE_VLIMITTO_VDDMAX,
+	.min_volt		= 709000,
+	.max_volt		= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6030_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6030_VCORE1_SR_VOLT_REG,
@@ -421,8 +421,8 @@ static struct omap_voltdm_pmic omap447x_core_pmic = {
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.min_volt		= OMAP4_VP_CORE_VLIMITTO_VDDMIN,
-	.max_volt		= OMAP4_VP_CORE_VLIMITTO_VDDMAX,
+	.min_volt		= 709000,
+	.max_volt		= 1418000,
 	.vp_timeout_us		= OMAP4_VP_VLIMITTO_TIMEOUT_US,
 	.i2c_slave_addr		= TWL6032_SRI2C_SLAVE_ADDR,
 	.volt_reg_addr		= TWL6032_SMPS2_SR_VOLT_REG,
@@ -454,6 +454,68 @@ static int __init twl_set_sr(struct voltagedomain *voltdm)
 	return r;
 }
 
+static int __init twl6030_set_offset(struct voltagedomain *voltdm)
+{
+	/*
+	 * In TWL6030 depending on the value of SMPS_OFFSET
+	 * efuse register the voltage range supported in
+	 * standard mode can be either between 0.6V - 1.3V or
+	 * 0.7V - 1.4V. In TWL6030 ES1.0 SMPS_OFFSET efuse
+	 * is programmed to all 0's where as starting from
+	 * TWL6030 ES1.1 the efuse is programmed to 1
+	 */
+	if (!is_offset_valid) {
+		int r;
+
+		r = twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset,
+				REG_SMPS_OFFSET);
+		if (r) {
+			pr_err("%s: read of smps offset failed - %d\n",
+				__func__, r);
+			/* Nothing we can do - try later? */
+			goto out;
+		}
+		/* Check if SMPS offset already set */
+		if (smps_offset & 0x8)
+			goto out;
+		/* Check if TWL firmware lets us write */
+		if (!(smps_offset & 0x80)) {
+			WARN(1, "%s: No SMPS OFFSET value=0x%02x"
+				"update not possible, max val might be wrong\n",
+				__func__, smps_offset);
+			/* Nothing we can do */
+			goto out;
+		}
+
+		/* Attempt to set offset for all */
+		r = twl_i2c_write_u8(TWL6030_MODULE_ID0, 0xFF, REG_SMPS_OFFSET);
+		if (r) {
+			WARN(1, "%s: No SMPS OFFSET value=0x%02x"
+				"update failed %d, max val might be wrong\n",
+				__func__, smps_offset, r);
+			/* Nothing we can do */
+			goto out;
+		}
+
+		/* Check if SMPS offset now set */
+		r = twl_i2c_read_u8(TWL6030_MODULE_ID0, &smps_offset,
+				REG_SMPS_OFFSET);
+		if (r || !(smps_offset & 0x8)) {
+			WARN(1, "%s: No SMPS OFFSET value=0x%02x"
+				"check(r=%d) failed, max val might be wrong\n",
+				__func__, smps_offset, r);
+			/* Nothing we can do */
+			goto out;
+		}
+		is_offset_valid = true;
+	}
+out:
+	/*
+	 * even if i2c op failed, there is not much we could have done
+	 * Carry on with the hope that we will fix ourselves in next iteration
+	 */
+	return 0;
+}
 
 /* OMAP4430 - All vcores: 1, 2 and 3 should go down with PREQ */
 static __initdata struct twl_reg_setup_array omap4430_twl6030_setup[] = {
@@ -492,6 +554,7 @@ static __initdata struct twl_reg_setup_array omap4430_twl6030_setup[] = {
 
 static int __init twl_set_4430vcore(struct voltagedomain *voltdm)
 {
+	twl6030_set_offset(voltdm);
 	return _twl_set_regs("OMAP4430 ", omap4430_twl6030_setup);
 }
 
@@ -527,6 +590,7 @@ static __initdata struct twl_reg_setup_array omap4460_twl6030_setup[] = {
 
 static int __init twl_set_4460vcore(struct voltagedomain *voltdm)
 {
+	twl6030_set_offset(voltdm);
 	return _twl_set_regs("OMAP4460 ", omap4460_twl6030_setup);
 }
 
@@ -551,6 +615,7 @@ static __initdata struct omap_pmic_map omap_twl_map[] = {
 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP443X |
 						CHIP_IS_OMAP447X),
 		.pmic_data = &omap443x_447x_mpu_pmic,
+		.special_action = twl6030_set_offset,
 	},
 	{
 		.name = "core",
@@ -568,17 +633,20 @@ static __initdata struct omap_pmic_map omap_twl_map[] = {
 		.name = "core",
 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP447X),
 		.pmic_data = &omap447x_core_pmic,
+		.special_action = twl6030_set_offset,
 	},
 	{
 		.name = "iva",
 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP443X |
 						CHIP_IS_OMAP446X),
 		.pmic_data = &omap443x_446x_iva_pmic,
+		.special_action = twl6030_set_offset,
 	},
 	{
 		.name = "iva",
 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP447X),
 		.pmic_data = &omap447x_iva_pmic,
+		.special_action = twl6030_set_offset,
 	},
 	/* Terminator */
 	{ .name = NULL, .pmic_data = NULL},
@@ -609,7 +677,7 @@ int __init omap_twl_init(void)
 }
 
 /**
- * omap3_twl_set_sr_bit() - Set/Clear SR bit on TWL
+ * twl6030_set_offset() - setup TWL offset voltages
  * @enable: enable SR mode in twl or not
  *
  * If 'enable' is true, enables Smartreflex bit on TWL 4030 to make sure
