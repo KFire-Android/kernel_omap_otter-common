@@ -25,9 +25,20 @@
 #include "common.h"
 #include <asm/hardware/gic.h>
 #include <plat/common.h>
+#include "common-board-devices.h"
+#include "mux.h"
+
+#ifdef CONFIG_OMAP_MUX
+static struct omap_board_mux board_mux[] __initdata = {
+	{ .reg_offset = OMAP_MUX_TERMINATOR },
+};
+#else
+#define board_mux NULL
+#endif
 
 static void __init omap_5430evm_init(void)
 {
+	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
 	omap_serial_init();
 }
