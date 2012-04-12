@@ -43,6 +43,14 @@
 #define OMAP_RPROC_CMA_BASE_IPU	(0xa9000000)
 #define OMAP_RPROC_CMA_BASE_DSP	(0xa8800000)
 
+static struct omap_rproc_timers_info ipu_timers[] = {
+	{ .id = 3 },
+};
+
+static struct omap_rproc_timers_info dsp_timers[] = {
+	{ .id = 5 },
+};
+
 /*
  * These data structures define platform-specific information
  * needed for each supported remote processor.
@@ -59,6 +67,8 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.mbox_name	= "mailbox-2",
 		.oh_name	= "dsp_c0",
 		.boot_reg	= OMAP4430_CONTROL_DSP_BOOTADDR,
+		.timers		= dsp_timers,
+		.timers_cnt	= ARRAY_SIZE(dsp_timers),
 	},
 #endif
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
@@ -68,6 +78,8 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.mbox_name	= "mailbox-1",
 		.oh_name	= "ipu_c0",
 		.oh_name_opt	= "ipu_c1",
+		.timers		= ipu_timers,
+		.timers_cnt	= ARRAY_SIZE(ipu_timers),
 	},
 #endif
 };
