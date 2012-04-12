@@ -204,11 +204,17 @@ static int __init omap4_sar_ram_init(void)
 	 * To avoid code running on other OMAPs in
 	 * multi-omap builds
 	 */
-	if (!cpu_is_omap44xx())
+	unsigned long sar_base_phys;
+
+	if (cpu_is_omap44xx())
+		sar_base_phys = OMAP44XX_SAR_RAM_BASE;
+	else if (cpu_is_omap54xx())
+		sar_base_phys = OMAP54XX_SAR_RAM_BASE;
+	else
 		return -ENOMEM;
 
 	/* Static mapping, never released */
-	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
+	sar_ram_base = ioremap(sar_base_phys, SZ_16K);
 	if (WARN_ON(!sar_ram_base))
 		return -ENOMEM;
 
