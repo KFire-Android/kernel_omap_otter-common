@@ -1,5 +1,5 @@
 /*
- * OMAP44xx sleep code.
+ * OMAP4/5 sleep code.
  *
  * Copyright (C) 2011 Texas Instruments, Inc.
  * 	Santosh Shilimkar <santosh.shilimkar@ti.com>
