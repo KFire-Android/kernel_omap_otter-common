@@ -61,6 +61,7 @@
 #include "prcm44xx.h"
 #include "prm44xx.h"
 #include "prm-regbits-44xx.h"
+#include "prcm_mpu54xx.h"
 
 #include "prcm_mpu54xx.h"
 #include "prm54xx.h"
@@ -373,6 +374,21 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 }
 
 
+static void enable_mercury_retention_mode(void)
+{
+	u32 reg;
+
+	reg = omap4_prcm_mpu_read_inst_reg(
+		OMAP54XX_PRCM_MPU_DEVICE_INST,
+		OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);
+	/* Enable the Mercury retention mode */
+	reg |= BIT(24);
+	omap4_prcm_mpu_write_inst_reg(reg,
+		OMAP54XX_PRCM_MPU_DEVICE_INST,
+		OMAP54XX_PRCM_MPU_PRM_PSCON_COUNT_OFFSET);
+
+}
+
 /*
  * Initialise OMAP4 MPUSS
  */
@@ -443,6 +459,9 @@ int __init omap_mpuss_init(void)
 		omap_pm_ops.resume = omap4_cpu_resume;
 		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
 	}
+
+	if (cpu_is_omap54xx())
+		enable_mercury_retention_mode();
 
 	return 0;
 }
