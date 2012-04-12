@@ -58,7 +58,7 @@ void __ref platform_cpu_die(unsigned int cpu)
 		/*
 		 * Enter into low power state
 		 */
-		omap4_hotplug_cpu(cpu, PWRDM_POWER_OFF);
+		omap_hotplug_cpu(cpu, PWRDM_POWER_OFF);
 
 		if (cpu_is_omap44xx())
 			boot_cpu = omap_read_auxcoreboot0();

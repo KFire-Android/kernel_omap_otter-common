@@ -126,7 +126,7 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 				cpu_cluster_pm_enter();
 	}
 
-	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+	omap_enter_lowpower(dev->cpu, cx->cpu_state);
 	cpu_done[dev->cpu] = true;
 
 	/* Wakeup CPU1 only if it is not offlined */
@@ -145,7 +145,7 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 	 * Call idle CPU cluster PM exit notifier chain
 	 * to restore GIC and wakeupgen context.
 	 */
-	if (omap4_mpuss_read_prev_context_state())
+	if (omap_mpuss_read_prev_context_state())
 		cpu_cluster_pm_exit();
 
 	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu_id);
