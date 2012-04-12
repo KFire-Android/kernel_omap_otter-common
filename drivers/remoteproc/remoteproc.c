@@ -891,11 +891,7 @@ static int rproc_handle_resources(struct rproc *rproc, struct fw_resource *rsc,
 			} else {
 				pr_info("RSC_CARVEOUT handle_resources, name == %s\n", rsc->name);
 #ifdef CONFIG_ION_OMAP_DYNAMIC
-				if ((strcmp(rsc->name, "IPU_MEM_IOBUFS") != 0) &&
-					(strcmp(rsc->name, "IPU_MEM_IPC_VRING") != 0) &&
-					(strcmp(rsc->name, "IPU_MEM_TEXT") != 0) &&
-					(strcmp(rsc->name, "IPU_MEM_DATA") != 0) &&
-					(strcmp(rsc->name, "IPU_MEM_IPC_DATA") != 0))
+				if (strcmp(rsc->name, "IPU_MEM_IOBUFS") != 0)
 #endif
 				ret = rproc_check_poolmem(rproc, rsc->len, pa);
 				/*
