@@ -182,6 +182,28 @@ static inline int omap4_init_static_deps(void)
 	return ret;
 }
 
+static inline int omap5_init_static_deps(void)
+{
+	struct clockdomain *mpuss_clkdm, *emif_clkdm;
+	int ret;
+
+	/*
+	 * The dynamic dependency between MPUSS -> EMIF
+	 * doesn't work as expected. The hardware recommendation is to
+	 * enable static dependencies for these to avoid system
+	 * lock ups or random crashes.
+	 */
+	mpuss_clkdm = clkdm_lookup("mpu_clkdm");
+	emif_clkdm = clkdm_lookup("emif_clkdm");
+	if (!mpuss_clkdm || !emif_clkdm)
+		return -EINVAL;
+
+	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+	if (ret)
+		pr_err("Failed to add MPUSS -> L4PER wakeup dependency\n");
+
+	return ret;
+}
 
 /**
  * omap_pm_init - Init routine for OMAP4 PM
@@ -209,12 +231,14 @@ static int __init omap_pm_init(void)
 		goto err2;
 	}
 
-	if (cpu_is_omap44xx()) {
+	if (cpu_is_omap44xx())
 		ret = omap4_init_static_deps();
-		if (ret) {
-			pr_err("Failed to initialise static depedencies\n");
-			goto err2;
-		}
+	else
+		ret = omap5_init_static_deps();
+
+	if (ret) {
+		pr_err("Failed to initialise static depedencies\n");
+		goto err2;
 	}
 
 	ret = omap_mpuss_init();
