@@ -1265,21 +1265,23 @@ static int _enable(struct omap_hwmod *oh)
 
 	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
 
-	/*
-	 * If an IP contains only one HW reset line, then de-assert it in order
-	 * to allow to enable the clocks. Otherwise the PRCM will return
-	 * Intransition status, and the init will failed.
-	 */
-	if ((oh->_state == _HWMOD_STATE_INITIALIZED ||
-	     oh->_state == _HWMOD_STATE_DISABLED) && oh->rst_lines_cnt == 1)
-		_deassert_hardreset(oh, oh->rst_lines[0].name);
-
 	_add_initiator_dep(oh, mpu_oh);
 	if (oh->_clk && oh->_clk->clkdm) {
 		hwsup = clkdm_is_idle(oh->_clk->clkdm);
 		clkdm_wakeup(oh->_clk->clkdm);
 	}
 	_enable_clocks(oh);
+
+	/*
+	 * If an IP contains only one HW reset line, then de-assert it to have
+	 * the module functional. deassert_hardreset is currently limited only
+	 * to processor device-like IPs - IPU, DSP and IVA, so we can safely
+	 * call it after enabling clocks.
+	 */
+	if ((oh->_state == _HWMOD_STATE_INITIALIZED ||
+	     oh->_state == _HWMOD_STATE_DISABLED) && oh->rst_lines_cnt == 1)
+		_deassert_hardreset(oh, oh->rst_lines[0].name);
+
 	r = _wait_target_ready(oh);
 	if (!r) {
 		if (oh->_clk && oh->_clk->clkdm && hwsup)
