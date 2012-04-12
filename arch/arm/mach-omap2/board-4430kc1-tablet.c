@@ -313,16 +313,22 @@ static struct omap2_hsmmc_info mmc[] = {
 };
 
 #if 0
-static struct wl12xx_platform_data __initdata omap4_panda_wlan_data = {
+static struct wl12xx_platform_data __initdata omap4_kc1_wlan_data = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = 0,
 };
 #endif
+#if 0
 static struct wl12xx_platform_data omap4_kc1_wlan_data __initdata = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = WL12XX_TCXOCLOCK_26,
+};
+#endif
+static struct wl12xx_platform_data __initdata omap4_kc1_wlan_data = {
+	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
+	.board_ref_clock = WL12XX_REFCLOCK_38,
 };
 
 static struct regulator_consumer_supply omap4_sdp4430_vmmc5_supply = {
