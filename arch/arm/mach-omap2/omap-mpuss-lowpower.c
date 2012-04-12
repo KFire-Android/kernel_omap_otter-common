@@ -260,6 +260,13 @@ static void save_l2x0_context(void)
  *	1 - CPUx L1 and logic lost: MPUSS CSWR
  *	2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
  *	3 - CPUx L1 and logic lost + GIC + L2 lost: DEVICE OFF
+ *
+ * OMAP5 MPUSS states for the context save:
+ * save_state =
+ *	0 - Nothing lost and no need to save: MPUSS INA/CSWR
+ *	1 - CPUx L1 and logic lost: CPU OFF, MPUSS INA/CSWR
+ *	2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
+ *	3 - CPUx L1 and logic lost + GIC + L2 lost: DEVICE OFF
  */
 int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 {
@@ -278,10 +285,14 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		save_state = 1;
 		break;
 	case PWRDM_POWER_RET:
+		if (cpu_is_omap54xx()) {
+			save_state = 0;
+			break;
+		}
 	default:
 		/*
-		 * CPUx CSWR is invalid hardware state. Also CPUx OSWR
-		 * doesn't make much scense, since logic is lost and $L1
+		 * CPUx CSWR is invalid hardware stateon OMAP4. Also CPUx
+		 * OSWR doesn't make much scense, since logic is lost and $L1
 		 * needs to be cleaned because of coherency. This makes
 		 * CPUx OSWR equivalent to CPUX OFF and hence not supported
 		 */
@@ -306,10 +317,14 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	omap_pm_ops.scu_prepare(cpu, power_state);
 	l2x0_pwrst_prepare(cpu, save_state);
 
+
 	/*
 	 * Call low level function  with targeted low power state.
 	 */
-	cpu_suspend(save_state, omap_pm_ops.finish_suspend);
+	if (cpu_is_omap44xx())
+		cpu_suspend(save_state, omap_pm_ops.finish_suspend);
+	else
+		omap_pm_ops.finish_suspend(save_state);
 
 	/*
 	 * Restore the CPUx power state to ON otherwise CPUx
