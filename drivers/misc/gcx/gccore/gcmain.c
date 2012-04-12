@@ -627,9 +627,9 @@ void gcpwr_disable_pulse_skipping(enum gcpower prevstate)
 		return;
 
 	if (g_pulseskipping) {
-		/* Set the min l3 data throughput to 2.5 GB. */
+		/* Set the min l3 data throughput */
 		omap_pm_set_min_bus_tput(g_bb2d_dev, OCP_INITIATOR_AGENT,
-						0xA0000000);
+						200*1000*4);
 
 		/* Enable loading and set to maximum value. */
 		gcclockcontrol.reg.pulsecount = 64;
