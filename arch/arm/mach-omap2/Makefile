@@ -125,10 +125,10 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(powerdomain-common) \
 					   powerdomains3xxx_data.o \
 					   powerdomains2xxx_3xxx_data.o
 obj-$(CONFIG_ARCH_OMAP4)		+= $(powerdomain-common) \
-					   powerdomain44xx.o \
+					   powerdomain4xxx_5xxx.o \
 					   powerdomains44xx_data.o
 obj-$(CONFIG_ARCH_OMAP5)                += $(powerdomain-common) \
-					   powerdomain44xx.o \
+					   powerdomain4xxx_5xxx.o \
 					   powerdomains54xx_data.o
 # PRCM clockdomain control
 obj-$(CONFIG_ARCH_OMAP2)		+= clockdomain.o \
