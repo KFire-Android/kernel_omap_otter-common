@@ -390,6 +390,27 @@ skip_secure_l1_clean_op:
 	isb
 	dsb
 
+	bl	omap4_get_sar_ram_base
+	mov	r8, r0
+	mrc	p15, 0, r5, c0, c0, 5		@ Read MPIDR
+	ands	r5, r5, #0x0f
+	ldreq	r0, [r8, #OMAP5_L2X0_SAVE_OFFSET0]	@ Retrieve L2 state
+	ldrne	r0, [r8, #OMAP5_L2X0_SAVE_OFFSET1]
+	cmp	r0, #3
+	bne	do_wfi
+	bl	omap4_get_sar_ram_base
+	ldr	r9, [r0, #OMAP_TYPE_OFFSET]
+	cmp	r9, #0x1			@ Check for HS device
+	bne	skip_secure_l2_clean_op
+	mov	r0, #1				@ Clean secure L2
+	stmfd   r13!, {r4-r12, r14}
+	ldr	r12, =OMAP5_MON_CACHES_CLEAN_INDEX
+	DO_SMC
+	ldmfd   r13!, {r4-r12, r14}
+skip_secure_l2_clean_op:
+	mov	r0, #2				@ Flush L2
+	bl	v7_flush_dcache_by_level
+
 do_wfi:
 	bl	omap_do_wfi
 
@@ -431,6 +452,15 @@ ENTRY(omap5_cpu_resume)
 	dsb
 1:
 #endif
+	mrc	p15, 1, r0, c15, c0, 0		@ Read L2 ACTLR
+	cmp	r0, #0x118			@ Check if it is already set
+	beq	skip_sec_l2
+	ldr	r0, =0x118			@ Setup L2 ACTLR = 0x118
+	ldr	r12, =OMAP5_MON_L2AUX_CTRL_INDEX
+	dsb
+	smc     #0
+	dsb
+skip_sec_l2:
 	b	cpu_resume			@ Jump to generic resume
 ENDPROC(omap5_cpu_resume)
 #endif
