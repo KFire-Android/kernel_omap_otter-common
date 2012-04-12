@@ -88,6 +88,8 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	static struct clockdomain *cpu1_clkdm;
 	static bool booted;
 	void __iomem *base = omap_get_wakeupgen_base();
+	static struct powerdomain *cpu1_pwrdm;
+
 
 	/*
 	 * Set synchronisation state between this boot processor
@@ -109,8 +111,10 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	flush_cache_all();
 	smp_wmb();
 
-	if (!cpu1_clkdm)
+	if (!cpu1_clkdm && !cpu1_pwrdm) {
 		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
+		cpu1_pwrdm = pwrdm_lookup("cpu1_pwrdm");
+	}
 
 	/*
 	 * The SGI(Software Generated Interrupts) are not wakeup capable
@@ -122,10 +126,14 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	 * More details can be found in OMAP4430 TRM - Version J
 	 * Section :
 	 *	4.3.4.2 Power States of CPU0 and CPU1
+	 * Ensure that CPU power state is set to ON and force off bit
+	 * is cleared to avoid CPU powerdomain transition of wfi.
 	 */
-	if (booted) {
+	if (booted && cpu1_pwrdm && cpu1_clkdm) {
 		clkdm_wakeup(cpu1_clkdm);
 		clkdm_allow_idle(cpu1_clkdm);
+		pwrdm_set_next_pwrst(cpu1_pwrdm, PWRDM_POWER_ON);
+		pwrdm_disable_force_off(cpu1_pwrdm);
 	} else {
 		dsb_sev();
 		booted = true;

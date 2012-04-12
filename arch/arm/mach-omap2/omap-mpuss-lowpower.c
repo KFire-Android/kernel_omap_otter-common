@@ -81,10 +81,12 @@ struct cpu_pm_ops {
 	int (*finish_suspend)(unsigned long cpu_state);
 	void (*resume)(void);
 	void (*scu_prepare)(unsigned int cpu_id, unsigned int cpu_state);
+	void (*hotplug_restart)(void);
 };
 
 extern int omap4_finish_suspend(unsigned long cpu_state);
 extern void omap4_cpu_resume(void);
+extern int omap5_finish_suspend(unsigned long cpu_state);
 
 static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
 static struct powerdomain *mpuss_pd;
@@ -106,6 +108,7 @@ struct cpu_pm_ops omap_pm_ops = {
 	.finish_suspend		= default_finish_suspend,
 	.resume			= dummy_cpu_resume,
 	.scu_prepare		= dummy_scu_prepare,
+	.hotplug_restart	= dummy_cpu_resume,
 };
 
 /*
@@ -148,6 +151,19 @@ static inline void clear_cpu_prev_pwrst(unsigned int cpu_id)
 	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
 
 	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
+}
+
+/*
+ * Enable/disable the CPUx powerdomain FORCE OFF mode.
+ */
+static inline void set_cpu_force_off(unsigned int cpu_id, bool on)
+{
+	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
+
+	if (on)
+		pwrdm_enable_force_off(pm_info->pwrdm);
+	else
+		pwrdm_disable_force_off(pm_info->pwrdm);
 }
 
 /*
@@ -359,8 +375,11 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 
 	clear_cpu_prev_pwrst(cpu);
 	set_cpu_next_pwrst(cpu, power_state);
-	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_secondary_startup));
+	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.hotplug_restart));
 	omap_pm_ops.scu_prepare(cpu, power_state);
+
+	/* Enable FORCE OFF mode if supported */
+	set_cpu_force_off(cpu, 1);
 
 	/*
 	 * CPU never retuns back if targetted power state is OFF mode.
@@ -368,6 +387,9 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	 * omap_secondary_startup().
 	 */
 	omap_pm_ops.finish_suspend(cpu_state);
+
+	/* Clear FORCE OFF mode if supported */
+	set_cpu_force_off(cpu, 0);
 
 	set_cpu_next_pwrst(cpu, PWRDM_POWER_ON);
 	return 0;
@@ -395,6 +417,7 @@ static void enable_mercury_retention_mode(void)
 int __init omap_mpuss_init(void)
 {
 	struct omap4_cpu_pm_info *pm_info;
+	u32 cpu_wakeup_addr = 0;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0) {
 		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
@@ -404,9 +427,13 @@ int __init omap_mpuss_init(void)
 	sar_base = omap4_get_sar_ram_base();
 
 	/* Initilaise per CPU PM information */
+	if (cpu_is_omap44xx())
+		cpu_wakeup_addr = CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
+	else if (cpu_is_omap54xx())
+		cpu_wakeup_addr = OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
 	pm_info = &per_cpu(omap4_pm_info, 0x0);
 	pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
-	pm_info->wkup_sar_addr = sar_base + CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
+	pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
 	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
 	pm_info->pwrdm = pwrdm_lookup("cpu0_pwrdm");
 	if (!pm_info->pwrdm) {
@@ -421,9 +448,13 @@ int __init omap_mpuss_init(void)
 	/* Initialise CPU0 power domain state to ON */
 	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
 
+	if (cpu_is_omap44xx())
+		cpu_wakeup_addr = CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
+	else if (cpu_is_omap54xx())
+		cpu_wakeup_addr = OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
 	pm_info = &per_cpu(omap4_pm_info, 0x1);
 	pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
-	pm_info->wkup_sar_addr = sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
+	pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
 	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
 	pm_info->pwrdm = pwrdm_lookup("cpu1_pwrdm");
 	if (!pm_info->pwrdm) {
@@ -458,6 +489,10 @@ int __init omap_mpuss_init(void)
 		omap_pm_ops.finish_suspend = omap4_finish_suspend;
 		omap_pm_ops.resume = omap4_cpu_resume;
 		omap_pm_ops.scu_prepare = scu_pwrst_prepare;
+		omap_pm_ops.hotplug_restart = omap_secondary_startup;
+	} else if (cpu_is_omap54xx()) {
+		omap_pm_ops.finish_suspend = omap5_finish_suspend;
+		omap_pm_ops.hotplug_restart = omap5_secondary_startup;
 	}
 
 	if (cpu_is_omap54xx())
