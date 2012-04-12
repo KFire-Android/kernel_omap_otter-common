@@ -135,6 +135,7 @@ static struct powerdomain cpu1_54xx_pwrdm = {
 	.pwrsts_mem_on	= {
 		[0] = PWRSTS_ON,	/* cpu1_l1 */
 	},
+	.flags		  = PWRDM_HAS_FORCE_OFF,
 };
 
 /* emu_54xx_pwrdm: Emulation power domain */
