@@ -410,6 +410,29 @@ do_wfi:
 	dsb
 	ldmfd	sp!, {pc}
 ENDPROC(omap5_finish_suspend)
+
+ENTRY(omap5_cpu_resume)
+#ifdef CONFIG_ARM_ERRATA_761171
+	/*
+	 * Work around for errata for 761171. Streaming write that will not
+	 * allocate in L2 could lead to data corruption.
+	 */
+	mrc	p15, 0, r0, c0, c0, 0		@ read main ID register
+	and	r5, r0, #0x00f00000		@ variant
+	and	r6, r0, #0x0000000f		@ revision
+	orr	r6, r6, r5, lsr #20-4		@ combine variant and revision
+	cmp	r6, #0x03			@ Present before r0p3
+	bgt	1f
+	mrc	p15, 0, r0, c1, c0, 1		@ Read Auxctrl
+	orr	r0, r0, #0x3 << 27		@ bits[28:27]-L1_mode3_threshold
+	ldr	r12, =OMAP5_MON_AUX_CTRL_INDEX
+	dsb
+	smc	#0
+	dsb
+1:
+#endif
+	b	cpu_resume			@ Jump to generic resume
+ENDPROC(omap5_cpu_resume)
 #endif
 
 #ifndef CONFIG_OMAP4_ERRATA_I688
