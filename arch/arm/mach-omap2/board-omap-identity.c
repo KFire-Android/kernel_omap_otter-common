@@ -19,12 +19,15 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/stat.h>
+#include <asm/system_info.h>
 #include <mach/id.h>
 #include <linux/platform_device.h>
 
 #include <mach/hardware.h>
 
 #include <plat/omap_apps_brd_id.h>
+
+static char omap_mach_print[255];
 
 static ssize_t omap_soc_family_show(struct kobject *kobj,
 				    struct kobj_attribute *attr, char *buf)
@@ -98,6 +101,7 @@ void __init omap_create_board_props(void)
 	struct kobject *board_props_kobj;
 	struct kobject *soc_kobj = NULL;
 	int ret = 0;
+	char soc_f[10], soc_r[10], soc_t[10], soc_pid[20], soc_die[40];
 
 	board_props_kobj = kobject_create_and_add("board_properties", NULL);
 	if (!board_props_kobj)
@@ -110,6 +114,21 @@ void __init omap_create_board_props(void)
 	ret = sysfs_create_group(soc_kobj, &omap_soc_prop_attr_group);
 	if (ret)
 		goto err_sysfs_create;
+
+	omap_soc_family_show(NULL, NULL, soc_f);
+	omap_soc_revision_show(NULL, NULL, soc_r);
+	omap_soc_type_show(NULL, NULL, soc_t);
+	omap_prod_id_show(NULL, NULL, soc_pid);
+	omap_die_id_show(NULL, NULL, soc_die);
+	snprintf(omap_mach_print, ARRAY_SIZE(omap_mach_print),
+		 "\n Revision : %04x\n Serial\t: %08x%08x\n"
+		 "SoC Information:\n CPU\t: %s Rev\t: %s"
+		 " Type\t: %s Production ID: %s Die ID\t: %s",
+		 system_rev, system_serial_high, system_serial_low,
+		 soc_f, soc_r, soc_t, soc_pid, soc_die);
+
+	mach_panic_string = omap_mach_print;
+
 	return;
 
 err_sysfs_create:
