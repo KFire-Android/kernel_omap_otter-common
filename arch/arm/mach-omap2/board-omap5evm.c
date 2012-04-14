@@ -509,6 +509,11 @@ static struct twl6040_platform_data twl6040_data = {
 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
+static struct platform_device omap5evm_dmic_codec = {
+	.name	= "dmic-codec",
+	.id	= -1,
+};
+
 static struct omap_abe_twl6040_data omap5evm_abe_audio_data = {
 	/* Audio out */
 	.has_hs		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
@@ -520,6 +525,7 @@ static struct omap_abe_twl6040_data omap5evm_abe_audio_data = {
 	.has_afm	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	.has_hsmic	= 1,
 	.has_abe	= 1,
+	.has_dmic	= 1,
 	/* Jack detection. */
 	.jack_detection	= 1,
 	/* MCLK input is 19.2MHz */
@@ -537,6 +543,7 @@ static struct platform_device omap5evm_abe_audio = {
 };
 
 static struct platform_device *omap5evm_devices[] __initdata = {
+	&omap5evm_dmic_codec,
 	&omap5evm_abe_audio,
 };
 
