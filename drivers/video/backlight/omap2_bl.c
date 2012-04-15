@@ -129,6 +129,10 @@ static int omapbl_update_status(struct backlight_device *dev)
 {
 	struct omap_backlight *bl = dev_get_drvdata(&dev->dev);
 
+	/* FIXME-HASH: temporary hack to set max brightness [by intersectRaven] */
+	if (dev->props.brightness)
+		dev->props.brightness = 255;
+
 	pr_info(">> omap2_bl :: omapbl_update_status(brightness == %d, fb_blank == %d)\n", dev->props.brightness, dev->props.fb_blank);
 	if (bl->current_intensity != dev->props.brightness) {
 		bl->current_intensity = dev->props.brightness;
