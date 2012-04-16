@@ -289,6 +289,13 @@ static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift,
 		"not suppose to be used on omap4\n");
 	return 0;
 }
+static inline void omap2_prm_enable_prcm_module_wakeup(s16 prcm_mod,
+		u8 prm_reg_id, u8 prm_reg_shift, bool set_wake)
+{
+	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
+		"not suppose to be used on omap4\n");
+	return 0;
+}
 #else
 /* Power/reset management domain register get/set */
 extern u32 omap2_prm_read_mod_reg(s16 module, u16 idx);
@@ -297,6 +304,8 @@ extern u32 omap2_prm_rmw_mod_reg_bits(u32 mask, u32 bits, s16 module, s16 idx);
 extern u32 omap2_prm_set_mod_reg_bits(u32 bits, s16 module, s16 idx);
 extern u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx);
 extern u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask);
+extern void omap2_prm_enable_prcm_module_wakeup(s16 prcm_mod, u8 prm_reg_id,
+			u8 prm_reg_shift, bool set_wake);
 
 /* These omap2_ PRM functions apply to both OMAP2 and 3 */
 extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
