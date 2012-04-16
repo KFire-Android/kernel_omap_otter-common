@@ -87,6 +87,20 @@ irqreturn_t abe_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static int omap_abe_hwrule_period_step(struct snd_pcm_hw_params *params,
+					struct snd_pcm_hw_rule *rule)
+{
+	struct snd_interval *period_size = hw_param_interval(params,
+				     SNDRV_PCM_HW_PARAM_PERIOD_SIZE);
+	unsigned int rate = params_rate(params);
+
+	/* 44.1kHz has the same iteration number as 48kHz */
+	rate = (rate == 44100) ? 48000 : rate;
+
+	/* ABE requires chunks of 250us worth of data */
+	return snd_interval_step(period_size, 0, rate / 4000);
+}
+
 static int aess_open(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -108,11 +122,15 @@ static int aess_open(struct snd_pcm_substream *substream)
 					 SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 1024);
 		break;
 	default:
-		/* ABE needs a step of 24 * 4 data bits
-		 * Ensure buffer size satisfies both constraints.
+		/*
+		 * Period size must be aligned with the Audio Engine
+		 * processing loop which is 250 us long
 		 */
-		ret = snd_pcm_hw_constraint_step(substream->runtime, 0,
-				 SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 24 * 4);
+		ret = snd_pcm_hw_rule_add(substream->runtime, 0,
+					SNDRV_PCM_HW_PARAM_PERIOD_SIZE,
+					omap_abe_hwrule_period_step,
+					NULL,
+					SNDRV_PCM_HW_PARAM_PERIOD_SIZE, -1);
 		break;
 	}
 
