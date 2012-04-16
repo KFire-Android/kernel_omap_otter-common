@@ -43,6 +43,7 @@ struct power_state {
 };
 
 static LIST_HEAD(pwrst_list);
+u16 pm44xx_errata;
 
 static struct powerdomain *tesla_pwrdm;
 static struct clockdomain *tesla_clkdm;
