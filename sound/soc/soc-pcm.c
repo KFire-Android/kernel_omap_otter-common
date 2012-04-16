@@ -881,18 +881,18 @@ static struct snd_soc_pcm_runtime *be_get_rtd(struct snd_soc_card *card,
 		for (i = 0; i < card->num_links; i++) {
 			be = &card->rtd[i];
 
-		if (be->cpu_dai->playback_widget == widget ||
-			be->codec_dai->playback_widget == widget)
-			return be;
+			if (be->cpu_dai->playback_widget == widget ||
+				be->codec_dai->playback_widget == widget)
+				return be;
 		}
 	} else {
 
 		for (i = 0; i < card->num_links; i++) {
 			be = &card->rtd[i];
 
-		if (be->cpu_dai->capture_widget == widget ||
-			be->codec_dai->capture_widget == widget)
-			return be;
+			if (be->cpu_dai->capture_widget == widget ||
+				be->codec_dai->capture_widget == widget)
+				return be;
 		}
 	}
 
@@ -1016,6 +1016,10 @@ static int be_add_new(struct snd_soc_pcm_runtime *fe, int stream,
 						list->widgets[i]->name);
 				continue;
 			}
+
+			/* make sure BE is a real BE */
+			if (!be->dai_link->no_pcm)
+				continue;
 
 			/* don't connect if FE is not running */
 			if (!fe->dpcm[stream].runtime)
