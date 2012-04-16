@@ -3810,6 +3810,38 @@ static void dsi_config_blanking_modes(struct omap_dss_device *dssdev)
 	dsi_write_reg(dsidev, DSI_CTRL, r);
 }
 
+static int dsi_compute_interleave_hs(int blank, bool ddr_alwon, int enter_hs,
+		int exit_hs, int ddr_pre, int ddr_post)
+{
+	int transition, trans1, trans2;
+
+	if (ddr_alwon) {
+		transition = enter_hs + exit_hs + max(enter_hs, 2) + 1;
+	} else {
+		trans1 = ddr_pre + enter_hs + exit_hs + max(enter_hs, 2) + 1;
+		trans2 = ddr_pre + enter_hs + ddr_post + ddr_pre + enter_hs + 1;
+		transition = max(trans1, trans2);
+	}
+
+	return blank > transition ? blank - transition : 0;
+}
+
+
+static int dsi_compute_interleave_lp(int blank, int enter_hs, int exit_hs,
+		int lp_clk_div, int regm_dsi)
+{
+	int trans_lp, lp_avail, lp_inter, dsi_hsdiv;
+
+	dsi_hsdiv = regm_dsi - 1;
+
+	trans_lp = exit_hs + max(enter_hs, 2) + 1;
+	lp_avail = 16 * (blank - trans_lp);	/* unit is clkin4DDR */
+	lp_inter = ((lp_avail - 8 * 16 - 5 * dsi_hsdiv) / dsi_hsdiv
+			/ lp_clk_div - 26) / 16;
+
+	return max(lp_inter, 0);
+}
+
 static int dsi_proto_config(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
@@ -3959,9 +3991,16 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 		int vbp = dssdev->panel.dsi_vm_data.vbp;
 		int window_sync = dssdev->panel.dsi_vm_data.window_sync;
 		bool hsync_end = dssdev->panel.dsi_vm_data.vp_hsync_end;
+		bool ddr_alwon = dssdev->panel.dsi_vm_data.ddr_clk_always_on;
+		int lp_clk_div = dssdev->clocks.dsi.lp_clk_div;
+		int regm_dsi = dssdev->clocks.dsi.regm_dsi;
 		struct omap_video_timings *timings = &dssdev->panel.timings;
 		int bpp = dsi_get_pixel_size(dssdev->panel.dsi_pix_fmt);
 		int tl, t_he, width_bytes;
+		int hsa_interleave_hs, hsa_interleave_lp;
+		int hfp_interleave_hs, hfp_interleave_lp;
+		int hbp_interleave_hs, hbp_interleave_lp;
+		int bl_interleave_hs, bl_interleave_lp, bllp;
 
 		t_he = hsync_end ?
 			((hsa == 0 && ndl == 3) ? 1 : DIV_ROUND_UP(4, ndl)) : 0;
@@ -3994,6 +4033,63 @@ static void dsi_proto_timings(struct omap_dss_device *dssdev)
 		r = FLD_MOD(r, timings->y_res, 14, 0);	/* VACT */
 		r = FLD_MOD(r, tl, 31, 16);		/* TL */
 		dsi_write_reg(dsidev, DSI_VM_TIMING3, r);
+
+		/* Command mode interleave configuration */
+
+		hsa_interleave_hs = dsi_compute_interleave_hs(hsa, ddr_alwon,
+					enter_hs_mode_lat, exit_hs_mode_lat,
+					ddr_clk_pre, ddr_clk_post);
+
+		hfp_interleave_hs = dsi_compute_interleave_hs(hfp, ddr_alwon,
+					enter_hs_mode_lat, exit_hs_mode_lat,
+					ddr_clk_pre, ddr_clk_post);
+
+		hbp_interleave_hs = dsi_compute_interleave_hs(hbp, ddr_alwon,
+					enter_hs_mode_lat, exit_hs_mode_lat,
+					ddr_clk_pre, ddr_clk_post);
+
+		hsa_interleave_lp = dsi_compute_interleave_lp(hsa,
+					enter_hs_mode_lat, exit_hs_mode_lat,
+					lp_clk_div, regm_dsi);
+
+		hfp_interleave_lp = dsi_compute_interleave_lp(hfp,
+					enter_hs_mode_lat, exit_hs_mode_lat,
+					lp_clk_div, regm_dsi);
+
+		hbp_interleave_lp = dsi_compute_interleave_lp(hbp,
+					enter_hs_mode_lat, exit_hs_mode_lat,
+					lp_clk_div, regm_dsi);
+
+		/*
+		 * BLLP gap is between HE and HS short packets during vertical
+		 * blanking
+		 */
+		bllp = hbp + hfp + DIV_ROUND_UP(width_bytes + 6, ndl);
+
+		bl_interleave_hs = dsi_compute_interleave_hs(bllp, ddr_alwon,
+					enter_hs_mode_lat, exit_hs_mode_lat,
+					ddr_clk_pre, ddr_clk_post);
+
+		bl_interleave_lp = dsi_compute_interleave_lp(bllp,
+					enter_hs_mode_lat, exit_hs_mode_lat,
+					lp_clk_div, regm_dsi);
+
+		r = dsi_read_reg(dsidev, DSI_VM_TIMING4);
+		r = FLD_MOD(r, hsa_interleave_hs, 23, 16);
+		r = FLD_MOD(r, hfp_interleave_hs, 15, 8);
+		r = FLD_MOD(r, hbp_interleave_hs, 7, 0);
+		dsi_write_reg(dsidev, DSI_VM_TIMING4, r);
+
+		r = dsi_read_reg(dsidev, DSI_VM_TIMING5);
+		r = FLD_MOD(r, hsa_interleave_lp, 23, 16);
+		r = FLD_MOD(r, hfp_interleave_lp, 15, 8);
+		r = FLD_MOD(r, hbp_interleave_lp, 7, 0);
+		dsi_write_reg(dsidev, DSI_VM_TIMING5, r);
+
+		r = dsi_read_reg(dsidev, DSI_VM_TIMING6);
+		r = FLD_MOD(r, bl_interleave_hs, 31, 15);
+		r = FLD_MOD(r, bl_interleave_lp, 16, 0);
+		dsi_write_reg(dsidev, DSI_VM_TIMING6, r);
 	}
 }
 
