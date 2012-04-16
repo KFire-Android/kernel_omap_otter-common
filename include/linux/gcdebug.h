@@ -1,5 +1,5 @@
 /*
- * gcx.h
+ * gcdebug.h
  *
  * Copyright (C) 2010-2011 Vivante Corporation.
  *
@@ -12,30 +12,17 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef GCX_H
-#define GCX_H
+#ifndef GCDEBUG_H
+#define GCDEBUG_H
 
-#include "gcerror.h"
-#include "gcreg.h"
+struct dentry;
 
-/* Debug print prefixes. */
-#define GC_MOD_PREFIX	GC_DEV_NAME ": %s(%d) "
+void gc_debug_init(struct dentry *debug_root);
 
-/* Debug macro stubs. */
-#ifndef GCDEBUG_ENABLE
-#	define GCDEBUG_ENABLE 0
-#endif
+void gc_debug_poweroff_cache(void);
+void gc_debug_cache_gpu_status_from_irq(unsigned int acknowledge);
 
-#ifndef GCGPUSTATUS
-#	define GCGPUSTATUS(filter, zone, function, line, acknowledge)
-#endif
+void gc_debug_blt(int srccount, int dstWidth, int dstHeight);
 
-#ifndef GCPRINT
-#	define GCPRINT(...)
-#endif
-
-#ifndef GCDUMPBUFFER
-#	define GCDUMPBUFFER(filter, zone, ptr, gpuaddr, datasize)
-#endif
 
 #endif

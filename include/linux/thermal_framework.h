@@ -18,7 +18,10 @@
 #ifndef __LINUX_THERMAL_FRAMEWORK_H__
 #define __LINUX_THERMAL_FRAMEWORK_H__
 
+#include <linux/seq_file.h>
+
 struct thermal_dev;
+struct thermal_domain;
 
 /**
  * struct thermal_dev_ops  - Structure for device operation call backs
@@ -43,8 +46,14 @@ struct thermal_dev_ops {
 	/* Cooling agent call backs */
 	int (*cool_device) (struct thermal_dev *, int temp);
 	/* Governor call backs */
-	int (*process_temp) (struct list_head *cooling_list,
-			struct thermal_dev *temp_sensor, int temp);
+	int (*process_temp) (struct thermal_dev *gov,
+				struct list_head *cooling_list,
+				struct thermal_dev *temp_sensor, int temp);
+#ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
+	/* Debugging interface */
+	int (*debug_report) (struct thermal_dev *, struct seq_file *s);
+	int (*register_debug_entries) (struct thermal_dev *, struct dentry *d);
+#endif
 };
 
 /**
@@ -65,18 +74,45 @@ struct thermal_dev {
 	struct device	*dev;
 	struct thermal_dev_ops *dev_ops;
 	struct list_head node;
-	int		index;
 	int 		current_temp;
-
+	struct thermal_domain	*domain;
 };
 
-extern int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
-		int min, int max);
+/**
+ * Call the specific call back for a thermal device. In case some pointer
+ * is missing, returns -EOPNOTSUPP, otherwise will return the result from
+ * callback function.
+ */
+#define thermal_device_call(tdev, f, args...)				\
+({									\
+	int __err = -EOPNOTSUPP;					\
+	if ((tdev) && (tdev)->dev_ops && (tdev)->dev_ops->f)		\
+		__err = (tdev)->dev_ops->f((tdev) , ##args);		\
+	__err;								\
+})
+
+/**
+ * Call the specific call back for a set of thermal devices. It will call
+ * until an error occurs or until all calls are done successfully. It will
+ * continue even if any of the thermal devices is missing the callback.
+ */
+#define thermal_device_call_all(tdev_list, f, args...)			\
+({									\
+	struct thermal_dev *tdev;					\
+	int ret = -ENODEV;						\
+									\
+	list_for_each_entry(tdev, (tdev_list), node) {			\
+		ret = thermal_device_call(tdev, f , ##args);		\
+		if (ret < 0)						\
+			pr_debug("%s: failed to call " #f		\
+				" on thermal device\n", __func__);	\
+	}								\
+	ret;								\
+})
+
 extern int thermal_request_temp(struct thermal_dev *tdev);
+extern int thermal_lookup_temp(const char *domain_name);
 extern int thermal_sensor_set_temp(struct thermal_dev *tdev);
-extern int thermal_update_temp_rate(struct thermal_dev *temp_sensor, int rate);
-extern int thermal_cooling_set_level(struct list_head *cooling_list,
-		unsigned int level);
 
 /* Registration and unregistration calls for the thermal devices */
 extern int thermal_sensor_dev_register(struct thermal_dev *tdev);

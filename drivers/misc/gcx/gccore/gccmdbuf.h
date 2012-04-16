@@ -18,14 +18,10 @@
 #include <linux/gccore.h>
 #include "gcmmu.h"
 
-extern wait_queue_head_t gc_event;
-extern int done;
-
 enum gcerror cmdbuf_init(void);
 enum gcerror cmdbuf_map(struct mmu2dcontext *ctxt);
 enum gcerror cmdbuf_alloc(u32 size, void **logical, u32 *physical);
 int cmdbuf_flush(void *logical);
 void cmdbuf_physical(bool forcephysical);
-void cmdbuf_dump(void);
 
 #endif

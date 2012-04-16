@@ -21,7 +21,7 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 
-/* gc-core platform device data structure */
+/* gccore platform device data structure */
 struct gccore_plat_data {
 	void __iomem *base;
 	int irq;
@@ -43,7 +43,7 @@ int __init gcxxx_init(void)
 	struct omap_hwmod *oh;
 	struct omap_device *od;
 	const char *oh_name = "bb2d";
-	const char *dev_name = "gc-core";
+	const char *dev_name = "gccore";
 
 	if (!cpu_is_omap447x())
 		return retval;

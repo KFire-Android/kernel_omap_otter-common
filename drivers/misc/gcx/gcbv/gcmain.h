@@ -15,11 +15,15 @@
 #ifndef GCMAIN_H
 #define GCMAIN_H
 
+#include <linux/gcx.h>
+#include <linux/gcioctl.h>
+#include <linux/gcbv.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/gccore.h>
+#include <linux/gcdebug.h>
 
-#define DEV_NAME	"gc2d"
+#define GC_DEV_NAME	"gc2d"
 
 /*******************************************************************************
  * Miscellaneous macros.
@@ -30,8 +34,6 @@
 
 #define gcfree(ptr) \
 	kfree(ptr)
-
-#define gcdump printk
 
 /*******************************************************************************
  * Core driver API definitions.

@@ -15,6 +15,6 @@
 #ifndef GCMAIN_H
 #define GCMAIN_H
 
-#define DEV_NAME	"gcioctl"
+#define GC_DEV_NAME	"gcioctl"
 
 #endif

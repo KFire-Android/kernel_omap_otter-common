@@ -282,6 +282,7 @@ struct twl6030_bci_device_info {
 	u16			current_avg_interval;
 	u16			monitoring_interval;
 	unsigned int		min_vbus;
+	unsigned int		vbus_charge_thres;
 
 	struct			twl4030_bci_platform_data *platform_data;
 
@@ -595,6 +596,11 @@ static int is_battery_present(struct twl6030_bci_device_info *di)
 	return 1;
 }
 
+static inline int twl6030_vbus_above_thres(struct twl6030_bci_device_info *di)
+{
+	return (di->vbus_charge_thres < twl6030_get_gpadc_conversion(di, 10));
+}
+
 static void twl6030_stop_usb_charger(struct twl6030_bci_device_info *di)
 {
 	int ret;
@@ -622,6 +628,11 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 
 	if (di->charger_source == POWER_SUPPLY_TYPE_MAINS)
 		return;
+
+	if (!twl6030_vbus_above_thres(di)) {
+		twl6030_stop_usb_charger(di);
+		return;
+	}
 
 	if ((di->features & TWL6032_SUBCLASS) &&
 			di->platform_data->use_eeprom_config)
@@ -1256,6 +1267,30 @@ err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
 }
 
+static int twl6030_usb_autogate_charger(struct twl6030_bci_device_info *di)
+{
+	int ret = 0;
+
+	if ((di->charger_source == POWER_SUPPLY_TYPE_USB) &&
+			!twl6030_vbus_above_thres(di)) {
+
+			twl6030_stop_usb_charger(di);
+
+			if (di->ac_online == POWER_SUPPLY_TYPE_MAINS)
+				twl6030_start_ac_charger(di);
+
+			ret = 1;
+	} else if ((di->charger_source != POWER_SUPPLY_TYPE_MAINS) &&
+			di->usb_online) {
+
+		twl6030_start_usb_charger(di);
+
+		ret = 1;
+	}
+
+	return ret;
+}
+
 static int capacity_changed(struct twl6030_bci_device_info *di)
 {
 	int curr_capacity = di->capacity;
@@ -1364,7 +1399,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	struct twl6030_gpadc_request req;
 	int adc_code;
 	int temp;
-	int ret;
+	int ret, ret1;
 
 	/* Kick the charger watchdog */
 	if (di->charge_status == POWER_SUPPLY_STATUS_CHARGING)
@@ -1393,7 +1428,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	if (di->platform_data->battery_tmp_tbl == NULL)
 		return;
 
-	adc_code = req.rbuf[1];
+	adc_code = req.buf[1].code;
 	for (temp = 0; temp < di->platform_data->tblsize; temp++) {
 		if (adc_code >= di->platform_data->
 				battery_tmp_tbl[temp])
@@ -1403,7 +1438,10 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	/* first 2 values are for negative temperature */
 	di->temp_C = (temp - 2); /* in degrees Celsius */
 
-	if (capacity_changed(di))
+	ret = capacity_changed(di);
+	ret1 = twl6030_usb_autogate_charger(di);
+
+	if (ret || ret1)
 		power_supply_changed(&di->bat);
 }
 
@@ -2086,6 +2124,37 @@ static ssize_t show_status_int2(struct device *dev,
 	return sprintf(buf, "%u\n", val);
 }
 
+static ssize_t show_vbus_charge_thres(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	unsigned int val;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	val = di->vbus_charge_thres;
+	return sprintf(buf, "%u\n", val);
+}
+
+static ssize_t set_vbus_charge_thres(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned long val;
+	int status = count;
+	struct twl6030_bci_device_info *di = dev_get_drvdata(dev);
+
+	/*
+	 * Revisit: add limit range checking
+	 */
+	if (strict_strtoul(buf, 10, &val) < 0)
+		return -EINVAL;
+
+	di->vbus_charge_thres = val & 0xffffffff;
+
+	cancel_delayed_work(&di->twl6030_bci_monitor_work);
+	schedule_delayed_work(&di->twl6030_bci_monitor_work, 0);
+
+	return status;
+}
+
 static DEVICE_ATTR(fg_mode, S_IWUSR | S_IRUGO, show_fg_mode, set_fg_mode);
 static DEVICE_ATTR(charge_src, S_IWUSR | S_IRUGO, show_charge_src,
 		set_charge_src);
@@ -2117,6 +2186,8 @@ static DEVICE_ATTR(bsi, S_IRUGO, show_bsi, NULL);
 static DEVICE_ATTR(stat1, S_IRUGO, show_stat1, NULL);
 static DEVICE_ATTR(status_int1, S_IRUGO, show_status_int1, NULL);
 static DEVICE_ATTR(status_int2, S_IRUGO, show_status_int2, NULL);
+static DEVICE_ATTR(vbus_charge_thres, S_IWUSR | S_IRUGO,
+		show_vbus_charge_thres, set_vbus_charge_thres);
 
 static struct attribute *twl6030_bci_attributes[] = {
 	&dev_attr_fg_mode.attr,
@@ -2142,6 +2213,7 @@ static struct attribute *twl6030_bci_attributes[] = {
 	&dev_attr_status_int1.attr,
 	&dev_attr_status_int2.attr,
 	&dev_attr_wakelock_enable.attr,
+	&dev_attr_vbus_charge_thres.attr,
 	NULL,
 };
 

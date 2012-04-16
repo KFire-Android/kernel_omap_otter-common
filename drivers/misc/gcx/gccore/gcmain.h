@@ -17,7 +17,7 @@
 
 #include <linux/gccore.h>
 
-#define DEV_NAME	"gccore"
+#define GC_DEV_NAME	"gccore"
 
 /*
  * Register access.
@@ -48,12 +48,12 @@ void gc_flush_pages(struct gcpage *p);
 
 enum gcpower {
 	GCPWR_UNKNOWN,
-	GCPWR_OFF,
-	GCPWR_SUSPEND,
-	GCPWR_ON
+	GCPWR_ON,
+	GCPWR_OFF
 };
 
 enum gcerror gc_set_power(enum gcpower gcpower);
+enum gcerror gc_get_power(void);
 
 /*
  * Interrupt.

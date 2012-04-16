@@ -51,8 +51,6 @@
 
 #include <linux/thermal_framework.h>
 
-#define REPORT_DELAY_MS	1000
-
 /* This DEBUG flag is used to enable the sysfs entries
  * for the thermal shutdown thresholds, uncomment #define
  * for testing tshut mechanism
@@ -96,8 +94,6 @@ struct omap_temp_sensor {
 	int is_efuse_valid;
 	u8 clk_on;
 	u32 clk_rate;
-	struct delayed_work omap_sensor_work;
-	int work_delay;
 	int debug;
 	int debug_temp;
 	bool context_saved;
@@ -241,9 +237,6 @@ static int omap_report_temp(struct thermal_dev *tdev)
 		if (ret == -ENODEV)
 			pr_err("%s:thermal_sensor_set_temp reports error\n",
 				__func__);
-		else
-			cancel_delayed_work_sync(
-				&temp_sensor->omap_sensor_work);
 		kobject_uevent(&temp_sensor->dev->kobj, KOBJ_CHANGE);
 	}
 
@@ -905,17 +898,6 @@ static struct thermal_dev_ops omap_sensor_ops = {
 	.set_temp_report_rate = omap_set_measuring_rate,
 };
 
-static void omap_sensor_delayed_work_fn(struct work_struct *work)
-{
-	struct omap_temp_sensor *temp_sensor =
-				container_of(work, struct omap_temp_sensor,
-					     omap_sensor_work.work);
-
-	omap_report_temp(temp_sensor->therm_fw);
-	schedule_delayed_work(&temp_sensor->omap_sensor_work,
-				msecs_to_jiffies(temp_sensor->work_delay));
-}
-
 static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -932,10 +914,6 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	temp_sensor = kzalloc(sizeof(struct omap_temp_sensor), GFP_KERNEL);
 	if (!temp_sensor)
 		return -ENOMEM;
-
-	/* Init delayed work for PCB sensor temperature */
-	INIT_DELAYED_WORK(&temp_sensor->omap_sensor_work,
-			  omap_sensor_delayed_work_fn);
 
 	spin_lock_init(&temp_sensor->lock);
 	mutex_init(&temp_sensor->sensor_mutex);
@@ -1042,7 +1020,7 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 
 	ret = request_threaded_irq(temp_sensor->irq, NULL,
 			omap_talert_irq_handler,
-			IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+			IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
 			"temp_sensor", (void *)temp_sensor);
 	if (ret) {
 		dev_err(&pdev->dev, "Request threaded irq failed.\n");
@@ -1063,10 +1041,6 @@ static int __devinit omap_temp_sensor_probe(struct platform_device *pdev)
 	val |= OMAP4_MASK_COLD_MASK;
 	val |= OMAP4_MASK_HOT_MASK;
 	omap_temp_sensor_writel(temp_sensor, val, BGAP_CTRL_OFFSET);
-
-	temp_sensor->work_delay = REPORT_DELAY_MS;
-	schedule_delayed_work(&temp_sensor->omap_sensor_work,
-			msecs_to_jiffies(0));
 
 	dev_info(&pdev->dev, "%s : '%s'\n", temp_sensor->therm_fw->name,
 			pdata->name);
@@ -1109,7 +1083,6 @@ static int __devexit omap_temp_sensor_remove(struct platform_device *pdev)
 	kfree(temp_sensor->therm_fw);
 	kobject_uevent(&temp_sensor->dev->kobj, KOBJ_REMOVE);
 	sysfs_remove_group(&temp_sensor->dev->kobj, &omap_temp_sensor_group);
-	cancel_delayed_work_sync(&temp_sensor->omap_sensor_work);
 	omap_temp_sensor_disable(temp_sensor);
 	if (temp_sensor->clock)
 		clk_put(temp_sensor->clock);

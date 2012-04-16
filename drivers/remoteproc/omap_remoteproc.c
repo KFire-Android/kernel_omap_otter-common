@@ -41,6 +41,7 @@ struct omap_rproc_priv {
 	struct iommu *iommu;
 	int (*iommu_cb)(struct rproc *, u64, u32);
 	int (*wdt_cb)(struct rproc *);
+	u64 bootaddr;
 #ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
 	struct omap_mbox *mbox;
 	void __iomem *idle;
@@ -150,6 +151,15 @@ static int omap_rproc_iommu_isr(struct iommu *iommu, u32 da, u32 errs, void *p)
 	return ret;
 }
 
+static inline void _load_boot_addr(struct rproc *rproc, u64 bootaddr)
+{
+	struct omap_rproc_pdata *pdata = rproc->dev->platform_data;
+
+	if (pdata->boot_reg)
+		omap_writel(bootaddr, pdata->boot_reg);
+	return;
+}
+
 int omap_rproc_activate(struct omap_device *od)
 {
 	int i, ret = 0;
@@ -157,8 +167,8 @@ int omap_rproc_activate(struct omap_device *od)
 	struct device *dev = rproc->dev;
 	struct omap_rproc_pdata *pdata = dev->platform_data;
 	struct omap_rproc_timers_info *timers = pdata->timers;
-#ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
 	struct omap_rproc_priv *rpp = rproc->priv;
+#ifdef CONFIG_REMOTE_PROC_AUTOSUSPEND
 	struct iommu *iommu;
 
 	if (!rpp->iommu) {
@@ -174,6 +184,11 @@ int omap_rproc_activate(struct omap_device *od)
 	if (!rpp->mbox)
 		rpp->mbox = omap_mbox_get(pdata->sus_mbox_name, NULL);
 #endif
+	/**
+	 * explicitly configure a boot address from which remoteproc
+	 * starts executing code when taken out of reset.
+	 */
+	_load_boot_addr(rproc, rpp->bootaddr);
 
 	/**
 	 * Domain is in HW SUP thus in hw_auto but
@@ -405,13 +420,17 @@ static irqreturn_t omap_rproc_watchdog_isr(int irq, void *p)
 }
 #endif
 
-static inline void _load_boot_addr(struct rproc *rproc, u64 bootaddr)
+static int omap_rproc_pm_init(struct rproc *rproc, u64 susp_addr)
 {
 	struct omap_rproc_pdata *pdata = rproc->dev->platform_data;
+	phys_addr_t pa;
+	int ret;
 
-	if (pdata->boot_reg)
-		omap_writel(bootaddr, pdata->boot_reg);
-	return;
+	ret = rproc_da_to_pa(rproc, susp_addr, &pa);
+	if (!ret)
+		pdata->suspend_addr = (u32)pa;
+
+	return ret;
 }
 
 static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
@@ -420,6 +439,7 @@ static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_rproc_pdata *pdata = dev->platform_data;
 	struct omap_rproc_timers_info *timers = pdata->timers;
+	struct omap_rproc_priv *rpp = rproc->priv;
 	int i;
 	int ret = 0;
 
@@ -460,7 +480,7 @@ static inline int omap_rproc_start(struct rproc *rproc, u64 bootaddr)
 #endif
 	}
 
-	_load_boot_addr(rproc, bootaddr);
+	rpp->bootaddr = bootaddr;
 	ret = omap_device_enable(pdev);
 out:
 	if (ret) {
@@ -567,6 +587,7 @@ static struct rproc_ops omap_rproc_ops = {
 	.watchdog_exit = omap_rproc_watchdog_exit,
 #endif
 	.dump_registers = omap_rproc_dump_registers,
+	.pm_init = omap_rproc_pm_init,
 };
 
 static int omap_rproc_probe(struct platform_device *pdev)

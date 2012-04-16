@@ -179,7 +179,7 @@ static struct omap_dss_device tablet_lcd_device = {
 
 		.dsi = {
 			.regn           = 38,
-			.regm           = 394,
+			.regm           = 441,
 			.regm_dispc     = 6,
 			.regm_dsi       = 9,
 			.lp_clk_div     = 5,
@@ -274,6 +274,12 @@ static struct omapfb_platform_data tablet_fb_pdata = {
 	},
 };
 
+static struct i2c_board_info __initdata omap4xx_i2c_bus2_d2l_info[] = {
+	{
+		I2C_BOARD_INFO("tc358765_i2c_driver", 0x0f),
+	},
+};
+
 int __init tablet_panel_init(void)
 {
 	if (omap_is_board_version(OMAP4_TABLET_1_0) ||
@@ -291,6 +297,9 @@ int __init tablet_panel_init(void)
 
 	omap_display_init(&tablet_dss_data);
 	platform_device_register(&omap4_tablet_disp_led);
+
+	i2c_register_board_info(2, omap4xx_i2c_bus2_d2l_info,
+		ARRAY_SIZE(omap4xx_i2c_bus2_d2l_info));
 
 	return 0;
 }

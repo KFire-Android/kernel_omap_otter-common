@@ -21,20 +21,14 @@
 #include <linux/uaccess.h>
 #include <linux/string.h>
 
+#define GCZONE_ALL		(~0U)
+#define GCZONE_INIT		(1 << 0)
+#define GCZONE_IOCTL		(1 << 1)
+
 #include <linux/gcx.h>
 #include <linux/gccore.h>
 #include <linux/gcbv.h>
 #include "gcif.h"
-
-#ifndef GC_DUMP
-#	define GC_DUMP 0
-#endif
-
-#if GC_DUMP
-#	define GC_PRINT printk
-#else
-#	define GC_PRINT(...)
-#endif
 
 static struct mutex g_maplock;
 
@@ -55,8 +49,9 @@ static enum gcerror get_buffer(struct gcbuffer **gcbuffer)
 	/* Acquire buffer access mutex. */
 	gcerror = gc_acquire_mutex(&g_bufferlock, GC_INFINITE);
 	if (gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcerror);
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to acquire mutex (0x%08X).\n",
+			__func__, __LINE__, gcerror);
 		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_BUF_ALLOC);
 		goto exit;
 	}
@@ -65,8 +60,9 @@ static enum gcerror get_buffer(struct gcbuffer **gcbuffer)
 	if (g_buffervacant == NULL) {
 		temp = kmalloc(sizeof(struct gcbuffer), GFP_KERNEL);
 		if (temp == NULL) {
-			GC_PRINT(GC_ERR_MSG " out of memory.\n",
-					__func__, __LINE__);
+			GCPRINT(NULL, 0, GC_MOD_PREFIX
+				"out of memory.\n",
+				__func__, __LINE__);
 			gcerror = GCERR_SETGRP(GCERR_OODM,
 						GCERR_IOCTL_BUF_ALLOC);
 			goto exit;
@@ -94,8 +90,9 @@ static enum gcerror get_fixup(struct gcfixup **gcfixup)
 	/* Acquire fixup access mutex. */
 	gcerror = gc_acquire_mutex(&g_bufferlock, GC_INFINITE);
 	if (gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcerror);
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to acquire mutex (0x%08X).\n",
+			__func__, __LINE__, gcerror);
 		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_FIXUP_ALLOC);
 		goto exit;
 	}
@@ -104,8 +101,9 @@ static enum gcerror get_fixup(struct gcfixup **gcfixup)
 	if (g_fixupvacant == NULL) {
 		temp = kmalloc(sizeof(struct gcfixup), GFP_KERNEL);
 		if (temp == NULL) {
-			GC_PRINT(GC_ERR_MSG " out of memory.\n",
-					__func__, __LINE__);
+			GCPRINT(NULL, 0, GC_MOD_PREFIX
+				"out of memory.\n",
+				__func__, __LINE__);
 			gcerror = GCERR_SETGRP(GCERR_OODM,
 						GCERR_IOCTL_FIXUP_ALLOC);
 			goto exit;
@@ -134,8 +132,9 @@ static enum gcerror put_buffer_tree(struct gcbuffer *gcbuffer)
 	/* Acquire buffer access mutex. */
 	gcerror = gc_acquire_mutex(&g_bufferlock, GC_INFINITE);
 	if (gcerror != GCERR_NONE) {
-		GC_PRINT(GC_ERR_MSG " failed to acquire mutex (0x%08X).\n",
-				__func__, __LINE__, gcerror);
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to acquire mutex (0x%08X).\n",
+			__func__, __LINE__, gcerror);
 		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_BUF_ALLOC);
 		goto exit;
 	}
@@ -182,8 +181,9 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 
 	/* Get IOCTL parameters. */
 	if (copy_from_user(&kgccommit, gccommit, sizeof(struct gccommit))) {
-		GC_PRINT(GC_ERR_MSG " failed to read data.\n",
-				__func__, __LINE__);
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to read data.\n",
+			__func__, __LINE__);
 		kgccommit.gcerror = GCERR_USER_READ;
 		goto exit;
 	}
@@ -209,8 +209,9 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 
 		/* Get the data from the user. */
 		if (copy_from_user(kbuffer, ubuffer, sizeof(struct gcbuffer))) {
-			GC_PRINT(GC_ERR_MSG " failed to read data.\n",
-					__func__, __LINE__);
+			GCPRINT(NULL, 0, GC_MOD_PREFIX
+				"failed to read data.\n",
+				__func__, __LINE__);
 			kgccommit.gcerror = GCERR_USER_READ;
 			goto exit;
 		}
@@ -240,8 +241,9 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 			/* Get the data from the user. */
 			if (copy_from_user(kfixup, ufixup,
 					offsetof(struct gcfixup, fixup))) {
-				GC_PRINT(GC_ERR_MSG " failed to read data.\n",
-						__func__, __LINE__);
+				GCPRINT(NULL, 0, GC_MOD_PREFIX
+					" failed to read data.\n",
+					__func__, __LINE__);
 				kgccommit.gcerror = GCERR_USER_READ;
 				goto exit;
 			}
@@ -256,8 +258,9 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 			/* Get the fixup table. */
 			if (copy_from_user(kfixup->fixup, ufixup->fixup,
 						tablesize)) {
-				GC_PRINT(GC_ERR_MSG " failed to read data.\n",
-						__func__, __LINE__);
+				GCPRINT(NULL, 0, GC_MOD_PREFIX
+					"failed to read data.\n",
+					__func__, __LINE__);
 				kgccommit.gcerror = GCERR_USER_READ;
 				goto exit;
 			}
@@ -272,12 +275,10 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 	gc_commit(&kgccommit, true);
 
 exit:
-	GC_PRINT(GC_INFO_MSG " gcerror = 0x%08X\n",
-		__func__, __LINE__, kgccommit.gcerror);
-
 	if (copy_to_user(&gccommit->gcerror, &kgccommit.gcerror,
 				sizeof(enum gcerror))) {
-		GC_PRINT(GC_ERR_MSG " failed to write data.\n",
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to write data.\n",
 			__func__, __LINE__);
 		ret = -EFAULT;
 	}
@@ -296,8 +297,9 @@ static int gc_map_wrapper(struct gcmap *gcmap)
 
 	/* Get IOCTL parameters. */
 	if (copy_from_user(&kgcmap, gcmap, sizeof(struct gcmap))) {
-		GC_PRINT(GC_ERR_MSG " failed to read data.\n",
-				__func__, __LINE__);
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to read data.\n",
+			__func__, __LINE__);
 		kgcmap.gcerror = GCERR_USER_READ;
 		goto exit;
 	}
@@ -312,11 +314,9 @@ static int gc_map_wrapper(struct gcmap *gcmap)
 	mapped = 1;
 
 exit:
-	GC_PRINT(GC_INFO_MSG " gcerror = 0x%08X\n",
-		__func__, __LINE__, kgcmap.gcerror);
-
 	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, logical))) {
-		GC_PRINT(GC_ERR_MSG " failed to write data.\n",
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to write data.\n",
 			__func__, __LINE__);
 		kgcmap.gcerror = GCERR_USER_WRITE;
 		ret = -EFAULT;
@@ -337,8 +337,9 @@ static int gc_unmap_wrapper(struct gcmap *gcmap)
 
 	/* Get IOCTL parameters. */
 	if (copy_from_user(&kgcmap, gcmap, sizeof(struct gcmap))) {
-		GC_PRINT(GC_ERR_MSG " failed to read data.\n",
-				__func__, __LINE__);
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			" failed to read data.\n",
+			__func__, __LINE__);
 		kgcmap.gcerror = GCERR_USER_READ;
 		goto exit;
 	}
@@ -347,11 +348,9 @@ static int gc_unmap_wrapper(struct gcmap *gcmap)
 	gc_unmap(&kgcmap);
 
 exit:
-	GC_PRINT(GC_INFO_MSG " gcerror = 0x%08X\n",
-		__func__, __LINE__, kgcmap.gcerror);
-
 	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, logical))) {
-		GC_PRINT(GC_ERR_MSG " failed to write data.\n",
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to write data.\n",
 			__func__, __LINE__);
 		ret = -EFAULT;
 	}
@@ -384,26 +383,31 @@ static long dev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case GCIOCTL_COMMIT:
-		GC_PRINT(GC_INFO_MSG " GCIOCTL_COMMIT\n", __func__, __LINE__);
+		GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
+			"GCIOCTL_COMMIT\n", __func__, __LINE__);
 		ret = gc_commit_wrapper((struct gccommit *) arg);
 		break;
 
 	case GCIOCTL_MAP:
-		GC_PRINT(GC_INFO_MSG " GCIOCTL_MAP\n", __func__, __LINE__);
+		GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
+			"GCIOCTL_MAP\n", __func__, __LINE__);
 		ret = gc_map_wrapper((struct gcmap *) arg);
 		break;
 
 	case GCIOCTL_UNMAP:
-		GC_PRINT(GC_INFO_MSG " GCIOCTL_UNMAP\n", __func__, __LINE__);
+		GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
+			"GCIOCTL_UNMAP\n", __func__, __LINE__);
 		ret = gc_unmap_wrapper((struct gcmap *) arg);
 		break;
 
 	default:
-		GC_PRINT(GC_INFO_MSG " invalid command\n", __func__, __LINE__);
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"invalid command (%d)\n", __func__, __LINE__, cmd);
 		ret = -EINVAL;
 	}
 
-	GC_PRINT(GC_INFO_MSG " ret = %d\n", __func__, __LINE__, ret);
+	GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
+		"ret = %d\n", __func__, __LINE__, ret);
 
 	return ret;
 }
@@ -425,29 +429,33 @@ static int mod_init(void)
 {
 	int ret;
 
-	GC_PRINT(GC_INFO_MSG " initializing device.\n", __func__, __LINE__);
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+		"initializing device.\n", __func__, __LINE__);
 
 	/* Register the character device. */
-	dev_major = register_chrdev(0, DEV_NAME, &dev_operations);
+	dev_major = register_chrdev(0, GC_DEV_NAME, &dev_operations);
 	if (dev_major < 0) {
-		GC_PRINT(GC_ERR_MSG " failed to allocate device (%d).\n",
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to allocate device (%d).\n",
 			__func__, __LINE__, ret = dev_major);
 		goto failed;
 	}
 
 	/* Create the device class. */
-	dev_class = class_create(THIS_MODULE, DEV_NAME);
+	dev_class = class_create(THIS_MODULE, GC_DEV_NAME);
 	if (IS_ERR(dev_class)) {
-		GC_PRINT(GC_ERR_MSG " failed to create class (%d).\n",
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to create class (%d).\n",
 			__func__, __LINE__, ret = PTR_ERR(dev_class));
 		goto failed;
 	}
 
 	/* Create device. */
 	dev_object = device_create(dev_class, NULL, MKDEV(dev_major, 0),
-					NULL, DEV_NAME);
+					NULL, GC_DEV_NAME);
 	if (IS_ERR(dev_object)) {
-		GC_PRINT(GC_ERR_MSG " failed to create device (%d).\n",
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to create device (%d).\n",
 			__func__, __LINE__, ret = PTR_ERR(dev_object));
 		goto failed;
 	}
@@ -456,13 +464,16 @@ static int mod_init(void)
 	mutex_init(&g_maplock);
 	mutex_init(&g_bufferlock);
 
-	GC_PRINT(GC_INFO_MSG " device number = %d\n",
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+		"device number = %d\n",
 		__func__, __LINE__, dev_major);
 
-	GC_PRINT(GC_INFO_MSG " device class = 0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+		"device class = 0x%08X\n",
 		__func__, __LINE__, (unsigned int) dev_class);
 
-	GC_PRINT(GC_INFO_MSG " device object = 0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+		"device object = 0x%08X\n",
 		__func__, __LINE__, (unsigned int) dev_object);
 
 	return 0;
@@ -474,7 +485,8 @@ failed:
 
 static void mod_exit(void)
 {
-	GC_PRINT(GC_INFO_MSG " cleaning up resources.\n", __func__, __LINE__);
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+		"cleaning up resources.\n", __func__, __LINE__);
 
 	if ((dev_object != NULL) && !IS_ERR(dev_object)) {
 		device_destroy(dev_class, MKDEV(dev_major, 0));
@@ -487,7 +499,7 @@ static void mod_exit(void)
 	}
 
 	if (dev_major > 0) {
-		unregister_chrdev(dev_major, DEV_NAME);
+		unregister_chrdev(dev_major, GC_DEV_NAME);
 		dev_major = 0;
 	}
 }

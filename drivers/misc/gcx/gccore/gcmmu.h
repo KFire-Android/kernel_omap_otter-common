@@ -137,9 +137,6 @@ struct mmu2dprivate {
 	/* Reference count. */
 	int refcount;
 
-	/* MMU enabled. */
-	int enabled;
-
 	/* Safe zone allocation. */
 	struct gcpage safezone;
 
@@ -206,7 +203,6 @@ struct mmu2dphysmem {
 enum gcerror mmu2d_create_context(struct mmu2dcontext *ctxt);
 enum gcerror mmu2d_destroy_context(struct mmu2dcontext *ctxt);
 enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt);
-void mmu2d_reset(void);
 enum gcerror mmu2d_map(struct mmu2dcontext *ctxt,
 	struct mmu2dphysmem *mem, struct mmu2darena **mapped);
 enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt,

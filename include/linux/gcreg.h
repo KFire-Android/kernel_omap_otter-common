@@ -1443,6 +1443,339 @@ union gcidle {
 #define GC_TOTAL_READ_LASTS_COUNT_Type                                       U32
 
 /*******************************************************************************
+** Register gcGpOut0
+*/
+
+/* General Purpose output register0. R/W but not connected to anywhere. */
+
+#define GC_GP_OUT0_Address                                               0x00064
+#define GC_GP_OUT0_MSB                                                        15
+#define GC_GP_OUT0_LSB                                                         0
+#define GC_GP_OUT0_BLK                                                         0
+#define GC_GP_OUT0_Count                                                       1
+#define GC_GP_OUT0_FieldMask                                          0xFFFFFFFF
+#define GC_GP_OUT0_ReadMask                                           0xFFFFFFFF
+#define GC_GP_OUT0_WriteMask                                          0xFFFFFFFF
+#define GC_GP_OUT0_ResetValue                                         0x00000000
+
+#define GC_GP_OUT0_COUNT                                                  31 : 0
+#define GC_GP_OUT0_COUNT_End                                                  31
+#define GC_GP_OUT0_COUNT_Start                                                 0
+#define GC_GP_OUT0_COUNT_Type                                                U32
+
+/*******************************************************************************
+** Register gcGpOut1
+*/
+
+/* General Purpose output register1. R/W but not connected to anywhere. */
+
+#define GC_GP_OUT1_Address                                               0x00068
+#define GC_GP_OUT1_MSB                                                        15
+#define GC_GP_OUT1_LSB                                                         0
+#define GC_GP_OUT1_BLK                                                         0
+#define GC_GP_OUT1_Count                                                       1
+#define GC_GP_OUT1_FieldMask                                          0xFFFFFFFF
+#define GC_GP_OUT1_ReadMask                                           0xFFFFFFFF
+#define GC_GP_OUT1_WriteMask                                          0xFFFFFFFF
+#define GC_GP_OUT1_ResetValue                                         0x00000000
+
+#define GC_GP_OUT1_COUNT                                                  31 : 0
+#define GC_GP_OUT1_COUNT_End                                                  31
+#define GC_GP_OUT1_COUNT_Start                                                 0
+#define GC_GP_OUT1_COUNT_Type                                                U32
+
+/*******************************************************************************
+** Register gcGpOut2
+*/
+
+/* General Purpose output register2. R/W but not connected to anywhere. */
+
+#define GC_GP_OUT2_Address                                               0x0006C
+#define GC_GP_OUT2_MSB                                                        15
+#define GC_GP_OUT2_LSB                                                         0
+#define GC_GP_OUT2_BLK                                                         0
+#define GC_GP_OUT2_Count                                                       1
+#define GC_GP_OUT2_FieldMask                                          0xFFFFFFFF
+#define GC_GP_OUT2_ReadMask                                           0xFFFFFFFF
+#define GC_GP_OUT2_WriteMask                                          0xFFFFFFFF
+#define GC_GP_OUT2_ResetValue                                         0x00000000
+
+#define GC_GP_OUT2_COUNT                                                  31 : 0
+#define GC_GP_OUT2_COUNT_End                                                  31
+#define GC_GP_OUT2_COUNT_Start                                                 0
+#define GC_GP_OUT2_COUNT_Type                                                U32
+
+/*******************************************************************************
+** Register gcAxiControl
+*/
+
+/* Special Handling on AXI Bus */
+
+#define GC_AXI_CONTROL_Address                                           0x00070
+#define GC_AXI_CONTROL_MSB                                                    15
+#define GC_AXI_CONTROL_LSB                                                     0
+#define GC_AXI_CONTROL_BLK                                                     0
+#define GC_AXI_CONTROL_Count                                                   1
+#define GC_AXI_CONTROL_FieldMask                                      0x00000001
+#define GC_AXI_CONTROL_ReadMask                                       0x00000001
+#define GC_AXI_CONTROL_WriteMask                                      0x00000001
+#define GC_AXI_CONTROL_ResetValue                                     0x00000000
+
+#define GC_AXI_CONTROL_WR_FULL_BURST_MODE                                  0 : 0
+#define GC_AXI_CONTROL_WR_FULL_BURST_MODE_End                                  0
+#define GC_AXI_CONTROL_WR_FULL_BURST_MODE_Start                                0
+#define GC_AXI_CONTROL_WR_FULL_BURST_MODE_Type                               U01
+#define   GC_AXI_CONTROL_WR_FULL_BURST_MODE_NO_BURST_RESET_VALUE             0x0
+#define   GC_AXI_CONTROL_WR_FULL_BURST_MODE_BURST_RESET_VALUE                0x1
+
+/*******************************************************************************
+** Register GCMinorFeatures1
+*/
+
+/* Shows which features are enabled in this chip. This register has no set
+   reset value. It varies with the implementation. */
+
+#define GC_MINOR_FEATURES1_Address                                       0x00074
+#define GC_MINOR_FEATURES1_MSB                                                15
+#define GC_MINOR_FEATURES1_LSB                                                 0
+#define GC_MINOR_FEATURES1_BLK                                                 0
+#define GC_MINOR_FEATURES1_Count                                               1
+#define GC_MINOR_FEATURES1_FieldMask                                  0xFFFFFFFF
+#define GC_MINOR_FEATURES1_ReadMask                                   0xFFFFFFFF
+#define GC_MINOR_FEATURES1_WriteMask                                  0x00000000
+#define GC_MINOR_FEATURES1_ResetValue                                 0x00000000
+
+/* Resolve UV swizzle. */
+#define GC_MINOR_FEATURES1_RSUV_SWIZZLE                                    0 : 0
+#define GC_MINOR_FEATURES1_RSUV_SWIZZLE_End                                    0
+#define GC_MINOR_FEATURES1_RSUV_SWIZZLE_Start                                  0
+#define GC_MINOR_FEATURES1_RSUV_SWIZZLE_Type                                 U01
+#define   GC_MINOR_FEATURES1_RSUV_SWIZZLE_NONE                               0x0
+#define   GC_MINOR_FEATURES1_RSUV_SWIZZLE_AVAILABLE                          0x1
+
+/* V2 compression. */
+#define GC_MINOR_FEATURES1_V2_COMPRESSION                                  1 : 1
+#define GC_MINOR_FEATURES1_V2_COMPRESSION_End                                  1
+#define GC_MINOR_FEATURES1_V2_COMPRESSION_Start                                1
+#define GC_MINOR_FEATURES1_V2_COMPRESSION_Type                               U01
+#define   GC_MINOR_FEATURES1_V2_COMPRESSION_NONE                             0x0
+#define   GC_MINOR_FEATURES1_V2_COMPRESSION_AVAILABLE                        0x1
+
+/* Double buffering support for VG (second TS-->VG semaphore is present). */
+#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER                                2 : 2
+#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_End                                2
+#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_Start                              2
+#define GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_Type                             U01
+#define   GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_NONE                           0x0
+#define   GC_MINOR_FEATURES1_VG_DOUBLE_BUFFER_AVAILABLE                      0x1
+
+#define GC_MINOR_FEATURES1_BUG_FIXES1                                      3 : 3
+#define GC_MINOR_FEATURES1_BUG_FIXES1_End                                      3
+#define GC_MINOR_FEATURES1_BUG_FIXES1_Start                                    3
+#define GC_MINOR_FEATURES1_BUG_FIXES1_Type                                   U01
+#define   GC_MINOR_FEATURES1_BUG_FIXES1_NONE                                 0x0
+#define   GC_MINOR_FEATURES1_BUG_FIXES1_AVAILABLE                            0x1
+
+#define GC_MINOR_FEATURES1_BUG_FIXES2                                      4 : 4
+#define GC_MINOR_FEATURES1_BUG_FIXES2_End                                      4
+#define GC_MINOR_FEATURES1_BUG_FIXES2_Start                                    4
+#define GC_MINOR_FEATURES1_BUG_FIXES2_Type                                   U01
+#define   GC_MINOR_FEATURES1_BUG_FIXES2_NONE                                 0x0
+#define   GC_MINOR_FEATURES1_BUG_FIXES2_AVAILABLE                            0x1
+
+/* Texture has stride and memory addressing. */
+#define GC_MINOR_FEATURES1_TEXTURE_STRIDE                                  5 : 5
+#define GC_MINOR_FEATURES1_TEXTURE_STRIDE_End                                  5
+#define GC_MINOR_FEATURES1_TEXTURE_STRIDE_Start                                5
+#define GC_MINOR_FEATURES1_TEXTURE_STRIDE_Type                               U01
+#define   GC_MINOR_FEATURES1_TEXTURE_STRIDE_NONE                             0x0
+#define   GC_MINOR_FEATURES1_TEXTURE_STRIDE_AVAILABLE                        0x1
+
+#define GC_MINOR_FEATURES1_BUG_FIXES3                                      6 : 6
+#define GC_MINOR_FEATURES1_BUG_FIXES3_End                                      6
+#define GC_MINOR_FEATURES1_BUG_FIXES3_Start                                    6
+#define GC_MINOR_FEATURES1_BUG_FIXES3_Type                                   U01
+#define   GC_MINOR_FEATURES1_BUG_FIXES3_NONE                                 0x0
+#define   GC_MINOR_FEATURES1_BUG_FIXES3_AVAILABLE                            0x1
+
+#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE                            7 : 7
+#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_End                            7
+#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_Start                          7
+#define GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_Type                         U01
+#define   GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_NONE                       0x0
+#define   GC_MINOR_FEATURES1_CORRECT_AUTO_DISABLE_AVAILABLE                  0x1
+
+#define GC_MINOR_FEATURES1_AUTO_RESTART_TS                                 8 : 8
+#define GC_MINOR_FEATURES1_AUTO_RESTART_TS_End                                 8
+#define GC_MINOR_FEATURES1_AUTO_RESTART_TS_Start                               8
+#define GC_MINOR_FEATURES1_AUTO_RESTART_TS_Type                              U01
+#define   GC_MINOR_FEATURES1_AUTO_RESTART_TS_NONE                            0x0
+#define   GC_MINOR_FEATURES1_AUTO_RESTART_TS_AVAILABLE                       0x1
+
+#define GC_MINOR_FEATURES1_BUG_FIXES4                                      9 : 9
+#define GC_MINOR_FEATURES1_BUG_FIXES4_End                                      9
+#define GC_MINOR_FEATURES1_BUG_FIXES4_Start                                    9
+#define GC_MINOR_FEATURES1_BUG_FIXES4_Type                                   U01
+#define   GC_MINOR_FEATURES1_BUG_FIXES4_NONE                                 0x0
+#define   GC_MINOR_FEATURES1_BUG_FIXES4_AVAILABLE                            0x1
+
+#define GC_MINOR_FEATURES1_L2_WINDOWING                                  10 : 10
+#define GC_MINOR_FEATURES1_L2_WINDOWING_End                                   10
+#define GC_MINOR_FEATURES1_L2_WINDOWING_Start                                 10
+#define GC_MINOR_FEATURES1_L2_WINDOWING_Type                                 U01
+#define   GC_MINOR_FEATURES1_L2_WINDOWING_NONE                               0x0
+#define   GC_MINOR_FEATURES1_L2_WINDOWING_AVAILABLE                          0x1
+
+#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE                               11 : 11
+#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_End                                11
+#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_Start                              11
+#define GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_Type                              U01
+#define   GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_NONE                            0x0
+#define   GC_MINOR_FEATURES1_HALF_FLOAT_PIPE_AVAILABLE                       0x1
+
+#define GC_MINOR_FEATURES1_PIXEL_DITHER                                  12 : 12
+#define GC_MINOR_FEATURES1_PIXEL_DITHER_End                                   12
+#define GC_MINOR_FEATURES1_PIXEL_DITHER_Start                                 12
+#define GC_MINOR_FEATURES1_PIXEL_DITHER_Type                                 U01
+#define   GC_MINOR_FEATURES1_PIXEL_DITHER_NONE                               0x0
+#define   GC_MINOR_FEATURES1_PIXEL_DITHER_AVAILABLE                          0x1
+
+#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE                         13 : 13
+#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_End                          13
+#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_Start                        13
+#define GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_Type                        U01
+#define   GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_NONE                      0x0
+#define   GC_MINOR_FEATURES1_TWO_STENCIL_REFERENCE_AVAILABLE                 0x1
+
+#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT                         14 : 14
+#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_End                          14
+#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_Start                        14
+#define GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_Type                        U01
+#define   GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_NONE                      0x0
+#define   GC_MINOR_FEATURES1_EXTENDED_PIXEL_FORMAT_AVAILABLE                 0x1
+
+/* EEZ and HZ are correct. */
+#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH                         15 : 15
+#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_End                          15
+#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_Start                        15
+#define GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_Type                        U01
+#define   GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_NONE                      0x0
+#define   GC_MINOR_FEATURES1_CORRECT_MIN_MAX_DEPTH_AVAILABLE                 0x1
+
+/* Dither and filter+alpha available. */
+#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D               16 : 16
+#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_End                16
+#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_Start              16
+#define GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_Type              U01
+#define   GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_NONE            0x0
+#define   GC_MINOR_FEATURES1_DITHER_AND_FILTER_PLUS_ALPHA_2D_AVAILABLE       0x1
+
+#define GC_MINOR_FEATURES1_BUG_FIXES5                                    17 : 17
+#define GC_MINOR_FEATURES1_BUG_FIXES5_End                                     17
+#define GC_MINOR_FEATURES1_BUG_FIXES5_Start                                   17
+#define GC_MINOR_FEATURES1_BUG_FIXES5_Type                                   U01
+#define   GC_MINOR_FEATURES1_BUG_FIXES5_NONE                                 0x0
+#define   GC_MINOR_FEATURES1_BUG_FIXES5_AVAILABLE                            0x1
+
+#define GC_MINOR_FEATURES1_NEW_2D                                        18 : 18
+#define GC_MINOR_FEATURES1_NEW_2D_End                                         18
+#define GC_MINOR_FEATURES1_NEW_2D_Start                                       18
+#define GC_MINOR_FEATURES1_NEW_2D_Type                                       U01
+#define   GC_MINOR_FEATURES1_NEW_2D_NONE                                     0x0
+#define   GC_MINOR_FEATURES1_NEW_2D_AVAILABLE                                0x1
+
+#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC                 19 : 19
+#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_End                  19
+#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_Start                19
+#define GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_Type                U01
+#define   GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_NONE              0x0
+#define   GC_MINOR_FEATURES1_NEW_FLOATING_POINT_ARITHMETIC_AVAILABLE         0x1
+
+#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT           20 : 20
+#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_End            20
+#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_Start          20
+#define GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_Type          U01
+#define   GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_NONE        0x0
+#define   GC_MINOR_FEATURES1_TEXTURE_HORIZONTAL_ALIGNMENT_SELECT_AVAILABLE   0x1
+
+#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO                              21 : 21
+#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO_End                               21
+#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO_Start                             21
+#define GC_MINOR_FEATURES1_NON_POWER_OF_TWO_Type                             U01
+#define   GC_MINOR_FEATURES1_NON_POWER_OF_TWO_NONE                           0x0
+#define   GC_MINOR_FEATURES1_NON_POWER_OF_TWO_AVAILABLE                      0x1
+
+#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT                        22 : 22
+#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_End                         22
+#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_Start                       22
+#define GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_Type                       U01
+#define   GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_NONE                     0x0
+#define   GC_MINOR_FEATURES1_LINEAR_TEXTURE_SUPPORT_AVAILABLE                0x1
+
+#define GC_MINOR_FEATURES1_HALTI0                                        23 : 23
+#define GC_MINOR_FEATURES1_HALTI0_End                                         23
+#define GC_MINOR_FEATURES1_HALTI0_Start                                       23
+#define GC_MINOR_FEATURES1_HALTI0_Type                                       U01
+#define   GC_MINOR_FEATURES1_HALTI0_NONE                                     0x0
+#define   GC_MINOR_FEATURES1_HALTI0_AVAILABLE                                0x1
+
+#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG                           24 : 24
+#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_End                            24
+#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_Start                          24
+#define GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_Type                          U01
+#define   GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_NONE                        0x0
+#define   GC_MINOR_FEATURES1_CORRECT_OVERFLOW_VG_AVAILABLE                   0x1
+
+#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX                              25 : 25
+#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_End                               25
+#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_Start                             25
+#define GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_Type                             U01
+#define   GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_NONE                           0x0
+#define   GC_MINOR_FEATURES1_NEGATIVE_LOG_FIX_AVAILABLE                      0x1
+
+#define GC_MINOR_FEATURES1_RESOLVE_OFFSET                                26 : 26
+#define GC_MINOR_FEATURES1_RESOLVE_OFFSET_End                                 26
+#define GC_MINOR_FEATURES1_RESOLVE_OFFSET_Start                               26
+#define GC_MINOR_FEATURES1_RESOLVE_OFFSET_Type                               U01
+#define   GC_MINOR_FEATURES1_RESOLVE_OFFSET_NONE                             0x0
+#define   GC_MINOR_FEATURES1_RESOLVE_OFFSET_AVAILABLE                        0x1
+
+#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK                          27 : 27
+#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_End                           27
+#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_Start                         27
+#define GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_Type                         U01
+#define   GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_NONE                       0x0
+#define   GC_MINOR_FEATURES1_OK_TO_GATE_AXI_CLOCK_AVAILABLE                  0x1
+
+#define GC_MINOR_FEATURES1_MMU                                           28 : 28
+#define GC_MINOR_FEATURES1_MMU_End                                            28
+#define GC_MINOR_FEATURES1_MMU_Start                                          28
+#define GC_MINOR_FEATURES1_MMU_Type                                          U01
+#define   GC_MINOR_FEATURES1_MMU_NONE                                        0x0
+#define   GC_MINOR_FEATURES1_MMU_AVAILABLE                                   0x1
+
+#define GC_MINOR_FEATURES1_WIDE_LINE                                     29 : 29
+#define GC_MINOR_FEATURES1_WIDE_LINE_End                                      29
+#define GC_MINOR_FEATURES1_WIDE_LINE_Start                                    29
+#define GC_MINOR_FEATURES1_WIDE_LINE_Type                                    U01
+#define   GC_MINOR_FEATURES1_WIDE_LINE_NONE                                  0x0
+#define   GC_MINOR_FEATURES1_WIDE_LINE_AVAILABLE                             0x1
+
+#define GC_MINOR_FEATURES1_BUG_FIXES6                                    30 : 30
+#define GC_MINOR_FEATURES1_BUG_FIXES6_End                                     30
+#define GC_MINOR_FEATURES1_BUG_FIXES6_Start                                   30
+#define GC_MINOR_FEATURES1_BUG_FIXES6_Type                                   U01
+#define   GC_MINOR_FEATURES1_BUG_FIXES6_NONE                                 0x0
+#define   GC_MINOR_FEATURES1_BUG_FIXES6_AVAILABLE                            0x1
+
+#define GC_MINOR_FEATURES1_FC_FLUSH_STALL                                31 : 31
+#define GC_MINOR_FEATURES1_FC_FLUSH_STALL_End                                 31
+#define GC_MINOR_FEATURES1_FC_FLUSH_STALL_Start                               31
+#define GC_MINOR_FEATURES1_FC_FLUSH_STALL_Type                               U01
+#define   GC_MINOR_FEATURES1_FC_FLUSH_STALL_NONE                             0x0
+#define   GC_MINOR_FEATURES1_FC_FLUSH_STALL_AVAILABLE                        0x1
+
+/*******************************************************************************
 ** Register gcTotalCycles
 */
 
