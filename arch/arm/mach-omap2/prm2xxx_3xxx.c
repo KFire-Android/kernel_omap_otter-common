@@ -28,6 +28,10 @@
 #include "prm-regbits-24xx.h"
 #include "prm-regbits-34xx.h"
 
+static const u8 pm_wken_offs[] = {
+	PM_WKEN1, OMAP24XX_PM_WKEN2
+};
+
 static const struct omap_prcm_irq omap3_prcm_irqs[] = {
 	OMAP_PRCM_IRQ("wkup",	0,	0),
 	OMAP_PRCM_IRQ("io",	9,	1),
@@ -91,6 +95,18 @@ u32 omap2_prm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
 	return omap2_prm_rmw_mod_reg_bits(bits, 0x0, module, idx);
 }
 
+void omap2_prm_enable_prcm_module_wakeup(s16 prcm_mod, u8 prm_reg_id,
+			u8 prm_reg_shift, bool set_wake)
+{
+	if (prm_reg_id && (prm_reg_id <= ARRAY_SIZE(pm_wken_offs))) {
+		if (set_wake)
+			omap2_prm_set_mod_reg_bits(1 << prm_reg_shift,
+				prcm_mod, pm_wken_offs[prm_reg_id - 1]);
+		else
+			omap2_prm_clear_mod_reg_bits(1 << prm_reg_shift,
+				prcm_mod, pm_wken_offs[prm_reg_id - 1]);
+	}
+}
 
 /**
  * omap2_prm_is_hardreset_asserted - read the HW reset line state of
