@@ -54,6 +54,11 @@
 #define OMAP_HDMI_HPD_ADDR      0x4A100098
 #define OMAP_HDMI_PULLTYPE_MASK 0x00000010
 
+static enum omap_44xx_tablet_panel_type {
+	LCD_DEFAULT,
+	TC35876x_SHARP_LQ101K1LYxx_WXGA,/* TC35876x + Sharp LCD */
+	TC35876x_SAMSUNG_HYDIS_WUXGA,	/* TC35876x + Samsung or HYDIS */
+} tablet_panel_type = LCD_DEFAULT;
 
 static void omap4_tablet_init_display_led(void)
 {
@@ -139,20 +144,71 @@ static void tablet_hdmi_mux_init(void)
 		pr_err("%s: Cannot request HDMI GPIOs %x\n", __func__, status);
 }
 
-static struct tc358765_board_data tablet_dsi_panel = {
+static struct tc358765_board_data dsi_data_tc35876x_sharp_lq101k1lyxx = {
 	.lp_time	= 0x4,
 	.clrsipo	= 0x3,
 	.lv_is		= 0x1,
 	.lv_nd		= 0x6,
-	.vtgen		= 0x1,
-	.vsdelay	= 0xf,
+	.vtgen		= 0x0,
+	.vsdelay	= 0xf02,
+	.pclkdiv	= 0x0,
+	.pclksel	= 0x0,
+	.lvdlink	= 0x0,
+	.msf		= 0x0,
+	.evtmode	= 0x1,
 };
 
-static struct omap_dss_device tablet_lcd_device = {
+static struct tc358765_board_data dsi_data_tc35876x_samhyd_wuxga = {
+	.lp_time	= 0x7,
+	.clrsipo	= 0x7,
+	.lv_is		= 0x2,
+	.lv_nd		= 0x6,
+	.vtgen		= 0x0,
+	.vsdelay	= 0x0,
+	.pclkdiv	= 0x1,
+	.pclksel	= 0x0,
+	.lvdlink	= 0x1,
+	.msf		= 0x1,
+	.evtmode	= 0x1,
+};
+
+static struct omap_dsi_timings dsi_timings_tc35876x_samhyd_wuxga = {
+	.hbp		= 0,
+	.hfp		= 24,
+	.hsa		= 0,
+	.vbp		= 9,
+	.vfp		= 10,
+	.vsa		= 1,
+	.vact		= 1200,
+	.tl		= 1107,
+	.hsa_hs_int	= 0,
+	.hfp_hs_int	= 0,
+	.hbp_hs_int	= 0,
+	.hsa_lp_int	= 130,
+	.hfp_lp_int	= 223,
+	.hbp_lp_int	= 59,
+	.bl_lp_int	= 0,
+	.bl_hs_int	= 1038,
+	.exit_lat	= 20,
+	.enter_lat	= 23,
+};
+
+static struct omap_video_timings dispc_timings_tc35876x_samhyd_wuxga = {
+	.x_res		= 1920,
+	.y_res		= 1200,
+	.hfp		= 4,
+	.hsw		= 5,
+	.hbp		= 39,
+	.vfp		= 9,
+	.vsw		= 1,
+	.vbp		= 10,
+};
+
+static struct omap_dss_device lcd_tc35876x_sharp_lq101k1lyxx = {
 	.name                   = "lcd",
 	.driver_name            = "tc358765",
 	.type                   = OMAP_DISPLAY_TYPE_DSI,
-	.data			= &tablet_dsi_panel,
+	.data			= &dsi_data_tc35876x_sharp_lq101k1lyxx,
 	.phy.dsi                = {
 		.clk_lane       = 1,
 		.clk_pol        = 0,
@@ -166,6 +222,7 @@ static struct omap_dss_device tablet_lcd_device = {
 		.data4_pol      = 0,
 
 		.type = OMAP_DSS_DSI_TYPE_VIDEO_MODE,
+		.line_bufs	= 2,
 	},
 
 	.clocks = {
@@ -186,6 +243,18 @@ static struct omap_dss_device tablet_lcd_device = {
 			.lp_clk_div     = 5,
 			.offset_ddr_clk = 0,
 			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+			.tlpx	= 12,
+			.tclk = {
+				.zero	 = 58,
+				.prepare = 15,
+				.trail	 = 16,
+			},
+			.ths = {
+				.zero	 = 23,
+				.prepare = 18,
+				.exit	 = 33,
+				.trail	 = 19,
+			},
 		},
 	},
 
@@ -215,6 +284,91 @@ static struct omap_dss_device tablet_lcd_device = {
 
 	.platform_enable = NULL,
 	.platform_disable = NULL,
+	.dispc_timings = NULL,
+	.dsi_timings = NULL,
+};
+
+static struct omap_dss_device lcd_tc35876x_samhyd_wuxga = {
+	.name                   = "lcd",
+	.driver_name            = "tc358765",
+	.type                   = OMAP_DISPLAY_TYPE_DSI,
+	.data			= &dsi_data_tc35876x_samhyd_wuxga,
+	.phy.dsi                = {
+		.clk_lane       = 1,
+		.clk_pol        = 0,
+		.data1_lane     = 2,
+		.data1_pol      = 0,
+		.data2_lane     = 3,
+		.data2_pol      = 0,
+		.data3_lane     = 4,
+		.data3_pol      = 0,
+		.data4_lane     = 5,
+		.data4_pol      = 0,
+
+		.type = OMAP_DSS_DSI_TYPE_VIDEO_MODE,
+		.line_bufs	= 0,
+	},
+
+	.clocks = {
+		.dispc = {
+			 .channel = {
+				.lck_div        = 1,
+				.pck_div        = 1,
+				.lcd_clk_src    = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+			},
+			.dispc_fclk_src = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+		},
+
+		.dsi = {
+			.regn           = 17,
+			.regm           = 287,
+			.regm_dispc     = 9,
+			.regm_dsi       = 7,
+			.lp_clk_div     = 19,
+			.offset_ddr_clk = 0,
+			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+			.tlpx	= 18,
+			.tclk = {
+				.zero	 = 86,
+				.prepare = 22,
+				.trail	 = 22,
+			},
+			.ths = {
+				.zero	 = 34,
+				.prepare = 25,
+				.exit	 = 47,
+				.trail	 = 25,
+			},
+		},
+	},
+
+	.panel = {
+		.timings = {
+			.x_res		= 1920,
+			.y_res		= 1200,
+			.pixel_clock	= 81035,
+			.hfp		= 40,
+			.hsw		= 6,
+			.hbp		= 248,
+			.vfp		= 8,
+			.vsw		= 6,
+			.vbp		= 6,
+		},
+	},
+
+	.ctrl = {
+		.pixel_size = 18,
+	},
+
+	.reset_gpio     = 102,
+	.channel = OMAP_DSS_CHANNEL_LCD,
+	.skip_init = false,
+
+	.platform_enable = NULL,
+	.platform_disable = NULL,
+
+	.dispc_timings = &dispc_timings_tc35876x_samhyd_wuxga,
+	.dsi_timings = &dsi_timings_tc35876x_samhyd_wuxga,
 };
 
 static struct omap_dss_device tablet_hdmi_device = {
@@ -235,16 +389,45 @@ static struct omap_dss_device tablet_hdmi_device = {
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
 };
 
-static struct omap_dss_device *tablet_dss_devices[] = {
-	&tablet_lcd_device,
+static struct omap_dss_device *dss_devices_tc35876x_samhyd_wuxga[] = {
+	&lcd_tc35876x_samhyd_wuxga, /* LCD device has to be first */
 	&tablet_hdmi_device,
 };
 
-static struct omap_dss_board_info tablet_dss_data = {
-	.num_devices	= ARRAY_SIZE(tablet_dss_devices),
-	.devices	= tablet_dss_devices,
-	.default_device	= &tablet_lcd_device,
+static struct omap_dss_device *dss_devices_tc35876x_sharp_lq101k1lyxx[] = {
+	&lcd_tc35876x_sharp_lq101k1lyxx, /* LCD device has to be first */
+	&tablet_hdmi_device,
 };
+
+static struct omap_dss_board_info tablet_dss_data_tc35876x_samhyd_wuxga = {
+	.num_devices	= ARRAY_SIZE(dss_devices_tc35876x_samhyd_wuxga),
+	.devices	= dss_devices_tc35876x_samhyd_wuxga,
+	.default_device = &lcd_tc35876x_samhyd_wuxga,
+};
+
+static struct omap_dss_board_info tablet_dss_data_tc35876x_sharp_lq101k1lyxx = {
+	.num_devices	= ARRAY_SIZE(dss_devices_tc35876x_sharp_lq101k1lyxx),
+	.devices	= dss_devices_tc35876x_sharp_lq101k1lyxx,
+	.default_device = &lcd_tc35876x_sharp_lq101k1lyxx,
+};
+
+static struct omap_dss_board_info *get_panel_data(enum omap_44xx_tablet_panel_type panel_type)
+{
+	switch (panel_type) {
+	case TC35876x_SAMSUNG_HYDIS_WUXGA: /* HYDIS & Samsung equivalent */
+		return &tablet_dss_data_tc35876x_samhyd_wuxga;
+		break;
+	case TC35876x_SHARP_LQ101K1LYxx_WXGA:
+	default:
+		if (omap_is_board_version(OMAP4_TABLET_1_0) ||
+		    omap_is_board_version(OMAP4_TABLET_1_1) ||
+		    omap_is_board_version(OMAP4_TABLET_1_2)) {
+			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.x_res = 1024;
+			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.y_res = 768;
+		}
+		return &tablet_dss_data_tc35876x_sharp_lq101k1lyxx;
+	}
+}
 
 static void tablet_lcd_init(void)
 {
@@ -259,21 +442,15 @@ static void tablet_lcd_init(void)
 	reg |= 0x1f << OMAP4_DSI1_PIPD_SHIFT;
 	omap4_ctrl_pad_writel(reg, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
 
-	status = gpio_request_one(tablet_lcd_device.reset_gpio,
+	status = gpio_request_one(get_panel_data(tablet_panel_type)->devices[0]->reset_gpio,
 				GPIOF_OUT_INIT_LOW, "lcd_reset_gpio");
 	if (status)
 		pr_err("%s: Could not get lcd_reset_gpio\n", __func__);
 }
 
-#define TABLET_FB_RAM_SIZE                SZ_16M /* 1920×1080*4 * 2 */
 static struct omapfb_platform_data tablet_fb_pdata = {
 	.mem_desc = {
 		.region_cnt = 1,
-		.region = {
-			[0] = {
-				.size = TABLET_FB_RAM_SIZE,
-			},
-		},
 	},
 };
 
@@ -283,21 +460,28 @@ static struct i2c_board_info __initdata omap4xx_i2c_bus2_d2l_info[] = {
 	},
 };
 
-static void set_panel_size(void)
+static int __init set_tablet_panel_type(char *str)
 {
-	if (omap_is_board_version(OMAP4_TABLET_1_0) ||
-	    omap_is_board_version(OMAP4_TABLET_1_1) ||
-	    omap_is_board_version(OMAP4_TABLET_1_2)) {
-		tablet_lcd_device.panel.timings.x_res	= 1024;
-		tablet_lcd_device.panel.timings.y_res	= 768;
+	int retval = 0;
+	if (!strncmp("2202-002", str, 8) ||
+	    !strncmp("2102-002", str, 8))
+		tablet_panel_type = TC35876x_SAMSUNG_HYDIS_WUXGA;
+	else if (!strncmp("2156-003", str, 8))
+		tablet_panel_type = TC35876x_SHARP_LQ101K1LYxx_WXGA;
+	else {
+		pr_err("%s: No valid omapdss.board_id sent from bootloader, "
+		       "will default to TC35876x_SHARP_LQ101K1LYxx_WXGA\n",
+			__func__);
+		retval = 1;
 	}
+	return retval;
 }
+
+early_param("omapdss.board_id", set_tablet_panel_type);
 
 void tablet_android_display_setup(struct omap_ion_platform_data *ion)
 {
-	set_panel_size();
-
-	omap_android_display_setup(&tablet_dss_data,
+	omap_android_display_setup(get_panel_data(tablet_panel_type),
 				   NULL,
 				   NULL,
 				   &tablet_fb_pdata,
@@ -306,15 +490,12 @@ void tablet_android_display_setup(struct omap_ion_platform_data *ion)
 
 int __init tablet_panel_init(void)
 {
-	set_panel_size();
-
 	tablet_lcd_init();
 	tablet_hdmi_mux_init();
 
-	omap_vram_set_sdram_vram(TABLET_FB_RAM_SIZE, 0);
 	omapfb_set_platform_data(&tablet_fb_pdata);
 
-	omap_display_init(&tablet_dss_data);
+	omap_display_init(get_panel_data(tablet_panel_type));
 	platform_device_register(&omap4_tablet_disp_led);
 
 	i2c_register_board_info(2, omap4xx_i2c_bus2_d2l_info,
