@@ -19,6 +19,7 @@
 
 #include <linux/types.h>
 #include <linux/list.h>
+#include <linux/plist.h>
 #include <linux/spinlock.h>
 #include <linux/atomic.h>
 
@@ -34,6 +35,12 @@
 #define PWRDM_POWER_OSWR	0x5
 
 #define PWRDM_MAX_PWRSTS	4
+
+/* Maximum number of power domain states - including OSWR */
+#define PWRDM_MAX_POWER_PWRSTS	6
+
+/* Unsupported power latency state for a power domain */
+#define UNSUP_STATE		-1
 
 /* Powerdomain allowable state bitfields */
 #define PWRSTS_ON		(1 << PWRDM_POWER_ON)
@@ -110,6 +117,7 @@ struct powerdomain;
  * @timer:
  * @state_timer:
  * @lock: lock to keep the pwrdm structure access sanity.
+ * @wkup_lat_plist_lock: Lock to control access to Latency and updates
  *
  * @prcm_partition possible values are defined in mach-omap2/prcm44xx.h.
  */
@@ -142,6 +150,17 @@ struct powerdomain {
 	s64 timer;
 	s64 state_timer[PWRDM_MAX_PWRSTS];
 #endif
+	const s32 wakeup_lat[PWRDM_MAX_POWER_PWRSTS];
+	struct plist_head wkup_lat_plist_head;
+	/* Lock to control access to latency list */
+	struct mutex wkup_lat_plist_lock;
+	int wkup_lat_next_state;
+};
+
+/* Linked list for the wake-up latency constraints */
+struct pwrdm_wkup_constraints_entry {
+	void			*cookie;
+	struct plist_node	node;
 };
 
 /**
@@ -240,6 +259,11 @@ int pwrdm_clkdm_state_switch(struct clockdomain *clkdm);
 int pwrdm_pre_transition(struct powerdomain *pwrdm);
 int pwrdm_post_transition(struct powerdomain *pwrdm);
 int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
+
+int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
+				      long min_latency);
+int pwrdm_wakeuplat_remove_constraint(struct powerdomain *pwrdm, void *cookie);
+
 int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
 bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
 int pwrdm_enable_force_off(struct powerdomain *pwrdm);

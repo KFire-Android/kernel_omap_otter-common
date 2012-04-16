@@ -17,9 +17,11 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/list.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/ratelimit.h>
+#include <linux/pm_qos.h>
 #include <trace/events/power.h>
 
 #include "cm2xxx_3xxx.h"
@@ -50,6 +52,15 @@ static unsigned char _pwrdm_state_idx_lookup[] = {
 	[PWRDM_POWER_CSWR] = 3,
 	[PWRDM_POWER_INACTIVE] = 4,
 	[PWRDM_POWER_ON] = 5,
+};
+
+/* index to state lookup table */
+static unsigned char _pwrdm_idx_state_lookup[] = {
+	[1] = PWRDM_POWER_OFF,
+	[2] = PWRDM_POWER_OSWR,
+	[3] = PWRDM_POWER_CSWR,
+	[4] = PWRDM_POWER_INACTIVE,
+	[5] = PWRDM_POWER_ON,
 };
 
 /* Fwd declarations */
@@ -137,6 +148,12 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
 	for (i = 0; i < pwrdm->banks; i++)
 		pwrdm->ret_mem_off_counter[i] = 0;
 
+	/* Initialize the per-device wake-up constraints framework data */
+	mutex_init(&pwrdm->wkup_lat_plist_lock);
+	plist_head_init(&pwrdm->wkup_lat_plist_head);
+	pwrdm->wkup_lat_next_state = PWRDM_POWER_OFF;
+
+	/* Initialize the pwrdm state */
 	pwrdm_wait_transition(pwrdm);
 	pwrdm->state = pwrdm_read_pwrst(pwrdm);
 	pwrdm->state_counter[_PWRDM_STATE_COUNT_IDX(pwrdm->state)] = 1;
@@ -231,6 +248,56 @@ static int _pwrdm_post_transition_cb(struct powerdomain *pwrdm, void *unused)
 	_pwrdm_state_switch(pwrdm, PWRDM_STATE_PREV);
 	return 0;
 }
+
+/**
+ * _pwrdm_wakeuplat_update_pwrst - Update power domain power state if needed
+ * @pwrdm: struct powerdomain * to which requesting device belongs to.
+ * @min_latency: the allowed wake-up latency for the given power domain. A
+ *  value of PM_QOS_DEV_LAT_DEFAULT_VALUE means 'no constraint' on the pwrdm.
+ *
+ * Finds the power domain next power state that fulfills the constraint.
+ * Programs a new target state if it is different from current power state.
+ * The power domains get the next power state programmed directly in the
+ * registers.
+ *
+ * Returns 0 in case of success, -EINVAL in case of invalid parameters,
+ * or the return value from omap_set_pwrdm_state.
+ */
+static int _pwrdm_wakeuplat_update_pwrst(struct powerdomain *pwrdm,
+					 long min_latency)
+{
+	int ret = 0, state, state_idx, new_state = PWRDM_POWER_ON;
+
+	/*
+	 * Find the next supported power state with
+	 *  wakeup latency <= min_latency.
+	 * Pick the lower state if no constraint on the pwrdm
+	 *  (min_latency == PM_QOS_DEV_LAT_DEFAULT_VALUE).
+	 * Skip the states marked as unsupported (UNSUP_STATE).
+	 * If no power state found, fall back to PWRDM_POWER_ON.
+	 */
+	for (state_idx = 1; state_idx < PWRDM_MAX_POWER_PWRSTS; state_idx++) {
+		state = _pwrdm_idx_state_lookup[state_idx];
+
+		if (pwrdm->wakeup_lat[state] == UNSUP_STATE)
+			continue;
+		if (min_latency == PM_QOS_DEV_LAT_DEFAULT_VALUE ||
+		    pwrdm->wakeup_lat[state] <= min_latency) {
+			new_state = state;
+			break;
+		}
+	}
+
+	pwrdm->wkup_lat_next_state = new_state;
+	ret = omap_set_pwrdm_state(pwrdm, new_state);
+
+	pr_debug("%s: pwrst for %s: curr=%d, next=%d, min_latency=%ld, new_state=%d\n",
+		 __func__, pwrdm->name, pwrdm_read_pwrst(pwrdm),
+		 pwrdm_read_next_pwrst(pwrdm), min_latency, new_state);
+
+	return ret;
+}
+
 
 /* Public functions */
 
@@ -1352,6 +1419,171 @@ int pwrdm_post_transition(struct powerdomain *pwrdm)
 		pwrdm_for_each(_pwrdm_post_transition_cb, NULL);
 
 	return 0;
+}
+
+/**
+ * pwrdm_wakeuplat_update_constraint - Set or update a powerdomain wakeup
+ *  latency constraint and apply it
+ * @pwrdm: struct powerdomain * which the constraint applies to
+ * @cookie: constraint identifier, used for tracking
+ * @min_latency: minimum wakeup latency constraint (in microseconds) for
+ *  the given pwrdm
+ *
+ * Tracks the constraints by @cookie.
+ * Constraint set/update: Adds a new entry to powerdomain's wake-up latency
+ * constraint list. If the constraint identifier already exists in the list,
+ * the old value is overwritten.
+ *
+ * Applies the aggregated constraint value for the given pwrdm by calling
+ * _pwrdm_wakeuplat_update_pwrst.
+ *
+ * Returns 0 upon success, -ENOMEM in case of memory shortage, -EINVAL in
+ * case of invalid latency value, or the return value from
+ * _pwrdm_wakeuplat_update_pwrst.
+ *
+ * The caller must check the validity of the parameters.
+ */
+int pwrdm_wakeuplat_update_constraint(struct powerdomain *pwrdm, void *cookie,
+				      long min_latency)
+{
+	struct pwrdm_wkup_constraints_entry *tmp_user, *new_user, *user = NULL;
+	long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
+	int free_new_user = 0;
+
+	if (!pwrdm) {
+		WARN(1, "powerdomain: %s: NULL pwrdm parameter!\n", __func__);
+		return -EINVAL;
+	}
+
+	pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p, min_latency=%ld\n",
+		 __func__, pwrdm->name, cookie, min_latency);
+
+	if (min_latency <= PM_QOS_DEV_LAT_DEFAULT_VALUE) {
+		pr_warn("%s: min_latency >= PM_QOS_DEV_LAT_DEFAULT_VALUE\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	/* Allocate a new entry for insertion in the list */
+	new_user = kzalloc(sizeof(struct pwrdm_wkup_constraints_entry),
+			   GFP_KERNEL);
+	if (!new_user) {
+		pr_err("%s: FATAL ERROR: kzalloc failed\n", __func__);
+		return -ENOMEM;
+	}
+
+	mutex_lock(&pwrdm->wkup_lat_plist_lock);
+
+	/* Check if there already is a constraint for cookie */
+	plist_for_each_entry(tmp_user, &pwrdm->wkup_lat_plist_head, node) {
+		if (tmp_user->cookie == cookie) {
+			user = tmp_user;
+			break;
+		}
+	}
+
+	/* If nothing to update, job done */
+	if (user && (user->node.prio == min_latency))
+		goto out;
+
+	if (!user) {
+		/* Add new entry to the list */
+		user = new_user;
+		user->cookie = cookie;
+	} else {
+		/* Update existing entry */
+		plist_del(&user->node, &pwrdm->wkup_lat_plist_head);
+		free_new_user = 1;
+	}
+
+	plist_node_init(&user->node, min_latency);
+	plist_add(&user->node, &pwrdm->wkup_lat_plist_head);
+
+	/* Find the aggregated constraint value from the list */
+	if (!plist_head_empty(&pwrdm->wkup_lat_plist_head))
+		value = plist_first(&pwrdm->wkup_lat_plist_head)->prio;
+
+	mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+
+	/* Free the newly allocated entry if not in use */
+	if (free_new_user)
+		kfree(new_user);
+
+	/* Apply the constraint to the pwrdm */
+	pr_debug("powerdomain: %s: pwrdm %s, value=%ld\n",
+		 __func__, pwrdm->name, value);
+	return _pwrdm_wakeuplat_update_pwrst(pwrdm, value);
+
+out:
+	mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+	return 0;
+}
+
+/**
+ * pwrdm_wakeuplat_remove_constraint - Release a powerdomain wakeup latency
+ *  constraint and apply it
+ * @pwrdm: struct powerdomain * which the constraint applies to
+ * @cookie: constraint identifier, used for tracking
+ *
+ * Tracks the constraints by @cookie.
+ * Constraint removal: Removes the identifier's entry from powerdomain's
+ * wakeup latency constraint list.
+ *
+ * Applies the aggregated constraint value for the given pwrdm by calling
+ * _pwrdm_wakeuplat_update_pwrst.
+ *
+ * Returns 0 upon success, -EINVAL in case the constraint to remove is not
+ * existing, or the return value from _pwrdm_wakeuplat_update_pwrst.
+ *
+ * The caller must check the validity of the parameters.
+ */
+int pwrdm_wakeuplat_remove_constraint(struct powerdomain *pwrdm, void *cookie)
+{
+	struct pwrdm_wkup_constraints_entry *tmp_user, *user = NULL;
+	long value = PM_QOS_DEV_LAT_DEFAULT_VALUE;
+
+	if (!pwrdm) {
+		WARN(1, "powerdomain: %s: NULL pwrdm parameter!\n", __func__);
+		return -EINVAL;
+	}
+
+	pr_debug("powerdomain: %s: pwrdm %s, cookie=0x%p\n",
+		 __func__, pwrdm->name, cookie);
+
+	mutex_lock(&pwrdm->wkup_lat_plist_lock);
+
+	/* Check if there is a constraint for cookie */
+	plist_for_each_entry(tmp_user, &pwrdm->wkup_lat_plist_head, node) {
+		if (tmp_user->cookie == cookie) {
+			user = tmp_user;
+			break;
+		}
+	}
+
+	/* If constraint not existing or list empty, return -EINVAL */
+	if (!user)
+		goto out;
+
+	/* Remove the constraint from the list */
+	plist_del(&user->node, &pwrdm->wkup_lat_plist_head);
+
+	/* Find the aggregated constraint value from the list */
+	if (!plist_head_empty(&pwrdm->wkup_lat_plist_head))
+		value = plist_first(&pwrdm->wkup_lat_plist_head)->prio;
+
+	mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+
+	/* Release the constraint memory */
+	kfree(user);
+
+	/* Apply the constraint to the pwrdm */
+	pr_debug("powerdomain: %s: pwrdm %s, value=%ld\n",
+		 __func__, pwrdm->name, value);
+	return _pwrdm_wakeuplat_update_pwrst(pwrdm, value);
+
+out:
+	mutex_unlock(&pwrdm->wkup_lat_plist_lock);
+	return -EINVAL;
 }
 
 /**
