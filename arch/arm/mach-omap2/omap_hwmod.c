@@ -2884,7 +2884,7 @@ ohsps_unlock:
 }
 
 /**
- * omap_hwmod_set_wakeuplat_constraint - set/release a wake-up latency
+ * omap_hwmod_set_wakeuplat_constraint - Set or update a wake-up latency
  * constraint
  * @oh: struct omap_hwmod* to which the target device belongs to.
  * @cookie: identifier of the constraints list for @oh.
@@ -2901,12 +2901,7 @@ int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
 	if (!pwrdm)
 		return -EINVAL;
 
-	/*
-	 * XXX Update to use pwrdm_wakeuplat_update_constraint() when
-	 * that code is ready
-	 */
-	return -EINVAL;
-
+	return pwrdm_wakeuplat_update_constraint(pwrdm, cookie, min_latency);
 }
 
 /**
@@ -2916,7 +2911,7 @@ int omap_hwmod_set_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie,
  * @cookie: identifier of the constraints list for @oh.
  *
  * Removes a wakeup latency contraint.  Returns the return value from
- * pwrdm_wakeuplat_update_constraint(), or -EINVAL in case of invalid
+ * pwrdm_wakeuplat_remove_constraint(), or -EINVAL in case of invalid
  * parameters.
  */
 int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie)
@@ -2926,12 +2921,7 @@ int omap_hwmod_remove_wakeuplat_constraint(struct omap_hwmod *oh, void *cookie)
 	if (!pwrdm)
 		return -EINVAL;
 
-	/*
-	 * XXX Update to use pwrdm_wakeuplat_remove_constraint() when
-	 * that code is ready
-	 */
-	return -EINVAL;
-
+	return pwrdm_wakeuplat_remove_constraint(pwrdm, cookie);
 }
 
 /**
