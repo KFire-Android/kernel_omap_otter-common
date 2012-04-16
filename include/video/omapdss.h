@@ -326,6 +326,45 @@ struct omap_video_timings {
 	u16 vbp;	/* Vertical back porch */
 };
 
+struct omap_dsi_timings {
+	/* Unit: HS DSI byte clocks */
+	u16 tl;		/* Total line length */
+	/* Unit: pixels */
+	u16 vact;	/* Active lines */
+	/* Unit: HS DSI byte clocks */
+	u16 hsa;	/* Horizontal synchronization pulse width */
+	/* Unit: HS DSI byte clocks */
+	u16 hfp;	/* Horizontal front porch */
+	/* Unit: HS DSI byte clocks */
+	u16 hbp;	/* Horizontal back porch */
+	/* Unit: Line clocks */
+	u16 vsa;	/* Vertical synchronization pulse width */
+	/* Unit: Line clocks */
+	u16 vfp;	/* Vertical front porch */
+	/* Unit: Line clocks */
+	u16 vbp;	/* Vertical back porch */
+	/* Unit: HS DSI byte clocks */
+	u16 hsa_hs_int;	/* HSA HS interleaving */
+	/* Unit: HS DSI byte clocks */
+	u16 hfp_hs_int;	/* HFP HS interleaving */
+	/* Unit: HS DSI byte clocks */
+	u16 hbp_hs_int;	/* HBP HS interleaving */
+	/* Unit: DSI Command mode packets */
+	u16 hsa_lp_int;	/* HSA LP interleaving */
+	/* Unit: DSI Command mode packets */
+	u16 hfp_lp_int;	/* HFP LP interleaving */
+	/* Unit: DSI Command mode packets */
+	u16 hbp_lp_int;	/* HBP LP interleaving */
+	/* Unit: HS DSI byte clocks */
+	u16 bl_hs_int;	/* Blanking HS interleaving */
+	/* Unit: DSI command mode packets */
+	u16 bl_lp_int;	/* Blanking LP interleaving */
+	/* Unit: HS DSI byte clocks */
+	u16 enter_lat;	/* Enter HS mode latency */
+	/* Unit: HS DSI byte clocks */
+	u16 exit_lat;	/* Exit HS mode latency */
+};
+
 #ifdef CONFIG_OMAP2_DSS_VENC
 /* Hardcoded timings for tv modes. Venc only uses these to
  * identify the mode, and does not actually use the configs
@@ -582,6 +621,7 @@ struct omap_dss_device {
 
 			bool ext_te;
 			u8 ext_te_gpio;
+			u8 line_bufs;
 		} dsi;
 
 		struct {
@@ -610,6 +650,18 @@ struct omap_dss_device {
 			u16 lp_clk_div;
 			unsigned offset_ddr_clk;
 			enum omap_dss_clk_source dsi_fclk_src;
+			u8 tlpx;
+			struct {
+				u8 zero;
+				u8 prepare;
+				u8 trail;
+			} tclk;
+			struct {
+				u8 zero;
+				u8 prepare;
+				u8 trail;
+				u8 exit;
+			} ths;
 		} dsi;
 
 		struct {
@@ -671,6 +723,9 @@ struct omap_dss_device {
 	void (*platform_disable)(struct omap_dss_device *dssdev);
 	int (*set_backlight)(struct omap_dss_device *dssdev, int level);
 	int (*get_backlight)(struct omap_dss_device *dssdev);
+
+	struct omap_video_timings *dispc_timings;
+	struct omap_dsi_timings *dsi_timings;
 };
 
 struct omap_dss_driver {
