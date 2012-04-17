@@ -1,7 +1,7 @@
 /*
- * omap4-hdmi-card.c
+ * omap-hdmi-card.c
  *
- * OMAP ALSA SoC machine driver for TI OMAP4 HDMI
+ * OMAP ALSA SoC machine driver for TI OMAP4/5 HDMI
  * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
  * Author: Ricardo Neri <ricardo.neri@ti.com>
  *
@@ -29,7 +29,7 @@
 
 #define DRV_NAME "omap-hdmi-audio"
 
-static int omap4_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
+static int omap_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 		struct snd_pcm_hw_params *params)
 {
 	int i;
@@ -58,30 +58,30 @@ static int omap4_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static struct snd_soc_ops omap4_hdmi_dai_ops = {
-	.hw_params = omap4_hdmi_dai_hw_params,
+static struct snd_soc_ops omap_hdmi_dai_ops = {
+	.hw_params = omap_hdmi_dai_hw_params,
 };
 
-static struct snd_soc_dai_link omap4_hdmi_dai = {
+static struct snd_soc_dai_link omap_hdmi_dai = {
 	.name = "HDMI",
 	.stream_name = "HDMI",
 	.cpu_dai_name = "omap-hdmi-audio-dai",
 	.platform_name = "omap-pcm-audio",
 	.codec_name = "hdmi-audio-codec",
 	.codec_dai_name = "omap-hdmi-hifi",
-	.ops = &omap4_hdmi_dai_ops,
+	.ops = &omap_hdmi_dai_ops,
 };
 
-static struct snd_soc_card snd_soc_omap4_hdmi = {
-	.name = "OMAP4HDMI",
+static struct snd_soc_card snd_soc_omap_hdmi = {
+	.name = "OMAPHDMI",
 	.owner = THIS_MODULE,
-	.dai_link = &omap4_hdmi_dai,
+	.dai_link = &omap_hdmi_dai,
 	.num_links = 1,
 };
 
-static __devinit int omap4_hdmi_probe(struct platform_device *pdev)
+static __devinit int omap_hdmi_probe(struct platform_device *pdev)
 {
-	struct snd_soc_card *card = &snd_soc_omap4_hdmi;
+	struct snd_soc_card *card = &snd_soc_omap_hdmi;
 	int ret;
 
 	card->dev = &pdev->dev;
@@ -95,7 +95,7 @@ static __devinit int omap4_hdmi_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int __devexit omap4_hdmi_remove(struct platform_device *pdev)
+static int __devexit omap_hdmi_remove(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 
@@ -104,18 +104,18 @@ static int __devexit omap4_hdmi_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct platform_driver omap4_hdmi_driver = {
+static struct platform_driver omap_hdmi_driver = {
 	.driver = {
 		.name = DRV_NAME,
 		.owner = THIS_MODULE,
 	},
-	.probe = omap4_hdmi_probe,
-	.remove = __devexit_p(omap4_hdmi_remove),
+	.probe = omap_hdmi_probe,
+	.remove = __devexit_p(omap_hdmi_remove),
 };
 
-module_platform_driver(omap4_hdmi_driver);
+module_platform_driver(omap_hdmi_driver);
 
 MODULE_AUTHOR("Ricardo Neri <ricardo.neri@ti.com>");
-MODULE_DESCRIPTION("OMAP4 HDMI machine ASoC driver");
+MODULE_DESCRIPTION("OMAP4/5 HDMI machine ASoC driver");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:" DRV_NAME);
