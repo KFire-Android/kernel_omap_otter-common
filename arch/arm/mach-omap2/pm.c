@@ -65,7 +65,7 @@ static void __init omap2_init_processor_devices(void)
 	if (omap3_has_iva())
 		_init_omap_device("iva");
 
-	if (cpu_is_omap44xx()) {
+	if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		_init_omap_device("l3_main_1");
 		_init_omap_device("dsp");
 		_init_omap_device("iva");
