@@ -27,6 +27,9 @@
 #include <linux/delay.h>
 #include <linux/string.h>
 #include <linux/seq_file.h>
+#if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
+#include <sound/asoundef.h>
+#endif
 
 #include "ti_hdmi_5xxx_ip.h"
 #include "dss.h"
@@ -760,3 +763,240 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 
 	hdmi_core_enable_interrupts(ip_data);
 }
+
+
+#if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
+static void ti_hdmi_5xxx_wp_audio_config_format(struct hdmi_ip_data *ip_data,
+					struct hdmi_audio_format *aud_fmt)
+{
+	u32 r;
+
+	DSSDBG("Enter hdmi_wp_audio_config_format\n");
+	r = hdmi_read_reg(ip_data->base_wp, HDMI_WP_AUDIO_CFG);
+	r = FLD_MOD(r, aud_fmt->en_sig_blk_strt_end, 5, 5);
+	r = FLD_MOD(r, aud_fmt->type, 4, 4);
+	r = FLD_MOD(r, aud_fmt->justification, 3, 3);
+	r = FLD_MOD(r, aud_fmt->samples_per_word, 1, 1);
+	r = FLD_MOD(r, aud_fmt->sample_size, 0, 0);
+	hdmi_write_reg(ip_data->base_wp, HDMI_WP_AUDIO_CFG, r);
+}
+
+static void ti_hdmi_5xxx_core_audio_config(struct hdmi_ip_data *ip_data,
+					struct hdmi_core_audio_config *cfg)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+	u8 val;
+
+	/* Mute audio before configuring */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCONF, 0xf, 7, 4);
+
+	/* Set the N parameter */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_N1, cfg->n, 7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_N2, cfg->n >> 8, 7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_N3, cfg->n >> 16, 3, 0);
+
+	/*
+	 * CTS manual mode. Automatic mode is not supported
+	 * when using audio parallel interface.
+	 */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS3, 1, 4, 4);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS1, cfg->cts, 7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS2, cfg->cts >> 8, 7, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS2,
+		cfg->cts >> 16, 3, 0);
+
+	/* Layout of Audio Sample Packets: 2-channel */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCONF, cfg->layout, 0, 0);
+
+	/* Configure IEC-609580 Validity bits */
+	/* Channel 0 is valid */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 0, 0, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 0, 4, 4);
+	/* Channels 1, 2, 3 are not valid */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 1, 1);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 5, 5);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 2, 2);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 6, 6);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 3, 3);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSV, 1, 7, 7);
+
+	/* Configure IEC-60958 User bits */
+	/* TODO: should be set by user. */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSU, 0, 7, 0);
+
+	/* Configure IEC-60958 Channel Status word */
+	/* CGMSA */
+	val = cfg->iec60958_cfg->status[5] & IEC958_AES5_CON_CGMSA;
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(0), val, 5, 4);
+
+	/* Copyright */
+	val = (cfg->iec60958_cfg->status[0] &
+			IEC958_AES0_CON_NOT_COPYRIGHT)>>2;
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(0), val, 0, 0);
+
+	/* Category */
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(1),
+		cfg->iec60958_cfg->status[1]);
+
+	/* PCM audio mode */
+	val = (cfg->iec60958_cfg->status[0] & IEC958_AES0_CON_MODE)>>6;
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(2), val, 6, 4);
+
+	/* Source number */
+	val = cfg->iec60958_cfg->status[2] & IEC958_AES2_CON_SOURCE;
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(2), val, 3, 4);
+
+	/* Channel number right 0  */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(3), 2, 3, 0);
+	/* Channel number right 1*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(3), 4, 7, 4);
+	/* Channel number right 2  */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(4), 6, 3, 0);
+	/* Channel number right 3*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(4), 8, 7, 4);
+	/* Channel number left 0  */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(5), 1, 3, 0);
+	/* Channel number left 1*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(5), 3, 7, 4);
+	/* Channel number left 2  */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(6), 5, 3, 0);
+	/* Channel number left 3*/
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(6), 7, 7, 4);
+
+	/* Clock accuracy and sample rate */
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(7),
+		cfg->iec60958_cfg->status[3]);
+
+	/* Original sample rate and word length */
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDSCHNLS(8),
+		cfg->iec60958_cfg->status[4]);
+
+	/* Enable FIFO empty and full interrupts */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_INT, 3, 3, 2);
+
+	/* Configure GPA */
+	/* select HBR/SPDIF interfaces */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CONF0, 0, 5, 5);
+	/* enable two channels in GPA */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF1, 3, 7, 0);
+	/* disable HBR */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GP_CONF2, 0, 0, 0);
+	/* Enable GPA FIFO full and empty mask */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_GP_MASK, 3, 1, 0);
+	/* Set polarity of GPA FIFO empty interrupts */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_GP_POL, 1, 0, 0);
+
+	/*Unmute audio */
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCONF, 0, 7, 4);
+}
+
+static void ti_hdmi_5xxx_core_audio_infoframe_cfg
+	(struct hdmi_ip_data *ip_data,
+	 struct snd_cea_861_aud_if *info_aud)
+{
+	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
+
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF0,
+		info_aud->db1_ct_cc);
+
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF1,
+		info_aud->db2_sf_ss);
+
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF2,
+		info_aud->db4_ca);
+
+	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_AUDICONF3,
+		info_aud->db5_dminh_lsv);
+}
+
+int ti_hdmi_5xxx_audio_config(struct hdmi_ip_data *ip_data,
+		struct snd_aes_iec958 *iec, struct snd_cea_861_aud_if *aud_if)
+{
+	struct hdmi_audio_format audio_format;
+	struct hdmi_audio_dma audio_dma;
+	struct hdmi_core_audio_config core;
+	int err, n, cts, channel_count;
+	unsigned int fs_nr;
+	bool word_length_16b = false;
+
+	if (!iec || !aud_if || !ip_data)
+		return -EINVAL;
+
+	core.iec60958_cfg = iec;
+
+	if (!(iec->status[4] & IEC958_AES4_CON_MAX_WORDLEN_24))
+		if (iec->status[4] & IEC958_AES4_CON_WORDLEN_20_16)
+			word_length_16b = true;
+
+	/* only 16-bit word length supported atm */
+	if (!word_length_16b)
+		return -EINVAL;
+
+	/* only 44.1kHz supported atm */
+	switch (iec->status[3] & IEC958_AES3_CON_FS) {
+	case IEC958_AES3_CON_FS_44100:
+		fs_nr = 44100;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	err = hdmi_compute_acr(fs_nr, &n, &cts);
+	core.n = n;
+	core.cts = cts;
+
+	/* Audio channels settings */
+	channel_count = (aud_if->db1_ct_cc & CEA861_AUDIO_INFOFRAME_DB1CC) + 1;
+
+	/* only 2 channels supported atm */
+	if (channel_count != 2)
+		return -EINVAL;
+
+	core.layout = HDMI_AUDIO_LAYOUT_2CH;
+
+	/* DMA settings */
+	if (word_length_16b)
+		audio_dma.transfer_size = 0x10;
+	else
+		audio_dma.transfer_size = 0x20;
+	audio_dma.block_size = 0xC0;
+	audio_dma.mode = HDMI_AUDIO_TRANSF_DMA;
+	audio_dma.fifo_threshold = 0x20; /* in number of samples */
+
+	/* audio FIFO format settings for 16-bit samples*/
+	audio_format.samples_per_word = HDMI_AUDIO_ONEWORD_TWOSAMPLES;
+	audio_format.sample_size = HDMI_AUDIO_SAMPLE_16BITS;
+	audio_format.justification = HDMI_AUDIO_JUSTIFY_LEFT;
+
+	/* only LPCM atm */
+	audio_format.type = HDMI_AUDIO_TYPE_LPCM;
+
+	/* disable start/stop signals of IEC 60958 blocks */
+	audio_format.en_sig_blk_strt_end = HDMI_AUDIO_BLOCK_SIG_STARTEND_ON;
+
+	/* configure DMA and audio FIFO format*/
+	ti_hdmi_4xxx_wp_audio_config_dma(ip_data, &audio_dma);
+	ti_hdmi_5xxx_wp_audio_config_format(ip_data, &audio_format);
+
+	/* configure the core*/
+	ti_hdmi_5xxx_core_audio_config(ip_data, &core);
+
+	/* configure CEA 861 audio infoframe*/
+	ti_hdmi_5xxx_core_audio_infoframe_cfg(ip_data, aud_if);
+
+	return 0;
+}
+
+void ti_hdmi_5xxx_wp_audio_enable(struct hdmi_ip_data *ip_data, bool enable)
+{
+	REG_FLD_MOD(ip_data->base_wp,
+		HDMI_WP_AUDIO_CTRL, enable, 31, 31);
+}
+
+void ti_hdmi_5xxx_audio_start(struct hdmi_ip_data *ip_data, bool enable)
+{
+	REG_FLD_MOD(ip_data->base_wp,
+		HDMI_WP_AUDIO_CTRL, enable, 30, 30);
+}
+
+#endif
