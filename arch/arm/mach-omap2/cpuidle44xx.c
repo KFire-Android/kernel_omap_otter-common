@@ -259,6 +259,7 @@ int __init omap4_idle_init(void)
 		dev->state_count++;
 		drv->state_count++;
 
+		clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu_id);
 		cpuidle_register_driver(&omap4_idle_driver);
 
 		if (cpuidle_register_device(dev)) {
