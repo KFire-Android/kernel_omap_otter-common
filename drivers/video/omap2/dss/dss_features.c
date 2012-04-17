@@ -698,6 +698,11 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.irq_handler		=	ti_hdmi_4xxx_irq_handler,
 	.irq_process		=	ti_hdmi_5xxx_irq_process,
 	.configure_range	=	ti_hdmi_5xxx_configure_range,
+#if defined(CONFIG_OMAP5_DSS_HDMI_AUDIO)
+	.audio_enable		=       ti_hdmi_5xxx_wp_audio_enable,
+	.audio_start		=       ti_hdmi_5xxx_audio_start,
+	.audio_config		=	ti_hdmi_5xxx_audio_config,
+#endif
 
 };
 
