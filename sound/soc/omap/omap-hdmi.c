@@ -229,9 +229,6 @@ static const struct snd_soc_dai_ops omap_hdmi_dai_ops = {
 static struct snd_soc_dai_driver omap_hdmi_dai = {
 	.playback = {
 		.channels_min = 2,
-		.channels_max = 8,
-		.rates = OMAP_HDMI_RATES,
-		.formats = OMAP_HDMI_FORMATS,
 	},
 	.ops = &omap_hdmi_dai_ops,
 };
@@ -285,6 +282,16 @@ static __devinit int omap_hdmi_probe(struct platform_device *pdev)
 
 	hdmi.dssdev = dssdev;
 
+	/* the supported rates and sample format depend on the cpu */
+	if (cpu_is_omap44xx()) {
+		omap_hdmi_dai.playback.rates = OMAP4_HDMI_RATES;
+		omap_hdmi_dai.playback.formats = OMAP4_HDMI_FORMATS;
+		omap_hdmi_dai.playback.channels_max	= 8;
+	} else { /* OMAP5 ES1.0 */
+		omap_hdmi_dai.playback.rates = OMAP5_HDMI_RATES;
+		omap_hdmi_dai.playback.formats = OMAP5_HDMI_FORMATS;
+		omap_hdmi_dai.playback.channels_max	= 2;
+	}
 	ret = snd_soc_register_dai(&pdev->dev, &omap_hdmi_dai);
 	return ret;
 }
