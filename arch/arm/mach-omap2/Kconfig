@@ -186,6 +186,13 @@ config MACH_OMAP3EVM
 	default y
 	select OMAP_PACKAGE_CBB
 
+config FORCE_SILICON_PERFORMANCE
+	bool "Force SILICON_TYPE_PERFORMANCE setting (1.2Ghz)"
+	depends on MACH_OMAP_4430_KC1
+	default N
+	help
+	  Enables the SILICON_TYPE_PERFORMANCE flag for CPU settings.  This puts the OMAP4430's max at 1.2Ghz.
+
 config WIFI_CONTROL_FUNC
 	bool "Enable WiFi control function abstraction"
 	depends on MACH_OMAP_4430_KC1 || MACH_OMAP_4430SDP || MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3
