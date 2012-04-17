@@ -79,6 +79,11 @@ config OMAP5_DSS_HDMI
 	help
 	    HDMI Interface.This add the High Deinition Multimedia Interface.
 	    See http://wwww.hdmi.org/ for HDMI specification.
+
+config OMAP5_DSS_HDMI_AUDIO
+	bool
+	depends on OMAP5_DSS_HDMI
+
 config OMAP2_DSS_SDI
 	bool "SDI support"
 	depends on ARCH_OMAP3
