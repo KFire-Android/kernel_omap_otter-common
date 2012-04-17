@@ -197,6 +197,8 @@ static const char *gc_power_string(enum gcpower power)
 		return "GCPWR_OFF";
 	case GCPWR_ON:
 		return "GCPWR_ON";
+	case GCPWR_LOW:
+		return "GCPWR_LOW";
 	}
 
 	return "unknown";
