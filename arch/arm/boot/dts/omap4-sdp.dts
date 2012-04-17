@@ -37,6 +37,16 @@
 		regulator-boot-on;
 	};
 
+	quart_eth: fixedregulator@1 {
+		compatible = "regulator-fixed";
+		regulator-name = "QUART_ETH";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio5 10 0>;  /* gpio line 138 */
+		enable-active-high;
+		regulator-boot-on;
+	};
+
 	leds {
 		compatible = "gpio-leds";
 		debug0 {
@@ -299,6 +309,7 @@
 		interrupt-parent = <&gpio2>;
 		interrupts = <2>; /* gpio line 34 */
 		vdd-supply = <&vdd_eth>;
+		enable-active-high;
 	};
 };
 
