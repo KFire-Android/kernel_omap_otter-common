@@ -1192,6 +1192,7 @@ static struct platform_driver hsi_pdriver = {
 #endif
 		   },
 	.id_table = hsi_id_table,
+	.probe = hsi_platform_device_probe,
 	.remove = __exit_p(hsi_platform_device_remove),
 };
 
@@ -1214,9 +1215,10 @@ static int __init hsi_driver_init(void)
 		pr_warn(LOG_NAME "HSI debugfs failed %d\n", err);
 
 	/* Register the HSI platform driver */
-	err = platform_driver_probe(&hsi_pdriver, hsi_platform_device_probe);
+	err = platform_driver_register(&hsi_pdriver);
 	if (err < 0) {
-		pr_err(LOG_NAME "Platform DRIVER register FAILED: %d\n", err);
+		pr_err(LOG_NAME "%s: hsi platform driver register failed: %d\n",
+			__func__, err);
 		goto rback2;
 	}
 
