@@ -103,6 +103,8 @@ static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
 		pdata->regs->clr_dataout = OMAP4_GPIO_CLEARDATAOUT;
 		pdata->regs->irqstatus = OMAP4_GPIO_IRQSTATUS0;
 		pdata->regs->irqstatus2 = OMAP4_GPIO_IRQSTATUS1;
+		pdata->regs->irqstatus_set_0 = OMAP4_GPIO_IRQSTATUSSET0;
+		pdata->regs->irqstatus_clr_0 = OMAP4_GPIO_IRQSTATUSCLR0;
 		pdata->regs->irqenable = OMAP4_GPIO_IRQSTATUSSET0;
 		pdata->regs->irqenable2 = OMAP4_GPIO_IRQSTATUSSET1;
 		pdata->regs->set_irqenable = OMAP4_GPIO_IRQSTATUSSET0;
