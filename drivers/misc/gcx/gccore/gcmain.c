@@ -26,8 +26,12 @@
 #include <linux/dma-mapping.h>
 #include <plat/cpu.h>
 #include <linux/debugfs.h>
+#include <plat/omap_gcx.h>
+#include <linux/delay.h>
 
 #include "gcmain.h"
+
+#define GC_ENABLE_SUSPEND
 
 #define GCZONE_ALL		(~0U)
 #define GCZONE_CONTEXT		(1 << 0)
@@ -45,6 +49,7 @@
 #define DEVICE_INT	(32 + 125)
 #define DEVICE_REG_BASE	0x59000000
 #define DEVICE_REG_SIZE	(32 * 1024)
+#define GC_POLL_PRCM_STBY 100
 
 /* Driver context structure. */
 struct gccontext {
@@ -74,6 +79,7 @@ static struct gccontextmap *g_mapvacant;
 static int g_clientref;
 
 static void *g_reg_base;
+static struct omap_gcx_platform_data *g_gcxplat;
 
 static enum gcerror find_context(struct gccontextmap **context, int create)
 {
@@ -555,23 +561,26 @@ exit:
 
 void gcpwr_disable_clock(enum gcpower prevstate)
 {
-	if (g_clockenabled) {
-		/* Signal software idle. */
-		gc_write_reg(GC_GP_OUT0_Address, 1);
+	u32 trys = 0;
+	if (!g_clockenabled)
+		return;
 
-		/* Disable the clock. */
-		clk_disable(g_bb2d_clk);
+	gc_debug_poweroff_cache();
 
-		/* Clock disabled. */
-		g_clockenabled = false;
-		GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
+	/* Signal software idle. */
+	gc_write_reg(GC_GP_OUT0_Address, 1);
+	while (!g_gcxplat->prcm_bb2d_idlest() && ++trys != GC_POLL_PRCM_STBY)
+		udelay(100);
+	/* Not much we can do here, so assert */
+	WARN(trys == GC_POLL_PRCM_STBY, "gccore device not in idle\n");
+	/* Disable the clock. */
+	clk_disable(g_bb2d_clk);
+
+	/* Clock disabled. */
+	g_clockenabled = false;
+	GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
 			"clock disabled.\n",
 			__func__, __LINE__);
-	} else {
-		GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
-			"clock is already disabled.\n",
-			__func__, __LINE__);
-	}
 }
 
 void gcpwr_enable_pulse_skipping(enum gcpower prevstate)
@@ -676,10 +685,7 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 			break;
 
 		case GCPWR_OFF:
-			gc_debug_poweroff_cache();
-
 			gcpwr_disable_clock(g_gcpower);
-
 			if (g_irqenabled) {
 				disable_irq(DEVICE_INT);
 				g_irqenabled = false;
@@ -966,6 +972,7 @@ EXPORT_SYMBOL(gc_unmap);
 
 static int gc_probe(struct platform_device *pdev)
 {
+	g_gcxplat = (struct omap_gcx_platform_data *)pdev->dev.platform_data;
 	return 0;
 }
 
@@ -974,7 +981,6 @@ static int gc_suspend(struct platform_device *pdev, pm_message_t s)
 {
 	GCPRINT(GCDBGFILTER, GCZONE_POWER, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
-
 	if (gc_set_power(GCPWR_OFF))
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
 			"suspend failure.\n",
