@@ -377,9 +377,12 @@ struct omap_hwmod_omap2_prcm {
 
 /**
  * struct omap_hwmod_omap4_prcm - OMAP4-specific PRCM data
- * @clkctrl_reg: PRCM address of the clock control register
- * @rstctrl_reg: address of the XXX_RSTCTRL register located in the PRM
+ * @clkctrl_offs: offset of the PRCM clock control register
+ * @rstctrl_offs: offset of the XXX_RSTCTRL register located in the PRM
+ * @context_offs: offset of the RM_*_CONTEXT register
  * @submodule_wkdep_bit: bit shift of the WKDEP range
+ * @modulemode: allowable modulemodes
+ * @context_lost_counter: Count of module level context lost
  */
 struct omap_hwmod_omap4_prcm {
 	u16		clkctrl_offs;
@@ -387,6 +390,7 @@ struct omap_hwmod_omap4_prcm {
 	u16		context_offs;
 	u8		submodule_wkdep_bit;
 	u8		modulemode;
+	unsigned	context_lost_counter;
 };
 
 
