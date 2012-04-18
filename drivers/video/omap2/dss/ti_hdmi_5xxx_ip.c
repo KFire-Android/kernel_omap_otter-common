@@ -884,7 +884,7 @@ static void ti_hdmi_5xxx_core_audio_config(struct hdmi_ip_data *ip_data,
 	/* Enable GPA FIFO full and empty mask */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_GP_MASK, 3, 1, 0);
 	/* Set polarity of GPA FIFO empty interrupts */
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_GP_POL, 1, 0, 0);
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_GB_POL, 1, 0, 0);
 
 	/*Unmute audio */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_AUDSCONF, 0, 7, 4);
