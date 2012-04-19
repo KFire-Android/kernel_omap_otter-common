@@ -559,6 +559,12 @@ void __init omap_5430evm_init_early(void)
 	omap2_set_globals_543x();
 	omap5xxx_check_revision();
 	omap_common_init_early();
+	omap54xx_voltagedomains_init();
+	omap54xx_powerdomains_init();
+	omap54xx_clockdomains_init();
+	omap54xx_hwmod_init();
+	omap_hwmod_init_postsetup();
+	omap5xxx_clk_init();
 }
 #endif
 
