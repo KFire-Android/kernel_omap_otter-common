@@ -80,12 +80,21 @@ static inline void omap44xx_map_common_io(void)
 }
 #endif
 
+#ifdef CONFIG_ARCH_OMAP5
+extern void omap54xx_map_common_io(void);
+#else
+static inline void omap54xx_map_common_io(void)
+{
+}
+#endif
+
 extern void omap2_init_common_infrastructure(void);
 
 extern struct sys_timer omap2_timer;
 extern struct sys_timer omap3_timer;
 extern struct sys_timer omap3_secure_timer;
 extern struct sys_timer omap4_timer;
+extern struct sys_timer omap5_timer;
 
 void omap2420_init_early(void);
 void omap2430_init_early(void);
@@ -96,6 +105,7 @@ void omap3_init_early(void);	/* Do not use this one */
 void am35xx_init_early(void);
 void ti81xx_init_early(void);
 void omap4430_init_early(void);
+void omap_5430evm_init_early(void);
 void omap_prcm_restart(char, const char *);
 
 /*
@@ -113,12 +123,14 @@ struct omap_globals {
 	void __iomem	*prm;            /* Power and Reset Management */
 	void __iomem	*cm;             /* Clock Management */
 	void __iomem	*cm2;
+	void __iomem	*prcm_mpu;
 };
 
 void omap2_set_globals_242x(void);
 void omap2_set_globals_243x(void);
 void omap2_set_globals_3xxx(void);
 void omap2_set_globals_443x(void);
+void omap2_set_globals_543x(void);
 void omap2_set_globals_ti81xx(void);
 void omap2_set_globals_am33xx(void);
 
@@ -133,6 +145,7 @@ void omap243x_map_io(void);
 void omap3_map_io(void);
 void am33xx_map_io(void);
 void omap4_map_io(void);
+void omap5_map_io(void);
 void ti81xx_map_io(void);
 void omap_barriers_init(void);
 
