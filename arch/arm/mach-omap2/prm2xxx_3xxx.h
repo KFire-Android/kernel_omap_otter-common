@@ -232,8 +232,9 @@
  * Stub omap2xxx/omap3xxx functions so that common files
  * continue to build when custom builds are used
  */
-#if defined(CONFIG_ARCH_OMAP4) && !(defined(CONFIG_ARCH_OMAP2) ||	\
-					defined(CONFIG_ARCH_OMAP3))
+#if (defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)) && \
+		!(defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
+
 static inline u32 omap2_prm_read_mod_reg(s16 module, u16 idx)
 {
 	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
