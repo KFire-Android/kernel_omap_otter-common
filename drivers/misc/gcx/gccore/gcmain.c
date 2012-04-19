@@ -44,7 +44,7 @@
 
 #define DEVICE_INT	(32 + 125)
 #define DEVICE_REG_BASE	0x59000000
-#define DEVICE_REG_SIZE	(256 * 1024)
+#define DEVICE_REG_SIZE	(32 * 1024)
 
 #define GC_ENABLE_SUSPEND 0
 
@@ -627,9 +627,9 @@ void gcpwr_disable_pulse_skipping(enum gcpower prevstate)
 		return;
 
 	if (g_pulseskipping) {
-		/* Set the min l3 data throughput to 2.5 GB. */
+		/* Set the min l3 data throughput */
 		omap_pm_set_min_bus_tput(g_bb2d_dev, OCP_INITIATOR_AGENT,
-						0xA0000000);
+						200*1000*4);
 
 		/* Enable loading and set to maximum value. */
 		gcclockcontrol.reg.pulsecount = 64;

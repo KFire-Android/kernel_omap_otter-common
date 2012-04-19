@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/string.h>
+#include <plat/cpu.h>
 
 #define GCZONE_ALL		(~0U)
 #define GCZONE_INIT		(1 << 0)
@@ -369,7 +370,10 @@ static struct device *dev_object;
 
 static int dev_open(struct inode *inode, struct file *file)
 {
-	return 0;
+	if (cpu_is_omap447x())
+		return 0;
+	else
+		return -1;
 }
 
 static int dev_release(struct inode *inode, struct file *file)

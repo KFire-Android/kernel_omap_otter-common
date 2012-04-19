@@ -53,6 +53,10 @@ static struct iommu_platform_data omap3_devices_data[] = {
 #endif
 
 #ifdef CONFIG_ARCH_OMAP4
+
+#define SET_DSP_CONSTRAINT	10
+#define SET_MPU_CORE_CONSTRAINT	10
+
 static struct iommu_platform_data omap4_devices_data[] = {
 	{
 		.name = "ducati",
@@ -60,6 +64,7 @@ static struct iommu_platform_data omap4_devices_data[] = {
 		.nr_tlb_entries = 32,
 		.da_start = 0x0,
 		.da_end = 0xFFFFF000,
+		.pm_constraint = SET_MPU_CORE_CONSTRAINT,
 	},
 	{
 		.name = "tesla",
@@ -67,6 +72,7 @@ static struct iommu_platform_data omap4_devices_data[] = {
 		.nr_tlb_entries = 32,
 		.da_start = 0x0,
 		.da_end = 0xFFFFF000,
+		.pm_constraint = SET_DSP_CONSTRAINT,
 	},
 };
 #define NR_OMAP4_IOMMU_DEVICES ARRAY_SIZE(omap4_devices_data)

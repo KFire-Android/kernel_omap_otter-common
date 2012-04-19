@@ -20,6 +20,7 @@
 #include "bvblend.h"
 #include "bvfilter.h"
 #include "bvbuffdesc.h"
+#include "bvcache.h"
 #include "bventry.h"
 #include "bvsurfgeom.h"
 

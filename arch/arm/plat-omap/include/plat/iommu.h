@@ -56,6 +56,7 @@ struct iommu {
 	u32 da_end;
 	struct platform_device *pdev;
 	struct pm_qos_request_list *qos_request;
+	unsigned int pm_constraint;
 	void *secure_ttb;
 	bool secure_mode;
 };
@@ -114,6 +115,7 @@ struct iommu_platform_data {
 	u32 da_start;
 	u32 da_end;
 	int irq;
+	unsigned int pm_constraint;
 	void __iomem *io_base;
 };
 

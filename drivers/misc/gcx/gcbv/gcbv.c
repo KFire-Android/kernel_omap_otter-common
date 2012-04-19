@@ -179,7 +179,7 @@ struct gcblit {
 struct gcbatch {
 	unsigned int structsize;	/* Used to ID structure version. */
 
-	unsigned int dstchanged;	/* Destination change flag. */
+	unsigned long batchflags;	/* Batch change flags. */
 
 	gcbatchend batchend;		/* Pointer to the function to finilize
 					   the current operation. */
@@ -189,6 +189,13 @@ struct gcbatch {
 	int deltatop;
 	int deltaright;
 	int deltabottom;
+
+#if GCDEBUG_ENABLE
+	struct bvrect prevdstrect;	/* Rectangle validation. */
+	struct bvrect prevsrc1rect;
+	struct bvrect prevsrc2rect;
+	struct bvrect prevmaskrect;
+#endif
 
 	unsigned int size;		/* Total size of the command buffer. */
 
@@ -318,15 +325,15 @@ do { \
 	bltparams->errdesc = gccontext.bverrorstr; \
 } while (0)
 
-#define BVERR_DESC		0
-#define BVERR_DESC_VERS		1
-#define BVERR_DESC_VIRTADDR	2
-#define BVERR_TILE		3
-#define BVERR_TILE_VERS		4
-#define BVERR_TILE_VIRTADDR	5
-#define BVERR_GEOM		6
-#define BVERR_GEOM_VERS		7
-#define BVERR_GEOM_FORMAT	8
+#define GCBVERR_DESC		0
+#define GCBVERR_DESC_VERS	1
+#define GCBVERR_DESC_VIRTADDR	2
+#define GCBVERR_TILE		3
+#define GCBVERR_TILE_VERS	4
+#define GCBVERR_TILE_VIRTADDR	5
+#define GCBVERR_GEOM		6
+#define GCBVERR_GEOM_VERS	7
+#define GCBVERR_GEOM_FORMAT	8
 
 struct bvsurferrorid {
 	char *id;
@@ -339,31 +346,31 @@ struct bvsurferror {
 };
 
 static struct bvsurferror g_surferr[] = {
-	/* BVERR_DESC */
+	/* GCBVERR_DESC */
 	{    0, "%s(%d): %s desc structure is not set" },
 
-	/* BVERR_DESC_VERS */
+	/* GCBVERR_DESC_VERS */
 	{  100, "%s(%d): %s desc structure has invalid size" },
 
-	/* BVERR_DESC_VIRTADDR */
+	/* GCBVERR_DESC_VIRTADDR */
 	{  200, "%s(%d): %s desc virtual pointer is not set" },
 
-	/* BVERR_TILE: FIXME/TODO define error code */
+	/* GCBVERR_TILE: FIXME/TODO define error code */
 	{    0, "%s(%d): %s tileparams structure is not set" },
 
-	/* BVERR_TILE_VERS */
+	/* GCBVERR_TILE_VERS */
 	{ 3000, "%s(%d): %s tileparams structure has invalid size" },
 
-	/* BVERR_TILE_VIRTADDR: FIXME/TODO define error code */
+	/* GCBVERR_TILE_VIRTADDR: FIXME/TODO define error code */
 	{  200, "%s(%d): %s tileparams virtual pointer is not set" },
 
-	/* BVERR_GEOM */
+	/* GCBVERR_GEOM */
 	{ 1000, "%s(%d): %s geom structure is not set" },
 
-	/* BVERR_GEOM_VERS */
+	/* GCBVERR_GEOM_VERS */
 	{ 1100, "%s(%d): %s geom structure has invalid size" },
 
-	/* BVERR_GEOM_FORMAT */
+	/* GCBVERR_GEOM_FORMAT */
 	{ 1200, "%s(%d): %s invalid format specified" },
 };
 
@@ -371,44 +378,6 @@ static struct bvsurferrorid g_destsurferr = { "dst",  BVERR_DSTDESC };
 static struct bvsurferrorid g_src1surferr = { "src1", BVERR_SRC1DESC };
 static struct bvsurferrorid g_src2surferr = { "src2", BVERR_SRC2DESC };
 static struct bvsurferrorid g_masksurferr = { "mask", BVERR_MASKDESC };
-
-/*******************************************************************************
- * Threads etc... TBD
- */
-
-#if 0
-#define MAX_THRD 1
-static pthread_t id[MAX_THRD];
-
-/* TODO: check that we aren't using more logic than we need */
-static void sig_handler(int sig)
-{
-	GC_PRINT(GC_INFO_MSG " %s(%d): %lx:%d\n", __func__, __LINE__,
-		(unsigned long) pthread_self(), sig);
-	sleep(2); sched_yield();
-}
-
-/* TODO: check that we aren't using more logic than we need */
-static void *thread(void *p)
-{
-	int r = 0;
-	sigset_t set;
-	struct sigaction sa;
-
-	sigemptyset(&set);
-	sa.sa_handler = sig_handler;
-	sa.sa_flags = SA_RESTART;
-	sigaction(SIGUSR1, &sa, NULL);
-
-	while (1) {
-		GC_PRINT(GC_INFO_MSG " %s(%d)\n", __func__, __LINE__);
-		sigwait(&set, &r);
-		GC_PRINT(GC_INFO_MSG " %s(%d)\n", __func__, __LINE__);
-	}
-
-	return NULL;
-}
-#endif
 
 /*******************************************************************************
  * Memory management.
@@ -425,6 +394,7 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 	struct bvbuffmap *bvbuffmap;
 	struct bvbuffmapinfo *bvbuffmapinfo;
 	struct gcmap gcmap;
+	struct bvphysdesc *physdesc;
 
 	/* Try to find existing mapping. */
 	bvbuffmap = buffdesc->map;
@@ -483,8 +453,13 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 	gcmap.logical = 0;
 	gcmap.size = buffdesc->length;
 	gcmap.handle = 0;
-	gcmap.pagecount = buffdesc->pagecount;
-	gcmap.pagearray = buffdesc->pagearray;
+	if (buffdesc->auxtype == BVAT_PHYSDESC) {
+		physdesc = buffdesc->auxptr;
+		gcmap.pagecount = physdesc->pagecount;
+		gcmap.pagearray = physdesc->pagearray;
+		/* TODO: structsize needs to be checked to validate the
+		 * version */
+	}
 
 	gc_map(&gcmap);
 
@@ -2054,39 +2029,36 @@ static int verify_surface(unsigned int tile,
 {
 	if (tile) {
 		if (surf->tileparams == NULL)
-			return BVERR_TILE;
+			return GCBVERR_TILE;
 
 		if (surf->tileparams->structsize <
 		    STRUCTSIZE(surf->tileparams, srcheight))
-			return BVERR_TILE_VERS;
+			return GCBVERR_TILE_VERS;
 
 #if 0
 		if (surf->tileparams->virtaddr == NULL)
-			return BVERR_TILE_VIRTADDR;
+			return GCBVERR_TILE_VIRTADDR;
 #endif
-
 		/* FIXME/TODO */
-		return BVERR_TILE;
+		return GCBVERR_TILE;
 	} else {
 		if (surf->desc == NULL)
-			return BVERR_DESC;
+			return GCBVERR_DESC;
 
 		if (surf->desc->structsize < STRUCTSIZE(surf->desc, map))
-			return BVERR_DESC_VERS;
+			return GCBVERR_DESC_VERS;
 
 #if 0
 		if (surf->desc->virtaddr == NULL)
-			return BVERR_DESC_VIRTADDR;
+			return GCBVERR_DESC_VIRTADDR;
 #endif
 	}
 
 	if (geom == NULL)
-		return BVERR_GEOM;
+		return GCBVERR_GEOM;
 
-#if 0
 	if (geom->structsize < STRUCTSIZE(geom, palette))
-		return BVERR_GEOM_VERS;
-#endif
+		return GCBVERR_GEOM_VERS;
 
 #if GCDEBUG_ENABLE
 	{
@@ -2144,11 +2116,6 @@ static int verify_surface(unsigned int tile,
 #	define VERIFYBATCH(changeflags, prevrect, currrect) \
 		verify_batch(__func__, __LINE__, \
 				changeflags, prevrect, currrect)
-
-static struct bvrect g_prevdstrect;
-static struct bvrect g_prevsrc1rect;
-static struct bvrect g_prevsrc2rect;
-static struct bvrect g_prevmaskrect;
 
 static void verify_batch(const char *function, int line,
 				unsigned int changeflags,
@@ -2208,21 +2175,30 @@ static void verify_batch(const char *function, int line,
  * Primitive renderers.
  */
 
-static enum bverror set_dst(struct bvbltparams *bltparams,
-				struct gcbatch *batch,
-				struct bvbuffmap *dstmap)
+static enum bverror set_clip(struct bvbltparams *bltparams,
+				struct gcbatch *batch)
 {
-	enum bverror bverror;
-	struct bvsurfgeom *dstgeom = bltparams->dstgeom;
+	enum bverror bverror = BVERR_NONE;
 	struct bvrect *dstrect = &bltparams->dstrect;
 	struct bvrect *cliprect = &bltparams->cliprect;
 	int destleft, desttop, destright, destbottom;
 	int clipleft, cliptop, clipright, clipbottom;
 	int clippedleft, clippedtop, clippedright, clippedbottom;
-	struct gcmodst *gcmodst;
+	struct gcmoclip *gcmoclip;
 
-	GCPRINT(GCDBGFILTER, GCZONE_DEST, "++" GC_MOD_PREFIX
+	GCPRINT(GCDBGFILTER, GCZONE_CLIP, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
+
+	/* Did clipping/destination rects change? */
+	if ((batch->batchflags & (BVBATCH_CLIPRECT_ORIGIN |
+					BVBATCH_CLIPRECT_SIZE |
+					BVBATCH_DSTRECT_ORIGIN |
+					BVBATCH_DSTRECT_SIZE)) == 0)
+		goto exit;
+
+	GCPRINT(GCDBGFILTER, GCZONE_CLIP, GC_MOD_PREFIX
+		"destination clipping changed.\n",
+		__func__, __LINE__);
 
 	/* Determine destination rectangle. */
 	destleft = dstrect->left;
@@ -2292,6 +2268,76 @@ static enum bverror set_dst(struct bvbltparams *bltparams,
 	batch->gcblit.rect.right = clippedright;
 	batch->gcblit.rect.bottom = clippedbottom;
 
+	/* Allocate command buffer. */
+	bverror = claim_buffer(batch, sizeof(struct gcmoclip),
+				(void **) &gcmoclip);
+	if (bverror != BVERR_NONE) {
+		BVSETBLTERROR(BVERR_OOM,
+				"failed to allocate command buffer");
+		goto exit;
+	}
+
+	/* Set clipping. */
+	gcmoclip->lt_ldst = gcmoclip_lt_ldst;
+	gcmoclip->lt.reg.left = clipleft;
+	gcmoclip->lt.reg.top = cliptop;
+	gcmoclip->rb.reg.right = clipright;
+	gcmoclip->rb.reg.bottom = clipbottom;
+
+	GCPRINT(GCDBGFILTER, GCZONE_CLIP, GC_MOD_PREFIX
+		"destination rectangle:\n",
+		__func__, __LINE__);
+
+	GCPRINT(GCDBGFILTER, GCZONE_CLIP, GC_MOD_PREFIX
+		"  dstrect = (%d,%d)-(%d,%d), %dx%d\n",
+		__func__, __LINE__,
+		destleft, desttop, destright, destbottom,
+		destright - destleft, destbottom - desttop);
+
+	GCPRINT(GCDBGFILTER, GCZONE_CLIP, GC_MOD_PREFIX
+		"  clipping rect = (%d,%d)-(%d,%d), %dx%d\n",
+		__func__, __LINE__,
+		clipleft, cliptop, clipright, clipbottom,
+		clipright - clipleft, clipbottom - cliptop);
+
+	GCPRINT(GCDBGFILTER, GCZONE_CLIP, GC_MOD_PREFIX
+		"  clipping delta = (%d,%d)-(%d,%d)\n",
+		__func__, __LINE__,
+		batch->deltaleft, batch->deltatop,
+		batch->deltaright, batch->deltabottom);
+
+	GCPRINT(GCDBGFILTER, GCZONE_CLIP, GC_MOD_PREFIX
+		"  clipped dstrect = (%d,%d)-(%d,%d), %dx%d\n",
+		__func__, __LINE__,
+		clippedleft, clippedtop, clippedright, clippedbottom,
+		clippedright - clippedleft, clippedbottom - clippedtop);
+
+exit:
+	GCPRINT(GCDBGFILTER, GCZONE_CLIP, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	return bverror;
+}
+
+static enum bverror set_dst(struct bvbltparams *bltparams,
+				struct gcbatch *batch,
+				struct bvbuffmap *dstmap)
+{
+	enum bverror bverror = BVERR_NONE;
+	struct bvsurfgeom *dstgeom = bltparams->dstgeom;
+	struct gcmodst *gcmodst;
+
+	GCPRINT(GCDBGFILTER, GCZONE_DEST, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	/* Did destination surface change? */
+	if ((batch->batchflags & BVBATCH_DST) == 0)
+		goto exit;
+
+	GCPRINT(GCDBGFILTER, GCZONE_DEST, GC_MOD_PREFIX
+		"destination surface changed.\n",
+		__func__, __LINE__);
+
 	/* Parse the destination format. */
 	if (!parse_format(dstgeom->format, &batch->gcblit.format)) {
 		BVSETBLTERRORARG(BVERR_DSTGEOM_FORMAT,
@@ -2309,56 +2355,26 @@ static enum bverror set_dst(struct bvbltparams *bltparams,
 		goto exit;
 	}
 
-	memset(gcmodst, 0, sizeof(struct gcmodst));
-
-	GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
-		"allocated %d of commmand buffer\n",
-		__func__, __LINE__, sizeof(struct gcmodst));
-
-	GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
+	GCPRINT(GCDBGFILTER, GCZONE_DEST, GC_MOD_PREFIX
 		"destination surface:\n",
 		__func__, __LINE__);
 
-	GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
+	GCPRINT(GCDBGFILTER, GCZONE_DEST, GC_MOD_PREFIX
 		"  dstvirtaddr = 0x%08X\n",
 		__func__, __LINE__,
 		(unsigned int) bltparams->dstdesc->virtaddr);
 
-	GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
+	GCPRINT(GCDBGFILTER, GCZONE_DEST, GC_MOD_PREFIX
 		"  dstaddr = 0x%08X\n",
 		__func__, __LINE__,
 		GET_MAP_HANDLE(dstmap));
 
-	GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
+	GCPRINT(GCDBGFILTER, GCZONE_DEST, GC_MOD_PREFIX
 		"  dstsurf = %dx%d, stride = %ld\n",
 		__func__, __LINE__,
 		dstgeom->width,
 		dstgeom->height,
 		dstgeom->virtstride);
-
-	GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
-		"  dstrect = (%d,%d)-(%d,%d), %dx%d\n",
-		__func__, __LINE__,
-		destleft, desttop, destright, destbottom,
-		destright - destleft, destbottom - desttop);
-
-	GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
-		"  clipping rect = (%d,%d)-(%d,%d), %dx%d\n",
-		__func__, __LINE__,
-		clipleft, cliptop, clipright, clipbottom,
-		clipright - clipleft, clipbottom - cliptop);
-
-	GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
-		"  clipping delta = (%d,%d)-(%d,%d)\n",
-		__func__, __LINE__,
-		batch->deltaleft, batch->deltatop,
-		batch->deltaright, batch->deltabottom);
-
-	GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
-		"  clipped dstrect = (%d,%d)-(%d,%d), %dx%d\n",
-		__func__, __LINE__,
-		clippedleft, clippedtop, clippedright, clippedbottom,
-		clippedright - clippedleft, clippedbottom - clippedtop);
 
 	/* Add the address fixup. */
 	add_fixup(batch, &gcmodst->address, 0);
@@ -2372,13 +2388,6 @@ static enum bverror set_dst(struct bvbltparams *bltparams,
 	gcmodst->rotation.reg.surf_width = dstgeom->width;
 	gcmodst->rotationheight_ldst = gcmodst_rotationheight_ldst;
 	gcmodst->rotationheight.reg.height = dstgeom->height;
-
-	/* Set clipping. */
-	gcmodst->clip.lt_ldst = gcmoclip_lt_ldst;
-	gcmodst->clip.lt.reg.left = clipleft;
-	gcmodst->clip.lt.reg.top = cliptop;
-	gcmodst->clip.rb.reg.right = clipright;
-	gcmodst->clip.rb.reg.bottom = clipbottom;
 
 exit:
 	GCPRINT(GCDBGFILTER, GCZONE_DEST, "--" GC_MOD_PREFIX
@@ -2407,24 +2416,22 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	if (bverror != BVERR_NONE)
 		goto exit;
 
-	/* Did destination change? */
-	if (batch->dstchanged) {
-		GCPRINT(GCDBGFILTER, GCZONE_DO_FILL, GC_MOD_PREFIX
-			"destination changed, applying new parameters\n",
-			__func__, __LINE__);
-
-		/* Map the destination. */
-		bverror = do_map(bltparams->dstdesc, 0, &dstmap);
-		if (bverror != BVERR_NONE) {
-			bltparams->errdesc = gccontext.bverrorstr;
-			goto exit;
-		}
-
-		/* Set the new destination. */
-		bverror = set_dst(bltparams, batch, dstmap);
-		if (bverror != BVERR_NONE)
-			goto exit;
+	/* Map the destination. */
+	bverror = do_map(bltparams->dstdesc, 0, &dstmap);
+	if (bverror != BVERR_NONE) {
+		bltparams->errdesc = gccontext.bverrorstr;
+		goto exit;
 	}
+
+	/* Update clipping/destination rect if necessary. */
+	bverror = set_clip(bltparams, batch);
+	if (bverror != BVERR_NONE)
+		goto exit;
+
+	/* Set the new destination. */
+	bverror = set_dst(bltparams, batch, dstmap);
+	if (bverror != BVERR_NONE)
+		goto exit;
 
 	/* Parse the source format. */
 	if (!parse_format(srcdesc->geom->format, &srcformat)) {
@@ -2495,10 +2502,6 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 
 	/* Set destination rectangle. */
 	gcmofill->start.rect = batch->gcblit.rect;
-
-	/* Flush PE cache. */
-	gcmofill->start.flush.flush_ldst = gcmoflush_flush_ldst;
-	gcmofill->start.flush.flush.reg = gcregflush_pe2D;
 
 exit:
 	if (dstmap != NULL) {
@@ -2588,10 +2591,6 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 	/* Set destination rectangle. */
 	gcmostart->rect = batch->gcblit.rect;
 
-	/* Flush PE cache. */
-	gcmostart->flush.flush_ldst = gcmoflush_flush_ldst;
-	gcmostart->flush.flush.reg = gcregflush_pe2D;
-
 	/* Reset the finalizer. */
 	batch->batchend = do_end;
 
@@ -2636,28 +2635,33 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		"\n", __func__, __LINE__);
 
 	/* Did destination change? */
-	if (batch->dstchanged) {
-		GCPRINT(GCDBGFILTER, GCZONE_DO_BLIT, GC_MOD_PREFIX
-			"destination changed, applying new parameters\n",
-			__func__, __LINE__);
-
+	if ((batch->batchflags & (BVBATCH_DST |
+					BVBATCH_CLIPRECT_ORIGIN |
+					BVBATCH_CLIPRECT_SIZE |
+					BVBATCH_DSTRECT_ORIGIN |
+					BVBATCH_DSTRECT_SIZE)) != 0) {
 		/* Finalize the previous blit if any. */
 		bverror = batch->batchend(bltparams, batch);
 		if (bverror != BVERR_NONE)
 			goto exit;
-
-		/* Map the destination. */
-		bverror = do_map(bltparams->dstdesc, 0, &dstmap);
-		if (bverror != BVERR_NONE) {
-			bltparams->errdesc = gccontext.bverrorstr;
-			goto exit;
-		}
-
-		/* Set the new destination. */
-		bverror = set_dst(bltparams, batch, dstmap);
-		if (bverror != BVERR_NONE)
-			goto exit;
 	}
+
+	/* Map the destination. */
+	bverror = do_map(bltparams->dstdesc, 0, &dstmap);
+	if (bverror != BVERR_NONE) {
+		bltparams->errdesc = gccontext.bverrorstr;
+		goto exit;
+	}
+
+	/* Update clipping/destination rect if necessary. */
+	bverror = set_clip(bltparams, batch);
+	if (bverror != BVERR_NONE)
+		goto exit;
+
+	/* Set the new destination. */
+	bverror = set_dst(bltparams, batch, dstmap);
+	if (bverror != BVERR_NONE)
+		goto exit;
 
 	for (i = 0; i < srccount; i += 1) {
 		srcgeom = srcdesc[i].geom;
@@ -2995,7 +2999,7 @@ static enum bverror do_filter(struct bvbltparams *bltparams,
 	GCPRINT(GCDBGFILTER, GCZONE_DO_FILTER, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
 
-	BVSETBLTERROR(BVERR_UNK, "FIXME/TODO");
+	BVSETBLTERROR(BVERR_SRC1_HORZSCALE, "scaling not supported");
 
 	GCPRINT(GCDBGFILTER, GCZONE_DO_FILTER, "--" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
@@ -3064,7 +3068,7 @@ enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
 	/* FIXME/TODO: add check for initialization success. */
 
 	if (buffdesc == NULL) {
-		BVSETERROR(BVERR_UNK, "invalid argument");
+		BVSETERROR(BVERR_BUFFERDESC, "bvbuffdesc is NULL");
 		goto exit;
 	}
 
@@ -3106,7 +3110,7 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 	/* FIXME/TODO: add check for initialization success. */
 
 	if (buffdesc == NULL) {
-		BVSETERROR(BVERR_UNK, "invalid argument");
+		BVSETERROR(BVERR_BUFFERDESC, "bvbuffdesc is NULL");
 		goto exit;
 	}
 
@@ -3120,7 +3124,8 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 		return BVERR_NONE;
 
 	if (bvbuffmap->structsize < STRUCTSIZE(bvbuffmap, nextmap)) {
-		BVSETERROR(BVERR_UNK, "invalid map structure size");
+		BVSETERROR(BVERR_BUFFERDESC_VERS,
+			"unsupported bvbuffdesc version (structsize)");
 		goto exit;
 	}
 
@@ -3178,7 +3183,6 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	struct gcalpha *gca = NULL;
 	struct gcalpha _gca;
 	unsigned int op, type;
-	unsigned int batchflags;
 	unsigned int batchexec = 0;
 	bool nop = false;
 	struct gcbatch *batch;
@@ -3196,8 +3200,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 	/* Verify blt parameters structure. */
 	if (bltparams == NULL) {
-		BVSETERROR(BVERR_UNK,
-				"pointer to bvbltparams struct is expected");
+		BVSETERROR(BVERR_BLTPARAMS_VERS, "bvbltparams is NULL");
 		goto exit;
 	}
 
@@ -3233,7 +3236,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		}
 
 		batchexec = 1;
-		batchflags = 0x7FFFFFFF;
+		batch->batchflags = 0x7FFFFFFF;
 		break;
 
 	case (BVFLAG_BATCH_BEGIN >> BVFLAG_BATCH_SHIFT):
@@ -3250,7 +3253,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 		batchexec = 0;
 		bltparams->batchflags =
-		batchflags = 0x7FFFFFFF;
+		batch->batchflags = 0x7FFFFFFF;
 		break;
 
 	case (BVFLAG_BATCH_CONTINUE >> BVFLAG_BATCH_SHIFT):
@@ -3269,7 +3272,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		}
 
 		batchexec = 0;
-		batchflags = bltparams->batchflags;
+		batch->batchflags = bltparams->batchflags;
 		break;
 
 	case (BVFLAG_BATCH_END >> BVFLAG_BATCH_SHIFT):
@@ -3289,7 +3292,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 		batchexec = 1;
 		nop = (bltparams->batchflags & BVBATCH_ENDNOP) != 0;
-		batchflags = bltparams->batchflags;
+		batch->batchflags = bltparams->batchflags;
 		break;
 
 	default:
@@ -3299,23 +3302,11 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 	GCPRINT(GCDBGFILTER, GCZONE_BATCH, GC_MOD_PREFIX
 		"batchflags=0x%08X\n",
-		__func__, __LINE__, batchflags);
+		__func__, __LINE__, batch->batchflags);
 
 	if (!nop) {
-		/* Determine whether the destination has changed. */
-		batch->dstchanged = batchflags
-			& (BVBATCH_DST
-			| BVBATCH_DSTRECT_ORIGIN
-			| BVBATCH_DSTRECT_SIZE
-			| BVBATCH_CLIPRECT_ORIGIN
-			| BVBATCH_CLIPRECT_SIZE);
-
-		GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX
-			"dstchanged=%d\n",
-			__func__, __LINE__, (batch->dstchanged != 0));
-
 		/* Verify the batch change flags. */
-		VERIFYBATCH(batchflags >> 12, &g_prevdstrect,
+		VERIFYBATCH(batch->batchflags >> 12, &batch->prevdstrect,
 				&bltparams->dstrect);
 
 		switch (op) {
@@ -3366,7 +3357,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX
 				"BVFLAG_FILTER\n",
 				__func__, __LINE__);
-			BVSETBLTERROR(BVERR_UNK, "FIXME/TODO");
+			BVSETBLTERROR(BVERR_OP,
+				"filter operation not supported");
 			goto exit;
 
 		default:
@@ -3392,7 +3384,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			}
 
 			/* Verify the batch change flags. */
-			VERIFYBATCH(batchflags >> 14, &g_prevsrc1rect,
+			VERIFYBATCH(batch->batchflags >> 14,
+					&batch->prevsrc1rect,
 					&bltparams->src1rect);
 
 			/* Same as the destination? */
@@ -3433,7 +3426,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			}
 
 			/* Verify the batch change flags. */
-			VERIFYBATCH(batchflags >> 16, &g_prevsrc2rect,
+			VERIFYBATCH(batch->batchflags >> 16,
+					&batch->prevsrc2rect,
 					&bltparams->src2rect);
 
 			/* Same as the destination? */
@@ -3473,10 +3467,12 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			}
 
 			/* Verify the batch change flags. */
-			VERIFYBATCH(batchflags >> 18, &g_prevmaskrect,
+			VERIFYBATCH(batch->batchflags >> 18,
+					&batch->prevmaskrect,
 					&bltparams->maskrect);
 
-			BVSETERROR(BVERR_UNK, "FIXME/TODO");
+			BVSETERROR(BVERR_OP,
+				"operation with mask not supported");
 			goto exit;
 		}
 
@@ -3507,25 +3503,40 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 					bverror = do_blit(bltparams, batch,
 							srcdesc, 2, gca);
 				else
-					BVSETBLTERROR(
-						BVERR_UNK, "FIXME/TODO");
+					BVSETBLTERROR(BVERR_SRC2_HORZSCALE,
+						"scaling not supported");
 			else
 				if (EQ_SIZE((*srcdesc[1].rect),
 					bltparams->dstrect))
-					BVSETBLTERROR(
-						BVERR_UNK, "FIXME/TODO");
+					BVSETBLTERROR(BVERR_SRC1_HORZSCALE,
+						"scaling not supported");
 				else
-					BVSETBLTERROR(
-						BVERR_UNK, "FIXME/TODO");
+					BVSETBLTERROR(BVERR_SRC1_HORZSCALE,
+						"scaling not supported");
 		}
 	}
 
 	if (batchexec) {
+		struct gcmoflush *flush;
+
 		/* Finalize the current operation. */
 		bverror = batch->batchend(bltparams, batch);
 		if (bverror != BVERR_NONE)
 			goto exit;
 
+		/* Add PE flush. */
+		bverror = claim_buffer(batch, sizeof(struct gcmoflush),
+					(void **) &flush);
+		if (bverror != BVERR_NONE) {
+			BVSETBLTERROR(BVERR_OOM,
+				"failed to allocate command buffer");
+			goto exit;
+		}
+
+		flush->flush_ldst = gcmoflush_flush_ldst;
+		flush->flush.reg = gcregflush_pe2D;
+
+		/* Pass the batch for execution. */
 		GCDUMPBATCH(batch);
 
 		gccommit.gcerror = GCERR_NONE;
@@ -3533,10 +3544,18 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 		gc_commit_wrapper(&gccommit);
 		if (gccommit.gcerror != GCERR_NONE) {
-			BVSETBLTERRORARG(BVERR_UNK,
-					"blit error occured (0x%08X)",
-					gccommit.gcerror);
-			goto exit;
+			switch (gccommit.gcerror) {
+			case GCERR_OODM:
+			case GCERR_CTX_ALLOC:
+				BVSETBLTERROR(BVERR_OOM,
+					"unable to allocate gccore memory");
+				goto exit;
+			default:
+				BVSETBLTERROR(BVERR_RSRC,
+					"gccore error");
+
+				goto exit;
+			}
 		}
 
 		GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX

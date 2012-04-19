@@ -1429,6 +1429,15 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 		return;
 
 	adc_code = req.buf[1].code;
+
+	/*
+	 * TWL6032 has 12-bit ADC, TWL6030 has 10-bit ADC,
+	 * battery temperature table is calculated for the TWL6030.
+	 * So reject two lower bits for TWL6032.
+	 */
+	if (di->features & TWL6032_SUBCLASS)
+		adc_code >>= 2;
+
 	for (temp = 0; temp < di->platform_data->tblsize; temp++) {
 		if (adc_code >= di->platform_data->
 				battery_tmp_tbl[temp])
