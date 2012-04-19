@@ -193,15 +193,6 @@ config BACKLIGHT_OMAP1
 	  the PWL module of OMAP1 processors.  Say Y if your board
 	  uses this hardware.
 
-config BACKLIGHT_OMAP2
-	tristate "OMAP2+ DM Timer-based LCD Backlight"
-	depends on ARCH_OMAP2PLUS
-	default y
-	help
-	  This driver controls the LCD backlight level via DM timer / PWL module
-	  on OMAP2PLUS processors.  Say Y if your board
-	  uses this hardware.
-
 config BACKLIGHT_HP680
 	tristate "HP Jornada 680 Backlight Driver"
 	depends on SH_HP6XX

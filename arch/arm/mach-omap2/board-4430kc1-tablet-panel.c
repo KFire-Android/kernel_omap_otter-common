@@ -28,9 +28,12 @@
 #include <video/omapdss.h>
 #include <linux/leds_pwm.h>
 #include <linux/leds.h>
-#include <linux/pwm_backlight.h>
+#include <linux/delay.h>
+// #include <linux/pwm_backlight.h>
 
 #include <linux/i2c/twl.h>
+#include <linux/regulator/machine.h>
+#include <linux/regulator/consumer.h>
 
 #include <plat/vram.h>
 #include <plat/omap_apps_brd_id.h>
@@ -47,8 +50,6 @@
 #define LED_PWM2ON			0x03
 #define LED_PWM2OFF			0x04
 #define TWL6030_TOGGLE3			0x92
-
-#define LED_SEC_DISP_GPIO 27
 
 
 static int tablet_panel_enable_lcd(struct omap_dss_device *dssdev)
@@ -162,19 +163,10 @@ static void sdp4430_set_primary_brightness(u8 brightness)
 	}
 }
 
-static void sdp4430_set_secondary_brightness(u8 brightness)
-{
-	if (brightness > 0)
-		brightness = 1;
-
-	gpio_set_value(LED_SEC_DISP_GPIO, brightness);
-}
-
 static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
 	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
 	.display_led_init = sdp4430_init_display_led,
 	.primary_display_set = sdp4430_set_primary_brightness,
-	//.secondary_display_set = sdp4430_set_secondary_brightness,
 };
 
 static struct platform_device sdp4430_disp_led = {
@@ -193,26 +185,55 @@ static struct platform_device sdp4430_keypad_led = {
 	},
 };
 
-static struct omap_backlight_config kc1_backlight_data = {
-	.default_intensity = 0x7F,
+static void bkl_set_power(struct omap_pwm_led_platform_data *self, int on_off)
+{
+	pr_debug("%s: on_off:%d\n", __func__, on_off);
+
+#if 0
+	if (bkl_reg != NULL) {
+		if (on_off)
+			regulator_enable(bkl_reg);
+		else
+			regulator_disable(bkl_reg);
+	}
+
+	if (gpio_is_valid(bkl_power_gpio))
+		gpio_set_value( bkl_power_gpio, on_off );
+#endif
+
+	// enable this fixed backlight startup for A100 on low level
+	// but could generate a little white flash at start
+	msleep(1);
+
+}
+
+static struct omap_pwm_led_platform_data board_backlight_data = {
+	.name			= "lcd-backlight",
+	.default_trigger	= "backlight",
+	.intensity_timer	= 10,
+	.bkl_max		= 254,
+	.bkl_min		= 0,
+	.bkl_freq		= 30000,
+	.set_power		= &bkl_set_power,
 };
 
-static struct platform_device kc1_backlight = {
-	.name		= "omap-bl",
-	.id		= -1,
-	.dev		= {
-		.platform_data = &kc1_backlight_data,
-	},
+static struct platform_device board_backlight_device = {
+	.name		= "omap_pwm_led",
+	.id		= 0,
+	.dev.platform_data = &board_backlight_data,
 };
+
 
 static struct platform_device __initdata *sdp4430_panel_devices[] = {
 	&sdp4430_disp_led,
 	&sdp4430_keypad_led,
-	&kc1_backlight,
+	&board_backlight_device,
 };
 
 void __init omap4_kc1_display_init(void)
 {
+	int ret;
+
 	spi_register_board_info(tablet_spi_board_info,	ARRAY_SIZE(tablet_spi_board_info));
 
 	omap_display_init(&sdp4430_dss_data);

@@ -81,7 +81,7 @@
 #define BLUETOOTH_UART			(0x1)
 #define CONSOLE_UART			(0x2)
 
-#define OMAP4_LCD_EN_GPIO		28
+//#define OMAP4_LCD_EN_GPIO		28
 
 #define OMAP4_TOUCH_RESET_GPIO	18
 

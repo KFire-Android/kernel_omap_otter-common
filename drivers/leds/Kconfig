@@ -383,6 +383,13 @@ config LEDS_OMAP4430_SDP_KEYPAD
 	  This option enables support for keypad LEDs on the
           OMAP4430 SDP
 
+config LEDS_OMAP_PWM
+	tristate "LED Support for OMAP PWM-controlled LEDs"
+	depends on LEDS_CLASS && ARCH_OMAP && OMAP_DM_TIMER
+	help
+	  This options enables support for LEDs connected to GPIO lines
+	  controlled by a PWM timer on OMAP CPUs.
+
 config LEDS_NS2
 	tristate "LED support for Network Space v2 GPIO LEDs"
 	depends on LEDS_CLASS
