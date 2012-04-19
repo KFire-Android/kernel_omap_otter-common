@@ -12,6 +12,7 @@
  *
  * NOTE: This timer is not the same timer as the old OMAP1 MPU timer.
  */
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/clk.h>
@@ -97,6 +98,8 @@ int __init omap_init_clocksource_32k(void)
 			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
 		else if (cpu_is_omap44xx())
 			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
+		else if (cpu_is_omap54xx())
+			pbase = OMAP54XX_32KSYNCT_BASE + 0x30;
 		else
 			return -ENODEV;
 
