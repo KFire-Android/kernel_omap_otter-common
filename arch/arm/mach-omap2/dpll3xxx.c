@@ -39,7 +39,11 @@
 #define DPLL_AUTOIDLE_DISABLE			0x0
 #define DPLL_AUTOIDLE_LOW_POWER_STOP		0x1
 
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+#define MAX_DPLL_WAIT_TRIES             10000
+#else
 #define MAX_DPLL_WAIT_TRIES		1000000
+#endif
 
 /* Private functions */
 

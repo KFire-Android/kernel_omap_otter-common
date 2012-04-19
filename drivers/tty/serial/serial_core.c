@@ -1739,6 +1739,12 @@ struct baud_rates {
 };
 
 static const struct baud_rates baud_rates[] = {
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+	/* 3M baudrate for zebu only,
+	 * to speed zebu boot
+	 */
+	{ 3000000, B3000000 },
+#endif
 	{ 921600, B921600 },
 	{ 460800, B460800 },
 	{ 230400, B230400 },

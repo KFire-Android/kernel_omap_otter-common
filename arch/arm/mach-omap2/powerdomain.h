@@ -71,8 +71,12 @@
  */
 #define PWRDM_MAX_CLKDMS	9
 
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+#define PWRDM_TRANSITION_BAILOUT 1000
+#else
 /* XXX A completely arbitrary number. What is reasonable here? */
 #define PWRDM_TRANSITION_BAILOUT 100000
+#endif
 
 struct clockdomain;
 struct powerdomain;
