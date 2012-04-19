@@ -5,8 +5,8 @@
  *
  * Author: Juha Yrjola
  *
- * Copyright (C) 2009 Texas Instruments
- * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
+ * Copyright (C) 20011 Texas Instruments
+ * Added OMAP4/5 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -717,6 +717,11 @@ static int __init gpmc_init(void)
 		ck = "gpmc_ck";
 		l = OMAP44XX_GPMC_BASE;
 		gpmc_irq = OMAP44XX_IRQ_GPMC;
+	} else if (cpu_is_omap54xx()) {
+		ck = "gpmc_ck";
+		l = OMAP54XX_GPMC_BASE;
+		/* FIXME: Remove with clock-framework */
+		return 0;
 	}
 
 	if (WARN_ON(!ck))
