@@ -1,0 +1,15 @@
+#
+# DC drivers configuration
+#
+
+config OMAP4_DUTY_CYCLE
+	bool "Control OPP_NITRO usage based on duty cycle strategy"
+	depends on THERMAL_FRAMEWORK && ARCH_OMAP4
+	default y
+	help
+	If you are going to use OPP_NITRO with high level of leakage which.
+	could pontentially sustain a thermal runaway, say Y here.
+
+source "drivers/staging/thermal_framework/governor/Kconfig.dc_governor"
+
+

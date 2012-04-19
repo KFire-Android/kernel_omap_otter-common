@@ -276,7 +276,7 @@ static inline void freq_table_free(void)
 		opp_free_cpufreq_table(mpu_dev, &freq_table);
 }
 
-#if defined(CONFIG_THERMAL_FRAMEWORK) || defined(CONFIG_OMAP4_DUTY_CYCLE)
+#if defined(CONFIG_OMAP_THERMAL) || defined(CONFIG_OMAP4_DUTY_CYCLE)
 void omap_thermal_step_freq_down(void)
 {
 	unsigned int cur;
@@ -380,7 +380,7 @@ static void __exit omap_duty_cooling_exit(void) { }
 
 #endif
 
-#ifdef CONFIG_THERMAL_FRAMEWORK
+#ifdef CONFIG_OMAP_THERMAL
 
 static struct thermal_dev_ops cpufreq_cooling_ops = {
 	.cool_device = cpufreq_apply_cooling,

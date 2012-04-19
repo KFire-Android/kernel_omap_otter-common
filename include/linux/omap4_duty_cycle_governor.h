@@ -43,5 +43,15 @@ struct duty_cycle {
 
 void omap4_duty_pcb_section_reg(struct pcb_section *pcb_sect, int sect_size);
 int omap4_duty_pcb_register(struct pcb_sens *tpcb);
+
+#ifdef CONFIG_OMAP4_DUTY_CYCLE_GOVERNOR
 int omap4_duty_cycle_register(struct duty_cycle *tduty);
+#else
+static inline int omap4_duty_cycle_register(struct duty_cycle *tduty)
+{
+	return 0;
+}
+#endif
+
+
 #endif /*__OMAP4_DUTY_CYCLE_GOVERNOR_H__*/
