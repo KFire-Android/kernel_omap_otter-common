@@ -48,6 +48,8 @@
 #define LED_PWM2OFF			0x04
 #define TWL6030_TOGGLE3			0x92
 
+#define LED_SEC_DISP_GPIO 27
+
 
 static int tablet_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
@@ -135,6 +137,62 @@ static struct spi_board_info tablet_spi_board_info[] __initdata = {
 	},
 };
 
+static void __init sdp4430_init_display_led(void)
+{
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
+	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
+	//twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
+    twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
+    twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
+}
+
+static void sdp4430_set_primary_brightness(u8 brightness)
+{
+	if (brightness > 1) {
+		if (brightness == 255)
+			brightness = 0x7f;
+		else
+			brightness = (~(brightness/2)) & 0x7f;
+
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
+		twl_i2c_write_u8(TWL_MODULE_PWM, brightness, LED_PWM2ON);
+	} else if (brightness <= 1) {
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
+		twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
+	}
+}
+
+static void sdp4430_set_secondary_brightness(u8 brightness)
+{
+	if (brightness > 0)
+		brightness = 1;
+
+	gpio_set_value(LED_SEC_DISP_GPIO, brightness);
+}
+
+static struct omap4430_sdp_disp_led_platform_data sdp4430_disp_led_data = {
+	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
+	.display_led_init = sdp4430_init_display_led,
+	.primary_display_set = sdp4430_set_primary_brightness,
+	//.secondary_display_set = sdp4430_set_secondary_brightness,
+};
+
+static struct platform_device sdp4430_disp_led = {
+	.name	=	"display_led",
+	.id	=	-1,
+	.dev	= {
+		.platform_data = &sdp4430_disp_led_data,
+	},
+};
+
+static struct platform_device sdp4430_keypad_led = {
+	.name	=	"keypad_led",
+	.id	=	-1,
+	.dev	= {
+		.platform_data = NULL,
+	},
+};
+
 static struct omap_backlight_config kc1_backlight_data = {
 	.default_intensity = 0x7F,
 };
@@ -148,6 +206,8 @@ static struct platform_device kc1_backlight = {
 };
 
 static struct platform_device __initdata *sdp4430_panel_devices[] = {
+	&sdp4430_disp_led,
+	&sdp4430_keypad_led,
 	&kc1_backlight,
 };
 

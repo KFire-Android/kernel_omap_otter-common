@@ -186,8 +186,8 @@ void summit_fsm_doAction(struct summit_smb347_info *di,int event)
 		 * the battery is being charged when USB
 		 * is not connected.
 		 */
-		//omap4430_green_led_set(NULL, 0);
-		//omap4430_orange_led_set(NULL, 0);
+		omap4430_green_led_set(NULL, 0);
+		omap4430_orange_led_set(NULL, 0);
                 CLEAR_BAT_FULL(di->protect_event);
 
                 //enable low battery interrupt

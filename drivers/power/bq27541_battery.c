@@ -931,23 +931,23 @@ update_status:
 					/*
 					 * Battery being charged, capacity < 90%: Amber LED
 					 */
-					//omap4430_green_led_set(NULL, 0);
-					//omap4430_orange_led_set(NULL, 255);
+					omap4430_green_led_set(NULL, 0);
+					omap4430_orange_led_set(NULL, 255);
 				} else {
 					/*
 					 * Battery being charged, capacity >= 90%: Green LED
 					 */
-					//omap4430_orange_led_set(NULL, 0);
-					//omap4430_green_led_set(NULL, 255);
+					omap4430_orange_led_set(NULL, 0);
+					omap4430_green_led_set(NULL, 255);
 				}
 		        } else if (di->status == POWER_SUPPLY_STATUS_FULL) {
 				if (led_value & (1 << 2)) {
 					/* Set to green if connected to USB */
-					//omap4430_orange_led_set(NULL, 0);
-					//omap4430_green_led_set(NULL, 255);
+					omap4430_orange_led_set(NULL, 0);
+					omap4430_green_led_set(NULL, 255);
 				} else {
-					//omap4430_green_led_set(NULL, 0);
-					//omap4430_orange_led_set(NULL, 0);
+					omap4430_green_led_set(NULL, 0);
+					omap4430_orange_led_set(NULL, 0);
 				}
 		        }
 		}
@@ -1193,8 +1193,8 @@ static ssize_t disable_led_store(struct device *dev,
 		di->disable_led = 0;
 	} else if (value == 1) {
 		di->disable_led = 1;
-                //omap4430_green_led_set(NULL, 0);
-                //omap4430_orange_led_set(NULL, 0);
+                omap4430_green_led_set(NULL, 0);
+                omap4430_orange_led_set(NULL, 0);
 	}
 
 	return size;
