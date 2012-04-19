@@ -291,6 +291,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.power_saving	= true,
 #endif
 	},
+#if 0
 	{
 		.mmc = 5,
 		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
@@ -299,7 +300,7 @@ static struct omap2_hsmmc_info mmc[] = {
 		.ocr_mask = MMC_VDD_165_195,
 		.nonremovable = true,
 	},
-#if 0
+#endif
 	{
 		.mmc = 5,
 		.caps = MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
@@ -308,7 +309,6 @@ static struct omap2_hsmmc_info mmc[] = {
 		.ocr_mask = MMC_VDD_165_195,
 		.nonremovable = true,
 	},
-#endif
 	{}	/* Terminator */
 };
 
@@ -317,13 +317,6 @@ static struct wl12xx_platform_data __initdata omap4_kc1_wlan_data = {
 	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = 0,
-};
-#endif
-#if 0
-static struct wl12xx_platform_data omap4_kc1_wlan_data __initdata = {
-	.irq = OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),
-	.board_ref_clock = WL12XX_REFCLOCK_26,
-	.board_tcxo_clock = WL12XX_TCXOCLOCK_26,
 };
 #endif
 static struct wl12xx_platform_data __initdata omap4_kc1_wlan_data = {
@@ -379,7 +372,6 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 	if (pdev->id == 4)
 		pdata->slots[0].set_power = wifi_set_power;
 #else
-#if 0
 	/* Setting MMC5 SDIO card .built-in variable
 	  * This is to make sure that if WiFi driver is not loaded
 	  * at all, then the MMC/SD/SDIO driver does not keep
@@ -389,7 +381,6 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 		ret = 0;
 		pdata->slots[0].mmc_data.built_in = 1;
 	}
-#endif
 #endif
 
 	return ret;
@@ -658,6 +649,8 @@ static void omap_ilitek_init(void)
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux __initdata board_mux[] = {
+	OMAP4_MUX(SDMMC5_CLK, OMAP_MUX_MODE0 | OMAP_INPUT_EN | OMAP_OFF_EN
+					| OMAP_OFF_PULL_EN),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
