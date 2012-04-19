@@ -657,6 +657,7 @@ static int twl6030_gpadc_wait_conversion_ready(
 	do {
 		if (twl6030_gpadc_is_conversion_ready(gpadc, status_reg))
 			return 0;
+		msleep_interruptible(1);
 	} while (!time_after(jiffies, timeout));
 
 	/* one more checking against scheduler-caused timeout */
