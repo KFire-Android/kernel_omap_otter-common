@@ -40,6 +40,7 @@
 #include "clock2xxx.h"
 #include "clock3xxx.h"
 #include "clock44xx.h"
+#include "clock54xx.h"
 
 /*
  * The machine specific code may provide the extra mapping besides the
@@ -262,6 +263,65 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
 };
 #endif
 
+#ifdef	CONFIG_ARCH_OMAP5
+static struct map_desc omap54xx_io_desc[] __initdata = {
+	{
+		.virtual	= L3_54XX_VIRT,
+		.pfn		= __phys_to_pfn(L3_54XX_PHYS),
+		.length		= L3_54XX_SIZE,
+		.type		= MT_DEVICE,
+	},
+	{
+		.virtual	= L4_54XX_VIRT,
+		.pfn		= __phys_to_pfn(L4_54XX_PHYS),
+		.length		= L4_54XX_SIZE,
+		.type		= MT_DEVICE,
+	},
+	{
+		.virtual	= L4_WK_54XX_VIRT,
+		.pfn		= __phys_to_pfn(L4_WK_54XX_PHYS),
+		.length		= L4_WK_54XX_SIZE,
+		.type		= MT_DEVICE,
+	},
+	{
+		.virtual	= OMAP54XX_GPMC_VIRT,
+		.pfn		= __phys_to_pfn(OMAP54XX_GPMC_PHYS),
+		.length		= OMAP54XX_GPMC_SIZE,
+		.type		= MT_DEVICE,
+	},
+	{
+		.virtual	= OMAP54XX_EMIF1_VIRT,
+		.pfn		= __phys_to_pfn(OMAP54XX_EMIF1_PHYS),
+		.length		= OMAP54XX_EMIF1_SIZE,
+		.type		= MT_DEVICE,
+	},
+	{
+		.virtual	= OMAP54XX_EMIF2_VIRT,
+		.pfn		= __phys_to_pfn(OMAP54XX_EMIF2_PHYS),
+		.length		= OMAP54XX_EMIF2_SIZE,
+		.type		= MT_DEVICE,
+	},
+	{
+		.virtual	= OMAP54XX_DMM_VIRT,
+		.pfn		= __phys_to_pfn(OMAP54XX_DMM_PHYS),
+		.length		= OMAP54XX_DMM_SIZE,
+		.type		= MT_DEVICE,
+	},
+	{
+		.virtual	= L4_PER_54XX_VIRT,
+		.pfn		= __phys_to_pfn(L4_PER_54XX_PHYS),
+		.length		= L4_PER_54XX_SIZE,
+		.type		= MT_DEVICE,
+	},
+	{
+		.virtual	= L4_EMU_54XX_VIRT,
+		.pfn		= __phys_to_pfn(L4_EMU_54XX_PHYS),
+		.length		= L4_EMU_54XX_SIZE,
+		.type		= MT_DEVICE,
+	},
+};
+#endif
+
 #ifdef CONFIG_SOC_OMAP2420
 void __init omap242x_map_common_io(void)
 {
@@ -307,6 +367,12 @@ void __init omap44xx_map_common_io(void)
 }
 #endif
 
+#ifdef CONFIG_ARCH_OMAP5
+void __init omap54xx_map_common_io(void)
+{
+	iotable_init(omap54xx_io_desc, ARRAY_SIZE(omap54xx_io_desc));
+}
+#endif
 /*
  * omap2_init_reprogram_sdrc - reprogram SDRC timing parameters
  *
@@ -381,7 +447,10 @@ static void __init omap_hwmod_init_postsetup(void)
 				     _set_hwmod_postsetup_state,
 				     &postsetup_state);
 
-	omap_pm_if_early_init();
+	if (cpu_is_omap54xx())
+		pr_err("FIXME: omap5 opp layer init\n");
+	else
+		omap_pm_if_early_init();
 }
 
 #ifdef CONFIG_SOC_OMAP2420
@@ -481,6 +550,15 @@ void __init omap4430_init_early(void)
 	omap44xx_hwmod_init();
 	omap_hwmod_init_postsetup();
 	omap4xxx_clk_init();
+}
+#endif
+
+#ifdef CONFIG_ARCH_OMAP5
+void __init omap_5430evm_init_early(void)
+{
+	omap2_set_globals_543x();
+	omap5xxx_check_revision();
+	omap_common_init_early();
 }
 #endif
 

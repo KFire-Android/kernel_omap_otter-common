@@ -1,6 +1,14 @@
 /*
  * IO mappings for OMAP2+
  *
+ * IO definitions for TI OMAP processors and boards
+ *
+ * Copied from arch/arm/mach-sa1100/include/mach/io.h
+ * Copyright (C) 1997-1999 Russell King
+ *
+ * Copyright (C) 2009-2011 Texas Instruments
+ * Added OMAP4/5 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -195,3 +203,50 @@
 						/* 0x4e000000 --> 0xfd300000 */
 #define OMAP44XX_DMM_SIZE	SZ_1M
 #define OMAP44XX_DMM_VIRT	(OMAP44XX_EMIF2_VIRT + OMAP44XX_EMIF2_SIZE)
+
+/*
+ * ----------------------------------------------------------------------------
+ * Omap5 specific IO mapping
+ * ----------------------------------------------------------------------------
+ */
+#define L3_54XX_PHYS		L3_54XX_BASE	/* 0x44000000 --> 0xf8000000 */
+#define L3_54XX_VIRT		(L3_54XX_PHYS + OMAP4_L3_IO_OFFSET)
+#define L3_54XX_SIZE		SZ_1M
+
+#define L4_54XX_PHYS		L4_54XX_BASE	/* 0x4a000000 --> 0xfc000000 */
+#define L4_54XX_VIRT		(L4_54XX_PHYS + OMAP2_L4_IO_OFFSET)
+#define L4_54XX_SIZE		SZ_4M
+
+#define L4_WK_54XX_PHYS		L4_WK_54XX_BASE	/* 0x4ae00000 --> 0xfce00000 */
+#define L4_WK_54XX_VIRT		(L4_WK_54XX_PHYS + OMAP2_L4_IO_OFFSET)
+#define L4_WK_54XX_SIZE		SZ_2M
+
+#define L4_PER_54XX_PHYS	L4_PER_54XX_BASE
+						/* 0x48000000 --> 0xfa000000 */
+#define L4_PER_54XX_VIRT	(L4_PER_54XX_PHYS + OMAP2_L4_IO_OFFSET)
+#define L4_PER_54XX_SIZE	SZ_4M
+
+#define L4_EMU_54XX_PHYS	L4_EMU_54XX_BASE
+						/* 0x54000000 --> 0xfe800000 */
+#define L4_EMU_54XX_VIRT	(L4_EMU_54XX_PHYS + OMAP2_EMU_IO_OFFSET)
+#define L4_EMU_54XX_SIZE	SZ_8M
+
+						/* 0x50000000 --> 0xf9000000 */
+#define OMAP54XX_GPMC_PHYS	OMAP54XX_GPMC_BASE
+#define OMAP54XX_GPMC_VIRT	(OMAP54XX_GPMC_PHYS + OMAP4_GPMC_IO_OFFSET)
+#define OMAP54XX_GPMC_SIZE	SZ_1M
+
+#define OMAP54XX_EMIF1_PHYS	OMAP54XX_EMIF1_BASE
+						/* 0x4c000000 --> 0xfd100000 */
+#define OMAP54XX_EMIF1_VIRT	(OMAP44XX_EMIF1_PHYS + OMAP4_L3_PER_IO_OFFSET)
+#define OMAP54XX_EMIF1_SIZE	SZ_1M
+
+#define OMAP54XX_EMIF2_PHYS	OMAP54XX_EMIF2_BASE
+						/* 0x4d000000 --> 0xfd200000 */
+#define OMAP54XX_EMIF2_VIRT	(OMAP54XX_EMIF2_PHYS + OMAP4_L3_PER_IO_OFFSET)
+#define OMAP54XX_EMIF2_SIZE	SZ_1M
+
+						/* 0x4e000000 --> 0xfd300000 */
+#define OMAP54XX_DMM_PHYS	OMAP54XX_DMM_BASE
+#define OMAP54XX_DMM_VIRT	(OMAP54XX_DMM_PHYS + OMAP4_L3_PER_IO_OFFSET)
+#define OMAP54XX_DMM_SIZE	SZ_1M
