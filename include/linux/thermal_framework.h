@@ -19,6 +19,7 @@
 #define __LINUX_THERMAL_FRAMEWORK_H__
 
 struct thermal_dev;
+struct thermal_domain;
 
 /**
  * struct thermal_dev_ops  - Structure for device operation call backs
@@ -70,7 +71,7 @@ struct thermal_dev {
 	int		slope;
 	int		constant_offset;
 	int		sen_id;
-
+	struct thermal_domain   *domain;
 };
 
 extern int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
