@@ -185,6 +185,13 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 	}
 
 	/*
+	 * Now with port open enable any platform specific wakeup
+	 * capability for the port if available.
+	 */
+	if (uport->ops->set_wake)
+		uport->ops->set_wake(uport, true);
+
+	/*
 	 * This is to allow setserial on this port. People may want to set
 	 * port/irq/type and then reconfigure the port properly if it failed
 	 * now.
@@ -1425,6 +1432,13 @@ static void uart_port_shutdown(struct tty_port *port)
 	 * Free the IRQ and disable the port.
 	 */
 	uport->ops->shutdown(uport);
+
+	/*
+	 * now port is closed disable any platform
+	 * specific wakeup capability that might be enabled.
+	 */
+	if (uport->ops->set_wake)
+		uport->ops->set_wake(uport, false);
 
 	/*
 	 * Ensure that the IRQ handler isn't running on another CPU.
