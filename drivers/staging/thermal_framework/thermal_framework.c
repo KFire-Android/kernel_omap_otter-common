@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
+#include <linux/uaccess.h>
 
 #include <linux/thermal_framework.h>
 
@@ -124,6 +125,106 @@ static int thermal_debug_domain(struct thermal_domain *domain)
 		thermal_domains_dbg, (void *)domain, &thermal_debug_fops));
 }
 
+static int thermal_remove_cooling_action(struct thermal_dev *tdev,
+						unsigned int priority)
+{
+	struct thermal_cooling_action *action, *tmp;
+
+	list_for_each_entry_safe(action, tmp, &tdev->cooling_actions, node) {
+		if (action->priority == priority) {
+			list_del(&action->node);
+			debugfs_remove(action->d);
+			kfree(action);
+			break;
+		}
+	}
+
+	return 0;
+}
+
+static int thermal_add_action_debug(struct thermal_cooling_action *action,
+					struct dentry *d)
+{
+	char buf[32];
+
+	sprintf(buf, "action_%d", action->priority);
+
+	action->d = debugfs_create_u32(buf, S_IRUGO, d,
+					(u32 *)&action->reduction);
+
+	return PTR_ERR(action->d);
+}
+
+static int thermal_insert_cooling_action(struct thermal_dev *tdev,
+						unsigned int priority,
+						unsigned int reduction,
+						struct dentry *d)
+{
+	struct list_head *head = &tdev->cooling_actions;
+	struct thermal_cooling_action *action, *new;
+
+	list_for_each_entry(action, &tdev->cooling_actions, node) {
+		if (action->priority > priority)
+			break;
+		else
+			head = &action->node;
+	}
+
+	new = kzalloc(sizeof(struct thermal_cooling_action), GFP_KERNEL);
+	if (!new)
+		return -ENOMEM;
+	new->priority = priority;
+	new->reduction = reduction;
+	list_add(&new->node, head);
+
+	return thermal_add_action_debug(new, d);
+}
+
+static ssize_t thermal_debug_inject_action_write(struct file *file,
+				const char __user *user_buf,
+				size_t count, loff_t *ppos)
+{
+	struct thermal_dev *tdev = file->private_data;
+	unsigned int priority;
+	int reduction;
+	char buf[32];
+	ssize_t len;
+
+	len = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, user_buf, len))
+		return -EFAULT;
+
+	buf[len] = '\0';
+	if (sscanf(buf, "%u %d", &priority, &reduction) != 2)
+		return -EINVAL;
+
+	/* I know, there is a better way to lock this stuff */
+	mutex_lock(&thermal_domain_list_lock);
+	if (reduction < 0)
+		thermal_remove_cooling_action(tdev, priority);
+	else
+		thermal_insert_cooling_action(tdev, priority, reduction,
+						file->f_path.dentry->d_parent);
+	mutex_unlock(&thermal_domain_list_lock);
+
+	return count;
+}
+
+static int thermal_debug_inject_action_open(struct inode *inode,
+							struct file *file)
+{
+	file->private_data = inode->i_private;
+
+	return 0;
+}
+
+static const struct file_operations inject_action_fops = {
+	.write = thermal_debug_inject_action_write,
+	.open = thermal_debug_inject_action_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
 static void thermal_debug_register_device(struct thermal_dev *tdev)
 {
 	struct dentry *d;
@@ -131,6 +232,16 @@ static void thermal_debug_register_device(struct thermal_dev *tdev)
 	d = debugfs_create_dir(tdev->name, thermal_devices_dbg);
 	if (IS_ERR(d))
 		return;
+
+	/* Am I a cooling device ? */
+	if (tdev->dev_ops && tdev->dev_ops->cool_device) {
+		struct thermal_cooling_action *cact;
+
+		(void) debugfs_create_file("inject_action", S_IWUSR, d,
+					(void *)tdev, &inject_action_fops);
+		list_for_each_entry(cact, &tdev->cooling_actions, node)
+			thermal_add_action_debug(cact, d);
+	}
 
 	thermal_device_call(tdev, register_debug_entries, d);
 }
@@ -471,6 +582,7 @@ int thermal_cooling_dev_register(struct thermal_dev *tdev)
 	mutex_lock(&thermal_domain_list_lock);
 	list_add(&tdev->node, &domain->cooling_agents);
 	tdev->domain = domain;
+	INIT_LIST_HEAD(&tdev->cooling_actions);
 	thermal_debug_register_device(tdev);
 	mutex_unlock(&thermal_domain_list_lock);
 	thermal_init_thermal_state(tdev);
