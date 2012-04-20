@@ -2060,7 +2060,6 @@ static int verify_surface(unsigned int tile,
 	if (geom->structsize < STRUCTSIZE(geom, palette))
 		return GCBVERR_GEOM_VERS;
 
-#if GCDEBUG_ENABLE
 	{
 		struct bvformatxlate *format;
 		if (parse_format(geom->format, &format)) {
@@ -2104,10 +2103,11 @@ static int verify_surface(unsigned int tile,
 					"    size specified = %d\n",
 					__func__, __LINE__,
 					surf->desc->length);
+
+				return GCBVERR_GEOM;
 			}
 		}
 	}
-#endif
 
 	return -1;
 }
