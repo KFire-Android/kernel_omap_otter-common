@@ -454,7 +454,8 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 
 }
 
-static int omap_process_cpu_temp(struct list_head *cooling_list,
+static int omap_process_cpu_temp(struct thermal_dev *gov,
+				struct list_head *cooling_list,
 				struct thermal_dev *temp_sensor,
 				int temp)
 {
