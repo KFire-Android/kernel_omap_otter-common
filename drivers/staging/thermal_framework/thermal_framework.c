@@ -134,7 +134,8 @@ int thermal_sensor_set_temp(struct thermal_dev *tdev)
 			thermal_domain->governor->dev_ops &&
 			thermal_domain->governor->dev_ops->process_temp) {
 		thermal_domain->governor->dev_ops->process_temp
-			(&thermal_domain->cooling_agents,
+			(thermal_domain->governor,
+			 &thermal_domain->cooling_agents,
 			 tdev, tdev->current_temp);
 		ret = 0;
 		goto out;
