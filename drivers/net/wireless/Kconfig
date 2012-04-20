@@ -268,6 +268,16 @@ config MWL8K
 	  To compile this driver as a module, choose M here: the module
 	  will be called mwl8k.  If unsure, say N.
 
+config RFKILL_STE
+	bool "ST-Ericsson modem rfkill driver"
+	depends on RFKILL || !RFKILL
+	---help---
+	  This driver support rfkill switch for ST-Ericsson modem.
+
+	  Select this option to enable usage of RFKILL driver for ST-Ericsson
+	  modem. This permits control of modem power on and off sequences
+	  from rfkill framework.
+
 source "drivers/net/wireless/ath/Kconfig"
 source "drivers/net/wireless/b43/Kconfig"
 source "drivers/net/wireless/b43legacy/Kconfig"
