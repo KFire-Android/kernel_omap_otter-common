@@ -108,6 +108,7 @@ struct thermal_dev {
 })
 
 extern int thermal_request_temp(struct thermal_dev *tdev);
+extern int thermal_lookup_temp(const char *domain_name);
 extern int thermal_sensor_set_temp(struct thermal_dev *tdev);
 extern int thermal_get_slope(struct thermal_dev *tdev);
 extern int thermal_get_offset(struct thermal_dev *tdev);
