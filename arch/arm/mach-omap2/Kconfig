@@ -477,6 +477,15 @@ config OMAP4_HSOTG_ED_CORRECTION
 	  order to improve Eye Diagramm. On 4430 CPUs this should
 	  improve Eye Diagram at least 8%.
 
+config OMAP_RFKILL_STE_MODEM
+	bool "Enable OMAP RFKILL driver for ST-E modem"
+	depends on RFKILL || !RFKILL
+	help
+	  Select this option to enable usage of RFKILL driver for ST-E modem on
+	  OMAP platforms. This will permit control of power on and off sequences
+	  of the modem as well as necessary dynamic pin muxing of AP/CP
+	  interfaces (platform data dependant)
+
 endmenu
 
 endif
