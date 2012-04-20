@@ -108,11 +108,6 @@ int thermal_sensor_set_temp(struct thermal_dev *tdev)
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
 
-	if (list_empty(&thermal_domain_list)) {
-		pr_debug("%s: No governors registered\n", __func__);
-		goto out;
-	}
-
 	thermal_domain = tdev->domain;
 	if (!thermal_domain) {
 		pr_err("%s: device not part of a domain\n", __func__);
@@ -145,9 +140,6 @@ int thermal_get_slope(struct thermal_dev *tdev)
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
 
-	if (list_empty(&thermal_domain_list))
-		pr_info("%s: No sensors registered\n", __func__);
-
 	thermal_domain = tdev->domain;
 	if (!thermal_domain) {
 		pr_err("%s: device not part of a domain\n", __func__);
@@ -178,9 +170,6 @@ int thermal_get_offset(struct thermal_dev *tdev)
 {
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
-
-	if (list_empty(&thermal_domain_list))
-		pr_debug("%s: No sensors registered\n", __func__);
 
 	thermal_domain = tdev->domain;
 	if (!thermal_domain) {
@@ -217,11 +206,6 @@ int thermal_request_temp(struct thermal_dev *tdev)
 {
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
-
-	if (list_empty(&thermal_domain_list)) {
-		pr_debug("%s: No thermal sensors registered\n", __func__);
-		return ret;
-	}
 
 	thermal_domain = tdev->domain;
 	if (!thermal_domain) {
@@ -283,11 +267,6 @@ EXPORT_SYMBOL_GPL(thermal_update_temp_rate);
 static int thermal_init_thermal_state(struct thermal_dev *tdev)
 {
 	struct thermal_domain *domain;
-
-	if (list_empty(&thermal_domain_list)) {
-		pr_err("%s: No cooling devices registered\n", __func__);
-		return -ENODEV;
-	}
 
 	domain = tdev->domain;
 	if (!domain) {
