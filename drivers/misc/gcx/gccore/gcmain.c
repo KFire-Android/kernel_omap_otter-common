@@ -245,11 +245,6 @@ static enum gcerror release_context(struct gccontextmap *context)
 		context->context = NULL;
 
 		g_clientref -= 1;
-		if (g_clientref == 0) {
-			gcerror = gc_set_power(GCPWR_OFF);
-			if (gcerror != GCERR_NONE)
-				goto exit;
-		}
 	}
 
 	kfree(context);
@@ -1161,6 +1156,7 @@ static void __exit gc_exit(void)
 
 	delete_context_map();
 	mutex_destroy(&g_maplock);
+	gc_set_power(GCPWR_OFF);
 
 	if (g_reg_base != NULL) {
 		iounmap(g_reg_base);
