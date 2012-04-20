@@ -26,21 +26,7 @@
 #include "cm2_44xx.h"
 #include "cm-regbits-44xx.h"
 
-static u32 bb2d_clkctrl(void)
-{
-	return omap4_cminst_read_inst_reg(OMAP4430_CM2_PARTITION,
-			OMAP4430_CM2_DSS_INST,
-			OMAP4_CM_DSS_BB2D_CLKCTRL_OFFSET);
-}
-
-static u32 gcxxx_prcm_bb2d_idlest(void)
-{
-	return (bb2d_clkctrl() & OMAP4430_IDLEST_MASK) >> OMAP4430_IDLEST_SHIFT;
-}
-
-static struct omap_gcx_platform_data omap_gcxxx = {
-	.prcm_bb2d_idlest = gcxxx_prcm_bb2d_idlest,
-};
+static struct omap_gcx_platform_data omap_gcxxx;
 
 struct omap_device_pm_latency omap_gcxxx_latency[] = {
 	{

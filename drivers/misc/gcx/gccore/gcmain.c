@@ -22,7 +22,7 @@
 #include <linux/pagemap.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/clk.h>
+#include <linux/pm_runtime.h>
 #include <linux/dma-mapping.h>
 #include <plat/cpu.h>
 #include <linux/debugfs.h>
@@ -55,6 +55,7 @@ struct gccontext {
 };
 
 struct gccore {
+	struct device *dev;
 	void *priv;
 };
 
@@ -430,7 +431,6 @@ static irqreturn_t gc_irq(int irq, void *p)
 #include <plat/omap_hwmod.h>
 #include <plat/omap-pm.h>
 
-static struct clk *g_bb2d_clk;
 struct device *g_bb2d_dev;
 static enum gcpower g_gcpower = GCPWR_UNKNOWN;
 static bool g_clockenabled;
@@ -509,19 +509,9 @@ void gc_reset_gpu(void)
 
 enum gcerror gcpwr_enable_clock(enum gcpower prevstate)
 {
-	enum gcerror gcerror = GCERR_NONE;
-	int ret;
-
 	if (!g_clockenabled) {
 		/* Enable the clock. */
-		ret = clk_enable(g_bb2d_clk);
-		if (ret < 0) {
-			GCPRINT(NULL, 0, GC_MOD_PREFIX
-					" failed to enable bb2d_fck (%d).\n",
-					__func__, __LINE__, ret);
-			gcerror = GCERR_POWER_CLOCK_ON;
-			goto exit;
-		}
+		pm_runtime_get_sync(gcdevice.dev);
 
 		/* Signal software not idle. */
 		gc_write_reg(GC_GP_OUT0_Address, 0);
@@ -536,13 +526,11 @@ enum gcerror gcpwr_enable_clock(enum gcpower prevstate)
 	if (prevstate == GCPWR_UNKNOWN)
 		gc_reset_gpu();
 
-exit:
-	return gcerror;
+	return GCERR_NONE;
 }
 
 void gcpwr_disable_clock(enum gcpower prevstate)
 {
-	u32 trys = 0;
 	if (!g_clockenabled)
 		return;
 
@@ -550,12 +538,9 @@ void gcpwr_disable_clock(enum gcpower prevstate)
 
 	/* Signal software idle. */
 	gc_write_reg(GC_GP_OUT0_Address, 1);
-	while (!g_gcxplat->prcm_bb2d_idlest() && ++trys != GC_POLL_PRCM_STBY)
-		udelay(100);
-	/* Not much we can do here, so assert */
-	WARN(trys == GC_POLL_PRCM_STBY, "gccore device not in idle\n");
+
 	/* Disable the clock. */
-	clk_disable(g_bb2d_clk);
+	pm_runtime_put_sync(gcdevice.dev);
 
 	/* Clock disabled. */
 	g_clockenabled = false;
@@ -972,6 +957,9 @@ static int gc_probe(struct platform_device *pdev)
 	disable_irq(gcirq);
 	g_irqenabled = false;
 
+	gcdevice.dev = &pdev->dev;
+	pm_runtime_enable(gcdevice.dev);
+
 	return 0;
 }
 
@@ -1055,18 +1043,6 @@ static int __init gc_init(void)
 	/* Initialize interrupt completion. */
 	init_completion(&g_gccoreint);
 
-	g_bb2d_clk = clk_get(NULL, "bb2d_fck");
-	if (IS_ERR(g_bb2d_clk)) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"cannot find bb2d_fck.\n",
-			 __func__, __LINE__);
-		goto fail;
-	}
-
-	GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
-		"BB2D clock is %ldMHz\n",
-		__func__, __LINE__, (clk_get_rate(g_bb2d_clk) / 1000000));
-
 	g_bb2d_dev = omap_hwmod_name_get_dev("bb2d");
 	if (g_bb2d_dev == NULL) {
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
@@ -1097,9 +1073,6 @@ static int __init gc_init(void)
 	return platform_driver_register(&plat_drv);
 fail:
 
-	if (g_bb2d_clk)
-		clk_put(g_bb2d_clk);
-
 	return -EINVAL;
 }
 
@@ -1116,8 +1089,7 @@ static void __exit gc_exit(void)
 	mutex_destroy(&g_maplock);
 	gc_set_power(GCPWR_OFF);
 
-	if (g_bb2d_clk)
-		clk_put(g_bb2d_clk);
+	pm_runtime_disable(gcdevice.dev);
 
 	if (g_debugRoot)
 		debugfs_remove_recursive(g_debugRoot);
