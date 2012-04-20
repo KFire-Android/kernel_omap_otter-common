@@ -40,66 +40,6 @@ void gc_delay(unsigned int milliseconds)
 }
 EXPORT_SYMBOL(gc_delay);
 
-enum gcerror gc_wait_completion(struct completion *completion,
-				unsigned int milliseconds)
-{
-	enum gcerror gcerror;
-	int timeout;
-
-	might_sleep();
-
-	spin_lock_irq(&completion->wait.lock);
-
-	if (completion->done) {
-		completion->done = 0;
-		gcerror = GCERR_NONE;
-	}  else if (milliseconds == 0) {
-		gcerror = GCERR_TIMEOUT;
-	} else {
-		DECLARE_WAITQUEUE(wait, current);
-
-		if (milliseconds == GC_INFINITE)
-#if GC_DETECT_TIMEOUT
-			timeout = GC_DIAG_SLEEP_JIF;
-#else
-			timeout = MAX_SCHEDULE_TIMEOUT;
-#endif
-		else
-			timeout = milliseconds * HZ / 1000;
-
-		wait.flags |= WQ_FLAG_EXCLUSIVE;
-		__add_wait_queue_tail(&completion->wait, &wait);
-
-		while (1) {
-			if (signal_pending(current)) {
-				/* Interrupt received. */
-				gcerror = GCERR_INTERRUPTED;
-				break;
-			}
-
-			__set_current_state(TASK_INTERRUPTIBLE);
-			spin_unlock_irq(&completion->wait.lock);
-			timeout = schedule_timeout(timeout);
-			spin_lock_irq(&completion->wait.lock);
-
-			if (completion->done) {
-				completion->done = 0;
-				gcerror = GCERR_NONE;
-				break;
-			}
-
-			timeout = GC_DIAG_SLEEP_JIF;
-		}
-
-		__remove_wait_queue(&completion->wait, &wait);
-	}
-
-	spin_unlock_irq(&completion->wait.lock);
-
-	return gcerror;
-}
-EXPORT_SYMBOL(gc_wait_completion);
-
 enum gcerror gc_acquire_mutex(struct mutex *mutex,
 				unsigned int milliseconds)
 {

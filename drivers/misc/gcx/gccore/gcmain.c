@@ -386,7 +386,12 @@ static unsigned int g_gccoredata;
 
 void gc_wait_interrupt(void)
 {
-	gc_wait_completion(&g_gccoreint, GC_INFINITE);
+	while (true) {
+		if (wait_for_completion_timeout(&g_gccoreint, HZ * 5))
+			break;
+
+		GCGPUSTATUS(NULL, 0, __func__, __LINE__, NULL);
+	}
 }
 
 unsigned int gc_get_interrupt_data(void)
