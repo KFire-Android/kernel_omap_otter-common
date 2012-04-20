@@ -17,7 +17,9 @@
 #include <linux/gcbv.h>
 #include "gcbv-priv.h"
 
-static struct bventry ops;
+static struct bventry ops = {
+	.structsize = sizeof(struct bventry),
+};
 
 void gcbv_clear(void)
 {

@@ -2327,8 +2327,10 @@ static enum bverror set_dst(struct bvbltparams *bltparams,
 	gcmodst->stride = dstgeom->virtstride;
 
 	/* Set surface width and height. */
+	gcmodst->rotation.raw = 0;
 	gcmodst->rotation.reg.surf_width = dstgeom->width + dstoffset;
 	gcmodst->rotationheight_ldst = gcmodst_rotationheight_ldst;
+	gcmodst->rotationheight.raw = 0;
 	gcmodst->rotationheight.reg.height = dstgeom->height;
 
 	GCPRINT(GCDBGFILTER, GCZONE_DEST, GC_MOD_PREFIX
@@ -2474,8 +2476,10 @@ static enum bverror set_clip(struct bvbltparams *bltparams,
 
 	/* Set clipping. */
 	gcmoclip->lt_ldst = gcmoclip_lt_ldst;
+	gcmoclip->lt.raw = 0;
 	gcmoclip->lt.reg.left = clipleftadj;
 	gcmoclip->lt.reg.top = cliptop;
+	gcmoclip->rb.raw = 0;
 	gcmoclip->rb.reg.right = cliprightadj;
 	gcmoclip->rb.reg.bottom = clipbottom;
 
@@ -2578,24 +2582,21 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 		goto exit;
 	}
 
-	memset(gcmofill, 0, sizeof(struct gcmofill));
-
-	GCPRINT(GCDBGFILTER, GCZONE_BUFFER, GC_MOD_PREFIX
-		"allocated %d of commmand buffer\n",
-		__func__, __LINE__, sizeof(struct gcmofill));
-
 	/***********************************************************************
 	** Set source.
 	*/
 
 	/* Set surface dummy width and height. */
 	gcmofill->src.rotation_ldst = gcmofillsrc_rotation_ldst;
+	gcmofill->src.rotation.raw = 0;
 	gcmofill->src.rotation.reg.surf_width = dstgeom->width;
+	gcmofill->src.config.raw = 0;
 	gcmofill->src.rotationheight_ldst = gcmofillsrc_rotationheight_ldst;
 	gcmofill->src.rotationheight.reg.height = dstgeom->height;
 
 	/* Disable alpha blending. */
 	gcmofill->src.alphacontrol_ldst = gcmofillsrc_alphacontrol_ldst;
+	gcmofill->src.alphacontrol.raw = 0;
 	gcmofill->src.alphacontrol.reg.enable = GCREG_ALPHA_CONTROL_ENABLE_OFF;
 
 	/***********************************************************************
@@ -2616,12 +2617,14 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 
 	/* Set destination configuration. */
 	gcmofill->start.config_ldst = gcmostart_config_ldst;
+	gcmofill->start.config.raw = 0;
 	gcmofill->start.config.reg.swizzle = batch->dstformat->swizzle;
 	gcmofill->start.config.reg.format = batch->dstformat->format;
 	gcmofill->start.config.reg.command = GCREG_DEST_CONFIG_COMMAND_CLEAR;
 
 	/* Set ROP3. */
 	gcmofill->start.rop_ldst = gcmostart_rop_ldst;
+	gcmofill->start.rop.raw = 0;
 	gcmofill->start.rop.reg.type = GCREG_ROP_TYPE_ROP3;
 	gcmofill->start.rop.reg.fg = (unsigned char) bltparams->op.rop;
 
@@ -2676,14 +2679,9 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 		goto exit;
 	}
 
-	memset(gcmomultisrc, 0, buffersize);
-
-	GCPRINT(GCDBGFILTER, GCZONE_BUFFER, GC_MOD_PREFIX
-		"allocated %d of commmand buffer\n",
-		__func__, __LINE__, buffersize);
-
 	/* Configure multi-source control. */
 	gcmomultisrc->control_ldst = gcmomultisrc_control_ldst;
+	gcmomultisrc->control.raw = 0;
 	gcmomultisrc->control.reg.srccount = batch->gcblit.srccount - 1;
 	gcmomultisrc->control.reg.horblock
 		= GCREG_DE_MULTI_SOURCE_HORIZONTAL_BLOCK_PIXEL128;
@@ -2705,6 +2703,7 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 		__func__, __LINE__, batch->dstformat->format);
 
 	gcmostart->config_ldst = gcmostart_config_ldst;
+	gcmostart->config.raw = 0;
 	gcmostart->config.reg.swizzle = batch->dstformat->swizzle;
 	gcmostart->config.reg.format = batch->dstformat->format;
 	gcmostart->config.reg.command = batch->gcblit.multisrc
@@ -2713,6 +2712,7 @@ static enum bverror do_blit_end(struct bvbltparams *bltparams,
 
 	/* Set ROP. */
 	gcmostart->rop_ldst = gcmostart_rop_ldst;
+	gcmostart->rop.raw = 0;
 	gcmostart->rop.reg.type = GCREG_ROP_TYPE_ROP3;
 	gcmostart->rop.reg.fg = (unsigned char) batch->gcblit.rop;
 
@@ -2749,6 +2749,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 	enum bverror unmap_bverror;
 
 	struct gcmosrc *gcmosrc;
+	struct gcmosrcalpha *gcmosrcalpha;
 
 	unsigned int i, index;
 
@@ -2941,9 +2942,10 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		}
 
 		/***************************************************************
-		** Allocate command buffer.
+		** Configure source.
 		*/
 
+		/* Allocate command buffer. */
 		bverror = claim_buffer(batch, sizeof(struct gcmosrc),
 					(void **) &gcmosrc);
 		if (bverror != BVERR_NONE) {
@@ -2951,16 +2953,6 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 				"failed to allocate command buffer");
 			goto exit;
 		}
-
-		memset(gcmosrc, 0, sizeof(struct gcmosrc));
-
-		GCPRINT(GCDBGFILTER, GCZONE_BUFFER, GC_MOD_PREFIX
-			"allocated %d of commmand buffer\n",
-			__func__, __LINE__, sizeof(struct gcmosrc));
-
-		/***************************************************************
-		** Configure source.
-		*/
 
 		/* Shortcut to the register index. */
 		index = batch->gcblit.srccount;
@@ -2975,10 +2967,12 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		gcmosrc->stride = srcgeom->virtstride;
 
 		gcmosrc->rotation_ldst = gcmosrc_rotation_ldst[index];
+		gcmosrc->rotation.raw = 0;
 		gcmosrc->rotation.reg.surf_width
 			= dstrect->left + srcgeom->width;
 
 		gcmosrc->config_ldst = gcmosrc_config_ldst[index];
+		gcmosrc->config.raw = 0;
 		gcmosrc->config.reg.swizzle = srcformat->swizzle;
 		gcmosrc->config.reg.format = srcformat->format;
 
@@ -2999,10 +2993,12 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			= dstrect->top + srcgeom->height;
 
 		gcmosrc->rop_ldst = gcmosrc_rop_ldst[index];
+		gcmosrc->rop.raw = 0;
 		gcmosrc->rop.reg.type = GCREG_ROP_TYPE_ROP3;
 		gcmosrc->rop.reg.fg = (unsigned char) batch->gcblit.rop;
 
 		gcmosrc->mult_ldst = gcmosrc_mult_ldst[index];
+		gcmosrc->mult.raw = 0;
 		gcmosrc->mult.reg.srcglobalpremul
 		= GCREG_COLOR_MULTIPLY_MODES_SRC_GLOBAL_PREMULTIPLY_DISABLE;
 
@@ -3027,18 +3023,29 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			= GCREG_COLOR_MULTIPLY_MODES_DST_DEMULTIPLY_DISABLE;
 		}
 
-		gcmosrc->alphacontrol_ldst = gcmosrc_alphacontrol_ldst[index];
-		gcmosrc->alphamodes_ldst = gcmosrc_alphamodes_ldst[index];
-		gcmosrc->srcglobal_ldst = gcmosrc_srcglobal_ldst[index];
-		gcmosrc->dstglobal_ldst = gcmosrc_dstglobal_ldst[index];
-
 		if ((gca != NULL) && ((srccount == 1) || (i > 0))) {
+			gcmosrc->alphacontrol_ldst
+				= gcmosrc_alphacontrol_ldst[index];
+			gcmosrc->alphacontrol.raw = 0;
 			gcmosrc->alphacontrol.reg.enable
 				= GCREG_ALPHA_CONTROL_ENABLE_ON;
 
-			gcmosrc->alphamodes.reg.src_global_alpha
+			/* Allocate command buffer. */
+			bverror = claim_buffer(batch,
+						sizeof(struct gcmosrcalpha),
+						(void **) &gcmosrcalpha);
+			if (bverror != BVERR_NONE) {
+				BVSETBLTERROR(BVERR_OOM,
+					"failed to allocate command buffer");
+				goto exit;
+			}
+
+			gcmosrcalpha->alphamodes_ldst
+				= gcmosrcalpha_alphamodes_ldst[index];
+			gcmosrcalpha->alphamodes.raw = 0;
+			gcmosrcalpha->alphamodes.reg.src_global_alpha
 				= gca->src_global_alpha_mode;
-			gcmosrc->alphamodes.reg.dst_global_alpha
+			gcmosrcalpha->alphamodes.reg.dst_global_alpha
 				= gca->dst_global_alpha_mode;
 
 			if (srccount == 1) {
@@ -3049,14 +3056,14 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 					"k2 sets dst blend.\n",
 					__func__, __LINE__);
 
-				gcmosrc->alphamodes.reg.src_blend
+				gcmosrcalpha->alphamodes.reg.src_blend
 					= gca->k1->factor_mode;
-				gcmosrc->alphamodes.reg.src_color_reverse
+				gcmosrcalpha->alphamodes.reg.src_color_reverse
 					= gca->k1->color_reverse;
 
-				gcmosrc->alphamodes.reg.dst_blend
+				gcmosrcalpha->alphamodes.reg.dst_blend
 					= gca->k2->factor_mode;
-				gcmosrc->alphamodes.reg.dst_color_reverse
+				gcmosrcalpha->alphamodes.reg.dst_color_reverse
 					= gca->k2->color_reverse;
 			} else {
 				GCPRINT(GCDBGFILTER, GCZONE_BLEND, GC_MOD_PREFIX
@@ -3066,14 +3073,14 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 					"k2 sets src blend.\n",
 					__func__, __LINE__);
 
-				gcmosrc->alphamodes.reg.src_blend
+				gcmosrcalpha->alphamodes.reg.src_blend
 					= gca->k2->factor_mode;
-				gcmosrc->alphamodes.reg.src_color_reverse
+				gcmosrcalpha->alphamodes.reg.src_color_reverse
 					= gca->k2->color_reverse;
 
-				gcmosrc->alphamodes.reg.dst_blend
+				gcmosrcalpha->alphamodes.reg.dst_blend
 					= gca->k1->factor_mode;
-				gcmosrc->alphamodes.reg.dst_color_reverse
+				gcmosrcalpha->alphamodes.reg.dst_color_reverse
 					= gca->k1->color_reverse;
 			}
 
@@ -3083,11 +3090,11 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			GCPRINT(GCDBGFILTER, GCZONE_BLEND, GC_MOD_PREFIX
 				"  factor = %d\n",
 				__func__, __LINE__,
-				gcmosrc->alphamodes.reg.dst_blend);
+				gcmosrcalpha->alphamodes.reg.dst_blend);
 			GCPRINT(GCDBGFILTER, GCZONE_BLEND, GC_MOD_PREFIX
 				"  inverse = %d\n",
 				__func__, __LINE__,
-				gcmosrc->alphamodes.reg.dst_color_reverse);
+				gcmosrcalpha->alphamodes.reg.dst_color_reverse);
 
 			GCPRINT(GCDBGFILTER, GCZONE_BLEND, GC_MOD_PREFIX
 				"src blend:\n",
@@ -3095,19 +3102,27 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			GCPRINT(GCDBGFILTER, GCZONE_BLEND, GC_MOD_PREFIX
 				"  factor = %d\n",
 				__func__, __LINE__,
-				gcmosrc->alphamodes.reg.src_blend);
+				gcmosrcalpha->alphamodes.reg.src_blend);
 			GCPRINT(GCDBGFILTER, GCZONE_BLEND, GC_MOD_PREFIX
 				"  inverse = %d\n",
 				__func__, __LINE__,
-				gcmosrc->alphamodes.reg.src_color_reverse);
+				gcmosrcalpha->alphamodes.reg.src_color_reverse);
 
-			gcmosrc->srcglobal.raw = gca->src_global_color;
-			gcmosrc->dstglobal.raw = gca->dst_global_color;
+			gcmosrcalpha->srcglobal_ldst
+				= gcmosrcalpha_srcglobal_ldst[index];
+			gcmosrcalpha->srcglobal.raw = gca->src_global_color;
+
+			gcmosrcalpha->dstglobal_ldst
+				= gcmosrcalpha_dstglobal_ldst[index];
+			gcmosrcalpha->dstglobal.raw = gca->dst_global_color;
 		} else {
 			GCPRINT(GCDBGFILTER, GCZONE_BLEND, GC_MOD_PREFIX
 				"blending disabled.\n",
 				__func__, __LINE__);
 
+			gcmosrc->alphacontrol_ldst
+				= gcmosrc_alphacontrol_ldst[index];
+			gcmosrc->alphacontrol.raw = 0;
 			gcmosrc->alphacontrol.reg.enable
 				= GCREG_ALPHA_CONTROL_ENABLE_OFF;
 		}

@@ -8331,8 +8331,6 @@ struct gcmodst {
 			struct gcregdstrotationheight reg;
 			unsigned int raw;
 		} rotationheight;
-
-	struct gcmoclip clip;
 };
 
 /*******************************************************************************
@@ -8409,21 +8407,21 @@ static const struct gccmdldstate gcmosrc_alphacontrol_ldst[4] = {
 	GCLDSTATE(gcregBlock4AlphaControlRegAddrs + 3, 1),
 };
 
-static const struct gccmdldstate gcmosrc_alphamodes_ldst[4] = {
+static const struct gccmdldstate gcmosrcalpha_alphamodes_ldst[4] = {
 	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 0, 1),
 	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 1, 1),
 	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 2, 1),
 	GCLDSTATE(gcregBlock4AlphaModesRegAddrs + 3, 1),
 };
 
-static const struct gccmdldstate gcmosrc_srcglobal_ldst[4] = {
+static const struct gccmdldstate gcmosrcalpha_srcglobal_ldst[4] = {
 	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 0, 1),
 	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 1, 1),
 	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 2, 1),
 	GCLDSTATE(gcregBlock4GlobalSrcColorRegAddrs + 3, 1),
 };
 
-static const struct gccmdldstate gcmosrc_dstglobal_ldst[4] = {
+static const struct gccmdldstate gcmosrcalpha_dstglobal_ldst[4] = {
 	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 0, 1),
 	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 1, 1),
 	GCLDSTATE(gcregBlock4GlobalDestColorRegAddrs + 2, 1),
@@ -8514,7 +8512,9 @@ struct gcmosrc {
 			struct gcregalphacontrol reg;
 			unsigned int raw;
 		} alphacontrol;
+};
 
+struct gcmosrcalpha {
 	/* gcregBlock4AlphaModesRegAddrs */
 	struct gccmdldstate alphamodes_ldst;
 
