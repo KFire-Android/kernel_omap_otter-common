@@ -50,6 +50,9 @@ series
 cscope.*
 ncscope.*
 
+# output dir
+binary2_540_120_omap4430_android_release
+
 *.orig
 *~
 \#*#
