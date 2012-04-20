@@ -532,11 +532,7 @@ enum gcerror gcpwr_enable_clock(enum gcpower prevstate)
 	enum gcerror gcerror = GCERR_NONE;
 	int ret;
 
-	if (g_clockenabled) {
-		GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
-			"clock is already enabled.\n",
-			__func__, __LINE__);
-	} else {
+	if (!g_clockenabled) {
 		/* Enable the clock. */
 		ret = clk_enable(g_bb2d_clk);
 		if (ret < 0) {
@@ -552,10 +548,10 @@ enum gcerror gcpwr_enable_clock(enum gcpower prevstate)
 
 		/* Clock enabled. */
 		g_clockenabled = true;
-		GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
-			"clock enabled.\n",
-			__func__, __LINE__);
 	}
+	GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
+		"clock %s.\n",
+		__func__, __LINE__, g_clockenabled ? "enabled" : "disabled");
 
 	if (prevstate == GCPWR_UNKNOWN)
 		gc_reset_gpu();
@@ -682,9 +678,13 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 			}
 			break;
 
+		case GCPWR_LOW:
+			gcpwr_enable_pulse_skipping(g_gcpower);
+			break;
+
 		case GCPWR_OFF:
 			gc_debug_poweroff_cache();
-			gcpwr_enable_pulse_skipping(g_gcpower);
+
 			gcpwr_disable_clock(g_gcpower);
 
 			if (g_irqenabled) {
@@ -830,8 +830,7 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	}
 
 exit:
-	/* Shut down. */
-	gc_set_power(GCPWR_OFF);
+	gc_set_power(GCPWR_LOW);
 
 	mutex_unlock(&mtx);
 

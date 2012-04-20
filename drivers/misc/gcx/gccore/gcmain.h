@@ -49,6 +49,7 @@ void gc_flush_pages(struct gcpage *p);
 enum gcpower {
 	GCPWR_UNKNOWN,
 	GCPWR_ON,
+	GCPWR_LOW,
 	GCPWR_OFF
 };
 
