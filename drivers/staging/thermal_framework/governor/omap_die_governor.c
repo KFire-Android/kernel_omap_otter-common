@@ -196,7 +196,7 @@ out:
 		return -ENODEV;
 	} else {
 		omap_gov->cooling_level = 0;
-		thermal_cooling_set_level(&cooling_agents,
+		thermal_device_call_all(&cooling_agents, cool_device,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
 		die_temp_lower = hotspot_temp_to_sensor_temp(
@@ -249,7 +249,7 @@ out:
 		return -ENODEV;
 	} else {
 		omap_gov->cooling_level = 0;
-		thermal_cooling_set_level(&cooling_agents,
+		thermal_device_call_all(&cooling_agents, cool_device,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
 		die_temp_lower = hotspot_temp_to_sensor_temp(
@@ -307,7 +307,7 @@ out:
 		if (omap_gov->panic_zone_reached == 0) {
 			/* Temperature rises and enters into alert zone */
 			omap_gov->cooling_level = 0;
-			thermal_cooling_set_level(&cooling_agents,
+			thermal_device_call_all(&cooling_agents, cool_device,
 						omap_gov->cooling_level);
 		}
 
@@ -364,7 +364,7 @@ out:
 		omap_gov->panic_zone_reached++;
 		pr_debug("%s: Panic zone reached %i times\n",
 			__func__, omap_gov->panic_zone_reached);
-		thermal_cooling_set_level(&cooling_agents,
+		thermal_device_call_all(&cooling_agents, cool_device,
 					omap_gov->cooling_level);
 		list_del_init(&cooling_agents);
 		die_temp_lower = hotspot_temp_to_sensor_temp(
