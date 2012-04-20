@@ -322,19 +322,6 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	n_tiler_pages = (PAGE_ALIGN(v_size) / PAGE_SIZE);
 
 #ifndef CONFIG_ION_OMAP_DYNAMIC
-	info = kzalloc(sizeof(struct omap_tiler_info) +
-		       sizeof(u32) * n_phys_pages +
-		       sizeof(u32) * n_tiler_pages, GFP_KERNEL);
-	if (!info)
-		goto err_alloc;
-
-	info->tiler_handle = tiler_handle;
-	info->tiler_start = tiler_start;
-	info->n_phys_pages = n_phys_pages;
-	info->n_tiler_pages = n_tiler_pages;
-	info->phys_addrs = (u32 *)(info + 1);
-	info->tiler_addrs = info->phys_addrs + n_phys_pages;
-
 	addr = ion_carveout_allocate(heap, n_phys_pages*PAGE_SIZE, 0);
 	if (addr == ION_CARVEOUT_ALLOCATE_FAIL) {
 		for (i = 0; i < n_phys_pages; i++) {
@@ -503,6 +490,24 @@ int omap_tiler_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
 			return ret;
 	}
 	return 0;
+}
+
+void *omap_tiler_heap_map_kernel(struct ion_heap *heap,
+				   struct ion_buffer *buffer)
+{
+	ion_phys_addr_t addr;
+	size_t len;
+
+	omap_tiler_phys(heap, buffer, &addr, &len);
+	return __arch_ioremap(addr, len, MT_MEMORY_NONCACHED);
+}
+
+void omap_tiler_heap_unmap_kernel(struct ion_heap *heap,
+				    struct ion_buffer *buffer)
+{
+	__arch_iounmap(buffer->vaddr);
+	buffer->vaddr = NULL;
+	return;
 }
 
 static struct ion_heap_ops omap_tiler_ops = {
