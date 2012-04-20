@@ -1751,6 +1751,134 @@ static struct omap_hwmod omap54xx_dss_rfbi_hwmod = {
 };
 
 /*
+ * 'emif' class
+ * external memory interface no1 (wrapper)
+ */
+
+static struct omap_hwmod_class_sysconfig omap54xx_emif_sysc = {
+	.rev_offs	= 0x0000,
+};
+
+static struct omap_hwmod_class omap54xx_emif_hwmod_class = {
+	.name	= "emif",
+	.sysc	= &omap54xx_emif_sysc,
+};
+
+/* emif1 */
+static struct omap_hwmod omap54xx_emif1_hwmod;
+static struct omap_hwmod_irq_info omap54xx_emif1_irqs[] = {
+	{ .irq = 110 + OMAP54XX_IRQ_GIC_START },
+	{ .irq = -1 }
+};
+
+/* emif_ocp_fw -> emif1 */
+static struct omap_hwmod_ocp_if omap54xx_emif_ocp_fw__emif1 = {
+	.master		= &omap54xx_emif_ocp_fw_hwmod,
+	.slave		= &omap54xx_emif1_hwmod,
+	.clk		= "l3_div_ck",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+static struct omap_hwmod_addr_space omap54xx_emif1_addrs[] = {
+	{
+		.pa_start	= 0x4c000000,
+		.pa_end		= 0x4c0003ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{ }
+};
+
+/* mpu -> emif1 */
+static struct omap_hwmod_ocp_if omap54xx_mpu__emif1 = {
+	.master		= &omap54xx_mpu_hwmod,
+	.slave		= &omap54xx_emif1_hwmod,
+	.clk		= "l3_div_ck",
+	.addr		= omap54xx_emif1_addrs,
+	.user		= OCP_USER_MPU,
+};
+
+/* emif1 slave ports */
+static struct omap_hwmod_ocp_if *omap54xx_emif1_slaves[] = {
+	&omap54xx_emif_ocp_fw__emif1,
+	&omap54xx_mpu__emif1,
+};
+
+static struct omap_hwmod omap54xx_emif1_hwmod = {
+	.name		= "emif1",
+	.class		= &omap54xx_emif_hwmod_class,
+	.clkdm_name	= "emif_clkdm",
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+	.mpu_irqs	= omap54xx_emif1_irqs,
+	.main_clk	= "l3_div_ck",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_EMIF_EMIF1_CLKCTRL_OFFSET,
+			.context_offs = OMAP54XX_RM_EMIF_EMIF1_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+	.slaves		= omap54xx_emif1_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap54xx_emif1_slaves),
+};
+
+/* emif2 */
+static struct omap_hwmod omap54xx_emif2_hwmod;
+static struct omap_hwmod_irq_info omap54xx_emif2_irqs[] = {
+	{ .irq = 111 + OMAP54XX_IRQ_GIC_START },
+	{ .irq = -1 }
+};
+
+/* emif_ocp_fw -> emif2 */
+static struct omap_hwmod_ocp_if omap54xx_emif_ocp_fw__emif2 = {
+	.master		= &omap54xx_emif_ocp_fw_hwmod,
+	.slave		= &omap54xx_emif2_hwmod,
+	.clk		= "l3_div_ck",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+static struct omap_hwmod_addr_space omap54xx_emif2_addrs[] = {
+	{
+		.pa_start	= 0x4d000000,
+		.pa_end		= 0x4d0003ff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{ }
+};
+
+/* mpu -> emif2 */
+static struct omap_hwmod_ocp_if omap54xx_mpu__emif2 = {
+	.master		= &omap54xx_mpu_hwmod,
+	.slave		= &omap54xx_emif2_hwmod,
+	.clk		= "l3_div_ck",
+	.addr		= omap54xx_emif2_addrs,
+	.user		= OCP_USER_MPU,
+};
+
+/* emif2 slave ports */
+static struct omap_hwmod_ocp_if *omap54xx_emif2_slaves[] = {
+	&omap54xx_emif_ocp_fw__emif2,
+	&omap54xx_mpu__emif2,
+};
+
+static struct omap_hwmod omap54xx_emif2_hwmod = {
+	.name		= "emif2",
+	.class		= &omap54xx_emif_hwmod_class,
+	.clkdm_name	= "emif_clkdm",
+	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+	.mpu_irqs	= omap54xx_emif2_irqs,
+	.main_clk	= "l3_div_ck",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_EMIF_EMIF2_CLKCTRL_OFFSET,
+			.context_offs = OMAP54XX_RM_EMIF_EMIF2_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+	.slaves		= omap54xx_emif2_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap54xx_emif2_slaves),
+};
+
+/*
  * 'gpio' class
  * general purpose io module
  */
@@ -4013,6 +4141,8 @@ static struct omap_hwmod_irq_info omap54xx_mpu_irqs[] = {
 static struct omap_hwmod_ocp_if *omap54xx_mpu_masters[] = {
 	&omap54xx_mpu__l3_main_1,
 	&omap54xx_mpu__l4_abe,
+	&omap54xx_mpu__emif1,
+	&omap54xx_mpu__emif2,
 };
 
 static struct omap_hwmod_addr_space omap54xx_mpu_addrs[] = {
@@ -5789,6 +5919,10 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_dss_dsi1_c_hwmod,
 	&omap54xx_dss_hdmi_hwmod,
 	&omap54xx_dss_rfbi_hwmod,
+
+	/* emif class */
+	&omap54xx_emif1_hwmod,
+	&omap54xx_emif2_hwmod,
 
 	/* gpio class */
 	&omap54xx_gpio1_hwmod,
