@@ -20,14 +20,27 @@
 
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
+#include <plat/omap_gcx.h>
+#include "prcm44xx.h"
+#include "cminst44xx.h"
+#include "cm2_44xx.h"
+#include "cm-regbits-44xx.h"
 
-/* gccore platform device data structure */
-struct gccore_plat_data {
-	void __iomem *base;
-	int irq;
+static u32 bb2d_clkctrl(void)
+{
+	return omap4_cminst_read_inst_reg(OMAP4430_CM2_PARTITION,
+			OMAP4430_CM2_DSS_INST,
+			OMAP4_CM_DSS_BB2D_CLKCTRL_OFFSET);
+}
+
+static u32 gcxxx_prcm_bb2d_idlest(void)
+{
+	return (bb2d_clkctrl() & OMAP4430_IDLEST_MASK) >> OMAP4430_IDLEST_SHIFT;
+}
+
+static struct omap_gcx_platform_data omap_gcxxx = {
+	.prcm_bb2d_idlest = gcxxx_prcm_bb2d_idlest,
 };
-
-static struct gccore_plat_data omap_gcxxx;
 
 struct omap_device_pm_latency omap_gcxxx_latency[] = {
 	{
@@ -56,9 +69,6 @@ int __init gcxxx_init(void)
 	oh = omap_hwmod_lookup(oh_name);
 	if (oh == NULL)
 		return -EINVAL;
-
-	omap_gcxxx.base = omap_hwmod_get_mpu_rt_va(oh);
-	omap_gcxxx.irq = oh->mpu_irqs[0].irq;
 
 	od = omap_device_build(dev_name, 0, oh, &omap_gcxxx,
 				sizeof(omap_gcxxx), omap_gcxxx_latency,
