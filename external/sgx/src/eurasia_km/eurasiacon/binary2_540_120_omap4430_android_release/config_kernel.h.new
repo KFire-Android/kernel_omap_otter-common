@@ -1,0 +1,2 @@
+#define ANDROID 
+#define PVR_NO_OMAP_TIMER 
