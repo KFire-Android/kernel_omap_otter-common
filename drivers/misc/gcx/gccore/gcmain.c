@@ -46,8 +46,6 @@
 #define DEVICE_REG_BASE	0x59000000
 #define DEVICE_REG_SIZE	(32 * 1024)
 
-#define GC_ENABLE_SUSPEND 0
-
 /* Driver context structure. */
 struct gccontext {
 	struct mmu2dcontext mmu;
@@ -971,7 +969,7 @@ static int gc_probe(struct platform_device *pdev)
 	return 0;
 }
 
-#ifndef CONFIG_HAS_EARLYSUSPEND
+#if defined(GC_ENABLE_SUSPEND)
 static int gc_suspend(struct platform_device *pdev, pm_message_t s)
 {
 	GCPRINT(GCDBGFILTER, GCZONE_POWER, "++" GC_MOD_PREFIX
@@ -1002,7 +1000,7 @@ static int gc_resume(struct platform_device *pdev)
 
 static struct platform_driver plat_drv = {
 	.probe = gc_probe,
-#if !defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
+#if defined(GC_ENABLE_SUSPEND)
 	.suspend = gc_suspend,
 	.resume = gc_resume,
 #endif
@@ -1011,39 +1009,6 @@ static struct platform_driver plat_drv = {
 		.name = "gccore",
 	},
 };
-
-#if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
-#include <linux/earlysuspend.h>
-
-static void gccore_early_suspend(struct early_suspend *h)
-{
-	GCPRINT(GCDBGFILTER, GCZONE_POWER, "++" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
-
-	if (gc_set_power(GCPWR_OFF))
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"early suspend failure.\n",
-			__func__, __LINE__);
-
-	GCPRINT(GCDBGFILTER, GCZONE_POWER, "--" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
-}
-
-static void gccore_late_resume(struct early_suspend *h)
-{
-	GCPRINT(GCDBGFILTER, GCZONE_POWER, "++" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
-
-	GCPRINT(GCDBGFILTER, GCZONE_POWER, "--" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
-}
-
-static struct early_suspend early_suspend_info = {
-	.suspend = gccore_early_suspend,
-	.resume = gccore_late_resume,
-	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
-};
-#endif
 
 /*******************************************************************************
  * Driver init/shutdown.
@@ -1123,10 +1088,6 @@ static int __init gc_init(void)
 
 	mutex_init(&g_maplock);
 
-#if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
-	register_early_suspend(&early_suspend_info);
-#endif
-
 	return platform_driver_register(&plat_drv);
 fail:
 	if (g_irqinstalled)
@@ -1149,11 +1110,6 @@ static void __exit gc_exit(void)
 		return;
 
 	platform_driver_unregister(&plat_drv);
-
-#if defined(CONFIG_HAS_EARLYSUSPEND) && GC_ENABLE_SUSPEND
-	unregister_early_suspend(&early_suspend_info);
-#endif
-
 	delete_context_map();
 	mutex_destroy(&g_maplock);
 	gc_set_power(GCPWR_OFF);
