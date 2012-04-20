@@ -8593,6 +8593,9 @@ struct gcmostart {
 	/* Start DE command. */
 	struct gccmdstartde startde;
 	struct gccmdstartderect rect;
+
+	/* PE cache flush. */
+	struct gcmoflush flush;
 };
 
 /*******************************************************************************
