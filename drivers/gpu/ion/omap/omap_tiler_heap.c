@@ -30,7 +30,6 @@
 #include <asm/page.h>
 
 #include "../ion_priv.h"
-#include <asm/cacheflush.h>
 
 #ifdef CONFIG_ION_OMAP_DYNAMIC
 #define FLUSH_PAGE
@@ -94,7 +93,6 @@ struct omap_tiler_info {
 	u32 *phys_addrs;		/* array addrs of pages */
 	u32 n_tiler_pages;		/* number of tiler pages */
 	u32 *tiler_addrs;		/* array of addrs of tiler pages */
-	int fmt;			/* tiler buffer format */
 	u32 tiler_start;		/* start addr in tiler -- if not page
 					   aligned this may not equal the
 					   first entry onf tiler_addrs */
@@ -336,7 +334,6 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	info->n_tiler_pages = n_tiler_pages;
 	info->phys_addrs = (u32 *)(info + 1);
 	info->tiler_addrs = info->phys_addrs + n_phys_pages;
-	info->fmt = data->fmt;
 
 	addr = ion_carveout_allocate(heap, n_phys_pages*PAGE_SIZE, 0);
 	if (addr == ION_CARVEOUT_ALLOCATE_FAIL) {
@@ -495,95 +492,17 @@ int omap_tiler_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
 	unsigned long addr = vma->vm_start;
 	u32 vma_pages = (vma->vm_end - vma->vm_start) / PAGE_SIZE;
 	int n_pages = min(vma_pages, info->n_tiler_pages);
-	int i, ret = 0;
+	int i, ret;
 
-	if (TILER_PIXEL_FMT_PAGE == info->fmt) {
-		/* Since 1D buffer is linear, map whole buffer in one shot */
+	for (i = vma->vm_pgoff; i < n_pages; i++, addr += PAGE_SIZE) {
 		ret = remap_pfn_range(vma, addr,
-				 __phys_to_pfn(info->tiler_addrs[0]),
-				(vma->vm_end - vma->vm_start),
-				(buffer->cached ?
-				(vma->vm_page_prot)
-				: pgprot_writecombine(vma->vm_page_prot)));
-	} else {
-		for (i = vma->vm_pgoff; i < n_pages; i++, addr += PAGE_SIZE) {
-			ret = remap_pfn_range(vma, addr,
-				 __phys_to_pfn(info->tiler_addrs[i]),
-				PAGE_SIZE,
-				pgprot_writecombine(vma->vm_page_prot));
-			if (ret)
-				return ret;
-		}
+				      __phys_to_pfn(info->tiler_addrs[i]),
+				      PAGE_SIZE,
+				      pgprot_noncached(vma->vm_page_prot));
+		if (ret)
+			return ret;
 	}
-	return ret;
-}
-
-static void per_cpu_cache_flush_arm(void *arg)
-{
-	   flush_cache_all();
-}
-
-int omap_tiler_cache_operation(struct ion_buffer *buffer, size_t len,
-			unsigned long vaddr, enum cache_operation cacheop)
-{
-	struct omap_tiler_info *info;
-	int n_pages;
-
-	if (!buffer) {
-		pr_err("%s(): buffer is NULL\n", __func__);
-		return -EINVAL;
-	}
-	if (!buffer->cached) {
-		pr_err("%s(): buffer not mapped as cacheable\n", __func__);
-		return -EINVAL;
-	}
-
-	info = buffer->priv_virt;
-	if (!info) {
-		pr_err("%s(): tiler info of buffer is NULL\n", __func__);
-		return -EINVAL;
-	}
-
-	n_pages = info->n_tiler_pages;
-	if (len > (n_pages * PAGE_SIZE)) {
-		pr_err("%s(): size to flush is greater than allocated size\n",
-			__func__);
-		return -EINVAL;
-	}
-
-	if (TILER_PIXEL_FMT_PAGE != info->fmt) {
-		pr_err("%s(): only TILER 1D buffers can be cached\n",
-			__func__);
-		return -EINVAL;
-	}
-
-	if (len > FULL_CACHE_FLUSH_THRESHOLD) {
-		on_each_cpu(per_cpu_cache_flush_arm, NULL, 1);
-		outer_flush_all();
-		return 0;
-	}
-
-	flush_cache_user_range(vaddr, vaddr + len);
-
-	if (cacheop == CACHE_FLUSH)
-		outer_flush_range(info->tiler_addrs[0],
-			info->tiler_addrs[0] + len);
-	else
-		outer_inv_range(info->tiler_addrs[0],
-			info->tiler_addrs[0] + len);
 	return 0;
-}
-
-int omap_tiler_heap_flush_user(struct ion_buffer *buffer, size_t len,
-			unsigned long vaddr)
-{
-	return omap_tiler_cache_operation(buffer, len, vaddr, CACHE_FLUSH);
-}
-
-int omap_tiler_heap_inval_user(struct ion_buffer *buffer, size_t len,
-			unsigned long vaddr)
-{
-	return omap_tiler_cache_operation(buffer, len, vaddr, CACHE_INVALIDATE);
 }
 
 static struct ion_heap_ops omap_tiler_ops = {
@@ -591,8 +510,6 @@ static struct ion_heap_ops omap_tiler_ops = {
 	.free = omap_tiler_heap_free,
 	.phys = omap_tiler_phys,
 	.map_user = omap_tiler_heap_map_user,
-	.flush_user = omap_tiler_heap_flush_user,
-	.inval_user = omap_tiler_heap_inval_user,
 };
 
 #ifdef CONFIG_ION_OMAP_DYNAMIC
