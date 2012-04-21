@@ -23,6 +23,7 @@ extern int omap3_idle_init(void);
 extern int omap4_idle_init(void);
 extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
 extern int (*omap_pm_suspend)(void);
+extern int omap5_idle_init(void);
 
 #if defined(CONFIG_PM_OPP)
 extern int omap3_opp_init(void);

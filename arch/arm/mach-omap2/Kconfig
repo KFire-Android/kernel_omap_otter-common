@@ -66,6 +66,7 @@ config ARCH_OMAP5
 	select ARM_ERRATA_761171
 	select ARM_ERRATA_4668
 	select ARM_ARCH_TIMER
+	select ARCH_NEEDS_CPU_IDLE_COUPLED
 
 comment "OMAP Core Type"
 	depends on ARCH_OMAP2
