@@ -251,6 +251,8 @@ static int __init omap_pm_init(void)
 		/* Overwrite the default arch_idle() */
 		arm_pm_idle = omap_default_idle;
 		omap4_idle_init();
+	} else if (cpu_is_omap54xx()) {
+		omap5_idle_init();
 	}
 
 err2:
