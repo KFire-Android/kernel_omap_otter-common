@@ -844,30 +844,26 @@ void gc_map(struct gcmap *gcmap)
 		__func__, __LINE__, (unsigned int) gcmap->logical);
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  pagearray = 0x%08X\n",
+		__func__, __LINE__, (unsigned int) gcmap->pagearray);
+
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
 		"  size = %d\n",
 		__func__, __LINE__, gcmap->size);
 
-	/* Initialize the mapping parameters. See if we were passed a list
-	 * of pages first
-	 */
-	if (gcmap->pagecount > 0 && gcmap->pagearray != NULL) {
-		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-			"got page array %p with %lu pages",
-			__func__, __LINE__, gcmap->pagearray, gcmap->pagecount);
-		mem.base = 0;
-		mem.offset = 0;
-		mem.count = gcmap->pagecount;
-		mem.pages = gcmap->pagearray;
-	} else {
-		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-			"gcmap->logical = %p\n",
-			__func__, __LINE__, gcmap->logical);
-		mem.base = ((u32) gcmap->logical) & ~(PAGE_SIZE - 1);
-		mem.offset = ((u32) gcmap->logical) & (PAGE_SIZE - 1);
-		mem.count = DIV_ROUND_UP(gcmap->size + mem.offset, PAGE_SIZE);
+	/* Initialize the mapping parameters. */
+	if (gcmap->pagearray == NULL) {
+		mem.base = ((u32) gcmap->buf.logical) & ~(PAGE_SIZE - 1);
+		mem.offset = ((u32) gcmap->buf.logical) & (PAGE_SIZE - 1);
 		mem.pages = NULL;
+	} else {
+		mem.base = 0;
+		mem.offset = gcmap->buf.offset;
+		mem.pages = gcmap->pagearray;
 	}
-	mem.pagesize = PAGE_SIZE;
+
+	mem.count = DIV_ROUND_UP(gcmap->size + mem.offset, PAGE_SIZE);
+	mem.pagesize = gcmap->pagesize ? gcmap->pagesize : PAGE_SIZE;
 
 	/* Map the buffer. */
 	gcmap->gcerror = mmu2d_map(&context->context->mmu, &mem, &mapped);

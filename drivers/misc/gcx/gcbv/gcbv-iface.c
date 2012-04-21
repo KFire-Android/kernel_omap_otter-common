@@ -17,7 +17,7 @@
 #include <linux/gcbv.h>
 #include "gcbv-priv.h"
 
-static struct bventry ops = {NULL, NULL, NULL};
+static struct bventry ops;
 
 void gcbv_clear(void)
 {

@@ -305,7 +305,6 @@ static int gc_map_wrapper(struct gcmap *gcmap)
 		goto exit;
 	}
 
-	kgcmap.pagecount = 0;
 	kgcmap.pagearray = NULL;
 
 	/* Call the core driver. */
@@ -315,7 +314,7 @@ static int gc_map_wrapper(struct gcmap *gcmap)
 	mapped = 1;
 
 exit:
-	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, logical))) {
+	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, buf))) {
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
 			"failed to write data.\n",
 			__func__, __LINE__);
@@ -349,7 +348,7 @@ static int gc_unmap_wrapper(struct gcmap *gcmap)
 	gc_unmap(&kgcmap);
 
 exit:
-	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, logical))) {
+	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, buf))) {
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
 			"failed to write data.\n",
 			__func__, __LINE__);
