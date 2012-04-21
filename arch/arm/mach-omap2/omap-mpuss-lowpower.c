@@ -87,7 +87,7 @@ extern void omap5_cpu_resume(void);
 static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
 static struct powerdomain *mpuss_pd;
 static void __iomem *sar_base;
-static u32 cpu_context_offset;
+static u32 cpu_context_offset, cpu_cswr_supported;
 
 static int default_finish_suspend(unsigned long cpu_state)
 {
@@ -265,6 +265,10 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		save_state = 1;
 		break;
 	case PWRDM_POWER_RET:
+		if (cpu_cswr_supported) {
+			save_state = 0;
+			break;
+		}
 	default:
 		/*
 		 * CPUx CSWR is invalid hardware state. Also CPUx OSWR
@@ -449,6 +453,7 @@ int __init omap4_mpuss_init(void)
 		omap_pm_ops.resume = omap5_cpu_resume;
 		cpu_context_offset = OMAP54XX_RM_CPU0_CPU0_CONTEXT_OFFSET;
 		enable_mercury_retention_mode();
+		cpu_cswr_supported = 1;
 	}
 
 	if (cpu_is_omap446x())

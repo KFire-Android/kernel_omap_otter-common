@@ -97,8 +97,10 @@ endif
 endif
 
 ifeq ($(CONFIG_CPU_IDLE),y)
+omap4plus-common-idle			= cpuidle_omap4plus.o
 obj-$(CONFIG_ARCH_OMAP3)                += cpuidle34xx.o
-obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
+obj-$(CONFIG_ARCH_OMAP4)		+= $(omap4plus-common-idle)
+obj-$(CONFIG_SOC_OMAP5)			+= $(omap4plus-common-idle)
 endif
 
 # PRCM
