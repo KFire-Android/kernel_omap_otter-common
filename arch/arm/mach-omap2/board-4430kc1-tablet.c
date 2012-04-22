@@ -245,31 +245,18 @@ static struct omap_musb_board_data musb_board_data = {
 	.power			= 100,
 };
 
-#if 0
+static int sdp4430_wifi_power_state;
+
 static int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 {
-	static int power_state;
+	printk(KERN_WARNING"%s: %d\n", __func__, power_on);
 
-	pr_debug("Powering %s wifi", (power_on ? "on" : "off"));
+	gpio_set_value(GPIO_WIFI_PMENA, power_on);
 
-	if (power_on == power_state)
-		return 0;
-	power_state = power_on;
-
-	if (power_on) {
-		gpio_set_value(GPIO_WIFI_PMENA, 1);
-		mdelay(15);
-		gpio_set_value(GPIO_WIFI_PMENA, 0);
-		mdelay(1);
-		gpio_set_value(GPIO_WIFI_PMENA, 1);
-		mdelay(70);
-	} else {
-		gpio_set_value(GPIO_WIFI_PMENA, 0);
-	}
+	sdp4430_wifi_power_state = power_on;
 
 	return 0;
 }
-#endif
 
 static struct omap2_hsmmc_info mmc[] = {
 	{
@@ -367,21 +354,9 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
 		pdata->slots[0].card_detect = twl6030_mmc_card_detect;
 	}
 
-#ifndef CONFIG_MMC_EMBEDDED_SDIO
 	/* Set the MMC5 (wlan) power function */
 	if (pdev->id == 4)
 		pdata->slots[0].set_power = wifi_set_power;
-#else
-	/* Setting MMC5 SDIO card .built-in variable
-	  * This is to make sure that if WiFi driver is not loaded
-	  * at all, then the MMC/SD/SDIO driver does not keep
-	  * turning on/off the voltage to the SDIO card
-	  */
-	if (pdev->id == 4) {
-		ret = 0;
-		pdata->slots[0].mmc_data.built_in = 1;
-	}
-#endif
 
 	return ret;
 }
@@ -649,8 +624,6 @@ static void omap_ilitek_init(void)
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux __initdata board_mux[] = {
-	OMAP4_MUX(SDMMC5_CLK, OMAP_MUX_MODE0 | OMAP_INPUT_EN | OMAP_OFF_EN
-					| OMAP_OFF_PULL_EN),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
