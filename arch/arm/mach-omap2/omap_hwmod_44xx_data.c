@@ -1946,6 +1946,11 @@ static struct omap_hwmod_opt_clk dsi1_opt_clks[] = {
 	{ .role = "sys_clk", .clk = "dss_sys_clk" },
 };
 
+static struct omap_hwmod_opt_clk dsi2_opt_clks[] = {
+	{ .role = "dss_clk", .clk = "dss_dss_clk" },
+	{ .role = "sys_clk", .clk = "dss_sys_clk" },
+};
+
 static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
 	.name		= "dss_dsi1",
 	.class		= &omap44xx_dsi_hwmod_class,
@@ -2037,6 +2042,8 @@ static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
 			.clkctrl_reg = OMAP4430_CM_DSS_DSS_CLKCTRL,
 		},
 	},
+	.opt_clks	= dsi2_opt_clks,
+	.opt_clks_cnt	= ARRAY_SIZE(dsi2_opt_clks),
 	.slaves		= omap44xx_dss_dsi2_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_dsi2_slaves),
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),

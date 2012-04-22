@@ -69,7 +69,6 @@ static struct omap_dss_device tablet_lcd_device = {
 			.data_lines	= 24,
 		},
 	},
-#if 0
 	.clocks		= {
 		.dispc	= {
 			.channel	= {
@@ -77,8 +76,9 @@ static struct omap_dss_device tablet_lcd_device = {
 				.pck_div        = 4,
 				.lcd_clk_src    = OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DISPC,
 			},
-			.dispc_fclk_src = OMAP_DSS_CLK_SRC_FCK,
+			.dispc_fclk_src = OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DISPC,
 		},
+#if 0
 		.dsi	= {
 			.regn		= 16, /*it is (N+1)*/
 			.regm		= 115,
@@ -86,8 +86,8 @@ static struct omap_dss_device tablet_lcd_device = {
 			.regm_dsi	= 3,
 			.dsi_fclk_src   = OMAP_DSS_CLK_SRC_DSI2_PLL_HSDIV_DSI,
 		},
-	},
 #endif
+	},
         .panel          = {
 		.config		= OMAP_DSS_LCD_TFT | OMAP_DSS_LCD_IVS |
 				  OMAP_DSS_LCD_IHS,

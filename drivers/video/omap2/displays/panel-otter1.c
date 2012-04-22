@@ -234,10 +234,11 @@ static void boxer_init_panel(void) {
 
 static void boxer_panel_work_func(struct work_struct *work)
 {
+#if 0
 	if (!regulator_is_enabled(boxer_panel_regulator)){
 		regulator_enable(boxer_panel_regulator);
 	}
-
+#endif
 	msleep(LCD_RST_DELAY);
 
 	boxer_spi_device->mode = SPI_MODE_0;
@@ -341,9 +342,11 @@ static void boxer_panel_stop(struct omap_dss_device *dssdev)
 		if (dssdev->platform_disable){
 			dssdev->platform_disable(dssdev);
 		}
+#if 0
 		if (regulator_is_enabled(boxer_panel_regulator)){
 			//regulator_disable(boxer_panel_regulator);
 		}
+#endif
 	} else {
 		printk(KERN_WARNING "%s: attempting to disable panel twice!\n",
 		       __func__);
@@ -443,6 +446,7 @@ static int boxer_spi_probe(struct spi_device *spi)
 {
 	int ret = 0;
 
+#if 0
 	boxer_panel_regulator = regulator_get(&spi->dev, "vlcd");
 	if (!regulator_is_enabled(boxer_panel_regulator)) {
 		if (g_ft_i2c_adapter) {
@@ -458,7 +462,7 @@ static int boxer_spi_probe(struct spi_device *spi)
 			goto out;
 		}
 	}
-
+#endif
 	spi->mode = SPI_MODE_0;
 	spi->bits_per_word = 16;
 	spi->chip_select=0;
@@ -478,8 +482,8 @@ static int boxer_spi_remove(struct spi_device *spi)
 	printk(KERN_INFO " boxer : %s called , line %d\n", __FUNCTION__ , __LINE__);
 	sysfs_remove_group(&spi->dev.kobj, &otter1_panel_attribute_group);
 	omap_dss_unregister_driver(&boxer_driver);
-	regulator_disable(boxer_panel_regulator);
-	regulator_put(boxer_panel_regulator);
+	//regulator_disable(boxer_panel_regulator);
+	//regulator_put(boxer_panel_regulator);
 	return 0;
 }
 
@@ -498,22 +502,16 @@ static int __init boxer_lcd_init(void)
 {
 	int ret = 0;
 
-#if 0
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
-	twl_i2c_write_u8(TWL_MODULE_PWM, 0x7F, LED_PWM2OFF);
-	//twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x30, TWL6030_TOGGLE3);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x08, TWL6030_TOGGLE3);
-	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x38, TWL6030_TOGGLE3);
-#endif
 	boxer_panel_wq = create_singlethread_workqueue("boxer-panel-wq");
 
+#if 0
 	if (IS_ERR(boxer_panel_regulator)) {
 		printk(KERN_ERR "Unable to get vlcd regulator, reason: %ld!\n",
 		       IS_ERR(boxer_panel_regulator));
 		ret = -ENODEV;
 		goto out;
 	}
-
+#endif
 	return spi_register_driver(&boxer_spi_driver);
 out:
 	return ret;

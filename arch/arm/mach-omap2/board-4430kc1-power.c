@@ -83,11 +83,6 @@ static struct regulator_init_data sdp4430_vana = {
 	},
 };
 
-static struct regulator_consumer_supply vcxio_supply[] = {
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi1"),
-};
-
 static struct regulator_init_data sdp4430_vcxio = {
 	.constraints = {
 		.min_uV			= 1800000,
@@ -97,10 +92,6 @@ static struct regulator_init_data sdp4430_vcxio = {
 		.state_mem		= { .enabled = false, .disabled = true, },
 		.always_on		= true,
 	},
-#if 0
-	.num_consumer_supplies	= ARRAY_SIZE(vcxio_supply),
-	.consumer_supplies	= vcxio_supply,
-#endif
 };
 
 static struct regulator_consumer_supply vdac_supply[] = {

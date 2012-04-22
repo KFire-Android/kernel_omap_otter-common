@@ -132,7 +132,11 @@ static struct platform_device sdp4430_pmic_thermal_sensor = {
 
 /* Panel Power */
 static struct regulator_consumer_supply lcd_supply[] = {
-	{ .supply = "vlcd" },
+//	REGULATOR_SUPPLY("vlcd", "otter1_panel_drv"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dss"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi1"),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi2"),
+//	{ .supply = "vdds_dsi", },
 };
 
 static struct regulator_init_data lcd_vinit = {
@@ -142,7 +146,7 @@ static struct regulator_init_data lcd_vinit = {
 		.valid_modes_mask = REGULATOR_MODE_NORMAL,
 		.valid_ops_mask = REGULATOR_CHANGE_STATUS,
 	},
-	.num_consumer_supplies = 1,
+	.num_consumer_supplies = ARRAY_SIZE(lcd_supply),
 	.consumer_supplies = lcd_supply,
 };
 
