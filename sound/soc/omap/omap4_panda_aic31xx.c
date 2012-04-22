@@ -95,7 +95,7 @@ static int omap4_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	struct snd_soc_codec *codec = rtd->codec;
+//	struct snd_soc_codec *codec = rtd->codec;
 
 	void __iomem *phymux_base = NULL;
 	int ret, gpio_status;
@@ -226,6 +226,7 @@ static int mic_power_up_event(struct snd_soc_dapm_widget *w,
 		/* Power down control of MICBIAS */
 		snd_soc_update_bits(codec, MICBIAS_CTRL, 0x03, 0x03);
 	}
+	return ret;
 }
 
 /* OMAP4 machine DAPM */
@@ -264,7 +265,7 @@ static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_codec *codec = rtd->codec;
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 	int ret = 0;
-	int gpiostatus;
+//	int gpiostatus;
 
 	printk(KERN_INFO "entered the omap4_aic31xx_init function....\n");
 
@@ -320,7 +321,7 @@ static int omap4_aic31xx_init(struct snd_soc_pcm_runtime *rtd)
 static int Qoo_headset_jack_status_check(void)
 {
 	int gpio_status, ret = 0;
-	struct aic31xx_priv *private_data;
+//	struct aic31xx_priv *private_data;
 	struct snd_soc_codec *codec = hs_jack.codec;
 	struct snd_soc_dapm_context *dapm = &codec->dapm;
 
@@ -378,8 +379,8 @@ static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	DBG("%s: CPU DAI %s BE_ID %d\n", __func__, cpu_dai->name, \
 						rtd->dai_link->be_id);
 
-	struct snd_interval *rate = hw_param_interval(params,
-			SNDRV_PCM_HW_PARAM_RATE);
+//	struct snd_interval *rate = hw_param_interval(params,
+//			SNDRV_PCM_HW_PARAM_RATE);
 	be_id = rtd->dai_link->be_id;
 
 	switch (be_id) {

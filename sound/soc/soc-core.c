@@ -1573,8 +1573,8 @@ out:
 		rtd->complete = 1;
 		card->num_rtd++;
 	}
-        printk (KERN_INFO "Codec %x Codec_Dai %x Platform %x CPU_DAI %x\n",
-		rtd->codec, rtd->codec_dai, rtd->platform, rtd->cpu_dai);
+//        printk (KERN_INFO "Codec %x Codec_Dai %x Platform %x CPU_DAI %x\n",
+//		rtd->codec, rtd->codec_dai, rtd->platform, rtd->cpu_dai);
 
         printk (KERN_INFO "-soc_bind_dai_link RTD %d\n", card->num_rtd);
 	return 1;
@@ -1838,7 +1838,7 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num, int order)
 
 	dev_dbg(card->dev, "probe %s dai link %d late %d\n",
 			card->name, num, order);
-        printk (KERN_INFO "soc_probe_dai_link %s %d %d\n", card->name, num, order);
+//        printk (KERN_INFO "soc_probe_dai_link %s %d %d\n", card->name, num, order);
 
 	/* config components */
 	codec_dai->codec = codec;
@@ -1849,7 +1849,7 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num, int order)
 
 	/* set default power off timeout */
 	rtd->pmdown_time = pmdown_time;
-        printk (KERN_INFO "cpu_dai->probed flag %d\n", cpu_dai->probed);
+//        printk (KERN_INFO "cpu_dai->probed flag %d\n", cpu_dai->probed);
 
 	/* probe the cpu_dai */
 	if (!cpu_dai->probed &&
@@ -1858,7 +1858,7 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num, int order)
 			return -ENODEV;
 
 		if (cpu_dai->driver->probe) {
-                        printk (KERN_INFO "invoking codec driver probe...\n"); 
+//                        printk (KERN_INFO "invoking codec driver probe...\n"); 
 			ret = cpu_dai->driver->probe(cpu_dai);
 			if (ret < 0) {
 				printk(KERN_ERR "asoc: failed to probe CPU DAI %s\n",
@@ -1866,15 +1866,15 @@ static int soc_probe_dai_link(struct snd_soc_card *card, int num, int order)
 				module_put(cpu_dai->dev->driver->owner);
 				return ret;
 			}
-                        printk (KERN_INFO "coming out of codec->driver probe...\n");
+//                        printk (KERN_INFO "coming out of codec->driver probe...\n");
 		}
-                printk (KERN_INFO "codec->driver->probe %x\n", codec->driver->probe);
+//                printk (KERN_INFO "codec->driver->probe %x\n", codec->driver->probe);
 
 		cpu_dai->probed = 1;
 		/* mark cpu_dai as probed and add to card cpu_dai list */
 		list_add(&cpu_dai->card_list, &card->dai_dev_list);
 	}
-        printk (KERN_INFO "platform driver probe %d\n", platform->probed);
+//        printk (KERN_INFO "platform driver probe %d\n", platform->probed);
 
 	/* probe the CODEC */
 	if (!codec->probed &&
@@ -2148,7 +2148,7 @@ static void snd_soc_instantiate_card(struct snd_soc_card *card)
 		snd_soc_dapm_new_controls(&card->dapm, card->dapm_widgets,
 					  card->num_dapm_widgets);
 
-        printk (KERN_INFO "checking Card->probe %x\n", card->probe); 
+//        printk (KERN_INFO "checking Card->probe %x\n", card->probe); 
 
 	/* initialise the sound card only once */
 	if (card->probe) {

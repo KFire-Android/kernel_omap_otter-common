@@ -560,7 +560,7 @@ int aic31xx_mic_check(struct snd_soc_codec *codec)
 static int aic31xx_set_bias_level(struct snd_soc_codec *codec,
 		enum snd_soc_bias_level level)
 {
-	struct aic31xx_priv *aic31xx = snd_soc_codec_get_drvdata(codec);
+//	struct aic31xx_priv *aic31xx = snd_soc_codec_get_drvdata(codec);
 
 	DBG("%s: Entered: level %d\n", __func__, level);
 
@@ -1156,8 +1156,8 @@ static int aic31xx_dac_power_up_event(struct snd_soc_dapm_widget *w,
 			} while ((counter < 20) && ((value & 0x08) != 0));
 		printk(KERN_INFO "RDAC powered down, counter = %d\n", counter);
 		}
-	return 0;
 	}
+	return 0;
 }
 
 static int aic31xx_adc_power_up_event(struct snd_soc_dapm_widget *w,
@@ -1278,9 +1278,9 @@ static int aic31xx_hp_power_up_event(struct snd_soc_dapm_widget *w,
 				counter++;
 			} while ((counter < 10) && ((value & 0x02) != 0));
 		printk(KERN_INFO "##HPR Power down Iterations %d\r\n", counter);
-		return 0;
 		}
 	}
+	return 0;
 }
 
 static int aic31xx_sp_event(struct snd_soc_dapm_widget *w,
@@ -1338,17 +1338,18 @@ static int aic31xx_sp_event(struct snd_soc_dapm_widget *w,
 		printk(KERN_INFO "##SPR Power down Iterations %d\r\n", counter);
 
 		}
-	return 0;
 	}
+	return 0;
 }
 
 static int pll_power_on_event(struct snd_soc_dapm_widget *w, \
 			struct snd_kcontrol *kcontrol, int event)
 {
-	struct snd_soc_codec *codec = w->codec;
+//	struct snd_soc_codec *codec = w->codec;
 
-	if (event == SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD)
+	if (event == (SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD))
 		mdelay(10);
+	return 0;
 }
 
 /* Left Output Mixer */
