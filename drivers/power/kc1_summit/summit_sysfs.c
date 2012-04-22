@@ -18,7 +18,7 @@ extern int fast_current[];
 //====================================================================================================
 static ssize_t summit_version_show(struct device *dev, struct device_attribute *attr,char *buf)
 {
-    //struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
+//    struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
     ssize_t result=0;
     result=sprintf(buf, "%s\n", "2011/7/9--1.1");
     return result;
@@ -34,7 +34,7 @@ static ssize_t summit_ondemand_show(struct device *dev, struct device_attribute 
 static ssize_t summit_ondemand_store(struct device *dev, struct device_attribute *attr,const char *buf,size_t len)
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
-    //char *buffer;
+//    char *buffer;
     int enable=0;
     enable = (int)simple_strtoul(buf, NULL, 10);
     if(enable){
@@ -66,14 +66,14 @@ static ssize_t summit_apsd_setting_show(struct device *dev, struct device_attrib
 static ssize_t summit_apsd_setting_store(struct device *dev, struct device_attribute *attr,const char *buf,size_t len)
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
-    //char *buffer;
+//    char *buffer;
     int enable=0;
     enable = (int)simple_strtoul(buf, NULL, 10);
     summit_config_apsd(di,enable);
     return len;
 }
 
-static ssize_t summit_apsd_status_show(struct device *dev, struct device_attribute *attr,char *buf) // ,size_t len)
+static ssize_t summit_apsd_status_show(struct device *dev, struct device_attribute *attr,char *buf) //,size_t len
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
     ssize_t result=0;
@@ -130,7 +130,7 @@ static ssize_t summit_aicl_setting_store(struct device *dev, struct device_attri
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
     int config=0;
-    //char *buffer;
+//    char *buffer;
     int enable=0;
     config=i2c_smbus_read_byte_data(di->client,2);
     enable = (int)simple_strtoul(buf, NULL, 10);
@@ -138,7 +138,7 @@ static ssize_t summit_aicl_setting_store(struct device *dev, struct device_attri
     return len;
 }
 
-static ssize_t summit_aicl_status_show(struct device *dev, struct device_attribute *attr,char *buf) // ,size_t len)
+static ssize_t summit_aicl_status_show(struct device *dev, struct device_attribute *attr,char *buf) //,size_t len
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
     ssize_t result=0;
@@ -178,7 +178,7 @@ static ssize_t summit_mode_store(struct device *dev, struct device_attribute *at
     return len;
 }
 
-static ssize_t summit_mode_status_show(struct device *dev, struct device_attribute *attr,char *buf) //,size_t len)
+static ssize_t summit_mode_status_show(struct device *dev, struct device_attribute *attr,char *buf) //,size_t len
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
     ssize_t result=0;
@@ -236,7 +236,7 @@ static ssize_t summit_charge_store(struct device *dev, struct device_attribute *
 	return len;
 }
 
-static ssize_t summit_charge_status_show(struct device *dev, struct device_attribute *attr,char *buf) //,size_t len)
+static ssize_t summit_charge_status_show(struct device *dev, struct device_attribute *attr,char *buf) //,size_t len
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
     ssize_t result=0;
@@ -310,7 +310,7 @@ static ssize_t summit_present_show(struct device *dev, struct device_attribute *
 static ssize_t summit_fake_disconnect_store(struct device *dev, struct device_attribute *attr,const char *buf,size_t len)
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
-    //char *buffer;
+//    char *buffer;
     int value = simple_strtoul(buf, NULL, 10);
     if(value==1){
         di->fake_disconnect=1;
@@ -351,7 +351,7 @@ Bit9 : Battert too weak protection
 static ssize_t summit_protect_enable_store(struct device *dev, struct device_attribute *attr,const char *buf,size_t len)
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
-    // char *buffer;
+//    char *buffer;
     int value = simple_strtoul(buf, NULL, 10);
     printk("value=%d\n",value);
     if(value>=1 && value <=10){
@@ -364,7 +364,7 @@ static ssize_t summit_protect_enable_store(struct device *dev, struct device_att
 static ssize_t summit_protect_disable_store(struct device *dev, struct device_attribute *attr,const char *buf,size_t len)
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
-    // bchar *buffer;
+//    char *buffer;
     int value = simple_strtoul(buf, NULL, 10);
     printk("value=%d\n",value);
     if(value>=1 && value <=10){
@@ -426,7 +426,7 @@ static ssize_t summit_fast_current_show(struct device *dev, struct device_attrib
 static ssize_t summit_fast_current_store(struct device *dev, struct device_attribute *attr,const char *buf,size_t len)
 {
     struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
-    // char *buffer;
+//    char *buffer;
     int value=0;
     value = (int)simple_strtoul(buf, NULL, 10);
     if(value>=0 && value <=7){
@@ -436,7 +436,7 @@ static ssize_t summit_fast_current_store(struct device *dev, struct device_attri
 }
 
 static ssize_t summit_charge_current_show(struct device *dev,
-		struct device_attribute *attr, char *buf) //, size_t len)
+		struct device_attribute *attr, char *buf) //, size_t len
 {
 	int val = 0;
 	struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
@@ -512,9 +512,9 @@ static ssize_t summit_charge_current_store(struct device *dev,
 	return len;
 }
 static ssize_t summit_bad_battery_show(struct device *dev,
-		struct device_attribute *attr, char *buf) //, size_t len)
+		struct device_attribute *attr, char *buf) //, size_t len
 {
-	// int val = 0;
+//	int val = 0;
 	struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
 	return sprintf(buf, "%d\n",di->bad_battery);
 }
@@ -522,7 +522,7 @@ static ssize_t summit_bad_battery_show(struct device *dev,
 static ssize_t summit_bad_battery_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
-	// int i = 0;
+//	int i = 0;
 	struct summit_smb347_info *di = i2c_get_clientdata(to_i2c_client(dev));
 	int value = simple_strtoul(buf, NULL, 10);
 	if(value ==1){

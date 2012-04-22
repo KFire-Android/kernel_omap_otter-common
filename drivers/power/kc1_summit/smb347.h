@@ -103,6 +103,7 @@ struct summit_smb347_info {
     struct notifier_block       usb_notifier;
 	struct delayed_work	disconnect_work;
     struct wake_lock chrg_lock;
+    struct wake_lock summit_lock;
 };
 enum usb_charger_states
 {

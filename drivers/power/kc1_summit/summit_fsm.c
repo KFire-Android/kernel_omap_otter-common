@@ -85,7 +85,7 @@ const char *fsm_event_string(int event)
 }
 void summit_fsm_stateTransform(struct summit_smb347_info *di,int event)
 {
-    int vbus_state;
+//    int vbus_state;
     int state=di->current_state;
     if(event==USB_EVENT_NONE && state != STATE_SHUTDOWN) {
             state=STATE_SUSPEND;
@@ -167,7 +167,8 @@ extern void twl6030_poweroff(void);
 void summit_fsm_doAction(struct summit_smb347_info *di,int event)
 {
     int state=di->current_state;
-    int temp=0;    u32 value;
+    int temp=0;
+//    u32 value;
     int config,command=0;
     u8  pre_protect_event=0;
     switch (state){

@@ -21,6 +21,13 @@
 #include <asm/unaligned.h>
 #include <plat/led.h>
 #include "kc1_summit/smb347.h"
+#if defined(CONFIG_LAB126)
+#include <linux/metricslog.h>
+
+#if defined(CONFIG_EARLYSUSPEND)
+#include <linux/earlysuspend.h>
+#endif
+#endif
 #undef BAT_LOG
 
 struct bq27541_info  {
@@ -61,6 +68,9 @@ struct bq27541_info  {
 	unsigned int		full_charge_uncompensated;
 	unsigned int		long_count;
 	unsigned int		manufacturer_id_read_count;
+#if defined(CONFIG_LAB126) && defined(CONFIG_EARLYSUSPEND)
+	struct early_suspend	early_suspend;
+#endif
 };
 
 enum bat_events
@@ -81,7 +91,7 @@ static int fake_temp;static int fake_full_available_capacity;
 #define NOT_RECOGNIZE  -2
 #define ATL            0
 #define THM            1
-
+#define SWE            2
 
 #define BAT_NORMAL_STATE                0x00
 #define BAT_CRITICAL_STATE              0x01
@@ -275,13 +285,16 @@ int bq27x00_get_property(struct power_supply *psy,
             
             switch(di->manufacturer){
                 case NOT_RECOGNIZE:
-                     val->strval = "NOT_RECOGNIZE";
+                     val->strval = "UNKNOWN";
                 break;
                 case ATL:
                      val->strval = "ATL";
                 break;
                 case THM:
                      val->strval = "THM";
+                break;
+                case SWE:
+                    val->strval = "SWE";
                 break;
                 default:
                      val->strval = "UNKNOWN";
@@ -636,7 +649,7 @@ void bat_log_work_func(struct work_struct *work)
     struct bq27541_info *di = container_of(work,
                 struct bq27541_info, bat_log_work.work);
     sprintf(buf,"%s:def:capacity=%d,current=%d,voltage=%d",__func__,di->capacity,di->current_avg,di->voltage);
-    //log_to_metrics(ANDROID_LOG_INFO, "Battery", buf);
+    log_to_metrics(ANDROID_LOG_INFO, "Battery", buf);
     if(di->state==BAT_CRITICAL_STATE)
         queue_delayed_work(bat_work_queue,&di->bat_log_work,
                             msecs_to_jiffies(60000 * 1));
@@ -920,13 +933,13 @@ update_status:
 		power_supply_changed(&di->bat);
 
 		// LED function
-		u8 led_value = 0;
+		u8 value = 0;
 
 		if ((di->disable_led == 0) &&
-			!twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &led_value, 0x03)) {
+			!twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &value, 0x03)) {
 
 		        if ((di->status == POWER_SUPPLY_STATUS_CHARGING)
-					&& (led_value & (1 << 2))) {
+					&& (value & (1 << 2))) {
 				if(di->capacity < 90) {
 					/*
 					 * Battery being charged, capacity < 90%: Amber LED
@@ -941,7 +954,7 @@ update_status:
 					omap4430_green_led_set(NULL, 255);
 				}
 		        } else if (di->status == POWER_SUPPLY_STATUS_FULL) {
-				if (led_value & (1 << 2)) {
+				if (value & (1 << 2)) {
 					/* Set to green if connected to USB */
 					omap4430_orange_led_set(NULL, 0);
 					omap4430_green_led_set(NULL, 255);
@@ -984,11 +997,27 @@ enum power_supply_property bq27x00_battery_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 };
 
+#if defined(CONFIG_LAB126)
+static struct timespec bq27541_suspend_time;
+static int bq27541_suspend_capacity = -1;
+#endif
+
 static int bq27541_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-    struct bq27541_info *di = i2c_get_clientdata(client);
-    cancel_delayed_work(&di->bat_monitor_work);    
-    return 0;
+	struct bq27541_info *di = i2c_get_clientdata(client);
+
+	cancel_delayed_work_sync(&di->bat_monitor_work);
+
+#if defined(CONFIG_LAB126)
+	int value = -1;
+
+	/* Use the cached value */
+	bq27541_suspend_capacity = di->capacity;
+
+	bq27541_suspend_time = current_kernel_time();
+#endif
+
+	return 0;
 }
 
 static int bq27541_resume(struct i2c_client *client)
@@ -996,6 +1025,30 @@ static int bq27541_resume(struct i2c_client *client)
     struct bq27541_info *di = i2c_get_clientdata(client);
     int err = 0;
     int new_value=0;
+
+	static int first_resume = 1;
+	static struct timespec last_resume_time;
+
+	if (first_resume == 0) {
+		/* Make sure we don't query less than 5 seconds */
+		struct timespec resume_diff;
+
+		resume_diff = timespec_sub(current_kernel_time(),
+				last_resume_time);
+
+		long resume_diff_ms = resume_diff.tv_sec * 1000
+					+ resume_diff.tv_nsec / NSEC_PER_MSEC;
+
+		if (resume_diff_ms < 5000) {
+			dev_warn(di->dev,
+				"Resuming too frequently, not querying\n");
+			return 0;
+		}
+	} else {
+		first_resume = 0;
+	}
+
+	last_resume_time = current_kernel_time();
 
     //Low battery protection
 //	printk(KERN_INFO "at %s\n", __FUNCTION__);
@@ -1014,6 +1067,28 @@ static int bq27541_resume(struct i2c_client *client)
     power_supply_changed(&di->bat);  
     queue_delayed_work(bat_work_queue,&di->bat_monitor_work,
             msecs_to_jiffies(2500 * 1));
+
+#if defined(CONFIG_LAB126)
+	/* Compute elapsed time and determine battery drainage */
+	struct timespec diff = timespec_sub(current_kernel_time(),
+				bq27541_suspend_time);
+
+	if (!err && bq27541_suspend_capacity != -1) {
+		char buf[512];
+		snprintf(buf, sizeof(buf), "suspend_drain:def:value=%d,elapsed=%ld:",
+			bq27541_suspend_capacity - new_value,
+			diff.tv_sec * 1000 + diff.tv_nsec / NSEC_PER_MSEC);
+		log_to_metrics(ANDROID_LOG_INFO, "drain_metrics", buf);
+		dev_info(di->dev, "Suspend drainage: %d %% over %ld msecs\n",
+			bq27541_suspend_capacity - new_value,
+			diff.tv_sec * 1000 + diff.tv_nsec / NSEC_PER_MSEC);
+	} else {
+		log_to_metrics(ANDROID_LOG_INFO, "drain_metrics",
+			"suspend_drain:def:value=-1,elapsed=-1:");
+		dev_err(di->dev, "Unable to obtain suspend drainage\n");
+	}
+#endif
+
     return 0;
 }
 
@@ -1223,13 +1298,14 @@ static struct attribute_group bq_attr_grp = {
 /*Manufacturer id check function */
 static int bat_name[3][8] = {
 {0x41,0x54,0x4C,0x20,0x4B,0x43,0x31,0x20}, //ATL KC1
-{0x54,0x48,0x4D,0x20,0x4B,0x43,0x31,0x20}   //THM KC1
+{0x54,0x48,0x4D,0x20,0x4B,0x43,0x31,0x20},   //THM KC1
+{0x53,0x57,0x45,0x20,0x4B,0x43,0x31,0x20}    //SWE KC1
 };
 
 static int check_manufacturer(struct bq27541_info *di)
 {
 	u8 m_name[8];
-	int i = 0, offset = 0; //, value = 0, ret = -1;
+	int i = 0, ret = -1, offset = 0, value = 0;
 
 	i2c_smbus_write_byte_data(di->bat_client, BQ27541_DATAFLASHBLOCK, 1);
 	mdelay(10);
@@ -1243,7 +1319,7 @@ static int check_manufacturer(struct bq27541_info *di)
 		return UNKNOW;
 	}
 
-    for(i=0;i<2;i++){
+    for(i=0;i<3;i++){
         for(offset=0;offset<8;offset++){
             if(m_name[offset]!=bat_name[i][offset])
                 break;
@@ -1292,9 +1368,9 @@ static ssize_t bq_proc_write(struct file *filp,
     	const char *buff,unsigned long len, void *data)
 {
     struct bq27541_info *di=data;
-    u32 reg_val; //,value;
-    // int event  = USB_EVENT_VBUS;
-    char messages[256]; //, vol[256];
+    u32 reg_val,value;
+    int event  = USB_EVENT_VBUS;
+    char messages[256], vol[256];
 
     if (len > 256)
     	len = 256;
@@ -1407,6 +1483,59 @@ void remove_bq_procfs(void)
     remove_proc_entry(BQ_PROC_FILE, NULL);
 }
 #endif
+
+#if defined(CONFIG_LAB126) && defined(CONFIG_EARLYSUSPEND)
+
+static struct timespec bq27541_early_suspend_time;
+static int bq27541_early_suspend_capacity = -1;
+
+static void bq27541_early_suspend(struct early_suspend *handler)
+{
+	int value = -1;
+	struct bq27541_info *di = container_of(handler, struct bq27541_info,
+			early_suspend);
+
+	/* Use the cached value */
+	bq27541_early_suspend_capacity = di->capacity;
+
+	bq27541_early_suspend_time = current_kernel_time();
+
+	return;
+};
+
+static void bq27541_late_resume(struct early_suspend *handler)
+{
+	int value = -1;
+	struct bq27541_info *di = container_of(handler, struct bq27541_info,
+			early_suspend);
+
+	/* Compute elapsed time and determine battery drainage */
+	struct timespec diff = timespec_sub(current_kernel_time(),
+				bq27541_early_suspend_time);
+
+	value = di->capacity;
+
+	if (bq27541_early_suspend_capacity != -1) {
+		char buf[512];
+		snprintf(buf, sizeof(buf),
+			"screen_off_drain:def:value=%d,elapsed=%ld:",
+			bq27541_early_suspend_capacity - value,
+			diff.tv_sec * 1000 + diff.tv_nsec / NSEC_PER_MSEC);
+		log_to_metrics(ANDROID_LOG_INFO, "drain_metrics", buf);
+		dev_info(di->dev, "Screen off drainage: %d %% over %ld msecs\n",
+			bq27541_early_suspend_capacity - value,
+			diff.tv_sec * 1000 + diff.tv_nsec / NSEC_PER_MSEC);
+	} else {
+		log_to_metrics(ANDROID_LOG_INFO, "drain_metrics",
+			"screen_off_drain:def:value=-1,elapsed=-1:");
+		dev_err(di->dev, "Unable to obtain screen off drainage\n");
+	}
+
+	return;
+}
+
+#endif
+
 static int __devinit bq27541_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct bq27541_info *di;
@@ -1447,7 +1576,7 @@ static int __devinit bq27541_probe(struct i2c_client *client, const struct i2c_d
 /*Manufacturer id check function */
     di->manufacturer=check_manufacturer(di);
     bq27x00_read(REG_FULL_AVAILABLE_CHARGE, &g_full_available_capacity, 0, di);
-    create_bq_procfs(di);
+    //create_bq_procfs(di);
 #ifdef BAT_LOG
     INIT_DELAYED_WORK_DEFERRABLE(&di->bat_log_work,bat_log_work_func);
 #endif
@@ -1462,6 +1591,14 @@ static int __devinit bq27541_probe(struct i2c_client *client, const struct i2c_d
     	dev_dbg(di->dev,"could not create sysfs_create_group\n");
     	return -1;
     }
+
+#if defined(CONFIG_LAB126) && defined(CONFIG_EARLYSUSPEND)
+	di->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1;
+	di->early_suspend.suspend = bq27541_early_suspend;
+	di->early_suspend.resume = bq27541_late_resume;
+	register_early_suspend(&di->early_suspend);
+#endif
+
     return 0;
 }
 
@@ -1498,7 +1635,7 @@ static struct i2c_driver bq27541_i2c_driver = {
     .probe = bq27541_probe,
     .remove = bq27541_remove,
     .id_table = bq27541_id,
-    .shutdown = bq27541_shutdown,
+	.shutdown = bq27541_shutdown,
 };
 
 static int __init bq27541_init(void)

@@ -45,15 +45,15 @@ static ssize_t summit_proc_write(struct file *filp,
     	const char *buff,unsigned long len, void *data)
 {
     struct summit_smb347_info *di=data;
-    struct regulator *p_regulator = regulator_get(NULL, "usb-phy");
+    struct regulator *p_regulator = regulator_get(NULL, "vusb");
     //printk(KERN_INFO "%s\n",__func__);
     u32 reg_val,value;
 //    void __iomem *addr = NULL;
-    int event  = USB_EVENT_VBUS;
+//    int event  = USB_EVENT_VBUS;
     struct clk *phyclk;
     struct clk *clk48m;
     struct clk *clk32k;
-    int hw_state=0;
+//    int hw_state=0;
     char messages[256], vol[256];
     phyclk = clk_get(NULL, "ocp2scp_usb_phy_ick");
     if (IS_ERR(phyclk)) {

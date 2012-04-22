@@ -15,23 +15,22 @@
 #include <linux/gpio.h>
 #include "smb347.h"
 
-struct workqueue_struct *summit_work_queue;
-
+struct workqueue_struct    *summit_work_queue;
 static int kc1_chargerdetect_setting[] = {
-	/*0*/ FCC_2500mA | PCC_150mA | TC_250mA,															//0xed,
-	/*1*/ DC_ICL_1800mA | USBHC_ICL_1800mA,																//0x66,
-	/*2*/ SUS_CTRL_BY_REGISTER | BAT_TO_SYS_NORMAL | VFLT_PLUS_200mV | AICL_ENABLE | AIC_TH_4200mV | USB_IN_FIRST | BAT_OV_END_CHARGE,				//0xb6,
-	/*3*/ PRE_CHG_VOLTAGE_THRESHOLD_3_0 | FLOAT_VOLTAGE_4_2_0,													//0xe3,
-	/*4*/ AUTOMATIC_RECHARGE_ENABLE|CURRENT_TERMINATION_ENABLE|BMD_VIA_THERM_IO|AUTO_RECHARGE_100mV|APSD_ENABLE|NC_APSD_ENABLE|SECONDARY_INPUT_NOT_ACCEPTED_IN_OVLO,//0x3e,
-	/*5*/ STAT_ACTIVE_LOW|STAT_CHARGEING_STATE|STAT_ENABLE|NC_INPUT_HC_SETTING|CC_TIMEOUT_764MIN|PC_TIMEOUT_48MIN,//0x1f,
-	/*6*/ LED_BLINK_DISABLE|EN_PIN_ACTIVE_LOW|USB_HC_CONTROL_BY_PIN|USB_HC_DUAL_STATE|CHARGER_ERROR_NO_IRQ|APSD_DONE_IRQ|DCIN_INPUT_PRE_BIAS_ENABLE,//0x7B
-	/*7*/ 0x80|MIN_SYS_3_4_5_V|THERM_MONITOR_VDDCAP|THERM_MONITOR_ENABLE|SOFT_COLD_CC_FV_COMPENSATION|SOFT_HOT_CC_FV_COMPENSATION,//0xaf,THERM Control A
-	/*8*/ INOK_OPERATION|USB_2|VFLT_MINUS_240mV|HARD_TEMP_CHARGE_SUSPEND|PC_TO_FC_THRESHOLD_ENABLE|INOK_ACTIVE_LOW,//0x18,SYSOK and USB3.0 Selection
-	/*9*/ RID_DISABLE_OTG_I2C_CONTROL|OTG_PIN_ACTIVE_HIGH|LOW_BAT_VOLTAGE_3_4_6_V,//0x0e,
-	/*a*/ CCC_700mA|DTRT_130C|OTG_CURRENT_LIMIT_500mA|OTG_BAT_UVLO_THRES_2_7_V,//0x28,OTG, TLIM and THERM Control
-	/*b*/ 0x61,//xxxxxxx
-	/*c*/ AICL_COMPLETE_TRIGGER_IRQ,//0x02
-	/*d*/ INOK_TRIGGER_IRQ|LOW_BATTERY_TRIGGER_IRQ,//0x5,
+/*0*/FCC_2500mA|PCC_150mA|TC_250mA,                                                     //0xed,
+/*1*/DC_ICL_1800mA|USBHC_ICL_1800mA,                                                    //0x66,
+/*2*/SUS_CTRL_BY_REGISTER|BAT_TO_SYS_NORMAL|VFLT_PLUS_200mV|AICL_ENABLE|AIC_TH_4200mV|USB_IN_FIRST|BAT_OV_END_CHARGE,    //0xb6,
+/*3*/PRE_CHG_VOLTAGE_THRESHOLD_3_0|FLOAT_VOLTAGE_4_2_0,                                        //0xe3,
+/*4*/AUTOMATIC_RECHARGE_ENABLE|CURRENT_TERMINATION_ENABLE|BMD_VIA_THERM_IO|AUTO_RECHARGE_100mV|APSD_ENABLE|NC_APSD_ENABLE|SECONDARY_INPUT_NOT_ACCEPTED_IN_OVLO,//0x3e,
+/*5*/STAT_ACTIVE_LOW|STAT_CHARGEING_STATE|STAT_ENABLE|NC_INPUT_HC_SETTING|CC_TIMEOUT_764MIN|PC_TIMEOUT_48MIN,//0x1f,
+/*6*/LED_BLINK_DISABLE|EN_PIN_ACTIVE_LOW|USB_HC_CONTROL_BY_PIN|USB_HC_DUAL_STATE|CHARGER_ERROR_NO_IRQ|APSD_DONE_IRQ|DCIN_INPUT_PRE_BIAS_ENABLE,//0x7B
+/*7*/0x80|MIN_SYS_3_4_5_V|THERM_MONITOR_VDDCAP|THERM_MONITOR_ENABLE|SOFT_COLD_CC_FV_COMPENSATION|SOFT_HOT_CC_FV_COMPENSATION,//0xaf,THERM Control A
+/*8*/INOK_OPERATION|USB_2|VFLT_MINUS_240mV|HARD_TEMP_CHARGE_SUSPEND|PC_TO_FC_THRESHOLD_ENABLE|INOK_ACTIVE_LOW,//0x18,SYSOK and USB3.0 Selection
+/*9*/RID_DISABLE_OTG_I2C_CONTROL|OTG_PIN_ACTIVE_HIGH|LOW_BAT_VOLTAGE_3_4_6_V,//0x0e,
+/*a*/CCC_700mA|DTRT_130C|OTG_CURRENT_LIMIT_500mA|OTG_BAT_UVLO_THRES_2_7_V,//0x28,OTG, TLIM and THERM Control
+/*b*/0x61,//xxxxxxx
+/*c*/AICL_COMPLETE_TRIGGER_IRQ,//0x02
+/*d*/INOK_TRIGGER_IRQ|LOW_BATTERY_TRIGGER_IRQ,//0x5,
 };
 static int kc1_chargerdetect_setting_pvt[] = {
 /*0*/FCC_2500mA|PCC_150mA|TC_200mA,                                                     //0xed,
@@ -50,22 +49,22 @@ static int kc1_chargerdetect_setting_pvt[] = {
 /*d*/INOK_TRIGGER_IRQ|LOW_BATTERY_TRIGGER_IRQ,//0x5,
 };
 static int kc1_phydetect_setting[] = {
-	FCC_2500mA|PCC_150mA|TC_150mA,													//0xe0,
-	DC_ICL_1800mA|USBHC_ICL_1800mA,													//0x66,
-	SUS_CTRL_BY_REGISTER|BAT_TO_SYS_NORMAL | VFLT_PLUS_200mV | AICL_ENABLE|AIC_TH_4200mV | USB_IN_FIRST|BAT_OV_END_CHARGE,		//0x17,
-	//SUS_CTRL_BY_REGISTER|BAT_TO_SYS_NORMAL | VFLT_PLUS_200mV | AICL_DISABLE | AIC_TH_4200mV | USB_IN_FIRST | BAT_OV_END_CHARGE,	//0x17,
-	PRE_CHG_VOLTAGE_THRESHOLD_3_0|FLOAT_VOLTAGE_4_2_0,										//0xe3,
-	//detect by omap
-	AUTOMATIC_RECHARGE_ENABLE | CURRENT_TERMINATION_ENABLE | BMD_VIA_THERM_IO|AUTO_RECHARGE_100mV | APSD_DISABLE | NC_APSD_DISABLE | SECONDARY_INPUT_NOT_ACCEPTED_IN_OVLO,	//0xf0,
-	STAT_ACTIVE_LOW | STAT_CHARGEING_STATE | STAT_DISABLE | NC_INPUT_HC_SETTING | CC_TIMEOUT_DISABLED | PC_TIMEOUT_DISABLED,	//0x1f,
-	LED_BLINK_DISABLE | CHARGE_EN_I2C_0 | USB_HC_CONTROL_BY_REGISTER | USB_HC_TRI_STATE | CHARGER_ERROR_NO_IRQ | APSD_DONE_IRQ | DCIN_INPUT_PRE_BIAS_ENABLE,		//0x79
-	0X80 | MIN_SYS_3_4_5_V | THERM_MONITOR_VDDCAP | SOFT_COLD_NO_RESPONSE | SOFT_HOT_NO_RESPONSE,					//0xa0,
-	INOK_OPERATION | USB_2 | VFLT_MINUS_60mV | PC_TO_FC_THRESHOLD_ENABLE | HARD_TEMP_CHARGE_SUSPEND | INOK_ACTIVE_LOW,		//0x04,
-	RID_DISABLE_OTG_I2C_CONTROL | OTG_PIN_ACTIVE_HIGH | LOW_BAT_VOLTAGE_3_5_8_V,							//0x0e,
-	CCC_700mA | DTRT_130C | OTG_CURRENT_LIMIT_500mA | OTG_BAT_UVLO_THRES_2_7_V,							//0x78,
-	0x61,
-	TEMP_OUTSIDE_COLD_HOT_HARD_LIMIITS_TRIGGER_IRQ | TEMP_OUTSIDE_COLD_HOT_SOFT_LIMIITS_TRIGGER_IRQ | USB_OVER_VOLTAGE_TRIGGER_IRQ | USB_UNDER_VOLTAGE_TRIGGER_IRQ | AICL_COMPLETE_TRIGGER_IRQ,
-	CHARGE_TIMEOUT_TRIGGER_IRQ | TERMINATION_OR_TAPER_CHARGING_TRIGGER_IRQ | FAST_CHARGING_TRIGGER_IRQ | INOK_TRIGGER_IRQ | MISSING_BATTERY_TRIGGER_IRQ | LOW_BATTERY_TRIGGER_IRQ,	//0x83,
+FCC_2500mA|PCC_150mA|TC_150mA,                                                     //0xe0,
+DC_ICL_1800mA|USBHC_ICL_1800mA,                                                   //0x66,
+SUS_CTRL_BY_REGISTER|BAT_TO_SYS_NORMAL|VFLT_PLUS_200mV|AICL_ENABLE|AIC_TH_4200mV|USB_IN_FIRST|BAT_OV_END_CHARGE,    //0x17,
+//SUS_CTRL_BY_REGISTER|BAT_TO_SYS_NORMAL|VFLT_PLUS_200mV|AICL_DISABLE|AIC_TH_4200mV|USB_IN_FIRST|BAT_OV_END_CHARGE,    //0x17,
+PRE_CHG_VOLTAGE_THRESHOLD_3_0|FLOAT_VOLTAGE_4_2_0,                                        //0xe3,
+//detect by omap
+AUTOMATIC_RECHARGE_ENABLE|CURRENT_TERMINATION_ENABLE|BMD_VIA_THERM_IO|AUTO_RECHARGE_100mV|APSD_DISABLE|NC_APSD_DISABLE|SECONDARY_INPUT_NOT_ACCEPTED_IN_OVLO,//0xf0,
+STAT_ACTIVE_LOW|STAT_CHARGEING_STATE|STAT_DISABLE|NC_INPUT_HC_SETTING|CC_TIMEOUT_DISABLED|PC_TIMEOUT_DISABLED,//0x1f,
+LED_BLINK_DISABLE|CHARGE_EN_I2C_0|USB_HC_CONTROL_BY_REGISTER|USB_HC_TRI_STATE|CHARGER_ERROR_NO_IRQ|APSD_DONE_IRQ|DCIN_INPUT_PRE_BIAS_ENABLE,//0x79
+0X80|MIN_SYS_3_4_5_V|THERM_MONITOR_VDDCAP|SOFT_COLD_NO_RESPONSE|SOFT_HOT_NO_RESPONSE,//0xa0,
+INOK_OPERATION|USB_2|VFLT_MINUS_60mV|PC_TO_FC_THRESHOLD_ENABLE|HARD_TEMP_CHARGE_SUSPEND|INOK_ACTIVE_LOW,//0x04,
+RID_DISABLE_OTG_I2C_CONTROL|OTG_PIN_ACTIVE_HIGH|LOW_BAT_VOLTAGE_3_5_8_V,//0x0e,
+CCC_700mA|DTRT_130C|OTG_CURRENT_LIMIT_500mA|OTG_BAT_UVLO_THRES_2_7_V,//0x78,
+0x61,
+TEMP_OUTSIDE_COLD_HOT_HARD_LIMIITS_TRIGGER_IRQ|TEMP_OUTSIDE_COLD_HOT_SOFT_LIMIITS_TRIGGER_IRQ|USB_OVER_VOLTAGE_TRIGGER_IRQ|USB_UNDER_VOLTAGE_TRIGGER_IRQ|AICL_COMPLETE_TRIGGER_IRQ,
+CHARGE_TIMEOUT_TRIGGER_IRQ|TERMINATION_OR_TAPER_CHARGING_TRIGGER_IRQ|FAST_CHARGING_TRIGGER_IRQ|INOK_TRIGGER_IRQ|MISSING_BATTERY_TRIGGER_IRQ| LOW_BATTERY_TRIGGER_IRQ,//0x83,
 };
 
 int aicl_results[]={
@@ -74,96 +73,88 @@ int aicl_results[]={
 int accc[]={
     100,150,200,250,700,900,1200,1500,1800,2000,2200,2500
 };
-
-int summit_bat_notifier_call(struct notifier_block *nb, unsigned long val, void *priv)
+int summit_bat_notifier_call(struct notifier_block *nb, unsigned long val,
+         void *priv)
 {
-	int result = NOTIFY_OK;
-	struct summit_smb347_info* di_smb;
+    int result = NOTIFY_OK;
+//    unsigned long flags;
+    struct summit_smb347_info* di= container_of(nb, struct summit_smb347_info, bat_notifier);
+    printk("%s val=%lu \n",__func__,val);
+    ////spin_lock_irqsave(&di->lock, flags);
+    writeIntoCBuffer(&di->events,val);
+    queue_delayed_work_on(0,summit_work_queue,&di->summit_monitor_work,0);
+    //spin_unlock_irqrestore(&di->lock, flags);
+    return result;
 
-	// unsigned long flags;
-	printk("%s val=%d \n",__func__,val);
-	di_smb = container_of(nb, struct summit_smb347_info, bat_notifier);
-	// spin_lock_irqsave(&di_smb->lock, flags);
-	writeIntoCBuffer(&di_smb->events,val);
-	queue_delayed_work_on(0, summit_work_queue, &di_smb->summit_monitor_work, 0);
-	// spin_unlock_irqrestore(&di_smb->lock, flags);
-	return result;
 }
-
-int summit_usb_notifier_call(struct notifier_block *nb, unsigned long val, void *priv)
+int summit_usb_notifier_call(struct notifier_block *nb, unsigned long val,
+         void *priv)
 {
-	int result = NOTIFY_OK;
-	// unsigned long flags;
-	struct summit_smb347_info* di= container_of(nb, struct summit_smb347_info, usb_notifier);
-	if (val==USB_EVENT_DETECT_SOURCE)
-		wake_lock(&di->chrg_lock);
-	writeIntoCBuffer(&di->events,val);
-	queue_delayed_work_on(0,summit_work_queue,&di->summit_monitor_work,0);
-	return result;
+    int result = NOTIFY_OK;
+//    unsigned long flags;
+    struct summit_smb347_info* di= container_of(nb, struct summit_smb347_info, usb_notifier);
+    if(val==USB_EVENT_DETECT_SOURCE)
+        wake_lock(&di->chrg_lock);
+    writeIntoCBuffer(&di->events,val);
+    queue_delayed_work_on(0,summit_work_queue,&di->summit_monitor_work,0);
+    
+    return result;
 }
-
 static irqreturn_t summit_charger_interrupt(int irq, void *_di)
 {
-	struct summit_smb347_info *di = _di;
-	// unsigned long flags;
-	// spin_lock_irqsave(&di->lock, flags);
-	writeIntoCBuffer(&di->events,EVENT_INTERRUPT_FROM_CHARGER);
-	// schedule_work(&di->summit_monitor_work);
-	queue_delayed_work_on(0,summit_work_queue,&di->summit_monitor_work,msecs_to_jiffies(100));
-	//spin_unlock_irqrestore(&di->lock, flags);
-	return IRQ_HANDLED;
+    struct summit_smb347_info *di = _di;
+//    unsigned long flags;
+    wake_lock(&di->summit_lock);
+    writeIntoCBuffer(&di->events,EVENT_INTERRUPT_FROM_CHARGER);
+    queue_delayed_work_on(0,summit_work_queue,&di->summit_monitor_work,0);
+    return IRQ_HANDLED;
 }
-
 void summit_monitor_work_func(struct work_struct *work){
-	struct summit_smb347_info *di = container_of(work,struct summit_smb347_info, summit_monitor_work.work);
-	mdelay(100);
-	while(isCBufferNotEmpty(&di->events)) {
-		int event = readFromCBuffer(&di->events);
-	if (event==EVENT_INTERRUPT_FROM_CHARGER) {
-		summit_read_interrupt_a(di);
-		mdelay(1);
-		summit_read_interrupt_b(di);
-		mdelay(1);
-		summit_read_interrupt_c(di);
-		mdelay(1);
-		summit_read_interrupt_d(di);
-		mdelay(1);
-		summit_read_interrupt_e(di);
-		mdelay(1);
-		summit_read_interrupt_f(di);
-        } else {
-		summit_fsm_stateTransform(di,event); 
+    struct summit_smb347_info *di = container_of(work,struct summit_smb347_info, summit_monitor_work.work);
+    while(isCBufferNotEmpty(&di->events)) {
+        int event=readFromCBuffer(&di->events);
+        if(event==EVENT_INTERRUPT_FROM_CHARGER){
+            summit_read_interrupt_a(di);
+            mdelay(1);
+            summit_read_interrupt_b(di);
+            mdelay(1);
+            summit_read_interrupt_c(di);
+            mdelay(1);
+            summit_read_interrupt_d(di);
+            mdelay(1);
+            summit_read_interrupt_e(di);
+            mdelay(1);
+            summit_read_interrupt_f(di);
+            wake_unlock(&di->summit_lock);
+        }else{
+            summit_fsm_stateTransform(di,event); 
         }  
-        mdelay(100); 
     }
-    mdelay(100);
 }
-
-void summit_check_work_func(struct work_struct *work) {
-	struct summit_smb347_info *di = container_of(work,struct summit_smb347_info, summit_check_work.work);
-	printk("%s\n",__func__);
-	summit_read_interrupt_d(di);
+void summit_check_work_func(struct work_struct *work){
+    struct summit_smb347_info *di = container_of(work,struct summit_smb347_info, summit_check_work.work);
+    printk("%s\n",__func__);
+    summit_read_interrupt_d(di);
 }
-
 /*
 * Battery missing detect only has effect when enable charge.
 *
 **/
 int summit_check_bmd(struct summit_smb347_info *di){
-	int value = 0;
-    	int result = 0;
-	value = i2c_smbus_read_byte_data(di->client,SUMMIT_SMB347_INTSTAT_REG_B);
-	// dev_dbg(di->dev,"INTERRUPT_STATUS_B=0x%x\n",value);
-	result = BAT_MISS_STATUS_BIT(value);
-	if (result) {
-		dev_dbg(di->dev,"%s:Battery Miss\n",__func__);
-	} else {
-		dev_dbg(di->dev,"%s:Battery Not Miss\n",__func__);
-	}
-	return result;
+    int value=0;
+    int result=0;
+    value=i2c_smbus_read_byte_data(di->client,SUMMIT_SMB347_INTSTAT_REG_B);
+    //dev_dbg(di->dev,"INTERRUPT_STATUS_B=0x%x\n",value);
+    result=BAT_MISS_STATUS_BIT(value);
+    if(result){
+        dev_dbg(di->dev,"%s:Battery Miss\n",__func__);
+    }else{
+        dev_dbg(di->dev,"%s:Battery Not Miss\n",__func__);
+    }
+    return result;
 }
 
-void summit_switch_mode(struct summit_smb347_info *di,int mode) {
+void summit_switch_mode(struct summit_smb347_info *di,int mode){
     int command=0;
     int value=0;
     value=i2c_smbus_read_byte_data(di->client,SUMMIT_SMB347_ENABLE_CONTROL);
@@ -290,7 +281,8 @@ void summit_config_suspend_by_register(struct summit_smb347_info *di,int byregis
     summit_write_config(di,0);
 }
 void summit_suspend_mode(struct summit_smb347_info *di,int enable){
-    int config; //,result=0;
+    int config;
+//    int result=0;
     int command=0;
     config=i2c_smbus_read_byte_data(di->client,SUMMIT_SMB347_FUNCTIONS); 
     if(IS_BIT_SET(config,7)){//Controlled by Register
@@ -366,20 +358,16 @@ void summit_write_config(struct summit_smb347_info *di,int enable){
     }else{
         COMMAND_NOT_ALLOW_WRITE_TO_CONFIG_REGISTER(command);
     }    
-    i2c_smbus_write_byte_data(di->client, SUMMIT_SMB347_COMMAND_REG_A, command);
+    i2c_smbus_write_byte_data(di->client,SUMMIT_SMB347_COMMAND_REG_A,command);
 }
-
 extern void twl6030_poweroff();
 extern int get_battery_mAh();
-
 int pre_current[4] = {
-	100, 150, 200, 250
+100,150,200,250
 };
-
 int fast_current[8] = {
-	700, 900, 1200, 1500, 1800, 2000, 2200, 2500
+700,900,1200,1500,1800,2000,2200,2500
 };
-
 int summit_find_pre_cc(int cc){
     int i=0;
     for(i=3;i>-1;i--){
@@ -703,44 +691,43 @@ int summit_get_mode(struct summit_smb347_info *di){
     temp=value;
     return USB15_HC_MODE(temp);
 }
-int summit_get_apsd_result(struct summit_smb347_info *di) {
-	int status, result;
-	status = i2c_smbus_read_byte_data(di->client,SUMMIT_SMB347_STATUS_REG_D);
-	result = status;
-	if(APSD_STATUS(status)) {
-		switch(APSD_RESULTS(result)){
-			case APSD_NOT_RUN:
-				dev_info(di->dev,"APSD_NOT_RUN\n");
-				// return APSD_NOT_RUN;
-			break;
-			case APSD_CHARGING_DOWNSTREAM_PORT:
-				dev_info(di->dev,"CHARGING_DOWNSTREAM_PORT\n");  
-				return USB_EVENT_HOST_CHARGER;
-			break;
-			case APSD_DEDICATED_DOWNSTREAM_PORT:
-				dev_info(di->dev,"DEDICATED_DOWNSTREAM_PORT\n");
-				return USB_EVENT_CHARGER;
-			break;
-			case APSD_OTHER_DOWNSTREAM_PORT:
-				dev_info(di->dev,"OTHER_DOWNSTREAM_PORT\n");
-				return EVENT_DETECT_OTHER;
-			break;
-			case APSD_STANDARD_DOWNSTREAM_PORT:
-				dev_info(di->dev,"STANDARD_DOWNSTREAM_PORT\n");
-				return EVENT_DETECT_PC;
-			break;
-			case APSD_ACA_CHARGER:
-				dev_info(di->dev,"ACA_CHARGER\n");
-			break;
-			case APSD_TBD:
-				dev_info(di->dev,"TBD\n");
-				return EVENT_DETECT_TBD;
-			break;
-		} 
-	} else {
-		dev_dbg(di->dev,"APSD Not Completed\n");
-		return EVENT_APSD_NOT_COMPLETE;
-	}
+int summit_get_apsd_result(struct summit_smb347_info *di){
+    int status,result;
+    status=i2c_smbus_read_byte_data(di->client,SUMMIT_SMB347_STATUS_REG_D);
+    result=status;
+    if(APSD_STATUS(status)){
+        switch(APSD_RESULTS(result)){
+            case APSD_NOT_RUN:
+                dev_info(di->dev,"APSD_NOT_RUN\n");
+            break;
+            case APSD_CHARGING_DOWNSTREAM_PORT:
+                dev_info(di->dev,"CHARGING_DOWNSTREAM_PORT\n");  
+                return USB_EVENT_HOST_CHARGER;
+            break;
+            case APSD_DEDICATED_DOWNSTREAM_PORT:
+                dev_info(di->dev,"DEDICATED_DOWNSTREAM_PORT\n");
+                return USB_EVENT_CHARGER;
+            break;
+            case APSD_OTHER_DOWNSTREAM_PORT:
+                dev_info(di->dev,"OTHER_DOWNSTREAM_PORT\n");
+                return EVENT_DETECT_OTHER;
+            break;
+            case APSD_STANDARD_DOWNSTREAM_PORT:
+                dev_info(di->dev,"STANDARD_DOWNSTREAM_PORT\n");
+                return EVENT_DETECT_PC;
+            break;
+            case APSD_ACA_CHARGER:
+                dev_info(di->dev,"ACA_CHARGER\n");
+            break;
+            case APSD_TBD:
+                dev_info(di->dev,"TBD\n");
+                return EVENT_DETECT_TBD;           
+            break;
+        } 
+    }else{
+         dev_dbg(di->dev,"APSD NOt Completed\n");
+         return EVENT_APSD_NOT_COMPLETE;
+    }
 }
 int summit_get_aicl_result(struct summit_smb347_info *di){
     int value=0;
@@ -748,8 +735,8 @@ int summit_get_aicl_result(struct summit_smb347_info *di){
     return aicl_results[AICL_RESULT(value)];
 }
 void summit_read_interrupt_a(struct summit_smb347_info *di){
-	int value=0;
-	// unsigned long flags;
+    int value=0;
+//    unsigned long flags;
     value=i2c_smbus_read_byte_data(di->client,SUMMIT_SMB347_INTSTAT_REG_A);
     //dev_dbg(di->dev,"==============================================\n");
     //dev_dbg(di->dev,"interrupt_a=0x%x\n",value);
@@ -873,7 +860,7 @@ void summit_read_interrupt_c(struct summit_smb347_info *di){
 }
 void summit_read_interrupt_d(struct summit_smb347_info *di){
     int value=0;
-	// unsigned long flags;
+//    unsigned long flags;
     value=i2c_smbus_read_byte_data(di->client,SUMMIT_SMB347_INTSTAT_REG_D);
     //dev_dbg(di->dev,"==============================================\n");
     //dev_dbg(di->dev,"interrupt_d=0x%x\n",value);
@@ -1198,14 +1185,14 @@ void summit_smb347_read_id(struct summit_smb347_info *di)
 #if 1
 static int summit_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-    //struct summit_smb347_info *di = i2c_get_clientdata(client);
+//    struct summit_smb347_info *di = i2c_get_clientdata(client);
 
     return 0;
 }
 
 static int summit_resume(struct i2c_client *client)
 {
-    //struct summit_smb347_info *di = i2c_get_clientdata(client);
+//    struct summit_smb347_info *di = i2c_get_clientdata(client);
     //summit_check_low_battery(di);
     return 0;
 }
@@ -1237,10 +1224,10 @@ static int __devinit summit_probe(struct i2c_client *client, const struct i2c_de
 
     int ret;
     int status;
-    // int temp;
+//    int temp
     int config=0;
-    u8 value = 0;
-    // u8 controller_stat = 0;
+    int value=0;
+//    u8 controller_stat = 0;
     printk(KERN_INFO "%s\n",__func__);
     di = kzalloc(sizeof(*di), GFP_KERNEL);
     if (!di) {
@@ -1282,9 +1269,10 @@ static int __devinit summit_probe(struct i2c_client *client, const struct i2c_de
     status = otg_register_notifier(di->xceiv, &di->usb_notifier);
     status = bq275xx_register_notifier(&di->bat_notifier);
     wake_lock_init(&di->chrg_lock, WAKE_LOCK_SUSPEND, "usb_wake_lock");
+    wake_lock_init(&di->summit_lock,WAKE_LOCK_SUSPEND, "summit_wake_lock");
     create_summit_powersupplyfs(di);
 #ifdef    CONFIG_PROC_FS
-    create_summit_procfs(di);
+    //create_summit_procfs(di);
 #endif
     create_summit_sysfs(di);
 
@@ -1298,7 +1286,7 @@ static int __devinit summit_probe(struct i2c_client *client, const struct i2c_de
     if (ret) {
         printk(KERN_ERR "Failed to request IRQ %d: %d\n",client->irq, ret);
     }
-    irq_set_irq_wake(di->irq, 1);
+    irq_set_irq_wake(di->irq,1);
     ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &value, CONTROLLER_STAT1);
     if(value & VBUS_DET){
         dev_info(di->dev,"USBIN in use\n");
