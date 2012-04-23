@@ -139,3 +139,139 @@ void __init omap_nand_flash_init(int options, struct mtd_partition *parts,
 {
 }
 #endif
+
+#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
+/*
+ * SDRAM memory data
+ */
+struct ddr_device_info lpddr2_elpida_2G_S4_x2_info = {
+	.type		= DDR_TYPE_LPDDR2_S4,
+	.density	= DDR_DENSITY_2Gb,
+	.io_width	= DDR_IO_WIDTH_32,
+	.cs1_used	= true,
+	.cal_resistors_per_cs = false,
+	.manufacturer	= "Elpida"
+};
+
+/*
+ * AC timings for Elpida LPDDR2-s4 2Gb memory device
+ */
+struct lpddr2_timings lpddr2_elpida_2G_S4_timings[] = {
+	/* Speed bin 800(400 MHz) */
+	[0] = {
+		.max_freq	= 400000000,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tDQSCK_max_derated = 6000,
+	},
+	/* Speed bin 400(200 MHz) */
+	[1] = {
+		.max_freq	= 200000000,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 10000,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tDQSCK_max_derated = 6000,
+	}
+};
+
+struct lpddr2_min_tck lpddr2_elpida_S4_min_tck = {
+	.tRPab		= 3,
+	.tRCD		= 3,
+	.tWR		= 3,
+	.tRASmin	= 3,
+	.tRRD		= 2,
+	.tWTR		= 2,
+	.tXP		= 2,
+	.tRTP		= 2,
+	.tCKE		= 3,
+	.tCKESR		= 3,
+	.tFAW		= 8,
+};
+
+/*
+ * AC timings for Elpida LPDDR2-s4 4Gb memory device
+ */
+struct lpddr2_timings lpddr2_elpida_4G_S4_timings[] = {
+	/* Speed bin 1066(533 MHz) */
+	[0] = {
+		.max_freq	= 533333333,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tDQSCK_max_derated = 5620,
+	},
+	/* Speed bin 533(266 MHz) */
+	[1] = {
+		.max_freq	= 266666666,
+		.min_freq	= 10000000,
+		.tRPab		= 21000,
+		.tRCD		= 18000,
+		.tWR		= 15000,
+		.tRAS_min	= 42000,
+		.tRRD		= 10000,
+		.tWTR		= 7500,
+		.tXP		= 7500,
+		.tRTP		= 7500,
+		.tCKESR		= 15000,
+		.tDQSCK_max	= 5500,
+		.tFAW		= 50000,
+		.tZQCS		= 90000,
+		.tZQCL		= 360000,
+		.tZQinit	= 1000000,
+		.tRAS_max_ns	= 70000,
+		.tDQSCK_max_derated = 6000,
+	}
+};
+
+/*
+ * SDRAM memory data
+ */
+struct ddr_device_info lpddr2_elpida_4G_S4_x2_info = {
+	.type		= DDR_TYPE_LPDDR2_S4,
+	.density	= DDR_DENSITY_4Gb,
+	.io_width	= DDR_IO_WIDTH_32,
+	.cs1_used	= true,
+	.cal_resistors_per_cs = false,
+	.manufacturer	= "Elpida"
+};
+#endif

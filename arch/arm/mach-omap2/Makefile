@@ -274,3 +274,6 @@ emac-$(CONFIG_TI_DAVINCI_EMAC)		:= am35xx-emac.o
 obj-y					+= $(emac-m) $(emac-y)
 
 obj-y					+= common-board-devices.o twl-common.o
+
+emif-omap-$(CONFIG_TI_EMIF)		:= emif_omap.o
+obj-y					+= $(emif-omap-m) $(emif-omap-y)
