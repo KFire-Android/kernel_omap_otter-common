@@ -30,4 +30,7 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 
 void dsscomp_set_platform_data(struct dsscomp_platform_data *data);
 
+int dsscomp_apply(dsscomp_t comp);
+u32 dsscomp_mgr_callback(void *data, int id, int status);
+
 #endif
