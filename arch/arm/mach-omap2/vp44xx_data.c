@@ -98,18 +98,18 @@ struct omap_vp_instance omap4_vp_core = {
 };
 
 struct omap_vp_param omap443x_mpu_vp_data = {
-	.vddmin			= 830000,
-	.vddmax			= 1410000,
+	.vddmin			= 750000,
+	.vddmax			= 1388000,
 };
 
 struct omap_vp_param omap443x_iva_vp_data = {
-	.vddmin			= 830000,
-	.vddmax			= 1260000,
+	.vddmin			= 750000,
+	.vddmax			= 1291000,
 };
 
 struct omap_vp_param omap443x_core_vp_data = {
-	.vddmin			= 830000,
-	.vddmax			= 1200000,
+	.vddmin			= 750000,
+	.vddmax			= 1127000,
 };
 
 struct omap_vp_param omap446x_mpu_vp_data = {
