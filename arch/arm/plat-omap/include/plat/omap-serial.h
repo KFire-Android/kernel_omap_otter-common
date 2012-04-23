@@ -61,11 +61,15 @@
 #define UART_ERRATA_i202_MDR1_ACCESS	BIT(0)
 #define UART_ERRATA_i291_DMA_FORCEIDLE	BIT(1)
 
+#define OMAP_UART_TX_WAKEUP_EN	BIT(7)
+
+/* Feature flags */
+#define OMAP_UART_WER_HAS_TX_WAKEUP	BIT(0)
+
 struct omap_uart_port_info {
 	bool			dma_enabled;	/* To specify DMA Mode */
 	unsigned int		uartclk;	/* UART clock rate */
 	upf_t			flags;		/* UPF_* flags */
-	u32			errata;
 	unsigned int		dma_rx_buf_size;
 	unsigned int		dma_rx_timeout;
 	unsigned int		autosuspend_timeout;
@@ -117,6 +121,7 @@ struct uart_omap_port {
 	unsigned char		dlh;
 	unsigned char		mdr1;
 	unsigned char		scr;
+	unsigned char		wer;
 
 	int			use_dma;
 	/*
@@ -131,6 +136,8 @@ struct uart_omap_port {
 	u32			context_loss_cnt;
 	u32			errata;
 	u8			wakeups_enabled;
+
+	u32			features;
 
 	struct pm_qos_request	pm_qos_request;
 	u32			latency;

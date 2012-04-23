@@ -135,6 +135,7 @@ static struct clock_event_device clockevent_gpt = {
 	.name		= "gp timer",
 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
 	.shift		= 32,
+	.rating		= 300,
 	.set_next_event	= omap2_gp_timer_set_next_event,
 	.set_mode	= omap2_gp_timer_set_mode,
 };
@@ -187,7 +188,6 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
 		}
 	}
 	__omap_dm_timer_init_regs(timer);
-	__omap_dm_timer_reset(timer, 1, 1);
 	timer->posted = 1;
 
 	timer->rate = clk_get_rate(timer->fclk);
@@ -218,7 +218,8 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
 		clockevent_delta2ns(3, &clockevent_gpt);
 		/* Timer internal resynch latency. */
 
-	clockevent_gpt.cpumask = cpumask_of(0);
+	clockevent_gpt.cpumask = cpu_possible_mask;
+	clockevent_gpt.irq = omap_dm_timer_get_irq(&clkev);
 	clockevents_register_device(&clockevent_gpt);
 
 	pr_info("OMAP clockevent source: GPTIMER%d at %lu Hz\n",
