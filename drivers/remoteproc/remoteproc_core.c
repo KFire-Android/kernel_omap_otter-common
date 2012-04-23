@@ -1383,6 +1383,51 @@ void rproc_put(struct rproc *rproc)
 }
 EXPORT_SYMBOL(rproc_put);
 
+int rproc_set_constraints(struct device *dev, struct rproc *rproc,
+				enum rproc_constraint type, long v)
+{
+	int ret;
+	char *cname[] = {"scale", "latency", "bandwidth"};
+	int (*func)(struct device *, struct rproc *, long);
+
+	switch (type) {
+	case RPROC_CONSTRAINT_FREQUENCY:
+		func = rproc->ops->set_frequency;
+		break;
+	case RPROC_CONSTRAINT_BANDWIDTH:
+		func = rproc->ops->set_bandwidth;
+		break;
+	case RPROC_CONSTRAINT_LATENCY:
+		func = rproc->ops->set_latency;
+		break;
+	default:
+		dev_err(rproc->dev, "invalid constraint\n");
+		return -EINVAL;
+	}
+
+	if (!func) {
+		dev_err(rproc->dev, "%s: no %s constraint\n",
+			__func__, cname[type]);
+		return -EINVAL;
+	}
+
+	mutex_lock(&rproc->lock);
+	if (rproc->state == RPROC_OFFLINE) {
+		pr_err("%s: rproc inactive\n", __func__);
+		mutex_unlock(&rproc->lock);
+		return -EPERM;
+	}
+
+	dev_dbg(rproc->dev, "set %s constraint %ld\n", cname[type], v);
+	ret = func(dev, rproc, v);
+	if (ret)
+		dev_err(rproc->dev, "error %s constraint\n", cname[type]);
+	mutex_unlock(&rproc->lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(rproc_set_constraints);
+
 /**
  * rproc_register() - register a remote processor
  * @rproc: the remote processor handle to register
