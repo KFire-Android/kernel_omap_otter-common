@@ -75,7 +75,6 @@ struct clk;
 
 struct timer_regs {
 	u32 tidr;
-	u32 tiocp_cfg;
 	u32 tistat;
 	u32 tisr;
 	u32 tier;
@@ -259,7 +258,7 @@ struct omap_dm_timer {
 	unsigned long phys_base;
 	int id;
 	int irq;
-	struct clk *iclk, *fclk;
+	struct clk *fclk;
 
 	void __iomem	*io_base;
 	void __iomem	*sys_stat;	/* TISTAT timer status */
