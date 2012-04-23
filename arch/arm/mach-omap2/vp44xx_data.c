@@ -66,7 +66,6 @@ static const struct omap_vp_common omap4_vp_common = {
 
 struct omap_vp_volt_limits omap4_vp_mpu_limit = {
 	.vddmin	= OMAP4_VP_MPU_VLIMITTO_VDDMIN,
-	.vddmax	= OMAP4_VP_MPU_VLIMITTO_VDDMAX,
 };
 
 struct omap_vp_instance omap4_vp_mpu = {
@@ -83,7 +82,6 @@ struct omap_vp_instance omap4_vp_mpu = {
 
 struct omap_vp_volt_limits omap4_vp_iva_limit = {
 	.vddmin	= OMAP4_VP_IVA_VLIMITTO_VDDMIN,
-	.vddmax	= OMAP4_VP_IVA_VLIMITTO_VDDMAX,
 };
 
 struct omap_vp_instance omap4_vp_iva = {
@@ -100,7 +98,6 @@ struct omap_vp_instance omap4_vp_iva = {
 
 struct omap_vp_volt_limits omap4_vp_core_limit = {
 	.vddmin	= OMAP4_VP_CORE_VLIMITTO_VDDMIN,
-	.vddmax	= OMAP4_VP_CORE_VLIMITTO_VDDMAX,
 };
 
 struct omap_vp_instance omap4_vp_core = {
