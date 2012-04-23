@@ -25,6 +25,7 @@
 #include <plat/omap_hwmod.h>
 #include <plat/remoteproc.h>
 #include <plat/iommu.h>
+#include <plat/omap-pm.h>
 
 /* CONTROL_DSP_BOOTADDR
  * Description: DSP boot loader physical address. It strores the boot address,
@@ -49,6 +50,23 @@ static struct omap_rproc_timers_info ipu_timers[] = {
 
 static struct omap_rproc_timers_info dsp_timers[] = {
 	{ .id = 5 },
+};
+
+static int
+_ducati_set_bandwidth(struct device *dev, struct rproc *rproc, long val)
+{
+	return omap_pm_set_min_bus_tput(rproc->dev, OCP_INITIATOR_AGENT, val);
+}
+
+static int
+_ducati_set_frequency(struct device *dev, struct rproc *rproc, long val)
+{
+	return 0;
+}
+
+static struct rproc_ops ducati_ops = {
+	.set_bandwidth	= _ducati_set_bandwidth,
+	.set_frequency	= _ducati_set_frequency,
 };
 
 /*
@@ -80,6 +98,7 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.oh_name_opt	= "ipu_c1",
 		.timers		= ipu_timers,
 		.timers_cnt	= ARRAY_SIZE(ipu_timers),
+		.ops		= &ducati_ops,
 	},
 #endif
 };

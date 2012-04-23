@@ -29,6 +29,7 @@
 #include <linux/remoteproc.h>
 #include <linux/kthread.h>
 #include <linux/slab.h>
+#include <linux/pm_qos.h>
 
 #include <plat/mailbox.h>
 #include <plat/remoteproc.h>
@@ -43,12 +44,14 @@
  * @nb: notifier block that will be invoked on inbound mailbox messages
  * @rproc: rproc handle
  * @boot_reg: virtual address of the register where the bootaddr is stored
+ * @qos_req: for requesting latency constraints for rproc
  */
 struct omap_rproc {
 	struct omap_mbox *mbox;
 	struct notifier_block nb;
 	struct rproc *rproc;
 	void __iomem *boot_reg;
+	struct dev_pm_qos_request qos_req;
 };
 
 struct _thread_data {
@@ -122,6 +125,57 @@ static void omap_rproc_kick(struct rproc *rproc, int vqid)
 	ret = omap_mbox_msg_send(oproc->mbox, vqid);
 	if (ret)
 		dev_err(rproc->dev, "omap_mbox_msg_send failed: %d\n", ret);
+}
+
+static int
+omap_rproc_set_latency(struct device *dev, struct rproc *rproc, long val)
+{
+	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+	struct omap_rproc *oproc = rproc->priv;
+	int ret;
+
+	/* Call device specific api if any */
+	if (pdata->ops && pdata->ops->set_latency)
+		return pdata->ops->set_latency(dev, rproc, val);
+
+	ret = dev_pm_qos_update_request(&oproc->qos_req, val);
+	/*
+	 * dev_pm_qos_update_request returns 0 or 1 on success depending
+	 * on if the constraint changed or not (same request). So, return
+	 * 0 in both cases
+	 */
+	return ret - ret == 1;
+}
+
+static int
+omap_rproc_set_bandwidth(struct device *dev, struct rproc *rproc, long val)
+{
+	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+
+	/* Call device specific api if any */
+	if (pdata->ops && pdata->ops->set_bandwidth)
+		return pdata->ops->set_bandwidth(dev, rproc, val);
+
+	/* TODO: call platform specific */
+
+	return 0;
+}
+
+static int
+omap_rproc_set_frequency(struct device *dev, struct rproc *rproc, long val)
+{
+	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+
+	/* Call device specific api if any */
+	if (pdata->ops && pdata->ops->set_frequency)
+		return pdata->ops->set_frequency(dev, rproc, val);
+
+	/* TODO: call platform specific */
+
+	return 0;
 }
 
 /*
@@ -226,6 +280,9 @@ static struct rproc_ops omap_rproc_ops = {
 	.start		= omap_rproc_start,
 	.stop		= omap_rproc_stop,
 	.kick		= omap_rproc_kick,
+	.set_latency	= omap_rproc_set_latency,
+	.set_bandwidth	= omap_rproc_set_bandwidth,
+	.set_frequency	= omap_rproc_set_frequency,
 };
 
 static int __devinit omap_rproc_probe(struct platform_device *pdev)
@@ -256,13 +313,19 @@ static int __devinit omap_rproc_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, rproc);
-
-	ret = rproc_register(rproc);
+	ret = dev_pm_qos_add_request(&pdev->dev, &oproc->qos_req,
+			PM_QOS_DEFAULT_VALUE);
 	if (ret)
 		goto free_rproc;
 
+	ret = rproc_register(rproc);
+	if (ret)
+		goto remove_req;
+
 	return 0;
 
+remove_req:
+	dev_pm_qos_remove_request(&oproc->qos_req);
 free_rproc:
 	if (oproc->boot_reg)
 		iounmap(oproc->boot_reg);
@@ -279,6 +342,7 @@ static int __devexit omap_rproc_remove(struct platform_device *pdev)
 	if (oproc->boot_reg)
 		iounmap(oproc->boot_reg);
 
+	dev_pm_qos_remove_request(&oproc->qos_req);
 	return rproc_unregister(rproc);
 }
 
