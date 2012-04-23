@@ -2218,6 +2218,106 @@ int snd_soc_platform_trigger(struct snd_pcm_substream *substream,
 }
 EXPORT_SYMBOL_GPL(snd_soc_platform_trigger);
 
+int snd_soc_dai_startup(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	int ret = 0;
+
+	mutex_lock(&rtd->pcm_mutex);
+
+	if (dai->driver->ops->startup)
+		ret = dai->driver->ops->startup(substream, dai);
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		dai->playback_active++;
+	else
+		dai->capture_active++;
+
+	dai->active++;
+
+	mutex_unlock(&rtd->pcm_mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_soc_dai_startup);
+
+void snd_soc_dai_shutdown(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+
+	mutex_lock(&rtd->pcm_mutex);
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		dai->playback_active--;
+	else
+		dai->capture_active--;
+
+	dai->active--;
+
+	if (dai->driver->ops->shutdown)
+		dai->driver->ops->shutdown(substream, dai);
+	mutex_unlock(&rtd->pcm_mutex);
+}
+EXPORT_SYMBOL_GPL(snd_soc_dai_shutdown);
+
+int snd_soc_dai_hw_params(struct snd_pcm_substream * substream,
+		struct snd_pcm_hw_params *hw_params, struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	int ret = 0;
+
+	mutex_lock(&rtd->pcm_mutex);
+
+	if (dai->driver->ops->hw_params)
+		ret = dai->driver->ops->hw_params(substream, hw_params, dai);
+
+	mutex_unlock(&rtd->pcm_mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_soc_dai_hw_params);
+
+int snd_soc_dai_hw_free(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	int ret = 0;
+
+	mutex_lock(&rtd->pcm_mutex);
+
+	if (dai->driver->ops->hw_free)
+		ret = dai->driver->ops->hw_free(substream, dai);
+
+	mutex_unlock(&rtd->pcm_mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_soc_dai_hw_free);
+
+int snd_soc_dai_prepare(struct snd_pcm_substream *substream,
+	struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	int ret = 0;
+
+	mutex_lock(&rtd->pcm_mutex);
+
+	if (dai->driver->ops->prepare)
+		ret = dai->driver->ops->prepare(substream, dai);
+
+	mutex_unlock(&rtd->pcm_mutex);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(snd_soc_dai_prepare);
+
+int snd_soc_dai_trigger(struct snd_pcm_substream *substream,
+	int cmd, struct snd_soc_dai *dai)
+{
+	if (dai->driver->ops->trigger)
+		return dai->driver->ops->trigger(substream, cmd, dai);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(snd_soc_dai_trigger);
+
 #ifdef CONFIG_DEBUG_FS
 static char *dpcm_state_string(enum snd_soc_dpcm_state state)
 {
