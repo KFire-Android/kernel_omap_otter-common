@@ -80,6 +80,7 @@ static int g_clientref;
 
 static void *g_reg_base;
 static struct omap_gcx_platform_data *g_gcxplat;
+static bool gforceoff; /* protected by mtx */
 
 static enum gcerror find_context(struct gccontextmap **context, int create)
 {
@@ -830,6 +831,8 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 
 exit:
 	gc_set_power(GCPWR_LOW);
+	if (gforceoff)
+		gc_set_power(GCPWR_OFF);
 
 	mutex_unlock(&mtx);
 
@@ -1016,6 +1019,30 @@ static struct platform_driver plat_drv = {
 	},
 };
 
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+#include <linux/earlysuspend.h>
+static void gc_early_suspend(struct early_suspend *h)
+{
+	mutex_lock(&mtx);
+	gforceoff = true;
+	gc_set_power(GCPWR_OFF);
+	mutex_unlock(&mtx);
+}
+
+static void gc_late_resume(struct early_suspend *h)
+{
+	mutex_lock(&mtx);
+	gforceoff = false;
+	mutex_unlock(&mtx);
+}
+
+static struct early_suspend early_suspend_info = {
+	.suspend = gc_early_suspend,
+	.resume = gc_late_resume,
+	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
+};
+#endif /* CONFIG_HAS_EARLYSUSPEND */
+
 /*******************************************************************************
  * Driver init/shutdown.
  */
@@ -1094,6 +1121,10 @@ static int __init gc_init(void)
 
 	mutex_init(&g_maplock);
 
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+	register_early_suspend(&early_suspend_info);
+#endif
+
 	return platform_driver_register(&plat_drv);
 fail:
 	if (g_irqinstalled)
@@ -1116,6 +1147,9 @@ static void __exit gc_exit(void)
 		return;
 
 	platform_driver_unregister(&plat_drv);
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+	unregister_early_suspend(&early_suspend_info);
+#endif
 	delete_context_map();
 	mutex_destroy(&g_maplock);
 	gc_set_power(GCPWR_OFF);
