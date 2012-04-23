@@ -1755,13 +1755,8 @@ static struct omap_hwmod omap54xx_dss_rfbi_hwmod = {
  * external memory interface no1 (wrapper)
  */
 
-static struct omap_hwmod_class_sysconfig omap54xx_emif_sysc = {
-	.rev_offs	= 0x0000,
-};
-
 static struct omap_hwmod_class omap54xx_emif_hwmod_class = {
 	.name	= "emif",
-	.sysc	= &omap54xx_emif_sysc,
 };
 
 /* emif1 */
