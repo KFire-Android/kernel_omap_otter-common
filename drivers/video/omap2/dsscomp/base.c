@@ -355,26 +355,19 @@ done:
 	return ovl->set_overlay_info(ovl, &info);
 }
 
-int set_dss_wb_info(struct dss2_ovl_info *oi,
-	enum omap_writeback_source src)
+int set_dss_wb_info(struct dss2_ovl_info *oi)
 {
 	struct omap_writeback_info info;
 	struct omap_writeback *wb;
 	struct dss2_ovl_cfg *cfg;
 	union rect crop, win;
-	struct omap_overlay_manager *manager;
 
 	/* check overlay number */
 	if (!oi || oi->cfg.ix != OMAP_DSS_WB)
 		return -EINVAL;
 
-	/* current support only for manager capture mode */
-	if (src != oi->cfg.mgr_ix)
-		return -EINVAL;
-
 	cfg = &oi->cfg;
 	wb = omap_dss_get_wb(0);
-	manager = omap_dss_get_overlay_manager(cfg->mgr_ix);
 
 	/* just in case there are new fields, we get the current info */
 	wb->get_wb_info(wb, &info);
@@ -383,18 +376,9 @@ int set_dss_wb_info(struct dss2_ovl_info *oi,
 	if (!cfg->enabled)
 		goto done;
 
-	/* Currently, we always use output of manager for WB input */
-	info.source = manager->id;
+	info.source = cfg->wb_source;
+	info.mode = cfg->wb_mode;
 	info.capturemode = OMAP_WB_CAPTURE_ALL;
-	info.mode = OMAP_WB_CAPTURE_MODE;
-
-	/* WB overlay does not support cropping */
-	if ((cfg->crop.w != manager->device->panel.timings.x_res) ||
-		(cfg->crop.h != manager->device->panel.timings.y_res) ||
-		(cfg->crop.x != 0) || (cfg->crop.y != 0)) {
-		info.enabled = false;
-		goto done;
-	}
 
 	/* calculate input/output height and width */
 	crop.r = cfg->crop;

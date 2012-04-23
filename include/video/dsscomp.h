@@ -56,6 +56,22 @@ enum omap_color_mode {
 	OMAP_DSS_COLOR_XRGB16_1555	= 1 << 18, /* xRGB16-1555 */
 };
 
+/* Writeback data structures */
+enum omap_writeback_source {
+	OMAP_WB_LCD1		= 0,
+	OMAP_WB_TV		= 1,
+	OMAP_WB_LCD2		= 2,
+	OMAP_WB_GFX		= 3,
+	OMAP_WB_VID1		= 4,
+	OMAP_WB_VID2		= 5,
+	OMAP_WB_VID3		= 6
+};
+
+enum omap_writeback_mode {
+	OMAP_WB_CAPTURE_MODE	= 0x0,
+	OMAP_WB_MEM2MEM_MODE	= 0x1,
+};
+
 enum omap_dss_trans_key_type {
 	OMAP_DSS_COLOR_KEY_GFX_DST = 0,
 	OMAP_DSS_COLOR_KEY_VID_SRC = 1,
@@ -334,6 +350,8 @@ struct dss2_ovl_cfg {
 	struct omap_dss_cconv_coefs cconv;
 	struct dss2_vc1_range_map_info vc1;
 
+	__u8 wb_source; /* pipe: is source or not, wb: capture device id */
+	enum omap_writeback_mode wb_mode;
 	__u8 ix;	/* ovl index same as sysfs/overlay# */
 	__u8 zorder;	/* 0..3 */
 	__u8 enabled;	/* bool */
