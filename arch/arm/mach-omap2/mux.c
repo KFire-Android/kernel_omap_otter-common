@@ -120,10 +120,8 @@ static int __init _omap_mux_init_gpio(struct omap_mux_partition *partition,
 		}
 	}
 
-	if (found == 0) {
-		pr_err("%s: Could not set gpio%i\n", __func__, gpio);
+	if (found == 0)
 		return -ENODEV;
-	}
 
 	if (found > 1) {
 		pr_info("%s: Multiple gpio paths (%d) for gpio%i\n", __func__,
@@ -135,8 +133,11 @@ static int __init _omap_mux_init_gpio(struct omap_mux_partition *partition,
 	mux_mode = val & ~(OMAP_MUX_NR_MODES - 1);
 	if (partition->flags & OMAP_MUX_GPIO_IN_MODE3)
 		mux_mode |= OMAP_MUX_MODE3;
+	else if (partition->flags & OMAP_MUX_GPIO_IN_MODE6)
+		mux_mode |= OMAP_MUX_MODE6;
 	else
 		mux_mode |= OMAP_MUX_MODE4;
+
 	pr_debug("%s: Setting signal %s.gpio%i 0x%04x -> 0x%04x\n", __func__,
 		 gpio_mux->muxnames[0], gpio, old_mode, mux_mode);
 	omap_mux_write(partition, mux_mode, gpio_mux->reg_offset);
@@ -154,6 +155,8 @@ int __init omap_mux_init_gpio(int gpio, int val)
 		if (!ret)
 			return ret;
 	}
+
+	pr_err("%s: Could not set gpio%i\n", __func__, gpio);
 
 	return -ENODEV;
 }
@@ -212,8 +215,6 @@ static int __init _omap_mux_get_by_name(struct omap_mux_partition *partition,
 		return -EINVAL;
 	}
 
-	pr_err("%s: Could not find signal %s\n", __func__, muxname);
-
 	return -ENODEV;
 }
 
@@ -235,6 +236,8 @@ omap_mux_get_by_name(const char *muxname,
 
 		return mux_mode;
 	}
+
+	pr_err("%s: Could not find signal %s\n", __func__, muxname);
 
 	return -ENODEV;
 }
