@@ -2259,7 +2259,6 @@ static int aess_open(struct snd_pcm_substream *substream)
 	if (!abe->active++) {
 		abe->opp = 0;
 		aess_restore_context(abe);
-		abe_set_opp_mode(abe, 100);
 		abe_wakeup();
 	}
 
