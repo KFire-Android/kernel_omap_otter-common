@@ -3,7 +3,7 @@
  *
  * Author: Thara Gopinath	<thara@ti.com>
  *
- * Copyright (C) 2010 Texas Instruments, Inc.
+ * Copyright (C) 2012 Texas Instruments, Inc.
  * Thara Gopinath <thara@ti.com>
  *
  * Copyright (C) 2008 Nokia Corporation
@@ -26,9 +26,7 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include <linux/power/smartreflex.h>
-
-#include "common.h"
-#include "pm.h"
+#include <plat/voltage.h>
 
 #define SMARTREFLEX_NAME_LEN	16
 #define NVALUE_NAME_LEN		40
@@ -197,8 +195,8 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
 {
 	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
 		dev_warn(&sr->pdev->dev,
-			"%s: smartreflex class driver not registered\n",
-			__func__);
+			 "%s: smartreflex class driver not registered\n",
+			 __func__);
 		return;
 	}
 
@@ -210,8 +208,8 @@ static void sr_stop_vddautocomp(struct omap_sr *sr)
 {
 	if (!sr_class || !(sr_class->disable)) {
 		dev_warn(&sr->pdev->dev,
-			"%s: smartreflex class driver not registered\n",
-			__func__);
+			 "%s: smartreflex class driver not registered\n",
+			 __func__);
 		return;
 	}
 
@@ -256,8 +254,8 @@ error:
 	mem = platform_get_resource(sr_info->pdev, IORESOURCE_MEM, 0);
 	release_mem_region(mem->start, resource_size(mem));
 	list_del(&sr_info->node);
-	dev_err(&sr_info->pdev->dev, "%s: ERROR in registering"
-		"interrupt handler. Smartreflex will"
+	dev_err(&sr_info->pdev->dev, "%s: ERROR in registering"\
+		"interrupt handler. Smartreflex will"\
 		"not function as desired\n", __func__);
 	kfree(sr_info);
 
@@ -272,7 +270,7 @@ static void sr_v1_disable(struct omap_sr *sr)
 
 	/* Enable MCUDisableAcknowledge interrupt */
 	sr_modify_reg(sr, ERRCONFIG_V1,
-			ERRCONFIG_MCUDISACKINTEN, ERRCONFIG_MCUDISACKINTEN);
+		      ERRCONFIG_MCUDISACKINTEN, ERRCONFIG_MCUDISACKINTEN);
 
 	/* SRCONFIG - disable SR */
 	sr_modify_reg(sr, SRCONFIG, SRCONFIG_SRENABLE, 0x0);
@@ -281,9 +279,9 @@ static void sr_v1_disable(struct omap_sr *sr)
 	if (sr_read_reg(sr, ERRCONFIG_V1) & ERRCONFIG_VPBOUNDINTST_V1)
 		errconf_val |= ERRCONFIG_VPBOUNDINTST_V1;
 	sr_modify_reg(sr, ERRCONFIG_V1,
-			(ERRCONFIG_MCUACCUMINTEN | ERRCONFIG_MCUVALIDINTEN |
-			ERRCONFIG_MCUBOUNDINTEN | ERRCONFIG_VPBOUNDINTEN_V1),
-			errconf_val);
+		      (ERRCONFIG_MCUACCUMINTEN | ERRCONFIG_MCUVALIDINTEN |
+		      ERRCONFIG_MCUBOUNDINTEN | ERRCONFIG_VPBOUNDINTEN_V1),
+		      errconf_val);
 
 	/*
 	 * Wait for SR to be disabled.
@@ -295,11 +293,11 @@ static void sr_v1_disable(struct omap_sr *sr)
 
 	if (timeout >= SR_DISABLE_TIMEOUT)
 		dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
-			__func__);
+			 __func__);
 
 	/* Disable MCUDisableAcknowledge interrupt & clear pending interrupt */
 	sr_modify_reg(sr, ERRCONFIG_V1, ERRCONFIG_MCUDISACKINTEN,
-			ERRCONFIG_MCUDISACKINTST);
+		      ERRCONFIG_MCUDISACKINTST);
 }
 
 static void sr_v2_disable(struct omap_sr *sr)
@@ -319,10 +317,10 @@ static void sr_v2_disable(struct omap_sr *sr)
 	 */
 	if (sr_read_reg(sr, ERRCONFIG_V2) & ERRCONFIG_VPBOUNDINTST_V2)
 		sr_modify_reg(sr, ERRCONFIG_V2, ERRCONFIG_VPBOUNDINTEN_V2,
-			ERRCONFIG_VPBOUNDINTST_V2);
+			      ERRCONFIG_VPBOUNDINTST_V2);
 	else
 		sr_modify_reg(sr, ERRCONFIG_V2, ERRCONFIG_VPBOUNDINTEN_V2,
-				0x0);
+			      0x0);
 	sr_write_reg(sr, IRQENABLE_CLR, (IRQENABLE_MCUACCUMINT |
 			IRQENABLE_MCUVALIDINT |
 			IRQENABLE_MCUBOUNDSINT));
@@ -340,7 +338,7 @@ static void sr_v2_disable(struct omap_sr *sr)
 
 	if (timeout >= SR_DISABLE_TIMEOUT)
 		dev_warn(&sr->pdev->dev, "%s: Smartreflex disable timedout\n",
-			__func__);
+			 __func__);
 
 	/* Disable MCUDisableAcknowledge interrupt & clear pending interrupt */
 	sr_write_reg(sr, IRQENABLE_CLR, IRQENABLE_MCUDISABLEACKINT);
@@ -353,7 +351,7 @@ static u32 sr_retrieve_nvalue(struct omap_sr *sr, u32 efuse_offs)
 
 	if (!sr->nvalue_table) {
 		dev_warn(&sr->pdev->dev, "%s: Missing ntarget value table\n",
-			__func__);
+			 __func__);
 		return 0;
 	}
 
@@ -419,7 +417,7 @@ int sr_configure_errgen(struct voltagedomain *voltdm)
 		vpboundint_st = ERRCONFIG_VPBOUNDINTST_V2;
 		break;
 	default:
-		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"
+		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"\
 			"module without specifying the ip\n", __func__);
 		return -EINVAL;
 	}
@@ -473,7 +471,7 @@ int sr_disable_errgen(struct voltagedomain *voltdm)
 		vpboundint_st = ERRCONFIG_VPBOUNDINTST_V2;
 		break;
 	default:
-		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"
+		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"\
 			"module without specifying the ip\n", __func__);
 		return -EINVAL;
 	}
@@ -533,7 +531,7 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
 		senp_shift = SRCONFIG_SENPENABLE_V2_SHIFT;
 		break;
 	default:
-		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"
+		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"\
 			"module without specifying the ip\n", __func__);
 		return -EINVAL;
 	}
@@ -551,22 +549,30 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
 	switch (sr->ip_type) {
 	case SR_TYPE_V1:
 		sr_modify_reg(sr, ERRCONFIG_V1,
-			(ERRCONFIG_MCUACCUMINTEN | ERRCONFIG_MCUVALIDINTEN |
-			ERRCONFIG_MCUBOUNDINTEN),
-			(ERRCONFIG_MCUACCUMINTEN | ERRCONFIG_MCUACCUMINTST |
-			 ERRCONFIG_MCUVALIDINTEN | ERRCONFIG_MCUVALIDINTST |
-			 ERRCONFIG_MCUBOUNDINTEN | ERRCONFIG_MCUBOUNDINTST));
+			      (ERRCONFIG_MCUACCUMINTEN |
+			      ERRCONFIG_MCUVALIDINTEN |
+			      ERRCONFIG_MCUBOUNDINTEN),
+			      (ERRCONFIG_MCUACCUMINTEN |
+			      ERRCONFIG_MCUACCUMINTST |
+			      ERRCONFIG_MCUVALIDINTEN |
+			      ERRCONFIG_MCUVALIDINTST |
+			      ERRCONFIG_MCUBOUNDINTEN |
+			      ERRCONFIG_MCUBOUNDINTST));
 		break;
 	case SR_TYPE_V2:
 		sr_write_reg(sr, IRQSTATUS,
-			IRQSTATUS_MCUACCUMINT | IRQSTATUS_MCVALIDINT |
-			IRQSTATUS_MCBOUNDSINT | IRQSTATUS_MCUDISABLEACKINT);
+			     IRQSTATUS_MCUACCUMINT |
+			     IRQSTATUS_MCVALIDINT |
+			     IRQSTATUS_MCBOUNDSINT |
+			     IRQSTATUS_MCUDISABLEACKINT);
 		sr_write_reg(sr, IRQENABLE_SET,
-			IRQENABLE_MCUACCUMINT | IRQENABLE_MCUVALIDINT |
-			IRQENABLE_MCUBOUNDSINT | IRQENABLE_MCUDISABLEACKINT);
+			     IRQENABLE_MCUACCUMINT |
+			     IRQENABLE_MCUVALIDINT |
+			     IRQENABLE_MCUBOUNDSINT |
+			     IRQENABLE_MCUDISABLEACKINT);
 		break;
 	default:
-		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"
+		dev_err(&sr->pdev->dev, "%s: Trying to Configure smartreflex"\
 			"module without specifying the ip\n", __func__);
 		return -EINVAL;
 	}
@@ -577,7 +583,7 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
 /**
  * sr_enable() - Enables the smartreflex module.
  * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
- * @volt_data:	The voltage at which the Voltage domain associated with
+ * @volt:	The voltage at which the Voltage domain associated with
  *		the smartreflex module is operating at.
  *		This is required only to program the correct Ntarget value.
  *
@@ -690,13 +696,13 @@ int sr_register_class(struct omap_sr_class_data *class_data)
 
 	if (!class_data) {
 		pr_warning("%s:, Smartreflex class data passed is NULL\n",
-			__func__);
+			   __func__);
 		return -EINVAL;
 	}
 
 	if (sr_class) {
 		pr_warning("%s: Smartreflex class driver already registered\n",
-			__func__);
+			   __func__);
 		return -EBUSY;
 	}
 
@@ -738,7 +744,7 @@ void omap_sr_enable(struct voltagedomain *voltdm,
 		return;
 
 	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
-		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"\
 			"registered\n", __func__);
 		return;
 	}
@@ -771,7 +777,7 @@ void omap_sr_disable(struct voltagedomain *voltdm)
 		return;
 
 	if (!sr_class || !(sr_class->disable)) {
-		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"\
 			"registered\n", __func__);
 		return;
 	}
@@ -804,7 +810,7 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
 		return;
 
 	if (!sr_class || !(sr_class->disable)) {
-		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
+		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"\
 			"registered\n", __func__);
 		return;
 	}
@@ -823,7 +829,7 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
 void omap_sr_register_pmic(struct omap_sr_pmic_data *pmic_data)
 {
 	if (!pmic_data) {
-		pr_warning("%s: Trying to register NULL PMIC data structure"
+		pr_warning("%s: Trying to register NULL PMIC data structure"\
 			"with smartreflex\n", __func__);
 		return;
 	}
@@ -968,7 +974,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 		if (IS_ERR_OR_NULL(sr_dbg_dir)) {
 			ret = PTR_ERR(sr_dbg_dir);
 			pr_err("%s:sr debugfs dir creation failed(%d)\n",
-				__func__, ret);
+			       __func__, ret);
 			goto err_iounmap;
 		}
 	}
@@ -990,7 +996,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 
 	nvalue_dir = debugfs_create_dir("nvalue", sr_info->dbg_dir);
 	if (IS_ERR_OR_NULL(nvalue_dir)) {
-		dev_err(&pdev->dev, "%s: Unable to create debugfs directory"
+		dev_err(&pdev->dev, "%s: Unable to create debugfs directory"\
 			"for n-values\n", __func__);
 		ret = PTR_ERR(nvalue_dir);
 		goto err_debugfs;
@@ -1049,7 +1055,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
 	sr_info = _sr_lookup(pdata->voltdm);
 	if (IS_ERR(sr_info)) {
 		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
-			__func__);
+			 __func__);
 		return PTR_ERR(sr_info);
 	}
 
@@ -1081,7 +1087,7 @@ static void __devexit omap_sr_shutdown(struct platform_device *pdev)
 	sr_info = _sr_lookup(pdata->voltdm);
 	if (IS_ERR(sr_info)) {
 		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
-			__func__);
+			 __func__);
 		return;
 	}
 
@@ -1117,7 +1123,7 @@ static int __init sr_init(void)
 	ret = platform_driver_probe(&smartreflex_driver, omap_sr_probe);
 	if (ret) {
 		pr_err("%s: platform driver register failed for SR\n",
-			__func__);
+		       __func__);
 		return ret;
 	}
 
