@@ -152,14 +152,21 @@ static void set_vram_sizes(struct sgx_omaplfb_config *sgx_config,
 			   struct omapfb_platform_data *fb,
 			   struct omap_android_display_data *mem)
 {
-	u32 num_vram_buffers = 1;
+	u32 num_vram_buffers = 0;
 	u32 vram = 0;
 	int i;
 
+	if (fb && fb->mem_desc.region_cnt >= 1) {
+		/* Need at least 1 VRAM buffer for fb0 */
+		num_vram_buffers = 1;
+	}
+
 	if (sgx_config) {
 		vram += sgx_config->vram_reserve;
-		num_vram_buffers = sgx_config->vram_buffers;
+		num_vram_buffers = max(sgx_config->vram_buffers,
+				       num_vram_buffers);
 	}
+
 	vram += num_vram_buffers * vram_size(mem);
 
 	if (fb) {
