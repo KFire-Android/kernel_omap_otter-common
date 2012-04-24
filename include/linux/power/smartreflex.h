@@ -145,6 +145,7 @@ struct voltagedomain;
 struct omap_volt_data;
 
 struct omap_sr {
+	char				*name;
 	struct list_head		node;
 	struct platform_device		*pdev;
 	struct omap_sr_nvalue_table	*nvalue_table;
@@ -233,6 +234,7 @@ struct omap_sr_nvalue_table {
 /**
  * struct omap_sr_data - Smartreflex platform data.
  *
+ * @name:		instance name
  * @ip_type:		Smartreflex IP type.
  * @senp_mod:		SENPENABLE value for the sr
  * @senn_mod:		SENNENABLE value for sr
@@ -244,6 +246,7 @@ struct omap_sr_nvalue_table {
  * @voltdm:		Pointer to the voltage domain associated with the SR
  */
 struct omap_sr_data {
+	const char			*name;
 	int				ip_type;
 	u32				senp_mod;
 	u32				senn_mod;
