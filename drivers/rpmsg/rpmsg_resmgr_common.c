@@ -25,6 +25,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/err.h>
 #include <linux/rpmsg_resmgr.h>
+#include <linux/remoteproc.h>
 #include "rpmsg_resmgr_common.h"
 
 struct rprm_regulator_depot {
@@ -36,6 +37,11 @@ struct rprm_regulator_depot {
 struct rprm_i2c_depot {
 	u32 id;
 	struct device *dev;
+};
+
+struct rprm_rproc_depot {
+	char name[16];
+	struct rproc *rp;
 };
 
 static int rprm_gpio_request(void **handle, void *args, size_t len)
@@ -225,6 +231,76 @@ static int rprm_i2c_get_info(void *handle, char *buf, size_t len)
 	return snprintf(buf, len, "id:%d\n", i2cd->id);
 }
 
+static int rprm_rproc_request(void **handle, void *data, size_t len)
+{
+	struct rprm_rproc *rproc_data = data;
+	struct rprm_rproc_depot *rprocd;
+	int ret;
+
+	if (len != sizeof *rproc_data)
+		return -EINVAL;
+
+	rprocd = kmalloc(sizeof *rprocd, GFP_KERNEL);
+	if (!rprocd)
+		return -ENOMEM;
+
+	rprocd->rp = rproc_get_by_name(rproc_data->name);
+	if (!rprocd->rp) {
+		ret = -ENODEV;
+		goto error;
+	}
+
+	strcpy(rprocd->name, rproc_data->name);
+	*handle = rprocd;
+
+	return 0;
+error:
+	kfree(rprocd);
+	return ret;
+}
+
+static int rprm_rproc_release(void *handle)
+{
+	struct rprm_rproc_depot *rprocd = handle;
+
+	rproc_shutdown(rprocd->rp);
+	kfree(rprocd);
+
+	return 0;
+}
+
+static int rprm_rproc_get_info(void *handle, char *buf, size_t len)
+{
+	struct rprm_rproc_depot *rprocd = handle;
+
+	return snprintf(buf, len, "Name:%s\n", rprocd->name);
+}
+
+static int _rproc_latency(struct device *rdev, void *handle, unsigned long val)
+{
+	struct rprm_rproc_depot *rprocd = handle;
+
+	return rproc_set_constraints(rdev, rprocd->rp,
+				     RPROC_CONSTRAINT_LATENCY, val);
+}
+
+static int _rproc_bandwidth(struct device *rdev, void *handle,
+							unsigned long val)
+{
+	struct rprm_rproc_depot *rprocd = handle;
+
+	return rproc_set_constraints(rdev, rprocd->rp,
+				     RPROC_CONSTRAINT_BANDWIDTH, val);
+}
+
+static int _rproc_scale(struct device *rdev, void *handle, unsigned long val)
+{
+	struct rprm_rproc_depot *rprocd = handle;
+
+	return rproc_set_constraints(rdev, rprocd->rp,
+				     RPROC_CONSTRAINT_FREQUENCY, val);
+}
+
 static struct rprm_res_ops gpio_ops = {
 	.request = rprm_gpio_request,
 	.release = rprm_gpio_release,
@@ -243,6 +319,15 @@ static struct rprm_res_ops i2c_ops = {
 	.get_info = rprm_i2c_get_info,
 };
 
+static struct rprm_res_ops rproc_ops = {
+	.request = rprm_rproc_request,
+	.release = rprm_rproc_release,
+	.get_info = rprm_rproc_get_info,
+	.latency = _rproc_latency,
+	.bandwidth = _rproc_bandwidth,
+	.scale = _rproc_scale,
+};
+
 static struct rprm_res generic_res[] = {
 	{
 		.name = "gpio",
@@ -255,6 +340,10 @@ static struct rprm_res generic_res[] = {
 	{
 		.name = "i2c",
 		.ops = &i2c_ops,
+	},
+	{
+		.name = "rproc",
+		.ops = &rproc_ops,
 	},
 };
 
