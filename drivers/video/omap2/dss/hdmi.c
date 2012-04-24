@@ -97,6 +97,9 @@ static struct {
 	void (*hdmi_start_frame_cb)(void);
 	void (*hdmi_irq_cb)(int);
 	bool (*hdmi_power_on_cb)(void);
+	void (*hdmi_cec_enable_cb)(int status);
+	void (*hdmi_cec_irq_cb)(void);
+	void (*hdmi_cec_hpd)(int phy_addr, int status);
 } hdmi;
 
 static const u8 edid_header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
@@ -280,6 +283,22 @@ void hdmi_get_monspecs(struct fb_monspecs *specs)
 		i++;
 
 	}
+}
+
+void hdmi_inform_hpd_to_cec(int status)
+{
+	if (!status)
+		hdmi.source_physical_address = 0;
+
+	if (hdmi.hdmi_cec_hpd)
+		(*hdmi.hdmi_cec_hpd)(hdmi.source_physical_address,
+			status);
+}
+
+void hdmi_inform_power_on_to_cec(int status)
+{
+	if (hdmi.hdmi_cec_enable_cb)
+		(*hdmi.hdmi_cec_enable_cb)(status);
 }
 
 u8 *hdmi_read_edid(struct omap_video_timings *dp)
@@ -561,6 +580,25 @@ int omapdss_hdmi_register_hdcp_callbacks(void (*hdmi_start_frame_cb)(void),
 }
 EXPORT_SYMBOL(omapdss_hdmi_register_hdcp_callbacks);
 
+int omapdss_hdmi_register_cec_callbacks(void (*hdmi_cec_enable_cb)(int status),
+					void (*hdmi_cec_irq_cb)(void),
+					void (*hdmi_cec_hpd)(int phy_addr,
+						int status))
+{
+	hdmi.hdmi_cec_enable_cb = hdmi_cec_enable_cb;
+	hdmi.hdmi_cec_irq_cb = hdmi_cec_irq_cb;
+	hdmi.hdmi_cec_hpd = hdmi_cec_hpd;
+	return 0;
+}
+EXPORT_SYMBOL(omapdss_hdmi_register_cec_callbacks);
+
+int omapdss_hdmi_unregister_cec_callbacks(void)
+{
+	hdmi.hdmi_cec_enable_cb = NULL;
+	hdmi.hdmi_cec_irq_cb = NULL;
+	hdmi.hdmi_cec_hpd = NULL;
+	return 0;
+}
 void omapdss_hdmi_set_deepcolor(int val)
 {
 	hdmi.deep_color = val;
@@ -622,6 +660,9 @@ static irqreturn_t hdmi_irq_handler(int irq, void *arg)
 	r = hdmi_ti_4xxx_irq_handler(&hdmi.hdmi_data);
 
 	DSSDBG("Received HDMI IRQ = %08x\n", r);
+
+	if (hdmi.hdmi_cec_irq_cb && (r & HDMI_CEC_INT))
+		hdmi.hdmi_cec_irq_cb();
 
 	if (hdmi.hdmi_irq_cb)
 		hdmi.hdmi_irq_cb(r);

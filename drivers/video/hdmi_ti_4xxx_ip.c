@@ -1086,7 +1086,7 @@ EXPORT_SYMBOL(hdmi_ti_4xxx_basic_configure);
 u32 hdmi_ti_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
 {
 	u32 val, sys_stat = 0, core_state = 0;
-	u32 intr2 = 0, intr3 = 0, r = 0;
+	u32 intr2 = 0, intr3 = 0, intr4 = 0, r = 0;
 	void __iomem *wp_base = hdmi_wp_base(ip_data);
 	void __iomem *core_base = hdmi_core_sys_base(ip_data);
 
@@ -1100,6 +1100,7 @@ u32 hdmi_ti_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
 						 HDMI_CORE_SYS_SYS_STAT);
 			intr2 = hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR2);
 			intr3 = hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR3);
+			intr4 = hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR4);
 
 			pr_debug("HDMI_CORE_SYS_SYS_STAT = 0x%x\n", sys_stat);
 			pr_debug("HDMI_CORE_SYS_INTR2 = 0x%x\n", intr2);
@@ -1107,6 +1108,7 @@ u32 hdmi_ti_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
 
 			hdmi_write_reg(core_base, HDMI_CORE_SYS_INTR2, intr2);
 			hdmi_write_reg(core_base, HDMI_CORE_SYS_INTR3, intr3);
+			hdmi_write_reg(core_base, HDMI_CORE_SYS_INTR4, intr4);
 
 			hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR2);
 			hdmi_read_reg(core_base, HDMI_CORE_SYS_INTR3);
@@ -1124,6 +1126,9 @@ u32 hdmi_ti_4xxx_irq_handler(struct hdmi_ip_data *ip_data)
 
 	if (intr3 & HDMI_CORE_SYSTEM_INTR3__RI_ERR)
 		r |= HDMI_RI_ERR;
+
+	if (intr4 & HDMI_CORE_SYSTEM_INTR4_CEC)
+		r |= HDMI_CEC_INT;
 
 	/* Ack other interrupts if any */
 	hdmi_write_reg(wp_base, HDMI_WP_IRQSTATUS, val);
