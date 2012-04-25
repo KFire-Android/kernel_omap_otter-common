@@ -642,25 +642,10 @@ err:
 		pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
 }
 
-static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
+static void twl6030_start_usb_charger_sw(struct twl6030_bci_device_info *di)
 {
 	int ret;
 	u8 reg = 0;
-
-	if (di->use_hw_charger) {
-		ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &reg,
-				CHARGERUSB_CTRL1);
-		if (ret)
-			goto err;
-
-		reg &= ~HZ_MODE;
-		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg,
-				CHARGERUSB_CTRL1);
-		if (ret)
-			goto err;
-
-		return;
-	}
 
 	if (!is_battery_present(di)) {
 		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
@@ -707,6 +692,47 @@ static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
 	return;
 err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+}
+
+static void twl6032_start_usb_charger_hw(struct twl6030_bci_device_info *di)
+{
+	int ret;
+	u8 reg = 0;
+
+	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &reg,
+				CHARGERUSB_CTRL1);
+	if (ret)
+		goto err;
+
+	if (di->charger_incurrentmA < 50) {
+		reg |= HZ_MODE;
+		di->charge_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+	} else {
+		reg &= ~HZ_MODE;
+		twl6030_config_cinlimit_reg(di, di->charger_incurrentmA);
+	}
+
+	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg,
+			CHARGERUSB_CTRL1);
+	if (ret)
+		goto err;
+
+	return;
+
+err:
+	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+
+	return;
+}
+
+static void twl6030_start_usb_charger(struct twl6030_bci_device_info *di)
+{
+	if (di->use_hw_charger)
+		twl6032_start_usb_charger_hw(di);
+	else
+		twl6030_start_usb_charger_sw(di);
+
+	return;
 }
 
 static void twl6030_stop_ac_charger(struct twl6030_bci_device_info *di)
