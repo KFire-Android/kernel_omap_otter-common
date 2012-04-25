@@ -786,6 +786,7 @@ struct omap_dss_driver {
 	/* for wrapping around state changes */
 	void (*disable_orig)(struct omap_dss_device *display);
 	int (*enable_orig)(struct omap_dss_device *display);
+	int (*suspend_orig)(struct omap_dss_device *display);
 };
 
 int omap_dss_register_driver(struct omap_dss_driver *);
