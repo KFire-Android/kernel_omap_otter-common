@@ -632,6 +632,11 @@ struct dsscomp_wait_data {
 	enum dsscomp_wait_phase phase;	/* phase to wait for */
 };
 
+enum dsscomp_fbmem_type {
+	DSSCOMP_FBMEM_TILER2D = 0,
+	DSSCOMP_FBMEM_VRAM = 1,
+};
+
 /*
  * ioctl: DSSCIOC_QUERY_PLATFORM, struct dsscomp_platform_info
  *
@@ -670,6 +675,7 @@ struct dsscomp_platform_info {
 	/* below this width, we assume integer pixelclk scale */
 	__u16 integer_scale_ratio_limit;
 	__u32 tiler1d_slot_size;
+	enum dsscomp_fbmem_type fbmem_type; /* TILER2D vs VRAM */
 };
 
 /* IOCTLS */
