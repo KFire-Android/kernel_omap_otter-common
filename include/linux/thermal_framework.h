@@ -43,8 +43,8 @@ struct thermal_dev_ops {
 	int (*set_temp_thresh) (struct thermal_dev *temp_sensor,
 			int min, int max);
 	int (*set_temp_report_rate) (struct thermal_dev *, int rate);
-	int (*init_slope) (struct thermal_dev *);
-	int (*init_offset) (struct thermal_dev *);
+	int (*init_slope) (struct thermal_dev *, const char *rel);
+	int (*init_offset) (struct thermal_dev *, const char *rel);
 	/* Cooling agent call backs */
 	int (*cool_device) (struct thermal_dev *, int temp);
 	/* Governor call backs */
@@ -150,8 +150,8 @@ struct thermal_dev {
 extern int thermal_request_temp(struct thermal_dev *tdev);
 extern int thermal_lookup_temp(const char *domain_name);
 extern int thermal_sensor_set_temp(struct thermal_dev *tdev);
-extern int thermal_get_slope(struct thermal_dev *tdev);
-extern int thermal_get_offset(struct thermal_dev *tdev);
+extern int thermal_get_slope(struct thermal_dev *tdev, const char *rel);
+extern int thermal_get_offset(struct thermal_dev *tdev, const char *rel);
 
 /* Registration and unregistration calls for the thermal devices */
 extern int thermal_sensor_dev_register(struct thermal_dev *tdev);
