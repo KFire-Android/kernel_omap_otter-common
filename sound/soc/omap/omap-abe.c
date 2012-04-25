@@ -1439,9 +1439,9 @@ static struct snd_soc_dai_driver omap_abe_dai[] = {
 		.capture = {
 			.stream_name = "MultiMedia1 Capture",
 			.channels_min = 2,
-			.channels_max = 8,
+			.channels_max = 6,
 			.rates = SNDRV_PCM_RATE_48000,
-			.formats = OMAP_ABE_FORMATS,
+			.formats = SNDRV_PCM_FMTBIT_S32_LE,
 		},
 		.ops = &omap_abe_dai_ops,
 	},
