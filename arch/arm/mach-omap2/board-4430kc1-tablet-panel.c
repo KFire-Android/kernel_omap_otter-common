@@ -189,22 +189,8 @@ static void bkl_set_power(struct omap_pwm_led_platform_data *self, int on_off)
 {
 	pr_debug("%s: on_off:%d\n", __func__, on_off);
 
-#if 0
-	if (bkl_reg != NULL) {
-		if (on_off)
-			regulator_enable(bkl_reg);
-		else
-			regulator_disable(bkl_reg);
-	}
-
-	if (gpio_is_valid(bkl_power_gpio))
-		gpio_set_value( bkl_power_gpio, on_off );
-#endif
-
-	// enable this fixed backlight startup for A100 on low level
-	// but could generate a little white flash at start
-	msleep(1);
-
+	// slight delay to cut out a white flashing effect
+	msleep(500);
 }
 
 static struct omap_pwm_led_platform_data board_backlight_data = {
