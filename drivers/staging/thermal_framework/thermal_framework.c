@@ -323,7 +323,7 @@ EXPORT_SYMBOL_GPL(thermal_sensor_set_temp);
  *					get the Slope
  *					for Hotspot temperature computation
  */
-int thermal_get_slope(struct thermal_dev *tdev)
+int thermal_get_slope(struct thermal_dev *tdev, const char *rel_name)
 {
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
@@ -338,7 +338,7 @@ int thermal_get_slope(struct thermal_dev *tdev)
 		thermal_domain->temp_sensor->dev_ops &&
 		thermal_domain->temp_sensor->dev_ops->init_slope) {
 		return thermal_domain->temp_sensor->dev_ops->init_slope
-			(thermal_domain->temp_sensor);
+			(thermal_domain->temp_sensor, rel_name);
 		} else {
 			pr_err("%s:Getting slope is not supported for domain %s\n",
 				__func__, thermal_domain->domain_name);
@@ -354,7 +354,7 @@ EXPORT_SYMBOL_GPL(thermal_get_slope);
  *                                      get the Slope
  *                                      for Hotspot temperature computation
  */
-int thermal_get_offset(struct thermal_dev *tdev)
+int thermal_get_offset(struct thermal_dev *tdev, const char *rel_name)
 {
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
@@ -369,7 +369,7 @@ int thermal_get_offset(struct thermal_dev *tdev)
 		thermal_domain->temp_sensor->dev_ops &&
 		thermal_domain->temp_sensor->dev_ops->init_offset) {
 			return thermal_domain->temp_sensor->dev_ops->init_offset
-					(thermal_domain->temp_sensor);
+					(thermal_domain->temp_sensor, rel_name);
 		} else {
 			pr_err("%s:Getting offset is not supported for domain %s\n",
 				__func__, thermal_domain->domain_name);

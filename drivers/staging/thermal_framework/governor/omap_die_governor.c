@@ -438,8 +438,8 @@ static int __init omap_die_governor_init(void)
 		return -ENOMEM;
 	}
 
-	omap_gradient_slope = thermal_get_slope(thermal_fw);
-	omap_gradient_const = thermal_get_offset(thermal_fw);
+	omap_gradient_slope = thermal_get_slope(thermal_fw, NULL);
+	omap_gradient_const = thermal_get_offset(thermal_fw, NULL);
 
 	/* Init delayed work to average on-die temperature */
 	INIT_DELAYED_WORK(&omap_gov->average_cpu_sensor_work,
