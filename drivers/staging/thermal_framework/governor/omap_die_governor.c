@@ -20,6 +20,7 @@
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/suspend.h>
 
 #include <linux/thermal_framework.h>
 
@@ -40,6 +41,7 @@
 #define HYSTERESIS_VALUE 5000
 #define NORMAL_TEMP_MONITORING_RATE 1000
 #define FAST_TEMP_MONITORING_RATE 250
+#define AVERAGE_NUMBER 20
 
 static int omap_gradient_slope;
 static int omap_gradient_const;
@@ -50,6 +52,15 @@ struct omap_die_governor {
 	int report_rate;
 	int panic_zone_reached;
 	int cooling_level;
+	int hotspot_temp_upper;
+	int hotspot_temp_lower;
+	int pcb_temp;
+	int sensor_temp;
+	int absolute_delta;
+	int average_period;
+	int avg_cpu_sensor_temp;
+	int avg_is_valid;
+	struct delayed_work average_cpu_sensor_work;
 };
 
 #define OMAP_THERMAL_ZONE_NAME_SZ	10
@@ -86,6 +97,7 @@ static struct omap_thermal_zone omap_thermal_zones[] = {
 };
 static struct thermal_dev *therm_fw;
 static struct omap_die_governor *omap_gov;
+static int cpu_sensor_temp_table[AVERAGE_NUMBER];
 
 /**
  * DOC: Introduction
@@ -219,6 +231,11 @@ static int omap_enter_zone(struct omap_thermal_zone *zone,
 								temp_upper);
 	omap_update_report_rate(omap_gov->temp_sensor, zone->update_rate);
 
+	omap_gov->hotspot_temp_lower = temp_lower;
+	omap_gov->hotspot_temp_upper = temp_upper;
+	if (thermal_lookup_temp("pcb") >= 0)
+		omap_gov->average_period = zone->average_rate;
+
 	return 0;
 }
 
@@ -298,6 +315,74 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 	return zone;
 }
 
+/*
+ * Make an average of the OMAP on-die temperature
+ * this is helpful to handle burst activity of OMAP when extrapolating
+ * the OMAP hot spot temperature from on-die sensor and PCB temperature
+ * Re-evaluate the temperature gradient between hot spot and on-die sensor
+ * (See absolute_delta) and reconfigure the thresholds if needed
+ */
+static void average_on_die_temperature(void)
+{
+	int i;
+	int die_temp_lower = 0;
+	int die_temp_upper = 0;
+
+	if (omap_gov->temp_sensor == NULL)
+		return;
+
+	/* Read current temperature */
+	omap_gov->sensor_temp = thermal_request_temp(omap_gov->temp_sensor);
+
+	/* if on-die sensor does not report a correct value, then return */
+	if (omap_gov->sensor_temp == -EINVAL)
+		return;
+
+	/* Update historical buffer */
+	for (i = 1; i < AVERAGE_NUMBER; i++) {
+		cpu_sensor_temp_table[AVERAGE_NUMBER - i] =
+		cpu_sensor_temp_table[AVERAGE_NUMBER - i - 1];
+	}
+	cpu_sensor_temp_table[0] = omap_gov->sensor_temp;
+
+	if (cpu_sensor_temp_table[AVERAGE_NUMBER - 1] == 0)
+		omap_gov->avg_is_valid = 0;
+	else
+		omap_gov->avg_is_valid = 1;
+
+	/* Compute the new average value */
+	omap_gov->avg_cpu_sensor_temp = 0;
+	for (i = 0; i < AVERAGE_NUMBER; i++)
+		omap_gov->avg_cpu_sensor_temp += cpu_sensor_temp_table[i];
+
+	omap_gov->avg_cpu_sensor_temp =
+		(omap_gov->avg_cpu_sensor_temp / AVERAGE_NUMBER);
+
+	/*
+	 * Reconfigure the current temperature thresholds according
+	 * to the current PCB temperature
+	 */
+	convert_omap_sensor_temp_to_hotspot_temp(omap_gov->sensor_temp);
+	die_temp_lower = hotspot_temp_to_sensor_temp(
+		omap_gov->hotspot_temp_lower);
+	die_temp_upper = hotspot_temp_to_sensor_temp(
+		omap_gov->hotspot_temp_upper);
+	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+		die_temp_lower, die_temp_upper);
+}
+
+static void average_cpu_sensor_delayed_work_fn(struct work_struct *work)
+{
+	struct omap_die_governor *omap_gov_wk =
+		container_of(work, struct omap_die_governor,
+			average_cpu_sensor_work.work);
+
+	average_on_die_temperature();
+
+	schedule_delayed_work(&omap_gov_wk->average_cpu_sensor_work,
+		msecs_to_jiffies(omap_gov_wk->average_period));
+}
+
 static int omap_process_cpu_temp(struct thermal_dev *gov,
 				struct list_head *cooling_list,
 				struct thermal_dev *temp_sensor,
@@ -308,8 +393,27 @@ static int omap_process_cpu_temp(struct thermal_dev *gov,
 	return omap_cpu_thermal_manager(cooling_list, temp);
 }
 
+static int omap_die_pm_notifier_cb(struct notifier_block *notifier,
+				unsigned long pm_event,  void *unused)
+{
+	switch (pm_event) {
+	case PM_SUSPEND_PREPARE:
+		cancel_delayed_work_sync(&omap_gov->average_cpu_sensor_work);
+		break;
+	case PM_POST_SUSPEND:
+		schedule_work(&omap_gov->average_cpu_sensor_work.work);
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
 static struct thermal_dev_ops omap_gov_ops = {
 	.process_temp = omap_process_cpu_temp,
+};
+
+static struct notifier_block omap_die_pm_notifier = {
+	.notifier_call = omap_die_pm_notifier_cb,
 };
 
 static int __init omap_die_governor_init(void)
@@ -337,11 +441,24 @@ static int __init omap_die_governor_init(void)
 	omap_gradient_slope = thermal_get_slope(thermal_fw);
 	omap_gradient_const = thermal_get_offset(thermal_fw);
 
+	/* Init delayed work to average on-die temperature */
+	INIT_DELAYED_WORK(&omap_gov->average_cpu_sensor_work,
+		average_cpu_sensor_delayed_work_fn);
+
+	omap_gov->average_period = NORMAL_TEMP_MONITORING_RATE;
+	omap_gov->avg_is_valid = 0;
+
+	if (register_pm_notifier(&omap_die_pm_notifier))
+		pr_err("%s: omap_die pm registration failed!\n", __func__);
+
+	schedule_work(&omap_gov->average_cpu_sensor_work.work);
+
 	return 0;
 }
 
 static void __exit omap_die_governor_exit(void)
 {
+	cancel_delayed_work_sync(&omap_gov->average_cpu_sensor_work);
 	thermal_governor_dev_unregister(therm_fw);
 	kfree(therm_fw);
 	kfree(omap_gov);
