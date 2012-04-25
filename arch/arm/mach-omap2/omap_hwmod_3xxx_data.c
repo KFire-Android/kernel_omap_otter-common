@@ -13,6 +13,8 @@
  *
  * XXX these should be marked initdata for multi-OMAP kernels
  */
+#include <linux/power/smartreflex.h>
+
 #include <plat/omap_hwmod.h>
 #include <mach/irqs.h>
 #include <plat/cpu.h>
@@ -28,8 +30,6 @@
 #include <plat/dmtimer.h>
 
 #include "omap_hwmod_common_data.h"
-
-#include "smartreflex.h"
 #include "prm-regbits-34xx.h"
 #include "cm-regbits-34xx.h"
 #include "wd_timer.h"

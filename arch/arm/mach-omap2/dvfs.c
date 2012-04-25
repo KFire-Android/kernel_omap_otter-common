@@ -22,13 +22,13 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/pm_qos.h>
+#include <linux/power/smartreflex.h>
 #include <plat/common.h>
 #include <plat/omap_device.h>
 #include <plat/omap_hwmod.h>
 #include <plat/clock.h>
 #include <plat/dvfs.h>
 #include <plat/voltage.h>
-#include "smartreflex.h"
 #include "powerdomain.h"
 #include "pm.h"
 

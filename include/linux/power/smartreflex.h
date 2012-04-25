@@ -17,12 +17,11 @@
  * published by the Free Software Foundation.
  */
 
-#ifndef __ASM_ARM_OMAP_SMARTREFLEX_H
-#define __ASM_ARM_OMAP_SMARTREFLEX_H
+#ifndef __POWER_SMARTREFLEX_H
+#define __POWER_SMARTREFLEX_H
 
+#include <linux/types.h>
 #include <linux/platform_device.h>
-
-#include "voltage.h"
 
 /*
  * Different Smartreflex IPs version. The v1 is the 65nm version used in
@@ -141,6 +140,9 @@
 
 #define OMAP3430_SR_ERRWEIGHT		0x04
 #define OMAP3430_SR_ERRMAXLIMIT		0x02
+
+struct voltagedomain;
+struct omap_volt_data;
 
 /**
  * struct omap_sr_pmic_data - Strucutre to be populated by pmic code to pass

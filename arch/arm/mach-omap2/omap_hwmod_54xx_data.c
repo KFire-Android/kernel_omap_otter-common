@@ -19,6 +19,7 @@
 
 #include <linux/io.h>
 #include <linux/omap_ocp2scp.h>
+#include <linux/power/smartreflex.h>
 
 #include <plat/omap_hwmod.h>
 #include <plat/cpu.h>
@@ -34,7 +35,6 @@
 
 #include "omap_hwmod_common_data.h"
 
-#include "smartreflex.h"
 #include "cm1_54xx.h"
 #include "cm2_54xx.h"
 #include "prm54xx.h"
