@@ -46,6 +46,9 @@
 #endif
 #define OMAP5_SRAM_PA		0x40300000
 
+#define OMAP4_SRAM_RESERVE	0x4000
+#define OMAP5_SRAM_RESERVE 	0x10000
+
 #if defined(CONFIG_ARCH_OMAP2PLUS)
 #define SRAM_BOOTLOADER_SZ	0x00
 #else
@@ -119,9 +122,11 @@ static void __init omap_detect_sram(void)
 			} else if (cpu_is_omap44xx()) {
 				omap_sram_start = OMAP4_SRAM_PUB_PA;
 				omap_sram_size = 0xa000; /* 40K */
+				omap_sram_size -= OMAP4_SRAM_RESERVE;
 			} else if (cpu_is_omap54xx()) {
 				omap_sram_start = OMAP5_SRAM_PA;
 				omap_sram_size = SZ_128K; /* 128KB */
+				omap_sram_size -= OMAP5_SRAM_RESERVE;
 			} else {
 				omap_sram_start = OMAP2_SRAM_PUB_PA;
 				omap_sram_size = 0x800; /* 2K */
@@ -136,9 +141,11 @@ static void __init omap_detect_sram(void)
 			} else if (cpu_is_omap44xx()) {
 				omap_sram_start = OMAP4_SRAM_PA;
 				omap_sram_size = 0xe000; /* 56K */
+				omap_sram_size -= OMAP4_SRAM_RESERVE;
 			} else if (cpu_is_omap54xx()) {
 				omap_sram_start = OMAP5_SRAM_PA;
 				omap_sram_size = SZ_128K; /* 128KB */
+				omap_sram_size -= OMAP5_SRAM_RESERVE;
 			} else {
 				omap_sram_start = OMAP2_SRAM_PA;
 				if (cpu_is_omap242x())
