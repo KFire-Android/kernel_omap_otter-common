@@ -1439,6 +1439,11 @@ static void __devinit twl_setup_errata(int features)
 				" not support full PM functionality\n");
 			twl_errata |= TWL6032_ERRATA_LDO_MUST_BE_ALWAYS_ON;
 		}
+		/*
+		 * Errata ProDB00119490 present only in the TWL6032 ES1.1
+		 */
+		if (twlrev == 1)
+			twl_errata |= TWL6032_ERRATA_DB00119490;
 	}
 }
 
