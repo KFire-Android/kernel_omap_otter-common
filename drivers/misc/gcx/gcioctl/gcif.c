@@ -43,20 +43,11 @@ struct gcfixup *g_fixupvacant;
 
 static enum gcerror get_buffer(struct gcbuffer **gcbuffer)
 {
-	enum gcerror gcerror;
-	int bufferlocked = 0;
+	enum gcerror gcerror = GCERR_NONE;
 	struct gcbuffer *temp;
 
 	/* Acquire buffer access mutex. */
-	gcerror = gc_acquire_mutex(&g_bufferlock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to acquire mutex (0x%08X).\n",
-			__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_BUF_ALLOC);
-		goto exit;
-	}
-	bufferlocked = 1;
+	mutex_lock(&g_bufferlock);
 
 	if (g_buffervacant == NULL) {
 		temp = kmalloc(sizeof(struct gcbuffer), GFP_KERNEL);
@@ -76,28 +67,17 @@ static enum gcerror get_buffer(struct gcbuffer **gcbuffer)
 	*gcbuffer = temp;
 
 exit:
-	if (bufferlocked)
-		mutex_unlock(&g_bufferlock);
-
+	mutex_unlock(&g_bufferlock);
 	return gcerror;
 }
 
 static enum gcerror get_fixup(struct gcfixup **gcfixup)
 {
-	enum gcerror gcerror;
-	int bufferlocked = 0;
+	enum gcerror gcerror = GCERR_NONE;
 	struct gcfixup *temp;
 
 	/* Acquire fixup access mutex. */
-	gcerror = gc_acquire_mutex(&g_bufferlock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to acquire mutex (0x%08X).\n",
-			__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_FIXUP_ALLOC);
-		goto exit;
-	}
-	bufferlocked = 1;
+	mutex_lock(&g_bufferlock);
 
 	if (g_fixupvacant == NULL) {
 		temp = kmalloc(sizeof(struct gcfixup), GFP_KERNEL);
@@ -117,29 +97,17 @@ static enum gcerror get_fixup(struct gcfixup **gcfixup)
 	*gcfixup = temp;
 
 exit:
-	if (bufferlocked)
-		mutex_unlock(&g_bufferlock);
-
+	mutex_unlock(&g_bufferlock);
 	return gcerror;
 }
 
-static enum gcerror put_buffer_tree(struct gcbuffer *gcbuffer)
+static void put_buffer_tree(struct gcbuffer *gcbuffer)
 {
-	enum gcerror gcerror;
-	int bufferlocked = 0;
 	struct gcbuffer *prev;
 	struct gcbuffer *curr;
 
 	/* Acquire buffer access mutex. */
-	gcerror = gc_acquire_mutex(&g_bufferlock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to acquire mutex (0x%08X).\n",
-			__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_BUF_ALLOC);
-		goto exit;
-	}
-	bufferlocked = 1;
+	mutex_lock(&g_bufferlock);
 
 	prev = NULL;
 	curr = gcbuffer;
@@ -156,11 +124,7 @@ static enum gcerror put_buffer_tree(struct gcbuffer *gcbuffer)
 	prev->next = g_buffervacant;
 	g_buffervacant = gcbuffer;
 
-exit:
-	if (bufferlocked)
-		mutex_unlock(&g_bufferlock);
-
-	return gcerror;
+	mutex_unlock(&g_bufferlock);
 }
 
 /*******************************************************************************

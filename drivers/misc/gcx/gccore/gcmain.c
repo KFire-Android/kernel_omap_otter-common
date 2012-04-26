@@ -25,6 +25,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/dma-mapping.h>
 #include <plat/cpu.h>
+#include <linux/delay.h>
 #include <linux/debugfs.h>
 #include <plat/omap_gcx.h>
 #include <linux/delay.h>
@@ -458,7 +459,7 @@ void gc_reset_gpu(void)
 				gcclockcontrol.raw);
 
 		/* Wait for reset. */
-		gc_delay(1);
+		mdelay(1);
 
 		/* Reset soft reset bit. */
 		gcclockcontrol.reg.reset = 0;
@@ -829,28 +830,28 @@ void gc_map(struct gcmap *gcmap)
 		"map client buffer\n",
 		__func__, __LINE__);
 
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  logical = 0x%08X\n",
-		__func__, __LINE__, (unsigned int) gcmap->logical);
-
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  pagearray = 0x%08X\n",
-		__func__, __LINE__, (unsigned int) gcmap->pagearray);
-
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  size = %d\n",
-		__func__, __LINE__, gcmap->size);
-
 	/* Initialize the mapping parameters. */
 	if (gcmap->pagearray == NULL) {
 		mem.base = ((u32) gcmap->buf.logical) & ~(PAGE_SIZE - 1);
 		mem.offset = ((u32) gcmap->buf.logical) & (PAGE_SIZE - 1);
 		mem.pages = NULL;
+
+		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+			"  logical = 0x%08X\n",
+			__func__, __LINE__, (unsigned int) gcmap->buf.logical);
 	} else {
 		mem.base = 0;
 		mem.offset = gcmap->buf.offset;
 		mem.pages = gcmap->pagearray;
+
+		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+			"  pagearray = 0x%08X\n",
+			__func__, __LINE__, (unsigned int) gcmap->pagearray);
 	}
+
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"  size = %d\n",
+		__func__, __LINE__, gcmap->size);
 
 	mem.count = DIV_ROUND_UP(gcmap->size + mem.offset, PAGE_SIZE);
 	mem.pagesize = gcmap->pagesize ? gcmap->pagesize : PAGE_SIZE;
@@ -901,10 +902,6 @@ void gc_unmap(struct gcmap *gcmap)
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
 		"unmap client buffer\n",
 		__func__, __LINE__);
-
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  logical = 0x%08X\n",
-		__func__, __LINE__, (unsigned int) gcmap->logical);
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
 		"  size = %d\n",
