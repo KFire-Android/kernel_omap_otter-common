@@ -580,14 +580,30 @@ static int dsscomp_apply(dsscomp_t comp)
 				goto skip_ovl_set;
 			}
 			if (ovl->manager != mgr) {
-				/*
-				 * Ideally, we should call ovl->unset_manager(ovl),
-				 * but it may block on go even though the disabling
-				 * of the overlay already went through.  So instead,
-				 * we are just clearing the manager.
-				 */
-				ovl->manager = NULL;
-				r = ovl->set_manager(ovl, mgr);
+				mutex_lock(&mtx);
+				if (!mgrq[comp->ix].blanking) {
+					/*
+					 * Ideally, we should call
+					 * ovl->unset_manager(ovl),
+					 * but it may block on go
+					 * even though the disabling
+					 * of the overlay already
+					 * went through. So instead,
+					 * we are just clearing the manager.
+					 */
+					ovl->manager = NULL;
+					r = ovl->set_manager(ovl, mgr);
+				} else	{
+					/* Ignoring manager change
+					during blanking. */
+					pr_info_ratelimited("dsscomp_apply "
+						"skip set_manager(%s) for "
+						"ovl%d while blank."
+						, mgr->name, oi->cfg.ix);
+					r = -ENODEV;
+				}
+				mutex_unlock(&mtx);
+
 				if (r)
 					goto skip_ovl_set;
 			}
