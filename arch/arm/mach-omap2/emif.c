@@ -1449,9 +1449,6 @@ static void __init setup_lowpower_regs(u32 emif_nr,
 	if (dev->emif_ddr_selfrefresh_cycles >= 0) {
 		u32 num_cycles, ddr_sr_timer;
 
-		/* Enable self refresh if not already configured */
-		temp = __raw_readl(base + OMAP44XX_EMIF_PWR_MGMT_CTRL) &
-			OMAP44XX_REG_LP_MODE_MASK;
 		/*
 		 * Configure the self refresh timing
 		 * base value starts at 16 cycles mapped to 1( __fls(16) = 4)
@@ -1487,24 +1484,18 @@ static void __init setup_lowpower_regs(u32 emif_nr,
 		__raw_writel(temp, base + OMAP44XX_EMIF_PWR_MGMT_CTRL_SHDW);
 
 		/* Enable Self Refresh */
-		temp = __raw_readl(base + OMAP44XX_EMIF_PWR_MGMT_CTRL);
-		mask_n_set(temp, OMAP44XX_REG_LP_MODE_SHIFT,
-			   OMAP44XX_REG_LP_MODE_MASK, LP_MODE_SELF_REFRESH);
-		__raw_writel(temp, base + OMAP44XX_EMIF_PWR_MGMT_CTRL);
+		set_lp_mode(emif_nr, LP_MODE_SELF_REFRESH);
 	} else {
-		/* Disable Automatic power management if < 0 and not disabled */
-		temp = __raw_readl(base + OMAP44XX_EMIF_PWR_MGMT_CTRL) &
-			OMAP44XX_REG_LP_MODE_MASK;
+		/* Disable Automatic power management if < 0 */
 
+		/* Program the idle delay to 0x0 */
 		temp = __raw_readl(base + OMAP44XX_EMIF_PWR_MGMT_CTRL_SHDW);
 		mask_n_set(temp, OMAP44XX_REG_SR_TIM_SHDW_SHIFT,
 			   OMAP44XX_REG_SR_TIM_SHDW_MASK, 0x0);
 		__raw_writel(temp, base + OMAP44XX_EMIF_PWR_MGMT_CTRL_SHDW);
 
-		temp = __raw_readl(base + OMAP44XX_EMIF_PWR_MGMT_CTRL);
-		mask_n_set(temp, OMAP44XX_REG_LP_MODE_SHIFT,
-			   OMAP44XX_REG_LP_MODE_MASK, LP_MODE_DISABLE);
-		__raw_writel(temp, base + OMAP44XX_EMIF_PWR_MGMT_CTRL);
+		/* Disable Automatic power management */
+		set_lp_mode(emif_nr, LP_MODE_DISABLE);
 	}
 }
 
