@@ -3853,3 +3853,118 @@ exit:
 	return bverror;
 }
 EXPORT_SYMBOL(gcbv_blt);
+
+enum bverror gcbv_cache(struct bvcopparams *copparams)
+{
+	enum bverror bverror = BVERR_NONE;
+	int count; /* number of planes */
+	unsigned int bpp = 0; /* bytes per pixel */
+	unsigned long vert_offset, horiz_offset;
+
+	struct c2dmrgn rgn[3];
+	int container_size = 0;
+
+	unsigned long subsample = copparams->geom->format &
+			OCDFMTDEF_SUBSAMPLE_MASK;
+	unsigned long vendor = copparams->geom->format &
+			OCDFMTDEF_VENDOR_MASK;
+	unsigned long layout = copparams->geom->format &
+			OCDFMTDEF_LAYOUT_MASK;
+	unsigned long sizeminus1 = copparams->geom->format &
+			OCDFMTDEF_COMPONENTSIZEMINUS1_MASK;
+	unsigned long container = copparams->geom->format &
+			OCDFMTDEF_CONTAINER_MASK;
+
+
+	if (vendor != OCDFMTDEF_VENDOR_ALL) {
+		bverror = BVERR_FORMAT;
+		goto Error;
+	}
+
+	switch (container) {
+	case OCDFMTDEF_CONTAINER_8BIT:
+		container_size = 8;
+		break;
+	case OCDFMTDEF_CONTAINER_16BIT:
+		container_size = 16;
+		break;
+	case OCDFMTDEF_CONTAINER_24BIT:
+		container_size = 24;
+		break;
+	case OCDFMTDEF_CONTAINER_32BIT:
+		container_size = 32;
+		break;
+	case OCDFMTDEF_CONTAINER_48BIT:
+		container_size = 48;
+		break;
+	case OCDFMTDEF_CONTAINER_64BIT:
+		container_size = 64;
+		break;
+	}
+
+	switch (layout) {
+	case OCDFMTDEF_PACKED:
+
+		count = 1;
+
+		switch (subsample) {
+		case OCDFMTDEF_SUBSAMPLE_NONE:
+			if (sizeminus1 >= 8) {
+				bpp = container_size / 8;
+			} else {
+				bverror = BVERR_FORMAT;
+				goto Error;
+			}
+			break;
+
+		case OCDFMTDEF_SUBSAMPLE_422_YCbCr:
+			bpp = (container_size / 2) / 8;
+			break;
+
+		case OCDFMTDEF_SUBSAMPLE_420_YCbCr:
+			bverror = BVERR_FORMAT;
+			goto Error;
+			break;
+
+		case OCDFMTDEF_SUBSAMPLE_411_YCbCr:
+			bverror = BVERR_FORMAT;
+			goto Error;
+			break;
+		default:
+			bverror = BVERR_FORMAT;
+			goto Error;
+		}
+
+		rgn[0].span = copparams->rect->width * bpp;
+		rgn[0].lines = copparams->rect->height;
+		rgn[0].stride = copparams->geom->virtstride;
+		horiz_offset = copparams->rect->left * bpp;
+		vert_offset = copparams->rect->top;
+
+		rgn[0].start = (void *) ((unsigned long)
+				copparams->desc->virtaddr +
+				vert_offset * rgn[0].stride +
+				horiz_offset);
+		gcbvcacheop(count, rgn, copparams->cacheop);
+
+		break;
+	case OCDFMTDEF_DISTRIBUTED:
+		bverror = BVERR_FORMAT;
+		break;
+	/*TODO: Multi plane still need to be implemented */
+	case OCDFMTDEF_2_PLANE_YCbCr:
+		printk(KERN_INFO "Not yet implemented\n");
+		break;
+	case OCDFMTDEF_3_PLANE_STACKED:
+	case OCDFMTDEF_3_PLANE_SIDE_BY_SIDE_YCbCr:
+		printk(KERN_INFO "Not yet implemented\n");
+		break;
+	default:
+		bverror = BVERR_FORMAT;
+		break;
+	}
+
+Error:
+	return bverror;
+}
+EXPORT_SYMBOL(gcbv_cache);
