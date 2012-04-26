@@ -2325,6 +2325,25 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	wake_lock_init(&chrg_lock, WAKE_LOCK_SUSPEND, "ac_chrg_wake_lock");
 
+	if (di->errata & TWL6032_ERRATA_DB00119490) {
+		/*
+		 * Set Anti-collapse threshold correspond
+		 * to the ERRATA DB00119490 (4.4 volts)
+		 */
+		ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &reg,
+						ANTICOLLAPSE_CTRL1);
+		if (ret)
+			goto temp_setup_fail;
+
+		reg = reg & 0x1F;
+		reg = reg | ((0x3) << BUCK_VTH_SHIFT);
+		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg,
+						ANTICOLLAPSE_CTRL1);
+
+		if (ret)
+			goto temp_setup_fail;
+	}
+
 	/* settings for temperature sensing */
 	ret = twl6030battery_temp_setup(true);
 	if (ret)

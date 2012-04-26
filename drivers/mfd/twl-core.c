@@ -1322,6 +1322,7 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	u8 temp;
 	int ret = 0, features;
 	unsigned long errata = 0;
+	u8 twlrev;
 
 	if (!pdata) {
 		dev_dbg(&client->dev, "no platform data?\n");
@@ -1380,6 +1381,18 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		twl_i2c_read_u8(TWL_MODULE_USB, &temp, USB_PRODUCT_ID_LSB);
 		if (temp == 0x32)
 			features |= TWL6032_SUBCLASS;
+
+		twl_i2c_read_u8(TWL6030_MODULE_ID2, &twlrev,
+				TWL6030_REG_JTAGVERNUM);
+
+		/*
+		 * Check for the errata implementation
+		 * Errata ProDB00119490 present only in the TWL6032 ES1.1
+		 */
+		if (features & TWL6032_SUBCLASS) {
+			if (twlrev == 1)
+				errata |= TWL6032_ERRATA_DB00119490;
+		}
 	}
 
 	/* load power event scripts */
