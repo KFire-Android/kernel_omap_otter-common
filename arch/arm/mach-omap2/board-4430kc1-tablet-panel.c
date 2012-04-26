@@ -189,8 +189,7 @@ static void bkl_set_power(struct omap_pwm_led_platform_data *self, int on_off)
 {
 	pr_debug("%s: on_off:%d\n", __func__, on_off);
 
-	// slight delay to cut out a white flashing effect
-	msleep(500);
+	msleep(1);
 }
 
 static struct omap_pwm_led_platform_data board_backlight_data = {
@@ -200,7 +199,7 @@ static struct omap_pwm_led_platform_data board_backlight_data = {
 	.bkl_max		= 254,
 	.bkl_min		= 0,
 	.bkl_freq		= 30000,
-	.set_power		= &bkl_set_power,
+//	.set_power		= &bkl_set_power,
 };
 
 static struct platform_device board_backlight_device = {
