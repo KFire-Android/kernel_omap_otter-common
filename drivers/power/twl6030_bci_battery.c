@@ -1565,7 +1565,10 @@ static int twl6030_usb_autogate_charger(struct twl6030_bci_device_info *di)
 
 			ret = 1;
 	} else if ((di->charger_source != POWER_SUPPLY_TYPE_MAINS) &&
+			(di->charger_source != POWER_SUPPLY_TYPE_USB) &&
 			di->usb_online) {
+
+		di->charger_source = POWER_SUPPLY_TYPE_USB;
 
 		twl6030_start_usb_charger(di);
 
