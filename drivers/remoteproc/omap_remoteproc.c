@@ -27,6 +27,8 @@
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/remoteproc.h>
+#include <linux/kthread.h>
+#include <linux/slab.h>
 
 #include <plat/mailbox.h>
 #include <plat/remoteproc.h>
@@ -48,6 +50,20 @@ struct omap_rproc {
 	struct rproc *rproc;
 	void __iomem *boot_reg;
 };
+
+struct _thread_data {
+	struct rproc *rproc;
+	int msg;
+};
+
+static int _vq_interrupt_thread(struct _thread_data *d)
+{
+	/* msg contains the index of the triggered vring */
+	if (rproc_vq_interrupt(d->rproc, d->msg) == IRQ_NONE)
+		dev_dbg(d->rproc->dev, "no message was found in vqid 0x0\n");
+	kfree(d);
+	return 0;
+}
 
 /**
  * omap_rproc_mbox_callback() - inbound mailbox message handler
@@ -71,6 +87,7 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 	struct omap_rproc *oproc = container_of(this, struct omap_rproc, nb);
 	struct device *dev = oproc->rproc->dev;
 	const char *name = oproc->rproc->name;
+	struct _thread_data *d;
 
 	dev_dbg(dev, "mbox msg: 0x%x\n", msg);
 
@@ -83,9 +100,13 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 		dev_info(dev, "received echo reply from %s\n", name);
 		break;
 	default:
-		/* msg contains the index of the triggered vring */
-		if (rproc_vq_interrupt(oproc->rproc, msg) == IRQ_NONE)
-			dev_dbg(dev, "no message was found in vqid %d\n", msg);
+		d = kmalloc(sizeof(*d), GFP_KERNEL);
+		if (!d)
+			break;
+		d->rproc = oproc->rproc;
+		d->msg = msg;
+		kthread_run((void *)_vq_interrupt_thread, d,
+					"vp_interrupt_thread");
 	}
 
 	return NOTIFY_DONE;
