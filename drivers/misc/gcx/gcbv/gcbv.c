@@ -86,29 +86,17 @@
 ** Miscellaneous defines and macros.
 */
 
-#define EQ_ORIGIN(rect1, rect2) \
-( \
-	(rect1.left == rect2.left) && (rect1.top == rect2.top) \
-)
-
 #define EQ_SIZE(rect1, rect2) \
 ( \
 	(rect1.width == rect2.width) && (rect1.height == rect2.height) \
 )
 
-#if 1
 #define STRUCTSIZE(structptr, lastmember) \
 ( \
 	(size_t) &structptr->lastmember + \
 	sizeof(structptr->lastmember) - \
 	(size_t) structptr \
 )
-#else
-#define STRUCTSIZE(structptr, lastmember) \
-( \
-	(size_t) sizeof(*structptr) \
-)
-#endif
 
 #define GET_MAP_HANDLE(map) \
 ( \
@@ -138,7 +126,7 @@
 */
 
 /* Used by blitters to define an array of valid sources. */
-struct srcdesc {
+struct srcinfo {
 	int index;
 	union bvinbuff buf;
 	struct bvsurfgeom *geom;
@@ -2100,15 +2088,105 @@ exit:
 }
 
 /*******************************************************************************
- * Surface validation.
+ * Surface compare and validation.
  */
+
+static inline bool equal_rects(struct bvrect *rect1, struct bvrect *rect2)
+{
+	if (rect1->left != rect2->left)
+		return false;
+
+	if (rect1->top != rect2->top)
+		return false;
+
+	if (rect1->width != rect2->width)
+		return false;
+
+	if (rect1->height != rect2->height)
+		return false;
+
+	return true;
+}
+
+/* The function verifies whether the two buffer descriptors and rectangles
+   define the same physical area. */
+static bool same_phys_area(struct bvbuffdesc *surf1, struct bvrect *rect1,
+				struct bvbuffdesc *surf2, struct bvrect *rect2)
+{
+	struct bvphysdesc *physdesc1;
+	struct bvphysdesc *physdesc2;
+
+	/* If pointers are the same, things are much easier. */
+	if (surf1 == surf2)
+		/* Compare the rectangles. For simplicity we don't consider
+		   cases with partially overlapping rectangles at this time. */
+		return equal_rects(rect1, rect2);
+
+	/* Assume diffrent areas if the types are different. */
+	if (surf1->auxtype != surf2->auxtype)
+		return false;
+
+	if (surf1->auxtype == BVAT_PHYSDESC) {
+		physdesc1 = (struct bvphysdesc *) surf1->auxptr;
+		physdesc2 = (struct bvphysdesc *) surf2->auxptr;
+
+		/* Same physical descriptor? */
+		if (physdesc1 == physdesc2)
+			return equal_rects(rect1, rect2);
+
+		/* Same page array? */
+		if (physdesc1->pagearray == physdesc2->pagearray)
+			return equal_rects(rect1, rect2);
+
+		/* Assume the same surface if first pages match. */
+		if (physdesc1->pagearray[0] == physdesc2->pagearray[0])
+			return equal_rects(rect1, rect2);
+
+	} else {
+		if (surf1->virtaddr == surf2->virtaddr)
+			return equal_rects(rect1, rect2);
+	}
+
+	return false;
+}
+
+static bool valid_geom(struct bvbuffdesc *buffdesc, struct bvsurfgeom *geom,
+			struct bvformatxlate *format)
+{
+	unsigned int size;
+
+	/* Compute the size of the surface. */
+	size = (geom->width * geom->height * format->bitspp) / 8;
+
+	/* Make sure the size is not greater then the surface. */
+	if (size > buffdesc->length) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"ERROR: invalid geometry detected:\n",
+			__func__, __LINE__);
+
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"       specified dimensions: %dx%d, %d bitspp\n",
+			__func__, __LINE__);
+
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"       surface size based on the dimensions: %d\n",
+			__func__, __LINE__, size);
+
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"       specified surface size: %d\n",
+			__func__, __LINE__, buffdesc->length);
+
+		return false;
+	}
+
+	return true;
+}
 
 static int verify_surface(unsigned int tile,
 				union bvinbuff *surf,
-				struct bvsurfgeom *geom,
-				struct bvrect *rect)
+				struct bvsurfgeom *geom)
 {
-	int ret = -1;
+	int ret;
 
 	GCPRINT(GCDBGFILTER, GCZONE_SURF, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
@@ -2150,54 +2228,8 @@ static int verify_surface(unsigned int tile,
 		goto exit;
 	}
 
-	{
-		struct bvformatxlate *format;
-		if (parse_format(geom->format, &format)) {
-			unsigned int geomsize;
-			unsigned int rectsize;
-
-			geomsize
-				= (geom->width
-				*  geom->height
-				*  format->bitspp) / 8;
-
-			rectsize
-				= (rect->top + rect->height - 1)
-				* geom->virtstride
-				+ ((rect->left + rect->width)
-				* format->bitspp) / 8;
-
-			if ((geomsize > surf->desc->length) ||
-				(rectsize > surf->desc->length)) {
-				GCPRINT(NULL, 0, GC_MOD_PREFIX
-					"*** INVALID SURFACE PARAMETERS\n",
-					__func__, __LINE__);
-				GCPRINT(NULL, 0, GC_MOD_PREFIX
-					"    dimensions = %dx%d\n",
-					__func__, __LINE__,
-					geom->width, geom->height);
-				GCPRINT(NULL, 0, GC_MOD_PREFIX
-					"    rectangle = (%d,%d %dx%d)\n",
-					__func__, __LINE__,
-					rect->left, rect->top,
-					rect->width, rect->height);
-				GCPRINT(NULL, 0, GC_MOD_PREFIX
-					"    size based on dimensions = %d\n",
-					__func__, __LINE__,
-					geomsize);
-				GCPRINT(NULL, 0, GC_MOD_PREFIX
-					"    size based on rectangle = %d\n",
-					__func__, __LINE__,
-					rectsize);
-				GCPRINT(NULL, 0, GC_MOD_PREFIX
-					"    size specified = %d\n",
-					__func__, __LINE__,
-					surf->desc->length);
-
-				return GCBVERR_GEOM;
-			}
-		}
-	}
+	/* Validation successful. */
+	ret = -1;
 
 exit:
 	GCPRINT(GCDBGFILTER, GCZONE_SURF, "--" GC_MOD_PREFIX
@@ -2298,6 +2330,14 @@ static enum bverror set_dst(struct bvbltparams *bltparams,
 		BVSETBLTERRORARG(BVERR_DSTGEOM_FORMAT,
 				"invalid destination format (%d)",
 				dstgeom->format);
+		goto exit;
+	}
+
+	/* Validate geometry. */
+	if (!valid_geom(bltparams->dstdesc, bltparams->dstgeom,
+				batch->dstformat)) {
+		BVSETBLTERROR(BVERR_DSTGEOM,
+				"destination geom exceeds surface size");
 		goto exit;
 	}
 
@@ -2457,6 +2497,14 @@ static enum bverror set_clip(struct bvbltparams *bltparams,
 		clippedbottom = destbottom + batch->deltabottom;
 	}
 
+	/* Validate the rectangle. */
+	if ((clippedright > bltparams->dstgeom->width) ||
+		(clippedbottom > bltparams->dstgeom->height)) {
+		BVSETBLTERROR(BVERR_DSTRECT,
+				"destination rect exceeds surface size");
+		goto exit;
+	}
+
 	/* Set the destination rectangle. */
 	batch->dstleft = clippedleft;
 	batch->dsttop = clippedtop;
@@ -2530,7 +2578,7 @@ exit:
 
 static enum bverror do_fill(struct bvbltparams *bltparams,
 				struct gcbatch *batch,
-				struct srcdesc *srcdesc)
+				struct srcinfo *srcinfo)
 {
 	enum bverror bverror;
 	enum bverror unmap_bverror;
@@ -2570,12 +2618,22 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 		"parsing the source format.\n",
 		__func__, __LINE__);
 
-	if (!parse_format(srcdesc->geom->format, &srcformat)) {
-		BVSETBLTERRORARG((srcdesc->index == 0)
+	if (!parse_format(srcinfo->geom->format, &srcformat)) {
+		BVSETBLTERRORARG((srcinfo->index == 0)
 					? BVERR_SRC1GEOM_FORMAT
 					: BVERR_SRC2GEOM_FORMAT,
 				"invalid source format (%d)",
-				srcdesc->geom->format);
+				srcinfo->geom->format);
+		goto exit;
+	}
+
+	/* Validate soource geometry. */
+	if (!valid_geom(srcinfo->buf.desc, srcinfo->geom, srcformat)) {
+		BVSETBLTERRORARG((srcinfo->index == 0)
+					? BVERR_SRC1GEOM
+					: BVERR_SRC2GEOM,
+				"source%d geom exceeds surface size",
+				srcinfo->index + 1);
 		goto exit;
 	}
 
@@ -2608,9 +2666,9 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	*/
 
 	fillcolorptr
-		= (unsigned char *) srcdesc->buf.desc->virtaddr
-		+ srcdesc->rect->top * srcdesc->geom->virtstride
-		+ srcdesc->rect->left * srcformat->bitspp / 8;
+		= (unsigned char *) srcinfo->buf.desc->virtaddr
+		+ srcinfo->rect->top * srcinfo->geom->virtstride
+		+ srcinfo->rect->left * srcformat->bitspp / 8;
 
 	gcmofill->clearcolor_ldst = gcmofill_clearcolor_ldst;
 	gcmofill->clearcolor.raw = getinternalcolor(fillcolorptr, srcformat);
@@ -2745,7 +2803,7 @@ exit:
 
 static enum bverror do_blit(struct bvbltparams *bltparams,
 				struct gcbatch *batch,
-				struct srcdesc *srcdesc,
+				struct srcinfo *srcinfo,
 				unsigned int srccount,
 				struct gcalpha *gca)
 {
@@ -2763,9 +2821,10 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 	struct bvformatxlate *srcformat;
 	struct bvbuffmap *srcmap[2] = { NULL, NULL };
+	struct bvbuffdesc *srcdesc;
 	struct bvsurfgeom *srcgeom;
 	struct bvrect *srcrect;
-	int srcleft, srctop;
+	int srcleft, srctop, srcright, srcbottom;
 	int srcoffset, srcsurfleft, srcsurftop;
 	int srcshift, srcadjust, srcalign;
 	int multisrc;
@@ -2807,8 +2866,9 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		** Parse the source format.
 		*/
 
-		srcgeom = srcdesc[i].geom;
-		srcrect = srcdesc[i].rect;
+		srcdesc = srcinfo[i].buf.desc;
+		srcgeom = srcinfo[i].geom;
+		srcrect = srcinfo[i].rect;
 
 		/* Parse the source format. */
 		GCPRINT(GCDBGFILTER, GCZONE_FORMAT, GC_MOD_PREFIX
@@ -2816,11 +2876,35 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			__func__, __LINE__);
 
 		if (!parse_format(srcgeom->format, &srcformat)) {
-			BVSETBLTERRORARG((srcdesc[i].index == 0)
+			BVSETBLTERRORARG((srcinfo[i].index == 0)
 						? BVERR_SRC1GEOM_FORMAT
 						: BVERR_SRC2GEOM_FORMAT,
 					"invalid source format (%d)",
 					srcgeom->format);
+			goto exit;
+		}
+
+		/* Validate soource geometry. */
+		if (!valid_geom(srcdesc, srcgeom, srcformat)) {
+			BVSETBLTERRORARG((srcinfo->index == 0)
+						? BVERR_SRC1GEOM
+						: BVERR_SRC2GEOM,
+					"source%d geom exceeds surface size",
+					srcinfo->index + 1);
+			goto exit;
+		}
+
+		srcright = srcrect->left + srcrect->width + batch->deltaright;
+		srcbottom = srcrect->top + srcrect->height + batch->deltabottom;
+
+		/* Validate the rectangle. */
+		if ((srcright > srcgeom->width) ||
+			(srcbottom > srcgeom->height)) {
+			BVSETBLTERRORARG((srcinfo->index == 0)
+						? BVERR_SRC1RECT
+						: BVERR_SRC2RECT,
+					"source%d rect exceeds surface size",
+					srcinfo->index + 1);
 			goto exit;
 		}
 
@@ -2831,7 +2915,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
 			"  srcaddr[%d] = 0x%08X\n",
 			__func__, __LINE__,
-			i, (unsigned int) srcdesc[i].buf.desc->virtaddr);
+			i, (unsigned int) srcdesc->virtaddr);
 
 		GCPRINT(GCDBGFILTER, GCZONE_SURF, GC_MOD_PREFIX
 			"  srcsurf = %dx%d, stride = %ld\n",
@@ -2853,7 +2937,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 		/* Compute the source offset in pixels needed to compensate
 		   for the surface base address misalignment if any. */
-		srcoffset = (((unsigned int) srcdesc[i].buf.desc->virtaddr
+		srcoffset = (((unsigned int) srcdesc->virtaddr
 				& (GC_BASE_ALIGN - 1)) * 8)
 				/ srcformat->bitspp;
 
@@ -2939,7 +3023,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		** Map the source.
 		*/
 
-		bverror = do_map(srcdesc[i].buf.desc, 0, &srcmap[i]);
+		bverror = do_map(srcdesc, 0, &srcmap[i]);
 		if (bverror != BVERR_NONE) {
 			bltparams->errdesc = gccontext.bverrorstr;
 			goto exit;
@@ -3138,7 +3222,7 @@ exit:
 	for (i = 0; i < 2; i += 1)
 		if (srcmap[i] != NULL) {
 			unmap_bverror = schedule_unmap(batch,
-							srcdesc[i].buf.desc);
+							srcinfo[i].buf.desc);
 			if ((unmap_bverror != BVERR_NONE) &&
 				(bverror == BVERR_NONE)) {
 				bltparams->errdesc = gccontext.bverrorstr;
@@ -3345,7 +3429,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	bool nop = false;
 	struct gcbatch *batch;
 	int src1used, src2used, maskused;
-	struct srcdesc srcdesc[2];
+	struct srcinfo srcinfo[2];
 	unsigned short rop, blend, format;
 	struct gccommit gccommit;
 	int srccount, res;
@@ -3376,7 +3460,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		__func__, __LINE__);
 
 	res = verify_surface(0, (union bvinbuff *) &bltparams->dstdesc,
-				bltparams->dstgeom, &bltparams->dstrect);
+				bltparams->dstgeom);
 	if (res != -1) {
 		BVSETBLTSURFERROR(res, g_destsurferr);
 		goto exit;
@@ -3542,8 +3626,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 			res = verify_surface(
 				bltparams->flags & BVBATCH_TILE_SRC1,
-				&bltparams->src1, bltparams->src1geom,
-				&bltparams->src1rect);
+				&bltparams->src1, bltparams->src1geom);
 			if (res != -1) {
 				BVSETBLTSURFERROR(res, g_src1surferr);
 				goto exit;
@@ -3555,22 +3638,18 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 					&bltparams->src1rect);
 
 			/* Same as the destination? */
-			if ((bltparams->src1.desc
-				== bltparams->dstdesc) &&
-				(bltparams->src1geom
-				== bltparams->dstgeom) &&
-				EQ_ORIGIN(bltparams->src1rect,
-						bltparams->dstrect) &&
-				EQ_SIZE(bltparams->src1rect,
-						bltparams->dstrect)) {
+			if (same_phys_area(bltparams->src1.desc,
+						&bltparams->src1rect,
+						bltparams->dstdesc,
+						&bltparams->dstrect)) {
 				GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX
 					"src1 is the same as dst\n",
 					__func__, __LINE__);
 			} else {
-				srcdesc[srccount].index = 0;
-				srcdesc[srccount].buf = bltparams->src1;
-				srcdesc[srccount].geom = bltparams->src1geom;
-				srcdesc[srccount].rect = &bltparams->src1rect;
+				srcinfo[srccount].index = 0;
+				srcinfo[srccount].buf = bltparams->src1;
+				srcinfo[srccount].geom = bltparams->src1geom;
+				srcinfo[srccount].rect = &bltparams->src1rect;
 
 				srccount += 1;
 			}
@@ -3588,8 +3667,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 			res = verify_surface(
 				bltparams->flags & BVBATCH_TILE_SRC2,
-				&bltparams->src2, bltparams->src2geom,
-				&bltparams->src2rect);
+				&bltparams->src2, bltparams->src2geom);
 			if (res != -1) {
 				BVSETBLTSURFERROR(res, g_src2surferr);
 				goto exit;
@@ -3601,22 +3679,18 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 					&bltparams->src2rect);
 
 			/* Same as the destination? */
-			if ((bltparams->src2.desc
-				== bltparams->dstdesc) &&
-				(bltparams->src2geom
-				== bltparams->dstgeom) &&
-				EQ_ORIGIN(bltparams->src2rect,
-						bltparams->dstrect) &&
-				EQ_SIZE(bltparams->src2rect,
-						bltparams->dstrect)) {
+			if (same_phys_area(bltparams->src2.desc,
+						&bltparams->src2rect,
+						bltparams->dstdesc,
+						&bltparams->dstrect)) {
 				GCPRINT(GCDBGFILTER, GCZONE_BLIT, GC_MOD_PREFIX
 					"src2 is the same as dst\n",
 					__func__, __LINE__);
 			} else {
-				srcdesc[srccount].index = 1;
-				srcdesc[srccount].buf = bltparams->src2;
-				srcdesc[srccount].geom = bltparams->src2geom;
-				srcdesc[srccount].rect = &bltparams->src2rect;
+				srcinfo[srccount].index = 1;
+				srcinfo[srccount].buf = bltparams->src2;
+				srcinfo[srccount].geom = bltparams->src2geom;
+				srcinfo[srccount].rect = &bltparams->src2rect;
 
 				srccount += 1;
 			}
@@ -3634,8 +3708,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 			res = verify_surface(
 				bltparams->flags & BVBATCH_TILE_MASK,
-				&bltparams->mask, bltparams->maskgeom,
-				&bltparams->maskrect);
+				&bltparams->mask, bltparams->maskgeom);
 			if (res != -1) {
 				BVSETBLTSURFERROR(res, g_masksurferr);
 				goto exit;
@@ -3661,27 +3734,27 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			break;
 
 		case 1:
-			if (EQ_SIZE((*srcdesc[0].rect), bltparams->dstrect))
+			if (EQ_SIZE((*srcinfo[0].rect), bltparams->dstrect))
 				bverror = do_blit(bltparams, batch,
-						srcdesc, 1, gca);
-			else if ((srcdesc[0].rect->width == 1) &&
-				(srcdesc[0].rect->height == 1))
-				bverror = do_fill(bltparams, batch, srcdesc);
+						srcinfo, 1, gca);
+			else if ((srcinfo[0].rect->width == 1) &&
+				(srcinfo[0].rect->height == 1))
+				bverror = do_fill(bltparams, batch, srcinfo);
 			else
 				bverror = do_filter(bltparams, batch);
 			break;
 
 		case 2:
-			if (EQ_SIZE((*srcdesc[0].rect), bltparams->dstrect))
-				if (EQ_SIZE((*srcdesc[1].rect),
+			if (EQ_SIZE((*srcinfo[0].rect), bltparams->dstrect))
+				if (EQ_SIZE((*srcinfo[1].rect),
 					bltparams->dstrect))
 					bverror = do_blit(bltparams, batch,
-							srcdesc, 2, gca);
+							srcinfo, 2, gca);
 				else
 					BVSETBLTERROR(BVERR_SRC2_HORZSCALE,
 						"scaling not supported");
 			else
-				if (EQ_SIZE((*srcdesc[1].rect),
+				if (EQ_SIZE((*srcinfo[1].rect),
 					bltparams->dstrect))
 					BVSETBLTERROR(BVERR_SRC1_HORZSCALE,
 						"scaling not supported");
