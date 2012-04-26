@@ -251,6 +251,8 @@ defined(CONFIG_INPUT_TWL6030_PWRBUTTON_MODULE)
 #define USB_PRODUCT_ID_LSB	0x02
 
 /*----------------------------------------------------------------------*/
+/* Bit mask of implemented erratums and WAs */
+static u32 twl_errata;
 
 /* is driver active, bound to a chip? */
 static bool inuse;
@@ -1371,6 +1373,40 @@ static int twl_remove(struct i2c_client *client)
 	return 0;
 }
 
+static void __devinit twl_setup_errata(int features)
+{
+	u8 eepromrev_reg = TWL6030_REG_EPROM_REV;
+	u8 eepromrev = 0, twlrev = 0;
+	int err;
+	char *twl_id = "twl6030";
+
+	if (!twl_class_is_6030())
+		return;
+
+	if (features & TWL6032_SUBCLASS) {
+		eepromrev_reg = TWL6032_REG_EPROM_REV;
+		twl_id = "twl6032";
+	}
+
+	err = twl_i2c_read_u8(TWL6030_MODULE_ID2, &eepromrev, eepromrev_reg);
+	if (err) {
+		pr_err("twl-core: unable to read REG_EPROM_REV -%d\n", err);
+		return;
+	}
+
+	err = twl_i2c_read_u8(TWL6030_MODULE_ID2, &twlrev,
+			      TWL6030_REG_JTAGVERNUM);
+	if (err) {
+		pr_err("twl-core: unable to read JTAGVERNUM -%d\n", err);
+		return;
+	}
+
+	pr_info("twl_core: detected %s rev.%u eepromrev.%u\n",
+		twl_id, twlrev, eepromrev);
+
+	/* Put errata detection code here */
+}
+
 /* NOTE: This driver only handles a single twl4030/tps659x0 chip */
 static int __devinit
 twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
@@ -1460,6 +1496,8 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		if (temp == 0x32)
 			features |= TWL6032_SUBCLASS;
 	}
+
+	twl_setup_errata(features);
 
 	/* load power event scripts */
 	if (twl_has_power()) {

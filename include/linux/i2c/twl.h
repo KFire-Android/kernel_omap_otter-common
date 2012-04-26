@@ -481,6 +481,15 @@ static inline int twl6030_mmc_card_detect(struct device *dev, int slot)
 */
 #define TWL6030_REG_CFG_SMPS_PD		0xF6
 
+/*
+* Test Register Map (use TWL6030_MODULE_ID2)
+*/
+/* silicon version number */
+#define TWL6030_REG_JTAGVERNUM		0x87
+/* EPROM revision number register */
+#define TWL6030_REG_EPROM_REV		0xd7
+#define TWL6032_REG_EPROM_REV		0xdf
+
 /*----------------------------------------------------------------------*/
 
 /* Power bus message definitions */
