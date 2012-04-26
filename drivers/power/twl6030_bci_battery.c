@@ -310,6 +310,7 @@ struct twl6030_bci_device_info {
 	struct delayed_work	twl6030_current_avg_work;
 
 	unsigned long		features;
+	unsigned long		errata;
 };
 
 static BLOCKING_NOTIFIER_HEAD(notifier_list);
@@ -2270,6 +2271,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 
 	di->platform_data = pdata;
 	di->features = pdata->features;
+	di->errata = pdata->errata;
 
 	if (pdata->use_eeprom_config &&
 			di->features & TWL6032_SUBCLASS) {
@@ -2322,6 +2324,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, di);
 
 	wake_lock_init(&chrg_lock, WAKE_LOCK_SUSPEND, "ac_chrg_wake_lock");
+
 	/* settings for temperature sensing */
 	ret = twl6030battery_temp_setup(true);
 	if (ret)
