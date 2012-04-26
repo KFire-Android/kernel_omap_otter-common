@@ -645,6 +645,8 @@ struct twl4030_bci_platform_data {
 	unsigned int use_power_path;
 	unsigned long features;
 	unsigned int use_eeprom_config;
+
+	unsigned long errata;
 };
 
 /* TWL4030_GPIO_MAX (18) GPIOs, with interrupts */
