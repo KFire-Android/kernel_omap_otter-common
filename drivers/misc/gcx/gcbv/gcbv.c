@@ -734,7 +734,8 @@ static enum bverror allocate_batch(struct gcbatch **batch)
 
 exit:
 	GCPRINT(GCDBGFILTER, GCZONE_BATCH, "--" GC_MOD_PREFIX
-		"bverror = %d\n", __func__, __LINE__, bverror);
+		"bv%s = %d\n", __func__, __LINE__,
+		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 
 	return bverror;
 }
@@ -817,7 +818,8 @@ static enum bverror append_buffer(struct gcbatch *batch)
 
 exit:
 	GCPRINT(GCDBGFILTER, GCZONE_BUFFER, "--" GC_MOD_PREFIX
-		"bverror = %d\n", __func__, __LINE__, bverror);
+		"bv%s = %d\n", __func__, __LINE__,
+		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 
 	return bverror;
 }
@@ -889,7 +891,8 @@ static enum bverror add_fixup(struct gcbatch *batch, unsigned int *fixup,
 
 exit:
 	GCPRINT(GCDBGFILTER, GCZONE_FIXUP, "--" GC_MOD_PREFIX
-		"bverror = %d\n", __func__, __LINE__, bverror);
+		"bv%s = %d\n", __func__, __LINE__,
+		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 
 	return bverror;
 }
@@ -939,7 +942,8 @@ static enum bverror claim_buffer(struct gcbatch *batch,
 
 exit:
 	GCPRINT(GCDBGFILTER, GCZONE_BUFFER, "--" GC_MOD_PREFIX
-		"bverror = %d\n", __func__, __LINE__, bverror);
+		"bv%s = %d\n", __func__, __LINE__,
+		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 
 	return bverror;
 }
@@ -3244,7 +3248,8 @@ enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
 
 exit:
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
-		"bverror = %d\n", __func__, __LINE__, bverror);
+		"bv%s = %d\n", __func__, __LINE__,
+		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 
 	return bverror;
 }
@@ -3323,7 +3328,8 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 
 exit:
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
-		"bverror = %d\n", __func__, __LINE__, bverror);
+		"bv%s = %d\n", __func__, __LINE__,
+		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 
 	return bverror;
 }
@@ -3740,7 +3746,8 @@ exit:
 	}
 
 	GCPRINT(GCDBGFILTER, GCZONE_BLIT, "--" GC_MOD_PREFIX
-		"bverror = %d\n", __func__, __LINE__, bverror);
+		"bv%s = %d\n", __func__, __LINE__,
+		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 
 	return bverror;
 }
