@@ -316,6 +316,10 @@ enum gcerror gc_alloc_pages(struct gcpage *p, unsigned int size)
 	p->logical = dma_alloc_coherent(NULL, p->size, &p->physical,
 								GFP_KERNEL);
 	if (!p->logical) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to allocate memory\n",
+			__func__, __LINE__);
+
 		gcerror = GCERR_OOPM;
 		goto fail;
 	}
@@ -701,7 +705,6 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	unsigned int address;
 	struct gcmopipesel *gcmopipesel;
 	struct gccontextmap *context;
-	struct gccommit kgccommit;
 
 	GCPRINT(GCDBGFILTER, GCZONE_COMMIT, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
@@ -712,8 +715,8 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	gc_set_power(GCPWR_ON);
 
 	/* Locate the client entry. */
-	kgccommit.gcerror = find_context(&context, true);
-	if (kgccommit.gcerror != GCERR_NONE)
+	gccommit->gcerror = find_context(&context, true);
+	if (gccommit->gcerror != GCERR_NONE)
 		goto exit;
 
 	context->context->mmu_dirty = true;
@@ -812,7 +815,9 @@ exit:
 	mutex_unlock(&mtx);
 
 	GCPRINT(GCDBGFILTER, GCZONE_COMMIT, "--" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
+		"gc%s = 0x%08X\n", __func__, __LINE__,
+		(gccommit->gcerror == GCERR_NONE) ? "result" : "error",
+		gccommit->gcerror);
 }
 EXPORT_SYMBOL(gc_commit);
 
@@ -821,7 +826,6 @@ void gc_map(struct gcmap *gcmap)
 	struct mmu2dphysmem mem;
 	struct mmu2darena *mapped = NULL;
 	struct gccontextmap *context;
-	struct gcmap kgcmap;
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
@@ -829,8 +833,8 @@ void gc_map(struct gcmap *gcmap)
 	mutex_lock(&mtx);
 
 	/* Locate the client entry. */
-	kgcmap.gcerror = find_context(&context, true);
-	if (kgcmap.gcerror != GCERR_NONE)
+	gcmap->gcerror = find_context(&context, true);
+	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
 
 	context->context->mmu_dirty = true;
@@ -887,14 +891,15 @@ exit:
 	mutex_unlock(&mtx);
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
+		"gc%s = 0x%08X\n", __func__, __LINE__,
+		(gcmap->gcerror == GCERR_NONE) ? "result" : "error",
+		gcmap->gcerror);
 }
 EXPORT_SYMBOL(gc_map);
 
 void gc_unmap(struct gcmap *gcmap)
 {
 	struct gccontextmap *context;
-	struct gcmap kgcmap;
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
@@ -902,8 +907,8 @@ void gc_unmap(struct gcmap *gcmap)
 	mutex_lock(&mtx);
 
 	/* Locate the client entry. */
-	kgcmap.gcerror = find_context(&context, true);
-	if (kgcmap.gcerror != GCERR_NONE)
+	gcmap->gcerror = find_context(&context, true);
+	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
 
 	context->context->mmu_dirty = true;
@@ -936,7 +941,9 @@ exit:
 	mutex_unlock(&mtx);
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
-		"\n", __func__, __LINE__);
+		"gc%s = 0x%08X\n", __func__, __LINE__,
+		(gcmap->gcerror == GCERR_NONE) ? "result" : "error",
+		gcmap->gcerror);
 }
 EXPORT_SYMBOL(gc_unmap);
 
