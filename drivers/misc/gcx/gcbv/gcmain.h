@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 #include <linux/gccore.h>
 #include <linux/gcdebug.h>
+#include "gcbv-cache.h"
 
 #define GC_DEV_NAME	"gc2d"
 
