@@ -164,10 +164,20 @@ static enum gcerror mmu2d_allocate_slave(struct mmu2dcontext *ctxt,
 	struct mmu2dstlbblock *block;
 	struct mmu2dstlb *temp;
 
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
 	if (ctxt->slave_recs == NULL) {
 		block = kmalloc(STLB_PREALLOC_SIZE, GFP_KERNEL);
-		if (block == NULL)
-			return GCERR_SETGRP(GCERR_OODM, GCERR_MMU_STLB_ALLOC);
+		if (block == NULL) {
+			GCPRINT(NULL, 0, GC_MOD_PREFIX
+				"failed to allocate slave page table wrapper\n",
+				__func__, __LINE__);
+
+			gcerror = GCERR_SETGRP(GCERR_OODM,
+						GCERR_MMU_STLB_ALLOC);
+			goto exit;
+		}
 
 		block->next = ctxt->slave_blocks;
 		ctxt->slave_blocks = block;
@@ -181,8 +191,14 @@ static enum gcerror mmu2d_allocate_slave(struct mmu2dcontext *ctxt,
 	}
 
 	gcerror = gc_alloc_pages(&ctxt->slave_recs->pages, MMU_STLB_SIZE);
-	if (gcerror != GCERR_NONE)
-		return GCERR_SETGRP(gcerror, GCERR_MMU_STLB_ALLOC);
+	if (gcerror != GCERR_NONE) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to allocate slave page table\n",
+			__func__, __LINE__);
+
+		gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_STLB_ALLOC);
+		goto exit;
+	}
 
 	/* Remove from the list of available records. */
 	temp = ctxt->slave_recs;
@@ -194,9 +210,14 @@ static enum gcerror mmu2d_allocate_slave(struct mmu2dcontext *ctxt,
 
 	/* Reset allocated entry count. */
 	temp->count = 0;
-
 	*stlb = temp;
-	return GCERR_NONE;
+
+exit:
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
+		"gc%s = 0x%08X\n", __func__, __LINE__,
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+
+	return gcerror;
 }
 #endif
 
@@ -642,8 +663,8 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 		"  stlb=%d\n",
 		__func__, __LINE__, vacant->stlb);
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  count=%d\n",
-		__func__, __LINE__, vacant->count);
+		"  count=%d (needed %d)\n",
+		__func__, __LINE__, vacant->count, mem->count);
 
 	/*
 	 * Create page array.

@@ -521,6 +521,11 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 		__func__, __LINE__, gcmap.size);
 
 	gc_map(&gcmap);
+	if (gcmap.gcerror != GCERR_NONE) {
+		BVSETERROR(BVERR_OOM,
+				"unable to allocate gccore memory");
+		goto exit;
+	}
 
 	bvbuffmapinfo = (struct bvbuffmapinfo *) bvbuffmap->handle;
 	bvbuffmapinfo->handle = gcmap.handle;
@@ -607,6 +612,11 @@ static enum bverror do_unmap(struct bvbuffdesc *buffdesc, int client)
 
 	/* Unmap the buffer. */
 	gc_unmap(&gcmap);
+	if (gcmap.gcerror != GCERR_NONE) {
+		BVSETERROR(BVERR_OOM,
+				"unable to free gccore memory");
+		goto exit;
+	}
 
 	bverror = BVERR_NONE;
 
@@ -840,9 +850,17 @@ static enum bverror add_fixup(struct gcbatch *batch, unsigned int *fixup,
 						"fixup allocation failed");
 				goto exit;
 			}
+
+			GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
+				"new fixup struct allocated = 0x%08X\n",
+				__func__, __LINE__, (unsigned int) temp);
 		} else {
 			temp = gccontext.vac_fixups;
 			gccontext.vac_fixups = temp->next;
+
+			GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
+				"fixup struct reused = 0x%08X\n",
+				__func__, __LINE__, (unsigned int) temp);
 		}
 
 		temp->next = NULL;
@@ -853,10 +871,6 @@ static enum bverror add_fixup(struct gcbatch *batch, unsigned int *fixup,
 		else
 			buffer->fixuptail->next = temp;
 		buffer->fixuptail = temp;
-
-		GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
-			"new fixup struct allocated = 0x%08X\n",
-			__func__, __LINE__, (unsigned int) temp);
 
 	} else {
 		GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
@@ -3759,6 +3773,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		switch (srccount) {
 		case 0:
 			bverror = do_blit(bltparams, batch, NULL, 0, gca);
+			if (bverror != BVERR_NONE)
+				goto exit;
 			break;
 
 		case 1:
@@ -3770,6 +3786,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 				bverror = do_fill(bltparams, batch, srcinfo);
 			else
 				bverror = do_filter(bltparams, batch);
+			if (bverror != BVERR_NONE)
+				goto exit;
 			break;
 
 		case 2:
@@ -3789,6 +3807,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 				else
 					BVSETBLTERROR(BVERR_SRC1_HORZSCALE,
 						"scaling not supported");
+			if (bverror != BVERR_NONE)
+				goto exit;
 		}
 	}
 
