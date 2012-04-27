@@ -520,7 +520,7 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 		"  mapping size = %d\n",
 		__func__, __LINE__, gcmap.size);
 
-	gc_map(&gcmap);
+	gc_map_wrapper(&gcmap);
 	if (gcmap.gcerror != GCERR_NONE) {
 		BVSETERROR(BVERR_OOM,
 				"unable to allocate gccore memory");
@@ -611,7 +611,7 @@ static enum bverror do_unmap(struct bvbuffdesc *buffdesc, int client)
 	gccontext.vac_buffmap = bvbuffmap;
 
 	/* Unmap the buffer. */
-	gc_unmap(&gcmap);
+	gc_unmap_wrapper(&gcmap);
 	if (gcmap.gcerror != GCERR_NONE) {
 		BVSETERROR(BVERR_OOM,
 				"unable to free gccore memory");

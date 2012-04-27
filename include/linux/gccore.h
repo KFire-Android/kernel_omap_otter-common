@@ -19,10 +19,10 @@
 #include "gcioctl.h"
 
 /* Command buffer submission. */
-void gc_commit(struct gccommit *gccommit, int fromuser);
+void gc_commit(struct gccommit *gccommit, bool fromuser);
 
 /* Surface management. */
-void gc_map(struct gcmap *gcmap);
-void gc_unmap(struct gcmap *gcmap);
+void gc_map(struct gcmap *gcmap, bool fromuser);
+void gc_unmap(struct gcmap *gcmap, bool fromuser);
 
 #endif

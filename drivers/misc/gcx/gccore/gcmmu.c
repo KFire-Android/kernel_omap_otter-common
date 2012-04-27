@@ -16,8 +16,11 @@
 
 #define GCZONE_ALL		(~0U)
 #define GCZONE_MAPPING		(1 << 0)
-#define GCZONE_FIXUP		(1 << 1)
-#define GCZONE_FLUSH		(1 << 2)
+#define GCZONE_CONTEXT		(1 << 1)
+#define GCZONE_MASTER		(1 << 2)
+#define GCZONE_FIXUP		(1 << 3)
+#define GCZONE_FLUSH		(1 << 4)
+#define GCZONE_ARENA		(1 << 5)
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -31,166 +34,150 @@
 #include "gcmmu.h"
 #include "gccmdbuf.h"
 
-/*
- * Debugging.
+/*******************************************************************************
+ * Internal definitions.
  */
 
-#ifndef GC_FLUSH_USER_PAGES
-#	define GC_FLUSH_USER_PAGES 0
-#endif
+/* Slave table preallocation block; can describe an array of slave tables. */
+struct gcmmustlbblock {
+	/* Slave table allocation. */
+	struct gcpage pages;
 
-#if !defined(PFN_DOWN)
-#	define PFN_DOWN(x) \
-		((x) >> PAGE_SHIFT)
-#endif
-
-#if !defined(phys_to_pfn)
-#	define phys_to_pfn(phys) \
-		(PFN_DOWN(phys))
-#endif
-
-#if !defined(phys_to_page)
-#	define phys_to_page(paddr) \
-		(pfn_to_page(phys_to_pfn(paddr)))
-#endif
-
-#define ARENA_PREALLOC_SIZE	MMU_PAGE_SIZE
-#define ARENA_PREALLOC_COUNT \
-	((ARENA_PREALLOC_SIZE - sizeof(struct mmu2darenablock)) \
-		/ sizeof(struct mmu2darena))
-
-typedef u32 (*pfn_get_present) (u32 entry);
-typedef void (*pfn_print_entry) (u32 index, u32 entry);
-
-struct mm2dtable {
-	char *name;
-	u32 entry_count;
-	u32 vacant_entry;
-	pfn_get_present get_present;
-	pfn_print_entry print_entry;
+	/* Next block of preallocated slave memory. */
+	struct gcmmustlbblock *next;
 };
 
-static inline struct mmu2dprivate *get_mmu(void)
+static inline struct gcmmu *get_mmu(void)
 {
-	static struct mmu2dprivate _mmu;
+	static struct gcmmu _mmu = {
+		.vacarena = LIST_HEAD_INIT(_mmu.vacarena),
+	};
+
 	return &_mmu;
 }
 
-/*
+/*******************************************************************************
  * Arena record management.
  */
 
-static enum gcerror mmu2d_get_arena(struct mmu2dprivate *mmu,
-					struct mmu2darena **arena)
+#define GCDUMPARENA(text, arena) \
+	do { \
+		GCPRINT(GCDBGFILTER, GCZONE_ARENA, GC_MOD_PREFIX \
+			text ":\n", __func__, __LINE__); \
+		GCPRINT(GCDBGFILTER, GCZONE_ARENA, GC_MOD_PREFIX \
+			"  number of pages = %u\n", \
+			__func__, __LINE__, (arena)->count); \
+		GCPRINT(GCDBGFILTER, GCZONE_ARENA, GC_MOD_PREFIX \
+			"  from (absolute/mtlb/stlb) = 0x%08X / %u / %u\n", \
+			__func__, __LINE__, \
+			(arena)->start.absolute, \
+			(arena)->start.loc.mtlb, \
+			(arena)->start.loc.stlb); \
+		GCPRINT(GCDBGFILTER, GCZONE_ARENA, GC_MOD_PREFIX \
+			"    to (absolute/mtlb/stlb) = 0x%08X / %u / %u\n", \
+			__func__, __LINE__, \
+			(arena)->end.absolute, \
+			(arena)->end.index.mtlb, \
+			(arena)->end.index.stlb); \
+	} while (false)
+
+static enum gcerror get_arena(struct gcmmu *mmu, struct gcmmuarena **arena)
 {
-	int i;
-	struct mmu2darenablock *block;
-	struct mmu2darena *temp;
+	enum gcerror gcerror = GCERR_NONE;
+	struct gcmmuarena *temp;
 
-	if (mmu->arena_recs == NULL) {
-		block = kmalloc(ARENA_PREALLOC_SIZE, GFP_KERNEL);
-		if (block == NULL)
-			return GCERR_SETGRP(GCERR_OODM, GCERR_MMU_ARENA_ALLOC);
+	GCPRINT(GCDBGFILTER, GCZONE_ARENA, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
-		block->next = mmu->arena_blocks;
-		mmu->arena_blocks = block;
-
-		temp = (struct mmu2darena *)(block + 1);
-		for (i = 0; i < ARENA_PREALLOC_COUNT; i += 1) {
-			temp->next = mmu->arena_recs;
-			mmu->arena_recs = temp;
-			temp += 1;
+	if (list_empty(&mmu->vacarena)) {
+		temp = kmalloc(sizeof(struct gcmmuarena), GFP_KERNEL);
+		if (temp == NULL) {
+			GCPRINT(NULL, 0, GC_MOD_PREFIX
+				"arena entry allocation failed.\n",
+				__func__, __LINE__);
+			gcerror = GCERR_SETGRP(GCERR_OODM,
+						GCERR_MMU_ARENA_ALLOC);
+			goto exit;
 		}
-	}
-
-	*arena = mmu->arena_recs;
-	mmu->arena_recs = mmu->arena_recs->next;
-
-	return GCERR_NONE;
-}
-
-static void mmu2d_free_arena(struct mmu2dprivate *mmu, struct mmu2darena *arena)
-{
-	/* Add back to the available arena list. */
-	arena->next = mmu->arena_recs;
-	mmu->arena_recs = arena;
-}
-
-static int mmu2d_siblings(struct mmu2darena *arena1, struct mmu2darena *arena2)
-{
-	int result;
-
-	if ((arena1 == NULL) || (arena2 == NULL)) {
-		result = 0;
 	} else {
-		u32 mtlb_idx, stlb_idx;
-		u32 count, available;
-
-		mtlb_idx = arena1->mtlb;
-		stlb_idx = arena1->stlb;
-		count = arena1->count;
-
-		while (count > 0) {
-			available = MMU_STLB_ENTRY_NUM - stlb_idx;
-
-			if (available > count) {
-				available = count;
-				stlb_idx += count;
-			} else {
-				mtlb_idx += 1;
-				stlb_idx  = 0;
-			}
-
-			count -= available;
-		}
-
-		result = (mtlb_idx == arena2->mtlb)
-			&& (stlb_idx == arena2->stlb);
+		struct list_head *head;
+		head = mmu->vacarena.next;
+		temp = list_entry(head, struct gcmmuarena, link);
+		list_del(head);
 	}
 
-	return result;
+	*arena = temp;
+
+exit:
+	GCPRINT(GCDBGFILTER, GCZONE_ARENA, "--" GC_MOD_PREFIX
+		"gc%s = 0x%08X\n", __func__, __LINE__,
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+
+	return gcerror;
 }
 
-/*
+static inline bool siblings(struct list_head *head,
+				struct list_head *arenahead1,
+				struct list_head *arenahead2)
+{
+	struct gcmmuarena *arena1;
+	struct gcmmuarena *arena2;
+
+	if ((arenahead1 == head) || (arenahead2 == head))
+		return false;
+
+	arena1 = list_entry(arenahead1, struct gcmmuarena, link);
+	arena2 = list_entry(arenahead2, struct gcmmuarena, link);
+
+	return (arena1->end.absolute == arena2->start.absolute) ? true : false;
+}
+
+/*******************************************************************************
  * Slave table allocation management.
  */
 
-#if MMU_ENABLE
-static enum gcerror mmu2d_allocate_slave(struct mmu2dcontext *ctxt,
-						struct mmu2dstlb **stlb)
+static enum gcerror allocate_slave(struct gcmmucontext *gcmmucontext,
+					union gcmmuloc index)
 {
 	enum gcerror gcerror;
-	int i;
-	struct mmu2dstlbblock *block;
-	struct mmu2dstlb *temp;
+	struct gcmmustlbblock *block = NULL;
+	struct gcmmustlb *slave;
+	unsigned int *mtlblogical;
+	unsigned int prealloccount;
+	unsigned int preallocsize;
+	unsigned int preallocentries;
+	unsigned int physical;
+	unsigned int *logical;
+	unsigned int i;
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
 
-	if (ctxt->slave_recs == NULL) {
-		block = kmalloc(STLB_PREALLOC_SIZE, GFP_KERNEL);
-		if (block == NULL) {
-			GCPRINT(NULL, 0, GC_MOD_PREFIX
-				"failed to allocate slave page table wrapper\n",
-				__func__, __LINE__);
+	/* Allocate a new prealloc block wrapper. */
+	block = kmalloc(sizeof(struct gcmmustlbblock), GFP_KERNEL);
+	if (block == NULL) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to allocate slave page table wrapper\n",
+			__func__, __LINE__);
 
-			gcerror = GCERR_SETGRP(GCERR_OODM,
-						GCERR_MMU_STLB_ALLOC);
-			goto exit;
-		}
-
-		block->next = ctxt->slave_blocks;
-		ctxt->slave_blocks = block;
-
-		temp = (struct mmu2dstlb *)(block + 1);
-		for (i = 0; i < STLB_PREALLOC_COUNT; i += 1) {
-			temp->next = ctxt->slave_recs;
-			ctxt->slave_recs = temp;
-			temp += 1;
-		}
+		gcerror = GCERR_SETGRP(GCERR_OODM,
+					GCERR_MMU_STLB_ALLOC);
+		goto exit;
 	}
 
-	gcerror = gc_alloc_pages(&ctxt->slave_recs->pages, MMU_STLB_SIZE);
+	/* Determine the number and the size of tables to allocate. */
+	prealloccount = min(GCMMU_STLB_PREALLOC_COUNT,
+				GCMMU_MTLB_ENTRY_NUM - index.loc.mtlb);
+
+	preallocsize = prealloccount * GCMMU_STLB_SIZE;
+	preallocentries = prealloccount * GCMMU_STLB_ENTRY_NUM;
+
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"preallocating %d slave tables.\n",
+		__func__, __LINE__, prealloccount);
+
+	/* Allocate slave table pool. */
+	gcerror = gc_alloc_cached(&block->pages, preallocsize);
 	if (gcerror != GCERR_NONE) {
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
 			"failed to allocate slave page table\n",
@@ -200,28 +187,63 @@ static enum gcerror mmu2d_allocate_slave(struct mmu2dcontext *ctxt,
 		goto exit;
 	}
 
-	/* Remove from the list of available records. */
-	temp = ctxt->slave_recs;
-	ctxt->slave_recs = ctxt->slave_recs->next;
+	/* Add the block to the list. */
+	block->next = gcmmucontext->slavealloc;
+	gcmmucontext->slavealloc = block;
 
-	/* Invalidate all entries. */
-	for (i = 0; i < MMU_STLB_ENTRY_NUM; i += 1)
-		temp->pages.logical[i] = MMU_STLB_ENTRY_VACANT;
+	/* Get shortcuts to the pointers. */
+	physical = block->pages.physical;
+	logical = block->pages.logical;
 
-	/* Reset allocated entry count. */
-	temp->count = 0;
-	*stlb = temp;
+	/* Invalidate all slave entries. */
+	for (i = 0; i < preallocentries; i += 1)
+		logical[i] = GCMMU_STLB_ENTRY_VACANT;
+
+	/* Init the slaves. */
+	slave = &gcmmucontext->slave[index.loc.mtlb];
+	mtlblogical = &gcmmucontext->master.logical[index.loc.mtlb];
+
+	for (i = 0; i < prealloccount; i += 1) {
+		mtlblogical[i]
+			= (physical & GCMMU_MTLB_SLAVE_MASK)
+			| GCMMU_MTLB_4K_PAGE
+			| GCMMU_MTLB_EXCEPTION
+			| GCMMU_MTLB_PRESENT;
+
+		slave[i].physical = physical;
+		slave[i].logical = logical;
+
+		physical += GCMMU_STLB_SIZE;
+		logical = (unsigned int *)
+			((unsigned char *) logical + GCMMU_STLB_SIZE);
+	}
+
+	/* Flush CPU cache. */
+	gc_flush_region(gcmmucontext->master.physical,
+			gcmmucontext->master.logical,
+			index.loc.mtlb * sizeof(unsigned int),
+			prealloccount * sizeof(unsigned int));
+
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX,
+		__func__, __LINE__);
+
+	return GCERR_NONE;
 
 exit:
+	if (block != NULL)
+		kfree(block);
+
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
-		"gc%s = 0x%08X\n", __func__, __LINE__,
-		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+		"gcerror = 0x%08X\n", __func__, __LINE__, gcerror);
 
 	return gcerror;
 }
-#endif
 
-static enum gcerror virt2phys(u32 logical, pte_t *physical)
+/*******************************************************************************
+ * Physical page array generation.
+ */
+
+static enum gcerror virt2phys(unsigned int logical, pte_t *physical)
 {
 	pgd_t *pgd;	/* Page Global Directory (PGD). */
 	pmd_t *pmd;	/* Page Middle Directory (PMD). */
@@ -246,14 +268,29 @@ static enum gcerror virt2phys(u32 logical, pte_t *physical)
 	return GCERR_NONE;
 }
 
-static enum gcerror get_physical_pages(struct mmu2dphysmem *mem,
+#if !defined(PFN_DOWN)
+#	define PFN_DOWN(x) \
+		((x) >> PAGE_SHIFT)
+#endif
+
+#if !defined(phys_to_pfn)
+#	define phys_to_pfn(phys) \
+		(PFN_DOWN(phys))
+#endif
+
+#if !defined(phys_to_page)
+#	define phys_to_page(paddr) \
+		(pfn_to_page(phys_to_pfn(paddr)))
+#endif
+
+static enum gcerror get_physical_pages(struct gcmmuphysmem *mem,
 					pte_t *parray,
-					struct mmu2darena *arena)
+					struct gcmmuarena *arena)
 {
 	enum gcerror gcerror = GCERR_NONE;
 	struct vm_area_struct *vma;
 	struct page **pages = NULL;
-	u32 base, write;
+	unsigned int base, write;
 	int i, count = 0;
 
 	/* Reset page descriptor array. */
@@ -327,9 +364,9 @@ exit:
 	return gcerror;
 }
 
-static void release_physical_pages(struct mmu2darena *arena)
+static void release_physical_pages(struct gcmmuarena *arena)
 {
-	u32 i;
+	unsigned int i;
 
 	if (arena->pages != NULL) {
 		for (i = 0; i < arena->count; i += 1)
@@ -340,207 +377,168 @@ static void release_physical_pages(struct mmu2darena *arena)
 	}
 }
 
-#if GC_FLUSH_USER_PAGES
-static void flush_user_buffer(struct mmu2darena *arena)
-{
-	u32 i;
-	struct gcpage gcpage;
-	unsigned char *logical;
+/*******************************************************************************
+ * MMU management API.
+ */
 
-	if (arena->pages == NULL) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"page array is NULL.\n",
-			__func__, __LINE__);
-		return;
-	}
-
-
-	logical = arena->logical;
-	if (logical == NULL) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"buffer base is NULL.\n",
-			__func__, __LINE__);
-		return;
-	}
-
-	for (i = 0; i < arena->count; i += 1) {
-		gcpage.order = get_order(PAGE_SIZE);
-		gcpage.size = PAGE_SIZE;
-
-		gcpage.pages = arena->pages[i];
-		if (gcpage.pages == NULL) {
-			GCPRINT(NULL, 0, GC_MOD_PREFIX
-				"page structure %d is NULL.\n",
-				__func__, __LINE__, i);
-			continue;
-		}
-
-		gcpage.physical = page_to_phys(gcpage.pages);
-		if (gcpage.physical == 0) {
-			GCPRINT(NULL, 0, GC_MOD_PREFIX
-				"physical address of page %d is 0.\n",
-				__func__, __LINE__, i);
-			continue;
-		}
-
-		gcpage.logical = (unsigned int *) (logical + i * PAGE_SIZE);
-		if (gcpage.logical == NULL) {
-			GCPRINT(NULL, 0, GC_MOD_PREFIX
-				"virtual address of page %d is NULL.\n",
-				__func__, __LINE__, i);
-			continue;
-		}
-	}
-}
-#endif
-
-enum gcerror mmu2d_create_context(struct mmu2dcontext *ctxt)
+enum gcerror gcmmu_create_context(struct gcmmucontext *gcmmucontext)
 {
 	enum gcerror gcerror;
-
-#if MMU_ENABLE
+	struct gcmmu *mmu = get_mmu();
+	struct gcmmuarena *arena = NULL;
+	unsigned int *logical;
+	unsigned int safecount;
 	int i;
-#endif
 
-	struct mmu2dprivate *mmu = get_mmu();
+	GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
-	if (ctxt == NULL)
-		return GCERR_MMU_CTXT_BAD;
+	if (gcmmucontext == NULL) {
+		gcerror = GCERR_MMU_CTXT_BAD;
+		goto exit;
+	}
 
-	memset(ctxt, 0, sizeof(struct mmu2dcontext));
+	/* Reset the context. */
+	memset(gcmmucontext, 0, sizeof(struct gcmmucontext));
 
-#if MMU_ENABLE
+	/* Initialize arena lists. */
+	INIT_LIST_HEAD(&gcmmucontext->vacant);
+	INIT_LIST_HEAD(&gcmmucontext->allocated);
+
 	/* Allocate MTLB table. */
-	gcerror = gc_alloc_pages(&ctxt->master, MMU_MTLB_SIZE);
+	gcerror = gc_alloc_cached(&gcmmucontext->master, GCMMU_MTLB_SIZE);
 	if (gcerror != GCERR_NONE) {
 		gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_MTLB_ALLOC);
-		goto fail;
+		goto exit;
 	}
 
-	/* Allocate an array of pointers to slave descriptors. */
-	ctxt->slave = kmalloc(MMU_MTLB_SIZE, GFP_KERNEL);
-	if (ctxt->slave == NULL) {
-		gcerror = GCERR_SETGRP(GCERR_OODM, GCERR_MMU_STLBIDX_ALLOC);
-		goto fail;
-	}
-	memset(ctxt->slave, 0, MMU_MTLB_SIZE);
+	/* Invalidate MTLB entries. */
+	logical = gcmmucontext->master.logical;
+	for (i = 0; i < GCMMU_MTLB_ENTRY_NUM; i += 1)
+		logical[i] = GCMMU_MTLB_ENTRY_VACANT;
 
-	/* Invalidate all entries. */
-	for (i = 0; i < MMU_MTLB_ENTRY_NUM; i += 1)
-		ctxt->master.logical[i] = MMU_MTLB_ENTRY_VACANT;
+	/* Set MMU table mode. */
+	gcmmucontext->mmuconfig.reg.master_mask
+		= GCREG_MMU_CONFIGURATION_MASK_MODE_ENABLED;
+	gcmmucontext->mmuconfig.reg.master = GCMMU_MTLB_MODE;
 
-	/* Configure the physical address. */
-	ctxt->physical
-	= SETFIELD(~0U, GCREG_MMU_CONFIGURATION, ADDRESS,
-	  (ctxt->master.physical >> GCREG_MMU_CONFIGURATION_ADDRESS_Start))
-	& SETFIELDVAL(~0U, GCREG_MMU_CONFIGURATION, MASK_ADDRESS, ENABLED)
-	& SETFIELD(~0U, GCREG_MMU_CONFIGURATION, MODE, MMU_MTLB_MODE)
-	& SETFIELDVAL(~0U, GCREG_MMU_CONFIGURATION, MASK_MODE, ENABLED);
-#endif
+	/* Set the table address. */
+	gcmmucontext->mmuconfig.reg.address_mask
+		= GCREG_MMU_CONFIGURATION_MASK_ADDRESS_ENABLED;
+	gcmmucontext->mmuconfig.reg.address
+		= GETFIELD(gcmmucontext->master.physical,
+				GCREG_MMU_CONFIGURATION, ADDRESS);
 
 	/* Allocate the first vacant arena. */
-	gcerror = mmu2d_get_arena(mmu, &ctxt->vacant);
+	gcerror = get_arena(mmu, &arena);
 	if (gcerror != GCERR_NONE)
-		goto fail;
+		goto exit;
 
-	/* Everything is vacant. */
-	ctxt->vacant->mtlb  = 0;
-	ctxt->vacant->stlb  = 0;
-	ctxt->vacant->count = MMU_MTLB_ENTRY_NUM * MMU_STLB_ENTRY_NUM;
-	ctxt->vacant->next  = NULL;
+	/* Entire range is currently vacant. */
+	arena->start.absolute = 0;
+	arena->end.absolute =
+	arena->count = GCMMU_MTLB_ENTRY_NUM * GCMMU_STLB_ENTRY_NUM;
+	list_add(&arena->link, &gcmmucontext->vacant);
+	GCDUMPARENA("initial vacant arena", arena);
 
-	/* Nothing is allocated. */
-	ctxt->allocated = NULL;
-
-#if MMU_ENABLE
 	/* Allocate the safe zone. */
 	if (mmu->safezone.size == 0) {
-		gcerror = gc_alloc_pages(&mmu->safezone,
-						MMU_SAFE_ZONE_SIZE);
+		gcerror = gc_alloc_cached(&mmu->safezone,
+						GCMMU_SAFE_ZONE_SIZE);
 		if (gcerror != GCERR_NONE) {
 			gcerror = GCERR_SETGRP(gcerror,
 						GCERR_MMU_SAFE_ALLOC);
-			goto fail;
+			goto exit;
 		}
 
 		/* Initialize safe zone to a value. */
-		for (i = 0; i < MMU_SAFE_ZONE_SIZE / sizeof(u32); i += 1)
+		safecount = GCMMU_SAFE_ZONE_SIZE / sizeof(unsigned int);
+		for (i = 0; i < safecount; i += 1)
 			mmu->safezone.logical[i] = 0xDEADC0DE;
+
+		gc_flush_region(mmu->safezone.physical, mmu->safezone.logical,
+				0, safecount * sizeof(unsigned int));
 	}
-#endif
 
 	/* Reference MMU. */
 	mmu->refcount += 1;
-	ctxt->mmu = mmu;
+	gcmmucontext->mmu = mmu;
+
+	GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
 	return GCERR_NONE;
 
-fail:
-#if MMU_ENABLE
-	gc_free_pages(&ctxt->master);
-	if (ctxt->slave != NULL)
-		kfree(ctxt->slave);
-#endif
+exit:
+	gcmmu_destroy_context(gcmmucontext);
+
+	GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, "--" GC_MOD_PREFIX
+		"gcerror = 0x%08X\n", __func__, __LINE__, gcerror);
 
 	return gcerror;
 }
 
-enum gcerror mmu2d_destroy_context(struct mmu2dcontext *ctxt)
+enum gcerror gcmmu_destroy_context(struct gcmmucontext *gcmmucontext)
 {
-	int i;
-	struct mmu2dstlbblock *nextblock;
+	enum gcerror gcerror;
+	struct gcmmustlbblock *nextblock;
+	struct gcmmu *mmu;
 
-	if ((ctxt == NULL) || (ctxt->mmu == NULL))
-		return GCERR_MMU_CTXT_BAD;
+	GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
-	if (ctxt->slave != NULL) {
-		for (i = 0; i < MMU_MTLB_ENTRY_NUM; i += 1) {
-			if (ctxt->slave[i] != NULL) {
-				gc_free_pages(&ctxt->slave[i]->pages);
-				ctxt->slave[i] = NULL;
-			}
-		}
-		kfree(ctxt->slave);
-		ctxt->slave = NULL;
+	if ((gcmmucontext == NULL) || (gcmmucontext->mmu == NULL)) {
+		gcerror = GCERR_MMU_CTXT_BAD;
+		goto exit;
 	}
 
-	gc_free_pages(&ctxt->master);
-
-	while (ctxt->slave_blocks != NULL) {
-		nextblock = ctxt->slave_blocks->next;
-		kfree(ctxt->slave_blocks);
-		ctxt->slave_blocks = nextblock;
+	/* Free slave tables. */
+	while (gcmmucontext->slavealloc != NULL) {
+		gc_free_cached(&gcmmucontext->slavealloc->pages);
+		nextblock = gcmmucontext->slavealloc->next;
+		kfree(gcmmucontext->slavealloc);
+		gcmmucontext->slavealloc = nextblock;
 	}
 
-	ctxt->slave_recs = NULL;
+	/* Free the master table. */
+	gc_free_cached(&gcmmucontext->master);
 
-	while (ctxt->allocated != NULL) {
-		mmu2d_free_arena(ctxt->mmu, ctxt->allocated);
-		ctxt->allocated = ctxt->allocated->next;
-	}
+	/* Free arenas. */
+	mmu = gcmmucontext->mmu;
+	list_splice_init(&gcmmucontext->vacant, &mmu->vacarena);
+	list_splice_init(&gcmmucontext->allocated, &mmu->vacarena);
 
-	while (ctxt->vacant != NULL) {
-		mmu2d_free_arena(ctxt->mmu, ctxt->vacant);
-		ctxt->vacant = ctxt->vacant->next;
-	}
+	/* Dereference. */
+	mmu->refcount -= 1;
+	gcmmucontext->mmu = NULL;
 
-	ctxt->mmu->refcount -= 1;
-	ctxt->mmu = NULL;
+	GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
 	return GCERR_NONE;
+
+exit:
+	GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, "--" GC_MOD_PREFIX
+		"gcerror = 0x%08X\n", __func__, __LINE__, gcerror);
+
+	return gcerror;
 }
 
-enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
+enum gcerror gcmmu_set_master(struct gcmmucontext *gcmmucontext)
 {
-#if MMU_ENABLE
 	enum gcerror gcerror;
 	struct gcmommumaster *gcmommumaster;
 	struct gcmommuinit *gcmommuinit;
 	unsigned int size, status, enabled;
-	struct mmu2dprivate *mmu = get_mmu();
+	struct gcmmu *mmu = get_mmu();
 
-	if ((ctxt == NULL) || (ctxt->mmu == NULL))
-		return GCERR_MMU_CTXT_BAD;
+	GCPRINT(GCDBGFILTER, GCZONE_MASTER, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	if ((gcmmucontext == NULL) || (gcmmucontext->mmu == NULL)) {
+		gcerror = GCERR_MMU_CTXT_BAD;
+		goto exit;
+	}
 
 	/* Read the MMU status. */
 	status = gc_read_reg(GCREG_MMU_CONTROL_Address);
@@ -548,23 +546,20 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 
 	/* Is MMU enabled? */
 	if (enabled) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"gcx: mmu is already enabled.\n",
-			__func__, __LINE__);
-
 		/* Allocate command buffer space. */
 		gcerror = cmdbuf_alloc(sizeof(struct gcmommumaster),
 					(void **) &gcmommumaster, NULL);
-		if (gcerror != GCERR_NONE)
-			return GCERR_SETGRP(gcerror, GCERR_MMU_MTLB_SET);
+		if (gcerror != GCERR_NONE) {
+			gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_MTLB_SET);
+			goto exit;
+		}
 
 		/* Program master table address. */
 		gcmommumaster->master_ldst = gcmommumaster_master_ldst;
-		gcmommumaster->master = ctxt->physical;
+		gcmommumaster->master = gcmmucontext->mmuconfig.raw;
 	} else {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"gcx: mmu is disabled, enabling.\n",
-			__func__, __LINE__);
+		GCPRINT(GCDBGFILTER, GCZONE_MASTER, GC_MOD_PREFIX
+			"enabling MMU.\n", __func__, __LINE__);
 
 		/* MMU disabled, force physical mode. */
 		cmdbuf_physical(true);
@@ -572,13 +567,15 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 		/* Allocate command buffer space. */
 		size = sizeof(struct gcmommuinit) + cmdbuf_flush(NULL);
 		gcerror = cmdbuf_alloc(size, (void **) &gcmommuinit, NULL);
-		if (gcerror != GCERR_NONE)
-			return GCERR_SETGRP(gcerror, GCERR_MMU_INIT);
+		if (gcerror != GCERR_NONE) {
+			gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_INIT);
+			goto exit;
+		}
 
 		/* Program the safe zone and the master table address. */
 		gcmommuinit->safe_ldst = gcmommuinit_safe_ldst;
 		gcmommuinit->safe = mmu->safezone.physical;
-		gcmommuinit->mtlb = ctxt->physical;
+		gcmommuinit->mtlb = gcmmucontext->mmuconfig.raw;
 
 		/* Execute the buffer. */
 		cmdbuf_flush(gcmommuinit + 1);
@@ -595,40 +592,41 @@ enum gcerror mmu2d_set_master(struct mmu2dcontext *ctxt)
 			SETFIELDVAL(0, GCREG_MMU_CONTROL, ENABLE, ENABLE));
 	}
 
-	return GCERR_NONE;
-#else
-	if ((ctxt == NULL) || (ctxt->mmu == NULL))
-		return GCERR_MMU_CTXT_BAD;
+exit:
+	GCPRINT(GCDBGFILTER, GCZONE_MASTER, "--" GC_MOD_PREFIX
+		"gc%s = 0x%08X\n", __func__, __LINE__,
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 
-	return GCERR_NONE;
-#endif
+	return gcerror;
 }
 
-enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
-			struct mmu2darena **mapped)
+enum gcerror gcmmu_map(struct gcmmucontext *gcmmucontext,
+			struct gcmmuphysmem *mem,
+			struct gcmmuarena **mapped)
 {
 	enum gcerror gcerror = GCERR_NONE;
-	struct mmu2darena *prev, *vacant, *split;
-#if MMU_ENABLE
-	struct mmu2dstlb *stlb = NULL;
-	struct mmu2dstlb **stlb_array;
-	u32 *mtlb_logical, *stlb_logical;
-#endif
-	u32 mtlb_idx, stlb_idx, next_idx;
-#if MMU_ENABLE
-	u32 i, j, count, available;
-#else
-	u32 i, count, available;
-#endif
+	struct list_head *arenahead;
+	struct gcmmuarena *vacant = NULL, *split;
+	struct gcmmustlb *slave;
+	unsigned int *stlblogical;
+	union gcmmuloc index;
+	unsigned int i, allocated, count;
 	pte_t *parray_alloc = NULL;
 	pte_t *parray;
 
-	if ((ctxt == NULL) || (ctxt->mmu == NULL))
-		return GCERR_MMU_CTXT_BAD;
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	if ((gcmmucontext == NULL) || (gcmmucontext->mmu == NULL)) {
+		gcerror = GCERR_MMU_CTXT_BAD;
+		goto exit;
+	}
 
 	if ((mem == NULL) || (mem->count <= 0) || (mapped == NULL) ||
-		((mem->pagesize != 0) && (mem->pagesize != MMU_PAGE_SIZE)))
-		return GCERR_MMU_ARG;
+		((mem->pagesize != 0) && (mem->pagesize != GCMMU_PAGE_SIZE))) {
+		gcerror = GCERR_MMU_ARG;
+		goto exit;
+	}
 
 	/*
 	 * Find available sufficient arena.
@@ -638,36 +636,21 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 		"mapping (%d) pages\n",
 		__func__, __LINE__, mem->count);
 
-	prev = NULL;
-	vacant = ctxt->vacant;
-
-	while (vacant != NULL) {
+	list_for_each(arenahead, &gcmmucontext->vacant) {
+		vacant = list_entry(arenahead, struct gcmmuarena, link);
 		if (vacant->count >= mem->count)
 			break;
-		prev = vacant;
-		vacant = vacant->next;
 	}
 
-	if (vacant == NULL) {
+	if (arenahead == &gcmmucontext->vacant) {
 		gcerror = GCERR_MMU_OOM;
-		goto fail;
+		goto exit;
 	}
 
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"found vacant arena:\n",
-		__func__, __LINE__);
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  mtlb=%d\n",
-		__func__, __LINE__, vacant->mtlb);
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  stlb=%d\n",
-		__func__, __LINE__, vacant->stlb);
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  count=%d (needed %d)\n",
-		__func__, __LINE__, vacant->count, mem->count);
+	GCDUMPARENA("allocating from arena", vacant);
 
 	/*
-	 * Create page array.
+	 * If page array isn't provided, create it here.
 	 */
 
 	/* Reset page array. */
@@ -681,13 +664,13 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 		if (parray_alloc == NULL) {
 			gcerror = GCERR_SETGRP(GCERR_OODM,
 						GCERR_MMU_PHYS_ALLOC);
-			goto fail;
+			goto exit;
 		}
 
 		/* Fetch page addresses. */
 		gcerror = get_physical_pages(mem, parray_alloc, vacant);
 		if (gcerror != GCERR_NONE)
-			goto fail;
+			goto exit;
 
 		parray = parray_alloc;
 
@@ -703,106 +686,102 @@ enum gcerror mmu2d_map(struct mmu2dcontext *ctxt, struct mmu2dphysmem *mem,
 	}
 
 	/*
-	 * Allocate slave tables as necessary.
+	 * Create the mapping.
 	 */
 
-	mtlb_idx = vacant->mtlb;
-	stlb_idx = vacant->stlb;
+	index.absolute = vacant->start.absolute;
+	slave = &gcmmucontext->slave[index.loc.mtlb];
 	count = mem->count;
 
-#if MMU_ENABLE
-	mtlb_logical = &ctxt->master.logical[mtlb_idx];
-	stlb_array = &ctxt->slave[mtlb_idx];
-#endif
-
-	for (i = 0; count > 0; i += 1) {
-#if MMU_ENABLE
-		if (mtlb_logical[i] == MMU_MTLB_ENTRY_VACANT) {
-			gcerror = mmu2d_allocate_slave(ctxt, &stlb);
+	while (count > 0) {
+		/* Allocate slaves if not yet allocated. */
+		if (slave->logical == NULL) {
+			gcerror = allocate_slave(gcmmucontext, index);
 			if (gcerror != GCERR_NONE)
-				goto fail;
-
-			mtlb_logical[i]
-				= (stlb->pages.physical & MMU_MTLB_SLAVE_MASK)
-				| MMU_MTLB_4K_PAGE
-				| MMU_MTLB_EXCEPTION
-				| MMU_MTLB_PRESENT;
-
-			stlb_array[i] = stlb;
-		}
-#endif
-
-		available = MMU_STLB_ENTRY_NUM - stlb_idx;
-
-		if (available > count) {
-			available = count;
-			next_idx = stlb_idx + count;
-		} else {
-			mtlb_idx += 1;
-			next_idx = 0;
+				goto exit;
 		}
 
-#if MMU_ENABLE
-		stlb_logical = &stlb_array[i]->pages.logical[stlb_idx];
-		stlb_array[i]->count += available;
+		/* Determine the number of entries allocated. */
+		allocated = GCMMU_STLB_ENTRY_NUM - index.loc.stlb;
+		if (allocated > count)
+			allocated = count;
 
-		for (j = 0; j < available; j += 1) {
-			stlb_logical[j]
-				= (*parray & MMU_STLB_ADDRESS_MASK)
-				| MMU_STLB_PRESENT
-				| MMU_STLB_EXCEPTION
-				| MMU_STLB_WRITEABLE;
+		/* Initialize slave entries. */
+		stlblogical = &slave->logical[index.loc.stlb];
+		for (i = 0; i < allocated; i += 1)
+			*stlblogical++
+				= (*parray++ & GCMMU_STLB_ADDRESS_MASK)
+				| GCMMU_STLB_PRESENT
+				| GCMMU_STLB_EXCEPTION
+				| GCMMU_STLB_WRITEABLE;
 
-			parray += 1;
-		}
-#endif
+		/* Flush CPU cache. */
+		gc_flush_region(slave->physical, slave->logical,
+				index.loc.stlb * sizeof(unsigned int),
+				allocated * sizeof(unsigned int));
 
-		count -= available;
-		stlb_idx = next_idx;
+		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+			"allocated %d pages at %d.%d\n",
+			__func__, __LINE__,
+			allocated, index.loc.mtlb, index.loc.stlb);
+
+		/* Advance. */
+		slave += 1;
+		index.absolute += allocated;
+		count -= allocated;
 	}
 
 	/*
 	 * Claim arena.
 	 */
 
-	mem->pagesize = MMU_PAGE_SIZE;
-
+	/* Split the arena. */
 	if (vacant->count != mem->count) {
-		gcerror = mmu2d_get_arena(ctxt->mmu, &split);
-		if (gcerror != GCERR_NONE)
-			goto fail;
+		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+			"splitting vacant arena\n",
+			__func__, __LINE__);
 
-		split->mtlb  = mtlb_idx;
-		split->stlb  = stlb_idx;
+		gcerror = get_arena(gcmmucontext->mmu, &split);
+		if (gcerror != GCERR_NONE)
+			goto exit;
+
+		split->start.absolute = index.absolute;
+		split->end.absolute = vacant->end.absolute;
 		split->count = vacant->count - mem->count;
-		split->next  = vacant->next;
-		vacant->next = split;
+		list_add(&split->link, &vacant->link);
+
+		vacant->end.absolute = index.absolute;
 		vacant->count = mem->count;
 	}
 
-	if (prev == NULL)
-		ctxt->vacant = vacant->next;
-	else
-		prev->next = vacant->next;
+	GCDUMPARENA("allocated arena", vacant);
 
-	vacant->next = ctxt->allocated;
-	ctxt->allocated = vacant;
+	/* Move the vacant arena to the list of allocated arenas. */
+	list_move(&vacant->link, &gcmmucontext->allocated);
 
+	/* Set page size. */
+	mem->pagesize = GCMMU_PAGE_SIZE;
+
+	/* Determine the virtual address. */
+	vacant->address
+		= ((vacant->start.loc.mtlb << GCMMU_MTLB_SHIFT)
+					    & GCMMU_MTLB_MASK)
+		| ((vacant->start.loc.stlb << GCMMU_STLB_SHIFT)
+					    & GCMMU_STLB_MASK)
+		| (mem->offset & GCMMU_OFFSET_MASK);
+
+	/* Determine the size of the area. */
+	vacant->size = mem->count * GCMMU_PAGE_SIZE - mem->offset;
+
+	/* Set the result. */
 	*mapped = vacant;
 
-#if MMU_ENABLE
-	vacant->address
-		= ((vacant->mtlb << MMU_MTLB_SHIFT) & MMU_MTLB_MASK)
-		| ((vacant->stlb << MMU_STLB_SHIFT) & MMU_STLB_MASK)
-		| (mem->offset & MMU_OFFSET_MASK);
-#else
-	vacant->address = mem->offset + ((parray_alloc == NULL)
-		? *mem->pages : *parray_alloc);
-#endif
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+		"mapped %d bytes at 0x%08X\n",
+		__func__, __LINE__,
+		vacant->size, vacant->address);
 
-	vacant->size = mem->count * MMU_PAGE_SIZE - mem->offset;
-
-fail:
+exit:
 	if (parray_alloc != NULL) {
 		kfree(parray_alloc);
 
@@ -810,27 +789,32 @@ fail:
 			release_physical_pages(vacant);
 	}
 
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
+		"gc%s = 0x%08X\n", __func__, __LINE__,
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+
 	return gcerror;
 }
 
-enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt, struct mmu2darena *mapped)
+enum gcerror gcmmu_unmap(struct gcmmucontext *gcmmucontext,
+				struct gcmmuarena *mapped)
 {
 	enum gcerror gcerror = GCERR_NONE;
-	struct mmu2darena *prev, *allocated, *vacant;
-#if MMU_ENABLE
-	struct mmu2dstlb *stlb;
-#endif
-	u32 mtlb_idx, stlb_idx;
-	u32 next_mtlb_idx, next_stlb_idx;
-#if MMU_ENABLE
-	u32 i, j, count, available;
-	u32 *stlb_logical;
-#else
-	u32 i, count, available;
-#endif
+	struct list_head *allochead, *prevhead, *nexthead;
+	struct gcmmuarena *allocated, *prevvacant, *nextvacant = NULL;
+	struct gcmmustlb *slave;
+	unsigned int *stlblogical;
+	union gcmmuloc index;
+	unsigned int i, freed, count;
+	struct gcmmu *mmu = get_mmu();
 
-	if ((ctxt == NULL) || (ctxt->mmu == NULL))
-		return GCERR_MMU_CTXT_BAD;
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	if ((gcmmucontext == NULL) || (gcmmucontext->mmu == NULL)) {
+		gcerror = GCERR_MMU_CTXT_BAD;
+		goto exit;
+	}
 
 	/*
 	 * Find the arena.
@@ -840,151 +824,126 @@ enum gcerror mmu2d_unmap(struct mmu2dcontext *ctxt, struct mmu2darena *mapped)
 		"unmapping arena 0x%08X\n",
 		__func__, __LINE__, (unsigned int) mapped);
 
-	prev = NULL;
-	allocated = ctxt->allocated;
-
-	while (allocated != NULL) {
+	list_for_each(allochead, &gcmmucontext->allocated) {
+		allocated = list_entry(allochead, struct gcmmuarena, link);
 		if (allocated == mapped)
 			break;
-		prev = allocated;
-		allocated = allocated->next;
 	}
 
-	/* The allocation is not listed. */
-	if (allocated == NULL) {
+	if (allochead == &gcmmucontext->allocated) {
 		gcerror = GCERR_MMU_ARG;
-		goto fail;
+		goto exit;
 	}
-
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"found allocated arena:\n",
-		__func__, __LINE__);
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  mtlb=%d\n",
-		__func__, __LINE__, allocated->mtlb);
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  stlb=%d\n",
-		__func__, __LINE__, allocated->stlb);
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  count=%d\n",
-		__func__, __LINE__, allocated->count);
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  address=0x%08X\n",
-		__func__, __LINE__, allocated->address);
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  logical=0x%08X\n",
-		__func__, __LINE__, (unsigned int) allocated->logical);
-	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
-		"  pages=0x%08X\n",
-		__func__, __LINE__, (unsigned int) allocated->pages);
-
-	mtlb_idx = allocated->mtlb;
-	stlb_idx = allocated->stlb;
 
 	/*
 	 * Free slave tables.
 	 */
 
+	index.absolute = allocated->start.absolute;
+	slave = &gcmmucontext->slave[index.loc.mtlb];
 	count = allocated->count;
 
-	for (i = 0; count > 0; i += 1) {
-		available = MMU_STLB_ENTRY_NUM - stlb_idx;
+	while (count > 0) {
+		/* Determine the number of entries freed. */
+		freed = GCMMU_STLB_ENTRY_NUM - index.loc.stlb;
+		if (freed > count)
+			freed = count;
 
-		if (available > count) {
-			available = count;
-			next_mtlb_idx = mtlb_idx;
-			next_stlb_idx = stlb_idx + count;
-		} else {
-			next_mtlb_idx = mtlb_idx + 1;
-			next_stlb_idx = 0;
-		}
+		/* Free slave entries. */
+		stlblogical = &slave->logical[index.loc.stlb];
+		for (i = 0; i < freed; i += 1)
+			*stlblogical++ = GCMMU_STLB_ENTRY_VACANT;
 
-#if MMU_ENABLE
-		stlb = ctxt->slave[mtlb_idx];
-		if (stlb == NULL) {
-			gcerror = GCERR_MMU_ARG;
-			goto fail;
-		}
+		/* Flush CPU cache. */
+		gc_flush_region(slave->physical, slave->logical,
+				index.loc.stlb * sizeof(unsigned int),
+				freed * sizeof(unsigned int));
 
-		if (stlb->count < available) {
-			gcerror = GCERR_MMU_ARG;
-			goto fail;
-		}
+		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+			"freed %d pages at %d.%d\n",
+			__func__, __LINE__,
+			freed, index.loc.mtlb, index.loc.stlb);
 
-		stlb_logical = &stlb->pages.logical[stlb_idx];
-		for (j = 0; j < available; j += 1)
-			stlb_logical[j] = MMU_STLB_ENTRY_VACANT;
-
-		stlb->count -= available;
-#endif
-
-		count -= available;
-		mtlb_idx = next_mtlb_idx;
-		stlb_idx = next_stlb_idx;
+		/* Advance. */
+		slave += 1;
+		index.absolute += freed;
+		count -= freed;
 	}
 
 	/*
-	 * Remove from allocated arenas.
+	 * Delete page cache for the arena.
 	 */
-
-	if (prev == NULL)
-		ctxt->allocated = allocated->next;
-	else
-		prev->next = allocated->next;
 
 	release_physical_pages(allocated);
 
 	/*
-	 * Find point of insertion for the arena.
+	 * Find point of insertion and free the arena.
 	 */
 
-	prev = NULL;
-	vacant = ctxt->vacant;
-
-	while (vacant != NULL) {
-		if ((vacant->mtlb > allocated->mtlb) ||
-			((vacant->mtlb == allocated->mtlb) &&
-			 (vacant->stlb  > allocated->stlb)))
+	list_for_each(nexthead, &gcmmucontext->vacant) {
+		nextvacant = list_entry(nexthead, struct gcmmuarena, link);
+		if (nextvacant->start.absolute >= allocated->end.absolute)
 			break;
-		prev = vacant;
-		vacant = vacant->next;
 	}
 
-	/* Insert between the previous and the next vacant arenas. */
-	if (mmu2d_siblings(prev, allocated)) {
-		if (mmu2d_siblings(allocated, vacant)) {
-			prev->count += allocated->count;
-			prev->count += vacant->count;
-			prev->next   = vacant->next;
-			mmu2d_free_arena(ctxt->mmu, allocated);
-			mmu2d_free_arena(ctxt->mmu, vacant);
+	/* Get the previous vacant entry. */
+	prevhead = nexthead->prev;
+
+	/* Merge the area back into vacant list. */
+	if (siblings(&gcmmucontext->vacant, prevhead, allochead)) {
+		if (siblings(&gcmmucontext->vacant, allochead, nexthead)) {
+			prevvacant = list_entry(prevhead, struct gcmmuarena,
+						link);
+
+			/* Merge all three arenas. */
+			prevvacant->count += allocated->count;
+			prevvacant->count += nextvacant->count;
+			prevvacant->end.absolute = nextvacant->end.absolute;
+
+			/* Free the merged arenas. */
+			list_move(allochead, &mmu->vacarena);
+			list_move(nexthead, &mmu->vacarena);
 		} else {
-			prev->count += allocated->count;
-			mmu2d_free_arena(ctxt->mmu, allocated);
+			prevvacant = list_entry(prevhead, struct gcmmuarena,
+						link);
+
+			/* Merge with the previous. */
+			prevvacant->count += allocated->count;
+			prevvacant->end.absolute = allocated->end.absolute;
+
+			/* Free the merged arena. */
+			list_move(allochead, &mmu->vacarena);
 		}
-	} else if (mmu2d_siblings(allocated, vacant)) {
-		vacant->mtlb   = allocated->mtlb;
-		vacant->stlb   = allocated->stlb;
-		vacant->count += allocated->count;
-		mmu2d_free_arena(ctxt->mmu, allocated);
+	} else if (siblings(&gcmmucontext->vacant, allochead, nexthead)) {
+		/* Merge with the next arena. */
+		nextvacant->start.absolute = allocated->start.absolute;
+		nextvacant->count += allocated->count;
+
+		/* Free the merged arena. */
+		list_move(allochead, &mmu->vacarena);
 	} else {
-		allocated->next = vacant;
-		if (prev == NULL)
-			ctxt->vacant = allocated;
-		else
-			prev->next = allocated;
+
+		GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
+			"cannot merge, inserting in between:\n",
+			__func__, __LINE__);
+
+		/* Neighbor vacant arenas are not siblings, can't merge. */
+		list_move(allochead, prevhead);
 	}
 
-fail:
+exit:
+	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
+		"gc%s = 0x%08X\n", __func__, __LINE__,
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+
 	return gcerror;
 }
 
-int mmu2d_flush(void *logical, u32 address, u32 size)
+int gcmmu_flush(void *logical, unsigned int address, unsigned int size)
 {
-#if MMU_ENABLE
 	static const int flushSize = sizeof(struct gcmommuflush);
 	struct gcmommuflush *gcmommuflush;
-	u32 count;
+	unsigned int count;
 
 	GCPRINT(GCDBGFILTER, GCZONE_FLUSH, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
@@ -1045,19 +1004,19 @@ int mmu2d_flush(void *logical, u32 address, u32 size)
 
 	/* Return the size in bytes required for the flush. */
 	return flushSize;
-#else
-	return 0;
-#endif
 }
 
-enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
+enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data)
 {
 	enum gcerror gcerror = GCERR_NONE;
 	struct gcfixupentry *table;
-	struct mmu2darena *arena;
+	struct gcmmuarena *arena;
 	unsigned int dataoffset;
 	unsigned int surfoffset;
 	unsigned int i;
+
+	GCPRINT(GCDBGFILTER, GCZONE_FIXUP, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
 	/* Process fixups. */
 	while (fixup != NULL) {
@@ -1076,7 +1035,7 @@ enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
 				table->surfoffset);
 
 			dataoffset = table->dataoffset;
-			arena = (struct mmu2darena *) data[dataoffset];
+			arena = (struct gcmmuarena *) data[dataoffset];
 
 			GCPRINT(GCDBGFILTER, GCZONE_FIXUP, GC_MOD_PREFIX
 				"arena = 0x%08X\n",
@@ -1103,16 +1062,16 @@ enum gcerror mmu2d_fixup(struct gcfixup *fixup, unsigned int *data)
 				"surface address = 0x%08X\n",
 				__func__, __LINE__, data[dataoffset]);
 
-#if GC_FLUSH_USER_PAGES
-			flush_user_buffer(arena);
-#endif
-
 			table += 1;
 		}
 
 		/* Get the next fixup. */
 		fixup = fixup->next;
 	}
+
+	GCPRINT(GCDBGFILTER, GCZONE_FIXUP, "--" GC_MOD_PREFIX
+		"gc%s = 0x%08X\n", __func__, __LINE__,
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 
 	return gcerror;
 }

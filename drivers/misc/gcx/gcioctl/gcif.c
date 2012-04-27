@@ -293,7 +293,7 @@ static int gc_map_wrapper(struct gcmap *gcmap)
 	kgcmap.pagearray = NULL;
 
 	/* Call the core driver. */
-	gc_map(&kgcmap);
+	gc_map(&kgcmap, true);
 	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
 	mapped = 1;
@@ -309,7 +309,7 @@ exit:
 
 	if (kgcmap.gcerror != GCERR_NONE) {
 		if (mapped)
-			gc_unmap(&kgcmap);
+			gc_unmap(&kgcmap, true);
 	}
 
 	return ret;
@@ -330,7 +330,7 @@ static int gc_unmap_wrapper(struct gcmap *gcmap)
 	}
 
 	/* Call the core driver. */
-	gc_unmap(&kgcmap);
+	gc_unmap(&kgcmap, true);
 
 exit:
 	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, buf))) {
