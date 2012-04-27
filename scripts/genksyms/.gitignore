@@ -1,4 +1,6 @@
-keywords.c
-lex.c
-parse.[ch]
 genksyms
+
+#keywords.c
+#lex.c
+#parse.[ch]
+
