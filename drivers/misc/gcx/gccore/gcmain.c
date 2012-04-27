@@ -36,11 +36,13 @@
 #define GC_ENABLE_SUSPEND
 
 #define GCZONE_ALL		(~0U)
-#define GCZONE_CONTEXT		(1 << 0)
-#define GCZONE_POWER		(1 << 1)
-#define GCZONE_PAGE		(1 << 2)
-#define GCZONE_COMMIT		(1 << 3)
-#define GCZONE_MAPPING		(1 << 4)
+#define GCZONE_INIT		(1 << 0)
+#define GCZONE_CONTEXT		(1 << 1)
+#define GCZONE_POWER		(1 << 2)
+#define GCZONE_PAGE		(1 << 3)
+#define GCZONE_COMMIT		(1 << 4)
+#define GCZONE_MAPPING		(1 << 5)
+#define GCZONE_PROBE		(1 << 6)
 
 #include <linux/gcx.h>
 #include <linux/gccore.h>
@@ -50,230 +52,127 @@
 
 #define GC_POLL_PRCM_STBY 100
 
-/* Driver context structure. */
-struct gccontext {
-	struct mmu2dcontext mmu;
-	int mmu_dirty;
-};
+/* Driver private data. */
+static struct gccorecontext g_context;
 
-struct gccore {
-	struct device *dev;
-	void *priv;
-};
+/*******************************************************************************
+ * Context management.
+ */
 
-static struct gccore gcdevice;
-static bool g_irqinstalled;
-static unsigned int gcirq;
-
-static struct mutex mtx;
-static struct dentry *g_debugRoot;
-
-struct gccontextmap {
-	pid_t pid;
-	struct gccontext *context;
-	struct gccontextmap *prev;
-	struct gccontextmap *next;
-};
-static struct mutex g_maplock;
-static struct gccontextmap *g_map;
-static struct gccontextmap *g_mapvacant;
-static int g_clientref;
-
-static void *g_reg_base;
-static struct omap_gcx_platform_data *g_gcxplat;
-static bool gforceoff; /* protected by mtx */
-/* opp */
-static int g_opp_count;
-static unsigned long *g_opp_freqs;
-static unsigned long  g_cur_freq;
-
-static enum gcerror find_context(struct gccontextmap **context, int create)
+static enum gcerror find_context(struct gccorecontext *gccorecontext,
+					bool fromuser,
+					struct gcmmucontext **gcmmucontext)
 {
 	enum gcerror gcerror = GCERR_NONE;
-	struct gccontextmap *prev;
-	struct gccontextmap *curr;
+	struct list_head *ctxhead;
+	struct gcmmucontext *temp = NULL;
 	pid_t pid;
 
+	GCPRINT(GCDBGFILTER, GCZONE_COMMIT, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
 	/* Get current PID. */
-	pid = 0;
+	pid = fromuser ? current->tgid : 0;
 
 	/* Search the list. */
-	prev = NULL;
-	curr = g_map;
-
 	GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, GC_MOD_PREFIX
-		"scanning existing records for pid %d.\n",
+		"scanning context records for pid %d.\n",
 		__func__, __LINE__, pid);
 
 	/* Try to locate the record. */
-	while (curr != NULL) {
-		/* Found the record? */
-		if (curr->pid == pid) {
-			/* Move to the top of the list. */
-			if (prev != NULL) {
-				prev->next = curr->next;
-				curr->next = g_map;
-				g_map = curr;
-			}
-
+	list_for_each(ctxhead, &gccorecontext->mmuctxlist) {
+		temp = list_entry(ctxhead, struct gcmmucontext, link);
+		if (temp->pid == pid) {
 			/* Success. */
 			GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, GC_MOD_PREFIX
-				"record is found @ 0x%08X\n",
-				__func__, __LINE__, (unsigned int) curr);
+				"context is found @ 0x%08X\n",
+				__func__, __LINE__,
+				(unsigned int) temp);
 
-			*context = curr;
 			goto exit;
 		}
-
-		/* Get the next record. */
-		prev = curr;
-		curr = curr->next;
-	}
-
-	/* Not found, do we need to create a new one? */
-	if (!create) {
-		GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, GC_MOD_PREFIX
-			"not found, exiting.\n",
-			__func__, __LINE__);
-		gcerror = GCERR_NOT_FOUND;
-		goto exit;
 	}
 
 	/* Get new record. */
-	if (g_mapvacant == NULL) {
+	if (list_empty(&gccorecontext->mmuctxvac)) {
 		GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, GC_MOD_PREFIX
 			"not found, allocating.\n",
 			__func__, __LINE__);
 
-		curr = kmalloc(sizeof(struct gccontextmap), GFP_KERNEL);
-		if (curr == NULL) {
+		temp = kmalloc(sizeof(struct gcmmucontext), GFP_KERNEL);
+		if (temp == NULL) {
 			GCPRINT(NULL, 0, GC_MOD_PREFIX
 				"out of memory.\n",
 				__func__, __LINE__);
 			gcerror = GCERR_SETGRP(GCERR_OODM,
 						GCERR_IOCTL_CTX_ALLOC);
-			goto exit;
+			goto fail;
 		}
 
 		GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, GC_MOD_PREFIX
 			"allocated @ 0x%08X\n",
-			__func__, __LINE__, (unsigned int) curr);
+			__func__, __LINE__, (unsigned int) temp);
 	} else {
+		ctxhead = gccorecontext->mmuctxvac.next;
+		temp = list_entry(ctxhead, struct gcmmucontext, link);
+		list_del(ctxhead);
+
 		GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, GC_MOD_PREFIX
-			"not found, reusing record @ 0x%08X\n",
-			__func__, __LINE__, (unsigned int) g_mapvacant);
-
-		curr = g_mapvacant;
-		g_mapvacant = g_mapvacant->next;
+			"not found, reusing vacant @ 0x%08X\n",
+			__func__, __LINE__, (unsigned int) temp);
 	}
 
-	GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, GC_MOD_PREFIX
-		"creating new context.\n",
-		__func__, __LINE__);
-
-	curr->context = kzalloc(sizeof(*curr->context), GFP_KERNEL);
-	if (curr->context == NULL) {
-		gcerror = GCERR_SETGRP(GCERR_OODM, GCERR_CTX_ALLOC);
-		goto exit;
-	}
-
-	gcerror = mmu2d_create_context(&curr->context->mmu);
+	gcerror = gcmmu_create_context(temp);
 	if (gcerror != GCERR_NONE)
-		goto free_map_ctx;
+		goto fail;
 
-#if MMU_ENABLE
-	gcerror = cmdbuf_map(&curr->context->mmu);
+	gcerror = cmdbuf_map(temp);
 	if (gcerror != GCERR_NONE)
-		goto free_2d_ctx;
-#endif
+		goto fail;
 
-	curr->context->mmu_dirty = true;
+	temp->pid = pid;
+	temp->dirty = true;
 
-	g_clientref += 1;
+	/* Add the context to the list. */
+	list_add(&temp->link, &gccorecontext->mmuctxlist);
 
-	/* Success? */
-	if (gcerror == GCERR_NONE) {
-		GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, GC_MOD_PREFIX
-			"new context created @ 0x%08X\n",
-			__func__, __LINE__, (unsigned int) curr->context);
-
-		/* Set the PID. */
-		curr->pid = pid;
-
-		/* Add to the list. */
-		curr->prev = NULL;
-		curr->next = g_map;
-		if (g_map != NULL)
-			g_map->prev = curr;
-		g_map = curr;
-
-		/* Set return value. */
-		*context = curr;
-	} else {
-		GCPRINT(GCDBGFILTER, GCZONE_CONTEXT, GC_MOD_PREFIX
-			"failed to create a context.\n",
-			__func__, __LINE__);
-
-		/* Add the record to the vacant list. */
-		curr->next = g_mapvacant;
-		g_mapvacant = curr;
-	}
-	goto exit;
-
-free_2d_ctx:
-	mmu2d_destroy_context(&curr->context->mmu);
-free_map_ctx:
-	kfree(curr->context);
 exit:
+	*gcmmucontext = temp;
+
+	GCPRINT(GCDBGFILTER, GCZONE_COMMIT, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	return GCERR_NONE;
+
+fail:
+	if (temp != NULL) {
+		gcmmu_destroy_context(temp);
+		list_add(&temp->link, &gccorecontext->mmuctxvac);
+	}
+
 	return gcerror;
 }
 
-static enum gcerror release_context(struct gccontextmap *context)
+static void destroy_mmu_context(struct gccorecontext *gccorecontext)
 {
-	enum gcerror gcerror;
+	struct list_head *head;
+	struct gcmmucontext *temp;
 
-	/* Remove from the list. */
-	if (context->prev == NULL) {
-		if (context != g_map) {
-			gcerror = GCERR_NOT_FOUND;
-			goto exit;
-		}
-
-		g_map = context->next;
-		g_map->prev = NULL;
-	} else {
-		context->prev->next = context->next;
-		context->next->prev = context->prev;
+	/* Free vacant entry list. */
+	while (!list_empty(&gccorecontext->mmuctxvac)) {
+		head = gccorecontext->mmuctxvac.next;
+		temp = list_entry(head, struct gcmmucontext, link);
+		list_del(head);
+		kfree(temp);
 	}
 
-	if (context->context != NULL) {
-		gcerror = mmu2d_destroy_context(&context->context->mmu);
-		if (gcerror != GCERR_NONE)
-			goto exit;
-
-		kfree(context->context);
-		context->context = NULL;
-
-		g_clientref -= 1;
-	}
-
-	kfree(context);
-
-exit:
-	return gcerror;
-}
-
-static void delete_context_map(void)
-{
-	struct gccontextmap *curr;
-
-	while (g_map != NULL)
-		release_context(g_map);
-
-	while (g_mapvacant != NULL) {
-		curr = g_mapvacant;
-		g_mapvacant = g_mapvacant->next;
-		kfree(curr);
+	/* Free active contexts. */
+	while (!list_empty(&gccorecontext->mmuctxlist)) {
+		head = gccorecontext->mmuctxlist.next;
+		temp = list_entry(head, struct gcmmucontext, link);
+		gcmmu_destroy_context(temp);
+		list_del(head);
+		kfree(temp);
 	}
 }
 
@@ -283,31 +182,31 @@ static void delete_context_map(void)
 
 unsigned int gc_read_reg(unsigned int address)
 {
-	return readl((unsigned char *) g_reg_base + address);
+	return readl((unsigned char *) g_context.regbase + address);
 }
 
 void gc_write_reg(unsigned int address, unsigned int data)
 {
-	writel(data, (unsigned char *) g_reg_base + address);
+	writel(data, (unsigned char *) g_context.regbase + address);
 }
 
 /*******************************************************************************
  * Page allocation routines.
  */
 
-enum gcerror gc_alloc_pages(struct gcpage *p, unsigned int size)
+enum gcerror gc_alloc_noncached(struct gcpage *p, unsigned int size)
 {
 	enum gcerror gcerror;
-	int order;
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "++" GC_MOD_PREFIX
+		"p = 0x%08X\n",
+		__func__, __LINE__, (unsigned int) p);
 
 	p->pages = NULL;
+	p->order = 0;
+	p->size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
 	p->logical = NULL;
 	p->physical = ~0UL;
-
-	order = get_order(size);
-
-	p->order = order;
-	p->size = (1 << order) * PAGE_SIZE;
 
 	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
 		"requested size=%d\n", __func__, __LINE__, size);
@@ -315,23 +214,107 @@ enum gcerror gc_alloc_pages(struct gcpage *p, unsigned int size)
 	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
 		"aligned size=%d\n", __func__, __LINE__, p->size);
 
-	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
-		"order=%d\n", __func__, __LINE__, order);
-
 	p->logical = dma_alloc_coherent(NULL, p->size, &p->physical,
-								GFP_KERNEL);
+						GFP_KERNEL);
 	if (!p->logical) {
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
 			"failed to allocate memory\n",
 			__func__, __LINE__);
 
 		gcerror = GCERR_OOPM;
-		goto fail;
+		goto exit;
 	}
 
 	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
-		"container = 0x%08X\n",
+		"logical=0x%08X\n",
+		__func__, __LINE__, (unsigned int) p->logical);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
+		"physical=0x%08X\n",
+		__func__, __LINE__, (unsigned int) p->physical);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	return GCERR_NONE;
+
+exit:
+	gc_free_noncached(p);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "--" GC_MOD_PREFIX
+		"gcerror = 0x%08X\n", __func__, __LINE__, gcerror);
+
+	return gcerror;
+}
+
+void gc_free_noncached(struct gcpage *p)
+{
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "++" GC_MOD_PREFIX
+		"p = 0x%08X\n",
 		__func__, __LINE__, (unsigned int) p);
+
+	if (p->logical != NULL) {
+		dma_free_coherent(NULL, p->size, p->logical, p->physical);
+		p->logical = NULL;
+	}
+
+	p->physical = ~0UL;
+	p->size = 0;
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+}
+
+enum gcerror gc_alloc_cached(struct gcpage *p, unsigned int size)
+{
+	enum gcerror gcerror;
+	struct page *pages;
+	int count;
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "++" GC_MOD_PREFIX
+		"p = 0x%08X\n",
+		__func__, __LINE__, (unsigned int) p);
+
+	p->order = get_order(size);
+	p->pages = NULL;
+	p->size = (1 << p->order) * PAGE_SIZE;
+	p->logical = NULL;
+	p->physical = ~0UL;
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
+		"requested size=%d\n", __func__, __LINE__, size);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
+		"aligned size=%d\n", __func__, __LINE__, p->size);
+
+	p->pages = alloc_pages(GFP_KERNEL, p->order);
+	if (p->pages == NULL) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to allocate memory\n",
+			__func__, __LINE__);
+
+		gcerror = GCERR_OOPM;
+		goto exit;
+	}
+
+	p->physical = page_to_phys(p->pages);
+	p->logical = (unsigned int *) page_address(p->pages);
+
+	if (p->logical == NULL) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to retrieve page virtual address\n",
+			__func__, __LINE__);
+
+		gcerror = GCERR_PMMAP;
+		goto exit;
+	}
+
+	/* Reserve pages. */
+	pages = p->pages;
+	count = p->size / PAGE_SIZE;
+
+	while (count--)
+		SetPageReserved(pages++);
 
 	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
 		"page array=0x%08X\n",
@@ -345,21 +328,24 @@ enum gcerror gc_alloc_pages(struct gcpage *p, unsigned int size)
 		"physical=0x%08X\n",
 		__func__, __LINE__, (unsigned int) p->physical);
 
-	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
-		"size=%d\n",
-		__func__, __LINE__, p->size);
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
 	return GCERR_NONE;
 
-fail:
-	gc_free_pages(p);
+exit:
+	gc_free_cached(p);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "--" GC_MOD_PREFIX
+		"gcerror = 0x%08X\n", __func__, __LINE__, gcerror);
+
 	return gcerror;
 }
 
-void gc_free_pages(struct gcpage *p)
+void gc_free_cached(struct gcpage *p)
 {
-	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
-		"container = 0x%08X\n",
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "++" GC_MOD_PREFIX
+		"p = 0x%08X\n",
 		__func__, __LINE__, (unsigned int) p);
 
 	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
@@ -379,26 +365,87 @@ void gc_free_pages(struct gcpage *p)
 		__func__, __LINE__, p->size);
 
 	if (p->logical != NULL) {
-		dma_free_coherent(NULL, p->size, p->logical, p->physical);
+		struct page *pages;
+		int count;
+
+		pages = p->pages;
+		count = p->size / PAGE_SIZE;
+
+		while (count--)
+			ClearPageReserved(pages++);
+
 		p->logical = NULL;
+	}
+
+	if (p->pages != NULL) {
+		__free_pages(p->pages, p->order);
+		p->pages = NULL;
 	}
 
 	p->physical = ~0UL;
 	p->order = 0;
 	p->size = 0;
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+}
+
+void gc_flush_cached(struct gcpage *p)
+{
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "++" GC_MOD_PREFIX
+		"p = 0x%08X\n",
+		__func__, __LINE__, (unsigned int) p);
+
+	dmac_flush_range(p->logical, (unsigned char *) p->logical + p->size);
+	outer_flush_range(p->physical, p->physical + p->size);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+}
+
+void gc_flush_region(unsigned int physical, void *logical,
+			unsigned int offset, unsigned int size)
+{
+	unsigned char *startlog;
+	unsigned int startphys;
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
+		"logical=0x%08X\n",
+		__func__, __LINE__, (unsigned int) logical);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
+		"physical=0x%08X\n",
+		__func__, __LINE__, physical);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
+		"offset=%d\n",
+		__func__, __LINE__, offset);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, GC_MOD_PREFIX
+		"size=%d\n",
+		__func__, __LINE__, size);
+
+	startlog = (unsigned char *) logical + offset;
+	startphys = physical + offset;
+
+	dmac_flush_range(startlog, startlog + size);
+	outer_flush_range(startphys, startphys + size);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PAGE, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 }
 
 /*******************************************************************************
  * Interrupt handling.
  */
 
-struct completion g_gccoreint;
-static unsigned int g_gccoredata;
-
 void gc_wait_interrupt(void)
 {
 	while (true) {
-		if (wait_for_completion_timeout(&g_gccoreint, HZ * 5))
+		if (wait_for_completion_timeout(&g_context.intready, HZ * 5))
 			break;
 
 		GCGPUSTATUS(NULL, 0, __func__, __LINE__, NULL);
@@ -409,14 +456,15 @@ unsigned int gc_get_interrupt_data(void)
 {
 	unsigned int data;
 
-	data = g_gccoredata;
-	g_gccoredata = 0;
+	data = g_context.intdata;
+	g_context.intdata = 0;
 
 	return data;
 }
 
-static irqreturn_t gc_irq(int irq, void *p)
+static irqreturn_t gc_irq(int irq, void *_gccorecontext)
 {
+	struct gccorecontext *gccorecontext;
 	unsigned int data;
 
 	/* Read gcregIntrAcknowledge register. */
@@ -428,8 +476,9 @@ static irqreturn_t gc_irq(int irq, void *p)
 
 	gc_debug_cache_gpu_status_from_irq(data);
 
-	g_gccoredata = data;
-	complete(&g_gccoreint);
+	gccorecontext = (struct gccorecontext *) _gccorecontext;
+	gccorecontext->intdata = data;
+	complete(&gccorecontext->intready);
 
 	return IRQ_HANDLED;
 }
@@ -441,13 +490,7 @@ static irqreturn_t gc_irq(int irq, void *p)
 #include <plat/omap_hwmod.h>
 #include <plat/omap-pm.h>
 
-struct device *g_bb2d_dev;
-static enum gcpower g_gcpower = GCPWR_UNKNOWN;
-static bool g_clockenabled;
-static bool g_irqenabled;
-static bool g_pulseskipping;
-
-void gc_reset_gpu(void)
+static void gc_reset_gpu(struct gccorecontext *gccorecontext)
 {
 	union gcclockcontrol gcclockcontrol;
 	union gcidle gcidle;
@@ -510,96 +553,94 @@ void gc_reset_gpu(void)
 	}
 
 	/* Pulse skipping disabled. */
-	g_pulseskipping = false;
+	gccorecontext->pulseskipping = false;
 
 	GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
 		"gpu reset.\n",
 		__func__, __LINE__);
 }
 
-enum gcerror gcpwr_enable_clock(enum gcpower prevstate)
+static void gcpwr_enable_clock(struct gccorecontext *gccorecontext)
 {
-	bool ctxlost = g_gcxplat->was_context_lost(gcdevice.dev);
-	if (!g_clockenabled) {
+	bool ctxlost = gccorecontext->plat->was_context_lost(
+		gccorecontext->device);
+
+	if (!gccorecontext->clockenabled) {
 		/* Enable the clock. */
-		pm_runtime_get_sync(gcdevice.dev);
+		pm_runtime_get_sync(gccorecontext->device);
 
 		/* Signal software not idle. */
 		gc_write_reg(GC_GP_OUT0_Address, 0);
 
 		/* Clock enabled. */
-		g_clockenabled = true;
+		gccorecontext->clockenabled = true;
 	} else if (ctxlost) {
 		u32 reg;
-		dev_info(gcdevice.dev, "unexpected context\n");
+		dev_info(gccorecontext->device, "unexpected context\n");
 		reg = gc_read_reg(GC_GP_OUT0_Address);
 		if (reg) {
-			dev_info(gcdevice.dev, "reset gchold\n");
+			dev_info(gccorecontext->device, "reset gchold\n");
 			gc_write_reg(GC_GP_OUT0_Address, 0);
 		}
 	}
+
 	GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
-		"clock %s.\n",
-		__func__, __LINE__, g_clockenabled ? "enabled" : "disabled");
+		"clock %s.\n", __func__, __LINE__,
+		gccorecontext->clockenabled ? "enabled" : "disabled");
 
-	if (ctxlost || prevstate == GCPWR_UNKNOWN)
-		gc_reset_gpu();
-
-	return GCERR_NONE;
+	if (ctxlost || gccorecontext->gcpower == GCPWR_UNKNOWN)
+		gc_reset_gpu(gccorecontext);
 }
 
-void gcpwr_disable_clock(enum gcpower prevstate)
+static void gcpwr_disable_clock(struct gccorecontext *gccorecontext)
 {
-	if (!g_clockenabled)
-		return;
+	if (gccorecontext->clockenabled) {
+		gc_debug_poweroff_cache();
 
-	gc_debug_poweroff_cache();
+		/* Signal software idle. */
+		gc_write_reg(GC_GP_OUT0_Address, 1);
 
-	/* Signal software idle. */
-	gc_write_reg(GC_GP_OUT0_Address, 1);
+		/* Disable the clock. */
+		pm_runtime_put_sync(gccorecontext->device);
 
-	/* Disable the clock. */
-	pm_runtime_put_sync(gcdevice.dev);
+		/* Clock disabled. */
+		gccorecontext->clockenabled = false;
+	}
 
-	/* Clock disabled. */
-	g_clockenabled = false;
 	GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
-			"clock disabled.\n",
-			__func__, __LINE__);
+		"clock %s.\n", __func__, __LINE__,
+		gccorecontext->clockenabled ? "enabled" : "disabled");
 }
 
 /*
  * scale gcxx device
  */
-static void gcxxx_device_scale(int idx)
+static void gcxxx_device_scale(struct gccorecontext *core, int idx)
 {
 	int ret;
 
-	if (!g_opp_count || (idx >= g_opp_count))
+	if (!core->opp_count || (idx >= core->opp_count))
 		return;
-	if (!g_gcxplat || !g_gcxplat->scale_dev)
+	if (!core->plat || !core->plat->scale_dev)
 		return;
-	if (g_cur_freq != g_opp_freqs[idx]) {
-		ret = g_gcxplat->scale_dev(g_bb2d_dev, g_opp_freqs[idx]);
+	if (core->cur_freq != core->opp_freqs[idx]) {
+		ret = core->plat->scale_dev(
+			core->bb2ddevice, core->opp_freqs[idx]);
 		if (!ret)
-			g_cur_freq = g_opp_freqs[idx];
+			core->cur_freq = core->opp_freqs[idx];
 	}
 }
 
-void gcpwr_enable_pulse_skipping(enum gcpower prevstate)
+static void gcpwr_enable_pulse_skipping(struct gccorecontext *gccorecontext)
 {
-	union gcclockcontrol gcclockcontrol;
-
-	if (!g_clockenabled)
+	if (!gccorecontext->clockenabled)
 		return;
 
-	if (g_pulseskipping) {
-		GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
-			"pulse skipping is already enabled.\n",
-			__func__, __LINE__);
-	} else {
+	if (!gccorecontext->pulseskipping) {
+		union gcclockcontrol gcclockcontrol;
+
 		/* opp scale */
-		gcxxx_device_scale(0);
+		gcxxx_device_scale(gccorecontext, 0);
 
 		/* Enable loading and set to minimum value. */
 		gcclockcontrol.raw = 0;
@@ -614,23 +655,28 @@ void gcpwr_enable_pulse_skipping(enum gcpower prevstate)
 				gcclockcontrol.raw);
 
 		/* Pulse skipping enabled. */
-		g_pulseskipping = true;
+		gccorecontext->pulseskipping = true;
 		GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
 			"pulse skipping enabled.\n",
 			__func__, __LINE__);
 	}
+
+	GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
+		"pulse skipping %s.\n", __func__, __LINE__,
+		gccorecontext->pulseskipping ? "enabled" : "disabled");
 }
 
-void gcpwr_disable_pulse_skipping(enum gcpower prevstate)
+static void gcpwr_disable_pulse_skipping(struct gccorecontext *gccorecontext)
 {
-	union gcclockcontrol gcclockcontrol;
-
-	if (!g_clockenabled)
+	if (!gccorecontext->clockenabled)
 		return;
 
-	if (g_pulseskipping) {
+	if (gccorecontext->pulseskipping) {
+		union gcclockcontrol gcclockcontrol;
+
 		/* opp device scale */
-		gcxxx_device_scale(g_opp_count - 1);
+		gcxxx_device_scale(gccorecontext,
+				   gccorecontext->opp_count - 1);
 
 		/* Enable loading and set to maximum value. */
 		gcclockcontrol.reg.pulsecount = 64;
@@ -644,18 +690,16 @@ void gcpwr_disable_pulse_skipping(enum gcpower prevstate)
 				gcclockcontrol.raw);
 
 		/* Pulse skipping disabled. */
-		g_pulseskipping = false;
-		GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
-			"pulse skipping disabled.\n",
-			__func__, __LINE__);
-	} else {
-		GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
-			"pulse skipping is already disabled.\n",
-			__func__, __LINE__);
+		gccorecontext->pulseskipping = false;
 	}
+
+	GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
+		"pulse skipping %s.\n", __func__, __LINE__,
+		gccorecontext->pulseskipping ? "enabled" : "disabled");
 }
 
-enum gcerror gc_set_power(enum gcpower gcpower)
+enum gcerror gc_set_power(struct gccorecontext *gccorecontext,
+				enum gcpower gcpower)
 {
 	enum gcerror gcerror = GCERR_NONE;
 
@@ -664,34 +708,32 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 		goto exit;
 	}
 
-	if (gcpower != g_gcpower) {
+	if (gcpower != gccorecontext->gcpower) {
 		GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
 			"power state %d --> %d\n",
-			__func__, __LINE__, g_gcpower, gcpower);
+			__func__, __LINE__, gccorecontext->gcpower, gcpower);
 
 		switch (gcpower) {
 		case GCPWR_ON:
-			gcerror = gcpwr_enable_clock(g_gcpower);
-			if (gcerror != GCERR_NONE)
-				goto exit;
+			gcpwr_enable_clock(gccorecontext);
+			gcpwr_disable_pulse_skipping(gccorecontext);
 
-			gcpwr_disable_pulse_skipping(g_gcpower);
-
-			if (!g_irqenabled) {
-				enable_irq(gcirq);
-				g_irqenabled = true;
+			if (!gccorecontext->irqenabled) {
+				enable_irq(gccorecontext->irqline);
+				gccorecontext->irqenabled = true;
 			}
 			break;
 
 		case GCPWR_LOW:
-			gcpwr_enable_pulse_skipping(g_gcpower);
+			gcpwr_enable_pulse_skipping(gccorecontext);
 			break;
 
 		case GCPWR_OFF:
-			gcpwr_disable_clock(g_gcpower);
-			if (g_irqenabled) {
-				disable_irq(gcirq);
-				g_irqenabled = false;
+			gcpwr_disable_clock(gccorecontext);
+
+			if (gccorecontext->irqenabled) {
+				disable_irq(gccorecontext->irqline);
+				gccorecontext->irqenabled = false;
 			}
 			break;
 
@@ -701,7 +743,7 @@ enum gcerror gc_set_power(enum gcpower gcpower)
 		}
 
 		/* Set new power state. */
-		g_gcpower = gcpower;
+		gccorecontext->gcpower = gcpower;
 	}
 
 exit:
@@ -710,15 +752,17 @@ exit:
 
 enum gcerror gc_get_power(void)
 {
-	return g_gcpower;
+	return g_context.gcpower;
 }
 
 /*******************************************************************************
  * Command buffer submission.
  */
 
-void gc_commit(struct gccommit *gccommit, int fromuser)
+void gc_commit(struct gccommit *gccommit, bool fromuser)
 {
+	struct gccorecontext *gccorecontext = &g_context;
+	struct gcmmucontext *gcmmucontext;
 	struct gcbuffer *gcbuffer;
 	unsigned int cmdflushsize;
 	unsigned int mmuflushsize;
@@ -727,25 +771,29 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	unsigned int *logical;
 	unsigned int address;
 	struct gcmopipesel *gcmopipesel;
-	struct gccontextmap *context;
 
 	GCPRINT(GCDBGFILTER, GCZONE_COMMIT, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
 
-	mutex_lock(&mtx);
+	mutex_lock(&gccorecontext->mmucontextlock);
 
 	/* Enable power to the chip. */
-	gc_set_power(GCPWR_ON);
+	gc_set_power(gccorecontext, GCPWR_ON);
 
 	/* Locate the client entry. */
-	gccommit->gcerror = find_context(&context, true);
+	gccommit->gcerror = find_context(gccorecontext, fromuser,
+						&gcmmucontext);
 	if (gccommit->gcerror != GCERR_NONE)
 		goto exit;
 
-	context->context->mmu_dirty = true;
+	/* Different context? */
+	if (gccorecontext->mmucontext != gcmmucontext) {
+		gccorecontext->mmucontext = gcmmucontext;
+		gcmmucontext->dirty = true;
+	}
 
 	/* Set the client's master table. */
-	gccommit->gcerror = mmu2d_set_master(&context->context->mmu);
+	gccommit->gcerror = gcmmu_set_master(gcmmucontext);
 	if (gccommit->gcerror != GCERR_NONE)
 		goto exit;
 
@@ -778,8 +826,8 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 			__func__, __LINE__, buffersize);
 
 		/* Determine MMU flush size. */
-		mmuflushsize = context->context->mmu_dirty
-			? mmu2d_flush(NULL, 0, 0) : 0;
+		mmuflushsize = gcmmucontext->dirty
+			? gcmmu_flush(NULL, 0, 0) : 0;
 
 		/* Reserve command buffer space. */
 		allocsize = mmuflushsize + buffersize + cmdflushsize;
@@ -789,15 +837,15 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 			goto exit;
 
 		/* Append MMU flush. */
-		if (context->context->mmu_dirty) {
-			mmu2d_flush(logical, address, allocsize);
+		if (gcmmucontext->dirty) {
+			gcmmu_flush(logical, address, allocsize);
 
 			/* Skip MMU flush. */
 			logical = (unsigned int *)
 				((unsigned char *) logical + mmuflushsize);
 
 			/* Validate MMU state. */
-			context->context->mmu_dirty = false;
+			gcmmucontext->dirty = false;
 		}
 
 		if (fromuser) {
@@ -815,7 +863,7 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 		}
 
 		/* Process fixups. */
-		gccommit->gcerror = mmu2d_fixup(gcbuffer->fixuphead, logical);
+		gccommit->gcerror = gcmmu_fixup(gcbuffer->fixuphead, logical);
 		if (gccommit->gcerror != GCERR_NONE)
 			goto exit;
 
@@ -831,11 +879,11 @@ void gc_commit(struct gccommit *gccommit, int fromuser)
 	}
 
 exit:
-	gc_set_power(GCPWR_LOW);
-	if (gforceoff)
-		gc_set_power(GCPWR_OFF);
+	gc_set_power(gccorecontext, GCPWR_LOW);
+	if (gccorecontext->forceoff)
+		gc_set_power(gccorecontext, GCPWR_OFF);
 
-	mutex_unlock(&mtx);
+	mutex_unlock(&gccorecontext->mmucontextlock);
 
 	GCPRINT(GCDBGFILTER, GCZONE_COMMIT, "--" GC_MOD_PREFIX
 		"gc%s = 0x%08X\n", __func__, __LINE__,
@@ -844,23 +892,22 @@ exit:
 }
 EXPORT_SYMBOL(gc_commit);
 
-void gc_map(struct gcmap *gcmap)
+void gc_map(struct gcmap *gcmap, bool fromuser)
 {
-	struct mmu2dphysmem mem;
-	struct mmu2darena *mapped = NULL;
-	struct gccontextmap *context;
+	struct gccorecontext *gccorecontext = &g_context;
+	struct gcmmucontext *gcmmucontext;
+	struct gcmmuphysmem mem;
+	struct gcmmuarena *mapped = NULL;
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
 
-	mutex_lock(&mtx);
+	mutex_lock(&gccorecontext->mmucontextlock);
 
 	/* Locate the client entry. */
-	gcmap->gcerror = find_context(&context, true);
+	gcmap->gcerror = find_context(gccorecontext, fromuser, &gcmmucontext);
 	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
-
-	context->context->mmu_dirty = true;
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
 		"map client buffer\n",
@@ -893,12 +940,12 @@ void gc_map(struct gcmap *gcmap)
 	mem.pagesize = gcmap->pagesize ? gcmap->pagesize : PAGE_SIZE;
 
 	/* Map the buffer. */
-	gcmap->gcerror = mmu2d_map(&context->context->mmu, &mem, &mapped);
+	gcmap->gcerror = gcmmu_map(gcmmucontext, &mem, &mapped);
 	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
 
 	/* Invalidate the MMU. */
-	context->context->mmu_dirty = true;
+	gcmmucontext->dirty = true;
 
 	gcmap->handle = (unsigned int) mapped;
 
@@ -911,7 +958,7 @@ void gc_map(struct gcmap *gcmap)
 		__func__, __LINE__, (unsigned int) mapped);
 
 exit:
-	mutex_unlock(&mtx);
+	mutex_unlock(&gccorecontext->mmucontextlock);
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
 		"gc%s = 0x%08X\n", __func__, __LINE__,
@@ -920,21 +967,20 @@ exit:
 }
 EXPORT_SYMBOL(gc_map);
 
-void gc_unmap(struct gcmap *gcmap)
+void gc_unmap(struct gcmap *gcmap, bool fromuser)
 {
-	struct gccontextmap *context;
+	struct gccorecontext *gccorecontext = &g_context;
+	struct gcmmucontext *gcmmucontext;
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
 
-	mutex_lock(&mtx);
+	mutex_lock(&gccorecontext->mmucontextlock);
 
 	/* Locate the client entry. */
-	gcmap->gcerror = find_context(&context, true);
+	gcmap->gcerror = find_context(gccorecontext, fromuser, &gcmmucontext);
 	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
-
-	context->context->mmu_dirty = true;
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, GC_MOD_PREFIX
 		"unmap client buffer\n",
@@ -949,19 +995,19 @@ void gc_unmap(struct gcmap *gcmap)
 		__func__, __LINE__, gcmap->handle);
 
 	/* Map the buffer. */
-	gcmap->gcerror = mmu2d_unmap(&context->context->mmu,
-					(struct mmu2darena *) gcmap->handle);
+	gcmap->gcerror = gcmmu_unmap(gcmmucontext,
+					(struct gcmmuarena *) gcmap->handle);
 	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
 
 	/* Invalidate the MMU. */
-	context->context->mmu_dirty = true;
+	gcmmucontext->dirty = true;
 
 	/* Invalidate the handle. */
 	gcmap->handle = ~0U;
 
 exit:
-	mutex_unlock(&mtx);
+	mutex_unlock(&gccorecontext->mmucontextlock);
 
 	GCPRINT(GCDBGFILTER, GCZONE_MAPPING, "--" GC_MOD_PREFIX
 		"gc%s = 0x%08X\n", __func__, __LINE__,
@@ -970,73 +1016,97 @@ exit:
 }
 EXPORT_SYMBOL(gc_unmap);
 
-static int gc_probe(struct platform_device *pdev)
+static int gc_probe_opp(struct platform_device *pdev)
 {
-	int ret;
 	int i;
 	unsigned long freq = 0;
-
-	g_gcxplat = (struct omap_gcx_platform_data *)pdev->dev.platform_data;
-	g_reg_base = g_gcxplat->regbase;
-	gcirq = platform_get_irq(pdev, pdev->id);
-
-	ret = request_irq(gcirq, gc_irq, IRQF_SHARED,
-				GC_DEV_NAME, &gcdevice);
-	if (ret < 0) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to install IRQ (%d).\n",
-			__func__, __LINE__, ret);
-		return -ENODEV;
-	}
-
-	g_irqinstalled = true;
-
-	/* Disable IRQ. */
-	disable_irq(gcirq);
-	g_irqenabled = false;
-
-	gcdevice.dev = &pdev->dev;
-
-	pm_runtime_enable(gcdevice.dev);
-	(void)g_gcxplat->was_context_lost(gcdevice.dev);
+	struct gccorecontext *core = &g_context;
 
 	/* Query supported OPPs */
 	rcu_read_lock();
 
-	g_opp_count = opp_get_opp_count(&pdev->dev);
-	if (g_opp_count <= 0) {
-		g_opp_count = 0;
+	core->opp_count = opp_get_opp_count(&pdev->dev);
+	if (core->opp_count <= 0) {
+		core->opp_count = 0;
 		goto done;
 	}
 
-	g_opp_freqs = kzalloc((g_opp_count) * sizeof(unsigned long),
+	core->opp_freqs = kzalloc((core->opp_count) * sizeof(unsigned long),
 			GFP_KERNEL);
-	if (!g_opp_freqs) {
-		g_opp_count = 0;
+	if (!core->opp_freqs) {
+		core->opp_count = 0;
 		goto done;
 	}
 
-	for (i = 0; i < g_opp_count; i++) {
+	for (i = 0; i < core->opp_count; i++) {
 		struct opp *opp = opp_find_freq_ceil(&pdev->dev, &freq);
 		if (IS_ERR_OR_NULL(opp)) {
-			g_opp_count = i;
+			core->opp_count = i;
 			goto done;
 		}
-		g_opp_freqs[i] = freq++; /* get freq, prepare to next */
+		core->opp_freqs[i] = freq++; /* get freq, prepare to next */
 	}
 done:
 	rcu_read_unlock();
 
 	/* set lowest opp */
-	if (g_opp_count)
-		gcxxx_device_scale(0);
+	if (core->opp_count)
+		gcxxx_device_scale(core, 0);
 
 	return 0;
 }
 
+static int gc_probe(struct platform_device *pdev)
+{
+	int ret;
+	struct gccorecontext *gccorecontext = &g_context;
+
+	GCPRINT(GCDBGFILTER, GCZONE_PROBE, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	gccorecontext->plat = (struct omap_gcx_platform_data *)
+		pdev->dev.platform_data;
+
+	gccorecontext->regbase = gccorecontext->plat->regbase;
+	gccorecontext->irqline = platform_get_irq(pdev, pdev->id);
+
+	ret = request_irq(gccorecontext->irqline, gc_irq, IRQF_SHARED,
+				GC_DEV_NAME, gccorecontext);
+	if (ret < 0) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to install IRQ (%d).\n",
+			__func__, __LINE__, ret);
+		goto fail;
+	}
+
+	gccorecontext->isrroutine = true;
+
+	/* Disable IRQ. */
+	disable_irq(gccorecontext->irqline);
+	gccorecontext->irqenabled = false;
+
+	gccorecontext->device = &pdev->dev;
+
+	pm_runtime_enable(gccorecontext->device);
+	(void)gccorecontext->plat->was_context_lost(gccorecontext->device);
+
+	gc_probe_opp(pdev);
+
+	GCPRINT(GCDBGFILTER, GCZONE_PROBE, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	return 0;
+
+fail:
+	GCPRINT(GCDBGFILTER, GCZONE_PROBE, "--" GC_MOD_PREFIX
+		"ret = %d\n", __func__, __LINE__, ret);
+
+	return ret;
+}
+
 static int gc_remove(struct platform_device *pdev)
 {
-	kfree(g_opp_freqs);
+	kfree(g_context.opp_freqs);
 	return 0;
 }
 
@@ -1045,7 +1115,8 @@ static int gc_suspend(struct platform_device *pdev, pm_message_t s)
 {
 	GCPRINT(GCDBGFILTER, GCZONE_POWER, "++" GC_MOD_PREFIX
 		"\n", __func__, __LINE__);
-	if (gc_set_power(GCPWR_OFF))
+
+	if (gc_set_power(&g_context, GCPWR_OFF))
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
 			"suspend failure.\n",
 			__func__, __LINE__);
@@ -1085,17 +1156,27 @@ static struct platform_driver plat_drv = {
 #include <linux/earlysuspend.h>
 static void gc_early_suspend(struct early_suspend *h)
 {
-	mutex_lock(&mtx);
-	gforceoff = true;
-	gc_set_power(GCPWR_OFF);
-	mutex_unlock(&mtx);
+	struct gccorecontext *gccorecontext = &g_context;
+
+	GCPRINT(GCDBGFILTER, GCZONE_POWER, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	mutex_lock(&gccorecontext->mmucontextlock);
+	gccorecontext->forceoff = true;
+	gc_set_power(gccorecontext, GCPWR_OFF);
+	mutex_unlock(&gccorecontext->mmucontextlock);
+
+	GCPRINT(GCDBGFILTER, GCZONE_POWER, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 }
 
 static void gc_late_resume(struct early_suspend *h)
 {
-	mutex_lock(&mtx);
-	gforceoff = false;
-	mutex_unlock(&mtx);
+	struct gccorecontext *gccorecontext = &g_context;
+
+	mutex_lock(&gccorecontext->mmucontextlock);
+	gccorecontext->forceoff = false;
+	mutex_unlock(&gccorecontext->mmucontextlock);
 }
 
 static struct early_suspend early_suspend_info = {
@@ -1109,77 +1190,138 @@ static struct early_suspend early_suspend_info = {
  * Driver init/shutdown.
  */
 
-static int __init gc_init(void)
+static int gc_init(void);
+static void gc_exit(void);
+
+static int gc_init(void)
 {
+	int result;
+	struct gccorecontext *gccorecontext = &g_context;
+
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
 	/* check if hardware is available */
-	if (!cpu_is_omap447x())
-		return 0;
+	if (!cpu_is_omap447x()) {
+		GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
+			"gcx hardware is not present\n",
+			__func__, __LINE__);
 
-	/* Initialize context mutex. */
-	mutex_init(&mtx);
+		goto exit;
+	}
 
-	/* Initialize interrupt completion. */
-	init_completion(&g_gccoreint);
+	/* Initialize data structutres. */
+	mutex_init(&gccorecontext->mmucontextlock);
+	init_completion(&gccorecontext->intready);
+	INIT_LIST_HEAD(&gccorecontext->mmuctxlist);
+	INIT_LIST_HEAD(&gccorecontext->mmuctxvac);
 
-	g_bb2d_dev = omap_hwmod_name_get_dev("bb2d");
-	if (g_bb2d_dev == NULL) {
+	gccorecontext->bb2ddevice = omap_hwmod_name_get_dev("bb2d");
+	if (gccorecontext->bb2ddevice == NULL) {
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"cannot find bb2d_fck.\n",
+			"cannot find bb2d device.\n",
+			 __func__, __LINE__);
+		result = -EINVAL;
+		goto fail;
+	}
+
+	result = platform_driver_register(&plat_drv);
+	if (result < 0) {
+		GCPRINT(NULL, 0, GC_MOD_PREFIX
+			"failed to register platform driver.\n",
 			 __func__, __LINE__);
 		goto fail;
 	}
+	gccorecontext->platdriver = true;
+
+#if defined(CONFIG_HAS_EARLYSUSPEND)
+	register_early_suspend(&early_suspend_info);
+#endif
 
 	/* Initialize the command buffer. */
 	if (cmdbuf_init() != GCERR_NONE) {
 		GCPRINT(NULL, 0, GC_MOD_PREFIX
 			"failed to initialize command buffer.\n",
 			 __func__, __LINE__);
+		result = -EINVAL;
 		goto fail;
 	}
 
 	/* Create debugfs entry */
-	g_debugRoot = debugfs_create_dir("gcx", NULL);
-	if (g_debugRoot)
-		gc_debug_init(g_debugRoot);
+	gccorecontext->dbgroot = debugfs_create_dir("gcx", NULL);
+	if (gccorecontext->dbgroot)
+		gc_debug_init(gccorecontext->dbgroot);
 
-	mutex_init(&g_maplock);
+exit:
+	GCPRINT(GCDBGFILTER, GCZONE_PROBE, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
 
-#if defined(CONFIG_HAS_EARLYSUSPEND)
-	register_early_suspend(&early_suspend_info);
-#endif
+	return 0;
 
-	return platform_driver_register(&plat_drv);
 fail:
+	gc_exit();
 
-	return -EINVAL;
+	GCPRINT(GCDBGFILTER, GCZONE_PROBE, "--" GC_MOD_PREFIX
+		"result = %d\n", __func__, __LINE__, result);
+
+	return result;
 }
 
-static void __exit gc_exit(void)
+static void gc_exit(void)
 {
-	if (!cpu_is_omap447x())
-		return;
+	struct gccorecontext *gccorecontext = &g_context;
 
-	platform_driver_unregister(&plat_drv);
+	GCPRINT(GCDBGFILTER, GCZONE_INIT, "++" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+
+	if (cpu_is_omap447x()) {
+		destroy_mmu_context(gccorecontext);
+		gc_set_power(gccorecontext, GCPWR_OFF);
+		pm_runtime_disable(gccorecontext->device);
+
+		if (gccorecontext->platdriver) {
+			platform_driver_unregister(&plat_drv);
+			gccorecontext->platdriver = false;
+		}
+
 #if defined(CONFIG_HAS_EARLYSUSPEND)
-	unregister_early_suspend(&early_suspend_info);
+		unregister_early_suspend(&early_suspend_info);
 #endif
-	delete_context_map();
-	mutex_destroy(&g_maplock);
-	gc_set_power(GCPWR_OFF);
 
-	pm_runtime_disable(gcdevice.dev);
+		if (gccorecontext->regbase != NULL) {
+			iounmap(gccorecontext->regbase);
+			gccorecontext->regbase = NULL;
+		}
 
-	if (g_debugRoot)
-		debugfs_remove_recursive(g_debugRoot);
+		if (gccorecontext->dbgroot) {
+			debugfs_remove_recursive(gccorecontext->dbgroot);
+			gccorecontext->dbgroot = NULL;
+		}
 
-	mutex_destroy(&mtx);
+		mutex_destroy(&gccorecontext->mmucontextlock);
 
-	if (g_irqinstalled)
-		free_irq(gcirq, &gcdevice);
+		if (gccorecontext->isrroutine) {
+			free_irq(gccorecontext->irqline, gccorecontext);
+			gccorecontext->isrroutine = false;
+		}
+	}
+
+	GCPRINT(GCDBGFILTER, GCZONE_PROBE, "--" GC_MOD_PREFIX
+		"\n", __func__, __LINE__);
+}
+
+static int __init gc_init_wrapper(void)
+{
+	return gc_init();
+}
+
+static void __exit gc_exit_wrapper(void)
+{
+	gc_exit();
 }
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("www.vivantecorp.com");
 MODULE_AUTHOR("www.ti.com");
-module_init(gc_init);
-module_exit(gc_exit);
+module_init(gc_init_wrapper);
+module_exit(gc_exit_wrapper);
