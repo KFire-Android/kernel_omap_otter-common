@@ -41,6 +41,11 @@
 #define TWL6040_RATES		SNDRV_PCM_RATE_8000_96000
 #define TWL6040_FORMATS	(SNDRV_PCM_FMTBIT_S32_LE)
 
+/* Register voltage supplies */
+#define TWL6040_NO_SUPPLY	0
+#define TWL6040_VIO_SUPPLY	1
+#define TWL6040_VDD_SUPPLY	2
+
 #define TWL6040_OUTHS_0dB 0x00
 #define TWL6040_OUTHS_M30dB 0x0F
 #define TWL6040_OUTHF_0dB 0x03
@@ -136,6 +141,62 @@ static const u8 twl6040_reg[TWL6040_CACHEREGNUM] = {
 	0x00, /* REG_SW_SHADOW	0x2F - Shadow, non HW register */
 };
 
+/*
+ * twl6040 vio/gnd registers: registers under vio/gnd supply can be accessed
+ * twl6040 vdd/vss registers: registers under vdd/vss supplies can only be
+ *                            accessed after the power-up sequence
+ */
+static const u8 twl6040_reg_supply[TWL6040_CACHEREGNUM] = {
+	TWL6040_NO_SUPPLY,  /* not used		*/
+	TWL6040_VIO_SUPPLY, /* REG_ASICID (ro)	*/
+	TWL6040_VIO_SUPPLY, /* REG_ASICREV (ro)	*/
+	TWL6040_VIO_SUPPLY, /* REG_INTID	*/
+	TWL6040_VIO_SUPPLY, /* REG_INTMR	*/
+	TWL6040_VIO_SUPPLY, /* REG_NCPCTRL	*/
+	TWL6040_VIO_SUPPLY, /* REG_LDOCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_HPPLLCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_LPPLLCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_LPPLLDIV	*/
+	TWL6040_VIO_SUPPLY, /* REG_AMICBCTL	*/
+	TWL6040_VIO_SUPPLY, /* REG_DMICBCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_MICLCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_MICRCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_MICGAIN	*/
+	TWL6040_VDD_SUPPLY, /* REG_LINEGAIN	*/
+	TWL6040_VDD_SUPPLY, /* REG_HSLCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_HSRCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_HSGAIN	*/
+	TWL6040_VDD_SUPPLY, /* REG_EARCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_HFLCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_HFLGAIN	*/
+	TWL6040_VDD_SUPPLY, /* REG_HFRCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_HFRGAIN	*/
+	TWL6040_VDD_SUPPLY, /* REG_VIBCTLL	*/
+	TWL6040_VDD_SUPPLY, /* REG_VIBDATL	*/
+	TWL6040_VDD_SUPPLY, /* REG_VIBCTLR	*/
+	TWL6040_VDD_SUPPLY, /* REG_VIBDATR	*/
+	TWL6040_VIO_SUPPLY, /* REG_HKCTL1	*/
+	TWL6040_VIO_SUPPLY, /* REG_HKCTL2	*/
+	TWL6040_VIO_SUPPLY, /* REG_GPOCTL	*/
+	TWL6040_VDD_SUPPLY, /* REG_ALB		*/
+	TWL6040_VDD_SUPPLY, /* REG_DLB		*/
+	TWL6040_NO_SUPPLY,  /* not used		*/
+	TWL6040_NO_SUPPLY,  /* not used		*/
+	TWL6040_NO_SUPPLY,  /* not used		*/
+	TWL6040_NO_SUPPLY,  /* not used		*/
+	TWL6040_NO_SUPPLY,  /* not used		*/
+	TWL6040_NO_SUPPLY,  /* not used		*/
+	TWL6040_NO_SUPPLY,  /* not used		*/
+	TWL6040_VIO_SUPPLY, /* REG_TRIM1	*/
+	TWL6040_VIO_SUPPLY, /* REG_TRIM2	*/
+	TWL6040_VIO_SUPPLY, /* REG_TRIM3	*/
+	TWL6040_VIO_SUPPLY, /* REG_HSOTRIM	*/
+	TWL6040_VIO_SUPPLY, /* REG_HFOTRIM	*/
+	TWL6040_VIO_SUPPLY, /* REG_ACCCTL	*/
+	TWL6040_VIO_SUPPLY, /* REG_STATUS (ro)	*/
+	TWL6040_NO_SUPPLY,  /* REG_SW_SHADOW	*/
+};
+
 /* List of registers to be restored after power up */
 static const int twl6040_restore_list[] = {
 	TWL6040_REG_MICLCTL,
@@ -212,12 +273,18 @@ static int twl6040_read_reg_volatile(struct snd_soc_codec *codec,
 			unsigned int reg)
 {
 	struct twl6040 *twl6040 = codec->control_data;
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 	u8 value;
 
 	if (reg >= TWL6040_CACHEREGNUM)
 		return -EIO;
 
 	if (likely(reg < TWL6040_REG_SW_SHADOW)) {
+		/* read access not supported while in sleep state */
+		if ((twl6040_reg_supply[reg] == TWL6040_VDD_SUPPLY) &&
+		    !priv->codec_powered)
+			return -EINVAL;
+
 		value = twl6040_reg_read(twl6040, reg);
 		twl6040_write_reg_cache(codec, reg, value);
 	} else {
@@ -234,15 +301,26 @@ static int twl6040_write(struct snd_soc_codec *codec,
 			unsigned int reg, unsigned int value)
 {
 	struct twl6040 *twl6040 = codec->control_data;
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
+	int ret = 0;
 
 	if (reg >= TWL6040_CACHEREGNUM)
 		return -EIO;
 
 	twl6040_write_reg_cache(codec, reg, value);
-	if (likely(reg < TWL6040_REG_SW_SHADOW))
-		return twl6040_reg_write(twl6040, reg, value);
-	else
+
+	if (unlikely(reg >= TWL6040_REG_SW_SHADOW))
 		return 0;
+
+	if ((twl6040_reg_supply[reg] == TWL6040_VIO_SUPPLY) ||
+	    priv->codec_powered)
+		ret = twl6040_reg_write(twl6040, reg, value);
+	else
+		dev_dbg(codec->dev,
+			"deferring register 0x%02x write: %02x\n",
+			reg, value);
+
+	return ret;
 }
 
 static void twl6040_init_chip(struct snd_soc_codec *codec)
