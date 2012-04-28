@@ -552,6 +552,7 @@ static void __init omap_5430evm_init(void)
 #endif
 #endif
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
+	omap_5430evm_i2c_init();
 	omap_sdrc_init(NULL, NULL);
 	omap_serial_init();
 }
