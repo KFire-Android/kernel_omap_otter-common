@@ -177,9 +177,32 @@ static void omap_update_report_rate(struct thermal_dev *temp_sensor,
 static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 {
 	int absolute_delta;
+	int pcb_temp;
 
-	absolute_delta = ((sensor_temp * omap_gradient_slope / 1000) +
+	pcb_temp = thermal_lookup_temp("pcb");
+	if (pcb_temp >= 0 && (omap_gov->avg_is_valid == 1)) {
+		omap_gov->pcb_temp = pcb_temp;
+		if (omap_gov->pcb_temp < 0)
+			return sensor_temp + omap_gov->absolute_delta;
+
+		absolute_delta = (
+			((omap_gov->avg_cpu_sensor_temp - omap_gov->pcb_temp) *
+			thermal_lookup_slope("pcb", "cpu") / 1000) +
+			thermal_lookup_offset("pcb", "cpu"));
+		/* Ensure that this formula never returns negative value */
+		if (absolute_delta < 0)
+			absolute_delta = 0;
+	} else {
+		absolute_delta = ((sensor_temp * omap_gradient_slope / 1000) +
 			omap_gradient_const);
+	}
+
+	omap_gov->absolute_delta = absolute_delta;
+	pr_debug("%s:sensor %d avg sensor %d pcb %d, delta %d hot spot %d\n",
+			__func__, sensor_temp, omap_gov->avg_cpu_sensor_temp,
+			omap_gov->pcb_temp, omap_gov->absolute_delta,
+			sensor_temp + absolute_delta);
+
 	return sensor_temp + absolute_delta;
 }
 
@@ -198,7 +221,10 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 
 static signed hotspot_temp_to_sensor_temp(int hot_spot_temp)
 {
-	return ((hot_spot_temp - omap_gradient_const) * 1000) /
+	if (thermal_lookup_temp("pcb") >= 0 && (omap_gov->avg_is_valid == 1))
+		return hot_spot_temp - omap_gov->absolute_delta;
+	else
+		return ((hot_spot_temp - omap_gradient_const) * 1000) /
 			(1000 + omap_gradient_slope);
 }
 

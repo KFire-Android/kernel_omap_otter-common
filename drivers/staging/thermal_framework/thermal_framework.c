@@ -511,6 +511,73 @@ int thermal_lookup_temp(const char *name)
 EXPORT_SYMBOL_GPL(thermal_lookup_temp);
 
 /**
+ * thermal_lookup_slope() - First, look up a thermal domain and then, if
+ *                     available, requests its thermal sensor to report
+ *                     slope.
+ *
+ * @domain_name: a char pointer to the domain name to look up.
+ *
+ * Returns the slope of the current found domain.
+ * ENODEV if the temperature sensor does not exist.
+ * EOPNOTSUPP if the temperature sensor does not support this API.
+ */
+int thermal_lookup_slope(const char *name, const char *rel_name)
+{
+	struct thermal_domain *thermal_domain;
+	int ret = -ENODEV;
+
+	thermal_domain = thermal_domain_find(name);
+	if (!thermal_domain) {
+		pr_err("%s: %s is a non existing domain\n", __func__, name);
+		return ret;
+	}
+
+	ret = thermal_device_call(thermal_domain->temp_sensor, init_slope,
+							rel_name);
+	if (ret < 0) {
+		pr_err("%s: getting slope is not supported for domain %s\n",
+			__func__, thermal_domain->domain_name);
+		ret = -EOPNOTSUPP;
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(thermal_lookup_slope);
+
+/**
+ * thermal_lookup_offset() - First, look up a thermal domain and then, if
+ *                     available, requests its thermal sensor to report
+ *                      it's offset.
+ *
+ * @domain_name: a char pointer to the domain name to look up.
+ *
+ * Returns the offset of the current found domain.
+ * ENODEV if the temperature sensor does not exist.
+ * EOPNOTSUPP if the temperature sensor does not support this API.
+ */
+int thermal_lookup_offset(const char *name, const char *rel_name)
+{
+	struct thermal_domain *thermal_domain;
+	int ret = -ENODEV;
+
+	thermal_domain = thermal_domain_find(name);
+	if (!thermal_domain) {
+		pr_err("%s: %s is a non existing domain\n", __func__, name);
+		return ret;
+	}
+
+	ret = thermal_device_call(thermal_domain->temp_sensor, init_offset,
+							rel_name);
+	/* offset can be a negative value */
+	if (ret == -EOPNOTSUPP) {
+		pr_err("%s: getting offset is not supported for domain %s\n",
+			__func__, thermal_domain->domain_name);
+		ret = -EOPNOTSUPP;
+	}
+	return ret;
+}
+EXPORT_SYMBOL_GPL(thermal_lookup_offset);
+
+/**
  * thermal_governor_dev_register() - Registration call for thermal domain governors
  *
  * @tdev: The thermal governor device structure.
