@@ -328,6 +328,22 @@ struct twl6030_bci_device_info {
 	unsigned int		min_vbus_val;
 };
 
+/* Battery capacity estimation table */
+struct batt_capacity_chart {
+	int volt;
+	unsigned int cap;
+};
+
+static struct batt_capacity_chart volt_cap_table[] = {
+	{ .volt = 3345, .cap =  7 },
+	{ .volt = 3450, .cap = 15 },
+	{ .volt = 3500, .cap = 30 },
+	{ .volt = 3600, .cap = 50 },
+	{ .volt = 3650, .cap = 70 },
+	{ .volt = 3780, .cap = 85 },
+	{ .volt = 3850, .cap = 95 },
+};
+
 static BLOCKING_NOTIFIER_HEAD(notifier_list);
 extern u32 wakeup_timer_seconds;
 
@@ -1614,6 +1630,19 @@ static int twl6030_usb_autogate_charger(struct twl6030_bci_device_info *di)
 	}
 
 	return ret;
+}
+
+static int capacity_lookup(int volt)
+{
+	int i, table_size;
+	table_size = ARRAY_SIZE(volt_cap_table);
+
+	for (i = 1; i < table_size; i++) {
+		if (volt < volt_cap_table[i].volt)
+			break;
+	}
+
+	return volt_cap_table[i-1].cap;
 }
 
 static int capacity_changed(struct twl6030_bci_device_info *di)
