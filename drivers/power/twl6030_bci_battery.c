@@ -300,6 +300,7 @@ struct twl6030_bci_device_info {
 
 	unsigned int		capacity;
 	unsigned int		capacity_debounce_count;
+	unsigned int		boot_capacity_mAh;
 	unsigned long		ac_next_refresh;
 	unsigned int		prev_capacity;
 	unsigned int		wakelock_enabled;
@@ -327,6 +328,9 @@ struct twl6030_bci_device_info {
 
 	unsigned int		min_vbus_val;
 };
+
+/* FIXME: Make this a platform data passed down from the board file */
+#define BATT_CAPACITY_MAH	4000
 
 /* Battery capacity estimation table */
 struct batt_capacity_chart {
@@ -1659,6 +1663,9 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 	int curr_capacity = di->capacity;
 	int charger_source = di->charger_source;
 	int charging_disabled = 0;
+	s32 acc_value, samples = 0;
+	int accumulated_charge;
+	int ret;
 
 	/* Because system load is always greater than
 	 * termination current, we will never get a CHARGE DONE
@@ -1721,6 +1728,47 @@ static int capacity_changed(struct twl6030_bci_device_info *di)
 		else if (charger_source == POWER_SUPPLY_TYPE_USB)
 			twl6030_start_usb_charger(di);
 	}
+
+	/* FG_REG_01, 02, 03 is 24 bit unsigned sample counter value */
+	ret = twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &samples,
+							FG_REG_01, 3);
+	if (ret < 0)
+		dev_dbg(di->dev, "Could not read fuel gauge samples\n");
+	/*
+	 * FG_REG_04, 5, 6, 7 is 32 bit signed accumulator value
+	 * accumulates instantaneous current value
+	 */
+	ret = twl_i2c_read(TWL6030_MODULE_GASGAUGE, (u8 *) &acc_value,
+							FG_REG_04, 4);
+	if (ret < 0)
+		dev_dbg(di->dev, "Could not read fuel gauge accumulator\n");
+
+	/*
+	 * 3000 mA maps to a count of 4096 per sample
+	 * We have 4 samples per second
+	 * Charge added in one second == (acc_value * 3000 / (4 * 4096))
+	 * mAh added == (Charge added in one second / 3600)
+	 * mAh added == acc_value * (3000/3600) / (4 * 4096)
+	 * mAh added == acc_value * (5/6) / (2^14)
+	 * Using 5/6 instead of 3000 to avoid overflow
+	 * FIXME: revisit this code for overflows
+	 * FIXME: Take care of different value of samples/sec
+	 */
+
+	accumulated_charge = ((acc_value - (di->cc_offset * samples))
+								* 5 / 6) >> 14;
+	curr_capacity = (di->boot_capacity_mAh + accumulated_charge)
+					/ (BATT_CAPACITY_MAH / 100);
+	dev_dbg(di->dev, "voltage %d\n", di->voltage_mV);
+	dev_dbg(di->dev,
+		"initial capacity %d mAh, accumulated %d mAh, total %d mAh\n",
+			di->boot_capacity_mAh, accumulated_charge,
+			di->boot_capacity_mAh + accumulated_charge);
+	dev_dbg(di->dev, "percentage_capacity %d\n", curr_capacity);
+
+	if (curr_capacity > 99)
+		curr_capacity = 99;
+
 
 	/* if battery is not present we assume it is on battery simulator and
 	 * current capacity is set to 100%
@@ -2882,6 +2930,8 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, "Battery Voltage at Bootup is %d mV\n",
 							di->voltage_mV);
 
+	di->capacity = capacity_lookup(di->voltage_mV);
+	di->boot_capacity_mAh = di->capacity * (BATT_CAPACITY_MAH / 100);
 	ret = twl_i2c_read_u8(TWL6030_MODULE_ID0, &hw_state, STS_HW_CONDITIONS);
 	if (ret)
 		goto  bk_batt_failed;
