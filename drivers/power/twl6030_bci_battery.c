@@ -3030,13 +3030,6 @@ static int twl6030_bci_battery_suspend(struct device *dev)
 		return ret;
 	}
 
-	ret = twl6030battery_current_setup(false);
-	if (ret) {
-		pr_err("%s: Current measurement setup failed (%d)!\n",
-				__func__, ret);
-		return ret;
-	}
-
 	return 0;
 err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
@@ -3054,13 +3047,6 @@ static int twl6030_bci_battery_resume(struct device *dev)
 	ret = twl6030battery_temp_setup(true);
 	if (ret) {
 		pr_err("%s: Temp measurement setup failed (%d)!\n",
-				__func__, ret);
-		return ret;
-	}
-
-	ret = twl6030battery_current_setup(true);
-	if (ret) {
-		pr_err("%s: Current measurement setup failed (%d)!\n",
 				__func__, ret);
 		return ret;
 	}
