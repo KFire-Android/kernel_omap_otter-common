@@ -1492,6 +1492,15 @@ static int twl6030battery_current_setup(bool enable)
 	u8  reg = 0;
 
 	/*
+	 * Autoclear the register at init
+	 * This is done so early, because it might take
+	 * a while for the autoclear to take effect
+	 * and let's not add an unnecessary delay
+	 */
+	ret = twl_i2c_write_u8(TWL6030_MODULE_GASGAUGE, CC_AUTOCLEAR,
+								FG_REG_00);
+
+	/*
 	 * Writing 0 to REG_TOGGLE1 has no effect, so
 	 * can directly set/reset FG.
 	 */
