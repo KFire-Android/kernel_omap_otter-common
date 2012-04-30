@@ -357,6 +357,8 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
 	conn->power_save = 1;
 	conn->disc_timeout = HCI_DISCONN_TIMEOUT;
 
+	conn->link_policy = hdev->link_policy;
+
 	switch (type) {
 	case ACL_LINK:
 		conn->pkt_type = hdev->pkt_type & ACL_PTYPE_MASK;
