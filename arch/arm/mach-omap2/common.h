@@ -273,6 +273,13 @@ void __init omap_emif_set_device_details(u32 emif_nr,
 			u32 timings_arr_size,
 			struct lpddr2_min_tck *min_tck,
 			struct emif_custom_configs *custom_configs);
+#else
+static inline void __init omap_emif_set_device_details(u32 emif_nr,
+			struct ddr_device_info *device_info,
+			struct lpddr2_timings *timings,
+			u32 timings_arr_size,
+			struct lpddr2_min_tck *min_tck,
+			struct emif_custom_configs *custom_configs) { return; }
 #endif
 #endif /* __ASSEMBLER__ */
 #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
