@@ -1412,6 +1412,7 @@ u32 dispc_get_plane_fifo_size(enum omap_plane plane)
 void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high)
 {
 	u8 hi_start, hi_end, lo_start, lo_end;
+	u32 fifosize;
 
 	dss_feat_get_reg_field(FEAT_REG_FIFOHIGHTHRESHOLD, &hi_start, &hi_end);
 	dss_feat_get_reg_field(FEAT_REG_FIFOLOWTHRESHOLD, &lo_start, &lo_end);
@@ -1432,9 +1433,16 @@ void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high)
 			FLD_VAL(high, hi_start, hi_end) |
 			FLD_VAL(low, lo_start, lo_end));
 
+	if (plane == OMAP_DSS_GFX) {
+		/* give high priority to GFX pipe */
+		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(OMAP_DSS_GFX), 1, 14, 14);
+	}
+
+	fifosize = dispc_get_plane_fifo_size(plane);
+
 	if (dss_has_feature(FEAT_GLOBAL_MFLAG))
 		dispc_write_reg(DISPC_OVL_MFLAG_THRESHOLD(plane),
-			FLD_VAL(high, 31, 16) | FLD_VAL(low, 15, 0));
+			FLD_VAL((fifosize*5)/8, 31, 16) | FLD_VAL((fifosize*4)/8, 15, 0));
 }
 
 void dispc_enable_fifomerge(bool enable)
