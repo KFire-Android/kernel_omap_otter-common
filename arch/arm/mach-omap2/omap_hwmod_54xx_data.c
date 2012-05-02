@@ -2708,6 +2708,7 @@ static struct omap_hwmod omap54xx_i2c5_hwmod = {
 	.name		= "i2c5",
 	.class		= &omap54xx_i2c_hwmod_class,
 	.clkdm_name	= "l4per_clkdm",
+	.flags		= HWMOD_16BIT_REG | HWMOD_SET_DEFAULT_CLOCKACT,
 	.mpu_irqs	= omap54xx_i2c5_irqs,
 	.main_clk	= "func_96m_fclk",
 	.prcm = {
