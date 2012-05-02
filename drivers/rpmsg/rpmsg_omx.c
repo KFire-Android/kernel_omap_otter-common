@@ -607,6 +607,9 @@ static ssize_t rpmsg_omx_write(struct file *filp, const char __user *ubuf,
 	struct omx_msg_hdr *hdr = (struct omx_msg_hdr *) kbuf;
 	int use, ret;
 
+	if (omx->state == OMX_FAIL)
+		return -ENXIO;
+
 	if (omx->state != OMX_CONNECTED)
 		return -ENOTCONN;
 
