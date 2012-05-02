@@ -189,4 +189,17 @@ struct dmm {
 	spinlock_t list_lock;
 };
 
+enum mem_type {
+	MEMTYPE_PAGES = 0,
+	MEMTYPE_CARVEOUT,
+};
+
+struct mem_info {
+	enum mem_type type;
+	union {
+		struct page **pages;
+		uint32_t *phys_addrs;
+	};
+};
+
 #endif

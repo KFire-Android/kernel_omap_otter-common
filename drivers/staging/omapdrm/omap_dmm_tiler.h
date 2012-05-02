@@ -39,6 +39,9 @@ struct tiler_block {
 	struct list_head alloc_node;	/* node for global block list */
 	struct tcm_area area;		/* area */
 	enum tiler_fmt fmt;		/* format */
+	uint32_t stride;		/* 2D: length of one line in pages
+					   1D: length of buffer rounded to
+						PAGE_SIZE */
 };
 
 /* bits representing the same slot in DMM-TILER hw-block */
@@ -80,6 +83,7 @@ int tiler_map_show(struct seq_file *s, void *arg);
 /* pin/unpin */
 int tiler_pin(struct tiler_block *block, struct page **pages,
 		uint32_t npages, uint32_t roll, bool wait);
+int tiler_pin_phys(struct tiler_block *block, u32 *phys_addrs, u32 num_pages);
 int tiler_unpin(struct tiler_block *block);
 
 /* reserve/release */
