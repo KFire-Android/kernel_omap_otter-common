@@ -61,3 +61,4 @@ obj-$(CONFIG_INPUT_YEALINK)		+= yealink.o
 obj-$(CONFIG_INPUT_BH1780)		+= bh1780gli.o
 obj-$(CONFIG_INPUT_BMA180)		+= bma180.o
 obj-$(CONFIG_INPUT_BMP085)              += bmp085.o
+obj-$(CONFIG_INPUT_HMC5843)		+= hmc5843.o
