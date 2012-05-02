@@ -613,4 +613,11 @@ config INPUT_PALMAS_PWRBUTTON
 	  Say Y here if you want to eable power key reporting for the palmas
 	  familty of PMICs
 
+config INPUT_BH1780
+	bool "ROHM BH1780GLI ambient light sensor"
+	depends on I2C && SYSFS
+	help
+	  If you say yes here you get support for the ROHM BH1780GLI
+	  ambient light sensor.
+
 endif
