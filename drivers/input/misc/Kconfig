@@ -627,4 +627,11 @@ config INPUT_BMA180
 	  Say Y here if you want to use BMA-180 Tri-axis accelerometer
 	  through I2C interface.
 
+config INPUT_BMP085
+       bool "BMP085 digital pressure sensor"
+       depends on I2C && SYSFS
+       help
+         If you say yes here you get support for the Bosch Sensortec
+         BMP086 digital pressure sensor
+
 endif
