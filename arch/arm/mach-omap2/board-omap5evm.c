@@ -138,6 +138,17 @@ static struct __devinitdata emif_custom_configs custom_configs = {
 #endif
 #endif
 
+static int __init omap_5430evm_i2c_init(void)
+{
+
+	omap_register_i2c_bus(1, 400, NULL, 0);
+	omap_register_i2c_bus(2, 400, NULL, 0);
+	omap_register_i2c_bus(3, 400, NULL, 0);
+	omap_register_i2c_bus(4, 400, NULL, 0);
+	omap_register_i2c_bus(5, 400, NULL, 0);
+
+	return 0;
+}
 static void __init omap_5430evm_init(void)
 {
 	int status;
@@ -157,6 +168,7 @@ ifndef CONFIG_MACH_OMAP_5430ZEBU
 #endif
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
+	omap_5430evm_i2c_init();
 	omap_serial_init();
 	status = omap4_keyboard_init(&evm5430_keypad_data, &keypad_data);
 	if (status)
