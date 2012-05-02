@@ -113,10 +113,10 @@ static void omap3_core_save_context(void)
 	/* Save the Interrupt controller context */
 	omap_intc_save_context();
 	/* Save the GPMC context */
-	omap3_gpmc_save_context();
+	omap_gpmc_save_context();
 	/* Save the system control module context, padconf already save above*/
 	omap3_control_save_context();
-	omap_dma_global_context_save();
+	omap2_dma_context_save();
 }
 
 static void omap3_core_restore_context(void)
@@ -124,10 +124,10 @@ static void omap3_core_restore_context(void)
 	/* Restore the control module context, padconf restored by h/w */
 	omap3_control_restore_context();
 	/* Restore the GPMC context */
-	omap3_gpmc_restore_context();
+	omap_gpmc_restore_context();
 	/* Restore the interrupt controller context */
 	omap_intc_restore_context();
-	omap_dma_global_context_restore();
+	omap2_dma_context_restore();
 }
 
 /*
@@ -786,9 +786,9 @@ static int __init omap3_pm_init(void)
 		local_irq_disable();
 		local_fiq_disable();
 
-		omap_dma_global_context_save();
+		omap2_dma_context_save();
 		omap3_save_secure_ram_context();
-		omap_dma_global_context_restore();
+		omap2_dma_context_restore();
 
 		local_irq_enable();
 		local_fiq_enable();

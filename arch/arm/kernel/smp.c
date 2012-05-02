@@ -104,9 +104,13 @@ int __cpuinit __cpu_up(unsigned int cpu)
 		 * CPU was successfully started, wait for it
 		 * to come online or time out.
 		 */
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
 		wait_for_completion_timeout(&cpu_running,
 						 msecs_to_jiffies(1000));
-
+#else
+		wait_for_completion_timeout(&cpu_running,
+						 msecs_to_jiffies(10000));
+#endif
 		if (!cpu_online(cpu)) {
 			pr_crit("CPU%u: failed to come online\n", cpu);
 			ret = -EIO;
@@ -454,6 +458,9 @@ static struct local_timer_ops *lt_ops;
 #ifdef CONFIG_LOCAL_TIMERS
 int local_timer_register(struct local_timer_ops *ops)
 {
+	if (!is_smp() || !setup_max_cpus)
+		return -ENXIO;
+
 	if (lt_ops)
 		return -EBUSY;
 

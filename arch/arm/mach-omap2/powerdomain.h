@@ -46,18 +46,25 @@
 #define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | PWRSTS_ON)
 
 
-/* Powerdomain flags */
-#define PWRDM_HAS_HDWR_SAR	(1 << 0) /* hardware save-and-restore support */
-#define PWRDM_HAS_MPU_QUIRK	(1 << 1) /* MPU pwr domain has MEM bank 0 bits
-					  * in MEM bank 1 position. This is
-					  * true for OMAP3430
-					  */
-#define PWRDM_HAS_LOWPOWERSTATECHANGE	(1 << 2) /*
-						  * support to transition from a
-						  * sleep state to a lower sleep
-						  * state without waking up the
-						  * powerdomain
-						  */
+/* Powerdomain flags: hardware save-and-restore support */
+#define PWRDM_HAS_HDWR_SAR		(1 << 0)
+/*
+ * MPU pwr domain has MEM bank 0 bits in MEM bank 1 position.
+ * This is true for OMAP3430
+ */
+#define PWRDM_HAS_MPU_QUIRK		(1 << 1)
+/*
+ * Support to transition from a sleep state to a lower sleep state
+ * without waking up the powerdomain
+ */
+#define PWRDM_HAS_LOWPOWERSTATECHANGE	(1 << 2)
+/*
+ * Supported only on CPU power domains to take care of Cortex-A15 based
+ * design limitation. All the CPUs in a cluster transitions to low power
+ * state together and not individually with wfi. Force OFF mode fix that
+ * limitation and let CPU individually hit OFF mode.
+ */
+#define PWRDM_HAS_FORCE_OFF		(1 << 3)
 
 /*
  * Number of memory banks that are power-controllable.	On OMAP4430, the
@@ -71,8 +78,12 @@
  */
 #define PWRDM_MAX_CLKDMS	9
 
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+#define PWRDM_TRANSITION_BAILOUT 1000
+#else
 /* XXX A completely arbitrary number. What is reasonable here? */
 #define PWRDM_TRANSITION_BAILOUT 100000
+#endif
 
 struct clockdomain;
 struct powerdomain;
@@ -147,6 +158,8 @@ struct powerdomain {
  * @pwrdm_disable_hdwr_sar: Disable Hardware Save-Restore feature for a pd
  * @pwrdm_set_lowpwrstchange: Enable pd transitions from a shallow to deep sleep
  * @pwrdm_wait_transition: Wait for a pd state transition to complete
+ * @pwrdm_enable_force_off: Enable force off transition feature for the pd
+ * @pwrdm_disable_force_off: Disable force off transition feature for the pd
  */
 struct pwrdm_ops {
 	int	(*pwrdm_set_next_pwrst)(struct powerdomain *pwrdm, u8 pwrst);
@@ -167,6 +180,8 @@ struct pwrdm_ops {
 	int	(*pwrdm_disable_hdwr_sar)(struct powerdomain *pwrdm);
 	int	(*pwrdm_set_lowpwrstchange)(struct powerdomain *pwrdm);
 	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
+	int	(*pwrdm_enable_force_off)(struct powerdomain *pwrdm);
+	int	(*pwrdm_disable_force_off)(struct powerdomain *pwrdm);
 };
 
 int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);
@@ -219,15 +234,19 @@ int pwrdm_post_transition(void);
 int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
 int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
 bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
+int pwrdm_enable_force_off(struct powerdomain *pwrdm);
+int pwrdm_disable_force_off(struct powerdomain *pwrdm);
 
 extern void omap242x_powerdomains_init(void);
 extern void omap243x_powerdomains_init(void);
 extern void omap3xxx_powerdomains_init(void);
 extern void omap44xx_powerdomains_init(void);
+extern void omap54xx_powerdomains_init(void);
 
 extern struct pwrdm_ops omap2_pwrdm_operations;
 extern struct pwrdm_ops omap3_pwrdm_operations;
 extern struct pwrdm_ops omap4_pwrdm_operations;
+extern struct pwrdm_ops omap5_pwrdm_operations;
 
 /* Common Internal functions used across OMAP rev's */
 extern u32 omap2_pwrdm_get_mem_bank_onstate_mask(u8 bank);

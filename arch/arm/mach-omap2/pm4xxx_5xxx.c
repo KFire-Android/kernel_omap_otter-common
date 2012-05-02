@@ -1,5 +1,5 @@
 /*
- * OMAP4 Power Management Routines
+ * OMAP4/5 Power Management Routines
  *
  * Copyright (C) 2010-2011 Texas Instruments, Inc.
  * Rajendra Nayak <rnayak@ti.com>
@@ -36,7 +36,7 @@ struct power_state {
 static LIST_HEAD(pwrst_list);
 
 #ifdef CONFIG_SUSPEND
-static int omap4_pm_suspend(void)
+static int omap4_5_pm_suspend(void)
 {
 	struct power_state *pwrst;
 	int state, ret = 0;
@@ -63,7 +63,7 @@ static int omap4_pm_suspend(void)
 	 * domain CSWR is not supported by hardware.
 	 * More details can be found in OMAP4430 TRM section 4.3.4.2.
 	 */
-	omap4_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
+	omap_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
 
 	/* Restore next powerdomain state */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
@@ -135,34 +135,11 @@ static void omap_default_idle(void)
 	local_fiq_enable();
 }
 
-/**
- * omap4_pm_init - Init routine for OMAP4 PM
- *
- * Initializes all powerdomain and clockdomain target states
- * and all PRCM settings.
- */
-static int __init omap4_pm_init(void)
+static inline int omap4_init_static_deps(void)
 {
-	int ret;
 	struct clockdomain *emif_clkdm, *mpuss_clkdm, *l3_1_clkdm, *l4wkup;
 	struct clockdomain *ducati_clkdm, *l3_2_clkdm, *l4_per_clkdm;
-
-	if (!cpu_is_omap44xx())
-		return -ENODEV;
-
-	if (omap_rev() == OMAP4430_REV_ES1_0) {
-		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
-		return -ENODEV;
-	}
-
-	pr_err("Power Management for TI OMAP4.\n");
-
-	ret = pwrdm_for_each(pwrdms_setup, NULL);
-	if (ret) {
-		pr_err("Failed to setup powerdomains\n");
-		goto err2;
-	}
-
+	int ret;
 	/*
 	 * The dynamic dependency between MPUSS -> MEMIF and
 	 * MPUSS -> L4_PER/L3_* and DUCATI -> L3_* doesn't work as
@@ -182,7 +159,7 @@ static int __init omap4_pm_init(void)
 	ducati_clkdm = clkdm_lookup("ducati_clkdm");
 	if ((!mpuss_clkdm) || (!emif_clkdm) || (!l3_1_clkdm) || (!l4wkup) ||
 		(!l3_2_clkdm) || (!ducati_clkdm) || (!l4_per_clkdm))
-		goto err2;
+		return -EINVAL;
 
 	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
 	ret |= clkdm_add_wkdep(mpuss_clkdm, l3_1_clkdm);
@@ -194,27 +171,91 @@ static int __init omap4_pm_init(void)
 	if (ret) {
 		pr_err("Failed to add MPUSS -> L3/EMIF/L4PER, DUCATI -> L3 "
 				"wakeup dependency\n");
+	}
+
+	return ret;
+}
+
+static inline int omap5_init_static_deps(void)
+{
+	struct clockdomain *mpuss_clkdm, *emif_clkdm;
+	int ret;
+
+	/*
+	 * The dynamic dependency between MPUSS -> EMIF
+	 * doesn't work as expected. The hardware recommendation is to
+	 * enable static dependencies for these to avoid system
+	 * lock ups or random crashes.
+	 */
+	mpuss_clkdm = clkdm_lookup("mpu_clkdm");
+	emif_clkdm = clkdm_lookup("emif_clkdm");
+	if (!mpuss_clkdm || !emif_clkdm)
+		return -EINVAL;
+
+	ret = clkdm_add_wkdep(mpuss_clkdm, emif_clkdm);
+	if (ret)
+		pr_err("Failed to add MPUSS -> L4PER wakeup dependency\n");
+
+	return ret;
+}
+
+/**
+ * omap_pm_init - Init routine for OMAP4 PM
+ *
+ * Initializes all powerdomain and clockdomain target states
+ * and all PRCM settings.
+ */
+static int __init omap_pm_init(void)
+{
+	int ret;
+
+	if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
+		return -ENODEV;
+
+	if (omap_rev() == OMAP4430_REV_ES1_0) {
+		WARN(1, "Power Management not supported on OMAP4430 ES1.0\n");
+		return -ENODEV;
+	}
+
+	pr_info("Power Management for TI OMAP4XX/OMAP5XXX devices.\n");
+
+	ret = pwrdm_for_each(pwrdms_setup, NULL);
+	if (ret) {
+		pr_err("Failed to setup powerdomains\n");
 		goto err2;
 	}
 
-	ret = omap4_mpuss_init();
+	if (cpu_is_omap44xx())
+		ret = omap4_init_static_deps();
+	else
+		ret = omap5_init_static_deps();
+
 	if (ret) {
-		pr_err("Failed to initialise OMAP4 MPUSS\n");
+		pr_err("Failed to initialise static depedencies\n");
+		goto err2;
+	}
+
+	ret = omap_mpuss_init();
+	if (ret) {
+		pr_err("Failed to initialise OMAP MPUSS\n");
 		goto err2;
 	}
 
 	(void) clkdm_for_each(omap_pm_clkdms_setup, NULL);
 
 #ifdef CONFIG_SUSPEND
-	omap_pm_suspend = omap4_pm_suspend;
+	omap_pm_suspend = omap4_5_pm_suspend;
 #endif
 
-	/* Overwrite the default cpu_do_idle() */
-	arm_pm_idle = omap_default_idle;
-
-	omap4_idle_init();
+	if (cpu_is_omap44xx()) {
+		/* Overwrite the default arch_idle() */
+		arm_pm_idle = omap_default_idle;
+		omap4_idle_init();
+	} else if (cpu_is_omap54xx()) {
+		omap5_idle_init();
+	}
 
 err2:
 	return ret;
 }
-late_initcall(omap4_pm_init);
+late_initcall(omap_pm_init);

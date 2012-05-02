@@ -932,6 +932,18 @@ static void __init omap_4430sdp_init(void)
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		package = OMAP_PACKAGE_CBL;
+
+#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
+	omap_emif_set_device_details(1, &lpddr2_elpida_2G_S4_x2_info,
+			lpddr2_elpida_2G_S4_timings,
+			ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
+			&lpddr2_elpida_S4_min_tck, NULL);
+	omap_emif_set_device_details(2, &lpddr2_elpida_2G_S4_x2_info,
+			lpddr2_elpida_2G_S4_timings,
+			ARRAY_SIZE(lpddr2_elpida_2G_S4_timings),
+			&lpddr2_elpida_S4_min_tck, NULL);
+#endif
+
 	omap4_mux_init(board_mux, NULL, package);
 
 	omap4_i2c_init();

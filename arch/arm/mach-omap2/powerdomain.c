@@ -127,8 +127,10 @@ static void _update_logic_membank_counters(struct powerdomain *pwrdm)
 	u8 prev_logic_pwrst, prev_mem_pwrst;
 
 	prev_logic_pwrst = pwrdm_read_prev_logic_pwrst(pwrdm);
+
+	/* Fake logic off counter */
 	if ((pwrdm->pwrsts_logic_ret == PWRSTS_OFF_RET) &&
-	    (prev_logic_pwrst == PWRDM_POWER_OFF))
+		(pwrdm_read_logic_retst(pwrdm) == PWRDM_POWER_OFF))
 		pwrdm->ret_logic_off_counter++;
 
 	for (i = 0; i < pwrdm->banks; i++) {
@@ -1077,4 +1079,70 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
 			return 1;
 
 	return 0;
+}
+
+/**
+ * pwrdm_enable_force_off - Enable force off for a pwrdm
+ * @pwrdm: struct powerdomain *
+ *
+ * Enable force off mode upon a power domain. Supported only on CPU power
+ * domains to take care of Cortex-A15 based design limitation. All the CPUs
+ * in a cluster transitions to low power state together and not individually
+ * with wfi. Force OFF mode fix that limitation and let CPU individually
+ * hit OFF mode. check the TRM closely.
+ * Returns -EINVAL if the powerdomain pointer is null or if
+ * the powerdomain does not support automatic save-and-restore, or
+ * returns 0 upon success.
+ */
+int pwrdm_enable_force_off(struct powerdomain *pwrdm)
+{
+	int ret = -EINVAL;
+
+	if (!pwrdm)
+		return ret;
+
+	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF))
+		return ret;
+
+
+	pr_debug("powerdomain: %s: setting FORCE OFF bit\n",
+		 pwrdm->name);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_enable_force_off)
+		ret = arch_pwrdm->pwrdm_enable_force_off(pwrdm);
+
+	return ret;
+}
+
+/**
+ * pwrdm_disable_force_off - Disable force off for a pwrdm
+ * @pwrdm: struct powerdomain *
+ *
+ * Disable force off mode upon a power domain. Supported only on CPU power
+ * domains to take care of Cortex-A15 based design limitation. All the CPUs
+ * in a cluster transitions to low power state together and not individually
+ * with wfi. Force OFF mode fix that limitation and let CPU individually
+ * hit OFF mode. check the TRM closely.
+ * Returns -EINVAL if the powerdomain pointer is null or if
+ * the powerdomain does not support automatic save-and-restore, or
+ * returns 0 upon success.
+ */
+int pwrdm_disable_force_off(struct powerdomain *pwrdm)
+{
+	int ret = -EINVAL;
+
+	if (!pwrdm)
+		return ret;
+
+	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF))
+		return ret;
+
+
+	pr_debug("powerdomain: %s: clearing FORCE OFF bit\n",
+		 pwrdm->name);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_disable_force_off)
+		ret = arch_pwrdm->pwrdm_disable_force_off(pwrdm);
+
+	return ret;
 }

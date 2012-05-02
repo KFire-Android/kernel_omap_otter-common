@@ -41,6 +41,7 @@
 #include <plat/dmtimer.h>
 #include <asm/smp_twd.h>
 #include <asm/sched_clock.h>
+#include <asm/arch_timer.h>
 #include "common.h"
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -53,19 +54,27 @@
 #define OMAP2_MPU_SOURCE	"sys_ck"
 #define OMAP3_MPU_SOURCE	OMAP2_MPU_SOURCE
 #define OMAP4_MPU_SOURCE	"sys_clkin_ck"
+#define OMAP5_MPU_SOURCE	"sys_clkin_ck"
 #define OMAP2_32K_SOURCE	"func_32k_ck"
 #define OMAP3_32K_SOURCE	"omap_32k_fck"
 #define OMAP4_32K_SOURCE	"sys_32k_ck"
+#define OMAP5_32K_SOURCE	"sys_32k_ck"
 
 #ifdef CONFIG_OMAP_32K_TIMER
 #define OMAP2_CLKEV_SOURCE	OMAP2_32K_SOURCE
 #define OMAP3_CLKEV_SOURCE	OMAP3_32K_SOURCE
 #define OMAP4_CLKEV_SOURCE	OMAP4_32K_SOURCE
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
+#define OMAP5_CLKEV_SOURCE	OMAP5_32K_SOURCE
+#else
+#define OMAP5_CLKEV_SOURCE      OMAP5_MPU_SOURCE
+#endif
 #define OMAP3_SECURE_TIMER	12
 #else
 #define OMAP2_CLKEV_SOURCE	OMAP2_MPU_SOURCE
 #define OMAP3_CLKEV_SOURCE	OMAP3_MPU_SOURCE
 #define OMAP4_CLKEV_SOURCE	OMAP4_MPU_SOURCE
+#define OMAP5_CLKEV_SOURCE	OMAP5_MPU_SOURCE
 #define OMAP3_SECURE_TIMER	1
 #endif
 
@@ -73,6 +82,9 @@
 #define MAX_GPTIMER_ID		12
 
 static u32 sys_timer_reserved;
+#ifdef CONFIG_PM_DEBUG
+extern u32	wakeup_timer_seconds;
+#endif
 
 /* Clockevent code */
 
@@ -115,6 +127,9 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
 	case CLOCK_EVT_MODE_PERIODIC:
 		period = clkev.rate / HZ;
 		period -= 1;
+#ifdef CONFIG_MACH_OMAP_5430ZEBU
+		period = 0x3ff;
+#endif
 		/* Looks like we need to first set the load value separately */
 		__omap_dm_timer_write(&clkev, OMAP_TIMER_LOAD_REG,
 					0xffffffff - period, 1);
@@ -126,6 +141,15 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
 		break;
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_SHUTDOWN:
+#ifdef CONFIG_PM_DEBUG
+		if (wakeup_timer_seconds) {
+			__omap_dm_timer_write(&clkev, OMAP_TIMER_LOAD_REG,
+			0xffffffff - (clkev.rate * wakeup_timer_seconds), 1);
+			__omap_dm_timer_load_start(&clkev, OMAP_TIMER_CTRL_ST,
+			0xffffffff - (clkev.rate * wakeup_timer_seconds), 1);
+		}
+#endif
+		break;
 	case CLOCK_EVT_MODE_RESUME:
 		break;
 	}
@@ -135,6 +159,7 @@ static struct clock_event_device clockevent_gpt = {
 	.name		= "gp timer",
 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
 	.shift		= 32,
+	.rating		= 300,
 	.set_next_event	= omap2_gp_timer_set_next_event,
 	.set_mode	= omap2_gp_timer_set_mode,
 };
@@ -164,17 +189,9 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
 		return -ENXIO;
 
 	/* After the dmtimer is using hwmod these clocks won't be needed */
-	sprintf(name, "gpt%d_fck", gptimer_id);
-	timer->fclk = clk_get(NULL, name);
+	timer->fclk = clk_get(NULL, omap_hwmod_get_main_clk(oh));
 	if (IS_ERR(timer->fclk))
 		return -ENODEV;
-
-	sprintf(name, "gpt%d_ick", gptimer_id);
-	timer->iclk = clk_get(NULL, name);
-	if (IS_ERR(timer->iclk)) {
-		clk_put(timer->fclk);
-		return -ENODEV;
-	}
 
 	omap_hwmod_enable(oh);
 
@@ -195,7 +212,6 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
 		}
 	}
 	__omap_dm_timer_init_regs(timer);
-	__omap_dm_timer_reset(timer, 1, 1);
 	timer->posted = 1;
 
 	timer->rate = clk_get_rate(timer->fclk);
@@ -226,7 +242,8 @@ static void __init omap2_gp_clockevent_init(int gptimer_id,
 		clockevent_delta2ns(3, &clockevent_gpt);
 		/* Timer internal resynch latency. */
 
-	clockevent_gpt.cpumask = cpumask_of(0);
+	clockevent_gpt.cpumask = cpu_possible_mask;
+	clockevent_gpt.irq = omap_dm_timer_get_irq(&clkev);
 	clockevents_register_device(&clockevent_gpt);
 
 	pr_info("OMAP clockevent source: GPTIMER%d at %lu Hz\n",
@@ -346,6 +363,43 @@ static void __init omap4_timer_init(void)
 #endif
 }
 OMAP_SYS_TIMER(4)
+#endif
+
+#ifdef CONFIG_ARM_ARCH_TIMER
+static struct arch_timer arch_timer_resources[] = {
+	{
+		.res[0] = {
+			.start  = 30,
+			.end    = 30,
+			.flags  = IORESOURCE_IRQ,
+		},
+		.res[1] = {
+			.start  = 6144000,
+			.end    = 6144000,
+			.flags  = IORESOURCE_MEM,
+		},
+
+	},
+};
+#endif
+
+#ifdef CONFIG_ARCH_OMAP5
+static void __init omap5_timer_init(void)
+{
+	int err;
+
+	omap2_gp_clockevent_init(1, OMAP5_CLKEV_SOURCE);
+
+	omap2_gp_clocksource_init(2, OMAP5_MPU_SOURCE);
+
+#ifdef CONFIG_ARM_ARCH_TIMER
+	omap_mpuss_timer_init();
+	err = arch_timer_register(arch_timer_resources);
+	if (err)
+		pr_err("arch_timer_register failed %d\n", err);
+#endif
+}
+OMAP_SYS_TIMER(5)
 #endif
 
 /**

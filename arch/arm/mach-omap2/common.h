@@ -29,6 +29,8 @@
 #include <linux/delay.h>
 #include <plat/common.h>
 #include <asm/proc-fns.h>
+#include <linux/platform_data/emif_plat.h>
+#include <misc/jedec_ddr.h>
 
 #ifdef CONFIG_SOC_OMAP2420
 extern void omap242x_map_common_io(void);
@@ -78,12 +80,21 @@ static inline void omap44xx_map_common_io(void)
 }
 #endif
 
+#ifdef CONFIG_ARCH_OMAP5
+extern void omap54xx_map_common_io(void);
+#else
+static inline void omap54xx_map_common_io(void)
+{
+}
+#endif
+
 extern void omap2_init_common_infrastructure(void);
 
 extern struct sys_timer omap2_timer;
 extern struct sys_timer omap3_timer;
 extern struct sys_timer omap3_secure_timer;
 extern struct sys_timer omap4_timer;
+extern struct sys_timer omap5_timer;
 
 void omap2420_init_early(void);
 void omap2430_init_early(void);
@@ -94,6 +105,7 @@ void omap3_init_early(void);	/* Do not use this one */
 void am35xx_init_early(void);
 void ti81xx_init_early(void);
 void omap4430_init_early(void);
+void omap_5430evm_init_early(void);
 void omap_prcm_restart(char, const char *);
 
 /*
@@ -111,12 +123,14 @@ struct omap_globals {
 	void __iomem	*prm;            /* Power and Reset Management */
 	void __iomem	*cm;             /* Clock Management */
 	void __iomem	*cm2;
+	void __iomem	*prcm_mpu;
 };
 
 void omap2_set_globals_242x(void);
 void omap2_set_globals_243x(void);
 void omap2_set_globals_3xxx(void);
 void omap2_set_globals_443x(void);
+void omap2_set_globals_543x(void);
 void omap2_set_globals_ti81xx(void);
 void omap2_set_globals_am33xx(void);
 
@@ -131,6 +145,7 @@ void omap243x_map_io(void);
 void omap3_map_io(void);
 void am33xx_map_io(void);
 void omap4_map_io(void);
+void omap5_map_io(void);
 void ti81xx_map_io(void);
 void omap_barriers_init(void);
 
@@ -209,51 +224,55 @@ extern void omap_secondary_startup(void);
 extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
 extern void omap_auxcoreboot_addr(u32 cpu_addr);
 extern u32 omap_read_auxcoreboot0(void);
+extern void omap5_secondary_startup(void);
 #endif
 
 #if defined(CONFIG_SMP) && defined(CONFIG_PM)
-extern int omap4_mpuss_init(void);
-extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
-extern int omap4_finish_suspend(unsigned long cpu_state);
-extern void omap4_cpu_resume(void);
-extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
-extern u32 omap4_mpuss_read_prev_context_state(void);
+extern int omap_mpuss_init(void);
+extern int omap_enter_lowpower(unsigned int cpu, unsigned int power_state);
+extern int omap_hotplug_cpu(unsigned int cpu, unsigned int power_state);
+extern u32 omap_mpuss_read_prev_context_state(void);
+extern void mpuss_timer_setup(unsigned long freq);
+extern void omap_mpuss_timer_init(void);
 #else
-static inline int omap4_enter_lowpower(unsigned int cpu,
+static inline int omap_enter_lowpower(unsigned int cpu,
 					unsigned int power_state)
 {
 	cpu_do_idle();
 	return 0;
 }
 
-static inline int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state)
+static inline int omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 {
 	cpu_do_idle();
 	return 0;
 }
 
-static inline int omap4_mpuss_init(void)
+static inline int omap_mpuss_init(void)
 {
 	return 0;
 }
 
-static inline int omap4_finish_suspend(unsigned long cpu_state)
+static inline u32 omap_mpuss_read_prev_context_state(void)
 {
 	return 0;
 }
 
-static inline void omap4_cpu_resume(void)
+static inline void omap_mpuss_timer_init(void)
 {}
-
-static inline u32 omap4_mpuss_read_prev_context_state(void)
-{
-	return 0;
-}
 #endif
 
 struct omap_sdrc_params;
 extern void omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
 				      struct omap_sdrc_params *sdrc_cs1);
 
+#if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
+void __init omap_emif_set_device_details(u32 emif_nr,
+			struct ddr_device_info *device_info,
+			struct lpddr2_timings *timings,
+			u32 timings_arr_size,
+			struct lpddr2_min_tck *min_tck,
+			struct emif_custom_configs *custom_configs);
+#endif
 #endif /* __ASSEMBLER__ */
 #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */

@@ -440,7 +440,13 @@ struct omap_system_dma_plat_info {
 	void (*clear_dma)(int lch);
 	void (*dma_write)(u32 val, int reg, int lch);
 	u32 (*dma_read)(int reg, int lch);
+	void (*dma_context_save)(void);
+	void (*dma_context_restore)(void);
 };
+
+extern u32 *ch_ctx_regs;
+extern u8 ch_spec_regs;
+extern u32 omap_context_registers[];
 
 extern void omap_set_dma_priority(int lch, int dst_port, int priority);
 extern int omap_request_dma(int dev_id, const char *dev_name,
@@ -498,8 +504,8 @@ extern void omap_set_dma_dst_endian_type(int lch, enum end_type etype);
 extern void omap_set_dma_src_endian_type(int lch, enum end_type etype);
 extern int omap_get_dma_index(int lch, int *ei, int *fi);
 
-void omap_dma_global_context_save(void);
-void omap_dma_global_context_restore(void);
+void omap2_dma_context_save(void);
+void omap2_dma_context_restore(void);
 
 extern void omap_dma_disable_irq(int lch);
 

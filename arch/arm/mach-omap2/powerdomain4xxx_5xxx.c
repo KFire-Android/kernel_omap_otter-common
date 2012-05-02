@@ -1,7 +1,7 @@
 /*
- * OMAP4 powerdomain control
+ * OMAP4/5 powerdomain control
  *
- * Copyright (C) 2009-2010 Texas Instruments, Inc.
+ * Copyright (C) 2009-2011 Texas Instruments, Inc.
  * Copyright (C) 2007-2009 Nokia Corporation
  *
  * Derived from mach-omap2/powerdomain.c written by Paul Walmsley
@@ -208,6 +208,26 @@ static int omap4_pwrdm_wait_transition(struct powerdomain *pwrdm)
 	return 0;
 }
 
+/* FIXME: Need to autogenerate below macro */
+#define OMAP5_FOCRE_OFF_SHIFT				7
+
+static int omap5_pwrdm_enable_force_off(struct powerdomain *pwrdm)
+{
+	omap4_prminst_rmw_inst_reg_bits(0, 1 << OMAP5_FOCRE_OFF_SHIFT,
+		pwrdm->prcm_partition, pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
+
+	return 0;
+}
+
+static int omap5_pwrdm_disable_force_off(struct powerdomain *pwrdm)
+{
+	omap4_prminst_rmw_inst_reg_bits(1 << OMAP5_FOCRE_OFF_SHIFT, 0,
+		pwrdm->prcm_partition, pwrdm->prcm_offs, OMAP4_PM_PWSTCTRL);
+
+	return 0;
+}
+
+
 struct pwrdm_ops omap4_pwrdm_operations = {
 	.pwrdm_set_next_pwrst	= omap4_pwrdm_set_next_pwrst,
 	.pwrdm_read_next_pwrst	= omap4_pwrdm_read_next_pwrst,
@@ -223,4 +243,23 @@ struct pwrdm_ops omap4_pwrdm_operations = {
 	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
 	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
 	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
+};
+
+struct pwrdm_ops omap5_pwrdm_operations = {
+	.pwrdm_set_next_pwrst	= omap4_pwrdm_set_next_pwrst,
+	.pwrdm_read_next_pwrst	= omap4_pwrdm_read_next_pwrst,
+	.pwrdm_read_pwrst	= omap4_pwrdm_read_pwrst,
+	.pwrdm_read_prev_pwrst	= omap4_pwrdm_read_prev_pwrst,
+	.pwrdm_set_lowpwrstchange	= omap4_pwrdm_set_lowpwrstchange,
+	.pwrdm_clear_all_prev_pwrst	= omap4_pwrdm_clear_all_prev_pwrst,
+	.pwrdm_set_logic_retst	= omap4_pwrdm_set_logic_retst,
+	.pwrdm_read_logic_pwrst	= omap4_pwrdm_read_logic_pwrst,
+	.pwrdm_read_logic_retst	= omap4_pwrdm_read_logic_retst,
+	.pwrdm_read_mem_pwrst	= omap4_pwrdm_read_mem_pwrst,
+	.pwrdm_read_mem_retst	= omap4_pwrdm_read_mem_retst,
+	.pwrdm_set_mem_onst	= omap4_pwrdm_set_mem_onst,
+	.pwrdm_set_mem_retst	= omap4_pwrdm_set_mem_retst,
+	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
+	.pwrdm_enable_force_off	= omap5_pwrdm_enable_force_off,
+	.pwrdm_disable_force_off	= omap5_pwrdm_disable_force_off,
 };

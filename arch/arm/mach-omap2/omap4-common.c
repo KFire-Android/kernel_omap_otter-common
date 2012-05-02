@@ -95,11 +95,19 @@ void __init gic_init_irq(void)
 	void __iomem *gic_dist_base_addr;
 
 	/* Static mapping, never released */
-	gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
+	if (cpu_is_omap44xx())
+		gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
+	else
+		gic_dist_base_addr = ioremap(OMAP54XX_GIC_DIST_BASE, SZ_4K);
+
 	BUG_ON(!gic_dist_base_addr);
 
 	/* Static mapping, never released */
-	omap_irq_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
+	if (cpu_is_omap44xx())
+		omap_irq_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
+	else
+		omap_irq_base = ioremap(OMAP54XX_GIC_CPU_BASE, SZ_512);
+
 	BUG_ON(!omap_irq_base);
 
 	omap_wakeupgen_init();
@@ -196,11 +204,17 @@ static int __init omap4_sar_ram_init(void)
 	 * To avoid code running on other OMAPs in
 	 * multi-omap builds
 	 */
-	if (!cpu_is_omap44xx())
+	unsigned long sar_base_phys;
+
+	if (cpu_is_omap44xx())
+		sar_base_phys = OMAP44XX_SAR_RAM_BASE;
+	else if (cpu_is_omap54xx())
+		sar_base_phys = OMAP54XX_SAR_RAM_BASE;
+	else
 		return -ENOMEM;
 
 	/* Static mapping, never released */
-	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
+	sar_ram_base = ioremap(sar_base_phys, SZ_16K);
 	if (WARN_ON(!sar_ram_base))
 		return -ENOMEM;
 

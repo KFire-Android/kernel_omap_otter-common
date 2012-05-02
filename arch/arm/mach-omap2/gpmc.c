@@ -5,8 +5,8 @@
  *
  * Author: Juha Yrjola
  *
- * Copyright (C) 2009 Texas Instruments
- * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
+ * Copyright (C) 20011 Texas Instruments
+ * Added OMAP4/5 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -78,9 +78,9 @@ struct gpmc_cs_config {
 
 /*
  * Structure to save/restore gpmc context
- * to support core off on OMAP3
+ * to support core off.
  */
-struct omap3_gpmc_regs {
+struct omap_gpmc_regs {
 	u32 sysconfig;
 	u32 irqenable;
 	u32 timeout_ctrl;
@@ -717,6 +717,11 @@ static int __init gpmc_init(void)
 		ck = "gpmc_ck";
 		l = OMAP44XX_GPMC_BASE;
 		gpmc_irq = OMAP44XX_IRQ_GPMC;
+	} else if (cpu_is_omap54xx()) {
+		ck = "gpmc_ck";
+		l = OMAP54XX_GPMC_BASE;
+		/* FIXME: Remove with clock-framework */
+		return 0;
 	}
 
 	if (WARN_ON(!ck))
@@ -776,10 +781,9 @@ static irqreturn_t gpmc_handle_irq(int irq, void *dev)
 	return IRQ_HANDLED;
 }
 
-#ifdef CONFIG_ARCH_OMAP3
-static struct omap3_gpmc_regs gpmc_context;
+static struct omap_gpmc_regs gpmc_context;
 
-void omap3_gpmc_save_context(void)
+void omap_gpmc_save_context(void)
 {
 	int i;
 
@@ -811,7 +815,7 @@ void omap3_gpmc_save_context(void)
 	}
 }
 
-void omap3_gpmc_restore_context(void)
+void omap_gpmc_restore_context(void)
 {
 	int i;
 
@@ -841,7 +845,6 @@ void omap3_gpmc_restore_context(void)
 		}
 	}
 }
-#endif /* CONFIG_ARCH_OMAP3 */
 
 /**
  * gpmc_enable_hwecc - enable hardware ecc functionality

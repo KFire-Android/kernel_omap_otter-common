@@ -34,8 +34,10 @@
 
 #define OMAP2_DMA_STRIDE	0x60
 
-static u32 errata;
-static u8 dma_stride;
+u32 errata;
+u8 dma_stride;
+u32 *ch_ctx_regs;
+u8 ch_spec_regs;
 
 static struct omap_dma_dev_attr *d;
 
@@ -85,6 +87,33 @@ static u16 reg_map[] = {
 	[CDP]			= 0xd0,
 	[CNDP]			= 0xd4,
 	[CCDN]			= 0xd8,
+};
+
+u32 omap_context_registers[] = {
+/* Common register offsets */
+	CCR,
+	CLNK_CTRL,
+	CICR,
+	CSR,
+	CSDP,
+	CEN,
+	CFN,
+	CSEI,
+	CSFI,
+	CDEI,
+	CDFI,
+	CSAC,
+	CDAC,
+	/* Channel specific register offsets */
+	CSSA,
+	CDSA,
+	CCEN,
+	CCFN,
+	COLOR,
+	/* OMAP4 specific registers */
+	CDP,
+	CNDP,
+	CCDN
 };
 
 static void __iomem *dma_base;
@@ -217,6 +246,7 @@ static u32 configure_dma_errata(void)
 	return errata;
 }
 
+
 /* One time initializations */
 static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
 {
@@ -227,7 +257,7 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
 
 	dma_stride		= OMAP2_DMA_STRIDE;
 	dma_common_ch_start	= CSDP;
-	if (cpu_is_omap3630() || cpu_is_omap44xx())
+	if (cpu_is_omap3630() || cpu_is_omap44xx() || cpu_is_omap54xx())
 		dma_common_ch_end = CCDN;
 	else
 		dma_common_ch_end = CCFN;
@@ -245,7 +275,8 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
 	p->clear_dma		= omap2_clear_dma;
 	p->dma_write		= dma_write;
 	p->dma_read		= dma_read;
-
+	p->dma_context_save	= omap2_dma_context_save;
+	p->dma_context_restore	= omap2_dma_context_restore;
 	p->clear_lch_regs	= NULL;
 
 	p->errata		= configure_dma_errata();
@@ -277,6 +308,20 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
 		dev_err(&pdev->dev, "%s: kzalloc fail\n", __func__);
 		return -ENOMEM;
 	}
+
+	/* OMAP4/5 and OMAP3630 has descrіptor loading registers */
+	if (cpu_is_omap3630() || cpu_is_omap44xx() || cpu_is_omap54xx())
+		ch_spec_regs = 21;
+	else
+		ch_spec_regs = 18;
+
+	ch_ctx_regs = kzalloc((d->lch_count) * (4 * ch_spec_regs), GFP_KERNEL);
+
+	if (!ch_ctx_regs) {
+		kfree(d->chan);
+		return -ENOMEM;
+	}
+
 	return 0;
 }
 

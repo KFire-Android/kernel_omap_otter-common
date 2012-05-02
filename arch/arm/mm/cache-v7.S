@@ -43,12 +43,32 @@ ENDPROC(v7_flush_icache_all)
  */
 ENTRY(v7_flush_dcache_all)
 	dmb					@ ensure ordering with previous memory accesses
+	mov	r8, lr				@ store lr
 	mrc	p15, 1, r0, c0, c0, 1		@ read clidr
 	ands	r3, r0, #0x7000000		@ extract loc from clidr
 	mov	r3, r3, lsr #23			@ left align loc bit field
 	beq	finished			@ if loc is 0, then no need to clean
 	mov	r10, #0				@ start clean at cache level 0
 loop1:
+	bl	v7_flush_dcache_current_level
+skip:
+	add	r10, r10, #2			@ increment cache number
+	cmp	r3, r10						@
+	bgt	loop1
+finished:
+	mov	r10, #0				@ swith back to cache level 0
+	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
+	dsb
+	isb
+	mov	pc, r8				@ restore lr
+ENDPROC(v7_flush_dcache_all)
+/*
+ *	v7_flush_dcache_current_level()
+ *
+ *	Flush the D-cache by specifed level like l1, l2 etc.
+ *	Corrupted registers: r0-r7, r9-r11 (r6 only in Thumb mode)
+ */
+ENTRY(v7_flush_dcache_current_level)
 	add	r2, r10, r10, lsr #1		@ work out 3x current cache level
 	mov	r1, r0, lsr r2			@ extract cache type bits from clidr
 	and	r1, r1, #7			@ mask of the bits for current cache only
@@ -68,33 +88,50 @@ loop1:
 	ldr	r4, =0x3ff
 	ands	r4, r4, r1, lsr #3		@ find maximum number on the way size
 	clz	r5, r4				@ find bit position of way size increment
-	ldr	r7, =0x7fff
-	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
 loop2:
-	mov	r9, r4				@ create working copy of max way size
+	ldr	r7, =0x7fff							@
+	ands	r7, r7, r1, lsr #13		@ extract max number of the index size
+	mov	r9, #0
+	mov	r3, r7
 loop3:
- ARM(	orr	r11, r10, r9, lsl r5	)	@ factor way and cache number into r11
- THUMB(	lsl	r6, r9, r5		)
+ ARM(	orr	r11, r10, r4, lsl r5	)	@ factor way and cache number into r11
+ THUMB(	lsl	r6, r4, r5		)				@
  THUMB(	orr	r11, r10, r6		)	@ factor way and cache number into r11
- ARM(	orr	r11, r11, r7, lsl r2	)	@ factor index number into r11
- THUMB(	lsl	r6, r7, r2		)
+ ARM(	orr	r11, r11, r9, lsl r2	)	@ factor index number into r11
+ THUMB(	lsl	r6, r9, r2		)				@
  THUMB(	orr	r11, r11, r6		)	@ factor index number into r11
 	mcr	p15, 0, r11, c7, c14, 2		@ clean & invalidate by set/way
-	subs	r9, r9, #1			@ decrement the way
-	bge	loop3
+	add	r9, #63
+	and	r9, r9, r3
 	subs	r7, r7, #1			@ decrement the index
+	bge	loop3
+	subs	r4, r4, #1			@ decrement the way
 	bge	loop2
-skip:
-	add	r10, r10, #2			@ increment cache number
-	cmp	r3, r10
-	bgt	loop1
-finished:
+	mov	pc, lr
+ENDPROC(v7_flush_dcache_current_level)
+
+/*
+ *	v7_flush_dcache_by_level()
+ *	r0	- cache level to be flushed
+ *
+ *	Flush the D-cache by specifed level like l1, l2 etc.
+ *	Corrupted registers: r0-r7, r9-r11 (r6 only in Thumb mode)
+ */
+ENTRY(v7_flush_dcache_by_level)
+	dmb					@ ensure ordering with previous memory accesses
+	mov	r8, lr				@ store the lr
+	mov	r10, r0				@ temp storage
+	sub	r10, r10, #1
+	mov	r10, r10, lsl #1
+	mrc	p15, 1, r0, c0, c0, 1		@ read clidr
+	bl	v7_flush_dcache_current_level
+finished1:
 	mov	r10, #0				@ swith back to cache level 0
 	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
 	dsb
 	isb
-	mov	pc, lr
-ENDPROC(v7_flush_dcache_all)
+	mov	pc, r8				@ restore lr
+ENDPROC(v7_flush_dcache_by_level)
 
 /*
  *	v7_flush_cache_all()
@@ -108,14 +145,14 @@ ENDPROC(v7_flush_dcache_all)
  *
  */
 ENTRY(v7_flush_kern_cache_all)
- ARM(	stmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
- THUMB(	stmfd	sp!, {r4-r7, r9-r11, lr}	)
+ ARM(	stmfd	sp!, {r4-r5, r7-r11, lr}	)
+ THUMB(	stmfd	sp!, {r4-r11, lr}	)
 	bl	v7_flush_dcache_all
 	mov	r0, #0
 	ALT_SMP(mcr	p15, 0, r0, c7, c1, 0)	@ invalidate I-cache inner shareable
 	ALT_UP(mcr	p15, 0, r0, c7, c5, 0)	@ I+BTB cache invalidate
- ARM(	ldmfd	sp!, {r4-r5, r7, r9-r11, lr}	)
- THUMB(	ldmfd	sp!, {r4-r7, r9-r11, lr}	)
+ ARM(	ldmfd	sp!, {r4-r5, r7-r11, lr}	)
+ THUMB(	ldmfd	sp!, {r4-r11, lr}	)
 	mov	pc, lr
 ENDPROC(v7_flush_kern_cache_all)
 
