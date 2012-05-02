@@ -69,7 +69,7 @@ static struct resource i2c_resources[][2] = {
 	}
 
 #define MAX_OMAP_I2C_HWMOD_NAME_LEN	16
-#define OMAP_I2C_MAX_CONTROLLERS 4
+#define OMAP_I2C_MAX_CONTROLLERS 5
 static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
 static struct platform_device omap_i2c_devices[] = {
 	I2C_DEV_BUILDER(1, i2c_resources[0], &i2c_pdata[0]),
@@ -89,6 +89,8 @@ static int __init omap_i2c_nr_ports(void)
 		ports = 3;
 	else if (cpu_is_omap44xx())
 		ports = 4;
+	else if (cpu_is_omap54xx())
+		ports = 5;
 
 	return ports;
 }
