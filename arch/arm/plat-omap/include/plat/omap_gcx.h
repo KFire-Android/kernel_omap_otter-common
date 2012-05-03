@@ -21,6 +21,7 @@
 
 struct omap_gcx_platform_data {
 	void *regbase;
+	bool (*was_context_lost)(struct device *dev);
 };
 
 #endif
