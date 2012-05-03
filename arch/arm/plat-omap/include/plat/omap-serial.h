@@ -42,10 +42,10 @@
 #define OMAP_UART_WER_MOD_WKUP	0X7F
 
 /* Enable XON/XOFF flow control on output */
-#define OMAP_UART_SW_TX		0x04
+#define OMAP_UART_SW_TX		0x8
 
 /* Enable XON/XOFF flow control on input */
-#define OMAP_UART_SW_RX		0x04
+#define OMAP_UART_SW_RX		0x2
 
 #define OMAP_UART_SYSC_RESET	0X07
 #define OMAP_UART_TCR_TRIG	0X0F
@@ -54,7 +54,7 @@
 
 #define OMAP_UART_DMA_CH_FREE	-1
 
-#define OMAP_MAX_HSUART_PORTS	4
+#define OMAP_MAX_HSUART_PORTS	6
 
 #define MSR_SAVE_FLAGS		UART_MSR_ANY_DELTA
 
@@ -133,9 +133,8 @@ struct uart_omap_port {
 	unsigned char		msr_saved_flags;
 	char			name[20];
 	unsigned long		port_activity;
-	u32			context_loss_cnt;
+	int			context_loss_cnt;
 	u32			errata;
-	u8			wakeups_enabled;
 
 	u32			features;
 
