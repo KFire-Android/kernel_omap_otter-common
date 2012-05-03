@@ -510,6 +510,7 @@ void gc_reset_gpu(void)
 
 enum gcerror gcpwr_enable_clock(enum gcpower prevstate)
 {
+	bool ctxlost = g_gcxplat->was_context_lost(gcdevice.dev);
 	if (!g_clockenabled) {
 		/* Enable the clock. */
 		pm_runtime_get_sync(gcdevice.dev);
@@ -519,12 +520,20 @@ enum gcerror gcpwr_enable_clock(enum gcpower prevstate)
 
 		/* Clock enabled. */
 		g_clockenabled = true;
+	} else if (ctxlost) {
+		u32 reg;
+		dev_info(gcdevice.dev, "unexpected context\n");
+		reg = gc_read_reg(GC_GP_OUT0_Address);
+		if (reg) {
+			dev_info(gcdevice.dev, "reset gchold\n");
+			gc_write_reg(GC_GP_OUT0_Address, 0);
+		}
 	}
 	GCPRINT(GCDBGFILTER, GCZONE_POWER, GC_MOD_PREFIX
 		"clock %s.\n",
 		__func__, __LINE__, g_clockenabled ? "enabled" : "disabled");
 
-	if (prevstate == GCPWR_UNKNOWN)
+	if (ctxlost || prevstate == GCPWR_UNKNOWN)
 		gc_reset_gpu();
 
 	return GCERR_NONE;
@@ -955,8 +964,9 @@ static int gc_probe(struct platform_device *pdev)
 	g_irqenabled = false;
 
 	gcdevice.dev = &pdev->dev;
-	pm_runtime_enable(gcdevice.dev);
 
+	pm_runtime_enable(gcdevice.dev);
+	(void)g_gcxplat->was_context_lost(gcdevice.dev);
 	return 0;
 }
 

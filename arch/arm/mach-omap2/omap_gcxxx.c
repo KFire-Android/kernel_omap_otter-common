@@ -21,12 +21,15 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 #include <plat/omap_gcx.h>
+#include <plat/omap-pm.h>
 #include "prcm44xx.h"
 #include "cminst44xx.h"
 #include "cm2_44xx.h"
 #include "cm-regbits-44xx.h"
 
-static struct omap_gcx_platform_data omap_gcxxx;
+static struct omap_gcx_platform_data omap_gcxxx = {
+	.was_context_lost = omap_pm_was_context_lost,
+};
 
 struct omap_device_pm_latency omap_gcxxx_latency[] = {
 	{

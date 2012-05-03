@@ -1260,6 +1260,8 @@ static struct omap_hwmod omap44xx_bb2d_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_reg = OMAP4470_CM_DSS_BB2D_CLKCTRL,
+			/* FIXME no BB2D def*/
+			.context_reg = OMAP4430_RM_DSS_DEISS_CONTEXT,
 		},
 	},
 	.slaves		= omap44xx_bb2d_slaves,
