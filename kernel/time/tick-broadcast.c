@@ -346,7 +346,8 @@ int tick_resume_broadcast(void)
 						     tick_get_broadcast_mask());
 			break;
 		case TICKDEV_MODE_ONESHOT:
-			broadcast = tick_resume_broadcast_oneshot(bc);
+			if (!cpumask_empty(tick_get_broadcast_mask()))
+				broadcast = tick_resume_broadcast_oneshot(bc);
 			break;
 		}
 	}
@@ -375,7 +376,6 @@ static int tick_broadcast_set_event(ktime_t expires, int force)
 
 	if (bc->mode != CLOCK_EVT_MODE_ONESHOT)
 		clockevents_set_mode(bc, CLOCK_EVT_MODE_ONESHOT);
-
 
 	return clockevents_program_event(bc, expires, force);
 }
