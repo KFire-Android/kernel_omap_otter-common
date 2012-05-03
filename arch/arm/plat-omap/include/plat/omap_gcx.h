@@ -22,6 +22,10 @@
 struct omap_gcx_platform_data {
 	void *regbase;
 	bool (*was_context_lost)(struct device *dev);
+	/* device scale */
+	int (*scale_dev)(struct device *dev, unsigned long freq);
+	/* bandwith */
+	int (*set_bw)(struct device *dev, unsigned long v);
 };
 
 #endif
