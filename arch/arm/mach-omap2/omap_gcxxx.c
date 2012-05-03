@@ -17,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/gccore.h>
+#include <linux/opp.h>
 
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -26,9 +27,15 @@
 #include "cminst44xx.h"
 #include "cm2_44xx.h"
 #include "cm-regbits-44xx.h"
+#include "dvfs.h"
+
+static int gcxxx_scale_dev(struct device *dev, unsigned long val);
+static int gcxxx_set_l3_bw(struct device *dev, unsigned long val);
 
 static struct omap_gcx_platform_data omap_gcxxx = {
 	.was_context_lost = omap_pm_was_context_lost,
+	.scale_dev = gcxxx_scale_dev,
+	.set_bw = gcxxx_set_l3_bw,
 };
 
 struct omap_device_pm_latency omap_gcxxx_latency[] = {
@@ -38,6 +45,16 @@ struct omap_device_pm_latency omap_gcxxx_latency[] = {
 		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
 	}
 };
+
+static int gcxxx_scale_dev(struct device *dev, unsigned long val)
+{
+	return omap_device_scale(dev, dev, val);
+}
+
+static int gcxxx_set_l3_bw(struct device *dev, unsigned long val)
+{
+	return omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, val);
+}
 
 int __init gcxxx_init(void)
 {
@@ -71,7 +88,7 @@ int __init gcxxx_init(void)
 
 	return retval;
 }
-device_initcall(gcxxx_init);
+arch_initcall(gcxxx_init);
 
 MODULE_AUTHOR("David Sin");
 MODULE_DESCRIPTION("omap gcxxx: omap device registration");
