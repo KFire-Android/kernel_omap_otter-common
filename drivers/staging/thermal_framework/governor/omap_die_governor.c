@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/suspend.h>
+#include <linux/debugfs.h>
 
 #include <linux/thermal_framework.h>
 
@@ -54,6 +55,7 @@ struct omap_die_governor {
 	int cooling_level;
 	int hotspot_temp_upper;
 	int hotspot_temp_lower;
+	int hotspot_temp;
 	int pcb_temp;
 	int sensor_temp;
 	int absolute_delta;
@@ -203,6 +205,7 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(int sensor_temp)
 			omap_gov->pcb_temp, omap_gov->absolute_delta,
 			sensor_temp + absolute_delta);
 
+	omap_gov->hotspot_temp = sensor_temp + absolute_delta;
 	return sensor_temp + absolute_delta;
 }
 
@@ -434,8 +437,47 @@ static int omap_die_pm_notifier_cb(struct notifier_block *notifier,
 	return NOTIFY_DONE;
 }
 
+/* debugfs hooks for omap die gov */
+static int option_get(void *data, u64 *val)
+{
+	u32 *option = data;
+
+	*val = *option;
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_fops, option_get, NULL, "%llu\n");
+
+#ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
+static int omapdie_gov_register_debug_entries(struct thermal_dev *gov,
+					struct dentry *d)
+{
+
+	(void) debugfs_create_file("cooling_level",
+			S_IRUGO, d, &(omap_gov->cooling_level),
+			&omap_die_gov_fops);
+	(void) debugfs_create_file("hotspot_temp_upper",
+			S_IRUGO, d, &(omap_gov->hotspot_temp_upper),
+			&omap_die_gov_fops);
+	(void) debugfs_create_file("hotspot_temp_lower",
+			S_IRUGO, d, &(omap_gov->hotspot_temp_lower),
+			&omap_die_gov_fops);
+	(void) debugfs_create_file("hotspot_temp",
+			S_IRUGO, d, &(omap_gov->hotspot_temp),
+			&omap_die_gov_fops);
+	(void) debugfs_create_file("avg_cpu_sensor_temp",
+			S_IRUGO, d, &(omap_gov->avg_cpu_sensor_temp),
+			&omap_die_gov_fops);
+	return 0;
+}
+#endif
+
 static struct thermal_dev_ops omap_gov_ops = {
 	.process_temp = omap_process_cpu_temp,
+#ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
+	.register_debug_entries = omapdie_gov_register_debug_entries,
+#endif
+
 };
 
 static struct notifier_block omap_die_pm_notifier = {
@@ -473,6 +515,7 @@ static int __init omap_die_governor_init(void)
 
 	omap_gov->average_period = NORMAL_TEMP_MONITORING_RATE;
 	omap_gov->avg_is_valid = 0;
+	omap_gov->hotspot_temp = 0;
 
 	if (register_pm_notifier(&omap_die_pm_notifier))
 		pr_err("%s: omap_die pm registration failed!\n", __func__);
