@@ -54,8 +54,8 @@ static struct iommu_platform_data omap3_devices_data[] = {
 
 #ifdef CONFIG_ARCH_OMAP4
 
-#define SET_DSP_CONSTRAINT	10
-#define SET_MPU_CORE_CONSTRAINT	10
+#define SET_DSP_CONSTRAINT	400
+#define SET_MPU_CORE_CONSTRAINT	400
 
 static struct iommu_platform_data omap4_devices_data[] = {
 	{
