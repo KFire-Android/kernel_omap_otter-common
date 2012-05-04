@@ -508,7 +508,13 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
 #endif
 		}
 
-		ret = request_threaded_irq(client->irq,
+		ret = gpio_request_one(client->irq, GPIOF_IN, "pca953x");
+		if (ret) {
+			dev_err(&client->dev, "gpio request failure\n");
+			goto out_failed;
+		}
+
+		ret = request_threaded_irq(gpio_to_irq(client->irq),
 					   NULL,
 					   pca953x_irq_handler,
 					   IRQF_TRIGGER_LOW | IRQF_ONESHOT,
