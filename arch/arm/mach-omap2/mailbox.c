@@ -41,7 +41,7 @@
 #define MBOX_NR_REGS                   2
 #define OMAP4_MBOX_NR_REGS             3
 
-#define SET_MPU_CORE_CONSTRAINT		10
+#define SET_MPU_CORE_CONSTRAINT		400
 
 static void __iomem *mbox_base;
 
