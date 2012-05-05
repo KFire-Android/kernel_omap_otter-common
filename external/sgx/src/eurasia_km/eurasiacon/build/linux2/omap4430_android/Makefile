@@ -58,7 +58,7 @@ DISPLAY_CONTROLLER := omaplfb
 PVR_SYSTEM := omap4
 HAL_VARIANT := $(PVR_SYSTEM)
 
-KERNEL_CROSS_COMPILE ?= arm-eabi-
+KERNEL_CROSS_COMPILE ?= arm-none-linux-gnueabi-
 
 include ../common/android/paths.mk
 include ../common/android/armv7-a.mk
