@@ -35,6 +35,12 @@ void __init omap4_reserve(void)
 	omap_reserve();
 }
 
+void __init omap5_reserve(void)
+{
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
+	omap_reserve();
+}
+
 void __init omap_reserve(void)
 {
 	omap_dsp_reserve_sdram_memblock();

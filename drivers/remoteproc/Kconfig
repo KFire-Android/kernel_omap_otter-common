@@ -20,8 +20,8 @@ config OMAP_REMOTEPROC
 	select OMAP2PLUS_MBOX
 	select RPMSG
 	help
-	  Support for OMAP's remote processors (dual Cortex-M3
-	  and DSP on OMAP4) via the remote processor framework.
+	  Support for OMAP's remote processors (dual Cortex-M3/M4
+	  and DSP) via the remote processor framework.
 
 	  Currently only supported on OMAP4.
 
@@ -37,9 +37,9 @@ config OMAP_REMOTEPROC_IPU
 	help
 	  Say Y here if you want to enable OMAP's IPU remote processor.
 
-	  This option controls only the dual Cortex-M3 processor sub-system.
-	  You would want to say y here usually, as this is the sub-system
-	  where typically video & imaging codec control s/w is offloaded.
+	  This option controls only the dual Cortex-M3/M4 processor sub-system.
+	  You would want to say y here usually, as this is the sub-system where
+	  typically video & imaging codec control s/w is offloaded.
 
 	  It's safe to say n here if you're not interested in multimedia
 	  offloading (by IPU) or just want a bare minimum kernel.

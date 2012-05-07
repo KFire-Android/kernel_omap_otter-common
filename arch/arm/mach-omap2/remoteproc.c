@@ -357,7 +357,8 @@ void __init omap_rproc_reserve_cma(int platform_type)
 	int rproc_size = 0;
 	int i, ret;
 
-	if (platform_type == RPROC_CMA_OMAP4) {
+	if ((platform_type == RPROC_CMA_OMAP4) ||
+	    (platform_type == RPROC_CMA_OMAP5)) {
 		rproc_pdev_data = omap4_rproc_pdev_data;
 		rproc_size = ARRAY_SIZE(omap4_rproc_pdev_data);
 	} else {
@@ -397,14 +398,16 @@ static int __init omap_rproc_init(void)
 {
 	struct omap_hwmod *oh;
 	struct omap_device *od;
-	int i, ret = 0, oh_count;
+	int i, j, ret = 0, oh_count;
 
-	if (!cpu_is_omap44xx())
+	if (!cpu_is_omap44xx() && !soc_is_omap54xx())
 		return 0;
 
 	for (i = 0; i < ARRAY_SIZE(omap4_rproc_pdev_data); i++) {
 		const char *oh_name = omap4_rproc_data[i].oh_name;
 		struct platform_device *pdev = omap4_rproc_pdev_data[i].pdev;
+		struct omap_rproc_timers_info *timers =
+						omap4_rproc_data[i].timers;
 		oh_count = 0;
 
 		if (!omap4_rproc_pdev_data[i].enabled) {
@@ -420,6 +423,18 @@ static int __init omap_rproc_init(void)
 			continue;
 		}
 		oh_count++;
+
+		/*
+		 * adjust the PWM capability for the additional timers
+		 * in OMAP5, so that the exact capabilities are mentioned
+		 * for each of OMAP4 and OMAP5. This is done dynamically
+		 * to avoid creating separate static data for OMAP5.
+		 */
+		for (j = 0; j < omap4_rproc_data[i].timers_cnt; j++) {
+			if (soc_is_omap54xx() && timers &&
+				(timers[j].id == 5 || timers[j].id == 6))
+				timers[j].cap |= OMAP_TIMER_HAS_PWM;
+		}
 
 		omap4_rproc_data[i].device_enable = omap_rproc_device_enable;
 		omap4_rproc_data[i].device_shutdown =

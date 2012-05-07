@@ -81,5 +81,6 @@ static inline void __init omap_rproc_reserve_cma(int platform_type)
  * the appropriate SoC-specific CMA memory size and locations.
  */
 #define RPROC_CMA_OMAP4		1
+#define RPROC_CMA_OMAP5		2
 
 #endif /* _PLAT_REMOTEPROC_H */

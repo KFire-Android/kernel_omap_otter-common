@@ -173,7 +173,7 @@ static const char *omap5_boards_compat[] __initdata = {
 };
 
 DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
-	.reserve	= omap_reserve,
+	.reserve	= omap5_reserve,
 	.smp		= smp_ops(omap4_smp_ops),
 	.map_io		= omap5_map_io,
 	.init_early	= omap5_init_early,
