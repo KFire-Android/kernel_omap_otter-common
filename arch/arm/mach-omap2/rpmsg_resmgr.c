@@ -69,14 +69,14 @@ static int __init omap2_rprm_init(void)
 	if (ret)
 		goto err;
 
-	ret =  platform_device_register(pdev);
+	ret =  platform_device_add(pdev);
 	if (ret)
 		goto err;
 
 	return 0;
 
 err:
-	platform_device_del(pdev);
+	platform_device_put(pdev);
 	return ret;
 }
 device_initcall(omap2_rprm_init);
