@@ -39,6 +39,7 @@
 #include <plat/usb.h>
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
+#include <plat/remoteproc.h>
 #include <video/omapdss.h>
 #include <video/omap-panel-nokia-dsi.h>
 #include <video/omap-panel-picodlp.h>
@@ -972,10 +973,16 @@ static void __init omap_4430sdp_init(void)
 	omap_4430sdp_display_init();
 }
 
+static void __init omap_4430sdp_reserve(void)
+{
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+	omap_reserve();
+}
+
 MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.atag_offset	= 0x100,
-	.reserve	= omap_reserve,
+	.reserve	= omap_4430sdp_reserve,
 	.map_io		= omap4_map_io,
 	.init_early	= omap4430_init_early,
 	.init_irq	= gic_init_irq,

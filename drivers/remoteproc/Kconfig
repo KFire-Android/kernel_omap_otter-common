@@ -49,24 +49,33 @@ config OMAP_REMOTEPROC_DSP
 	  It's safe to say n here if you're not interested in offloading
 	  audio or any other algorithm (by DSP) or just want a bare minimum kernel.
 
-# Amount of CMA memory to reserve for OMAP's dual-M3 "Ducati" sub-system.
+# Amount of CMA memory to reserve for OMAP's remoteproc sub-system.
 # We need quite much. Fortunately, CMA makes sure this memory isn't
 # wasted in case we're not loading the remote processors.
-config OMAP_DUCATI_CMA_SIZE
-	hex "Ducati M3 physically contiguous memory pool size (in bytes)"
+config OMAP4_IPU_CMA_SIZE
+	hex "Cortex M3 physically contiguous memory pool size (in bytes)"
 	depends on OMAP_REMOTEPROC_IPU
 	default 0x6500000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)
-	  for OMAP's dual M3 "Ducati" sub-system. Vast majority of this
+	  for OMAP4's dual Cortex-M3 sub-system. Vast majority of this
 	  memory isn't wasted in case the M3 sub-system isn't loaded.
 
-config OMAP_TESLA_CMA_SIZE
-	hex "Tesla dsp physically contiguous memory pool size (in bytes)"
+config OMAP5_IPU_CMA_SIZE
+	hex "Cortex M4 physically contiguous memory pool size (in bytes)"
+	depends on OMAP_REMOTEPROC_IPU
+	default 0xA100000
+	help
+	  Allocate a specified size of physically contiguous memory (CMA)
+	  for OMAP's dual M4 sub-system. Vast majority of this
+	  memory isn't wasted in case the M4 sub-system isn't loaded.
+
+config OMAP_DSP_CMA_SIZE
+	hex "Dsp physically contiguous memory pool size (in bytes)"
 	depends on OMAP_REMOTEPROC_DSP
 	default 0x400000
 	help
 	  Allocate a specified size of physically contiguous memory (CMA)
-	  for OMAP's dsp "Tesla" sub-system. Vast majority of this
+	  for OMAP's dsp sub-system. Vast majority of this
 	  memory isn't wasted in case the Dsp sub-system isn't loaded.
 endmenu
