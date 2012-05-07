@@ -169,7 +169,7 @@ static int __init omap_rproc_init(void)
 	int i, ret = 0, oh_count;
 
 	/* names like ipu_cx/dsp_cx might show up on other OMAPs, too */
-	if (!cpu_is_omap44xx())
+	if (!cpu_is_omap44xx() && !cpu_is_omap54xx())
 		return 0;
 
 	/* build the remote proc devices */
