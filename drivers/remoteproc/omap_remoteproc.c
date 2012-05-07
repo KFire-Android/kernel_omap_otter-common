@@ -103,6 +103,10 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 		dev_info(dev, "received echo reply from %s\n", name);
 		break;
 	default:
+		if (msg >= RP_MBOX_END_MSG) {
+			dev_info(dev, "Dropping unknown message %x", msg);
+			return NOTIFY_DONE;
+		}
 		d = kmalloc(sizeof(*d), GFP_KERNEL);
 		if (!d)
 			break;
