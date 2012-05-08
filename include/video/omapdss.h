@@ -429,6 +429,7 @@ struct omap_overlay_info {
 	u16 out_height;	/* if 0, out_height == height */
 	u8 global_alpha;
 	u8 pre_mult_alpha;
+	u8 wb_source;
 	enum omap_overlay_zorder zorder;
 	u16 min_x_decim, max_x_decim, min_y_decim, max_y_decim;
 	struct omap_dss_cconv_coefs cconv;
