@@ -15,14 +15,12 @@
 #ifndef GCDEBUG_H
 #define GCDEBUG_H
 
-struct dentry;
-
-void gc_debug_init(struct dentry *debug_root);
+void gc_debug_init(void);
+void gc_debug_shutdown(void);
 
 void gc_debug_poweroff_cache(void);
 void gc_debug_cache_gpu_status_from_irq(unsigned int acknowledge);
 
 void gc_debug_blt(int srccount, int dstWidth, int dstHeight);
-
 
 #endif

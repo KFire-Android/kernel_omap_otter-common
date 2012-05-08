@@ -4,4 +4,5 @@ gccore-y := \
 	gcmain.o \
 	gcmmu.o \
 	gccmdbuf.o \
-	gcdebug.o
+	gcdebug.o \
+	gcdbglog.o

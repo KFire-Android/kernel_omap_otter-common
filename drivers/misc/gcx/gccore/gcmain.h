@@ -15,6 +15,7 @@
 #ifndef GCMAIN_H
 #define GCMAIN_H
 
+#include <linux/gcx.h>
 #include <linux/gccore.h>
 
 #define GC_DEV_NAME	"gccore"
@@ -66,8 +67,6 @@ struct gccorecontext {
 	int opp_count;
 	unsigned long *opp_freqs;
 	unsigned long  cur_freq;
-
-	struct dentry *dbgroot;		/* Debug FS enrey. */
 };
 
 /*
