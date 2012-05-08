@@ -140,4 +140,22 @@ static inline void omap_pm_setup_oscillator(u32 tstart, u32 tshut) { }
 static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { }
 #endif
 
+#ifdef CONFIG_PM
+extern bool omap_pm_is_ready_status;
+/**
+ * omap_pm_is_ready() - tells if OMAP pm framework is done it's initialization
+ *
+ * In few cases, to sequence operations properly, we'd like to know if OMAP's PM
+ * framework has completed all it's expected initializations.
+ */
+static inline bool omap_pm_is_ready(void)
+{
+	return omap_pm_is_ready_status;
+}
+#else
+static inline bool omap_pm_is_ready(void)
+{
+	return false;
+}
+#endif
 #endif

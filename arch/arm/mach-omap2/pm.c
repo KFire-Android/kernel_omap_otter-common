@@ -51,6 +51,8 @@ static struct omap2_oscillator oscillator = {
 	.shutdown_time = ULONG_MAX,
 };
 
+bool omap_pm_is_ready_status;
+
 void omap_pm_setup_oscillator(u32 tstart, u32 tshut)
 {
 	oscillator.startup_time = tstart;
@@ -418,6 +420,10 @@ static int __init omap2_common_pm_late_init(void)
 
 	/* Smartreflex device init */
 	omap_devinit_smartreflex();
+
+	omap_pm_is_ready_status = true;
+	/* let the other CPU know as well */
+	smp_wmb();
 
 #ifdef CONFIG_SUSPEND
 	suspend_set_ops(&omap_pm_ops);
