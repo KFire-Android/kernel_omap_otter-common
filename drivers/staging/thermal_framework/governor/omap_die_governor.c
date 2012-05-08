@@ -62,6 +62,7 @@ struct omap_die_governor {
 	int average_period;
 	int avg_cpu_sensor_temp;
 	int avg_is_valid;
+	int alert_threshold;
 	struct delayed_work average_cpu_sensor_work;
 };
 
@@ -303,10 +304,11 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 		omap_thermal_zones[PANIC_ZONE - 1].temp_upper = temp_upper;
 		zone = PANIC_ZONE;
 	} else if (cpu_temp < (OMAP_PANIC_TEMP - HYSTERESIS_VALUE)) {
-		if (cpu_temp >= OMAP_ALERT_TEMP) {
+		if (cpu_temp >= omap_gov->alert_threshold) {
 			set_cooling_level = omap_gov->panic_zone_reached == 0;
 			zone = ALERT_ZONE;
-		} else if (cpu_temp < (OMAP_ALERT_TEMP - HYSTERESIS_VALUE)) {
+		} else if (cpu_temp < (omap_gov->alert_threshold -
+						HYSTERESIS_VALUE)) {
 			if (cpu_temp >= OMAP_MONITOR_TEMP) {
 				omap_gov->panic_zone_reached = 0;
 				zone = MONITOR_ZONE;
@@ -448,11 +450,48 @@ static int option_get(void *data, u64 *val)
 }
 DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_fops, option_get, NULL, "%llu\n");
 
+static int option_alert_set(void *data, u64 val)
+{
+	u32 *option = data;
+	int die_temp_lower = 0;
+	int die_temp_upper = 0;
+
+	if (val <= OMAP_MONITOR_TEMP) {
+		pr_err("Invalid threshold: ALERT:%d is <= MONITOR:%d\n",
+			(int)val, OMAP_MONITOR_TEMP);
+		return -EINVAL;
+	} else if (val >= OMAP_PANIC_TEMP) {
+		pr_err("Invalid threshold: ALERT:%d is >= PANIC:%d\n",
+			(int)val, OMAP_PANIC_TEMP);
+		return -EINVAL;
+	}
+	/* Change the Threshold values */
+	*option = val;
+
+	/*
+	 * Reconfigure the current temperature thresholds according
+	 * to the new user space TALERT thresholds.
+	 */
+	die_temp_lower = hotspot_temp_to_sensor_temp(
+		omap_gov->hotspot_temp_lower);
+	die_temp_upper = hotspot_temp_to_sensor_temp(
+		omap_gov->hotspot_temp_upper);
+	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+		die_temp_lower, die_temp_upper);
+
+	omap_gov->sensor_temp = thermal_request_temp(omap_gov->temp_sensor);
+	thermal_sensor_set_temp(omap_gov->temp_sensor);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(omap_die_gov_alert_fops, option_get, option_alert_set,
+			"%llu\n");
+
 #ifdef CONFIG_THERMAL_FRAMEWORK_DEBUG
 static int omapdie_gov_register_debug_entries(struct thermal_dev *gov,
 					struct dentry *d)
 {
-
+	/* Read Only - Debug properties of die gov */
 	(void) debugfs_create_file("cooling_level",
 			S_IRUGO, d, &(omap_gov->cooling_level),
 			&omap_die_gov_fops);
@@ -468,6 +507,12 @@ static int omapdie_gov_register_debug_entries(struct thermal_dev *gov,
 	(void) debugfs_create_file("avg_cpu_sensor_temp",
 			S_IRUGO, d, &(omap_gov->avg_cpu_sensor_temp),
 			&omap_die_gov_fops);
+
+	/* Read  and Write properties of die gov */
+	(void) debugfs_create_file("alert_threshold",
+			S_IRUGO | S_IWUSR, d, &(omap_gov->alert_threshold),
+			&omap_die_gov_alert_fops);
+
 	return 0;
 }
 #endif
@@ -516,6 +561,7 @@ static int __init omap_die_governor_init(void)
 	omap_gov->average_period = NORMAL_TEMP_MONITORING_RATE;
 	omap_gov->avg_is_valid = 0;
 	omap_gov->hotspot_temp = 0;
+	omap_gov->alert_threshold = OMAP_ALERT_TEMP;
 
 	if (register_pm_notifier(&omap_die_pm_notifier))
 		pr_err("%s: omap_die pm registration failed!\n", __func__);
