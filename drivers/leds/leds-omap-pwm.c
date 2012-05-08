@@ -363,6 +363,8 @@ static int omap_pwm_led_probe(struct platform_device *pdev)
 			goto error_blink3;
 
 	}
+	
+	omap_pwm_led_set(&led->cdev, 200);
 
 	return 0;
 
