@@ -367,6 +367,8 @@ struct backlight_device *backlight_device_register(const char *name,
 		new_bd->props.type = BACKLIGHT_RAW;
 	}
 
+	new_bd->props.max_thermal_brightness = new_bd->props.max_brightness;
+
 	rc = device_register(&new_bd->dev);
 	if (rc) {
 		kfree(new_bd);
