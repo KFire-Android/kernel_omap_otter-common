@@ -9,6 +9,7 @@
 #define PWRCTL2		0xc2
 #define PWRCTL3		0xc3
 #define PWRCTL4		0xc4
+#define BLCTL		0xc8
 #define RGAMMAP		0xd0
 #define RGAMMAN		0xd1
 #define GGAMMAP		0xd2

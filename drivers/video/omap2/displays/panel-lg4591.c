@@ -160,6 +160,7 @@ static struct lg4591_reg init_seq4[] = {
 
 static struct lg4591_reg brightness_ctrl[] = {
 	{ { WRCTRLD, 0x24}, 2 },
+	{ { BLCTL, 0x82, 0x24, 0x01, 0x11}, 5 },
 };
 
 static struct lg4591_reg display_on[] = {
