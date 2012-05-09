@@ -154,13 +154,35 @@ void omap_vc_post_scale(struct voltagedomain *voltdm,
 			unsigned long target_volt,
 			u8 target_vsel, u8 current_vsel)
 {
+	struct omap_vc_channel *vc;
 	u32 smps_steps = 0, smps_delay = 0;
+	u8 on_vsel, onlp_vsel;
+	u32 val;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_err("%s bad voldm\n", __func__);
+		return;
+	}
+
+	vc = voltdm->vc;
+	if (IS_ERR_OR_NULL(vc)) {
+		pr_err("%s voldm=%s bad vc\n", __func__, voltdm->name);
+		return;
+	}
 
 	smps_steps = abs(target_vsel - current_vsel);
 	/* SMPS slew rate / step size. 2us added as buffer. */
 	smps_delay = DIV_ROUND_UP(smps_steps * voltdm->pmic->step_size,
 				  voltdm->pmic->slew_rate) + 2;
 	udelay(smps_delay);
+
+	/* Set up the on voltage for wakeup from lp and OFF */
+	onlp_vsel = target_vsel;
+	on_vsel = target_vsel;
+	val = (on_vsel << vc->common->cmd_on_shift) |
+	       (onlp_vsel << vc->common->cmd_onlp_shift) |
+	       vc->setup_voltage_common;
+	voltdm->write(val, vc->cmdval_reg);
 }
 
 /* vc_bypass_scale - VC bypass method of voltage scaling */
@@ -631,11 +653,12 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
 	onlp_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->onlp);
 	ret_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->ret);
 	off_vsel = omap_vc_calc_vsel(voltdm, voltdm->vc_param->off);
-
-	val = ((on_vsel << vc->common->cmd_on_shift) |
-	       (onlp_vsel << vc->common->cmd_onlp_shift) |
+	vc->setup_voltage_common =
 	       (ret_vsel << vc->common->cmd_ret_shift) |
-	       (off_vsel << vc->common->cmd_off_shift));
+	       (off_vsel << vc->common->cmd_off_shift);
+	val = (on_vsel << vc->common->cmd_on_shift) |
+	       (onlp_vsel << vc->common->cmd_onlp_shift) |
+	       vc->setup_voltage_common;
 	voltdm->write(val, vc->cmdval_reg);
 	vc->cfg_channel |= vc_cfg_bits->cmd;
 

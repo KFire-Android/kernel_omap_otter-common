@@ -67,6 +67,7 @@ struct omap_vc_common {
  * @cmd_reg_addr: command configuration register address
  * @setup_time: setup time (in sys_clk cycles) of regulator for this channel
  * @cfg_channel: current value of VC channel configuration register
+ * @setup_voltage_common: voltage command reg value for RET and OFF mode
  * @i2c_high_speed: whether or not to use I2C high-speed mode
  *
  * @common: pointer to VC common data for this platform
@@ -87,6 +88,7 @@ struct omap_vc_channel {
 	u16 volt_reg_addr;
 	u16 cmd_reg_addr;
 	u8 cfg_channel;
+	u32 setup_voltage_common;
 	bool i2c_high_speed;
 
 	/* register access data */
