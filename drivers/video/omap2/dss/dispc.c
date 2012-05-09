@@ -3306,6 +3306,8 @@ static void _omap_dispc_initial_config(void)
 	if (dss_has_feature(FEAT_FUNCGATED))
 		REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
 
+	REG_FLD_MOD(DISPC_CONFIG, 1, 17, 17);
+
 	_dispc_setup_color_conv_coef();
 
 	dispc_set_loadmode(OMAP_DSS_LOAD_FRAME_ONLY);
