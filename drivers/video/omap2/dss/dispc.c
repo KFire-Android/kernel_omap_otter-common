@@ -572,39 +572,20 @@ static void dispc_ovl_set_scale_coef(enum omap_plane plane, int fir_hinc,
 	}
 }
 
-static void _dispc_setup_color_conv_coef(void)
+void dispc_mgr_setup_color_conv_coef(enum omap_plane plane,
+		const struct omap_dss_cconv_coefs *ct)
 {
-	int i;
-	const struct color_conv_coef {
-		int  ry,  rcr,  rcb,   gy,  gcr,  gcb,   by,  bcr,  bcb;
-		int  full_range;
-	}  ctbl_bt601_5 = {
-		298,  409,    0,  298, -208, -100,  298,    0,  517, 0,
-	};
-
-	const struct color_conv_coef *ct;
-
 #define CVAL(x, y) (FLD_VAL(x, 26, 16) | FLD_VAL(y, 10, 0))
 
-	ct = &ctbl_bt601_5;
-
-	for (i = 1; i < dss_feat_get_num_ovls(); i++) {
-		dispc_write_reg(DISPC_OVL_CONV_COEF(i, 0),
-			CVAL(ct->rcr, ct->ry));
-		dispc_write_reg(DISPC_OVL_CONV_COEF(i, 1),
-			CVAL(ct->gy,  ct->rcb));
-		dispc_write_reg(DISPC_OVL_CONV_COEF(i, 2),
-			CVAL(ct->gcb, ct->gcr));
-		dispc_write_reg(DISPC_OVL_CONV_COEF(i, 3),
-			CVAL(ct->bcr, ct->by));
-		dispc_write_reg(DISPC_OVL_CONV_COEF(i, 4),
-			CVAL(0, ct->bcb));
-
-		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(i), ct->full_range,
-			11, 11);
-	}
+	dispc_write_reg(DISPC_OVL_CONV_COEF(plane, 0), CVAL(ct->rcr, ct->ry));
+	dispc_write_reg(DISPC_OVL_CONV_COEF(plane, 1), CVAL(ct->gy,  ct->rcb));
+	dispc_write_reg(DISPC_OVL_CONV_COEF(plane, 2), CVAL(ct->gcb, ct->gcr));
+	dispc_write_reg(DISPC_OVL_CONV_COEF(plane, 3), CVAL(ct->bcr, ct->by));
+	dispc_write_reg(DISPC_OVL_CONV_COEF(plane, 4), CVAL(0, ct->bcb));
 
 #undef CVAL
+
+	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), ct->full_range, 11, 11);
 }
 
 
@@ -1932,6 +1913,9 @@ int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 	dispc_ovl_setup_global_alpha(plane, global_alpha);
 
 	dispc_ovl_enable_replication(plane, replication);
+
+	if (plane != OMAP_DSS_GFX)
+		dispc_mgr_setup_color_conv_coef(plane, &oi->cconv);
 
 	return 0;
 }
@@ -3321,8 +3305,6 @@ static void _omap_dispc_initial_config(void)
 		REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
 
 	REG_FLD_MOD(DISPC_CONFIG, 1, 17, 17);
-
-	_dispc_setup_color_conv_coef();
 
 	dispc_set_loadmode(OMAP_DSS_LOAD_FRAME_ONLY);
 
