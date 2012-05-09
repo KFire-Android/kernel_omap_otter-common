@@ -83,26 +83,30 @@ static int thermal_debug_show_domain(struct seq_file *s, void *data)
 	struct thermal_domain *domain = (struct thermal_domain *)s->private;
 	struct thermal_dev *tdev;
 
-	mutex_lock(&thermal_domain_list_lock);
 	seq_printf(s, "Domain name: %s\n", domain->domain_name);
 	seq_printf(s, "Temperature sensor:\n");
 	if (domain->temp_sensor) {
 		seq_printf(s, "\tName: %s\n", domain->temp_sensor->name);
 		seq_printf(s, "\tCurrent temperature: %d\n",
 			thermal_device_call(domain->temp_sensor, report_temp));
+		mutex_lock(&thermal_domain_list_lock);
 		thermal_device_call(domain->temp_sensor, debug_report, s);
+		mutex_unlock(&thermal_domain_list_lock);
 	}
 	seq_printf(s, "Governor:\n");
 	if (domain->governor) {
 		seq_printf(s, "\tName: %s\n", domain->governor->name);
+		mutex_lock(&thermal_domain_list_lock);
 		thermal_device_call(domain->temp_sensor, debug_report, s);
+		mutex_unlock(&thermal_domain_list_lock);
 	}
 	seq_printf(s, "Cooling agents:\n");
 	list_for_each_entry(tdev, &domain->cooling_agents, node) {
 		seq_printf(s, "\tName: %s\n", tdev->name);
+		mutex_lock(&thermal_domain_list_lock);
 		thermal_device_call(domain->temp_sensor, debug_report, s);
+		mutex_unlock(&thermal_domain_list_lock);
 	}
-	mutex_unlock(&thermal_domain_list_lock);
 
 	return 0;
 }
