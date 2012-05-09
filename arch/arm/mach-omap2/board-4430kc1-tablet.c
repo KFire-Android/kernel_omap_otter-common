@@ -116,20 +116,6 @@ static struct platform_device sdp4430_aic3110 = {
         .id             = -1,
 };
 
-#if defined(CONFIG_SENSORS_OMAP_BANDGAP)
-static struct platform_device sdp4430_omap_bandgap_sensor = {
-	.name           = "omap_bandgap_sensor",
-	.id             = -1,
-};
-#endif
-
-#if defined(CONFIG_SENSORS_PMIC_THERMAL)
-static struct platform_device sdp4430_pmic_thermal_sensor = {
-	.name		= "pmic_thermal_sensor",
-	.id		= -1,
-};
-#endif
-
 /* Panel Power */
 static struct regulator_consumer_supply lcd_supply[] = {
 //	REGULATOR_SUPPLY("vlcd", "otter1_panel_drv"),
@@ -217,12 +203,6 @@ static void __init quanta_boardids(void)
 static struct platform_device __initdata *sdp4430_devices[] = {
      &sdp4430_aic3110,
      &lcd_regulator_device,
-#if defined(CONFIG_SENSORS_OMAP_BANDGAP)
-//	&sdp4430_omap_bandgap_sensor,
-#endif
-#if defined(CONFIG_SENSORS_PMIC_THERMAL)
-//	&sdp4430_pmic_thermal_sensor,
-#endif
 };
 
 static struct omap_board_config_kernel __initdata sdp4430_config[] = {
