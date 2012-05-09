@@ -444,7 +444,8 @@ static void omap4_set_timings(struct voltagedomain *voltdm, bool off_mode)
 
 	if (off_mode) {
 		ramp = omap4_calc_volt_ramp(voltdm,
-			voltdm->vc_param->on - voltdm->vc_param->off);
+			voltdm->vc_param->on - voltdm->vc_param->off) +
+			voltdm->pmic->switch_on_time;
 		offset = voltdm->vfsm->voltsetup_off_reg;
 	} else {
 		ramp = omap4_calc_volt_ramp(voltdm,

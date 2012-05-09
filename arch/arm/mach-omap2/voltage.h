@@ -143,12 +143,15 @@ struct omap_volt_data {
  * @shutdown_time: PMIC shutdown time, only valid for core domain
  * @i2c_high_speed: whether VC uses I2C high-speed mode to PMIC
  * @i2c_mcode: master code value for I2C high-speed preamble transmission
+ * @switch_on_time: time taken for switch on the DCDC in uSec
  * @vsel_to_uv:	PMIC API to convert vsel value to actual voltage in uV.
  * @uv_to_vsel:	PMIC API to convert voltage in uV to vsel value.
  */
 struct omap_voltdm_pmic {
 	int slew_rate;
 	int step_size;
+	u16 volt_setup_time;
+	u16 switch_on_time;
 	u16 i2c_slave_addr;
 	u16 volt_reg_addr;
 	u16 cmd_reg_addr;
