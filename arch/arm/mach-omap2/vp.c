@@ -306,8 +306,9 @@ void omap_vp_disable(struct voltagedomain *voltdm)
 	/*
 	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
 	 */
-	omap_test_timeout((voltdm->read(vp->vstatus)),
-			  VP_IDLE_TIMEOUT, timeout);
+	omap_test_timeout((voltdm->read(vp->vstatus) &
+			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
+			  timeout);
 
 	if (timeout >= VP_IDLE_TIMEOUT)
 		pr_warning("%s: vdd_%s idle timedout\n",
