@@ -33,9 +33,10 @@ struct voltagedomain;
 /*
  * Time out for Voltage processor in micro seconds. Typical latency is < 2uS,
  * but worst case latencies could be around 3-200uS depending on where we
- * interrupted VP's operation.
+ * interrupted VP's operation. Use an improbable timeout value to be
+ * sure that timeout events are beyond doubt.
  */
-#define VP_IDLE_TIMEOUT		200
+#define VP_IDLE_TIMEOUT		500
 #define VP_TRANXDONE_TIMEOUT	300
 
 /**

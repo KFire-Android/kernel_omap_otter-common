@@ -344,6 +344,10 @@ void omap_vp_disable(struct voltagedomain *voltdm)
 		return;
 	}
 
+	if (_vp_wait_for_idle(voltdm, vp)) {
+		pr_warn_ratelimited("%s: vdd_%s timedout!Ignore and try\n",
+				    __func__, voltdm->name);
+	}
 	/* Disable VP */
 	vpconfig = voltdm->read(vp->vpconfig);
 	vpconfig &= ~vp->common->vpconfig_vpenable;
