@@ -793,7 +793,7 @@ static void __exit thermal_framework_exit(void)
 	mutex_unlock(&thermal_domain_list_lock);
 }
 
-fs_initcall(thermal_framework_init);
+postcore_initcall(thermal_framework_init);
 module_exit(thermal_framework_exit);
 
 MODULE_AUTHOR("Dan Murphy <DMurphy@ti.com>");
