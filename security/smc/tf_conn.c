@@ -36,6 +36,7 @@
 #include "tf_conn.h"
 
 #ifdef CONFIG_TF_ZEBRA
+#include "tf_zebra.h"
 #include "tf_crypto.h"
 #endif
 
@@ -1123,11 +1124,6 @@ error:
 
 }
 
-
-#ifdef CONFIG_TF_ION
-extern struct ion_device *omap_ion_device;
-#endif /* CONFIG_TF_ION */
-
 /*
  * Invokes a client command to the Secure World
  */
@@ -1187,9 +1183,9 @@ int tf_invoke_client_command(
 
 			if (connection->ion_client == NULL) {
 				connection->ion_client = ion_client_create(
-					omap_ion_device,
+					zebra_ion_device,
 					(1 << ION_HEAP_TYPE_CARVEOUT),
-					"smc");
+					"tf");
 			}
 			if (connection->ion_client == NULL) {
 				dprintk(KERN_ERR "%s(%p): "
