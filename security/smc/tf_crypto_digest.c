@@ -477,7 +477,7 @@ static bool tf_digest_hw_perform_dma(u8 *data, u32 nDataLength,
 	/*lock the DMA */
 	if (!mutex_trylock(&dev->sm.dma_mutex)) {
 		local_buf = dma_alloc_coherent(NULL, dev->dma_buffer_length,
-			&local_buf_phys, GFP_KERNEL);
+			&local_buf_phys, GFP_ATOMIC);
 		if (local_buf == NULL) {
 			printk(KERN_ERR "SMC: DMA buffer is already taken "
 				"and %s could not allocate a temporary one\n",

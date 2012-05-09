@@ -27,6 +27,7 @@
 #include <linux/interrupt.h>
 #include <linux/crypto.h>
 #include <linux/scatterlist.h>
+#include <linux/mempool.h>
 #include <crypto/algapi.h>
 #include <crypto/scatterwalk.h>
 #include <crypto/aes.h>
@@ -1190,8 +1191,11 @@ static void aes_sync_op_complete(
 	struct ablkcipher_request *req = ablkcipher_request_cast(async_req);
 
 	/* Notify crypto operation has finished */
-	complete((struct completion *) req->base.data);
+	atomic_set((atomic_t *) req->base.data, 0);
 }
+
+#define MIN_SYNC_REQ	8
+static mempool_t *req_pool;
 
 static int aes_sync_operate(struct blkcipher_desc *desc,
 	struct scatterlist *dst, struct scatterlist *src,
@@ -1199,21 +1203,20 @@ static int aes_sync_operate(struct blkcipher_desc *desc,
 {
 	struct ablkcipher_request *req;
 	struct aes_reqctx *rctx;
-	int err;
-	DECLARE_COMPLETION(aes_sync_op_completion);
+	int err = 0;
+	atomic_t pending = ATOMIC_INIT(1);
 
 	if (nbytes % AES_BLOCK_SIZE)
 		return -EINVAL;
 
-	req =  kmalloc(sizeof(struct ablkcipher_request) +
-		sizeof(struct aes_reqctx), GFP_KERNEL);
+	req = mempool_alloc(req_pool, GFP_ATOMIC);
 	if (req == NULL)
 		return -ENOMEM;
 
 	req->base.tfm = crypto_blkcipher_tfm(desc->tfm);
 	ablkcipher_request_set_crypt(req, src, dst, nbytes, desc->info);
 	ablkcipher_request_set_callback(req, desc->flags,
-		aes_sync_op_complete, &aes_sync_op_completion);
+		aes_sync_op_complete, &pending);
 
 	rctx = ablkcipher_request_ctx(req);
 	rctx->mode = encrypt ? FLAGS_ENCRYPT : FLAGS_DECRYPT;
@@ -1225,15 +1228,17 @@ static int aes_sync_operate(struct blkcipher_desc *desc,
 		break;
 
 	default:
-		return err;
+		goto out;
 	}
 
 	/* Wait for crypto operation to be actually finished */
-	wait_for_completion(&aes_sync_op_completion);
+	while (atomic_read(&pending))
+		cpu_relax();
 
-	kzfree(req);
+out:
+	mempool_free(req, req_pool);
 
-	return 0;
+	return err;
 }
 
 static int aes_sync_encrypt(struct blkcipher_desc *desc,
@@ -1341,7 +1346,7 @@ static void aes_cra_exit(struct crypto_tfm *tfm)
 static struct crypto_alg smc_aes_ecb_sync_alg = {
 	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER,
 	.cra_priority		= 999,
-	.cra_name		= "ecb(aes)",
+	.cra_name		= "ecb(aes-hw)",
 	.cra_driver_name	= "aes-ecb-smc",
 	.cra_type		= &crypto_blkcipher_type,
 	.cra_module		= THIS_MODULE,
@@ -1364,7 +1369,7 @@ static struct crypto_alg smc_aes_ecb_sync_alg = {
 static struct crypto_alg smc_aes_cbc_sync_alg = {
 	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER,
 	.cra_priority		= 999,
-	.cra_name		= "cbc(aes)",
+	.cra_name		= "cbc(aes-hw)",
 	.cra_driver_name	= "aes-cbc-smc",
 	.cra_type		= &crypto_blkcipher_type,
 	.cra_module		= THIS_MODULE,
@@ -1388,7 +1393,7 @@ static struct crypto_alg smc_aes_cbc_sync_alg = {
 static struct crypto_alg smc_aes_ctr_sync_alg = {
 	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER,
 	.cra_priority		= 999,
-	.cra_name		= "ctr(aes)",
+	.cra_name		= "ctr(aes-hw)",
 	.cra_driver_name	= "aes-ctr-smc",
 	.cra_type		= &crypto_blkcipher_type,
 	.cra_module		= THIS_MODULE,
@@ -1510,6 +1515,11 @@ int register_smc_public_crypto_aes(void)
 	if (ret)
 		goto err_dma;
 
+	req_pool = mempool_create_kmalloc_pool(MIN_SYNC_REQ,
+		sizeof(struct ablkcipher_request) + sizeof(struct aes_reqctx));
+	if (req_pool == NULL)
+		goto err_dma;
+
 	ret = crypto_register_alg(&smc_aes_ecb_sync_alg);
 	if (ret)
 		goto err_ecb_sync;
@@ -1571,6 +1581,8 @@ void unregister_smc_public_crypto_aes(void)
 
 	tasklet_kill(&aes_ctx->task);
 	kfree(aes_ctx);
+
+	mempool_destroy(req_pool);
 }
 
 #endif /* CONFIG_SMC_KERNEL_CRYPTO */
