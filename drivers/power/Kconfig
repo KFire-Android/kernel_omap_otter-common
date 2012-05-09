@@ -188,6 +188,14 @@ config BATTERY_MAX17042
 	  multi-function devices that include fuel gauages that are compatible
 	  with MAX17042.
 
+config BATTERY_MANAGER
+	tristate "Battery Manager"
+	help
+	  Say Y to enable supprot SEC Battery manager.
+	  This driver include battery concept.
+	  Charging(Discharging) by temperature, limit timer
+	  and fully charged.
+
 config BATTERY_Z2
 	tristate "Z2 battery driver"
 	depends on I2C && MACH_ZIPIT2
