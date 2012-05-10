@@ -1158,11 +1158,6 @@ static void gc_exit(void)
 		unregister_early_suspend(&early_suspend_info);
 #endif
 
-		if (gccorecontext->regbase != NULL) {
-			iounmap(gccorecontext->regbase);
-			gccorecontext->regbase = NULL;
-		}
-
 		gc_debug_shutdown();
 
 		mutex_destroy(&gccorecontext->mmucontextlock);
