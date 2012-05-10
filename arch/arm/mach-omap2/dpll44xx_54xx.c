@@ -61,7 +61,10 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 
 	/* Just to avoid look-up on every call to speed up */
 	if (!l3_emif_clkdm) {
-		l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+		if (cpu_is_omap44xx())
+			l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+		else
+			l3_emif_clkdm = clkdm_lookup("emif_clkdm");
 		if (!l3_emif_clkdm) {
 			pr_err("%s: clockdomain lookup failed\n", __func__);
 			return -EINVAL;
@@ -192,7 +195,10 @@ int omap4_core_dpll_m5x2_set_rate(struct clk *clk, unsigned long rate)
 
 	/* Just to avoid look-up on every call to speed up */
 	if (!l3_emif_clkdm) {
+		if (cpu_is_omap44xx())
 			l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+		else
+			l3_emif_clkdm = clkdm_lookup("emif_clkdm");
 		if (!l3_emif_clkdm) {
 			pr_err("%s: clockdomain lookup failed\n", __func__);
 			return -EINVAL;
