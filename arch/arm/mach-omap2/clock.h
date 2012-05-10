@@ -57,6 +57,7 @@ int omap2_clk_set_parent(struct clk *clk, struct clk *new_parent);
 long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate);
 unsigned long omap3_dpll_recalc(struct clk *clk);
 unsigned long omap3_clkoutx2_recalc(struct clk *clk);
+unsigned long omap3_clkout_mn_recalc(struct clk *clk);
 void omap3_dpll_allow_idle(struct clk *clk);
 void omap3_dpll_deny_idle(struct clk *clk);
 u32 omap3_dpll_autoidle_read(struct clk *clk);

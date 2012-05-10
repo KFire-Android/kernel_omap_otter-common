@@ -630,3 +630,44 @@ unsigned long omap3_clkoutx2_recalc(struct clk *clk)
 		rate = clk->parent->rate * 2;
 	return rate;
 }
+
+/**
+ * omap3_clkoutx2_mn_recalc - recalculate rate for DPLL clock outputs
+ * @clk: DPLL clock output
+ *
+ * Look up parent DPLL and if it is locked then recalculate rate via the usual
+ * clksel method; if it is bypassed then take the bypass clock rate.
+ */
+unsigned long omap3_clkout_mn_recalc(struct clk *clk)
+{
+	const struct dpll_data *dd;
+	unsigned long rate;
+	u32 v;
+	struct clk *pclk;
+
+	/* Walk up the parents of clk, looking for a DPLL */
+	pclk = clk->parent;
+	while (pclk && !pclk->dpll_data)
+		pclk = pclk->parent;
+
+	/* clk does not have a DPLL as a parent? */
+	WARN_ON(!pclk);
+
+	if (pclk) {
+		dd = pclk->dpll_data;
+	} else {
+		pr_err("%s: pclk is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	WARN_ON(!dd->enable_mask);
+
+	v = __raw_readl(dd->control_reg) & dd->enable_mask;
+	v >>= __ffs(dd->enable_mask);
+	if (v == OMAP3XXX_EN_DPLL_LOCKED)
+		rate = omap2_clksel_recalc(clk);
+	else
+		rate = dd->clk_bypass->rate;
+
+	return rate;
+}
