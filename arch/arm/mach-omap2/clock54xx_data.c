@@ -314,7 +314,7 @@ static struct clk dpll_abe_m2x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_ABE,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -374,7 +374,7 @@ static struct clk dpll_abe_m3x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M3_DPLL_ABE,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -495,7 +495,7 @@ static struct clk dpll_core_h12x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H12_DPLL_CORE,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -609,7 +609,7 @@ static struct clk dpll_core_h23x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H23_DPLL_CORE,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -699,7 +699,7 @@ static struct clk dpll_iva_h11x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H11_DPLL_IVA,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -711,7 +711,7 @@ static struct clk dpll_iva_h12x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H12_DPLL_IVA,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -759,7 +759,7 @@ static struct clk dpll_mpu_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_MPU,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -823,7 +823,7 @@ static struct clk dpll_per_h11x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H11_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -835,7 +835,7 @@ static struct clk dpll_per_h12x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H12_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -847,7 +847,7 @@ static struct clk dpll_per_h14x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H14_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -864,7 +864,7 @@ static struct clk dpll_per_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -881,7 +881,7 @@ static struct clk dpll_per_m2x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -893,7 +893,7 @@ static struct clk dpll_per_m3x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M3_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -1080,7 +1080,7 @@ static struct clk dpll_unipro1_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_UNIPRO1,
 	.clksel_mask	= OMAP54XX_DIVHS_0_6_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -1136,7 +1136,7 @@ static struct clk dpll_unipro2_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_UNIPRO2,
 	.clksel_mask	= OMAP54XX_DIVHS_0_6_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -1203,7 +1203,7 @@ static struct clk dpll_usb_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_USB,
 	.clksel_mask	= OMAP54XX_DIVHS_0_6_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
