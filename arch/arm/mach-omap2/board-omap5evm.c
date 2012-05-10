@@ -27,6 +27,8 @@
 #include <linux/mfd/palmas.h>
 #endif
 
+#include <linux/i2c/pca953x.h>
+
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
@@ -828,6 +830,22 @@ static struct omap_dss_board_info omap5evm_dss_data = {
 	.default_device	= &omap5evm_lcd_device,
 };
 
+/*
+ * I2C GPIO Expander - TCA6424
+ */
+
+/* Mounted on Base-Board */
+static struct pca953x_platform_data omap5evm_gpio_expander_info = {
+	.gpio_base	= OMAP_MAX_GPIO_LINES,
+};
+
+static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("tca6424", 0x22),
+		.platform_data = &omap5evm_gpio_expander_info,
+	},
+};
+
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_1_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_2_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_3_bus_pdata;
@@ -869,7 +887,8 @@ static int __init omap_5430evm_i2c_init(void)
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
 	omap_register_i2c_bus(4, 400, NULL, 0);
-	omap_register_i2c_bus(5, 400, NULL, 0);
+	omap_register_i2c_bus(5, 400, omap5evm_i2c_5_boardinfo,
+					ARRAY_SIZE(omap5evm_i2c_5_boardinfo));
 
 	return 0;
 }
