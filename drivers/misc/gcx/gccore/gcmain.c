@@ -32,8 +32,6 @@
 #include <linux/opp.h>
 
 #include "gcmain.h"
-#include "gccmdbuf.h"
-#include "gcmmu.h"
 
 #define GC_ENABLE_SUSPEND
 
@@ -42,16 +40,14 @@
 #define GCZONE_INIT		(1 << 0)
 #define GCZONE_CONTEXT		(1 << 1)
 #define GCZONE_POWER		(1 << 2)
-#define GCZONE_PAGE		(1 << 3)
-#define GCZONE_COMMIT		(1 << 4)
-#define GCZONE_MAPPING		(1 << 5)
-#define GCZONE_PROBE		(1 << 6)
+#define GCZONE_COMMIT		(1 << 3)
+#define GCZONE_MAPPING		(1 << 4)
+#define GCZONE_PROBE		(1 << 5)
 
 GCDBG_FILTERDEF(core, GCZONE_ALL,
 		"init",
 		"context",
 		"power",
-		"page",
 		"commit",
 		"mapping",
 		"probe")
@@ -117,11 +113,11 @@ static enum gcerror find_context(struct gccorecontext *gccorecontext,
 			(unsigned int) temp);
 	}
 
-	gcerror = gcmmu_create_context(temp);
+	gcerror = gcmmu_create_context(gccorecontext, temp);
 	if (gcerror != GCERR_NONE)
 		goto fail;
 
-	gcerror = cmdbuf_map(temp);
+	gcerror = cmdbuf_map(gccorecontext, temp);
 	if (gcerror != GCERR_NONE)
 		goto fail;
 
@@ -139,7 +135,7 @@ exit:
 
 fail:
 	if (temp != NULL) {
-		gcmmu_destroy_context(temp);
+		gcmmu_destroy_context(gccorecontext, temp);
 		list_add(&temp->link, &gccorecontext->mmuctxvac);
 	}
 
@@ -164,7 +160,7 @@ static void destroy_mmu_context(struct gccorecontext *gccorecontext)
 	while (!list_empty(&gccorecontext->mmuctxlist)) {
 		head = gccorecontext->mmuctxlist.next;
 		temp = list_entry(head, struct gcmmucontext, link);
-		gcmmu_destroy_context(temp);
+		gcmmu_destroy_context(gccorecontext, temp);
 		list_del(head);
 		kfree(temp);
 	}
@@ -188,181 +184,6 @@ unsigned int gc_read_reg(unsigned int address)
 void gc_write_reg(unsigned int address, unsigned int data)
 {
 	writel(data, (unsigned char *) g_context.regbase + address);
-}
-
-/*******************************************************************************
- * Page allocation routines.
- */
-
-enum gcerror gc_alloc_noncached(struct gcpage *p, unsigned int size)
-{
-	enum gcerror gcerror;
-
-	GCENTERARG(GCZONE_PAGE, "p = 0x%08X\n", (unsigned int) p);
-
-	p->pages = NULL;
-	p->order = 0;
-	p->size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-	p->logical = NULL;
-	p->physical = ~0UL;
-
-	GCDBG(GCZONE_PAGE, "requested size=%d\n", size);
-	GCDBG(GCZONE_PAGE, "aligned size=%d\n", p->size);
-
-	p->logical = dma_alloc_coherent(NULL, p->size, &p->physical,
-						GFP_KERNEL);
-	if (!p->logical) {
-		GCERR("failed to allocate memory\n");
-		gcerror = GCERR_OOPM;
-		goto exit;
-	}
-
-	GCDBG(GCZONE_PAGE, "logical=0x%08X\n", (unsigned int) p->logical);
-	GCDBG(GCZONE_PAGE, "physical=0x%08X\n", (unsigned int) p->physical);
-
-	GCEXIT(GCZONE_PAGE);
-	return GCERR_NONE;
-
-exit:
-	gc_free_noncached(p);
-
-	GCEXITARG(GCZONE_PAGE, "gcerror = 0x%08X\n", gcerror);
-	return gcerror;
-}
-
-void gc_free_noncached(struct gcpage *p)
-{
-	GCENTERARG(GCZONE_PAGE, "p = 0x%08X\n", (unsigned int) p);
-
-	if (p->logical != NULL) {
-		dma_free_coherent(NULL, p->size, p->logical, p->physical);
-		p->logical = NULL;
-	}
-
-	p->physical = ~0UL;
-	p->size = 0;
-
-	GCEXIT(GCZONE_PAGE);
-}
-
-enum gcerror gc_alloc_cached(struct gcpage *p, unsigned int size)
-{
-	enum gcerror gcerror;
-	struct page *pages;
-	int count;
-
-	GCENTERARG(GCZONE_PAGE, "p = 0x%08X\n", (unsigned int) p);
-
-	p->order = get_order(size);
-	p->pages = NULL;
-	p->size = (1 << p->order) * PAGE_SIZE;
-	p->logical = NULL;
-	p->physical = ~0UL;
-
-	GCDBG(GCZONE_PAGE, "requested size=%d\n", size);
-	GCDBG(GCZONE_PAGE, "aligned size=%d\n", p->size);
-
-	p->pages = alloc_pages(GFP_KERNEL, p->order);
-	if (p->pages == NULL) {
-		GCERR("failed to allocate memory\n");
-		gcerror = GCERR_OOPM;
-		goto exit;
-	}
-
-	p->physical = page_to_phys(p->pages);
-	p->logical = (unsigned int *) page_address(p->pages);
-
-	if (p->logical == NULL) {
-		GCERR("failed to retrieve page virtual address\n");
-		gcerror = GCERR_PMMAP;
-		goto exit;
-	}
-
-	/* Reserve pages. */
-	pages = p->pages;
-	count = p->size / PAGE_SIZE;
-
-	while (count--)
-		SetPageReserved(pages++);
-
-	GCDBG(GCZONE_PAGE, "page array=0x%08X\n", (unsigned int) p->pages);
-	GCDBG(GCZONE_PAGE, "logical=0x%08X\n", (unsigned int) p->logical);
-	GCDBG(GCZONE_PAGE, "physical=0x%08X\n", (unsigned int) p->physical);
-
-	GCEXIT(GCZONE_PAGE);
-	return GCERR_NONE;
-
-exit:
-	gc_free_cached(p);
-
-	GCEXITARG(GCZONE_PAGE, "gcerror = 0x%08X\n", gcerror);
-	return gcerror;
-}
-
-void gc_free_cached(struct gcpage *p)
-{
-	GCENTERARG(GCZONE_PAGE, "p = 0x%08X\n", (unsigned int) p);
-
-	GCDBG(GCZONE_PAGE, "page array=0x%08X\n", (unsigned int) p->pages);
-	GCDBG(GCZONE_PAGE, "logical=0x%08X\n", (unsigned int) p->logical);
-	GCDBG(GCZONE_PAGE, "physical=0x%08X\n", (unsigned int) p->physical);
-	GCDBG(GCZONE_PAGE, "size=%d\n", p->size);
-
-	if (p->logical != NULL) {
-		struct page *pages;
-		int count;
-
-		pages = p->pages;
-		count = p->size / PAGE_SIZE;
-
-		while (count--)
-			ClearPageReserved(pages++);
-
-		p->logical = NULL;
-	}
-
-	if (p->pages != NULL) {
-		__free_pages(p->pages, p->order);
-		p->pages = NULL;
-	}
-
-	p->physical = ~0UL;
-	p->order = 0;
-	p->size = 0;
-
-	GCEXIT(GCZONE_PAGE);
-}
-
-void gc_flush_cached(struct gcpage *p)
-{
-	GCENTERARG(GCZONE_PAGE, "p = 0x%08X\n", (unsigned int) p);
-
-	dmac_flush_range(p->logical, (unsigned char *) p->logical + p->size);
-	outer_flush_range(p->physical, p->physical + p->size);
-
-	GCEXIT(GCZONE_PAGE);
-}
-
-void gc_flush_region(unsigned int physical, void *logical,
-			unsigned int offset, unsigned int size)
-{
-	unsigned char *startlog;
-	unsigned int startphys;
-
-	GCENTER(GCZONE_PAGE);
-
-	GCDBG(GCZONE_PAGE, "logical=0x%08X\n", (unsigned int) logical);
-	GCDBG(GCZONE_PAGE, "physical=0x%08X\n", physical);
-	GCDBG(GCZONE_PAGE, "offset=%d\n", offset);
-	GCDBG(GCZONE_PAGE, "size=%d\n", size);
-
-	startlog = (unsigned char *) logical + offset;
-	startphys = physical + offset;
-
-	dmac_flush_range(startlog, startlog + size);
-	outer_flush_range(startphys, startphys + size);
-
-	GCEXIT(GCZONE_PAGE);
 }
 
 /*******************************************************************************
@@ -704,7 +525,7 @@ void gc_commit(struct gccommit *gccommit, bool fromuser)
 	}
 
 	/* Set the client's master table. */
-	gccommit->gcerror = gcmmu_set_master(gcmmucontext);
+	gccommit->gcerror = gcmmu_set_master(gccorecontext, gcmmucontext);
 	if (gccommit->gcerror != GCERR_NONE)
 		goto exit;
 
@@ -838,7 +659,7 @@ void gc_map(struct gcmap *gcmap, bool fromuser)
 	mem.pagesize = gcmap->pagesize ? gcmap->pagesize : PAGE_SIZE;
 
 	/* Map the buffer. */
-	gcmap->gcerror = gcmmu_map(gcmmucontext, &mem, &mapped);
+	gcmap->gcerror = gcmmu_map(gccorecontext, gcmmucontext, &mem, &mapped);
 	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
 
@@ -878,7 +699,7 @@ void gc_unmap(struct gcmap *gcmap, bool fromuser)
 	GCDBG(GCZONE_MAPPING, "  handle = 0x%08X\n", gcmap->handle);
 
 	/* Map the buffer. */
-	gcmap->gcerror = gcmmu_unmap(gcmmucontext,
+	gcmap->gcerror = gcmmu_unmap(gccorecontext, gcmmucontext,
 					(struct gcmmuarena *) gcmap->handle);
 	if (gcmap->gcerror != GCERR_NONE)
 		goto exit;
@@ -1077,13 +898,12 @@ static struct early_suspend early_suspend_info = {
  * Driver init/shutdown.
  */
 
-static int gc_init(void);
-static void gc_exit(void);
+static int gc_init(struct gccorecontext *gccorecontext);
+static void gc_exit(struct gccorecontext *gccorecontext);
 
-static int gc_init(void)
+static int gc_init(struct gccorecontext *gccorecontext)
 {
 	int result;
-	struct gccorecontext *gccorecontext = &g_context;
 
 	GCENTER(GCZONE_INIT);
 
@@ -1098,6 +918,13 @@ static int gc_init(void)
 	init_completion(&gccorecontext->intready);
 	INIT_LIST_HEAD(&gccorecontext->mmuctxlist);
 	INIT_LIST_HEAD(&gccorecontext->mmuctxvac);
+
+	/* Initialize MMU. */
+	if (gcmmu_init(gccorecontext) != GCERR_NONE) {
+		GCERR("failed to initialize MMU.\n");
+		result = -EINVAL;
+		goto fail;
+	}
 
 	gccorecontext->bb2ddevice = omap_hwmod_name_get_dev("bb2d");
 	if (gccorecontext->bb2ddevice == NULL) {
@@ -1132,20 +959,22 @@ exit:
 	return 0;
 
 fail:
-	gc_exit();
+	gc_exit(gccorecontext);
 
 	GCEXITARG(GCZONE_INIT, "result = %d\n", result);
 	return result;
 }
 
-static void gc_exit(void)
+static void gc_exit(struct gccorecontext *gccorecontext)
 {
-	struct gccorecontext *gccorecontext = &g_context;
-
 	GCENTER(GCZONE_INIT);
 
 	if (cpu_is_omap447x()) {
+		/* Destroy MMU. */
 		destroy_mmu_context(gccorecontext);
+		gcmmu_exit(gccorecontext);
+
+		/* Disable power. */
 		gc_set_power(gccorecontext, GCPWR_OFF);
 		pm_runtime_disable(gccorecontext->device);
 
@@ -1175,15 +1004,16 @@ static int __init gc_init_wrapper(void)
 {
 	GCDBG_INIT();
 	GCDBG_REGISTER(core);
+	GCDBG_REGISTER(mem);
 	GCDBG_REGISTER(mmu);
 	GCDBG_REGISTER(cmdbuf);
 
-	return gc_init();
+	return gc_init(&g_context);
 }
 
 static void __exit gc_exit_wrapper(void)
 {
-	gc_exit();
+	gc_exit(&g_context);
 	GCDBG_EXIT();
 }
 

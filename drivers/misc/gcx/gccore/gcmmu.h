@@ -16,9 +16,9 @@
 #define GCMMU_H
 
 #include <linux/gccore.h>
-#include "gcmain.h"
+#include "gcmem.h"
 
-/*
+/*******************************************************************************
  * Master table can be configured in 1KB mode with 256 maximum entries
  * or 4KB mode with 1024 maximum entries.
  *
@@ -95,10 +95,12 @@
 
 #define GCMMU_SAFE_ZONE_SIZE		64
 
-/* STLB preallocation count. This value controls how many slave tables will be
-   allocated every time we run out of available slave tables during mapping.
-   The value must be between 1 and the total number of slave tables possible,
-   which is equal to 256 assuming 4KB page size. */
+/*
+ * STLB preallocation count. This value controls how many slave tables will be
+ * allocated every time we run out of available slave tables during mapping.
+ * The value must be between 1 and the total number of slave tables possible,
+ * which is equal to 256 assuming 4KB page size.
+ */
 #define GCMMU_STLB_PREALLOC_COUNT	(GCMMU_MTLB_ENTRY_NUM / 4)
 
 /* This union defines a location within MMU. */
@@ -140,7 +142,7 @@ struct gcmmuarena {
 	struct list_head link;
 };
 
-/* Private internal structure shared between contexts. */
+/* MMU shared object. */
 struct gcmmu {
 	/* Reference count. */
 	int refcount;
@@ -160,8 +162,6 @@ struct gcmmustlb {
 
 struct gcmmustlbblock;
 struct gcmmucontext {
-	struct gcmmu *mmu;
-
 	/* PID of the owner process. */
 	pid_t pid;
 
@@ -208,13 +208,27 @@ struct gcmmuphysmem {
 	int pagesize;
 };
 
-enum gcerror gcmmu_create_context(struct gcmmucontext *gcmmucontext);
-enum gcerror gcmmu_destroy_context(struct gcmmucontext *gcmmucontext);
-enum gcerror gcmmu_set_master(struct gcmmucontext *gcmmucontext);
-enum gcerror gcmmu_map(struct gcmmucontext *gcmmucontext,
-	struct gcmmuphysmem *mem, struct gcmmuarena **mapped);
-enum gcerror gcmmu_unmap(struct gcmmucontext *gcmmucontext,
-	struct gcmmuarena *mapped);
+struct gccorecontext;
+
+enum gcerror gcmmu_init(struct gccorecontext *gccorecontext);
+void gcmmu_exit(struct gccorecontext *gccorecontext);
+
+enum gcerror gcmmu_create_context(struct gccorecontext *gccorecontext,
+					struct gcmmucontext *gcmmucontext);
+enum gcerror gcmmu_destroy_context(struct gccorecontext *gccorecontext,
+					struct gcmmucontext *gcmmucontext);
+
+enum gcerror gcmmu_set_master(struct gccorecontext *gccorecontext,
+				struct gcmmucontext *gcmmucontext);
+
+enum gcerror gcmmu_map(struct gccorecontext *gccorecontext,
+			struct gcmmucontext *gcmmucontext,
+			struct gcmmuphysmem *mem,
+			struct gcmmuarena **mapped);
+enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
+				struct gcmmucontext *gcmmucontext,
+				struct gcmmuarena *mapped);
+
 int gcmmu_flush(void *logical, unsigned int address, unsigned int size);
 enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data);
 

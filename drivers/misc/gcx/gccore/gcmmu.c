@@ -19,10 +19,7 @@
 #include <linux/io.h>
 #include <linux/pagemap.h>
 #include <linux/sched.h>
-
 #include "gcmain.h"
-#include "gcmmu.h"
-#include "gccmdbuf.h"
 
 #define GCZONE_NONE		0
 #define GCZONE_ALL		(~0U)
@@ -54,27 +51,18 @@ struct gcmmustlbblock {
 	struct gcmmustlbblock *next;
 };
 
-static inline struct gcmmu *get_mmu(void)
-{
-	static struct gcmmu _mmu = {
-		.vacarena = LIST_HEAD_INIT(_mmu.vacarena),
-	};
-
-	return &_mmu;
-}
-
 /*******************************************************************************
  * Arena record management.
  */
 
-static enum gcerror get_arena(struct gcmmu *mmu, struct gcmmuarena **arena)
+static enum gcerror get_arena(struct gcmmu *gcmmu, struct gcmmuarena **arena)
 {
 	enum gcerror gcerror = GCERR_NONE;
 	struct gcmmuarena *temp;
 
 	GCENTER(GCZONE_ARENA);
 
-	if (list_empty(&mmu->vacarena)) {
+	if (list_empty(&gcmmu->vacarena)) {
 		temp = kmalloc(sizeof(struct gcmmuarena), GFP_KERNEL);
 		if (temp == NULL) {
 			GCERR("arena entry allocation failed.\n");
@@ -84,7 +72,7 @@ static enum gcerror get_arena(struct gcmmu *mmu, struct gcmmuarena **arena)
 		}
 	} else {
 		struct list_head *head;
-		head = mmu->vacarena.next;
+		head = gcmmu->vacarena.next;
 		temp = list_entry(head, struct gcmmuarena, link);
 		list_del(head);
 	}
@@ -204,7 +192,8 @@ exit:
 	if (block != NULL)
 		kfree(block);
 
-	GCEXITARG(GCZONE_MAPPING, "gcerror = 0x%08X\n", gcerror);
+	GCEXITARG(GCZONE_MAPPING, "gc%s = 0x%08X\n",
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 	return gcerror;
 }
 
@@ -350,14 +339,72 @@ static void release_physical_pages(struct gcmmuarena *arena)
  * MMU management API.
  */
 
-enum gcerror gcmmu_create_context(struct gcmmucontext *gcmmucontext)
+enum gcerror gcmmu_init(struct gccorecontext *gccorecontext)
 {
 	enum gcerror gcerror;
-	struct gcmmu *mmu = get_mmu();
+	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
+	unsigned int safecount;
+	unsigned int *logical;
+	unsigned int i;
+
+	GCENTER(GCZONE_CONTEXT);
+
+	/* Allocate the safe zone. */
+	gcerror = gc_alloc_cached(&gcmmu->safezone, GCMMU_SAFE_ZONE_SIZE);
+	if (gcerror != GCERR_NONE) {
+		GCERR("failed to allocate MMU safe zone.\n");
+		gcerror = GCERR_SETGRP(gcerror, GCERR_MMU_SAFE_ALLOC);
+		goto exit;
+	}
+
+	/* Initialize safe zone to a value. */
+	safecount = GCMMU_SAFE_ZONE_SIZE / sizeof(unsigned int);
+	logical = gcmmu->safezone.logical;
+	for (i = 0; i < safecount; i += 1)
+		logical[i] = 0xDEADC0DE;
+
+	gc_flush_region(gcmmu->safezone.physical, gcmmu->safezone.logical,
+			0, safecount * sizeof(unsigned int));
+
+	/* Initialize the list of vacant arenas. */
+	INIT_LIST_HEAD(&gcmmu->vacarena);
+
+exit:
+	GCEXITARG(GCZONE_CONTEXT, "gc%s = 0x%08X\n",
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
+	return gcerror;
+}
+
+void gcmmu_exit(struct gccorecontext *gccorecontext)
+{
+	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
+	struct list_head *head;
+	struct gcmmuarena *arena;
+
+	GCENTER(GCZONE_CONTEXT);
+
+	/* Free the safe zone. */
+	gc_free_cached(&gcmmu->safezone);
+
+	/* Free vacant arena list. */
+	while (!list_empty(&gcmmu->vacarena)) {
+		head = gcmmu->vacarena.next;
+		arena = list_entry(head, struct gcmmuarena, link);
+		list_del(head);
+		kfree(arena);
+	}
+
+	GCEXIT(GCZONE_CONTEXT);
+}
+
+enum gcerror gcmmu_create_context(struct gccorecontext *gccorecontext,
+					struct gcmmucontext *gcmmucontext)
+{
+	enum gcerror gcerror;
+	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
 	struct gcmmuarena *arena = NULL;
 	unsigned int *logical;
-	unsigned int safecount;
-	int i;
+	unsigned int i;
 
 	GCENTER(GCZONE_CONTEXT);
 
@@ -398,7 +445,7 @@ enum gcerror gcmmu_create_context(struct gcmmucontext *gcmmucontext)
 				GCREG_MMU_CONFIGURATION, ADDRESS);
 
 	/* Allocate the first vacant arena. */
-	gcerror = get_arena(mmu, &arena);
+	gcerror = get_arena(gcmmu, &arena);
 	if (gcerror != GCERR_NONE)
 		goto exit;
 
@@ -409,48 +456,30 @@ enum gcerror gcmmu_create_context(struct gcmmucontext *gcmmucontext)
 	list_add(&arena->link, &gcmmucontext->vacant);
 	GCDUMPARENA(GCZONE_ARENA, "initial vacant arena", arena);
 
-	/* Allocate the safe zone. */
-	if (mmu->safezone.size == 0) {
-		gcerror = gc_alloc_cached(&mmu->safezone,
-						GCMMU_SAFE_ZONE_SIZE);
-		if (gcerror != GCERR_NONE) {
-			gcerror = GCERR_SETGRP(gcerror,
-						GCERR_MMU_SAFE_ALLOC);
-			goto exit;
-		}
-
-		/* Initialize safe zone to a value. */
-		safecount = GCMMU_SAFE_ZONE_SIZE / sizeof(unsigned int);
-		for (i = 0; i < safecount; i += 1)
-			mmu->safezone.logical[i] = 0xDEADC0DE;
-
-		gc_flush_region(mmu->safezone.physical, mmu->safezone.logical,
-				0, safecount * sizeof(unsigned int));
-	}
-
 	/* Reference MMU. */
-	mmu->refcount += 1;
-	gcmmucontext->mmu = mmu;
+	gcmmu->refcount += 1;
 
 	GCEXIT(GCZONE_CONTEXT);
 	return GCERR_NONE;
 
 exit:
-	gcmmu_destroy_context(gcmmucontext);
+	gcmmu_destroy_context(gccorecontext, gcmmucontext);
 
-	GCEXITARG(GCZONE_CONTEXT, "gcerror = 0x%08X\n", gcerror);
+	GCEXITARG(GCZONE_CONTEXT, "gc%s = 0x%08X\n",
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 	return gcerror;
 }
 
-enum gcerror gcmmu_destroy_context(struct gcmmucontext *gcmmucontext)
+enum gcerror gcmmu_destroy_context(struct gccorecontext *gccorecontext,
+					struct gcmmucontext *gcmmucontext)
 {
 	enum gcerror gcerror;
+	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
 	struct gcmmustlbblock *nextblock;
-	struct gcmmu *mmu;
 
 	GCENTER(GCZONE_CONTEXT);
 
-	if ((gcmmucontext == NULL) || (gcmmucontext->mmu == NULL)) {
+	if (gcmmucontext == NULL) {
 		gcerror = GCERR_MMU_CTXT_BAD;
 		goto exit;
 	}
@@ -467,33 +496,33 @@ enum gcerror gcmmu_destroy_context(struct gcmmucontext *gcmmucontext)
 	gc_free_cached(&gcmmucontext->master);
 
 	/* Free arenas. */
-	mmu = gcmmucontext->mmu;
-	list_splice_init(&gcmmucontext->vacant, &mmu->vacarena);
-	list_splice_init(&gcmmucontext->allocated, &mmu->vacarena);
+	list_splice_init(&gcmmucontext->vacant, &gcmmu->vacarena);
+	list_splice_init(&gcmmucontext->allocated, &gcmmu->vacarena);
 
 	/* Dereference. */
-	mmu->refcount -= 1;
-	gcmmucontext->mmu = NULL;
+	gcmmu->refcount -= 1;
 
 	GCEXIT(GCZONE_CONTEXT);
 	return GCERR_NONE;
 
 exit:
-	GCEXITARG(GCZONE_CONTEXT, "gcerror = 0x%08X\n", gcerror);
+	GCEXITARG(GCZONE_CONTEXT, "gc%s = 0x%08X\n",
+		(gcerror == GCERR_NONE) ? "result" : "error", gcerror);
 	return gcerror;
 }
 
-enum gcerror gcmmu_set_master(struct gcmmucontext *gcmmucontext)
+enum gcerror gcmmu_set_master(struct gccorecontext *gccorecontext,
+				struct gcmmucontext *gcmmucontext)
 {
 	enum gcerror gcerror;
+	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
 	struct gcmommumaster *gcmommumaster;
 	struct gcmommuinit *gcmommuinit;
 	unsigned int size, status, enabled;
-	struct gcmmu *mmu = get_mmu();
 
 	GCENTER(GCZONE_MASTER);
 
-	if ((gcmmucontext == NULL) || (gcmmucontext->mmu == NULL)) {
+	if (gcmmucontext == NULL) {
 		gcerror = GCERR_MMU_CTXT_BAD;
 		goto exit;
 	}
@@ -531,7 +560,7 @@ enum gcerror gcmmu_set_master(struct gcmmucontext *gcmmucontext)
 
 		/* Program the safe zone and the master table address. */
 		gcmommuinit->safe_ldst = gcmommuinit_safe_ldst;
-		gcmommuinit->safe = mmu->safezone.physical;
+		gcmommuinit->safe = gcmmu->safezone.physical;
 		gcmommuinit->mtlb = gcmmucontext->mmuconfig.raw;
 
 		/* Execute the buffer. */
@@ -555,11 +584,13 @@ exit:
 	return gcerror;
 }
 
-enum gcerror gcmmu_map(struct gcmmucontext *gcmmucontext,
+enum gcerror gcmmu_map(struct gccorecontext *gccorecontext,
+			struct gcmmucontext *gcmmucontext,
 			struct gcmmuphysmem *mem,
 			struct gcmmuarena **mapped)
 {
 	enum gcerror gcerror = GCERR_NONE;
+	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
 	struct list_head *arenahead;
 	struct gcmmuarena *vacant = NULL, *split;
 	struct gcmmustlb *slave;
@@ -571,7 +602,7 @@ enum gcerror gcmmu_map(struct gcmmucontext *gcmmucontext,
 
 	GCENTER(GCZONE_MAPPING);
 
-	if ((gcmmucontext == NULL) || (gcmmucontext->mmu == NULL)) {
+	if (gcmmucontext == NULL) {
 		gcerror = GCERR_MMU_CTXT_BAD;
 		goto exit;
 	}
@@ -689,7 +720,7 @@ enum gcerror gcmmu_map(struct gcmmucontext *gcmmucontext,
 	if (vacant->count != mem->count) {
 		GCDBG(GCZONE_MAPPING, "splitting vacant arena\n");
 
-		gcerror = get_arena(gcmmucontext->mmu, &split);
+		gcerror = get_arena(gcmmu, &split);
 		if (gcerror != GCERR_NONE)
 			goto exit;
 
@@ -740,21 +771,22 @@ exit:
 	return gcerror;
 }
 
-enum gcerror gcmmu_unmap(struct gcmmucontext *gcmmucontext,
+enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
+				struct gcmmucontext *gcmmucontext,
 				struct gcmmuarena *mapped)
 {
 	enum gcerror gcerror = GCERR_NONE;
+	struct gcmmu *gcmmu = &gccorecontext->gcmmu;
 	struct list_head *allochead, *prevhead, *nexthead;
 	struct gcmmuarena *allocated, *prevvacant, *nextvacant = NULL;
 	struct gcmmustlb *slave;
 	unsigned int *stlblogical;
 	union gcmmuloc index;
 	unsigned int i, freed, count;
-	struct gcmmu *mmu = get_mmu();
 
 	GCENTER(GCZONE_MAPPING);
 
-	if ((gcmmucontext == NULL) || (gcmmucontext->mmu == NULL)) {
+	if (gcmmucontext == NULL) {
 		gcerror = GCERR_MMU_CTXT_BAD;
 		goto exit;
 	}
@@ -855,8 +887,8 @@ enum gcerror gcmmu_unmap(struct gcmmucontext *gcmmucontext,
 			prevvacant->end.absolute = nextvacant->end.absolute;
 
 			/* Free the merged arenas. */
-			list_move(allochead, &mmu->vacarena);
-			list_move(nexthead, &mmu->vacarena);
+			list_move(allochead, &gcmmu->vacarena);
+			list_move(nexthead, &gcmmu->vacarena);
 		} else {
 			prevvacant = list_entry(prevhead, struct gcmmuarena,
 						link);
@@ -871,7 +903,7 @@ enum gcerror gcmmu_unmap(struct gcmmucontext *gcmmucontext,
 			prevvacant->end.absolute = allocated->end.absolute;
 
 			/* Free the merged arena. */
-			list_move(allochead, &mmu->vacarena);
+			list_move(allochead, &gcmmu->vacarena);
 		}
 	} else if (siblings(&gcmmucontext->vacant, allochead, nexthead)) {
 		GCDBG(GCZONE_MAPPING, "merged with the next:\n");
@@ -884,7 +916,7 @@ enum gcerror gcmmu_unmap(struct gcmmucontext *gcmmucontext,
 		nextvacant->count += allocated->count;
 
 		/* Free the merged arena. */
-		list_move(allochead, &mmu->vacarena);
+		list_move(allochead, &gcmmu->vacarena);
 	} else {
 		GCDBG(GCZONE_MAPPING, "cannot merge, inserting in between:\n");
 
