@@ -31,8 +31,10 @@
 #include <linux/switch.h>
 #include <video/hdmi_ti_4xxx_ip.h>
 #include <video/cec.h>
+#include <linux/input/cec_keyboard.h>
 
 #include "dss.h"
+#include "cec_util.h"
 
 #define CEC_UNREGISTERED_DEVICE	0xF
 /***************************/
@@ -57,13 +59,15 @@ static struct cec_t {
 	struct switch_dev rx_switch;
 	struct mutex lock;/* Mutex for cec access */
 	struct hdmi_ip_data hdmi_data;
-	bool cec_rx_data_valid;
 	struct workqueue_struct *my_workq;
+	struct cec_keyboard_device key_dev;
 	int phy_address;
 	int device_id;/* Logical address of cec dev */
 	int dss_state;
 	int switch_state;
 	int power_on;
+	int route_ui_cmds;
+	bool cec_rx_data_valid;
 } cec;
 
 static int cec_request_dss(void)
@@ -219,6 +223,13 @@ int cec_ioctl_register_device(struct cec_dev *dev)
 }
 EXPORT_SYMBOL(cec_ioctl_register_device);
 
+int cec_enable_ui_event(int enable)
+{
+	cec.route_ui_cmds = enable;
+	return 0;
+}
+EXPORT_SYMBOL(cec_enable_ui_event);
+
 long cec_ioctl(struct file *fd, unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
@@ -292,6 +303,38 @@ int cec_module_init(void)
 
 static void cec_rx_worker(struct work_struct *work)
 {
+	int r;
+	char rx_cmd;
+
+	/*UI events should be sent to keyboard driver*/
+	if (cec.route_ui_cmds && cec.key_dev.key_event) {
+		r = cec_request_dss();
+		if (r) {
+			pr_err("CEC no clocks\n");
+			return;
+		}
+		mutex_lock(&cec.lock);
+		r = hdmi_ti_4xx_cec_get_rx_cmd(&cec.hdmi_data, &rx_cmd);
+		if (rx_cmd == cec_cmd_u_user_control_pressed) {
+			r = hdmi_ti_4xx_cec_read_rx_cmd(&cec.hdmi_data,
+				&cec.rx_data);
+			if (!r)
+				r = cec.key_dev.key_event(cec.rx_data.rx_operand[0],
+					true);
+		} else if (rx_cmd == cec_cmd_u_user_control_released) {
+			r = hdmi_ti_4xx_cec_read_rx_cmd(&cec.hdmi_data,
+				&cec.rx_data);
+			if (!r)
+				r = cec.key_dev.key_event(cec.rx_data.rx_operand[0],
+					false);
+		}
+		mutex_unlock(&cec.lock);
+		cec_release_dss();
+	}
+
+	/* It is still OK to send event to user space for UI commands also
+	 * just to inform them about the cec event*/
+
 	cec.switch_state++;
 	switch_set_state(&cec.rx_switch, cec.switch_state);
 }
@@ -321,6 +364,9 @@ void cec_hpd_cb(int phy_addr, int status)
 	/* Set it to unregisterd device id */
 	cec.device_id = CEC_UNREGISTERED_DEVICE;
 	mutex_unlock(&cec.lock);
+
+	if (cec.key_dev.connect)
+		cec.key_dev.connect(status);
 }
 
 void cec_power_on_cb(int status)
@@ -413,6 +459,11 @@ static int __init cec_init(void)
 		goto error_work;
 
 	INIT_DELAYED_WORK(&cec_work.dwork, cec_rx_worker);
+	r = cec_get_keyboard_handle(&cec.key_dev);
+	if (r)
+		pr_err("Keyboard driver not present\n");
+
+	cec.route_ui_cmds = 0;
 	return 0;
 
 error_work:

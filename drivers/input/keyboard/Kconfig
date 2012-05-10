@@ -563,4 +563,11 @@ config KEYBOARD_W90P910
 	  To compile this driver as a module, choose M here: the
 	  module will be called w90p910_keypad.
 
+config KEYBOARD_CEC
+	tristate "CEC keyboard support"
+	depends on ARCH_OMAP4 || OMAP4_DSS_HDMI
+	default n
+	help
+	  Say Y here if your board suppots CEC keyboard
+
 endif
