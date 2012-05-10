@@ -69,6 +69,8 @@ struct hdmi_reg { u16 idx; };
 #define HDMI_CORE_SYS_INTR3			HDMI_CORE_SYS_REG(0x1CC)
 #define HDMI_CORE_SYS_INTR4			HDMI_CORE_SYS_REG(0x1D0)
 #define HDMI_CORE_SYS_UMASK1			HDMI_CORE_SYS_REG(0x1D4)
+#define HDMI_CORE_SYS_UMASK4			HDMI_CORE_SYS_REG(0x1E0)
+
 #define HDMI_CORE_SYS_TMDS_CTRL		HDMI_CORE_SYS_REG(0x208)
 #define HDMI_CORE_SYS_DE_DLY			HDMI_CORE_SYS_REG(0xC8)
 #define HDMI_CORE_SYS_DE_CTRL			HDMI_CORE_SYS_REG(0xCC)
@@ -196,6 +198,35 @@ struct hdmi_reg { u16 idx; };
 #define HDMI_TXPHY_POWER_CTRL			HDMI_PHY_REG(0x8)
 #define HDMI_TXPHY_PAD_CFG_CTRL		HDMI_PHY_REG(0xC)
 
+
+/**************************************
+* HDMI CEC registers *
+***************************************/
+#define HDMI_CEC_REG(idx)			HDMI_REG(idx)
+
+#define HDMI_CEC_DEV_ID                         HDMI_CEC_REG(0x0)
+#define HDMI_CEC_SPEC                           HDMI_CEC_REG(0x4)
+#define HDMI_CEC_TX_INIT                        HDMI_CEC_REG(0x20)
+#define HDMI_CEC_TX_DEST                        HDMI_CEC_REG(0x24)
+#define HDMI_CEC_TRANSMIT_DATA                  HDMI_CEC_REG(0x7c)
+#define HDMI_CEC_SETUP                          HDMI_CEC_REG(0x38)
+#define HDMI_CEC_TX_COMMAND                     HDMI_CEC_REG(0x3c)
+#define HDMI_CEC_DBG_3                          HDMI_CEC_REG(0x1c)
+#define HDMI_CEC_INT_STATUS_1                   HDMI_CEC_REG(0x9c)
+#define HDMI_CEC_INT_STATUS_0                   HDMI_CEC_REG(0x98)
+#define HDMI_CEC_INT_ENABLE_0                   HDMI_CEC_REG(0x90)
+#define HDMI_CEC_RX_CMD_HEADER                  HDMI_CEC_REG(0xb8)
+#define HDMI_CEC_RX_COUNT                       HDMI_CEC_REG(0xB4)
+#define HDMI_CEC_RX_CONTROL                     HDMI_CEC_REG(0xB0)
+#define HDMI_CEC_RX_COMMAND                     HDMI_CEC_REG(0xbc)
+#define HDMI_CEC_RX_OPERAND                     (0xc0)
+#define HDMI_CEC_TX_OPERAND                     (0x40)
+#define HDMI_CEC_CA_7_0                         (0x88)
+#define HDMI_CEC_CA_15_8                        (0x8c)
+
+#define HDMI_CEC_TX_FIFO_INT_MASK		(0x64)
+#define HDMI_CEC_RETRANSMIT_CNT_INT_MASK	(0x2)
+
 #define FLD_MASK(start, end)	(((1 << ((start) - (end) + 1)) - 1) << (end))
 #define FLD_VAL(val, start, end) (((val) << (end)) & FLD_MASK(start, end))
 #define FLD_GET(val, start, end) (((val) & FLD_MASK(start, end)) >> (end))
@@ -206,6 +237,9 @@ struct hdmi_reg { u16 idx; };
 							val, start, end))
 #define REG_GET(base, idx, start, end) \
 	FLD_GET(hdmi_read_reg(base, idx), start, end)
+
+#define WR_REG_32(base, offset, val)	__raw_writel(val, base + offset)
+#define RD_REG_32(base, offset)		__raw_readl(base + offset)
 
 enum hdmi_phy_pwr {
 	HDMI_PHYPWRCMD_OFF = 0,
