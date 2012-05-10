@@ -26,13 +26,13 @@
 $(if $(KERNELDIR),,$(error KERNELDIR must be set to obtain a version))
 
 override KERNEL_VERSION := \
- $(shell grep "^VERSION = " $(KERNELDIR)/Makefile | cut -f3 -d' ')
+ $(shell grep "^VERSION = " $(KERNELSRC)/Makefile | cut -f3 -d' ')
 override KERNEL_PATCHLEVEL := \
- $(shell grep "^PATCHLEVEL = " $(KERNELDIR)/Makefile | cut -f3 -d' ')
+ $(shell grep "^PATCHLEVEL = " $(KERNELSRC)/Makefile | cut -f3 -d' ')
 override KERNEL_SUBLEVEL := \
- $(shell grep "^SUBLEVEL = " $(KERNELDIR)/Makefile | cut -f3 -d' ')
+ $(shell grep "^SUBLEVEL = " $(KERNELSRC)/Makefile | cut -f3 -d' ')
 override KERNEL_EXTRAVERSION := \
- $(shell grep "^EXTRAVERSION = " $(KERNELDIR)/Makefile | cut -f3 -d' ')
+ $(shell grep "^EXTRAVERSION = " $(KERNELSRC)/Makefile | cut -f3 -d' ')
 
 # Break the Mesa version up into a space separated list
 kernel_version_as_list := $(KERNEL_VERSION) \
@@ -49,7 +49,7 @@ override KERNEL_BASE_ID := \
 # Try to get the kernel ID from the kernel.release file.
 # 
 KERNEL_ID ?= \
- $(shell cat $(KERNELDIR)/include/config/kernel.release 2>/dev/null)
+ $(shell cat $(KERNELSRC)/include/config/kernel.release 2>/dev/null)
 
 # If the kernel ID isn't set yet, try to set it from the UTS_RELEASE
 # macro.
@@ -57,7 +57,7 @@ KERNEL_ID ?= \
 ifeq ($(strip $(KERNEL_ID)),)
 KERNEL_ID := \
  $(shell grep -h '\#define UTS_RELEASE' \
-	$(KERNELDIR)/include/linux/* | cut -f3 -d' ' | sed s/\"//g)
+	$(KERNELSRC)/include/linux/* | cut -f3 -d' ' | sed s/\"//g)
 endif
 
 ifeq ($(strip $(KERNEL_ID)),)

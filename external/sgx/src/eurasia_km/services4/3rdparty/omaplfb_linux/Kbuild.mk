@@ -25,8 +25,8 @@
 
 ccflags-y += \
 	-I$(TOP)/services4/3rdparty/omaplfb_linux \
-	-I$(KERNELDIR)/drivers/video/omap2 \
-	-I$(KERNELDIR)/arch/arm/plat-omap/include
+	-I$(KERNELSRC)/drivers/video/omap2 \
+	-I$(KERNELSRC)/arch/arm/plat-omap/include
 
 omaplfb_sgx$(SGXCORE)_$(SGX_CORE_REV)-y += \
 	services4/3rdparty/omaplfb_linux/omaplfb_displayclass.o \
