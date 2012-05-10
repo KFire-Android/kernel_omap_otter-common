@@ -810,8 +810,6 @@ static int pdev_remove(struct platform_device *device)
 {
 	DBG("");
 	drm_platform_exit(&omap_drm_driver, device);
-
-	platform_driver_unregister(&omap_dmm_driver);
 	return 0;
 }
 
@@ -830,10 +828,6 @@ struct platform_driver pdev = {
 static int __init omap_drm_init(void)
 {
 	DBG("init");
-	if (platform_driver_register(&omap_dmm_driver)) {
-		/* we can continue on without DMM.. so not fatal */
-		dev_err(NULL, "DMM registration failed\n");
-	}
 	return platform_driver_register(&pdev);
 }
 

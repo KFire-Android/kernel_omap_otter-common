@@ -963,6 +963,19 @@ struct platform_driver omap_dmm_driver = {
 	},
 };
 
+static int __init omap_dmm_init(void)
+{
+	return platform_driver_register(&omap_dmm_driver);
+}
+
+static void __exit omap_dmm_exit(void)
+{
+	platform_driver_unregister(&omap_dmm_driver);
+}
+
+module_init(omap_dmm_init);
+module_exit(omap_dmm_exit);
+
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Andy Gross <andy.gross@ti.com>");
 MODULE_DESCRIPTION("OMAP DMM/Tiler Driver");

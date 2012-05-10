@@ -12,11 +12,13 @@ omapdrm-y := omap_drv.o \
 	omap_connector.o \
 	omap_fb.o \
 	omap_fbdev.o \
-	omap_gem.o \
-	omap_dmm_tiler.o \
-	tcm-sita.o
+	omap_gem.o
 
 # temporary:
 omapdrm-y += omap_gem_helpers.o
 
-obj-$(CONFIG_DRM_OMAP)	+= omapdrm.o
+omap-dmm-tiler-y := omap_dmm_tiler.o \
+	tcm-sita.o
+
+obj-$(CONFIG_DRM_OMAP_DMM_TILER) += omap-dmm-tiler.o
+obj-$(CONFIG_DRM_OMAP_DISPLAY)	+= omapdrm.o
