@@ -462,6 +462,7 @@ enum gcerror gc_set_power(struct gccorecontext *gccorecontext,
 			break;
 
 		case GCPWR_OFF:
+			gcpwr_enable_pulse_skipping(gccorecontext);
 			gcpwr_disable_clock(gccorecontext);
 
 			if (gccorecontext->irqenabled) {
@@ -606,9 +607,8 @@ void gc_commit(struct gccommit *gccommit, bool fromuser)
 	}
 
 exit:
-	gc_set_power(gccorecontext, GCPWR_LOW);
-	if (gccorecontext->forceoff)
-		gc_set_power(gccorecontext, GCPWR_OFF);
+	gc_set_power(gccorecontext,
+			gccorecontext->forceoff ? GCPWR_OFF : GCPWR_LOW);
 
 	mutex_unlock(&gccorecontext->mmucontextlock);
 
