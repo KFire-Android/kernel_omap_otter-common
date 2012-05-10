@@ -29,6 +29,9 @@
 #include "common.h"
 
 #define MAX_FREQ_UPDATE_TIMEOUT  100000
+#define OMAP_1GHz		1000000000
+#define OMAP_920MHz		920000000
+#define OMAP_748MHz		748000000
 
 static struct clockdomain *l3_emif_clkdm;
 
@@ -248,6 +251,90 @@ int omap4_core_dpll_m5x2_set_rate(struct clk *clk, unsigned long rate)
 	clk->rate = validrate;
 
 	return 0;
+}
+
+static void omap4460_mpu_dpll_update_children(unsigned long rate)
+{
+	u32 v;
+
+	/*
+	 * The interconnect frequency to EMIF should
+	 * be switched between MPU clk divide by 4 (for
+	 * frequencies higher than 920Mhz) and MPU clk divide
+	 * by 2 (for frequencies lower than or equal to 920Mhz)
+	 * Also the async bridge to ABE must be MPU clk divide
+	 * by 8 for MPU clk > 748Mhz and MPU clk divide by 4
+	 * for lower frequencies.
+	 */
+	v = __raw_readl(OMAP4430_CM_MPU_MPU_CLKCTRL);
+	if (rate > OMAP_920MHz)
+		v |= OMAP4460_CLKSEL_EMIF_DIV_MODE_MASK;
+	else
+		v &= ~OMAP4460_CLKSEL_EMIF_DIV_MODE_MASK;
+
+	if (rate > OMAP_748MHz)
+		v |= OMAP4460_CLKSEL_ABE_DIV_MODE_MASK;
+	else
+		v &= ~OMAP4460_CLKSEL_ABE_DIV_MODE_MASK;
+	__raw_writel(v, OMAP4430_CM_MPU_MPU_CLKCTRL);
+}
+
+int omap4460_mpu_dpll_set_rate(struct clk *clk, unsigned long rate)
+{
+	struct dpll_data *dd;
+	unsigned long dpll_rate;
+
+	if (!clk || !rate || !clk->parent)
+		return -EINVAL;
+
+	dd = clk->parent->dpll_data;
+
+	if (!dd)
+		return -EINVAL;
+
+	if (!clk->parent->set_rate)
+		return -EINVAL;
+
+	if (rate > clk->rate)
+		omap4460_mpu_dpll_update_children(rate);
+
+	dpll_rate = omap2_get_dpll_rate(clk->parent);
+
+	if (rate != dpll_rate)
+		clk->parent->set_rate(clk->parent, rate);
+
+	if (rate < clk->rate)
+		omap4460_mpu_dpll_update_children(rate);
+
+	clk->rate = rate;
+
+	return 0;
+}
+
+long omap4460_mpu_dpll_round_rate(struct clk *clk, unsigned long rate)
+{
+	if (!clk || !rate || !clk->parent)
+		return -EINVAL;
+
+	if (clk->parent->round_rate)
+		return clk->parent->round_rate(clk->parent, rate);
+	else
+		return 0;
+}
+
+unsigned long omap4460_mpu_dpll_recalc(struct clk *clk)
+{
+	struct dpll_data *dd;
+
+	if (!clk || !clk->parent)
+		return -EINVAL;
+
+	dd = clk->parent->dpll_data;
+
+	if (!dd)
+		return -EINVAL;
+
+	return omap2_get_dpll_rate(clk->parent);
 }
 
 /* Supported only on OMAP4 */
