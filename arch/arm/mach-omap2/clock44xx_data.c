@@ -460,6 +460,11 @@ static struct clk dpll_core_ck = {
 	.ops		= &clkops_omap3_core_dpll_ops,
 	.recalc		= &omap3_dpll_recalc,
 	.speculate	= &omap2_clksel_speculate,
+
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	.round_rate     = &omap2_dpll_round_rate,
+	.set_rate       = &omap4_core_dpll_set_rate,
+#endif
 };
 
 static struct clk dpll_core_x2_ck = {

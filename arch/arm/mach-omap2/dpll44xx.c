@@ -54,6 +54,8 @@ struct dpll_cascading_blocker {
 
 static atomic_t in_dpll_cascading = ATOMIC_INIT(0);
 static LIST_HEAD(dpll_cascading_blocker_list);
+static struct clk *dpll_core_m2_ck, *dpll_core_m5x2_ck;
+static struct clk *gpmc_ick;
 #endif
 
 /**
@@ -61,12 +63,12 @@ static LIST_HEAD(dpll_cascading_blocker_list);
  * @clk: struct clk * of DPLL to set
  * @rate: rounded target rate
  *
- * Programs the CM shadow registers to update CORE DPLL M2
- * divider. M2 divider is used to clock external DDR and its
- * reconfiguration on frequency change is managed through a
- * hardware sequencer. This is managed by the PRCM with EMIF
- * uding shadow registers.
- * Returns -EINVAL/-1 on error and 0 on success.
+ * Programs the CM shadow registers to update CORE DPLL M2 divider. M2 divider
+ * is used to clock external DDR and its reconfiguration on frequency change
+ * is managed through a hardware sequencer. This is managed by the PRCM with
+ * EMIF using shadow registers.  If rate specified matches DPLL_CORE's bypass
+ * clock rate then put it in Low-Power Bypass.
+ * Returns negative int on error and 0 on success.
  */
 int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 {
@@ -92,7 +94,7 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 
 	spin_lock_irqsave(&l3_emif_lock, flags);
 
-	/* Configures MEMIF domain in SW_WKUP */
+	/* Configures MEMIF domain in SW_WKUP & increment usecount for clks */
 	clkdm_wakeup(l3_emif_clkdm);
 
 	/*
@@ -125,38 +127,34 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	omap_emif_frequency_pre_notify();
 
 	/*
-	 * Program EMIF timing parameters in EMIF shadow registers
-	 * for targetted DRR clock.
-	 * DDR Clock = core_dpll_m2 / 2
+	 * maybe program core m5 divider here
+	 * definitely program m3, m6 & m7 dividers here
+	 * DDR clock = DPLL_CORE_M2_CK / 2.  Program EMIF timing
+	 * parameters in EMIF shadow registers for validrate divided
+	 * by 2.
 	 */
 	omap_emif_setup_registers(validrate >> 1, LPDDR2_VOLTAGE_STABLE);
 
 	/*
-	 * FREQ_UPDATE sequence:
-	 * - DLL_OVERRIDE=0 (DLL lock & code must not be overridden
-	 *	after CORE DPLL lock)
-	 * - DLL_RESET=1 (DLL must be reset upon frequency change)
-	 * - DPLL_CORE_M2_DIV with same value as the one already
-	 *	in direct register
-	 * - DPLL_CORE_DPLL_EN=0x7 (to make CORE DPLL lock)
-	 * - FREQ_UPDATE=1 (to start HW sequence)
+	 * program DPLL_CORE_M2_DIV with same value as the one already
+	 * in direct register and lock DPLL_CORE
 	 */
-	shadow_freq_cfg1 = (1 << OMAP4430_DLL_RESET_SHIFT) |
-			(new_div << OMAP4430_DPLL_CORE_M2_DIV_SHIFT) |
-			(DPLL_LOCKED << OMAP4430_DPLL_CORE_DPLL_EN_SHIFT) |
-			(1 << OMAP4430_FREQ_UPDATE_SHIFT);
-	shadow_freq_cfg1 &= ~OMAP4430_DLL_OVERRIDE_MASK;
+	shadow_freq_cfg1 =
+		(new_div << OMAP4430_DPLL_CORE_M2_DIV_SHIFT) |
+		(DPLL_LOCKED << OMAP4430_DPLL_CORE_DPLL_EN_SHIFT) |
+		(1 << OMAP4430_DLL_RESET_SHIFT) |
+		(1 << OMAP4430_FREQ_UPDATE_SHIFT);
 	__raw_writel(shadow_freq_cfg1, OMAP4430_CM_SHADOW_FREQ_CONFIG1);
 
 	/* wait for the configuration to be applied */
 	omap_test_timeout(((__raw_readl(OMAP4430_CM_SHADOW_FREQ_CONFIG1)
-				& OMAP4430_FREQ_UPDATE_MASK) == 0),
-				MAX_FREQ_UPDATE_TIMEOUT, i);
+					& OMAP4430_FREQ_UPDATE_MASK) == 0),
+			MAX_FREQ_UPDATE_TIMEOUT, i);
 
 	/* Re-enable DDR self refresh */
 	omap_emif_frequency_post_notify();
 
-	/* Configures MEMIF domain back to HW_WKUP */
+	/* put MEMIF clkdm back to HW_AUTO & decrement usecount for clks */
 	clkdm_allow_idle(l3_emif_clkdm);
 
 	spin_unlock_irqrestore(&l3_emif_lock, flags);
@@ -169,10 +167,267 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 
 	/* Update the clock change */
 	clk->rate = validrate;
-
 	return 0;
 }
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+/**
+ * omap4_core_dpll_set_rate - set the rate for the CORE DPLL
+ * @clk: struct clk * of the DPLL to set
+ * @rate: rounded target rate
+ *
+ * Program the CORE DPLL, including handling of EMIF frequency changes on M2
+ * divider.  Returns 0 on success, otherwise a negative error code.
+ */
+int omap4_core_dpll_set_rate(struct clk *clk, unsigned long rate)
+{
+	int i = 0, m2_div, m5_div;
+	u32 mask, reg;
+	u32 shadow_freq_cfg1 = 0, shadow_freq_cfg2 = 0;
+	struct clk *new_parent;
+	struct dpll_data *dd;
+	unsigned long flags;
+	int res = 0;
+
+	if (!clk  || !rate)
+		return -EINVAL;
+
+	if (!clk->dpll_data)
+		return -EINVAL;
+
+	dd = clk->dpll_data;
+
+	if (rate == clk->rate)
+		return 0;
+
+	/* enable reference and bypass clocks */
+	omap2_clk_enable(dd->clk_bypass);
+	omap2_clk_enable(dd->clk_ref);
+
+	/* Just to avoid look-up on every call to speed up */
+	if (!l3_emif_clkdm) {
+		l3_emif_clkdm = clkdm_lookup("l3_emif_clkdm");
+		if (!l3_emif_clkdm) {
+			pr_err("%s: clockdomain lookup failed\n", __func__);
+			return -EINVAL;
+		}
+	}
+	if (!dpll_core_m2_ck)
+		dpll_core_m2_ck = clk_get(NULL, "dpll_core_m2_ck");
+	if (!dpll_core_m5x2_ck)
+		dpll_core_m5x2_ck = clk_get(NULL, "dpll_core_m5x2_ck");
+	if (!gpmc_ick)
+		gpmc_ick = clk_get(NULL, "gpmc_ick");
+
+	spin_lock_irqsave(&l3_emif_lock, flags);
+
+	/* Make sure MEMIF clkdm is in SW_WKUP & GPMC clocks are active */
+	clkdm_wakeup(l3_emif_clkdm);
+	omap2_clk_enable(gpmc_ick);
+
+	/*
+	 * Errata ID: i728
+	 *
+	 * DESCRIPTION:
+	 *
+	 * If during a small window the following three events occur:
+	 *
+	 * 1) The EMIF_PWR_MGMT_CTRL[7:4] REG_SR_TIM SR_TIMING counter expires
+	 * 2) Frequency change update is requested CM_SHADOW_FREQ_CONFIG1
+	 *    FREQ_UPDATE set to 1
+	 * 3) OCP access is requested
+	 *
+	 * There will be clock instability on the DDR interface.
+	 *
+	 * WORKAROUND:
+	 *
+	 * Prevent event 1) while event 2) is happening.
+	 *
+	 * Disable the self-refresh when requesting a frequency change.
+	 * Before requesting a frequency change, program
+	 * EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE to 0x0
+	 * (omap_emif_frequency_pre_notify)
+	 *
+	 * When the frequency change is completed, reprogram
+	 * EMIF_PWR_MGMT_CTRL[10:8] REG_LP_MODE to 0x2.
+	 * (omap_emif_frequency_post_notify)
+	 */
+	omap_emif_frequency_pre_notify();
+
+	/* FIXME set m3, m6 & m7 rates here? */
+
+	/* check for bypass rate */
+	if (rate == dd->clk_bypass->rate &&
+			clk->dpll_data->modes & (1 << DPLL_LOW_POWER_BYPASS)) {
+		/*
+		 * DDR clock = DPLL_CORE_M2_CK / 2.  Program EMIF timing
+		 * parameters in EMIF shadow registers for bypass clock rate
+		 * divided by 2
+		 */
+		omap_emif_setup_registers(rate / 2, LPDDR2_VOLTAGE_STABLE);
+
+		/*
+		 * program CM_DIV_M5_DPLL_CORE.DPLL_CLKOUT_DIV into shadow
+		 * register as well as L3_CLK freq and update GPMC frequency
+		 *
+		 * HACK: hardcode L3_CLK = CORE_CLK / 2 for DPLL cascading
+		 * HACK: hardcode CORE_CLK = CORE_X2_CLK / 2 for DPLL
+		 * cascading
+		 */
+		m5_div = omap4_prm_read_bits_shift(
+				dpll_core_m5x2_ck->clksel_reg,
+				dpll_core_m5x2_ck->clksel_mask);
+
+		shadow_freq_cfg2 =
+			(m5_div << OMAP4430_DPLL_CORE_M5_DIV_SHIFT) |
+			(1 << OMAP4430_CLKSEL_L3_SHADOW_SHIFT) |
+			(0 << OMAP4430_CLKSEL_CORE_1_1_SHIFT) |
+			(1 << OMAP4430_GPMC_FREQ_UPDATE_SHIFT);
+
+		__raw_writel(shadow_freq_cfg2, OMAP4430_CM_SHADOW_FREQ_CONFIG2);
+
+
+		/*
+		 * program CM_DIV_M2_DPLL_CORE.DPLL_CLKOUT_DIV
+		 * for divide by two, ensure DLL_OVERRIDE = '1'
+		 * and put DPLL_CORE into LP Bypass
+		 */
+		m2_div = omap4_prm_read_bits_shift(dpll_core_m2_ck->clksel_reg,
+				dpll_core_m2_ck->clksel_mask);
+
+		shadow_freq_cfg1 =
+			(m2_div << OMAP4430_DPLL_CORE_M2_DIV_SHIFT) |
+			(DPLL_LOW_POWER_BYPASS <<
+			 OMAP4430_DPLL_CORE_DPLL_EN_SHIFT) |
+			(1 << OMAP4430_DLL_RESET_SHIFT) |
+			(1 << OMAP4430_FREQ_UPDATE_SHIFT) |
+			(1 << OMAP4430_DLL_OVERRIDE_SHIFT);
+		__raw_writel(shadow_freq_cfg1, OMAP4430_CM_SHADOW_FREQ_CONFIG1);
+
+		new_parent = dd->clk_bypass;
+	} else {
+		if (dd->last_rounded_rate != rate)
+			rate = clk->round_rate(clk, rate);
+
+		if (dd->last_rounded_rate == 0) {
+			res = -EINVAL;
+			goto out;
+		}
+
+		if (omap4_prm_read_bits_shift(dd->idlest_reg,
+					OMAP4430_ST_DPLL_CLK_MASK)) {
+				WARN_ONCE(1, "%s: DPLL core should be in"
+					"Low Power Bypass\n", __func__);
+				res = -EINVAL;
+				goto out;
+		}
+
+		/*
+		 * DDR clock = DPLL_CORE_M2_CK / 2.  Program EMIF timing
+		 * parameters in EMIF shadow registers for rate divided
+		 * by 2.
+		 */
+		omap_emif_setup_registers(rate / 2, LPDDR2_VOLTAGE_STABLE);
+
+		/*
+		 * FIXME skipping bypass part of omap3_noncore_dpll_program.
+		 * also x-loader's configure_core_dpll_no_lock bypasses
+		 * DPLL_CORE directly through CM_CLKMODE_DPLL_CORE via MN
+		 * bypass; no shadow register necessary!
+		 */
+
+		mask = (dd->mult_mask | dd->div1_mask);
+		reg  = (dd->last_rounded_m << __ffs(dd->mult_mask)) |
+			((dd->last_rounded_n - 1) << __ffs(dd->div1_mask));
+
+		/* program mn divider values */
+		omap4_prm_rmw_reg_bits(mask, reg, dd->mult_div1_reg);
+
+		/*
+		 * program CM_DIV_M5_DPLL_CORE.DPLL_CLKOUT_DIV into shadow
+		 * register as well as L3_CLK freq and update GPMC frequency
+		 *
+		 * HACK: hardcode L3_CLK = CORE_CLK / 2 for DPLL cascading
+		 * HACK: hardcode CORE_CLK = CORE_X2_CLK / 1 for DPLL
+		 * cascading
+		 */
+		m5_div = omap4_prm_read_bits_shift(
+				dpll_core_m5x2_ck->clksel_reg,
+				dpll_core_m5x2_ck->clksel_mask);
+
+		shadow_freq_cfg2 =
+			(m5_div << OMAP4430_DPLL_CORE_M5_DIV_SHIFT) |
+			(1 << OMAP4430_CLKSEL_L3_SHADOW_SHIFT) |
+			(0 << OMAP4430_CLKSEL_CORE_1_1_SHIFT) |
+			(1 << OMAP4430_GPMC_FREQ_UPDATE_SHIFT);
+
+		__raw_writel(shadow_freq_cfg2, OMAP4430_CM_SHADOW_FREQ_CONFIG2);
+
+		/*
+		 * program DPLL_CORE_M2_DIV with same value
+		 * as the one already in direct register, ensure
+		 * DLL_OVERRIDE = '0' and lock DPLL_CORE
+		 */
+		m2_div = omap4_prm_read_bits_shift(dpll_core_m2_ck->clksel_reg,
+				dpll_core_m2_ck->clksel_mask);
+
+		shadow_freq_cfg1 =
+			(m2_div << OMAP4430_DPLL_CORE_M2_DIV_SHIFT) |
+			(DPLL_LOCKED << OMAP4430_DPLL_CORE_DPLL_EN_SHIFT) |
+			(1 << OMAP4430_DLL_RESET_SHIFT) |
+			(1 << OMAP4430_FREQ_UPDATE_SHIFT) |
+			(0 << OMAP4430_DLL_OVERRIDE_SHIFT);
+		__raw_writel(shadow_freq_cfg1, OMAP4430_CM_SHADOW_FREQ_CONFIG1);
+
+		new_parent = dd->clk_ref;
+	}
+
+	/* wait for the configuration to be applied */
+	omap_test_timeout(((__raw_readl(OMAP4430_CM_SHADOW_FREQ_CONFIG1)
+				& OMAP4430_FREQ_UPDATE_MASK) == 0),
+				MAX_FREQ_UPDATE_TIMEOUT, i);
+
+	/* clear GPMC_FREQ_UPDATE bit */
+	shadow_freq_cfg2 = __raw_readl(OMAP4430_CM_SHADOW_FREQ_CONFIG2);
+	shadow_freq_cfg2 &= ~1;
+	__raw_writel(shadow_freq_cfg2, OMAP4430_CM_SHADOW_FREQ_CONFIG2);
+
+	/*
+	 * Switch the parent clock in the heirarchy, and make sure that the
+	 * new parent's usecount is correct.  Note: we enable the new parent
+	 * before disabling the old to avoid any unnecessary hardware
+	 * disable->enable transitions.
+	 */
+	if (clk->usecount) {
+		omap2_clk_enable(new_parent);
+		omap2_clk_disable(clk->parent);
+	}
+	clk_reparent(clk, new_parent);
+	clk->rate = rate;
+
+	/* disable reference and bypass clocks */
+	omap2_clk_disable(dd->clk_bypass);
+	omap2_clk_disable(dd->clk_ref);
+
+	/* Re-enable DDR self refresh */
+	omap_emif_frequency_post_notify();
+
+	/* Configures MEMIF domain back to HW_WKUP & let GPMC clocks to idle */
+	clkdm_allow_idle(l3_emif_clkdm);
+	omap2_clk_disable(gpmc_ick);
+
+out:
+	spin_unlock_irqrestore(&l3_emif_lock, flags);
+
+	if (i == MAX_FREQ_UPDATE_TIMEOUT) {
+		pr_err("%s: Frequency update for CORE DPLL M2 change failed\n",
+				__func__);
+		res = -EBUSY;
+	}
+
+	return res;
+}
+#endif
 
 /**
  * omap4_prcm_freq_update - set freq_update bit
