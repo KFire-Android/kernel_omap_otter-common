@@ -362,7 +362,7 @@ static struct clockdomain iss_44xx_clkdm = {
 	.flags		  = CLKDM_CAN_SWSUP,
 };
 
-static struct clockdomain l3_dss_44xx_clkdm = {
+static struct clockdomain l3_dss_443x_446x_clkdm = {
 	.name		  = "l3_dss_clkdm",
 	.pwrdm		  = { .name = "dss_pwrdm" },
 	.prcm_partition	  = OMAP4430_CM2_PARTITION,
@@ -372,6 +372,23 @@ static struct clockdomain l3_dss_44xx_clkdm = {
 	.wkdep_srcs	  = l3_dss_wkup_sleep_deps,
 	.sleepdep_srcs	  = l3_dss_wkup_sleep_deps,
 	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
+};
+
+/*
+ * WORK-AROUND: There are currently problems with integration of BB2D with
+ * DSS during suspend/resume. Therefore we have added a special version of
+ * of l3_dss_clkdm for 4470 which will not use HW_AUTO
+ */
+static struct clockdomain l3_dss_447x_clkdm = {
+	.name		  = "l3_dss_clkdm",
+	.pwrdm		  = { .name = "dss_pwrdm" },
+	.prcm_partition	  = OMAP4430_CM2_PARTITION,
+	.cm_inst	  = OMAP4430_CM2_DSS_INST,
+	.clkdm_offs	  = OMAP4430_CM2_DSS_DSS_CDOFFS,
+	.dep_bit	  = OMAP4430_DSS_STATDEP_SHIFT,
+	.wkdep_srcs	  = l3_dss_wkup_sleep_deps,
+	.sleepdep_srcs	  = l3_dss_wkup_sleep_deps,
+	.flags		  = CLKDM_CAN_SWSUP,
 };
 
 static struct clockdomain l4_wkup_44xx_clkdm = {
@@ -426,10 +443,19 @@ static struct clockdomain *clockdomains_omap44xx[] __initdata = {
 	&l3_2_44xx_clkdm,
 	&l3_1_44xx_clkdm,
 	&iss_44xx_clkdm,
-	&l3_dss_44xx_clkdm,
 	&l4_wkup_44xx_clkdm,
 	&emu_sys_44xx_clkdm,
 	&l3_dma_44xx_clkdm,
+	NULL
+};
+
+static struct clockdomain *clockdomains_omap443x_446x[] __initdata = {
+	&l3_dss_443x_446x_clkdm,
+	NULL
+};
+
+static struct clockdomain *clockdomains_omap447x[] __initdata = {
+	&l3_dss_447x_clkdm,
 	NULL
 };
 
@@ -438,5 +464,11 @@ void __init omap44xx_clockdomains_init(void)
 {
 	clkdm_register_platform_funcs(&omap4_clkdm_operations);
 	clkdm_register_clkdms(clockdomains_omap44xx);
+
+	if (cpu_is_omap443x() || cpu_is_omap446x())
+		clkdm_register_clkdms(clockdomains_omap443x_446x);
+	else if (cpu_is_omap447x())
+		clkdm_register_clkdms(clockdomains_omap447x);
+
 	clkdm_complete_init();
 }
