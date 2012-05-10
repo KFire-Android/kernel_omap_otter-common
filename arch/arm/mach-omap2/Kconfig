@@ -415,6 +415,19 @@ config OMAP_REBOOT_REASON
 	depends on ARCH_OMAP4
 	bool
 
+config OMAP4_DPLL_CASCADING
+       bool  "Enable DPLL Cascading for OMAP4"
+       depends on ARCH_OMAP4
+       depends on PM
+       depends on HAS_EARLYSUSPEND
+       default y
+       help
+         Select this option to enable DPLL Cascading during Low power mp3
+         playback. It will enter DPLL cascade when :
+               - Head set is inserted.
+               - Display is Off.
+               - No USB.
+
 config OMAP_RAM_CONSOLE
         bool "Enable OMAP support for Android RAM console"
         depends on ANDROID_RAM_CONSOLE
