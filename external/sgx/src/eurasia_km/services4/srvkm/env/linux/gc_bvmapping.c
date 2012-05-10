@@ -67,6 +67,7 @@ void gc_bvmap_meminfo(PVRSRV_KERNEL_MEM_INFO *psMemInfo)
 	buffdesc->length = psMemInfo->uAllocSize;
 	buffdesc->auxtype = BVAT_PHYSDESC;
 	buffdesc->auxptr = physdesc;
+	physdesc->structsize = sizeof(*physdesc);
 	physdesc->pagesize = PAGE_SIZE;
 	physdesc->pagearray = page_addrs;
 	physdesc->pagecount = num_pages;
@@ -77,13 +78,12 @@ void gc_bvmap_meminfo(PVRSRV_KERNEL_MEM_INFO *psMemInfo)
 	else
 		psMemInfo->bvmap_handle = buffdesc;
 
-	kfree(page_addrs);
-	kfree(physdesc);
 }
 
 void gc_bvunmap_meminfo(PVRSRV_KERNEL_MEM_INFO *psMemInfo)
 {
 	struct bvbuffdesc *buffdesc;
+	struct bvphysdesc *physdesc;
 	struct bventry bv_entry;
 	enum bverror bv_error;
 
@@ -92,8 +92,11 @@ void gc_bvunmap_meminfo(PVRSRV_KERNEL_MEM_INFO *psMemInfo)
 		return;
 
 	buffdesc = psMemInfo->bvmap_handle;
+	physdesc = (struct bvphysdesc*) buffdesc->auxptr;
 	bv_error = bv_entry.bv_unmap(buffdesc);
 
+	kfree(physdesc->pagearray);
+	kfree(physdesc);
 	kfree(psMemInfo->bvmap_handle);
 	psMemInfo->bvmap_handle = NULL;
 }

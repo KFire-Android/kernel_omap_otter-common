@@ -1108,9 +1108,9 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 						  dsscomp_proxy_cmdcomplete,
 						  (void *)hCmdCookie);
 
-	for(i = 0; i < k; i++)
+	for(i = 0; i < ARRAY_SIZE(asMemInfo); i++)
 	{
-		tiler_pa_free(apsTilerPAs[i]);
+		tiler_pa_free(asMemInfo[i].psTilerInfo);
 	}
 
 	return IMG_TRUE;

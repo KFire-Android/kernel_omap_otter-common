@@ -73,6 +73,7 @@
 #include "event.h"
 #include "linkage.h"
 #include "pvr_uaccess.h"
+#include "lock.h"
 #include <syslocal.h>
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))
@@ -3288,6 +3289,16 @@ IMG_UINT32 OSAtomicRead(IMG_PVOID pvRefCount)
 	AtomicStruct *psRefCount = pvRefCount;
 
 	return (IMG_UINT32) atomic_read(&psRefCount->RefCount);
+}
+
+IMG_VOID OSReleaseBridgeLock(IMG_VOID)
+{
+       LinuxUnLockMutex(&gPVRSRVLock);
+}
+
+IMG_VOID OSReacquireBridgeLock(IMG_VOID)
+{
+       LinuxLockMutex(&gPVRSRVLock);
 }
 
 PVRSRV_ERROR PVROSFuncInit(IMG_VOID)

@@ -35,7 +35,7 @@
 #include "kerneldisplay.h"
 #include "omaplfb.h"
 
-static int debugbv;
+static int debugbv = 0;
 extern struct ion_client *gpsIONClient;
 
 /*
@@ -88,23 +88,27 @@ static void print_bvparams(struct bvbltparams *bltparams,
 		physdesc ? physdesc->pagearray : NULL);
 
 	printk(KERN_INFO "%s: src1 %d,%d rect{%d,%d sz %d,%d}"
-		" stride %ld, virtaddr 0x%x (0x%x)\n", "bv",
+		" stride %ld, %s 0x%x (0x%x)\n", "bv",
 		bltparams->src1geom->width,
 		bltparams->src1geom->height, bltparams->src1rect.left,
 		bltparams->src1rect.top, bltparams->src1rect.width,
 		bltparams->src1rect.height, bltparams->src1geom->virtstride,
-		(unsigned int)bltparams->src1.desc->virtaddr, pSrc1DescInfo);
+		bltparams->src1.desc->auxtype == BVAT_PHYSDESC ? "phys" : "unk",
+		bltparams->src1.desc->auxtype == BVAT_PHYSDESC ? (unsigned int)bltparams->src1.desc : 0,
+		pSrc1DescInfo);
 
 	if (!(bltparams->flags & BVFLAG_BLEND))
 		return;
 
 	printk(KERN_INFO "%s: src2 %d,%d rect{%d,%d sz %d,%d}"
-		" stride %ld, virtaddr 0x%x (0x%x)\n", "bv",
+		" stride %ld, %s 0x%x (0x%x)\n", "bv",
 		bltparams->src2geom->width,
 		bltparams->src2geom->height, bltparams->src2rect.left,
 		bltparams->src2rect.top, bltparams->src2rect.width,
 		bltparams->src2rect.height, bltparams->src2geom->virtstride,
-		(unsigned int)bltparams->src2.desc->virtaddr, pSrc2DescInfo);
+		bltparams->src2.desc->auxtype == BVAT_PHYSDESC ? "phys" : "unk",
+		bltparams->src2.desc->auxtype == BVAT_PHYSDESC ? (unsigned int)bltparams->src2.desc : 0,
+		pSrc2DescInfo);
 }
 
 void OMAPLFBGetBltFBsBvHndl(OMAPLFB_FBINFO *psPVRFBInfo, IMG_UINTPTR_T *ppPhysAddr)
@@ -204,6 +208,7 @@ static OMAPLFB_ERROR InitBltFBsVram(OMAPLFB_DEVINFO *psDevInfo)
 
 		pBvDesc->structsize = sizeof(*pBvDesc);
 		pBvDesc->auxtype = BVAT_PHYSDESC;
+		pBvPhysDesc->structsize = sizeof(*pBvPhysDesc);
 		pBvPhysDesc->pagesize = PAGE_SIZE;
 		pBvPhysDesc->pagearray = pPaddrs;
 		pBvPhysDesc->pagecount = uiNumPages;
@@ -221,8 +226,6 @@ static OMAPLFB_ERROR InitBltFBsVram(OMAPLFB_DEVINFO *psDevInfo)
 			return OMAPLFB_ERROR_GENERIC;
 		}
 		psPVRFBInfo->psBltFBsBvHndl[uiFb] = pBvDesc;
-		kfree(pPaddrs);
-		kfree(pBvPhysDesc);
 	}
 	return OMAPLFB_OK;
 }
@@ -297,7 +300,6 @@ static PVRSRV_ERROR InitBltFBsMapTiler2D(OMAPLFB_DEVINFO *psDevInfo)
 			psPVRFBInfo->psBltFBsBvHndl[iFB] = pBvDesc;
 			psPVRFBInfo->psBltFBsBvPhys[iFB] = pPageList[0];
 		}
-		kfree(pPageList);
 	}
 
 	return res;
@@ -573,16 +575,22 @@ void OMAPLFBDeInitBltFBs(OMAPLFB_DEVINFO *psDevInfo)
 			pBufDesc = psPVRFBInfo->psBltFBsBvHndl[i];
 			if (pBufDesc)
 			{
+				struct bvphysdesc *pPhyDesc;
 				bv_entry->bv_unmap(pBufDesc);
+				pPhyDesc = (struct bvphysdesc*) pBufDesc->auxptr;
+				kfree(pPhyDesc->pagearray);
+				kfree(pPhyDesc);
 				kfree(pBufDesc);
 			}
 		}
+		kfree(psPVRFBInfo->psBltFBsBvHndl);
+		psPVRFBInfo->psBltFBsBvHndl = NULL;
 	}
-	kfree(psPVRFBInfo->psBltFBsBvHndl);
 
 	if (psPVRFBInfo->psBltFBsIonHndl)
 	{
 		ion_free(gpsIONClient, psPVRFBInfo->psBltFBsIonHndl);
+		psPVRFBInfo->psBltFBsIonHndl = NULL;
 	}
 }
 
