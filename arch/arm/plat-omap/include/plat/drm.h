@@ -52,6 +52,7 @@ struct omap_drm_platform_data {
 #if defined(CONFIG_DRM_OMAP) || defined(CONFIG_DRM_OMAP_MODULE)
 
 void omapdrm_reserve_vram(void);
+void omap_init_dmm_tiler(void);
 
 #else
 

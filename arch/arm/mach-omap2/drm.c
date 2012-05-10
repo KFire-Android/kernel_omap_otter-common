@@ -45,10 +45,11 @@ static struct platform_device omap_drm_device = {
 		.id = 0,
 };
 
-static int __init omap_init_drm(void)
+#if defined(CONFIG_DRM_OMAP_DMM_TILER) || (CONFIG_DRM_OMAP_DMM_TILER_MODULE)
+void __init omap_init_dmm_tiler(void)
 {
 	struct omap_hwmod *oh = NULL;
-	struct platform_device *pdev;
+	struct platform_device *pdev = NULL;
 
 	/* lookup and populate the DMM information, if present - OMAP4+ */
 	oh = omap_hwmod_lookup("dmm");
@@ -59,10 +60,18 @@ static int __init omap_init_drm(void)
 		WARN(IS_ERR(pdev), "Could not build omap_device for %s\n",
 			oh->name);
 	}
-
-	return platform_device_register(&omap_drm_device);
-
 }
+#else
+void __init omap_init_dmm_tiler(void)
+{
+}
+#endif
+
+static int __init omap_init_drm(void)
+{
+	return platform_device_register(&omap_drm_device);
+}
+
 
 arch_initcall(omap_init_drm);
 
