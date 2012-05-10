@@ -133,3 +133,9 @@ void __init omap44xx_voltagedomains_init(void)
 
 	voltdm_init(voltagedomains_omap4);
 };
+
+static int __init init_volt_domain_notifier_list(void)
+{
+	return __init_volt_domain_notifier_list(voltagedomains_omap4);
+}
+pure_initcall(init_volt_domain_notifier_list);
