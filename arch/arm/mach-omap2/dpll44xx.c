@@ -15,6 +15,10 @@
 #include <linux/io.h>
 #include <linux/bitops.h>
 #include <linux/spinlock.h>
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+#include <linux/slab.h>
+#include "dvfs.h"
+#endif
 #include <plat/cpu.h>
 #include <plat/clock.h>
 #include <plat/common.h>
@@ -41,6 +45,16 @@
 
 static struct clockdomain *l3_emif_clkdm;
 static DEFINE_SPINLOCK(l3_emif_lock);
+
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+struct dpll_cascading_blocker {
+	struct device *dev;
+	struct list_head node;
+};
+
+static atomic_t in_dpll_cascading = ATOMIC_INIT(0);
+static LIST_HEAD(dpll_cascading_blocker_list);
+#endif
 
 /**
  * omap4_core_dpll_m2_set_rate - set CORE DPLL M2 divider
@@ -720,3 +734,92 @@ void omap4_dpll_abe_reconfigure(void)
 	else
 		pr_info("Warm Reset WA: succeeded to reconfigure the ABE DPLL\n");
 }
+
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+int omap4_dpll_cascading_blocker_hold(struct device *dev)
+{
+	struct dpll_cascading_blocker *blocker;
+	int list_was_empty = 0;
+	int ret = 0;
+
+	mutex_lock(&omap_dvfs_lock);
+
+	if (list_empty(&dpll_cascading_blocker_list))
+		list_was_empty = 1;
+
+	/* bail early if constraint for this device already exists */
+	list_for_each_entry(blocker, &dpll_cascading_blocker_list, node) {
+		if (blocker->dev == dev)
+			goto out;
+	}
+
+	/* add new member to list of devices blocking dpll cascading entry */
+	blocker = kzalloc(sizeof(struct dpll_cascading_blocker), GFP_KERNEL);
+	if (!blocker) {
+		pr_err("%s: Unable to create a new blocker\n",
+				__func__);
+		ret = -ENOMEM;
+		goto out;
+	}
+	blocker->dev = dev;
+
+	list_add(&blocker->node, &dpll_cascading_blocker_list);
+
+	if (list_was_empty && omap4_is_in_dpll_cascading()) {
+		/* TODO: exit point of DPLL cascading */
+		/*omap4_dpll_low_power_cascade_exit();*/
+	}
+
+out:
+	mutex_unlock(&omap_dvfs_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(omap4_dpll_cascading_blocker_hold);
+
+int omap4_dpll_cascading_blocker_release(struct device *dev)
+{
+	struct dpll_cascading_blocker *blocker;
+	int ret = 0;
+	int found = 0;
+
+	mutex_lock(&omap_dvfs_lock);
+
+	/* bail early if list is empty */
+	if (list_empty(&dpll_cascading_blocker_list))
+		goto out;
+
+	/* find the list entry that matches the device */
+	list_for_each_entry(blocker, &dpll_cascading_blocker_list, node) {
+		if (blocker->dev == dev) {
+			found = 1;
+			break;
+		}
+	}
+
+	/* bail if constraint for this device does not exist */
+	if (!found) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	list_del(&blocker->node);
+
+	if (list_empty(&dpll_cascading_blocker_list)
+		&& !omap4_is_in_dpll_cascading()) {
+		/* TODO: enter point of DPLL cascading */
+		/* omap4_dpll_low_power_cascade_enter();*/
+	}
+
+out:
+	mutex_unlock(&omap_dvfs_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(omap4_dpll_cascading_blocker_release);
+
+bool omap4_is_in_dpll_cascading(void)
+{
+	return atomic_read(&in_dpll_cascading);
+}
+#endif
