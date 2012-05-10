@@ -26,7 +26,7 @@
 #include <stdarg.h>
 #include <linux/gcreg.h>
 #include <linux/gcx.h>
-#include "gcmmu.h"
+#include "gcmain.h"
 
 #if GCDEBUG_ENABLE
 

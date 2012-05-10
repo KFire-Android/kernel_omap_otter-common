@@ -18,8 +18,7 @@
 #include <linux/uaccess.h>
 #include <linux/gcx.h>
 #include <linux/gccore.h>
-#include <linux/gcdebug.h>
-#include "gcmmu.h"
+#include "gcmain.h"
 
 #define MMU_UNITS  4
 #define MMU_ERROR(irq_ack) ((irq_ack & 0x40000000) != 0)

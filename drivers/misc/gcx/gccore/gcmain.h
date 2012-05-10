@@ -17,10 +17,13 @@
 
 #include <linux/gcx.h>
 #include <linux/gccore.h>
+#include "gcmmu.h"
+#include "gccmdbuf.h"
 
 #define GC_DEV_NAME	"gccore"
 
-/*
+
+/*******************************************************************************
  * Power management modes.
  */
 
@@ -31,7 +34,8 @@ enum gcpower {
 	GCPWR_OFF
 };
 
-/*
+
+/*******************************************************************************
  * Driver context.
  */
 
@@ -59,6 +63,8 @@ struct gccorecontext {
 	struct completion intready;	/* Interrupt comletion. */
 	unsigned int intdata;		/* Interrupt acknowledge data. */
 
+	struct gcmmu gcmmu;		/* MMU object. */
+
 	struct list_head mmuctxlist;	/* List of active contexts. */
 	struct list_head mmuctxvac;	/* Vacant contexts. */
 	struct gcmmucontext *mmucontext;/* Current MMU context. */
@@ -69,36 +75,16 @@ struct gccorecontext {
 	unsigned long  cur_freq;
 };
 
-/*
+
+/*******************************************************************************
  * Register access.
  */
 
 unsigned int gc_read_reg(unsigned int address);
 void gc_write_reg(unsigned int address, unsigned int data);
 
-/*
- * Paged memory allocator.
- */
 
-struct gcpage {
-	unsigned int order;
-	struct page *pages;
-
-	unsigned int size;
-	unsigned int physical;
-	unsigned int *logical;
-};
-
-enum gcerror gc_alloc_noncached(struct gcpage *p, unsigned int size);
-void gc_free_noncached(struct gcpage *p);
-
-enum gcerror gc_alloc_cached(struct gcpage *p, unsigned int size);
-void gc_free_cached(struct gcpage *p);
-void gc_flush_cached(struct gcpage *p);
-void gc_flush_region(unsigned int physical, void *logical,
-			unsigned int offset, unsigned int size);
-
-/*
+/*******************************************************************************
  * Power management.
  */
 
@@ -106,7 +92,8 @@ enum gcerror gc_set_power(struct gccorecontext *context,
 				enum gcpower gcpower);
 enum gcerror gc_get_power(void);
 
-/*
+
+/*******************************************************************************
  * Interrupt.
  */
 

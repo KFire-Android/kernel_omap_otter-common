@@ -18,9 +18,7 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/wait.h>
-
 #include "gcmain.h"
-#include "gccmdbuf.h"
 
 #define GCZONE_NONE		0
 #define GCZONE_ALL		(~0U)
@@ -88,7 +86,8 @@ void cmdbuf_physical(bool forcephysical)
 	GCEXIT(GCZONE_ALLOC);
 }
 
-enum gcerror cmdbuf_map(struct gcmmucontext *ctxt)
+enum gcerror cmdbuf_map(struct gccorecontext *gccorecontext,
+			struct gcmmucontext *ctxt)
 {
 	enum gcerror gcerror;
 	struct gcmmuphysmem mem;
@@ -114,7 +113,7 @@ enum gcerror cmdbuf_map(struct gcmmucontext *ctxt)
 	mem.pages = physpages;
 	mem.pagesize = PAGE_SIZE;
 
-	gcerror = gcmmu_map(ctxt, &mem, &mapped);
+	gcerror = gcmmu_map(gccorecontext, ctxt, &mem, &mapped);
 	if (gcerror != 0)
 		return gcerror;
 
