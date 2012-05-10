@@ -74,9 +74,11 @@ unsigned char gcfp2norm8(float value)
 static int __init mod_init(void)
 {
 	bv_init();
+
 	/* Assign BV function parameters only if SoC contains a GC core */
 	if (cpu_is_omap447x())
 		gcbv_assign();
+
 	return 0;
 }
 

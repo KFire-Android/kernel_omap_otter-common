@@ -216,7 +216,7 @@ static const char *gc_when_string(enum gc_debug_when when)
 
 static int gc_debug_show_gpu_status(struct seq_file *s, void *data)
 {
-	const char *powerString = gc_power_string(gc_get_power());
+	const char *powerString = gc_power_string(gcpwr_get());
 
 	struct gc_gpu_status *status = (struct gc_gpu_status *)s->private;
 
@@ -227,7 +227,7 @@ static int gc_debug_show_gpu_status(struct seq_file *s, void *data)
 
 	seq_printf(s, "GC gpu current power status: %s\n", powerString);
 
-	if (gc_get_power() == GCPWR_ON) {
+	if (gcpwr_get() == GCPWR_ON) {
 		/* update the gpu status now */
 		gc_debug_cache_gpu_status_internal(GC_DEBUG_USER_REQUEST, 0);
 	}

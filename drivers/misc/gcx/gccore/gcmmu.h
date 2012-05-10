@@ -17,6 +17,7 @@
 
 #include <linux/gccore.h>
 #include "gcmem.h"
+#include "gcqueue.h"
 
 /*******************************************************************************
  * Master table can be configured in 1KB mode with 256 maximum entries
@@ -40,7 +41,7 @@
  */
 
 /* Page size. */
-#define GCMMU_PAGE_SIZE	4096
+#define GCMMU_PAGE_SIZE			4096
 
 /* Master table definitions. */
 #define GCMMU_MTLB_BITS			8
@@ -95,13 +96,16 @@
 
 #define GCMMU_SAFE_ZONE_SIZE		64
 
-/*
- * STLB preallocation count. This value controls how many slave tables will be
+/* STLB preallocation count. This value controls how many slave tables will be
  * allocated every time we run out of available slave tables during mapping.
  * The value must be between 1 and the total number of slave tables possible,
- * which is equal to 256 assuming 4KB page size.
- */
+ * which is equal to 256 assuming 4KB page size. */
 #define GCMMU_STLB_PREALLOC_COUNT	(GCMMU_MTLB_ENTRY_NUM / 4)
+
+
+/*******************************************************************************
+ * MMU structures.
+ */
 
 /* This union defines a location within MMU. */
 union gcmmuloc {
@@ -113,11 +117,9 @@ union gcmmuloc {
 	unsigned int absolute;
 };
 
-/*
- * Arenas describe memory regions. Two lists of areanas are maintained:
+/* Arenas describe memory regions. Two lists of areanas are maintained:
  * one that defines a list of vacant arenas ready to map and the other
- * a list of already mapped arenas.
- */
+ * a list of already mapped arenas. */
 struct gcmmuarena {
 	/* Arena starting and ending points. */
 	union gcmmuloc start;
@@ -144,11 +146,27 @@ struct gcmmuarena {
 
 /* MMU shared object. */
 struct gcmmu {
+	/* Access lock. */
+	struct GCLOCK_TYPE lock;
+
 	/* Reference count. */
 	int refcount;
 
-	/* Safe zone allocation. */
-	struct gcpage safezone;
+	/* One physical page used for MMU management. */
+	struct gcpage gcpage;
+
+	/* Physical command buffer. */
+	unsigned int cmdbufphys;
+	unsigned int *cmdbuflog;
+	unsigned int cmdbufsize;
+
+	/* Safe zone location. */
+	unsigned int safezonephys;
+	unsigned int *safezonelog;
+	unsigned int safezonesize;
+
+	/* Currently set master table. */
+	unsigned int master;
 
 	/* Available page allocation arenas. */
 	struct list_head vacarena;
@@ -162,6 +180,9 @@ struct gcmmustlb {
 
 struct gcmmustlbblock;
 struct gcmmucontext {
+	/* Access lock. */
+	struct GCLOCK_TYPE lock;
+
 	/* PID of the owner process. */
 	pid_t pid;
 
@@ -187,9 +208,15 @@ struct gcmmucontext {
 	struct list_head vacant;
 	struct list_head allocated;
 
+	/* Driver instance has only one set of command buffers that must be
+	 * mapped the same exact way in all clients. This array stores
+	 * pointers to arena structures of mapped storage buffers. */
+	struct gcmmuarena *storagearray[GC_STORAGE_COUNT];
+
 	/* Prev/next context. */
 	struct list_head link;
 };
+
 
 /*******************************************************************************
  * MMU management API.
@@ -214,22 +241,30 @@ enum gcerror gcmmu_init(struct gccorecontext *gccorecontext);
 void gcmmu_exit(struct gccorecontext *gccorecontext);
 
 enum gcerror gcmmu_create_context(struct gccorecontext *gccorecontext,
-					struct gcmmucontext *gcmmucontext);
+				  struct gcmmucontext *gcmmucontext,
+				  pid_t pid);
 enum gcerror gcmmu_destroy_context(struct gccorecontext *gccorecontext,
-					struct gcmmucontext *gcmmucontext);
+				   struct gcmmucontext *gcmmucontext);
 
+enum gcerror gcmmu_enable(struct gccorecontext *gccorecontext,
+			  struct gcqueue *gcqueue);
 enum gcerror gcmmu_set_master(struct gccorecontext *gccorecontext,
-				struct gcmmucontext *gcmmucontext);
+			      struct gcmmucontext *gcmmucontext);
 
 enum gcerror gcmmu_map(struct gccorecontext *gccorecontext,
-			struct gcmmucontext *gcmmucontext,
-			struct gcmmuphysmem *mem,
-			struct gcmmuarena **mapped);
+		       struct gcmmucontext *gcmmucontext,
+		       struct gcmmuphysmem *mem,
+		       struct gcmmuarena **mapped);
 enum gcerror gcmmu_unmap(struct gccorecontext *gccorecontext,
-				struct gcmmucontext *gcmmucontext,
-				struct gcmmuarena *mapped);
+			 struct gcmmucontext *gcmmucontext,
+			 struct gcmmuarena *mapped);
 
-int gcmmu_flush(void *logical, unsigned int address, unsigned int size);
+enum gcerror gcmmu_flush(struct gccorecontext *gccorecontext,
+			 struct gcmmucontext *gcmmucontext);
+void gcmmu_flush_finalize(struct gccmdbuf *openentry,
+			  struct gcmommuflush *flushlogical,
+			  unsigned int flushaddress);
+
 enum gcerror gcmmu_fixup(struct gcfixup *fixup, unsigned int *data);
 
 #endif

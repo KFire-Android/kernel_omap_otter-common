@@ -18,7 +18,6 @@
 #include <linux/gcx.h>
 #include <linux/gccore.h>
 #include "gcmmu.h"
-#include "gccmdbuf.h"
 
 #define GC_DEV_NAME	"gccore"
 
@@ -42,33 +41,41 @@ enum gcpower {
 struct omap_gcx_platform_data;
 
 struct gccorecontext {
-	int irqline;			/* GPU IRQ line. */
-	bool irqenabled;		/* IRQ ennabled flag. */
-	bool isrroutine;		/* ISR installed flag. */
-	void *regbase;			/* Virtual pointer to the GPU
-					   register bank. */
+	/* GPU IRQ line. */
+	int irqline;
 
-	bool platdriver;		/* Platform driver install flag. */
-	struct device *device;		/* gccore device. */
-	struct device *bb2ddevice;	/* BB2D device. */
-	struct omap_gcx_platform_data *plat; /* platform data */
+	/* Virtual pointer to the GPU register bank. */
+	void *regbase;
 
-	enum gcpower gcpower;		/* Current power mode. */
-	struct clk *clk;		/* GPU clock descriptor. */
-	bool clockenabled;		/* Clock enabled flag. */
-	bool pulseskipping;		/* Pulse skipping enabled flag. */
-	bool forceoff;			/* Enters OFF mode as opposed to SLOW
-					   mode after every commit. */
+	/* Platform driver install flag. */
+	bool platdriver;
+	struct omap_gcx_platform_data *plat;
 
-	struct completion intready;	/* Interrupt comletion. */
-	unsigned int intdata;		/* Interrupt acknowledge data. */
+	/* Pointers to the gccore and BB2D devices. */
+	struct device *device;
+	struct device *bb2ddevice;
 
-	struct gcmmu gcmmu;		/* MMU object. */
+	/* Current power mode. */
+	enum gcpower gcpower;
+	struct GCLOCK_TYPE powerlock;
+	struct GCLOCK_TYPE resetlock;
 
-	struct list_head mmuctxlist;	/* List of active contexts. */
-	struct list_head mmuctxvac;	/* Vacant contexts. */
-	struct gcmmucontext *mmucontext;/* Current MMU context. */
-	struct mutex mmucontextlock;
+	/* Current graphics pipe. */
+	enum gcpipe gcpipe;
+
+	/* Power mode flags. */
+	bool clockenabled;
+	bool pulseskipping;
+	bool forceoff;
+
+	/* MMU and command buffer managers. */
+	struct gcmmu gcmmu;
+	struct gcqueue gcqueue;
+
+	/* MMU context lists. */
+	struct list_head mmuctxlist;
+	struct list_head mmuctxvac;
+	struct GCLOCK_TYPE mmucontextlock;
 
 	int opp_count;
 	unsigned long *opp_freqs;
@@ -88,16 +95,8 @@ void gc_write_reg(unsigned int address, unsigned int data);
  * Power management.
  */
 
-enum gcerror gc_set_power(struct gccorecontext *context,
-				enum gcpower gcpower);
-enum gcerror gc_get_power(void);
-
-
-/*******************************************************************************
- * Interrupt.
- */
-
-void gc_wait_interrupt(void);
-unsigned int gc_get_interrupt_data(void);
+enum gcpower gcpwr_get(void);
+void gcpwr_set(struct gccorecontext *gccorecontext, enum gcpower gcpower);
+void gcpwr_reset(struct gccorecontext *gccorecontext);
 
 #endif

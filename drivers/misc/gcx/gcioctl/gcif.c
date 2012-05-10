@@ -40,7 +40,7 @@ GCDBG_FILTERDEF(ioctl, GCZONE_NONE,
 		"init",
 		"ioctl")
 
-static struct mutex g_maplock;
+static struct GCLOCK_TYPE g_maplock;
 
 static struct platform_driver gcx_drv = {
 	.probe = 0,
@@ -63,7 +63,7 @@ static DRIVER_ATTR(version, 0444, show_version, NULL);
  * Command buffer copy management.
  */
 
-static struct mutex g_bufferlock;
+static struct GCLOCK_TYPE g_bufferlock;
 struct gcbuffer *g_buffervacant;
 struct gcfixup *g_fixupvacant;
 
@@ -72,8 +72,7 @@ static enum gcerror get_buffer(struct gcbuffer **gcbuffer)
 	enum gcerror gcerror = GCERR_NONE;
 	struct gcbuffer *temp;
 
-	/* Acquire buffer access mutex. */
-	mutex_lock(&g_bufferlock);
+	GCLOCK(&g_bufferlock);
 
 	if (g_buffervacant == NULL) {
 		temp = kmalloc(sizeof(struct gcbuffer), GFP_KERNEL);
@@ -91,7 +90,7 @@ static enum gcerror get_buffer(struct gcbuffer **gcbuffer)
 	*gcbuffer = temp;
 
 exit:
-	mutex_unlock(&g_bufferlock);
+	GCUNLOCK(&g_bufferlock);
 	return gcerror;
 }
 
@@ -100,8 +99,7 @@ static enum gcerror get_fixup(struct gcfixup **gcfixup)
 	enum gcerror gcerror = GCERR_NONE;
 	struct gcfixup *temp;
 
-	/* Acquire fixup access mutex. */
-	mutex_lock(&g_bufferlock);
+	GCLOCK(&g_bufferlock);
 
 	if (g_fixupvacant == NULL) {
 		temp = kmalloc(sizeof(struct gcfixup), GFP_KERNEL);
@@ -119,7 +117,7 @@ static enum gcerror get_fixup(struct gcfixup **gcfixup)
 	*gcfixup = temp;
 
 exit:
-	mutex_unlock(&g_bufferlock);
+	GCUNLOCK(&g_bufferlock);
 	return gcerror;
 }
 
@@ -128,8 +126,7 @@ static void put_buffer_tree(struct gcbuffer *gcbuffer)
 	struct gcbuffer *prev;
 	struct gcbuffer *curr;
 
-	/* Acquire buffer access mutex. */
-	mutex_lock(&g_bufferlock);
+	GCLOCK(&g_bufferlock);
 
 	prev = NULL;
 	curr = gcbuffer;
@@ -146,7 +143,7 @@ static void put_buffer_tree(struct gcbuffer *gcbuffer)
 	prev->next = g_buffervacant;
 	g_buffervacant = gcbuffer;
 
-	mutex_unlock(&g_bufferlock);
+	GCUNLOCK(&g_bufferlock);
 }
 
 /*******************************************************************************
@@ -477,8 +474,8 @@ static int mod_init(void)
 	}
 
 	/* Initialize mutexes. */
-	mutex_init(&g_maplock);
-	mutex_init(&g_bufferlock);
+	GCLOCK_INIT(&g_maplock);
+	GCLOCK_INIT(&g_bufferlock);
 
 	GCDBG_REGISTER(ioctl);
 

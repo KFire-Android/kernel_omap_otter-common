@@ -49,7 +49,7 @@
  * printed to the console. GC_DUMP_BUFFER_SIZE determines the size of
  * the buffer.
  */
-#define GC_BUFFERED_OUTPUT	1
+#define GC_BUFFERED_OUTPUT	0
 
 /*
  * GC_DUMP_BUFFER_SIZE
@@ -112,18 +112,11 @@
 
 #define GC_VARARG_ALIGNMENT sizeof(unsigned long long)
 
-#ifndef countof
-#	define countof(a) \
-	( \
-		sizeof(a) / sizeof(a[0]) \
-	)
-#endif
-
 #if defined(GCDBGFILTER)
 #undef GCDBGFILTER
 #endif
 
-#define GCDBGFILTER() \
+#define GCDBGFILTER \
 	(*filter)
 
 /*******************************************************************************
@@ -405,7 +398,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 		command = (data32[i] >> 27) & 0x1F;
 
 		switch (command) {
-		case GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE_LOAD_STATE:
+		case GCREG_COMMAND_OPCODE_LOAD_STATE:
 			count = (data32[i] >> 16) & 0x3F;
 			addr = data32[i] & 0xFFFF;
 			GC_PRINTK(s, "%s"
@@ -420,7 +413,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 					buffer, ' ', data32[i]);
 			break;
 
-		case GCREG_COMMAND_END_COMMAND_OPCODE_END:
+		case GCREG_COMMAND_OPCODE_END:
 			GC_PRINTK(s, "%s"
 				"  0x%08X: 0x%08X  END()\n",
 				buffer, item->gpuaddr + (i << 2),
@@ -432,7 +425,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 			i += 1;
 			break;
 
-		case GCREG_COMMAND_NOP_COMMAND_OPCODE_NOP:
+		case GCREG_COMMAND_OPCODE_NOP:
 			GC_PRINTK(s, "%s"
 				"  0x%08X: 0x%08X  NOP()\n",
 				buffer, item->gpuaddr + (i << 2),
@@ -444,7 +437,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 			i += 1;
 			break;
 
-		case GCREG_COMMAND_START_DE_COMMAND_OPCODE_START_DE:
+		case GCREG_COMMAND_OPCODE_STARTDE:
 			count = (data32[i] >> 8) & 0xFF;
 			GC_PRINTK(s, "%s"
 				"  0x%08X: 0x%08X  STARTDE(%d)\n",
@@ -473,7 +466,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 			}
 			break;
 
-		case GCREG_COMMAND_WAIT_COMMAND_OPCODE_WAIT:
+		case GCREG_COMMAND_OPCODE_WAIT:
 			delay = data32[i] & 0xFFFF;
 			GC_PRINTK(s, "%s"
 				"  0x%08X: 0x%08X  WAIT(%d)\n",
@@ -486,7 +479,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 			i += 1;
 			break;
 
-		case GCREG_COMMAND_LINK_COMMAND_OPCODE_LINK:
+		case GCREG_COMMAND_OPCODE_LINK:
 			count = data32[i] & 0xFFFF;
 			addr = data32[i + 1];
 			GC_PRINTK(s, "%s"
@@ -501,7 +494,7 @@ static void gc_print_command(struct seq_file *s, struct itembuffer *item,
 			i += 1;
 			break;
 
-		case GCREG_COMMAND_STALL_COMMAND_OPCODE_STALL:
+		case GCREG_COMMAND_OPCODE_STALL:
 			src =  data32[i + 1]	   & 0x1F;
 			dst = (data32[i + 1] >> 8) & 0x1F;
 
@@ -1754,7 +1747,7 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 		command = (buffer[i] >> 27) & 0x1F;
 
 		switch (command) {
-		case GCREG_COMMAND_LOAD_STATE_COMMAND_OPCODE_LOAD_STATE:
+		case GCREG_COMMAND_OPCODE_LOAD_STATE:
 			count = (buffer[i] >> 16) & 0x3F;
 			addr = buffer[i] & 0xFFFF;
 			i += 1;
@@ -1926,15 +1919,15 @@ int gc_parse_command_buffer(unsigned int *buffer, unsigned int size,
 			i += ((~count) & 1);
 			break;
 
-		case GCREG_COMMAND_END_COMMAND_OPCODE_END:
-		case GCREG_COMMAND_NOP_COMMAND_OPCODE_NOP:
-		case GCREG_COMMAND_WAIT_COMMAND_OPCODE_WAIT:
-		case GCREG_COMMAND_LINK_COMMAND_OPCODE_LINK:
-		case GCREG_COMMAND_STALL_COMMAND_OPCODE_STALL:
+		case GCREG_COMMAND_OPCODE_END:
+		case GCREG_COMMAND_OPCODE_NOP:
+		case GCREG_COMMAND_OPCODE_WAIT:
+		case GCREG_COMMAND_OPCODE_LINK:
+		case GCREG_COMMAND_OPCODE_STALL:
 			i += 2;
 			break;
 
-		case GCREG_COMMAND_START_DE_COMMAND_OPCODE_START_DE:
+		case GCREG_COMMAND_OPCODE_STARTDE:
 			info->dst.rectcount = (buffer[i] >> 8) & 0xFF;
 			i += 2;
 
@@ -1977,161 +1970,70 @@ exit:
 EXPORT_SYMBOL(gc_parse_command_buffer);
 
 /* TODO: merge this with gpu status caching in gcdebug.c */
-void gc_gpu_status(struct gcdbgfilter *filter, unsigned int zone,
-			char *function, int line, unsigned int *acknowledge)
+void gc_dump_status(struct gcdbgfilter *filter, unsigned int zone,
+		    char *function, int line)
 {
-	int i;
-	unsigned int idle;
-	unsigned int dma_state, dma_addr;
-	unsigned int dma_low_data, dma_high_data;
-	unsigned int status;
-	unsigned int mmu;
-	unsigned int address;
-	unsigned int total_reads;
-	unsigned int total_writes;
-	unsigned int total_read_bursts;
-	unsigned int total_write_bursts;
-	unsigned int total_read_reqs;
-	unsigned int total_write_reqs;
+	static const unsigned int detectcount = 1000;
+	unsigned int address1, address2;
+	unsigned int i;
 
-	gc_dump_string(filter, zone,
-			"Current GPU status requested from %s(%d).\n",
-			function, line);
-
-	idle = gc_read_reg(GCREG_HI_IDLE_Address);
-	gc_dump_string(filter, zone,
-			"  idle = 0x%08X\n",
-			idle);
-
-	dma_state = gc_read_reg(GCREG_FE_DEBUG_STATE_Address);
-	gc_dump_string(filter, zone,
-			"  DMA state = 0x%08X\n",
-				dma_state);
-
-	dma_addr = gc_read_reg(GCREG_FE_DEBUG_CUR_CMD_ADR_Address);
-	gc_dump_string(filter, zone,
-			"  DMA address = 0x%08X\n",
-			dma_addr);
-
-	dma_low_data = gc_read_reg(GCREG_FE_DEBUG_CMD_LOW_REG_Address);
-	gc_dump_string(filter, zone,
-			"  DMA low data = 0x%08X\n",
-			dma_low_data);
-
-	dma_high_data = gc_read_reg(GCREG_FE_DEBUG_CMD_HI_REG_Address);
-	gc_dump_string(filter, zone,
-			"  DMA high data = 0x%08X\n",
-			dma_high_data);
-
-	total_reads = gc_read_reg(GC_TOTAL_READS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory reads = %d\n",
-			total_reads);
-
-	total_writes = gc_read_reg(GC_TOTAL_WRITES_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory writes = %d\n",
-			total_writes);
-
-	total_read_bursts = gc_read_reg(GC_TOTAL_READ_BURSTS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory read 64-bit bursts = %d\n",
-			total_read_bursts);
-
-	total_write_bursts = gc_read_reg(GC_TOTAL_WRITE_BURSTS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory write 64-bit bursts = %d\n",
-			total_write_bursts);
-
-	total_read_reqs = gc_read_reg(GC_TOTAL_READ_REQS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory read requests = %d\n",
-			total_read_reqs);
-
-	total_write_reqs = gc_read_reg(GC_TOTAL_WRITE_REQS_Address);
-	gc_dump_string(filter, zone,
-			"  Total memory write requests = %d\n",
-			total_write_reqs);
-
-	if (acknowledge != NULL)
-		gc_dump_string(filter, zone,
-				"  interrupt acknowledge = 0x%08X\n",
-				*acknowledge);
-
-	if (*acknowledge & 0x80000000)
-		gc_dump_string(filter, zone,
-				"  *** BUS ERROR ***\n");
-
-	if (*acknowledge & 0x40000000) {
-		unsigned int mtlb, stlb, offset;
-
-		gc_dump_string(filter, zone,
-				"  *** MMU ERROR ***\n");
-
-		status = gc_read_reg(GCREG_MMU_STATUS_Address);
-		gc_dump_string(filter, zone,
-				"  MMU status = 0x%08X\n",
-				status);
-
-		for (i = 0; i < 4; i += 1) {
-			mmu = status & 0xF;
-			status >>= 4;
-
-			if (mmu == 0)
-				continue;
-
-			switch (mmu) {
-			case 1:
-				gc_dump_string(filter, zone,
-						"  MMU%d: slave not present\n",
-						i);
-				break;
-
-			case 2:
-				gc_dump_string(filter, zone,
-						"  MMU%d: page not present\n",
-						i);
-				break;
-
-			case 3:
-				gc_dump_string(filter, zone,
-						"  MMU%d: write violation\n",
-						i);
-				break;
-
-			default:
-				gc_dump_string(filter, zone,
-						"  MMU%d: unknown state\n",
-						i);
-			}
-
-			address = gc_read_reg(GCREG_MMU_EXCEPTION_Address + i);
-
-			mtlb   = (address & GCMMU_MTLB_MASK)
-						>> GCMMU_MTLB_SHIFT;
-			stlb   = (address & GCMMU_STLB_MASK)
-						>> GCMMU_STLB_SHIFT;
-			offset =  address & GCMMU_OFFSET_MASK;
-
-			gc_dump_string(filter, zone,
-					"  MMU%d: exception address = 0x%08X\n",
-					i, address);
-
-			gc_dump_string(filter, zone,
-					"	 MTLB entry = %d\n",
-					mtlb);
-
-			gc_dump_string(filter, zone,
-					"	 STLB entry = %d\n",
-					stlb);
-
-			gc_dump_string(filter, zone,
-					"	 Offset = 0x%08X (%d)\n",
-					offset, offset);
-		}
+	address1 = gc_read_reg(GCREG_FE_DEBUG_CUR_CMD_ADR_Address);
+	for (i = 0; i < detectcount; i += 1) {
+		address2 = gc_read_reg(GCREG_FE_DEBUG_CUR_CMD_ADR_Address);
+		if (address1 != address2)
+			break;
 	}
+
+	gc_dump_string(filter, zone,
+		       "Current GPU status requested from %s(%d).\n",
+		       function, line);
+
+	gc_dump_string(filter, zone,
+		       "  idle = 0x%08X\n",
+		       gc_read_reg(GCREG_HI_IDLE_Address));
+
+	gc_dump_string(filter, zone,
+		       "  DMA state = 0x%08X\n",
+		       gc_read_reg(GCREG_FE_DEBUG_STATE_Address));
+
+	gc_dump_string(filter, zone,
+		       "  DMA address = 0x%08X (%s)\n",
+		       address2, (i == detectcount)
+				? "not running" : "running");
+
+	gc_dump_string(filter, zone,
+		       "  DMA low data = 0x%08X\n",
+		       gc_read_reg(GCREG_FE_DEBUG_CMD_LOW_REG_Address));
+
+	gc_dump_string(filter, zone,
+		       "  DMA high data = 0x%08X\n",
+		       gc_read_reg(GCREG_FE_DEBUG_CMD_HI_REG_Address));
+
+	gc_dump_string(filter, zone,
+		       "  Total memory reads = %d\n",
+		       gc_read_reg(GC_TOTAL_READS_Address));
+
+	gc_dump_string(filter, zone,
+		       "  Total memory writes = %d\n",
+		       gc_read_reg(GC_TOTAL_WRITES_Address));
+
+	gc_dump_string(filter, zone,
+		       "  Total memory read 64-bit bursts = %d\n",
+		       gc_read_reg(GC_TOTAL_READ_BURSTS_Address));
+
+	gc_dump_string(filter, zone,
+		       "  Total memory write 64-bit bursts = %d\n",
+		       gc_read_reg(GC_TOTAL_WRITE_BURSTS_Address));
+
+	gc_dump_string(filter, zone,
+		       "  Total memory read requests = %d\n",
+		       gc_read_reg(GC_TOTAL_READ_REQS_Address));
+
+	gc_dump_string(filter, zone,
+		       "  Total memory write requests = %d\n",
+		       gc_read_reg(GC_TOTAL_WRITE_REQS_Address));
 }
-EXPORT_SYMBOL(gc_gpu_status);
+EXPORT_SYMBOL(gc_dump_status);
 
 /*******************************************************************************
  * Bltsville debugging.

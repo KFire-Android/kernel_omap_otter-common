@@ -102,8 +102,35 @@ enum gcerror {
 	= GCERR_GROUP(0x01020),
 
 	/**** Command queue errors. */
-	GCERR_CMD_ALLOC			/* Buffer allocation. */
+	GCERR_CMD_ENTRY_PIPE		/* Entry pipe is invalid. */
 	= GCERR_GROUP(0x02000),
+
+	GCERR_CMD_EXIT_PIPE		/* Exit pipe is invalid. */
+	= GCERR_GROUP(0x02010),
+
+	GCERR_CMD_MAPPED		/* Command buffer mapping error. */
+	= GCERR_GROUP(0x02020),
+
+	GCERR_CMD_CONSISTENCY		/* Inconsistent mapping. */
+	= GCERR_GROUP(0x02030),
+
+	GCERR_CMD_ALLOC			/* Buffer allocation. */
+	= GCERR_GROUP(0x02040),
+
+	GCERR_CMD_QUEUE_ALLOC		/* Buffer queue allocation. */
+	= GCERR_GROUP(0x02050),
+
+	GCERR_CMD_EVENT_ALLOC		/* Event allocation. */
+	= GCERR_GROUP(0x02060),
+
+	GCERR_CMD_INT_ALLOC		/* Interrupt allocation. */
+	= GCERR_GROUP(0x02070),
+
+	GCERR_CMD_ISR			/* ISR initialization. */
+	= GCERR_GROUP(0x02080),
+
+	GCERR_CMD_THREAD		/* Thread initialization. */
+	= GCERR_GROUP(0x02090),
 
 	/**** MMU errors. */
 	GCERR_MMU_CTXT_BAD		/* Invalid context. */
