@@ -84,6 +84,7 @@ void __init omap_pmic_late_init(void)
 		return;
 	omap_twl_init();
 	omap_tps6236x_init();
+	omap_palmas_init();
 }
 
 #if defined(CONFIG_ARCH_OMAP3)
@@ -411,6 +412,9 @@ int __init omap_pmic_register_data(struct omap_pmic_map *map)
 			goto next;
 
 		if (cpu_is_omap446x() && !(map->cpu & PMIC_CPU_OMAP4460))
+			goto next;
+
+		if (cpu_is_omap54xx() && !(map->cpu & PMIC_CPU_OMAP54XX))
 			goto next;
 
 		voltdm = voltdm_lookup(map->name);

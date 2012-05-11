@@ -82,6 +82,7 @@ struct omap_pmic_map {
 #define PMIC_CPU_OMAP4430	(1 << 1)
 #define PMIC_CPU_OMAP4460	(1 << 2)
 #define PMIC_CPU_OMAP44XX	(PMIC_CPU_OMAP4430 | PMIC_CPU_OMAP4460)
+#define PMIC_CPU_OMAP54XX	(1 << 3)
 
 extern int omap_pmic_register_data(struct omap_pmic_map *map);
 extern void omap_pmic_data_init(void);
@@ -102,4 +103,12 @@ static inline int omap_tps6236x_init(void)
 }
 #endif
 
+#ifdef CONFIG_MFD_PALMAS
+extern int omap_palmas_init(void);
+#else
+static inline int omap_palmas_init(void)
+{
+	return -EINVAL;
+}
+#endif
 #endif /* __OMAP_PMIC_COMMON__ */
