@@ -427,6 +427,9 @@ int dss_mgr_wait_for_go(struct omap_overlay_manager *mgr)
 		}
 
 		r = omap_dispc_wait_for_irq_interruptible_timeout(irq, timeout);
+		if (!r)
+			mgr->device->first_vsync = true;
+
 		if (r == -ERESTARTSYS)
 			break;
 
@@ -807,8 +810,11 @@ static void dss_apply_irq_handler(void *data, u32 mask)
 			bool was_busy = mp->busy;
 			mp->busy = dispc_mgr_go_busy(i);
 
-			if (was_busy && !mp->busy)
+			if (was_busy && !mp->busy) {
+				if (mgr && mgr->device)
+					mgr->device->first_vsync = true;
 				mgr_clear_shadow_dirty(mgr);
+			}
 		}
 	}
 

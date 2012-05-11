@@ -3379,6 +3379,12 @@ static void dispc_error_worker(struct work_struct *work)
 		unsigned bit;
 
 		mgr = omap_dss_get_overlay_manager(i);
+
+		if (!mgr->device->first_vsync) {
+			DSSERR("First SYNC_LOST.. ignoring\n");
+			break;
+		}
+
 		bit = sync_lost_bits[i];
 
 		if (bit & errors) {

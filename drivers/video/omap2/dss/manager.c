@@ -512,6 +512,8 @@ static int dss_mgr_wait_for_vsync(struct omap_overlay_manager *mgr)
 	}
 
 	r = omap_dispc_wait_for_irq_interruptible_timeout(irq, timeout);
+	if (!r)
+		mgr->device->first_vsync = true;
 
 	dispc_runtime_put();
 
