@@ -70,6 +70,7 @@ static struct {
 	bool edid_set;
 	bool custom_set;
 	int hdmi_irq;
+	bool hdcp;
 
 	struct clk *sys_clk;
 	struct clk *dss_32k_clk;
@@ -466,7 +467,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 	hdmi.ip_data.ops->video_enable(&hdmi.ip_data, 1);
 
-	if (hdmi.hdmi_start_frame_cb)
+	if (hdmi.hdcp && hdmi.hdmi_start_frame_cb)
 		(*hdmi.hdmi_start_frame_cb)();
 
 	r = dss_mgr_enable(dssdev->manager);
@@ -624,6 +625,7 @@ int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
 	hdmi.ip_data.set_mode = false;
 	hdmi.ip_data.cfg.timings = *vm;
 	hdmi.custom_set = 1;
+	hdmi.hdcp = true;
 	hdmi.code = code;
 	hdmi.mode = mode;
 	return dssdev->driver->enable(dssdev);
@@ -639,6 +641,7 @@ int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 	hdmi.ip_data.set_mode = false;
 	r1 = hdmi_set_timings(vm, false) ? 0 : -EINVAL;
 	hdmi.custom_set = true;
+	hdmi.hdcp = true;
 	hdmi.code = hdmi.ip_data.cfg.cm.code;
 	hdmi.mode = hdmi.ip_data.cfg.cm.mode;
 	r2 = dssdev->driver->enable(dssdev);
@@ -1012,6 +1015,7 @@ void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev)
 	}
 
 	hdmi.enabled = false;
+	hdmi.hdcp = false;
 
 	if (!dssdev->sync_lost_error
 		&& (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)) {
