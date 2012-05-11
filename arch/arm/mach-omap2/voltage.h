@@ -151,6 +151,10 @@ struct omap_volt_data {
  * @switch_on_time: time taken for switch on the DCDC in uSec
  * @vsel_to_uv:	PMIC API to convert vsel value to actual voltage in uV.
  * @uv_to_vsel:	PMIC API to convert voltage in uV to vsel value.
+ * @i2c_hscll_low: PMIC interface speed config for highspeed mode (T low)
+ * @i2c_hscll_high: PMIC interface speed config for highspeed mode (T high)
+ * @i2c_scll_low: PMIC interface speed config for fullspeed mode (T low)
+ * @i2c_scll_high: PMIC interface speed config for fullspeed mode (T high)
  */
 struct omap_voltdm_pmic {
 	int slew_rate;
@@ -169,6 +173,10 @@ struct omap_voltdm_pmic {
 	u32 shutdown_time;
 	u8 vp_timeout_us;
 	bool i2c_high_speed;
+	u8 i2c_hscll_low;
+	u8 i2c_hscll_high;
+	u8 i2c_scll_low;
+	u8 i2c_scll_high;
 	u8 i2c_mcode;
 	unsigned long (*vsel_to_uv) (const u8 vsel);
 	u8 (*uv_to_vsel) (unsigned long uV);

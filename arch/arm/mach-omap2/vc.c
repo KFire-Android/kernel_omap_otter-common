@@ -517,20 +517,26 @@ static void omap4_set_timings(struct voltagedomain *voltdm)
 static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
 {
 	static bool is_initialized;
-	u32 vc_val;
+	struct omap_voltdm_pmic *pmic = voltdm->pmic;
+	u32 vc_val = 0;
 
 	omap4_set_timings(voltdm);
 
 	if (is_initialized)
 		return;
 
-	/* XXX These are magic numbers and do not belong! */
-	vc_val = (0x28 << OMAP4430_SCLL_SHIFT | 0x2c << OMAP4430_SCLH_SHIFT);
-	vc_val |= (0x0b << OMAP4430_HSSCLL_SHIFT);
-	vc_val |= (0x0 << OMAP4430_HSSCLH_SHIFT);
-	voltdm->write(vc_val, OMAP4_PRM_VC_CFG_I2C_CLK_OFFSET);
-
 	is_initialized = true;
+
+	if (pmic->i2c_high_speed) {
+		vc_val |= pmic->i2c_hscll_low << OMAP4430_HSCLL_SHIFT;
+		vc_val |= pmic->i2c_hscll_high << OMAP4430_HSCLH_SHIFT;
+	}
+
+	vc_val |= pmic->i2c_scll_low << OMAP4430_SCLL_SHIFT;
+	vc_val |= pmic->i2c_scll_high << OMAP4430_SCLH_SHIFT;
+
+	if (vc_val)
+		voltdm->write(vc_val, OMAP4_PRM_VC_CFG_I2C_CLK_OFFSET);
 }
 
 /**
