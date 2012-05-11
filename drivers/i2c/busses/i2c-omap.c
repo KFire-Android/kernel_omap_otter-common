@@ -308,14 +308,6 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
 
 			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
 							dev->syscstate);
-			/*
-			 * Enabling all wakup sources to stop I2C freezing on
-			 * WFI instruction.
-			 * REVISIT: Some wkup sources might not be needed.
-			 */
-			dev->westate = OMAP_I2C_WE_ALL;
-			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
-							dev->westate);
 		}
 	}
 	return 0;
@@ -437,6 +429,17 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 			OMAP_I2C_IE_AL)  | ((dev->fifo_size) ?
 				(OMAP_I2C_IE_RDR | OMAP_I2C_IE_XDR) : 0);
 	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
+		/*
+		 * Enabling all wakup sources to stop I2C freezing on
+		 * WFI instruction.
+		 * REVISIT: Some wkup sources might not be needed.
+		 */
+		dev->westate = OMAP_I2C_WE_ALL;
+		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
+						dev->westate);
+	}
+
 	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
 		dev->pscstate = psc;
 		dev->scllstate = scll;
