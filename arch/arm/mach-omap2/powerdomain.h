@@ -208,6 +208,8 @@ struct voltagedomain *pwrdm_get_voltdm(struct powerdomain *pwrdm);
 
 int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm);
 
+int pwrdm_get_achievable_pwrst(struct powerdomain *pwrdm, u8 req_pwrst);
+
 int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
 
 int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst);

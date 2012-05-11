@@ -512,6 +512,105 @@ int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm)
 	return pwrdm->banks;
 }
 
+static int _match_pwrst(u32 pwrsts, u8 pwrst, u8 default_pwrst)
+{
+	bool found = true;
+	int new_pwrst = pwrst;
+
+	/* Search down */
+	while (!(pwrsts & (1 << new_pwrst))) {
+		if (new_pwrst == PWRDM_POWER_OFF) {
+			found = false;
+			break;
+		}
+		new_pwrst--;
+	}
+
+	if (found)
+		goto done;
+
+	/* Search up */
+	new_pwrst = pwrst;
+	while (!(pwrsts & (1 << new_pwrst))) {
+		if (new_pwrst == default_pwrst)
+			break;
+		new_pwrst++;
+	}
+done:
+	return new_pwrst;
+}
+
+/**
+ * pwrdm_get_achievable_pwrst() - Provide achievable pwrst
+ * @pwrdm: struct powerdomain * to check on
+ * @req_pwrst: minimum state we would like to hit
+ * (one of the PWRDM_POWER* macros)
+ *
+ * Power domains have varied capabilities. When attempting a low power
+ * state such as OFF/RET, a specific min requested state may not be
+ * supported on the power domain. This is because a combination
+ * of system power states where the parent PD's state is not in line
+ * with expectation can result in system instabilities.
+ *
+ * The achievable power state is first looked for in the lower power
+ * states in order to maximize the power savings, then if not found
+ * in the higher power states.
+ *
+ * Returns the achievable functional power state, or -EINVAL in case of
+ * invalid parameters.
+ */
+int pwrdm_get_achievable_pwrst(struct powerdomain *pwrdm, u8 req_pwrst)
+{
+	int pwrst = req_pwrst;
+	int logic = PWRDM_POWER_RET;
+	int new_pwrst, new_logic;
+
+	if (!pwrdm || IS_ERR(pwrdm)) {
+		pr_err("%s: invalid params: pwrdm=%p, req_pwrst=%0x\n",
+		       __func__, pwrdm, req_pwrst);
+		return -EINVAL;
+	}
+
+	switch (req_pwrst) {
+	case PWRDM_POWER_OFF:
+		logic = PWRDM_POWER_OFF;
+		break;
+	case PWRDM_POWER_OSWR:
+		logic = PWRDM_POWER_OFF;
+		/* Fall through */
+	case PWRDM_POWER_CSWR:
+		pwrst = PWRDM_POWER_RET;
+		break;
+	}
+
+	/*
+	 * If no lower power state found, fallback to the higher
+	 * power states.
+	 * PWRDM_POWER_ON is always valid.
+	 */
+	new_pwrst = _match_pwrst(pwrdm->pwrsts, pwrst,
+				 PWRDM_POWER_ON);
+	/*
+	 * If no lower logic state found, fallback to the higher
+	 * logic states.
+	 * PWRDM_POWER_RET is always valid.
+	 */
+	new_logic = _match_pwrst(pwrdm->pwrsts_logic_ret, logic,
+				 PWRDM_POWER_RET);
+
+	if (new_pwrst == PWRDM_POWER_RET) {
+		if (new_logic == PWRDM_POWER_OFF)
+			new_pwrst = PWRDM_POWER_OSWR;
+		else
+			new_pwrst = PWRDM_POWER_CSWR;
+	}
+
+	pr_debug("%s(%s, req_pwrst=%0x) returns %0x\n", __func__,
+		 pwrdm->name, req_pwrst, new_pwrst);
+
+	return new_pwrst;
+}
+
 /* Types of sleep_switch used in omap_set_pwrdm_state */
 #define FORCEWAKEUP_SWITCH	0
 #define LOWPOWERSTATE_SWITCH	1
@@ -526,7 +625,7 @@ int pwrdm_get_mem_bank_count(struct powerdomain *pwrdm)
  */
 int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 {
-	u8 curr_pwrst, next_pwrst, tmp_pwrst = pwrst;
+	u8 curr_pwrst, next_pwrst;
 	int sleep_switch = -1, ret = 0, hwsup = 0;
 
 	if (!pwrdm || IS_ERR(pwrdm)) {
@@ -535,16 +634,9 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 		return -EINVAL;
 	}
 
-	if (pwrst == PWRDM_POWER_OSWR || pwrst == PWRDM_POWER_CSWR)
-		tmp_pwrst = PWRDM_POWER_RET;
+	pwrst = pwrdm_get_achievable_pwrst(pwrdm, pwrst);
 
 	spin_lock(&pwrdm->lock);
-
-	while (!(pwrdm->pwrsts & (1 << tmp_pwrst))) {
-		if (tmp_pwrst == PWRDM_POWER_OFF)
-			goto out;
-		tmp_pwrst--;
-	}
 
 	next_pwrst = pwrdm_read_next_pwrst(pwrdm);
 	if (next_pwrst == pwrst)
