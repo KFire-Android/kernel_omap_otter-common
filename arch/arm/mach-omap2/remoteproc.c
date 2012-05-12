@@ -48,12 +48,16 @@
 #define OMAP4_RPROC_CMA_BASE_IPU	(0xa9000000)
 #define OMAP4_RPROC_CMA_BASE_DSP	(0xa8800000)
 
-static struct omap_rproc_timers_info ipu_timers[] = {
-	{ .id = 3 },
-};
 
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP
 static struct omap_rproc_timers_info dsp_timers[] = {
 	{ .id = 5 },
+};
+#endif
+
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU
+static struct omap_rproc_timers_info ipu_timers[] = {
+	{ .id = 3 },
 };
 
 static int
@@ -72,6 +76,7 @@ static struct rproc_ops ducati_ops = {
 	.set_bandwidth	= _ducati_set_bandwidth,
 	.set_frequency	= _ducati_set_frequency,
 };
+#endif
 
 /*
  * These data structures define platform-specific information
