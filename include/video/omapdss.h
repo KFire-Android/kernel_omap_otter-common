@@ -427,6 +427,7 @@ struct omap_overlay_info {
 	u8 global_alpha;
 	u8 pre_mult_alpha;
 	u8 zorder;
+	u16 min_x_decim, max_x_decim, min_y_decim, max_y_decim;
 
 	struct omap_dss_cconv_coefs cconv;
 };
