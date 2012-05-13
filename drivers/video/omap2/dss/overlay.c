@@ -531,6 +531,26 @@ static ssize_t overlay_attr_store(struct kobject *kobj, struct attribute *attr,
 	return overlay_attr->store(overlay, buf, size);
 }
 
+static int init_default_overlay_params(struct omap_overlay *ovl)
+{
+	struct omap_overlay_info info;
+	const struct omap_dss_cconv_coefs ctbl_bt601_5 = {
+		298, 409, 0, 298, -208, -100, 298, 0, 517, 0,
+	};
+
+	ovl->get_overlay_info(ovl, &info);
+
+	/* default paddr should be a non-zero value */
+	info.paddr = 1;
+	info.color_mode = OMAP_DSS_COLOR_ARGB32;
+	info.min_x_decim = 1;
+	info.min_y_decim = 1;
+	info.max_x_decim = (cpu_is_omap44xx() || cpu_is_omap54xx()) ? 16 : 1;
+	info.max_y_decim = (cpu_is_omap44xx() || cpu_is_omap54xx()) ? 16 : 1;
+	info.cconv = ctbl_bt601_5;
+	return ovl->set_overlay_info(ovl, &info);
+}
+
 static const struct sysfs_ops overlay_sysfs_ops = {
 	.show = overlay_attr_show,
 	.store = overlay_attr_store,
@@ -607,6 +627,10 @@ void dss_init_overlays(struct platform_device *pdev)
 
 		if (r)
 			DSSERR("failed to create sysfs file\n");
+
+		r = init_default_overlay_params(ovl);
+		if (r)
+			DSSERR("failed to set default overlay params\n");
 	}
 }
 
