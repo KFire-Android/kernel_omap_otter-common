@@ -60,6 +60,12 @@ static enum omap_44xx_tablet_panel_type {
 	TC35876x_SAMSUNG_HYDIS_WUXGA,	/* TC35876x + Samsung or HYDIS */
 } tablet_panel_type = LCD_DEFAULT;
 
+struct omap_tablet_panel_data {
+	struct omap_dss_board_info *board_info;
+	struct dsscomp_platform_data *dsscomp_data;
+	struct sgx_omaplfb_platform_data *omaplfb_data;
+};
+
 static void omap4_tablet_init_display_led(void)
 {
 	twl_i2c_write_u8(TWL_MODULE_PWM, 0xFF, LED_PWM2ON);
@@ -411,11 +417,49 @@ static struct omap_dss_board_info tablet_dss_data_tc35876x_sharp_lq101k1lyxx = {
 	.default_device = &lcd_tc35876x_sharp_lq101k1lyxx,
 };
 
-static struct omap_dss_board_info *get_panel_data(enum omap_44xx_tablet_panel_type panel_type)
+
+/* Allocate ( 18 + 9 ) MB for TILER1D slot size for WUXGA panel, total of
+ * 54 MB of TILER1D
+ */
+static struct dsscomp_platform_data dsscomp_config_tc35876x_samhyd_wuxga = {
+		.tiler1d_slotsz = (SZ_16M + SZ_2M + SZ_8M + SZ_1M),
+};
+
+#ifdef CONFIG_FB_OMAP2_NUM_FBS
+#define OMAPLFB_NUM_DEV CONFIG_FB_OMAP2_NUM_FBS
+#else
+#define OMAPLFB_NUM_DEV 1
+#endif
+
+static struct sgx_omaplfb_config omaplfb_config_tc35876x_samhyd_wuxga[OMAPLFB_NUM_DEV] = {
+	{
+	.vram_buffers = 2,
+	.swap_chain_length = 2,
+	}
+};
+
+static struct sgx_omaplfb_platform_data omaplfb_plat_data_tc35876x_samhyd_wuxga = {
+	.num_configs = OMAPLFB_NUM_DEV,
+	.configs = omaplfb_config_tc35876x_samhyd_wuxga,
+};
+
+static struct omap_tablet_panel_data panel_data_tc35876x_samhyd_wuxga = {
+	.board_info = &tablet_dss_data_tc35876x_samhyd_wuxga,
+	.dsscomp_data = &dsscomp_config_tc35876x_samhyd_wuxga,
+	.omaplfb_data = &omaplfb_plat_data_tc35876x_samhyd_wuxga,
+};
+
+static struct omap_tablet_panel_data panel_data_tc35876x_sharp_lq101k1lyxx = {
+	.board_info = &tablet_dss_data_tc35876x_sharp_lq101k1lyxx,
+	.dsscomp_data = NULL,
+	.omaplfb_data = NULL,
+};
+
+static struct omap_tablet_panel_data *get_panel_data(enum omap_44xx_tablet_panel_type panel_type)
 {
 	switch (panel_type) {
 	case TC35876x_SAMSUNG_HYDIS_WUXGA: /* HYDIS & Samsung equivalent */
-		return &tablet_dss_data_tc35876x_samhyd_wuxga;
+		return &panel_data_tc35876x_samhyd_wuxga;
 		break;
 	case TC35876x_SHARP_LQ101K1LYxx_WXGA:
 	default:
@@ -425,7 +469,7 @@ static struct omap_dss_board_info *get_panel_data(enum omap_44xx_tablet_panel_ty
 			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.x_res = 1024;
 			lcd_tc35876x_sharp_lq101k1lyxx.panel.timings.y_res = 768;
 		}
-		return &tablet_dss_data_tc35876x_sharp_lq101k1lyxx;
+		return &panel_data_tc35876x_sharp_lq101k1lyxx;
 	}
 }
 
@@ -442,7 +486,7 @@ static void tablet_lcd_init(void)
 	reg |= 0x1f << OMAP4_DSI1_PIPD_SHIFT;
 	omap4_ctrl_pad_writel(reg, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
 
-	status = gpio_request_one(get_panel_data(tablet_panel_type)->devices[0]->reset_gpio,
+	status = gpio_request_one(get_panel_data(tablet_panel_type)->board_info->devices[0]->reset_gpio,
 				GPIOF_OUT_INIT_LOW, "lcd_reset_gpio");
 	if (status)
 		pr_err("%s: Could not get lcd_reset_gpio\n", __func__);
@@ -481,9 +525,10 @@ early_param("omapdss.board_id", set_tablet_panel_type);
 
 void tablet_android_display_setup(struct omap_ion_platform_data *ion)
 {
-	omap_android_display_setup(get_panel_data(tablet_panel_type),
-				   NULL,
-				   NULL,
+	struct omap_tablet_panel_data *panel_data = get_panel_data(tablet_panel_type);
+	omap_android_display_setup(panel_data->board_info,
+				   panel_data->dsscomp_data,
+				   panel_data->omaplfb_data,
 				   &tablet_fb_pdata,
 				   ion);
 }
@@ -495,7 +540,7 @@ int __init tablet_panel_init(void)
 
 	omapfb_set_platform_data(&tablet_fb_pdata);
 
-	omap_display_init(get_panel_data(tablet_panel_type));
+	omap_display_init(get_panel_data(tablet_panel_type)->board_info);
 	platform_device_register(&omap4_tablet_disp_led);
 
 	i2c_register_board_info(2, omap4xx_i2c_bus2_d2l_info,
