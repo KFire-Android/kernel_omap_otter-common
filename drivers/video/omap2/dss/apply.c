@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/jiffies.h>
+#include <linux/seq_file.h>
 
 #include <video/omapdss.h>
 
@@ -1087,6 +1088,53 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	spin_unlock_irqrestore(&data_lock, flags);
 
 	return 0;
+}
+
+#ifdef CONFIG_DEBUG_FS
+static void seq_print_cb(struct seq_file *s, struct omapdss_ovl_cb *cb)
+{
+	if (!cb->fn) {
+		seq_printf(s, "(none)\n");
+		return;
+	}
+
+	seq_printf(s, "mask=%c%c%c%c [%p] %pf\n",
+		   (cb->mask & DSS_COMPLETION_CHANGED) ? 'C' : '-',
+		   (cb->mask & DSS_COMPLETION_PROGRAMMED) ? 'P' : '-',
+		   (cb->mask & DSS_COMPLETION_DISPLAYED) ? 'D' : '-',
+		   (cb->mask & DSS_COMPLETION_RELEASED) ? 'R' : '-',
+		   cb->data,
+		   cb->fn);
+}
+#endif
+
+void seq_print_cbs(struct omap_overlay_manager *mgr, struct seq_file *s)
+{
+#ifdef CONFIG_DEBUG_FS
+	struct mgr_priv_data *mp;
+	unsigned long flags;
+
+	spin_lock_irqsave(&data_lock, flags);
+
+	mp = get_mgr_priv(mgr);
+
+	seq_printf(s, "  DISPC pipeline:\n\n"
+				"    user_info:%13s ", mp->user_info_dirty ?
+				"DIRTY" : "clean");
+	seq_print_cb(s, &mp->user_info.cb);
+	seq_printf(s, "    info:%12s ", mp->info_dirty ? "DIRTY" : "clean");
+	seq_print_cb(s, &mp->cb.info);
+	seq_printf(s, "    shadow:  %s %s ", mp->cb.shadow_enabled ? "ACT" :
+				"off", mp->shadow_info_dirty ?
+				"DIRTY" : "clean");
+	seq_print_cb(s, &mp->cb.shadow);
+	seq_printf(s, "    dispc:%12s ", mp->cb.dispc_displayed ?
+				"DISPLAYED" : "");
+	seq_print_cb(s, &mp->cb.dispc);
+	seq_printf(s, "\n");
+
+	spin_unlock_irqrestore(&data_lock, flags);
+#endif
 }
 
 static void dss_apply_ovl_enable(struct omap_overlay *ovl, bool enable)

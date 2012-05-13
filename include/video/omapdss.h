@@ -547,6 +547,7 @@ struct omap_overlay_manager {
 	int (*apply)(struct omap_overlay_manager *mgr);
 	int (*wait_for_go)(struct omap_overlay_manager *mgr);
 	int (*wait_for_vsync)(struct omap_overlay_manager *mgr);
+	void (*dump_cb)(struct omap_overlay_manager *mgr, struct seq_file *s);
 };
 
 struct omap_dss_device {
