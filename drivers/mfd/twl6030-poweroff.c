@@ -25,6 +25,7 @@
 #include <linux/pm.h>
 #include <linux/i2c/twl.h>
 
+#define TWL6030_PHONIX_DEV_ON	0x25
 #define APP_DEVOFF	(1<<0)
 #define CON_DEVOFF	(1<<1)
 #define MOD_DEVOFF	(1<<2)
@@ -34,8 +35,10 @@ void twl6030_poweroff(void)
 	u8 val = 0;
 	int err = 0;
 
-	err = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &val,
-				  TWL6030_PHOENIX_DEV_ON);
+//	err = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &val,
+//				  TWL6030_PHOENIX_DEV_ON);
+	err = twl_i2c_read_u8(TWL6030_MODULE_ID0, &val,
+				  TWL6030_PHONIX_DEV_ON);
 	if (err) {
 		pr_warning("I2C error %d reading PHOENIX_DEV_ON\n", err);
 		return;
@@ -43,8 +46,10 @@ void twl6030_poweroff(void)
 
 	val |= APP_DEVOFF | CON_DEVOFF | MOD_DEVOFF;
 
-	err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, val,
-				   TWL6030_PHOENIX_DEV_ON);
+	err = twl_i2c_write_u8(TWL6030_MODULE_ID0, val,
+				   TWL6030_PHONIX_DEV_ON);
+//	err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, val,
+//				   TWL6030_PHOENIX_DEV_ON);
 
 	if (err) {
 		pr_warning("I2C error %d writing PHOENIX_DEV_ON\n", err);
