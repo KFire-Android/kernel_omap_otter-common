@@ -1753,6 +1753,172 @@ static unsigned long calc_fclk(enum omap_channel channel, u16 width,
 	}
 }
 
+int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
+			enum omap_channel channel,
+			u16 *x_decim, u16 *y_decim, bool *five_taps)
+{
+	const int maxdownscale = dss_feat_get_param_max(FEAT_PARAM_DOWNSCALE);
+	int bpp = color_mode_to_bpp(oi->color_mode);
+
+	/*
+	 * For now only whole byte formats on OMAP4/5 can be predecimated.
+	 * Later SDMA decimation support may be added
+	 */
+	bool can_decimate_x = (cpu_is_omap44xx() || cpu_is_omap54xx()) &&
+						!(bpp & 7);
+	bool can_decimate_y = can_decimate_x;
+
+	bool can_scale = plane != OMAP_DSS_GFX;
+
+	u16 in_width, in_height;
+	unsigned long fclk = 0, fclk5 = 0;
+	int min_factor, max_factor;	/* decimation search limits */
+	int x, y;			/* decimation search variables */
+	unsigned long fclk_max = dispc_fclk_rate();
+	u16 y_decim_limit = oi->rotation_type == OMAP_DSS_ROT_TILER ? 2 : 16;
+
+	/* No decimation for bitmap formats */
+	if (oi->color_mode == OMAP_DSS_COLOR_CLUT1 ||
+	    oi->color_mode == OMAP_DSS_COLOR_CLUT2 ||
+	    oi->color_mode == OMAP_DSS_COLOR_CLUT4 ||
+	    oi->color_mode == OMAP_DSS_COLOR_CLUT8) {
+		*x_decim = 1;
+		*y_decim = 1;
+		*five_taps = false;
+		return 0;
+	}
+
+	/* restrict search region based on whether we can decimate */
+	if (!can_decimate_x) {
+		if (oi->min_x_decim > 1)
+			return -EINVAL;
+		oi->min_x_decim = 1;
+		oi->max_x_decim = 1;
+	} else {
+		if (oi->max_x_decim > 16)
+			oi->max_x_decim = 16;
+	}
+
+	if (!can_decimate_y) {
+		if (oi->min_y_decim > 1)
+			return -EINVAL;
+		oi->min_y_decim = 1;
+		oi->max_y_decim = 1;
+	} else {
+		if (oi->max_y_decim > y_decim_limit)
+			oi->max_y_decim = y_decim_limit;
+	}
+
+	/*
+	 * Find best supported quality.  In the search algorithm, we make use
+	 * of the fact, that increased decimation in either direction will have
+	 * lower quality.  However, we do not differentiate horizontal and
+	 * vertical decimation even though they may affect quality differently
+	 * given the exact geometry involved.
+	 *
+	 * Also, since the clock calculations are abstracted, we cannot make
+	 * assumptions on how decimation affects the clock rates in our search.
+	 *
+	 * We search the whole search region in increasing layers from
+	 * min_factor to max_factor.  In each layer we search in increasing
+	 * factors alternating between x and y axis:
+	 *
+	 *   x:	1	2	3
+	 * y:
+	 * 1	1st |	3rd |	6th |
+	 *	----+	    |	    |
+	 * 2	2nd	4th |	8th |
+	 *	------------+	    |
+	 * 3	5th	7th	9th |
+	*	--------------------+
+	 */
+	min_factor = min(oi->min_x_decim, oi->min_y_decim);
+	max_factor = max(oi->max_x_decim, oi->max_y_decim);
+	x = oi->min_x_decim;
+	y = oi->min_y_decim;
+	while (1) {
+		if (x < oi->min_x_decim || x > oi->max_x_decim ||
+				y < oi->min_y_decim || y > oi->max_y_decim)
+			goto loop;
+
+		in_width = DIV_ROUND_UP(oi->width, x);
+		in_height = DIV_ROUND_UP(oi->height, y);
+
+		if (in_width == oi->out_width && in_height == oi->out_height)
+			break;
+
+		if (!can_scale)
+			goto loop;
+
+		if (oi->out_width * maxdownscale < in_width ||
+				oi->out_height * maxdownscale < in_height)
+			goto loop;
+
+		/* Use 5-tap filter unless must use 3-tap */
+		if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
+			*five_taps = in_width <= 1024;
+		else if (omap_rev() == OMAP4430_REV_ES1_0)
+			*five_taps = in_width <= 1280;
+		else
+			*five_taps = true;
+
+		/*
+		 * Predecimation on OMAP4 still fetches the whole lines
+		 * :TODO: How does it affect the required clock speed?
+		 */
+		fclk = calc_fclk(channel, in_width, in_height,
+					oi->out_width, oi->out_height);
+		fclk5 = *five_taps ?
+			calc_fclk_five_taps(channel, in_width, in_height,
+					oi->out_width, oi->out_height,
+					oi->color_mode) : 0;
+
+		DSSDBG("%d*%d,%d*%d->%d,%d requires %lu(3T), %lu(5T) Hz\n",
+				in_width, x, in_height, y, oi->out_width,
+				oi->out_height, fclk, fclk5);
+
+		/* for now we always use 5-tap unless 3-tap is required */
+		if (*five_taps)
+			fclk = fclk5;
+
+		/* OMAP2/3 has a scaler size limitation */
+		if (!(cpu_is_omap44xx() || cpu_is_omap54xx()) && in_width >
+				(1024 << !*five_taps))
+			goto loop;
+
+		DSSDBG("required fclk rate = %lu Hz\n", fclk);
+		DSSDBG("current fclk rate = %lu Hz\n", fclk_max);
+
+		if (fclk > fclk_max)
+			goto loop;
+		break;
+
+loop:
+		/* err if exhausted search region */
+		if (x == oi->max_x_decim && y == oi->max_y_decim) {
+			DSSERR("failed to set up scaling %u*%u to %u*%u, "
+				"required fclk rate = %lu Hz, current = %lu Hz"
+				"\n", oi->width, oi->height, oi->out_width,
+				oi->out_height, fclk, fclk_max);
+			return -EINVAL;
+		}
+
+		/* get to next factor */
+		if (x == y) {
+			x = min_factor;
+			y++;
+		} else {
+			swap(x, y);
+			if (x < y)
+				x++;
+		}
+	}
+
+	*x_decim = x;
+	*y_decim = y;
+	return 0;
+}
+
 static int dispc_ovl_calc_scaling(enum omap_plane plane,
 		enum omap_channel channel, u16 width, u16 height,
 		u16 out_width, u16 out_height,
@@ -1760,9 +1926,6 @@ static int dispc_ovl_calc_scaling(enum omap_plane plane,
 {
 	struct omap_overlay *ovl = omap_dss_get_overlay(plane);
 	const int maxdownscale = dss_feat_get_param_max(FEAT_PARAM_DOWNSCALE);
-	const int maxsinglelinewidth =
-				dss_feat_get_param_max(FEAT_PARAM_LINEWIDTH);
-	unsigned long fclk = 0;
 
 	if (width == out_width && height == out_height)
 		return 0;
@@ -1770,67 +1933,20 @@ static int dispc_ovl_calc_scaling(enum omap_plane plane,
 	if ((ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0)
 		return -EINVAL;
 
-	if (out_width < width / maxdownscale ||
-			out_width > width * 8)
+	if (out_width * maxdownscale < width)
 		return -EINVAL;
 
-	if (out_height < height / maxdownscale ||
-			out_height > height * 8)
+	if (out_height * maxdownscale < height)
 		return -EINVAL;
-
-	if (cpu_is_omap24xx()) {
-		if (width > maxsinglelinewidth)
-			DSSERR("Cannot scale max input width exceeded");
-		*five_taps = false;
-		fclk = calc_fclk(channel, width, height, out_width,
-								out_height);
-	} else if (cpu_is_omap34xx()) {
-		if (width > (maxsinglelinewidth * 2)) {
-			DSSERR("Cannot setup scaling");
-			DSSERR("width exceeds maximum width possible");
-			return -EINVAL;
-		}
-		fclk = calc_fclk_five_taps(channel, width, height, out_width,
-						out_height, color_mode);
-		if (width > maxsinglelinewidth) {
-			if (height > out_height && height < out_height * 2)
-				*five_taps = false;
-			else {
-				DSSERR("cannot setup scaling with five taps");
-				return -EINVAL;
-			}
-		}
-		if (!*five_taps)
-			fclk = calc_fclk(channel, width, height, out_width,
-					out_height);
-	} else {
-		if (width > maxsinglelinewidth) {
-			DSSERR("Cannot scale width exceeds max line width");
-			return -EINVAL;
-		}
-		fclk = calc_fclk(channel, width, height, out_width,
-				out_height);
-	}
-
-	DSSDBG("required fclk rate = %lu Hz\n", fclk);
-	DSSDBG("current fclk rate = %lu Hz\n", dispc_fclk_rate());
-
-	if (!fclk || fclk > dispc_fclk_rate()) {
-		DSSERR("failed to set up scaling, "
-			"required fclk rate = %lu Hz, "
-			"current fclk rate = %lu Hz\n",
-			fclk, dispc_fclk_rate());
-		return -EINVAL;
-	}
 
 	return 0;
 }
 
 int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
-		bool ilace, bool replication, int x_decim, int y_decim)
+		bool ilace, bool replication, int x_decim, int y_decim,
+		bool five_taps)
 {
 	struct omap_overlay *ovl = omap_dss_get_overlay(plane);
-	bool five_taps = true;
 	bool fieldmode = 0;
 	int r, cconv = 0;
 	unsigned offset0, offset1;
@@ -2056,7 +2172,7 @@ int dispc_ovl_setup(enum omap_plane plane, struct omap_overlay_info *oi,
 
 int dispc_ovl_enable(enum omap_plane plane, bool enable)
 {
-	DSSDBG("dispc_enable_plane %d, %d\n", plane, enable);
+	DSSDBG("dispc_ovl_enable %d, %d\n", plane, enable);
 
 	REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), enable ? 1 : 0, 0, 0);
 

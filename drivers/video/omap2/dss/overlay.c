@@ -559,7 +559,6 @@ EXPORT_SYMBOL(omap_dss_get_overlay);
 void dss_init_overlays(struct platform_device *pdev)
 {
 	int i, r;
-	struct omap_overlay_info info;
 
 	num_overlays = dss_feat_get_num_ovls();
 
@@ -608,17 +607,6 @@ void dss_init_overlays(struct platform_device *pdev)
 
 		if (r)
 			DSSERR("failed to create sysfs file\n");
-
-		ovl->get_overlay_info(ovl, &info);
-
-		info.min_x_decim = 1;
-		info.min_y_decim = 1;
-		info.max_x_decim = (cpu_is_omap44xx() || cpu_is_omap54xx()) ?
-									16 : 1;
-		info.max_y_decim = (cpu_is_omap44xx() || cpu_is_omap54xx()) ?
-									16 : 1;
-
-		ovl->set_overlay_info(ovl, &info);
 	}
 }
 

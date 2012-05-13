@@ -779,5 +779,8 @@ int omap_rfbi_update(struct omap_dss_device *dssdev,
 		void (*callback)(void *), void *data);
 int omap_rfbi_configure(struct omap_dss_device *dssdev, int pixel_size,
 		int data_lines);
+int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
+		enum omap_channel channel,
+		u16 *x_decim, u16 *y_decim, bool *three_tap);
 
 #endif

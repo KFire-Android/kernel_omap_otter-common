@@ -516,7 +516,8 @@ static void dss_ovl_write_regs(struct omap_overlay *ovl)
 	struct omap_overlay_info *oi;
 	bool ilace, replication;
 	struct mgr_priv_data *mp;
-	u16 x_decim = 1, y_decim = 1;
+	u16 x_decim, y_decim;
+	bool five_taps = true;
 	int r;
 
 	DSSDBGF("%d", ovl->id);
@@ -530,7 +531,11 @@ static void dss_ovl_write_regs(struct omap_overlay *ovl)
 
 	ilace = ovl->manager->device->type == OMAP_DISPLAY_TYPE_VENC;
 
-	r = dispc_ovl_setup(ovl->id, oi, ilace, replication, x_decim, y_decim);
+	r = dispc_scaling_decision(ovl->id, oi, op->channel,
+						&x_decim, &y_decim, &five_taps);
+
+	r = r ? : dispc_ovl_setup(ovl->id, oi, ilace,
+			replication, x_decim, y_decim, five_taps);
 	if (r) {
 		/*
 		 * We can't do much here, as this function can be called from
