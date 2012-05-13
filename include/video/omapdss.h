@@ -395,6 +395,28 @@ extern const struct omap_video_timings omap_dss_pal_timings;
 extern const struct omap_video_timings omap_dss_ntsc_timings;
 #endif
 
+enum omapdss_completion_status {
+	DSS_COMPLETION_PROGRAMMED	= (1 << 1),
+	DSS_COMPLETION_DISPLAYED	= (1 << 2),
+
+	DSS_COMPLETION_CHANGED_SET	= (1 << 3),
+	DSS_COMPLETION_CHANGED_CACHE	= (1 << 4),
+	DSS_COMPLETION_CHANGED		= (3 << 3),
+
+	DSS_COMPLETION_RELEASED		= (15 << 5),
+	DSS_COMPLETION_ECLIPSED_SET	= (1 << 5),
+	DSS_COMPLETION_ECLIPSED_CACHE	= (1 << 6),
+	DSS_COMPLETION_ECLIPSED_SHADOW	= (1 << 7),
+	DSS_COMPLETION_TORN		= (1 << 8),
+};
+
+struct omapdss_ovl_cb {
+	/* optional callback method */
+	u32 (*fn)(void *data, int id, int status);
+	void *data;
+	u32 mask;
+};
+
 struct omap_dss_cpr_coefs {
 	s16 rr, rg, rb;
 	s16 gr, gg, gb;
@@ -429,6 +451,7 @@ struct omap_overlay_info {
 	u8 zorder;
 	u16 min_x_decim, max_x_decim, min_y_decim, max_y_decim;
 
+	struct omapdss_ovl_cb cb;
 	struct omap_dss_cconv_coefs cconv;
 };
 
@@ -483,6 +506,8 @@ struct omap_overlay_manager_info {
 
 	bool cpr_enable;
 	struct omap_dss_cpr_coefs cpr_coefs;
+
+	struct omapdss_ovl_cb cb;
 };
 
 struct omap_overlay_manager {
@@ -787,5 +812,19 @@ int omap_rfbi_configure(struct omap_dss_device *dssdev, int pixel_size,
 int dispc_scaling_decision(enum omap_plane plane, struct omap_overlay_info *oi,
 		enum omap_channel channel,
 		u16 *x_decim, u16 *y_decim, bool *three_tap);
+
+int omap_dss_manager_unregister_callback(struct omap_overlay_manager *mgr,
+					 struct omapdss_ovl_cb *cb);
+
+/* generic callback handling */
+static inline void dss_ovl_cb(struct omapdss_ovl_cb *cb, int id, int status)
+{
+	if (cb->fn && (cb->mask & status))
+		cb->mask &= cb->fn(cb->data, id, status);
+	if (status & DSS_COMPLETION_RELEASED)
+		cb->mask = 0;
+	if (!cb->mask)
+		cb->fn = NULL;
+}
 
 #endif
