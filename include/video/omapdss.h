@@ -21,6 +21,7 @@
 #include <linux/list.h>
 #include <linux/kobject.h>
 #include <linux/device.h>
+#include <linux/fb.h>
 #include <sound/asound.h>
 
 #define DISPC_IRQ_FRAMEDONE		(1 << 0)
@@ -669,6 +670,8 @@ struct omap_dss_device {
 
 	enum omap_dss_display_state state;
 
+	struct blocking_notifier_head state_notifiers;
+
 	/* platform specific  */
 	int (*platform_enable)(struct omap_dss_device *dssdev);
 	void (*platform_disable)(struct omap_dss_device *dssdev);
@@ -728,6 +731,11 @@ struct omap_dss_driver {
 
 	int (*read_edid)(struct omap_dss_device *dssdev, u8 *buf, int len);
 	bool (*detect)(struct omap_dss_device *dssdev);
+
+	/* for wrapping around state changes */
+	void (*disable_orig)(struct omap_dss_device *display);
+	int (*enable_orig)(struct omap_dss_device *display);
+
 	/*
 	 * For display drivers that support audio. This encompasses
 	 * HDMI and DisplayPort at the moment.

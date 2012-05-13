@@ -423,6 +423,8 @@ void dss_init_device(struct platform_device *pdev,
 			DSSERR("failed to create sysfs file\n");
 	}
 
+	BLOCKING_INIT_NOTIFIER_HEAD(&dssdev->state_notifiers);
+
 	/* create display? sysfs links */
 	r = sysfs_create_link(&pdev->dev.kobj, &dssdev->dev.kobj,
 			dev_name(&dssdev->dev));
