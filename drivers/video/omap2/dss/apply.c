@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/jiffies.h>
+#include <linux/ratelimit.h>
 #include <linux/seq_file.h>
 
 #include <video/omapdss.h>
@@ -999,6 +1000,117 @@ static void dss_apply_irq_handler(void *data, u32 mask)
 	spin_unlock(&data_lock);
 }
 
+int dss_mgr_blank(struct omap_overlay_manager *mgr,
+			bool wait_for_go)
+{
+	struct ovl_priv_data *op;
+	struct mgr_priv_data *mp;
+	unsigned long flags;
+	int r, r_get, i;
+
+	DSSDBG("dss_mgr_blank(%s,wait=%d)\n", mgr->name, wait_for_go);
+
+	r = dispc_runtime_get();
+	r_get = r;
+	/* still clear cache even if failed to get clocks, just don't config */
+
+	spin_lock_irqsave(&data_lock, flags);
+
+	/* disable overlays in overlay user info structs and in data info */
+	for (i = 0; i < omap_dss_get_num_overlays(); i++) {
+		struct omap_overlay *ovl;
+
+		ovl = omap_dss_get_overlay(i);
+
+		if (ovl->manager != mgr)
+			continue;
+
+		r = ovl->disable(ovl);
+
+		op = get_ovl_priv(ovl);
+
+		/* complete unconfigured info */
+		if (op->user_info_dirty)
+			dss_ovl_cb(&op->user_info.cb, i,
+					DSS_COMPLETION_ECLIPSED_SET);
+		dss_ovl_cb(&op->cb.info, i, DSS_COMPLETION_ECLIPSED_CACHE);
+		op->cb.info.fn = NULL;
+
+		op->user_info_dirty = false;
+		op->info_dirty = true;
+		op->enabled = false;
+	}
+
+	/* dirty manager */
+	mp = get_mgr_priv(mgr);
+	if (mp->user_info_dirty)
+		dss_ovl_cb(&mp->user_info.cb, mgr->id,
+				DSS_COMPLETION_ECLIPSED_SET);
+	dss_ovl_cb(&mp->cb.info, mgr->id, DSS_COMPLETION_ECLIPSED_CACHE);
+	mp->cb.info.fn = NULL;
+	mp->user_info.cb.fn = NULL;
+	mp->info_dirty = true;
+	mp->user_info_dirty = false;
+
+	/*
+	 * TRICKY: Enable apply irq even if not waiting for vsync, so that
+	 * DISPC programming takes place in case GO bit was on.
+	 */
+	if (!dss_data.irq_enabled) {
+		u32 mask;
+
+		mask = DISPC_IRQ_VSYNC	| DISPC_IRQ_EVSYNC_ODD |
+			DISPC_IRQ_EVSYNC_EVEN;
+		if (dss_has_feature(FEAT_MGR_LCD2))
+			mask |= DISPC_IRQ_VSYNC2;
+
+		r = omap_dispc_register_isr(dss_apply_irq_handler, NULL, mask);
+		dss_data.irq_enabled = true;
+	}
+
+	if (!r_get) {
+		dss_write_regs();
+		dss_set_go_bits();
+	}
+
+	if (r_get || !wait_for_go) {
+		/* pretend that programming has happened */
+		for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
+			op = &dss_data.ovl_priv_data_array[i];
+			if (op->channel != mgr->id)
+				continue;
+			if (op->info_dirty)
+				dss_ovl_configure_cb(&op->cb, i, false);
+			if (op->shadow_info_dirty) {
+				dss_ovl_program_cb(&op->cb, i);
+				op->dispc_channel = op->channel;
+				op->shadow_info_dirty = false;
+			} else {
+				pr_warn("ovl%d-shadow is not dirty\n", i);
+			}
+		}
+
+		if (mp->info_dirty)
+			dss_ovl_configure_cb(&mp->cb, i, false);
+		if (mp->shadow_info_dirty) {
+			dss_ovl_program_cb(&mp->cb, i);
+			mp->shadow_info_dirty = false;
+		} else {
+			pr_warn("mgr%d-shadow is not dirty\n", mgr->id);
+		}
+	}
+
+	spin_unlock_irqrestore(&data_lock, flags);
+
+	if (wait_for_go)
+		mgr->wait_for_go(mgr);
+
+	if (!r_get)
+		dispc_runtime_put();
+
+	return r;
+}
+
 int omap_dss_manager_unregister_callback(struct omap_overlay_manager *mgr,
 					 struct omapdss_ovl_cb *cb)
 {
@@ -1067,7 +1179,16 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	DSSDBG("omap_dss_mgr_apply(%s)\n", mgr->name);
 
 	spin_lock_irqsave(&data_lock, flags);
-
+#if 0
+	/* TODO: FIXME: Check why this causes spin lock crash */
+	if (!mgr->device || mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
+		pr_info_ratelimited("cannot apply mgr(%s) on inactive device\n",
+				mgr->name);
+		r = -ENODEV;
+		spin_unlock_irqrestore(&data_lock, flags);
+		return r;
+	}
+#endif
 	r = dss_check_settings_apply(mgr, mgr->device);
 	if (r) {
 		spin_unlock_irqrestore(&data_lock, flags);

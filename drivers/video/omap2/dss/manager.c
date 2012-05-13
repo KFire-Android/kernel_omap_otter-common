@@ -556,6 +556,7 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 		mgr->get_manager_info = &dss_mgr_get_info;
 		mgr->wait_for_go = &dss_mgr_wait_for_go;
 		mgr->wait_for_vsync = &dss_mgr_wait_for_vsync;
+		mgr->blank = &dss_mgr_blank;
 		mgr->dump_cb = &seq_print_cbs;
 
 		mgr->caps = 0;
