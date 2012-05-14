@@ -184,6 +184,7 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	union rect crop, win, vis;
 	int c;
 	enum tiler_fmt fmt;
+	int r = 0;
 
 	/* check overlay number */
 	if (!oi || oi->cfg.ix >= omap_dss_get_num_overlays())
@@ -194,8 +195,12 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	/* just in case there are new fields, we get the current info */
 	ovl->get_overlay_info(ovl, &info);
 
-	if (!cfg->enabled)
+	if (!cfg->enabled) {
+		r = ovl->disable(ovl);
+		if (r)
+			pr_warn("Error disabling ovl%d\n", cfg->ix);
 		goto done;
+	}
 
 	/* copied params */
 	info.zorder = cfg->zorder;
