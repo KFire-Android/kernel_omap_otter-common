@@ -3176,6 +3176,102 @@ static struct omap_hwmod omap54xx_mailbox_hwmod = {
 };
 
 /*
+ * 'mcasp' class
+ * multi channel audio serial port controller
+ */
+
+static struct omap_hwmod_class_sysconfig omap54xx_mcasp_sysc = {
+	.sysc_offs	= 0x0004,
+	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.sysc_fields	= &omap_hwmod_sysc_type3,
+};
+
+static struct omap_hwmod_class omap54xx_mcasp_hwmod_class = {
+	.name = "mcasp",
+	.sysc = &omap54xx_mcasp_sysc,
+};
+
+/* mcasp */
+static struct omap_hwmod omap54xx_mcasp_hwmod;
+static struct omap_hwmod_irq_info omap54xx_mcasp_irqs[] = {
+	{ .irq = 109 + OMAP54XX_IRQ_GIC_START },
+};
+
+static struct omap_hwmod_dma_info omap54xx_mcasp_sdma_reqs[] = {
+	{ .name = "tx", .dma_req = 7 + OMAP54XX_DMA_REQ_START },
+};
+
+static struct omap_hwmod_addr_space omap54xx_mcasp_addrs[] = {
+	{
+		.pa_start	= 0x40128000,
+		.pa_end         = 0x40128000 + SZ_4K - 1, /* McASP CFG Port */
+		.flags          = ADDR_TYPE_RT
+	},
+	{
+		.pa_start       = 0x4012A000,
+		.pa_end         = 0x4012A000 + SZ_4K - 1, /* McASP Data Port */
+		.flags          = ADDR_TYPE_RT
+	},
+};
+
+/* l4_abe -> mcasp */
+static struct omap_hwmod_ocp_if omap54xx_l4_abe__mcasp = {
+	.master		= &omap54xx_l4_abe_hwmod,
+	.slave		= &omap54xx_mcasp_hwmod,
+	.clk		= "abe_iclk",
+	.addr		= omap54xx_mcasp_addrs,
+	.user		= OCP_USER_MPU,
+};
+
+static struct omap_hwmod_addr_space omap54xx_mcasp_dma_addrs[] = {
+	{
+		.pa_start	= 0x49028000,
+		.pa_end         = 0x49028000 + SZ_4K - 1, /* McASP CFG Port */
+		.flags          = ADDR_TYPE_RT
+	},
+	{
+		.pa_start       = 0x4902A000,
+		.pa_end         = 0x4902A000 + SZ_4K - 1, /* McASP Data Port */
+		.flags          = ADDR_TYPE_RT
+	},
+};
+
+/* l4_abe -> mcasp (dma) */
+static struct omap_hwmod_ocp_if omap54xx_l4_abe__mcasp_dma = {
+	.master		= &omap54xx_l4_abe_hwmod,
+	.slave		= &omap54xx_mcasp_hwmod,
+	.clk		= "abe_iclk",
+	.addr		= omap54xx_mcasp_dma_addrs,
+	.user		= OCP_USER_SDMA,
+};
+
+/* mcasp1 slave ports */
+static struct omap_hwmod_ocp_if *omap54xx_mcasp_slaves[] = {
+	&omap54xx_l4_abe__mcasp,
+	&omap54xx_l4_abe__mcasp_dma,
+};
+
+static struct omap_hwmod omap54xx_mcasp_hwmod = {
+	.name		= "mcasp",
+	.class		= &omap54xx_mcasp_hwmod_class,
+	.clkdm_name	= "abe_clkdm",
+	.flags		= HWMOD_SWSUP_SIDLE,
+	.mpu_irqs	= omap54xx_mcasp_irqs,
+	.sdma_reqs	= omap54xx_mcasp_sdma_reqs,
+	.main_clk	= "mcasp_gfclk",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_ABE_MCASP_CLKCTRL_OFFSET,
+			.context_offs = OMAP54XX_RM_ABE_MCASP_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_SWCTRL,
+		},
+	},
+	.slaves		= omap54xx_mcasp_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap54xx_mcasp_slaves),
+};
+
+/*
  * 'mcbsp' class
  * multi channel buffered serial port controller
  */
@@ -5958,6 +6054,9 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 
 	/* mailbox class */
 	&omap54xx_mailbox_hwmod,
+
+	/* mcasp class */
+	&omap54xx_mcasp_hwmod,
 
 	/* mcbsp class */
 	&omap54xx_mcbsp1_hwmod,
