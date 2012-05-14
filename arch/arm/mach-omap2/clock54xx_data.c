@@ -2452,6 +2452,7 @@ static struct clk auxclkreq5_ck = {
 
 static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"pad_clks",			&pad_clks,	CK_54XX),
+	CLK(NULL,	"pad_clks_ck",			&pad_clks,	CK_54XX),
 	CLK(NULL,	"pad_slimbus_core_clks",	&pad_slimbus_core_clks,	CK_54XX),
 	CLK(NULL,	"secure_32k_clk_src",		&secure_32k_clk_src,	CK_54XX),
 	CLK(NULL,	"slimbus_clk",			&slimbus_clk,	CK_54XX),
