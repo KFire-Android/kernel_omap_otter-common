@@ -758,17 +758,18 @@ static struct snd_soc_dai_link omap_abe_dai[] = {
 		.ops = &omap_abe_mcpdm_ops,
 		.ignore_suspend = 1,
 	},
-#if 0
 	{
 		.name = "SPDIF",
-		.stream_name = "SPDIF",
-		.cpu_dai_name = "omap-mcasp-dai.0",
+		.stream_name = "SPDIF Playback",
+
+		.cpu_dai_name = "mcasp-legacy",
+		.platform_name = "omap-pcm-audio",
+
 		.codec_dai_name = "dit-hifi",	/* dummy s/pdif transciever
 						 * driver */
-		.platform_name = "omap-pcm-audio",
+		.codec_name = "spdif-dit",
 		.ignore_suspend = 1,
 	},
-#endif
 	{
 		.name = "Legacy DMIC",
 		.stream_name = "DMIC Capture",
