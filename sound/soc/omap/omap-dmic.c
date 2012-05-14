@@ -451,6 +451,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 {
 	.name = "omap-dmic-abe-dai-0",
 	.capture = {
+		.stream_name = "omap-dmic-abe.0 Capture",
 		.channels_min = 2,
 		.channels_max = 2,
 		.rates = SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000,
@@ -461,6 +462,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 {
 	.name = "omap-dmic-abe-dai-1",
 	.capture = {
+		.stream_name = "omap-dmic-abe.1 Capture",
 		.channels_min = 2,
 		.channels_max = 2,
 		.rates = SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000,
@@ -471,6 +473,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 {
 	.name = "omap-dmic-abe-dai-2",
 	.capture = {
+		.stream_name = "omap-dmic-abe.2 Capture",
 		.channels_min = 2,
 		.channels_max = 2,
 		.rates = SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000,
