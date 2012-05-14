@@ -378,13 +378,16 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"AFMR", NULL, "Line In"},
 
 	/* Digital Mics: DMic0, DMic1, DMic2 with bias */
-	{"DMIC0", NULL, "Digital Mic1 Bias"},
+	{"DMIC0", NULL, "omap-dmic-abe.0 Capture"},
+	{"omap-dmic-abe.0 Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 0"},
 
-	{"DMIC1", NULL, "Digital Mic1 Bias"},
+	{"DMIC1", NULL, "omap-dmic-abe.2 Capture"},
+	{"omap-dmic-abe.1 Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 1"},
 
-	{"DMIC2", NULL, "Digital Mic1 Bias"},
+	{"DMIC2", NULL, "omap-dmic-abe.2 Capture"},
+	{"omap-dmic-abe.2 Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 2"},
 
 	/* Connections between twl6040 and ABE */
