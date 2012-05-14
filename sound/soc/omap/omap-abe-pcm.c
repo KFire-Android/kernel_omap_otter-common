@@ -575,7 +575,7 @@ static void mute_fe_port_playback(struct snd_soc_pcm_runtime *fe,
 			omap_aess_mute_gain(abe->aess, OMAP_AESS_MIXDL2_TONES);
 		} else {
 			omap_aess_unmute_gain(abe->aess, OMAP_AESS_MIXDL1_TONES);
-			omap_aess_unmute_gain(abe->aess, OMAP_AESS_MIXDL1_TONES);
+			omap_aess_unmute_gain(abe->aess, OMAP_AESS_MIXDL2_TONES);
 		}
 		break;
 	case OMAP_ABE_FRONTEND_DAI_VIBRA:
