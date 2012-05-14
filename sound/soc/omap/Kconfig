@@ -5,6 +5,10 @@ config SND_OMAP_SOC
 config SND_OMAP_SOC_DMIC
 	tristate
 
+config SND_OMAP_SOC_MCASP
+	tristate
+	select SND_SOC_SPDIF
+
 config SND_OMAP_SOC_MCBSP
 	tristate
 
@@ -105,6 +109,7 @@ config SND_OMAP_SOC_OMAP_ABE_TWL6040
 	select SND_OMAP_SOC_MCPDM
 	select SND_SOC_TWL6040
 	select SND_SOC_DMIC
+	select SND_OMAP_SOC_MCASP
 	select SND_OMAP_SOC_MCBSP
 	select SND_OMAP_SOC_ABE
 	select SND_DYNAMIC_MINORS
