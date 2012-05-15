@@ -382,7 +382,7 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"omap-dmic-abe.0 Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 0"},
 
-	{"DMIC1", NULL, "omap-dmic-abe.2 Capture"},
+	{"DMIC1", NULL, "omap-dmic-abe.1 Capture"},
 	{"omap-dmic-abe.1 Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 1"},
 
