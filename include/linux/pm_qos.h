@@ -43,7 +43,8 @@ struct dev_pm_qos_request {
 enum pm_qos_type {
 	PM_QOS_UNITIALIZED,
 	PM_QOS_MAX,		/* return the largest value */
-	PM_QOS_MIN		/* return the smallest value */
+	PM_QOS_MIN,		/* return the smallest value */
+	PM_QOS_ADD		/* return the sum of two values */
 };
 
 /*
