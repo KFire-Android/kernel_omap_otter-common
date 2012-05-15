@@ -548,6 +548,9 @@ struct musb {
 #ifdef MUSB_CONFIG_PROC_FS
 	struct proc_dir_entry *proc_entry;
 #endif
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	int event;
+#endif
 };
 
 struct musb_otg_work {
