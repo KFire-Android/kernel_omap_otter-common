@@ -41,6 +41,10 @@
 
 #include <mach/hardware.h>
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+#include <mach/omap4-common.h>
+#endif
+
 #include "dvfs.h"
 
 #ifdef CONFIG_SMP
@@ -261,9 +265,17 @@ static int omap_target(struct cpufreq_policy *policy,
 
 	current_target_freq = freq_table[i].frequency;
 
-	if (!omap_cpufreq_suspended)
+	if (!omap_cpufreq_suspended) {
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+		if (cpu_is_omap44xx() && target_freq > policy->min)
+			omap4_dpll_cascading_blocker_hold(mpu_dev);
+#endif
 		ret = omap_cpufreq_scale(current_target_freq, policy->cur);
-
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+		if (cpu_is_omap44xx() && target_freq == policy->min)
+			omap4_dpll_cascading_blocker_release(mpu_dev);
+#endif
+	}
 
 	mutex_unlock(&omap_cpufreq_lock);
 
