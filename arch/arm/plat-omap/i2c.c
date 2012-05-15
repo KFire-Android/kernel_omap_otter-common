@@ -79,7 +79,7 @@ static struct platform_device omap_i2c_devices[] = {
 
 #define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
 
-static int __init omap_i2c_nr_ports(void)
+static int omap_i2c_nr_ports(void)
 {
 	int ports = 0;
 
