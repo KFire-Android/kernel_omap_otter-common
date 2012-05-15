@@ -2571,6 +2571,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"hsi_fclk",			&hsi_fclk,	CK_54XX),
 	CLK(NULL,	"mcasp_sync_mux_ck",		&mcasp_sync_mux_ck,	CK_54XX),
 	CLK(NULL,	"mcasp_gfclk",			&mcasp_gfclk,	CK_54XX),
+	CLK(NULL,	"mcasp_fck",			&mcasp_gfclk,	CK_54XX),
 	CLK(NULL,	"mcbsp1_sync_mux_ck",		&mcbsp1_sync_mux_ck,	CK_54XX),
 	CLK(NULL,	"mcbsp1_gfclk",			&mcbsp1_gfclk,	CK_54XX),
 	CLK(NULL,	"mcbsp2_sync_mux_ck",		&mcbsp2_sync_mux_ck,	CK_54XX),
