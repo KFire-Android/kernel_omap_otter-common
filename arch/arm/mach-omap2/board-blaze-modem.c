@@ -32,6 +32,8 @@
 #define MODEM_PWRSTATE_POLLING_MS 10
 #define MODEM_PWRSTATE_TIMEOUT (100 / MODEM_PWRSTATE_POLLING_MS)
 
+static int modem_detected;
+
 /*
  * Switch-on or switch-off the modem and return modem status
  * Pre-requisites:
@@ -146,7 +148,6 @@ static void blaze_modem_pad_conf(void)
  */
 void __init blaze_modem_init(bool force_mux)
 {
-	int modem_detected = 0;
 	int modem_enabled;
 
 	/* Prepare MDM VBAT */
@@ -225,3 +226,29 @@ err_pwrstate1:
 err_pwr:
 	return;
 }
+
+
+#include "omap-rfkill-ste.h"
+
+static struct omap_rfkill_ste_platform_data ste_pdata;
+
+static struct platform_device modem_dev = {
+	.name			= "ste-p5780",
+	.id			= -1,
+	.dev.platform_data	= &ste_pdata
+};
+
+static int late_blaze_modem_init(void)
+{
+	int ret;
+
+	if (modem_detected) {
+		ret =  platform_device_register(&modem_dev);
+		if (ret)
+			pr_err("Error registering modem dev: %d\n", ret);
+	}
+
+	return 0;
+}
+
+late_initcall(late_blaze_modem_init);

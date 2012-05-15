@@ -337,6 +337,7 @@ config MACH_OMAP_4430SDP
 	select OMAP_REBOOT_REASON
 	select OMAP_RAM_CONSOLE
 	select CDC_TCXO
+	select OMAP_RFKILL_STE_MODEM
 
 config MACH_OMAP_BLAZE
 	bool "OMAP 44xx Tablet2 Board"
