@@ -57,7 +57,7 @@ static int palmas_resource_write(struct palmas *palmas, unsigned int reg,
 int palmas_enable_clk32kgaudio(struct palmas_resource *resource)
 {
 	int ret;
-	u8 reg;
+	unsigned int reg;
 
 	ret = palmas_resource_read(resource->palmas,
 			PALMAS_CLK32KGAUDIO_CTRL, &reg);
