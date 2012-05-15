@@ -36,6 +36,10 @@ struct omap_i2c_bus_platform_data {
 	u32		flags;
 	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
 	int		(*get_context_loss_count)(struct device *dev);
+	struct          hwspinlock *handle;
+	int             (*hwspin_lock_timeout)(struct hwspinlock *hwlock,
+							unsigned int to);
+	void            (*hwspin_unlock)(struct hwspinlock *hwlock);
 };
 
 #endif
