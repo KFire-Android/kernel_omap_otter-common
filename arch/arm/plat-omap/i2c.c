@@ -306,6 +306,83 @@ void omap_register_i2c_bus_board_data(int bus_id,
 }
 
 /**
+ * OMAP5 I2C register pull-up definition has changed so create a new
+ * API to handle the OMAP5 configuration
+ *
+ * omap5_i2c_pullup - setup pull-up resistors for I2C bus for OMAP5
+ * @bus_id: bus id counting from number 1
+ * @enable: Pull-up resistor for SDA and SCL pins
+ * @glitch_free: glitch free operation for SDA and SCL pins
+ *
+ */
+void omap5_i2c_pullup(int bus_id, int enable, int glitch_free)
+{
+	u32 val = 0;
+
+	if (!cpu_is_omap54xx())
+		return;
+
+	if (bus_id < 1 || bus_id > omap_i2c_nr_ports()) {
+		pr_err("%s:Wrong I2C port (%d)\n",
+			__func__, bus_id);
+		return;
+	}
+
+	if ((enable > 1) || (glitch_free > 1)) {
+		pr_err("%s:Enable (%d) or glitch (%d) setting is wrong\n",
+			__func__, enable, glitch_free);
+		return;
+	}
+
+	val = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_0);
+	/*TODO: HACK away at the register values since there does not appear
+	 * to be a header file to handle these offsets for OMAP5.  And the
+	 * i2c pull-up and glitch deifinitions have changed.
+	 */
+	switch (bus_id) {
+	case 1:
+		val &= 0xfcfcffff;
+		val |= enable << 16;
+		val |= glitch_free << 17;
+		val |= enable << 26;
+		val |= glitch_free << 27;
+		break;
+	case 2:
+		val &= 0xf3f3ffff;
+		val |= enable << 18;
+		val |= glitch_free << 19;
+		val |= enable << 26;
+		val |= glitch_free << 27;
+		break;
+	case 3:
+		val &= 0xcfcfffff;
+		val |= enable << 20;
+		val |= glitch_free << 21;
+		val |= enable << 28;
+		val |= glitch_free << 29;
+		break;
+	case 4:
+		val &= 0x3f3fffff;
+		val |= enable << 22;
+		val |= glitch_free << 23;
+		val |= enable << 30;
+		val |= glitch_free << 31;
+		break;
+	case 5:
+		val &= 0xffff0fff;
+		val |= enable << 12;
+		val |= glitch_free << 13;
+		val |= enable << 14;
+		val |= glitch_free << 15;
+		break;
+	default:
+		break;
+	}
+
+	omap4_ctrl_pad_writel(val, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_I2C_0);
+}
+
+/**
  * omap2_i2c_pullup - setup pull-up resistors for I2C bus
  * @bus_id: bus id counting from number 1
  * @sda_pullup: Pull-up resistor for SDA and SCL pins
@@ -314,6 +391,9 @@ void omap_register_i2c_bus_board_data(int bus_id,
 void omap2_i2c_pullup(int bus_id, enum omap_i2c_pullup_values pullup)
 {
 	u32 val = 0;
+
+	if (!cpu_is_omap44xx())
+		return;
 
 	if (bus_id < 1 || bus_id > omap_i2c_nr_ports() ||
 			pullup > I2C_PULLUP_STD_NA_FAST_300_OM) {
