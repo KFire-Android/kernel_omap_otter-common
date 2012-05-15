@@ -281,8 +281,13 @@ int omap_pm_set_min_bus_tput_helper(struct device *dev, u8 agent_id, long r)
 
 	ret = omap_device_scale(&dummy_l3_dev, l3_dev, target_level);
 	if (ret)
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+		pr_debug("Failed: change interconnect bandwidth to %ld\n",
+		     target_level);
+#else
 		pr_err("Failed: change interconnect bandwidth to %ld\n",
 		     target_level);
+#endif
 unlock:
 	mutex_unlock(&bus_tput_mutex);
 	return ret;
