@@ -1168,8 +1168,12 @@ static void __exit omap_dmm_exit(void)
 	platform_driver_unregister(&omap_dmm_driver);
 }
 
+#ifdef MODULE
 module_init(omap_dmm_init);
 module_exit(omap_dmm_exit);
+#else
+core_initcall(omap_dmm_init);
+#endif
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Andy Gross <andy.gross@ti.com>");
