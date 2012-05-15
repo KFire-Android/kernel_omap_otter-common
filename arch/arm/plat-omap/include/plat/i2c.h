@@ -25,6 +25,11 @@
 #include <linux/i2c-omap.h>
 #include <linux/hwspinlock.h>
 
+#define OMAP5_I2C_PULLUP_DIS		1
+#define OMAP5_I2C_PULLUP_EN		0
+#define OMAP5_I2C_GLITCH_FREE_DIS	0
+#define OMAP5_I2C_GLITCH_FREE_EN	1
+
 struct omap_i2c_bus_board_data {
 	struct hwspinlock *handle;
 	int (*hwspin_lock_timeout)(struct hwspinlock *hwlock, unsigned int to);
@@ -85,5 +90,6 @@ void __init omap2_i2c_mux_pins(int bus_id);
 struct omap_hwmod;
 int omap_i2c_reset(struct omap_hwmod *oh);
 void omap2_i2c_pullup(int bus_id, enum omap_i2c_pullup_values pullup);
+void omap5_i2c_pullup(int bus_id, int enable, int glitch_free);
 
 #endif /* __ASM__ARCH_OMAP_I2C_H */
