@@ -36,6 +36,7 @@
 #include <linux/rpmsg_omx.h>
 #include <linux/completion.h>
 #include <linux/remoteproc.h>
+#include <linux/fdtable.h>
 
 #ifdef CONFIG_ION_OMAP
 #include <linux/ion.h>
@@ -125,12 +126,11 @@ static int _rpmsg_pa_to_da(struct rpmsg_omx_instance *omx, u32 pa, u32 *da)
 #endif
 
 static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
-					long buffer, u32 *va, u32 *va2)
+					long buffer, u32 *va)
 {
 	int ret = -EIO;
 
 	*va = 0;
-	*va2 = 0;
 
 #ifdef CONFIG_ION_OMAP
 	{
@@ -138,47 +138,12 @@ static int _rpmsg_omx_buffer_lookup(struct rpmsg_omx_instance *omx,
 		ion_phys_addr_t paddr;
 		size_t unused;
 
-		/* is it an ion handle? */
 		handle = (struct ion_handle *)buffer;
 		if (!ion_phys(omx->ion_client, handle, &paddr, &unused)) {
 			ret = _rpmsg_pa_to_da(omx, (phys_addr_t)paddr, va);
 			goto exit;
 		}
-
-		/* how about an sgx buffer wrapping an ion handle? */
-		{
-			int fd;
-			struct ion_handle *handles[2] = { NULL, NULL };
-			struct ion_client *pvr_ion_client;
-			ion_phys_addr_t paddr2;
-			int num_handles = 2;
-
-			fd = buffer;
-			if (omap_ion_fd_to_handles(fd, &pvr_ion_client,
-					handles, &num_handles) < 0)
-				goto nopvr;
-
-			/* Get the 1st buffer's da */
-			if ((handles[0]) && !ion_phys(pvr_ion_client,
-					handles[0], &paddr, &unused)) {
-				ret = _rpmsg_pa_to_da(omx,
-						(phys_addr_t)paddr, va);
-				if (ret)
-					goto exit;
-
-				/* Get the 2nd buffer's da in da2 */
-				if ((handles[1]) &&
-					!ion_phys(pvr_ion_client,
-					handles[1], &paddr2, &unused)) {
-					ret = _rpmsg_pa_to_da(omx,
-						(phys_addr_t)paddr2, va2);
-					goto exit;
-				} else
-					goto exit;
-			}
-		}
 	}
-nopvr:
 exit:
 #endif
 
@@ -194,7 +159,7 @@ static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
 	long *buffer;
 	char *data;
 	enum rpc_omx_map_info_type maptype;
-	u32 da = 0 , da2 = 0;
+	u32 da = 0;
 
 	data = (char *)((struct omx_packet *)packet)->data;
 	maptype = *((enum rpc_omx_map_info_type *)data);
@@ -211,25 +176,18 @@ static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
 	buffer = (long *)((int)data + offset);
 
 	/* Lookup for the da of 1st buffer */
-	ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da, &da2);
+	ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
 	if (!ret)
 		*buffer = da;
 
 	/* If 2 buffers, get the 2nd buffers da */
 	if (!ret && (maptype >= RPC_OMX_MAP_INFO_TWO_BUF)) {
 		buffer = (long *)((int)data + offset + sizeof(*buffer));
-
 		if (*buffer != 0) {
-			/* Use da2 if valid in case of NV12 contiguous bufs */
-			if (da2)
-				*buffer = da2;
-			/* If not, do the lookup for 2nd buf */
-			else {
-				ret = _rpmsg_omx_buffer_lookup(omx,
-						*buffer, &da, &da2);
-				if (!ret)
-					*buffer = da;
-			}
+			/* Lookup the da for 2nd buffer */
+			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
+			if (!ret)
+				*buffer = da;
 		}
 	}
 
@@ -237,8 +195,7 @@ static int _rpmsg_omx_map_buf(struct rpmsg_omx_instance *omx, char *packet)
 	if (!ret && maptype >= RPC_OMX_MAP_INFO_THREE_BUF) {
 		buffer = (long *)((int)data + offset + 2*sizeof(*buffer));
 		if (*buffer != 0) {
-			ret = _rpmsg_omx_buffer_lookup(omx,
-					*buffer, &da, &da2);
+			ret = _rpmsg_omx_buffer_lookup(omx, *buffer, &da);
 			if (!ret)
 				*buffer = da;
 		}
@@ -397,6 +354,50 @@ long rpmsg_omx_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (IS_ERR_OR_NULL(data.handle))
 			data.handle = NULL;
 		if (copy_to_user((char __user *) arg, &data, sizeof(data))) {
+			dev_err(omxserv->dev,
+				"%s: %d: copy_to_user fail: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EFAULT;
+		}
+		break;
+	}
+	case OMX_IOCPVRREGISTER:
+	{
+		struct omx_pvr_data data;
+		struct ion_buffer *ion_bufs[2] = { NULL, NULL };
+		int num_handles = 2, i = 0;
+
+		if (copy_from_user(&data, (char __user *)arg, sizeof(data))) {
+			dev_err(omxserv->dev,
+				"%s: %d: copy_from_user fail: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EFAULT;
+		}
+
+		if (!fcheck(data.fd)) {
+			dev_err(omxserv->dev,
+				"%s: %d: invalid fd: %d\n", __func__,
+				_IOC_NR(cmd), ret);
+			return -EBADF;
+		}
+
+		data.handles[0] = data.handles[1] = NULL;
+		if (!omap_ion_share_fd_to_buffers(data.fd, ion_bufs,
+						  &num_handles)) {
+			unsigned int size = ARRAY_SIZE(data.handles);
+			for (i = 0; (i < num_handles) && (i < size); i++) {
+				struct ion_handle *handle = NULL;
+
+				if (!IS_ERR_OR_NULL(ion_bufs[i]))
+					handle = ion_import(omx->ion_client,
+							   ion_bufs[i]);
+				if (!IS_ERR_OR_NULL(handle))
+					data.handles[i] = handle;
+			}
+		}
+		data.num_handles = i;
+
+		if (copy_to_user((char __user *)arg, &data, sizeof(data))) {
 			dev_err(omxserv->dev,
 				"%s: %d: copy_to_user fail: %d\n", __func__,
 				_IOC_NR(cmd), ret);
