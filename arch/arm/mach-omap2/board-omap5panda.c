@@ -17,6 +17,7 @@
 #include <linux/io.h>
 #include <linux/gpio.h>
 #include <linux/input.h>
+#include <linux/of_platform.h>
 
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
@@ -689,8 +690,16 @@ static void __init omap5panda_display_init(void)
 	omap_display_init(&omap5evm_dss_data);
 }
 
+static struct of_device_id omap_dt_match_table[] __initdata = {
+	{ .compatible = "simple-bus", },
+	{ .compatible = "ti,omap-infra", },
+	{ }
+};
+
 static void __init omap_5_panda_init(void)
 {
+
+	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 
 #if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
 #ifndef CONFIG_MACH_OMAP_5430ZEBU
