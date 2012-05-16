@@ -2,16 +2,15 @@
 # Generated files
 #
 config*
+lex.*.c
 *.tab.c
 *.tab.h
+zconf.hash.c
 *.moc
 lkc_defs.h
 gconf.glade.h
 *.pot
 *.mo
-
-#lex.*.c
-#zconf.hash.c
 
 #
 # configuration programs
