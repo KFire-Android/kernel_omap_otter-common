@@ -69,7 +69,6 @@
 #include "abe_mem.h"
 #include "abe_gain.h"
 
-#include "abe_taskid.h"
 #include "abe_functionsid.h"
 #include "abe_initxxx_labels.h"
 #include "abe_define.h"
@@ -126,6 +125,10 @@ extern struct omap_aess_io_task aess_port_mm_dl_441k;
 extern struct omap_aess_io_task aess_port_mm_dl_48k;
 
 extern struct omap_aess_init_task aess_port_mm_dl_48k_pp;
+
+extern struct omap_aess_task aess_dl1_mono_mixer[];
+extern struct omap_aess_task aess_dl2_mono_mixer[];
+extern struct omap_aess_task aess_audul_mono_mixer[];
 
 u32 abe_dma_port_iter_factor(struct omap_aess_data_format *f);
 u32 abe_dma_port_iteration(struct omap_aess_data_format *f);
@@ -1639,39 +1642,31 @@ EXPORT_SYMBOL(omap_aess_read_remaining_data);
  */
 int omap_aess_mono_mixer(struct omap_aess *abe, u32 id, u32 on_off)
 {
-#if 0
+	struct omap_aess_task *task;
+
 	switch (id) {
 	case MIXDL1:
-		if (on_off)
-			abe->MultiFrame[TASK_DL1Mixer_SLT][TASK_DL1Mixer_IDX] =
-				ABE_TASK_ID(C_ABE_FW_TASK_DL1Mixer_dual_mono);
-		else
-			abe->MultiFrame[TASK_DL1Mixer_SLT][TASK_DL1Mixer_IDX] =
-				ABE_TASK_ID(C_ABE_FW_TASK_DL1Mixer);
+		task = aess_dl1_mono_mixer;
 		break;
 	case MIXDL2:
-		if (on_off)
-			abe->MultiFrame[TASK_DL2Mixer_SLT][TASK_DL2Mixer_IDX] =
-				ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer_dual_mono);
-		else
-			abe->MultiFrame[TASK_DL2Mixer_SLT][TASK_DL2Mixer_IDX] =
-				ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer);
+		task = aess_dl2_mono_mixer;
 		break;
 	case MIXAUDUL:
-		if (on_off)
-			abe->MultiFrame[12][4] =
-				ABE_TASK_ID(C_ABE_FW_TASK_ULMixer_dual_mono);
-		else
-			abe->MultiFrame[12][4] =
-				ABE_TASK_ID(C_ABE_FW_TASK_ULMixer);
+		task = aess_audul_mono_mixer;
 		break;
 	default:
+		return 0;
 		break;
 	}
 
+	if (on_off)
+		task += sizeof(struct omap_aess_task);
+
+	abe->MultiFrame[task->frame][task->slot] = task->task;
+
 	omap_aess_mem_write(abe, omap_aess_map[OMAP_AESS_DMEM_MULTIFRAME_ID],
 		       (u32 *) abe->MultiFrame);
-#endif
+
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_mono_mixer);

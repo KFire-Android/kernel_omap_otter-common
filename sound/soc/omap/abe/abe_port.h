@@ -68,11 +68,6 @@ u32 omap_aess_dma_port_iter_factor(struct omap_aess *abe, struct omap_aess_data_
 
 #define ABE_TASK_ID(ID) (OMAP_ABE_D_TASKSLIST_ADDR + sizeof(ABE_STask)*(ID))
 
-#define TASK_DL2Mixer_SLT 1
-#define TASK_DL2Mixer_IDX 6
-#define TASK_DL1Mixer_SLT 2
-#define TASK_DL1Mixer_IDX 0
-
 void omap_aess_build_scheduler_table(struct omap_aess *abe);
 
 #endif/* _ABE_PORT_H_ */

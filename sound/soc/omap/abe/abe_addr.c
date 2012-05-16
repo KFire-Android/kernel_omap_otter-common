@@ -719,6 +719,61 @@ struct omap_aess_init_task aess_init_table = {
 };
 
 
+struct omap_aess_task aess_dl1_mono_mixer[] = {
+	{
+		.frame = 2,
+		.slot = 0,
+		.task = ABE_TASK_ID(C_ABE_FW_TASK_DL1Mixer),
+	},
+	{
+		.frame = 2,
+		.slot = 0,
+		.task = ABE_TASK_ID(C_ABE_FW_TASK_DL1Mixer_dual_mono),
+	},
+};
+
+struct omap_aess_init_task aess_init_dl1_mono_mixer = {
+	.nb_task = sizeof(aess_dl1_mono_mixer)/sizeof(struct omap_aess_task),
+	.task = aess_dl1_mono_mixer,
+};
+
+struct omap_aess_task aess_dl2_mono_mixer[] = {
+	{
+		.frame = 1,
+		.slot = 6,
+		.task = ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer),
+	},
+	{
+		.frame = 1,
+		.slot = 6,
+		.task = ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer_dual_mono),
+	},
+};
+
+struct omap_aess_init_task aess_init_dl2_mono_mixer = {
+	.nb_task = sizeof(aess_dl2_mono_mixer)/sizeof(struct omap_aess_task),
+	.task = aess_dl2_mono_mixer,
+};
+
+struct omap_aess_task aess_audul_mono_mixer[] = {
+	{
+		.frame = 12,
+		.slot = 4,
+		.task = ABE_TASK_ID(C_ABE_FW_TASK_ULMixer),
+	},
+	{
+		.frame = 12,
+		.slot = 4,
+		.task = ABE_TASK_ID(C_ABE_FW_TASK_ULMixer_dual_mono),
+	},
+};
+
+struct omap_aess_init_task aess_init_audul_mono_mixer = {
+	.nb_task = sizeof(aess_audul_mono_mixer)/sizeof(struct omap_aess_task),
+	.task = aess_audul_mono_mixer,
+};
+
+
 /* Generic Vx-DL 8 kHz tasks */
 struct omap_aess_task task_aess_enable_vx_dl_8k_port[] = {
 	{
