@@ -1445,6 +1445,10 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
 
 	of_property_read_u32(dev->of_node, "clock-frequency",
 					 &omap_up_info->uartclk);
+
+	omap_up_info->flags = UPF_BOOT_AUTOCONF;
+	omap_up_info->autosuspend_timeout = -1;
+
 	return omap_up_info;
 }
 
@@ -1455,8 +1459,11 @@ static int __devinit serial_omap_probe(struct platform_device *pdev)
 	struct omap_uart_port_info *omap_up_info = pdev->dev.platform_data;
 	int ret = -ENOSPC;
 
-	if (pdev->dev.of_node)
+	if (pdev->dev.of_node) {
 		omap_up_info = of_get_uart_port_info(&pdev->dev);
+		/* Assign platform_data as what dt found */
+		pdev->dev.platform_data = omap_up_info;
+	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
