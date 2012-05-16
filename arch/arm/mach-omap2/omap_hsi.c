@@ -30,13 +30,13 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 #include <plat/omap-pm.h>
+#include <plat/dvfs.h>
 
 #include <../drivers/omap_hsi/hsi_driver.h>
 #include "clock.h"
 #include "mux.h"
 #include "control.h"
 #include "pm.h"
-#include "dvfs.h"
 
 #define OMAP_HSI_PLATFORM_DEVICE_DRIVER_NAME	"omap_hsi"
 #define OMAP_HSI_PLATFORM_DEVICE_NAME		"omap_hsi.0"
