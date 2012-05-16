@@ -280,9 +280,8 @@ static int omap_i2c_hwspinlock_lock(struct omap_i2c_dev *dev)
 		if (ret != 0)
 			dev_err(&pdev->dev, "%s: TIMEDOUT: Failed to acquire"
 						" hwspinlock\n", __func__);
-		return ret;
-	} else
-		return -EINVAL;
+	}
+	return ret;
 }
 
 static void omap_i2c_hwspinlock_unlock(struct omap_i2c_dev *dev)
