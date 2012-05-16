@@ -709,6 +709,7 @@ add_children(struct twl4030_platform_data *pdata, unsigned irq_base,
 	}
 
 	if (twl_has_gpadc() && pdata->madc) {
+		pdata->madc->features = features;
 		child = add_child(1, "twl6030_gpadc",
 				pdata->madc, sizeof(*pdata->madc),
 				true, irq_base + MADC_INTR_OFFSET,
