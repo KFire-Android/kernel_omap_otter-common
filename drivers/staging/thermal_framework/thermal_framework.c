@@ -308,7 +308,7 @@ int thermal_sensor_set_temp(struct thermal_dev *tdev)
 	}
 
 	if (list_empty(&thermal_domain->cooling_agents)) {
-		pr_err("%s: no cooling agents for domain %s\n",
+		pr_debug("%s: no cooling agents for domain %s\n",
 			__func__, thermal_domain->domain_name);
 		goto out;
 	}
