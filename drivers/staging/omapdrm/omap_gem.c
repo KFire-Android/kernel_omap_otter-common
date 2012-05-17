@@ -1294,7 +1294,6 @@ void omap_gem_init(struct drm_device *dev)
 		 */
 		usergart[i].height = h;
 		usergart[i].height_shift = ilog2(h);
-		usergart[i].stride_pfn = tiler_stride(fmts[i]) >> PAGE_SHIFT;
 		usergart[i].slot_shift = ilog2((PAGE_SIZE / h) >> i);
 		for (j = 0; j < NUM_USERGART_ENTRIES; j++) {
 			struct usergart_entry *entry = &usergart[i].entry[j];
@@ -1309,6 +1308,8 @@ void omap_gem_init(struct drm_device *dev)
 			}
 			entry->paddr = tiler_ssptr(block);
 			entry->block = block;
+			usergart[i].stride_pfn = tiler_stride(entry->paddr) >>
+						PAGE_SHIFT;
 
 			DBG("%d:%d: %dx%d: paddr=%08x stride=%d", i, j, w, h,
 					entry->paddr,
