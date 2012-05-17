@@ -63,7 +63,15 @@ struct omap_mmc_platform_data {
 
 	/* set if your board has components or wiring that limits the
 	 * maximum frequency on the MMC bus */
-	unsigned int max_freq;
+	unsigned long max_freq;
+	/* Silicon can have a limitation on how fast the MMC controller can
+	 * run.
+	 */
+	unsigned long max_si_freq;
+	unsigned long min_freq;
+
+	/*Function pointer to set clk source */
+	int (*set_clk_src)(struct device *dev, unsigned int slot);
 
 	/* switch the bus to a new slot */
 	int (*switch_slot)(struct device *dev, int slot);
