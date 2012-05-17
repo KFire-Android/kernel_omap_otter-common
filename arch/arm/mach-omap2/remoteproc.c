@@ -114,10 +114,10 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 
 static struct omap_iommu_arch_data omap4_rproc_iommu[] = {
 #ifdef CONFIG_OMAP_REMOTEPROC_DSP
-	{ .name = "tesla" },
+	{ .name = "dsp" },
 #endif
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
-	{ .name = "ducati" },
+	{ .name = "ipu" },
 #endif
 };
 
