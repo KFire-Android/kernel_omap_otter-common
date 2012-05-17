@@ -66,6 +66,7 @@
 #include "abe.h"
 #include "abe_mem.h"
 #include "abe_typedef.h"
+#include "abe_private.h"
 
 #define ABE_TASK_ID(ID) (OMAP_ABE_D_TASKSLIST_ADDR + sizeof(ABE_STask)*(ID))
 
@@ -480,7 +481,7 @@ struct omap_aess_addr omap_aess_map[] = {
 };
 
 /* Default scheduling table for AESS (load after boot and OFF mode) */
-struct omap_aess_task init_table[] = {
+static struct omap_aess_task init_table[] = {
 	{
 		.frame = 0,
 		.slot = 3,
@@ -775,7 +776,7 @@ struct omap_aess_init_task aess_init_audul_mono_mixer = {
 
 
 /* Generic Vx-DL 8 kHz tasks */
-struct omap_aess_task task_aess_enable_vx_dl_8k_port[] = {
+static struct omap_aess_task task_aess_enable_vx_dl_8k_port[] = {
 	{
 		.frame = 21,
 		.slot = 2,
@@ -793,14 +794,14 @@ struct omap_aess_task task_aess_enable_vx_dl_8k_port[] = {
 	},
 };
 
-struct omap_aess_io_task aess_port_vx_dl_8k = {
+static struct omap_aess_io_task aess_port_vx_dl_8k = {
 	.nb_task = sizeof(task_aess_enable_vx_dl_8k_port)/sizeof(struct omap_aess_task),
 	.smem = IO_VX_DL_ASRC_labelID,
 	.task = task_aess_enable_vx_dl_8k_port,
 };
 
 /* Serail port Vx-DL 8 kHz tasks - Siblink ASRC block */
-struct omap_aess_task task_aess_enable_vx_dl_8k_asrc_serial_port[] = {
+static struct omap_aess_task task_aess_enable_vx_dl_8k_asrc_serial_port[] = {
 	{
 		.frame = 0,
 		.slot = 3,
@@ -813,13 +814,13 @@ struct omap_aess_task task_aess_enable_vx_dl_8k_asrc_serial_port[] = {
 	},
 };
 
-struct omap_aess_init_task aess_enable_vx_dl_8k_asrc_serial = {
+static struct omap_aess_init_task aess_enable_vx_dl_8k_asrc_serial = {
 	.nb_task = sizeof(task_aess_enable_vx_dl_8k_asrc_serial_port)/sizeof(struct omap_aess_task),
 	.task = task_aess_enable_vx_dl_8k_asrc_serial_port,
 };
 
 /* CBPr port Vx-DL 8 kHz tasks - Only one ASRC block */
-struct omap_aess_task task_aess_enable_vx_dl_8k_asrc_cbpr_port[] = {
+static struct omap_aess_task task_aess_enable_vx_dl_8k_asrc_cbpr_port[] = {
 	{
 		.frame = 0,
 		.slot = 3,
@@ -827,7 +828,7 @@ struct omap_aess_task task_aess_enable_vx_dl_8k_asrc_cbpr_port[] = {
 	},
 };
 
-struct omap_aess_init_task aess_enable_vx_dl_8k_asrc_cbpr = {
+static struct omap_aess_init_task aess_enable_vx_dl_8k_asrc_cbpr = {
 	.nb_task = sizeof(task_aess_enable_vx_dl_8k_asrc_cbpr_port)/sizeof(struct omap_aess_task),
 	.task = task_aess_enable_vx_dl_8k_asrc_cbpr_port,
 };
@@ -842,7 +843,7 @@ struct omap_aess_asrc_port aess_enable_vx_dl_8k_asrc = {
 
 
 /* Generic Vx-DL 16 kHz tasks */
-struct omap_aess_task task_aess_enable_vx_dl_16k_port[] = {
+static struct omap_aess_task task_aess_enable_vx_dl_16k_port[] = {
 	{
 		.frame = 21,
 		.slot = 2,
@@ -860,13 +861,13 @@ struct omap_aess_task task_aess_enable_vx_dl_16k_port[] = {
 	},
 };
 
-struct omap_aess_io_task aess_port_vx_dl_16k = {
+static struct omap_aess_io_task aess_port_vx_dl_16k = {
 	.nb_task = sizeof(task_aess_enable_vx_dl_16k_port)/sizeof(struct omap_aess_task),
 	.smem = IO_VX_DL_ASRC_labelID,
 	.task = task_aess_enable_vx_dl_16k_port,
 };
 
-struct omap_aess_task task_aess_enable_vx_dl_16k_asrc_serial_port[] = {
+static struct omap_aess_task task_aess_enable_vx_dl_16k_asrc_serial_port[] = {
 	{
 		.frame = 0,
 		.slot = 3,
@@ -879,12 +880,12 @@ struct omap_aess_task task_aess_enable_vx_dl_16k_asrc_serial_port[] = {
 	},
 };
 
-struct omap_aess_init_task aess_enable_vx_dl_16k_asrc_serial = {
+static struct omap_aess_init_task aess_enable_vx_dl_16k_asrc_serial = {
 	.nb_task = sizeof(task_aess_enable_vx_dl_16k_asrc_serial_port)/sizeof(struct omap_aess_task),
 	.task = task_aess_enable_vx_dl_16k_asrc_serial_port,
 };
 
-struct omap_aess_task task_aess_enable_vx_dl_16k_asrc_cbpr_port[] = {
+static struct omap_aess_task task_aess_enable_vx_dl_16k_asrc_cbpr_port[] = {
 	{
 		.frame = 0,
 		.slot = 3,
@@ -892,7 +893,7 @@ struct omap_aess_task task_aess_enable_vx_dl_16k_asrc_cbpr_port[] = {
 	},
 };
 
-struct omap_aess_init_task aess_enable_vx_dl_16k_asrc_cbpr = {
+static struct omap_aess_init_task aess_enable_vx_dl_16k_asrc_cbpr = {
 	.nb_task = sizeof(task_aess_enable_vx_dl_16k_asrc_cbpr_port)/sizeof(struct omap_aess_task),
 	.task = task_aess_enable_vx_dl_16k_asrc_cbpr_port,
 };
@@ -906,7 +907,7 @@ struct omap_aess_asrc_port aess_enable_vx_dl_16k_asrc = {
 };
 
 /* Generic Vx-DL 48 kHz tasks - No SRC/ASRC blocks */
-struct omap_aess_task task_aess_enable_vx_dl_48k_port[] = {
+static struct omap_aess_task task_aess_enable_vx_dl_48k_port[] = {
 	{
 		.frame = 0,
 		.slot = 3,
@@ -919,7 +920,7 @@ struct omap_aess_task task_aess_enable_vx_dl_48k_port[] = {
 	},
 };
 
-struct omap_aess_io_task aess_port_vx_dl_48k = {
+static struct omap_aess_io_task aess_port_vx_dl_48k = {
 	.nb_task = sizeof(task_aess_enable_vx_dl_48k_port)/sizeof(struct omap_aess_task),
 	.smem = VX_DL_labelID,
 	.task = task_aess_enable_vx_dl_48k_port,
@@ -931,7 +932,7 @@ struct omap_aess_asrc_port aess_enable_vx_dl_48k_asrc = {
 
 
 /* Generic Vx-UL 8 kHz tasks */
-struct omap_aess_task task_aess_enable_vx_ul_8k_port[] = {
+static struct omap_aess_task task_aess_enable_vx_ul_8k_port[] = {
 	{
 		.frame = 21,
 		.slot = 2,
@@ -949,14 +950,14 @@ struct omap_aess_task task_aess_enable_vx_ul_8k_port[] = {
 	},
 };
 
-struct omap_aess_io_task aess_port_vx_ul_8k = {
+static struct omap_aess_io_task aess_port_vx_ul_8k = {
 	.nb_task = sizeof(task_aess_enable_vx_ul_8k_port)/sizeof(struct omap_aess_task),
 	.smem = Voice_8k_UL_labelID,
 	.task = task_aess_enable_vx_ul_8k_port,
 };
 
 /* Serail port Vx-UL 8 kHz tasks - Siblink ASRC block */
-struct omap_aess_task task_aess_enable_vx_ul_8k_asrc_serial_port[] = {
+static struct omap_aess_task task_aess_enable_vx_ul_8k_asrc_serial_port[] = {
 	{
 		.frame = 0,
 		.slot = 3,
@@ -969,13 +970,13 @@ struct omap_aess_task task_aess_enable_vx_ul_8k_asrc_serial_port[] = {
 	},
 };
 
-struct omap_aess_init_task aess_enable_vx_ul_8k_asrc_serial = {
+static struct omap_aess_init_task aess_enable_vx_ul_8k_asrc_serial = {
 	.nb_task = sizeof(task_aess_enable_vx_ul_8k_asrc_serial_port)/sizeof(struct omap_aess_task),
 	.task = task_aess_enable_vx_ul_8k_asrc_serial_port,
 };
 
 /* CBPr port Vx-UL 8 kHz tasks - Only one ASRC block */
-struct omap_aess_task task_aess_enable_vx_ul_8k_asrc_cbpr_port[] = {
+static struct omap_aess_task task_aess_enable_vx_ul_8k_asrc_cbpr_port[] = {
 	{
 		.frame = 16,
 		.slot = 2,
@@ -983,7 +984,7 @@ struct omap_aess_task task_aess_enable_vx_ul_8k_asrc_cbpr_port[] = {
 	},
 };
 
-struct omap_aess_init_task aess_enable_vx_ul_8k_asrc_cbpr = {
+static struct omap_aess_init_task aess_enable_vx_ul_8k_asrc_cbpr = {
 	.nb_task = sizeof(task_aess_enable_vx_ul_8k_asrc_cbpr_port)/sizeof(struct omap_aess_task),
 	.task = task_aess_enable_vx_ul_8k_asrc_cbpr_port,
 };
@@ -998,7 +999,7 @@ struct omap_aess_asrc_port aess_enable_vx_ul_8k_asrc = {
 
 
 /* Generic Vx-UL 16 kHz tasks */
-struct omap_aess_task task_aess_enable_vx_ul_16k_port[] = {
+static struct omap_aess_task task_aess_enable_vx_ul_16k_port[] = {
 	{
 		.frame = 21,
 		.slot = 2,
@@ -1016,13 +1017,13 @@ struct omap_aess_task task_aess_enable_vx_ul_16k_port[] = {
 	},
 };
 
-struct omap_aess_io_task aess_port_vx_ul_16k = {
+static struct omap_aess_io_task aess_port_vx_ul_16k = {
 	.nb_task = sizeof(task_aess_enable_vx_ul_16k_port)/sizeof(struct omap_aess_task),
 	.smem = Voice_16k_UL_labelID,
 	.task = task_aess_enable_vx_ul_16k_port,
 };
 
-struct omap_aess_task task_aess_enable_vx_ul_16k_asrc_serial_port[] = {
+static struct omap_aess_task task_aess_enable_vx_ul_16k_asrc_serial_port[] = {
 	{
 		.frame = 0,
 		.slot = 3,
@@ -1035,12 +1036,12 @@ struct omap_aess_task task_aess_enable_vx_ul_16k_asrc_serial_port[] = {
 	},
 };
 
-struct omap_aess_init_task aess_enable_vx_ul_16k_asrc_serial = {
+static struct omap_aess_init_task aess_enable_vx_ul_16k_asrc_serial = {
 	.nb_task = sizeof(task_aess_enable_vx_ul_16k_asrc_serial_port)/sizeof(struct omap_aess_task),
 	.task = task_aess_enable_vx_ul_16k_asrc_serial_port,
 };
 
-struct omap_aess_task task_aess_enable_vx_ul_16k_asrc_cbpr_port[] = {
+static struct omap_aess_task task_aess_enable_vx_ul_16k_asrc_cbpr_port[] = {
 	{
 		.frame = 16,
 		.slot = 2,
@@ -1048,7 +1049,7 @@ struct omap_aess_task task_aess_enable_vx_ul_16k_asrc_cbpr_port[] = {
 	},
 };
 
-struct omap_aess_init_task aess_enable_vx_ul_16k_asrc_cbpr = {
+static struct omap_aess_init_task aess_enable_vx_ul_16k_asrc_cbpr = {
 	.nb_task = sizeof(task_aess_enable_vx_ul_16k_asrc_cbpr_port)/sizeof(struct omap_aess_task),
 	.task = task_aess_enable_vx_ul_16k_asrc_cbpr_port,
 };
@@ -1062,7 +1063,7 @@ struct omap_aess_asrc_port aess_enable_vx_ul_16k_asrc = {
 };
 
 /* Generic Vx-UL 48 kHz tasks - No SRC/ASRC blocks */
-struct omap_aess_task task_aess_enable_vx_ul_48k_port[] = {
+static struct omap_aess_task task_aess_enable_vx_ul_48k_port[] = {
 	{
 		.frame = 16,
 		.slot = 2,
@@ -1075,7 +1076,7 @@ struct omap_aess_task task_aess_enable_vx_ul_48k_port[] = {
 	},
 };
 
-struct omap_aess_io_task aess_port_vx_ul_48k = {
+static struct omap_aess_io_task aess_port_vx_ul_48k = {
 	.nb_task = sizeof(task_aess_enable_vx_ul_48k_port)/sizeof(struct omap_aess_task),
 	.smem = VX_UL_M_labelID,
 	.task = task_aess_enable_vx_ul_48k_port,
@@ -1087,7 +1088,7 @@ struct omap_aess_asrc_port aess_enable_vx_ul_48k_asrc = {
 
 
 /* Generic BT-Vx-DL 8 kHz tasks */
-struct omap_aess_task task_aess_enable_bt_vx_dl_8k_port[] = {
+static struct omap_aess_task task_aess_enable_bt_vx_dl_8k_port[] = {
 	{
 		.frame = 14,
 		.slot = 4,
@@ -1102,7 +1103,7 @@ struct omap_aess_io_task aess_port_bt_vx_dl_8k = {
 };
 
 /* Generic BT-Vx-DL 16 kHz tasks */
-struct omap_aess_task task_aess_enable_bt_vx_dl_16k_port[] = {
+static struct omap_aess_task task_aess_enable_bt_vx_dl_16k_port[] = {
 	{
 		.frame = 14,
 		.slot = 4,
@@ -1117,7 +1118,7 @@ struct omap_aess_io_task aess_port_bt_vx_dl_16k = {
 };
 
 /* Generic BT-Vx-DL 48 kHz tasks */
-struct omap_aess_task task_aess_enable_bt_vx_dl_48k_port[] = {
+static struct omap_aess_task task_aess_enable_bt_vx_dl_48k_port[] = {
 	{
 		.frame = 14,
 		.slot = 4,
@@ -1132,7 +1133,7 @@ struct omap_aess_io_task aess_port_bt_vx_dl_48k = {
 };
 
 /* Generic BT-Vx-UL 8 kHz tasks */
-struct omap_aess_task task_aess_enable_bt_vx_ul_8k_port[] = {
+static struct omap_aess_task task_aess_enable_bt_vx_ul_8k_port[] = {
 	{
 		.frame = 17,
 		.slot = 2,
@@ -1147,7 +1148,7 @@ struct omap_aess_io_task aess_port_bt_vx_ul_8k = {
 };
 
 /* Generic BT-Vx-UL 16 kHz tasks */
-struct omap_aess_task task_aess_enable_bt_vx_ul_16k_port[] = {
+static struct omap_aess_task task_aess_enable_bt_vx_ul_16k_port[] = {
 	{
 		.frame = 17,
 		.slot = 2,
@@ -1162,7 +1163,7 @@ struct omap_aess_io_task aess_port_bt_vx_ul_16k = {
 };
 
 /* Generic BT-Vx-UL 48 kHz tasks */
-struct omap_aess_task task_aess_enable_bt_vx_ul_48k_port[] = {
+static struct omap_aess_task task_aess_enable_bt_vx_ul_48k_port[] = {
 	{
 		.frame = 15,
 		.slot = 6,
@@ -1182,7 +1183,7 @@ struct omap_aess_io_task aess_port_bt_vx_ul_48k = {
 };
 
 /* Generic TONES-DL 48 kHz tasks */
-struct omap_aess_task task_aess_enable_tones_dl_48k_port[] = {
+static struct omap_aess_task task_aess_enable_tones_dl_48k_port[] = {
 	{
 		.frame = 20,
 		.slot = 1,
@@ -1197,7 +1198,7 @@ struct omap_aess_io_task aess_port_tones_dl_48k = {
 };
 
 /* Generic TONES-DL 44.1 kHz tasks */
-struct omap_aess_task task_aess_enable_tones_dl_441k_port[] = {
+static struct omap_aess_task task_aess_enable_tones_dl_441k_port[] = {
 	{
 		.frame = 20,
 		.slot = 1,
@@ -1212,7 +1213,7 @@ struct omap_aess_io_task aess_port_tones_dl_441k = {
 };
 
 /* Generic MM-DL 48 kHz tasks */
-struct omap_aess_task task_aess_enable_mm_dl_48k_port[] = {
+static struct omap_aess_task task_aess_enable_mm_dl_48k_port[] = {
 	{
 		.frame = 18,
 		.slot = 1,
@@ -1227,7 +1228,7 @@ struct omap_aess_io_task aess_port_mm_dl_48k = {
 };
 
 /* Generic TONES-DL 44.1 kHz tasks */
-struct omap_aess_task task_aess_enable_mm_dl_441k_port[] = {
+static struct omap_aess_task task_aess_enable_mm_dl_441k_port[] = {
 	{
 		.frame = 18,
 		.slot = 1,
@@ -1242,7 +1243,7 @@ struct omap_aess_io_task aess_port_mm_dl_441k = {
 };
 
 /* Generic TONES-DL 44.1 kHz tasks */
-struct omap_aess_task task_aess_enable_mm_dl_441k_pp_port[] = {
+static struct omap_aess_task task_aess_enable_mm_dl_441k_pp_port[] = {
 	{
 		.frame = 18,
 		.slot = 1,
@@ -1256,7 +1257,7 @@ struct omap_aess_io_task aess_port_mm_dl_441k_pp = {
 	.task = task_aess_enable_mm_dl_441k_pp_port,
 };
 
-struct omap_aess_task task_aess_enable_mm_dl_48k_pp_port[] = {
+static struct omap_aess_task task_aess_enable_mm_dl_48k_pp_port[] = {
 	{
 		.frame = 18,
 		.slot = 0,

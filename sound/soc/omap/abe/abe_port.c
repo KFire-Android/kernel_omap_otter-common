@@ -74,6 +74,7 @@
 #include "abe_define.h"
 #include "abe_def.h"
 #include "abe_typedef.h"
+#include "abe_private.h"
 
 /*
  * GLOBAL DEFINITION
@@ -98,37 +99,6 @@ struct omap_abe_atc_desc {
 	unsigned desen:1;
 };
 
-
-extern struct omap_aess_init_task aess_init_table;
-
-extern struct omap_aess_asrc_port aess_enable_vx_dl_8k_asrc;
-extern struct omap_aess_asrc_port aess_enable_vx_dl_16k_asrc;
-extern struct omap_aess_asrc_port aess_enable_vx_dl_48k_asrc;
-
-extern struct omap_aess_asrc_port aess_enable_vx_ul_8k_asrc;
-extern struct omap_aess_asrc_port aess_enable_vx_ul_16k_asrc;
-extern struct omap_aess_asrc_port aess_enable_vx_ul_48k_asrc;
-
-extern struct omap_aess_io_task aess_port_bt_vx_dl_8k;
-extern struct omap_aess_io_task aess_port_bt_vx_dl_16k;
-extern struct omap_aess_io_task aess_port_bt_vx_dl_48k;
-
-extern struct omap_aess_io_task aess_port_bt_vx_ul_8k;
-extern struct omap_aess_io_task aess_port_bt_vx_ul_16k;
-extern struct omap_aess_io_task aess_port_bt_vx_ul_48k;
-
-extern struct omap_aess_io_task aess_port_tones_dl_441k;
-extern struct omap_aess_io_task aess_port_tones_dl_48k;
-
-extern struct omap_aess_io_task aess_port_mm_dl_441k_pp;
-extern struct omap_aess_io_task aess_port_mm_dl_441k;
-extern struct omap_aess_io_task aess_port_mm_dl_48k;
-
-extern struct omap_aess_init_task aess_port_mm_dl_48k_pp;
-
-extern struct omap_aess_task aess_dl1_mono_mixer[];
-extern struct omap_aess_task aess_dl2_mono_mixer[];
-extern struct omap_aess_task aess_audul_mono_mixer[];
 
 u32 abe_dma_port_iter_factor(struct omap_aess_data_format *f);
 u32 abe_dma_port_iteration(struct omap_aess_data_format *f);
