@@ -23,6 +23,8 @@
 
 #include <linux/fb.h>
 
+#define HDMI_CEC_INT		0x100
+
 struct hdmi_ip_data;
 struct snd_aes_iec958;
 struct snd_cea_861_aud_if;

@@ -528,6 +528,14 @@ int hdmi_panel_hpd_handler(int hpd);
 int hdmi_get_current_hpd(void);
 int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd);
 void hdmi_get_monspecs(struct omap_dss_device *dssdev);
+void hdmi_inform_hpd_to_cec(int status);
+void hdmi_inform_power_on_to_cec(int status);
+int omapdss_hdmi_register_cec_callbacks(void (*hdmi_cec_enable_cb)(int status),
+					void (*hdmi_cec_irq_cb)(void),
+					void (*hdmi_cec_hpd)(int phy_addr,
+					int status));
+int omapdss_hdmi_unregister_cec_callbacks(void);
+
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 					struct s3d_disp_info *info, int code);
 int hdmi_panel_init(void);
