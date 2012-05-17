@@ -343,4 +343,21 @@ void omap_abe_dc_set_hs_offset(struct snd_soc_platform *platform,
 void omap_abe_dc_set_hf_offset(struct snd_soc_platform *platform,
 	int left, int right);
 
+/* Internal OMAP SoC API declarations */
+
+/* forward declarations */
+struct snd_ctl_elem_info;
+struct snd_kcontrol;
+struct snd_soc_platform;
+
+/* omap-abe-mixer.c */
+unsigned int abe_mixer_read(struct snd_soc_platform *platform,
+		unsigned int reg);
+int abe_mixer_write(struct snd_soc_platform *platform, unsigned int reg,
+		unsigned int val);
+int abe_mixer_enable_mono(struct omap_abe *abe, int id, int enable);
+int abe_mixer_set_equ_profile(struct omap_abe *abe,
+		unsigned int id, unsigned int profile);
+int abe_mixer_add_widgets(struct snd_soc_platform *platform);
+
 #endif	/* End of __OMAP_MCPDM_H__ */

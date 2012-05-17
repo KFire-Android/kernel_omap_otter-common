@@ -42,11 +42,6 @@
 int abe_opp_stream_event(struct snd_soc_dapm_context *dapm, int event);
 int abe_pm_suspend(struct snd_soc_dai *dai);
 int abe_pm_resume(struct snd_soc_dai *dai);
-int abe_mixer_add_widgets(struct snd_soc_platform *platform);
-int abe_mixer_write(struct snd_soc_platform *platform, unsigned int reg,
-		unsigned int val);
-unsigned int abe_mixer_read(struct snd_soc_platform *platform,
-		unsigned int reg);
 irqreturn_t abe_irq_handler(int irq, void *dev_id);
 void abe_init_debugfs(struct omap_abe *abe);
 void abe_cleanup_debugfs(struct omap_abe *abe);

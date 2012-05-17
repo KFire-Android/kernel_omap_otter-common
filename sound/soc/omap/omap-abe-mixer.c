@@ -494,7 +494,7 @@ static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
-int snd_soc_info_enum_ext1(struct snd_kcontrol *kcontrol,
+static int snd_soc_info_enum_ext1(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_info *uinfo)
 {
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
