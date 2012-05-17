@@ -394,8 +394,8 @@ skip_secure_l1_clean_op:
 	mov	r8, r0
 	mrc	p15, 0, r5, c0, c0, 5		@ Read MPIDR
 	ands	r5, r5, #0x0f
-	ldreq	r0, [r8, #OMAP5_L2X0_SAVE_OFFSET0]	@ Retrieve L2 state
-	ldrne	r0, [r8, #OMAP5_L2X0_SAVE_OFFSET1]
+	ldreq	r0, [r8, #L2X0_SAVE_OFFSET0]	@ Retrieve L2 state
+	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]
 	cmp	r0, #3
 	bne	do_wfi
 	bl	omap4_get_sar_ram_base
