@@ -27,8 +27,10 @@ struct omap2_hsmmc_info {
 	char	*name;		/* or NULL for default */
 	struct platform_device *pdev;	/* mmc controller instance */
 	int	ocr_mask;	/* temporary HACK */
-	int	max_freq;	/* maximum clock, if constrained by external
-				 * circuitry, or 0 for default */
+	/* Maximum clock, if constrained by external circuitly,
+	 * or 0 for default
+	 */
+	unsigned long	max_freq;
 	/* Remux (pad configuration) when powering on/off */
 	void (*remux)(struct device *dev, int slot, int power_on);
 	/* init some special card */

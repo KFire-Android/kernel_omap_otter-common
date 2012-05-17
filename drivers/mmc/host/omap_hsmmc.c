@@ -113,8 +113,6 @@
 
 #define MMC_AUTOSUSPEND_DELAY	100
 #define MMC_TIMEOUT_MS		20
-#define OMAP_MMC_MIN_CLOCK	400000
-#define OMAP_MMC_MAX_CLOCK	52000000
 #define DRIVER_NAME		"omap_hsmmc"
 
 #define AUTO_CMD12		(1 << 0)	/* Auto CMD12 support */
@@ -1813,6 +1811,7 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret, irq;
 	const struct of_device_id *match;
+	long mmc_fclk;
 
 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
 	if (match) {
@@ -1878,12 +1877,12 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	if (mmc_slot(host).vcc_aux_disable_is_sleep)
 		mmc_slot(host).no_off = 1;
 
-	mmc->f_min = OMAP_MMC_MIN_CLOCK;
+	if (pdata->set_clk_src)
+		if (pdata->set_clk_src(&pdev->dev, pdev->id))
+			goto err1;
 
-	if (pdata->max_freq > 0)
-		mmc->f_max = pdata->max_freq;
-	else
-		mmc->f_max = OMAP_MMC_MAX_CLOCK;
+	mmc->f_min = pdata->min_freq;
+	mmc->f_max = pdata->max_freq;
 
 	spin_lock_init(&host->irq_lock);
 
@@ -1892,6 +1891,14 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 		ret = PTR_ERR(host->fclk);
 		host->fclk = NULL;
 		goto err1;
+	}
+	if (clk_get_rate(host->fclk) != pdata->max_si_freq) {
+		mmc_fclk = clk_round_rate(host->fclk, pdata->max_si_freq);
+		if (mmc_fclk <= 0)
+			goto err_fclk;
+		ret = clk_set_rate(host->fclk, mmc_fclk);
+		if (ret)
+			goto err_fclk;
 	}
 
 	if (host->pdata->controller_flags & OMAP_HSMMC_BROKEN_MULTIBLOCK_READ) {
@@ -2039,11 +2046,13 @@ err_irq_cd_init:
 err_irq:
 	pm_runtime_put_sync(host->dev);
 	pm_runtime_disable(host->dev);
-	clk_put(host->fclk);
 	if (host->got_dbclk) {
 		clk_disable(host->dbclk);
 		clk_put(host->dbclk);
 	}
+err_fclk:
+	clk_put(host->fclk);
+	host->fclk = NULL;
 err1:
 	iounmap(host->base);
 	platform_set_drvdata(pdev, NULL);
