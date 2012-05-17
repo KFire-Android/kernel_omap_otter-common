@@ -84,7 +84,7 @@ static struct {
 
 static const u8 edid_header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
 
-static int hdmi_runtime_get(void)
+int hdmi_runtime_get(void)
 {
 	int r;
 
@@ -98,7 +98,7 @@ static int hdmi_runtime_get(void)
 	return 0;
 }
 
-static void hdmi_runtime_put(void)
+void hdmi_runtime_put(void)
 {
 	int r;
 
@@ -586,6 +586,13 @@ int omapdss_hdmi_register_cec_callbacks(void (*hdmi_cec_enable_cb)(int status),
 	return 0;
 }
 EXPORT_SYMBOL(omapdss_hdmi_register_cec_callbacks);
+
+int hdmi_get_ipdata(struct hdmi_ip_data *ip_data)
+{
+	*ip_data = hdmi.ip_data;
+	return 0;
+}
+EXPORT_SYMBOL(hdmi_get_ipdata);
 
 int omapdss_hdmi_unregister_cec_callbacks(void)
 {

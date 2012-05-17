@@ -58,6 +58,7 @@ struct omap_dss_features {
 	const int dsi_ddr_div;
 
 	const u32 hdmi_core_sys_offset;
+	const u32 hdmi_cec_offset;
 };
 
 /* This struct is assigned to one of the below during initialization */
@@ -595,6 +596,7 @@ static const struct omap_dss_features omap4430_es1_0_dss_features  = {
 	.burst_size_unit = 16,
 	.dsi_ddr_div = 4,
 	.hdmi_core_sys_offset = 0x400,
+	.hdmi_cec_offset = 0xD00,
 };
 
 /* For OMAP4430 ES 2.0, 2.1 and 2.2 revisions */
@@ -616,6 +618,7 @@ static const struct omap_dss_features omap4430_es2_0_1_2_dss_features = {
 	.burst_size_unit = 16,
 	.dsi_ddr_div = 4,
 	.hdmi_core_sys_offset = 0x400,
+	.hdmi_cec_offset = 0xD00,
 };
 
 /* For all the other OMAP4 versions */
@@ -637,6 +640,7 @@ static const struct omap_dss_features omap4_dss_features = {
 	.burst_size_unit = 16,
 	.dsi_ddr_div = 4,
 	.hdmi_core_sys_offset = 0x400,
+	.hdmi_cec_offset = 0xD00,
 };
 
 /* OMAP5 DSS Features */
@@ -658,6 +662,7 @@ static const struct omap_dss_features omap5_dss_features = {
 	.burst_size_unit = 16,
 	.dsi_ddr_div = 2,
 	.hdmi_core_sys_offset = 0x20000,
+	.hdmi_cec_offset = 0x20000,
 };
 
 #if defined(CONFIG_OMAP4_DSS_HDMI) || defined(CONFIG_OMAP5_DSS_HDMI)
@@ -683,6 +688,16 @@ static const struct ti_hdmi_ip_ops omap4_hdmi_functions = {
 	.audio_config		=	ti_hdmi_4xxx_audio_config,
 #endif
 	.irq_handler		=	ti_hdmi_4xxx_irq_handler,
+	.cec_get_rx_cmd			=	ti_hdmi_4xxx_cec_get_rx_cmd,
+	.cec_read_rx_cmd		=	ti_hdmi_4xxx_cec_read_rx_cmd,
+	.cec_transmit_cmd		=	ti_hdmi_4xxx_cec_transmit_cmd,
+	.power_on_cec			=	ti_hdmi_4xxx_power_on_cec,
+	.power_off_cec			=	ti_hdmi_4xxx_power_off_cec,
+	.cec_int_handler		=	ti_hdmi_4xxx_cec_int_handler,
+	.cec_clr_rx_int			=	ti_hdmi_4xxx_cec_clr_rx_int,
+	.cec_get_reg_device_list	=	ti_hdmi_4xxx_cec_get_reg_device_list,
+	.cec_add_reg_device		=	ti_hdmi_4xxx_cec_add_reg_device,
+	.cec_set_reg_device_list	=	ti_hdmi_4xxx_cec_set_reg_device_list,
 
 };
 
@@ -783,6 +798,11 @@ int dss_feat_get_dsi_ddr_div(void)
 unsigned long dss_feat_get_hdmi_core_sys_offset(void)
 {
 	return omap_current_dss_features->hdmi_core_sys_offset;
+}
+
+unsigned long dss_feat_get_hdmi_cec_offset(void)
+{
+	return omap_current_dss_features->hdmi_cec_offset;
 }
 
 /* DSS has_feature check */

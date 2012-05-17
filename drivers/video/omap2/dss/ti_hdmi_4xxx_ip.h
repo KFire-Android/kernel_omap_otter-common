@@ -165,7 +165,7 @@
 #define HDMI_CORE_AV_GEN2_DBYTE_ELSIZE		0x4
 #define HDMI_CORE_AV_MPEG_DBYTE_ELSIZE		0x4
 #define HDMI_CORE_AV_GEN_DBYTE_ELSIZE		0x4
-
+#define HDMI_CORE_SYS_UMASK4			0x1E0
 /* PLL */
 
 #define PLLCTRL_PLL_CONTROL			0x0
@@ -184,11 +184,41 @@
 #define HDMI_TXPHY_PAD_CFG_CTRL			0xC
 #define HDMI_TXPHY_BIST_CONTROL			0x1C
 
+
+/**************************************
+* HDMI CEC registers *
+***************************************/
+#define HDMI_CEC_DEV_ID                         0x0
+#define HDMI_CEC_SPEC                           0x4
+#define HDMI_CEC_TX_INIT                        0x20
+#define HDMI_CEC_TX_DEST                        0x24
+#define HDMI_CEC_TRANSMIT_DATA                  0x7c
+#define HDMI_CEC_SETUP                          0x38
+#define HDMI_CEC_TX_COMMAND                     0x3c
+#define HDMI_CEC_DBG_3                          0x1c
+#define HDMI_CEC_INT_STATUS_1                   0x9c
+#define HDMI_CEC_INT_STATUS_0                   0x98
+#define HDMI_CEC_INT_ENABLE_0                   0x90
+#define HDMI_CEC_RX_CMD_HEADER                  0xb8
+#define HDMI_CEC_RX_COUNT                       0xB4
+#define HDMI_CEC_RX_CONTROL                     0xB0
+#define HDMI_CEC_RX_COMMAND                     0xbc
+#define HDMI_CEC_RX_OPERAND                     0xc0
+#define HDMI_CEC_TX_OPERAND                     0x40
+#define HDMI_CEC_CA_7_0                         0x88
+#define HDMI_CEC_CA_15_8                        0x8c
+
+#define HDMI_CEC_TX_FIFO_INT_MASK		0x64
+#define HDMI_CEC_RETRANSMIT_CNT_INT_MASK	0x2
+
 #define REG_FLD_MOD(base, idx, val, start, end) \
 	hdmi_write_reg(base, idx, FLD_MOD(hdmi_read_reg(base, idx),\
 							val, start, end))
 #define REG_GET(base, idx, start, end) \
 	FLD_GET(hdmi_read_reg(base, idx), start, end)
+
+#define WR_REG_32(base, offset, val)   __raw_writel(val, base + offset)
+#define RD_REG_32(base, offset)                __raw_readl(base + offset)
 
 enum hdmi_phy_pwr {
 	HDMI_PHYPWRCMD_OFF = 0,

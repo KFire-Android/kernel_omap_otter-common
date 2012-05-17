@@ -22,7 +22,7 @@
 #define _TI_HDMI_H
 
 #include <linux/fb.h>
-
+#include <video/cec.h>
 #define HDMI_CEC_INT		0x100
 
 struct hdmi_ip_data;
@@ -175,6 +175,30 @@ struct ti_hdmi_ip_ops {
 	int (*irq_process) (struct hdmi_ip_data *ip_data);
 
 	int (*configure_range)(struct hdmi_ip_data *ip_data);
+
+	int (*cec_get_rx_cmd)(struct hdmi_ip_data *ip_data, char *rx_cmd);
+
+	int (*cec_read_rx_cmd)(struct hdmi_ip_data *ip_data,
+		struct cec_rx_data *rx_data);
+
+	int (*cec_transmit_cmd)(struct hdmi_ip_data *ip_data,
+		struct cec_tx_data *data, int *cmd_acked);
+
+	int (*power_on_cec)(struct hdmi_ip_data *ip_data);
+
+	int (*power_off_cec)(struct hdmi_ip_data *ip_data);
+
+	int (*cec_int_handler)(struct hdmi_ip_data *ip_data);
+
+	int (*cec_clr_rx_int)(struct hdmi_ip_data *ip_data, int cec_rx);
+
+	int (*cec_get_reg_device_list)(struct hdmi_ip_data *ip_data);
+
+	int (*cec_add_reg_device)(struct hdmi_ip_data *ip_data,
+		int device_id, int clear);
+
+	int (*cec_set_reg_device_list)(struct hdmi_ip_data *ip_data,
+		int mask);
 };
 
 /*
@@ -224,6 +248,7 @@ struct hdmi_ip_data {
 	unsigned long	core_av_offset;
 	unsigned long	pll_offset;
 	unsigned long	phy_offset;
+	unsigned long	cec_offset;
 	const struct ti_hdmi_ip_ops *ops;
 	struct hdmi_config cfg;
 	struct hdmi_pll_info pll_data;
@@ -267,6 +292,23 @@ void ti_hdmi_5xxx_audio_start(struct hdmi_ip_data *ip_data, bool enable);
 int ti_hdmi_5xxx_audio_config(struct hdmi_ip_data *ip_data,
 		struct snd_aes_iec958 *iec, struct snd_cea_861_aud_if *aud_if);
 #endif
+int hdmi_get_ipdata(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_notify_hpd(struct hdmi_ip_data *ip_data, bool hpd_state);
+int ti_hdmi_4xxx_cec_get_rx_cmd(struct hdmi_ip_data *ip_data,
+	char *rx_cmd);
+int ti_hdmi_4xxx_cec_read_rx_cmd(struct hdmi_ip_data *ip_data,
+	struct cec_rx_data *rx_data);
+int ti_hdmi_4xxx_cec_transmit_cmd(struct hdmi_ip_data *ip_data,
+	struct cec_tx_data *data, int *cmd_acked);
+int ti_hdmi_4xxx_power_on_cec(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_power_off_cec(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_cec_int_handler(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_cec_clr_rx_int(struct hdmi_ip_data *ip_data, int cec_rx);
+int ti_hdmi_4xxx_cec_get_reg_device_list(struct hdmi_ip_data *ip_data);
+int ti_hdmi_4xxx_cec_add_reg_device(struct hdmi_ip_data *ip_data,
+	int device_id, int clear);
+int ti_hdmi_4xxx_cec_set_reg_device_list(struct hdmi_ip_data *ip_data,
+	int mask);
 void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data);
 void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
