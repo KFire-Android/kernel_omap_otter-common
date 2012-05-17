@@ -536,7 +536,6 @@ int __init omap_mpuss_init(void)
 {
 	struct omap4_cpu_pm_info *pm_info;
 	u32 cpu_wakeup_addr = 0;
-	u32 l2x0_offset = 0;
 	u32 omap_type_offset = 0;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0) {
@@ -550,16 +549,14 @@ int __init omap_mpuss_init(void)
 	/* Initilaise per CPU PM information */
 	if (cpu_is_omap44xx()) {
 		cpu_wakeup_addr = CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
-		l2x0_offset = L2X0_SAVE_OFFSET0;
 	} else if (cpu_is_omap54xx()) {
 		cpu_wakeup_addr = OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
-		l2x0_offset = OMAP5_L2X0_SAVE_OFFSET0;
 	}
 
 	pm_info = &per_cpu(omap4_pm_info, 0x0);
 	pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
 	pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
-	pm_info->l2x0_sar_addr = sar_base + l2x0_offset;
+	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
 	pm_info->pwrdm = pwrdm_lookup("cpu0_pwrdm");
 	if (!pm_info->pwrdm) {
 		pr_err("Lookup failed for CPU0 pwrdm\n");
@@ -575,21 +572,21 @@ int __init omap_mpuss_init(void)
 
 	if (cpu_is_omap44xx()) {
 		cpu_wakeup_addr = CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-		l2x0_offset = L2X0_SAVE_OFFSET1;
 	} else if (cpu_is_omap54xx()) {
 		cpu_wakeup_addr = OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-		l2x0_offset = OMAP5_L2X0_SAVE_OFFSET1;
 	}
 
 	pm_info = &per_cpu(omap4_pm_info, 0x1);
 	pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
 	pm_info->wkup_sar_addr = sar_base + cpu_wakeup_addr;
-	pm_info->l2x0_sar_addr = sar_base + l2x0_offset;
+	pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
 
 	if (cpu_is_omap446x())
 		pm_info->secondary_startup = omap_secondary_startup_4460;
-	else
+	else if (cpu_is_omap44xx())
 		pm_info->secondary_startup = omap_secondary_startup;
+	else if (cpu_is_omap54xx())
+		pm_info->secondary_startup = omap5_secondary_startup;
 
 	pm_info->pwrdm = pwrdm_lookup("cpu1_pwrdm");
 	if (!pm_info->pwrdm) {
@@ -621,7 +618,7 @@ int __init omap_mpuss_init(void)
 	if (cpu_is_omap44xx())
 		omap_type_offset = OMAP_TYPE_OFFSET;
 	else if (cpu_is_omap54xx())
-		omap_type_offset = OMAP5_TYPE_OFFSET;
+		omap_type_offset = OMAP_TYPE_OFFSET;
 
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
 		__raw_writel(1, sar_base + omap_type_offset);
