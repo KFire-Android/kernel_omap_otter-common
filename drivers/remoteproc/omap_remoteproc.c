@@ -52,6 +52,7 @@ struct omap_rproc {
 	struct rproc *rproc;
 	void __iomem *boot_reg;
 	struct dev_pm_qos_request qos_req;
+	atomic_t thrd_cnt;
 };
 
 struct _thread_data {
@@ -61,10 +62,13 @@ struct _thread_data {
 
 static int _vq_interrupt_thread(struct _thread_data *d)
 {
+	struct omap_rproc *oproc = d->rproc->priv;
+
 	/* msg contains the index of the triggered vring */
 	if (rproc_vq_interrupt(d->rproc, d->msg) == IRQ_NONE)
 		dev_dbg(d->rproc->dev, "no message was found in vqid 0x0\n");
 	kfree(d);
+	atomic_dec(&oproc->thrd_cnt);
 	return 0;
 }
 
@@ -112,6 +116,7 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 			break;
 		d->rproc = oproc->rproc;
 		d->msg = msg;
+		atomic_inc(&oproc->thrd_cnt);
 		kthread_run((void *)_vq_interrupt_thread, d,
 					"vp_interrupt_thread");
 	}
@@ -197,6 +202,8 @@ static int omap_rproc_start(struct rproc *rproc)
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
 
+	/* init thread counter for mbox messages */
+	atomic_set(&oproc->thrd_cnt, 0);
 	/* load remote processor boot address if needed. */
 	if (oproc->boot_reg)
 		writel(rproc->bootaddr, oproc->boot_reg);
@@ -276,6 +283,10 @@ static int omap_rproc_stop(struct rproc *rproc)
 	}
 
 	omap_mbox_put(oproc->mbox, &oproc->nb);
+
+	/* wait untill all threads have finished */
+	while (atomic_read(&oproc->thrd_cnt))
+		schedule();
 
 	return 0;
 }
