@@ -266,6 +266,7 @@ static int abe_probe(struct snd_soc_platform *platform)
 		goto err_irq;
 	}
 
+/* TODO: Enable when PM tree creates arch/arm/mach-omap2/opp5xxx_data.c */
 #if 0
 	ret = abe_opp_init_initial_opp(abe);
 	if (ret < 0)
@@ -296,7 +297,10 @@ static int abe_probe(struct snd_soc_platform *platform)
 	abe_init_debugfs(abe);
 	return ret;
 
+/* TODO: Enable when PM tree creates arch/arm/mach-omap2/opp5xxx_data.c */
+#if 0
 err_opp:
+#endif
 	free_irq(abe->irq, (void *)abe);
 err_irq:
 	abe_free_fw(abe);
