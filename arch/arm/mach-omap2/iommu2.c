@@ -19,6 +19,8 @@
 #include <linux/stringify.h>
 
 #include <plat/iommu.h>
+#include <plat/omap_hwmod.h>
+#include "clockdomain.h"
 
 /*
  * omap2 architecture specific register bit definitions
@@ -96,11 +98,37 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
 
 static void omap2_iommu_disable(struct omap_iommu *obj)
 {
-	u32 l = iommu_read_reg(obj, MMU_CNTL);
+	struct omap_hwmod *oh;
+	u32 l;
 
+	oh = omap_hwmod_lookup(obj->name);
+	if (!oh)
+		return;
+	/*
+	 * IPU and DSP iommus are not directly connected to the processor
+	 * instead they are  behind a shared MMU. Therefore in the case of
+	 * a mmu fault and the mmu fault was not handled, even if the processor
+	 * is under reset, the shared MMU will try to translation the address
+	 * again causing that the status flag cannot be clear and therefore
+	 * as soon as the clkdm wants to go to idle the clkdm will be stuck
+	 * in transition state. The only way to reset the shared MMU is doing
+	 * a hardreset of the L2 iommu which shared the reset line with the
+	 * shared MMU. That way we can clean the status bit and turn off
+	 * the iommu without any issue.
+	 */
+	if (!strcmp(obj->name, "ipu") || !strcmp(obj->name, "dsp")) {
+		omap_hwmod_assert_hardreset(oh, oh->rst_lines->name);
+		omap_hwmod_deassert_hardreset(oh, oh->rst_lines->name);
+		goto out;
+	}
+
+	l = iommu_read_reg(obj, MMU_IRQSTATUS);
+	iommu_write_reg(obj, l, MMU_IRQSTATUS);
+	l = iommu_read_reg(obj, MMU_CNTL);
 	l &= ~MMU_CNTL_MASK;
 	iommu_write_reg(obj, l, MMU_CNTL);
-
+out:
+	clkdm_allow_idle(oh->clkdm);
 	dev_dbg(obj->dev, "%s is shutting down\n", obj->name);
 }
 
@@ -111,8 +139,13 @@ static void omap2_iommu_set_twl(struct omap_iommu *obj, bool on)
 
 static u32 omap2_iommu_fault_isr(struct omap_iommu *obj, u32 *ra)
 {
+	struct omap_hwmod *oh;
 	u32 stat, da;
 	u32 errs = 0;
+
+	oh = omap_hwmod_lookup(obj->name);
+	if (!oh)
+		return 0;
 
 	stat = iommu_read_reg(obj, MMU_IRQSTATUS);
 	stat &= MMU_IRQ_MASK;
@@ -135,6 +168,8 @@ static u32 omap2_iommu_fault_isr(struct omap_iommu *obj, u32 *ra)
 	if (stat & MMU_IRQ_MULTIHITFAULT)
 		errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
 	iommu_write_reg(obj, stat, MMU_IRQSTATUS);
+
+	clkdm_deny_idle(oh->clkdm);
 
 	return errs;
 }
