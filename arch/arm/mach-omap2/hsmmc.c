@@ -305,7 +305,13 @@ static int omap_hsmmc_set_clks_src(struct device *dev, unsigned int id)
 	if (id > 1)
 		return 0;
 
-	if (cpu_is_omap44xx()) {
+	if (cpu_is_omap54xx()) {
+		parent_name = "dpll_per_m2x2_ck";
+		if (id == 0)
+			child_name = "mmc1_fclk_mux";
+		else
+			child_name = "mmc2_fclk_mux";
+	} else if (cpu_is_omap44xx()) {
 		parent_name = "func_96m_fclk";
 		if (id == 0)
 			child_name = "mmc1_fck";
@@ -337,7 +343,25 @@ static int omap_hsmmc_set_clks_src(struct device *dev, unsigned int id)
 static int __init
 omap_hsmmc_max_min(u8 slot, unsigned long *max, unsigned long *min)
 {
-	if (cpu_is_omap44xx()) {
+	if (cpu_is_omap54xx()) {
+		switch (slot) {
+		case 0:
+		case 1:
+#if defined(OMAP5432_REV_ES1_0)
+			*max = 96000000;
+#else
+			*max = 192000000;
+#endif
+			break;
+		case 2:
+		case 3:
+		case 4:
+			*max = 48000000;
+			break;
+		default:
+			return -EINVAL;
+		}
+	} else if (cpu_is_omap44xx()) {
 		switch (slot) {
 		case 0:
 		case 1:
