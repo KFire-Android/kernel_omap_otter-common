@@ -811,7 +811,7 @@ static inline int be_connect(struct snd_soc_pcm_runtime *fe,
 
 #ifdef CONFIG_DEBUG_FS
 	dpcm_params->debugfs_state = debugfs_create_u32(be->dai_link->name, 0644,
-			fe->debugfs_dpcm_root, &dpcm_params->state);
+			fe->debugfs_dpcm_root, (u32 *)&dpcm_params->state);
 #endif
 
 	return 1;
