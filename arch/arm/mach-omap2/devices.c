@@ -35,6 +35,7 @@
 #include <plat/board.h>
 #include <plat/mmc.h>
 #include <plat/dma.h>
+#include <plat/gpu.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 #include <plat/omap4-keypad.h>
@@ -450,6 +451,44 @@ static void __init omap_init_dmic(void)
 #else
 static inline void omap_init_dmic(void) {}
 #endif
+
+static struct omap_device_pm_latency omap_gpu_latency[] = {
+	[0] = {
+		.deactivate_func	= omap_device_idle_hwmods,
+		.activate_func		= omap_device_enable_hwmods,
+		.flags			= OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static void __init omap_init_gpu(void)
+{
+	struct omap_hwmod *oh;
+	struct platform_device *pdev;
+	struct gpu_platform_data *pdata;
+	const char *oh_name = "gpu";
+	const char *name = "pvrsrvkm";
+
+	oh = omap_hwmod_lookup(oh_name);
+	if (!oh) {
+		pr_err("omap_init_gpu: Could not look up %s\n", oh_name);
+		return;
+	}
+
+	pdata = kzalloc(sizeof(struct gpu_platform_data),
+					GFP_KERNEL);
+	if (!pdata) {
+		pr_err("omap_init_gpu: Platform data memory allocation failed\n");
+		return;
+	}
+
+	pdev = omap_device_build(name, 0, oh, pdata,
+			     sizeof(struct gpu_platform_data),
+			     omap_gpu_latency, ARRAY_SIZE(omap_gpu_latency), 0);
+	WARN(IS_ERR(pdev), "Could not build omap_device for %s %s\n",
+	     name, oh_name);
+
+	kfree(pdata);
+}
 
 #if defined(CONFIG_SND_OMAP_SOC_ABE) || \
 	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
@@ -1030,6 +1069,7 @@ static int __init omap2_init_devices(void)
 	omap_init_mcpdm();
 	omap_init_dmic();
 	omap_init_camera();
+	omap_init_gpu();
 	omap_init_hdmi_audio();
 	omap3_init_camera(&bogus_isp_pdata);
 	omap_init_mbox();
