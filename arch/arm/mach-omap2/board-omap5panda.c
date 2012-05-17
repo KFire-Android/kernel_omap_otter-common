@@ -24,7 +24,7 @@
 #ifdef CONFIG_OMAP5_SEVM_PALMAS
 #include <linux/mfd/palmas.h>
 #endif
-
+#include <linux/i2c/pca953x.h>
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
@@ -617,9 +617,14 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 	},
 };
 
+static struct pca953x_platform_data omap5evm_gpio_expander_info = {
+	.gpio_base	= OMAP_MAX_GPIO_LINES,
+};
+
 static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
 	{
-		I2C_BOARD_INFO("pio_a_i2c_driver", 0x22),
+		I2C_BOARD_INFO("tca6424", 0x22),
+		.platform_data = &omap5evm_gpio_expander_info,
 	},
 };
 
