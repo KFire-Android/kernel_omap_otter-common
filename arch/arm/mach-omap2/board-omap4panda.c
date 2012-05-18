@@ -231,7 +231,7 @@ static struct platform_device omap_vwlan_device = {
 	},
 };
 
-struct wl12xx_platform_data omap_panda_wlan_data  __initdata = {
+static struct wl12xx_platform_data omap_panda_wlan_data  __initdata = {
 	/* PANDA ref clock is 38.4 MHz */
 	.board_ref_clock = 2,
 };
