@@ -350,6 +350,7 @@ void omap_abe_dc_set_hf_offset(struct snd_soc_platform *platform,
 /* forward declarations */
 struct snd_ctl_elem_info;
 struct snd_kcontrol;
+struct snd_soc_dai;
 struct snd_soc_platform;
 
 /* omap-abe-mixer.c */
@@ -364,5 +365,13 @@ int abe_mixer_add_widgets(struct snd_soc_platform *platform);
 
 /* omap-abe-pcm.c */
 extern struct snd_soc_dai_driver omap_abe_dai[7];
+
+/* omap-abe-pm.c */
+int abe_pm_save_context(struct omap_abe *abe);
+int abe_pm_restore_context(struct omap_abe *abe);
+#ifdef CONFIG_PM
+int abe_pm_suspend(struct snd_soc_dai *dai);
+int abe_pm_resume(struct snd_soc_dai *dai);
+#endif
 
 #endif	/* End of __OMAP_MCPDM_H__ */

@@ -40,8 +40,6 @@
 #include "omap-abe-priv.h"
 
 int abe_opp_stream_event(struct snd_soc_dapm_context *dapm, int event);
-int abe_pm_suspend(struct snd_soc_dai *dai);
-int abe_pm_resume(struct snd_soc_dai *dai);
 irqreturn_t abe_irq_handler(int irq, void *dev_id);
 void abe_init_debugfs(struct omap_abe *abe);
 void abe_cleanup_debugfs(struct omap_abe *abe);
@@ -328,8 +326,10 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.ops		= &omap_aess_pcm_ops,
 	.probe		= abe_probe,
 	.remove		= abe_remove,
+#ifdef CONFIG_PM
 	.suspend	= abe_pm_suspend,
 	.resume		= abe_pm_resume,
+#endif
 	.read		= abe_mixer_read,
 	.write		= abe_mixer_write,
 #if 0

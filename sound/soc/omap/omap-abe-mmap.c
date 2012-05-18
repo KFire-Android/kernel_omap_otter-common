@@ -33,8 +33,6 @@
 #include "omap-abe-priv.h"
 #include "omap-pcm.h"
 
-int abe_pm_save_context(struct omap_abe *abe);
-int abe_pm_restore_context(struct omap_abe *abe);
 int abe_opp_recalc_level(struct omap_abe *abe);
 int abe_opp_set_level(struct omap_abe *abe, int opp);
 
