@@ -742,7 +742,7 @@ u32 dss_feat_get_burst_size_unit(void)
 	return omap_current_dss_features->burst_size_unit;
 }
 
-int dss_feat_get_dsi_ddr_div()
+int dss_feat_get_dsi_ddr_div(void)
 {
 	return omap_current_dss_features->dsi_ddr_div;
 }
