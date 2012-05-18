@@ -98,13 +98,13 @@ static int get_physical_id(int logical_id)
 static int port_get_num_users(struct omap_aess *abe, struct omap_abe_port *port)
 {
 	struct omap_abe_port *p;
-	int users = 0;
+	int count = 0;
 
 	list_for_each_entry(p, &abe->ports, list) {
 		if (p->physical_id == port->physical_id && p->state == PORT_ENABLED)
-			users++;
+			count++;
 	}
-	return users;
+	return count;
 }
 
 static int port_is_open(struct omap_aess *abe, int phy_port)
