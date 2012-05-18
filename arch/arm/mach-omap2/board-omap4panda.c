@@ -520,7 +520,7 @@ static struct omap_dss_board_info omap4_panda_dss_data = {
 	.default_device	= &omap4_panda_dvi_device,
 };
 
-void __init omap4_panda_display_init(void)
+static void __init omap4_panda_display_init(void)
 {
 	int r;
 
