@@ -124,10 +124,10 @@ static void omap_aess_update_scheduling_table(struct omap_aess *abe,
 }
 
 static void omap_aess_update_scheduling_table1(struct omap_aess *abe,
-		struct omap_aess_init_task1 *init_task, int enable)
+		const struct omap_aess_init_task1 *init_task, int enable)
 {
 	int i;
-	struct omap_aess_task *task;
+	const struct omap_aess_task *task;
 
 	for (i = 0; i < init_task->nb_task; i++) {
 		task = &init_task->task[i];
