@@ -74,4 +74,8 @@ void omap_aess_init_asrc_bt_dl(struct omap_aess *abe, s32 dppm);
 int omap_aess_init_ping_pong_buffer(struct omap_aess *abe,
 		u32 id, u32 size_bytes, u32 n_buffers, u32 *p);
 
+/* abe_dat.c */
+extern const u32 abe_atc_srcid[];
+extern const u32 abe_atc_dstid[];
+
 #endif /* __SND_SOC_OMAP_ABE_HAL_ABE_PRIVATE_H__ */
