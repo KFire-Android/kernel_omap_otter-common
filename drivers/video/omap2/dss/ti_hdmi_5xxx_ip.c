@@ -296,7 +296,7 @@ static void hdmi_core_init(struct hdmi_core_vid_config *video_cfg,
 
 }
 
-void hdmi_core_infoframe_vsi_config(struct hdmi_ip_data *ip_data,
+static void hdmi_core_infoframe_vsi_config(struct hdmi_ip_data *ip_data,
 				struct hdmi_s3d_info info_s3d)
 {
 	int length;
