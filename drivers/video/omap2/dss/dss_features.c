@@ -828,6 +828,7 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.read_edid		=	ti_hdmi_5xxx_read_edid,
 	.irq_core_handler	=	ti_hdmi_5xxx_core_irq_handler,
 	.dump_core		=	ti_hdmi_5xxx_core_dump,
+	.configure_range	=	ti_hdmi_5xxx_configure_range,
 #endif
 	.phy_enable		=	ti_hdmi_4xxx_phy_enable,
 	.phy_disable		=	ti_hdmi_4xxx_phy_disable,

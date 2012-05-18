@@ -145,6 +145,7 @@ struct ti_hdmi_ip_ops {
 
 	int (*irq_core_handler) (struct hdmi_ip_data *ip_data);
 
+	int (*configure_range)(struct hdmi_ip_data *ip_data);
 };
 
 /*
@@ -243,4 +244,5 @@ void ti_hdmi_5xxx_core_dump(struct hdmi_ip_data *ip_data, struct seq_file *s);
 int ti_hdmi_5xxx_read_edid(struct hdmi_ip_data *ip_data,
 				u8 *edid, int len);
 int ti_hdmi_5xxx_core_irq_handler(struct hdmi_ip_data *ip_data);
+int ti_hdmi_5xxx_configure_range(struct hdmi_ip_data *ip_data);
 #endif
