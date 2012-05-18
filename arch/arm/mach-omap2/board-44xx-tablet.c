@@ -31,6 +31,7 @@
 #include <mach/omap4-common.h>
 #include <mach/emif.h>
 #include <mach/lpddr2-elpida.h>
+#include <mach/omap4_ion.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -47,7 +48,6 @@
 #include "control.h"
 #include "pm.h"
 #include "board-44xx-tablet.h"
-#include "omap4_ion.h"
 #include "omap_ram_console.h"
 
 #define WILINK_UART_DEV_NAME	"/dev/ttyO1"
@@ -753,7 +753,10 @@ static void __init omap_tablet_reserve(void)
 #endif
 
 #ifdef CONFIG_ION_OMAP
+	tablet_android_display_setup(get_omap_ion_platform_data());
 	omap_ion_init();
+#else
+	tablet_android_display_setup(NULL);
 #endif
 	omap_reserve();
 }
