@@ -591,7 +591,7 @@ int ti_hdmi_5xxx_configure_range(struct hdmi_ip_data *ip_data)
 	return 0;
 }
 
-void hdmi_enable_video_path(struct hdmi_ip_data *ip_data)
+static void hdmi_enable_video_path(struct hdmi_ip_data *ip_data)
 {
 	void __iomem *core_sys_base = hdmi_core_sys_base(ip_data);
 
