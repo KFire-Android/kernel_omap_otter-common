@@ -218,6 +218,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	}
 
 	buffer = ion_handle_buffer(handle);
+	buffer->heap = heap;	/* clarify tiler heap */
 	buffer->size = v_size;
 	buffer->priv_virt = info;
 	data->handle = handle;

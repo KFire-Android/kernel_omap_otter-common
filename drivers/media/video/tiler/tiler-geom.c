@@ -94,6 +94,55 @@ u32 tiler_bpp(const struct tiler_block_t *b)
 }
 EXPORT_SYMBOL(tiler_bpp);
 
+static void geom_init(void)
+{
+	struct tiler_geom *g;
+
+	/* run only if geom has not been completely filled */
+	if (geom[TILFMT_PAGE].slot_h)
+		return;
+
+	/* calculate missing members of geometry structure */
+	for (g = geom; g < geom + TILER_FORMATS; g++) {
+		g->bpp = 1 << (g->x_shft + g->y_shft);
+
+		if (g - geom == TILFMT_PAGE)
+			/* most applications deal in byte data for page mode */
+			g->bpp_m = 1;
+		else
+			g->bpp_m = g->bpp;
+		g->slot_w = 1 << (SLOT_WIDTH_BITS - g->x_shft);
+		g->slot_h = 1 << (SLOT_HEIGHT_BITS - g->y_shft);
+	}
+}
+
+u32 tiler_backpages(enum tiler_fmt fmt, u32 width, u32 height)
+{
+	u32 x, y;
+
+	geom_init();
+
+	if (fmt == TILFMT_PAGE) {
+		/* for 1D area keep the height (1), width is in tiler slots */
+		x = DIV_ROUND_UP(width, TILER_PAGE);
+
+		if (x > TILER_WIDTH * TILER_HEIGHT)
+			return 0;
+		return x;
+	} else if (fmt >= TILFMT_8BIT && fmt <= TILFMT_32BIT) {
+		/* adjust to slots */
+		x = DIV_ROUND_UP(width, geom[fmt].slot_w);
+		y = DIV_ROUND_UP(height, geom[fmt].slot_h);
+
+		if (x > TILER_WIDTH || y > TILER_HEIGHT)
+			return 0;
+		return x * y;
+	} else {
+		return 0;
+	}
+}
+EXPORT_SYMBOL(tiler_backpages);
+
 /* return the stride of a tiler-block in tiler space */
 static inline s32 tiler_stride(u32 tsptr)
 {
@@ -350,8 +399,6 @@ static inline void alias_xy(u32 ssptr, u32 *x, u32 *y)
 /* initialize shared geometric data */
 void tiler_geom_init(struct tiler_ops *tiler)
 {
-	struct tiler_geom *g;
-
 	tiler->xy = alias_xy;
 	tiler->addr = alias_address;
 	tiler->geom = get_geom;
@@ -360,13 +407,5 @@ void tiler_geom_init(struct tiler_ops *tiler)
 	tiler->width  = TILER_WIDTH;
 	tiler->height = TILER_HEIGHT;
 
-	/* calculate geometry */
-	for (g = geom; g < geom + TILER_FORMATS; g++) {
-		g->bpp_m = g->bpp = 1 << (g->x_shft + g->y_shft);
-		g->slot_w = 1 << (SLOT_WIDTH_BITS - g->x_shft);
-		g->slot_h = 1 << (SLOT_HEIGHT_BITS - g->y_shft);
-	}
-
-	/* set bpp_m = 1 for page mode as most applications deal in byte data */
-	geom[TILFMT_PAGE].bpp_m = 1;
+	geom_init();
 }
