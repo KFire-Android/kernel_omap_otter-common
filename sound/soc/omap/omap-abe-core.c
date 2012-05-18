@@ -40,11 +40,9 @@
 #include "omap-abe-priv.h"
 
 int abe_opp_stream_event(struct snd_soc_dapm_context *dapm, int event);
-irqreturn_t abe_irq_handler(int irq, void *dev_id);
 void abe_init_debugfs(struct omap_abe *abe);
 void abe_cleanup_debugfs(struct omap_abe *abe);
 int abe_opp_init_initial_opp(struct omap_abe *abe);
-extern struct snd_pcm_ops omap_aess_pcm_ops;
 
 static u64 omap_abe_dmamask = DMA_BIT_MASK(32);
 

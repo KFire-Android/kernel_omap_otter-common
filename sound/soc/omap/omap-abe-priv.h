@@ -25,6 +25,7 @@
 #define __OMAP_ABE_PRIV_H__
 
 #include <sound/soc.h>
+#include <linux/irqreturn.h>
 
 #include "abe/abe.h"
 #include "abe/abe_gain.h"
@@ -373,5 +374,9 @@ int abe_pm_restore_context(struct omap_abe *abe);
 int abe_pm_suspend(struct snd_soc_dai *dai);
 int abe_pm_resume(struct snd_soc_dai *dai);
 #endif
+
+/* omap-abe-mmap.c */
+irqreturn_t abe_irq_handler(int irq, void *dev_id);
+extern struct snd_pcm_ops omap_aess_pcm_ops;
 
 #endif	/* End of __OMAP_MCPDM_H__ */
