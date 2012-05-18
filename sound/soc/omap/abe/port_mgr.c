@@ -246,13 +246,13 @@ struct omap_abe_port *omap_abe_port_open(struct omap_aess *abe, int logical_id)
 #ifdef CONFIG_DEBUG_FS
 	sprintf(debug_fs_name, "%s_state", lport_name[logical_id]);
 	port->debugfs_lstate = debugfs_create_u32(debug_fs_name, 0644,
-			abe->debugfs_root, &port->state);
+			abe->debugfs_root, (u32 *)&port->state);
 	sprintf(debug_fs_name, "%s_phy", lport_name[logical_id]);
 	port->debugfs_lphy = debugfs_create_u32(debug_fs_name, 0644,
-			abe->debugfs_root, &port->physical_id);
+			abe->debugfs_root, (u32 *)&port->physical_id);
 	sprintf(debug_fs_name, "%s_users", lport_name[logical_id]);
 	port->debugfs_lusers = debugfs_create_u32(debug_fs_name, 0644,
-			abe->debugfs_root, &port->users);
+			abe->debugfs_root, (u32 *)&port->users);
 #endif
 
 	pr_debug("opened port %s\n", lport_name[logical_id]);
