@@ -300,11 +300,8 @@ int voltdm_scale(struct voltagedomain *voltdm, unsigned long target_volt);
 void voltdm_reset(struct voltagedomain *voltdm);
 unsigned long voltdm_get_voltage(struct voltagedomain *voltdm);
 
-static inline int voltdm_register_notifier(struct voltagedomain *voltdm,
-						struct notifier_block *nb)
-{
-	return srcu_notifier_chain_register(&voltdm->change_notify_list, nb);
-}
+int voltdm_register_notifier(struct voltagedomain *voltdm,
+					struct notifier_block *nb);
 
 static inline int voltdm_unregister_notifier(struct voltagedomain *voltdm,
 						struct notifier_block *nb)
