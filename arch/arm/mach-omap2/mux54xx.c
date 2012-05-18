@@ -885,7 +885,7 @@ static struct omap_mux __initdata omap5_wkup_muxmodes[] = {
  */
 #if defined(CONFIG_OMAP_MUX) && defined(CONFIG_DEBUG_FS)		\
 		&& defined(CONFIG_OMAP_PACKAGE_CBL)
-struct omap_ball __initdata omap5_wkup_cbl_ball[] = {
+static struct omap_ball __initdata omap5_wkup_cbl_ball[] = {
 	_OMAP5_BALLENTRY(LLIA_WAKEREQIN, "c30", NULL),
 	_OMAP5_BALLENTRY(LLIB_WAKEREQIN, "e30", NULL),
 	_OMAP5_BALLENTRY(DRM_EMU0, "b30", NULL),
