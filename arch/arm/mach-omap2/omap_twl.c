@@ -19,8 +19,8 @@
 #include <linux/i2c/twl.h>
 
 #include "voltage.h"
-
 #include "pm.h"
+#include "twl-common.h"
 
 #define OMAP3_SRI2C_SLAVE_ADDR		0x12
 #define OMAP3_VDD_MPU_SR_CONTROL_REG	0x00
@@ -170,7 +170,7 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
 	.uv_to_vsel		= twl4030_uv_to_vsel,
 };
 
-static struct omap_voltdm_pmic omap4_mpu_pmic = {
+static struct omap_voltdm_pmic twl6030_vcore1_pmic = {
 	.slew_rate		= 4000,
 	.step_size		= 12660,
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
@@ -187,7 +187,7 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
 	.uv_to_vsel		= twl6030_uv_to_vsel,
 };
 
-static struct omap_voltdm_pmic omap4_iva_pmic = {
+static struct omap_voltdm_pmic twl6030_vcore2_pmic = {
 	.slew_rate		= 4000,
 	.step_size		= 12660,
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
@@ -204,7 +204,7 @@ static struct omap_voltdm_pmic omap4_iva_pmic = {
 	.uv_to_vsel		= twl6030_uv_to_vsel,
 };
 
-static struct omap_voltdm_pmic omap4_core_pmic = {
+static struct omap_voltdm_pmic twl6030_vcore3_pmic = {
 	.slew_rate		= 4000,
 	.step_size		= 12660,
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
@@ -220,31 +220,9 @@ static struct omap_voltdm_pmic omap4_core_pmic = {
 	.uv_to_vsel		= twl6030_uv_to_vsel,
 };
 
-int __init omap4_twl_init(void)
+static int __init twl_set_sr(struct voltagedomain *voltdm)
 {
-	struct voltagedomain *voltdm;
-
-	if (!cpu_is_omap44xx())
-		return -ENODEV;
-
-	voltdm = voltdm_lookup("mpu");
-	omap_voltage_register_pmic(voltdm, &omap4_mpu_pmic);
-
-	voltdm = voltdm_lookup("iva");
-	omap_voltage_register_pmic(voltdm, &omap4_iva_pmic);
-
-	voltdm = voltdm_lookup("core");
-	omap_voltage_register_pmic(voltdm, &omap4_core_pmic);
-
-	return 0;
-}
-
-int __init omap3_twl_init(void)
-{
-	struct voltagedomain *voltdm;
-
-	if (!cpu_is_omap34xx())
-		return -ENODEV;
+	int r = 0;
 
 	/*
 	 * The smartreflex bit on twl4030 specifies if the setting of voltage
@@ -256,15 +234,50 @@ int __init omap3_twl_init(void)
 	 * voltage scaling will not function on TWL over I2C_SR.
 	 */
 	if (!twl_sr_enable_autoinit)
-		omap3_twl_set_sr_bit(true);
+		r = omap3_twl_set_sr_bit(true);
 
-	voltdm = voltdm_lookup("mpu_iva");
-	omap_voltage_register_pmic(voltdm, &omap3_mpu_pmic);
+	return r;
+}
 
-	voltdm = voltdm_lookup("core");
-	omap_voltage_register_pmic(voltdm, &omap3_core_pmic);
+static __initdata struct omap_pmic_map omap_twl_map[] = {
+	{
+		.name = "mpu_iva",
+		.cpu = PMIC_CPU_OMAP3,
+		.pmic_data = &omap3_mpu_pmic,
+		.special_action = twl_set_sr,
+	},
+	{
+		.name = "core",
+		.cpu = PMIC_CPU_OMAP3,
+		.pmic_data = &omap3_core_pmic,
+	},
+	{
+		.name = "mpu",
+		.cpu = PMIC_CPU_OMAP4430,
+		.pmic_data = &twl6030_vcore1_pmic,
+	},
+	{
+		.name = "core",
+		.cpu = PMIC_CPU_OMAP4430,
+		.pmic_data = &twl6030_vcore3_pmic,
+	},
+	{
+		.name = "core",
+		.cpu = PMIC_CPU_OMAP4460,
+		.pmic_data = &twl6030_vcore1_pmic,
+	},
+	{
+		.name = "iva",
+		.cpu = PMIC_CPU_OMAP44XX,
+		.pmic_data = &twl6030_vcore2_pmic,
+	},
+	/* Terminator */
+	{ .name = NULL, .pmic_data = NULL},
+};
 
-	return 0;
+int __init omap_twl_init(void)
+{
+	return omap_pmic_register_data(omap_twl_map);
 }
 
 /**

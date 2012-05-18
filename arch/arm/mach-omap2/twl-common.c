@@ -80,10 +80,9 @@ void __init omap4_pmic_init(const char *pmic_type,
 void __init omap_pmic_late_init(void)
 {
 	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
-	if (pmic_i2c_board_info.irq)
-		omap3_twl_init();
-	if (omap4_i2c1_board_info[0].irq)
-		omap4_twl_init();
+	if (!pmic_i2c_board_info.irq || !omap4_i2c1_board_info[0].irq)
+		return;
+	omap_twl_init();
 }
 
 #if defined(CONFIG_ARCH_OMAP3)
@@ -390,3 +389,55 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 		pmic_data->v2v1 = &omap4_v2v1_idata;
 }
 #endif /* CONFIG_ARCH_OMAP4 */
+
+/**
+ * omap_pmic_register_data() - Register the PMIC information to OMAP mapping
+ * @map:    array ending with a empty element representing the maps
+ */
+int __init omap_pmic_register_data(struct omap_pmic_map *map)
+{
+	struct voltagedomain *voltdm;
+	int r;
+
+	if (!map)
+		return 0;
+
+	while (map->name) {
+		if (cpu_is_omap34xx() && !(map->cpu & PMIC_CPU_OMAP3))
+			goto next;
+
+		if (cpu_is_omap443x() && !(map->cpu & PMIC_CPU_OMAP4430))
+			goto next;
+
+		if (cpu_is_omap446x() && !(map->cpu & PMIC_CPU_OMAP4460))
+			goto next;
+
+		voltdm = voltdm_lookup(map->name);
+		if (IS_ERR_OR_NULL(voltdm)) {
+			pr_err("%s: unable to find map %s\n", __func__,
+			       map->name);
+			goto next;
+		}
+		if (IS_ERR_OR_NULL(map->pmic_data)) {
+			pr_warning("%s: domain[%s] has no pmic data\n",
+				   __func__, map->name);
+			goto next;
+		}
+
+		r = omap_voltage_register_pmic(voltdm, map->pmic_data);
+		if (r) {
+			pr_warning("%s: domain[%s] register returned %d\n",
+				   __func__, map->name, r);
+			goto next;
+		}
+		if (map->special_action) {
+			r = map->special_action(voltdm);
+			WARN(r, "%s: domain[%s] action returned %d\n", __func__,
+			     map->name, r);
+		}
+next:
+		map++;
+	}
+
+	return 0;
+}
