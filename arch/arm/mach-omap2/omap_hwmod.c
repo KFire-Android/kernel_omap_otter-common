@@ -2566,7 +2566,9 @@ struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
 	if (!oh)
 		return NULL;
 
-	if (oh->_clk) {
+	if (oh->clkdm) {
+		return oh->clkdm->pwrdm.ptr;
+	} else if (oh->_clk) {
 		c = oh->_clk;
 	} else {
 		if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
