@@ -39,9 +39,6 @@
 
 #include "omap-abe-priv.h"
 
-void abe_init_debugfs(struct omap_abe *abe);
-void abe_cleanup_debugfs(struct omap_abe *abe);
-
 static u64 omap_abe_dmamask = DMA_BIT_MASK(32);
 
 static const char *abe_memory_bank[5] = {

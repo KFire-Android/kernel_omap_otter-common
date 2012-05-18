@@ -386,4 +386,8 @@ int abe_opp_init_initial_opp(struct omap_abe *abe);
 int abe_opp_set_level(struct omap_abe *abe, int opp);
 int abe_opp_stream_event(struct snd_soc_dapm_context *dapm, int event);
 
+/* omap-abe-dbg.c */
+void abe_init_debugfs(struct omap_abe *abe);
+void abe_cleanup_debugfs(struct omap_abe *abe);
+
 #endif	/* End of __OMAP_MCPDM_H__ */
