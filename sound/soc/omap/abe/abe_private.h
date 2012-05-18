@@ -60,4 +60,14 @@ extern struct omap_aess_task aess_dl1_mono_mixer[];
 extern struct omap_aess_task aess_dl2_mono_mixer[];
 extern struct omap_aess_task aess_audul_mono_mixer[];
 
+/* abe_asrc.c */
+void omap_aess_write_fifo(struct omap_aess *abe, u32 memory_bank,
+		u32 descr_addr, u32 *data, u32 nb_data32);
+int omap_aess_write_asrc(struct omap_aess *abe, u32 port, s32 dppm);
+void omap_aess_init_asrc_vx_dl(struct omap_aess *abe, s32 dppm);
+void omap_aess_init_asrc_vx_ul(struct omap_aess *abe, s32 dppm);
+void omap_aess_init_asrc_mm_ext_in(struct omap_aess *abe, s32 dppm);
+void omap_aess_init_asrc_bt_ul(struct omap_aess *abe, s32 dppm);
+void omap_aess_init_asrc_bt_dl(struct omap_aess *abe, s32 dppm);
+
 #endif /* __SND_SOC_OMAP_ABE_HAL_ABE_PRIVATE_H__ */

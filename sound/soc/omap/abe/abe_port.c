@@ -111,9 +111,6 @@ void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot);
 extern const u32 abe_atc_srcid[];
 extern const u32 abe_atc_dstid[];
 
-extern void omap_aess_init_asrc_vx_dl(struct omap_aess *abe, s32 dppm);
-extern void omap_aess_init_asrc_vx_ul(struct omap_aess *abe, s32 dppm);
-
 extern int omap_aess_init_ping_pong_buffer(struct omap_aess *abe,
 				   u32 id, u32 size_bytes, u32 n_buffers,
 				   u32 *p);
