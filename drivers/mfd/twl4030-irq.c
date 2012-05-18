@@ -692,7 +692,7 @@ int twl4030_init_irq(struct device *dev, int irq_num)
 {
 	static struct irq_chip	twl4030_irq_chip;
 	int			status, i;
-	int			irq_base, irq_end, nr_irqs;
+	int			irq_base, irq_end, num_irqs;
 	struct			device_node *node = dev->of_node;
 
 	/*
@@ -700,15 +700,15 @@ int twl4030_init_irq(struct device *dev, int irq_num)
 	 * the hwirqs numbers are defined contiguously from 1 to 15.
 	 * Create only one domain for both.
 	 */
-	nr_irqs = TWL4030_PWR_NR_IRQS + TWL4030_CORE_NR_IRQS;
+	num_irqs = TWL4030_PWR_NR_IRQS + TWL4030_CORE_NR_IRQS;
 
-	irq_base = irq_alloc_descs(-1, 0, nr_irqs, 0);
+	irq_base = irq_alloc_descs(-1, 0, num_irqs, 0);
 	if (IS_ERR_VALUE(irq_base)) {
 		dev_err(dev, "Fail to allocate IRQ descs\n");
 		return irq_base;
 	}
 
-	irq_domain_add_legacy(node, nr_irqs, irq_base, 0,
+	irq_domain_add_legacy(node, num_irqs, irq_base, 0,
 			      &irq_domain_simple_ops, NULL);
 
 	irq_end = irq_base + TWL4030_CORE_NR_IRQS;
