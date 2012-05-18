@@ -24,6 +24,8 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <misc/jedec_ddr.h>
+#include <linux/notifier.h>
+#include <mach/common.h>
 #include "emif.h"
 
 /**
@@ -283,6 +285,7 @@ static void do_freq_update(void)
 	 * is available for this as part of the new
 	 * clock framework
 	 */
+	omap4_prcm_freq_update();
 
 	list_for_each_entry(emif, &device_list, node) {
 		if (emif->lpmode == EMIF_LP_MODE_SELF_REFRESH)
@@ -1521,8 +1524,7 @@ static void do_volt_notify_handling(struct emif_data *emif, u32 volt_state)
 		volt_state);
 
 	if (!emif->curr_regs) {
-		dev_err(emif->dev,
-			"%s: volt-notify before registers are ready: %d\n",
+		dev_dbg(emif->dev, "%s: notify before registers are ready:%d\n",
 			__func__, volt_state);
 		return;
 	}
@@ -1536,17 +1538,30 @@ static void do_volt_notify_handling(struct emif_data *emif, u32 volt_state)
  * is available in mainline kernel. This function is un-used
  * right now.
  */
-static void __attribute__((unused)) volt_notify_handling(u32 volt_state)
+static int volt_notify_handling(struct notifier_block *nb,
+				unsigned long volt_state, void *data)
 {
 	struct emif_data *emif;
+	u32 val;
+
+	/* If there are no devices, nothing for us to do */
+	if (list_empty(&device_list))
+		return 0;
+
+	if (volt_state == OMAP_VOLTAGE_PRECHANGE)
+		val =  DDR_VOLTAGE_RAMPING;
+	else
+		val =  DDR_VOLTAGE_STABLE;
 
 	spin_lock_irqsave(&emif_lock, irq_state);
 
 	list_for_each_entry(emif, &device_list, node)
-		do_volt_notify_handling(emif, volt_state);
+		do_volt_notify_handling(emif, val);
 	do_freq_update();
 
 	spin_unlock_irqrestore(&emif_lock, irq_state);
+
+	return 0;
 }
 
 static void do_freq_pre_notify_handling(struct emif_data *emif, u32 new_freq)
@@ -1585,7 +1600,7 @@ static void do_freq_pre_notify_handling(struct emif_data *emif, u32 new_freq)
  * available in mainline kernel. This function is un-used
  * right now.
  */
-static void __attribute__((unused)) freq_pre_notify_handling(u32 new_freq)
+static void freq_pre_notify_handling(u32 new_freq)
 {
 	struct emif_data *emif;
 
@@ -1630,7 +1645,7 @@ static void do_freq_post_notify_handling(struct emif_data *emif)
  * available in mainline kernel. This function is un-used
  * right now.
  */
-static void __attribute__((unused)) freq_post_notify_handling(void)
+static void freq_post_notify_handling(void)
 {
 	struct emif_data *emif;
 
@@ -1644,6 +1659,37 @@ static void __attribute__((unused)) freq_post_notify_handling(void)
 	spin_unlock_irqrestore(&emif_lock, irq_state);
 }
 
+static int core_dpll_notify_handling(struct notifier_block *nb,
+				     unsigned long dpll_state, void *data)
+{
+
+	struct omap_dpll_notifier *notify = (struct omap_dpll_notifier *)data;
+
+	/* If there are no devices, nothing for us to do */
+	if (list_empty(&device_list))
+		return 0;
+
+	switch (dpll_state) {
+	case OMAP_CORE_DPLL_PRECHANGE:
+		freq_pre_notify_handling(notify->rate);
+		break;
+	case OMAP_CORE_DPLL_POSTCHANGE:
+		freq_post_notify_handling();
+		break;
+	default:
+		WARN(1, "INVALID state usage - %ld\n", dpll_state);
+	}
+	return 0;
+}
+
+static struct notifier_block emif_dpll_notifier_block = {
+	.notifier_call = core_dpll_notify_handling,
+};
+
+static struct notifier_block emif_volt_notifier_block = {
+	.notifier_call = volt_notify_handling,
+};
+
 static struct platform_driver emif_driver = {
 	.remove		= __exit_p(emif_remove),
 	.shutdown	= emif_shutdown,
@@ -1654,15 +1700,31 @@ static struct platform_driver emif_driver = {
 
 static int __init_or_module emif_register(void)
 {
+	struct voltagedomain *voltdm = voltdm_lookup("core");
+
+	if (!voltdm) {
+		pr_err("%s: CORE voltage domain lookup failed\n", __func__);
+		return -EINVAL;
+	}
+
+	voltdm_register_notifier(voltdm, &emif_volt_notifier_block);
+	omap4_core_dpll_register_notifier(&emif_dpll_notifier_block);
+
 	return platform_driver_probe(&emif_driver, emif_probe);
 }
 
 static void __exit emif_unregister(void)
 {
+	struct voltagedomain *voltdm = voltdm_lookup("core");
+
+	if (!voltdm)
+		pr_err("%s: CORE voltage domain lookup failed\n", __func__);
+	else
+		voltdm_unregister_notifier(voltdm, &emif_volt_notifier_block);
+	omap4_core_dpll_unregister_notifier(&emif_dpll_notifier_block);
 	platform_driver_unregister(&emif_driver);
 }
 
-postcore_initcall(emif_register);
 module_init(emif_register);
 module_exit(emif_unregister);
 MODULE_DESCRIPTION("TI EMIF SDRAM Controller Driver");
