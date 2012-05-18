@@ -28,6 +28,8 @@
 
 #include "abe_mem.h"
 
+struct omap_aess_dbg;
+
 /* abe_addr.c */
 extern struct omap_aess_init_task aess_init_table;
 
@@ -77,5 +79,8 @@ int omap_aess_init_ping_pong_buffer(struct omap_aess *abe,
 /* abe_dat.c */
 extern const u32 abe_atc_srcid[];
 extern const u32 abe_atc_dstid[];
+
+/* abe_dbg.c */
+int omap_aess_set_debug_trace(struct omap_aess_dbg *dbg, int debug);
 
 #endif /* __SND_SOC_OMAP_ABE_HAL_ABE_PRIVATE_H__ */
