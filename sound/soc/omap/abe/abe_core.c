@@ -70,6 +70,7 @@
 #include "abe_typedef.h"
 #include "abe_dbg.h"
 #include "abe_seq.h"
+#include "abe_private.h"
 
 #define OMAP_ABE_IRQ_FIFO_MASK ((OMAP_ABE_D_MCUIRQFIFO_SIZE >> 2) - 1)
 
@@ -130,7 +131,7 @@ EXPORT_SYMBOL(omap_aess_wakeup);
  *
  * checks the internal status of ABE and HAL
  */
-void omap_aess_monitoring(struct omap_aess *abe)
+static void omap_aess_monitoring(struct omap_aess *abe)
 {
 
 }
@@ -146,7 +147,7 @@ void omap_aess_monitoring(struct omap_aess *abe)
  * Ping-Pong Interrupts : IRQ_FIFO[31:28] = IRQtag_PP,
  *	IRQ_FIFO[27:16] = PP_MCU_IRQ, IRQ_FIFO[15:0] = loopCounter
  */
-void omap_aess_irq_ping_pong(struct omap_aess *abe)
+static void omap_aess_irq_ping_pong(struct omap_aess *abe)
 {
 	/* first IRQ doesn't represent a buffer transference completion */
 	if (abe->pp_first_irq)

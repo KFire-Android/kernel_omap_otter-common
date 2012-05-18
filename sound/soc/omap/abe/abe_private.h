@@ -70,4 +70,8 @@ void omap_aess_init_asrc_mm_ext_in(struct omap_aess *abe, s32 dppm);
 void omap_aess_init_asrc_bt_ul(struct omap_aess *abe, s32 dppm);
 void omap_aess_init_asrc_bt_dl(struct omap_aess *abe, s32 dppm);
 
+/* abe_core.c */
+int omap_aess_init_ping_pong_buffer(struct omap_aess *abe,
+		u32 id, u32 size_bytes, u32 n_buffers, u32 *p);
+
 #endif /* __SND_SOC_OMAP_ABE_HAL_ABE_PRIVATE_H__ */
