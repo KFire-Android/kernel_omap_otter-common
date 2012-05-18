@@ -304,11 +304,11 @@ static irqreturn_t handle_twl4030_pih(int irq, void *devid)
 
 	while (pih_isr) {
 		unsigned long	pending = __ffs(pih_isr);
-		unsigned int	irq;
+		unsigned int	pih_irq;
 
 		pih_isr &= ~BIT(pending);
-		irq = pending + twl4030_irq_base;
-		handle_nested_irq(irq);
+		pih_irq = pending + twl4030_irq_base;
+		handle_nested_irq(pih_irq);
 	}
 
 	return IRQ_HANDLED;
