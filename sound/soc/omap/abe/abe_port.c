@@ -108,7 +108,8 @@ void omap_aess_init_io_tasks(struct omap_aess *abe, u32 id, struct omap_aess_dat
 		       struct omap_aess_port_protocol *prot);
 void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot);
 
-void omap_aess_update_scheduling_table(struct omap_aess *abe, struct omap_aess_init_task *init_task, int enable)
+static void omap_aess_update_scheduling_table(struct omap_aess *abe,
+		struct omap_aess_init_task *init_task, int enable)
 {
 	int i;
 	struct omap_aess_task *task;
@@ -122,7 +123,8 @@ void omap_aess_update_scheduling_table(struct omap_aess *abe, struct omap_aess_i
 	}
 }
 
-void omap_aess_update_scheduling_table1(struct omap_aess *abe, struct omap_aess_init_task1 *init_task, int enable)
+static void omap_aess_update_scheduling_table1(struct omap_aess *abe,
+		struct omap_aess_init_task1 *init_task, int enable)
 {
 	int i;
 	struct omap_aess_task *task;
@@ -136,7 +138,8 @@ void omap_aess_update_scheduling_table1(struct omap_aess *abe, struct omap_aess_
 	}
 }
 
-u32 omap_aess_update_io_task(struct omap_aess *abe, struct omap_aess_io_task *io_task, int enable)
+static u32 omap_aess_update_io_task(struct omap_aess *abe,
+		struct omap_aess_io_task *io_task, int enable)
 {
 	int i;
 	struct omap_aess_task *task;
@@ -183,7 +186,7 @@ void omap_aess_build_scheduler_table(struct omap_aess *abe)
  *
  * clear temporary buffers
  */
-void omap_aess_clean_temporary_buffers(struct omap_aess *abe, u32 id)
+static void omap_aess_clean_temporary_buffers(struct omap_aess *abe, u32 id)
 {
 	switch (id) {
 	case OMAP_ABE_DMIC_PORT:
@@ -357,7 +360,7 @@ void omap_aess_clean_temporary_buffers(struct omap_aess *abe, u32 id)
  * Operations:
  * Return value:
  */
-void omap_aess_disable_enable_dma_request(struct omap_aess *abe, u32 id,
+static void omap_aess_disable_enable_dma_request(struct omap_aess *abe, u32 id,
 					 u32 on_off)
 {
 	u8 desc_third_word[4], irq_dmareq_field;
@@ -405,7 +408,7 @@ void omap_aess_disable_enable_dma_request(struct omap_aess *abe, u32 id,
  * Return value:
  *
  */
-void omap_aess_enable_dma_request(struct omap_aess *abe, u32 id)
+static void omap_aess_enable_dma_request(struct omap_aess *abe, u32 id)
 {
 	omap_aess_disable_enable_dma_request(abe, id, 1);
 }
@@ -418,7 +421,7 @@ void omap_aess_enable_dma_request(struct omap_aess *abe, u32 id)
  * Return value:
  *
  */
-void omap_aess_disable_dma_request(struct omap_aess *abe, u32 id)
+static void omap_aess_disable_dma_request(struct omap_aess *abe, u32 id)
 {
 	omap_aess_disable_enable_dma_request(abe, id, 0);
 }
@@ -429,7 +432,7 @@ void omap_aess_disable_dma_request(struct omap_aess *abe, u32 id)
  *
  * load the DMEM ATC/AESS descriptors
  */
-void omap_aess_init_atc(struct omap_aess *abe, u32 id)
+static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
 {
 	u8 iter;
 	s32 datasize;
@@ -884,6 +887,10 @@ void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot)
 	abe_port[id].dma = dma;
 }
 
+/* Code disabled since it is unused.  Code is retained for
+ * synchronization with upstream
+ */
+#if 0
 /**
  * abe_enable_atc
  * Parameter:
@@ -903,6 +910,12 @@ void omap_aess_enable_atc(struct omap_aess *abe, u32 id)
 		       (u32 *) &atc_desc, sizeof(atc_desc));
 
 }
+#endif /* 0 */
+
+/* Code disabled since it is unused.  Code is retained for
+ * synchronization with upstream
+ */
+#if 0
 /**
  * abe_disable_atc
  * Parameter:
@@ -922,6 +935,8 @@ void omap_aess_disable_atc(struct omap_aess *abe, u32 id)
 		       (u32 *) &atc_desc, sizeof(atc_desc));
 
 }
+#endif /* 0 */
+
 /**
  * abe_init_io_tasks
  * @prot : protocol being used
@@ -1339,7 +1354,7 @@ int omap_aess_select_main_port(struct omap_aess *abe, u32 id)
  *
  * takes the first port in a list which is slave on the data interface
  */
-u32 abe_valid_port_for_synchro(u32 id)
+static u32 abe_valid_port_for_synchro(u32 id)
 {
 	if ((abe_port[id].protocol.protocol_switch == DMAREQ_PORT_PROT) ||
 	    (abe_port[id].protocol.protocol_switch == PINGPONG_PORT_PROT) ||
@@ -1375,7 +1390,8 @@ void omap_aess_decide_main_port(struct omap_aess *abe)
  * and the multiplier factor to apply during data move with DMEM
  *
  */
-void abe_format_switch(struct omap_aess_data_format *f, u32 *iter, u32 *mulfac)
+static void abe_format_switch(struct omap_aess_data_format *f, u32 *iter,
+		u32 *mulfac)
 {
 	u32 n_freq;
 	switch (f->f) {

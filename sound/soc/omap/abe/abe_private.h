@@ -83,4 +83,7 @@ extern const u32 abe_atc_dstid[];
 /* abe_dbg.c */
 int omap_aess_set_debug_trace(struct omap_aess_dbg *dbg, int debug);
 
+/* abe_port.c */
+int omap_aess_read_remaining_data(struct omap_aess *abe, u32 port, u32 *n);
+
 #endif /* __SND_SOC_OMAP_ABE_HAL_ABE_PRIVATE_H__ */
