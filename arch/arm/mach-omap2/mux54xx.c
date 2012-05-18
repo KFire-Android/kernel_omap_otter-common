@@ -575,7 +575,7 @@ static struct omap_mux __initdata omap5_core_muxmodes[] = {
  */
 #if defined(CONFIG_OMAP_MUX) && defined(CONFIG_DEBUG_FS)		\
 		&& defined(CONFIG_OMAP_PACKAGE_CBL)
-struct omap_ball __initdata omap5_core_cbl_ball[] = {
+static struct omap_ball __initdata omap5_core_cbl_ball[] = {
 	_OMAP5_BALLENTRY(EMMC_CLK, "al2", NULL),
 	_OMAP5_BALLENTRY(EMMC_CMD, "ak4", NULL),
 	_OMAP5_BALLENTRY(EMMC_DATA0, "ak3", NULL),
