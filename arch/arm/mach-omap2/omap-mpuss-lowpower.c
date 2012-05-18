@@ -102,7 +102,7 @@ static int default_finish_suspend(unsigned long cpu_state)
 static void dummy_cpu_resume(void)
 {}
 
-void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
+static void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
 {}
 
 struct cpu_pm_ops omap_pm_ops = {
