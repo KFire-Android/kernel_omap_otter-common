@@ -258,7 +258,7 @@ EXPORT_SYMBOL(omap_aess_reload_fw);
  *
  * Get default ABE firmware
  */
-u32 *omap_aess_get_default_fw()
+u32 *omap_aess_get_default_fw(void)
 {
 	return (u32 *)aess_firmware_array;
 }
