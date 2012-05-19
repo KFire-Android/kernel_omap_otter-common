@@ -415,6 +415,7 @@ enum rproc_err {
  * @notifyids: idr for dynamically assigning rproc-wide unique notify ids
  * @error_handler: workqueue for reseting virtio devices
  * @crash_cnt: counter for fatal errors
+ * @recovery_disabled: flag that state if recovery was disabled
  */
 struct rproc {
 	struct klist_node node;
@@ -439,6 +440,7 @@ struct rproc {
 	struct idr notifyids;
 	struct work_struct error_handler;
 	unsigned crash_cnt;
+	bool recovery_disabled;
 };
 
 /* we currently support only two vrings per rvdev */

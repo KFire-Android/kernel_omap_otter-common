@@ -1428,11 +1428,13 @@ static void rproc_error_handler_work(struct work_struct *work)
 	dev_dbg(dev, "enter %s\n", __func__);
 
 	/*
-	 * reset all virtio devices, so that all rpmsg drivers can be
-	 * restarted in order to make them functional again
+	 * if recovery enabled reset all virtio devices, so that all rpmsg
+	 * drivers can be restarted in order to make them functional again
 	 */
-	dev_err(dev, "trying to recover %s\n", rproc->name);
-	_reset_all_vdev(rproc);
+	if (!rproc->recovery_disabled) {
+		dev_err(dev, "trying to recover %s\n", rproc->name);
+		_reset_all_vdev(rproc);
+	}
 }
 
 /**

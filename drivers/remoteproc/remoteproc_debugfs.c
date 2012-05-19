@@ -29,6 +29,7 @@
 #include <linux/remoteproc.h>
 #include <linux/device.h>
 #include "remoteproc_internal.h"
+#include <linux/uaccess.h>
 
 /* remoteproc debugfs parent dir */
 static struct dentry *rproc_dbg;
@@ -112,6 +113,48 @@ static const struct file_operations rproc_name_ops = {
 	.llseek	= generic_file_llseek,
 };
 
+/* expose recovery flag via debugfs */
+static ssize_t rproc_recovery_read(struct file *filp, char __user *userbuf,
+						size_t count, loff_t *ppos)
+{
+	struct rproc *rproc = filp->private_data;
+	char *buf = rproc->recovery_disabled ? "disabled\n" : "enabled\n";
+
+	return simple_read_from_buffer(userbuf, count, ppos, buf, strlen(buf));
+}
+static ssize_t rproc_recovery_write(struct file *filp,
+		const char __user *user_buf, size_t count, loff_t *ppos)
+{
+	struct rproc *rproc = filp->private_data;
+	char buf[10];
+	int ret;
+
+	if (count > sizeof buf)
+		goto out;
+
+	ret = copy_from_user(buf, user_buf, count);
+	if (ret)
+		return ret;
+
+	/* remove end of line */
+	if (buf[count - 1] == '\n')
+		buf[count - 1] = '\0';
+
+	if (!strncmp(buf, "enabled", count))
+		rproc->recovery_disabled = false;
+	else if (!strncmp(buf, "disabled", count))
+		rproc->recovery_disabled = true;
+
+out:
+	return count;
+}
+static const struct file_operations rproc_recovery_ops = {
+	.read = rproc_recovery_read,
+	.write = rproc_recovery_write,
+	.open = simple_open,
+	.llseek	= generic_file_llseek,
+};
+
 void rproc_remove_trace_file(struct dentry *tfile)
 {
 	debugfs_remove(tfile);
@@ -155,6 +198,8 @@ void rproc_create_debug_dir(struct rproc *rproc)
 					rproc, &rproc_name_ops);
 	debugfs_create_file("state", 0400, rproc->dbg_dir,
 					rproc, &rproc_state_ops);
+	debugfs_create_file("recovery", 0400, rproc->dbg_dir,
+					rproc, &rproc_recovery_ops);
 }
 
 void __init rproc_init_debugfs(void)
