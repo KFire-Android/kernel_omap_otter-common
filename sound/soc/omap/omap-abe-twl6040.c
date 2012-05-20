@@ -986,6 +986,22 @@ static struct snd_soc_dai_link omap_abe_dai[] = {
 		.be_hw_params_fixup = dmic_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_DMIC2,
 	},
+	{
+		.name = OMAP_ABE_BE_VXREC,
+		.stream_name = "VXREC Capture",
+
+		/* ABE components - VxREC */
+		.cpu_dai_name = "omap-abe-vxrec-dai",
+		.platform_name = "aess",
+
+		/* no codec needed */
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_id = OMAP_ABE_DAI_VXREC,
+		.ignore_suspend = 1,
+	},
 };
 
 static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
