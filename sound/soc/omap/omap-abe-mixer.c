@@ -687,10 +687,10 @@ static const struct snd_kcontrol_new abe_controls[] = {
 		OMAP_AESS_MIXVXREC_TONES, 0, 149, 0,
 		volume_get_mixer, volume_put_mixer, vxrec_tones_tlv),
 	SOC_SINGLE_EXT_TLV("VXREC Voice DL Volume",
-		OMAP_AESS_MIXVXREC_VX_UL, 0, 149, 0,
+		OMAP_AESS_MIXVXREC_VX_DL, 0, 149, 0,
 		volume_get_mixer, volume_put_mixer, vxrec_vx_dl_tlv),
 	SOC_SINGLE_EXT_TLV("VXREC Voice UL Volume",
-		OMAP_AESS_MIXVXREC_VX_DL, 0, 149, 0,
+		OMAP_AESS_MIXVXREC_VX_UL, 0, 149, 0,
 		volume_get_mixer, volume_put_mixer, vxrec_vx_ul_tlv),
 
 	/* AUDUL mixer gains */
