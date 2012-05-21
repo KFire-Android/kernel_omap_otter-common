@@ -1233,6 +1233,7 @@ static void __init omap_4430sdp_map_io(void)
 }
 static void __init omap_4430sdp_reserve(void)
 {
+	omap_init_ram_size();
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 

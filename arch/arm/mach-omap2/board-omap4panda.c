@@ -816,6 +816,7 @@ static void __init omap4_panda_map_io(void)
 
 static void __init omap4_panda_reserve(void)
 {
+	omap_init_ram_size();
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 
