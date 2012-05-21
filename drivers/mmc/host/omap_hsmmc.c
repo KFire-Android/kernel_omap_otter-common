@@ -1270,12 +1270,20 @@ static irqreturn_t omap_hsmmc_detect(int irq, void *dev_id)
 	if (carddetect) {
 		mmc_detect_change(host->mmc, (HZ * 200) / 1000);
 	} else {
+	/*
+	 * Because of OMAP4 Silicon errata (i705), we have to turn off the
+	 * PBIAS and VMMC for SD card as soon as we get card disconnect
+	 * interrupt. Because of this, we don't wait for all higher layer
+	 * structures to be dismantled before turning off power
+	 */
+		mmc_claim_host(host->mmc);
 		if ((MMC_POWER_OFF != host->power_mode) &&
 				(mmc_slot(host).set_power != NULL)) {
 			mmc_slot(host).set_power(host->dev, host->slot_id,
 						0, 0);
 			host->power_mode = MMC_POWER_OFF;
 		}
+		mmc_release_host(host->mmc);
 		mmc_detect_change(host->mmc, 0);
 	}
 	return IRQ_HANDLED;
@@ -1654,6 +1662,26 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
 	} else if (host->reqs_blocked)
 		host->reqs_blocked = 0;
 	WARN_ON(host->mrq != NULL);
+
+	/*
+	 * Because of OMAP4 Silicon errata (i705), we have to turn off the
+	 * PBIAS and VMMC for SD card as soon as we get card disconnect
+	 * interrupt. Because of this, we don't wait for all higher layer
+	 * structures to be dismantled before turning off power. Because
+	 * of this, we might end up here even after SD card is removed
+	 * and VMMC and PBIAS are turned off. In that case, just fail
+	 * the commands immediately
+	 */
+	if (host->power_mode == MMC_POWER_OFF) {
+		req->cmd->error = EIO;
+		if (req->data)
+			req->data->error = -EIO;
+		dev_warn(mmc_dev(host->mmc),
+			"Card is no longer present\n");
+		mmc_request_done(mmc, req);
+		return;
+	}
+
 	host->mrq = req;
 	err = omap_hsmmc_prepare_data(host, req);
 	if (err) {
