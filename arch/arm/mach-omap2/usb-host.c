@@ -56,7 +56,7 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
 /*
  * setup_ehci_io_mux - initialize IO pad mux for USBHOST
  */
-static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+static void __init setup_34xx_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 {
 	switch (port_mode[0]) {
 	case OMAP_EHCI_PORT_MODE_PHY:
@@ -200,7 +200,7 @@ static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 }
 
 static
-void __init setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 {
 	switch (port_mode[0]) {
 	case OMAP_EHCI_PORT_MODE_PHY:
@@ -254,6 +254,12 @@ void __init setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 			OMAP_PIN_INPUT_PULLDOWN);
 		omap_mux_init_signal("usbb1_ulpitll_dat7",
 			OMAP_PIN_INPUT_PULLDOWN);
+			break;
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		omap_mux_init_signal("usbb1_hsic_data",
+			OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("usbb1_hsic_strobe",
+			OMAP_PIN_OUTPUT);
 			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	default:
@@ -312,13 +318,30 @@ void __init setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 		omap_mux_init_signal("usbb2_ulpitll_dat7",
 			OMAP_PIN_INPUT_PULLDOWN);
 			break;
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		omap_mux_init_signal("usbb2_hsic_data",
+			OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("usbb2_hsic_strobe",
+			OMAP_PIN_OUTPUT);
+			break;
+	case OMAP_USBHS_PORT_MODE_UNUSED:
+	default:
+			break;
+	}
+	switch (port_mode[2]) {
+	case OMAP_EHCI_PORT_MODE_HSIC:
+		omap_mux_init_signal("usbb3_hsic_data",
+			OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("usbb3_hsic_strobe",
+			OMAP_PIN_OUTPUT);
+			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	default:
 			break;
 	}
 }
 
-static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+static void __init setup_34xx_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 {
 	switch (port_mode[0]) {
 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
@@ -416,7 +439,7 @@ static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 }
 
 static
-void __init setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 {
 	switch (port_mode[0]) {
 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
@@ -508,11 +531,11 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 	usbhs_data.ohci_data = &ohci_data;
 
 	if (cpu_is_omap34xx()) {
+		setup_34xx_ehci_io_mux(pdata->port_mode);
+		setup_34xx_ohci_io_mux(pdata->port_mode);
+	} else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		setup_ehci_io_mux(pdata->port_mode);
 		setup_ohci_io_mux(pdata->port_mode);
-	} else if (cpu_is_omap44xx()) {
-		setup_4430ehci_io_mux(pdata->port_mode);
-		setup_4430ohci_io_mux(pdata->port_mode);
 	}
 
 	uhh_hwm = omap_hwmod_lookup(USBHS_UHH_HWMODNAME);
