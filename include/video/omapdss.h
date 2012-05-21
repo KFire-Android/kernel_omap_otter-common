@@ -613,6 +613,8 @@ struct omap_dss_device {
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_data dsi_vm_data;
 		struct s3d_disp_info s3d_info;
+		u32 width_in_um;
+		u32 height_in_um;
 	} panel;
 
 	struct {
