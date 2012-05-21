@@ -35,7 +35,7 @@
 #include "common-board-devices.h"
 #include "mux.h"
 
-static const int evm5430_keymap[] = {
+static const uint32_t evm5430_keymap[] = {
 	KEY(0, 0, KEY_RESERVED),
 	KEY(0, 1, KEY_RESERVED),
 	KEY(0, 2, KEY_RESERVED),
