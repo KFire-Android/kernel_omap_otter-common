@@ -558,6 +558,17 @@ config KEYBOARD_TWL4030
 	  To compile this driver as a module, choose M here: the
 	  module will be called twl4030_keypad.
 
+config KEYBOARD_SMSC
+	tristate "SMSC ECE1099 keypad support"
+	depends on I2C
+	help
+	  Say Y here if your board use the smsc keypad controller.
+	  It's safe to say enable this even on boards that don't
+	  use the keypad controller.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called smsc-ece1099-keypad.
+
 config KEYBOARD_XTKBD
 	tristate "XT keyboard"
 	select SERIO
