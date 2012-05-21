@@ -55,10 +55,13 @@
 
 #define	OMAP_TLL_CHANNEL_CONF(num)			(0x040 + 0x004 * num)
 #define OMAP_TLL_CHANNEL_CONF_FSLSMODE_SHIFT		24
+#define OMAP_TLL_CHANNEL_CONF_DRVVBUS			(1 << 16)
+#define OMAP_TLL_CHANNEL_CONF_CHRGVBUS			(1 << 15)
 #define	OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF		(1 << 11)
 #define	OMAP_TLL_CHANNEL_CONF_ULPI_ULPIAUTOIDLE		(1 << 10)
 #define	OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE		(1 << 9)
 #define	OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE		(1 << 8)
+#define OMAP_TLL_CHANNEL_CONF_CHANMODE_TRANSPARENT_UTMI	(2 << 1)
 #define OMAP_TLL_CHANNEL_CONF_CHANMODE_FSLS		(1 << 1)
 #define	OMAP_TLL_CHANNEL_CONF_CHANEN			(1 << 0)
 
@@ -288,7 +291,10 @@ static int __devinit usbtll_omap_probe(struct platform_device *pdev)
 		is_ehci_tll_mode(pdata->port_mode[2]) ||
 		(is_ohci_port(pdata->port_mode[0])) ||
 		(is_ohci_port(pdata->port_mode[1])) ||
-		(is_ohci_port(pdata->port_mode[2]))) {
+		(is_ohci_port(pdata->port_mode[2])) ||
+		(is_ehci_hsic_mode(pdata->port_mode[0]) ||
+		is_ehci_hsic_mode(pdata->port_mode[1]) ||
+		is_ehci_hsic_mode(pdata->port_mode[2]))) {
 
 		/* Program Common TLL register */
 		reg = usbtll_read(base, OMAP_TLL_SHARED_CONF);
@@ -318,6 +324,15 @@ static int __devinit usbtll_omap_probe(struct platform_device *pdev)
 					| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
 					| OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE);
 			} else
+			if (pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_HSIC) {
+				/*
+				 * HSIC Mode requires UTMI port configurations
+				 */
+				reg |= OMAP_TLL_CHANNEL_CONF_CHANMODE_TRANSPARENT_UTMI
+					| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
+					| OMAP_TLL_CHANNEL_CONF_DRVVBUS
+					| OMAP_TLL_CHANNEL_CONF_CHRGVBUS;
+			} else
 				continue;
 
 			reg |= OMAP_TLL_CHANNEL_CONF_CHANEN;
@@ -331,6 +346,7 @@ static int __devinit usbtll_omap_probe(struct platform_device *pdev)
 err_ioremap:
 	spin_unlock_irqrestore(&tll->lock, flags);
 	iounmap(base);
+
 	pm_runtime_put_sync(dev);
 	tll_pdev = pdev;
 	if (!ret)
@@ -384,13 +400,16 @@ static int usbtll_runtime_resume(struct device *dev)
 
 	spin_lock_irqsave(&tll->lock, flags);
 
-	if (is_ehci_tll_mode(pdata->port_mode[0]))
+	if (is_ehci_tll_mode(pdata->port_mode[0]) ||
+			is_ehci_hsic_mode(pdata->port_mode[0]))
 		clk_enable(tll->usbtll_p1_fck);
 
-	if (is_ehci_tll_mode(pdata->port_mode[1]))
+	if (is_ehci_tll_mode(pdata->port_mode[1]) ||
+			is_ehci_hsic_mode(pdata->port_mode[1]))
 		clk_enable(tll->usbtll_p2_fck);
 
-	if (is_ehci_tll_mode(pdata->port_mode[2]))
+	if (is_ehci_tll_mode(pdata->port_mode[2]) ||
+			is_ehci_hsic_mode(pdata->port_mode[2]))
 		clk_enable(tll->usbtll_p3_fck);
 
 	spin_unlock_irqrestore(&tll->lock, flags);
@@ -413,13 +432,16 @@ static int usbtll_runtime_suspend(struct device *dev)
 
 	spin_lock_irqsave(&tll->lock, flags);
 
-	if (is_ehci_tll_mode(pdata->port_mode[0]))
+	if (is_ehci_tll_mode(pdata->port_mode[0]) ||
+			is_ehci_hsic_mode(pdata->port_mode[0]))
 		clk_disable(tll->usbtll_p1_fck);
 
-	if (is_ehci_tll_mode(pdata->port_mode[1]))
+	if (is_ehci_tll_mode(pdata->port_mode[1]) ||
+			is_ehci_hsic_mode(pdata->port_mode[1]))
 		clk_disable(tll->usbtll_p2_fck);
 
-	if (is_ehci_tll_mode(pdata->port_mode[2]))
+	if (is_ehci_tll_mode(pdata->port_mode[2]) ||
+			is_ehci_hsic_mode(pdata->port_mode[2]))
 		clk_disable(tll->usbtll_p3_fck);
 
 	spin_unlock_irqrestore(&tll->lock, flags);
