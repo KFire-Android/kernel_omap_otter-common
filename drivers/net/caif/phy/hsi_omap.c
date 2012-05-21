@@ -15,6 +15,7 @@
 #include <linux/hsi_driver_if.h>
 
 #include <plat/omap_hsi.h>
+#include <plat/cpu.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Daniel Martensson<daniel.martensson@stericsson.com>");
@@ -522,7 +523,6 @@ static int hsi_proto_resume(struct hsi_device *dev)
 
 static struct hsi_device_driver cfhsi_omap_driver = {
 	.ctrl_mask = ANY_HSI_CONTROLLER,
-	.ch_mask[0] = (1 << 0),	/* TODO: Wait for second channel. | (1 << 1)*/
 	.probe = hsi_proto_probe,
 	.remove = hsi_proto_remove,
 	.suspend = hsi_proto_suspend,
@@ -537,6 +537,12 @@ static int __init cfhsi_omap_init(void)
 	int res;
 
 	printk(KERN_INFO "%s.\n", __func__);
+
+	/* TODO: Wait for second channel. | (1 << 1)*/
+	if (cpu_is_omap54xx())
+		cfhsi_omap_driver.ch_mask[1] = (1 << 0);
+	else
+		cfhsi_omap_driver.ch_mask[0] = (1 << 0);
 
 	/* Register protocol driver for HSI channel 0. */
 	res =  hsi_register_driver(&cfhsi_omap_driver);
