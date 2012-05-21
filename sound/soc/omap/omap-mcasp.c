@@ -276,16 +276,17 @@ static inline void mcasp_set_ctl_reg(void __iomem *regs, u32 val)
 }
 
 static int mcasp_compute_clock_dividers(long fclk_rate, int tgt_sample_rate,
-			int *out_div_lo, int *out_div_hi)
+			u32 *out_div_lo, u32 *out_div_hi)
 {
 	/* Given a particular functional clock rate and a target audio sample
 	 * rate, determine the proper values for the ACLKXCTL and AHCLKXCTL, the
 	 * dividers which produce the high frequency transmit master clock and
 	 * the transmit clock.
 	 */
-	long divisor;
+	u32 divisor;
 	unsigned long ppm;
-	int sample_rate, i;
+	int sample_rate;
+	u32 i;
 	BUG_ON(!out_div_lo);
 	BUG_ON(!out_div_hi);
 
