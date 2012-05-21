@@ -732,10 +732,13 @@ struct omap_aess_task aess_dl1_mono_mixer[] = {
 	},
 };
 
+/* Structure is unused.  Code is retained for synchronization with upstream */
+#if 0
 struct omap_aess_init_task aess_init_dl1_mono_mixer = {
 	.nb_task = sizeof(aess_dl1_mono_mixer)/sizeof(struct omap_aess_task),
 	.task = aess_dl1_mono_mixer,
 };
+#endif
 
 struct omap_aess_task aess_dl2_mono_mixer[] = {
 	{
@@ -750,10 +753,13 @@ struct omap_aess_task aess_dl2_mono_mixer[] = {
 	},
 };
 
+/* Structure is unused.  Code is retained for synchronization with upstream */
+#if 0
 struct omap_aess_init_task aess_init_dl2_mono_mixer = {
 	.nb_task = sizeof(aess_dl2_mono_mixer)/sizeof(struct omap_aess_task),
 	.task = aess_dl2_mono_mixer,
 };
+#endif
 
 struct omap_aess_task aess_audul_mono_mixer[] = {
 	{
@@ -768,11 +774,13 @@ struct omap_aess_task aess_audul_mono_mixer[] = {
 	},
 };
 
+/* Structure is unused.  Code is retained for synchronization with upstream */
+#if 0
 struct omap_aess_init_task aess_init_audul_mono_mixer = {
 	.nb_task = sizeof(aess_audul_mono_mixer)/sizeof(struct omap_aess_task),
 	.task = aess_audul_mono_mixer,
 };
-
+#endif
 
 /* Generic Vx-DL 8 kHz tasks */
 static struct omap_aess_task task_aess_enable_vx_dl_8k_port[] = {
