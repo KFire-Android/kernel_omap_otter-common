@@ -54,7 +54,7 @@ static int palmas_resource_write(struct palmas *palmas, unsigned int reg,
 	return regmap_write(palmas->regmap[slave], addr, data);
 }
 
-int palmas_enable_clk32kgaudio(struct palmas_resource *resource)
+static int palmas_enable_clk32kgaudio(struct palmas_resource *resource)
 {
 	int ret;
 	u8 reg;
@@ -72,7 +72,6 @@ int palmas_enable_clk32kgaudio(struct palmas_resource *resource)
 
 	return ret;
 }
-EXPORT_SYMBOL(palmas_enable_clk32kgaudio);
 
 int palmas_enable_regen1(struct palmas_resource *resource)
 {
