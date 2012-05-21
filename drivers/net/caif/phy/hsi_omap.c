@@ -30,6 +30,10 @@ MODULE_DESCRIPTION("CAIF HSI OMAP device");
 #define TX_DYN_SPEED_TABLE {LOW_SPEED, MIDDLE_SPEED, HIGH_SPEED}
 #define RX_DYN_SPEED_TABLE {LOW_SPEED, MIDDLE_SPEED, HIGH_SPEED}
 
+#define DIV_BY_1 0
+#define DIV_BY_2 1
+#define DIV_BY_4 3
+
 const u32 tx_dyn_speed_table[] = TX_DYN_SPEED_TABLE;
 const u32 rx_dyn_speed_table[] = RX_DYN_SPEED_TABLE;
 
@@ -83,17 +87,18 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 	cfhsi = container_of(dev, struct cfhsi_omap, dev);
 
 	/* Register protocol driver for HSI channel 0. */
-	printk(KERN_ERR "- registering HSI driver\n");
+	pr_info("%s: registering HSI driver\n", __func__);
+
 	res =  hsi_register_driver(&cfhsi_omap_driver);
 	if (res) {
-		printk(KERN_ERR "%s: Failed to register CAIF HSI OMAP driver: %d.\n.",
+		pr_err("%s: Failed to register CAIF HSI OMAP driver: %d.\n.",
 		       __func__, res);
 		return res;
 	}
 
 	/* If hsi_proto_probe() has not been called, we bail out */
 	if (cfhsi->hsi_dev == NULL) {
-		printk(KERN_ERR "%s: HSI device not yet present\n", __func__);
+		pr_err("%s: HSI device not yet present\n", __func__);
 		return -ENODEV;
 	}
 
@@ -137,7 +142,7 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 	tx_conf.flow = HSI_FLOW_SYNCHRONIZED;
 	tx_conf.frame_size = 31;
 	tx_conf.channels = 2;
-	tx_conf.divisor = 0; /* divide by 1. */
+	tx_conf.divisor = DIV_BY_1; /* divide by 1. */
 	tx_conf.arb_mode = 0; /* HSI_ARBMODE_RR. */
 	cfhsi->tx_conf = tx_conf;
 
@@ -146,7 +151,7 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 	rx_conf.flow = HSI_FLOW_PIPELINED;
 	rx_conf.frame_size = 31;
 	rx_conf.channels = 2;
-	rx_conf.divisor = 0;
+	rx_conf.divisor = DIV_BY_1;
 	rx_conf.counters =
 		(180 << HSI_COUNTERS_FT_OFFSET) |
 		(7 << HSI_COUNTERS_TB_OFFSET) |
@@ -243,7 +248,7 @@ static int cfhsi_down(struct cfhsi_dev *dev)
 	WARN_ON(hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SW_RESET, NULL));
 
 	/* Unregister OMAP-HSI driver. */
-	printk(KERN_ERR "- UNregistering HSI driver\n");
+	pr_err("- UNregistering HSI driver\n");
 	hsi_unregister_driver(&cfhsi_omap_driver);
 	cfhsi->hsi_dev = NULL;
 
@@ -479,13 +484,23 @@ static int cfhsi_set_tx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 
 	switch (speed) {
 	case LOW_SPEED:
-		next_divisor = 2;
+		if (cfhsi->current_clock == HSI_SPEED_HI_SPEED)
+			next_divisor = DIV_BY_4;
+		else
+			next_divisor = DIV_BY_2;
 		break;
 	case MIDDLE_SPEED:
-		next_divisor = 1;
+		if (cfhsi->current_clock == HSI_SPEED_HI_SPEED)
+			next_divisor = DIV_BY_2;
+		else
+			next_divisor = DIV_BY_1;
 		break;
 	case HIGH_SPEED:
-		next_divisor = 0;
+		if (cfhsi->current_clock == HSI_SPEED_LOW_SPEED)
+			dev_err(&cfhsi->pdev.dev, "%s: Invalid tx speed config\n",
+				__func__);
+
+		next_divisor = DIV_BY_1;
 		break;
 	default:
 		dev_err(&cfhsi->pdev.dev,
@@ -494,8 +509,10 @@ static int cfhsi_set_tx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 		return -1;
 	}
 
+
 	if (next_divisor != cfhsi->tx_conf.divisor) {
 		cfhsi->tx_conf.divisor = next_divisor;
+		pr_info("tx_speed=%d, tx_divisor=%d\n", speed, next_divisor);
 		/* Configure HSI TX. */
 		res = hsi_ioctl(cfhsi->hsi_dev,
 				HSI_IOCTL_SET_TX,
@@ -519,13 +536,19 @@ static int cfhsi_set_rx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 
 	switch (speed) {
 	case LOW_SPEED:
-		next_divisor = 2;
+		if (cfhsi->current_clock == HSI_SPEED_HI_SPEED)
+			next_divisor = DIV_BY_4;
+		else
+			next_divisor = DIV_BY_2;
 		break;
 	case MIDDLE_SPEED:
-		next_divisor = 1;
+		if (cfhsi->current_clock == HSI_SPEED_HI_SPEED)
+			next_divisor = DIV_BY_2;
+		else
+			next_divisor = DIV_BY_1;
 		break;
 	case HIGH_SPEED:
-		next_divisor = 0;
+		next_divisor = DIV_BY_1;
 		break;
 	default:
 		dev_err(&cfhsi->pdev.dev,
@@ -536,6 +559,7 @@ static int cfhsi_set_rx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 
 	if (next_divisor != cfhsi->rx_conf.divisor) {
 		cfhsi->rx_conf.divisor = next_divisor;
+		pr_info("rx_speed=%d, rx_divisor=%d\n", speed, next_divisor);
 		/* Configure HSI RX. */
 		res = hsi_ioctl(cfhsi->hsi_dev,
 				HSI_IOCTL_SET_RX,
@@ -552,13 +576,14 @@ static int cfhsi_set_rx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 	return 0;
 }
 
-int cfhsi_change_tx_speed(struct cfhsi_dev *dev,
-			  enum dyn_speed_cmd speed_cmd,
-			  u32 *tx_speed,
-			  enum dyn_speed_level *speed_level)
+int cfhsi_set_hsi_clock(struct cfhsi_dev *dev, unsigned int hsi_clock)
 {
+	int res;
 	struct cfhsi_omap *cfhsi = NULL;
-	u8 tmp_index = 0;
+	u8 tx_index, rx_index;
+	struct dyn_speed *dfs_p = NULL;
+	u32 tx_divisor;
+	u32 rx_divisor;
 
 	cfhsi = container_of(dev, struct cfhsi_omap, dev);
 
@@ -566,27 +591,179 @@ int cfhsi_change_tx_speed(struct cfhsi_dev *dev,
 
 	BUG_ON(cfhsi->dev.drv == NULL);
 
+	if (hsi_clock == cfhsi->current_clock) {
+		pr_info("Already running with this clock rate\n");
+		return 0;
+	}
+
+	tx_divisor = cfhsi->tx_conf.divisor;
+	rx_divisor = cfhsi->rx_conf.divisor;
+	dfs_p = &cfhsi->dyn_speed;
+	tx_index = dfs_p->tx_speed_index;
+	rx_index = dfs_p->rx_speed_index;
+
+	if (hsi_clock == HSI_SPEED_HI_SPEED) {
+		/* Going from Low to High clock-rate*/
+		switch (dfs_p->tx_speed_table[tx_index]) {
+		case LOW_SPEED:
+		case MIDDLE_SPEED:
+			tx_index++;
+			break;
+		case HIGH_SPEED:
+		default:
+			pr_info("%s: TX Speed config error 1\n", __func__);
+			break;
+		}
+
+		switch (dfs_p->rx_speed_table[rx_index]) {
+		case LOW_SPEED:
+		case MIDDLE_SPEED:
+			rx_index++;
+			break;
+		case HIGH_SPEED:
+		default:
+			pr_info("%s: RX Speed config error 1\n", __func__);
+			break;
+		}
+	} else {
+		/* Going from High to Low clock-rate*/
+		switch (dfs_p->tx_speed_table[tx_index]) {
+		case LOW_SPEED:
+			tx_divisor = DIV_BY_2;
+			break;
+		case MIDDLE_SPEED:
+			tx_divisor = DIV_BY_1;
+			break;
+		case HIGH_SPEED:
+			tx_index--;
+		default:
+			pr_info("%s: TX Speed config error 2\n", __func__);
+			break;
+		}
+		switch (dfs_p->rx_speed_table[rx_index]) {
+		case LOW_SPEED:
+			rx_divisor = DIV_BY_2;
+			break;
+		case MIDDLE_SPEED:
+			rx_divisor = DIV_BY_1;
+			break;
+		case HIGH_SPEED:
+			rx_index--;
+		default:
+			pr_info("%s: RX Speed config error 2\n", __func__);
+			break;
+		}
+	}
+
+	dfs_p->tx_speed_index = tx_index;
+	dfs_p->rx_speed_index = rx_index;
+
+	pr_info("rx_speed=%d, rx_divisor=%d\n",
+		dfs_p->tx_speed_table[rx_index], rx_divisor);
+	if (rx_divisor != cfhsi->rx_conf.divisor) {
+		cfhsi->rx_conf.divisor = rx_divisor;
+
+		/* Configure HSI RX. */
+		res = hsi_ioctl(cfhsi->hsi_dev,
+				HSI_IOCTL_SET_RX,
+				&cfhsi->rx_conf);
+		if (res) {
+			dev_err(&cfhsi->pdev.dev,
+				"%s: Failed to configure RX: %d.\n",
+				__func__, res);
+			hsi_close(cfhsi->hsi_dev);
+			return res;
+		}
+	}
+
+	pr_info("tx_speed=%d, tx_divisor=%d\n",
+		dfs_p->rx_speed_table[tx_index], rx_divisor);
+	if (tx_divisor != cfhsi->tx_conf.divisor) {
+		cfhsi->tx_conf.divisor = tx_divisor;
+
+		/* Configure HSI TX. */
+		res = hsi_ioctl(cfhsi->hsi_dev,
+				HSI_IOCTL_SET_TX,
+				&cfhsi->tx_conf);
+		if (res) {
+			dev_err(&cfhsi->pdev.dev,
+				"%s: Failed to configure TX: %d.\n",
+				__func__, res);
+			hsi_close(cfhsi->hsi_dev);
+			return res;
+		}
+	}
+
+	/* Set HSI clock */
+	cfhsi->current_clock = hsi_clock;
+	pr_info("New clock value=%d\n", hsi_clock);
+	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SET_HI_SPEED,
+			&cfhsi->current_clock);
+	if (res) {
+		dev_err(&cfhsi->pdev.dev,
+			"%s: Failed to set HSI clock: %d.\n",
+			__func__, res);
+		hsi_close(cfhsi->hsi_dev);
+		return res;
+	}
+	return 0;
+}
+
+int cfhsi_change_tx_speed(struct cfhsi_dev *dev,
+			  enum dyn_speed_cmd speed_cmd,
+			  u32 *tx_speed,
+			  enum dyn_speed_level *speed_level)
+{
+	struct cfhsi_omap *cfhsi = NULL;
+	u8 tmp_index = 0;
+	u8 max_index;
+
+	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+
+	dev_dbg(&cfhsi->pdev.dev, "enter %s\n", __func__);
+
+	BUG_ON(cfhsi->dev.drv == NULL);
+
+	if (cfhsi->current_clock == HSI_SPEED_HI_SPEED)
+		max_index = MAX_DYN_TX_SPEEDS-1;
+	else
+		max_index = MAX_DYN_TX_SPEEDS-2;
+
 	switch (speed_cmd) {
 	case CFHSI_DYN_SPEED_GO_LOWEST:
 		cfhsi->dyn_speed.tx_speed_index = 0;
 		*speed_level = CFHSI_DYN_SPEED_LOW;
 		break;
 	case CFHSI_DYN_SPEED_GO_DOWN:
-		*speed_level = CFHSI_DYN_SPEED_MIDDLE;
-		if (cfhsi->dyn_speed.tx_speed_index > 0)
-			cfhsi->dyn_speed.tx_speed_index--;
-		if (cfhsi->dyn_speed.tx_speed_index == 0)
+		if (cfhsi->current_clock == HSI_SPEED_HI_SPEED) {
+			*speed_level = CFHSI_DYN_SPEED_MIDDLE;
+
+			if (cfhsi->dyn_speed.tx_speed_index > 0)
+				cfhsi->dyn_speed.tx_speed_index--;
+			if (cfhsi->dyn_speed.tx_speed_index == 0)
+				*speed_level = CFHSI_DYN_SPEED_LOW;
+		} else {
+			if (cfhsi->dyn_speed.tx_speed_index > 0)
+				cfhsi->dyn_speed.tx_speed_index--;
 			*speed_level = CFHSI_DYN_SPEED_LOW;
+		}
 		break;
 	case CFHSI_DYN_SPEED_GO_UP:
-		*speed_level = CFHSI_DYN_SPEED_MIDDLE;
-		if (cfhsi->dyn_speed.tx_speed_index < (MAX_DYN_TX_SPEEDS-1))
-			cfhsi->dyn_speed.tx_speed_index++;
-		if (cfhsi->dyn_speed.tx_speed_index == (MAX_DYN_TX_SPEEDS-1))
+		if (cfhsi->current_clock == HSI_SPEED_HI_SPEED) {
+			*speed_level = CFHSI_DYN_SPEED_MIDDLE;
+
+			if (cfhsi->dyn_speed.tx_speed_index < max_index)
+				cfhsi->dyn_speed.tx_speed_index++;
+			if (cfhsi->dyn_speed.tx_speed_index == max_index)
+				*speed_level = CFHSI_DYN_SPEED_HIGH;
+		} else {
+			if (cfhsi->dyn_speed.tx_speed_index < max_index)
+				cfhsi->dyn_speed.tx_speed_index++;
 			*speed_level = CFHSI_DYN_SPEED_HIGH;
+		}
 		break;
 	case CFHSI_DYN_SPEED_GO_HIGHEST:
-		cfhsi->dyn_speed.tx_speed_index = (MAX_DYN_TX_SPEEDS-1);
+		cfhsi->dyn_speed.tx_speed_index = max_index;
 		*speed_level = CFHSI_DYN_SPEED_HIGH;
 		break;
 	default:
@@ -608,12 +785,19 @@ int cfhsi_get_next_tx_speed(struct cfhsi_dev *dev,
 {
 	u8 tmp_index;
 	struct cfhsi_omap *cfhsi = NULL;
+	u8 max_index;
 
 	cfhsi = container_of(dev, struct cfhsi_omap, dev);
 
 	dev_dbg(&cfhsi->pdev.dev, "enter %s\n", __func__);
 
 	BUG_ON(cfhsi->dev.drv == NULL);
+
+	if (cfhsi->current_clock == HSI_SPEED_HI_SPEED)
+		max_index = MAX_DYN_TX_SPEEDS-1;
+	else
+		max_index = MAX_DYN_TX_SPEEDS-2;
+
 
 	switch (speed_cmd) {
 	case CFHSI_DYN_SPEED_GO_LOWEST:
@@ -626,11 +810,11 @@ int cfhsi_get_next_tx_speed(struct cfhsi_dev *dev,
 		break;
 	case CFHSI_DYN_SPEED_GO_UP:
 		tmp_index = cfhsi->dyn_speed.tx_speed_index;
-		if (cfhsi->dyn_speed.tx_speed_index < (MAX_DYN_TX_SPEEDS-1))
+		if (cfhsi->dyn_speed.tx_speed_index < max_index)
 			tmp_index++;
 		break;
 	case CFHSI_DYN_SPEED_GO_HIGHEST:
-		tmp_index = (MAX_DYN_TX_SPEEDS-1);
+		tmp_index = max_index;
 		break;
 	default:
 		return -1;
@@ -659,9 +843,12 @@ int cfhsi_change_rx_speed(struct cfhsi_dev *dev, u32 requested_rx_speed)
 		cfhsi->dyn_speed.rx_speed_index = 1;
 	else if ((requested_rx_speed >= HIGH_SPEED)
 		 && (requested_rx_speed <= (HIGH_SPEED+8)))
-		cfhsi->dyn_speed.rx_speed_index = 2;
+		if (cfhsi->current_clock == HSI_SPEED_HI_SPEED)
+			cfhsi->dyn_speed.rx_speed_index = 2;
+		else
+			cfhsi->dyn_speed.rx_speed_index = 1;
 	else {
-		printk(KERN_ERR "hsi_omap: Invalid rx speed requested=%d\n",
+		pr_err("hsi_omap: Invalid rx speed requested=%d\n",
 		       requested_rx_speed);
 		return -1;
 	}
@@ -722,6 +909,7 @@ int cfhsi_create_and_register(void)
 	cfhsi->dev.cfhsi_get_peer_wake = cfhsi_get_peer_wake;
 	cfhsi->dev.cfhsi_fifo_occupancy = cfhsi_fifo_occupancy;
 	cfhsi->dev.cfhsi_rx_cancel = cfhsi_rx_cancel;
+	cfhsi->dev.cfhsi_set_hsi_clock = cfhsi_set_hsi_clock;
 	cfhsi->dev.cfhsi_change_tx_speed = cfhsi_change_tx_speed;
 	cfhsi->dev.cfhsi_get_next_tx_speed = cfhsi_get_next_tx_speed;
 	cfhsi->dev.cfhsi_change_rx_speed = cfhsi_change_rx_speed;
@@ -737,7 +925,7 @@ int cfhsi_create_and_register(void)
 	/* Register platform device. */
 	res = platform_device_register(&cfhsi->pdev);
 	if (res) {
-		printk(KERN_INFO "%s: Failed to register dev: %d.\n",
+		pr_err("%s: Failed to register dev: %d.\n",
 			__func__, res);
 		res = -ENODEV;
 		list_del(&cfhsi->list);
@@ -778,7 +966,7 @@ static struct hsi_device_driver cfhsi_omap_driver = {
 
 static int __init cfhsi_omap_init(void)
 {
-	printk(KERN_INFO "%s - create platform device\n", __func__);
+	pr_info("%s - create platform device\n", __func__);
 
 	/* TODO: Wait for second channel. | (1 << 1)*/
 	if (cpu_is_omap54xx())
@@ -800,8 +988,8 @@ static void __exit cfhsi_omap_exit(void)
 		cfhsi = list_entry(list_node, struct cfhsi_omap, list);
 		if (!unregistered) {
 			/* Unregister driver. */
-			printk(KERN_ERR "- UNregistering HSI driver on exit\n");
-			cfhsi_down(cfhsi);
+			pr_err("- UNregistering HSI driver on exit\n");
+			cfhsi_down(&cfhsi->dev);
 			unregistered = true;
 		}
 		/* Remove from list. */
