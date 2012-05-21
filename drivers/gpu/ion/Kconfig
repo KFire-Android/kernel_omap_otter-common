@@ -11,3 +11,11 @@ config ION_TEGRA
 	help
 	  Choose this option if you wish to use ion on an nVidia Tegra.
 
+config ION_OMAP
+	tristate "Ion for OMAP"
+	depends on (ARCH_OMAP5 || ARCH_OMAP4) && ION && DRM_OMAP
+	help
+	  Choose this option if you wish to use ion on OMAP4/5.
+	  This option shall be chosen if ion carveout is required
+	  for OMAP4/5. The corresponding board file shall also have
+	  the ion carveout implementation.
