@@ -22,13 +22,13 @@
 #include "tee_client_api.h"
 #include "tf_defs.h"
 
-/* 7B1DD682-1077-4939-9755-B6192C5CC5FD */
-#define WVDRM_UUID {0x7B1DD682, 0x1077, 0x4939, \
-			{0x97, 0x55, 0xB6, 0x19, 0x2C, 0x5C, 0xC5, 0xFD} }
+/*C2537CC3-36F0-48D9-820E-559601478029*/
+#define COMMON_SECURE_DRIVER_UUID {0xC2537CC3, 0x36F0, 0x48D9, \
+			{0x82, 0x0E, 0x55, 0x96, 0x01, 0x47, 0x80, 0x29} }
 
-#define WVDRM_ENTER_SECURE_PLAYBACK	0x00003000
+#define ENTER_SECURE_PLAYBACK	0x00003000
 
-#define WVDRM_EXIT_SECURE_PLAYBACK	0x00003001
+#define EXIT_SECURE_PLAYBACK	0x00003001
 
 enum rproc_drm_s_state {
 	RPROC_DRM_SECURE_LEAVE,
@@ -40,7 +40,7 @@ static enum rproc_drm_s_state s_state;
 static TEEC_Result rproc_drm_initialize(TEEC_Context *teec_context,
 					TEEC_Session *teec_session)
 {
-	static const TEEC_UUID drm_uuid = WVDRM_UUID;
+	static const TEEC_UUID drm_uuid = COMMON_SECURE_DRIVER_UUID;
 	static u32 drm_gid = 1019;
 	TEEC_Result result;
 
@@ -79,8 +79,8 @@ static TEEC_Result _rproc_drm_invoke_secure_service(bool enable)
 
 	operation.paramTypes = TEEC_PARAM_TYPES(TEEC_NONE, TEEC_NONE,
 						TEEC_NONE, TEEC_NONE);
-	command = (enable ? WVDRM_ENTER_SECURE_PLAYBACK :
-				WVDRM_EXIT_SECURE_PLAYBACK);
+	command = (enable ? ENTER_SECURE_PLAYBACK :
+				EXIT_SECURE_PLAYBACK);
 	result = TEEC_InvokeCommand(&teec_session, command, &operation, NULL);
 	rproc_drm_finalize(&teec_context, &teec_session);
 out:
