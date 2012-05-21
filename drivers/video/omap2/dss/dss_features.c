@@ -711,7 +711,7 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.pll_enable		=	ti_hdmi_4xxx_pll_enable,
 	.pll_disable		=	ti_hdmi_4xxx_pll_disable,
 	.video_enable		=	ti_hdmi_4xxx_wp_video_start,
-	.irq_handler		=	ti_hdmi_4xxx_irq_handler,
+	.irq_handler		=	ti_hdmi_5xxx_irq_handler,
 	.irq_process		=	ti_hdmi_5xxx_irq_process,
 	.configure_range	=	ti_hdmi_5xxx_configure_range,
 	.set_phy		=	ti_hdmi_4xxx_set_phy_on_hpd,
@@ -720,6 +720,16 @@ static const struct ti_hdmi_ip_ops omap5_hdmi_functions = {
 	.audio_start		=       ti_hdmi_5xxx_audio_start,
 	.audio_config		=	ti_hdmi_5xxx_audio_config,
 #endif
+	.cec_get_rx_cmd                 =       ti_hdmi_5xxx_cec_get_rx_cmd,
+	.cec_read_rx_cmd                =       ti_hdmi_5xxx_cec_read_rx_cmd,
+	.cec_transmit_cmd               =       ti_hdmi_5xxx_cec_transmit_cmd,
+	.power_on_cec                   =       ti_hdmi_5xxx_power_on_cec,
+	.power_off_cec			=	ti_hdmi_5xxx_power_off_cec,
+	.cec_int_handler		=	ti_hdmi_5xxx_cec_int_handler,
+	.cec_clr_rx_int                 =       ti_hdmi_5xxx_cec_clr_rx_int,
+	.cec_get_reg_device_list        =       ti_hdmi_5xxx_cec_get_reg_device_list,
+	.cec_add_reg_device             =       ti_hdmi_5xxx_cec_add_reg_device,
+	.cec_set_reg_device_list        =       ti_hdmi_5xxx_cec_set_reg_device_list,
 
 };
 
