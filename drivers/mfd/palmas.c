@@ -174,8 +174,8 @@ static int palmas_rtc_init(struct palmas *palmas)
 	twl_rtc->mfd = palmas;
 	twl_rtc->chip_version = 6035;
 
-	palmas_children[5].platform_data = twl_rtc;
-	palmas_children[5].pdata_size = sizeof(*twl_rtc);
+	palmas_children[10].platform_data = twl_rtc;
+	palmas_children[10].pdata_size = sizeof(*twl_rtc);
 
 	return 0;
 }
