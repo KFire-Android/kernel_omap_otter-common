@@ -822,7 +822,11 @@ static struct omap_dss_device omap5evm_lcd_device = {
 			.dsi_fclk_src	= OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
 		},
 	},
-	.panel.dsi_mode		= OMAP_DSS_DSI_VIDEO_MODE,
+	.panel = {
+		.dsi_mode	= OMAP_DSS_DSI_VIDEO_MODE,
+		.width_in_um	= 55400,
+		.height_in_um	= 98300,
+	},
 	.channel		= OMAP_DSS_CHANNEL_LCD,
 };
 
