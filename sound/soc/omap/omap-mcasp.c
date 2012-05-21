@@ -350,8 +350,7 @@ static int omap_mcasp_start(struct omap_mcasp *mcasp)
 			break;
 
 		if (++i > 1000) {
-			pr_err("Timeout waiting for DMA to load first"
-					" sample of audio.\n");
+			pr_err("Timeout waiting for DMA to load first sample of audio.\n");
 			return -ETIMEDOUT;
 		}
 
