@@ -31,7 +31,7 @@
 #include "abe_port.h"
 
 /* this must match logical ID numbers in port_mgr.h */
-static const char *lport_name[] = {
+static const char * const lport_name[] = {
 		"dmic0", "dmic1", "dmic2", "pdmdl1", "pdmdl2", "pdmvib",
 		"pdmul1", "bt_vx_dl", "bt_vx_ul", "mm_ext_ul", "mm_ext_dl",
 		"mm_dl1", "mm_ul1", "mm_ul2", "vx_dl", "vx_ul", "vib", "tones",
