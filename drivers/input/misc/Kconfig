@@ -642,5 +642,14 @@ config INPUT_HMC5843
 	  Say Y here to add support for the Honeywell HMC 5843 3-Axis
 	  Magnetometer (digital compass).
 
+config INPUT_TSL2771
+	tristate "TSL2771 ALS/Proximity Sensor Driver"
+	depends on I2C && SYSFS
+	help
+	  Say Y here if you want to use TSL2771 ALS/Proximity Sensor Driver
+          through I2C interface.
+
+          To compile this driver as a module, choose M here: the
+          module will be called tsl2771.
 
 endif
