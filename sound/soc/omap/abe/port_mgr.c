@@ -39,7 +39,7 @@ static const char *lport_name[] = {
 };
 
 static DEFINE_MUTEX(port_mgr_mutex);
-static struct abe *the_abe;
+static struct omap_aess *the_abe;
 static int users;
 
 /*
