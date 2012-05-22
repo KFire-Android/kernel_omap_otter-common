@@ -222,7 +222,7 @@ static ssize_t store_fmrx_band(struct device *dev,
 	if (kstrtoul(buf, 0, &fm_band))
 		return -EINVAL;
 
-	if (fm_band < FM_BAND_EUROPE_US || fm_band > FM_BAND_RUSSIAN)
+	if (fm_band < FM_BAND_EUROPE_US || fm_band > FM_BAND_WEATHER)
 		return -EINVAL;
 
 	ret = fm_rx_set_region(fmdev, fm_band);

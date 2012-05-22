@@ -47,7 +47,7 @@ int fm_rx_set_freq(struct fmdev *fmdev, u32 freq)
 {
 	unsigned long timeleft;
 	u16 payload, curr_frq, intr_flag;
-	u32 curr_frq_in_khz;
+	u32 curr_frq_in_khz, fm_freq_mul;
 	u32 resp_len;
 	int ret;
 
@@ -55,6 +55,13 @@ int fm_rx_set_freq(struct fmdev *fmdev, u32 freq)
 		fmerr("Invalid frequency %d\n", freq);
 		return -EINVAL;
 	}
+
+	if (fmdev->rx.region.fm_band == FM_BAND_RUSSIAN)
+		fm_freq_mul = FM_FREQ_MUL_RUS;
+	else if (fmdev->rx.region.fm_band == FM_BAND_WEATHER)
+		fm_freq_mul = FM_FREQ_MUL_WB;
+	else
+		fm_freq_mul = FM_FREQ_MUL;
 
 	/* Set audio enable */
 	payload = FM_RX_AUDIO_ENABLE_I2S_AND_ANALOG;
@@ -72,7 +79,7 @@ int fm_rx_set_freq(struct fmdev *fmdev, u32 freq)
 		return ret;
 
 	/* Calculate frequency index and set*/
-	payload = (freq - fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
+	payload = (freq - fmdev->rx.region.bot_freq) / fm_freq_mul;
 
 	ret = fmc_send_cmd(fmdev, FREQ_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
@@ -117,7 +124,8 @@ int fm_rx_set_freq(struct fmdev *fmdev, u32 freq)
 		goto exit;
 
 	curr_frq = be16_to_cpu(curr_frq);
-	curr_frq_in_khz = (fmdev->rx.region.bot_freq + ((u32)curr_frq * FM_FREQ_MUL));
+	curr_frq_in_khz = (fmdev->rx.region.bot_freq +
+			((u32)curr_frq * fm_freq_mul));
 
 	if (curr_frq_in_khz != freq) {
 		pr_info("Frequency is set to (%d) but "
@@ -169,7 +177,7 @@ static int fm_rx_set_channel_spacing(struct fmdev *fmdev, u32 spacing)
 int fm_rx_seek(struct fmdev *fmdev, u32 seek_upward,
 		u32 wrap_around, u32 spacing)
 {
-	u32 resp_len;
+	u32 resp_len, fm_freq_mul;
 	u16 curr_frq, next_frq, last_frq;
 	u16 payload, int_reason, intr_flag;
 	u16 offset, space_idx;
@@ -190,10 +198,25 @@ int fm_rx_seek(struct fmdev *fmdev, u32 seek_upward,
 		return ret;
 
 	curr_frq = be16_to_cpu(curr_frq);
-	last_frq = (fmdev->rx.region.top_freq - fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
 
 	/* Check the offset in order to be aligned to the channel spacing*/
-	space_idx = fmdev->rx.region.chanl_space / FM_FREQ_MUL;
+	if (fmdev->rx.region.fm_band == FM_BAND_RUSSIAN) {
+		last_frq = (fmdev->rx.region.top_freq -
+				fmdev->rx.region.bot_freq) / FM_FREQ_MUL_RUS;
+		space_idx = fmdev->rx.region.chanl_space / FM_FREQ_MUL_RUS;
+		fm_freq_mul = FM_FREQ_MUL_RUS;
+	} else if (fmdev->rx.region.fm_band == FM_BAND_WEATHER) {
+		last_frq = (fmdev->rx.region.top_freq -
+				fmdev->rx.region.bot_freq) / FM_FREQ_MUL_WB;
+		space_idx = 1;
+		fm_freq_mul = FM_FREQ_MUL_WB;
+	} else {
+		last_frq = (fmdev->rx.region.top_freq -
+				fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
+		space_idx = fmdev->rx.region.chanl_space / FM_FREQ_MUL;
+		fm_freq_mul = FM_FREQ_MUL;
+	}
+
 	offset = curr_frq % space_idx;
 
 	next_frq = seek_upward ? curr_frq + space_idx /* Seek Up */ :
@@ -238,7 +261,11 @@ again:
 		return ret;
 
 	/* Start seek */
-	payload = FM_TUNER_AUTONOMOUS_SEARCH_MODE;
+	if (fmdev->rx.region.fm_band == FM_BAND_WEATHER)
+		payload = FM_TUNER_PRESET_MODE;
+	else
+		payload = FM_TUNER_AUTONOMOUS_SEARCH_MODE;
+
 	ret = fmc_send_cmd(fmdev, TUNER_MODE_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
 	if (ret < 0)
@@ -275,7 +302,7 @@ again:
 				fmdev->rx.region.top_freq;
 			/* Calculate frequency index to write */
 			next_frq = (fmdev->rx.freq -
-					fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
+				fmdev->rx.region.bot_freq) / fm_freq_mul;
 
 			/* If no valid chanel then report default frequency */
 			wrap_around = 0;
@@ -291,7 +318,7 @@ again:
 
 		curr_frq = be16_to_cpu(curr_frq);
 		fmdev->rx.freq = (fmdev->rx.region.bot_freq +
-				((u32)curr_frq * FM_FREQ_MUL));
+				((u32)curr_frq * fm_freq_mul));
 
 	}
 	/* Reset RDS cache and current station pointers */
@@ -368,6 +395,7 @@ int fm_rx_set_region(struct fmdev *fmdev, u8 region_to_set)
 
 	if (region_to_set != FM_BAND_EUROPE_US &&
 	    region_to_set != FM_BAND_JAPAN &&
+	    region_to_set != FM_BAND_WEATHER &&
 	    region_to_set != FM_BAND_RUSSIAN) {
 		fmerr("Invalid band\n");
 		return -EINVAL;

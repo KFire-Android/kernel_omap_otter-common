@@ -60,11 +60,18 @@ static struct region_info region_configs[] = {
 	 },
 	/* Russian (OIRT) band */
 	{
-	 .chanl_space = FM_CHANNEL_SPACING_200KHZ * FM_FREQ_MUL,
+	 .chanl_space = FM_CHANNEL_SPACING_50KHZ * FM_FREQ_MUL_RUS,
 	 .bot_freq = 65800,	/* 65.8 MHz */
 	 .top_freq = 74000,	/* 74 MHz */
 	 .fm_band = 2,
 	 },
+	/* Weather Band */
+	{
+	 .chanl_space = FM_CHANNEL_SPACING_50KHZ * FM_FREQ_MUL_WB,
+	 .bot_freq = 162400,     /* 162.4 MHz */
+	 .top_freq = 162550,     /* 162.55 MHz */
+	 .fm_band = 3,
+	}
 };
 
 /* Band selection */

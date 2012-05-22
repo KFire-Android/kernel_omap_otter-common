@@ -204,6 +204,7 @@ struct fm_event_msg_hdr {
 #define FM_BAND_EUROPE_US	0
 #define FM_BAND_JAPAN		1
 #define FM_BAND_RUSSIAN		2
+#define FM_BAND_WEATHER		3
 
 /* Seek directions */
 #define FM_SEARCH_DIRECTION_DOWN	0
@@ -214,6 +215,10 @@ struct fm_event_msg_hdr {
 #define FM_TUNER_PRESET_MODE		1
 #define FM_TUNER_AUTONOMOUS_SEARCH_MODE	2
 #define FM_TUNER_AF_JUMP_MODE		3
+#define FM_TUNER_PI_MATCH_MODE		4
+#define FM_TUNER_BULK_SEARCH_MODE	5
+#define FM_TUNER_WRAP_SEARCH_MODE	6
+#define FM_TUNER_WEATHER_MODE		7
 
 /* Min and Max volume */
 #define FM_RX_VOLUME_MIN	0
@@ -396,15 +401,26 @@ int fmc_get_mode(struct fmdev *, u8 *);
 /*
  * channel spacing
  */
-#define FM_CHANNEL_SPACING_50KHZ 1
-#define FM_CHANNEL_SPACING_100KHZ 2
-#define FM_CHANNEL_SPACING_200KHZ 4
-#define FM_FREQ_MUL 50
+#define FM_CHANNEL_SPACING_50KHZ	1
+#define FM_CHANNEL_SPACING_100KHZ	2
+#define FM_CHANNEL_SPACING_200KHZ	4
 
-#define FM_US_BAND_LOW		87500
-#define FM_US_BAND_HIGH		180000
-#define FM_JAPAN_BAND_LOW	76000
-#define FM_JAPAN_BAND_HIGH	90000
+#define FM_FREQ_MUL			50	/* For Europe and Japan bands */
+#define FM_FREQ_MUL_RUS			10	/* Russian band */
+#define FM_FREQ_MUL_WB			25	/* Weather Band */
+
+
+#define FM_US_BAND_LOW			87500
+#define FM_US_BAND_HIGH			180000
+
+#define FM_JAPAN_BAND_LOW		76000
+#define FM_JAPAN_BAND_HIGH		90000
+
+#define FM_RUSSIAN_BAND_LOW		65800
+#define FM_RUSSIAN_BAND_HIGH		74000
+
+#define FM_WEATHER_BAND_LOW		162400
+#define FM_WEATHER_BAND_HIGH		162550
 
 #define FM_KHZ			100
 
