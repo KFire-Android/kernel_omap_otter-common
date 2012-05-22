@@ -400,5 +400,13 @@ int fmc_get_mode(struct fmdev *, u8 *);
 #define FM_CHANNEL_SPACING_200KHZ 4
 #define FM_FREQ_MUL 50
 
+#define FM_US_BAND_LOW		87500
+#define FM_US_BAND_HIGH		180000
+#define FM_JAPAN_BAND_LOW	76000
+#define FM_JAPAN_BAND_HIGH	90000
+
+#define FM_KHZ			100
+
+
 #endif
 

@@ -196,6 +196,7 @@ struct fmtx_data {
 	u16 aud_mode;
 	u32 preemph;
 	u32 tx_frq;
+	u32 af_frq;
 	struct tx_rds rds;
 };
 
