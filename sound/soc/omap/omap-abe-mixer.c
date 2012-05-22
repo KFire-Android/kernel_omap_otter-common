@@ -511,7 +511,7 @@ static int snd_soc_info_enum_ext1(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static const char *route_ul_texts[] = {
+static const char * const route_ul_texts[] = {
 	"None", "DMic0L", "DMic0R", "DMic1L", "DMic1R", "DMic2L", "DMic2R",
 	"BT Left", "BT Right", "MMExt Left", "MMExt Right", "AMic0", "AMic1",
 	"VX Left", "VX Right"

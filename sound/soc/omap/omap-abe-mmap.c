@@ -237,9 +237,6 @@ static int aess_close(struct snd_pcm_substream *substream)
 
 	mutex_lock(&abe->mutex);
 
-	if (dai->id != OMAP_ABE_FRONTEND_DAI_LP_MEDIA) {
-	}
-
 	if (!--abe->active) {
 		omap_aess_disable_irq(abe->aess);
 		abe_pm_save_context(abe);
