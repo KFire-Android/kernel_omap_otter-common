@@ -571,7 +571,11 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		}
 	}
 
-	omap->init_60m_fclk = clk_get(dev, "init_60m_fclk");
+	if (cpu_is_omap54xx())
+		omap->init_60m_fclk = clk_get(dev, "l3init_60m_fclk");
+	else
+		omap->init_60m_fclk = clk_get(dev, "init_60m_fclk");
+
 	if (IS_ERR(omap->init_60m_fclk)) {
 		ret = PTR_ERR(omap->init_60m_fclk);
 		dev_err(dev, "init_60m_fclk failed error:%d\n", ret);
