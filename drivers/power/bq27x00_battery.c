@@ -74,7 +74,7 @@ struct bq27x00_access_methods {
 	int (*read)(struct bq27x00_device_info *di, u8 reg, bool single);
 };
 
-enum bq27x00_chip { BQ27000, BQ27500 };
+enum bq27x00_chip { BQ27000, BQ27500, BQ27530 };
 
 struct bq27x00_reg_cache {
 	int temperature;
@@ -148,7 +148,7 @@ static int bq27x00_battery_read_rsoc(struct bq27x00_device_info *di)
 {
 	int rsoc;
 
-	if (di->chip == BQ27500)
+	if ((di->chip == BQ27500) || (di->chip == BQ27530))
 		rsoc = bq27x00_read(di, BQ27500_REG_SOC, false);
 	else
 		rsoc = bq27x00_read(di, BQ27000_REG_RSOC, true);
@@ -174,7 +174,7 @@ static int bq27x00_battery_read_charge(struct bq27x00_device_info *di, u8 reg)
 		return charge;
 	}
 
-	if (di->chip == BQ27500)
+	if ((di->chip == BQ27500) || (di->chip == BQ27530))
 		charge *= 1000;
 	else
 		charge = charge * 3570 / BQ27000_RS;
@@ -208,7 +208,7 @@ static int bq27x00_battery_read_ilmd(struct bq27x00_device_info *di)
 {
 	int ilmd;
 
-	if (di->chip == BQ27500)
+	if ((di->chip == BQ27500) || (di->chip == BQ27530))
 		ilmd = bq27x00_read(di, BQ27500_REG_DCAP, false);
 	else
 		ilmd = bq27x00_read(di, BQ27000_REG_ILMD, true);
@@ -218,7 +218,7 @@ static int bq27x00_battery_read_ilmd(struct bq27x00_device_info *di)
 		return ilmd;
 	}
 
-	if (di->chip == BQ27500)
+	if ((di->chip == BQ27500) || (di->chip == BQ27530))
 		ilmd *= 1000;
 	else
 		ilmd = ilmd * 256 * 3570 / BQ27000_RS;
@@ -240,7 +240,7 @@ static int bq27x00_battery_read_energy(struct bq27x00_device_info *di)
 		return ae;
 	}
 
-	if (di->chip == BQ27500)
+	if ((di->chip == BQ27500) || (di->chip == BQ27530))
 		ae *= 1000;
 	else
 		ae = ae * 29200 / BQ27000_RS;
@@ -262,7 +262,7 @@ static int bq27x00_battery_read_temperature(struct bq27x00_device_info *di)
 		return temp;
 	}
 
-	if (di->chip == BQ27500)
+	if ((di->chip == BQ27500) || (di->chip == BQ27530))
 		temp -= 2731;
 	else
 		temp = ((temp * 5) - 5463) / 2;
@@ -310,10 +310,11 @@ static void bq27x00_update(struct bq27x00_device_info *di)
 {
 	struct bq27x00_reg_cache cache = {0, };
 	bool is_bq27500 = di->chip == BQ27500;
+	bool is_bq27530 = di->chip == BQ27530;
 
-	cache.flags = bq27x00_read(di, BQ27x00_REG_FLAGS, !is_bq27500);
+	cache.flags = bq27x00_read(di, BQ27x00_REG_FLAGS, !(is_bq27500 || is_bq27530));
 	if (cache.flags >= 0) {
-		if (!is_bq27500 && (cache.flags & BQ27000_FLAG_CI)) {
+		if (!(is_bq27500|| is_bq27530) && (cache.flags & BQ27000_FLAG_CI)) {
 			dev_info(di->dev, "battery is not calibrated! ignoring capacity values\n");
 			cache.capacity = -ENODATA;
 			cache.energy = -ENODATA;
@@ -326,7 +327,8 @@ static void bq27x00_update(struct bq27x00_device_info *di)
 			cache.energy = bq27x00_battery_read_energy(di);
 			cache.time_to_empty = bq27x00_battery_read_time(di, BQ27x00_REG_TTE);
 			cache.time_to_empty_avg = bq27x00_battery_read_time(di, BQ27x00_REG_TTECP);
-			cache.time_to_full = bq27x00_battery_read_time(di, BQ27x00_REG_TTF);
+			if (di->chip != BQ27530)
+				cache.time_to_full = bq27x00_battery_read_time(di, BQ27x00_REG_TTF);
 			cache.charge_full = bq27x00_battery_read_lmd(di);
 		}
 		cache.temperature = bq27x00_battery_read_temperature(di);
@@ -376,7 +378,7 @@ static int bq27x00_battery_current(struct bq27x00_device_info *di,
 		return curr;
 	}
 
-	if (di->chip == BQ27500) {
+	if ((di->chip == BQ27500) || (di->chip == BQ27530)) {
 		/* bq27500 returns signed value */
 		val->intval = (int)((s16)curr) * 1000;
 	} else {
@@ -397,7 +399,7 @@ static int bq27x00_battery_status(struct bq27x00_device_info *di,
 {
 	int status;
 
-	if (di->chip == BQ27500) {
+	if ((di->chip == BQ27500) || (di->chip == BQ27530)) {
 		if (di->cache.flags & BQ27500_FLAG_FC)
 			status = POWER_SUPPLY_STATUS_FULL;
 		else if (di->cache.flags & BQ27500_FLAG_DSC)
@@ -425,7 +427,7 @@ static int bq27x00_battery_capacity_level(struct bq27x00_device_info *di,
 {
 	int level;
 
-	if (di->chip == BQ27500) {
+	if ((di->chip == BQ27500) || (di->chip == BQ27530)) {
 		if (di->cache.flags & BQ27500_FLAG_FC)
 			level = POWER_SUPPLY_CAPACITY_LEVEL_FULL;
 		else if (di->cache.flags & BQ27500_FLAG_SOC1)
@@ -729,6 +731,7 @@ static int bq27x00_battery_remove(struct i2c_client *client)
 static const struct i2c_device_id bq27x00_id[] = {
 	{ "bq27200", BQ27000 },	/* bq27200 is same as bq27000, but with i2c */
 	{ "bq27500", BQ27500 },
+	{ "bq27530", BQ27530 },
 	{},
 };
 MODULE_DEVICE_TABLE(i2c, bq27x00_id);
