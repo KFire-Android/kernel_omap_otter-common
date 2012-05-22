@@ -39,26 +39,13 @@
 
 #define HSI_PORT_OFFSET			0x1000
 
-/*
- * GDD base addr : 0x48059000 (SSI)
- * GDD base addr : 0x4A059000 (HSI)
- */
 #define HSI_GDD_OFFSET			0x1000
 #define HSI_GDD_BASE			HSI_GDD_OFFSET	/* 0x9000 */
 
-/*
- * HST base addr:
- *	port 1: 0x4805a000 (SSI) - 0x4A05a000 (HSI)
- *	port 2: 0x4805b000 (SSI) - 0x4a05b000 (HSI)
- */
 #define HSI_HST_OFFSET			0x2000
 #define HSI_HST_BASE(port)		(HSI_HST_OFFSET + (((port) - 1) *\
 							(HSI_PORT_OFFSET)))
- /*
- * HSR base addr:
- *	port 1: 0x4805a800 (SSI) - 0x4A05a800 (HSI)
- *	port 2: 0x4805b800 (SSI) - 0x4A05b800 (HSI)
- */
+
 #define HSI_HSR_OFFSET			0x2800
 #define HSI_HSR_BASE(port)		(HSI_HSR_OFFSET + (((port) - 1) *\
 							(HSI_PORT_OFFSET)))
