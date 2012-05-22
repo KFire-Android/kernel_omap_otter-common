@@ -95,6 +95,7 @@
 /* Values of USBTLL_REVISION - Note: these are not given in the TRM */
 #define OMAP_USBTLL_REV1		0x00000015	/* OMAP3 */
 #define OMAP_USBTLL_REV2		0x00000004	/* OMAP4 */
+#define OMAP_USBTLL_REV3		0x00000006	/* OMAP5 */
 
 #define is_ehci_phy_mode(x)	(x == OMAP_EHCI_PORT_MODE_PHY)
 #define is_ehci_tll_mode(x)	(x == OMAP_EHCI_PORT_MODE_TLL)
@@ -278,8 +279,10 @@ static int __devinit usbtll_omap_probe(struct platform_device *pdev)
 	ver =  usbtll_read(base, OMAP_USBTLL_REVISION);
 	if (ver == OMAP_USBTLL_REV1)
 		count = OMAP_TLL_CHANNEL_COUNT;
-	else if (ver >= OMAP_USBTLL_REV2)
+	else if (ver == OMAP_USBTLL_REV2)
 		count = OMAP_REV2_TLL_CHANNEL_COUNT;
+	else if (ver == OMAP_USBTLL_REV3)
+		count = OMAP_TLL_CHANNEL_COUNT;
 	else {
 		dev_err(dev, "TLL version failed\n");
 		ret = -ENODEV;

@@ -72,6 +72,7 @@
 #define OMAP4_P2_MODE_CLEAR				(3 << 18)
 #define OMAP4_P2_MODE_TLL				(1 << 18)
 #define OMAP4_P2_MODE_HSIC				(3 << 18)
+#define OMAP5_P3_MODE_HSIC				(3 << 20)
 
 #define	OMAP_UHH_DEBUG_CSR				(0x44)
 
@@ -456,6 +457,9 @@ static void omap_usbhs_init(struct device *dev)
 			reg |= OMAP4_P2_MODE_TLL;
 		else if (is_ehci_hsic_mode(pdata->port_mode[1]))
 			reg |= OMAP4_P2_MODE_HSIC;
+
+		if (is_ehci_hsic_mode(pdata->port_mode[2]))
+			reg |= OMAP5_P3_MODE_HSIC;
 	}
 
 	usbhs_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
