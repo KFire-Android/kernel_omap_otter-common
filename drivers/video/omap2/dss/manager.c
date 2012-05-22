@@ -963,9 +963,11 @@ static bool dispc_is_overlay_scaled(struct overlay_cache_data *oc)
 static int configure_wb_overlay(void)
 {
 	struct writeback_cache_data *c = &dss_cache.writeback_cache;
-	int r;
+	int r = 0;
 
-	r = dispc_setup_wb(c);
+	if (c->enabled)
+		r = dispc_setup_wb(c);
+
 	if (r)
 		DSSERR("dispc_setup_wb failed with error %d\n", r);
 	return r;
@@ -1315,6 +1317,16 @@ static int configure_dispc(void)
 				break;
 			}
 		} else if (wbc->dirty && !wbc->enabled) {
+			if (wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+				wbc->source >= OMAP_WB_GFX) {
+				/* This is a workaround. According to TRM
+				 * we should disable the manager but it will
+				 * cause blinking of panel. WA is to disable
+				 * pipe which was used as source of WB and do
+				 * dummy enable and disable of WB.
+				 */
+				dispc_enable_plane(OMAP_DSS_WB, 1);
+			}
 			dispc_enable_plane(OMAP_DSS_WB, 0);
 			wbc->dirty = false;
 		}
