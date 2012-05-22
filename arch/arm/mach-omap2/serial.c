@@ -370,5 +370,9 @@ void __init omap_serial_board_init(struct omap_uart_port_info *info)
  */
 void __init omap_serial_init(void)
 {
+	/* If dtb is there, the devices will be created dynamically */
+	if (of_have_populated_dt())
+		return;
+
 	omap_serial_board_init(NULL);
 }

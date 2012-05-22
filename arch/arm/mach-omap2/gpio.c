@@ -147,6 +147,10 @@ static int __init omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
  */
 static int __init omap2_gpio_init(void)
 {
+	/* If dtb is there, the devices will be created dynamically */
+	if (of_have_populated_dt())
+		return -ENODEV;
+
 	return omap_hwmod_for_each_by_class("gpio", omap2_gpio_dev_init,
 						NULL);
 }
