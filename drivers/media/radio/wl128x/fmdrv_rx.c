@@ -367,7 +367,8 @@ int fm_rx_set_region(struct fmdev *fmdev, u8 region_to_set)
 	int ret;
 
 	if (region_to_set != FM_BAND_EUROPE_US &&
-	    region_to_set != FM_BAND_JAPAN) {
+	    region_to_set != FM_BAND_JAPAN &&
+	    region_to_set != FM_BAND_RUSSIAN) {
 		fmerr("Invalid band\n");
 		return -EINVAL;
 	}

@@ -58,6 +58,13 @@ static struct region_info region_configs[] = {
 	 .top_freq = 90000,	/* 90 MHz */
 	 .fm_band = 1,
 	 },
+	/* Russian (OIRT) band */
+	{
+	 .chanl_space = FM_CHANNEL_SPACING_200KHZ * FM_FREQ_MUL,
+	 .bot_freq = 65800,	/* 65.8 MHz */
+	 .top_freq = 74000,	/* 74 MHz */
+	 .fm_band = 2,
+	 },
 };
 
 /* Band selection */
