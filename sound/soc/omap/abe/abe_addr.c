@@ -477,7 +477,6 @@ struct omap_aess_addr omap_aess_map[] = {
 		.offset = 0,
 		.bytes = 0,
 	},
-			   
 };
 
 /* Default scheduling table for AESS (load after boot and OFF mode) */
@@ -1269,5 +1268,3 @@ struct omap_aess_init_task aess_port_mm_dl_48k_pp = {
 	.nb_task = sizeof(task_aess_enable_mm_dl_48k_pp_port)/sizeof(struct omap_aess_task),
 	.task = task_aess_enable_mm_dl_48k_pp_port,
 };
-
-

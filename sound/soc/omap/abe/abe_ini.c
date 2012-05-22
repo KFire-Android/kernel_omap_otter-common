@@ -272,5 +272,3 @@ u32 omap_abe_get_supported_fw_version(void)
        return OMAP_ABE_SUPPORTED_FW_VERSION;
 }
 EXPORT_SYMBOL(omap_abe_get_supported_fw_version);
-
-

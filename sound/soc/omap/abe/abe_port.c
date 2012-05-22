@@ -152,7 +152,7 @@ static u32 omap_aess_update_io_task(struct omap_aess *abe,
 			abe->MultiFrame[task->frame][task->slot] = 0;
 	}
 
-	return(io_task->smem);
+	return io_task->smem;
 }
 
 /**

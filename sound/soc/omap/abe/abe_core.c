@@ -514,4 +514,3 @@ int omap_aess_check_activity(struct omap_aess *abe)
 	return ret;
 }
 EXPORT_SYMBOL(omap_aess_check_activity);
-

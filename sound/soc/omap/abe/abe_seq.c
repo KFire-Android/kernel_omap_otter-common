@@ -350,4 +350,3 @@ int omap_aess_plug_subroutine(struct omap_aess *abe, u32 *id, abe_subroutine2 f,
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_plug_subroutine);
-
