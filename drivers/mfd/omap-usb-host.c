@@ -94,7 +94,6 @@ struct usbhs_hcd_omap {
 	struct clk			*usbhost_p1_fck;
 	struct clk			*utmi_p2_fck;
 	struct clk			*usbhost_p2_fck;
-	struct clk			*utmi_p3_fck;
 	struct clk			*usbhost_p3_fck;
 	struct clk			*init_60m_fclk;
 	struct clk			*ehci_logic_fck;
@@ -328,7 +327,6 @@ static int usbhs_runtime_resume(struct device *dev)
 
 	clk_enable(omap->utmi_p1_fck);
 	clk_enable(omap->utmi_p2_fck);
-	clk_enable(omap->utmi_p3_fck);
 
 	spin_unlock_irqrestore(&omap->lock, flags);
 	return 0;
@@ -376,7 +374,6 @@ static int usbhs_runtime_suspend(struct device *dev)
 		clk_disable(omap->usb_host_hs_hsic480m_p3_clk);
 	}
 
-	clk_disable(omap->utmi_p3_fck);
 	clk_disable(omap->utmi_p2_fck);
 	clk_disable(omap->utmi_p1_fck);
 	if (omap->ehci_logic_fck && !IS_ERR(omap->ehci_logic_fck))
@@ -547,20 +544,11 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto err_utmi_p2_fck;
 	}
 
-	if (cpu_is_omap54xx()) {
-		omap->utmi_p3_fck = clk_get(dev, "utmi_p3_gfclk");
-		if (IS_ERR(omap->utmi_p3_fck)) {
-			ret = PTR_ERR(omap->utmi_p3_fck);
-			dev_err(dev, "utmi_p3_gfclk failed error:%d\n", ret);
-			goto err_xclk60mhsp2_ck;
-		}
-	}
-
 	omap->usbhost_p1_fck = clk_get(dev, "usb_host_hs_utmi_p1_clk");
 	if (IS_ERR(omap->usbhost_p1_fck)) {
 		ret = PTR_ERR(omap->usbhost_p1_fck);
 		dev_err(dev, "usbhost_p1_fck failed error:%d\n", ret);
-		goto err_utmi_p3_fck;
+		goto err_xclk60mhsp2_ck;
 	}
 
 	omap->usbhost_p2_fck = clk_get(dev, "usb_host_hs_utmi_p2_clk");
@@ -721,9 +709,6 @@ err_usbhost_p2_fck:
 err_usbhost_p1_fck:
 	clk_put(omap->usbhost_p1_fck);
 
-err_utmi_p3_fck:
-	clk_put(omap->utmi_p3_fck);
-
 err_xclk60mhsp2_ck:
 	clk_put(omap->xclk60mhsp2_ck);
 
@@ -770,7 +755,6 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
 	clk_put(omap->ehci_logic_fck);
 
 	if (cpu_is_omap54xx()) {
-		clk_put(omap->utmi_p3_fck);
 		clk_put(omap->usbhost_p3_fck);
 		clk_put(omap->usb_host_hs_hsic480m_p3_clk);
 		clk_put(omap->usb_host_hs_hsic60m_p3_clk);

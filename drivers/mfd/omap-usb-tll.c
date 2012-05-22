@@ -278,7 +278,7 @@ static int __devinit usbtll_omap_probe(struct platform_device *pdev)
 	ver =  usbtll_read(base, OMAP_USBTLL_REVISION);
 	if (ver == OMAP_USBTLL_REV1)
 		count = OMAP_TLL_CHANNEL_COUNT;
-	else if (ver == OMAP_USBTLL_REV2)
+	else if (ver >= OMAP_USBTLL_REV2)
 		count = OMAP_REV2_TLL_CHANNEL_COUNT;
 	else {
 		dev_err(dev, "TLL version failed\n");
