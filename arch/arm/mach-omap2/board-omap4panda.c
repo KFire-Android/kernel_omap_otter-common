@@ -42,6 +42,7 @@
 #include "common.h"
 #include <plat/usb.h>
 #include <plat/mmc.h>
+#include <plat/drm.h>
 #include <video/omap-panel-dvi.h>
 
 #include "hsmmc.h"
@@ -592,6 +593,7 @@ static void __init omap4_panda_init(void)
 	omap4_twl6030_hsmmc_init(mmc);
 	omap4_ehci_init();
 	usb_musb_init(&musb_board_data);
+	omap_init_dmm_tiler();
 	omap4_panda_display_init();
 }
 
