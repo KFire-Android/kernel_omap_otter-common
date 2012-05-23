@@ -34,7 +34,7 @@
 #define OMAP_PANIC_TEMP 110000
 #define OMAP_ALERT_TEMP 100000
 #define OMAP_MONITOR_TEMP 85000
-
+#define OMAP_SAFE_TEMP  25000
 
 /* TODO: Define this via a configurable file */
 #define HYSTERESIS_VALUE 5000
@@ -54,8 +54,6 @@ struct omap_die_governor {
 
 static struct thermal_dev *therm_fw;
 static struct omap_die_governor *omap_gov;
-
-static LIST_HEAD(cooling_agents);
 
 /**
  * DOC: Introduction
@@ -173,41 +171,26 @@ static signed hotspot_temp_to_sensor_temp(int hot_spot_temp)
  */
 static int omap_safe_zone(struct list_head *cooling_list, int cpu_temp)
 {
-	struct thermal_dev *cooling_dev, *tmp;
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
-	pr_debug("%s:hot spot temp %d\n", __func__, cpu_temp);
-	/* TO DO: need to build an algo to find the right cooling agent */
-	list_for_each_entry_safe(cooling_dev, tmp, cooling_list, node) {
-		if (cooling_dev->dev_ops &&
-			cooling_dev->dev_ops->cool_device) {
-			/* TO DO: Add cooling agents to a list here */
-			list_add(&cooling_dev->node, &cooling_agents);
-			goto out;
-		} else {
-			pr_info("%s:Cannot find cool_device for %s\n",
-				__func__, cooling_dev->name);
-		}
-	}
-out:
-	if (list_empty(&cooling_agents)) {
+
+	pr_info("%s:hot spot temp %d\n", __func__, cpu_temp);
+	if (list_empty(cooling_list)) {
 		pr_err("%s: No Cooling devices registered\n",
 			__func__);
 		return -ENODEV;
-	} else {
-		omap_gov->cooling_level = 0;
-		thermal_device_call_all(&cooling_agents, cool_device,
-					omap_gov->cooling_level);
-		list_del_init(&cooling_agents);
-		die_temp_lower = hotspot_temp_to_sensor_temp(
-			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
-		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_MONITOR_TEMP);
-		thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
-					die_temp_lower, die_temp_upper);
-		omap_update_report_rate(omap_gov->temp_sensor,
-			NORMAL_TEMP_MONITORING_RATE);
-		omap_gov->panic_zone_reached = 0;
 	}
+
+	omap_gov->cooling_level = 0;
+	thermal_device_call_all(cooling_list, cool_device,
+						omap_gov->cooling_level);
+	die_temp_lower = hotspot_temp_to_sensor_temp(OMAP_SAFE_TEMP);
+	die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_MONITOR_TEMP);
+	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+						die_temp_lower, die_temp_upper);
+	omap_update_report_rate(omap_gov->temp_sensor,
+						FAST_TEMP_MONITORING_RATE);
+	omap_gov->panic_zone_reached = 0;
 
 	return 0;
 }
@@ -225,43 +208,27 @@ out:
  */
 static int omap_monitor_zone(struct list_head *cooling_list, int cpu_temp)
 {
-	struct thermal_dev *cooling_dev, *tmp;
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_debug("%s:hot spot temp %d\n", __func__, cpu_temp);
-	/* TO DO: need to build an algo to find the right cooling agent */
-	list_for_each_entry_safe(cooling_dev, tmp, cooling_list, node) {
-		if (cooling_dev->dev_ops &&
-			cooling_dev->dev_ops->cool_device) {
-			/* TO DO: Add cooling agents to a list here */
-			list_add(&cooling_dev->node, &cooling_agents);
-			goto out;
-		} else {
-			pr_info("%s:Cannot find cool_device for %s\n",
-				__func__, cooling_dev->name);
-		}
-	}
-out:
-	if (list_empty(&cooling_agents)) {
+	pr_info("%s:hot spot temp %d\n", __func__, cpu_temp);
+	if (list_empty(cooling_list)) {
 		pr_err("%s: No Cooling devices registered\n",
 			__func__);
 		return -ENODEV;
-	} else {
-		omap_gov->cooling_level = 0;
-		thermal_device_call_all(&cooling_agents, cool_device,
-					omap_gov->cooling_level);
-		list_del_init(&cooling_agents);
-		die_temp_lower = hotspot_temp_to_sensor_temp(
-			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
-		die_temp_upper =
-			hotspot_temp_to_sensor_temp(OMAP_ALERT_TEMP);
-		thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
-					die_temp_lower, die_temp_upper);
-		omap_update_report_rate(omap_gov->temp_sensor,
-			FAST_TEMP_MONITORING_RATE);
-		omap_gov->panic_zone_reached = 0;
 	}
+
+	omap_gov->cooling_level = 0;
+	thermal_device_call_all(cooling_list, cool_device,
+						omap_gov->cooling_level);
+	die_temp_lower = hotspot_temp_to_sensor_temp(
+					OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
+	die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_ALERT_TEMP);
+	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+						die_temp_lower, die_temp_upper);
+	omap_update_report_rate(omap_gov->temp_sensor,
+						FAST_TEMP_MONITORING_RATE);
+	omap_gov->panic_zone_reached = 0;
 
 	return 0;
 }
@@ -281,46 +248,30 @@ out:
  */
 static int omap_alert_zone(struct list_head *cooling_list, int cpu_temp)
 {
-	struct thermal_dev *cooling_dev, *tmp;
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_debug("%s:hot spot temp %d\n", __func__, cpu_temp);
-	/* TO DO: need to build an algo to find the right cooling agent */
-	list_for_each_entry_safe(cooling_dev, tmp, cooling_list, node) {
-		if (cooling_dev->dev_ops &&
-			cooling_dev->dev_ops->cool_device) {
-			/* TO DO: Add cooling agents to a list here */
-			list_add(&cooling_dev->node, &cooling_agents);
-			goto out;
-		} else {
-			pr_info("%s:Cannot find cool_device for %s\n",
-				__func__, cooling_dev->name);
-		}
-	}
-out:
-	if (list_empty(&cooling_agents)) {
+	pr_info("%s:hot spot temp %d\n", __func__, cpu_temp);
+	if (list_empty(cooling_list)) {
 		pr_err("%s: No Cooling devices registered\n",
 			__func__);
 		return -ENODEV;
-	} else {
-		if (omap_gov->panic_zone_reached == 0) {
-			/* Temperature rises and enters into alert zone */
-			omap_gov->cooling_level = 0;
-			thermal_device_call_all(&cooling_agents, cool_device,
-						omap_gov->cooling_level);
-		}
-
-		list_del_init(&cooling_agents);
-		die_temp_lower = hotspot_temp_to_sensor_temp(
-			OMAP_ALERT_TEMP - HYSTERESIS_VALUE);
-		die_temp_upper = hotspot_temp_to_sensor_temp(
-			OMAP_PANIC_TEMP);
-		thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
-					die_temp_lower, die_temp_upper);
-		omap_update_report_rate(omap_gov->temp_sensor,
-			FAST_TEMP_MONITORING_RATE);
 	}
+
+	if (omap_gov->panic_zone_reached == 0) {
+		/* Temperature rises and enters into alert zone */
+		omap_gov->cooling_level = 0;
+		thermal_device_call_all(cooling_list, cool_device,
+						omap_gov->cooling_level);
+	}
+
+	die_temp_lower = hotspot_temp_to_sensor_temp(
+					OMAP_ALERT_TEMP - HYSTERESIS_VALUE);
+	die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_PANIC_TEMP);
+	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+						die_temp_lower, die_temp_upper);
+	omap_update_report_rate(omap_gov->temp_sensor,
+						FAST_TEMP_MONITORING_RATE);
 
 	return 0;
 }
@@ -337,54 +288,40 @@ out:
  */
 static int omap_panic_zone(struct list_head *cooling_list, int cpu_temp)
 {
-	struct thermal_dev *cooling_dev, *tmp;
 	int die_temp_upper = 0;
 	int die_temp_lower = 0;
 
-	pr_debug("%s:hot spot temp %d\n", __func__, cpu_temp);
-	/* TO DO: need to build an algo to find the right cooling agent */
-	list_for_each_entry_safe(cooling_dev, tmp, cooling_list, node) {
-		if (cooling_dev->dev_ops &&
-			cooling_dev->dev_ops->cool_device) {
-			/* TO DO: Add cooling agents to a list here */
-			list_add(&cooling_dev->node, &cooling_agents);
-			goto out;
-		} else {
-			pr_info("%s:Cannot find cool_device for %s\n",
-				__func__, cooling_dev->name);
-		}
-	}
-out:
-	if (list_empty(&cooling_agents)) {
+	pr_info("%s:hot spot temp %d\n", __func__, cpu_temp);
+	if (list_empty(cooling_list)) {
 		pr_err("%s: No Cooling devices registered\n",
 			__func__);
 		return -ENODEV;
-	} else {
-		omap_gov->cooling_level++;
-		omap_gov->panic_zone_reached++;
-		pr_debug("%s: Panic zone reached %i times\n",
-			__func__, omap_gov->panic_zone_reached);
-		thermal_device_call_all(&cooling_agents, cool_device,
-					omap_gov->cooling_level);
-		list_del_init(&cooling_agents);
-		die_temp_lower = hotspot_temp_to_sensor_temp(
-			OMAP_PANIC_TEMP - HYSTERESIS_VALUE);
-
-		/* Set the threshold window to below fatal.  This way the
-		 * governor can manage the thermal if the temp should rise
-		 * while throttling.  We need to be agressive with throttling
-		 * should we reach this zone. */
-		die_temp_upper = (((OMAP_FATAL_TEMP - OMAP_PANIC_TEMP) / 4) *
-				omap_gov->panic_zone_reached) + OMAP_PANIC_TEMP;
-		if (die_temp_upper >= OMAP_FATAL_TEMP)
-			die_temp_upper = OMAP_FATAL_TEMP;
-
-		die_temp_upper = hotspot_temp_to_sensor_temp(die_temp_upper);
-		thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
-					die_temp_lower, die_temp_upper);
-		omap_update_report_rate(omap_gov->temp_sensor,
-			FAST_TEMP_MONITORING_RATE);
 	}
+
+
+	omap_gov->cooling_level++;
+	omap_gov->panic_zone_reached++;
+	pr_debug("%s: Panic zone reached %i times\n", __func__,
+						omap_gov->panic_zone_reached);
+	thermal_device_call_all(cooling_list, cool_device,
+						omap_gov->cooling_level);
+	die_temp_lower = hotspot_temp_to_sensor_temp(
+					OMAP_PANIC_TEMP - HYSTERESIS_VALUE);
+
+	/* Set the threshold window to below fatal.  This way the
+	 * governor can manage the thermal if the temp should rise
+	 * while throttling.  We need to be agressive with throttling
+	 * should we reach this zone. */
+	die_temp_upper = (((OMAP_FATAL_TEMP - OMAP_PANIC_TEMP) / 4) *
+			omap_gov->panic_zone_reached) + OMAP_PANIC_TEMP;
+	if (die_temp_upper >= OMAP_FATAL_TEMP)
+		die_temp_upper = OMAP_FATAL_TEMP;
+
+	die_temp_upper = hotspot_temp_to_sensor_temp(die_temp_upper);
+	thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+					die_temp_lower, die_temp_upper);
+	omap_update_report_rate(omap_gov->temp_sensor,
+					FAST_TEMP_MONITORING_RATE);
 
 	return 0;
 }
