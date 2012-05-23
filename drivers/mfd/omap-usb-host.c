@@ -536,7 +536,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto err_end;
 	}
 
-	omap->xclk60mhsp1_ck = clk_get(dev, "xclk60mhsp1_ck");
+	omap->xclk60mhsp1_ck = clk_get(dev, "xclk60mhsp1");
 	if (IS_ERR(omap->xclk60mhsp1_ck)) {
 		ret = PTR_ERR(omap->xclk60mhsp1_ck);
 		dev_err(dev, "xclk60mhsp1_ck failed error:%d\n", ret);
@@ -550,7 +550,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 		goto err_xclk60mhsp1_ck;
 	}
 
-	omap->xclk60mhsp2_ck = clk_get(dev, "xclk60mhsp2_ck");
+	omap->xclk60mhsp2_ck = clk_get(dev, "xclk60mhsp2");
 	if (IS_ERR(omap->xclk60mhsp2_ck)) {
 		ret = PTR_ERR(omap->xclk60mhsp2_ck);
 		dev_err(dev, "xclk60mhsp2_ck failed error:%d\n", ret);
