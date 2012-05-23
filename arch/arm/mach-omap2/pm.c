@@ -390,6 +390,16 @@ static void __init omap4_init_voltages(void)
 	omap_set_init_opp("iva", "dpll_iva_m5x2_ck", "iva");
 }
 
+static void __init omap5_init_voltages(void)
+{
+	if (!cpu_is_omap54xx())
+		return;
+
+	omap_set_init_opp("mpu", "dpll_mpu_ck", "mpu");
+	omap_set_init_opp("core", "virt_l3_ck", "l3_main_1");
+	omap_set_init_opp("mm", "dpll_iva_h12x2_ck", "iva");
+}
+
 static int __init omap2_common_pm_init(void)
 {
 	if (!of_have_populated_dt())
@@ -417,6 +427,7 @@ static int __init omap2_common_pm_late_init(void)
 	/* Initialize the voltages */
 	omap3_init_voltages();
 	omap4_init_voltages();
+	omap5_init_voltages();
 
 	/* Smartreflex device init */
 	omap_devinit_smartreflex();
