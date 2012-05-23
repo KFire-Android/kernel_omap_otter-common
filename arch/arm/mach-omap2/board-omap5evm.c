@@ -609,6 +609,8 @@ static struct palmas_resource_platform_data omap5_palmas_resource = {
 	.sysen1_mode_sleep = 0,
 	.sysen2_mode_sleep = 0,
 
+	.sysen2_mode_active = 1,
+
 	.nsleep_res = 0,
 	.nsleep_smps = 0,
 	.nsleep_ldo1 = 0,
