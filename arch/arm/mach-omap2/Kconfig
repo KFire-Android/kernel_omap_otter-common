@@ -364,6 +364,7 @@ config MACH_OMAP5_SEVM
 	depends on ARCH_OMAP5
 	select KEYBOARD_SMSC
 	select TOUCHSCREEN_QUANTUM_OBP
+	select INPUT_TSL2771
 
 config MACH_OMAP5_PANDA
 	bool "OMAP5 Panda board"
