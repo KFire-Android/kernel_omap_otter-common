@@ -24,11 +24,16 @@
 
 #include <plat/i2c.h>
 
+static struct i2c_board_info __initdata omap5evm_sensor_i2c2_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("bmp085", 0x77),
+	},
+};
 
 int __init sevm_sensor_init(void)
 {
-
-	/* Initialize Sensor modules here */
+	i2c_register_board_info(2, omap5evm_sensor_i2c2_boardinfo,
+		ARRAY_SIZE(omap5evm_sensor_i2c2_boardinfo));
 
 	return 0;
 }
