@@ -107,13 +107,10 @@ struct thermal_dev {
 	ret;								\
 })
 
-extern int thermal_update_temp_thresholds(struct thermal_dev *temp_sensor,
-		int min, int max);
 extern int thermal_request_temp(struct thermal_dev *tdev);
 extern int thermal_sensor_set_temp(struct thermal_dev *tdev);
 extern int thermal_get_slope(struct thermal_dev *tdev);
 extern int thermal_get_offset(struct thermal_dev *tdev);
-extern int thermal_update_temp_rate(struct thermal_dev *temp_sensor, int rate);
 
 /* Registration and unregistration calls for the thermal devices */
 extern int thermal_sensor_dev_register(struct thermal_dev *tdev);
