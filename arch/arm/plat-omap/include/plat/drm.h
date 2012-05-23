@@ -60,6 +60,9 @@ static inline void omapdrm_reserve_vram(void)
 {
 }
 
+static inline void omap_init_dmm_tiler(void)
+{
+}
 #endif
 
 #endif /* __PLAT_OMAP_DRM_H__ */
