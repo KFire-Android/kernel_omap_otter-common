@@ -4,7 +4,7 @@
 
 config OMAP_HSI
 	bool "OMAP HSI hardware driver"
-	depends on (ARCH_OMAP34XX || ARCH_OMAP4)
+	depends on (ARCH_OMAP34XX || ARCH_OMAP4 || ARCH_OMAP5)
 	default n
 	---help---
 	  If you say Y here, you will enable the OMAP HSI hardware driver.
@@ -41,7 +41,7 @@ choice
 
 config OMAP_HSI_DEVICE
 	bool "HSI (OMAP MIPI HSI)"
-	depends on ARCH_OMAP4
+	depends on (ARCH_OMAP4 || ARCH_OMAP5)
 	---help---
 	  The MIPI High Speed Synchronous Serial Interface (HSI) is a high
 	  speed communication interface that is used for connecting OMAP
