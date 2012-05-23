@@ -381,6 +381,10 @@ static int palmas_initialise_resource(struct palmas_resource *resource,
 			return ret;
 	}
 
+	if (pdata->sysen2_mode_active) {
+		palmas_enable_sysen2(resource);
+	}
+
 	if (pdata->nsleep_res) {
 		ret = palmas_resource_write(resource->palmas,
 			PALMAS_NSLEEP_RES_ASSIGN, pdata->nsleep_res);
@@ -554,4 +558,3 @@ MODULE_ALIAS("platform:palmas-resource");
 MODULE_AUTHOR("Graeme Gregory <gg@slimlogic.co.uk>");
 MODULE_DESCRIPTION("Palmas General Resource driver");
 MODULE_LICENSE("GPL");
-

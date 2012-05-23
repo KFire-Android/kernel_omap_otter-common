@@ -167,6 +167,8 @@ struct palmas_resource_platform_data {
 	int sysen1_mode_sleep;
 	int sysen2_mode_sleep;
 
+	int sysen2_mode_active;
+
 	/* bitfield to be loaded to NSLEEP_RES_ASSIGN */
 	u8 nsleep_res;
 	/* bitfield to be loaded to NSLEEP_SMPS_ASSIGN */
