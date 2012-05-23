@@ -159,7 +159,6 @@ static struct usb_configuration android_config_driver = {
 	.unbind		= android_unbind_config,
 	.bConfigurationValue = 1,
 	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
-	.bMaxPower	= 0xFA, /* 500ma */
 };
 
 static void android_work(struct work_struct *data)
@@ -1202,6 +1201,11 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	req->complete = composite_setup_complete;
 	req->length = 0;
 	gadget->ep0->driver_data = cdev;
+
+	if (gadget->speed == USB_SPEED_SUPER)
+		android_config_driver.bMaxPower = 0x70; /* ~900 mA */
+	else
+		android_config_driver.bMaxPower = 0xFA; /* 500 mA */
 
 	list_for_each_entry(f, &dev->enabled_functions, enabled_list) {
 		if (f->ctrlrequest) {
