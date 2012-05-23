@@ -120,6 +120,14 @@ extern struct omap_vc_param omap4_mpu_vc_data;
 extern struct omap_vc_param omap4_iva_vc_data;
 extern struct omap_vc_param omap4_core_vc_data;
 
+extern struct omap_vc_channel omap5_vc_mpu;
+extern struct omap_vc_channel omap5_vc_mm;
+extern struct omap_vc_channel omap5_vc_core;
+
+extern struct omap_vc_param omap5_mpu_vc_data;
+extern struct omap_vc_param omap5_mm_vc_data;
+extern struct omap_vc_param omap5_core_vc_data;
+
 void omap_vc_init_channel(struct voltagedomain *voltdm);
 int omap_vc_pre_scale(struct voltagedomain *voltdm,
 		      unsigned long target_volt,

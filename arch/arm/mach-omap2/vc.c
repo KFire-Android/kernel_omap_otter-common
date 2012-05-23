@@ -25,6 +25,7 @@
 #include "prm44xx.h"
 #include "pm.h"
 #include "scrm44xx.h"
+#include "scrm54xx.h"
 
 /**
  * struct omap_vc_channel_cfg - describe the cfg_channel bitfield
@@ -509,8 +510,10 @@ static void omap4_set_timings(struct voltagedomain *voltdm)
 		OMAP4_SETUPTIME_MASK);
 	val |= omap4_usec_to_val_scrm(tshut, OMAP4_DOWNTIME_SHIFT,
 		OMAP4_DOWNTIME_MASK);
-
-	__raw_writel(val, OMAP4_SCRM_CLKSETUPTIME);
+	if (cpu_is_omap54xx())
+		__raw_writel(val, OMAP5_SCRM_CLKSETUPTIME);
+	else
+		__raw_writel(val, OMAP4_SCRM_CLKSETUPTIME);
 }
 
 /* OMAP4 specific voltage init functions */
@@ -679,7 +682,7 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
 
 	if (cpu_is_omap34xx())
 		omap3_vc_init_channel(voltdm);
-	else if (cpu_is_omap44xx())
+	else if (cpu_is_omap44xx() || cpu_is_omap54xx())
 		omap4_vc_init_channel(voltdm);
 }
 

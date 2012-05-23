@@ -104,7 +104,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
 
 obj-$(CONFIG_ARCH_OMAP5)                += prcm.o cm2xxx_3xxx.o cminst44xx.o \
 					   cm44xx.o prcm_mpu44xx.o \
-					   prminst44xx.o vc44xx_data.o \
+					   prminst44xx.o vc54xx_data.o \
 					   vp54xx_data.o
 
 # OMAP voltage domains
