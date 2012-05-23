@@ -69,6 +69,8 @@ config ARCH_OMAP5
 	select USB_ARCH_HAS_XHCI if USB_SUPPORT
 	select ARM_ARCH_TIMER
 	select ARCH_NEEDS_CPU_IDLE_COUPLED
+	select ARCH_HAS_OPP
+	select PM_OPP if PM
 
 comment "OMAP Core Type"
 	depends on ARCH_OMAP2
