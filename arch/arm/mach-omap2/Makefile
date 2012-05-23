@@ -306,3 +306,6 @@ obj-y					+= common-board-devices.o twl-common.o
 
 emif-omap-$(CONFIG_TI_EMIF)		:= emif_omap.o
 obj-y					+= $(emif-omap-m) $(emif-omap-y)
+
+obj-$(CONFIG_ARCH_OMAP4)		+= board-omap-identity.o
+obj-$(CONFIG_ARCH_OMAP5)		+= board-omap-identity.o

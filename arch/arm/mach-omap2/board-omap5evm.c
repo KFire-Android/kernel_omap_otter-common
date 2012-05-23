@@ -38,6 +38,7 @@
 #include <plat/common.h>
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
+#include <plat/omap_apps_brd_id.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-lg4591.h>
@@ -947,6 +948,7 @@ static void __init omap_5430evm_init(void)
 #endif
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
+	omap_create_board_props();
 	omap_5430evm_i2c_init();
 	omap_serial_init();
 	platform_device_register(&dummy_sd_regulator_device);

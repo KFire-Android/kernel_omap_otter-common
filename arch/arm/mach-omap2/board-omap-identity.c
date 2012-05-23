@@ -24,6 +24,8 @@
 
 #include <mach/hardware.h>
 
+#include <plat/omap_apps_brd_id.h>
+
 static ssize_t omap_soc_family_show(struct kobject *kobj,
 				    struct kobj_attribute *attr, char *buf)
 {
