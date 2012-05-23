@@ -1,7 +1,9 @@
 /*
- * arch/arm/mach-omap2/board-54xx-sevm.h
+ * arch/arm/mach-omap2/board-54xx-sevm-sensors.c
  *
  * Copyright (C) 2012 Texas Instruments
+ *
+ * Author: Leed Aguilar <leed.aguilar@ti.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -14,11 +16,19 @@
  *
  */
 
-#ifndef _MACH_OMAP_BOARD_54XX_SEVM_H
-#define _MACH_OMAP_BOARD_54XX_SEVM_H
+#include <linux/kernel.h>
+#include <linux/interrupt.h>
+#include <linux/i2c.h>
+#include <linux/io.h>
+#include <linux/init.h>
 
-int __init sevm_dock_init(void);
-int __init sevm_touch_init(void);
-int __init sevm_sensor_init(void);
+#include <plat/i2c.h>
 
-#endif
+
+int __init sevm_sensor_init(void)
+{
+
+	/* Initialize Sensor modules here */
+
+	return 0;
+}

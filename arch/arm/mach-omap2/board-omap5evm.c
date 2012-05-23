@@ -955,6 +955,7 @@ static void __init omap_5430evm_init(void)
 	platform_device_register(&dummy_sd_regulator_device);
 	sevm_dock_init();
 	sevm_touch_init();
+	sevm_sensor_init();
 	status = omap4_keyboard_init(&evm5430_keypad_data, &keypad_data);
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
