@@ -24,6 +24,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/input/mt.h>
 #include <linux/platform_device.h>
 #include <linux/qtouch_obp_ts.h>
@@ -981,6 +982,7 @@ static int qtouch_ts_probe(struct i2c_client *client,
 
 	ts->pdata = pdata;
 	ts->client = client;
+	ts->client->irq = gpio_to_irq(ts->client->irq);
 	i2c_set_clientdata(client, ts);
 	ts->checksum_cnt = 0;
 	ts->x_delta = ts->pdata->x_delta;
