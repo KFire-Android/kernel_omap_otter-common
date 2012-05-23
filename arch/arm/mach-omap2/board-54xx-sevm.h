@@ -18,5 +18,6 @@
 #define _MACH_OMAP_BOARD_54XX_SEVM_H
 
 int __init sevm_dock_init(void);
+int __init sevm_touch_init(void);
 
 #endif

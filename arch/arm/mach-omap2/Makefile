@@ -261,6 +261,7 @@ obj-$(CONFIG_MACH_TI8168EVM)		+= board-ti8168evm.o
 obj-$(CONFIG_MACH_TI8148EVM)		+= board-ti8168evm.o
 obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-omap5evm.o \
 					   board-54xx-sevm-dock.o \
+					   board-54xx-sevm-touch.o \
 					      hsmmc.o
 obj-$(CONFIG_MACH_OMAP5_PANDA)		+= board-omap5panda.o
 
