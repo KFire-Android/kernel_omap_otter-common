@@ -29,6 +29,9 @@ struct voltagedomain;
 #define OMAP4_VP_VDD_CORE_ID 0
 #define OMAP4_VP_VDD_IVA_ID 1
 #define OMAP4_VP_VDD_MPU_ID 2
+#define OMAP5_VP_VDD_CORE_ID 0
+#define OMAP5_VP_VDD_MM_ID 1
+#define OMAP5_VP_VDD_MPU_ID 2
 
 /*
  * Time out for Voltage processor in micro seconds. Typical latency is < 2uS,
@@ -129,6 +132,14 @@ extern struct omap_vp_param omap3_core_vp_data;
 extern struct omap_vp_param omap4_mpu_vp_data;
 extern struct omap_vp_param omap4_iva_vp_data;
 extern struct omap_vp_param omap4_core_vp_data;
+
+extern struct omap_vp_instance omap5_vp_mpu;
+extern struct omap_vp_instance omap5_vp_mm;
+extern struct omap_vp_instance omap5_vp_core;
+
+extern struct omap_vp_param omap5_mpu_vp_data;
+extern struct omap_vp_param omap5_mm_vp_data;
+extern struct omap_vp_param omap5_core_vp_data;
 
 void omap_vp_init(struct voltagedomain *voltdm);
 void omap_vp_enable(struct voltagedomain *voltdm);

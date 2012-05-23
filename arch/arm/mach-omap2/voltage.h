@@ -162,6 +162,18 @@ struct omap_voltage_notifier {
 #define OMAP4_VP_VSTEPMAX_VSTEPMAX	0x04
 #define OMAP4_VP_VLIMITTO_TIMEOUT_US	200
 
+#define OMAP5_VP_MPU_VLIMITTO_VDDMIN	700000
+#define OMAP5_VP_MPU_VLIMITTO_VDDMAX	1220000
+#define OMAP5_VP_MM_VLIMITTO_VDDMIN		700000
+#define OMAP5_VP_MM_VLIMITTO_VDDMAX		1220000
+#define OMAP5_VP_CORE_VLIMITTO_VDDMIN	700000
+#define OMAP5_VP_CORE_VLIMITTO_VDDMAX	1040000
+
+/* XXX Reusing OMAP4 values. To be fixed */
+#define OMAP5_VP_CONFIG_ERROROFFSET	0x00
+#define OMAP5_VP_VSTEPMIN_VSTEPMIN	0x01
+#define OMAP5_VP_VSTEPMAX_VSTEPMAX	0x04
+#define OMAP5_VP_VLIMITTO_TIMEOUT_US	200
 /**
  * struct omap_voltdm_pmic - PMIC specific data required by voltage driver.
  * @slew_rate:	PMIC slew rate (in uv/us)
