@@ -36,6 +36,8 @@
 
 #include "mm.h"
 
+void __init setup_dma_zone(struct machine_desc *mdesc);
+
 static unsigned long phys_initrd_start __initdata = 0;
 static unsigned long phys_initrd_size __initdata = 0;
 
