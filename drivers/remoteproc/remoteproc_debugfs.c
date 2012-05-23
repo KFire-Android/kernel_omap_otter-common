@@ -28,6 +28,7 @@
 #include <linux/debugfs.h>
 #include <linux/remoteproc.h>
 #include <linux/device.h>
+#include "remoteproc_internal.h"
 
 /* remoteproc debugfs parent dir */
 static struct dentry *rproc_dbg;
