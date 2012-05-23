@@ -19,6 +19,7 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/stat.h>
+#include <mach/id.h>
 #include <linux/platform_device.h>
 
 #include <mach/hardware.h>
@@ -44,6 +45,14 @@ static const char *omap_types[] = {
 	[OMAP2_DEVICE_TYPE_BAD]		= "BAD",
 };
 
+static ssize_t omap_prod_id_show(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	struct  omap_die_id opi;
+	omap_get_production_id(&opi);
+	return sprintf(buf, "%08X-%08X\n", opi.id_1, opi.id_0);
+}
+
 static ssize_t omap_soc_type_show(struct kobject *kobj,
 				 struct kobj_attribute *attr, char *buf)
 {
@@ -57,11 +66,13 @@ static ssize_t omap_soc_type_show(struct kobject *kobj,
 static OMAP_SOC_ATTR_RO(family, omap_soc_family_show);
 static OMAP_SOC_ATTR_RO(revision, omap_soc_revision_show);
 static OMAP_SOC_ATTR_RO(type, omap_soc_type_show);
+static OMAP_SOC_ATTR_RO(production_id, omap_prod_id_show);
 
 static struct attribute *omap_soc_prop_attrs[] = {
 	&omap_soc_prop_attr_family.attr,
 	&omap_soc_prop_attr_revision.attr,
 	&omap_soc_prop_attr_type.attr,
+	&omap_soc_prop_attr_production_id.attr,
 	NULL,
 };
 
