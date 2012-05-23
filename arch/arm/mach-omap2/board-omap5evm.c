@@ -961,7 +961,7 @@ static void __init omap_5430evm_init(void)
 	omap5evm_display_init();
 }
 
-MACHINE_START(OMAP5_SEVM, "OMAP5430 evm board")
+MACHINE_START(OMAP5_SEVM, "OMAP5 sevm board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.atag_offset	= 0x100,
 	.reserve	= omap_reserve,
