@@ -660,4 +660,57 @@ config INPUT_SFH7741
 	  To compile this driver as a module, choose M here: the
 	  module will be called sfh7741.
 
+config INPUT_MPU6050
+	tristate "MPU6050 Sensor"
+	select INPUT_MPU6050_I2C
+	select INPUT_MPU6050_ACCEL
+	select INPUT_MPU6050_GYRO
+	help
+	  Say Y here if you want to use MPU6050 Chip driver
+
+	  This driver currently only supports I2C interface to the
+	  controller. Also select the I2C method.
+
+	  If unsure, say N
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mpu6050.
+
+config INPUT_MPU6050_I2C
+	tristate "Support I2C bus connection"
+	depends on I2C
+	help
+	  Say Y here if you want to configure MPU6050 chip through I2C
+	  interface.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mpu6050_i2c.
+
+config INPUT_MPU6050_ACCEL
+	tristate "MPU6050 built in Accelerometer Sensor"
+	depends on INPUT_MPU6050_I2C
+	depends on GPIOLIB
+	help
+	  Say Y here if you want to use accelerometer driver for MPU6050
+	  INVESNSENSE CHIP
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mpu6050_accel.
+
+config INPUT_MPU6050_GYRO
+	tristate "MPU6050 built in Gyroscope Sensor"
+	depends on INPUT_MPU6050_I2C
+	help
+	  Say Y here if you want to use MPU6050 gyroscope driver
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mpu6050_gyro.
+
+config INPUT_AK8975
+	tristate "AK8975 compass support"
+	depends on I2C
+	depends on GPIOLIB
+	help
+	  If you say yes here you get support for AK8975 Digital Compass.
+
 endif
