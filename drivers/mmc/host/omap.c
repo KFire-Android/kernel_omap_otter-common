@@ -1330,7 +1330,8 @@ static int __init mmc_omap_new_slot(struct mmc_omap_host *host, int id)
 	else
 		mmc->f_max = 24000000;
 	if (host->pdata->max_freq)
-		mmc->f_max = min(host->pdata->max_freq, mmc->f_max);
+		mmc->f_max = min((unsigned int)host->pdata->max_freq,
+							mmc->f_max);
 	mmc->ocr_avail = slot->pdata->ocr_mask;
 
 	/* Use scatterlist DMA to reduce per-transfer costs.
