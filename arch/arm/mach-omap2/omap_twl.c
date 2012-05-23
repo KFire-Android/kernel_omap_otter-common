@@ -166,7 +166,7 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
 };
 
 static struct omap_voltdm_pmic twl6030_vcore1_pmic = {
-	.slew_rate		= 4000,
+	.slew_rate		= 9000,
 	.step_size		= 12660,
 	.switch_on_time		= 549,
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
@@ -184,7 +184,7 @@ static struct omap_voltdm_pmic twl6030_vcore1_pmic = {
 };
 
 static struct omap_voltdm_pmic twl6030_vcore2_pmic = {
-	.slew_rate		= 4000,
+	.slew_rate		= 9000,
 	.step_size		= 12660,
 	.switch_on_time		= 549,
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
@@ -202,7 +202,7 @@ static struct omap_voltdm_pmic twl6030_vcore2_pmic = {
 };
 
 static struct omap_voltdm_pmic twl6030_vcore3_pmic = {
-	.slew_rate		= 4000,
+	.slew_rate		= 9000,
 	.step_size		= 12660,
 	.switch_on_time		= 549,
 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
