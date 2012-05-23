@@ -77,6 +77,7 @@ struct mtp_dev {
 	struct usb_ep *ep_in;
 	struct usb_ep *ep_out;
 	struct usb_ep *ep_intr;
+	int bulk_out_maxpacket;
 
 	int state;
 
@@ -466,6 +467,7 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 	struct usb_request *req;
 	int r = count, xfer;
 	int ret = 0;
+	unsigned int rem = 0;
 
 	DBG(cdev, "mtp_read(%d)\n", count);
 
@@ -494,6 +496,13 @@ requeue_req:
 	/* queue a request */
 	req = dev->rx_req[0];
 	req->length = count;
+
+	/* Pass maxpacket length for RX(out) case:
+	   buffer size is large enough to accomodate */
+	rem = req->length % dev->bulk_out_maxpacket;
+	if (rem)
+		req->length += (dev->bulk_out_maxpacket - rem);
+
 	dev->rx_done = 0;
 	ret = usb_ep_queue(dev->ep_out, req, GFP_KERNEL);
 	if (ret < 0) {
@@ -741,6 +750,7 @@ static void receive_file_work(struct work_struct *data)
 	int64_t count;
 	int ret, cur_buf = 0;
 	int r = 0;
+	unsigned int rem = 0;
 
 	/* read our parameters */
 	smp_rmb();
@@ -758,6 +768,14 @@ static void receive_file_work(struct work_struct *data)
 
 			read_req->length = (count > MTP_BULK_BUFFER_SIZE
 					? MTP_BULK_BUFFER_SIZE : count);
+
+			/* Pass maxpacket length for RX(out) case:
+			   buffer size is large enough to accomodate */
+			rem = read_req->length % dev->bulk_out_maxpacket;
+			if (rem)
+				read_req->length += (dev->bulk_out_maxpacket -
+									rem);
+
 			dev->rx_done = 0;
 			ret = usb_ep_queue(dev->ep_out, read_req, GFP_KERNEL);
 			if (ret < 0) {
@@ -1168,6 +1186,9 @@ static int mtp_function_set_alt(struct usb_function *f,
 		usb_ep_disable(dev->ep_in);
 		return ret;
 	}
+
+	dev->bulk_out_maxpacket = usb_endpoint_maxp(dev->ep_out->desc);
+
 	dev->state = STATE_READY;
 
 	/* readers may be blocked waiting for us to go online */
