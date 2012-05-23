@@ -118,8 +118,8 @@ static void omap_update_report_rate(struct thermal_dev *temp_sensor,
 	}
 
 	if (omap_gov->report_rate != new_rate)
-		omap_gov->report_rate =
-			thermal_update_temp_rate(temp_sensor, new_rate);
+		omap_gov->report_rate = thermal_device_call(temp_sensor,
+						set_temp_report_rate, new_rate);
 }
 
 /*
@@ -202,8 +202,8 @@ out:
 		die_temp_lower = hotspot_temp_to_sensor_temp(
 			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
 		die_temp_upper = hotspot_temp_to_sensor_temp(OMAP_MONITOR_TEMP);
-		thermal_update_temp_thresholds(omap_gov->temp_sensor,
-			die_temp_lower, die_temp_upper);
+		thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+					die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			NORMAL_TEMP_MONITORING_RATE);
 		omap_gov->panic_zone_reached = 0;
@@ -256,8 +256,8 @@ out:
 			OMAP_MONITOR_TEMP - HYSTERESIS_VALUE);
 		die_temp_upper =
 			hotspot_temp_to_sensor_temp(OMAP_ALERT_TEMP);
-		thermal_update_temp_thresholds(omap_gov->temp_sensor,
-			die_temp_lower, die_temp_upper);
+		thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+					die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			FAST_TEMP_MONITORING_RATE);
 		omap_gov->panic_zone_reached = 0;
@@ -316,8 +316,8 @@ out:
 			OMAP_ALERT_TEMP - HYSTERESIS_VALUE);
 		die_temp_upper = hotspot_temp_to_sensor_temp(
 			OMAP_PANIC_TEMP);
-		thermal_update_temp_thresholds(omap_gov->temp_sensor,
-			die_temp_lower, die_temp_upper);
+		thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+					die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			FAST_TEMP_MONITORING_RATE);
 	}
@@ -380,8 +380,8 @@ out:
 			die_temp_upper = OMAP_FATAL_TEMP;
 
 		die_temp_upper = hotspot_temp_to_sensor_temp(die_temp_upper);
-		thermal_update_temp_thresholds(omap_gov->temp_sensor,
-			die_temp_lower, die_temp_upper);
+		thermal_device_call(omap_gov->temp_sensor, set_temp_thresh,
+					die_temp_lower, die_temp_upper);
 		omap_update_report_rate(omap_gov->temp_sensor,
 			FAST_TEMP_MONITORING_RATE);
 	}
