@@ -11,44 +11,42 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/platform_device.h>
-#include <linux/io.h>
-#include <linux/gpio.h>
-#include <linux/input.h>
-#include <linux/hwspinlock.h>
-#include <linux/input/matrix_keypad.h>
-#include <linux/platform_data/omap4-keypad.h>
-
-#include <linux/regulator/machine.h>
-#include <linux/regulator/fixed.h>
-#ifdef CONFIG_OMAP5_SEVM_PALMAS
-#include <linux/mfd/palmas.h>
-#endif
-
-#include <linux/i2c/pca953x.h>
-
-#include <linux/i2c/twl.h>
-#include <linux/mfd/twl6040.h>
-#include <linux/platform_data/omap-abe-twl6040.h>
-
+#include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
+#include <linux/gpio.h>
+#include <linux/hwspinlock.h>
+#include <linux/init.h>
+#include <linux/input.h>
+#include <linux/io.h>
+#include <linux/kernel.h>
+#include <linux/platform_device.h>
+#include <linux/i2c/pca953x.h>
+#include <linux/i2c/twl.h>
+#include <linux/input/matrix_keypad.h>
+#include <linux/platform_data/omap-abe-twl6040.h>
+#include <linux/platform_data/omap4-keypad.h>
+#include <linux/mfd/palmas.h>
+#include <linux/mfd/twl6040.h>
+#include <linux/regulator/machine.h>
+#include <linux/regulator/fixed.h>
+
 #include <mach/hardware.h>
-#include "common.h"
-#include <asm/hardware/gic.h>
+
 #include <plat/common.h>
-#include <plat/omap4-keypad.h>
 #include <plat/mmc.h>
-#include "hsmmc.h"
-#include "common-board-devices.h"
-#include "mux.h"
+#include <plat/omap4-keypad.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-lg4591.h>
+
+#include "common.h"
+#include "common-board-devices.h"
+#include "hsmmc.h"
+#include "mux.h"
+
 
 static const uint32_t evm5430_keymap[] = {
 	KEY(0, 0, KEY_RESERVED),
