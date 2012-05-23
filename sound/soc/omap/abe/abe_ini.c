@@ -272,3 +272,52 @@ u32 omap_abe_get_supported_fw_version(void)
        return OMAP_ABE_SUPPORTED_FW_VERSION;
 }
 EXPORT_SYMBOL(omap_abe_get_supported_fw_version);
+
+/*
+ * same as memcpy_fromio, but with 32-bit access.
+ * Assumes 'from' is 32-bit aligned and that (count % 4) == 0
+ */
+void omap_abe_memcpy_fromio(void *to, const void __iomem *from, size_t count)
+{
+	unsigned long *t = to;
+	count /= 4;
+	while (count) {
+		count--;
+		*t = readl(from);
+		t++;
+		from += 4;
+	}
+}
+EXPORT_SYMBOL(omap_abe_memcpy_fromio);
+
+/*
+ * same as memcpy_toio, but with 32-bit access.
+ * Assumes 'to' is 32-bit aligned and that (count % 4) == 0
+ */
+void omap_abe_memcpy_toio(void __iomem *to, const void *from, size_t count)
+{
+	const unsigned long *f = from;
+	count /= 4;
+	while (count) {
+		count--;
+		writel(*f, to);
+		f++;
+		to += 4;
+	}
+}
+EXPORT_SYMBOL(omap_abe_memcpy_toio);
+
+/*
+ * same as memset_io, but with 32-bit access.
+ * Assumes 'dst' is 32-bit aligned and that (count % 4) == 0
+ */
+void omap_abe_memset_io(void __iomem *dst, int c, size_t count)
+{
+	count /= 4;
+	while (count) {
+		count--;
+		writel(c, dst);
+		dst += 4;
+	}
+}
+EXPORT_SYMBOL(omap_abe_memset_io);
