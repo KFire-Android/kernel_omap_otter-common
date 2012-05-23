@@ -352,6 +352,7 @@ void omap_abe_dc_set_hf_offset(struct snd_soc_platform *platform,
 struct snd_ctl_elem_info;
 struct snd_kcontrol;
 struct snd_soc_dai;
+struct snd_soc_dapm_context;
 struct snd_soc_platform;
 
 /* omap-abe-mixer.c */
@@ -378,5 +379,11 @@ int abe_pm_resume(struct snd_soc_dai *dai);
 /* omap-abe-mmap.c */
 irqreturn_t abe_irq_handler(int irq, void *dev_id);
 extern struct snd_pcm_ops omap_aess_pcm_ops;
+int abe_opp_recalc_level(struct omap_abe *abe);
+
+/* omap-abe-opp.c */
+int abe_opp_init_initial_opp(struct omap_abe *abe);
+int abe_opp_set_level(struct omap_abe *abe, int opp);
+int abe_opp_stream_event(struct snd_soc_dapm_context *dapm, int event);
 
 #endif	/* End of __OMAP_MCPDM_H__ */

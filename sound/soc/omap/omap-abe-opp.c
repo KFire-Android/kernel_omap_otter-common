@@ -33,8 +33,6 @@
 
 #include "omap-abe-priv.h"
 
-int abe_opp_recalc_level(struct omap_abe *abe);
-
 static struct abe_opp_req *abe_opp_lookup_requested(struct omap_abe *abe,
 					struct device *dev)
 {

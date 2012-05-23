@@ -33,9 +33,6 @@
 #include "omap-abe-priv.h"
 #include "omap-pcm.h"
 
-int abe_opp_recalc_level(struct omap_abe *abe);
-int abe_opp_set_level(struct omap_abe *abe, int opp);
-
 /* Ping pong buffer DMEM offset - we should read this from future FWs */
 #define OMAP_ABE_DMEM_BASE_OFFSET_PING_PONG	0x4000
 
