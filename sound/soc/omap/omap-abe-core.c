@@ -47,7 +47,6 @@ void abe_init_debugfs(struct omap_abe *abe);
 void abe_cleanup_debugfs(struct omap_abe *abe);
 int abe_opp_init_initial_opp(struct omap_abe *abe);
 extern struct snd_pcm_ops omap_aess_pcm_ops;
-extern struct snd_soc_dai_driver omap_abe_dai[7];
 
 static u64 omap_abe_dmamask = DMA_BIT_MASK(32);
 

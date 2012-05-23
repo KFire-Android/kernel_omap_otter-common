@@ -623,7 +623,7 @@ static struct snd_soc_dai_link twl6040_only_dai[] = {
 };
 
 
-static struct snd_soc_dai_link omap_abe_dai[] = {
+static struct snd_soc_dai_link omap_abe_dai_link[] = {
 
 /*
  * Frontend DAIs - i.e. userspace visible interfaces (ALSA PCMs)
@@ -1309,8 +1309,8 @@ static __devinit int omap_abe_probe(struct platform_device *pdev)
 
 	if (pdata->has_abe) {
 		if (pdata->has_dmic) {
-			card->dai_link = omap_abe_dai;
-			card->num_links = ARRAY_SIZE(omap_abe_dai);
+			card->dai_link = omap_abe_dai_link;
+			card->num_links = ARRAY_SIZE(omap_abe_dai_link);
 		} else {
 			card->dai_link = omap_abe_no_dmic_dai;
 			card->num_links = ARRAY_SIZE(omap_abe_no_dmic_dai);

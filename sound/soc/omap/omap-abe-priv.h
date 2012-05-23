@@ -24,6 +24,8 @@
 #ifndef __OMAP_ABE_PRIV_H__
 #define __OMAP_ABE_PRIV_H__
 
+#include <sound/soc.h>
+
 #include "abe/abe.h"
 #include "abe/abe_gain.h"
 #include "abe/abe_aess.h"
@@ -359,5 +361,8 @@ int abe_mixer_enable_mono(struct omap_abe *abe, int id, int enable);
 int abe_mixer_set_equ_profile(struct omap_abe *abe,
 		unsigned int id, unsigned int profile);
 int abe_mixer_add_widgets(struct snd_soc_platform *platform);
+
+/* omap-abe-pcm.c */
+extern struct snd_soc_dai_driver omap_abe_dai[7];
 
 #endif	/* End of __OMAP_MCPDM_H__ */
