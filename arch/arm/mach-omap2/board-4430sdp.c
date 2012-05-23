@@ -945,6 +945,18 @@ static struct omap_dss_device sdp4430_lcd_device = {
 
 			.lp_clk_div	= 10,	/* LP Clock = 8.64 MHz */
 			.dsi_fclk_src	= OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+			.tlpx	= 12,
+			.tclk = {
+				.zero	 = 57,
+				.prepare = 15,
+				.trail	 = 15,
+			},
+			.ths = {
+				.zero	 = 22,
+				.prepare = 18,
+				.exit	 = 32,
+				.trail	 = 18,
+			},
 		},
 	},
 	.channel = OMAP_DSS_CHANNEL_LCD,
