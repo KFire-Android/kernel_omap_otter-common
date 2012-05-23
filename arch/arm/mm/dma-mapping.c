@@ -590,7 +590,8 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
 	if (arch_is_coherent() || nommu())
 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
 	else if (cpu_architecture() < CPU_ARCH_ARMv6)
-		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller);
+		addr = __alloc_remap_buffer(dev, size,
+					gfp, prot, &page, caller);
 	else if (gfp & GFP_ATOMIC)
 		addr = __alloc_from_pool(dev, size, &page, caller);
 	else

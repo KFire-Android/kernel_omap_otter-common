@@ -267,7 +267,8 @@ int __init dma_declare_contiguous(struct device *dev, unsigned long size,
 		 * Use __memblock_alloc_base() since
 		 * memblock_alloc_base() panic()s.
 		 */
-		phys_addr_t addr = __memblock_alloc_base(size, alignment, limit);
+		phys_addr_t addr = __memblock_alloc_base(size,
+						alignment, limit);
 		if (!addr) {
 			base = -ENOMEM;
 			goto err;

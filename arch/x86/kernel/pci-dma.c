@@ -111,7 +111,8 @@ again:
 	if (!(flag & GFP_ATOMIC))
 		page = dma_alloc_from_contiguous(dev, count, get_order(size));
 	if (!page)
-		page = alloc_pages_node(dev_to_node(dev), flag, get_order(size));
+		page = alloc_pages_node(dev_to_node(dev),
+					flag, get_order(size));
 	if (!page)
 		return NULL;
 

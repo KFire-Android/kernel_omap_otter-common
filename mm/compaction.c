@@ -364,7 +364,9 @@ static bool suitable_migration_target(struct page *page)
 
 	int migratetype = get_pageblock_migratetype(page);
 
-	/* Don't interfere with memory hot-remove or the min_free_kbytes blocks */
+	/* Don't interfere with memory hot-remove or
+	 * the min_free_kbytes blocks
+	 */
 	if (migratetype == MIGRATE_ISOLATE || migratetype == MIGRATE_RESERVE)
 		return false;
 
@@ -516,17 +518,17 @@ static void update_nr_listpages(struct compact_control *cc)
 }
 
 /* possible outcome of isolate_migratepages */
-typedef enum {
+enum {
 	ISOLATE_ABORT,		/* Abort compaction now */
 	ISOLATE_NONE,		/* No pages isolated, continue scanning */
 	ISOLATE_SUCCESS,	/* Pages isolated, migrate */
-} isolate_migrate_t;
+};
 
 /*
  * Isolate all pages that can be migrated from the block pointed to by
  * the migrate scanner within compact_control.
  */
-static isolate_migrate_t isolate_migratepages(struct zone *zone,
+static u32 isolate_migratepages(struct zone *zone,
 					struct compact_control *cc)
 {
 	unsigned long low_pfn, end_pfn;

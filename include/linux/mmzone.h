@@ -63,7 +63,7 @@ enum {
 
 #ifdef CONFIG_CMA
 #  define is_migrate_cma(migratetype) unlikely((migratetype) == MIGRATE_CMA)
-#  define cma_wmark_pages(zone)	zone->min_cma_pages
+#  define cma_wmark_pages(zone)	(zone->min_cma_pages)
 #else
 #  define is_migrate_cma(migratetype) false
 #  define cma_wmark_pages(zone) 0
