@@ -362,6 +362,7 @@ config MACH_OMAP5_SEVM
 	bool "OMAP5 EVM board"
 	default y
 	depends on ARCH_OMAP5
+	select KEYBOARD_SMSC
 
 config MACH_OMAP5_PANDA
 	bool "OMAP5 Panda board"

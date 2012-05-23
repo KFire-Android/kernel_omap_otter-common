@@ -17,5 +17,6 @@
 #ifndef _MACH_OMAP_BOARD_54XX_SEVM_H
 #define _MACH_OMAP_BOARD_54XX_SEVM_H
 
+int __init sevm_dock_init(void);
 
 #endif

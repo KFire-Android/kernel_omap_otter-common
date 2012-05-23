@@ -42,6 +42,7 @@
 #include <video/omapdss.h>
 #include <video/omap-panel-lg4591.h>
 
+#include "board-54xx-sevm.h"
 #include "common.h"
 #include "common-board-devices.h"
 #include "hsmmc.h"
@@ -949,6 +950,7 @@ static void __init omap_5430evm_init(void)
 	omap_5430evm_i2c_init();
 	omap_serial_init();
 	platform_device_register(&dummy_sd_regulator_device);
+	sevm_dock_init();
 	status = omap4_keyboard_init(&evm5430_keypad_data, &keypad_data);
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
