@@ -40,6 +40,7 @@
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
 #include <plat/omap_apps_brd_id.h>
+#include <plat/drm.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-lg4591.h>
@@ -969,6 +970,7 @@ static void __init omap_5430evm_init(void)
 	omap_hsmmc_init(mmc);
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
 
+	omap_init_dmm_tiler();
 	omap5evm_display_init();
 }
 
