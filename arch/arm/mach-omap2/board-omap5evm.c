@@ -207,6 +207,7 @@ static int __init omap_5430evm_i2c_init(void)
 
 	return 0;
 }
+
 static void __init omap_5430evm_init(void)
 {
 	int status;
@@ -229,11 +230,10 @@ static void __init omap_5430evm_init(void)
 	omap_sdrc_init(NULL, NULL);
 	omap_5430evm_i2c_init();
 	omap_serial_init();
+	omap_hsmmc_init(mmc);
 	status = omap4_keyboard_init(&evm5430_keypad_data, &keypad_data);
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
-
-	omap_hsmmc_init(mmc);
 }
 
 MACHINE_START(OMAP5_SEVM, "OMAP5430 evm board")
