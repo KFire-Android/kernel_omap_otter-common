@@ -590,11 +590,6 @@ int omap_aess_disable_data_transfer(struct omap_aess *abe, u32 id)
 		break;
 	}
 
-	omap_aess_update_scheduling_table1(abe, &(abe_port_init[id].task), 0);
-
-	omap_aess_mem_write(abe, omap_aess_map[OMAP_AESS_DMEM_MULTIFRAME_ID],
-		(u32 *) abe->MultiFrame);
-
 	/* local host variable status= "port is running" */
 	abe_port[id].status = OMAP_ABE_PORT_ACTIVITY_IDLE;
 	/* disable DMA requests */
