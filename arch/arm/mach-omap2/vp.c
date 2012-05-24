@@ -18,7 +18,7 @@
  */
 unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
 {
-	struct omap_vp_instance *vp = voltdm->vp;
+	struct omap_vp_instance *vp;
 	u8 curr_vsel;
 
 	if (IS_ERR_OR_NULL(voltdm)) {
@@ -31,6 +31,8 @@ unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
 		       __func__, voltdm->name);
 		return 0;
 	}
+
+	vp = voltdm->vp;
 
 	curr_vsel = (voltdm->read(vp->voltage) & vp->common->vpvoltage_mask)
 		>> __ffs(vp->common->vpvoltage_mask);
@@ -170,18 +172,14 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
 }
 
 int omap_vp_update_errorgain(struct voltagedomain *voltdm,
-			     unsigned long target_volt)
+			     struct omap_volt_data *volt_data)
 {
-	struct omap_volt_data *volt_data;
-
 	if (!voltdm->vp)
 		return -EINVAL;
 
-	/* Get volt_data corresponding to target_volt */
-	volt_data = omap_voltage_get_voltdata(voltdm, target_volt);
 	if (IS_ERR(volt_data)) {
-		pr_err("%s: vdm %s no voltage data for %ld\n", __func__,
-		       voltdm->name, target_volt);
+		pr_err("%s: vdm %s no voltage data for %p\n", __func__,
+		       voltdm->name, volt_data);
 		return -EINVAL;
 	}
 
@@ -226,7 +224,8 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
 		return ret;
 	}
 
-	ret = omap_vc_pre_scale(voltdm, target_volt, &target_vsel, &current_vsel);
+	ret = omap_vc_pre_scale(voltdm, target_volt, target_v,
+				&target_vsel, &current_vsel);
 	if (ret)
 		return ret;
 

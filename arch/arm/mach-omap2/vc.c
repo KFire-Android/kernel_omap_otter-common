@@ -110,6 +110,7 @@ static int omap_vc_config_channel(struct voltagedomain *voltdm)
 /* Voltage scale and accessory APIs */
 int omap_vc_pre_scale(struct voltagedomain *voltdm,
 		      unsigned long target_volt,
+		      struct omap_volt_data *target_v,
 		      u8 *target_vsel, u8 *current_vsel)
 {
 	struct omap_vc_channel *vc = voltdm->vc;
@@ -146,7 +147,7 @@ int omap_vc_pre_scale(struct voltagedomain *voltdm,
 
 	voltdm->vc_param->on = target_volt;
 
-	omap_vp_update_errorgain(voltdm, target_volt);
+	omap_vp_update_errorgain(voltdm, target_v);
 
 	return 0;
 }
@@ -200,7 +201,8 @@ int omap_vc_bypass_scale(struct voltagedomain *voltdm,
 	int ret;
 	unsigned long target_volt = omap_get_operation_voltage(target_v);
 
-	ret = omap_vc_pre_scale(voltdm, target_volt, &target_vsel, &current_vsel);
+	ret = omap_vc_pre_scale(voltdm, target_volt,
+				target_v, &target_vsel, &current_vsel);
 	if (ret)
 		return ret;
 
