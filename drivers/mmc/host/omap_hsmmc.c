@@ -140,6 +140,7 @@
  * Hence rounding it to a lesser value.
  */
 #define ADMA_MAX_XFER_PER_ROW (60 * 1024)
+#define ADMA_MAX_BLKS_PER_ROW (ADMA_MAX_XFER_PER_ROW / 512)
 
 
 #define MMC_AUTOSUSPEND_DELAY	100
@@ -1472,9 +1473,7 @@ static int mmc_populate_adma_desc_table(struct omap_hsmmc_host *host,
 			pdesc[i + j].attr = (ADMA_XFER_DESC |
 				ADMA_XFER_VALID);
 		} else {
-			dev_err(mmc_dev(host->mmc), "unexpected dmalen %d\n",
-								dmalen);
-			/* Each descritpor row can only support
+			/* Each descriptor row can only support
 			 * transfer upto ADMA_MAX_XFER_PER_ROW.
 			 * If the current segment is bigger, it has to be
 			 * split to multiple ADMA table entries.
@@ -2095,14 +2094,22 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 
 	/* Since we do only SG emulation, we can have as many segs
 	 * as we want. */
-	mmc->max_segs = DMA_TABLE_NUM_ENTRIES;
 	mmc->max_blk_size = HSMMC_BLK_SIZE;
 	if (host->dma_type == ADMA_XFER) {
-		/* ADMA Block size is 16 bits wide */
-		mmc->max_blk_count = 120;
-		mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count
-					* DMA_TABLE_NUM_ENTRIES;
+		/* Worst case is when above block layer gives us 512 segments,
+		 * in which there are 511 single block entries, but one large
+		 * block that is of size mmc->max_req_size - (511*512) bytes.
+		 * In this case, we use the reserved 512 table entries to
+		 * break up the large request. This is also the reason why we
+		 * say we can only handle DMA_TABLE_NUM_ENTRIES/2
+		 * segments instead of DMA_TABLE_NUM_ENTRIES.
+		 */
+		mmc->max_segs = DMA_TABLE_NUM_ENTRIES / 2;
+		mmc->max_blk_count = ADMA_MAX_BLKS_PER_ROW *
+					DMA_TABLE_NUM_ENTRIES / 2;
+		mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
 	} else {
+		mmc->max_segs = DMA_TABLE_NUM_ENTRIES;
 		/* No. of Blocks is 16 bits */
 		mmc->max_blk_count = 0xFFFF;
 		mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
