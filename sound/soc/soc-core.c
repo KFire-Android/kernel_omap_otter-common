@@ -42,6 +42,8 @@
 #include <sound/soc-dpcm.h>
 #include <sound/initval.h>
 
+#include "soc-private.h"
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/asoc.h>
 
@@ -60,14 +62,6 @@ static LIST_HEAD(platform_list);
 static LIST_HEAD(codec_list);
 
 int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num);
-int soc_dpcm_debugfs_add(struct snd_soc_pcm_runtime *rtd);
-int soc_dpcm_be_digital_mute(struct snd_soc_pcm_runtime *fe, int mute);
-int soc_dpcm_be_ac97_cpu_dai_suspend(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_ac97_cpu_dai_resume(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_cpu_dai_resume(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_cpu_dai_suspend(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_platform_suspend(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_platform_resume(struct snd_soc_pcm_runtime *fe);
 
 /*
  * This is a timeout to do a DAPM powerdown after a stream is closed().

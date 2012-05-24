@@ -32,6 +32,8 @@
 #include <sound/soc-dpcm.h>
 #include <sound/initval.h>
 
+#include "soc-private.h"
+
 #define MAX_BE_USERS	8	/* adjust if too low for everday use */
 
 static int soc_dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream);
@@ -172,7 +174,7 @@ static void soc_pcm_apply_msb(struct snd_pcm_substream *substream,
 /*
  * stream event, send event to FE and all active BEs.
  */
-int soc_dpcm_dapm_stream_event(struct snd_soc_pcm_runtime *fe, int dir,
+static int soc_dpcm_dapm_stream_event(struct snd_soc_pcm_runtime *fe, int dir,
 	int event)
 {
 	struct snd_soc_dpcm_params *dpcm_params;
@@ -721,7 +723,7 @@ static int soc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	return 0;
 }
 
-int soc_pcm_bespoke_trigger(struct snd_pcm_substream *substream, int cmd)
+static int soc_pcm_bespoke_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_platform *platform = rtd->platform;
@@ -1178,7 +1180,7 @@ unwind:
 	return err;
 }
 
-void soc_dpcm_set_dynamic_runtime(struct snd_pcm_substream *substream)
+static void soc_dpcm_set_dynamic_runtime(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
@@ -1380,7 +1382,7 @@ unwind:
 	return ret;
 }
 
-int soc_dpcm_fe_dai_hw_params(struct snd_pcm_substream *substream,
+static int soc_dpcm_fe_dai_hw_params(struct snd_pcm_substream *substream,
 				    struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *fe = substream->private_data;
@@ -1430,7 +1432,8 @@ static int dpcm_do_trigger(struct snd_soc_dpcm_params *dpcm_params,
 	return ret;
 }
 
-int soc_dpcm_be_dai_trigger(struct snd_soc_pcm_runtime *fe, int stream, int cmd)
+static int soc_dpcm_be_dai_trigger(struct snd_soc_pcm_runtime *fe, int stream,
+		int cmd)
 {
 	struct snd_soc_dpcm_params *dpcm_params;
 	int ret = 0;
@@ -1523,7 +1526,7 @@ int soc_dpcm_be_dai_trigger(struct snd_soc_pcm_runtime *fe, int stream, int cmd)
 }
 EXPORT_SYMBOL_GPL(soc_dpcm_be_dai_trigger);
 
-int soc_dpcm_fe_dai_trigger(struct snd_pcm_substream *substream, int cmd)
+static int soc_dpcm_fe_dai_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_soc_pcm_runtime *fe = substream->private_data;
 	int stream = substream->stream, ret;
@@ -1631,7 +1634,7 @@ static int soc_dpcm_be_dai_prepare(struct snd_soc_pcm_runtime *fe, int stream)
 	return ret;
 }
 
-int soc_dpcm_fe_dai_prepare(struct snd_pcm_substream *substream)
+static int soc_dpcm_fe_dai_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *fe = substream->private_data;
 	int stream = substream->stream, ret = 0;
@@ -1710,7 +1713,7 @@ static int soc_dpcm_be_dai_hw_free(struct snd_soc_pcm_runtime *fe, int stream)
 	return 0;
 }
 
-int soc_dpcm_fe_dai_hw_free(struct snd_pcm_substream *substream)
+static int soc_dpcm_fe_dai_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *fe = substream->private_data;
 	int err, stream = substream->stream;
@@ -2333,7 +2336,7 @@ int soc_dpcm_fe_resume(struct snd_soc_pcm_runtime *fe)
 }
 
 /* called when opening FE stream  */
-int soc_dpcm_fe_dai_open(struct snd_pcm_substream *fe_substream)
+static int soc_dpcm_fe_dai_open(struct snd_pcm_substream *fe_substream)
 {
 	struct snd_soc_pcm_runtime *fe = fe_substream->private_data;
 	struct snd_soc_dpcm_params *dpcm_params;
@@ -2371,7 +2374,7 @@ int soc_dpcm_fe_dai_open(struct snd_pcm_substream *fe_substream)
 }
 
 /* called when closing FE stream  */
-int soc_dpcm_fe_dai_close(struct snd_pcm_substream *fe_substream)
+static int soc_dpcm_fe_dai_close(struct snd_pcm_substream *fe_substream)
 {
 	struct snd_soc_pcm_runtime *fe = fe_substream->private_data;
 	struct snd_soc_dpcm_params *dpcm_params;
