@@ -815,8 +815,8 @@ static void __dwc3_ep0_do_control_data(struct dwc3 *dwc,
 
 		/*
 		 * REVISIT in case request length is bigger than
-		 * EP0_BOUNCE_SIZE we will need two chained TRBs
-		 * to handle the transfer.
+		 * DWC3_EP0_BOUNCE_SIZE we will need two chained
+		 * TRBs to handle the transfer.
 		 */
 		ret = dwc3_ep0_start_trans(dwc, dep->number,
 				dwc->ep0_bounce_addr, transfer_size,
