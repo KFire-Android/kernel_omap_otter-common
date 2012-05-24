@@ -226,6 +226,11 @@ struct omapfb_platform_data {
 	struct omap_lcd_config		lcd;
 };
 
+/* helper methods that may be used by other modules */
+enum omap_color_mode;
+int omapfb_mode_to_dss_mode(struct fb_var_screeninfo *var,
+			enum omap_color_mode *mode);
+
 void __init omapfb_set_lcd_config(const struct omap_lcd_config *config);
 
 #endif
