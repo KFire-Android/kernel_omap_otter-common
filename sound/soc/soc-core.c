@@ -593,8 +593,7 @@ int snd_soc_suspend(struct device *dev)
 			continue;
 
 		if (card->rtd[i].dai_link->dynamic) {
-			soc_dpcm_be_cpu_dai_suspend(&card->rtd[i]);
-			soc_dpcm_be_platform_suspend(&card->rtd[i]);
+			soc_dpcm_fe_suspend(&card->rtd[i]);
 		} else {
 			if (cpu_dai->driver->suspend && !cpu_dai->driver->ac97_control)
 				cpu_dai->driver->suspend(cpu_dai);
@@ -774,8 +773,7 @@ static void soc_resume_deferred(struct work_struct *work)
 			continue;
 
 		if (card->rtd[i].dai_link->dynamic) {
-			soc_dpcm_be_cpu_dai_resume(&card->rtd[i]);
-			soc_dpcm_be_platform_resume(&card->rtd[i]);
+			soc_dpcm_fe_resume(&card->rtd[i]);
 		} else {
 			if (cpu_dai->driver->resume && !cpu_dai->driver->ac97_control)
 				cpu_dai->driver->resume(cpu_dai);

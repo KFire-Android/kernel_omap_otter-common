@@ -24,6 +24,8 @@ struct snd_soc_dapm_widget;
 /* soc-pcm.c */
 int soc_dpcm_debugfs_add(struct snd_soc_pcm_runtime *rtd);
 int soc_dpcm_be_digital_mute(struct snd_soc_pcm_runtime *fe, int mute);
+int soc_dpcm_fe_suspend(struct snd_soc_pcm_runtime *fe);
+int soc_dpcm_fe_resume(struct snd_soc_pcm_runtime *fe);
 int soc_dpcm_be_cpu_dai_suspend(struct snd_soc_pcm_runtime *fe);
 int soc_dpcm_be_cpu_dai_resume(struct snd_soc_pcm_runtime *fe);
 int soc_dpcm_be_platform_suspend(struct snd_soc_pcm_runtime *fe);
