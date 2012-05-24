@@ -84,35 +84,24 @@ static void ion_carveout_heap_free(struct ion_buffer *buffer)
 	buffer->priv_phys = ION_CARVEOUT_ALLOCATE_FAIL;
 }
 
-struct scatterlist *ion_carveout_heap_map_dma(struct ion_heap *heap,
-					      struct ion_buffer *buffer)
-{
-	return ERR_PTR(-EINVAL);
-}
-
-void ion_carveout_heap_unmap_dma(struct ion_heap *heap,
-				 struct ion_buffer *buffer)
-{
-	return;
-}
-
-void *ion_carveout_heap_map_kernel(struct ion_heap *heap,
+static void __iomem *ion_carveout_heap_map_kernel(struct ion_heap *heap,
 				   struct ion_buffer *buffer)
 {
 	return __arm_ioremap(buffer->priv_phys, buffer->size,
 			      MT_MEMORY_NONCACHED);
 }
 
-void ion_carveout_heap_unmap_kernel(struct ion_heap *heap,
+static void ion_carveout_heap_unmap_kernel(struct ion_heap *heap,
 				    struct ion_buffer *buffer)
 {
-	__arm_iounmap(buffer->vaddr);
+	__arm_iounmap((void __iomem *)buffer->vaddr);
 	buffer->vaddr = NULL;
 	return;
 }
 
-int ion_carveout_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
-			       struct vm_area_struct *vma)
+static int ion_carveout_heap_map_user(struct ion_heap *heap,
+				struct ion_buffer *buffer,
+				struct vm_area_struct *vma)
 {
 	return remap_pfn_range(vma, vma->vm_start,
 			       __phys_to_pfn(buffer->priv_phys) + vma->vm_pgoff,
@@ -125,7 +114,7 @@ static struct ion_heap_ops carveout_heap_ops = {
 	.free = ion_carveout_heap_free,
 	.phys = ion_carveout_heap_phys,
 	.map_user = ion_carveout_heap_map_user,
-	.map_kernel = ion_carveout_heap_map_kernel,
+	.map_kernel = (void *)ion_carveout_heap_map_kernel,
 	.unmap_kernel = ion_carveout_heap_unmap_kernel,
 };
 

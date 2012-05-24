@@ -582,7 +582,7 @@ static int ion_debug_client_show(struct seq_file *s, void *unused)
 	struct ion_client *client = s->private;
 	struct rb_node *n;
 	size_t sizes[ION_NUM_HEAPS] = {0};
-	const char *names[ION_NUM_HEAPS] = {0};
+	const char *names[ION_NUM_HEAPS] = {(char *)0};
 	int i;
 
 	mutex_lock(&client->lock);
