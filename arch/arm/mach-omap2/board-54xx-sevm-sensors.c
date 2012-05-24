@@ -22,6 +22,7 @@
 #include <linux/io.h>
 #include <linux/init.h>
 #include <linux/i2c/tsl2771.h>
+#include <linux/i2c/drv2667.h>
 
 #include <plat/i2c.h>
 
@@ -50,6 +51,31 @@ struct tsl2771_platform_data tsl2771_data = {
 	.device_factor                  = 0x34,
 };
 
+static struct drv2667_pattern_data omap5evm_vib_array_data[] = {
+	{
+		.wave_seq = 0x01,
+		.page_num = 0x01,
+		.hdr_size = 0x05,
+		.start_addr_upper = 0x80,
+		.start_addr_lower = 0x06,
+		.stop_addr_upper = 0x00,
+		.stop_addr_lower = 0x09,
+		.repeat_count = 0x01,
+		.amplitude = 0xff,
+		.frequency = 0x19,
+		.duration = 0x05,
+		.envelope = 0x0,
+	},
+};
+
+static struct drv2667_platform_data omap5evm_drv2667_plat_data = {
+	.drv2667_pattern_data = {
+		.pattern_data = omap5evm_vib_array_data,
+		.num_of_patterns = ARRAY_SIZE(omap5evm_vib_array_data),
+	},
+	.initial_vibrate = 10,
+};
+
 static struct i2c_board_info __initdata omap5evm_sensor_i2c2_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("bmp085", 0x77),
@@ -61,10 +87,20 @@ static struct i2c_board_info __initdata omap5evm_sensor_i2c2_boardinfo[] = {
 	},
 };
 
+static struct i2c_board_info __initdata omap5evm_sensor_i2c5_boardinfo[] = {
+	{
+		I2C_BOARD_INFO(DRV2667_NAME, 0x59),
+		.platform_data = &omap5evm_drv2667_plat_data,
+	},
+};
+
 int __init sevm_sensor_init(void)
 {
 	i2c_register_board_info(2, omap5evm_sensor_i2c2_boardinfo,
 		ARRAY_SIZE(omap5evm_sensor_i2c2_boardinfo));
+
+	i2c_register_board_info(5, omap5evm_sensor_i2c5_boardinfo,
+		ARRAY_SIZE(omap5evm_sensor_i2c5_boardinfo));
 
 	return 0;
 }
