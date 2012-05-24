@@ -54,6 +54,25 @@ static int palmas_resource_write(struct palmas *palmas, unsigned int reg,
 	return regmap_write(palmas->regmap[slave], addr, data);
 }
 
+static int palmas_enable_clk32kg(struct palmas_resource *resource)
+{
+	int ret;
+	unsigned int reg;
+
+	ret = palmas_resource_read(resource->palmas,
+			PALMAS_CLK32KG_CTRL, &reg);
+
+	if (ret)
+		return ret;
+
+	reg |= CLK32KG_CTRL_MODE_ACTIVE;
+
+	ret = palmas_resource_write(resource->palmas,
+			PALMAS_CLK32KG_CTRL, reg);
+
+	return ret;
+}
+
 static int palmas_enable_clk32kgaudio(struct palmas_resource *resource)
 {
 	int ret;
@@ -512,7 +531,8 @@ static int __devinit palmas_resource_probe(struct platform_device *pdev)
 
 	/* Test */
 	palmas_enable_clk32kgaudio(resource);
-
+	/* Enable 32Khz slow clock */
+	palmas_enable_clk32kg(resource);
 	return 0;
 
 err_int:
