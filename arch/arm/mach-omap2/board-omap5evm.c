@@ -13,6 +13,7 @@
 
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/gpio.h>
@@ -41,10 +42,12 @@
 #include "common.h"
 #include <asm/hardware/gic.h>
 #include <plat/common.h>
+#include <plat/omap_hsi.h>
 #include <plat/omap4-keypad.h>
 #include <plat/mmc.h>
 #include "hsmmc.h"
 #include "common-board-devices.h"
+#include "board-omap5evm.h"
 #include "mux.h"
 
 #include <video/omapdss.h>
@@ -928,6 +931,15 @@ static int __init omap_5430evm_i2c_init(void)
 	return 0;
 }
 
+/*
+ * HSI usage is declared using bootargs variable:
+ * board-omap5evm.modem_ipc=hsi
+ * Variable modem_ipc is used to catch bootargs parameter value.
+ */
+static char *modem_ipc = "n/a";
+module_param(modem_ipc, charp, 0);
+MODULE_PARM_DESC(modem_ipc, "Modem IPC setting");
+
 static void __init omap_5430evm_init(void)
 {
 	int status;
@@ -951,6 +963,12 @@ static void __init omap_5430evm_init(void)
 	omap_5430evm_i2c_init();
 	omap_serial_init();
 	platform_device_register(&dummy_sd_regulator_device);
+	/* omap5evm_modem_init shall be called before omap_ehci_ohci_init */
+	if (!strcmp(modem_ipc, "hsi"))
+		omap5evm_modem_init(true);
+	else
+		omap5evm_modem_init(false);
+
 	status = omap4_keyboard_init(&evm5430_keypad_data, &keypad_data);
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
