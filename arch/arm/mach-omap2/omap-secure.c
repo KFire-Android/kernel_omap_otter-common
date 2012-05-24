@@ -24,6 +24,7 @@
 #include "common.h"
 #include "clockdomain.h"
 
+static unsigned int ppa_service_0_index;
 static phys_addr_t omap_secure_memblock_base;
 static struct clockdomain *l4_secure_clkdm;
 
@@ -104,7 +105,7 @@ static int secure_notifier(struct notifier_block *self, unsigned long cmd,
 		 * subsequent calls to secure ROM. Otherwise the return address
 		 * will be to a PA return address and the system will hang.
 		 */
-		omap_secure_dispatcher(OMAP4_PPA_SERVICE_0,
+		omap_secure_dispatcher(ppa_service_0_index,
 				       FLAG_START_CRITICAL,
 				       0, 0, 0, 0, 0);
 		break;
@@ -120,6 +121,12 @@ static int __init secure_pm_init(void)
 {
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
 		cpu_pm_register_notifier(&secure_notifier_block);
+
+	if (cpu_is_omap44xx())
+		ppa_service_0_index = OMAP4_PPA_SERVICE_0;
+	else if (cpu_is_omap54xx())
+		ppa_service_0_index = OMAP5_PPA_SERVICE_0;
+
 	return 0;
 }
 early_initcall(secure_pm_init);
