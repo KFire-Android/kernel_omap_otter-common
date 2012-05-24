@@ -41,6 +41,8 @@
 #include <linux/virtio_ring.h>
 #include <asm/byteorder.h>
 #include <linux/pm_runtime.h>
+#include <linux/kthread.h>
+#include <linux/delay.h>
 
 #include "remoteproc_internal.h"
 
@@ -1769,6 +1771,21 @@ int rproc_set_constraints(struct device *dev, struct rproc *rproc,
 }
 EXPORT_SYMBOL(rproc_set_constraints);
 
+
+static void rproc_loader_thread(struct rproc *rproc)
+{
+	const struct firmware *fw;
+	struct device *dev = &rproc->dev;
+
+	while (kobject_uevent(&dev->kobj, KOBJ_CHANGE))
+		msleep(1000);
+
+	request_firmware(&fw, rproc->firmware, dev);
+
+	if (fw)
+		rproc_fw_config_virtio(fw, rproc);
+}
+
 /**
  * rproc_register() - register a remote processor
  * @rproc: the remote processor handle to register
@@ -1820,9 +1837,7 @@ int rproc_register(struct rproc *rproc)
 	 * We're initiating an asynchronous firmware loading, so we can
 	 * be built-in kernel code, without hanging the boot process.
 	 */
-	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
-					rproc->firmware, dev, GFP_KERNEL,
-					rproc, rproc_fw_config_virtio);
+	kthread_run((void *)rproc_loader_thread, rproc, "rproc_loader");
 	if (ret < 0) {
 		dev_err(dev, "request_firmware_nowait failed: %d\n", ret);
 		complete_all(&rproc->firmware_loading_complete);
