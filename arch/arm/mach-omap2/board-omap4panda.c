@@ -30,6 +30,7 @@
 #include <linux/regulator/fixed.h>
 #include <linux/wl12xx.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
+#include <linux/memblock.h>
 
 #include <mach/hardware.h>
 #include <asm/hardware/gic.h>
@@ -50,6 +51,7 @@
 #include "control.h"
 #include "mux.h"
 #include "common-board-devices.h"
+#include "omap4_ion.h"
 
 #define GPIO_HUB_POWER		1
 #define GPIO_HUB_NRESET		62
@@ -587,6 +589,7 @@ static void __init omap4_panda_init(void)
 
 	omap4_panda_init_rev();
 	omap4_panda_i2c_init();
+	omap4_register_ion();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 	platform_device_register(&omap_vwlan_device);
 	omap_serial_init();
@@ -601,6 +604,13 @@ static void __init omap4_panda_init(void)
 static void __init omap4_panda_reserve(void)
 {
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+
+	/* do the static reservations first */
+	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
+	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
+
+	omap4_ion_init();
+
 	omap_reserve();
 }
 
