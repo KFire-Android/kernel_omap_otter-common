@@ -294,5 +294,12 @@ static inline unsigned long omap_get_operation_voltage(
 		return 0;
 	return vdata->volt_nominal;
 }
+static inline unsigned long omap_get_nominal_voltage(
+				struct omap_volt_data *vdata)
+{
+	if (IS_ERR_OR_NULL(vdata))
+		return 0;
+	return vdata->volt_nominal;
+}
 
 #endif
