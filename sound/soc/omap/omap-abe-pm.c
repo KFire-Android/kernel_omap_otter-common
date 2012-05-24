@@ -269,7 +269,4 @@ out:
 	pm_runtime_put_sync(abe->dev);
 	return ret;
 }
-#else
-#define abe_suspend	NULL
-#define abe_resume	NULL
 #endif
