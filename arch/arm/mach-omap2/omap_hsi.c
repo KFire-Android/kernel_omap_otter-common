@@ -170,6 +170,7 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 	.default_hsi_fclk = HSI_DEFAULT_FCLK,
 	.fifo_mapping_strategy = HSI_FIFO_MAPPING_ALL_PORT2,
 	.ctx = &omap_hsi_ctrl_ctx,
+	.ssi_cawake_gpio = -1, /* If using SSI, define CAWAKE GPIO used here */
 	.device_enable = omap_device_enable,
 	.device_idle = omap_device_idle,
 	.device_shutdown = omap_device_shutdown,

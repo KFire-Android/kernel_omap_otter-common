@@ -518,6 +518,7 @@ static int __init hsi_request_cawake_irq(struct hsi_port *hsi_p)
 {
 	struct hsi_dev *hsi_ctrl = hsi_p->hsi_controller;
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
+	struct hsi_platform_data *pdata = dev_get_platdata(&pd->dev);
 	struct resource *cawake_irq;
 
 	if (hsi_driver_device_is_hsi(pd)) {
@@ -534,6 +535,13 @@ static int __init hsi_request_cawake_irq(struct hsi_port *hsi_p)
 		return -ENXIO;
 	}
 
+
+	if (pdata->ssi_cawake_gpio < 0) {
+		dev_err(hsi_ctrl->dev, "SSI device misses info for CAWAKE GPIO on port %d\n",
+			hsi_p->port_number);
+		return -ENXIO;
+	}
+
 	if (cawake_irq->flags & IORESOURCE_UNSET) {
 		dev_info(hsi_ctrl->dev, "No CAWAKE GPIO support\n");
 		hsi_p->cawake_gpio = -1;
@@ -541,7 +549,8 @@ static int __init hsi_request_cawake_irq(struct hsi_port *hsi_p)
 	}
 
 	hsi_p->cawake_gpio_irq = cawake_irq->start;
-	hsi_p->cawake_gpio = irq_to_gpio(cawake_irq->start);
+	hsi_p->cawake_gpio = pdata->ssi_cawake_gpio;
+
 	return hsi_cawake_init(hsi_p, cawake_irq->name);
 }
 

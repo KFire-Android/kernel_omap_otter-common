@@ -245,6 +245,7 @@ struct hsi_platform_data {
 	unsigned long default_hsi_fclk;
 	unsigned int fifo_mapping_strategy;
 	u32 errata;
+	int ssi_cawake_gpio; /* Only used for SSI */
 };
 
 /* HSI Bus */
