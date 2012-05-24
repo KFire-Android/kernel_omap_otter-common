@@ -1629,8 +1629,7 @@ int omap_aess_mono_mixer(struct omap_aess *abe, u32 id, u32 on_off)
 		task = aess_audul_mono_mixer;
 		break;
 	default:
-		return 0;
-		break;
+		return -EINVAL;
 	}
 
 	if (on_off)
