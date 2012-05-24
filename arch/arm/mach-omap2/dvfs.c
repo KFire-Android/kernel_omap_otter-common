@@ -388,7 +388,7 @@ static int _remove_vdd_user(struct omap_vdd_dvfs_info *dvfs_info,
  *
  * This runs down the table provided to find the match for main_volt
  * provided and sets up a scale request for the dependent domain
- * for the dependent voltage.
+ * for the dependent OPP.
  *
  * Returns 0 if all went well.
  */
@@ -397,7 +397,10 @@ static int _dep_scan_table(struct device *dev,
 {
 	struct omap_vdd_dep_volt *dep_table = dep_info->dep_table;
 	int i;
-	unsigned long dep_volt = 0;
+	struct device *target_dev;
+	struct omap_vdd_dvfs_info *tdvfs_info;
+	struct opp *opp;
+	unsigned long dep_volt = 0, new_dep_volt = 0, new_freq = 0;
 
 	if (!dep_table) {
 		dev_err(dev, "%s: deptable not present for vdd%s\n",
@@ -426,6 +429,31 @@ static int _dep_scan_table(struct device *dev,
 				 __func__, dep_info->name);
 			return -ENODEV;
 		}
+	}
+
+	tdvfs_info = _voltdm_to_dvfs_info(dep_info->_dep_voltdm);
+	if (!tdvfs_info) {
+		dev_warn(dev, "%s: no dvfs_info\n", __func__);
+		return -ENODEV;
+	}
+	target_dev = _dvfs_info_to_dev(tdvfs_info);
+	if (!target_dev) {
+		dev_warn(dev, "%s: no target_dev\n", __func__);
+		return -ENODEV;
+	}
+
+	rcu_read_lock();
+	opp = _volt_to_opp(target_dev, dep_volt);
+	if (!IS_ERR(opp)) {
+		new_dep_volt = opp_get_voltage(opp);
+		new_freq = opp_get_freq(opp);
+	}
+	rcu_read_unlock();
+
+	if (!new_dep_volt || !new_freq) {
+		dev_err(target_dev, "%s: no valid OPP for voltage %lu\n",
+			__func__, dep_volt);
+		return -ENODATA;
 	}
 
 	/* See if dep_volt is possible for the vdd*/
