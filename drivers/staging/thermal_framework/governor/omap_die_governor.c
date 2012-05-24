@@ -485,7 +485,7 @@ static int omap_die_pm_notifier_cb(struct notifier_block *notifier,
 	switch (pm_event) {
 	case PM_SUSPEND_PREPARE:
 		cancel_delayed_work_sync(&omap_gov->average_cpu_sensor_work);
-		cancel_delayed_work(&omap_gov->decrease_mpu_freq_work);
+		cancel_delayed_work_sync(&omap_gov->decrease_mpu_freq_work);
 		break;
 	case PM_POST_SUSPEND:
 		schedule_work(&omap_gov->average_cpu_sensor_work.work);
