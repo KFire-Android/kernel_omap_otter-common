@@ -365,7 +365,7 @@ static struct platform_device omap_pcm = {
 	.id	= -1,
 };
 
-#if defined(CONFIG_SND_OMAP_SOC_VXREC)
+#if defined(CONFIG_SND_OMAP_SOC_VXREC) || defined(CONFIG_SND_OMAP_SOC_VXREC_MODULE)
 static struct platform_device omap_abe_vxrec = {
 	.name   = "omap-abe-vxrec-dai",
 	.id     = -1,
@@ -375,7 +375,7 @@ static struct platform_device omap_abe_vxrec = {
 static void omap_init_audio(void)
 {
 	platform_device_register(&omap_pcm);
-#if defined(CONFIG_SND_OMAP_SOC_VXREC)
+#if defined(CONFIG_SND_OMAP_SOC_VXREC) || defined(CONFIG_SND_OMAP_SOC_VXREC_MODULE)
 	platform_device_register(&omap_abe_vxrec);
 #endif
 }
