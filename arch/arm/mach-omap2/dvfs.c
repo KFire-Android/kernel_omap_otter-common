@@ -618,13 +618,13 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 		return PTR_ERR(curr_vdata);
 	}
 
+	/* Disable smartreflex module across voltage and frequency scaling */
+	omap_sr_disable(voltdm);
+
 	/* Pick up the current voltage ONLY after ensuring no changes occur */
 	curr_volt = omap_vp_get_curr_volt(voltdm);
 	if (!curr_volt)
 		curr_volt = omap_get_operation_voltage(curr_vdata);
-
-	/* Disable smartreflex module across voltage and frequency scaling */
-	omap_sr_disable(voltdm);
 
 	if (curr_volt == new_volt) {
 		volt_scale_dir = DVFS_VOLT_SCALE_NONE;
