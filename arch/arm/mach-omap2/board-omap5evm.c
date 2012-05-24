@@ -22,6 +22,7 @@
 #include <linux/input.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
+#include <linux/memblock.h>
 #include <linux/platform_device.h>
 #include <linux/i2c/pca953x.h>
 #include <linux/i2c/twl.h>
@@ -52,7 +53,7 @@
 #include "common-board-devices.h"
 #include "hsmmc.h"
 #include "mux.h"
-
+#include "omap5_ion.h"
 
 static const uint32_t evm5430_keymap[] = {
 	KEY(0, 0, KEY_RESERVED),
@@ -977,12 +978,20 @@ static void __init omap_5430evm_init(void)
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
 
 	omap_init_dmm_tiler();
+	omap5_register_ion();
 	omap5evm_display_init();
 }
 
 static void __init omap_5430evm_reserve(void)
 {
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
+
+	/* do the static reservations first */
+	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
+	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
+
+	omap5_ion_init();
+
 	omap_reserve();
 }
 
