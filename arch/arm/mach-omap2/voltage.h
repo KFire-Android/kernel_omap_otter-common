@@ -72,6 +72,8 @@ struct voltagedomain {
 	const struct omap_vfsm_instance *vfsm;
 	struct omap_vp_instance *vp;
 	struct omap_voltdm_pmic *pmic;
+	struct omap_vp_param *vp_param;
+	struct omap_vc_param *vc_param;
 
 	/* VC/VP register access functions: SoC specific */
 	u32 (*read) (u8 offset);
@@ -142,10 +144,6 @@ struct omap_volt_data {
 struct omap_voltdm_pmic {
 	int slew_rate;
 	int step_size;
-	u32 on_volt;
-	u32 onlp_volt;
-	u32 ret_volt;
-	u32 off_volt;
 	u16 volt_setup_time;
 	u16 i2c_slave_addr;
 	u16 volt_reg_addr;
@@ -160,6 +158,18 @@ struct omap_voltdm_pmic {
 	u8 i2c_mcode;
 	unsigned long (*vsel_to_uv) (const u8 vsel);
 	u8 (*uv_to_vsel) (unsigned long uV);
+};
+
+struct omap_vp_param {
+	u32 vddmax;
+	u32 vddmin;
+};
+
+struct omap_vc_param {
+	u32 on;
+	u32 onlp;
+	u32 ret;
+	u32 off;
 };
 
 void omap_voltage_get_volttable(struct voltagedomain *voltdm,
