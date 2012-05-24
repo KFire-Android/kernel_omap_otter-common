@@ -317,6 +317,14 @@ int twl6030_mmc_card_detect_config(void)
 									ret);
 		return ret;
 	}
+	ret = twl_i2c_write_u8(TWL6030_MODULE_ID0,
+				(MMC_MINS_DEB_MASK | MMC_MEXT_DEB_MASK),
+				TWL6030_MMCDEBOUNCING);
+	if (ret < 0) {
+		pr_err("twl6030: Failed to write MMC_MEXT_DEB_MASK %d\n",
+								ret);
+		return ret;
+	}
 
 	return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
 }
