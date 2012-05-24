@@ -28,10 +28,7 @@
 #define PCA953X_INVERT		2
 #define PCA953X_DIRECTION	3
 
-#define TCA6424_INPUT		0x40
-#define TCA6424_OUTPUT		0x42
-#define TCA6424_INVERT		0x44
-#define TCA6424_DIRECTION	0x46
+#define REG_ADDR_AI		0x80
 
 #define PCA957X_IN		0
 #define PCA957X_INVRT		1
@@ -46,7 +43,6 @@
 #define PCA_INT			0x0100
 #define PCA953X_TYPE		0x1000
 #define PCA957X_TYPE		0x2000
-#define TCA6424_TYPE		0x4000
 
 static const struct i2c_device_id pca953x_id[] = {
 	{ "pca9534", 8  | PCA953X_TYPE | PCA_INT, },
@@ -69,25 +65,23 @@ static const struct i2c_device_id pca953x_id[] = {
 	{ "pca6107", 8  | PCA953X_TYPE | PCA_INT, },
 	{ "tca6408", 8  | PCA953X_TYPE | PCA_INT, },
 	{ "tca6416", 16 | PCA953X_TYPE | PCA_INT, },
-	{ "tca6424", 24 | TCA6424_TYPE, },
+	{ "tca6424", 24 | PCA953X_TYPE | PCA_INT, },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, pca953x_id);
 
 struct pca953x_chip {
 	unsigned gpio_start;
-	uint16_t reg_output;
-	uint16_t reg_direction;
-	uint16_t upper_reg_output;
-	uint16_t upper_reg_direction;
+	u32 reg_output;
+	u32 reg_direction;
 	struct mutex i2c_lock;
 
 #ifdef CONFIG_GPIO_PCA953X_IRQ
 	struct mutex irq_lock;
-	uint16_t irq_mask;
-	uint16_t irq_stat;
-	uint16_t irq_trig_raise;
-	uint16_t irq_trig_fall;
+	uint32_t irq_mask;
+	uint32_t irq_stat;
+	uint32_t irq_trig_raise;
+	uint32_t irq_trig_fall;
 	int	 irq_base;
 #endif
 
@@ -97,15 +91,22 @@ struct pca953x_chip {
 	int	chip_type;
 };
 
-static int pca953x_write_reg(struct pca953x_chip *chip, int reg, uint16_t val)
+static int pca953x_write_reg(struct pca953x_chip *chip, int reg, u32 val)
 {
 	int ret = 0;
 
 	if (chip->gpio_chip.ngpio <= 8)
 		ret = i2c_smbus_write_byte_data(chip->client, reg, val);
+	else if (chip->gpio_chip.ngpio == 24) {
+		ret = i2c_smbus_write_word_data(chip->client,
+						(reg << 2) | REG_ADDR_AI,
+						val & 0xffff);
+		ret = i2c_smbus_write_byte_data(chip->client,
+						(reg << 2) + 2,
+						(val & 0xff0000) >> 16);
+	}
 	else {
 		switch (chip->chip_type) {
-		case TCA6424_TYPE:
 		case PCA953X_TYPE:
 			ret = i2c_smbus_write_word_data(chip->client,
 							reg << 1, val);
@@ -130,12 +131,17 @@ static int pca953x_write_reg(struct pca953x_chip *chip, int reg, uint16_t val)
 	return 0;
 }
 
-static int pca953x_read_reg(struct pca953x_chip *chip, int reg, uint16_t *val)
+static int pca953x_read_reg(struct pca953x_chip *chip, int reg, u32 *val)
 {
 	int ret;
 
 	if (chip->gpio_chip.ngpio <= 8)
 		ret = i2c_smbus_read_byte_data(chip->client, reg);
+	else if (chip->gpio_chip.ngpio == 24) {
+		ret =  i2c_smbus_read_word_data(chip->client, reg << 2);
+		ret |= (i2c_smbus_read_byte_data(chip->client,
+						 (reg << 2) + 2)<<16);
+	}
 	else
 		ret = i2c_smbus_read_word_data(chip->client, reg << 1);
 
@@ -144,25 +150,20 @@ static int pca953x_read_reg(struct pca953x_chip *chip, int reg, uint16_t *val)
 		return ret;
 	}
 
-	*val = (uint16_t)ret;
+	*val = (u32)ret;
 	return 0;
 }
 
 static int pca953x_gpio_direction_input(struct gpio_chip *gc, unsigned off)
 {
 	struct pca953x_chip *chip;
-	uint16_t reg_val;
+	uint reg_val;
 	int ret, offset = 0;
 
 	chip = container_of(gc, struct pca953x_chip, gpio_chip);
 
 	mutex_lock(&chip->i2c_lock);
-
-	if (off > 15)
-		reg_val = chip->upper_reg_direction | (1u << (off - 16));
-	else
-		reg_val = chip->reg_direction | (1u << off);
-
+	reg_val = chip->reg_direction | (1u << off);
 
 	switch (chip->chip_type) {
 	case PCA953X_TYPE:
@@ -171,23 +172,12 @@ static int pca953x_gpio_direction_input(struct gpio_chip *gc, unsigned off)
 	case PCA957X_TYPE:
 		offset = PCA957X_CFG;
 		break;
-	case TCA6424_TYPE:
-		offset = TCA6424_DIRECTION;
-		if (off > 15) {
-			offset += 0x01;
-			reg_val = chip->upper_reg_direction | (1u << (off-16));
-		}
-		break;
 	}
 	ret = pca953x_write_reg(chip, offset, reg_val);
 	if (ret)
 		goto exit;
 
-	if (off > 15)
-		chip->upper_reg_direction = reg_val;
-	else
-		chip->reg_direction = reg_val;
-
+	chip->reg_direction = reg_val;
 	ret = 0;
 exit:
 	mutex_unlock(&chip->i2c_lock);
@@ -198,24 +188,17 @@ static int pca953x_gpio_direction_output(struct gpio_chip *gc,
 		unsigned off, int val)
 {
 	struct pca953x_chip *chip;
-	uint16_t reg_val;
+	uint reg_val;
 	int ret, offset = 0;
 
 	chip = container_of(gc, struct pca953x_chip, gpio_chip);
 
 	mutex_lock(&chip->i2c_lock);
 	/* set output level */
-	if (off > 15) {
-		if (val)
-			reg_val = chip->upper_reg_output | (1u << (off - 16));
-		else
-			reg_val = chip->upper_reg_output & ~(1u << (off - 16));
-	} else {
-		if (val)
-			reg_val = chip->reg_output | (1u << off);
-		else
-			reg_val = chip->reg_output & ~(1u << off);
-	}
+	if (val)
+		reg_val = chip->reg_output | (1u << off);
+	else
+		reg_val = chip->reg_output & ~(1u << off);
 
 	switch (chip->chip_type) {
 	case PCA953X_TYPE:
@@ -224,27 +207,15 @@ static int pca953x_gpio_direction_output(struct gpio_chip *gc,
 	case PCA957X_TYPE:
 		offset = PCA957X_OUT;
 		break;
-	case TCA6424_TYPE:
-		offset = TCA6424_OUTPUT;
-		if (off > 15)
-			offset += 0x01;
-		break;
 	}
 	ret = pca953x_write_reg(chip, offset, reg_val);
 	if (ret)
 		goto exit;
 
-	if (off > 15)
-		chip->upper_reg_output = reg_val;
-	else
-		chip->reg_output = reg_val;
+	chip->reg_output = reg_val;
 
 	/* then direction */
-	if (off > 15)
-		reg_val = chip->upper_reg_direction & ~(1u << (off - 16));
-	else
-		reg_val = chip->reg_direction & ~(1u << off);
-
+	reg_val = chip->reg_direction & ~(1u << off);
 	switch (chip->chip_type) {
 	case PCA953X_TYPE:
 		offset = PCA953X_DIRECTION;
@@ -252,20 +223,12 @@ static int pca953x_gpio_direction_output(struct gpio_chip *gc,
 	case PCA957X_TYPE:
 		offset = PCA957X_CFG;
 		break;
-	case TCA6424_TYPE:
-		offset = TCA6424_DIRECTION;
-		if (off > 15)
-			offset += 0x01;
-		break;
 	}
 	ret = pca953x_write_reg(chip, offset, reg_val);
 	if (ret)
 		goto exit;
 
-	if (off > 15)
-		chip->upper_reg_direction = reg_val;
-	else
-		chip->reg_direction = reg_val;
+	chip->reg_direction = reg_val;
 	ret = 0;
 exit:
 	mutex_unlock(&chip->i2c_lock);
@@ -275,7 +238,7 @@ exit:
 static int pca953x_gpio_get_value(struct gpio_chip *gc, unsigned off)
 {
 	struct pca953x_chip *chip;
-	uint16_t reg_val;
+	u32 reg_val;
 	int ret, offset = 0;
 
 	chip = container_of(gc, struct pca953x_chip, gpio_chip);
@@ -288,11 +251,6 @@ static int pca953x_gpio_get_value(struct gpio_chip *gc, unsigned off)
 	case PCA957X_TYPE:
 		offset = PCA957X_IN;
 		break;
-	case TCA6424_TYPE:
-		offset = TCA6424_INPUT;
-		if (off > 15)
-			offset += 0x01;
-		break;
 	}
 	ret = pca953x_read_reg(chip, offset, &reg_val);
 	mutex_unlock(&chip->i2c_lock);
@@ -304,32 +262,22 @@ static int pca953x_gpio_get_value(struct gpio_chip *gc, unsigned off)
 		return 0;
 	}
 
-	if (off > 15)
-		return (reg_val & (1u << (off - 16))) ? 1 : 0;
-	else
-		return (reg_val & (1u << off)) ? 1 : 0;
+	return (reg_val & (1u << off)) ? 1 : 0;
 }
 
 static void pca953x_gpio_set_value(struct gpio_chip *gc, unsigned off, int val)
 {
 	struct pca953x_chip *chip;
-	uint16_t reg_val;
+	u32 reg_val;
 	int ret, offset = 0;
 
 	chip = container_of(gc, struct pca953x_chip, gpio_chip);
 
 	mutex_lock(&chip->i2c_lock);
-	if (off > 15) {
-		if (val)
-			reg_val = chip->upper_reg_output | (1u << (off - 16));
-		else
-			reg_val = chip->upper_reg_output & ~(1u << (off - 16));
-	} else {
-		if (val)
-			reg_val = chip->reg_output | (1u << off);
-		else
-			reg_val = chip->reg_output & ~(1u << off);
-	}
+	if (val)
+		reg_val = chip->reg_output | (1u << off);
+	else
+		reg_val = chip->reg_output & ~(1u << off);
 
 	switch (chip->chip_type) {
 	case PCA953X_TYPE:
@@ -338,27 +286,12 @@ static void pca953x_gpio_set_value(struct gpio_chip *gc, unsigned off, int val)
 	case PCA957X_TYPE:
 		offset = PCA957X_OUT;
 		break;
-	case TCA6424_TYPE:
-		offset = TCA6424_OUTPUT;
-		if (off > 15)
-			offset += 0x01;
-		break;
 	}
-
-	if (off > 15)
-		ret = i2c_smbus_write_byte_data(chip->client, offset << 1,
-							reg_val & 0xff);
-	else
-		ret = pca953x_write_reg(chip, offset, reg_val);
-
+	ret = pca953x_write_reg(chip, offset, reg_val);
 	if (ret)
 		goto exit;
 
-	if (off > 15)
-		chip->upper_reg_output = reg_val;
-	else
-		chip->reg_output = reg_val;
-
+	chip->reg_output = reg_val;
 exit:
 	mutex_unlock(&chip->i2c_lock);
 }
@@ -416,8 +349,8 @@ static void pca953x_irq_bus_lock(struct irq_data *d)
 static void pca953x_irq_bus_sync_unlock(struct irq_data *d)
 {
 	struct pca953x_chip *chip = irq_data_get_irq_chip_data(d);
-	uint16_t new_irqs;
-	uint16_t level;
+	uint32_t new_irqs;
+	uint32_t level;
 
 	/* Look for any newly setup interrupt */
 	new_irqs = chip->irq_trig_fall | chip->irq_trig_raise;
@@ -435,8 +368,8 @@ static void pca953x_irq_bus_sync_unlock(struct irq_data *d)
 static int pca953x_irq_set_type(struct irq_data *d, unsigned int type)
 {
 	struct pca953x_chip *chip = irq_data_get_irq_chip_data(d);
-	uint16_t level = d->irq - chip->irq_base;
-	uint16_t mask = 1 << level;
+	uint32_t level = d->irq - chip->irq_base;
+	uint32_t mask = 1 << level;
 
 	if (!(type & IRQ_TYPE_EDGE_BOTH)) {
 		dev_err(&chip->client->dev, "irq %d: unsupported type %d\n",
@@ -466,12 +399,12 @@ static struct irq_chip pca953x_irq_chip = {
 	.irq_set_type		= pca953x_irq_set_type,
 };
 
-static uint16_t pca953x_irq_pending(struct pca953x_chip *chip)
+static uint32_t pca953x_irq_pending(struct pca953x_chip *chip)
 {
-	uint16_t cur_stat;
-	uint16_t old_stat;
-	uint16_t pending;
-	uint16_t trigger;
+	u32 cur_stat;
+	uint32_t old_stat;
+	uint32_t pending;
+	uint32_t trigger;
 	int ret, offset = 0;
 
 	switch (chip->chip_type) {
@@ -481,11 +414,6 @@ static uint16_t pca953x_irq_pending(struct pca953x_chip *chip)
 	case PCA957X_TYPE:
 		offset = PCA957X_IN;
 		break;
-	case TCA6424_TYPE:
-		offset = TCA6424_INPUT;
-		if (off > 15)
-			offset += 0x01;
-		break;
 	}
 	ret = pca953x_read_reg(chip, offset, &cur_stat);
 	if (ret)
@@ -493,7 +421,6 @@ static uint16_t pca953x_irq_pending(struct pca953x_chip *chip)
 
 	/* Remove output pins from the equation */
 	cur_stat &= chip->reg_direction;
-
 	old_stat = chip->irq_stat;
 	trigger = (cur_stat ^ old_stat) & chip->irq_mask;
 
@@ -512,8 +439,8 @@ static uint16_t pca953x_irq_pending(struct pca953x_chip *chip)
 static irqreturn_t pca953x_irq_handler(int irq, void *devid)
 {
 	struct pca953x_chip *chip = devid;
-	uint16_t pending;
-	uint16_t level;
+	uint32_t pending;
+	uint32_t level;
 
 	pending = pca953x_irq_pending(chip);
 
@@ -536,6 +463,7 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
 {
 	struct i2c_client *client = chip->client;
 	int ret, offset = 0;
+	u32 temporary;
 
 	if (irq_base != -1
 			&& (id->driver_data & PCA_INT)) {
@@ -548,13 +476,9 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
 		case PCA957X_TYPE:
 			offset = PCA957X_IN;
 			break;
-		case TCA6424_TYPE:
-			offset = TCA6424_INPUT;
-			if (off > 15)
-				offset += 0x01;
-			break;
 		}
-		ret = pca953x_read_reg(chip, offset, &chip->irq_stat);
+		ret = pca953x_read_reg(chip, offset, &temporary);
+		chip->irq_stat = temporary;
 		if (ret)
 			goto out_failed;
 
@@ -584,7 +508,13 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
 #endif
 		}
 
-		ret = request_threaded_irq(client->irq,
+		ret = gpio_request_one(client->irq, GPIOF_IN, "pca953x");
+		if (ret) {
+			dev_err(&client->dev, "gpio request failure\n");
+			goto out_failed;
+		}
+
+		ret = request_threaded_irq(gpio_to_irq(client->irq),
 					   NULL,
 					   pca953x_irq_handler,
 					   IRQF_TRIGGER_LOW | IRQF_ONESHOT,
@@ -651,8 +581,7 @@ pca953x_get_alt_pdata(struct i2c_client *client, int *gpio_base, int *invert)
 
 	*gpio_base = -1;
 	val = of_get_property(node, "linux,gpio-base", &size);
-	WARN(val, "%s: device-tree property 'linux,gpio-base' is deprecated!",
-		__func__);
+	WARN(val, "%s: device-tree property 'linux,gpio-base' is deprecated!", __func__);
 	if (val) {
 		if (size != sizeof(*val))
 			dev_warn(&client->dev, "%s: wrong linux,gpio-base\n",
@@ -662,8 +591,7 @@ pca953x_get_alt_pdata(struct i2c_client *client, int *gpio_base, int *invert)
 	}
 
 	val = of_get_property(node, "polarity", NULL);
-	WARN(val, "%s: device-tree property 'polarity' is deprecated!",
-		__func__);
+	WARN(val, "%s: device-tree property 'polarity' is deprecated!", __func__);
 	if (val)
 		*invert = *val;
 }
@@ -697,7 +625,7 @@ out:
 static int __devinit device_pca957x_init(struct pca953x_chip *chip, int invert)
 {
 	int ret;
-	uint16_t val = 0;
+	u32 val = 0;
 
 	/* Let every port in proper state, that could save power */
 	pca953x_write_reg(chip, PCA957X_PUPD, 0x0);
@@ -725,43 +653,13 @@ out:
 	return ret;
 }
 
-static int __devinit device_tca6424_init(struct pca953x_chip *chip, int invert)
-{
-	int ret;
-
-	ret = pca953x_read_reg(chip, TCA6424_OUTPUT, &chip->reg_output);
-	if (ret)
-		goto out;
-
-	ret = pca953x_read_reg(chip, TCA6424_OUTPUT + 0x01, &chip->upper_reg_output);
-	if (ret)
-		goto out;
-
-	ret = pca953x_read_reg(chip, TCA6424_DIRECTION,
-			       &chip->reg_direction);
-	if (ret)
-		goto out;
-
-	ret = pca953x_read_reg(chip, TCA6424_DIRECTION + 0x01,
-			       &chip->upper_reg_direction);
-	if (ret)
-		goto out;
-
-	/* set platform specific polarity inversion */
-	ret = pca953x_write_reg(chip, TCA6424_INVERT, invert);
-	ret = pca953x_write_reg(chip, TCA6424_INVERT + 0x01, invert);
-out:
-	return ret;
-}
-
-
 static int __devinit pca953x_probe(struct i2c_client *client,
 				   const struct i2c_device_id *id)
 {
 	struct pca953x_platform_data *pdata;
 	struct pca953x_chip *chip;
-	int irq_base = 0, invert = 0;
-	int ret = 0;
+	int irq_base=0, invert=0;
+	int ret;
 
 	chip = kzalloc(sizeof(struct pca953x_chip), GFP_KERNEL);
 	if (chip == NULL)
@@ -776,8 +674,7 @@ static int __devinit pca953x_probe(struct i2c_client *client,
 	} else {
 		pca953x_get_alt_pdata(client, &chip->gpio_start, &invert);
 #ifdef CONFIG_OF_GPIO
-		/* If I2C node has no interrupts property,
-		 * disable GPIO interrupts */
+		/* If I2C node has no interrupts property, disable GPIO interrupts */
 		if (of_find_property(client->dev.of_node, "interrupts", NULL) == NULL)
 			irq_base = -1;
 #endif
@@ -785,8 +682,7 @@ static int __devinit pca953x_probe(struct i2c_client *client,
 
 	chip->client = client;
 
-	chip->chip_type = id->driver_data &
-		(PCA953X_TYPE | PCA957X_TYPE | TCA6424_TYPE);
+	chip->chip_type = id->driver_data & (PCA953X_TYPE | PCA957X_TYPE);
 
 	mutex_init(&chip->i2c_lock);
 
@@ -795,19 +691,12 @@ static int __devinit pca953x_probe(struct i2c_client *client,
 	 */
 	pca953x_setup_gpio(chip, id->driver_data & PCA_GPIO_MASK);
 
-	switch (chip->chip_type) {
-	case PCA953X_TYPE:
+	if (chip->chip_type == PCA953X_TYPE)
 		ret = device_pca953x_init(chip, invert);
-		break;
-	case PCA957X_TYPE:
+	else
 		ret = device_pca957x_init(chip, invert);
-		break;
-	case TCA6424_TYPE:
-		ret = device_tca6424_init(chip, invert);
-		break;
-	default:
+	if (ret)
 		goto out_failed;
-	}
 
 	ret = pca953x_irq_setup(chip, id, irq_base);
 	if (ret)
