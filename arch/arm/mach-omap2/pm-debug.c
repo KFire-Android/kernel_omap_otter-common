@@ -39,6 +39,7 @@
 #include "pm.h"
 #include "powerdomain-private.h"
 
+u32 omap4_device_off_counter;
 u32 enable_off_mode;
 u32 wakeup_timer_seconds = 0;
 
@@ -154,6 +155,10 @@ static int pwrdm_dbg_show_timer(struct powerdomain *pwrdm, void *user)
 static int pm_dbg_show_counters(struct seq_file *s, void *unused)
 {
 	pwrdm_for_each(pwrdm_dbg_show_counter, s);
+
+	if (cpu_is_omap44xx() || cpu_is_omap54xx())
+		seq_printf(s, "DEVICE-OFF:%d\n", omap4_device_off_counter);
+
 	clkdm_for_each(clkdm_dbg_show_counter, s);
 
 	return 0;

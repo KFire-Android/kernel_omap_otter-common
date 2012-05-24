@@ -466,6 +466,9 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	    pwrdm_read_prev_pwrst(core_pd) == PWRDM_POWER_OFF) {
 		omap4_dpll_resume_off();
 		omap4_cm_resume_off();
+#ifdef CONFIG_PM_DEBUG
+		omap4_device_off_counter++;
+#endif
 	}
 
 sar_save_failed:
