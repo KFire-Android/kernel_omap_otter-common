@@ -1820,8 +1820,8 @@ static const struct clksel hsi_fclk_div[] = {
 	{ .parent = NULL },
 };
 
-static struct clk hsi_fclk = {
-	.name		= "hsi_fclk",
+static struct clk hsi_fck = {
+	.name		= "hsi_fck",
 	.parent		= &dpll_per_m2x2_ck,
 	.clksel		= hsi_fclk_div,
 	.clksel_reg	= OMAP54XX_CM_L3INIT_HSI_CLKCTRL,
@@ -2569,7 +2569,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"fdif_fclk",			&fdif_fclk,	CK_54XX),
 	CLK(NULL,	"gpu_core_clk_mux",		&gpu_core_clk_mux,	CK_54XX),
 	CLK(NULL,	"gpu_hyd_clk_mux",		&gpu_hyd_clk_mux,	CK_54XX),
-	CLK(NULL,	"hsi_fclk",			&hsi_fclk,	CK_54XX),
+	CLK(NULL,	"hsi_fck",			&hsi_fck,	CK_54XX),
 	CLK(NULL,	"mcasp_sync_mux_ck",		&mcasp_sync_mux_ck,	CK_54XX),
 	CLK(NULL,	"mcasp_gfclk",			&mcasp_gfclk,	CK_54XX),
 	CLK(NULL,	"mcbsp1_sync_mux_ck",		&mcbsp1_sync_mux_ck,	CK_54XX),
