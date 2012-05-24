@@ -4,7 +4,7 @@
 
 config OMAP_HSI
 	bool "OMAP HSI hardware driver"
-	depends on (ARCH_OMAP34XX || ARCH_OMAP4 || ARCH_OMAP5)
+	depends on (ARCH_OMAP3 || ARCH_OMAP4 || ARCH_OMAP5)
 	default n
 	---help---
 	  If you say Y here, you will enable the OMAP HSI hardware driver.
@@ -53,7 +53,7 @@ config OMAP_HSI_DEVICE
 
 config OMAP_SSI_DEVICE
 	bool "SSI (OMAP SSI)"
-	depends on ARCH_OMAP34XX
+	depends on ARCH_OMAP3
 	---help---
 	  Synchronous Serial Interface (SSI) is a high speed communication
 	  interface that is used for connecting OMAP to another IC.
