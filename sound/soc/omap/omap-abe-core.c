@@ -329,9 +329,7 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 #endif
 	.read		= abe_mixer_read,
 	.write		= abe_mixer_write,
-#if 0
 	.stream_event = abe_opp_stream_event,
-#endif
 };
 
 static int __devinit abe_engine_probe(struct platform_device *pdev)
