@@ -902,6 +902,7 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 	} else
 		pr_err("I2C hwspinlock request failed for bus %d\n", bus_id);
 }
+
 static int __init omap_5430evm_i2c_init(void)
 {
 
