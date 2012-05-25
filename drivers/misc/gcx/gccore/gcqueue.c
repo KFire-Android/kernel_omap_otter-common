@@ -493,6 +493,7 @@ static int gccmdthread(void *_gccorecontext)
 				headcmdbuf = list_entry(head,
 							struct gccmdbuf,
 							link);
+
 				GCDUMPBUFFER(GCZONE_BUFFER,
 					     headcmdbuf->logical,
 					     headcmdbuf->physical,

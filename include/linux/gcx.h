@@ -27,7 +27,7 @@
 
 #include <linux/semaphore.h>
 
-#define GCLOCK_TIMEOUT_SEC 30
+#define GCLOCK_TIMEOUT_SEC 20
 #define GCLOCK_TIMEOUT_JIF (msecs_to_jiffies(GCLOCK_TIMEOUT_SEC * 1000))
 
 #define GCLOCK_TYPE \
@@ -41,6 +41,8 @@
 
 #define GCLOCK_DESTROY(lock) \
 	do { } while (0)
+
+#if GCDEBUG_ENABLE
 
 #define GCLOCK(lock) { \
 	unsigned long __result__; \
@@ -91,5 +93,21 @@
 		result = wait_for_completion_timeout(completion, timeout); \
 	} \
 }
+
+#else
+
+#define GCLOCK(lock) \
+	down(lock)
+
+#define GCUNLOCK(lock) \
+	up(lock)
+
+#define GCWAIT_FOR_COMPLETION(completion) \
+	wait_for_completion(completion)
+
+#define GCWAIT_FOR_COMPLETION_TIMEOUT(result, completion, timeout) \
+	result = wait_for_completion_timeout(completion, timeout)
+
+#endif
 
 #endif

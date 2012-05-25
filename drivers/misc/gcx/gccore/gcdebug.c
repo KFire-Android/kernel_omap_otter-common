@@ -422,7 +422,7 @@ static ssize_t gc_debug_write_log_enable(
 	const char __user *user_buf,
 	size_t count, loff_t *ppos)
 {
-	char buf[128];
+	char buf[256];
 	size_t len;
 	unsigned long val;
 	int ret;

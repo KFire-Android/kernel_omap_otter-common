@@ -21,12 +21,12 @@ struct gcmmucontext;
 
 
 /*******************************************************************************
- * Debug logging enable switch.
+ * Debug logging switches.
  */
 
 /* Enables internal gccore logging backend. */
 #if !defined(GCDEBUG_ENABLE)
-#define GCDEBUG_ENABLE 1
+#define GCDEBUG_ENABLE 0
 #endif
 
 /* Enables linux builtin logging backend. */
@@ -37,6 +37,7 @@ struct gcmmucontext;
 #if GCDEBUG_ENABLE && GCDEBUG_LINUXLOGS
 #error GCDEBUG_ENABLE and GCDEBUG_LINUXLOGS cannot be enabled simultaneously.
 #endif
+
 
 /*******************************************************************************
  * Dumping interface macro for release mode.
@@ -84,6 +85,7 @@ struct gcmmucontext;
 
 #endif
 
+
 /*******************************************************************************
  * Dumping macros not specific to a particular logging backend.
  */
@@ -126,6 +128,9 @@ do { \
 } while (false)
 
 #endif
+
+#define GC_FUNC_ENTER "++"
+#define GC_FUNC_EXIT "--"
 
 
 /*******************************************************************************
@@ -181,19 +186,19 @@ do { \
 	gc_dump_reset()
 
 #define GCENTER(zone) \
-	gc_dump_string(&GCDBGFILTER, zone, "++" GC_MOD_PREFIX "\n", \
+	gc_dump_string(&GCDBGFILTER, zone, GC_FUNC_ENTER GC_MOD_PREFIX "\n", \
 			__func__, __LINE__)
 
 #define GCEXIT(zone) \
-	gc_dump_string(&GCDBGFILTER, zone, "--" GC_MOD_PREFIX "\n", \
+	gc_dump_string(&GCDBGFILTER, zone, GC_FUNC_EXIT GC_MOD_PREFIX "\n", \
 			__func__, __LINE__)
 
 #define GCENTERARG(zone, msg, ...) \
-	gc_dump_string(&GCDBGFILTER, zone, "++" GC_MOD_PREFIX msg, \
+	gc_dump_string(&GCDBGFILTER, zone, GC_FUNC_ENTER GC_MOD_PREFIX msg, \
 			__func__, __LINE__, ##__VA_ARGS__)
 
 #define GCEXITARG(zone, msg, ...) \
-	gc_dump_string(&GCDBGFILTER, zone, "--" GC_MOD_PREFIX msg, \
+	gc_dump_string(&GCDBGFILTER, zone, GC_FUNC_EXIT GC_MOD_PREFIX msg, \
 			__func__, __LINE__, ##__VA_ARGS__)
 
 #define GCDBG(zone, msg, ...) \
@@ -228,16 +233,18 @@ do { \
 #define GCDBG_REGISTER(...)
 
 #define GCENTER(zone) \
-	GCDBG(zone, "++ %s(%d)\n", __func__, __LINE__)
+	GCDBG(zone, GC_FUNC_ENTER " %s(%d)\n", __func__, __LINE__)
 
 #define GCEXIT(zone) \
-	GCDBG(zone, "-- %s(%d)\n", __func__, __LINE__)
+	GCDBG(zone, GC_FUNC_EXIT " %s(%d)\n", __func__, __LINE__)
 
 #define GCENTERARG(zone, msg, ...) \
-	GCDBG(zone, "++ %s(%d) " msg "\n", __func__, __LINE__, ##__VA_ARGS__)
+	GCDBG(zone, GC_FUNC_ENTER " %s(%d) " msg "\n", \
+	      __func__, __LINE__, ##__VA_ARGS__)
 
 #define GCEXITARG(zone, msg, ...) \
-	GCDBG(zone, "-- %s(%d) " msg "\n", __func__, __LINE__, ##__VA_ARGS__)
+	GCDBG(zone, GC_FUNC_EXIT " %s(%d) " msg "\n", \
+	      __func__, __LINE__, ##__VA_ARGS__)
 
 #define GCDBG(zone, msg, ...) \
 	dev_dbg(gc_get_dev(), msg, ##__VA_ARGS__)
