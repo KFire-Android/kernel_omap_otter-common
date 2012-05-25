@@ -576,42 +576,8 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 	},
 };
 
-static struct omap_i2c_bus_board_data __initdata omap5_i2c_1_bus_pdata;
-static struct omap_i2c_bus_board_data __initdata omap5_i2c_2_bus_pdata;
-static struct omap_i2c_bus_board_data __initdata omap5_i2c_3_bus_pdata;
-static struct omap_i2c_bus_board_data __initdata omap5_i2c_4_bus_pdata;
-static struct omap_i2c_bus_board_data __initdata omap5_i2c_5_bus_pdata;
-
-static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
-				struct omap_i2c_bus_board_data *pdata)
-{
-	/* spinlock_id should be -1 for a generic lock request */
-	if (spinlock_id < 0)
-		pdata->handle = hwspin_lock_request();
-	else
-		pdata->handle = hwspin_lock_request_specific(spinlock_id);
-
-	if (pdata->handle != NULL) {
-		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
-		pdata->hwspin_unlock = hwspin_unlock;
-	} else
-		pr_err("I2C hwspinlock request failed for bus %d\n", bus_id);
-}
-
 static int __init omap_5430evm_i2c_init(void)
 {
-
-	omap_i2c_hwspinlock_init(1, 0, &omap5_i2c_1_bus_pdata);
-	omap_i2c_hwspinlock_init(2, 1, &omap5_i2c_2_bus_pdata);
-	omap_i2c_hwspinlock_init(3, 2, &omap5_i2c_3_bus_pdata);
-	omap_i2c_hwspinlock_init(4, 3, &omap5_i2c_4_bus_pdata);
-	omap_i2c_hwspinlock_init(5, 4, &omap5_i2c_5_bus_pdata);
-
-	omap_register_i2c_bus_board_data(1, &omap5_i2c_1_bus_pdata);
-	omap_register_i2c_bus_board_data(2, &omap5_i2c_2_bus_pdata);
-	omap_register_i2c_bus_board_data(3, &omap5_i2c_3_bus_pdata);
-	omap_register_i2c_bus_board_data(4, &omap5_i2c_4_bus_pdata);
-	omap_register_i2c_bus_board_data(5, &omap5_i2c_5_bus_pdata);
 
 	omap_register_i2c_bus(1, 400, omap5evm_i2c_1_boardinfo,
 					ARRAY_SIZE(omap5evm_i2c_1_boardinfo));
