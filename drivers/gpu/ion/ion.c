@@ -281,6 +281,7 @@ void ion_free(struct ion_client *client, struct ion_handle *handle)
 	}
 	ion_handle_put(handle);
 }
+EXPORT_SYMBOL(ion_free);
 
 static void ion_client_get(struct ion_client *client);
 static int ion_client_put(struct ion_client *client);
@@ -338,6 +339,7 @@ int ion_phys(struct ion_client *client, struct ion_handle *handle,
 	ret = buffer->heap->ops->phys(buffer->heap, buffer, addr, len);
 	return ret;
 }
+EXPORT_SYMBOL(ion_phys);
 
 void *ion_map_kernel(struct ion_client *client, struct ion_handle *handle)
 {
@@ -512,6 +514,7 @@ end:
 	fput(file);
 	return handle;
 }
+EXPORT_SYMBOL(ion_import_fd);
 
 static int ion_debug_client_show(struct seq_file *s, void *unused)
 {
@@ -665,6 +668,7 @@ struct ion_client *ion_client_create(struct ion_device *dev,
 
 	return client;
 }
+EXPORT_SYMBOL(ion_client_create);
 
 static void _ion_client_destroy(struct kref *kref)
 {
@@ -690,6 +694,7 @@ static void _ion_client_destroy(struct kref *kref)
 
 	kfree(client);
 }
+EXPORT_SYMBOL(ion_client_destroy);
 
 static void ion_client_get(struct ion_client *client)
 {
