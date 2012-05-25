@@ -114,7 +114,7 @@ static struct device_info mpu_dev_info = {
 
 static struct device_info l3_dev_info = {
 	.hwmod_name	= "l3_main_1",
-	.clk_name	= "dpll_core_m5x2_ck",
+	.clk_name	= "virt_l3_ck",
 	.voltdm_name	= "core",
 };
 
