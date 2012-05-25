@@ -75,7 +75,7 @@ static int __init omap_init_drm(void)
 
 arch_initcall(omap_init_drm);
 
-void omapdrm_reserve_vram(void)
+void __init omapdrm_reserve_vram(void)
 {
 #ifdef CONFIG_CMA
 	/*
