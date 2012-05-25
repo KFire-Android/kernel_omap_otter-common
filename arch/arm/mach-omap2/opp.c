@@ -22,8 +22,12 @@
 
 #include <plat/omap_device.h>
 #include <plat/clock.h>
+#include <plat/dvfs.h>
 
 #include "omap_opp_data.h"
+#include "clockdomain.h"
+#include "powerdomain.h"
+#include "voltage.h"
 
 /* Temp variable to allow multiple calls */
 static u8 __initdata omap_table_init;
@@ -99,7 +103,15 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 				"result=%d\n",
 			       __func__, opp_def->freq,
 			       opp_def->dev_info->hwmod_name, i, r);
+			continue;
 		}
+
+		r  = omap_dvfs_register_device(dev,
+					       opp_def->dev_info->voltdm_name,
+					       opp_def->dev_info->clk_name);
+		if (r)
+			dev_err(dev, "%s:%s:err dvfs register %d %d\n",
+				__func__, opp_def->dev_info->hwmod_name, r, i);
 	}
 
 	return 0;
