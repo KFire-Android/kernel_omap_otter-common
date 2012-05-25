@@ -486,7 +486,9 @@ static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
 		return;
 
 	/* XXX These are magic numbers and do not belong! */
-	vc_val = (0x60 << OMAP4430_SCLL_SHIFT | 0x26 << OMAP4430_SCLH_SHIFT);
+	vc_val = (0x28 << OMAP4430_SCLL_SHIFT | 0x2c << OMAP4430_SCLH_SHIFT);
+	vc_val |= (0x0b << OMAP4430_HSSCLL_SHIFT);
+	vc_val |= (0x0 << OMAP4430_HSSCLH_SHIFT);
 	voltdm->write(vc_val, OMAP4_PRM_VC_CFG_I2C_CLK_OFFSET);
 
 	is_initialized = true;
