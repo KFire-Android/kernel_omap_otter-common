@@ -32,10 +32,6 @@
 #include "omap-abe-priv.h"
 /* #include "abe/abe_main.h" */
 
-int abe_mixer_enable_mono(struct omap_abe *abe, int id, int enable);
-int abe_mixer_set_equ_profile(struct omap_abe *abe,
-		unsigned int id, unsigned int profile);
-
 void omap_abe_pm_get(struct snd_soc_platform *platform)
 {
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
@@ -273,7 +269,4 @@ out:
 	pm_runtime_put_sync(abe->dev);
 	return ret;
 }
-#else
-#define abe_suspend	NULL
-#define abe_resume	NULL
 #endif

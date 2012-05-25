@@ -388,6 +388,11 @@ static struct platform_device sdp4430_dmic_codec = {
 	.id	= -1,
 };
 
+static struct platform_device sdp4430_spdif_dit_codec = {
+	.name           = "spdif-dit",
+	.id             = -1,
+};
+
 static struct platform_device sdp4430_hdmi_audio_codec = {
 	.name	= "hdmi-audio-codec",
 	.id	= -1,
@@ -427,6 +432,7 @@ static struct platform_device *sdp4430_devices[] __initdata = {
 	&sdp4430_leds_pwm,
 	&sdp4430_vbat,
 	&sdp4430_dmic_codec,
+	&sdp4430_spdif_dit_codec,
 	&sdp4430_abe_audio,
 	&sdp4430_hdmi_audio_codec,
 };

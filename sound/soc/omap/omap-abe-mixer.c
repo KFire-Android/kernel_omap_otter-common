@@ -494,7 +494,7 @@ static int abe_put_equalizer(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
-int snd_soc_info_enum_ext1(struct snd_kcontrol *kcontrol,
+static int snd_soc_info_enum_ext1(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_info *uinfo)
 {
 	struct soc_enum *e = (struct soc_enum *)kcontrol->private_value;
@@ -511,7 +511,7 @@ int snd_soc_info_enum_ext1(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static const char *route_ul_texts[] = {
+static const char * const route_ul_texts[] = {
 	"None", "DMic0L", "DMic0R", "DMic1L", "DMic1R", "DMic2L", "DMic2R",
 	"BT Left", "BT Right", "MMExt Left", "MMExt Right", "AMic0", "AMic1",
 	"VX Left", "VX Right"
@@ -687,10 +687,10 @@ static const struct snd_kcontrol_new abe_controls[] = {
 		OMAP_AESS_MIXVXREC_TONES, 0, 149, 0,
 		volume_get_mixer, volume_put_mixer, vxrec_tones_tlv),
 	SOC_SINGLE_EXT_TLV("VXREC Voice DL Volume",
-		OMAP_AESS_MIXVXREC_VX_UL, 0, 149, 0,
+		OMAP_AESS_MIXVXREC_VX_DL, 0, 149, 0,
 		volume_get_mixer, volume_put_mixer, vxrec_vx_dl_tlv),
 	SOC_SINGLE_EXT_TLV("VXREC Voice UL Volume",
-		OMAP_AESS_MIXVXREC_VX_DL, 0, 149, 0,
+		OMAP_AESS_MIXVXREC_VX_UL, 0, 149, 0,
 		volume_get_mixer, volume_put_mixer, vxrec_vx_ul_tlv),
 
 	/* AUDUL mixer gains */
@@ -792,6 +792,8 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			OMAP_ABE_AIF_DMIC1, OMAP_ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_IN("DMIC2", "DMIC2 Capture", 0,
 			OMAP_ABE_AIF_DMIC2, OMAP_ABE_OPP_50, 0),
+	SND_SOC_DAPM_AIF_IN("VXREC", "VXREC Capture", 0,
+			OMAP_ABE_AIF_VXREC, OMAP_ABE_OPP_50, 0),
 
 	/* ROUTE_UL Capture Muxes */
 	SND_SOC_DAPM_MUX("MUX_UL00",
@@ -1117,10 +1119,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"PDM_DL2", NULL, "DL2 Mixer"},
 
 	/* VxREC Mixer */
-	{"Capture Mixer", "Tones", "TONES_DL"},
-	{"Capture Mixer", "Voice Playback", "VX DL VMixer"},
-	{"Capture Mixer", "Voice Capture", "VX UL VMixer"},
-	{"Capture Mixer", "Media Playback", "MM_DL"},
+	{"Capture Mixer", "Tones", "VXREC"},
+	{"Capture Mixer", "Voice Playback", "VXREC"},
+	{"Capture Mixer", "Voice Capture", "VXREC"},
+	{"Capture Mixer", "Media Playback", "VXREC"},
 
 	/* Audio UL mixer */
 	{"Voice Capture Mixer", "Tones Playback", "TONES_DL"},
@@ -1167,6 +1169,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"DMIC0", NULL, "BE_IN"},
 	{"DMIC1", NULL, "BE_IN"},
 	{"DMIC2", NULL, "BE_IN"},
+	{"VXREC", NULL, "BE_IN"},
 };
 
 int abe_mixer_add_widgets(struct snd_soc_platform *platform)

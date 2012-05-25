@@ -77,7 +77,7 @@
 #include "abe_define.h"
 #include "abe_def.h"
 #include "abe_typedef.h"
-
+#include "abe_private.h"
 
 
 /* one scheduler loop = 4kHz = 12 samples at 48kHz */

@@ -31,7 +31,7 @@
 #include "abe_port.h"
 
 /* this must match logical ID numbers in port_mgr.h */
-static const char *lport_name[] = {
+static const char * const lport_name[] = {
 		"dmic0", "dmic1", "dmic2", "pdmdl1", "pdmdl2", "pdmvib",
 		"pdmul1", "bt_vx_dl", "bt_vx_ul", "mm_ext_ul", "mm_ext_dl",
 		"mm_dl1", "mm_ul1", "mm_ul2", "vx_dl", "vx_ul", "vib", "tones",
@@ -39,7 +39,7 @@ static const char *lport_name[] = {
 };
 
 static DEFINE_MUTEX(port_mgr_mutex);
-static struct abe *the_abe;
+static struct omap_aess *the_abe;
 static int users;
 
 /*
@@ -98,13 +98,13 @@ static int get_physical_id(int logical_id)
 static int port_get_num_users(struct omap_aess *abe, struct omap_abe_port *port)
 {
 	struct omap_abe_port *p;
-	int users = 0;
+	int count = 0;
 
 	list_for_each_entry(p, &abe->ports, list) {
 		if (p->physical_id == port->physical_id && p->state == PORT_ENABLED)
-			users++;
+			count++;
 	}
-	return users;
+	return count;
 }
 
 static int port_is_open(struct omap_aess *abe, int phy_port)
@@ -246,13 +246,13 @@ struct omap_abe_port *omap_abe_port_open(struct omap_aess *abe, int logical_id)
 #ifdef CONFIG_DEBUG_FS
 	sprintf(debug_fs_name, "%s_state", lport_name[logical_id]);
 	port->debugfs_lstate = debugfs_create_u32(debug_fs_name, 0644,
-			abe->debugfs_root, &port->state);
+			abe->debugfs_root, (u32 *)&port->state);
 	sprintf(debug_fs_name, "%s_phy", lport_name[logical_id]);
 	port->debugfs_lphy = debugfs_create_u32(debug_fs_name, 0644,
-			abe->debugfs_root, &port->physical_id);
+			abe->debugfs_root, (u32 *)&port->physical_id);
 	sprintf(debug_fs_name, "%s_users", lport_name[logical_id]);
 	port->debugfs_lusers = debugfs_create_u32(debug_fs_name, 0644,
-			abe->debugfs_root, &port->users);
+			abe->debugfs_root, (u32 *)&port->users);
 #endif
 
 	pr_debug("opened port %s\n", lport_name[logical_id]);

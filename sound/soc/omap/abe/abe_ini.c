@@ -70,7 +70,7 @@
 #include "abe_port.h"
 #include "abe_seq.h"
 
-const u32 aess_firmware_array[ABE_FIRMWARE_MAX_SIZE] = {
+static const u32 aess_firmware_array[ABE_FIRMWARE_MAX_SIZE] = {
 #include "abe_firmware.c"
 };
 
@@ -89,7 +89,7 @@ const u32 aess_firmware_array[ABE_FIRMWARE_MAX_SIZE] = {
  * processing features.
  * Clears the internal AE buffers.
  */
-int omap_aess_reset_port(u32 id)
+static int omap_aess_reset_port(u32 id)
 {
 	abe_port[id] = ((struct omap_aess_port *) abe_port_init)[id];
 	return 0;
@@ -100,7 +100,7 @@ int omap_aess_reset_port(u32 id)
  *
  * load default configuration for all features
  */
-void omap_aess_reset_all_ports(struct omap_aess *abe)
+static void omap_aess_reset_all_ports(struct omap_aess *abe)
 {
 	u16 i;
 	for (i = 0; i < LAST_PORT_ID; i++)
@@ -258,7 +258,7 @@ EXPORT_SYMBOL(omap_aess_reload_fw);
  *
  * Get default ABE firmware
  */
-u32 *omap_aess_get_default_fw()
+u32 *omap_aess_get_default_fw(void)
 {
 	return (u32 *)aess_firmware_array;
 }
@@ -273,4 +273,51 @@ u32 omap_abe_get_supported_fw_version(void)
 }
 EXPORT_SYMBOL(omap_abe_get_supported_fw_version);
 
+/*
+ * same as memcpy_fromio, but with 32-bit access.
+ * Assumes 'from' is 32-bit aligned and that (count % 4) == 0
+ */
+void omap_abe_memcpy_fromio(void *to, const void __iomem *from, size_t count)
+{
+	unsigned long *t = to;
+	count /= 4;
+	while (count) {
+		count--;
+		*t = readl(from);
+		t++;
+		from += 4;
+	}
+}
+EXPORT_SYMBOL(omap_abe_memcpy_fromio);
 
+/*
+ * same as memcpy_toio, but with 32-bit access.
+ * Assumes 'to' is 32-bit aligned and that (count % 4) == 0
+ */
+void omap_abe_memcpy_toio(void __iomem *to, const void *from, size_t count)
+{
+	const unsigned long *f = from;
+	count /= 4;
+	while (count) {
+		count--;
+		writel(*f, to);
+		f++;
+		to += 4;
+	}
+}
+EXPORT_SYMBOL(omap_abe_memcpy_toio);
+
+/*
+ * same as memset_io, but with 32-bit access.
+ * Assumes 'dst' is 32-bit aligned and that (count % 4) == 0
+ */
+void omap_abe_memset_io(void __iomem *dst, int c, size_t count)
+{
+	count /= 4;
+	while (count) {
+		count--;
+		writel(c, dst);
+		dst += 4;
+	}
+}
+EXPORT_SYMBOL(omap_abe_memset_io);
