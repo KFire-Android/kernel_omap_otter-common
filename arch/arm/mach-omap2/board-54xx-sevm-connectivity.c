@@ -24,6 +24,15 @@
 
 #include <linux/wl12xx.h>
 
+/* for TI Shared Transport devices */
+#include <linux/skbuff.h>
+#include <linux/ti_wilink_st.h>
+#include <plat/omap-serial.h>
+#include <linux/wakelock.h>
+
+#define WILINK_UART_DEV_NAME "/dev/ttyO4"
+#define OMAP5_BT_NSHUTDOWN_GPIO	142
+
 #define GPIO_WIFI_PMENA     140
 #define GPIO_WIFI_IRQ       9
 
@@ -108,9 +117,109 @@ void __init omap5_sdp5430_wifi_init(void)
 		pr_err("Error registering wl12xx device: %d\n", ret);
 }
 
+/* TODO: handle suspend/resume here.
+ * Upon every suspend, make sure the wilink chip is capable
+ * enough to wake-up the OMAP host.
+ */
+static int plat_wlink_kim_suspend(struct platform_device *pdev,
+		pm_message_t state)
+{
+	return 0;
+}
+
+static int plat_wlink_kim_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+
+static bool uart_req;
+static struct wake_lock st_wk_lock;
+/* Call the uart disable of serial driver */
+static int plat_uart_disable(struct kim_data_s *un_used)
+{
+	int port_id = 0;
+	int err = 0;
+	if (uart_req) {
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
+		err = omap_serial_ext_uart_disable(port_id);
+		if (!err)
+			uart_req = false;
+	}
+	wake_unlock(&st_wk_lock);
+	return err;
+}
+
+/* Call the uart enable of serial driver */
+static int plat_uart_enable(struct kim_data_s *un_used)
+{
+	int port_id = 0;
+	int err = 0;
+	if (!uart_req) {
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
+		err = omap_serial_ext_uart_enable(port_id);
+		if (!err)
+			uart_req = true;
+	}
+	wake_lock(&st_wk_lock);
+	return err;
+}
+
+/* wl18xx, wl128x BT, FM, GPS connectivity chip */
+static struct ti_st_plat_data wilink_pdata = {
+	.dev_name = WILINK_UART_DEV_NAME,
+	.nshutdown_gpio = OMAP5_BT_NSHUTDOWN_GPIO, /* BT GPIO in OMAP5 */
+	.flow_cntrl = 1,
+	.baud_rate = 3686400, /* 115200 for test */
+	.suspend = plat_wlink_kim_suspend,
+	.resume = plat_wlink_kim_resume,
+	.chip_enable = plat_uart_enable,
+	.chip_disable = plat_uart_disable,
+	.chip_asleep = plat_uart_disable,
+	.chip_awake = plat_uart_enable,
+};
+
+static struct platform_device wl18xx_device = {
+	.name           = "kim",
+	.id             = -1,
+	.dev.platform_data = &wilink_pdata,
+};
+
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+};
+
+static void __init omap5sevm_ti_st_init(void)
+{
+	int ret;
+
+	omap_mux_init_gpio(OMAP5_BT_NSHUTDOWN_GPIO,
+		OMAP_PIN_OUTPUT | OMAP_PIN_INPUT_PULLUP);
+	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
+	/* Mux configure OMAP5 UART5/WL UART */
+	omap_mux_init_signal("uart5_rx.uart5_rx", OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("uart5_tx.uart5_tx", OMAP_PIN_OUTPUT);
+	omap_mux_init_signal("uart5_cts.uart5.cts", OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("uart5_rts.uart5.rts", OMAP_PIN_OUTPUT);
+
+	ret = platform_device_register(&wl18xx_device);
+	if (ret) {
+		pr_err("error registering ti-st device: %d\n", ret);
+	} else {
+		ret = platform_device_register(&btwilink_device);
+		if (ret)
+			pr_err("error registering btwilink device: %d\n", ret);
+	}
+}
+
+
 int __init omap5sevm_connectivity_init(void)
 {
 	omap5_sdp5430_wifi_init();
+#ifdef CONFIG_TI_ST
+	/* add shared transport relevant platform devices only */
+	omap5sevm_ti_st_init();
+#endif
 
 	return 0;
 }
