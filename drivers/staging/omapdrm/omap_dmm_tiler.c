@@ -373,8 +373,10 @@ struct tiler_block *tiler_reserve_2d(enum tiler_fmt fmt, uint16_t w,
 	/* check for valid format and overflow for w/h */
 	if (!validfmt(fmt) || !w || !h ||
 		(w > USHRT_MAX - geom[fmt].slot_w) ||
-		(h > USHRT_MAX - geom[fmt].slot_h))
+		(h > USHRT_MAX - geom[fmt].slot_h)) {
+		pr_err("%s: Invalid fmt|| height || width  value\n", __func__);
 		return ERR_PTR(-EINVAL);
+	}
 
 	block = kzalloc(sizeof(*block), GFP_KERNEL);
 	if (!block)
@@ -490,7 +492,7 @@ static u32 tiler_get_address(u32 orient, enum tiler_fmt fmt, u32 x, u32 y)
 
 dma_addr_t tiler_ssptr(struct tiler_block *block)
 {
-	BUG_ON(!validfmt(block->fmt));
+	WARN_ON(!validfmt(block->fmt));
 
 	return TILVIEW_8BIT + tiler_get_address(0, block->fmt,
 			block->area.p0.x * geom[block->fmt].slot_w,
@@ -500,7 +502,7 @@ EXPORT_SYMBOL(tiler_ssptr);
 
 void tiler_align(enum tiler_fmt fmt, uint16_t *w, uint16_t *h)
 {
-	BUG_ON(!validfmt(fmt) || fmt == TILFMT_PAGE);
+	WARN_ON(!validfmt(fmt) || fmt == TILFMT_PAGE);
 	*w = round_up(*w, geom[fmt].slot_w);
 	*h = round_up(*h, geom[fmt].slot_h);
 }
@@ -509,7 +511,7 @@ EXPORT_SYMBOL(tiler_align);
 uint32_t tiler_stride(dma_addr_t tsptr)
 {
 	enum tiler_fmt fmt = TILER_FMT(tsptr);
-	BUG_ON(!validfmt(fmt));
+	WARN_ON(!validfmt(fmt));
 
 	if (fmt == TILFMT_PAGE)
 		return 0;
@@ -529,7 +531,7 @@ EXPORT_SYMBOL(tiler_size);
 
 size_t tiler_vsize(enum tiler_fmt fmt, uint16_t w, uint16_t h)
 {
-	BUG_ON(!validfmt(fmt) || fmt == TILFMT_PAGE);
+	WARN_ON(!validfmt(fmt) || fmt == TILFMT_PAGE);
 	return round_up(geom[fmt].cpp * w, PAGE_SIZE) * h;
 }
 EXPORT_SYMBOL(tiler_vsize);
