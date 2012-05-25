@@ -361,6 +361,7 @@ int omapfb_set_update_mode(struct fb_info *fbi,
 
 	return r;
 }
+EXPORT_SYMBOL(omapfb_set_update_mode);
 
 int omapfb_get_update_mode(struct fb_info *fbi,
 		enum omapfb_update_mode *mode)
@@ -383,6 +384,7 @@ int omapfb_get_update_mode(struct fb_info *fbi,
 
 	return 0;
 }
+EXPORT_SYMBOL(omapfb_get_update_mode);
 
 /* XXX this color key handling is a hack... */
 static struct omapfb_color_key omapfb_color_keys[2];
