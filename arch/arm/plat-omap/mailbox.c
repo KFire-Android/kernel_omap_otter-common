@@ -30,6 +30,8 @@
 #include <linux/err.h>
 #include <linux/notifier.h>
 #include <linux/module.h>
+#include <linux/pm.h>
+#include <linux/pm_runtime.h>
 
 #include <plat/mailbox.h>
 
@@ -41,6 +43,49 @@ static DEFINE_MUTEX(mbox_configured_lock);
 static unsigned int mbox_kfifo_size = CONFIG_OMAP_MBOX_KFIFO_SIZE;
 module_param(mbox_kfifo_size, uint, S_IRUGO);
 MODULE_PARM_DESC(mbox_kfifo_size, "Size of omap's mailbox kfifo (bytes)");
+
+/* Runtime PM */
+static int omap_mbox_save_ctx(struct device *dev, void *data)
+{
+	struct omap_mbox *mbox = dev_get_drvdata(dev);
+
+	if (!mbox->ops->save_ctx) {
+		dev_err(mbox->dev, "%s:\tno save\n", __func__);
+		return -EINVAL;
+	}
+
+	mbox->ops->save_ctx(mbox);
+
+	return 0;
+}
+
+static int omap_mbox_restore_ctx(struct device *dev, void *data)
+{
+	struct omap_mbox *mbox = dev_get_drvdata(dev);
+
+	if (!mbox->ops->restore_ctx) {
+		dev_err(mbox->dev, "%s:\tno restore\n", __func__);
+		return -EINVAL;
+	}
+
+	mbox->ops->restore_ctx(mbox);
+
+	return 0;
+}
+
+static int mbox_runtime_resume(struct device *dev)
+{
+	return device_for_each_child(dev, NULL, omap_mbox_restore_ctx);
+}
+
+static int mbox_runtime_suspend(struct device *dev)
+{
+	return device_for_each_child(dev, NULL, omap_mbox_save_ctx);
+}
+
+const struct dev_pm_ops mbox_pm_ops = {
+	SET_RUNTIME_PM_OPS(mbox_runtime_suspend, mbox_runtime_resume, NULL)
+};
 
 /* Mailbox FIFO handle functions */
 static inline mbox_msg_t mbox_fifo_read(struct omap_mbox *mbox)
@@ -249,9 +294,23 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
 {
 	int ret = 0;
 	struct omap_mbox_queue *mq;
+	int fail_constraint = 0;
 
 	mutex_lock(&mbox_configured_lock);
+
+	omap_mbox_enable(mbox);
+
 	if (!mbox_configured++) {
+		if (mbox->pm_constraint) {
+			ret = dev_pm_qos_update_request(&mbox->qos_request,
+					mbox->pm_constraint);
+			if (ret < 0) {
+				fail_constraint = 1;
+				dev_err(mbox->dev,
+					"failed to update qos constraint\n");
+				goto fail_startup;
+			}
+		}
 		if (likely(mbox->ops->startup)) {
 			ret = mbox->ops->startup(mbox);
 			if (unlikely(ret))
@@ -261,13 +320,6 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
 	}
 
 	if (!mbox->use_count++) {
-		ret = request_irq(mbox->irq, mbox_interrupt, IRQF_SHARED,
-							mbox->name, mbox);
-		if (unlikely(ret)) {
-			pr_err("failed to register mailbox interrupt:%d\n",
-									ret);
-			goto fail_request_irq;
-		}
 		mq = mbox_queue_alloc(mbox, NULL, mbox_tx_tasklet);
 		if (!mq) {
 			ret = -ENOMEM;
@@ -282,20 +334,35 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
 		}
 		mbox->rxq = mq;
 		mq->mbox = mbox;
+		ret = request_irq(mbox->irq, mbox_interrupt, IRQF_SHARED,
+							mbox->name, mbox);
+		if (unlikely(ret)) {
+			pr_err("failed to register mailbox interrupt:%d\n",
+									ret);
+			goto fail_request_irq;
+		} else
+			mbox->ops->enable_irq(mbox, IRQ_RX);
 	}
 	mutex_unlock(&mbox_configured_lock);
 	return 0;
 
+fail_request_irq:
+	mbox_queue_free(mbox->rxq);
 fail_alloc_rxq:
 	mbox_queue_free(mbox->txq);
 fail_alloc_txq:
-	free_irq(mbox->irq, mbox);
-fail_request_irq:
 	if (mbox->ops->shutdown)
 		mbox->ops->shutdown(mbox);
 	mbox->use_count--;
 fail_startup:
-	mbox_configured--;
+	if (!--mbox_configured)
+		if (mbox->pm_constraint && !fail_constraint) {
+			if (dev_pm_qos_update_request(&mbox->qos_request,
+					 PM_QOS_DEFAULT_VALUE) < 0)
+				dev_err(mbox->dev,
+					"failed to relax qos constraint\n");
+
+		}
 	mutex_unlock(&mbox_configured_lock);
 	return ret;
 }
@@ -313,9 +380,17 @@ static void omap_mbox_fini(struct omap_mbox *mbox)
 	}
 
 	if (likely(mbox->ops->shutdown)) {
-		if (!--mbox_configured)
+		if (!--mbox_configured) {
 			mbox->ops->shutdown(mbox);
+			if (mbox->pm_constraint &&
+				(dev_pm_qos_update_request(&mbox->qos_request,
+						PM_QOS_DEFAULT_VALUE) < 0))
+				dev_err(mbox->dev,
+					"failed to relax qos constraint\n");
+		}
 	}
+
+	omap_mbox_disable(mbox);
 
 	mutex_unlock(&mbox_configured_lock);
 }
@@ -351,10 +426,23 @@ EXPORT_SYMBOL(omap_mbox_get);
 
 void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb)
 {
-	blocking_notifier_chain_unregister(&mbox->notifier, nb);
+	if (nb)
+		blocking_notifier_chain_unregister(&mbox->notifier, nb);
 	omap_mbox_fini(mbox);
 }
 EXPORT_SYMBOL(omap_mbox_put);
+
+int omap_mbox_enable(struct omap_mbox *mbox)
+{
+	return pm_runtime_get_sync(mbox->dev->parent);
+}
+EXPORT_SYMBOL(omap_mbox_enable);
+
+int omap_mbox_disable(struct omap_mbox *mbox)
+{
+	return pm_runtime_put_sync(mbox->dev->parent);
+}
+EXPORT_SYMBOL(omap_mbox_disable);
 
 static struct class omap_mbox_class = { .name = "mbox", };
 
@@ -376,27 +464,42 @@ int omap_mbox_register(struct device *parent, struct omap_mbox **list)
 			goto err_out;
 		}
 
+		ret = dev_pm_qos_add_request(parent, &mbox->qos_request,
+						PM_QOS_DEFAULT_VALUE);
+		if (ret < 0)
+			goto err_out;
+
 		BLOCKING_INIT_NOTIFIER_HEAD(&mbox->notifier);
 	}
+
+	pm_runtime_enable(parent);
+
 	return 0;
 
 err_out:
-	while (i--)
+	while (i--) {
+		dev_pm_qos_remove_request(&mboxes[i]->qos_request);
 		device_unregister(mboxes[i]->dev);
+	}
 	return ret;
 }
 EXPORT_SYMBOL(omap_mbox_register);
 
-int omap_mbox_unregister(void)
+int omap_mbox_unregister(struct device *parent)
 {
 	int i;
 
 	if (!mboxes)
 		return -EINVAL;
 
-	for (i = 0; mboxes[i]; i++)
+	for (i = 0; mboxes[i]; i++) {
+		dev_pm_qos_remove_request(&mboxes[i]->qos_request);
 		device_unregister(mboxes[i]->dev);
+	}
 	mboxes = NULL;
+
+	pm_runtime_disable(parent);
+
 	return 0;
 }
 EXPORT_SYMBOL(omap_mbox_unregister);
@@ -413,7 +516,6 @@ static int __init omap_mbox_init(void)
 	mbox_kfifo_size = ALIGN(mbox_kfifo_size, sizeof(mbox_msg_t));
 	mbox_kfifo_size = max_t(unsigned int, mbox_kfifo_size,
 							sizeof(mbox_msg_t));
-
 	return 0;
 }
 subsys_initcall(omap_mbox_init);

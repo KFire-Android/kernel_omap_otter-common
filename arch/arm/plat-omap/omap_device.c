@@ -1082,6 +1082,23 @@ int omap_device_idle_hwmods(struct omap_device *od)
 }
 
 /**
+ * omap_device_shutdown_hwmods - call omap_hwmod_shutdown() on all hwmods
+ * @od: struct omap_device *od
+ *
+ * Shutdown all underlying hwmods.  Returns 0.
+ */
+int omap_device_shutdown_hwmods(struct omap_device *od)
+{
+	int i;
+
+	for (i = 0; i < od->hwmods_cnt; i++)
+		omap_hwmod_shutdown(od->hwmods[i]);
+
+	/* XXX pass along return value here? */
+	return 0;
+}
+
+/**
  * omap_device_disable_clocks - disable all main and interface clocks
  * @od: struct omap_device *od
  *

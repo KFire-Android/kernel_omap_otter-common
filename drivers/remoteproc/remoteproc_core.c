@@ -40,8 +40,15 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_ring.h>
 #include <asm/byteorder.h>
+#include <linux/pm_runtime.h>
+#include <linux/kthread.h>
+#include <linux/delay.h>
 
 #include "remoteproc_internal.h"
+
+#define DEFAULT_AUTOSUSPEND_TIMEOUT 5000
+
+#define dev_to_rproc(dev) container_of(dev, struct rproc, dev)
 
 static void klist_rproc_get(struct klist_node *n);
 static void klist_rproc_put(struct klist_node *n);
@@ -66,6 +73,200 @@ typedef int (*rproc_handle_resources_t)(struct rproc *rproc,
 				struct resource_table *table, int len);
 typedef int (*rproc_handle_resource_t)(struct rproc *rproc, void *, int avail);
 
+/* Unique numbering for remoteproc devices */
+static unsigned int dev_index;
+
+static const char * const rproc_err_names[] = {
+	[RPROC_ERR_MMUFAULT]	= "mmufault",
+};
+
+static int rproc_resume(struct device *dev)
+{
+	struct rproc *rproc = dev_to_rproc(dev);
+	int ret = 0;
+
+	dev_dbg(dev, "Enter %s\n", __func__);
+
+	mutex_lock(&rproc->lock);
+	/* system suspend has finished */
+	rproc->system_suspended = false;
+	if (rproc->state != RPROC_SUSPENDED)
+		goto out;
+
+	/* resume no needed (already autosuspended when system suspend) */
+	if (!rproc->need_resume)
+		goto out;
+
+	/*
+	 * if a message came after rproc was system suspended, need_resume is
+	 * true and if runtime status is suspended in this case  we need to
+	 * resume and then runtime status needs to be updated too, thas is easy
+	 * acomplish by calling pm_runtime_resume
+	 */
+	if (pm_runtime_status_suspended(dev)) {
+		pm_runtime_resume(dev);
+		goto mark;
+	}
+
+	/*
+	 * if a system suspend request came when rproc was running, the
+	 * rproc was forced to go to suspend by the system suspend callback.
+	 * However, the rproc runtime status is still active. In this
+	 * case we only need to wake up the rproc and update rproc state
+	 */
+	if (rproc->ops->resume) {
+		ret = rproc->ops->resume(rproc);
+		if (ret) {
+			dev_err(dev, "resume failed %d\n", ret);
+			goto out;
+		}
+	}
+	rproc->state = RPROC_RUNNING;
+mark:
+	/* if a resume was needed we need to schedule next autosupend */
+	pm_runtime_mark_last_busy(dev);
+	pm_runtime_autosuspend(dev);
+out:
+	mutex_unlock(&rproc->lock);
+	return ret;
+}
+
+static int rproc_suspend(struct device *dev)
+{
+	struct rproc *rproc = dev_to_rproc(dev);
+	int ret = 0;
+
+	dev_dbg(dev, "Enter %s\n", __func__);
+
+	mutex_lock(&rproc->lock);
+	if (rproc->state != RPROC_RUNNING)
+		goto out;
+
+	if (rproc->ops->suspend) {
+		ret = rproc->ops->suspend(rproc, false);
+		if (ret) {
+			dev_err(dev, "suspend failed %d\n", ret);
+			goto out;
+		}
+	}
+
+	/*
+	 * rproc was not already suspended, so we forced the suspend and
+	 * therefore we need a resume in the system resume callback
+	 */
+	rproc->need_resume = 1;
+	rproc->state = RPROC_SUSPENDED;
+out:
+	if (!ret)
+		rproc->system_suspended = true;
+	mutex_unlock(&rproc->lock);
+	return ret;
+}
+
+static int rproc_runtime_resume(struct device *dev)
+{
+	struct rproc *rproc = dev_to_rproc(dev);
+	int ret = 0;
+
+	dev_dbg(dev, "Enter %s\n", __func__);
+
+	if (rproc->state != RPROC_SUSPENDED)
+		goto out;
+
+	/*
+	 * if we are in system suspend we cannot wakeup the rproc yet,
+	 * instead set need_resume flag so that rproc can be resumed in
+	 * the system resume callback
+	 */
+	if (rproc->system_suspended) {
+		rproc->need_resume = true;
+		return -EAGAIN;
+	}
+
+	if (rproc->ops->resume) {
+		ret = rproc->ops->resume(rproc);
+		if (ret) {
+			dev_err(dev, "resume failed %d\n", ret);
+			goto out;
+		}
+	}
+
+	rproc->state = RPROC_RUNNING;
+out:
+	return ret;
+}
+
+static int rproc_runtime_suspend(struct device *dev)
+{
+	struct rproc *rproc = dev_to_rproc(dev);
+	int ret;
+
+	dev_dbg(dev, "Enter %s\n", __func__);
+
+	if (rproc->state != RPROC_RUNNING)
+		goto out;
+
+	if (rproc->ops->suspend) {
+		ret = rproc->ops->suspend(rproc, true);
+		if (ret)
+			goto abort;
+	}
+
+	rproc->state = RPROC_SUSPENDED;
+out:
+	return 0;
+abort:
+	dev_dbg(dev, "auto suspend aborted %d\n", ret);
+	pm_runtime_mark_last_busy(dev);
+	return ret;
+}
+
+static int rproc_runtime_idle(struct device *dev)
+{
+	dev_dbg(dev, "Enter %s\n", __func__);
+
+	/* try to auto suspend when idle is called */
+	return pm_runtime_autosuspend(dev);
+}
+
+static const struct dev_pm_ops rproc_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(rproc_suspend, rproc_resume)
+	SET_RUNTIME_PM_OPS(rproc_runtime_suspend, rproc_runtime_resume,
+			rproc_runtime_idle)
+};
+
+/* translate rproc_err to string */
+static const char *rproc_err_to_string(enum rproc_err type)
+{
+	if (type < ARRAY_SIZE(rproc_err_names))
+		return rproc_err_names[type];
+	return "unkown";
+}
+
+/**
+ * rproc_error_reporter() - rproc error reporter function
+ * @rproc: remote processor
+ * @type: fatal error
+ *
+ * This function must be called every time a fatal error is detected
+ */
+static void rproc_error_reporter(struct rproc *rproc, enum rproc_err type)
+{
+	struct device *dev = &rproc->dev;
+
+	dev_err(dev, "fatal error #%u detected in %s: error type %s\n",
+		++rproc->crash_cnt, rproc->name, rproc_err_to_string(type));
+
+
+	rproc->state = RPROC_CRASHED;
+
+	/*
+	 * as this function can be called from a ISR or a atomic context
+	 * we need to create a workqueue to handle the error
+	 */
+	schedule_work(&rproc->error_handler);
+}
+
 /*
  * This is the IOMMU fault handler we register with the IOMMU API
  * (when relevant; not all remote processors access memory through
@@ -78,9 +279,13 @@ typedef int (*rproc_handle_resource_t)(struct rproc *rproc, void *, int avail);
  * the recovery of the remote processor.
  */
 static int rproc_iommu_fault(struct iommu_domain *domain, struct device *dev,
-		unsigned long iova, int flags)
+		unsigned long iova, int flags, void *token)
 {
+	struct rproc *rproc = token;
+
 	dev_err(dev, "iommu fault: da 0x%lx flags 0x%x\n", iova, flags);
+
+	rproc_error_reporter(rproc, RPROC_ERR_MMUFAULT);
 
 	/*
 	 * Let the iommu core know we're not really handling this fault;
@@ -92,7 +297,7 @@ static int rproc_iommu_fault(struct iommu_domain *domain, struct device *dev,
 static int rproc_enable_iommu(struct rproc *rproc)
 {
 	struct iommu_domain *domain;
-	struct device *dev = rproc->dev;
+	struct device *dev = rproc->dev.parent;
 	int ret;
 
 	/*
@@ -117,7 +322,7 @@ static int rproc_enable_iommu(struct rproc *rproc)
 		return -ENOMEM;
 	}
 
-	iommu_set_fault_handler(domain, rproc_iommu_fault);
+	iommu_set_fault_handler(domain, rproc_iommu_fault, rproc);
 
 	ret = iommu_attach_device(domain, dev);
 	if (ret) {
@@ -137,7 +342,7 @@ free_domain:
 static void rproc_disable_iommu(struct rproc *rproc)
 {
 	struct iommu_domain *domain = rproc->domain;
-	struct device *dev = rproc->dev;
+	struct device *dev = rproc->dev.parent;
 
 	if (!domain)
 		return;
@@ -189,6 +394,45 @@ static void *rproc_da_to_va(struct rproc *rproc, u64 da, int len)
 	return ptr;
 }
 
+
+int rproc_pa_to_da(struct rproc *rproc, phys_addr_t pa, u64 *da)
+{
+	int ret = -EINVAL;
+	struct rproc_mem_entry *maps = NULL;
+
+	if (!rproc || !da)
+		return -EINVAL;
+
+	if (mutex_lock_interruptible(&rproc->lock))
+		return -EINTR;
+
+	if (rproc->state == RPROC_RUNNING || rproc->state == RPROC_SUSPENDED) {
+		/* Look in the mappings first */
+		list_for_each_entry(maps, &rproc->mappings, node) {
+			if (pa >= maps->dma && pa < (maps->dma + maps->len)) {
+				*da = maps->da + (pa - maps->dma);
+				ret = 0;
+				goto exit;
+			}
+		}
+		/* If not, check in the carveouts */
+		list_for_each_entry(maps, &rproc->carveouts, node) {
+			if (pa >= maps->dma && pa < (maps->dma + maps->len)) {
+				*da = maps->da + (pa - maps->dma);
+				ret = 0;
+				break;
+			}
+		}
+
+	}
+exit:
+	mutex_unlock(&rproc->lock);
+	return ret;
+
+}
+EXPORT_SYMBOL(rproc_pa_to_da);
+
+
 /**
  * rproc_load_segments() - load firmware segments to memory
  * @rproc: remote processor which will be booted using these fw segments
@@ -217,7 +461,7 @@ static void *rproc_da_to_va(struct rproc *rproc, u64 da, int len)
 static int
 rproc_load_segments(struct rproc *rproc, const u8 *elf_data, size_t len)
 {
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	struct elf32_hdr *ehdr;
 	struct elf32_phdr *phdr;
 	int i, ret = 0;
@@ -279,15 +523,63 @@ rproc_load_segments(struct rproc *rproc, const u8 *elf_data, size_t len)
 	return ret;
 }
 
-static int
-__rproc_handle_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
+int rproc_alloc_vring(struct rproc_vdev *rvdev, int i)
 {
 	struct rproc *rproc = rvdev->rproc;
-	struct device *dev = rproc->dev;
-	struct fw_rsc_vdev_vring *vring = &rsc->vring[i];
+	struct device *dev = &rproc->dev;
+	struct rproc_vring *vring = &rvdev->vring[i];
 	dma_addr_t dma;
 	void *va;
 	int ret, size, notifyid;
+
+	/* actual size of vring (in bytes) */
+	size = PAGE_ALIGN(vring_size(vring->len, vring->align));
+
+	if (!idr_pre_get(&rproc->notifyids, GFP_KERNEL)) {
+		dev_err(dev, "idr_pre_get failed\n");
+		return -ENOMEM;
+	}
+
+	/*
+	 * Allocate non-cacheable memory for the vring. In the future
+	 * this call will also configure the IOMMU for us
+	 * TODO: let the rproc know the da of this vring
+	 */
+	va = dma_alloc_coherent(dev->parent, size, &dma, GFP_KERNEL);
+	if (!va) {
+		dev_err(dev, "dma_alloc_coherent failed\n");
+		return -EINVAL;
+	}
+
+	/*
+	 * Assign an rproc-wide unique index for this vring
+	 * TODO: assign a notifyid for rvdev updates as well
+	 * TODO: let the rproc know the notifyid of this vring
+	 * TODO: support predefined notifyids (via resource table)
+	 */
+	ret = idr_get_new(&rproc->notifyids, vring, &notifyid);
+	if (ret) {
+		dev_err(dev, "idr_get_new failed: %d\n", ret);
+		dma_free_coherent(dev->parent, size, va, dma);
+		return ret;
+	}
+
+	dev_dbg(dev, "vring%d: va %p dma %x size %x idr %d\n", i, va,
+					dma, size, notifyid);
+
+	vring->va = va;
+	vring->dma = dma;
+	vring->notifyid = notifyid;
+
+	return 0;
+}
+
+static int
+rproc_parse_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
+{
+	struct rproc *rproc = rvdev->rproc;
+	struct device *dev = &rproc->dev;
+	struct fw_rsc_vdev_vring *vring = &rsc->vring[i];
 
 	dev_dbg(dev, "vdev rsc: vring%d: da %x, qsz %d, align %d\n",
 				i, vring->da, vring->num, vring->align);
@@ -305,62 +597,21 @@ __rproc_handle_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
 		return -EINVAL;
 	}
 
-	/* actual size of vring (in bytes) */
-	size = PAGE_ALIGN(vring_size(vring->num, vring->align));
-
-	if (!idr_pre_get(&rproc->notifyids, GFP_KERNEL)) {
-		dev_err(dev, "idr_pre_get failed\n");
-		return -ENOMEM;
-	}
-
-	/*
-	 * Allocate non-cacheable memory for the vring. In the future
-	 * this call will also configure the IOMMU for us
-	 */
-	va = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
-	if (!va) {
-		dev_err(dev, "dma_alloc_coherent failed\n");
-		return -EINVAL;
-	}
-
-	/* assign an rproc-wide unique index for this vring */
-	/* TODO: assign a notifyid for rvdev updates as well */
-	ret = idr_get_new(&rproc->notifyids, &rvdev->vring[i], &notifyid);
-	if (ret) {
-		dev_err(dev, "idr_get_new failed: %d\n", ret);
-		dma_free_coherent(dev, size, va, dma);
-		return ret;
-	}
-
-	/* let the rproc know the da and notifyid of this vring */
-	/* TODO: expose this to remote processor */
-	vring->da = dma;
-	vring->notifyid = notifyid;
-
-	dev_dbg(dev, "vring%d: va %p dma %x size %x idr %d\n", i, va,
-					dma, size, notifyid);
-
 	rvdev->vring[i].len = vring->num;
 	rvdev->vring[i].align = vring->align;
-	rvdev->vring[i].va = va;
-	rvdev->vring[i].dma = dma;
-	rvdev->vring[i].notifyid = notifyid;
 	rvdev->vring[i].rvdev = rvdev;
 
 	return 0;
 }
 
-static void __rproc_free_vrings(struct rproc_vdev *rvdev, int i)
+void rproc_free_vring(struct rproc_vring *rvring)
 {
-	struct rproc *rproc = rvdev->rproc;
+	int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
+	struct rproc *rproc = rvring->rvdev->rproc;
+	struct device *dev = &rproc->dev;
 
-	for (i--; i >= 0; i--) {
-		struct rproc_vring *rvring = &rvdev->vring[i];
-		int size = PAGE_ALIGN(vring_size(rvring->len, rvring->align));
-
-		dma_free_coherent(rproc->dev, size, rvring->va, rvring->dma);
-		idr_remove(&rproc->notifyids, rvring->notifyid);
-	}
+	dma_free_coherent(dev->parent, size, rvring->va, rvring->dma);
+	idr_remove(&rproc->notifyids, rvring->notifyid);
 }
 
 /**
@@ -393,14 +644,14 @@ static void __rproc_free_vrings(struct rproc_vdev *rvdev, int i)
 static int rproc_handle_vdev(struct rproc *rproc, struct fw_rsc_vdev *rsc,
 								int avail)
 {
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	struct rproc_vdev *rvdev;
 	int i, ret;
 
 	/* make sure resource isn't truncated */
 	if (sizeof(*rsc) + rsc->num_of_vrings * sizeof(struct fw_rsc_vdev_vring)
 			+ rsc->config_len > avail) {
-		dev_err(rproc->dev, "vdev rsc is truncated\n");
+		dev_err(dev, "vdev rsc is truncated\n");
 		return -EINVAL;
 	}
 
@@ -425,11 +676,11 @@ static int rproc_handle_vdev(struct rproc *rproc, struct fw_rsc_vdev *rsc,
 
 	rvdev->rproc = rproc;
 
-	/* allocate the vrings */
+	/* parse the vrings */
 	for (i = 0; i < rsc->num_of_vrings; i++) {
-		ret = __rproc_handle_vring(rvdev, rsc, i);
+		ret = rproc_parse_vring(rvdev, rsc, i);
 		if (ret)
-			goto free_vrings;
+			goto free_rvdev;
 	}
 
 	/* remember the device features */
@@ -440,12 +691,11 @@ static int rproc_handle_vdev(struct rproc *rproc, struct fw_rsc_vdev *rsc,
 	/* it is now safe to add the virtio device */
 	ret = rproc_add_virtio_dev(rvdev, rsc->id);
 	if (ret)
-		goto free_vrings;
+		goto free_rvdev;
 
 	return 0;
 
-free_vrings:
-	__rproc_free_vrings(rvdev, i);
+free_rvdev:
 	kfree(rvdev);
 	return ret;
 }
@@ -470,12 +720,12 @@ static int rproc_handle_trace(struct rproc *rproc, struct fw_rsc_trace *rsc,
 								int avail)
 {
 	struct rproc_mem_entry *trace;
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	void *ptr;
 	char name[15];
 
 	if (sizeof(*rsc) > avail) {
-		dev_err(rproc->dev, "trace rsc is truncated\n");
+		dev_err(dev, "trace rsc is truncated\n");
 		return -EINVAL;
 	}
 
@@ -552,6 +802,7 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 								int avail)
 {
 	struct rproc_mem_entry *mapping;
+	struct device *dev = &rproc->dev;
 	int ret;
 
 	/* no point in handling this resource without a valid iommu domain */
@@ -559,25 +810,25 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 		return -EINVAL;
 
 	if (sizeof(*rsc) > avail) {
-		dev_err(rproc->dev, "devmem rsc is truncated\n");
+		dev_err(dev, "devmem rsc is truncated\n");
 		return -EINVAL;
 	}
 
 	/* make sure reserved bytes are zeroes */
 	if (rsc->reserved) {
-		dev_err(rproc->dev, "devmem rsc has non zero reserved bytes\n");
+		dev_err(dev, "devmem rsc has non zero reserved bytes\n");
 		return -EINVAL;
 	}
 
 	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
 	if (!mapping) {
-		dev_err(rproc->dev, "kzalloc mapping failed\n");
+		dev_err(dev, "kzalloc mapping failed\n");
 		return -ENOMEM;
 	}
 
 	ret = iommu_map(rproc->domain, rsc->da, rsc->pa, rsc->len, rsc->flags);
 	if (ret) {
-		dev_err(rproc->dev, "failed to map devmem: %d\n", ret);
+		dev_err(dev, "failed to map devmem: %d\n", ret);
 		goto out;
 	}
 
@@ -588,11 +839,12 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 	 * We can't trust the remote processor not to change the resource
 	 * table, so we must maintain this info independently.
 	 */
+	mapping->dma = rsc->pa;
 	mapping->da = rsc->da;
 	mapping->len = rsc->len;
 	list_add_tail(&mapping->node, &rproc->mappings);
 
-	dev_dbg(rproc->dev, "mapped devmem pa 0x%x, da 0x%x, len 0x%x\n",
+	dev_dbg(dev, "mapped devmem pa 0x%x, da 0x%x, len 0x%x\n",
 					rsc->pa, rsc->da, rsc->len);
 
 	return 0;
@@ -624,13 +876,13 @@ static int rproc_handle_carveout(struct rproc *rproc,
 				struct fw_rsc_carveout *rsc, int avail)
 {
 	struct rproc_mem_entry *carveout, *mapping;
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	dma_addr_t dma;
 	void *va;
 	int ret;
 
 	if (sizeof(*rsc) > avail) {
-		dev_err(rproc->dev, "carveout rsc is truncated\n");
+		dev_err(dev, "carveout rsc is truncated\n");
 		return -EINVAL;
 	}
 
@@ -656,9 +908,9 @@ static int rproc_handle_carveout(struct rproc *rproc,
 		goto free_mapping;
 	}
 
-	va = dma_alloc_coherent(dev, rsc->len, &dma, GFP_KERNEL);
+	va = dma_alloc_coherent(dev->parent, rsc->len, &dma, GFP_KERNEL);
 	if (!va) {
-		dev_err(dev, "failed to dma alloc carveout: %d\n", rsc->len);
+		dev_err(dev, "dma_alloc_coherent failed: %d\n", rsc->len);
 		ret = -ENOMEM;
 		goto free_carv;
 	}
@@ -729,7 +981,7 @@ static int rproc_handle_carveout(struct rproc *rproc,
 	return 0;
 
 dma_free:
-	dma_free_coherent(dev, rsc->len, va, dma);
+	dma_free_coherent(dev->parent, rsc->len, va, dma);
 free_carv:
 	kfree(carveout);
 free_mapping:
@@ -737,6 +989,29 @@ free_mapping:
 	return ret;
 }
 
+/**
+ * rproc_handle_suspd_time() - handle auto suspend timeout resource
+ * @rproc: the remote processor
+ * @rsc: auto suspend tiemout resource descriptor
+ * @avail: size of available data (for sanity checking the image)
+ *
+ * Set the autosuspend timeout the rproc will use
+ *
+ * Returns 0 on success, or an appropriate error code otherwise
+ */
+static int rproc_handle_suspd_time(struct rproc *rproc,
+		 struct fw_rsc_suspd_time *rsc, int avail)
+{
+	struct device *dev = &rproc->dev;
+
+	if (sizeof(*rsc) > avail) {
+		dev_err(dev, "suspend timeout rsc is truncated\n");
+		return -EINVAL;
+	}
+
+	rproc->auto_suspend_timeout = rsc->suspd_time;
+	return 0;
+}
 /*
  * A lookup table for resource handlers. The indices are defined in
  * enum fw_resource_type.
@@ -745,6 +1020,7 @@ static rproc_handle_resource_t rproc_handle_rsc[] = {
 	[RSC_CARVEOUT] = (rproc_handle_resource_t)rproc_handle_carveout,
 	[RSC_DEVMEM] = (rproc_handle_resource_t)rproc_handle_devmem,
 	[RSC_TRACE] = (rproc_handle_resource_t)rproc_handle_trace,
+	[RSC_SUSPD_TIME] = (rproc_handle_resource_t)rproc_handle_suspd_time,
 	[RSC_VDEV] = NULL, /* VDEVs were handled upon registrarion */
 };
 
@@ -752,7 +1028,7 @@ static rproc_handle_resource_t rproc_handle_rsc[] = {
 static int
 rproc_handle_boot_rsc(struct rproc *rproc, struct resource_table *table, int len)
 {
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	rproc_handle_resource_t handler;
 	int ret = 0, i;
 
@@ -791,7 +1067,7 @@ rproc_handle_boot_rsc(struct rproc *rproc, struct resource_table *table, int len
 static int
 rproc_handle_virtio_rsc(struct rproc *rproc, struct resource_table *table, int len)
 {
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	int ret = 0, i;
 
 	for (i = 0; i < table->num; i++) {
@@ -844,7 +1120,7 @@ rproc_find_rsc_table(struct rproc *rproc, const u8 *elf_data, size_t len,
 	struct elf32_hdr *ehdr;
 	struct elf32_shdr *shdr;
 	const char *name_table;
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	struct resource_table *table = NULL;
 	int i;
 
@@ -910,7 +1186,7 @@ rproc_find_rsc_table(struct rproc *rproc, const u8 *elf_data, size_t len,
 static void rproc_resource_cleanup(struct rproc *rproc)
 {
 	struct rproc_mem_entry *entry, *tmp;
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 
 	/* clean up debugfs trace entries */
 	list_for_each_entry_safe(entry, tmp, &rproc->traces, node) {
@@ -922,7 +1198,8 @@ static void rproc_resource_cleanup(struct rproc *rproc)
 
 	/* clean up carveout allocations */
 	list_for_each_entry_safe(entry, tmp, &rproc->carveouts, node) {
-		dma_free_coherent(dev, entry->len, entry->va, entry->dma);
+		dma_free_coherent(dev->parent, entry->len, entry->va,
+				entry->dma);
 		list_del(&entry->node);
 		kfree(entry);
 	}
@@ -947,7 +1224,7 @@ static void rproc_resource_cleanup(struct rproc *rproc)
 static int rproc_fw_sanity_check(struct rproc *rproc, const struct firmware *fw)
 {
 	const char *name = rproc->firmware;
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	struct elf32_hdr *ehdr;
 	char class;
 
@@ -1008,7 +1285,7 @@ static int rproc_fw_sanity_check(struct rproc *rproc, const struct firmware *fw)
  */
 static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 {
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	const char *name = rproc->firmware;
 	struct elf32_hdr *ehdr;
 	struct resource_table *table;
@@ -1066,6 +1343,18 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
 	}
 
 	rproc->state = RPROC_RUNNING;
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+	pm_runtime_get_noresume(dev);
+	rproc->auto_suspend_timeout = rproc->auto_suspend_timeout ? :
+					DEFAULT_AUTOSUSPEND_TIMEOUT;
+	if (rproc->auto_suspend_timeout >= 0) {
+		pm_runtime_set_autosuspend_delay(dev,
+						 rproc->auto_suspend_timeout);
+		pm_runtime_use_autosuspend(dev);
+		pm_runtime_mark_last_busy(dev);
+		pm_runtime_put_autosuspend(dev);
+	}
 
 	dev_info(dev, "remote processor %s is now up\n", rproc->name);
 
@@ -1133,7 +1422,7 @@ int rproc_boot(struct rproc *rproc)
 		return -EINVAL;
 	}
 
-	dev = rproc->dev;
+	dev = &rproc->dev;
 
 	ret = mutex_lock_interruptible(&rproc->lock);
 	if (ret) {
@@ -1149,7 +1438,7 @@ int rproc_boot(struct rproc *rproc)
 	}
 
 	/* prevent underlying implementation from being removed */
-	if (!try_module_get(dev->driver->owner)) {
+	if (!try_module_get(dev->parent->driver->owner)) {
 		dev_err(dev, "%s: can't get owner\n", __func__);
 		ret = -EINVAL;
 		goto unlock_mutex;
@@ -1176,7 +1465,7 @@ int rproc_boot(struct rproc *rproc)
 
 downref_rproc:
 	if (ret) {
-		module_put(dev->driver->owner);
+		module_put(dev->parent->driver->owner);
 		atomic_dec(&rproc->power);
 	}
 unlock_mutex:
@@ -1210,7 +1499,7 @@ EXPORT_SYMBOL(rproc_boot);
  */
 void rproc_shutdown(struct rproc *rproc)
 {
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	int ret;
 
 	ret = mutex_lock_interruptible(&rproc->lock);
@@ -1222,6 +1511,19 @@ void rproc_shutdown(struct rproc *rproc)
 	/* if the remote proc is still needed, bail out */
 	if (!atomic_dec_and_test(&rproc->power))
 		goto out;
+
+	/*
+	 * if autosuspend is enabled we need to cancel possible already
+	 * scheduled runtime suspend. Also, if it is already autosuspended
+	 * we need to wake it up to avoid stopping the processor with
+	 * context saved which can cause a issue when it is started again
+	 */
+	if (rproc->auto_suspend_timeout >= 0)
+		pm_runtime_get_sync(dev);
+
+	pm_runtime_put_noidle(&rproc->dev);
+	pm_runtime_disable(&rproc->dev);
+	pm_runtime_set_suspended(&rproc->dev);
 
 	/* power off the remote processor */
 	ret = rproc->ops->stop(rproc);
@@ -1243,7 +1545,7 @@ void rproc_shutdown(struct rproc *rproc)
 out:
 	mutex_unlock(&rproc->lock);
 	if (!ret)
-		module_put(dev->driver->owner);
+		module_put(dev->parent->driver->owner);
 }
 EXPORT_SYMBOL(rproc_shutdown);
 
@@ -1265,17 +1567,10 @@ EXPORT_SYMBOL(rproc_shutdown);
 void rproc_release(struct kref *kref)
 {
 	struct rproc *rproc = container_of(kref, struct rproc, refcount);
-	struct rproc_vdev *rvdev, *rvtmp;
 
-	dev_info(rproc->dev, "removing %s\n", rproc->name);
+	dev_info(&rproc->dev, "removing %s\n", rproc->name);
 
 	rproc_delete_debug_dir(rproc);
-
-	/* clean up remote vdev entries */
-	list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node) {
-		__rproc_free_vrings(rvdev, RVDEV_NUM_VRINGS);
-		list_del(&rvdev->node);
-	}
 
 	/*
 	 * At this point no one holds a reference to rproc anymore,
@@ -1309,6 +1604,54 @@ static struct rproc *next_rproc(struct klist_iter *i)
 		return NULL;
 
 	return container_of(n, struct rproc, node);
+}
+
+/**
+ * _reset_all_vdev() - reset all virtio devices
+ * @rproc: the remote processor
+ *
+ * This function reset all the rpmsg driver and also the remoteproc. That must
+ * not be called during normal use cases, it could be used as a last resource
+ * in the error handler to make a recovery of the remoteproc. This function can
+ * sleep, so that it cannot be called from atomic context.
+ */
+static int _reset_all_vdev(struct rproc *rproc)
+{
+	struct rproc_vdev *rvdev, *rvtmp;
+
+	dev_dbg(&rproc->dev, "reseting virtio devices for %s\n", rproc->name);
+	/* clean up remote vdev entries */
+	list_for_each_entry_safe(rvdev, rvtmp, &rproc->rvdevs, node)
+		rproc_remove_virtio_dev(rvdev);
+
+	/* run rproc_fw_config_virtio to create vdevs again */
+	return request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
+			rproc->firmware, &rproc->dev, GFP_KERNEL,
+			rproc, rproc_fw_config_virtio);
+}
+
+/**
+ * rproc_error_handler_work() - handle a faltar error
+ *
+ * This function needs to handle everything related to a fatal error,
+ * like cpu registers and stack dump, information to help to
+ * debug the fatal error, etc.
+ */
+static void rproc_error_handler_work(struct work_struct *work)
+{
+	struct rproc *rproc = container_of(work, struct rproc, error_handler);
+	struct device *dev = &rproc->dev;
+
+	dev_dbg(dev, "enter %s\n", __func__);
+
+	/*
+	 * if recovery enabled reset all virtio devices, so that all rpmsg
+	 * drivers can be restarted in order to make them functional again
+	 */
+	if (!rproc->recovery_disabled) {
+		dev_err(dev, "trying to recover %s\n", rproc->name);
+		_reset_all_vdev(rproc);
+	}
 }
 
 /**
@@ -1383,6 +1726,66 @@ void rproc_put(struct rproc *rproc)
 }
 EXPORT_SYMBOL(rproc_put);
 
+int rproc_set_constraints(struct device *dev, struct rproc *rproc,
+				enum rproc_constraint type, long v)
+{
+	int ret;
+	char *cname[] = {"scale", "latency", "bandwidth"};
+	int (*func)(struct device *, struct rproc *, long);
+
+	switch (type) {
+	case RPROC_CONSTRAINT_FREQUENCY:
+		func = rproc->ops->set_frequency;
+		break;
+	case RPROC_CONSTRAINT_BANDWIDTH:
+		func = rproc->ops->set_bandwidth;
+		break;
+	case RPROC_CONSTRAINT_LATENCY:
+		func = rproc->ops->set_latency;
+		break;
+	default:
+		dev_err(&rproc->dev, "invalid constraint\n");
+		return -EINVAL;
+	}
+
+	if (!func) {
+		dev_err(&rproc->dev, "%s: no %s constraint\n",
+			__func__, cname[type]);
+		return -EINVAL;
+	}
+
+	mutex_lock(&rproc->lock);
+	if (rproc->state == RPROC_OFFLINE) {
+		pr_err("%s: rproc inactive\n", __func__);
+		mutex_unlock(&rproc->lock);
+		return -EPERM;
+	}
+
+	dev_dbg(&rproc->dev, "set %s constraint %ld\n", cname[type], v);
+	ret = func(dev, rproc, v);
+	if (ret)
+		dev_err(&rproc->dev, "error %s constraint\n", cname[type]);
+	mutex_unlock(&rproc->lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(rproc_set_constraints);
+
+
+static void rproc_loader_thread(struct rproc *rproc)
+{
+	const struct firmware *fw;
+	struct device *dev = &rproc->dev;
+
+	while (kobject_uevent(&dev->kobj, KOBJ_CHANGE))
+		msleep(1000);
+
+	request_firmware(&fw, rproc->firmware, dev);
+
+	if (fw)
+		rproc_fw_config_virtio(fw, rproc);
+}
+
 /**
  * rproc_register() - register a remote processor
  * @rproc: the remote processor handle to register
@@ -1405,13 +1808,17 @@ EXPORT_SYMBOL(rproc_put);
  */
 int rproc_register(struct rproc *rproc)
 {
-	struct device *dev = rproc->dev;
+	struct device *dev = &rproc->dev;
 	int ret = 0;
+
+	ret = device_add(dev);
+	if (ret < 0)
+		return ret;
 
 	/* expose to rproc_get_by_name users */
 	klist_add_tail(&rproc->node, &rprocs);
 
-	dev_info(rproc->dev, "%s is available\n", rproc->name);
+	dev_info(dev, "%s is available\n", rproc->name);
 
 	dev_info(dev, "Note: remoteproc is still under development and considered experimental.\n");
 	dev_info(dev, "THE BINARY FORMAT IS NOT YET FINALIZED, and backward compatibility isn't yet guaranteed.\n");
@@ -1430,9 +1837,7 @@ int rproc_register(struct rproc *rproc)
 	 * We're initiating an asynchronous firmware loading, so we can
 	 * be built-in kernel code, without hanging the boot process.
 	 */
-	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
-					rproc->firmware, dev, GFP_KERNEL,
-					rproc, rproc_fw_config_virtio);
+	kthread_run((void *)rproc_loader_thread, rproc, "rproc_loader");
 	if (ret < 0) {
 		dev_err(dev, "request_firmware_nowait failed: %d\n", ret);
 		complete_all(&rproc->firmware_loading_complete);
@@ -1442,6 +1847,20 @@ int rproc_register(struct rproc *rproc)
 	return ret;
 }
 EXPORT_SYMBOL(rproc_register);
+
+static void rproc_class_release(struct device *dev)
+{
+	struct rproc *rproc = container_of(dev, struct rproc, dev);
+
+	kfree(rproc);
+}
+
+static struct class rproc_class = {
+	.name		= "rproc",
+	.owner		= THIS_MODULE,
+	.dev_release	= rproc_class_release,
+	.pm		= &rproc_pm_ops,
+};
 
 /**
  * rproc_alloc() - allocate a remote processor handle
@@ -1481,11 +1900,18 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 		return NULL;
 	}
 
-	rproc->dev = dev;
 	rproc->name = name;
 	rproc->ops = ops;
 	rproc->firmware = firmware;
 	rproc->priv = &rproc[1];
+
+	device_initialize(&rproc->dev);
+	rproc->dev.parent = dev;
+	rproc->dev.class = &rproc_class;
+
+	/* Assign a unique device index and name */
+	rproc->index = dev_index++;
+	dev_set_name(&rproc->dev, "remoteproc%d", rproc->index);
 
 	atomic_set(&rproc->power, 0);
 
@@ -1499,6 +1925,8 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 	INIT_LIST_HEAD(&rproc->mappings);
 	INIT_LIST_HEAD(&rproc->traces);
 	INIT_LIST_HEAD(&rproc->rvdevs);
+
+	INIT_WORK(&rproc->error_handler, rproc_error_handler_work);
 
 	rproc->state = RPROC_OFFLINE;
 
@@ -1521,7 +1949,7 @@ void rproc_free(struct rproc *rproc)
 	idr_remove_all(&rproc->notifyids);
 	idr_destroy(&rproc->notifyids);
 
-	kfree(rproc);
+	put_device(&rproc->dev);
 }
 EXPORT_SYMBOL(rproc_free);
 
@@ -1547,7 +1975,7 @@ EXPORT_SYMBOL(rproc_free);
  */
 int rproc_unregister(struct rproc *rproc)
 {
-	struct rproc_vdev *rvdev;
+	struct rproc_vdev *rvdev, *tmp;
 
 	if (!rproc)
 		return -EINVAL;
@@ -1556,11 +1984,13 @@ int rproc_unregister(struct rproc *rproc)
 	wait_for_completion(&rproc->firmware_loading_complete);
 
 	/* clean up remote vdev entries */
-	list_for_each_entry(rvdev, &rproc->rvdevs, node)
+	list_for_each_entry_safe(rvdev, tmp, &rproc->rvdevs, node)
 		rproc_remove_virtio_dev(rvdev);
 
 	/* the rproc is downref'ed as soon as it's removed from the klist */
 	klist_del(&rproc->node);
+
+	device_del(&rproc->dev);
 
 	/* the rproc will only be released after its refcount drops to zero */
 	kref_put(&rproc->refcount, rproc_release);
@@ -1571,7 +2001,14 @@ EXPORT_SYMBOL(rproc_unregister);
 
 static int __init remoteproc_init(void)
 {
+	int ret;
+
+	ret = class_register(&rproc_class);
+	if (ret)
+		return ret;
+
 	rproc_init_debugfs();
+
 	return 0;
 }
 module_init(remoteproc_init);
@@ -1579,6 +2016,8 @@ module_init(remoteproc_init);
 static void __exit remoteproc_exit(void)
 {
 	rproc_exit_debugfs();
+
+	class_unregister(&rproc_class);
 }
 module_exit(remoteproc_exit);
 

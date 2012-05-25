@@ -80,26 +80,6 @@ static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
 	__omap_dm_timer_write(timer, reg, value, timer->posted);
 }
 
-static void omap_timer_save_context(struct omap_dm_timer *timer)
-{
-	if (timer->sys_stat)
-		timer->context.tistat = __raw_readl(timer->sys_stat);
-	timer->context.tisr = __raw_readl(timer->irq_stat);
-	timer->context.tier = __raw_readl(timer->irq_ena);
-	timer->context.twer =
-		omap_dm_timer_read_reg(timer, OMAP_TIMER_WAKEUP_EN_REG);
-	timer->context.tclr =
-		omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-	timer->context.tcrr =
-		omap_dm_timer_read_reg(timer, OMAP_TIMER_COUNTER_REG);
-	timer->context.tldr =
-		omap_dm_timer_read_reg(timer, OMAP_TIMER_LOAD_REG);
-	timer->context.tmar =
-	omap_dm_timer_read_reg(timer, OMAP_TIMER_MATCH_REG);
-	timer->context.tsicr =
-		omap_dm_timer_read_reg(timer, OMAP_TIMER_IF_CTRL_REG);
-}
-
 static void omap_timer_restore_context(struct omap_dm_timer *timer)
 {
 	if (timer->revision == 1)
@@ -377,11 +357,10 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
 
 	__omap_dm_timer_stop(timer, timer->posted, rate);
 
-	if (timer->loses_context && timer->get_context_loss_count) {
+	if (timer->loses_context && timer->get_context_loss_count)
 		timer->ctx_loss_count =
 			timer->get_context_loss_count(&timer->pdev->dev);
-		omap_timer_save_context(timer);
-	}
+
 	/*
 	 * Since the register values are computed and written within
 	 * __omap_dm_timer_stop, we need to use read to retrieve the

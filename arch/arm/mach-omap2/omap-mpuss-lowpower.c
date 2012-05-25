@@ -102,10 +102,10 @@ static int default_finish_suspend(unsigned long cpu_state)
 static void dummy_cpu_resume(void)
 {}
 
-static void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
+void dummy_scu_prepare(unsigned int cpu_id, unsigned int cpu_state)
 {}
 
-static struct cpu_pm_ops omap_pm_ops = {
+struct cpu_pm_ops omap_pm_ops = {
 	.finish_suspend		= default_finish_suspend,
 	.resume			= dummy_cpu_resume,
 	.scu_prepare		= dummy_scu_prepare,

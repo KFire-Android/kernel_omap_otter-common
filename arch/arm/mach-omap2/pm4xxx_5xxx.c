@@ -169,8 +169,8 @@ static inline int omap4_init_static_deps(void)
 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_1_clkdm);
 	ret |= clkdm_add_wkdep(ducati_clkdm, l3_2_clkdm);
 	if (ret) {
-		pr_err("Failed to add MPUSS->L3/EMIF/L4PER, DUCATI->L3 \
-			wakeup dependency\n");
+		pr_err("Failed to add MPUSS -> L3/EMIF/L4PER, DUCATI -> L3 "
+				"wakeup dependency\n");
 	}
 
 	return ret;

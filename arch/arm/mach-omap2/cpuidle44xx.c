@@ -100,7 +100,7 @@ static int omap4_enter_idle_coupled(struct cpuidle_device *dev,
 			 * waiting for CPU1 off.
 			 */
 			if (cpu_done[1])
-				goto fail;
+			    goto fail;
 
 		}
 	}

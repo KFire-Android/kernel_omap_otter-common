@@ -107,7 +107,7 @@ static u16 tap_prod_id;
 
 void omap_get_die_id(struct omap_die_id *odi)
 {
-	if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
+	if (cpu_is_omap44xx()) {
 		odi->id_0 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_0);
 		odi->id_1 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_1);
 		odi->id_2 = read_tap_reg(OMAP_TAP_DIE_ID_44XX_2);
@@ -495,11 +495,8 @@ void __init omap4xxx_check_revision(void)
 	case 0xb94e:
 		switch (rev) {
 		case 0:
-			omap_revision = OMAP4460_REV_ES1_0;
-			break;
-		case 2:
 		default:
-			omap_revision = OMAP4460_REV_ES1_1;
+			omap_revision = OMAP4460_REV_ES1_0;
 			break;
 		}
 		break;

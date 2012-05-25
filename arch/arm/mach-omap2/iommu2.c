@@ -19,24 +19,13 @@
 #include <linux/stringify.h>
 
 #include <plat/iommu.h>
+#include <plat/omap_hwmod.h>
+#include "clockdomain.h"
 
 /*
  * omap2 architecture specific register bit definitions
  */
 #define IOMMU_ARCH_VERSION	0x00000011
-
-/* SYSCONF */
-#define MMU_SYS_IDLE_SHIFT	3
-#define MMU_SYS_IDLE_FORCE	(0 << MMU_SYS_IDLE_SHIFT)
-#define MMU_SYS_IDLE_NONE	(1 << MMU_SYS_IDLE_SHIFT)
-#define MMU_SYS_IDLE_SMART	(2 << MMU_SYS_IDLE_SHIFT)
-#define MMU_SYS_IDLE_MASK	(3 << MMU_SYS_IDLE_SHIFT)
-
-#define MMU_SYS_SOFTRESET	(1 << 1)
-#define MMU_SYS_AUTOIDLE	1
-
-/* SYSSTATUS */
-#define MMU_SYS_RESETDONE	1
 
 /* IRQSTATUS & IRQENABLE */
 #define MMU_IRQ_MULTIHITFAULT	(1 << 4)
@@ -88,7 +77,6 @@ static void __iommu_set_twl(struct omap_iommu *obj, bool on)
 static int omap2_iommu_enable(struct omap_iommu *obj)
 {
 	u32 l, pa;
-	unsigned long timeout;
 
 	if (!obj->iopgd || !IS_ALIGNED((u32)obj->iopgd,  SZ_16K))
 		return -EINVAL;
@@ -97,28 +85,9 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
 	if (!IS_ALIGNED(pa, SZ_16K))
 		return -EINVAL;
 
-	iommu_write_reg(obj, MMU_SYS_SOFTRESET, MMU_SYSCONFIG);
-
-	timeout = jiffies + msecs_to_jiffies(20);
-	do {
-		l = iommu_read_reg(obj, MMU_SYSSTATUS);
-		if (l & MMU_SYS_RESETDONE)
-			break;
-	} while (!time_after(jiffies, timeout));
-
-	if (!(l & MMU_SYS_RESETDONE)) {
-		dev_err(obj->dev, "can't take mmu out of reset\n");
-		return -ENODEV;
-	}
-
 	l = iommu_read_reg(obj, MMU_REVISION);
 	dev_info(obj->dev, "%s: version %d.%d\n", obj->name,
 		 (l >> 4) & 0xf, l & 0xf);
-
-	l = iommu_read_reg(obj, MMU_SYSCONFIG);
-	l &= ~MMU_SYS_IDLE_MASK;
-	l |= (MMU_SYS_IDLE_SMART | MMU_SYS_AUTOIDLE);
-	iommu_write_reg(obj, l, MMU_SYSCONFIG);
 
 	iommu_write_reg(obj, pa, MMU_TTB);
 
@@ -129,12 +98,37 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
 
 static void omap2_iommu_disable(struct omap_iommu *obj)
 {
-	u32 l = iommu_read_reg(obj, MMU_CNTL);
+	struct omap_hwmod *oh;
+	u32 l;
 
+	oh = omap_hwmod_lookup(obj->name);
+	if (!oh)
+		return;
+	/*
+	 * IPU and DSP iommus are not directly connected to the processor
+	 * instead they are  behind a shared MMU. Therefore in the case of
+	 * a mmu fault and the mmu fault was not handled, even if the processor
+	 * is under reset, the shared MMU will try to translation the address
+	 * again causing that the status flag cannot be clear and therefore
+	 * as soon as the clkdm wants to go to idle the clkdm will be stuck
+	 * in transition state. The only way to reset the shared MMU is doing
+	 * a hardreset of the L2 iommu which shared the reset line with the
+	 * shared MMU. That way we can clean the status bit and turn off
+	 * the iommu without any issue.
+	 */
+	if (!strcmp(obj->name, "ipu") || !strcmp(obj->name, "dsp")) {
+		omap_hwmod_assert_hardreset(oh, oh->rst_lines->name);
+		omap_hwmod_deassert_hardreset(oh, oh->rst_lines->name);
+		goto out;
+	}
+
+	l = iommu_read_reg(obj, MMU_IRQSTATUS);
+	iommu_write_reg(obj, l, MMU_IRQSTATUS);
+	l = iommu_read_reg(obj, MMU_CNTL);
 	l &= ~MMU_CNTL_MASK;
 	iommu_write_reg(obj, l, MMU_CNTL);
-	iommu_write_reg(obj, MMU_SYS_IDLE_FORCE, MMU_SYSCONFIG);
-
+out:
+	clkdm_allow_idle(oh->clkdm);
 	dev_dbg(obj->dev, "%s is shutting down\n", obj->name);
 }
 
@@ -145,8 +139,13 @@ static void omap2_iommu_set_twl(struct omap_iommu *obj, bool on)
 
 static u32 omap2_iommu_fault_isr(struct omap_iommu *obj, u32 *ra)
 {
+	struct omap_hwmod *oh;
 	u32 stat, da;
 	u32 errs = 0;
+
+	oh = omap_hwmod_lookup(obj->name);
+	if (!oh)
+		return 0;
 
 	stat = iommu_read_reg(obj, MMU_IRQSTATUS);
 	stat &= MMU_IRQ_MASK;
@@ -169,6 +168,8 @@ static u32 omap2_iommu_fault_isr(struct omap_iommu *obj, u32 *ra)
 	if (stat & MMU_IRQ_MULTIHITFAULT)
 		errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
 	iommu_write_reg(obj, stat, MMU_IRQSTATUS);
+
+	clkdm_deny_idle(oh->clkdm);
 
 	return errs;
 }
@@ -262,8 +263,6 @@ omap2_iommu_dump_ctx(struct omap_iommu *obj, char *buf, ssize_t len)
 	char *p = buf;
 
 	pr_reg(REVISION);
-	pr_reg(SYSCONFIG);
-	pr_reg(SYSSTATUS);
 	pr_reg(IRQSTATUS);
 	pr_reg(IRQENABLE);
 	pr_reg(WALKING_ST);

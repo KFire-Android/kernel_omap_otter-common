@@ -42,6 +42,7 @@
 #include <linux/virtio.h>
 #include <linux/completion.h>
 #include <linux/idr.h>
+#include <linux/pm_qos.h>
 
 /**
  * struct resource_table - firmware resource table header
@@ -101,6 +102,7 @@ struct fw_rsc_hdr {
  *		    the remote processor will be writing logs.
  * @RSC_VDEV:       declare support for a virtio device, and serve as its
  *		    virtio header.
+ * @RSC_SUSPD_TIME: suspend timeout used for autosuspend feature
  * @RSC_LAST:       just keep this one at the end
  *
  * For more details regarding a specific resource type, please see its
@@ -116,7 +118,8 @@ enum fw_resource_type {
 	RSC_DEVMEM	= 1,
 	RSC_TRACE	= 2,
 	RSC_VDEV	= 3,
-	RSC_LAST	= 4,
+	RSC_SUSPD_TIME	= 4,
+	RSC_LAST	= 5,
 };
 
 #define FW_RSC_ADDR_ANY (0xFFFFFFFFFFFFFFFF)
@@ -307,6 +310,14 @@ struct fw_rsc_vdev {
 } __packed;
 
 /**
+ * struct fw_rsc_suspd_time - suspend timeout resource
+ * @suspd_time: auto suspend timeout
+ */
+struct fw_rsc_suspd_time {
+	s32 suspd_time;
+} __packed;
+
+/**
  * struct rproc_mem_entry - memory entry descriptor
  * @va:	virtual address
  * @dma: dma address
@@ -331,11 +342,33 @@ struct rproc;
  * @start:	power on the device and boot it
  * @stop:	power off the device
  * @kick:	kick a virtqueue (virtqueue id given as a parameter)
+ * @suspend:	suspend callback (auto_suspend flag as a parameter)
+ * @resume:	resume callback
+ * @set_latency		set latency on remote processor
+ * @set_bandwidth	set bandwidth on remote processor
+ * @set_frequency	set frequency of remote processor
  */
 struct rproc_ops {
 	int (*start)(struct rproc *rproc);
 	int (*stop)(struct rproc *rproc);
 	void (*kick)(struct rproc *rproc, int vqid);
+	int (*suspend)(struct rproc *rproc, bool auto_suspend);
+	int (*resume)(struct rproc *rproc);
+	int (*set_latency)(struct device *dev, struct rproc *rproc, long v);
+	int (*set_bandwidth)(struct device *dev, struct rproc *rproc, long v);
+	int (*set_frequency)(struct device *dev, struct rproc *rproc, long v);
+};
+
+/**
+ * enum rproc_constrants - remote processor available constraints
+ * @RPROC_CONSTRAINT_LATENCY:	set latency on remote processor
+ * @RPROC_CONSTRAINT_BANDWIDTH:	set bandwidth on remote processor
+ * @RPROC_CONSTRAINT_FREQUENCY: set frequency of remote processor
+ */
+enum rproc_constraint {
+	RPROC_CONSTRAINT_LATENCY,
+	RPROC_CONSTRAINT_BANDWIDTH,
+	RPROC_CONSTRAINT_FREQUENCY,
 };
 
 /**
@@ -362,6 +395,17 @@ enum rproc_state {
 };
 
 /**
+ * enum rproc_err - remote processor errors
+ * @RPROC_ERR_MMUFAULT:	iommmu fault error
+ *
+ * Each element of the enum is used as an array index. So that, the value of
+ * the elements should be always something sane.
+ */
+enum rproc_err {
+	RPROC_ERR_MMUFAULT	= 0,
+};
+
+/**
  * struct rproc - represents a physical remote processor device
  * @node: klist node of this rproc object
  * @domain: iommu domain
@@ -383,6 +427,13 @@ enum rproc_state {
  * @bootaddr: address of first instruction to boot rproc with (optional)
  * @rvdevs: list of remote virtio devices
  * @notifyids: idr for dynamically assigning rproc-wide unique notify ids
+ * @error_handler: workqueue for reseting virtio devices
+ * @crash_cnt: counter for fatal errors
+ * @recovery_disabled: flag that state if recovery was disabled
+ * @index: index of this rproc device
+ * @auto_suspend_timeout: store the auto suspend timeout for a rproc in msecs
+ * @need resume: if true a resume is needed in the system resume callback
+ * @system_suspended: true if a system suspend has happened
  */
 struct rproc {
 	struct klist_node node;
@@ -391,7 +442,7 @@ struct rproc {
 	const char *firmware;
 	void *priv;
 	const struct rproc_ops *ops;
-	struct device *dev;
+	struct device dev;
 	struct kref refcount;
 	atomic_t power;
 	unsigned int state;
@@ -405,6 +456,13 @@ struct rproc {
 	u32 bootaddr;
 	struct list_head rvdevs;
 	struct idr notifyids;
+	struct work_struct error_handler;
+	unsigned crash_cnt;
+	bool recovery_disabled;
+	int index;
+	int auto_suspend_timeout;
+	bool need_resume;
+	bool system_suspended;
 };
 
 /* we currently support only two vrings per rvdev */
@@ -462,6 +520,9 @@ int rproc_unregister(struct rproc *rproc);
 
 int rproc_boot(struct rproc *rproc);
 void rproc_shutdown(struct rproc *rproc);
+int rproc_set_constraints(struct device *dev, struct rproc *rproc,
+			  enum rproc_constraint type, long v);
+int rproc_pa_to_da(struct rproc *rproc, phys_addr_t pa, u64 *da);
 
 static inline struct rproc_vdev *vdev_to_rvdev(struct virtio_device *vdev)
 {

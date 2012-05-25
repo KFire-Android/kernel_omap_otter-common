@@ -42,8 +42,6 @@
 #define CPU1_ID			0x1
 #define OMAP4_NR_BANKS		4
 #define OMAP4_NR_IRQS		128
-#define OMAP5_NR_BANKS		5
-#define OMAP5_NR_IRQS		160
 
 static void __iomem *wakeupgen_base;
 static void __iomem *sar_base;
@@ -417,8 +415,6 @@ int __init omap_wakeupgen_init(void)
 		max_irqs = OMAP4_NR_IRQS;
 		secure_api_index = OMAP4_HAL_SAVEGIC_INDEX;
 	} else if (cpu_is_omap54xx()) {
-		irq_banks = OMAP5_NR_BANKS;
-		max_irqs = OMAP5_NR_IRQS;
 		secure_api_index = OMAP5_HAL_SAVEGIC_INDEX;
 	}
 
