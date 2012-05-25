@@ -32,6 +32,7 @@
 #include <linux/workqueue.h>
 #include <linux/io.h>
 #include <linux/delay.h>
+#include <linux/usb/musb-omap.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/ulpi.h>
 #include <linux/i2c/twl.h>
@@ -159,10 +160,11 @@ struct twl4030_usb {
 	enum twl4030_usb_mode	usb_mode;
 
 	int			irq;
-	u8			linkstat;
 	bool			vbus_supplied;
 	u8			asleep;
 	bool			irq_enabled;
+
+	enum omap_musb_vbus_id_status prev_status;
 };
 
 /* internal define on top of container_of */
@@ -250,7 +252,6 @@ static enum usb_phy_events twl4030_usb_linkstat(struct twl4030_usb *twl)
 {
 	int	status;
 	int	linkstat = USB_EVENT_NONE;
-	struct usb_otg *otg = twl->phy.otg;
 
 	twl->vbus_supplied = false;
 
@@ -272,32 +273,20 @@ static enum usb_phy_events twl4030_usb_linkstat(struct twl4030_usb *twl)
 		if (status & (BIT(7)))
                         twl->vbus_supplied = true;
 
-		if (status & BIT(2))
+		if (status & BIT(2)) {
+			twl->prev_status = OMAP_MUSB_ID_GROUND;
 			linkstat = USB_EVENT_ID;
-		else
+		} else {
+			twl->prev_status = OMAP_MUSB_VBUS_VALID;
 			linkstat = USB_EVENT_VBUS;
-	} else
+		}
+	} else {
+		twl->prev_status = OMAP_MUSB_VBUS_OFF;
 		linkstat = USB_EVENT_NONE;
+	}
 
 	dev_dbg(twl->dev, "HW_CONDITIONS 0x%02x/%d; link %d\n",
 			status, status, linkstat);
-
-	twl->phy.last_event = linkstat;
-
-	/* REVISIT this assumes host and peripheral controllers
-	 * are registered, and that both are active...
-	 */
-
-	spin_lock_irq(&twl->lock);
-	twl->linkstat = linkstat;
-	if (linkstat == USB_EVENT_ID) {
-		otg->default_a = true;
-		twl->phy.state = OTG_STATE_A_IDLE;
-	} else {
-		otg->default_a = false;
-		twl->phy.state = OTG_STATE_B_IDLE;
-	}
-	spin_unlock_irq(&twl->lock);
 
 	return linkstat;
 }
@@ -521,8 +510,7 @@ static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
 		else
 			twl4030_phy_resume(twl);
 
-		atomic_notifier_call_chain(&twl->phy.notifier, status,
-				twl->phy.otg->gadget);
+		omap_musb_mailbox(twl->prev_status);
 	}
 	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 
@@ -543,8 +531,7 @@ static void twl4030_usb_phy_init(struct twl4030_usb *twl)
 			twl->asleep = 0;
 		}
 
-		atomic_notifier_call_chain(&twl->phy.notifier, status,
-				twl->phy.otg->gadget);
+		omap_musb_mailbox(twl->prev_status);
 	}
 	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 }
@@ -613,6 +600,7 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 	twl->usb_mode		= pdata->usb_mode;
 	twl->vbus_supplied	= false;
 	twl->asleep		= 1;
+	twl->prev_status	= OMAP_MUSB_UNKNOWN;
 
 	twl->phy.dev		= twl->dev;
 	twl->phy.label		= "twl4030";
