@@ -250,6 +250,7 @@ void vibrator_haptic_fire(int value)
 static int vib_suspend(struct device *dev)
 {
 	hrtimer_cancel(&misc_data->timer);
+	cancel_work_sync(&misc_data->vib_work);
 	vib_set(0);
 	flush_delayed_work_sync(&misc_data->power_work);
 
