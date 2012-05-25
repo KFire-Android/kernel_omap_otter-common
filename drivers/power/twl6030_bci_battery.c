@@ -2611,8 +2611,8 @@ static int twl6030_bci_battery_suspend(struct device *dev)
 	if (ret)
 		goto err;
 
-	cancel_delayed_work(&di->twl6030_bci_monitor_work);
-	cancel_delayed_work(&di->twl6030_current_avg_work);
+	cancel_delayed_work_sync(&di->twl6030_bci_monitor_work);
+	cancel_delayed_work_sync(&di->twl6030_current_avg_work);
 
 	/* We cannot tolarate a sleep longer than 30 seconds
 	 * while on ac charging we have to reset the BQ watchdog timer.
