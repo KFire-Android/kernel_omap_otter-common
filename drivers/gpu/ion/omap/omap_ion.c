@@ -22,8 +22,10 @@
 #include <linux/uaccess.h>
 #include "../ion_priv.h"
 #include "omap_ion_priv.h"
+#include <linux/module.h>
 
 static struct ion_device *omap_ion_device;
+EXPORT_SYMBOL(omap_ion_device);
 
 static int num_heaps;
 static struct ion_heap **heaps;
@@ -35,6 +37,7 @@ int omap_ion_tiler_alloc(struct ion_client *client,
 {
 	return omap_tiler_alloc(tiler_heap, client, data);
 }
+EXPORT_SYMBOL(omap_ion_tiler_alloc);
 
 int omap_ion_nonsecure_tiler_alloc(struct ion_client *client,
 			 struct omap_ion_tiler_alloc_data *data)
@@ -43,6 +46,7 @@ int omap_ion_nonsecure_tiler_alloc(struct ion_client *client,
 		return -ENOMEM;
 	return omap_tiler_alloc(nonsecure_tiler_heap, client, data);
 }
+EXPORT_SYMBOL(omap_ion_nonsecure_tiler_alloc);
 
 static long omap_ion_ioctl(struct ion_client *client, unsigned int cmd,
 		    unsigned long arg)

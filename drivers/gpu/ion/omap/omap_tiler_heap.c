@@ -256,6 +256,7 @@ int omap_tiler_pages(struct ion_client *client, struct ion_handle *handle,
 	*tiler_addrs = info->tiler_addrs;
 	return 0;
 }
+EXPORT_SYMBOL(omap_tiler_pages);
 
 int omap_tiler_vinfo(struct ion_client *client, struct ion_handle *handle,
 			unsigned int *vstride, unsigned int *vsize)
