@@ -587,7 +587,7 @@ proto_unreg:
 	return ret;
 }
 
-void __exit rpmsg_proto_exit(void)
+static void __exit rpmsg_proto_exit(void)
 {
 	unregister_rpmsg_driver(&rpmsg_proto_drv);
 	sock_unregister(PF_RPMSG);
