@@ -57,6 +57,10 @@ int omap_ion_fd_to_handles(int fd, struct ion_client **client,
 int omap_tiler_vinfo(struct ion_client *client,
 			struct ion_handle *handle, unsigned int *vstride,
 			unsigned int *vsize);
+int omap_ion_fd_to_handles(int fd, struct ion_client **client,
+		struct ion_handle **handles,
+		int *num_handles);
+
 #endif /* __KERNEL__ */
 
 /* additional heaps used only on omap */

@@ -149,6 +149,36 @@ static int omap_ion_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void (*export_fd_to_ion_handles)(int fd,
+		struct ion_client **client,
+		struct ion_handle **handles,
+		int *num_handles);
+
+void omap_ion_register_pvr_export(void *pvr_export_fd)
+{
+	export_fd_to_ion_handles = pvr_export_fd;
+}
+EXPORT_SYMBOL(omap_ion_register_pvr_export);
+
+int omap_ion_fd_to_handles(int fd, struct ion_client **client,
+		struct ion_handle **handles,
+		int *num_handles)
+{
+	if (export_fd_to_ion_handles) {
+		export_fd_to_ion_handles(fd,
+				client,
+				handles,
+				num_handles);
+	} else {
+		pr_err("%s: export_fd_to_ion_handles"
+				"not initiazied",
+				__func__);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
 	.remove = omap_ion_remove,
