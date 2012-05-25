@@ -76,6 +76,7 @@ struct gpio_bank {
 	int stride;
 	u32 width;
 	int context_loss_count;
+	u16 id;
 	int power_mode;
 	bool workaround_enabled;
 
@@ -1085,6 +1086,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 #ifdef CONFIG_OF_GPIO
 	bank->chip.of_node = of_node_get(node);
 #endif
+	bank->id = pdev->id;
 
 	bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
 	if (bank->irq_base < 0) {
@@ -1209,6 +1211,21 @@ update_gpio_context_count:
 		bank->context_loss_count =
 				bank->get_context_loss_count(bank->dev);
 
+	/*
+	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
+	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
+	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
+	 * This WA changes the direction to input while in OFF and back
+	 * to input in resume. This is fixed in ES2.0
+	 */
+	if (cpu_is_omap54xx() &&
+	    (omap_rev() == OMAP5430_REV_ES1_0 ||
+	     omap_rev() == OMAP5432_REV_ES1_0) &&
+	    bank->id == 4) {
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
+	}
+
 	_gpio_dbck_disable(bank);
 	spin_unlock_irqrestore(&bank->lock, flags);
 
@@ -1309,6 +1326,21 @@ static int omap_gpio_runtime_resume(struct device *dev)
 	}
 
 	bank->workaround_enabled = false;
+
+	/*
+	 * WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
+	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
+	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
+	 * Change the direct back to o/p in resume.
+	 */
+	if (cpu_is_omap54xx() &&
+	    (omap_rev() == OMAP5430_REV_ES1_0 ||
+	     omap_rev() == OMAP5432_REV_ES1_0) &&
+	    bank->id == 4) {
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
+	}
+
 	spin_unlock_irqrestore(&bank->lock, flags);
 
 	return 0;
