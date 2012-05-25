@@ -42,6 +42,7 @@
 #include "common.h"
 #include <plat/usb.h>
 #include <plat/mmc.h>
+#include <plat/remoteproc.h>
 #include <video/omap-panel-dvi.h>
 
 #include "hsmmc.h"
@@ -239,7 +240,7 @@ static struct platform_device omap_vwlan_device = {
 	},
 };
 
-static struct wl12xx_platform_data omap_panda_wlan_data  __initdata = {
+struct wl12xx_platform_data omap_panda_wlan_data  __initdata = {
 	/* PANDA ref clock is 38.4 MHz */
 	.board_ref_clock = 2,
 };
@@ -448,7 +449,7 @@ static struct panel_dvi_platform_data omap4_dvi_panel = {
 	.i2c_bus_num = 3,
 };
 
-static struct omap_dss_device omap4_panda_dvi_device = {
+struct omap_dss_device omap4_panda_dvi_device = {
 	.type			= OMAP_DISPLAY_TYPE_DPI,
 	.name			= "dvi",
 	.driver_name		= "dvi",
@@ -458,7 +459,7 @@ static struct omap_dss_device omap4_panda_dvi_device = {
 	.channel		= OMAP_DSS_CHANNEL_LCD2,
 };
 
-static int __init omap4_panda_dvi_init(void)
+int __init omap4_panda_dvi_init(void)
 {
 	int r;
 
@@ -519,7 +520,7 @@ static struct omap_dss_board_info omap4_panda_dss_data = {
 	.default_device	= &omap4_panda_dvi_device,
 };
 
-static void __init omap4_panda_display_init(void)
+void __init omap4_panda_display_init(void)
 {
 	int r;
 
@@ -595,10 +596,16 @@ static void __init omap4_panda_init(void)
 	omap4_panda_display_init();
 }
 
+static void __init omap4_panda_reserve(void)
+{
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
+	omap_reserve();
+}
+
 MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
 	/* Maintainer: David Anders - Texas Instruments Inc */
 	.atag_offset	= 0x100,
-	.reserve	= omap_reserve,
+	.reserve	= omap4_panda_reserve,
 	.map_io		= omap4_map_io,
 	.init_early	= omap4430_init_early,
 	.init_irq	= gic_init_irq,

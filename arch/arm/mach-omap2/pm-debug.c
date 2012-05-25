@@ -39,7 +39,7 @@
 #include "pm.h"
 
 u32 enable_off_mode;
-u32 wakeup_timer_seconds;
+u32 wakeup_timer_seconds = 0;
 
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
@@ -252,14 +252,6 @@ static int option_set(void *data, u64 val)
 			omap3_pm_off_mode_enable(val);
 	}
 
-	if (option == &wakeup_timer_seconds) {
-		if (val > 0xFFFFFFFF) {
-			pr_err("Value assigned needs to be of type u32\n");
-			return 1;
-		} else
-			wakeup_timer_seconds = (u32)val;
-	}
-
 	return 0;
 }
 
@@ -289,7 +281,6 @@ static int __init pm_dbg_init(void)
 	(void) debugfs_create_file("wakeup_timer_seconds", S_IRUGO | S_IWUSR, d,
 				   &wakeup_timer_seconds, &pm_dbg_option_fops);
 
-	wakeup_timer_seconds = 0;
 	pm_dbg_init_done = 1;
 
 	return 0;
