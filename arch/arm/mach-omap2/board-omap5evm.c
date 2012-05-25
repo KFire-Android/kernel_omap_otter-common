@@ -662,6 +662,11 @@ static struct platform_device omap5evm_dmic_codec = {
 	.id	= -1,
 };
 
+static struct platform_device omap5evm_spdif_dit_codec = {
+	.name           = "spdif-dit",
+	.id             = -1,
+};
+
 static struct platform_device omap5evm_hdmi_audio_codec = {
 	.name	= "hdmi-audio-codec",
 	.id	= -1,
@@ -699,23 +704,9 @@ static struct platform_device omap5evm_abe_audio = {
 
 static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_dmic_codec,
+	&omap5evm_spdif_dit_codec,
 	&omap5evm_hdmi_audio_codec,
 	&omap5evm_abe_audio,
-};
-
-static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
-#ifdef CONFIG_OMAP5_SEVM_PALMAS
-	{
-		I2C_BOARD_INFO("twl6035", 0x48),
-		.platform_data = &palmas_omap5,
-		.irq = OMAP44XX_IRQ_SYS_1N,
-	},
-#endif
-	{
-		I2C_BOARD_INFO("twl6040", 0x4b),
-		.platform_data = &twl6040_data,
-		.irq = OMAP44XX_IRQ_SYS_2N,
-	},
 };
 
 static struct regulator_consumer_supply omap5_evm_vmmc1_supply[] = {
@@ -878,6 +869,21 @@ static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("tca6424", 0x22),
 		.platform_data = &omap5evm_gpio_expander_info,
+	},
+};
+
+static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
+#ifdef CONFIG_OMAP5_SEVM_PALMAS
+	{
+		I2C_BOARD_INFO("twl6035", 0x48),
+		.platform_data = &palmas_omap5,
+		.irq = OMAP44XX_IRQ_SYS_1N,
+	},
+#endif
+	{
+		I2C_BOARD_INFO("twl6040", 0x4b),
+		.platform_data = &twl6040_data,
+		.irq = OMAP44XX_IRQ_SYS_2N,
 	},
 };
 

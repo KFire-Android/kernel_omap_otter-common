@@ -24,6 +24,9 @@
 #ifndef __OMAP_ABE_PRIV_H__
 #define __OMAP_ABE_PRIV_H__
 
+#include <sound/soc.h>
+#include <linux/irqreturn.h>
+
 #include "abe/abe.h"
 #include "abe/abe_gain.h"
 #include "abe/abe_aess.h"
@@ -48,7 +51,8 @@
 #define OMAP_ABE_DAI_DMIC0			7
 #define OMAP_ABE_DAI_DMIC1			8
 #define OMAP_ABE_DAI_DMIC2			9
-#define OMAP_ABE_DAI_NUM			10
+#define OMAP_ABE_DAI_VXREC			10
+#define OMAP_ABE_DAI_NUM			11
 
 #define OMAP_ABE_BE_PDM_DL1		"PDM-DL1"
 #define OMAP_ABE_BE_PDM_UL1		"PDM-UL1"
@@ -61,6 +65,7 @@
 #define OMAP_ABE_BE_DMIC0		"DMIC0"
 #define OMAP_ABE_BE_DMIC1		"DMIC1"
 #define OMAP_ABE_BE_DMIC2		"DMIC2"
+#define OMAP_ABE_BE_VXREC		"VXREC"
 
 #define OMAP_ABE_MIXER(x)		(x)
 
@@ -120,6 +125,7 @@
 #define OMAP_ABE_AIF_DMIC0		OMAP_ABE_WIDGET(17)
 #define OMAP_ABE_AIF_DMIC1		OMAP_ABE_WIDGET(18)
 #define OMAP_ABE_AIF_DMIC2		OMAP_ABE_WIDGET(19)
+#define OMAP_ABE_AIF_VXREC		OMAP_ABE_WIDGET(41)
 
 /* ABE ROUTE_UL MUX Widgets */
 #define OMAP_ABE_MUX_UL00		OMAP_ABE_WIDGET(20)
@@ -146,8 +152,8 @@
 #define OMAP_ABE_VSWITCH_DL1_BT_VX	OMAP_ABE_WIDGET(39)
 #define OMAP_ABE_VSWITCH_DL1_MM_EXT	OMAP_ABE_WIDGET(40)
 
-#define OMAP_ABE_NUM_WIDGETS		(OMAP_ABE_VSWITCH_DL1_MM_EXT - OMAP_ABE_AIF_TONES_DL)
-#define OMAP_ABE_WIDGET_LAST		OMAP_ABE_VSWITCH_DL1_MM_EXT
+#define OMAP_ABE_NUM_WIDGETS		(OMAP_ABE_AIF_VXREC - OMAP_ABE_AIF_TONES_DL)
+#define OMAP_ABE_WIDGET_LAST		OMAP_ABE_AIF_VXREC
 
 #define OMAP_ABE_NUM_DAPM_REG		\
 	(OMAP_ABE_NUM_MIXERS + OMAP_ABE_NUM_MUXES + OMAP_ABE_NUM_WIDGETS)
@@ -339,5 +345,49 @@ void omap_abe_dc_set_hs_offset(struct snd_soc_platform *platform,
 	int left, int right, int step_mV);
 void omap_abe_dc_set_hf_offset(struct snd_soc_platform *platform,
 	int left, int right);
+
+/* Internal OMAP SoC API declarations */
+
+/* forward declarations */
+struct snd_ctl_elem_info;
+struct snd_kcontrol;
+struct snd_soc_dai;
+struct snd_soc_dapm_context;
+struct snd_soc_platform;
+
+/* omap-abe-mixer.c */
+unsigned int abe_mixer_read(struct snd_soc_platform *platform,
+		unsigned int reg);
+int abe_mixer_write(struct snd_soc_platform *platform, unsigned int reg,
+		unsigned int val);
+int abe_mixer_enable_mono(struct omap_abe *abe, int id, int enable);
+int abe_mixer_set_equ_profile(struct omap_abe *abe,
+		unsigned int id, unsigned int profile);
+int abe_mixer_add_widgets(struct snd_soc_platform *platform);
+
+/* omap-abe-pcm.c */
+extern struct snd_soc_dai_driver omap_abe_dai[7];
+
+/* omap-abe-pm.c */
+int abe_pm_save_context(struct omap_abe *abe);
+int abe_pm_restore_context(struct omap_abe *abe);
+#ifdef CONFIG_PM
+int abe_pm_suspend(struct snd_soc_dai *dai);
+int abe_pm_resume(struct snd_soc_dai *dai);
+#endif
+
+/* omap-abe-mmap.c */
+irqreturn_t abe_irq_handler(int irq, void *dev_id);
+extern struct snd_pcm_ops omap_aess_pcm_ops;
+int abe_opp_recalc_level(struct omap_abe *abe);
+
+/* omap-abe-opp.c */
+int abe_opp_init_initial_opp(struct omap_abe *abe);
+int abe_opp_set_level(struct omap_abe *abe, int opp);
+int abe_opp_stream_event(struct snd_soc_dapm_context *dapm, int event);
+
+/* omap-abe-dbg.c */
+void abe_init_debugfs(struct omap_abe *abe);
+void abe_cleanup_debugfs(struct omap_abe *abe);
 
 #endif	/* End of __OMAP_MCPDM_H__ */

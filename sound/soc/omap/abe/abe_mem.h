@@ -162,18 +162,26 @@ struct omap_aess_addr {
 
 extern struct omap_aess_addr omap_aess_map[];
 
+/* Special 32-bit access versions of memcpy_toio, memcpy_fromio, and memset_io
+ * Defined in abe_ini.c
+ */
+void omap_abe_memcpy_fromio(void *to, const void __iomem *from, size_t count);
+void omap_abe_memcpy_toio(void __iomem *to, const void *from, size_t count);
+void omap_abe_memset_io(void __iomem *dst, int c, size_t count);
+
+
 /* Distinction between Read and Write from/to ABE memory
  * is useful for simulation tool */
 static inline void omap_abe_mem_write(struct omap_aess *abe, int bank,
 				u32 offset, u32 *src, size_t bytes)
 {
-	memcpy((abe->io_base[bank] + offset), src, bytes);
+	omap_abe_memcpy_toio((abe->io_base[bank] + offset), src, bytes);
 }
 
 static inline void omap_abe_mem_read(struct omap_aess *abe, int bank,
 				u32 offset, u32 *dest, size_t bytes)
 {
-	memcpy(dest, (abe->io_base[bank] + offset), bytes);
+	omap_abe_memcpy_fromio(dest, (abe->io_base[bank] + offset), bytes);
 }
 
 static inline u32 omap_aess_reg_readl(struct omap_aess *abe, u32 offset)
@@ -187,28 +195,31 @@ static inline void omap_aess_reg_writel(struct omap_aess *abe,
 	__raw_writel(val, (abe->io_base[OMAP_ABE_AESS] + offset));
 }
 
-static inline void *omap_abe_reset_mem(struct omap_aess *abe, int bank,
+static inline void omap_abe_reset_mem(struct omap_aess *abe, int bank,
 			u32 offset, size_t bytes)
 {
-	return memset(abe->io_base[bank] + offset, 0, bytes);
+	omap_abe_memset_io(abe->io_base[bank] + offset, 0, bytes);
 }
 
 static inline void omap_aess_mem_write(struct omap_aess *abe,
 			struct omap_aess_addr addr, u32 *src)
 {
-	memcpy((abe->io_base[addr.bank] + addr.offset), src, addr.bytes);
+	omap_abe_memcpy_toio((abe->io_base[addr.bank] + addr.offset), src,
+			addr.bytes);
 }
 
 static inline void omap_aess_mem_read(struct omap_aess *abe,
 				struct omap_aess_addr addr, u32 *dest)
 {
-	memcpy(dest, (abe->io_base[addr.bank] + addr.offset), addr.bytes);
+	omap_abe_memcpy_fromio(dest, (abe->io_base[addr.bank] + addr.offset),
+			addr.bytes);
 }
 
-static inline void *omap_aess_reset_mem(struct omap_aess *abe,
+static inline void omap_aess_reset_mem(struct omap_aess *abe,
 			struct omap_aess_addr addr)
 {
-	return memset(abe->io_base[addr.bank] + addr.offset, 0, addr.bytes);
+	omap_abe_memset_io(abe->io_base[addr.bank] + addr.offset, 0,
+			addr.bytes);
 }
 
 

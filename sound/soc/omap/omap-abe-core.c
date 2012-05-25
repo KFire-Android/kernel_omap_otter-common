@@ -39,21 +39,6 @@
 
 #include "omap-abe-priv.h"
 
-int abe_opp_stream_event(struct snd_soc_dapm_context *dapm, int event);
-int abe_pm_suspend(struct snd_soc_dai *dai);
-int abe_pm_resume(struct snd_soc_dai *dai);
-int abe_mixer_add_widgets(struct snd_soc_platform *platform);
-int abe_mixer_write(struct snd_soc_platform *platform, unsigned int reg,
-		unsigned int val);
-unsigned int abe_mixer_read(struct snd_soc_platform *platform,
-		unsigned int reg);
-irqreturn_t abe_irq_handler(int irq, void *dev_id);
-void abe_init_debugfs(struct omap_abe *abe);
-void abe_cleanup_debugfs(struct omap_abe *abe);
-int abe_opp_init_initial_opp(struct omap_abe *abe);
-extern struct snd_pcm_ops omap_aess_pcm_ops;
-extern struct snd_soc_dai_driver omap_abe_dai[7];
-
 static u64 omap_abe_dmamask = DMA_BIT_MASK(32);
 
 static const char *abe_memory_bank[5] = {
@@ -281,6 +266,7 @@ static int abe_probe(struct snd_soc_platform *platform)
 		goto err_irq;
 	}
 
+/* TODO: Enable when PM tree creates arch/arm/mach-omap2/opp5xxx_data.c */
 #if 0
 	ret = abe_opp_init_initial_opp(abe);
 	if (ret < 0)
@@ -311,7 +297,10 @@ static int abe_probe(struct snd_soc_platform *platform)
 	abe_init_debugfs(abe);
 	return ret;
 
+/* TODO: Enable when PM tree creates arch/arm/mach-omap2/opp5xxx_data.c */
+#if 0
 err_opp:
+#endif
 	free_irq(abe->irq, (void *)abe);
 err_irq:
 	abe_free_fw(abe);
@@ -334,13 +323,13 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 	.ops		= &omap_aess_pcm_ops,
 	.probe		= abe_probe,
 	.remove		= abe_remove,
+#ifdef CONFIG_PM
 	.suspend	= abe_pm_suspend,
 	.resume		= abe_pm_resume,
+#endif
 	.read		= abe_mixer_read,
 	.write		= abe_mixer_write,
-#if 0
 	.stream_event = abe_opp_stream_event,
-#endif
 };
 
 static int __devinit abe_engine_probe(struct platform_device *pdev)

@@ -69,12 +69,12 @@
 #include "abe_mem.h"
 #include "abe_gain.h"
 
-#include "abe_taskid.h"
 #include "abe_functionsid.h"
 #include "abe_initxxx_labels.h"
 #include "abe_define.h"
 #include "abe_def.h"
 #include "abe_typedef.h"
+#include "abe_private.h"
 
 /*
  * GLOBAL DEFINITION
@@ -100,33 +100,6 @@ struct omap_abe_atc_desc {
 };
 
 
-extern struct omap_aess_init_task aess_init_table;
-
-extern struct omap_aess_asrc_port aess_enable_vx_dl_8k_asrc;
-extern struct omap_aess_asrc_port aess_enable_vx_dl_16k_asrc;
-extern struct omap_aess_asrc_port aess_enable_vx_dl_48k_asrc;
-
-extern struct omap_aess_asrc_port aess_enable_vx_ul_8k_asrc;
-extern struct omap_aess_asrc_port aess_enable_vx_ul_16k_asrc;
-extern struct omap_aess_asrc_port aess_enable_vx_ul_48k_asrc;
-
-extern struct omap_aess_io_task aess_port_bt_vx_dl_8k;
-extern struct omap_aess_io_task aess_port_bt_vx_dl_16k;
-extern struct omap_aess_io_task aess_port_bt_vx_dl_48k;
-
-extern struct omap_aess_io_task aess_port_bt_vx_ul_8k;
-extern struct omap_aess_io_task aess_port_bt_vx_ul_16k;
-extern struct omap_aess_io_task aess_port_bt_vx_ul_48k;
-
-extern struct omap_aess_io_task aess_port_tones_dl_441k;
-extern struct omap_aess_io_task aess_port_tones_dl_48k;
-
-extern struct omap_aess_io_task aess_port_mm_dl_441k_pp;
-extern struct omap_aess_io_task aess_port_mm_dl_441k;
-extern struct omap_aess_io_task aess_port_mm_dl_48k;
-
-extern struct omap_aess_init_task aess_port_mm_dl_48k_pp;
-
 u32 abe_dma_port_iter_factor(struct omap_aess_data_format *f);
 u32 abe_dma_port_iteration(struct omap_aess_data_format *f);
 u32 abe_dma_port_copy_subroutine_id(u32 port_id);
@@ -135,19 +108,8 @@ void omap_aess_init_io_tasks(struct omap_aess *abe, u32 id, struct omap_aess_dat
 		       struct omap_aess_port_protocol *prot);
 void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot);
 
-extern const u32 abe_atc_srcid[];
-extern const u32 abe_atc_dstid[];
-
-extern void omap_aess_init_asrc_vx_dl(struct omap_aess *abe, s32 dppm);
-extern void omap_aess_init_asrc_vx_ul(struct omap_aess *abe, s32 dppm);
-
-extern int omap_aess_init_ping_pong_buffer(struct omap_aess *abe,
-				   u32 id, u32 size_bytes, u32 n_buffers,
-				   u32 *p);
-
-
-
-void omap_aess_update_scheduling_table(struct omap_aess *abe, struct omap_aess_init_task *init_task, int enable)
+static void omap_aess_update_scheduling_table(struct omap_aess *abe,
+		struct omap_aess_init_task *init_task, int enable)
 {
 	int i;
 	struct omap_aess_task *task;
@@ -161,10 +123,11 @@ void omap_aess_update_scheduling_table(struct omap_aess *abe, struct omap_aess_i
 	}
 }
 
-void omap_aess_update_scheduling_table1(struct omap_aess *abe, struct omap_aess_init_task1 *init_task, int enable)
+static void omap_aess_update_scheduling_table1(struct omap_aess *abe,
+		const struct omap_aess_init_task1 *init_task, int enable)
 {
 	int i;
-	struct omap_aess_task *task;
+	const struct omap_aess_task *task;
 
 	for (i = 0; i < init_task->nb_task; i++) {
 		task = &init_task->task[i];
@@ -175,7 +138,8 @@ void omap_aess_update_scheduling_table1(struct omap_aess *abe, struct omap_aess_
 	}
 }
 
-u32 omap_aess_update_io_task(struct omap_aess *abe, struct omap_aess_io_task *io_task, int enable)
+static u32 omap_aess_update_io_task(struct omap_aess *abe,
+		struct omap_aess_io_task *io_task, int enable)
 {
 	int i;
 	struct omap_aess_task *task;
@@ -188,7 +152,7 @@ u32 omap_aess_update_io_task(struct omap_aess *abe, struct omap_aess_io_task *io
 			abe->MultiFrame[task->frame][task->slot] = 0;
 	}
 
-	return(io_task->smem);
+	return io_task->smem;
 }
 
 /**
@@ -222,7 +186,7 @@ void omap_aess_build_scheduler_table(struct omap_aess *abe)
  *
  * clear temporary buffers
  */
-void omap_aess_clean_temporary_buffers(struct omap_aess *abe, u32 id)
+static void omap_aess_clean_temporary_buffers(struct omap_aess *abe, u32 id)
 {
 	switch (id) {
 	case OMAP_ABE_DMIC_PORT:
@@ -396,7 +360,7 @@ void omap_aess_clean_temporary_buffers(struct omap_aess *abe, u32 id)
  * Operations:
  * Return value:
  */
-void omap_aess_disable_enable_dma_request(struct omap_aess *abe, u32 id,
+static void omap_aess_disable_enable_dma_request(struct omap_aess *abe, u32 id,
 					 u32 on_off)
 {
 	u8 desc_third_word[4], irq_dmareq_field;
@@ -444,7 +408,7 @@ void omap_aess_disable_enable_dma_request(struct omap_aess *abe, u32 id,
  * Return value:
  *
  */
-void omap_aess_enable_dma_request(struct omap_aess *abe, u32 id)
+static void omap_aess_enable_dma_request(struct omap_aess *abe, u32 id)
 {
 	omap_aess_disable_enable_dma_request(abe, id, 1);
 }
@@ -457,7 +421,7 @@ void omap_aess_enable_dma_request(struct omap_aess *abe, u32 id)
  * Return value:
  *
  */
-void omap_aess_disable_dma_request(struct omap_aess *abe, u32 id)
+static void omap_aess_disable_dma_request(struct omap_aess *abe, u32 id)
 {
 	omap_aess_disable_enable_dma_request(abe, id, 0);
 }
@@ -468,7 +432,7 @@ void omap_aess_disable_dma_request(struct omap_aess *abe, u32 id)
  *
  * load the DMEM ATC/AESS descriptors
  */
-void omap_aess_init_atc(struct omap_aess *abe, u32 id)
+static void omap_aess_init_atc(struct omap_aess *abe, u32 id)
 {
 	u8 iter;
 	s32 datasize;
@@ -625,11 +589,6 @@ int omap_aess_disable_data_transfer(struct omap_aess *abe, u32 id)
 	default:
 		break;
 	}
-
-	omap_aess_update_scheduling_table1(abe, &(abe_port_init[id].task), 0);
-
-	omap_aess_mem_write(abe, omap_aess_map[OMAP_AESS_DMEM_MULTIFRAME_ID],
-		(u32 *) abe->MultiFrame);
 
 	/* local host variable status= "port is running" */
 	abe_port[id].status = OMAP_ABE_PORT_ACTIVITY_IDLE;
@@ -923,6 +882,10 @@ void abe_init_dma_t(u32 id, struct omap_aess_port_protocol *prot)
 	abe_port[id].dma = dma;
 }
 
+/* Code disabled since it is unused.  Code is retained for
+ * synchronization with upstream
+ */
+#if 0
 /**
  * abe_enable_atc
  * Parameter:
@@ -942,6 +905,12 @@ void omap_aess_enable_atc(struct omap_aess *abe, u32 id)
 		       (u32 *) &atc_desc, sizeof(atc_desc));
 
 }
+#endif /* 0 */
+
+/* Code disabled since it is unused.  Code is retained for
+ * synchronization with upstream
+ */
+#if 0
 /**
  * abe_disable_atc
  * Parameter:
@@ -961,6 +930,8 @@ void omap_aess_disable_atc(struct omap_aess *abe, u32 id)
 		       (u32 *) &atc_desc, sizeof(atc_desc));
 
 }
+#endif /* 0 */
+
 /**
  * abe_init_io_tasks
  * @prot : protocol being used
@@ -1378,7 +1349,7 @@ int omap_aess_select_main_port(struct omap_aess *abe, u32 id)
  *
  * takes the first port in a list which is slave on the data interface
  */
-u32 abe_valid_port_for_synchro(u32 id)
+static u32 abe_valid_port_for_synchro(u32 id)
 {
 	if ((abe_port[id].protocol.protocol_switch == DMAREQ_PORT_PROT) ||
 	    (abe_port[id].protocol.protocol_switch == PINGPONG_PORT_PROT) ||
@@ -1414,7 +1385,8 @@ void omap_aess_decide_main_port(struct omap_aess *abe)
  * and the multiplier factor to apply during data move with DMEM
  *
  */
-void abe_format_switch(struct omap_aess_data_format *f, u32 *iter, u32 *mulfac)
+static void abe_format_switch(struct omap_aess_data_format *f, u32 *iter,
+		u32 *mulfac)
 {
 	u32 n_freq;
 	switch (f->f) {
@@ -1639,39 +1611,30 @@ EXPORT_SYMBOL(omap_aess_read_remaining_data);
  */
 int omap_aess_mono_mixer(struct omap_aess *abe, u32 id, u32 on_off)
 {
-#if 0
+	struct omap_aess_task *task;
+
 	switch (id) {
 	case MIXDL1:
-		if (on_off)
-			abe->MultiFrame[TASK_DL1Mixer_SLT][TASK_DL1Mixer_IDX] =
-				ABE_TASK_ID(C_ABE_FW_TASK_DL1Mixer_dual_mono);
-		else
-			abe->MultiFrame[TASK_DL1Mixer_SLT][TASK_DL1Mixer_IDX] =
-				ABE_TASK_ID(C_ABE_FW_TASK_DL1Mixer);
+		task = aess_dl1_mono_mixer;
 		break;
 	case MIXDL2:
-		if (on_off)
-			abe->MultiFrame[TASK_DL2Mixer_SLT][TASK_DL2Mixer_IDX] =
-				ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer_dual_mono);
-		else
-			abe->MultiFrame[TASK_DL2Mixer_SLT][TASK_DL2Mixer_IDX] =
-				ABE_TASK_ID(C_ABE_FW_TASK_DL2Mixer);
+		task = aess_dl2_mono_mixer;
 		break;
 	case MIXAUDUL:
-		if (on_off)
-			abe->MultiFrame[12][4] =
-				ABE_TASK_ID(C_ABE_FW_TASK_ULMixer_dual_mono);
-		else
-			abe->MultiFrame[12][4] =
-				ABE_TASK_ID(C_ABE_FW_TASK_ULMixer);
+		task = aess_audul_mono_mixer;
 		break;
 	default:
-		break;
+		return -EINVAL;
 	}
+
+	if (on_off)
+		task += sizeof(struct omap_aess_task);
+
+	abe->MultiFrame[task->frame][task->slot] = task->task;
 
 	omap_aess_mem_write(abe, omap_aess_map[OMAP_AESS_DMEM_MULTIFRAME_ID],
 		       (u32 *) abe->MultiFrame);
-#endif
+
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_mono_mixer);

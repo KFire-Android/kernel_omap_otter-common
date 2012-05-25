@@ -58,6 +58,7 @@
 
 #include "abe.h"
 #include "abe_dbg.h"
+#include "abe_seq.h"
 
 #include "abe_mem.h"
 
@@ -99,28 +100,28 @@ struct omap_aess_subroutine {
 };
 
 
-const struct omap_aess_sequence seq_null = {
+static const struct omap_aess_sequence seq_null = {
 	NOMASK, {CL_M1, 0, {0, 0, 0, 0}, 0}, {CL_M1, 0, {0, 0, 0, 0}, 0}
 };
 /* table of new subroutines called in the sequence */
-abe_subroutine2 abe_all_subsubroutine[OMAP_ABE_MAX_SUB_ROUTINE];
+static abe_subroutine2 abe_all_subsubroutine[OMAP_ABE_MAX_SUB_ROUTINE];
 /* number of parameters per calls */
-u32 abe_all_subsubroutine_nparam[OMAP_ABE_MAX_SUB_ROUTINE];
+static u32 abe_all_subsubroutine_nparam[OMAP_ABE_MAX_SUB_ROUTINE];
 /* index of the subroutine */
-u32 abe_subroutine_id[OMAP_ABE_MAX_SUB_ROUTINE];
+/* static u32 abe_subroutine_id[OMAP_ABE_MAX_SUB_ROUTINE]; */
 /* paramters of the subroutine (if any) */
-u32 abe_all_subroutine_params[OMAP_ABE_MAX_SUB_ROUTINE][4];
+static u32 abe_all_subroutine_params[OMAP_ABE_MAX_SUB_ROUTINE][4];
 /* table of all sequences */
-struct omap_aess_sequence abe_all_sequence[OMAP_ABE_MAX_NB_SEQ];
-u32 abe_sequence_write_pointer;
+static struct omap_aess_sequence abe_all_sequence[OMAP_ABE_MAX_NB_SEQ];
+static u32 abe_sequence_write_pointer;
 /* current number of pending sequences (avoids to look in the table) */
-u32 abe_nb_pending_sequences;
+/* static u32 abe_nb_pending_sequences; */
 
 /**
  * omap_aess_dummy_subroutine
  *
  */
-void omap_aess_dummy_subroutine(void)
+static void omap_aess_dummy_subroutine(void)
 {
 }
 
@@ -133,7 +134,8 @@ void omap_aess_dummy_subroutine(void)
  *
  * add one function pointer more and returns the index to it
  */
-void omap_aess_add_subroutine(struct omap_aess *abe, u32 *id, abe_subroutine2 f, u32 nparam, u32 *params)
+static void omap_aess_add_subroutine(struct omap_aess *abe, u32 *id,
+		abe_subroutine2 f, u32 nparam, u32 *params)
 {
 	u32 i, i_found;
 
@@ -176,7 +178,7 @@ void omap_aess_add_subroutine(struct omap_aess *abe, u32 *id, abe_subroutine2 f,
  * initializes the default table of pointers to subroutines
  *
  */
-void omap_aess_init_subroutine_table(struct omap_aess *abe)
+static void omap_aess_init_subroutine_table(struct omap_aess *abe)
 {
 	u32 id;
 
@@ -199,7 +201,8 @@ void omap_aess_init_subroutine_table(struct omap_aess *abe)
  *
  * Load a time-sequenced operations.
  */
-void omap_aess_add_sequence(struct omap_aess *abe, u32 *id, struct omap_aess_sequence *s)
+static void omap_aess_add_sequence(struct omap_aess *abe, u32 *id,
+		struct omap_aess_sequence *s)
 {
 	struct omap_aess_seq_info *seq_src, *seq_dst;
 	u32 i, no_end_of_sequence_found;
@@ -230,6 +233,10 @@ void omap_aess_add_sequence(struct omap_aess *abe, u32 *id, struct omap_aess_seq
 	}
 }
 
+/* Code disabled since it is unused.  Code is retained for
+ * synchronization with upstream
+ */
+#if 0
 /**
  * abe_reset_one_sequence
  * @id: sequence ID
@@ -240,6 +247,7 @@ void omap_aess_add_sequence(struct omap_aess *abe, u32 *id, struct omap_aess_seq
 void abe_reset_one_sequence(u32 id)
 {
 }
+#endif
 
 /**
  * omap_aess_reset_all_sequence
@@ -342,4 +350,3 @@ int omap_aess_plug_subroutine(struct omap_aess *abe, u32 *id, abe_subroutine2 f,
 	return 0;
 }
 EXPORT_SYMBOL(omap_aess_plug_subroutine);
-

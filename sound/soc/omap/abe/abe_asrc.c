@@ -71,6 +71,7 @@
 #include "abe.h"
 #include "abe_dbg.h"
 #include "abe_mem.h"
+#include "abe_private.h"
 
 /**
  * omap_aess_write_fifo
