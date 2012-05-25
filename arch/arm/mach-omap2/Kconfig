@@ -367,6 +367,7 @@ config MACH_OMAP5_SEVM
 	select INPUT_TSL2771
 	select INPUT_BMP085
 	select DRV2667_HAPTICS
+	select BATTERY_BQ27x00
 
 config MACH_OMAP5_PANDA
 	bool "OMAP5 Panda board"
