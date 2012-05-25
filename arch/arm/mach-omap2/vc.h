@@ -134,9 +134,9 @@ int omap_vc_pre_scale(struct voltagedomain *voltdm,
 		      u8 *target_vsel, u8 *current_vsel);
 void omap_vc_post_scale(struct voltagedomain *voltdm,
 			unsigned long target_volt,
+			struct omap_volt_data *target_vdata,
 			u8 target_vsel, u8 current_vsel);
 int omap_vc_bypass_scale(struct voltagedomain *voltdm,
-			 unsigned long target_volt);
-
+			struct omap_volt_data *target_v);
 #endif
 

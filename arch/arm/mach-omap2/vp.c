@@ -83,7 +83,8 @@ static inline int _vp_wait_for_idle(struct voltagedomain *voltdm,
 	return 0;
 }
 
-static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
+static u32 _vp_set_init_voltage(struct voltagedomain *voltdm,
+				unsigned long volt)
 {
 	struct omap_vp_instance *vp = voltdm->vp;
 	u32 vpconfig;
@@ -178,8 +179,11 @@ int omap_vp_update_errorgain(struct voltagedomain *voltdm,
 
 	/* Get volt_data corresponding to target_volt */
 	volt_data = omap_voltage_get_voltdata(voltdm, target_volt);
-	if (IS_ERR(volt_data))
+	if (IS_ERR(volt_data)) {
+		pr_err("%s: vdm %s no voltage data for %ld\n", __func__,
+		       voltdm->name, target_volt);
 		return -EINVAL;
+	}
 
 	/* Setting vp errorgain based on the voltage */
 	voltdm->rmw(voltdm->vp->common->vpconfig_errorgain_mask,
@@ -207,12 +211,13 @@ static u8 __vp_debug_error_message_count = _MAX_COUNT_ERR;
 
 /* VP force update method of voltage scaling */
 int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
-			      unsigned long target_volt)
+			      struct omap_volt_data *target_v)
 {
 	struct omap_vp_instance *vp = voltdm->vp;
 	u32 vpconfig;
 	u8 target_vsel, current_vsel;
 	int ret, timeout = 0;
+	unsigned long target_volt = omap_get_operation_voltage(target_v);
 
 	ret = _vp_wait_for_idle(voltdm, vp);
 	if (ret) {
@@ -265,7 +270,8 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
 			__func__, voltdm->name, target_volt,
 			target_vsel, current_vsel);
 
-	omap_vc_post_scale(voltdm, target_volt, target_vsel, current_vsel);
+	omap_vc_post_scale(voltdm, target_volt, target_v,
+			   target_vsel, current_vsel);
 
 	/*
 	 * Disable TransactionDone interrupt , clear all status, clear
@@ -300,7 +306,8 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
 void omap_vp_enable(struct voltagedomain *voltdm)
 {
 	struct omap_vp_instance *vp;
-	u32 vpconfig, volt;
+	u32 vpconfig;
+	struct omap_volt_data *volt;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -318,14 +325,15 @@ void omap_vp_enable(struct voltagedomain *voltdm)
 	if (vp->enabled)
 		return;
 
-	volt = voltdm_get_voltage(voltdm);
+	volt = omap_voltage_get_curr_vdata(voltdm);
 	if (!volt) {
 		pr_warning("%s: unable to find current voltage for %s\n",
 			   __func__, voltdm->name);
 		return;
 	}
 
-	vpconfig = _vp_set_init_voltage(voltdm, volt);
+	vpconfig = _vp_set_init_voltage(voltdm,
+					omap_get_operation_voltage(volt));
 
 	/* Enable VP */
 	vpconfig |= vp->common->vpconfig_vpenable;

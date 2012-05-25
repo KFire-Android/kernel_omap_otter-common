@@ -46,20 +46,20 @@ static LIST_HEAD(voltdm_list);
 
 /* Public functions */
 /**
- * voltdm_get_voltage() - Gets the current non-auto-compensated voltage
+ * omap_voltage_get_curr_vdata() - Gets the current non-auto-compensated voltage
  * @voltdm:	pointer to the voltdm for which current voltage info is needed
  *
  * API to get the current non-auto-compensated voltage for a voltage domain.
  * Returns 0 in case of error else returns the current voltage.
  */
-unsigned long voltdm_get_voltage(struct voltagedomain *voltdm)
+struct omap_volt_data *omap_voltage_get_curr_vdata(struct voltagedomain *voltdm)
 {
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
-		return 0;
+		return NULL;
 	}
 
-	return voltdm->nominal_volt;
+	return voltdm->curr_volt;
 }
 
 int voltdm_register_notifier(struct voltagedomain *voltdm,
@@ -84,10 +84,11 @@ int voltdm_unregister_notifier(struct voltagedomain *voltdm,
  * for a particular voltage domain during DVFS.
  */
 int voltdm_scale(struct voltagedomain *voltdm,
-		 unsigned long target_volt)
+			struct omap_volt_data *target_v)
 {
 	int ret;
 	struct omap_voltage_notifier notify;
+	unsigned long target_volt = omap_get_operation_voltage(target_v);
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -105,9 +106,7 @@ int voltdm_scale(struct voltagedomain *voltdm,
 	srcu_notifier_call_chain(&voltdm->change_notify_list,
 				 OMAP_VOLTAGE_PRECHANGE, (void *)&notify);
 
-	ret = voltdm->scale(voltdm, target_volt);
-	if (!ret)
-		voltdm->nominal_volt = target_volt;
+	ret = voltdm->scale(voltdm, target_v);
 
 	notify.op_result = ret;
 	srcu_notifier_call_chain(&voltdm->change_notify_list,
@@ -126,14 +125,14 @@ int voltdm_scale(struct voltagedomain *voltdm,
  */
 void voltdm_reset(struct voltagedomain *voltdm)
 {
-	unsigned long target_volt;
+	struct omap_volt_data *target_volt;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
 		return;
 	}
 
-	target_volt = voltdm_get_voltage(voltdm);
+	target_volt = omap_voltage_get_curr_vdata(voltdm);
 	if (!target_volt) {
 		pr_err("%s: unable to find current voltage for vdd_%s\n",
 			__func__, voltdm->name);
@@ -279,13 +278,20 @@ DEFINE_SIMPLE_ATTRIBUTE(vp_volt_debug_fops, vp_volt_debug_get, NULL, "%llu\n");
 static int nom_volt_debug_get(void *data, u64 *val)
 {
 	struct voltagedomain *voltdm = (struct voltagedomain *)data;
+	struct omap_volt_data *vdata;
 
 	if (!voltdm) {
 		pr_warning("Wrong paramater passed\n");
 		return -EINVAL;
 	}
 
-	*val = voltdm_get_voltage(voltdm);
+	vdata = omap_voltage_get_curr_vdata(voltdm);
+	if (IS_ERR_OR_NULL(vdata)) {
+		pr_warning("%s: unable to get volt for vdd_%s\n", __func__,
+			   voltdm->name);
+		return -ENODEV;
+	}
+	*val = vdata->volt_nominal;
 
 	return 0;
 }
