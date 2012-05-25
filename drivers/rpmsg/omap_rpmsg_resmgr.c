@@ -554,7 +554,7 @@ static struct platform_driver omap_rprm_driver = {
 	},
 };
 
-int __init omap_rprm_init(void)
+static int __init omap_rprm_init(void)
 {
 	int i, ret;
 
