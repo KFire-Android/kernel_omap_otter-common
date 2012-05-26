@@ -103,9 +103,11 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
 
 		pm_runtime_put_sync(phy->dev);
 		clk_disable(phy->wkupclk);
+		clk_disable(phy->optclk);
 
 		phy->is_suspended = 1;
 	} else if (!suspend && phy->is_suspended) {
+		clk_enable(phy->optclk);
 		clk_enable(phy->wkupclk);
 		pm_runtime_get_sync(phy->dev);
 
@@ -157,6 +159,7 @@ static int __devinit omap_usb2_probe(struct platform_device *pdev)
 	otg->phy		= &phy->phy;
 
 	phy->wkupclk = clk_get(phy->dev, "usb_phy_cm_clk32k");
+	phy->optclk = clk_get(phy->dev, "usb_otg_ss_refclk960m");
 
 	usb_add_phy(&phy->phy, USB_PHY_TYPE_USB2);
 
