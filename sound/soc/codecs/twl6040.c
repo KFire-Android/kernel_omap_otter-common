@@ -73,6 +73,7 @@ struct twl6040_data {
 	u16 hs_right_step;
 	u16 hf_left_step;
 	u16 hf_right_step;
+	u16 amic_bias_settle_ms;
 	struct twl6040_jack_data hs_jack;
 	struct snd_soc_codec *codec;
 	struct workqueue_struct *workqueue;
@@ -307,6 +308,30 @@ static int headset_power_mode(struct snd_soc_codec *codec, int high_perf)
 
 	twl6040_write(codec, TWL6040_REG_HSLCTL, hslctl);
 	twl6040_write(codec, TWL6040_REG_HSRCTL, hsrctl);
+
+	return 0;
+}
+
+static int twl6040_adc_event(struct snd_soc_dapm_widget *w,
+			struct snd_kcontrol *kcontrol, int event)
+{
+	struct twl6040_data *priv = snd_soc_codec_get_drvdata(w->codec);
+
+	/* Assuming event == SND_SOC_DAPM_POST_PMU */
+
+	/* After setting the microphone bias, the mic's won't settle
+	 * until the amplifier (MicAmpL/MicAmpR) is enabled.  The
+	 * settle time is board/device specific.  In addition, after
+	 * the ADC is enabled there's a pop for up to 3ms.
+	 *
+	 * Since the ADC is the last thing to be set before starting a
+	 * capture, the sleep to let them everything settle is placed
+	 * here.
+	 */
+	if (priv->amic_bias_settle_ms)
+		msleep(priv->amic_bias_settle_ms);
+	else
+		usleep_range(3000, 10000);
 
 	return 0;
 }
@@ -729,10 +754,14 @@ static const struct snd_soc_dapm_widget twl6040_dapm_widgets[] = {
 			TWL6040_REG_MICRCTL, 1, 0, NULL, 0),
 
 	/* ADCs */
-	SND_SOC_DAPM_ADC("ADC Left", NULL,
-			TWL6040_REG_MICLCTL, 2, 0),
-	SND_SOC_DAPM_ADC("ADC Right", NULL,
-			TWL6040_REG_MICRCTL, 2, 0),
+	SND_SOC_DAPM_ADC_E("ADC Left", NULL,
+			TWL6040_REG_MICLCTL, 2, 0,
+			twl6040_adc_event,
+			SND_SOC_DAPM_POST_PMU),
+	SND_SOC_DAPM_ADC_E("ADC Right", NULL,
+			TWL6040_REG_MICRCTL, 2, 0,
+			twl6040_adc_event,
+			SND_SOC_DAPM_POST_PMU),
 
 	/* Microphone bias */
 	SND_SOC_DAPM_SUPPLY("Headset Mic Bias",
@@ -1172,6 +1201,11 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 		priv->hf_left_step = 1;
 		priv->hf_right_step = 1;
 	}
+
+	if (pdata && pdata->amic_bias_settle_ms)
+		priv->amic_bias_settle_ms = pdata->amic_bias_settle_ms;
+	else
+		priv->amic_bias_settle_ms = 48;
 
 	priv->plug_irq = platform_get_irq(pdev, 0);
 	if (priv->plug_irq < 0) {

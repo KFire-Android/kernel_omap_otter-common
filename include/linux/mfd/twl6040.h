@@ -180,6 +180,7 @@ struct twl6040_codec_data {
 	u16 hs_right_step;
 	u16 hf_left_step;
 	u16 hf_right_step;
+	u16 amic_bias_settle_ms;
 };
 
 struct twl6040_vibra_data {
