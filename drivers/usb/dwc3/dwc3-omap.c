@@ -213,6 +213,7 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 	struct dwc3_omap	*omap;
 	struct resource		*res;
 	struct device		*dev = &pdev->dev;
+	struct resource		dwc3_res[2];
 
 	int			devid;
 	int			size;
@@ -239,7 +240,7 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		dev_err(dev, "missing memory base resource\n");
 		return -EINVAL;
@@ -342,8 +343,33 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 
 	dwc3_omap_writel(omap->base, USBOTGSS_IRQENABLE_SET_1, reg);
 
-	ret = platform_device_add_resources(dwc3, pdev->resource,
-			pdev->num_resources);
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if (!res) {
+		dev_err(&pdev->dev, "missing memory base resource for dwc3\n");
+		ret = -EINVAL;
+		goto err2;
+	}
+
+	memset(dwc3_res, 0, sizeof(dwc3_res));
+
+	dwc3_res[0].start	= res->start;
+	dwc3_res[0].end		= res->end;
+	dwc3_res[0].flags	= res->flags;
+	dwc3_res[0].name	= res->name;
+
+	irq = platform_get_irq(pdev, 0);
+	if (irq < 0) {
+		dev_err(&pdev->dev, "missing IRQ\n");
+		ret = -EINVAL;
+		goto err2;
+	}
+
+	dwc3_res[1].start	= irq;
+	dwc3_res[1].flags	= IORESOURCE_IRQ;
+	dwc3_res[1].name	= res->name;
+
+	ret = platform_device_add_resources(dwc3, dwc3_res,
+							ARRAY_SIZE(dwc3_res));
 	if (ret) {
 		dev_err(dev, "couldn't add resources to dwc3 device\n");
 		goto err2;
