@@ -43,6 +43,7 @@
 #include <linux/spinlock.h>
 #include <linux/platform_device.h>
 #include <linux/platform_data/dwc3-omap.h>
+#include <linux/pm_runtime.h>
 #include <linux/dma-mapping.h>
 #include <linux/ioport.h>
 #include <linux/io.h>
@@ -281,6 +282,9 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 	omap->base	= base;
 	omap->dwc3	= dwc3;
 
+	pm_runtime_enable(dev);
+	pm_runtime_get_sync(dev);
+
 	reg = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
 
 	utmi_mode = of_get_property(node, "utmi-mode", &size);
@@ -397,6 +401,9 @@ static int __devexit dwc3_omap_remove(struct platform_device *pdev)
 	struct dwc3_omap	*omap = platform_get_drvdata(pdev);
 
 	platform_device_unregister(omap->dwc3);
+
+	pm_runtime_put(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 
 	dwc3_put_device_id(omap->dwc3->id);
 
