@@ -31,20 +31,43 @@
 
 #include "omap-abe-priv.h"
 /* #include "abe/abe_main.h" */
+#include "abe/abe_aess.h"
 
 void omap_abe_pm_get(struct snd_soc_platform *platform)
 {
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 }
 EXPORT_SYMBOL_GPL(omap_abe_pm_get);
 
 void omap_abe_pm_put(struct snd_soc_platform *platform)
 {
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 }
 EXPORT_SYMBOL_GPL(omap_abe_pm_put);
+
+int omap_abe_pm_runtime_get_sync(struct omap_abe *abe)
+{
+	int ret;
+	ret = pm_runtime_get_sync(abe->dev);
+	if (!ret)
+		omap_aess_set_auto_gating(abe->aess);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(omap_abe_pm_runtime_get_sync);
+
+int omap_abe_pm_runtime_put_sync(struct omap_abe *abe)
+{
+	return pm_runtime_put_sync(abe->dev);
+}
+EXPORT_SYMBOL_GPL(omap_abe_pm_runtime_put_sync);
+
+int omap_abe_pm_runtime_put_sync_suspend(struct omap_abe *abe)
+{
+	return pm_runtime_put_sync_suspend(abe->dev);
+}
+EXPORT_SYMBOL_GPL(omap_abe_pm_runtime_put_sync_suspend);
 
 void omap_abe_pm_shutdown(struct snd_soc_platform *platform)
 {
@@ -160,7 +183,7 @@ int abe_pm_suspend(struct snd_soc_dai *dai)
 	if (!dai->active)
 		return 0;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 
 	switch (dai->id) {
 	case OMAP_ABE_DAI_PDM_UL:
@@ -196,7 +219,7 @@ int abe_pm_suspend(struct snd_soc_dai *dai)
 		break;
 	}
 
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 	return ret;
 }
 
@@ -217,7 +240,7 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 
 	abe->context_lost = abe->get_context_lost_count(abe->dev);
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 
 	if (abe->device_scale) {
 		ret = abe->device_scale(abe->dev, abe->dev,
@@ -280,7 +303,7 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 	for (i = 0; i < OMAP_ABE_NUM_MONO_MIXERS; i++)
 		abe_mixer_enable_mono(abe, MIX_DL1_MONO + i, abe->mixer.mono[i]);
 out:
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 	return ret;
 }
 #endif

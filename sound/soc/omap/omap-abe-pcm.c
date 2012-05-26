@@ -872,7 +872,7 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 	dev_dbg(dai->dev, "%s: %s\n", __func__, dai->name);
 	abe->dai.num_active++;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 
 	if (dai->id == OMAP_ABE_FRONTEND_DAI_MODEM) {
 
@@ -895,7 +895,7 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 	return 0;
 
 err:
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 	abe->dai.num_active--;
 	return ret;
 }
@@ -1179,7 +1179,7 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 		}
 	}
 
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	abe->dai.num_active--;
 }

@@ -75,10 +75,10 @@ irqreturn_t abe_irq_handler(int irq, void *dev_id)
 {
 	struct omap_abe *abe = dev_id;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 	omap_aess_clear_irq(abe->aess);
 	omap_aess_irq_processing(abe->aess);
-	pm_runtime_put_sync_suspend(abe->dev);
+	omap_abe_pm_runtime_put_sync_suspend(abe);
 	return IRQ_HANDLED;
 }
 
@@ -135,7 +135,7 @@ static int aess_open(struct snd_pcm_substream *substream)
 		goto out;
 	}
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 
 	if (!abe->active++) {
 		abe->opp.level = 0;
@@ -246,7 +246,7 @@ static int aess_close(struct snd_pcm_substream *substream)
 		 * if ABE is still active */
 		abe_opp_recalc_level(abe);
 	}
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	mutex_unlock(&abe->mutex);
 	return 0;

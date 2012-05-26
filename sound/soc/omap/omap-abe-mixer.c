@@ -174,7 +174,7 @@ static int put_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 
 	if (ucontrol->value.integer.value[0]) {
 		abe->opp.widget[mc->reg] |= ucontrol->value.integer.value[0]<<mc->shift;
@@ -186,7 +186,7 @@ static int put_mixer(struct snd_kcontrol *kcontrol,
 		omap_aess_disable_gain(abe->aess, mc->reg);
 	}
 
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 	return 1;
 }
 
@@ -223,9 +223,9 @@ int abe_mixer_enable_mono(struct omap_abe *abe, int id, int enable)
 		return -EINVAL;
 	}
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 	omap_aess_mono_mixer(abe->aess, mixer, enable);
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	return 0;
 }
@@ -286,7 +286,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 		return 0;
 	}
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 
 	/* TODO: remove the gap */
 	if (reg < 8) {
@@ -307,7 +307,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 		abe->opp.widget[e->reg] = 0;
 
 	snd_soc_dapm_mux_update_power(widget, kcontrol, mux, e);
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	return 1;
 }
@@ -354,7 +354,7 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 
 	if (ucontrol->value.integer.value[0]) {
 		abe->opp.widget[mc->reg] |= ucontrol->value.integer.value[0]<<mc->shift;
@@ -363,7 +363,7 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 		abe->opp.widget[mc->reg] &= ~(0x1<<mc->shift);
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 	}
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	return 1;
 }
@@ -377,11 +377,11 @@ static int volume_put_mixer(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 
 	omap_aess_write_mixer(abe->aess, mc->reg, abe_val_to_gain(ucontrol->value.integer.value[0]));
 
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	return 1;
 }
@@ -394,13 +394,13 @@ static int volume_put_gain(struct snd_kcontrol *kcontrol,
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 	/*SEBG: Ramp 2ms */
 	omap_aess_write_gain(abe->aess, mc->shift,
 		       abe_val_to_gain(ucontrol->value.integer.value[0]));
 	omap_aess_write_gain(abe->aess, mc->rshift,
 		       abe_val_to_gain(ucontrol->value.integer.value[1]));
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	return 1;
 }
@@ -414,10 +414,10 @@ static int volume_get_mixer(struct snd_kcontrol *kcontrol,
 		(struct soc_mixer_control *)kcontrol->private_value;
 	u32 val;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 	omap_aess_read_mixer(abe->aess, mc->reg, &val);
 	ucontrol->value.integer.value[0] = abe_gain_to_val(val);
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	return 0;
 }
@@ -432,12 +432,12 @@ static int volume_get_gain(struct snd_kcontrol *kcontrol,
 		(struct soc_mixer_control *)kcontrol->private_value;
 	u32 val;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 	omap_aess_read_gain(abe->aess, mc->shift, &val);
 	ucontrol->value.integer.value[0] = abe_gain_to_val(val);
 	omap_aess_read_gain(abe->aess, mc->rshift, &val);
 	ucontrol->value.integer.value[1] = abe_gain_to_val(val);
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	return 0;
 }
@@ -460,9 +460,9 @@ int abe_mixer_set_equ_profile(struct omap_abe *abe,
 		len * sizeof(u32));
 	abe->equ.profile[id] = profile;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 	omap_aess_write_equalizer(abe->aess, id + 1, (struct omap_aess_equ *)&equ_params);
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	return 0;
 }
