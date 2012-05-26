@@ -41,6 +41,7 @@
 #include <linux/slab.h>
 #include <linux/highmem.h>
 #include <linux/sched.h>
+#include <linux/scatterlist.h>
 
 #include "img_defs.h"
 #include "services.h"
@@ -1119,50 +1120,101 @@ NewIONLinuxMemArea(IMG_UINT32 ui32Bytes, IMG_UINT32 ui32AreaFlags,
 
     ui32ProcID = OSGetCurrentProcessIDKM();
 
-    /* We do not care about what the first (Y) buffer offset would be,
-     * but we do care for the UV buffers to be co-aligned with Y
-     * This for SGX to find the UV offset solely based on the height
-     * and stride of the YUV buffer.This is very important for OMAP4470
-     * and later chipsets, where SGX version is 544. 544 and later use
-     * non-shader based YUV to RGB conversion unit that require
-     * contiguous GPU virtual space */
-    for(i = 0; i < ui32NumHandlesPerFd; i++)
-    {
-        memcpy(&asAllocData[i], &pbPrivData[i * ui32AllocDataLen], ui32AllocDataLen);
-        asAllocData[i].token = ui32ProcID;
+	memcpy(&asAllocData[0], &pbPrivData[0 * ui32AllocDataLen], ui32AllocDataLen);
+	/* FIXME This should use a flag to indicate a system heap buffer, instead
+	 * of using h == 1. */
+	if (asAllocData[0].h != 1) {
+		/* We do not care about what the first (Y) buffer offset would be,
+		 * but we do care for the UV buffers to be co-aligned with Y
+		 * This for SGX to find the UV offset solely based on the height
+		 * and stride of the YUV buffer.This is very important for OMAP4470
+		 * and later chipsets, where SGX version is 544. 544 and later use
+		 * non-shader based YUV to RGB conversion unit that require
+		 * contiguous GPU virtual space */
+		for(i = 0; i < ui32NumHandlesPerFd; i++)
+		{
+			/* already copied for i == 0 above */
+			if(i != 0)
+				memcpy(&asAllocData[i], &pbPrivData[i * ui32AllocDataLen], ui32AllocDataLen);
+			asAllocData[i].token = ui32ProcID;
 
-        if((i == 0) || (!TILER_ENABLE_CO_ALIGNED_BUFFER_ALLOCATIONS))
-        {
-            /* Tiler API says:
-             * Allocate first buffer with the required alignment
-             * and an offset of 0 ... */
-            asAllocData[i].out_align = CONFIG_TILER_GRANULARITY;
-            asAllocData[i].offset = 0;
-        }
-        else
-        {  /*  .. Then for the second buffer, use the offset from the first
-            * buffer with alignment of PAGE_SIZE */
-            asAllocData[i].out_align = PAGE_SIZE;
-            asAllocData[i].offset = asAllocData[0].offset;
-        }
+			if((i == 0) || (!TILER_ENABLE_CO_ALIGNED_BUFFER_ALLOCATIONS))
+			{
+				/* Tiler API says:
+				 * Allocate first buffer with the required alignment
+				 * and an offset of 0 ... */
+				asAllocData[i].out_align = CONFIG_TILER_GRANULARITY;
+				asAllocData[i].offset = 0;
+			}
+			else
+			{  /*  .. Then for the second buffer, use the offset from the first
+				* buffer with alignment of PAGE_SIZE */
+				asAllocData[i].out_align = PAGE_SIZE;
+				asAllocData[i].offset = asAllocData[0].offset;
+			}
 
-        if(omap_ion_tiler_alloc(gpsIONClient, &asAllocData[i]) < 0)
-        {
-            PVR_DPF((PVR_DBG_ERROR, "%s: Failed to allocate via ion_tiler",
-                                                                 __func__));
-            goto err_free;
-        }
+			if(omap_ion_tiler_alloc(gpsIONClient, &asAllocData[i]) < 0)
+			{
+				PVR_DPF((PVR_DBG_ERROR, "%s: Failed to allocate via ion_tiler",
+																	 __func__));
+				goto err_free;
+			}
 
-        if (omap_tiler_pages(gpsIONClient, asAllocData[i].handle, &iNumPages[i],
-                              &pu32PageAddrs[i]) < 0)
-        {
-            PVR_DPF((PVR_DBG_ERROR, "%s: Failed to compute tiler pages",
-                                 __func__));
-            goto err_free;
-        }
-    }
+			if (omap_tiler_pages(gpsIONClient, asAllocData[i].handle, &iNumPages[i],
+								  &pu32PageAddrs[i]) < 0)
+			{
+				PVR_DPF((PVR_DBG_ERROR, "%s: Failed to compute tiler pages",
+									 __func__));
+				goto err_free;
+			}
+		}
+	} else {
+		struct scatterlist *sg, *sglist;
+		int size;
+		int n_pages;
+		int j;
 
-    
+		i = 0;
+
+		memcpy(&asAllocData[i], &pbPrivData[i * ui32AllocDataLen], ui32AllocDataLen);
+		asAllocData[i].token = ui32ProcID;
+
+		asAllocData[i].out_align = CONFIG_TILER_GRANULARITY;
+		asAllocData[i].offset = 0;
+
+		size = asAllocData[i].w;
+		size = PAGE_ALIGN(size);
+
+		asAllocData[i].handle = ion_alloc (gpsIONClient,
+				ui32Bytes,
+				PAGE_SIZE, (1<<OMAP_ION_HEAP_SYSTEM));
+		if (asAllocData[i].handle == NULL)
+		{
+			PVR_DPF((PVR_DBG_ERROR, "%s: Failed to allocate via ion_alloc",
+						__func__));
+			goto err_free;
+		}
+
+		sglist = ion_map_dma (gpsIONClient, asAllocData[i].handle);
+		if (sglist == NULL)
+		{
+			PVR_DPF((PVR_DBG_ERROR, "%s: Failed to compute pages",
+						__func__));
+			goto err_free;
+		}
+
+		n_pages = (ui32Bytes >> PAGE_SHIFT);
+		pu32PageAddrs[i] = kmalloc (sizeof(u32) * n_pages, GFP_KERNEL);
+
+		for_each_sg (sglist, sg, n_pages, j) {
+			pu32PageAddrs[i][j] = sg_phys (sg);
+		}
+
+		iNumPages[0] = n_pages;
+		iNumPages[1] = 0;
+	}
+
+
     BUG_ON(ui32Bytes != (iNumPages[0] + iNumPages[1]) * PAGE_SIZE);
     BUG_ON(sizeof(IMG_CPU_PHYADDR) != sizeof(int));
 

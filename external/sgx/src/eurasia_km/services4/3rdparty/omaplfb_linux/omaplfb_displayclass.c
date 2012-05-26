@@ -1078,7 +1078,8 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		/* only supporting Post2, cloned and fbmem layers */
 		if (psDssData->ovls[i].addressing != OMAP_DSS_BUFADDR_LAYER_IX &&
 		    psDssData->ovls[i].addressing != OMAP_DSS_BUFADDR_OVL_IX &&
-		    psDssData->ovls[i].addressing != OMAP_DSS_BUFADDR_FB)
+		    psDssData->ovls[i].addressing != OMAP_DSS_BUFADDR_FB &&
+		    psDssData->ovls[i].addressing != OMAP_DSS_BUFADDR_ION)
 			psDssData->ovls[i].cfg.enabled = false;
 
 		if (psDssData->ovls[i].addressing != OMAP_DSS_BUFADDR_LAYER_IX)
