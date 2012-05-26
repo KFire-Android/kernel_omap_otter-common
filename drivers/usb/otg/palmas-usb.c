@@ -31,6 +31,7 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/usb/otg.h>
+#include <linux/usb/omap_usb.h>
 #include <linux/regulator/consumer.h>
 #include <linux/err.h>
 #include <linux/notifier.h>
@@ -204,16 +205,20 @@ static void palmas_set_vbus_work(struct work_struct *data)
 		regulator_disable(palmas_usb->vbus_reg);
 }
 
-static int palmas_set_vbus(struct palmas_usb *palmas_usb, bool enabled)
+static int palmas_set_vbus(struct phy_companion *comparator, bool enabled)
 {
+	struct palmas_usb *palmas_usb = comparator_to_palmas(comparator);
+
 	palmas_usb->vbus_enable = enabled;
 	schedule_work(&palmas_usb->set_vbus_work);
 
 	return 0;
 }
 
-static int palmas_start_srp(struct palmas_usb *palmas_usb)
+static int palmas_start_srp(struct phy_companion *comparator)
 {
+	struct palmas_usb *palmas_usb = comparator_to_palmas(comparator);
+
 	palmas_usb_write(palmas_usb->palmas, PALMAS_USB_VBUS_CTRL_SET,
 			USB_VBUS_CTRL_SET_VBUS_DISCHRG |
 			USB_VBUS_CTRL_SET_VBUS_IADP_SINK);
@@ -254,6 +259,11 @@ static int __devinit palmas_usb_probe(struct platform_device *pdev)
 	palmas_usb->irq4	= platform_get_irq(pdev, 3);
 
 	palmas_usb_wakeup(palmas, pdata->usb_pdata->wakeup);
+
+	palmas_usb->comparator.set_vbus	= palmas_set_vbus;
+	palmas_usb->comparator.start_srp = palmas_start_srp;
+
+	omap_usb2_set_comparator(&palmas_usb->comparator);
 
 	/* init spinlock for workqueue */
 	spin_lock_init(&palmas_usb->lock);

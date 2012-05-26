@@ -18,6 +18,7 @@
 #include <linux/usb/otg.h>
 #include <linux/leds.h>
 #include <linux/regmap.h>
+#include <linux/usb/phy_companion.h>
 
 #define PALMAS_ID_TWL6035		1
 #define PALMAS_ID_TPS65913		2
@@ -397,6 +398,8 @@ extern int palmas_is_enabled_sysen2(struct palmas_resource *resource);
 struct palmas_usb {
 	struct palmas *palmas;
 	struct device *dev;
+
+	struct phy_companion	comparator;
 
 	/* for vbus reporting with irqs disabled */
 	spinlock_t lock;
