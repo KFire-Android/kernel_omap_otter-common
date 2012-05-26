@@ -758,7 +758,11 @@ static void omap_init_ocp2scp(void)
 	const char		*oh_name, *name;
 	struct omap_ocp2scp_platform_data *pdata;
 
-	oh_name = "ocp2scp_usb_phy";
+	if (cpu_is_omap44xx())
+		oh_name = "ocp2scp_usb_phy";
+	else
+		oh_name = "ocp2scp1";
+
 	name	= "omap-ocp2scp";
 
 	oh = omap_hwmod_lookup(oh_name);
