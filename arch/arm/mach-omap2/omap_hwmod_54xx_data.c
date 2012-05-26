@@ -6184,6 +6184,7 @@ static struct omap_hwmod omap54xx_usb_otg_ss_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_usb_otg_ss_slaves),
 	.masters	= omap54xx_usb_otg_ss_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_usb_otg_ss_masters),
+	.flags		= HWMOD_SWSUP_SIDLE,
 };
 
 /*
