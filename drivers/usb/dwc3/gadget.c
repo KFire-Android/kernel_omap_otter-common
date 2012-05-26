@@ -1906,6 +1906,8 @@ static void dwc3_clear_stall_all_ep(struct dwc3 *dwc)
 
 static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc)
 {
+	u32			reg;
+
 	dev_vdbg(dwc->dev, "%s\n", __func__);
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
