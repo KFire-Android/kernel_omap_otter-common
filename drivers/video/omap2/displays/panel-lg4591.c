@@ -497,6 +497,9 @@ static int lg4591_power_on(struct omap_dss_device *dssdev)
 	struct lg4591_data *lg_d = dev_get_drvdata(&dssdev->dev);
 	int r;
 
+	/* At power on the first vsync has not been received yet */
+	dssdev->first_vsync = false;
+
 	if (lg_d->pdata->set_power)
 		lg_d->pdata->set_power(true);
 
