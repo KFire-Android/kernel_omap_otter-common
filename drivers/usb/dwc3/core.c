@@ -136,6 +136,7 @@ static void dwc3_core_soft_reset(struct dwc3 *dwc)
 	reg |= DWC3_GUSB2PHYCFG_PHYSOFTRST;
 	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
 
+	usb_phy_init(dwc->usb3_phy);
 	mdelay(100);
 
 	/* Clear USB3 PHY reset */
@@ -429,17 +430,34 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 	dwc = PTR_ALIGN(mem, DWC3_ALIGN_MASK + 1);
 	dwc->mem = mem;
 
+	dwc->usb2_phy = usb_get_phy(USB_PHY_TYPE_USB2);
+	if (!dwc->usb2_phy) {
+		dev_err(dev, "no usb2 phy configured\n");
+		return -ENODEV;
+	}
+
+	dwc->usb3_phy = usb_get_phy(USB_PHY_TYPE_USB3);
+	if (!dwc->usb3_phy) {
+		dev_err(dev, "no usb3 phy configured\n");
+		ret = -ENODEV;
+		goto err0;
+	}
+
+	usb_phy_init(dwc->usb2_phy);
+
 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (!res) {
 		dev_err(dev, "missing IRQ\n");
-		return -ENODEV;
+		ret = -ENODEV;
+		goto err1;
 	}
 	dwc->xhci_resources[1] = *res;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		dev_err(dev, "missing memory resource\n");
-		return -ENODEV;
+		ret = -ENODEV;
+		goto err1;
 	}
 	dwc->xhci_resources[0] = *res;
 	dwc->xhci_resources[0].end = dwc->xhci_resources[0].start +
@@ -454,13 +472,15 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 			dev_name(dev));
 	if (!res) {
 		dev_err(dev, "can't request mem region\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto err1;
 	}
 
 	regs = devm_ioremap(dev, res->start, resource_size(res));
 	if (!regs) {
 		dev_err(dev, "ioremap failed\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto err1;
 	}
 
 	spin_lock_init(&dwc->lock);
@@ -488,10 +508,13 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 	pm_runtime_get_sync(dev);
 	pm_runtime_forbid(dev);
 
+	usb_phy_set_suspend(dwc->usb2_phy, 0);
+	usb_phy_set_suspend(dwc->usb3_phy, 0);
+
 	ret = dwc3_core_init(dwc);
 	if (ret) {
 		dev_err(dev, "failed to initialize core\n");
-		return ret;
+		goto err1;
 	}
 
 	mode = DWC3_MODE(dwc->hwparams.hwparams0);
@@ -502,7 +525,7 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 		ret = dwc3_gadget_init(dwc);
 		if (ret) {
 			dev_err(dev, "failed to initialize gadget\n");
-			goto err1;
+			goto err2;
 		}
 		break;
 	case DWC3_MODE_HOST:
@@ -510,7 +533,7 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 		ret = dwc3_host_init(dwc);
 		if (ret) {
 			dev_err(dev, "failed to initialize host\n");
-			goto err1;
+			goto err2;
 		}
 		break;
 	case DWC3_MODE_DRD:
@@ -518,32 +541,32 @@ static int __devinit dwc3_probe(struct platform_device *pdev)
 		ret = dwc3_host_init(dwc);
 		if (ret) {
 			dev_err(dev, "failed to initialize host\n");
-			goto err1;
+			goto err2;
 		}
 
 		ret = dwc3_gadget_init(dwc);
 		if (ret) {
 			dev_err(dev, "failed to initialize gadget\n");
-			goto err1;
+			goto err2;
 		}
 		break;
 	default:
 		dev_err(dev, "Unsupported mode of operation %d\n", mode);
-		goto err1;
+		goto err2;
 	}
 	dwc->mode = mode;
 
 	ret = dwc3_debugfs_init(dwc);
 	if (ret) {
 		dev_err(dev, "failed to initialize debugfs\n");
-		goto err2;
+		goto err3;
 	}
 
 	pm_runtime_allow(dev);
 
 	return 0;
 
-err2:
+err3:
 	switch (mode) {
 	case DWC3_MODE_DEVICE:
 		dwc3_gadget_exit(dwc);
@@ -560,8 +583,14 @@ err2:
 		break;
 	}
 
-err1:
+err2:
 	dwc3_core_exit(dwc);
+
+err1:
+	usb_put_phy(dwc->usb3_phy);
+
+err0:
+	usb_put_phy(dwc->usb2_phy);
 
 	return ret;
 }
@@ -595,6 +624,12 @@ static int __devexit dwc3_remove(struct platform_device *pdev)
 	}
 
 	dwc3_core_exit(dwc);
+
+	usb_phy_set_suspend(dwc->usb3_phy, 1);
+	usb_phy_set_suspend(dwc->usb2_phy, 1);
+
+	usb_put_phy(dwc->usb3_phy);
+	usb_put_phy(dwc->usb2_phy);
 
 	return 0;
 }
