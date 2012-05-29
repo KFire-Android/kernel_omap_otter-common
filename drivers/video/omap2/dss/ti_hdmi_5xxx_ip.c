@@ -819,7 +819,7 @@ static void ti_hdmi_5xxx_core_audio_config(struct hdmi_ip_data *ip_data,
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS3, 1, 4, 4);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS1, cfg->cts, 7, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS2, cfg->cts >> 8, 7, 0);
-	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS2,
+	REG_FLD_MOD(core_sys_base, HDMI_CORE_AUD_CTS3,
 		cfg->cts >> 16, 3, 0);
 
 	/* Layout of Audio Sample Packets: 2-channel */
