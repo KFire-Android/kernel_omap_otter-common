@@ -1190,6 +1190,7 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 		.codec_name = "twl6040-codec",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.ignore_pmdown_time = 1, /* Power down without delay */
 		.init = omap_abe_twl6040_dl2_init,
 		.ops = &omap_abe_mcpdm_ops,
 		.be_id = OMAP_ABE_DAI_PDM_DL2,
