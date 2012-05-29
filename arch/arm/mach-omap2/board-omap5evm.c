@@ -42,6 +42,7 @@
 #include <plat/omap_apps_brd_id.h>
 #include <plat/drm.h>
 #include <plat/remoteproc.h>
+#include <plat/usb.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-lg4591.h>
@@ -972,6 +973,7 @@ static void __init omap_5430evm_init(void)
 		pr_err("Keypad initialization failed: %d\n", status);
 
 	omap_hsmmc_init(mmc);
+	usb_dwc3_init();
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
 
 	omap_init_dmm_tiler();

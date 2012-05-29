@@ -1361,16 +1361,6 @@ static struct clk wkupaon_clk_mux = {
 
 /* Leaf clocks controlled by modules */
 
-static struct clk ocp2scp1_ick = {
-	.name		= "ocp2scp1_ick",
-	.ops		= &clkops_omap2_dflt,
-	.enable_reg	= OMAP54XX_CM_L3INIT_OCP2SCP1_CLKCTRL,
-	.enable_bit	= OMAP54XX_MODULEMODE_HWCTRL,
-	.clkdm_name	= "l3init_clkdm",
-	.parent		= &l4_div_ck,
-	.recalc		= &followparent_recalc,
-};
-
 static struct clk ocp2scp3_ick = {
 	.name		= "ocp2scp3_ick",
 	.ops		= &clkops_omap2_dflt,
@@ -2574,7 +2564,6 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"per_abe_24m_fclk",		&per_abe_24m_fclk,	CK_54XX),
 	CLK(NULL,	"syc_clk_div",			&syc_clk_div,	CK_54XX),
 	CLK(NULL,	"wkupaon_clk_mux",		&wkupaon_clk_mux,	CK_54XX),
-	CLK(NULL,	"ocp2scp1_ick",			&ocp2scp1_ick,	CK_54XX),
 	CLK(NULL,	"ocp2scp3_ick",			&ocp2scp3_ick,	CK_54XX),
 	CLK(NULL,	"dss_32khz_clk",		&dss_32khz_clk,	CK_54XX),
 	CLK(NULL,	"dss_48mhz_clk",		&dss_48mhz_clk,	CK_54XX),

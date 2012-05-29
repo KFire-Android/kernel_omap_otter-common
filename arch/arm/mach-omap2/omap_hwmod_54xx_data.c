@@ -18,6 +18,7 @@
  */
 
 #include <linux/io.h>
+#include <linux/omap_ocp2scp.h>
 
 #include <plat/omap_hwmod.h>
 #include <plat/cpu.h>
@@ -775,7 +776,6 @@ static struct omap_hwmod omap54xx_mpu_private_hwmod = {
  *  mpu_c0
  *  mpu_c1
  *  ocmc_ram
- *  ocp2scp1
  *  ocp2scp2
  *  ocp2scp3
  *  ocp_wp_noc
@@ -4604,6 +4604,112 @@ static struct omap_hwmod omap54xx_mpu_hwmod = {
 };
 
 /*
+ * 'ocp2scp' class
+ * bridge to transform ocp interface protocol to scp (serial control port)
+ * protocol
+ */
+static struct omap_hwmod_class_sysconfig omap54xx_ocp2scp_sysc = {
+	.rev_offs	= 0x0000,
+	.sysc_offs	= 0x0010,
+	.syss_offs	= 0x0014,
+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
+			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+	.sysc_fields	= &omap_hwmod_sysc_type1,
+};
+
+static struct omap_hwmod_class omap54xx_ocp2scp_hwmod_class = {
+	.name	= "ocp2scp",
+	.sysc	= &omap54xx_ocp2scp_sysc,
+};
+
+/* ocp2scp dev_attr */
+static struct resource omap54xx_usb2_phy_and_pll_addrs[] = {
+	{
+		.name		= "usb_phy",
+		.start		= 0x4a084000,
+		.end		= 0x4a08407c,
+		.flags		= IORESOURCE_MEM,
+	},
+	{ }
+};
+
+static struct resource omap54xx_usb3_phy_and_pll_addrs[] = {
+	{
+		.name		= "usb_phy_rx",
+		.start		= 0x4a084400,
+		.end		= 0x4a084480,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.name		= "usb_phy_tx",
+		.start		= 0x4a084800,
+		.end		= 0x4a084864,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.name		= "pll_ctrl",
+		.start		= 0x4a084c00,
+		.end		= 0x4a084c40,
+		.flags		= IORESOURCE_MEM,
+	},
+	{ }
+};
+
+static struct omap_ocp2scp_dev ocp2scp_dev_attr[] = {
+	{
+		.drv_name       = "omap-usb2",
+		.res		= omap54xx_usb2_phy_and_pll_addrs,
+	},
+	{
+		.drv_name       = "omap-usb3",
+		.res		= omap54xx_usb3_phy_and_pll_addrs,
+	},
+	{ }
+};
+
+/* ocp2scp1 */
+static struct omap_hwmod omap54xx_ocp2scp1_hwmod;
+static struct omap_hwmod_addr_space omap54xx_ocp2scp1_addrs[] = {
+	{
+		.pa_start	= 0x4a080000,
+		.pa_end		= 0x4a08001f,
+		.flags		= ADDR_TYPE_RT
+	},
+	{ }
+};
+
+/* l4_cfg -> ocp2scp1 */
+static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ocp2scp1 = {
+	.master		= &omap54xx_l4_cfg_hwmod,
+	.slave		= &omap54xx_ocp2scp1_hwmod,
+	.clk		= "l4_div_ck",
+	.addr		= omap54xx_ocp2scp1_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* ocp2scp1 slave ports */
+static struct omap_hwmod_ocp_if *omap54xx_ocp2scp1_slaves[] = {
+	&omap54xx_l4_cfg__ocp2scp1,
+};
+
+static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
+	.name		= "ocp2scp1",
+	.class		= &omap54xx_ocp2scp_hwmod_class,
+	.clkdm_name	= "l3init_clkdm",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_L3INIT_OCP2SCP1_CLKCTRL_OFFSET,
+			.context_offs = OMAP54XX_RM_L3INIT_OCP2SCP1_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_HWCTRL,
+		},
+	},
+	.dev_attr	= ocp2scp_dev_attr,
+	.slaves		= omap54xx_ocp2scp1_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap54xx_ocp2scp1_slaves),
+};
+
+/*
  * 'sata' class
  * sata:  serial ata interface  gen2 compliant   ( 1 rx/ 1 tx)
  */
@@ -6028,9 +6134,15 @@ static struct omap_hwmod_ocp_if *omap54xx_usb_otg_ss_masters[] = {
 
 static struct omap_hwmod_addr_space omap54xx_usb_otg_ss_addrs[] = {
 	{
-		.pa_start	= 0x4a020000,
-		.pa_end		= 0x4a03ffff,
-		.flags		= ADDR_TYPE_RT
+		.name           = "wrapper",
+		.pa_start       = 0x4a020000,
+		.pa_end         = 0x4a02ffff,
+		.flags          = ADDR_TYPE_RT
+	}, {
+		.name           = "dwc_usb3",
+		.pa_start       = 0x4a030000,
+		.pa_end         = 0x4a03ffff,
+		.flags          = ADDR_TYPE_RT
 	},
 	{ }
 };
@@ -6072,6 +6184,7 @@ static struct omap_hwmod omap54xx_usb_otg_ss_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_usb_otg_ss_slaves),
 	.masters	= omap54xx_usb_otg_ss_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_usb_otg_ss_masters),
+	.flags		= HWMOD_SWSUP_SIDLE,
 };
 
 /*
@@ -6411,6 +6524,9 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 
 	/* mpu class */
 	&omap54xx_mpu_hwmod,
+
+	/* ocp2scp class */
+	&omap54xx_ocp2scp1_hwmod,
 
 	/* sata class */
 	&omap54xx_sata_hwmod,

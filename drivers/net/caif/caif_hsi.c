@@ -399,6 +399,7 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 			netif_rx(skb);
 		else
 			netif_rx_ni(skb);
+		cfhsi_notify_rx(cfhsi);
 
 		/* Update network statistics. */
 		cfhsi->ndev->stats.rx_packets++;
@@ -529,6 +530,7 @@ static int cfhsi_rx_pld(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 			netif_rx(skb);
 		else
 			netif_rx_ni(skb);
+		cfhsi_notify_rx(cfhsi);
 
 		/* Update network statistics. */
 		cfhsi->ndev->stats.rx_packets++;
@@ -840,6 +842,9 @@ static void cfhsi_wake_down(struct work_struct *work)
 	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
 		return;
 
+	/* Clear spurious states (if any) */
+	WARN_ON(test_and_clear_bit(CFHSI_WAKE_DOWN_ACK, &cfhsi->bits));
+
 	/* Deactivate wake line. */
 	cfhsi->dev->cfhsi_wake_down(cfhsi->dev);
 
@@ -889,6 +894,11 @@ static void cfhsi_wake_down(struct work_struct *work)
 	/* Cancel pending RX requests. */
 	cfhsi->dev->cfhsi_rx_cancel(cfhsi->dev);
 
+	/* Release system wake lock */
+	spin_lock_bh(&cfhsi->lock);
+	if (!test_bit(CFHSI_WAKE_UP, &cfhsi->bits))
+		cfhsi_wakelock_unlock(cfhsi);
+	spin_unlock_bh(&cfhsi->lock);
 }
 
 static void cfhsi_out_of_sync(struct work_struct *work)
@@ -917,8 +927,12 @@ static void cfhsi_wake_up_cb(struct cfhsi_drv *drv)
 		return;
 
 	/* Schedule wake up work queue if the peer initiates. */
-	if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits))
+	spin_lock_bh(&cfhsi->lock);
+	if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits)) {
+		cfhsi_wakelock_lock(cfhsi);
 		queue_work(cfhsi->wq, &cfhsi->wake_up_work);
+	}
+	spin_unlock_bh(&cfhsi->lock);
 }
 
 static void cfhsi_wake_down_cb(struct cfhsi_drv *drv)
@@ -997,8 +1011,12 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 	} else {
 		/* Schedule wake up work queue if the we initiate. */
-		if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits))
+		spin_lock_bh(&cfhsi->lock);
+		if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits)) {
+			cfhsi_wakelock_lock(cfhsi);
 			queue_work(cfhsi->wq, &cfhsi->wake_up_work);
+		}
+		spin_unlock_bh(&cfhsi->lock);
 	}
 
 	return 0;
@@ -1158,6 +1176,8 @@ int cfhsi_probe(struct platform_device *pdev)
 	cfhsi->rx_slowpath_timer.data = (unsigned long)cfhsi;
 	cfhsi->rx_slowpath_timer.function = cfhsi_rx_slowpath;
 
+	cfhsi_wakelock_init(cfhsi);
+
 	/* Add CAIF HSI device to list. */
 	spin_lock(&cfhsi_list_lock);
 	list_add_tail(&cfhsi->list, &cfhsi_list);
@@ -1240,6 +1260,8 @@ static void cfhsi_shutdown(struct cfhsi *cfhsi)
 
 	/* Deactivate interface */
 	cfhsi->dev->cfhsi_down(cfhsi->dev);
+
+	cfhsi_wakelock_deinit(cfhsi);
 
 	/* Finally unregister the network device. */
 	unregister_netdev(cfhsi->ndev);
