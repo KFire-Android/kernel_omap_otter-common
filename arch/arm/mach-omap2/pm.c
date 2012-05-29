@@ -288,6 +288,18 @@ static int omap_pm_enter(suspend_state_t suspend_state)
 static int omap_pm_begin(suspend_state_t state)
 {
 	disable_hlt();
+
+	/*
+	 * If any device was in the middle of a scale operation
+	 * then abort, as we cannot predict which part of the scale
+	 * operation we interrupted.
+	 */
+	if (omap_dvfs_is_any_dev_scaling()) {
+		pr_err("%s: oops.. middle of scale op.. aborting suspend\n",
+		       __func__);
+		return -EBUSY;
+	}
+
 	if (cpu_is_omap34xx())
 		omap_prcm_irq_prepare();
 	return 0;
