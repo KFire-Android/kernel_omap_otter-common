@@ -2109,6 +2109,7 @@ enum usb_irq_events {
 #define INT3_LINE_STATE_GPADC_AUTO_1_SHIFT			1
 #define INT3_LINE_STATE_GPADC_AUTO_0				0x01
 #define INT3_LINE_STATE_GPADC_AUTO_0_SHIFT			0
+#define INT3_LINE_STATE_NONE					0x00
 
 /* Bit definitions for INT4_STATUS */
 #define INT4_STATUS_GPIO_7					0x80
