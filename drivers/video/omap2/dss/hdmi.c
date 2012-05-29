@@ -479,11 +479,10 @@ int omapdss_hdmi_set_deepcolor(struct omap_dss_device *dssdev, int val,
 		return 0;
 	}
 
-	omapdss_hdmi_display_disable(dssdev);
-
+	dssdev->driver->disable(dssdev);
+	hdmi.custom_set = true;
 	hdmi.ip_data.cfg.deep_color = val;
-
-	r = omapdss_hdmi_display_enable(dssdev);
+	r = dssdev->driver->enable(dssdev);
 	if (r)
 		return r;
 
@@ -546,12 +545,12 @@ int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 {
 	int r1, r2;
 	/* turn the hdmi off and on to get new timings to use */
-	omapdss_hdmi_display_disable(dssdev);
+	dssdev->driver->disable(dssdev);
 	r1 = hdmi_set_timings(vm, false) ? 0 : -EINVAL;
 	hdmi.custom_set = true;
 	hdmi.code = hdmi.ip_data.cfg.cm.code;
 	hdmi.mode = hdmi.ip_data.cfg.cm.mode;
-	r2 = omapdss_hdmi_display_enable(dssdev);
+	r2 = dssdev->driver->enable(dssdev);
 	return r1 ? : r2;
 }
 
