@@ -546,7 +546,7 @@ static struct rpmsg_device_id rpmsg_proto_id_table[] = {
 };
 MODULE_DEVICE_TABLE(rpmsg, rpmsg_proto_id_table);
 
-static struct rpmsg_driver rpmsg_proto_drv = {
+static struct rpmsg_driver rpmsg_proto_driver = {
 	.drv.name	= KBUILD_MODNAME,
 	.drv.owner	= THIS_MODULE,
 	.id_table	= rpmsg_proto_id_table,
@@ -572,7 +572,7 @@ static int __init rpmsg_proto_init(void)
 	}
 
 	/* gimme rpmsg channels to expose ! */
-	ret = register_rpmsg_driver(&rpmsg_proto_drv);
+	ret = register_rpmsg_driver(&rpmsg_proto_driver);
 	if (ret) {
 		pr_err("register_rpmsg_driver failed: %d\n", ret);
 		goto sock_unreg;
@@ -589,7 +589,7 @@ proto_unreg:
 
 static void __exit rpmsg_proto_exit(void)
 {
-	unregister_rpmsg_driver(&rpmsg_proto_drv);
+	unregister_rpmsg_driver(&rpmsg_proto_driver);
 	sock_unregister(PF_RPMSG);
 	proto_unregister(&rpmsg_proto);
 }
