@@ -43,6 +43,7 @@
 #include <plat/common.h>
 #include <plat/omap4-keypad.h>
 #include <plat/mmc.h>
+#include <plat/usb.h>
 #include "hsmmc.h"
 #include <plat/remoteproc.h>
 #include "common-board-devices.h"
@@ -964,6 +965,7 @@ static void __init omap_5430evm_init(void)
 		pr_err("Keypad initialization failed: %d\n", status);
 
 	omap_hsmmc_init(mmc);
+	usb_dwc3_init();
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
 
 	omap5evm_display_init();
