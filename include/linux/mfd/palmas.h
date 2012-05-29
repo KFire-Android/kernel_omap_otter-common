@@ -19,6 +19,7 @@
 #include <linux/leds.h>
 #include <linux/regmap.h>
 #include <linux/usb/phy_companion.h>
+#include <linux/platform_data/dwc3-omap.h>
 
 #define PALMAS_ID_TWL6035		1
 #define PALMAS_ID_TPS65913		2
@@ -416,7 +417,7 @@ struct palmas_usb {
 
 	int vbus_enable;
 
-	u8 linkstat;
+	enum omap_dwc3_vbus_id_status linkstat;
 };
 
 #define comparator_to_palmas(x) container_of((x), struct palmas_usb, comparator)

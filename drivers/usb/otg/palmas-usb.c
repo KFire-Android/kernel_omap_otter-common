@@ -30,7 +30,6 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
-#include <linux/usb/otg.h>
 #include <linux/usb/omap_usb.h>
 #include <linux/regulator/consumer.h>
 #include <linux/err.h>
@@ -83,13 +82,14 @@ static ssize_t palmas_usb_vbus_show(struct device *dev,
 	spin_lock_irqsave(&palmas_usb->lock, flags);
 
 	switch (palmas_usb->linkstat) {
-	case USB_EVENT_VBUS:
+	case OMAP_DWC3_VBUS_VALID:
 	       ret = snprintf(buf, PAGE_SIZE, "vbus\n");
 	       break;
-	case USB_EVENT_ID:
+	case OMAP_DWC3_ID_GROUND:
 	       ret = snprintf(buf, PAGE_SIZE, "id\n");
 	       break;
-	case USB_EVENT_NONE:
+	case OMAP_DWC3_ID_FLOAT:
+	case OMAP_DWC3_VBUS_OFF:
 	       ret = snprintf(buf, PAGE_SIZE, "none\n");
 	       break;
 	default:
@@ -110,7 +110,7 @@ static irqreturn_t palmas_vbus_irq(int irq, void *_palmas_usb)
 
 static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 {
-	int status = 0;
+	enum omap_dwc3_vbus_id_status status = OMAP_DWC3_UNKNOWN;
 	int vbus_line_state;
 	int slave;
 	unsigned int addr;
@@ -123,14 +123,15 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 
 	if (vbus_line_state == INT3_LINE_STATE_VBUS) {
 		regulator_enable(palmas_usb->vbus_reg);
-		status = USB_EVENT_VBUS;
+		status = OMAP_DWC3_VBUS_VALID;
 	} else if (vbus_line_state == INT3_LINE_STATE_NONE &&
 				palmas_usb->linkstat != OMAP_DWC3_UNKNOWN) {
-		status = USB_EVENT_NONE;
+		status = OMAP_DWC3_VBUS_OFF;
 		regulator_disable(palmas_usb->vbus_reg);
 	}
 
 	palmas_usb->linkstat = status;
+	omap_dwc3_mailbox(status);
 
 	return IRQ_HANDLED;
 }
@@ -144,7 +145,7 @@ static irqreturn_t palmas_id_irq(int irq, void *_palmas_usb)
 
 static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 {
-	int			status = 0;
+	enum omap_dwc3_vbus_id_status status = OMAP_DWC3_UNKNOWN;
 	int			set;
 	struct palmas_usb	*palmas_usb = _palmas_usb;
 
@@ -158,7 +159,7 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 		palmas_usb_write(palmas_usb->palmas,
 						PALMAS_USB_ID_INT_EN_HI_CLR,
 						USB_ID_INT_EN_HI_CLR_ID_GND);
-		status = USB_EVENT_ID;
+		status = OMAP_DWC3_ID_GROUND;
 	} else if (set & USB_ID_INT_SRC_ID_FLOAT) {
 		palmas_usb_write(palmas_usb->palmas,
 						PALMAS_USB_ID_INT_EN_HI_SET,
@@ -167,10 +168,11 @@ static irqreturn_t palmas_id_wakeup_irq(int irq, void *_palmas_usb)
 						PALMAS_USB_ID_INT_EN_HI_CLR,
 						USB_ID_INT_EN_HI_CLR_ID_FLOAT);
 		regulator_disable(palmas_usb->vbus_reg);
-		status = USB_EVENT_NONE;
+		status = OMAP_DWC3_ID_FLOAT;
 	}
 
 	palmas_usb->linkstat = status;
+	omap_dwc3_mailbox(status);
 
 	return IRQ_HANDLED;
 }
