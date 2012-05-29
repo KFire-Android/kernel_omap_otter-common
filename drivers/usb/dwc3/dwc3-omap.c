@@ -187,6 +187,7 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 
 	return;
 }
+EXPORT_SYMBOL_GPL(omap_dwc3_mailbox);
 
 static irqreturn_t dwc3_omap_interrupt(int irq, void *_omap)
 {
@@ -458,7 +459,17 @@ static struct platform_driver dwc3_omap_driver = {
 	},
 };
 
-module_platform_driver(dwc3_omap_driver);
+static int __init dwc3_omap_init(void)
+{
+	return platform_driver_register(&dwc3_omap_driver);
+}
+subsys_initcall(dwc3_omap_init);
+
+static void __exit dwc3_omap_exit(void)
+{
+	platform_driver_unregister(&dwc3_omap_driver);
+}
+module_exit(dwc3_omap_exit);
 
 MODULE_ALIAS("platform:omap-dwc3");
 MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");

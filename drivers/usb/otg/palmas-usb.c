@@ -188,6 +188,11 @@ static int palmas_enable_irq(struct palmas_usb *palmas_usb)
 	palmas_usb_write(palmas_usb->palmas, PALMAS_USB_ID_INT_EN_HI_SET,
 						USB_ID_INT_EN_HI_SET_ID_GND);
 
+	palmas_vbus_wakeup_irq(palmas_usb->irq4, palmas_usb);
+
+	if (palmas_usb->linkstat == OMAP_DWC3_UNKNOWN)
+		palmas_id_wakeup_irq(palmas_usb->irq2, palmas_usb);
+
 	return 0;
 }
 
@@ -382,7 +387,7 @@ static int __init palmas_usb_init(void)
 {
 	return platform_driver_register(&palmas_usb_driver);
 }
-subsys_initcall(palmas_usb_init);
+module_init(palmas_usb_init);
 
 static void __exit palmas_usb_exit(void)
 {
