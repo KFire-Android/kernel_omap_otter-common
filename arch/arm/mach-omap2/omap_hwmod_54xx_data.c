@@ -55,6 +55,7 @@ static struct omap_hwmod omap54xx_dsp_hwmod;
 static struct omap_hwmod omap54xx_dss_hwmod;
 static struct omap_hwmod omap54xx_emif_ocp_fw_hwmod;
 static struct omap_hwmod omap54xx_fdif_hwmod;
+static struct omap_hwmod omap54xx_gpu_hwmod;
 static struct omap_hwmod omap54xx_hsi_hwmod;
 static struct omap_hwmod omap54xx_ipu_hwmod;
 static struct omap_hwmod omap54xx_iss_hwmod;
@@ -351,6 +352,14 @@ static struct omap_hwmod_ocp_if omap54xx_dma_system__l3_main_2 = {
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
 
+/* gpu -> l3_main_2 */
+static struct omap_hwmod_ocp_if omap54xx_gpu__l3_main_2 = {
+	.master		= &omap54xx_gpu_hwmod,
+	.slave		= &omap54xx_l3_main_2_hwmod,
+	.clk		= "l3_div_ck",
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
 /* hsi -> l3_main_2 */
 static struct omap_hwmod_ocp_if omap54xx_hsi__l3_main_2 = {
 	.master		= &omap54xx_hsi_hwmod,
@@ -446,6 +455,7 @@ static struct omap_hwmod_ocp_if omap54xx_usb_otg_ss__l3_main_2 = {
 static struct omap_hwmod_ocp_if *omap54xx_l3_main_2_slaves[] = {
 	&omap54xx_bb2d__l3_main_2,
 	&omap54xx_dma_system__l3_main_2,
+	&omap54xx_gpu__l3_main_2,
 	&omap54xx_hsi__l3_main_2,
 	&omap54xx_ipu__l3_main_2,
 	&omap54xx_iss__l3_main_2,
@@ -756,7 +766,6 @@ static struct omap_hwmod omap54xx_mpu_private_hwmod = {
  *  emif2
  *  fdif
  *  gpmc
- *  gpu
  *  hdq1w
  *  ieee1500_2_ocp
  *  lli
@@ -2484,6 +2493,99 @@ static struct omap_hwmod omap54xx_gpio8_hwmod = {
 	.dev_attr	= &gpio_dev_attr,
 	.slaves		= omap54xx_gpio8_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_gpio8_slaves),
+};
+
+/*
+ * 'gpu' class
+ * 2d/3d graphics accelerator
+ */
+
+static struct omap_hwmod_class_sysconfig omap54xx_gpu_sysc = {
+	.rev_offs	= 0x0000,
+	.sysc_offs	= 0x0010,
+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
+	.idlemodes	= (MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART |
+				SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+				SIDLE_SMART_WKUP),
+	.sysc_fields	= &omap_hwmod_sysc_type2,
+};
+
+static struct omap_hwmod_class omap54xx_gpu_hwmod_class = {
+	.name	= "gpu",
+	.sysc	= &omap54xx_gpu_sysc,
+};
+
+/* gpu */
+static struct omap_hwmod_irq_info omap54xx_gpu_irqs[] = {
+	{ .irq = 21 + OMAP54XX_IRQ_GIC_START },
+	{ .irq = -1 }
+};
+
+/* gpu master ports */
+static struct omap_hwmod_ocp_if *omap54xx_gpu_masters[] = {
+	&omap54xx_gpu__l3_main_2,
+};
+
+static struct omap_hwmod_addr_space omap54xx_gpu_addrs[] = {
+	{
+		.name		= "klio",
+		.pa_start	= 0x56000000,
+		.pa_end		= 0x56001fff,
+	},
+	{
+		.name		= "hydra2",
+		.pa_start	= 0x56004000,
+		.pa_end		= 0x56004fff,
+	},
+	{
+		.name		= "klio_0",
+		.pa_start	= 0x56008000,
+		.pa_end		= 0x56009fff,
+	},
+	{
+		.name		= "klio_1",
+		.pa_start	= 0x5600c000,
+		.pa_end		= 0x5600dfff,
+	},
+	{
+		.name		= "klio_hl",
+		.pa_start	= 0x5600fe00,
+		.pa_end		= 0x5600ffff,
+		.flags		= ADDR_TYPE_RT
+	},
+	{ }
+};
+/* l3_main_2 -> gpu */
+static struct omap_hwmod_ocp_if omap54xx_l3_main_2__gpu = {
+	.master		= &omap54xx_l3_main_2_hwmod,
+	.slave		= &omap54xx_gpu_hwmod,
+	.clk		= "l3_div_ck",
+	.addr		= omap54xx_gpu_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* gpu slave ports */
+static struct omap_hwmod_ocp_if *omap54xx_gpu_slaves[] = {
+	&omap54xx_l3_main_2__gpu,
+};
+
+static struct omap_hwmod omap54xx_gpu_hwmod = {
+	.name		= "gpu",
+	.class		= &omap54xx_gpu_hwmod_class,
+	.clkdm_name	= "gpu_clkdm",
+	.mpu_irqs	= omap54xx_gpu_irqs,
+	.main_clk	= "gpu_core_clk_mux",
+	.prcm = {
+		.omap4 = {
+			.clkctrl_offs = OMAP54XX_CM_GPU_GPU_CLKCTRL_OFFSET,
+			.context_offs = OMAP54XX_RM_GPU_GPU_CONTEXT_OFFSET,
+			.modulemode   = MODULEMODE_SWCTRL,
+		},
+	},
+	.slaves		= omap54xx_gpu_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap54xx_gpu_slaves),
+	.masters	= omap54xx_gpu_masters,
+	.masters_cnt	= ARRAY_SIZE(omap54xx_gpu_masters),
 };
 
 /*
@@ -6251,6 +6353,9 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 	&omap54xx_gpio7_hwmod,
 	&omap54xx_gpio8_hwmod,
 
+	/* gpu class */
+	&omap54xx_gpu_hwmod,
+
 	/* hsi class */
 	&omap54xx_hsi_hwmod,
 
@@ -6361,4 +6466,3 @@ int __init omap54xx_hwmod_init(void)
 {
 	return omap_hwmod_register(omap54xx_hwmods);
 }
-
