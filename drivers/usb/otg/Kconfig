@@ -73,10 +73,19 @@ config TWL6030_USB
 	help
 	  Enable this to support the USB OTG transceiver on TWL6030
 	  family chips. This TWL6030 transceiver has the VBUS and ID GND
-	  and OTG SRP events capabilities. For all other transceiver functionality
-	  UTMI PHY is embedded in OMAP4430. The internal PHY configurations APIs
-	  are hooked to this driver through platform_data structure.
-	  The definition of internal PHY APIs are in the mach-omap2 layer.
+          and OTG SRP events capabilities. For all other transceiver
+	  functionality UTMI PHY is embedded in OMAP4430.
+
+config OMAP_USB2
+	tristate "OMAP USB2 PHY Driver"
+	depends on OMAP_OCP2SCP
+	depends on OMAP4_USB_PHY
+	select USB_OTG_UTILS
+	help
+	  Enable this to support the transceiver that is part of SOC. This
+	  driver takes care of all the PHY functionality apart from comparator.
+	  The USB OTG controller communicates with the comparator using this
+	  driver.
 
 config NOP_USB_XCEIV
 	tristate "NOP USB Transceiver Driver"
