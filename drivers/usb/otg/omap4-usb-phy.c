@@ -25,6 +25,7 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/platform_device.h>
@@ -34,11 +35,11 @@
 /**
  * omap4_usb_phy_power - power on/off the phy using control module reg
  * @dev: struct device *
- * @on: 0 or 1, based on powering on or off the PHY
+ * @on: 0 to off and 1 to on based on powering on or off the PHY
  *
  * omap_usb2 can call this API to power on or off the PHY.
  */
-int omap4_usb_phy_power(struct device *dev, int on)
+int omap4_usb_phy_power(struct device *dev, bool on)
 {
 	u32 val;
 	int ret;
@@ -90,6 +91,50 @@ static int __devinit omap_usb_phy_probe(struct platform_device *pdev)
 
 	return 0;
 }
+
+/**
+ * omap5_usb_phy_power - power on/off the serializer using control module
+ * @dev: struct device *
+ * @on: 0 to off and 1 to on based on powering on or off the PHY
+ *
+ * omap_usb3 can call this API to power on or off the PHY.
+ */
+int omap5_usb_phy_power(struct device *dev, bool on)
+{
+	int ret;
+	u32 val;
+	unsigned long rate;
+	struct clk *sys_clk;
+
+	sys_clk = clk_get(NULL, "sys_clkin");
+	if (IS_ERR(sys_clk)) {
+		pr_err("%s: unable to get sys_clkin\n", __func__);
+		return -EINVAL;
+	}
+
+	rate = clk_get_rate(sys_clk);
+	rate = rate/1000000;
+
+	ret = omap_control_readl(dev, CONTROL_PHY_POWER_USB, &val);
+	if (ret) {
+		pr_err("%s: unable to read register\n", __func__);
+		return ret;
+	}
+
+	if (on) {
+		val &= ~(USB_PWRCTL_CLK_CMD_MASK | USB_PWRCTL_CLK_FREQ_MASK);
+		val |= USB3_PHY_TX_RX_POWERON << USB_PWRCTL_CLK_CMD_SHIFT;
+		val |= rate << USB_PWRCTL_CLK_FREQ_SHIFT;
+	} else {
+		val &= ~USB_PWRCTL_CLK_CMD_MASK;
+		val |= USB3_PHY_TX_RX_POWEROFF << USB_PWRCTL_CLK_CMD_SHIFT;
+	}
+
+	ret = omap_control_writel(dev, val, CONTROL_PHY_POWER_USB);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(omap5_usb_phy_power);
 
 static int __devexit omap_usb_phy_remove(struct platform_device *pdev)
 {
