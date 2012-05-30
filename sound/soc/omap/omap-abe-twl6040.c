@@ -152,33 +152,59 @@ static int mcpdm_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 static int omap_abe_mcpdm_startup(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_codec *codec = rtd->codec;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_card *card = rtd->card;
 	struct omap_abe_twl6040_data *pdata = dev_get_platdata(card->dev);
+	struct twl6040 *twl6040 = codec->control_data;
 	int clk_id, freq;
 	int ret;
 
-	clk_id = twl6040_get_clk_id(rtd->codec);
+	/* twl6040 supplies McPDM PAD_CLKS */
+	ret = twl6040_power(twl6040, 1);
+	if (ret) {
+		dev_err(card->dev, "failed to enable twl6040\n");
+		return ret;
+	}
+
+	clk_id = twl6040_get_clk_id(codec);
 	if (clk_id == TWL6040_SYSCLK_SEL_HPPLL)
 		freq = pdata->mclk_freq;
 	else if (clk_id == TWL6040_SYSCLK_SEL_LPPLL)
 		freq = 32768;
 	else {
 		dev_err(card->dev, "invalid clock\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err;
 	}
 
 	/* set the codec mclk */
 	ret = snd_soc_dai_set_sysclk(codec_dai, clk_id, freq,
 				SND_SOC_CLOCK_IN);
-	if (ret)
+	if (ret) {
 		dev_err(card->dev, "can't set codec system clock\n");
+		goto err;
+	}
 
+	return 0;
+
+err:
+	twl6040_power(twl6040, 0);
 	return ret;
+}
+
+static void omap_abe_mcpdm_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_codec *codec = rtd->codec;
+	struct twl6040 *twl6040 = codec->control_data;
+
+	twl6040_power(twl6040, 0);
 }
 
 static struct snd_soc_ops omap_abe_mcpdm_ops = {
 	.startup = omap_abe_mcpdm_startup,
+	.shutdown = omap_abe_mcpdm_shutdown,
 };
 
 static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
