@@ -154,10 +154,18 @@ static int __devinit omap_control_probe(struct platform_device *pdev)
 	omap_control->dev = dev;
 	spin_lock_init(&omap_control->reglock);
 
-	platform_set_drvdata(pdev, omap_control);
+	if (pdev->dev.platform_data)
+		dev_set_drvdata(dev, omap_control);
+	else
+		platform_set_drvdata(pdev, omap_control);
+
 	omap_control_module = omap_control;
 
-	return of_platform_populate(np, of_omap_control_match, NULL, dev);
+	if (pdev->dev.platform_data)
+		return 0;
+	else
+		return of_platform_populate(np, of_omap_control_match,
+							NULL, dev);
 }
 
 static int __devexit omap_control_remove(struct platform_device *pdev)
@@ -173,7 +181,11 @@ static int __devexit omap_control_remove(struct platform_device *pdev)
 	spin_unlock(&omap_control->reglock);
 
 	iounmap(omap_control->base);
-	platform_set_drvdata(pdev, NULL);
+
+	if (pdev->dev.platform_data)
+		dev_set_drvdata(omap_control->dev, NULL);
+	else
+		platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }

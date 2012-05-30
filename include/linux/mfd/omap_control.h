@@ -40,6 +40,19 @@ struct omap_control {
 	int			use_count;
 };
 
+/**
+ * struct omap_control_data - system control module platform data
+ * @rev: IP revision
+ * @has_usb_phy: flag to determine if this control module has usb phy
+ * @has_bandgap: flag to determine if this control module has BG sensor
+ */
+struct omap_control_data {
+	int			rev;
+	bool			has_usb_phy;
+	bool			has_bandgap;
+};
+
+
 #ifdef CONFIG_MFD_OMAP_CONTROL
 extern int omap_control_readl(struct device *dev, u32 reg, u32 *val);
 extern int omap_control_writel(struct device *dev, u32 val, u32 reg);
