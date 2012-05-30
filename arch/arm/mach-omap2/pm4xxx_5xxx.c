@@ -61,6 +61,13 @@ static struct clockdomain *tesla_clkdm;
 * System can't enter in off mode due to the DSP.
 */
 #define OMAP44xx_54xx_PM_ERRATUM_HSI_SWAKEUP_i702	BIT(0)
+/*
+ * Errata ID: i608: All OMAP4
+ * On OMAP4, Retention-Till-Access Memory feature is not working
+ * reliably and hardware recommondation is keep it disabled by
+ * default
+ */
+#define OMAP44xx_54xx_PM_ERRATUM_RTA_i608		BIT(1)
 
 static u8 pm44xx_54xx_errata;
 #define is_pm44xx_54xx_erratum(erratum) (pm44xx_54xx_errata & \
@@ -334,6 +341,40 @@ static void __init omap_pm_setup_errata(void)
 {
 	if (cpu_is_omap44xx())
 		pm44xx_54xx_errata |= OMAP44xx_54xx_PM_ERRATUM_HSI_SWAKEUP_i702;
+	if (cpu_is_omap44xx())
+		pm44xx_54xx_errata |= OMAP44xx_54xx_PM_ERRATUM_RTA_i608;
+}
+
+static void __init prcm_setup_regs(void)
+{
+	/*
+	 * Errata ID: i608: All OMAP4
+	 * On OMAP4, Retention-Till-Access Memory feature is not working
+	 * reliably and hardware recommondation is keep it disabled by
+	 * default
+	 */
+	if (is_pm44xx_54xx_erratum(RTA_i608)) {
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_DISABLE_RTA_EXPORT_MASK,
+			0x1 << OMAP4430_DISABLE_RTA_EXPORT_SHIFT,
+			OMAP4430_PRM_PARTITION,
+			OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_SRAM_WKUP_SETUP_OFFSET);
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_DISABLE_RTA_EXPORT_MASK,
+			0x1 << OMAP4430_DISABLE_RTA_EXPORT_SHIFT,
+			OMAP4430_PRM_PARTITION,
+			OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_LDO_SRAM_CORE_SETUP_OFFSET);
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_DISABLE_RTA_EXPORT_MASK,
+			0x1 << OMAP4430_DISABLE_RTA_EXPORT_SHIFT,
+			OMAP4430_PRM_PARTITION,
+			OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_LDO_SRAM_MPU_SETUP_OFFSET);
+		omap4_prminst_rmw_inst_reg_bits(OMAP4430_DISABLE_RTA_EXPORT_MASK,
+			0x1 << OMAP4430_DISABLE_RTA_EXPORT_SHIFT,
+			OMAP4430_PRM_PARTITION,
+			OMAP4430_PRM_DEVICE_INST,
+			OMAP4_PRM_LDO_SRAM_IVA_SETUP_OFFSET);
+	}
 }
 
 /**
@@ -357,6 +398,11 @@ static int __init omap_pm_init(void)
 	}
 
 	pr_info("Power Management for TI OMAP4XX/OMAP5XXX devices.\n");
+
+	/* setup the erratas */
+	omap_pm_setup_errata();
+
+	prcm_setup_regs();
 
 	/*
 	 * Work around for OMAP443x Errata i632: "LPDDR2 Corruption After OFF
@@ -389,9 +435,6 @@ static int __init omap_pm_init(void)
 		iounmap(emif1);
 		iounmap(emif2);
 	}
-
-	/* setup the erratas */
-	omap_pm_setup_errata();
 
 	ret = pwrdm_for_each(pwrdms_setup, NULL);
 	if (ret) {
