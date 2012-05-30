@@ -36,7 +36,6 @@ static struct {
 	struct mutex hdmi_lock;
 	struct switch_dev hpd_switch;
 	int hpd_gpio;
-	bool hpd;
 #if defined(CONFIG_OMAP4_DSS_HDMI_AUDIO)
 	/* protects calls to HDMI driver audio functionality */
 	spinlock_t hdmi_sp_lock;
@@ -50,9 +49,15 @@ static int hdmi_get_current_hpd(void)
 
 static irqreturn_t hpd_enable_handler(int irq, void *ptr)
 {
-	hdmi.hpd = hdmi_get_current_hpd();
-	DSSDBG("hpd enable %d\n", hdmi.hpd);
-	hdmi_panel_hpd_handler(hdmi.hpd);
+	static int hpd_prev;
+	int hpd = hdmi_get_current_hpd();
+
+	pr_info("hpd %d\n", hpd);
+	if (hpd_prev != hpd) {
+		hdmi_panel_hpd_handler(hpd);
+		hpd_prev = hpd;
+	}
+
 	return IRQ_HANDLED;
 }
 
