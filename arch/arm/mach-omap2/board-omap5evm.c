@@ -38,6 +38,7 @@
 
 #include <plat/common.h>
 #include <plat/i2c.h>
+#include <plat/omap4-keypad.h>
 #include <plat/mmc.h>
 #include <plat/omap4-keypad.h>
 #include <plat/omap_apps_brd_id.h>
@@ -54,6 +55,12 @@
 #include "hsmmc.h"
 #include "mux.h"
 #include "omap5_ion.h"
+
+/* USBB3 to SMSC LAN9730 */
+#define GPIO_ETH_NRESET	172
+
+/* USBB2 to SMSC 4640 HUB */
+#define GPIO_HUB_NRESET	173
 
 static const uint32_t evm5430_keymap[] = {
 	KEY(0, 0, KEY_RESERVED),
@@ -605,6 +612,8 @@ static struct palmas_resource_platform_data omap5_palmas_resource = {
 	.sysen1_mode_sleep = 0,
 	.sysen2_mode_sleep = 0,
 
+	.sysen2_mode_active = 1,
+
 	.nsleep_res = 0,
 	.nsleep_smps = 0,
 	.nsleep_ldo1 = 0,
@@ -946,6 +955,24 @@ static int __init omap_5430evm_i2c_init(void)
 	return 0;
 }
 
+static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[1] = OMAP_EHCI_PORT_MODE_HSIC,
+	.port_mode[2] = OMAP_EHCI_PORT_MODE_HSIC,
+	.phy_reset  = true,
+	.reset_gpio_port[0]  = -EINVAL,
+	.reset_gpio_port[1]  = GPIO_HUB_NRESET,
+	.reset_gpio_port[2]  = GPIO_ETH_NRESET
+};
+
+static void __init omap_ehci_ohci_init(void)
+{
+	omap_mux_init_signal("gpio_172", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+	omap_mux_init_signal("gpio_173", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+	usbhs_init(&usbhs_bdata);
+	return;
+}
+
 static void __init omap_5430evm_init(void)
 {
 	int status;
@@ -977,6 +1004,7 @@ static void __init omap_5430evm_init(void)
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
 
+	omap_ehci_ohci_init();
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));

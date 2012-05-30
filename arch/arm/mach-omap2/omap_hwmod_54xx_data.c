@@ -77,6 +77,7 @@ static struct omap_hwmod omap54xx_sata_hwmod;
 static struct omap_hwmod omap54xx_usb_host_hs_hwmod;
 static struct omap_hwmod omap54xx_usb_otg_ss_hwmod;
 static struct omap_hwmod omap54xx_sl2if_hwmod;
+static struct omap_hwmod omap54xx_usb_tll_hs_hwmod;
 
 /*
  * Interconnects omap_hwmod structures
@@ -6034,8 +6035,8 @@ static struct omap_hwmod_class omap54xx_usb_host_hs_hwmod_class = {
 
 /* usb_host_hs */
 static struct omap_hwmod_irq_info omap54xx_usb_host_hs_irqs[] = {
-	{ .name = "ohci", .irq = 76 + OMAP54XX_IRQ_GIC_START },
-	{ .name = "ehci", .irq = 77 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "ohci-irq", .irq = 76 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "ehci-irq", .irq = 77 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -6046,9 +6047,20 @@ static struct omap_hwmod_ocp_if *omap54xx_usb_host_hs_masters[] = {
 
 static struct omap_hwmod_addr_space omap54xx_usb_host_hs_addrs[] = {
 	{
+		.name		= "uhh",
 		.pa_start	= 0x4a064000,
-		.pa_end		= 0x4a064fff,
+		.pa_end		= 0x4a0647ff,
 		.flags		= ADDR_TYPE_RT
+	},
+	{
+		.name		= "ohci",
+		.pa_start	= 0x4a064800,
+		.pa_end		= 0x4a064bff,
+	},
+	{
+		.name		= "ehci",
+		.pa_start	= 0x4a064c00,
+		.pa_end		= 0x4a064fff,
 	},
 	{ }
 };
@@ -6098,6 +6110,55 @@ static struct omap_hwmod omap54xx_usb_host_hs_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_usb_host_hs_slaves),
 	.masters	= omap54xx_usb_host_hs_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_usb_host_hs_masters),
+
+/*
+ * TODO:
+ * Need check with omap5; But these erratas were exist in omap3 and omap4
+ */
+/*
+ *	Errata: USBHOST Configured In Smart-Idle Can Lead To a Deadlock
+ *	id: i660
+ *
+ *	Description:
+ *	In the following configuration :
+ *	- USBHOST module is set to smart-idle mode
+ *	- PRCM asserts idle_req to the USBHOST module ( This typically happens
+ *	  when the system is going to a low power mode : all ports have been
+ *	  suspended, the master part of the USBHOST module has entered the
+ *	  standby state, and SW has cut the functional clocks.)
+ *	- an USBHOST interrupt occurs before the module is able to answer
+ *	  idle_ack, typically a remote wakeup IRQ.
+ *	Then the USB HOST module will enter a deadlock situation where it is no
+ *	more accessible nor functional.
+ *
+ *	Workaround:
+ *	Don't use smart idle; use only force idle, hence HWMOD_SWSUP_SIDLE
+ */
+
+/*	Errata: USB host EHCI may stall when entering smart-standby mode
+ *	Id: i571
+ *
+ *	Description:
+ *	When the USBHOST module is set to smart-standby mode, and when it is
+ *	ready to enter the standby state (i.e. all ports are suspended and
+ *	all attached devices are in suspend mode), then it can wrongly assert
+ *	the Mstandby signal too early while there are still some residual OCP
+ *	transactions ongoing. If this condition occurs, the internal state
+ *	machine may go to an undefined state and the USB link may be stuck
+ *	upon the next resume.
+ *
+ *	Workaround:
+ *	Don't use smart standby; use only force standby,
+ *	hence HWMOD_SWSUP_MSTANDBY
+ */
+
+/*	During system boot; If the hwmod framework resets the module
+ *	the module will have smart idle settings; which can lead to deadlock
+ *	(above Errata Id:i660); so, dont reset the module during boot;
+ *	Use HWMOD_INIT_NO_RESET.
+ */
+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
+			  HWMOD_INIT_NO_RESET,
 };
 
 /*
@@ -6209,7 +6270,6 @@ static struct omap_hwmod_class omap54xx_usb_tll_hs_hwmod_class = {
 };
 
 /* usb_tll_hs */
-static struct omap_hwmod omap54xx_usb_tll_hs_hwmod;
 static struct omap_hwmod_irq_info omap54xx_usb_tll_hs_irqs[] = {
 	{ .irq = 78 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
