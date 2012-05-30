@@ -62,6 +62,7 @@ struct twl6040_jack_data {
 /* codec private data */
 struct twl6040_data {
 	int plug_irq;
+	int hf_irq;
 	int codec_powered;
 	int pll;
 	int pll_power_mode;
@@ -431,6 +432,28 @@ static irqreturn_t twl6040_audio_handler(int irq, void *data)
 
 	queue_delayed_work(priv->workqueue, &priv->hs_jack.work,
 			   msecs_to_jiffies(200));
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t twl6040_hf_overcurrent_handler(int irq, void *data)
+{
+	struct snd_soc_codec *codec = data;
+	int val;
+
+	val = twl6040_read_reg_volatile(codec, TWL6040_REG_STATUS);
+	if (val & TWL6040_HFLOCDET)
+		dev_err(codec->dev, "Left Handsfree overcurrent\n");
+	if (val & TWL6040_HFROCDET)
+		dev_err(codec->dev, "Right Handsfree overcurrent\n");
+
+	val = twl6040_read_reg_cache(codec, TWL6040_REG_HFLCTL);
+	twl6040_write(codec, TWL6040_REG_HFLCTL,
+		      val & ~TWL6040_HFDRVENA);
+
+	val = twl6040_read_reg_cache(codec, TWL6040_REG_HFRCTL);
+	twl6040_write(codec, TWL6040_REG_HFRCTL,
+		      val & ~TWL6040_HFDRVENA);
 
 	return IRQ_HANDLED;
 }
@@ -1214,6 +1237,13 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 		goto work_err;
 	}
 
+	priv->hf_irq = platform_get_irq_byname(pdev, "hf");
+	if (priv->hf_irq < 0) {
+		dev_err(codec->dev, "invalid handsfree overcurrent irq\n");
+		ret = -EINVAL;
+		goto work_err;
+	}
+
 	priv->workqueue = alloc_workqueue("twl6040-codec", 0, 0);
 	if (!priv->workqueue) {
 		ret = -ENOMEM;
@@ -1231,6 +1261,14 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 		goto plugirq_err;
 	}
 
+	ret = request_threaded_irq(priv->hf_irq, NULL,
+				   twl6040_hf_overcurrent_handler,
+				   0, "twl6040_irq_hf", codec);
+	if (ret) {
+		dev_err(codec->dev, "HF IRQ request failed: %d\n", ret);
+		goto hfirq_err;
+	}
+
 	twl6040_init_chip(codec);
 
 	/* power on device */
@@ -1239,6 +1277,8 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 		return 0;
 
 	/* Error path */
+	free_irq(priv->hf_irq, codec);
+hfirq_err:
 	free_irq(priv->plug_irq, codec);
 plugirq_err:
 	destroy_workqueue(priv->workqueue);
@@ -1252,6 +1292,7 @@ static int twl6040_remove(struct snd_soc_codec *codec)
 	struct twl6040_data *priv = snd_soc_codec_get_drvdata(codec);
 
 	twl6040_set_bias_level(codec, SND_SOC_BIAS_OFF);
+	free_irq(priv->hf_irq, codec);
 	free_irq(priv->plug_irq, codec);
 	destroy_workqueue(priv->workqueue);
 	kfree(priv);
