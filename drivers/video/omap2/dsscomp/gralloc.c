@@ -35,7 +35,6 @@
 static bool blanked;
 
 #define NUM_TILER1D_SLOTS 2
-#define TILER1D_SLOT_SIZE (16 << 20)
 
 static struct tiler1d_slot {
 	struct list_head q;
@@ -427,9 +426,9 @@ skip_map1d:
 		r = tiler_pin_phys(slot->block_handle, slot->page_map,
 						slot_used);
 		if (r)
-			dev_err(DEV(cdev), "failed to pin %d pages into %d-pg "
-					"slots (%d)\n", slot_used,
-					TILER1D_SLOT_SIZE >> PAGE_SHIFT, r);
+			dev_err(DEV(cdev), "failed to pin %d pages into"
+				" %d-pg slots (%d)\n", slot_used,
+				tiler1d_slot_size(cdev) >> PAGE_SHIFT, r);
 	}
 
 	for (ch = 0; ch < MAX_MANAGERS; ch++) {
@@ -586,8 +585,11 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 {
 	int i;
 
+	if (!cdev_)
+		return;
+
 	/* save at least cdev pointer */
-	if (!cdev && cdev_) {
+	if (!cdev) {
 		cdev = cdev_;
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -599,14 +601,14 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 		INIT_LIST_HEAD(&free_slots);
 		for (i = 0; i < NUM_TILER1D_SLOTS; i++) {
 			struct tiler_block *block_handle =
-				tiler_reserve_1d(TILER1D_SLOT_SIZE);
+				tiler_reserve_1d(tiler1d_slot_size(cdev_));
 			if (IS_ERR_OR_NULL(block_handle)) {
 				pr_err("could not allocate tiler block\n");
 				break;
 			}
 			slots[i].block_handle = block_handle;
 			slots[i].phys = tiler_ssptr(block_handle);
-			slots[i].size = TILER1D_SLOT_SIZE >> PAGE_SHIFT;
+			slots[i].size =  tiler1d_slot_size(cdev_) >> PAGE_SHIFT;
 			slots[i].page_map = vmalloc(sizeof(*slots[i].page_map) *
 						slots[i].size);
 			if (!slots[i].page_map) {

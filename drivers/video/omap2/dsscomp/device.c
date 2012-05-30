@@ -42,12 +42,16 @@
 #include <plat/dsscomp.h>
 #include "../../../drivers/staging/omapdrm/omap_dmm_tiler.h"
 #include "dsscomp.h"
+#include "../dss/dss_features.h"
+#include "../dss/dss.h"
 
 #include <linux/debugfs.h>
 
 static DECLARE_WAIT_QUEUE_HEAD(waitq);
 static DEFINE_MUTEX(wait_mtx);
 bool alpha_only = true;
+
+static struct dsscomp_platform_info platform_info;
 
 static u32 hwc_virt_to_phys(u32 arg)
 {
@@ -508,6 +512,34 @@ static void fill_cache(struct dsscomp_dev *cdev)
 		(cdev->ovls[0]->caps & OMAP_DSS_OVL_CAP_ZORDER);
 }
 
+static void fill_platform_info(struct dsscomp_dev *cdev)
+{
+	struct dsscomp_platform_info *p = &platform_info;
+
+	p->max_xdecim_1d = 16;
+	p->max_xdecim_2d = 16;
+	p->max_ydecim_1d = 16;
+	p->max_ydecim_2d = 2;
+
+	p->fclk = dss_feat_get_param_max(FEAT_PARAM_DSS_FCK);
+	/*
+	 * :TODO: for now overwrite with actual fclock as dss will not scale
+	 * fclock based on composition
+	 */
+	p->fclk = dispc_fclk_rate();
+
+	p->min_width = 2;
+	p->max_width = 2048;
+	p->max_height = 2048;
+
+	p->max_downscale = 4;
+	p->integer_scale_ratio_limit = 2048;
+
+	p->tiler1d_slot_size = tiler1d_slot_size(cdev);
+
+	p->fbmem_type = DSSCOMP_FBMEM_TILER2D;
+}
+
 static long comp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	int r = 0;
@@ -573,6 +605,13 @@ static long comp_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	{
 		r = copy_from_user(&u.sdis, ptr, sizeof(u.sdis)) ? :
 		    setup_display(cdev, &u.sdis);
+		break;
+	}
+	case DSSCIOC_QUERY_PLATFORM:
+	{
+		/* :TODO: for now refill platform info as it is dynamic */
+		r = copy_to_user(ptr, &platform_info, sizeof(platform_info));
+		break;
 	}
 	default:
 		r = -EINVAL;
@@ -627,6 +666,7 @@ static int dsscomp_probe(struct platform_device *pdev)
 	ret = misc_register(&cdev->dev);
 	if (ret) {
 		pr_err("dsscomp: failed to register misc device.\n");
+		kfree(cdev);
 		return ret;
 	}
 	cdev->dbgfs = debugfs_create_dir("dsscomp", NULL);
@@ -643,11 +683,13 @@ static int dsscomp_probe(struct platform_device *pdev)
 #endif
 	}
 
+	cdev->pdev = &pdev->dev;
 	platform_set_drvdata(pdev, cdev);
 
 	pr_info("dsscomp: initializing.\n");
 
 	fill_cache(cdev);
+	fill_platform_info(cdev);
 
 	/* initialize queues */
 	dsscomp_queue_init(cdev);
@@ -674,26 +716,13 @@ static struct platform_driver dsscomp_pdriver = {
 	.driver = { .name = MODULE_NAME_DSSCOMP, .owner = THIS_MODULE }
 };
 
-static struct platform_device dsscomp_pdev = {
-	.name = MODULE_NAME_DSSCOMP,
-	.id = -1
-};
-
 static int __init dsscomp_init(void)
 {
-	int err = platform_driver_register(&dsscomp_pdriver);
-	if (err)
-		return err;
-
-	err = platform_device_register(&dsscomp_pdev);
-	if (err)
-		platform_driver_unregister(&dsscomp_pdriver);
-	return err;
+	return platform_driver_register(&dsscomp_pdriver);
 }
 
 static void __exit dsscomp_exit(void)
 {
-	platform_device_unregister(&dsscomp_pdev);
 	platform_driver_unregister(&dsscomp_pdriver);
 }
 
