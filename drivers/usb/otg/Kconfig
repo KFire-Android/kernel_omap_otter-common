@@ -76,6 +76,19 @@ config TWL6030_USB
           and OTG SRP events capabilities. For all other transceiver
 	  functionality UTMI PHY is embedded in OMAP4430.
 
+config OMAP4_USB_PHY
+	tristate "Texas Instruments OMAP4+ USB pin control driver"
+	depends on MFD_OMAP_CONTROL
+	help
+	  If you say yes here you get support for the Texas Instruments
+	  OMAP4+ USB pin control driver. The register set is part of system
+	  control module.
+
+	  USB phy in OMAP configures control module register for powering on
+	  the phy, configuring VBUSVALID, AVALID, IDDIG and SESSEND. For
+	  performing the above mentioned configuration, API's are added in
+	  by this children of the control module driver.
+
 config OMAP_USB2
 	tristate "OMAP USB2 PHY Driver"
 	depends on OMAP_OCP2SCP

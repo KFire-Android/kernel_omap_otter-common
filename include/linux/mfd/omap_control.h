@@ -22,6 +22,9 @@
 #ifndef __DRIVERS_OMAP_CONTROL_H
 #define __DRIVERS_OMAP_CONTROL_H
 
+#define	CONTROL_DEV_CONF		0x00000300
+#define	CONTROL_USBOTGHS_CONTROL	0x0000033C
+
 /**
  * struct system control module - scm device structure
  * @dev: device pointer
