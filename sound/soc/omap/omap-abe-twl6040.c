@@ -138,6 +138,17 @@ static struct snd_soc_ops omap_abe_modem_ops = {
 	.hw_free = omap_abe_modem_hw_free,
 };
 
+static int mcpdm_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
+			struct snd_pcm_hw_params *params)
+{
+	struct snd_interval *rate = hw_param_interval(params,
+			SNDRV_PCM_HW_PARAM_RATE);
+
+	rate->min = rate->max = 96000;
+
+	return 0;
+}
+
 static int omap_abe_mcpdm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
@@ -798,6 +809,7 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 		.ignore_pmdown_time = 1, /* Power down without delay */
 		.init = omap_abe_twl6040_init,
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_DL1,
 		.ignore_suspend = 1,
 	},
@@ -815,6 +827,7 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_UL,
 		.ignore_suspend = 1,
 	},
@@ -833,6 +846,7 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.init = omap_abe_twl6040_dl2_init,
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_DL2,
 		.ignore_suspend = 1,
 	},
@@ -1151,6 +1165,7 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 		.ignore_pmdown_time = 1, /* Power down without delay */
 		.init = omap_abe_twl6040_init,
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_DL1,
 		.ignore_suspend = 1,
 	},
@@ -1168,6 +1183,7 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_UL,
 		.ignore_suspend = 1,
 	},
@@ -1187,6 +1203,7 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 		.ignore_pmdown_time = 1, /* Power down without delay */
 		.init = omap_abe_twl6040_dl2_init,
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_DL2,
 		.ignore_suspend = 1,
 	},
