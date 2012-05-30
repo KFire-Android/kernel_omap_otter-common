@@ -1207,9 +1207,9 @@ static int twl6040_probe(struct snd_soc_codec *codec)
 	else
 		priv->amic_bias_settle_ms = 48;
 
-	priv->plug_irq = platform_get_irq(pdev, 0);
+	priv->plug_irq = platform_get_irq_byname(pdev, "plug");
 	if (priv->plug_irq < 0) {
-		dev_err(codec->dev, "invalid irq\n");
+		dev_err(codec->dev, "invalid plug irq\n");
 		ret = -EINVAL;
 		goto work_err;
 	}
