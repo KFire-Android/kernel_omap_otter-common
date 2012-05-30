@@ -89,6 +89,20 @@ int abe_pm_save_context(struct omap_abe *abe)
 	omap_aess_mute_gain(abe->aess, OMAP_AESS_MIXECHO_DL1);
 	omap_aess_mute_gain(abe->aess, OMAP_AESS_MIXECHO_DL2);
 
+	/*
+	 * mute gains associated with DL1 BE
+	 * ideally, these gains should be muted/saved when BE is muted, but
+	 * when ABE McPDM is started for DL1 or DL2, PDM_DL1 port gets enabled
+	 * which prevents to mute these gains since two ports on DL1 path are
+	 * active when mute is called for BT_VX_DL or MM_EXT_DL.
+	 *
+	 * These gains are not restored along with the context because they
+	 * are properly unmuted/restored when any of the DL1 BEs is unmuted
+	 */
+	omap_aess_mute_gain(abe->aess, OMAP_AESS_GAIN_DL1_LEFT);
+	omap_aess_mute_gain(abe->aess, OMAP_AESS_GAIN_DL1_RIGHT);
+	omap_aess_mute_gain(abe->aess, OMAP_AESS_MIXSDT_DL);
+
 	return 0;
 }
 
