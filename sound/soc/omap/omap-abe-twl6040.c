@@ -149,8 +149,7 @@ static int mcpdm_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 	return 0;
 }
 
-static int omap_abe_mcpdm_hw_params(struct snd_pcm_substream *substream,
-	struct snd_pcm_hw_params *params)
+static int omap_abe_mcpdm_startup(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
@@ -179,7 +178,7 @@ static int omap_abe_mcpdm_hw_params(struct snd_pcm_substream *substream,
 }
 
 static struct snd_soc_ops omap_abe_mcpdm_ops = {
-	.hw_params = omap_abe_mcpdm_hw_params,
+	.startup = omap_abe_mcpdm_startup,
 };
 
 static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
