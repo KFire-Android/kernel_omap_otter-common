@@ -188,6 +188,14 @@ static struct omap2_hsmmc_info mmc[] = {
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_29_30,
 	},
+	{
+		.mmc            = 3,
+		.caps           = MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
+		.gpio_cd        = -EINVAL,
+		.gpio_wp        = -EINVAL,
+		.ocr_mask       = MMC_VDD_165_195,
+		.nonremovable   = true,
+	},
 	{}	/* Terminator */
 };
 
@@ -1023,6 +1031,8 @@ static void __init omap_5430evm_init(void)
 		pr_err("Keypad initialization failed: %d\n", status);
 
 	omap_ehci_ohci_init();
+
+	omap5sevm_connectivity_init();
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
