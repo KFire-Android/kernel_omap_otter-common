@@ -117,12 +117,40 @@ void omap_control_put(struct device *dev)
 }
 EXPORT_SYMBOL_GPL(omap_control_put);
 
+
+static struct mfd_cell omap4_control_usb_devs[] = {
+	{
+		.name = "omap-control-usb",
+	},
+};
+
 static const struct of_device_id of_omap_control_match[] = {
 	{ .compatible = "ti,omap3-control", },
 	{ .compatible = "ti,omap4-control", },
 	{ .compatible = "ti,omap5-control", },
 	{ },
 };
+
+static int omap_control_add_children(struct platform_device *pdev,
+				     struct omap_control *omap_control)
+{
+	int ret;
+
+	struct device *dev = &pdev->dev;
+	struct omap_control_data *pdata = dev_get_platdata(dev);
+
+	/* USB-PHY */
+	if (pdata && pdata->has_usb_phy) {
+		ret = mfd_add_devices(dev, -1, omap4_control_usb_devs,
+				      ARRAY_SIZE(omap4_control_usb_devs),
+				      NULL, 0);
+		if (ret)
+			dev_err(dev, "failed to populate usb-phy child\n");
+	}
+
+	return ret;
+}
+
 
 static int __devinit omap_control_probe(struct platform_device *pdev)
 {
@@ -162,7 +190,7 @@ static int __devinit omap_control_probe(struct platform_device *pdev)
 	omap_control_module = omap_control;
 
 	if (pdev->dev.platform_data)
-		return 0;
+		return omap_control_add_children(pdev, omap_control);
 	else
 		return of_platform_populate(np, of_omap_control_match,
 							NULL, dev);
