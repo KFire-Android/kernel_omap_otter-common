@@ -1095,6 +1095,7 @@ static int dpcm_be_dai_startup(struct snd_soc_pcm_runtime *fe, int stream)
 					be->dpcm[stream].state);
 
 			be->dpcm[stream].state = SND_SOC_DPCM_STATE_CLOSE;
+			be_substream->runtime = NULL;
 			goto unwind;
 		}
 
