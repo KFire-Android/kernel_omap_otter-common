@@ -31,7 +31,8 @@ static struct ion_platform_data omap5_ion_data = {
 		{	.type = OMAP_ION_HEAP_TYPE_TILER,
 			.id = OMAP_ION_HEAP_TILER,
 			.name = "tiler",
-			.base = PHYS_ADDR_DUCATI_MEM -
+			.base = PHYS_ADDR_SMC_MEM -
+					OMAP_ION_HEAP_SECURE_INPUT_SIZE -
 					OMAP5_ION_HEAP_TILER_SIZE,
 			.size = OMAP5_ION_HEAP_TILER_SIZE,
 		},
@@ -39,7 +40,8 @@ static struct ion_platform_data omap5_ion_data = {
 			.type = OMAP_ION_HEAP_TYPE_TILER,
 			.id = OMAP_ION_HEAP_NONSECURE_TILER,
 			.name = "nonsecure_tiler",
-			.base = PHYS_ADDR_DUCATI_MEM -
+			.base = PHYS_ADDR_SMC_MEM -
+					OMAP_ION_HEAP_SECURE_INPUT_SIZE -
 					OMAP5_ION_HEAP_TILER_SIZE -
 					OMAP5_ION_HEAP_NONSECURE_TILER_SIZE,
 			.size = OMAP5_ION_HEAP_NONSECURE_TILER_SIZE,
