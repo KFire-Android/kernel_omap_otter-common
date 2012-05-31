@@ -716,7 +716,7 @@ void __init omap_hsmmc_init(struct omap2_hsmmc_info *controllers)
 		omap4_ctrl_pad_writel(reg, control_mmc1);
 	} else if (cpu_is_omap54xx()) {
 		control_pbias_offset =
-			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_PBIASLITE;
+			OMAP5_CTRL_MODULE_CORE_PAD_CONTROL_PBIAS;
 	}
 
 	for (; controllers->mmc; controllers++)
