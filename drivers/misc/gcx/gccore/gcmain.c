@@ -29,6 +29,7 @@
 #include <linux/debugfs.h>
 #include <plat/omap_gcx.h>
 #include <linux/delay.h>
+#include <linux/opp.h>
 
 #include "gcmain.h"
 
@@ -81,6 +82,10 @@ static int g_clientref;
 static void *g_reg_base;
 static struct omap_gcx_platform_data *g_gcxplat;
 static bool gforceoff; /* protected by mtx */
+/* opp */
+static int g_opp_count;
+static unsigned long *g_opp_freqs;
+static unsigned long  g_cur_freq;
 
 static enum gcerror find_context(struct gccontextmap **context, int create)
 {
@@ -563,6 +568,24 @@ void gcpwr_disable_clock(enum gcpower prevstate)
 			__func__, __LINE__);
 }
 
+/*
+ * scale gcxx device
+ */
+static void gcxxx_device_scale(int idx)
+{
+	int ret;
+
+	if (!g_opp_count || (idx >= g_opp_count))
+		return;
+	if (!g_gcxplat || !g_gcxplat->scale_dev)
+		return;
+	if (g_cur_freq != g_opp_freqs[idx]) {
+		ret = g_gcxplat->scale_dev(g_bb2d_dev, g_opp_freqs[idx]);
+		if (!ret)
+			g_cur_freq = g_opp_freqs[idx];
+	}
+}
+
 void gcpwr_enable_pulse_skipping(enum gcpower prevstate)
 {
 	union gcclockcontrol gcclockcontrol;
@@ -575,7 +598,8 @@ void gcpwr_enable_pulse_skipping(enum gcpower prevstate)
 			"pulse skipping is already enabled.\n",
 			__func__, __LINE__);
 	} else {
-		omap_pm_set_min_bus_tput(g_bb2d_dev, OCP_INITIATOR_AGENT, -1);
+		/* opp scale */
+		gcxxx_device_scale(0);
 
 		/* Enable loading and set to minimum value. */
 		gcclockcontrol.raw = 0;
@@ -605,9 +629,8 @@ void gcpwr_disable_pulse_skipping(enum gcpower prevstate)
 		return;
 
 	if (g_pulseskipping) {
-		/* Set the min l3 data throughput */
-		omap_pm_set_min_bus_tput(g_bb2d_dev, OCP_INITIATOR_AGENT,
-						200*1000*4);
+		/* opp device scale */
+		gcxxx_device_scale(g_opp_count - 1);
 
 		/* Enable loading and set to maximum value. */
 		gcclockcontrol.reg.pulsecount = 64;
@@ -950,6 +973,8 @@ EXPORT_SYMBOL(gc_unmap);
 static int gc_probe(struct platform_device *pdev)
 {
 	int ret;
+	int i;
+	unsigned long freq = 0;
 
 	g_gcxplat = (struct omap_gcx_platform_data *)pdev->dev.platform_data;
 	g_reg_base = g_gcxplat->regbase;
@@ -974,6 +999,44 @@ static int gc_probe(struct platform_device *pdev)
 
 	pm_runtime_enable(gcdevice.dev);
 	(void)g_gcxplat->was_context_lost(gcdevice.dev);
+
+	/* Query supported OPPs */
+	rcu_read_lock();
+
+	g_opp_count = opp_get_opp_count(&pdev->dev);
+	if (g_opp_count <= 0) {
+		g_opp_count = 0;
+		goto done;
+	}
+
+	g_opp_freqs = kzalloc((g_opp_count) * sizeof(unsigned long),
+			GFP_KERNEL);
+	if (!g_opp_freqs) {
+		g_opp_count = 0;
+		goto done;
+	}
+
+	for (i = 0; i < g_opp_count; i++) {
+		struct opp *opp = opp_find_freq_ceil(&pdev->dev, &freq);
+		if (IS_ERR_OR_NULL(opp)) {
+			g_opp_count = i;
+			goto done;
+		}
+		g_opp_freqs[i] = freq++; /* get freq, prepare to next */
+	}
+done:
+	rcu_read_unlock();
+
+	/* set lowest opp */
+	if (g_opp_count)
+		gcxxx_device_scale(0);
+
+	return 0;
+}
+
+static int gc_remove(struct platform_device *pdev)
+{
+	kfree(g_opp_freqs);
 	return 0;
 }
 
@@ -1007,6 +1070,7 @@ static int gc_resume(struct platform_device *pdev)
 
 static struct platform_driver plat_drv = {
 	.probe = gc_probe,
+	.remove = gc_remove,
 #if defined(GC_ENABLE_SUSPEND)
 	.suspend = gc_suspend,
 	.resume = gc_resume,
