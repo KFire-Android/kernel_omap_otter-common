@@ -79,7 +79,8 @@ static DEFINE_MUTEX(hwspinlock_tree_lock);
  * whether he wants their previous state to be saved. It is up to the user
  * to choose the appropriate @mode of operation, exactly the same way users
  * should decide between spin_trylock, spin_trylock_irq and
- * spin_trylock_irqsave.
+ * spin_trylock_irqsave. However if the user wishes to use hwspinlock from
+ * context that sleeps, it needs to be decided when hwspinlock is requested.
  *
  * Returns 0 if we successfully locked the hwspinlock or -EBUSY if
  * the hwspinlock was already taken.
@@ -105,13 +106,16 @@ int __hwspin_trylock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
 	 *    problems with hwspinlock usage (e.g. scheduler checks like
 	 *    'scheduling while atomic' etc.)
 	 */
-	if (mode == HWLOCK_IRQSTATE)
-		ret = spin_trylock_irqsave(&hwlock->lock, *flags);
-	else if (mode == HWLOCK_IRQ)
-		ret = spin_trylock_irq(&hwlock->lock);
-	else
-		ret = spin_trylock(&hwlock->lock);
-
+	if (hwlock->tlock == USE_MUTEX_LOCK) {
+		ret = mutex_trylock(&hwlock->sw_l.mlock);
+	} else {
+		if (mode == HWLOCK_IRQSTATE)
+			ret = spin_trylock_irqsave(&hwlock->sw_l.slock, *flags);
+		else if (mode == HWLOCK_IRQ)
+			ret = spin_trylock_irq(&hwlock->sw_l.slock);
+		else
+			ret = spin_trylock(&hwlock->sw_l.slock);
+	}
 	/* is lock already taken by another context on the local cpu ? */
 	if (!ret)
 		return -EBUSY;
@@ -121,13 +125,17 @@ int __hwspin_trylock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
 
 	/* if hwlock is already taken, undo spin_trylock_* and exit */
 	if (!ret) {
-		if (mode == HWLOCK_IRQSTATE)
-			spin_unlock_irqrestore(&hwlock->lock, *flags);
-		else if (mode == HWLOCK_IRQ)
-			spin_unlock_irq(&hwlock->lock);
-		else
-			spin_unlock(&hwlock->lock);
-
+		if (hwlock->tlock == USE_MUTEX_LOCK) {
+			mutex_unlock(&hwlock->sw_l.mlock);
+		} else {
+			if (mode == HWLOCK_IRQSTATE)
+				spin_unlock_irqrestore(&hwlock->sw_l.slock,
+							*flags);
+			else if (mode == HWLOCK_IRQ)
+				spin_unlock_irq(&hwlock->sw_l.slock);
+			else
+				spin_unlock(&hwlock->sw_l.slock);
+		}
 		return -EBUSY;
 	}
 
@@ -248,12 +256,16 @@ void __hwspin_unlock(struct hwspinlock *hwlock, int mode, unsigned long *flags)
 	hwlock->bank->ops->unlock(hwlock);
 
 	/* Undo the spin_trylock{_irq, _irqsave} called while locking */
-	if (mode == HWLOCK_IRQSTATE)
-		spin_unlock_irqrestore(&hwlock->lock, *flags);
-	else if (mode == HWLOCK_IRQ)
-		spin_unlock_irq(&hwlock->lock);
-	else
-		spin_unlock(&hwlock->lock);
+	if (hwlock->tlock == USE_MUTEX_LOCK) {
+		mutex_unlock(&hwlock->sw_l.mlock);
+	} else {
+		if (mode == HWLOCK_IRQSTATE)
+			spin_unlock_irqrestore(&hwlock->sw_l.slock, *flags);
+		else if (mode == HWLOCK_IRQ)
+			spin_unlock_irq(&hwlock->sw_l.slock);
+		else
+			spin_unlock(&hwlock->sw_l.slock);
+	}
 }
 EXPORT_SYMBOL_GPL(__hwspin_unlock);
 
@@ -341,8 +353,6 @@ int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
 
 	for (i = 0; i < num_locks; i++) {
 		hwlock = &bank->lock[i];
-
-		spin_lock_init(&hwlock->lock);
 		hwlock->bank = bank;
 
 		ret = hwspin_lock_register_single(hwlock, i);
@@ -448,6 +458,11 @@ EXPORT_SYMBOL_GPL(hwspin_lock_get_id);
 
 /**
  * hwspin_lock_request() - request an hwspinlock
+ * @lock_type: User to decide to use mutex or spinlocks
+ * 1 to use mutex & 0 to use spinlock. If mutex is used, hwspinlock APIs can
+ * be called from context that sleeps but cannot be called from interrupt
+ * context. If spinlock is used the APIs can be called from any context but
+ * the calling context cannot sleep.
  *
  * This function should be called by users of the hwspinlock device,
  * in order to dynamically assign them an unused hwspinlock.
@@ -459,7 +474,7 @@ EXPORT_SYMBOL_GPL(hwspin_lock_get_id);
  *
  * Returns the address of the assigned hwspinlock, or NULL on error
  */
-struct hwspinlock *hwspin_lock_request(void)
+struct hwspinlock *hwspin_lock_request(enum lock_type l)
 {
 	struct hwspinlock *hwlock;
 	int ret;
@@ -480,8 +495,16 @@ struct hwspinlock *hwspin_lock_request(void)
 
 	/* mark as used and power up */
 	ret = __hwspin_lock_request(hwlock);
-	if (ret < 0)
+	if (ret < 0) {
 		hwlock = NULL;
+	} else {
+		if (l == USE_MUTEX_LOCK)
+			mutex_init(&hwlock->sw_l.mlock);
+		else
+			spin_lock_init(&hwlock->sw_l.slock);
+
+		hwlock->tlock = l;
+	}
 
 out:
 	mutex_unlock(&hwspinlock_tree_lock);
@@ -492,6 +515,11 @@ EXPORT_SYMBOL_GPL(hwspin_lock_request);
 /**
  * hwspin_lock_request_specific() - request for a specific hwspinlock
  * @id: index of the specific hwspinlock that is requested
+ * @lock_type: caller decides to use mutex or spinlock for locking
+ * 1 for mutex and 0 for spinlock. If mutex is used, hwspinlock APIs can
+ * be called from context that sleeps but cannot be called from interrupt
+ * context. If spinlock is used the APIs can be called from any context but
+ * the calling context cannot sleep.
  *
  * This function should be called by users of the hwspinlock module,
  * in order to assign them a specific hwspinlock.
@@ -502,7 +530,8 @@ EXPORT_SYMBOL_GPL(hwspin_lock_request);
  *
  * Returns the address of the assigned hwspinlock, or NULL on error
  */
-struct hwspinlock *hwspin_lock_request_specific(unsigned int id)
+struct hwspinlock *hwspin_lock_request_specific(unsigned int id,
+					enum lock_type l)
 {
 	struct hwspinlock *hwlock;
 	int ret;
@@ -529,9 +558,16 @@ struct hwspinlock *hwspin_lock_request_specific(unsigned int id)
 
 	/* mark as used and power up */
 	ret = __hwspin_lock_request(hwlock);
-	if (ret < 0)
+	if (ret < 0) {
 		hwlock = NULL;
+	} else {
+		if (l == USE_MUTEX_LOCK)
+			mutex_init(&hwlock->sw_l.mlock);
+		else
+			spin_lock_init(&hwlock->sw_l.slock);
 
+		hwlock->tlock = l;
+	}
 out:
 	mutex_unlock(&hwspinlock_tree_lock);
 	return hwlock;

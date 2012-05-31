@@ -22,6 +22,12 @@
 #include <linux/device.h>
 
 struct hwspinlock_device;
+enum lock_type;
+union sw_lock {
+	spinlock_t slock;
+	struct mutex mlock;
+};
+
 
 /**
  * struct hwspinlock_ops - platform-specific hwspinlock handlers
@@ -43,11 +49,14 @@ struct hwspinlock_ops {
  * struct hwspinlock - this struct represents a single hwspinlock instance
  * @bank: the hwspinlock_device structure which owns this lock
  * @lock: initialized and used by hwspinlock core
+ * @slock: mutex lock used by hwspinlock core
+ * @lock_type: User of hwspinlock to decide whether to use mutex or spinlock
  * @priv: private data, owned by the underlying platform-specific hwspinlock drv
  */
 struct hwspinlock {
 	struct hwspinlock_device *bank;
-	spinlock_t lock;
+	union sw_lock sw_l;
+	enum lock_type tlock;
 	void *priv;
 };
 
