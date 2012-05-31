@@ -24,7 +24,7 @@
 #include "omap_ion_priv.h"
 #include <linux/module.h>
 
-static struct ion_device *omap_ion_device;
+struct ion_device *omap_ion_device;
 EXPORT_SYMBOL(omap_ion_device);
 
 static int num_heaps;

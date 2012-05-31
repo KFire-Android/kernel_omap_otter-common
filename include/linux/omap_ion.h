@@ -61,6 +61,7 @@ int omap_ion_fd_to_handles(int fd, struct ion_client **client,
 		struct ion_handle **handles,
 		int *num_handles);
 
+extern struct ion_device *omap_ion_device;
 #endif /* __KERNEL__ */
 
 /* additional heaps used only on omap */
