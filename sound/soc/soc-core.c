@@ -42,6 +42,8 @@
 #include <sound/soc-dpcm.h>
 #include <sound/initval.h>
 
+#include "soc-private.h"
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/asoc.h>
 
@@ -60,14 +62,6 @@ static LIST_HEAD(platform_list);
 static LIST_HEAD(codec_list);
 
 int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num);
-int soc_dpcm_debugfs_add(struct snd_soc_pcm_runtime *rtd);
-int soc_dpcm_be_digital_mute(struct snd_soc_pcm_runtime *fe, int mute);
-int soc_dpcm_be_ac97_cpu_dai_suspend(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_ac97_cpu_dai_resume(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_cpu_dai_resume(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_cpu_dai_suspend(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_platform_suspend(struct snd_soc_pcm_runtime *fe);
-int soc_dpcm_be_platform_resume(struct snd_soc_pcm_runtime *fe);
 
 /*
  * This is a timeout to do a DAPM powerdown after a stream is closed().
@@ -599,8 +593,7 @@ int snd_soc_suspend(struct device *dev)
 			continue;
 
 		if (card->rtd[i].dai_link->dynamic) {
-			soc_dpcm_be_cpu_dai_suspend(&card->rtd[i]);
-			soc_dpcm_be_platform_suspend(&card->rtd[i]);
+			soc_dpcm_fe_suspend(&card->rtd[i]);
 		} else {
 			if (cpu_dai->driver->suspend && !cpu_dai->driver->ac97_control)
 				cpu_dai->driver->suspend(cpu_dai);
@@ -780,8 +773,7 @@ static void soc_resume_deferred(struct work_struct *work)
 			continue;
 
 		if (card->rtd[i].dai_link->dynamic) {
-			soc_dpcm_be_cpu_dai_resume(&card->rtd[i]);
-			soc_dpcm_be_platform_resume(&card->rtd[i]);
+			soc_dpcm_fe_resume(&card->rtd[i]);
 		} else {
 			if (cpu_dai->driver->resume && !cpu_dai->driver->ac97_control)
 				cpu_dai->driver->resume(cpu_dai);

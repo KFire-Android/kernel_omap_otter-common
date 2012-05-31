@@ -86,8 +86,8 @@ typedef struct abetaskTag {
 	/* 14 */
 	u16 misc1;
 } ABE_STask;
-typedef ABE_STask *pABE_STask;
-typedef ABE_STask **ppABE_STask;
+typedef struct ABE_STask *pABE_STask;
+typedef struct ABE_STask **ppABE_STask;
 
 struct ABE_SIODescriptor {
 	/* 0 */

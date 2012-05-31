@@ -317,6 +317,14 @@ int twl6030_mmc_card_detect_config(void)
 									ret);
 		return ret;
 	}
+	ret = twl_i2c_write_u8(TWL6030_MODULE_ID0,
+				(MMC_MINS_DEB_MASK | MMC_MEXT_DEB_MASK),
+				TWL6030_MMCDEBOUNCING);
+	if (ret < 0) {
+		pr_err("twl6030: Failed to write MMC_MEXT_DEB_MASK %d\n",
+								ret);
+		return ret;
+	}
 
 	return twl6030_irq_base + MMCDETECT_INTR_OFFSET;
 }
@@ -350,25 +358,25 @@ EXPORT_SYMBOL(twl6030_mmc_card_detect);
 int twl6030_init_irq(struct device *dev, int irq_num)
 {
 	struct			device_node *node = dev->of_node;
-	int			nr_irqs, irq_base, irq_end;
+	int			num_irqs, irq_base, irq_end;
 	struct task_struct	*task;
 	static struct irq_chip  twl6030_irq_chip;
 	int			status = 0;
 	int			i;
 	u8			mask[4];
 
-	nr_irqs = TWL6030_NR_IRQS;
+	num_irqs = TWL6030_NR_IRQS;
 
-	irq_base = irq_alloc_descs(-1, 0, nr_irqs, 0);
+	irq_base = irq_alloc_descs(-1, 0, num_irqs, 0);
 	if (IS_ERR_VALUE(irq_base)) {
 		dev_err(dev, "Fail to allocate IRQ descs\n");
 		return irq_base;
 	}
 
-	irq_domain_add_legacy(node, nr_irqs, irq_base, 0,
+	irq_domain_add_legacy(node, num_irqs, irq_base, 0,
 			      &irq_domain_simple_ops, NULL);
 
-	irq_end = irq_base + nr_irqs;
+	irq_end = irq_base + num_irqs;
 
 	mask[1] = 0xFF;
 	mask[2] = 0xFF;

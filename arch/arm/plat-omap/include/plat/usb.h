@@ -4,6 +4,7 @@
 #define	__ASM_ARCH_OMAP_USB_H
 
 #include <linux/io.h>
+#include <linux/platform_device.h>
 #include <linux/usb/musb.h>
 #include <plat/board.h>
 
@@ -62,6 +63,10 @@ struct usbhs_omap_platform_data {
 	struct ehci_hcd_omap_platform_data	*ehci_data;
 	struct ohci_hcd_omap_platform_data	*ohci_data;
 };
+
+struct usbtll_omap_platform_data {
+	enum usbhs_omap_port_mode		port_mode[OMAP3_HS_USB_PORTS];
+};
 /*-------------------------------------------------------------------------*/
 
 #define OMAP1_OTG_BASE			0xfffb0400
@@ -106,6 +111,9 @@ extern int omap4430_phy_set_clk(struct device *dev, int on);
 extern int omap4430_phy_init(struct device *dev);
 extern int omap4430_phy_exit(struct device *dev);
 extern int omap4430_phy_suspend(struct device *dev, int suspend);
+
+extern int omap_tll_enable(void);
+extern int omap_tll_disable(void);
 
 /*
  * NOTE: Please update omap USB drivers to use ioremap + read/write
@@ -360,6 +368,12 @@ static inline u32 omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
 {
 	return 0;
 }
+#endif
+
+#if defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_DWC3_MODULE)
+void usb_dwc3_init(void);
+#else
+static inline void usb_dwc3_init(void) {}
 #endif
 
 #endif	/* __ASM_ARCH_OMAP_USB_H */

@@ -41,6 +41,7 @@ struct omap_device;
 
 extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type1;
 extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type2;
+extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type3;
 
 /*
  * OCP SYSCONFIG bit shifts/masks TYPE1. These are for IPs compliant
@@ -69,8 +70,13 @@ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type2;
 #define SYSC_TYPE2_SIDLEMODE_MASK	(0x3 << SYSC_TYPE2_SIDLEMODE_SHIFT)
 #define SYSC_TYPE2_MIDLEMODE_SHIFT	4
 #define SYSC_TYPE2_MIDLEMODE_MASK	(0x3 << SYSC_TYPE2_MIDLEMODE_SHIFT)
-#define SYSC_TYPE2_DMADISABLE_SHIFT	16
-#define SYSC_TYPE2_DMADISABLE_MASK	(0x1 << SYSC_TYPE2_DMADISABLE_SHIFT)
+
+/*
+ * OCP SYSCONFIG bit shifts/masks TYPE3. These are for IPs compliant
+ * that only implement the sidle feature.
+ */
+#define SYSC_TYPE3_SIDLEMODE_SHIFT	0
+#define SYSC_TYPE3_SIDLEMODE_MASK	(0x3 << SYSC_TYPE3_SIDLEMODE_SHIFT)
 
 /* OCP SYSSTATUS bit shifts/masks */
 #define SYSS_RESETDONE_SHIFT		0
@@ -277,7 +283,6 @@ struct omap_hwmod_ocp_if {
 #define SYSS_HAS_RESET_STATUS	(1 << 7)
 #define SYSC_NO_CACHE		(1 << 8)  /* XXX SW flag, belongs elsewhere */
 #define SYSC_HAS_RESET_STATUS	(1 << 9)
-#define SYSC_HAS_DMADISABLE	(1 << 10)
 
 /* omap_hwmod_sysconfig.clockact flags */
 #define CLOCKACT_TEST_BOTH	0x0
@@ -293,7 +298,6 @@ struct omap_hwmod_ocp_if {
  * @enwkup_shift: Offset of the enawakeup bit
  * @srst_shift: Offset of the softreset bit
  * @autoidle_shift: Offset of the autoidle bit
- * @dmadisable_shift: Offset of the dmadisable bit
  */
 struct omap_hwmod_sysc_fields {
 	u8 midle_shift;
@@ -302,7 +306,6 @@ struct omap_hwmod_sysc_fields {
 	u8 enwkup_shift;
 	u8 srst_shift;
 	u8 autoidle_shift;
-	u8 dmadisable_shift;
 };
 
 /**

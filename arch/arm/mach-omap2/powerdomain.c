@@ -341,8 +341,8 @@ int pwrdm_add_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm)
 	if (!pwrdm || !clkdm)
 		return -EINVAL;
 
-	pr_debug("%s: associating clockdomain %s with powerdomain %s\n",
-			__func__, clkdm->name, pwrdm->name);
+	pr_debug("powerdomain: associating clockdomain %s with powerdomain "
+		 "%s\n", clkdm->name, pwrdm->name);
 
 	for (i = 0; i < PWRDM_MAX_CLKDMS; i++) {
 		if (!pwrdm->pwrdm_clkdms[i])
@@ -356,9 +356,8 @@ int pwrdm_add_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm)
 	}
 
 	if (i == PWRDM_MAX_CLKDMS) {
-		pr_debug("%s: increase PWRDM_MAX_CLKDMS for \
-			pwrdm %s clkdm %s\n",
-			__func__, pwrdm->name, clkdm->name);
+		pr_debug("powerdomain: increase PWRDM_MAX_CLKDMS for "
+			 "pwrdm %s clkdm %s\n", pwrdm->name, clkdm->name);
 		WARN_ON(1);
 		ret = -ENOMEM;
 		goto pac_exit;
@@ -390,16 +389,16 @@ int pwrdm_del_clkdm(struct powerdomain *pwrdm, struct clockdomain *clkdm)
 	if (!pwrdm || !clkdm)
 		return -EINVAL;
 
-	pr_debug("%s: dissociating clockdomain %s from powerdomain %s\n",
-			__func__, clkdm->name, pwrdm->name);
+	pr_debug("powerdomain: dissociating clockdomain %s from powerdomain "
+		 "%s\n", clkdm->name, pwrdm->name);
 
 	for (i = 0; i < PWRDM_MAX_CLKDMS; i++)
 		if (pwrdm->pwrdm_clkdms[i] == clkdm)
 			break;
 
 	if (i == PWRDM_MAX_CLKDMS) {
-		pr_debug("%s: clkdm %s not associated with pwrdm %s?!\n",
-			__func__, clkdm->name, pwrdm->name);
+		pr_debug("powerdomain: clkdm %s not associated with pwrdm "
+			 "%s ?!\n", clkdm->name, pwrdm->name);
 		ret = -ENOENT;
 		goto pdc_exit;
 	}
@@ -488,10 +487,10 @@ int pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 	if (!(pwrdm->pwrsts & (1 << pwrst)))
 		return -EINVAL;
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
-		pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
-			pwrdm->name, pwrst);
+	pr_debug("powerdomain: setting next powerstate for %s to %0x\n",
+		 pwrdm->name, pwrst);
 
+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
 		/* Trace the pwrdm desired target state */
 		trace_power_domain_target(pwrdm->name, pwrst,
 					  smp_processor_id());
@@ -586,11 +585,11 @@ int pwrdm_set_logic_retst(struct powerdomain *pwrdm, u8 pwrst)
 	if (!(pwrdm->pwrsts_logic_ret & (1 << pwrst)))
 		return -EINVAL;
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_logic_retst) {
-		pr_debug("powerdomain: setting next logic powerstate for \
-			 %s to %0x\n", pwrdm->name, pwrst);
+	pr_debug("powerdomain: setting next logic powerstate for %s to %0x\n",
+		 pwrdm->name, pwrst);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_logic_retst)
 		ret = arch_pwrdm->pwrdm_set_logic_retst(pwrdm, pwrst);
-	}
 
 	return ret;
 }
@@ -623,12 +622,11 @@ int pwrdm_set_mem_onst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
 	if (!(pwrdm->pwrsts_mem_on[bank] & (1 << pwrst)))
 		return -EINVAL;
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_onst) {
-		pr_debug("powerdomain: setting next memory powerstate for \
-			 domain %s " "bank %0x while pwrdm-ON to %0x\n",
-			 pwrdm->name, bank, pwrst);
+	pr_debug("powerdomain: setting next memory powerstate for domain %s "
+		 "bank %0x while pwrdm-ON to %0x\n", pwrdm->name, bank, pwrst);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_onst)
 		ret = arch_pwrdm->pwrdm_set_mem_onst(pwrdm, bank, pwrst);
-	}
 
 	return ret;
 }
@@ -662,12 +660,11 @@ int pwrdm_set_mem_retst(struct powerdomain *pwrdm, u8 bank, u8 pwrst)
 	if (!(pwrdm->pwrsts_mem_ret[bank] & (1 << pwrst)))
 		return -EINVAL;
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_retst) {
-		pr_debug("powerdomain: setting next memory powerstate for \
-			 domain %s ""bank %0x while pwrdm-RET to %0x\n",
-			 pwrdm->name, bank, pwrst);
+	pr_debug("powerdomain: setting next memory powerstate for domain %s "
+		 "bank %0x while pwrdm-RET to %0x\n", pwrdm->name, bank, pwrst);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_mem_retst)
 		ret = arch_pwrdm->pwrdm_set_mem_retst(pwrdm, bank, pwrst);
-	}
 
 	return ret;
 }
@@ -842,11 +839,11 @@ int pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
 	 * warn & fail if it is not ON.
 	 */
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_clear_all_prev_pwrst) {
-		pr_debug("powerdomain: clearing previous power state reg \
-			 for %s\n", pwrdm->name);
+	pr_debug("powerdomain: clearing previous power state reg for %s\n",
+		 pwrdm->name);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_clear_all_prev_pwrst)
 		ret = arch_pwrdm->pwrdm_clear_all_prev_pwrst(pwrdm);
-	}
 
 	return ret;
 }
@@ -872,11 +869,11 @@ int pwrdm_enable_hdwr_sar(struct powerdomain *pwrdm)
 	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR))
 		return ret;
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_enable_hdwr_sar) {
-		pr_debug("powerdomain: %s: setting SAVEANDRESTORE bit\n",
-			 pwrdm->name);
+	pr_debug("powerdomain: %s: setting SAVEANDRESTORE bit\n",
+		 pwrdm->name);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_enable_hdwr_sar)
 		ret = arch_pwrdm->pwrdm_enable_hdwr_sar(pwrdm);
-	}
 
 	return ret;
 }
@@ -902,11 +899,11 @@ int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
 	if (!(pwrdm->flags & PWRDM_HAS_HDWR_SAR))
 		return ret;
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_disable_hdwr_sar) {
-		pr_debug("powerdomain: %s: clearing SAVEANDRESTORE bit\n",
-			 pwrdm->name);
+	pr_debug("powerdomain: %s: clearing SAVEANDRESTORE bit\n",
+		 pwrdm->name);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_disable_hdwr_sar)
 		ret = arch_pwrdm->pwrdm_disable_hdwr_sar(pwrdm);
-	}
 
 	return ret;
 }
@@ -943,11 +940,11 @@ int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
 	if (!(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE))
 		return -EINVAL;
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_set_lowpwrstchange) {
-		pr_debug("powerdomain: %s: setting LOWPOWERSTATECHANGE bit\n",
-			 pwrdm->name);
+	pr_debug("powerdomain: %s: setting LOWPOWERSTATECHANGE bit\n",
+		 pwrdm->name);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_set_lowpwrstchange)
 		ret = arch_pwrdm->pwrdm_set_lowpwrstchange(pwrdm);
-	}
 
 	return ret;
 }
@@ -1107,11 +1104,12 @@ int pwrdm_enable_force_off(struct powerdomain *pwrdm)
 	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF))
 		return ret;
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_enable_force_off) {
-		pr_debug("powerdomain: %s: setting FORCE OFF bit\n",
-			pwrdm->name);
+
+	pr_debug("powerdomain: %s: setting FORCE OFF bit\n",
+		 pwrdm->name);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_enable_force_off)
 		ret = arch_pwrdm->pwrdm_enable_force_off(pwrdm);
-	}
 
 	return ret;
 }
@@ -1139,11 +1137,12 @@ int pwrdm_disable_force_off(struct powerdomain *pwrdm)
 	if (!(pwrdm->flags & PWRDM_HAS_FORCE_OFF))
 		return ret;
 
-	if (arch_pwrdm && arch_pwrdm->pwrdm_disable_force_off) {
-		pr_debug("powerdomain: %s: clearing FORCE OFF bit\n",
-			pwrdm->name);
+
+	pr_debug("powerdomain: %s: clearing FORCE OFF bit\n",
+		 pwrdm->name);
+
+	if (arch_pwrdm && arch_pwrdm->pwrdm_disable_force_off)
 		ret = arch_pwrdm->pwrdm_disable_force_off(pwrdm);
-	}
 
 	return ret;
 }

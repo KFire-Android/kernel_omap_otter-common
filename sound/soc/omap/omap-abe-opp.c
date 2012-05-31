@@ -33,8 +33,6 @@
 
 #include "omap-abe-priv.h"
 
-int abe_opp_recalc_level(struct omap_abe *abe);
-
 static struct abe_opp_req *abe_opp_lookup_requested(struct omap_abe *abe,
 					struct device *dev)
 {
@@ -174,8 +172,6 @@ EXPORT_SYMBOL(omap_abe_opp_free_request);
 int abe_opp_set_level(struct omap_abe *abe, int opp)
 {
 	int ret = 0;
-#if 0
-	struct omap_abe_pdata *pdata = abe->pdata;
 
 	if (abe->opp.level > opp) {
 		/* Decrease OPP mode - no need of OPP100% */
@@ -259,7 +255,6 @@ err_down_scale:
 
 err_up_scale:
 	dev_err(abe->dev, "opp: failed to scale to OPP%d\n", opp);
-#endif
 	omap_aess_set_opp_processing(abe->aess, ABE_OPP100);
 	return ret;
 }

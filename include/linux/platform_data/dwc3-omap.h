@@ -45,3 +45,20 @@ enum dwc3_omap_utmi_mode {
 struct dwc3_omap_data {
 	enum dwc3_omap_utmi_mode	utmi_mode;
 };
+
+enum omap_dwc3_vbus_id_status {
+	OMAP_DWC3_UNKNOWN = 0,
+	OMAP_DWC3_ID_GROUND,
+	OMAP_DWC3_ID_FLOAT,
+	OMAP_DWC3_VBUS_VALID,
+	OMAP_DWC3_VBUS_OFF,
+};
+
+#if (defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_DWC3_MODULE))
+void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status);
+#else
+static inline void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
+{
+	return;
+}
+#endif

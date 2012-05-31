@@ -24,27 +24,72 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/err.h>
+#include <linux/sched.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <linux/remoteproc.h>
+#include <linux/kthread.h>
+#include <linux/slab.h>
+#include <linux/pm_qos.h>
 
 #include <plat/mailbox.h>
 #include <plat/remoteproc.h>
+#include <plat/dmtimer.h>
 
 #include "omap_remoteproc.h"
 #include "remoteproc_internal.h"
+
+/* 1 sec is fair enough time for suspending an OMAP device */
+#define DEF_SUSPEND_TIMEOUT 1000
 
 /**
  * struct omap_rproc - omap remote processor state
  * @mbox: omap mailbox handle
  * @nb: notifier block that will be invoked on inbound mailbox messages
  * @rproc: rproc handle
+ * @boot_reg: virtual address of the register where the bootaddr is stored
+ * @qos_req: for requesting latency constraints for rproc
+ * @pm_comp: completion needed for suspend respond
+ * @idle: address to the idle register
+ * @idle_mask: mask of the idle register
+ * @suspend_timeout: max time it can wait for the suspend respond
+ * @suspend_acked: flag that says if the suspend request was acked
+ * @suspended: flag that says if rproc suspended
+ * @need_kick: flag that says if vrings need to be kicked on resume
  */
 struct omap_rproc {
 	struct omap_mbox *mbox;
 	struct notifier_block nb;
 	struct rproc *rproc;
+	void __iomem *boot_reg;
+	struct dev_pm_qos_request qos_req;
+	atomic_t thrd_cnt;
+	struct completion pm_comp;
+	void __iomem *idle;
+	u32 idle_mask;
+	unsigned long suspend_timeout;
+	bool suspend_acked;
+	bool suspended;
+	bool need_kick;
 };
+
+struct _thread_data {
+	struct rproc *rproc;
+	int msg;
+};
+
+static int _vq_interrupt_thread(struct _thread_data *d)
+{
+	struct omap_rproc *oproc = d->rproc->priv;
+	struct device *dev = d->rproc->dev.parent;
+
+	/* msg contains the index of the triggered vring */
+	if (rproc_vq_interrupt(d->rproc, d->msg) == IRQ_NONE)
+		dev_dbg(dev, "no message was found in vqid 0x0\n");
+	kfree(d);
+	atomic_dec(&oproc->thrd_cnt);
+	return 0;
+}
 
 /**
  * omap_rproc_mbox_callback() - inbound mailbox message handler
@@ -66,8 +111,9 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 {
 	mbox_msg_t msg = (mbox_msg_t) data;
 	struct omap_rproc *oproc = container_of(this, struct omap_rproc, nb);
-	struct device *dev = oproc->rproc->dev;
+	struct device *dev = oproc->rproc->dev.parent;
 	const char *name = oproc->rproc->name;
+	struct _thread_data *d;
 
 	dev_dbg(dev, "mbox msg: 0x%x\n", msg);
 
@@ -79,10 +125,24 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 	case RP_MBOX_ECHO_REPLY:
 		dev_info(dev, "received echo reply from %s\n", name);
 		break;
+	case RP_MBOX_SUSPEND_ACK:
+	case RP_MBOX_SUSPEND_CANCEL:
+		oproc->suspend_acked = msg == RP_MBOX_SUSPEND_ACK;
+		complete(&oproc->pm_comp);
+		break;
 	default:
-		/* msg contains the index of the triggered vring */
-		if (rproc_vq_interrupt(oproc->rproc, msg) == IRQ_NONE)
-			dev_dbg(dev, "no message was found in vqid %d\n", msg);
+		if (msg >= RP_MBOX_END_MSG) {
+			dev_info(dev, "Dropping unknown message %x", msg);
+			return NOTIFY_DONE;
+		}
+		d = kmalloc(sizeof(*d), GFP_KERNEL);
+		if (!d)
+			break;
+		d->rproc = oproc->rproc;
+		d->msg = msg;
+		atomic_inc(&oproc->thrd_cnt);
+		kthread_run((void *)_vq_interrupt_thread, d,
+					"vp_interrupt_thread");
 	}
 
 	return NOTIFY_DONE;
@@ -92,12 +152,69 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 static void omap_rproc_kick(struct rproc *rproc, int vqid)
 {
 	struct omap_rproc *oproc = rproc->priv;
+	struct device *dev = oproc->rproc->dev.parent;
 	int ret;
 
+	/* if suspended set need kick flag to kick on resume */
+	if (oproc->suspended) {
+		oproc->need_kick = true;
+		return;
+	}
 	/* send the index of the triggered virtqueue in the mailbox payload */
 	ret = omap_mbox_msg_send(oproc->mbox, vqid);
 	if (ret)
-		dev_err(rproc->dev, "omap_mbox_msg_send failed: %d\n", ret);
+		dev_err(dev, "omap_mbox_msg_send failed: %d\n", ret);
+}
+
+static int
+omap_rproc_set_latency(struct device *dev, struct rproc *rproc, long val)
+{
+	struct platform_device *pdev = to_platform_device(rproc->dev.parent);
+	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+	struct omap_rproc *oproc = rproc->priv;
+	int ret;
+
+	/* Call device specific api if any */
+	if (pdata->ops && pdata->ops->set_latency)
+		return pdata->ops->set_latency(dev, rproc, val);
+
+	ret = dev_pm_qos_update_request(&oproc->qos_req, val);
+	/*
+	 * dev_pm_qos_update_request returns 0 or 1 on success depending
+	 * on if the constraint changed or not (same request). So, return
+	 * 0 in both cases
+	 */
+	return ret - ret == 1;
+}
+
+static int
+omap_rproc_set_bandwidth(struct device *dev, struct rproc *rproc, long val)
+{
+	struct platform_device *pdev = to_platform_device(rproc->dev.parent);
+	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+
+	/* Call device specific api if any */
+	if (pdata->ops && pdata->ops->set_bandwidth)
+		return pdata->ops->set_bandwidth(dev, rproc, val);
+
+	/* TODO: call platform specific */
+
+	return 0;
+}
+
+static int
+omap_rproc_set_frequency(struct device *dev, struct rproc *rproc, long val)
+{
+	struct platform_device *pdev = to_platform_device(rproc->dev.parent);
+	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+
+	/* Call device specific api if any */
+	if (pdata->ops && pdata->ops->set_frequency)
+		return pdata->ops->set_frequency(dev, rproc, val);
+
+	/* TODO: call platform specific */
+
+	return 0;
 }
 
 /*
@@ -110,9 +227,17 @@ static void omap_rproc_kick(struct rproc *rproc, int vqid)
 static int omap_rproc_start(struct rproc *rproc)
 {
 	struct omap_rproc *oproc = rproc->priv;
-	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct device *dev = rproc->dev.parent;
+	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
-	int ret;
+	struct omap_rproc_timers_info *timers = pdata->timers;
+	int ret, i;
+
+	/* init thread counter for mbox messages */
+	atomic_set(&oproc->thrd_cnt, 0);
+	/* load remote processor boot address if needed. */
+	if (oproc->boot_reg)
+		writel(rproc->bootaddr, oproc->boot_reg);
 
 	oproc->nb.notifier_call = omap_rproc_mbox_callback;
 
@@ -120,7 +245,7 @@ static int omap_rproc_start(struct rproc *rproc)
 	oproc->mbox = omap_mbox_get(pdata->mbox_name, &oproc->nb);
 	if (IS_ERR(oproc->mbox)) {
 		ret = PTR_ERR(oproc->mbox);
-		dev_err(rproc->dev, "omap_mbox_get failed: %d\n", ret);
+		dev_err(dev, "omap_mbox_get failed: %d\n", ret);
 		return ret;
 	}
 
@@ -133,17 +258,35 @@ static int omap_rproc_start(struct rproc *rproc)
 	 */
 	ret = omap_mbox_msg_send(oproc->mbox, RP_MBOX_ECHO_REQUEST);
 	if (ret) {
-		dev_err(rproc->dev, "omap_mbox_get failed: %d\n", ret);
+		dev_err(dev, "omap_mbox_get failed: %d\n", ret);
 		goto put_mbox;
+	}
+
+	for (i = 0; i < pdata->timers_cnt; i++) {
+		timers[i].odt = omap_dm_timer_request_specific(timers[i].id);
+		if (!timers[i].odt) {
+			ret = -EBUSY;
+			dev_err(dev, "omap_dm_timer_request failed: %d\n", ret);
+			goto err_timers;
+		}
+		omap_dm_timer_set_source(timers[i].odt, OMAP_TIMER_SRC_SYS_CLK);
+		omap_dm_timer_start(timers[i].odt);
 	}
 
 	ret = pdata->device_enable(pdev);
 	if (ret) {
-		dev_err(rproc->dev, "omap_device_enable failed: %d\n", ret);
+		dev_err(dev, "omap_device_enable failed: %d\n", ret);
 		goto put_mbox;
 	}
 
 	return 0;
+
+err_timers:
+	while (i--) {
+		omap_dm_timer_stop(timers[i].odt);
+		omap_dm_timer_free(timers[i].odt);
+		timers[i].odt = NULL;
+	}
 
 put_mbox:
 	omap_mbox_put(oproc->mbox, &oproc->nb);
@@ -153,24 +296,132 @@ put_mbox:
 /* power off the remote processor */
 static int omap_rproc_stop(struct rproc *rproc)
 {
-	struct platform_device *pdev = to_platform_device(rproc->dev);
+	struct device *dev = rproc->dev.parent;
+	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
 	struct omap_rproc *oproc = rproc->priv;
-	int ret;
+	struct omap_rproc_timers_info *timers = pdata->timers;
+	int ret, i;
 
 	ret = pdata->device_shutdown(pdev);
 	if (ret)
 		return ret;
 
+	for (i = 0; i < pdata->timers_cnt; i++) {
+		omap_dm_timer_stop(timers[i].odt);
+		omap_dm_timer_free(timers[i].odt);
+		timers[i].odt = NULL;
+	}
+
 	omap_mbox_put(oproc->mbox, &oproc->nb);
 
+	/* wait untill all threads have finished */
+	while (atomic_read(&oproc->thrd_cnt))
+		schedule();
+
 	return 0;
+}
+
+static bool _rproc_idled(struct omap_rproc *oproc)
+{
+	return !oproc->idle || readl(oproc->idle) & oproc->idle_mask;
+}
+
+static int _suspend(struct rproc *rproc, bool auto_suspend)
+{
+	struct device *dev = rproc->dev.parent;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_rproc_pdata *pdata = dev->platform_data;
+	struct omap_rproc *oproc = rproc->priv;
+	unsigned long to = msecs_to_jiffies(oproc->suspend_timeout);
+	unsigned long ta = jiffies + to;
+	int ret;
+
+	init_completion(&oproc->pm_comp);
+	oproc->suspend_acked = false;
+	omap_mbox_msg_send(oproc->mbox,
+		auto_suspend ? RP_MBOX_SUSPEND : RP_MBOX_SUSPEND_FORCED);
+	ret = wait_for_completion_timeout(&oproc->pm_comp, to);
+	if (!oproc->suspend_acked)
+		return -EBUSY;
+
+	/*
+	 * FIXME: Ducati side is returning the ACK message before saving the
+	 * context, becuase the function which saves the context is a
+	 * SYSBIOS function that can not be modified until a new SYSBIOS
+	 * release is done. However, we can know that Ducati already saved
+	 * the context once it reaches idle again (after saving the context
+	 * ducati executes WFI instruction), so this way we can workaround
+	 * this problem.
+	 */
+	if (oproc->idle) {
+		while (!_rproc_idled(oproc)) {
+			if (time_after(jiffies, ta))
+				return -ETIME;
+			schedule();
+		}
+	}
+
+	ret = pdata->device_shutdown(pdev);
+	if (ret)
+		return ret;
+
+	oproc->suspended = true;
+
+	return 0;
+}
+
+static int omap_rproc_suspend(struct rproc *rproc, bool auto_suspend)
+{
+	struct omap_rproc *oproc = rproc->priv;
+
+	if (auto_suspend && !_rproc_idled(oproc))
+		return -EBUSY;
+
+	return _suspend(rproc, auto_suspend);
+}
+
+static int _resume_kick(int id, void *p, void *rproc)
+{
+	omap_rproc_kick(rproc, id);
+	return 0;
+}
+
+static int omap_rproc_resume(struct rproc *rproc)
+{
+	struct device *dev = rproc->dev.parent;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_rproc_pdata *pdata = dev->platform_data;
+	struct omap_rproc *oproc = rproc->priv;
+
+	oproc->suspended = false;
+	/* boot address could be lost after suspend, so restore it */
+	if (oproc->boot_reg)
+		writel(rproc->bootaddr, oproc->boot_reg);
+
+	/*
+	 * if need_kick flag is true, we need to kick all the vrings as
+	 * we do not know which vrings were tried to be kicked while the
+	 * rproc was suspended. We can optimize later, however this scenario
+	 * is very rarely, so it is not big deal.
+	 */
+	if (oproc->need_kick) {
+		idr_for_each(&rproc->notifyids, _resume_kick, rproc);
+		oproc->need_kick = false;
+	}
+
+	return pdata->device_enable(pdev);
 }
 
 static struct rproc_ops omap_rproc_ops = {
 	.start		= omap_rproc_start,
 	.stop		= omap_rproc_stop,
 	.kick		= omap_rproc_kick,
+	.suspend	= omap_rproc_suspend,
+	.resume		= omap_rproc_resume,
+	.set_latency	= omap_rproc_set_latency,
+	.set_bandwidth	= omap_rproc_set_bandwidth,
+	.set_frequency	= omap_rproc_set_frequency,
 };
 
 static int __devinit omap_rproc_probe(struct platform_device *pdev)
@@ -193,15 +444,41 @@ static int __devinit omap_rproc_probe(struct platform_device *pdev)
 
 	oproc = rproc->priv;
 	oproc->rproc = rproc;
+	oproc->suspend_timeout = pdata->suspend_timeout ? : DEF_SUSPEND_TIMEOUT;
+	init_completion(&oproc->pm_comp);
+
+	if (pdata->idle_addr) {
+		oproc->idle = ioremap(pdata->idle_addr, sizeof(u32));
+		if (!oproc->idle)
+			goto free_rproc;
+		oproc->idle_mask = pdata->idle_mask;
+	}
+
+	if (pdata->boot_reg) {
+		oproc->boot_reg = ioremap(pdata->boot_reg, sizeof(u32));
+		if (!oproc->boot_reg)
+			goto iounmap;
+	}
 
 	platform_set_drvdata(pdev, rproc);
+	ret = dev_pm_qos_add_request(&pdev->dev, &oproc->qos_req,
+			PM_QOS_DEFAULT_VALUE);
+	if (ret)
+		goto iounmap;
 
 	ret = rproc_register(rproc);
 	if (ret)
-		goto free_rproc;
+		goto remove_req;
 
 	return 0;
 
+remove_req:
+	dev_pm_qos_remove_request(&oproc->qos_req);
+iounmap:
+	if (oproc->idle)
+		iounmap(oproc->idle);
+	if (oproc->boot_reg)
+		iounmap(oproc->boot_reg);
 free_rproc:
 	rproc_free(rproc);
 	return ret;
@@ -210,7 +487,15 @@ free_rproc:
 static int __devexit omap_rproc_remove(struct platform_device *pdev)
 {
 	struct rproc *rproc = platform_get_drvdata(pdev);
+	struct omap_rproc *oproc = rproc->priv;
 
+	if (oproc->idle)
+		iounmap(oproc->idle);
+
+	if (oproc->boot_reg)
+		iounmap(oproc->boot_reg);
+
+	dev_pm_qos_remove_request(&oproc->qos_req);
 	return rproc_unregister(rproc);
 }
 

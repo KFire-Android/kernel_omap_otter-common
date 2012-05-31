@@ -34,7 +34,7 @@
 #include "ti_hdmi_5xxx_ip.h"
 #include "dss.h"
 
-const struct csc_table csc_table_deepcolor[4] = {
+static const struct csc_table csc_table_deepcolor[4] = {
 	/* HDMI_DEEP_COLOR_24BIT */
 	[0] = { 7036, 0, 0, 32,
 		0, 7036, 0, 32,

@@ -43,15 +43,24 @@
 #include <asm/hardware/gic.h>
 #include <plat/common.h>
 #include <plat/omap_hsi.h>
+#include <plat/usb.h>
 #include <plat/omap4-keypad.h>
 #include <plat/mmc.h>
+#include <plat/usb.h>
 #include "hsmmc.h"
+#include <plat/remoteproc.h>
 #include "common-board-devices.h"
 #include "board-omap5evm.h"
 #include "mux.h"
 
 #include <video/omapdss.h>
 #include <video/omap-panel-lg4591.h>
+
+/* USBB3 to SMSC LAN9730 */
+#define GPIO_ETH_NRESET	172
+
+/* USBB2 to SMSC 4640 HUB */
+#define GPIO_HUB_NRESET	173
 
 static const uint32_t evm5430_keymap[] = {
 	KEY(0, 0, KEY_RESERVED),
@@ -603,6 +612,8 @@ static struct palmas_resource_platform_data omap5_palmas_resource = {
 	.sysen1_mode_sleep = 0,
 	.sysen2_mode_sleep = 0,
 
+	.sysen2_mode_active = 1,
+
 	.nsleep_res = 0,
 	.nsleep_smps = 0,
 	.nsleep_ldo1 = 0,
@@ -665,6 +676,11 @@ static struct platform_device omap5evm_dmic_codec = {
 	.id	= -1,
 };
 
+static struct platform_device omap5evm_spdif_dit_codec = {
+	.name           = "spdif-dit",
+	.id             = -1,
+};
+
 static struct platform_device omap5evm_hdmi_audio_codec = {
 	.name	= "hdmi-audio-codec",
 	.id	= -1,
@@ -702,23 +718,9 @@ static struct platform_device omap5evm_abe_audio = {
 
 static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_dmic_codec,
+	&omap5evm_spdif_dit_codec,
 	&omap5evm_hdmi_audio_codec,
 	&omap5evm_abe_audio,
-};
-
-static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
-#ifdef CONFIG_OMAP5_SEVM_PALMAS
-	{
-		I2C_BOARD_INFO("twl6035", 0x48),
-		.platform_data = &palmas_omap5,
-		.irq = OMAP44XX_IRQ_SYS_1N,
-	},
-#endif
-	{
-		I2C_BOARD_INFO("twl6040", 0x4b),
-		.platform_data = &twl6040_data,
-		.irq = OMAP44XX_IRQ_SYS_2N,
-	},
 };
 
 static struct regulator_consumer_supply omap5_evm_vmmc1_supply[] = {
@@ -884,6 +886,21 @@ static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
 	},
 };
 
+static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
+#ifdef CONFIG_OMAP5_SEVM_PALMAS
+	{
+		I2C_BOARD_INFO("twl6035", 0x48),
+		.platform_data = &palmas_omap5,
+		.irq = OMAP44XX_IRQ_SYS_1N,
+	},
+#endif
+	{
+		I2C_BOARD_INFO("twl6040", 0x4b),
+		.platform_data = &twl6040_data,
+		.irq = OMAP44XX_IRQ_SYS_2N,
+	},
+};
+
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_1_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_2_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_3_bus_pdata;
@@ -905,6 +922,7 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 	} else
 		pr_err("I2C hwspinlock request failed for bus %d\n", bus_id);
 }
+
 static int __init omap_5430evm_i2c_init(void)
 {
 
@@ -940,6 +958,24 @@ static char *modem_ipc = "n/a";
 module_param(modem_ipc, charp, 0);
 MODULE_PARM_DESC(modem_ipc, "Modem IPC setting");
 
+static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[1] = OMAP_EHCI_PORT_MODE_HSIC,
+	.port_mode[2] = OMAP_EHCI_PORT_MODE_HSIC,
+	.phy_reset  = true,
+	.reset_gpio_port[0]  = -EINVAL,
+	.reset_gpio_port[1]  = GPIO_HUB_NRESET,
+	.reset_gpio_port[2]  = GPIO_ETH_NRESET
+};
+
+static void __init omap_ehci_ohci_init(void)
+{
+	omap_mux_init_signal("gpio_172", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+	omap_mux_init_signal("gpio_173", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+	usbhs_init(&usbhs_bdata);
+	return;
+}
+
 static void __init omap_5430evm_init(void)
 {
 	int status;
@@ -973,16 +1009,24 @@ static void __init omap_5430evm_init(void)
 	if (status)
 		pr_err("Keypad initialization failed: %d\n", status);
 
+	omap_ehci_ohci_init();
 	omap_hsmmc_init(mmc);
+	usb_dwc3_init();
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
 
 	omap5evm_display_init();
 }
 
+static void __init omap_5430evm_reserve(void)
+{
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
+	omap_reserve();
+}
+
 MACHINE_START(OMAP5_SEVM, "OMAP5430 evm board")
 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
 	.atag_offset	= 0x100,
-	.reserve	= omap_reserve,
+	.reserve	= omap_5430evm_reserve,
 	.map_io		= omap5_map_io,
 	.init_early	= omap_5430evm_init_early,
 	.init_irq	= gic_init_irq,

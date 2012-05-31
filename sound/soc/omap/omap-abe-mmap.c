@@ -33,11 +33,6 @@
 #include "omap-abe-priv.h"
 #include "omap-pcm.h"
 
-int abe_pm_save_context(struct omap_abe *abe);
-int abe_pm_restore_context(struct omap_abe *abe);
-int abe_opp_recalc_level(struct omap_abe *abe);
-int abe_opp_set_level(struct omap_abe *abe, int opp);
-
 /* Ping pong buffer DMEM offset - we should read this from future FWs */
 #define OMAP_ABE_DMEM_BASE_OFFSET_PING_PONG	0x4000
 
@@ -241,9 +236,6 @@ static int aess_close(struct snd_pcm_substream *substream)
 	dev_dbg(dai->dev, "%s: %s\n", __func__, dai->name);
 
 	mutex_lock(&abe->mutex);
-
-	if (dai->id != OMAP_ABE_FRONTEND_DAI_LP_MEDIA) {
-	}
 
 	if (!--abe->active) {
 		omap_aess_disable_irq(abe->aess);

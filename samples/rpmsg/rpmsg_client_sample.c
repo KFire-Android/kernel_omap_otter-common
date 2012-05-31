@@ -22,7 +22,10 @@
 #include <linux/rpmsg.h>
 
 #define MSG		"hello world!"
-#define MSG_LIMIT	100
+
+static unsigned int send = 100;
+module_param(send, uint, S_IRUGO);
+MODULE_PARM_DESC(send, "Number of ping messages to send across");
 
 static void rpmsg_sample_cb(struct rpmsg_channel *rpdev, void *data, int len,
 						void *priv, u32 src)
@@ -36,7 +39,7 @@ static void rpmsg_sample_cb(struct rpmsg_channel *rpdev, void *data, int len,
 		       data, len,  true);
 
 	/* samples should not live forever */
-	if (rx_count >= MSG_LIMIT) {
+	if (rx_count >= send) {
 		dev_info(&rpdev->dev, "goodbye!\n");
 		return;
 	}

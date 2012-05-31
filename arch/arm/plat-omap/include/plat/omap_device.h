@@ -120,6 +120,7 @@ int omap_device_get_context_loss_count(struct platform_device *pdev);
 
 int omap_device_idle_hwmods(struct omap_device *od);
 int omap_device_enable_hwmods(struct omap_device *od);
+int omap_device_shutdown_hwmods(struct omap_device *od);
 
 int omap_device_disable_clocks(struct omap_device *od);
 int omap_device_enable_clocks(struct omap_device *od);

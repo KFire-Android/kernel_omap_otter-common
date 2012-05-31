@@ -20,6 +20,7 @@
 #include <linux/highmem.h>
 #include <linux/gfp.h>
 #include <linux/memblock.h>
+#include <linux/dma-contiguous.h>
 
 #include <asm/mach-types.h>
 #include <asm/memblock.h>
@@ -34,6 +35,8 @@
 #include <asm/mach/map.h>
 
 #include "mm.h"
+
+void __init setup_dma_zone(struct machine_desc *mdesc);
 
 static unsigned long phys_initrd_start __initdata = 0;
 static unsigned long phys_initrd_size __initdata = 0;
@@ -226,6 +229,17 @@ static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
 }
 #endif
 
+void __init setup_dma_zone(struct machine_desc *mdesc)
+{
+#ifdef CONFIG_ZONE_DMA
+	if (mdesc->dma_zone_size) {
+		arm_dma_zone_size = mdesc->dma_zone_size;
+		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
+	} else
+		arm_dma_limit = 0xffffffff;
+#endif
+}
+
 static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
 	unsigned long max_high)
 {
@@ -273,12 +287,9 @@ static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
 	 * Adjust the sizes according to any special requirements for
 	 * this machine type.
 	 */
-	if (arm_dma_zone_size) {
+	if (arm_dma_zone_size)
 		arm_adjust_dma_zone(zone_size, zhole_size,
 			arm_dma_zone_size >> PAGE_SHIFT);
-		arm_dma_limit = PHYS_OFFSET + arm_dma_zone_size - 1;
-	} else
-		arm_dma_limit = 0xffffffff;
 #endif
 
 	free_area_init_node(0, zone_size, min, zhole_size);
@@ -363,6 +374,12 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 	/* reserve any platform specific memblock areas */
 	if (mdesc->reserve)
 		mdesc->reserve();
+
+	/*
+	 * reserve memory for DMA contigouos allocations,
+	 * must come from DMA area inside low memory
+	 */
+	dma_contiguous_reserve(min(arm_dma_limit, arm_lowmem_limit));
 
 	arm_memblock_steal_permitted = false;
 	memblock_allow_resize();
@@ -728,11 +745,13 @@ void free_initmem(void)
 				    "TCM link");
 #endif
 
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
 	poison_init_mem(__init_begin, __init_end - __init_begin);
 	if (!machine_is_integrator() && !machine_is_cintegrator())
 		totalram_pages += free_area(__phys_to_pfn(__pa(__init_begin)),
 					    __phys_to_pfn(__pa(__init_end)),
 					    "init");
+#endif
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -741,12 +760,14 @@ static int keep_initrd;
 
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
 	if (!keep_initrd) {
 		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
 		totalram_pages += free_area(__phys_to_pfn(__pa(start)),
 					    __phys_to_pfn(__pa(end)),
 					    "initrd");
 	}
+#endif
 }
 
 static int __init keepinitrd_setup(char *__unused)

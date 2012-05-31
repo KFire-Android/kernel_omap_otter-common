@@ -279,6 +279,10 @@ obj-y					+= $(usbfs-m) $(usbfs-y)
 obj-y					+= usb-musb.o
 obj-y					+= omap_phy_internal.o
 
+ifneq ($(CONFIG_USB_DWC3),)
+obj-y					+= usb-dwc3.o
+endif
+
 obj-$(CONFIG_MACH_OMAP2_TUSB6010)	+= usb-tusb6010.o
 obj-y					+= usb-host.o
 
@@ -305,5 +309,11 @@ obj-y					+= common-board-devices.o twl-common.o
 emif-omap-$(CONFIG_TI_EMIF)		:= emif_omap.o
 obj-y					+= $(emif-omap-m) $(emif-omap-y)
 
-# HSI support
 obj-$(CONFIG_OMAP_HSI_DEVICE)           += omap_hsi.o
+ifneq ($(CONFIG_OMAP_REMOTEPROC),)
+obj-y					+= remoteproc.o
+endif
+
+ifneq ($(CONFIG_OMAP_RPMSG_RESMGR),)
+obj-y					+= rpmsg_resmgr.o
+endif

@@ -382,7 +382,7 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"omap-dmic-abe.0 Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 0"},
 
-	{"DMIC1", NULL, "omap-dmic-abe.2 Capture"},
+	{"DMIC1", NULL, "omap-dmic-abe.1 Capture"},
 	{"omap-dmic-abe.1 Capture", NULL, "Digital Mic1 Bias"},
 	{"Digital Mic1 Bias", NULL, "Digital Mic 1"},
 
@@ -623,7 +623,7 @@ static struct snd_soc_dai_link twl6040_only_dai[] = {
 };
 
 
-static struct snd_soc_dai_link omap_abe_dai[] = {
+static struct snd_soc_dai_link omap_abe_dai_link[] = {
 
 /*
  * Frontend DAIs - i.e. userspace visible interfaces (ALSA PCMs)
@@ -758,17 +758,18 @@ static struct snd_soc_dai_link omap_abe_dai[] = {
 		.ops = &omap_abe_mcpdm_ops,
 		.ignore_suspend = 1,
 	},
-#if 0
 	{
 		.name = "SPDIF",
-		.stream_name = "SPDIF",
-		.cpu_dai_name = "omap-mcasp-dai.0",
+		.stream_name = "SPDIF Playback",
+
+		.cpu_dai_name = "mcasp-legacy",
+		.platform_name = "omap-pcm-audio",
+
 		.codec_dai_name = "dit-hifi",	/* dummy s/pdif transciever
 						 * driver */
-		.platform_name = "omap-pcm-audio",
+		.codec_name = "spdif-dit",
 		.ignore_suspend = 1,
 	},
-#endif
 	{
 		.name = "Legacy DMIC",
 		.stream_name = "DMIC Capture",
@@ -984,6 +985,22 @@ static struct snd_soc_dai_link omap_abe_dai[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.be_hw_params_fixup = dmic_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_DMIC2,
+	},
+	{
+		.name = OMAP_ABE_BE_VXREC,
+		.stream_name = "VXREC Capture",
+
+		/* ABE components - VxREC */
+		.cpu_dai_name = "omap-abe-vxrec-dai",
+		.platform_name = "aess",
+
+		/* no codec needed */
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_id = OMAP_ABE_DAI_VXREC,
+		.ignore_suspend = 1,
 	},
 };
 
@@ -1292,8 +1309,8 @@ static __devinit int omap_abe_probe(struct platform_device *pdev)
 
 	if (pdata->has_abe) {
 		if (pdata->has_dmic) {
-			card->dai_link = omap_abe_dai;
-			card->num_links = ARRAY_SIZE(omap_abe_dai);
+			card->dai_link = omap_abe_dai_link;
+			card->num_links = ARRAY_SIZE(omap_abe_dai_link);
 		} else {
 			card->dai_link = omap_abe_no_dmic_dai;
 			card->num_links = ARRAY_SIZE(omap_abe_no_dmic_dai);

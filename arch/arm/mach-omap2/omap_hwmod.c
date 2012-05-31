@@ -344,44 +344,6 @@ static int _set_softreset(struct omap_hwmod *oh, u32 *v)
 	return 0;
 }
 
- /**
- * _set_dmadisable: set OCP_SYSCONFIG.DMADISABLE bit in @v
- * @oh: struct omap_hwmod *
- *
- * Set the DMADISABLE bit in @v for hwmod @oh.  Returns -EINVAL upon
- * error or 0 upon success.
- */
-static int _set_dmadisable(struct omap_hwmod *oh)
-{
-	u32 v;
-	u32 dmadisable_mask;
-
-	if (!oh->class->sysc ||
-		!(oh->class->sysc->sysc_flags & SYSC_HAS_DMADISABLE))
-		return -EINVAL;
-
-	if (!oh->class->sysc->sysc_fields) {
-		WARN(1, "omap_hwmod: %s: offset struct for sysconfig not provided in class\n", oh->name);
-		return -EINVAL;
-	}
-
-	/* clocks must be on for this operation */
-	if (oh->_state != _HWMOD_STATE_ENABLED) {
-		pr_warning("omap_hwmod: %s: dma can be disabled only from enabled state\n", oh->name);
-		return -EINVAL;
-	}
-
-	pr_info("omap_hwmod: %s: setting DMADISABLE\n", oh->name);
-
-	v = oh->_sysc_cache;
-	dmadisable_mask =
-		(0x1 << oh->class->sysc->sysc_fields->dmadisable_shift);
-	v |= dmadisable_mask;
-	_write_sysconfig(v, oh);
-
-	return 0;
-}
-
 /**
  * _set_module_autoidle: set the OCP_SYSCONFIG AUTOIDLE field in @v
  * @oh: struct omap_hwmod *
@@ -624,11 +586,11 @@ static int _init_main_clk(struct omap_hwmod *oh)
 			   oh->name, oh->main_clk);
 		return -EINVAL;
 	}
-
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
 	if (!oh->_clk->clkdm && !oh->clkdm_name)
 		pr_warning("omap_hwmod: %s: missing clockdomain for %s.\n",
 			   oh->name, oh->_clk->name);
-
+#endif
 	return ret;
 }
 
@@ -1544,7 +1506,6 @@ static int _reset(struct omap_hwmod *oh)
 	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
 
 	ret = (oh->class->reset) ? oh->class->reset(oh) : _ocp_softreset(oh);
-	_set_dmadisable(oh);
 
 	if (oh->class->sysc) {
 		_update_sysc_cache(oh);
@@ -1855,8 +1816,10 @@ static int _setup(struct omap_hwmod *oh, void *data)
 
 	r = _enable(oh);
 	if (r) {
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
 		pr_warning("omap_hwmod: %s: cannot be enabled (%d)\n",
 			   oh->name, oh->_state);
+#endif
 		return 0;
 	}
 

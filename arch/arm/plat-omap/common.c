@@ -22,7 +22,7 @@
 #include <plat/dsp.h>
 
 #include <plat/omap-secure.h>
-
+#include <plat/remoteproc.h>
 
 #define NO_LENGTH_CHECK 0xffffffff
 

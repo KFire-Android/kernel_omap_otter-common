@@ -316,7 +316,7 @@ void abe_init_debugfs(struct omap_abe *abe)
 
 	abe->debugfs.d_opp = debugfs_create_u32("opp_level", 0604,
 						 abe->debugfs.d_root,
-						 &abe->opp.level);
+						(u32 *)&abe->opp.level);
 	if (!abe->debugfs.d_opp)
 		dev_err(abe->dev, "Failed to create OPP level debugfs file\n");
 

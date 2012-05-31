@@ -15,32 +15,43 @@
 #include <linux/err.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
+#include <linux/slab.h>
+#include <linux/delay.h>
 #include <linux/pm_runtime.h>
 #include <plat/mailbox.h>
 #include <mach/irqs.h>
 
 #define MAILBOX_REVISION		0x000
-#define MAILBOX_MESSAGE(m)		(0x040 + 4 * (m))
-#define MAILBOX_FIFOSTATUS(m)		(0x080 + 4 * (m))
-#define MAILBOX_MSGSTATUS(m)		(0x0c0 + 4 * (m))
-#define MAILBOX_IRQSTATUS(u)		(0x100 + 8 * (u))
-#define MAILBOX_IRQENABLE(u)		(0x104 + 8 * (u))
+#define MAILBOX_SYSCONFIG		0x10
+#define MAILBOX_MESSAGE(m)		(0x040 + 0x4 * (m))
+#define MAILBOX_FIFOSTATUS(m)		(0x080 + 0x4 * (m))
+#define MAILBOX_MSGSTATUS(m)		(0x0c0 + 0x4 * (m))
+#define MAILBOX_IRQSTATUS(u)		(0x100 + 0x8 * (u))
+#define MAILBOX_IRQENABLE(u)		(0x104 + 0x8 * (u))
 
-#define OMAP4_MAILBOX_IRQSTATUS(u)	(0x104 + 10 * (u))
-#define OMAP4_MAILBOX_IRQENABLE(u)	(0x108 + 10 * (u))
-#define OMAP4_MAILBOX_IRQENABLE_CLR(u)	(0x10c + 10 * (u))
+/* These are valid for OMAP4 and OMAP5 as well */
+#define OMAP4_MAILBOX_IRQSTATUS(u)	(0x104 + 0x10 * (u))
+#define OMAP4_MAILBOX_IRQENABLE(u)	(0x108 + 0x10 * (u))
+#define OMAP4_MAILBOX_IRQENABLE_CLR(u)	(0x10c + 0x10 * (u))
 
 #define MAILBOX_IRQ_NEWMSG(m)		(1 << (2 * (m)))
 #define MAILBOX_IRQ_NOTFULL(m)		(1 << (2 * (m) + 1))
+#define MAILBOX_SOFTRESET		1
 
-#define MBOX_REG_SIZE			0x120
+#define MBOX_NUM_USER                  2
+#define MBOX_NR_REGS                   2
 
-#define OMAP4_MBOX_REG_SIZE		0x130
+/* These are valid for OMAP4 and OMAP5 as well */
+#define OMAP4_MBOX_NUM_USER            3
+#define OMAP4_MBOX_NR_REGS             3
 
-#define MBOX_NR_REGS			(MBOX_REG_SIZE / sizeof(u32))
-#define OMAP4_MBOX_NR_REGS		(OMAP4_MBOX_REG_SIZE / sizeof(u32))
+#define SET_MPU_CORE_CONSTRAINT		10
 
 static void __iomem *mbox_base;
+
+static u32 *mbox_ctx;
+static int nr_mbox_users;
+static bool context_saved;
 
 struct omap_mbox2_fifo {
 	unsigned long msg;
@@ -55,7 +66,6 @@ struct omap_mbox2_priv {
 	unsigned long irqstatus;
 	u32 newmsg_bit;
 	u32 notfull_bit;
-	u32 ctx[OMAP4_MBOX_NR_REGS];
 	unsigned long irqdisable;
 };
 
@@ -72,26 +82,77 @@ static inline void mbox_write_reg(u32 val, size_t ofs)
 	__raw_writel(val, mbox_base + ofs);
 }
 
+static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
+{
+	int i, max_iter = 100;
+
+	if (context_saved)
+		return;
+
+	/* Save irqs per user */
+	for (i = 0; i < nr_mbox_users; i++) {
+		if (cpu_is_omap44xx() || cpu_is_omap54xx())
+			mbox_ctx[i] = mbox_read_reg(OMAP4_MAILBOX_IRQENABLE(i));
+		else
+			mbox_ctx[i] = mbox_read_reg(MAILBOX_IRQENABLE(i));
+
+		dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
+							i, mbox_ctx[i]);
+	}
+
+	context_saved = true;
+
+	/*
+	 * Softreset sequence supposedly fixes user's recovery issues,
+	 * given that there might be pending messages (IRQs) that were
+	 * not serviced.
+	 *
+	 * Care must be taken given that this could override any previous
+	 * setting (e.g.: hwmod).
+	 */
+	mbox_write_reg(MAILBOX_SOFTRESET, MAILBOX_SYSCONFIG);
+	while (mbox_read_reg(MAILBOX_SYSCONFIG) & MAILBOX_SOFTRESET) {
+		if (WARN_ON(!max_iter--))
+			break;
+		udelay(1);
+	}
+}
+
+static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
+{
+	int i;
+
+	if (!context_saved)
+		return;
+
+	/* Restore irqs per user */
+	for (i = 0; i < nr_mbox_users; i++) {
+		if (cpu_is_omap44xx() || cpu_is_omap54xx())
+			mbox_write_reg(mbox_ctx[i], OMAP4_MAILBOX_IRQENABLE(i));
+		else
+			mbox_write_reg(mbox_ctx[i], MAILBOX_IRQENABLE(i));
+
+		dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
+							i, mbox_ctx[i]);
+	}
+
+	context_saved = false;
+}
+
 /* Mailbox H/W preparations */
 static int omap2_mbox_startup(struct omap_mbox *mbox)
 {
 	u32 l;
 
-	pm_runtime_enable(mbox->dev->parent);
-	pm_runtime_get_sync(mbox->dev->parent);
-
 	l = mbox_read_reg(MAILBOX_REVISION);
 	pr_debug("omap mailbox rev %d.%d\n", (l & 0xf0) >> 4, (l & 0x0f));
-
-	omap2_mbox_enable_irq(mbox, IRQ_RX);
 
 	return 0;
 }
 
 static void omap2_mbox_shutdown(struct omap_mbox *mbox)
 {
-	pm_runtime_put_sync(mbox->dev->parent);
-	pm_runtime_disable(mbox->dev->parent);
+	/* Do nothing */
 }
 
 /* Mailbox FIFO handle functions */
@@ -141,7 +202,7 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
 	struct omap_mbox2_priv *p = mbox->priv;
 	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
 
-	if (!cpu_is_omap44xx())
+	if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
 		bit = mbox_read_reg(p->irqdisable) & ~bit;
 
 	mbox_write_reg(bit, p->irqdisable);
@@ -168,40 +229,6 @@ static int omap2_mbox_is_irq(struct omap_mbox *mbox,
 	u32 status = mbox_read_reg(p->irqstatus);
 
 	return (int)(enable & status & bit);
-}
-
-static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
-{
-	int i;
-	struct omap_mbox2_priv *p = mbox->priv;
-	int nr_regs;
-	if (cpu_is_omap44xx())
-		nr_regs = OMAP4_MBOX_NR_REGS;
-	else
-		nr_regs = MBOX_NR_REGS;
-	for (i = 0; i < nr_regs; i++) {
-		p->ctx[i] = mbox_read_reg(i * sizeof(u32));
-
-		dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
-			i, p->ctx[i]);
-	}
-}
-
-static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
-{
-	int i;
-	struct omap_mbox2_priv *p = mbox->priv;
-	int nr_regs;
-	if (cpu_is_omap44xx())
-		nr_regs = OMAP4_MBOX_NR_REGS;
-	else
-		nr_regs = MBOX_NR_REGS;
-	for (i = 0; i < nr_regs; i++) {
-		mbox_write_reg(p->ctx[i], i * sizeof(u32));
-
-		dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
-			i, p->ctx[i]);
-	}
 }
 
 static struct omap_mbox_ops omap2_mbox_ops = {
@@ -293,7 +320,7 @@ struct omap_mbox *omap2_mboxes[] = {
 };
 #endif
 
-#if defined(CONFIG_ARCH_OMAP4)
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
 /* OMAP4 */
 static struct omap_mbox2_priv omap2_mbox_1_priv = {
 	.tx_fifo = {
@@ -312,9 +339,10 @@ static struct omap_mbox2_priv omap2_mbox_1_priv = {
 };
 
 struct omap_mbox mbox_1_info = {
-	.name	= "mailbox-1",
-	.ops	= &omap2_mbox_ops,
-	.priv	= &omap2_mbox_1_priv,
+	.name		= "mailbox-1",
+	.ops		= &omap2_mbox_ops,
+	.priv		= &omap2_mbox_1_priv,
+	.pm_constraint	= SET_MPU_CORE_CONSTRAINT,
 };
 
 static struct omap_mbox2_priv omap2_mbox_2_priv = {
@@ -334,9 +362,10 @@ static struct omap_mbox2_priv omap2_mbox_2_priv = {
 };
 
 struct omap_mbox mbox_2_info = {
-	.name	= "mailbox-2",
-	.ops	= &omap2_mbox_ops,
-	.priv	= &omap2_mbox_2_priv,
+	.name		= "mailbox-2",
+	.ops		= &omap2_mbox_ops,
+	.priv		= &omap2_mbox_2_priv,
+	.pm_constraint	= SET_MPU_CORE_CONSTRAINT,
 };
 
 struct omap_mbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
@@ -369,8 +398,8 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
 		list[1]->irq = platform_get_irq_byname(pdev, "iva");
 	}
 #endif
-#if defined(CONFIG_ARCH_OMAP4)
-	else if (cpu_is_omap44xx()) {
+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
+	else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		list = omap4_mboxes;
 
 		list[0]->irq = list[1]->irq = platform_get_irq(pdev, 0);
@@ -382,22 +411,37 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
 	}
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!mem)
+		return -ENODEV;
+
 	mbox_base = ioremap(mem->start, resource_size(mem));
 	if (!mbox_base)
 		return -ENOMEM;
 
-	ret = omap_mbox_register(&pdev->dev, list);
-	if (ret) {
-		iounmap(mbox_base);
-		return ret;
+	nr_mbox_users = (cpu_is_omap44xx() || cpu_is_omap54xx()) ?
+					OMAP4_MBOX_NUM_USER : MBOX_NUM_USER;
+	mbox_ctx = kzalloc(sizeof(u32) * nr_mbox_users, GFP_KERNEL);
+	if (!mbox_ctx) {
+		ret = -ENOMEM;
+		goto unmap_base;
 	}
 
+	ret = omap_mbox_register(&pdev->dev, list);
+	if (ret)
+		goto free_ctx;
+
 	return 0;
+
+free_ctx:
+	kfree(mbox_ctx);
+unmap_base:
+	iounmap(mbox_base);
+	return ret;
 }
 
 static int __devexit omap2_mbox_remove(struct platform_device *pdev)
 {
-	omap_mbox_unregister();
+	omap_mbox_unregister(&pdev->dev);
 	iounmap(mbox_base);
 	return 0;
 }
@@ -407,6 +451,7 @@ static struct platform_driver omap2_mbox_driver = {
 	.remove = __devexit_p(omap2_mbox_remove),
 	.driver = {
 		.name = "omap-mailbox",
+		.pm = &mbox_pm_ops,
 	},
 };
 

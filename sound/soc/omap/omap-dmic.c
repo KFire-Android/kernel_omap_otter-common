@@ -43,6 +43,11 @@
 #include "omap-pcm.h"
 #include "omap-dmic.h"
 
+#define OMAP_DMIC_LEGACY_MODE	0x0
+#define OMAP_DMIC_ABE_MODE	0x1
+
+#define OMAP_DMIC_DAI_MODE_MASK	0x0f
+
 struct omap_dmic {
 	struct device *dev;
 	void __iomem *io_base;
@@ -53,7 +58,9 @@ struct omap_dmic {
 	int sysclk;
 	int threshold;
 	u32 ch_enabled;
-	bool active;
+	int active;
+	bool abe_mode;
+	int running;
 	struct mutex mutex;
 };
 
@@ -109,14 +116,25 @@ static int omap_dmic_dai_startup(struct snd_pcm_substream *substream,
 				  struct snd_soc_dai *dai)
 {
 	struct omap_dmic *dmic = snd_soc_dai_get_drvdata(dai);
+	int dai_abe_mode = dai->id & OMAP_DMIC_DAI_MODE_MASK;
 	int ret = 0;
 
 	mutex_lock(&dmic->mutex);
 
-	if (!dai->active)
-		dmic->active = 1;
-	else
-		ret = -EBUSY;
+	if (!dmic->active++) {
+		dmic->abe_mode = dai_abe_mode;
+		/* DMIC FIFO configuration */
+		if (dmic->abe_mode == OMAP_DMIC_LEGACY_MODE)
+			dmic->threshold = OMAP_DMIC_THRES_MAX - 3;
+		else
+			dmic->threshold = 2;
+	} else if (dmic->abe_mode != dai_abe_mode) {
+		dev_err(dmic->dev, "Trying %s, while DMIC is in %s.\n",
+			dai_abe_mode ? "ABE mode" : "Legacy mode",
+			dmic->abe_mode ? "ABE mode" : "Legacy mode");
+		dmic->active--;
+		ret = -EINVAL;
+	}
 
 	mutex_unlock(&dmic->mutex);
 
@@ -130,8 +148,7 @@ static void omap_dmic_dai_shutdown(struct snd_pcm_substream *substream,
 
 	mutex_lock(&dmic->mutex);
 
-	if (!dai->active)
-		dmic->active = 0;
+	dmic->active--;
 
 	mutex_unlock(&dmic->mutex);
 }
@@ -204,7 +221,7 @@ static int omap_dmic_dai_hw_params(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
 	struct omap_dmic *dmic = snd_soc_dai_get_drvdata(dai);
-	int channels;
+	int channels, select_channels;
 
 	dmic->clk_div = omap_dmic_select_divider(dmic, params_rate(params));
 	if (dmic->clk_div < 0) {
@@ -215,7 +232,12 @@ static int omap_dmic_dai_hw_params(struct snd_pcm_substream *substream,
 
 	dmic->ch_enabled = 0;
 	channels = params_channels(params);
-	switch (channels) {
+	if (dmic->abe_mode == OMAP_DMIC_LEGACY_MODE)
+		select_channels = channels;
+	else
+		select_channels = 6;
+
+	switch (select_channels) {
 	case 6:
 		dmic->ch_enabled |= OMAP_DMIC_UP3_ENABLE;
 	case 4:
@@ -240,6 +262,10 @@ static int omap_dmic_dai_prepare(struct snd_pcm_substream *substream,
 {
 	struct omap_dmic *dmic = snd_soc_dai_get_drvdata(dai);
 	u32 ctrl;
+
+	/* Do not alter the configuration runtime */
+	if (dmic_is_enabled(dmic))
+		return 0;
 
 	/* Configure uplink threshold */
 	omap_dmic_write(dmic, OMAP_DMIC_FIFO_CTRL_REG, dmic->threshold);
@@ -271,10 +297,12 @@ static int omap_dmic_dai_trigger(struct snd_pcm_substream *substream,
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		omap_dmic_start(dmic);
+		if (!dmic->running++)
+			omap_dmic_start(dmic);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		omap_dmic_stop(dmic);
+		if (!--dmic->running)
+			omap_dmic_stop(dmic);
 		break;
 	default:
 		break;
@@ -420,8 +448,6 @@ static int omap_dmic_probe(struct snd_soc_dai *dai)
 	omap_dmic_write(dmic, OMAP_DMIC_CTRL_REG, 0x00);
 	pm_runtime_put_sync(dmic->dev);
 
-	/* Configure DMIC threshold value */
-	dmic->threshold = OMAP_DMIC_THRES_MAX - 3;
 	return 0;
 }
 
@@ -434,9 +460,15 @@ static int omap_dmic_remove(struct snd_soc_dai *dai)
 	return 0;
 }
 
+#define DMIC_LEGACY_DAI		(OMAP_DMIC_LEGACY_MODE | (0 << 4))
+#define DMIC_ABE_DAI_1		(OMAP_DMIC_ABE_MODE | (1 << 4))
+#define DMIC_ABE_DAI_2		(OMAP_DMIC_ABE_MODE | (2 << 4))
+#define DMIC_ABE_DAI_3		(OMAP_DMIC_ABE_MODE | (3 << 4))
+
 static struct snd_soc_dai_driver omap_dmic_dai[] = {
 {
 	.name = "omap-dmic",
+	.id	= DMIC_LEGACY_DAI,
 	.probe = omap_dmic_probe,
 	.remove = omap_dmic_remove,
 	.capture = {
@@ -450,6 +482,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 },
 {
 	.name = "omap-dmic-abe-dai-0",
+	.id	= DMIC_ABE_DAI_1,
 	.capture = {
 		.stream_name = "omap-dmic-abe.0 Capture",
 		.channels_min = 2,
@@ -461,6 +494,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 },
 {
 	.name = "omap-dmic-abe-dai-1",
+	.id	= DMIC_ABE_DAI_2,
 	.capture = {
 		.stream_name = "omap-dmic-abe.1 Capture",
 		.channels_min = 2,
@@ -472,6 +506,7 @@ static struct snd_soc_dai_driver omap_dmic_dai[] = {
 },
 {
 	.name = "omap-dmic-abe-dai-2",
+	.id	= DMIC_ABE_DAI_3,
 	.capture = {
 		.stream_name = "omap-dmic-abe.2 Capture",
 		.channels_min = 2,

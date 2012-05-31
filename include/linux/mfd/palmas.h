@@ -18,6 +18,8 @@
 #include <linux/usb/otg.h>
 #include <linux/leds.h>
 #include <linux/regmap.h>
+#include <linux/usb/phy_companion.h>
+#include <linux/platform_data/dwc3-omap.h>
 
 #define PALMAS_ID_TWL6035		1
 #define PALMAS_ID_TPS65913		2
@@ -164,6 +166,8 @@ struct palmas_resource_platform_data {
 	int regen2_mode_sleep;
 	int sysen1_mode_sleep;
 	int sysen2_mode_sleep;
+
+	int sysen2_mode_active;
 
 	/* bitfield to be loaded to NSLEEP_RES_ASSIGN */
 	u8 nsleep_res;
@@ -398,6 +402,8 @@ struct palmas_usb {
 	struct palmas *palmas;
 	struct device *dev;
 
+	struct phy_companion	comparator;
+
 	/* for vbus reporting with irqs disabled */
 	spinlock_t lock;
 
@@ -413,7 +419,7 @@ struct palmas_usb {
 
 	int vbus_enable;
 
-	u8 linkstat;
+	enum omap_dwc3_vbus_id_status linkstat;
 };
 
 #define comparator_to_palmas(x) container_of((x), struct palmas_usb, comparator)
@@ -2109,6 +2115,7 @@ enum usb_irq_events {
 #define INT3_LINE_STATE_GPADC_AUTO_1_SHIFT			1
 #define INT3_LINE_STATE_GPADC_AUTO_0				0x01
 #define INT3_LINE_STATE_GPADC_AUTO_0_SHIFT			0
+#define INT3_LINE_STATE_NONE					0x00
 
 /* Bit definitions for INT4_STATUS */
 #define INT4_STATUS_GPIO_7					0x80

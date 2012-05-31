@@ -210,7 +210,7 @@ static int ohci_omap_init(struct usb_hcd *hcd)
 
 #ifdef	CONFIG_USB_OTG
 	if (need_transceiver) {
-		ohci->transceiver = usb_get_transceiver();
+		ohci->transceiver = usb_get_phy();
 		if (ohci->transceiver) {
 			int	status = otg_set_host(ohci->transceiver->otg,
 						&ohci_to_hcd(ohci)->self);

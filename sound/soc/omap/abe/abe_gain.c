@@ -74,7 +74,7 @@
 #define max_mdb (3000)
 #define sizeof_db2lin_table (1 + ((max_mdb - min_mdb)/100))
 
-const u32 abe_db2lin_table[sizeof_db2lin_table] = {
+static const u32 abe_db2lin_table[sizeof_db2lin_table] = {
 	0x00000000,		/* SMEM coding of -120 dB */
 	0x00000000,		/* SMEM coding of -119 dB */
 	0x00000000,		/* SMEM coding of -118 dB */
@@ -228,7 +228,7 @@ const u32 abe_db2lin_table[sizeof_db2lin_table] = {
 	0x007E7DB9,		/* SMEM coding of 30 dB */
 };
 
-const u32 abe_1_alpha_iir[64] = {
+static const u32 abe_1_alpha_iir[64] = {
 	0x040002, 0x040002, 0x040002, 0x040002,	/* 0 */
 	0x50E955, 0x48CA65, 0x40E321, 0x72BE78,	/* 1 [ms] */
 	0x64BA68, 0x57DF14, 0x4C3D60, 0x41D690,	/* 2 */
@@ -247,7 +247,7 @@ const u32 abe_1_alpha_iir[64] = {
 	0x00FFFF, 0x00D743, 0x00B503, 0x009837,
 };
 
-const u32 abe_alpha_iir[64] = {
+static const u32 abe_alpha_iir[64] = {
 	0x000000, 0x000000, 0x000000, 0x000000,	/* 0 */
 	0x5E2D58, 0x6E6B3C, 0x7E39C0, 0x46A0C5,	/* 1 [ms] */
 	0x4DA2CD, 0x541079, 0x59E151, 0x5F14B9,	/* 2 */

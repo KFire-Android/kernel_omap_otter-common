@@ -183,8 +183,8 @@
  * ATC DESCRIPTORS - DESTINATIONS
  */
 #define DEST_DMEM_access	0x00
-#define DEST_MCBSP1_ TX	 0x01
-#define DEST_MCBSP2_ TX	 0x02
+#define DEST_MCBSP1_TX	 0x01
+#define DEST_MCBSP2_TX	 0x02
 #define DEST_MCBSP3_TX	 0x03
 #define DEST_SLIMBUS1_TX0 0x04
 #define DEST_SLIMBUS1_TX1 0x05
@@ -209,7 +209,7 @@
  * ATC DESCRIPTORS - SOURCES
  */
 #define SRC_DMEM_access	0x0
-#define SRC_MCBSP1_ RX 0x01
+#define SRC_MCBSP1_RX 0x01
 #define SRC_MCBSP2_RX 0x02
 #define SRC_MCBSP3_RX 0x03
 #define SRC_SLIMBUS1_RX0 0x04

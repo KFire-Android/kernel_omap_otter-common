@@ -1,0 +1,34 @@
+# Include EMP CAIF Physical drivers physical drivers
+# sourced "drivers/net/caif/Kconfig"
+
+# Some options here should be made platform dependent
+
+menu "CAIF ZOOM2/ZOOM3/BLAZE low level physical drivers"
+	depends on CAIF && MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3 || ARCH_OMAP4 || ARCH_OMAP5
+
+config CAIF_HSI_OMAP
+	tristate "CAIF HSI OMAP driver"
+	default n
+	depends on ARCH_OMAP4 || ARCH_OMAP5
+	---help---
+	CAIF OMAP HSI driver using the OMAP HSI interface.
+	This driver is required if you want to use CAIF HSI with OMAP.
+
+	Say Y here to compile support for CAIF HSI OMAP devices into the
+	kernel or say M to compile it as module.
+
+config CAIF_PHY_GPIO_AWR
+	int "AWR GPIO pin"
+	default "23"
+	depends on CAIF_TTY && CAIF_TTY_PM
+	---help---
+	Output GPIO pin for the modem AWR signal.
+
+config CAIF_PHY_GPIO_CWR
+	int "CWR GPIO pin"
+	default "156"
+	depends on CAIF_TTY && CAIF_TTY_PM
+	---help---
+	Input GPIO pin for the modem CWR signal.
+
+endmenu

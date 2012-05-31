@@ -185,8 +185,7 @@ static int arch_timer_available(void)
 	}
 
 	pr_info_once("Architected local timer running at %lu.%02luMHz.\n",
-		     arch_timer_rate / 1000000,
-		     (arch_timer_rate / 10000) % 100);
+		     arch_timer_rate / 1000000, (arch_timer_rate / 10000) % 100);
 	return 0;
 }
 

@@ -18,6 +18,10 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 #include <linux/platform_data/omap4-keypad.h>
+#include <linux/pm_runtime.h>
+#include <media/omap3isp.h>
+
+#include <linux/omap_ocp2scp.h>
 
 #include <mach/hardware.h>
 #include <mach/irqs.h>
@@ -126,6 +130,8 @@ static struct platform_device omap2cam_device = {
 	.resource	= omap2cam_resources,
 };
 #endif
+
+static struct isp_platform_data bogus_isp_pdata;
 
 #if defined(CONFIG_IOMMU_API)
 
@@ -298,19 +304,58 @@ static inline void omap_init_mbox(void) { }
 static inline void omap_init_sti(void) {}
 
 #if defined(CONFIG_SND_SOC) || defined(CONFIG_SND_SOC_MODULE)
-
 static struct platform_device omap_pcm = {
 	.name	= "omap-pcm-audio",
 	.id	= -1,
 };
 
+#if defined(CONFIG_SND_OMAP_SOC_VXREC)
+static struct platform_device omap_abe_vxrec = {
+	.name   = "omap-abe-vxrec-dai",
+	.id     = -1,
+};
+#endif
+
 static void omap_init_audio(void)
 {
 	platform_device_register(&omap_pcm);
+#if defined(CONFIG_SND_OMAP_SOC_VXREC)
+	platform_device_register(&omap_abe_vxrec);
+#endif
 }
 
 #else
 static inline void omap_init_audio(void) {}
+#endif
+
+#if defined(CONFIG_SND_OMAP_SOC_MCASP) || \
+	defined(CONFIG_SND_OMAP_SOC_MCASP_MODULE)
+static struct omap_device_pm_latency omap_mcasp_latency[] = {
+	{
+		.deactivate_func = omap_device_idle_hwmods,
+		.activate_func = omap_device_enable_hwmods,
+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+	},
+};
+
+static void omap_init_mcasp(void)
+{
+	struct omap_hwmod *oh;
+	struct platform_device *pdev;
+
+	oh = omap_hwmod_lookup("mcasp");
+	if (!oh) {
+		pr_err("could not look up mcasp hw_mod\n");
+		return;
+	}
+
+	pdev = omap_device_build("omap-mcasp", -1, oh, NULL, 0,
+				omap_mcasp_latency,
+				ARRAY_SIZE(omap_mcasp_latency), 0);
+	WARN(IS_ERR(pdev), "Can't build omap_device for omap-mcasp-audio.\n");
+}
+#else
+static inline void omap_init_mcasp(void) {}
 #endif
 
 #if defined(CONFIG_SND_OMAP_SOC_MCPDM) || \
@@ -691,6 +736,122 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
 
 #endif
 
+#if defined(CONFIG_OMAP_OCP2SCP) || defined(CONFIG_OMAP_OCP2SCP_MODULE)
+static int count_ocp2scp_devices(struct omap_ocp2scp_dev *ocp2scp_dev)
+{
+	int cnt	= 0;
+
+	while (ocp2scp_dev->drv_name != NULL) {
+		cnt++;
+		ocp2scp_dev++;
+	}
+
+	return cnt;
+}
+
+static void omap_init_ocp2scp(void)
+{
+	struct omap_hwmod	*oh;
+	struct platform_device	*pdev;
+	int			bus_id = -1, dev_cnt = 0, i;
+	struct omap_ocp2scp_dev	*ocp2scp_dev;
+	const char		*oh_name, *name;
+	struct omap_ocp2scp_platform_data *pdata;
+
+	if (cpu_is_omap44xx())
+		oh_name = "ocp2scp_usb_phy";
+	else
+		oh_name = "ocp2scp1";
+
+	name	= "omap-ocp2scp";
+
+	oh = omap_hwmod_lookup(oh_name);
+	if (!oh) {
+		pr_err("%s: could not find omap_hwmod for %s\n", __func__,
+								oh_name);
+		return;
+	}
+
+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+	if (!pdata) {
+		pr_err("%s: No memory for ocp2scp pdata\n", __func__);
+		return;
+	}
+
+	ocp2scp_dev = oh->dev_attr;
+	dev_cnt = count_ocp2scp_devices(ocp2scp_dev);
+
+	if (!dev_cnt) {
+		pr_err("%s: No devices connected to ocp2scp\n", __func__);
+		return;
+	}
+
+	pdata->devices = kzalloc(sizeof(struct omap_ocp2scp_dev *)
+					* dev_cnt, GFP_KERNEL);
+	if (!pdata->devices) {
+		pr_err("%s: No memory for ocp2scp pdata devices\n", __func__);
+		return;
+	}
+
+	for (i = 0; i < dev_cnt; i++, ocp2scp_dev++)
+		pdata->devices[i] = ocp2scp_dev;
+
+	pdata->dev_cnt	= dev_cnt;
+
+	pdev = omap_device_build(name, bus_id, oh, pdata, sizeof(*pdata), NULL,
+								0, false);
+	if (IS_ERR(pdev)) {
+		pr_err("Could not build omap_device for %s %s\n",
+						name, oh_name);
+		return;
+	}
+}
+#else
+static inline void omap_init_ocp2scp(void) { }
+#endif
+
+static __init void omap_init_dev(char *name)
+{
+	struct platform_device *pd;
+	struct omap_hwmod *oh;
+
+	oh = omap_hwmod_lookup(name);
+	if (!oh) {
+		pr_err("Could not look up %s hwmod\n", name);
+		return;
+	}
+
+	pd = omap_device_build(name, -1, oh, NULL, 0, NULL, 0, 0);
+	if (IS_ERR(pd))
+		pr_err("Can't build omap_device for %s.\n", name);
+	else
+		pm_runtime_enable(&pd->dev);
+}
+
+static void __init omap_init_fdif(void)
+{
+	if (!cpu_is_omap44xx() && !cpu_is_omap54xx())
+		return;
+
+	omap_init_dev("fdif");
+}
+
+static void __init omap_init_sl2if(void)
+{
+	if (!cpu_is_omap44xx() && !cpu_is_omap54xx())
+		return;
+
+	omap_init_dev("sl2if");
+}
+
+static void __init omap_init_iss(void)
+{
+	if (!cpu_is_omap44xx() && !cpu_is_omap54xx())
+		return;
+
+	omap_init_dev("iss");
+}
+
 /*-------------------------------------------------------------------------*/
 
 #if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
@@ -763,10 +924,12 @@ static int __init omap2_init_devices(void)
 	 */
 	omap_init_aess();
 	omap_init_audio();
+	omap_init_mcasp();
 	omap_init_mcpdm();
 	omap_init_dmic();
 	omap_init_camera();
 	omap_init_hdmi_audio();
+	omap3_init_camera(&bogus_isp_pdata);
 	omap_init_mbox();
 	omap_init_mcspi();
 	omap_init_pmu();
@@ -775,6 +938,10 @@ static int __init omap2_init_devices(void)
 	omap_init_sham();
 	omap_init_aes();
 	omap_init_vout();
+	omap_init_ocp2scp();
+	omap_init_fdif();
+	omap_init_sl2if();
+	omap_init_iss();
 
 	return 0;
 }
