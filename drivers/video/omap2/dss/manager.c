@@ -631,10 +631,10 @@ int dss_mgr_check(struct omap_overlay_manager *mgr,
 		struct omap_overlay_info **overlay_infos)
 {
 	struct omap_overlay *ovl;
+	int r;
 
 	list_for_each_entry(ovl, &mgr->overlays, list) {
 		struct omap_overlay_info *oi;
-		int r;
 
 		oi = overlay_infos[ovl->id];
 

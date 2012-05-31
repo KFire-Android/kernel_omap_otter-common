@@ -266,6 +266,9 @@ obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-omap5evm.o \
 					      hsmmc.o
 obj-$(CONFIG_MACH_OMAP5_PANDA)		+= board-omap5panda.o
 
+ifeq ($(CONFIG_OMAP_HSI_DEVICE),y)
+obj-$(CONFIG_MACH_OMAP5_SEVM)		+= board-omap5evm-modem.o
+endif
 
 # Platform specific device init code
 
@@ -312,10 +315,9 @@ obj-y					+= common-board-devices.o twl-common.o
 emif-omap-$(CONFIG_TI_EMIF)		:= emif_omap.o
 obj-y					+= $(emif-omap-m) $(emif-omap-y)
 
-
 obj-$(CONFIG_ARCH_OMAP4)		+= board-omap-identity.o
 obj-$(CONFIG_ARCH_OMAP5)		+= board-omap-identity.o
-
+obj-$(CONFIG_OMAP_HSI_DEVICE)           += omap_hsi.o
 ifneq ($(CONFIG_OMAP_REMOTEPROC),)
 obj-y					+= remoteproc.o
 endif
