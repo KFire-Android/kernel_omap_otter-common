@@ -210,10 +210,6 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 	struct snd_soc_dai_driver *codec_dai_drv = codec_dai->driver;
 	int ret = 0;
 
-	pm_runtime_get_sync(cpu_dai->dev);
-	pm_runtime_get_sync(codec_dai->dev);
-	pm_runtime_get_sync(platform->dev);
-
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
 
 	if (rtd->dai_link->no_host_mode == SND_SOC_DAI_LINK_NO_HOST)
@@ -229,6 +225,7 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 		}
 	}
 
+	pm_runtime_get_sync(cpu_dai->dev);
 	if (cpu_dai->driver->ops->startup) {
 		ret = cpu_dai->driver->ops->startup(substream, cpu_dai);
 		if (ret < 0) {
@@ -238,6 +235,7 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 		}
 	}
 
+	pm_runtime_get_sync(platform->dev);
 	if (platform->driver->ops && platform->driver->ops->open) {
 		ret = platform->driver->ops->open(substream);
 		if (ret < 0) {
@@ -247,6 +245,7 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 		}
 	}
 
+	pm_runtime_get_sync(codec_dai->dev);
 	if (codec_dai->driver->ops->startup) {
 		ret = codec_dai->driver->ops->startup(substream, codec_dai);
 		if (ret < 0) {
@@ -369,14 +368,17 @@ dynamic:
 config_err:
 	if (codec_dai->driver->ops->shutdown)
 		codec_dai->driver->ops->shutdown(substream, codec_dai);
+	pm_runtime_put(codec_dai->dev);
 
 codec_dai_err:
 	if (platform->driver->ops && platform->driver->ops->close)
 		platform->driver->ops->close(substream);
+	pm_runtime_put(platform->dev);
 
 platform_err:
 	if (cpu_dai->driver->ops->shutdown)
 		cpu_dai->driver->ops->shutdown(substream, cpu_dai);
+	pm_runtime_put(cpu_dai->dev);
 
 cpu_err:
 	if (rtd->dai_link->ops && rtd->dai_link->ops->shutdown)
@@ -385,9 +387,6 @@ cpu_err:
 machine_err:
 	mutex_unlock(&rtd->pcm_mutex);
 
-	pm_runtime_put(platform->dev);
-	pm_runtime_put(codec_dai->dev);
-	pm_runtime_put(cpu_dai->dev);
 
 	return ret;
 }
@@ -462,12 +461,15 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 
 	if (cpu_dai->driver->ops->shutdown)
 		cpu_dai->driver->ops->shutdown(substream, cpu_dai);
+	pm_runtime_put(cpu_dai->dev);
 
 	if (codec_dai->driver->ops->shutdown)
 		codec_dai->driver->ops->shutdown(substream, codec_dai);
+	pm_runtime_put(codec_dai->dev);
 
 	if (platform->driver->ops && platform->driver->ops->close)
 		platform->driver->ops->close(substream);
+	pm_runtime_put(platform->dev);
 
 	if (rtd->dai_link->ops && rtd->dai_link->ops->shutdown)
 		rtd->dai_link->ops->shutdown(substream);
@@ -494,10 +496,6 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 	}
 
 	mutex_unlock(&rtd->pcm_mutex);
-
-	pm_runtime_put(platform->dev);
-	pm_runtime_put(codec_dai->dev);
-	pm_runtime_put(cpu_dai->dev);
 
 	return 0;
 }
