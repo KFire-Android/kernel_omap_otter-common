@@ -16,11 +16,13 @@
 #include <linux/opp.h>
 #include <linux/export.h>
 #include <linux/suspend.h>
+#include <linux/pm_qos.h>
 
 #include <asm/system_misc.h>
 
 #include <plat/omap-pm.h>
 #include <plat/omap_device.h>
+#include <plat/dvfs.h>
 #include "common.h"
 
 #include "prcm-common.h"
@@ -29,6 +31,8 @@
 #include "clockdomain.h"
 #include "pm.h"
 #include "twl-common.h"
+
+static struct device *l3_dev;
 
 /*
  * omap_pm_suspend: points to a function that does the SoC-specific
@@ -400,11 +404,73 @@ static void __init omap5_init_voltages(void)
 	omap_set_init_opp("mm", "dpll_iva_h12x2_ck", "iva");
 }
 
+/* Interface to the memory throughput class of the PM QoS framework */
+static int omap2_pm_qos_tput_handler(struct notifier_block *nb,
+				     unsigned long new_value,
+				     void *unused)
+{
+	int ret = 0;
+	static struct device dummy_l3_dev = {
+		.init_name = "omap2_pm_qos_tput_handler",
+	};
+
+	pr_debug("OMAP PM MEM TPUT: new_value=%lu\n", new_value);
+
+	/* Apply the constraint */
+	if (!l3_dev) {
+		pr_err("Unable to get l3 device pointer");
+		ret = -EINVAL;
+		goto err;
+	}
+
+	/*
+	 * Add a call to the DVFS layer, using the new_value (in kB/s)
+	 * as the minimum memory throughput to calculate the L3
+	 * minimum allowed frequency
+	 */
+	/* Convert the throughput(in KiB/s) into Hz. */
+	new_value = (new_value * 1000) / 4;
+
+	ret = omap_device_scale(&dummy_l3_dev, l3_dev, new_value);
+
+err:
+	return ret;
+}
+
+static struct notifier_block omap2_pm_qos_tput_notifier = {
+	.notifier_call	= omap2_pm_qos_tput_handler,
+};
+
+static int __init omap2_pm_qos_tput_init(void)
+{
+	int ret;
+	struct omap_hwmod *oh;
+
+	ret = pm_qos_add_notifier(PM_QOS_MEMORY_THROUGHPUT,
+				  &omap2_pm_qos_tput_notifier);
+	if (ret)
+		WARN(1, KERN_ERR "Cannot add global notifier for dev PM QoS\n");
+
+
+	if (cpu_is_omap44xx() || cpu_is_omap54xx())
+		oh = omap_hwmod_lookup("l3_main_1");
+	else
+		oh = omap_hwmod_lookup("l3_main");
+
+	if (oh)
+		l3_dev = &oh->od->pdev->dev;
+
+	return ret;
+}
+
 static int __init omap2_common_pm_init(void)
 {
 	if (!of_have_populated_dt())
 		omap2_init_processor_devices();
 	omap_pm_if_init();
+
+	/* Register to the throughput class of PM QoS */
+	omap2_pm_qos_tput_init();
 
 	return 0;
 }
