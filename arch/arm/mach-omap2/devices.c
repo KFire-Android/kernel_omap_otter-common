@@ -414,7 +414,7 @@ static struct platform_device omap_omaplfb_device = {
 	.id		= -1,
 };
 
-static void omap_init_gpu(void)
+static void __init omap_init_gpu(void)
 {
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
