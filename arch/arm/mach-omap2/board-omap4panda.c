@@ -605,10 +605,6 @@ static void __init omap4_panda_reserve(void)
 {
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 
-	/* do the static reservations first */
-	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
-	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
-
 	omap4_ion_init();
 
 	omap_reserve();
