@@ -54,6 +54,7 @@
 #include "hsmmc.h"
 #include "mux.h"
 #include "omap5_ion.h"
+#include "omap_ram_console.h"
 
 /* USBB3 to SMSC LAN9730 */
 #define GPIO_ETH_NRESET	172
@@ -942,6 +943,9 @@ static void __init omap_5430evm_init(void)
 
 static void __init omap_5430evm_reserve(void)
 {
+	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
+			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
+
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
 
 	omap5_ion_init();
