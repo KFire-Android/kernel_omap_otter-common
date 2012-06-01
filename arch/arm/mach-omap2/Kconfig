@@ -428,6 +428,16 @@ config OMAP4_DPLL_CASCADING
                - Display is Off.
                - No USB.
 
+config OMAP4_ONLY_OMAP4430_DPLL_CASCADING
+       bool  "Enable DPLL Cascading for OMAP4430 only"
+       depends on OMAP4_DPLL_CASCADING
+       default y
+       help
+         Enables DPLL Cascading only for OMAP4430.
+	 Current DPLL cascading implementation is going to be used
+	 only on OMAP4430, where it provides significant power savings.
+	 Keeps DPLL cascading disabled for other OMAPs.
+
 config OMAP_RAM_CONSOLE
         bool "Enable OMAP support for Android RAM console"
         depends on ANDROID_RAM_CONSOLE
