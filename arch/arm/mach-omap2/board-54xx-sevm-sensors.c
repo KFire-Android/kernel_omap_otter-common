@@ -28,7 +28,7 @@
 
 #define OMAP5_TSL2771_INT_GPIO		149
 
-struct tsl2771_platform_data tsl2771_data = {
+static struct tsl2771_platform_data tsl2771_data = {
 	.irq_flags      = (IRQF_TRIGGER_LOW | IRQF_ONESHOT),
 	.flags          = (TSL2771_USE_ALS | TSL2771_USE_PROX),
 	.def_enable                     = 0x0,
