@@ -57,6 +57,9 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 		struct omap_hwmod *oh;
 		struct device *dev;
 
+		if (!opp_def->default_available)
+			continue;
+
 		if (!opp_def->dev_info->hwmod_name) {
 			pr_err("%s: NULL name of omap_hwmod, failing [%d].\n",
 				__func__, i);
@@ -64,7 +67,7 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 		}
 		oh = omap_hwmod_lookup(opp_def->dev_info->hwmod_name);
 		if (!oh || !oh->od) {
-			pr_debug("%s: no hwmod or odev for %s, [%d] "
+			pr_warn("%s: no hwmod or odev for %s, [%d] "
 				"cannot add OPPs.\n", __func__,
 				opp_def->dev_info->hwmod_name, i);
 			continue;
@@ -77,14 +80,6 @@ int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 				"result=%d\n",
 			       __func__, opp_def->freq,
 			       opp_def->dev_info->hwmod_name, i, r);
-		} else {
-			if (!opp_def->default_available)
-				r = opp_disable(dev, opp_def->freq);
-			if (r)
-				dev_err(dev, "%s: disable %ld failed for %s "
-					"[%d] result=%d\n",
-					__func__, opp_def->freq,
-					opp_def->dev_info->hwmod_name, i, r);
 		}
 	}
 
