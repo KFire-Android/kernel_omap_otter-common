@@ -1047,10 +1047,6 @@ static void __init omap_5430evm_reserve(void)
 {
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
 
-	/* do the static reservations first */
-	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
-	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
-
 	omap5_ion_init();
 
 	omap_reserve();
