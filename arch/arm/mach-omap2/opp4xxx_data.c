@@ -106,33 +106,63 @@ struct omap_vdd_dep_info omap443x_vddiva_dep_info[] = {
 	{.name = NULL, .dep_table = NULL, .nr_dep_entries = 0},
 };
 
+static struct device_info mpu_dev_info = {
+	.hwmod_name	= "mpu",
+	.clk_name	= "dpll_mpu_ck",
+	.voltdm_name	= "mpu_iva",
+};
+
+static struct device_info l3_dev_info = {
+	.hwmod_name	= "l3_main_1",
+	.clk_name	= "dpll_core_m5x2_ck",
+	.voltdm_name	= "core",
+};
+
+static struct device_info iva_dev_info = {
+	.hwmod_name	= "iva",
+	.clk_name	= "dpll_iva_m5x2_ck",
+	.voltdm_name	= "iva",
+};
+
+static struct device_info abe_dev_info = {
+	.hwmod_name	= "aess",
+	.clk_name	= "abe_clk",
+	.voltdm_name	= "iva",
+};
+
+static struct device_info hsi_dev_info = {
+	.hwmod_name	= "hsi",
+	.clk_name	= "hsi_fck",
+	.voltdm_name	= "core",
+};
+
 static struct omap_opp_def __initdata omap44xx_opp_def_list[] = {
 	/* MPU OPP1 - OPP50 */
-	OPP_INITIALIZER("mpu", true, 300000000, OMAP4430_VDD_MPU_OPP50_UV),
+	OPP_INITIALIZER(&mpu_dev_info, true, 300000000, OMAP4430_VDD_MPU_OPP50_UV),
 	/* MPU OPP2 - OPP100 */
-	OPP_INITIALIZER("mpu", true, 600000000, OMAP4430_VDD_MPU_OPP100_UV),
+	OPP_INITIALIZER(&mpu_dev_info, true, 600000000, OMAP4430_VDD_MPU_OPP100_UV),
 	/* MPU OPP3 - OPP-Turbo */
-	OPP_INITIALIZER("mpu", true, 800000000, OMAP4430_VDD_MPU_OPPTURBO_UV),
+	OPP_INITIALIZER(&mpu_dev_info, true, 800000000, OMAP4430_VDD_MPU_OPPTURBO_UV),
 	/* MPU OPP4 - OPP-SB */
-	OPP_INITIALIZER("mpu", true, 1008000000, OMAP4430_VDD_MPU_OPPNITRO_UV),
+	OPP_INITIALIZER(&mpu_dev_info, true, 1008000000, OMAP4430_VDD_MPU_OPPNITRO_UV),
 	/* L3 OPP1 - OPP50 */
-	OPP_INITIALIZER("l3_main_1", true, 100000000, OMAP4430_VDD_CORE_OPP50_UV),
+	OPP_INITIALIZER(&l3_dev_info, true, 100000000, OMAP4430_VDD_CORE_OPP50_UV),
 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
-	OPP_INITIALIZER("l3_main_1", true, 200000000, OMAP4430_VDD_CORE_OPP100_UV),
+	OPP_INITIALIZER(&l3_dev_info, true, 200000000, OMAP4430_VDD_CORE_OPP100_UV),
 	/* IVA OPP1 - OPP50 */
-	OPP_INITIALIZER("iva", true, 133000000, OMAP4430_VDD_IVA_OPP50_UV),
+	OPP_INITIALIZER(&iva_dev_info, true, 133000000, OMAP4430_VDD_IVA_OPP50_UV),
 	/* IVA OPP2 - OPP100 */
-	OPP_INITIALIZER("iva", true, 266100000, OMAP4430_VDD_IVA_OPP100_UV),
+	OPP_INITIALIZER(&iva_dev_info, true, 266100000, OMAP4430_VDD_IVA_OPP100_UV),
 	/* IVA OPP3 - OPP-Turbo */
-	OPP_INITIALIZER("iva", false, 332000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
+	OPP_INITIALIZER(&iva_dev_info, false, 332000000, OMAP4430_VDD_IVA_OPPTURBO_UV),
 	/* ABE OPP1 - OPP50 */
-	OPP_INITIALIZER("aess", true, 98304000, OMAP4430_VDD_IVA_OPP50_UV),
+	OPP_INITIALIZER(&abe_dev_info, true, 98304000, OMAP4430_VDD_IVA_OPP50_UV),
 	/* ABE OPP2 - OPP100 */
-	OPP_INITIALIZER("aess", true, 196608000, OMAP4430_VDD_IVA_OPP100_UV),
+	OPP_INITIALIZER(&abe_dev_info, true, 196608000, OMAP4430_VDD_IVA_OPP100_UV),
 	/* HSI OPP1 - OPP50 */
-	OPP_INITIALIZER("hsi", true, 96000000, OMAP4430_VDD_CORE_OPP50_UV),
+	OPP_INITIALIZER(&hsi_dev_info, true, 96000000, OMAP4430_VDD_CORE_OPP50_UV),
 	/* HSI OPP2 - OPP100 */
-	OPP_INITIALIZER("hsi", true, 192000000, OMAP4430_VDD_CORE_OPP100_UV),
+	OPP_INITIALIZER(&hsi_dev_info, true, 192000000, OMAP4430_VDD_CORE_OPP100_UV),
 	/* TODO: add DSP, fdif, gpu */
 };
 

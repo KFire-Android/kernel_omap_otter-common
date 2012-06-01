@@ -30,6 +30,18 @@
  */
 
 /**
+ * struct def_info - device info for OPP entry
+ * @hwmod_name:	Name of the hwmod for this domain
+ * @freq:	Frequency in hertz corresponding to this OPP
+ * @clk_name: Clock to be configured as part of dvfs
+ */
+struct device_info {
+	char *hwmod_name;
+	char *clk_name;
+	char *voltdm_name;
+};
+
+/**
  * struct omap_opp_def - OMAP OPP Definition
  * @hwmod_name:	Name of the hwmod for this domain
  * @freq:	Frequency in hertz corresponding to this OPP
@@ -48,8 +60,7 @@
  * of this - but this is handled by the appropriate driver.
  */
 struct omap_opp_def {
-	char *hwmod_name;
-
+	struct device_info *dev_info;
 	unsigned long freq;
 	unsigned long u_volt;
 
@@ -59,9 +70,9 @@ struct omap_opp_def {
 /*
  * Initialization wrapper used to define an OPP for OMAP variants.
  */
-#define OPP_INITIALIZER(_hwmod_name, _enabled, _freq, _uv)	\
+#define OPP_INITIALIZER(_dev_info, _enabled, _freq, _uv)	\
 {								\
-	.hwmod_name	= _hwmod_name,				\
+	.dev_info	= _dev_info,				\
 	.default_available	= _enabled,			\
 	.freq		= _freq,				\
 	.u_volt		= _uv,					\
