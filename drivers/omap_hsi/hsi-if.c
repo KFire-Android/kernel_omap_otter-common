@@ -674,7 +674,7 @@ int __init if_hsi_init(unsigned int port, unsigned int *channels_map,
 		return ret;
 	}
 
-	if (hsi_iface.init_chan_map == if_hsi_char_driver.ch_mask[port]) {
+	if (hsi_iface.init_chan_map == if_hsi_char_driver.ch_mask[port - 1]) {
 		pr_err("%s: No channels could be registered\n", __func__);
 		hsi_unregister_driver(&if_hsi_char_driver);
 		return -ENODEV;
