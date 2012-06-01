@@ -111,15 +111,20 @@ void __init omap44xx_voltagedomains_init(void)
 	 * for the currently-running IC
 	 */
 #ifdef CONFIG_PM_OPP
-	omap4_voltdm_mpu.volt_data = omap44xx_vdd_mpu_volt_data;
-	omap4_vdd_mpu_info.dep_vdd_info = omap443x_vddmpu_dep_info;
-
-	omap4_voltdm_iva.volt_data = omap44xx_vdd_iva_volt_data;
-	omap4_vdd_iva_info.dep_vdd_info = omap443x_vddiva_dep_info;
-
-	omap4_voltdm_core.volt_data = omap44xx_vdd_core_volt_data;
+	if (cpu_is_omap443x()) {
+		omap4_voltdm_mpu.volt_data = omap443x_vdd_mpu_volt_data;
+		omap4_voltdm_iva.volt_data = omap443x_vdd_iva_volt_data;
+		omap4_voltdm_core.volt_data = omap443x_vdd_core_volt_data;
+		omap4_vdd_mpu_info.dep_vdd_info = omap443x_vddmpu_dep_info;
+		omap4_vdd_iva_info.dep_vdd_info = omap443x_vddiva_dep_info;
+	} else if (cpu_is_omap446x()) {
+		omap4_vdd_mpu_info.volt_data = omap446x_vdd_mpu_volt_data;
+		omap4_vdd_iva_info.volt_data = omap446x_vdd_iva_volt_data;
+		omap4_vdd_core_info.volt_data = omap446x_vdd_core_volt_data;
+		omap4_vdd_mpu_info.dep_vdd_info = omap446x_vddmpu_dep_info;
+		omap4_vdd_iva_info.dep_vdd_info = omap446x_vddiva_dep_info;
+	}
 #endif
-
 	omap4_voltdm_mpu.vp_param = &omap4_mpu_vp_data;
 	omap4_voltdm_iva.vp_param = &omap4_iva_vp_data;
 	omap4_voltdm_core.vp_param = &omap4_core_vp_data;
