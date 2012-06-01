@@ -428,6 +428,17 @@ config OMAP4_ERRATA_I688
 	  In MPU case, L3 T2ASYNC FIFO and DDR T2ASYNC FIFO needs to be drained.
 	  IO barrier ensure that there is no synchronisation loss on initiators
 	  operating on both interconnect port simultaneously.
+
+config OMAP_RAM_CONSOLE
+        bool "Enable OMAP support for Android RAM console"
+        depends on ANDROID_RAM_CONSOLE
+        help
+          Select this option to enable Android RAM console support on OMAP.
+          This allows saving the kernel printk messages to a buffer in RAM, so
+          that after a kernel panic they can be viewed in the next kernel
+          invocation, by accessing /proc/last_kmsg
+          NOTE: Board file needs to invoke relevant api to enable the support
+
 endmenu
 
 endif
