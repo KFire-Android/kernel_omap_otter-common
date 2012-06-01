@@ -594,7 +594,7 @@ static irqreturn_t hsi_gdd_mpu_handler(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
-int __init hsi_gdd_init(struct hsi_dev *hsi_ctrl, const char *irq_name)
+int __devinit hsi_gdd_init(struct hsi_dev *hsi_ctrl, const char *irq_name)
 {
 	tasklet_init(&hsi_ctrl->hsi_gdd_tasklet, do_hsi_gdd_tasklet,
 		     (unsigned long)hsi_ctrl);

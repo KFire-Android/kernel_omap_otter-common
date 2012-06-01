@@ -687,7 +687,7 @@ int __init if_hsi_init(unsigned int port, unsigned int *channels_map,
 	return ret;
 }
 
-int __devexit if_hsi_exit(void)
+int if_hsi_exit(void)
 {
 	struct if_hsi_channel *channel;
 	unsigned long *address;
