@@ -1,5 +1,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/ratelimit.h>
 
 #include "common.h"
 
@@ -41,6 +42,45 @@ unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
 	}
 
 	return voltdm->pmic->vsel_to_uv(curr_vsel);
+}
+
+/**
+ * _vp_wait_for_idle() - wait for voltage processor to idle
+ * @voltdm:	voltage domain
+ * @vp:		voltage processor instance
+ *
+ * In some conditions, it is important to ensure that Voltage Processor
+ * is idle before performing operations on the Voltage Processor(VP).
+ * This is primarily to ensure that VP state machine does not enter into
+ * invalid state.
+ *
+ * Returns -ETIMEDOUT if timeout occurs - This could be critical failure
+ * as it indicates that Voltage processor might have it's state machine
+ * stuck up without recovering out(theoretically should never happen
+ * ofcourse). Returns 0 if idle state is detected.
+ *
+ * Note: callers are expected to ensure requisite checks are performed
+ * on the pointers passed.
+ */
+static inline int _vp_wait_for_idle(struct voltagedomain *voltdm,
+				    struct omap_vp_instance *vp)
+{
+	int timeout;
+
+	omap_test_timeout((voltdm->read(vp->vstatus) &
+			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
+			  timeout);
+
+	if (timeout >= VP_IDLE_TIMEOUT) {
+		/* Dont spam the console but ensure we catch attention */
+		pr_warn_ratelimited("%s: vdd_%s idle timedout\n",
+				    __func__, voltdm->name);
+		WARN_ONCE("vdd_%s idle timedout\n", voltdm->name);
+
+		return -ETIMEDOUT;
+	}
+
+	return 0;
 }
 
 static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
@@ -277,7 +317,6 @@ void omap_vp_disable(struct voltagedomain *voltdm)
 {
 	struct omap_vp_instance *vp;
 	u32 vpconfig;
-	int timeout;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -303,16 +342,10 @@ void omap_vp_disable(struct voltagedomain *voltdm)
 	vpconfig &= ~vp->common->vpconfig_vpenable;
 	voltdm->write(vpconfig, vp->vpconfig);
 
-	/*
-	 * Wait for VP idle Typical latency is <2us. Maximum latency is ~100us
-	 */
-	omap_test_timeout((voltdm->read(vp->vstatus) &
-			   vp->common->vstatus_vpidle), VP_IDLE_TIMEOUT,
-			  timeout);
-
-	if (timeout >= VP_IDLE_TIMEOUT)
-		pr_warning("%s: vdd_%s idle timedout\n",
-			__func__, voltdm->name);
+	if (_vp_wait_for_idle(voltdm, vp)) {
+		pr_warn_ratelimited("%s: vdd_%s timedout after disable!!\n",
+				    __func__, voltdm->name);
+	}
 
 	vp->enabled = false;
 

@@ -30,7 +30,11 @@ struct voltagedomain;
 #define OMAP4_VP_VDD_IVA_ID 1
 #define OMAP4_VP_VDD_MPU_ID 2
 
-/* XXX document */
+/*
+ * Time out for Voltage processor in micro seconds. Typical latency is < 2uS,
+ * but worst case latencies could be around 3-200uS depending on where we
+ * interrupted VP's operation.
+ */
 #define VP_IDLE_TIMEOUT		200
 #define VP_TRANXDONE_TIMEOUT	300
 
