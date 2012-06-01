@@ -1772,18 +1772,40 @@ int rproc_set_constraints(struct device *dev, struct rproc *rproc,
 EXPORT_SYMBOL(rproc_set_constraints);
 
 
-static void rproc_loader_thread(struct rproc *rproc)
+static int rproc_loader_thread(struct rproc *rproc)
 {
 	const struct firmware *fw;
 	struct device *dev = &rproc->dev;
+	unsigned long to;
+	int ret;
 
-	while (kobject_uevent(&dev->kobj, KOBJ_CHANGE))
-		msleep(1000);
+	/* wait until 120 secs waiting for the firmware */
+	to = jiffies + msecs_to_jiffies(120000);
 
-	request_firmware(&fw, rproc->firmware, dev);
+	/* wait until uevent can be sent */
+	do {
+		ret = kobject_uevent(&dev->kobj, KOBJ_CHANGE);
+	} while (ret && time_after(to, jiffies));
 
-	if (fw)
-		rproc_fw_config_virtio(fw, rproc);
+	if (ret) {
+		dev_err(dev, "failed waiting for udev %d\n", ret);
+		return ret;
+	}
+
+	/* make some retries in case FS is not up yet */
+	do {
+		ret = request_firmware(&fw, rproc->firmware, dev);
+	} while (ret && time_after(to, jiffies));
+
+	if (ret || !fw) {
+		dev_err(dev, "error %d requesting firmware %s\n",
+							ret, rproc->firmware);
+		return ret;
+	}
+
+	rproc_fw_config_virtio(fw, rproc);
+
+	return 0;
 }
 
 /**
