@@ -46,7 +46,7 @@
 #include <video/omap-panel-picodlp.h>
 #include <linux/wl12xx.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
-
+#include "omap4_ion.h"
 #include "mux.h"
 #include "hsmmc.h"
 #include "control.h"
@@ -990,6 +990,7 @@ static void __init omap_4430sdp_init(void)
 		pr_err("Keypad initialization failed: %d\n", status);
 
 	omap_init_dmm_tiler();
+	omap4_register_ion();
 	omap_4430sdp_display_init();
 }
 
@@ -997,6 +998,7 @@ static void __init omap_4430sdp_reserve(void)
 {
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
 	omap_reserve();
+	omap4_ion_init();
 }
 
 MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
