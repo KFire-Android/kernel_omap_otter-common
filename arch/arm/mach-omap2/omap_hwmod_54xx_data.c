@@ -628,6 +628,7 @@ static struct omap_hwmod omap54xx_l4_abe_hwmod = {
 	.prcm = {
 		.omap4 = {
 			.clkctrl_offs = OMAP54XX_CM_ABE_L4_ABE_CLKCTRL_OFFSET,
+			.context_offs = USHRT_MAX,
 		},
 	},
 	.slaves		= omap54xx_l4_abe_slaves,
