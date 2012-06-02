@@ -41,8 +41,13 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	{.exit_latency = 2 + 2 , .target_residency = 5, .valid = 1},
 	/* C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR */
 	{.exit_latency = 16 + 16 , .target_residency = 40, .valid = 1},
+
+	/*
+	 * FIXME: Errata analysis pending. Disabled C-state as CPU Forced-OFF is
+	 * not safe on ES1.0. Preventing MPU OSWR C-state for now.
+	 */
 	/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
-	{.exit_latency = 460 + 518 , .target_residency = 1100, .valid = 1},
+	{.exit_latency = 460 + 518 , .target_residency = 1100, .valid = 0},
 };
 
 #define OMAP5_NUM_STATES ARRAY_SIZE(cpuidle_params_table)
