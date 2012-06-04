@@ -54,7 +54,7 @@ static uint32_t haptics_debug;
 module_param_named(drv2667_debug, haptics_debug, uint, 0664);
 
 #ifdef DRV2667_DEBUG
-struct drv2667_reg {
+static struct drv2667_reg {
 	const char *name;
 	uint8_t reg;
 	int writeable;
@@ -74,7 +74,7 @@ struct drv2667_reg {
 	{ "PAGE",		DRV2667_PAGE, 1 },
 };
 
-struct drv2667_ram_reg {
+static struct drv2667_ram_reg {
 	const char *name;
 	uint8_t reg;
 	int writeable;
