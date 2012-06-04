@@ -305,6 +305,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 {
 	unsigned int save_state = 0;
 	unsigned int wakeup_cpu;
+	int ret;
 
 	if (omap_rev() == OMAP4430_REV_ES1_0)
 		return -ENXIO;
@@ -341,6 +342,10 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 */
 	mpuss_clear_prev_logic_pwrst();
 	if (pwrdm_read_next_pwrst(core_pd) == PWRDM_POWER_OFF) {
+		/* Save the device context to SAR RAM */
+		ret = omap_sar_save();
+		if (ret)
+			goto sar_save_failed;
 		omap4_cm_prepare_off();
 		omap4_dpll_prepare_off();
 		save_state = 3;
@@ -379,6 +384,7 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 		omap4_cm_resume_off();
 	}
 
+sar_save_failed:
 	pwrdm_post_transition(mpuss_pd);
 
 	return 0;

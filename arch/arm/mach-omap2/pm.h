@@ -166,4 +166,13 @@ static inline bool omap_pm_is_ready(void)
 	return false;
 }
 #endif
+
+#ifdef CONFIG_PM
+extern int omap_sar_save(void);
+#else
+static inline void omap_sar_save(void)
+{
+}
+#endif
+
 #endif

@@ -13,7 +13,7 @@ clock-common				= clock.o clock_common_data.o \
 					  clkt_dpll.o clkt_clksel.o
 secure-common				= omap-smc.o omap-secure.o
 omap-4-5-common				= omap4-common.o omap-wakeupgen.o \
-					  sleep4xxx_5xxx.o
+					  sleep4xxx_5xxx.o omap-sar.o
 
 obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
 obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common) $(secure-common)

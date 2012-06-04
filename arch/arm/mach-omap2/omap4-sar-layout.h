@@ -11,6 +11,32 @@
 #ifndef OMAP_ARCH_OMAP4_SAR_LAYOUT_H
 #define OMAP_ARCH_OMAP4_SAR_LAYOUT_H
 
+#include <mach/hardware.h>
+#include <mach/ctrl_module_pad_core_44xx.h>
+
+#include "cm1_44xx.h"
+#include "cm2_44xx.h"
+#include "prcm-common.h"
+
+/*
+ * The SAR RAM is maintained during Device OFF mode.
+ * It is split into 4 banks with different privilege accesses
+ *
+ * ---------------------------------------------------------------------
+ * Access mode			Bank	Address Range
+ * ---------------------------------------------------------------------
+ * HS/GP : Public		1	0x4A32_6000 - 0x4A32_6FFF (4kB)
+ * HS/GP : Public, Secured
+ * if padconfaccdisable=1	2	0x4A32_7000 - 0x4A32_73FF (1kB)
+ * HS/EMU : Secured
+ * GP : Public			3	0x4A32_8000 - 0x4A32_87FF (2kB)
+ * HS/GP :
+ * Secure Priviledge,
+ * write once.			4	0x4A32_9000 - 0x4A32_93FF (1kB)
+ * ---------------------------------------------------------------------
+ * The SAR RAM save regiter layout is fixed since restore is done by hardware.
+ */
+
 /*
  * SAR BANK offsets from base address OMAP44XX/54XX_SAR_RAM_BASE
  */

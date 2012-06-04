@@ -450,8 +450,10 @@
 #define OMAP4430_CM_CEFUSE_CEFUSE_CLKCTRL		OMAP44XX_CM2_REGADDR(OMAP4430_CM2_CEFUSE_INST, 0x0020)
 
 /* Function prototypes */
+#ifndef __ASSEMBLER__
 extern u32 omap4_cm2_read_inst_reg(s16 inst, u16 idx);
 extern void omap4_cm2_write_inst_reg(u32 val, s16 inst, u16 idx);
 extern u32 omap4_cm2_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
+#endif
 
 #endif
