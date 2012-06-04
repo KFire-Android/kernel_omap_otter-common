@@ -1362,6 +1362,11 @@ static int __devexit omap_abe_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void omap_abe_shutdown(struct platform_device *pdev)
+{
+	snd_soc_poweroff(&pdev->dev);
+}
+
 static struct platform_driver omap_abe_driver = {
 	.driver = {
 		.name = "omap-abe-twl6040",
@@ -1370,6 +1375,7 @@ static struct platform_driver omap_abe_driver = {
 	},
 	.probe = omap_abe_probe,
 	.remove = __devexit_p(omap_abe_remove),
+	.shutdown = omap_abe_shutdown,
 };
 
 module_platform_driver(omap_abe_driver);
