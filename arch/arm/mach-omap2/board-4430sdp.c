@@ -997,8 +997,8 @@ static void __init omap_4430sdp_init(void)
 static void __init omap_4430sdp_reserve(void)
 {
 	omap_rproc_reserve_cma(RPROC_CMA_OMAP4);
-	omap_reserve();
 	omap4_ion_init();
+	omap_reserve();
 }
 
 MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
