@@ -52,6 +52,7 @@ struct omap_abe_data {
 	int twl6040_power_mode;
 	int mcbsp_cfg;
 	struct snd_soc_platform *abe_platform;
+	struct twl6040 *twl6040;
 	struct i2c_client *tps6130x;
 	struct i2c_adapter *adapter;
 };
@@ -254,24 +255,50 @@ static int omap_abe_dmic_startup(struct snd_pcm_substream *substream)
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *card = rtd->card;
+	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
+	struct twl6040 *twl6040 = card_data->twl6040;
 	int ret = 0;
+
+	/* twl6040 supplies DMic PAD_CLKS */
+	ret = twl6040_power(twl6040, 1);
+	if (ret) {
+		dev_err(card->dev, "failed to enable twl6040\n");
+		return ret;
+	}
 
 	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_SYSCLK_PAD_CLKS,
 				     19200000, SND_SOC_CLOCK_IN);
 	if (ret < 0) {
 		dev_err(card->dev, "can't set DMIC in system clock\n");
-		return ret;
+		goto err;
 	}
 	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_ABE_DMIC_CLK, 2400000,
 				     SND_SOC_CLOCK_OUT);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_err(card->dev, "can't set DMIC output clock\n");
+		goto err;
+	}
 
+	return 0;
+
+err:
+	twl6040_power(twl6040, 0);
 	return ret;
+}
+
+static void omap_abe_dmic_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_card *card = rtd->card;
+	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
+	struct twl6040 *twl6040 = card_data->twl6040;
+
+	twl6040_power(twl6040, 0);
 }
 
 static struct snd_soc_ops omap_abe_dmic_ops = {
 	.startup = omap_abe_dmic_startup,
+	.shutdown = omap_abe_dmic_shutdown,
 };
 
 static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
@@ -464,6 +491,8 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
 	u32 hsotrim, left_offset, right_offset, step_mV;
 	int ret = 0;
+
+	card_data->twl6040 = codec->control_data;
 
 	/* Disable not connected paths if not used */
 	twl6040_disconnect_pin(dapm, pdata->has_hs, "Headset Stereophone");
