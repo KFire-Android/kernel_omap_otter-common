@@ -215,7 +215,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 		return -ENOMEM;
 
 	pwrst->pwrdm = pwrdm;
-	pwrst->next_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_CSWR);
+	pwrst->next_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_OSWR);
 
 	pr_debug("Default setup powerdomain %s: next_state =%d\n", pwrdm->name,
 		 pwrst->next_state);
