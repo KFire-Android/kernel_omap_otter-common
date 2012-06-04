@@ -179,6 +179,41 @@ int omap_ion_fd_to_handles(int fd, struct ion_client **client,
 	return 0;
 }
 
+int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
+		int *num_handles)
+{
+	struct ion_handle **handles;
+	struct ion_client *client;
+	int i = 0, ret = 0;
+
+	handles = kzalloc(*num_handles * sizeof(struct ion_handle *),
+			  GFP_KERNEL);
+	if (!handles)
+		return -ENOMEM;
+
+	if (export_fd_to_ion_handles) {
+		export_fd_to_ion_handles(fd,
+				&client,
+				handles,
+				num_handles);
+	} else {
+		pr_err("%s: export_fd_to_ion_handles not initialized",
+				__func__);
+		ret = -EINVAL;
+		goto exit;
+	}
+
+	for (i = 0; i < *num_handles; i++) {
+		if (handles[i])
+			buffers[i] = ion_share(client, handles[i]);
+	}
+
+exit:
+	kfree(handles);
+	return ret;
+}
+EXPORT_SYMBOL(omap_ion_share_fd_to_buffers);
+
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
 	.remove = omap_ion_remove,
