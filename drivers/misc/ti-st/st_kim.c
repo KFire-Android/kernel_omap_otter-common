@@ -383,7 +383,8 @@ static long download_firmware(struct kim_data_s *kim_gdata)
 		case ACTION_DELAY:	/* sleep */
 			pr_info("sleep command in scr");
 			action_ptr = &(((struct bts_action *)ptr)->data[0]);
-			mdelay(((struct bts_action_delay *)action_ptr)->msec);
+			msleep_interruptible(
+				((struct bts_action_delay *)action_ptr)->msec);
 			break;
 		}
 		len =
@@ -458,7 +459,7 @@ long st_kim_start(void *kim_data)
 		gpio_set_value(kim_gdata->nshutdown, GPIO_LOW);
 		mdelay(5);	/* FIXME: a proper toggle */
 		gpio_set_value(kim_gdata->nshutdown, GPIO_HIGH);
-		mdelay(100);
+		msleep_interruptible(100);
 		/* re-initialize the completion */
 		INIT_COMPLETION(kim_gdata->ldisc_installed);
 		/* send notification to UIM */
