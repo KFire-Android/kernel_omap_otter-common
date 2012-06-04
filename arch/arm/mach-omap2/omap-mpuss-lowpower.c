@@ -91,7 +91,7 @@ extern int omap5_finish_suspend(unsigned long cpu_state);
 extern void omap5_cpu_resume(void);
 
 static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
-static struct powerdomain *mpuss_pd;
+static struct powerdomain *mpuss_pd, *core_pd;
 static void __iomem *sar_base;
 
 static int default_finish_suspend(unsigned long cpu_state)
@@ -340,7 +340,9 @@ int omap_enter_lowpower(unsigned int cpu, unsigned int power_state)
 	 * In MPUSS OSWR or device OFF, interrupt controller  contest is lost.
 	 */
 	mpuss_clear_prev_logic_pwrst();
-	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OSWR)
+	if (pwrdm_read_next_pwrst(core_pd) == PWRDM_POWER_OFF)
+		save_state = 3;
+	else if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OSWR)
 		save_state = 2;
 
 	cpu_pwrdm_pre_post_transition(cpu, 1);
@@ -505,6 +507,11 @@ int __init omap_mpuss_init(void)
 	mpuss_pd = pwrdm_lookup("mpu_pwrdm");
 	if (!mpuss_pd) {
 		pr_err("Failed to lookup MPUSS power domain\n");
+		return -ENODEV;
+	}
+	core_pd = pwrdm_lookup("core_pwrdm");
+	if (!core_pd) {
+		pr_err("Failed to lookup CORE power domain\n");
 		return -ENODEV;
 	}
 	pwrdm_clear_all_prev_pwrst(mpuss_pd);
