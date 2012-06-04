@@ -89,6 +89,14 @@ static int omap4_pwrdm_clear_all_prev_pwrst(struct powerdomain *pwrdm)
 					OMAP4430_LASTPOWERSTATEENTERED_MASK,
 					pwrdm->prcm_partition,
 					pwrdm->prcm_offs, OMAP4_PM_PWSTST);
+
+	if (pwrdm->context_offs)
+		omap4_prminst_write_inst_reg(OMAP4430_LOSTCONTEXT_DFF_MASK |
+					     OMAP4430_LOSTCONTEXT_RFF_MASK,
+					     pwrdm->prcm_partition,
+					     pwrdm->prcm_offs,
+					     pwrdm->context_offs);
+
 	return 0;
 }
 
@@ -344,6 +352,36 @@ static int omap4_pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
 	return 0;
 }
 
+/**
+ * omap4_pwrdm_lost_context_rff - check if a pwrdm has lost it rff context
+ * @pwrdm: struct powerdomain * to check
+ *
+ * Checks if the powerdomain has lost its RFF context or not. Basically
+ * this means if the device has entered off or not. Returns true if the
+ * context has been lost, false otherwise.
+ */
+static bool omap4_pwrdm_lost_context_rff(struct powerdomain *pwrdm)
+{
+	u32 val;
+	s16 inst, offset;
+
+	if (!pwrdm)
+		return false;
+
+	inst = pwrdm->prcm_offs;
+	offset = pwrdm->context_offs;
+
+	if (!offset)
+		return false;
+
+	val = omap4_prminst_read_inst_reg(pwrdm->prcm_partition, inst, offset);
+
+	if (val & OMAP4430_LOSTCONTEXT_RFF_MASK)
+		return true;
+
+	return false;
+}
+
 struct pwrdm_ops omap4_pwrdm_operations = {
 	.pwrdm_set_next_pwrst	= omap4_pwrdm_set_next_pwrst,
 	.pwrdm_read_next_pwrst	= omap4_pwrdm_read_next_pwrst,
@@ -363,6 +401,7 @@ struct pwrdm_ops omap4_pwrdm_operations = {
 	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
 	.pwrdm_enable_hdwr_sar	= omap4_pwrdm_enable_hdwr_sar,
 	.pwrdm_disable_hdwr_sar	= omap4_pwrdm_disable_hdwr_sar,
+	.pwrdm_lost_context_rff = omap4_pwrdm_lost_context_rff,
 };
 
 struct pwrdm_ops omap5_pwrdm_operations = {
@@ -384,6 +423,7 @@ struct pwrdm_ops omap5_pwrdm_operations = {
 	.pwrdm_wait_transition	= omap4_pwrdm_wait_transition,
 	.pwrdm_enable_hdwr_sar	= omap4_pwrdm_enable_hdwr_sar,
 	.pwrdm_disable_hdwr_sar	= omap4_pwrdm_disable_hdwr_sar,
+	.pwrdm_lost_context_rff = omap4_pwrdm_lost_context_rff,
 	.pwrdm_enable_force_off	= omap5_pwrdm_enable_force_off,
 	.pwrdm_disable_force_off	= omap5_pwrdm_disable_force_off,
 };

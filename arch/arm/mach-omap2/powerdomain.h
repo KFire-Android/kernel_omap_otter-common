@@ -94,6 +94,7 @@ struct powerdomain;
  * @name: Powerdomain name
  * @voltdm: voltagedomain containing this powerdomain
  * @prcm_offs: the address offset from CM_BASE/PRM_BASE
+ * @context_offs: the address offset for the CONTEXT register
  * @prcm_partition: (OMAP4 only) the PRCM partition ID containing @prcm_offs
  * @pwrsts: Possible powerdomain power states
  * @pwrsts_logic_ret: Possible logic power states when pwrdm in RETENTION
@@ -119,6 +120,7 @@ struct powerdomain {
 		struct voltagedomain *ptr;
 	} voltdm;
 	const s16 prcm_offs;
+	const s16 context_offs;
 	const u8 pwrsts;
 	const u8 pwrsts_logic_ret;
 	const u8 flags;
@@ -164,6 +166,7 @@ struct powerdomain {
  * @pwrdm_wait_transition: Wait for a pd state transition to complete
  * @pwrdm_enable_force_off: Enable force off transition feature for the pd
  * @pwrdm_disable_force_off: Disable force off transition feature for the pd
+ * @pwrdm_lost_context_rff: Check if pd has lost RFF context (entered off)
  */
 struct pwrdm_ops {
 	int	(*pwrdm_set_next_pwrst)(struct powerdomain *pwrdm, u8 pwrst);
@@ -186,6 +189,7 @@ struct pwrdm_ops {
 	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
 	int	(*pwrdm_enable_force_off)(struct powerdomain *pwrdm);
 	int	(*pwrdm_disable_force_off)(struct powerdomain *pwrdm);
+	bool	(*pwrdm_lost_context_rff)(struct powerdomain *pwrdm);
 };
 
 int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);

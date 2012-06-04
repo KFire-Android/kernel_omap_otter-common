@@ -807,6 +807,10 @@ int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
 	if (!pwrdm)
 		return -EINVAL;
 
+	if (arch_pwrdm && arch_pwrdm->pwrdm_lost_context_rff &&
+	    arch_pwrdm->pwrdm_lost_context_rff(pwrdm))
+		return PWRDM_POWER_OFF;
+
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_prev_pwrst)
 		ret = arch_pwrdm->pwrdm_read_prev_pwrst(pwrdm);
 
@@ -816,6 +820,7 @@ int pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
 		else
 			ret = PWRDM_POWER_CSWR;
 	}
+
 	return ret;
 }
 
