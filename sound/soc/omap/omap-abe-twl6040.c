@@ -115,9 +115,9 @@ static int omap_abe_modem_hw_params(struct snd_pcm_substream *substream,
 		/* this need to be done for playback and/or record */
 		channels = params_channels(params);
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-			omap_mcbsp_set_rx_threshold(mcbsp, channels);
-		else
 			omap_mcbsp_set_tx_threshold(mcbsp, channels);
+		else
+			omap_mcbsp_set_rx_threshold(mcbsp, channels);
 	}
 
 	return ret;
