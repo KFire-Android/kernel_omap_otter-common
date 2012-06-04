@@ -114,7 +114,7 @@ GCDBG_FILTERDEF(gcbv, GCZONE_NONE,
 #define GC_CLIP_RESET_RIGHT	((unsigned short) ((1 << 15) - 1))
 #define GC_CLIP_RESET_BOTTOM	((unsigned short) ((1 << 15) - 1))
 
-#define GC_BASE_ALIGN	16
+#define GC_BASE_ALIGN	64
 
 #define GPU_CMD_SIZE	(sizeof(unsigned int) * 2)
 
@@ -1175,6 +1175,11 @@ struct bvformatxlate {
 #define BVFORMATINVALID \
 	{ 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } } }
 
+static struct bvformatxlate g_format_nv12 = {
+	.bitspp = 8,
+	.format = GCREG_DE_FORMAT_NV12,
+};
+
 static struct bvformatxlate formatxlate[] = {
 	/*  #0: OCDFMT_xRGB12
 		BITS=12 ALPHA=0 REVERSED=0 LEFT_JUSTIFIED=0 */
@@ -1356,6 +1361,16 @@ static int parse_format(enum ocdformat ocdformat, struct bvformatxlate **format)
 	unsigned int cont;
 
 	GCDBG(GCZONE_FORMAT, "ocdformat = 0x%08X\n", ocdformat);
+
+	switch (ocdformat) {
+	case OCDFMT_NV12:
+		GCDBG(GCZONE_FORMAT, "OCDFMT_NV12\n");
+		*format = &g_format_nv12;
+		return 1;
+
+	default:
+		break;
+	}
 
 	cs = (ocdformat & OCDFMTDEF_CS_MASK) >> OCDFMTDEF_CS_SHIFT;
 	bits = (ocdformat & OCDFMTDEF_COMPONENTSIZEMINUS1_MASK)
@@ -2265,6 +2280,12 @@ static bool same_phys_area(struct bvbuffdesc *surf1, struct bvrect *rect1,
 		if (physdesc1->pagearray == physdesc2->pagearray)
 			return equal_rects(rect1, rect2);
 
+		/* Pageoffsets must match since different buffers
+		 * can share the same first page (eg nv12).
+		 */
+		if (physdesc1->pageoffset != physdesc2->pageoffset)
+			return false;
+
 		/* Assume the same surface if first pages match. */
 		if (physdesc1->pagearray[0] == physdesc2->pagearray[0])
 			return equal_rects(rect1, rect2);
@@ -2839,6 +2860,24 @@ exit:
 	return bverror;
 }
 
+
+static inline int get_offset(struct bvbuffdesc *desc)
+{
+	int offset;
+
+	if (desc->auxtype == BVAT_PHYSDESC) {
+		struct bvphysdesc *pdesc;
+		pdesc = (struct bvphysdesc *) desc->auxptr;
+
+		offset = pdesc->pageoffset &
+			(GC_BASE_ALIGN - 1);
+	} else {
+		offset = (unsigned int) desc->virtaddr &
+			(GC_BASE_ALIGN - 1);
+	}
+	return offset;
+}
+
 static enum bverror do_blit(struct bvbltparams *bltparams,
 			    struct gcbatch *batch,
 			    struct srcinfo *srcinfo,
@@ -2962,9 +3001,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 		/* Compute the source offset in pixels needed to compensate
 		   for the surface base address misalignment if any. */
-		srcoffset = (((unsigned int) srcdesc->virtaddr
-				& (GC_BASE_ALIGN - 1)) * 8)
-				/ srcformat->bitspp;
+		srcoffset = get_offset(srcdesc) * 8 / srcformat->bitspp;
 
 		GCDBG(GCZONE_SURF, "  source offset = %d\n", srcoffset);
 
@@ -2975,7 +3012,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			srcsurfleft, srcsurftop);
 
 		/* (srcsurfleft,srcsurftop) are the coordinates of the source
-		   surface origin. PE requires 16 byte alignment of the base
+		   surface origin. PE requires alignment of the base
 		   address. Compute the alignment requirement in pixels. */
 		srcalign = 16 * 8 / srcformat->bitspp;
 
@@ -2987,29 +3024,53 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 		GCDBG(GCZONE_SURF, "  srcadjust = %d\n", srcadjust);
 
-		multisrc = (srcadjust == 0);
+		/* TODO: multisrc with nv12 format */
+		multisrc = (srcformat->format == GCREG_DE_FORMAT_NV12) ? 0 :
+			(srcadjust == 0);
 
 		GCDBG(GCZONE_DO_BLIT, "  multisrc = %d\n", multisrc);
 
-		/* Adjust the origin. */
-		srcsurfleft -= srcadjust;
+		if (multisrc) {
+			/* Adjust the origin. */
+			srcsurfleft -= srcadjust;
 
-		GCDBG(GCZONE_SURF, "  adjusted source surface origin = %d,%d\n",
-			srcsurfleft, srcsurftop);
+			GCDBG(GCZONE_SURF,
+			      "  adjusted source surface origin = %d,%d\n",
+			      srcsurfleft, srcsurftop);
 
-		/* Adjust the source rectangle for the single source walker. */
-		srcleft = dstrect->left + batch->deltaleft + srcadjust;
-		srctop = dstrect->top + batch->deltatop;
+			/* Adjust the source rectangle for the
+			 * single source walker.
+			 */
+			srcleft = dstrect->left + batch->deltaleft + srcadjust;
+			srctop = dstrect->top + batch->deltatop;
 
-		GCDBG(GCZONE_SURF, "  source %d rectangle origin = %d,%d\n",
-			i, srcleft, srctop);
+			GCDBG(GCZONE_SURF,
+			      "  source %d rectangle origin = %d,%d\n",
+			      i, srcleft, srctop);
 
-		/* Compute the surface offset in bytes. */
-		srcshift
-			= srcsurftop * (int) srcgeom->virtstride
-			+ srcsurfleft * (int) srcformat->bitspp / 8;
+			/* Compute the surface offset in bytes. */
+			srcshift
+				= srcsurftop * (int) srcgeom->virtstride
+				+ srcsurfleft * (int) srcformat->bitspp / 8;
 
-		GCDBG(GCZONE_SURF, "  srcshift = 0x%08X\n", srcshift);
+			GCDBG(GCZONE_SURF, "  srcshift = 0x%08X (%d)\n",
+			      srcshift, srcshift);
+		} else {
+			srcadjust = srcoffset % srcalign;
+
+			GCDBG(GCZONE_SURF, "  single source srcadjust = %d\n",
+			      srcadjust);
+
+			srcleft = srcrect->left + srcadjust;
+			srctop = srcrect->top;
+
+			GCDBG(GCZONE_SURF,
+			      "  source %d rectangle origin = %d,%d\n",
+			      i, srcleft, srctop);
+
+			/* No shift needed for single source walker */
+			srcshift = 0;
+		}
 
 		/***************************************************************
 		** Finalize existing blit if necessary.
@@ -3121,6 +3182,68 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 			gcmosrc->mult.reg.dstdemul
 			= GCREG_COLOR_MULTIPLY_MODES_DST_DEMULTIPLY_DISABLE;
+		}
+
+		if (srcformat->format == GCREG_DE_FORMAT_NV12) {
+			struct gcmosrcplanaryuv *yuv;
+			int uvshift;
+
+			if (multisrc && srcsurftop % 2) {
+				/* We can't shift the uv plane by
+				 * an odd number of rows.
+				 */
+				BVSETBLTERROR(BVERR_SRC1RECT,
+					      "src/dst y coordinate combination not supported");
+				goto exit;
+			}
+
+			bverror = claim_buffer(batch,
+					       sizeof(struct gcmosrcplanaryuv),
+					       (void **) &yuv);
+			if (bverror != BVERR_NONE) {
+				BVSETBLTERROR(BVERR_OOM,
+					"failed to allocate command buffer for planar yuv");
+				goto exit;
+			}
+
+			yuv->uplane_address_ldst =
+				gcmosrc_uplaneaddress_ldst[index];
+			yuv->uplane_stride_ldst =
+				gcmosrc_uplanestride_ldst[index];
+			yuv->vplane_address_ldst =
+				gcmosrc_vplaneaddress_ldst[index];
+			yuv->vplane_stride_ldst =
+				gcmosrc_vplanestride_ldst[index];
+
+			if (multisrc) {
+				/* uv plane is half height */
+				uvshift = (srcsurftop / 2) *
+					(int) srcgeom->virtstride +
+					srcsurfleft *
+					(int) srcformat->bitspp / 8;
+			} else {
+				/* No shift needed for single source walker */
+				uvshift = 0;
+			}
+
+			GCDBG(GCZONE_SURF, "  uvshift = 0x%08X (%d)\n",
+			      uvshift, uvshift);
+
+			/* add fixed offset from Y plane */
+			uvshift += srcgeom->virtstride * srcgeom->height;
+
+			GCDBG(GCZONE_SURF, "  final uvshift = 0x%08X (%d)\n",
+			      uvshift, uvshift);
+
+			yuv->uplane_address = GET_MAP_HANDLE(srcmap[i]);
+			add_fixup(batch, &yuv->uplane_address, uvshift);
+
+			yuv->uplane_stride = srcgeom->virtstride;
+
+			yuv->vplane_address = GET_MAP_HANDLE(srcmap[i]);
+			add_fixup(batch, &yuv->vplane_address, uvshift);
+
+			yuv->vplane_stride = srcgeom->virtstride;
 		}
 
 		if ((gca != NULL) && ((srccount == 1) || (i > 0))) {

@@ -8397,6 +8397,34 @@ static const struct gccmdldstate gcmosrc_stride_ldst[4] = {
 	GCLDSTATE(gcregBlock4SrcStrideRegAddrs + 3, 1),
 };
 
+static const struct gccmdldstate gcmosrc_uplaneaddress_ldst[4] = {
+	GCLDSTATE(gcregUPlaneAddressRegAddrs + 0, 1),
+	GCLDSTATE(gcregUPlaneAddressRegAddrs + 1, 1),
+	GCLDSTATE(gcregUPlaneAddressRegAddrs + 2, 1),
+	GCLDSTATE(gcregUPlaneAddressRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmosrc_uplanestride_ldst[4] = {
+	GCLDSTATE(gcregUPlaneStrideRegAddrs + 0, 1),
+	GCLDSTATE(gcregUPlaneStrideRegAddrs + 1, 1),
+	GCLDSTATE(gcregUPlaneStrideRegAddrs + 2, 1),
+	GCLDSTATE(gcregUPlaneStrideRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmosrc_vplaneaddress_ldst[4] = {
+	GCLDSTATE(gcregVPlaneAddressRegAddrs + 0, 1),
+	GCLDSTATE(gcregVPlaneAddressRegAddrs + 1, 1),
+	GCLDSTATE(gcregVPlaneAddressRegAddrs + 2, 1),
+	GCLDSTATE(gcregVPlaneAddressRegAddrs + 3, 1),
+};
+
+static const struct gccmdldstate gcmosrc_vplanestride_ldst[4] = {
+	GCLDSTATE(gcregVPlaneStrideRegAddrs + 0, 1),
+	GCLDSTATE(gcregVPlaneStrideRegAddrs + 1, 1),
+	GCLDSTATE(gcregVPlaneStrideRegAddrs + 2, 1),
+	GCLDSTATE(gcregVPlaneStrideRegAddrs + 3, 1),
+};
+
 static const struct gccmdldstate gcmosrc_rotation_ldst[4] = {
 	GCLDSTATE(gcregBlock4SrcRotationConfigRegAddrs + 0, 1),
 	GCLDSTATE(gcregBlock4SrcRotationConfigRegAddrs + 1, 1),
@@ -8558,6 +8586,24 @@ struct gcmosrc {
 			struct gcregalphacontrol reg;
 			unsigned int raw;
 		} alphacontrol;
+};
+
+struct gcmosrcplanaryuv {
+	struct gccmdldstate uplane_address_ldst;
+
+	unsigned int uplane_address;
+
+	struct gccmdldstate uplane_stride_ldst;
+
+	unsigned int uplane_stride;
+
+	struct gccmdldstate vplane_address_ldst;
+
+	unsigned int vplane_address;
+
+	struct gccmdldstate vplane_stride_ldst;
+
+	unsigned int vplane_stride;
 };
 
 struct gcmosrcalpha {
