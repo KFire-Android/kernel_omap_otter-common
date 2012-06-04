@@ -33,16 +33,32 @@
 #define	SESSEND				BIT(3)
 #define	IDDIG				BIT(4)
 
+#define	CONTROL_PHY_POWER_USB		0x00000370
+
+#define	USB_PWRCTL_CLK_CMD_MASK		0x003FC000
+#define	USB_PWRCTL_CLK_CMD_SHIFT	0xE
+
+#define	USB_PWRCTL_CLK_FREQ_MASK	0xFFC00000
+#define	USB_PWRCTL_CLK_FREQ_SHIFT	0x16
+
+#define	USB3_PHY_TX_RX_POWERON		0x3
+#define	USB3_PHY_TX_RX_POWEROFF		0x0
+
 /* USB-PHY helpers */
 #if (defined(CONFIG_OMAP4_USB_PHY)) || (defined(CONFIG_OMAP4_USB_PHY_MODULE))
 extern int omap4_usb_phy_mailbox(struct device *dev, u32 val);
-extern int omap4_usb_phy_power(struct device *dev, int on);
+extern int omap4_usb_phy_power(struct device *dev, bool on);
+extern int omap5_usb_phy_power(struct device *dev, bool on);
 #else
 static int omap4_usb_phy_mailbox(struct device *dev, u32 val)
 {
 	return 0;
 }
-static int omap4_usb_phy_power(struct device *dev, int on)
+static int omap4_usb_phy_power(struct device *dev, bool on)
+{
+	return 0;
+}
+static int omap5_usb_phy_power(struct device *dev, bool on)
 {
 	return 0;
 }
