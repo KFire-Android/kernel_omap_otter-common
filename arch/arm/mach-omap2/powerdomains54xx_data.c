@@ -55,7 +55,8 @@ static struct powerdomain core_54xx_pwrdm = {
 		[3] = PWRSTS_OFF_RET,	/* ipu_l2ram */
 		[4] = PWRSTS_OFF_RET,	/* ipu_unicache */
 	},
-	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE,
+	.flags		  = PWRDM_HAS_LOWPOWERSTATECHANGE |
+			    PWRDM_HAS_EXTRA_OFF_ENABLE,
 };
 
 /* abe_54xx_pwrdm: Audio back end power domain */

@@ -627,11 +627,20 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 {
 	u8 curr_pwrst, next_pwrst;
 	int sleep_switch = -1, ret = 0, hwsup = 0;
+	bool extra_off_enable = false;
+	bool has_extra_off = false;
 
 	if (!pwrdm || IS_ERR(pwrdm)) {
 		pr_err_ratelimited("%s: powerdomain: bad pwrdm\n",
 				   __func__);
 		return -EINVAL;
+	}
+
+	/* Check if powerdomain has extra off mode handling */
+	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE) {
+		has_extra_off = true;
+		if (pwrst == PWRDM_POWER_OFF)
+			extra_off_enable = true;
 	}
 
 	pwrst = pwrdm_get_achievable_pwrst(pwrdm, pwrst);
@@ -672,6 +681,9 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 pwrst)
 		pwrdm_state_switch(pwrdm);
 		break;
 	}
+
+	if (has_extra_off && arch_pwrdm && arch_pwrdm->pwrdm_enable_off)
+		arch_pwrdm->pwrdm_enable_off(pwrdm, extra_off_enable);
 
 out:
 	spin_unlock(&pwrdm->lock);
@@ -747,6 +759,11 @@ int pwrdm_read_next_pwrst(struct powerdomain *pwrdm)
 
 	if (!pwrdm)
 		return -EINVAL;
+
+	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE && arch_pwrdm &&
+	    arch_pwrdm->pwrdm_read_next_off &&
+	    arch_pwrdm->pwrdm_read_next_off(pwrdm))
+		return PWRDM_POWER_OFF;
 
 	if (arch_pwrdm && arch_pwrdm->pwrdm_read_next_pwrst)
 		ret = arch_pwrdm->pwrdm_read_next_pwrst(pwrdm);

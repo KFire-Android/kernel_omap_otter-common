@@ -28,6 +28,7 @@
 #include "prcm44xx.h"
 #include "cm2_44xx.h"
 #include "cminst44xx.h"
+#include "prm54xx.h"
 
 static int omap4_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
 {
@@ -382,6 +383,73 @@ static bool omap4_pwrdm_lost_context_rff(struct powerdomain *pwrdm)
 	return false;
 }
 
+/**
+ * omap4_device_set_next_state_off - setup device off state
+ * @pwrdm: struct powerdomain * to target powerdomain
+ * @enable: true if off-mode should be enabled
+ *
+ * When Device OFF is enabled, Device is allowed to perform
+ * transition to off mode as soon as all power domains in MPU, IVA
+ * and CORE voltage are in OFF or OSWR state (open switch retention)
+ */
+static void omap4_device_set_next_state_off(struct powerdomain *pwrdm,
+					    bool enable)
+{
+	u8 val = enable ? 0x1 : 0x0;
+	u16 offset, inst;
+
+	if (!(pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE))
+		return;
+
+	if (cpu_is_omap44xx()) {
+		offset = OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET;
+		inst = OMAP4430_PRM_DEVICE_INST;
+	} else if (cpu_is_omap54xx()) {
+		offset = OMAP54XX_PRM_DEVICE_OFF_CTRL_OFFSET;
+		inst = OMAP54XX_PRM_DEVICE_INST;
+	} else {
+		return;
+	}
+
+	omap4_prminst_write_inst_reg(val << OMAP4430_DEVICE_OFF_ENABLE_SHIFT,
+				     pwrdm->prcm_partition,
+				     inst, offset);
+}
+
+
+/**
+ * omap4_device_read_next_state_off - read device off state
+ * @pwrdm: struct powerdomain * to target powerdomain
+ *
+ * Checks if device off is enabled or not.
+ * Returns true if enabled, false otherwise.
+ */
+static bool omap4_device_read_next_state_off(struct powerdomain *pwrdm)
+{
+	u32 val;
+	u16 offset, inst;
+
+	if (!(pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE))
+		return false;
+
+	if (cpu_is_omap44xx()) {
+		offset = OMAP4_PRM_DEVICE_OFF_CTRL_OFFSET;
+		inst = OMAP4430_PRM_DEVICE_INST;
+	} else if (cpu_is_omap54xx()) {
+		offset = OMAP54XX_PRM_DEVICE_OFF_CTRL_OFFSET;
+		inst = OMAP54XX_PRM_DEVICE_INST;
+	} else {
+		return false;
+	}
+
+	val = omap4_prminst_read_inst_reg(pwrdm->prcm_partition,
+					  inst, offset);
+
+	val &= OMAP4430_DEVICE_OFF_ENABLE_MASK;
+
+	return val ? true : false;
+}
+
 struct pwrdm_ops omap4_pwrdm_operations = {
 	.pwrdm_set_next_pwrst	= omap4_pwrdm_set_next_pwrst,
 	.pwrdm_read_next_pwrst	= omap4_pwrdm_read_next_pwrst,
@@ -402,6 +470,8 @@ struct pwrdm_ops omap4_pwrdm_operations = {
 	.pwrdm_enable_hdwr_sar	= omap4_pwrdm_enable_hdwr_sar,
 	.pwrdm_disable_hdwr_sar	= omap4_pwrdm_disable_hdwr_sar,
 	.pwrdm_lost_context_rff = omap4_pwrdm_lost_context_rff,
+	.pwrdm_enable_off	= omap4_device_set_next_state_off,
+	.pwrdm_read_next_off	= omap4_device_read_next_state_off,
 };
 
 struct pwrdm_ops omap5_pwrdm_operations = {
@@ -426,4 +496,6 @@ struct pwrdm_ops omap5_pwrdm_operations = {
 	.pwrdm_lost_context_rff = omap4_pwrdm_lost_context_rff,
 	.pwrdm_enable_force_off	= omap5_pwrdm_enable_force_off,
 	.pwrdm_disable_force_off	= omap5_pwrdm_disable_force_off,
+	.pwrdm_enable_off	= omap4_device_set_next_state_off,
+	.pwrdm_read_next_off	= omap4_device_read_next_state_off,
 };
