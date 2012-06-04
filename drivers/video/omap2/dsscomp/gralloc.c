@@ -340,7 +340,7 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			int fb_ix = (oi->ba >> 28);
 			int fb_uv_ix = (oi->uv >> 28);
 			struct fb_info *fbi = NULL, *fbi_uv = NULL;
-			size_t size = oi->cfg.height * oi->cfg.stride;
+			size_t hs_size = oi->cfg.height * oi->cfg.stride;
 			if (fb_ix >= num_registered_fb ||
 			    (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12 &&
 			     fb_uv_ix >= num_registered_fb)) {
@@ -353,9 +353,9 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			if (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12)
 				fbi_uv = registered_fb[fb_uv_ix];
 
-			if (size + oi->ba > fbi->fix.smem_len ||
+			if (hs_size + oi->ba > fbi->fix.smem_len ||
 			    (oi->cfg.color_mode == OMAP_DSS_COLOR_NV12 &&
-			     (size >> 1) + oi->uv > fbi_uv->fix.smem_len)) {
+			     (hs_size >> 1) + oi->uv > fbi_uv->fix.smem_len)) {
 				WARN(1, "image outside of framebuffer memory");
 				goto skip_buffer;
 			}
@@ -560,10 +560,11 @@ void dsscomp_dbg_gralloc(struct seq_file *s)
 				if (!c->extra_cb || c->extra_cb_data != g)
 					continue;
 				if (i < c->dbg_used) {
-					u32 t = c->dbg_log[i].t;
+					u32 dbg_t = c->dbg_log[i].t;
 					u32 state = c->dbg_log[i].state;
 					seq_printf(s, "| % 6d.%03d %7s ",
-							t / 1000, t % 1000,
+							dbg_t / 1000,
+							dbg_t % 1000,
 							log_state_str(state));
 					go |= c->dbg_used > i + 1;
 				} else {
