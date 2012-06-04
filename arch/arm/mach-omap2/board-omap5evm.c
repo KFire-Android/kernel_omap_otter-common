@@ -926,9 +926,10 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 {
 	/* spinlock_id should be -1 for a generic lock request */
 	if (spinlock_id < 0)
-		pdata->handle = hwspin_lock_request();
+		pdata->handle = hwspin_lock_request(USE_MUTEX_LOCK);
 	else
-		pdata->handle = hwspin_lock_request_specific(spinlock_id);
+		pdata->handle = hwspin_lock_request_specific(spinlock_id,
+							USE_MUTEX_LOCK);
 
 	if (pdata->handle != NULL) {
 		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
