@@ -189,10 +189,19 @@ static struct platform_device btwilink_device = {
 	.id = -1,
 };
 
+static struct platform_device nfcwilink_device = {
+	.name = "nfcwilink",
+	.id = -1,
+};
+
+static struct platform_device *omap5evm_wilink_devs[] = {
+	&wl18xx_device,
+	&btwilink_device,
+	&nfcwilink_device,
+};
+
 static void __init omap5sevm_ti_st_init(void)
 {
-	int ret;
-
 	omap_mux_init_gpio(OMAP5_BT_NSHUTDOWN_GPIO,
 		OMAP_PIN_OUTPUT | OMAP_PIN_INPUT_PULLUP);
 	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
@@ -202,14 +211,8 @@ static void __init omap5sevm_ti_st_init(void)
 	omap_mux_init_signal("uart5_cts.uart5_cts", OMAP_PIN_INPUT_PULLUP);
 	omap_mux_init_signal("uart5_rts.uart5_rts", OMAP_PIN_OUTPUT);
 
-	ret = platform_device_register(&wl18xx_device);
-	if (ret) {
-		pr_err("error registering ti-st device: %d\n", ret);
-	} else {
-		ret = platform_device_register(&btwilink_device);
-		if (ret)
-			pr_err("error registering btwilink device: %d\n", ret);
-	}
+	platform_add_devices(omap5evm_wilink_devs,
+				ARRAY_SIZE(omap5evm_wilink_devs));
 }
 
 
