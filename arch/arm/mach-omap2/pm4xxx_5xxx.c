@@ -198,6 +198,7 @@ void omap_pm_clear_dsp_wake_up(void)
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 {
 	struct power_state *pwrst;
+	unsigned int program_state;
 
 	if (!pwrdm->pwrsts)
 		return 0;
@@ -222,14 +223,24 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 		return -ENOMEM;
 
 	pwrst->pwrdm = pwrdm;
-	pwrst->next_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_OSWR);
+
+	/* Program power domain to what state on suspend */
+	pwrst->next_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_OFF);
+	if (pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE)
+		pwrst->next_state = PWRDM_POWER_OFF;
 
 	pr_debug("Default setup powerdomain %s: next_state =%d\n", pwrdm->name,
 		 pwrst->next_state);
 
 	list_add(&pwrst->node, &pwrst_list);
 
-	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+	/*
+	 * What state to program every Power domain can enter deepest to when
+	 * not in suspend state?
+	 */
+	program_state = pwrdm_get_achievable_pwrst(pwrdm, PWRDM_POWER_OSWR);
+
+	return omap_set_pwrdm_state(pwrst->pwrdm, program_state);
 }
 
 /**
