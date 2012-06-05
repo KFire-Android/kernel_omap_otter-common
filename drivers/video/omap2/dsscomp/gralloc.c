@@ -12,6 +12,7 @@
 #include <linux/earlysuspend.h>
 #endif
 static bool blanked;
+static u32 dev_display_mask;
 
 #include <linux/ion.h>
 #include <plat/dma.h>
@@ -262,6 +263,30 @@ static void dsscomp_gralloc_do_clone(struct work_struct *work)
 	kfree(wk);
 }
 
+static bool dsscomp_is_any_device_active()
+{
+	struct omap_dss_device *dssdev;
+	u32 display_ix;
+	for (display_ix = 0 ; display_ix < cdev->num_displays ; display_ix++) {
+		dssdev = cdev->displays[display_ix];
+		if (dssdev && dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
+			dev_display_mask |= 1 << display_ix;
+			return true;
+		}
+	}
+
+	/* Blank all the mangers which were active before to
+		avoid lock ups of gralloc queue */
+	for (display_ix = 0 ; display_ix < cdev->num_displays ; display_ix++) {
+		dssdev = cdev->displays[display_ix];
+		if (dev_display_mask & 1 << display_ix) {
+			dev_display_mask &= ~(1 << display_ix);
+			dssdev->manager->blank(dssdev->manager, false);
+		}
+	}
+	return false;
+}
+
 int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 			struct tiler_pa_info **pas,
 			bool early_callback,
@@ -340,7 +365,7 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 	memset(comp, 0, sizeof(comp));
 	memset(ovl_new_use_mask, 0, sizeof(ovl_new_use_mask));
 
-	if (skip)
+	if (skip || !dsscomp_is_any_device_active())
 		goto skip_comp;
 
 	d->mode = DSSCOMP_SETUP_DISPLAY;
