@@ -383,9 +383,14 @@ static u32 get_sdram_ref_ctrl_shdw(u32 freq,
 
 static u32 get_sdram_tim_1_shdw(const struct lpddr2_timings *timings,
 		const struct lpddr2_min_tck *min_tck,
-		const struct lpddr2_addressing *addressing)
+		const struct lpddr2_addressing *addressing, u32 ip_rev)
 {
 	u32 tim1 = 0, val = 0;
+
+	if (ip_rev == EMIF_4D5) {
+		val = DIV_ROUND_UP(timings->tRTW, t_ck) - 1;
+		tim1 |= val << T_RTW_SHIFT;
+	}
 
 	val = max(min_tck->tWTR, DIV_ROUND_UP(timings->tWTR, t_ck)) - 1;
 	tim1 |= val << T_WTR_SHIFT;
@@ -416,9 +421,14 @@ static u32 get_sdram_tim_1_shdw(const struct lpddr2_timings *timings,
 
 static u32 get_sdram_tim_1_shdw_derated(const struct lpddr2_timings *timings,
 		const struct lpddr2_min_tck *min_tck,
-		const struct lpddr2_addressing *addressing)
+		const struct lpddr2_addressing *addressing, u32 ip_rev)
 {
 	u32 tim1 = 0, val = 0;
+
+	if (ip_rev == EMIF_4D5) {
+		val = DIV_ROUND_UP(timings->tRTW, t_ck) - 1;
+		tim1 |= val << T_RTW_SHIFT;
+	}
 
 	val = max(min_tck->tWTR, DIV_ROUND_UP(timings->tWTR, t_ck)) - 1;
 	tim1 = val << T_WTR_SHIFT;
@@ -457,7 +467,7 @@ static u32 get_sdram_tim_1_shdw_derated(const struct lpddr2_timings *timings,
 static u32 get_sdram_tim_2_shdw(const struct lpddr2_timings *timings,
 		const struct lpddr2_min_tck *min_tck,
 		const struct lpddr2_addressing *addressing,
-		u32 type)
+		u32 type, u32 ip_rev)
 {
 	u32 tim2 = 0, val = 0;
 
@@ -473,6 +483,11 @@ static u32 get_sdram_tim_2_shdw(const struct lpddr2_timings *timings,
 
 	/* XSRD same as XSNR for LPDDR2 */
 	tim2 |= val << T_XSRD_SHIFT;
+
+	if (ip_rev == EMIF_4D5) {
+		val = DIV_ROUND_UP(timings->tAONPD, t_ck) - 1;
+		tim2 |= val << T_ODT_SHIFT;
+	}
 
 	val = max(min_tck->tXP, DIV_ROUND_UP(timings->tXP, t_ck)) - 1;
 	tim2 |= val << T_XP_SHIFT;
@@ -1400,9 +1415,9 @@ static int get_emif_reg_values(struct emif_data *emif, u32 freq,
 
 	regs->ref_ctrl_shdw = get_sdram_ref_ctrl_shdw(freq, addressing);
 	regs->sdram_tim1_shdw = get_sdram_tim_1_shdw(timings, min_tck,
-			addressing);
+			addressing, ip_rev);
 	regs->sdram_tim2_shdw = get_sdram_tim_2_shdw(timings, min_tck,
-			addressing, type);
+			addressing, type, ip_rev);
 	regs->sdram_tim3_shdw = get_sdram_tim_3_shdw(timings, min_tck,
 		addressing, type, ip_rev, EMIF_NORMAL_TIMINGS);
 
@@ -1445,7 +1460,7 @@ static int get_emif_reg_values(struct emif_data *emif, u32 freq,
 
 		regs->sdram_tim1_shdw_derated =
 			get_sdram_tim_1_shdw_derated(timings, min_tck,
-				addressing);
+				addressing, ip_rev);
 
 		regs->sdram_tim3_shdw_derated = get_sdram_tim_3_shdw(timings,
 			min_tck, addressing, type, ip_rev,

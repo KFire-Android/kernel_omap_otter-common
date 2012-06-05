@@ -144,6 +144,8 @@ struct lpddr2_timings {
 	u32 tZQCS;
 	u32 tZQCL;
 	u32 tZQinit;
+	u32 tRTW;
+	u32 tAONPD;
 	u32 tRAS_max_ns;
 };
 
