@@ -30,6 +30,7 @@
 #include <linux/time.h>
 #include <linux/list.h>
 #include <linux/semaphore.h>
+#include <linux/debugfs.h>
 
 #include "omap_dmm_tiler.h"
 #include "omap_dmm_priv.h"
@@ -73,6 +74,24 @@ static const uint32_t reg[][4] = {
 		[PAT_DESCR]  = {DMM_PAT_DESCR__0, DMM_PAT_DESCR__1,
 				DMM_PAT_DESCR__2, DMM_PAT_DESCR__3},
 };
+
+#ifdef CONFIG_DEBUG_FS
+#ifndef CONFIG_DRM_OMAP_DISPLAY
+static struct dentry *dbgfs;
+
+static int tiler_debug_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, tiler_map_show, inode->i_private);
+}
+
+static const struct file_operations dmm_tiler_debug_fops = {
+	.open           = tiler_debug_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+#endif
+#endif
 
 /* simple allocator to grab next 16 byte aligned memory from txn */
 static void *alloc_dma(struct dmm_txn *txn, size_t sz, dma_addr_t *pa)
@@ -972,6 +991,18 @@ static int omap_dmm_probe(struct platform_device *dev)
 	}
 
 	dev_info(omap_dmm->dev, "initialized all PAT entries\n");
+
+#ifdef CONFIG_DEBUG_FS
+#ifndef CONFIG_DRM_OMAP_DISPLAY
+	dbgfs = debugfs_create_dir("dmm_tiler", NULL);
+	if (IS_ERR_OR_NULL(dbgfs))
+		dev_warn(omap_dmm->dev, "failed to create debug files\n");
+	else
+		debugfs_create_file("tiler_map", S_IRUGO,
+			dbgfs, NULL,
+			&dmm_tiler_debug_fops);
+#endif
+#endif
 
 	return 0;
 
