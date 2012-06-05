@@ -679,9 +679,9 @@ static int __init omap_rpmsg_ini(void)
 			}
 		} else if (!strcmp(rpdev->rproc_name, "dsp")) {
 			paddr = omap_dsp_get_mempool_tbase(
-					OMAP_RPROC_MEMPOOL_STATIC);
+					OMAP_RPROC_MEMPOOL_DYNAMIC);
 			psize = omap_dsp_get_mempool_tsize(
-					OMAP_RPROC_MEMPOOL_STATIC);
+					OMAP_RPROC_MEMPOOL_DYNAMIC);
 		} else
 			break;
 
