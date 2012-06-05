@@ -502,6 +502,8 @@ static inline unsigned long hdmi_get_pixel_clock(void)
 	return 0;
 }
 #endif
+
+extern struct device_attribute dev_attr_hdmi_timings;
 int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev);
 void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev);
 void omapdss_hdmi_display_set_timing(struct omap_dss_device *dssdev);
@@ -516,6 +518,10 @@ int omapdss_hdmi_set_deepcolor(struct omap_dss_device *dssdev, int val,
 		bool hdmi_restart);
 int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 					struct fb_videomode *mode);
+int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
+					struct fb_videomode *vm,
+					int code, int mode);
+int hdmi_panel_set_mode(struct fb_videomode *vm, int code, int mode);
 u8 *hdmi_read_valid_edid(void);
 int hdmi_panel_hpd_handler(int hpd);
 int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd);

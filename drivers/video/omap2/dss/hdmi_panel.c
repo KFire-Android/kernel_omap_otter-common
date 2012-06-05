@@ -145,8 +145,9 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 
 	dssdev->panel.timings = (struct omap_video_timings){640, 480, 25175, 96, 16, 48, 2 , 11, 31};
 
-	/* sysfs entry to provide user space control to set deepcolor mode */
-	if (device_create_file(&dssdev->dev, &dev_attr_deepcolor))
+	/* sysfs entry to to set deepcolor mode and hdmi_timings */
+	if (device_create_file(&dssdev->dev, &dev_attr_deepcolor) ||
+	    device_create_file(&dssdev->dev, &dev_attr_hdmi_timings))
 		DSSERR("failed to create sysfs file\n");
 
 	DSSDBG("hdmi_panel_probe x_res= %d y_res = %d\n",
@@ -164,6 +165,7 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 			gpio_to_irq(hdmi.hpd_gpio));
 		device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
 		device_remove_file(&dssdev->dev, &dev_attr_range);
+		device_remove_file(&dssdev->dev, &dev_attr_hdmi_timings);
 		return -EINVAL;
 	}
 
@@ -174,6 +176,7 @@ static void hdmi_panel_remove(struct omap_dss_device *dssdev)
 {
 	device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
 	device_remove_file(&dssdev->dev, &dev_attr_range);
+	device_remove_file(&dssdev->dev, &dev_attr_hdmi_timings);
 	free_irq(gpio_to_irq(hdmi.hpd_gpio), NULL);
 }
 
@@ -362,6 +365,10 @@ int hdmi_panel_hpd_handler(int hpd)
 	return 0;
 }
 
+int hdmi_panel_set_mode(struct fb_videomode *vm, int code, int mode)
+{
+	return omapdss_hdmi_display_set_mode2(hdmi.dssdev, vm, code, mode);
+}
 static void hdmi_get_timings(struct omap_dss_device *dssdev,
 			struct omap_video_timings *timings)
 {

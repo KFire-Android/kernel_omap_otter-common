@@ -540,6 +540,19 @@ int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 	return 0;
 }
 
+int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
+				   struct fb_videomode *vm,
+				   int code, int mode)
+{
+	/* turn the hdmi off and on to get new timings to use */
+	dssdev->driver->disable(dssdev);
+	hdmi.ip_data.cfg.timings = *vm;
+	hdmi.custom_set = 1;
+	hdmi.code = code;
+	hdmi.mode = mode;
+	return dssdev->driver->enable(dssdev);
+}
+
 int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 				  struct fb_videomode *vm)
 {
@@ -712,6 +725,137 @@ bool omapdss_hdmi_detect(void)
 
 	return r == 1;
 }
+
+static ssize_t hdmi_timings_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_videomode *t = &hdmi.ip_data.cfg.timings;
+	return snprintf(buf, PAGE_SIZE,
+			"%u,%u/%u/%u/%u,%u/%u/%u/%u,%c/%c,%s-%u\n",
+			t->pixclock ? (u32)PICOS2KHZ(t->pixclock) : 0,
+			t->xres, t->right_margin, t->left_margin, t->hsync_len,
+			t->yres, t->lower_margin, t->upper_margin, t->vsync_len,
+			(t->sync & FB_SYNC_HOR_HIGH_ACT) ? '+' : '-',
+			(t->sync & FB_SYNC_VERT_HIGH_ACT) ? '+' : '-',
+			hdmi.ip_data.cfg.cm.mode == HDMI_HDMI ? "CEA" : "VESA",
+			hdmi.ip_data.cfg.cm.code);
+}
+
+static ssize_t hdmi_timings_store(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t size)
+{
+	struct fb_videomode t = { .pixclock = 0 }, c;
+	u32 code, x, y, old_rate, new_rate = 0;
+	int mode = -1, pos = 0, pos2 = 0;
+	char hsync, vsync, ilace;
+
+	/* check for timings */
+	if (sscanf(buf, "%u,%u/%u/%u/%u,%u/%u/%u/%u,%c/%c%n",
+		&t.pixclock,
+		&t.xres, &t.right_margin, &t.left_margin, &t.hsync_len,
+		&t.yres, &t.lower_margin, &t.upper_margin, &t.vsync_len,
+		&hsync, &vsync, &pos) >= 11 &&
+		(hsync == '+' || hsync == '-') &&
+		(vsync == '+' || vsync == '-') && t.pixclock) {
+		t.sync = (hsync == '+' ? FB_SYNC_HOR_HIGH_ACT : 0) |
+			(vsync == '+' ? FB_SYNC_VERT_HIGH_ACT : 0);
+		t.pixclock = KHZ2PICOS(t.pixclock);
+		buf += pos;
+		if (*buf == ',')
+			buf++;
+	} else {
+		t.pixclock = 0;
+	}
+
+	/* check for CEA/VESA code/mode */
+	pos = 0;
+	if (sscanf(buf, "CEA-%u%n", &code, &pos) >= 1 &&
+	    code < CEA_MODEDB_SIZE) {
+		mode = HDMI_HDMI;
+		if (t.pixclock)
+			t.flag = cea_modes[code].flag;
+		else
+			t = cea_modes[code];
+	} else if (sscanf(buf, "VESA-%u%n", &code, &pos) >= 1 &&
+		   code < VESA_MODEDB_SIZE) {
+		mode = HDMI_DVI;
+		if (!t.pixclock)
+			t = vesa_modes[code];
+	} else if (!t.pixclock &&
+		   sscanf(buf, "%u*%u%c,%uHz%n",
+			  &t.xres, &t.yres, &ilace, &t.refresh, &pos) >= 4 &&
+		   (ilace == 'p' || ilace == 'i')) {
+
+		/* optional aspect ratio (defaults to 16:9) for 720p */
+		if (sscanf(buf + pos, ",%u:%u%n", &x, &y, &pos2) >= 2 &&
+		      (x * 9 == y * 16 || x * 3 == y * 4) && x) {
+			pos += pos2;
+		} else {
+			x = t.yres >= 720 ? 16 : 4;
+			y = t.yres >= 720 ? 9 : 3;
+		}
+
+		pr_err("looking for %u*%u%c,%uHz,%u:%u\n",
+		       t.xres, t.yres, ilace, t.refresh, x, y);
+		/* CEA shorthand */
+#define RATE(x) ((x) + ((x) % 6 == 5))
+		t.flag = (x * 9 == y * 16) ? FB_FLAG_RATIO_16_9 :
+							FB_FLAG_RATIO_4_3;
+		t.vmode = (ilace == 'i') ? FB_VMODE_INTERLACED :
+							FB_VMODE_NONINTERLACED;
+		for (code = 0; code < CEA_MODEDB_SIZE; code++) {
+			c = cea_modes[code];
+			if (t.xres == c.xres &&
+			    t.yres == c.yres &&
+			    RATE(t.refresh) == RATE(c.refresh) &&
+			    t.vmode == (c.vmode & FB_VMODE_MASK) &&
+			    t.flag == (c.flag &
+				(FB_FLAG_RATIO_16_9 | FB_FLAG_RATIO_4_3)))
+				break;
+		}
+		if (code >= CEA_MODEDB_SIZE)
+			return -EINVAL;
+		mode = HDMI_HDMI;
+		if (t.refresh != c.refresh)
+			new_rate = t.refresh;
+		t = c;
+	} else {
+		mode = HDMI_DVI;
+		code = 0;
+	}
+
+	if (!t.pixclock)
+		return -EINVAL;
+
+	if (new_rate || sscanf(buf + pos, ",%uHz\n", &new_rate) == 1) {
+		u64 temp;
+		new_rate = RATE(new_rate) * 1000000 /
+					(1000 + ((new_rate % 6) == 5));
+		old_rate = RATE(t.refresh) * 1000000 /
+					(1000 + ((t.refresh % 6) == 5));
+		pr_err("%u mHz => %u mHz (%u", old_rate, new_rate, t.pixclock);
+		temp = (u64) t.pixclock * old_rate;
+		do_div(temp, new_rate);
+		t.pixclock = temp;
+		pr_err("=>%u)\n", t.pixclock);
+	}
+
+	pr_info("setting %u,%u/%u/%u/%u,%u/%u/%u/%u,%c/%c,%s-%u\n",
+			t.pixclock ? (u32) PICOS2KHZ(t.pixclock) : 0,
+			t.xres, t.right_margin, t.left_margin, t.hsync_len,
+			t.yres, t.lower_margin, t.upper_margin, t.vsync_len,
+			(t.sync & FB_SYNC_HOR_HIGH_ACT) ? '+' : '-',
+			(t.sync & FB_SYNC_VERT_HIGH_ACT) ? '+' : '-',
+			mode == HDMI_HDMI ? "CEA" : "VESA",
+			code);
+
+	return hdmi_panel_set_mode(&t, code, mode) ?
+		: size;
+}
+
+DEVICE_ATTR(hdmi_timings, S_IRUGO | S_IWUSR, hdmi_timings_show,
+							hdmi_timings_store);
 
 int omapdss_hdmi_display_enable(struct omap_dss_device *dssdev)
 {
