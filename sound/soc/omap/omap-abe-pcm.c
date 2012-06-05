@@ -1328,7 +1328,7 @@ struct snd_soc_dai_driver omap_abe_dai[] = {
 		.capture = {
 			.stream_name = "MM1 Capture",
 			.channels_min = 1,
-			.channels_max = 8,
+			.channels_max = 6,
 			.rates = SNDRV_PCM_RATE_48000,
 			.formats = SNDRV_PCM_FMTBIT_S32_LE,
 		},
