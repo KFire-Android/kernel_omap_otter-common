@@ -1017,6 +1017,11 @@ int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 	if (!info.min_y_decim)
 		info.min_y_decim = 1;
 
+	/*
+	 * If fb is used directly, set zorder to 0
+	 */
+	info.zorder = 0;
+
 	r = ovl->set_overlay_info(ovl, &info);
 	if (r) {
 		DBG("ovl->setup_overlay_info failed\n");
