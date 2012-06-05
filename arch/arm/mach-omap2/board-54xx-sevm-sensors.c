@@ -23,10 +23,39 @@
 #include <linux/init.h>
 #include <linux/i2c/tsl2771.h>
 #include <linux/i2c/drv2667.h>
+#include <linux/input/mpu6050.h>
 
 #include <plat/i2c.h>
 
 #define OMAP5_TSL2771_INT_GPIO		149
+#define OMAP5_MPU6050_INT_GPIO		150
+
+static struct mpu6050_platform_data mpu6050_platform_data = {
+	.aux_i2c_supply = 0,
+	.sample_rate_div = 0,
+	.config = 0,
+	.fifo_mode = 0,
+	.flags = (MPU6050_USE_ACCEL | MPU6050_USE_GYRO),
+	.mpu6050_accel = {
+		.x_axis = 2,
+		.y_axis = 2,
+		.z_axis = 2,
+		.fsr = MPU6050_RANGE_2G,
+		.hpf = 4, /* HPF ON and cut off 0.63HZ */
+		.ctrl_mode = MPU605_MODE_MD,
+		.mode_thr_val = 1, /* Threshold value */
+		.mode_thr_dur = 5, /* Threshold duration */
+		.irqflags = IRQF_TRIGGER_HIGH,
+	},
+	.mpu6050_gyro = {
+		.def_poll_rate = 200,
+		.x_axis = 2,
+		.y_axis = 2,
+		.z_axis = 2,
+		.fsr = MPU6050_GYRO_FSR_250,
+		.config = 0,
+	},
+};
 
 static struct tsl2771_platform_data tsl2771_data = {
 	.irq_flags      = (IRQF_TRIGGER_LOW | IRQF_ONESHOT),
@@ -84,6 +113,11 @@ static struct i2c_board_info __initdata omap5evm_sensor_i2c2_boardinfo[] = {
 		I2C_BOARD_INFO("tsl2771", 0x39),
 		.platform_data = &tsl2771_data,
 		.irq = OMAP5_TSL2771_INT_GPIO,
+	},
+	{
+		I2C_BOARD_INFO("mpu6050", 0x68),
+		.platform_data = &mpu6050_platform_data,
+		.irq = OMAP5_MPU6050_INT_GPIO,
 	},
 };
 
