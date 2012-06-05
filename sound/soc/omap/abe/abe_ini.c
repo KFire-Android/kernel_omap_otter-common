@@ -105,6 +105,11 @@ static void omap_aess_reset_all_ports(struct omap_aess *abe)
 	u16 i;
 	for (i = 0; i < LAST_PORT_ID; i++)
 		omap_aess_reset_port(i);
+
+	/* Default ramp for all gains is 2ms */
+	for (i = 0; i <= OMAP_AESS_GAIN_BTUL_RIGHT; i++)
+		omap_aess_gain_ramp(abe, i, RAMP_2MS);
+
 	/* mixers' configuration */
 	omap_aess_write_mixer(abe, OMAP_AESS_MIXDL1_MM_DL, MUTE_GAIN);
 	omap_aess_write_mixer(abe, OMAP_AESS_MIXDL1_MM_UL2, MUTE_GAIN);

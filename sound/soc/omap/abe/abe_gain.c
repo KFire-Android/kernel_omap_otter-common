@@ -479,6 +479,21 @@ int omap_aess_unmute_gain(struct omap_aess *abe, u32 id)
 EXPORT_SYMBOL(omap_aess_unmute_gain);
 
 /**
+ * omap_aess_gain_ramp
+ * @id: gain name or mixer name
+ * @ramp: ramp time
+ *
+ * Sets ramp time associated with gain blocks. New ramp time will take effect
+ * until next call to omap_aess_write_gain().
+ */
+int omap_aess_gain_ramp(struct omap_aess *abe, u32 id, u32 ramp)
+{
+	abe->desired_ramp_delay_ms[id] = ramp;
+	return 0;
+}
+EXPORT_SYMBOL(omap_aess_gain_ramp);
+
+/**
  * omap_aess_write_gain
  * @id: gain name or mixer name
  * @f_g: list of input gains of the mixer
@@ -498,7 +513,7 @@ int omap_aess_write_gain(struct omap_aess *abe,
 	s32 gain_index;
 	u32 alpha, beta;
 	u32 ramp_index;
-	u32 ramp = RAMP_2MS;
+	u32 ramp;
 
 	gain_index = ((f_g - min_mdb) / 100);
 	gain_index = maximum(gain_index, 0);
@@ -507,7 +522,7 @@ int omap_aess_write_gain(struct omap_aess *abe,
 	/* save the input parameters for mute/unmute */
 	abe->desired_gains_linear[id] = lin_g;
 	abe->desired_gains_decibel[id] = f_g;
-	abe->desired_ramp_delay_ms[id] = ramp;
+	ramp = abe->desired_ramp_delay_ms[id];
 	/* SMEM address in bytes */
 	mixer_target = omap_aess_map[OMAP_AESS_SMEM_GTARGET1_ID].offset;
 	mixer_target += (id<<2);
