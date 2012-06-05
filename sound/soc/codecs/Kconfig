@@ -281,6 +281,7 @@ config SND_SOC_TWL4030
 
 config SND_SOC_TWL6040
 	tristate
+	depends on SWITCH
 
 config SND_SOC_UDA134X
        tristate
