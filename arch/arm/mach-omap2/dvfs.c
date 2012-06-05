@@ -27,7 +27,7 @@
 #include <plat/omap_hwmod.h>
 #include <plat/clock.h>
 #include <plat/dvfs.h>
-#include "voltage.h"
+#include <plat/voltage.h>
 #include "smartreflex.h"
 #include "powerdomain.h"
 #include "pm.h"

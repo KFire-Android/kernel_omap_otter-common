@@ -12,9 +12,11 @@
 #define __ARCH_ARM_OMAP_VOLTAGE_H
 
 struct voltagedomain;
+struct omap_volt_data;
 
 struct voltagedomain *voltdm_lookup(const char *name);
-int voltdm_scale(struct voltagedomain *voltdm, unsigned long target_volt);
+int voltdm_scale(struct voltagedomain *voltdm,
+		 struct omap_volt_data *target_volt);
 struct omap_volt_data *omap_voltage_get_curr_vdata(struct voltagedomain *voltdm);
 
 #endif

@@ -294,8 +294,6 @@ int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
 int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
 			  int (*fn)(struct voltagedomain *voltdm,
 				    struct powerdomain *pwrdm));
-int voltdm_scale(struct voltagedomain *voltdm,
-		 struct omap_volt_data *target_volt);
 void voltdm_reset(struct voltagedomain *voltdm);
 
 int __init __init_volt_domain_notifier_list(struct voltagedomain **voltdms);
