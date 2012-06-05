@@ -307,6 +307,7 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 	if (state == HPD_STATE_OFF) {
 		switch_set_state(&hdmi.hpd_switch, 0);
 		if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
+			hdmi_notify_hpd(dssdev, false);
 			mutex_unlock(&hdmi.hdmi_lock);
 			dssdev->driver->disable(dssdev);
 			mutex_lock(&hdmi.hdmi_lock);
@@ -317,6 +318,7 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 			mutex_unlock(&hdmi.hdmi_lock);
 			dssdev->driver->enable(dssdev);
 			mutex_lock(&hdmi.hdmi_lock);
+			hdmi_notify_hpd(dssdev, true);
 		} else if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE ||
 			   hdmi.hpd_switch.state) {
 			/* powered down after enable - skip EDID read */

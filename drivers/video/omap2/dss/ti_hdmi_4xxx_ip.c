@@ -233,17 +233,15 @@ void ti_hdmi_4xxx_pll_disable(struct hdmi_ip_data *ip_data)
 	hdmi_set_pll_pwr(ip_data, HDMI_PLLPWRCMD_ALLOFF);
 }
 
-static int hdmi_check_hpd_state(struct hdmi_ip_data *ip_data)
+int ti_hdmi_4xxx_set_phy_on_hpd(struct hdmi_ip_data *ip_data, bool hpd)
 {
 	unsigned long flags;
-	bool hpd;
 	int r;
 	/* this should be in ti_hdmi_4xxx_ip private data */
 	static DEFINE_SPINLOCK(phy_tx_lock);
 
 	spin_lock_irqsave(&phy_tx_lock, flags);
 
-	hpd = gpio_get_value(ip_data->hpd_gpio);
 
 	if (hpd == ip_data->phy_tx_enabled) {
 		spin_unlock_irqrestore(&phy_tx_lock, flags);
@@ -273,21 +271,13 @@ err:
 	return r;
 }
 
-static irqreturn_t hpd_irq_handler(int irq, void *data)
-{
-	struct hdmi_ip_data *ip_data = data;
-
-	hdmi_check_hpd_state(ip_data);
-
-	return IRQ_HANDLED;
-}
-
 int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 {
 	u16 r = 0;
 	void __iomem *phy_base = hdmi_phy_base(ip_data);
 	unsigned long pclk = ip_data->cfg.timings.pixclock;
 	u16 freqout = 1;
+	bool hpd;
 	pclk = pclk ? PICOS2KHZ(pclk) : 0;
 
 	r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_LDOON);
@@ -334,19 +324,10 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 	/* Write to phy address 3 to change the polarity control */
 	REG_FLD_MOD(phy_base, HDMI_TXPHY_PAD_CFG_CTRL, 0x1, 27, 27);
 
-	r = request_threaded_irq(gpio_to_irq(ip_data->hpd_gpio),
-			NULL, hpd_irq_handler,
-			IRQF_DISABLED | IRQF_TRIGGER_RISING |
-			IRQF_TRIGGER_FALLING, "hpd", ip_data);
-	if (r) {
-		DSSERR("HPD IRQ request failed\n");
-		hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
-		return r;
-	}
+	hpd = gpio_get_value(ip_data->hpd_gpio);
 
-	r = hdmi_check_hpd_state(ip_data);
+	r = ti_hdmi_4xxx_set_phy_on_hpd(ip_data, hpd);
 	if (r) {
-		free_irq(gpio_to_irq(ip_data->hpd_gpio), ip_data);
 		hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
 		return r;
 	}
@@ -360,7 +341,6 @@ int ti_hdmi_4xxx_phy_enable(struct hdmi_ip_data *ip_data)
 
 void ti_hdmi_4xxx_phy_disable(struct hdmi_ip_data *ip_data)
 {
-	free_irq(gpio_to_irq(ip_data->hpd_gpio), ip_data);
 
 	hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_OFF);
 	ip_data->phy_tx_enabled = false;

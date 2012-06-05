@@ -512,6 +512,11 @@ int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 	return r1 ? : r2;
 }
 
+int hdmi_notify_hpd(struct omap_dss_device *dssdev, bool hpd)
+{
+	return hdmi.ip_data.ops->set_phy(&hdmi.ip_data, hpd);
+}
+
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
 					struct s3d_disp_info *info, int code)
 {
