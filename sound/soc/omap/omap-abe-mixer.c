@@ -386,6 +386,17 @@ static int volume_put_mixer(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
+static int do_volume_put_gain(struct omap_abe *abe,
+	struct soc_mixer_control *mc, int lval, int rval)
+{
+	omap_abe_pm_runtime_get_sync(abe);
+	omap_aess_write_gain(abe->aess, mc->shift, abe_val_to_gain(lval));
+	omap_aess_write_gain(abe->aess, mc->rshift, abe_val_to_gain(rval));
+	omap_abe_pm_runtime_put_sync(abe);
+
+	return 1;
+}
+
 static int volume_put_gain(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
@@ -393,16 +404,36 @@ static int volume_put_gain(struct snd_kcontrol *kcontrol,
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
 	struct soc_mixer_control *mc =
 		(struct soc_mixer_control *)kcontrol->private_value;
+	int lval = ucontrol->value.integer.value[0];
+	int rval = ucontrol->value.integer.value[1];
 
-	omap_abe_pm_runtime_get_sync(abe);
-	/*SEBG: Ramp 2ms */
-	omap_aess_write_gain(abe->aess, mc->shift,
-		       abe_val_to_gain(ucontrol->value.integer.value[0]));
-	omap_aess_write_gain(abe->aess, mc->rshift,
-		       abe_val_to_gain(ucontrol->value.integer.value[1]));
-	omap_abe_pm_runtime_put_sync(abe);
+	return do_volume_put_gain(abe, mc, lval, rval);
+}
 
-	return 1;
+static int volume_put_dmic_gain(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_platform *platform = snd_kcontrol_chip(kcontrol);
+	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+	int lval = ucontrol->value.integer.value[0];
+	int rval = ucontrol->value.integer.value[1];
+	int ramp = RAMP_2MS;
+
+	/* DMic's typ. need 10ms to settle after applying bias and clocks.
+	 * The OMAP DMic module is unable to start the clocks independent
+	 * of starting the sDMA transfer, so there will always be a pop.
+	 * This is worked around by setting a slower ramp for everything
+	 * except muting.
+	 */
+	if ((lval >= 0) && (rval >= 0))
+		ramp = RAMP_50MS;
+
+	omap_aess_gain_ramp(abe->aess, mc->shift, ramp);
+	omap_aess_gain_ramp(abe->aess, mc->rshift, ramp);
+
+	return do_volume_put_gain(abe, mc, lval, rval);
 }
 
 static int volume_get_mixer(struct snd_kcontrol *kcontrol,
@@ -718,15 +749,15 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	/* DMIC gains */
 	SOC_DOUBLE_EXT_TLV("DMIC1 UL Volume",
 		GAINS_DMIC1, OMAP_AESS_GAIN_DMIC1_LEFT, OMAP_AESS_GAIN_DMIC1_RIGHT, 149, 0,
-		volume_get_gain, volume_put_gain, dmic_tlv),
+		volume_get_gain, volume_put_dmic_gain, dmic_tlv),
 
 	SOC_DOUBLE_EXT_TLV("DMIC2 UL Volume",
 		GAINS_DMIC2, OMAP_AESS_GAIN_DMIC2_LEFT, OMAP_AESS_GAIN_DMIC2_RIGHT, 149, 0,
-		volume_get_gain, volume_put_gain, dmic_tlv),
+		volume_get_gain, volume_put_dmic_gain, dmic_tlv),
 
 	SOC_DOUBLE_EXT_TLV("DMIC3 UL Volume",
 		GAINS_DMIC3, OMAP_AESS_GAIN_DMIC3_LEFT, OMAP_AESS_GAIN_DMIC3_RIGHT, 149, 0,
-		volume_get_gain, volume_put_gain, dmic_tlv),
+		volume_get_gain, volume_put_dmic_gain, dmic_tlv),
 
 	SOC_DOUBLE_EXT_TLV("AMIC UL Volume",
 		GAINS_AMIC, OMAP_AESS_GAIN_AMIC_LEFT, OMAP_AESS_GAIN_AMIC_RIGHT, 149, 0,
