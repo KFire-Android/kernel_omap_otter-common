@@ -574,6 +574,8 @@ struct omap_dss_device {
 
 	enum omap_channel channel;
 
+	bool sync_lost_error;
+
 	bool first_vsync;
 
 	union {

@@ -3396,7 +3396,10 @@ static void dispc_error_worker(struct work_struct *work)
 					"disabled\n", mgr->name);
 
 			enable = dssdev->state == OMAP_DSS_DISPLAY_ACTIVE;
+
+			mgr->device->sync_lost_error = true;
 			dssdev->driver->disable(dssdev);
+			mgr->device->sync_lost_error = false;
 
 			for (i = 0; i < omap_dss_get_num_overlays(); ++i) {
 				struct omap_overlay *ovl;

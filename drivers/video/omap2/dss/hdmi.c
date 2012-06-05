@@ -774,7 +774,8 @@ void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev)
 
 	hdmi.enabled = false;
 
-	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
+	if (!dssdev->sync_lost_error
+		&& (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)) {
 		/* clear EDID and mode on disable only */
 		hdmi.edid_set = false;
 		hdmi.custom_set = false;
