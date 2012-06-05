@@ -21,6 +21,7 @@ int __init sevm_dock_init(void);
 int __init sevm_touch_init(void);
 int __init sevm_sensor_init(void);
 int __init omap5sevm_connectivity_init(void);
+int __init sevm_panel_init(void);
 
 #ifdef CONFIG_OMAP_HSI
 extern void __init omap5evm_modem_init(bool force_mux);
