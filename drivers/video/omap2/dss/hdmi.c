@@ -177,11 +177,16 @@ done:
 
 }
 
-void hdmi_get_monspecs(struct fb_monspecs *specs)
+void hdmi_get_monspecs(struct omap_dss_device *dssdev)
 {
 	int i, j;
 	char *edid = (char *)hdmi.edid;
+	struct fb_monspecs *specs = &dssdev->panel.monspecs;
 	u32 fclk = dispc_fclk_rate() / 1000;
+	u32 max_pclk = dssdev->clocks.hdmi.max_pixclk_khz;
+
+	if (max_pclk && max_pclk < fclk)
+		fclk = max_pclk;
 
 	memset(specs, 0x0, sizeof(*specs));
 	if (!hdmi.edid_set)

@@ -643,6 +643,8 @@ struct omap_dss_device {
 			/* regn is one greater than TRM's REGN value */
 			u16 regn;
 			u16 regm2;
+
+			u32 max_pixclk_khz;
 		} hdmi;
 	} clocks;
 

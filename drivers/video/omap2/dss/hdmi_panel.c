@@ -330,7 +330,7 @@ static void hdmi_hotplug_detect_worker(struct work_struct *work)
 			goto done;
 		} else if (hdmi_read_valid_edid()) {
 			/* get monspecs from edid */
-			hdmi_get_monspecs(&dssdev->panel.monspecs);
+			hdmi_get_monspecs(dssdev);
 			DSSDBG("panel size %d by %d\n",
 					dssdev->panel.monspecs.max_x,
 					dssdev->panel.monspecs.max_y);
