@@ -78,6 +78,8 @@ static unsigned int dev_index;
 
 static const char * const rproc_err_names[] = {
 	[RPROC_ERR_MMUFAULT]	= "mmufault",
+	[RPROC_ERR_EXCEPTION]	= "device exception",
+	[RPROC_ERR_WATCHDOG]	= "watchdog fired",
 };
 
 static int rproc_resume(struct device *dev)
