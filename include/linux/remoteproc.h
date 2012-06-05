@@ -520,6 +520,7 @@ int rproc_unregister(struct rproc *rproc);
 
 int rproc_boot(struct rproc *rproc);
 void rproc_shutdown(struct rproc *rproc);
+void rproc_error_reporter(struct rproc *rproc, enum rproc_err type);
 int rproc_set_constraints(struct device *dev, struct rproc *rproc,
 			  enum rproc_constraint type, long v);
 int rproc_pa_to_da(struct rproc *rproc, phys_addr_t pa, u64 *da);
