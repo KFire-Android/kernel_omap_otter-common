@@ -653,6 +653,7 @@ struct omap_dss_device {
 
 		enum omap_panel_config config;
 
+		struct fb_monspecs monspecs;
 		enum omap_dss_dsi_pixel_format dsi_pix_fmt;
 		enum omap_dss_dsi_mode dsi_mode;
 		struct omap_dss_dsi_videomode_data dsi_vm_data;

@@ -64,6 +64,8 @@ static struct {
 	struct hdmi_ip_data ip_data;
 	int code;
 	int mode;
+	u8 edid[HDMI_EDID_MAX_LENGTH];
+	bool edid_set;
 	bool custom_set;
 	int hdmi_irq;
 
@@ -72,6 +74,8 @@ static struct {
 	struct regulator *vdds_hdmi;
 	bool enabled;
 } hdmi;
+
+static const u8 edid_header[8] = {0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0};
 
 static int hdmi_runtime_get(void)
 {
@@ -171,6 +175,70 @@ done:
 	r = i >= 0 ? 1 : 0;
 	return r;
 
+}
+
+void hdmi_get_monspecs(struct fb_monspecs *specs)
+{
+	int i, j;
+	char *edid = (char *)hdmi.edid;
+	u32 fclk = dispc_fclk_rate() / 1000;
+
+	memset(specs, 0x0, sizeof(*specs));
+	if (!hdmi.edid_set)
+		return;
+	fb_edid_to_monspecs(edid, specs);
+	if (specs->modedb == NULL)
+		return;
+
+	for (i = 1; i <= edid[0x7e] && i * 128 < HDMI_EDID_MAX_LENGTH; i++) {
+		if (edid[i * 128] == 0x2)
+			fb_edid_add_monspecs(edid + i * 128, specs);
+	}
+	/* filter out resolutions we don't support */
+	for (i = j = 0; i < specs->modedb_len; i++) {
+		if (!hdmi_set_timings(&specs->modedb[i], true))
+			continue;
+		if (fclk < PICOS2KHZ(specs->modedb[i].pixclock))
+			continue;
+		if (specs->modedb[i].flag & FB_FLAG_PIXEL_REPEAT)
+			continue;
+		specs->modedb[j++] = specs->modedb[i];
+	}
+	specs->modedb_len = j;
+}
+
+u8 *hdmi_read_valid_edid(void)
+{
+	int ret, i;
+
+	if (hdmi.edid_set)
+		return hdmi.edid;
+
+	memset(hdmi.edid, 0, HDMI_EDID_MAX_LENGTH);
+
+	ret = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, hdmi.edid,
+						  HDMI_EDID_MAX_LENGTH);
+
+	for (i = 0; i < HDMI_EDID_MAX_LENGTH; i += 16)
+		pr_info("edid[%03x] = %02x %02x %02x %02x %02x %02x %02x %02x "\
+			"%02x %02x %02x %02x %02x %02x %02x %02x\n", i,
+			hdmi.edid[i], hdmi.edid[i + 1], hdmi.edid[i + 2],
+			hdmi.edid[i + 3], hdmi.edid[i + 4], hdmi.edid[i + 5],
+			hdmi.edid[i + 6], hdmi.edid[i + 7], hdmi.edid[i + 8],
+			hdmi.edid[i + 9], hdmi.edid[i + 10], hdmi.edid[i + 11],
+			hdmi.edid[i + 12], hdmi.edid[i + 13], hdmi.edid[i + 14],
+			hdmi.edid[i + 15]);
+
+	if (ret) {
+		DSSWARN("failed to read E-EDID\n");
+		return NULL;
+	}
+	if (memcmp(hdmi.edid, edid_header, sizeof(edid_header))) {
+		DSSWARN("failed to read E-EDID: wrong header\n");
+		return NULL;
+	}
+	hdmi.edid_set = true;
+	return hdmi.edid;
 }
 
 unsigned long hdmi_get_pixel_clock(void)
@@ -664,7 +732,8 @@ void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev)
 	hdmi.enabled = false;
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
-		/* clear mode on disable only */
+		/* clear EDID and mode on disable only */
+		hdmi.edid_set = false;
 		hdmi.custom_set = false;
 		pr_info("hdmi: clearing EDID info\n");
 	}
