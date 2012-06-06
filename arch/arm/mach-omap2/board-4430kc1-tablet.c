@@ -77,6 +77,10 @@
 
 #include "board-4430kc1-tablet.h"
 
+#ifdef CONFIG_TOUCHSCREEN_ILI210X
+#include <linux/input/ili210x.h>
+#endif
+
 #define WILINK_UART_DEV_NAME		"/dev/ttyO1"
 #define BLUETOOTH_UART			(0x1)
 #define CONSOLE_UART			(0x2)
@@ -368,6 +372,12 @@ static int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
 	return 0;
 }
 
+#ifdef CONFIG_TOUCHSCREEN_ILI210X
+struct ili210x_platform_data ili210x_data = {
+	.irq_flags = IRQF_TRIGGER_LOW,
+//	.get_pendown_state = ili210x_get_pendown_state
+};
+#endif
 
 /***** I2C BOARD INIT ****/
 
@@ -401,7 +411,8 @@ static struct i2c_board_info __initdata sdp4430_i2c_2_boardinfo[] = {
 #endif
 #ifdef CONFIG_TOUCHSCREEN_ILI210X
 		I2C_BOARD_INFO("ili210x_i2c", 0x41),
-		 .irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1),
+		.irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1),
+		.platform_data = &ili210x_data,
 #endif
 	},
 };
