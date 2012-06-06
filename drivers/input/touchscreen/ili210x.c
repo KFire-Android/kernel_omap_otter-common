@@ -105,6 +105,8 @@ static void ili210x_report_events(struct input_dev *input,
 
 			input_report_abs(input, ABS_MT_POSITION_X, x);
 			input_report_abs(input, ABS_MT_POSITION_Y, y);
+
+	printk(ILITEK_DEBUG_LEVEL "%s :: report_events (x, y)\n", __func__);
 		}
 	}
 
@@ -151,7 +153,6 @@ static irqreturn_t ili210x_irq(int irq, void *irq_data)
 {
 	struct ili210x *priv = irq_data;
 
-	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	schedule_delayed_work(&priv->dwork, 0);
 
 	return IRQ_HANDLED;
