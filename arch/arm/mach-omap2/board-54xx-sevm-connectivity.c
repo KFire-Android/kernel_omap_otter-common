@@ -199,8 +199,8 @@ static void __init omap5sevm_ti_st_init(void)
 	/* Mux configure OMAP5 UART5/WL UART */
 	omap_mux_init_signal("uart5_rx.uart5_rx", OMAP_PIN_INPUT_PULLUP);
 	omap_mux_init_signal("uart5_tx.uart5_tx", OMAP_PIN_OUTPUT);
-	omap_mux_init_signal("uart5_cts.uart5.cts", OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_signal("uart5_rts.uart5.rts", OMAP_PIN_OUTPUT);
+	omap_mux_init_signal("uart5_cts.uart5_cts", OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("uart5_rts.uart5_rts", OMAP_PIN_OUTPUT);
 
 	ret = platform_device_register(&wl18xx_device);
 	if (ret) {
