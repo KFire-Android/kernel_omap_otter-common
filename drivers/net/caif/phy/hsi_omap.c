@@ -45,7 +45,6 @@ struct dyn_speed {
 };
 
 struct cfhsi_omap {
-	struct list_head list;
 	struct cfhsi_dev dev;
 	struct platform_device pdev;
 	struct hsi_device *hsi_dev;
@@ -68,14 +67,13 @@ static bool sw_reset_on_cfhsi_up;
 module_param(sw_reset_on_cfhsi_up, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(sw_reset_on_cfhsi_up, "Perform software reset of HSI on interface up");
 
-/* TODO: Lists are not protected with regards to device removal. */
-static LIST_HEAD(cfhsi_dev_list);
-
 static void cfhsi_omap_read_cb(struct hsi_device *dev, unsigned int size);
 static void cfhsi_omap_write_cb(struct hsi_device *dev, unsigned int size);
 static void cfhsi_omap_port_event_cb(struct hsi_device *dev,
 				     unsigned int event, void *arg);
 static struct hsi_device_driver cfhsi_omap_driver;
+
+static struct cfhsi_omap *cfhsi_dev;
 
 static int cfhsi_up(struct cfhsi_dev *dev)
 {
@@ -390,68 +388,30 @@ static int cfhsi_rx_cancel(struct cfhsi_dev *dev)
 
 static void cfhsi_omap_read_cb(struct hsi_device *dev, unsigned int size)
 {
-	struct cfhsi_omap *cfhsi = NULL;
-	struct list_head *list_node;
+	if (cfhsi_dev->hsi_dev == dev) {
+		BUG_ON(!cfhsi_dev->dev.drv);
+		BUG_ON(!cfhsi_dev->dev.drv->rx_done_cb);
+		BUG_ON(cfhsi_dev->hsi_dev == NULL);
 
-	/*
-	 * TODO: It would be nice to map this without having to search through
-	 * the list.
-	 */
-	list_for_each(list_node, &cfhsi_dev_list) {
-		cfhsi = list_entry(list_node, struct cfhsi_omap, list);
-		/* Find the corresponding device. */
-		if (cfhsi->hsi_dev == dev) {
-			/* BUG_ON(size != cfhsi->rx_len); */
-			BUG_ON(!cfhsi->dev.drv);
-			BUG_ON(!cfhsi->dev.drv->rx_done_cb);
-			BUG_ON(cfhsi->hsi_dev == NULL);
-
-			cfhsi->dev.drv->rx_done_cb(cfhsi->dev.drv);
-			break;
-		}
+		cfhsi_dev->dev.drv->rx_done_cb(cfhsi_dev->dev.drv);
 	}
 }
 
 static void cfhsi_omap_write_cb(struct hsi_device *dev, unsigned int size)
 {
-	struct cfhsi_omap *cfhsi = NULL;
-	struct list_head *list_node;
+	if (cfhsi_dev->hsi_dev == dev) {
+		BUG_ON(!cfhsi_dev->dev.drv);
+		BUG_ON(!cfhsi_dev->dev.drv->tx_done_cb);
+		BUG_ON(cfhsi_dev->hsi_dev == NULL);
 
-	/*
-	 * TODO: It would be nice to map this without having to search through
-	 * the list.
-	 */
-	list_for_each(list_node, &cfhsi_dev_list) {
-		cfhsi = list_entry(list_node, struct cfhsi_omap, list);
-		/* Find the corresponding device. */
-		if (cfhsi->hsi_dev == dev) {
-			/*BUG_ON(size != cfhsi->tx_len); */
-			BUG_ON(!cfhsi->dev.drv);
-			BUG_ON(!cfhsi->dev.drv->tx_done_cb);
-			BUG_ON(cfhsi->hsi_dev == NULL);
-
-			cfhsi->dev.drv->tx_done_cb(cfhsi->dev.drv);
-			break;
-		}
+		cfhsi_dev->dev.drv->tx_done_cb(cfhsi_dev->dev.drv);
 	}
 }
 
 static void cfhsi_omap_port_event_cb(struct hsi_device *dev,
 				     unsigned int event, void *arg)
 {
-	struct cfhsi_omap *cfhsi = NULL;
-	struct list_head *list_node;
-
-	/*
-	 * TODO: It would be nice to map this without having to search through
-	 * the list.
-	 */
-	list_for_each(list_node, &cfhsi_dev_list) {
-		cfhsi = list_entry(list_node, struct cfhsi_omap, list);
-		/* Find the corresponding device. */
-		if (cfhsi->hsi_dev == dev)
-			break;
-	}
+	struct cfhsi_omap *cfhsi = cfhsi_dev;
 
 	if ((!cfhsi) || (cfhsi->hsi_dev != dev)) {
 		dev_err(&dev->device, "%s (%d): No device.\n",
@@ -575,6 +535,19 @@ static int cfhsi_set_rx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 
 	return 0;
 }
+
+struct platform_device *cfhsi_get_device(void)
+{
+	struct cfhsi_omap *cfhsi = cfhsi_dev;
+
+	pr_info("%s enter\n", __func__);
+
+	if (!cfhsi)
+		return NULL;
+
+	return &cfhsi->pdev;
+}
+EXPORT_SYMBOL(cfhsi_get_device);
 
 int cfhsi_set_hsi_clock(struct cfhsi_dev *dev, unsigned int hsi_clock)
 {
@@ -798,7 +771,6 @@ int cfhsi_get_next_tx_speed(struct cfhsi_dev *dev,
 	else
 		max_index = MAX_DYN_TX_SPEEDS-2;
 
-
 	switch (speed_cmd) {
 	case CFHSI_DYN_SPEED_GO_LOWEST:
 		tmp_index = 0;
@@ -864,22 +836,13 @@ int cfhsi_change_rx_speed(struct cfhsi_dev *dev, u32 requested_rx_speed)
 
 static void hsi_proto_release(struct device *dev)
 {
-	struct cfhsi_omap *cfhsi = NULL;
-	struct list_head *list_node;
-	struct list_head *n;
+	struct cfhsi_omap *cfhsi = cfhsi_dev;
 
-	list_for_each_safe(list_node, n, &cfhsi_dev_list) {
-		cfhsi = list_entry(list_node, struct cfhsi_omap, list);
-		/* Find the corresponding device. */
-		if (&cfhsi->pdev.dev == dev) {
-			/* This should not happen. */
-			dev_warn(&cfhsi->pdev.dev, "%s: orphan.\n", __func__);
-			/* Remove from list. */
-			list_del(list_node);
-			/* Free memory. */
-			kfree(cfhsi);
-			return;
-		}
+	if (&cfhsi->pdev.dev == dev) {
+		/* This should not happen. */
+		dev_warn(&cfhsi->pdev.dev, "%s: orphan.\n", __func__);
+		kfree(cfhsi);
+		return;
 	}
 }
 
@@ -919,20 +882,18 @@ int cfhsi_create_and_register(void)
 	cfhsi->pdev.dev.platform_data = &cfhsi->dev;
 	cfhsi->pdev.dev.release = hsi_proto_release;
 
-	/* Add HSI device to device list. */
-	list_add_tail(&cfhsi->list, &cfhsi_dev_list);
-
 	/* Register platform device. */
 	res = platform_device_register(&cfhsi->pdev);
 	if (res) {
 		pr_err("%s: Failed to register dev: %d.\n",
 			__func__, res);
-		res = -ENODEV;
-		list_del(&cfhsi->list);
 		kfree(cfhsi);
+		return -ENODEV;
 	}
 
-	return res;
+	cfhsi_dev = cfhsi;
+
+	return 0;
 }
 
 static int hsi_proto_remove(struct hsi_device *dev)
@@ -979,26 +940,8 @@ static int __init cfhsi_omap_init(void)
 
 static void __exit cfhsi_omap_exit(void)
 {
-	struct cfhsi_omap *cfhsi = NULL;
-	struct list_head *list_node;
-	struct list_head *n;
-	bool unregistered = false;
-
-	list_for_each_safe(list_node, n, &cfhsi_dev_list) {
-		cfhsi = list_entry(list_node, struct cfhsi_omap, list);
-		if (!unregistered) {
-			/* Unregister driver. */
-			pr_err("- UNregistering HSI driver on exit\n");
-			cfhsi_down(&cfhsi->dev);
-			unregistered = true;
-		}
-		/* Remove from list. */
-		list_del(list_node);
-		/* unregister CAIF HSI device. */
-		platform_device_unregister(&cfhsi->pdev);
-		/* FIXME: Remove this kfree, replaced with a dev_put() */
-		kfree(cfhsi);
-	}
+	platform_device_unregister(&cfhsi_dev->pdev);
+	kfree(cfhsi_dev);
 }
 
 module_init(cfhsi_omap_init);
