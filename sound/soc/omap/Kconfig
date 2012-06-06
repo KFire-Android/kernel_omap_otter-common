@@ -21,9 +21,6 @@ config SND_OMAP_SOC_HDMI
 config SND_OMAP_SOC_ABE
 	tristate
 
-config SND_OMAP_SOC_VXREC
-	tristate
-
 config SND_OMAP_SOC_N810
 	tristate "SoC Audio support for Nokia N810"
 	depends on SND_OMAP_SOC && MACH_NOKIA_N810 && I2C
@@ -116,7 +113,6 @@ config SND_OMAP_SOC_OMAP_ABE_TWL6040
 	select SND_OMAP_SOC_MCBSP
 	select SND_OMAP_SOC_ABE
 	select SND_DYNAMIC_MINORS
-	select SND_OMAP_SOC_VXREC
 	help
 	  Say Y if you want to add support for SoC audio on OMAP boards using
 	  ABE and twl6040 codec. This driver currently supports:

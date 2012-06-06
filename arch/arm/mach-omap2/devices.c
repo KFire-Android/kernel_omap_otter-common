@@ -367,19 +367,9 @@ static struct platform_device omap_pcm = {
 	.id	= -1,
 };
 
-#if defined(CONFIG_SND_OMAP_SOC_VXREC) || defined(CONFIG_SND_OMAP_SOC_VXREC_MODULE)
-static struct platform_device omap_abe_vxrec = {
-	.name   = "omap-abe-vxrec-dai",
-	.id     = -1,
-};
-#endif
-
 static void omap_init_audio(void)
 {
 	platform_device_register(&omap_pcm);
-#if defined(CONFIG_SND_OMAP_SOC_VXREC) || defined(CONFIG_SND_OMAP_SOC_VXREC_MODULE)
-	platform_device_register(&omap_abe_vxrec);
-#endif
 }
 
 #else
@@ -461,6 +451,11 @@ static inline void omap_init_dmic(void) {}
 #if defined(CONFIG_SND_OMAP_SOC_ABE) || \
 	defined(CONFIG_SND_OMAP_SOC_ABE_MODULE)
 
+static struct platform_device omap_abe_vxrec = {
+	.name   = "omap-abe-vxrec-dai",
+	.id     = -1,
+};
+
 static struct omap_device_pm_latency omap_aess_latency[] = {
 	{
 		.deactivate_func = omap_device_idle_hwmods,
@@ -483,7 +478,12 @@ static void __init omap_init_aess(void)
 	pdev = omap_device_build("aess", -1, oh, NULL, 0,
 				omap_aess_latency,
 				ARRAY_SIZE(omap_aess_latency), 0);
-	WARN(IS_ERR(pdev), "Can't build omap_device for omap-aess-audio.\n");
+	if (IS_ERR(pdev)) {
+		WARN(1, "Can't build omap_device for omap-aess-audio.\n");
+		return;
+	}
+
+	platform_device_register(&omap_abe_vxrec);
 }
 #else
 static inline void omap_init_aess(void) {}
