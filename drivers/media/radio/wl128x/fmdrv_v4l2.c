@@ -138,6 +138,42 @@ static ssize_t store_fmtx_af(struct device *dev,
 	return size;
 }
 
+static ssize_t show_fmrx_deemphasis(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fmdev *fmdev = dev_get_drvdata(dev);
+
+	return sprintf(buf, "%d\n", (fmdev->rx.deemphasis_mode ==
+				FM_RX_EMPHASIS_FILTER_50_USEC) ? 50 : 75);
+}
+
+static ssize_t store_fmrx_deemphasis(struct device *dev,
+		struct device_attribute *attr, char *buf, size_t size)
+{
+	int ret;
+	unsigned long deemph_mode;
+	struct fmdev *fmdev = dev_get_drvdata(dev);
+
+	if (kstrtoul(buf, 0, &deemph_mode))
+		return -EINVAL;
+
+	if (deemph_mode != 50 && deemph_mode != 75)
+		return -EINVAL;
+
+	if (deemph_mode == 50)
+		deemph_mode = FM_RX_EMPHASIS_FILTER_50_USEC;
+	else
+		deemph_mode = FM_RX_EMPHASIS_FILTER_75_USEC;
+
+	ret = fm_rx_set_deemphasis_mode(fmdev, deemph_mode);
+	if (ret < 0) {
+		fmerr("Failed to set De-emphasis Mode\n");
+		return ret;
+	}
+
+	return size;
+}
+
 static ssize_t show_fmrx_af(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -230,9 +266,14 @@ static ssize_t store_fmrx_rssi_lvl(struct device *dev,
  * below features, so these entries got permission "666"
  */
 
-/* To start transmitting FM TX Alternate frequencyi */
+/* To start transmitting FM TX Alternate frequency */
 static struct kobj_attribute v4l2_fmtx_rds_af =
 __ATTR(fmtx_rds_af, 0666, (void *)show_fmtx_af, (void *)store_fmtx_af);
+
+/* To Set De-Emphasis filter mode */
+static struct kobj_attribute v4l2_fmrx_deemph_mode =
+__ATTR(fmrx_deemph_mode, 0666, (void *)show_fmrx_deemphasis,
+		(void *)store_fmrx_deemphasis);
 
 /* To Enable/Disable FM RX RDS AF feature */
 static struct kobj_attribute v4l2_fmrx_rds_af =
@@ -249,6 +290,7 @@ __ATTR(fmrx_rssi_lvl, 0666, (void *) show_fmrx_rssi_lvl,
 
 static struct attribute *v4l2_fm_attrs[] = {
 	&v4l2_fmtx_rds_af.attr,
+	&v4l2_fmrx_deemph_mode.attr,
 	&v4l2_fmrx_rds_af.attr,
 	&v4l2_fmrx_band.attr,
 	&v4l2_fmrx_rssi_lvl.attr,
