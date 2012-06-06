@@ -147,6 +147,7 @@ struct thermal_dev {
 	ret;								\
 })
 
+#ifdef CONFIG_THERMAL_FRAMEWORK
 extern int thermal_request_temp(struct thermal_dev *tdev);
 extern int thermal_lookup_temp(const char *domain_name);
 extern int thermal_lookup_slope(const char *domain_name, const char *rel);
@@ -162,5 +163,60 @@ extern int thermal_cooling_dev_register(struct thermal_dev *tdev);
 extern void thermal_cooling_dev_unregister(struct thermal_dev *tdev);
 extern int thermal_governor_dev_register(struct thermal_dev *tdev);
 extern void thermal_governor_dev_unregister(struct thermal_dev *tdev);
+#else
+static inline int thermal_request_temp(struct thermal_dev *tdev)
+{
+	return 0;
+}
+static inline int thermal_lookup_temp(const char *domain_name)
+{
+	return 0;
+}
+static
+inline int thermal_lookup_slope(const char *domain_name, const char *rel)
+{
+	return 0;
+}
+static
+inline int thermal_lookup_offset(const char *domain_name, const char *rel)
+{
+	return 0;
+}
+static inline int thermal_sensor_set_temp(struct thermal_dev *tdev)
+{
+	return 0;
+}
+static inline int thermal_get_slope(struct thermal_dev *tdev)
+{
+	return 0;
+}
+static inline int thermal_get_offset(struct thermal_dev *tdev)
+{
+	return 0;
+}
+
+/* Registration and unregistration calls for the thermal devices */
+static inline int thermal_sensor_dev_register(struct thermal_dev *tdev)
+{
+	return 0;
+}
+static inline void thermal_sensor_dev_unregister(struct thermal_dev *tdev)
+{
+}
+static inline int thermal_cooling_dev_register(struct thermal_dev *tdev)
+{
+	return 0;
+}
+static inline void thermal_cooling_dev_unregister(struct thermal_dev *tdev)
+{
+}
+static inline int thermal_governor_dev_register(struct thermal_dev *tdev)
+{
+	return 0;
+}
+static inline void thermal_governor_dev_unregister(struct thermal_dev *tdev)
+{
+}
+#endif
 
 #endif /* __LINUX_THERMAL_FRAMEWORK_H__ */
