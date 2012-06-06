@@ -532,7 +532,7 @@ config WL127X_RFKILL
 	 
 config DRV2667_HAPTICS
 	tristate "Texas Instruments DRV2667 Haptics driver"
-	depends on I2C
+	depends on I2C && ANDROID_TIMED_OUTPUT
 	default n
 	help
 	 This is the driver for the TI DRV2667 Haptics piezoelectric driver.
