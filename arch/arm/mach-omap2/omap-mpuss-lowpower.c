@@ -498,9 +498,16 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	set_cpu_wakeup_addr(cpu, virt_to_phys(omap_pm_ops.hotplug_restart));
 	omap_pm_ops.scu_prepare(cpu, power_state);
 
+	/*
+	 * XXX: Force_off is not stable. Disable it till it's
+	 * rootcaused. The POR seems to be inclining to using legacy
+	 * techniques instead of force_off. So, leave the #if 0
+	 * here to go back to force_off if that eventually works.
+	 */
+#if 0
 	/* Enable FORCE OFF mode if supported */
 	set_cpu_force_off(cpu, 1);
-
+#endif
 	/*
 	 * CPU never retuns back if targetted power state is OFF mode.
 	 * CPU ONLINE follows normal CPU ONLINE ptah via
@@ -508,8 +515,10 @@ int __cpuinit omap_hotplug_cpu(unsigned int cpu, unsigned int power_state)
 	 */
 	omap_pm_ops.finish_suspend(cpu_state);
 
+#if 0
 	/* Clear FORCE OFF mode if supported */
 	set_cpu_force_off(cpu, 0);
+#endif
 
 	cpu_pwrdm_pre_post_transition(cpu, 0);
 	set_cpu_next_pwrst(cpu, PWRDM_POWER_ON);
