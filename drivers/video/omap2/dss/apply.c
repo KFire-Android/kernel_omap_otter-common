@@ -1014,7 +1014,6 @@ int dss_mgr_blank(struct omap_overlay_manager *mgr,
 	r_get = r;
 	/* still clear cache even if failed to get clocks, just don't config */
 
-	spin_lock_irqsave(&data_lock, flags);
 
 	/* disable overlays in overlay user info structs and in data info */
 	for (i = 0; i < omap_dss_get_num_overlays(); i++) {
@@ -1027,6 +1026,7 @@ int dss_mgr_blank(struct omap_overlay_manager *mgr,
 
 		r = ovl->disable(ovl);
 
+		spin_lock_irqsave(&data_lock, flags);
 		op = get_ovl_priv(ovl);
 
 		/* complete unconfigured info */
@@ -1039,8 +1039,10 @@ int dss_mgr_blank(struct omap_overlay_manager *mgr,
 		op->user_info_dirty = false;
 		op->info_dirty = true;
 		op->enabled = false;
+		spin_unlock_irqrestore(&data_lock, flags);
 	}
 
+	spin_lock_irqsave(&data_lock, flags);
 	/* dirty manager */
 	mp = get_mgr_priv(mgr);
 	if (mp->user_info_dirty)
