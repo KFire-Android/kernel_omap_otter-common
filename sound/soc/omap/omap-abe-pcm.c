@@ -884,10 +884,13 @@ static int omap_abe_dai_startup(struct snd_pcm_substream *substream,
 		dev_dbg(abe->modem.dai->dev, "%s: MODEM stream %d\n",
 				__func__, substream->stream);
 
+		pm_runtime_get_sync(abe->modem.dai->dev);
+
 		ret = snd_soc_dai_startup(abe->modem.substream[substream->stream],
 				abe->modem.dai);
 		if (ret < 0) {
 			dev_err(abe->modem.dai->dev, "failed to open DAI %d\n", ret);
+			pm_runtime_put(abe->modem.dai->dev);
 			goto err;
 		}
 	}
@@ -1164,6 +1167,8 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 
 		snd_soc_dai_shutdown(abe->modem.substream[substream->stream],
 				abe->modem.dai);
+		pm_runtime_put(abe->modem.dai->dev);
+
 	}
 
 	/* shutdown the ABE if last user */
