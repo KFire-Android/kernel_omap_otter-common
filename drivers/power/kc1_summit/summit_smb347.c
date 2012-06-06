@@ -79,7 +79,7 @@ int summit_bat_notifier_call(struct notifier_block *nb, unsigned long val,
     int result = NOTIFY_OK;
 //    unsigned long flags;
     struct summit_smb347_info* di= container_of(nb, struct summit_smb347_info, bat_notifier);
-    printk("%s val=%lu \n",__func__,val);
+    printk(">>> %s val=%lu \n",__func__,val);
     ////spin_lock_irqsave(&di->lock, flags);
     writeIntoCBuffer(&di->events,val);
     queue_delayed_work_on(0,summit_work_queue,&di->summit_monitor_work,0);
@@ -95,6 +95,7 @@ int summit_usb_notifier_call(struct notifier_block *nb, unsigned long val,
     struct summit_smb347_info* di= container_of(nb, struct summit_smb347_info, usb_notifier);
     if(val==USB_EVENT_DETECT_SOURCE)
         wake_lock(&di->chrg_lock);
+    printk(">>> %s val=%lu \n",__func__,val);
     writeIntoCBuffer(&di->events,val);
     queue_delayed_work_on(0,summit_work_queue,&di->summit_monitor_work,0);
     
@@ -1175,6 +1176,7 @@ int summit_charger_reconfig(struct summit_smb347_info *di){
     summit_write_config(di,0);
     return 0;
 }
+
 void summit_smb347_read_id(struct summit_smb347_info *di)
 {
     u8 config = 0;
@@ -1212,12 +1214,55 @@ static void disconnect_work_func(struct work_struct *work)
 extern u8 quanta_get_mbid(void);
 extern int bq275xx_register_notifier(struct notifier_block *nb);
 extern int bq275xx_unregister_notifier(struct notifier_block *nb);
+
 /*
 Dvt(mbid=4)
 ->SUSP pin ->UART4_RX/GPIO155
 ->EN pin   ->C2C_DATA12/GPIO101
 ->
 */
+
+static enum power_supply_property summit_usb_props[] = {
+    POWER_SUPPLY_PROP_ONLINE,
+};
+
+static enum power_supply_property summit_ac_props[] = {
+    POWER_SUPPLY_PROP_ONLINE,
+};
+
+static int summit_ac_get_property(struct power_supply *psy,
+                    enum power_supply_property psp,
+                    union power_supply_propval *val)
+{
+    struct summit_smb347_info *di = container_of(psy,struct summit_smb347_info, ac);
+
+    switch (psp) {
+    	case POWER_SUPPLY_PROP_ONLINE:
+    		val->intval = di->ac_online;
+    	break;
+    	default:
+    		return -EINVAL;
+    }
+
+    return 0;
+}
+static int summit_usb_get_property(struct power_supply *psy,
+                    enum power_supply_property psp,
+                    union power_supply_propval *val)
+{
+    struct summit_smb347_info *di = container_of(psy,struct summit_smb347_info, usb);
+
+    switch (psp) {
+    	case POWER_SUPPLY_PROP_ONLINE:
+    		val->intval = di->usb_online;
+    	break;
+    	default:
+    		return -EINVAL;
+    }
+
+    return 0;
+}
+
 static int __devinit summit_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
     struct summit_smb347_info *di;
@@ -1270,10 +1315,31 @@ static int __devinit summit_probe(struct i2c_client *client, const struct i2c_de
     status = bq275xx_register_notifier(&di->bat_notifier);
     wake_lock_init(&di->chrg_lock, WAKE_LOCK_SUSPEND, "usb_wake_lock");
     wake_lock_init(&di->summit_lock,WAKE_LOCK_SUSPEND, "summit_wake_lock");
-    create_summit_powersupplyfs(di);
-#ifdef    CONFIG_PROC_FS
-    //create_summit_procfs(di);
-#endif
+
+    di->usb.name = "usb";
+    di->usb.type = POWER_SUPPLY_TYPE_USB;
+    di->usb.properties = summit_usb_props;
+    di->usb.num_properties = ARRAY_SIZE(summit_usb_props);
+    di->usb.get_property = summit_usb_get_property;
+
+    di->ac.name = "ac";
+    di->ac.type = POWER_SUPPLY_TYPE_MAINS;
+    di->ac.properties = summit_ac_props;
+    di->ac.num_properties = ARRAY_SIZE(summit_ac_props);
+    di->ac.get_property = summit_ac_get_property;
+
+    ret = power_supply_register(di->dev, &di->usb);
+    if (ret) {
+    	dev_dbg(di->dev,"failed to register usb power supply\n");
+    	//goto usb_failed;
+    }
+
+    ret = power_supply_register(di->dev, &di->ac);
+    if (ret) {
+    	dev_dbg(di->dev,"failed to register ac power supply\n");
+    	//goto ac_failed;
+    }
+
     create_summit_sysfs(di);
 
     INIT_DELAYED_WORK(&di->disconnect_work, disconnect_work_func);
@@ -1305,20 +1371,23 @@ static int __devinit summit_probe(struct i2c_client *client, const struct i2c_de
 static int __devexit summit_remove(struct i2c_client *client)
 {
     struct summit_smb347_info *di = i2c_get_clientdata(client);
+
     dev_dbg(di->dev,KERN_INFO "%s\n",__func__);
+
     disable_irq(di->irq);
     free_irq(di->irq, di);
     usb_unregister_notify(&di->usb_notifier);
     bq275xx_unregister_notifier(&di->bat_notifier);
     cancel_delayed_work(&di->summit_check_work);
     cancel_delayed_work(&di->summit_monitor_work);
+
     flush_scheduled_work();
     //iounmap(di->usb_phy);
     releaseCBuffer(&di->events);
-    remove_summit_powersupplyfs(di);
-#ifdef    CONFIG_PROC_FS
-    remove_summit_procfs();
-#endif
+
+    power_supply_unregister(&di->ac);
+    power_supply_unregister(&di->usb);
+
     remove_summit_sysfs(di);
 
     kfree(di);

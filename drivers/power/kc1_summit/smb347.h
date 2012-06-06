@@ -770,8 +770,6 @@ void writeIntoCBuffer(circular_buffer_t* cbuffer,int data);
 int isCBufferNotEmpty(circular_buffer_t* cbuffer);
 
 /*interface*/
-void create_summit_powersupplyfs(struct summit_smb347_info *di);
-void remove_summit_powersupplyfs(struct summit_smb347_info *di);
 void create_summit_procfs( struct summit_smb347_info *di);
 void remove_summit_procfs(void);
 int create_summit_sysfs( struct summit_smb347_info *di);

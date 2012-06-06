@@ -171,6 +171,7 @@ void summit_fsm_doAction(struct summit_smb347_info *di,int event)
 //    u32 value;
     int config,command=0;
     u8  pre_protect_event=0;
+    printk(">>> %s state=%d,event=%d \n",__func__,state,event);
     switch (state){
         case STATE_SUSPEND:
             if(event==USB_EVENT_NONE){
