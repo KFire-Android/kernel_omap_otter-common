@@ -24,18 +24,21 @@
 #include <linux/i2c/tsl2771.h>
 #include <linux/i2c/drv2667.h>
 #include <linux/input/mpu6050.h>
+#include <linux/akm8975.h>
 
 #include <plat/i2c.h>
 
 #define OMAP5_TSL2771_INT_GPIO		149
 #define OMAP5_MPU6050_INT_GPIO		150
+#define OMAP5_AK8975_INT_GPIO		165
 
 static struct mpu6050_platform_data mpu6050_platform_data = {
 	.aux_i2c_supply = 0,
 	.sample_rate_div = 0,
 	.config = 0,
 	.fifo_mode = 0,
-	.flags = (MPU6050_USE_ACCEL | MPU6050_USE_GYRO),
+	.flags = (MPU6050_USE_ACCEL | MPU6050_USE_GYRO |
+		  MPU6050_PASS_THROUGH_EN),
 	.mpu6050_accel = {
 		.x_axis = 2,
 		.y_axis = 2,
@@ -105,6 +108,10 @@ static struct drv2667_platform_data omap5evm_drv2667_plat_data = {
 	.initial_vibrate = 10,
 };
 
+static struct akm8975_platform_data ak8975_data = {
+	.intr = OMAP5_AK8975_INT_GPIO,
+};
+
 static struct i2c_board_info __initdata omap5evm_sensor_i2c2_boardinfo[] = {
 	{
 		I2C_BOARD_INFO("bmp085", 0x77),
@@ -118,6 +125,10 @@ static struct i2c_board_info __initdata omap5evm_sensor_i2c2_boardinfo[] = {
 		I2C_BOARD_INFO("mpu6050", 0x68),
 		.platform_data = &mpu6050_platform_data,
 		.irq = OMAP5_MPU6050_INT_GPIO,
+	},
+	{
+		I2C_BOARD_INFO("akm8975", 0x0C),
+		.platform_data = &ak8975_data,
 	},
 };
 
