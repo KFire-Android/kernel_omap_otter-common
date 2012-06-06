@@ -116,6 +116,7 @@ static bool get_pendown_state(const struct ili210x *priv)
 {
 	bool state = false;
 
+	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	if (priv->get_pendown_state)
 		state = priv->get_pendown_state();
 
@@ -130,6 +131,7 @@ static void ili210x_work(struct work_struct *work)
 	struct touchdata touchdata;
 	int error;
 
+	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	error = ili210x_read_reg(client, REG_TOUCHDATA,
 				 &touchdata, sizeof(touchdata));
 	if (error) {
@@ -149,6 +151,7 @@ static irqreturn_t ili210x_irq(int irq, void *irq_data)
 {
 	struct ili210x *priv = irq_data;
 
+	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	schedule_delayed_work(&priv->dwork, 0);
 
 	return IRQ_HANDLED;
@@ -164,6 +167,7 @@ static ssize_t ili210x_calibrate(struct device *dev,
 	int rc;
 	u8 cmd = REG_CALIBRATE;
 
+	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	if (kstrtoul(buf, 10, &calibrate))
 		return -EINVAL;
 
@@ -192,7 +196,6 @@ static const struct attribute_group ili210x_attr_group = {
 static int __devinit ili210x_i2c_probe(struct i2c_client *client,
 				       const struct i2c_device_id *id)
 {
-	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	struct device *dev = &client->dev;
 	const struct ili210x_platform_data *pdata = dev->platform_data;
 	struct ili210x *priv;
@@ -202,6 +205,7 @@ static int __devinit ili210x_i2c_probe(struct i2c_client *client,
 	int xmax, ymax;
 	int error;
 
+	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	dev_dbg(dev, "Probing for ILI210X I2C Touschreen driver");
 
 	if (!pdata) {
@@ -292,9 +296,8 @@ static int __devinit ili210x_i2c_probe(struct i2c_client *client,
 
 	device_init_wakeup(&client->dev, 1);
 
-	dev_dbg(dev,
-		"ILI210x initialized (IRQ: %d), firmware version %d.%d.%d",
-		client->irq, firmware.id, firmware.major, firmware.minor);
+	printk(ILITEK_DEBUG_LEVEL "%s: ILI210x initialized (IRQ: %d), firmware version %d.%d.%d",
+		__func__, client->irq, firmware.id, firmware.major, firmware.minor\n");
 
 	return 0;
 
@@ -326,6 +329,7 @@ static int ili210x_i2c_suspend(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 
+	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	if (device_may_wakeup(&client->dev))
 		enable_irq_wake(client->irq);
 
@@ -336,6 +340,7 @@ static int ili210x_i2c_resume(struct device *dev)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 
+	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	if (device_may_wakeup(&client->dev))
 		disable_irq_wake(client->irq);
 
