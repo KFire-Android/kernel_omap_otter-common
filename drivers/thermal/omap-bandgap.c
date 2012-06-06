@@ -217,6 +217,9 @@ struct omap_temp_sensor {
  * @fclock_name: clock name of the functional clock
  * @div_ck_nme: clock name of the clock divisor
  * @sensor_count: count of temperature sensor device in scm
+ * @rev: Revision of the temperature sensor
+ * @tshut_gpio: gpio linked to tshut signal
+ * @accurate: Accuracy of the temperature
  * @sensors: array of sensors present in this bandgap instance
  * @expose_sensor: callback to export sensor to thermal API
  */
@@ -227,6 +230,9 @@ struct omap_bandgap_data {
 	char				*fclock_name;
 	char				*div_ck_name;
 	int				sensor_count;
+	int				rev;
+	int				tshut_gpio;
+	bool				accurate;
 	int (*report_temperature)(struct omap_bandgap *bg_ptr, int id);
 	int (*expose_sensor)(struct omap_bandgap *bg_ptr, int id, char *domain);
 
@@ -1243,6 +1249,43 @@ static const struct of_device_id of_omap_bandgap_match[] = {
 	{ },
 };
 
+static
+struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
+{
+	struct omap_bdg_data *pdata = dev_get_platdata(&pdev->dev);
+	struct omap_bandgap *bg_ptr;
+
+	bg_ptr = devm_kzalloc(&pdev->dev, sizeof(struct omap_bandgap),
+				    GFP_KERNEL);
+	if (!bg_ptr) {
+		dev_err(&pdev->dev, "Unable to allocate mem for driver ref\n");
+		return ERR_PTR(-ENOMEM);
+	}
+
+	if (pdata->rev == 1)
+		bg_ptr->pdata = &omap4460_data;
+	else if (pdata->rev == 2)
+		bg_ptr->pdata = &omap5430_data;
+
+	bg_ptr->irq = platform_get_irq(pdev, 0);
+	if (bg_ptr->irq < 0) {
+		dev_err(&pdev->dev, "get_irq failed\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	if (bg_ptr->pdata->has_tshut) {
+		bg_ptr->tshut_gpio = bg_ptr->pdata->tshut_gpio;
+		if (!gpio_is_valid(bg_ptr->tshut_gpio)) {
+			dev_err(&pdev->dev, "invalid gpio for tshut (%d)\n",
+				bg_ptr->tshut_gpio);
+			return ERR_PTR(-EINVAL);
+		}
+	}
+
+	return bg_ptr;
+}
+
+
 static struct omap_bandgap *omap_bandgap_build(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
@@ -1295,7 +1338,11 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	bg_ptr = omap_bandgap_build(pdev);
+	if (pdev->dev.platform_data)
+		bg_ptr = omap_bandgap_platform_build(pdev);
+	else
+		bg_ptr = omap_bandgap_build(pdev);
+
 	if (IS_ERR_OR_NULL(bg_ptr)) {
 		dev_err(&pdev->dev, "failed to fetch platform data\n");
 		return PTR_ERR(bg_ptr);

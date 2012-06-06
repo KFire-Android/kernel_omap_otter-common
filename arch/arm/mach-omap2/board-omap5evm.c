@@ -658,6 +658,7 @@ static struct twl6040_codec_data twl6040_codec = {
 	.hs_right_step	= 0x0f,
 	.hf_left_step	= 0x1d,
 	.hf_right_step	= 0x1d,
+	.amic_bias_settle_ms = 0xeb, /* 235 ms */
 };
 
 static struct twl6040_vibra_data twl6040_vibra = {
@@ -696,6 +697,8 @@ static struct omap_abe_twl6040_data omap5evm_abe_audio_data = {
 	.has_hs		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	/* HandsFree through expasion connector */
 	.has_hf		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
+	/* Earpiece */
+	.has_ep		= 1,
 	/* PandaBoard: FM TX, PandaBoardES: can be connected to audio out */
 	.has_aux	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	/* PandaBoard: FM RX, PandaBoardES: audio in */

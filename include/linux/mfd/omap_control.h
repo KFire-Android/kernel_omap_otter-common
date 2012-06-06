@@ -52,6 +52,20 @@ struct omap_control_data {
 	bool			has_bandgap;
 };
 
+/**
+ * struct omap_bandgap_data - platform data for bandgap
+ * @cnt: count of temperature sensor device in scm
+ * @rev: Revision of Temperature sensor
+ * @tshut_gpio: gpio linked to tshut signal
+ * @accurate: Accuracy of the temperature
+ */
+struct omap_bdg_data {
+	u32			cnt;
+	int			rev;
+	int			tshut_gpio;
+	bool			accurate;
+};
+
 
 #ifdef CONFIG_MFD_OMAP_CONTROL
 extern int omap_control_readl(struct device *dev, u32 reg, u32 *val);

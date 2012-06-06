@@ -805,8 +805,10 @@ static void rpmsg_omx_driver_cb(struct rpmsg_channel *rpdev, void *data,
 {
 	dev_warn(&rpdev->dev, "uhm, unexpected message\n");
 
+#if 0
 	print_hex_dump(KERN_DEBUG, __func__, DUMP_PREFIX_NONE, 16, 1,
 		       data, len,  true);
+#endif
 }
 
 static struct rpmsg_device_id rpmsg_omx_id_table[] = {

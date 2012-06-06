@@ -124,6 +124,36 @@ static struct mfd_cell omap4_control_usb_devs[] = {
 	},
 };
 
+static struct resource omap4_bandgap_resources[] = {
+	{
+		.start = 0,
+		.end   = 0,
+		.flags = IORESOURCE_IRQ,
+	},
+};
+
+static struct omap_bdg_data omap4_bg_data = {
+	.rev		= 1,
+	.cnt		= 1,
+	.tshut_gpio	= 86,
+	.accurate	= true,
+};
+
+static struct omap_bdg_data omap5_bg_data = {
+	.rev		= 2,
+	.cnt		= 3,
+	.tshut_gpio	= 86,
+	.accurate	= true,
+};
+
+static struct mfd_cell omap_bandgap_devs[] = {
+	{
+		.name = "omap-bandgap",
+		.num_resources = ARRAY_SIZE(omap4_bandgap_resources),
+		.resources = omap4_bandgap_resources,
+	},
+};
+
 static const struct of_device_id of_omap_control_match[] = {
 	{ .compatible = "ti,omap3-control", },
 	{ .compatible = "ti,omap4-control", },
@@ -135,20 +165,55 @@ static int omap_control_add_children(struct platform_device *pdev,
 				     struct omap_control *omap_control)
 {
 	int ret;
-
+	int thermal_irq;
 	struct device *dev = &pdev->dev;
 	struct omap_control_data *pdata = dev_get_platdata(dev);
 
+	if (!pdata) {
+		dev_err(dev, "No Children for the mfd device: Fail probe\n");
+		return -ENODEV;
+	}
+
 	/* USB-PHY */
-	if (pdata && pdata->has_usb_phy) {
+	if (pdata->has_usb_phy) {
 		ret = mfd_add_devices(dev, -1, omap4_control_usb_devs,
 				      ARRAY_SIZE(omap4_control_usb_devs),
 				      NULL, 0);
-		if (ret)
+		if (ret) /* If Error,flag it,Continue adding other children */
 			dev_err(dev, "failed to populate usb-phy child\n");
 	}
 
-	return ret;
+	/* Bandgap */
+	if (pdata->has_bandgap) {
+		void *child_pdata = NULL;
+		int size;
+
+		if (pdata->rev == 1) {
+			child_pdata = &omap4_bg_data;
+			size = sizeof(omap4_bg_data);
+		} else if (pdata->rev == 2) {
+			child_pdata = &omap5_bg_data;
+			size = sizeof(omap5_bg_data);
+		}
+		omap_bandgap_devs[0].platform_data = child_pdata;
+		omap_bandgap_devs[0].pdata_size = size;
+
+		thermal_irq = platform_get_irq_byname(pdev, "thermal_alert");
+		if (thermal_irq < 0) {
+			dev_err(dev, "Fail: request thermal irq\n");
+			goto exit;
+		}
+
+		ret = mfd_add_devices(dev, -1, omap_bandgap_devs,
+				      ARRAY_SIZE(omap_bandgap_devs),
+				      NULL, thermal_irq);
+		if (ret) /* If Error, flag it */
+			dev_err(dev, "failed to populate bandgap child\n");
+	}
+
+exit:
+	return 0;
+
 }
 
 
@@ -208,12 +273,13 @@ static int __devexit omap_control_remove(struct platform_device *pdev)
 	}
 	spin_unlock(&omap_control->reglock);
 
-	iounmap(omap_control->base);
 
-	if (pdev->dev.platform_data)
+	if (pdev->dev.platform_data) {
+		mfd_remove_devices(omap_control->dev);
 		dev_set_drvdata(omap_control->dev, NULL);
-	else
+	} else {
 		platform_set_drvdata(pdev, NULL);
+	}
 
 	return 0;
 }

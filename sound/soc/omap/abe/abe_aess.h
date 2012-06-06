@@ -113,5 +113,6 @@ int omap_aess_disable_irq(struct omap_aess *abe);
 int omap_aess_clear_irq(struct omap_aess *abe);
 
 void omap_aess_hw_configuration(struct omap_aess *abe);
+void omap_aess_set_auto_gating(struct omap_aess *abe);
 
 #endif/* _ABE_AESS_H_ */
