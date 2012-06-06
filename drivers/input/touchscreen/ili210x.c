@@ -10,6 +10,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/input/ili210x.h>
 
+#define ILITEK_I2C_DRIVER_NAME	"ili210x_i2c"
 #define ILITEK_DEBUG_LEVEL	KERN_INFO
 #define ILITEK_ERROR_LEVEL	KERN_ALERT
 #define ILITEK_TS_RESET		104
@@ -191,6 +192,7 @@ static const struct attribute_group ili210x_attr_group = {
 static int __devinit ili210x_i2c_probe(struct i2c_client *client,
 				       const struct i2c_device_id *id)
 {
+	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	struct device *dev = &client->dev;
 	const struct ili210x_platform_data *pdata = dev->platform_data;
 	struct ili210x *priv;
@@ -345,7 +347,7 @@ static SIMPLE_DEV_PM_OPS(ili210x_i2c_pm,
 			 ili210x_i2c_suspend, ili210x_i2c_resume);
 
 static const struct i2c_device_id ili210x_i2c_id[] = {
-	{ "ili210x", 0 },
+	{ ILITEK_I2C_DRIVER_NAME, 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(i2c, ili210x_i2c_id);
@@ -353,7 +355,7 @@ MODULE_DEVICE_TABLE(i2c, ili210x_i2c_id);
 static struct i2c_driver ili210x_ts_driver = {
 	.id_table = ili210x_i2c_id,
 	.driver = {
-		.name = "ili210x_i2c",
+		.name = ILITEK_I2C_DRIVER_NAME,
 		.owner = THIS_MODULE,
 		.pm = &ili210x_i2c_pm,
 	},
