@@ -1119,12 +1119,6 @@ static int android_bind(struct usb_composite_dev *cdev)
 	struct usb_gadget	*gadget = cdev->gadget;
 	int			gcnum, id, ret;
 
-	/*
-	 * Start disconnected. Userspace will connect the gadget once
-	 * it is done configuring the functions.
-	 */
-	usb_gadget_disconnect(gadget);
-
 	ret = android_init_functions(dev->functions, cdev);
 	if (ret)
 		return ret;
