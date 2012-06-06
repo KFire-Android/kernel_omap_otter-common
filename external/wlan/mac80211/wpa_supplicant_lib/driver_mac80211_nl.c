@@ -30,7 +30,6 @@
 #include <netlink/msg.h>
 #include <netlink/attr.h>
 
-#include "wireless_copy.h"
 #include "common.h"
 #include "driver.h"
 #include "eloop.h"

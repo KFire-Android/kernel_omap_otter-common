@@ -38,6 +38,7 @@ Module.symvers
 # MAC80211 generated files
 modules
 compat_autoconf.h
+mac80211/compat_wl12xx/drivers/net/wireless/wl12xx/version.h
 
 # stgit generated dirs
 patches-*
