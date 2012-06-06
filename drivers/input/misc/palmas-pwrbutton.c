@@ -53,7 +53,7 @@ static int __devinit palmas_pwron_probe(struct platform_device *pdev)
 	struct input_dev *input_dev;
 	struct palmas_pwron *pwron;
 	int irq = platform_get_irq_byname(pdev, "PWRON_BUTTON");
-	unsigned int addr, value;
+	unsigned int addr;
 	int err, slave;
 
 
