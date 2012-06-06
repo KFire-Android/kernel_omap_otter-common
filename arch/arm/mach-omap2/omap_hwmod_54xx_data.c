@@ -1102,6 +1102,13 @@ static struct omap_mmu_dev_attr omap54xx_dsp_mmu_dev_attr = {
 	.da_end = 0xfffff000,
 	.nr_tlb_entries = 32,
 	.has_bus_err_back = 0,
+	/*
+	 * A value of 10 keeps the corresponding power domain in
+	 * ON/INACTIVE state as long as iommu is being used, to
+	 * prevent loss of IOMMU register context during CPU-idle path.
+	 * TODO: Modify value to allow a lower CSWR state.
+	 */
+	.pm_constraint = 10,
 };
 
 static struct omap_hwmod_class omap54xx_dsp_hwmod_class = {
@@ -2821,6 +2828,13 @@ static struct omap_mmu_dev_attr omap54xx_ipu_mmu_dev_attr = {
 	.da_end = 0xfffff000,
 	.nr_tlb_entries = 32,
 	.has_bus_err_back = 1,
+	/*
+	 * A value of 10 keeps the corresponding power domain in
+	 * ON/INACTIVE state as long as iommu is being used, to
+	 * prevent loss of IOMMU register context during CPU-idle path.
+	 * TODO: Modify value to allow a lower CSWR state.
+	 */
+	.pm_constraint = 10,
 };
 
 static struct omap_hwmod_class omap54xx_ipu_hwmod_class = {
