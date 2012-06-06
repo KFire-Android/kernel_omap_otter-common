@@ -48,12 +48,33 @@ static ssize_t fm_v4l2_fops_read(struct file *file, char __user * buf,
 	u8 rds_mode;
 	int ret;
 	struct fmdev *fmdev;
+	int no_of_chans;
 
 	fmdev = video_drvdata(file);
+
+	no_of_chans = fmdev->rx.no_of_chans;
 
 	if (!radio_disconnected) {
 		fmerr("FM device is already disconnected\n");
 		return -EIO;
+	}
+
+	if (fmdev->rx.comp_scan_status == 1) {
+		fmdev->rx.comp_scan_status = 0;
+		memcpy(buf, &fmdev->rx.stat_found[0], 4*fmdev->rx.no_of_chans);
+
+		if (fmdev->rx.rds.pause == 1) {
+			fmdev->rx.rds.pause = 0;
+
+			ret = fmc_set_rds_mode(fmdev, FM_RDS_ENABLE);
+			if (ret < 0)
+				fmerr("Failed to set RX RDS mode\n");
+		}
+
+		/* Set back the Original Frequency */
+		fmc_set_freq(fmdev, fmdev->rx.freq);
+
+		return 4*fmdev->rx.no_of_chans;
 	}
 
 	/* Turn on RDS mode , if it is disabled */
@@ -101,13 +122,30 @@ static u32 fm_v4l2_fops_poll(struct file *file, struct poll_table_struct *pts)
 {
 	int ret;
 	struct fmdev *fmdev;
+	unsigned int mask = 0;
 
 	fmdev = video_drvdata(file);
+
+	if (fmdev->rx.comp_scan_status == 1) {
+		if (fmdev->rx.comp_scan_done == 1) {
+			mask |= POLLPRI | POLLIN;
+			fmdev->rx.comp_scan_done = 0;
+		} else {
+			mask = 0;
+		}
+
+		return mask;
+	}
+
+	mask = 0;
+
 	ret = fmc_is_rds_data_available(fmdev, file, pts);
 	if (ret < 0)
-		return POLLIN | POLLRDNORM;
+		mask = 0;
+	else
+		mask |= (POLLIN | POLLRDNORM);
 
-	return 0;
+	return mask;
 }
 
 /**********************************************************************/
@@ -136,6 +174,42 @@ static ssize_t store_fmtx_af(struct device *dev,
 		return ret;
 	}
 	return size;
+}
+
+static ssize_t show_fmrx_comp_scan(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fmdev *fmdev = dev_get_drvdata(dev);
+
+	/* Chip doesn't support complete scan for weather band */
+	if (fmdev->rx.region.fm_band == FM_BAND_WEATHER)
+		return -EINVAL;
+
+	return sprintf(buf, "%d\n", fmdev->rx.no_of_chans);
+}
+
+static ssize_t store_fmrx_comp_scan(struct device *dev,
+		struct device_attribute *attr, char *buf, size_t size)
+{
+	int ret;
+	unsigned long comp_scan;
+	struct fmdev *fmdev = dev_get_drvdata(dev);
+
+	/* Chip doesn't support complete scan for weather band */
+	if (fmdev->rx.region.fm_band == FM_BAND_WEATHER)
+		return -EINVAL;
+
+	if (kstrtoul(buf, 0, &comp_scan))
+		return -EINVAL;
+
+	ret = fm_rx_seek(fmdev, 1, 0, FM_CHANNEL_SPACING_200KHZ, comp_scan);
+	if (ret < 0)
+		fmerr("RX complete scan failed - %d\n", ret);
+
+	if (comp_scan == COMP_SCAN_READ)
+		return (size_t) fmdev->rx.no_of_chans;
+	else
+		return size;
 }
 
 static ssize_t show_fmrx_deemphasis(struct device *dev,
@@ -270,6 +344,11 @@ static ssize_t store_fmrx_rssi_lvl(struct device *dev,
 static struct kobj_attribute v4l2_fmtx_rds_af =
 __ATTR(fmtx_rds_af, 0666, (void *)show_fmtx_af, (void *)store_fmtx_af);
 
+/* To start FM RX complete scan*/
+static struct kobj_attribute v4l2_fmrx_comp_scan =
+__ATTR(fmrx_comp_scan, 0666, (void *)show_fmrx_comp_scan,
+		(void *)store_fmrx_comp_scan);
+
 /* To Set De-Emphasis filter mode */
 static struct kobj_attribute v4l2_fmrx_deemph_mode =
 __ATTR(fmrx_deemph_mode, 0666, (void *)show_fmrx_deemphasis,
@@ -290,6 +369,7 @@ __ATTR(fmrx_rssi_lvl, 0666, (void *) show_fmrx_rssi_lvl,
 
 static struct attribute *v4l2_fm_attrs[] = {
 	&v4l2_fmtx_rds_af.attr,
+	&v4l2_fmrx_comp_scan.attr,
 	&v4l2_fmrx_deemph_mode.attr,
 	&v4l2_fmrx_rds_af.attr,
 	&v4l2_fmrx_band.attr,
@@ -347,6 +427,16 @@ static int fm_v4l2_fops_release(struct file *file)
 	struct fmdev *fmdev;
 
 	fmdev = video_drvdata(file);
+
+	if (fmdev->rx.comp_scan_status == 1) {
+		if (fmdev->rx.comp_scan_done == 0) {
+			ret = fm_rx_seek(fmdev, 1, 0, FM_CHANNEL_SPACING_200KHZ,
+					COMP_SCAN_STOP);
+			if (ret < 0)
+				fmerr("RX complete scan failed - %d\n", ret);
+		}
+	}
+
 	if (!radio_disconnected) {
 		fmdbg("FM device is already closed\n");
 		return 0;
@@ -629,7 +719,7 @@ static int fm_v4l2_vidioc_s_hw_freq_seek(struct file *file, void *priv,
 	}
 
 	ret = fm_rx_seek(fmdev, seek->seek_upward, seek->wrap_around,
-			seek->spacing);
+			seek->spacing, SEEK_START);
 	if (ret < 0)
 		fmerr("RX seek failed - %d\n", ret);
 

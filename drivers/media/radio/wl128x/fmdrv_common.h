@@ -84,7 +84,7 @@ struct fm_reg_table {
 
 #define FM_POWER_MODE			254
 #define FM_INTERRUPT			255
-#define STATION_VALID			123
+#define TUNE_VALIDITY_CHECK		123
 
 /* Transmitter API */
 
@@ -189,6 +189,7 @@ struct fm_event_msg_hdr {
 #define FM_STIC_EVENT		(1 << 9)
 #define FM_MAL_EVENT		(1 << 10)
 #define FM_POW_ENB_EVENT	(1 << 11)
+#define FM_SCAN_DONE_EVENT	(1 << 15)
 
 /*
  * Firmware files of FM. ASIC ID and ASIC version will be appened to this,
@@ -409,6 +410,10 @@ int fmc_get_mode(struct fmdev *, u8 *);
 #define FM_FREQ_MUL_RUS			10	/* Russian band */
 #define FM_FREQ_MUL_WB			25	/* Weather Band */
 
+#define SEEK_START			0
+#define COMP_SCAN_START			1
+#define COMP_SCAN_READ			2
+#define COMP_SCAN_STOP			3
 
 #define FM_US_BAND_LOW			87500
 #define FM_US_BAND_HIGH			180000
