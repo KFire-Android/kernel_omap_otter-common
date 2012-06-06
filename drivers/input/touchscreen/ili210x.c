@@ -296,8 +296,8 @@ static int __devinit ili210x_i2c_probe(struct i2c_client *client,
 
 	device_init_wakeup(&client->dev, 1);
 
-	printk(ILITEK_DEBUG_LEVEL "%s: ILI210x initialized (IRQ: %d), firmware version %d.%d.%d",
-		__func__, client->irq, firmware.id, firmware.major, firmware.minor\n");
+	printk(ILITEK_DEBUG_LEVEL "%s: ILI210x initialized (IRQ: %d), firmware version %d.%d.%d\n",
+		__func__, client->irq, firmware.id, firmware.major, firmware.minor);
 
 	return 0;
 
