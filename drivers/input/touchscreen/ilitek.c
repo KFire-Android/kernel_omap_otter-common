@@ -23,6 +23,11 @@
 		2011/02/18 Rearrange code
 		2011/03/21 Fix counld not report first point
 		2011/03/25 Support linux 2.36.x 
+
+	Author:	 Hashcode
+	Version: 2
+	History:
+		2012/06/06 Updated for 3.0.x kernel
 */
 #include <linux/module.h>
 #include <linux/input.h>
@@ -37,15 +42,12 @@
 #include <linux/version.h>
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
+#include <linux/input/mt.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #include <linux/wakelock.h>
 #endif
-
-int touch_key_hold_press = 0;
-int touch_key_code[] = {KEY_BACK, KEY_MENU, KEY_HOME, KEY_F12};
-int touch_key_press[] = {0, 0, 0, 0};
 
 // definitions
 #define ILITEK_I2C_RETRY_COUNT			3
@@ -54,6 +56,10 @@ int touch_key_press[] = {0, 0, 0, 0};
 #define ILITEK_DEBUG_LEVEL			KERN_INFO
 #define ILITEK_ERROR_LEVEL			KERN_ALERT
 #define ILITEK_TS_RESET                         104
+
+#define ILITEK_DEFAULT_WIDTH			5
+#define ILITEK_DEFAULT_PRESSURE			20
+#define ILITEK_DEFAULT_POLL_DELAY		2
 
 // i2c command for ilitek touch screen
 #define ILITEK_TP_CMD_READ_DATA			0x10
@@ -100,16 +106,16 @@ static void ilitek_exit(void);
 static int ilitek_i2c_transfer(struct i2c_client*, struct i2c_msg*, int);
 static int ilitek_i2c_read(struct i2c_client*, uint8_t, uint8_t*, int);
 static int ilitek_i2c_process_and_report(void);
+
 static int ilitek_i2c_suspend(struct i2c_client*, pm_message_t);
 static int ilitek_i2c_resume(struct i2c_client*);
 static void ilitek_i2c_shutdown(struct i2c_client*);
 static int ilitek_i2c_probe(struct i2c_client*, const struct i2c_device_id*);
 static int ilitek_i2c_remove(struct i2c_client*);
 #ifdef CONFIG_HAS_EARLYSUSPEND
-        static void ilitek_i2c_early_suspend(struct early_suspend *h);
-        static void ilitek_i2c_late_resume(struct early_suspend *h);
+static void ilitek_i2c_early_suspend(struct early_suspend *h);
+static void ilitek_i2c_late_resume(struct early_suspend *h);
 #endif
-static int ilitek_i2c_polling_thread(void*);
 static irqreturn_t ilitek_i2c_isr(int, void*);
 static void ilitek_i2c_irq_work_queue_func(struct work_struct*);
 
@@ -125,24 +131,12 @@ static ssize_t ilitek_file_write(struct file*, const char*, size_t, loff_t*);
 static ssize_t ilitek_file_read(struct file*, char*, size_t, loff_t*);
 static int ilitek_file_close(struct inode*, struct file*);
 
-// declare touch point data
-struct touch_data {
-	// x, y value
-	int x, y;
-	// check wehther this point is valid or not
-	int valid;
-	// id information
-	int id;
-};
-
 // declare i2c data member
 struct i2c_data {
 	// input device
         struct input_dev *input_dev;
         // i2c client
         struct i2c_client *client;
-        // polling thread
-        struct task_struct *thread;
         // maximum x
         int max_x;
         // maximum y
@@ -167,13 +161,17 @@ struct i2c_data {
 	int protocol_ver;
 	// valid irq request
 	int valid_irq_request;
-	//int irq_enable;
 	int is_suspend;
+	// last touch
+	int last_touch1_x;
+	int last_touch1_y;
+	int last_touch2_x;
+	int last_touch2_y;
 	// work queue for interrupt use only
 	struct workqueue_struct *irq_work_queue;
 	// work struct for work queue
 	struct work_struct irq_work;
-    struct timer_list timer;
+	struct timer_list timer;
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
 #endif
@@ -206,7 +204,7 @@ static struct i2c_driver ilitek_i2c_driver = {
 	.driver = {.name = ILITEK_I2C_DRIVER_NAME},
 #ifndef CONFIG_HAS_EARLYSUSPEND
 	.resume = ilitek_i2c_resume,
-    .suspend  = ilitek_i2c_suspend,
+	.suspend  = ilitek_i2c_suspend,
 #endif
 	.shutdown = ilitek_i2c_shutdown,
 	.probe = ilitek_i2c_probe,
@@ -226,43 +224,11 @@ struct file_operations ilitek_fops = {
 	.release = ilitek_file_close,
 };
 
-/*
-description
-	open function for character device driver
-prarmeters
-	inode
-	    inode
-	filp
-	    file pointer
-return
-	status
-*/
-static int 
-ilitek_file_open(
-	struct inode *inode, struct file *filp)
-{
+static int ilitek_file_open(struct inode *inode, struct file *filp) {
 	return 0; 
 }
 
-/*
-description
-	write function for character device driver
-prarmeters
-	filp
-	    file pointer
-	buf
-	    buffer
-	count
-	    buffer length
-	f_pos
-	    offset
-return
-	status
-*/
-static ssize_t 
-ilitek_file_write(
-	struct file *filp, const char *buf, size_t count, loff_t *f_pos)
-{
+static ssize_t ilitek_file_write(struct file *filp, const char *buf, size_t count, loff_t *f_pos) {
 	int ret;
 	unsigned char buffer[128]={0};
         struct i2c_msg msgs[] = {
@@ -316,27 +282,11 @@ ilitek_file_write(
 	return -1;
 }
 
-/*
-description
-        ioctl function for character device driver
-prarmeters
-	inode
-		file node
-        filp
-            file pointer
-        cmd
-            command
-        arg
-            arguments
-return
-        status
-*/
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
-static long ilitek_file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+static long ilitek_file_ioctl(struct file *filp, unsigned int cmd, unsigned long arg) {
 #else
-static int  ilitek_file_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg)
+static int  ilitek_file_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg) {
 #endif
-{
 	static unsigned char buffer[64]={0};
 	static int len=0;
 	int ret;
@@ -406,105 +356,29 @@ static int  ilitek_file_ioctl(struct inode *inode, struct file *filp, unsigned i
     	return 0;
 }
 
-/*
-description
-	read function for character device driver
-prarmeters
-	filp
-	    file pointer
-	buf
-	    buffer
-	count
-	    buffer length
-	f_pos
-	    offset
-return
-	status
-*/
-static ssize_t
-ilitek_file_read(
-        struct file *filp, char *buf, size_t count, loff_t *f_pos)
-{
+static ssize_t ilitek_file_read(struct file *filp, char *buf, size_t count, loff_t *f_pos) {
 	return 0;
 }
 
-/*
-description
-	close function
-prarmeters
-	inode
-	    inode
-	filp
-	    file pointer
-return
-	status
-*/
-static int 
-ilitek_file_close(
-	struct inode *inode, struct file *filp)
-{
+static int ilitek_file_close(struct inode *inode, struct file *filp) {
         return 0;
 }
 
-/*
-description
-	set input device's parameter
-prarmeters
-	input
-		input device data
-	max_tp
-		single touch or multi touch
-	max_x
-		maximum	x value
-	max_y
-		maximum y value
-return
-	nothing
-*/
-static void 
-ilitek_set_input_param(
-	struct input_dev *input, 
-	int max_tp, 
-	int max_x, 
-	int max_y)
-{
-	int key;
-	input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
+static void ilitek_set_input_param(struct input_dev *input, int max_tp, int max_x, int max_y) {
+	// __set_bit(EV_SYN, input->evbit);
+	input->evbit[0] = BIT_MASK(EV_ABS);
 	input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
         input_set_abs_params(input, ABS_MT_POSITION_X, 0, max_x + 1, 0, 0);
         input_set_abs_params(input, ABS_MT_POSITION_Y, 0, max_y + 1, 0, 0);
         input_set_abs_params(input, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
-        input_set_abs_params(input, ABS_MT_WIDTH_MAJOR, 0, 255, 0, 0);
+	input_set_abs_params(input, ABS_MT_PRESSURE, 0, 255, 0, 0);
 	input_set_abs_params(input, ABS_MT_TRACKING_ID, 0, max_tp, 0, 0);
-	for(key=0; key<sizeof(touch_key_code); key++){
-        	if(touch_key_code[key] <= 0){
-            		continue;
-		}
-        	set_bit(touch_key_code[key] & KEY_MAX, input->keybit);
-	}
 	input->name = ILITEK_I2C_DRIVER_NAME;
 	input->id.bustype = BUS_I2C;
 	input->dev.parent = &(i2c.client)->dev;
 }
 
-/*
-description
-	send message to i2c adaptor
-parameter
-	client
-		i2c client
-	msgs
-		i2c message
-	cnt
-		i2c message count
-return
-	>= 0 if success
-	others if error
-*/
-static int 
-ilitek_i2c_transfer(
-	struct i2c_client *client, struct i2c_msg *msgs, int cnt)
-{
+static int ilitek_i2c_transfer(struct i2c_client *client, struct i2c_msg *msgs, int cnt) {
 	int ret, count=ILITEK_I2C_RETRY_COUNT;
 	while(count >= 0){
 		count-= 1;
@@ -520,28 +394,7 @@ ilitek_i2c_transfer(
 	return ret;
 }
 
-/*
-description
-	read data from i2c device
-parameter
-	client
-		i2c client data
-	addr
-		i2c address
-	data
-		data for transmission
-	length
-		data length
-return
-	status
-*/
-static int 
-ilitek_i2c_read(
-	struct i2c_client *client,
-	uint8_t cmd, 
-	uint8_t *data, 
-	int length)
-{
+static int ilitek_i2c_read(struct i2c_client *client, uint8_t cmd, uint8_t *data, int length) {
 	int ret;
         struct i2c_msg msgs[] = {
 		{.addr = client->addr, .flags = 0, .len = 1, .buf = &cmd,},
@@ -555,21 +408,13 @@ ilitek_i2c_read(
 	return ret;
 }
 
-/*
-description
-	process i2c data and then report to kernel
-parameters
-	none
-return
-	status
-*/
-static int 
-ilitek_i2c_process_and_report(
-	void)
-{
-	int i, len, ret, org_x, org_y, x, y, key;
+static int ilitek_i2c_process_and_report(void) {
+	int i, len, ret, org_x, org_y, x1, y1, x2, y2, key;
 	struct input_dev *input = i2c.input_dev;
         unsigned char buf[9]={0};
+	int width = ILITEK_DEFAULT_WIDTH;
+	int pressure = ILITEK_DEFAULT_PRESSURE;
+	bool changed = false;
 
        	// read i2c data from device
        	ret = ilitek_i2c_read(i2c.client, ILITEK_TP_CMD_READ_DATA, buf, 9);
@@ -578,7 +423,8 @@ ilitek_i2c_process_and_report(
 	}
 
 	// multipoint process
-	if(i2c.protocol_ver & 0x200){
+	if (i2c.protocol_ver & 0x200) {
+#if 0
 		len = buf[0];
 
 		// read touch point
@@ -587,8 +433,8 @@ ilitek_i2c_process_and_report(
 			if(ilitek_i2c_read(i2c.client, ILITEK_TP_CMD_READ_SUB_DATA, buf, 5)){
 				org_x = (((int)buf[1]) << 8) + buf[2];
 				org_y = (((int)buf[3]) << 8) + buf[4];
-                x = i2c.max_y - org_y;
-                y = org_x;
+				x = i2c.max_y - org_y;
+				y = org_x;
 
 				// no touch
 				if((buf[0] & 0x80) == 0 && buf[0]!=0x01){
@@ -600,136 +446,90 @@ ilitek_i2c_process_and_report(
                         	input_event(input, EV_ABS, ABS_MT_POSITION_X, x);
                         	input_event(input, EV_ABS, ABS_MT_POSITION_Y, y);
                         	input_event(input, EV_ABS, ABS_MT_TOUCH_MAJOR, 1);
-                        	input_mt_sync(input);
+                        	// input_mt_sync(input);
 				//printk(ILITEK_DEBUG_LEVEL "%s, %X, %d, %d\n", __func__, buf[0], x, y);
 			}
 		}
 		// release point
 		if(buf[0] == 0){
-				input_event(input, EV_ABS, ABS_MT_TOUCH_MAJOR, 0);
-				input_mt_sync(input);
+			input_event(input, EV_ABS, ABS_MT_TOUCH_MAJOR, 0);
+			// input_mt_sync(input);
 		}
 		input_sync(input);
+#endif
 	}
-	else{
+	else {
 		// parse point
-//#if resolution_test
-#if 1
 
-		//printk("buf[0] = %x \n",buf[0]);
-		unsigned char tp_id, key_id;
+		unsigned char tp_id;
 		tp_id = buf[0];
-		key_id = buf[1] - 1;
 		i = 0;
 
-		if(tp_id & 0x01)
-		{
-			i = 0;
-			org_x = (int)buf[1 + (i * 4)] + ((int)buf[2 + (i * 4)] * 256);
-			org_y = (int)buf[3 + (i * 4)] + ((int)buf[4 + (i * 4)] * 256);
-
-			x = (i2c.max_y - org_y);
-         	y = org_x;
-
-            //Workaround for wiping from right to left when device is rotated
-            if (x == 0)
-                x++;
-            if (y == 0)
-                y++;
-
-			input_event(i2c.input_dev, EV_ABS, ABS_MT_TRACKING_ID, i);
-            input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_X, x);
-            input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_Y, y);
-            input_event(i2c.input_dev, EV_ABS, ABS_MT_TOUCH_MAJOR, 1);
-            input_mt_sync(i2c.input_dev);
-			//printk( "@@@@@@@@@  buf[%x]=(%x) point 1= %d, %d\n",i, buf[i]&0x3F, x, y);
-
-		}
-
-		if(tp_id & 0x02)
-		{
-			i = 1;
-        	org_x = (int)buf[1 + (i * 4)] + ((int)buf[2 + (i * 4)] * 256);
-        	org_y = (int)buf[3 + (i * 4)] + ((int)buf[4 + (i * 4)] * 256);
-
-			x = (i2c.max_y - org_y);
-         	y = org_x;
-
-			input_event(i2c.input_dev, EV_ABS, ABS_MT_TRACKING_ID, i);
-            input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_X, x);
-            input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_Y, y);
-            input_event(i2c.input_dev, EV_ABS, ABS_MT_TOUCH_MAJOR, 1);
-            input_mt_sync(i2c.input_dev);
-			//printk( "@@@@@@@@@  buf[%x]=(%x) point 2= %d, %d\n",i, buf[i]&0x3F, x, y);
-		}
-
-#else
-		for(i=0; i<i2c.max_tp && (buf[0] & (1<<i)); i++){
-			unsigned char tp_id, key_id;
-			tp_id = buf[0];
-			key_id = buf[1] - 1;
-        	org_x = (int)buf[1 + (i * 4)] + ((int)buf[2 + (i * 4)] * 256);
-        	org_y = (int)buf[3 + (i * 4)] + ((int)buf[4 + (i * 4)] * 256);
-            x = i2c.max_y - org_y;
-            y = org_x;
-
-			// check whether the point is valid or not		
-			if(tp_id== 0){
-				continue;
-			}
-
-			// report to android system
-#if 0
-			switch(tp_id){
-			case 0x81:
-				input_report_abs(input, ABS_MT_TOUCH_MAJOR, 0);
-    				input_mt_sync(input);
-				if((touch_key_press[key_id] == 0) && (touch_key_hold_press == 0)){
-					input_report_key(input, touch_key_code[key_id], 1);
-					touch_key_press[key_id] = 1;
-					touch_key_hold_press = 1;
-					printk("Key:%d ID:%d press\n", touch_key_code[key_id], key_id);
-				}
-				break;
-			case 0x80:
-			default:
-				for(key=0; key<sizeof(touch_key_code)/sizeof(touch_key_code[0]); key++){
-					if(touch_key_press[key]){
-						input_report_key(input, touch_key_code[key], 0);
-						touch_key_press[key] = 0;
-						printk("Key:%d ID:%d release\n", touch_key_code[key], key);
-                   	}
-				}
-				touch_key_hold_press = 0;
-#endif
-				input_event(i2c.input_dev, EV_ABS, ABS_MT_TRACKING_ID, i);
-               	input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_X, x);
-              	input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_Y, y);
-               	input_event(i2c.input_dev, EV_ABS, ABS_MT_TOUCH_MAJOR, 1);
-               	input_mt_sync(i2c.input_dev);
-				//printk(ILITEK_DEBUG_LEVEL "%s, point[%d]= %d, %d\n", __func__, buf[i]&0x3F, x, y);
-			//}
-			
-		}
-#endif
-
 		// release point
-		if(buf[0] == 0){
-#if 0
-			for(key=0; key<sizeof(touch_key_code)/sizeof(touch_key_code[0]); key++){
-				if(touch_key_press[key]){
-						input_report_key(input, touch_key_code[key], 0);
-						touch_key_press[key] = 0;
-						printk("-Key:%d ID:%d release\n", touch_key_code[key], key);
+		if (buf[0] == 0) {
+			// input_mt_report_slot_state(i2c.input_dev, MT_TOOL_FINGER, false);
+			if ((i2c.last_touch1_x != 0) || (i2c.last_touch1_y != 0) || (i2c.last_touch2_x != 0) || (i2c.last_touch2_y != 0)) {
+				i2c.last_touch1_x = 0;
+				i2c.last_touch1_y = 0;
+				i2c.last_touch2_x = 0;
+				i2c.last_touch2_y = 0;
+				input_mt_sync(i2c.input_dev);
+			}
+		}
+		else {
+			if (tp_id & 0x01) {
+				i = 0;
+				org_x = (int)buf[1 + (i * 4)] + ((int)buf[2 + (i * 4)] * 256);
+				org_y = (int)buf[3 + (i * 4)] + ((int)buf[4 + (i * 4)] * 256);
+
+				x1 = (i2c.max_y - org_y);
+				y1 = org_x;
+
+				// Workaround for wiping from right to left when device is rotated
+				if (x1 == 0) x1++;
+				if (y1 == 0) y1++;
+
+				if ((i2c.last_touch1_x != x1) || (i2c.last_touch1_y != y1))
+					changed = true;
+			}
+
+			if (tp_id & 0x02) {
+				i = 1;
+				org_x = (int)buf[1 + (i * 4)] + ((int)buf[2 + (i * 4)] * 256);
+				org_y = (int)buf[3 + (i * 4)] + ((int)buf[4 + (i * 4)] * 256);
+
+				x2 = (i2c.max_y - org_y);
+				y2 = org_x;
+
+				if ((i2c.last_touch2_x != x2) || (i2c.last_touch2_y != y2))
+					changed = true;
+			}
+
+			
+			if (changed) {
+				if (tp_id & 0x01) {
+					i2c.last_touch1_x = x1;
+					i2c.last_touch1_y = y1;
+					// input_mt_report_slot_state(i2c.input_dev, MT_TOOL_FINGER, true);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_TRACKING_ID, 0);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_TOUCH_MAJOR, width);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_X, x1);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_Y, y1);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_PRESSURE, pressure);
+					input_mt_sync(i2c.input_dev);
+				}
+				if (tp_id & 0x02) {
+					i2c.last_touch2_x = x2;
+					i2c.last_touch2_y = y2;
+					// input_mt_report_slot_state(i2c.input_dev, MT_TOOL_FINGER, true);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_TRACKING_ID, 1);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_TOUCH_MAJOR, width);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_X, x2);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_POSITION_Y, y2);
+					input_event(i2c.input_dev, EV_ABS, ABS_MT_PRESSURE, pressure);
+					input_mt_sync(i2c.input_dev);
 				}
 			}
-#endif
-			touch_key_hold_press = 0;
-			input_event(i2c.input_dev, EV_ABS, ABS_MT_TOUCH_MAJOR, 0);
-            input_mt_sync(i2c.input_dev);
-			//printk(ILITEK_DEBUG_LEVEL "%s, finger up point[%d]= %d, %d\n", __func__, buf[0]&0x3F, x, y);
-            //Workaround to clear TP buffer
-            //ilitek_i2c_read(i2c.client, ILITEK_TP_CMD_READ_DATA, buf, 9);
 		}
 		input_sync(i2c.input_dev);
 	}
@@ -738,139 +538,46 @@ ilitek_i2c_process_and_report(
 
 static void ilitek_i2c_timer(unsigned long handle)
 {
-    struct i2c_data *priv = (void *)handle;
-
-    schedule_work(&priv->irq_work);
+	struct i2c_data *priv = (void *)handle;
+	schedule_work(&priv->irq_work);
 }
 
-/*
-description
-	work queue function for irq use
-parameter
-	work
-		work queue
-return
-	nothing
-*/
-static void 
-ilitek_i2c_irq_work_queue_func(
-	struct work_struct *work)
-{
-    struct i2c_data *priv =  
-        container_of(work, struct i2c_data, irq_work);
+static void ilitek_i2c_irq_work_queue_func(struct work_struct *work) {
+	struct i2c_data *priv = container_of(work, struct i2c_data, irq_work);
 
-    if(i2c.is_suspend) {
-        //printk("%s %d enable_irq\n", __func__, __LINE__);
-        enable_irq(i2c.client->irq);
-        return;
-    }
+	if (i2c.is_suspend) {
+		enable_irq(i2c.client->irq);
+		return;
+	}
 
-    if(ilitek_i2c_process_and_report() < 0){
-        msleep(3000);
-        printk(ILITEK_ERROR_LEVEL "%s, process error\n", __func__);
-    }
-    if(gpio_get_value(35) == 0 && i2c.is_suspend == 0)
-        mod_timer(&priv->timer, jiffies + msecs_to_jiffies(0));
-    else {
-        //printk("%s %d enable_irq\n", __func__, __LINE__);
-        enable_irq(i2c.client->irq);
-    }
+	if (ilitek_i2c_process_and_report() < 0) {
+		msleep(3000);
+		printk(ILITEK_ERROR_LEVEL "%s, process error\n", __func__);
+	}
+	if (gpio_get_value(35) == 0 && i2c.is_suspend == 0)
+		mod_timer(&priv->timer, jiffies + msecs_to_jiffies(ILITEK_DEFAULT_POLL_DELAY));
+	else {
+		enable_irq(i2c.client->irq);
+	}
 }
 
-/*
-description
-	i2c interrupt service routine
-parameters
-	irq
-		interrupt number
-	dev_id
-		device parameter
-return
-	return status
-*/
-static irqreturn_t 
-ilitek_i2c_isr(
-	int irq, void *dev_id)
-{
-    if(i2c.is_suspend)
-        return IRQ_HANDLED;
+static irqreturn_t ilitek_i2c_isr(int irq, void *dev_id) {
+	if(i2c.is_suspend)
+		return IRQ_HANDLED;
 
-    //printk("%s %d disable_irq\n", __func__, __LINE__);
 	disable_irq_nosync(i2c.client->irq);
 	queue_work(i2c.irq_work_queue, &i2c.irq_work);
 	return IRQ_HANDLED;
 }
 
-/*
-description
-        i2c polling thread
-parameters
-        arg
-                arguments
-return
-        return status
-*/
-static int 
-ilitek_i2c_polling_thread(
-	void *arg)
-{
-	// check input parameter
-	printk(ILITEK_DEBUG_LEVEL "%s, enter\n", __func__);
 
-	// mainloop
-	while(1){
-		// check whether we should exit or not
-		if(kthread_should_stop()){
-			printk(ILITEK_DEBUG_LEVEL "%s, stop\n", __func__);
-			break;
-		}
-
-		// this delay will influence the CPU usage and response latency
-		msleep(10);
-		
-		// when i2c is in suspend or shutdown mode, we do nothing
-		if(i2c.stop_polling){
-			msleep(1000);
-			continue;
-		}
-
-		// read i2c data
-		if(ilitek_i2c_process_and_report() < 0){
-			msleep(3000);
-			printk(ILITEK_ERROR_LEVEL "%s, process error\n", __func__);
-		}
-	}
-	printk(ILITEK_DEBUG_LEVEL "%s, exit\n", __func__);
-	return 0;
-}
-
-/*
-description
-	i2c early suspend function
-parameters
-	h
-		early suspend pointer
-return
-	nothing
-*/
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void ilitek_i2c_early_suspend(struct early_suspend *h)
 {
 	ilitek_i2c_suspend(i2c.client, PMSG_SUSPEND);
 	printk("%s\n", __func__);
 }
-#endif
 
-/*
-description
-        i2c later resume function
-parameters
-        h
-                early suspend pointer
-return
-        nothing
-*/
-#ifdef CONFIG_HAS_EARLYSUSPEND
 static void ilitek_i2c_late_resume(struct early_suspend *h)
 {
 	ilitek_i2c_resume(i2c.client);
@@ -878,126 +585,79 @@ static void ilitek_i2c_late_resume(struct early_suspend *h)
 }
 #endif
 
-/*
-description
-        i2c suspend function
-parameters
-        client
-		i2c client data
-	mesg
-		suspend data
-return
-        return status
-*/
-
-static int 
-ilitek_i2c_suspend(
-	struct i2c_client *client, pm_message_t mesg)
-{
-    i2c.is_suspend = 1;
+static int ilitek_i2c_suspend(struct i2c_client *client, pm_message_t mesg) {
+	i2c.is_suspend = 1;
 	if(i2c.valid_irq_request != 0){
-            //printk("%s %d disable_irq\n", __func__, __LINE__);
-            disable_irq(i2c.client->irq);
-            //printk(ILITEK_DEBUG_LEVEL "%s, disable i2c irq\n", __func__);
+		disable_irq(i2c.client->irq);
 	}
-	else{
+	else {
 		i2c.stop_polling = 1;
- 	       	printk(ILITEK_DEBUG_LEVEL "%s, stop i2c thread polling\n", __func__);
+		printk(ILITEK_DEBUG_LEVEL "%s, stop i2c thread polling\n", __func__);
   	}
-    flush_workqueue(i2c.irq_work_queue);
-    msleep(1);
-    del_timer_sync(&i2c.timer);
-    //mdelay(10);
+	flush_workqueue(i2c.irq_work_queue);
+	msleep(1);
+	del_timer_sync(&i2c.timer);
+	//mdelay(10);
 
-    gpio_direction_output(ILITEK_TS_RESET ,0);
-    if(regulator_disable(p_regulator))
-        printk("%s regulator disable fail!\n",__func__);
-    //gpio_171 and gpio_172 input pin for diagnostic to pull low
-    omap_writew(omap_readw(0x4a10017C) | 0x010B, 0x4a10017C);
-    omap_writew(omap_readw(0x4a10017C) | 0x010B, 0x4a10017E);
-    //Disable I2C2 internal pull high
-    omap_writel(omap_readl(0x4a100604) | 0x00100010,0x4a100604);
-
-	return 0;
-}
-
-/*
-description
-        i2c resume function
-parameters
-        client
-		i2c client data
-return
-        return status
-*/
-static int 
-ilitek_i2c_resume(
-	struct i2c_client *client)
-{
-    int retry = 1;
-    struct irq_desc *desc = irq_to_desc(i2c.client->irq);
-
-    i2c.is_suspend = 0;
-    //Enable I2C2 internal pull high
-    omap_writel(omap_readl(0x4a100604) & 0xFFEFFFEF,0x4a100604);
-    if(regulator_enable(p_regulator))
-        printk("%s regulator enable fail!\n",__func__);
-    msleep(1);
-    gpio_direction_output(ILITEK_TS_RESET ,1);
-    msleep(15);
-    //gpio_171 and gpio_172 input pin for diagnostic to pull high
-    omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017C);
-    omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017E);
-
-    if(i2c.valid_irq_request != 0){
-        //printk("%s %d enable_irq\n", __func__, __LINE__);
-        enable_irq(i2c.client->irq);
-        //printk(ILITEK_DEBUG_LEVEL "%s, enable i2c irq\n", __func__);
-        while(desc->depth != 0 && retry <= 3) {
-            printk("%s re-enable irq! retry = %d\n", __func__, retry);
-            enable_irq(i2c.client->irq);
-            retry++;
-        }
-    }
-    else{
-        i2c.stop_polling = 0;
-        printk(ILITEK_DEBUG_LEVEL "%s, start i2c thread polling\n", __func__);
-    }
+	gpio_direction_output(ILITEK_TS_RESET ,0);
+	if (regulator_disable(p_regulator))
+		printk("%s regulator disable fail!\n",__func__);
+	//gpio_171 and gpio_172 input pin for diagnostic to pull low
+	omap_writew(omap_readw(0x4a10017C) | 0x010B, 0x4a10017C);
+	omap_writew(omap_readw(0x4a10017C) | 0x010B, 0x4a10017E);
+	//Disable I2C2 internal pull high
+	omap_writel(omap_readl(0x4a100604) | 0x00100010,0x4a100604);
 
 	return 0;
 }
 
-/*
-description
-        i2c shutdown function
-parameters
-        client
-                i2c client data
-return
-        nothing
-*/
-static void
-ilitek_i2c_shutdown(
-        struct i2c_client *client)
-{
-        printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
-        i2c.stop_polling = 1;
+static int ilitek_i2c_resume(struct i2c_client *client) {
+	int retry = 1;
+	struct irq_desc *desc = irq_to_desc(i2c.client->irq);
+
+	i2c.is_suspend = 0;
+
+	//Enable I2C2 internal pull high
+	omap_writel(omap_readl(0x4a100604) & 0xFFEFFFEF,0x4a100604);
+	if(regulator_enable(p_regulator))
+		printk("%s regulator enable fail!\n",__func__);
+	msleep(1);
+	gpio_direction_output(ILITEK_TS_RESET ,1);
+	msleep(15);
+	//gpio_171 and gpio_172 input pin for diagnostic to pull high
+	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017C);
+	omap_writew(omap_readw(0x4a10017C) | 0x011B, 0x4a10017E);
+
+	if (i2c.valid_irq_request != 0) {
+		enable_irq(i2c.client->irq);
+		while(desc->depth != 0 && retry <= 3) {
+			printk("%s re-enable irq! retry = %d\n", __func__, retry);
+			enable_irq(i2c.client->irq);
+			retry++;
+		}
+	}
+	else {
+		i2c.stop_polling = 0;
+		printk(ILITEK_DEBUG_LEVEL "%s, start i2c thread polling\n", __func__);
+	}
+
+	return 0;
 }
 
-static int ilitek_i2c_read_info(struct i2c_client *client,
-		uint8_t cmd, uint8_t *data, int length);
+static void ilitek_i2c_shutdown(struct i2c_client *client) {
+	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
+	i2c.stop_polling = 1;
+}
 
-static ssize_t ilitek_version_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
+static int ilitek_i2c_read_info(struct i2c_client *client, uint8_t cmd, uint8_t *data, int length);
+
+static ssize_t ilitek_version_show(struct device *dev, struct device_attribute *attr, char *buf) {
 	u8 ver[4];
 
-	if (ilitek_i2c_read_info(i2c.client,
-			ILITEK_TP_CMD_GET_FIRMWARE_VERSION, ver, 4) < 0) {
+	if (ilitek_i2c_read_info(i2c.client, ILITEK_TP_CMD_GET_FIRMWARE_VERSION, ver, 4) < 0) {
 		return sprintf(buf, "-1\n");
 	} else {
-		return sprintf(buf, "%d.%d.%d.%d\n",
-			ver[0], ver[1], ver[2], ver[3]);
+		return sprintf(buf, "%d.%d.%d.%d\n", ver[0], ver[1], ver[2], ver[3]);
 	}
 }
 
@@ -1012,30 +672,11 @@ static struct attribute_group ilitek_attrs_group = {
 	.attrs = ilitek_attrs,
 };
 
-/*
-description
-	when adapter detects the i2c device, this function will be invoked.
-parameters
-	client
-		i2c client data
-	id
-		i2c data
-return
-	status
-*/
-static int 
-ilitek_i2c_probe(
-	struct i2c_client *client, 
-	const struct i2c_device_id *id)
-{
-    printk(ILITEK_DEBUG_LEVEL "%s:: ENTER\n", __func__);
+static int ilitek_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id) {
 	if (sysfs_create_group(&client->dev.kobj, &ilitek_attrs_group)) {
-		printk(ILITEK_ERROR_LEVEL "%s: Unable to create sysfs group\n",
-				__FUNCTION__);
-                
+		printk(ILITEK_ERROR_LEVEL "%s: Unable to create sysfs group\n", __FUNCTION__);
 		return -EINVAL;
 	}
-
 	if(!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)){
                 printk(ILITEK_ERROR_LEVEL "%s, I2C_FUNC_I2C not support\n", __func__);
                 return -1;
@@ -1043,23 +684,10 @@ ilitek_i2c_probe(
 	i2c.client = client;
         printk(ILITEK_DEBUG_LEVEL "%s, i2c new style format\n", __func__);
 	printk("%s, IRQ: 0x%X\n", __func__, client->irq);
-    printk(ILITEK_DEBUG_LEVEL "%s:: EXI\n", __func__);
 	return 0;
 }
 
-/*
-description
-	when the i2c device want to detach from adapter, this function will be invoked.
-parameters
-	client
-		i2c client data
-return
-	status
-*/
-static int 
-ilitek_i2c_remove(
-	struct i2c_client *client)
-{
+static int ilitek_i2c_remove(struct i2c_client *client) {
 	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	i2c.stop_polling = 1;
 	return 0;
@@ -1218,24 +846,25 @@ ilitek_i2c_register_device(
 		register_early_suspend(&i2c.early_suspend);
 #endif
 
-	if(i2c.client->irq != 0 ){
-		i2c.irq_work_queue = create_singlethread_workqueue("ilitek_i2c_irq_queue");
-		if(i2c.irq_work_queue){
-			INIT_WORK(&i2c.irq_work, ilitek_i2c_irq_work_queue_func);
-            init_timer(&i2c.timer);
-            i2c.timer.data = (unsigned long)&i2c;
-            i2c.timer.function = ilitek_i2c_timer;
-			if(request_irq(i2c.client->irq, ilitek_i2c_isr, IRQF_TRIGGER_LOW, "ilitek_i2c_irq", &i2c)){
-				printk(ILITEK_ERROR_LEVEL "%s, request irq, error\n", __func__);
-			}
-			else{
-				i2c.valid_irq_request = 1;
-                        	printk(ILITEK_ERROR_LEVEL "%s, request irq, success\n", __func__);
+		if(i2c.client->irq != 0 ){
+			i2c.irq_work_queue = create_singlethread_workqueue("ilitek_i2c_irq_queue");
+			if(i2c.irq_work_queue) {
+				INIT_WORK(&i2c.irq_work, ilitek_i2c_irq_work_queue_func);
+				init_timer(&i2c.timer);
+				i2c.timer.data = (unsigned long)&i2c;
+				i2c.timer.function = ilitek_i2c_timer;
+				if (request_irq(i2c.client->irq, ilitek_i2c_isr, IRQF_TRIGGER_LOW, "ilitek_i2c_irq", &i2c)) {
+					printk(ILITEK_ERROR_LEVEL "%s, request irq, error\n", __func__);
+				}
+				else {
+					i2c.valid_irq_request = 1;
+					printk(ILITEK_ERROR_LEVEL "%s, request irq, success\n", __func__);
+				}
 			}
 		}
-	}
-	else{
-		i2c.stop_polling = 0;
+		else {
+#if 0
+			i2c.stop_polling = 0;
         	i2c.thread = kthread_create(ilitek_i2c_polling_thread, NULL, "ilitek_i2c_thread");
         	if(i2c.thread == (struct task_struct*)ERR_PTR){
             		i2c.thread = NULL;
@@ -1244,7 +873,8 @@ ilitek_i2c_register_device(
         	else{
             		wake_up_process(i2c.thread);
         	}
-	}
+#endif
+		}
 	}
 	else{
 		printk(ILITEK_ERROR_LEVEL "%s, add i2c device, error\n", __func__);
@@ -1253,33 +883,22 @@ ilitek_i2c_register_device(
 	return 0;
 }
 
-/*
-description
-	initiali function for driver to invoke.
-parameters
 
-	nothing
-return
-	status
-*/
-static int 
-ilitek_init(
-	void)
-{
+static int ilitek_init(void) {
 	int ret = 0;
 
 	printk(ILITEK_DEBUG_LEVEL "%s\n", __func__);
 	
-    if(gpio_request(ILITEK_TS_RESET, "ilitek_ts_reset")) {
-        printk("Unable to request ilitek_ts_reset pin.\n");
-        return -1;
-    }
-    gpio_direction_output(ILITEK_TS_RESET ,0);
+	if (gpio_request(ILITEK_TS_RESET, "ilitek_ts_reset")) {
+		printk("Unable to request ilitek_ts_reset pin.\n");
+		return -1;
+	}
+	gpio_direction_output(ILITEK_TS_RESET ,0);
 
-    p_regulator = regulator_get(NULL, "vaux3");
-    if(IS_ERR(p_regulator)) {
-        printk("%s regulator_get error\n", __func__);
-        return -1;
+	p_regulator = regulator_get(NULL, "vaux3");
+	if (IS_ERR(p_regulator)) {
+		printk("%s regulator_get error\n", __func__);
+		return -1;
     }
     ret = regulator_set_voltage(p_regulator, 3000000,
                     3000000);
@@ -1362,12 +981,6 @@ ilitek_exit(
                         	destroy_workqueue(i2c.irq_work_queue);
                         	printk(ILITEK_DEBUG_LEVEL "%s, destory work queue\n", __func__);
                 	}
-        	}
-	}
-	else{
-        	if(i2c.thread != NULL){
-                	kthread_stop(i2c.thread);
-                	printk(ILITEK_DEBUG_LEVEL "%s, stop i2c thread\n", __func__);
         	}
 	}
         if(i2c.valid_i2c_register != 0){
