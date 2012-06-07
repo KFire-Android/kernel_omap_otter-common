@@ -216,6 +216,33 @@ omap_rproc_set_frequency(struct device *dev, struct rproc *rproc, long val)
 	return 0;
 }
 
+static irqreturn_t omap_rproc_watchdog_isr(int irq, void *p)
+{
+	struct rproc *rproc = p;
+	struct device *dev = rproc->dev.parent;
+	struct omap_rproc_pdata *pdata = dev->platform_data;
+	struct omap_rproc_timers_info *timers = pdata->timers;
+	struct omap_dm_timer *timer = NULL;
+	int i;
+
+	for (i = 0; i < pdata->timers_cnt; i++) {
+		if (irq == omap_dm_timer_get_irq(timers[i].odt)) {
+			timer = timers[i].odt;
+			break;
+		}
+	}
+
+	if (!timer) {
+		dev_err(dev, "invalid timer\n");
+		return IRQ_NONE;
+	}
+	omap_dm_timer_write_status(timer, OMAP_TIMER_INT_OVERFLOW);
+
+	rproc_error_reporter(rproc, RPROC_ERR_WATCHDOG);
+
+	return IRQ_HANDLED;
+}
+
 /*
  * Power up the remote processor.
  *
@@ -228,7 +255,7 @@ static int omap_rproc_start(struct rproc *rproc)
 	struct omap_rproc *oproc = rproc->priv;
 	struct device *dev = rproc->dev.parent;
 	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+	struct omap_rproc_pdata *pdata = dev->platform_data;
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
 
@@ -270,6 +297,22 @@ static int omap_rproc_start(struct rproc *rproc)
 			goto err_timers;
 		}
 		omap_dm_timer_set_source(timers[i].odt, OMAP_TIMER_SRC_SYS_CLK);
+
+		if (timers[i].is_wdt) {
+			ret = request_irq(omap_dm_timer_get_irq(timers[i].odt),
+					omap_rproc_watchdog_isr, IRQF_SHARED,
+					"rproc-wdt", rproc);
+			if (ret) {
+				dev_err(dev,
+					"error requesting irq for timer %d\n",
+								timers[i].id);
+				omap_dm_timer_free(timers[i].odt);
+				timers[i].odt = NULL;
+				goto err_timers;
+			}
+			/* clean counter, remoteproc proc will set the value */
+			omap_dm_timer_set_load(timers[i].odt, 0, 0);
+		}
 		omap_dm_timer_start(timers[i].odt);
 	}
 
@@ -284,6 +327,9 @@ static int omap_rproc_start(struct rproc *rproc)
 err_timers:
 	while (i--) {
 		omap_dm_timer_stop(timers[i].odt);
+		if (timers[i].is_wdt)
+			free_irq(omap_dm_timer_get_irq(timers[i].odt), rproc);
+
 		omap_dm_timer_free(timers[i].odt);
 		timers[i].odt = NULL;
 	}
@@ -309,6 +355,9 @@ static int omap_rproc_stop(struct rproc *rproc)
 
 	for (i = 0; i < pdata->timers_cnt; i++) {
 		omap_dm_timer_stop(timers[i].odt);
+		if (timers[i].is_wdt)
+			free_irq(omap_dm_timer_get_irq(timers[i].odt), rproc);
+
 		omap_dm_timer_free(timers[i].odt);
 		timers[i].odt = NULL;
 	}
