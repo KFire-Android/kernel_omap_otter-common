@@ -68,6 +68,13 @@ int voltdm_register_notifier(struct voltagedomain *voltdm,
 	return srcu_notifier_chain_register(&voltdm->change_notify_list, nb);
 }
 
+int voltdm_unregister_notifier(struct voltagedomain *voltdm,
+					     struct notifier_block *nb)
+{
+	return srcu_notifier_chain_unregister(&voltdm->change_notify_list, nb);
+}
+
+
 /**
  * voltdm_scale() - API to scale voltage of a particular voltage domain.
  * @voltdm: pointer to the voltage domain which is to be scaled.

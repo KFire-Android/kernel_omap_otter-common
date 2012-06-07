@@ -43,4 +43,30 @@ static inline int omap4_prcm_freq_update(void)
 }
 #endif
 
+struct voltagedomain;
+/* Notifier values for voltage changes */
+#define OMAP_VOLTAGE_PRECHANGE	1
+#define OMAP_VOLTAGE_POSTCHANGE	2
+
+/**
+ * struct omap_voltage_notifier - notifier data that is passed along
+ * @voltdm:		voltage domain for the notification
+ * @target_volt:	what voltage is happening
+ * @op_result:		valid only for POSTCHANGE, tells the result of
+ *			the operation.
+ *
+ * This provides notification
+ */
+struct omap_voltage_notifier {
+	struct voltagedomain	*voltdm;
+	unsigned long		target_volt;
+	int			op_result;
+};
+
+int voltdm_register_notifier(struct voltagedomain *voltdm,
+			     struct notifier_block *nb);
+
+int voltdm_unregister_notifier(struct voltagedomain *voltdm,
+			       struct notifier_block *nb);
+
 #endif			/* __ARCH_ARM_MACH_OMAP2_MACH_COMMON_H_ */
