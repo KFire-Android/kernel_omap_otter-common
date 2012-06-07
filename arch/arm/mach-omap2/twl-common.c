@@ -47,6 +47,16 @@ static struct i2c_board_info __initdata omap4_i2c1_board_info[] = {
 	},
 };
 
+static struct i2c_board_info __initdata omap5_i2c1_generic_info[] = {
+	{
+		I2C_BOARD_INFO("twl6035", 0x48),
+		.flags	= I2C_CLIENT_WAKE,
+	},
+	{
+		I2C_BOARD_INFO("twl6040", 0x4b),
+	},
+};
+
 void __init omap_pmic_init(int bus, u32 clkrate,
 			   const char *pmic_type, int pmic_irq,
 			   struct twl4030_platform_data *pmic_data)
@@ -77,10 +87,45 @@ void __init omap4_pmic_init(const char *pmic_type,
 
 }
 
+/**
+ * omap5_pmic_init() - PMIC init for i2c
+ * @bus_id:	which bus
+ * @speed:	speed
+ * @pmic_type:	name of pmic
+ * @pmic_data:	pointer to pmic data
+ * @audio_data:	audio data
+ * @audio_irq: irq for audio
+ * @bd_info:	other board specific i2c_board_info data
+ * @num_bd_info: count
+ *
+ * To be called after register_i2c_bus is called by board file
+ */
+void __init omap5_pmic_init(int bus_id, const char *pmic_type, int pmic_irq,
+			    struct palmas_platform_data *pmic_data,
+			    const char *audio_type, int audio_irq,
+			    struct twl6040_platform_data *audio_data)
+{
+	/* PMIC part*/
+	strncpy(omap5_i2c1_generic_info[0].type, pmic_type,
+		sizeof(omap5_i2c1_generic_info[0].type));
+	omap5_i2c1_generic_info[0].irq = pmic_irq;
+	omap5_i2c1_generic_info[0].platform_data = pmic_data;
+
+	/* TWL6040 audio IC part */
+	strncpy(omap5_i2c1_generic_info[1].type, audio_type,
+		sizeof(omap5_i2c1_generic_info[1].type));
+	omap5_i2c1_generic_info[1].irq = audio_irq;
+	omap5_i2c1_generic_info[1].platform_data = audio_data;
+
+	i2c_register_board_info(bus_id, omap5_i2c1_generic_info,
+				ARRAY_SIZE(omap5_i2c1_generic_info));
+}
+
 void __init omap_pmic_late_init(void)
 {
 	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
-	if (!pmic_i2c_board_info.irq || !omap4_i2c1_board_info[0].irq)
+	if (!pmic_i2c_board_info.irq && !omap4_i2c1_board_info[0].irq &&
+	    !omap5_i2c1_generic_info[0].irq)
 		return;
 	omap_twl_init();
 	omap_tps6236x_init();
