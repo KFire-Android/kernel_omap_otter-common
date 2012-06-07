@@ -833,6 +833,21 @@ static void setup_volt_sensitive_regs(struct emif_data *emif,
 		calib_ctrl = regs->dll_calib_ctrl_shdw_normal;
 
 	writel(calib_ctrl, base + EMIF_DLL_CALIB_CTRL_SHDW);
+	/*
+	 * Due to errata OMAP5430-2.0BUG00669:
+	 * MDLL fast_lock asserion freezes MDLL output codes
+	 * We have to disable MDLL fast_lock. For IP which is fixed:
+	 */
+	if (emif->plat_data->phy_type == EMIF_PHY_TYPE_INTELLIPHY &&
+	    emif->plat_data->ip_rev > EMIF_4D5) {
+		u32 phy_ctrl = readl(base + EMIF_DDR_PHY_CTRL_1);
+
+		if (volt_state == DDR_VOLTAGE_RAMPING)
+			phy_ctrl |= FAST_DLL_LOCK_MASK_4D5;
+		else
+			phy_ctrl &= ~FAST_DLL_LOCK_MASK_4D5;
+		writel(phy_ctrl, base + EMIF_DDR_PHY_CTRL_1);
+	}
 }
 
 /*
