@@ -1112,7 +1112,16 @@ static void __init_or_module emif_onetime_settings(struct emif_data *emif)
 	pwr_mgmt_ctrl = get_pwr_mgmt_ctrl(1000000000, emif,
 			emif->plat_data->ip_rev);
 	emif->lpmode = (pwr_mgmt_ctrl & LP_MODE_MASK) >> LP_MODE_SHIFT;
-	writel(pwr_mgmt_ctrl, base + EMIF_POWER_MANAGEMENT_CONTROL);
+
+	/* First update the time in shadow register */
+	pwr_mgmt_ctrl &= CS_TIM_MASK | SR_TIM_MASK | PD_TIM_MASK;
+	writel(pwr_mgmt_ctrl, base + EMIF_POWER_MANAGEMENT_CTRL_SHDW);
+
+	/*
+	 * Next set the LP mode in ctrl reg. In the next cycle, timing
+	 * values in shadow will get updated to the ctrl register.
+	 */
+	set_lpmode(emif, emif->lpmode);
 
 	/* Init ZQ calibration settings */
 	zq = get_zq_config_reg(addressing, device_info->cs1_used,
