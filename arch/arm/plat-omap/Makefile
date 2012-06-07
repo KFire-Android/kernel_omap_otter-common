@@ -13,7 +13,7 @@ obj-  :=
 obj-$(CONFIG_ARCH_OMAP16XX) += ocpi.o
 
 # omap_device support (OMAP2+ only at the moment)
-obj-$(CONFIG_ARCH_OMAP2PLUS) += omap_device.o
+obj-$(CONFIG_ARCH_OMAP2PLUS) += omap_device.o rproc_user.o
 
 obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
 obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
