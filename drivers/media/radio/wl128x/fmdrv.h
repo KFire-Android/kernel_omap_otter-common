@@ -32,25 +32,25 @@
 #include <media/v4l2-common.h>
 #include <media/v4l2-ctrls.h>
 
-#define FM_DRV_VERSION            "0.1.1"
-#define FM_DRV_NAME               "ti_fmdrv"
-#define FM_DRV_CARD_SHORT_NAME    "TI FM Radio"
-#define FM_DRV_CARD_LONG_NAME     "Texas Instruments FM Radio"
+#define FM_DRV_VERSION			"0.1.1"
+#define FM_DRV_NAME			"ti_fmdrv"
+#define FM_DRV_CARD_SHORT_NAME		"TI FM Radio"
+#define FM_DRV_CARD_LONG_NAME		"Texas Instruments FM Radio"
 
 /* Flag info */
-#define FM_INTTASK_RUNNING            0
-#define FM_INTTASK_SCHEDULE_PENDING   1
-#define FM_FW_DW_INPROGRESS     2
-#define FM_CORE_READY                 3
-#define FM_CORE_TRANSPORT_READY       4
-#define FM_AF_SWITCH_INPROGRESS	      5
-#define FM_CORE_TX_XMITING	      6
+#define FM_INTTASK_RUNNING		0
+#define FM_INTTASK_SCHEDULE_PENDING	1
+#define FM_FW_DW_INPROGRESS		2
+#define FM_CORE_READY			3
+#define FM_CORE_TRANSPORT_READY	4
+#define FM_AF_SWITCH_INPROGRESS	5
+#define FM_CORE_TX_XMITING		6
 
-#define FM_TUNE_COMPLETE	      0x1
-#define FM_BAND_LIMIT		      0x2
+#define FM_TUNE_COMPLETE		0x1
+#define FM_BAND_LIMIT			0x2
 
-#define FM_DRV_TX_TIMEOUT      (5*HZ)	/* 5 seconds */
-#define FM_DRV_RX_SEEK_TIMEOUT (20*HZ)	/* 20 seconds */
+#define FM_DRV_TX_TIMEOUT		(5*HZ)	/* 5 seconds */
+#define FM_DRV_RX_SEEK_TIMEOUT		(20*HZ)	/* 20 seconds */
 
 #define fmerr(format, ...) \
 	printk(KERN_ERR "fmdrv: " format, ## __VA_ARGS__)
@@ -121,7 +121,7 @@ struct fm_irq {
 /* RDS info */
 struct fm_rds {
 	u8 flag;	/* RX RDS on/off status */
-	u8 last_blk_idx;	/* Last received RDS block */
+	u8 last_blk_idx;/* Last received RDS block */
 
 	/* RDS buffer */
 	wait_queue_head_t read_queue;
@@ -148,19 +148,19 @@ struct tuned_station_info {
 /* FM RX mode info */
 struct fm_rx {
 	struct region_info region;	/* Current selected band */
-	u32 freq;	/* Current RX frquency */
-	u8 mute_mode;	/* Current mute mode */
-	u8 deemphasis_mode; /* Current deemphasis mode */
+	u32 freq;			/* Current RX frquency */
+	u8 mute_mode;			/* Current mute mode */
+	u8 deemphasis_mode;		/* Current deemphasis mode */
 	/* RF dependent soft mute mode */
 	u8 rf_depend_mute;
-	u16 volume;	/* Current volume level */
-	u16 rssi_threshold;	/* Current RSSI threshold level */
+	u16 volume;			/* Current volume level */
+	u16 rssi_threshold;		/* Current RSSI threshold level */
 	/* Holds the index of the current AF jump */
 	u8 afjump_idx;
 	/* Will hold the frequency before the jump */
 	u32 freq_before_jump;
-	u8 rds_mode;	/* RDS operation mode (RDS/RDBS) */
-	u8 af_mode;	/* Alternate frequency on/off */
+	u8 rds_mode;			/* RDS operation mode (RDS/RDBS) */
+	u8 af_mode;			/* Alternate frequency on/off */
 	struct tuned_station_info stat_info;
 	struct fm_rds rds;
 };
@@ -203,13 +203,13 @@ struct fmtx_data {
 /* FM driver operation structure */
 struct fmdev {
 	struct video_device *radio_dev;	/* V4L2 video device pointer */
-	struct snd_card *card;	/* Card which holds FM mixer controls */
+	struct snd_card *card;		/* Card which holds FM mixer controls */
 	u16 asci_id;
-	spinlock_t rds_buff_lock; /* To protect access to RDS buffer */
-	spinlock_t resp_skb_lock; /* To protect access to received SKB */
+	spinlock_t rds_buff_lock;	/* To protect access to RDS buffer */
+	spinlock_t resp_skb_lock;	/* To protect access to received SKB */
 
-	long flag;		/*  FM driver state machine info */
-	u8 streg_cbdata; /* status of ST registration */
+	long flag;			/* FM driver state machine info */
+	u8 streg_cbdata;		/* status of ST registration */
 
 	struct sk_buff_head rx_q;	/* RX queue */
 	struct tasklet_struct rx_task;	/* RX Tasklet */
@@ -227,8 +227,8 @@ struct fmdev {
 	/* Handler used for wakeup when response packet is received */
 	struct completion *resp_comp;
 	struct fm_irq irq_info;
-	u8 curr_fmmode; /* Current FM chip mode (TX, RX, OFF) */
-	struct fm_rx rx;	/* FM receiver info */
+	u8 curr_fmmode;			/* Current FM chip mode (TX, RX, OFF) */
+	struct fm_rx rx;		/* FM receiver info */
 	struct fmtx_data tx_data;
 
 	/* V4L2 ctrl framwork handler*/
