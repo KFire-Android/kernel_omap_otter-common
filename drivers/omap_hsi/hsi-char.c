@@ -446,16 +446,10 @@ static long  hsi_char_ioctl(struct file *file,
 			ret = -EFAULT;
 		break;
 	case CS_SET_CLK_FORCE_ON:
-		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
-			ret = -EFAULT;
-		else
-			if_hsi_set_clk_forced_on(ch, state);
+		if_hsi_set_clk_forced_on(ch);
 		break;
 	case CS_SET_CLK_DYNAMIC:
-		if (copy_from_user(&state, (void __user *)arg, sizeof(state)))
-			ret = -EFAULT;
-		else
-			if_hsi_set_clk_dynamic(ch, state);
+		if_hsi_set_clk_dynamic(ch);
 		break;
 	default:
 		ret = -ENOIOCTLCMD;
