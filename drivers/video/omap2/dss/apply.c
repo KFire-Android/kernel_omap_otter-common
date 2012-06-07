@@ -1062,8 +1062,8 @@ int dss_mgr_blank(struct omap_overlay_manager *mgr,
 		u32 mask;
 
 		mask = DISPC_IRQ_VSYNC	| DISPC_IRQ_EVSYNC_ODD |
-			DISPC_IRQ_EVSYNC_EVEN | DISPC_IRQ_FRAMEDONE |
-			DISPC_IRQ_FRAMEDONE2;
+			DISPC_IRQ_EVSYNC_EVEN | DISPC_IRQ_FRAMEDONETV |
+			DISPC_IRQ_FRAMEDONE | DISPC_IRQ_FRAMEDONE2;
 		if (dss_has_feature(FEAT_MGR_LCD2))
 			mask |= DISPC_IRQ_VSYNC2;
 

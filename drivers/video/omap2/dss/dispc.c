@@ -414,7 +414,8 @@ u32 dispc_mgr_get_vsync_irq(enum omap_channel channel)
 	case OMAP_DSS_CHANNEL_LCD2:
 		return DISPC_IRQ_VSYNC2;
 	case OMAP_DSS_CHANNEL_DIGIT:
-		return DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_EVSYNC_EVEN;
+		return DISPC_IRQ_EVSYNC_ODD | DISPC_IRQ_EVSYNC_EVEN |
+			DISPC_IRQ_FRAMEDONETV;
 	default:
 		BUG();
 	}
