@@ -17,6 +17,8 @@
 #include <linux/clk.h>
 #include <linux/slab.h>
 
+#include <mach/ctrl_module_wkup_44xx.h>
+
 #include "iomap.h"
 #include "pm.h"
 #include "clockdomain.h"
@@ -30,8 +32,8 @@
 
 static void __iomem *sar_ram_base;
 static struct powerdomain *l3init_pwrdm;
-	static struct clockdomain *l3init_clkdm;
-static struct clk *usb_host_ck, *usb_tll_ck;
+static struct clockdomain *l3init_clkdm;
+static struct omap_hwmod *uhh_hwm, *tll_hwm;
 
 /**
  * struct sar_ram_entry - SAR RAM layout descriptor
@@ -81,6 +83,15 @@ static struct sar_overwrite_entry omap4_sar_overwrite_data[OW_IDX_SIZE] = {
 	[HSUSBHOST_CLKCTRL_IDX] = { .reg_addr = 0x4a009e54 },
 	[HSUSBHOST_CLKCTRL_2_IDX] = { .reg_addr = 0x4a009e54 },
 	[L3INIT_CLKSTCTRL_IDX] = { .reg_addr = 0x4a009300 },
+};
+
+static struct sar_overwrite_entry omap5_sar_overwrite_data[OW_IDX_SIZE] = {
+	[MEMIF_CLKSTCTRL_IDX] = { .reg_addr = 0x4a009e24 },
+	[MEMIF_CLKSTCTRL_2_IDX] = { .reg_addr = 0x4a009e24 },
+	[SHADOW_FREQ_CFG1_IDX] = { .reg_addr = 0x4a004e38 },
+	[HSUSBHOST_CLKCTRL_IDX] = { .reg_addr = 0x4a009e60 },
+	[HSUSBHOST_CLKCTRL_2_IDX] = { .reg_addr = 0x4a009e60 },
+	[L3INIT_CLKSTCTRL_IDX] = { .reg_addr = 0x4a009e2c },
 };
 
 /**
@@ -321,14 +332,14 @@ int omap_sar_save(void)
 	 */
 	clkdm_wakeup(l3init_clkdm);
 	pwrdm_enable_hdwr_sar(l3init_pwrdm);
-	clk_enable(usb_host_ck);
-	clk_enable(usb_tll_ck);
+	omap_hwmod_enable_clocks(uhh_hwm);
+	omap_hwmod_enable_clocks(tll_hwm);
 
 	/* Save SAR BANK1 */
 	sar_save(sar_ram_layout[0]);
 
-	clk_disable(usb_host_ck);
-	clk_disable(usb_tll_ck);
+	omap_hwmod_disable_clocks(uhh_hwm);
+	omap_hwmod_disable_clocks(tll_hwm);
 	pwrdm_disable_hdwr_sar(l3init_pwrdm);
 	clkdm_allow_idle(l3init_clkdm);
 
@@ -458,10 +469,17 @@ static int sar_layout_generate(void)
 
 	pr_info("generating sar_ram layout...\n");
 
-	rombase = OMAP44XX_SAR_ROM_BASE;
-	romend = rombase + SZ_8K;
-	rambase = OMAP44XX_SAR_RAM_BASE;
-	ramend = rambase + SAR_BANK4_OFFSET - 1;
+	if (cpu_is_omap44xx()) {
+		rombase = OMAP44XX_SAR_ROM_BASE;
+		romend = rombase + SZ_8K;
+		rambase = OMAP44XX_SAR_RAM_BASE;
+		ramend = rambase + SAR_BANK4_OFFSET - 1;
+	} else if (cpu_is_omap54xx()) {
+		rombase = OMAP54XX_SAR_ROM_BASE;
+		romend = rombase + SZ_8K;
+		rambase = OMAP54XX_SAR_RAM_BASE;
+		ramend = rambase + SAR_BANK4_OFFSET - 1;
+	}
 
 	sarrom = ioremap(rombase, SZ_8K);
 
@@ -536,6 +554,16 @@ cleanup:
 	return ret;
 }
 
+static void __init omap_usb_clk_init(void)
+{
+	uhh_hwm = omap_hwmod_lookup("usb_host_hs");
+	if (!uhh_hwm)
+		pr_err("Could not look up usb_host_hs\n");
+
+	tll_hwm = omap_hwmod_lookup("usb_tll_hs");
+	if (!tll_hwm)
+		pr_err("Could not look up usb_tll_hs\n");
+}
 /*
  * SAR IO module mapping. This is used to access the hardware registers
  * during SAR save.
@@ -572,26 +600,16 @@ static int __init omap4_sar_ram_init(void)
 	 * To avoid code running on other OMAPs in
 	 * multi-omap builds
 	 */
-	unsigned long sar_base_phys;
+	if (!cpu_is_omap44xx())
+		return -ENODEV;
 
 	/*
 	 * Static mapping, never released Actual SAR area used is 8K it's
 	 * spaced over 16K address with some part is reserved.
 	 */
-	if (cpu_is_omap44xx())
-		sar_base_phys = OMAP44XX_SAR_RAM_BASE;
-	else if (cpu_is_omap54xx())
-		sar_base_phys = OMAP54XX_SAR_RAM_BASE;
-	else
-		return -ENOMEM;
-
-	/* Static mapping, never released */
-	sar_ram_base = ioremap(sar_base_phys, SZ_16K);
+	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_16K);
 	if (WARN_ON(!sar_ram_base))
 		return -ENOMEM;
-
-	if (!cpu_is_omap44xx())
-		return -ENODEV;
 
 	sar_modules = omap44xx_sar_modules;
 	sar_overwrite_data = omap4_sar_overwrite_data;
@@ -621,14 +639,87 @@ static int __init omap4_sar_ram_init(void)
 	if (!l3init_clkdm)
 		pr_err("Failed to get l3_init_clkdm\n");
 
-	usb_host_ck = clk_get_sys("usbhs_omap", "hs_fck");
-	if (IS_ERR(usb_host_ck))
-		pr_err("Could not get usb_host_ck\n");
-
-	usb_tll_ck = clk_get_sys("usbhs_omap", "usbtll_ick");
-	if (IS_ERR(usb_tll_ck))
-		pr_err("Could not get usb_tll_ck\n");
+	omap_usb_clk_init();
 
 	return 0;
 }
 early_initcall(omap4_sar_ram_init);
+
+static struct sar_module omap54xx_sar_modules[] = {
+	{ .base = OMAP54XX_EMIF1_BASE, .size = SZ_1M },
+	{ .base = OMAP54XX_EMIF2_BASE, .size = SZ_1M },
+	{ .base = OMAP54XX_DMM_BASE, .size = SZ_1M },
+	{ .base = OMAP54XX_CM_CORE_AON_BASE, .size = SZ_8K },
+	{ .base = OMAP54XX_CM_CORE_BASE, .size = SZ_8K },
+	{ .base = OMAP54XX_C2C_BASE, .size = SZ_1M },
+	{ .base = OMAP543x_CTRL_BASE, .size = SZ_4K },
+	{ .base = OMAP543x_SCM_BASE, .size = SZ_4K },
+	{ .base = L3_54XX_BASE_CLK1, .size = SZ_1M },
+	{ .base = L3_54XX_BASE_CLK2, .size = SZ_1M },
+	{ .base = L3_54XX_BASE_CLK3, .size = SZ_1M },
+#ifndef CONFIG_MACH_OMAP_5430ZEBU
+	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_1M },
+	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_1M },
+#else
+	{ .base = OMAP54XX_USBTLL_BASE, .size = SZ_1M, .invalid = true },
+	{ .base = OMAP54XX_UHH_CONFIG_BASE, .size = SZ_1M, .invalid = true },
+#endif
+	{ .base = L4_54XX_PHYS, .size = SZ_4M },
+	{ .base = L4_PER_54XX_PHYS, .size = SZ_4M },
+	{ .base = OMAP54XX_LLIA_BASE, .size = SZ_64K },
+	{ .base = OMAP54XX_LLIB_BASE, .size = SZ_64K },
+	{ .base = 0 },
+};
+
+static int __init omap5_sar_ram_init(void)
+{
+	/*
+	 * To avoid code running on other OMAPs in
+	 * multi-omap builds
+	 */
+	if (!cpu_is_omap54xx())
+		return -ENODEV;
+
+	/*
+	 * Static mapping, never released Actual SAR area used is 8K it's
+	 * spaced over 16K address with some part is reserved.
+	 */
+	sar_ram_base = ioremap(OMAP54XX_SAR_RAM_BASE, SZ_16K);
+	BUG_ON(!sar_ram_base);
+
+	sar_modules = omap54xx_sar_modules;
+	sar_overwrite_data = omap5_sar_overwrite_data;
+
+	sar_ioremap_modules();
+
+	sar_layout_generate();
+
+	/*
+	 * SAR BANK3 contains all firewall settings and it's saved through
+	 * secure API on HS device. On GP device these registers are
+	 * meaningless but still needs to be saved. Otherwise Auto-restore
+	 * phase DMA takes an abort. Hence save these conents only once
+	 * in init to avoid the issue while waking up from device OFF
+	 */
+	if (omap_type() == OMAP2_DEVICE_TYPE_GP)
+		save_sar_bank3();
+
+	/*
+	 * L3INIT PD and clocks are needed for SAR save phase
+	 */
+	l3init_pwrdm = pwrdm_lookup("l3init_pwrdm");
+	if (!l3init_pwrdm)
+		pr_err("Failed to get l3init_pwrdm\n");
+
+	l3init_clkdm = clkdm_lookup("l3init_clkdm");
+	if (!l3init_clkdm)
+		pr_err("Failed to get l3init_clkdm\n");
+
+	/*
+	 * usbhost and tll clocks are needed for SAR save phase
+	 */
+	omap_usb_clk_init();
+
+	return 0;
+}
+early_initcall(omap5_sar_ram_init);

@@ -18,6 +18,12 @@
 #include "cm2_44xx.h"
 #include "prcm-common.h"
 
+#include <mach/hardware.h>
+
+#include "cm1_44xx.h"
+#include "cm2_44xx.h"
+#include "prcm-common.h"
+
 /*
  * The SAR RAM is maintained during Device OFF mode.
  * It is split into 4 banks with different privilege accesses
