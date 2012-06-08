@@ -68,4 +68,16 @@ struct rprm_auxclk {
 	unsigned pclk_rate;
 } __packed;
 
+/**
+ * struct rprm_regulator - resource manager parameters for regulator
+ * @name:	name of the regulator
+ * @min_uv	minimum voltage in micro volts
+ * @max_uv	maximum voltage in micro volts
+ */
+struct rprm_regulator {
+	char name[16];
+	u32 min_uv;
+	u32 max_uv;
+} __packed;
+
 #endif /* _LINUX_RPMSG_RESMGR_COMMON_H */

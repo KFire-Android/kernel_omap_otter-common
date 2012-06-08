@@ -17,9 +17,6 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/clk.h>
-#include <linux/regulator/consumer.h>
-#include <linux/regulator/driver.h>
-#include <linux/regulator/machine.h>
 #include <linux/gpio.h>
 #include <linux/i2c.h>
 #include <linux/pm_runtime.h>
@@ -27,12 +24,6 @@
 #include <linux/rpmsg_resmgr.h>
 #include <linux/remoteproc.h>
 #include "rpmsg_resmgr_common.h"
-
-struct rprm_regulator_depot {
-	struct rprm_regulator args;
-	struct regulator *reg_p;
-	u32 orig_uv;
-};
 
 struct rprm_i2c_depot {
 	u32 id;
@@ -77,105 +68,6 @@ static int rprm_gpio_get_info(void *handle, char *buf, size_t len)
 	u32 id = (unsigned)handle;
 
 	return snprintf(buf, len, "Id:%d\n", id);
-}
-
-#if defined(CONFIG_REGULATOR)
-static int rprm_regulator_request(void **handle, void *data, size_t len)
-{
-	int ret;
-	struct rprm_regulator *reg = data;
-	struct rprm_regulator_depot *rd;
-
-	if (len != sizeof *reg)
-		return -EINVAL;
-
-	/* Create regulator depot */
-	rd = kmalloc(sizeof *rd, GFP_KERNEL);
-	if (!rd)
-		return -ENOMEM;
-
-	/* make sure name is NULL terminated */
-	reg->name[sizeof reg->name - 1] = '\0';
-	rd->reg_p = regulator_get_exclusive(NULL, reg->name);
-	if (IS_ERR_OR_NULL(rd->reg_p)) {
-		pr_err("error providing regulator %s\n", reg->name);
-		ret = -EINVAL;
-		goto error;
-	}
-
-	rd->orig_uv = regulator_get_voltage(rd->reg_p);
-	ret = regulator_set_voltage(rd->reg_p, reg->min_uv, reg->max_uv);
-	if (ret) {
-		pr_err("error setting %s voltage\n", reg->name);
-		goto error_reg;
-	}
-
-	ret = regulator_enable(rd->reg_p);
-	if (ret) {
-		pr_err("error enabling %s ldo regulator\n", reg->name);
-		goto error_enable;
-	}
-
-	memcpy(&rd->args, reg, sizeof *reg);
-	*handle = rd;
-
-	return 0;
-error_enable:
-	/* restore original voltage */
-	regulator_set_voltage(rd->reg_p, rd->orig_uv, rd->orig_uv);
-error_reg:
-	regulator_put(rd->reg_p);
-error:
-	kfree(rd);
-
-	return ret;
-}
-
-static int rprm_regulator_release(void *handle)
-{
-	int ret;
-	struct rprm_regulator_depot *rd = handle;
-
-	ret = regulator_disable(rd->reg_p);
-	if (ret) {
-		pr_err("error disabling regulator %s\n", rd->args.name);
-		return ret;
-	}
-
-	/* Restore orginal voltage */
-	ret = regulator_set_voltage(rd->reg_p, rd->orig_uv, rd->orig_uv);
-	if (ret) {
-		pr_err("error restoring voltage %u\n", rd->orig_uv);
-		return ret;
-	}
-
-	regulator_put(rd->reg_p);
-	kfree(rd);
-
-	return 0;
-}
-#else
-static inline int rprm_regulator_request(void **handle, void *data, size_t len)
-{
-	return -1;
-}
-
-static inline int rprm_regulator_release(void *handle)
-{
-	return 0;
-}
-#endif
-
-static int rprm_regulator_get_info(void *handle, char *buf, size_t len)
-{
-	struct rprm_regulator_depot *rd = handle;
-	struct rprm_regulator *reg = &rd->args;
-
-	return snprintf(buf, len,
-		"name:%s\n"
-		"min_uV:%d\n"
-		"max_uV:%d\n",
-		reg->name, reg->min_uv, reg->max_uv);
 }
 
 static int rprm_i2c_request(void **handle, void *data, size_t len)
@@ -319,12 +211,6 @@ static struct rprm_res_ops gpio_ops = {
 	.get_info = rprm_gpio_get_info,
 };
 
-static struct rprm_res_ops regulator_ops = {
-	.request = rprm_regulator_request,
-	.release = rprm_regulator_release,
-	.get_info = rprm_regulator_get_info,
-};
-
 static struct rprm_res_ops i2c_ops = {
 	.request = rprm_i2c_request,
 	.release = rprm_i2c_release,
@@ -344,10 +230,6 @@ static struct rprm_res generic_res[] = {
 	{
 		.name = "gpio",
 		.ops = &gpio_ops,
-	},
-	{
-		.name = "regulator",
-		.ops = &regulator_ops,
 	},
 	{
 		.name = "i2c",

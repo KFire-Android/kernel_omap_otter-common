@@ -21,6 +21,9 @@
 #include <linux/rpmsg_resmgr.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_qos.h>
+#include <linux/regulator/consumer.h>
+#include <linux/regulator/driver.h>
+#include <linux/regulator/machine.h>
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
 #include <plat/omap-pm.h>
@@ -37,6 +40,12 @@ struct rprm_gpt_depot {
 struct rprm_auxclk_depot {
 	struct rprm_auxclk args;
 	struct clk *clk;
+};
+
+struct rprm_regulator_depot {
+	struct rprm_regulator args;
+	struct regulator *reg_p;
+	u32 orig_uv;
 };
 
 /* device handle for resources which use the generic apis */
@@ -296,6 +305,111 @@ static int rprm_auxclk_get_info(void *handle, char *buf, size_t len)
 		auxck->name, auxck->clk_rate, auxck->pname, auxck->pclk_rate);
 }
 
+#ifdef CONFIG_REGULATOR
+static int rprm_regulator_request(void **handle, void *data, size_t len)
+{
+	int ret;
+	struct rprm_regulator *reg = data;
+	struct rprm_regulator_depot *rd;
+
+	if (len != sizeof *reg) {
+		pr_err("error requesting regulator - invalid length\n");
+		return -EINVAL;
+	}
+
+	/* create regulator depot */
+	rd = kzalloc(sizeof *rd, GFP_KERNEL);
+	if (!rd) {
+		pr_err("error allocating memory for regulator\n");
+		return -ENOMEM;
+	}
+
+	/* make sure name is NULL terminated */
+	reg->name[sizeof reg->name - 1] = '\0';
+	rd->reg_p = regulator_get_exclusive(NULL, reg->name);
+	if (IS_ERR_OR_NULL(rd->reg_p)) {
+		pr_err("error providing regulator %s\n", reg->name);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	rd->orig_uv = regulator_get_voltage(rd->reg_p);
+	ret = regulator_set_voltage(rd->reg_p, reg->min_uv, reg->max_uv);
+	if (ret) {
+		pr_err("error setting %s voltage\n", reg->name);
+		goto error_reg;
+	}
+
+	ret = regulator_enable(rd->reg_p);
+	if (ret) {
+		pr_err("error enabling %s ldo regulator\n", reg->name);
+		goto error_enable;
+	}
+
+	memcpy(&rd->args, reg, sizeof rd->args);
+	*handle = rd;
+
+	return 0;
+
+error_enable:
+	/* restore original voltage */
+	regulator_set_voltage(rd->reg_p, rd->orig_uv, rd->orig_uv);
+error_reg:
+	regulator_put(rd->reg_p);
+error:
+	kfree(rd);
+
+	return ret;
+}
+
+static int rprm_regulator_release(void *handle)
+{
+	int ret;
+	struct rprm_regulator_depot *rd = handle;
+
+	ret = regulator_disable(rd->reg_p);
+	if (ret) {
+		pr_err("error disabling regulator %s\n", rd->args.name);
+		return ret;
+	}
+
+	/* restore orginal voltage */
+	ret = regulator_set_voltage(rd->reg_p, rd->orig_uv, rd->orig_uv);
+	if (ret) {
+		pr_err("error restoring voltage %u\n", rd->orig_uv);
+		return ret;
+	}
+
+	regulator_put(rd->reg_p);
+	kfree(rd);
+
+	return 0;
+}
+#else
+static inline int rprm_regulator_request(void **handle, void *data, size_t len)
+{
+	return -1;
+}
+
+static inline int rprm_regulator_release(void *handle)
+{
+	return 0;
+}
+#endif
+
+static int rprm_regulator_get_info(void *handle, char *buf, size_t len)
+{
+	struct rprm_regulator_depot *rd = handle;
+	struct rprm_regulator *reg = &rd->args;
+
+	return snprintf(buf, len,
+		"name:%s\n"
+		"min_uV:%d\n"
+		"max_uV:%d\n"
+		"orig_uV:%d\n",
+		reg->name, reg->min_uv, reg->max_uv, rd->orig_uv);
+}
+
 static int
 _enable_device_exclusive(void **handle, struct device **pdev, const char *name)
 {
@@ -453,6 +567,12 @@ static struct rprm_res_ops auxclk_ops = {
 	.get_info = rprm_auxclk_get_info,
 };
 
+static struct rprm_res_ops regulator_ops = {
+	.request = rprm_regulator_request,
+	.release = rprm_regulator_release,
+	.get_info = rprm_regulator_get_info,
+};
+
 static struct rprm_res_ops iva_ops = {
 	.request = rprm_iva_request,
 	.release = _device_release,
@@ -503,6 +623,10 @@ static struct rprm_res omap_res[] = {
 	{
 		.name = "omap-auxclk",
 		.ops = &auxclk_ops,
+	},
+	{
+		.name = "regulator",
+		.ops = &regulator_ops,
 	},
 	{
 		.name = "iva",
