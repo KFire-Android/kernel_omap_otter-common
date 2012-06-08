@@ -30,6 +30,8 @@
 /* PALMAS Erratum list */
 /* TWL6035 Erratum #23 */
 #define PALMAS_ERRATUM_SMPS_OUTPUT_VOLT_DROP				BIT(0)
+/* TWL6035 Erratum #12 */
+#define PALMAS_ERRATUM_SMPS_MIXED_PHASE_ZERO_CROSS_DETECT		BIT(1)
 
 #define is_palmas_erratum(palmas, erratum) ((palmas)->errata &		\
 					PALMAS_ERRATUM_##erratum)
