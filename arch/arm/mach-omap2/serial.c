@@ -139,9 +139,10 @@ omap_serial_fill_uart_tx_rx_pads(struct omap_board_data *bdata,
 	uart->default_omap_uart_pads[0].name = rx_pad_name;
 	uart->default_omap_uart_pads[0].flags = OMAP_DEVICE_PAD_REMUX |
 							OMAP_DEVICE_PAD_WAKEUP;
-	uart->default_omap_uart_pads[0].enable = OMAP_PIN_INPUT |
+	uart->default_omap_uart_pads[0].enable = OMAP_PIN_INPUT_PULLUP |
 							OMAP_MUX_MODE0;
-	uart->default_omap_uart_pads[0].idle = OMAP_PIN_INPUT | OMAP_MUX_MODE0;
+	uart->default_omap_uart_pads[0].idle = OMAP_PIN_INPUT_PULLUP |
+							OMAP_MUX_MODE0;
 	uart->default_omap_uart_pads[1].name = tx_pad_name;
 	uart->default_omap_uart_pads[1].enable = OMAP_PIN_OUTPUT |
 							OMAP_MUX_MODE0;
