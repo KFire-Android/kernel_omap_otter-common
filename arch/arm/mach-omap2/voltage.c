@@ -101,6 +101,22 @@ int voltdm_scale(struct voltagedomain *voltdm,
 		return -ENODATA;
 	}
 
+	/* XXXX: UGLY HACK TO BE REVERTED. Core Voltage scale fails!!! */
+	if (!strcmp(voltdm->name, "core")) {
+		static int core_first_time_scaled;
+
+		if (core_first_time_scaled) {
+			voltdm->curr_volt = target_v;
+			return 0;
+		}
+		core_first_time_scaled = true;
+
+		/* Give a constant reminder begging for a fix */
+		WARN(1, "%s: FIXME: CORE VOLTAGE WILL BE LOCKED AT %lduV\n",
+		     __func__, target_volt);
+	}
+
+
 	notify.voltdm = voltdm;
 	notify.target_volt = target_volt;
 	srcu_notifier_call_chain(&voltdm->change_notify_list,
