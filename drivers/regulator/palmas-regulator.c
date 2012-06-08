@@ -704,13 +704,22 @@ static int palmas_smps_init(struct palmas *palmas, int id,
 			reg |= reg_init->mode_sleep <<
 					SMPS12_CTRL_MODE_SLEEP_SHIFT;
 		}
+		if (reg_init->mode_active) {
+			reg &= ~SMPS12_CTRL_MODE_ACTIVE_MASK;
+			reg |= reg_init->mode_active <<
+					SMPS12_CTRL_MODE_ACTIVE_SHIFT;
+		}
 	} else {
 		if (reg_init->mode_sleep) {
 			reg &= ~SMPS10_CTRL_MODE_SLEEP_MASK;
 			reg |= reg_init->mode_sleep <<
 					SMPS10_CTRL_MODE_SLEEP_SHIFT;
 		}
-
+		if (reg_init->mode_active) {
+			reg &= ~SMPS10_CTRL_MODE_ACTIVE_MASK;
+			reg |= reg_init->mode_active <<
+					SMPS10_CTRL_MODE_ACTIVE_SHIFT;
+		}
 	}
 	ret = palmas_smps_write(palmas, addr, reg);
 	if (ret)

@@ -113,6 +113,23 @@ struct palmas_reg_init {
 	 */
 	int mode_sleep;
 
+	/* active_mode is the mode loaded to MODE_ACTIVE bits as defined in
+	 * the data sheet.
+	 *
+	 * For SMPS
+	 *
+	 * 0: Off
+	 * 1: AUTO
+	 * 2: ECO
+	 * 3: Forced PWM
+	 *
+	 * For LDO
+	 *
+	 * 0: Off
+	 * 1: On
+	 */
+	int mode_active;
+
 	/* tstep is the timestep loaded to the TSTEP register
 	 *
 	 * For SMPS
