@@ -518,6 +518,7 @@ static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
 {
 	static bool is_initialized;
 	struct omap_voltdm_pmic *pmic = voltdm->pmic;
+	struct omap_vc_channel *vc = voltdm->vc;
 	u32 vc_val = 0;
 
 	omap4_set_timings(voltdm);
@@ -536,7 +537,7 @@ static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
 	vc_val |= pmic->i2c_scll_high << OMAP4430_SCLH_SHIFT;
 
 	if (vc_val)
-		voltdm->write(vc_val, OMAP4_PRM_VC_CFG_I2C_CLK_OFFSET);
+		voltdm->write(vc_val, vc->common->i2c_clk_reg);
 }
 
 /**

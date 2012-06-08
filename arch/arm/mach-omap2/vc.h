@@ -54,6 +54,7 @@ struct omap_vc_common {
 	u8 i2c_cfg_reg;
 	u8 i2c_cfg_hsen_mask;
 	u8 i2c_mcode_mask;
+	u8 i2c_clk_reg;
 };
 
 /* omap_vc_channel.flags values */
