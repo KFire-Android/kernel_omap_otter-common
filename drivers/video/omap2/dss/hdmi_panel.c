@@ -155,6 +155,28 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 		dssdev->panel.timings.y_res);
 
 	priv = hdmi.dssdev->data;
+
+	r = gpio_request_one(priv->ct_cp_hpd_gpio, GPIOF_OUT_INIT_HIGH,
+				"hdmi_gpio_ct_cp_hpd");
+	if (r) {
+		DSSERR("Could not get HDMI_CT_CP_HPD gpio\n");
+		goto done_err;
+	}
+
+	r = gpio_request_one(priv->ls_oe_gpio, GPIOF_OUT_INIT_HIGH,
+				"hdmi_gpio_ls_oe");
+	if (r) {
+		DSSERR("Could not get HDMI_GPIO_LS_OE gpio\n");
+		goto done_err1;
+	}
+
+	r = gpio_request_one(priv->hpd_gpio, GPIOF_DIR_IN,
+				"hdmi_gpio_hpd");
+	if (r) {
+		DSSERR("Could not get HDMI_HPD gpio\n");
+		goto done_hpd_err;
+	}
+
 	hdmi.hpd_gpio = priv->hpd_gpio;
 	r = request_threaded_irq(gpio_to_irq(hdmi.hpd_gpio),
 		NULL, hpd_enable_handler,
@@ -163,21 +185,35 @@ static int hdmi_panel_probe(struct omap_dss_device *dssdev)
 	if (r < 0) {
 		pr_err("hdmi: request_irq %d failed\n",
 			gpio_to_irq(hdmi.hpd_gpio));
-		device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
-		device_remove_file(&dssdev->dev, &dev_attr_range);
-		device_remove_file(&dssdev->dev, &dev_attr_hdmi_timings);
-		return -EINVAL;
+		r = -EINVAL;
+		goto err_irq;
 	}
-
 	return 0;
+
+err_irq:
+	gpio_free(priv->hpd_gpio);
+done_hpd_err:
+	gpio_free(priv->ls_oe_gpio);
+done_err1:
+	gpio_free(priv->ct_cp_hpd_gpio);
+done_err:
+	device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
+	device_remove_file(&dssdev->dev, &dev_attr_hdmi_timings);
+	device_remove_file(&dssdev->dev, &dev_attr_range);
+	return r;
 }
 
 static void hdmi_panel_remove(struct omap_dss_device *dssdev)
 {
+	struct omap_dss_hdmi_data *priv = dssdev->data;
+
 	device_remove_file(&dssdev->dev, &dev_attr_deepcolor);
 	device_remove_file(&dssdev->dev, &dev_attr_range);
 	device_remove_file(&dssdev->dev, &dev_attr_hdmi_timings);
 	free_irq(gpio_to_irq(hdmi.hpd_gpio), NULL);
+	gpio_free(priv->hpd_gpio);
+	gpio_free(priv->ls_oe_gpio);
+	gpio_free(priv->ct_cp_hpd_gpio);
 }
 
 static int hdmi_panel_enable(struct omap_dss_device *dssdev)
