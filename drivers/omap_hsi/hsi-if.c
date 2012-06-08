@@ -627,7 +627,7 @@ static void if_hsi_port_event(struct hsi_device *dev, unsigned int event,
 	}
 }
 
-int __init if_hsi_init(unsigned int port, unsigned int *channels_map,
+int if_hsi_init(unsigned int port, unsigned int *channels_map,
 		      unsigned int num_channels)
 {
 	struct if_hsi_channel *channel;
