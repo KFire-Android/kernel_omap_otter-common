@@ -17,8 +17,26 @@
 #define __ARCH_ARM_MACH_OMAP2_MACH_COMMON_H_
 
 #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_ARCH_OMAP5)
+
+/* Notifier flags for core DPLL changes */
+#define OMAP_CORE_DPLL_PRECHANGE	1
+#define OMAP_CORE_DPLL_POSTCHANGE	2
+struct omap_dpll_notifier {
+	u32 rate;
+};
+int omap4_core_dpll_register_notifier(struct notifier_block *nb);
+int omap4_core_dpll_unregister_notifier(struct notifier_block *nb);
+
 int omap4_prcm_freq_update(void);
 #else
+static inline int omap4_core_dpll_register_notifier(struct notifier_block *nb)
+{
+	return -EINVAL;
+}
+static inline int omap4_core_dpll_unregister_notifier(struct notifier_block *nb)
+{
+	return -EINVAL;
+}
 static inline int omap4_prcm_freq_update(void)
 {
 	return -EINVAL;

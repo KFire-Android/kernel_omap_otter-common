@@ -34,6 +34,8 @@
 #define OMAP_748MHz		748000000
 
 static struct clockdomain *l3_emif_clkdm;
+static struct srcu_notifier_head core_dpll_change_notify_list;
+
 
 /**
  * omap4_core_dpll_m2_set_rate - set CORE DPLL M2 divider
@@ -51,6 +53,7 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 {
 	int i = 0;
 	u32 validrate = 0, shadow_freq_cfg1 = 0, new_div = 0;
+	struct omap_dpll_notifier notify;
 
 	if (!clk || !rate)
 		return -EINVAL;
@@ -83,7 +86,9 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	* for targetted DRR clock.
 	* DDR Clock = core_dpll_m2 / 2
 	*/
-	/* omap_emif_setup_registers(validrate >> 1, LPDDR2_VOLTAGE_STABLE); */
+	notify.rate = validrate;
+	srcu_notifier_call_chain(&core_dpll_change_notify_list,
+				 OMAP_CORE_DPLL_PRECHANGE, (void *)&notify);
 
 	/*
 	 * FREQ_UPDATE sequence:
@@ -106,6 +111,9 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	omap_test_timeout(((__raw_readl(OMAP4430_CM_SHADOW_FREQ_CONFIG1)
 				& OMAP4430_FREQ_UPDATE_MASK) == 0),
 				MAX_FREQ_UPDATE_TIMEOUT, i);
+
+	srcu_notifier_call_chain(&core_dpll_change_notify_list,
+				 OMAP_CORE_DPLL_POSTCHANGE, (void *)&notify);
 
 	/* Configures MEMIF domain back to HW_WKUP */
 	clkdm_allow_idle(l3_emif_clkdm);
@@ -472,3 +480,21 @@ long omap4_dpll_regm4xen_round_rate(struct clk *clk, unsigned long target_rate)
 
 	return clk->dpll_data->last_rounded_rate;
 }
+
+int omap4_core_dpll_register_notifier(struct notifier_block *nb)
+{
+	return srcu_notifier_chain_register(&core_dpll_change_notify_list, nb);
+}
+
+int omap4_core_dpll_unregister_notifier(struct notifier_block *nb)
+{
+	return srcu_notifier_chain_unregister(&core_dpll_change_notify_list,
+					      nb);
+}
+
+static int __init __init_core_dpll_notifier_list(void)
+{
+	srcu_init_notifier_head(&core_dpll_change_notify_list);
+	return 0;
+}
+core_initcall(__init_core_dpll_notifier_list);
