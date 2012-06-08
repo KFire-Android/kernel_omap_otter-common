@@ -293,7 +293,8 @@ static void __init omap44xx_prm_enable_io_wakeup(void)
 static int __init omap4xxx_prcm_init(void)
 {
 	int ret = 0;
-	if (cpu_is_omap44xx()) {
+
+	if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
 		ret = omap_prcm_register_chain_handler(&omap4_prcm_irq_setup);
 		/*
 		 * Don't enable daisy chain, if failed to register
