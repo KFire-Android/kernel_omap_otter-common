@@ -111,6 +111,22 @@ enum omap_dss_load_mode {
 	OMAP_DSS_LOAD_CLUT_ONCE_FRAME	= 3,
 };
 
+/* Writeback data structures */
+enum omap_writeback_source {
+	OMAP_WB_LCD1		= 0,
+	OMAP_WB_TV		= 1,
+	OMAP_WB_LCD2		= 2,
+	OMAP_WB_GFX		= 3,
+	OMAP_WB_VID1		= 4,
+	OMAP_WB_VID2		= 5,
+	OMAP_WB_VID3		= 6,
+};
+
+enum omap_writeback_mode {
+	OMAP_WB_CAPTURE_MODE	= 0,
+	OMAP_WB_MEM2MEM_MODE	= 1,
+};
+
 enum omap_dss_trans_key_type {
 	OMAP_DSS_COLOR_KEY_GFX_DST = 0,
 	OMAP_DSS_COLOR_KEY_VID_SRC = 1,
