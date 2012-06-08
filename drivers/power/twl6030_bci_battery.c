@@ -1732,7 +1732,7 @@ static void twl6030_bci_battery_work(struct work_struct *work)
 	}
 
 	/* first 2 values are for negative temperature */
-	di->temp_C = (temp - 2); /* in degrees Celsius */
+	di->temp_C = (temp - 2) * 10; /* in tenths of degree Celsius */
 
 	ret = capacity_changed(di);
 	ret1 = twl6030_usb_autogate_charger(di);
