@@ -693,6 +693,12 @@ static int palmas_smps_init(struct palmas *palmas, int id,
 		return ret;
 
 	if (id != PALMAS_REG_SMPS10) {
+		/* if we have the erratum, OVERRIDE to FORCE_PWM */
+		if (is_palmas_erratum(palmas, SMPS_OUTPUT_VOLT_DROP)) {
+			reg_init->mode_sleep = SMPS_CTRL_MODE_PWM;
+			reg_init->mode_active = SMPS_CTRL_MODE_PWM;
+		}
+
 		if (reg_init->warm_reset)
 			reg |= SMPS12_CTRL_WR_S;
 
@@ -834,6 +840,15 @@ static __devinit int palmas_probe(struct platform_device *pdev)
 
 	if (reg & SMPS_CTRL_SMPS45_SMPS457_EN)
 		pmic->smps457 = 1;
+
+	/*
+	 * Errata Registration
+	 * TBD - Handle based on revision once we are sure of fix
+	 */
+	if (palmas->id == PALMAS_ID_TWL6035) {
+		set_palmas_erratum(palmas, SMPS_OUTPUT_VOLT_DROP);
+		dev_warn(&pdev->dev, "Erratum SMPS_OUTPUT_VOLT_DROP!");
+	}
 
 	for (id = 0; id < PALMAS_REG_LDO1; id++) {
 

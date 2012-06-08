@@ -27,6 +27,15 @@
 #define PALMAS_NUM_CLIENTS		3
 #define PALMAS_MAX_BLOCK_TRANSFER	16
 
+/* PALMAS Erratum list */
+/* TWL6035 Erratum #23 */
+#define PALMAS_ERRATUM_SMPS_OUTPUT_VOLT_DROP				BIT(0)
+
+#define is_palmas_erratum(palmas, erratum) ((palmas)->errata &		\
+					PALMAS_ERRATUM_##erratum)
+#define set_palmas_erratum(palmas, erratum) ((palmas)->errata |=	\
+					PALMAS_ERRATUM_##erratum)
+
 struct palmas_gpadc;
 struct palmas_pmic;
 struct palmas_usb;
@@ -40,6 +49,9 @@ struct palmas {
 
 	/* Stored chip id */
 	int id;
+
+	/* Silicon Errata */
+	u32 errata;
 
 	/* IRQ Data */
 	int irq, irq_base, irq_end;
