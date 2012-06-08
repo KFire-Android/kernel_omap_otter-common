@@ -21,6 +21,7 @@
 #include <linux/cpufreq.h>
 #include <linux/device.h>
 #include <linux/platform_device.h>
+#include <linux/export.h>
 
 #include "omap_device.h"
 #include "omap-pm.h"
@@ -351,6 +352,7 @@ int omap_pm_get_dev_context_loss_count(struct device *dev)
 }
 
 #endif
+EXPORT_SYMBOL(omap_pm_get_dev_context_loss_count);
 
 /* Should be called before clk framework init */
 int __init omap_pm_if_early_init(void)
