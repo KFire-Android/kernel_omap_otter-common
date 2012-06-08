@@ -69,4 +69,6 @@ int voltdm_register_notifier(struct voltagedomain *voltdm,
 int voltdm_unregister_notifier(struct voltagedomain *voltdm,
 			       struct notifier_block *nb);
 
+struct voltagedomain *voltdm_lookup(const char *name);
+
 #endif			/* __ARCH_ARM_MACH_OMAP2_MACH_COMMON_H_ */

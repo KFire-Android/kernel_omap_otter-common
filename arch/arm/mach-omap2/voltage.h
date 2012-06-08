@@ -271,7 +271,6 @@ extern void omap3xxx_voltagedomains_init(void);
 extern void omap44xx_voltagedomains_init(void);
 extern void omap54xx_voltagedomains_init(void);
 
-struct voltagedomain *voltdm_lookup(const char *name);
 void voltdm_init(struct voltagedomain **voltdm_list);
 int voltdm_add_pwrdm(struct voltagedomain *voltdm, struct powerdomain *pwrdm);
 int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
