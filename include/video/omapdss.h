@@ -575,12 +575,15 @@ struct omap_writeback {
 	/* mutex to control access to wb data */
 	struct mutex			lock;
 	struct omap_writeback_info	info;
+	struct completion		wb_completion;
 
 	bool (*check_wb)(struct omap_writeback *wb);
 	int (*set_wb_info)(struct omap_writeback *wb,
 			struct omap_writeback_info *info);
 	void (*get_wb_info)(struct omap_writeback *wb,
 			struct omap_writeback_info *info);
+	int (*register_framedone)(struct omap_writeback *wb);
+	int (*wait_framedone)(struct omap_writeback *wb);
 };
 struct omap_dss_device {
 	struct device dev;

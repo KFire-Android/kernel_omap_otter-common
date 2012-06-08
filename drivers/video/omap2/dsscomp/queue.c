@@ -558,7 +558,20 @@ int dsscomp_apply(dsscomp_t comp)
 
 		if (oi->cfg.ix == OMAP_DSS_WB) {
 			/* update status of WB */
+			struct omap_writeback_info wb_info;
+			struct omap_writeback *wb;
+
 			wb_apply = true;
+
+			wb = omap_dss_get_wb(0);
+			wb->get_wb_info(wb, &wb_info);
+			/* if prev comp was with M2M WB */
+			if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+				wb_info.enabled) {
+					if (wb->wait_framedone(wb))
+						dev_warn(DEV(cdev),
+							"WB Framedone expired\n");
+			}
 			r = set_dss_wb_info(oi);
 		} else {
 			ovl = cdev->ovls[oi->cfg.ix];
@@ -673,6 +686,18 @@ skip_ovl_set:
 		d->win.w = dssdev->panel.timings.x_res - d->win.x;
 	if (!d->win.h && !d->win.y)
 		d->win.h = dssdev->panel.timings.y_res - d->win.y;
+
+	if (wb_apply) {
+		struct omap_writeback_info wb_info;
+		struct omap_writeback *wb;
+
+		wb = omap_dss_get_wb(0);
+		wb->get_wb_info(wb, &wb_info);
+
+		if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+			wb_info.enabled)
+			wb->register_framedone(wb);
+	}
 
 	mutex_lock(&mtx);
 	if (mgrq[comp->ix].blanking) {
