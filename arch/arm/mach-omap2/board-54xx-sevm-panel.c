@@ -33,6 +33,8 @@
 #define OMAP5_SEVM_FB_RAM_SIZE       SZ_8M /* 1280×800*4 * 2 */
 
 #define HDMI_GPIO_HPD 193
+#define HDMI_GPIO_CT_CP_HPD 256
+#define HDMI_GPIO_LS_OE     257
 
 static void lg_panel_set_power(bool enable)
 {
@@ -53,15 +55,8 @@ static void omap5evm_lcd_init(void)
 		pr_err("%s: Could not get lcd1_reset_gpio\n", __func__);
 }
 
-static void omap5evm_hdmi_init(void)
+static void __init omap5evm_hdmi_init(void)
 {
-	int r;
-
-	r = gpio_request_one(HDMI_GPIO_HPD, GPIOF_DIR_IN,
-				"hdmi_gpio_hpd");
-	if (r)
-		pr_err("%s: Could not get HDMI\n", __func__);
-
 	/* Need to configure HPD as a gpio in mux */
 	omap_hdmi_init(0);
 }
@@ -123,6 +118,9 @@ static void omap5evm_panel_disable_hdmi(struct omap_dss_device *dssdev)
 
 static struct omap_dss_hdmi_data sdp54xx_hdmi_data = {
 	.hpd_gpio = HDMI_GPIO_HPD,
+	.ct_cp_hpd_gpio = HDMI_GPIO_CT_CP_HPD,
+	.ls_oe_gpio = HDMI_GPIO_LS_OE,
+
 };
 
 static struct omap_dss_device omap5evm_hdmi_device = {
