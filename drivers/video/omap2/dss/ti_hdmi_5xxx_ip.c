@@ -257,23 +257,15 @@ static void hdmi_core_init(struct hdmi_core_vid_config *video_cfg,
 
 	/* video core */
 	video_cfg->data_enable_pol = 1; /* It is always 1*/
-	video_cfg->v_fc_config.timings.hsync_pol = cfg->timings.hsync_pol;
-	video_cfg->v_fc_config.timings.x_res = cfg->timings.x_res;
-	video_cfg->v_fc_config.timings.hsw = cfg->timings.hsw;
-	video_cfg->v_fc_config.timings.hbp = cfg->timings.hbp;
-	video_cfg->v_fc_config.timings.hfp = cfg->timings.hfp;
-	video_cfg->hblank = cfg->timings.hfp +
-				cfg->timings.hbp + cfg->timings.hsw;
-	video_cfg->v_fc_config.timings.vsync_pol = cfg->timings.vsync_pol;
-	video_cfg->v_fc_config.timings.y_res = cfg->timings.y_res;
-	video_cfg->v_fc_config.timings.vsw = cfg->timings.vsw;
-	video_cfg->v_fc_config.timings.vfp = cfg->timings.vfp;
-	video_cfg->v_fc_config.timings.vbp = cfg->timings.vbp;
+	video_cfg->v_fc_config.timings = cfg->timings;
+	video_cfg->hblank = cfg->timings.right_margin +
+			cfg->timings.left_margin + cfg->timings.hsync_len;
+
 	video_cfg->vblank_osc = 0; /* Always 0 - need to confirm */
-	video_cfg->vblank = cfg->timings.vsw +
-				cfg->timings.vfp + cfg->timings.vbp;
+	video_cfg->vblank = cfg->timings.vsync_len +
+			cfg->timings.lower_margin + cfg->timings.upper_margin;
 	video_cfg->v_fc_config.cm.mode = cfg->cm.mode;
-	video_cfg->v_fc_config.timings.interlace = cfg->timings.interlace;
+	video_cfg->v_fc_config.interlace = cfg->interlace;
 
 	/* info frame */
 	avi_cfg->db1_format = 0;
@@ -342,24 +334,26 @@ static void hdmi_core_video_config(struct hdmi_ip_data *ip_data,
 	/* Set hsync, vsync and data-enable polarity  */
 	r = hdmi_read_reg(core_sys_base, HDMI_CORE_FC_INVIDCONF);
 
-	r = FLD_MOD(r, cfg->v_fc_config.timings.vsync_pol, 6, 6);
-	r = FLD_MOD(r, cfg->v_fc_config.timings.hsync_pol, 5, 5);
+	r = FLD_MOD(r, !!(cfg->v_fc_config.timings.sync &
+						FB_SYNC_VERT_HIGH_ACT), 6, 6);
+	r = FLD_MOD(r, !!(cfg->v_fc_config.timings.sync &
+						FB_SYNC_HOR_HIGH_ACT), 5, 5);
 	r = FLD_MOD(r, cfg->data_enable_pol, 4, 4);
 	r = FLD_MOD(r, cfg->vblank_osc, 1, 1);
-	r = FLD_MOD(r, cfg->v_fc_config.timings.interlace, 0, 0);
+	r = FLD_MOD(r, cfg->v_fc_config.interlace, 0, 0);
 	hdmi_write_reg(core_sys_base, HDMI_CORE_FC_INVIDCONF, r);
 
 	/* set x resolution */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_INHACTIV1,
-			(cfg->v_fc_config.timings.x_res >> 8), 4, 0);
+			(cfg->v_fc_config.timings.xres >> 8), 4, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_INHACTIV0,
-			(cfg->v_fc_config.timings.x_res & 0xFF), 7, 0);
+			(cfg->v_fc_config.timings.xres & 0xFF), 7, 0);
 
 	/* set y resolution */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_INVACTIV1,
-			(cfg->v_fc_config.timings.y_res >> 8), 4, 0);
+			(cfg->v_fc_config.timings.yres >> 8), 4, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_INVACTIV0,
-			(cfg->v_fc_config.timings.y_res & 0xFF), 7, 0);
+			(cfg->v_fc_config.timings.yres & 0xFF), 7, 0);
 
 	/* set horizontal blanking pixels */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_INHBLANK1,
@@ -372,23 +366,23 @@ static void hdmi_core_video_config(struct hdmi_ip_data *ip_data,
 
 	/* set horizontal sync offset */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINDELAY1,
-			(cfg->v_fc_config.timings.hfp >> 8), 4, 0);
+			(cfg->v_fc_config.timings.right_margin >> 8), 4, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINDELAY0,
-			(cfg->v_fc_config.timings.hfp & 0xFF), 7, 0);
+			(cfg->v_fc_config.timings.right_margin & 0xFF), 7, 0);
 
 	/* set vertical sync offset */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_VSYNCINDELAY,
-			cfg->v_fc_config.timings.vfp, 7, 0);
+			cfg->v_fc_config.timings.lower_margin, 7, 0);
 
 	/* set horizontal sync pulse width */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH1,
-			(cfg->v_fc_config.timings.hsw >> 8), 1, 0);
+			(cfg->v_fc_config.timings.hsync_len >> 8), 1, 0);
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_HSYNCINWIDTH0,
-			(cfg->v_fc_config.timings.hsw & 0xFF), 7, 0);
+			(cfg->v_fc_config.timings.hsync_len & 0xFF), 7, 0);
 
 	/*  set vertical sync pulse width */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_VSYNCINWIDTH,
-			cfg->v_fc_config.timings.vsw, 5, 0);
+			cfg->v_fc_config.timings.vsync_len, 5, 0);
 
 	/* select DVI mode */
 	REG_FLD_MOD(core_sys_base, HDMI_CORE_FC_INVIDCONF,
@@ -679,6 +673,7 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 	/* HDMI */
 	struct omap_video_timings video_timing;
 	struct hdmi_video_format video_format;
+	struct hdmi_video_interface video_interface;
 	/* HDMI core */
 	struct hdmi_core_vid_config v_core_cfg;
 	struct hdmi_core_infoframe_avi *avi_cfg = &ip_data->avi_cfg;
@@ -700,7 +695,16 @@ void ti_hdmi_5xxx_basic_configure(struct hdmi_ip_data *ip_data)
 
 	hdmi_wp_video_config_format(ip_data, &video_format);
 
-	hdmi_wp_video_config_interface(ip_data);
+	video_interface.vsp =
+		!!(cfg->timings.sync & FB_SYNC_VERT_HIGH_ACT);
+	video_interface.hsp =
+		!!(cfg->timings.sync & FB_SYNC_HOR_HIGH_ACT);
+	video_interface.interlacing =
+		!!(cfg->timings.vmode & FB_VMODE_INTERLACED);
+	video_interface.tm = cfg->deep_color + 1;
+
+	hdmi_wp_video_config_interface(ip_data, &video_interface);
+
 
 	if (ip_data->cfg.cm.mode == HDMI_DVI ||
 	(ip_data->cfg.cm.code == 1 && ip_data->cfg.cm.mode == HDMI_HDMI)) {

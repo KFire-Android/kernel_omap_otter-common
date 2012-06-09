@@ -402,6 +402,13 @@ struct hdmi_video_format {
 	u32			x_res;	/* pixel per line */
 };
 
+struct hdmi_video_interface {
+	int     vsp;    /* Vsync polarity */
+	int     hsp;    /* Hsync polarity */
+	int     interlacing;
+	int     tm;     /* Timing mode */
+};
+
 struct hdmi_audio_format {
 	enum hdmi_stereo_channels		stereo_channels;
 	u8					active_chnnls_msk;
@@ -452,7 +459,8 @@ struct hdmi_core_audio_config {
 
 void hdmi_wp_video_config_timing(struct hdmi_ip_data *ip_data,
 				struct omap_video_timings *timings);
-void hdmi_wp_video_config_interface(struct hdmi_ip_data *ip_data);
+void hdmi_wp_video_config_interface(struct hdmi_ip_data *ip_data,
+				struct hdmi_video_interface *video_int);
 void hdmi_wp_video_config_format(struct hdmi_ip_data *ip_data,
 				struct hdmi_video_format *video_fmt);
 void hdmi_wp_video_init_format(struct hdmi_video_format *video_fmt,

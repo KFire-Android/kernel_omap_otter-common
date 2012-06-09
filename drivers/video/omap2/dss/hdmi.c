@@ -33,6 +33,8 @@
 #include <linux/pm_runtime.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
+#include <linux/fb.h>
+#include <linux/omapfb.h>
 #include <video/omapdss.h>
 
 #include "ti_hdmi.h"
@@ -60,6 +62,9 @@ static struct {
 	struct mutex lock;
 	struct platform_device *pdev;
 	struct hdmi_ip_data ip_data;
+	int code;
+	int mode;
+	bool custom_set;
 	int hdmi_irq;
 
 	struct clk *sys_clk;
@@ -67,66 +72,6 @@ static struct {
 	struct regulator *vdds_hdmi;
 	bool enabled;
 } hdmi;
-
-/*
- * Logic for the below structure :
- * user enters the CEA or VESA timings by specifying the HDMI/DVI code.
- * There is a correspondence between CEA/VESA timing and code, please
- * refer to section 6.3 in HDMI 1.3 specification for timing code.
- *
- * In the below structure, cea_vesa_timings corresponds to all OMAP4
- * supported CEA and VESA timing values.code_cea corresponds to the CEA
- * code, It is used to get the timing from cea_vesa_timing array.Similarly
- * with code_vesa. Code_index is used for back mapping, that is once EDID
- * is read from the TV, EDID is parsed to find the timing values and then
- * map it to corresponding CEA or VESA index.
- */
-
-static const struct hdmi_config cea_timings[] = {
-{ {640, 480, 25200, 96, 16, 48, 2, 10, 33, 0, 0, 0}, {1, HDMI_HDMI} },
-{ {720, 480, 27027, 62, 16, 60, 6, 9, 30, 0, 0, 0}, {2, HDMI_HDMI} },
-{ {1280, 720, 74250, 40, 110, 220, 5, 5, 20, 1, 1, 0}, {4, HDMI_HDMI} },
-{ {1920, 540, 74250, 44, 88, 148, 5, 2, 15, 1, 1, 1}, {5, HDMI_HDMI} },
-{ {1440, 240, 27027, 124, 38, 114, 3, 4, 15, 0, 0, 1}, {6, HDMI_HDMI} },
-{ {1920, 1080, 148500, 44, 88, 148, 5, 4, 36, 1, 1, 0}, {16, HDMI_HDMI} },
-{ {720, 576, 27000, 64, 12, 68, 5, 5, 39, 0, 0, 0}, {17, HDMI_HDMI} },
-{ {1280, 720, 74250, 40, 440, 220, 5, 5, 20, 1, 1, 0}, {19, HDMI_HDMI} },
-{ {1920, 540, 74250, 44, 528, 148, 5, 2, 15, 1, 1, 1}, {20, HDMI_HDMI} },
-{ {1440, 288, 27000, 126, 24, 138, 3, 2, 19, 0, 0, 1}, {21, HDMI_HDMI} },
-{ {1440, 576, 54000, 128, 24, 136, 5, 5, 39, 0, 0, 0}, {29, HDMI_HDMI} },
-{ {1920, 1080, 148500, 44, 528, 148, 5, 4, 36, 1, 1, 0}, {31, HDMI_HDMI} },
-{ {1920, 1080, 74250, 44, 638, 148, 5, 4, 36, 1, 1, 0}, {32, HDMI_HDMI} },
-{ {2880, 480, 108108, 248, 64, 240, 6, 9, 30, 0, 0, 0}, {35, HDMI_HDMI} },
-{ {2880, 576, 108000, 256, 48, 272, 5, 5, 39, 0, 0, 0}, {37, HDMI_HDMI} },
-};
-static const struct hdmi_config vesa_timings[] = {
-/* VESA From Here */
-{ {640, 480, 25175, 96, 16, 48, 2 , 11, 31, 0, 0, 0}, {4, HDMI_DVI} },
-{ {800, 600, 40000, 128, 40, 88, 4 , 1, 23, 1, 1, 0}, {9, HDMI_DVI} },
-{ {848, 480, 33750, 112, 16, 112, 8 , 6, 23, 1, 1, 0}, {0xE, HDMI_DVI} },
-{ {1280, 768, 79500, 128, 64, 192, 7 , 3, 20, 1, 0, 0}, {0x17, HDMI_DVI} },
-{ {1280, 800, 83500, 128, 72, 200, 6 , 3, 22, 1, 0, 0}, {0x1C, HDMI_DVI} },
-{ {1360, 768, 85500, 112, 64, 256, 6 , 3, 18, 1, 1, 0}, {0x27, HDMI_DVI} },
-{ {1280, 960, 108000, 112, 96, 312, 3 , 1, 36, 1, 1, 0}, {0x20, HDMI_DVI} },
-{ {1280, 1024, 108000, 112, 48, 248, 3 , 1, 38, 1, 1, 0}, {0x23, HDMI_DVI} },
-{ {1024, 768, 65000, 136, 24, 160, 6, 3, 29, 0, 0, 0}, {0x10, HDMI_DVI} },
-{ {1400, 1050, 121750, 144, 88, 232, 4, 3, 32, 1, 0, 0}, {0x2A, HDMI_DVI} },
-{ {1440, 900, 106500, 152, 80, 232, 6, 3, 25, 1, 0, 0}, {0x2F, HDMI_DVI} },
-{ {1680, 1050, 146250, 176 , 104, 280, 6, 3, 30, 1, 0, 0}, {0x3A, HDMI_DVI} },
-{ {1366, 768, 85500, 143, 70, 213, 3, 3, 24, 1, 1, 0}, {0x51, HDMI_DVI} },
-{ {1920, 1080, 148500, 44, 148, 80, 5, 4, 36, 1, 1, 0}, {0x52, HDMI_DVI} },
-{ {1280, 768, 68250, 32, 48, 80, 7, 3, 12, 0, 1, 0}, {0x16, HDMI_DVI} },
-{ {1400, 1050, 101000, 32, 48, 80, 4, 3, 23, 0, 1, 0}, {0x29, HDMI_DVI} },
-{ {1680, 1050, 119000, 32, 48, 80, 6, 3, 21, 0, 1, 0}, {0x39, HDMI_DVI} },
-{ {1280, 800, 79500, 32, 48, 80, 6, 3, 14, 0, 1, 0}, {0x1B, HDMI_DVI} },
-{ {1280, 720, 74250, 40, 110, 220, 5, 5, 20, 1, 1, 0}, {0x55, HDMI_DVI} }
-};
-
-static const struct hdmi_config s3d_timings[] = {
-{ {1280, 1485, 148500, 40, 110, 220, 5, 5, 20, 1, 1, 0}, {4, HDMI_HDMI} },
-{ {1280, 1485, 148500, 40, 440, 220, 5, 5, 20, 1, 1, 0}, {19, HDMI_HDMI} },
-{ {1920, 2205, 148500, 44, 638, 148, 5, 4, 36, 1, 1, 0}, {32, HDMI_HDMI} },
-};
 
 static int hdmi_runtime_get(void)
 {
@@ -160,100 +105,78 @@ int hdmi_init_display(struct omap_dss_device *dssdev)
 	return 0;
 }
 
-static const struct hdmi_config *hdmi_find_timing(
-					const struct hdmi_config *timings_arr,
-					int len)
+static int relaxed_fb_mode_is_equal(const struct fb_videomode *mode1,
+					const struct fb_videomode *mode2)
 {
-	int i;
+	u32 ratio1 = mode1->flag & (FB_FLAG_RATIO_4_3 | FB_FLAG_RATIO_16_9);
+	u32 ratio2 = mode2->flag & (FB_FLAG_RATIO_4_3 | FB_FLAG_RATIO_16_9);
+	return (mode1->xres         == mode2->xres &&
+		mode1->yres         == mode2->yres &&
+		mode1->pixclock     <= mode2->pixclock * 201 / 200 &&
+		mode1->pixclock     >= mode2->pixclock * 200 / 201 &&
+		mode1->hsync_len + mode1->left_margin + mode1->right_margin ==
+		mode2->hsync_len + mode2->left_margin + mode2->right_margin &&
+		mode1->vsync_len + mode1->upper_margin + mode1->lower_margin ==
+		mode2->vsync_len + mode2->upper_margin + mode2->lower_margin &&
+		(!ratio1 || !ratio2 || ratio1 == ratio2) &&
+		(mode1->vmode & FB_VMODE_INTERLACED) ==
+		(mode2->vmode & FB_VMODE_INTERLACED));
 
-	for (i = 0; i < len; i++) {
-		if (timings_arr[i].cm.code == hdmi.ip_data.cfg.cm.code)
-			return &timings_arr[i];
-	}
-	return NULL;
 }
 
-static const struct hdmi_config *hdmi_get_timings(void)
+static int hdmi_set_timings(struct fb_videomode *vm, bool check_only)
 {
-       const struct hdmi_config *arr;
-       int len;
+	int i = 0;
+	int r = 0;
+	DSSDBG("hdmi_set_timings\n");
 
+	if (!vm->xres || !vm->yres || !vm->pixclock)
+		goto fail;
 
-	if (!hdmi.ip_data.cfg.s3d_enabled) {
-		if (hdmi.ip_data.cfg.cm.mode == HDMI_DVI) {
-			arr = vesa_timings;
-			len = ARRAY_SIZE(vesa_timings);
-		} else {
-			arr = cea_timings;
-			len = ARRAY_SIZE(cea_timings);
-		}
-	} else {
-		arr = s3d_timings;
-		len = ARRAY_SIZE(s3d_timings);
-	}
-	return hdmi_find_timing(arr, len);
-}
-
-static bool hdmi_timings_compare(struct omap_video_timings *timing1,
-				const struct hdmi_video_timings *timing2)
-{
-	int timing1_vsync, timing1_hsync, timing2_vsync, timing2_hsync;
-
-	if ((timing2->pixel_clock == timing1->pixel_clock) &&
-		(timing2->x_res == timing1->x_res) &&
-		(timing2->y_res == timing1->y_res)) {
-
-		timing2_hsync = timing2->hfp + timing2->hsw + timing2->hbp;
-		timing1_hsync = timing1->hfp + timing1->hsw + timing1->hbp;
-		timing2_vsync = timing2->vfp + timing2->vsw + timing2->vbp;
-		timing1_vsync = timing2->vfp + timing2->vsw + timing2->vbp;
-
-		DSSDBG("timing1_hsync = %d timing1_vsync = %d"\
-			"timing2_hsync = %d timing2_vsync = %d\n",
-			timing1_hsync, timing1_vsync,
-			timing2_hsync, timing2_vsync);
-
-		if ((timing1_hsync == timing2_hsync) &&
-			(timing1_vsync == timing2_vsync)) {
-			return true;
+	for (i = 0; i < CEA_MODEDB_SIZE; i++) {
+		if (relaxed_fb_mode_is_equal(cea_modes + i, vm)) {
+			*vm = cea_modes[i];
+			if (check_only)
+				return 1;
+			hdmi.ip_data.cfg.cm.code = i;
+			hdmi.ip_data.cfg.cm.mode = HDMI_HDMI;
+			hdmi.ip_data.cfg.timings =
+			cea_modes[hdmi.ip_data.cfg.cm.code];
+			goto done;
 		}
 	}
-	return false;
-}
-
-static struct hdmi_cm hdmi_get_code(struct omap_video_timings *timing)
-{
-	int i;
-	struct hdmi_cm cm = {-1};
-	DSSDBG("hdmi_get_code\n");
-
-	for (i = 0; i < ARRAY_SIZE(cea_timings); i++) {
-		if (hdmi_timings_compare(timing, &cea_timings[i].timings)) {
-			cm = cea_timings[i].cm;
-			goto end;
+	for (i = 0; i < VESA_MODEDB_SIZE; i++) {
+		if (relaxed_fb_mode_is_equal(vesa_modes + i, vm)) {
+			*vm = vesa_modes[i];
+			if (check_only)
+				return 1;
+			hdmi.ip_data.cfg.cm.code = i;
+			hdmi.ip_data.cfg.cm.mode = HDMI_DVI;
+			hdmi.ip_data.cfg.timings =
+			vesa_modes[hdmi.ip_data.cfg.cm.code];
+			goto done;
 		}
 	}
-	for (i = 0; i < ARRAY_SIZE(vesa_timings); i++) {
-		if (hdmi_timings_compare(timing, &vesa_timings[i].timings)) {
-			cm = vesa_timings[i].cm;
-			goto end;
-		}
-	}
-	for (i = 0; i < ARRAY_SIZE(s3d_timings); i++) {
-		if (hdmi_timings_compare(timing, &s3d_timings[i].timings)) {
-			cm = s3d_timings[i].cm;
-			goto end;
-		}
-	}
+fail:
+	if (check_only)
+		return 0;
+	hdmi.ip_data.cfg.cm.code = 1;
+	hdmi.ip_data.cfg.cm.mode = HDMI_HDMI;
+	hdmi.ip_data.cfg.timings = cea_modes[hdmi.ip_data.cfg.cm.code];
+	i = -1;
+done:
+	DSSDBG("%s-%d\n", hdmi.ip_data.cfg.cm.mode ? "CEA" : "VESA",
+		hdmi.ip_data.cfg.cm.code);
 
-end:	return cm;
+	r = i >= 0 ? 1 : 0;
+	return r;
 
 }
 
 unsigned long hdmi_get_pixel_clock(void)
 {
 	/* HDMI Pixel Clock in Mhz */
-	return hdmi.ip_data.cfg.timings.pixel_clock * 1000;
+	return PICOS2KHZ(hdmi.ip_data.cfg.timings.pixclock) * 1000;
 }
 
 static void hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
@@ -318,7 +241,6 @@ static void hdmi_compute_pll(struct omap_dss_device *dssdev, int phy,
 static int hdmi_power_on(struct omap_dss_device *dssdev)
 {
 	int r;
-	const struct hdmi_config *timing;
 	struct omap_video_timings *p;
 	unsigned long phy;
 
@@ -340,16 +262,13 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 		dssdev->panel.timings.x_res,
 		dssdev->panel.timings.y_res);
 
-	timing = hdmi_get_timings();
-	if (timing == NULL) {
-		/* HDMI code 4 corresponds to 640 * 480 VGA */
-		hdmi.ip_data.cfg.cm.code = 4;
-		/* DVI mode 1 corresponds to HDMI 0 to DVI */
-		hdmi.ip_data.cfg.cm.mode = HDMI_DVI;
-		hdmi.ip_data.cfg = vesa_timings[0];
-	} else {
-		hdmi.ip_data.cfg = *timing;
+	if (!hdmi.custom_set) {
+		struct fb_videomode vesa_vga = vesa_modes[4];
+		hdmi_set_timings(&vesa_vga, false);
 	}
+
+	omapfb_fb2dss_timings(&hdmi.ip_data.cfg.timings,
+					&dssdev->panel.timings);
 
 	switch (hdmi.ip_data.cfg.deep_color) {
 	case HDMI_DEEP_COLOR_30BIT:
@@ -496,15 +415,33 @@ int omapdss_hdmi_get_range(void)
 int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
 					struct omap_video_timings *timings)
 {
-	struct hdmi_cm cm;
+	struct fb_videomode t;
 
-	cm = hdmi_get_code(timings);
-	if (cm.code == -1) {
-		return -EINVAL;
+	omapfb_dss2fb_timings(timings, &t);
+
+	/* also check interlaced timings */
+	if (!hdmi_set_timings(&t, true)) {
+		t.yres *= 2;
+		t.vmode |= FB_VMODE_INTERLACED;
 	}
+	if (!hdmi_set_timings(&t, true))
+		return -EINVAL;
 
 	return 0;
+}
 
+int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
+				  struct fb_videomode *vm)
+{
+	int r1, r2;
+	/* turn the hdmi off and on to get new timings to use */
+	omapdss_hdmi_display_disable(dssdev);
+	r1 = hdmi_set_timings(vm, false) ? 0 : -EINVAL;
+	hdmi.custom_set = true;
+	hdmi.code = hdmi.ip_data.cfg.cm.code;
+	hdmi.mode = hdmi.ip_data.cfg.cm.mode;
+	r2 = omapdss_hdmi_display_enable(dssdev);
+	return r1 ? : r2;
 }
 
 int omapdss_hdmi_display_3d_enable(struct omap_dss_device *dssdev,
@@ -600,21 +537,15 @@ err0:
 
 void omapdss_hdmi_display_set_timing(struct omap_dss_device *dssdev)
 {
-	struct hdmi_cm cm;
-
-	cm = hdmi_get_code(&dssdev->panel.timings);
-	hdmi.ip_data.cfg.cm.code = cm.code;
-	hdmi.ip_data.cfg.cm.mode = cm.mode;
-
-	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
-		int r;
-
-		hdmi_power_off(dssdev);
-
-		r = hdmi_power_on(dssdev);
-		if (r)
-			DSSERR("failed to power on device\n");
+	struct fb_videomode t;
+	omapfb_dss2fb_timings(&dssdev->panel.timings, &t);
+	/* also check interlaced timings */
+	if (!hdmi_set_timings(&t, true)) {
+		t.yres *= 2;
+		t.vmode |= FB_VMODE_INTERLACED;
 	}
+	omapdss_hdmi_display_set_mode(dssdev, &t);
+
 }
 
 void hdmi_dump_regs(struct seq_file *s)
@@ -731,6 +662,12 @@ void omapdss_hdmi_display_disable(struct omap_dss_device *dssdev)
 	}
 
 	hdmi.enabled = false;
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
+		/* clear mode on disable only */
+		hdmi.custom_set = false;
+		pr_info("hdmi: clearing EDID info\n");
+	}
 
 	hdmi_power_off(dssdev);
 
