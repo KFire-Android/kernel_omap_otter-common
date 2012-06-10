@@ -520,7 +520,7 @@ void gc_debug_init(void)
 			    &gc_debug_fops_blt_stats);
 	debugfs_create_file("last_error", 0664, debug_root, NULL,
 			    &gc_debug_fops_gpu_last_error);
-	debugfs_create_bool("cache_status_every_irq", 0666, debug_root,
+	debugfs_create_bool("cache_status_every_irq", 0664, debug_root,
 			    &g_gcCacheStatusEveryIrq);
 
 	logDir = debugfs_create_dir("log", debug_root);
