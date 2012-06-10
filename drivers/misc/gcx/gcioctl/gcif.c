@@ -25,7 +25,6 @@
 
 #include <linux/gcx.h>
 #include <linux/gccore.h>
-#include <linux/gcbv.h>
 #include <linux/cache-2dmanager.h>
 
 #include "gcif.h"

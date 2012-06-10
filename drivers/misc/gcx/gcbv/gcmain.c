@@ -14,7 +14,38 @@
 
 #include <plat/cpu.h>
 #include "gcmain.h"
-#include "gcbv-priv.h"
+
+
+/*******************************************************************************
+ * BLTsville interface exposure.
+ */
+
+static struct bventry ops = {
+	.structsize = sizeof(struct bventry),
+};
+
+static void gcbv_clear(void)
+{
+	ops.bv_map = NULL;
+	ops.bv_unmap = NULL;
+	ops.bv_blt = NULL;
+	ops.bv_cache = NULL;
+}
+
+static void gcbv_assign(void)
+{
+	ops.bv_map = bv_map;
+	ops.bv_unmap = bv_unmap;
+	ops.bv_blt = bv_blt;
+	ops.bv_cache = bv_cache;
+}
+
+void gcbv_init(struct bventry *entry)
+{
+	*entry = ops;
+}
+EXPORT_SYMBOL(gcbv_init);
+
 
 /*******************************************************************************
  * Convert floating point in 0..1 range to an 8-bit value in range 0..255.
@@ -66,6 +97,42 @@ unsigned char gcfp2norm8(float value)
 
 	return (unsigned char) mantissa;
 }
+
+
+/*******************************************************************************
+ * Cache operation wrapper.
+ */
+
+enum bverror gcbvcacheop(int count, struct c2dmrgn rgn[],
+			 enum bvcacheop cacheop)
+{
+	enum bverror err = BVERR_NONE;
+
+	switch (cacheop) {
+
+	case DMA_FROM_DEVICE:
+		c2dm_l2cache(count, rgn, cacheop);
+		c2dm_l1cache(count, rgn, cacheop);
+		break;
+
+	case DMA_TO_DEVICE:
+		c2dm_l1cache(count, rgn, cacheop);
+		c2dm_l2cache(count, rgn, cacheop);
+		break;
+
+	case DMA_BIDIRECTIONAL:
+		c2dm_l1cache(count, rgn, cacheop);
+		c2dm_l2cache(count, rgn, cacheop);
+		break;
+
+	default:
+		err = BVERR_CACHEOP;
+		break;
+	}
+
+	return err;
+}
+
 
 /*******************************************************************************
  * Device init/cleanup.

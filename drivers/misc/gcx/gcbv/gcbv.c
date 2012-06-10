@@ -538,7 +538,7 @@ static enum bverror do_map(struct bvbuffdesc *bvbuffdesc,
 	/* Try to find existing mapping. */
 	bvbuffmap = bvbuffdesc->map;
 	while (bvbuffmap != NULL) {
-		if (bvbuffmap->bv_unmap == gcbv_unmap)
+		if (bvbuffmap->bv_unmap == bv_unmap)
 			break;
 		bvbuffmap = bvbuffmap->nextmap;
 	}
@@ -555,7 +555,7 @@ static enum bverror do_map(struct bvbuffdesc *bvbuffdesc,
 			}
 
 			bvbuffmap->structsize = sizeof(struct bvbuffmap);
-			bvbuffmap->bv_unmap = gcbv_unmap;
+			bvbuffmap->bv_unmap = bv_unmap;
 			bvbuffmap->handle = (unsigned long) (bvbuffmap + 1);
 		} else {
 			bvbuffmap = gccontext.vac_buffmap;
@@ -751,7 +751,7 @@ static void unmap_implicit(struct gcbatch *batch)
 		prev = NULL;
 		bvbuffmap = bvbuffdesc->map;
 		while (bvbuffmap != NULL) {
-			if (bvbuffmap->bv_unmap == gcbv_unmap)
+			if (bvbuffmap->bv_unmap == bv_unmap)
 				break;
 			prev = bvbuffmap;
 			bvbuffmap = bvbuffmap->nextmap;
@@ -3289,7 +3289,7 @@ void bv_exit(void)
  * Library API.
  */
 
-enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
+enum bverror bv_map(struct bvbuffdesc *buffdesc)
 {
 	enum bverror bverror;
 	struct bvbuffmap *bvbuffmap;
@@ -3314,9 +3314,8 @@ exit:
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
-EXPORT_SYMBOL(gcbv_map);
 
-enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
+enum bverror bv_unmap(struct bvbuffdesc *buffdesc)
 {
 	enum bverror bverror = BVERR_NONE;
 	enum bverror otherbverror = BVERR_NONE;
@@ -3350,7 +3349,7 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 
 	/* Try to find our mapping. */
 	while (bvbuffmap != NULL) {
-		if (bvbuffmap->bv_unmap == gcbv_unmap)
+		if (bvbuffmap->bv_unmap == bv_unmap)
 			break;
 		prev = bvbuffmap;
 		bvbuffmap = bvbuffmap->nextmap;
@@ -3448,9 +3447,8 @@ exit:
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
-EXPORT_SYMBOL(gcbv_unmap);
 
-enum bverror gcbv_blt(struct bvbltparams *bltparams)
+enum bverror bv_blt(struct bvbltparams *bltparams)
 {
 	enum bverror bverror = BVERR_NONE;
 	struct gcalpha *gca = NULL;
@@ -3895,9 +3893,8 @@ exit:
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
-EXPORT_SYMBOL(gcbv_blt);
 
-enum bverror gcbv_cache(struct bvcopparams *copparams)
+enum bverror bv_cache(struct bvcopparams *copparams)
 {
 	enum bverror bverror = BVERR_NONE;
 	int count; /* number of planes */
@@ -4015,4 +4012,3 @@ enum bverror gcbv_cache(struct bvcopparams *copparams)
 Error:
 	return bverror;
 }
-EXPORT_SYMBOL(gcbv_cache);
