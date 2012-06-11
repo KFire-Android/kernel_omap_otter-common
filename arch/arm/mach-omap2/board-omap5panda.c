@@ -86,6 +86,8 @@ static struct omap2_hsmmc_info mmc[] = {
 };
 
 #define HDMI_GPIO_HPD 193
+#define HDMI_GPIO_CT_CP_HPD	256
+#define HDMI_GPIO_LS_OE		257
 
 #ifdef CONFIG_OMAP5_SEVM_PALMAS
 #define OMAP5_GPIO_END	0
@@ -634,6 +636,8 @@ static int __init omap5pandai2c_init(void)
 
 static struct omap_dss_hdmi_data omap5panda_hdmi_data = {
         .hpd_gpio = HDMI_GPIO_HPD,
+	.ct_cp_hpd_gpio = HDMI_GPIO_CT_CP_HPD,
+	.ls_oe_gpio = HDMI_GPIO_LS_OE,
 };
 
 static int omap5panda_panel_enable_hdmi(struct omap_dss_device *dssdev)
@@ -668,13 +672,6 @@ static struct omap_dss_board_info omap5evm_dss_data = {
 
 static void omap5panda_hdmi_init(void)
 {
-	int r;
-
-	r = gpio_request_one(HDMI_GPIO_HPD, GPIOF_DIR_IN,
-				"hdmi_gpio_hpd");
-	if (r)
-		pr_err("%s: Could not get HDMI\n", __func__);
-
 	/* Need to configure HPD as a gpio in mux */
 	omap_hdmi_init(0);
 }
