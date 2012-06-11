@@ -106,6 +106,7 @@ enum rpmsg_ns_flags {
  * @tx_lock:	protects svq, sbufs and sleepers, to allow concurrent senders.
  *		sending a message might require waking up a dozing remote
  *		processor, which involves sleeping, hence the mutex.
+ * @rx_lock:	protects rvq, to allow concurrent receive threads.
  * @endpoints:	idr of local endpoints, allows fast retrieval
  * @endpoints_lock: lock of the endpoints set
  * @sendq:	wait queue of sending contexts waiting for a tx buffers
@@ -124,6 +125,7 @@ struct virtproc_info {
 	int last_sbuf;
 	dma_addr_t bufs_dma;
 	struct mutex tx_lock;
+	struct mutex rx_lock;
 	struct idr endpoints;
 	struct mutex endpoints_lock;
 	wait_queue_head_t sendq;
