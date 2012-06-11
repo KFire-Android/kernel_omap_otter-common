@@ -1187,6 +1187,8 @@ static int omapdss_hdmihw_probe(struct platform_device *pdev)
 
 	hdmi_panel_init();
 
+	if (hdmi_get_current_hpd())
+		hdmi_panel_hpd_handler(1);
 	return 0;
 }
 

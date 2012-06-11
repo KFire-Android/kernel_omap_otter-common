@@ -42,7 +42,7 @@ static struct {
 #endif
 } hdmi;
 
-static int hdmi_get_current_hpd(void)
+int hdmi_get_current_hpd(void)
 {
 	return gpio_get_value(hdmi.hpd_gpio);
 }
