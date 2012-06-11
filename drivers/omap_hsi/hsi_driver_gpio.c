@@ -47,7 +47,7 @@ static irqreturn_t hsi_cawake_isr(int irq, void *hsi_p)
 	return IRQ_HANDLED;
 }
 
-int __init hsi_cawake_init(struct hsi_port *port, const char *irq_name)
+int __devinit hsi_cawake_init(struct hsi_port *port, const char *irq_name)
 {
 	tasklet_init(&port->cawake_tasklet, do_hsi_cawake_tasklet,
 		     (unsigned long)port);

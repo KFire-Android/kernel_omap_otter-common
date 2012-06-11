@@ -52,6 +52,7 @@ struct omap_abe_data {
 	int twl6040_power_mode;
 	int mcbsp_cfg;
 	struct snd_soc_platform *abe_platform;
+	struct twl6040 *twl6040;
 	struct i2c_client *tps6130x;
 	struct i2c_adapter *adapter;
 };
@@ -138,37 +139,73 @@ static struct snd_soc_ops omap_abe_modem_ops = {
 	.hw_free = omap_abe_modem_hw_free,
 };
 
-static int omap_abe_mcpdm_hw_params(struct snd_pcm_substream *substream,
-	struct snd_pcm_hw_params *params)
+static int mcpdm_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
+			struct snd_pcm_hw_params *params)
+{
+	struct snd_interval *rate = hw_param_interval(params,
+			SNDRV_PCM_HW_PARAM_RATE);
+
+	rate->min = rate->max = 96000;
+
+	return 0;
+}
+
+static int omap_abe_mcpdm_startup(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_codec *codec = rtd->codec;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_card *card = rtd->card;
 	struct omap_abe_twl6040_data *pdata = dev_get_platdata(card->dev);
+	struct twl6040 *twl6040 = codec->control_data;
 	int clk_id, freq;
 	int ret;
 
-	clk_id = twl6040_get_clk_id(rtd->codec);
+	/* twl6040 supplies McPDM PAD_CLKS */
+	ret = twl6040_power(twl6040, 1);
+	if (ret) {
+		dev_err(card->dev, "failed to enable twl6040\n");
+		return ret;
+	}
+
+	clk_id = twl6040_get_clk_id(codec);
 	if (clk_id == TWL6040_SYSCLK_SEL_HPPLL)
 		freq = pdata->mclk_freq;
 	else if (clk_id == TWL6040_SYSCLK_SEL_LPPLL)
 		freq = 32768;
 	else {
 		dev_err(card->dev, "invalid clock\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err;
 	}
 
 	/* set the codec mclk */
 	ret = snd_soc_dai_set_sysclk(codec_dai, clk_id, freq,
 				SND_SOC_CLOCK_IN);
-	if (ret)
+	if (ret) {
 		dev_err(card->dev, "can't set codec system clock\n");
+		goto err;
+	}
 
+	return 0;
+
+err:
+	twl6040_power(twl6040, 0);
 	return ret;
 }
 
+static void omap_abe_mcpdm_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_codec *codec = rtd->codec;
+	struct twl6040 *twl6040 = codec->control_data;
+
+	twl6040_power(twl6040, 0);
+}
+
 static struct snd_soc_ops omap_abe_mcpdm_ops = {
-	.hw_params = omap_abe_mcpdm_hw_params,
+	.startup = omap_abe_mcpdm_startup,
+	.shutdown = omap_abe_mcpdm_shutdown,
 };
 
 static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
@@ -178,17 +215,11 @@ static int omap_abe_mcbsp_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *card = rtd->card;
 	int ret;
-	unsigned int be_id, channels;
+	unsigned int channels;
 
-	be_id = rtd->dai_link->be_id;
-
-	if (be_id == OMAP_ABE_DAI_BT_VX)
-		ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_DSP_B |
-				SND_SOC_DAIFMT_NB_IF | SND_SOC_DAIFMT_CBM_CFM);
-	else
-		/* Set cpu DAI configuration */
-		ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
-				SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBM_CFM);
+	/* Set cpu DAI configuration */
+	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
+			SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBM_CFM);
 
 	if (ret < 0) {
 		dev_err(card->dev, "can't set cpu DAI configuration\n");
@@ -219,30 +250,55 @@ static struct snd_soc_ops omap_abe_mcbsp_ops = {
 	.hw_params = omap_abe_mcbsp_hw_params,
 };
 
-static int omap_abe_dmic_hw_params(struct snd_pcm_substream *substream,
-	struct snd_pcm_hw_params *params)
+static int omap_abe_dmic_startup(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *card = rtd->card;
+	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
+	struct twl6040 *twl6040 = card_data->twl6040;
 	int ret = 0;
+
+	/* twl6040 supplies DMic PAD_CLKS */
+	ret = twl6040_power(twl6040, 1);
+	if (ret) {
+		dev_err(card->dev, "failed to enable twl6040\n");
+		return ret;
+	}
 
 	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_SYSCLK_PAD_CLKS,
 				     19200000, SND_SOC_CLOCK_IN);
 	if (ret < 0) {
 		dev_err(card->dev, "can't set DMIC in system clock\n");
-		return ret;
+		goto err;
 	}
 	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_ABE_DMIC_CLK, 2400000,
 				     SND_SOC_CLOCK_OUT);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_err(card->dev, "can't set DMIC output clock\n");
+		goto err;
+	}
 
+	return 0;
+
+err:
+	twl6040_power(twl6040, 0);
 	return ret;
 }
 
+static void omap_abe_dmic_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_card *card = rtd->card;
+	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
+	struct twl6040 *twl6040 = card_data->twl6040;
+
+	twl6040_power(twl6040, 0);
+}
+
 static struct snd_soc_ops omap_abe_dmic_ops = {
-	.hw_params = omap_abe_dmic_hw_params,
+	.startup = omap_abe_dmic_startup,
+	.shutdown = omap_abe_dmic_shutdown,
 };
 
 static int mcbsp_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
@@ -377,19 +433,6 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"AFML", NULL, "Line In"},
 	{"AFMR", NULL, "Line In"},
 
-	/* Digital Mics: DMic0, DMic1, DMic2 with bias */
-	{"DMIC0", NULL, "omap-dmic-abe.0 Capture"},
-	{"omap-dmic-abe.0 Capture", NULL, "Digital Mic1 Bias"},
-	{"Digital Mic1 Bias", NULL, "Digital Mic 0"},
-
-	{"DMIC1", NULL, "omap-dmic-abe.1 Capture"},
-	{"omap-dmic-abe.1 Capture", NULL, "Digital Mic1 Bias"},
-	{"Digital Mic1 Bias", NULL, "Digital Mic 1"},
-
-	{"DMIC2", NULL, "omap-dmic-abe.2 Capture"},
-	{"omap-dmic-abe.2 Capture", NULL, "Digital Mic1 Bias"},
-	{"Digital Mic1 Bias", NULL, "Digital Mic 2"},
-
 	/* Connections between twl6040 and ABE */
 	{"Headset Playback", NULL, "PDM_DL1"},
 	{"Handsfree Playback", NULL, "PDM_DL2"},
@@ -449,6 +492,8 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 	u32 hsotrim, left_offset, right_offset, step_mV;
 	int ret = 0;
 
+	card_data->twl6040 = codec->control_data;
+
 	/* Disable not connected paths if not used */
 	twl6040_disconnect_pin(dapm, pdata->has_hs, "Headset Stereophone");
 	twl6040_disconnect_pin(dapm, pdata->has_hf, "Ext Spk");
@@ -490,7 +535,7 @@ static int omap_abe_twl6040_init(struct snd_soc_pcm_runtime *rtd)
 
 		ret = snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
 					hs_jack_pins);
-		if (machine_is_omap_4430sdp())
+		if (machine_is_omap_4430sdp() || machine_is_omap5_sevm())
 			twl6040_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADSET);
 		else
 			snd_soc_jack_report(&hs_jack, SND_JACK_HEADSET, SND_JACK_HEADSET);
@@ -523,8 +568,18 @@ static const struct snd_soc_dapm_widget dmic_dapm_widgets[] = {
 };
 
 static const struct snd_soc_dapm_route dmic_audio_map[] = {
-	{"DMic", NULL, "Digital Mic"},
-	{"Digital Mic", NULL, "Digital Mic1 Bias"},
+	/* Digital Mics: DMic0, DMic1, DMic2 with bias */
+	{"DMIC0", NULL, "omap-dmic-abe.0 Capture"},
+	{"omap-dmic-abe.0 Capture", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic 0"},
+
+	{"DMIC1", NULL, "omap-dmic-abe.1 Capture"},
+	{"omap-dmic-abe.1 Capture", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic 1"},
+
+	{"DMIC2", NULL, "omap-dmic-abe.2 Capture"},
+	{"omap-dmic-abe.2 Capture", NULL, "Digital Mic1 Bias"},
+	{"Digital Mic1 Bias", NULL, "Digital Mic 2"},
 };
 
 static int omap_abe_dmic_init(struct snd_soc_pcm_runtime *rtd)
@@ -807,6 +862,7 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 		.ignore_pmdown_time = 1, /* Power down without delay */
 		.init = omap_abe_twl6040_init,
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_DL1,
 		.ignore_suspend = 1,
 	},
@@ -824,6 +880,7 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_UL,
 		.ignore_suspend = 1,
 	},
@@ -842,6 +899,7 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.init = omap_abe_twl6040_dl2_init,
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_DL2,
 		.ignore_suspend = 1,
 	},
@@ -899,8 +957,25 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 		.ignore_suspend = 1,
 	},
 	{
-		.name = OMAP_ABE_BE_MM_EXT0,
-		.stream_name = "FM",
+		.name = OMAP_ABE_BE_MM_EXT0_UL,
+		.stream_name = "FM Capture",
+
+		/* ABE components - MCBSP2 - MM-EXT */
+		.cpu_dai_name = "omap-mcbsp.2",
+		.platform_name = "aess",
+
+		/* FM */
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
+		.ops = &omap_abe_mcbsp_ops,
+		.be_id = OMAP_ABE_DAI_MM_FM,
+	},
+	{
+		.name = OMAP_ABE_BE_MM_EXT0_DL,
+		.stream_name = "FM Playback",
 
 		/* ABE components - MCBSP2 - MM-EXT */
 		.cpu_dai_name = "omap-mcbsp.2",
@@ -1160,6 +1235,7 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 		.ignore_pmdown_time = 1, /* Power down without delay */
 		.init = omap_abe_twl6040_init,
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_DL1,
 		.ignore_suspend = 1,
 	},
@@ -1177,6 +1253,7 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_UL,
 		.ignore_suspend = 1,
 	},
@@ -1193,8 +1270,10 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 		.codec_name = "twl6040-codec",
 
 		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.ignore_pmdown_time = 1, /* Power down without delay */
 		.init = omap_abe_twl6040_dl2_init,
 		.ops = &omap_abe_mcpdm_ops,
+		.be_hw_params_fixup = mcpdm_be_hw_params_fixup,
 		.be_id = OMAP_ABE_DAI_PDM_DL2,
 		.ignore_suspend = 1,
 	},
@@ -1252,8 +1331,25 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 		.ignore_suspend = 1,
 	},
 	{
-		.name = OMAP_ABE_BE_MM_EXT0,
-		.stream_name = "FM",
+		.name = OMAP_ABE_BE_MM_EXT0_UL,
+		.stream_name = "FM Capture",
+
+		/* ABE components - MCBSP2 - MM-EXT */
+		.cpu_dai_name = "omap-mcbsp-dai.1",
+		.platform_name = "aess",
+
+		/* FM */
+		.codec_dai_name = "FM Digital",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		/* .no_codec = 1, */ /* TODO: have a dummy CODEC */
+		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
+		.ops = &omap_abe_mcbsp_ops,
+		.be_id = OMAP_ABE_DAI_MM_FM,
+	},
+	{
+		.name = OMAP_ABE_BE_MM_EXT0_DL,
+		.stream_name = "FM Playback",
 
 		/* ABE components - MCBSP2 - MM-EXT */
 		.cpu_dai_name = "omap-mcbsp.2",
@@ -1347,6 +1443,11 @@ static int __devexit omap_abe_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void omap_abe_shutdown(struct platform_device *pdev)
+{
+	snd_soc_poweroff(&pdev->dev);
+}
+
 static struct platform_driver omap_abe_driver = {
 	.driver = {
 		.name = "omap-abe-twl6040",
@@ -1355,6 +1456,7 @@ static struct platform_driver omap_abe_driver = {
 	},
 	.probe = omap_abe_probe,
 	.remove = __devexit_p(omap_abe_remove),
+	.shutdown = omap_abe_shutdown,
 };
 
 module_platform_driver(omap_abe_driver);

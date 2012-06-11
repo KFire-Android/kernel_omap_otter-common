@@ -295,7 +295,7 @@ static inline void omap2_prm_enable_prcm_module_wakeup(s16 prcm_mod,
 {
 	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
 		"not suppose to be used on omap4\n");
-	return 0;
+	return;
 }
 #else
 /* Power/reset management domain register get/set */

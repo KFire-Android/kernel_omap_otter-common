@@ -274,6 +274,8 @@ static int abe_probe(struct snd_soc_platform *platform)
 #endif
 	/* aess_clk has to be enabled to access hal register.
 	 * Disable the clk after it has been used.
+	 * Using pm_runtime_get_sync() instead of omap_abe_*
+	 * because it's too early to write to the register.
 	 */
 	pm_runtime_get_sync(abe->dev);
 
@@ -286,13 +288,14 @@ static int abe_probe(struct snd_soc_platform *platform)
 
 	/* "tick" of the audio engine */
 	omap_aess_write_event_generator(abe->aess, EVENT_TIMER);
+	omap_aess_set_auto_gating(abe->aess);
 	abe_init_gains(abe->aess);
 
 	/* Stop the engine */
 	omap_aess_stop_event_generator(abe->aess);
 	omap_aess_disable_irq(abe->aess);
 
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 	abe_mixer_add_widgets(platform);
 	abe_init_debugfs(abe);
 	return ret;

@@ -464,7 +464,7 @@ static const struct file_operations hsi_gdd_regs_fops = {
 	.release = single_release,
 };
 
-int __init hsi_debug_add_ctrl(struct hsi_dev *hsi_ctrl)
+int __devinit hsi_debug_add_ctrl(struct hsi_dev *hsi_ctrl)
 {
 	struct platform_device *pdev = to_platform_device(hsi_ctrl->dev);
 	unsigned char dir_name[HSI_DIR_NAME_SIZE];
@@ -514,7 +514,7 @@ void hsi_debug_remove_ctrl(struct hsi_dev *hsi_ctrl)
 	debugfs_remove_recursive(hsi_ctrl->dir);
 }
 
-int __init hsi_debug_init(void)
+int __devinit hsi_debug_init(void)
 {
 	hsi_dir = debugfs_create_dir("hsi", NULL);
 	if (IS_ERR(hsi_dir))

@@ -338,7 +338,7 @@ static struct omap_mbox2_priv omap2_mbox_1_priv = {
 	.irqdisable	= OMAP4_MAILBOX_IRQENABLE_CLR(0),
 };
 
-struct omap_mbox mbox_1_info = {
+static struct omap_mbox mbox_1_info = {
 	.name		= "mailbox-1",
 	.ops		= &omap2_mbox_ops,
 	.priv		= &omap2_mbox_1_priv,
@@ -361,14 +361,14 @@ static struct omap_mbox2_priv omap2_mbox_2_priv = {
 	.irqdisable     = OMAP4_MAILBOX_IRQENABLE_CLR(0),
 };
 
-struct omap_mbox mbox_2_info = {
+static struct omap_mbox mbox_2_info = {
 	.name		= "mailbox-2",
 	.ops		= &omap2_mbox_ops,
 	.priv		= &omap2_mbox_2_priv,
 	.pm_constraint	= SET_MPU_CORE_CONSTRAINT,
 };
 
-struct omap_mbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
+static struct omap_mbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
 #endif
 
 static int __devinit omap2_mbox_probe(struct platform_device *pdev)

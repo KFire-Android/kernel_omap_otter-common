@@ -254,6 +254,7 @@ int omap_aess_enable_gain(struct omap_aess *abe, u32 id);
 int omap_aess_mute_gain(struct omap_aess *abe, u32 id);
 int omap_aess_unmute_gain(struct omap_aess *abe, u32 id);
 
+int omap_aess_gain_ramp(struct omap_aess *abe, u32 id, u32 ramp);
 int omap_aess_write_gain(struct omap_aess *abe,	u32 id, s32 f_g);
 int omap_aess_write_mixer(struct omap_aess *abe, u32 id, s32 f_g);
 int omap_aess_read_gain(struct omap_aess *abe, u32 id, u32 *f_g);

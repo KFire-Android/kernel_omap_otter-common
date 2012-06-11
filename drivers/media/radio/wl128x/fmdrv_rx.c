@@ -47,7 +47,7 @@ int fm_rx_set_freq(struct fmdev *fmdev, u32 freq)
 {
 	unsigned long timeleft;
 	u16 payload, curr_frq, intr_flag;
-	u32 curr_frq_in_khz;
+	u32 curr_frq_in_khz, fm_freq_mul;
 	u32 resp_len;
 	int ret;
 
@@ -55,6 +55,13 @@ int fm_rx_set_freq(struct fmdev *fmdev, u32 freq)
 		fmerr("Invalid frequency %d\n", freq);
 		return -EINVAL;
 	}
+
+	if (fmdev->rx.region.fm_band == FM_BAND_RUSSIAN)
+		fm_freq_mul = FM_FREQ_MUL_RUS;
+	else if (fmdev->rx.region.fm_band == FM_BAND_WEATHER)
+		fm_freq_mul = FM_FREQ_MUL_WB;
+	else
+		fm_freq_mul = FM_FREQ_MUL;
 
 	/* Set audio enable */
 	payload = FM_RX_AUDIO_ENABLE_I2S_AND_ANALOG;
@@ -72,7 +79,7 @@ int fm_rx_set_freq(struct fmdev *fmdev, u32 freq)
 		return ret;
 
 	/* Calculate frequency index and set*/
-	payload = (freq - fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
+	payload = (freq - fmdev->rx.region.bot_freq) / fm_freq_mul;
 
 	ret = fmc_send_cmd(fmdev, FREQ_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
@@ -117,7 +124,8 @@ int fm_rx_set_freq(struct fmdev *fmdev, u32 freq)
 		goto exit;
 
 	curr_frq = be16_to_cpu(curr_frq);
-	curr_frq_in_khz = (fmdev->rx.region.bot_freq + ((u32)curr_frq * FM_FREQ_MUL));
+	curr_frq_in_khz = (fmdev->rx.region.bot_freq +
+			((u32)curr_frq * fm_freq_mul));
 
 	if (curr_frq_in_khz != freq) {
 		pr_info("Frequency is set to (%d) but "
@@ -156,7 +164,7 @@ static int fm_rx_set_channel_spacing(struct fmdev *fmdev, u32 spacing)
 
 	/* set channel spacing */
 	payload = spacing;
-	ret = fmc_send_cmd(fmdev, CHANL_BW_SET, REG_WR, &payload,
+	ret = fmc_send_cmd(fmdev, SCAN_SPACING_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
 	if (ret < 0)
 		return ret;
@@ -167,18 +175,70 @@ static int fm_rx_set_channel_spacing(struct fmdev *fmdev, u32 spacing)
 }
 
 int fm_rx_seek(struct fmdev *fmdev, u32 seek_upward,
-		u32 wrap_around, u32 spacing)
+		u32 wrap_around, u32 spacing, u32 comp_scan)
 {
-	u32 resp_len;
+	u32 resp_len, fm_freq_mul;
 	u16 curr_frq, next_frq, last_frq;
-	u16 payload, int_reason, intr_flag;
-	u16 offset, space_idx;
+	u16 payload, int_reason;
+	u16 offset, space_idx, no_stations, chnl_found[410];
 	unsigned long timeleft;
-	int ret;
+	int ret, i;
+	static int intr_flag;
+
+	if (comp_scan == COMP_SCAN_STOP) {
+		/* Stop Complete Scan */
+		if (fmdev->rx.comp_scan_status == COMP_SCAN_START &&
+				fmdev->rx.comp_scan_done == false) {
+			payload = FM_TUNER_STOP_SEARCH_MODE;
+			ret = fmc_send_cmd(fmdev, STOP_SEARCH, REG_WR, &payload,
+					sizeof(payload), NULL, NULL);
+			if (ret < false)
+				return ret;
+		}
+
+		return 0;
+	} else if (comp_scan == COMP_SCAN_READ) {
+		/* Read Complete Scan results */
+		ret = fmc_send_cmd(fmdev, TUNE_VALIDITY_CHECK, REG_RD, NULL,
+				sizeof(no_stations), &no_stations, &resp_len);
+		if (ret < false)
+			return ret;
+
+		no_stations = be16_to_cpu(no_stations);
+		no_stations = no_stations & 63;
+		fmdev->rx.no_of_chans = no_stations;
+		if (fmdev->rx.no_of_chans == false)
+			return 0;
+
+		ret = fmc_send_cmd(fmdev, RDS_DATA_GET, REG_RD, NULL,
+				no_stations * 2, chnl_found, &resp_len);
+		if (ret < false)
+			return ret;
+
+		fmdbg("Complete Scan results\n");
+		memset(fmdev->rx.stat_found, 0, sizeof(fmdev->rx.stat_found));
+		for (i = 0; i < no_stations; i++) {
+			fmdev->rx.stat_found[i] = (u32) ((chnl_found[i] * 50) +
+					fmdev->rx.region.bot_freq);
+			fmdbg("channel[%d]-%d\n", i+1, fmdev->rx.stat_found[i]);
+		}
+
+		/* Re-enable default FM interrupts */
+		int_reason = fmdev->irq_info.flag &
+			(FM_TUNE_COMPLETE | FM_BAND_LIMIT);
+		fmdev->irq_info.mask = intr_flag;
+		payload = fmdev->irq_info.mask;
+		ret = fmc_send_cmd(fmdev, INT_MASK_SET, REG_WR, &payload,
+				sizeof(payload), NULL, NULL);
+		if (ret < false)
+			return ret;
+
+		goto exit;
+	}
 
 	/* Set channel spacing */
 	ret = fm_rx_set_channel_spacing(fmdev, spacing);
-	if (ret < 0) {
+	if (ret < false) {
 		fmerr("Failed to set channel spacing\n");
 		return ret;
 	}
@@ -186,14 +246,29 @@ int fm_rx_seek(struct fmdev *fmdev, u32 seek_upward,
 	/* Read the current frequency from chip */
 	ret = fmc_send_cmd(fmdev, FREQ_SET, REG_RD, NULL,
 			sizeof(curr_frq), &curr_frq, &resp_len);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
 	curr_frq = be16_to_cpu(curr_frq);
-	last_frq = (fmdev->rx.region.top_freq - fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
 
 	/* Check the offset in order to be aligned to the channel spacing*/
-	space_idx = fmdev->rx.region.chanl_space / FM_FREQ_MUL;
+	if (fmdev->rx.region.fm_band == FM_BAND_RUSSIAN) {
+		last_frq = (fmdev->rx.region.top_freq -
+				fmdev->rx.region.bot_freq) / FM_FREQ_MUL_RUS;
+		space_idx = fmdev->rx.region.chanl_space / FM_FREQ_MUL_RUS;
+		fm_freq_mul = FM_FREQ_MUL_RUS;
+	} else if (fmdev->rx.region.fm_band == FM_BAND_WEATHER) {
+		last_frq = (fmdev->rx.region.top_freq -
+				fmdev->rx.region.bot_freq) / FM_FREQ_MUL_WB;
+		space_idx = 1;
+		fm_freq_mul = FM_FREQ_MUL_WB;
+	} else {
+		last_frq = (fmdev->rx.region.top_freq -
+				fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
+		space_idx = fmdev->rx.region.chanl_space / FM_FREQ_MUL;
+		fm_freq_mul = FM_FREQ_MUL;
+	}
+
 	offset = curr_frq % space_idx;
 
 	next_frq = seek_upward ? curr_frq + space_idx /* Seek Up */ :
@@ -206,43 +281,73 @@ int fm_rx_seek(struct fmdev *fmdev, u32 seek_upward,
 	if ((short)next_frq < 0)
 		next_frq = last_frq - offset;
 	else if (next_frq > last_frq)
-		next_frq = 0 + offset;
+		next_frq = offset;
 
 again:
 	/* Set calculated next frequency to perform seek */
 	payload = next_frq;
 	ret = fmc_send_cmd(fmdev, FREQ_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
 	/* Set search direction (0:Seek Down, 1:Seek Up) */
 	payload = (seek_upward ? FM_SEARCH_DIRECTION_UP : FM_SEARCH_DIRECTION_DOWN);
 	ret = fmc_send_cmd(fmdev, SEARCH_DIR_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
 	/* Read flags - just to clear any pending interrupts if we had */
 	ret = fmc_send_cmd(fmdev, FLAG_GET, REG_RD, NULL, 2, NULL, NULL);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
 	/* Enable FR, BL interrupts */
 	intr_flag = fmdev->irq_info.mask;
-	fmdev->irq_info.mask = (FM_FR_EVENT | FM_BL_EVENT);
+	fmdev->irq_info.mask = (FM_FR_EVENT | FM_BL_EVENT | FM_SCAN_DONE_EVENT);
 	payload = fmdev->irq_info.mask;
 	ret = fmc_send_cmd(fmdev, INT_MASK_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
-	/* Start seek */
-	payload = FM_TUNER_AUTONOMOUS_SEARCH_MODE;
-	ret = fmc_send_cmd(fmdev, TUNER_MODE_SET, REG_WR, &payload,
-			sizeof(payload), NULL, NULL);
-	if (ret < 0)
-		return ret;
+	if (comp_scan == SEEK_START) {
+		/* Start Seek */
+		if (fmdev->rx.region.fm_band == FM_BAND_WEATHER)
+			payload = FM_TUNER_PRESET_MODE;
+		else
+			payload = FM_TUNER_AUTONOMOUS_SEARCH_MODE;
+
+		ret = fmc_send_cmd(fmdev, TUNER_MODE_SET, REG_WR, &payload,
+				sizeof(payload), NULL, NULL);
+		if (ret < false)
+			return ret;
+
+	} else if (comp_scan == COMP_SCAN_START) {
+		/* Pause RDS reception before Starting Complete Scan */
+		if (fmdev->rx.rds.flag == true) {
+			fmdev->rx.rds.pause = true;
+			ret = fmc_set_rds_mode(fmdev, FM_RDS_DISABLE);
+			if (ret < false)
+				fmerr("Failed to set RX RDS mode\n");
+		}
+
+		/* Clear RDS data present in chip */
+		fmc_send_cmd(fmdev, RDS_DATA_GET, REG_RD, NULL,
+			(FM_RX_RDS_FIFO_THRESHOLD * 3), NULL, NULL);
+
+		/* Start Complete Scan */
+		payload = FM_TUNER_BULK_SEARCH_MODE;
+		ret = fmc_send_cmd(fmdev, TUNER_MODE_SET, REG_WR, &payload,
+				sizeof(payload), NULL, NULL);
+		if (ret < false)
+			return ret;
+
+		fmdev->rx.comp_scan_status = true;
+		fmdev->rx.comp_scan_done = false;
+		return 0;
+	}
 
 	/* Wait for tune ended/band limit reached interrupt */
 	init_completion(&fmdev->maintask_comp);
@@ -261,7 +366,7 @@ again:
 	payload = fmdev->irq_info.mask;
 	ret = fmc_send_cmd(fmdev, INT_MASK_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
-	if (ret < 0)
+	if (ret < false)
 		return ret;
 
 	if (int_reason & FM_BL_EVENT) {
@@ -275,21 +380,25 @@ again:
 				fmdev->rx.region.top_freq;
 			/* Calculate frequency index to write */
 			next_frq = (fmdev->rx.freq -
-					fmdev->rx.region.bot_freq) / FM_FREQ_MUL;
+				fmdev->rx.region.bot_freq) / fm_freq_mul;
+
+			/* If no valid chanel then report default frequency */
+			wrap_around = 0;
+
 			goto again;
 		}
 	} else {
 		/* Read freq to know where operation tune operation stopped */
 		ret = fmc_send_cmd(fmdev, FREQ_SET, REG_RD, NULL, 2,
 				&curr_frq, &resp_len);
-		if (ret < 0)
+		if (ret < false)
 			return ret;
 
 		curr_frq = be16_to_cpu(curr_frq);
 		fmdev->rx.freq = (fmdev->rx.region.bot_freq +
-				((u32)curr_frq * FM_FREQ_MUL));
-
+				((u32)curr_frq * fm_freq_mul));
 	}
+exit:
 	/* Reset RDS cache and current station pointers */
 	fm_rx_reset_rds_cache(fmdev);
 	fm_rx_reset_station_info(fmdev);
@@ -310,7 +419,6 @@ int fm_rx_set_volume(struct fmdev *fmdev, u16 vol_to_set)
 			   FM_RX_VOLUME_MIN, FM_RX_VOLUME_MAX);
 		return -EINVAL;
 	}
-	vol_to_set *= FM_RX_VOLUME_GAIN_STEP;
 
 	payload = vol_to_set;
 	ret = fmc_send_cmd(fmdev, VOLUME_SET, REG_WR, &payload,
@@ -333,7 +441,7 @@ int fm_rx_get_volume(struct fmdev *fmdev, u16 *curr_vol)
 		return -ENOMEM;
 	}
 
-	*curr_vol = fmdev->rx.volume / FM_RX_VOLUME_GAIN_STEP;
+	*curr_vol = fmdev->rx.volume;
 
 	return 0;
 }
@@ -364,7 +472,9 @@ int fm_rx_set_region(struct fmdev *fmdev, u8 region_to_set)
 	int ret;
 
 	if (region_to_set != FM_BAND_EUROPE_US &&
-	    region_to_set != FM_BAND_JAPAN) {
+	    region_to_set != FM_BAND_JAPAN &&
+	    region_to_set != FM_BAND_WEATHER &&
+	    region_to_set != FM_BAND_RUSSIAN) {
 		fmerr("Invalid band\n");
 		return -EINVAL;
 	}
@@ -550,7 +660,7 @@ int fm_rx_set_rssi_threshold(struct fmdev *fmdev, short rssi_lvl_toset)
 		fmerr("Invalid RSSI threshold level\n");
 		return -EINVAL;
 	}
-	payload = (u16)rssi_lvl_toset;
+	payload = (u16) rssi_lvl_toset;
 	ret = fmc_send_cmd(fmdev, SEARCH_LVL_SET, REG_WR, &payload,
 			sizeof(payload), NULL, NULL);
 	if (ret < 0)
@@ -674,6 +784,7 @@ int fm_rx_set_rds_mode(struct fmdev *fmdev, u8 rds_en_dis)
 {
 	u16 payload;
 	int ret;
+
 
 	if (rds_en_dis != FM_RDS_ENABLE && rds_en_dis != FM_RDS_DISABLE) {
 		fmerr("Invalid rds option\n");

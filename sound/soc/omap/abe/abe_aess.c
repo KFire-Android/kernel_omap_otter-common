@@ -82,6 +82,21 @@ void omap_aess_hw_configuration(struct omap_aess *abe)
 }
 
 /**
+ * omap_aess_set_auto_gating - Enable AESS auto gating (required to release all AESS clocks)
+ * @abe: Pointer to an abe handle
+ *
+ * This simply sets the auto-gating bit in the AESS.  This must be
+ * re-enabled every time that gains are changed because setting the
+ * gains before the FW is loaded will overwrite this register
+ * with a 0.
+ */
+void omap_aess_set_auto_gating(struct omap_aess *abe)
+{
+	omap_aess_reg_writel(abe, AESS_AUTO_GATING_ENABLE, 1);
+}
+EXPORT_SYMBOL(omap_aess_set_auto_gating);
+
+/**
  * omap_aess_clear_irq - clear ABE interrupt
  * @abe: Pointer on abe handle
  *

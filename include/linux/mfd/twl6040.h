@@ -127,6 +127,9 @@
 #define TWL6040_HSDACMODE		(1 << 1)
 #define TWL6040_HSDRVMODE		(1 << 3)
 
+/* HFLCTL/R (0x14/0x16) fields */
+#define TWL6040_HFDRVENA		(1 << 4)
+
 /* VIBCTLL/R (0x18/0x1A) fields */
 
 #define TWL6040_VIBENA			(1 << 0)
@@ -154,6 +157,8 @@
 /* STATUS (0x2E) fields */
 
 #define TWL6040_PLUGCOMP		0x02
+#define TWL6040_HFLOCDET		0x04
+#define TWL6040_HFROCDET		0x08
 #define TWL6040_VIBLOCDET		0x10
 #define TWL6040_VIBROCDET		0x20
 #define TWL6040_TSHUTDET                0x40
@@ -180,6 +185,7 @@ struct twl6040_codec_data {
 	u16 hs_right_step;
 	u16 hf_left_step;
 	u16 hf_right_step;
+	u16 amic_bias_settle_ms;
 };
 
 struct twl6040_vibra_data {

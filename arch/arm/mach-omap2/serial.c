@@ -198,7 +198,7 @@ static int __init omap_serial_fill_default_pads(struct omap_board_data *bdata
 }
 #endif
 
-char *cmdline_find_option(char *str)
+static char *cmdline_find_option(char *str)
 {
 	extern char *saved_command_line;
 

@@ -1,0 +1,44 @@
+* Texas Instrument OMAP System Control Module (SCM) bindings
+
+The control module allows software control of various static modes supported by
+the device. The control module controls the settings of various device  modules
+through register configuration and internal signals. It also controls  the  pad
+configuration, pin functional multiplexing, and the routing of internal signals
+(such as PRCM  signals or DMA requests)  to output pins configured for hardware
+observability.
+
+Required properties:
+- compatible : Should be:
+  - "ti,omap3-control" for OMAP3 support
+  - "ti,omap4-control" for OMAP4 support
+  - "ti,omap5-control" for OMAP5 support
+
+OMAP specific properties:
+- ti,hwmods: Name of the hwmod associated to the control module:
+  Should be "ctrl_module_core";
+
+Sub-nodes:
+- bandgap : contains the bandgap node
+
+  The bindings details of individual bandgap device can be found in:
+  Documentation/devicetree/bindings/thermal/omap_bandgap.txt
+
+- usb : contains the usb phy pin control node
+
+  The only required property for this child is:
+    - compatible = "ti,omap4-control-usb";
+
+Examples:
+
+ctrl_module_core: ctrl_module_core@4a002000 {
+	compatible = "ti,omap4-control";
+	ti,hwmods = "ctrl_module_core";
+	bandgap {
+		compatible = "ti,omap4460-bandgap";
+		interrupts = <0 126 4>; /* talert */
+		ti,tshut-gpio = <86>; /* tshut */
+	};
+	usb {
+		compatible = "ti,omap4-usb-phy";
+	};
+};

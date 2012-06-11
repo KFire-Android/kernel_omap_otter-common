@@ -26,3 +26,15 @@ config SPEAR_THERMAL
 	help
 	  Enable this to plug the SPEAr thermal sensor driver into the Linux
 	  thermal framework
+
+config OMAP_BANDGAP
+	tristate "Texas Instruments OMAP4+ temperature sensor driver"
+	depends on THERMAL
+	depends on MFD_OMAP_CONTROL
+	help
+	  If you say yes here you get support for the Texas Instruments
+	  OMAP4460+ on die bandgap temperature sensor support. The register
+	  set is part of system control module.
+
+	  This includes alert interrupts generation and also the TSHUT
+	  support.

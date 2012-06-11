@@ -921,7 +921,7 @@ static int is_connected_input_ep(struct snd_soc_dapm_widget *widget,
 			/* do we need to add this widget to the list ? */
 			if (list) {
 				int err;
-				err = dapm_list_add_widget(list, path->sink);
+				err = dapm_list_add_widget(list, path->source);
 				if (err < 0) {
 					dev_err(widget->dapm->dev, "could not add widget %s\n",
 						widget->name);
@@ -2900,6 +2900,17 @@ snd_soc_dapm_new_control(struct snd_soc_dapm_context *dapm,
 	else
 		snprintf((char *)w->name, name_len, "%s", widget->name);
 
+	if (widget->sname) {
+		name_len = strlen(widget->sname) + 1;
+		w->sname = kmalloc(name_len, GFP_KERNEL);
+		if (w->sname == NULL) {
+			kfree(w->name);
+			kfree(w);
+			return NULL;
+		}
+		snprintf((char *)w->sname, name_len, "%s", widget->sname);
+	}
+
 	switch (w->id) {
 	case snd_soc_dapm_switch:
 	case snd_soc_dapm_mixer:
@@ -3508,7 +3519,7 @@ void snd_soc_dapm_shutdown(struct snd_soc_card *card)
 {
 	struct snd_soc_codec *codec;
 
-	list_for_each_entry(codec, &card->codec_dev_list, list) {
+	list_for_each_entry(codec, &card->codec_dev_list, card_list) {
 		soc_dapm_shutdown_codec(&codec->dapm);
 		if (codec->dapm.bias_level == SND_SOC_BIAS_STANDBY)
 			snd_soc_dapm_set_bias_level(&codec->dapm,

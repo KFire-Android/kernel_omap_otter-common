@@ -100,7 +100,7 @@ static int abe_dbg_start_dma(struct omap_abe *abe, int circular)
 
 	abe->debugfs.reader_offset = 0;
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 	omap_start_dma(abe->debugfs.dma_ch);
 	return 0;
 }
@@ -116,7 +116,7 @@ static void abe_dbg_stop_dma(struct omap_abe *abe)
 		omap_dma_unlink_lch(abe->debugfs.dma_ch, abe->debugfs.dma_ch);
 
 	omap_free_dma(abe->debugfs.dma_ch);
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 }
 
 static int abe_open_data(struct inode *inode, struct file *file)

@@ -800,7 +800,7 @@ static irqreturn_t hsi_mpu_handler(int irq, void *p)
 	return IRQ_HANDLED;
 }
 
-int __init hsi_mpu_init(struct hsi_port *hsi_p, const char *irq_name)
+int __devinit hsi_mpu_init(struct hsi_port *hsi_p, const char *irq_name)
 {
 	int err;
 

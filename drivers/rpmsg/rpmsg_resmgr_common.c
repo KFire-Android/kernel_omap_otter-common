@@ -79,6 +79,7 @@ static int rprm_gpio_get_info(void *handle, char *buf, size_t len)
 	return snprintf(buf, len, "Id:%d\n", id);
 }
 
+#if defined(CONFIG_REGULATOR)
 static int rprm_regulator_request(void **handle, void *data, size_t len)
 {
 	int ret;
@@ -153,6 +154,17 @@ static int rprm_regulator_release(void *handle)
 
 	return 0;
 }
+#else
+static inline int rprm_regulator_request(void **handle, void *data, size_t len)
+{
+	return -1;
+}
+
+static inline int rprm_regulator_release(void *handle)
+{
+	return 0;
+}
+#endif
 
 static int rprm_regulator_get_info(void *handle, char *buf, size_t len)
 {

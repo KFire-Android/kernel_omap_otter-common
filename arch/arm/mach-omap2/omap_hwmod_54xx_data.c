@@ -1059,6 +1059,63 @@ static struct omap_hwmod omap54xx_counter_32k_hwmod = {
 };
 
 /*
+ * 'ctrl_module' class
+ * attila core control module
+ */
+static struct omap_hwmod_class_sysconfig omap54xx_ctrl_module_sysc = {
+	.rev_offs	= 0x0000,
+	.sysc_offs	= 0x0010,
+	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+			SIDLE_SMART_WKUP),
+	.sysc_fields	= &omap_hwmod_sysc_type2,
+};
+
+static struct omap_hwmod_class omap54xx_ctrl_module_hwmod_class = {
+	.name	= "ctrl_module",
+	.sysc	= &omap54xx_ctrl_module_sysc,
+};
+
+/* ctrl_module_core */
+static struct omap_hwmod omap54xx_ctrl_module_core_hwmod;
+static struct omap_hwmod_irq_info omap54xx_ctrl_module_core_irqs[] = {
+	{ .name = "sec_evts", .irq = 8 + OMAP44XX_IRQ_GIC_START },
+	{ .name = "thermal_alert", .irq = 126 + OMAP44XX_IRQ_GIC_START },
+	{ .irq = -1 }
+};
+
+static struct omap_hwmod_addr_space omap54xx_ctrl_module_core_addrs[] = {
+	{
+		.pa_start	= 0x4a002000,
+		.pa_end		= 0x4a0027ff,
+		.flags		= ADDR_TYPE_RT
+	},
+};
+
+/* l4_cfg -> ctrl_module_core */
+static struct omap_hwmod_ocp_if omap54xx_l4_cfg__ctrl_module_core = {
+	.master		= &omap54xx_l4_cfg_hwmod,
+	.slave		= &omap54xx_ctrl_module_core_hwmod,
+	.clk		= "l4_div_ck",
+	.addr		= omap54xx_ctrl_module_core_addrs,
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* ctrl_module_core slave ports */
+static struct omap_hwmod_ocp_if *omap54xx_ctrl_module_core_slaves[] = {
+	&omap54xx_l4_cfg__ctrl_module_core,
+};
+
+static struct omap_hwmod omap54xx_ctrl_module_core_hwmod = {
+	.name		= "ctrl_module_core",
+	.class		= &omap54xx_ctrl_module_hwmod_class,
+	.clkdm_name	= "l4cfg_clkdm",
+	.mpu_irqs	= omap54xx_ctrl_module_core_irqs,
+	.slaves		= omap54xx_ctrl_module_core_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap54xx_ctrl_module_core_slaves),
+};
+
+/*
  * 'dma' class
  * dma controller for data exchange between memory to memory (i.e. internal or
  * external memory) and gp peripherals to memory or memory to gp peripherals
@@ -3579,7 +3636,7 @@ static struct omap_hwmod_class omap54xx_mcbsp_hwmod_class = {
 /* mcbsp1 */
 static struct omap_hwmod omap54xx_mcbsp1_hwmod;
 static struct omap_hwmod_irq_info omap54xx_mcbsp1_irqs[] = {
-	{ .irq = 17 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "common", .irq = 17 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -3635,7 +3692,7 @@ static struct omap_hwmod_ocp_if *omap54xx_mcbsp1_slaves[] = {
 
 static struct omap_hwmod_opt_clk mcbsp1_opt_clks[] = {
 	{ .role = "pad_fck", .clk = "pad_clks" },
-	{ .role = "prcm_clk", .clk = "mcbsp1_sync_mux_ck" },
+	{ .role = "prcm_fck", .clk = "mcbsp1_sync_mux_ck" },
 };
 
 static struct omap_hwmod omap54xx_mcbsp1_hwmod = {
@@ -3661,7 +3718,7 @@ static struct omap_hwmod omap54xx_mcbsp1_hwmod = {
 /* mcbsp2 */
 static struct omap_hwmod omap54xx_mcbsp2_hwmod;
 static struct omap_hwmod_irq_info omap54xx_mcbsp2_irqs[] = {
-	{ .irq = 22 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "common", .irq = 22 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -3717,7 +3774,7 @@ static struct omap_hwmod_ocp_if *omap54xx_mcbsp2_slaves[] = {
 
 static struct omap_hwmod_opt_clk mcbsp2_opt_clks[] = {
 	{ .role = "pad_fck", .clk = "pad_clks" },
-	{ .role = "prcm_clk", .clk = "mcbsp2_sync_mux_ck" },
+	{ .role = "prcm_fck", .clk = "mcbsp2_sync_mux_ck" },
 };
 
 static struct omap_hwmod omap54xx_mcbsp2_hwmod = {
@@ -3743,7 +3800,7 @@ static struct omap_hwmod omap54xx_mcbsp2_hwmod = {
 /* mcbsp3 */
 static struct omap_hwmod omap54xx_mcbsp3_hwmod;
 static struct omap_hwmod_irq_info omap54xx_mcbsp3_irqs[] = {
-	{ .irq = 23 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "common", .irq = 23 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -3799,7 +3856,7 @@ static struct omap_hwmod_ocp_if *omap54xx_mcbsp3_slaves[] = {
 
 static struct omap_hwmod_opt_clk mcbsp3_opt_clks[] = {
 	{ .role = "pad_fck", .clk = "pad_clks" },
-	{ .role = "prcm_clk", .clk = "mcbsp3_sync_mux_ck" },
+	{ .role = "prcm_fck", .clk = "mcbsp3_sync_mux_ck" },
 };
 
 static struct omap_hwmod omap54xx_mcbsp3_hwmod = {
@@ -6490,6 +6547,9 @@ static __initdata struct omap_hwmod *omap54xx_hwmods[] = {
 
 	/* counter class */
 	&omap54xx_counter_32k_hwmod,
+
+	/* ctrl module class */
+	&omap54xx_ctrl_module_core_hwmod,
 
 	/* dma class */
 	&omap54xx_dma_system_hwmod,

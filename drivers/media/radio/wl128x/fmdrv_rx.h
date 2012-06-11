@@ -37,7 +37,7 @@ int fm_rx_set_af_switch(struct fmdev *, u8);
 void fm_rx_reset_rds_cache(struct fmdev *);
 void fm_rx_reset_station_info(struct fmdev *);
 
-int fm_rx_seek(struct fmdev *, u32, u32, u32);
+int fm_rx_seek(struct fmdev *, u32, u32, u32, u32);
 
 int fm_rx_get_rds_mode(struct fmdev *, u8 *);
 int fm_rx_get_rds_system(struct fmdev *, u8 *);

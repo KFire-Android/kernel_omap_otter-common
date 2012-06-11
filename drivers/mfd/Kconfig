@@ -795,6 +795,15 @@ config MFD_WL1273_CORE
 	  driver connects the radio-wl1273 V4L2 module and the wl1273
 	  audio codec.
 
+config MFD_OMAP_CONTROL
+	bool "Texas Instruments OMAP System control module"
+	depends on ARCH_OMAP
+	help
+	  This is the core driver for system control module. This driver
+	  is responsible for creating the control module mfd child,
+	  like USB-pin control, pin muxing, MMC-pbias and DDR IO dynamic
+	  change for off mode.
+
 config MFD_OMAP_USB_HOST
 	bool "Support OMAP USBHS core and TLL driver"
 	depends on USB_EHCI_HCD_OMAP || USB_OHCI_HCD_OMAP3

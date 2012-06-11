@@ -73,7 +73,7 @@ static int hsi_bus_unreg_dev(struct device *device, void *p)
 	return 0;
 }
 
-int __init hsi_bus_init(void)
+int __devinit hsi_bus_init(void)
 {
 	return bus_register(&hsi_bus_type);
 }

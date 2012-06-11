@@ -2197,12 +2197,32 @@ static struct clk ts_clk_div = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+static struct clk dpll_core_m3x2_opt_ck = {
+	.name		= "dpll_core_m3x2_opt_ck",
+	.parent		= &dpll_core_m3x2_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_WKUPAON_SCRM_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SCRM_CORE_SHIFT,
+	.clkdm_name	= "wkupaon_clkdm",
+};
+
+static struct clk dpll_per_m3x2_opt_ck = {
+	.name		= "dpll_per_m3x2_opt_ck",
+	.parent		= &dpll_per_m3x2_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_WKUPAON_SCRM_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_SCRM_PER_SHIFT,
+	.clkdm_name	= "wkupaon_clkdm",
+};
+
 /* SCRM aux clk nodes */
 
 static const struct clksel auxclk_src_sel[] = {
 	{ .parent = &sys_clkin, .rates = div_1_0_rates },
-	{ .parent = &dpll_core_m3x2_ck, .rates = div_1_1_rates },
-	{ .parent = &dpll_per_m3x2_ck, .rates = div_1_2_rates },
+	{ .parent = &dpll_core_m3x2_opt_ck, .rates = div_1_1_rates },
+	{ .parent = &dpll_per_m3x2_opt_ck, .rates = div_1_2_rates },
 	{ .parent = NULL },
 };
 
@@ -2526,6 +2546,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_core_h23x2_ck",		&dpll_core_h23x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_m2_ck",		&dpll_core_m2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_m3x2_ck",		&dpll_core_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_core_m3x2_opt_ck",	&dpll_core_m3x2_opt_ck,	CK_54XX),
 	CLK(NULL,	"dpll_iva_ck",			&dpll_iva_ck,	CK_54XX),
 	CLK(NULL,	"dpll_iva_x2_ck",		&dpll_iva_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_iva_h11x2_ck",		&dpll_iva_h11x2_ck,	CK_54XX),
@@ -2541,6 +2562,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_per_m2_ck",		&dpll_per_m2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m2x2_ck",		&dpll_per_m2x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_per_m3x2_ck",		&dpll_per_m3x2_ck,	CK_54XX),
+	CLK(NULL,	"dpll_per_m3x2_opt_ck",		&dpll_per_m3x2_opt_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_ck",		&dpll_unipro1_ck,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_clkdcoldo",	&dpll_unipro1_clkdcoldo,	CK_54XX),
 	CLK(NULL,	"dpll_unipro1_m2_ck",		&dpll_unipro1_m2_ck,	CK_54XX),

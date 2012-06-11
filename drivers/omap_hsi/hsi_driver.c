@@ -196,8 +196,8 @@ static void hsi_dev_release(struct device *dev)
 }
 
 /* Register a hsi_device, linked to a port and channel id */
-static int __init reg_hsi_dev_ch(struct hsi_dev *hsi_ctrl, unsigned int port_i,
-				 unsigned int ch)
+static int __devinit reg_hsi_dev_ch(struct hsi_dev *hsi_ctrl,
+				      unsigned int port_i, unsigned int ch)
 {
 	struct hsi_device *dev;
 	struct hsi_port *pport = &hsi_ctrl->hsi_port[port_i];
@@ -238,7 +238,7 @@ static int __init reg_hsi_dev_ch(struct hsi_dev *hsi_ctrl, unsigned int port_i,
 	return err;
 }
 
-static int __init register_hsi_devices(struct hsi_dev *hsi_ctrl)
+static int __devinit register_hsi_devices(struct hsi_dev *hsi_ctrl)
 {
 	int i;
 	int ch;
@@ -254,7 +254,7 @@ static int __init register_hsi_devices(struct hsi_dev *hsi_ctrl)
 	return 0;
 }
 
-static void __exit unregister_hsi_devices(struct hsi_dev *hsi_ctrl)
+static void __devexit unregister_hsi_devices(struct hsi_dev *hsi_ctrl)
 {
 	struct hsi_port *hsi_p;
 	struct hsi_device *device;
@@ -403,7 +403,7 @@ static void hsi_set_ports_default(struct hsi_dev *hsi_ctrl,
 	}
 }
 
-static int __init hsi_port_channels_init(struct hsi_port *pport)
+static int __devinit hsi_port_channels_init(struct hsi_port *pport)
 {
 	struct hsi_channel *ch;
 	unsigned int ch_i;
@@ -491,7 +491,7 @@ void hsi_softreset_driver(struct hsi_dev *hsi_ctrl)
 			 (revision & HSI_SSI_REV_MINOR));
 }
 
-static int __init hsi_request_mpu_irq(struct hsi_port *hsi_p)
+static int __devinit hsi_request_mpu_irq(struct hsi_port *hsi_p)
 {
 	struct hsi_dev *hsi_ctrl = hsi_p->hsi_controller;
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
@@ -514,7 +514,7 @@ static int __init hsi_request_mpu_irq(struct hsi_port *hsi_p)
 	return hsi_mpu_init(hsi_p, mpu_irq->name);
 }
 
-static int __init hsi_request_cawake_irq(struct hsi_port *hsi_p)
+static int __devinit hsi_request_cawake_irq(struct hsi_port *hsi_p)
 {
 	struct hsi_dev *hsi_ctrl = hsi_p->hsi_controller;
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
@@ -566,7 +566,7 @@ static void hsi_ports_exit(struct hsi_dev *hsi_ctrl, unsigned int max_ports)
 	}
 }
 
-static int __init hsi_ports_init(struct hsi_dev *hsi_ctrl)
+static int __devinit hsi_ports_init(struct hsi_dev *hsi_ctrl)
 {
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
 	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
@@ -616,7 +616,7 @@ rback:
 	return err;
 }
 
-static int __init hsi_request_gdd_irq(struct hsi_dev *hsi_ctrl)
+static int __devinit hsi_request_gdd_irq(struct hsi_dev *hsi_ctrl)
 {
 	struct platform_device *pd = to_platform_device(hsi_ctrl->dev);
 	struct resource *gdd_irq;
@@ -635,7 +635,7 @@ static int __init hsi_request_gdd_irq(struct hsi_dev *hsi_ctrl)
 	return hsi_gdd_init(hsi_ctrl, gdd_irq->name);
 }
 
-static int __init hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
+static int __devinit hsi_init_gdd_chan_count(struct hsi_dev *hsi_ctrl)
 {
 	struct hsi_platform_data *pdata = dev_get_platdata(hsi_ctrl->dev);
 	u8 gdd_chan_count;
@@ -757,7 +757,7 @@ int hsi_clocks_enable_channel(struct device *dev, u8 channel_number,
 	return pm_runtime_get_sync(dev);
 }
 
-static int __init hsi_controller_init(struct hsi_dev *hsi_ctrl,
+static int __devinit hsi_controller_init(struct hsi_dev *hsi_ctrl,
 					 struct platform_device *pd)
 {
 	struct hsi_platform_data *pdata = dev_get_platdata(&pd->dev);
@@ -833,7 +833,7 @@ static void hsi_controller_exit(struct hsi_dev *hsi_ctrl)
 }
 
 /* HSI Platform Device probing & hsi_device registration */
-static int __init hsi_platform_device_probe(struct platform_device *pd)
+static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 {
 	struct hsi_platform_data *pdata = dev_get_platdata(&pd->dev);
 	struct hsi_dev *hsi_ctrl;
@@ -947,7 +947,7 @@ rollback1:
 	return err;
 }
 
-static int __exit hsi_platform_device_remove(struct platform_device *pd)
+static int __devexit hsi_platform_device_remove(struct platform_device *pd)
 {
 	struct hsi_dev *hsi_ctrl = platform_get_drvdata(pd);
 
@@ -1205,11 +1205,11 @@ static struct platform_driver hsi_pdriver = {
 		   },
 	.id_table = hsi_id_table,
 	.probe = hsi_platform_device_probe,
-	.remove = __exit_p(hsi_platform_device_remove),
+	.remove = __devexit_p(hsi_platform_device_remove),
 };
 
 /* HSI bus and platform driver registration */
-static int __init hsi_driver_init(void)
+static int __devinit hsi_driver_init(void)
 {
 	int err = 0;
 
@@ -1245,7 +1245,7 @@ rback2:
 	return err;
 }
 
-static void __exit hsi_driver_exit(void)
+static void __devexit hsi_driver_exit(void)
 {
 	platform_driver_unregister(&hsi_pdriver);
 	hsi_debug_exit();

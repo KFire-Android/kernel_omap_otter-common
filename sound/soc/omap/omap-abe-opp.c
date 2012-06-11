@@ -280,9 +280,9 @@ int abe_opp_recalc_level(struct omap_abe *abe)
 	dev_dbg(abe->dev, "opp: calculated %d requested %d selected %d\n",
 		opp, requested_opp, max(opp, requested_opp));
 
-	pm_runtime_get_sync(abe->dev);
+	omap_abe_pm_runtime_get_sync(abe);
 	abe_opp_set_level(abe, max(opp, requested_opp));
-	pm_runtime_put_sync(abe->dev);
+	omap_abe_pm_runtime_put_sync(abe);
 
 	mutex_unlock(&abe->opp.mutex);
 	return 0;

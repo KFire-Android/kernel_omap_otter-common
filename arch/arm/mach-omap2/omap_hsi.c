@@ -102,7 +102,8 @@ omap_hsi_fill_default_pads(struct hsi_platform_data *pdata)
 
 	if ((pdata->ctx->pctx[0].port_number > 2) ||
 	    ((pdata->num_ports == 2) &&
-	     (pdata->ctx->pctx[1].port_number > 2))) {
+	     (pdata->ctx->pctx[1].port_number > 2)) ||
+	     (pdata->num_ports > 2)) {
 		pr_err("%s: invalid port info\n", __func__);
 		return NULL;
 	}
@@ -123,6 +124,10 @@ omap_hsi_fill_default_pads(struct hsi_platform_data *pdata)
 		/* Mux all ports */
 		pads_to_mux = &omap_pads[0];
 		pr_info("%s: Muxed hsi ports 1 & 2\n", __func__);
+	} else {
+		pr_err("%s: invalid port number %d\n", __func__,
+			pdata->num_ports);
+		return NULL;
 	}
 
 	return omap_hwmod_mux_init(pads_to_mux, pdata->num_ports);

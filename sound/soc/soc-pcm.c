@@ -210,25 +210,32 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 	struct snd_soc_dai_driver *codec_dai_drv = codec_dai->driver;
 	int ret = 0;
 
-	pm_runtime_get_sync(cpu_dai->dev);
-	pm_runtime_get_sync(codec_dai->dev);
-	pm_runtime_get_sync(platform->dev);
-
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
 
 	if (rtd->dai_link->no_host_mode == SND_SOC_DAI_LINK_NO_HOST)
 		snd_soc_set_runtime_hwparams(substream, &no_host_hardware);
 
 	/* startup the audio subsystem */
+	if (rtd->dai_link->ops && rtd->dai_link->ops->startup) {
+		ret = rtd->dai_link->ops->startup(substream);
+		if (ret < 0) {
+			pr_err("asoc: %s startup failed: %d\n",
+			       rtd->dai_link->name, ret);
+			goto machine_err;
+		}
+	}
+
+	pm_runtime_get_sync(cpu_dai->dev);
 	if (cpu_dai->driver->ops->startup) {
 		ret = cpu_dai->driver->ops->startup(substream, cpu_dai);
 		if (ret < 0) {
 			dev_err(cpu_dai->dev, "can't open interface %s: %d\n",
 				cpu_dai->name, ret);
-			goto out;
+			goto cpu_err;
 		}
 	}
 
+	pm_runtime_get_sync(platform->dev);
 	if (platform->driver->ops && platform->driver->ops->open) {
 		ret = platform->driver->ops->open(substream);
 		if (ret < 0) {
@@ -238,21 +245,13 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 		}
 	}
 
+	pm_runtime_get_sync(codec_dai->dev);
 	if (codec_dai->driver->ops->startup) {
 		ret = codec_dai->driver->ops->startup(substream, codec_dai);
 		if (ret < 0) {
 			dev_err(codec_dai->dev, "can't open codec %s: %d\n",
 				codec_dai->name, ret);
 			goto codec_dai_err;
-		}
-	}
-
-	if (rtd->dai_link->ops && rtd->dai_link->ops->startup) {
-		ret = rtd->dai_link->ops->startup(substream);
-		if (ret < 0) {
-			pr_err("asoc: %s startup failed: %d\n",
-			       rtd->dai_link->name, ret);
-			goto machine_err;
 		}
 	}
 
@@ -367,26 +366,27 @@ dynamic:
 	return 0;
 
 config_err:
-	if (rtd->dai_link->ops && rtd->dai_link->ops->shutdown)
-		rtd->dai_link->ops->shutdown(substream);
-
-machine_err:
 	if (codec_dai->driver->ops->shutdown)
 		codec_dai->driver->ops->shutdown(substream, codec_dai);
+	pm_runtime_put(codec_dai->dev);
 
 codec_dai_err:
 	if (platform->driver->ops && platform->driver->ops->close)
 		platform->driver->ops->close(substream);
+	pm_runtime_put(platform->dev);
 
 platform_err:
 	if (cpu_dai->driver->ops->shutdown)
 		cpu_dai->driver->ops->shutdown(substream, cpu_dai);
-out:
+	pm_runtime_put(cpu_dai->dev);
+
+cpu_err:
+	if (rtd->dai_link->ops && rtd->dai_link->ops->shutdown)
+		rtd->dai_link->ops->shutdown(substream);
+
+machine_err:
 	mutex_unlock(&rtd->pcm_mutex);
 
-	pm_runtime_put(platform->dev);
-	pm_runtime_put(codec_dai->dev);
-	pm_runtime_put(cpu_dai->dev);
 
 	return ret;
 }
@@ -461,15 +461,19 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 
 	if (cpu_dai->driver->ops->shutdown)
 		cpu_dai->driver->ops->shutdown(substream, cpu_dai);
+	pm_runtime_put(cpu_dai->dev);
 
 	if (codec_dai->driver->ops->shutdown)
 		codec_dai->driver->ops->shutdown(substream, codec_dai);
+	pm_runtime_put(codec_dai->dev);
+
+	if (platform->driver->ops && platform->driver->ops->close)
+		platform->driver->ops->close(substream);
+	pm_runtime_put(platform->dev);
 
 	if (rtd->dai_link->ops && rtd->dai_link->ops->shutdown)
 		rtd->dai_link->ops->shutdown(substream);
 
-	if (platform->driver->ops && platform->driver->ops->close)
-		platform->driver->ops->close(substream);
 	cpu_dai->runtime = NULL;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -492,10 +496,6 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 	}
 
 	mutex_unlock(&rtd->pcm_mutex);
-
-	pm_runtime_put(platform->dev);
-	pm_runtime_put(codec_dai->dev);
-	pm_runtime_put(cpu_dai->dev);
 
 	return 0;
 }
@@ -883,6 +883,9 @@ static struct snd_soc_pcm_runtime *be_get_rtd(struct snd_soc_card *card,
 		for (i = 0; i < card->num_links; i++) {
 			be = &card->rtd[i];
 
+			if (!be->dai_link->no_pcm)
+				continue;
+
 			if (be->cpu_dai->playback_widget == widget ||
 				be->codec_dai->playback_widget == widget)
 				return be;
@@ -891,6 +894,9 @@ static struct snd_soc_pcm_runtime *be_get_rtd(struct snd_soc_card *card,
 
 		for (i = 0; i < card->num_links; i++) {
 			be = &card->rtd[i];
+
+			if (!be->dai_link->no_pcm)
+				continue;
 
 			if (be->cpu_dai->capture_widget == widget ||
 				be->codec_dai->capture_widget == widget)
@@ -1019,10 +1025,6 @@ static int be_add_new(struct snd_soc_pcm_runtime *fe, int stream,
 				continue;
 			}
 
-			/* make sure BE is a real BE */
-			if (!be->dai_link->no_pcm)
-				continue;
-
 			/* don't connect if FE is not running */
 			if (!fe->dpcm[stream].runtime)
 				continue;
@@ -1142,6 +1144,7 @@ static int soc_dpcm_be_dai_startup(struct snd_soc_pcm_runtime *fe, int stream)
 						be->dpcm[stream].state);
 
 			be->dpcm[stream].state = SND_SOC_DPCM_STATE_CLOSE;
+			be_substream->runtime = NULL;
 			goto unwind;
 		}
 
@@ -1964,6 +1967,8 @@ int soc_dpcm_runtime_update(struct snd_soc_dapm_widget *widget)
 			fe_clear_pending(fe, SNDRV_PCM_STREAM_PLAYBACK);
 			be_disconnect(fe, SNDRV_PCM_STREAM_PLAYBACK);
 		}
+
+		fe_path_put(&list);
 
 capture:
 		/* skip if FE doesn't have capture capability */

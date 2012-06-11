@@ -61,6 +61,8 @@
 #define OMAP_ABE_BE_BT_VX_UL		"BT-VX-UL"
 #define OMAP_ABE_BE_BT_VX_DL		"BT-VX-DL"
 #define OMAP_ABE_BE_MM_EXT0		"FM-EXT"
+#define OMAP_ABE_BE_MM_EXT0_UL		"FM-EXT-UL"
+#define OMAP_ABE_BE_MM_EXT0_DL		"FM-EXT-DL"
 #define OMAP_ABE_BE_MM_EXT1		"MODEM-EXT"
 #define OMAP_ABE_BE_DMIC0		"DMIC0"
 #define OMAP_ABE_BE_DMIC1		"DMIC1"
@@ -349,6 +351,7 @@ void omap_abe_dc_set_hf_offset(struct snd_soc_platform *platform,
 /* Internal OMAP SoC API declarations */
 
 /* forward declarations */
+struct omap_abe;
 struct snd_ctl_elem_info;
 struct snd_kcontrol;
 struct snd_soc_dai;
@@ -375,6 +378,10 @@ int abe_pm_restore_context(struct omap_abe *abe);
 int abe_pm_suspend(struct snd_soc_dai *dai);
 int abe_pm_resume(struct snd_soc_dai *dai);
 #endif
+/* use everywhere except probe(): */
+int omap_abe_pm_runtime_get_sync(struct omap_abe *abe);
+int omap_abe_pm_runtime_put_sync(struct omap_abe *abe);
+int omap_abe_pm_runtime_put_sync_suspend(struct omap_abe *abe);
 
 /* omap-abe-mmap.c */
 irqreturn_t abe_irq_handler(int irq, void *dev_id);

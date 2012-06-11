@@ -29,7 +29,7 @@
 #endif
 
 #include <linux/i2c/pca953x.h>
-
+#include <linux/i2c/tmp102.h>
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
@@ -428,15 +428,23 @@ static struct regulator_init_data omap5_smps10 = {
 	.consumer_supplies	= omap5_vbus_supply,
 };
 
+static struct regulator_consumer_supply omap5_evm_cam2_supply[] = {
+	REGULATOR_SUPPLY("cam2pwr", NULL),
+};
+
+/* VAUX3 for Camera */
 static struct regulator_init_data omap5_ldo1 = {
 	.constraints = {
 		.min_uV			= 2800000,
 		.max_uV			= 2800000,
+		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap5_evm_cam2_supply),
+	.consumer_supplies	= omap5_evm_cam2_supply,
 };
 
 static struct regulator_consumer_supply omap5evm_lcd_panel_supply[] = {
@@ -522,15 +530,23 @@ static struct regulator_init_data omap5_ldo7 = {
 	.consumer_supplies	= omap5_dss_phy_supply,
 };
 
+static struct regulator_consumer_supply omap5_evm_phy3_supply[] = {
+	REGULATOR_SUPPLY("cam2csi", NULL),
+};
+
+/* CSI for Camera */
 static struct regulator_init_data omap5_ldo8 = {
 	.constraints = {
 		.min_uV			= 1500000,
 		.max_uV			= 1500000,
+		.apply_uV		= true,
 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
 					| REGULATOR_MODE_STANDBY,
 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
 					| REGULATOR_CHANGE_STATUS,
 	},
+	.num_consumer_supplies	= ARRAY_SIZE(omap5_evm_phy3_supply),
+	.consumer_supplies	= omap5_evm_phy3_supply,
 };
 
 static struct regulator_consumer_supply omap5_mmc1_io_supply[] = {
@@ -653,6 +669,7 @@ static struct twl6040_codec_data twl6040_codec = {
 	.hs_right_step	= 0x0f,
 	.hf_left_step	= 0x1d,
 	.hf_right_step	= 0x1d,
+	.amic_bias_settle_ms = 0xeb, /* 235 ms */
 };
 
 static struct twl6040_vibra_data twl6040_vibra = {
@@ -691,6 +708,8 @@ static struct omap_abe_twl6040_data omap5evm_abe_audio_data = {
 	.has_hs		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	/* HandsFree through expasion connector */
 	.has_hf		= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
+	/* Earpiece */
+	.has_ep		= 1,
 	/* PandaBoard: FM TX, PandaBoardES: can be connected to audio out */
 	.has_aux	= ABE_TWL6040_LEFT | ABE_TWL6040_RIGHT,
 	/* PandaBoard: FM RX, PandaBoardES: audio in */
@@ -899,6 +918,27 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 		.platform_data = &twl6040_data,
 		.irq = OMAP44XX_IRQ_SYS_2N,
 	},
+	{
+		I2C_BOARD_INFO("bq27530", 0x55),
+	},
+};
+
+/* TMP102 PCB Temperature sensor */
+static struct tmp102_platform_data tmp102_slope_offset_info = {
+	.slope = 541,
+	.slope_cpu = 300,
+	.offset = -3884,
+	.offset_cpu = 2472,
+};
+
+static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("tmp102_temp_sensor", 0x48),
+		.platform_data = &tmp102_slope_offset_info,
+	},
+	{
+		I2C_BOARD_INFO("tmp006_temp_sensor", 0x40),
+	},
 };
 
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_1_bus_pdata;
@@ -912,9 +952,10 @@ static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 {
 	/* spinlock_id should be -1 for a generic lock request */
 	if (spinlock_id < 0)
-		pdata->handle = hwspin_lock_request();
+		pdata->handle = hwspin_lock_request(USE_MUTEX_LOCK);
 	else
-		pdata->handle = hwspin_lock_request_specific(spinlock_id);
+		pdata->handle = hwspin_lock_request_specific(spinlock_id,
+							USE_MUTEX_LOCK);
 
 	if (pdata->handle != NULL) {
 		pdata->hwspin_lock_timeout = hwspin_lock_timeout;
@@ -942,7 +983,8 @@ static int __init omap_5430evm_i2c_init(void)
 					ARRAY_SIZE(omap5evm_i2c_1_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
-	omap_register_i2c_bus(4, 400, NULL, 0);
+	omap_register_i2c_bus(4, 400, omap5evm_i2c_4_boardinfo,
+					ARRAY_SIZE(omap5evm_i2c_4_boardinfo));
 	omap_register_i2c_bus(5, 400, omap5evm_i2c_5_boardinfo,
 					ARRAY_SIZE(omap5evm_i2c_5_boardinfo));
 
@@ -970,8 +1012,8 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 
 static void __init omap_ehci_ohci_init(void)
 {
-	omap_mux_init_signal("gpio_172", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
-	omap_mux_init_signal("gpio_173", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+	omap_mux_init_signal("gpio6_172", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
+	omap_mux_init_signal("gpio6_173", OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE);
 	usbhs_init(&usbhs_bdata);
 	return;
 }

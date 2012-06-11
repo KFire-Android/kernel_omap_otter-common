@@ -481,9 +481,35 @@ static struct resource twl6040_vibra_rsrc[] = {
 
 static struct resource twl6040_codec_rsrc[] = {
 	{
+		.name = "plug",
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "hook",
+		.flags = IORESOURCE_IRQ,
+	},
+	{
+		.name = "hf",
 		.flags = IORESOURCE_IRQ,
 	},
 };
+
+static void twl6040_fill_codec_resources(struct twl6040 *twl6040)
+{
+	int base = twl6040->irq_base;
+
+	/* plug */
+	twl6040_codec_rsrc[0].start = base + TWL6040_IRQ_PLUG;
+	twl6040_codec_rsrc[0].end = base + TWL6040_IRQ_PLUG;
+
+	/* hook */
+	twl6040_codec_rsrc[1].start = base + TWL6040_IRQ_HOOK;
+	twl6040_codec_rsrc[1].end = base + TWL6040_IRQ_HOOK;
+
+	/* handsfree overcurrent */
+	twl6040_codec_rsrc[2].start = base + TWL6040_IRQ_HF;
+	twl6040_codec_rsrc[2].end = base + TWL6040_IRQ_HF;
+}
 
 static bool twl6040_readable_reg(struct device *dev, unsigned int reg)
 {
@@ -591,12 +617,9 @@ static int __devinit twl6040_probe(struct i2c_client *client,
 	twl6040_set_bits(twl6040, TWL6040_REG_ACCCTL, TWL6040_I2CSEL);
 
 	if (pdata->codec) {
-		int irq = twl6040->irq_base + TWL6040_IRQ_PLUG;
-
+		twl6040_fill_codec_resources(twl6040);
 		cell = &twl6040->cells[children];
 		cell->name = "twl6040-codec";
-		twl6040_codec_rsrc[0].start = irq;
-		twl6040_codec_rsrc[0].end = irq;
 		cell->resources = twl6040_codec_rsrc;
 		cell->num_resources = ARRAY_SIZE(twl6040_codec_rsrc);
 		cell->platform_data = pdata->codec;

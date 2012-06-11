@@ -25,6 +25,12 @@
 #define HWLOCK_IRQSTATE	0x01	/* Disable interrupts, save state */
 #define HWLOCK_IRQ	0x02	/* Disable interrupts, don't save state */
 
+/* For user to decide to use mutex or spin locks in hwspinlock core */
+enum lock_type {
+	USE_SPIN_LOCK = 0,
+	USE_MUTEX_LOCK
+};
+
 struct device;
 struct hwspinlock;
 struct hwspinlock_device;
@@ -63,8 +69,9 @@ struct hwspinlock_pdata {
 int hwspin_lock_register(struct hwspinlock_device *bank, struct device *dev,
 		const struct hwspinlock_ops *ops, int base_id, int num_locks);
 int hwspin_lock_unregister(struct hwspinlock_device *bank);
-struct hwspinlock *hwspin_lock_request(void);
-struct hwspinlock *hwspin_lock_request_specific(unsigned int id);
+struct hwspinlock *hwspin_lock_request(enum lock_type lock);
+struct hwspinlock *hwspin_lock_request_specific(unsigned int id,
+		enum lock_type lock);
 int hwspin_lock_free(struct hwspinlock *hwlock);
 int hwspin_lock_get_id(struct hwspinlock *hwlock);
 int __hwspin_lock_timeout(struct hwspinlock *, unsigned int, int,
@@ -87,12 +94,13 @@ void __hwspin_unlock(struct hwspinlock *, int, unsigned long *);
  * Note: ERR_PTR(-ENODEV) will still be considered a success for NULL-checking
  * users. Others, which care, can still check this with IS_ERR.
  */
-static inline struct hwspinlock *hwspin_lock_request(void)
+static inline struct hwspinlock *hwspin_lock_request(enum lock_type lock)
 {
 	return ERR_PTR(-ENODEV);
 }
 
-static inline struct hwspinlock *hwspin_lock_request_specific(unsigned int id)
+static inline struct hwspinlock *hwspin_lock_request_specific(unsigned int id,
+							enum lock_type lock)
 {
 	return ERR_PTR(-ENODEV);
 }

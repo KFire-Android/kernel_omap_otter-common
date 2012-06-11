@@ -58,6 +58,20 @@ static struct region_info region_configs[] = {
 	 .top_freq = 90000,	/* 90 MHz */
 	 .fm_band = 1,
 	 },
+	/* Russian (OIRT) band */
+	{
+	 .chanl_space = FM_CHANNEL_SPACING_50KHZ * FM_FREQ_MUL_RUS,
+	 .bot_freq = 65800,	/* 65.8 MHz */
+	 .top_freq = 74000,	/* 74 MHz */
+	 .fm_band = 2,
+	 },
+	/* Weather Band */
+	{
+	 .chanl_space = FM_CHANNEL_SPACING_50KHZ * FM_FREQ_MUL_WB,
+	 .bot_freq = 162400,     /* 162.4 MHz */
+	 .top_freq = 162550,     /* 162.55 MHz */
+	 .fm_band = 3,
+	}
 };
 
 /* Band selection */
@@ -354,7 +368,7 @@ static void send_tasklet(unsigned long arg)
 
 	/* Check, is there any timeout happened to last transmitted packet */
 	if ((jiffies - fmdev->last_tx_jiffies) > FM_DRV_TX_TIMEOUT) {
-		fmerr("TX timeout occurred\n");
+		fmdbg("TX timeout occurred\n");
 		atomic_set(&fmdev->tx_cnt, 1);
 	}
 
@@ -615,7 +629,11 @@ static void fm_irq_handle_rds_start(struct fmdev *fmdev)
 {
 	if (fmdev->irq_info.flag & FM_RDS_EVENT & fmdev->irq_info.mask) {
 		fmdbg("irq: rds threshold reached\n");
-		fmdev->irq_info.stage = FM_RDS_SEND_RDS_GETCMD_IDX;
+		/* If RSSI reached below threshold then dont get RDS data */
+		if (fmdev->irq_info.flag & FM_LEV_EVENT)
+			fmdev->irq_info.stage = FM_HW_TUNE_OP_ENDED_IDX;
+		else
+			fmdev->irq_info.stage = FM_RDS_SEND_RDS_GETCMD_IDX;
 	} else {
 		/* Continue next function in interrupt handler table */
 		fmdev->irq_info.stage = FM_HW_TUNE_OP_ENDED_IDX;
@@ -655,7 +673,7 @@ static void fm_rx_update_af_cache(struct fmdev *fmdev, u8 af)
 	if (reg_idx == FM_BAND_JAPAN && af > FM_RDS_MAX_AF_JAPAN)
 		return;
 
-	freq = fmdev->rx.region.bot_freq + (af * 100);
+	freq = fmdev->rx.region.bot_freq + (af * FM_KHZ);
 	if (freq == fmdev->rx.freq) {
 		fmdbg("Current freq(%d) is matching with received AF(%d)\n",
 				fmdev->rx.freq, freq);
@@ -832,12 +850,17 @@ static void fm_irq_handle_rds_finish(struct fmdev *fmdev)
 
 static void fm_irq_handle_tune_op_ended(struct fmdev *fmdev)
 {
-	if (fmdev->irq_info.flag & (FM_FR_EVENT | FM_BL_EVENT) & fmdev->
-	    irq_info.mask) {
+	if (fmdev->irq_info.flag & (FM_FR_EVENT | FM_BL_EVENT |
+				FM_SCAN_DONE_EVENT) & fmdev->irq_info.mask) {
 		fmdbg("irq: tune ended/bandlimit reached\n");
 		if (test_and_clear_bit(FM_AF_SWITCH_INPROGRESS, &fmdev->flag)) {
 			fmdev->irq_info.stage = FM_AF_JUMP_RD_FREQ_IDX;
 		} else {
+			if (fmdev->rx.comp_scan_status) {
+				fmdbg("irq: complete scan done\n");
+				fmdev->rx.comp_scan_done = 1;
+			}
+
 			complete(&fmdev->maintask_comp);
 			fmdev->irq_info.stage = FM_HW_POWER_ENB_IDX;
 		}
@@ -1129,8 +1152,9 @@ int fmc_set_freq(struct fmdev *fmdev, u32 freq_to_set)
 
 int fmc_get_freq(struct fmdev *fmdev, u32 *cur_tuned_frq)
 {
-	if (fmdev->rx.freq == FM_UNDEFINED_FREQ) {
-		fmerr("RX frequency is not set\n");
+	if (fmdev->rx.freq == FM_UNDEFINED_FREQ &&
+			fmdev->tx_data.tx_frq == FM_UNDEFINED_FREQ) {
+		fmerr("RX/TX frequency is not set\n");
 		return -EPERM;
 	}
 	if (cur_tuned_frq == NULL) {
@@ -1144,7 +1168,7 @@ int fmc_get_freq(struct fmdev *fmdev, u32 *cur_tuned_frq)
 		return 0;
 
 	case FM_MODE_TX:
-		*cur_tuned_frq = 0;	/* TODO : Change this later */
+		*cur_tuned_frq = fmdev->tx_data.tx_frq;
 		return 0;
 
 	default:
@@ -1571,8 +1595,10 @@ int fmc_prepare(struct fmdev *fmdev)
 	fmdev->rx.rds.flag = FM_RDS_DISABLE;
 	fmdev->rx.freq = FM_UNDEFINED_FREQ;
 	fmdev->rx.rds_mode = FM_RDS_SYSTEM_RDS;
-	fmdev->rx.af_mode = FM_RX_RDS_AF_SWITCH_MODE_OFF;
+	fmdev->rx.af_mode = FM_RX_RDS_AF_SWITCH_MODE_ON;
 	fmdev->irq_info.retry = 0;
+
+	fmdev->tx_data.tx_frq = FM_UNDEFINED_FREQ;
 
 	fm_rx_reset_rds_cache(fmdev);
 	init_waitqueue_head(&fmdev->rx.rds.read_queue);
