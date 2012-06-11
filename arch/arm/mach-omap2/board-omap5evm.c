@@ -29,7 +29,7 @@
 #endif
 
 #include <linux/i2c/pca953x.h>
-
+#include <linux/i2c/tmp102.h>
 #include <linux/i2c/twl.h>
 #include <linux/mfd/twl6040.h>
 #include <linux/platform_data/omap-abe-twl6040.h>
@@ -923,6 +923,21 @@ static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
 	},
 };
 
+/* TMP102 PCB Temperature sensor */
+static struct tmp102_platform_data tmp102_slope_offset_info = {
+	.slope = 541,
+	.slope_cpu = 300,
+	.offset = -3884,
+	.offset_cpu = 2472,
+};
+
+static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("tmp102_temp_sensor", 0x48),
+		.platform_data = &tmp102_slope_offset_info,
+	},
+};
+
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_1_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_2_bus_pdata;
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_3_bus_pdata;
@@ -965,7 +980,8 @@ static int __init omap_5430evm_i2c_init(void)
 					ARRAY_SIZE(omap5evm_i2c_1_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
-	omap_register_i2c_bus(4, 400, NULL, 0);
+	omap_register_i2c_bus(4, 400, omap5evm_i2c_4_boardinfo,
+					ARRAY_SIZE(omap5evm_i2c_4_boardinfo));
 	omap_register_i2c_bus(5, 400, omap5evm_i2c_5_boardinfo,
 					ARRAY_SIZE(omap5evm_i2c_5_boardinfo));
 
