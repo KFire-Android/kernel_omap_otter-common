@@ -936,6 +936,9 @@ static struct i2c_board_info __initdata omap5evm_i2c_4_boardinfo[] = {
 		I2C_BOARD_INFO("tmp102_temp_sensor", 0x48),
 		.platform_data = &tmp102_slope_offset_info,
 	},
+	{
+		I2C_BOARD_INFO("tmp006_temp_sensor", 0x40),
+	},
 };
 
 static struct omap_i2c_bus_board_data __initdata omap5_i2c_1_bus_pdata;
