@@ -25,6 +25,7 @@
 /* Sensor features enable flags */
 #define MPU6050_USE_ACCEL	(1 << 0)
 #define MPU6050_USE_GYRO	(1 << 1)
+#define MPU6050_PASS_THROUGH_EN	(1 << 2)
 
 /* Accelerometer operational modes */
 #define MPU605_MODE_FF		0  /*Free Fall mode*/

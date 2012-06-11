@@ -94,6 +94,69 @@ static int mpu6050_reset(struct mpu6050_data *data)
 	return 0;
 }
 
+static int mpu6050_set_bypass_mode(struct mpu6050_data *data)
+{
+	int error;
+	unsigned char val = 0;
+
+	error = MPU6050_READ(data, MPU6050_CHIP_I2C_ADDR,
+				MPU6050_REG_I2C_MST_STATUS,
+				1, &val, "Pass Through");
+	if (error) {
+		dev_err(data->dev,
+			"MPU6050: fail to read MST_STATUS register\n");
+		return error;
+	}
+	val |= MPU6050_PASS_THROUGH;
+	error = MPU6050_WRITE(data, MPU6050_CHIP_I2C_ADDR,
+				MPU6050_REG_I2C_MST_STATUS,
+				val, "Pass Through");
+	if (error) {
+		dev_err(data->dev,
+			"MPU6050: fail to set pass through\n");
+		return error;
+	}
+
+	/* Bypass Enable Configuration */
+	error = MPU6050_READ(data, MPU6050_CHIP_I2C_ADDR,
+				MPU6050_REG_INT_PIN_CFG,
+				1, &val, "Bypass enabled");
+	if (error) {
+		dev_err(data->dev,
+			"MPU6050: fail to read INT_PIN_CFG register\n");
+		return error;
+	}
+
+	val |= MPU6050_I2C_BYPASS_EN;
+	error = MPU6050_WRITE(data, MPU6050_CHIP_I2C_ADDR,
+				MPU6050_REG_INT_PIN_CFG,
+				val, "Bypass enabled");
+	if (error) {
+		dev_err(data->dev,
+			"MPU6050: fail to set i2c bypass mode\n");
+		return error;
+	}
+	error = MPU6050_READ(data, MPU6050_CHIP_I2C_ADDR,
+				MPU6050_REG_USER_CTRL,
+				1, &val, "I2C MST mode");
+	if (error) {
+		dev_err(data->dev,
+			"MPU6050: fail to read USER_CTRL register\n");
+		return error;
+	}
+	val &= ~MPU6050_I2C_MST_EN;
+	error = MPU6050_WRITE(data, MPU6050_CHIP_I2C_ADDR,
+				MPU6050_REG_USER_CTRL,
+				val, "I2C MST mode");
+	if (error) {
+		dev_err(data->dev,
+			"MPU6050: fail to set i2c master enable bit\n");
+		return error;
+	}
+
+	return 0;
+}
+
 static int mpu6050_poweron(struct mpu6050_data *data)
 {
 	mpu6050_enable_sleep(data, 0);
@@ -178,13 +241,24 @@ int mpu6050_init(struct mpu6050_data *data, const struct mpu6050_bus_ops *bops)
 		return error;
 	}
 
+	/* Verify if pass-through mode is required */
+	if (pdata->flags & MPU6050_PASS_THROUGH_EN) {
+		error = mpu6050_set_bypass_mode(data);
+		if (error) {
+			dev_err(data->dev,
+				"MPU6050: fail to set bypass mode\n");
+			return error;
+		}
+	}
+
 	/* Initializing built-in sensors on MPU6050 */
 	if (pdata->flags & MPU6050_USE_ACCEL) {
 		data->accel_data = mpu6050_accel_init(data);
 		if (IS_ERR(data->accel_data)) {
 			dev_err(data->dev,
 				"MPU6050: mpu6050_accel_init failed\n");
-			return -ENODEV;
+			if (!(pdata->flags & MPU6050_PASS_THROUGH_EN))
+				return -ENODEV;
 		}
 	}
 
@@ -193,7 +267,8 @@ int mpu6050_init(struct mpu6050_data *data, const struct mpu6050_bus_ops *bops)
 		if (IS_ERR(data->gyro_data)) {
 			dev_err(data->dev,
 				"MPU6050: mpu6050_gyro_init failed\n");
-			return -ENODEV;
+			if (!(pdata->flags & MPU6050_PASS_THROUGH_EN))
+				return -ENODEV;
 		}
 	}
 

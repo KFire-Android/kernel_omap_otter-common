@@ -131,6 +131,9 @@
 #define MPU6050_MOT_INT				BIT(6)
 #define MPU6050_ZMOT_INT			BIT(5)
 #define MPU6050_DATARDY_INT			BIT(0)
+#define MPU6050_PASS_THROUGH			BIT(7)
+#define MPU6050_I2C_BYPASS_EN			BIT(1)
+#define MPU6050_I2C_MST_EN			BIT(5)
 
 /* The sensor measurement is stored as 16-bit 2's complement
  * value, so the maximun absolute value that can be obtained
