@@ -7,7 +7,7 @@ snd-soc-omap-mcpdm-objs := omap-mcpdm.o
 snd-soc-omap-hdmi-objs := omap-hdmi.o
 snd-soc-omap-abe-objs := omap-abe-core.o omap-abe-dbg.o omap-abe-mixer.o \
 			omap-abe-mmap.o omap-abe-opp.o omap-abe-pcm.o \
-			omap-abe-pm.o omap-abe-vxrec.o
+			omap-abe-pm.o omap-abe-vxrec.o omap-abe-echo.o
 
 obj-$(CONFIG_SND_OMAP_SOC) += snd-soc-omap.o
 obj-$(CONFIG_SND_OMAP_SOC_DMIC) += snd-soc-omap-dmic.o

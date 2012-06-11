@@ -161,6 +161,9 @@ static DECLARE_TLV_DB_SCALE(btul_tlv, -12000, 100, 3000);
 /* AMIC volume control from -120 to 30 dB in 1 dB steps */
 static DECLARE_TLV_DB_SCALE(amic_tlv, -12000, 100, 3000);
 
+/* ECHO volume control from -120 to 30 dB in 1 dB steps */
+static DECLARE_TLV_DB_SCALE(echo_tlv, -12000, 100, 1);
+
 /* TODO: we have to use the shift value atm to represent register
  * id due to current HAL ID MACROS not being unique.
  */
@@ -268,6 +271,7 @@ static const abe_router_t router[] = {
 		MM_EXT_IN_L_labelID, MM_EXT_IN_R_labelID,
 		AMIC_L_labelID, AMIC_R_labelID,
 		VX_REC_L_labelID, VX_REC_R_labelID,
+		EchoRef_L_labelID, EchoRef_R_labelID,
 };
 
 static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
@@ -545,23 +549,23 @@ static int snd_soc_info_enum_ext1(struct snd_kcontrol *kcontrol,
 static const char * const route_ul_texts[] = {
 	"None", "DMic0L", "DMic0R", "DMic1L", "DMic1R", "DMic2L", "DMic2R",
 	"BT Left", "BT Right", "MMExt Left", "MMExt Right", "AMic0", "AMic1",
-	"VX Left", "VX Right"
+	"VX Left", "VX Right", "Echo Left", "Echo Right",
 };
 
 /* ROUTE_UL Mux table */
 static const struct soc_enum abe_enum[] = {
-		SOC_ENUM_SINGLE(MUX_MM_UL10, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL11, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL12, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL13, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL14, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL15, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL16, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL17, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL20, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_MM_UL21, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_VX_UL0, 0, 15, route_ul_texts),
-		SOC_ENUM_SINGLE(MUX_VX_UL1, 0, 15, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL10, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL11, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL12, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL13, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL14, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL15, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL16, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL17, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL20, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_MM_UL21, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_VX_UL0, 0, 17, route_ul_texts),
+		SOC_ENUM_SINGLE(MUX_VX_UL1, 0, 17, route_ul_texts),
 };
 
 static const struct snd_kcontrol_new mm_ul00_control =
@@ -666,6 +670,14 @@ static const struct snd_kcontrol_new sdt_mixer_controls[] = {
 		abe_get_mixer, put_mixer),
 };
 
+/* ECHO ("Echo Mixer") mixer paths */
+static const struct snd_kcontrol_new echo_mixer_controls[] = {
+	SOC_SINGLE_EXT("DL1", OMAP_AESS_MIXECHO_DL1, 0, 1, 0,
+		abe_get_mixer, put_mixer),
+	SOC_SINGLE_EXT("DL2", OMAP_AESS_MIXECHO_DL2, 0, 1, 0,
+		abe_get_mixer, put_mixer),
+};
+
 /* Virtual PDM_DL Switch */
 static const struct snd_kcontrol_new pdm_dl1_switch_controls =
 	SOC_SINGLE_EXT("Switch", OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_PDM_DL, 1, 0,
@@ -723,6 +735,14 @@ static const struct snd_kcontrol_new abe_controls[] = {
 	SOC_SINGLE_EXT_TLV("VXREC Voice UL Volume",
 		OMAP_AESS_MIXVXREC_VX_UL, 0, 149, 0,
 		volume_get_mixer, volume_put_mixer, vxrec_vx_ul_tlv),
+
+	/* ECHO mixer gains */
+	SOC_SINGLE_EXT_TLV("Echo DL1 Volume",
+		OMAP_AESS_MIXECHO_DL1, 0, 149, 0,
+		volume_get_mixer, volume_put_mixer, echo_tlv),
+	SOC_SINGLE_EXT_TLV("Echo DL2 Volume",
+		OMAP_AESS_MIXECHO_DL2, 0, 149, 0,
+		volume_get_mixer, volume_put_mixer, echo_tlv),
 
 	/* AUDUL mixer gains */
 	SOC_SINGLE_EXT_TLV("AUDUL Media Volume",
@@ -825,6 +845,8 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			OMAP_ABE_AIF_DMIC2, OMAP_ABE_OPP_50, 0),
 	SND_SOC_DAPM_AIF_IN("VXREC", "VXREC Capture", 0,
 			OMAP_ABE_AIF_VXREC, OMAP_ABE_OPP_50, 0),
+	SND_SOC_DAPM_AIF_IN("ECHO", "ECHO Capture", 0,
+			OMAP_ABE_AIF_ECHO, OMAP_ABE_OPP_50, 0),
 
 	/* ROUTE_UL Capture Muxes */
 	SND_SOC_DAPM_MUX("MUX_UL00",
@@ -879,6 +901,11 @@ static const struct snd_soc_dapm_widget abe_dapm_widgets[] = {
 			OMAP_ABE_MIXER_SDT, OMAP_ABE_OPP_25, 0, sdt_mixer_controls,
 			ARRAY_SIZE(sdt_mixer_controls)),
 
+	/* ECHO_MIXER */
+	SND_SOC_DAPM_MIXER("Echo Mixer", OMAP_ABE_MIXER_ECHO,
+			OMAP_ABE_OPP_50, 0, echo_mixer_controls,
+			ARRAY_SIZE(echo_mixer_controls)),
+
 	/*
 	 * The Following three are virtual switches to select the output port
 	 * after DL1 Gain.
@@ -931,6 +958,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL00", "AMic1", "PDM_UL1"},
 	{"MUX_UL00", "VX Left", "Capture Mixer"},
 	{"MUX_UL00", "VX Right", "Capture Mixer"},
+	{"MUX_UL00", "Echo Left", "Echo Mixer"},
+	{"MUX_UL00", "Echo Right", "Echo Mixer"},
 	{"MM_UL1", NULL, "MUX_UL00"},
 
 	/* MUX_UL01 - ROUTE_UL - Chan 1  */
@@ -948,6 +977,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL01", "AMic1", "PDM_UL1"},
 	{"MUX_UL01", "VX Left", "Capture Mixer"},
 	{"MUX_UL01", "VX Right", "Capture Mixer"},
+	{"MUX_UL01", "Echo Left", "Echo Mixer"},
+	{"MUX_UL01", "Echo Right", "Echo Mixer"},
 	{"MM_UL1", NULL, "MUX_UL01"},
 
 	/* MUX_UL02 - ROUTE_UL - Chan 2  */
@@ -965,6 +996,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL02", "AMic1", "PDM_UL1"},
 	{"MUX_UL02", "VX Left", "Capture Mixer"},
 	{"MUX_UL02", "VX Right", "Capture Mixer"},
+	{"MUX_UL02", "Echo Left", "Echo Mixer"},
+	{"MUX_UL02", "Echo Right", "Echo Mixer"},
 	{"MM_UL1", NULL, "MUX_UL02"},
 
 	/* MUX_UL03 - ROUTE_UL - Chan 3  */
@@ -982,6 +1015,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL03", "AMic1", "PDM_UL1"},
 	{"MUX_UL03", "VX Left", "Capture Mixer"},
 	{"MUX_UL03", "VX Right", "Capture Mixer"},
+	{"MUX_UL03", "Echo Left", "Echo Mixer"},
+	{"MUX_UL03", "Echo Right", "Echo Mixer"},
 	{"MM_UL1", NULL, "MUX_UL03"},
 
 	/* MUX_UL04 - ROUTE_UL - Chan 4  */
@@ -999,6 +1034,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL04", "AMic1", "PDM_UL1"},
 	{"MUX_UL04", "VX Left", "Capture Mixer"},
 	{"MUX_UL04", "VX Right", "Capture Mixer"},
+	{"MUX_UL04", "Echo Left", "Echo Mixer"},
+	{"MUX_UL04", "Echo Right", "Echo Mixer"},
 	{"MM_UL1", NULL, "MUX_UL04"},
 
 	/* MUX_UL05 - ROUTE_UL - Chan 5  */
@@ -1016,6 +1053,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL05", "AMic1", "PDM_UL1"},
 	{"MUX_UL05", "VX Left", "Capture Mixer"},
 	{"MUX_UL05", "VX Right", "Capture Mixer"},
+	{"MUX_UL05", "Echo Left", "Echo Mixer"},
+	{"MUX_UL05", "Echo Right", "Echo Mixer"},
 	{"MM_UL1", NULL, "MUX_UL05"},
 
 	/* MUX_UL06 - ROUTE_UL - Chan 6  */
@@ -1033,6 +1072,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL06", "AMic1", "PDM_UL1"},
 	{"MUX_UL06", "VX Left", "Capture Mixer"},
 	{"MUX_UL06", "VX Right", "Capture Mixer"},
+	{"MUX_UL06", "Echo Left", "Echo Mixer"},
+	{"MUX_UL06", "Echo Right", "Echo Mixer"},
 	{"MM_UL1", NULL, "MUX_UL06"},
 
 	/* MUX_UL07 - ROUTE_UL - Chan 7  */
@@ -1050,6 +1091,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL07", "AMic1", "PDM_UL1"},
 	{"MUX_UL07", "VX Left", "Capture Mixer"},
 	{"MUX_UL07", "VX Right", "Capture Mixer"},
+	{"MUX_UL07", "Echo Left", "Echo Mixer"},
+	{"MUX_UL07", "Echo Right", "Echo Mixer"},
 	{"MM_UL1", NULL, "MUX_UL07"},
 
 	/* MUX_UL10 - ROUTE_UL - Chan 0  */
@@ -1067,6 +1110,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL10", "AMic1", "PDM_UL1"},
 	{"MUX_UL10", "VX Left", "Capture Mixer"},
 	{"MUX_UL10", "VX Right", "Capture Mixer"},
+	{"MUX_UL10", "Echo Left", "Echo Mixer"},
+	{"MUX_UL10", "Echo Right", "Echo Mixer"},
 	{"MM_UL2", NULL, "MUX_UL10"},
 
 	/* MUX_UL11 - ROUTE_UL - Chan 1  */
@@ -1084,6 +1129,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_UL11", "AMic1", "PDM_UL1"},
 	{"MUX_UL11", "VX Left", "Capture Mixer"},
 	{"MUX_UL11", "VX Right", "Capture Mixer"},
+	{"MUX_UL11", "Echo Left", "Echo Mixer"},
+	{"MUX_UL11", "Echo Right", "Echo Mixer"},
 	{"MM_UL2", NULL, "MUX_UL11"},
 
 	/* MUX_VX0 - ROUTE_UL - Chan 0  */
@@ -1101,6 +1148,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_VX0", "AMic1", "PDM_UL1"},
 	{"MUX_VX0", "VX Left", "Capture Mixer"},
 	{"MUX_VX0", "VX Right", "Capture Mixer"},
+	{"MUX_VX0", "Echo Left", "Echo Mixer"},
+	{"MUX_VX0", "Echo Right", "Echo Mixer"},
 
 	/* MUX_VX1 - ROUTE_UL - Chan 1 */
 	{"MUX_VX1", "DMic0L", "DMIC0"},
@@ -1117,6 +1166,8 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"MUX_VX1", "AMic1", "PDM_UL1"},
 	{"MUX_VX1", "VX Left", "Capture Mixer"},
 	{"MUX_VX1", "VX Right", "Capture Mixer"},
+	{"MUX_VX1", "Echo Left", "Echo Mixer"},
+	{"MUX_VX1", "Echo Right", "Echo Mixer"},
 
 	/* Headset (DL1)  playback path */
 	{"DL1 Mixer", "Tones", "TONES_DL"},
@@ -1154,6 +1205,10 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"Capture Mixer", "Voice Playback", "VXREC"},
 	{"Capture Mixer", "Voice Capture", "VXREC"},
 	{"Capture Mixer", "Media Playback", "VXREC"},
+
+	/* ECHO Mixer */
+	{"Echo Mixer", "DL1", "ECHO"},
+	{"Echo Mixer", "DL2", "ECHO"},
 
 	/* Audio UL mixer */
 	{"Voice Capture Mixer", "Tones Playback", "TONES_DL"},
@@ -1201,6 +1256,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"DMIC1", NULL, "BE_IN"},
 	{"DMIC2", NULL, "BE_IN"},
 	{"VXREC", NULL, "BE_IN"},
+	{"ECHO", NULL, "BE_IN"},
 };
 
 int abe_mixer_add_widgets(struct snd_soc_platform *platform)
