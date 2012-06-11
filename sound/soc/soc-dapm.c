@@ -921,7 +921,7 @@ static int is_connected_input_ep(struct snd_soc_dapm_widget *widget,
 			/* do we need to add this widget to the list ? */
 			if (list) {
 				int err;
-				err = dapm_list_add_widget(list, path->sink);
+				err = dapm_list_add_widget(list, path->source);
 				if (err < 0) {
 					dev_err(widget->dapm->dev, "could not add widget %s\n",
 						widget->name);
@@ -2899,6 +2899,17 @@ snd_soc_dapm_new_control(struct snd_soc_dapm_context *dapm,
 			dapm->codec->name_prefix, widget->name);
 	else
 		snprintf((char *)w->name, name_len, "%s", widget->name);
+
+	if (widget->sname) {
+		name_len = strlen(widget->sname) + 1;
+		w->sname = kmalloc(name_len, GFP_KERNEL);
+		if (w->sname == NULL) {
+			kfree(w->name);
+			kfree(w);
+			return NULL;
+		}
+		snprintf((char *)w->sname, name_len, "%s", widget->sname);
+	}
 
 	switch (w->id) {
 	case snd_soc_dapm_switch:

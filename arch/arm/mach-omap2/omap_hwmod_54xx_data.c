@@ -3636,7 +3636,7 @@ static struct omap_hwmod_class omap54xx_mcbsp_hwmod_class = {
 /* mcbsp1 */
 static struct omap_hwmod omap54xx_mcbsp1_hwmod;
 static struct omap_hwmod_irq_info omap54xx_mcbsp1_irqs[] = {
-	{ .irq = 17 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "common", .irq = 17 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -3692,7 +3692,7 @@ static struct omap_hwmod_ocp_if *omap54xx_mcbsp1_slaves[] = {
 
 static struct omap_hwmod_opt_clk mcbsp1_opt_clks[] = {
 	{ .role = "pad_fck", .clk = "pad_clks" },
-	{ .role = "prcm_clk", .clk = "mcbsp1_sync_mux_ck" },
+	{ .role = "prcm_fck", .clk = "mcbsp1_sync_mux_ck" },
 };
 
 static struct omap_hwmod omap54xx_mcbsp1_hwmod = {
@@ -3718,7 +3718,7 @@ static struct omap_hwmod omap54xx_mcbsp1_hwmod = {
 /* mcbsp2 */
 static struct omap_hwmod omap54xx_mcbsp2_hwmod;
 static struct omap_hwmod_irq_info omap54xx_mcbsp2_irqs[] = {
-	{ .irq = 22 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "common", .irq = 22 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -3774,7 +3774,7 @@ static struct omap_hwmod_ocp_if *omap54xx_mcbsp2_slaves[] = {
 
 static struct omap_hwmod_opt_clk mcbsp2_opt_clks[] = {
 	{ .role = "pad_fck", .clk = "pad_clks" },
-	{ .role = "prcm_clk", .clk = "mcbsp2_sync_mux_ck" },
+	{ .role = "prcm_fck", .clk = "mcbsp2_sync_mux_ck" },
 };
 
 static struct omap_hwmod omap54xx_mcbsp2_hwmod = {
@@ -3800,7 +3800,7 @@ static struct omap_hwmod omap54xx_mcbsp2_hwmod = {
 /* mcbsp3 */
 static struct omap_hwmod omap54xx_mcbsp3_hwmod;
 static struct omap_hwmod_irq_info omap54xx_mcbsp3_irqs[] = {
-	{ .irq = 23 + OMAP54XX_IRQ_GIC_START },
+	{ .name = "common", .irq = 23 + OMAP54XX_IRQ_GIC_START },
 	{ .irq = -1 }
 };
 
@@ -3856,7 +3856,7 @@ static struct omap_hwmod_ocp_if *omap54xx_mcbsp3_slaves[] = {
 
 static struct omap_hwmod_opt_clk mcbsp3_opt_clks[] = {
 	{ .role = "pad_fck", .clk = "pad_clks" },
-	{ .role = "prcm_clk", .clk = "mcbsp3_sync_mux_ck" },
+	{ .role = "prcm_fck", .clk = "mcbsp3_sync_mux_ck" },
 };
 
 static struct omap_hwmod omap54xx_mcbsp3_hwmod = {
