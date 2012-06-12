@@ -147,7 +147,8 @@ static struct omap_rprm_ops omap2_rprm_ops = {
 };
 
 static struct omap_rprm_pdata omap2_rprm_data = {
-	.ops		= &omap2_rprm_ops,
+	.iss_opt_clk_name	= "iss_ctrlclk",
+	.ops			= &omap2_rprm_ops,
 };
 
 static int __init omap2_rprm_init(void)
