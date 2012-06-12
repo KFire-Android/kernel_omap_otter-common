@@ -46,6 +46,7 @@ struct rprm_auxclk_depot {
 struct rprm_regulator_depot {
 	struct rprm_regulator args;
 	struct regulator *reg_p;
+	struct omap_rprm_regulator *oreg;
 	u32 orig_uv;
 };
 
@@ -312,9 +313,21 @@ static int rprm_regulator_request(void **handle, void *data, size_t len)
 	int ret;
 	struct rprm_regulator *reg = data;
 	struct rprm_regulator_depot *rd;
+	struct omap_rprm_regulator *oreg;
 
 	if (len != sizeof *reg) {
 		pr_err("error requesting regulator - invalid length\n");
+		return -EINVAL;
+	}
+
+	if (!mach_ops || !mach_ops->lookup_regulator) {
+		pr_err("error requesting regulator - invalid ops\n");
+		return -ENOSYS;
+	}
+
+	oreg = mach_ops->lookup_regulator(reg->reg_id);
+	if (!oreg) {
+		pr_err("regulator lookup failed, id %d\n", reg->reg_id);
 		return -EINVAL;
 	}
 
@@ -325,25 +338,35 @@ static int rprm_regulator_request(void **handle, void *data, size_t len)
 		return -ENOMEM;
 	}
 
-	/* make sure name is NULL terminated */
-	reg->name[sizeof reg->name - 1] = '\0';
-	rd->reg_p = regulator_get_exclusive(NULL, reg->name);
+	rd->oreg = oreg;
+	rd->reg_p = regulator_get_exclusive(NULL, oreg->name);
 	if (IS_ERR_OR_NULL(rd->reg_p)) {
-		pr_err("error providing regulator %s\n", reg->name);
+		pr_err("error providing regulator %s\n", oreg->name);
 		ret = -EINVAL;
 		goto error;
 	}
 
 	rd->orig_uv = regulator_get_voltage(rd->reg_p);
-	ret = regulator_set_voltage(rd->reg_p, reg->min_uv, reg->max_uv);
-	if (ret) {
-		pr_err("error setting %s voltage\n", reg->name);
-		goto error_reg;
+
+	/* if regulator is not fixed, set voltage as requested */
+	if (!oreg->fixed) {
+		ret = regulator_set_voltage(rd->reg_p,
+				 reg->min_uv, reg->max_uv);
+		if (ret) {
+			pr_err("error setting %s voltage\n", oreg->name);
+			goto error_reg;
+		}
+	} else {
+		/*
+		 * if regulator is fixed update paramaters so that rproc
+		 * can get the real voltage the regulator was set
+		 */
+		reg->min_uv = reg->max_uv = rd->orig_uv;
 	}
 
 	ret = regulator_enable(rd->reg_p);
 	if (ret) {
-		pr_err("error enabling %s ldo regulator\n", reg->name);
+		pr_err("error enabling %s ldo regulator\n", oreg->name);
 		goto error_enable;
 	}
 
@@ -353,8 +376,9 @@ static int rprm_regulator_request(void **handle, void *data, size_t len)
 	return 0;
 
 error_enable:
-	/* restore original voltage */
-	regulator_set_voltage(rd->reg_p, rd->orig_uv, rd->orig_uv);
+	/* restore original voltage if not fixed*/
+	if (!oreg->fixed)
+		regulator_set_voltage(rd->reg_p, rd->orig_uv, rd->orig_uv);
 error_reg:
 	regulator_put(rd->reg_p);
 error:
@@ -370,15 +394,18 @@ static int rprm_regulator_release(void *handle)
 
 	ret = regulator_disable(rd->reg_p);
 	if (ret) {
-		pr_err("error disabling regulator %s\n", rd->args.name);
+		pr_err("error disabling regulator %s\n", rd->oreg->name);
 		return ret;
 	}
 
-	/* restore orginal voltage */
-	ret = regulator_set_voltage(rd->reg_p, rd->orig_uv, rd->orig_uv);
-	if (ret) {
-		pr_err("error restoring voltage %u\n", rd->orig_uv);
-		return ret;
+	/* restore original voltage if not fixed */
+	if (!rd->oreg->fixed) {
+		ret = regulator_set_voltage(rd->reg_p,
+					 rd->orig_uv, rd->orig_uv);
+		if (ret) {
+			pr_err("error restoring voltage %u\n", rd->orig_uv);
+			return ret;
+		}
 	}
 
 	regulator_put(rd->reg_p);
@@ -408,7 +435,7 @@ static int rprm_regulator_get_info(void *handle, char *buf, size_t len)
 		"min_uV:%d\n"
 		"max_uV:%d\n"
 		"orig_uV:%d\n",
-		reg->name, reg->min_uv, reg->max_uv, rd->orig_uv);
+		rd->oreg->name, reg->min_uv, reg->max_uv, rd->orig_uv);
 }
 
 static int

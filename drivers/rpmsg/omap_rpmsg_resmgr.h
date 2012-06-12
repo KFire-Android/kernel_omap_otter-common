@@ -70,12 +70,12 @@ struct rprm_auxclk {
 
 /**
  * struct rprm_regulator - resource manager parameters for regulator
- * @name:	name of the regulator
+ * @reg_id:	regulator id
  * @min_uv	minimum voltage in micro volts
  * @max_uv	maximum voltage in micro volts
  */
 struct rprm_regulator {
-	char name[16];
+	u32 reg_id;
 	u32 min_uv;
 	u32 max_uv;
 } __packed;
