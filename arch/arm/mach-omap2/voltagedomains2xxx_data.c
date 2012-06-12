@@ -30,3 +30,9 @@ void __init omap2xxx_voltagedomains_init(void)
 {
 	voltdm_init(voltagedomains_omap2);
 }
+
+static int __init init_volt_domain_notifier_list(void)
+{
+	return __init_volt_domain_notifier_list(voltagedomains_omap2);
+}
+pure_initcall(init_volt_domain_notifier_list);

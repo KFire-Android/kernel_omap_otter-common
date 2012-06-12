@@ -27,6 +27,17 @@
 #define PALMAS_NUM_CLIENTS		3
 #define PALMAS_MAX_BLOCK_TRANSFER	16
 
+/* PALMAS Erratum list */
+/* TWL6035 Erratum #23 */
+#define PALMAS_ERRATUM_SMPS_OUTPUT_VOLT_DROP				BIT(0)
+/* TWL6035 Erratum #12 */
+#define PALMAS_ERRATUM_SMPS_MIXED_PHASE_ZERO_CROSS_DETECT		BIT(1)
+
+#define is_palmas_erratum(palmas, erratum) ((palmas)->errata &		\
+					PALMAS_ERRATUM_##erratum)
+#define set_palmas_erratum(palmas, erratum) ((palmas)->errata |=	\
+					PALMAS_ERRATUM_##erratum)
+
 struct palmas_gpadc;
 struct palmas_pmic;
 struct palmas_usb;
@@ -40,6 +51,9 @@ struct palmas {
 
 	/* Stored chip id */
 	int id;
+
+	/* Silicon Errata */
+	u32 errata;
 
 	/* IRQ Data */
 	int irq, irq_base, irq_end;
@@ -112,6 +126,23 @@ struct palmas_reg_init {
 	 * 1: On
 	 */
 	int mode_sleep;
+
+	/* active_mode is the mode loaded to MODE_ACTIVE bits as defined in
+	 * the data sheet.
+	 *
+	 * For SMPS
+	 *
+	 * 0: Off
+	 * 1: AUTO
+	 * 2: ECO
+	 * 3: Forced PWM
+	 *
+	 * For LDO
+	 *
+	 * 0: Off
+	 * 1: On
+	 */
+	int mode_active;
 
 	/* tstep is the timestep loaded to the TSTEP register
 	 *

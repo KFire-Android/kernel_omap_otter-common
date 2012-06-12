@@ -533,6 +533,11 @@ static struct palmas_platform_data palmas_omap5 = {
 	.usb_pdata = &omap5_palmas_usb,
 	.resource_pdata = &omap5_palmas_resource,
 };
+#define PALMAS_NAME "twl6035"
+#define PALMAS_DATA (&palmas_omap5)
+#else
+#define PALMAS_NAME NULL
+#define PALMAS_DATA NULL
 #endif  /* CONFIG_OMAP5_SEVM_PALMAS */
 
 static struct twl6040_codec_data twl6040_codec = {
@@ -603,21 +608,6 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_abe_audio,
 };
 
-static struct i2c_board_info __initdata omap5evm_i2c_1_boardinfo[] = {
-#ifdef CONFIG_OMAP5_SEVM_PALMAS
-	{
-		I2C_BOARD_INFO("twl6035", 0x48),
-		.platform_data = &palmas_omap5,
-		.irq = OMAP44XX_IRQ_SYS_1N,
-	},
-#endif
-	{
-		I2C_BOARD_INFO("twl6040", 0x4b),
-		.platform_data = &twl6040_data,
-		.irq = OMAP44XX_IRQ_SYS_2N,
-	},
-};
-
 static struct pca953x_platform_data omap5evm_gpio_expander_info = {
 	.gpio_base	= OMAP_MAX_GPIO_LINES,
 };
@@ -632,8 +622,7 @@ static struct i2c_board_info __initdata omap5evm_i2c_5_boardinfo[] = {
 static int __init omap5pandai2c_init(void)
 {
 
-	omap_register_i2c_bus(1, 400, omap5evm_i2c_1_boardinfo,
-					ARRAY_SIZE(omap5evm_i2c_1_boardinfo));
+	omap_register_i2c_bus(1, 400, NULL, 0);
 	omap_register_i2c_bus(2, 400, NULL, 0);
 	omap_register_i2c_bus(3, 400, NULL, 0);
 	omap_register_i2c_bus(4, 400, NULL, 0);
@@ -725,6 +714,9 @@ static void __init omap_5_panda_init(void)
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
 	omap5pandai2c_init();
+	omap5_pmic_init(1, PALMAS_NAME, OMAP44XX_IRQ_SYS_1N, PALMAS_DATA,
+			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
+
 	omap_serial_init();
 
 	omap_hsmmc_init(mmc);

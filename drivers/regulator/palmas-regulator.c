@@ -164,6 +164,11 @@ static struct regs_info palmas_regs_info[] = {
 #define SMPS10_BYPASS_EN		(1<<1)
 #define SMPS10_SWITCH_EN		(1<<0)
 
+/* SMPS PHASE REG VALUES */
+#define SMPS_PHASE_SELECTION_AUTOMATIC		0x00
+#define SMPS_PHASE_SELECTION_FORCE_SINGLE	0x01
+#define SMPS_PHASE_SELECTION_FORCE_MULTI	0x02
+
 static int palmas_smps_read(struct palmas *palmas, unsigned int reg,
 		unsigned int *dest)
 {
@@ -693,6 +698,12 @@ static int palmas_smps_init(struct palmas *palmas, int id,
 		return ret;
 
 	if (id != PALMAS_REG_SMPS10) {
+		/* if we have the erratum, OVERRIDE to FORCE_PWM */
+		if (is_palmas_erratum(palmas, SMPS_OUTPUT_VOLT_DROP)) {
+			reg_init->mode_sleep = SMPS_CTRL_MODE_PWM;
+			reg_init->mode_active = SMPS_CTRL_MODE_PWM;
+		}
+
 		if (reg_init->warm_reset)
 			reg |= SMPS12_CTRL_WR_S;
 
@@ -704,13 +715,22 @@ static int palmas_smps_init(struct palmas *palmas, int id,
 			reg |= reg_init->mode_sleep <<
 					SMPS12_CTRL_MODE_SLEEP_SHIFT;
 		}
+		if (reg_init->mode_active) {
+			reg &= ~SMPS12_CTRL_MODE_ACTIVE_MASK;
+			reg |= reg_init->mode_active <<
+					SMPS12_CTRL_MODE_ACTIVE_SHIFT;
+		}
 	} else {
 		if (reg_init->mode_sleep) {
 			reg &= ~SMPS10_CTRL_MODE_SLEEP_MASK;
 			reg |= reg_init->mode_sleep <<
 					SMPS10_CTRL_MODE_SLEEP_SHIFT;
 		}
-
+		if (reg_init->mode_active) {
+			reg &= ~SMPS10_CTRL_MODE_ACTIVE_MASK;
+			reg |= reg_init->mode_active <<
+					SMPS10_CTRL_MODE_ACTIVE_SHIFT;
+		}
 	}
 	ret = palmas_smps_write(palmas, addr, reg);
 	if (ret)
@@ -825,6 +845,40 @@ static __devinit int palmas_probe(struct platform_device *pdev)
 
 	if (reg & SMPS_CTRL_SMPS45_SMPS457_EN)
 		pmic->smps457 = 1;
+
+	/*
+	 * Errata Registration
+	 * TBD - Handle based on revision once we are sure of fix
+	 */
+	if (palmas->id == PALMAS_ID_TWL6035) {
+		set_palmas_erratum(palmas, SMPS_OUTPUT_VOLT_DROP);
+		dev_warn(&pdev->dev, "Erratum SMPS_OUTPUT_VOLT_DROP!");
+	}
+
+	if (palmas->id == PALMAS_ID_TWL6035) {
+		set_palmas_erratum(palmas, SMPS_MIXED_PHASE_ZERO_CROSS_DETECT);
+		dev_warn(&pdev->dev,
+			 "Erratum SMPS_MIXED_PHASE_ZERO_CROSS_DETECT!");
+
+		ret = palmas_smps_read(palmas, PALMAS_SMPS_CTRL, &reg);
+		if (ret)
+			goto err_unregister_regulator;
+
+		/*
+		 * Dont bother to check if enabled, set the config and usage
+		 * determine the result.
+		 */
+		reg &= ~(SMPS_CTRL_SMPS45_PHASE_CTRL_MASK |
+			 SMPS_CTRL_SMPS123_PHASE_CTRL_MASK);
+		reg |= SMPS_PHASE_SELECTION_FORCE_MULTI <<
+			SMPS_CTRL_SMPS45_PHASE_CTRL_SHIFT;
+		reg |= SMPS_PHASE_SELECTION_FORCE_MULTI <<
+			SMPS_CTRL_SMPS123_PHASE_CTRL_SHIFT;
+
+		ret = palmas_smps_write(palmas, PALMAS_SMPS_CTRL, reg);
+		if (ret)
+			goto err_unregister_regulator;
+	}
 
 	for (id = 0; id < PALMAS_REG_LDO1; id++) {
 

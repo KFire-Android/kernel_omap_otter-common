@@ -20,6 +20,7 @@
 #include <linux/kernel.h>
 
 struct voltagedomain;
+struct omap_volt_data;
 
 /*
  * Voltage Processor (VP) identifiers
@@ -29,9 +30,17 @@ struct voltagedomain;
 #define OMAP4_VP_VDD_CORE_ID 0
 #define OMAP4_VP_VDD_IVA_ID 1
 #define OMAP4_VP_VDD_MPU_ID 2
+#define OMAP5_VP_VDD_CORE_ID 0
+#define OMAP5_VP_VDD_MM_ID 1
+#define OMAP5_VP_VDD_MPU_ID 2
 
-/* XXX document */
-#define VP_IDLE_TIMEOUT		200
+/*
+ * Time out for Voltage processor in micro seconds. Typical latency is < 2uS,
+ * but worst case latencies could be around 3-200uS depending on where we
+ * interrupted VP's operation. Use an improbable timeout value to be
+ * sure that timeout events are beyond doubt.
+ */
+#define VP_IDLE_TIMEOUT		500
 #define VP_TRANXDONE_TIMEOUT	300
 
 /**
@@ -73,6 +82,7 @@ struct omap_vp_common {
 	u8 vpconfig_initvdd;
 	u8 vpconfig_forceupdate;
 	u8 vpconfig_vpenable;
+	u8 vstatus_vpidle;
 	u8 vstepmin_stepmin_shift;
 	u8 vstepmin_smpswaittimemin_shift;
 	u8 vstepmax_stepmax_shift;
@@ -117,12 +127,28 @@ extern struct omap_vp_instance omap4_vp_mpu;
 extern struct omap_vp_instance omap4_vp_iva;
 extern struct omap_vp_instance omap4_vp_core;
 
+extern struct omap_vp_param omap3_mpu_vp_data;
+extern struct omap_vp_param omap3_core_vp_data;
+
+extern struct omap_vp_param omap4_mpu_vp_data;
+extern struct omap_vp_param omap4_iva_vp_data;
+extern struct omap_vp_param omap4_core_vp_data;
+
+extern struct omap_vp_instance omap5_vp_mpu;
+extern struct omap_vp_instance omap5_vp_mm;
+extern struct omap_vp_instance omap5_vp_core;
+
+extern struct omap_vp_param omap5_mpu_vp_data;
+extern struct omap_vp_param omap5_mm_vp_data;
+extern struct omap_vp_param omap5_core_vp_data;
+
 void omap_vp_init(struct voltagedomain *voltdm);
 void omap_vp_enable(struct voltagedomain *voltdm);
 void omap_vp_disable(struct voltagedomain *voltdm);
 int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
-			      unsigned long target_volt);
+			      struct omap_volt_data *target_v);
 int omap_vp_update_errorgain(struct voltagedomain *voltdm,
-			     unsigned long target_volt);
+			     struct omap_volt_data *volt_data);
+unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm);
 
 #endif

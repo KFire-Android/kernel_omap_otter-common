@@ -47,6 +47,16 @@ static struct i2c_board_info __initdata omap4_i2c1_board_info[] = {
 	},
 };
 
+static struct i2c_board_info __initdata omap5_i2c1_generic_info[] = {
+	{
+		I2C_BOARD_INFO("twl6035", 0x48),
+		.flags	= I2C_CLIENT_WAKE,
+	},
+	{
+		I2C_BOARD_INFO("twl6040", 0x4b),
+	},
+};
+
 void __init omap_pmic_init(int bus, u32 clkrate,
 			   const char *pmic_type, int pmic_irq,
 			   struct twl4030_platform_data *pmic_data)
@@ -77,13 +87,49 @@ void __init omap4_pmic_init(const char *pmic_type,
 
 }
 
+/**
+ * omap5_pmic_init() - PMIC init for i2c
+ * @bus_id:	which bus
+ * @speed:	speed
+ * @pmic_type:	name of pmic
+ * @pmic_data:	pointer to pmic data
+ * @audio_data:	audio data
+ * @audio_irq: irq for audio
+ * @bd_info:	other board specific i2c_board_info data
+ * @num_bd_info: count
+ *
+ * To be called after register_i2c_bus is called by board file
+ */
+void __init omap5_pmic_init(int bus_id, const char *pmic_type, int pmic_irq,
+			    struct palmas_platform_data *pmic_data,
+			    const char *audio_type, int audio_irq,
+			    struct twl6040_platform_data *audio_data)
+{
+	/* PMIC part*/
+	strncpy(omap5_i2c1_generic_info[0].type, pmic_type,
+		sizeof(omap5_i2c1_generic_info[0].type));
+	omap5_i2c1_generic_info[0].irq = pmic_irq;
+	omap5_i2c1_generic_info[0].platform_data = pmic_data;
+
+	/* TWL6040 audio IC part */
+	strncpy(omap5_i2c1_generic_info[1].type, audio_type,
+		sizeof(omap5_i2c1_generic_info[1].type));
+	omap5_i2c1_generic_info[1].irq = audio_irq;
+	omap5_i2c1_generic_info[1].platform_data = audio_data;
+
+	i2c_register_board_info(bus_id, omap5_i2c1_generic_info,
+				ARRAY_SIZE(omap5_i2c1_generic_info));
+}
+
 void __init omap_pmic_late_init(void)
 {
 	/* Init the OMAP TWL parameters (if PMIC has been registerd) */
-	if (pmic_i2c_board_info.irq)
-		omap3_twl_init();
-	if (omap4_i2c1_board_info[0].irq)
-		omap4_twl_init();
+	if (!pmic_i2c_board_info.irq && !omap4_i2c1_board_info[0].irq &&
+	    !omap5_i2c1_generic_info[0].irq)
+		return;
+	omap_twl_init();
+	omap_tps6236x_init();
+	omap_palmas_init();
 }
 
 #if defined(CONFIG_ARCH_OMAP3)
@@ -390,3 +436,58 @@ void __init omap4_pmic_get_config(struct twl4030_platform_data *pmic_data,
 		pmic_data->v2v1 = &omap4_v2v1_idata;
 }
 #endif /* CONFIG_ARCH_OMAP4 */
+
+/**
+ * omap_pmic_register_data() - Register the PMIC information to OMAP mapping
+ * @map:    array ending with a empty element representing the maps
+ */
+int __init omap_pmic_register_data(struct omap_pmic_map *map)
+{
+	struct voltagedomain *voltdm;
+	int r;
+
+	if (!map)
+		return 0;
+
+	while (map->name) {
+		if (cpu_is_omap34xx() && !(map->cpu & PMIC_CPU_OMAP3))
+			goto next;
+
+		if (cpu_is_omap443x() && !(map->cpu & PMIC_CPU_OMAP4430))
+			goto next;
+
+		if (cpu_is_omap446x() && !(map->cpu & PMIC_CPU_OMAP4460))
+			goto next;
+
+		if (cpu_is_omap54xx() && !(map->cpu & PMIC_CPU_OMAP54XX))
+			goto next;
+
+		voltdm = voltdm_lookup(map->name);
+		if (IS_ERR_OR_NULL(voltdm)) {
+			pr_err("%s: unable to find map %s\n", __func__,
+			       map->name);
+			goto next;
+		}
+		if (IS_ERR_OR_NULL(map->pmic_data)) {
+			pr_warning("%s: domain[%s] has no pmic data\n",
+				   __func__, map->name);
+			goto next;
+		}
+
+		r = omap_voltage_register_pmic(voltdm, map->pmic_data);
+		if (r) {
+			pr_warning("%s: domain[%s] register returned %d\n",
+				   __func__, map->name, r);
+			goto next;
+		}
+		if (map->special_action) {
+			r = map->special_action(voltdm);
+			WARN(r, "%s: domain[%s] action returned %d\n", __func__,
+			     map->name, r);
+		}
+next:
+		map++;
+	}
+
+	return 0;
+}

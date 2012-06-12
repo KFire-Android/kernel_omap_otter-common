@@ -32,6 +32,7 @@
 
 #include "iomap.h"
 #include "clock.h"
+#include "clock44xx.h"
 #include "clock54xx.h"
 #include "cm1_54xx.h"
 #include "cm2_54xx.h"
@@ -41,9 +42,13 @@
 #include "control.h"
 #include "scrm54xx.h"
 
-/* OMAP4 modulemode control */
+/* OMAP5 modulemode control */
 #define OMAP54XX_MODULEMODE_HWCTRL			0
 #define OMAP54XX_MODULEMODE_SWCTRL			1
+
+static int omap5_virt_l3_set_rate(struct clk *clk, unsigned long rate);
+static long omap5_virt_l3_round_rate(struct clk *clk, unsigned long rate);
+static unsigned long omap5_virt_l3_recalc(struct clk *clk);
 
 /* Root clocks */
 
@@ -313,7 +318,7 @@ static struct clk dpll_abe_m2x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_ABE,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -373,7 +378,7 @@ static struct clk dpll_abe_m3x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M3_DPLL_ABE,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -416,69 +421,69 @@ static struct clk dpll_core_x2_ck = {
 };
 
 static const struct clksel_rate div63_1to63_rates[] = {
-	{ .div = 1, .val = 0, .flags = RATE_IN_54XX },
-	{ .div = 2, .val = 1, .flags = RATE_IN_54XX },
-	{ .div = 3, .val = 2, .flags = RATE_IN_54XX },
-	{ .div = 4, .val = 3, .flags = RATE_IN_54XX },
-	{ .div = 5, .val = 4, .flags = RATE_IN_54XX },
-	{ .div = 6, .val = 5, .flags = RATE_IN_54XX },
-	{ .div = 7, .val = 6, .flags = RATE_IN_54XX },
-	{ .div = 8, .val = 7, .flags = RATE_IN_54XX },
-	{ .div = 9, .val = 8, .flags = RATE_IN_54XX },
-	{ .div = 10, .val = 9, .flags = RATE_IN_54XX },
-	{ .div = 11, .val = 10, .flags = RATE_IN_54XX },
-	{ .div = 12, .val = 11, .flags = RATE_IN_54XX },
-	{ .div = 13, .val = 12, .flags = RATE_IN_54XX },
-	{ .div = 14, .val = 13, .flags = RATE_IN_54XX },
-	{ .div = 15, .val = 14, .flags = RATE_IN_54XX },
-	{ .div = 16, .val = 15, .flags = RATE_IN_54XX },
-	{ .div = 17, .val = 16, .flags = RATE_IN_54XX },
-	{ .div = 18, .val = 17, .flags = RATE_IN_54XX },
-	{ .div = 19, .val = 18, .flags = RATE_IN_54XX },
-	{ .div = 20, .val = 19, .flags = RATE_IN_54XX },
-	{ .div = 21, .val = 20, .flags = RATE_IN_54XX },
-	{ .div = 22, .val = 21, .flags = RATE_IN_54XX },
-	{ .div = 23, .val = 22, .flags = RATE_IN_54XX },
-	{ .div = 24, .val = 23, .flags = RATE_IN_54XX },
-	{ .div = 25, .val = 24, .flags = RATE_IN_54XX },
-	{ .div = 26, .val = 25, .flags = RATE_IN_54XX },
-	{ .div = 27, .val = 26, .flags = RATE_IN_54XX },
-	{ .div = 28, .val = 27, .flags = RATE_IN_54XX },
-	{ .div = 29, .val = 28, .flags = RATE_IN_54XX },
-	{ .div = 30, .val = 29, .flags = RATE_IN_54XX },
-	{ .div = 31, .val = 30, .flags = RATE_IN_54XX },
-	{ .div = 32, .val = 31, .flags = RATE_IN_54XX },
-	{ .div = 33, .val = 32, .flags = RATE_IN_54XX },
-	{ .div = 34, .val = 33, .flags = RATE_IN_54XX },
-	{ .div = 35, .val = 34, .flags = RATE_IN_54XX },
-	{ .div = 36, .val = 35, .flags = RATE_IN_54XX },
-	{ .div = 37, .val = 36, .flags = RATE_IN_54XX },
-	{ .div = 38, .val = 37, .flags = RATE_IN_54XX },
-	{ .div = 39, .val = 38, .flags = RATE_IN_54XX },
-	{ .div = 40, .val = 39, .flags = RATE_IN_54XX },
-	{ .div = 41, .val = 40, .flags = RATE_IN_54XX },
-	{ .div = 42, .val = 41, .flags = RATE_IN_54XX },
-	{ .div = 43, .val = 42, .flags = RATE_IN_54XX },
-	{ .div = 44, .val = 43, .flags = RATE_IN_54XX },
-	{ .div = 45, .val = 44, .flags = RATE_IN_54XX },
-	{ .div = 46, .val = 45, .flags = RATE_IN_54XX },
-	{ .div = 47, .val = 46, .flags = RATE_IN_54XX },
-	{ .div = 48, .val = 47, .flags = RATE_IN_54XX },
-	{ .div = 49, .val = 48, .flags = RATE_IN_54XX },
-	{ .div = 50, .val = 49, .flags = RATE_IN_54XX },
-	{ .div = 51, .val = 50, .flags = RATE_IN_54XX },
-	{ .div = 52, .val = 51, .flags = RATE_IN_54XX },
-	{ .div = 53, .val = 52, .flags = RATE_IN_54XX },
-	{ .div = 54, .val = 53, .flags = RATE_IN_54XX },
-	{ .div = 55, .val = 54, .flags = RATE_IN_54XX },
-	{ .div = 56, .val = 55, .flags = RATE_IN_54XX },
-	{ .div = 57, .val = 56, .flags = RATE_IN_54XX },
-	{ .div = 58, .val = 57, .flags = RATE_IN_54XX },
-	{ .div = 59, .val = 58, .flags = RATE_IN_54XX },
-	{ .div = 60, .val = 59, .flags = RATE_IN_54XX },
-	{ .div = 61, .val = 60, .flags = RATE_IN_54XX },
-	{ .div = 62, .val = 61, .flags = RATE_IN_54XX },
-	{ .div = 63, .val = 62, .flags = RATE_IN_54XX },
+	{ .div = 1, .val = 1, .flags = RATE_IN_54XX },
+	{ .div = 2, .val = 2, .flags = RATE_IN_54XX },
+	{ .div = 3, .val = 3, .flags = RATE_IN_54XX },
+	{ .div = 4, .val = 4, .flags = RATE_IN_54XX },
+	{ .div = 5, .val = 5, .flags = RATE_IN_54XX },
+	{ .div = 6, .val = 6, .flags = RATE_IN_54XX },
+	{ .div = 7, .val = 7, .flags = RATE_IN_54XX },
+	{ .div = 8, .val = 8, .flags = RATE_IN_54XX },
+	{ .div = 9, .val = 9, .flags = RATE_IN_54XX },
+	{ .div = 10, .val = 10, .flags = RATE_IN_54XX },
+	{ .div = 11, .val = 11, .flags = RATE_IN_54XX },
+	{ .div = 12, .val = 12, .flags = RATE_IN_54XX },
+	{ .div = 13, .val = 13, .flags = RATE_IN_54XX },
+	{ .div = 14, .val = 14, .flags = RATE_IN_54XX },
+	{ .div = 15, .val = 15, .flags = RATE_IN_54XX },
+	{ .div = 16, .val = 16, .flags = RATE_IN_54XX },
+	{ .div = 17, .val = 17, .flags = RATE_IN_54XX },
+	{ .div = 18, .val = 18, .flags = RATE_IN_54XX },
+	{ .div = 19, .val = 19, .flags = RATE_IN_54XX },
+	{ .div = 20, .val = 20, .flags = RATE_IN_54XX },
+	{ .div = 21, .val = 21, .flags = RATE_IN_54XX },
+	{ .div = 22, .val = 22, .flags = RATE_IN_54XX },
+	{ .div = 23, .val = 23, .flags = RATE_IN_54XX },
+	{ .div = 24, .val = 24, .flags = RATE_IN_54XX },
+	{ .div = 25, .val = 25, .flags = RATE_IN_54XX },
+	{ .div = 26, .val = 26, .flags = RATE_IN_54XX },
+	{ .div = 27, .val = 27, .flags = RATE_IN_54XX },
+	{ .div = 28, .val = 28, .flags = RATE_IN_54XX },
+	{ .div = 29, .val = 29, .flags = RATE_IN_54XX },
+	{ .div = 30, .val = 30, .flags = RATE_IN_54XX },
+	{ .div = 31, .val = 31, .flags = RATE_IN_54XX },
+	{ .div = 32, .val = 32, .flags = RATE_IN_54XX },
+	{ .div = 33, .val = 33, .flags = RATE_IN_54XX },
+	{ .div = 34, .val = 34, .flags = RATE_IN_54XX },
+	{ .div = 35, .val = 35, .flags = RATE_IN_54XX },
+	{ .div = 36, .val = 36, .flags = RATE_IN_54XX },
+	{ .div = 37, .val = 37, .flags = RATE_IN_54XX },
+	{ .div = 38, .val = 38, .flags = RATE_IN_54XX },
+	{ .div = 39, .val = 39, .flags = RATE_IN_54XX },
+	{ .div = 40, .val = 40, .flags = RATE_IN_54XX },
+	{ .div = 41, .val = 41, .flags = RATE_IN_54XX },
+	{ .div = 42, .val = 42, .flags = RATE_IN_54XX },
+	{ .div = 43, .val = 43, .flags = RATE_IN_54XX },
+	{ .div = 44, .val = 44, .flags = RATE_IN_54XX },
+	{ .div = 45, .val = 45, .flags = RATE_IN_54XX },
+	{ .div = 46, .val = 46, .flags = RATE_IN_54XX },
+	{ .div = 47, .val = 47, .flags = RATE_IN_54XX },
+	{ .div = 48, .val = 48, .flags = RATE_IN_54XX },
+	{ .div = 49, .val = 49, .flags = RATE_IN_54XX },
+	{ .div = 50, .val = 50, .flags = RATE_IN_54XX },
+	{ .div = 51, .val = 51, .flags = RATE_IN_54XX },
+	{ .div = 52, .val = 52, .flags = RATE_IN_54XX },
+	{ .div = 53, .val = 53, .flags = RATE_IN_54XX },
+	{ .div = 54, .val = 54, .flags = RATE_IN_54XX },
+	{ .div = 55, .val = 55, .flags = RATE_IN_54XX },
+	{ .div = 56, .val = 56, .flags = RATE_IN_54XX },
+	{ .div = 57, .val = 57, .flags = RATE_IN_54XX },
+	{ .div = 58, .val = 58, .flags = RATE_IN_54XX },
+	{ .div = 59, .val = 59, .flags = RATE_IN_54XX },
+	{ .div = 60, .val = 60, .flags = RATE_IN_54XX },
+	{ .div = 61, .val = 61, .flags = RATE_IN_54XX },
+	{ .div = 62, .val = 62, .flags = RATE_IN_54XX },
+	{ .div = 63, .val = 63, .flags = RATE_IN_54XX },
 	{ .div = 0 },
 };
 
@@ -494,7 +499,7 @@ static struct clk dpll_core_h12x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H12_DPLL_CORE,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -608,7 +613,7 @@ static struct clk dpll_core_h23x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H23_DPLL_CORE,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -627,7 +632,7 @@ static struct clk dpll_core_m2_ck = {
 	.ops		= &clkops_omap4_dpllmx_ops,
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
-	.set_rate	= &omap2_clksel_set_rate,
+	.set_rate	= &omap4_core_dpll_m2_set_rate,
 };
 
 static const struct clksel dpll_core_m3x2_div[] = {
@@ -673,8 +678,8 @@ static struct clk dpll_iva_ck = {
 	.dpll_data	= &dpll_iva_dd,
 	.init		= &omap2_init_dpll_parent,
 	.ops		= &clkops_omap3_noncore_dpll_ops,
-	.recalc		= &omap3_dpll_recalc,
-	.round_rate	= &omap2_dpll_round_rate,
+	.recalc		= &omap4_dpll_regm4xen_recalc,
+	.round_rate	= &omap4_dpll_regm4xen_round_rate,
 	.set_rate	= &omap3_noncore_dpll_set_rate,
 };
 
@@ -698,7 +703,7 @@ static struct clk dpll_iva_h11x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H11_DPLL_IVA,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -710,7 +715,7 @@ static struct clk dpll_iva_h12x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H12_DPLL_IVA,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -758,7 +763,7 @@ static struct clk dpll_mpu_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_MPU,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -822,7 +827,7 @@ static struct clk dpll_per_h11x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H11_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -834,7 +839,7 @@ static struct clk dpll_per_h12x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H12_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -846,7 +851,7 @@ static struct clk dpll_per_h14x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_H14_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -863,7 +868,7 @@ static struct clk dpll_per_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -880,7 +885,7 @@ static struct clk dpll_per_m2x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -892,7 +897,7 @@ static struct clk dpll_per_m3x2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M3_DPLL_PER,
 	.clksel_mask	= OMAP54XX_DIVHS_0_4_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -1079,7 +1084,7 @@ static struct clk dpll_unipro1_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_UNIPRO1,
 	.clksel_mask	= OMAP54XX_DIVHS_0_6_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -1135,7 +1140,7 @@ static struct clk dpll_unipro2_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_UNIPRO2,
 	.clksel_mask	= OMAP54XX_DIVHS_0_6_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -1202,7 +1207,7 @@ static struct clk dpll_usb_m2_ck = {
 	.clksel_reg	= OMAP54XX_CM_DIV_M2_DPLL_USB,
 	.clksel_mask	= OMAP54XX_DIVHS_0_6_MASK,
 	.ops		= &clkops_omap4_dpllmx_ops,
-	.recalc		= &omap2_clksel_recalc,
+	.recalc		= &omap3_clkout_mn_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
 };
@@ -1288,6 +1293,15 @@ static const struct clksel_rate div2_1to8_rates[] = {
 static const struct clksel l3init_60m_fclk_div[] = {
 	{ .parent = &dpll_usb_m2_ck, .rates = div2_1to8_rates },
 	{ .parent = NULL },
+};
+
+static struct clk virt_l3_ck = {
+	.name		= "virt_l3_ck",
+	.parent		= &dpll_core_h12x2_ck,
+	.ops		= &clkops_null,
+	.set_rate	= &omap5_virt_l3_set_rate,
+	.recalc		= &omap5_virt_l3_recalc,
+	.round_rate	= &omap5_virt_l3_round_rate,
 };
 
 static struct clk l3init_60m_fclk = {
@@ -2536,6 +2550,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_core_ck",			&dpll_core_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_x2_ck",		&dpll_core_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_h12x2_ck",		&dpll_core_h12x2_ck,	CK_54XX),
+	CLK(NULL,	"virt_l3_ck",			&virt_l3_ck,		CK_54XX),
 	CLK(NULL,	"div_iva_hs_clk",		&div_iva_hs_clk,	CK_54XX),
 	CLK(NULL,	"div_mpu_hs_clk",		&div_mpu_hs_clk,	CK_54XX),
 	CLK(NULL,	"dpll_abe_m2_ck",		&dpll_abe_m2_ck,	CK_54XX),
@@ -2724,6 +2739,104 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK("omap_timer.7",	"sys_ck",		&syc_clk_div,	CK_54XX),
 	CLK("omap_timer.8",	"sys_ck",		&syc_clk_div,	CK_54XX),
 };
+
+#define L3_OPP50_RATE			133000000
+#define DPLL_CORE_M2_OPP50_RATE		266000000
+#define DPLL_CORE_M2_OPP100_RATE	532000000
+#define DPLL_CORE_M3_OPP50_RATE		266000000
+#define DPLL_CORE_M3_OPP100_RATE	425600000
+#define DPLL_CORE_H14_OPP50_RATE	212800000
+#define DPLL_CORE_H14_OPP100_RATE	425600000
+#define DPLL_CORE_H14_OPPOD_RATE	532000000
+#define DPLL_PER_M3_OPP50_RATE		192000000
+#define DPLL_PER_M3_OPP100_RATE		256000000
+#define DPLL_PER_H14_OPP50_RATE		192000000
+#define DPLL_PER_H14_OPP100_RATE	384000000
+
+static long omap5_virt_l3_round_rate(struct clk *clk, unsigned long rate)
+{
+	long parent_rate;
+
+	if (!clk || !clk->parent)
+		return 0;
+
+	if (clk->parent->round_rate) {
+		parent_rate = clk->parent->round_rate(clk->parent, rate * 2);
+		if (parent_rate)
+			return parent_rate / 2;
+	}
+	return 0;
+}
+
+static unsigned long omap5_virt_l3_recalc(struct clk *clk)
+{
+	if (!clk || !clk->parent)
+		return 0;
+
+	return clk->parent->rate / 2;
+}
+
+static int omap5_clksel_set_rate(struct clk *clk, unsigned long rate)
+{
+	int ret = -EINVAL;
+
+	if (!clk->set_rate || !clk->round_rate)
+		return ret;
+
+	rate = clk->round_rate(clk, rate);
+	if (rate) {
+		ret = clk->set_rate(clk, rate);
+		if (!ret)
+			propagate_rate(clk);
+	}
+	return ret;
+}
+
+struct virt_l3_ck_deps {
+	unsigned long core_m2_rate;
+	unsigned long core_m3_rate;
+	unsigned long core_h14_rate;
+	unsigned long per_m3_rate;
+};
+
+#define NO_OF_L3_OPPS 2
+#define L3_OPP_50_INDEX 0
+#define L3_OPP_100_INDEX 1
+
+static struct virt_l3_ck_deps omap5_virt_l3_clk_deps[NO_OF_L3_OPPS] = {
+	{ /* OPP 50 */
+		.core_m2_rate = DPLL_CORE_M2_OPP50_RATE,
+		.core_m3_rate = DPLL_CORE_M3_OPP50_RATE,
+		.core_h14_rate = DPLL_CORE_H14_OPP50_RATE,
+		.per_m3_rate = DPLL_PER_M3_OPP50_RATE,
+	},
+	{ /* OPP 100 */
+		.core_m2_rate = DPLL_CORE_M2_OPP100_RATE,
+		.core_m3_rate = DPLL_CORE_M3_OPP100_RATE,
+		.core_h14_rate = DPLL_CORE_H14_OPP100_RATE,
+		.per_m3_rate = DPLL_PER_M3_OPP100_RATE,
+	},
+};
+
+static int omap5_virt_l3_set_rate(struct clk *clk, unsigned long rate)
+{
+	struct virt_l3_ck_deps *l3_deps;
+
+	if (rate <= L3_OPP50_RATE)
+		l3_deps = &omap5_virt_l3_clk_deps[L3_OPP_50_INDEX];
+	else
+		l3_deps = &omap5_virt_l3_clk_deps[L3_OPP_100_INDEX];
+
+	omap5_clksel_set_rate(&dpll_core_m2_ck, l3_deps->core_m2_rate);
+	omap5_clksel_set_rate(&dpll_core_m3x2_ck, l3_deps->core_m3_rate);
+	omap5_clksel_set_rate(&dpll_core_h14x2_ck, l3_deps->core_h14_rate);
+
+	omap5_clksel_set_rate(&dpll_per_m3x2_ck, l3_deps->per_m3_rate);
+	omap5_clksel_set_rate(&dpll_core_h12x2_ck, rate * 2);
+
+	clk->rate = rate;
+	return 0;
+}
 
 int __init omap5xxx_clk_init(void)
 {

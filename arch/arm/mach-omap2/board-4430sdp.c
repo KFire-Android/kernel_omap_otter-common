@@ -68,6 +68,7 @@
 
 #define FIXED_REG_VBAT_ID	0
 #define FIXED_REG_VWLAN_ID	1
+#define TPS62361_GPIO   7
 
 static const uint32_t sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -992,6 +993,14 @@ static void __init omap_4430sdp_init(void)
 	omap_init_dmm_tiler();
 	omap4_register_ion();
 	omap_4430sdp_display_init();
+
+	if (cpu_is_omap446x()) {
+		/* Vsel0 = gpio, vsel1 = gnd */
+		status = omap_tps6236x_board_setup(true, TPS62361_GPIO, -1,
+					OMAP_PIN_OFF_OUTPUT_HIGH, -1);
+		if (status)
+			pr_err("TPS62361 initialization failed: %d\n", status);
+	}
 }
 
 static void __init omap_4430sdp_reserve(void)

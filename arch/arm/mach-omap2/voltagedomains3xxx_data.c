@@ -44,6 +44,8 @@ static const struct omap_vfsm_instance omap3_vdd1_vfsm = {
 	.voltsetup_mask = OMAP3430_SETUP_TIME1_MASK,
 };
 
+static struct omap_vdd_info omap3_vdd1_info;
+
 static const struct omap_vfsm_instance omap3_vdd2_vfsm = {
 	.voltsetup_reg = OMAP3_PRM_VOLTSETUP1_OFFSET,
 	.voltsetup_mask = OMAP3430_SETUP_TIME2_MASK,
@@ -58,7 +60,10 @@ static struct voltagedomain omap3_voltdm_mpu = {
 	.vc = &omap3_vc_mpu,
 	.vfsm = &omap3_vdd1_vfsm,
 	.vp = &omap3_vp_mpu,
+	.vdd = &omap3_vdd1_info,
 };
+
+static struct omap_vdd_info omap3_vdd2_info;
 
 static struct voltagedomain omap3_voltdm_core = {
 	.name = "core",
@@ -69,6 +74,7 @@ static struct voltagedomain omap3_voltdm_core = {
 	.vc = &omap3_vc_core,
 	.vfsm = &omap3_vdd2_vfsm,
 	.vp = &omap3_vp_core,
+	.vdd = &omap3_vdd2_info,
 };
 
 static struct voltagedomain *voltagedomains_omap3[] __initdata = {
@@ -112,11 +118,18 @@ void __init omap3xxx_voltagedomains_init(void)
 	if (cpu_is_omap3630()) {
 		omap3_voltdm_mpu.volt_data = omap36xx_vddmpu_volt_data;
 		omap3_voltdm_core.volt_data = omap36xx_vddcore_volt_data;
+		omap3_vdd1_info.dep_vdd_info = omap36xx_vddmpu_dep_info;
 	} else {
 		omap3_voltdm_mpu.volt_data = omap34xx_vddmpu_volt_data;
 		omap3_voltdm_core.volt_data = omap34xx_vddcore_volt_data;
+		omap3_vdd1_info.dep_vdd_info = omap34xx_vddmpu_dep_info;
 	}
 #endif
+
+	omap3_voltdm_mpu.vp_param = &omap3_mpu_vp_data;
+	omap3_voltdm_core.vp_param = &omap3_core_vp_data;
+	omap3_voltdm_mpu.vc_param = &omap3_mpu_vc_data;
+	omap3_voltdm_core.vc_param = &omap3_core_vc_data;
 
 	if (cpu_is_omap3517() || cpu_is_omap3505())
 		voltdms = voltagedomains_am35xx;
@@ -128,3 +141,9 @@ void __init omap3xxx_voltagedomains_init(void)
 
 	voltdm_init(voltdms);
 };
+
+static int __init init_volt_domain_notifier_list(void)
+{
+	return __init_volt_domain_notifier_list(voltagedomains_omap3);
+}
+pure_initcall(init_volt_domain_notifier_list);

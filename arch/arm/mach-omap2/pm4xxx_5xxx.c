@@ -16,7 +16,11 @@
 #include <linux/list.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/clk.h>
 #include <asm/system_misc.h>
+
+#include <plat/omap_device.h>
+#include <plat/dvfs.h>
 
 #include "common.h"
 #include "clockdomain.h"
@@ -315,7 +319,8 @@ static void __init omap_pm_setup_errata(void)
  */
 static int __init omap_pm_init(void)
 {
-	int ret;
+	int ret, i;
+	char *init_devices[] = {"mpu", "iva"};
 
 	if (!(cpu_is_omap44xx() || cpu_is_omap54xx()))
 		return -ENODEV;
@@ -369,6 +374,36 @@ static int __init omap_pm_init(void)
 		omap4_idle_init();
 	} else if (cpu_is_omap54xx()) {
 		omap5_idle_init();
+	}
+
+	/* Setup the scales for every init device appropriately */
+	for (i = 0; i < ARRAY_SIZE(init_devices); i++) {
+		struct omap_hwmod *oh = omap_hwmod_lookup(init_devices[i]);
+		struct clk *clk;
+		struct device *dev;
+		unsigned int rate;
+
+		if (!oh || !oh->od || !oh->main_clk) {
+			pr_warn("%s: no hwmod or odev or clk for %s, [%d]\n",
+				__func__, init_devices[i], i);
+			pr_warn("%s:oh=%p od=%p clk=%p fail scale boot OPP.\n",
+				__func__, oh, (oh) ? oh->od : NULL,
+				(oh) ? oh->main_clk :  NULL);
+			continue;
+		}
+
+		clk = oh->_clk;
+		dev = &oh->od->pdev->dev;
+		/* Get the current rate */
+		rate = clk_get_rate(clk);
+
+		/* Update DVFS framework with rate information */
+		ret = omap_device_scale(dev, dev, rate);
+		if (ret) {
+			dev_warn(dev, "%s unable to scale to %d - %d\n",
+				 __func__, rate, ret);
+			/* Continue to next device */
+		}
 	}
 
 err2:

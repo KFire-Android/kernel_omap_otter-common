@@ -176,6 +176,8 @@ struct lpddr2_timings lpddr2_elpida_2G_S4_timings[] = {
 		.tZQCL		= 360000,
 		.tZQinit	= 1000000,
 		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
 		.tDQSCK_max_derated = 6000,
 	},
 	/* Speed bin 400(200 MHz) */
@@ -197,6 +199,8 @@ struct lpddr2_timings lpddr2_elpida_2G_S4_timings[] = {
 		.tZQCL		= 360000,
 		.tZQinit	= 1000000,
 		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
 		.tDQSCK_max_derated = 6000,
 	}
 };
@@ -238,6 +242,8 @@ struct lpddr2_timings lpddr2_elpida_4G_S4_timings[] = {
 		.tZQCL		= 360000,
 		.tZQinit	= 1000000,
 		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
 		.tDQSCK_max_derated = 5620,
 	},
 	/* Speed bin 533(266 MHz) */
@@ -259,6 +265,8 @@ struct lpddr2_timings lpddr2_elpida_4G_S4_timings[] = {
 		.tZQCL		= 360000,
 		.tZQinit	= 1000000,
 		.tRAS_max_ns	= 70000,
+		.tRTW		= 7500,
+		.tAONPD		= 1000,
 		.tDQSCK_max_derated = 6000,
 	}
 };

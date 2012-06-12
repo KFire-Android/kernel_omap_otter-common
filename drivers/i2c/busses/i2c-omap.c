@@ -45,6 +45,7 @@
 #include <linux/i2c-omap.h>
 #include <linux/pm_runtime.h>
 #include <plat/omap_device.h>
+#include <linux/pm_qos.h>
 
 /* I2C controller revisions */
 #define OMAP_I2C_OMAP1_REV_2		0x20
@@ -181,8 +182,7 @@ struct omap_i2c_dev {
 	struct completion	cmd_complete;
 	struct resource		*ioarea;
 	u32			latency;	/* maximum mpu wkup latency */
-	void			(*set_mpu_wkup_lat)(struct device *dev,
-						    long latency);
+	struct pm_qos_request   pm_qos_request;
 	int			(*get_context_loss_count)(struct device *dev);
 	u32			speed;		/* Speed of bus in kHz */
 	u32			dtrev;		/* extra revision from DT */
@@ -656,8 +656,16 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	if (r < 0)
 		goto out;
 
-	if (dev->set_mpu_wkup_lat != NULL)
-		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
+	/*
+	 * When waiting for completion of a i2c transfer, we need to
+	 * set a wake up latency constraint for the MPU. This is to
+	 * ensure quick enough wakeup from idle, when transfer
+	 * completes.
+	 */
+	if (dev->latency)
+		pm_qos_add_request(&dev->pm_qos_request,
+				   PM_QOS_CPU_DMA_LATENCY,
+				   dev->latency);
 
 	for (i = 0; i < num; i++) {
 		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
@@ -665,8 +673,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 			break;
 	}
 
-	if (dev->set_mpu_wkup_lat != NULL)
-		dev->set_mpu_wkup_lat(dev->dev, -1);
+	if (dev->latency)
+		pm_qos_remove_request(&dev->pm_qos_request);
 
 	if (r == 0)
 		r = num;
@@ -1059,7 +1067,6 @@ omap_i2c_probe(struct platform_device *pdev)
 	} else if (pdata != NULL) {
 		dev->speed = pdata->clkrate;
 		dev->flags = pdata->flags;
-		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
 		dev->get_context_loss_count = pdata->get_context_loss_count;
 		dev->dtrev = pdata->rev;
 	}
@@ -1112,10 +1119,9 @@ omap_i2c_probe(struct platform_device *pdev)
 		else
 			dev->b_hw = 1; /* Enable hardware fixes */
 
-		/* calculate wakeup latency constraint for MPU */
-		if (dev->set_mpu_wkup_lat != NULL)
-			dev->latency = (1000000 * dev->fifo_size) /
-				       (1000 * dev->speed / 8);
+		/* calculate wakeup latency constraint */
+		dev->latency = (1000000 * dev->fifo_size) /
+			       (1000 * dev->speed / 8);
 	}
 
 	/* reset ASAP, clearing any IRQs */

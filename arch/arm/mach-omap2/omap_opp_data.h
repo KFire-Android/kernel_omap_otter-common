@@ -30,6 +30,18 @@
  */
 
 /**
+ * struct def_info - device info for OPP entry
+ * @hwmod_name:	Name of the hwmod for this domain
+ * @freq:	Frequency in hertz corresponding to this OPP
+ * @clk_name: Clock to be configured as part of dvfs
+ */
+struct device_info {
+	char *hwmod_name;
+	char *clk_name;
+	char *voltdm_name;
+};
+
+/**
  * struct omap_opp_def - OMAP OPP Definition
  * @hwmod_name:	Name of the hwmod for this domain
  * @freq:	Frequency in hertz corresponding to this OPP
@@ -48,8 +60,7 @@
  * of this - but this is handled by the appropriate driver.
  */
 struct omap_opp_def {
-	char *hwmod_name;
-
+	struct device_info *dev_info;
 	unsigned long freq;
 	unsigned long u_volt;
 
@@ -59,9 +70,9 @@ struct omap_opp_def {
 /*
  * Initialization wrapper used to define an OPP for OMAP variants.
  */
-#define OPP_INITIALIZER(_hwmod_name, _enabled, _freq, _uv)	\
+#define OPP_INITIALIZER(_dev_info, _enabled, _freq, _uv)	\
 {								\
-	.hwmod_name	= _hwmod_name,				\
+	.dev_info	= _dev_info,				\
 	.default_available	= _enabled,			\
 	.freq		= _freq,				\
 	.u_volt		= _uv,					\
@@ -86,11 +97,27 @@ extern int __init omap_init_opp_table(struct omap_opp_def *opp_def,
 
 extern struct omap_volt_data omap34xx_vddmpu_volt_data[];
 extern struct omap_volt_data omap34xx_vddcore_volt_data[];
+extern struct omap_vdd_dep_info omap34xx_vddmpu_dep_info[];
 extern struct omap_volt_data omap36xx_vddmpu_volt_data[];
 extern struct omap_volt_data omap36xx_vddcore_volt_data[];
+extern struct omap_vdd_dep_info omap36xx_vddmpu_dep_info[];
 
-extern struct omap_volt_data omap44xx_vdd_mpu_volt_data[];
-extern struct omap_volt_data omap44xx_vdd_iva_volt_data[];
-extern struct omap_volt_data omap44xx_vdd_core_volt_data[];
+extern struct omap_volt_data omap443x_vdd_mpu_volt_data[];
+extern struct omap_volt_data omap443x_vdd_iva_volt_data[];
+extern struct omap_volt_data omap443x_vdd_core_volt_data[];
+extern struct omap_volt_data omap446x_vdd_mpu_volt_data[];
+extern struct omap_volt_data omap446x_vdd_iva_volt_data[];
+extern struct omap_volt_data omap446x_vdd_core_volt_data[];
 
+extern struct omap_vdd_dep_info omap443x_vddmpu_dep_info[];
+extern struct omap_vdd_dep_info omap443x_vddiva_dep_info[];
+extern struct omap_vdd_dep_info omap446x_vddmpu_dep_info[];
+extern struct omap_vdd_dep_info omap446x_vddiva_dep_info[];
+
+extern struct omap_volt_data omap54xx_vdd_mpu_volt_data[];
+extern struct omap_volt_data omap54xx_vdd_mm_volt_data[];
+extern struct omap_volt_data omap54xx_vdd_core_volt_data[];
+
+extern struct omap_vdd_dep_info omap54xx_vddmpu_dep_info[];
+extern struct omap_vdd_dep_info omap54xx_vddmm_dep_info[];
 #endif		/* __ARCH_ARM_MACH_OMAP2_OMAP_OPP_DATA_H */
