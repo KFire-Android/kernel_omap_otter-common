@@ -15,11 +15,15 @@
 #ifndef GCDEBUG_H
 #define GCDEBUG_H
 
+#define GCGPUSTATUS() \
+	gc_debug_dump_status(__func__, __LINE__)
+
 void gc_debug_init(void);
 void gc_debug_shutdown(void);
 
 void gc_debug_poweroff_cache(void);
 void gc_debug_cache_gpu_status_from_irq(unsigned int acknowledge);
+void gc_debug_dump_status(const char *function, int line);
 
 void gc_debug_blt(int srccount, int dstWidth, int dstHeight);
 

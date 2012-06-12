@@ -58,30 +58,30 @@ struct gcmmucontext;
 #define GCDUMPBUFFER(...)
 #define GCDUMPARENA(...)
 #define GCDUMPARENAS(...)
-#define GCGPUSTATUS(...)
 #endif
 
 #if !GCDEBUG_ENABLE
-#define GCDBG_REPORT_MISSING() \
-	printk(KERN_INFO "gcx logging is not integrated.\n")
+#define GCDBG_REPORT_MISSING(file, line)				\
+	printk(KERN_INFO "(%s:%d) gcx logging is not integrated.\n",	\
+		   file, line)
 
 #define GCDBG_SHOWENABLED(s) \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_ENABLEDUMP() \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_DISABLEDUMP() \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_SETFILTER(filtername, zone) \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_FLUSHDUMP(s) \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #define GCDBG_RESETDUMP() \
-	GCDBG_REPORT_MISSING()
+	GCDBG_REPORT_MISSING(__FILE__, __LINE__)
 
 #endif
 
@@ -215,9 +215,6 @@ do { \
 #define GCDUMPBUFFER(zone, ptr, gpuaddr, datasize) \
 	gc_dump_cmd_buffer(&GCDBGFILTER, zone, ptr, gpuaddr, datasize)
 
-#define GCGPUSTATUS() \
-	gc_dump_status(NULL, 0, (char *) __func__, __LINE__)
-
 #endif
 
 
@@ -256,7 +253,6 @@ do { \
 	GCDBG(0, msg, ##__VA_ARGS__)
 
 #define GCDUMPBUFFER(...)
-#define GCGPUSTATUS(...)
 
 #endif
 

@@ -23,10 +23,29 @@
 #define MMU_UNITS  4
 #define MMU_ERROR(irq_ack) ((irq_ack & 0x40000000) != 0)
 
+#if GCDEBUG_ENABLE
+#define STATUS_DUMP(s, msg, ...)					\
+	do {								\
+		if (s)							\
+			seq_printf(s, msg, __VA_ARGS__);		\
+		else							\
+			gc_dump_string(NULL, 0, msg, __VA_ARGS__);	\
+	} while (0)
+#else
+#define STATUS_DUMP(s, msg, ...)					\
+	do {								\
+		if (s)							\
+			seq_printf(s, msg, __VA_ARGS__);		\
+		else							\
+			printk(KERN_ERR msg, __VA_ARGS__);		\
+	} while (0)
+#endif
+
 enum gc_debug_when {
 	GC_DEBUG_USER_REQUEST,
 	GC_DEBUG_DRIVER_POWEROFF,
-	GC_DEBUG_DRIVER_IRQ
+	GC_DEBUG_DRIVER_IRQ,
+	GC_DEBUG_DRIVER_REQUEST,
 };
 
 struct gc_gpu_id {
@@ -89,8 +108,8 @@ static const struct file_operations gc_debug_fops_gpu_id = {
 
 struct gc_gpu_status {
 	bool		   valid;
+	bool           dma_addr_changing;
 	const char        *name;
-	enum gc_debug_when when;
 	unsigned int	   idle;
 	unsigned int	   dma_state;
 	unsigned int	   dma_addr;
@@ -107,80 +126,106 @@ struct gc_gpu_status {
 	unsigned int	   exception_address[MMU_UNITS];
 };
 
-struct gc_gpu_status g_gcGpuStatus = {
+enum gc_debug_when gc_gpu_status_when;
+
+struct gc_gpu_status gc_gpu_status = {
 	.name = "GPU status"
 };
-struct gc_gpu_status g_gcGpuStatusLastError = {
+struct gc_gpu_status gc_gpu_status_last_error = {
 	.name = "GPU last error status"
 };
 
 /* By default we don't cache the status on every irq */
-static int g_gcCacheStatusEveryIrq;
+static int gc_cache_status_every_irq;
 
-void gc_debug_cache_gpu_status_internal(enum gc_debug_when when,
-					unsigned int acknowledge)
+
+static bool gc_dma_addr_changing(void)
 {
-	bool haveError = ((when == GC_DEBUG_DRIVER_IRQ) &&
-			  (acknowledge & 0xC0000000) != 0);
-	int i;
+	static const unsigned int detectcount = 1000;
+	unsigned int address1, address2;
+	unsigned int i;
 
-	if ((when == GC_DEBUG_DRIVER_IRQ) && !haveError &&
-	    !g_gcCacheStatusEveryIrq) {
-		/* called from irq, no error, not caching every irq */
-		return;
+	address1 = gc_read_reg(GCREG_FE_DEBUG_CUR_CMD_ADR_Address);
+	for (i = 0; i < detectcount; i += 1) {
+		address2 = gc_read_reg(GCREG_FE_DEBUG_CUR_CMD_ADR_Address);
+		if (address1 != address2)
+			break;
 	}
 
-	g_gcGpuStatus.when = when;
-	g_gcGpuStatus.idle =
+	return i < detectcount;
+}
+
+void gc_debug_cache_gpu_status(
+	struct gc_gpu_status *status,
+	unsigned int acknowledge)
+{
+	int i;
+
+	if (!status) {
+		status = &gc_gpu_status;
+		gc_gpu_status_when = GC_DEBUG_DRIVER_REQUEST;
+	}
+
+	status->dma_addr_changing = gc_dma_addr_changing();
+
+	status->idle =
 		gc_read_reg(GCREG_HI_IDLE_Address);
-	g_gcGpuStatus.dma_state =
+	status->dma_state =
 		gc_read_reg(GCREG_FE_DEBUG_STATE_Address);
-	g_gcGpuStatus.dma_addr =
+	status->dma_addr =
 		gc_read_reg(GCREG_FE_DEBUG_CUR_CMD_ADR_Address);
-	g_gcGpuStatus.dma_low_data =
+	status->dma_low_data =
 		gc_read_reg(GCREG_FE_DEBUG_CMD_LOW_REG_Address);
-	g_gcGpuStatus.dma_high_data =
+	status->dma_high_data =
 		gc_read_reg(GCREG_FE_DEBUG_CMD_HI_REG_Address);
-	g_gcGpuStatus.total_reads =
+	status->total_reads =
 		gc_read_reg(GC_TOTAL_READS_Address);
-	g_gcGpuStatus.total_writes =
+	status->total_writes =
 		gc_read_reg(GC_TOTAL_WRITES_Address);
-	g_gcGpuStatus.total_read_bursts =
+	status->total_read_bursts =
 		gc_read_reg(GC_TOTAL_READ_BURSTS_Address);
-	g_gcGpuStatus.total_write_bursts =
+	status->total_write_bursts =
 		gc_read_reg(GC_TOTAL_WRITE_BURSTS_Address);
-	g_gcGpuStatus.total_read_reqs =
+	status->total_read_reqs =
 		gc_read_reg(GC_TOTAL_READ_REQS_Address);
-	g_gcGpuStatus.total_write_reqs =
+	status->total_write_reqs =
 		gc_read_reg(GC_TOTAL_WRITE_REQS_Address);
-	g_gcGpuStatus.irq_acknowledge = acknowledge;
+	status->irq_acknowledge = acknowledge;
 
 	/* Is it valid/useful to read the mmu registers for
 	 * other error conditions? */
-	if (haveError && MMU_ERROR(acknowledge)) {
-		g_gcGpuStatus.mmu_status =
+	if (MMU_ERROR(acknowledge)) {
+		status->mmu_status =
 			gc_read_reg(GCREG_MMU_STATUS_Address);
 
 		for (i = 0; i < MMU_UNITS; i++)
-			g_gcGpuStatus.exception_address[i] =
+			status->exception_address[i] =
 				gc_read_reg(GCREG_MMU_EXCEPTION_Address + i);
 	} else {
-		g_gcGpuStatus.mmu_status = 0;
+		status->mmu_status = 0;
 
 		for (i = 0; i < MMU_UNITS; i++)
-			g_gcGpuStatus.exception_address[i] = 0;
+			status->exception_address[i] = 0;
 	}
 
-	g_gcGpuStatus.valid = true;
-
-	if (haveError)
-		memcpy(&g_gcGpuStatusLastError, &g_gcGpuStatus,
-		       sizeof(struct gc_gpu_status));
+	status->valid = true;
 }
 
 void gc_debug_cache_gpu_status_from_irq(unsigned int acknowledge)
 {
-	gc_debug_cache_gpu_status_internal(GC_DEBUG_DRIVER_IRQ, acknowledge);
+	bool haveError = (acknowledge & 0xC0000000) != 0;
+
+	if (!gc_cache_status_every_irq && !haveError) {
+		/* called from irq, no error, not caching every irq */
+		return;
+	}
+
+	gc_debug_cache_gpu_status(&gc_gpu_status, acknowledge);
+	gc_gpu_status_when = GC_DEBUG_DRIVER_IRQ;
+
+	if (haveError)
+		memcpy(&gc_gpu_status_last_error, &gc_gpu_status,
+		       sizeof(struct gc_gpu_status));
 }
 
 static const char *gc_power_string(enum gcpower power)
@@ -206,6 +251,8 @@ static const char *gc_when_string(enum gc_debug_when when)
 		return "GC_DEBUG_USER_REQUEST";
 	case GC_DEBUG_DRIVER_POWEROFF:
 		return "GC_DEBUG_DRIVER_POWEROFF";
+	case GC_DEBUG_DRIVER_REQUEST:
+		return "GC_DEBUG_DRIVER_REQUEST";
 	case GC_DEBUG_DRIVER_IRQ:
 		return "GC_DEBUG_DRIVER_IRQ";
 	}
@@ -213,6 +260,55 @@ static const char *gc_when_string(enum gc_debug_when when)
 	return "unknown";
 }
 
+
+static void gc_dump_status_internal(struct seq_file *s,
+				    struct gc_gpu_status *status)
+{
+	if (!status->valid) {
+		STATUS_DUMP(s, "%s: not valid.\n", status->name);
+		return;
+	}
+
+	STATUS_DUMP(s, "  idle = 0x%08X\n", status->idle);
+	STATUS_DUMP(s, "  DMA state = 0x%08X\n", status->dma_state);
+	STATUS_DUMP(s, "  DMA address = 0x%08X (%s)\n", status->dma_addr,
+		    status->dma_addr_changing ? "running" : "not running");
+	STATUS_DUMP(s, "  DMA low data = 0x%08X\n", status->dma_low_data);
+	STATUS_DUMP(s, "  DMA high data = 0x%08X\n", status->dma_high_data);
+	STATUS_DUMP(s, "  Total memory reads = %d\n", status->total_reads);
+	STATUS_DUMP(s, "  Total memory writes = %d\n", status->total_writes);
+	STATUS_DUMP(s, "  Total memory read 64-bit bursts = %d\n",
+				status->total_read_bursts);
+	STATUS_DUMP(s, "  Total memory write 64-bit bursts = %d\n",
+				status->total_write_bursts);
+	STATUS_DUMP(s, "  Total memory read requests = %d\n",
+				status->total_read_reqs);
+	STATUS_DUMP(s, "  Total memory write requests = %d\n",
+				status->total_write_reqs);
+
+	if (MMU_ERROR(status->irq_acknowledge)) {
+		int i;
+
+		STATUS_DUMP(s, "mmu status = 0x%08X\n", status->mmu_status);
+
+		for (i = 0; i < MMU_UNITS; i++)
+			STATUS_DUMP(s, "exception address %d = 0x%08X\n",
+				    i, status->exception_address[i]);
+	}
+}
+
+void gc_debug_dump_status(const char *function, int line)
+{
+	STATUS_DUMP(NULL, "Current GC gpu status requested from %s(%d).\n",
+				function, line);
+
+	gc_debug_cache_gpu_status(&gc_gpu_status, 0);
+	gc_gpu_status_when = GC_DEBUG_DRIVER_REQUEST;
+
+	gc_dump_status_internal(NULL, &gc_gpu_status);
+
+	GCDBG_FLUSHDUMP(NULL);
+}
 
 static int gc_debug_show_gpu_status(struct seq_file *s, void *data)
 {
@@ -229,50 +325,21 @@ static int gc_debug_show_gpu_status(struct seq_file *s, void *data)
 
 	if (gcpwr_get() == GCPWR_ON) {
 		/* update the gpu status now */
-		gc_debug_cache_gpu_status_internal(GC_DEBUG_USER_REQUEST, 0);
-	}
-
-	if (!status->valid) {
-		seq_printf(s, "%s: not valid.\n", status->name);
-		return 0;
+		gc_debug_cache_gpu_status(&gc_gpu_status, 0);
+		gc_gpu_status_when = GC_DEBUG_USER_REQUEST;
 	}
 
 	seq_printf(s, "%s: cached at: %s\n", status->name,
-		   gc_when_string(status->when));
+			   gc_when_string(gc_gpu_status_when));
 
-	seq_printf(s, "idle = 0x%08X\n", status->idle);
-	seq_printf(s, "DMA state = 0x%08X\n", status->dma_state);
-	seq_printf(s, "DMA address = 0x%08X\n", status->dma_addr);
-	seq_printf(s, "DMA low data = 0x%08X\n", status->dma_low_data);
-	seq_printf(s, "DMA high data = 0x%08X\n", status->dma_high_data);
-	seq_printf(s, "Total memory reads = %d\n", status->total_reads);
-	seq_printf(s, "Total memory writes = %d\n", status->total_writes);
-	seq_printf(s, "Total memory read 64-bit bursts = %d\n",
-		   status->total_read_bursts);
-	seq_printf(s, "Total memory write 64-bit bursts = %d\n",
-		   status->total_write_bursts);
-	seq_printf(s, "Total memory read requests = %d\n",
-		   status->total_read_reqs);
-	seq_printf(s, "Total memory write requests = %d\n",
-		   status->total_write_reqs);
-	seq_printf(s, "irq acknowledge = 0x%08X\n", status->irq_acknowledge);
-
-	if (MMU_ERROR(status->irq_acknowledge)) {
-		int i;
-
-		seq_printf(s, "mmu status = 0x%08X\n", status->mmu_status);
-
-		for (i = 0; i < MMU_UNITS; i++)
-			seq_printf(s, "exception address %d = 0x%08X\n",
-				   i, status->exception_address[i]);
-	}
+	gc_dump_status_internal(s, status);
 
 	return 0;
 }
 
 static int gc_debug_open_gpu_status(struct inode *inode, struct file *file)
 {
-	return single_open(file, gc_debug_show_gpu_status, &g_gcGpuStatus);
+	return single_open(file, gc_debug_show_gpu_status, &gc_gpu_status);
 }
 
 static const struct file_operations gc_debug_fops_gpu_status = {
@@ -286,7 +353,7 @@ static int gc_debug_open_gpu_last_error(struct inode *inode, struct file *file)
 {
 	return single_open(file,
 			   gc_debug_show_gpu_status,
-			   &g_gcGpuStatusLastError);
+			   &gc_gpu_status_last_error);
 }
 
 static const struct file_operations gc_debug_fops_gpu_last_error = {
@@ -521,7 +588,7 @@ void gc_debug_init(void)
 	debugfs_create_file("last_error", 0664, debug_root, NULL,
 			    &gc_debug_fops_gpu_last_error);
 	debugfs_create_bool("cache_status_every_irq", 0664, debug_root,
-			    &g_gcCacheStatusEveryIrq);
+			    &gc_cache_status_every_irq);
 
 	logDir = debugfs_create_dir("log", debug_root);
 	if (!logDir)

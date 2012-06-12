@@ -655,7 +655,6 @@ static int gccmdthread(void *_gccorecontext)
 		/* Bus error? */
 		if (try_wait_for_completion(&gcqueue->buserror)) {
 			GCERR("bus error detected.\n");
-
 			GCGPUSTATUS();
 
 			/* Execute all pending events. */
@@ -765,8 +764,9 @@ static int gccmdthread(void *_gccorecontext)
 			if (!list_empty(&gcqueue->queue)) {
 				GCDBG(GCZONE_THREAD, "queue not empty,"
 				      " large amount of work?\n");
+#if GCDEBUG_ENABLE
 				GCGPUSTATUS();
-				GCDBG_FLUSHDUMP(NULL);
+#endif
 				continue;
 			}
 

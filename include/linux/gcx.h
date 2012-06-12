@@ -41,17 +41,15 @@
 #define GCLOCK_DESTROY(lock) \
 	do { } while (0)
 
-#if GCDEBUG_ENABLE
-
 #define GCLOCK(lock) { \
 	unsigned long __result__; \
 	while (true) { \
 		__result__ = down_timeout(lock, GCLOCK_TIMEOUT_JIF); \
 		if (__result__ == 0) \
 			break; \
-		printk(KERN_INFO "%s(%d) GCLOCK timeout (%lu).\n", \
+		printk(KERN_ERR "%s(%d) GCLOCK timeout (%lu).\n", \
 		       __func__, __LINE__, __result__); \
-		gc_dump_flush(NULL); \
+		GCGPUSTATUS();					  \
 		printk(KERN_INFO "%s(%d)\n", __func__, __LINE__); \
 	} \
 }
@@ -66,10 +64,10 @@
 							GCLOCK_TIMEOUT_JIF); \
 		if (__result__ != 0) \
 			break; \
-		printk(KERN_INFO \
+		printk(KERN_ERR \
 		       "%s(%d) GCWAIT_FOR_COMPLETION timeout (%lu).\n", \
 		       __func__, __LINE__, __result__); \
-		gc_dump_flush(NULL); \
+		GCGPUSTATUS();					  \
 		printk(KERN_INFO "%s(%d)\n", __func__, __LINE__); \
 	} \
 }
@@ -81,32 +79,16 @@
 							GCLOCK_TIMEOUT_JIF); \
 			if (result != 0) \
 				break; \
-			printk(KERN_INFO \
+			printk(KERN_ERR \
 			       "%s(%d) GCWAIT_FOR_COMPLETION_TIMEOUT" \
 			       " timeout (%lu).\n", \
 			       __func__, __LINE__, result); \
-			gc_dump_flush(NULL); \
+			GCGPUSTATUS();					\
 			printk(KERN_INFO "%s(%d)\n", __func__, __LINE__); \
 		} \
 	} else { \
 		result = wait_for_completion_timeout(completion, timeout); \
 	} \
 }
-
-#else
-
-#define GCLOCK(lock) \
-	down(lock)
-
-#define GCUNLOCK(lock) \
-	up(lock)
-
-#define GCWAIT_FOR_COMPLETION(completion) \
-	wait_for_completion(completion)
-
-#define GCWAIT_FOR_COMPLETION_TIMEOUT(result, completion, timeout) \
-	result = wait_for_completion_timeout(completion, timeout)
-
-#endif
 
 #endif
