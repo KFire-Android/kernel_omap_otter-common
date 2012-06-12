@@ -35,6 +35,8 @@ struct omap_rprm_regulator {
  * @set_max_dev_wakeup_lat:	set a latency constraint to @tdev
  * @device_scale:		scale @tdev, it can be used to set a frequency
  *				constraint in @tdev
+ * @lookup_regulator:		return the regulator identified by the @reg_id
+ *
  */
 struct omap_rprm_ops {
 	int (*set_min_bus_tput)(struct device *rdev, struct device *tdev,
@@ -43,6 +45,7 @@ struct omap_rprm_ops {
 			unsigned long val);
 	int (*device_scale)(struct device *rdev, struct device *tdev,
 			unsigned long val);
+	struct omap_rprm_regulator *(*lookup_regulator)(u32 reg_id);
 };
 
 /*

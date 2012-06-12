@@ -45,10 +45,25 @@ static int omap2_rprm_device_scale(struct device *rdev, struct device *tdev,
 #define omap2_rprm_device_scale NULL
 #endif
 
+static struct omap_rprm_regulator *omap2_rprm_lookup_regulator(u32 reg_id)
+{
+	static struct omap_rprm_regulator *regulators;
+	static u32 regulators_cnt;
+
+	if (!regulators)
+		regulators_cnt = omap_rprm_get_regulators(&regulators);
+
+	if (reg_id-- > regulators_cnt)
+		return NULL;
+
+	return &regulators[reg_id];
+}
+
 static struct omap_rprm_ops omap2_rprm_ops = {
 	.set_min_bus_tput	= omap2_rprm_set_min_bus_tput,
 	.set_max_dev_wakeup_lat	= omap2_rprm_set_max_dev_wakeup_lat,
 	.device_scale		= omap2_rprm_device_scale,
+	.lookup_regulator	= omap2_rprm_lookup_regulator,
 };
 
 static struct omap_rprm_pdata omap2_rprm_data = {
