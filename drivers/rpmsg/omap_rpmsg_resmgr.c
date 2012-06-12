@@ -27,6 +27,7 @@
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
 #include <plat/omap-pm.h>
+#include <plat/clock.h>
 #include <plat/rpmsg_resmgr.h>
 #include "omap_rpmsg_resmgr.h"
 
@@ -542,11 +543,33 @@ static int rprm_sl2if_request(void **handle, void *data, size_t len)
 	return _enable_device_exclusive(handle, &dev, "sl2if");
 }
 
+static struct clk *iss_opt_clk;
+
 static int rprm_iss_request(void **handle, void *data, size_t len)
 {
 	static struct device *dev;
+	int ret;
+
+	/* enable the iss optional clock, if present */
+	if (iss_opt_clk) {
+		ret = clk_enable(iss_opt_clk);
+		if (ret)
+			return ret;
+	}
 
 	return _enable_device_exclusive(handle, &dev, "iss");
+}
+
+static int rprm_iss_release(void *handle)
+{
+	int ret;
+
+	ret = _device_release(handle);
+	/* disable the iss optional clock, if present */
+	if (!ret && iss_opt_clk)
+		clk_disable(iss_opt_clk);
+
+	return ret;
 }
 
 static struct rprm_res_ops gptimer_ops = {
@@ -606,7 +629,7 @@ static struct rprm_res_ops sl2if_ops = {
 
 static struct rprm_res_ops iss_ops = {
 	.request = rprm_iss_request,
-	.release = _device_release,
+	.release = rprm_iss_release,
 	.latency = _device_latency,
 	.bandwidth = _device_bandwidth,
 };
@@ -657,6 +680,15 @@ static struct rprm_res omap_res[] = {
 static int omap_rprm_probe(struct platform_device *pdev)
 {
 	struct omap_rprm_pdata *pdata = pdev->dev.platform_data;
+
+	/* get iss optional clock if any */
+	if (pdata->iss_opt_clk_name) {
+		iss_opt_clk = omap_clk_get_by_name(pdata->iss_opt_clk_name);
+		if (!iss_opt_clk) {
+			dev_err(&pdev->dev, "error getting iss opt clk\n");
+			return -ENOENT;
+		}
+	}
 
 	mach_ops = pdata->ops;
 	return 0;
