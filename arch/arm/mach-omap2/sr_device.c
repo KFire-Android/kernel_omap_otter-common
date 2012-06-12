@@ -127,6 +127,46 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
 	sr_data->nvalue_count = j;
 }
 
+static void __init lvt_sr_set_nvalues(struct omap_volt_data *volt_data,
+				struct omap_sr_data *sr_data)
+{
+	struct omap_sr_nvalue_table *lvt_nvalue_table;
+	int i, count = 0, j = 0;
+
+	while (volt_data[count].volt_nominal)
+		count++;
+
+	lvt_nvalue_table = kzalloc(sizeof(struct omap_sr_nvalue_table)*count,
+				GFP_KERNEL);
+	if (!lvt_nvalue_table) {
+		pr_err("%s: cannot allocate memory for LVT table\n", __func__);
+		return;
+	}
+
+	for (i = 0; i < count; i++) {
+		u32 v;
+
+		v = omap_ctrl_readl(volt_data[i].lvt_sr_efuse_offs);
+		/*
+		 * Few voltage offsets may have empty LVT sensor efuse values,
+		 * DONOT populate those.
+		 */
+		if (v == 0)
+			continue;
+		lvt_nvalue_table[j].efuse_offs = volt_data[i].lvt_sr_efuse_offs;
+		lvt_nvalue_table[j].nvalue = v;
+		lvt_nvalue_table[j].volt_nominal = volt_data[i].volt_nominal;
+		/* NOTE: we dont populate the limits here */
+		j++;
+	}
+
+	/* Just WARN to get developer attention if NO of the LVT efuse */
+	WARN(!j, "NO efuses available on silicon for LVT???\n");
+
+	sr_data->lvt_nvalue_table = lvt_nvalue_table;
+	sr_data->lvt_nvalue_count = j;
+}
+
 static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
 {
 	struct omap_sr_data *sr_data;
@@ -152,6 +192,7 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
 	}
 
 	sr_data->name = oh->name;
+	sr_data->lvt_sensor = false;
 	sr_data->ip_type = oh->class->rev;
 	sr_data->senn_mod = 0x1;
 	sr_data->senp_mod = 0x1;
@@ -163,6 +204,11 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
 		goto exit;
 	}
 
+	if (cpu_is_omap54xx() &&
+	    (!strcmp(sr_data->voltdm->name, "mpu") ||
+	     !strcmp(sr_data->voltdm->name, "mm")))
+		sr_data->lvt_sensor = true;
+
 	omap_voltage_get_volttable(sr_data->voltdm, &volt_data);
 	if (!volt_data) {
 		pr_warning("%s: No Voltage table registerd fo VDD%d."
@@ -171,6 +217,9 @@ static int __init sr_dev_init(struct omap_hwmod *oh, void *user)
 	}
 
 	sr_set_nvalues(volt_data, sr_data);
+
+	if (sr_data->lvt_sensor)
+		lvt_sr_set_nvalues(volt_data, sr_data);
 
 	sr_data->enable_on_init = sr_enable_on_init;
 
