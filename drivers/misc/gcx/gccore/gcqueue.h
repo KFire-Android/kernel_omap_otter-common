@@ -26,7 +26,7 @@
 #define GC_STORAGE_COUNT	2
 
 /* Number of command buffers that fit in one storage buffer. */
-#define GC_CMDBUF_FACTOR	10
+#define GC_CMDBUF_FACTOR	2
 
 
 /*******************************************************************************
