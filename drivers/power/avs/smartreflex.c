@@ -217,6 +217,14 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
 
 	/* Pause DVFS from interfering with our operations */
 	mutex_lock(&omap_dvfs_lock);
+	if (sr_class->init &&
+	    sr_class->init(sr, sr_class->class_priv_data)) {
+		dev_err(&sr->pdev->dev,
+			"%s: SRClass initialization failed\n", __func__);
+		mutex_unlock(&omap_dvfs_lock);
+		return;
+	}
+
 	if (!sr_class->enable(sr))
 		sr->autocomp_active = true;
 	mutex_unlock(&omap_dvfs_lock);
@@ -235,6 +243,13 @@ static void sr_stop_vddautocomp(struct omap_sr *sr)
 		/* Pause DVFS from interfering with our operations */
 		mutex_lock(&omap_dvfs_lock);
 		sr_class->disable(sr, 1);
+		if (sr_class->deinit &&
+		    sr_class->deinit(sr,
+			    sr_class->class_priv_data)) {
+			dev_err(&sr->pdev->dev,
+				"%s: SR[%d]Class deinitialization failed\n",
+				__func__, sr->srid);
+		}
 		sr->autocomp_active = false;
 		mutex_unlock(&omap_dvfs_lock);
 	}
