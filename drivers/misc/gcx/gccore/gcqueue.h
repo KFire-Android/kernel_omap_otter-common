@@ -129,7 +129,7 @@ struct gcqueue {
 
 	/* Array to keep track of which interrupts are in use. */
 	bool intused[30];
-	struct GCLOCK_TYPE intusedlock;
+	GCLOCK_TYPE intusedlock;
 
 	/* The completion to track the number of available interrupts. */
 	struct completion freeint;
@@ -160,18 +160,18 @@ struct gcqueue {
 
 	/* Queue of entries scheduled to be executed (gccmdbuf). */
 	struct list_head schedule;
-	struct GCLOCK_TYPE schedulelock;
+	GCLOCK_TYPE schedulelock;
 
 	/* Queue of entries being executed (gccmdbuf). */
 	struct list_head queue;
 
 	/* Cache of vacant event entries (gcevent). */
 	struct list_head vacevents;
-	struct GCLOCK_TYPE vaceventlock;
+	GCLOCK_TYPE vaceventlock;
 
 	/* Cache of vacant queue entries (gccmdbuf). */
 	struct list_head vacqueue;
-	struct GCLOCK_TYPE vacqueuelock;
+	GCLOCK_TYPE vacqueuelock;
 
 	/* MMU flush pointers. */
 	struct gcmommuflush *flushlogical;

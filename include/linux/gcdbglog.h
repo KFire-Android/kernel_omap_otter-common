@@ -15,8 +15,8 @@
 #ifndef GCDBGLOG_H
 #define GCDBGLOG_H
 
-#include <linux/list.h>
-#include <linux/bltsville.h>
+#include "list.h"
+#include "bltsville.h"
 struct gcmmucontext;
 
 

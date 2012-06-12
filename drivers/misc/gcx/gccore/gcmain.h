@@ -57,8 +57,8 @@ struct gccorecontext {
 
 	/* Current power mode. */
 	enum gcpower gcpower;
-	struct GCLOCK_TYPE powerlock;
-	struct GCLOCK_TYPE resetlock;
+	GCLOCK_TYPE powerlock;
+	GCLOCK_TYPE resetlock;
 
 	/* Current graphics pipe. */
 	enum gcpipe gcpipe;
@@ -75,7 +75,7 @@ struct gccorecontext {
 	/* MMU context lists. */
 	struct list_head mmuctxlist;
 	struct list_head mmuctxvac;
-	struct GCLOCK_TYPE mmucontextlock;
+	GCLOCK_TYPE mmucontextlock;
 
 	int opp_count;
 	unsigned long *opp_freqs;

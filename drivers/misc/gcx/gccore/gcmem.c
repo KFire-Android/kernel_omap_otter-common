@@ -13,6 +13,7 @@
  */
 
 #include <linux/pagemap.h>
+#include <linux/dma-mapping.h>
 #include "gcmain.h"
 
 #define GCZONE_NONE		0

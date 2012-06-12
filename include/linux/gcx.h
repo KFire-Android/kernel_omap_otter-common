@@ -15,6 +15,7 @@
 #ifndef GCX_H
 #define GCX_H
 
+#include "semaphore.h"
 #include "gcerror.h"
 #include "gcreg.h"
 #include "gcdbglog.h"
@@ -25,13 +26,11 @@
 	(sizeof(a) / sizeof(a[0]))
 #endif
 
-#include <linux/semaphore.h>
-
-#define GCLOCK_TIMEOUT_SEC 20
+#define GCLOCK_TIMEOUT_SEC 10
 #define GCLOCK_TIMEOUT_JIF (msecs_to_jiffies(GCLOCK_TIMEOUT_SEC * 1000))
 
 #define GCLOCK_TYPE \
-	semaphore
+	struct semaphore
 
 #define GCDEFINE_LOCK(name) \
 	DEFINE_SEMAPHORE(name)

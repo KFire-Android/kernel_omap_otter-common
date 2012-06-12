@@ -269,11 +269,11 @@ struct gccontext {
 	struct list_head callbackvac;
 
 	/* Access locks. */
-	struct GCLOCK_TYPE batchlock;
-	struct GCLOCK_TYPE bufferlock;
-	struct GCLOCK_TYPE fixuplock;
-	struct GCLOCK_TYPE maplock;
-	struct GCLOCK_TYPE callbacklock;
+	GCLOCK_TYPE batchlock;
+	GCLOCK_TYPE bufferlock;
+	GCLOCK_TYPE fixuplock;
+	GCLOCK_TYPE maplock;
+	GCLOCK_TYPE callbacklock;
 };
 
 static struct gccontext gccontext;
@@ -2591,8 +2591,8 @@ static enum bverror set_clip(struct bvbltparams *bltparams,
 	}
 
 	/* Validate the rectangle. */
-	if ((clippedright > bltparams->dstgeom->width) ||
-		(clippedbottom > bltparams->dstgeom->height)) {
+	if ((clippedright > (int) bltparams->dstgeom->width) ||
+		(clippedbottom > (int) bltparams->dstgeom->height)) {
 		BVSETBLTERROR(BVERR_DSTRECT,
 				"destination rect exceeds surface size");
 		goto exit;
@@ -2971,8 +2971,8 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		srcbottom = srcrect->top + srcrect->height + batch->deltabottom;
 
 		/* Validate the rectangle. */
-		if ((srcright > srcgeom->width) ||
-			(srcbottom > srcgeom->height)) {
+		if ((srcright > (int) srcgeom->width) ||
+			(srcbottom > (int) srcgeom->height)) {
 			BVSETBLTERRORARG((srcinfo->index == 0)
 						? BVERR_SRC1RECT
 						: BVERR_SRC2RECT,

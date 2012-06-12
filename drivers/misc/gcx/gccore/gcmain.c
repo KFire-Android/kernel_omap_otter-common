@@ -18,6 +18,7 @@
 #include <linux/delay.h>
 #include <plat/omap_gcx.h>
 #include <linux/opp.h>
+#include <linux/io.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap-pm.h>
 #include "gcmain.h"
@@ -283,7 +284,6 @@ static void gcpwr_enable_pulse_skipping(struct gccorecontext *gccorecontext)
 
 		/* Pulse skipping enabled. */
 		gccorecontext->pulseskipping = true;
-		GCDBG(GCZONE_POWER, "pulse skipping enabled.\n");
 	}
 
 	GCDBG(GCZONE_POWER, "pulse skipping %s.\n",

@@ -147,7 +147,7 @@ struct gcmmuarena {
 /* MMU shared object. */
 struct gcmmu {
 	/* Access lock. */
-	struct GCLOCK_TYPE lock;
+	GCLOCK_TYPE lock;
 
 	/* Reference count. */
 	int refcount;
@@ -181,7 +181,7 @@ struct gcmmustlb {
 struct gcmmustlbblock;
 struct gcmmucontext {
 	/* Access lock. */
-	struct GCLOCK_TYPE lock;
+	GCLOCK_TYPE lock;
 
 	/* PID of the owner process. */
 	pid_t pid;

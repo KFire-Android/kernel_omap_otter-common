@@ -15,10 +15,10 @@
 #ifndef GCIOCTL_H
 #define GCIOCTL_H
 
-#include <linux/list.h>
-#include <linux/cache-2dmanager.h>
-#include <linux/bverror.h>
+#include "list.h"
 #include "gcerror.h"
+#include "cache-2dmanager.h"
+#include "bverror.h"
 
 /* IOCTL parameters. */
 #define GCIOCTL_TYPE 0x5D
@@ -28,10 +28,6 @@
 /*******************************************************************************
  * Commit API entry.
  */
-
-struct gccommit;
-struct gcbuffer;
-struct gcfixup;
 
 #define GCIOCTL_COMMIT _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x10, struct gccommit)
 
@@ -64,6 +60,7 @@ struct gccommit {
 	 * passed to the callback. */
 	void (*callback) (void *callbackparam);
 	void *callbackparam;
+	unsigned long handle;
 
 	/* If asynchronous is set to true, the call returns immediately without
 	 * waiting until all specified buffers have been executed. If set to
@@ -108,13 +105,13 @@ struct gcfixupentry {
 /* Address fixup array. */
 #define GC_FIXUP_MAX 1024
 struct gcfixup {
-	/* Fixup array. */
-	unsigned int count;
-	struct gcfixupentry fixup[GC_FIXUP_MAX];
-
 	/* Pointer to the next fixup array.
 	 * TODO: change to kernel style linked list. */
 	struct gcfixup *next;
+
+	/* Fixup array. */
+	unsigned int count;
+	struct gcfixupentry fixup[GC_FIXUP_MAX];
 };
 
 /* Defines a link list of scheduled unmappings. */
@@ -130,8 +127,6 @@ struct gcschedunmap {
 /*******************************************************************************
  * Map/unmap API entries.
  */
-
-struct gcmap;
 
 #define GCIOCTL_MAP   _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x20, struct gcmap)
 #define GCIOCTL_UNMAP _IOWR(GCIOCTL_TYPE, GCIOCTL_BASE + 0x21, struct gcmap)
@@ -168,12 +163,10 @@ struct gcmap {
  * Cache manipulation API entries.
  */
 
-struct bvcachexfer;
-
 #define GCIOCTL_CACHE _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x30, \
-			   struct bvcachexfer)
+			   struct gccachexfer)
 
-struct bvcachexfer {
+struct gccachexfer {
 	/* Number of regions. */
 	int count;
 
@@ -182,6 +175,42 @@ struct bvcachexfer {
 
 	/* Direction of data. */
 	int dir;
+};
+
+
+/*******************************************************************************
+ * Callback API entry.
+ */
+
+#define GCIOCTL_CALLBACK_ALLOC _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x40, \
+				    struct gccmdcallback)
+#define GCIOCTL_CALLBACK_FREE _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x41, \
+				   struct gccmdcallback)
+#define GCIOCTL_CALLBACK_WAIT _IOW(GCIOCTL_TYPE, GCIOCTL_BASE + 0x42, \
+				   struct gccmdcallbackwait)
+
+struct gccmdcallback {
+	/* Error code. */
+	enum gcerror gcerror;
+
+	/* Callback handle. */
+	unsigned long handle;
+};
+
+struct gccmdcallbackwait {
+	/* Error code. */
+	enum gcerror gcerror;
+
+	/* Callback handle. */
+	unsigned long handle;
+
+	/* Timeout in milliseconds. */
+	unsigned long timeoutms;
+
+	/* OUT: if the call succeeds, callback and callbackparam are
+	 *      initialized with the callback to call. */
+	void (*callback) (void *callbackparam);
+	void *callbackparam;
 };
 
 
