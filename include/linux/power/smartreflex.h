@@ -50,6 +50,11 @@
 #define IRQENABLE_CLR		0x30
 #define SENERROR_V2		0x34
 #define ERRCONFIG_V2		0x38
+#define LVTSENVAL		0x3C
+#define LVTSENMIN		0x40
+#define LVTSENMAX		0x44
+#define LVTSENAVG		0x48
+#define LVTNVALUERECIPROCAL	0x4C
 
 /* Bit/Shift Positions */
 
@@ -63,11 +68,16 @@
 #define SRCONFIG_CLKCTRL_SHIFT		0
 
 #define SRCONFIG_ACCUMDATA_MASK		(0x3ff << 22)
+#define SRCONFIG_LVTSENNENABLE_MASK	(1 << 3)
+#define SRCONFIG_LVTSENPENABLE_MASK	(1 << 2)
 
 #define SRCONFIG_SRENABLE		BIT(11)
 #define SRCONFIG_SENENABLE		BIT(10)
 #define SRCONFIG_ERRGEN_EN		BIT(9)
 #define SRCONFIG_MINMAXAVG_EN		BIT(8)
+#define SRCONFIG_LVTSENENABLE		BIT(4)
+#define SRCONFIG_LVTSENNENABLE		BIT(3)
+#define SRCONFIG_LVTSENPENABLE		BIT(2)
 #define SRCONFIG_DELAYCTRL		BIT(2)
 
 /* AVGWEIGHT */
@@ -152,14 +162,17 @@ struct omap_sr {
 	struct list_head		node;
 	struct platform_device		*pdev;
 	struct omap_sr_nvalue_table	*nvalue_table;
+	struct omap_sr_nvalue_table	*lvt_nvalue_table;
 	struct voltagedomain		*voltdm;
 	struct dentry			*dbg_dir;
 	unsigned int			irq;
 	int				srid;
 	int				ip_type;
 	int				nvalue_count;
+	int				lvt_nvalue_count;
 	bool				autocomp_active;
 	bool				suspended;
+	bool				lvt_sensor;
 	u32				clk_length;
 	u32				err_weight;
 	u32				err_minlimit;
@@ -282,7 +295,11 @@ struct omap_sr_nvalue_table {
  * @nvalue_count:	Number of distinct nvalues in the nvalue table
  * @enable_on_init:	whether this sr module needs to enabled at
  *			boot up or not.
+ * @lvt_sensor:		Flag to check whether LVT Sensor is enabled.
  * @nvalue_table:	table containing the  efuse offsets and nvalues
+ *			corresponding to them.
+ * @lvt_nvalue_count:	Number of distinct LVT nvlaues
+ * @lvt_nvalue_table:	table containing the LVT efuse offsets and LVT nvalues
  *			corresponding to them.
  * @voltdm:		Pointer to the voltage domain associated with the SR
  * @ops:		Operations for SmartReflex
@@ -293,8 +310,11 @@ struct omap_sr_data {
 	u32				senp_mod;
 	u32				senn_mod;
 	int				nvalue_count;
+	int                             lvt_nvalue_count;
 	bool				enable_on_init;
+	bool				lvt_sensor;
 	struct omap_sr_nvalue_table	*nvalue_table;
+	struct omap_sr_nvalue_table     *lvt_nvalue_table;
 	struct voltagedomain		*voltdm;
 	struct omap_sr_ops		*ops;
 };
