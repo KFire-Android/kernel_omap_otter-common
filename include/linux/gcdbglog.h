@@ -215,8 +215,8 @@ do { \
 #define GCDUMPBUFFER(zone, ptr, gpuaddr, datasize) \
 	gc_dump_cmd_buffer(&GCDBGFILTER, zone, ptr, gpuaddr, datasize)
 
-#define GCGPUSTATUS(zone) \
-	gc_dump_status(&GCDBGFILTER, zone, (char *) __func__, __LINE__)
+#define GCGPUSTATUS() \
+	gc_dump_status(NULL, 0, (char *) __func__, __LINE__)
 
 #endif
 

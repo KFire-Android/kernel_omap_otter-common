@@ -640,7 +640,7 @@ enum gcerror gcmmu_enable(struct gccorecontext *gccorecontext,
 
 		/* Configure the END command. */
 		gccmdend = (struct gccmdend *) (gcmosignal + 1);
-		gccmdend->cmd.fld = gcfldend;
+		gccmdend->cmd.raw = gccmdend_const.cmd.raw;
 
 		/* Initialize the command buffer. */
 		gccmdbuf->gcmmucontext = headcmdbuf->gcmmucontext;

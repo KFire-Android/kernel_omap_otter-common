@@ -1943,21 +1943,30 @@ struct gccmdend {
 	unsigned int _filler;
 };
 
-static const struct gcfldend gcfldend = {
-	/* gcregCommandEnd:GCREG_COMMAND_END_EVENT_ID */
-	0,
+static const struct gccmdend gccmdend_const = {
+	/* cmd */
+	{
+		/* fld */
+		{
+			/* gcregCommandEnd:GCREG_COMMAND_END_EVENT_ID */
+			0,
 
-	/* gcregCommandEnd:reserved */
-	0,
+			/* gcregCommandEnd:reserved */
+			0,
 
-	/* gcregCommandEnd:GCREG_COMMAND_END_EVENT */
-	GCREG_COMMAND_END_EVENT_DISABLE,
+			/* gcregCommandEnd:GCREG_COMMAND_END_EVENT */
+			GCREG_COMMAND_END_EVENT_DISABLE,
 
-	/* gcregCommandEnd:reserved */
-	0,
+			/* gcregCommandEnd:reserved */
+			0,
 
-	/* gcregCommandEnd:GCREG_COMMAND_END_OPCODE */
-	GCREG_COMMAND_OPCODE_END
+			/* gcregCommandEnd:GCREG_COMMAND_END_OPCODE */
+			GCREG_COMMAND_OPCODE_END
+		}
+	},
+
+	/* Alignment filler. */
+	0
 };
 
 /*******************************************************************************
@@ -1988,12 +1997,21 @@ struct gccmdnop {
 	unsigned int _filler;
 };
 
-static const struct gcfldnop gcfldnop = {
-	/* gcregCommandNop:reserve */
-	0,
+static const struct gccmdnop gccmdnop_const = {
+	/* cmd */
+	{
+		/* fld */
+		{
+			/* gcregCommandNop:reserve */
+			0,
 
-	/* gcregCommandNop:GCREG_COMMAND_NOP_OPCODE */
-	GCREG_COMMAND_OPCODE_NOP
+			/* gcregCommandNop:GCREG_COMMAND_NOP_OPCODE */
+			GCREG_COMMAND_OPCODE_NOP
+		}
+	},
+
+	/* Alignment filler. */
+	0
 };
 
 /*******************************************************************************
@@ -8589,21 +8607,21 @@ struct gcmosrc {
 };
 
 struct gcmosrcplanaryuv {
-	struct gccmdldstate uplane_address_ldst;
+	/* gcregUPlaneAddressRegAddrs */
+	struct gccmdldstate uplaneaddress_ldst;
+		unsigned int uplaneaddress;
 
-	unsigned int uplane_address;
+	/* gcregUPlaneStrideRegAddrs */
+	struct gccmdldstate uplanestride_ldst;
+		unsigned int uplanestride;
 
-	struct gccmdldstate uplane_stride_ldst;
+	/* gcregVPlaneAddressRegAddrs */
+	struct gccmdldstate vplaneaddress_ldst;
+		unsigned int vplaneaddress;
 
-	unsigned int uplane_stride;
-
-	struct gccmdldstate vplane_address_ldst;
-
-	unsigned int vplane_address;
-
-	struct gccmdldstate vplane_stride_ldst;
-
-	unsigned int vplane_stride;
+	/* gcregVPlaneStrideRegAddrs */
+	struct gccmdldstate vplanestride_ldst;
+		unsigned int vplanestride;
 };
 
 struct gcmosrcalpha {

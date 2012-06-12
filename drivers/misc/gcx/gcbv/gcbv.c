@@ -3206,13 +3206,13 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 				goto exit;
 			}
 
-			yuv->uplane_address_ldst =
+			yuv->uplaneaddress_ldst =
 				gcmosrc_uplaneaddress_ldst[index];
-			yuv->uplane_stride_ldst =
+			yuv->uplanestride_ldst =
 				gcmosrc_uplanestride_ldst[index];
-			yuv->vplane_address_ldst =
+			yuv->vplaneaddress_ldst =
 				gcmosrc_vplaneaddress_ldst[index];
-			yuv->vplane_stride_ldst =
+			yuv->vplanestride_ldst =
 				gcmosrc_vplanestride_ldst[index];
 
 			if (multisrc) {
@@ -3235,15 +3235,15 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			GCDBG(GCZONE_SURF, "  final uvshift = 0x%08X (%d)\n",
 			      uvshift, uvshift);
 
-			yuv->uplane_address = GET_MAP_HANDLE(srcmap[i]);
-			add_fixup(batch, &yuv->uplane_address, uvshift);
+			yuv->uplaneaddress = GET_MAP_HANDLE(srcmap[i]);
+			add_fixup(batch, &yuv->uplaneaddress, uvshift);
 
-			yuv->uplane_stride = srcgeom->virtstride;
+			yuv->uplanestride = srcgeom->virtstride;
 
-			yuv->vplane_address = GET_MAP_HANDLE(srcmap[i]);
-			add_fixup(batch, &yuv->vplane_address, uvshift);
+			yuv->vplaneaddress = GET_MAP_HANDLE(srcmap[i]);
+			add_fixup(batch, &yuv->vplaneaddress, uvshift);
 
-			yuv->vplane_stride = srcgeom->virtstride;
+			yuv->vplanestride = srcgeom->virtstride;
 		}
 
 		if ((gca != NULL) && ((srccount == 1) || (i > 0))) {

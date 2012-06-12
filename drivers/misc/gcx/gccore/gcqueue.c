@@ -394,7 +394,8 @@ static void link_queue(struct list_head *newlist,
 			/* Replace EVENT with a NOP. */
 			GCDBG_QUEUE(GCZONE_QUEUE, "removing interrupt from ",
 				    gccmdbuf);
-			gcmoterminator->u1.nop.cmd.fld = gcfldnop;
+			gcmoterminator->u1.nop.cmd.raw = gccmdnop_const.cmd.raw;
+			mb();
 		}
 	}
 
@@ -573,6 +574,9 @@ static int gccmdthread(void *_gccorecontext)
 
 		/* Process triggered interrupts. */
 		while (ints2process != 0) {
+			GCDBG(GCZONE_INTERRUPT, "ints2process = 0x%08X.\n",
+			      ints2process);
+
 			/* Queue empty? */
 			if (list_empty(&gcqueue->queue)) {
 				GCERR("no match for triggered ints 0x%08X.\n",
@@ -580,10 +584,19 @@ static int gccmdthread(void *_gccorecontext)
 
 				/* Reset triggered interrupts. */
 				atomic_sub(triggered, &gcqueue->triggered);
+				GCDBG(GCZONE_INTERRUPT, "triggered = 0x%08X.\n",
+				      atomic_read(&gcqueue->triggered));
 
 				/* Free triggered interrupts. */
 				for (i = 0, intmask = 1; ints2process != 0;
 					i += 1, intmask <<= 1) {
+					GCDBG(GCZONE_INTERRUPT,
+					      "ints2process = 0x%08X.\n",
+					      ints2process);
+					GCDBG(GCZONE_INTERRUPT,
+					      "intmask = 0x%08X (%d).\n",
+					      intmask, i);
+
 					if ((ints2process & intmask) != 0) {
 						free_interrupt(gcqueue, i);
 						ints2process &= ~intmask;
@@ -601,8 +614,17 @@ static int gccmdthread(void *_gccorecontext)
 
 			/* Did interrupt happen for the head entry? */
 			intmask = 1 << headcmdbuf->interrupt;
+			GCDBG(GCZONE_INTERRUPT, "intmask = 0x%08X.\n", intmask);
+
 			if ((ints2process & intmask) != 0) {
 				ints2process &= ~intmask;
+				GCDBG(GCZONE_INTERRUPT,
+				      "ints2process = 0x%08X\n", ints2process);
+
+				atomic_sub(intmask, &gcqueue->triggered);
+				GCDBG(GCZONE_INTERRUPT,
+				      "triggered = 0x%08X.\n",
+				      atomic_read(&gcqueue->triggered));
 			} else {
 				if (list_empty(&headcmdbuf->events)) {
 					GCDBG(GCZONE_THREAD,
@@ -610,15 +632,13 @@ static int gccmdthread(void *_gccorecontext)
 					      "interrupt %d.\n",
 					      headcmdbuf->interrupt);
 				} else {
-					GCDBG(GCZONE_THREAD,
-					      "lost interrupt %d.\n",
+					GCERR("lost interrupt %d.\n",
 					      headcmdbuf->interrupt);
 				}
 			}
 
 			/* Free the interrupt. */
 			free_interrupt(gcqueue, headcmdbuf->interrupt);
-			atomic_sub(intmask, &gcqueue->triggered);
 
 			/* Execute events if any. */
 			list_for_each(head, &headcmdbuf->events) {
@@ -636,7 +656,7 @@ static int gccmdthread(void *_gccorecontext)
 		if (try_wait_for_completion(&gcqueue->buserror)) {
 			GCERR("bus error detected.\n");
 
-			GCGPUSTATUS(GCZONE_THREAD);
+			GCGPUSTATUS();
 
 			/* Execute all pending events. */
 			while (!list_empty(&gcqueue->queue)) {
@@ -745,7 +765,7 @@ static int gccmdthread(void *_gccorecontext)
 			if (!list_empty(&gcqueue->queue)) {
 				GCDBG(GCZONE_THREAD, "queue not empty,"
 				      " large amount of work?\n");
-				GCGPUSTATUS(GCZONE_THREAD);
+				GCGPUSTATUS();
 				GCDBG_FLUSHDUMP(NULL);
 				continue;
 			}
@@ -759,7 +779,10 @@ static int gccmdthread(void *_gccorecontext)
 			      "no pending work, shutting down.\n");
 
 			/* Convert WAIT to END. */
-			gcqueue->gcmoterminator->u2.end.cmd.fld = gcfldend;
+			gcqueue->gcmoterminator->u2.end.cmd.raw
+				= gccmdend_const.cmd.raw;
+			mb();
+
 			gcqueue->gcmoterminator = NULL;
 
 			/* Go to suspend. */
@@ -1023,13 +1046,21 @@ enum gcerror gcqueue_map(struct gccorecontext *gccorecontext,
 
 		/* Make sure command buffer hasn't been mapped yet. */
 		if (gcmmucontext->storagearray[i] != NULL) {
-			GCERR("command buffer %d already mapped.\n", i);
+			GCERR("storage %d is already mapped.\n", i);
 			gcerror = GCERR_CMD_MAPPED;
 			goto fail;
 		}
 
+		GCDBG(GCZONE_MAPPING, "maping storage %d.\n", i);
+		GCDBG(GCZONE_MAPPING, "  physical = 0x%08X\n",
+		      gccmdstorage->page.physical);
+		GCDBG(GCZONE_MAPPING, "  logical = 0x%08X\n",
+		      (unsigned int) gccmdstorage->page.logical);
+		GCDBG(GCZONE_MAPPING, "  size = %d\n",
+		      gccmdstorage->page.size);
+
 		/* Get physical pages. */
-		physical = gccmdstorage->physical;
+		physical = gccmdstorage->page.physical;
 		for (j = 0; j < GC_STORAGE_PAGES; j += 1) {
 			physpages[j] = physical;
 			physical += PAGE_SIZE;
@@ -1045,32 +1076,39 @@ enum gcerror gcqueue_map(struct gccorecontext *gccorecontext,
 		gcerror = gcmmu_map(gccorecontext, gcmmucontext, &mem,
 					&gcmmucontext->storagearray[i]);
 		if (gcerror != 0) {
-			GCERR("failed to map command buffer %d.\n", i);
+			GCERR("failed to map storage %d.\n", i);
 			goto fail;
 		}
 
-		if (gccmdstorage->mapped &&
-			(gccmdstorage->physical
-				!= gcmmucontext->storagearray[i]->address)) {
-			GCERR("command buffer %d, inconsistent mapping!\n", i);
-			gcerror = GCERR_CMD_CONSISTENCY;
-			goto fail;
+		physical = gcmmucontext->storagearray[i]->address;
+		if (gccmdstorage->mapped) {
+			GCDBG(GCZONE_MAPPING,
+			      "  storage %d is already mapped.\n", i);
+
+			if (gccmdstorage->physical != physical) {
+				GCERR("storage %d, inconsistent mapping!\n", i);
+				gcerror = GCERR_CMD_CONSISTENCY;
+				goto fail;
+			}
+		} else {
+			GCDBG(GCZONE_MAPPING,
+			      "  mapped storage %d @ 0x%08X.\n",
+			      i, physical);
+
+			/* Not mapped yet, replace the physical address with
+			 * the mapped one. */
+			gccmdstorage->physical = physical;
+
+			/* Update the allocatable address. */
+			if (gccmdstorage == gcqueue->curstorage) {
+				gcqueue->physical = gccmdstorage->physical;
+				GCDBG(GCZONE_MAPPING,
+				      "  setting current physical address.\n");
+			}
 		}
 
-		/* Set mapped info. */
 		gccmdstorage->mapped += 1;
-		gccmdstorage->physical = gcmmucontext->storagearray[i]->address;
-
-		GCDBG(GCZONE_MAPPING, "mapped storage buffer [%d].\n", i);
-		GCDBG(GCZONE_MAPPING, "  physical = 0x%08X (mapped)\n",
-		      gccmdstorage->physical);
-		GCDBG(GCZONE_MAPPING, "  logical = 0x%08X\n",
-		      (unsigned int) gccmdstorage->page.logical);
-		GCDBG(GCZONE_MAPPING, "  size = %d\n", gccmdstorage->page.size);
 	}
-
-	/* Update physical address. */
-	gcqueue->physical = gcqueue->curstorage->physical;
 
 	GCEXIT(GCZONE_MAPPING);
 	return GCERR_NONE;
