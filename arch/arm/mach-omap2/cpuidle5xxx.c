@@ -185,7 +185,7 @@ static struct cpuidle_driver omap5_idle_driver = {
 static inline void _fill_cstate(struct cpuidle_driver *drv,
 					int idx, const char *descr, int flags)
 {
-	struct cpuidle_state *state = &drv->states[idx];
+	struct cpuidle_state *state = &drv->states[drv->state_count];
 
 	state->exit_latency	= cpuidle_params_table[idx].exit_latency;
 	state->target_residency	= cpuidle_params_table[idx].target_residency;
@@ -196,7 +196,7 @@ static inline void _fill_cstate(struct cpuidle_driver *drv,
 	else
 		state->enter		= omap5_enter_idle;
 
-	sprintf(state->name, "C%d", idx + 1);
+	sprintf(state->name, "C%d", drv->state_count + 1);
 	strncpy(state->desc, descr, CPUIDLE_DESC_LEN);
 }
 
@@ -259,27 +259,32 @@ int __init omap5_idle_init(void)
 		drv->state_count++;
 
 		/* C2 - CPU0 CSWR + CPU1 CSWR + MPU CSWR */
-		_fill_cstate(drv, 1, "MPUSS OSWR", 0);
-		cx = _fill_cstate_usage(dev, 1);
-		if (cx != NULL) {
-			cx->cpu_state = PWRDM_POWER_RET;
-			cx->mpu_state = PWRDM_POWER_RET;
-			cx->mpu_logic_state = PWRDM_POWER_RET;
-			atomic_set(&cx->mpu_state_vote, 0);
-			dev->state_count++;
-			drv->state_count++;
+		if (cpuidle_params_table[1].valid) {
+			_fill_cstate(drv, 1, "MPUSS OSWR", 0);
+			cx = _fill_cstate_usage(dev, 1);
+			if (cx != NULL) {
+				cx->cpu_state = PWRDM_POWER_RET;
+				cx->mpu_state = PWRDM_POWER_RET;
+				cx->mpu_logic_state = PWRDM_POWER_RET;
+				atomic_set(&cx->mpu_state_vote, 0);
+				dev->state_count++;
+				drv->state_count++;
+			}
 		}
 
 		/* C3 - CPU0 OFF + CPU1 OFF + MPU OSWR */
-		_fill_cstate(drv, 2, "MPUSS OSWR", CPUIDLE_FLAG_COUPLED);
-		cx = _fill_cstate_usage(dev, 2);
-		if (cx != NULL) {
-			cx->cpu_state = PWRDM_POWER_OFF;
-			cx->mpu_state = PWRDM_POWER_RET;
-			cx->mpu_logic_state = PWRDM_POWER_OFF;
-			atomic_set(&cx->mpu_state_vote, 0);
-			dev->state_count++;
-			drv->state_count++;
+		if (cpuidle_params_table[2].valid) {
+			_fill_cstate(drv, 2, "MPUSS OSWR",
+				     CPUIDLE_FLAG_COUPLED);
+			cx = _fill_cstate_usage(dev, 2);
+			if (cx != NULL) {
+				cx->cpu_state = PWRDM_POWER_OFF;
+				cx->mpu_state = PWRDM_POWER_RET;
+				cx->mpu_logic_state = PWRDM_POWER_OFF;
+				atomic_set(&cx->mpu_state_vote, 0);
+				dev->state_count++;
+				drv->state_count++;
+			}
 		}
 
 		/* Setup the brodcast device */
