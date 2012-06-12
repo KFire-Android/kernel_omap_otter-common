@@ -201,7 +201,7 @@ void keypad_pad_wkup(int enable)
 
 }
 
-#ifdef CONFIG_OMAP4_DUTY_CYCLE
+#ifdef CONFIG_OMAP4_DUTY_CYCLE_GOVERNOR
 
 static struct pcb_section omap4_duty_governor_pcb_sections[] = {
 	{

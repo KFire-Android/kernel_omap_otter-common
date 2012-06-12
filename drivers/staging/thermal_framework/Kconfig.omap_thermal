@@ -1,0 +1,12 @@
+config OMAP_THERMAL
+	bool "OMAP Thermal Framework support"
+	depends on THERMAL_FRAMEWORK && ARCH_OMAP4
+	default y
+	help
+	  This is the thermal framework support for OMAP4
+	  processors.
+
+source "drivers/staging/thermal_framework/sensor/Kconfig.omap"
+source "drivers/staging/thermal_framework/governor/Kconfig.omap"
+
+
