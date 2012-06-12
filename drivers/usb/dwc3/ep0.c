@@ -515,8 +515,8 @@ static void dwc3_ep0_set_sel_cmpl(struct usb_ep *ep, struct usb_request *req)
 
 	dwc->u1sel = timing.u1sel;
 	dwc->u1pel = timing.u1pel;
-	dwc->u2sel = timing.u2sel;
-	dwc->u2pel = timing.u2pel;
+	dwc->u2sel = le16_to_cpu(timing.u2sel);
+	dwc->u2pel = le16_to_cpu(timing.u2pel);
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 	if (reg & DWC3_DCTL_INITU2ENA)
@@ -641,11 +641,11 @@ static void dwc3_ep0_inspect_setup(struct dwc3 *dwc,
 		const struct dwc3_event_depevt *event)
 {
 	struct usb_ctrlrequest *ctrl = dwc->ctrl_req;
-	int ret;
+	int ret = -EINVAL;
 	u32 len;
 
 	if (!dwc->gadget_driver)
-		goto err;
+		goto out;
 
 	len = le16_to_cpu(ctrl->wLength);
 	if (!len) {
@@ -666,11 +666,9 @@ static void dwc3_ep0_inspect_setup(struct dwc3 *dwc,
 	if (ret == USB_GADGET_DELAYED_STATUS)
 		dwc->delayed_status = true;
 
-	if (ret >= 0)
-		return;
-
-err:
-	dwc3_ep0_stall_and_restart(dwc);
+out:
+	if (ret < 0)
+		dwc3_ep0_stall_and_restart(dwc);
 }
 
 static void dwc3_ep0_complete_data(struct dwc3 *dwc,
@@ -724,7 +722,7 @@ static void dwc3_ep0_complete_data(struct dwc3 *dwc,
 	}
 }
 
-static void dwc3_ep0_complete_req(struct dwc3 *dwc,
+static void dwc3_ep0_complete_status(struct dwc3 *dwc,
 		const struct dwc3_event_depevt *event)
 {
 	struct dwc3_request	*r;
@@ -775,7 +773,7 @@ static void dwc3_ep0_xfer_complete(struct dwc3 *dwc,
 
 	case EP0_STATUS_PHASE:
 		dev_vdbg(dwc->dev, "Status Phase\n");
-		dwc3_ep0_complete_req(dwc, event);
+		dwc3_ep0_complete_status(dwc, event);
 		break;
 	default:
 		WARN(true, "UNKNOWN ep0state %d\n", dwc->ep0state);
