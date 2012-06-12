@@ -46,7 +46,7 @@ struct rprm_gen_device_handle {
 };
 
 /* pointer to the constraint ops exported by omap mach module */
-static struct omap_rprm_ops *cnstrnt_ops;
+static struct omap_rprm_ops *mach_ops;
 
 static inline struct device *__find_device_by_name(const char *name)
 {
@@ -368,10 +368,10 @@ static int _device_scale(struct device *rdev, void *handle, unsigned long val)
 
 	return 0;
 
-	if (!cnstrnt_ops || !cnstrnt_ops->device_scale)
+	if (!mach_ops || !mach_ops->device_scale)
 			return -ENOSYS;
 
-	return cnstrnt_ops->device_scale(rdev, obj->dev, val);
+	return mach_ops->device_scale(rdev, obj->dev, val);
 }
 
 static int _device_latency(struct device *rdev, void *handle, unsigned long val)
@@ -387,10 +387,10 @@ static int _device_bandwidth(struct device *rdev, void *handle,
 {
 	struct rprm_gen_device_handle *obj = handle;
 
-	if (!cnstrnt_ops || !cnstrnt_ops->set_min_bus_tput)
+	if (!mach_ops || !mach_ops->set_min_bus_tput)
 		return -ENOSYS;
 
-	return cnstrnt_ops->set_min_bus_tput(rdev, obj->dev, val);
+	return mach_ops->set_min_bus_tput(rdev, obj->dev, val);
 }
 
 static int rprm_iva_request(void **handle, void *data, size_t len)
@@ -534,13 +534,13 @@ static int omap_rprm_probe(struct platform_device *pdev)
 {
 	struct omap_rprm_pdata *pdata = pdev->dev.platform_data;
 
-	cnstrnt_ops = pdata->ops;
+	mach_ops = pdata->ops;
 	return 0;
 }
 
 static int omap_rprm_remove(struct platform_device *pdev)
 {
-	cnstrnt_ops = NULL;
+	mach_ops = NULL;
 
 	return 0;
 }
