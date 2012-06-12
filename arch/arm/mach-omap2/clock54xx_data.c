@@ -2210,12 +2210,14 @@ static const struct clksel ts_clk_div_div[] = {
 };
 
 static struct clk ts_clk_div = {
-	.name		= "ts_clk_div",
+	.name		= "ts_clk_div_ck",
 	.parent		= &wkupaon_clk_mux,
+	.enable_reg	= OMAP54XX_CM_COREAON_BANDGAP_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_TS_FCLK_SHIFT,
 	.clksel		= ts_clk_div_div,
 	.clksel_reg	= OMAP54XX_CM_COREAON_BANDGAP_CLKCTRL,
 	.clksel_mask	= OMAP54XX_CLKSEL_24_25_MASK,
-	.ops		= &clkops_null,
+	.ops		= &clkops_omap2_dflt,
 	.recalc		= &omap2_clksel_recalc,
 	.round_rate	= &omap2_clksel_round_rate,
 	.set_rate	= &omap2_clksel_set_rate,
@@ -2684,7 +2686,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"timer7_sync_mux_ck",		&timer7_sync_mux_ck,	CK_54XX),
 	CLK(NULL,	"timer8_sync_mux_ck",		&timer8_sync_mux_ck,	CK_54XX),
 	CLK(NULL,	"timer9_clk_mux",		&timer9_clk_mux,	CK_54XX),
-	CLK(NULL,	"ts_clk_div",			&ts_clk_div,	CK_54XX),
+	CLK(NULL,	"ts_clk_div_ck",		&ts_clk_div,	CK_54XX),
 	CLK(NULL,	"auxclk0_src_ck",		&auxclk0_src_ck,	CK_54XX),
 	CLK(NULL,	"auxclk0_ck",			&auxclk0_ck,	CK_54XX),
 	CLK(NULL,	"auxclkreq0_ck",		&auxclkreq0_ck,	CK_54XX),
