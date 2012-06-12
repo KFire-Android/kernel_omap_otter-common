@@ -57,6 +57,7 @@ int omap2_clk_set_parent(struct clk *clk, struct clk *new_parent);
 long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate);
 unsigned long omap3_dpll_recalc(struct clk *clk);
 unsigned long omap3_clkoutx2_recalc(struct clk *clk);
+unsigned long omap3_clkout_mn_recalc(struct clk *clk);
 void omap3_dpll_allow_idle(struct clk *clk);
 void omap3_dpll_deny_idle(struct clk *clk);
 u32 omap3_dpll_autoidle_read(struct clk *clk);
@@ -131,6 +132,9 @@ int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
 void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
 			       const char *core_ck_name,
 			       const char *mpu_ck_name);
+int omap4460_mpu_dpll_set_rate(struct clk *clk, unsigned long rate);
+long omap4460_mpu_dpll_round_rate(struct clk *clk, unsigned long rate);
+unsigned long omap4460_mpu_dpll_recalc(struct clk *clk);
 
 extern u16 cpu_mask;
 

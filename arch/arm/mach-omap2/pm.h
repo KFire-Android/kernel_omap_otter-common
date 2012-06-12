@@ -123,18 +123,39 @@ static inline void omap_enable_smartreflex_on_init(void) {}
 #endif
 
 #ifdef CONFIG_TWL4030_CORE
-extern int omap3_twl_init(void);
-extern int omap4_twl_init(void);
+extern int omap_twl_init(void);
 extern int omap3_twl_set_sr_bit(bool enable);
 #else
-static inline int omap3_twl_init(void)
-{
-	return -EINVAL;
-}
-static inline int omap4_twl_init(void)
+static inline int omap_twl_init(void)
 {
 	return -EINVAL;
 }
 #endif
 
+#ifdef CONFIG_PM
+extern void omap_pm_setup_oscillator(u32 tstart, u32 tshut);
+extern void omap_pm_get_oscillator(u32 *tstart, u32 *tshut);
+#else
+static inline void omap_pm_setup_oscillator(u32 tstart, u32 tshut) { }
+static inline void omap_pm_get_oscillator(u32 *tstart, u32 *tshut) { }
+#endif
+
+#ifdef CONFIG_PM
+extern bool omap_pm_is_ready_status;
+/**
+ * omap_pm_is_ready() - tells if OMAP pm framework is done it's initialization
+ *
+ * In few cases, to sequence operations properly, we'd like to know if OMAP's PM
+ * framework has completed all it's expected initializations.
+ */
+static inline bool omap_pm_is_ready(void)
+{
+	return omap_pm_is_ready_status;
+}
+#else
+static inline bool omap_pm_is_ready(void)
+{
+	return false;
+}
+#endif
 #endif

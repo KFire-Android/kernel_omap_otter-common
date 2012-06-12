@@ -55,6 +55,7 @@ config ARCH_OMAP4
 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
 	select ARM_CPU_SUSPEND if PM
 	select ARCH_NEEDS_CPU_IDLE_COUPLED
+	select TI_EMIF
 
 config ARCH_OMAP5
 	bool "TI OMAP5"
@@ -69,6 +70,9 @@ config ARCH_OMAP5
 	select USB_ARCH_HAS_XHCI if USB_SUPPORT
 	select ARM_ARCH_TIMER
 	select ARCH_NEEDS_CPU_IDLE_COUPLED
+	select ARCH_HAS_OPP
+	select PM_OPP if PM
+	select TI_EMIF
 
 comment "OMAP Core Type"
 	depends on ARCH_OMAP2
@@ -349,6 +353,7 @@ config MACH_OMAP_4430SDP
 	select OMAP_PACKAGE_CBL
 	select OMAP_PACKAGE_CBS
 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+	select OMAP_TPS6236X
 
 config MACH_OMAP4_PANDA
 	bool "OMAP4 Panda Board"
@@ -357,6 +362,7 @@ config MACH_OMAP4_PANDA
 	select OMAP_PACKAGE_CBL
 	select OMAP_PACKAGE_CBS
 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+	select OMAP_TPS6236X
 
 config MACH_OMAP5_SEVM
 	bool "OMAP5 EVM board"
@@ -418,6 +424,13 @@ config OMAP4_ERRATA_I688
 	  In MPU case, L3 T2ASYNC FIFO and DDR T2ASYNC FIFO needs to be drained.
 	  IO barrier ensure that there is no synchronisation loss on initiators
 	  operating on both interconnect port simultaneously.
+
+config OMAP_TPS6236X
+	bool "OMAP4 support for TPS6236X power IC"
+	help
+	  TPS62361 is a PMIC used with OMAP4460 to supply MPU VDD voltage.
+	  Rest of the VDDs continue to be supplied via TWL6030.
+
 endmenu
 
 endif

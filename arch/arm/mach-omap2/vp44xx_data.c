@@ -44,6 +44,7 @@ static const struct omap_vp_common omap4_vp_common = {
 	.vpconfig_initvdd = OMAP4430_INITVDD_MASK,
 	.vpconfig_forceupdate = OMAP4430_FORCEUPDATE_MASK,
 	.vpconfig_vpenable = OMAP4430_VPENABLE_MASK,
+	.vstatus_vpidle = OMAP4430_VPINIDLE_MASK,
 	.vstepmin_smpswaittimemin_shift = OMAP4430_SMPSWAITTIMEMIN_SHIFT,
 	.vstepmax_smpswaittimemax_shift = OMAP4430_SMPSWAITTIMEMAX_SHIFT,
 	.vstepmin_stepmin_shift = OMAP4430_VSTEPMIN_SHIFT,
@@ -86,4 +87,19 @@ struct omap_vp_instance omap4_vp_core = {
 	.vlimitto = OMAP4_PRM_VP_CORE_VLIMITTO_OFFSET,
 	.vstatus = OMAP4_PRM_VP_CORE_STATUS_OFFSET,
 	.voltage = OMAP4_PRM_VP_CORE_VOLTAGE_OFFSET,
+};
+
+struct omap_vp_param omap4_mpu_vp_data = {
+	.vddmin			= OMAP4_VP_MPU_VLIMITTO_VDDMIN,
+	.vddmax			= OMAP4_VP_MPU_VLIMITTO_VDDMAX,
+};
+
+struct omap_vp_param omap4_iva_vp_data = {
+	.vddmin			= OMAP4_VP_IVA_VLIMITTO_VDDMIN,
+	.vddmax			= OMAP4_VP_IVA_VLIMITTO_VDDMAX,
+};
+
+struct omap_vp_param omap4_core_vp_data = {
+	.vddmin			= OMAP4_VP_CORE_VLIMITTO_VDDMIN,
+	.vddmax			= OMAP4_VP_CORE_VLIMITTO_VDDMAX,
 };

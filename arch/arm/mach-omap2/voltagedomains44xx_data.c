@@ -34,15 +34,22 @@
 
 static const struct omap_vfsm_instance omap4_vdd_mpu_vfsm = {
 	.voltsetup_reg = OMAP4_PRM_VOLTSETUP_MPU_RET_SLEEP_OFFSET,
+	.voltsetup_off_reg = OMAP4_PRM_VOLTSETUP_MPU_OFF_OFFSET,
 };
+static struct omap_vdd_info omap4_vdd_mpu_info;
+
 
 static const struct omap_vfsm_instance omap4_vdd_iva_vfsm = {
 	.voltsetup_reg = OMAP4_PRM_VOLTSETUP_IVA_RET_SLEEP_OFFSET,
+	.voltsetup_off_reg = OMAP4_PRM_VOLTSETUP_IVA_OFF_OFFSET,
 };
+static struct omap_vdd_info omap4_vdd_iva_info;
 
 static const struct omap_vfsm_instance omap4_vdd_core_vfsm = {
 	.voltsetup_reg = OMAP4_PRM_VOLTSETUP_CORE_RET_SLEEP_OFFSET,
+	.voltsetup_off_reg = OMAP4_PRM_VOLTSETUP_CORE_OFF_OFFSET,
 };
+static struct omap_vdd_info omap4_vdd_core_info;
 
 static struct voltagedomain omap4_voltdm_mpu = {
 	.name = "mpu",
@@ -53,6 +60,7 @@ static struct voltagedomain omap4_voltdm_mpu = {
 	.vc = &omap4_vc_mpu,
 	.vfsm = &omap4_vdd_mpu_vfsm,
 	.vp = &omap4_vp_mpu,
+	.vdd = &omap4_vdd_mpu_info,
 };
 
 static struct voltagedomain omap4_voltdm_iva = {
@@ -64,6 +72,7 @@ static struct voltagedomain omap4_voltdm_iva = {
 	.vc = &omap4_vc_iva,
 	.vfsm = &omap4_vdd_iva_vfsm,
 	.vp = &omap4_vp_iva,
+	.vdd = &omap4_vdd_iva_info,
 };
 
 static struct voltagedomain omap4_voltdm_core = {
@@ -75,6 +84,7 @@ static struct voltagedomain omap4_voltdm_core = {
 	.vc = &omap4_vc_core,
 	.vfsm = &omap4_vdd_core_vfsm,
 	.vp = &omap4_vp_core,
+	.vdd = &omap4_vdd_core_info,
 };
 
 static struct voltagedomain omap4_voltdm_wkup = {
@@ -101,13 +111,36 @@ void __init omap44xx_voltagedomains_init(void)
 	 * for the currently-running IC
 	 */
 #ifdef CONFIG_PM_OPP
-	omap4_voltdm_mpu.volt_data = omap44xx_vdd_mpu_volt_data;
-	omap4_voltdm_iva.volt_data = omap44xx_vdd_iva_volt_data;
-	omap4_voltdm_core.volt_data = omap44xx_vdd_core_volt_data;
+	if (cpu_is_omap443x()) {
+		omap4_voltdm_mpu.volt_data = omap443x_vdd_mpu_volt_data;
+		omap4_voltdm_iva.volt_data = omap443x_vdd_iva_volt_data;
+		omap4_voltdm_core.volt_data = omap443x_vdd_core_volt_data;
+		omap4_vdd_mpu_info.dep_vdd_info = omap443x_vddmpu_dep_info;
+		omap4_vdd_iva_info.dep_vdd_info = omap443x_vddiva_dep_info;
+	} else if (cpu_is_omap446x()) {
+		omap4_vdd_mpu_info.volt_data = omap446x_vdd_mpu_volt_data;
+		omap4_vdd_iva_info.volt_data = omap446x_vdd_iva_volt_data;
+		omap4_vdd_core_info.volt_data = omap446x_vdd_core_volt_data;
+		omap4_vdd_mpu_info.dep_vdd_info = omap446x_vddmpu_dep_info;
+		omap4_vdd_iva_info.dep_vdd_info = omap446x_vddiva_dep_info;
+	}
 #endif
+	omap4_voltdm_mpu.vp_param = &omap4_mpu_vp_data;
+	omap4_voltdm_iva.vp_param = &omap4_iva_vp_data;
+	omap4_voltdm_core.vp_param = &omap4_core_vp_data;
+
+	omap4_voltdm_mpu.vc_param = &omap4_mpu_vc_data;
+	omap4_voltdm_iva.vc_param = &omap4_iva_vc_data;
+	omap4_voltdm_core.vc_param = &omap4_core_vc_data;
 
 	for (i = 0; voltdm = voltagedomains_omap4[i], voltdm; i++)
 		voltdm->sys_clk.name = sys_clk_name;
 
 	voltdm_init(voltagedomains_omap4);
 };
+
+static int __init init_volt_domain_notifier_list(void)
+{
+	return __init_volt_domain_notifier_list(voltagedomains_omap4);
+}
+pure_initcall(init_volt_domain_notifier_list);

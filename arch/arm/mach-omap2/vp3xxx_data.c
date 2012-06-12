@@ -44,6 +44,7 @@ static const struct omap_vp_common omap3_vp_common = {
 	.vpconfig_initvdd = OMAP3430_INITVDD_MASK,
 	.vpconfig_forceupdate = OMAP3430_FORCEUPDATE_MASK,
 	.vpconfig_vpenable = OMAP3430_VPENABLE_MASK,
+	.vstatus_vpidle = OMAP3430_VPINIDLE_MASK,
 	.vstepmin_smpswaittimemin_shift = OMAP3430_SMPSWAITTIMEMIN_SHIFT,
 	.vstepmax_smpswaittimemax_shift = OMAP3430_SMPSWAITTIMEMAX_SHIFT,
 	.vstepmin_stepmin_shift = OMAP3430_VSTEPMIN_SHIFT,
@@ -76,4 +77,14 @@ struct omap_vp_instance omap3_vp_core = {
 	.vlimitto = OMAP3_PRM_VP2_VLIMITTO_OFFSET,
 	.vstatus = OMAP3_PRM_VP2_STATUS_OFFSET,
 	.voltage = OMAP3_PRM_VP2_VOLTAGE_OFFSET,
+};
+
+struct omap_vp_param omap3_mpu_vp_data = {
+	.vddmin			= OMAP3430_VP1_VLIMITTO_VDDMIN,
+	.vddmax			= OMAP3430_VP1_VLIMITTO_VDDMAX,
+};
+
+struct omap_vp_param omap3_core_vp_data = {
+	.vddmin			= OMAP3430_VP2_VLIMITTO_VDDMIN,
+	.vddmax			= OMAP3430_VP2_VLIMITTO_VDDMAX,
 };

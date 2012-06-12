@@ -46,21 +46,34 @@ static LIST_HEAD(voltdm_list);
 
 /* Public functions */
 /**
- * voltdm_get_voltage() - Gets the current non-auto-compensated voltage
+ * omap_voltage_get_curr_vdata() - Gets the current non-auto-compensated voltage
  * @voltdm:	pointer to the voltdm for which current voltage info is needed
  *
  * API to get the current non-auto-compensated voltage for a voltage domain.
  * Returns 0 in case of error else returns the current voltage.
  */
-unsigned long voltdm_get_voltage(struct voltagedomain *voltdm)
+struct omap_volt_data *omap_voltage_get_curr_vdata(struct voltagedomain *voltdm)
 {
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
-		return 0;
+		return NULL;
 	}
 
-	return voltdm->nominal_volt;
+	return voltdm->curr_volt;
 }
+
+int voltdm_register_notifier(struct voltagedomain *voltdm,
+						struct notifier_block *nb)
+{
+	return srcu_notifier_chain_register(&voltdm->change_notify_list, nb);
+}
+
+int voltdm_unregister_notifier(struct voltagedomain *voltdm,
+					     struct notifier_block *nb)
+{
+	return srcu_notifier_chain_unregister(&voltdm->change_notify_list, nb);
+}
+
 
 /**
  * voltdm_scale() - API to scale voltage of a particular voltage domain.
@@ -71,9 +84,11 @@ unsigned long voltdm_get_voltage(struct voltagedomain *voltdm)
  * for a particular voltage domain during DVFS.
  */
 int voltdm_scale(struct voltagedomain *voltdm,
-		 unsigned long target_volt)
+			struct omap_volt_data *target_v)
 {
 	int ret;
+	struct omap_voltage_notifier notify;
+	unsigned long target_volt = omap_get_operation_voltage(target_v);
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -86,10 +101,32 @@ int voltdm_scale(struct voltagedomain *voltdm,
 		return -ENODATA;
 	}
 
-	ret = voltdm->scale(voltdm, target_volt);
-	if (!ret)
-		voltdm->nominal_volt = target_volt;
+	/* XXXX: UGLY HACK TO BE REVERTED. Core Voltage scale fails!!! */
+	if (!strcmp(voltdm->name, "core")) {
+		static int core_first_time_scaled;
 
+		if (core_first_time_scaled) {
+			voltdm->curr_volt = target_v;
+			return 0;
+		}
+		core_first_time_scaled = true;
+
+		/* Give a constant reminder begging for a fix */
+		WARN(1, "%s: FIXME: CORE VOLTAGE WILL BE LOCKED AT %lduV\n",
+		     __func__, target_volt);
+	}
+
+
+	notify.voltdm = voltdm;
+	notify.target_volt = target_volt;
+	srcu_notifier_call_chain(&voltdm->change_notify_list,
+				 OMAP_VOLTAGE_PRECHANGE, (void *)&notify);
+
+	ret = voltdm->scale(voltdm, target_v);
+
+	notify.op_result = ret;
+	srcu_notifier_call_chain(&voltdm->change_notify_list,
+				 OMAP_VOLTAGE_POSTCHANGE, (void *)&notify);
 	return ret;
 }
 
@@ -104,14 +141,14 @@ int voltdm_scale(struct voltagedomain *voltdm,
  */
 void voltdm_reset(struct voltagedomain *voltdm)
 {
-	unsigned long target_volt;
+	struct omap_volt_data *target_volt;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
 		return;
 	}
 
-	target_volt = voltdm_get_voltage(voltdm);
+	target_volt = omap_voltage_get_curr_vdata(voltdm);
 	if (!target_volt) {
 		pr_err("%s: unable to find current voltage for vdd_%s\n",
 			__func__, voltdm->name);
@@ -239,6 +276,72 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
 	}
 }
 
+/* Voltage debugfs support */
+static int vp_volt_debug_get(void *data, u64 *val)
+{
+	struct voltagedomain *voltdm = (struct voltagedomain *)data;
+
+	if (!voltdm) {
+		pr_warning("Wrong paramater passed\n");
+		return -EINVAL;
+	}
+	*val = omap_vp_get_curr_volt(voltdm);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(vp_volt_debug_fops, vp_volt_debug_get, NULL, "%llu\n");
+
+static int nom_volt_debug_get(void *data, u64 *val)
+{
+	struct voltagedomain *voltdm = (struct voltagedomain *)data;
+	struct omap_volt_data *vdata;
+
+	if (!voltdm) {
+		pr_warning("Wrong paramater passed\n");
+		return -EINVAL;
+	}
+
+	vdata = omap_voltage_get_curr_vdata(voltdm);
+	if (IS_ERR_OR_NULL(vdata)) {
+		pr_warning("%s: unable to get volt for vdd_%s\n", __func__,
+			   voltdm->name);
+		return -ENODEV;
+	}
+	*val = vdata->volt_nominal;
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(nom_volt_debug_fops, nom_volt_debug_get, NULL,
+			"%llu\n");
+
+static void __init voltdm_debugfs_init(struct dentry *voltage_dir,
+					struct voltagedomain *voltdm)
+{
+	char *name;
+
+	name = kasprintf(GFP_KERNEL, "vdd_%s", voltdm->name);
+	if (!name) {
+		pr_warning("%s:vdd_%s: no mem for debugfs\n", __func__,
+			   voltdm->name);
+		return;
+	}
+
+	voltdm->debug_dir = debugfs_create_dir(name, voltage_dir);
+	kfree(name);
+	if (IS_ERR_OR_NULL(voltdm->debug_dir)) {
+		pr_warning("%s: Cannot create debugfs vdd_%s directory!\n",
+			   __func__, voltdm->name);
+		voltdm->debug_dir = NULL;
+		return;
+	}
+
+	(void) debugfs_create_file("curr_vp_volt", S_IRUGO, voltdm->debug_dir,
+				(void *)voltdm, &vp_volt_debug_fops);
+	(void) debugfs_create_file("curr_nominal_volt", S_IRUGO,
+				voltdm->debug_dir, (void *)voltdm,
+				&nom_volt_debug_fops);
+}
+
 /**
  * omap_voltage_late_init() - Init the various voltage parameters
  *
@@ -249,12 +352,15 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
 int __init omap_voltage_late_init(void)
 {
 	struct voltagedomain *voltdm;
+	struct dentry *voltage_dir;
 
 	if (list_empty(&voltdm_list)) {
 		pr_err("%s: Voltage driver support not added\n",
 			__func__);
 		return -EINVAL;
 	}
+
+	voltage_dir = debugfs_create_dir("voltage", NULL);
 
 	list_for_each_entry(voltdm, &voltdm_list, node) {
 		struct clk *sys_ck;
@@ -280,6 +386,9 @@ int __init omap_voltage_late_init(void)
 			voltdm->scale = omap_vp_forceupdate_scale;
 			omap_vp_init(voltdm);
 		}
+
+		if (voltage_dir)
+			voltdm_debugfs_init(voltage_dir, voltdm);
 	}
 
 	return 0;
@@ -428,4 +537,17 @@ void voltdm_init(struct voltagedomain **voltdms)
 		for (v = voltdms; *v; v++)
 			_voltdm_register(*v);
 	}
+}
+
+int __init __init_volt_domain_notifier_list(struct voltagedomain **voltdms)
+{
+	struct voltagedomain **v;
+
+	if (!voltdms)
+		return -1;
+
+	for (v = voltdms; *v; v++)
+		srcu_init_notifier_head(&(*v)->change_notify_list);
+
+	return 0;
 }

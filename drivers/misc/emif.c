@@ -24,6 +24,8 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <misc/jedec_ddr.h>
+#include <linux/notifier.h>
+#include <mach/common.h>
 #include "emif.h"
 
 /**
@@ -283,6 +285,7 @@ static void do_freq_update(void)
 	 * is available for this as part of the new
 	 * clock framework
 	 */
+	omap4_prcm_freq_update();
 
 	list_for_each_entry(emif, &device_list, node) {
 		if (emif->lpmode == EMIF_LP_MODE_SELF_REFRESH)
@@ -380,9 +383,14 @@ static u32 get_sdram_ref_ctrl_shdw(u32 freq,
 
 static u32 get_sdram_tim_1_shdw(const struct lpddr2_timings *timings,
 		const struct lpddr2_min_tck *min_tck,
-		const struct lpddr2_addressing *addressing)
+		const struct lpddr2_addressing *addressing, u32 ip_rev)
 {
 	u32 tim1 = 0, val = 0;
+
+	if (ip_rev == EMIF_4D5) {
+		val = DIV_ROUND_UP(timings->tRTW, t_ck) - 1;
+		tim1 |= val << T_RTW_SHIFT;
+	}
 
 	val = max(min_tck->tWTR, DIV_ROUND_UP(timings->tWTR, t_ck)) - 1;
 	tim1 |= val << T_WTR_SHIFT;
@@ -413,9 +421,14 @@ static u32 get_sdram_tim_1_shdw(const struct lpddr2_timings *timings,
 
 static u32 get_sdram_tim_1_shdw_derated(const struct lpddr2_timings *timings,
 		const struct lpddr2_min_tck *min_tck,
-		const struct lpddr2_addressing *addressing)
+		const struct lpddr2_addressing *addressing, u32 ip_rev)
 {
 	u32 tim1 = 0, val = 0;
+
+	if (ip_rev == EMIF_4D5) {
+		val = DIV_ROUND_UP(timings->tRTW, t_ck) - 1;
+		tim1 |= val << T_RTW_SHIFT;
+	}
 
 	val = max(min_tck->tWTR, DIV_ROUND_UP(timings->tWTR, t_ck)) - 1;
 	tim1 = val << T_WTR_SHIFT;
@@ -454,7 +467,7 @@ static u32 get_sdram_tim_1_shdw_derated(const struct lpddr2_timings *timings,
 static u32 get_sdram_tim_2_shdw(const struct lpddr2_timings *timings,
 		const struct lpddr2_min_tck *min_tck,
 		const struct lpddr2_addressing *addressing,
-		u32 type)
+		u32 type, u32 ip_rev)
 {
 	u32 tim2 = 0, val = 0;
 
@@ -470,6 +483,11 @@ static u32 get_sdram_tim_2_shdw(const struct lpddr2_timings *timings,
 
 	/* XSRD same as XSNR for LPDDR2 */
 	tim2 |= val << T_XSRD_SHIFT;
+
+	if (ip_rev == EMIF_4D5) {
+		val = DIV_ROUND_UP(timings->tAONPD, t_ck) - 1;
+		tim2 |= val << T_ODT_SHIFT;
+	}
 
 	val = max(min_tck->tXP, DIV_ROUND_UP(timings->tXP, t_ck)) - 1;
 	tim2 |= val << T_XP_SHIFT;
@@ -830,6 +848,21 @@ static void setup_volt_sensitive_regs(struct emif_data *emif,
 		calib_ctrl = regs->dll_calib_ctrl_shdw_normal;
 
 	writel(calib_ctrl, base + EMIF_DLL_CALIB_CTRL_SHDW);
+	/*
+	 * Due to errata OMAP5430-2.0BUG00669:
+	 * MDLL fast_lock asserion freezes MDLL output codes
+	 * We have to disable MDLL fast_lock. For IP which is fixed:
+	 */
+	if (emif->plat_data->phy_type == EMIF_PHY_TYPE_INTELLIPHY &&
+	    emif->plat_data->ip_rev > EMIF_4D5) {
+		u32 phy_ctrl = readl(base + EMIF_DDR_PHY_CTRL_1);
+
+		if (volt_state == DDR_VOLTAGE_RAMPING)
+			phy_ctrl |= FAST_DLL_LOCK_MASK_4D5;
+		else
+			phy_ctrl &= ~FAST_DLL_LOCK_MASK_4D5;
+		writel(phy_ctrl, base + EMIF_DDR_PHY_CTRL_1);
+	}
 }
 
 /*
@@ -1382,9 +1415,9 @@ static int get_emif_reg_values(struct emif_data *emif, u32 freq,
 
 	regs->ref_ctrl_shdw = get_sdram_ref_ctrl_shdw(freq, addressing);
 	regs->sdram_tim1_shdw = get_sdram_tim_1_shdw(timings, min_tck,
-			addressing);
+			addressing, ip_rev);
 	regs->sdram_tim2_shdw = get_sdram_tim_2_shdw(timings, min_tck,
-			addressing, type);
+			addressing, type, ip_rev);
 	regs->sdram_tim3_shdw = get_sdram_tim_3_shdw(timings, min_tck,
 		addressing, type, ip_rev, EMIF_NORMAL_TIMINGS);
 
@@ -1427,7 +1460,7 @@ static int get_emif_reg_values(struct emif_data *emif, u32 freq,
 
 		regs->sdram_tim1_shdw_derated =
 			get_sdram_tim_1_shdw_derated(timings, min_tck,
-				addressing);
+				addressing, ip_rev);
 
 		regs->sdram_tim3_shdw_derated = get_sdram_tim_3_shdw(timings,
 			min_tck, addressing, type, ip_rev,
@@ -1521,8 +1554,7 @@ static void do_volt_notify_handling(struct emif_data *emif, u32 volt_state)
 		volt_state);
 
 	if (!emif->curr_regs) {
-		dev_err(emif->dev,
-			"%s: volt-notify before registers are ready: %d\n",
+		dev_dbg(emif->dev, "%s: notify before registers are ready:%d\n",
 			__func__, volt_state);
 		return;
 	}
@@ -1536,17 +1568,30 @@ static void do_volt_notify_handling(struct emif_data *emif, u32 volt_state)
  * is available in mainline kernel. This function is un-used
  * right now.
  */
-static void __attribute__((unused)) volt_notify_handling(u32 volt_state)
+static int volt_notify_handling(struct notifier_block *nb,
+				unsigned long volt_state, void *data)
 {
 	struct emif_data *emif;
+	u32 val;
+
+	/* If there are no devices, nothing for us to do */
+	if (list_empty(&device_list))
+		return 0;
+
+	if (volt_state == OMAP_VOLTAGE_PRECHANGE)
+		val =  DDR_VOLTAGE_RAMPING;
+	else
+		val =  DDR_VOLTAGE_STABLE;
 
 	spin_lock_irqsave(&emif_lock, irq_state);
 
 	list_for_each_entry(emif, &device_list, node)
-		do_volt_notify_handling(emif, volt_state);
+		do_volt_notify_handling(emif, val);
 	do_freq_update();
 
 	spin_unlock_irqrestore(&emif_lock, irq_state);
+
+	return 0;
 }
 
 static void do_freq_pre_notify_handling(struct emif_data *emif, u32 new_freq)
@@ -1585,7 +1630,7 @@ static void do_freq_pre_notify_handling(struct emif_data *emif, u32 new_freq)
  * available in mainline kernel. This function is un-used
  * right now.
  */
-static void __attribute__((unused)) freq_pre_notify_handling(u32 new_freq)
+static void freq_pre_notify_handling(u32 new_freq)
 {
 	struct emif_data *emif;
 
@@ -1630,7 +1675,7 @@ static void do_freq_post_notify_handling(struct emif_data *emif)
  * available in mainline kernel. This function is un-used
  * right now.
  */
-static void __attribute__((unused)) freq_post_notify_handling(void)
+static void freq_post_notify_handling(void)
 {
 	struct emif_data *emif;
 
@@ -1644,6 +1689,37 @@ static void __attribute__((unused)) freq_post_notify_handling(void)
 	spin_unlock_irqrestore(&emif_lock, irq_state);
 }
 
+static int core_dpll_notify_handling(struct notifier_block *nb,
+				     unsigned long dpll_state, void *data)
+{
+
+	struct omap_dpll_notifier *notify = (struct omap_dpll_notifier *)data;
+
+	/* If there are no devices, nothing for us to do */
+	if (list_empty(&device_list))
+		return 0;
+
+	switch (dpll_state) {
+	case OMAP_CORE_DPLL_PRECHANGE:
+		freq_pre_notify_handling(notify->rate);
+		break;
+	case OMAP_CORE_DPLL_POSTCHANGE:
+		freq_post_notify_handling();
+		break;
+	default:
+		WARN(1, "INVALID state usage - %ld\n", dpll_state);
+	}
+	return 0;
+}
+
+static struct notifier_block emif_dpll_notifier_block = {
+	.notifier_call = core_dpll_notify_handling,
+};
+
+static struct notifier_block emif_volt_notifier_block = {
+	.notifier_call = volt_notify_handling,
+};
+
 static struct platform_driver emif_driver = {
 	.remove		= __exit_p(emif_remove),
 	.shutdown	= emif_shutdown,
@@ -1654,15 +1730,31 @@ static struct platform_driver emif_driver = {
 
 static int __init_or_module emif_register(void)
 {
+	struct voltagedomain *voltdm = voltdm_lookup("core");
+
+	if (!voltdm) {
+		pr_err("%s: CORE voltage domain lookup failed\n", __func__);
+		return -EINVAL;
+	}
+
+	voltdm_register_notifier(voltdm, &emif_volt_notifier_block);
+	omap4_core_dpll_register_notifier(&emif_dpll_notifier_block);
+
 	return platform_driver_probe(&emif_driver, emif_probe);
 }
 
 static void __exit emif_unregister(void)
 {
+	struct voltagedomain *voltdm = voltdm_lookup("core");
+
+	if (!voltdm)
+		pr_err("%s: CORE voltage domain lookup failed\n", __func__);
+	else
+		voltdm_unregister_notifier(voltdm, &emif_volt_notifier_block);
+	omap4_core_dpll_unregister_notifier(&emif_dpll_notifier_block);
 	platform_driver_unregister(&emif_driver);
 }
 
-postcore_initcall(emif_register);
 module_init(emif_register);
 module_exit(emif_unregister);
 MODULE_DESCRIPTION("TI EMIF SDRAM Controller Driver");

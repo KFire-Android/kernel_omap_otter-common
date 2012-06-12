@@ -186,7 +186,8 @@ struct omap_smartreflex_dev_attr {
  *			based decisions.
  */
 struct omap_sr_class_data {
-	int (*enable)(struct voltagedomain *voltdm);
+	int (*enable)(struct voltagedomain *voltdm,
+			struct omap_volt_data *volt_data);
 	int (*disable)(struct voltagedomain *voltdm, int is_volt_reset);
 	int (*configure)(struct voltagedomain *voltdm);
 	int (*notify)(struct voltagedomain *voltdm, u32 status);
@@ -229,7 +230,8 @@ struct omap_sr_data {
 };
 
 /* Smartreflex module enable/disable interface */
-void omap_sr_enable(struct voltagedomain *voltdm);
+void omap_sr_enable(struct voltagedomain *voltdm,
+			struct omap_volt_data *volt_data);
 void omap_sr_disable(struct voltagedomain *voltdm);
 void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
 
@@ -237,7 +239,7 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
 void omap_sr_register_pmic(struct omap_sr_pmic_data *pmic_data);
 
 /* Smartreflex driver hooks to be called from Smartreflex class driver */
-int sr_enable(struct voltagedomain *voltdm, unsigned long volt);
+int sr_enable(struct voltagedomain *voltdm, struct omap_volt_data *volt_data);
 void sr_disable(struct voltagedomain *voltdm);
 int sr_configure_errgen(struct voltagedomain *voltdm);
 int sr_disable_errgen(struct voltagedomain *voltdm);
@@ -246,7 +248,8 @@ int sr_configure_minmax(struct voltagedomain *voltdm);
 /* API to register the smartreflex class driver with the smartreflex driver */
 int sr_register_class(struct omap_sr_class_data *class_data);
 #else
-static inline void omap_sr_enable(struct voltagedomain *voltdm) {}
+static inline  void omap_sr_enable(struct voltagedomain *voltdm,
+			struct omap_volt_data *volt_data) {}
 static inline void omap_sr_disable(struct voltagedomain *voltdm) {}
 static inline void omap_sr_disable_reset_volt(
 		struct voltagedomain *voltdm) {}

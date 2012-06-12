@@ -13,18 +13,11 @@
 
 #include "smartreflex.h"
 
-static int sr_class3_enable(struct voltagedomain *voltdm)
+static int sr_class3_enable(struct voltagedomain *voltdm,
+				struct omap_volt_data *volt_data)
 {
-	unsigned long volt = voltdm_get_voltage(voltdm);
-
-	if (!volt) {
-		pr_warning("%s: Curr voltage unknown. Cannot enable sr_%s\n",
-				__func__, voltdm->name);
-		return -ENODATA;
-	}
-
 	omap_vp_enable(voltdm);
-	return sr_enable(voltdm, volt);
+	return sr_enable(voltdm, volt_data);
 }
 
 static int sr_class3_disable(struct voltagedomain *voltdm, int is_volt_reset)

@@ -54,6 +54,7 @@ struct omap_vc_common {
 	u8 i2c_cfg_reg;
 	u8 i2c_cfg_hsen_mask;
 	u8 i2c_mcode_mask;
+	u8 i2c_clk_reg;
 };
 
 /* omap_vc_channel.flags values */
@@ -67,6 +68,7 @@ struct omap_vc_common {
  * @cmd_reg_addr: command configuration register address
  * @setup_time: setup time (in sys_clk cycles) of regulator for this channel
  * @cfg_channel: current value of VC channel configuration register
+ * @setup_voltage_common: voltage command reg value for RET and OFF mode
  * @i2c_high_speed: whether or not to use I2C high-speed mode
  *
  * @common: pointer to VC common data for this platform
@@ -86,8 +88,8 @@ struct omap_vc_channel {
 	u16 i2c_slave_addr;
 	u16 volt_reg_addr;
 	u16 cmd_reg_addr;
-	u16 setup_time;
 	u8 cfg_channel;
+	u32 setup_voltage_common;
 	bool i2c_high_speed;
 
 	/* register access data */
@@ -111,15 +113,31 @@ extern struct omap_vc_channel omap4_vc_mpu;
 extern struct omap_vc_channel omap4_vc_iva;
 extern struct omap_vc_channel omap4_vc_core;
 
+extern struct omap_vc_param omap3_mpu_vc_data;
+extern struct omap_vc_param omap3_core_vc_data;
+
+extern struct omap_vc_param omap4_mpu_vc_data;
+extern struct omap_vc_param omap4_iva_vc_data;
+extern struct omap_vc_param omap4_core_vc_data;
+
+extern struct omap_vc_channel omap5_vc_mpu;
+extern struct omap_vc_channel omap5_vc_mm;
+extern struct omap_vc_channel omap5_vc_core;
+
+extern struct omap_vc_param omap5_mpu_vc_data;
+extern struct omap_vc_param omap5_mm_vc_data;
+extern struct omap_vc_param omap5_core_vc_data;
+
 void omap_vc_init_channel(struct voltagedomain *voltdm);
 int omap_vc_pre_scale(struct voltagedomain *voltdm,
 		      unsigned long target_volt,
+		      struct omap_volt_data *target_vdata,
 		      u8 *target_vsel, u8 *current_vsel);
 void omap_vc_post_scale(struct voltagedomain *voltdm,
 			unsigned long target_volt,
+			struct omap_volt_data *target_vdata,
 			u8 target_vsel, u8 current_vsel);
 int omap_vc_bypass_scale(struct voltagedomain *voltdm,
-			 unsigned long target_volt);
-
+			struct omap_volt_data *target_v);
 #endif
 
