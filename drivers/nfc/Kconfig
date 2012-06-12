@@ -2,8 +2,17 @@
 # Near Field Communication (NFC) devices
 #
 
-menu "Near Field Communication (NFC) devices"
-	depends on NFC
+menuconfig NFC_DEVICES
+	bool "Near Field Communication (NFC) devices"
+	default n
+	---help---
+	You'll have to say Y if your computer contains an NFC device that
+	you want to use under Linux.
+
+	You can say N here if you don't have any Near Field Communication
+	devices connected to your computer.
+
+if NFC_DEVICES
 
 config PN544_NFC
 	tristate "PN544 NFC driver"
@@ -38,4 +47,12 @@ config NFC_WILINK
 	  Say Y here to compile support for Texas Instrument's NFC WiLink driver
 	  into the kernel or say M to compile it as module.
 
-endmenu
+config ST_NFC
+    tristate "Texas Instruments ST nfc driver"
+       depends on TI_ST
+    help
+      This enables the NFC driver for TI WL128x BT/FM/GPS/NFC combo devices.
+      It will provide a character device for the TI NFC host software to
+      access the NFC core on the WL128x.
+
+endif
