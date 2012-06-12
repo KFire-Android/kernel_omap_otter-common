@@ -49,6 +49,7 @@
 #include <plat/usb.h>
 #include "hsmmc.h"
 #include <plat/remoteproc.h>
+#include <plat/rpmsg_resmgr.h>
 #include "common-board-devices.h"
 #include "board-omap5evm.h"
 #include "mux.h"
@@ -693,6 +694,21 @@ static struct twl6040_platform_data twl6040_data = {
 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
+#ifdef CONFIG_OMAP5_SEVM_PALMAS
+static struct omap_rprm_regulator omap5evm_rprm_regulators[] = {
+	{
+		.name = "cam2pwr",
+		.fixed = true,
+	},
+	{
+		.name = "cam2csi",
+		.fixed = true,
+	},
+};
+#else
+static struct omap_rprm_regulator omap5evm_rprm_regulators[] = { };
+#endif  /* CONFIG_OMAP5_SEVM_PALMAS */
+
 static struct platform_device omap5evm_dmic_codec = {
 	.name	= "dmic-codec",
 	.id	= -1,
@@ -1054,6 +1070,8 @@ static void __init omap_5430evm_init(void)
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
 
 	omap5evm_display_init();
+	omap_rprm_regulator_init(omap5evm_rprm_regulators,
+					ARRAY_SIZE(omap5evm_rprm_regulators));
 }
 
 static void __init omap_5430evm_reserve(void)
