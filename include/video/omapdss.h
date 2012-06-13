@@ -729,6 +729,11 @@ struct omap_dss_device {
 	struct omap_dsi_timings *dsi_timings;
 };
 
+struct omap_dss_hdmi_data
+{
+	int hpd_gpio;
+};
+
 struct omap_dss_driver {
 	struct device_driver driver;
 
