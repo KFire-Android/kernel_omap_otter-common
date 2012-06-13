@@ -56,15 +56,15 @@ struct rprm_sdma {
 
 /**
  * struct rprm_auxclk - resource manager parameters for auxiliary clock
- * @name:	name of the auxclk
- * @clk_rate:	rate in Hz of the auxclk
- * @pname:	parent clk of auxclk
- * @pclk_rate:	rate of the auxclk's parent
+ * @cl_id:	id of the auxclk
+ * @clk_rate:	rate in Hz for the auxclk
+ * @pclk_id:	id of the auxclk source's parent
+ * @pclk_rate:	rate in Hz for the auxclk source's parent
  */
 struct rprm_auxclk {
-	char name[24];
+	u32 clk_id;
 	unsigned clk_rate;
-	char pname[24];
+	u32 pclk_id;
 	unsigned pclk_rate;
 } __packed;
 

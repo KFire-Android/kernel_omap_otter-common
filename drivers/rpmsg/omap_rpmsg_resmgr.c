@@ -40,7 +40,9 @@ struct rprm_gpt_depot {
 
 struct rprm_auxclk_depot {
 	struct rprm_auxclk args;
+	struct omap_rprm_auxclk *oauxck;
 	struct clk *clk;
+	struct clk *old_pclk;
 };
 
 struct rprm_regulator_depot {
@@ -202,20 +204,45 @@ static int rprm_auxclk_request(void **handle, void *args, size_t len)
 	struct rprm_auxclk_depot *acd;
 	struct clk *src;
 	struct clk *parent;
+	struct omap_rprm_auxclk *oauxck;
+	char const *name;
+	char const *pname;
 
-	if (len != sizeof *auxck)
+	if (len != sizeof *auxck) {
+		pr_err("error requesting auxclk - invalid length\n");
 		return -EINVAL;
+	}
 
+	if (!mach_ops || !mach_ops->lookup_auxclk) {
+		pr_err("error requesting auxclk - invalid ops\n");
+		return -ENOENT;
+	}
+
+	oauxck = mach_ops->lookup_auxclk(auxck->clk_id);
+	if (!oauxck) {
+		pr_err("auxclk lookup failed, id %d\n", auxck->clk_id);
+		return -ENOENT;
+	}
+
+	if (auxck->pclk_id >= oauxck->parents_cnt) {
+		pr_err("invalid auxclk source parent, id %d parent_id %d\n",
+				auxck->clk_id, auxck->pclk_id);
+		return -ENOENT;
+	}
+
+	name = oauxck->name;
+	pname = oauxck->parents[auxck->pclk_id];
 	/* Create auxclks depot */
-	acd = kmalloc(sizeof *acd, GFP_KERNEL);
-	if (!acd)
+	acd = kzalloc(sizeof *acd, GFP_KERNEL);
+	if (!acd) {
+		pr_err("error allocating memory for auxclk\n");
 		return -ENOMEM;
+	}
 
-	/* make sure make is NULL terminated */
-	auxck->name[sizeof auxck->name - 1] = '\0';
-	acd->clk = clk_get(NULL, auxck->name);
+	acd->oauxck = oauxck;
+	acd->clk = clk_get(NULL, name);
 	if (!acd->clk) {
-		pr_err("unable to get clock %s\n", auxck->name);
+		pr_err("unable to get clock %s\n", name);
 		ret = -EIO;
 		goto error;
 	}
@@ -225,46 +252,45 @@ static int rprm_auxclk_request(void **handle, void *args, size_t len)
 	 */
 	src = clk_get_parent(acd->clk);
 	if (!src) {
-		pr_err("unable to get %s source clock\n", auxck->name);
+		pr_err("unable to get %s source parent clock\n", name);
 		ret = -EIO;
 		goto error_aux;
 	}
 
-	/* make sure pname is NULL terminated */
-	auxck->pname[sizeof auxck->pname - 1] = '\0';
-	parent = clk_get(NULL, auxck->pname);
+	parent = clk_get(NULL, pname);
 	if (!parent) {
-		pr_err("unable to get parent clock %s\n", auxck->pname);
+		pr_err("unable to get source parent clock %s\n", pname);
 		ret = -EIO;
 		goto error_aux;
 	}
 
+	/* save old parent in order to restore at release time*/
+	acd->old_pclk = clk_get_parent(src);
 	ret = clk_set_parent(src, parent);
 	if (ret) {
-		pr_err("unable to set clk %s as parent of %s\n",
-						auxck->pname, auxck->name);
+		pr_err("unable to set clk %s as parent of %s\n", pname, name);
 		goto error_aux_parent;
 	}
 
 	ret = clk_set_rate(parent, auxck->pclk_rate);
 	if (ret) {
-		pr_err("rate %u not supported by %s\n", auxck->pclk_rate,
-								auxck->pname);
-		goto error_aux_parent;
+		pr_err("rate %u not supported by %s\n",
+						auxck->pclk_rate, pname);
+		goto error_set_parent;
 	}
 
 	ret = clk_set_rate(acd->clk, auxck->clk_rate);
 	if (ret) {
-		pr_err("rate %u not supported by %s\n", auxck->clk_rate,
-								auxck->name);
-		goto error_aux_parent;
+		pr_err("rate %u not supported by %s\n", auxck->clk_rate, name);
+		goto error_set_parent;
 	}
 
 	ret = clk_enable(acd->clk);
 	if (ret) {
-		pr_err("error enabling %s\n", auxck->name);
-		goto error_aux_parent;
+		pr_err("error enabling %s\n", name);
+		goto error_set_parent;
 	}
+
 	clk_put(parent);
 
 	memcpy(&acd->args, auxck, sizeof *auxck);
@@ -272,6 +298,9 @@ static int rprm_auxclk_request(void **handle, void *args, size_t len)
 	*handle = acd;
 
 	return 0;
+
+error_set_parent:
+	clk_set_parent(src, acd->old_pclk);
 error_aux_parent:
 	clk_put(parent);
 error_aux:
@@ -286,6 +315,7 @@ static int rprm_auxclk_release(void *handle)
 {
 	struct rprm_auxclk_depot *acd = handle;
 
+	clk_set_parent(clk_get_parent(acd->clk), acd->old_pclk);
 	clk_disable(acd->clk);
 	clk_put(acd->clk);
 
@@ -298,13 +328,15 @@ static int rprm_auxclk_get_info(void *handle, char *buf, size_t len)
 {
 	struct rprm_auxclk_depot *acd = handle;
 	struct rprm_auxclk *auxck = &acd->args;
+	struct omap_rprm_auxclk *oauxck = acd->oauxck;
 
 	return snprintf(buf, len,
 		"name:%s\n"
 		"rate:%u\n"
 		"parent:%s\n"
 		"parent rate:%u\n",
-		auxck->name, auxck->clk_rate, auxck->pname, auxck->pclk_rate);
+		oauxck->name, auxck->clk_rate,
+		oauxck->parents[auxck->clk_id], auxck->pclk_rate);
 }
 
 #ifdef CONFIG_REGULATOR
