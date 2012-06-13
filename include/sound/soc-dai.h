@@ -91,6 +91,24 @@ struct snd_compr_stream;
                                SNDRV_PCM_FMTBIT_S32_LE |\
                                SNDRV_PCM_FMTBIT_S32_BE)
 
+#define SND_SOC_DAI_CONNECT(xname, xcodec, xplatform, xcodec_dai, xcpu_dai) \
+	.name = xname, .codec_name = xcodec, \
+	.platform_name = xplatform, .codec_dai_name = xcodec_dai,\
+	.cpu_dai_name = xcpu_dai
+#define SND_SOC_DAI_OPS(xops, xinit) \
+	.ops = xops, .init = xinit
+#define SND_SOC_DAI_IGNORE_SUSPEND .ignore_suspend = 1
+#define SND_SOC_DAI_IGNORE_PMDOWN .ignore_pmdown_time = 1
+#define SND_SOC_DAI_BE_LINK(xid, xfixup) \
+	.be_id = xid, .be_hw_params_fixup = xfixup, .no_pcm = 1
+#define SND_SOC_DAI_FE_LINK(xname, xplatform, xcpu_dai) \
+	.name = xname, .platform_name = xplatform, \
+	.cpu_dai_name = xcpu_dai, .dynamic = 1, \
+	.codec_name = "snd-soc-dummy", .codec_dai_name = "snd-soc-dummy-dai"
+#define SND_SOC_DAI_FE_TRIGGER(xplay, xcapture) \
+	.trigger = {xplay, xcapture}
+#define SND_SOC_DAI_LINK_NO_HOST	.no_host_mode = 1
+
 struct snd_soc_dai_driver;
 struct snd_soc_dai;
 struct snd_ac97_bus_ops;

@@ -165,7 +165,7 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
 
-	if (rtd->dai_link->no_host_mode == SND_SOC_DAI_LINK_NO_HOST)
+	if (rtd->dai_link->no_host_mode)
 		snd_soc_set_runtime_hwparams(substream, &no_host_hardware);
 	/* startup the audio subsystem */
 	if (cpu_dai->driver->ops->startup) {
@@ -575,7 +575,7 @@ static int soc_pcm_hw_params(struct snd_pcm_substream *substream,
 	/* malloc a page for hostless IO.
 	 * FIXME: rework with alsa-lib changes so that this malloc is not required.
 	 */
-	if (rtd->dai_link->no_host_mode == SND_SOC_DAI_LINK_NO_HOST) {
+	if (rtd->dai_link->no_host_mode) {
 		substream->dma_buffer.dev.type = SNDRV_DMA_TYPE_DEV;
 		substream->dma_buffer.dev.dev = rtd->dev;
 		substream->dma_buffer.dev.dev->coherent_dma_mask = DMA_BIT_MASK(32);
@@ -636,7 +636,7 @@ static int soc_pcm_hw_free(struct snd_pcm_substream *substream)
 
 	if (cpu_dai->driver->ops->hw_free)
 		cpu_dai->driver->ops->hw_free(substream, cpu_dai);
-	if (rtd->dai_link->no_host_mode == SND_SOC_DAI_LINK_NO_HOST)
+	if (rtd->dai_link->no_host_mode)
 		snd_pcm_lib_free_pages(substream);
 
 	mutex_unlock(&rtd->pcm_mutex);

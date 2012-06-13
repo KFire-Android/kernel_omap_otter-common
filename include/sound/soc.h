@@ -311,9 +311,6 @@ enum snd_soc_bias_level {
 	SND_SOC_BIAS_ON = 3,
 };
 
-/* DAI Link Host Mode Support */
-#define SND_SOC_DAI_LINK_NO_HOST		0x1
-#define SND_SOC_DAI_LINK_OPT_HOST		0x2
 
 struct device_node;
 struct snd_jack;
