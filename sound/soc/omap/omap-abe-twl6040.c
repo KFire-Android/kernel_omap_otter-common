@@ -1355,7 +1355,7 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 		.stream_name = "FM Capture",
 
 		/* ABE components - MCBSP2 - MM-EXT */
-		.cpu_dai_name = "omap-mcbsp-dai.1",
+		.cpu_dai_name = "omap-mcbsp.2",
 		.platform_name = "aess",
 
 		/* FM */
