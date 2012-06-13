@@ -28,6 +28,18 @@ struct omap_rprm_regulator {
 };
 
 /*
+ * struct omap_rprm_auxclk - omap resmgr auxclk data
+ * @name	name of the auxiliary clock
+ * @parents	array of possible parents names for the auxclk
+ * @parents_cnt number of possible parents
+ */
+struct omap_rprm_auxclk {
+	const char *name;
+	const char * const *parents;
+	u32 parents_cnt;
+};
+
+/*
  * struct omap_rprm_ops - operations exported for this module
  *			(only constraints at the comment)
  * @set_min_bus_tput:		set a throughput constraint to the bus there
@@ -36,6 +48,7 @@ struct omap_rprm_regulator {
  * @device_scale:		scale @tdev, it can be used to set a frequency
  *				constraint in @tdev
  * @lookup_regulator:		return the regulator identified by the @reg_id
+ * @lookup_auxclk		return the auxclk identified by the @id
  *
  */
 struct omap_rprm_ops {
@@ -46,6 +59,7 @@ struct omap_rprm_ops {
 	int (*device_scale)(struct device *rdev, struct device *tdev,
 			unsigned long val);
 	struct omap_rprm_regulator *(*lookup_regulator)(u32 reg_id);
+	struct omap_rprm_auxclk *(*lookup_auxclk)(u32 id);
 };
 
 /*

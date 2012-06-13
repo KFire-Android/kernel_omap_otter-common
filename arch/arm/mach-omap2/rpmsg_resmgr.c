@@ -22,6 +22,75 @@
 
 #include <plat/rpmsg_resmgr.h>
 #include <plat/omap-pm.h>
+#include <plat/cpu.h>
+
+static const char * const omap4_pauxclks[] = {
+	"sys_clkin_ck",
+	"dpll_core_m3x2_ck",
+	"dpll_per_m3x2_ck",
+};
+
+static struct omap_rprm_auxclk omap4_auxclks[] = {
+	{
+		.name = "auxclk0_ck",
+		.parents = omap4_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap4_pauxclks),
+	},
+	{
+		.name = "auxclk1_ck",
+		.parents = omap4_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap4_pauxclks),
+	},
+	{
+		.name = "auxclk2_ck",
+		.parents = omap4_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap4_pauxclks),
+	},
+	{
+		.name = "auxclk3_ck",
+		.parents = omap4_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap4_pauxclks),
+	},
+};
+
+static const char * const omap5_pauxclks[] = {
+	"sys_clkin",
+	"dpll_core_m3x2_opt_ck",
+	"dpll_per_m3x2_opt_ck",
+};
+
+static struct omap_rprm_auxclk omap5_auxclks[] = {
+	{
+		.name = "auxclk0_ck",
+		.parents = omap5_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap5_pauxclks),
+	},
+	{
+		.name = "auxclk1_ck",
+		.parents = omap5_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap5_pauxclks),
+	},
+	{
+		.name = "auxclk2_ck",
+		.parents = omap5_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap5_pauxclks),
+	},
+	{
+		.name = "auxclk3_ck",
+		.parents = omap5_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap5_pauxclks),
+	},
+	{
+		.name = "auxclk4_ck",
+		.parents = omap5_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap5_pauxclks),
+	},
+	{
+		.name = "auxclk5_ck",
+		.parents = omap5_pauxclks,
+		.parents_cnt = ARRAY_SIZE(omap5_pauxclks),
+	},
+};
 
 static int omap2_rprm_set_min_bus_tput(struct device *rdev,
 		struct device *tdev, unsigned long val)
@@ -59,11 +128,22 @@ static struct omap_rprm_regulator *omap2_rprm_lookup_regulator(u32 reg_id)
 	return &regulators[reg_id];
 }
 
+static struct omap_rprm_auxclk *auxclks;
+static u32 auxclk_cnt;
+
+static struct omap_rprm_auxclk *omap2_rprm_lookup_auxclk(u32 id)
+{
+	if (id >= auxclk_cnt)
+		return NULL;
+	return &auxclks[id];
+}
+
 static struct omap_rprm_ops omap2_rprm_ops = {
 	.set_min_bus_tput	= omap2_rprm_set_min_bus_tput,
 	.set_max_dev_wakeup_lat	= omap2_rprm_set_max_dev_wakeup_lat,
 	.device_scale		= omap2_rprm_device_scale,
 	.lookup_regulator	= omap2_rprm_lookup_regulator,
+	.lookup_auxclk		= omap2_rprm_lookup_auxclk,
 };
 
 static struct omap_rprm_pdata omap2_rprm_data = {
@@ -74,6 +154,14 @@ static int __init omap2_rprm_init(void)
 {
 	struct platform_device *pdev;
 	int ret;
+
+	if (cpu_is_omap54xx()) {
+		auxclks = omap5_auxclks;
+		auxclk_cnt = ARRAY_SIZE(omap5_auxclks);
+	} else if (cpu_is_omap44xx()) {
+		auxclks = omap4_auxclks;
+		auxclk_cnt = ARRAY_SIZE(omap4_auxclks);
+	}
 
 	pdev = platform_device_alloc("omap-rprm", -1);
 	if (!pdev)
