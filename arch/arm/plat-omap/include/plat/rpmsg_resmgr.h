@@ -18,6 +18,16 @@
 #include <linux/device.h>
 
 /*
+ * struct omap_rprm_regulator - omap resmgr regulator data
+ * @name:	name of the regulator
+ * @fixed:	true if the voltage is fixed and therefore is not programmable
+ */
+struct omap_rprm_regulator {
+	const char *name;
+	bool fixed;
+};
+
+/*
  * struct omap_rprm_ops - operations exported for this module
  *			(only constraints at the comment)
  * @set_min_bus_tput:		set a throughput constraint to the bus there
@@ -42,5 +52,9 @@ struct omap_rprm_ops {
 struct omap_rprm_pdata {
 	struct omap_rprm_ops *ops;
 };
+
+void __init omap_rprm_regulator_init(struct omap_rprm_regulator *regulators,
+			     u32 regulator_cnt);
+u32 omap_rprm_get_regulators(struct omap_rprm_regulator **regulators);
 
 #endif /* _PLAT_RPMSG_RESMGR_H */
