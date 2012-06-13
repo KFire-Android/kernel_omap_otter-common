@@ -63,6 +63,9 @@
 /* USBB2 to SMSC 4640 HUB */
 #define GPIO_HUB_NRESET	173
 
+/* MSECURE GPIO */
+#define GPIO_MSECURE 234
+
 static const uint32_t evm5430_keymap[] = {
 	KEY(0, 0, KEY_RESERVED),
 	KEY(0, 1, KEY_RESERVED),
@@ -1027,6 +1030,17 @@ static void __init omap_ehci_ohci_init(void)
 	return;
 }
 
+static void __init omap_msecure_init(void)
+{
+	int err;
+	/* setup msecure line as GPIO for RTC accesses */
+	omap_mux_init_gpio(GPIO_MSECURE, OMAP_PIN_OUTPUT);
+	err = gpio_request_one(GPIO_MSECURE, GPIOF_OUT_INIT_HIGH, "msecure");
+	if (err < 0)
+		pr_err("Failed to request GPIO %d, error %d\n",
+			GPIO_MSECURE, err);
+}
+
 static void __init omap_5430evm_init(void)
 {
 	int status;
@@ -1049,6 +1063,7 @@ static void __init omap_5430evm_init(void)
 	omap_sdrc_init(NULL, NULL);
 
 	omap_5430evm_i2c_init();
+	omap_msecure_init();
 	omap5_pmic_init(1, PALMAS_NAME, OMAP44XX_IRQ_SYS_1N, PALMAS_DATA,
 			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
 
