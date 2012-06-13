@@ -2060,17 +2060,21 @@ int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 	/* create the PCM */
 	if (rtd->dai_link->no_pcm) {
 		snprintf(new_name, sizeof(new_name), "(%s)",
-			rtd->dai_link->stream_name);
+			rtd->dai_link->stream_name ?
+			rtd->dai_link->stream_name : rtd->dai_link->name);
 
 		ret = snd_pcm_new_internal(rtd->card->snd_card, new_name, num,
 				playback, capture, &pcm);
 	} else {
 		if (rtd->dai_link->dynamic)
 			snprintf(new_name, sizeof(new_name), "%s (*)",
-				rtd->dai_link->stream_name);
+				rtd->dai_link->stream_name ?
+				rtd->dai_link->stream_name : rtd->dai_link->name);
 		else
 			snprintf(new_name, sizeof(new_name), "%s %s-%d",
-				rtd->dai_link->stream_name, codec_dai->name, num);
+				rtd->dai_link->stream_name ?
+				rtd->dai_link->stream_name : rtd->dai_link->name,
+				codec_dai->name, num);
 
 		ret = snd_pcm_new(rtd->card->snd_card, new_name, num, playback,
 			capture, &pcm);
