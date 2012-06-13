@@ -232,6 +232,28 @@ void propagate_rate(struct clk *tclk)
 	}
 }
 
+/**
+ * followparent_set_rate - set rate on parent and propagate to children
+ * @clk: struct clk * to set the rate on
+ * @rate: clock rate to set
+ *
+ * Sets the rate for dummy clocks by setting the rate on the corresponding
+ * parent and then propagating the rate to all the parent's children
+ */
+int followparent_set_rate(struct clk *clk, unsigned long rate)
+{
+	struct clk *pclk = clk->parent;
+	int ret = 0;
+
+	if (pclk->set_rate) {
+		ret = pclk->set_rate(pclk, rate);
+		if (!ret)
+			propagate_rate(pclk);
+	}
+
+	return ret;
+}
+
 static LIST_HEAD(root_clks);
 
 /**
