@@ -347,7 +347,7 @@ found:
 			driver->unbind(udc->gadget);
 			goto err1;
 		}
-		usb_gadget_disconnect(udc->gadget);
+		usb_gadget_connect(udc->gadget);
 	} else {
 
 		ret = usb_gadget_start(udc->gadget, driver, bind);

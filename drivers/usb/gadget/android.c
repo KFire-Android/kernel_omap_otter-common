@@ -198,6 +198,7 @@ static void android_enable(struct android_dev *dev)
 	if (--dev->disable_depth == 0) {
 		usb_add_config(cdev, &android_config_driver,
 					android_bind_config);
+		usb_gadget_allow_pullup(cdev->gadget, 1);
 		usb_gadget_connect(cdev->gadget);
 	}
 }
@@ -207,6 +208,7 @@ static void android_disable(struct android_dev *dev)
 	struct usb_composite_dev *cdev = dev->cdev;
 
 	if (dev->disable_depth++ == 0) {
+		usb_gadget_allow_pullup(cdev->gadget, 1);
 		usb_gadget_disconnect(cdev->gadget);
 		/* Cancel pending control requests */
 		usb_ep_dequeue(cdev->gadget->ep0, cdev->req);
@@ -1118,6 +1120,8 @@ static int android_bind(struct usb_composite_dev *cdev)
 	struct android_dev *dev = _android_dev;
 	struct usb_gadget	*gadget = cdev->gadget;
 	int			gcnum, id, ret;
+
+	usb_gadget_allow_pullup(gadget, 0);
 
 	ret = android_init_functions(dev->functions, cdev);
 	if (ret)
