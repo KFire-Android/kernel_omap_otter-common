@@ -70,6 +70,7 @@
 #define GCZONE_CLIP		(1 << 11)
 #define GCZONE_BATCH		(1 << 12)
 #define GCZONE_BLIT		(1 << 13)
+#define GCZONE_CACHE		(1 << 14)
 
 GCDBG_FILTERDEF(gcbv, GCZONE_NONE,
 		"mapping",
@@ -85,7 +86,8 @@ GCDBG_FILTERDEF(gcbv, GCZONE_NONE,
 		"do_filter",
 		"clip",
 		"batch",
-		"blit")
+		"blit",
+		"cache")
 
 
 /*******************************************************************************
@@ -4020,50 +4022,45 @@ exit:
 enum bverror bv_cache(struct bvcopparams *copparams)
 {
 	enum bverror bverror = BVERR_NONE;
-	int count; /* number of planes */
-	unsigned int bpp = 0; /* bytes per pixel */
+	unsigned int bytespp = 0; /* bytes per pixel */
 	unsigned long vert_offset, horiz_offset;
 
 	struct c2dmrgn rgn[3];
 	int container_size = 0;
 
-	unsigned long subsample = copparams->geom->format &
-			OCDFMTDEF_SUBSAMPLE_MASK;
-	unsigned long vendor = copparams->geom->format &
-			OCDFMTDEF_VENDOR_MASK;
-	unsigned long layout = copparams->geom->format &
-			OCDFMTDEF_LAYOUT_MASK;
-	unsigned long sizeminus1 = copparams->geom->format &
-			OCDFMTDEF_COMPONENTSIZEMINUS1_MASK;
-	unsigned long container = copparams->geom->format &
-			OCDFMTDEF_CONTAINER_MASK;
+	unsigned long subsample;
+	unsigned long vendor;
+	unsigned long layout;
+	unsigned long size;
+	unsigned long container;
+
+	subsample = copparams->geom->format & OCDFMTDEF_SUBSAMPLE_MASK;
+	vendor = copparams->geom->format & OCDFMTDEF_VENDOR_MASK;
+	layout = copparams->geom->format & OCDFMTDEF_LAYOUT_MASK;
+	size = copparams->geom->format & OCDFMTDEF_COMPONENTSIZEMINUS1_MASK;
+	container = copparams->geom->format & OCDFMTDEF_CONTAINER_MASK;
 
 	if (vendor != OCDFMTDEF_VENDOR_ALL) {
 		bverror = BVERR_FORMAT;
-		goto Error;
+		goto exit;
 	}
 
 	switch (container) {
 	case OCDFMTDEF_CONTAINER_8BIT:
 		container_size = 8;
 		break;
-
 	case OCDFMTDEF_CONTAINER_16BIT:
 		container_size = 16;
 		break;
-
 	case OCDFMTDEF_CONTAINER_24BIT:
 		container_size = 24;
 		break;
-
 	case OCDFMTDEF_CONTAINER_32BIT:
 		container_size = 32;
 		break;
-
 	case OCDFMTDEF_CONTAINER_48BIT:
 		container_size = 48;
 		break;
-
 	case OCDFMTDEF_CONTAINER_64BIT:
 		container_size = 64;
 		break;
@@ -4071,67 +4068,83 @@ enum bverror bv_cache(struct bvcopparams *copparams)
 
 	switch (layout) {
 	case OCDFMTDEF_PACKED:
-
-		count = 1;
-
 		switch (subsample) {
 		case OCDFMTDEF_SUBSAMPLE_NONE:
-			if (sizeminus1 >= 8) {
-				bpp = container_size / 8;
+			if (size >= 8) {
+				bytespp = container_size / 8;
 			} else {
+				GCERR("format not supported.\n");
 				bverror = BVERR_FORMAT;
-				goto Error;
+				goto exit;
 			}
 			break;
 
 		case OCDFMTDEF_SUBSAMPLE_422_YCbCr:
-			bpp = (container_size / 2) / 8;
+			bytespp = (container_size / 2) / 8;
 			break;
 
 		case OCDFMTDEF_SUBSAMPLE_420_YCbCr:
 			bverror = BVERR_FORMAT;
-			goto Error;
+			goto exit;
 			break;
 
 		case OCDFMTDEF_SUBSAMPLE_411_YCbCr:
 			bverror = BVERR_FORMAT;
-			goto Error;
+			goto exit;
 			break;
 
 		default:
 			bverror = BVERR_FORMAT;
-			goto Error;
+			goto exit;
 		}
 
-		rgn[0].span = copparams->rect->width * bpp;
+		rgn[0].span = copparams->rect->width * bytespp;
 		rgn[0].lines = copparams->rect->height;
 		rgn[0].stride = copparams->geom->virtstride;
-		horiz_offset = copparams->rect->left * bpp;
+		horiz_offset = copparams->rect->left * bytespp;
 		vert_offset = copparams->rect->top;
 
 		rgn[0].start = (void *) ((unsigned long)
 				copparams->desc->virtaddr +
 				vert_offset * rgn[0].stride +
 				horiz_offset);
-		gcbvcacheop(count, rgn, copparams->cacheop);
 
+		gcbvcacheop(1, rgn, copparams->cacheop);
 		break;
 
-	case OCDFMTDEF_DISTRIBUTED:
-		bverror = BVERR_FORMAT;
-		break;
-
-	/*TODO: Multi plane still need to be implemented */
 	case OCDFMTDEF_2_PLANE_YCbCr:
-	case OCDFMTDEF_3_PLANE_STACKED:
-	case OCDFMTDEF_3_PLANE_SIDE_BY_SIDE_YCbCr:
-		GCERR("not yet implemented.\n");
+		/* 1 byte per pixel */
+		rgn[0].span = copparams->rect->width;
+		rgn[0].lines = copparams->rect->height;
+		rgn[0].stride = copparams->geom->virtstride;
+		rgn[0].start = (void *)
+			((unsigned long) copparams->desc->virtaddr +
+			 copparams->rect->top * rgn[0].stride +
+			 copparams->rect->left);
+
+		rgn[1].span = copparams->rect->width;
+		rgn[1].lines = copparams->rect->height / 2;
+		rgn[1].stride = copparams->geom->virtstride;
+		rgn[1].start = rgn[0].start +
+			copparams->geom->height * rgn[0].stride;
+
+		GCDBG(GCZONE_CACHE,
+		      "virtaddr %p start[0] 0x%08x start[1] 0x%08x\n",
+		      copparams->desc->virtaddr, rgn[0].start, rgn[1].start);
+
+		gcbvcacheop(2, rgn, copparams->cacheop);
 		break;
 
 	default:
+		GCERR("format 0x%x (%d) not supported.\n",
+		      copparams->geom->format, copparams->geom->format);
 		bverror = BVERR_FORMAT;
+		break;
 	}
 
-Error:
+exit:
+	if (bverror != BVERR_NONE)
+		GCERR("bverror = %d\n", bverror);
+
 	return bverror;
 }
