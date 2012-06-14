@@ -1406,10 +1406,26 @@ static int dwc3_gadget_set_selfpowered(struct usb_gadget *g,
 	return 0;
 }
 
+static int dwc3_allow_gadget_pullup(struct usb_gadget *g, int allow)
+{
+	int			ret = 0;
+	struct dwc3		*dwc = gadget_to_dwc(g);
+
+	if (allow)
+		dwc->allow_pullup = 1;
+	else
+		dwc->allow_pullup = 0;
+
+	return ret;
+}
+
 void dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
 {
 	u32			reg;
 	u32			timeout = 500;
+
+	if (!dwc->allow_pullup)
+		return;
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 	if (is_on) {
@@ -1615,6 +1631,7 @@ static const struct usb_gadget_ops dwc3_gadget_ops = {
 	.get_frame		= dwc3_gadget_get_frame,
 	.wakeup			= dwc3_gadget_wakeup,
 	.set_selfpowered	= dwc3_gadget_set_selfpowered,
+	.allow_pullup		= dwc3_allow_gadget_pullup,
 	.pullup			= dwc3_gadget_pullup,
 	.udc_start		= dwc3_gadget_start,
 	.udc_stop		= dwc3_gadget_stop,
@@ -2562,6 +2579,8 @@ int __devinit dwc3_gadget_init(struct dwc3 *dwc)
 		dev_err(dwc->dev, "failed to register udc\n");
 		goto err7;
 	}
+
+	dwc->allow_pullup = 1;
 
 	return 0;
 

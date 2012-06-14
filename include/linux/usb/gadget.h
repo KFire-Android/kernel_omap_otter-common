@@ -463,6 +463,7 @@ struct usb_gadget_ops {
 	int	(*set_selfpowered) (struct usb_gadget *, int is_selfpowered);
 	int	(*vbus_session) (struct usb_gadget *, int is_active);
 	int	(*vbus_draw) (struct usb_gadget *, unsigned mA);
+	int	(*allow_pullup) (struct usb_gadget *, int allow);
 	int	(*pullup) (struct usb_gadget *, int is_on);
 	int	(*ioctl)(struct usb_gadget *,
 				unsigned code, unsigned long param);
@@ -722,6 +723,22 @@ static inline int usb_gadget_vbus_disconnect(struct usb_gadget *gadget)
 	if (!gadget->ops->vbus_session)
 		return -EOPNOTSUPP;
 	return gadget->ops->vbus_session(gadget, 0);
+}
+
+/**
+ * usb_gadget_allow_pullup - software-control to allow pullup
+ * @gadget:the peripheral being connected
+ *
+ * Certain gadgets (like Android) require the controller to be
+ * inactive untill the userspace comes up and configures usb
+ * functions and then does a pullup, this api gives the control
+ * to keep the controller inactive for such gadgets.
+ */
+static inline int usb_gadget_allow_pullup(struct usb_gadget *gadget, int allow)
+{
+	if (!gadget->ops->allow_pullup)
+		return -EOPNOTSUPP;
+	return gadget->ops->allow_pullup(gadget, allow);
 }
 
 /**
