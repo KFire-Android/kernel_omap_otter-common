@@ -24,6 +24,7 @@
 #include <plat/omap-pm.h>
 #include <plat/cpu.h>
 #include <plat/clock.h>
+#include <plat/dvfs.h>
 
 static const char * const omap4_pauxclks[] = {
 	"sys_clkin_ck",
@@ -105,15 +106,11 @@ static int omap2_rprm_set_max_dev_wakeup_lat(struct device *rdev,
 	return omap_pm_set_max_dev_wakeup_lat(rdev, tdev, val);
 }
 
-#ifdef CONFIG_OMAP_DVFS
 static int omap2_rprm_device_scale(struct device *rdev, struct device *tdev,
-		unsigned long val);
+		unsigned long val)
 {
-	return omap_device_scale(dev, &pdev->dev, val);
+	return omap_device_scale(rdev, tdev, val);
 }
-#else
-#define omap2_rprm_device_scale NULL
-#endif
 
 static struct omap_rprm_regulator *omap2_rprm_lookup_regulator(u32 reg_id)
 {
