@@ -539,10 +539,8 @@ static int _device_scale(struct device *rdev, void *handle, unsigned long val)
 {
 	struct rprm_gen_device_handle *obj = handle;
 
-	return 0;
-
 	if (!mach_ops || !mach_ops->device_scale)
-			return -ENOSYS;
+		return -ENOSYS;
 
 	return mach_ops->device_scale(rdev, obj->dev, val);
 }
