@@ -147,6 +147,7 @@ static struct omap4_keypad_platform_data evm5430_keypad_data = {
 	.keymap_data            = &evm5430_keymap_data,
 	.rows                   = 8,
 	.cols                   = 8,
+	.no_autorepeat		= true,
 };
 
 static struct omap_board_data keypad_data = {
