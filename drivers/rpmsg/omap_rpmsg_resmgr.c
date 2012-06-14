@@ -21,9 +21,13 @@
 #include <linux/rpmsg_resmgr.h>
 #include <linux/pm_runtime.h>
 #include <linux/pm_qos.h>
+#include <linux/regulator/consumer.h>
+#include <linux/regulator/driver.h>
+#include <linux/regulator/machine.h>
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
 #include <plat/omap-pm.h>
+#include <plat/clock.h>
 #include <plat/rpmsg_resmgr.h>
 #include "omap_rpmsg_resmgr.h"
 
@@ -36,7 +40,16 @@ struct rprm_gpt_depot {
 
 struct rprm_auxclk_depot {
 	struct rprm_auxclk args;
+	struct omap_rprm_auxclk *oauxck;
 	struct clk *clk;
+	struct clk *old_pclk;
+};
+
+struct rprm_regulator_depot {
+	struct rprm_regulator args;
+	struct regulator *reg_p;
+	struct omap_rprm_regulator *oreg;
+	u32 orig_uv;
 };
 
 /* device handle for resources which use the generic apis */
@@ -46,7 +59,7 @@ struct rprm_gen_device_handle {
 };
 
 /* pointer to the constraint ops exported by omap mach module */
-static struct omap_rprm_ops *cnstrnt_ops;
+static struct omap_rprm_ops *mach_ops;
 
 static inline struct device *__find_device_by_name(const char *name)
 {
@@ -191,20 +204,45 @@ static int rprm_auxclk_request(void **handle, void *args, size_t len)
 	struct rprm_auxclk_depot *acd;
 	struct clk *src;
 	struct clk *parent;
+	struct omap_rprm_auxclk *oauxck;
+	char const *name;
+	char const *pname;
 
-	if (len != sizeof *auxck)
+	if (len != sizeof *auxck) {
+		pr_err("error requesting auxclk - invalid length\n");
 		return -EINVAL;
+	}
 
+	if (!mach_ops || !mach_ops->lookup_auxclk) {
+		pr_err("error requesting auxclk - invalid ops\n");
+		return -ENOENT;
+	}
+
+	oauxck = mach_ops->lookup_auxclk(auxck->clk_id);
+	if (!oauxck) {
+		pr_err("auxclk lookup failed, id %d\n", auxck->clk_id);
+		return -ENOENT;
+	}
+
+	if (auxck->pclk_id >= oauxck->parents_cnt) {
+		pr_err("invalid auxclk source parent, id %d parent_id %d\n",
+				auxck->clk_id, auxck->pclk_id);
+		return -ENOENT;
+	}
+
+	name = oauxck->name;
+	pname = oauxck->parents[auxck->pclk_id];
 	/* Create auxclks depot */
-	acd = kmalloc(sizeof *acd, GFP_KERNEL);
-	if (!acd)
+	acd = kzalloc(sizeof *acd, GFP_KERNEL);
+	if (!acd) {
+		pr_err("error allocating memory for auxclk\n");
 		return -ENOMEM;
+	}
 
-	/* make sure make is NULL terminated */
-	auxck->name[sizeof auxck->name - 1] = '\0';
-	acd->clk = clk_get(NULL, auxck->name);
+	acd->oauxck = oauxck;
+	acd->clk = clk_get(NULL, name);
 	if (!acd->clk) {
-		pr_err("unable to get clock %s\n", auxck->name);
+		pr_err("unable to get clock %s\n", name);
 		ret = -EIO;
 		goto error;
 	}
@@ -214,46 +252,45 @@ static int rprm_auxclk_request(void **handle, void *args, size_t len)
 	 */
 	src = clk_get_parent(acd->clk);
 	if (!src) {
-		pr_err("unable to get %s source clock\n", auxck->name);
+		pr_err("unable to get %s source parent clock\n", name);
 		ret = -EIO;
 		goto error_aux;
 	}
 
-	/* make sure pname is NULL terminated */
-	auxck->pname[sizeof auxck->pname - 1] = '\0';
-	parent = clk_get(NULL, auxck->pname);
+	parent = clk_get(NULL, pname);
 	if (!parent) {
-		pr_err("unable to get parent clock %s\n", auxck->pname);
+		pr_err("unable to get source parent clock %s\n", pname);
 		ret = -EIO;
 		goto error_aux;
 	}
 
+	/* save old parent in order to restore at release time*/
+	acd->old_pclk = clk_get_parent(src);
 	ret = clk_set_parent(src, parent);
 	if (ret) {
-		pr_err("unable to set clk %s as parent of %s\n",
-						auxck->pname, auxck->name);
+		pr_err("unable to set clk %s as parent of %s\n", pname, name);
 		goto error_aux_parent;
 	}
 
 	ret = clk_set_rate(parent, auxck->pclk_rate);
 	if (ret) {
-		pr_err("rate %u not supported by %s\n", auxck->pclk_rate,
-								auxck->pname);
-		goto error_aux_parent;
+		pr_err("rate %u not supported by %s\n",
+						auxck->pclk_rate, pname);
+		goto error_set_parent;
 	}
 
 	ret = clk_set_rate(acd->clk, auxck->clk_rate);
 	if (ret) {
-		pr_err("rate %u not supported by %s\n", auxck->clk_rate,
-								auxck->name);
-		goto error_aux_parent;
+		pr_err("rate %u not supported by %s\n", auxck->clk_rate, name);
+		goto error_set_parent;
 	}
 
 	ret = clk_enable(acd->clk);
 	if (ret) {
-		pr_err("error enabling %s\n", auxck->name);
-		goto error_aux_parent;
+		pr_err("error enabling %s\n", name);
+		goto error_set_parent;
 	}
+
 	clk_put(parent);
 
 	memcpy(&acd->args, auxck, sizeof *auxck);
@@ -261,6 +298,9 @@ static int rprm_auxclk_request(void **handle, void *args, size_t len)
 	*handle = acd;
 
 	return 0;
+
+error_set_parent:
+	clk_set_parent(src, acd->old_pclk);
 error_aux_parent:
 	clk_put(parent);
 error_aux:
@@ -275,6 +315,7 @@ static int rprm_auxclk_release(void *handle)
 {
 	struct rprm_auxclk_depot *acd = handle;
 
+	clk_set_parent(clk_get_parent(acd->clk), acd->old_pclk);
 	clk_disable(acd->clk);
 	clk_put(acd->clk);
 
@@ -287,13 +328,146 @@ static int rprm_auxclk_get_info(void *handle, char *buf, size_t len)
 {
 	struct rprm_auxclk_depot *acd = handle;
 	struct rprm_auxclk *auxck = &acd->args;
+	struct omap_rprm_auxclk *oauxck = acd->oauxck;
 
 	return snprintf(buf, len,
 		"name:%s\n"
 		"rate:%u\n"
 		"parent:%s\n"
 		"parent rate:%u\n",
-		auxck->name, auxck->clk_rate, auxck->pname, auxck->pclk_rate);
+		oauxck->name, auxck->clk_rate,
+		oauxck->parents[auxck->clk_id], auxck->pclk_rate);
+}
+
+#ifdef CONFIG_REGULATOR
+static int rprm_regulator_request(void **handle, void *data, size_t len)
+{
+	int ret;
+	struct rprm_regulator *reg = data;
+	struct rprm_regulator_depot *rd;
+	struct omap_rprm_regulator *oreg;
+
+	if (len != sizeof *reg) {
+		pr_err("error requesting regulator - invalid length\n");
+		return -EINVAL;
+	}
+
+	if (!mach_ops || !mach_ops->lookup_regulator) {
+		pr_err("error requesting regulator - invalid ops\n");
+		return -ENOSYS;
+	}
+
+	oreg = mach_ops->lookup_regulator(reg->reg_id);
+	if (!oreg) {
+		pr_err("regulator lookup failed, id %d\n", reg->reg_id);
+		return -EINVAL;
+	}
+
+	/* create regulator depot */
+	rd = kzalloc(sizeof *rd, GFP_KERNEL);
+	if (!rd) {
+		pr_err("error allocating memory for regulator\n");
+		return -ENOMEM;
+	}
+
+	rd->oreg = oreg;
+	rd->reg_p = regulator_get_exclusive(NULL, oreg->name);
+	if (IS_ERR_OR_NULL(rd->reg_p)) {
+		pr_err("error providing regulator %s\n", oreg->name);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	rd->orig_uv = regulator_get_voltage(rd->reg_p);
+
+	/* if regulator is not fixed, set voltage as requested */
+	if (!oreg->fixed) {
+		ret = regulator_set_voltage(rd->reg_p,
+				 reg->min_uv, reg->max_uv);
+		if (ret) {
+			pr_err("error setting %s voltage\n", oreg->name);
+			goto error_reg;
+		}
+	} else {
+		/*
+		 * if regulator is fixed update paramaters so that rproc
+		 * can get the real voltage the regulator was set
+		 */
+		reg->min_uv = reg->max_uv = rd->orig_uv;
+	}
+
+	ret = regulator_enable(rd->reg_p);
+	if (ret) {
+		pr_err("error enabling %s ldo regulator\n", oreg->name);
+		goto error_enable;
+	}
+
+	memcpy(&rd->args, reg, sizeof rd->args);
+	*handle = rd;
+
+	return 0;
+
+error_enable:
+	/* restore original voltage if not fixed*/
+	if (!oreg->fixed)
+		regulator_set_voltage(rd->reg_p, rd->orig_uv, rd->orig_uv);
+error_reg:
+	regulator_put(rd->reg_p);
+error:
+	kfree(rd);
+
+	return ret;
+}
+
+static int rprm_regulator_release(void *handle)
+{
+	int ret;
+	struct rprm_regulator_depot *rd = handle;
+
+	ret = regulator_disable(rd->reg_p);
+	if (ret) {
+		pr_err("error disabling regulator %s\n", rd->oreg->name);
+		return ret;
+	}
+
+	/* restore original voltage if not fixed */
+	if (!rd->oreg->fixed) {
+		ret = regulator_set_voltage(rd->reg_p,
+					 rd->orig_uv, rd->orig_uv);
+		if (ret) {
+			pr_err("error restoring voltage %u\n", rd->orig_uv);
+			return ret;
+		}
+	}
+
+	regulator_put(rd->reg_p);
+	kfree(rd);
+
+	return 0;
+}
+#else
+static inline int rprm_regulator_request(void **handle, void *data, size_t len)
+{
+	return -1;
+}
+
+static inline int rprm_regulator_release(void *handle)
+{
+	return 0;
+}
+#endif
+
+static int rprm_regulator_get_info(void *handle, char *buf, size_t len)
+{
+	struct rprm_regulator_depot *rd = handle;
+	struct rprm_regulator *reg = &rd->args;
+
+	return snprintf(buf, len,
+		"name:%s\n"
+		"min_uV:%d\n"
+		"max_uV:%d\n"
+		"orig_uV:%d\n",
+		rd->oreg->name, reg->min_uv, reg->max_uv, rd->orig_uv);
 }
 
 static int
@@ -368,10 +542,10 @@ static int _device_scale(struct device *rdev, void *handle, unsigned long val)
 
 	return 0;
 
-	if (!cnstrnt_ops || !cnstrnt_ops->device_scale)
+	if (!mach_ops || !mach_ops->device_scale)
 			return -ENOSYS;
 
-	return cnstrnt_ops->device_scale(rdev, obj->dev, val);
+	return mach_ops->device_scale(rdev, obj->dev, val);
 }
 
 static int _device_latency(struct device *rdev, void *handle, unsigned long val)
@@ -387,10 +561,10 @@ static int _device_bandwidth(struct device *rdev, void *handle,
 {
 	struct rprm_gen_device_handle *obj = handle;
 
-	if (!cnstrnt_ops || !cnstrnt_ops->set_min_bus_tput)
+	if (!mach_ops || !mach_ops->set_min_bus_tput)
 		return -ENOSYS;
 
-	return cnstrnt_ops->set_min_bus_tput(rdev, obj->dev, val);
+	return mach_ops->set_min_bus_tput(rdev, obj->dev, val);
 }
 
 static int rprm_iva_request(void **handle, void *data, size_t len)
@@ -428,11 +602,33 @@ static int rprm_sl2if_request(void **handle, void *data, size_t len)
 	return _enable_device_exclusive(handle, &dev, "sl2if");
 }
 
+static struct clk *iss_opt_clk;
+
 static int rprm_iss_request(void **handle, void *data, size_t len)
 {
 	static struct device *dev;
+	int ret;
+
+	/* enable the iss optional clock, if present */
+	if (iss_opt_clk) {
+		ret = clk_enable(iss_opt_clk);
+		if (ret)
+			return ret;
+	}
 
 	return _enable_device_exclusive(handle, &dev, "iss");
+}
+
+static int rprm_iss_release(void *handle)
+{
+	int ret;
+
+	ret = _device_release(handle);
+	/* disable the iss optional clock, if present */
+	if (!ret && iss_opt_clk)
+		clk_disable(iss_opt_clk);
+
+	return ret;
 }
 
 static struct rprm_res_ops gptimer_ops = {
@@ -451,6 +647,12 @@ static struct rprm_res_ops auxclk_ops = {
 	.request = rprm_auxclk_request,
 	.release = rprm_auxclk_release,
 	.get_info = rprm_auxclk_get_info,
+};
+
+static struct rprm_res_ops regulator_ops = {
+	.request = rprm_regulator_request,
+	.release = rprm_regulator_release,
+	.get_info = rprm_regulator_get_info,
 };
 
 static struct rprm_res_ops iva_ops = {
@@ -486,7 +688,7 @@ static struct rprm_res_ops sl2if_ops = {
 
 static struct rprm_res_ops iss_ops = {
 	.request = rprm_iss_request,
-	.release = _device_release,
+	.release = rprm_iss_release,
 	.latency = _device_latency,
 	.bandwidth = _device_bandwidth,
 };
@@ -503,6 +705,10 @@ static struct rprm_res omap_res[] = {
 	{
 		.name = "omap-auxclk",
 		.ops = &auxclk_ops,
+	},
+	{
+		.name = "regulator",
+		.ops = &regulator_ops,
 	},
 	{
 		.name = "iva",
@@ -534,13 +740,22 @@ static int omap_rprm_probe(struct platform_device *pdev)
 {
 	struct omap_rprm_pdata *pdata = pdev->dev.platform_data;
 
-	cnstrnt_ops = pdata->ops;
+	/* get iss optional clock if any */
+	if (pdata->iss_opt_clk_name) {
+		iss_opt_clk = omap_clk_get_by_name(pdata->iss_opt_clk_name);
+		if (!iss_opt_clk) {
+			dev_err(&pdev->dev, "error getting iss opt clk\n");
+			return -ENOENT;
+		}
+	}
+
+	mach_ops = pdata->ops;
 	return 0;
 }
 
 static int omap_rprm_remove(struct platform_device *pdev)
 {
-	cnstrnt_ops = NULL;
+	mach_ops = NULL;
 
 	return 0;
 }

@@ -47,6 +47,7 @@
 #include <plat/omap_apps_brd_id.h>
 #include <plat/drm.h>
 #include <plat/remoteproc.h>
+#include <plat/rpmsg_resmgr.h>
 #include <plat/usb.h>
 
 #include "board-54xx-sevm.h"
@@ -700,6 +701,21 @@ static struct twl6040_platform_data twl6040_data = {
 	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
+#ifdef CONFIG_OMAP5_SEVM_PALMAS
+static struct omap_rprm_regulator omap5evm_rprm_regulators[] = {
+	{
+		.name = "cam2pwr",
+		.fixed = true,
+	},
+	{
+		.name = "cam2csi",
+		.fixed = true,
+	},
+};
+#else
+static struct omap_rprm_regulator omap5evm_rprm_regulators[] = { };
+#endif  /* CONFIG_OMAP5_SEVM_PALMAS */
+
 static struct platform_device omap5evm_dmic_codec = {
 	.name	= "dmic-codec",
 	.id	= -1,
@@ -955,6 +971,9 @@ static void __init omap_5430evm_init(void)
 	omap_init_dmm_tiler();
 	omap5_register_ion();
 	sevm_panel_init();
+	omap_rprm_regulator_init(omap5evm_rprm_regulators,
+					ARRAY_SIZE(omap5evm_rprm_regulators));
+
 }
 
 static void __init omap_5430evm_reserve(void)

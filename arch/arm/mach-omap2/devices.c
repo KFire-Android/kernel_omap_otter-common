@@ -11,6 +11,7 @@
 #include <linux/gpio.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/export.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/clk.h>
@@ -37,6 +38,7 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 #include <plat/omap4-keypad.h>
+#include <plat/rpmsg_resmgr.h>
 #include <linux/mfd/omap_control.h>
 
 #include "mux.h"
@@ -904,6 +906,27 @@ static void __init omap_init_ocp2scp(void)
 #else
 static inline void omap_init_ocp2scp(void) { }
 #endif
+
+static struct omap_rprm_regulator *omap_regulators;
+static u32 omap_regulators_cnt;
+void __init omap_rprm_regulator_init(struct omap_rprm_regulator *regulators,
+				u32 regulator_cnt)
+{
+	if (!regulator_cnt)
+		return;
+
+	omap_regulators = regulators;
+	omap_regulators_cnt = regulator_cnt;
+}
+
+u32 omap_rprm_get_regulators(struct omap_rprm_regulator **regulators)
+{
+	if (omap_regulators_cnt)
+		*regulators = omap_regulators;
+
+	return omap_regulators_cnt;
+}
+EXPORT_SYMBOL(omap_rprm_get_regulators);
 
 static __init void omap_init_dev(char *name)
 {

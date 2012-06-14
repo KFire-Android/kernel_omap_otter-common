@@ -56,16 +56,28 @@ struct rprm_sdma {
 
 /**
  * struct rprm_auxclk - resource manager parameters for auxiliary clock
- * @name:	name of the auxclk
- * @clk_rate:	rate in Hz of the auxclk
- * @pname:	parent clk of auxclk
- * @pclk_rate:	rate of the auxclk's parent
+ * @cl_id:	id of the auxclk
+ * @clk_rate:	rate in Hz for the auxclk
+ * @pclk_id:	id of the auxclk source's parent
+ * @pclk_rate:	rate in Hz for the auxclk source's parent
  */
 struct rprm_auxclk {
-	char name[24];
+	u32 clk_id;
 	unsigned clk_rate;
-	char pname[24];
+	u32 pclk_id;
 	unsigned pclk_rate;
+} __packed;
+
+/**
+ * struct rprm_regulator - resource manager parameters for regulator
+ * @reg_id:	regulator id
+ * @min_uv	minimum voltage in micro volts
+ * @max_uv	maximum voltage in micro volts
+ */
+struct rprm_regulator {
+	u32 reg_id;
+	u32 min_uv;
+	u32 max_uv;
 } __packed;
 
 #endif /* _LINUX_RPMSG_RESMGR_COMMON_H */

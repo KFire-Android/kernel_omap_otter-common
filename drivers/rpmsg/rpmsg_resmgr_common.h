@@ -34,18 +34,6 @@
 #define _LINUX_RPMSG_RESMGR_COMMON_H
 
 /**
- * struct rprm_regulator - resource manager parameters for regulator
- * @name:	name of the regulator
- * @min_uv	minimum voltage in micro volts
- * @max_uv	maximum voltage in micro volts
- */
-struct rprm_regulator {
-	char name[16];
-	u32 min_uv;
-	u32 max_uv;
-} __packed;
-
-/**
  * struct rprm_gpio - resource manager parameters for GPIO
  * @id:		id of the requested GPIO
  */

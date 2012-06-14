@@ -94,13 +94,13 @@ int omap4_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	 * FREQ_UPDATE sequence:
 	 * - DLL_OVERRIDE=0 (DLL lock & code must not be overridden
 	 *	after CORE DPLL lock)
-	 * - DLL_RESET=1 (DLL must be reset upon frequency change)
+	 * - DLL_RESET=0 (DLL must NOT be reset upon frequency change)
 	 * - DPLL_CORE_M2_DIV with same value as the one already
 	 *	in direct register
 	 * - DPLL_CORE_DPLL_EN=0x7 (to make CORE DPLL lock)
 	 * - FREQ_UPDATE=1 (to start HW sequence)
 	 */
-	shadow_freq_cfg1 = (1 << OMAP4430_DLL_RESET_SHIFT) |
+	shadow_freq_cfg1 = (0 << OMAP4430_DLL_RESET_SHIFT) |
 			(new_div << OMAP4430_DPLL_CORE_M2_DIV_SHIFT) |
 			(DPLL_LOCKED << OMAP4430_DPLL_CORE_DPLL_EN_SHIFT) |
 			(1 << OMAP4430_FREQ_UPDATE_SHIFT);
@@ -161,7 +161,7 @@ int omap4_prcm_freq_update(void)
 	 * - FREQ_UPDATE=1 (to start HW sequence)
 	 */
 	shadow_freq_cfg1 = __raw_readl(OMAP4430_CM_SHADOW_FREQ_CONFIG1);
-	shadow_freq_cfg1 |= (1 << OMAP4430_DLL_RESET_SHIFT) |
+	shadow_freq_cfg1 |= (0 << OMAP4430_DLL_RESET_SHIFT) |
 			   (1 << OMAP4430_FREQ_UPDATE_SHIFT);
 	shadow_freq_cfg1 &= ~OMAP4430_DLL_OVERRIDE_2_2_MASK;
 	__raw_writel(shadow_freq_cfg1, OMAP4430_CM_SHADOW_FREQ_CONFIG1);
