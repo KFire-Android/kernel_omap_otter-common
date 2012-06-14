@@ -1414,18 +1414,26 @@ static void dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
 	reg = dwc3_readl(dwc->regs, DWC3_DCTL);
 	if (is_on) {
 		if (dwc->revision <= DWC3_REVISION_187A) {
-			reg &= ~DWC3_DCTL_TRGTULST_MASK;
-			reg |= DWC3_DCTL_TRGTULST_RX_DET;
+			reg &= ~DWC3_DCTL_ULSTCHNGREQ_MASK;
+			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+			reg |= DWC3_DCTL_ULSTCHNG_RX_DETECT;
+			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+			mdelay(25);
+			reg |= DWC3_DCTL_RUN_STOP;
+			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+			usb_phy_poweron(dwc->usb3_phy);
 		}
 
-		if (dwc->revision >= DWC3_REVISION_194A)
+		if (dwc->revision >= DWC3_REVISION_194A) {
 			reg &= ~DWC3_DCTL_KEEP_CONNECT;
-		reg |= DWC3_DCTL_RUN_STOP;
+			reg |= DWC3_DCTL_RUN_STOP;
+			dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+		}
 	} else {
 		reg &= ~DWC3_DCTL_RUN_STOP;
+		dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+		usb_phy_shutdown(dwc->usb3_phy);
 	}
-
-	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
 
 	do {
 		reg = dwc3_readl(dwc->regs, DWC3_DSTS);

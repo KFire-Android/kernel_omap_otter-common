@@ -199,6 +199,20 @@ static int omap_usb3_init(struct usb_phy *x)
 	return 0;
 }
 
+static void omap_usb3_poweron(struct usb_phy *x)
+{
+	struct omap_usb *phy = phy_to_omapusb(x);
+
+	omap5_usb_phy_power(phy->control_dev, 1);
+}
+
+static void omap_usb3_shutdown(struct usb_phy *x)
+{
+	struct omap_usb *phy = phy_to_omapusb(x);
+
+	omap5_usb_phy_power(phy->control_dev, 0);
+}
+
 static int __devinit omap_usb3_probe(struct platform_device *pdev)
 {
 	struct omap_usb			*phy;
@@ -228,6 +242,8 @@ static int __devinit omap_usb3_probe(struct platform_device *pdev)
 	phy->phy.dev		= phy->dev;
 	phy->phy.label		= "omap-usb3";
 	phy->phy.init		= omap_usb3_init;
+	phy->phy.poweron	= omap_usb3_poweron;
+	phy->phy.shutdown	= omap_usb3_shutdown;
 	phy->phy.set_suspend	= omap_usb3_suspend;
 
 	phy->control_dev	= omap_control_get();

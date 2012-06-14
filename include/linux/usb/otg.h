@@ -116,8 +116,9 @@ struct usb_phy {
 	/* to support controllers that have multiple transceivers */
 	struct list_head	head;
 
-	/* initialize/shutdown the OTG controller */
+	/* initialize/poweron/shutdown the OTG controller */
 	int	(*init)(struct usb_phy *x);
+	void    (*poweron)(struct usb_phy *x);
 	void	(*shutdown)(struct usb_phy *x);
 
 	/* effective for B devices, ignored for A-peripheral */
@@ -173,6 +174,13 @@ usb_phy_init(struct usb_phy *x)
 		return x->init(x);
 
 	return 0;
+}
+
+static inline void
+usb_phy_poweron(struct usb_phy *x)
+{
+	if (x->poweron)
+		x->poweron(x);
 }
 
 static inline void
