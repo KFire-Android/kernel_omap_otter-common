@@ -1206,9 +1206,6 @@ int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	/* Configure manager */
 	omap_dss_mgr_apply_mgr(mgr);
 
-	dss_write_regs();
-	dss_set_go_bits();
-
 	spin_unlock_irqrestore(&data_lock, flags);
 
 	return 0;
@@ -1750,6 +1747,48 @@ bool dss_ovl_is_enabled(struct omap_overlay *ovl)
 	spin_unlock_irqrestore(&data_lock, flags);
 
 	return e;
+}
+
+int dss_mgr_set_ovls(struct omap_overlay_manager *mgr)
+{
+	unsigned long flags;
+	int i;
+	if (!mgr || !mgr->ovls) {
+		DSSERR("null pointer\n");
+		return -EINVAL;
+	}
+	if (mgr->num_ovls > dss_feat_get_num_ovls()) {
+		DSSERR("Invalid number of overlays passed\n");
+		return -EINVAL;
+	}
+	mutex_lock(&apply_lock);
+	spin_lock_irqsave(&data_lock, flags);
+
+	for (i = 0; i < mgr->num_ovls; i++) {
+		if (mgr != mgr->ovls[i]->manager) {
+			DSSERR("Invalid mgr for ovl#%d\n", mgr->ovls[i]->id);
+			spin_unlock_irqrestore(&data_lock, flags);
+			mutex_unlock(&apply_lock);
+			return -EINVAL;
+		}
+		/* Enable the overlay */
+		if (mgr->ovls[i]->enabled) {
+			struct ovl_priv_data *op = get_ovl_priv(mgr->ovls[i]);
+			op->enabling = true;
+			dss_setup_fifos(false);
+			dss_apply_fifo_merge(false);
+			op->enabling = false;
+			dss_apply_ovl_enable(mgr->ovls[i], true);
+		} else {
+			dss_apply_ovl_enable(mgr->ovls[i], false);
+		}
+	}
+	dss_write_regs();
+	dss_set_go_bits();
+	spin_unlock_irqrestore(&data_lock, flags);
+	wait_pending_extra_info_updates();
+	mutex_unlock(&apply_lock);
+	return 0;
 }
 
 int dss_ovl_enable(struct omap_overlay *ovl)

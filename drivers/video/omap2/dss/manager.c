@@ -558,6 +558,7 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 		mgr->wait_for_vsync = &dss_mgr_wait_for_vsync;
 		mgr->blank = &dss_mgr_blank;
 		mgr->dump_cb = &seq_print_cbs;
+		mgr->set_ovl = &dss_mgr_set_ovls;
 
 		mgr->caps = 0;
 		mgr->supported_displays =
