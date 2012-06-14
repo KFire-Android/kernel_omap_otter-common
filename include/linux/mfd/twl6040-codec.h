@@ -91,6 +91,7 @@
 #define TWL6040_REV_1_1			0x01
 #define TWL6040_REV_1_3			0x02
 #define TWL6041_REV_2_0			0x10
+#define TWL6041_REV_2_2			0x12
 
 /* INTID (0x03) fields */
 
