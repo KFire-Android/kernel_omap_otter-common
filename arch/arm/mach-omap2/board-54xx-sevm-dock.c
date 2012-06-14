@@ -17,16 +17,17 @@
 #include <linux/input.h>
 #include <linux/i2c/smsc.h>
 #include <linux/input/matrix_keypad.h>
-#include <linux/switch.h>
 #include <linux/interrupt.h>
+#include <linux/gpio.h>
+#include <linux/sevm_dock_station.h>
 
 #include <plat/i2c.h>
-#include <plat/irqs.h>
+#include <plat/gpio.h>
 
 #include "board-54xx-sevm.h"
 
 #define OMAP5_SEVM_KEYBOARD_IRQ	151
-#define DOCK_STATION_GPIO	(OMAP_MAX_GPIO_LINES + 20)
+#define DOCK_STATION_GPIO	OMAP_MPUIO(20)
 
 static const uint32_t sevm_dock_keymap[] = {
 	KEY(0, 0,  KEY_RESERVED)     , KEY(0, 1,  KEY_RESERVED),
@@ -120,22 +121,16 @@ static struct i2c_board_info __initdata sevm_i2c_5_dockinfo[] = {
 	},
 };
 
-/*
- * Register a gpio-switch class device to report the sEVM Docking
- * Station state through a sysfs entry
- */
-static struct gpio_switch_platform_data dock_switch_data = {
-	.name = "dock",
-	.gpio = DOCK_STATION_GPIO,
-	.irq_flags = (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING),
+static struct sevm_dockstation_platform_data dockstation_data = {
+	.gpio		= DOCK_STATION_GPIO,
+	.irqflags	= (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING),
 };
 
-static struct platform_device dock_switch_device = {
-	.name = "switch-gpio",
-	.id = -1,
-	.dev  = {
-		.platform_data = &dock_switch_data,
-	}
+static struct platform_device sevm_dockstation = {
+	.name = DOCK_STATION_NAME,
+	.dev = {
+		.platform_data = &dockstation_data,
+	},
 };
 
 int __init sevm_dock_init(void)
@@ -143,7 +138,7 @@ int __init sevm_dock_init(void)
 	i2c_register_board_info(5, sevm_i2c_5_dockinfo,
 		ARRAY_SIZE(sevm_i2c_5_dockinfo));
 
-	platform_device_register(&dock_switch_device);
+	platform_device_register(&sevm_dockstation);
 
 	return 0;
 }
