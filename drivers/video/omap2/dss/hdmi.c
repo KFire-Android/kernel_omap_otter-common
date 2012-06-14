@@ -62,6 +62,7 @@ static struct {
 	struct mutex lock;
 	struct platform_device *pdev;
 	struct hdmi_ip_data ip_data;
+	struct omap_dss_device *dssdev;
 	int code;
 	int mode;
 	u8 edid[HDMI_EDID_MAX_LENGTH];
@@ -106,6 +107,7 @@ int hdmi_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("init_display\n");
 
+	hdmi.dssdev = dssdev;
 	dss_init_hdmi_ip_ops(&hdmi.ip_data);
 	return 0;
 }
@@ -1000,10 +1002,11 @@ int hdmi_compute_acr(u32 sample_freq, u32 *n, u32 *cts)
 {
 	u32 deep_color;
 	bool deep_color_correct = false;
-	u32 pclk = hdmi.ip_data.cfg.timings.pixel_clock;
+	u32 pclk = hdmi.dssdev->panel.timings.pixel_clock;
 
 	if (n == NULL || cts == NULL)
 		return -EINVAL;
+
 
 	/* TODO: When implemented, query deep color mode here. */
 	deep_color = 100;
