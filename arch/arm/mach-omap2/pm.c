@@ -446,7 +446,7 @@ static struct notifier_block omap2_pm_qos_tput_notifier = {
 static int __init omap2_pm_qos_tput_init(void)
 {
 	int ret;
-	struct omap_hwmod *oh;
+	const char *oh_name;
 
 	ret = pm_qos_add_notifier(PM_QOS_MEMORY_THROUGHPUT,
 				  &omap2_pm_qos_tput_notifier);
@@ -455,12 +455,22 @@ static int __init omap2_pm_qos_tput_init(void)
 
 
 	if (cpu_is_omap44xx() || cpu_is_omap54xx())
-		oh = omap_hwmod_lookup("l3_main_1");
+		oh_name = "l3_main_1";
 	else
-		oh = omap_hwmod_lookup("l3_main");
+		oh_name = "l3_main";
 
-	if (oh)
-		l3_dev = &oh->od->pdev->dev;
+	l3_dev = omap_device_get_by_hwmod_name(oh_name);
+	/*
+	 * we need to ensure that processor devices exist!
+	 * BUG() if system is attempting boot completely messed up!
+	 * platform device existance should be fixed as part of
+	 * bringup!
+	 */
+	if (IS_ERR(l3_dev)) {
+		pr_err("%s: FIX_ME: no device for oh %s?\n", __func__,
+		       oh_name);
+		BUG();
+	}
 
 	return ret;
 }
