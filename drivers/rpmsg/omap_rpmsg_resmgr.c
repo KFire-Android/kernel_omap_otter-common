@@ -27,7 +27,6 @@
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
 #include <plat/omap-pm.h>
-#include <plat/clock.h>
 #include <plat/rpmsg_resmgr.h>
 #include "omap_rpmsg_resmgr.h"
 
@@ -740,21 +739,16 @@ static int omap_rprm_probe(struct platform_device *pdev)
 {
 	struct omap_rprm_pdata *pdata = pdev->dev.platform_data;
 
-	/* get iss optional clock if any */
-	if (pdata->iss_opt_clk_name) {
-		iss_opt_clk = omap_clk_get_by_name(pdata->iss_opt_clk_name);
-		if (!iss_opt_clk) {
-			dev_err(&pdev->dev, "error getting iss opt clk\n");
-			return -ENOENT;
-		}
-	}
-
+	/* set iss optional clock */
+	iss_opt_clk = pdata->iss_opt_clk;
 	mach_ops = pdata->ops;
+
 	return 0;
 }
 
 static int omap_rprm_remove(struct platform_device *pdev)
 {
+	iss_opt_clk = NULL;
 	mach_ops = NULL;
 
 	return 0;

@@ -23,6 +23,7 @@
 #include <plat/rpmsg_resmgr.h>
 #include <plat/omap-pm.h>
 #include <plat/cpu.h>
+#include <plat/clock.h>
 
 static const char * const omap4_pauxclks[] = {
 	"sys_clkin_ck",
@@ -154,6 +155,7 @@ static struct omap_rprm_pdata omap2_rprm_data = {
 static int __init omap2_rprm_init(void)
 {
 	struct platform_device *pdev;
+	struct omap_rprm_pdata *pdata = &omap2_rprm_data;
 	int ret;
 
 	if (cpu_is_omap54xx()) {
@@ -168,8 +170,17 @@ static int __init omap2_rprm_init(void)
 	if (!pdev)
 		return -ENOMEM;
 
-	ret = platform_device_add_data(pdev, &omap2_rprm_data,
-			sizeof omap2_rprm_data);
+	if (pdata->iss_opt_clk_name) {
+		pdata->iss_opt_clk =
+				omap_clk_get_by_name(pdata->iss_opt_clk_name);
+		if (!pdata->iss_opt_clk) {
+			dev_err(&pdev->dev, "error getting iss opt clk\n");
+			ret = -ENOENT;
+			goto err;
+		}
+	}
+
+	ret = platform_device_add_data(pdev, pdata, sizeof *pdata);
 	if (ret)
 		goto err;
 
