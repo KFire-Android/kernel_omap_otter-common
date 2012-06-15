@@ -20,6 +20,7 @@
 
 #include "hsi_driver.h"
 #include <linux/delay.h>
+#include <mach/common.h>
 
 void hsi_reset_ch_read(struct hsi_channel *ch)
 {
