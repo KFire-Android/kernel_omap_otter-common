@@ -3063,8 +3063,8 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			GCDBG(GCZONE_SURF, "  single source srcadjust = %d\n",
 			      srcadjust);
 
-			srcleft = srcrect->left + srcadjust;
-			srctop = srcrect->top;
+			srcleft = srcrect->left + batch->deltaleft + srcadjust;
+			srctop = srcrect->top + batch->deltatop;
 
 			GCDBG(GCZONE_SURF,
 			      "  source %d rectangle origin = %d,%d\n",
