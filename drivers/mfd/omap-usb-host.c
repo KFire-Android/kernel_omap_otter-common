@@ -24,6 +24,7 @@
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>
 #include <linux/spinlock.h>
+#include <linux/gpio.h>
 #include <plat/cpu.h>
 #include <plat/usb.h>
 #include <plat/omap_device.h>
@@ -405,6 +406,24 @@ static void omap_usbhs_init(struct device *dev)
 	dev_dbg(dev, "starting TI HSUSB Controller\n");
 
 	pm_runtime_get_sync(dev);
+
+	if (pdata->ehci_data->phy_reset) {
+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+			gpio_request_one(pdata->ehci_data->reset_gpio_port[0],
+					GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
+
+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+			gpio_request_one(pdata->ehci_data->reset_gpio_port[1],
+					GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
+
+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[2]))
+			gpio_request_one(pdata->ehci_data->reset_gpio_port[2],
+					GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
+
+		/* Hold the PHY in RESET for enough time till DIR is high */
+		udelay(10);
+	}
+
 	spin_lock_irqsave(&omap->lock, flags);
 
 	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
@@ -475,7 +494,41 @@ static void omap_usbhs_init(struct device *dev)
 	dev_dbg(dev, "UHH setup done, uhh_hostconfig=%x\n", reg);
 
 	spin_unlock_irqrestore(&omap->lock, flags);
+
+	if (pdata->ehci_data->phy_reset) {
+		/* Hold the PHY in RESET for enough time till
+		* PHY is settled and ready
+		*/
+		udelay(10);
+
+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+			gpio_set_value(pdata->ehci_data->reset_gpio_port[0], 1);
+
+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+			gpio_set_value(pdata->ehci_data->reset_gpio_port[1], 1);
+
+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[2]))
+			gpio_set_value(pdata->ehci_data->reset_gpio_port[2], 1);
+	}
+
 	pm_runtime_put_sync(dev);
+}
+
+static void omap_usbhs_deinit(struct device *dev)
+{
+	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
+	struct usbhs_omap_platform_data *pdata = &omap->platdata;
+
+	if (pdata->ehci_data->phy_reset) {
+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
+			gpio_free(pdata->ehci_data->reset_gpio_port[0]);
+
+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
+			gpio_free(pdata->ehci_data->reset_gpio_port[1]);
+
+		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[2]))
+			gpio_free(pdata->ehci_data->reset_gpio_port[2]);
+	}
 }
 
 
@@ -697,6 +750,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 	goto end_probe;
 
 err_alloc:
+	omap_usbhs_deinit(&pdev->dev);
 	iounmap(omap->uhh_base);
 
 err_usb_host_hs_hsic480m_p3_clk:
@@ -757,6 +811,7 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
 {
 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
 
+	omap_usbhs_deinit(&pdev->dev);
 	iounmap(omap->uhh_base);
 	clk_put(omap->usb_host_hs_hsic480m_p2_clk);
 	clk_put(omap->usb_host_hs_hsic60m_p2_clk);

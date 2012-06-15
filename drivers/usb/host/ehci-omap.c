@@ -203,23 +203,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (pdata->phy_reset) {
-		if (gpio_is_valid(pdata->reset_gpio_port[0]))
-			gpio_request_one(pdata->reset_gpio_port[0],
-					 GPIOF_OUT_INIT_LOW, "USB1 PHY reset");
-
-		if (gpio_is_valid(pdata->reset_gpio_port[1]))
-			gpio_request_one(pdata->reset_gpio_port[1],
-					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
-
-		if (gpio_is_valid(pdata->reset_gpio_port[2]))
-			gpio_request_one(pdata->reset_gpio_port[2],
-					 GPIOF_OUT_INIT_LOW, "USB2 PHY reset");
-
-		/* Hold the PHY in RESET for enough time till DIR is high */
-		udelay(10);
-	}
-
 	pm_runtime_enable(dev);
 	pm_runtime_get_sync(dev);
 
@@ -252,10 +235,30 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	dbg_hcs_params(omap_ehci, "reset");
 	dbg_hcc_params(omap_ehci, "reset");
 
+	/* Hold PHYs in reset while initializing EHCI controller */
+	if (pdata->phy_reset) {
+		if (gpio_is_valid(pdata->reset_gpio_port[0]))
+			gpio_set_value(pdata->reset_gpio_port[0], 0);
+
+		if (gpio_is_valid(pdata->reset_gpio_port[1]))
+			gpio_set_value(pdata->reset_gpio_port[1], 0);
+
+		if (gpio_is_valid(pdata->reset_gpio_port[2]))
+			gpio_set_value(pdata->reset_gpio_port[2], 0);
+
+		udelay(10);
+	}
+
 	/* cache this readonly data; minimize chip reads */
 	omap_ehci->hcs_params = readl(&omap_ehci->caps->hcs_params);
 
 	ehci_reset(omap_ehci);
+
+	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+	if (ret) {
+		dev_err(dev, "failed to add hcd with err %d\n", ret);
+		goto err_add_hcd;
+	}
 
 	if (pdata->phy_reset) {
 		/* Hold the PHY in RESET for enough time till
@@ -271,12 +274,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 
 		if (gpio_is_valid(pdata->reset_gpio_port[2]))
 			gpio_set_value(pdata->reset_gpio_port[2], 1);
-	}
-
-	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
-	if (ret) {
-		dev_err(dev, "failed to add hcd with err %d\n", ret);
-		goto err_add_hcd;
 	}
 
 	/* root ports should always stay powered */
