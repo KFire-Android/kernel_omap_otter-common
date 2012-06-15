@@ -412,9 +412,6 @@ static int omap2_pm_qos_tput_handler(struct notifier_block *nb,
 				     void *unused)
 {
 	int ret = 0;
-	static struct device dummy_l3_dev = {
-		.init_name = "omap2_pm_qos_tput_handler",
-	};
 
 	pr_debug("OMAP PM MEM TPUT: new_value=%lu\n", new_value);
 
@@ -433,7 +430,7 @@ static int omap2_pm_qos_tput_handler(struct notifier_block *nb,
 	/* Convert the throughput(in KiB/s) into Hz. */
 	new_value = (new_value * 1000) / 4;
 
-	ret = omap_device_scale(&dummy_l3_dev, l3_dev, new_value);
+	ret = omap_device_scale(l3_dev, new_value);
 
 err:
 	return ret;

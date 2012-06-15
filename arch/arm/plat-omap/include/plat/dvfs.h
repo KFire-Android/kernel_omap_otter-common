@@ -20,8 +20,7 @@ extern struct mutex omap_dvfs_lock;
 
 int omap_dvfs_register_device(struct device *dev, char *voltdm_name,
 				char *clk_name);
-int omap_device_scale(struct device *req_dev, struct device *target_dev,
-				unsigned long rate);
+int omap_device_scale(struct device *target_dev, unsigned long rate);
 static inline bool omap_dvfs_is_any_dev_scaling(void)
 {
 	return mutex_is_locked(&omap_dvfs_lock);
@@ -32,8 +31,8 @@ static inline int omap_dvfs_register_device(struct device *dev,
 {
 	return 0;
 }
-static inline int omap_device_scale(struct device *req_dev,
-				struct device *target_dev, unsigned long rate)
+static inline int omap_device_scale(struct device *target_dev,
+				    unsigned long rate)
 {
 	return 0;
 }

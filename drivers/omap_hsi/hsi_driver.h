@@ -231,8 +231,7 @@ struct hsi_platform_data {
 	int (*device_enable) (struct platform_device *pdev);
 	int (*device_shutdown) (struct platform_device *pdev);
 	int (*device_idle) (struct platform_device *pdev);
-	int (*device_scale) (struct device *req_dev, struct device *target_dev,
-			unsigned long rate);
+	int (*device_scale) (struct device *target_dev, unsigned long rate);
 	int (*get_context_loss_count)(struct device *dev);
 	int (*wakeup_enable) (int hsi_port);
 	int (*wakeup_disable) (int hsi_port);

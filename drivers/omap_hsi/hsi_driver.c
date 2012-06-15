@@ -914,8 +914,7 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 #ifdef OMAP_HSI_DVFS_SUPPORT
 	/* Set the HSI FCLK to default. */
 	hsi_ctrl->hsi_fclk_req = pdata->default_hsi_fclk;
-	err = pdata->device_scale(hsi_ctrl->dev, hsi_ctrl->dev,
-				  pdata->default_hsi_fclk);
+	err = pdata->device_scale(hsi_ctrl->dev, pdata->default_hsi_fclk);
 	if (err == -EBUSY) {
 		/* PM framework init is late_initcall, so it may not yet be */
 		/* initialized, so be prepared to retry later on open. */
