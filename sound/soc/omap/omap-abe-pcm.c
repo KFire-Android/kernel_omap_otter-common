@@ -235,7 +235,7 @@ static void unmute_be(struct snd_soc_pcm_runtime *be,
 			break;
 		case OMAP_ABE_DAI_PDM_DL2:
 			omap_aess_unmute_gain(abe->aess, OMAP_AESS_GAIN_DL2_LEFT);
-			omap_aess_unmute_gain(abe->aess, OMAP_AESS_GAIN_DL1_RIGHT);
+			omap_aess_unmute_gain(abe->aess, OMAP_AESS_GAIN_DL2_RIGHT);
 			break;
 		case OMAP_ABE_DAI_PDM_VIB:
 			break;

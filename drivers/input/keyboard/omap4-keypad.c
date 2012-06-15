@@ -299,7 +299,7 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
 	struct resource *res;
 	resource_size_t size;
 	unsigned int row_shift = 0, max_keys = 0;
-	uint32_t num_rows = 0, num_cols = 0;
+	uint32_t num_rows = 0, num_cols = 0, no_autorepeat = 0;
 	int irq;
 	int error;
 
@@ -312,9 +312,12 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "number of keypad rows/columns not specified\n");
 			return -EINVAL;
 		}
+		of_property_read_u32(np, "linux,input-no-autorepeat",
+			&no_autorepeat);
 	} else if (pdata) {
 		num_rows = pdata->rows;
 		num_cols = pdata->cols;
+		no_autorepeat = pdata->no_autorepeat;
 	} else {
 		dev_err(&pdev->dev, "no platform data defined\n");
 		return -EINVAL;
@@ -371,6 +374,7 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
 
 	keypad_data->rows = num_rows;
 	keypad_data->cols = num_cols;
+	keypad_data->no_autorepeat = no_autorepeat;
 	keypad_data->irq = irq;
 	keypad_data->row_shift = row_shift;
 

@@ -446,6 +446,9 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	/* FM <--> ABE */
 	{"omap-mcbsp.2 Playback", NULL, "MM_EXT_DL"},
 	{"MM_EXT_UL", NULL, "omap-mcbsp.2 Capture"},
+
+	/* Echo */
+	{"ECHO", NULL, "omap-abe-echo-dai Capture"},
 };
 
 static inline void twl6040_disconnect_pin(struct snd_soc_dapm_context *dapm,
@@ -1077,6 +1080,22 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 		.be_id = OMAP_ABE_DAI_VXREC,
 		.ignore_suspend = 1,
 	},
+	{
+		.name = OMAP_ABE_BE_ECHO,
+		.stream_name = "ECHO Capture",
+
+		/* ABE components - ECHO */
+		.cpu_dai_name = "omap-abe-echo-dai",
+		.platform_name = "aess",
+
+		/* no codec needed */
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_id = OMAP_ABE_DAI_ECHO,
+		.ignore_suspend = 1,
+	},
 };
 
 static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
@@ -1363,6 +1382,22 @@ static struct snd_soc_dai_link omap_abe_no_dmic_dai[] = {
 		.be_hw_params_fixup = mcbsp_be_hw_params_fixup,
 		.ops = &omap_abe_mcbsp_ops,
 		.be_id = OMAP_ABE_DAI_MM_FM,
+	},
+	{
+		.name = OMAP_ABE_BE_ECHO,
+		.stream_name = "ECHO Capture",
+
+		/* ABE components - ECHO */
+		.cpu_dai_name = "omap-abe-echo-dai",
+		.platform_name = "aess",
+
+		/* no codec needed */
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.codec_name = "snd-soc-dummy",
+
+		.no_pcm = 1, /* don't create ALSA pcm for this */
+		.be_id = OMAP_ABE_DAI_ECHO,
+		.ignore_suspend = 1,
 	},
 };
 

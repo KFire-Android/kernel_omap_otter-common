@@ -83,26 +83,30 @@ static int thermal_debug_show_domain(struct seq_file *s, void *data)
 	struct thermal_domain *domain = (struct thermal_domain *)s->private;
 	struct thermal_dev *tdev;
 
-	mutex_lock(&thermal_domain_list_lock);
 	seq_printf(s, "Domain name: %s\n", domain->domain_name);
 	seq_printf(s, "Temperature sensor:\n");
 	if (domain->temp_sensor) {
 		seq_printf(s, "\tName: %s\n", domain->temp_sensor->name);
 		seq_printf(s, "\tCurrent temperature: %d\n",
 			thermal_device_call(domain->temp_sensor, report_temp));
+		mutex_lock(&thermal_domain_list_lock);
 		thermal_device_call(domain->temp_sensor, debug_report, s);
+		mutex_unlock(&thermal_domain_list_lock);
 	}
 	seq_printf(s, "Governor:\n");
 	if (domain->governor) {
 		seq_printf(s, "\tName: %s\n", domain->governor->name);
+		mutex_lock(&thermal_domain_list_lock);
 		thermal_device_call(domain->temp_sensor, debug_report, s);
+		mutex_unlock(&thermal_domain_list_lock);
 	}
 	seq_printf(s, "Cooling agents:\n");
 	list_for_each_entry(tdev, &domain->cooling_agents, node) {
 		seq_printf(s, "\tName: %s\n", tdev->name);
+		mutex_lock(&thermal_domain_list_lock);
 		thermal_device_call(domain->temp_sensor, debug_report, s);
+		mutex_unlock(&thermal_domain_list_lock);
 	}
-	mutex_unlock(&thermal_domain_list_lock);
 
 	return 0;
 }
@@ -296,6 +300,11 @@ int thermal_sensor_set_temp(struct thermal_dev *tdev)
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
 
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid thermal device\n", __func__);
+		goto out;
+	}
+
 	thermal_domain = tdev->domain;
 	if (!thermal_domain) {
 		pr_err("%s: device not part of a domain\n", __func__);
@@ -303,7 +312,7 @@ int thermal_sensor_set_temp(struct thermal_dev *tdev)
 	}
 
 	if (list_empty(&thermal_domain->cooling_agents)) {
-		pr_err("%s: no cooling agents for domain %s\n",
+		pr_debug("%s: no cooling agents for domain %s\n",
 			__func__, thermal_domain->domain_name);
 		goto out;
 	}
@@ -327,6 +336,11 @@ int thermal_get_slope(struct thermal_dev *tdev, const char *rel_name)
 {
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
+
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid thermal device\n", __func__);
+		return ret;
+	}
 
 	thermal_domain = tdev->domain;
 	if (!thermal_domain) {
@@ -358,6 +372,11 @@ int thermal_get_offset(struct thermal_dev *tdev, const char *rel_name)
 {
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
+
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid thermal device\n", __func__);
+		return ret;
+	}
 
 	thermal_domain = tdev->domain;
 	if (!thermal_domain) {
@@ -394,6 +413,11 @@ int thermal_request_temp(struct thermal_dev *tdev)
 {
 	struct thermal_domain *thermal_domain;
 	int ret = -ENODEV;
+
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid thermal device\n", __func__);
+		return ret;
+	}
 
 	thermal_domain = tdev->domain;
 	if (!thermal_domain) {
@@ -590,6 +614,11 @@ int thermal_governor_dev_register(struct thermal_dev *tdev)
 {
 	struct thermal_domain *domain;
 
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid Governor thermal device\n", __func__);
+		return -ENODEV;
+	}
+
 	domain = thermal_domain_find(tdev->domain_name);
 	if (!domain)
 		domain = thermal_domain_add(tdev->domain_name);
@@ -618,6 +647,11 @@ EXPORT_SYMBOL_GPL(thermal_governor_dev_register);
  */
 void thermal_governor_dev_unregister(struct thermal_dev *tdev)
 {
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid Governor thermal device\n", __func__);
+		return;
+	}
+
 	mutex_lock(&thermal_domain_list_lock);
 
 	if (tdev->domain)
@@ -638,6 +672,11 @@ EXPORT_SYMBOL_GPL(thermal_governor_dev_unregister);
 int thermal_cooling_dev_register(struct thermal_dev *tdev)
 {
 	struct thermal_domain *domain;
+
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid Cooling thermal device\n", __func__);
+		return -ENODEV;
+	}
 
 	domain = thermal_domain_find(tdev->domain_name);
 	if (!domain)
@@ -667,6 +706,12 @@ EXPORT_SYMBOL_GPL(thermal_cooling_dev_register);
  */
 void thermal_cooling_dev_unregister(struct thermal_dev *tdev)
 {
+
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid Cooling thermal device\n", __func__);
+		return;
+	}
+
 	mutex_lock(&thermal_domain_list_lock);
 
 	if (tdev->domain)
@@ -687,6 +732,11 @@ EXPORT_SYMBOL_GPL(thermal_cooling_dev_unregister);
 int thermal_sensor_dev_register(struct thermal_dev *tdev)
 {
 	struct thermal_domain *domain;
+
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid Sensor thermal device\n", __func__);
+		return -ENODEV;
+	}
 
 	domain = thermal_domain_find(tdev->domain_name);
 	if (!domain)
@@ -715,6 +765,11 @@ EXPORT_SYMBOL_GPL(thermal_sensor_dev_register);
  */
 void thermal_sensor_dev_unregister(struct thermal_dev *tdev)
 {
+	if (unlikely(IS_ERR_OR_NULL(tdev))) {
+		pr_err("%s: Invalid Sensor thermal device\n", __func__);
+		return;
+	}
+
 	mutex_lock(&thermal_domain_list_lock);
 
 	if (tdev->domain)
@@ -742,7 +797,7 @@ static void __exit thermal_framework_exit(void)
 	mutex_unlock(&thermal_domain_list_lock);
 }
 
-fs_initcall(thermal_framework_init);
+postcore_initcall(thermal_framework_init);
 module_exit(thermal_framework_exit);
 
 MODULE_AUTHOR("Dan Murphy <DMurphy@ti.com>");

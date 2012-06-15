@@ -345,23 +345,23 @@ void if_hsi_get_speed(int ch, unsigned long *fclock)
 	hsi_ioctl(channel->dev, HSI_IOCTL_GET_SPEED, fclock);
 }
 
-void if_hsi_set_clk_forced_on(int ch, unsigned int state)
+void if_hsi_set_clk_forced_on(int ch)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 
 	spin_lock_bh(&hsi_iface.lock);
-	hsi_ioctl(channel->dev, HSI_IOCTL_SET_CLK_FORCE_ON, &state);
+	hsi_ioctl(channel->dev, HSI_IOCTL_SET_CLK_FORCE_ON, NULL);
 	spin_unlock_bh(&hsi_iface.lock);
 }
 
-void if_hsi_set_clk_dynamic(int ch, unsigned int state)
+void if_hsi_set_clk_dynamic(int ch)
 {
 	struct if_hsi_channel *channel;
 	channel = &hsi_iface.channels[ch];
 
 	spin_lock_bh(&hsi_iface.lock);
-	hsi_ioctl(channel->dev, HSI_IOCTL_SET_CLK_DYNAMIC, &state);
+	hsi_ioctl(channel->dev, HSI_IOCTL_SET_CLK_DYNAMIC, NULL);
 	spin_unlock_bh(&hsi_iface.lock);
 }
 
