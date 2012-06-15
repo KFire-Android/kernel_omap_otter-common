@@ -257,6 +257,10 @@
 			ti,viblmotor-res = <10>;
 			ti,vibrmotor-res = <10>;
 		};
+		
+		gpo {
+			ti,nr_gpo = <3>;
+		};
 	};
 };
 
