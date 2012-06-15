@@ -6226,7 +6226,8 @@ static struct omap_hwmod omap54xx_usb_host_hs_hwmod = {
 static struct omap_hwmod_class_sysconfig omap54xx_usb_otg_ss_sysc = {
 	.rev_offs	= 0x0000,
 	.sysc_offs	= 0x0010,
-	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE
+				| SYSC_HAS_DMADISABLE),
 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
 			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
 			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
