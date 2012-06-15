@@ -89,6 +89,8 @@
 #define ILITEK_IOCTL_GET_INTERFANCE             _IOWR(ILITEK_IOCTL_BASE, 14, int)//default setting is i2c interface
 #define ILITEK_IOCTL_I2C_SWITCH_IRQ             _IOWR(ILITEK_IOCTL_BASE, 15, int)
 
+#define TOUCH_FILTER		70
+
 // module information
 MODULE_AUTHOR("Steward_Fu");
 MODULE_DESCRIPTION("ILITEK I2C touch driver for Android platform");
@@ -130,6 +132,8 @@ static int ilitek_file_open(struct inode*, struct file*);
 static ssize_t ilitek_file_write(struct file*, const char*, size_t, loff_t*);
 static ssize_t ilitek_file_read(struct file*, char*, size_t, loff_t*);
 static int ilitek_file_close(struct inode*, struct file*);
+
+static bool touch_move = false;
 
 // declare i2c data member
 struct i2c_data {
@@ -475,6 +479,7 @@ static int ilitek_i2c_process_and_report(void) {
 				i2c.last_touch2_y = 0;
 				input_mt_sync(i2c.input_dev);
 			}
+            touch_move = false;
 		}
 		else {
 			if (tp_id & 0x01) {
@@ -489,8 +494,18 @@ static int ilitek_i2c_process_and_report(void) {
 				if (x1 == 0) x1++;
 				if (y1 == 0) y1++;
 
-				if ((i2c.last_touch1_x != x1) || (i2c.last_touch1_y != y1))
-					changed = true;
+                if (!touch_move && i2c.last_touch1_x != 0 && i2c.last_touch1_y != 0) {
+                    if ((i2c.last_touch1_x + TOUCH_FILTER < x1) ||
+                            (i2c.last_touch1_x - TOUCH_FILTER > x1) ||
+                            (i2c.last_touch1_y + TOUCH_FILTER < y1) ||
+                            (i2c.last_touch1_y - TOUCH_FILTER > y1)) {
+                        touch_move = true;
+                        changed = true;
+                    }
+                } else {
+                    if ((i2c.last_touch1_x != x1) || (i2c.last_touch1_y != y1))
+                    changed = true;
+                }
 			}
 
 			if (tp_id & 0x02) {
