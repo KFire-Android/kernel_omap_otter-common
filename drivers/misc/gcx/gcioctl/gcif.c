@@ -766,11 +766,13 @@ static int gc_callback_wait(struct gccmdcallbackwait *gccmdcallbackwait)
 		: msecs_to_jiffies(cpcmdcallbackwait.timeoutms);
 
 	/* Wait until a callback is triggered. */
-	GCWAIT_FOR_COMPLETION_TIMEOUT(timeout,
-				      &gccallbackhandle->ready,
-				      timeout);
+	timeout = wait_for_completion_interruptible_timeout(
+		&gccallbackhandle->ready, timeout);
 
-	if (timeout == 0) {
+	if (timeout < 0)
+		ret = timeout;
+
+	else if (timeout == 0) {
 		cpcmdcallbackwait.gcerror = GCERR_TIMEOUT;
 		cpcmdcallbackwait.callback = NULL;
 		cpcmdcallbackwait.callbackparam = NULL;
