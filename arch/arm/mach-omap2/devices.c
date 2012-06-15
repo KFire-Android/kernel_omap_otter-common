@@ -468,6 +468,7 @@ static void __init omap_init_gpu(void)
 	struct gpu_platform_data *pdata;
 	const char *oh_name = "gpu";
 	const char *name = "pvrsrvkm";
+	struct clk *cck, *hck, *pck;
 
 	oh = omap_hwmod_lookup(oh_name);
 	if (!oh) {
@@ -495,6 +496,17 @@ static void __init omap_init_gpu(void)
 			     omap_gpu_latency, ARRAY_SIZE(omap_gpu_latency), 0);
 	WARN(IS_ERR(pdev), "Could not build omap_device for %s %s\n",
 	     name, oh_name);
+
+	if (cpu_is_omap54xx()) {
+		cck = clk_get(&pdev->dev, "gpu_core_clk_mux");
+		hck = clk_get(&pdev->dev, "gpu_hyd_clk_mux");
+		pck = clk_get(&pdev->dev, "dpll_per_h14x2_ck");
+		clk_set_parent(cck, pck);
+		clk_set_parent(hck, pck);
+		clk_put(cck);
+		clk_put(hck);
+		clk_put(pck);
+	}
 
 	kfree(pdata);
 }
