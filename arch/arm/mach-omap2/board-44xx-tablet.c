@@ -739,6 +739,12 @@ static void __init omap_tablet_reserve(void)
 {
 
 	omap_init_ram_size();
+#ifdef CONFIG_ION_OMAP
+	tablet_android_display_setup(get_omap_ion_platform_data());
+	omap_ion_init();
+#else
+	tablet_android_display_setup(NULL);
+#endif
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 
@@ -748,12 +754,12 @@ static void __init omap_tablet_reserve(void)
 	/* ipu needs to recognize secure input buffer area as well */
 	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
 					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-#ifdef CONFIG_ION_OMAP
-	tablet_android_display_setup(get_omap_ion_platform_data());
-	omap_ion_init();
-#else
-	tablet_android_display_setup(NULL);
+#ifdef CONFIG_OMAP_REMOTE_PROC_DSP
+	memblock_remove(PHYS_ADDR_TESLA_MEM, PHYS_ADDR_TESLA_SIZE);
+	omap_dsp_set_static_mempool(PHYS_ADDR_TESLA_MEM,
+					PHYS_ADDR_TESLA_SIZE);
 #endif
+
 	omap_reserve();
 }
 
