@@ -159,6 +159,12 @@
 #define OMAP54XX_SR2_SENPAVGWEIGHT	0x04
 #define OMAP54XX_SR2_SENNAVGWEIGHT	0x04
 
+/* Smart reflex notifiers for class drivers to use */
+#define SR_NOTIFY_MCUDISACK		BIT(3)
+#define SR_NOTIFY_MCUBOUND		BIT(2)
+#define SR_NOTIFY_MCUVALID		BIT(1)
+#define SR_NOTIFY_MCUACCUM		BIT(0)
+
 struct voltagedomain;
 struct omap_sr_ops;
 
