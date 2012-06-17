@@ -123,8 +123,27 @@ static irqreturn_t sr_interrupt(int irq, void *data)
 		return IRQ_NONE;
 	}
 
-	if (sr_class->notify)
-		sr_class->notify(sr_info, status);
+	/* Attempt some resemblance of recovery! */
+	if (!status) {
+		dev_err(&sr_info->pdev->dev,
+			"%s: Spurious interrupt!status = 0x%08x."
+			"Disabling to prevent spamming!!\n",
+			__func__, status);
+		disable_irq_nosync(sr_info->irq);
+	} else {
+		/*
+		 * If the notifier does not exist OR reports inability to
+		 * handle, disable as well
+		 */
+		if (!sr_class->notify ||
+		    sr_class->notify(sr_info, status)) {
+			dev_err(&sr_info->pdev->dev,
+				"%s: Callback cant handle int status=0x%08x."
+				"Disabling to prevent spam!!\n",
+				__func__, status);
+			disable_irq_nosync(sr_info->irq);
+		}
+	}
 
 	return IRQ_HANDLED;
 }
