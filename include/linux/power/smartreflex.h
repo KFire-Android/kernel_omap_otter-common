@@ -177,6 +177,7 @@ struct omap_sr {
 	struct voltagedomain		*voltdm;
 	struct dentry			*dbg_dir;
 	unsigned int			irq;
+	bool				irq_enabled;
 	int				srid;
 	int				ip_type;
 	int				nvalue_count;
@@ -353,6 +354,7 @@ void sr_disable(struct omap_sr *sr);
 int sr_configure_errgen(struct omap_sr *sr);
 int sr_disable_errgen(struct omap_sr *sr);
 int sr_configure_minmax(struct omap_sr *sr);
+int sr_notifier_control(struct omap_sr *sr, bool enable);
 
 /* API to register the smartreflex class driver with the smartreflex driver */
 int sr_register_class(struct omap_sr_class_data *class_data);
