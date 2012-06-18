@@ -24,6 +24,7 @@
 #include <video/omapdss.h>
 
 #include <plat/vram.h>
+#include <plat/gpio.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-lg4591.h>
@@ -33,8 +34,8 @@
 #define OMAP5_SEVM_FB_RAM_SIZE       SZ_8M /* 1280×800*4 * 2 */
 
 #define HDMI_GPIO_HPD 193
-#define HDMI_GPIO_CT_CP_HPD 256
-#define HDMI_GPIO_LS_OE     257
+#define HDMI_GPIO_CT_CP_HPD OMAP_MPUIO(0)
+#define HDMI_GPIO_LS_OE     OMAP_MPUIO(1)
 
 static void lg_panel_set_power(bool enable)
 {
