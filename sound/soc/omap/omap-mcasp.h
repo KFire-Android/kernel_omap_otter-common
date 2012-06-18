@@ -25,6 +25,7 @@
 
 struct omap_mcasp {
 	struct device *dev;
+	struct resource *res;
 	void __iomem *base;
 	spinlock_t lock;
 	struct clk *fclk;
