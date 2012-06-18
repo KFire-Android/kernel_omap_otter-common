@@ -49,6 +49,7 @@
  * @rproc: rproc handle
  * @boot_reg: virtual address of the register where the bootaddr is stored
  * @qos_req: for requesting latency constraints for rproc
+ * @bw_req: for requesting L3 bandwidth constraints on behalf of rproc
  * @pm_comp: completion needed for suspend respond
  * @idle: address to the idle register
  * @idle_mask: mask of the idle register
@@ -63,6 +64,7 @@ struct omap_rproc {
 	struct rproc *rproc;
 	void __iomem *boot_reg;
 	struct dev_pm_qos_request qos_req;
+	struct pm_qos_request bw_req;
 	atomic_t thrd_cnt;
 	struct completion pm_comp;
 	void __iomem *idle;
@@ -190,14 +192,9 @@ omap_rproc_set_latency(struct device *dev, struct rproc *rproc, long val)
 static int
 omap_rproc_set_bandwidth(struct device *dev, struct rproc *rproc, long val)
 {
-	struct platform_device *pdev = to_platform_device(rproc->dev.parent);
-	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+	struct omap_rproc *oproc = rproc->priv;
 
-	/* Call device specific api if any */
-	if (pdata->ops && pdata->ops->set_bandwidth)
-		return pdata->ops->set_bandwidth(dev, rproc, val);
-
-	/* TODO: call platform specific */
+	pm_qos_update_request(&oproc->bw_req, val);
 
 	return 0;
 }
@@ -466,6 +463,9 @@ static int __devinit omap_rproc_probe(struct platform_device *pdev)
 	if (ret)
 		goto iounmap;
 
+	pm_qos_add_request(&oproc->bw_req, PM_QOS_MEMORY_THROUGHPUT,
+				PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
+
 	ret = rproc_register(rproc);
 	if (ret)
 		goto remove_req;
@@ -473,6 +473,7 @@ static int __devinit omap_rproc_probe(struct platform_device *pdev)
 	return 0;
 
 remove_req:
+	pm_qos_remove_request(&oproc->bw_req);
 	dev_pm_qos_remove_request(&oproc->qos_req);
 iounmap:
 	if (oproc->idle)
@@ -495,6 +496,7 @@ static int __devexit omap_rproc_remove(struct platform_device *pdev)
 	if (oproc->boot_reg)
 		iounmap(oproc->boot_reg);
 
+	pm_qos_remove_request(&oproc->bw_req);
 	dev_pm_qos_remove_request(&oproc->qos_req);
 	return rproc_unregister(rproc);
 }
