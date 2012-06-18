@@ -521,8 +521,10 @@ static u32 get_ddr_phy_ctrl_1(u32 freq, u8 RL)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_100_MHZ_AND_LESS;
 	else if (freq <= 200000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_200_MHZ;
-	else
+	else if (freq <= 400000000)
 		val = EMIF_DLL_SLAVE_DLY_CTRL_400_MHZ;
+	else
+		val = EMIF_DLL_SLAVE_DLY_CTRL_466_MHZ;
 	mask_n_set(phy, OMAP44XX_REG_DLL_SLAVE_DLY_CTRL_SHIFT,
 		   OMAP44XX_REG_DLL_SLAVE_DLY_CTRL_MASK, val);
 
@@ -647,6 +649,17 @@ static void setup_registers(u32 emif_nr, struct emif_regs *regs, u32 volt_state)
 	mask_n_set(temp, OMAP44XX_REG_DDR_PHY_CTRL_1_SHDW_SHIFT,
 		   OMAP44XX_REG_DDR_PHY_CTRL_1_SHDW_MASK,
 		   regs->emif_ddr_phy_ctlr_1_final);
+
+	/*
+	 * Set Read Latency value RL=0xB according to OMAP4470 LPDDR
+	 * interface configuration update for 466 MHz
+	 */
+	if (regs->freq == 466666666) {
+		mask_n_set(temp, OMAP44XX_REG_READ_LATENCY_SHDW_SHIFT,
+			OMAP44XX_REG_READ_LATENCY_SHDW_MASK,
+			regs->RL_final);
+	}
+
 	__raw_writel(temp, base + OMAP44XX_EMIF_DDR_PHY_CTRL_1_SHDW);
 
 	__raw_writel(regs->temp_alert_config,
