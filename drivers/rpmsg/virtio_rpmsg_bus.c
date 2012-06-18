@@ -750,8 +750,8 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 
 	mutex_lock(&vrp->rx_lock);
 	msg = virtqueue_get_buf(rvq, &len);
-	mutex_unlock(&vrp->rx_lock);
 	if (!msg) {
+		mutex_unlock(&vrp->rx_lock);
 		dev_err(dev, "uhm, incoming signal, but no used buffer ?\n");
 		return;
 	}
@@ -770,6 +770,7 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	 */
 	if (len > RPMSG_BUF_SIZE ||
 		msg->len > (len - sizeof(struct rpmsg_hdr))) {
+		mutex_unlock(&vrp->rx_lock);
 		dev_warn(dev, "inbound msg too big: (%d, %d)\n", len, msg->len);
 		return;
 	}
@@ -788,7 +789,6 @@ static void rpmsg_recv_done(struct virtqueue *rvq)
 	sg_init_one(&sg, msg, RPMSG_BUF_SIZE);
 
 	/* add the buffer back to the remote processor's virtqueue */
-	mutex_lock(&vrp->rx_lock);
 	err = virtqueue_add_buf(vrp->rvq, &sg, 0, 1, msg, GFP_KERNEL);
 	if (err < 0) {
 		mutex_unlock(&vrp->rx_lock);

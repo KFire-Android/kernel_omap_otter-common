@@ -115,9 +115,9 @@ static int omap_abe_modem_hw_params(struct snd_pcm_substream *substream,
 		/* this need to be done for playback and/or record */
 		channels = params_channels(params);
 		if (stream == SNDRV_PCM_STREAM_PLAYBACK)
-			omap_mcbsp_set_rx_threshold(mcbsp, channels);
-		else
 			omap_mcbsp_set_tx_threshold(mcbsp, channels);
+		else
+			omap_mcbsp_set_rx_threshold(mcbsp, channels);
 	}
 
 	return ret;
@@ -993,7 +993,6 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 		.ops = &omap_abe_mcbsp_ops,
 		.be_id = OMAP_ABE_DAI_MM_FM,
 	},
-#if 0
 	{
 		.name = OMAP_ABE_BE_MM_EXT1,
 		.stream_name = "MODEM",
@@ -1012,7 +1011,6 @@ static struct snd_soc_dai_link omap_abe_dai_link[] = {
 		.be_id = OMAP_ABE_DAI_MODEM,
 		.ignore_suspend = 1,
 	},
-#endif
 	{
 		.name = OMAP_ABE_BE_DMIC0,
 		.stream_name = "DMIC0 Capture",
