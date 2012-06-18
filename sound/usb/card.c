@@ -48,6 +48,7 @@
 #include <linux/usb/audio.h>
 #include <linux/usb/audio-v2.h>
 #include <linux/module.h>
+#include <linux/switch.h>
 
 #include <sound/control.h>
 #include <sound/core.h>
@@ -115,6 +116,18 @@ MODULE_PARM_DESC(ignore_ctl_error,
 static DEFINE_MUTEX(register_mutex);
 static struct snd_usb_audio *usb_chip[SNDRV_CARDS];
 static struct usb_driver usb_audio_driver;
+
+/*
+ * use a switch to report to userspace what type of device
+ * is most recently connected.
+ */
+enum switch_state {
+	STATE_CONNECTED_UNKNOWN = -1,
+	STATE_DISCONNECTED = 0,
+	STATE_CONNECTED = 1
+};
+
+static struct switch_dev sdev;
 
 /*
  * disconnect streams
@@ -524,6 +537,12 @@ snd_usb_audio_probe(struct usb_device *dev,
 		goto __error;
 	}
 
+	/*
+	 * not sure how to distinguish analog/digital/unknown,
+	 * assume digital for now
+	 */
+	switch_set_state(&sdev, STATE_CONNECTED);
+
 	usb_chip[chip->index] = chip;
 	chip->num_interfaces++;
 	chip->probing = 0;
@@ -559,6 +578,7 @@ static void snd_usb_audio_disconnect(struct usb_device *dev,
 	mutex_lock(&chip->shutdown_mutex);
 	chip->shutdown = 1;
 	chip->num_interfaces--;
+	switch_set_state(&sdev, STATE_DISCONNECTED);
 	if (chip->num_interfaces <= 0) {
 		snd_card_disconnect(card);
 		/* release the pcm resources */
@@ -713,16 +733,31 @@ static struct usb_driver usb_audio_driver = {
 
 static int __init snd_usb_audio_init(void)
 {
+	int err = 0;
+
 	if (nrpacks < 1 || nrpacks > MAX_PACKS) {
 		printk(KERN_WARNING "invalid nrpacks value.\n");
 		return -EINVAL;
 	}
-	return usb_register(&usb_audio_driver);
+
+	sdev.name = "usb_audio";
+	err = switch_dev_register(&sdev);
+	if (err) {
+		snd_printk(KERN_ERR "error registering switch device");
+		return err;
+	}
+
+	err = usb_register(&usb_audio_driver);
+	if (err)
+		switch_dev_unregister(&sdev);
+
+	return err;
 }
 
 static void __exit snd_usb_audio_cleanup(void)
 {
 	usb_deregister(&usb_audio_driver);
+	switch_dev_unregister(&sdev);
 }
 
 module_init(snd_usb_audio_init);
