@@ -55,6 +55,7 @@ struct rprm_regulator_depot {
 struct rprm_gen_device_handle {
 	struct device *dev;
 	struct dev_pm_qos_request req;
+	struct pm_qos_request bw_req;
 };
 
 /* pointer to the constraint ops exported by omap mach module */
@@ -496,6 +497,9 @@ _enable_device_exclusive(void **handle, struct device **pdev, const char *name)
 	if (ret < 0)
 		goto err_handle_free;
 
+	pm_qos_add_request(&rprm_handle->bw_req, PM_QOS_MEMORY_THROUGHPUT,
+				PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
+
 	ret = pm_runtime_get_sync(dev);
 	if (ret) {
 		/*
@@ -518,6 +522,7 @@ _enable_device_exclusive(void **handle, struct device **pdev, const char *name)
 	return 0;
 
 err_qos_free:
+	pm_qos_remove_request(&rprm_handle->bw_req);
 	dev_pm_qos_remove_request(&rprm_handle->req);
 err_handle_free:
 	kfree(rprm_handle);
@@ -530,6 +535,7 @@ static int _device_release(void *handle)
 	struct device *dev = obj->dev;
 
 	dev_pm_qos_remove_request(&obj->req);
+	pm_qos_remove_request(&obj->bw_req);
 	kfree(obj);
 
 	return pm_runtime_put_sync(dev);
@@ -558,10 +564,9 @@ static int _device_bandwidth(struct device *rdev, void *handle,
 {
 	struct rprm_gen_device_handle *obj = handle;
 
-	if (!mach_ops || !mach_ops->set_min_bus_tput)
-		return -ENOSYS;
+	pm_qos_update_request(&obj->bw_req, val);
 
-	return mach_ops->set_min_bus_tput(rdev, obj->dev, val);
+	return 0;
 }
 
 static int rprm_iva_request(void **handle, void *data, size_t len)
