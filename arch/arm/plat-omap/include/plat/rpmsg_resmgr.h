@@ -42,8 +42,6 @@ struct omap_rprm_auxclk {
 /*
  * struct omap_rprm_ops - operations exported for this module
  *			(only constraints at the comment)
- * @set_min_bus_tput:		set a throughput constraint to the bus there
- *				@tdev is connected
  * @set_max_dev_wakeup_lat:	set a latency constraint to @tdev
  * @device_scale:		scale @tdev, it can be used to set a frequency
  *				constraint in @tdev
@@ -52,8 +50,6 @@ struct omap_rprm_auxclk {
  *
  */
 struct omap_rprm_ops {
-	int (*set_min_bus_tput)(struct device *rdev, struct device *tdev,
-			unsigned long val);
 	int (*set_max_dev_wakeup_lat)(struct device *rdev, struct device *tdev,
 			unsigned long val);
 	int (*device_scale)(struct device *rdev, struct device *tdev,
