@@ -340,6 +340,24 @@
 			ti,hwmods = "wd_timer2";
 		};
 
+		aess: aess@0x401f1000 {
+			compatible = "ti,omap4-aess";
+			reg = <0x401f1000 0x3ff>, /* MPU private access */
+			      <0x40180000 0xffff>, /* DMEM - MPU */
+			      <0x401a0000 0x1fff>, /* CMEM - MPU */
+			      <0x401c0000 0x5fff>, /* SMEM - MPU */
+			      <0x401e0000 0x1fff>, /* PMEM - MPU */
+			      <0x4901f000 0x3ff>, /* L3 Interconnect */
+			      <0x49080000 0xffff>, /* DMEM - MPU */
+			      <0x490a0000 0x1fff>, /* CMEM - MPU */
+			      <0x490ce000 0x5fff>, /* SMEM - MPU */
+			      <0x490e0000 0x1fff>; /* PMEM - MPU */
+			reg-names = "mpu", "dmem", "cmem", "smem", "pmem",
+				"dma","dmem_dma", "cmem_dma", "smem_dma", "pmem_dma";
+			interrupts = <0 99 0x4>;
+			ti,hwmods = "aess";
+		};
+
 		mcpdm: mcpdm@40132000 {
 			compatible = "ti,omap4-mcpdm";
 			reg = <0x40132000 0x7f>, /* MPU private access */
