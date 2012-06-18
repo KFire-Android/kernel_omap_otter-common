@@ -34,6 +34,7 @@
 #include <linux/dma-mapping.h>
 
 #include <sound/soc.h>
+#include <sound/omap-abe.h>
 
 #include <plat/omap-pm.h>
 
@@ -266,12 +267,10 @@ static int abe_probe(struct snd_soc_platform *platform)
 		goto err_irq;
 	}
 
-/* TODO: Enable when PM tree creates arch/arm/mach-omap2/opp5xxx_data.c */
-#if 0
 	ret = abe_opp_init_initial_opp(abe);
 	if (ret < 0)
 		goto err_opp;
-#endif
+
 	/* aess_clk has to be enabled to access hal register.
 	 * Disable the clk after it has been used.
 	 * Using pm_runtime_get_sync() instead of omap_abe_*
@@ -300,10 +299,7 @@ static int abe_probe(struct snd_soc_platform *platform)
 	abe_init_debugfs(abe);
 	return ret;
 
-/* TODO: Enable when PM tree creates arch/arm/mach-omap2/opp5xxx_data.c */
-#if 0
 err_opp:
-#endif
 	free_irq(abe->irq, (void *)abe);
 err_irq:
 	abe_free_fw(abe);
@@ -337,6 +333,7 @@ static struct snd_soc_platform_driver omap_aess_platform = {
 
 static int __devinit abe_engine_probe(struct platform_device *pdev)
 {
+	struct omap_abe_pdata *pdata = dev_get_platdata(&pdev->dev);
 	struct resource *res;
 	struct omap_abe *abe;
 	int ret = -EINVAL, i;
@@ -369,7 +366,8 @@ static int __devinit abe_engine_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_PM
 	abe->get_context_lost_count = omap_pm_get_dev_context_loss_count;
-	abe->device_scale = NULL;
+	if (pdata)
+		abe->device_scale = pdata->device_scale;
 #endif
 	abe->dev = &pdev->dev;
 	mutex_init(&abe->mutex);

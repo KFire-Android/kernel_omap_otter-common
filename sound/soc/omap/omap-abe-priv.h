@@ -310,8 +310,7 @@ struct omap_abe {
 	struct mutex mutex;
 
 	int (*get_context_lost_count)(struct device *dev);
-	int (*device_scale)(struct device *req_dev,
-			    struct device *target_dev,
+	int (*device_scale)(struct device *target_dev,
 			    unsigned long rate);
 	u32 context_lost;
 

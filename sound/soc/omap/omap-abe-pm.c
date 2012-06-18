@@ -84,7 +84,7 @@ void omap_abe_pm_shutdown(struct snd_soc_platform *platform)
 	udelay(250);
 
 	if (abe->device_scale) {
-		ret = abe->device_scale(abe->dev, abe->dev, abe->opp.freqs[0]);
+		ret = abe->device_scale(abe->dev, abe->opp.freqs[0]);
 		if (ret)
 			dev_err(abe->dev, "failed to scale to lowest OPP\n");
 	}
@@ -134,7 +134,7 @@ int abe_pm_restore_context(struct omap_abe *abe)
 	int i, ret;
 
 	if (abe->device_scale) {
-		ret = abe->device_scale(abe->dev, abe->dev,
+		ret = abe->device_scale(abe->dev,
 				abe->opp.freqs[OMAP_ABE_OPP_50]);
 		if (ret) {
 			dev_err(abe->dev, "failed to scale to OPP 50\n");
@@ -243,7 +243,7 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 	omap_abe_pm_runtime_get_sync(abe);
 
 	if (abe->device_scale) {
-		ret = abe->device_scale(abe->dev, abe->dev,
+		ret = abe->device_scale(abe->dev,
 				abe->opp.freqs[OMAP_ABE_OPP_50]);
 		if (ret) {
 			dev_err(abe->dev, "failed to scale to OPP 50\n");
