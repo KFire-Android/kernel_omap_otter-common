@@ -1348,20 +1348,12 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 		return PTR_ERR(bg_ptr);
 	}
 
-	if (bg_ptr->pdata->has_talert) {
-		ret = omap_bandgap_talert_init(bg_ptr, pdev);
-		if (ret) {
-			dev_err(&pdev->dev, "failed to initialize Talert IRQ\n");
-			return ret;
-		}
-	}
-
 	if (bg_ptr->pdata->has_tshut) {
 		ret = omap_bandgap_tshut_init(bg_ptr, pdev);
 		if (ret) {
 			dev_err(&pdev->dev,
 				"failed to initialize system tshut IRQ\n");
-			goto free_talert;
+			return ret;
 		}
 	}
 
@@ -1452,6 +1444,20 @@ int __devinit omap_bandgap_probe(struct platform_device *pdev)
 			bg_ptr->pdata->expose_sensor(bg_ptr, i, domain);
 	}
 
+	/*
+	 * Enable the Interrupts once everything is set. Otherwise irq handler
+	 * might be called as soon as it is enabled where as rest of framework
+	 * is still getting initialised.
+	 */
+	if (bg_ptr->pdata->has_talert) {
+		ret = omap_bandgap_talert_init(bg_ptr, pdev);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to initialize Talert IRQ\n");
+			i = bg_ptr->pdata->sensor_count;
+			goto put_clks;
+		}
+	}
+
 	return 0;
 
 put_clks:
@@ -1461,8 +1467,6 @@ put_clks:
 free_irqs:
 	free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
 	gpio_free(bg_ptr->tshut_gpio);
-free_talert:
-	free_irq(bg_ptr->irq, bg_ptr);
 
 	return ret;
 }
