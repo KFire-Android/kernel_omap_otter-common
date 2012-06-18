@@ -121,125 +121,6 @@
 #define OMAP5430_CORE_MAX_TEMP		125000
 #define OMAP5430_CORE_HYST_VAL		5000
 
-/**
- * The register offsets and bit fields might change across
- * OMAP versions hence populating them in this structure.
- */
-
-struct temp_sensor_registers {
-	u32	temp_sensor_ctrl;
-	u32	bgap_tempsoff_mask;
-	u32	bgap_soc_mask;
-	u32	bgap_eocz_mask;
-	u32	bgap_dtemp_mask;
-
-	u32	bgap_mask_ctrl;
-	u32	mask_hot_mask;
-	u32	mask_cold_mask;
-
-	u32	bgap_mode_ctrl;
-	u32	mode_ctrl_mask;
-
-	u32	bgap_counter;
-	u32	counter_mask;
-
-	u32	bgap_threshold;
-	u32	threshold_thot_mask;
-	u32	threshold_tcold_mask;
-
-	u32	tshut_threshold;
-	u32	tshut_hot_mask;
-	u32	tshut_cold_mask;
-
-	u32	bgap_status;
-	u32	status_clean_stop_mask;
-	u32	status_bgap_alert_mask;
-	u32	status_hot_mask;
-	u32	status_cold_mask;
-
-	u32	bgap_efuse;
-};
-
-/**
- * The thresholds and limits for temperature sensors.
- */
-struct temp_sensor_data {
-	u32	tshut_hot;
-	u32	tshut_cold;
-	u32	t_hot;
-	u32	t_cold;
-	u32	min_freq;
-	u32	max_freq;
-	int	max_temp;
-	int	min_temp;
-	int	hyst_val;
-	u32	adc_start_val;
-	u32	adc_end_val;
-	u32	update_int1;
-	u32	update_int2;
-};
-
-/**
- * struct temp_sensor_regval - temperature sensor register values
- * @bg_mode_ctrl: temp sensor control register value
- * @bg_ctrl: bandgap ctrl register value
- * @bg_counter: bandgap counter value
- * @bg_threshold: bandgap threshold register value
- * @tshut_threshold: bandgap tshut register value
- */
-struct temp_sensor_regval {
-	u32			bg_mode_ctrl;
-	u32			bg_ctrl;
-	u32			bg_counter;
-	u32			bg_threshold;
-	u32			tshut_threshold;
-};
-
-/**
- * struct omap_temp_sensor - bandgap temperature sensor platform data
- * @ts_data: pointer to struct with thresholds, limits of temperature sensor
- * @registers: pointer to the list of register offsets and bitfields
- * @regval: temperature sensor register values
- * @domain: the name of the domain where the sensor is located
- */
-struct omap_temp_sensor {
-	struct temp_sensor_data		*ts_data;
-	struct temp_sensor_registers	*registers;
-	struct temp_sensor_regval	*regval;
-	char				*domain;
-};
-
-/**
- * struct omap_bandgap_data - bandgap platform data structure
- * @has_talert: indicates if the chip has talert output line
- * @has_tshut: indicates if the chip has tshut output line
- * @conv_table: Pointer to adc to temperature conversion table
- * @fclock_name: clock name of the functional clock
- * @div_ck_nme: clock name of the clock divisor
- * @sensor_count: count of temperature sensor device in scm
- * @rev: Revision of the temperature sensor
- * @tshut_gpio: gpio linked to tshut signal
- * @accurate: Accuracy of the temperature
- * @sensors: array of sensors present in this bandgap instance
- * @expose_sensor: callback to export sensor to thermal API
- */
-struct omap_bandgap_data {
-	bool				has_talert;
-	bool				has_tshut;
-	int				*conv_table;
-	char				*fclock_name;
-	char				*div_ck_name;
-	int				sensor_count;
-	int				rev;
-	int				tshut_gpio;
-	bool				accurate;
-	int (*report_temperature)(struct omap_bandgap *bg_ptr, int id);
-	int (*expose_sensor)(struct omap_bandgap *bg_ptr, int id, char *domain);
-
-	/* this needs to be at the end */
-	struct omap_temp_sensor		sensors[];
-};
-
 /* TODO: provide data structures for 4430 */
 
 /*
@@ -1118,6 +999,56 @@ int omap_bandgap_read_temperature(struct omap_bandgap *bg_ptr, int id,
 }
 
 /**
+ * omap_bandgap_set_sensor_data() - helper function to store thermal
+ * framework related data.
+ * @bg_ptr - pointer to bandgap instance
+ * @id - sensor id
+ * @data - thermal framework related data to be stored
+ *
+ * returns 0 on success or the proper error code
+ */
+int omap_bandgap_set_sensor_data(struct omap_bandgap *bg_ptr, int id,
+				void *data)
+{
+	if (!bg_ptr) {
+		pr_err("%s:Invalid pointer\n", __func__);
+		return -EINVAL;
+	}
+
+	if ((id < 0) || (id >= bg_ptr->pdata->sensor_count)) {
+		dev_err(bg_ptr->dev, "Invalid sensor device\n");
+		return -ENODEV;
+	}
+
+	bg_ptr->pdata->sensors[id].data = data;
+
+	return 0;
+}
+
+/**
+ * omap_bandgap_get_sensor_data() - helper function to get thermal
+ * framework related data.
+ * @bg_ptr - pointer to bandgap instance
+ * @id - sensor id
+ *
+ * returns data stored by set function with sensor id on success or NULL
+ */
+void *omap_bandgap_get_sensor_data(struct omap_bandgap *bg_ptr, int id)
+{
+	if (!bg_ptr) {
+		pr_err("%s:Invalid pointer\n", __func__);
+		return ERR_PTR(-EINVAL);
+	}
+
+	if ((id < 0) || (id >= bg_ptr->pdata->sensor_count)) {
+		dev_err(bg_ptr->dev, "Invalid sensor device\n");
+		return ERR_PTR(-ENODEV);
+	}
+
+	return bg_ptr->pdata->sensors[id].data;
+}
+
+/**
  * enable_continuous_mode() - One time enabling of continuous conversion mode
  * @bg_ptr - pointer to scm instance
  */
@@ -1208,6 +1139,8 @@ static struct omap_bandgap_data omap4460_data = {
 			.registers = &omap4460_mpu_temp_sensor_registers,
 			.ts_data = &omap4460_mpu_temp_sensor_data,
 			.domain = "cpu",
+			.slope = 376,
+			.constant_offset = -16000,
 		},
 	},
 	.sensor_count = 1,
@@ -1224,16 +1157,22 @@ static struct omap_bandgap_data omap5430_data = {
 			.registers = &omap5430_mpu_temp_sensor_registers,
 			.ts_data = &omap5430_mpu_temp_sensor_data,
 			.domain = "cpu",
+			.slope = 196,
+			.constant_offset = -6822,
 		},
 		{
 			.registers = &omap5430_gpu_temp_sensor_registers,
 			.ts_data = &omap5430_gpu_temp_sensor_data,
 			.domain = "gpu",
+			.slope = 0,
+			.constant_offset = 7000,
 		},
 		{
 			.registers = &omap5430_core_temp_sensor_registers,
 			.ts_data = &omap5430_core_temp_sensor_data,
 			.domain = "core",
+			.slope = 0,
+			.constant_offset = 0,
 		},
 	},
 	.sensor_count = 3,
@@ -1475,6 +1414,12 @@ static
 int __devexit omap_bandgap_remove(struct platform_device *pdev)
 {
 	struct omap_bandgap *bg_ptr = platform_get_drvdata(pdev);
+	int i;
+
+	/* First thing is to remove sensor interfaces */
+	for (i = 0; i < bg_ptr->pdata->sensor_count; i++)
+		if (bg_ptr->pdata->remove_sensor)
+			bg_ptr->pdata->remove_sensor(bg_ptr, i);
 
 	clk_disable(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
