@@ -123,7 +123,7 @@ static struct omap_rprm_regulator *omap2_rprm_lookup_regulator(u32 reg_id)
 	if (!regulators)
 		regulators_cnt = omap_rprm_get_regulators(&regulators);
 
-	if (reg_id-- > regulators_cnt)
+	if (--reg_id >= regulators_cnt)
 		return NULL;
 
 	return &regulators[reg_id];
