@@ -39,6 +39,13 @@
 
 #include <linux/mfd/palmas.h>
 
+/*
+ * This is an Empirical value that works, need to confirm the actual
+ * value required for PALMAS_INT3_LINE_STATE to get stabilized.
+ */
+
+#define PALMAS_INT3_LINE_STATE_TIME	20000
+
 static int palmas_usb_read(struct palmas *palmas, unsigned int reg,
 		unsigned int *dest)
 {
@@ -114,21 +121,30 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 	int vbus_line_state;
 	int slave;
 	unsigned int addr;
+	int timeout = PALMAS_INT3_LINE_STATE_TIME;
 	struct palmas_usb *palmas_usb = _palmas_usb;
 
 	slave = PALMAS_BASE_TO_SLAVE(PALMAS_INTERRUPT_BASE);
 	addr = PALMAS_BASE_TO_REG(PALMAS_INTERRUPT_BASE,
 						PALMAS_INT3_LINE_STATE);
-	regmap_read(palmas_usb->palmas->regmap[slave], addr, &vbus_line_state);
 
-	if (vbus_line_state == INT3_LINE_STATE_VBUS) {
-		regulator_enable(palmas_usb->vbus_reg);
-		status = OMAP_DWC3_VBUS_VALID;
-	} else if (vbus_line_state == INT3_LINE_STATE_NONE &&
-				palmas_usb->linkstat != OMAP_DWC3_UNKNOWN) {
-		status = OMAP_DWC3_VBUS_OFF;
-		regulator_disable(palmas_usb->vbus_reg);
-	}
+	do {
+		regmap_read(palmas_usb->palmas->regmap[slave], addr, &vbus_line_state);
+
+		if (vbus_line_state == INT3_LINE_STATE_VBUS) {
+			regulator_enable(palmas_usb->vbus_reg);
+			status = OMAP_DWC3_VBUS_VALID;
+			break;
+		} else if (vbus_line_state == INT3_LINE_STATE_NONE &&
+					palmas_usb->linkstat != OMAP_DWC3_UNKNOWN) {
+			status = OMAP_DWC3_VBUS_OFF;
+			regulator_disable(palmas_usb->vbus_reg);
+			break;
+		}
+		udelay(1);
+	} while (--timeout);
+
+	WARN_ON(!timeout);
 
 	palmas_usb->linkstat = status;
 	omap_dwc3_mailbox(status);
