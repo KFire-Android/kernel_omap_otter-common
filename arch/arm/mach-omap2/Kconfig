@@ -383,7 +383,6 @@ config MACH_OMAP5_PANDA
 	bool "OMAP5 Panda board"
 	default y
 	depends on ARCH_OMAP5
-	select OF
 	select GPIO_PCA953X
 	select GPIO_PCA953X_IRQ
 
