@@ -236,6 +236,7 @@ static void omap_sar_overwrite(void)
 		offset = sar_overwrite_data[SHADOW_FREQ_CFG1_IDX].sar_offset;
 		val = __raw_readl(sar_ram_base + offset);
 		val |= 1 << OMAP4430_FREQ_UPDATE_SHIFT;
+		val |= 1 << OMAP4430_DLL_RESET_SHIFT;
 		val &= ~OMAP4430_DLL_OVERRIDE_2_2_MASK;
 		__raw_writel(val, sar_ram_base + offset);
 	}
