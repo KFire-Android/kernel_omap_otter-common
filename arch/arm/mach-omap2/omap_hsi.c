@@ -30,9 +30,7 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
 #include <plat/omap-pm.h>
-#ifdef OMAP_HSI_DVFS_SUPPORT
 #include <plat/dvfs.h>
-#endif
 
 #include <../drivers/omap_hsi/hsi_driver.h>
 #include "clock.h"
@@ -179,9 +177,7 @@ static struct hsi_platform_data omap_hsi_platform_data = {
 	.device_enable = omap_device_enable,
 	.device_idle = omap_device_idle,
 	.device_shutdown = omap_device_shutdown,
-#ifdef OMAP_HSI_DVFS_SUPPORT
 	.device_scale = omap_device_scale,
-#endif
 	.get_context_loss_count = omap_pm_get_dev_context_loss_count,
 
 };
