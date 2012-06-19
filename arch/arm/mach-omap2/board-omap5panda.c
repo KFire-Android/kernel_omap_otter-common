@@ -38,6 +38,7 @@
 #include <plat/common.h>
 #include <plat/mmc.h>
 #include <plat/drm.h>
+#include <plat/usb.h>
 #include "hsmmc.h"
 #include "common-board-devices.h"
 #include "mux.h"
@@ -708,6 +709,7 @@ static void __init omap_5_panda_init(void)
 	omap_serial_init();
 
 	omap_hsmmc_init(mmc);
+	usb_dwc3_init();
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
 
 	omap_init_dmm_tiler();
