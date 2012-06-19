@@ -161,8 +161,9 @@ int omap4_prcm_freq_update(void)
 	 * - FREQ_UPDATE=1 (to start HW sequence)
 	 */
 	shadow_freq_cfg1 = __raw_readl(OMAP4430_CM_SHADOW_FREQ_CONFIG1);
-	shadow_freq_cfg1 |= (0 << OMAP4430_DLL_RESET_SHIFT) |
-			   (1 << OMAP4430_FREQ_UPDATE_SHIFT);
+	/* Be explicit in NOT setting DLL reset */
+	shadow_freq_cfg1 &= ~(1 << OMAP4430_DLL_RESET_SHIFT);
+	shadow_freq_cfg1 |= (1 << OMAP4430_FREQ_UPDATE_SHIFT);
 	shadow_freq_cfg1 &= ~OMAP4430_DLL_OVERRIDE_2_2_MASK;
 	__raw_writel(shadow_freq_cfg1, OMAP4430_CM_SHADOW_FREQ_CONFIG1);
 
