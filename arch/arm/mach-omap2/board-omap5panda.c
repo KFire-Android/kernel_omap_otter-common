@@ -17,7 +17,6 @@
 #include <linux/io.h>
 #include <linux/gpio.h>
 #include <linux/input.h>
-#include <linux/of_platform.h>
 
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
@@ -684,16 +683,8 @@ static void __init omap5panda_display_init(void)
 	omap_display_init(&omap5evm_dss_data);
 }
 
-static struct of_device_id omap_dt_match_table[] __initdata = {
-	{ .compatible = "simple-bus", },
-	{ .compatible = "ti,omap-infra", },
-	{ }
-};
-
 static void __init omap_5_panda_init(void)
 {
-
-	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 
 #if defined(CONFIG_TI_EMIF) || defined(CONFIG_TI_EMIF_MODULE)
 #ifndef CONFIG_MACH_OMAP_5430ZEBU
@@ -724,12 +715,8 @@ static void __init omap_5_panda_init(void)
 	omap5panda_display_init();
 }
 
-static const char *omap5_panda_compat[] __initdata = {
-       "ti,omap5-panda",
-       NULL,
-};
 
-DT_MACHINE_START(OMAP5_SEVM_DT, "OMAP5 panda board")
+MACHINE_START(OMAP5_PANDA, "OMAP5 panda board")
 	/* Maintainer: Dan Murphy - Texas Instruments Inc */
 	.atag_offset	= 0x100,
 	.reserve	= omap_reserve,
@@ -738,6 +725,5 @@ DT_MACHINE_START(OMAP5_SEVM_DT, "OMAP5 panda board")
 	.init_irq	= gic_init_irq,
 	.handle_irq	= gic_handle_irq,
 	.init_machine	= omap_5_panda_init,
-	.dt_compat      = omap5_panda_compat,
 	.timer		= &omap5_timer,
 MACHINE_END

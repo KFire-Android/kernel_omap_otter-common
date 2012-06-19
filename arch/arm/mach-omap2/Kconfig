@@ -373,7 +373,6 @@ config MACH_OMAP5_PANDA
 	bool "OMAP5 Panda board"
 	default y
 	depends on ARCH_OMAP5
-	select OF
 
 config SECURE_REGS
 	bool "a15: set secure l2 registers"
