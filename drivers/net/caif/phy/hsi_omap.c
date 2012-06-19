@@ -8,14 +8,11 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/device.h>
-#include <linux/platform_device.h>
-
 #include <net/caif/caif_hsi.h>
-
 #include <linux/hsi_driver_if.h>
-
 #include <plat/omap_hsi.h>
 #include <plat/cpu.h>
+
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Daniel Martensson<daniel.martensson@stericsson.com>");
@@ -45,8 +42,7 @@ struct dyn_speed {
 };
 
 struct cfhsi_omap {
-	struct cfhsi_dev dev;
-	struct platform_device pdev;
+	struct cfhsi_ops ops;
 	struct hsi_device *hsi_dev;
 	struct dyn_speed dyn_speed;
 	int tx_len;
@@ -62,7 +58,7 @@ enum tx_rx_config {
 	TX_CONFIG,
 	RX_CONFIG
 };
-
+static struct cfhsi_omap *cfhsi_singleton;
 static bool sw_reset_on_cfhsi_up;
 module_param(sw_reset_on_cfhsi_up, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(sw_reset_on_cfhsi_up, "Perform software reset of HSI on interface up");
@@ -75,14 +71,14 @@ static struct hsi_device_driver cfhsi_omap_driver;
 
 static struct cfhsi_omap *cfhsi_dev;
 
-static int cfhsi_up(struct cfhsi_dev *dev)
+static int cfhsi_up(struct cfhsi_ops *ops)
 {
 	int res;
 	struct cfhsi_omap *cfhsi;
 	struct hst_ctx tx_conf;
 	struct hsr_ctx rx_conf;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 
 	/* Register protocol driver for HSI channel 0. */
 	pr_info("%s: registering HSI driver\n", __func__);
@@ -108,7 +104,7 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 	/* Open OMAP HSI device. */
 	res = hsi_open(cfhsi->hsi_dev);
 	if (res) {
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: Failed to open HSI device: %d.\n",
 			__func__, res);
 		return res;
@@ -118,7 +114,7 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 		/* HACK!!! Flush the FIFO */
 		res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SW_RESET, NULL);
 		if (res) {
-			dev_err(&cfhsi->pdev.dev,
+			dev_err(&cfhsi->hsi_dev->device,
 				"%s: Failed to reset HSI block: %d.\n",
 				__func__, res);
 			hsi_close(cfhsi->hsi_dev);
@@ -128,7 +124,7 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 		/* Open OMAP HSI device again after reset. */
 		res = hsi_open(cfhsi->hsi_dev);
 		if (res) {
-			dev_err(&cfhsi->pdev.dev,
+			dev_err(&cfhsi->hsi_dev->device,
 				"%s: Failed to open HSI device: %d.\n",
 				__func__, res);
 			return res;
@@ -159,7 +155,7 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 	/* Configure HSI TX. */
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SET_TX, &tx_conf);
 	if (res) {
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: Failed to configure TX: %d.\n",
 			__func__, res);
 		hsi_close(cfhsi->hsi_dev);
@@ -169,7 +165,7 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 	/* Configure HSI RX. */
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SET_RX, &rx_conf);
 	if (res) {
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: Failed to configure RX: %d.\n",
 			__func__, res);
 		hsi_close(cfhsi->hsi_dev);
@@ -180,7 +176,7 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_GET_SPEED,
 			&cfhsi->default_clock);
 	if (res) {
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: Failed to read default clock: %d.\n",
 			__func__, res);
 		hsi_close(cfhsi->hsi_dev);
@@ -192,7 +188,7 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SET_HI_SPEED,
 			&cfhsi->current_clock);
 	if (res) {
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: Failed to set HSI clock: %d.\n",
 			__func__, res);
 		hsi_close(cfhsi->hsi_dev);
@@ -208,12 +204,12 @@ static int cfhsi_up(struct cfhsi_dev *dev)
 	return 0;
 }
 
-static int cfhsi_down(struct cfhsi_dev *dev)
+static int cfhsi_down(struct cfhsi_ops *ops)
 {
 	int res;
 	struct cfhsi_omap *cfhsi;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 
 	if (cfhsi->hsi_dev == NULL)
 		return 0;
@@ -228,7 +224,7 @@ static int cfhsi_down(struct cfhsi_dev *dev)
 		hsi_read_cancel(cfhsi->hsi_dev);
 		res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_DOWN, NULL);
 		if (res) {
-			dev_err(&cfhsi->pdev.dev, "%s: Wake down failed: %d.\n",
+			dev_err(&cfhsi->hsi_dev->device, "%s: Wake down failed: %d.\n",
 				__func__, res);
 		}
 	}
@@ -237,7 +233,7 @@ static int cfhsi_down(struct cfhsi_dev *dev)
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SET_HI_SPEED,
 			&cfhsi->default_clock);
 	if (WARN_ON(res)) {
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: Failed to set HSI clock: %d.\n",
 			__func__, res);
 	}
@@ -253,7 +249,7 @@ static int cfhsi_down(struct cfhsi_dev *dev)
 	return 0;
 }
 
-static int cfhsi_tx(u8 *ptr, int len, struct cfhsi_dev *dev)
+static int cfhsi_tx(u8 *ptr, int len, struct cfhsi_ops *ops)
 {
 	int res;
 	struct cfhsi_omap *cfhsi = NULL;
@@ -261,7 +257,7 @@ static int cfhsi_tx(u8 *ptr, int len, struct cfhsi_dev *dev)
 	/* Check length and alignment. */
 	BUG_ON(((int)ptr)%4);
 	BUG_ON(len%4);
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 	BUG_ON(cfhsi->hsi_dev == NULL);
 
 	cfhsi->tx_len = len/4;
@@ -272,7 +268,7 @@ static int cfhsi_tx(u8 *ptr, int len, struct cfhsi_dev *dev)
 	return res;
 }
 
-static int cfhsi_rx(u8 *ptr, int len, struct cfhsi_dev *dev)
+static int cfhsi_rx(u8 *ptr, int len, struct cfhsi_ops *ops)
 {
 	int res;
 	struct cfhsi_omap *cfhsi = NULL;
@@ -282,7 +278,7 @@ static int cfhsi_rx(u8 *ptr, int len, struct cfhsi_dev *dev)
 	if (WARN_ON(len % 4))
 		return -EINVAL;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 	BUG_ON(cfhsi->hsi_dev == NULL);
 
 	cfhsi->rx_len = len/4;
@@ -293,33 +289,33 @@ static int cfhsi_rx(u8 *ptr, int len, struct cfhsi_dev *dev)
 	return res;
 }
 
-static int cfhsi_wake_up(struct cfhsi_dev *dev)
+static int cfhsi_wake_up(struct cfhsi_ops *ops)
 {
 	int res;
 	struct cfhsi_omap *cfhsi = NULL;
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 	BUG_ON(cfhsi->hsi_dev == NULL);
 
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_UP, NULL);
 	if (res)
-		dev_err(&cfhsi->pdev.dev, "%s: Wake up failed: %d.\n",
+		dev_err(&cfhsi->hsi_dev->device, "%s: Wake up failed: %d.\n",
 			__func__, res);
 	else
 		cfhsi->awake = true;
 	return res;
 }
 
-static int cfhsi_wake_down(struct cfhsi_dev *dev)
+static int cfhsi_wake_down(struct cfhsi_ops *ops)
 {
 	int res;
 	struct cfhsi_omap *cfhsi = NULL;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 	BUG_ON(cfhsi->hsi_dev == NULL);
 
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_ACWAKE_DOWN, NULL);
 	if (res)
-		dev_err(&cfhsi->pdev.dev, "%s: Wake down failed: %d.\n",
+		dev_err(&cfhsi->hsi_dev->device, "%s: Wake down failed: %d.\n",
 			__func__, res);
 	else
 		cfhsi->awake = false;
@@ -327,19 +323,19 @@ static int cfhsi_wake_down(struct cfhsi_dev *dev)
 	return res;
 }
 
-static int cfhsi_get_peer_wake(struct cfhsi_dev *dev, bool *status)
+static int cfhsi_get_peer_wake(struct cfhsi_ops *ops, bool *status)
 {
 	int res;
 	struct cfhsi_omap *cfhsi;
 	u32 wake_status;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 	BUG_ON(cfhsi->hsi_dev == NULL);
 
 	/* Get CA WAKE line status. */
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_GET_CAWAKE, &wake_status);
 	if (res < 0) {
-		dev_err(&cfhsi->pdev.dev, "%s: Get CA Wake failed: %d.\n",
+		dev_err(&cfhsi->hsi_dev->device, "%s: Get CA Wake failed: %d.\n",
 			__func__, res);
 		return res;
 	}
@@ -352,18 +348,18 @@ static int cfhsi_get_peer_wake(struct cfhsi_dev *dev, bool *status)
 	return 0;
 }
 
-static int cfhsi_fifo_occupancy(struct cfhsi_dev *dev, size_t *occupancy)
+static int cfhsi_fifo_occupancy(struct cfhsi_ops *ops, size_t *occupancy)
 {
 	int res;
 	struct cfhsi_omap *cfhsi = NULL;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 	BUG_ON(cfhsi->hsi_dev == NULL);
 
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_GET_FIFO_OCCUPANCY,
 			occupancy);
 	if (res)
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: HSI_IOCTL_GET_FIFO_OCCUPANCY failed: %d.\n",
 			__func__, res);
 
@@ -372,16 +368,16 @@ static int cfhsi_fifo_occupancy(struct cfhsi_dev *dev, size_t *occupancy)
 	return res;
 }
 
-static int cfhsi_rx_cancel(struct cfhsi_dev *dev)
+static int cfhsi_rx_cancel(struct cfhsi_ops *ops)
 {
 	struct cfhsi_omap *cfhsi = NULL;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 	BUG_ON(cfhsi->hsi_dev == NULL);
 
 	/* Cancel outstanding read request. Zero means transfer is done. */
 	if (!hsi_read_cancel(cfhsi->hsi_dev))
-		cfhsi->dev.drv->rx_done_cb(cfhsi->dev.drv);
+		cfhsi->ops.cb_ops->rx_done_cb(cfhsi->ops.cb_ops);
 
 	return 0;
 }
@@ -389,22 +385,22 @@ static int cfhsi_rx_cancel(struct cfhsi_dev *dev)
 static void cfhsi_omap_read_cb(struct hsi_device *dev, unsigned int size)
 {
 	if (cfhsi_dev->hsi_dev == dev) {
-		BUG_ON(!cfhsi_dev->dev.drv);
-		BUG_ON(!cfhsi_dev->dev.drv->rx_done_cb);
+		BUG_ON(!cfhsi_dev->ops.cb_ops);
+		BUG_ON(!cfhsi_dev->ops.cb_ops->rx_done_cb);
 		BUG_ON(cfhsi_dev->hsi_dev == NULL);
 
-		cfhsi_dev->dev.drv->rx_done_cb(cfhsi_dev->dev.drv);
+		cfhsi_dev->ops.cb_ops->rx_done_cb(cfhsi_dev->ops.cb_ops);
 	}
 }
 
 static void cfhsi_omap_write_cb(struct hsi_device *dev, unsigned int size)
 {
 	if (cfhsi_dev->hsi_dev == dev) {
-		BUG_ON(!cfhsi_dev->dev.drv);
-		BUG_ON(!cfhsi_dev->dev.drv->tx_done_cb);
+		BUG_ON(!cfhsi_dev->ops.cb_ops);
+		BUG_ON(!cfhsi_dev->ops.cb_ops->tx_done_cb);
 		BUG_ON(cfhsi_dev->hsi_dev == NULL);
 
-		cfhsi_dev->dev.drv->tx_done_cb(cfhsi_dev->dev.drv);
+		cfhsi_dev->ops.cb_ops->tx_done_cb(cfhsi_dev->ops.cb_ops);
 	}
 }
 
@@ -421,12 +417,12 @@ static void cfhsi_omap_port_event_cb(struct hsi_device *dev,
 
 	switch (event) {
 	case HSI_EVENT_CAWAKE_UP:
-		if (cfhsi->dev.drv->wake_up_cb)
-			cfhsi->dev.drv->wake_up_cb(cfhsi->dev.drv);
+		if (cfhsi->ops.cb_ops->wake_up_cb)
+			cfhsi->ops.cb_ops->wake_up_cb(cfhsi->ops.cb_ops);
 		break;
 	case HSI_EVENT_CAWAKE_DOWN:
-		if (cfhsi->dev.drv->wake_down_cb)
-			cfhsi->dev.drv->wake_down_cb(cfhsi->dev.drv);
+		if (cfhsi->ops.cb_ops->wake_down_cb)
+			cfhsi->ops.cb_ops->wake_down_cb(cfhsi->ops.cb_ops);
 		break;
 	case HSI_EVENT_HSR_DATAAVAILABLE:
 		break;
@@ -457,13 +453,13 @@ static int cfhsi_set_tx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 		break;
 	case HIGH_SPEED:
 		if (cfhsi->current_clock == HSI_SPEED_LOW_SPEED)
-			dev_err(&cfhsi->pdev.dev, "%s: Invalid tx speed config\n",
+			dev_err(&cfhsi->hsi_dev->device, "%s: Invalid tx speed config\n",
 				__func__);
 
 		next_divisor = DIV_BY_1;
 		break;
 	default:
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: Invalid speed requested\n",
 			__func__);
 		return -1;
@@ -478,7 +474,7 @@ static int cfhsi_set_tx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 				HSI_IOCTL_SET_TX,
 				&cfhsi->tx_conf);
 		if (res) {
-			dev_err(&cfhsi->pdev.dev,
+			dev_err(&cfhsi->hsi_dev->device,
 				"%s: Failed to configure TX: %d.\n",
 				__func__, res);
 			hsi_close(cfhsi->hsi_dev);
@@ -511,7 +507,7 @@ static int cfhsi_set_rx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 		next_divisor = DIV_BY_1;
 		break;
 	default:
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: Invalid speed requested\n",
 			__func__);
 		return -1;
@@ -525,7 +521,7 @@ static int cfhsi_set_rx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 				HSI_IOCTL_SET_RX,
 				&cfhsi->rx_conf);
 		if (res) {
-			dev_err(&cfhsi->pdev.dev,
+			dev_err(&cfhsi->hsi_dev->device,
 				"%s: Failed to configure RX: %d.\n",
 				__func__, res);
 			hsi_close(cfhsi->hsi_dev);
@@ -536,7 +532,7 @@ static int cfhsi_set_rx_speed(struct cfhsi_omap *cfhsi, u32 speed)
 	return 0;
 }
 
-struct platform_device *cfhsi_get_device(void)
+struct cfhsi_ops *cfhsi_get_ops(void)
 {
 	struct cfhsi_omap *cfhsi = cfhsi_dev;
 
@@ -545,11 +541,11 @@ struct platform_device *cfhsi_get_device(void)
 	if (!cfhsi)
 		return NULL;
 
-	return &cfhsi->pdev;
+	return &cfhsi->ops;
 }
-EXPORT_SYMBOL(cfhsi_get_device);
+EXPORT_SYMBOL(cfhsi_get_ops);
 
-int cfhsi_set_hsi_clock(struct cfhsi_dev *dev, unsigned int hsi_clock)
+int cfhsi_set_hsi_clock(struct cfhsi_ops *ops, unsigned int hsi_clock)
 {
 	int res;
 	struct cfhsi_omap *cfhsi = NULL;
@@ -558,11 +554,11 @@ int cfhsi_set_hsi_clock(struct cfhsi_dev *dev, unsigned int hsi_clock)
 	u32 tx_divisor;
 	u32 rx_divisor;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 
-	dev_dbg(&cfhsi->pdev.dev, "enter %s\n", __func__);
+	dev_dbg(&cfhsi->hsi_dev->device, "enter %s\n", __func__);
 
-	BUG_ON(cfhsi->dev.drv == NULL);
+	BUG_ON(cfhsi->ops.cb_ops == NULL);
 
 	if (hsi_clock == cfhsi->current_clock) {
 		pr_info("Already running with this clock rate\n");
@@ -641,7 +637,7 @@ int cfhsi_set_hsi_clock(struct cfhsi_dev *dev, unsigned int hsi_clock)
 				HSI_IOCTL_SET_RX,
 				&cfhsi->rx_conf);
 		if (res) {
-			dev_err(&cfhsi->pdev.dev,
+			dev_err(&cfhsi->hsi_dev->device,
 				"%s: Failed to configure RX: %d.\n",
 				__func__, res);
 			hsi_close(cfhsi->hsi_dev);
@@ -659,7 +655,7 @@ int cfhsi_set_hsi_clock(struct cfhsi_dev *dev, unsigned int hsi_clock)
 				HSI_IOCTL_SET_TX,
 				&cfhsi->tx_conf);
 		if (res) {
-			dev_err(&cfhsi->pdev.dev,
+			dev_err(&cfhsi->hsi_dev->device,
 				"%s: Failed to configure TX: %d.\n",
 				__func__, res);
 			hsi_close(cfhsi->hsi_dev);
@@ -673,7 +669,7 @@ int cfhsi_set_hsi_clock(struct cfhsi_dev *dev, unsigned int hsi_clock)
 	res = hsi_ioctl(cfhsi->hsi_dev, HSI_IOCTL_SET_HI_SPEED,
 			&cfhsi->current_clock);
 	if (res) {
-		dev_err(&cfhsi->pdev.dev,
+		dev_err(&cfhsi->hsi_dev->device,
 			"%s: Failed to set HSI clock: %d.\n",
 			__func__, res);
 		hsi_close(cfhsi->hsi_dev);
@@ -682,7 +678,7 @@ int cfhsi_set_hsi_clock(struct cfhsi_dev *dev, unsigned int hsi_clock)
 	return 0;
 }
 
-int cfhsi_change_tx_speed(struct cfhsi_dev *dev,
+int cfhsi_change_tx_speed(struct cfhsi_ops *ops,
 			  enum dyn_speed_cmd speed_cmd,
 			  u32 *tx_speed,
 			  enum dyn_speed_level *speed_level)
@@ -691,11 +687,11 @@ int cfhsi_change_tx_speed(struct cfhsi_dev *dev,
 	u8 tmp_index = 0;
 	u8 max_index;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 
-	dev_dbg(&cfhsi->pdev.dev, "enter %s\n", __func__);
+	dev_dbg(&cfhsi->hsi_dev->device, "enter %s\n", __func__);
 
-	BUG_ON(cfhsi->dev.drv == NULL);
+	BUG_ON(cfhsi->ops.cb_ops == NULL);
 
 	if (cfhsi->current_clock == HSI_SPEED_HI_SPEED)
 		max_index = MAX_DYN_TX_SPEEDS-1;
@@ -752,7 +748,7 @@ int cfhsi_change_tx_speed(struct cfhsi_dev *dev,
 	return 0;
 }
 
-int cfhsi_get_next_tx_speed(struct cfhsi_dev *dev,
+int cfhsi_get_next_tx_speed(struct cfhsi_ops *ops,
 			    enum dyn_speed_cmd speed_cmd,
 			    u32 *tx_next_speed)
 {
@@ -760,11 +756,11 @@ int cfhsi_get_next_tx_speed(struct cfhsi_dev *dev,
 	struct cfhsi_omap *cfhsi = NULL;
 	u8 max_index;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 
-	dev_dbg(&cfhsi->pdev.dev, "enter %s\n", __func__);
+	dev_dbg(&cfhsi->hsi_dev->device, "enter %s\n", __func__);
 
-	BUG_ON(cfhsi->dev.drv == NULL);
+	BUG_ON(cfhsi->ops.cb_ops == NULL);
 
 	if (cfhsi->current_clock == HSI_SPEED_HI_SPEED)
 		max_index = MAX_DYN_TX_SPEEDS-1;
@@ -796,17 +792,17 @@ int cfhsi_get_next_tx_speed(struct cfhsi_dev *dev,
 	return 0;
 }
 
-int cfhsi_change_rx_speed(struct cfhsi_dev *dev, u32 requested_rx_speed)
+int cfhsi_change_rx_speed(struct cfhsi_ops *ops, u32 requested_rx_speed)
 {
 	struct cfhsi_omap *cfhsi = NULL;
 	u32 rx_speed = 0;
 	u8 tmp_index = 0;
 
-	cfhsi = container_of(dev, struct cfhsi_omap, dev);
+	cfhsi = container_of(ops, struct cfhsi_omap, ops);
 
-	dev_dbg(&cfhsi->pdev.dev, "enter %s\n", __func__);
+	dev_dbg(&cfhsi->hsi_dev->device, "enter %s\n", __func__);
 
-	BUG_ON(cfhsi->dev.drv == NULL);
+	BUG_ON(cfhsi->ops.cb_ops == NULL);
 
 	if (requested_rx_speed <= (LOW_SPEED+2))
 		cfhsi->dyn_speed.rx_speed_index = 0;
@@ -834,62 +830,33 @@ int cfhsi_change_rx_speed(struct cfhsi_dev *dev, u32 requested_rx_speed)
 	return 0;
 }
 
-static void hsi_proto_release(struct device *dev)
-{
-	struct cfhsi_omap *cfhsi = cfhsi_dev;
-
-	if (&cfhsi->pdev.dev == dev) {
-		/* This should not happen. */
-		dev_warn(&cfhsi->pdev.dev, "%s: orphan.\n", __func__);
-		kfree(cfhsi);
-		return;
-	}
-}
-
-static struct cfhsi_omap *cfhsi_singleton;
 static int hsi_proto_probe(struct hsi_device *dev)
 {
 	BUG_ON(cfhsi_singleton == NULL);
 	cfhsi_singleton->hsi_dev = dev;
 	/* Use channel number as id. Assuming only one HSI port. */
-	cfhsi_singleton->pdev.id = dev->n_ch;
 	return 0;
 }
 
 int cfhsi_create_and_register(void)
 {
-	int res;
 	struct cfhsi_omap *cfhsi = NULL;
 	cfhsi = kzalloc(sizeof(struct cfhsi_omap), GFP_KERNEL);
 	cfhsi_singleton = cfhsi;
 	/* Assign OMAP HSI device to this CAIF HSI device. */
-	cfhsi->dev.cfhsi_tx = cfhsi_tx;
-	cfhsi->dev.cfhsi_rx = cfhsi_rx;
-	cfhsi->dev.cfhsi_up = cfhsi_up;
-	cfhsi->dev.cfhsi_down = cfhsi_down;
-	cfhsi->dev.cfhsi_wake_up = cfhsi_wake_up;
-	cfhsi->dev.cfhsi_wake_down = cfhsi_wake_down;
-	cfhsi->dev.cfhsi_get_peer_wake = cfhsi_get_peer_wake;
-	cfhsi->dev.cfhsi_fifo_occupancy = cfhsi_fifo_occupancy;
-	cfhsi->dev.cfhsi_rx_cancel = cfhsi_rx_cancel;
-	cfhsi->dev.cfhsi_set_hsi_clock = cfhsi_set_hsi_clock;
-	cfhsi->dev.cfhsi_change_tx_speed = cfhsi_change_tx_speed;
-	cfhsi->dev.cfhsi_get_next_tx_speed = cfhsi_get_next_tx_speed;
-	cfhsi->dev.cfhsi_change_rx_speed = cfhsi_change_rx_speed;
-
-	/* Initialize CAIF HSI platform device. */
-	cfhsi->pdev.name = "cfhsi";
-	cfhsi->pdev.dev.platform_data = &cfhsi->dev;
-	cfhsi->pdev.dev.release = hsi_proto_release;
-
-	/* Register platform device. */
-	res = platform_device_register(&cfhsi->pdev);
-	if (res) {
-		pr_err("%s: Failed to register dev: %d.\n",
-			__func__, res);
-		kfree(cfhsi);
-		return -ENODEV;
-	}
+	cfhsi->ops.cfhsi_tx = cfhsi_tx;
+	cfhsi->ops.cfhsi_rx = cfhsi_rx;
+	cfhsi->ops.cfhsi_up = cfhsi_up;
+	cfhsi->ops.cfhsi_down = cfhsi_down;
+	cfhsi->ops.cfhsi_wake_up = cfhsi_wake_up;
+	cfhsi->ops.cfhsi_wake_down = cfhsi_wake_down;
+	cfhsi->ops.cfhsi_get_peer_wake = cfhsi_get_peer_wake;
+	cfhsi->ops.cfhsi_fifo_occupancy = cfhsi_fifo_occupancy;
+	cfhsi->ops.cfhsi_rx_cancel = cfhsi_rx_cancel;
+	cfhsi->ops.cfhsi_set_hsi_clock = cfhsi_set_hsi_clock;
+	cfhsi->ops.cfhsi_change_tx_speed = cfhsi_change_tx_speed;
+	cfhsi->ops.cfhsi_get_next_tx_speed = cfhsi_get_next_tx_speed;
+	cfhsi->ops.cfhsi_change_rx_speed = cfhsi_change_rx_speed;
 
 	cfhsi_dev = cfhsi;
 
@@ -940,7 +907,6 @@ static int __init cfhsi_omap_init(void)
 
 static void __exit cfhsi_omap_exit(void)
 {
-	platform_device_unregister(&cfhsi_dev->pdev);
 	kfree(cfhsi_dev);
 }
 
