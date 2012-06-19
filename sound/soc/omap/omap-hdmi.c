@@ -33,6 +33,7 @@
 #include <sound/asound.h>
 #include <sound/asoundef.h>
 
+#include <plat/omap_hwmod.h>
 #include <plat/dma.h>
 #include <video/omapdss.h>
 #include "omap-pcm.h"
@@ -51,6 +52,7 @@ static struct {
 	struct snd_cea_861_aud_if cea;
 	struct notifier_block notifier;
 	int active;
+	struct omap_hwmod *oh;
 } hdmi;
 
 static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
@@ -203,9 +205,12 @@ int hdmi_audio_notifier_callback(struct notifier_block *nb,
 			hdmi.dssdev->driver->audio_enable(hdmi.dssdev, false);
 			err = hdmi.dssdev->driver->audio_config(hdmi.dssdev,
 						&hdmi.iec, &hdmi.cea);
-			if (hdmi.active)
+			if (hdmi.active) {
+				omap_hwmod_set_slave_idlemode(hdmi.oh,
+						HWMOD_IDLEMODE_NO);
 				hdmi.dssdev->driver->audio_enable(hdmi.dssdev,
 									true);
+			}
 		}
 	return err;
 }
@@ -226,6 +231,8 @@ static int omap_hdmi_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		omap_hwmod_set_slave_idlemode(hdmi.oh,
+				HWMOD_IDLEMODE_NO);
 		hdmi.dssdev->driver->audio_start(hdmi.dssdev, true);
 		hdmi.active = 1;
 		break;
@@ -234,6 +241,8 @@ static int omap_hdmi_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
 		hdmi.active = 0;
 		hdmi.dssdev->driver->audio_start(hdmi.dssdev, false);
+		omap_hwmod_set_slave_idlemode(hdmi.oh,
+			HWMOD_IDLEMODE_SMART_WKUP);
 		break;
 	default:
 		err = -EINVAL;
@@ -281,6 +290,12 @@ static __devinit int omap_hdmi_probe(struct platform_device *pdev)
 	hdmi_rsrc = platform_get_resource(pdev, IORESOURCE_DMA, 0);
 	if (!hdmi_rsrc) {
 		dev_err(&pdev->dev, "Cannot obtain IORESOURCE_DMA HDMI\n");
+		return -ENODEV;
+	}
+
+	hdmi.oh = omap_hwmod_lookup("dss_hdmi");
+	if (!hdmi.oh) {
+		dev_err(&pdev->dev, "can't find omap_hwmod for hdmi\n");
 		return -ENODEV;
 	}
 
