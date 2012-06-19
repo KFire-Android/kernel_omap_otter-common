@@ -132,13 +132,24 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 		regmap_read(palmas_usb->palmas->regmap[slave], addr, &vbus_line_state);
 
 		if (vbus_line_state == INT3_LINE_STATE_VBUS) {
-			regulator_enable(palmas_usb->vbus_reg);
-			status = OMAP_DWC3_VBUS_VALID;
+			if (palmas_usb->linkstat != OMAP_DWC3_VBUS_VALID) {
+				regulator_enable(palmas_usb->vbus_reg);
+				status = OMAP_DWC3_VBUS_VALID;
+				palmas_usb->linkstat = status;
+			} else {
+				dev_err(palmas_usb->dev,
+					"Spurious connect event detected\n");
+			}
 			break;
-		} else if (vbus_line_state == INT3_LINE_STATE_NONE &&
-					palmas_usb->linkstat != OMAP_DWC3_UNKNOWN) {
-			status = OMAP_DWC3_VBUS_OFF;
-			regulator_disable(palmas_usb->vbus_reg);
+		} else if (vbus_line_state == INT3_LINE_STATE_NONE) {
+			if (palmas_usb->linkstat == OMAP_DWC3_VBUS_VALID) {
+				regulator_disable(palmas_usb->vbus_reg);
+				status = OMAP_DWC3_VBUS_OFF;
+				palmas_usb->linkstat = status;
+			} else {
+				dev_err(palmas_usb->dev,
+					"Spurious disconnect event detected\n");
+			}
 			break;
 		}
 		udelay(1);
@@ -146,10 +157,12 @@ static irqreturn_t palmas_vbus_wakeup_irq(int irq, void *_palmas_usb)
 
 	WARN_ON(!timeout);
 
-	palmas_usb->linkstat = status;
-	omap_dwc3_mailbox(status);
+	if (status != OMAP_DWC3_UNKNOWN) {
+		omap_dwc3_mailbox(status);
+		return IRQ_HANDLED;
+	}
 
-	return IRQ_HANDLED;
+	return IRQ_NONE;
 }
 
 static irqreturn_t palmas_id_irq(int irq, void *_palmas_usb)
