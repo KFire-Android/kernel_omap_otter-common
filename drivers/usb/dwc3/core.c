@@ -659,6 +659,7 @@ static int dwc3_runtime_resume(struct device *dev)
 	struct dwc3_context_regs *context = &dwc->context;
 
 	dwc3_writel(dwc->regs, DWC3_GCTL, context->gctl);
+	dwc3_enable_irqs(dwc);
 
 	return 0;
 }
