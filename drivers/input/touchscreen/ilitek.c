@@ -89,8 +89,6 @@
 #define ILITEK_IOCTL_GET_INTERFANCE             _IOWR(ILITEK_IOCTL_BASE, 14, int)//default setting is i2c interface
 #define ILITEK_IOCTL_I2C_SWITCH_IRQ             _IOWR(ILITEK_IOCTL_BASE, 15, int)
 
-#define TOUCH_FILTER		70
-
 // module information
 MODULE_AUTHOR("Steward_Fu");
 MODULE_DESCRIPTION("ILITEK I2C touch driver for Android platform");
@@ -133,6 +131,7 @@ static ssize_t ilitek_file_write(struct file*, const char*, size_t, loff_t*);
 static ssize_t ilitek_file_read(struct file*, char*, size_t, loff_t*);
 static int ilitek_file_close(struct inode*, struct file*);
 
+static int touch_filter = 0;
 static bool touch_move = false;
 
 // declare i2c data member
@@ -494,11 +493,12 @@ static int ilitek_i2c_process_and_report(void) {
 				if (x1 == 0) x1++;
 				if (y1 == 0) y1++;
 
-                if (!touch_move && i2c.last_touch1_x != 0 && i2c.last_touch1_y != 0) {
-                    if ((i2c.last_touch1_x + TOUCH_FILTER < x1) ||
-                            (i2c.last_touch1_x - TOUCH_FILTER > x1) ||
-                            (i2c.last_touch1_y + TOUCH_FILTER < y1) ||
-                            (i2c.last_touch1_y - TOUCH_FILTER > y1)) {
+                if (touch_filter > 0 && !touch_move &&
+                        i2c.last_touch1_x != 0 && i2c.last_touch1_y != 0) {
+                    if ((i2c.last_touch1_x + touch_filter < x1) ||
+                            (i2c.last_touch1_x - touch_filter > x1) ||
+                            (i2c.last_touch1_y + touch_filter < y1) ||
+                            (i2c.last_touch1_y - touch_filter > y1)) {
                         touch_move = true;
                         changed = true;
                     }
@@ -676,10 +676,22 @@ static ssize_t ilitek_version_show(struct device *dev, struct device_attribute *
 	}
 }
 
+static ssize_t touch_filter_read(struct device *dev, struct device_attribute *attr, char *buf) {
+	return sprintf(buf,"%d\n", touch_filter);
+}
+
+static ssize_t touch_filter_write(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	sscanf(buf, "%d\n", &touch_filter);
+	return size;
+}
+
 static DEVICE_ATTR(version, S_IRUGO, ilitek_version_show, NULL);
+static DEVICE_ATTR(touch_filter, S_IRUGO | S_IWUGO, touch_filter_read, touch_filter_write);
 
 static struct attribute *ilitek_attrs[] = {
 	&dev_attr_version.attr,
+	&dev_attr_touch_filter.attr,
 	NULL
 };
 
