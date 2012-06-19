@@ -237,7 +237,8 @@ u8 *hdmi_read_valid_edid(void)
 	ret = hdmi.ip_data.ops->read_edid(&hdmi.ip_data, hdmi.edid,
 						  HDMI_EDID_MAX_LENGTH);
 
-	if (omap_rev() == OMAP5430_REV_ES1_0) {
+	if ((omap_rev() == OMAP5430_REV_ES1_0) ||
+		(omap_rev() == OMAP5432_REV_ES1_0)) {
 		unsigned char edid_980[] = {
 			0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x44,
 			0x89, 0xd4, 0x03, 0x15, 0xcd, 0x5b, 0x07, 0x1d, 0x14,
