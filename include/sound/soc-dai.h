@@ -120,6 +120,7 @@ void snd_soc_unregister_dai(struct device *dev);
 int snd_soc_register_dais(struct device *dev,
 		struct snd_soc_dai_driver *dai_drv, size_t count);
 void snd_soc_unregister_dais(struct device *dev, size_t count);
+void snd_soc_card_reset_dai_links(struct snd_soc_card *card);
 
 /* Digital Audio Interface clocking API.*/
 int snd_soc_dai_set_sysclk(struct snd_soc_dai *dai, int clk_id,
