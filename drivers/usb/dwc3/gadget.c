@@ -49,6 +49,7 @@
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
+#include <linux/usb/otg.h>
 
 #include "core.h"
 #include "gadget.h"
@@ -1917,6 +1918,44 @@ static void dwc3_clear_stall_all_ep(struct dwc3 *dwc)
 	}
 }
 
+static void dwc3_gadget_usb3_phy_power(struct dwc3 *dwc, int on)
+{
+	u32			reg;
+
+	reg = dwc3_readl(dwc->regs, DWC3_GUSB3PIPECTL(0));
+
+	if (on) {
+		reg &= ~DWC3_GUSB3PIPECTL_SUSPHY;
+	} else {
+		usb_phy_set_suspend(dwc->usb3_phy, true);
+		reg |= DWC3_GUSB3PIPECTL_SUSPHY;
+	}
+
+	dwc3_writel(dwc->regs, DWC3_GUSB3PIPECTL(0), reg);
+}
+
+static void dwc3_gadget_usb2_phy_power(struct dwc3 *dwc, int on)
+{
+	u32			reg;
+
+	reg = dwc3_readl(dwc->regs, DWC3_GUSB2PHYCFG(0));
+
+	if (on) {
+		reg &= ~DWC3_GUSB2PHYCFG_SUSPHY;
+	} else {
+		usb_phy_set_suspend(dwc->usb2_phy, true);
+		reg |= DWC3_GUSB2PHYCFG_SUSPHY;
+	}
+
+	dwc3_writel(dwc->regs, DWC3_GUSB2PHYCFG(0), reg);
+}
+
+static void dwc3_gadget_enable_phys(struct dwc3 *dwc)
+{
+	dwc3_gadget_usb3_phy_power(dwc, true);
+	dwc3_gadget_usb2_phy_power(dwc, true);
+}
+
 static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc)
 {
 	int			reg;
@@ -1933,6 +1972,7 @@ static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc)
 	dwc3_disconnect_gadget(dwc);
 	dwc->start_config_issued = false;
 
+	dwc3_gadget_enable_phys(dwc);
 	dwc->gadget.speed = USB_SPEED_UNKNOWN;
 	dwc->setup_packet_pending = false;
 }
