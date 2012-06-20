@@ -69,9 +69,9 @@
 static const uint32_t evm5430_keymap[] = {
 	KEY(2, 2, KEY_VOLUMEUP),
 	KEY(2, 3, KEY_VOLUMEDOWN),
-	KEY(2, 4, KEY_SEND),
+	KEY(2, 4, KEY_BACK),
 	KEY(2, 5, KEY_HOME),
-	KEY(2, 6, KEY_END),
+	KEY(2, 6, KEY_MENU),
 	KEY(2, 7, KEY_SEARCH),
 };
 
