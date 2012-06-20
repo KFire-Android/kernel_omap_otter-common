@@ -338,6 +338,8 @@ static inline int hsi_runtime_suspend(struct device *dev) { return -ENOSYS; }
 void hsi_save_ctx(struct hsi_dev *hsi_ctrl);
 void hsi_restore_ctx(struct hsi_dev *hsi_ctrl);
 
+int hsi_pm_change_hsi_speed(struct hsi_dev *hsi_ctrl, bool hi_speed);
+
 
 #ifdef CONFIG_DEBUG_FS
 int hsi_debug_init(void);

@@ -744,7 +744,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	int err = 0;
 	int fifo = 0;
 	u8 ret;
-	struct hsi_platform_data *pdata;
+	bool hi_speed;
 
 	if (unlikely((!dev) ||
 		     (!dev->ch) ||
@@ -961,14 +961,8 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			err = -EINVAL;
 			goto out;
 		}
-		hsi_ctrl->hsi_fclk_req = *(unsigned int *)arg ?
-					HSI_FCLK_HI_SPEED : HSI_FCLK_LOW_SPEED;
+		hi_speed = *(unsigned int *)arg;
 
-		if (hsi_ctrl->hsi_fclk_req == hsi_ctrl->hsi_fclk_current) {
-			dev_dbg(hsi_ctrl->dev, "HSI FClk already @%ldHz\n",
-				 hsi_ctrl->hsi_fclk_current);
-			goto out;
-		}
 
 		if (hsi_is_controller_transfer_ongoing(hsi_ctrl)) {
 			err = -EBUSY;
@@ -977,20 +971,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		hsi_ctrl->clock_change_ongoing = true;
 		spin_unlock_bh(&hsi_ctrl->lock);
 
-		pdata = dev_get_platdata(hsi_ctrl->dev);
-
-		/* Set the HSI FCLK to requested value. */
-		err = pdata->device_scale(hsi_ctrl->dev,
-					  hsi_ctrl->hsi_fclk_req);
-		if (err < 0) {
-			dev_err(hsi_ctrl->dev, "%s: Cannot set HSI FClk to %ldHz, err %d\n",
-				__func__, hsi_ctrl->hsi_fclk_req, err);
-		} else {
-			dev_info(hsi_ctrl->dev, "HSI FClk changed from %ldHz to %ldHz\n",
-				hsi_ctrl->hsi_fclk_current,
-				hsi_ctrl->hsi_fclk_req);
-			hsi_ctrl->hsi_fclk_current = hsi_ctrl->hsi_fclk_req;
-		}
+		hsi_pm_change_hsi_speed(hsi_ctrl, hi_speed);
 
 		spin_lock_bh(&hsi_ctrl->lock);
 		hsi_ctrl->clock_change_ongoing = false;
