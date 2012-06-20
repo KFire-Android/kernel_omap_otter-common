@@ -62,7 +62,16 @@ enum sys_clk_rate {
 #define	PLL_SD_MASK		0x0003FC00
 #define	PLL_SD_SHIFT		0x9
 #define	SET_PLL_GO		0x1
+#define	PLL_TICOPWDN		0x10000
 #define	PLL_LOCK		0x2
+#define	PLL_IDLE		0x1
+
+/*
+ * This is an Empirical value that works, need to confirm the actual
+ * value required for the USB3PHY_PLL_CONFIGURATION2.PLL_IDLE status
+ * to be correctly reflected in the USB3PHY_PLL_STATUS register.
+ */
+# define PLL_IDLE_TIME  100;
 
 struct omap_usb {
 	struct usb_phy		phy;
