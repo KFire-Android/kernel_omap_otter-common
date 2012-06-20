@@ -1444,6 +1444,12 @@ static void __devinit twl_setup_errata(int features)
 		 */
 		if (twlrev == 1)
 			twl_errata |= TWL6032_ERRATA_DB00119490;
+	} else {
+		/*
+		 * Errata ProDB00112620 present only in the TWL6030 ES2.1
+		 */
+		if (twlrev == 2)
+			twl_errata |= TWL6030_ERRATA_DB00112620;
 	}
 }
 

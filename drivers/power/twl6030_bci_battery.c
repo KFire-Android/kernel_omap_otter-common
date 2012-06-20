@@ -184,6 +184,8 @@
 
 /* ANTICOLLAPSE_CTRL2 */
 #define BUCK_VTH_SHIFT			5
+#define ANTICOLL_ANA			(1 << 2)
+#define ANTICOLL_DIG			(1 << 1)
 
 /* FG_REG_00 */
 #define CC_ACTIVE_MODE_SHIFT	6
@@ -314,6 +316,8 @@ struct twl6030_bci_device_info {
 	int			current_max_scale;
 
 	struct alarm		wakeup_alarm;
+
+	unsigned int		min_vbus_val;
 };
 
 /* Battery capacity estimation table */
@@ -334,34 +338,36 @@ static struct batt_capacity_chart volt_cap_table[] = {
 
 static BLOCKING_NOTIFIER_HEAD(notifier_list);
 
-static void twl6030_config_min_vbus_reg(struct twl6030_bci_device_info *di,
+static int twl6030_config_min_vbus_reg(struct twl6030_bci_device_info *di,
 						unsigned int value)
 {
 	u8 rd_reg = 0;
 	int ret;
 
-	/* not required on TWL6032 */
+	u8 anticollapse_ctrl = ANTICOLLAPSE_CTRL2;
+
 	if (di->features & TWL6032_SUBCLASS)
-		return;
+		anticollapse_ctrl = ANTICOLLAPSE_CTRL1;
 
 	if (value > 4760 || value < 4200) {
 		dev_dbg(di->dev, "invalid min vbus\n");
-		return;
+		return -EINVAL;
 	}
 
 	ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &rd_reg,
-					ANTICOLLAPSE_CTRL2);
+			      anticollapse_ctrl);
 	if (ret)
 		goto err;
 	rd_reg = rd_reg & 0x1F;
 	rd_reg = rd_reg | (((value - 4200)/80) << BUCK_VTH_SHIFT);
 	ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, rd_reg,
-					ANTICOLLAPSE_CTRL2);
+			       anticollapse_ctrl);
 
 	if (!ret)
-		return;
+		return ret;
 err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
+	return ret;
 }
 
 static void twl6030_config_iterm_reg(struct twl6030_bci_device_info *di,
@@ -2643,17 +2649,30 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 			di->current_max_scale = 6200;
 	}
 
-	if (di->errata & TWL6032_ERRATA_DB00119490) {
+	di->min_vbus_val = 4200;
+	if ((di->errata & TWL6032_ERRATA_DB00119490) ||
+	    (di->errata & TWL6030_ERRATA_DB00112620)) {
 		/*
-		 * Set Anti-collapse threshold correspond
-		 * to the ERRATA DB00119490 (4.4 volts)
+		 * Enable Anti-collapse threshold:
+		 * for ERRATA DB00119490: 4.4 volts
+		 * for ERRATA DB00112620: 4.2 volts
 		 */
+		if (di->errata & TWL6032_ERRATA_DB00119490)
+			di->min_vbus_val = 4400;
+
+		ret = twl6030_config_min_vbus_reg(di, di->min_vbus_val);
+
+		if (ret)
+			goto temp_setup_fail;
+
+		/* Enable Anti-collapse threshold */
 		ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &reg,
 				      ANTICOLLAPSE_CTRL1);
 		if (ret)
 			goto temp_setup_fail;
-		reg = reg & 0x1F;
-		reg = reg | (0x3 << BUCK_VTH_SHIFT);
+
+		reg = reg & ~ANTICOLL_DIG;
+		reg = reg | ANTICOLL_ANA;
 		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg,
 				       ANTICOLLAPSE_CTRL1);
 		if (ret)
