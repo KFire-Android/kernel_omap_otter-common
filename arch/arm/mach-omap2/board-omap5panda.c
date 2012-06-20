@@ -39,6 +39,7 @@
 #include <plat/mmc.h>
 #include <plat/drm.h>
 #include <plat/usb.h>
+#include <plat/omap_apps_brd_id.h>
 #include "hsmmc.h"
 #include "common-board-devices.h"
 #include "mux.h"
@@ -702,6 +703,7 @@ static void __init omap_5_panda_init(void)
 #endif
 	omap5_mux_init(board_mux, NULL, OMAP_PACKAGE_CBL);
 	omap_sdrc_init(NULL, NULL);
+	omap_create_board_props();
 	omap5pandai2c_init();
 	omap5_pmic_init(1, PALMAS_NAME, OMAP44XX_IRQ_SYS_1N, PALMAS_DATA,
 			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
