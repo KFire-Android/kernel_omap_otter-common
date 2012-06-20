@@ -64,7 +64,7 @@ static unsigned long twl6035_vsel_to_uv(const u8 vsel)
 }
 
 static struct omap_voltdm_pmic twl6035_vcore1_pmic = {
-	.slew_rate			= 5000,
+	.slew_rate			= 220,	/* BUG00117 - TI internal ref */
 	.step_size			= 10000,
 	.switch_on_time		= 549,
 	.vp_erroroffset		= OMAP5_VP_CONFIG_ERROROFFSET,
@@ -86,7 +86,7 @@ static struct omap_voltdm_pmic twl6035_vcore1_pmic = {
 };
 
 static struct omap_voltdm_pmic twl6035_vcore2_pmic = {
-	.slew_rate			= 5000,
+	.slew_rate			= 220,	/* BUG00117 - TI internal ref */
 	.step_size			= 10000,
 	.switch_on_time		= 549,
 	.vp_erroroffset		= OMAP5_VP_CONFIG_ERROROFFSET,
@@ -108,7 +108,7 @@ static struct omap_voltdm_pmic twl6035_vcore2_pmic = {
 };
 
 static struct omap_voltdm_pmic twl6035_vcore3_pmic = {
-	.slew_rate			= 5000,
+	.slew_rate			= 220,	/* BUG00117 - TI internal ref */
 	.step_size			= 10000,
 	.startup_time		= 500,
 	.shutdown_time		= 500,
