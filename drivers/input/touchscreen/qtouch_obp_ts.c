@@ -70,6 +70,8 @@ struct qtouch_ts_data {
 	uint32_t			last_keystate;
 	uint16_t			eeprom_checksum;
 	uint8_t			    checksum_cnt;
+	int				irq;
+	int				gpio;
 	int					x_delta;
 	int					y_delta;
 
@@ -97,7 +99,7 @@ static irqreturn_t qtouch_ts_irq_handler(int irq, void *dev_id)
 {
 	struct qtouch_ts_data *ts = dev_id;
 
-	disable_irq_nosync(ts->client->irq);
+	disable_irq_nosync(ts->irq);
 	queue_work(qtouch_ts_wq, &ts->work);
 	return IRQ_HANDLED;
 }
@@ -815,7 +817,7 @@ static void qtouch_ts_work_func(struct work_struct *work)
 	}
 
 done:
-	enable_irq(ts->client->irq);
+	enable_irq(ts->irq);
 }
 
 static int qtouch_process_info_block(struct qtouch_ts_data *ts)
@@ -982,7 +984,8 @@ static int qtouch_ts_probe(struct i2c_client *client,
 
 	ts->pdata = pdata;
 	ts->client = client;
-	ts->client->irq = gpio_to_irq(ts->client->irq);
+	ts->gpio = ts->client->irq;
+	ts->irq = gpio_to_irq(ts->client->irq);
 	i2c_set_clientdata(client, ts);
 	ts->checksum_cnt = 0;
 	ts->x_delta = ts->pdata->x_delta;
@@ -1070,11 +1073,17 @@ static int qtouch_ts_probe(struct i2c_client *client,
 		goto err_input_register_dev;
 	}
 
-	err = request_irq(ts->client->irq, qtouch_ts_irq_handler,
+	err = gpio_request_one(ts->gpio, GPIOF_IN, "touch");
+	if (err) {
+		pr_err("%s: failed to request gpio\n", __func__);
+		goto err_request_gpio;
+	}
+
+	err = request_irq(ts->irq, qtouch_ts_irq_handler,
 			  pdata->irqflags, "qtouch_ts_int", ts);
 	if (err != 0) {
 		pr_err("%s: request_irq (%d) failed\n", __func__,
-		       ts->client->irq);
+		       ts->irq);
 		goto err_request_irq;
 	}
 
@@ -1088,6 +1097,8 @@ static int qtouch_ts_probe(struct i2c_client *client,
 	return 0;
 
 err_request_irq:
+	gpio_free(ts->gpio);
+err_request_gpio:
 	input_unregister_device(ts->input_dev);
 
 err_input_register_dev:
@@ -1111,7 +1122,8 @@ static int qtouch_ts_remove(struct i2c_client *client)
 {
 	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
 
-	free_irq(ts->client->irq, ts);
+	gpio_free(ts->gpio);
+	free_irq(ts->irq, ts);
 	input_unregister_device(ts->input_dev);
 	input_free_device(ts->input_dev);
 	i2c_set_clientdata(client, NULL);
@@ -1126,11 +1138,11 @@ static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 	if (qtouch_tsdebug & 4)
 		pr_info("%s: Suspending\n", __func__);
 
-	disable_irq_nosync(ts->client->irq);
+	disable_irq_nosync(ts->irq);
 	ret = cancel_work_sync(&ts->work);
 	if (ret) { /* if work was pending disable-count is now 2 */
 		pr_info("%s: Pending work item\n", __func__);
-		enable_irq(ts->client->irq);
+		enable_irq(ts->irq);
 	}
 
 	ret = qtouch_power_config(ts, 0);
@@ -1172,7 +1184,7 @@ static int qtouch_ts_resume(struct i2c_client *client)
 	}
 	qtouch_force_reset(ts, ts->reset_type);
 
-	enable_irq(ts->client->irq);
+	enable_irq(ts->irq);
 	return 0;
 }
 
