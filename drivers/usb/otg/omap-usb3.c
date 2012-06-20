@@ -42,7 +42,7 @@ static struct usb_dpll_params omap_usb3_dpll_params[NUM_SYS_CLKS] = {
 static int omap_usb3_suspend(struct usb_phy *x, int suspend)
 {
 	struct omap_usb *phy = phy_to_omapusb(x);
-	u32	val;
+	u32	val, ret;
 	int timeout = PLL_IDLE_TIME;
 
 	if (suspend && !phy->is_suspended) {
@@ -66,9 +66,22 @@ static int omap_usb3_suspend(struct usb_phy *x, int suspend)
 		phy->is_suspended	= 1;
 	} else if (!suspend && phy->is_suspended) {
 		phy->is_suspended	= 0;
-		clk_enable(phy->optclk);
-		clk_enable(phy->wkupclk);
-		pm_runtime_get_sync(phy->dev);
+		ret = clk_enable(phy->optclk);
+		if (ret) {
+			dev_err(phy->dev, "Failed to enable optclk %d\n", ret);
+			goto err3;
+		}
+		ret = clk_enable(phy->wkupclk);
+		if (ret) {
+			dev_err(phy->dev, "Failed to enable wkupclk %d\n", ret);
+			goto err2;
+		}
+		ret = pm_runtime_get_sync(phy->dev);
+		if (ret < 0) {
+			dev_err(phy->dev, "get_sync failed with err %d\n",
+									ret);
+			goto err1;
+		}
 
 		val = omap_usb_readl(phy->pll_ctrl_base, PLL_CONFIGURATION2);
 		val &= ~PLL_IDLE;
@@ -83,6 +96,13 @@ static int omap_usb3_suspend(struct usb_phy *x, int suspend)
 	}
 
 	return 0;
+
+err1:
+	clk_disable(phy->wkupclk);
+err2:
+	clk_disable(phy->optclk);
+err3:
+	return ret;
 }
 
 static inline enum sys_clk_rate __get_sys_clk_index(unsigned long rate)

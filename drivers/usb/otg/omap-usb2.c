@@ -96,6 +96,7 @@ static int omap_usb_set_peripheral(struct usb_otg *otg,
 
 static int omap_usb2_suspend(struct usb_phy *x, int suspend)
 {
+	u32		ret;
 	struct omap_usb *phy = phy_to_omapusb(x);
 
 	if (suspend && !phy->is_suspended) {
@@ -107,9 +108,22 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
 
 		phy->is_suspended = 1;
 	} else if (!suspend && phy->is_suspended) {
-		clk_enable(phy->optclk);
-		clk_enable(phy->wkupclk);
-		pm_runtime_get_sync(phy->dev);
+		ret = clk_enable(phy->optclk);
+		if (ret) {
+			dev_err(phy->dev, "Failed to enable optclk %d\n", ret);
+			goto err3;
+		}
+		ret = clk_enable(phy->wkupclk);
+		if (ret) {
+			dev_err(phy->dev, "Failed to enable wkupclk %d\n", ret);
+			goto err2;
+		}
+		ret = pm_runtime_get_sync(phy->dev);
+		if (ret < 0) {
+			dev_err(phy->dev, "get_sync failed with err %d\n",
+									ret);
+			goto err1;
+		}
 
 		omap4_usb_phy_power(phy->control_dev, 1);
 
@@ -117,6 +131,13 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
 	}
 
 	return 0;
+
+err1:
+	clk_disable(phy->wkupclk);
+err2:
+	clk_disable(phy->optclk);
+err3:
+	return ret;
 }
 
 static int __devinit omap_usb2_probe(struct platform_device *pdev)
