@@ -27,6 +27,7 @@
 #define _OMAP_ABE_H
 
 struct omap_abe_pdata {
+	int (*get_context_loss_count)(struct device *dev);
 	int (*device_scale)(struct device *target_dev,
 			    unsigned long rate);
 };

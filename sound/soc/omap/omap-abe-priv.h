@@ -309,10 +309,10 @@ struct omap_abe {
 	int active;
 	struct mutex mutex;
 
-	int (*get_context_lost_count)(struct device *dev);
+	int (*get_context_loss_count)(struct device *dev);
 	int (*device_scale)(struct device *target_dev,
 			    unsigned long rate);
-	u32 context_lost;
+	int context_loss;
 
 	struct omap_abe_opp opp;
 	struct omap_abe_dc_offset dc_offset;
