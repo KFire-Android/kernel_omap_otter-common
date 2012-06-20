@@ -40,6 +40,7 @@
 #include <plat/drm.h>
 #include <plat/usb.h>
 #include <plat/omap_apps_brd_id.h>
+#include <plat/vram.h>
 #include "hsmmc.h"
 #include "common-board-devices.h"
 #include "mux.h"
@@ -47,6 +48,7 @@
 #include <video/omapdss.h>
 #include <video/omap-panel-lg4591.h>
 
+#define OMAP5_SEVM_FB_RAM_SIZE       SZ_8M /* 1280×800*4 * 2 */
 
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
@@ -679,6 +681,8 @@ static void omap5panda_hdmi_init(void)
 
 static void __init omap5panda_display_init(void)
 {
+	omap_vram_set_sdram_vram(OMAP5_SEVM_FB_RAM_SIZE, 0);
+
 	omap5panda_hdmi_init();
 	omap_display_init(&omap5evm_dss_data);
 }
