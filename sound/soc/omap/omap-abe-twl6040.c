@@ -1473,8 +1473,11 @@ static int __devexit omap_abe_remove(struct platform_device *pdev)
 	struct omap_abe_data *card_data = snd_soc_card_get_drvdata(card);
 
 	snd_soc_unregister_card(card);
-	i2c_unregister_device(card_data->tps6130x);
-	i2c_put_adapter(card_data->adapter);
+
+	if (machine_is_omap_4430sdp()) {
+		i2c_unregister_device(card_data->tps6130x);
+		i2c_put_adapter(card_data->adapter);
+	}
 
 	return 0;
 }
