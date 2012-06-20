@@ -586,7 +586,23 @@ static int hdmi_power_on_full(struct omap_dss_device *dssdev)
 
 	DSSDBG("hdmi_power_on x_res= %d y_res = %d\n", p->x_res, p->y_res);
 
-	phy = p->pixel_clock;
+	switch (hdmi.ip_data.cfg.deep_color) {
+	case HDMI_DEEP_COLOR_30BIT:
+		phy = (p->pixel_clock * 125) / 100 ;
+		break;
+	case HDMI_DEEP_COLOR_36BIT:
+		if (p->pixel_clock >= 148500) {
+			DSSERR("36 bit deep color not supported for the pixel clock %d\n",
+				p->pixel_clock);
+			goto err;
+		}
+		phy = (p->pixel_clock * 150) / 100;
+		break;
+	case HDMI_DEEP_COLOR_24BIT:
+	default:
+		phy = p->pixel_clock;
+		break;
+	}
 
 	hdmi_compute_pll(dssdev, phy, &hdmi.ip_data.pll_data);
 
@@ -644,7 +660,35 @@ static void hdmi_power_off_full(struct omap_dss_device *dssdev)
 	hdmi.ip_data.ops->phy_disable(&hdmi.ip_data);
 	hdmi.ip_data.ops->pll_disable(&hdmi.ip_data);
 
+	hdmi.ip_data.cfg.deep_color = HDMI_DEEP_COLOR_24BIT;
+
 	hdmi_power_off_core(dssdev);
+}
+
+int omapdss_hdmi_set_deepcolor(struct omap_dss_device *dssdev, int val,
+		bool hdmi_restart)
+{
+	int r;
+
+	if (!hdmi_restart) {
+		hdmi.ip_data.cfg.deep_color = val;
+		return 0;
+	}
+
+	omapdss_hdmi_display_disable(dssdev);
+
+	hdmi.ip_data.cfg.deep_color = val;
+
+	r = omapdss_hdmi_display_enable(dssdev);
+	if (r)
+		return r;
+
+	return 0;
+}
+
+int omapdss_hdmi_get_deepcolor(void)
+{
+	return hdmi.ip_data.cfg.deep_color;
 }
 
 int omapdss_hdmi_display_check_timing(struct omap_dss_device *dssdev,
