@@ -977,5 +977,6 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 #define TWL6032_PREQ1_RES_ASS_A	0xd7
 
 #define TWL6032_ERRATA_DB00119490	(1 << 0)
+#define TWL6030_ERRATA_DB00112620	(1 << 1)
 
 #endif /* End of __TWL4030_H */
