@@ -17,6 +17,7 @@
 #include <linux/export.h>
 #include <linux/suspend.h>
 #include <linux/pm_qos.h>
+#include <linux/ratelimit.h>
 
 #include <asm/system_misc.h>
 
@@ -412,9 +413,8 @@ static int omap2_pm_qos_tput_handler(struct notifier_block *nb,
 				     void *unused)
 {
 	int ret = 0;
-	static struct device dummy_l3_dev = {
-		.init_name = "omap2_pm_qos_tput_handler",
-	};
+	struct opp *opp;
+	unsigned long freq_valid;
 
 	pr_debug("OMAP PM MEM TPUT: new_value=%lu\n", new_value);
 
@@ -429,11 +429,34 @@ static int omap2_pm_qos_tput_handler(struct notifier_block *nb,
 	 * Add a call to the DVFS layer, using the new_value (in kB/s)
 	 * as the minimum memory throughput to calculate the L3
 	 * minimum allowed frequency
+	 * FIXME: fix algorithm to work on ALL SoCs in a proper manner
+	 * The equation used below is approximation for OMAP3 only.
 	 */
 	/* Convert the throughput(in KiB/s) into Hz. */
 	new_value = (new_value * 1000) / 4;
 
-	ret = omap_device_scale(&dummy_l3_dev, l3_dev, new_value);
+	freq_valid = new_value;
+	rcu_read_lock();
+	opp = opp_find_freq_ceil(l3_dev, &freq_valid);
+	if (IS_ERR(opp)) {
+		opp = opp_find_freq_floor(l3_dev, &freq_valid);
+		if (IS_ERR(opp)) {
+			rcu_read_unlock();
+			pr_err("%s: no OPP match for %ld\n",
+			       __func__, new_value);
+			ret = -ENOENT;
+			goto err;
+		}
+	}
+	rcu_read_unlock();
+	/*
+	 * TODO: convert warning to error and add error handling once algo fixed
+	 */
+	if (freq_valid < new_value)
+		pr_debug_ratelimited("%s:Compute=%ld>match %ld: Convert err?\n",
+				     __func__, new_value, freq_valid);
+
+	ret = omap_device_scale(l3_dev, freq_valid);
 
 err:
 	return ret;

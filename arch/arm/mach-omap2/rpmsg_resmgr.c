@@ -104,7 +104,7 @@ static int omap2_rprm_set_max_dev_wakeup_lat(struct device *rdev,
 static int omap2_rprm_device_scale(struct device *rdev, struct device *tdev,
 		unsigned long val)
 {
-	return omap_device_scale(rdev, tdev, val);
+	return omap_device_scale(tdev, val);
 }
 
 static struct omap_rprm_regulator *omap2_rprm_lookup_regulator(u32 reg_id)

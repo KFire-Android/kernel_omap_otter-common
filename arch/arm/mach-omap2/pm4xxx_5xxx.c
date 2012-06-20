@@ -398,7 +398,7 @@ static int __init omap_pm_init(void)
 		rate = clk_get_rate(clk);
 
 		/* Update DVFS framework with rate information */
-		ret = omap_device_scale(dev, dev, rate);
+		ret = omap_device_scale(dev, rate);
 		if (ret) {
 			dev_warn(dev, "%s unable to scale to %d - %d\n",
 				 __func__, rate, ret);

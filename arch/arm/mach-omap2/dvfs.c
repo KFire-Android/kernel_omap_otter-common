@@ -725,7 +725,6 @@ out:
 
 /**
  * omap_device_scale() - Set a new rate at which the device is to operate
- * @req_dev:	pointer to the device requesting the scaling.
  * @target_dev:	pointer to the device that is to be scaled
  * @rate:	the rnew rate for the device.
  *
@@ -737,10 +736,14 @@ out:
  * voltage domain can enter and then decides on the final device
  * rate.
  *
+ * IMPORTANT NOTE: This API assumes that there is ONLY one requestor per
+ * target device. If there are multiple an abstraction API needs to be
+ * created on a need basis to consolidate and arbitrate among requestors
+ * and provide a singular request to this API.
+ *
  * Return 0 on success else the error value
  */
-int omap_device_scale(struct device *req_dev, struct device *target_dev,
-			unsigned long rate)
+int omap_device_scale(struct device *target_dev, unsigned long rate)
 {
 	struct opp *opp;
 	unsigned long volt, freq = rate;
@@ -748,6 +751,11 @@ int omap_device_scale(struct device *req_dev, struct device *target_dev,
 	struct platform_device *pdev;
 	struct omap_device *od;
 	int ret = 0;
+	/*
+	 * For our internal tracking system - the request and target devices
+	 * are the same
+	 */
+	struct device *req_dev = target_dev;
 
 	pdev = container_of(target_dev, struct platform_device, dev);
 	if (IS_ERR_OR_NULL(pdev)) {
@@ -775,8 +783,8 @@ int omap_device_scale(struct device *req_dev, struct device *target_dev,
 	opp = opp_find_freq_ceil(target_dev, &freq);
 	if (IS_ERR(opp)) {
 		rcu_read_unlock();
-		dev_err(target_dev, "%s: Unable to find OPP for freq%ld\n",
-			__func__, rate);
+		dev_err(target_dev, "%s: %pF Unable to find OPP for freq%ld\n",
+			__func__, (void *)_RET_IP_, rate);
 		ret = -ENODEV;
 		goto out;
 	}
@@ -785,16 +793,16 @@ int omap_device_scale(struct device *req_dev, struct device *target_dev,
 
 	tdvfs_info = _dev_to_dvfs_info(target_dev);
 	if (IS_ERR_OR_NULL(tdvfs_info)) {
-		dev_err(target_dev, "%s: (req=%s) no vdd![f=%ld, v=%ld]\n",
-			__func__, dev_name(req_dev), freq, volt);
+		dev_err(target_dev, "%s: %pF no vdd![f=%ld, v=%ld]\n",
+			__func__, (void *)_RET_IP_, freq, volt);
 		ret = -ENODEV;
 		goto out;
 	}
 
 	ret = _add_vdd_user(tdvfs_info, req_dev, volt);
 	if (ret) {
-		dev_err(target_dev, "%s: vddadd(%s) failed %d[f=%ld, v=%ld]\n",
-			__func__, dev_name(req_dev), ret, freq, volt);
+		dev_err(target_dev, "%s: %pF failed %d[f=%ld, v=%ld]\n",
+			__func__, (void *)_RET_IP_, ret, freq, volt);
 		goto out;
 	}
 
@@ -810,8 +818,8 @@ int omap_device_scale(struct device *req_dev, struct device *target_dev,
 	/* Do the actual scaling */
 	ret = _dvfs_scale(req_dev, target_dev, tdvfs_info);
 	if (ret) {
-		dev_err(target_dev, "%s: scale by %s failed %d[f=%ld, v=%ld]\n",
-			__func__, dev_name(req_dev), ret, freq, volt);
+		dev_err(target_dev, "%s:scale by %pF failed %d[f=%ld, v=%ld]\n",
+			__func__, (void *)_RET_IP_, ret, freq, volt);
 		_remove_vdd_user(tdvfs_info, target_dev);
 		/* Fall through */
 	}
