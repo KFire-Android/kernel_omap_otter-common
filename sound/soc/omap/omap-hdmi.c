@@ -47,6 +47,10 @@ static struct omap_pcm_dma_data omap_hdmi_dai_dma_params = {
 
 static struct {
 	struct omap_dss_device *dssdev;
+	struct snd_aes_iec958 iec;
+	struct snd_cea_861_aud_if cea;
+	struct notifier_block notifier;
+	int active;
 } hdmi;
 
 static int omap_hdmi_dai_startup(struct snd_pcm_substream *substream,
@@ -179,10 +183,33 @@ static int omap_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
 	cea.db5_dminh_lsv = CEA861_AUDIO_INFOFRAME_DB5_DM_INH_PROHIBITED;
 	cea.db5_dminh_lsv |= (0 & CEA861_AUDIO_INFOFRAME_DB5_LSV);
 
-	err = hdmi.dssdev->driver->audio_config(hdmi.dssdev, &iec, &cea);
+	hdmi.iec = iec;
+	hdmi.cea = cea;
+
+	err = hdmi.dssdev->driver->audio_config(hdmi.dssdev, &hdmi.iec,
+							&hdmi.cea);
 
 	return err;
 }
+
+int hdmi_audio_notifier_callback(struct notifier_block *nb,
+			unsigned long arg, void *ptr)
+{
+	enum omap_dss_display_state state = arg;
+	int err = 0;
+
+	if (state == OMAP_DSS_DISPLAY_ACTIVE) {
+		if (hdmi.active)
+			hdmi.dssdev->driver->audio_enable(hdmi.dssdev, false);
+			err = hdmi.dssdev->driver->audio_config(hdmi.dssdev,
+						&hdmi.iec, &hdmi.cea);
+			if (hdmi.active)
+				hdmi.dssdev->driver->audio_enable(hdmi.dssdev,
+									true);
+		}
+	return err;
+}
+
 
 static int omap_hdmi_dai_prepare(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
@@ -200,10 +227,12 @@ static int omap_hdmi_dai_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
 		hdmi.dssdev->driver->audio_start(hdmi.dssdev, true);
+		hdmi.active = 1;
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+		hdmi.active = 0;
 		hdmi.dssdev->driver->audio_start(hdmi.dssdev, false);
 		break;
 	default:
@@ -293,12 +322,20 @@ static __devinit int omap_hdmi_probe(struct platform_device *pdev)
 		omap_hdmi_dai.playback.channels_max	= 2;
 	}
 	ret = snd_soc_register_dai(&pdev->dev, &omap_hdmi_dai);
+
+	hdmi.notifier.notifier_call = hdmi_audio_notifier_callback;
+	blocking_notifier_chain_register(&hdmi.dssdev->state_notifiers,
+							&hdmi.notifier);
+
 	return ret;
 }
 
 static int __devexit omap_hdmi_remove(struct platform_device *pdev)
 {
 	omap_dss_put_device(hdmi.dssdev);
+	blocking_notifier_chain_unregister(&hdmi.dssdev->state_notifiers,
+							&hdmi.notifier);
+
 	snd_soc_unregister_dai(&pdev->dev);
 	return 0;
 }
