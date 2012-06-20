@@ -40,10 +40,13 @@
 #include <plat/drm.h>
 #include <plat/usb.h>
 #include <plat/omap_apps_brd_id.h>
+#include <plat/remoteproc.h>
+#include <plat/rpmsg_resmgr.h>
 #include <plat/vram.h>
 #include "hsmmc.h"
 #include "common-board-devices.h"
 #include "mux.h"
+#include "omap5_ion.h"
 
 #include <video/omapdss.h>
 #include <video/omap-panel-lg4591.h>
@@ -719,14 +722,23 @@ static void __init omap_5_panda_init(void)
 	platform_add_devices(omap5evm_devices, ARRAY_SIZE(omap5evm_devices));
 
 	omap_init_dmm_tiler();
+	omap5_register_ion();
 	omap5panda_display_init();
 }
 
+static void __init omap_panda5_reserve(void)
+{
+	omap_rproc_reserve_cma(RPROC_CMA_OMAP5);
+
+	omap5_ion_init();
+
+	omap_reserve();
+}
 
 MACHINE_START(OMAP5_PANDA, "OMAP5 panda board")
 	/* Maintainer: Dan Murphy - Texas Instruments Inc */
 	.atag_offset	= 0x100,
-	.reserve	= omap_reserve,
+	.reserve	= omap_panda5_reserve,
 	.map_io		= omap5_map_io,
 	.init_early	= omap_5430evm_init_early,
 	.init_irq	= gic_init_irq,
