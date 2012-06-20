@@ -340,6 +340,33 @@ err:
 	return r;
 }
 
+static int hdmi_panel_3d_enable(struct omap_dss_device *dssdev,
+				struct s3d_disp_info *info, int code)
+{
+	int r = 0;
+	DSSDBG("ENTER hdmi_panel_3d_enable\n");
+
+	mutex_lock(&hdmi.lock);
+
+	if (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) {
+		r = -EINVAL;
+		goto err;
+	}
+
+	r = omapdss_hdmi_display_3d_enable(dssdev, info, code);
+	if (r) {
+		DSSERR("failed to power on\n");
+		goto err;
+	}
+
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
+
+err:
+	mutex_unlock(&hdmi.lock);
+
+	return r;
+}
+
 static void hdmi_panel_disable(struct omap_dss_device *dssdev)
 {
 	mutex_lock(&hdmi.lock);
@@ -482,6 +509,7 @@ static struct omap_dss_driver hdmi_driver = {
 	.audio_stop	= hdmi_panel_audio_stop,
 	.audio_supported	= hdmi_panel_audio_supported,
 	.audio_config	= hdmi_panel_audio_config,
+	.s3d_enable	= hdmi_panel_3d_enable,
 	.driver			= {
 		.name   = "hdmi_panel",
 		.owner  = THIS_MODULE,
