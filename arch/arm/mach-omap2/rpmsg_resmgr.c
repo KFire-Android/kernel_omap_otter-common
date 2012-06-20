@@ -23,6 +23,8 @@
 #include <plat/rpmsg_resmgr.h>
 #include <plat/omap-pm.h>
 #include <plat/cpu.h>
+#include <plat/clock.h>
+#include <plat/dvfs.h>
 
 static const char * const omap4_pauxclks[] = {
 	"sys_clkin_ck",
@@ -92,11 +94,6 @@ static struct omap_rprm_auxclk omap5_auxclks[] = {
 	},
 };
 
-static int omap2_rprm_set_min_bus_tput(struct device *rdev,
-		struct device *tdev, unsigned long val)
-{
-	return omap_pm_set_min_bus_tput(rdev, OCP_INITIATOR_AGENT, val);
-}
 
 static int omap2_rprm_set_max_dev_wakeup_lat(struct device *rdev,
 		struct device *tdev, unsigned long val)
@@ -104,15 +101,11 @@ static int omap2_rprm_set_max_dev_wakeup_lat(struct device *rdev,
 	return omap_pm_set_max_dev_wakeup_lat(rdev, tdev, val);
 }
 
-#ifdef CONFIG_OMAP_DVFS
 static int omap2_rprm_device_scale(struct device *rdev, struct device *tdev,
-		unsigned long val);
+		unsigned long val)
 {
-	return omap_device_scale(dev, &pdev->dev, val);
+	return omap_device_scale(rdev, tdev, val);
 }
-#else
-#define omap2_rprm_device_scale NULL
-#endif
 
 static struct omap_rprm_regulator *omap2_rprm_lookup_regulator(u32 reg_id)
 {
@@ -122,7 +115,7 @@ static struct omap_rprm_regulator *omap2_rprm_lookup_regulator(u32 reg_id)
 	if (!regulators)
 		regulators_cnt = omap_rprm_get_regulators(&regulators);
 
-	if (reg_id-- > regulators_cnt)
+	if (--reg_id >= regulators_cnt)
 		return NULL;
 
 	return &regulators[reg_id];
@@ -139,7 +132,6 @@ static struct omap_rprm_auxclk *omap2_rprm_lookup_auxclk(u32 id)
 }
 
 static struct omap_rprm_ops omap2_rprm_ops = {
-	.set_min_bus_tput	= omap2_rprm_set_min_bus_tput,
 	.set_max_dev_wakeup_lat	= omap2_rprm_set_max_dev_wakeup_lat,
 	.device_scale		= omap2_rprm_device_scale,
 	.lookup_regulator	= omap2_rprm_lookup_regulator,
@@ -154,6 +146,7 @@ static struct omap_rprm_pdata omap2_rprm_data = {
 static int __init omap2_rprm_init(void)
 {
 	struct platform_device *pdev;
+	struct omap_rprm_pdata *pdata = &omap2_rprm_data;
 	int ret;
 
 	if (cpu_is_omap54xx()) {
@@ -168,8 +161,17 @@ static int __init omap2_rprm_init(void)
 	if (!pdev)
 		return -ENOMEM;
 
-	ret = platform_device_add_data(pdev, &omap2_rprm_data,
-			sizeof omap2_rprm_data);
+	if (pdata->iss_opt_clk_name) {
+		pdata->iss_opt_clk =
+				omap_clk_get_by_name(pdata->iss_opt_clk_name);
+		if (!pdata->iss_opt_clk) {
+			dev_err(&pdev->dev, "error getting iss opt clk\n");
+			ret = -ENOENT;
+			goto err;
+		}
+	}
+
+	ret = platform_device_add_data(pdev, pdata, sizeof *pdata);
 	if (ret)
 		goto err;
 

@@ -1699,6 +1699,16 @@ static struct clk usb_otg_ss_refclk960m = {
 	.clkdm_name	= "l3init_clkdm",
 };
 
+static struct clk usb_phy_cm_clk32k = {
+	.name		= "usb_phy_cm_clk32k",
+	.parent		= &sys_32k_ck,
+	.ops		= &clkops_omap2_dflt,
+	.recalc		= &followparent_recalc,
+	.enable_reg	= OMAP54XX_CM_COREAON_USB_PHY_CORE_CLKCTRL,
+	.enable_bit	= OMAP54XX_OPTFCLKEN_CLK32K_SHIFT,
+	.clkdm_name	= "coreaon_clkdm",
+};
+
 static struct clk usb_tll_hs_usb_ch0_clk = {
 	.name		= "usb_tll_hs_usb_ch0_clk",
 	.parent		= &l3init_60m_fclk,
@@ -2638,6 +2648,7 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"usb_host_hs_utmi_p2_clk",	&usb_host_hs_utmi_p2_clk,	CK_54XX),
 	CLK(NULL,	"usb_host_hs_utmi_p3_clk",	&usb_host_hs_utmi_p3_clk,	CK_54XX),
 	CLK(NULL,	"usb_otg_ss_refclk960m",	&usb_otg_ss_refclk960m,	CK_54XX),
+	CLK(NULL,	"usb_phy_cm_clk32k",		&usb_phy_cm_clk32k,		CK_54XX),
 	CLK(NULL,	"usb_tll_hs_usb_ch0_clk",	&usb_tll_hs_usb_ch0_clk,	CK_54XX),
 	CLK(NULL,	"usb_tll_hs_usb_ch1_clk",	&usb_tll_hs_usb_ch1_clk,	CK_54XX),
 	CLK(NULL,	"usb_tll_hs_usb_ch2_clk",	&usb_tll_hs_usb_ch2_clk,	CK_54XX),

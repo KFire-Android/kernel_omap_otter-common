@@ -229,6 +229,25 @@ static const struct file_operations inject_action_fops = {
 	.llseek = default_llseek,
 };
 
+static int sensor_get_temperature(void *data, u64 *val)
+{
+	struct thermal_dev *temp_sensor = (struct thermal_dev *)data;
+	struct thermal_domain *domain = temp_sensor->domain;
+	int ret;
+
+	ret = thermal_device_call(domain->temp_sensor, report_temp);
+	if (ret < 0) {
+		pr_err("%s: getting temp is not supported for domain %s\n",
+			__func__, domain->domain_name);
+		return ret;
+	}
+	*val = ret;
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(sensor_temp_fops, sensor_get_temperature,
+			NULL, "%llu\n");
+
 static void thermal_debug_register_device(struct thermal_dev *tdev)
 {
 	struct dentry *d;
@@ -246,6 +265,11 @@ static void thermal_debug_register_device(struct thermal_dev *tdev)
 		list_for_each_entry(cact, &tdev->cooling_actions, node)
 			thermal_add_action_debug(cact, d);
 	}
+
+	/* Am I a sensor device ? */
+	if (tdev->dev_ops && tdev->dev_ops->report_temp)
+		(void) debugfs_create_file("temperature", S_IRUSR, d,
+					(void *)tdev, &sensor_temp_fops);
 
 	thermal_device_call(tdev, register_debug_entries, d);
 }

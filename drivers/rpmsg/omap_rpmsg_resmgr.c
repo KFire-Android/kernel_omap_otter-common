@@ -27,7 +27,6 @@
 #include <plat/dma.h>
 #include <plat/dmtimer.h>
 #include <plat/omap-pm.h>
-#include <plat/clock.h>
 #include <plat/rpmsg_resmgr.h>
 #include "omap_rpmsg_resmgr.h"
 
@@ -56,6 +55,7 @@ struct rprm_regulator_depot {
 struct rprm_gen_device_handle {
 	struct device *dev;
 	struct dev_pm_qos_request req;
+	struct pm_qos_request bw_req;
 };
 
 /* pointer to the constraint ops exported by omap mach module */
@@ -497,6 +497,9 @@ _enable_device_exclusive(void **handle, struct device **pdev, const char *name)
 	if (ret < 0)
 		goto err_handle_free;
 
+	pm_qos_add_request(&rprm_handle->bw_req, PM_QOS_MEMORY_THROUGHPUT,
+				PM_QOS_MEMORY_THROUGHPUT_DEFAULT_VALUE);
+
 	ret = pm_runtime_get_sync(dev);
 	if (ret) {
 		/*
@@ -519,6 +522,7 @@ _enable_device_exclusive(void **handle, struct device **pdev, const char *name)
 	return 0;
 
 err_qos_free:
+	pm_qos_remove_request(&rprm_handle->bw_req);
 	dev_pm_qos_remove_request(&rprm_handle->req);
 err_handle_free:
 	kfree(rprm_handle);
@@ -531,6 +535,7 @@ static int _device_release(void *handle)
 	struct device *dev = obj->dev;
 
 	dev_pm_qos_remove_request(&obj->req);
+	pm_qos_remove_request(&obj->bw_req);
 	kfree(obj);
 
 	return pm_runtime_put_sync(dev);
@@ -540,10 +545,8 @@ static int _device_scale(struct device *rdev, void *handle, unsigned long val)
 {
 	struct rprm_gen_device_handle *obj = handle;
 
-	return 0;
-
 	if (!mach_ops || !mach_ops->device_scale)
-			return -ENOSYS;
+		return -ENOSYS;
 
 	return mach_ops->device_scale(rdev, obj->dev, val);
 }
@@ -561,10 +564,9 @@ static int _device_bandwidth(struct device *rdev, void *handle,
 {
 	struct rprm_gen_device_handle *obj = handle;
 
-	if (!mach_ops || !mach_ops->set_min_bus_tput)
-		return -ENOSYS;
+	pm_qos_update_request(&obj->bw_req, val);
 
-	return mach_ops->set_min_bus_tput(rdev, obj->dev, val);
+	return 0;
 }
 
 static int rprm_iva_request(void **handle, void *data, size_t len)
@@ -740,21 +742,16 @@ static int omap_rprm_probe(struct platform_device *pdev)
 {
 	struct omap_rprm_pdata *pdata = pdev->dev.platform_data;
 
-	/* get iss optional clock if any */
-	if (pdata->iss_opt_clk_name) {
-		iss_opt_clk = omap_clk_get_by_name(pdata->iss_opt_clk_name);
-		if (!iss_opt_clk) {
-			dev_err(&pdev->dev, "error getting iss opt clk\n");
-			return -ENOENT;
-		}
-	}
-
+	/* set iss optional clock */
+	iss_opt_clk = pdata->iss_opt_clk;
 	mach_ops = pdata->ops;
+
 	return 0;
 }
 
 static int omap_rprm_remove(struct platform_device *pdev)
 {
+	iss_opt_clk = NULL;
 	mach_ops = NULL;
 
 	return 0;

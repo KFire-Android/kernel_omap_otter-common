@@ -42,8 +42,6 @@ struct omap_rprm_auxclk {
 /*
  * struct omap_rprm_ops - operations exported for this module
  *			(only constraints at the comment)
- * @set_min_bus_tput:		set a throughput constraint to the bus there
- *				@tdev is connected
  * @set_max_dev_wakeup_lat:	set a latency constraint to @tdev
  * @device_scale:		scale @tdev, it can be used to set a frequency
  *				constraint in @tdev
@@ -52,8 +50,6 @@ struct omap_rprm_auxclk {
  *
  */
 struct omap_rprm_ops {
-	int (*set_min_bus_tput)(struct device *rdev, struct device *tdev,
-			unsigned long val);
 	int (*set_max_dev_wakeup_lat)(struct device *rdev, struct device *tdev,
 			unsigned long val);
 	int (*device_scale)(struct device *rdev, struct device *tdev,
@@ -65,10 +61,12 @@ struct omap_rprm_ops {
 /*
  * struct omap_rprm_pdata - omap resmgr platform data
  * @iss_opt_clk_name	name of the ISS optional clock name
+ * @iss_opt_clk		clk handle reference to the ISS optional clock
  * @ops:		ops exported by this module
  */
 struct omap_rprm_pdata {
 	const char *iss_opt_clk_name;
+	struct clk *iss_opt_clk;
 	struct omap_rprm_ops *ops;
 };
 

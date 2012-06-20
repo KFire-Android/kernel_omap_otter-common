@@ -64,6 +64,7 @@ struct omap_die_governor {
 	int avg_is_valid;
 	int alert_threshold;
 	int panic_threshold;
+	int prev_zone;
 	struct delayed_work average_cpu_sensor_work;
 };
 
@@ -240,8 +241,6 @@ static int omap_enter_zone(struct omap_thermal_zone *zone,
 	int temp_upper;
 	int temp_lower;
 
-	pr_info("%s: hot spot temp %d - going into %s zone\n", __func__,
-				cpu_temp, zone->name);
 	if (list_empty(cooling_list)) {
 		pr_err("%s: No Cooling devices registered\n",
 			__func__);
@@ -342,9 +341,25 @@ static int omap_cpu_thermal_manager(struct list_head *cooling_list, int temp)
 		zone = ALERT_ZONE;
 	}
 
-	if (zone != NO_ACTION)
-		omap_enter_zone(&omap_thermal_zones[zone - 1],
-				set_cooling_level, cooling_list, cpu_temp);
+	if (zone != NO_ACTION) {
+		struct omap_thermal_zone *therm_zone;
+
+		therm_zone = &omap_thermal_zones[zone - 1];
+		if ((omap_gov->prev_zone != zone) || (zone == PANIC_ZONE)) {
+			pr_info("%s:sensor %d avg sensor %d pcb ",
+				 __func__, temp,
+				 omap_gov->avg_cpu_sensor_temp);
+			pr_info("%d, delta %d hot spot %d\n",
+				 omap_gov->pcb_temp, omap_gov->absolute_delta,
+				 cpu_temp);
+			pr_info("%s: hot spot temp %d - going into %s zone\n",
+				__func__, cpu_temp, therm_zone->name);
+			omap_gov->prev_zone = zone;
+		}
+
+		omap_enter_zone(therm_zone, set_cooling_level,
+				cooling_list, cpu_temp);
+	}
 
 	return zone;
 }
