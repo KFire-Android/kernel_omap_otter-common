@@ -192,5 +192,27 @@ int omap_bandgap_read_temperature(struct omap_bandgap *bg_ptr, int id,
 int omap_bandgap_set_sensor_data(struct omap_bandgap *bg_ptr, int id,
 				void *data);
 void *omap_bandgap_get_sensor_data(struct omap_bandgap *bg_ptr, int id);
+#ifdef CONFIG_OMAP5_THERMAL
+int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr, int id,
+					char *domain);
+int omap5_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id);
+int omap5_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id);
+#else
+static inline int omap5_thermal_expose_sensor(struct omap_bandgap *bg_ptr,
+						int id, char *domain)
+{
+	return 0;
+}
+static
+inline int omap5_thermal_report_temperature(struct omap_bandgap *bg_ptr, int id)
+{
+	return 0;
+}
+static
+inline int omap5_thermal_remove_sensor(struct omap_bandgap *bg_ptr, int id)
+{
+	return 0;
+}
+#endif
 
 #endif
