@@ -288,8 +288,8 @@ int hsi_open(struct hsi_device *dev)
 		pdata = dev_get_platdata(hsi_ctrl->dev);
 
 		/* Retry to set the HSI FCLK to default. */
-		err = pdata->device_scale(hsi_ctrl->dev, hsi_ctrl->dev,
-					  pdata->default_hsi_fclk);
+		err = pdata->device_scale(hsi_ctrl->dev,
+				pdata->default_hsi_fclk);
 		if (err) {
 			dev_err(dev->device.parent,
 				"%s: Error %d setting HSI FClk to %ld. Will retry on next open\n",
@@ -977,7 +977,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 		pdata = dev_get_platdata(hsi_ctrl->dev);
 
 		/* Set the HSI FCLK to requested value. */
-		err = pdata->device_scale(hsi_ctrl->dev, hsi_ctrl->dev,
+		err = pdata->device_scale(hsi_ctrl->dev,
 					  hsi_ctrl->hsi_fclk_req);
 		if (err < 0) {
 			dev_err(hsi_ctrl->dev, "%s: Cannot set HSI FClk to %ldHz, err %d\n",
