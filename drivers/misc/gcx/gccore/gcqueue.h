@@ -158,12 +158,9 @@ struct gcqueue {
 	/* Command buffer currently being worked on. */
 	struct list_head cmdbufhead;
 
-	/* Queue of entries scheduled to be executed (gccmdbuf). */
-	struct list_head schedule;
-	GCLOCK_TYPE schedulelock;
-
 	/* Queue of entries being executed (gccmdbuf). */
 	struct list_head queue;
+	GCLOCK_TYPE queuelock;
 
 	/* Cache of vacant event entries (gcevent). */
 	struct list_head vacevents;

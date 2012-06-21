@@ -303,10 +303,6 @@ static void gcpwr_disable_pulse_skipping(struct gccorecontext *gccorecontext)
 	if (gccorecontext->pulseskipping) {
 		union gcclockcontrol gcclockcontrol;
 
-		/* opp device scale */
-		gcxxx_device_scale(gccorecontext,
-				   gccorecontext->opp_count - 1);
-
 		/* Enable loading and set to maximum value. */
 		gcclockcontrol.reg.pulsecount = 64;
 		gcclockcontrol.reg.pulseset = true;
@@ -321,6 +317,10 @@ static void gcpwr_disable_pulse_skipping(struct gccorecontext *gccorecontext)
 		/* Pulse skipping disabled. */
 		gccorecontext->pulseskipping = false;
 	}
+
+	/* opp device scale */
+	gcxxx_device_scale(gccorecontext,
+			   gccorecontext->opp_count - 1);
 
 	GCDBG(GCZONE_POWER, "pulse skipping %s.\n",
 		gccorecontext->pulseskipping ? "enabled" : "disabled");
