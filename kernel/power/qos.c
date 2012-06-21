@@ -220,14 +220,17 @@ static int pm_qos_dbg_show_requests(struct seq_file *s, void *unused)
 
 	plist_for_each_entry(req, &c->list, node) {
 		char *state = "Default";
+		const char *dname;
 
 		if ((req->node).prio != c->default_value) {
 			active_reqs++;
 			state = "Active";
 		}
 		tot_reqs++;
-		seq_printf(s, "%d: %d: %s\n", tot_reqs,
-			   (req->node).prio, state);
+		dname = IS_ERR_OR_NULL(req->dev) ?  "Unknown" :
+			dev_name(req->dev);
+		seq_printf(s, "%d:%10s: %d: %s\n", tot_reqs,
+			   dname, (req->node).prio, state);
 	}
 
 	seq_printf(s, "Type=%s, Value=%d, Requests: active=%d / total=%d\n",
@@ -248,6 +251,10 @@ static const struct file_operations pm_qos_debug_fops = {
 	.read           = seq_read,
 	.llseek         = seq_lseek,
 	.release        = single_release,
+};
+
+static struct device pm_qos_dummy_dev = {
+	.init_name = "pm_qos_dbg_fops",
 };
 
 /**
@@ -537,6 +544,9 @@ static int pm_qos_power_open(struct inode *inode, struct file *filp)
 		struct pm_qos_request *req = kzalloc(sizeof(*req), GFP_KERNEL);
 		if (!req)
 			return -ENOMEM;
+
+		/* Dummy name */
+		req->dev = &pm_qos_dummy_dev;
 
 		pm_qos_add_request(req, pm_qos_class, PM_QOS_DEFAULT_VALUE);
 		filp->private_data = req;

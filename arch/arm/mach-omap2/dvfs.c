@@ -778,6 +778,7 @@ int omap_device_scale(struct device *target_dev, unsigned long rate)
 	/* Lock me to ensure cross domain scaling is secure */
 	mutex_lock(&omap_dvfs_lock);
 	/* I would like CPU to be active always at this point */
+	omap_dvfs_pm_qos_handle.dev = target_dev;
 	pm_qos_update_request(&omap_dvfs_pm_qos_handle, 0);
 
 	rcu_read_lock();
