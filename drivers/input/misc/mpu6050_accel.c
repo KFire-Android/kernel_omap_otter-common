@@ -601,8 +601,7 @@ struct mpu6050_accel_data *mpu6050_accel_init(
 
 	/* Verify for IRQ line */
 	if (!mpu_data->irq) {
-		dev_err(mpu_data->accel_data->dev,
-				"MPU6050 Accelerometer Irq not assigned\n");
+		pr_err("%s: Accelerometer Irq not assigned\n", __func__);
 		error = -EINVAL;
 		goto err_out;
 	}
