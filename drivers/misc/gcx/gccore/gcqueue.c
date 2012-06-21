@@ -67,7 +67,7 @@ GCDBG_FILTERDEF(queue, GCZONE_NONE,
 
 /* GPU timeout in milliseconds. The timeout value controls when the power
  * on the GPU is pulled if there is no activity in progress or scheduled. */
-#define GC_TIMEOUT		500
+#define GC_TIMEOUT		1000
 
 /* The size of storage buffer. */
 #define GC_STORAGE_SIZE		((GC_BUFFER_SIZE * GC_CMDBUF_FACTOR + \
@@ -425,17 +425,99 @@ static void link_queue(struct list_head *newlist,
 	GCEXIT(GCZONE_QUEUE);
 }
 
+static enum gcerror append_cmdbuf(
+	struct gccorecontext *gccorecontext,
+	struct gcqueue *gcqueue)
+{
+	enum gcerror gcerror = GCERR_NONE;
+	struct gccmdbuf *headcmdbuf, *tailcmdbuf;
+	struct list_head *head, *tail;
+
+	/* Dump scheduled command buffers. */
+#if GCDEBUG_ENABLE
+	list_for_each(head, &gcqueue->cmdbufhead) {
+		headcmdbuf = list_entry(head, struct gccmdbuf, link);
+
+		GCDUMPBUFFER(GCZONE_BUFFER,
+			     headcmdbuf->logical,
+			     headcmdbuf->physical,
+			     headcmdbuf->size);
+	}
+#endif
+
+	GCLOCK(&gcqueue->queuelock);
+
+	/* Link the tail of the active command buffer to
+	 * the first scheduled command buffer. */
+	link_queue(&gcqueue->cmdbufhead, &gcqueue->queue,
+		   gcqueue->gcmoterminator);
+
+	/* Get the last entry from the active queue. */
+	tail = gcqueue->queue.prev;
+	tailcmdbuf = list_entry(tail, struct gccmdbuf, link);
+
+	/* Update the tail pointer. */
+	gcqueue->gcmoterminator = tailcmdbuf->gcmoterminator;
+
+	/* Start the GPU if not already running. */
+	if (gcqueue->stopped) {
+		GCDBG(GCZONE_THREAD, "GPU is currently stopped - starting.\n");
+
+		/* Enable power to the chip. */
+		gcpwr_set(gccorecontext, GCPWR_ON);
+
+		/* Eable MMU. */
+		gcerror = gcmmu_enable(gccorecontext, gcqueue);
+		if (gcerror != GCERR_NONE) {
+			GCERR("failed to enable MMU.\n");
+			goto exit;
+		}
+
+		/* Get the first entry from the active queue. */
+		head = gcqueue->queue.next;
+		headcmdbuf = list_entry(head, struct gccmdbuf, link);
+
+		GCDBG_QUEUE(GCZONE_THREAD, "starting ", headcmdbuf);
+
+		/* Enable all events. */
+		gc_write_reg(GCREG_INTR_ENBL_Address, ~0U);
+
+		/* Write address register. */
+		gc_write_reg(GCREG_CMD_BUFFER_ADDR_Address,
+			     headcmdbuf->physical);
+
+		/* Write control register. */
+		gc_write_reg(GCREG_CMD_BUFFER_CTRL_Address,
+			     GCSETFIELDVAL(0, GCREG_CMD_BUFFER_CTRL,
+					   ENABLE, ENABLE) |
+			     GCSETFIELD(0, GCREG_CMD_BUFFER_CTRL,
+					PREFETCH, headcmdbuf->count));
+
+		/* Set running state. */
+		gcqueue->stopped = false;
+
+		/* Release the command buffer thread. */
+		complete(&gcqueue->ready);
+	}
+
+exit:
+	/* Unlock queue acccess. */
+	GCUNLOCK(&gcqueue->queuelock);
+
+	return gcerror;
+}
+
 static int gccmdthread(void *_gccorecontext)
 {
-	enum gcerror gcerror;
 	struct gccorecontext *gccorecontext;
 	struct gcqueue *gcqueue;
 	unsigned long timeout, signaled;
 	unsigned int i, triggered, ints2process, intmask;
-	struct list_head *head, *tail;
-	struct gccmdbuf *headcmdbuf, *tailcmdbuf;
+	struct list_head *head;
+	struct gccmdbuf *headcmdbuf;
 	struct gcevent *gcevent;
 	unsigned int flags;
+	unsigned int dmapc, pc1, pc2;
 
 	GCDBG(GCZONE_THREAD, "context = 0x%08X\n",
 		   (unsigned int) _gccorecontext);
@@ -458,8 +540,8 @@ static int gccmdthread(void *_gccorecontext)
 		/* Wait for ready signal. If 'ready' is signaled before the
 		 * call times out, signaled is set to a value greater then
 		 * zero. If the call times out, signaled is set to zero. */
-		signaled = wait_for_completion_timeout(
-			&gcqueue->ready, timeout);
+		signaled = wait_for_completion_timeout(&gcqueue->ready,
+						       timeout);
 		GCDBG(GCZONE_THREAD, "wait(ready) = %d.\n", signaled);
 
 		/* Is termination requested? */
@@ -471,103 +553,9 @@ static int gccmdthread(void *_gccorecontext)
 
 		/* Get triggered interrupts. */
 		ints2process = triggered = atomic_read(&gcqueue->triggered);
-		GCDBG(GCZONE_THREAD, "int = 0x%08X.\n",
-		      triggered);
+		GCDBG(GCZONE_THREAD, "int = 0x%08X.\n", triggered);
 
-		/* Get access to the schedule. */
-		GCLOCK(&gcqueue->schedulelock);
-
-		/* Anything scheduled? */
-		if (list_empty(&gcqueue->schedule)) {
-			GCDBG(GCZONE_THREAD,
-			      "nothing is currently scheduled.\n");
-
-			/* Unlock schedule queue acccess. */
-			GCUNLOCK(&gcqueue->schedulelock);
-		} else {
-			GCDBG(GCZONE_THREAD,
-			      "appending scheduled command buffers.\n");
-
-			/* Dump scheduled command buffers. */
-#if GCDEBUG_ENABLE
-			list_for_each(head, &gcqueue->schedule) {
-				headcmdbuf = list_entry(head,
-							struct gccmdbuf,
-							link);
-
-				GCDUMPBUFFER(GCZONE_BUFFER,
-					     headcmdbuf->logical,
-					     headcmdbuf->physical,
-					     headcmdbuf->size);
-			}
-#endif
-
-			/* Link the tail of the active command buffer to
-			 * the first scheduled command buffer. */
-			link_queue(&gcqueue->schedule, &gcqueue->queue,
-				   gcqueue->gcmoterminator);
-
-			/* Get the last entry from the active queue. */
-			tail = gcqueue->queue.prev;
-			tailcmdbuf = list_entry(tail,
-						struct gccmdbuf,
-						link);
-
-			/* Update the tail pointer. */
-			gcqueue->gcmoterminator
-				= tailcmdbuf->gcmoterminator;
-
-			/* Unlock schedule queue acccess. */
-			GCUNLOCK(&gcqueue->schedulelock);
-
-			/* Start the GPU if not already running. */
-			if (gcqueue->stopped) {
-				GCDBG(GCZONE_THREAD,
-				      "GPU is currently stopped - starting.\n");
-
-				/* The timeout value controls when the power
-				 * on the GPU is pulled if there is no activity
-				 * in progress or scheduled. */
-				timeout = msecs_to_jiffies(GC_TIMEOUT);
-
-				/* Enable power to the chip. */
-				gcpwr_set(gccorecontext, GCPWR_ON);
-
-				/* Eable MMU. */
-				gcerror = gcmmu_enable(gccorecontext, gcqueue);
-				if (gcerror != GCERR_NONE) {
-					GCERR("failed to enable MMU.\n");
-					break;
-				}
-
-				/* Get the first entry from the active queue. */
-				head = gcqueue->queue.next;
-				headcmdbuf = list_entry(head,
-							struct gccmdbuf,
-							link);
-
-				GCDBG_QUEUE(GCZONE_THREAD, "starting ",
-					    headcmdbuf);
-
-				/* Enable all events. */
-				gc_write_reg(GCREG_INTR_ENBL_Address, ~0U);
-
-				/* Write address register. */
-				gc_write_reg(GCREG_CMD_BUFFER_ADDR_Address,
-					     headcmdbuf->physical);
-
-				/* Write control register. */
-				gc_write_reg(GCREG_CMD_BUFFER_CTRL_Address,
-					GCSETFIELDVAL(0, GCREG_CMD_BUFFER_CTRL,
-						ENABLE, ENABLE) |
-					GCSETFIELD(0, GCREG_CMD_BUFFER_CTRL,
-						PREFETCH, headcmdbuf->count));
-
-				/* Set running state. */
-				gcqueue->stopped = false;
-				continue;
-			}
-		}
+		GCLOCK(&gcqueue->queuelock);
 
 		/* Reset execution control flags. */
 		flags = 0;
@@ -612,18 +600,31 @@ static int gccmdthread(void *_gccorecontext)
 
 			GCDBG_QUEUE(GCZONE_THREAD, "processing ", headcmdbuf);
 
-			/* Did interrupt happen for the head entry? */
+			/* Buffer with no events? */
+			if (headcmdbuf->interrupt == ~0U) {
+				GCDBG(GCZONE_THREAD,
+				      "buffer has no interrupt.\n");
+
+				if (!list_empty(&headcmdbuf->events))
+					GCERR("buffer has events.\n");
+
+				/* Free the entry. */
+				gcqueue_free_cmdbuf(gcqueue, headcmdbuf);
+				continue;
+			}
+
+			/* Compute interrupt mask for the buffer. */
 			intmask = 1 << headcmdbuf->interrupt;
 			GCDBG(GCZONE_INTERRUPT, "intmask = 0x%08X.\n", intmask);
 
+			/* Did interrupt happen for the head entry? */
 			if ((ints2process & intmask) != 0) {
 				ints2process &= ~intmask;
 				GCDBG(GCZONE_INTERRUPT,
 				      "ints2process = 0x%08X\n", ints2process);
 
 				atomic_sub(intmask, &gcqueue->triggered);
-				GCDBG(GCZONE_INTERRUPT,
-				      "triggered = 0x%08X.\n",
+				GCDBG(GCZONE_INTERRUPT, "triggered = 0x%08X.\n",
 				      atomic_read(&gcqueue->triggered));
 			} else {
 				if (list_empty(&headcmdbuf->events)) {
@@ -652,10 +653,14 @@ static int gccmdthread(void *_gccorecontext)
 			gcqueue_free_cmdbuf(gcqueue, headcmdbuf);
 		}
 
+		GCUNLOCK(&gcqueue->queuelock);
+
 		/* Bus error? */
 		if (try_wait_for_completion(&gcqueue->buserror)) {
 			GCERR("bus error detected.\n");
 			GCGPUSTATUS();
+
+			GCLOCK(&gcqueue->queuelock);
 
 			/* Execute all pending events. */
 			while (!list_empty(&gcqueue->queue)) {
@@ -673,6 +678,8 @@ static int gccmdthread(void *_gccorecontext)
 
 				gcqueue_free_cmdbuf(gcqueue, headcmdbuf);
 			}
+
+			GCUNLOCK(&gcqueue->queuelock);
 
 			/* Reset GPU. */
 			gcpwr_reset(gccorecontext);
@@ -736,6 +743,8 @@ static int gccmdthread(void *_gccorecontext)
 
 		/* Need to start FE? */
 		if ((flags & GC_CMDBUF_START_FE) != 0) {
+			GCLOCK(&gcqueue->queuelock);
+
 			/* Get the first entry from the active queue. */
 			head = gcqueue->queue.next;
 			headcmdbuf = list_entry(head,
@@ -754,29 +763,56 @@ static int gccmdthread(void *_gccorecontext)
 					ENABLE, ENABLE) |
 				GCSETFIELD(0, GCREG_CMD_BUFFER_CTRL,
 					PREFETCH, headcmdbuf->count));
+
+			GCUNLOCK(&gcqueue->queuelock);
+			continue;
 		}
 
-		/* Wait timedout? */
-		else if (!signaled) {
+		if (signaled) {
+			/* The timeout value controls when the power
+			 * on the GPU is pulled if there is no activity
+			 * in progress or scheduled. */
+			timeout = msecs_to_jiffies(GC_TIMEOUT);
+		} else {
 			GCDBG(GCZONE_THREAD,
 			      "timedout while waiting for ready signal.\n");
-
-			if (!list_empty(&gcqueue->queue)) {
-				GCDBG(GCZONE_THREAD, "queue not empty,"
-				      " large amount of work?\n");
-#if GCDEBUG_ENABLE
-				GCGPUSTATUS();
-#endif
-				continue;
-			}
 
 			if (gcqueue->gcmoterminator == NULL) {
 				GCERR("unexpected condition.\n");
 				continue;
 			}
 
+			/* Determine PC range for the terminatior. */
+			pc1 = gcqueue->gcmoterminator->u3.linkwait.address;
+			pc2 = pc1
+			    + sizeof(struct gccmdwait)
+			    + sizeof(struct gccmdlink);
+
+			/* Check to see if the FE reached the terminatior. */
+			dmapc = gc_read_reg(GCREG_FE_DEBUG_CUR_CMD_ADR_Address);
+			if ((dmapc < pc1) || (dmapc > pc2)) {
+				/* Haven't reached yet. */
+				GCDBG(GCZONE_THREAD,
+				      "execution hasn't reached the end; "
+				      "large amount of work?\n");
+				continue;
+			}
+
 			GCDBG(GCZONE_THREAD,
-			      "no pending work, shutting down.\n");
+			      "execution finished, shutting down.\n");
+
+			GCLOCK(&gcqueue->queuelock);
+
+			/* Free the queue. */
+			while (!list_empty(&gcqueue->queue)) {
+				head = gcqueue->queue.next;
+				headcmdbuf = list_entry(head,
+							struct gccmdbuf,
+							link);
+				gcqueue_free_cmdbuf(gcqueue, headcmdbuf);
+			}
+
+			GCUNLOCK(&gcqueue->queuelock);
 
 			/* Convert WAIT to END. */
 			gcqueue->gcmoterminator->u2.end.cmd.raw
@@ -887,8 +923,7 @@ enum gcerror gcqueue_start(struct gccorecontext *gccorecontext)
 
 	/* Initialize the schedule and active queue. */
 	INIT_LIST_HEAD(&gcqueue->queue);
-	INIT_LIST_HEAD(&gcqueue->schedule);
-	GCLOCK_INIT(&gcqueue->schedulelock);
+	GCLOCK_INIT(&gcqueue->queuelock);
 
 	/* Initialize entry cache. */
 	INIT_LIST_HEAD(&gcqueue->vacevents);
@@ -990,13 +1025,6 @@ enum gcerror gcqueue_stop(struct gccorecontext *gccorecontext)
 		gcqueue_free_cmdbuf(gcqueue, gccmdbuf);
 	}
 
-	/* Free scheduled entries. */
-	while (!list_empty(&gcqueue->schedule)) {
-		head = gcqueue->schedule.next;
-		gccmdbuf = list_entry(head, struct gccmdbuf, link);
-		gcqueue_free_cmdbuf(gcqueue, gccmdbuf);
-	}
-
 	/* Free command queue entries. */
 	while (!list_empty(&gcqueue->queue)) {
 		head = gcqueue->queue.next;
@@ -1074,7 +1102,7 @@ enum gcerror gcqueue_map(struct gccorecontext *gccorecontext,
 		mem.pagesize = PAGE_SIZE;
 
 		gcerror = gcmmu_map(gccorecontext, gcmmucontext, &mem,
-					&gcmmucontext->storagearray[i]);
+				    &gcmmucontext->storagearray[i]);
 		if (gcerror != 0) {
 			GCERR("failed to map storage %d.\n", i);
 			goto fail;
@@ -1143,7 +1171,7 @@ enum gcerror gcqueue_unmap(struct gccorecontext *gccorecontext,
 			continue;
 
 		gcerror = gcmmu_unmap(gccorecontext, gcmmucontext,
-					gcmmucontext->storagearray[i]);
+				      gcmmucontext->storagearray[i]);
 		if (gcerror != 0) {
 			GCERR("failed to unmap command buffer %d.\n", i);
 			goto fail;
@@ -1158,7 +1186,6 @@ enum gcerror gcqueue_unmap(struct gccorecontext *gccorecontext,
 	return GCERR_NONE;
 
 fail:
-	gcqueue_unmap(gccorecontext, gcmmucontext);
 	GCEXITARG(GCZONE_MAPPING, "gcerror = 0x%08X\n", gcerror);
 	return gcerror;
 }
@@ -1317,11 +1344,7 @@ enum gcerror gcqueue_alloc(struct gccorecontext *gccorecontext,
 			gccmdbuf->size = 0;
 			gccmdbuf->count = 0;
 			gccmdbuf->gcmoterminator = NULL;
-
-			gcerror = gcqueue_alloc_int(gcqueue,
-						    &gccmdbuf->interrupt);
-			if (gcerror != GCERR_NONE)
-				goto exit;
+			gccmdbuf->interrupt = ~0U;
 		} else {
 			head = gcqueue->cmdbufhead.next;
 			gccmdbuf = list_entry(head, struct gccmdbuf, link);
@@ -1420,12 +1443,6 @@ enum gcerror gcqueue_execute(struct gccorecontext *gccorecontext,
 	gccmdbuf->gcmoterminator = gcmoterminator
 		= (struct gcmoterminator *) gcqueue->logical;
 
-	/* Configure first entry as PE event. */
-	gcmoterminator->u1.done.signal_ldst = gcmosignal_signal_ldst;
-	gcmoterminator->u1.done.signal.raw = 0;
-	gcmoterminator->u1.done.signal.reg.id = gccmdbuf->interrupt;
-	gcmoterminator->u1.done.signal.reg.pe = GCREG_EVENT_PE_SRC_ENABLE;
-
 	/* Configure the second entry as a wait. */
 	gcmoterminator->u2.wait.cmd.fld = gcfldwait200;
 
@@ -1519,23 +1536,23 @@ enum gcerror gcqueue_execute(struct gccorecontext *gccorecontext,
 		      (unsigned int) gcevent->event.completion.completion);
 	}
 
-	/* Get access to the schedule. */
-	GCLOCK(&gcqueue->schedulelock);
-
-	/* Is there something scheduled already? */
-	if (list_empty(&gcqueue->schedule)) {
-		GCDBG(GCZONE_EXEC, "scheduling queue entry.\n");
-		list_splice_tail_init(&gcqueue->cmdbufhead, &gcqueue->schedule);
+	/* If the buffer has no events, don't allocate an interrupt for it. */
+	if (list_empty(&gccmdbuf->events)) {
+		gcmoterminator->u1.nop.cmd.raw = gccmdnop_const.cmd.raw;
 	} else {
-		GCDBG(GCZONE_EXEC, "appending to previously scheduled.\n");
-		link_queue(&gcqueue->cmdbufhead, &gcqueue->schedule, NULL);
+		gcerror = gcqueue_alloc_int(gcqueue, &gccmdbuf->interrupt);
+		if (gcerror != GCERR_NONE)
+			goto exit;
+
+		gcmoterminator->u1.done.signal_ldst = gcmosignal_signal_ldst;
+		gcmoterminator->u1.done.signal.raw = 0;
+		gcmoterminator->u1.done.signal.reg.id = gccmdbuf->interrupt;
+		gcmoterminator->u1.done.signal.reg.pe
+						= GCREG_EVENT_PE_SRC_ENABLE;
 	}
 
-	/* Release the schedule. */
-	GCUNLOCK(&gcqueue->schedulelock);
-
-	/* Release the command buffer thread. */
-	complete(&gcqueue->ready);
+	/* Append the current command buffer to the queue. */
+	append_cmdbuf(gccorecontext, gcqueue);
 
 	/* Wait for completion. */
 	if (!asynchronous) {
