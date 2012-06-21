@@ -265,6 +265,7 @@ static struct palmas_reg_init omap5_ldo8_init = {
 static struct palmas_reg_init omap5_ldo9_init = {
 	.warm_reset = 0,
 	.mode_sleep = 0,
+	.no_bypass = 1,
 };
 
 static struct palmas_reg_init omap5_ldoln_init = {
