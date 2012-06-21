@@ -579,6 +579,14 @@ struct dwc3_hwparams {
 /* HWPARAMS7 */
 #define DWC3_RAM1_DEPTH(n)	((n) & 0xffff)
 
+/**
+ * dwc3_context_regs - save regs that loose the contents on low power state
+ * @gctl - Global Core Control Register
+ */
+struct dwc3_context_regs {
+	u32	gctl;
+};
+
 struct dwc3_request {
 	struct usb_request	request;
 	struct list_head	list;
@@ -721,6 +729,7 @@ struct dwc3 {
 	void			*mem;
 
 	struct dwc3_hwparams	hwparams;
+	struct dwc3_context_regs context;
 	struct dentry		*root;
 
 	u8			test_mode;
