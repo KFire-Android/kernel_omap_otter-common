@@ -1406,7 +1406,7 @@ static int dwc3_gadget_set_selfpowered(struct usb_gadget *g,
 	return 0;
 }
 
-static void dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
+void dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
 {
 	u32			reg;
 	u32			timeout = 500;
@@ -1458,39 +1458,35 @@ static void dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on)
 
 static int dwc3_gadget_pullup(struct usb_gadget *g, int is_on)
 {
+	int			ret = 0;
 	struct dwc3		*dwc = gadget_to_dwc(g);
 	unsigned long		flags;
 
 	is_on = !!is_on;
 
 	spin_lock_irqsave(&dwc->lock, flags);
+
+	if (!dwc->is_connected) {
+		dev_vdbg(dwc->dev, "pullup operation not permitted\n");
+		ret = -EPERM;
+		goto err0;
+	}
+
 	dwc3_gadget_run_stop(dwc, is_on);
+
+err0:
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
-	return 0;
+	return ret;
 }
 
-static int dwc3_gadget_start(struct usb_gadget *g,
+int dwc3_gadget_delayed_start(struct usb_gadget *g,
 		struct usb_gadget_driver *driver)
 {
 	struct dwc3		*dwc = gadget_to_dwc(g);
 	struct dwc3_ep		*dep;
-	unsigned long		flags;
 	int			ret = 0;
 	u32			reg;
-
-	spin_lock_irqsave(&dwc->lock, flags);
-
-	if (dwc->gadget_driver) {
-		dev_err(dwc->dev, "%s is already bound to %s\n",
-				dwc->gadget.name,
-				dwc->gadget_driver->driver.name);
-		ret = -EBUSY;
-		goto err0;
-	}
-
-	dwc->gadget_driver	= driver;
-	dwc->gadget.dev.driver	= &driver->driver;
 
 	reg = dwc3_readl(dwc->regs, DWC3_DCFG);
 	reg &= ~(DWC3_DCFG_SPEED_MASK);
@@ -1537,17 +1533,60 @@ static int dwc3_gadget_start(struct usb_gadget *g,
 	dwc->ep0state = EP0_SETUP_PHASE;
 	dwc3_ep0_out_start(dwc);
 
-	spin_unlock_irqrestore(&dwc->lock, flags);
-
 	return 0;
 
 err1:
 	__dwc3_gadget_ep_disable(dwc->eps[0]);
 
 err0:
+	return ret;
+}
+
+static int dwc3_gadget_start(struct usb_gadget *g,
+		struct usb_gadget_driver *driver)
+{
+	struct dwc3		*dwc = gadget_to_dwc(g);
+	unsigned long		flags;
+	int			ret = 0;
+
+	spin_lock_irqsave(&dwc->lock, flags);
+
+	if (dwc->gadget_driver) {
+		dev_err(dwc->dev, "%s is already bound to %s\n",
+				dwc->gadget.name,
+				dwc->gadget_driver->driver.name);
+		spin_unlock_irqrestore(&dwc->lock, flags);
+		ret = -EBUSY;
+		goto err0;
+	}
+
+	dwc->gadget_driver	= driver;
+	dwc->gadget.dev.driver	= &driver->driver;
+
+
+	if (dwc->is_connected) {
+		spin_unlock_irqrestore(&dwc->lock, flags);
+		ret = dwc3_core_late_init(dwc->dev);
+		if (ret)
+			dev_vdbg(dwc->dev, "core init failed\n");
+		spin_lock_irqsave(&dwc->lock, flags);
+	}
+
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
+err0:
 	return ret;
+}
+
+int dwc3_gadget_early_stop(struct usb_gadget *g,
+		struct usb_gadget_driver *driver)
+{
+	struct dwc3		*dwc = gadget_to_dwc(g);
+
+	__dwc3_gadget_ep_disable(dwc->eps[0]);
+	__dwc3_gadget_ep_disable(dwc->eps[1]);
+
+	return 0;
 }
 
 static int dwc3_gadget_stop(struct usb_gadget *g,
@@ -1558,8 +1597,11 @@ static int dwc3_gadget_stop(struct usb_gadget *g,
 
 	spin_lock_irqsave(&dwc->lock, flags);
 
-	__dwc3_gadget_ep_disable(dwc->eps[0]);
-	__dwc3_gadget_ep_disable(dwc->eps[1]);
+	if (dwc->is_connected) {
+		spin_unlock_irqrestore(&dwc->lock, flags);
+		dwc3_core_shutdown(dwc->dev);
+		spin_lock_irqsave(&dwc->lock, flags);
+	}
 
 	dwc->gadget_driver	= NULL;
 	dwc->gadget.dev.driver	= NULL;
@@ -2389,6 +2431,23 @@ static irqreturn_t dwc3_interrupt(int irq, void *_dwc)
 	return ret;
 }
 
+void dwc3_enable_irqs(struct dwc3 *dwc)
+{
+	u32 reg;
+
+	/* Enable all but Start and End of Frame IRQs */
+	reg = (DWC3_DEVTEN_VNDRDEVTSTRCVEDEN |
+			DWC3_DEVTEN_EVNTOVERFLOWEN |
+			DWC3_DEVTEN_CMDCMPLTEN |
+			DWC3_DEVTEN_ERRTICERREN |
+			DWC3_DEVTEN_WKUPEVTEN |
+			DWC3_DEVTEN_ULSTCNGEN |
+			DWC3_DEVTEN_CONNECTDONEEN |
+			DWC3_DEVTEN_USBRSTEN |
+			DWC3_DEVTEN_DISCONNEVTEN);
+	dwc3_writel(dwc->regs, DWC3_DEVTEN, reg);
+}
+
 /**
  * dwc3_gadget_init - Initializes gadget related registers
  * @dwc: pointer to our controller context structure
@@ -2471,17 +2530,7 @@ int __devinit dwc3_gadget_init(struct dwc3 *dwc)
 	reg |= DWC3_DCFG_LPM_CAP;
 	dwc3_writel(dwc->regs, DWC3_DCFG, reg);
 
-	/* Enable all but Start and End of Frame IRQs */
-	reg = (DWC3_DEVTEN_VNDRDEVTSTRCVEDEN |
-			DWC3_DEVTEN_EVNTOVERFLOWEN |
-			DWC3_DEVTEN_CMDCMPLTEN |
-			DWC3_DEVTEN_ERRTICERREN |
-			DWC3_DEVTEN_WKUPEVTEN |
-			DWC3_DEVTEN_ULSTCNGEN |
-			DWC3_DEVTEN_CONNECTDONEEN |
-			DWC3_DEVTEN_USBRSTEN |
-			DWC3_DEVTEN_DISCONNEVTEN);
-	dwc3_writel(dwc->regs, DWC3_DEVTEN, reg);
+	dwc3_enable_irqs(dwc);
 
 	/* Enable USB2 LPM and automatic phy suspend only on recent versions */
 	if (dwc->revision >= DWC3_REVISION_194A) {

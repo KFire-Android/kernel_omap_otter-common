@@ -48,6 +48,7 @@
 #include <linux/ioport.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/delay.h>
 
 #include "core.h"
 
@@ -141,12 +142,26 @@ static inline void dwc3_omap_writel(void __iomem *base, u32 offset, u32 value)
 void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 {
 	u32			val;
+	u32			ret;
 	struct dwc3_omap	*omap = _omap;
+	struct platform_device  *pdev = to_platform_device(&omap->dwc3->dev);
+	struct dwc3             *dwc = platform_get_drvdata(pdev);
 
 	switch (status) {
 	case OMAP_DWC3_ID_GROUND:
 		dev_dbg(omap->dev, "ID GND\n");
 
+		dwc->is_connected = true;
+
+		dwc3_core_late_init(&omap->dwc3->dev);
+
+
+		ret = pm_runtime_get_sync(omap->dev);
+		if (ret < 0) {
+			dev_err(omap->dev, "get_sync failed with err %d\n",
+									ret);
+			return;
+		}
 		val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
 		val &= ~(USBOTGSS_UTMI_OTG_STATUS_IDDIG
 				| USBOTGSS_UTMI_OTG_STATUS_VBUSVALID
@@ -154,11 +169,22 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 		val |= USBOTGSS_UTMI_OTG_STATUS_SESSVALID
 				| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
 		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+		pm_runtime_put_sync(omap->dev);
 		break;
 
 	case OMAP_DWC3_VBUS_VALID:
 		dev_dbg(omap->dev, "VBUS Connect\n");
 
+		dwc->is_connected = true;
+
+		dwc3_core_late_init(&omap->dwc3->dev);
+
+		ret = pm_runtime_get_sync(omap->dev);
+		if (ret < 0) {
+			dev_err(omap->dev, "get_sync failed with err %d\n",
+									ret);
+			return;
+		}
 		val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
 		val &= ~USBOTGSS_UTMI_OTG_STATUS_SESSEND;
 		val |= USBOTGSS_UTMI_OTG_STATUS_IDDIG
@@ -166,12 +192,21 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 				| USBOTGSS_UTMI_OTG_STATUS_SESSVALID
 				| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
 		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+		pm_runtime_put_sync(omap->dev);
 		break;
 
 	case OMAP_DWC3_ID_FLOAT:
 	case OMAP_DWC3_VBUS_OFF:
 		dev_dbg(omap->dev, "VBUS Disconnect\n");
 
+		dwc->is_connected = false;
+
+		ret = pm_runtime_get_sync(omap->dev);
+		if (ret < 0) {
+			dev_err(omap->dev, "get_sync failed with err %d\n",
+									ret);
+			return;
+		}
 		val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
 		val &= ~(USBOTGSS_UTMI_OTG_STATUS_SESSVALID
 				| USBOTGSS_UTMI_OTG_STATUS_VBUSVALID
@@ -179,6 +214,16 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 		val |= USBOTGSS_UTMI_OTG_STATUS_SESSEND
 				| USBOTGSS_UTMI_OTG_STATUS_IDDIG;
 		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+		pm_runtime_put_sync(omap->dev);
+
+		/*
+		 * Give enough time for the DWC core to process disconnect
+		 * interrupt after mailboxing for the disconnect event is
+		 * done, before shutting down the DWC core.
+		 */
+		msleep(25);
+		dwc3_core_shutdown(&omap->dwc3->dev);
+
 		break;
 
 	default:
@@ -238,6 +283,26 @@ static irqreturn_t dwc3_omap_interrupt(int irq, void *_omap)
 	spin_unlock(&omap->lock);
 
 	return IRQ_HANDLED;
+}
+
+static void dwc3_omap_enable_irqs(struct dwc3_omap *omap)
+{
+	u32	reg;
+
+	reg = USBOTGSS_IRQO_COREIRQ_ST;
+	dwc3_omap_writel(omap->base, USBOTGSS_IRQENABLE_SET_0, reg);
+
+	reg = (USBOTGSS_IRQ1_OEVT |
+			USBOTGSS_IRQ1_DRVVBUS_RISE |
+			USBOTGSS_IRQ1_CHRGVBUS_RISE |
+			USBOTGSS_IRQ1_DISCHRGVBUS_RISE |
+			USBOTGSS_IRQ1_IDPULLUP_RISE |
+			USBOTGSS_IRQ1_DRVVBUS_FALL |
+			USBOTGSS_IRQ1_CHRGVBUS_FALL |
+			USBOTGSS_IRQ1_DISCHRGVBUS_FALL |
+			USBOTGSS_IRQ1_IDPULLUP_FALL);
+
+	dwc3_omap_writel(omap->base, USBOTGSS_IRQENABLE_SET_1, reg);
 }
 
 static int __devinit dwc3_omap_probe(struct platform_device *pdev)
@@ -363,21 +428,9 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 		goto err2;
 	}
 
-	/* enable all IRQs */
-	reg = USBOTGSS_IRQO_COREIRQ_ST;
-	dwc3_omap_writel(omap->base, USBOTGSS_IRQENABLE_SET_0, reg);
+	dwc3_omap_enable_irqs(omap);
 
-	reg = (USBOTGSS_IRQ1_OEVT |
-			USBOTGSS_IRQ1_DRVVBUS_RISE |
-			USBOTGSS_IRQ1_CHRGVBUS_RISE |
-			USBOTGSS_IRQ1_DISCHRGVBUS_RISE |
-			USBOTGSS_IRQ1_IDPULLUP_RISE |
-			USBOTGSS_IRQ1_DRVVBUS_FALL |
-			USBOTGSS_IRQ1_CHRGVBUS_FALL |
-			USBOTGSS_IRQ1_DISCHRGVBUS_FALL |
-			USBOTGSS_IRQ1_IDPULLUP_FALL);
-
-	dwc3_omap_writel(omap->base, USBOTGSS_IRQENABLE_SET_1, reg);
+	pm_runtime_put_sync(dev);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!res) {
@@ -450,12 +503,34 @@ static const struct of_device_id of_dwc3_matach[] = {
 };
 MODULE_DEVICE_TABLE(of, of_dwc3_matach);
 
+#ifdef CONFIG_PM
+
+static int dwc3_omap_runtime_resume(struct device *dev)
+{
+	struct platform_device	*pdev = to_platform_device(dev);
+	struct dwc3_omap	*omap = platform_get_drvdata(pdev);
+
+	dwc3_omap_enable_irqs(omap);
+
+	return 0;
+}
+
+static const struct dev_pm_ops dwc3_omap_pm_ops = {
+	SET_RUNTIME_PM_OPS(NULL, dwc3_omap_runtime_resume, NULL)
+};
+
+#define DEV_PM_OPS	(&dwc3_omap_pm_ops)
+#else
+#define DEV_PM_OPS	NULL
+#endif
+
 static struct platform_driver dwc3_omap_driver = {
 	.probe		= dwc3_omap_probe,
 	.remove		= __devexit_p(dwc3_omap_remove),
 	.driver		= {
 		.name	= "omap-dwc3",
 		.of_match_table	= of_dwc3_matach,
+		.pm	= DEV_PM_OPS,
 	},
 };
 

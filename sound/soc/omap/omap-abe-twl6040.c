@@ -447,6 +447,9 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"omap-mcbsp.2 Playback", NULL, "MM_EXT_DL"},
 	{"MM_EXT_UL", NULL, "omap-mcbsp.2 Capture"},
 
+	/* VXREC */
+	{"VXREC", NULL, "omap-abe-vxrec-dai Capture"},
+
 	/* Echo */
 	{"ECHO", NULL, "omap-abe-echo-dai Capture"},
 };

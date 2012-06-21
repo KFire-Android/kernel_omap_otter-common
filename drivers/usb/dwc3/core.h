@@ -579,6 +579,14 @@ struct dwc3_hwparams {
 /* HWPARAMS7 */
 #define DWC3_RAM1_DEPTH(n)	((n) & 0xffff)
 
+/**
+ * dwc3_context_regs - save regs that loose the contents on low power state
+ * @gctl - Global Core Control Register
+ */
+struct dwc3_context_regs {
+	u32	gctl;
+};
+
 struct dwc3_request {
 	struct usb_request	request;
 	struct list_head	list;
@@ -721,10 +729,12 @@ struct dwc3 {
 	void			*mem;
 
 	struct dwc3_hwparams	hwparams;
+	struct dwc3_context_regs context;
 	struct dentry		*root;
 
 	u8			test_mode;
 	u8			test_mode_nr;
+	bool			is_connected:1;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -872,5 +882,8 @@ void dwc3_gadget_exit(struct dwc3 *dwc);
 
 extern int dwc3_get_device_id(void);
 extern void dwc3_put_device_id(int id);
+
+extern int dwc3_core_late_init(struct device *dev);
+extern int dwc3_core_shutdown(struct device *dev);
 
 #endif /* __DRIVERS_USB_DWC3_CORE_H */
