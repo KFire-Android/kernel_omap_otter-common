@@ -1,8 +1,12 @@
 /*
- * drivers/thermal/omap_die_governor.c
+ * drivers/staging/thermal_framework/governor/omap_die_governor.c
  *
- * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+ * Copyright (C) 2011-2012 Texas Instruments Incorporated - http://www.ti.com/
  * Author: Dan Murphy <DMurphy@ti.com>
+ *
+ * Contributors:
+ *	Sebastien Sabatier <s-sabatier1@ti.com>
+ *	Margarita Olaya Cabrera <magi.olaya@ti.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -25,7 +29,7 @@
 
 #include <linux/thermal_framework.h>
 
-/* CPU Zone information */
+/* Zone information */
 #define FATAL_ZONE	5
 #define PANIC_ZONE	4
 #define ALERT_ZONE	3
@@ -115,11 +119,11 @@ static struct omap_governor *omap_gov_instance[OMAP_GOV_MAX_INSTANCE];
 /**
  * DOC: Introduction
  * =================
- * The OMAP On-Die Temperature governor maintains the policy for the CPU
+ * The OMAP On-Die Temperature governor maintains the policy for the
  * on die temperature sensor.  The main goal of the governor is to receive
  * a temperature report from a thermal sensor and calculate the current
  * thermal zone.  Each zone will sort through a list of cooling agents
- * passed in to determine the correct cooling stategy that will cool the
+ * passed in to determine the correct cooling strategy that will cool the
  * device appropriately for that zone.
  *
  * The temperature that is reported by the temperature sensor is first
@@ -237,7 +241,7 @@ static signed int convert_omap_sensor_temp_to_hotspot_temp(
  * @hot_spot_temp: Hot spot temperature to the be calculated to CPU on-die
  *		temperature value.
  *
- * Returns the calculated cpu on-die temperature.
+ * Returns the calculated on-die temperature.
  */
 
 static signed hotspot_temp_to_sensor_temp(struct omap_governor *omap_gov,
