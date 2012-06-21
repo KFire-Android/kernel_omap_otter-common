@@ -48,6 +48,7 @@
 #include <linux/ioport.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/delay.h>
 
 #include "core.h"
 
@@ -141,12 +142,26 @@ static inline void dwc3_omap_writel(void __iomem *base, u32 offset, u32 value)
 void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 {
 	u32			val;
+	u32			ret;
 	struct dwc3_omap	*omap = _omap;
+	struct platform_device  *pdev = to_platform_device(&omap->dwc3->dev);
+	struct dwc3             *dwc = platform_get_drvdata(pdev);
 
 	switch (status) {
 	case OMAP_DWC3_ID_GROUND:
 		dev_dbg(omap->dev, "ID GND\n");
 
+		dwc->is_connected = true;
+
+		dwc3_core_late_init(&omap->dwc3->dev);
+
+
+		ret = pm_runtime_get_sync(omap->dev);
+		if (ret < 0) {
+			dev_err(omap->dev, "get_sync failed with err %d\n",
+									ret);
+			return;
+		}
 		val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
 		val &= ~(USBOTGSS_UTMI_OTG_STATUS_IDDIG
 				| USBOTGSS_UTMI_OTG_STATUS_VBUSVALID
@@ -154,11 +169,22 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 		val |= USBOTGSS_UTMI_OTG_STATUS_SESSVALID
 				| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
 		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+		pm_runtime_put_sync(omap->dev);
 		break;
 
 	case OMAP_DWC3_VBUS_VALID:
 		dev_dbg(omap->dev, "VBUS Connect\n");
 
+		dwc->is_connected = true;
+
+		dwc3_core_late_init(&omap->dwc3->dev);
+
+		ret = pm_runtime_get_sync(omap->dev);
+		if (ret < 0) {
+			dev_err(omap->dev, "get_sync failed with err %d\n",
+									ret);
+			return;
+		}
 		val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
 		val &= ~USBOTGSS_UTMI_OTG_STATUS_SESSEND;
 		val |= USBOTGSS_UTMI_OTG_STATUS_IDDIG
@@ -166,12 +192,21 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 				| USBOTGSS_UTMI_OTG_STATUS_SESSVALID
 				| USBOTGSS_UTMI_OTG_STATUS_POWERPRESENT;
 		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+		pm_runtime_put_sync(omap->dev);
 		break;
 
 	case OMAP_DWC3_ID_FLOAT:
 	case OMAP_DWC3_VBUS_OFF:
 		dev_dbg(omap->dev, "VBUS Disconnect\n");
 
+		dwc->is_connected = false;
+
+		ret = pm_runtime_get_sync(omap->dev);
+		if (ret < 0) {
+			dev_err(omap->dev, "get_sync failed with err %d\n",
+									ret);
+			return;
+		}
 		val = dwc3_omap_readl(omap->base, USBOTGSS_UTMI_OTG_STATUS);
 		val &= ~(USBOTGSS_UTMI_OTG_STATUS_SESSVALID
 				| USBOTGSS_UTMI_OTG_STATUS_VBUSVALID
@@ -179,6 +214,16 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 		val |= USBOTGSS_UTMI_OTG_STATUS_SESSEND
 				| USBOTGSS_UTMI_OTG_STATUS_IDDIG;
 		dwc3_omap_writel(omap->base, USBOTGSS_UTMI_OTG_STATUS, val);
+		pm_runtime_put_sync(omap->dev);
+
+		/*
+		 * Give enough time for the DWC core to process disconnect
+		 * interrupt after mailboxing for the disconnect event is
+		 * done, before shutting down the DWC core.
+		 */
+		msleep(25);
+		dwc3_core_shutdown(&omap->dwc3->dev);
+
 		break;
 
 	default:
@@ -384,6 +429,8 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 	}
 
 	dwc3_omap_enable_irqs(omap);
+
+	pm_runtime_put_sync(dev);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!res) {

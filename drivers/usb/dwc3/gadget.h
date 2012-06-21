@@ -120,6 +120,12 @@ int dwc3_send_gadget_generic_command(struct dwc3 *dwc, int cmd, u32 param);
 
 void dwc3_enable_irqs(struct dwc3 *dwc);
 
+int dwc3_gadget_delayed_start(struct usb_gadget *g,
+		struct usb_gadget_driver *driver);
+int dwc3_gadget_early_stop(struct usb_gadget *g,
+		struct usb_gadget_driver *driver);
+void dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on);
+
 /**
  * dwc3_gadget_ep_get_transfer_index - Gets transfer index from HW
  * @dwc: DesignWare USB3 Pointer
