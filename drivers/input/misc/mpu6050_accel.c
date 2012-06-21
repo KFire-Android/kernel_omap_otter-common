@@ -607,7 +607,7 @@ struct mpu6050_accel_data *mpu6050_accel_init(
 	}
 
 	/* Driver data memory allocation */
-	accel_data = kzalloc(sizeof(accel_data), GFP_KERNEL);
+	accel_data = kzalloc(sizeof(*accel_data), GFP_KERNEL);
 	if (!accel_data) {
 		error = -ENOMEM;
 		goto err_out;

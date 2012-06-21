@@ -223,7 +223,7 @@ struct mpu6050_gyro_data *mpu6050_gyro_init(const struct mpu6050_data *mpu_data)
 	int error;
 
 	/* Driver data memory allocation */
-	gyro_data = kzalloc(sizeof(gyro_data), GFP_KERNEL);
+	gyro_data = kzalloc(sizeof(*gyro_data), GFP_KERNEL);
 	if (!gyro_data) {
 		error = -ENOMEM;
 		goto err_out;
