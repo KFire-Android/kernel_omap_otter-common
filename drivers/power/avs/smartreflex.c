@@ -776,6 +776,28 @@ int sr_register_class(struct omap_sr_class_data *class_data)
 }
 
 /**
+ * omap_sr_is_enabled() - is Smart reflex enabled for this domain?
+ * @voltdm:	VDD pointer to which the SR module to be checked
+ *
+ * Returns true if SR is enabled for this domain, else returns false
+ */
+bool omap_sr_is_enabled(struct voltagedomain *voltdm)
+{
+	struct omap_sr *sr;
+
+	if (!atomic_read(&sr_driver_ready))
+		return false;
+
+	sr = _sr_lookup(voltdm);
+	if (IS_ERR(sr)) {
+		pr_warning("%s: omap_sr struct for voltdm not found\n",
+			   __func__);
+		return false;
+	}
+	return sr->autocomp_active;
+}
+
+/**
  * omap_sr_enable() -  API to enable SR clocks and to call into the
  *			registered smartreflex class enable API.
  * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
