@@ -1160,6 +1160,7 @@ static int omap_dmm_resume(struct device *dev)
 	struct page **pages;
 	struct tcm_area area = {0};
 	int number_slots;
+	struct mem_info mem;
 	int i, j;
 
 	if (!dmm_is_initialized()) {
@@ -1168,9 +1169,9 @@ static int omap_dmm_resume(struct device *dev)
 	}
 
 	number_slots = omap_dmm->container_height * omap_dmm->container_width;
-	pages = kmalloc(number_slots * sizeof(*pages), GFP_KERNEL);
+	mem.pages = kmalloc(number_slots * sizeof(*pages), GFP_KERNEL);
 
-	if (!pages) {
+	if (!mem.pages) {
 		dev_err(dev, "%s: Failed to allocate page structures\n",
 				__func__);
 		return -ENOMEM;
@@ -1178,6 +1179,7 @@ static int omap_dmm_resume(struct device *dev)
 
 	area.p1.x = omap_dmm->container_width - 1;
 	area.p1.y = omap_dmm->container_height - 1;
+	mem.type = MEMTYPE_PAGES;
 
 	for (i = 0; i < omap_dmm->num_lut; i++) {
 		area.tcm = omap_dmm->tcm[i];
@@ -1185,12 +1187,12 @@ static int omap_dmm_resume(struct device *dev)
 
 		for (j = 0; j < number_slots; j++) {
 			if (area.tcm->lut[j] != omap_dmm->dummy_pa)
-				pages[j] = phys_to_page(area.tcm->lut[j]);
+				mem.pages[j] = phys_to_page(area.tcm->lut[j]);
 			else
-				pages[j] = NULL;
+				mem.pages[j] = NULL;
 		}
 
-		if (fill(&area, pages, omap_dmm->container_width *
+		if (fill(&area, &mem, omap_dmm->container_width *
 				omap_dmm->container_height, 0, true))
 			dev_err(omap_dmm->dev, "refill failed");
 	}
@@ -1198,7 +1200,7 @@ static int omap_dmm_resume(struct device *dev)
 	dev_info(omap_dmm->dev, "%s: omap_dmm_resume:PAT entries restored\n",
 			__func__);
 
-	kfree(pages);
+	kfree(mem.pages);
 	return 0;
 }
 
