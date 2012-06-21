@@ -180,7 +180,7 @@ int abe_opp_set_level(struct omap_abe *abe, int opp)
 			omap_aess_set_opp_processing(abe->aess, ABE_OPP25);
 			udelay(250);
 			if (abe->device_scale) {
-				ret = abe->device_scale(abe->dev, abe->dev,
+				ret = abe->device_scale(abe->dev,
 					abe->opp.freqs[OMAP_ABE_OPP_25]);
 				if (ret)
 					goto err_down_scale;
@@ -191,7 +191,7 @@ int abe_opp_set_level(struct omap_abe *abe, int opp)
 			omap_aess_set_opp_processing(abe->aess, ABE_OPP50);
 			udelay(250);
 			if (abe->device_scale) {
-				ret = abe->device_scale(abe->dev, abe->dev,
+				ret = abe->device_scale(abe->dev,
 					abe->opp.freqs[OMAP_ABE_OPP_50]);
 				if (ret)
 					goto err_down_scale;
@@ -203,7 +203,7 @@ int abe_opp_set_level(struct omap_abe *abe, int opp)
 		switch (opp) {
 		case 25:
 			if (abe->device_scale) {
-				abe->device_scale(abe->dev, abe->dev,
+				abe->device_scale(abe->dev,
 					abe->opp.freqs[OMAP_ABE_OPP_25]);
 				if (ret)
 					goto err_up_scale;
@@ -212,7 +212,7 @@ int abe_opp_set_level(struct omap_abe *abe, int opp)
 			break;
 		case 50:
 			if (abe->device_scale) {
-				ret = abe->device_scale(abe->dev, abe->dev,
+				ret = abe->device_scale(abe->dev,
 					abe->opp.freqs[OMAP_ABE_OPP_50]);
 				if (ret)
 					goto err_up_scale;
@@ -222,7 +222,7 @@ int abe_opp_set_level(struct omap_abe *abe, int opp)
 		case 100:
 		default:
 			if (abe->device_scale) {
-				ret = abe->device_scale(abe->dev, abe->dev,
+				ret = abe->device_scale(abe->dev,
 					abe->opp.freqs[OMAP_ABE_OPP_100]);
 				if (ret)
 					goto err_up_scale;

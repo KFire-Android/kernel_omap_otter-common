@@ -21,6 +21,7 @@
 #include <linux/platform_data/omap4-keypad.h>
 #include <linux/pm_runtime.h>
 #include <media/omap3isp.h>
+#include <sound/omap-abe.h>
 
 #include <linux/omap_ocp2scp.h>
 
@@ -39,6 +40,8 @@
 #include <plat/omap_device.h>
 #include <plat/omap4-keypad.h>
 #include <plat/rpmsg_resmgr.h>
+#include <plat/dvfs.h>
+#include <plat/omap-pm.h>
 #include <linux/mfd/omap_control.h>
 
 #include "mux.h"
@@ -512,6 +515,7 @@ static void __init omap_init_aess(void)
 {
 	struct omap_hwmod *oh;
 	struct platform_device *pdev;
+	struct omap_abe_pdata *pdata;
 
 	oh = omap_hwmod_lookup("aess");
 	if (!oh) {
@@ -519,16 +523,29 @@ static void __init omap_init_aess(void)
 		return;
 	}
 
-	pdev = omap_device_build("aess", -1, oh, NULL, 0,
+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+	if (!pdata) {
+		pr_err("Could not allocate aess pdata\n");
+		return;
+	}
+
+	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
+	pdata->device_scale = omap_device_scale;
+
+	pdev = omap_device_build("aess", -1, oh,
+				pdata, sizeof(*pdata),
 				omap_aess_latency,
 				ARRAY_SIZE(omap_aess_latency), 0);
 	if (IS_ERR(pdev)) {
 		WARN(1, "Can't build omap_device for omap-aess-audio.\n");
+		kfree(pdata);
 		return;
 	}
 
 	platform_device_register(&omap_abe_vxrec);
 	platform_device_register(&omap_abe_echo);
+
+	kfree(pdata);
 }
 #else
 static inline void omap_init_aess(void) {}

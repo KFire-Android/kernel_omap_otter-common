@@ -1178,7 +1178,7 @@ static void omap_abe_dai_shutdown(struct snd_pcm_substream *substream,
 		omap_aess_stop_event_generator(abe->aess);
 		udelay(250);
 		if (abe->device_scale) {
-			err = abe->device_scale(abe->dev, abe->dev, abe->opp.freqs[0]);
+			err = abe->device_scale(abe->dev, abe->opp.freqs[0]);
 			if (err)
 				dev_err(abe->dev, "failed to scale to lowest OPP\n");
 		}

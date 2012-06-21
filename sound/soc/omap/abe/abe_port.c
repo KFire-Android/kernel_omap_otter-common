@@ -1628,7 +1628,7 @@ int omap_aess_mono_mixer(struct omap_aess *abe, u32 id, u32 on_off)
 	}
 
 	if (on_off)
-		task += sizeof(struct omap_aess_task);
+		task += 1;
 
 	abe->MultiFrame[task->frame][task->slot] = task->task;
 

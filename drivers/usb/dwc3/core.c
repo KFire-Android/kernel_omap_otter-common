@@ -649,7 +649,17 @@ static struct platform_driver dwc3_driver = {
 	},
 };
 
-module_platform_driver(dwc3_driver);
+static int __init dwc3_init(void)
+{
+	return platform_driver_register(&dwc3_driver);
+}
+subsys_initcall(dwc3_init);
+
+static void __exit dwc3_exit(void)
+{
+	platform_driver_unregister(&dwc3_driver);
+}
+module_exit(dwc3_exit);
 
 MODULE_ALIAS("platform:dwc3");
 MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");

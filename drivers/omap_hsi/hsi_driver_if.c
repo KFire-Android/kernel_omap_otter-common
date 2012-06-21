@@ -250,9 +250,7 @@ int hsi_open(struct hsi_device *dev)
 	struct hsi_channel *ch;
 	struct hsi_port *port;
 	struct hsi_dev *hsi_ctrl;
-#ifdef OMAP_HSI_DVFS_SUPPORT
 	int err;
-#endif
 
 	if (!dev || !dev->ch) {
 		pr_err(LOG_NAME "Wrong HSI device %p\n", dev);
@@ -281,15 +279,14 @@ int hsi_open(struct hsi_device *dev)
 		return -EINVAL;
 	}
 
-#ifdef OMAP_HSI_DVFS_SUPPORT
 	if (hsi_ctrl->hsi_fclk_current == 0) {
 		struct hsi_platform_data *pdata;
 
 		pdata = dev_get_platdata(hsi_ctrl->dev);
 
 		/* Retry to set the HSI FCLK to default. */
-		err = pdata->device_scale(hsi_ctrl->dev, hsi_ctrl->dev,
-					  pdata->default_hsi_fclk);
+		err = pdata->device_scale(hsi_ctrl->dev,
+				pdata->default_hsi_fclk);
 		if (err) {
 			dev_err(dev->device.parent,
 				"%s: Error %d setting HSI FClk to %ld. Will retry on next open\n",
@@ -301,7 +298,6 @@ int hsi_open(struct hsi_device *dev)
 			hsi_ctrl->hsi_fclk_current = pdata->default_hsi_fclk;
 		}
 	}
-#endif
 	spin_lock_bh(&hsi_ctrl->lock);
 	hsi_clocks_enable_channel(dev->device.parent, ch->channel_number,
 				__func__);
@@ -738,9 +734,7 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 	int err = 0;
 	int fifo = 0;
 	u8 ret;
-#ifdef OMAP_HSI_DVFS_SUPPORT
 	struct hsi_platform_data *pdata;
-#endif
 
 	if (unlikely((!dev) ||
 		     (!dev->ch) ||
@@ -970,14 +964,13 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 			err = -EBUSY;
 			goto out;
 		}
-#ifdef OMAP_HSI_DVFS_SUPPORT
 		hsi_ctrl->clock_change_ongoing = true;
 		spin_unlock_bh(&hsi_ctrl->lock);
 
 		pdata = dev_get_platdata(hsi_ctrl->dev);
 
 		/* Set the HSI FCLK to requested value. */
-		err = pdata->device_scale(hsi_ctrl->dev, hsi_ctrl->dev,
+		err = pdata->device_scale(hsi_ctrl->dev,
 					  hsi_ctrl->hsi_fclk_req);
 		if (err < 0) {
 			dev_err(hsi_ctrl->dev, "%s: Cannot set HSI FClk to %ldHz, err %d\n",
@@ -991,7 +984,6 @@ int hsi_ioctl(struct hsi_device *dev, unsigned int command, void *arg)
 
 		spin_lock_bh(&hsi_ctrl->lock);
 		hsi_ctrl->clock_change_ongoing = false;
-#endif
 
 		break;
 	case HSI_IOCTL_GET_SPEED:

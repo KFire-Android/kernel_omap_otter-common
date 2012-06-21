@@ -84,7 +84,7 @@ void omap_abe_pm_shutdown(struct snd_soc_platform *platform)
 	udelay(250);
 
 	if (abe->device_scale) {
-		ret = abe->device_scale(abe->dev, abe->dev, abe->opp.freqs[0]);
+		ret = abe->device_scale(abe->dev, abe->opp.freqs[0]);
 		if (ret)
 			dev_err(abe->dev, "failed to scale to lowest OPP\n");
 	}
@@ -131,16 +131,31 @@ int abe_pm_save_context(struct omap_abe *abe)
 
 int abe_pm_restore_context(struct omap_abe *abe)
 {
+	int context_loss = 0;
 	int i, ret;
 
 	if (abe->device_scale) {
-		ret = abe->device_scale(abe->dev, abe->dev,
+		ret = abe->device_scale(abe->dev,
 				abe->opp.freqs[OMAP_ABE_OPP_50]);
 		if (ret) {
 			dev_err(abe->dev, "failed to scale to OPP 50\n");
 			return ret;
 		}
 	}
+
+	if (abe->get_context_loss_count) {
+		context_loss = abe->get_context_loss_count(abe->dev);
+		if (context_loss < 0)
+			return context_loss;
+	}
+
+	dev_dbg(abe->dev, "%s: context is %slost\n", __func__,
+		(context_loss != abe->context_loss) ? "" : "not ");
+
+	if (context_loss != abe->context_loss)
+		omap_aess_reload_fw(abe->aess, abe->firmware);
+
+	abe->context_loss = context_loss;
 
 	/* unmute gains not associated with FEs/BEs */
 	omap_aess_unmute_gain(abe->aess, OMAP_AESS_MIXAUDUL_MM_DL);
@@ -226,6 +241,7 @@ int abe_pm_suspend(struct snd_soc_dai *dai)
 int abe_pm_resume(struct snd_soc_dai *dai)
 {
 	struct omap_abe *abe = snd_soc_dai_get_drvdata(dai);
+	int context_loss = 0;
 	int i, ret = 0;
 
 	dev_dbg(dai->dev, "%s: %s active %d\n",
@@ -234,16 +250,26 @@ int abe_pm_resume(struct snd_soc_dai *dai)
 	if (!dai->active)
 		return 0;
 
+	if (abe->get_context_loss_count) {
+		context_loss = abe->get_context_loss_count(abe->dev);
+		if (context_loss < 0)
+			return context_loss;
+	}
+
+	dev_dbg(abe->dev, "%s: context is %slost\n", __func__,
+		(context_loss != abe->context_loss) ? "" : "not ");
+
 	/* context retained, no need to restore */
-	if (abe->get_context_lost_count && abe->get_context_lost_count(abe->dev) == abe->context_lost)
+	if (context_loss == abe->context_loss)
 		return 0;
 
-	abe->context_lost = abe->get_context_lost_count(abe->dev);
+	omap_aess_reload_fw(abe->aess, abe->firmware);
+	abe->context_loss = context_loss;
 
 	omap_abe_pm_runtime_get_sync(abe);
 
 	if (abe->device_scale) {
-		ret = abe->device_scale(abe->dev, abe->dev,
+		ret = abe->device_scale(abe->dev,
 				abe->opp.freqs[OMAP_ABE_OPP_50]);
 		if (ret) {
 			dev_err(abe->dev, "failed to scale to OPP 50\n");

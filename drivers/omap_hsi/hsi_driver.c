@@ -31,7 +31,6 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 
-#include <plat/common.h>
 #include <plat/omap_device.h>
 
 #include "hsi_driver.h"
@@ -850,13 +849,12 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 		return -ENXIO;
 	}
 
-#ifdef OMAP_HSI_DVFS_SUPPORT
 	/* Check if mandatory board functions are populated */
 	if (!pdata->device_scale) {
 		dev_err(&pd->dev, "Missing platform device_scale function\n");
 		return -ENOSYS;
 	}
-#endif
+
 	hsi_ctrl = kzalloc(sizeof(*hsi_ctrl), GFP_KERNEL);
 	if (hsi_ctrl == NULL) {
 		dev_err(&pd->dev, "Could not allocate memory for struct hsi_dev\n");
@@ -911,7 +909,6 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 	/* Allow HSI to wake up the platform */
 	device_init_wakeup(hsi_ctrl->dev, true);
 
-#ifdef OMAP_HSI_DVFS_SUPPORT
 	/* Set the HSI FCLK to default. */
 	hsi_ctrl->hsi_fclk_req = pdata->default_hsi_fclk;
 	err = pdata->device_scale(hsi_ctrl->dev, pdata->default_hsi_fclk);
@@ -927,7 +924,6 @@ static int __devinit hsi_platform_device_probe(struct platform_device *pd)
 	} else {
 		hsi_ctrl->hsi_fclk_current = pdata->default_hsi_fclk;
 	}
-#endif
 	/* From here no need for HSI HW access */
 	hsi_clocks_disable(hsi_ctrl->dev, __func__);
 
