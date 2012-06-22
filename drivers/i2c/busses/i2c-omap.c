@@ -1089,6 +1089,8 @@ omap_i2c_probe(struct platform_device *pdev)
 	if (r < 0)
 		return -ENOMEM;
 
+	dev->pm_qos_request.dev = dev->dev;
+
 	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
 
 	dev->errata = 0;

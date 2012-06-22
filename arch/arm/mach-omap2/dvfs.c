@@ -20,6 +20,7 @@
 #include <linux/export.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
+#include <linux/uaccess.h>
 #include <linux/pm_qos.h>
 #include <plat/common.h>
 #include <plat/omap_device.h>
@@ -777,6 +778,7 @@ int omap_device_scale(struct device *target_dev, unsigned long rate)
 	/* Lock me to ensure cross domain scaling is secure */
 	mutex_lock(&omap_dvfs_lock);
 	/* I would like CPU to be active always at this point */
+	omap_dvfs_pm_qos_handle.dev = target_dev;
 	pm_qos_update_request(&omap_dvfs_pm_qos_handle, 0);
 
 	rcu_read_lock();
@@ -978,6 +980,299 @@ static inline void dvfs_dbg_init(struct omap_vdd_dvfs_info *dvfs_info)
 }
 #endif				/* CONFIG_PM_DEBUG */
 
+#ifdef CONFIG_PM_ADVANCED_DEBUG
+
+/**
+ * struct dvfs_verify_info - used to store device specific debug info
+ * @dev:	device we are testing on
+ * @clk_name:	clock name of the device
+ * @clk:	storage for clock pointer
+ * @voltdm_name: voltage domain name of the device
+ * @voltdm:	storage for voltage domain pointer
+ * @lock:	lock to ensure exclusivity for DEBUG operations.
+ */
+struct dvfs_verify_info {
+	struct device *dev;
+	char *clk_name;
+	struct clk *clk;
+	char *voltdm_name;
+	struct voltagedomain *voltdm;
+	struct mutex lock; /* lock per device */
+};
+
+/* Should I lock the dvfs lock before doing any reads ? */
+static u32 _dvfs_singular_read_lock = 1;
+
+static ssize_t _set_freq_handle_write(struct file *file,
+				const char __user *user_buf,
+				size_t count, loff_t *ppos)
+{
+	char buf[30] = {0};
+	struct seq_file *seqf;
+	struct dvfs_verify_info *info;
+	unsigned long target_rate;
+	int ret;
+
+	if (count > sizeof(buf))
+		return -EINVAL;
+
+	if (copy_from_user(buf, user_buf, count))
+		return -EFAULT;
+
+	ret = kstrtoul(buf, 10, &target_rate);
+	if (ret < 0)
+		return ret;
+
+	seqf = file->private_data;
+	if (IS_ERR_OR_NULL(seqf)) {
+		pr_err("%s: NO SEQF?\n", __func__);
+		return -EINVAL;
+	}
+	info = (struct dvfs_verify_info *)seqf->private;
+	if (IS_ERR_OR_NULL(info)) {
+		pr_err("%s: NO INFO?\n", __func__);
+		return -EINVAL;
+	}
+	if (IS_ERR_OR_NULL(info->dev)) {
+		pr_err("%s: NO DEVICE ?\n", __func__);
+		return -EINVAL;
+	}
+
+	WARN_ONCE(1, "OVERRIDES driver control- echo 0 to remove constraint\n");
+	mutex_lock(&info->lock);
+	ret = omap_device_scale(info->dev, target_rate);
+	mutex_unlock(&info->lock);
+	*ppos += count;
+
+	return ret ? ret : count;
+}
+
+static int _set_freq_handle_open(struct seq_file *sf, void *unused)
+{
+	struct dvfs_verify_info *info;
+
+	/* Just verify */
+	info = (struct dvfs_verify_info *)sf->private;
+	if (IS_ERR_OR_NULL(info)) {
+		pr_err("%s: NO INFO ?\n", __func__);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int _cur_opp_handle_open(struct seq_file *sf, void *unused)
+{
+	struct dvfs_verify_info *info;
+	unsigned long freq, curr_volt;
+
+	info = (struct dvfs_verify_info *)sf->private;
+	if (IS_ERR_OR_NULL(info)) {
+		pr_err("%s: NO INFO ?\n", __func__);
+		return -EINVAL;
+	}
+
+	/* serialize access per debug device */
+	mutex_lock(&info->lock);
+	/* Hold the "Big DVFS Lock" if we need to */
+	if (_dvfs_singular_read_lock)
+		mutex_lock(&omap_dvfs_lock);
+
+	/* Get frequency */
+	freq = clk_get_rate(info->clk);
+	/* Get the current voltage */
+	curr_volt = omap_vp_get_curr_volt(info->voltdm);
+
+	/* Release locks */
+	if (_dvfs_singular_read_lock)
+		mutex_unlock(&omap_dvfs_lock);
+	mutex_unlock(&info->lock);
+
+	/* Now the error checks */
+	if (!freq) {
+		pr_err("%s: Unable to get frequency\n", __func__);
+		return freq;
+	}
+	if (!curr_volt) {
+		pr_err("%s: Unable to read Volt data from vp\n",
+		       __func__);
+		return curr_volt;
+	}
+
+	seq_printf(sf, "%s:%ld\tvdd_%s:%ld\n", info->clk_name, freq,
+		   info->voltdm_name, curr_volt);
+	return 0;
+}
+
+static int _avail_freq_handle_open(struct seq_file *sf, void *unused)
+{
+	struct device *dev;
+	struct opp *opp;
+	struct dvfs_verify_info *info;
+	unsigned long freq = 0;
+
+	info = (struct dvfs_verify_info *)sf->private;
+	if (IS_ERR_OR_NULL(info)) {
+		pr_err("%s: NO INFO ?\n", __func__);
+		return -EINVAL;
+	}
+	dev = info->dev;
+	if (IS_ERR_OR_NULL(dev)) {
+		pr_err("%s: NO DEVICE ?\n", __func__);
+		return -EINVAL;
+	}
+	rcu_read_lock();
+	do {
+		opp = opp_find_freq_ceil(dev, &freq);
+		if (IS_ERR(opp)) {
+			seq_printf(sf, "\n");
+			break;
+		}
+		seq_printf(sf, "%ld\t", freq);
+		freq++;
+	} while (1);
+	rcu_read_unlock();
+	return 0;
+}
+
+static int _set_freq_ver_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, _set_freq_handle_open, inode->i_private);
+}
+
+static int _avail_freq_ver_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, _avail_freq_handle_open, inode->i_private);
+}
+
+static int _cur_opp_ver_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, _cur_opp_handle_open, inode->i_private);
+}
+
+static const struct file_operations _set_freq_fops = {
+	.open = _set_freq_ver_open,
+	.write = _set_freq_handle_write,
+	.release = single_release,
+};
+
+static const struct file_operations _cur_opp_fops = {
+	.open = _cur_opp_ver_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static const struct file_operations _avail_freq_fops = {
+	.open = _avail_freq_ver_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+/* These operations are not really meant to be used concurrently */
+static int _vget(void *data, u64 *val)
+{
+	u32 *option = data;
+
+	*val = *option;
+
+	return 0;
+}
+
+static int _vset(void *data, u64 val)
+{
+	u32 *option = data;
+
+	*option = val;
+
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(dvfs_verify_lock_fops, _vget, _vset, "%llu\n");
+
+static struct dentry __initdata *dvfs_verify_debugfs_dir;
+
+static void __init dvfs_verify_dbg_init(struct device *dev,
+			char *voltdm_name, char *clk_name)
+{
+	struct dentry *ddir;
+	struct dvfs_verify_info *dvfs_verify = NULL;
+	/* create a base dir */
+	if (!dvfs_verify_debugfs_dir) {
+		dvfs_verify_debugfs_dir = debugfs_create_dir("dvfs-dev", NULL);
+		if (dvfs_verify_debugfs_dir) {
+			(void) debugfs_create_file("enable_locked_read_mode",
+						   S_IRUGO | S_IWUSR,
+						   dvfs_verify_debugfs_dir,
+						   &_dvfs_singular_read_lock,
+						   &dvfs_verify_lock_fops);
+		}
+	}
+	if (IS_ERR_OR_NULL(dvfs_verify_debugfs_dir)) {
+		WARN_ONCE("%s: Unable to create base DVFS dir\n", __func__);
+		return;
+	}
+
+	if (IS_ERR_OR_NULL(dev) || IS_ERR_OR_NULL(voltdm_name) ||
+	    IS_ERR_OR_NULL(clk_name)) {
+		pr_warning("%s: bad params: dev=%p voldm_name=%s clk_name=%s\n",
+			   __func__, dev, voltdm_name, clk_name);
+		return;
+	}
+
+	dvfs_verify = kzalloc(sizeof(struct dvfs_verify_info),
+			GFP_KERNEL);
+	if (!dvfs_verify) {
+		pr_warning("%s: unable to alloc memory!\n",
+			   __func__);
+		return;
+	}
+
+	dvfs_verify->dev = dev;
+
+	dvfs_verify->voltdm_name = voltdm_name;
+	dvfs_verify->voltdm = voltdm_lookup(voltdm_name);
+	if (!dvfs_verify->voltdm) {
+		pr_err("%s: unable to find voltdm %s!\n",
+		       __func__, voltdm_name);
+		goto err;
+	}
+
+	dvfs_verify->clk_name = clk_name;
+	dvfs_verify->clk = omap_clk_get_by_name(clk_name);
+	if (IS_ERR_OR_NULL(dvfs_verify->clk)) {
+		pr_err("%s: Bad clk %s pointer!\n", __func__, clk_name);
+		goto err;
+	}
+
+	ddir = debugfs_create_dir(dev_name(dev), dvfs_verify_debugfs_dir);
+	if (IS_ERR_OR_NULL(ddir)) {
+		pr_warning("%s: unable to create subdir %s\n", __func__,
+			   dev_name(dev));
+		goto err;
+	}
+	mutex_init(&dvfs_verify->lock);
+
+	(void)debugfs_create_file("available_frequencies", S_IRUGO, ddir,
+				  (void *)dvfs_verify, &_avail_freq_fops);
+	(void)debugfs_create_file("current_opp", S_IRUGO, ddir,
+				  (void *)dvfs_verify, &_cur_opp_fops);
+	(void)debugfs_create_file("set_frequency", S_IWUSR, ddir,
+				  (void *)dvfs_verify, &_set_freq_fops);
+	return;
+err:
+	kfree(dvfs_verify);
+	return;
+}
+#else
+static inline void dvfs_verify_dbg_init(struct device *dev,
+			char *voltdm_name, char *clk_name)
+{
+	return;
+}
+#endif				/* CONFIG_PM_ADVANCED_DEBUG */
+
 /**
  * omap_dvfs_register_device - Add a parent device into dvfs managed list
  * @dev:		Device to be added
@@ -1049,6 +1344,8 @@ int __init omap_dvfs_register_device(struct device *dev, char *voltdm_name,
 		if (temp_dev->dev == dev)
 			goto out;
 	}
+
+	dvfs_verify_dbg_init(dev, voltdm_name, clk_name);
 
 	temp_dev = kzalloc(sizeof(struct omap_vdd_dev_list), GFP_KERNEL);
 	if (!temp_dev) {

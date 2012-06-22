@@ -32,6 +32,7 @@ enum {
 struct pm_qos_request {
 	struct plist_node node;
 	int pm_qos_class;
+	struct device *dev;	/* Optional - for tracking purposes */
 	struct delayed_work work; /* for pm_qos_update_request_timeout */
 };
 
