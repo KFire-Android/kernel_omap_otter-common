@@ -481,6 +481,13 @@ static void __init omap_init_gpu(void)
 		return;
 	}
 
+	pdata->device_scale = omap_device_scale;
+	pdata->device_enable = omap_device_enable;
+	pdata->device_idle = omap_device_idle;
+	pdata->device_shutdown = omap_device_shutdown;
+	pdata->opp_get_opp_count = opp_get_opp_count;
+	pdata->opp_find_freq_ceil = opp_find_freq_ceil;
+
 	pdev = omap_device_build(name, 0, oh, pdata,
 			     sizeof(struct gpu_platform_data),
 			     omap_gpu_latency, ARRAY_SIZE(omap_gpu_latency), 0);
