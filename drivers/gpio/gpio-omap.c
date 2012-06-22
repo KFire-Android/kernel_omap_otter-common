@@ -76,6 +76,7 @@ struct gpio_bank {
 	int stride;
 	u32 width;
 	int context_loss_count;
+	u16 id;
 	int power_mode;
 	bool workaround_enabled;
 
@@ -1086,6 +1087,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 #ifdef CONFIG_OF_GPIO
 	bank->chip.of_node = of_node_get(node);
 #endif
+	bank->id = pdev->id;
 
 	bank->irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
 	if (bank->irq_base < 0) {
@@ -1143,6 +1145,40 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_ARCH_OMAP2PLUS
+
+static int omap_gpio_suspend(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct gpio_bank *bank = platform_get_drvdata(pdev);
+
+	/* WA for GPIO pins 140 (BT) & 142 (WLAN) used as output pins
+	 * due to h/w bug in GPIO module (Bug ID: OMAP5430-1.0BUG01667)
+	 * On OMAP5 ES1.0 the pins do not maintain their level in OFF.
+	 * This WA changes the direction to input while in OFF and back
+	 * to input in resume. This is fixed in ES2.0
+	 */
+	if ((cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0)) \
+		&& (bank->id == 4)) {
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 1);
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 1);
+	}
+
+	return 0;
+}
+
+static int omap_gpio_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct gpio_bank *bank = platform_get_drvdata(pdev);
+
+	if ((cpu_is_omap54xx() && (omap_rev() <= OMAP5430_REV_ES1_0)) \
+		&& (bank->id == 4)) {
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 142), 0);
+		_set_gpio_direction(bank, GPIO_INDEX(bank, 140), 0);
+	}
+
+	return 0;
+}
 
 #if defined(CONFIG_PM_RUNTIME)
 static void omap_gpio_restore_context(struct gpio_bank *bank);
@@ -1375,11 +1411,14 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
 }
 #endif /* CONFIG_PM_RUNTIME */
 #else
+#define omap_gpio_suspend NULL
+#define omap_gpio_resume NULL
 #define omap_gpio_runtime_suspend NULL
 #define omap_gpio_runtime_resume NULL
 #endif
 
 static const struct dev_pm_ops gpio_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(omap_gpio_suspend, omap_gpio_resume)
 	SET_RUNTIME_PM_OPS(omap_gpio_runtime_suspend, omap_gpio_runtime_resume,
 									NULL)
 };
