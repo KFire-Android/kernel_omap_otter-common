@@ -38,8 +38,6 @@ struct powerdomain;
 #define OMAP3_VOLTOFFSET	0xff
 #define OMAP3_VOLTSETUP2	0xff
 
-struct omap_vdd_info;
-
 /**
  * struct omap_vfsm_instance - per-voltage manager FSM register/bitfield
  * data
@@ -107,7 +105,7 @@ struct voltagedomain {
 				struct omap_volt_data *target_volt);
 	struct omap_volt_data *curr_volt;
 	struct omap_volt_data *volt_data;
-	struct omap_vdd_info *vdd;
+	struct omap_vdd_dep_info *dep_vdd_info;
 	struct srcu_notifier_head change_notify_list;
 	struct dentry *debug_dir;
 	/* spinlock for voltage usecount */
@@ -253,19 +251,6 @@ struct omap_vdd_dep_info {
 	struct voltagedomain *_dep_voltdm;
 	struct omap_vdd_dep_volt *dep_table;
 	int nr_dep_entries;
-};
-
-/**
- * omap_vdd_info - Per Voltage Domain info
- *
- * @volt_data		: voltage table having the distinct voltages supported
- *			  by the domain and other associated per voltage data.
- * @dep_vdd_info	: Array ending with a 0 terminator for dependency
- *			  voltage information.
- */
-struct omap_vdd_info {
-	struct omap_volt_data *volt_data;
-	struct omap_vdd_dep_info *dep_vdd_info;
 };
 
 void omap_voltage_get_volttable(struct voltagedomain *voltdm,
