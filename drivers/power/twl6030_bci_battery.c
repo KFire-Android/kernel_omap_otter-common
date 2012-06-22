@@ -651,6 +651,7 @@ static void twl6030_start_usb_charger_sw(struct twl6030_bci_device_info *di)
 {
 	int ret;
 	u8 reg = 0;
+	u8 reg_int_mask = 0;
 
 	if (!is_battery_present(di)) {
 		dev_dbg(di->dev, "BATTERY NOT DETECTED!\n");
@@ -676,6 +677,23 @@ static void twl6030_start_usb_charger_sw(struct twl6030_bci_device_info *di)
 		return;
 	}
 
+	if (di->errata & TWL6030_ERRATA_DB00110684) {
+		/* mask CHARGERUSB_THMREG interrupt */
+
+		ret = twl_i2c_read_u8(TWL6030_MODULE_CHARGER, &reg_int_mask,
+				CHARGERUSB_INT_MASK);
+
+		if (ret)
+			goto err;
+
+		reg_int_mask &= ~MASK_MCHARGERUSB_THMREG;
+
+		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg_int_mask,
+				CHARGERUSB_INT_MASK);
+		if (ret)
+			goto err;
+	}
+
 	twl6030_config_vichrg_reg(di, di->charger_outcurrentmA);
 	twl6030_config_cinlimit_reg(di, di->charger_incurrentmA);
 	twl6030_config_voreg_reg(di, di->platform_data->max_bat_voltagemV);
@@ -694,6 +712,17 @@ static void twl6030_start_usb_charger_sw(struct twl6030_bci_device_info *di)
 
 		di->charge_status = POWER_SUPPLY_STATUS_CHARGING;
 	}
+
+	if (di->errata & TWL6030_ERRATA_DB00110684) {
+		/* unmask CHARGERUSB_THMREG interrupt */
+		reg_int_mask |= MASK_MCHARGERUSB_THMREG;
+
+		ret = twl_i2c_write_u8(TWL6030_MODULE_CHARGER, reg_int_mask,
+				CHARGERUSB_INT_MASK);
+		if (ret)
+			goto err;
+	}
+
 	return;
 err:
 	pr_err("%s: Error access to TWL6030 (%d)\n", __func__, ret);
