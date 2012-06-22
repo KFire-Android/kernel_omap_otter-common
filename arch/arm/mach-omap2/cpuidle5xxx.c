@@ -40,7 +40,7 @@ static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 - CPU0 ON + CPU1 ON + MPU ON */
 	{.exit_latency = 2 + 2 , .target_residency = 5, .valid = 1},
 	/* C2- CPU0 CSWR + CPU1 CSWR + MPU CSWR */
-	{.exit_latency = 16 + 16 , .target_residency = 40, .valid = 1},
+	{.exit_latency = 100 + 100 , .target_residency = 200, .valid = 1},
 
 	/*
 	 * FIXME: Errata analysis pending. Disabled C-state as CPU Forced-OFF is
