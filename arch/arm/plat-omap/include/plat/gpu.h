@@ -29,7 +29,7 @@ struct gpu_platform_data {
 
 	void (*set_min_bus_tput)(struct device *dev, u8 agent_id,
 						unsigned long r);
-	int (*device_scale) (struct device *req_dev, struct device *target_dev,
+	int (*device_scale) (struct device *target_dev,
 			unsigned long rate);
 	int (*device_enable) (struct platform_device *pdev);
 	int (*device_shutdown) (struct platform_device *pdev);
@@ -37,6 +37,8 @@ struct gpu_platform_data {
 	int (*opp_get_opp_count) (struct device *dev);
 	struct opp *(*opp_find_freq_ceil) (struct device *dev,
 					unsigned long *freq);
+	int (*access_process_vm) (struct task_struct *tsk, unsigned long addr,
+				void *buf, int len, int write);
 
 };
 
