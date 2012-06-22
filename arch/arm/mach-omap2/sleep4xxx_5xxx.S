@@ -58,7 +58,7 @@ ppa_por_params:
  * CPU failed to transition to targeted OFF/DORMANT state.
  */
 ENTRY(omap4_finish_suspend)
-	stmfd	sp!, {lr}
+	stmfd	sp!, {r4-r12, lr}
 	cmp	r0, #0x0
 	beq	do_WFI				@ No lowpower state, jump to WFI
 
@@ -226,7 +226,7 @@ scu_gp_clear:
 skip_scu_gp_clear:
 	isb
 	dsb
-	ldmfd	sp!, {pc}
+	ldmfd	sp!, {r4-r12, pc}
 ENDPROC(omap4_finish_suspend)
 
 /*
@@ -336,7 +336,7 @@ ENDPROC(omap4_cpu_resume)
  *	3 - CPUx L1 and logic lost + GIC + L2 lost: DEVICE OFF
  */
 ENTRY(omap5_finish_suspend)
-	stmfd	sp!, {lr}
+	stmfd	sp!, {r4-r12, lr}
 	cmp	r0, #0x0
 	beq	do_wfi				@ No lowpower state, jump to WFI
 
@@ -432,7 +432,7 @@ do_wfi:
 	mcreq	p15, 0, r0, c1, c0, 1
 	isb
 	dsb
-	ldmfd	sp!, {pc}
+	ldmfd	sp!, {r4-r12, pc}
 ENDPROC(omap5_finish_suspend)
 
 ENTRY(omap5_cpu_resume)
