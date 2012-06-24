@@ -178,6 +178,8 @@ int crop_to_rect(union rect *crop, union rect *win, union rect *vis,
 int set_dss_ovl_info(struct dss2_ovl_info *oi)
 {
 	struct omap_overlay_info info;
+	struct omap_writeback_info wb_info;
+	struct omap_writeback *wb;
 	struct omap_overlay *ovl;
 	struct dss2_ovl_cfg *cfg;
 	union rect crop, win, vis;
@@ -212,9 +214,21 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	/* crop to screen */
 	crop.r = cfg->crop;
 	win.r = cfg->win;
+
 	vis.x = vis.y = 0;
-	vis.w = ovl->manager->device->panel.timings.x_res;
-	vis.h = ovl->manager->device->panel.timings.y_res;
+
+	wb = omap_dss_get_wb(0);
+
+	wb->get_wb_info(wb, &wb_info);
+
+	if (wb && wb_info.enabled && wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+					ovl->manager->id == wb_info.source) {
+		vis.w = wb_info.width;
+		vis.h = wb_info.height;
+	} else {
+		vis.w = ovl->manager->device->panel.timings.x_res;
+		vis.h = ovl->manager->device->panel.timings.y_res;
+	}
 
 	if (!info.wb_source) {
 		if (crop_to_rect(&crop, &win, &vis, cfg->rotation,
@@ -444,7 +458,8 @@ struct omap_overlay_manager *find_dss_mgr(int display_ix)
 	return NULL;
 }
 
-int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb)
+int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb,
+								bool m2m_mode)
 {
 	struct omap_overlay_manager_info info;
 	struct omap_overlay_manager *mgr;
@@ -467,6 +482,7 @@ int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb)
 	info.cpr_coefs = mi->cpr_coefs;
 	info.cpr_enable = mi->cpr_enabled;
 	info.cb = *cb;
+	info.wb_only = m2m_mode;
 
 	return mgr->set_manager_info(mgr, &info);
 }
