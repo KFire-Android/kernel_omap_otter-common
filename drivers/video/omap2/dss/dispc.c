@@ -2634,6 +2634,18 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	else
 		REG_FLD_MOD(DISPC_OVL_ATTRIBUTES(plane), source, 18, 16);
 
+	/* change resolution of manager if it works in MEM2MEM mode */
+	if (wb->mode == OMAP_WB_MEM2MEM_MODE) {
+		if (source == OMAP_WB_TV)
+			dispc_set_digit_size(out_width, out_height);
+		else if (source == OMAP_WB_LCD2)
+			dispc_set_lcd_size(OMAP_DSS_CHANNEL_LCD2, out_width,
+								out_height);
+		else if (source == OMAP_WB_LCD1)
+			dispc_set_lcd_size(OMAP_DSS_CHANNEL_LCD, out_width,
+								out_height);
+	}
+
 	/*
 	 * configure wb mode:
 	 * 0-capture-mode; 1-memory-to-memory mode

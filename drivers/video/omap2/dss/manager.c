@@ -1868,7 +1868,28 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 
 	spin_lock_irqsave(&dss_cache.lock, flags);
 
-	if (!mgr->device || mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
+	if (!mgr->device || (mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE &&
+							!mgr->info.wb_only)) {
+		struct writeback_cache_data *wbc;
+
+		if (dss_has_feature(FEAT_OVL_WB))
+			wbc = &dss_cache.writeback_cache;
+		else
+			wbc = NULL;
+
+		/* in case, if WB was configured with MEM2MEM with manager
+		 * mode, but manager, which is source for WB, is not marked as
+		 * wb_only, then skip apply operation. We have such case, when
+		 * composition was sent to disable pipes, which are sources for
+		 * WB.
+		 */
+		if (wbc && wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+				wbc->source == mgr->id && mgr->device &&
+			mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
+			r = 0;
+			goto done;
+		}
+
 		pr_info_ratelimited("cannot apply mgr(%s) on inactive device\n",
 								mgr->name);
 		r = -ENODEV;
@@ -2102,6 +2123,17 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr,
 	if (!wb) {
 		printk(KERN_ERR "[%s][%d] No WB!\n", __FILE__, __LINE__);
 		return -EINVAL;
+	}
+
+	/* skip composition, if manager is enabled. It happens when HDMI/TV
+	 * physical layer is activated in the time, when MEM2MEM with manager
+	 * mode is used.
+	 */
+	if (wb->info.source == OMAP_WB_TV &&
+			dispc_is_channel_enabled(OMAP_DSS_CHANNEL_DIGIT) &&
+				wb->info.mode == OMAP_WB_MEM2MEM_MODE) {
+		DSSERR("manager %d busy, dropping\n", mgr->id);
+		return -EBUSY;
 	}
 
 	spin_lock_irqsave(&dss_cache.lock, flags);
