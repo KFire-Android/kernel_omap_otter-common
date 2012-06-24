@@ -680,8 +680,6 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 			 */
 			memcpy(rx_buf, (u8 *)piggy_desc,
 					CFHSI_DESC_SHORT_SZ);
-			/* Mark no embedded frame here */
-			piggy_desc->offset = 0;
 		}
 	}
 
@@ -722,6 +720,8 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 			/* Extract any payload in piggyback descriptor. */
 			if (cfhsi_rx_desc(piggy_desc, cfhsi) < 0)
 				goto out_of_sync;
+			/* Mark no embedded frame after extracting it */
+			piggy_desc->offset = 0;
 		}
 	}
 
