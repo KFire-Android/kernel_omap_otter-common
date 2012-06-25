@@ -1067,7 +1067,7 @@ static int caif_create(struct net *net, struct socket *sock, int protocol,
 	/* Initialize default priority for well-known cases */
 	switch (protocol) {
 	case CAIFPROTO_AT:
-		sk->sk_priority = TC_PRIO_CONTROL;
+		sk->sk_priority = TC_PRIO_INTERACTIVE;
 		break;
 	case CAIFPROTO_RFM:
 		sk->sk_priority = TC_PRIO_INTERACTIVE_BULK;
