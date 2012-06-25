@@ -153,9 +153,29 @@ static int hdmi_pll_init(struct hdmi_ip_data *ip_data)
 	return 0;
 }
 
+static int hdmi_wait_for_audio_stop(struct hdmi_ip_data *ip_data)
+{
+	int count = 0;
+
+	/* wait for audio to stop before powering off the phy*/
+	while (REG_GET(hdmi_wp_base(ip_data),
+			HDMI_WP_AUDIO_CTRL, 31, 31) != 0) {
+		msleep(100);
+		if (count++ > 100) {
+			pr_err("Audio is not turned off "
+					"even after 10 seconds\n");
+			return -ETIMEDOUT;
+		}
+	}
+	return 0;
+}
+
 /* PHY_PWR_CMD */
 static int hdmi_set_phy_pwr(struct hdmi_ip_data *ip_data, enum hdmi_phy_pwr val)
 {
+	if (val == HDMI_PHYPWRCMD_OFF && !(ip_data->set_mode))
+		hdmi_wait_for_audio_stop(ip_data);
+
 	/* Command for power control of HDMI PHY */
 	REG_FLD_MOD(hdmi_wp_base(ip_data), HDMI_WP_PWR_CTRL, val, 7, 6);
 
@@ -248,6 +268,7 @@ int ti_hdmi_4xxx_set_phy_on_hpd(struct hdmi_ip_data *ip_data, bool hpd)
 		return 0;
 	}
 
+	ip_data->set_mode = false;
 	if (hpd)
 		r = hdmi_set_phy_pwr(ip_data, HDMI_PHYPWRCMD_TXON);
 	else

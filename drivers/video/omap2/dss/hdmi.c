@@ -460,6 +460,7 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 
 err_mgr_enable:
 	hdmi.ip_data.ops->video_enable(&hdmi.ip_data, 0);
+	hdmi.ip_data.set_mode = false;
 	hdmi.ip_data.ops->phy_disable(&hdmi.ip_data);
 	hdmi.ip_data.ops->pll_disable(&hdmi.ip_data);
 err:
@@ -559,7 +560,9 @@ int omapdss_hdmi_display_set_mode2(struct omap_dss_device *dssdev,
 				   int code, int mode)
 {
 	/* turn the hdmi off and on to get new timings to use */
+	hdmi.ip_data.set_mode = true;
 	dssdev->driver->disable(dssdev);
+	hdmi.ip_data.set_mode = false;
 	hdmi.ip_data.cfg.timings = *vm;
 	hdmi.custom_set = 1;
 	hdmi.code = code;
@@ -572,7 +575,9 @@ int omapdss_hdmi_display_set_mode(struct omap_dss_device *dssdev,
 {
 	int r1, r2;
 	/* turn the hdmi off and on to get new timings to use */
+	hdmi.ip_data.set_mode = true;
 	dssdev->driver->disable(dssdev);
+	hdmi.ip_data.set_mode = false;
 	r1 = hdmi_set_timings(vm, false) ? 0 : -EINVAL;
 	hdmi.custom_set = true;
 	hdmi.code = hdmi.ip_data.cfg.cm.code;
