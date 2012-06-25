@@ -111,6 +111,9 @@
 #define USBOTGSS_UTMI_OTG_STATUS_SESSVALID	(1 << 2)
 #define USBOTGSS_UTMI_OTG_STATUS_VBUSVALID	(1 << 1)
 
+/* Delay for runtime fw to enable all the modules */
+#define MAILBOX_WORK_DELAY	300
+
 struct dwc3_omap {
 	/* device lock */
 	spinlock_t		lock;
@@ -125,6 +128,11 @@ struct dwc3_omap {
 	u32			resource_size;
 
 	u32			dma_status:1;
+
+	enum omap_dwc3_vbus_id_status status;
+
+	struct delayed_work     omap_dwc3_mailbox_work;
+	struct workqueue_struct	*workqueue;
 };
 
 struct dwc3_omap		*_omap;
@@ -139,22 +147,18 @@ static inline void dwc3_omap_writel(void __iomem *base, u32 offset, u32 value)
 	writel(value, base + offset);
 }
 
-void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
+static void omap_dwc3_set_mailbox(struct dwc3_omap *omap)
 {
 	u32			val;
 	u32			ret;
-	struct dwc3_omap	*omap = _omap;
 	struct platform_device  *pdev = to_platform_device(&omap->dwc3->dev);
 	struct dwc3             *dwc = platform_get_drvdata(pdev);
 
-	switch (status) {
+	switch (omap->status) {
 	case OMAP_DWC3_ID_GROUND:
 		dev_dbg(omap->dev, "ID GND\n");
 
-		dwc->is_connected = true;
-
 		dwc3_core_late_init(&omap->dwc3->dev);
-
 
 		ret = pm_runtime_get_sync(omap->dev);
 		if (ret < 0) {
@@ -174,8 +178,6 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 
 	case OMAP_DWC3_VBUS_VALID:
 		dev_dbg(omap->dev, "VBUS Connect\n");
-
-		dwc->is_connected = true;
 
 		dwc3_core_late_init(&omap->dwc3->dev);
 
@@ -232,7 +234,36 @@ void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
 
 	return;
 }
+
+void omap_dwc3_mailbox(enum omap_dwc3_vbus_id_status status)
+{
+	struct dwc3_omap	*omap = _omap;
+	struct platform_device  *pdev = to_platform_device(&omap->dwc3->dev);
+	struct dwc3             *dwc = platform_get_drvdata(pdev);
+
+	omap->status = status;
+
+	if (status == OMAP_DWC3_ID_GROUND || status == OMAP_DWC3_VBUS_VALID)
+		dwc->is_connected = true;
+
+#ifdef CONFIG_PM
+	if (omap->dev->power.disable_depth)
+		queue_delayed_work(omap->workqueue,
+			&omap->omap_dwc3_mailbox_work, MAILBOX_WORK_DELAY);
+	else
+#endif
+		omap_dwc3_set_mailbox(omap);
+}
 EXPORT_SYMBOL_GPL(omap_dwc3_mailbox);
+
+static void omap_dwc3_mailbox_work(struct work_struct *mailbox_work)
+{
+	struct delayed_work *d_work = to_delayed_work(mailbox_work);
+	struct dwc3_omap *omap = container_of(d_work, struct dwc3_omap,
+		omap_dwc3_mailbox_work);
+
+	omap_dwc3_set_mailbox(omap);
+}
 
 static irqreturn_t dwc3_omap_interrupt(int irq, void *_omap)
 {
@@ -357,6 +388,12 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 	if (devid < 0)
 		return -ENODEV;
 
+	omap->workqueue = create_singlethread_workqueue("omap_dwc3");
+	if (!omap->workqueue) {
+		dev_err(dev, "unable to create workqueue for omap dwc3\n");
+		return -EINVAL;
+	}
+
 	dwc3 = platform_device_alloc("dwc3", devid);
 	if (!dwc3) {
 		dev_err(dev, "couldn't allocate dwc3 device\n");
@@ -381,6 +418,10 @@ static int __devinit dwc3_omap_probe(struct platform_device *pdev)
 	omap->irq	= irq;
 	omap->base	= base;
 	omap->dwc3	= dwc3;
+	omap->status	= OMAP_DWC3_UNKNOWN;
+
+	INIT_DELAYED_WORK(&omap->omap_dwc3_mailbox_work,
+		omap_dwc3_mailbox_work);
 
 	/*
 	 * REVISIT if we ever have two instances of the wrapper, we will be
