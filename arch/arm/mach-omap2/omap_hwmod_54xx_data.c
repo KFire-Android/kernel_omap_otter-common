@@ -3366,7 +3366,6 @@ static struct omap_hwmod omap54xx_iva_seq1_hwmod = {
 static struct omap_hwmod omap54xx_iva_hwmod = {
 	.name		= "iva",
 	.class		= &omap54xx_iva_hwmod_class,
-	.flags		= HWMOD_INIT_NO_RESET,
 	.clkdm_name	= "iva_clkdm",
 	.mpu_irqs	= omap54xx_iva_irqs,
 	.rst_lines	= omap54xx_iva_resets,
