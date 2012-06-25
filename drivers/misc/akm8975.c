@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/irq.h>
 #include <linux/miscdevice.h>
+#include <linux/module.h>
 #include <linux/gpio.h>
 #include <linux/uaccess.h>
 #include <linux/delay.h>
@@ -84,10 +85,12 @@ static ssize_t akm8975_store(struct device *dev, struct device_attribute *attr,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	unsigned long val;
-	strict_strtoul(buf, 10, &val);
-	if (val > 0xff)
-		return -EINVAL;
-	i2c_smbus_write_byte_data(client, AK8975_REG_CNTL, val);
+	int success = 	strict_strtoul(buf, 10, &val);
+	if (success == 0) {
+		if (val > 0xff)
+			return -EINVAL;
+		i2c_smbus_write_byte_data(client, AK8975_REG_CNTL, val);
+	}
 	return count;
 }
 static DEVICE_ATTR(akm_ms1, S_IWUSR | S_IRUGO, akm8975_show, akm8975_store);
@@ -222,8 +225,8 @@ static int akm_aot_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int akm_aot_ioctl(struct inode *inode, struct file *file,
-	      unsigned int cmd, unsigned long arg)
+static long akm_aot_ioctl(struct file *file, unsigned int cmd,
+			unsigned long arg)
 {
 	void __user *argp = (void __user *) arg;
 	short flag;
@@ -316,7 +319,7 @@ static int akmd_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int akmd_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
+static long akmd_ioctl(struct file *file, unsigned int cmd,
 		      unsigned long arg)
 {
 	void __user *argp = (void __user *) arg;
@@ -537,14 +540,14 @@ static const struct file_operations akmd_fops = {
 	.owner = THIS_MODULE,
 	.open = akmd_open,
 	.release = akmd_release,
-	.ioctl = akmd_ioctl,
+	.unlocked_ioctl = akmd_ioctl,
 };
 
 static const struct file_operations akm_aot_fops = {
 	.owner = THIS_MODULE,
 	.open = akm_aot_open,
 	.release = akm_aot_release,
-	.ioctl = akm_aot_ioctl,
+	.unlocked_ioctl = akm_aot_ioctl,
 };
 
 static struct miscdevice akm_aot_device = {
