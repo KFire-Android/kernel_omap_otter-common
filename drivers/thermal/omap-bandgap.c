@@ -1445,7 +1445,7 @@ static int omap_bandgap_save_ctxt(struct omap_bandgap *bg_ptr)
 		struct temp_sensor_registers *tsr;
 		struct temp_sensor_regval *rval;
 
-		rval = bg_ptr->pdata->sensors[i].regval;
+		rval = &bg_ptr->pdata->sensors[i].regval;
 		tsr = bg_ptr->pdata->sensors[i].registers;
 
 		err = omap_control_readl(cdev, tsr->bgap_mode_ctrl,
@@ -1510,7 +1510,7 @@ static int omap_bandgap_restore_ctxt(struct omap_bandgap *bg_ptr)
 		struct temp_sensor_regval *rval;
 		u32 val;
 
-		rval = bg_ptr->pdata->sensors[i].regval;
+		rval = &bg_ptr->pdata->sensors[i].regval;
 		tsr = bg_ptr->pdata->sensors[i].registers;
 
 		err = omap_control_readl(cdev, tsr->bgap_counter, &val);

@@ -138,7 +138,7 @@ struct temp_sensor_regval {
 struct omap_temp_sensor {
 	struct temp_sensor_data		*ts_data;
 	struct temp_sensor_registers	*registers;
-	struct temp_sensor_regval	*regval;
+	struct temp_sensor_regval	regval;
 	char				*domain;
 	void				*data;
 	int				slope;
