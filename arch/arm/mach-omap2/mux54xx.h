@@ -18,6 +18,13 @@
 
 #ifndef __ARCH_ARM_MACH_OMAP2_MUX_54XX_H
 #define __ARCH_ARM_MACH_OMAP2_MUX_54XX_H
+
+#define OMAP5_MUX(M0, mux_value)					\
+{									\
+	.reg_offset	= (OMAP5_CTRL_MODULE_PAD_##M0##_OFFSET),	\
+	.value		= (mux_value),					\
+}
+
 /* CTRL_MODULE_CORE_PAD base address*/
 #define OMAP5_CTRL_MODULE_PAD_CORE_MUX_PBASE		0x4a002800
 

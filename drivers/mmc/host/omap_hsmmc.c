@@ -43,6 +43,8 @@
 #include <plat/mmc.h>
 #include <plat/cpu.h>
 
+#define OMAP_V1V8_SIGEN_V1V8	(1 << 19)
+
 /* OMAP HSMMC Host Controller Registers */
 #define OMAP_HSMMC_SYSCONFIG	0x0010
 #define OMAP_HSMMC_SYSSTATUS	0x0014
@@ -61,6 +63,7 @@
 #define OMAP_HSMMC_STAT		0x0130
 #define OMAP_HSMMC_IE		0x0134
 #define OMAP_HSMMC_ISE		0x0138
+#define OMAP_HSMMC_AC12		0x013C
 #define OMAP_HSMMC_CAPA		0x0140
 #define OMAP_HSMMC_ADMA_ES	0x0154
 #define OMAP_HSMMC_ADMA_SAL	0x0158
@@ -97,6 +100,10 @@
 #define FOUR_BIT		(1 << 1)
 #define DDR			(1 << 19)
 #define DW8			(1 << 5)
+#define CLKEXTFREE		(1 << 16)
+#define PADEN			(1 << 15)
+#define CLEV			(1 << 24)
+#define DLEV			(0xF << 20)
 #define CC			0x1
 #define TC			0x02
 #define OD			0x1
@@ -146,6 +153,10 @@
 #define MMC_AUTOSUSPEND_DELAY	100
 #define MMC_TIMEOUT_MS		20
 #define DRIVER_NAME		"omap_hsmmc"
+
+#define VDD_SIGNAL_VOLTAGE_180	1800000
+#define VDD_SIGNAL_VOLTAGE_330	3300000
+#define VDD_165_195		(ffs(MMC_VDD_165_195) - 1)
 
 #define AUTO_CMD12		(1 << 0)	/* Auto CMD12 support */
 /*
@@ -217,6 +228,7 @@ struct omap_hsmmc_host {
 	int			use_reg;
 	int			req_in_progress;
 	unsigned int		flags;
+	int			regulator_enabled;
 	struct omap_hsmmc_next	next_data;
 
 	struct	omap_mmc_platform_data	*pdata;
@@ -274,10 +286,11 @@ static int omap_hsmmc_resume_cdirq(struct device *dev, int slot)
 #ifdef CONFIG_REGULATOR
 
 static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
-				   int vdd)
+				   int vdd_iopower)
 {
 	struct omap_hsmmc_host *host =
 		platform_get_drvdata(to_platform_device(dev));
+	struct mmc_ios *ios = &host->mmc->ios;
 	int ret = 0;
 
 	/*
@@ -291,11 +304,11 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
 	 * the pbias cell programming support is still missing when
 	 * booting with Device tree
 	 */
-	if (dev->of_node && !vdd)
+	if (dev->of_node && !vdd_iopower)
 		return 0;
 
 	if (mmc_slot(host).before_set_reg)
-		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd);
+		mmc_slot(host).before_set_reg(dev, slot, power_on, vdd_iopower);
 
 	/*
 	 * Assume Vcc regulator is used only to power the card ... OMAP
@@ -311,19 +324,31 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
 	 * chips/cards need an interface voltage rail too.
 	 */
 	if (power_on) {
-		ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
+		ret = mmc_regulator_set_ocr(host->mmc, host->vcc, ios->vdd);
 		/* Enable interface voltage rail, if needed */
-		if (ret == 0 && host->vcc_aux) {
+		if (host->vcc_aux) {
+			if (vdd_iopower == VDD_165_195)
+				ret = regulator_set_voltage(host->vcc_aux,
+				VDD_SIGNAL_VOLTAGE_180, VDD_SIGNAL_VOLTAGE_180);
+			else
+				ret = regulator_set_voltage(host->vcc_aux,
+				VDD_SIGNAL_VOLTAGE_330, VDD_SIGNAL_VOLTAGE_330);
+		}
+		if (host->vcc_aux && !host->regulator_enabled && !ret) {
 			ret = regulator_enable(host->vcc_aux);
-			if (ret < 0)
-				ret = mmc_regulator_set_ocr(host->mmc,
-							host->vcc, 0);
+			if (!ret)
+				host->regulator_enabled = 1;
 		}
 	} else {
 		/* Shut down the rail */
-		if (host->vcc_aux)
+		if (host->vcc_aux && regulator_is_enabled(host->vcc_aux) > 0) {
 			ret = regulator_disable(host->vcc_aux);
-		if (!ret) {
+			if (!ret)
+				host->regulator_enabled = 0;
+		} else {
+				host->regulator_enabled = 0;
+		}
+		if (host->vcc) {
 			/* Then proceed to shut down the local regulator */
 			ret = mmc_regulator_set_ocr(host->mmc,
 						host->vcc, 0);
@@ -331,7 +356,7 @@ static int omap_hsmmc_set_power(struct device *dev, int slot, int power_on,
 	}
 
 	if (mmc_slot(host).after_set_reg)
-		mmc_slot(host).after_set_reg(dev, slot, power_on, vdd);
+		mmc_slot(host).after_set_reg(dev, slot, power_on, vdd_iopower);
 
 	return ret;
 }
@@ -684,6 +709,17 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
 	omap_hsmmc_set_clock(host);
 
 	omap_hsmmc_set_bus_mode(host);
+
+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
+		value = OMAP_HSMMC_READ(host->base, HCTL);
+		value &= ~SDVS_MASK;
+		value |= SDVS18;
+		OMAP_HSMMC_WRITE(host->base, HCTL, value);
+
+		value = OMAP_HSMMC_READ(host->base, AC12);
+		value |= OMAP_V1V8_SIGEN_V1V8;
+		OMAP_HSMMC_WRITE(host->base, AC12, value);
+	}
 
 out:
 	host->context_loss = context_loss;
@@ -1841,6 +1877,124 @@ static int omap_hsmmc_disable_fclk(struct mmc_host *mmc)
 	return 0;
 }
 
+static int omap_start_signal_voltage_switch(struct mmc_host *mmc,
+			struct mmc_ios *ios)
+{
+	struct omap_hsmmc_host *host;
+	u32 value = 0;
+	unsigned long timeout;
+	unsigned long notimeout = 0;
+
+	if (!(mmc->caps & (MMC_CAP_UHS_SDR12 |
+			MMC_CAP_UHS_SDR25 | MMC_CAP_UHS_DDR50)))
+		return 0;
+
+	host  = mmc_priv(mmc);
+
+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
+		omap_hsmmc_conf_bus_power(host);
+
+		value = OMAP_HSMMC_READ(host->base, AC12);
+		value &= ~OMAP_V1V8_SIGEN_V1V8;
+		OMAP_HSMMC_WRITE(host->base, AC12, value);
+		dev_dbg(mmc_dev(host->mmc), " i/o voltage switch to 3V\n");
+		return 0;
+	}
+
+	value = OMAP_HSMMC_READ(host->base, CON);
+	OMAP_HSMMC_WRITE(host->base, CON, (value | PADEN));
+
+	value = OMAP_HSMMC_READ(host->base, PSTATE);
+	timeout = jiffies + msecs_to_jiffies(50);
+	do {
+		if (!(value & CLEV)) {
+			notimeout = 1;
+			break;
+		}
+		usleep_range(100, 200);
+		value = OMAP_HSMMC_READ(host->base, PSTATE);
+	} while (!time_after(jiffies, timeout));
+	if (!notimeout)
+		dev_err(mmc_dev(host->mmc), "timeout wait for clev 0\n");
+
+	notimeout = 0;
+	timeout = jiffies + msecs_to_jiffies(50);
+	do {
+		if (!(value & DLEV)) {
+			notimeout = 1;
+			break;
+		}
+		usleep_range(100, 200);
+		value = OMAP_HSMMC_READ(host->base, PSTATE);
+	} while (!time_after(jiffies, timeout));
+	if (!notimeout)
+		dev_err(mmc_dev(host->mmc), "timeout wait for dlev 0\n");
+
+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
+		mmc_slot(host).set_power(host->dev, host->slot_id,
+						 1, VDD_165_195);
+
+		value = OMAP_HSMMC_READ(host->base, HCTL);
+		value &= ~SDVS_MASK;
+		value |= SDVS18;
+		OMAP_HSMMC_WRITE(host->base, HCTL, value);
+
+		value = OMAP_HSMMC_READ(host->base, AC12);
+		value |= OMAP_V1V8_SIGEN_V1V8;
+		OMAP_HSMMC_WRITE(host->base, AC12, value);
+		dev_dbg(mmc_dev(host->mmc), "i/o voltage switch to 1.8v\n\n");
+	}
+	/*
+	 * According to OMAP5 TRM and SD Host Controller Specification
+	 * regulator output shall be stable within 5ms.
+	 * TODO: Need to figure out why 5ms delay causes timeout waiting
+	 * for DAT[3:0] line signal level.
+	 */
+	msleep(50);
+
+	value = OMAP_HSMMC_READ(host->base, AC12);
+	if (!(value & OMAP_V1V8_SIGEN_V1V8)) {
+		dev_dbg(mmc_dev(host->mmc), "failed switch to 1.8v\n\n");
+		return -1;
+	}
+
+	value = OMAP_HSMMC_READ(host->base, CON);
+	OMAP_HSMMC_WRITE(host->base, CON, (value | CLKEXTFREE));
+
+	value = OMAP_HSMMC_READ(host->base, PSTATE);
+
+	notimeout = 0;
+	timeout = jiffies + msecs_to_jiffies(50);
+	do {
+		if ((value & CLEV) == CLEV) {
+			notimeout = 1;
+			break;
+		}
+		usleep_range(100, 200);
+		value = OMAP_HSMMC_READ(host->base, PSTATE);
+	} while (!time_after(jiffies, timeout));
+	if (!notimeout)
+		dev_err(mmc_dev(host->mmc), "timeout wait for clev 1\n");
+
+	notimeout = 0;
+	timeout = jiffies + msecs_to_jiffies(50);
+	do {
+		if ((value & DLEV) == DLEV) {
+			notimeout = 1;
+			break;
+		}
+		usleep_range(100, 200);
+		value = OMAP_HSMMC_READ(host->base, PSTATE);
+	} while (!time_after(jiffies, timeout));
+	if (!notimeout)
+		dev_err(mmc_dev(host->mmc), "timeout wait for dlev 1\n");
+
+	value = OMAP_HSMMC_READ(host->base, CON);
+	OMAP_HSMMC_WRITE(host->base, CON, (value & ~(CLKEXTFREE | PADEN)));
+
+	return 0;
+}
+
 static const struct mmc_host_ops omap_hsmmc_ops = {
 	.enable = omap_hsmmc_enable_fclk,
 	.disable = omap_hsmmc_disable_fclk,
@@ -1851,6 +2005,7 @@ static const struct mmc_host_ops omap_hsmmc_ops = {
 	.get_cd = omap_hsmmc_get_cd,
 	.get_ro = omap_hsmmc_get_ro,
 	.init_card = omap_hsmmc_init_card,
+	.start_signal_voltage_switch = omap_start_signal_voltage_switch,
 	/* NYET -- enable_sdio_irq */
 };
 
@@ -2050,6 +2205,7 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
 	host->power_mode = MMC_POWER_OFF;
 	host->flags	= AUTO_CMD12;
 	host->next_data.cookie = 1;
+	host->regulator_enabled = 0;
 
 	platform_set_drvdata(pdev, host);
 

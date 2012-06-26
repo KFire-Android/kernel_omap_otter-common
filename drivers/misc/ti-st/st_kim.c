@@ -531,7 +531,7 @@ long st_kim_stop(void *kim_data)
 		&kim_gdata->ldisc_installed, msecs_to_jiffies(LDISC_TIME));
 	if (!err) {		/* timeout */
 		pr_err(" timed out waiting for ldisc to be un-installed");
-		return -ETIMEDOUT;
+		err = -ETIMEDOUT;
 	}
 
 	/* By default configure BT nShutdown to LOW state */

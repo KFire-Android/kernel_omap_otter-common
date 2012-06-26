@@ -22,6 +22,7 @@
 #include <linux/input.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
+#include <linux/leds.h>
 #include <linux/memblock.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -40,6 +41,7 @@
 
 #include <plat/common.h>
 #include <plat/i2c.h>
+#include <plat/gpio.h>
 #include <plat/omap_hsi.h>
 #include <plat/omap4-keypad.h>
 #include <plat/mmc.h>
@@ -92,6 +94,38 @@ static struct omap_board_data keypad_data = {
 	.id                     = 1,
 };
 
+static struct gpio_led sevm_gpio_leds[] = {
+	{
+		.name	= "blue",
+		.default_trigger = "timer",
+		.gpio	= OMAP_MPUIO(19),
+	},
+	{
+		.name	= "red",
+		.default_trigger = "timer",
+		.gpio	= OMAP_MPUIO(17),
+	},
+	{
+		.name	= "green",
+		.default_trigger = "timer",
+		.gpio	= OMAP_MPUIO(18),
+	},
+
+};
+
+static struct gpio_led_platform_data sevm_led_data = {
+	.leds	= sevm_gpio_leds,
+	.num_leds = ARRAY_SIZE(sevm_gpio_leds),
+};
+
+static struct platform_device sevm_leds_gpio = {
+	.name	= "leds-gpio",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &sevm_led_data,
+	},
+};
+
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
@@ -122,7 +156,8 @@ static struct omap2_hsmmc_info mmc[] = {
 	},
 	{
 		.mmc		= 1,
-		.caps		= MMC_CAP_4_BIT_DATA,
+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_UHS_SDR12 |
+					MMC_CAP_UHS_SDR25 | MMC_CAP_UHS_DDR50,
 		.gpio_cd	= 67,
 		.gpio_wp	= -EINVAL,
 		.ocr_mask	= MMC_VDD_29_30,
@@ -239,6 +274,7 @@ static struct palmas_reg_init omap5_ldo8_init = {
 static struct palmas_reg_init omap5_ldo9_init = {
 	.warm_reset = 0,
 	.mode_sleep = 0,
+	.no_bypass = 1,
 };
 
 static struct palmas_reg_init omap5_ldoln_init = {
@@ -708,6 +744,7 @@ static struct platform_device *omap5evm_devices[] __initdata = {
 	&omap5evm_spdif_dit_codec,
 	&omap5evm_hdmi_audio_codec,
 	&omap5evm_abe_audio,
+	&sevm_leds_gpio,
 };
 
 static struct regulator_consumer_supply omap5_evm_vmmc1_supply[] = {
