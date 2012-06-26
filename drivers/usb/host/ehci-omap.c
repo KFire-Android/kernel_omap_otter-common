@@ -310,6 +310,8 @@ static int ehci_hcd_omap_remove(struct platform_device *pdev)
 	struct usb_hcd *hcd				= dev_get_drvdata(dev);
 	struct ehci_hcd_omap_platform_data *pdata	= dev->platform_data;
 
+	if (pm_runtime_suspended(dev))
+		pm_runtime_get_sync(dev);
 	usb_remove_hcd(hcd);
 	disable_put_regulator(dev->platform_data);
 	iounmap(hcd->regs);
@@ -345,7 +347,7 @@ static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
 		return ret;
 	}
 
-	pm_runtime_put(dev);
+	pm_runtime_put_sync(dev);
 
 	pm_qos_update_request(&pdata->pm_qos_request,
 					PM_QOS_DEFAULT_VALUE);
@@ -359,8 +361,7 @@ static int ehci_omap_bus_resume(struct usb_hcd *hcd)
 
 	dev_dbg(dev, "ehci_omap_bus_resume\n");
 
-	if (pm_runtime_suspended(dev))
-		pm_runtime_get_sync(dev);
+	pm_runtime_get_sync(dev);
 
 	pm_qos_update_request(&pdata->pm_qos_request,
 					PM_QOS_MEMORY_THROUGHPUT_USBHOST);
