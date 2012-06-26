@@ -20,6 +20,7 @@
 #include <linux/if_arp.h>
 #include <linux/timer.h>
 #include <net/rtnetlink.h>
+#include <asm/unaligned.h>
 #include <linux/pkt_sched.h>
 #include <net/caif/caif_layer.h>
 #include <net/caif/caif_hsi.h>
@@ -60,7 +61,23 @@ static const struct cfhsi_config  hsi_default_config = {
 	 */
 	.head_align = 4,
 	.tail_align = 4,
+
+	/* HSI Dynamic speed change enabled for RX/TX */
+	.tx_dyn_speed_change = 0,
+	.rx_dyn_speed_change = 0,
+
+	.change_hsi_clock = 0,
 };
+
+/* Parameters which may be converted to module params */
+static int dfs_Q1 = DYN_SPEED_QUEUE_FILL_Q1;
+static int dfs_F1 = DYN_SPEED_FILL_GRADE_F1;
+static int dfs_F2 = DYN_SPEED_FILL_GRADE_F2;
+static int dfs_N = DYN_SPEED_FILL_GRADE_N;
+static int dfs_T1_fb = DYN_SPEED_T1_FB_VALUE;
+static int dfs_T1_ff = DYN_SPEED_T1_FF_VALUE;
+static int dfs_T2 = DYN_SPEED_T2_VALUE;
+static int dfs_T3 = DYN_SPEED_T3_TP_INTERVAL;
 
 #define ON 1
 #define OFF 0
@@ -161,6 +178,405 @@ static void cfhsi_abort_tx(struct cfhsi *cfhsi)
 	spin_unlock_bh(&cfhsi->lock);
 }
 
+static void cfhsi_send_speed_request(struct cfhsi *cfhsi, u32 new_speed)
+{
+	struct cfhsi_desc *desc = NULL;
+	int len;
+	int i = 0;
+	int res;
+	u16 *plen = NULL;
+
+	desc = (struct cfhsi_desc *)cfhsi->dyn_speed.tx_com_buf;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter send_speed_request(), new speed=%d\n",
+		new_speed);
+
+	desc->header = 0;
+	desc->header = CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC;
+	desc->offset = 0;
+
+	plen = desc->cffrm_len;
+	for (i = 0; i < CFHSI_MAX_PKTS; i++) {
+		*plen = 0;
+		plen++;
+	}
+
+	desc->emb_frm[0] = CFHSI_COM_REQUEST_SPEED_DESC;
+
+	put_unaligned_le32(new_speed, &desc->emb_frm[1]);
+
+	for (i = 5; i < CFHSI_MAX_EMB_FRM_SZ; i++)
+		desc->emb_frm[i] = 0;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: send new speed=%x %x %x %x\n",
+		desc->emb_frm[1], desc->emb_frm[2],
+		desc->emb_frm[3], desc->emb_frm[4]);
+
+	len = CFHSI_DESC_SZ;
+
+	res = cfhsi->ops->cfhsi_tx(cfhsi->dyn_speed.tx_com_buf,
+				   len, cfhsi->ops);
+	if (WARN_ON(res < 0)) {
+		dev_err(&cfhsi->ndev->dev, "%s: TX error %d.\n",
+			__func__, res);
+		cfhsi_abort_tx(cfhsi);
+	}
+	/* DYN_SPEED_T2_VALUE in millisecond */
+	cfhsi->dyn_speed.T2_time_stamp =
+		jiffies + cfhsi->dyn_speed.T2_time_factor;
+}
+
+static void cfhsi_build_acknack(struct cfhsi *cfhsi,
+				struct cfhsi_desc *desc,
+				bool send_ack)
+{
+	int i;
+	u16 *plen = NULL;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter build_acknack()\n");
+
+	desc->header = 0;
+	desc->header = CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC;
+	desc->offset = 0;
+	plen = desc->cffrm_len;
+
+	for (i = 0; i < CFHSI_MAX_PKTS; i++) {
+		*plen = 0;
+		plen++;
+	}
+
+	if (send_ack)
+		desc->emb_frm[0] = CFHSI_COM_ACK_SPEED_DESC;
+	else
+		desc->emb_frm[0] = CFHSI_COM_NACK_SPEED_DESC;
+
+	for (i = 1; i < CFHSI_MAX_EMB_FRM_SZ; i++)
+		desc->emb_frm[i] = 0;
+}
+
+static void cfhsi_send_acknack(struct cfhsi *cfhsi, bool send_ack)
+{
+	struct cfhsi_desc *desc = NULL;
+	int len;
+	int res;
+
+	desc = (struct cfhsi_desc *)cfhsi->dyn_speed.tx_com_buf;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter send_acknack()\n");
+
+	cfhsi_build_acknack(cfhsi, desc, send_ack);
+
+	len = CFHSI_DESC_SZ;
+
+	res = cfhsi->ops->cfhsi_tx(cfhsi->dyn_speed.tx_com_buf,
+				   len, cfhsi->ops);
+	if (WARN_ON(res < 0)) {
+		dev_err(&cfhsi->ndev->dev, "%s: TX error %d.\n",
+			__func__, res);
+		cfhsi_abort_tx(cfhsi);
+	}
+}
+
+static void cfhsi_start_throughput_measurement(struct dynamic_speed *dfs_p)
+{
+	dfs_p->uplink_data_counter = 0;
+	dfs_p->throughput_data_valid = false;
+	dfs_p->throughput_msg_ongoing = true;
+	dfs_p->data_count_timestamp = jiffies + dfs_p->throughput_time_factor;
+	return;
+}
+
+static void cfhsi_reset_throughput_measurement(struct dynamic_speed *dfs_p)
+{
+	dfs_p->uplink_data_counter = 0;
+	dfs_p->throughput_data_valid = false;
+	dfs_p->throughput_msg_ongoing = false;
+	dfs_p->data_count_timestamp = 0;
+	return;
+}
+
+static void cfhsi_measure_throughput(struct cfhsi *cfhsi, int len)
+{
+	if (cfhsi->dyn_speed.throughput_msg_ongoing) {
+		cfhsi->dyn_speed.uplink_data_counter += len;
+		if (time_before(jiffies, cfhsi->dyn_speed.data_count_timestamp))
+			return;
+
+		cfhsi->dyn_speed.throughput_msg_ongoing = false;
+		cfhsi->dyn_speed.throughput_data_valid = true;
+	}
+}
+
+static void cfhsi_process_speed_command(struct cfhsi *cfhsi,
+					struct cfhsi_desc *desc)
+{
+	u32 requested_speed = 0;
+	struct dynamic_speed *dfs_p = &cfhsi->dyn_speed;
+	struct cfhsi_ops *dev_p = cfhsi->ops;
+	int timer_active;
+	bool send_ack;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter %s\n", __func__);
+
+	switch (desc->emb_frm[0]) {
+	case CFHSI_COM_ACK_SPEED_DESC:
+		if (!dfs_p->negotiation_in_progress) {
+			dev_err(&cfhsi->ndev->dev, "%s: Received ACK in wrong state\n",
+				__func__);
+			return;
+		}
+		/* Is this ACK for fallforward?*/
+
+		dev_dbg(&cfhsi->ndev->dev, "%s: Received ACK\n",
+			__func__);
+
+		if (dfs_p->tx_speed <
+		    dfs_p->tx_next_speed) {
+			dev_p->cfhsi_change_tx_speed(dev_p,
+					  CFHSI_DYN_SPEED_GO_UP,
+					  &dfs_p->tx_speed,
+					  &dfs_p->tx_speed_level);
+		}
+		cfhsi_reset_throughput_measurement(dfs_p);
+		dfs_p->fb_state = FB_CHECK_QUEUE_LEVEL;
+		dfs_p->tx_next_speed = dfs_p->tx_speed;
+		dfs_p->negotiation_in_progress = false;
+		break;
+	case CFHSI_COM_NACK_SPEED_DESC:
+		if (!dfs_p->negotiation_in_progress) {
+			dev_err(&cfhsi->ndev->dev, "%s: Received ACK in wrong state\n",
+				__func__);
+			return;
+		}
+
+		dev_dbg(&cfhsi->ndev->dev, "%s: Received NACK\n",
+			__func__);
+
+		if (dfs_p->tx_speed < dfs_p->tx_next_speed) {
+			dfs_p->T1_ff_time_stamp = jiffies +
+				DYN_SPEED_DISABLED_AFTER_NACK_VALUE*HZ;
+		} else {
+			dev_p->cfhsi_change_tx_speed(dev_p,
+				    CFHSI_DYN_SPEED_GO_UP,
+				    &dfs_p->tx_speed,
+				    &dfs_p->tx_speed_level);
+			dfs_p->T1_fb_time_stamp = jiffies +
+				DYN_SPEED_DISABLED_AFTER_NACK_VALUE*HZ;
+		}
+		dfs_p->tx_next_speed = dfs_p->tx_speed;
+		dfs_p->negotiation_in_progress = false;
+		break;
+	case CFHSI_COM_REQUEST_SPEED_DESC:
+		requested_speed = get_unaligned_le32(&desc->emb_frm[1]);
+
+		/* The receiver will change speed/frequency for 2 reasons:
+		 * 1) If the requested speed is higher than current speed
+		 * 2) For a requested lower speed,
+		 *    a lower frequency may be needed to save power.
+		 *    If an invalid speed (ex. too high) is requested,
+		 *    the function shall return error (<0)
+		 */
+
+		requested_speed = requested_speed/1000000;
+
+		dev_dbg(&cfhsi->ndev->dev, "%s: Speed change request received, Requested Speed=%d\n",
+			__func__, requested_speed);
+
+		spin_lock_bh(&cfhsi->lock);
+		/* Delete inactivity timer if started. */
+		timer_active = del_timer_sync(&cfhsi->inactivity_timer);
+
+		send_ack = true;
+		if (cfhsi->cfg.rx_dyn_speed_change &&
+		    (dev_p->cfhsi_change_rx_speed(dev_p, requested_speed) < 0))
+			send_ack = false; /* Send NACK */
+
+		if (timer_active && (cfhsi->tx_state == CFHSI_TX_STATE_IDLE)) {
+			cfhsi->tx_state = CFHSI_TX_STATE_XFER;
+			cfhsi_send_acknack(cfhsi, send_ack);
+			dev_dbg(&cfhsi->ndev->dev, "%s: Send ACK-NACK\n",
+				__func__);
+			spin_unlock_bh(&cfhsi->lock);
+			break;
+		} else {
+			/* Delay ACK-NACK response until tx is available */
+			if (send_ack)
+				dfs_p->acknack_response
+					= CFHSI_DYN_SPEED_SEND_ACK;
+			else
+				dfs_p->acknack_response
+					= CFHSI_DYN_SPEED_SEND_NACK;
+		}
+
+		if (!timer_active) {
+			dev_dbg(&cfhsi->ndev->dev,
+				"Race condition: Wake-down vs rec. of speed change\n");
+			/*
+			 * We are in wake down
+			 * ACK-NACK will be sent after wake-up
+			 * Schedule wake up work queue if the peer initiates.
+			 */
+			if (!test_and_set_bit(CFHSI_WAKE_UP, &cfhsi->bits)) {
+				cfhsi_wakelock_lock(cfhsi);
+				queue_work(cfhsi->wq, &cfhsi->wake_up_work);
+			}
+		}
+		spin_unlock_bh(&cfhsi->lock);
+		break;
+	default:
+		dev_err(&cfhsi->ndev->dev, "%s: Unknown speed command received\n",
+			__func__);
+		break;
+	}
+
+	return;
+}
+
+static bool cfhsi_check_tx_speed_change(struct cfhsi *cfhsi)
+{
+	bool retval = false;
+	struct dynamic_speed *dfs_p = &cfhsi->dyn_speed;
+	struct cfhsi_ops *dev_p = cfhsi->ops;
+	u32 qlen, qlen_limit;
+	u32 tmp_fb_level = 0;
+
+	if (!cfhsi->cfg.tx_dyn_speed_change || dfs_p->negotiation_in_progress)
+		return retval;
+
+	if (dfs_p->T2_time_stamp != 0) {
+		if (time_before(jiffies, dfs_p->T2_time_stamp))
+			return retval;
+		dfs_p->T2_time_stamp = 0;
+	}
+
+	if (dfs_p->T1_ff_time_stamp != 0 &&
+	    time_after_eq(jiffies, dfs_p->T1_ff_time_stamp))
+		/* Fallforward disabled timeout, one may try again */
+			dfs_p->T1_ff_time_stamp = 0;
+
+	qlen = cfhsi_tx_queue_len(cfhsi);
+
+	/* Check for fallforward if speed level is below HIGH */
+	if (dfs_p->tx_speed_level < CFHSI_DYN_SPEED_HIGH &&
+	    dfs_p->T1_ff_time_stamp == 0) {
+		/*
+		 * If (tx queue is higher than Q1 (ex. 20 packets)) OR
+		 * ((fill-grade is higher than F2 (ex. 5 packets) AND
+		 * (N (ex 2) times higher than at last transfer)),
+		 * go to max speed
+		 */
+
+		qlen_limit = qlen;
+		if ((qlen > 0) &&
+		    (dfs_p->prev_fill_grade > 0) &&
+		    (qlen > dfs_p->prev_fill_grade)) {
+			qlen_limit = dfs_N * dfs_p->prev_fill_grade;
+		}
+		dfs_p->prev_fill_grade = qlen;
+
+		if (qlen >= dfs_Q1 ||
+		    (qlen >= dfs_F2 && qlen > qlen_limit)) {
+
+			dev_p->cfhsi_get_next_tx_speed(dev_p,
+						       CFHSI_DYN_SPEED_GO_UP,
+						       &dfs_p->tx_next_speed);
+
+			dev_dbg(&cfhsi->ndev->dev, "%s: Try to Fallforward, to speed=%d\n",
+				__func__, dfs_p->tx_next_speed);
+
+			cfhsi->tx_state = CFHSI_TX_STATE_XFER;
+			cfhsi_send_speed_request(cfhsi,
+						 dfs_p->tx_next_speed *
+						 1000000);
+
+			dfs_p->T1_ff_time_stamp = jiffies +
+				dfs_p->T1_ff_time_factor;
+
+			dfs_p->negotiation_in_progress = true;
+			retval = true;
+
+			return retval;
+		}
+	}
+
+	if (dfs_p->T1_fb_time_stamp != 0) {
+		if (time_before(jiffies, dfs_p->T1_fb_time_stamp))
+			return retval;
+
+		/* Fallback disabled timeout, one may try again */
+		dfs_p->T1_fb_time_stamp = 0;
+	}
+
+	switch (dfs_p->fb_state) {
+	case FB_CHECK_QUEUE_LEVEL:
+		/* Check for fallback if speed level is above LOW */
+		if (dfs_p->tx_speed_level > CFHSI_DYN_SPEED_LOW &&
+		    qlen <= dfs_F1) {
+
+			cfhsi_start_throughput_measurement(dfs_p);
+			dfs_p->fb_state = FB_THROUGHPUT_MEASUREMENT;
+		}
+		break;
+	case FB_THROUGHPUT_MEASUREMENT:
+
+		/* Check for fallback if speed level is above LOW */
+
+		if (!dfs_p->throughput_data_valid)
+			return false;
+
+		tmp_fb_level = dfs_p->tx_speed * DYN_SPEED_TP_FB_FACTOR;
+
+		if ((dfs_p->uplink_data_counter < tmp_fb_level) &&
+		    (qlen <= dfs_F1)) {
+			dev_p->cfhsi_change_tx_speed(dev_p,
+						     CFHSI_DYN_SPEED_GO_DOWN,
+						     &dfs_p->tx_speed,
+						     &dfs_p->tx_speed_level);
+			dfs_p->tx_next_speed =
+				dfs_p->tx_speed;
+
+			dev_dbg(&cfhsi->ndev->dev, "%s: Try to Fallback, to speed=%d\n",
+				__func__, dfs_p->tx_speed);
+
+			cfhsi->tx_state = CFHSI_TX_STATE_XFER;
+			cfhsi_send_speed_request(cfhsi,
+						 dfs_p->tx_speed * 1000000);
+			dfs_p->negotiation_in_progress = true;
+			retval = true;
+		}
+		cfhsi_reset_throughput_measurement(dfs_p);
+		dfs_p->T1_fb_time_stamp = jiffies +
+			dfs_p->T1_fb_time_factor;
+		dfs_p->fb_state = FB_CHECK_QUEUE_LEVEL;
+		break;
+	default:
+		dev_err(&cfhsi->ndev->dev, "%s: Invalid fb_state=%d\n",
+				__func__, dfs_p->fb_state);
+		break;
+	}
+	return retval;
+}
+
+static int cfhsi_start_dyn_speed(struct cfhsi *cfhsi)
+{
+	int res = 0;
+	struct dynamic_speed *dfs_p = &cfhsi->dyn_speed;
+
+	dev_dbg(&cfhsi->ndev->dev, "caif_hsi: enter %s\n", __func__);
+
+	dfs_p->tx_com_buf = kzalloc(CFHSI_DESC_SZ, GFP_KERNEL);
+	if (!dfs_p->tx_com_buf)
+		res = -ENODEV;
+
+	dfs_p->T1_fb_time_factor = (dfs_T1_fb*HZ)/1000;
+	dfs_p->T1_ff_time_factor = (dfs_T1_ff*HZ)/1000;
+	dfs_p->T2_time_factor = (dfs_T2*HZ)/1000;
+	dfs_p->throughput_time_factor = (dfs_T3*HZ)/1000;
+	cfhsi_reset_throughput_measurement(dfs_p);
+	dfs_p->fb_state = FB_CHECK_QUEUE_LEVEL;
+	return res;
+}
+
 static int cfhsi_flush_fifo(struct cfhsi *cfhsi)
 {
 	char buffer[32]; /* Any reasonable value */
@@ -222,11 +638,33 @@ static int cfhsi_tx_frm(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	struct sk_buff *skb;
 	u8 *pfrm = desc->emb_frm + CFHSI_MAX_EMB_FRM_SZ;
 
+	/* First check if there are any pending ACK or NACK
+	 * (after received speed change request) to be sent
+	 */
+	if (cfhsi->dyn_speed.acknack_response != CFHSI_DYN_SPEED_NO_RESPONSE) {
+		if (cfhsi->dyn_speed.acknack_response ==
+		    CFHSI_DYN_SPEED_SEND_ACK) {
+			cfhsi_build_acknack(cfhsi, desc, true);
+			dev_dbg(&cfhsi->ndev->dev, "%s: Send ACK\n",
+				__func__);
+		} else {
+			cfhsi_build_acknack(cfhsi, desc, false);
+			dev_dbg(&cfhsi->ndev->dev, "%s: Send NACK\n",
+				__func__);
+		}
+		spin_lock_bh(&cfhsi->lock);
+		cfhsi->dyn_speed.acknack_response = CFHSI_DYN_SPEED_NO_RESPONSE;
+		spin_unlock_bh(&cfhsi->lock);
+
+		return CFHSI_DESC_SZ;
+	}
+
 	skb = cfhsi_dequeue(cfhsi);
 	if (!skb)
 		return 0;
 
-	/* Clear offset. */
+	/* Clear header and offset. */
+	desc->header = 0;
 	desc->offset = 0;
 
 	/* Check if we can embed a CAIF frame. */
@@ -339,6 +777,9 @@ static void cfhsi_start_tx(struct cfhsi *cfhsi)
 	if (test_bit(CFHSI_SHUTDOWN, &cfhsi->bits))
 		return;
 
+	if (cfhsi_check_tx_speed_change(cfhsi))
+		return;
+
 	do {
 		/* Create HSI frame. */
 		len = cfhsi_tx_frm(desc, cfhsi);
@@ -358,6 +799,8 @@ static void cfhsi_start_tx(struct cfhsi *cfhsi)
 		}
 
 		/* Set up new transfer. */
+		cfhsi_measure_throughput(cfhsi, len);
+
 		res = cfhsi->ops->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->ops);
 		if (WARN_ON(res < 0))
 			netdev_err(cfhsi->ndev, "%s: TX error %d.\n",
@@ -417,8 +860,13 @@ static int cfhsi_rx_desc(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	u16 *plen = NULL;
 	u8 *pfrm = NULL;
 
-	if ((desc->header & ~CFHSI_PIGGY_DESC) ||
-			(desc->offset > CFHSI_MAX_EMB_FRM_SZ)) {
+	if (desc->header & (CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC))
+		return 0;
+
+	if ((desc->header &
+	     ~(CFHSI_PIGGY_DESC |
+	       CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC)) ||
+	    (desc->offset > CFHSI_MAX_EMB_FRM_SZ)) {
 		netdev_err(cfhsi->ndev, "%s: Invalid descriptor.\n",
 			__func__);
 		return -EPROTO;
@@ -505,9 +953,10 @@ static int cfhsi_rx_desc_len(struct cfhsi_desc *desc)
 	int nfrms = 0;
 	u16 *plen;
 
-	if ((desc->header & ~CFHSI_PIGGY_DESC) ||
-			(desc->offset > CFHSI_MAX_EMB_FRM_SZ)) {
-
+	if ((desc->header &
+	     ~(CFHSI_PIGGY_DESC |
+	       CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC)) ||
+	    (desc->offset > CFHSI_MAX_EMB_FRM_SZ)) {
 		pr_err("Invalid descriptor. %x %x\n", desc->header,
 				desc->offset);
 		return -EPROTO;
@@ -535,8 +984,14 @@ static int cfhsi_rx_pld(struct cfhsi_desc *desc, struct cfhsi *cfhsi)
 	u16 *plen = NULL;
 	u8 *pfrm = NULL;
 
+
+	if (desc->header & (CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC))
+		return 0;
+
 	/* Sanity check header and offset. */
-	if (WARN_ON((desc->header & ~CFHSI_PIGGY_DESC) ||
+	if (WARN_ON((desc->header & ~(CFHSI_PIGGY_DESC |
+				      CFHSI_PROT_SPEED_CHANGE_DESC
+				      | CFHSI_COM_BIT_DESC)) ||
 			(desc->offset > CFHSI_MAX_EMB_FRM_SZ))) {
 		netdev_err(cfhsi->ndev, "%s: Invalid descriptor.\n",
 			__func__);
@@ -644,6 +1099,10 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 		if (desc_pld_len < 0)
 			goto out_of_sync;
 
+		if (desc->header &
+		      (CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC))
+			cfhsi_process_speed_command(cfhsi, desc);
+
 		rx_buf = cfhsi->rx_buf;
 		rx_len = desc_pld_len;
 		if (desc_pld_len > 0 && (desc->header & CFHSI_PIGGY_DESC))
@@ -665,21 +1124,27 @@ static void cfhsi_rx_done(struct cfhsi *cfhsi)
 
 			/* Extract payload len from piggy-backed descriptor. */
 			desc_pld_len = cfhsi_rx_desc_len(piggy_desc);
-			if (desc_pld_len < 0)
-				goto out_of_sync;
 
-			if (desc_pld_len > 0) {
-				rx_len = desc_pld_len;
-				if (piggy_desc->header & CFHSI_PIGGY_DESC)
-					rx_len += CFHSI_DESC_SZ;
+			if (piggy_desc->header &
+			    (CFHSI_PROT_SPEED_CHANGE_DESC | CFHSI_COM_BIT_DESC))
+				cfhsi_process_speed_command(cfhsi, piggy_desc);
+			else {
+				if (desc_pld_len < 0)
+					goto out_of_sync;
+
+				if (desc_pld_len > 0) {
+					rx_len = desc_pld_len;
+					if (piggy_desc->header & CFHSI_PIGGY_DESC)
+						rx_len += CFHSI_DESC_SZ;
+				}
+
+				/*
+				 * Copy needed information from the piggy-backed
+				 * descriptor to the descriptor in the start.
+				 */
+				memcpy(rx_buf, (u8 *)piggy_desc,
+				       CFHSI_DESC_SHORT_SZ);
 			}
-
-			/*
-			 * Copy needed information from the piggy-backed
-			 * descriptor to the descriptor in the start.
-			 */
-			memcpy(rx_buf, (u8 *)piggy_desc,
-					CFHSI_DESC_SHORT_SZ);
 		}
 	}
 
@@ -885,6 +1350,8 @@ wake_ack:
 
 	if (likely(len > 0)) {
 		/* Set up new transfer. */
+		cfhsi_measure_throughput(cfhsi, len);
+
 		res = cfhsi->ops->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->ops);
 		if (WARN_ON(res < 0)) {
 			netdev_err(cfhsi->ndev, "%s: TX error %d.\n",
@@ -969,6 +1436,11 @@ static void cfhsi_wake_down(struct work_struct *work)
 	if (!test_bit(CFHSI_WAKE_UP, &cfhsi->bits))
 		cfhsi_wakelock_unlock(cfhsi);
 	spin_unlock_bh(&cfhsi->lock);
+
+	if (cfhsi->cfg.change_hsi_clock) {
+		cfhsi->ops->cfhsi_set_hsi_clock(cfhsi->ops, 0);
+		cfhsi->cfg.change_hsi_clock = false;
+	}
 }
 
 static void cfhsi_out_of_sync(struct work_struct *work)
@@ -1112,7 +1584,11 @@ static int cfhsi_xmit(struct sk_buff *skb, struct net_device *dev)
 		WARN_ON(!len);
 
 		/* Set up new transfer. */
+		cfhsi_measure_throughput(cfhsi, len);
+
 		res = cfhsi->ops->cfhsi_tx(cfhsi->tx_buf, len, cfhsi->ops);
+
+		/* Upon error we simply drop the frame and continue. */
 		if (WARN_ON(res < 0)) {
 			netdev_err(cfhsi->ndev, "%s: TX error %d.\n",
 				__func__, res);
@@ -1152,6 +1628,25 @@ static void cfhsi_setup(struct net_device *dev)
 	cfhsi->cfdev.use_fcs = false;
 	cfhsi->ndev = dev;
 	cfhsi->cfg = hsi_default_config;
+	/*
+	 * FIXME:For current design, knowledge of speed should be
+	 *       on lower layer.
+	 *       May be change by later hsi design
+	 */
+	cfhsi->dyn_speed.tx_speed = 196;
+	cfhsi->dyn_speed.rx_speed = 196;
+	cfhsi->dyn_speed.tx_next_speed = 0;
+	cfhsi->dyn_speed.tx_speed_level = CFHSI_DYN_SPEED_HIGH;
+	cfhsi->dyn_speed.rx_speed_level = CFHSI_DYN_SPEED_HIGH;
+
+	cfhsi->dyn_speed.negotiation_in_progress = false;
+	cfhsi->dyn_speed.T1_fb_time_stamp = 0;
+	cfhsi->dyn_speed.T1_ff_time_stamp = 0;
+	cfhsi->dyn_speed.T2_time_stamp = 0;
+	cfhsi->dyn_speed.tx_speed_change_enabled = false;
+	cfhsi->dyn_speed.prev_fill_grade = 1;
+	cfhsi->dyn_speed.acknack_response = CFHSI_DYN_SPEED_NO_RESPONSE;
+	cfhsi->cfg.change_hsi_clock = false;
 }
 
 static int cfhsi_open(struct net_device *ndev)
@@ -1327,7 +1822,7 @@ static void cfhsi_uninit(struct net_device *dev)
 {
 	struct cfhsi *cfhsi = netdev_priv(dev);
 	ASSERT_RTNL();
-	symbol_put(cfhsi_get_device);
+	symbol_put(cfhsi_get_ops);
 	list_del(&cfhsi->list);
 }
 
@@ -1381,6 +1876,18 @@ static void cfhsi_netlink_parms(struct nlattr *data[], struct cfhsi *cfhsi)
 	i = __IFLA_CAIF_HSI_QLOW_WATERMARK;
 	if (data[i])
 		cfhsi->cfg.q_low_mark = nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_TX_DYN_SPEED_CHANGE;
+	if (data[i])
+		cfhsi->cfg.tx_dyn_speed_change = (bool)nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_RX_DYN_SPEED_CHANGE;
+	if (data[i])
+		cfhsi->cfg.rx_dyn_speed_change = (bool)nla_get_u32(data[i]);
+
+	i = __IFLA_CAIF_HSI_CHANGE_HSI_CLOCK;
+	if (data[i])
+		cfhsi->cfg.change_hsi_clock = (bool)nla_get_u32(data[i]);
 }
 
 static int caif_hsi_changelink(struct net_device *dev, struct nlattr *tb[],
@@ -1398,6 +1905,9 @@ static const struct nla_policy caif_hsi_policy[__IFLA_CAIF_HSI_MAX + 1] = {
 	[__IFLA_CAIF_HSI_TAIL_ALIGN] = { .type = NLA_U32, .len = 4 },
 	[__IFLA_CAIF_HSI_QHIGH_WATERMARK] = { .type = NLA_U32, .len = 4 },
 	[__IFLA_CAIF_HSI_QLOW_WATERMARK] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_TX_DYN_SPEED_CHANGE] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_RX_DYN_SPEED_CHANGE] = { .type = NLA_U32, .len = 4 },
+	[__IFLA_CAIF_HSI_CHANGE_HSI_CLOCK] = { .type = NLA_U32, .len = 4 },
 };
 
 static size_t caif_hsi_get_size(const struct net_device *dev)
@@ -1424,11 +1934,18 @@ static int caif_hsi_fill_info(struct sk_buff *skb, const struct net_device *dev)
 	    nla_put_u32(skb, __IFLA_CAIF_HSI_QHIGH_WATERMARK,
 			cfhsi->cfg.q_high_mark) ||
 	    nla_put_u32(skb, __IFLA_CAIF_HSI_QLOW_WATERMARK,
-			cfhsi->cfg.q_low_mark))
+			cfhsi->cfg.q_low_mark) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_TX_DYN_SPEED_CHANGE,
+			cfhsi->cfg.tx_dyn_speed_change) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_RX_DYN_SPEED_CHANGE,
+			cfhsi->cfg.rx_dyn_speed_change) ||
+	    nla_put_u32(skb, __IFLA_CAIF_HSI_CHANGE_HSI_CLOCK,
+			cfhsi->cfg.change_hsi_clock))
 		return -EMSGSIZE;
 
 	return 0;
 }
+
 
 static int caif_hsi_newlink(struct net *src_net, struct net_device *dev,
 			  struct nlattr *tb[], struct nlattr *data[])
@@ -1457,6 +1974,8 @@ static int caif_hsi_newlink(struct net *src_net, struct net_device *dev,
 
 	/* Assign the driver to this HSI device. */
 	cfhsi->ops->cb_ops = &cfhsi->cb_ops;
+	cfhsi_start_dyn_speed(cfhsi);
+
 	if (register_netdevice(dev)) {
 		pr_warn("%s: caif_hsi device registration failed\n", __func__);
 		goto err;
