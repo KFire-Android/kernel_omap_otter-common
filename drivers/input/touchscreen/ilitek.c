@@ -131,6 +131,9 @@ static ssize_t ilitek_file_write(struct file*, const char*, size_t, loff_t*);
 static ssize_t ilitek_file_read(struct file*, char*, size_t, loff_t*);
 static int ilitek_file_close(struct inode*, struct file*);
 
+static int touch_filter = 0;
+static bool touch_move = false;
+
 // declare i2c data member
 struct i2c_data {
 	// input device
@@ -475,6 +478,7 @@ static int ilitek_i2c_process_and_report(void) {
 				i2c.last_touch2_y = 0;
 				input_mt_sync(i2c.input_dev);
 			}
+            touch_move = false;
 		}
 		else {
 			if (tp_id & 0x01) {
@@ -489,8 +493,19 @@ static int ilitek_i2c_process_and_report(void) {
 				if (x1 == 0) x1++;
 				if (y1 == 0) y1++;
 
-				if ((i2c.last_touch1_x != x1) || (i2c.last_touch1_y != y1))
-					changed = true;
+                if (touch_filter > 0 && !touch_move &&
+                        i2c.last_touch1_x != 0 && i2c.last_touch1_y != 0) {
+                    if ((i2c.last_touch1_x + touch_filter < x1) ||
+                            (i2c.last_touch1_x - touch_filter > x1) ||
+                            (i2c.last_touch1_y + touch_filter < y1) ||
+                            (i2c.last_touch1_y - touch_filter > y1)) {
+                        touch_move = true;
+                        changed = true;
+                    }
+                } else {
+                    if ((i2c.last_touch1_x != x1) || (i2c.last_touch1_y != y1))
+                    changed = true;
+                }
 			}
 
 			if (tp_id & 0x02) {
@@ -661,10 +676,22 @@ static ssize_t ilitek_version_show(struct device *dev, struct device_attribute *
 	}
 }
 
+static ssize_t touch_filter_read(struct device *dev, struct device_attribute *attr, char *buf) {
+	return sprintf(buf,"%d\n", touch_filter);
+}
+
+static ssize_t touch_filter_write(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	sscanf(buf, "%d\n", &touch_filter);
+	return size;
+}
+
 static DEVICE_ATTR(version, S_IRUGO, ilitek_version_show, NULL);
+static DEVICE_ATTR(touch_filter, S_IRUGO | S_IWUGO, touch_filter_read, touch_filter_write);
 
 static struct attribute *ilitek_attrs[] = {
 	&dev_attr_version.attr,
+	&dev_attr_touch_filter.attr,
 	NULL
 };
 
