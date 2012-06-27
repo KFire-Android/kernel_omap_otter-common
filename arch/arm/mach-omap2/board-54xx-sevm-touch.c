@@ -253,8 +253,6 @@ static struct i2c_board_info __initdata sevm_i2c_bus4_touch_info[] = {
 
 int __init sevm_touch_init(void)
 {
-	gpio_request(OMAP5_TOUCH_IRQ_1, "atmel touch irq");
-	gpio_direction_input(OMAP5_TOUCH_IRQ_1);
 	gpio_request(OMAP5_TOUCH_RESET, "atmel reset");
 
 	i2c_register_board_info(4, sevm_i2c_bus4_touch_info,
