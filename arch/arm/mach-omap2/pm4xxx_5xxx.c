@@ -85,8 +85,15 @@ static int omap4_5_pm_suspend(void)
 		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
 
 	/* Set targeted power domain states by suspend */
-	list_for_each_entry(pwrst, &pwrst_list, node)
+	list_for_each_entry(pwrst, &pwrst_list, node) {
+		if (pwrst->pwrdm->flags & PWRDM_HAS_EXTRA_OFF_ENABLE) {
+			pwrst->next_state = (off_mode_enabled) ?
+					     PWRDM_POWER_OFF :
+					     PWRDM_POWER_OSWR;
+		}
+
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
+	}
 
 	/*
 	 * For MPUSS to hit power domain retention(CSWR or OSWR),
