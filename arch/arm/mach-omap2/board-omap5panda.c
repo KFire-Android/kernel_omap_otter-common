@@ -10,7 +10,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-
+#include <linux/clk.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
@@ -46,8 +46,18 @@
 #include <video/omap-panel-generic-dpi.h>
 
 
+/* USBB3 to SMSC LAN9730 */
+#define GPIO_ETH_NRESET 15
+/* USBB2 to SMSC 3530 HUB */
+#define GPIO_HUB_NRESET 80
+
 #ifdef CONFIG_OMAP_MUX
 static struct omap_board_mux board_mux[] __initdata = {
+	OMAP5_MUX(FREF_CLK1_OUT, OMAP_PIN_INPUT_PULLUP),
+	OMAP5_MUX(LLIA_WAKEREQIN, OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
+	OMAP5_MUX(HSI2_CAFLAG, OMAP_PIN_OUTPUT | OMAP_PIN_OFF_NONE | OMAP_MUX_MODE6),
+	OMAP5_MUX(USBB2_HSIC_STROBE, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
+	OMAP5_MUX(USBB2_HSIC_DATA, OMAP_PIN_INPUT | OMAP_MUX_MODE0),
 	{ .reg_offset = OMAP_MUX_TERMINATOR },
 };
 #else
@@ -62,6 +72,7 @@ static struct __devinitdata emif_custom_configs custom_configs = {
 };
 #endif
 #endif
+
 
 static struct omap2_hsmmc_info mmc[] = {
 	{
@@ -730,6 +741,33 @@ static void __init omap5panda_display_init(void)
 	omap_display_init(&omap5evm_dss_data);
 }
 
+static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[1] = OMAP_EHCI_PORT_MODE_HSIC,
+	.port_mode[2] = OMAP_EHCI_PORT_MODE_HSIC,
+	.phy_reset  = true,
+	.reset_gpio_port[0]  = -EINVAL,
+	.reset_gpio_port[1]  = GPIO_HUB_NRESET,
+	.reset_gpio_port[2]  = GPIO_ETH_NRESET
+};
+
+static void __init omap_ehci_ohci_init(void)
+{
+	struct clk *phy_ref_clk;
+
+       /* FREF_CLK1 provides the 19.2 MHz reference clock to the PHY */
+	phy_ref_clk = clk_get(NULL, "auxclk1_ck");
+	if (IS_ERR(phy_ref_clk)) {
+		pr_err("Cannot request auxclk1\n");
+	} else {
+		clk_set_rate(phy_ref_clk, 19200000);
+		clk_enable(phy_ref_clk);
+	}
+
+	usbhs_init(&usbhs_bdata);
+	return;
+}
+
 static void __init omap_5_panda_init(void)
 {
 
@@ -755,6 +793,7 @@ static void __init omap_5_panda_init(void)
 			"twl6040", OMAP44XX_IRQ_SYS_2N, &twl6040_data);
 
 	omap_serial_init();
+	omap_ehci_ohci_init();
 
 	omap_hsmmc_init(mmc);
 	usb_dwc3_init();
