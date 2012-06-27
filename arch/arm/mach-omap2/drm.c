@@ -34,15 +34,12 @@
 
 #if defined(CONFIG_DRM_OMAP) || (CONFIG_DRM_OMAP_MODULE)
 
-static struct omap_drm_platform_data omapdrm_platdata;
-
 static struct platform_device omap_drm_device = {
-		.dev = {
-			.coherent_dma_mask = DMA_BIT_MASK(32),
-			.platform_data = &omapdrm_platdata,
-		},
-		.name = "omapdrm",
-		.id = 0,
+	.dev = {
+		.coherent_dma_mask = DMA_BIT_MASK(32),
+	},
+	.name = "omapdrm",
+	.id = 0,
 };
 
 #if defined(CONFIG_DRM_OMAP_DMM_TILER) || (CONFIG_DRM_OMAP_DMM_TILER_MODULE)

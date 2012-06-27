@@ -213,8 +213,9 @@ ifneq ($(CONFIG_TIDSPBRIDGE),)
 obj-y					+= dsp.o
 endif
 
-omapdrm-$(CONFIG_DRM_OMAP)		:= drm.o
-obj-y					+= $(omapdrm-m) $(omapdrm-y)
+ifneq ($(CONFIG_DRM_OMAP),)
+obj-y					+= drm.o
+endif
 
 # Specific board support
 obj-$(CONFIG_MACH_OMAP_GENERIC)		+= board-generic.o
