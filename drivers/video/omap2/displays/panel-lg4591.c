@@ -44,7 +44,7 @@
 static struct omap_video_timings lg4591_timings = {
 	.x_res		= 720,
 	.y_res		= 1280,
-	.pixel_clock	= 80842,
+	.pixel_clock	= 73147,
 	.hfp		= 62,
 	.hsw		= 4,
 	.hbp		= 154,
