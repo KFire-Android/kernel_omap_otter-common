@@ -71,6 +71,7 @@ static struct {
 	bool custom_set;
 	int hdmi_irq;
 	bool hdcp;
+	bool can_do_hdmi;
 
 	struct clk *sys_clk;
 	struct clk *dss_32k_clk;
@@ -220,6 +221,8 @@ void hdmi_get_monspecs(struct omap_dss_device *dssdev)
 		hdmi.force_timings = false;
 		return;
 	}
+
+	hdmi.can_do_hdmi = specs->misc & FB_MISC_HDMI;
 
 	/* filter out resolutions we don't support */
 	for (i = j = 0; i < specs->modedb_len; i++) {
@@ -444,6 +447,8 @@ static int hdmi_power_on(struct omap_dss_device *dssdev)
 		DSSDBG("Failed to start PHY\n");
 		goto err;
 	}
+
+	hdmi.ip_data.cfg.cm.mode = hdmi.can_do_hdmi ? hdmi.mode : HDMI_DVI;
 
 	hdmi.ip_data.ops->video_configure(&hdmi.ip_data);
 
