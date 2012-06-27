@@ -496,6 +496,69 @@ static void __init omap_init_gpu(void)
 	WARN(IS_ERR(pdev), "Could not build omap_device for %s %s\n",
 	     name, oh_name);
 
+	/*
+	 * Most OMAP5xxx ES1.0 silicon does not support OPP_OD, therefore the
+	 * OPP table will enable only OPP_LOW and OPP_NOM. As per the 5430 and
+	 * 5432 data manuals for ES1.0, OPP_LOW and OPP_NOM are 192 MHz and
+	 * 384 MHz respectively and require DPLL_PER as source clock.
+	 */
+	if ((omap_rev() == OMAP5430_REV_ES1_0) ||
+	    (omap_rev() == OMAP5432_REV_ES1_0)) {
+		struct clk *cck, *hck, *pck, *orig_cck_parent;
+		int ret;
+
+		cck = clk_get(&pdev->dev, "gpu_core_clk_mux");
+		if (IS_ERR_OR_NULL(cck)) {
+			WARN(1, "%s: Requesting GPU core clock failed. \
+				GPU may be unstable\n", __func__);
+			goto exit;
+		}
+
+		hck = clk_get(&pdev->dev, "gpu_hyd_clk_mux");
+		if (IS_ERR_OR_NULL(hck)) {
+			WARN(1, "%s: Requesting GPU hyd clock failed. \
+				GPU may be unstable\n", __func__);
+			goto exit_hyd;
+		}
+
+		pck = clk_get(&pdev->dev, "dpll_per_h14x2_ck");
+		if (IS_ERR_OR_NULL(pck)) {
+			WARN(1, "%s: Requesting GPU per clock failed. \
+				GPU may be unstable\n", __func__);
+			goto exit_dpll;
+		}
+		orig_cck_parent = clk_get_parent(cck);
+		if (IS_ERR(orig_cck_parent)) {
+			WARN(1, "%s: Getting original GPU core clock failed. \
+				GPU may be unstable\n", __func__);
+			goto exit_set_parent_cck;
+		}
+		ret = clk_set_parent(cck, pck);
+		if (IS_ERR_VALUE(ret)) {
+			WARN(1, "%s: Setting GPU core parent clock failed. \
+				GPU may be unstable\n", __func__);
+			goto exit_set_parent_cck;
+		}
+
+		ret = clk_set_parent(hck, pck);
+		if (IS_ERR_VALUE(ret)) {
+			WARN(1, "%s: Setting GPU hyd parent clock failed. \
+				GPU may be unstable\n", __func__);
+			ret = clk_set_parent(cck, orig_cck_parent);
+			if (IS_ERR_VALUE(ret))
+				pr_err("%s: Cannot reset GPU core clock back \
+					to original clock parent\n", __func__);
+			goto exit_set_parent_cck;
+		}
+
+exit_set_parent_cck:
+		clk_put(pck);
+exit_dpll:
+		clk_put(hck);
+exit_hyd:
+		clk_put(cck);
+	}
+exit:
 	kfree(pdata);
 }
 
