@@ -213,7 +213,6 @@ static int dmm_txn_append(struct dmm_txn *txn, struct pat_area *area,
 			page_to_phys(pages[n]) : engine->dmm->dummy_pa;
 	}
 
-	/* fill in lut with new addresses */
 	for (i = 0; i < rows; i++, lut += omap_dmm->lut_width)
 		memcpy(lut, &data[i*columns], columns * sizeof(u32));
 
@@ -908,12 +907,68 @@ error:
 }
 #endif
 
+#ifdef CONFIG_PM
+static int omap_dmm_resume(struct device *dev)
+{
+	struct page **pages;
+	struct tcm_area area = {0};
+	int number_slots;
+	int i, j;
+
+	if (!dmm_is_initialized()) {
+		dev_err(dev, "%s: DMM not initialized\n", __func__);
+		return -ENODEV;
+	}
+
+	number_slots = omap_dmm->container_height * omap_dmm->container_width;
+	pages = kmalloc(number_slots * sizeof(*pages), GFP_KERNEL);
+
+	if (!pages) {
+		dev_err(dev, "%s: Failed to allocate page structures\n",
+				__func__);
+		return -ENOMEM;
+	}
+
+	area.p1.x = omap_dmm->container_width - 1;
+	area.p1.y = omap_dmm->container_height - 1;
+
+	for (i = 0; i < omap_dmm->num_lut; i++) {
+		area.tcm = omap_dmm->tcm[i];
+		area.is2d = (cpu_is_omap54xx() && i) ? false : true;
+
+		for (j = 0; j < number_slots; j++) {
+			if (area.tcm->lut[j] != omap_dmm->dummy_pa)
+				pages[j] = phys_to_page(area.tcm->lut[j]);
+			else
+				pages[j] = NULL;
+		}
+
+		if (fill(&area, pages, omap_dmm->container_width *
+				omap_dmm->container_height, 0, true))
+			dev_err(omap_dmm->dev, "refill failed");
+	}
+
+	dev_info(omap_dmm->dev, "%s: omap_dmm_resume:PAT entries restored\n",
+			__func__);
+
+	kfree(pages);
+	return 0;
+}
+
+static const struct dev_pm_ops omap_dmm_pm_ops = {
+	.resume = omap_dmm_resume,
+};
+#endif
+
 struct platform_driver omap_dmm_driver = {
 	.probe = omap_dmm_probe,
 	.remove = omap_dmm_remove,
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = DMM_DRIVER_NAME,
+#ifdef CONFIG_PM
+		.pm = &omap_dmm_pm_ops,
+#endif
 	},
 };
 
