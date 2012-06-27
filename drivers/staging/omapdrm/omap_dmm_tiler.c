@@ -175,7 +175,8 @@ static struct dmm_txn *dmm_txn_init(struct dmm *dmm, struct tcm *tcm)
  * corresponding slot is cleared (ie. dummy_pa is programmed)
  */
 static int dmm_txn_append(struct dmm_txn *txn, struct pat_area *area,
-		struct page **pages, uint32_t npages, uint32_t roll)
+		struct page **pages, uint32_t npages, uint32_t roll,
+		uint32_t y_offset)
 {
 	dma_addr_t pat_pa = 0;
 	uint32_t *data;
@@ -184,9 +185,8 @@ static int dmm_txn_append(struct dmm_txn *txn, struct pat_area *area,
 	int columns = (1 + area->x1 - area->x0);
 	int rows = (1 + area->y1 - area->y0);
 	int i = columns*rows;
-	u32 *lut = omap_dmm->lut + (engine->tcm->lut_id * omap_dmm->lut_width *
-			omap_dmm->lut_height) +
-			(area->y0 * omap_dmm->lut_width) + area->x0;
+	u32 *lut = engine->tcm->lut + (area->y0 * omap_dmm->lut_width) +
+			area->x0;
 
 	pat = alloc_dma(txn, sizeof(struct pat), &pat_pa);
 
@@ -194,9 +194,13 @@ static int dmm_txn_append(struct dmm_txn *txn, struct pat_area *area,
 		txn->last_pat->next_pa = (uint32_t)pat_pa;
 
 	pat->area = *area;
+
+	pat->area.y0 += y_offset;
+	pat->area.y1 += y_offset;
+
 	pat->ctrl = (struct pat_ctrl){
 			.start = 1,
-			.lut_id = engine->tcm->lut_id,
+			.lut_id = 0,
 		};
 
 	data = alloc_dma(txn, 4*i, &pat->data_pa);
@@ -276,18 +280,23 @@ static int fill(struct tcm_area *area, struct page **pages,
 	int ret = 0;
 	struct tcm_area slice, area_s;
 	struct dmm_txn *txn;
+	u32 y_offset = 0;
 
 	txn = dmm_txn_init(omap_dmm, area->tcm);
 	if (IS_ERR_OR_NULL(txn))
 		return PTR_ERR(txn);
 
+	if (cpu_is_omap54xx() && !area->is2d)
+		y_offset = OMAP5_LUT_OFFSET;
+
 	tcm_for_each_slice(slice, *area, area_s) {
 		struct pat_area p_area = {
-				.x0 = slice.p0.x,  .y0 = slice.p0.y,
-				.x1 = slice.p1.x,  .y1 = slice.p1.y,
+				.x0 = slice.p0.x, .y0 = slice.p0.y,
+				.x1 = slice.p1.x, .y1 = slice.p1.y,
 		};
 
-		ret = dmm_txn_append(txn, &p_area, pages, npages, roll);
+		ret = dmm_txn_append(txn, &p_area, pages, npages, roll,
+					y_offset);
 		if (ret)
 			goto fail;
 
@@ -567,6 +576,16 @@ static int omap_dmm_probe(struct platform_device *dev)
 	omap_dmm->lut_width = ((pat_geom >> 16) & 0xF) << 5;
 	omap_dmm->lut_height = ((pat_geom >> 24) & 0xF) << 5;
 
+	/* adjust parameters for OMAP5
+	 * Even though there is 1 LUT, it is twice the size of the LUT in OMAP4.
+	 * Programming 1D areas requires an offset be added to all of the Y
+	 * coordinates
+	*/
+	if (cpu_is_omap54xx()) {
+		omap_dmm->num_lut++;
+		omap_dmm->lut_height = 128;
+	}
+
 	/* initialize DMM registers */
 	writel(0x88888888, omap_dmm->base + DMM_PAT_VIEW__0);
 	writel(0x88888888, omap_dmm->base + DMM_PAT_VIEW__1);
@@ -668,19 +687,26 @@ static int omap_dmm_probe(struct platform_device *dev)
 			goto fail;
 		}
 
+		/* get offset into LUT table for this container */
+		omap_dmm->tcm[i]->lut = omap_dmm->lut +
+			(i * omap_dmm->lut_width * omap_dmm->lut_height);
 		omap_dmm->tcm[i]->lut_id = i;
 	}
 
 	/* assign access mode containers to applicable tcm container */
 	/* OMAP 4 has 1 container for all 4 views */
+	/* OMAP 5 has 2 containers, 1 for 2D and 1 for 1D */
 	containers[TILFMT_8BIT] = omap_dmm->tcm[0];
 	containers[TILFMT_16BIT] = omap_dmm->tcm[0];
 	containers[TILFMT_32BIT] = omap_dmm->tcm[0];
-	containers[TILFMT_PAGE] = omap_dmm->tcm[0];
+	if (cpu_is_omap54xx())
+		containers[TILFMT_PAGE] = omap_dmm->tcm[1];
+	else
+		containers[TILFMT_PAGE] = omap_dmm->tcm[0];
 
 	area = (struct tcm_area) {
 		.is2d = true,
-		.tcm = NULL,
+		.tcm = omap_dmm->tcm[0],
 		.p1.x = omap_dmm->container_width - 1,
 		.p1.y = omap_dmm->container_height - 1,
 	};
@@ -689,8 +715,13 @@ static int omap_dmm_probe(struct platform_device *dev)
 		omap_dmm->lut[i] = omap_dmm->dummy_pa;
 
 	/* initialize all LUTs to dummy page entries */
-	for (i = 0; i < omap_dmm->num_lut; i++) {
-		area.tcm = omap_dmm->tcm[i];
+	if (fill(&area, NULL, 0, 0, true))
+		dev_err(omap_dmm->dev, "refill failed");
+
+	if (cpu_is_omap54xx()) {
+		area.tcm = omap_dmm->tcm[1];
+		area.is2d = false;
+
 		if (fill(&area, NULL, 0, 0, true))
 			dev_err(omap_dmm->dev, "refill failed");
 	}
@@ -794,6 +825,7 @@ int tiler_map_show(struct seq_file *s, void *arg)
 	int h_adj;
 	int w_adj;
 	unsigned long flags;
+	int lut_idx;
 
 	if (!omap_dmm) {
 		/* early return if dmm/tiler device is not initialized */
@@ -803,55 +835,69 @@ int tiler_map_show(struct seq_file *s, void *arg)
 	h_adj = omap_dmm->lut_height / ydiv;
 	w_adj = omap_dmm->lut_width / xdiv;
 
-	map = kzalloc(h_adj * sizeof(*map), GFP_KERNEL);
-	global_map = kzalloc((w_adj + 1) * h_adj, GFP_KERNEL);
+	map = kmalloc(h_adj * sizeof(*map), GFP_KERNEL);
+	global_map = kmalloc((w_adj + 1) * h_adj, GFP_KERNEL);
 
 	if (!map || !global_map)
 		goto error;
 
-	memset(global_map, ' ', (w_adj + 1) * h_adj);
-	for (i = 0; i < omap_dmm->lut_height; i++) {
-		map[i] = global_map + i * (w_adj + 1);
-		map[i][w_adj] = 0;
-	}
-	spin_lock_irqsave(&list_lock, flags);
+	for (lut_idx = 0; lut_idx < omap_dmm->num_lut; lut_idx++) {
+		memset(map, 0, sizeof(h_adj * sizeof(*map)));
+		memset(global_map, ' ', (w_adj + 1) * h_adj);
 
-	list_for_each_entry(block, &omap_dmm->alloc_head, alloc_node) {
-		if (block->fmt != TILFMT_PAGE) {
-			fill_map(map, xdiv, ydiv, &block->area, *m2dp, true);
-			if (!*++a2dp)
-				a2dp = a2d;
-			if (!*++m2dp)
-				m2dp = m2d;
-			map_2d_info(map, xdiv, ydiv, nice, &block->area);
-		} else {
-			bool start = read_map_pt(map, xdiv, ydiv,
-							&block->area.p0)
-									== ' ';
-			bool end = read_map_pt(map, xdiv, ydiv, &block->area.p1)
-									== ' ';
-			tcm_for_each_slice(a, block->area, p)
-				fill_map(map, xdiv, ydiv, &a, '=', true);
-			fill_map_pt(map, xdiv, ydiv, &block->area.p0,
-							start ? '<' : 'X');
-			fill_map_pt(map, xdiv, ydiv, &block->area.p1,
-							end ? '>' : 'X');
-			map_1d_info(map, xdiv, ydiv, nice, &block->area);
+		for (i = 0; i < omap_dmm->lut_height; i++) {
+			map[i] = global_map + i * (w_adj + 1);
+			map[i][w_adj] = 0;
 		}
-	}
+		spin_lock_irqsave(&list_lock, flags);
 
-	spin_unlock_irqrestore(&list_lock, flags);
+		list_for_each_entry(block, &omap_dmm->alloc_head, alloc_node) {
+			if (block->area.tcm->lut_id == lut_idx) {
+				if (block->fmt != TILFMT_PAGE) {
+					fill_map(map, xdiv, ydiv, &block->area,
+						*m2dp, true);
+					if (!*++a2dp)
+						a2dp = a2d;
+					if (!*++m2dp)
+						m2dp = m2d;
+					map_2d_info(map, xdiv, ydiv, nice,
+							&block->area);
+				} else {
+					bool start = read_map_pt(map, xdiv,
+						ydiv, &block->area.p0) == ' ';
+					bool end = read_map_pt(map, xdiv, ydiv,
+							&block->area.p1) == ' ';
 
-	if (s) {
-		seq_printf(s, "BEGIN DMM TILER MAP\n");
-		for (i = 0; i < 128; i++)
-			seq_printf(s, "%03d:%s\n", i, map[i]);
-		seq_printf(s, "END TILER MAP\n");
-	} else {
-		dev_dbg(omap_dmm->dev, "BEGIN DMM TILER MAP\n");
-		for (i = 0; i < 128; i++)
-			dev_dbg(omap_dmm->dev, "%03d:%s\n", i, map[i]);
-		dev_dbg(omap_dmm->dev, "END TILER MAP\n");
+					tcm_for_each_slice(a, block->area, p)
+						fill_map(map, xdiv, ydiv, &a,
+							'=', true);
+					fill_map_pt(map, xdiv, ydiv,
+							&block->area.p0,
+							start ? '<' : 'X');
+					fill_map_pt(map, xdiv, ydiv,
+							&block->area.p1,
+							end ? '>' : 'X');
+					map_1d_info(map, xdiv, ydiv, nice,
+							&block->area);
+				}
+			}
+		}
+
+		spin_unlock_irqrestore(&list_lock, flags);
+
+		if (s) {
+			seq_printf(s, "CONTAINER %d DUMP BEGIN\n", lut_idx);
+			for (i = 0; i < 128; i++)
+				seq_printf(s, "%03d:%s\n", i, map[i]);
+			seq_printf(s, "CONTAINER %d DUMP END\n", lut_idx);
+		} else {
+			dev_dbg(omap_dmm->dev, "CONTAINER %d DUMP_BEGIN\n",
+				lut_idx);
+			for (i = 0; i < 128; i++)
+				dev_dbg(omap_dmm->dev, "%03d:%s\n", i, map[i]);
+			dev_dbg(omap_dmm->dev, "CONTAINER %d DUMP END\n",
+				lut_idx);
+		}
 	}
 
 error:

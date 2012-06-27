@@ -128,7 +128,7 @@ static inline bool validfmt(enum tiler_fmt fmt)
 
 static inline int dmm_is_available(void)
 {
-	return cpu_is_omap44xx();
+	return cpu_is_omap44xx() || cpu_is_omap54xx();
 }
 
 #endif
