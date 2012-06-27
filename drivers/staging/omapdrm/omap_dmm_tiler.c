@@ -120,7 +120,7 @@ static int wait_status(struct refill_engine *engine, uint32_t wait_mask)
 	return 0;
 }
 
-irqreturn_t omap_dmm_irq_handler(int irq, void *arg)
+static irqreturn_t omap_dmm_irq_handler(int irq, void *arg)
 {
 	struct dmm *dmm = arg;
 	uint32_t status = readl(dmm->base + DMM_PAT_IRQSTATUS);
@@ -350,7 +350,7 @@ struct tiler_block *tiler_reserve_2d(enum tiler_fmt fmt, uint16_t w,
 	ret = tcm_reserve_2d(containers[fmt], w, h, align, &block->area);
 	if (ret) {
 		kfree(block);
-		return 0;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	/* add to allocation list */
@@ -367,14 +367,14 @@ struct tiler_block *tiler_reserve_1d(size_t size)
 	int num_pages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 
 	if (!block)
-		return 0;
+		return ERR_PTR(-ENOMEM);
 
 	block->fmt = TILFMT_PAGE;
 
 	if (tcm_reserve_1d(containers[TILFMT_PAGE], num_pages,
 				&block->area)) {
 		kfree(block);
-		return 0;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	spin_lock(&list_lock);
