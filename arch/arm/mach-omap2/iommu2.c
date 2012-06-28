@@ -120,7 +120,7 @@ static int omap2_iommu_enable(struct iommu *obj)
 	}
 
 	l = iommu_read_reg(obj, MMU_REVISION);
-	dev_info(obj->dev, "%s: version %d.%d\n", obj->name,
+	dev_dbg(obj->dev, "%s: version %d.%d\n", obj->name,
 		 (l >> 4) & 0xf, l & 0xf);
 
 	l = iommu_read_reg(obj, MMU_SYSCONFIG);

@@ -22,6 +22,11 @@
 
 #include "tf_defs.h"
 
+#ifdef CONFIG_TF_ION
+extern struct ion_device *omap_ion_device;
+#define zebra_ion_device omap_ion_device
+#endif
+
 int tf_ctrl_device_register(void);
 
 int tf_start(struct tf_comm *comm,

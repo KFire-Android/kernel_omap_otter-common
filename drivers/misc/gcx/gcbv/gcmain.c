@@ -13,8 +13,6 @@
  */
 
 #include <plat/cpu.h>
-#include <linux/gcx.h>
-#include <linux/gcbv.h>
 #include "gcmain.h"
 #include "gcbv-priv.h"
 

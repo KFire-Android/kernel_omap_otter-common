@@ -1,0 +1,15 @@
+
+config RPC_OMAP
+	tristate "OMAP Remote Procedure Call driver"
+	default y
+	depends on RPMSG
+	depends on (TI_TILER && ION_OMAP) || (DMA_SHARED_BUFFER && DRM_OMAP)
+	depends on REMOTEPROC || REMOTE_PROC
+	depends on OMAP_REMOTEPROC || OMAP_REMOTE_PROC
+	---help---
+	  An rpmsg driver that exposes the Remote Procedure Call API to
+	  user space, in order to allow applications to distribute
+	  remote calls to more power-efficient remote processors on OMAP4+ systems.
+
+	  If unsure, say N.
+

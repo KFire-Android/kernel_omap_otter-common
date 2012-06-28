@@ -71,8 +71,20 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
 	sys_clk_rate = voltdm->sys_clk.rate / 1000;
 
 	timeout = (sys_clk_rate * voltdm->pmic->vp_timeout_us) / 1000;
-	vddmin = voltdm->pmic->uv_to_vsel(voltdm->pmic->vp_vddmin);
-	vddmax = voltdm->pmic->uv_to_vsel(voltdm->pmic->vp_vddmax);
+
+	if (!vp->vlimits) {
+		WARN(1, "%s: voldm_%s: No limits for VP? Using PMIC data\n",
+			   __func__, voltdm->name);
+		vddmin = voltdm->pmic->uv_to_vsel(max(voltdm->pmic->ret_volt,
+						voltdm->pmic->min_volt));
+		vddmax = voltdm->pmic->uv_to_vsel(voltdm->pmic->max_volt);
+	} else {
+		vddmin = voltdm->pmic->uv_to_vsel(max(voltdm->pmic->ret_volt,
+					max(voltdm->pmic->min_volt,
+						vp->vlimits->vddmin)));
+		vddmax = voltdm->pmic->uv_to_vsel(min(voltdm->pmic->max_volt,
+				vp->vlimits->vddmax));
+	}
 
 	waittime = DIV_ROUND_UP(voltdm->pmic->step_size * sys_clk_rate,
 				1000 * voltdm->pmic->slew_rate);

@@ -15,11 +15,10 @@
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/module.h>
+#include <linux/uaccess.h>
 #include <linux/gcx.h>
 #include <linux/gccore.h>
-#include <linux/gcdebug.h>
-#include "gcmmu.h"
-
+#include "gcmain.h"
 
 #define MMU_UNITS  4
 #define MMU_ERROR(irq_ack) ((irq_ack & 0x40000000) != 0)
@@ -29,7 +28,6 @@ enum gc_debug_when {
 	GC_DEBUG_DRIVER_POWEROFF,
 	GC_DEBUG_DRIVER_IRQ
 };
-
 
 struct gc_gpu_id {
 	bool	     valid;
@@ -42,8 +40,7 @@ struct gc_gpu_id {
 };
 
 static struct gc_gpu_id g_gcGpuId;
-
-
+static struct dentry *debug_root;
 
 void gc_debug_cache_gpu_id(void)
 {
@@ -90,7 +87,6 @@ static const struct file_operations gc_debug_fops_gpu_id = {
 	.release = single_release,
 };
 
-
 struct gc_gpu_status {
 	bool		   valid;
 	const char        *name;
@@ -120,7 +116,6 @@ struct gc_gpu_status g_gcGpuStatusLastError = {
 
 /* By default we don't cache the status on every irq */
 static int g_gcCacheStatusEveryIrq;
-
 
 void gc_debug_cache_gpu_status_internal(enum gc_debug_when when,
 					unsigned int acknowledge)
@@ -197,6 +192,8 @@ static const char *gc_power_string(enum gcpower power)
 		return "GCPWR_OFF";
 	case GCPWR_ON:
 		return "GCPWR_ON";
+	case GCPWR_LOW:
+		return "GCPWR_LOW";
 	}
 
 	return "unknown";
@@ -387,10 +384,134 @@ static const struct file_operations gc_debug_fops_blt_stats = {
 	.release = single_release,
 };
 
+/*****************************************************************************/
 
-
-void gc_debug_init(struct dentry *debug_root)
+static int gc_debug_show_log_dump(struct seq_file *s, void *data)
 {
+	GCDBG_FLUSHDUMP(s);
+	return 0;
+}
+
+static int gc_debug_open_log_dump(struct inode *inode, struct file *file)
+{
+	return single_open(file, gc_debug_show_log_dump, 0);
+}
+
+static const struct file_operations gc_debug_fops_log_dump = {
+	.open = gc_debug_open_log_dump,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+/*****************************************************************************/
+
+static int gc_debug_show_log_enable(struct seq_file *s, void *data)
+{
+	GCDBG_SHOWENABLED(s);
+	return 0;
+}
+
+static int gc_debug_open_log_enable(struct inode *inode, struct file *file)
+{
+	return single_open(file, gc_debug_show_log_enable, 0);
+}
+
+static ssize_t gc_debug_write_log_enable(
+	struct file *file,
+	const char __user *user_buf,
+	size_t count, loff_t *ppos)
+{
+	char buf[128];
+	size_t len;
+	unsigned long val;
+	int ret;
+	char *name = 0;
+
+	len = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, user_buf, len))
+		return -EFAULT;
+
+	buf[len] = '\0';
+
+	ret = kstrtoul(buf, 0, &val);
+	if (ret < 0) {
+		int i;
+		for (i = 0; i < len - 1; i++) {
+			if (buf[i] == ' ') {
+				buf[i] = 0;
+
+				ret = kstrtoul(&buf[i+1], 0, &val);
+				if (ret < 0)
+					return -EINVAL;
+
+				name = &buf[0];
+				break;
+			}
+		}
+
+		if (!name)
+			return -EINVAL;
+	}
+
+	if (name)
+		GCDBG_SETFILTER(name, val);
+	else if (val)
+		GCDBG_ENABLEDUMP();
+	else
+		GCDBG_DISABLEDUMP();
+
+	return count;
+}
+
+static const struct file_operations gc_debug_fops_log_enable = {
+	.open    = gc_debug_open_log_enable,
+	.write   = gc_debug_write_log_enable,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
+/*****************************************************************************/
+
+static int gc_debug_show_log_reset(struct seq_file *s, void *data)
+{
+	GCDBG_RESETDUMP();
+	return 0;
+}
+
+static int gc_debug_open_log_reset(struct inode *inode, struct file *file)
+{
+	return single_open(file, gc_debug_show_log_reset, 0);
+}
+
+static ssize_t gc_debug_write_log_reset(
+	struct file *file,
+	const char __user *user_buf,
+	size_t count, loff_t *ppos)
+{
+	GCDBG_RESETDUMP();
+	return count;
+}
+
+static const struct file_operations gc_debug_fops_log_reset = {
+	.open    = gc_debug_open_log_reset,
+	.write   = gc_debug_write_log_reset,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = single_release,
+};
+
+/*****************************************************************************/
+
+void gc_debug_init(void)
+{
+	struct dentry *logDir;
+
+	debug_root = debugfs_create_dir("gcx", NULL);
+	if (!debug_root)
+		return;
+
 	debugfs_create_file("id", 0664, debug_root, NULL,
 			    &gc_debug_fops_gpu_id);
 	debugfs_create_file("status", 0664, debug_root, NULL,
@@ -401,6 +522,23 @@ void gc_debug_init(struct dentry *debug_root)
 			    &gc_debug_fops_gpu_last_error);
 	debugfs_create_bool("cache_status_every_irq", 0666, debug_root,
 			    &g_gcCacheStatusEveryIrq);
+
+	logDir = debugfs_create_dir("log", debug_root);
+	if (!logDir)
+		return;
+
+	debugfs_create_file("enable", 0664, logDir, NULL,
+						&gc_debug_fops_log_enable);
+	debugfs_create_file("reset", 0664, logDir, NULL,
+						&gc_debug_fops_log_reset);
+	debugfs_create_file("dump", 0664, logDir, NULL,
+						&gc_debug_fops_log_dump);
+}
+
+void gc_debug_shutdown(void)
+{
+	if (debug_root)
+		debugfs_remove_recursive(debug_root);
 }
 
 /* called just BEFORE powering off */

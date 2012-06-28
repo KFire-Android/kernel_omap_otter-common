@@ -190,8 +190,12 @@ static void tf_clock_timer_cb(unsigned long data)
 	 * DES   : 1 << 1
 	 * AES1  : 1 << 2
 	 * AES2  : 1 << 3
+	 * RNG   : 1 << 4
+	 * PKA   : 1 << 5
+	 *
+	 * Clock patch active: 1 << 7
 	 */
-	if (ret & 0xf)
+	if (ret & 0x3f)
 		goto restart;
 
 	wake_unlock(&g_tf_wake_lock);
@@ -684,6 +688,8 @@ int tf_start(struct tf_comm *comm,
 	workspace_size -= 0x20000;
 	sdp_bkext_store_addr = workspace_addr + workspace_size;
 
+	tf_clock_timer_start();
+
 	if (test_bit(TF_COMM_FLAG_PA_AVAILABLE, &comm->flags)) {
 		dpr_err("%s(%p): The SMC PA is already started\n",
 			__func__, comm);
@@ -871,6 +877,7 @@ error1:
 	}
 
 exit:
+	tf_clock_timer_stop();
 #ifdef CONFIG_SMP
 	ret_affinity = sched_setaffinity(0, &saved_cpu_mask);
 	if (ret_affinity != 0)

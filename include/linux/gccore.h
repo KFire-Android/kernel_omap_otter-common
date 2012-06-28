@@ -18,19 +18,11 @@
 #include <linux/sched.h>
 #include "gcioctl.h"
 
-/* Synchronization functions. */
-#define GC_INFINITE (~0U)
-void gc_delay(unsigned int milliseconds);
-enum gcerror gc_wait_completion(struct completion *completion,
-				unsigned int milliseconds);
-enum gcerror gc_acquire_mutex(struct mutex *mutex,
-				unsigned int milliseconds);
-
 /* Command buffer submission. */
-void gc_commit(struct gccommit *gccommit, int fromuser);
+void gc_commit(struct gccommit *gccommit, bool fromuser);
 
 /* Surface management. */
-void gc_map(struct gcmap *gcmap);
-void gc_unmap(struct gcmap *gcmap);
+void gc_map(struct gcmap *gcmap, bool fromuser);
+void gc_unmap(struct gcmap *gcmap, bool fromuser);
 
 #endif

@@ -323,14 +323,20 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 	int			retval = 0;
 	unsigned long		lockflags;
 	size_t			size = dev->rx_urb_size;
+	size_t			net_ip_align = NET_IP_ALIGN;
 
-	if ((skb = alloc_skb (size + NET_IP_ALIGN, flags)) == NULL) {
+	if (dev->udev && dev->udev->bus && dev->udev->bus->uses_dma &&
+			dev->udev->bus->dma_align)
+		net_ip_align = 0;
+
+	if ((skb = alloc_skb (size + net_ip_align, flags)) == NULL) {
 		netif_dbg(dev, rx_err, dev->net, "no rx skb\n");
 		usbnet_defer_kevent (dev, EVENT_RX_MEMORY);
 		usb_free_urb (urb);
 		return -ENOMEM;
 	}
-	skb_reserve (skb, NET_IP_ALIGN);
+	if (net_ip_align)
+		skb_reserve (skb, net_ip_align);
 
 	entry = (struct skb_data *) skb->cb;
 	entry->urb = urb;

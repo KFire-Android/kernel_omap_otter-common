@@ -17,25 +17,7 @@
 
 #include "gcerror.h"
 #include "gcreg.h"
-
-/* Debug print prefixes. */
-#define GC_MOD_PREFIX	GC_DEV_NAME ": %s(%d) "
-
-/* Debug macro stubs. */
-#ifndef GCDEBUG_ENABLE
-#	define GCDEBUG_ENABLE 0
-#endif
-
-#ifndef GCGPUSTATUS
-#	define GCGPUSTATUS(filter, zone, function, line, acknowledge)
-#endif
-
-#ifndef GCPRINT
-#	define GCPRINT(...)
-#endif
-
-#ifndef GCDUMPBUFFER
-#	define GCDUMPBUFFER(filter, zone, ptr, gpuaddr, datasize)
-#endif
+#include "gcdbglog.h"
+#include "gcdebug.h"
 
 #endif

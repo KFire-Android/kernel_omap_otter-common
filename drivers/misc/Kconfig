@@ -537,6 +537,13 @@ config TWL6040_VIB
 	depends on TWL6040_CODEC && ANDROID_TIMED_OUTPUT
 	default n
 
+config CDC_TCXO
+	tristate "Texas Instruments CDC TCXO"
+	depends on I2C
+	default n
+	help
+	  Enable support for Texas Instruments CDC TCXO CDC3S04
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
@@ -548,5 +555,6 @@ source "drivers/misc/bma250/Kconfig"
 source "drivers/misc/gcx/gccore/Kconfig"
 source "drivers/misc/gcx/gcioctl/Kconfig"
 source "drivers/misc/gcx/gcbv/Kconfig"
+source "drivers/misc/cache-2dmanager/Kconfig"
 
 endif # MISC_DEVICES

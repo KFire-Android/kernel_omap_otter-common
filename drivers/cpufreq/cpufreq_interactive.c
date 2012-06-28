@@ -611,6 +611,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		break;
 
 	case CPUFREQ_GOV_STOP:
+		/* boost timer */
+		del_timer_sync(&boost_timer);
+
 		for_each_cpu(j, policy->cpus) {
 			pcpu = &per_cpu(cpuinfo, j);
 			pcpu->governor_enabled = 0;
@@ -688,6 +691,8 @@ static int interactive_boost(struct cpufreq_policy *policy)
 		del_timer_sync(&pcpu->cpu_timer);
 		pcpu->idle_exit_time = 0;
 	}
+
+	flush_work(&freq_scale_down_work);
 	__cpufreq_driver_target(policy, policy->max,
 			CPUFREQ_RELATION_H);
 

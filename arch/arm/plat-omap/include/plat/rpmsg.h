@@ -55,6 +55,11 @@
  *
  * @RP_MBOX_ABORT_REQUEST: a "please crash" request, used for testing the
  * recovery mechanism (to some extent). will trigger a @RP_MBOX_CRASH reply.
+ *
+ * @RP_MSG_BOOTINIT_DONE: this message is sent by remote processor once it has
+ * completed some essential initialization during its boot. This notification
+ * is used to relax any constraints put in to speed up the remote processor
+ * boot.
  */
 enum {
 	RP_MBOX_READY		= 0xFFFFFF00,
@@ -63,6 +68,7 @@ enum {
 	RP_MBOX_ECHO_REQUEST	= 0xFFFFFF03,
 	RP_MBOX_ECHO_REPLY	= 0xFFFFFF04,
 	RP_MBOX_ABORT_REQUEST	= 0xFFFFFF05,
+	RP_MSG_BOOTINIT_DONE	= 0xFFFFFF08,
 };
 
 #endif /* _PLAT_RPMSG_H */

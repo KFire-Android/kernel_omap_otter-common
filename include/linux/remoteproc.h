@@ -203,6 +203,13 @@ enum rproc_state {
  *		  POS_SUSPEND event.
  *
  * @RPROC_SECURE: remote processor secure mode has changed.
+ *
+ * @RPROC_LOAD_ERROR: an error has occurred during loading the remote processor
+ *                    binary. users can use this event to release any resources
+ *                    acquired after a request to start the processor.
+ *
+ * @RPROC_PRELOAD: users can register for this event to perform any actions
+ *                 before the remoteproc starts loading the binary into memory.
  */
 enum rproc_event {
 	RPROC_ERROR,
@@ -210,6 +217,8 @@ enum rproc_event {
 	RPROC_POS_SUSPEND,
 	RPROC_RESUME,
 	RPROC_SECURE,
+	RPROC_LOAD_ERROR,
+	RPROC_PRELOAD,
 };
 
 #define RPROC_MAX_NAME	100

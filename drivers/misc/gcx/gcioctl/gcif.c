@@ -21,17 +21,43 @@
 #include <linux/uaccess.h>
 #include <linux/string.h>
 #include <plat/cpu.h>
-
-#define GCZONE_ALL		(~0U)
-#define GCZONE_INIT		(1 << 0)
-#define GCZONE_IOCTL		(1 << 1)
+#include <linux/platform_device.h>
 
 #include <linux/gcx.h>
 #include <linux/gccore.h>
 #include <linux/gcbv.h>
+#include <linux/cache-2dmanager.h>
+
 #include "gcif.h"
+#include "version.h"
+
+#define GCZONE_NONE		0
+#define GCZONE_ALL		(~0U)
+#define GCZONE_INIT		(1 << 0)
+#define GCZONE_IOCTL		(1 << 1)
+
+GCDBG_FILTERDEF(ioctl, GCZONE_NONE,
+		"init",
+		"ioctl")
 
 static struct mutex g_maplock;
+
+static struct platform_driver gcx_drv = {
+	.probe = 0,
+	.driver = {
+		.owner = THIS_MODULE,
+		.name = "gcx",
+	},
+};
+
+static const char *gcx_version = VER_FILEVERSION_STR;
+
+static ssize_t show_version(struct device_driver *driver, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%s\n", gcx_version);
+}
+
+static DRIVER_ATTR(version, 0444, show_version, NULL);
 
 /*******************************************************************************
  * Command buffer copy management.
@@ -43,27 +69,16 @@ struct gcfixup *g_fixupvacant;
 
 static enum gcerror get_buffer(struct gcbuffer **gcbuffer)
 {
-	enum gcerror gcerror;
-	int bufferlocked = 0;
+	enum gcerror gcerror = GCERR_NONE;
 	struct gcbuffer *temp;
 
 	/* Acquire buffer access mutex. */
-	gcerror = gc_acquire_mutex(&g_bufferlock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to acquire mutex (0x%08X).\n",
-			__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_BUF_ALLOC);
-		goto exit;
-	}
-	bufferlocked = 1;
+	mutex_lock(&g_bufferlock);
 
 	if (g_buffervacant == NULL) {
 		temp = kmalloc(sizeof(struct gcbuffer), GFP_KERNEL);
 		if (temp == NULL) {
-			GCPRINT(NULL, 0, GC_MOD_PREFIX
-				"out of memory.\n",
-				__func__, __LINE__);
+			GCERR("out of memory.\n");
 			gcerror = GCERR_SETGRP(GCERR_OODM,
 						GCERR_IOCTL_BUF_ALLOC);
 			goto exit;
@@ -76,35 +91,22 @@ static enum gcerror get_buffer(struct gcbuffer **gcbuffer)
 	*gcbuffer = temp;
 
 exit:
-	if (bufferlocked)
-		mutex_unlock(&g_bufferlock);
-
+	mutex_unlock(&g_bufferlock);
 	return gcerror;
 }
 
 static enum gcerror get_fixup(struct gcfixup **gcfixup)
 {
-	enum gcerror gcerror;
-	int bufferlocked = 0;
+	enum gcerror gcerror = GCERR_NONE;
 	struct gcfixup *temp;
 
 	/* Acquire fixup access mutex. */
-	gcerror = gc_acquire_mutex(&g_bufferlock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to acquire mutex (0x%08X).\n",
-			__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_FIXUP_ALLOC);
-		goto exit;
-	}
-	bufferlocked = 1;
+	mutex_lock(&g_bufferlock);
 
 	if (g_fixupvacant == NULL) {
 		temp = kmalloc(sizeof(struct gcfixup), GFP_KERNEL);
 		if (temp == NULL) {
-			GCPRINT(NULL, 0, GC_MOD_PREFIX
-				"out of memory.\n",
-				__func__, __LINE__);
+			GCERR("out of memory.\n");
 			gcerror = GCERR_SETGRP(GCERR_OODM,
 						GCERR_IOCTL_FIXUP_ALLOC);
 			goto exit;
@@ -117,29 +119,17 @@ static enum gcerror get_fixup(struct gcfixup **gcfixup)
 	*gcfixup = temp;
 
 exit:
-	if (bufferlocked)
-		mutex_unlock(&g_bufferlock);
-
+	mutex_unlock(&g_bufferlock);
 	return gcerror;
 }
 
-static enum gcerror put_buffer_tree(struct gcbuffer *gcbuffer)
+static void put_buffer_tree(struct gcbuffer *gcbuffer)
 {
-	enum gcerror gcerror;
-	int bufferlocked = 0;
 	struct gcbuffer *prev;
 	struct gcbuffer *curr;
 
 	/* Acquire buffer access mutex. */
-	gcerror = gc_acquire_mutex(&g_bufferlock, GC_INFINITE);
-	if (gcerror != GCERR_NONE) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to acquire mutex (0x%08X).\n",
-			__func__, __LINE__, gcerror);
-		gcerror = GCERR_SETGRP(gcerror, GCERR_IOCTL_BUF_ALLOC);
-		goto exit;
-	}
-	bufferlocked = 1;
+	mutex_lock(&g_bufferlock);
 
 	prev = NULL;
 	curr = gcbuffer;
@@ -156,11 +146,7 @@ static enum gcerror put_buffer_tree(struct gcbuffer *gcbuffer)
 	prev->next = g_buffervacant;
 	g_buffervacant = gcbuffer;
 
-exit:
-	if (bufferlocked)
-		mutex_unlock(&g_bufferlock);
-
-	return gcerror;
+	mutex_unlock(&g_bufferlock);
 }
 
 /*******************************************************************************
@@ -182,9 +168,7 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 
 	/* Get IOCTL parameters. */
 	if (copy_from_user(&kgccommit, gccommit, sizeof(struct gccommit))) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to read data.\n",
-			__func__, __LINE__);
+		GCERR("failed to read data.\n");
 		kgccommit.gcerror = GCERR_USER_READ;
 		goto exit;
 	}
@@ -210,9 +194,7 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 
 		/* Get the data from the user. */
 		if (copy_from_user(kbuffer, ubuffer, sizeof(struct gcbuffer))) {
-			GCPRINT(NULL, 0, GC_MOD_PREFIX
-				"failed to read data.\n",
-				__func__, __LINE__);
+			GCERR("failed to read data.\n");
 			kgccommit.gcerror = GCERR_USER_READ;
 			goto exit;
 		}
@@ -242,9 +224,7 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 			/* Get the data from the user. */
 			if (copy_from_user(kfixup, ufixup,
 					offsetof(struct gcfixup, fixup))) {
-				GCPRINT(NULL, 0, GC_MOD_PREFIX
-					" failed to read data.\n",
-					__func__, __LINE__);
+				GCERR("failed to read data.\n");
 				kgccommit.gcerror = GCERR_USER_READ;
 				goto exit;
 			}
@@ -259,9 +239,7 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 			/* Get the fixup table. */
 			if (copy_from_user(kfixup->fixup, ufixup->fixup,
 						tablesize)) {
-				GCPRINT(NULL, 0, GC_MOD_PREFIX
-					"failed to read data.\n",
-					__func__, __LINE__);
+				GCERR("failed to read data.\n");
 				kgccommit.gcerror = GCERR_USER_READ;
 				goto exit;
 			}
@@ -278,9 +256,7 @@ static int gc_commit_wrapper(struct gccommit *gccommit)
 exit:
 	if (copy_to_user(&gccommit->gcerror, &kgccommit.gcerror,
 				sizeof(enum gcerror))) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to write data.\n",
-			__func__, __LINE__);
+		GCERR("failed to write data.\n");
 		ret = -EFAULT;
 	}
 
@@ -298,34 +274,29 @@ static int gc_map_wrapper(struct gcmap *gcmap)
 
 	/* Get IOCTL parameters. */
 	if (copy_from_user(&kgcmap, gcmap, sizeof(struct gcmap))) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to read data.\n",
-			__func__, __LINE__);
+		GCERR("failed to read data.\n");
 		kgcmap.gcerror = GCERR_USER_READ;
 		goto exit;
 	}
 
-	kgcmap.pagecount = 0;
 	kgcmap.pagearray = NULL;
 
 	/* Call the core driver. */
-	gc_map(&kgcmap);
+	gc_map(&kgcmap, true);
 	if (kgcmap.gcerror != GCERR_NONE)
 		goto exit;
 	mapped = 1;
 
 exit:
-	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, logical))) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to write data.\n",
-			__func__, __LINE__);
+	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, buf))) {
+		GCERR("failed to write data.\n");
 		kgcmap.gcerror = GCERR_USER_WRITE;
 		ret = -EFAULT;
 	}
 
 	if (kgcmap.gcerror != GCERR_NONE) {
 		if (mapped)
-			gc_unmap(&kgcmap);
+			gc_unmap(&kgcmap, true);
 	}
 
 	return ret;
@@ -338,27 +309,61 @@ static int gc_unmap_wrapper(struct gcmap *gcmap)
 
 	/* Get IOCTL parameters. */
 	if (copy_from_user(&kgcmap, gcmap, sizeof(struct gcmap))) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			" failed to read data.\n",
-			__func__, __LINE__);
+		GCERR("failed to read data.\n");
 		kgcmap.gcerror = GCERR_USER_READ;
 		goto exit;
 	}
 
 	/* Call the core driver. */
-	gc_unmap(&kgcmap);
+	gc_unmap(&kgcmap, true);
 
 exit:
-	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, logical))) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to write data.\n",
-			__func__, __LINE__);
+	if (copy_to_user(gcmap, &kgcmap, offsetof(struct gcmap, buf))) {
+		GCERR("failed to write data.\n");
 		ret = -EFAULT;
 	}
 
 	return ret;
 }
 
+static int gc_cache_wrapper(struct bvcachexfer *bvcachexfer)
+{
+	int ret = 0;
+	struct bvcachexfer xfer;
+
+	/* Get IOCTL parameters. */
+	if (copy_from_user(&xfer, bvcachexfer,
+			sizeof(struct bvcachexfer))) {
+		GCERR("failed to read data.\n");
+		goto exit;
+	}
+
+	switch (xfer.dir) {
+
+	case DMA_FROM_DEVICE:
+		c2dm_l2cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		c2dm_l1cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		break;
+	case DMA_TO_DEVICE:
+		c2dm_l1cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		c2dm_l2cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		break;
+	case DMA_BIDIRECTIONAL:
+		c2dm_l1cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		c2dm_l2cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
+				xfer.dir);
+		break;
+	}
+
+exit:
+	return ret;
+
+}
 
 /*******************************************************************************
  * Device definitions/operations.
@@ -387,31 +392,31 @@ static long dev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case GCIOCTL_COMMIT:
-		GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
-			"GCIOCTL_COMMIT\n", __func__, __LINE__);
+		GCDBG(GCZONE_IOCTL, "GCIOCTL_COMMIT\n");
 		ret = gc_commit_wrapper((struct gccommit *) arg);
 		break;
 
 	case GCIOCTL_MAP:
-		GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
-			"GCIOCTL_MAP\n", __func__, __LINE__);
+		GCDBG(GCZONE_IOCTL, "GCIOCTL_MAP\n");
 		ret = gc_map_wrapper((struct gcmap *) arg);
 		break;
 
 	case GCIOCTL_UNMAP:
-		GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
-			"GCIOCTL_UNMAP\n", __func__, __LINE__);
+		GCDBG(GCZONE_IOCTL, "GCIOCTL_UNMAP\n");
 		ret = gc_unmap_wrapper((struct gcmap *) arg);
 		break;
 
+	case GCIOCTL_CACHE:
+		GCDBG(GCZONE_IOCTL, "GCIOCTL_CACHE\n");
+		ret = gc_cache_wrapper((struct bvcachexfer *) arg);
+		break;
+
 	default:
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"invalid command (%d)\n", __func__, __LINE__, cmd);
+		GCERR("invalid command (%d)\n", cmd);
 		ret = -EINVAL;
 	}
 
-	GCPRINT(GCDBGFILTER, GCZONE_IOCTL, GC_MOD_PREFIX
-		"ret = %d\n", __func__, __LINE__, ret);
+	GCDBG(GCZONE_IOCTL, "ret = %d\n", ret);
 
 	return ret;
 }
@@ -431,26 +436,22 @@ static void mod_exit(void);
 
 static int mod_init(void)
 {
-	int ret;
+	int ret = 0;
 
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
-		"initializing device.\n", __func__, __LINE__);
+	GCDBG(GCZONE_INIT, "initializing device.\n");
 
 	/* Register the character device. */
 	dev_major = register_chrdev(0, GC_DEV_NAME, &dev_operations);
 	if (dev_major < 0) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to allocate device (%d).\n",
-			__func__, __LINE__, ret = dev_major);
+		GCERR("failed to allocate device (%d).\n", ret = dev_major);
 		goto failed;
 	}
 
 	/* Create the device class. */
 	dev_class = class_create(THIS_MODULE, GC_DEV_NAME);
 	if (IS_ERR(dev_class)) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to create class (%d).\n",
-			__func__, __LINE__, ret = PTR_ERR(dev_class));
+		GCERR("failed to create class (%d).\n",
+			ret = PTR_ERR(dev_class));
 		goto failed;
 	}
 
@@ -458,9 +459,20 @@ static int mod_init(void)
 	dev_object = device_create(dev_class, NULL, MKDEV(dev_major, 0),
 					NULL, GC_DEV_NAME);
 	if (IS_ERR(dev_object)) {
-		GCPRINT(NULL, 0, GC_MOD_PREFIX
-			"failed to create device (%d).\n",
-			__func__, __LINE__, ret = PTR_ERR(dev_object));
+		GCERR("failed to create device (%d).\n",
+			ret = PTR_ERR(dev_object));
+		goto failed;
+	}
+
+	ret = platform_driver_register(&gcx_drv);
+	if (ret) {
+		GCERR("failed to create gcx driver (%d).\n", ret);
+		goto failed;
+	}
+
+	ret = driver_create_file(&gcx_drv.driver, &driver_attr_version);
+	if (ret) {
+		GCERR("failed to create gcx driver version (%d).\n", ret);
 		goto failed;
 	}
 
@@ -468,17 +480,13 @@ static int mod_init(void)
 	mutex_init(&g_maplock);
 	mutex_init(&g_bufferlock);
 
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
-		"device number = %d\n",
-		__func__, __LINE__, dev_major);
+	GCDBG_REGISTER(ioctl);
 
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
-		"device class = 0x%08X\n",
-		__func__, __LINE__, (unsigned int) dev_class);
-
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
-		"device object = 0x%08X\n",
-		__func__, __LINE__, (unsigned int) dev_object);
+	GCDBG(GCZONE_INIT, "device number = %d\n", dev_major);
+	GCDBG(GCZONE_INIT, "device class = 0x%08X\n",
+		(unsigned int) dev_class);
+	GCDBG(GCZONE_INIT, "device object = 0x%08X\n",
+		(unsigned int) dev_object);
 
 	return 0;
 
@@ -489,8 +497,7 @@ failed:
 
 static void mod_exit(void)
 {
-	GCPRINT(GCDBGFILTER, GCZONE_INIT, GC_MOD_PREFIX
-		"cleaning up resources.\n", __func__, __LINE__);
+	GCDBG(GCZONE_INIT, "cleaning up resources.\n");
 
 	if ((dev_object != NULL) && !IS_ERR(dev_object)) {
 		device_destroy(dev_class, MKDEV(dev_major, 0));
@@ -506,6 +513,9 @@ static void mod_exit(void)
 		unregister_chrdev(dev_major, GC_DEV_NAME);
 		dev_major = 0;
 	}
+
+	platform_driver_unregister(&gcx_drv);
+	driver_remove_file(&gcx_drv.driver, &driver_attr_version);
 }
 
 static int __init mod_init_wrapper(void)
