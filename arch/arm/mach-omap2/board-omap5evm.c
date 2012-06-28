@@ -856,6 +856,14 @@ static int __init omap_5430evm_i2c_init(void)
 	omap_register_i2c_bus_board_data(4, &omap5_i2c_4_bus_pdata);
 	omap_register_i2c_bus_board_data(5, &omap5_i2c_5_bus_pdata);
 
+	/* Enable internal pull-ups for SCL, SDA lines. OMAP5 sEVM platform
+	 * does not have external pull-ups for any of the I2C buses hence
+	 * internal pull-ups are enabled
+	 */
+	omap5_i2c_pullup(1, OMAP5_I2C_PULLUP_EN, OMAP5_I2C_GLITCH_FREE_DIS);
+	omap5_i2c_pullup(2, OMAP5_I2C_PULLUP_EN, OMAP5_I2C_GLITCH_FREE_DIS);
+	omap5_i2c_pullup(3, OMAP5_I2C_PULLUP_EN, OMAP5_I2C_GLITCH_FREE_DIS);
+	omap5_i2c_pullup(4, OMAP5_I2C_PULLUP_EN, OMAP5_I2C_GLITCH_FREE_DIS);
 	omap5_i2c_pullup(5, OMAP5_I2C_PULLUP_EN, OMAP5_I2C_GLITCH_FREE_DIS);
 
 	omap_register_i2c_bus(1, 400, omap5evm_i2c_1_boardinfo,

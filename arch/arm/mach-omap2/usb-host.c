@@ -53,7 +53,7 @@ static struct omap_device_pm_latency omap_uhhtll_latency[] = {
 };
 
 /* MUX settings for EHCI pins */
-static struct omap_device_pad port1_phy_pads[] __initdata = {
+static const struct omap_device_pad port1_phy_pads[] __initconst = {
 	{
 		.name = "usbb1_ulpitll_stp.usbb1_ulpiphy_stp",
 		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE4,
@@ -108,7 +108,7 @@ static struct omap_device_pad port1_phy_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port1_tll_pads[] __initdata = {
+static const struct omap_device_pad port1_tll_pads[] __initconst = {
 	{
 		.name = "usbb1_ulpitll_stp.usbb1_ulpitll_stp",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
@@ -161,7 +161,7 @@ static struct omap_device_pad port1_tll_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port1_hsic_pads[] __initdata = {
+static const struct omap_device_pad port1_hsic_pads[] __initconst = {
 	{
 		.name = "usbb1_hsic_data.usbb1_hsic_data",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
@@ -176,7 +176,7 @@ static struct omap_device_pad port1_hsic_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port2_hsic_pads[] __initdata = {
+static const struct omap_device_pad port2_hsic_pads[] __initconst = {
 	{
 		.name = "usbb2_hsic_data.usbb2_hsic_data",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
@@ -191,7 +191,7 @@ static struct omap_device_pad port2_hsic_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port3_hsic_pads[] __initdata = {
+static const struct omap_device_pad port3_hsic_pads[] __initconst = {
 	{
 		.name = "usbb3_hsic_data.usbb3_hsic_data",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
@@ -206,7 +206,7 @@ static struct omap_device_pad port3_hsic_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port2_phy_pads[] __initdata = {
+static const struct omap_device_pad port2_phy_pads[] __initconst = {
 	{
 		.name = "usbb2_ulpitll_stp.usbb2_ulpiphy_stp",
 		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE4,
@@ -261,7 +261,7 @@ static struct omap_device_pad port2_phy_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port2_tll_pads[] __initdata = {
+static const struct omap_device_pad port2_tll_pads[] __initconst = {
 	{
 		.name = "usbb2_ulpitll_stp.usbb2_ulpitll_stp",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
@@ -314,7 +314,7 @@ static struct omap_device_pad port2_tll_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port1_6pin_pads[] __initdata = {
+static const struct omap_device_pad port1_6pin_pads[] __initconst = {
 	{
 		.name = "usbb1_ulpitll_stp.usbb1_mm_rxdp",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
@@ -353,7 +353,7 @@ static struct omap_device_pad port1_6pin_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port1_4pin_pads[] __initdata = {
+static const struct omap_device_pad port1_4pin_pads[] __initconst = {
 	{
 		.name = "usbb1_ulpitll_dat0.usbb1_mm_rxrcv",
 		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
@@ -372,7 +372,7 @@ static struct omap_device_pad port1_4pin_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port1_3pin_pads[] __initdata = {
+static const struct omap_device_pad port1_3pin_pads[] __initconst = {
 	{
 		.name = "usbb1_ulpitll_dat3.usbb1_mm_txen",
 		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
@@ -387,7 +387,7 @@ static struct omap_device_pad port1_3pin_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port1_2pin_pads[] __initdata = {
+static const struct omap_device_pad port1_2pin_pads[] __initconst = {
 	{
 		.name = "usbb1_ulpitll_dat1.usbb1_mm_txdat",
 		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE5,
@@ -398,7 +398,7 @@ static struct omap_device_pad port1_2pin_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port2_6pin_pads[] __initdata = {
+static const struct omap_device_pad port2_6pin_pads[] __initconst = {
 	{
 		.name = "abe_mcbsp2_dr.usbb2_mm_rxdp",
 		.flags  = OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
@@ -437,7 +437,7 @@ static struct omap_device_pad port2_6pin_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port2_4pin_pads[] __initdata = {
+static const struct omap_device_pad port2_4pin_pads[] __initconst = {
 	{
 		.name = "abe_mcbsp2_dx.usbb2_mm_rxrcv",
 		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
@@ -456,7 +456,7 @@ static struct omap_device_pad port2_4pin_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port2_3pin_pads[] __initdata = {
+static const struct omap_device_pad port2_3pin_pads[] __initconst = {
 	{
 		.name = "abe_mcbsp2_fsx.usbb2_mm_txen",
 		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
@@ -471,7 +471,7 @@ static struct omap_device_pad port2_3pin_pads[] __initdata = {
 	},
 };
 
-static struct omap_device_pad port2_2pin_pads[] __initdata = {
+static const struct omap_device_pad port2_2pin_pads[] __initconst = {
 	{
 		.name = "abe_mcbsp2_fsx.usbb2_mm_txen",
 		.enable = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE4,
@@ -631,58 +631,134 @@ static void __init setup_ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 	return;
 }
 
-static
-struct omap_hwmod_mux_info *
-setup_4430ehci_io_mux(const enum usbhs_omap_port_mode *port_mode)
+
+static struct omap_hwmod_mux_info * __init
+omap_hwmod_mux_array_init(const struct omap_device_pad *bpads[], int *nr_pads)
 {
-	struct omap_device_pad *pads;
-	int pads_cnt = 0;
+	struct omap_device_pad		*pads;
+	struct omap_hwmod_mux_info	*hmux;
+	size_t				npads;
+	u32				i, k;
+
+	for (i = 0, npads = 0; i < OMAP3_HS_USB_PORTS; i++)
+		npads += nr_pads[i];
+
+	pads = kmalloc(sizeof(struct omap_device_pad)*npads, GFP_KERNEL);
+
+	if (!pads) {
+		pr_err("%s: Could not allocate device mux entry\n", __func__);
+		return NULL;
+	}
+
+	for (i = 0, k = 0; i < OMAP3_HS_USB_PORTS; i++)
+		if (nr_pads[i]) {
+			memcpy(pads + k, bpads[i],
+				sizeof(struct omap_device_pad) * nr_pads[i]);
+			k +=  nr_pads[i];
+		}
+	hmux = omap_hwmod_mux_init(pads, npads);
+	kfree(pads);
+	return hmux;
+}
+
+static struct omap_hwmod_mux_info * __init
+setup_4430_usbhs_io_mux(const enum usbhs_omap_port_mode *port_mode)
+{
+	const struct omap_device_pad	*pads[OMAP3_HS_USB_PORTS];
+	int				pads_cnt[OMAP3_HS_USB_PORTS];
 
 	switch (port_mode[0]) {
 	case OMAP_EHCI_PORT_MODE_PHY:
-		pads = port1_phy_pads;
-		pads_cnt = ARRAY_SIZE(port1_phy_pads);
+		pads[0] = port1_phy_pads;
+		pads_cnt[0] = ARRAY_SIZE(port1_phy_pads);
 			break;
 	case OMAP_EHCI_PORT_MODE_TLL:
-		pads = port1_tll_pads;
-		pads_cnt = ARRAY_SIZE(port1_tll_pads);
+		pads[0] = port1_tll_pads;
+		pads_cnt[0] = ARRAY_SIZE(port1_tll_pads);
 			break;
 	case OMAP_EHCI_PORT_MODE_HSIC:
-		pads = port1_hsic_pads;
-		pads_cnt = ARRAY_SIZE(port1_hsic_pads);
+		pads[0] = port1_hsic_pads;
+		pads_cnt[0] = ARRAY_SIZE(port1_hsic_pads);
+			break;
+	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
+	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
+		pads[0] = port1_6pin_pads;
+		pads_cnt[0] = ARRAY_SIZE(port1_6pin_pads);
+			break;
+	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
+	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
+		pads[0] = port1_4pin_pads;
+		pads_cnt[0] = ARRAY_SIZE(port1_4pin_pads);
+			break;
+	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
+		pads[0] = port1_3pin_pads;
+		pads_cnt[0] = ARRAY_SIZE(port1_3pin_pads);
+			break;
+	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
+		pads[0] = port1_2pin_pads;
+		pads_cnt[0] = ARRAY_SIZE(port1_2pin_pads);
 			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	default:
+		pads_cnt[0] = 0;
 			break;
 	}
 	switch (port_mode[1]) {
 	case OMAP_EHCI_PORT_MODE_PHY:
-		pads = port2_phy_pads;
-		pads_cnt = ARRAY_SIZE(port2_phy_pads);
+		pads[1] = port2_phy_pads;
+		pads_cnt[1] = ARRAY_SIZE(port2_phy_pads);
 			break;
 	case OMAP_EHCI_PORT_MODE_TLL:
-		pads = port2_tll_pads;
-		pads_cnt = ARRAY_SIZE(port2_tll_pads);
+		pads[1] = port2_tll_pads;
+		pads_cnt[1] = ARRAY_SIZE(port2_tll_pads);
 			break;
 	case OMAP_EHCI_PORT_MODE_HSIC:
-		pads = port2_hsic_pads;
-		pads_cnt = ARRAY_SIZE(port2_hsic_pads);
+		pads[1] = port2_hsic_pads;
+		pads_cnt[1] = ARRAY_SIZE(port2_hsic_pads);
 			break;
+	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
+	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
+		pads[1] = port2_6pin_pads;
+		pads_cnt[1] = ARRAY_SIZE(port2_6pin_pads);
+		break;
+	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
+	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
+		pads[1] = port2_4pin_pads;
+		pads_cnt[1] = ARRAY_SIZE(port2_4pin_pads);
+		break;
+	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
+		pads[1] = port2_3pin_pads;
+		pads_cnt[1] = ARRAY_SIZE(port2_3pin_pads);
+		break;
+	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
+	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
+		pads[1] = port2_2pin_pads;
+		pads_cnt[1] = ARRAY_SIZE(port2_3pin_pads);
+		break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	default:
+		pads_cnt[1] = 0;
 			break;
 	}
 	switch (port_mode[2]) {
 	case OMAP_EHCI_PORT_MODE_HSIC:
-		pads = port3_hsic_pads;
-		pads_cnt = ARRAY_SIZE(port3_hsic_pads);
+		pads[2] = port3_hsic_pads;
+		pads_cnt[2] = ARRAY_SIZE(port3_hsic_pads);
 			break;
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	default:
+		pads_cnt[2] = 0;
 			break;
 	}
 
-	return omap_hwmod_mux_init(pads, pads_cnt);
+	return omap_hwmod_mux_array_init(pads, pads_cnt);
 }
 
 static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
@@ -782,73 +858,6 @@ static void __init setup_ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
 	}
 }
 
-static struct omap_hwmod_mux_info *
-setup_4430ohci_io_mux(const enum usbhs_omap_port_mode *port_mode)
-{
-	struct omap_device_pad *pads;
-	int pads_cnt = 0;
-
-	switch (port_mode[0]) {
-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
-		pads = port1_6pin_pads;
-		pads_cnt = ARRAY_SIZE(port1_6pin_pads);
-		break;
-	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
-	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
-		pads = port1_4pin_pads;
-		pads_cnt = ARRAY_SIZE(port1_4pin_pads);
-		break;
-	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
-	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
-		pads = port1_3pin_pads;
-		pads_cnt = ARRAY_SIZE(port1_3pin_pads);
-		break;
-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
-		pads = port1_2pin_pads;
-		pads_cnt = ARRAY_SIZE(port1_2pin_pads);
-		break;
-
-	case OMAP_USBHS_PORT_MODE_UNUSED:
-	default:
-		break;
-	}
-
-	switch (port_mode[1]) {
-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
-	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DATSE0:
-	case OMAP_OHCI_PORT_MODE_TLL_6PIN_DPDM:
-		pads = port2_6pin_pads;
-		pads_cnt = ARRAY_SIZE(port2_6pin_pads);
-		break;
-	case OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM:
-	case OMAP_OHCI_PORT_MODE_TLL_4PIN_DPDM:
-		pads = port2_4pin_pads;
-		pads_cnt = ARRAY_SIZE(port2_4pin_pads);
-		break;
-	case OMAP_OHCI_PORT_MODE_PHY_3PIN_DATSE0:
-	case OMAP_OHCI_PORT_MODE_TLL_3PIN_DATSE0:
-		pads = port2_3pin_pads;
-		pads_cnt = ARRAY_SIZE(port2_3pin_pads);
-		break;
-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DATSE0:
-	case OMAP_OHCI_PORT_MODE_TLL_2PIN_DPDM:
-		pads = port2_2pin_pads;
-		pads_cnt = ARRAY_SIZE(port2_3pin_pads);
-		break;
-
-	case OMAP_USBHS_PORT_MODE_UNUSED:
-	default:
-		break;
-	}
-
-	return omap_hwmod_mux_init(pads, pads_cnt);
-}
-
 void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 {
 	struct omap_hwmod	*uhh_hwm, *tll_hwm;
@@ -904,11 +913,8 @@ void __init usbhs_init(const struct usbhs_omap_board_data *pdata)
 	if (cpu_is_omap34xx()) {
 		setup_ehci_io_mux(pdata->port_mode);
 		setup_ohci_io_mux(pdata->port_mode);
-	} else if (cpu_is_omap44xx() || cpu_is_omap54xx()) {
-		uhh_hwm->mux = setup_4430ehci_io_mux(pdata->port_mode);
-		if (!uhh_hwm->mux)
-			uhh_hwm->mux = setup_4430ohci_io_mux(pdata->port_mode);
-	}
+	} else if (cpu_is_omap44xx() || cpu_is_omap54xx())
+		uhh_hwm->mux = setup_4430_usbhs_io_mux(pdata->port_mode);
 }
 
 #else
