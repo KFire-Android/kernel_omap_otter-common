@@ -692,6 +692,38 @@ exit:
 }
 EXPORT_SYMBOL(gc_unmap);
 
+void gc_release(void)
+{
+	struct gccorecontext *gccorecontext = &g_context;
+	struct list_head *ctxhead;
+	struct gcmmucontext *temp = NULL;
+	pid_t pid;
+
+	GCENTER(GCZONE_CONTEXT);
+
+	GCLOCK(&gccorecontext->mmucontextlock);
+
+	pid = current->tgid;
+	GCDBG(GCZONE_CONTEXT, "scanning context records for pid %d.\n", pid);
+
+	list_for_each(ctxhead, &gccorecontext->mmuctxlist) {
+		temp = list_entry(ctxhead, struct gcmmucontext, link);
+		if (temp->pid == pid) {
+			GCDBG(GCZONE_CONTEXT, "context is found @ 0x%08X\n",
+			      (unsigned int) temp);
+
+			gcmmu_destroy_context(gccorecontext, temp);
+			list_move(ctxhead, &gccorecontext->mmuctxvac);
+			break;
+		}
+	}
+
+	GCUNLOCK(&gccorecontext->mmucontextlock);
+
+	GCEXIT(GCZONE_CONTEXT);
+}
+EXPORT_SYMBOL(gc_release);
+
 static int gc_probe_opp(struct platform_device *pdev)
 {
 	int i;

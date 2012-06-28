@@ -832,6 +832,7 @@ static int dev_open(struct inode *inode, struct file *file)
 
 static int dev_release(struct inode *inode, struct file *file)
 {
+	gc_release();
 	return 0;
 }
 
