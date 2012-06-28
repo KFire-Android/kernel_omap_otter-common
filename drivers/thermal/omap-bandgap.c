@@ -1216,7 +1216,7 @@ struct omap_bandgap *omap_bandgap_platform_build(struct platform_device *pdev)
 	}
 
 	if (bg_ptr->pdata->has_tshut) {
-		bg_ptr->tshut_gpio = bg_ptr->pdata->tshut_gpio;
+		bg_ptr->tshut_gpio = pdata->tshut_gpio;
 		if (!gpio_is_valid(bg_ptr->tshut_gpio)) {
 			dev_err(&pdev->dev, "invalid gpio for tshut (%d)\n",
 				bg_ptr->tshut_gpio);
