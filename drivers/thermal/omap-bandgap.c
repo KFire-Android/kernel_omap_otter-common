@@ -1407,8 +1407,10 @@ put_clks:
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
 free_irqs:
-	free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
-	gpio_free(bg_ptr->tshut_gpio);
+	if (bg_ptr->pdata->has_tshut) {
+		free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
+		gpio_free(bg_ptr->tshut_gpio);
+	}
 
 	return ret;
 }
@@ -1427,9 +1429,12 @@ int __devexit omap_bandgap_remove(struct platform_device *pdev)
 	clk_disable(bg_ptr->fclock);
 	clk_put(bg_ptr->fclock);
 	clk_put(bg_ptr->div_clk);
-	free_irq(bg_ptr->irq, bg_ptr);
-	free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
-	gpio_free(bg_ptr->tshut_gpio);
+	if (bg_ptr->pdata->has_talert)
+		free_irq(bg_ptr->irq, bg_ptr);
+	if (bg_ptr->pdata->has_tshut) {
+		free_irq(gpio_to_irq(bg_ptr->tshut_gpio), NULL);
+		gpio_free(bg_ptr->tshut_gpio);
+	}
 
 	return 0;
 }
