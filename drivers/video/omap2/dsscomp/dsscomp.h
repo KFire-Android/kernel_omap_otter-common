@@ -144,12 +144,18 @@ int dsscomp_state_notifier(struct notifier_block *nb,
 
 /* basic operation - if not using queues */
 int set_dss_ovl_info(struct dss2_ovl_info *oi);
-int set_dss_wb_info(struct dss2_ovl_info *oi,
-	enum omap_writeback_source src);
+int set_dss_wb_info(struct dss2_ovl_info *oi);
 int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb);
 struct omap_overlay_manager *find_dss_mgr(int display_ix);
 void swap_rb_in_ovl_info(struct dss2_ovl_info *oi);
 void swap_rb_in_mgr_info(struct dss2_mgr_info *mi);
+
+static inline u32 tiler1d_slot_size(struct dsscomp_dev *cdev)
+{
+	struct dsscomp_platform_data *pdata;
+	pdata = (struct dsscomp_platform_data *)cdev->pdev->platform_data;
+	return pdata->tiler1d_slotsz;
+}
 
 /*
  * Debug functions

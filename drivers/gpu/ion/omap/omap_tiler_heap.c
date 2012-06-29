@@ -25,13 +25,34 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <mach/tiler.h>
+#include <asm/cacheflush.h>
 #include <asm/mach/map.h>
 #include <asm/page.h>
+#include <plat/common.h>
 
 #include "../ion_priv.h"
-#include <asm/cacheflush.h>
 
+bool use_dynamic_pages;
 #define TILER_ENABLE_NON_PAGE_ALIGNED_ALLOCATIONS  1
+
+struct omap_ion_heap {
+	struct ion_heap heap;
+	struct gen_pool *pool;
+	ion_phys_addr_t base;
+};
+
+struct omap_tiler_info {
+	tiler_blk_handle tiler_handle;  /* handle of the allocation intiler */
+	bool lump;                      /* true for a single lump allocation */
+	u32 n_phys_pages;               /* number of physical pages */
+	u32 *phys_addrs;                /* array addrs of pages */
+	u32 n_tiler_pages;              /* number of tiler pages */
+	u32 *tiler_addrs;               /* array of addrs of tiler pages */
+	int fmt;                        /* tiler buffer format */
+	u32 tiler_start;                /* start addr in tiler -- if not page
+					   aligned this may not equal the
+					   first entry onf tiler_addrs */
+};
 
 static int omap_tiler_heap_allocate(struct ion_heap *heap,
 				    struct ion_buffer *buffer,
@@ -47,18 +68,99 @@ static int omap_tiler_heap_allocate(struct ion_heap *heap,
 	return -EINVAL;
 }
 
-struct omap_tiler_info {
-	tiler_blk_handle tiler_handle;	/* handle of the allocation intiler */
-	bool lump;			/* true for a single lump allocation */
-	u32 n_phys_pages;		/* number of physical pages */
-	u32 *phys_addrs;		/* array addrs of pages */
-	u32 n_tiler_pages;		/* number of tiler pages */
-	u32 *tiler_addrs;		/* array of addrs of tiler pages */
-	int fmt;			/* tiler buffer format */
-	u32 tiler_start;		/* start addr in tiler -- if not page
-					   aligned this may not equal the
-					   first entry onf tiler_addrs */
-};
+static int omap_tiler_alloc_carveout(struct ion_heap *heap,
+				     struct omap_tiler_info *info)
+{
+	struct omap_ion_heap *omap_heap = (struct omap_ion_heap *)heap;
+	int i;
+	int ret;
+	ion_phys_addr_t addr;
+
+	addr = gen_pool_alloc(omap_heap->pool, info->n_phys_pages * PAGE_SIZE);
+	if (addr) {
+		info->lump = true;
+		for (i = 0; i < info->n_phys_pages; i++)
+			info->phys_addrs[i] = addr + i * PAGE_SIZE;
+		return 0;
+	}
+
+	for (i = 0; i < info->n_phys_pages; i++) {
+		addr = gen_pool_alloc(omap_heap->pool, PAGE_SIZE);
+
+		if (addr == 0) {
+			ret = -ENOMEM;
+			pr_err("%s: failed to allocate pages to back "
+			       "tiler address space\n", __func__);
+			goto err;
+		}
+		info->phys_addrs[i] = addr;
+	}
+	return 0;
+
+err:
+	for (i -= 1; i >= 0; i--)
+		gen_pool_free(omap_heap->pool, info->phys_addrs[i], PAGE_SIZE);
+	return ret;
+}
+
+static void omap_tiler_free_carveout(struct ion_heap *heap,
+				     struct omap_tiler_info *info)
+{
+	struct omap_ion_heap *omap_heap = (struct omap_ion_heap *)heap;
+	int i;
+
+	if (info->lump) {
+		gen_pool_free(omap_heap->pool,
+				info->phys_addrs[0],
+				info->n_phys_pages * PAGE_SIZE);
+		return;
+	}
+
+	for (i = 0; i < info->n_phys_pages; i++)
+		gen_pool_free(omap_heap->pool, info->phys_addrs[i], PAGE_SIZE);
+}
+
+static int omap_tiler_alloc_dynamicpages(struct omap_tiler_info *info)
+{
+	int i;
+	int ret;
+	struct page *pg;
+
+	for (i = 0; i < info->n_phys_pages; i++) {
+		pg = alloc_page(GFP_KERNEL | GFP_DMA | GFP_HIGHUSER);
+		if (!pg) {
+			ret = -ENOMEM;
+			pr_err("%s: alloc_page failed\n",
+				__func__);
+			goto err_page_alloc;
+		}
+		info->phys_addrs[i] = page_to_phys(pg);
+		dmac_flush_range((void *)page_address(pg),
+			(void *)page_address(pg) + PAGE_SIZE);
+		outer_flush_range(info->phys_addrs[i],
+			info->phys_addrs[i] + PAGE_SIZE);
+	}
+	return 0;
+
+err_page_alloc:
+	for (i -= 1; i >= 0; i--) {
+		pg = phys_to_page(info->phys_addrs[i]);
+		__free_page(pg);
+	}
+	return ret;
+}
+
+static void omap_tiler_free_dynamicpages(struct omap_tiler_info *info)
+{
+	int i;
+	struct page *pg;
+
+	for (i = 0; i < info->n_phys_pages; i++) {
+		pg = phys_to_page(info->phys_addrs[i]);
+		__free_page(pg);
+	}
+	return;
+}
 
 int omap_tiler_alloc(struct ion_heap *heap,
 		     struct ion_client *client,
@@ -72,8 +174,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	u32 tiler_start = 0;
 	u32 v_size;
 	tiler_blk_handle tiler_handle;
-	ion_phys_addr_t addr = 0;
-	int i = 0, ret;
+	int ret;
 
 	if (data->fmt == TILER_PIXEL_FMT_PAGE && data->h != 1) {
 		pr_err("%s: Page mode (1D) allocations must have a height "
@@ -135,32 +236,24 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	info->tiler_addrs = info->phys_addrs + n_phys_pages;
 	info->fmt = data->fmt;
 
-	addr = ion_carveout_allocate(heap, n_phys_pages*PAGE_SIZE, 0);
-	if (addr == ION_CARVEOUT_ALLOCATE_FAIL) {
-		for (i = 0; i < n_phys_pages; i++) {
-			addr = ion_carveout_allocate(heap, PAGE_SIZE, 0);
+	if ((heap->id == OMAP_ION_HEAP_TILER) ||
+	    (heap->id == OMAP_ION_HEAP_NONSECURE_TILER)) {
+		if (use_dynamic_pages)
+			ret = omap_tiler_alloc_dynamicpages(info);
+		else
+			ret = omap_tiler_alloc_carveout(heap, info);
 
-			if (addr == ION_CARVEOUT_ALLOCATE_FAIL) {
-				ret = -ENOMEM;
-				pr_err("%s: failed to allocate pages to back "
-					"tiler address space\n", __func__);
-				goto err_alloc;
-			}
-			info->phys_addrs[i] = addr;
+		if (ret)
+			goto err_alloc;
+
+		ret = tiler_pin_block(info->tiler_handle, info->phys_addrs,
+				      info->n_phys_pages);
+		if (ret) {
+			pr_err("%s: failure to pin pages to tiler\n",
+				__func__);
+			goto err_pin;
 		}
-	} else {
-		info->lump = true;
-		for (i = 0; i < n_phys_pages; i++)
-			info->phys_addrs[i] = addr + i*PAGE_SIZE;
 	}
-
-	ret = tiler_pin_block(info->tiler_handle, info->phys_addrs,
-			      info->n_phys_pages);
-	if (ret) {
-		pr_err("%s: failure to pin pages to tiler\n", __func__);
-		goto err_alloc;
-	}
-
 	data->stride = tiler_block_vstride(info->tiler_handle);
 
 	/* create an ion handle  for the allocation */
@@ -173,6 +266,7 @@ int omap_tiler_alloc(struct ion_heap *heap,
 	}
 
 	buffer = ion_handle_buffer(handle);
+	buffer->heap = heap;	/* clarify tiler heap */
 	buffer->size = v_size;
 	buffer->priv_virt = info;
 	data->handle = handle;
@@ -188,16 +282,16 @@ int omap_tiler_alloc(struct ion_heap *heap,
 
 err:
 	tiler_unpin_block(info->tiler_handle);
-err_alloc:
-	tiler_free_block_area(info->tiler_handle);
-	if(info)
-	{
-		if (info->lump)
-			ion_carveout_free(heap, addr, n_phys_pages * PAGE_SIZE);
+err_pin:
+	if ((heap->id == OMAP_ION_HEAP_TILER) ||
+	    (heap->id == OMAP_ION_HEAP_NONSECURE_TILER)) {
+		if (use_dynamic_pages)
+			omap_tiler_free_dynamicpages(info);
 		else
-			for (i -= 1; i >= 0; i--)
-				ion_carveout_free(heap, info->phys_addrs[i], PAGE_SIZE);
+			omap_tiler_free_carveout(heap, info);
 	}
+err_alloc:
+	tiler_free_block_area(tiler_handle);
 err_nomem:
 	kfree(info);
 	return ret;
@@ -210,14 +304,12 @@ void omap_tiler_heap_free(struct ion_buffer *buffer)
 	tiler_unpin_block(info->tiler_handle);
 	tiler_free_block_area(info->tiler_handle);
 
-	if (info->lump) {
-		ion_carveout_free(buffer->heap, info->phys_addrs[0],
-				  info->n_phys_pages*PAGE_SIZE);
-	} else {
-		int i;
-		for (i = 0; i < info->n_phys_pages; i++)
-			ion_carveout_free(buffer->heap,
-					  info->phys_addrs[i], PAGE_SIZE);
+	if ((buffer->heap->id == OMAP_ION_HEAP_TILER) ||
+	    (buffer->heap->id == OMAP_ION_HEAP_NONSECURE_TILER)) {
+		if (use_dynamic_pages)
+			omap_tiler_free_dynamicpages(info);
+		else
+			omap_tiler_free_carveout(buffer->heap, info);
 	}
 
 	kfree(info);
@@ -373,19 +465,39 @@ static struct ion_heap_ops omap_tiler_ops = {
 
 struct ion_heap *omap_tiler_heap_create(struct ion_platform_heap *data)
 {
-	struct ion_heap *heap;
+	struct omap_ion_heap *heap;
 
-	heap = ion_carveout_heap_create(data);
+	heap = kzalloc(sizeof(struct omap_ion_heap), GFP_KERNEL);
 	if (!heap)
 		return ERR_PTR(-ENOMEM);
-	heap->ops = &omap_tiler_ops;
-	heap->type = OMAP_ION_HEAP_TYPE_TILER;
-	heap->name = data->name;
-	heap->id = data->id;
-	return heap;
+
+	if ((data->id == OMAP_ION_HEAP_TILER) ||
+	    (data->id == OMAP_ION_HEAP_NONSECURE_TILER)) {
+		heap->pool = gen_pool_create(12, -1);
+		if (!heap->pool) {
+			kfree(heap);
+			return ERR_PTR(-ENOMEM);
+		}
+		heap->base = data->base;
+		gen_pool_add(heap->pool, heap->base, data->size, -1);
+	}
+	heap->heap.ops = &omap_tiler_ops;
+	heap->heap.type = OMAP_ION_HEAP_TYPE_TILER;
+	heap->heap.name = data->name;
+	heap->heap.id = data->id;
+
+	if (omap_total_ram_size() <= SZ_512M)
+		use_dynamic_pages = true;
+	else
+		use_dynamic_pages = false;
+
+	return &heap->heap;
 }
 
 void omap_tiler_heap_destroy(struct ion_heap *heap)
 {
+	struct omap_ion_heap *omap_ion_heap = (struct omap_ion_heap *)heap;
+	if (omap_ion_heap->pool)
+		gen_pool_destroy(omap_ion_heap->pool);
 	kfree(heap);
 }

@@ -963,9 +963,11 @@ static bool dispc_is_overlay_scaled(struct overlay_cache_data *oc)
 static int configure_wb_overlay(void)
 {
 	struct writeback_cache_data *c = &dss_cache.writeback_cache;
-	int r;
+	int r = 0;
 
-	r = dispc_setup_wb(c);
+	if (c->enabled)
+		r = dispc_setup_wb(c);
+
 	if (r)
 		DSSERR("dispc_setup_wb failed with error %d\n", r);
 	return r;
@@ -1150,9 +1152,12 @@ static int configure_overlay(enum omap_plane plane)
 	if (plane != OMAP_DSS_GFX)
 		_dispc_setup_color_conv_coef(plane, &c->cconv);
 
-	/* for WB source, enable plane along with WB */
 	if (!source_of_wb)
-		dispc_enable_plane(plane, 1);
+		dispc_set_channel_out(plane, c->channel);
+	else
+		dispc_set_wb_channel_out(plane);
+
+	dispc_enable_plane(plane, 1);
 
 	return 0;
 }
@@ -1295,14 +1300,13 @@ static int configure_dispc(void)
 			case OMAP_WB_VID1:
 			case OMAP_WB_VID2:
 			case OMAP_WB_VID3:
-				dispc_enable_plane(wbc->source - 3, 1);
 				wbc->shadow_dirty = false;
 				dispc_enable_plane(OMAP_DSS_WB, 1);
 				break;
 			case OMAP_WB_LCD1:
 			case OMAP_WB_LCD2:
 			case OMAP_WB_TV:
-				dispc_enable_plane(OMAP_DSS_WB, true);
+				dispc_enable_plane(OMAP_DSS_WB, 1);
 				/* WB GO bit has to be used only in case of
 				 * capture mode and not in memory mode
 				 */
@@ -1313,6 +1317,16 @@ static int configure_dispc(void)
 				break;
 			}
 		} else if (wbc->dirty && !wbc->enabled) {
+			if (wbc->mode == OMAP_WB_MEM2MEM_MODE &&
+				wbc->source >= OMAP_WB_GFX) {
+				/* This is a workaround. According to TRM
+				 * we should disable the manager but it will
+				 * cause blinking of panel. WA is to disable
+				 * pipe which was used as source of WB and do
+				 * dummy enable and disable of WB.
+				 */
+				dispc_enable_plane(OMAP_DSS_WB, 1);
+			}
 			dispc_enable_plane(OMAP_DSS_WB, 0);
 			wbc->dirty = false;
 		}
@@ -2094,9 +2108,6 @@ int omap_dss_wb_apply(struct omap_overlay_manager *mgr,
 	wbc = &dss_cache.writeback_cache;
 
 	if (wb && wb->info.enabled) {
-		/* mem2mem mode not supported as of now */
-		if (wb->info.source >= OMAP_WB_GFX)
-			return -EINVAL;
 		/* if source is an overlay, mode cannot be capture */
 		if ((wb->info.source >= OMAP_WB_GFX) &&
 			(wb->info.mode != OMAP_WB_MEM2MEM_MODE))

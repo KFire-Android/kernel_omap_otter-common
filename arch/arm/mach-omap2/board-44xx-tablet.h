@@ -24,5 +24,7 @@ int tablet_panel_init(void);
 int tablet_button_init(void);
 void omap4_power_init(void);
 void board_serial_init(void);
+struct omap_ion_platform_data;
+void tablet_android_display_setup(struct omap_ion_platform_data *ion);
 
 #endif

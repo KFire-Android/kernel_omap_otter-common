@@ -175,7 +175,6 @@ struct cpufreq_governor {
 					 char *buf);
 	int	(*store_setspeed)	(struct cpufreq_policy *policy,
 					 unsigned int freq);
-	int	(*boost_cpu_freq)		(struct cpufreq_policy *policy);
 	unsigned int max_transition_latency; /* HW must be able to switch to
 			next freq faster than this value in nano secs or we
 			will fallback to performance governor */
@@ -332,6 +331,11 @@ static inline unsigned int cpufreq_quick_get(unsigned int cpu)
 }
 #endif
 
+#if defined(CONFIG_CPU_FREQ_GOV_INTERACTIVE) && \
+					defined(CONFIG_OMAP4_DPLL_CASCADING)
+extern void cpufreq_interactive_set_timer_rate(unsigned long val,
+							unsigned int reset);
+#endif
 
 /*********************************************************************
  *                       CPUFREQ DEFAULT GOVERNOR                    *

@@ -293,11 +293,7 @@ int dsscomp_set_ovl(dsscomp_t comp, struct dss2_ovl_info *ovl)
 
 		/* and disabled (unless forced) if on another manager */
 		o = cdev->ovls[ovl->cfg.ix];
-		if (ovl->cfg.ix == OMAP_DSS_WB) {
-			struct omap_writeback *wb = cdev->wb_ovl;
-			if (wb && wb->info.enabled && wb->info.source != ix)
-				goto done;
-		} else {
+		if (ovl->cfg.ix != OMAP_DSS_WB) {
 			if (o->info.enabled &&
 			   (!o->manager || o->manager->id != ix))
 				goto done;
@@ -465,7 +461,7 @@ static void dsscomp_mgr_delayed_cb(struct work_struct *work)
 	mutex_unlock(&mtx);
 }
 
-static u32 dsscomp_mgr_callback(void *data, int id, int status)
+u32 dsscomp_mgr_callback(void *data, int id, int status)
 {
 	struct dsscomp_data *comp = data;
 
@@ -492,6 +488,7 @@ static u32 dsscomp_mgr_callback(void *data, int id, int status)
 	/* get each callback only once */
 	return ~status;
 }
+EXPORT_SYMBOL(dsscomp_mgr_callback);
 
 static inline bool dssdev_manually_updated(struct omap_dss_device *dev)
 {
@@ -501,7 +498,7 @@ static inline bool dssdev_manually_updated(struct omap_dss_device *dev)
 
 /* apply composition */
 /* at this point the composition is not on any queue */
-static int dsscomp_apply(dsscomp_t comp)
+int dsscomp_apply(dsscomp_t comp)
 {
 	int i, r = -EFAULT;
 	u32 dmask, display_ix;
@@ -512,7 +509,6 @@ static int dsscomp_apply(dsscomp_t comp)
 	struct dsscomp_setup_mgr_data *d;
 	u32 oix;
 	bool cb_programmed = false;
-	struct omap_writeback *wb = cdev->wb_ovl;
 	bool wb_apply = false;
 
 	struct omapdss_ovl_cb cb = {
@@ -561,16 +557,22 @@ static int dsscomp_apply(dsscomp_t comp)
 		}
 
 		if (oi->cfg.ix == OMAP_DSS_WB) {
-			enum omap_writeback_source src;
-			if (wb->info.enabled && wb->info.source != mgr->id) {
-				dmask |= 1 << oi->cfg.ix;
-				continue;
-			}
 			/* update status of WB */
-			wb_apply = true;
-			src = mgr->id;
+			struct omap_writeback_info wb_info;
+			struct omap_writeback *wb;
 
-			r = set_dss_wb_info(oi, src);
+			wb_apply = true;
+
+			wb = omap_dss_get_wb(0);
+			wb->get_wb_info(wb, &wb_info);
+			/* if prev comp was with M2M WB */
+			if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+				wb_info.enabled) {
+					if (wb->wait_framedone(wb))
+						dev_warn(DEV(cdev),
+							"WB Framedone expired\n");
+			}
+			r = set_dss_wb_info(oi);
 		} else {
 			ovl = cdev->ovls[oi->cfg.ix];
 
@@ -685,6 +687,18 @@ skip_ovl_set:
 	if (!d->win.h && !d->win.y)
 		d->win.h = dssdev->panel.timings.y_res - d->win.y;
 
+	if (wb_apply) {
+		struct omap_writeback_info wb_info;
+		struct omap_writeback *wb;
+
+		wb = omap_dss_get_wb(0);
+		wb->get_wb_info(wb, &wb_info);
+
+		if (wb_info.mode == OMAP_WB_MEM2MEM_MODE &&
+			wb_info.enabled)
+			wb->register_framedone(wb);
+	}
+
 	mutex_lock(&mtx);
 	if (mgrq[comp->ix].blanking) {
 		pr_info_ratelimited("ignoring apply mgr(%s) while blanking\n",
@@ -746,6 +760,7 @@ skip_ovl_set:
 done:
 	return r;
 }
+EXPORT_SYMBOL(dsscomp_apply);
 
 int dsscomp_state_notifier(struct notifier_block *nb,
 						unsigned long arg, void *ptr)

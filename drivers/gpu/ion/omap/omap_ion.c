@@ -107,6 +107,9 @@ int omap_ion_probe(struct platform_device *pdev)
 				nonsecure_tiler_heap = heaps[i];
 			else
 				tiler_heap = heaps[i];
+		} else if (heap_data->type ==
+				OMAP_ION_HEAP_TYPE_TILER_RESERVATION) {
+			heaps[i] = omap_tiler_heap_create(heap_data);
 		} else {
 			heaps[i] = ion_heap_create(heap_data);
 		}
@@ -161,34 +164,51 @@ void omap_ion_register_pvr_export(void *pvr_export_fd)
 }
 EXPORT_SYMBOL(omap_ion_register_pvr_export);
 
-int omap_ion_fd_to_handles(int fd, struct ion_client **client,
-		struct ion_handle **handles,
+int omap_ion_share_fd_to_buffers(int fd, struct ion_buffer **buffers,
 		int *num_handles)
 {
+	struct ion_handle **handles;
+	struct ion_client *client;
+	int i = 0, ret = 0;
+
+	handles = kzalloc(*num_handles * sizeof(struct ion_handle *),
+			  GFP_KERNEL);
+	if (!handles)
+		return -ENOMEM;
+
 #ifdef CONFIG_PVR_SGX
-	if (*num_handles == 2)
-		PVRSRVExportFDToIONHandles(fd, client, handles);
-	else if (*num_handles == 1)
-		handles[0] = PVRSRVExportFDToIONHandle(fd, client);
-	else
-		return -EINVAL;
+	if (*num_handles == 2) {
+		PVRSRVExportFDToIONHandles(fd, &client, handles);
+	} else if (*num_handles == 1) {
+		handles[0] = PVRSRVExportFDToIONHandle(fd, &client);
+	} else {
+		ret = -EINVAL;
+		goto exit;
+	}
 #else
 	if (export_fd_to_ion_handles) {
 		export_fd_to_ion_handles(fd,
-				client,
+				&client,
 				handles,
 				num_handles);
 	} else {
 		pr_err("%s: export_fd_to_ion_handles"
 				"not initiazied",
 				__func__);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto exit;
 	}
 #endif
+	for (i = 0; i < *num_handles; i++) {
+		if (handles[i])
+			buffers[i] = ion_share(client, handles[i]);
+	}
 
-	return 0;
+exit:
+	kfree(handles);
+	return ret;
 }
-
+EXPORT_SYMBOL(omap_ion_share_fd_to_buffers);
 
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,

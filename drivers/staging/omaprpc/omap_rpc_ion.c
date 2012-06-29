@@ -110,17 +110,22 @@ phys_addr_t omaprpc_buffer_lookup(struct omaprpc_instance_t *rpc,
 			goto to_va;
 		} else {
 			/* is it an pvr buffer wrapping an ion handle? */
-			struct ion_client *pvr_ion_client;
+
 			/* @TODO need to support 2 ion handles per 1 pvr handle
 			 (NV12 case) */
+			struct ion_buffer *ion_buffer = NULL;
 			int num_handles = 1;
 			handle = NULL;
-			if (omap_ion_fd_to_handles((int)reserved,
-				&pvr_ion_client, &handle, &num_handles) < 0) {
+			if (omap_ion_share_fd_to_buffers((int)reserved,
+				&ion_buffer, &num_handles) < 0) {
 				goto to_va;
 			}
-			if (handle && !ion_phys(pvr_ion_client, handle, &paddr,
-				&unused)) {
+			if (ion_buffer) {
+				handle = ion_import(rpc->ion_client,
+							ion_buffer);
+			}
+			if (handle && !ion_phys(rpc->ion_client, handle,
+				&paddr, &unused)) {
 				lpa = (phys_addr_t)paddr;
 				OMAPRPC_INFO(rpc->rpcserv->dev,
 					"FD %d is an PVR Handle to ARM PA %p "
@@ -130,6 +135,12 @@ phys_addr_t omaprpc_buffer_lookup(struct omaprpc_instance_t *rpc,
 				lpa += uoff;
 				goto to_va;
 			}
+			/* @TODO need to do some buffer tracking and call
+			 * ion_free when it is no longer being used. this
+			 * will make sure the buffer is not freed while
+			 * we are still using it */
+			if (handle)
+				ion_free(rpc->ion_client, handle);
 		}
 	}
 #endif

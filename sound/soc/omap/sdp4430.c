@@ -285,13 +285,25 @@ static int sdp4430_dmic_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret = 0;
 
-	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_DMIC_SYSCLK_PAD_CLKS,
-				     19200000, SND_SOC_CLOCK_IN);
+	if (!rtd->dai_link->no_pcm)
+		ret = snd_soc_dai_set_sysclk(cpu_dai,
+				OMAP_DMIC_SYSCLK_SYNC_MUX_CLKS, 24000000,
+				SND_SOC_CLOCK_IN);
+	else
+		ret = snd_soc_dai_set_sysclk(cpu_dai,
+				OMAP_DMIC_SYSCLK_PAD_CLKS, 19200000,
+				SND_SOC_CLOCK_IN);
+
 	if (ret < 0) {
 		printk(KERN_ERR "can't set DMIC cpu system clock\n");
 		return ret;
 	}
-	ret = snd_soc_dai_set_clkdiv(cpu_dai, OMAP_DMIC_CLKDIV, 8);
+
+	if (!rtd->dai_link->no_pcm)
+		ret = snd_soc_dai_set_clkdiv(cpu_dai, OMAP_DMIC_CLKDIV, 10);
+	else
+		ret = snd_soc_dai_set_clkdiv(cpu_dai, OMAP_DMIC_CLKDIV, 8);
+
 	if (ret < 0) {
 		printk(KERN_ERR "can't set DMIC cpu clock divider\n");
 		return ret;
@@ -328,9 +340,12 @@ static int dmic_be_hw_params_fixup(struct snd_soc_pcm_runtime *rtd,
 {
 	struct snd_interval *rate = hw_param_interval(params,
 			SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval *channels = hw_param_interval(params,
+			SNDRV_PCM_HW_PARAM_CHANNELS);
 
 	/* The ABE will covert the FE rate to 96k */
 	rate->min = rate->max = 96000;
+	channels->min = channels->max = 2;
 
 	snd_mask_set(&params->masks[SNDRV_PCM_HW_PARAM_FORMAT -
 	                            SNDRV_PCM_HW_PARAM_FIRST_MASK],
@@ -463,6 +478,10 @@ static int sdp4430_set_pdm_dl1_gains(struct snd_soc_dapm_context *dapm)
 		else
 			/* HSDACL in HP mode */
 			output = OMAP_ABE_DL1_HEADSET_HP;
+#if !defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+	} else if (snd_soc_dapm_get_pin_power(dapm, "Ext Spk")) {
+		output = OMAP_ABE_DL1_HANDSFREE;
+#endif
 	} else {
 		output = OMAP_ABE_DL1_NO_PDM;
 	}

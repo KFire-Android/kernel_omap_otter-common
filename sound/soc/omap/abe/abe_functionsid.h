@@ -95,6 +95,7 @@
 #define C_ABE_FW_FUNCTION_CHECK_IIR_LEFT                    32
 #define C_ABE_FW_FUNCTION_CHECK_IIR_RIGHT                   33
 #define C_ABE_FW_FUNCTION_FIR12_2                           34
+#define C_ABE_FW_FUNCTION_IIR_SRC_MIC_NO_PRESCALING         35
 /*
  *    COPY function ID definitions
  */
@@ -120,4 +121,8 @@
 #define IO_IP_CFPID                                         19
 #define COPY_UNDERFLOW_CFPID                                20
 #define COPY_MCPDM_DL_HF_PDL1_CFPID                         21
+#define COPY_MCPDM_DL_HF_PDL2_CFPID                         22
+#define S2D_MONO_16_16_CFPID                                23
+#define D2S_MONO_16_16_CFPID                                24
+#define COPY_DMIC_NO_PRESCALE_CFPID                         25
 #endif /* _ABE_FUNCTIONSID_H_ */

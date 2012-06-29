@@ -64,6 +64,9 @@
 #define OMAP_ABE_DL1_HEADSET_LP		1
 #define OMAP_ABE_DL1_HEADSET_HP		2
 #define OMAP_ABE_DL1_EARPIECE		3
+#if !defined(CONFIG_SND_OMAP_SOC_ABE_DL2)
+#define OMAP_ABE_DL1_HANDSFREE		4
+#endif
 
 int omap_abe_set_dl1_output(int output);
 

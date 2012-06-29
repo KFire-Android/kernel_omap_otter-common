@@ -32,10 +32,12 @@
 #include <mach/emif.h>
 #include <mach/lpddr2-elpida.h>
 #include <mach/dmm.h>
+#include <mach/omap4_ion.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
+#include <plat/android-display.h>
 #include <plat/common.h>
 #include <plat/usb.h>
 #include <plat/mmc.h>
@@ -47,7 +49,6 @@
 #include <plat/vram.h>
 #include <plat/omap-pm.h>
 #include "board-blaze.h"
-#include "omap4_ion.h"
 #include "omap_ram_console.h"
 #include "mux.h"
 #include "hsmmc.h"
@@ -67,7 +68,7 @@
 #define ETH_KS8851_QUART		138
 #define OMAP4_TOUCH_IRQ_1		35
 #define OMAP4_TOUCH_IRQ_2		36
-#define HDMI_GPIO_CT_CP_HPD		60
+#define HDMI_GPIO_CT_CP_HPD		60 /* HPD mode enable/disable */
 #define HDMI_GPIO_HPD			63  /* Hot plug pin for HDMI */
 #define HDMI_GPIO_LS_OE 41 /* Level shifter for HDMI */
 #define LCD_BL_GPIO		27	/* LCD Backlight GPIO */
@@ -83,6 +84,8 @@
 #define OMAP_HDMI_HPD_ADDR	0x4A100098
 #define OMAP_HDMI_PULLTYPE_MASK	0x00000010
 
+#define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
+#define OMAP4_SFH7741_ENABLE_GPIO		188
 
 static const int sdp4430_keymap[] = {
 	KEY(0, 0, KEY_E),
@@ -604,8 +607,25 @@ static void omap4_audio_conf(void)
 
 static int tps6130x_enable(int on)
 {
-	u8 val = 0;
+	u8 rev, gpo, val = 0;
 	int ret;
+
+	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &rev,
+				TWL6040_REG_ASICREV);
+	if (ret < 0) {
+		pr_err("%s: failed to read ASICREV %d\n", __func__, ret);
+		return ret;
+	}
+
+	/*
+	 * tps6130x NRESET driven by:
+	 * - GPO2 in TWL6040
+	 * - GPO in TWL6041 (only one GPO supported)
+	 */
+	if (rev >= TWL6041_REV_2_0)
+		gpo = TWL6040_GPO1;
+	else
+		gpo = TWL6040_GPO2;
 
 	ret = twl_i2c_read_u8(TWL_MODULE_AUDIO_VOICE, &val, TWL6040_REG_GPOCTL);
 	if (ret < 0) {
@@ -613,11 +633,10 @@ static int tps6130x_enable(int on)
 		return ret;
 	}
 
-	/* TWL6040 GPO2 connected to TPS6130X NRESET */
 	if (on)
-		val |= TWL6040_GPO2;
+		val |= gpo;
 	else
-		val &= ~TWL6040_GPO2;
+		val &= ~gpo;
 
 	ret = twl_i2c_write_u8(TWL_MODULE_AUDIO_VOICE, val, TWL6040_REG_GPOCTL);
 	if (ret < 0)
@@ -901,6 +920,15 @@ static struct omap_dss_device sdp4430_lcd_device = {
 		.data2_pol	= 0,
 	},
 
+	.panel = {
+		.timings = {
+			.x_res = 864,
+			.y_res = 480,
+		},
+		.width_in_um = 84400,
+		.height_in_um = 47000,
+	},
+
 	.clocks = {
 		.dispc = {
 			.channel = {
@@ -919,6 +947,18 @@ static struct omap_dss_device sdp4430_lcd_device = {
 
 			.lp_clk_div	= 10,	/* LP Clock = 8.64 MHz */
 			.dsi_fclk_src	= OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DSI,
+			.tlpx	= 12,
+			.tclk = {
+				.zero	 = 57,
+				.prepare = 15,
+				.trail	 = 15,
+			},
+			.ths = {
+				.zero	 = 22,
+				.prepare = 18,
+				.exit	 = 32,
+				.trail	 = 18,
+			},
 		},
 	},
 	.channel = OMAP_DSS_CHANNEL_LCD,
@@ -969,9 +1009,12 @@ static void omap_4430sdp_display_init(void)
 {
 	sdp4430_lcd_init();
 	sdp4430_hdmi_mux_init();
-	omap_vram_set_sdram_vram(BLAZE_FB_RAM_SIZE, 0);
 	omapfb_set_platform_data(&blaze_fb_pdata);
 	omap_display_init(&sdp4430_dss_data);
+
+	omap_mux_init_gpio(HDMI_GPIO_LS_OE, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(HDMI_GPIO_CT_CP_HPD, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT_PULLDOWN);
 }
 
 #ifdef CONFIG_OMAP_MUX
@@ -1190,6 +1233,23 @@ static void __init omap_4430sdp_map_io(void)
 }
 static void __init omap_4430sdp_reserve(void)
 {
+	omap_init_ram_size();
+
+#ifdef CONFIG_ION_OMAP
+	omap_android_display_setup(&sdp4430_dss_data,
+				   NULL,
+				   NULL,
+				   &blaze_fb_pdata,
+				   get_omap_ion_platform_data());
+	omap_ion_init();
+#else
+	omap_android_display_setup(&sdp4430_dss_data,
+				   NULL,
+				   NULL,
+				   &blaze_fb_pdata,
+				   NULL);
+#endif
+
 	omap_ram_console_init(OMAP_RAM_CONSOLE_START_DEFAULT,
 			OMAP_RAM_CONSOLE_SIZE_DEFAULT);
 
@@ -1197,11 +1257,10 @@ static void __init omap_4430sdp_reserve(void)
 	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
 	memblock_remove(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE);
 	/* ipu needs to recognize secure input buffer area as well */
-	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM, PHYS_ADDR_DUCATI_SIZE +
-					OMAP4_ION_HEAP_SECURE_INPUT_SIZE);
-#ifdef CONFIG_ION_OMAP
-	omap_ion_init();
-#endif
+	omap_ipu_set_static_mempool(PHYS_ADDR_DUCATI_MEM,
+					PHYS_ADDR_DUCATI_SIZE +
+					OMAP4_ION_HEAP_SECURE_INPUT_SIZE +
+					OMAP4_ION_HEAP_SECURE_OUTPUT_WFDHDCP_SIZE);
 
 	omap_reserve();
 }

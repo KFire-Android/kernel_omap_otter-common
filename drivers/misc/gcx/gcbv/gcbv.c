@@ -70,6 +70,7 @@
 #define GCZONE_CLIP		(1 << 11)
 #define GCZONE_BATCH		(1 << 12)
 #define GCZONE_BLIT		(1 << 13)
+#define GCZONE_CACHE		(1 << 14)
 
 GCDBG_FILTERDEF(gcbv, GCZONE_NONE,
 		"mapping",
@@ -85,7 +86,9 @@ GCDBG_FILTERDEF(gcbv, GCZONE_NONE,
 		"do_filter",
 		"clip",
 		"batch",
-		"blit")
+		"blit",
+		"cache")
+
 
 /*******************************************************************************
 ** Miscellaneous defines and macros.
@@ -113,7 +116,7 @@ GCDBG_FILTERDEF(gcbv, GCZONE_NONE,
 #define GC_CLIP_RESET_RIGHT	((unsigned short) ((1 << 15) - 1))
 #define GC_CLIP_RESET_BOTTOM	((unsigned short) ((1 << 15) - 1))
 
-#define GC_BASE_ALIGN	16
+#define GC_BASE_ALIGN	64
 
 #define GPU_CMD_SIZE	(sizeof(unsigned int) * 2)
 
@@ -125,6 +128,25 @@ GCDBG_FILTERDEF(gcbv, GCZONE_NONE,
 	sizeof(struct gcmosignal) + \
 	sizeof(struct gccmdend) \
 )
+
+#if GCDEBUG_ENABLE
+#define GCDUMPSCHEDULE() { \
+	struct list_head *__temphead__; \
+	struct gcschedunmap *__tempunmap__; \
+	GCDBG(GCZONE_MAPPING, "scheduled unmaps:\n"); \
+	list_for_each(__temphead__, &batch->unmap) { \
+		__tempunmap__ = list_entry(__temphead__, \
+					   struct gcschedunmap, \
+					   link); \
+		GCDBG(GCZONE_MAPPING, \
+		      "  handle = 0x%08X\n", \
+		      (unsigned int) __tempunmap__->handle); \
+	} \
+}
+#else
+#define GCDUMPSCHEDULE()
+#endif
+
 
 /*******************************************************************************
 ** Internal structures.
@@ -140,24 +162,20 @@ struct srcinfo {
 
 /* bvbuffmap struct attachment. */
 struct bvbuffmapinfo {
-	unsigned long handle;	/* Mapped handle for the buffer. */
+	/* Mapped handle for the buffer. */
+	unsigned long handle;
 
-	int usermap;		/* Number of times the client explicitely
-				   mapped this buffer. */
+	/* Number of times the client explicitly mapped this buffer. */
+	int usermap;
 
-	int automap;		/* Number of times automapping happened. */
-};
-
-/* Defines a link list of scheduled unmappings. */
-struct gcschedunmap {
-	struct bvbuffdesc *bvbuffdesc;
-	struct gcschedunmap *next;
+	/* Number of times implicit mapping happened. */
+	int automap;
 };
 
 /* Operation finalization call. */
 struct gcbatch;
 typedef enum bverror (*gcbatchend) (struct bvbltparams *bltparams,
-					struct gcbatch *batch);
+				    struct gcbatch *batch);
 
 /* Blit states. */
 struct gcblit {
@@ -168,41 +186,54 @@ struct gcblit {
 
 /* Batch header. */
 struct gcbatch {
-	unsigned int structsize;	/* Used to ID structure version. */
+	/* Used to ID structure version. */
+	unsigned int structsize;
 
-	unsigned long batchflags;	/* Batch change flags. */
+	/* Batch change flags. */
+	unsigned long batchflags;
 
-	gcbatchend batchend;		/* Pointer to the function to finilize
-					   the current operation. */
-	struct gcblit gcblit;		/* States of the current operation. */
+	/* Pointer to the function to finalize the current operation. */
+	gcbatchend batchend;
 
-	int deltaleft;			/* Clipping deltas. */
+	/* State of the current operation. */
+	struct gcblit gcblit;
+
+	/* Clipping deltas; used to correct the source coordinates for
+	 * single source blits. */
+	int deltaleft;
 	int deltatop;
 	int deltaright;
 	int deltabottom;
 
-	struct bvformatxlate *dstformat;/* Destination format. */
+	/* Destination format. */
+	struct bvformatxlate *dstformat;
 
-	unsigned short dstleft;		/* Destination coordinates. */
+	/* Destination rectangle coordinates. */
+	unsigned short dstleft;
 	unsigned short dsttop;
 	unsigned short dstright;
 	unsigned short dstbottom;
 
-	unsigned int dstoffset;		/* Destination offset in pixels. */
+	/* Destination base address alignment offset in pixels. */
+	unsigned int dstoffset;
 
 #if GCDEBUG_ENABLE
-	struct bvrect prevdstrect;	/* Rectangle validation. */
+	/* Rectangle validation storage. */
+	struct bvrect prevdstrect;
 	struct bvrect prevsrc1rect;
 	struct bvrect prevsrc2rect;
 	struct bvrect prevmaskrect;
 #endif
 
-	unsigned int size;		/* Total size of the command buffer. */
+	/* Total size of the command buffer. */
+	unsigned int size;
 
-	struct gcbuffer *bufhead;	/* Command buffer list. */
+	/* Command buffer list. */
+	struct gcbuffer *bufhead;
 	struct gcbuffer *buftail;
 
-	struct gcschedunmap *unmap;	/* Scheduled unmappings. */
+	/* Scheduled implicit unmappings (gcschedunmap). */
+	struct list_head unmap;
 };
 
 /* Vacant batch header. */
@@ -210,19 +241,45 @@ struct gcvacbatch {
 	struct gcvacbatch *next;
 };
 
+/* Callback information. */
+struct gccallbackinfo {
+	/* BLTsville callback function. */
+	void (*callbackfn) (struct bvcallbackerror *err,
+			    unsigned long callbackdata);
+
+	/* Callback data. */
+	unsigned long callbackdata;
+
+	/* Previous/next callback information. */
+	struct list_head link;
+};
+
 /* Driver context. */
 struct gccontext {
-	char bverrorstr[128];		/* Last generated error message. */
+	/* Last generated error message. */
+	char bverrorstr[128];
 
-	struct bvbuffmap *vac_buffmap;	/* Vacant mappping structures. */
-	struct gcschedunmap *vac_unmap;	/* Vacant unmapping structures. */
+	/* Dynamically allocated structure cache. */
+	struct list_head vac_unmap;		/* gcschedunmap */
+	struct bvbuffmap *vac_buffmap;
+	struct gcbuffer *vac_buffers;
+	struct gcfixup *vac_fixups;
+	struct gcvacbatch *vac_batches;
 
-	struct gcbuffer *vac_buffers;	/* Vacant command buffers. */
-	struct gcfixup *vac_fixups;	/* Vacant fixups. */
-	struct gcvacbatch *vac_batches;	/* Vacant batches. */
+	/* Callback lists. */
+	struct list_head callbacklist;
+	struct list_head callbackvac;
+
+	/* Access locks. */
+	GCLOCK_TYPE batchlock;
+	GCLOCK_TYPE bufferlock;
+	GCLOCK_TYPE fixuplock;
+	GCLOCK_TYPE maplock;
+	GCLOCK_TYPE callbacklock;
 };
 
 static struct gccontext gccontext;
+
 
 /*******************************************************************************
  * Debugging.
@@ -234,7 +291,7 @@ static struct gccontext gccontext;
 
 static void dumpbatch(struct gcbatch *batch)
 {
-	if ((GCDBGFILTER().zone & GCZONE_BATCH) != 0) {
+	if ((GCDBGFILTER.zone & GCZONE_BATCH) != 0) {
 		struct gcbuffer *buffer;
 		unsigned int i, size;
 		struct gcfixup *fixup;
@@ -273,6 +330,7 @@ static void dumpbatch(struct gcbatch *batch)
 #else
 #	define GCDUMPBATCH(...)
 #endif
+
 
 /*******************************************************************************
  * Error handling.
@@ -384,12 +442,81 @@ static struct bvsurferrorid g_src1surferr = { "src1", BVERR_SRC1DESC };
 static struct bvsurferrorid g_src2surferr = { "src2", BVERR_SRC2DESC };
 static struct bvsurferrorid g_masksurferr = { "mask", BVERR_MASKDESC };
 
+
+/*******************************************************************************
+ * Callback info management.
+ */
+
+static enum bverror get_callbackinfo(struct gccallbackinfo **gccallbackinfo)
+{
+	enum bverror bverror;
+	struct gccallbackinfo *temp;
+
+	/* Lock access to callback info lists. */
+	GCLOCK(&gccontext.callbacklock);
+
+	if (list_empty(&gccontext.callbackvac)) {
+		temp = gcalloc(struct gccallbackinfo,
+			       sizeof(struct gccallbackinfo));
+		if (temp == NULL) {
+			bverror = BVERR_OOM;
+			goto exit;
+		}
+		list_add(&temp->link, &gccontext.callbacklist);
+	} else {
+		struct list_head *head;
+		head = gccontext.callbackvac.next;
+		temp = list_entry(head, struct gccallbackinfo, link);
+		list_move(head, &gccontext.callbacklist);
+	}
+
+	*gccallbackinfo = temp;
+	bverror = BVERR_NONE;
+
+exit:
+	/* Unlock access to callback info lists. */
+	GCUNLOCK(&gccontext.callbacklock);
+
+	return bverror;
+}
+
+static void free_callback(struct gccallbackinfo *gccallbackinfo)
+{
+	/* Lock access to callback info lists. */
+	GCLOCK(&gccontext.callbacklock);
+
+	list_move(&gccallbackinfo->link, &gccontext.callbackvac);
+
+	/* Unlock access to callback info lists. */
+	GCUNLOCK(&gccontext.callbacklock);
+}
+
+void gccallback(void *callbackparam)
+{
+	struct gccallbackinfo *gccallbackinfo;
+
+	GCENTER(GCZONE_BLIT);
+
+	gccallbackinfo = (struct gccallbackinfo *) callbackparam;
+	GCDBG(GCZONE_BLIT, "bltsville_callback = 0x%08X\n",
+		(unsigned int) gccallbackinfo->callbackfn);
+	GCDBG(GCZONE_BLIT, "bltsville_param    = 0x%08X\n",
+		(unsigned int) gccallbackinfo->callbackdata);
+
+	gccallbackinfo->callbackfn(NULL, gccallbackinfo->callbackdata);
+	free_callback(gccallbackinfo);
+
+	GCEXIT(GCZONE_BLIT);
+}
+
+
 /*******************************************************************************
  * Memory management.
  */
 
-static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
-				struct bvbuffmap **map)
+static enum bverror do_map(struct bvbuffdesc *bvbuffdesc,
+			   struct gcbatch *batch,
+			   struct bvbuffmap **map)
 {
 	static const int mapsize
 		= sizeof(struct bvbuffmap)
@@ -399,260 +526,305 @@ static enum bverror do_map(struct bvbuffdesc *buffdesc, int client,
 	struct bvbuffmap *bvbuffmap;
 	struct bvbuffmapinfo *bvbuffmapinfo;
 	struct bvphysdesc *bvphysdesc;
+	bool mappedbyothers;
 	struct gcmap gcmap;
 	unsigned int offset;
+	struct gcschedunmap *gcschedunmap;
+
+	GCENTERARG(GCZONE_MAPPING, "bvbuffdesc = 0x%08X\n",
+		   (unsigned int) bvbuffdesc);
+
+	/* Lock access to the mapping list. */
+	GCLOCK(&gccontext.maplock);
 
 	/* Try to find existing mapping. */
-	bvbuffmap = buffdesc->map;
+	bvbuffmap = bvbuffdesc->map;
 	while (bvbuffmap != NULL) {
-		if (bvbuffmap->bv_unmap == gcbv_unmap)
+		if (bvbuffmap->bv_unmap == bv_unmap)
 			break;
 		bvbuffmap = bvbuffmap->nextmap;
 	}
 
-	/* Already mapped? */
-	if (bvbuffmap != NULL) {
+	/* Not mapped yet? */
+	if (bvbuffmap == NULL) {
+		/* New mapping, allocate a record. */
+		if (gccontext.vac_buffmap == NULL) {
+			bvbuffmap = gcalloc(struct bvbuffmap, mapsize);
+			if (bvbuffmap == NULL) {
+				BVSETERROR(BVERR_OOM,
+					   "failed to allocate mapping record");
+				goto fail;
+			}
+
+			bvbuffmap->structsize = sizeof(struct bvbuffmap);
+			bvbuffmap->bv_unmap = bv_unmap;
+			bvbuffmap->handle = (unsigned long) (bvbuffmap + 1);
+		} else {
+			bvbuffmap = gccontext.vac_buffmap;
+			gccontext.vac_buffmap = bvbuffmap->nextmap;
+		}
+
+		/* Setup buffer mapping. Here we need to check and make sure
+		 * that the buffer starts at a location that is supported by
+		 * the hw. If it is not, offset is computed and the buffer is
+		 * extended by the value of the offset. */
+		gcmap.gcerror = GCERR_NONE;
+		gcmap.handle = 0;
+
+		if (bvbuffdesc->auxtype == BVAT_PHYSDESC) {
+			bvphysdesc = (struct bvphysdesc *) bvbuffdesc->auxptr;
+
+			if (bvphysdesc->structsize <
+			    STRUCTSIZE(bvphysdesc, pageoffset)) {
+				BVSETERROR(BVERR_BUFFERDESC_VERS,
+					   "unsupported bvphysdesc version");
+				goto fail;
+			}
+
+			gcmap.buf.offset = bvphysdesc->pageoffset
+					 & ~(GC_BASE_ALIGN - 1);
+			offset = bvphysdesc->pageoffset
+				& (GC_BASE_ALIGN - 1);
+			gcmap.pagesize = bvphysdesc->pagesize;
+			gcmap.pagearray = bvphysdesc->pagearray;
+
+			GCDBG(GCZONE_MAPPING, "new mapping (%s):\n",
+				(batch == NULL) ? "explicit" : "implicit");
+			GCDBG(GCZONE_MAPPING, "pagesize = %lu\n",
+				bvphysdesc->pagesize);
+			GCDBG(GCZONE_MAPPING, "pagearray = 0x%08X\n",
+				(unsigned int) bvphysdesc->pagearray);
+			GCDBG(GCZONE_MAPPING, "specified pageoffset = %lu\n",
+				bvphysdesc->pageoffset);
+			GCDBG(GCZONE_MAPPING, "aligned pageoffset = %d\n",
+				gcmap.buf.offset);
+		} else {
+			gcmap.buf.logical
+				= (void *) ((unsigned int) bvbuffdesc->virtaddr
+				& ~(GC_BASE_ALIGN - 1));
+			offset = (unsigned int) bvbuffdesc->virtaddr
+				& (GC_BASE_ALIGN - 1);
+			gcmap.pagesize = 0;
+			gcmap.pagearray = NULL;
+
+			GCDBG(GCZONE_MAPPING, "new mapping (%s):\n",
+				(batch == NULL) ? "explicit" : "implicit");
+			GCDBG(GCZONE_MAPPING, "specified virtaddr = 0x%08X\n",
+				(unsigned int) bvbuffdesc->virtaddr);
+			GCDBG(GCZONE_MAPPING, "aligned virtaddr = 0x%08X\n",
+				(unsigned int) gcmap.buf.logical);
+		}
+
+		gcmap.size = offset + bvbuffdesc->length;
+
+		GCDBG(GCZONE_MAPPING, "surface offset = %d\n", offset);
+		GCDBG(GCZONE_MAPPING, "mapping size = %d\n", gcmap.size);
+
+		gc_map_wrapper(&gcmap);
+		if (gcmap.gcerror != GCERR_NONE) {
+			BVSETERROR(BVERR_OOM,
+					"unable to allocate gccore memory");
+			goto fail;
+		}
+
+		/* Set map handle. */
+		bvbuffmapinfo = (struct bvbuffmapinfo *) bvbuffmap->handle;
+		bvbuffmapinfo->handle = gcmap.handle;
+
+		/* Initialize reference counters. */
+		if (batch == NULL) {
+			/* Explicit mapping. */
+			bvbuffmapinfo->usermap = 1;
+			bvbuffmapinfo->automap = 0;
+		} else {
+			/* Implicit mapping; if there are existing mappings
+			 * from other implementations, mark this an explicit
+			 * mapping as well. */
+			mappedbyothers = (bvbuffdesc->map != NULL);
+			GCDBG(GCZONE_MAPPING, "%smapped by others.\n",
+			      mappedbyothers ? "" : "not ");
+
+			bvbuffmapinfo->usermap = mappedbyothers ? 1 : 0;
+			bvbuffmapinfo->automap = 1;
+		}
+
+		/* Add the record to the list of mappings. */
+		bvbuffmap->nextmap = bvbuffdesc->map;
+		bvbuffdesc->map = bvbuffmap;
+	} else {
+		/* Mapping already exists. */
 		bvbuffmapinfo = (struct bvbuffmapinfo *) bvbuffmap->handle;
 
-		if (client)
+		/* Advance reference counters. */
+		if (batch == NULL) {
+			/* Explicit mapping. */
+			GCDBG(GCZONE_MAPPING, "explicit map.\n");
 			bvbuffmapinfo->usermap += 1;
-		else
+		} else {
+			/* Implicit mapping. */
+			GCDBG(GCZONE_MAPPING, "implicit map.\n");
 			bvbuffmapinfo->automap += 1;
-
-		GCDBG(GCZONE_MAPPING, "buffer already mapped:\n");
-		GCDBG(GCZONE_MAPPING, "  virtaddr = 0x%08X\n",
-			(unsigned int) buffdesc->virtaddr);
-		GCDBG(GCZONE_MAPPING, "  addr = 0x%08X\n",
-			(unsigned int) GET_MAP_HANDLE(bvbuffmap));
-
-		*map = bvbuffmap;
-		return BVERR_NONE;
-	}
-
-	/* New mapping, allocate a record. */
-	if (gccontext.vac_buffmap == NULL) {
-		bvbuffmap = gcalloc(struct bvbuffmap, mapsize);
-		if (bvbuffmap == NULL) {
-			BVSETERROR(BVERR_OOM,
-					"failed to allocate mapping record");
-			goto exit;
 		}
 
-		bvbuffmap->structsize = sizeof(struct bvbuffmap);
-		bvbuffmap->bv_unmap = gcbv_unmap;
-		bvbuffmap->handle = (unsigned long) (bvbuffmap + 1);
-	} else {
-		bvbuffmap = gccontext.vac_buffmap;
-		gccontext.vac_buffmap = bvbuffmap->nextmap;
+		GCDBG(GCZONE_MAPPING, "mapping exists.\n");
 	}
 
-	/* Setup buffer mapping. Here we need to check and make sure that
-	   the buffer starts at a location that is supported by the hw.
-	   If it is not, offset is computed and the buffer is extended
-	   by the value of the offset. */
-	gcmap.gcerror = GCERR_NONE;
-	gcmap.handle = 0;
+	GCDBG(GCZONE_MAPPING, "bvbuffmap = 0x%08X\n",
+		(unsigned int) bvbuffmap);
+	GCDBG(GCZONE_MAPPING, "explicit count = %d\n",
+		bvbuffmapinfo->usermap);
+	GCDBG(GCZONE_MAPPING, "implicit count = %d\n",
+		bvbuffmapinfo->automap);
 
-	if (buffdesc->auxtype == BVAT_PHYSDESC) {
-		bvphysdesc = (struct bvphysdesc *) buffdesc->auxptr;
-
-#if 0
-		if (bvphysdesc->structsize <
-		    STRUCTSIZE(bvphysdesc, pageoffset)) {
-			BVSETERROR(BVERR_BUFFERDESC_VERS,
-				"unsupported bvphysdesc version (structsize)");
-			goto exit;
+	/* Schedule for unmapping. */
+	if (batch != NULL) {
+		if (list_empty(&gccontext.vac_unmap)) {
+			gcschedunmap = gcalloc(struct gcschedunmap,
+					       sizeof(struct gcschedunmap));
+			if (gcschedunmap == NULL) {
+				BVSETERROR(BVERR_OOM,
+					   "failed to schedule unmapping");
+				goto fail;
+			}
+			list_add(&gcschedunmap->link, &batch->unmap);
+		} else {
+			struct list_head *head;
+			head = gccontext.vac_unmap.next;
+			gcschedunmap = list_entry(head,
+						  struct gcschedunmap,
+						  link);
+			list_move(&gcschedunmap->link, &batch->unmap);
 		}
-#endif
 
-		gcmap.buf.offset
-			= bvphysdesc->pageoffset
-			& ~(GC_BASE_ALIGN - 1);
-		offset = bvphysdesc->pageoffset
-			& (GC_BASE_ALIGN - 1);
-		gcmap.pagesize = bvphysdesc->pagesize;
-		gcmap.pagearray = bvphysdesc->pagearray;
+		gcschedunmap->handle = (unsigned long) bvbuffdesc;
 
-		GCDBG(GCZONE_MAPPING, "new mapping:\n");
-		GCDBG(GCZONE_MAPPING, "  pagesize = %lu\n",
-			bvphysdesc->pagesize);
-		GCDBG(GCZONE_MAPPING, "  pagearray = 0x%08X\n",
-			(unsigned int) bvphysdesc->pagearray);
-		GCDBG(GCZONE_MAPPING, "  specified pageoffset = %lu\n",
-			bvphysdesc->pageoffset);
-		GCDBG(GCZONE_MAPPING, "  aligned pageoffset = %d\n",
-			gcmap.buf.offset);
-	} else {
-		gcmap.buf.logical
-			= (void *) ((unsigned int) buffdesc->virtaddr
-			& ~(GC_BASE_ALIGN - 1));
-		offset = (unsigned int) buffdesc->virtaddr
-			& (GC_BASE_ALIGN - 1);
-		gcmap.pagesize = 0;
-		gcmap.pagearray = NULL;
-
-		GCDBG(GCZONE_MAPPING, "new mapping:\n");
-		GCDBG(GCZONE_MAPPING, "  specified virtaddr = 0x%08X\n",
-			(unsigned int) buffdesc->virtaddr);
-		GCDBG(GCZONE_MAPPING, "  aligned virtaddr = %d\n",
-			(unsigned int) gcmap.buf.logical);
+		GCDBG(GCZONE_MAPPING, "scheduled for unmapping.\n");
+		GCDUMPSCHEDULE();
 	}
 
-	gcmap.size = offset + buffdesc->length;
-
-	GCDBG(GCZONE_MAPPING, "  surface offset = %d\n", offset);
-	GCDBG(GCZONE_MAPPING, "  mapping size = %d\n", gcmap.size);
-
-	gc_map_wrapper(&gcmap);
-	if (gcmap.gcerror != GCERR_NONE) {
-		BVSETERROR(BVERR_OOM,
-				"unable to allocate gccore memory");
-		goto exit;
-	}
-
-	bvbuffmapinfo = (struct bvbuffmapinfo *) bvbuffmap->handle;
-	bvbuffmapinfo->handle = gcmap.handle;
-
-	if (client) {
-		bvbuffmapinfo->usermap = 1;
-		bvbuffmapinfo->automap = 0;
-	} else {
-		bvbuffmapinfo->usermap = 0;
-		bvbuffmapinfo->automap = 1;
-	}
-
-	bvbuffmap->nextmap = buffdesc->map;
-	buffdesc->map = bvbuffmap;
-
-	GCDBG(GCZONE_MAPPING, "  handle = 0x%08X\n",
-		(unsigned int) GET_MAP_HANDLE(bvbuffmap));
-
+	/* Set the map pointer. */
 	*map = bvbuffmap;
+
+	/* Unlock access to the mapping list. */
+	GCUNLOCK(&gccontext.maplock);
+
+	GCEXITARG(GCZONE_MAPPING, "handle = 0x%08X\n",
+		  bvbuffmapinfo->handle);
 	return BVERR_NONE;
 
-exit:
+fail:
 	if (bvbuffmap != NULL) {
 		bvbuffmap->nextmap = gccontext.vac_buffmap;
 		gccontext.vac_buffmap = bvbuffmap;
 	}
 
+	/* Unlock access to the mapping list. */
+	GCUNLOCK(&gccontext.maplock);
+
+	GCEXITARG(GCZONE_MAPPING, "bverror = %d\n", bverror);
 	return bverror;
 }
 
-static enum bverror do_unmap(struct bvbuffdesc *buffdesc, int client)
+static void unmap_implicit(struct gcbatch *batch)
 {
-	enum bverror bverror;
-	struct bvbuffmap *prev = NULL;
-	struct bvbuffmap *bvbuffmap;
+	struct list_head *head, *temphead;
+	struct gcschedunmap *gcschedunmap;
+	struct bvbuffdesc *bvbuffdesc;
+	struct bvbuffmap *prev, *bvbuffmap;
 	struct bvbuffmapinfo *bvbuffmapinfo;
-	struct gcmap gcmap;
 
-	/* Try to find existing mapping. */
-	bvbuffmap = buffdesc->map;
-	while (bvbuffmap != NULL) {
-		if (bvbuffmap->bv_unmap == gcbv_unmap)
-			break;
-		prev = bvbuffmap;
-		bvbuffmap = bvbuffmap->nextmap;
-	}
+	GCENTER(GCZONE_MAPPING);
 
-	/* No mapping found? */
-	if (bvbuffmap == NULL) {
-		bverror = BVERR_NONE;
-		goto exit;
-	}
+	/* Lock access to the mapping list. */
+	GCLOCK(&gccontext.maplock);
 
-	/* Get the info structure. */
-	bvbuffmapinfo = (struct bvbuffmapinfo *) bvbuffmap->handle;
+	/* Dump the schedule. */
+	GCDUMPSCHEDULE();
 
-	/* Dereference. */
-	if (client)
-		bvbuffmapinfo->usermap = 0;
-	else
-		bvbuffmapinfo->automap -= 1;
+	/* Scan scheduled unmappings and remove the ones that are still
+	 * in use. */
+	list_for_each_safe(head, temphead, &batch->unmap) {
+		gcschedunmap = list_entry(head, struct gcschedunmap, link);
 
-	/* Still referenced? */
-	if (bvbuffmapinfo->usermap || bvbuffmapinfo->automap) {
-		bverror = BVERR_NONE;
-		goto exit;
-	}
+		/* Cast the handle. */
+		bvbuffdesc = (struct bvbuffdesc *) gcschedunmap->handle;
 
-	/* Setup buffer unmapping. */
-	gcmap.gcerror = GCERR_NONE;
-	gcmap.buf.logical = NULL;
-	gcmap.size = buffdesc->length;
-	gcmap.handle = GET_MAP_HANDLE(bvbuffmap);
-
-	/* Remove mapping record. */
-	if (prev == NULL)
-		buffdesc->map = bvbuffmap->nextmap;
-	else
-		prev->nextmap = bvbuffmap->nextmap;
-
-	bvbuffmap->nextmap = gccontext.vac_buffmap;
-	gccontext.vac_buffmap = bvbuffmap;
-
-	/* Unmap the buffer. */
-	gc_unmap_wrapper(&gcmap);
-	if (gcmap.gcerror != GCERR_NONE) {
-		BVSETERROR(BVERR_OOM,
-				"unable to free gccore memory");
-		goto exit;
-	}
-
-	bverror = BVERR_NONE;
-
-exit:
-	return bverror;
-}
-
-static enum bverror schedule_unmap(struct gcbatch *batch,
-					struct bvbuffdesc *buffdesc)
-{
-	enum bverror bverror;
-	struct gcschedunmap *gcschedunmap;
-
-	if (gccontext.vac_unmap == NULL) {
-		gcschedunmap = gcalloc(struct gcschedunmap,
-					sizeof(struct gcschedunmap));
-		if (gcschedunmap == NULL) {
-			BVSETERROR(BVERR_OOM, "failed to schedule unmapping");
-			goto exit;
+		/* Find our mapping. */
+		prev = NULL;
+		bvbuffmap = bvbuffdesc->map;
+		while (bvbuffmap != NULL) {
+			if (bvbuffmap->bv_unmap == bv_unmap)
+				break;
+			prev = bvbuffmap;
+			bvbuffmap = bvbuffmap->nextmap;
 		}
-	} else {
-		gcschedunmap = gccontext.vac_unmap;
-		gccontext.vac_unmap = gcschedunmap->next;
+
+		/* Not found? */
+		if (bvbuffmap == NULL) {
+			GCERR("mapping not found for bvbuffdesc 0x%08X.\n",
+			      (unsigned int) bvbuffdesc);
+
+			/* Remove scheduled unmapping. */
+			list_move(head, &gccontext.vac_unmap);
+			continue;
+		}
+
+		/* Get the info structure. */
+		bvbuffmapinfo = (struct bvbuffmapinfo *) bvbuffmap->handle;
+
+		GCDBG(GCZONE_MAPPING, "head = 0x%08X\n",
+		      (unsigned int) gcschedunmap);
+		GCDBG(GCZONE_MAPPING, "  bvbuffmap = 0x%08X\n",
+		      (unsigned int) bvbuffmap);
+		GCDBG(GCZONE_MAPPING, "  handle = 0x%08X\n",
+		      bvbuffmapinfo->handle);
+
+		/* Implicit unmapping. */
+		bvbuffmapinfo->automap -= 1;
+		if (bvbuffmapinfo->automap < 0) {
+			GCERR("implicit count negative.\n");
+			bvbuffmapinfo->automap = 0;
+		}
+
+		GCDBG(GCZONE_MAPPING, "  explicit count = %d\n",
+			bvbuffmapinfo->usermap);
+		GCDBG(GCZONE_MAPPING, "  implicit count = %d\n",
+			bvbuffmapinfo->automap);
+
+		/* Still referenced? */
+		if (bvbuffmapinfo->usermap || bvbuffmapinfo->automap) {
+			GCDBG(GCZONE_MAPPING, "  still referenced.\n");
+
+			/* Remove scheduled unmapping. */
+			list_move(head, &gccontext.vac_unmap);
+			continue;
+		}
+
+		GCDBG(GCZONE_MAPPING, "  ready for unmapping.\n");
+
+		/* Set the handle. */
+		gcschedunmap->handle = bvbuffmapinfo->handle;
+
+		/* Remove from the buffer descriptor. */
+		if (prev == NULL)
+			bvbuffdesc->map = bvbuffmap->nextmap;
+		else
+			prev->nextmap = bvbuffmap->nextmap;
+
+		/* Add to the vacant list. */
+		bvbuffmap->nextmap = gccontext.vac_buffmap;
+		gccontext.vac_buffmap = bvbuffmap;
 	}
 
-	gcschedunmap->bvbuffdesc = buffdesc;
-	gcschedunmap->next = batch->unmap;
-	batch->unmap = gcschedunmap;
+	/* Dump the schedule. */
+	GCDUMPSCHEDULE();
 
-	bverror = BVERR_NONE;
+	/* Unlock access to the mapping list. */
+	GCUNLOCK(&gccontext.maplock);
 
-exit:
-	return bverror;
+	GCEXIT(GCZONE_MAPPING);
 }
 
-static enum bverror process_scheduled_unmap(struct gcbatch *batch)
-{
-	enum bverror bverror = BVERR_NONE;
-	struct gcschedunmap *gcschedunmap;
-
-	while (batch->unmap != NULL) {
-		gcschedunmap = batch->unmap;
-
-		bverror = do_unmap(gcschedunmap->bvbuffdesc, 0);
-		if (bverror != BVERR_NONE)
-			break;
-
-		batch->unmap = gcschedunmap->next;
-		gcschedunmap->next = gccontext.vac_unmap;
-		gccontext.vac_unmap = gcschedunmap;
-	}
-
-	return bverror;
-}
 
 /*******************************************************************************
  * Batch memory manager.
@@ -663,7 +835,7 @@ static void free_batch(struct gcbatch *batch);
 static enum bverror append_buffer(struct gcbatch *batch);
 
 static enum bverror do_end(struct bvbltparams *bltparams,
-				struct gcbatch *batch)
+			   struct gcbatch *batch)
 {
 	return BVERR_NONE;
 }
@@ -674,6 +846,9 @@ static enum bverror allocate_batch(struct gcbatch **batch)
 	struct gcbatch *temp;
 
 	GCENTER(GCZONE_BATCH);
+
+	/* Lock access to batch management. */
+	GCLOCK(&gccontext.batchlock);
 
 	if (gccontext.vac_batches == NULL) {
 		temp = gcalloc(struct gcbatch, sizeof(struct gcbatch));
@@ -696,6 +871,7 @@ static enum bverror allocate_batch(struct gcbatch **batch)
 	memset(temp, 0, sizeof(struct gcbatch));
 	temp->structsize = sizeof(struct gcbatch);
 	temp->batchend = do_end;
+	INIT_LIST_HEAD(&temp->unmap);
 
 	bverror = append_buffer(temp);
 	if (bverror != BVERR_NONE) {
@@ -708,6 +884,9 @@ static enum bverror allocate_batch(struct gcbatch **batch)
 	GCDBG(GCZONE_BATCH, "batch allocated = 0x%08X\n", (unsigned int) temp);
 
 exit:
+	/* Unlock access to batch management. */
+	GCUNLOCK(&gccontext.batchlock);
+
 	GCEXITARG(GCZONE_BATCH, "bv%s = %d\n",
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
@@ -718,6 +897,14 @@ static void free_batch(struct gcbatch *batch)
 	struct gcbuffer *buffer;
 
 	GCENTERARG(GCZONE_BATCH, "batch = 0x%08X\n", (unsigned int) batch);
+
+	/* Lock access. */
+	GCLOCK(&gccontext.batchlock);
+	GCLOCK(&gccontext.bufferlock);
+	GCLOCK(&gccontext.fixuplock);
+	GCLOCK(&gccontext.maplock);
+
+	list_splice_init(&batch->unmap, &gccontext.vac_unmap);
 
 	buffer = batch->bufhead;
 	if (buffer != NULL) {
@@ -736,6 +923,12 @@ static void free_batch(struct gcbatch *batch)
 	((struct gcvacbatch *) batch)->next = gccontext.vac_batches;
 	gccontext.vac_batches = (struct gcvacbatch *) batch;
 
+	/* Unlock access. */
+	GCUNLOCK(&gccontext.maplock);
+	GCUNLOCK(&gccontext.fixuplock);
+	GCUNLOCK(&gccontext.bufferlock);
+	GCUNLOCK(&gccontext.batchlock);
+
 	GCEXIT(GCZONE_BATCH);
 }
 
@@ -745,6 +938,9 @@ static enum bverror append_buffer(struct gcbatch *batch)
 	struct gcbuffer *temp;
 
 	GCENTERARG(GCZONE_BUFFER, "batch = 0x%08X\n", (unsigned int) batch);
+
+	/* Lock access to buffer management. */
+	GCLOCK(&gccontext.bufferlock);
 
 	if (gccontext.vac_buffers == NULL) {
 		temp = gcalloc(struct gcbuffer, GC_BUFFER_SIZE);
@@ -782,13 +978,16 @@ static enum bverror append_buffer(struct gcbatch *batch)
 	bverror = BVERR_NONE;
 
 exit:
+	/* Unlock access to buffer management. */
+	GCUNLOCK(&gccontext.bufferlock);
+
 	GCEXITARG(GCZONE_BUFFER, "bv%s = %d\n",
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
 
 static enum bverror add_fixup(struct gcbatch *batch, unsigned int *fixup,
-				unsigned int surfoffset)
+			      unsigned int surfoffset)
 {
 	enum bverror bverror;
 	struct gcbuffer *buffer;
@@ -796,6 +995,9 @@ static enum bverror add_fixup(struct gcbatch *batch, unsigned int *fixup,
 
 	GCENTERARG(GCZONE_FIXUP, "batch = 0x%08X, fixup ptr = 0x%08X\n",
 		(unsigned int) batch, (unsigned int) fixup);
+
+	/* Lock access to fixup management. */
+	GCLOCK(&gccontext.fixuplock);
 
 	buffer = batch->buftail;
 	temp = buffer->fixuptail;
@@ -849,14 +1051,17 @@ static enum bverror add_fixup(struct gcbatch *batch, unsigned int *fixup,
 	bverror = BVERR_NONE;
 
 exit:
+	/* Unlock access to fixup management. */
+	GCUNLOCK(&gccontext.fixuplock);
+
 	GCEXITARG(GCZONE_FIXUP, "bv%s = %d\n",
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
 
 static enum bverror claim_buffer(struct gcbatch *batch,
-					unsigned int size,
-					void **buffer)
+				 unsigned int size,
+				 void **buffer)
 {
 	enum bverror bverror;
 	struct gcbuffer *curbuf;
@@ -896,6 +1101,7 @@ exit:
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
+
 
 /*******************************************************************************
  * Pixel format parser.
@@ -970,6 +1176,11 @@ struct bvformatxlate {
 
 #define BVFORMATINVALID \
 	{ 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } } }
+
+static struct bvformatxlate g_format_nv12 = {
+	.bitspp = 8,
+	.format = GCREG_DE_FORMAT_NV12,
+};
 
 static struct bvformatxlate formatxlate[] = {
 	/*  #0: OCDFMT_xRGB12
@@ -1153,6 +1364,16 @@ static int parse_format(enum ocdformat ocdformat, struct bvformatxlate **format)
 
 	GCDBG(GCZONE_FORMAT, "ocdformat = 0x%08X\n", ocdformat);
 
+	switch (ocdformat) {
+	case OCDFMT_NV12:
+		GCDBG(GCZONE_FORMAT, "OCDFMT_NV12\n");
+		*format = &g_format_nv12;
+		return 1;
+
+	default:
+		break;
+	}
+
 	cs = (ocdformat & OCDFMTDEF_CS_MASK) >> OCDFMTDEF_CS_SHIFT;
 	bits = (ocdformat & OCDFMTDEF_COMPONENTSIZEMINUS1_MASK)
 		>> OCDFMTDEF_COMPONENTSIZEMINUS1_SHIFT;
@@ -1299,6 +1520,7 @@ static unsigned int getinternalcolor(void *ptr, struct bvformatxlate *format)
 
 	return dstpixel;
 }
+
 
 /*******************************************************************************
  * Alpha blending parser.
@@ -1913,7 +2135,7 @@ static struct bvblendxlate blendxlate[64] = {
 };
 
 static enum bverror parse_blend(struct bvbltparams *bltparams,
-	enum bvblend blend, struct gcalpha *gca)
+				enum bvblend blend, struct gcalpha *gca)
 {
 	enum bverror bverror;
 	unsigned int global;
@@ -2008,6 +2230,7 @@ exit:
 	return bverror;
 }
 
+
 /*******************************************************************************
  * Surface compare and validation.
  */
@@ -2059,6 +2282,12 @@ static bool same_phys_area(struct bvbuffdesc *surf1, struct bvrect *rect1,
 		if (physdesc1->pagearray == physdesc2->pagearray)
 			return equal_rects(rect1, rect2);
 
+		/* Pageoffsets must match since different buffers
+		 * can share the same first page (eg nv12).
+		 */
+		if (physdesc1->pageoffset != physdesc2->pageoffset)
+			return false;
+
 		/* Assume the same surface if first pages match. */
 		if (physdesc1->pagearray[0] == physdesc2->pagearray[0])
 			return equal_rects(rect1, rect2);
@@ -2081,12 +2310,12 @@ static bool valid_geom(struct bvbuffdesc *buffdesc, struct bvsurfgeom *geom,
 
 	/* Make sure the size is not greater then the surface. */
 	if (size > buffdesc->length) {
-		GCERR("ERROR: invalid geometry detected:\n");
-		GCERR("       specified dimensions: %dx%d, %d bitspp\n",
+		GCERR("invalid geometry detected:\n");
+		GCERR("  specified dimensions: %dx%d, %d bitspp\n",
 			geom->width, geom->height, format->bitspp);
-		GCERR("       surface size based on the dimensions: %d\n",
+		GCERR("  surface size based on the dimensions: %d\n",
 			size);
-		GCERR("       specified surface size: %lu\n",
+		GCERR("  specified surface size: %lu\n",
 			buffdesc->length);
 		return false;
 	}
@@ -2159,7 +2388,7 @@ static void verify_batch(unsigned int changeflags,
 		/* Origin did not change. */
 		if ((prevrect->left != currrect->left) ||
 			(prevrect->top != currrect->top)) {
-			GCERR("ERROR: origin changed\n");
+			GCERR("origin changed\n");
 			GCERR("  previous = %d,%d\n",
 				prevrect->left, prevrect->top);
 			GCERR("  current = %d,%d\n",
@@ -2171,7 +2400,7 @@ static void verify_batch(unsigned int changeflags,
 		/* Size did not change. */
 		if ((prevrect->width != currrect->width) ||
 			(prevrect->height != currrect->height)) {
-			GCERR("ERROR: size changed\n");
+			GCERR("size changed\n");
 			GCERR("  previous = %dx%d\n",
 				prevrect->width, prevrect->height);
 			GCERR("  current = %dx%d\n",
@@ -2188,13 +2417,14 @@ static void verify_batch(unsigned int changeflags,
 #	define VERIFYBATCH(...)
 #endif
 
+
 /*******************************************************************************
  * Primitive renderers.
  */
 
 static enum bverror set_dst(struct bvbltparams *bltparams,
-				struct gcbatch *batch,
-				struct bvbuffmap *dstmap)
+			    struct gcbatch *batch,
+			    struct bvbuffmap *dstmap)
 {
 	enum bverror bverror = BVERR_NONE;
 	struct bvsurfgeom *dstgeom = bltparams->dstgeom;
@@ -2278,7 +2508,7 @@ exit:
 }
 
 static enum bverror set_clip(struct bvbltparams *bltparams,
-				struct gcbatch *batch)
+			     struct gcbatch *batch)
 {
 	enum bverror bverror = BVERR_NONE;
 	struct bvrect *dstrect = &bltparams->dstrect;
@@ -2363,8 +2593,8 @@ static enum bverror set_clip(struct bvbltparams *bltparams,
 	}
 
 	/* Validate the rectangle. */
-	if ((clippedright > bltparams->dstgeom->width) ||
-		(clippedbottom > bltparams->dstgeom->height)) {
+	if ((clippedright > (int) bltparams->dstgeom->width) ||
+		(clippedbottom > (int) bltparams->dstgeom->height)) {
 		BVSETBLTERROR(BVERR_DSTRECT,
 				"destination rect exceeds surface size");
 		goto exit;
@@ -2429,11 +2659,10 @@ exit:
 }
 
 static enum bverror do_fill(struct bvbltparams *bltparams,
-				struct gcbatch *batch,
-				struct srcinfo *srcinfo)
+			    struct gcbatch *batch,
+			    struct srcinfo *srcinfo)
 {
 	enum bverror bverror;
-	enum bverror unmap_bverror;
 	struct gcmofill *gcmofill;
 	unsigned char *fillcolorptr;
 	struct bvformatxlate *srcformat;
@@ -2448,7 +2677,7 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 		goto exit;
 
 	/* Map the destination. */
-	bverror = do_map(bltparams->dstdesc, 0, &dstmap);
+	bverror = do_map(bltparams->dstdesc, batch, &dstmap);
 	if (bverror != BVERR_NONE) {
 		bltparams->errdesc = gccontext.bverrorstr;
 		goto exit;
@@ -2549,14 +2778,6 @@ static enum bverror do_fill(struct bvbltparams *bltparams,
 	gcmofill->start.rect.bottom = batch->dstbottom;
 
 exit:
-	if (dstmap != NULL) {
-		unmap_bverror = schedule_unmap(batch, bltparams->dstdesc);
-		if ((unmap_bverror != BVERR_NONE) && (bverror == BVERR_NONE)) {
-			bltparams->errdesc = gccontext.bverrorstr;
-			bverror = unmap_bverror;
-		}
-	}
-
 	GCEXITARG(GCZONE_DO_FILL, "bv%s = %d\n",
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
@@ -2641,14 +2862,31 @@ exit:
 	return bverror;
 }
 
+
+static inline int get_offset(struct bvbuffdesc *desc)
+{
+	int offset;
+
+	if (desc->auxtype == BVAT_PHYSDESC) {
+		struct bvphysdesc *pdesc;
+		pdesc = (struct bvphysdesc *) desc->auxptr;
+
+		offset = pdesc->pageoffset &
+			(GC_BASE_ALIGN - 1);
+	} else {
+		offset = (unsigned int) desc->virtaddr &
+			(GC_BASE_ALIGN - 1);
+	}
+	return offset;
+}
+
 static enum bverror do_blit(struct bvbltparams *bltparams,
-				struct gcbatch *batch,
-				struct srcinfo *srcinfo,
-				unsigned int srccount,
-				struct gcalpha *gca)
+			    struct gcbatch *batch,
+			    struct srcinfo *srcinfo,
+			    unsigned int srccount,
+			    struct gcalpha *gca)
 {
 	enum bverror bverror = BVERR_NONE;
-	enum bverror unmap_bverror;
 
 	struct gcmosrc *gcmosrc;
 	struct gcmosrcalpha *gcmosrcalpha;
@@ -2684,7 +2922,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 	}
 
 	/* Map the destination. */
-	bverror = do_map(bltparams->dstdesc, 0, &dstmap);
+	bverror = do_map(bltparams->dstdesc, batch, &dstmap);
 	if (bverror != BVERR_NONE) {
 		bltparams->errdesc = gccontext.bverrorstr;
 		goto exit;
@@ -2735,8 +2973,8 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		srcbottom = srcrect->top + srcrect->height + batch->deltabottom;
 
 		/* Validate the rectangle. */
-		if ((srcright > srcgeom->width) ||
-			(srcbottom > srcgeom->height)) {
+		if ((srcright > (int) srcgeom->width) ||
+			(srcbottom > (int) srcgeom->height)) {
 			BVSETBLTERRORARG((srcinfo->index == 0)
 						? BVERR_SRC1RECT
 						: BVERR_SRC2RECT,
@@ -2765,9 +3003,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 		/* Compute the source offset in pixels needed to compensate
 		   for the surface base address misalignment if any. */
-		srcoffset = (((unsigned int) srcdesc->virtaddr
-				& (GC_BASE_ALIGN - 1)) * 8)
-				/ srcformat->bitspp;
+		srcoffset = get_offset(srcdesc) * 8 / srcformat->bitspp;
 
 		GCDBG(GCZONE_SURF, "  source offset = %d\n", srcoffset);
 
@@ -2778,7 +3014,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 			srcsurfleft, srcsurftop);
 
 		/* (srcsurfleft,srcsurftop) are the coordinates of the source
-		   surface origin. PE requires 16 byte alignment of the base
+		   surface origin. PE requires alignment of the base
 		   address. Compute the alignment requirement in pixels. */
 		srcalign = 16 * 8 / srcformat->bitspp;
 
@@ -2790,29 +3026,53 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 		GCDBG(GCZONE_SURF, "  srcadjust = %d\n", srcadjust);
 
-		multisrc = (srcadjust == 0);
+		/* TODO: multisrc with nv12 format */
+		multisrc = (srcformat->format == GCREG_DE_FORMAT_NV12) ? 0 :
+			(srcadjust == 0);
 
 		GCDBG(GCZONE_DO_BLIT, "  multisrc = %d\n", multisrc);
 
-		/* Adjust the origin. */
-		srcsurfleft -= srcadjust;
+		if (multisrc) {
+			/* Adjust the origin. */
+			srcsurfleft -= srcadjust;
 
-		GCDBG(GCZONE_SURF, "  adjusted source surface origin = %d,%d\n",
-			srcsurfleft, srcsurftop);
+			GCDBG(GCZONE_SURF,
+			      "  adjusted source surface origin = %d,%d\n",
+			      srcsurfleft, srcsurftop);
 
-		/* Adjust the source rectangle for the single source walker. */
-		srcleft = dstrect->left + batch->deltaleft + srcadjust;
-		srctop = dstrect->top + batch->deltatop;
+			/* Adjust the source rectangle for the
+			 * single source walker.
+			 */
+			srcleft = dstrect->left + batch->deltaleft + srcadjust;
+			srctop = dstrect->top + batch->deltatop;
 
-		GCDBG(GCZONE_SURF, "  source %d rectangle origin = %d,%d\n",
-			i, srcleft, srctop);
+			GCDBG(GCZONE_SURF,
+			      "  source %d rectangle origin = %d,%d\n",
+			      i, srcleft, srctop);
 
-		/* Compute the surface offset in bytes. */
-		srcshift
-			= srcsurftop * (int) srcgeom->virtstride
-			+ srcsurfleft * (int) srcformat->bitspp / 8;
+			/* Compute the surface offset in bytes. */
+			srcshift
+				= srcsurftop * (int) srcgeom->virtstride
+				+ srcsurfleft * (int) srcformat->bitspp / 8;
 
-		GCDBG(GCZONE_SURF, "  srcshift = 0x%08X\n", srcshift);
+			GCDBG(GCZONE_SURF, "  srcshift = 0x%08X (%d)\n",
+			      srcshift, srcshift);
+		} else {
+			srcadjust = srcoffset % srcalign;
+
+			GCDBG(GCZONE_SURF, "  single source srcadjust = %d\n",
+			      srcadjust);
+
+			srcleft = srcrect->left + batch->deltaleft + srcadjust;
+			srctop = srcrect->top + batch->deltatop;
+
+			GCDBG(GCZONE_SURF,
+			      "  source %d rectangle origin = %d,%d\n",
+			      i, srcleft, srctop);
+
+			/* No shift needed for single source walker */
+			srcshift = 0;
+		}
 
 		/***************************************************************
 		** Finalize existing blit if necessary.
@@ -2838,7 +3098,7 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 		** Map the source.
 		*/
 
-		bverror = do_map(srcdesc, 0, &srcmap[i]);
+		bverror = do_map(srcdesc, batch, &srcmap[i]);
 		if (bverror != BVERR_NONE) {
 			bltparams->errdesc = gccontext.bverrorstr;
 			goto exit;
@@ -2924,6 +3184,68 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 
 			gcmosrc->mult.reg.dstdemul
 			= GCREG_COLOR_MULTIPLY_MODES_DST_DEMULTIPLY_DISABLE;
+		}
+
+		if (srcformat->format == GCREG_DE_FORMAT_NV12) {
+			struct gcmosrcplanaryuv *yuv;
+			int uvshift;
+
+			if (multisrc && srcsurftop % 2) {
+				/* We can't shift the uv plane by
+				 * an odd number of rows.
+				 */
+				BVSETBLTERROR(BVERR_SRC1RECT,
+					      "src/dst y coordinate combination not supported");
+				goto exit;
+			}
+
+			bverror = claim_buffer(batch,
+					       sizeof(struct gcmosrcplanaryuv),
+					       (void **) &yuv);
+			if (bverror != BVERR_NONE) {
+				BVSETBLTERROR(BVERR_OOM,
+					"failed to allocate command buffer for planar yuv");
+				goto exit;
+			}
+
+			yuv->uplaneaddress_ldst =
+				gcmosrc_uplaneaddress_ldst[index];
+			yuv->uplanestride_ldst =
+				gcmosrc_uplanestride_ldst[index];
+			yuv->vplaneaddress_ldst =
+				gcmosrc_vplaneaddress_ldst[index];
+			yuv->vplanestride_ldst =
+				gcmosrc_vplanestride_ldst[index];
+
+			if (multisrc) {
+				/* uv plane is half height */
+				uvshift = (srcsurftop / 2) *
+					(int) srcgeom->virtstride +
+					srcsurfleft *
+					(int) srcformat->bitspp / 8;
+			} else {
+				/* No shift needed for single source walker */
+				uvshift = 0;
+			}
+
+			GCDBG(GCZONE_SURF, "  uvshift = 0x%08X (%d)\n",
+			      uvshift, uvshift);
+
+			/* add fixed offset from Y plane */
+			uvshift += srcgeom->virtstride * srcgeom->height;
+
+			GCDBG(GCZONE_SURF, "  final uvshift = 0x%08X (%d)\n",
+			      uvshift, uvshift);
+
+			yuv->uplaneaddress = GET_MAP_HANDLE(srcmap[i]);
+			add_fixup(batch, &yuv->uplaneaddress, uvshift);
+
+			yuv->uplanestride = srcgeom->virtstride;
+
+			yuv->vplaneaddress = GET_MAP_HANDLE(srcmap[i]);
+			add_fixup(batch, &yuv->vplaneaddress, uvshift);
+
+			yuv->vplanestride = srcgeom->virtstride;
 		}
 
 		if ((gca != NULL) && ((srccount == 1) || (i > 0))) {
@@ -3012,32 +3334,13 @@ static enum bverror do_blit(struct bvbltparams *bltparams,
 	}
 
 exit:
-	for (i = 0; i < 2; i += 1)
-		if (srcmap[i] != NULL) {
-			unmap_bverror = schedule_unmap(batch,
-							srcinfo[i].buf.desc);
-			if ((unmap_bverror != BVERR_NONE) &&
-				(bverror == BVERR_NONE)) {
-				bltparams->errdesc = gccontext.bverrorstr;
-				bverror = unmap_bverror;
-			}
-		}
-
-	if (dstmap != NULL) {
-		unmap_bverror = schedule_unmap(batch, bltparams->dstdesc);
-		if ((unmap_bverror != BVERR_NONE) && (bverror == BVERR_NONE)) {
-			bltparams->errdesc = gccontext.bverrorstr;
-			bverror = unmap_bverror;
-		}
-	}
-
 	GCEXITARG(GCZONE_DO_BLIT, "bv%s = %d\n",
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
 
 static enum bverror do_filter(struct bvbltparams *bltparams,
-				struct gcbatch *batch)
+			      struct gcbatch *batch)
 {
 	enum bverror bverror;
 	GCENTER(GCZONE_DO_FILTER);
@@ -3047,6 +3350,7 @@ static enum bverror do_filter(struct bvbltparams *bltparams,
 	return bverror;
 }
 
+
 /*******************************************************************************
  * Library constructor and destructor.
  */
@@ -3054,26 +3358,36 @@ static enum bverror do_filter(struct bvbltparams *bltparams,
 void bv_init(void)
 {
 	GCDBG_REGISTER(gcbv);
+	GCLOCK_INIT(&gccontext.batchlock);
+	GCLOCK_INIT(&gccontext.bufferlock);
+	GCLOCK_INIT(&gccontext.fixuplock);
+	GCLOCK_INIT(&gccontext.maplock);
+	GCLOCK_INIT(&gccontext.callbacklock);
+	INIT_LIST_HEAD(&gccontext.callbacklist);
+	INIT_LIST_HEAD(&gccontext.callbackvac);
+	INIT_LIST_HEAD(&gccontext.vac_unmap);
 }
 
 void bv_exit(void)
 {
-	struct bvbuffmap *bufmap;
+	struct list_head *head;
 	struct gcschedunmap *bufunmap;
+	struct bvbuffmap *bufmap;
 	struct gcbuffer *buffer;
 	struct gcfixup *fixup;
 	struct gcvacbatch *batch;
+
+	while (!list_empty(&gccontext.vac_unmap)) {
+		head = gccontext.vac_unmap.next;
+		bufunmap = list_entry(head, struct gcschedunmap, link);
+		list_del(head);
+		gcfree(bufunmap);
+	}
 
 	while (gccontext.vac_buffmap != NULL) {
 		bufmap = gccontext.vac_buffmap;
 		gccontext.vac_buffmap = bufmap->nextmap;
 		gcfree(bufmap);
-	}
-
-	while (gccontext.vac_unmap != NULL) {
-		bufunmap = gccontext.vac_unmap;
-		gccontext.vac_unmap = bufunmap->next;
-		gcfree(bufunmap);
 	}
 
 	while (gccontext.vac_buffers != NULL) {
@@ -3095,18 +3409,18 @@ void bv_exit(void)
 	}
 }
 
+
 /*******************************************************************************
  * Library API.
  */
 
-enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
+enum bverror bv_map(struct bvbuffdesc *buffdesc)
 {
 	enum bverror bverror;
 	struct bvbuffmap *bvbuffmap;
 
-	GCENTER(GCZONE_MAPPING);
-
-	/* FIXME/TODO: add check for initialization success. */
+	GCENTERARG(GCZONE_MAPPING, "buffdesc = 0x%08X\n",
+		   (unsigned int) buffdesc);
 
 	if (buffdesc == NULL) {
 		BVSETERROR(BVERR_BUFFERDESC, "bvbuffdesc is NULL");
@@ -3118,24 +3432,28 @@ enum bverror gcbv_map(struct bvbuffdesc *buffdesc)
 		goto exit;
 	}
 
-	bverror = do_map(buffdesc, 1, &bvbuffmap);
+	bverror = do_map(buffdesc, NULL, &bvbuffmap);
 
 exit:
 	GCEXITARG(GCZONE_MAPPING, "bv%s = %d\n",
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
-EXPORT_SYMBOL(gcbv_map);
 
-enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
+enum bverror bv_unmap(struct bvbuffdesc *buffdesc)
 {
-	enum bverror bverror;
+	enum bverror bverror = BVERR_NONE;
+	enum bverror otherbverror = BVERR_NONE;
+	struct bvbuffmap *prev = NULL;
 	struct bvbuffmap *bvbuffmap;
 	struct bvbuffmapinfo *bvbuffmapinfo;
+	struct gcmap gcmap;
 
-	GCENTER(GCZONE_MAPPING);
+	GCENTERARG(GCZONE_MAPPING, "buffdesc = 0x%08X\n",
+		   (unsigned int) buffdesc);
 
-	/* FIXME/TODO: add check for initialization success. */
+	/* Lock access to the mapping list. */
+	GCLOCK(&gccontext.maplock);
 
 	if (buffdesc == NULL) {
 		BVSETERROR(BVERR_BUFFERDESC, "bvbuffdesc is NULL");
@@ -3147,82 +3465,131 @@ enum bverror gcbv_unmap(struct bvbuffdesc *buffdesc)
 		goto exit;
 	}
 
+	/* Is the buffer mapped? */
 	bvbuffmap = buffdesc->map;
-	if (bvbuffmap == NULL)
-		return BVERR_NONE;
-
-	if (bvbuffmap->structsize < STRUCTSIZE(bvbuffmap, nextmap)) {
-		BVSETERROR(BVERR_BUFFERDESC_VERS,
-			"unsupported bvbuffdesc version (structsize)");
+	if (bvbuffmap == NULL) {
+		GCDBG(GCZONE_MAPPING, "buffer isn't mapped.\n");
 		goto exit;
 	}
 
-	/* Not our mapping? */
-	if (bvbuffmap->bv_unmap != gcbv_unmap) {
-		bverror = bvbuffmap->bv_unmap(buffdesc);
-		goto exit;
+	/* Try to find our mapping. */
+	while (bvbuffmap != NULL) {
+		if (bvbuffmap->bv_unmap == bv_unmap)
+			break;
+		prev = bvbuffmap;
+		bvbuffmap = bvbuffmap->nextmap;
+	}
+
+	/* Are there other implementations? */
+	if ((prev != NULL) || (bvbuffmap->nextmap != NULL)) {
+		GCDBG(GCZONE_MAPPING,
+		      "have mappings from other implementations.\n");
+
+		/* Was our mapping found? */
+		if (bvbuffmap == NULL) {
+			GCDBG(GCZONE_MAPPING,
+			      "no mapping from our implementation.\n");
+
+			/* No, call other implementations. */
+			bverror = buffdesc->map->bv_unmap(buffdesc);
+			goto exit;
+		}
+
+		if (bvbuffmap->structsize
+				< STRUCTSIZE(bvbuffmap, nextmap)) {
+			BVSETERROR(BVERR_BUFFERDESC_VERS,
+				   "unsupported bvbuffdesc version");
+			goto exit;
+		}
+
+		/* Remove our mapping. */
+		if (prev == NULL)
+			buffdesc->map = bvbuffmap->nextmap;
+		else
+			prev->nextmap = bvbuffmap->nextmap;
+
+		/* Call other implementation. */
+		otherbverror = buffdesc->map->bv_unmap(buffdesc);
+
+		/* Add our mapping back. */
+		bvbuffmap->nextmap = buffdesc->map;
+		buffdesc->map = bvbuffmap;
+		prev = NULL;
+	} else {
+		GCDBG(GCZONE_MAPPING,
+		      "no mappings from other implementations.\n");
 	}
 
 	/* Get the info structure. */
 	bvbuffmapinfo = (struct bvbuffmapinfo *) bvbuffmap->handle;
 
-	/* Are there any existing auto-mappings? */
-	if (bvbuffmapinfo->automap) {
-		/* Reset user mappings if any. */
-		bvbuffmapinfo->usermap = 0;
+	GCDBG(GCZONE_MAPPING, "bvbuffmap = 0x%08X\n", (unsigned int) bvbuffmap);
+	GCDBG(GCZONE_MAPPING, "handle = 0x%08X\n", bvbuffmapinfo->handle);
 
-		/* Are there mappings from alternative implementations? */
-		if (bvbuffmap->nextmap != NULL) {
-			/* Temporarily remove the record from the mapping
-			   list so that other implementations can proceeed. */
-			buffdesc->map = bvbuffmap->nextmap;
+	/* Explicit unmapping. */
+	if (bvbuffmapinfo->usermap == 0)
+		GCERR("explicit count is already zero.\n");
+	bvbuffmapinfo->usermap = 0;
 
-			/* Call other implementations. */
-			bverror = gcbv_unmap(buffdesc);
+	GCDBG(GCZONE_MAPPING, "explicit count = %d\n",
+		bvbuffmapinfo->usermap);
+	GCDBG(GCZONE_MAPPING, "implicit count = %d\n",
+		bvbuffmapinfo->automap);
 
-			/* Link the record back into the list. */
-			bvbuffmap->nextmap = buffdesc->map;
-			buffdesc->map = bvbuffmap;
-		} else
-			bverror = BVERR_NONE;
-
-	/* No auto-mappings, must be user mapping. */
-	} else {
-		/* Unmap the buffer. */
-		bverror = do_unmap(buffdesc, 1);
-		if (bverror != BVERR_NONE)
-			goto exit;
-
-		/* Call other implementations. */
-		bverror = gcbv_unmap(buffdesc);
+	/* Do we have implicit mappings? */
+	if (bvbuffmapinfo->automap > 0) {
+		GCDBG(GCZONE_MAPPING, "have implicit unmappings.\n");
+		goto exit;
 	}
 
+	/* Unmap the buffer. */
+	memset(&gcmap, 0, sizeof(gcmap));
+	gcmap.handle = bvbuffmapinfo->handle;
+	gc_unmap_wrapper(&gcmap);
+	if (gcmap.gcerror != GCERR_NONE) {
+		BVSETERROR(BVERR_OOM, "unable to free gccore memory");
+		goto exit;
+	}
+
+	/* Remove from the buffer descriptor list. */
+	if (prev == NULL)
+		buffdesc->map = bvbuffmap->nextmap;
+	else
+		prev->nextmap = bvbuffmap->nextmap;
+
+	/* Invalidate the record. */
+	bvbuffmap->structsize = 0;
+
+	/* Add to the vacant list. */
+	bvbuffmap->nextmap = gccontext.vac_buffmap;
+	gccontext.vac_buffmap = bvbuffmap;
+
 exit:
+	/* Unlock access to the mapping list. */
+	GCUNLOCK(&gccontext.maplock);
+
 	GCEXITARG(GCZONE_MAPPING, "bv%s = %d\n",
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
-EXPORT_SYMBOL(gcbv_unmap);
 
-enum bverror gcbv_blt(struct bvbltparams *bltparams)
+enum bverror bv_blt(struct bvbltparams *bltparams)
 {
 	enum bverror bverror = BVERR_NONE;
 	struct gcalpha *gca = NULL;
 	struct gcalpha _gca;
-	unsigned int op, type;
+	unsigned int op, type, blend, format;
 	unsigned int batchexec = 0;
 	bool nop = false;
 	struct gcbatch *batch;
 	int src1used, src2used, maskused;
 	struct srcinfo srcinfo[2];
-	unsigned short rop, blend, format;
+	unsigned short rop;
 	struct gccommit gccommit;
 	int srccount, res;
 
 	GCENTERARG(GCZONE_BLIT, "bltparams = 0x%08X\n",
 		(unsigned int) bltparams);
-
-	/* FIXME/TODO: add check for initialization success. */
 
 	/* Verify blt parameters structure. */
 	if (bltparams == NULL) {
@@ -3254,8 +3621,6 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 	switch (type) {
 	case (BVFLAG_BATCH_NONE >> BVFLAG_BATCH_SHIFT):
-		GCDBG(GCZONE_BATCH, "BVFLAG_BATCH_NONE\n");
-
 		bverror = allocate_batch(&batch);
 		if (bverror != BVERR_NONE) {
 			bltparams->errdesc = gccontext.bverrorstr;
@@ -3264,11 +3629,12 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 		batchexec = 1;
 		batch->batchflags = 0x7FFFFFFF;
+
+		GCDBG(GCZONE_BATCH, "BVFLAG_BATCH_NONE(0x%08X)\n",
+		      (unsigned int) batch);
 		break;
 
 	case (BVFLAG_BATCH_BEGIN >> BVFLAG_BATCH_SHIFT):
-		GCDBG(GCZONE_BATCH, "BVFLAG_BATCH_BEGIN\n");
-
 		bverror = allocate_batch(&batch);
 		if (bverror != BVERR_NONE) {
 			bltparams->errdesc = gccontext.bverrorstr;
@@ -3280,11 +3646,12 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		batchexec = 0;
 		bltparams->batchflags =
 		batch->batchflags = 0x7FFFFFFF;
+
+		GCDBG(GCZONE_BATCH, "BVFLAG_BATCH_BEGIN(0x%08X)\n",
+		      (unsigned int) batch);
 		break;
 
 	case (BVFLAG_BATCH_CONTINUE >> BVFLAG_BATCH_SHIFT):
-		GCDBG(GCZONE_BATCH, "BVFLAG_BATCH_CONTINUE\n");
-
 		batch = (struct gcbatch *) bltparams->batch;
 		if (batch == NULL) {
 			BVSETBLTERROR(BVERR_BATCH, "batch is not initialized");
@@ -3298,11 +3665,12 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 		batchexec = 0;
 		batch->batchflags = bltparams->batchflags;
+
+		GCDBG(GCZONE_BATCH, "BVFLAG_BATCH_CONTINUE(0x%08X)\n",
+		      (unsigned int) batch);
 		break;
 
 	case (BVFLAG_BATCH_END >> BVFLAG_BATCH_SHIFT):
-		GCDBG(GCZONE_BATCH, "BVFLAG_BATCH_END\n");
-
 		batch = (struct gcbatch *) bltparams->batch;
 		if (batch == NULL) {
 			BVSETBLTERROR(BVERR_BATCH, "batch is not initialized");
@@ -3317,6 +3685,9 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		batchexec = 1;
 		nop = (bltparams->batchflags & BVBATCH_ENDNOP) != 0;
 		batch->batchflags = bltparams->batchflags;
+
+		GCDBG(GCZONE_BATCH, "BVFLAG_BATCH_END(0x%08X)\n",
+		      (unsigned int) batch);
 		break;
 
 	default:
@@ -3326,6 +3697,8 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 	GCDBG(GCZONE_BATCH, "batchflags=0x%08X\n",
 		(unsigned int) batch->batchflags);
+
+	GCDUMPSCHEDULE();
 
 	if (!nop) {
 		/* Verify the batch change flags. */
@@ -3352,8 +3725,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 			format = (blend & BVBLENDDEF_FORMAT_MASK)
 				>> BVBLENDDEF_FORMAT_SHIFT;
 
-			bverror = parse_blend(bltparams,
-						bltparams->op.blend, &_gca);
+			bverror = parse_blend(bltparams, blend, &_gca);
 			if (bverror != BVERR_NONE)
 				goto exit;
 
@@ -3525,14 +3897,17 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 	if (batchexec) {
 		struct gcmoflush *flush;
 
+		GCDBG(GCZONE_BLIT, "preparing to submit the batch.\n");
+
 		/* Finalize the current operation. */
 		bverror = batch->batchend(bltparams, batch);
 		if (bverror != BVERR_NONE)
 			goto exit;
 
 		/* Add PE flush. */
+		GCDBG(GCZONE_BLIT, "appending the flush.\n");
 		bverror = claim_buffer(batch, sizeof(struct gcmoflush),
-					(void **) &flush);
+				       (void **) &flush);
 		if (bverror != BVERR_NONE) {
 			BVSETBLTERROR(BVERR_OOM,
 				"failed to allocate command buffer");
@@ -3542,13 +3917,78 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 		flush->flush_ldst = gcmoflush_flush_ldst;
 		flush->flush.reg = gcregflush_pe2D;
 
+		/* Process asynchronous operation. */
+		if ((bltparams->flags & BVFLAG_ASYNC) == 0) {
+			GCDBG(GCZONE_BLIT, "synchronous batch.\n");
+			gccommit.callback = NULL;
+			gccommit.callbackparam = NULL;
+			gccommit.asynchronous = false;
+		} else {
+			struct gccallbackinfo *gccallbackinfo;
+
+			GCDBG(GCZONE_BLIT, "asynchronous batch (0x%08X):\n",
+			      bltparams->flags);
+
+			if (bltparams->callbackfn == NULL) {
+				GCDBG(GCZONE_BLIT, "no callback given.\n");
+				gccommit.callback = NULL;
+				gccommit.callbackparam = NULL;
+			} else {
+				bverror = get_callbackinfo(&gccallbackinfo);
+				if (bverror != BVERR_NONE) {
+					BVSETBLTERROR(BVERR_OOM,
+						"callback allocation failed");
+					goto exit;
+				}
+
+				gccallbackinfo->callbackfn
+					= bltparams->callbackfn;
+				gccallbackinfo->callbackdata
+					= bltparams->callbackdata;
+
+				gccommit.callback = gccallback;
+				gccommit.callbackparam = gccallbackinfo;
+
+				GCDBG(GCZONE_BLIT,
+				      "gcbv_callback = 0x%08X\n",
+				      (unsigned int) gccommit.callback);
+				GCDBG(GCZONE_BLIT,
+				      "gcbv_param    = 0x%08X\n",
+				      (unsigned int) gccommit.callbackparam);
+				GCDBG(GCZONE_BLIT,
+				      "bltsville_callback = 0x%08X\n",
+				      (unsigned int)
+				      gccallbackinfo->callbackfn);
+				GCDBG(GCZONE_BLIT,
+				      "bltsville_param    = 0x%08X\n",
+				      (unsigned int)
+				      gccallbackinfo->callbackdata);
+			}
+
+			gccommit.asynchronous = true;
+		}
+
+		/* Process scheduled unmappings. */
+		unmap_implicit(batch);
+
+		INIT_LIST_HEAD(&gccommit.unmap);
+		list_splice_init(&batch->unmap, &gccommit.unmap);
+
 		/* Pass the batch for execution. */
 		GCDUMPBATCH(batch);
 
 		gccommit.gcerror = GCERR_NONE;
+		gccommit.entrypipe = GCPIPE_2D;
+		gccommit.exitpipe = GCPIPE_2D;
 		gccommit.buffer = batch->bufhead;
 
+		GCDBG(GCZONE_BLIT, "submitting the batch.\n");
 		gc_commit_wrapper(&gccommit);
+
+		/* Move the list of mappings back to batch. */
+		list_splice_init(&gccommit.unmap, &batch->unmap);
+
+		/* Error? */
 		if (gccommit.gcerror != GCERR_NONE) {
 			switch (gccommit.gcerror) {
 			case GCERR_OODM:
@@ -3569,7 +4009,7 @@ enum bverror gcbv_blt(struct bvbltparams *bltparams)
 
 exit:
 	if ((batch != NULL) && batchexec) {
-		process_scheduled_unmap(batch);
+		GCDUMPSCHEDULE();
 		free_batch(batch);
 		bltparams->batch = NULL;
 	}
@@ -3578,32 +4018,31 @@ exit:
 		(bverror == BVERR_NONE) ? "result" : "error", bverror);
 	return bverror;
 }
-EXPORT_SYMBOL(gcbv_blt);
 
-enum bverror gcbv_cache(struct bvcopparams *copparams)
+enum bverror bv_cache(struct bvcopparams *copparams)
 {
 	enum bverror bverror = BVERR_NONE;
-	int count; /* number of planes */
-	unsigned int bpp = 0; /* bytes per pixel */
+	unsigned int bytespp = 0; /* bytes per pixel */
 	unsigned long vert_offset, horiz_offset;
 
 	struct c2dmrgn rgn[3];
 	int container_size = 0;
 
-	unsigned long subsample = copparams->geom->format &
-			OCDFMTDEF_SUBSAMPLE_MASK;
-	unsigned long vendor = copparams->geom->format &
-			OCDFMTDEF_VENDOR_MASK;
-	unsigned long layout = copparams->geom->format &
-			OCDFMTDEF_LAYOUT_MASK;
-	unsigned long sizeminus1 = copparams->geom->format &
-			OCDFMTDEF_COMPONENTSIZEMINUS1_MASK;
-	unsigned long container = copparams->geom->format &
-			OCDFMTDEF_CONTAINER_MASK;
+	unsigned long subsample;
+	unsigned long vendor;
+	unsigned long layout;
+	unsigned long size;
+	unsigned long container;
+
+	subsample = copparams->geom->format & OCDFMTDEF_SUBSAMPLE_MASK;
+	vendor = copparams->geom->format & OCDFMTDEF_VENDOR_MASK;
+	layout = copparams->geom->format & OCDFMTDEF_LAYOUT_MASK;
+	size = copparams->geom->format & OCDFMTDEF_COMPONENTSIZEMINUS1_MASK;
+	container = copparams->geom->format & OCDFMTDEF_CONTAINER_MASK;
 
 	if (vendor != OCDFMTDEF_VENDOR_ALL) {
 		bverror = BVERR_FORMAT;
-		goto Error;
+		goto exit;
 	}
 
 	switch (container) {
@@ -3629,67 +4068,83 @@ enum bverror gcbv_cache(struct bvcopparams *copparams)
 
 	switch (layout) {
 	case OCDFMTDEF_PACKED:
-
-		count = 1;
-
 		switch (subsample) {
 		case OCDFMTDEF_SUBSAMPLE_NONE:
-			if (sizeminus1 >= 8) {
-				bpp = container_size / 8;
+			if (size >= 8) {
+				bytespp = container_size / 8;
 			} else {
+				GCERR("format not supported.\n");
 				bverror = BVERR_FORMAT;
-				goto Error;
+				goto exit;
 			}
 			break;
 
 		case OCDFMTDEF_SUBSAMPLE_422_YCbCr:
-			bpp = (container_size / 2) / 8;
+			bytespp = (container_size / 2) / 8;
 			break;
 
 		case OCDFMTDEF_SUBSAMPLE_420_YCbCr:
 			bverror = BVERR_FORMAT;
-			goto Error;
+			goto exit;
 			break;
 
 		case OCDFMTDEF_SUBSAMPLE_411_YCbCr:
 			bverror = BVERR_FORMAT;
-			goto Error;
+			goto exit;
 			break;
+
 		default:
 			bverror = BVERR_FORMAT;
-			goto Error;
+			goto exit;
 		}
 
-		rgn[0].span = copparams->rect->width * bpp;
+		rgn[0].span = copparams->rect->width * bytespp;
 		rgn[0].lines = copparams->rect->height;
 		rgn[0].stride = copparams->geom->virtstride;
-		horiz_offset = copparams->rect->left * bpp;
+		horiz_offset = copparams->rect->left * bytespp;
 		vert_offset = copparams->rect->top;
 
 		rgn[0].start = (void *) ((unsigned long)
 				copparams->desc->virtaddr +
 				vert_offset * rgn[0].stride +
 				horiz_offset);
-		gcbvcacheop(count, rgn, copparams->cacheop);
 
+		gcbvcacheop(1, rgn, copparams->cacheop);
 		break;
-	case OCDFMTDEF_DISTRIBUTED:
-		bverror = BVERR_FORMAT;
-		break;
-	/*TODO: Multi plane still need to be implemented */
+
 	case OCDFMTDEF_2_PLANE_YCbCr:
-		printk(KERN_INFO "Not yet implemented\n");
+		/* 1 byte per pixel */
+		rgn[0].span = copparams->rect->width;
+		rgn[0].lines = copparams->rect->height;
+		rgn[0].stride = copparams->geom->virtstride;
+		rgn[0].start = (void *)
+			((unsigned long) copparams->desc->virtaddr +
+			 copparams->rect->top * rgn[0].stride +
+			 copparams->rect->left);
+
+		rgn[1].span = copparams->rect->width;
+		rgn[1].lines = copparams->rect->height / 2;
+		rgn[1].stride = copparams->geom->virtstride;
+		rgn[1].start = rgn[0].start +
+			copparams->geom->height * rgn[0].stride;
+
+		GCDBG(GCZONE_CACHE,
+		      "virtaddr %p start[0] 0x%08x start[1] 0x%08x\n",
+		      copparams->desc->virtaddr, rgn[0].start, rgn[1].start);
+
+		gcbvcacheop(2, rgn, copparams->cacheop);
 		break;
-	case OCDFMTDEF_3_PLANE_STACKED:
-	case OCDFMTDEF_3_PLANE_SIDE_BY_SIDE_YCbCr:
-		printk(KERN_INFO "Not yet implemented\n");
-		break;
+
 	default:
+		GCERR("format 0x%x (%d) not supported.\n",
+		      copparams->geom->format, copparams->geom->format);
 		bverror = BVERR_FORMAT;
 		break;
 	}
 
-Error:
+exit:
+	if (bverror != BVERR_NONE)
+		GCERR("bverror = %d\n", bverror);
+
 	return bverror;
 }
-EXPORT_SYMBOL(gcbv_cache);

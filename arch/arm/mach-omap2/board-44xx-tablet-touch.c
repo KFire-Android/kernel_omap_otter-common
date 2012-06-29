@@ -22,11 +22,14 @@
 #include <linux/io.h>
 #include <linux/gpio.h>
 #include <linux/qtouch_obp_ts.h>
+#include <linux/input/touch_platform.h>
 
 #include <plat/i2c.h>
 
 #include "board-44xx-tablet.h"
 #include "mux.h"
+
+extern struct touch_platform_data cyttsp4_i2c_touch_platform_data;
 
 #define OMAP4_TOUCH_IRQ_1		35
 
@@ -156,6 +159,13 @@ static struct i2c_board_info __initdata omap4xx_i2c_bus4_touch_info[] = {
 		.platform_data = &atmel_mxt224_ts_platform_data,
 		.irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1),
 	},
+#ifdef CONFIG_TOUCHSCREEN_CYPRESS_TTSP
+	{
+		I2C_BOARD_INFO(CY_I2C_NAME, CY_I2C_TCH_ADR),
+		.platform_data = &cyttsp4_i2c_touch_platform_data,
+		.irq = OMAP_GPIO_IRQ(OMAP4_TOUCH_IRQ_1),
+	},
+#endif
 };
 
 int __init tablet_touch_init(void)

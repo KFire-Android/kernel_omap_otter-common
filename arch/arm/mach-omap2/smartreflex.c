@@ -27,6 +27,10 @@
 
 #include <plat/common.h>
 
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+#include <mach/omap4-common.h>
+#endif
+
 #include "pm.h"
 #include "dvfs.h"
 #include "smartreflex.h"
@@ -256,10 +260,20 @@ static void sr_set_clk_length(struct omap_sr *sr)
 			__func__);
 		return;
 	}
-	sys_clk_speed = clk_get_rate(sys_ck);
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	if (omap4_is_in_dpll_cascading())
+		sys_clk_speed = 12288000;
+	else
+#endif
+		sys_clk_speed = clk_get_rate(sys_ck);
 	clk_put(sys_ck);
 
 	switch (sys_clk_speed) {
+#ifdef CONFIG_OMAP4_DPLL_CASCADING
+	case 12288000:
+		sr->clk_length = 0x3d;
+		break;
+#endif
 	case 12000000:
 		sr->clk_length = SRCLKLENGTH_12MHZ_SYSCLK;
 		break;
@@ -558,7 +572,9 @@ int sr_configure_errgen(struct voltagedomain *voltdm)
 		return -EINVAL;
 	}
 
+#ifndef CONFIG_OMAP4_DPLL_CASCADING
 	if (!sr->clk_length)
+#endif
 		sr_set_clk_length(sr);
 
 	senp_en = sr->senp_mod;
@@ -671,7 +687,9 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
 		return -EINVAL;
 	}
 
+#ifndef CONFIG_OMAP4_DPLL_CASCADING
 	if (!sr->clk_length)
+#endif
 		sr_set_clk_length(sr);
 
 	senp_en = sr->senp_mod;
