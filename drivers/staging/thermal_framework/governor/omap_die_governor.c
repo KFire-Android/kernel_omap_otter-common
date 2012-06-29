@@ -548,6 +548,11 @@ static int option_alert_set(void *data, u64 val)
 	}
 	/* Change the ALERT Threshold value */
 	omap_gov->alert_threshold = val;
+	/* Also update the governor zone array */
+	omap_gov->omap_thermal_zones[MONITOR_ZONE - 1].temp_upper =
+						omap_gov->alert_threshold;
+	omap_gov->omap_thermal_zones[ALERT_ZONE - 1].temp_lower =
+				omap_gov->alert_threshold - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
 	if (!IS_ERR_OR_NULL(omap_gov->temp_sensor))
@@ -582,6 +587,11 @@ static int option_panic_set(void *data, u64 val)
 	}
 	/* Change the PANIC Threshold value */
 	omap_gov->panic_threshold = val;
+	/* Also update the governor zone array */
+	omap_gov->omap_thermal_zones[ALERT_ZONE - 1].temp_upper =
+						omap_gov->panic_threshold;
+	omap_gov->omap_thermal_zones[PANIC_ZONE - 1].temp_lower =
+				omap_gov->panic_threshold - HYSTERESIS_VALUE;
 
 	/* Skip sensor update if no sensor is present */
 	if (!IS_ERR_OR_NULL(omap_gov->temp_sensor))
