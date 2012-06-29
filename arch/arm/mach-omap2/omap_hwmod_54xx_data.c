@@ -2625,6 +2625,36 @@ static struct omap_hwmod omap54xx_ocp2scp1_hwmod = {
 	},
 };
 
+static struct resource omap54xx_sata_phy_addrs[] = {
+	{
+		.name		= "sata_phy_rx",
+		.start		= 0x4A096000,
+		.end		= 0x4A096080,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.name		= "sata_phy_tx",
+		.start		= 0x4A096400,
+		.end		= 0x4A096464,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
+		.name		= "sata_pll",
+		.start		= 0x4A096800,
+		.end		= 0x4A096840,
+		.flags		= IORESOURCE_MEM,
+	},
+	{ }
+};
+
+static struct omap_ocp2scp_dev ocp2scp3_dev_attr[] = {
+	{
+		.drv_name       = "omap-sata",
+		.res		= omap54xx_sata_phy_addrs,
+	},
+	{ }
+};
+
 /* ocp2scp3 */
 static struct omap_hwmod omap54xx_ocp2scp3_hwmod;
 static struct omap_hwmod_addr_space omap54xx_ocp2scp3_addrs[] = {
@@ -2657,6 +2687,7 @@ static struct omap_hwmod omap54xx_ocp2scp3_hwmod = {
 			.modulemode   = MODULEMODE_HWCTRL,
 		},
 	},
+	.dev_attr	= ocp2scp3_dev_attr,
 };
 
 /*
