@@ -71,12 +71,19 @@
 #ifdef CONFIG_OMAP_REMOTEPROC_DSP
 static struct omap_rproc_timers_info dsp_timers[] = {
 	{ .id = 5 },
+#ifdef CONFIG_OMAP_REMOTEPROC_WATCHDOG
+	{ .id = 6, .is_wdt = 1 },
+#endif
 };
 #endif
 
 #ifdef CONFIG_OMAP_REMOTEPROC_IPU
 static struct omap_rproc_timers_info ipu_timers[] = {
 	{ .id = 3 },
+#ifdef CONFIG_OMAP_REMOTEPROC_WATCHDOG
+	{ .id = 9, .is_wdt = 1 },
+	{ .id = 11, .is_wdt = 1 },
+#endif
 };
 
 static int

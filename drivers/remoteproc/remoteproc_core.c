@@ -78,6 +78,8 @@ static unsigned int dev_index;
 
 static const char * const rproc_err_names[] = {
 	[RPROC_ERR_MMUFAULT]	= "mmufault",
+	[RPROC_ERR_EXCEPTION]	= "device exception",
+	[RPROC_ERR_WATCHDOG]	= "watchdog fired",
 };
 
 static int rproc_resume(struct device *dev)
@@ -250,13 +252,19 @@ static const char *rproc_err_to_string(enum rproc_err type)
  *
  * This function must be called every time a fatal error is detected
  */
-static void rproc_error_reporter(struct rproc *rproc, enum rproc_err type)
+void rproc_error_reporter(struct rproc *rproc, enum rproc_err type)
 {
-	struct device *dev = &rproc->dev;
+	struct device *dev;
+
+	if (!rproc) {
+		pr_err("invalid rproc handle\n");
+		return;
+	}
+
+	dev = &rproc->dev;
 
 	dev_err(dev, "fatal error #%u detected in %s: error type %s\n",
 		++rproc->crash_cnt, rproc->name, rproc_err_to_string(type));
-
 
 	rproc->state = RPROC_CRASHED;
 
@@ -266,6 +274,7 @@ static void rproc_error_reporter(struct rproc *rproc, enum rproc_err type)
 	 */
 	schedule_work(&rproc->error_handler);
 }
+EXPORT_SYMBOL(rproc_error_reporter);
 
 /*
  * This is the IOMMU fault handler we register with the IOMMU API

@@ -22,12 +22,16 @@ struct platform_device;
 
 /* struct omap_rproc_timers_info - timers for the omap rproc
  *
- * @id: timer id to use by the remoteproc
- * @odt: timer pointer
+ * @id:		timer id to use by the remoteproc
+ * @odt:	timer pointer
+ * @is_wdt:	flag to indicate watchdog timer
+		0 - regular timer
+		1 - watchdog timer
  */
 struct omap_rproc_timers_info {
 	int id;
 	struct omap_dm_timer *odt;
+	int is_wdt;
 };
 
 /*

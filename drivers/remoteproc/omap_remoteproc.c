@@ -121,8 +121,10 @@ static int omap_rproc_mbox_callback(struct notifier_block *this,
 
 	switch (msg) {
 	case RP_MBOX_CRASH:
-		/* just log this for now. later, we'll also do recovery */
+		/* remoteproc detected an exception, notify the rproc core.
+		 * The remoteproc core will handle the recovery. */
 		dev_err(dev, "omap rproc %s crashed\n", name);
+		rproc_error_reporter(oproc->rproc, RPROC_ERR_EXCEPTION);
 		break;
 	case RP_MBOX_ECHO_REPLY:
 		dev_info(dev, "received echo reply from %s\n", name);
@@ -214,6 +216,33 @@ omap_rproc_set_frequency(struct device *dev, struct rproc *rproc, long val)
 	return 0;
 }
 
+static irqreturn_t omap_rproc_watchdog_isr(int irq, void *p)
+{
+	struct rproc *rproc = p;
+	struct device *dev = rproc->dev.parent;
+	struct omap_rproc_pdata *pdata = dev->platform_data;
+	struct omap_rproc_timers_info *timers = pdata->timers;
+	struct omap_dm_timer *timer = NULL;
+	int i;
+
+	for (i = 0; i < pdata->timers_cnt; i++) {
+		if (irq == omap_dm_timer_get_irq(timers[i].odt)) {
+			timer = timers[i].odt;
+			break;
+		}
+	}
+
+	if (!timer) {
+		dev_err(dev, "invalid timer\n");
+		return IRQ_NONE;
+	}
+	omap_dm_timer_write_status(timer, OMAP_TIMER_INT_OVERFLOW);
+
+	rproc_error_reporter(rproc, RPROC_ERR_WATCHDOG);
+
+	return IRQ_HANDLED;
+}
+
 /*
  * Power up the remote processor.
  *
@@ -226,7 +255,7 @@ static int omap_rproc_start(struct rproc *rproc)
 	struct omap_rproc *oproc = rproc->priv;
 	struct device *dev = rproc->dev.parent;
 	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+	struct omap_rproc_pdata *pdata = dev->platform_data;
 	struct omap_rproc_timers_info *timers = pdata->timers;
 	int ret, i;
 
@@ -247,15 +276,15 @@ static int omap_rproc_start(struct rproc *rproc)
 	}
 
 	/*
-	 * Ping the remote processor. this is only for sanity-sake;
+	 * ping the remote processor. this is only for sanity-sake;
 	 * there is no functional effect whatsoever.
 	 *
-	 * Note that the reply will _not_ arrive immediately: this message
+	 * note that the reply will _not_ arrive immediately: this message
 	 * will wait in the mailbox fifo until the remote processor is booted.
 	 */
 	ret = omap_mbox_msg_send(oproc->mbox, RP_MBOX_ECHO_REQUEST);
 	if (ret) {
-		dev_err(dev, "omap_mbox_get failed: %d\n", ret);
+		dev_err(dev, "omap_mbox_msg_send failed: %d\n", ret);
 		goto put_mbox;
 	}
 
@@ -263,17 +292,34 @@ static int omap_rproc_start(struct rproc *rproc)
 		timers[i].odt = omap_dm_timer_request_specific(timers[i].id);
 		if (!timers[i].odt) {
 			ret = -EBUSY;
-			dev_err(dev, "omap_dm_timer_request failed: %d\n", ret);
+			dev_err(dev, "request for timer %d failed: %d\n",
+							timers[i].id, ret);
 			goto err_timers;
 		}
 		omap_dm_timer_set_source(timers[i].odt, OMAP_TIMER_SRC_SYS_CLK);
+
+		if (timers[i].is_wdt) {
+			ret = request_irq(omap_dm_timer_get_irq(timers[i].odt),
+					omap_rproc_watchdog_isr, IRQF_SHARED,
+					"rproc-wdt", rproc);
+			if (ret) {
+				dev_err(dev,
+					"error requesting irq for timer %d\n",
+								timers[i].id);
+				omap_dm_timer_free(timers[i].odt);
+				timers[i].odt = NULL;
+				goto err_timers;
+			}
+			/* clean counter, remoteproc proc will set the value */
+			omap_dm_timer_set_load(timers[i].odt, 0, 0);
+		}
 		omap_dm_timer_start(timers[i].odt);
 	}
 
 	ret = pdata->device_enable(pdev);
 	if (ret) {
 		dev_err(dev, "omap_device_enable failed: %d\n", ret);
-		goto put_mbox;
+		goto err_timers;
 	}
 
 	return 0;
@@ -281,6 +327,9 @@ static int omap_rproc_start(struct rproc *rproc)
 err_timers:
 	while (i--) {
 		omap_dm_timer_stop(timers[i].odt);
+		if (timers[i].is_wdt)
+			free_irq(omap_dm_timer_get_irq(timers[i].odt), rproc);
+
 		omap_dm_timer_free(timers[i].odt);
 		timers[i].odt = NULL;
 	}
@@ -306,6 +355,9 @@ static int omap_rproc_stop(struct rproc *rproc)
 
 	for (i = 0; i < pdata->timers_cnt; i++) {
 		omap_dm_timer_stop(timers[i].odt);
+		if (timers[i].is_wdt)
+			free_irq(omap_dm_timer_get_irq(timers[i].odt), rproc);
+
 		omap_dm_timer_free(timers[i].odt);
 		timers[i].odt = NULL;
 	}

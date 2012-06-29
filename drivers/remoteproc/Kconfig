@@ -49,6 +49,18 @@ config OMAP_REMOTEPROC_DSP
 	  It's safe to say n here if you're not interested in offloading
 	  audio or any other algorithm (by DSP) or just want a bare minimum kernel.
 
+config OMAP_REMOTEPROC_WATCHDOG
+	bool "OMAP remoteproc watchdog timer"
+	depends on OMAP_REMOTEPROC
+	default y
+	help
+	  Say Y here to enable watchdog timer for remote processors.
+
+	  This option controls the watchdog functionality for the remote
+	  processors in OMAP. Dedicated timers are used by the remote
+	  processors and triggers the timer interrupt upon a watchdog
+	  detection.
+
 # Amount of CMA memory to reserve for OMAP's remoteproc sub-system.
 # We need quite much. Fortunately, CMA makes sure this memory isn't
 # wasted in case we're not loading the remote processors.
