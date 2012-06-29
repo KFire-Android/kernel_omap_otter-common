@@ -1360,6 +1360,11 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 	irqstatus_mpu = omap4_prm_read_inst_reg(OMAP4430_PRM_OCP_SOCKET_INST,
 					 OMAP4_PRM_IRQSTATUS_MPU_OFFSET);
 
+	/* Clear the interrupt status before clearing the source events */
+	irqstatus_mpu &= irqenable_mpu;
+	omap4_prm_write_inst_reg(irqstatus_mpu, OMAP4430_PRM_OCP_SOCKET_INST,
+					OMAP4_PRM_IRQSTATUS_MPU_OFFSET);
+
 	/* Check if a IO_ST interrupt */
 	if (irqstatus_mpu & OMAP4430_IO_ST_MASK) {
 		/* Check if HSI caused the IO wakeup */
@@ -1369,11 +1374,6 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 		omap_debug_uart_resume_idle();
 		omap4_trigger_ioctrl();
 	}
-
-	/* Clear the interrupt */
-	irqstatus_mpu &= irqenable_mpu;
-	omap4_prm_write_inst_reg(irqstatus_mpu, OMAP4430_PRM_OCP_SOCKET_INST,
-					OMAP4_PRM_IRQSTATUS_MPU_OFFSET);
 
 	return IRQ_HANDLED;
 }
