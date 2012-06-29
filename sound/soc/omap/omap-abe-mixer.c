@@ -287,7 +287,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 	int reg = e->reg - OMAP_ABE_MUX(0);
 
 	if (mux > OMAP_ABE_ROUTES_UL) {
-		pr_err("inavlid mux %d\n", mux);
+		dev_err(platform->dev, "invalid mux %d\n", mux);
 		return 0;
 	}
 
@@ -306,10 +306,7 @@ static int ul_mux_put_route(struct snd_kcontrol *kcontrol,
 	/* 2nd arg here is unused */
 	omap_aess_set_router_configuration(abe->aess, UPROUTE, 0, (u32 *)abe->mixer.route_ul);
 
-	if (router[mux] != ZERO_labelID)
-		abe->opp.widget[e->reg] = e->shift_l;
-	else
-		abe->opp.widget[e->reg] = 0;
+	abe->opp.widget[e->reg] = mux;
 
 	snd_soc_dapm_mux_update_power(widget, kcontrol, mux, e);
 	omap_abe_pm_runtime_put_sync(abe);
@@ -326,26 +323,10 @@ static int ul_mux_get_route(struct snd_kcontrol *kcontrol,
 	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
 	struct soc_enum *e =
 		(struct soc_enum *)kcontrol->private_value;
-	int reg = e->reg - OMAP_ABE_MUX(0), i, rval = 0;
 
-	/* TODO: remove the gap */
-	if (reg < 8) {
-		/* 0  .. 9   = MM_UL */
-		rval = abe->mixer.route_ul[reg];
-	} else if (reg < 12) {
-		/* 10 .. 11  = MM_UL2 */
-		/* 12 .. 13  = VX_UL */
-		rval = abe->mixer.route_ul[reg + 2];
-	}
+	ucontrol->value.integer.value[0] = abe->opp.widget[e->reg];
 
-	for (i = 0; i < ARRAY_SIZE(router); i++) {
-		if (router[i] == rval) {
-			ucontrol->value.integer.value[0] = i;
-			return 0;
-		}
-	}
-
-	return 1;
+	return 0;
 }
 
 static int abe_put_switch(struct snd_kcontrol *kcontrol,
