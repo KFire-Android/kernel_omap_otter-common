@@ -4799,9 +4799,18 @@ static struct omap_hwmod_ocp_if *omap54xx_sata_masters[] = {
 };
 
 static struct omap_hwmod_addr_space omap54xx_sata_addrs[] = {
+	/* ahci address space should be always the first element
+	 * for the ahci platform driver.
+	 */
 	{
+		.name		= "ahci",
 		.pa_start	= 0x4a140000,
-		.pa_end		= 0x4a141fff,
+		.pa_end		= 0x4a1410ff,
+	},
+	{
+		.name		= "sysc",
+		.pa_start	= 0x4A141100,
+		.pa_end		= 0x4A141104,
 		.flags		= ADDR_TYPE_RT
 	},
 	{ }
@@ -4844,6 +4853,7 @@ static struct omap_hwmod omap54xx_sata_hwmod = {
 	.slaves_cnt	= ARRAY_SIZE(omap54xx_sata_slaves),
 	.masters	= omap54xx_sata_masters,
 	.masters_cnt	= ARRAY_SIZE(omap54xx_sata_masters),
+	.flags		= HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY,
 };
 
 /*
