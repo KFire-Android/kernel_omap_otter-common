@@ -830,45 +830,6 @@ exit:
 	return ret;
 }
 
-static int gc_cache_wrapper(struct bvcachexfer *bvcachexfer)
-{
-	int ret = 0;
-	struct bvcachexfer xfer;
-
-	/* Get IOCTL parameters. */
-	if (copy_from_user(&xfer, bvcachexfer,
-			sizeof(struct bvcachexfer))) {
-		GCERR("failed to read data.\n");
-		goto exit;
-	}
-
-	switch (xfer.dir) {
-
-	case DMA_FROM_DEVICE:
-		c2dm_l2cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
-				xfer.dir);
-		c2dm_l1cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
-				xfer.dir);
-		break;
-	case DMA_TO_DEVICE:
-		c2dm_l1cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
-				xfer.dir);
-		c2dm_l2cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
-				xfer.dir);
-		break;
-	case DMA_BIDIRECTIONAL:
-		c2dm_l1cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
-				xfer.dir);
-		c2dm_l2cache(xfer.count, (struct c2dmrgn *)&xfer.rgn,
-				xfer.dir);
-		break;
-	}
-
-exit:
-	return ret;
-
-}
-
 /*******************************************************************************
  * Device definitions/operations.
  */
@@ -950,26 +911,7 @@ static const struct file_operations dev_operations = {
 /*******************************************************************************
  * Device init/cleanup.
  */
-
-static int mod_init(void);
 static void mod_exit(void);
-
-static struct platform_driver gcx_drv = {
-	.probe = 0,
-	.driver = {
-		.owner = THIS_MODULE,
-		.name = "gcx",
-	},
-};
-
-static const char *gcx_version = VER_FILEVERSION_STR;
-
-static ssize_t show_version(struct device_driver *driver, char *buf)
-{
-	return scnprintf(buf, PAGE_SIZE, "%s\n", gcx_version);
-}
-
-static DRIVER_ATTR(version, 0444, show_version, NULL);
 
 static int mod_init(void)
 {
