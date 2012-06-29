@@ -20,6 +20,7 @@
  * GNU General Public License for more details.
  */
 #include <linux/module.h>
+#include <linux/opp.h>
 
 #include <plat/cpu.h>
 
@@ -162,13 +163,13 @@ static struct device_info mmc2_dev_info = {
 
 static struct device_info iva_dev_info = {
 	.hwmod_name	= "iva",
-	.clk_name	= "dpll_iva_h12x2_ck",
+	.clk_name	= "virt_dpll_iva_ck",
 	.voltdm_name	= "mm",
 };
 
 static struct device_info dsp_dev_info = {
 	.hwmod_name	= "dsp_c0",
-	.clk_name	= "dpll_iva_h11x2_ck",
+	.clk_name	= "virt_dpll_dsp_ck",
 	.voltdm_name	= "mm",
 };
 
@@ -242,11 +243,11 @@ static struct omap_opp_def __initdata omap54xx_opp_def_list[] = {
 	/* IVA OPP3 - OPP-OD */
 	OPP_INITIALIZER(&iva_dev_info, false, 532000000, OMAP5430_VDD_MM_OPP_OD),
 
-	/* DSP OPP1 - OPP50 */
+	/* DSP OPP1 - OPPLOW */
 	OPP_INITIALIZER(&dsp_dev_info, true, 233000000, OMAP5430_VDD_MM_OPP_LOW),
-	/* DSP OPP2 - OPP100 */
+	/* DSP OPP2 - OPPNOM */
 	OPP_INITIALIZER(&dsp_dev_info, true, 466000000, OMAP5430_VDD_MM_OPP_NOM),
-	/* DSP OPP3 - OPPTB */
+	/* DSP OPP3 - OPP-OD */
 	OPP_INITIALIZER(&dsp_dev_info, false, 532000000, OMAP5430_VDD_MM_OPP_OD),
 
 	/* SGX OPP1 - OPPLOW */

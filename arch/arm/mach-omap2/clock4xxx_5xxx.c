@@ -15,6 +15,7 @@
  * GNU General Public License for more details.
  */
 #include <linux/clk.h>
+#include <linux/err.h>
 
 #include <plat/hardware.h>
 #include <plat/clkdev_omap.h>
@@ -26,6 +27,69 @@
 #define OMAP4_L3_OPP50_RATE 100000000
 #define OMAP5_L3_OPP50_RATE 133000000
 
+#define CLK_SCALE_DOWN					0
+#define CLK_SCALE_NONE					1
+#define CLK_SCALE_UP					2
+#define DPLL_RELOCK_NOTNEED				0
+#define DPLL_RELOCK_NEEDED				1
+#define NO_OF_MM_OPPS 3
+#define MM_OPP_LOW_INDEX 0
+#define MM_OPP_NOM_INDEX 1
+#define MM_OPP_OD_INDEX 2
+
+/* OMAP4 IVA/DSP Clock rates */
+#define DPLL_IVA_M4_OPP50_RATE		232800000
+#define DPLL_IVA_M4_OPP100_RATE		465500000
+#define DPLL_IVA_M4_OPPTURBO_RATE	496000000
+#define DPLL_IVA_M4_OPPNITRO_RATE	430000000
+#define DPLL_IVA_M4_OPPNITROSB_RATE	500000000
+
+#define DPLL_IVA_M5_OPP50_RATE		133100000
+#define DPLL_IVA_M5_OPP100_RATE		266000000
+#define DPLL_IVA_M5_OPPTURBO_RATE	331000000
+#define DPLL_IVA_M5_OPPNITRO_RATE	430000000
+#define DPLL_IVA_M5_OPPNITROSB_RATE	500000000
+
+#define DPLL_IVA_OPP50_RATE			1862400000
+#define DPLL_IVA_OPP100_RATE		1862400000
+#define DPLL_IVA_OPPTURBO_RATE		992000000
+#define DPLL_IVA_OPPNITRO_RATE		1290000000
+#define DPLL_IVA_OPPNITROSB_RATE	1500000000
+
+/* OMAP5 IVA/DSP Clock rates */
+#define DPLL_IVA_H11_OPPLOW_RATE	233000000
+#define DPLL_IVA_H11_OPPNOM_RATE	466000000
+#define DPLL_IVA_H11_OPPOD_RATE		532000000
+#define DPLL_IVA_H12_OPPLOW_RATE	194167741
+#define DPLL_IVA_H12_OPPNOM_RATE	388335483
+#define DPLL_IVA_H12_OPPOD_RATE		582503225
+#define DPLL_IVA_OPPNOM_RATE		2329600000LL
+#define DPLL_IVA_OPPOD_RATE			1064000000
+
+struct virt_iva_ck_deps {
+	unsigned long iva_ck_rate;
+	unsigned long dsp_ck_rate;
+	unsigned long iva_dpll_rate;
+};
+
+static struct virt_iva_ck_deps omap5_virt_iva_clk_deps[] = {
+	{ /* OPP LOW */
+		.iva_ck_rate = DPLL_IVA_H12_OPPLOW_RATE,
+		.dsp_ck_rate = DPLL_IVA_H11_OPPLOW_RATE,
+		.iva_dpll_rate = DPLL_IVA_OPPNOM_RATE,
+	},
+	{ /* OPP NOM */
+		.iva_ck_rate = DPLL_IVA_H12_OPPNOM_RATE,
+		.dsp_ck_rate = DPLL_IVA_H11_OPPNOM_RATE,
+		.iva_dpll_rate = DPLL_IVA_OPPNOM_RATE,
+	},
+	{ /* OPP OD */
+		.iva_ck_rate = DPLL_IVA_H12_OPPOD_RATE,
+		.dsp_ck_rate = DPLL_IVA_H11_OPPOD_RATE,
+		.iva_dpll_rate = DPLL_IVA_OPPOD_RATE,
+	},
+};
+
 struct virt_l3_clk_data {
 	unsigned long opp50_rate;
 	unsigned long opp100_rate;
@@ -36,7 +100,7 @@ struct virt_l3_clk_data {
 static struct virt_l3_clk_data *omap_virt_l3_clk_data;
 static struct clk *main_l3_clk;
 static unsigned long l3_opp50_rate;
-
+static struct clk *iva_ck, *dsp_ck, *dpll_iva_ck;
 
 static struct virt_l3_clk_data omap4_virt_l3_clk_data[] = {
 	{	.opp50_rate = 200000000,
@@ -175,6 +239,146 @@ int omap_virt_l3_set_rate(struct clk *clk, unsigned long rate)
 }
 
 /**
+ * omap_virt_iva_round_rate() - Virtual iva clk round rate
+ * @clk:	clk pointer
+ * @rate:	frequency to round up to
+ */
+long omap_virt_iva_round_rate(struct clk *clk, unsigned long rate)
+{
+	struct virt_iva_ck_deps *iva_deps = NULL;
+	long last_diff = LONG_MAX;
+	int i;
+
+	if (!clk)
+		return 0;
+
+	for (i = 0; i < ARRAY_SIZE(omap5_virt_iva_clk_deps); i++) {
+		long diff;
+		iva_deps = &omap5_virt_iva_clk_deps[i];
+		diff = abs(rate - iva_deps->iva_ck_rate);
+		if (diff >= last_diff) {
+			iva_deps = &omap5_virt_iva_clk_deps[i-1];
+			break;
+		}
+		last_diff = diff;
+	}
+
+	if (!iva_deps)
+		return 0;
+
+	return iva_deps->iva_ck_rate;
+}
+
+/**
+ * omap_virt_iva_set_rate() -  set rate for virtual IVA clk
+ * @clk:	clk pointer
+ * @rate:	frequency to set
+ */
+int omap_virt_iva_set_rate(struct clk *clk, unsigned long rate)
+{
+	struct virt_iva_ck_deps *iva_deps = NULL;
+	long next_iva_dpll_rate;
+	int i, ret = 0;
+
+	if (!clk)
+		return -EINVAL;
+
+	for (i = 0; i < ARRAY_SIZE(omap5_virt_iva_clk_deps); i++)
+		if (rate == omap5_virt_iva_clk_deps[i].iva_ck_rate)
+			break;
+
+	if (i < ARRAY_SIZE(omap5_virt_iva_clk_deps))
+		iva_deps = &omap5_virt_iva_clk_deps[i];
+	else
+		return -EINVAL;
+
+	next_iva_dpll_rate = dpll_iva_ck->round_rate(dpll_iva_ck,
+			iva_deps->iva_dpll_rate / 2);
+
+	if (next_iva_dpll_rate == dpll_iva_ck->rate)
+		goto set_clock_rates;
+	else if (next_iva_dpll_rate < dpll_iva_ck->rate)
+		goto set_dpll_rate;
+
+	if (iva_deps->iva_ck_rate < iva_ck->rate) {
+		ret = omap_clksel_set_rate(iva_ck, iva_deps->iva_ck_rate);
+		if (ret)
+			goto out;
+	}
+
+	if (iva_deps->dsp_ck_rate < dsp_ck->rate) {
+		ret = omap_clksel_set_rate(dsp_ck, iva_deps->dsp_ck_rate);
+		if (ret)
+			goto out;
+	}
+
+set_dpll_rate:
+	ret = dpll_iva_ck->set_rate(dpll_iva_ck, next_iva_dpll_rate);
+	if (ret)
+		goto out;
+
+	propagate_rate(dpll_iva_ck);
+
+set_clock_rates:
+	ret = omap_clksel_set_rate(iva_ck, iva_deps->iva_ck_rate);
+	if (ret)
+		goto out;
+
+	ret = omap_clksel_set_rate(dsp_ck, iva_deps->dsp_ck_rate);
+	if (ret)
+		goto out;
+
+	clk->rate = iva_deps->iva_ck_rate;
+	return 0;
+
+out:
+	return ret;
+}
+
+/**
+ * omap_virt_dsp_round_rate() - DSP virtual clk round rate function
+ * @clk:	clk pointer
+ * @rate:	frequency to round up
+ */
+long omap_virt_dsp_round_rate(struct clk *clk, unsigned long rate)
+{
+	/*
+	 * DUMMY Function:
+	 * In the current code, DSP clocks are configured as part of IVA Clock
+	 * handling. Hence DSP_set and round rate are dummy. When you enable
+	 * DSP and try to set DSP rate (using omap_device_scale), it would
+	 * still work since DSP OPP Change will trigger IVA OPP change and
+	 * as part of IVA OPP change, DSP clocks are handled. As DSP and IVA
+	 * clocks are sourced via the same DPLL (with different dividers),
+	 * these 2 clocks are tightly coupled and hence it is implemented
+	 * this way.
+	 */
+	return rate;
+}
+
+/**
+ * omap_virt_dsp_set_rate() - DSP virtual clk set rate function
+ * @clk:	clk pointer
+ * @rate:	frequency to set
+ */
+int omap_virt_dsp_set_rate(struct clk *clk, unsigned long rate)
+{
+	/*
+	 * DUMMY Function:
+	 * In the current code, DSP clocks are configured as part of IVA Clock
+	 * handling. Hence DSP_set and round rate are dummy. When you enable
+	 * DSP and try to set DSP rate (using omap_device_scale), it would
+	 * still work since DSP OPP Change will trigger IVA OPP change and
+	 * as part of IVA OPP change, DSP clocks are handled. As DSP and IVA
+	 * clocks are sourced via the same DPLL (with different dividers),
+	 * these 2 clocks are tightly coupled and hence it is implemented
+	 * this way.
+	 */
+	clk->rate = rate;
+	return 0;
+}
+
+/**
  * omap4xxx_custom_clk_init() - clock initialization for OMAP4
  */
 int omap4xxx_custom_clk_init(void)
@@ -244,6 +448,24 @@ int omap5xxx_custom_clk_init(void)
 			       __func__, clk_name);
 			return -EINVAL;
 		}
+	}
+
+	iva_ck = clk_get(NULL, "dpll_iva_h12x2_ck");
+	if (IS_ERR(iva_ck)) {
+		pr_warning("%s:dpll_iva_h12x2_ck clk_get failed.\n", __func__);
+		return -EINVAL;
+	};
+
+	dsp_ck = clk_get(NULL, "dpll_iva_h11x2_ck");
+	if (IS_ERR(dsp_ck)) {
+		pr_warning("%s:dpll_iva_h11x2_ck clk_get failed.\n", __func__);
+		return -EINVAL;
+	}
+
+	dpll_iva_ck = clk_get(NULL, "dpll_iva_ck");
+	if (IS_ERR(dpll_iva_ck)) {
+		pr_warning("%s:dpll_iva_ck clk_get failed.\n", __func__);
+		return -EINVAL;
 	}
 
 	return 0;

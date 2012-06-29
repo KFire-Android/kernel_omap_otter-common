@@ -716,6 +716,24 @@ static struct clk dpll_iva_h12x2_ck = {
 	.set_rate	= &omap2_clksel_set_rate,
 };
 
+static struct clk virt_dpll_iva_ck = {
+	.name		= "virt_dpll_iva_ck",
+	.parent		= &dpll_iva_h12x2_ck,
+	.ops		= &clkops_null,
+	.set_rate	= &omap_virt_iva_set_rate,
+	.round_rate	= &omap_virt_iva_round_rate,
+	.rate		= 388335483,
+};
+
+static struct clk virt_dpll_dsp_ck = {
+	.name		= "virt_dpll_dsp_ck",
+	.parent		= &dpll_iva_h11x2_ck,
+	.ops		= &clkops_null,
+	.set_rate	= &omap_virt_dsp_set_rate,
+	.round_rate	= &omap_virt_dsp_round_rate,
+	.rate		= 388335483,
+};
+
 /* DPLL_MPU */
 static struct dpll_data dpll_mpu_dd = {
 	.mult_div1_reg	= OMAP54XX_CM_CLKSEL_DPLL_MPU,
@@ -2570,6 +2588,8 @@ static struct omap_clk omap54xx_clks[] = {
 	CLK(NULL,	"dpll_core_x2_ck",		&dpll_core_x2_ck,	CK_54XX),
 	CLK(NULL,	"dpll_core_h12x2_ck",		&dpll_core_h12x2_ck,	CK_54XX),
 	CLK(NULL,	"virt_l3_ck",			&virt_l3_ck,		CK_54XX),
+	CLK(NULL,	"virt_dpll_iva_ck",		&virt_dpll_iva_ck,	CK_54XX),
+	CLK(NULL,	"virt_dpll_dsp_ck",		&virt_dpll_dsp_ck,	CK_54XX),
 	CLK(NULL,	"div_iva_hs_clk",		&div_iva_hs_clk,	CK_54XX),
 	CLK(NULL,	"div_mpu_hs_clk",		&div_mpu_hs_clk,	CK_54XX),
 	CLK(NULL,	"dpll_abe_m2_ck",		&dpll_abe_m2_ck,	CK_54XX),
