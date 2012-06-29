@@ -30,6 +30,7 @@ static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
 	pdata.nr_tlb_entries = a->nr_tlb_entries;
 	pdata.da_start = a->da_start;
 	pdata.da_end = a->da_end;
+	pdata.has_bus_err_back = a->has_bus_err_back;
 
 	pdev = omap_device_build("omap-iommu", i, oh, &pdata, sizeof(pdata),
 				NULL, 0, 0);
