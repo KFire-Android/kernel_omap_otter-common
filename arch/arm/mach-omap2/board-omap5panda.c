@@ -581,7 +581,6 @@ static struct twl6040_platform_data twl6040_data = {
 	.codec		= &twl6040_codec,
 	.vibra		= &twl6040_vibra,
 	.audpwron_gpio	= 145,
-	.irq_base	= TWL6040_CODEC_IRQ_BASE,
 };
 
 static struct platform_device omap5evm_dmic_codec = {
