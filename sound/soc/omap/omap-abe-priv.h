@@ -84,6 +84,7 @@ enum omap_abe_virtual_mix {
 /* Virtual register ids storing enabled mixer inputs */
 enum omap_abe_mix {
 	OMAP_ABE_VIRTUAL_SWITCH = 0,
+	OMAP_ABE_MIX,
 	OMAP_ABE_MIX_LAST,
 };
 
@@ -163,6 +164,7 @@ enum omap_abe_widget {
 
 #define OMAP_ABE_NUM_MONO_MIXERS	(MIX_AUDUL_MONO - MIX_DL1_MONO + 1)
 #define OMAP_ABE_MIXER(x)		(x)
+#define OMAP_ABE_MIX_SHIFT(x)		(x - OMAP_AESS_MIXDL1_MM_DL)
 #define OMAP_ABE_MUX(x)			(x + OMAP_ABE_MIX_LAST)
 #define OMAP_ABE_WIDGET(x)		(x + OMAP_ABE_MUX_LAST)
 #define OMAP_ABE_NUM_WIDGETS		(OMAP_ABE_WIDGET_LAST - \
