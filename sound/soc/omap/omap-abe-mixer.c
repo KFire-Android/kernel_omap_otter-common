@@ -347,7 +347,6 @@ static int ul_mux_get_route(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
-
 static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
@@ -361,10 +360,10 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	omap_abe_pm_runtime_get_sync(abe);
 
 	if (ucontrol->value.integer.value[0]) {
-		abe->opp.widget[mc->reg] |= ucontrol->value.integer.value[0]<<mc->shift;
+		abe->opp.widget[mc->reg] |= BIT(mc->shift);
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 1);
 	} else {
-		abe->opp.widget[mc->reg] &= ~(0x1<<mc->shift);
+		abe->opp.widget[mc->reg] &= ~BIT(mc->shift);
 		snd_soc_dapm_mixer_update_power(widget, kcontrol, 0);
 	}
 	omap_abe_pm_runtime_put_sync(abe);
@@ -372,6 +371,21 @@ static int abe_put_switch(struct snd_kcontrol *kcontrol,
 	return 1;
 }
 
+static int abe_get_switch(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dapm_widget_list *wlist = snd_kcontrol_chip(kcontrol);
+	struct snd_soc_dapm_widget *widget = wlist->widgets[0];
+	struct soc_mixer_control *mc =
+		(struct soc_mixer_control *)kcontrol->private_value;
+	struct snd_soc_platform *platform = widget->platform;
+	struct omap_abe *abe = snd_soc_platform_get_drvdata(platform);
+
+	ucontrol->value.integer.value[0] =
+		!!(abe->opp.widget[mc->reg] & BIT(mc->shift));
+
+	return 0;
+}
 
 static int volume_put_mixer(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
@@ -680,18 +694,21 @@ static const struct snd_kcontrol_new echo_mixer_controls[] = {
 
 /* Virtual PDM_DL Switch */
 static const struct snd_kcontrol_new pdm_dl1_switch_controls =
-	SOC_SINGLE_EXT("Switch", OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_PDM_DL, 1, 0,
-			abe_get_mixer, abe_put_switch);
+	SOC_SINGLE_EXT("Switch",
+		OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_PDM_DL, 1, 0,
+		abe_get_switch, abe_put_switch);
 
 /* Virtual BT_VX_DL Switch */
 static const struct snd_kcontrol_new bt_vx_dl_switch_controls =
-	SOC_SINGLE_EXT("Switch", OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_BT_VX_DL, 1, 0,
-			abe_get_mixer, abe_put_switch);
+	SOC_SINGLE_EXT("Switch",
+		OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_BT_VX_DL, 1, 0,
+		abe_get_switch, abe_put_switch);
 
 /* Virtual MM_EXT_DL Switch */
 static const struct snd_kcontrol_new mm_ext_dl_switch_controls =
-	SOC_SINGLE_EXT("Switch", OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_MM_EXT_DL, 1, 0,
-			abe_get_mixer, abe_put_switch);
+	SOC_SINGLE_EXT("Switch",
+		OMAP_ABE_VIRTUAL_SWITCH, MIX_SWITCH_MM_EXT_DL, 1, 0,
+		abe_get_switch, abe_put_switch);
 
 static const struct snd_kcontrol_new abe_controls[] = {
 	/* DL1 mixer gains */
