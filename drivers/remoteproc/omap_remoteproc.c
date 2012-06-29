@@ -249,15 +249,15 @@ static int omap_rproc_start(struct rproc *rproc)
 	}
 
 	/*
-	 * Ping the remote processor. this is only for sanity-sake;
+	 * ping the remote processor. this is only for sanity-sake;
 	 * there is no functional effect whatsoever.
 	 *
-	 * Note that the reply will _not_ arrive immediately: this message
+	 * note that the reply will _not_ arrive immediately: this message
 	 * will wait in the mailbox fifo until the remote processor is booted.
 	 */
 	ret = omap_mbox_msg_send(oproc->mbox, RP_MBOX_ECHO_REQUEST);
 	if (ret) {
-		dev_err(dev, "omap_mbox_get failed: %d\n", ret);
+		dev_err(dev, "omap_mbox_msg_send failed: %d\n", ret);
 		goto put_mbox;
 	}
 
@@ -265,7 +265,8 @@ static int omap_rproc_start(struct rproc *rproc)
 		timers[i].odt = omap_dm_timer_request_specific(timers[i].id);
 		if (!timers[i].odt) {
 			ret = -EBUSY;
-			dev_err(dev, "omap_dm_timer_request failed: %d\n", ret);
+			dev_err(dev, "request for timer %d failed: %d\n",
+							timers[i].id, ret);
 			goto err_timers;
 		}
 		omap_dm_timer_set_source(timers[i].odt, OMAP_TIMER_SRC_SYS_CLK);
@@ -275,7 +276,7 @@ static int omap_rproc_start(struct rproc *rproc)
 	ret = pdata->device_enable(pdev);
 	if (ret) {
 		dev_err(dev, "omap_device_enable failed: %d\n", ret);
-		goto put_mbox;
+		goto err_timers;
 	}
 
 	return 0;
