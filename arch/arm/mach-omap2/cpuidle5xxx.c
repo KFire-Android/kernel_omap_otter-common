@@ -189,6 +189,7 @@ static inline void _fill_cstate(struct cpuidle_driver *drv,
 
 	state->exit_latency	= cpuidle_params_table[idx].exit_latency;
 	state->target_residency	= cpuidle_params_table[idx].target_residency;
+	state->disable	= !cpuidle_params_table[idx].valid;
 	state->flags            = (CPUIDLE_FLAG_TIME_VALID | flags);
 	if (state->flags & CPUIDLE_FLAG_COUPLED)
 		state->enter		= omap5_enter_couple_idle;
