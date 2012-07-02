@@ -108,7 +108,7 @@ struct omap_vdd_dep_info omap54xx_vddmm_dep_info[] = {
 
 static struct device_info mpu_dev_info = {
 	.hwmod_name	= "mpu",
-	.clk_name	= "dpll_mpu_ck",
+	.clk_name	= "virt_dpll_mpu_ck",
 	.voltdm_name	= "mpu",
 };
 

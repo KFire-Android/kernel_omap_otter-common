@@ -136,6 +136,10 @@ int omap4460_mpu_dpll_set_rate(struct clk *clk, unsigned long rate);
 long omap4460_mpu_dpll_round_rate(struct clk *clk, unsigned long rate);
 unsigned long omap4460_mpu_dpll_recalc(struct clk *clk);
 
+int omap5_mpu_dpll_set_rate(struct clk *clk, unsigned long rate);
+long omap5_mpu_dpll_round_rate(struct clk *clk, unsigned long rate);
+unsigned long omap5_mpu_dpll_recalc(struct clk *clk);
+
 extern u16 cpu_mask;
 
 extern const struct clkops clkops_omap2_dflt_wait;
